@@ -286,37 +286,34 @@ javaCase r e x [(DataAlt d,bs,rhs)] | length bs > 0
 		      ]
    
 javaCase r e x alts
-  | isIfThenElse && isPrimCmp = 
-       javaIfThenElse r (fromJust maybePrim) tExpr fExpr
-  | otherwise =
-       java_expr PushExpr e ++
+  | isIfThenElse && isPrimCmp
+  = javaIfThenElse r (fromJust maybePrim) tExpr fExpr
+  | otherwise
+  = java_expr PushExpr e ++
        [ var [Final] (javaName x)
 		           (whnf primRep (vmPOP (primRepToType primRep)))
-       , mkIfThenElse (map mk_alt alts) 
+       , IfThenElse (map mk_alt con_alts) (Just default_code)
        ]
   where
-     isIfThenElse = CoreUtils.exprType e == boolTy
+     isIfThenElse = CoreUtils.exprType e `Type.eqType` boolTy
 		    -- also need to check that x is not free in
 		    -- any of the branches.
      maybePrim    = findCmpPrim e []
      isPrimCmp    = isJust maybePrim
-     tExpr        = matches trueDataCon alts
-     fExpr        = matches falseDataCon alts
-
-     matches con [] = error "no match for true or false branch of if/then/else"
-     matches con ((DataAlt d,[],rhs):rest) | con == d = rhs
-     matches con ((DEFAULT,[],rhs):_)                 = rhs
-     matches con (other:rest)                         = matches con rest
+     (_,_,tExpr)  = CoreUtils.findAlt (DataAlt trueDataCon) alts 
+     (_,_,fExpr)  = CoreUtils.findAlt (DataAlt falseDataCon) alts 
 
      primRep = idPrimRep x
      whnf PtrRep = vmWHNF	-- needs evaluation
      whnf _      = id
 
-     mk_alt (DEFAULT, [], rhs)   = (true, 	    Block (javaExpr r rhs))
-     mk_alt (DataAlt d, bs, rhs) = (instanceOf x d, Block (bind_args d bs ++ javaExpr r rhs))
-     mk_alt alt@(LitAlt lit, [], rhs) 
-				 = (eqLit lit     , Block (javaExpr r rhs))
-     mk_alt alt@(LitAlt _, _, _) = pprPanic "mk_alt" (ppr alt)
+     (con_alts, maybe_default) = CoreUtils.findDefault alts
+     default_code = case maybe_default of
+			Nothing  -> ExprStatement (Raise excName [Literal (StringLit "case failure")])
+			Just rhs -> Block (javaExpr r rhs)
+
+     mk_alt (DataAlt d,  bs, rhs) = (instanceOf x d, Block (bind_args d bs ++ javaExpr r rhs))
+     mk_alt (LitAlt lit, bs, rhs) = (eqLit lit     , Block (javaExpr r rhs))
 
 
      eqLit (MachInt n) = Op (Literal (IntLit n))
@@ -335,14 +332,6 @@ javaCase r e x alts
 		      | (b,f) <- filter isId bs `zip` (constrToFields d)
 		      , not (isDeadBinder b)
 		      ]
-
-
-mkIfThenElse [(Var (Name "true" _),code)] = code
-mkIfThenElse other = IfThenElse other 
-		(Just (ExprStatement 
-			(Raise excName [Literal (StringLit "case failure")])
-		       )
-                )
 
 javaIfThenElse r cmp tExpr fExpr 
 {-

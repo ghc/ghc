@@ -25,12 +25,12 @@ module DataCon (
 import {-# SOURCE #-} Subst( substTy, mkTyVarSubst )
 
 import CmdLineOpts	( opt_DictsStrict )
-import Type		( Type, TauType, ThetaType,
+import Type		( Type, TauType, ThetaType, 
 			  mkForAllTys, mkFunTys, mkTyConApp,
-			  mkTyVarTys, mkPredTys, getClassPredTys_maybe,
-			  splitTyConApp_maybe, repType
+			  mkTyVarTys, splitTyConApp_maybe, repType
 			)
-import TyCon		( TyCon, tyConDataCons, tyConDataConsIfAvailable, isDataTyCon, isProductTyCon,
+import TcType		( isStrictPred, mkPredTys )
+import TyCon		( TyCon, tyConDataCons, tyConDataConsIfAvailable, isProductTyCon,
 			  isTupleTyCon, isUnboxedTupleTyCon, isRecursiveTyCon )
 import Class		( Class, classTyCon )
 import Name		( Name, NamedThing(..), nameUnique )
@@ -254,11 +254,8 @@ mkDataCon name arg_stricts fields
 
     result_ty = mkTyConApp tycon (mkTyVarTys tyvars)
 
-mk_dict_strict_mark pred
-  | opt_DictsStrict,	-- Don't mark newtype things as strict!
-    Just (clas,_) <- getClassPredTys_maybe pred,
-    isDataTyCon (classTyCon clas) = MarkedStrict
-  | otherwise			  = NotMarkedStrict
+mk_dict_strict_mark pred | isStrictPred pred = MarkedStrict
+			 | otherwise	     = NotMarkedStrict
 \end{code}
 
 \begin{code}

@@ -32,7 +32,7 @@ import TysWiredIn	( trueDataConId, falseDataConId )
 import TyCon		( tyConDataConsIfAvailable, isEnumerationTyCon, isNewTyCon )
 import DataCon		( dataConTag, dataConTyCon, dataConId, fIRST_TAG )
 import CoreUtils	( exprIsValue, cheapEqExpr, exprIsConApp_maybe )
-import Type		( tyConAppTyCon )
+import Type		( tyConAppTyCon, eqType )
 import OccName		( occNameUserString)
 import PrelNames	( unpackCStringFoldrName, unpackCStringFoldrIdKey, hasKey )
 import Name		( Name )
@@ -284,8 +284,8 @@ litEq is_eq name other		 = Nothing
 
 do_lit_eq is_eq name lit expr
   = Just (name, Case expr (mkWildId (literalType lit))
-		     [(LitAlt lit, [], val_if_eq),
-		      (DEFAULT,    [], val_if_neq)])
+		     [(DEFAULT,    [], val_if_neq),
+		      (LitAlt lit, [], val_if_eq)])
   where
     val_if_eq  | is_eq     = trueVal
 	       | otherwise = falseVal
@@ -476,7 +476,7 @@ match_append_lit_str [Type ty1,
 		     ]
   | unpk `hasKey` unpackCStringFoldrIdKey && 
     c1 `cheapEqExpr` c2
-  = ASSERT( ty1 == ty2 )
+  = ASSERT( ty1 `eqType` ty2 )
     Just (SLIT("AppendLitString"),
 	  Var unpk `App` Type ty1
 		   `App` Lit (MachStr (s1 _APPEND_ s2))

@@ -12,9 +12,9 @@ import CmdLineOpts	( DynFlags, DynFlag(..) )
 import Id		( Id, idName, idType, mkUserLocal,
 			  idSpecialisation, modifyIdInfo
 			)
-import Type		( Type, mkTyVarTy, splitSigmaTy, 
+import TcType		( Type, mkTyVarTy, tcSplitSigmaTy, 
 			  tyVarsOfTypes, tyVarsOfTheta, 
-			  mkForAllTys 
+			  mkForAllTys, tcCmpType
 			)
 import Subst		( Subst, mkSubst, substTy, mkSubst, extendSubstList, mkInScopeSet,
 			  simplBndr, simplBndrs, 
@@ -42,7 +42,7 @@ import Maybes		( catMaybes, maybeToBool )
 import ErrUtils		( dumpIfSet_dyn )
 import Bag
 import List		( partition )
-import Util		( zipEqual, zipWithEqual )
+import Util		( zipEqual, zipWithEqual, cmpList )
 import Outputable
 
 
@@ -818,7 +818,7 @@ specDefn subst calls (fn, rhs)
 	-- But it might be alive for some other reason by now.
 
     fn_type	       = idType fn
-    (tyvars, theta, _) = splitSigmaTy fn_type
+    (tyvars, theta, _) = tcSplitSigmaTy fn_type
     n_tyvars	       = length tyvars
     n_dicts	       = length theta
 
@@ -834,11 +834,11 @@ specDefn subst calls (fn, rhs)
 
     ----------------------------------------------------------
 	-- Specialise to one particular call pattern
-    spec_call :: ([Maybe Type], ([DictExpr], VarSet))	-- Call instance
+    spec_call :: (CallKey, ([DictExpr], VarSet))	-- Call instance
               -> SpecM ((Id,CoreExpr),			-- Specialised definition
 	                UsageDetails, 			-- Usage details from specialised body
                 	CoreRule)			-- Info for the Id's SpecEnv
-    spec_call (call_ts, (call_ds, call_fvs))
+    spec_call (CallKey call_ts, (call_ds, call_fvs))
       = ASSERT( length call_ts == n_tyvars && length call_ds == n_dicts )
 		-- Calls are only recorded for properly-saturated applications
 	
@@ -924,12 +924,13 @@ type DictExpr = CoreExpr
 emptyUDs = MkUD { dict_binds = emptyBag, calls = emptyFM }
 
 type ProtoUsageDetails = ([DictBind],
-			  [(Id, [Maybe Type], ([DictExpr], VarSet))]
+			  [(Id, CallKey, ([DictExpr], VarSet))]
 			 )
 
 ------------------------------------------------------------			
 type CallDetails  = FiniteMap Id CallInfo
-type CallInfo     = FiniteMap [Maybe Type]			-- Nothing => unconstrained type argument
+newtype CallKey   = CallKey [Maybe Type]			-- Nothing => unconstrained type argument
+type CallInfo     = FiniteMap CallKey
 		              ([DictExpr], VarSet)		-- Dict args and the vars of the whole
 								-- call (including tyvars)
 								-- [*not* include the main id itself, of course]
@@ -937,12 +938,25 @@ type CallInfo     = FiniteMap [Maybe Type]			-- Nothing => unconstrained type ar
 	-- The list of types and dictionaries is guaranteed to
 	-- match the type of f
 
+-- Type isn't an instance of Ord, so that we can control which
+-- instance we use.  That's tiresome here.  Oh well
+instance Eq CallKey where
+  k1 == k2 = case k1 `compare` k2 of { EQ -> True; other -> False }
+
+instance Ord CallKey where
+  compare (CallKey k1) (CallKey k2) = cmpList cmp k1 k2
+		where
+		  cmp Nothing Nothing     = EQ
+		  cmp Nothing (Just t2)   = LT
+		  cmp (Just t1) Nothing   = GT
+		  cmp (Just t1) (Just t2) = tcCmpType t1 t2
+
 unionCalls :: CallDetails -> CallDetails -> CallDetails
 unionCalls c1 c2 = plusFM_C plusFM c1 c2
 
 singleCall :: Id -> [Maybe Type] -> [DictExpr] -> CallDetails
 singleCall id tys dicts 
-  = unitFM id (unitFM tys (dicts, call_fvs))
+  = unitFM id (unitFM (CallKey tys) (dicts, call_fvs))
   where
     call_fvs = exprsFreeVars dicts `unionVarSet` tys_fvs
     tys_fvs  = tyVarsOfTypes (catMaybes tys)
@@ -964,7 +978,7 @@ listToCallDetails calls
 
 callDetailsToList calls = [ (id,tys,dicts)
 			  | (id,fm) <- fmToList calls,
-		            (tys,dicts) <- fmToList fm
+		            (tys, dicts) <- fmToList fm
 			  ]
 
 mkCallUDs subst f args 
@@ -983,7 +997,7 @@ mkCallUDs subst f args
 	  calls      = singleCall f spec_tys dicts
     }
   where
-    (tyvars, theta, _) = splitSigmaTy (idType f)
+    (tyvars, theta, _) = tcSplitSigmaTy (idType f)
     constrained_tyvars = tyVarsOfTheta theta 
     n_tyvars	       = length tyvars
     n_dicts	       = length theta

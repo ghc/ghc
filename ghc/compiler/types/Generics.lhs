@@ -10,9 +10,9 @@ import HsSyn		( HsExpr(..), InPat(..), mkSimpleMatch )
 import Type             ( Type, isUnLiftedType, applyTys, tyVarsOfType, tyVarsOfTypes,
 			  mkTyVarTys, mkForAllTys, mkTyConApp, 
 			  mkFunTy, isTyVarTy, getTyVar_maybe,
-			  splitSigmaTy, splitTyConApp_maybe, funTyCon
+			  funTyCon
 			)
-
+import TcType		( tcSplitTyConApp_maybe, tcSplitSigmaTy, tcSplitSigmaTy )
 import DataCon          ( DataCon, dataConOrigArgTys, dataConWrapId, dataConId, isExistentialDataCon )
 
 import TyCon            ( TyCon, tyConTyVars, tyConDataConsIfAvailable, 
@@ -187,7 +187,7 @@ validGenericInstanceType :: Type -> Bool
   --	f {| a + Int |}
 
 validGenericInstanceType inst_ty
-  = case splitTyConApp_maybe inst_ty of
+  = case tcSplitTyConApp_maybe inst_ty of
 	Just (tycon, tys) ->  all isTyVarTy tys && tycon `elem` genericTyCons
 	Nothing		  ->  False
 
@@ -202,12 +202,12 @@ validGenericMethodType :: Type -> Bool
 validGenericMethodType ty 
   = valid tau
   where
-    (local_tvs, _, tau) = splitSigmaTy ty
+    (local_tvs, _, tau) = tcSplitSigmaTy ty
 
     valid ty
       | isTyVarTy ty    = True
       | no_tyvars_in_ty	= True
-      | otherwise	= case splitTyConApp_maybe ty of
+      | otherwise	= case tcSplitTyConApp_maybe ty of
 				Just (tc,tys) -> valid_tycon tc && all valid tys
 				Nothing	      -> False
       where
@@ -266,7 +266,7 @@ mkTyConGenInfo tycon [from_name, to_name]
 
     (from_fn, to_fn, rep_ty) 
 	| isNewTyCon tycon
-	= ( mkLams tyvars $ Lam x  $ Note (Coerce newrep_ty tycon_ty) (Var x),
+	= ( mkLams tyvars $ Lam x  $ Var x,
 	    Var (dataConWrapId the_datacon),
 	    newrep_ty )
 
@@ -281,7 +281,7 @@ mkTyConGenInfo tycon [from_name, to_name]
 	    ----------------------
 	    -- 	Newtypes only
     [the_datacon]  = datacons
-    newrep_ty = applyTys (expectJust "mkGenTyConInfo" (newTyConRep tycon)) tyvar_tys
+    (_, newrep_ty) = newTyConRep tycon
        
 	    ----------------------
 	    -- 	Non-newtypes only
@@ -463,11 +463,11 @@ mkGenericRhs sel_id tyvar tycon
 
         -- Takes out the ForAll and the Class restrictions 
         -- in front of the type of the method.
-	(_,_,op_ty) = splitSigmaTy (idType sel_id)
+	(_,_,op_ty) = tcSplitSigmaTy (idType sel_id)
 
         -- Do it again!  This deals with the case where the method type 
 	-- is polymorphic -- see notes above
-	(local_tvs,_,final_ty) = splitSigmaTy op_ty
+	(local_tvs,_,final_ty) = tcSplitSigmaTy op_ty
 
 	-- Now we probably have a tycon in front
         -- of us, quite probably a FunTyCon.
@@ -488,7 +488,7 @@ generate_bimap env@(tv,ep,local_tvs) ty
 	Just tv1 |  tv == tv1 -> ep				-- The class tyvar
 		 |  otherwise -> ASSERT( tv1 `elem` local_tvs)	-- One of the polymorphic tyvars of the method
 				 idEP	
-	Nothing	 -> bimapApp env (splitTyConApp_maybe ty)
+	Nothing	 -> bimapApp env (tcSplitTyConApp_maybe ty)
 
 -------------------
 bimapApp :: EPEnv -> Maybe (TyCon, [Type]) -> EP RenamedHsExpr

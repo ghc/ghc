@@ -322,9 +322,7 @@ boxHigherOrderArgs almost_expr args
 
 isFunType var_type 
   = case splitForAllTys var_type of
-	(_, ty) -> case splitTyConApp_maybe ty of
-			Just (tycon,_) | isFunTyCon tycon -> True
-			_ -> False
+	(_, ty) -> maybeToBool (splitFunTy_Maybe ty)
 #endif
 \end{code}
 

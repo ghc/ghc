@@ -43,8 +43,9 @@ import CoreSyn		( Expr(..), Bind(..), Note(..), CoreExpr,
 			)
 import CoreFVs		( exprFreeVars )
 import TypeRep		( Type(..), TyNote(..) )  -- friend
-import Type		( ThetaType, PredType(..), 
-			  tyVarsOfType, tyVarsOfTypes, mkAppTy, mkUTy, isUTy
+import Type		( ThetaType, SourceType(..), PredType,
+			  tyVarsOfType, tyVarsOfTypes, mkAppTy, mkUTy, isUTy,
+			  getTyVar_maybe
 			)
 import VarSet
 import VarEnv
@@ -381,8 +382,11 @@ mkTopTyVarSubst :: [TyVar] -> [Type] -> Subst
 mkTopTyVarSubst tyvars tys = Subst emptyInScopeSet (zip_ty_env tyvars tys emptySubstEnv)
 
 zip_ty_env []       []       env = env
-zip_ty_env (tv:tvs) (ty:tys) env = UASSERT( not (isUTy ty) )
-                                   zip_ty_env tvs tys (extendSubstEnv env tv (DoneTy ty))
+zip_ty_env (tv:tvs) (ty:tys) env 
+  | Just tv' <- getTyVar_maybe ty, tv==tv' = zip_ty_env tvs tys env
+	-- Shortcut for the (I think not uncommon) case where we are
+	-- making an identity substitution
+  | otherwise = zip_ty_env tvs tys (extendSubstEnv env tv (DoneTy ty))
 \end{code}
 
 substTy works with general Substs, so that it can be called from substExpr too.
@@ -398,8 +402,11 @@ substTheta subst theta
   | otherwise	       = map (substPred subst) theta
 
 substPred :: TyVarSubst -> PredType -> PredType
-substPred subst (ClassP clas tys) = ClassP clas (map (subst_ty subst) tys)
-substPred subst (IParam n ty)     = IParam n (subst_ty subst ty)
+substPred = substSourceType
+
+substSourceType subst (IParam n ty)     = IParam n (subst_ty subst ty)
+substSourceType subst (ClassP clas tys) = ClassP clas (map (subst_ty subst) tys)
+substSourceType subst (NType  tc   tys) = NType  tc   (map (subst_ty subst) tys)
 
 subst_ty subst ty
    = go ty
@@ -407,7 +414,7 @@ subst_ty subst ty
     go (TyConApp tc tys)	   = let args = map go tys
 				     in  args `seqList` TyConApp tc args
 
-    go (PredTy p)  		   = PredTy $! (substPred subst p)
+    go (SourceTy p)  		   = SourceTy $! (substSourceType subst p)
 
     go (NoteTy (SynNote ty1) ty2)  = NoteTy (SynNote $! (go ty1)) $! (go ty2)
     go (NoteTy (FTVNote _) ty2)    = go ty2		-- Discard the free tyvar note

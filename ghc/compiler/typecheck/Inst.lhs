@@ -41,10 +41,20 @@ import TcHsSyn	( TcExpr, TcId,
 import TcMonad
 import TcEnv	( TcIdSet, tcGetInstEnv, tcLookupSyntaxId )
 import InstEnv	( InstLookupResult(..), lookupInstEnv )
-import TcType	( TcThetaType,
-		  TcType, TcTauType, TcTyVarSet,
-		  zonkTcType, zonkTcTypes, zonkTcPredType,
-		  zonkTcThetaType, tcInstTyVar, tcInstType
+import TcMType	( zonkTcType, zonkTcTypes, zonkTcPredType,
+		  zonkTcThetaType, tcInstTyVar, tcInstType,
+		)
+import TcType	( Type, 
+		  SourceType(..), PredType, ThetaType,
+		  tcSplitForAllTys, tcSplitForAllTys, 
+		  tcSplitMethodTy, tcSplitRhoTy, tcFunArgTy,
+		  isIntTy,isFloatTy, isIntegerTy, isDoubleTy,
+		  tcIsTyVarTy, mkPredTy, mkTyVarTy, mkTyVarTys,
+		  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tidyPred,
+		  predMentionsIPs, isClassPred, isTyVarClassPred, 
+		  getClassPredTys, getClassPredTys_maybe, mkPredName,
+		  tidyType, tidyTypes, tidyFreeTyVars,
+		  tcCmpType, tcCmpTypes, tcCmpPred
 		)
 import CoreFVs	( idFreeTyVars )
 import Class	( Class )
@@ -53,26 +63,13 @@ import PrelInfo	( isStandardClass, isCcallishClass, isNoDictClass )
 import Name	( Name, mkMethodOcc, getOccName )
 import NameSet	( NameSet )
 import PprType	( pprPred )	
-import Type	( Type, PredType(..), ThetaType,
-		  isTyVarTy, mkPredTy, mkTyVarTy, mkTyVarTys,
-		  splitForAllTys, splitSigmaTy, funArgTy,
-		  splitMethodTy, splitRhoTy,
-		  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tidyPred,
-		  predMentionsIPs, isClassPred, isTyVarClassPred, 
-		  getClassPredTys, getClassPredTys_maybe, mkPredName,
-		  tidyType, tidyTypes, tidyFreeTyVars
-		)
 import Subst	( emptyInScopeSet, mkSubst, 
 		  substTy, substTheta, mkTyVarSubst, mkTopTyVarSubst
 		)
 import Literal	( inIntRange )
 import VarEnv	( TidyEnv, lookupSubstEnv, SubstResult(..) )
 import VarSet	( elemVarSet, emptyVarSet, unionVarSet )
-import TysWiredIn ( isIntTy,
-		    floatDataCon, isFloatTy,
-		    doubleDataCon, isDoubleTy,
-		    isIntegerTy
-		  ) 
+import TysWiredIn ( floatDataCon, doubleDataCon )
 import PrelNames( fromIntegerName, fromRationalName )
 import Util	( thenCmp )
 import Bag
@@ -178,14 +175,14 @@ instance Eq Inst where
 	         EQ    -> True
 		 other -> False
 
-cmpInst (Dict _ pred1 _)     	  (Dict _ pred2 _)	    = (pred1 `compare` pred2)
+cmpInst (Dict _ pred1 _)     	  (Dict _ pred2 _)	    = pred1 `tcCmpPred` pred2
 cmpInst (Dict _ _ _)	     	  other 		    = LT
 
 cmpInst (Method _ _ _ _ _ _) 	  (Dict _ _ _)	  	    = GT
-cmpInst (Method _ id1 tys1 _ _ _) (Method _ id2 tys2 _ _ _) = (id1 `compare` id2) `thenCmp` (tys1 `compare` tys2)
+cmpInst (Method _ id1 tys1 _ _ _) (Method _ id2 tys2 _ _ _) = (id1 `compare` id2) `thenCmp` (tys1 `tcCmpTypes` tys2)
 cmpInst (Method _ _ _ _ _ _)      other			    = LT
 
-cmpInst (LitInst _ lit1 ty1 _)	  (LitInst _ lit2 ty2 _)    = (lit1 `compare` lit2) `thenCmp` (ty1 `compare` ty2)
+cmpInst (LitInst _ lit1 ty1 _)	  (LitInst _ lit2 ty2 _)    = (lit1 `compare` lit2) `thenCmp` (ty1 `tcCmpType` ty2)
 cmpInst (LitInst _ _ _ _)	  other 		    = GT
 
 -- and they can only have HsInt or HsFracs in them.
@@ -266,7 +263,7 @@ instMentionsIPs (Method _ _ _ theta _ _) ip_names = any (`predMentionsIPs` ip_na
 instMentionsIPs other			 ip_names = False
 
 isStdClassTyVarDict (Dict _ pred _) = case getClassPredTys_maybe pred of
-					Just (clas, [ty]) -> isStandardClass clas && isTyVarTy ty
+					Just (clas, [ty]) -> isStandardClass clas && tcIsTyVarTy ty
 					other		  -> False
 \end{code}
 
@@ -393,9 +390,9 @@ newMethod :: InstOrigin
 newMethod orig id tys
   =   	-- Get the Id type and instantiate it at the specified types
     let
-	(tyvars, rho) = splitForAllTys (idType id)
+	(tyvars, rho) = tcSplitForAllTys (idType id)
 	rho_ty	      = substTy (mkTyVarSubst tyvars tys) rho
-	(pred, tau)   = splitMethodTy rho_ty
+	(pred, tau)   = tcSplitMethodTy rho_ty
     in
     newMethodWithGivenTy orig id tys [pred] tau
 
@@ -417,10 +414,10 @@ newMethodAtLoc inst_loc real_id tys
 	-- This actually builds the Inst
   =   	-- Get the Id type and instantiate it at the specified types
     let
-	(tyvars,rho) = splitForAllTys (idType real_id)
+	(tyvars,rho)  = tcSplitForAllTys (idType real_id)
 	rho_ty	      = ASSERT( length tyvars == length tys )
 			substTy (mkTopTyVarSubst tyvars tys) rho
-	(theta, tau)  = splitRhoTy rho_ty
+	(theta, tau)  = tcSplitRhoTy rho_ty
     in
     newMethodWith inst_loc real_id tys theta tau	`thenNF_Tc` \ meth_inst ->
     returnNF_Tc (meth_inst, instToId meth_inst)
@@ -559,7 +556,7 @@ lookupInst dict@(Dict _ (ClassP clas tys) loc)
 
       FoundInst tenv dfun_id
 	-> let
-		(tyvars, rho) = splitForAllTys (idType dfun_id)
+		(tyvars, rho) = tcSplitForAllTys (idType dfun_id)
 		mk_ty_arg tv  = case lookupSubstEnv tenv tv of
 				   Just (DoneTy ty) -> returnNF_Tc ty
 				   Nothing 	    -> tcInstTyVar tv 	`thenNF_Tc` \ tc_tv ->
@@ -569,7 +566,7 @@ lookupInst dict@(Dict _ (ClassP clas tys) loc)
 	   let
 		subst	      = mkTyVarSubst tyvars ty_args
 		dfun_rho      = substTy subst rho
-		(theta, _)    = splitRhoTy dfun_rho
+		(theta, _)    = tcSplitRhoTy dfun_rho
 		ty_app        = mkHsTyApp (HsVar dfun_id) ty_args
 	   in
 	   if null theta then
@@ -622,7 +619,7 @@ lookupInst inst@(LitInst u (HsFractional f) ty loc)
   = tcLookupSyntaxId fromRationalName		`thenNF_Tc` \ from_rational ->
     newMethodAtLoc loc from_rational [ty]	`thenNF_Tc` \ (method_inst, method_id) ->
     let
-	rational_ty  = funArgTy (idType method_id)
+	rational_ty  = tcFunArgTy (idType method_id)
 	rational_lit = HsLit (HsRat f rational_ty)
     in
     returnNF_Tc (GenInst [method_inst] (HsApp (HsVar method_id) rational_lit))
@@ -641,7 +638,7 @@ ambiguous dictionaries.
 
 \begin{code}
 lookupSimpleInst :: Class
-		 -> [Type]				-- Look up (c,t)
+		 -> [Type]			-- Look up (c,t)
 	         -> NF_TcM (Maybe ThetaType)	-- Here are the needed (c,t)s
 
 lookupSimpleInst clas tys
@@ -650,7 +647,8 @@ lookupSimpleInst clas tys
       FoundInst tenv dfun
 	-> returnNF_Tc (Just (substTheta (mkSubst emptyInScopeSet tenv) theta))
         where
-	   (_, theta, _) = splitSigmaTy (idType dfun)
+	   (_, rho)  = tcSplitForAllTys (idType dfun)
+	   (theta,_) = tcSplitRhoTy rho
 
       other  -> returnNF_Tc Nothing
 \end{code}

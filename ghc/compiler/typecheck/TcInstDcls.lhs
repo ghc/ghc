@@ -23,7 +23,11 @@ import TcHsSyn		( TcMonoBinds, mkHsConApp )
 import TcBinds		( tcSpecSigs )
 import TcClassDcl	( tcMethodBind, badMethodErr )
 import TcMonad       
-import TcType		( tcInstType )
+import TcMType		( tcInstType, tcInstTyVars )
+import TcType		( tcSplitDFunTy, tcIsTyVarTy, tcSplitTyConApp_maybe,
+			  tyVarsOfTypes, mkClassPred, mkTyVarTy,
+			  isTyVarClassPred, inheritablePred
+			)
 import Inst		( InstOrigin(..),
 			  newDicts, instToId,
 			  LIE, mkLIE, emptyLIE, plusLIE, plusLIEs )
@@ -42,6 +46,7 @@ import HscTypes		( HomeSymbolTable, DFunId,
 			  ModDetails(..), PackageInstEnv, PersistentRenamerState
 			)
 
+import Subst		( substTy, substTheta )
 import DataCon		( classDataCon )
 import Class		( Class, DefMeth(..), classBigSig )
 import Var		( idName, idType )
@@ -56,12 +61,6 @@ import NameSet		( unitNameSet, nameSetToList )
 import PrelInfo		( eRROR_ID )
 import PprType		( pprClassPred, pprPred )
 import TyCon		( TyCon, isSynTyCon )
-import Type		( splitDFunTy, isTyVarTy,
-			  splitTyConApp_maybe, splitDictTy,
-			  splitForAllTys,
-			  tyVarsOfTypes, mkClassPred, mkTyVarTy,
-			  isTyVarClassPred, inheritablePred
-			)
 import Subst		( mkTopTyVarSubst, substTheta )
 import VarSet		( varSetElems )
 import TysWiredIn	( genericTyCons, isFFIArgumentTy, isFFIImportResultTy )
@@ -223,13 +222,16 @@ addInstInfos :: InstEnv -> [InstInfo] -> NF_TcM InstEnv
 addInstInfos inst_env infos = addInstDFuns inst_env (map iDFunId infos)
 
 addInstDFuns :: InstEnv -> [DFunId] -> NF_TcM InstEnv
-addInstDFuns dfuns infos
+addInstDFuns inst_env dfuns
   = getDOptsTc				`thenTc` \ dflags ->
     let
-	(inst_env', errs) = extendInstEnv dflags dfuns infos
+	(inst_env', errs) = extendInstEnv dflags inst_env dfuns
     in
     addErrsTc errs			`thenNF_Tc_` 
+    traceTc (text "Adding instances:" <+> vcat (map pp dfuns))	`thenTc_`
     returnTc inst_env'
+  where
+    pp dfun = ppr dfun <+> dcolon <+> ppr (idType dfun)
 \end{code} 
 
 \begin{code}
@@ -241,13 +243,15 @@ tcInstDecl1 decl@(InstDecl poly_ty binds uprags maybe_dfun_name src_loc)
     tcAddSrcLoc src_loc			$
 
 	-- Type-check all the stuff before the "where"
+    traceTc (text "Starting inst" <+> ppr poly_ty)	`thenTc_`
     tcAddErrCtxt (instDeclCtxt poly_ty)	(
  	tcHsSigType poly_ty
     )					`thenTc` \ poly_ty' ->
     let
-	(tyvars, theta, clas, inst_tys) = splitDFunTy poly_ty'
+	(tyvars, theta, clas, inst_tys) = tcSplitDFunTy poly_ty'
     in
 
+    traceTc (text "Check validity")	`thenTc_`
     (case maybe_dfun_name of
 	Nothing ->	-- A source-file instance declaration
 
@@ -260,6 +264,7 @@ tcInstDecl1 decl@(InstDecl poly_ty binds uprags maybe_dfun_name src_loc)
     	    checkInstValidity dflags theta clas inst_tys	`thenTc_`
 
 		-- Make the dfun id and return it
+	    traceTc (text "new name")	`thenTc_`
 	    newDFunName clas inst_tys src_loc		`thenNF_Tc` \ dfun_name ->
 	    returnNF_Tc (True, dfun_name)
 
@@ -268,6 +273,7 @@ tcInstDecl1 decl@(InstDecl poly_ty binds uprags maybe_dfun_name src_loc)
 	    returnNF_Tc (False, dfun_name)
     )						`thenNF_Tc` \ (is_local, dfun_name) ->
 
+    traceTc (text "Name" <+> ppr dfun_name)	`thenTc_`
     let
 	dfun_id = mkDictFunId dfun_name clas tyvars inst_tys theta
     in
@@ -519,10 +525,14 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id,
     tcAddErrCtxt (instDeclCtxt (toHsType (idType dfun_id)))	$
 
 	-- Instantiate the instance decl with tc-style type variables
-    tcInstType (idType dfun_id)		`thenNF_Tc` \ (inst_tyvars', dfun_theta', dict_ty') ->
     let
-	(clas, inst_tys') = splitDictTy dict_ty'
-	origin		  = InstanceDeclOrigin
+	(inst_tyvars, dfun_theta, clas, inst_tys) = tcSplitDFunTy (idType dfun_id)
+    in
+    tcInstTyVars inst_tyvars		`thenNF_Tc` \ (inst_tyvars', _, tenv) ->
+    let
+	inst_tys'   = map (substTy tenv) inst_tys
+	dfun_theta' = substTheta tenv dfun_theta
+	origin	    = InstanceDeclOrigin
 
         (class_tyvars, sc_theta, _, op_items) = classBigSig clas
 
@@ -534,11 +544,6 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id,
 
 	-- Find any definitions in monobinds that aren't from the class
 	bad_bndrs = collectMonoBinders monobinds `minusList` sel_names
-
-	-- The type variable from the dict fun actually scope 
-	-- over the bindings.  They were gotten from
-	-- the original instance declaration
-	(inst_tyvars, _) = splitForAllTys (idType dfun_id)
     in
 	 -- Check that all the method bindings come from this class
     mapTc (addErrTc . badMethodErr clas) bad_bndrs		`thenNF_Tc_`
@@ -549,6 +554,9 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id,
     newDicts origin [mkClassPred clas inst_tys'] `thenNF_Tc` \ [this_dict] ->
 
     tcExtendTyVarEnvForMeths inst_tyvars inst_tyvars' (
+	-- The type variable from the dict fun actually scope 
+	-- over the bindings.  They were gotten from
+	-- the original instance declaration
  	tcExtendGlobalValEnv dm_ids (
 		-- Default-method Ids may be mentioned in synthesised RHSs 
 
@@ -795,9 +803,9 @@ checkInstHead dflags theta clas inst_taus
 
 	-- WITH HASKELL 1.4, MUST HAVE C (T a b c)
   | not (length inst_taus == 1 &&
-         maybeToBool maybe_tycon_app &&	-- Yes, there's a type constuctor
+         maybeToBool maybe_tycon_app &&		-- Yes, there's a type constuctor
          not (isSynTyCon tycon) &&		-- ...but not a synonym
-         all isTyVarTy arg_tys && 		-- Applied to type variables
+         all tcIsTyVarTy arg_tys && 		-- Applied to type variables
 	 length (varSetElems (tyVarsOfTypes arg_tys)) == length arg_tys
           -- This last condition checks that all the type variables are distinct
         )
@@ -812,7 +820,7 @@ checkInstHead dflags theta clas inst_taus
     (first_inst_tau : _)       = inst_taus
 
 	-- Stuff for algebraic or -> type
-    maybe_tycon_app	  = splitTyConApp_maybe first_inst_tau
+    maybe_tycon_app	  = tcSplitTyConApp_maybe first_inst_tau
     Just (tycon, arg_tys) = maybe_tycon_app
 
     ccallable_type   dflags ty = isFFIArgumentTy dflags PlayRisky ty
@@ -822,7 +830,7 @@ check_tyvars dflags clas inst_taus
    	-- Check that at least one isn't a type variable
 	-- unless -fallow-undecideable-instances
   | dopt Opt_AllowUndecidableInstances dflags = []
-  | not (all isTyVarTy inst_taus)	      = []
+  | not (all tcIsTyVarTy inst_taus)	      = []
   | otherwise 				      = [the_err]
   where
     the_err = instTypeErr clas inst_taus msg

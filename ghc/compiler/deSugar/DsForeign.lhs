@@ -27,18 +27,19 @@ import Name		( mkGlobalName, nameModule, nameOccName, getOccString,
 			  mkForeignExportOcc, isLocalName,
 			  NamedThing(..),
 			)
-import Type		( repType, splitTyConApp_maybe,
-			  splitFunTys, splitForAllTys,
+import TcType		( tcSplitTyConApp_maybe, tcFunResultTy,
+			  tcSplitFunTys, tcSplitForAllTys,
 			  Type, mkFunTys, mkForAllTys, mkTyConApp,
-			  mkFunTy, splitAppTy, applyTy, funResultTy
+			  mkFunTy, tcSplitAppTy, applyTy, tcEqType, isUnitTy
 			)
+import Type		( repType )
 import ForeignCall	( ForeignCall(..), CCallSpec(..), 
 			  Safety(..), playSafe,
 			  CExportSpec(..),
 			  CCallConv(..), ccallConvToInt
 			)
 import CStrings		( CLabelString )
-import TysWiredIn	( unitTy, addrTy, stablePtrTyCon )
+import TysWiredIn	( addrTy, stablePtrTyCon )
 import TysPrim		( addrPrimTy )
 import PrelNames	( hasKey, ioTyConKey, deRefStablePtrName, newStablePtrName,
 			  bindIOName, returnIOName
@@ -119,7 +120,7 @@ dsFImport :: Module
 	  -> FoImport
 	  -> DsM ([Binding], SDoc, SDoc)
 dsFImport mod_name lbl_id (LblImport ext_nm) 
- = ASSERT(fromJust res_ty == addrPrimTy) -- typechecker ensures this
+ = ASSERT(fromJust res_ty `tcEqType` addrPrimTy) -- typechecker ensures this
    returnDs ([(lbl_id, rhs)], empty, empty)
  where
    (res_ty, fo_rhs) = resultWrapper (idType lbl_id)
@@ -141,8 +142,8 @@ dsFImport mod_name fn_id (CDynImport cconv) = dsFExportDynamic mod_name fn_id cc
 dsFCall mod_Name fn_id fcall
   = let
 	ty		     = idType fn_id
-	(tvs, fun_ty)        = splitForAllTys ty
-	(arg_tys, io_res_ty) = splitFunTys fun_ty
+	(tvs, fun_ty)        = tcSplitForAllTys ty
+	(arg_tys, io_res_ty) = tcSplitFunTys fun_ty
     in
     newSysLocalsDs arg_tys  			`thenDs` \ args ->
     mapAndUnzipDs unboxArg (map Var args)	`thenDs` \ (val_args, arg_wrappers) ->
@@ -216,7 +217,7 @@ dsFExport mod_name fn_id ty ext_name cconv isDyn
 	-- Look at the result type of the exported function, orig_res_ty
 	-- If it's IO t, return		(\x.x,	        IO t, t)
 	-- If it's plain t, return	(\x.returnIO x, IO t, t)
-     (case splitTyConApp_maybe orig_res_ty of
+     (case tcSplitTyConApp_maybe orig_res_ty of
 	Just (ioTyCon, [res_ty])
 	      -> ASSERT( ioTyCon `hasKey` ioTyConKey )
 			-- The function already returns IO t
@@ -225,7 +226,7 @@ dsFExport mod_name fn_id ty ext_name cconv isDyn
 	other -> 	-- The function returns t, so wrap the call in returnIO
 		 dsLookupGlobalValue returnIOName	`thenDs` \ retIOId ->
 	         returnDs (\body -> mkApps (Var retIOId) [Type orig_res_ty, body],
-		           funResultTy (applyTy (idType retIOId) orig_res_ty), 
+		           tcFunResultTy (applyTy (idType retIOId) orig_res_ty), 
 				-- We don't have ioTyCon conveniently to hand
 			   orig_res_ty)
 
@@ -293,11 +294,11 @@ dsFExport mod_name fn_id ty ext_name cconv isDyn
      returnDs (f_helper_glob, (f_helper_glob, the_body), h_stub, c_stub)
 
   where
-   (tvs,sans_foralls)		= splitForAllTys ty
-   (fe_arg_tys', orig_res_ty)	= splitFunTys sans_foralls
+   (tvs,sans_foralls)		= tcSplitForAllTys ty
+   (fe_arg_tys', orig_res_ty)	= tcSplitFunTys sans_foralls
 
-   (_, stbl_ptr_ty')		= splitForAllTys stbl_ptr_ty
-   (_, stbl_ptr_to_ty)		= splitAppTy stbl_ptr_ty'
+   (_, stbl_ptr_ty')		= tcSplitForAllTys stbl_ptr_ty
+   (_, stbl_ptr_to_ty)		= tcSplitAppTy stbl_ptr_ty'
 
    fe_arg_tys | isDyn	  = tail fe_arg_tys'
 	      | otherwise = fe_arg_tys'
@@ -388,9 +389,9 @@ dsFExportDynamic mod_name id cconv
 
  where
   ty				   = idType id
-  (tvs,sans_foralls)		   = splitForAllTys ty
-  ([arg_ty], io_res_ty)		   = splitFunTys sans_foralls
-  Just (ioTyCon, [res_ty])	   = splitTyConApp_maybe io_res_ty
+  (tvs,sans_foralls)		   = tcSplitForAllTys ty
+  ([arg_ty], io_res_ty)		   = tcSplitFunTys sans_foralls
+  Just (ioTyCon, [res_ty])	   = tcSplitTyConApp_maybe io_res_ty
   export_ty			   = mkFunTy (mkTyConApp stablePtrTyCon [arg_ty]) arg_ty
 
 toCName :: Id -> String
@@ -447,7 +448,7 @@ fexportEntry mod_nm c_nm helper args res_ty cc isDyn = (header_bits, c_bits)
 
   cParamTypes  = map showStgType real_args
 
-  res_ty_is_unit = res_ty == unitTy
+  res_ty_is_unit = isUnitTy res_ty
 
   cResType | res_ty_is_unit = text "void"
 	   | otherwise	    = showStgType res_ty
@@ -495,7 +496,7 @@ showStgType t = text "Hs" <> text (showFFIType t)
 showFFIType :: Type -> String
 showFFIType t = getOccString (getName tc)
  where
-  tc = case splitTyConApp_maybe (repType t) of
+  tc = case tcSplitTyConApp_maybe (repType t) of
 	    Just (tc,_) -> tc
 	    Nothing	-> pprPanic "showFFIType" (ppr t)
 \end{code}

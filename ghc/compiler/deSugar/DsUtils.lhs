@@ -44,20 +44,18 @@ import PrelInfo		( iRREFUT_PAT_ERROR_ID )
 import MkId		( rebuildConArgs )
 import Id		( idType, Id, mkWildId )
 import Literal		( Literal(..), inIntRange, tARGET_MAX_INT )
-import TyCon		( isNewTyCon, tyConDataCons )
+import TyCon		( isNewTyCon, tyConDataCons, isRecursiveTyCon )
 import DataCon		( DataCon, dataConStrictMarks, dataConId )
-import Type		( mkFunTy, isUnLiftedType, splitAlgTyConApp,
-			  Type
-			)
+import TcType		( mkFunTy, isUnLiftedType, Type )
+import TcType		( tcSplitTyConApp, isIntTy, isFloatTy, isDoubleTy )
 import TysPrim		( intPrimTy, charPrimTy, floatPrimTy, doublePrimTy )
 import TysWiredIn	( nilDataCon, consDataCon, 
                           tupleCon,
-			  stringTy,
 			  unitDataConId, unitTy,
                           charTy, charDataCon, 
-                          intTy, intDataCon, smallIntegerDataCon, 
-			  floatTy, floatDataCon, 
-                          doubleTy, doubleDataCon,
+                          intDataCon, smallIntegerDataCon, 
+			  floatDataCon, 
+                          doubleDataCon,
 			  stringTy
 			)
 import BasicTypes	( Boxity(..) )
@@ -92,9 +90,9 @@ tidyNPat (HsString s) _ pat
     mk_char_lit c = ConPat charDataCon charTy [] [] [LitPat (HsCharPrim c) charPrimTy]
 
 tidyNPat lit lit_ty default_pat
-  | lit_ty == intTy    	= ConPat intDataCon    lit_ty [] [] [LitPat (mk_int lit)    intPrimTy]
-  | lit_ty == floatTy  	= ConPat floatDataCon  lit_ty [] [] [LitPat (mk_float lit)  floatPrimTy]
-  | lit_ty == doubleTy 	= ConPat doubleDataCon lit_ty [] [] [LitPat (mk_double lit) doublePrimTy]
+  | isIntTy lit_ty     	= ConPat intDataCon    lit_ty [] [] [LitPat (mk_int lit)    intPrimTy]
+  | isFloatTy lit_ty  	= ConPat floatDataCon  lit_ty [] [] [LitPat (mk_float lit)  floatPrimTy]
+  | isDoubleTy lit_ty 	= ConPat doubleDataCon lit_ty [] [] [LitPat (mk_double lit) doublePrimTy]
   | otherwise		= default_pat
 
   where
@@ -252,7 +250,7 @@ mkCoPrimCaseMatchResult var match_alts
   where
     mk_case fail
       = mapDs (mk_alt fail) match_alts		`thenDs` \ alts ->
-	returnDs (Case (Var var) var (alts ++ [(DEFAULT, [], fail)]))
+	returnDs (Case (Var var) var ((DEFAULT, [], fail) : alts))
 
     mk_alt fail (lit, MatchResult _ body_fn) = body_fn fail	`thenDs` \ body ->
 					       returnDs (LitAlt lit, [], body)
@@ -264,24 +262,25 @@ mkCoAlgCaseMatchResult :: Id					-- Scrutinee
 
 mkCoAlgCaseMatchResult var match_alts
   | isNewTyCon tycon		-- Newtype case; use a let
-  = ASSERT( newtype_sanity )
-    mkCoLetsMatchResult [coercion_bind] match_result
+  = ASSERT( null (tail match_alts) && null (tail arg_ids) )
+    mkCoLetsMatchResult [NonRec arg_id newtype_rhs] match_result
 
   | otherwise			-- Datatype case; use a case
   = MatchResult fail_flag mk_case
   where
 	-- Common stuff
-    scrut_ty = idType var
-    (tycon, _, _) = splitAlgTyConApp scrut_ty
+    scrut_ty    = idType var
+    (tycon, _)  = tcSplitTyConApp scrut_ty		-- Newtypes must be opaque here
 
 	-- Stuff for newtype
     (_, arg_ids, match_result) = head match_alts
-    arg_id 	   	       = head arg_ids
-    coercion_bind	       = NonRec arg_id (Note (Coerce (idType arg_id)
-							     scrut_ty)
-						     (Var var))
-    newtype_sanity	       = null (tail match_alts) && null (tail arg_ids)
+    arg_id 	       	       = head arg_ids
 
+    newtype_rhs | isRecursiveTyCon tycon 	-- Recursive case; need a case
+	 	= Note (Coerce (idType arg_id) scrut_ty) (Var var)
+		| otherwise			-- Normal case (newtype is transparent)
+		= Var var
+		
 	-- Stuff for data types
     data_cons = tyConDataCons tycon
 
@@ -294,7 +293,7 @@ mkCoAlgCaseMatchResult var match_alts
 
     wild_var = mkWildId (idType var)
     mk_case fail = mapDs (mk_alt fail) match_alts	`thenDs` \ alts ->
-		   returnDs (Case (Var var) wild_var (alts ++ mk_default fail))
+		   returnDs (Case (Var var) wild_var (mk_default fail ++ alts))
 
     mk_alt fail (con, args, MatchResult _ body_fn)
 	= body_fn fail						`thenDs` \ body ->

@@ -4,9 +4,7 @@
 \section[TcTyDecls]{Typecheck type declarations}
 
 \begin{code}
-module TcTyDecls (
-	tcTyDecl1, kcConDetails, mkNewTyConRep
-    ) where
+module TcTyDecls ( tcTyDecl1, kcConDetails ) where
 
 #include "HsVersions.h"
 
@@ -23,20 +21,21 @@ import TcEnv		( tcExtendTyVarEnv,
 			  tcLookupTyCon, tcLookupRecId, 
 			  TyThingDetails(..), RecTcEnv
 			)
+import TcType		( tcSplitTyConApp_maybe, tcEqType, 
+			  tyVarsOfTypes, tyVarsOfPred, 
+			  mkTyConApp, mkTyVarTys, mkForAllTys, 
+			  Type, ThetaType
+			)
 import TcMonad
 
-import DataCon		( DataCon, mkDataCon, dataConFieldLabels, dataConRepType )
+import DataCon		( DataCon, mkDataCon, dataConFieldLabels, dataConRepType,
+			  isNullaryDataCon, dataConOrigArgTys )
 import MkId		( mkDataConId, mkDataConWrapId, mkRecordSelId )
 import FieldLabel
 import Var		( TyVar )
 import Name		( Name, NamedThing(..) )
 import Outputable
-import TyCon		( TyCon, isNewTyCon, tyConTyVars )
-import Type		( tyVarsOfTypes, tyVarsOfPred, splitFunTy, applyTys,
-			  mkTyConApp, mkTyVarTys, mkForAllTys, 
-			  splitAlgTyConApp_maybe, Type, ThetaType
-			)
-import TysWiredIn	( unitTy )
+import TyCon		( TyCon, AlgTyConFlavour(..), tyConTyVars )
 import VarSet		( intersectVarSet, isEmptyVarSet )
 import PrelNames	( unpackCStringName, unpackCStringUtf8Name )
 import ListSetOps	( equivClasses )
@@ -84,27 +83,6 @@ tcTyDecl1 is_rec unf_env (TyData {tcdND = new_or_data, tcdCtxt = context,
 
 tcTyDecl1 is_rec unf_env (ForeignType {tcdName = tycon_name})
   = returnTc (tycon_name, ForeignTyDetails)
-\end{code}
-
-\begin{code}
-mkNewTyConRep :: TyCon -> Type
--- Find the representation type for this newtype TyCon
--- The trick is to to deal correctly with recursive newtypes
--- such as	newtype T = MkT T
-
-mkNewTyConRep tc
-  = mkForAllTys tvs (loop [] (mkTyConApp tc (mkTyVarTys tvs)))
-  where
-    tvs = tyConTyVars tc
-    loop tcs ty = case splitAlgTyConApp_maybe ty of {
-			Nothing -> ty ;
-			Just (tc, tys, data_cons) | not (isNewTyCon tc) -> ty
-						  | tc `elem` tcs	-> unitTy
-						  | otherwise		->
-
-		  case splitFunTy (applyTys (dataConRepType (head data_cons)) tys) of
-			(rep_ty, _) -> loop (tc:tcs) rep_ty
-		  }
 \end{code}
 
 
@@ -218,7 +196,7 @@ tcRecordSelectors is_rec unf_env tycon data_cons
 	= 	-- Check that all the fields in the group have the same type
 		-- NB: this check assumes that all the constructors of a given
 		-- data type use the same type variables
-	  checkTc (all (== field_ty) other_tys) (fieldTypeMisMatch field_name)
+	  checkTc (all (tcEqType field_ty) other_tys) (fieldTypeMisMatch field_name)
 	where
 	    field_ty   = fieldLabelType first_field_label
 	    field_name = fieldLabelName first_field_label

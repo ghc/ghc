@@ -39,7 +39,20 @@ data HsLit
 					-- must resolve to boxed-primitive!
 	-- The Type in HsLitLit is needed when desuaring;
 	-- before the typechecker it's just an error value
-  deriving( Eq )
+
+instance Eq HsLit where
+  (HsChar x1)	    == (HsChar x2)	 = x1==x2
+  (HsCharPrim x1)   == (HsCharPrim x2)	 = x1==x2
+  (HsString x1)     == (HsString x2)	 = x1==x2
+  (HsStringPrim x1) == (HsStringPrim x2) = x1==x2
+  (HsInt x1)	    == (HsInt x2)	 = x1==x2
+  (HsIntPrim x1)    == (HsIntPrim x2)    = x1==x2
+  (HsInteger x1)    == (HsInteger x2)    = x1==x2
+  (HsRat x1 _)	    == (HsRat x2 _)      = x1==x2
+  (HsFloatPrim x1)  == (HsFloatPrim x2)  = x1==x2
+  (HsDoublePrim x1) == (HsDoublePrim x2) = x1==x2
+  (HsLitLit x1 _)   == (HsLitLit x2 _)   = x1==x2
+  lit1		    == lit2		 = False
 
 data HsOverLit 		-- An overloaded literal
   = HsIntegral	    Integer 		-- Integer-looking literals;

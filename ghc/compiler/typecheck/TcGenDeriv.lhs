@@ -53,7 +53,7 @@ import SrcLoc		( generatedSrcLoc, SrcLoc )
 import TyCon		( TyCon, isNewTyCon, tyConDataCons, isEnumerationTyCon,
 			  maybeTyConSingleCon, tyConFamilySize
 			)
-import Type		( isUnLiftedType, Type )
+import TcType		( isUnLiftedType, tcEqType, Type )
 import TysPrim		( charPrimTy, intPrimTy, wordPrimTy, addrPrimTy,
 			  floatPrimTy, doublePrimTy
 			)
@@ -1238,7 +1238,7 @@ assoc_ty_id tyids ty
   = if null res then panic "assoc_ty"
     else head res
   where
-    res = [id | (ty',id) <- tyids, ty == ty']
+    res = [id | (ty',id) <- tyids, ty `tcEqType` ty']
 
 eq_op_tbl =
     [(charPrimTy,	eqH_Char_RDR)

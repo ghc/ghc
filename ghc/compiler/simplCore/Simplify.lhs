@@ -53,7 +53,7 @@ import Rules		( lookupRule )
 import CostCentre	( currentCCS )
 import Type		( mkTyVarTys, isUnLiftedType, seqType,
 			  mkFunTy, splitTyConApp_maybe, tyConAppArgs,
-			  funResultTy, splitFunTy_maybe, splitFunTy
+			  funResultTy, splitFunTy_maybe, splitFunTy, eqType
 			)
 import Subst		( mkSubst, substTy, substEnv, substExpr,
 			  isInScope, lookupIdSubst, simplIdInfo
@@ -359,8 +359,8 @@ simplNote (Coerce to from) body cont
 		-- we may find 	(coerce T (coerce S (\x.e))) y
 		-- and we'd like it to simplify to e[y/x] in one round 
 		-- of simplification
-	  | t1 == k1  = cont		 	-- The coerces cancel out
-	  | otherwise = CoerceIt t1 cont	-- They don't cancel, but 
+	  | t1 `eqType` k1  = cont	 	-- The coerces cancel out
+	  | otherwise       = CoerceIt t1 cont	-- They don't cancel, but 
 						-- the inner one is redundant
 
 	addCoerce t1t2 s1s2 (ApplyTo dup arg arg_se cont)
@@ -1424,7 +1424,8 @@ simplAlts zap_occ_info scrut_cons case_bndr' alts cont'
 
 	-- handled_cons is all the constructors that are dealt
 	-- with, either by being impossible, or by there being an alternative
-    handled_cons = scrut_cons ++ [con | (con,_,_) <- alts, con /= DEFAULT]
+    (con_alts,_) = findDefault alts
+    handled_cons = scrut_cons ++ [con | (con,_,_) <- con_alts]
 
     simpl_alt (DEFAULT, _, rhs)
 	=	-- In the default case we record the constructors that the

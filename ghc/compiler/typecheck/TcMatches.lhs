@@ -27,16 +27,15 @@ import Inst		( LIE, isEmptyLIE, plusLIE, emptyLIE, plusLIEs, lieToList )
 import TcEnv		( TcId, tcLookupLocalIds, tcExtendLocalValEnv, tcExtendGlobalTyVars,
 			  tcInLocalScope )
 import TcPat		( tcPat, tcMonoPatBndr, polyPatSig )
-import TcType		( TcType, newTyVarTy )
+import TcMType		( newTyVarTy, unifyFunTy, unifyTauTy )
+import TcType		( tyVarsOfType, isTauTy,  mkFunTy, isOverloadedTy,
+			  liftedTypeKind, openTypeKind  )
 import TcBinds		( tcBindsAndThen )
 import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
-import TcUnify		( unifyFunTy, unifyTauTy )
 import Name		( Name )
 import TysWiredIn	( boolTy )
 import Id		( idType )
 import BasicTypes	( RecFlag(..) )
-import Type		( tyVarsOfType, isTauTy,  mkFunTy,
-			  liftedTypeKind, openTypeKind, splitSigmaTy )
 import NameSet
 import VarSet
 import Var		( Id )
@@ -283,8 +282,7 @@ tcCheckExistentialPat ids ex_tvs lie_avail lie_req result_ty
   where
     doc     = text ("the existential context of a data constructor")
     tv_list = bagToList ex_tvs
-    not_overloaded id = case splitSigmaTy (idType id) of
-			  (_, theta, _) -> null theta
+    not_overloaded id = not (isOverloadedTy (idType id))
 
 tc_match_pats [] expected_ty
   = returnTc (expected_ty, [], emptyLIE, emptyBag, emptyBag, emptyLIE)

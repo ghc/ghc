@@ -182,15 +182,17 @@ type ArgVrcs = [(Bool,Bool)]  -- Tyvar variance info: [(occPos,occNeg)]
 
 data AlgTyConFlavour
   = DataTyCon		-- Data type
+
   | EnumTyCon		-- Special sort of enumeration type
+
   | NewTyCon Type	-- Newtype, with its *ultimate* representation type
 			-- By 'ultimate' I mean that the rep type is not itself
 			-- a newtype or type synonym.
 
-			-- The rep type has explicit for-alls for the tyvars of
-			-- the TyCon.  Thus:
+			-- The rep type has free type variables the tyConTyVars
+			-- Thus:
 			-- 	newtype T a = MkT [(a,Int)]
-			-- The rep type is forall a. [(a,Int)]
+			-- The rep type is [(a,Int)]
 			--
 			-- The rep type isn't entirely simple:
 			--  for a recursive newtype we pick () as the rep type
@@ -267,7 +269,7 @@ mkAlgTyCon name kind tyvars theta argvrcs cons ncons sels flavour rec
 	genInfo   	        = gen_info
     }
 
-mkClassTyCon name kind tyvars argvrcs con clas flavour
+mkClassTyCon name kind tyvars argvrcs con clas flavour rec
   = AlgTyCon {	
 	tyConName 		= name,
 	tyConUnique		= nameUnique name,
@@ -281,7 +283,7 @@ mkClassTyCon name kind tyvars argvrcs con clas flavour
 	noOfDataCons		= 1,
 	algTyConClass		= Just clas,
 	algTyConFlavour		= flavour,
-	algTyConRec		= NonRecursive,
+	algTyConRec		= rec,
 	genInfo   	        = Nothing
     }
 
@@ -365,18 +367,26 @@ isAlgTyCon (AlgTyCon {})   = True
 isAlgTyCon (TupleTyCon {}) = True
 isAlgTyCon other 	   = False
 
--- isDataTyCon returns False for @newtype@ and for unboxed tuples
-isDataTyCon (AlgTyCon {algTyConFlavour = new_or_data})  = case new_or_data of
-								NewTyCon _ -> False
-								other	-> True
+-- isDataTyCon returns True for data types that are represented by
+-- heap-allocated constructors.
+-- These are srcutinised by Core-level @case@ expressions, and they
+-- get info tables allocated for them.
+--	True for all @data@ types
+--	False for newtypes
+--		  unboxed tuples
+isDataTyCon (AlgTyCon {algTyConFlavour = new_or_data, algTyConRec = is_rec})  
+  = case new_or_data of
+	NewTyCon _ -> False
+	other	   -> True
+
 isDataTyCon (TupleTyCon {tyConBoxed = boxity}) = isBoxed boxity
 isDataTyCon other = False
 
 isNewTyCon (AlgTyCon {algTyConFlavour = NewTyCon _}) = True 
 isNewTyCon other			             = False
 
-newTyConRep (AlgTyCon {algTyConFlavour = NewTyCon rep}) = Just rep
-newTyConRep other					= Nothing
+newTyConRep :: TyCon -> ([TyVar], Type)
+newTyConRep (AlgTyCon {tyConTyVars = tvs, algTyConFlavour = NewTyCon rep}) = (tvs, rep)
 
 -- A "product" tycon
 --	has *one* constructor, 

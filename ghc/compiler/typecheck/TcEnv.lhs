@@ -41,17 +41,15 @@ module TcEnv(
 
 import RnHsSyn		( RenamedMonoBinds, RenamedSig )
 import TcMonad
-import TcType		( TcKind,  TcType, TcTyVar, TcTyVarSet, 
-			  zonkTcTyVarsAndFV
+import TcMType		( zonkTcTyVarsAndFV )
+import TcType		( Type, ThetaType, 
+			  tyVarsOfTypes, tcSplitDFunTy,
+			  getDFunTyKey, tcTyConAppTyCon
 			)
 import Id		( idName, mkSpecPragmaId, mkUserLocal, isDataConWrapId_maybe )
 import IdInfo		( vanillaIdInfo )
 import Var		( TyVar, Id, idType, lazySetIdInfo, idInfo )
 import VarSet
-import Type		( Type, ThetaType, 
-			  tyVarsOfTypes, splitDFunTy,
-			  getDFunTyKey, tyConAppTyCon
-			)
 import DataCon		( DataCon )
 import TyCon		( TyCon )
 import Class		( Class, ClassOpItem )
@@ -541,13 +539,13 @@ pprInstInfo info = vcat [ptext SLIT("InstInfo:") <+> ppr (idType (iDFunId info))
 			 nest 4 (ppr (iBinds info))]
 
 simpleInstInfoTy :: InstInfo -> Type
-simpleInstInfoTy info = case splitDFunTy (idType (iDFunId info)) of
+simpleInstInfoTy info = case tcSplitDFunTy (idType (iDFunId info)) of
 			  (_, _, _, [ty]) -> ty
 
 simpleInstInfoTyCon :: InstInfo -> TyCon
   -- Gets the type constructor for a simple instance declaration,
   -- i.e. one of the form 	instance (...) => C (T a b c) where ...
-simpleInstInfoTyCon inst = tyConAppTyCon (simpleInstInfoTy inst)
+simpleInstInfoTyCon inst = tcTyConAppTyCon (simpleInstInfoTy inst)
 \end{code}
 
 

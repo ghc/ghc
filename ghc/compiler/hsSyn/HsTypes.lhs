@@ -27,11 +27,11 @@ module HsTypes (
 #include "HsVersions.h"
 
 import Class		( FunDep )
-import Type		( Type, Kind, ThetaType, PredType(..), 
-			  splitSigmaTy, liftedTypeKind
+import TcType		( Type, Kind, ThetaType, SourceType(..), PredType, 
+			  tcSplitSigmaTy, liftedTypeKind, eqKind, tcEqType
 			)
 import TypeRep		( Type(..), TyNote(..) )	-- toHsType sees the representation
-import TyCon		( isTupleTyCon, tupleTyConBoxity, tyConArity, getSynTyConDefn )
+import TyCon		( isTupleTyCon, tupleTyConBoxity, tyConArity, isNewTyCon, getSynTyConDefn )
 import RdrName		( RdrName, mkUnqual )
 import Name		( Name, getName )
 import OccName		( NameSpace, tvName )
@@ -166,8 +166,8 @@ instance Outputable name => Outputable (HsPred name) where
     ppr (HsIParam n ty)    = hsep [char '?' <> ppr n, text "::", ppr ty]
 
 pprHsTyVarBndr :: Outputable name => name -> Kind -> SDoc
-pprHsTyVarBndr name kind | kind == liftedTypeKind = ppr name
-			 | otherwise 	          = hsep [ppr name, dcolon, pprParendKind kind]
+pprHsTyVarBndr name kind | kind `eqKind` liftedTypeKind = ppr name
+			 | otherwise 	  	        = hsep [ppr name, dcolon, pprParendKind kind]
 
 pprHsForAll []  []  = empty
 pprHsForAll tvs cxt 
@@ -274,19 +274,18 @@ toHsType (TyVarTy tv)    = HsTyVar (getName tv)
 toHsType (FunTy arg res) = HsFunTy (toHsType arg) (toHsType res)
 toHsType (AppTy fun arg) = HsAppTy (toHsType fun) (toHsType arg) 
 
-toHsType (NoteTy (SynNote syn_ty) real_ty)
-  | syn_matches = toHsType syn_ty             -- Use synonyms if possible!!
-  | otherwise   = 
+toHsType (NoteTy (SynNote ty@(TyConApp tycon tyargs)) real_ty)
+  | isNewTyCon tycon = toHsType ty
+  | syn_matches      = toHsType ty             -- Use synonyms if possible!!
+  | otherwise        = 
 #ifdef DEBUG
-                  pprTrace "WARNING: synonym info lost in .hi file for " (ppr syn_ty) $
+                       pprTrace "WARNING: synonym info lost in .hi file for " (ppr syn_ty) $
 #endif
-                  toHsType real_ty              -- but drop it if not.
+                       toHsType real_ty              -- but drop it if not.
   where
-    syn_matches               = ty_from_syn == real_ty
-
-    TyConApp syn_tycon tyargs = syn_ty
-    (tyvars,ty)               = getSynTyConDefn syn_tycon
-    ty_from_syn               = substTy (mkTyVarSubst tyvars tyargs) ty
+    syn_matches      = ty_from_syn `tcEqType` real_ty
+    (tyvars,syn_ty)  = getSynTyConDefn tycon
+    ty_from_syn      = substTy (mkTyVarSubst tyvars tyargs) syn_ty
 
     -- We only use the type synonym in the file if this doesn't cause
     -- us to lose important information.  This matters for usage
@@ -299,9 +298,10 @@ toHsType (NoteTy (SynNote syn_ty) real_ty)
     -- error messages, but it's too much work for right now.
     -- KSW 2000-07.
 
-toHsType (NoteTy _ ty)		  = toHsType ty
+toHsType (NoteTy _ ty)	       = toHsType ty
 
-toHsType (PredTy p)		  = HsPredTy (toHsPred p)
+toHsType (SourceTy (NType tc tys)) = foldl HsAppTy (HsTyVar (getName tc)) (map toHsType tys)
+toHsType (SourceTy pred)	   = HsPredTy (toHsPred pred)
 
 toHsType ty@(TyConApp tc tys)	-- Must be saturated because toHsType's arg is of kind *
   | not saturated	       = generic_case
@@ -315,7 +315,7 @@ toHsType ty@(TyConApp tc tys)	-- Must be saturated because toHsType's arg is of 
      tys'         = map toHsType tys
      saturated    = length tys == tyConArity tc
 
-toHsType ty@(ForAllTy _ _) = case splitSigmaTy ty of
+toHsType ty@(ForAllTy _ _) = case tcSplitSigmaTy ty of
 			        (tvs, preds, tau) -> HsForAllTy (Just (map toHsTyVar tvs))
 			 				        (map toHsPred preds)
 						                (toHsType tau)
@@ -384,7 +384,7 @@ eq_hsTyVars env (tv1:tvs1) (tv2:tvs2)  k = eq_hsTyVar env tv1 tv2 $ \ env ->
 eq_hsTyVars env _ _ _ = False
 
 eq_hsTyVar env (UserTyVar v1)     (UserTyVar v2)     k = k (extendEqHsEnv env v1 v2)
-eq_hsTyVar env (IfaceTyVar v1 k1) (IfaceTyVar v2 k2) k = k1 == k2 && k (extendEqHsEnv env v1 v2)
+eq_hsTyVar env (IfaceTyVar v1 k1) (IfaceTyVar v2 k2) k = k1 `eqKind` k2 && k (extendEqHsEnv env v1 v2)
 eq_hsTyVar env _ _ _ = False
 
 eq_hsVars env []       []       k = k env

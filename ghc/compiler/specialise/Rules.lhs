@@ -29,8 +29,9 @@ import Id		( Id, idUnfolding, idSpecialisation, setIdSpecialisation )
 import Var		( isId )
 import VarSet
 import VarEnv
-import Type		( mkTyVarTy )
-import qualified Unify	( match )
+import TcType		( mkTyVarTy )
+import qualified TcType ( match )
+import TypeRep		( Type(..) )	-- Can see type representation for matching
 
 import Outputable
 import Maybe		( isJust, isNothing, fromMaybe )
@@ -237,10 +238,10 @@ match (Var v1) e2 tpl_vars kont subst
 			 kont (extendSubst subst v1 (DoneEx e2))
 
 
-		| eqExpr (Var v1) e2		 -> kont subst
+		| eqExpr (Var v1) e2	   -> kont subst
 			-- v1 is not a template variable, so it must be a global constant
 
-	Just (DoneEx e2')  | eqExpr e2'       e2 -> kont subst
+	Just (DoneEx e2')  | eqExpr e2' e2 -> kont subst
 
 	other -> match_fail
 
@@ -359,12 +360,6 @@ bind vs1 vs2 matcher tpl_vars kont subst
     bug_msg = sep [ppr vs1, ppr vs2]
 
 ----------------------------------------
-match_ty ty1 ty2 tpl_vars kont subst
-  = case Unify.match False {- for now: KSW 2000-10 -} ty1 ty2 tpl_vars Just (substEnv subst) of
-	Nothing    -> match_fail
-	Just senv' -> kont (setSubstEnv subst senv') 
-
-----------------------------------------
 matches [] [] tpl_vars kont subst 
   = kont subst
 matches (e:es) (e':es') tpl_vars kont subst
@@ -377,6 +372,22 @@ mkVarArg :: CoreBndr -> CoreArg
 mkVarArg v | isId v    = Var v
 	   | otherwise = Type (mkTyVarTy v)
 \end{code}
+
+Matching Core types: use the matcher in TcType.
+Notice that we treat newtypes as opaque.  For example, suppose 
+we have a specialised version of a function at a newtype, say 
+	newtype T = MkT Int
+We only want to replace (f T) with f', not (f Int).
+
+\begin{code}
+----------------------------------------
+match_ty ty1 ty2 tpl_vars kont subst
+  = TcType.match ty1 ty2 tpl_vars kont' (substEnv subst)
+  where
+    kont' senv = kont (setSubstEnv subst senv) 
+\end{code}
+
+
 
 %************************************************************************
 %*									*

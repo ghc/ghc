@@ -21,11 +21,11 @@ import CoreUnfold	( maybeUnfoldingTemplate )
 import Id		( Id, idType, idStrictness, idUnfolding, isDataConId_maybe )
 import DataCon		( dataConTyCon, splitProductType_maybe, dataConRepArgTys )
 import IdInfo		( StrictnessInfo(..) )
-import Demand		( Demand(..), wwPrim, wwStrict, wwUnpackData, wwLazy, wwUnpackNew,
+import Demand		( Demand(..), wwPrim, wwStrict, wwUnpack, wwLazy,
 			  mkStrictnessInfo, isLazy
 			)
 import SaLib
-import TyCon		( isProductTyCon, isRecursiveTyCon, isNewTyCon )
+import TyCon		( isProductTyCon, isRecursiveTyCon )
 import BasicTypes	( NewOrData(..) )
 import Type		( splitTyConApp_maybe, 
 		          isUnLiftedType, Type )
@@ -285,10 +285,7 @@ evalStrictness (WwLazy _) _   = False
 evalStrictness WwStrict   val = isBot val
 evalStrictness WwEnum	  val = isBot val
 
-evalStrictness (WwUnpack NewType _ (demand:_)) val
-  = evalStrictness demand val
-
-evalStrictness (WwUnpack DataType _ demand_info) val
+evalStrictness (WwUnpack _ demand_info) val
   = case val of
       AbsTop	   -> False
       AbsBot	   -> True
@@ -313,10 +310,7 @@ possibly} hit poison.
 evalAbsence (WwLazy True) _ = False	-- Can't possibly hit poison
 					-- with Absent demand
 
-evalAbsence (WwUnpack NewType _ (demand:_)) val
-  = evalAbsence demand val
-
-evalAbsence (WwUnpack DataType _ demand_info) val
+evalAbsence (WwUnpack _ demand_info) val
   = case val of
 	AbsTop	     -> False		-- No poison in here
 	AbsBot 	     -> True		-- Pure poison
@@ -633,8 +627,8 @@ find_strictness id orig_str_ds orig_str_res orig_abs_ds
 		-- to be strict in it.  Unless the function diverges.
 	   WwLazy True	-- Best of all
 
-    mk_dmd (WwUnpack nd u str_ds) 
-	   (WwUnpack _ _ abs_ds) = WwUnpack nd u (go str_ds abs_ds)
+    mk_dmd (WwUnpack u str_ds) 
+	   (WwUnpack _ abs_ds) = WwUnpack u (go str_ds abs_ds)
 
     mk_dmd str_dmd abs_dmd = str_dmd
 \end{code}
@@ -717,18 +711,11 @@ findRecDemand str_fn abs_fn ty
 	   ->	wwStrict			-- 	(this applies to newtypes too:
 						--	e.g.  data Void = MkVoid Void)
 
-	   | isNewTyCon tycon 			-- A newtype!
-	   ->	ASSERT( null (tail cmpnt_tys) )
-		let
-		    demand = findRecDemand str_fn abs_fn (head cmpnt_tys)
-		in
-		wwUnpackNew demand
-
 	   |  null compt_strict_infos 		-- A nullary data type
 	   ->	wwStrict
 
 	   | otherwise				-- Some other data type
-	   ->	wwUnpackData compt_strict_infos
+	   ->	wwUnpack compt_strict_infos
 
 	   where
 	      prod_len = length cmpnt_tys

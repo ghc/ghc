@@ -19,10 +19,10 @@ import Literal		( literalType, Literal )
 import Maybes		( catMaybes )
 import Name		( getSrcLoc )
 import ErrUtils		( ErrMsg, Message, addErrLocHdrLine, pprBagOfErrors, dontAddErrLoc )
-import Type		( mkFunTys, splitFunTys, splitAlgTyConApp_maybe, splitTyConApp_maybe,
+import Type		( mkFunTys, splitFunTys, splitTyConApp_maybe,
 			  isUnLiftedType, isTyVarTy, splitForAllTys, Type
 			)
-import TyCon		( TyCon )
+import TyCon		( TyCon, isDataTyCon, tyConDataCons )
 import Util		( zipEqual )
 import Outputable
 
@@ -253,11 +253,10 @@ lintStgAlts alts scrut_ty
 	  check ty = checkTys first_ty ty (mkCaseAltMsg alts)
 
 lintAlgAlt scrut_ty (con, args, _, rhs)
-  = (case splitAlgTyConApp_maybe scrut_ty of
-      Nothing ->
-	 addErrL (mkAlgAltMsg1 scrut_ty)
-      Just (tycon, tys_applied, cons) ->
+  = (case splitTyConApp_maybe scrut_ty of
+      Just (tycon, tys_applied) | isDataTyCon tycon ->
 	 let
+	   cons    = tyConDataCons tycon
 	   arg_tys = dataConArgTys con tys_applied
 		-- This almost certainly does not work for existential constructors
 	 in
@@ -266,6 +265,8 @@ lintAlgAlt scrut_ty (con, args, _, rhs)
 								 `thenL_`
 	 mapL check (zipEqual "lintAlgAlt:stg" arg_tys args)	 `thenL_`
 	 returnL ()
+      other ->
+	 addErrL (mkAlgAltMsg1 scrut_ty)
     )								 `thenL_`
     addInScopeVars args 	(
 	 lintStgExpr rhs
@@ -425,7 +426,7 @@ checkFunApp :: Type 		    -- The function type
 checkFunApp fun_ty arg_tys msg loc scope errs
   = cfa res_ty expected_arg_tys arg_tys
   where
-    (_, de_forall_ty)   = splitForAllTys fun_ty
+    (_, de_forall_ty) 	       = splitForAllTys fun_ty
     (expected_arg_tys, res_ty) = splitFunTys de_forall_ty
 
     cfa res_ty expected []	-- Args have run out; that's fine

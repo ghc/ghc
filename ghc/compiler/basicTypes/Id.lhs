@@ -84,7 +84,7 @@ import Var		( Id, DictId,
 			)
 import qualified Var	( mkLocalId, mkGlobalId, mkSpecPragmaId )
 import Type		( Type, typePrimRep, addFreeTyVars, 
-                          usOnce, seqType, splitTyConApp_maybe )
+                          usOnce, eqUsage, seqType, splitTyConApp_maybe )
 
 import IdInfo 
 
@@ -431,7 +431,7 @@ idLBVarInfo id = lbvarInfo (idInfo id)
 isOneShotLambda :: Id -> Bool
 isOneShotLambda id = analysis || hack
   where analysis = case idLBVarInfo id of
-                     LBVarInfo u    | u == usOnce             -> True
+                     LBVarInfo u    | u `eqUsage` usOnce      -> True
                      other                                    -> False
         hack     = case splitTyConApp_maybe (idType id) of
                      Just (tycon,_) | tycon == statePrimTyCon -> True

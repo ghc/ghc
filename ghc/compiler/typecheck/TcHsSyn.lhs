@@ -41,13 +41,10 @@ import HsSyn	-- oodles of it
 -- others:
 import Id	( idName, idType, setIdType, Id )
 import DataCon	( dataConWrapId )	
-import TcEnv	( tcLookupGlobal_maybe, tcExtendGlobalValEnv,
-		  TcEnv, TcId
-		)
+import TcEnv	( tcLookupGlobal_maybe, tcExtendGlobalValEnv, TcEnv, TcId )
 
 import TcMonad
-import TcType	( zonkTcTypeToType, zonkTcTyVarToTyVar, zonkTcType, zonkTcSigTyVars
-		)
+import TcMType	( zonkTcTypeToType, zonkTcTyVarToTyVar, zonkTcType, zonkTcSigTyVars )
 import CoreSyn  ( Expr )
 import BasicTypes ( RecFlag(..) )
 import Bag

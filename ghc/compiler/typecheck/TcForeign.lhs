@@ -35,16 +35,12 @@ import Inst		( emptyLIE, LIE, plusLIE )
 import ErrUtils		( Message )
 import Id		( Id, mkLocalId )
 import Name		( nameOccName )
-import Type		( splitFunTys
-			, splitTyConApp_maybe
-			, splitForAllTys
-			)
 import TysWiredIn	( isFFIArgumentTy, isFFIImportResultTy, 
 			  isFFIExportResultTy,
 			  isFFIExternalTy, isFFIDynArgumentTy, isFFIDynResultTy,
 			  isFFILabelTy
 			)
-import Type             ( Type )
+import TcType		( Type, tcSplitFunTys, tcSplitTyConApp_maybe, tcSplitForAllTys )
 import ForeignCall	( CCallSpec(..), CExportSpec(..), CCallTarget(..), isDynamicTarget, isCasmTarget )
 import CStrings		( CLabelString, isCLabelString )
 import PrelNames	( hasKey, ioTyConKey )
@@ -84,8 +80,8 @@ tcFImport fo@(ForeignImport nm hs_ty imp_decl src_loc)
    let 
       -- drop the foralls before inspecting the structure
       -- of the foreign type.
-	(_, t_ty)	  = splitForAllTys sig_ty
-	(arg_tys, res_ty) = splitFunTys t_ty
+	(_, t_ty)	  = tcSplitForAllTys sig_ty
+	(arg_tys, res_ty) = tcSplitFunTys t_ty
 	id		  = mkLocalId nm sig_ty
    in
    tcCheckFIType sig_ty arg_tys res_ty imp_decl		`thenNF_Tc_` 
@@ -112,7 +108,7 @@ tcCheckFIType sig_ty arg_tys res_ty (CDynImport _)
 		     checkForeignRes nonIOok  isFFIExportResultTy res1_ty	`thenNF_Tc_`
 		     checkForeignRes mustBeIO isFFIDynResultTy	  res_ty
 		  where
-		     (arg1_tys, res1_ty) = splitFunTys arg1_ty
+		     (arg1_tys, res1_ty) = tcSplitFunTys arg1_ty
         other -> addErrTc (illegalForeignTyErr empty sig_ty)
 
 tcCheckFIType sig_ty arg_tys res_ty (CImport (CCallSpec target _ safety))
@@ -192,8 +188,8 @@ tcCheckFEType sig_ty (CExport (CExportStatic str _))
   where
       -- Drop the foralls before inspecting n
       -- the structure of the foreign type.
-    (_, t_ty) = splitForAllTys sig_ty
-    (arg_tys, res_ty) = splitFunTys t_ty
+    (_, t_ty) = tcSplitForAllTys sig_ty
+    (arg_tys, res_ty) = tcSplitFunTys t_ty
 \end{code}
 
 
@@ -222,12 +218,12 @@ checkForeignRes :: Bool -> (Type -> Bool) -> Type -> NF_TcM ()
 nonIOok  = True
 mustBeIO = False
 
-checkForeignRes non_io_result_ok pred_res_ty ty =
- case (splitTyConApp_maybe ty) of
-    Just (io, [res_ty]) 
+checkForeignRes non_io_result_ok pred_res_ty ty
+ = case tcSplitTyConApp_maybe ty of
+      Just (io, [res_ty]) 
         | io `hasKey` ioTyConKey && pred_res_ty res_ty 
 	-> returnNF_Tc ()
-    _   
+      _   
         -> check (non_io_result_ok && pred_res_ty ty) 
 		 (illegalForeignTyErr result ty)
 \end{code}

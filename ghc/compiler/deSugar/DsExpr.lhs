@@ -18,6 +18,8 @@ import HsSyn		( failureFreePat,
 import TcHsSyn		( TypecheckedHsExpr, TypecheckedHsBinds,
 			  TypecheckedStmt, TypecheckedMatchContext
 			)
+import TcType		( tcSplitAppTy, tcSplitFunTys, tcSplitTyConApp_maybe, tcTyConAppArgs,
+			  isIntegerTy, tcSplitTyConApp, isUnLiftedType, Type )
 import CoreSyn
 import CoreUtils	( exprType, mkIfThenElse, bindNonRec )
 
@@ -39,11 +41,7 @@ import DataCon		( DataCon, dataConWrapId, dataConFieldLabels, dataConInstOrigArg
 import DataCon		( isExistentialDataCon )
 import Literal		( Literal(..) )
 import TyCon		( tyConDataCons )
-import Type		( splitFunTys,
-			  splitAlgTyConApp, splitTyConApp_maybe, tyConAppArgs,
-			  splitAppTy, isUnLiftedType, Type
-			)
-import TysWiredIn	( tupleCon, listTyCon, charDataCon, intDataCon, isIntegerTy )
+import TysWiredIn	( tupleCon, listTyCon, charDataCon, intDataCon )
 import BasicTypes	( RecFlag(..), Boxity(..) )
 import Maybes		( maybeToBool )
 import PrelNames	( hasKey, ratioTyConKey )
@@ -165,7 +163,7 @@ dsExpr (SectionL expr op)
   = dsExpr op						`thenDs` \ core_op ->
     -- for the type of y, we need the type of op's 2nd argument
     let
-	(x_ty:y_ty:_, _) = splitFunTys (exprType core_op)
+	(x_ty:y_ty:_, _) = tcSplitFunTys (exprType core_op)
     in
     dsExpr expr				`thenDs` \ x_core ->
     newSysLocalDs x_ty			`thenDs` \ x_id ->
@@ -179,7 +177,7 @@ dsExpr (SectionR op expr)
   = dsExpr op			`thenDs` \ core_op ->
     -- for the type of x, we need the type of op's 2nd argument
     let
-	(x_ty:y_ty:_, _) = splitFunTys (exprType core_op)
+	(x_ty:y_ty:_, _) = tcSplitFunTys (exprType core_op)
     in
     dsExpr expr				`thenDs` \ y_core ->
     newSysLocalDs x_ty			`thenDs` \ x_id ->
@@ -242,7 +240,7 @@ dsExpr (HsDoOut do_or_lc stmts return_id then_id fail_id result_ty src_loc)
     dsDo do_or_lc stmts return_id then_id fail_id result_ty
   where
     maybe_list_comp 
-	= case (do_or_lc, splitTyConApp_maybe result_ty) of
+	= case (do_or_lc, tcSplitTyConApp_maybe result_ty) of
 	    (ListComp, Just (tycon, [elt_ty]))
 		  | tycon == listTyCon
 		 -> Just elt_ty
@@ -343,7 +341,7 @@ constructor @C@, setting all of @C@'s fields to bottom.
 dsExpr (RecordConOut data_con con_expr rbinds)
   = dsExpr con_expr	`thenDs` \ con_expr' ->
     let
-	(arg_tys, _) = splitFunTys (exprType con_expr')
+	(arg_tys, _) = tcSplitFunTys (exprType con_expr')
 
 	mk_arg (arg_ty, lbl)
 	  = case [rhs | (sel_id,rhs,_) <- rbinds,
@@ -398,8 +396,8 @@ dsExpr (RecordUpdOut record_expr record_out_ty dicts rbinds)
 
     let
 	record_in_ty = exprType record_expr'
-	in_inst_tys  = tyConAppArgs record_in_ty
-	out_inst_tys = tyConAppArgs record_out_ty
+	in_inst_tys  = tcTyConAppArgs record_in_ty
+	out_inst_tys = tcTyConAppArgs record_out_ty
 
 	mk_val_arg field old_arg_id 
 	  = case [rhs | (sel_id, rhs, _) <- rbinds, 
@@ -500,7 +498,7 @@ dsDo	:: HsDoContext
 
 dsDo do_or_lc stmts return_id then_id fail_id result_ty
   = let
-	(_, b_ty) = splitAppTy result_ty	-- result_ty must be of the form (m b)
+	(_, b_ty) = tcSplitAppTy result_ty	-- result_ty must be of the form (m b)
 	is_do	  = case do_or_lc of
 			DoExpr   -> True
 			ListComp -> False
@@ -520,7 +518,7 @@ dsDo do_or_lc stmts return_id then_id fail_id result_ty
 	  = do_expr expr locn		`thenDs` \ expr2 ->
 	    go stmts     		`thenDs` \ rest  ->
 	    let
-		(_, a_ty) = splitAppTy (exprType expr2)  -- Must be of form (m a)
+		(_, a_ty) = tcSplitAppTy (exprType expr2)  -- Must be of form (m a)
 	    in
 	    newSysLocalDs a_ty		`thenDs` \ ignored_result_id ->
 	    returnDs (mkApps (Var then_id) [Type a_ty, Type b_ty, expr2, 
@@ -544,7 +542,7 @@ dsDo do_or_lc stmts return_id then_id fail_id result_ty
 	  = putSrcLocDs locn $
 	    dsExpr expr 	   `thenDs` \ expr2 ->
 	    let
-		(_, a_ty)  = splitAppTy (exprType expr2) -- Must be of form (m a)
+		(_, a_ty)  = tcSplitAppTy (exprType expr2) -- Must be of form (m a)
 		fail_expr  = HsApp (TyApp (HsVar fail_id) [b_ty])
                                    (HsLit (HsString (_PK_ msg)))
 	        msg = "Pattern match failure in do expression, " ++ showSDoc (ppr locn)
@@ -612,11 +610,10 @@ dsLit (HsRat r ty)
     mkIntegerLit (denominator r)	`thenDs` \ denom ->
     returnDs (mkConApp ratio_data_con [Type integer_ty, num, denom])
   where
-    (ratio_data_con, integer_ty)
-      = case splitAlgTyConApp ty of
-	  (tycon, [i_ty], [con])
-	    -> ASSERT(isIntegerTy i_ty && tycon `hasKey` ratioTyConKey)
-	       (con, i_ty)
+    (ratio_data_con, integer_ty) 
+	= case tcSplitTyConApp ty of
+		(tycon, [i_ty]) -> ASSERT(isIntegerTy i_ty && tycon `hasKey` ratioTyConKey)
+				   (head (tyConDataCons tycon), i_ty)
 \end{code}
 
 

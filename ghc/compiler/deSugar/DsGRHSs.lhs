@@ -14,7 +14,7 @@ import {-# SOURCE #-} Match   ( matchSinglePat )
 import HsSyn		( Stmt(..), HsExpr(..), GRHSs(..), GRHS(..), HsMatchContext(..) )
 import TcHsSyn		( TypecheckedGRHSs, TypecheckedPat, TypecheckedStmt, TypecheckedMatchContext )
 import CoreSyn		( CoreExpr )
-import Type		( Type )
+import TcType		( Type )
 
 import DsMonad
 import DsUtils

@@ -12,6 +12,7 @@ module Check ( check , ExhaustivePat ) where
 
 import HsSyn		
 import TcHsSyn		( TypecheckedPat )
+import TcType		( tcTyConAppTyCon, tcTyConAppArgs )
 import DsHsSyn		( outPatType ) 
 import DsUtils		( EquationInfo(..), MatchResult(..), EqnSet, 
 			  CanItFail(..),  tidyLitPat, tidyNPat, 
@@ -20,7 +21,7 @@ import Id		( idType )
 import DataCon		( DataCon, dataConTyCon, dataConArgTys,
 			  dataConSourceArity, dataConFieldLabels )
 import Name             ( Name, mkLocalName, getOccName, isDataSymOcc, getName, mkVarOcc )
-import Type		( splitAlgTyConApp, mkTyVarTys, splitTyConApp_maybe )
+import TcType		( mkTyVarTys )
 import TysPrim		( charPrimTy )
 import TysWiredIn
 import PrelNames	( unboundKey )
@@ -413,16 +414,11 @@ get_unused_cons :: [TypecheckedPat] -> [DataCon]
 get_unused_cons used_cons = unused_cons
      where
        (ConPat _ ty _ _ _) = head used_cons
-       Just (ty_con,_) 	   = sTyConApp_maybe used_cons ty
+       ty_con 		   = tcTyConAppTyCon ty		-- Newtype observable
        all_cons        	   = tyConDataCons ty_con
        used_cons_as_id 	   = map (\ (ConPat d _ _ _ _) -> d) used_cons
        unused_cons     	   = uniqSetToList
 		 (mkUniqSet all_cons `minusUniqSet` mkUniqSet used_cons_as_id) 
-
-sTyConApp_maybe used_cons ty =
-    case splitTyConApp_maybe ty of
-    Just x -> Just x
-    Nothing -> pprTrace "splitTyConApp_maybe" (ppr (used_cons, ty)) $ Nothing
 
 all_vars :: [TypecheckedPat] -> Bool
 all_vars []              = True
@@ -592,9 +588,9 @@ simplify_pat (RecPat dc ty ex_tvs dicts [])
   where
     all_wild_pats = map WildPat con_arg_tys
 
-      -- identical to machinations in Match.tidy1:
-    (_, inst_tys, _) = splitAlgTyConApp ty
-    con_arg_tys      = dataConArgTys dc (inst_tys ++ mkTyVarTys ex_tvs)
+      -- Identical to machinations in Match.tidy1:
+    inst_tys    = tcTyConAppArgs ty	-- Newtype is observable
+    con_arg_tys = dataConArgTys dc (inst_tys ++ mkTyVarTys ex_tvs)
 
 simplify_pat (RecPat dc ty ex_tvs dicts idps) 
   = ConPat dc ty ex_tvs dicts pats

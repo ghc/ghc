@@ -36,7 +36,7 @@ import RnEnv
 import RnMonad
 import Id		( idType, idName, globalIdDetails )
 import IdInfo		( GlobalIdDetails(..) )
-import Type		( namesOfType )
+import TcType		( namesOfType )
 import FieldLabel	( fieldLabelTyCon )
 import DataCon		( dataConTyCon )
 import TyCon		( isSynTyCon, getSynTyConDefn, tyConClass_maybe, tyConName )

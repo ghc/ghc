@@ -39,18 +39,18 @@ import TysWiredIn	( charTy, mkListTy )
 import PrelNames	( pREL_ERR, pREL_GHC )
 import PrelRules	( primOpRule )
 import Rules		( addRule )
-import Type		( Type, ThetaType, mkDictTy, mkPredTys, mkTyConApp,
-			  mkTyVarTys, repType, isNewType,
-			  mkFunTys, mkFunTy, mkSigmaTy, splitSigmaTy, 
+import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkTyConApp,
+			  mkTyVarTys, mkClassPred, tcEqPred,
+			  mkFunTys, mkFunTy, mkSigmaTy, tcSplitSigmaTy, 
 			  isUnLiftedType, mkForAllTys, mkTyVarTy, tyVarsOfType,
-			  splitFunTys, splitForAllTys, mkPredTy
+			  tcSplitFunTys, tcSplitForAllTys, mkPredTy
 			)
 import Module		( Module )
 import CoreUtils	( exprType, mkInlineMe )
 import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding, mkOtherCon )
 import Literal		( Literal(..) )
 import TyCon		( TyCon, isNewTyCon, tyConTyVars, tyConDataCons,
-                          tyConTheta, isProductTyCon, isDataTyCon )
+                          tyConTheta, isProductTyCon, isDataTyCon, isRecursiveTyCon )
 import Class		( Class, classTyCon, classTyVars, classSelIds )
 import Var		( Id, TyVar )
 import VarSet		( isEmptyVarSet )
@@ -70,7 +70,7 @@ import DataCon		( DataCon,
 			)
 import Id		( idType, mkGlobalId, mkVanillaGlobal, mkSysLocal,
 			  mkTemplateLocals, mkTemplateLocalsNum,
-			  mkTemplateLocal, idCprInfo
+			  mkTemplateLocal, idCprInfo, idName
 			)
 import IdInfo		( IdInfo, noCafNoTyGenIdInfo,
 			  exactArity, setUnfoldingInfo, setCprInfo,
@@ -157,7 +157,7 @@ mkDataConId work_name data_con
 	       arity <= mAX_CPR_SIZE	= ReturnsCPR
 	     | otherwise 		= NoCPRInfo
 	-- ReturnsCPR is only true for products that are real data types;
-	-- that is, not unboxed tuples or newtypes
+	-- that is, not unboxed tuples or [non-recursive] newtypes
 
 mAX_CPR_SIZE :: Arity
 mAX_CPR_SIZE = 10
@@ -236,9 +236,8 @@ mkDataConWrapId data_con
 	     = ASSERT( null ex_tyvars && null ex_dict_args && length orig_arg_tys == 1 )
 		-- No existentials on a newtype, but it can have a context
 		-- e.g. 	newtype Eq a => T a = MkT (...)
-
-	       mkLams tyvars $ mkLams dict_args $ Lam id_arg1 $
-	       Note (Coerce result_ty (head orig_arg_tys)) (Var id_arg1)
+		mkLams tyvars $ mkLams dict_args $ Lam id_arg1 $ 
+		mkNewTypeBody tycon result_ty id_arg1
 
 	     | null dict_args && not (any isMarkedStrict strict_marks)
 	     = Var work_id	-- The common case.  Not only is this efficient,
@@ -303,24 +302,12 @@ mkDataConWrapId data_con
 			Case (Var arg) arg [(DEFAULT,[], body i (arg:rep_args))]
 
 		MarkedUnboxed
-		   | isNewType arg_ty ->
-			Let (NonRec coerced_arg 
-				(Note (Coerce rep_ty arg_ty) (Var arg)))
-			      (do_unbox coerced_arg rep_ty i')
-		   | otherwise ->
-			do_unbox arg arg_ty i
-		  where
-		    ([coerced_arg],i') = mkLocals i [rep_ty]
-		    arg_ty = idType arg
-		    rep_ty = repType arg_ty
-
-		    do_unbox arg ty i = 
-			case splitProductType "do_unbox" ty of
+		   -> case splitProductType "do_unbox" (idType arg) of
 			   (tycon, tycon_args, con, tys) ->
 				   Case (Var arg) arg [(DataAlt con, con_args,
 					body i' (reverse con_args ++ rep_args))]
 			      where 
-				(con_args, i')   = mkLocals i tys
+				(con_args, i') = mkLocals i tys
 \end{code}
 
 
@@ -388,11 +375,11 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
 					--   eg data (Eq a, Ord b) => T a b = ...
     dict_tys  = [mkPredTy pred | pred <- tycon_theta, 
 				 needed_dict pred]
-    needed_dict pred = or [ pred `elem` (dataConTheta dc) 
-			  | (DataAlt dc, _, _) <- the_alts]
+    needed_dict pred = or [ tcEqPred pred p
+			  | (DataAlt dc, _, _) <- the_alts, p <- dataConTheta dc]
     n_dict_tys = length dict_tys
 
-    (field_tyvars,field_theta,field_tau) = splitSigmaTy field_ty
+    (field_tyvars,field_theta,field_tau) = tcSplitSigmaTy field_ty
     field_dict_tys			 = map mkPredTy field_theta
     n_field_dict_tys			 = length field_dict_tys
 	-- If the field has a universally quantified type we have to 
@@ -457,8 +444,8 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
 	      mkLams dict_ids $ mkLams field_dict_ids $
 	      Lam data_id     $ sel_body
 
-    sel_body | isNewTyCon tycon = Note (Coerce field_tau data_ty) (Var data_id)
-	     | otherwise	= Case (Var data_id) data_id (the_alts ++ default_alt)
+    sel_body | isNewTyCon tycon = mkNewTypeBody tycon field_tau data_id
+	     | otherwise	= Case (Var data_id) data_id (default_alt ++ the_alts)
 
     mk_maybe_alt data_con 
 	  = case maybe_the_arg_id of
@@ -519,24 +506,15 @@ rebuildConArgs (arg:args) (str:stricts) us
   | isMarkedUnboxed str
   = let
 	arg_ty  = idType arg
-	prod_ty | isNewType arg_ty = repType arg_ty
-		| otherwise        = arg_ty
 
 	(_, tycon_args, pack_con, con_arg_tys)
-	 	 = splitProductType "rebuildConArgs" prod_ty
+	 	 = splitProductType "rebuildConArgs" arg_ty
 
 	unpacked_args  = zipWith (mkSysLocal SLIT("rb")) us con_arg_tys
-
-	(binds, args') = rebuildConArgs args stricts 
-				(drop (length con_arg_tys) us)
-
-	coerce | isNewType arg_ty = Note (Coerce arg_ty prod_ty) con_app
-	       | otherwise        = con_app
-
-	con_app	       = mkConApp pack_con (map Type tycon_args ++ 
-					    map Var  unpacked_args)
+	(binds, args') = rebuildConArgs args stricts (drop (length con_arg_tys) us)
+	con_app	       = mkConApp pack_con (map Type tycon_args ++ map Var unpacked_args)
     in
-    (NonRec arg coerce : binds, unpacked_args ++ args')
+    (NonRec arg con_app : binds, unpacked_args ++ args')
 
   | otherwise
   = let (binds, args') = rebuildConArgs args stricts us
@@ -558,12 +536,17 @@ ToDo: unify with mkRecordSelId.
 \begin{code}
 mkDictSelId :: Name -> Class -> Id
 mkDictSelId name clas
-  = sel_id
+  = mkGlobalId (RecordSelId field_lbl) name sel_ty info
   where
-    ty	      = exprType rhs
-    sel_id    = mkGlobalId (RecordSelId field_lbl) name ty info
-    field_lbl = mkFieldLabel name tycon ty tag
-    tag       = assoc "MkId.mkDictSelId" (classSelIds clas `zip` allFieldLabelTags) sel_id
+    sel_ty = mkForAllTys tyvars (mkFunTy (idType dict_id) (idType the_arg_id))
+	-- We can't just say (exprType rhs), because that would give a type
+	--	C a -> C a
+	-- for a single-op class (after all, the selector is the identity)
+	-- But it's type must expose the representation of the dictionary
+	-- to gat (say)		C a -> (a -> a)
+
+    field_lbl = mkFieldLabel name tycon sel_ty tag
+    tag       = assoc "MkId.mkDictSelId" (map idName (classSelIds clas) `zip` allFieldLabelTags) name
 
     info      = noCafNoTyGenIdInfo
 		`setCgArity` 	    1
@@ -583,14 +566,20 @@ mkDictSelId name clas
     arg_tys    = dataConArgTys data_con tyvar_tys
     the_arg_id = arg_ids !! (tag - firstFieldLabelTag)
 
-    dict_ty    = mkDictTy clas tyvar_tys
-    (dict_id:arg_ids) = mkTemplateLocals (dict_ty : arg_tys)
+    pred	      = mkClassPred clas tyvar_tys
+    (dict_id:arg_ids) = mkTemplateLocals (mkPredTy pred : arg_tys)
 
-    rhs | isNewTyCon tycon = mkLams tyvars $ Lam dict_id $
-			     Note (Coerce (head arg_tys) dict_ty) (Var dict_id)
+    rhs | isNewTyCon tycon = mkLams tyvars $ Lam dict_id $ 
+			     mkNewTypeBody tycon (head arg_tys) dict_id
 	| otherwise	   = mkLams tyvars $ Lam dict_id $
 			     Case (Var dict_id) dict_id
 			     	  [(DataAlt data_con, arg_ids, Var the_arg_id)]
+
+mkNewTypeBody tycon result_ty result_id
+  | isRecursiveTyCon tycon	-- Recursive case; use a coerce
+  = Note (Coerce result_ty (idType result_id)) (Var result_id)
+  | otherwise			-- Normal case
+  = Var result_id
 \end{code}
 
 
@@ -647,8 +636,8 @@ mkFCallId uniq fcall ty
 	   `setArityInfo` 	exactArity arity
 	   `setStrictnessInfo`	strict_info
 
-    (_, tau) 	 = splitForAllTys ty
-    (arg_tys, _) = splitFunTys tau
+    (_, tau) 	 = tcSplitForAllTys ty
+    (arg_tys, _) = tcSplitFunTys tau
     arity	 = length arg_tys
     strict_info  = mkStrictnessInfo (take arity (repeat wwPrim), False)
 \end{code}

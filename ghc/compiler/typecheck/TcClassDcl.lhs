@@ -33,7 +33,8 @@ import TcEnv		( RecTcEnv, TyThingDetails(..), tcAddImportedIdInfo,
 import TcBinds		( tcBindWithSigs, tcSpecSigs )
 import TcMonoType	( tcHsRecType, tcRecTheta, checkSigTyVars, checkAmbiguity, sigCtxt, mkTcSig )
 import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
-import TcType		( TcType, TcTyVar, tcInstTyVars )
+import TcMType		( tcInstTyVars )
+import TcType		( Type, ThetaType, mkTyVarTys, mkPredTys, mkClassPred, tcIsTyVarTy, tcSplitTyConApp_maybe )
 import TcMonad
 import Generics		( mkGenericRhs, validGenericMethodType )
 import PrelInfo		( nO_METHOD_BINDING_ERROR_ID )
@@ -48,9 +49,6 @@ import Name		( Name, NamedThing(..) )
 import NameEnv		( NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, plusNameEnv, nameEnvElts )
 import NameSet		( emptyNameSet )
 import Outputable
-import Type		( Type, ThetaType, mkTyVarTys, mkPredTys, mkClassPred,
-			  splitTyConApp_maybe, isTyVarTy
-			)
 import Var		( TyVar )
 import VarSet		( mkVarSet, emptyVarSet )
 import CmdLineOpts
@@ -597,9 +595,9 @@ mkDefMethRhs is_inst_decl clas inst_tys sel_id loc GenDefMeth
     clas_tyvar    = head (classTyVars clas)
     Just tycon	  = maybe_tycon
     maybe_tycon   = case inst_tys of 
-			[ty] -> case splitTyConApp_maybe ty of
-				  Just (tycon, arg_tys) | all isTyVarTy arg_tys -> Just tycon
-				  other						-> Nothing
+			[ty] -> case tcSplitTyConApp_maybe ty of
+				  Just (tycon, arg_tys) | all tcIsTyVarTy arg_tys -> Just tycon
+				  other						  -> Nothing
 			other -> Nothing
 \end{code}
 

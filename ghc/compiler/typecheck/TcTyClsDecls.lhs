@@ -23,24 +23,28 @@ import HscTypes		( implicitTyThingIds )
 import TcMonad
 import TcEnv		( TcEnv, RecTcEnv, TcTyThing(..), TyThing(..), TyThingDetails(..),
 			  tcExtendKindEnv, tcLookup, tcExtendGlobalEnv, tcExtendGlobalValEnv )
-import TcTyDecls	( tcTyDecl1, kcConDetails, mkNewTyConRep )
+import TcTyDecls	( tcTyDecl1, kcConDetails )
 import TcClassDcl	( tcClassDecl1 )
-import TcMonoType	( kcHsTyVars, kcHsType, kcHsLiftedSigType, kcHsContext, mkTyClTyVars )
-import TcType		( TcKind, newKindVar, zonkKindEnv )
-
-import TcUnify		( unifyKind )
 import TcInstDcls	( tcAddDeclCtxt )
-import Type		( Kind, mkArrowKind, liftedTypeKind, zipFunTys )
+import TcMonoType	( kcHsTyVars, kcHsType, kcHsLiftedSigType, kcHsContext, mkTyClTyVars )
+import TcMType		( unifyKind, newKindVar, zonkKindEnv )
+import TcType		( tcSplitTyConApp_maybe,
+			  Type, Kind, mkArrowKind, liftedTypeKind, zipFunTys
+			)
+import Subst		( mkTyVarSubst, substTy )
 import Variance         ( calcTyConArgVrcs )
 import Class		( Class, mkClass, classTyCon )
-import TyCon		( TyCon, tyConKind, ArgVrcs, AlgTyConFlavour(..), 
-			  mkSynTyCon, mkAlgTyCon, mkClassTyCon, mkForeignTyCon )
-import DataCon		( isNullaryDataCon )
-import Var		( varName )
+import TyCon		( TyCon, ArgVrcs, AlgTyConFlavour(..), 
+			  tyConName, tyConKind, tyConTyVars, tyConArity, tyConDataCons,
+			  mkSynTyCon, mkAlgTyCon, mkClassTyCon, mkForeignTyCon, isNewTyCon,
+			  isRecursiveTyCon )
+import TysWiredIn	( unitTy )
+import DataCon		( isNullaryDataCon, dataConOrigArgTys )
+import Var		( varName, varType )
 import FiniteMap
 import Digraph		( stronglyConnComp, SCC(..) )
 import Name		( Name, getSrcLoc, isTyVarName )
-import NameEnv		( NameEnv, mkNameEnv, lookupNameEnv_NF )
+import NameEnv
 import NameSet
 import Outputable
 import Maybes		( mapMaybe )
@@ -323,10 +327,17 @@ buildTyConOrClass dflags is_rec kenv rec_vrcs  rec_details
 	tyvars	   = mkTyClTyVars tycon_kind tyvar_names
         argvrcs	   = lookupWithDefaultFM rec_vrcs bogusVrcs tycon
 
+	-- Watch out!  mkTyConApp asks whether the tycon is a NewType,
+	-- so flavour has to be able to answer this question without consulting rec_details
 	flavour = case data_or_new of
-			NewType -> NewTyCon (mkNewTyConRep tycon)
-			DataType | all isNullaryDataCon data_cons -> EnumTyCon
-				 | otherwise			  -> DataTyCon
+		    NewType  -> NewTyCon (mkNewTyConRep tycon)
+		    DataType | all (null . dataConOrigArgTys) data_cons -> EnumTyCon
+	 		     | otherwise		     		-> DataTyCon
+			-- NB (null . dataConOrigArgTys).  It used to say isNullaryDataCon
+			-- but that looks at the *representation* arity, and that in turn
+			-- depends on deciding whether to unpack the args, and that 
+			-- depends on whether it's a data type or a newtype --- so
+			-- in the recursive case we can get a loop.  This version is simple!
 
 buildTyConOrClass dflags is_rec kenv rec_vrcs  rec_details
                   (ForeignType {tcdName = tycon_name, tcdExtName = tycon_ext_name})
@@ -346,16 +357,25 @@ buildTyConOrClass dflags is_rec kenv rec_vrcs  rec_details
                              argvrcs dict_con
 			     clas 		-- Yes!  It's a dictionary 
 			     flavour
+			     is_rec
+		-- A class can be recursive, and in the case of newtypes 
+		-- this matters.  For example
+		-- 	class C a where { op :: C b => a -> b -> Int }
+		-- Because C has only one operation, it is represented by
+		-- a newtype, and it should be a *recursive* newtype.
+		-- [If we don't make it a recursive newtype, we'll expand the
+		-- newtype like a synonym, but that will lead toan inifinite type
 
 	ClassDetails sc_theta sc_sel_ids op_items dict_con = lookupNameEnv_NF rec_details class_name
 
 	class_kind = lookupNameEnv_NF kenv class_name
 	tyvars	   = mkTyClTyVars class_kind tyvar_names
         argvrcs	   = lookupWithDefaultFM rec_vrcs bogusVrcs tycon
-	n_fields   = length sc_sel_ids + length op_items
 
- 	flavour | n_fields == 1 = NewTyCon (mkNewTyConRep tycon)
-		| otherwise	= DataTyCon
+ 	flavour = case dataConOrigArgTys dict_con of
+			-- The tyvars in the datacon are the same as in the class
+		    [rep_ty] -> NewTyCon rep_ty
+		    other    -> DataTyCon 
 
 	-- We can find the functional dependencies right away, 
 	-- and it is vital to do so. Why?  Because in the next pass
@@ -366,6 +386,19 @@ buildTyConOrClass dflags is_rec kenv rec_vrcs  rec_details
 	lookup     = lookupNameEnv_NF tyvar_env
 
 bogusVrcs = panic "Bogus tycon arg variances"
+\end{code}
+
+\begin{code}
+mkNewTyConRep :: TyCon		-- The original type constructor
+	      -> Type		-- Chosen representation type
+-- Find the representation type for this newtype TyCon
+-- For a recursive type constructor we give an error thunk,
+-- because we never look at the rep in that case
+-- (see notes on newypes in types/TypeRep
+
+mkNewTyConRep tc
+  | isRecursiveTyCon tc = pprPanic "Attempt to get the rep of newtype" (ppr tc)
+  | otherwise		= head (dataConOrigArgTys (head (tyConDataCons tc)))
 \end{code}
 
 

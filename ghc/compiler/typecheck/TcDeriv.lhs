@@ -44,7 +44,7 @@ import TyCon		( tyConTyVars, tyConDataCons,
 			  tyConTheta, maybeTyConSingleCon, isDataTyCon,
 			  isEnumerationTyCon, TyCon
 			)
-import Type		( ThetaType, mkTyVarTys, mkTyConApp, 
+import TcType		( ThetaType, mkTyVarTys, mkTyConApp, 
 			  isUnLiftedType, mkClassPred )
 import Var		( TyVar )
 import PrelNames

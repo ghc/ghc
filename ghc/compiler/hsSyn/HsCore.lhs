@@ -44,7 +44,7 @@ import Literal		( Literal, maybeLitLit )
 import ForeignCall	( ForeignCall )
 import DataCon		( dataConTyCon, dataConSourceArity )
 import TyCon		( isTupleTyCon, tupleTyConBoxity )
-import Type		( Kind )
+import Type		( Kind, eqKind )
 import BasicTypes	( Arity )
 import FiniteMap	( lookupFM )
 import CostCentre
@@ -300,7 +300,7 @@ instance (NamedThing name, Ord name) => Eq (UfExpr name) where
 eq_ufBinder env (UfValBinder n1 t1) (UfValBinder n2 t2) k
   = eq_hsType env t1 t2 && k (extendEqHsEnv env n1 n2)
 eq_ufBinder env (UfTyBinder n1 k1) (UfTyBinder n2 k2) k
-  = k1==k2 && k (extendEqHsEnv env n1 n2)
+  = k1 `eqKind` k2 && k (extendEqHsEnv env n1 n2)
 eq_ufBinder _ _ _ _ = False
 
 -----------------

@@ -31,7 +31,7 @@ import RdrName		( RdrName, mkRdrOrig )
 import OccName		( OccName, pprOccName, mkVarOcc )
 import TyCon		( TyCon )
 import Type		( Type, mkForAllTys, mkFunTy, mkFunTys, typePrimRep,
-			  splitFunTy_maybe, splitAlgTyConApp_maybe, splitTyConApp,
+			  splitFunTy_maybe, tyConAppTyCon, splitTyConApp,
                           mkUTy, usOnce, usMany
 			)
 import Unique		( mkPrimOpIdUnique )
@@ -518,14 +518,9 @@ getPrimOpResultInfo op
       Dyadic  _ ty		 -> ReturnsPrim (typePrimRep ty)
       Monadic _ ty		 -> ReturnsPrim (typePrimRep ty)
       Compare _ ty		 -> ReturnsAlg boolTyCon
-      GenPrimOp _ _ _ ty	 -> 
-	let rep = typePrimRep ty in
-	case rep of
-	   PtrRep -> case splitAlgTyConApp_maybe ty of
-			Nothing -> pprPanic "getPrimOpResultInfo" 
-                                            (ppr ty <+> ppr op)
-			Just (tc,_,_) -> ReturnsAlg tc
-	   other -> ReturnsPrim other
+      GenPrimOp _ _ _ ty	 -> case typePrimRep ty of
+					   PtrRep -> ReturnsAlg (tyConAppTyCon ty)
+					   rep    -> ReturnsPrim rep
 \end{code}
 
 The commutable ops are those for which we will try to move constants

@@ -77,7 +77,7 @@ module IdInfo (
 
 
 import CoreSyn
-import Type		( Type, usOnce )
+import Type		( Type, usOnce, eqUsage )
 import PrimOp	 	( PrimOp )
 import NameEnv		( NameEnv, lookupNameEnv )
 import Name		( Name )
@@ -395,8 +395,6 @@ data TyGenInfo
                              -- preserve specified usage annotations
 
   | TyGenNever               -- never generalise the type of this Id
-
-  deriving ( Eq )
 \end{code}
 
 For TyGenUInfo, the list has one entry for each usage annotation on
@@ -428,9 +426,9 @@ ppTyGenInfo (TyGenUInfo us) = ptext SLIT("__G") <+> text (tyGenInfoString us)
 ppTyGenInfo  TyGenNever     = ptext SLIT("__G N")
 
 tyGenInfoString us = map go us
-  where go  Nothing               = 'x'  -- for legibility, choose
-        go (Just u) | u == usOnce = '1'  -- chars with identity
-                    | u == usMany = 'M'  -- Z-encoding.
+  where go  Nothing              	 = 'x'  -- for legibility, choose
+        go (Just u) | u `eqUsage` usOnce = '1'  -- chars with identity
+                    | u `eqUsage` usMany = 'M'  -- Z-encoding.
         go other = pprPanic "IdInfo.tyGenInfoString: unexpected annotation" (ppr other)
 
 instance Outputable TyGenInfo where
@@ -670,7 +668,7 @@ noLBVarInfo = NoLBVarInfo
 -- not safe to print or parse LBVarInfo because it is not really a
 -- property of the definition, but a property of the context.
 pprLBVarInfo NoLBVarInfo     = empty
-pprLBVarInfo (LBVarInfo u)   | u == usOnce
+pprLBVarInfo (LBVarInfo u)   | u `eqUsage` usOnce
                              = getPprStyle $ \ sty ->
                                if ifaceStyle sty
                                then empty

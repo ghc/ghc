@@ -490,8 +490,7 @@ schemeT d s p app
                   = case splitTyConApp_maybe ty of
                        (Just (tyc, [])) |  isDataTyCon tyc
                                         -> map getName (tyConDataCons tyc)
-                       other
-                          -> panic "maybe_is_tagToEnum_call.extract_constr_Ids"
+                       other            -> panic "maybe_is_tagToEnum_call.extract_constr_Ids"
            in 
            case app of
               (_, AnnApp (_, AnnApp (_, AnnVar v) (_, AnnType t)) arg)

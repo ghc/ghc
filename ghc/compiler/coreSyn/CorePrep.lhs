@@ -16,7 +16,7 @@ import CoreLint	( endPass )
 import CoreSyn
 import Type	( Type, applyTy, splitFunTy_maybe, isTyVarTy,
 		  isUnLiftedType, isUnboxedTupleType, repType,	
-		  uaUTy, usOnce, usMany, seqType )
+		  uaUTy, usOnce, usMany, eqUsage, seqType )
 import Demand	( Demand, isStrict, wwLazy, StrictnessInfo(..) )
 import PrimOp	( PrimOp(..) )
 import Var 	( Var, Id, setVarUnique )
@@ -493,14 +493,13 @@ rhs is strict --- but that would defeat the purpose of seq and par.
 
 
 \begin{code}
-mkCase scrut@(Var fn `App` Type ty `App` arg) bndr alts
+mkCase scrut@(Var fn `App` Type ty `App` arg) bndr alts@(deflt_alt@(DEFAULT,_,rhs) : con_alts)
+			-- DEFAULT alt is always first
   = case isPrimOpId_maybe fn of
 	Just ParOp -> Case scrut bndr     [deflt_alt]
 	Just SeqOp -> Case arg   new_bndr [deflt_alt]
 	other	   -> Case scrut bndr alts
   where
-    (deflt_alt@(_,_,rhs) : _) = [alt | alt@(DEFAULT,_,_) <- alts]
-
 	-- The binder shouldn't be used in the expression!
     new_bndr = ASSERT2( not (bndr `elemVarSet` exprFreeVars rhs), ppr bndr )
 	       setIdType bndr (exprType arg)
@@ -539,9 +538,9 @@ isOnceTy ty
     once
   where
     u = uaUTy ty
-    once | u == usOnce  = True
-         | u == usMany  = False
-         | isTyVarTy u  = False  -- if unknown at compile-time, is Top ie usMany
+    once | u `eqUsage` usOnce  = True
+         | u `eqUsage` usMany  = False
+         | isTyVarTy u 	       = False  -- if unknown at compile-time, is Top ie usMany
 
 bdrDem :: Id -> RhsDemand
 bdrDem id = mkDem (idDemandInfo id) (isOnceTy (idType id))

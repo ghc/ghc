@@ -19,12 +19,11 @@ module PprType(
 -- friends:
 -- (PprType can see all the representations it's trying to print)
 import TypeRep		( Type(..), TyNote(..), Kind, liftedTypeKind ) -- friend
-import Type		( PredType(..), ThetaType,
-			  splitPredTy_maybe,
-			  splitForAllTys, splitSigmaTy, splitRhoTy,
-			  isPredTy, isDictTy, splitTyConApp_maybe, splitFunTy_maybe,
-                          predRepTy, isUTyVar
-			)
+import Type		( SourceType(..), isUTyVar, eqKind )
+import TcType		( ThetaType, PredType, tcSplitPredTy_maybe, 
+			  tcSplitSigmaTy, isPredTy, isDictTy,
+			  tcSplitTyConApp_maybe, tcSplitFunTy_maybe
+			) 
 import Var		( TyVar, tyVarKind )
 import Class		( Class )
 import TyCon		( TyCon, isPrimTyCon, isTupleTyCon, tupleTyConBoxity,
@@ -115,51 +114,36 @@ ppr_ty ctxt_prec (TyVarTy tyvar)
 
 ppr_ty ctxt_prec ty@(TyConApp tycon tys)
   	-- KIND CASE; it's of the form (Type x)
-  | tycon `hasKey` typeConKey && n_tys == 1
+  | tycon `hasKey` typeConKey,
+    [ty] <- tys
   = 	-- For kinds, print (Type x) as just x if x is a 
 	-- 	type constructor (must be Boxed, Unboxed, AnyBox)
 	-- Otherwise print as (Type x)
-    case ty1 of
+    case ty of
 	TyConApp bx [] -> ppr (getOccName bx)	-- Always unqualified
 	other	       -> maybeParen ctxt_prec tYCON_PREC 
-				     (sep [ppr tycon, nest 4 tys_w_spaces])
+				     (ppr tycon <+> ppr_ty tYCON_PREC ty)
 
 	-- USAGE CASE
-  | (tycon `hasKey` usOnceTyConKey || tycon `hasKey` usManyTyConKey) && n_tys == 0
+  | (tycon `hasKey` usOnceTyConKey || tycon `hasKey` usManyTyConKey),
+    null tys
   =	-- For usages (! and .), always print bare OccName, without pkg/mod/uniq
     ppr (getOccName (tyConName tycon))
 	
 	-- TUPLE CASE (boxed and unboxed)
-  |  isTupleTyCon tycon
-  && length tys == tyConArity tycon	-- no magic if partially applied
-  = tupleParens (tupleTyConBoxity tycon) tys_w_commas
+  |  isTupleTyCon tycon,
+     length tys == tyConArity tycon	-- No magic if partially applied
+  = tupleParens (tupleTyConBoxity tycon)
+		(sep (punctuate comma (map (ppr_ty tOP_PREC) tys)))
 
 	-- LIST CASE
-  | tycon `hasKey` listTyConKey && n_tys == 1
-  = brackets (ppr_ty tOP_PREC ty1)
-
-	-- DICTIONARY CASE, prints {C a}
-	-- This means that instance decls come out looking right in interfaces
-	-- and that in turn means they get "gated" correctly when being slurped in
-  | maybeToBool maybe_pred
-  = braces (pprPred pred)
-
-	-- NO-ARGUMENT CASE (=> no parens)
-  | null tys
-  = ppr tycon
+  | tycon `hasKey` listTyConKey,
+    [ty] <- tys
+  = brackets (ppr_ty tOP_PREC ty)
 
 	-- GENERAL CASE
   | otherwise
-  = maybeParen ctxt_prec tYCON_PREC (sep [ppr tycon, nest 4 tys_w_spaces])
-
-  where
-    n_tys      = length tys
-    (ty1:_)    = tys
-    Just pred  = maybe_pred
-    maybe_pred = splitPredTy_maybe ty	-- Checks class and arity
-    tys_w_commas = sep (punctuate comma (map (ppr_ty tOP_PREC) tys))
-    tys_w_spaces = sep (map (ppr_ty tYCON_PREC) tys)
-  
+  = ppr_tc_app ctxt_prec tycon tys
 
 
 ppr_ty ctxt_prec ty@(ForAllTy _ _)
@@ -170,10 +154,9 @@ ppr_ty ctxt_prec ty@(ForAllTy _ _)
 	  ppr_ty tOP_PREC tau
     ]
  where		
-    (tyvars, rho) = splitForAllTys ty
-    (theta, tau)  = splitRhoTy rho
+    (tyvars, theta, tau) = tcSplitSigmaTy ty
     
-    pp_tyvars sty = hsep (map pprTyVarBndr some_tyvars)
+    pp_tyvars sty = sep (map pprTyVarBndr some_tyvars)
       where
         some_tyvars | userStyle sty && not opt_PprStyle_RawTypes
                     = filter (not . isUTyVar) tyvars  -- hide uvars from user
@@ -210,7 +193,14 @@ ppr_ty ctxt_prec (NoteTy (SynNote ty) expansion)
 
 ppr_ty ctxt_prec (NoteTy (FTVNote _) ty) = ppr_ty ctxt_prec ty
 
-ppr_ty ctxt_prec (PredTy p) = braces (pprPred p)
+ppr_ty ctxt_prec (SourceTy (NType tc tys))
+  =  ppr_tc_app ctxt_prec tc tys
+
+ppr_ty ctxt_prec (SourceTy pred) = braces (pprPred pred)
+
+ppr_tc_app ctxt_prec tc []  = ppr tc
+ppr_tc_app ctxt_prec tc tys = maybeParen ctxt_prec tYCON_PREC 
+			  		 (sep [ppr tc, nest 4 (sep (map (ppr_ty tYCON_PREC) tys))])
 \end{code}
 
 
@@ -227,7 +217,7 @@ and when in debug mode.
 pprTyVarBndr :: TyVar -> SDoc
 pprTyVarBndr tyvar
   = getPprStyle $ \ sty ->
-    if (ifaceStyle sty  && kind /= liftedTypeKind) || debugStyle sty then
+    if (ifaceStyle sty  && not (kind `eqKind` liftedTypeKind)) || debugStyle sty then
         hsep [ppr tyvar, dcolon, pprParendKind kind]
 		-- See comments with ppDcolon in PprCore.lhs
     else
@@ -252,20 +242,24 @@ description for profiling.
 getTyDescription :: Type -> String
 
 getTyDescription ty
-  = case (splitSigmaTy ty) of { (_, _, tau_ty) ->
+  = case (tcSplitSigmaTy ty) of { (_, _, tau_ty) ->
     case tau_ty of
-      TyVarTy _	       -> "*"
-      AppTy fun _      -> getTyDescription fun
-      FunTy _ res      -> '-' : '>' : fun_result res
-      TyConApp tycon _ -> getOccString tycon
+      TyVarTy _	       	     -> "*"
+      AppTy fun _      	     -> getTyDescription fun
+      FunTy _ res      	     -> '-' : '>' : fun_result res
+      TyConApp tycon _ 	     -> getOccString tycon
       NoteTy (FTVNote _) ty  -> getTyDescription ty
       NoteTy (SynNote ty1) _ -> getTyDescription ty1
-      PredTy p		     -> getTyDescription (predRepTy p)
-      ForAllTy _ ty    -> getTyDescription ty
+      SourceTy sty	     -> getSourceTyDescription sty
+      ForAllTy _ ty          -> getTyDescription ty
     }
   where
     fun_result (FunTy _ res) = '>' : fun_result res
     fun_result other	     = getTyDescription other
+
+getSourceTyDescription (ClassP cl tys) = getOccString cl
+getSourceTyDescription (NType  tc tys) = getOccString tc
+getSourceTyDescription (IParam id ty)  = getOccString id
 \end{code}
 
 
@@ -294,8 +288,8 @@ showTypeCategory ty
   = if isDictTy ty
     then '+'
     else
-      case splitTyConApp_maybe ty of
-	Nothing -> if maybeToBool (splitFunTy_maybe ty)
+      case tcSplitTyConApp_maybe ty of
+	Nothing -> if maybeToBool (tcSplitFunTy_maybe ty)
 		   then '>'
 		   else '.'
 

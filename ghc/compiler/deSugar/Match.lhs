@@ -23,7 +23,7 @@ import DataCon		( dataConFieldLabels, dataConInstOrigArgTys )
 import MatchCon		( matchConFamily )
 import MatchLit		( matchLiterals )
 import PrelInfo		( pAT_ERROR_ID )
-import Type		( splitAlgTyConApp, mkTyVarTys, Type )
+import TcType		( mkTyVarTys, Type, tcSplitTyConApp, tcEqType )
 import TysWiredIn	( nilDataCon, consDataCon, mkTupleTy, mkListTy, tupleCon )
 import BasicTypes	( Boxity(..) )
 import UniqSet
@@ -416,7 +416,7 @@ tidy1 v (RecPat data_con pat_ty ex_tvs dicts rpats) match_result
     pats 	     = map mk_pat tagged_arg_tys
 
 	-- Boring stuff to find the arg-tys of the constructor
-    (_, inst_tys, _) = splitAlgTyConApp pat_ty
+    (_, inst_tys)    = tcSplitTyConApp pat_ty
     con_arg_tys'     = dataConInstOrigArgTys data_con (inst_tys ++ mkTyVarTys ex_tvs)
     tagged_arg_tys   = con_arg_tys' `zip` (dataConFieldLabels data_con)
 
@@ -735,7 +735,7 @@ flattenMatches kind matches
     let
 	result_ty = head result_tys
     in
-    ASSERT( all (== result_ty) result_tys )
+    ASSERT( all (tcEqType result_ty) result_tys )
     returnDs (result_ty, eqn_infos)
   where
     flatten_match (Match _ pats _ grhss, n)

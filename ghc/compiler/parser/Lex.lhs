@@ -831,15 +831,13 @@ lex_demand cont buf =
     'P'# -> read_em (WwPrim       : acc) (stepOn buf)
     'E'# -> read_em (WwEnum       : acc) (stepOn buf)
     ')'# -> (reverse acc, stepOn buf)
-    'U'# -> do_unpack DataType True  acc (stepOnBy# buf 2#)
-    'u'# -> do_unpack DataType False acc (stepOnBy# buf 2#)
-    'N'# -> do_unpack NewType True  acc (stepOnBy# buf 2#)
-    'n'# -> do_unpack NewType False acc (stepOnBy# buf 2#)
+    'U'# -> do_unpack True  acc (stepOnBy# buf 2#)
+    'u'# -> do_unpack False acc (stepOnBy# buf 2#)
     _    -> (reverse acc, buf)
 
-  do_unpack new_or_data wrapper_unpacks acc buf
+  do_unpack wrapper_unpacks acc buf
    = case read_em [] buf of
-      (stuff, rest) -> read_em (WwUnpack new_or_data wrapper_unpacks stuff : acc) rest
+      (stuff, rest) -> read_em (WwUnpack wrapper_unpacks stuff : acc) rest
 
 
 ------------------

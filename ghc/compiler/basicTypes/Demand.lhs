@@ -7,7 +7,7 @@
 module Demand(
 	Demand(..),
 
-	wwLazy, wwStrict, wwUnpackData, wwUnpackNew, wwPrim, wwEnum, 
+	wwLazy, wwStrict, wwUnpack, wwPrim, wwEnum, 
 	isStrict, isLazy, isPrim,
 
 	pprDemands, seqDemand, seqDemands,
@@ -23,7 +23,6 @@ module Demand(
 
 #include "HsVersions.h"
 
-import BasicTypes	( NewOrData(..) )
 import Outputable
 \end{code}
 
@@ -47,7 +46,6 @@ data Demand
 			-- calling-convention magic)
 
   | WwUnpack		-- Argument is strict & a single-constructor type
-	NewOrData
 	Bool		-- True <=> wrapper unpacks it; False <=> doesn't
 	[Demand]	-- Its constituent parts (whose StrictInfos
 			-- are in the list) should be passed
@@ -67,16 +65,14 @@ type MaybeAbsent = Bool -- True <=> not even used
 -- versions that don't worry about Absence:
 wwLazy	    = WwLazy 	  False
 wwStrict    = WwStrict
-wwUnpackData xs = WwUnpack DataType False xs
-wwUnpackNew  x  = ASSERT( isStrict x) 	-- Invariant 
-	          WwUnpack NewType False [x]
+wwUnpack xs = WwUnpack False xs
 wwPrim	    = WwPrim
 wwEnum	    = WwEnum
 
 seqDemand :: Demand -> ()
-seqDemand (WwLazy a)         = a `seq` ()
-seqDemand (WwUnpack nd b ds) = nd `seq` b `seq` seqDemands ds
-seqDemand other		     = ()
+seqDemand (WwLazy a)      = a `seq` ()
+seqDemand (WwUnpack b ds) = b `seq` seqDemands ds
+seqDemand other		  = ()
 
 seqDemands [] = ()
 seqDemands (d:ds) = seqDemand d `seq` seqDemands ds
@@ -91,8 +87,6 @@ seqDemands (d:ds) = seqDemand d `seq` seqDemands ds
 
 \begin{code}
 isLazy :: Demand -> Bool
-  -- Even a demand of (WwUnpack NewType _ _) is strict
-  -- We don't create such a thing unless the demand inside is strict
 isLazy (WwLazy _) = True
 isLazy _	  = False
 
@@ -124,13 +118,9 @@ pprDemand (WwLazy True)   	 = char 'A'
 pprDemand WwStrict	      	 = char 'S'
 pprDemand WwPrim	      	 = char 'P'
 pprDemand WwEnum	      	 = char 'E'
-pprDemand (WwUnpack nd wu args)  = char ch <> parens (hcat (map pprDemand args))
+pprDemand (WwUnpack wu args)     = char ch <> parens (hcat (map pprDemand args))
 				      where
-					ch = case nd of
-						DataType | wu        -> 'U'
-							 | otherwise -> 'u'
-						NewType  | wu        -> 'N'
-							 | otherwise -> 'n'
+					ch = if wu then 'U' else 'u'
 
 instance Outputable Demand where
     ppr (WwLazy False) = empty

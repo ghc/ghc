@@ -15,7 +15,7 @@ import CoreUtils	( exprType )
 import Id		( Id, idType, idStrictness, idArity, isOneShotLambda,
 			  setIdStrictness, idInlinePragma, mkWorkerId,
 			  setIdWorkerInfo, idCprInfo, setInlinePragma )
-import Type		( Type, isNewType, splitForAllTys, splitFunTys )
+import Type		( Type, splitForAllTys, splitFunTys )
 import IdInfo		( mkStrictnessInfo, noStrictnessInfo, StrictnessInfo(..),
 			  CprInfo(..), InlinePragInfo(..), isNeverInlinePrag,
 			  WorkerInfo(..)
@@ -204,20 +204,6 @@ tryWW non_rec fn_id rhs
 	-- inside its __inline wrapper.  Death!  Disaster!
 	--
 	-- OUT OF DATE NOTE:
-	--  	[There used to be "&& not do_coerce_ww" in the above test.
-	--	 No longer necessary because SimplUtils.tryEtaExpansion
-	--	 now deals with coerces.]
-	-- The do_coerce_ww test is so that
-	-- a function with a coerce should w/w to get rid
-	-- of the coerces, which can significantly improve its arity.
-	-- Example:  f []     = return [] :: IO [Int]
-	--	     f (x:xs) = return (x:xs)
-	-- If we aren't careful we end up with
-	--	f = \ x -> case x of {
-	--		     x:xs -> __coerce (IO [Int]) (\ s -> (# s, x:xs #)
-	--		     []   -> lvl_sJ8
-	--
-	-- OUT OF DATE NOTE:
 	-- 	[Out of date because the size calculation in CoreUnfold now
 	--	 makes wrappers look very cheap even when they are inlined.]
 	--   In this case we add an INLINE pragma to the RHS.  Why?
@@ -229,7 +215,7 @@ tryWW non_rec fn_id rhs
 	--   So f doesn't get inlined, but it is strict and we have failed to w/w it.
   = returnUs [ (fn_id, rhs) ]
 
-  | not (do_strict_ww || do_cpr_ww || do_coerce_ww)
+  | not (do_strict_ww || do_cpr_ww)
   = returnUs [ (fn_id, rhs) ]
 
   | otherwise		-- Do w/w split
@@ -292,31 +278,7 @@ tryWW non_rec fn_id rhs
 			other	   -> False
 
 	-------------------------------------------------------------
-    do_coerce_ww = check_for_coerce arity fun_ty
-	-- We are willing to do a w/w even if the arity is zero.
-	--	x = coerce t E
-	-- ==>
-	--	x' = E
-	--	x  = coerce t x'
-
-	-------------------------------------------------------------
     one_shots = get_one_shots rhs
-
--- See if there's a Coerce before we run out of arity;
--- if so, it's worth trying a w/w split.  Reason: we find
--- functions like	f = coerce (\s -> e)
---	     and	g = \x -> coerce (\s -> e)
--- and they may have no useful strictness or cpr info, but if we
--- do the w/w thing we get rid of the coerces.  
-
-check_for_coerce arity ty
-  = length arg_tys <= arity && isNewType res_ty
-	-- Don't look further than arity args, 
-	-- but if there are arity or fewer, see if there's
-	-- a newtype in the corner
-  where
-    (_, tau) 	      = splitForAllTys ty
-    (arg_tys, res_ty) = splitFunTys tau
 
 -- If the original function has one-shot arguments, it is important to
 -- make the wrapper and worker have corresponding one-shot arguments too.

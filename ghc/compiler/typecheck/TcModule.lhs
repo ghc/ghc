@@ -32,9 +32,12 @@ import TcHsSyn		( TypecheckedMonoBinds, TypecheckedHsExpr,
 import MkIface		( pprModDetails )
 import TcExpr 		( tcMonoExpr )
 import TcMonad
-import TcType		( newTyVarTy, zonkTcType, tcInstType )
+import TcMType		( unifyTauTy, newTyVarTy, zonkTcType, tcInstType )
+import TcType		( Type, liftedTypeKind, openTypeKind,
+			  tyVarsOfType, tidyType, tcFunResultTy,
+			  mkForAllTys, mkFunTys, mkTyConApp, tcSplitForAllTys
+			)
 import TcMatches	( tcStmtsAndThen )
-import TcUnify		( unifyTauTy )
 import Inst		( emptyLIE, plusLIE )
 import TcBinds		( tcTopBinds )
 import TcClassDcl	( tcClassDecls2 )
@@ -50,10 +53,8 @@ import TcIfaceSig	( tcInterfaceSigs )
 import TcInstDcls	( tcInstDecls1, tcInstDecls2 )
 import TcSimplify	( tcSimplifyTop, tcSimplifyInfer )
 import TcTyClsDecls	( tcTyAndClassDecls )
-
 import CoreUnfold	( unfoldingTemplate, hasUnfolding )
 import TysWiredIn	( mkListTy, unitTy )
-import Type
 import ErrUtils		( printErrorsAndWarnings, errorsFound, 
 			  dumpIfSet_dyn, dumpIfSet_dyn_or, showPass )
 import Id		( Id, idType, idUnfolding )
@@ -261,8 +262,8 @@ typecheckExpr dflags pcs hst ic_type_env unqual this_mod (syn_map, expr, decls)
 
     newTyVarTy openTypeKind		`thenTc` \ ty ->
     tcMonoExpr expr ty 			`thenTc` \ (e', lie) ->
-    tcSimplifyInfer smpl_doc (varSetElems (tyVarsOfType ty)) lie 
-    		    	`thenTc` \ (qtvs, lie_free, dict_binds, dict_ids) ->
+    tcSimplifyInfer smpl_doc (tyVarsOfType ty) lie 
+		    		    	`thenTc` \ (qtvs, lie_free, dict_binds, dict_ids) ->
     tcSimplifyTop lie_free		`thenTc` \ const_binds ->
 
     let all_expr = mkHsLet const_binds	$
@@ -400,6 +401,7 @@ tcModule pcs hst get_fixity this_mod decls
 			   lie_rules
 	in
 	tcSimplifyTop lie_alldecls	`thenTc` \ const_inst_binds ->
+        traceTc (text "endsimpltop") `thenTc_`
 	
 	    -- Backsubstitution.    This must be done last.
 	    -- Even tcSimplifyTop may do some unification.
@@ -719,11 +721,10 @@ ppr_gen_tycon tycon
   | otherwise = ppr tycon <> colon <+> ptext SLIT("Not derivable")
 
 ppr_ep (EP from to)
-  = vcat [ ptext SLIT("Rep type:") <+> ppr (funResultTy from_tau),
+  = vcat [ ptext SLIT("Rep type:") <+> ppr (tcFunResultTy from_tau),
 	   ptext SLIT("From:") <+> ppr (unfoldingTemplate (idUnfolding from)),
 	   ptext SLIT("To:")   <+> ppr (unfoldingTemplate (idUnfolding to))
     ]
   where
-    (_,from_tau) = splitForAllTys (idType from)
-
+    (_,from_tau) = tcSplitForAllTys (idType from)
 \end{code}

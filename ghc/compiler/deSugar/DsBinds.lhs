@@ -29,7 +29,7 @@ import CostCentre	( mkAutoCC, IsCafCC(..) )
 import Id		( idType, idName, isExportedId, isSpecPragmaId, Id )
 import NameSet
 import VarSet
-import Type		( mkTyVarTy )
+import TcType		( mkTyVarTy )
 import Subst		( mkTyVarSubst, substTy )
 import TysWiredIn	( voidTy )
 import Outputable

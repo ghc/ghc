@@ -25,21 +25,24 @@ import Maybes		( maybeToBool )
 import ForeignCall	( ForeignCall(..), CCallSpec(..), CCallTarget(..), Safety, CCallConv(..) )
 import DataCon		( splitProductType_maybe, dataConSourceArity, dataConWrapId )
 import ForeignCall	( ForeignCall, CCallTarget(..) )
-import Type		( isUnLiftedType, splitAlgTyConApp_maybe, mkFunTys,
-			  splitTyConApp_maybe, tyVarsOfType, mkForAllTys, isPrimitiveType,
-			  isNewType, repType, isUnLiftedType, mkFunTy, mkTyConApp,
+import TcType		( isUnLiftedType, mkFunTys,
+			  tcSplitTyConApp_maybe, tyVarsOfType, mkForAllTys, isPrimitiveType,
+			  isUnLiftedType, mkFunTy, mkTyConApp, 
+			  tcEqType, isBoolTy, isUnitTy,
 			  Type
 			)
+import Type		( repType )
 import PrimOp		( PrimOp(TouchOp) )
 import TysPrim		( realWorldStatePrimTy,
 			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon,
 			  intPrimTy, foreignObjPrimTy
 			)
+import TyCon		( tyConDataCons )
 import TysWiredIn	( unitDataConId,
 			  unboxedSingletonDataCon, unboxedPairDataCon,
 			  unboxedSingletonTyCon, unboxedPairTyCon,
-			  boolTy, trueDataCon, falseDataCon, 
-			  trueDataConId, falseDataConId, unitTy
+			  trueDataCon, falseDataCon, 
+			  trueDataConId, falseDataConId 
 			)
 import Literal		( mkMachInt )
 import CStrings		( CLabelString )
@@ -140,12 +143,8 @@ unboxArg arg
   | isPrimitiveType arg_ty
   = returnDs (arg, \body -> body)
 
-  -- Newtypes
-  | isNewType arg_ty
-  = unboxArg (mkCoerce (repType arg_ty) arg_ty arg)
-      
   -- Booleans
-  | arg_ty == boolTy
+  | isBoolTy arg_ty
   = newSysLocalDs intPrimTy		`thenDs` \ prim_arg ->
     returnDs (Var prim_arg,
 	      \ body -> Case (Case arg (mkWildId arg_ty)
@@ -189,7 +188,7 @@ unboxArg arg
     (data_con_arg_ty1 : _)			= data_con_arg_tys
 
     (_ : _ : data_con_arg_ty3 : _) = data_con_arg_tys
-    maybe_arg3_tycon    	   = splitTyConApp_maybe data_con_arg_ty3
+    maybe_arg3_tycon    	   = tcSplitTyConApp_maybe data_con_arg_ty3
     Just (arg3_tycon,_)		   = maybe_arg3_tycon
 \end{code}
 
@@ -214,14 +213,15 @@ boxResult :: [Id] -> Type -> DsM (Type, CoreExpr -> CoreExpr)
 -- the call.  The arg_ids passed in are the Ids passed to the actual ccall.
 
 boxResult arg_ids result_ty
-  = case splitAlgTyConApp_maybe result_ty of
+  = case tcSplitTyConApp_maybe result_ty of
 
 	-- The result is IO t, so wrap the result in an IO constructor
-	Just (io_tycon, [io_res_ty], [io_data_con]) | io_tycon `hasKey` ioTyConKey
+	Just (io_tycon, [io_res_ty]) | io_tycon `hasKey` ioTyConKey
 		-> mk_alt return_result 
 			  (resultWrapper io_res_ty)	`thenDs` \ (ccall_res_ty, the_alt) ->
 		   newSysLocalDs  realWorldStatePrimTy	 `thenDs` \ state_id ->
 		   let
+			io_data_con = head (tyConDataCons io_tycon)
 			wrap = \ the_call -> 
 				 mkApps (Var (dataConWrapId io_data_con))
 					   [ Type io_res_ty, 
@@ -283,7 +283,7 @@ touchzh = mkPrimOpId TouchOp
 
 mkTouches []     s cont = returnDs (cont s)
 mkTouches (v:vs) s cont
-  | idType v /= foreignObjPrimTy = mkTouches vs s cont
+  | not (idType v `tcEqType` foreignObjPrimTy) = mkTouches vs s cont
   | otherwise = newSysLocalDs realWorldStatePrimTy `thenDs` \s' -> 
 		mkTouches vs s' cont `thenDs` \ rest ->
 	        returnDs (Case (mkApps (Var touchzh) [Type foreignObjPrimTy, 
@@ -299,13 +299,13 @@ resultWrapper result_ty
   = (Just result_ty, \e -> e)
 
   -- Base case 1: the unit type ()
-  | result_ty == unitTy
+  | isUnitTy result_ty
   = (Nothing, \e -> Var unitDataConId)
 
-  | result_ty == boolTy
+  | isBoolTy result_ty
   = (Just intPrimTy, \e -> Case e (mkWildId intPrimTy)
-	                          [(LitAlt (mkMachInt 0),[],Var falseDataConId),
-	                           (DEFAULT             ,[],Var trueDataConId )])
+	                          [(DEFAULT             ,[],Var trueDataConId ),
+				   (LitAlt (mkMachInt 0),[],Var falseDataConId)])
 
   -- Data types with a single constructor, which has a single arg
   | is_product_type && data_con_arity == 1
@@ -315,14 +315,6 @@ resultWrapper result_ty
     in
     (maybe_ty, \e -> mkApps (Var (dataConWrapId data_con)) 
 			    (map Type tycon_arg_tys ++ [wrapper e]))
-
-  -- newtypes
-  | isNewType result_ty
-  = let
-	rep_ty		    = repType result_ty
-        (maybe_ty, wrapper) = resultWrapper rep_ty
-    in
-    (maybe_ty, \e -> mkCoerce result_ty rep_ty (wrapper e))
 
   | otherwise
   = pprPanic "resultWrapper" (ppr result_ty)

@@ -17,7 +17,7 @@ import DsUtils
 
 import Id		( Id )
 import CoreSyn
-import Type		( mkTyVarTys )
+import TcType		( mkTyVarTys )
 import ListSetOps	( equivClassesByUniq )
 import Unique		( Uniquable(..) )
 \end{code}

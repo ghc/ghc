@@ -30,25 +30,25 @@ import TcEnv		( tcExtendTyVarEnv, tcLookup, tcLookupGlobal,
 			  tcGetGlobalTyVars, tcEnvTcIds, tcEnvTyVars,
 		 	  TyThing(..), TcTyThing(..), tcExtendKindEnv
 			)
-import TcType		( TcKind, TcTyVar, TcThetaType, TcTauType,
-			  newKindVar, tcInstSigVars,
-			  zonkKindEnv, zonkTcType, zonkTcTyVars, zonkTcTyVar
+import TcMType		( newKindVar, tcInstSigVars, 
+			  zonkKindEnv, zonkTcType, zonkTcTyVars, zonkTcTyVar,
+			  unifyKind, unifyOpenTypeKind
+			)
+import TcType		( Type, Kind, SourceType(..), ThetaType, SigmaType, TauType,
+			  mkTyVarTy, mkTyVarTys, mkFunTy, mkSynTy,
+			  tcSplitForAllTys, tcSplitRhoTy,
+		 	  hoistForAllTys, allDistinctTyVars,
+                          zipFunTys, 
+			  mkSigmaTy, mkPredTy, mkTyConApp,
+			  mkAppTys, mkRhoTy,
+			  liftedTypeKind, unliftedTypeKind, mkArrowKind,
+			  mkArrowKinds, tcGetTyVar_maybe, tcGetTyVar, tcSplitFunTy_maybe,
+		  	  tidyOpenType, tidyOpenTypes, tidyTyVar, tidyTyVars,
+			  tyVarsOfType, tyVarsOfPred, mkForAllTys,
+			  isUnboxedTupleType, tcIsForAllTy, isIPPred
 			)
 import Inst		( Inst, InstOrigin(..), newMethodWithGivenTy, instToId )
 import FunDeps		( grow )
-import TcUnify		( unifyKind, unifyOpenTypeKind )
-import Unify		( allDistinctTyVars )
-import Type		( Type, Kind, PredType(..), ThetaType, SigmaType, TauType,
-			  mkTyVarTy, mkTyVarTys, mkFunTy, mkSynTy,
-                          zipFunTys, hoistForAllTys,
-			  mkSigmaTy, mkPredTy, mkTyConApp,
-			  mkAppTys, splitForAllTys, splitRhoTy, mkRhoTy,
-			  liftedTypeKind, unliftedTypeKind, mkArrowKind,
-			  mkArrowKinds, getTyVar_maybe, getTyVar, splitFunTy_maybe,
-		  	  tidyOpenType, tidyOpenTypes, tidyTyVar, tidyTyVars,
-			  tyVarsOfType, tyVarsOfPred, mkForAllTys,
-			  isUnboxedTupleType, isForAllTy, isIPPred
-			)
 import PprType		( pprType, pprTheta, pprPred )
 import Subst		( mkTopTyVarSubst, substTy )
 import CoreFVs		( idFreeTyVars )
@@ -239,7 +239,7 @@ kcHsType (HsForAllTy (Just tv_names) context ty)
 
 ---------------------------
 kcAppKind fun_kind arg_kind
-  = case splitFunTy_maybe fun_kind of 
+  = case tcSplitFunTy_maybe fun_kind of 
 	Just (arg_kind', res_kind)
 		-> unifyKind arg_kind arg_kind'	`thenTc_`
 		   returnTc res_kind
@@ -302,7 +302,12 @@ tcHsSigType and tcHsLiftedSigType are used for type signatures written by the pr
 \begin{code}
 tcHsSigType, tcHsLiftedSigType :: RenamedHsType -> TcM Type
   -- Do kind checking, and hoist for-alls to the top
-tcHsSigType       ty = kcTypeType   ty `thenTc_` tcHsType ty	
+tcHsSigType       ty = traceTc (text "tcHsSig1:" <+> ppr ty) `thenTc_`
+			kcTypeType   ty `thenTc_` 
+			traceTc (text "tcHsSig2:" <+> ppr ty) `thenTc_`
+			tcHsType ty			`thenTc` \ sig_ty -> 
+			traceTc (text "tcHsSig3:" <+> ppr sig_ty) `thenTc_`
+			returnTc sig_ty
 tcHsLiftedSigType ty = kcLiftedType ty `thenTc_` tcHsType ty
 
 tcHsType    ::            RenamedHsType -> TcM Type
@@ -449,7 +454,7 @@ tc_arg_type wimp_out arg_ty
 
   | otherwise
   = tc_type wimp_out arg_ty								`thenTc` \ arg_ty' ->
-    checkTc (isRec wimp_out || not (isForAllTy arg_ty'))	 (polyArgTyErr arg_ty)	`thenTc_`
+    checkTc (isRec wimp_out || not (tcIsForAllTy arg_ty'))	 (polyArgTyErr arg_ty)	`thenTc_`
     checkTc (isRec wimp_out || not (isUnboxedTupleType arg_ty')) (ubxArgTyErr arg_ty)	`thenTc_`
     returnTc arg_ty'
 
@@ -692,7 +697,7 @@ mkTcSig poly_id src_loc
 	-- typechecking the rest of the program with the function bound
 	-- to a pristine type, namely sigma_tc_ty
    let
-	(tyvars, rho) = splitForAllTys (idType poly_id)
+	(tyvars, rho) = tcSplitForAllTys (idType poly_id)
    in
    tcInstSigVars tyvars			`thenNF_Tc` \ tyvars' ->
 	-- Make *signature* type variables
@@ -701,7 +706,8 @@ mkTcSig poly_id src_loc
      tyvar_tys' = mkTyVarTys tyvars'
      rho' = substTy (mkTopTyVarSubst tyvars tyvar_tys') rho
 	-- mkTopTyVarSubst because the tyvars' are fresh
-     (theta', tau') = splitRhoTy rho'
+
+     (theta', tau') = tcSplitRhoTy rho'
 	-- This splitRhoTy tries hard to make sure that tau' is a type synonym
 	-- wherever possible, which can improve interface files.
    in
@@ -796,7 +802,7 @@ checkSigTyVars sig_tyvars free_tyvars
     checkTcM (allDistinctTyVars sig_tys globals)
 	     (complain sig_tys globals)	`thenTc_`
 
-    returnTc (map (getTyVar "checkSigTyVars") sig_tys)
+    returnTc (map (tcGetTyVar "checkSigTyVars") sig_tys)
 
   where
     complain sig_tys globals
@@ -812,7 +818,7 @@ checkSigTyVars sig_tyvars free_tyvars
 	let
 	    in_scope_assoc = [ (zonked_tv, in_scope_tv) 
 			     | (z_ty, in_scope_tv) <- in_scope_tys `zip` in_scope_tvs,
-			       Just zonked_tv <- [getTyVar_maybe z_ty]
+			       Just zonked_tv <- [tcGetTyVar_maybe z_ty]
     			     ]
 	    in_scope_env = mkVarEnv in_scope_assoc
 	in
@@ -834,7 +840,7 @@ checkSigTyVars sig_tyvars free_tyvars
 		-- ty is what you get if you zonk sig_tyvar and then tidy it
 		--
 		-- acc maps a zonked type variable back to a signature type variable
-	  = case getTyVar_maybe ty of {
+	  = case tcGetTyVar_maybe ty of {
 	      Nothing ->			-- Error (a)!
 			returnNF_Tc (tidy_env, acc, unify_msg sig_tyvar (quotes (ppr ty)) : msgs) ;
 

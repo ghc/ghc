@@ -1,9 +1,7 @@
 \begin{code}
 module TcMonad(
-	TcType, 
-	TcTauType, TcPredType, TcThetaType, TcRhoType,
-	TcTyVar, TcTyVarSet,
-	TcKind,
+	TcType, TcTauType, TcPredType, TcThetaType, TcRhoType,
+	TcTyVar, TcTyVarSet, TcKind,
 
 	TcM, NF_TcM, TcDown, TcEnv, 
 
@@ -47,10 +45,9 @@ module TcMonad(
 
 import {-# SOURCE #-} TcEnv  ( TcEnv )
 
-import HsSyn		( HsOverLit )
+import HsLit		( HsOverLit )
 import RnHsSyn		( RenamedPat, RenamedArithSeqInfo, RenamedHsExpr )
-import Type		( Type, Kind, PredType, ThetaType, RhoType, TauType,
-			)
+import TcType		( Type, Kind, PredType, ThetaType, TauType, RhoType )
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine, ErrMsg, Message, WarnMsg )
 
 import Bag		( Bag, emptyBag, isEmptyBag,

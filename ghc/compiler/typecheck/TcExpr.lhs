@@ -32,10 +32,19 @@ import TcMatches	( tcMatchesCase, tcMatchLambda, tcStmts )
 import TcMonoType	( tcHsSigType, checkSigTyVars, sigCtxt )
 import TcPat		( badFieldCon, simpleHsLitTy )
 import TcSimplify	( tcSimplifyCheck, tcSimplifyIPs )
-import TcType		( TcType, TcTauType,
-			  tcInstTyVars, tcInstType, 
-			  newTyVarTy, newTyVarTys, zonkTcType )
-
+import TcMType		( tcInstTyVars, tcInstType, 
+			  newTyVarTy, newTyVarTys, zonkTcType,
+			  unifyTauTy, unifyFunTy, unifyListTy, unifyTupleTy
+			)
+import TcType		( tcSplitFunTys, tcSplitTyConApp,
+			  isQualifiedTy, 
+			  mkFunTy, mkAppTy, mkTyConTy,
+			  mkTyConApp, mkClassPred, tcFunArgTy,
+			  isTauTy, tyVarsOfType, tyVarsOfTypes, 
+			  liftedTypeKind, openTypeKind, mkArrowKind,
+			  tcSplitSigmaTy, tcTyConAppTyCon,
+			  tidyOpenType
+			)
 import FieldLabel	( FieldLabel, fieldLabelName, fieldLabelType, fieldLabelTyCon )
 import Id		( idType, recordSelectorFieldLabel, isRecordSelector )
 import DataCon		( dataConFieldLabels, dataConSig, 
@@ -43,19 +52,10 @@ import DataCon		( dataConFieldLabels, dataConSig,
 			)
 import Demand		( isMarkedStrict )
 import Name		( Name )
-import Type		( mkFunTy, mkAppTy, mkTyConTy,
-			  splitFunTy_maybe, splitFunTys,
-			  mkTyConApp, splitSigmaTy, mkClassPred,
-			  isTauTy, tyVarsOfType, tyVarsOfTypes, 
-			  isSigmaTy, splitAlgTyConApp, splitAlgTyConApp_maybe,
-			  liftedTypeKind, openTypeKind, mkArrowKind,
-			  tidyOpenType
-			)
-import TyCon		( TyCon, tyConTyVars )
+import TyCon		( TyCon, tyConTyVars, isAlgTyCon, tyConDataCons )
 import Subst		( mkTopTyVarSubst, substTheta, substTy )
 import VarSet		( elemVarSet )
 import TysWiredIn	( boolTy, mkListTy, listTyCon )
-import TcUnify		( unifyTauTy, unifyFunTy, unifyListTy, unifyTupleTy )
 import PrelNames	( cCallableClassName, 
 			  cReturnableClassName, 
 			  enumFromName, enumFromThenName, negateName,
@@ -82,12 +82,12 @@ tcExpr :: RenamedHsExpr			-- Expession to type check
 	-> TcType 			-- Expected type (could be a polytpye)
 	-> TcM (TcExpr, LIE)
 
-tcExpr expr ty | isSigmaTy ty = -- Polymorphic case
-				tcPolyExpr expr ty 	`thenTc` \ (expr', lie, _, _, _) ->
-				returnTc (expr', lie)
+tcExpr expr ty | isQualifiedTy ty = -- Polymorphic case
+				    tcPolyExpr expr ty 	`thenTc` \ (expr', lie, _, _, _) ->
+				    returnTc (expr', lie)
 
-	       | otherwise    = -- Monomorphic case
-				tcMonoExpr expr ty
+	       | otherwise        = -- Monomorphic case
+				    tcMonoExpr expr ty
 \end{code}
 
 
@@ -380,10 +380,10 @@ tcMonoExpr expr@(RecordCon con_name rbinds) res_ty
   = tcAddErrCtxt (recordConCtxt expr)		$
     tcId con_name			`thenNF_Tc` \ (con_expr, con_lie, con_tau) ->
     let
-	(_, record_ty) = splitFunTys con_tau
-	(tycon, ty_args, _) = splitAlgTyConApp record_ty
+	(_, record_ty)   = tcSplitFunTys con_tau
+	(tycon, ty_args) = tcSplitTyConApp record_ty
     in
-    ASSERT( maybeToBool (splitAlgTyConApp_maybe record_ty ) )
+    ASSERT( isAlgTyCon tycon )
     unifyTauTy res_ty record_ty          `thenTc_`
 
 	-- Check that the record bindings match the constructor
@@ -462,11 +462,13 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
 	-- STEP 1
 	-- Figure out the tycon and data cons from the first field name
     let
-	(Just (AnId sel_id) : _)  = maybe_sel_ids
-	(_, _, tau)	      	  = splitSigmaTy (idType sel_id)	-- Selectors can be overloaded
+		-- It's OK to use the non-tc splitters here (for a selector)
+	(Just (AnId sel_id) : _)    = maybe_sel_ids
+	(_, _, tau)	      	    = tcSplitSigmaTy (idType sel_id)	-- Selectors can be overloaded
 									-- when the data type has a context
-	Just (data_ty, _)     	  = splitFunTy_maybe tau	-- Must succeed since sel_id is a selector
-	(tycon, _, data_cons) 	    = splitAlgTyConApp data_ty
+	data_ty		     	    = tcFunArgTy tau			-- Must succeed since sel_id is a selector
+	tycon		 	    = tcTyConAppTyCon data_ty
+	data_cons		    = tyConDataCons tycon
 	(con_tyvars, _, _, _, _, _) = dataConSig (head data_cons)
     in
     tcInstTyVars con_tyvars			`thenNF_Tc` \ (_, result_inst_tys, _) ->
@@ -598,7 +600,7 @@ tcMonoExpr in_expr@(ExprWithTySig expr poly_ty) res_ty
  = tcAddErrCtxt (exprSigCtxt in_expr)	$
    tcHsSigType  poly_ty		`thenTc` \ sig_tc_ty ->
 
-   if not (isSigmaTy sig_tc_ty) then
+   if not (isQualifiedTy sig_tc_ty) then
 	-- Easy case
 	unifyTauTy sig_tc_ty res_ty	`thenTc_`
 	tcMonoExpr expr sig_tc_ty
@@ -693,8 +695,8 @@ checkArgsCtxt fun args expected_res_ty actual_res_ty tidy_env
     let
       (env1, exp_ty'') = tidyOpenType tidy_env exp_ty'
       (env2, act_ty'') = tidyOpenType env1     act_ty'
-      (exp_args, _) = splitFunTys exp_ty''
-      (act_args, _) = splitFunTys act_ty''
+      (exp_args, _)    = tcSplitFunTys exp_ty''
+      (act_args, _)    = tcSplitFunTys act_ty''
 
       message | length exp_args < length act_args = wrongArgsCtxt "too few" fun args
               | length exp_args > length act_args = wrongArgsCtxt "too many" fun args

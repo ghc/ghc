@@ -21,7 +21,7 @@ import DsUtils
 
 import Literal		( mkMachInt, Literal(..) )
 import Maybes		( catMaybes )
-import Type		( isUnLiftedType )
+import TcType		( isUnLiftedType )
 import Panic		( panic, assertPanic )
 \end{code}
 

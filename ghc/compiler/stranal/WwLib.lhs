@@ -23,9 +23,8 @@ import Demand		( Demand(..), wwLazy, wwPrim )
 import PrelInfo		( realWorldPrimId, aBSENT_ERROR_ID )
 import TysPrim		( realWorldStatePrimTy )
 import TysWiredIn	( tupleCon )
-import Type		( Type, isUnLiftedType, 
-			  splitForAllTys, splitFunTys,  isAlgType,
-			  splitNewType_maybe, mkFunTys
+import Type		( Type, isUnLiftedType, mkFunTys,
+			  splitForAllTys, splitFunTys,  isAlgType
 			)
 import BasicTypes	( NewOrData(..), Arity, Boxity(..) )
 import Var              ( Var, isId )
@@ -157,10 +156,10 @@ setUnpackStrategy ds
        -> [Demand]
        -> (Int, [Demand])	-- Args remaining after subcomponents of [Demand] are unpacked
 
-    go n (WwUnpack nd _ cs : ds) | n' >= 0
-			         = WwUnpack nd True cs' `cons` go n'' ds
-			         | otherwise
-			         = WwUnpack nd False cs `cons` go n ds
+    go n (WwUnpack _ cs : ds) | n' >= 0
+			      = WwUnpack True cs' `cons` go n'' ds
+			      | otherwise
+			      = WwUnpack False cs `cons` go n ds
 			         where
 			 	   n' = n + 1 - nonAbsentArgs cs
 					-- Add one because we don't pass the top-level arg any more
@@ -191,17 +190,17 @@ worthSplitting ds result_bot = any worth_it ds
 	-- The re-boxing code won't go away unless error_fn gets a wrapper too.
 
   where
-    worth_it (WwLazy True)	 = True		-- Absent arg
-    worth_it (WwUnpack _ True _) = True		-- Arg to unpack
-    worth_it WwStrict		 = False	-- Don't w/w just because of strictness
-    worth_it other		 = False
+    worth_it (WwLazy True)     = True	-- Absent arg
+    worth_it (WwUnpack True _) = True	-- Arg to unpack
+    worth_it WwStrict	       = False	-- Don't w/w just because of strictness
+    worth_it other	       = False
 
 allAbsent :: [Demand] -> Bool
 allAbsent ds = all absent ds
   where
-    absent (WwLazy is_absent)   = is_absent
-    absent (WwUnpack _ True cs) = allAbsent cs
-    absent other		= False
+    absent (WwLazy is_absent) = is_absent
+    absent (WwUnpack True cs) = allAbsent cs
+    absent other	      = False
 \end{code}
 
 
@@ -333,14 +332,7 @@ mkWWargs fun_ty arity demands res_bot one_shots
 			| otherwise  	      = mkFunTys (drop n_args arg_tys) body_ty
 
 mkWWargs fun_ty arity demands res_bot one_shots
-  = case splitNewType_maybe fun_ty of
-	Nothing     -> returnUs ([], id, id, fun_ty)
-	Just rep_ty -> mkWWargs rep_ty arity demands res_bot one_shots	`thenUs` \ (wrap_args, wrap_fn_args, work_fn_args, res_ty) ->
-		       returnUs (wrap_args,
-				 Note (Coerce fun_ty rep_ty) . wrap_fn_args,
-				 work_fn_args . Note (Coerce rep_ty fun_ty),
-				 res_ty)
-
+  = returnUs ([], id, id, fun_ty)
 
 applyToVars :: [Var] -> CoreExpr -> CoreExpr
 applyToVars vars fn = mkVarApps fn vars
@@ -420,7 +412,7 @@ mk_ww_str (arg : ds)
 	returnUs (worker_args, wrap_fn, mk_absent_let arg . work_fn)
 
 	-- Unpack case
-      WwUnpack new_or_data True cs ->
+      WwUnpack True cs ->
 	getUniquesUs 		`thenUs` \ uniqs ->
 	let
 	  unpk_args	 = zipWith mk_ww_local uniqs inst_con_arg_tys
@@ -428,8 +420,8 @@ mk_ww_str (arg : ds)
 	in
 	mk_ww_str (unpk_args_w_ds ++ ds)		`thenUs` \ (worker_args, wrap_fn, work_fn) ->
 	returnUs (worker_args,
-	          mk_unpk_case new_or_data arg unpk_args data_con arg_tycon . wrap_fn,
-		  work_fn . mk_pk_let new_or_data arg data_con tycon_arg_tys unpk_args)
+	          mk_unpk_case arg unpk_args data_con arg_tycon . wrap_fn,
+		  work_fn . mk_pk_let arg data_con tycon_arg_tys unpk_args)
 	where
 	  (arg_tycon, tycon_arg_tys, data_con, inst_con_arg_tys) = splitProductType "mk_ww_str" (idType arg)
 
@@ -540,16 +532,7 @@ mk_absent_let arg body
   where
     arg_ty = idType arg
 
-mk_unpk_case NewType arg unpk_args boxing_con boxing_tycon body
-  	-- A newtype!  Use a coercion not a case
-  = ASSERT( null other_args )
-    Case (Note (Coerce (idType unpk_arg) (idType arg)) (Var arg))
-	 (sanitiseCaseBndr unpk_arg)
-	 [(DEFAULT,[],body)]
-  where
-    (unpk_arg:other_args) = unpk_args
-
-mk_unpk_case DataType arg unpk_args boxing_con boxing_tycon body
+mk_unpk_case arg unpk_args boxing_con boxing_tycon body
 	-- A data type
   = Case (Var arg) 
 	 (sanitiseCaseBndr arg)
@@ -566,13 +549,7 @@ sanitiseCaseBndr :: Id -> Id
 -- like		(x+y) `seq` ....
 sanitiseCaseBndr id = id `setIdInfo` vanillaIdInfo
 
-mk_pk_let NewType arg boxing_con con_tys unpk_args body
-  = ASSERT( null other_args )
-    Let (NonRec arg (Note (Coerce (idType arg) (idType unpk_arg)) (Var unpk_arg))) body
-  where
-    (unpk_arg:other_args) = unpk_args
-
-mk_pk_let DataType arg boxing_con con_tys unpk_args body
+mk_pk_let arg boxing_con con_tys unpk_args body
   = Let (NonRec arg (mkConApp boxing_con con_args)) body
   where
     con_args = map Type con_tys ++ map Var unpk_args

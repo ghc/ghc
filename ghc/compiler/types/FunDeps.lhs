@@ -15,9 +15,11 @@ module FunDeps (
 import Name		( getSrcLoc )
 import Var		( Id, TyVar )
 import Class		( Class, FunDep, classTvsFds )
-import Type		( Type, ThetaType, PredType(..), predTyUnique, mkClassPred, tyVarsOfTypes, tyVarsOfPred )
 import Subst		( mkSubst, emptyInScopeSet, substTy )
-import Unify		( unifyTyListsX, unifyExtendTysX )
+import TcType		( Type, ThetaType, SourceType(..), PredType,
+			  predTyUnique, mkClassPred, tyVarsOfTypes, tyVarsOfPred,
+			  unifyTyListsX, unifyExtendTysX, tcEqType
+			)
 import VarSet
 import VarEnv
 import Outputable
@@ -211,7 +213,8 @@ checkGroup :: InstEnv Id -> [(PredType,SDoc)] -> [(Equation, SDoc)]
 
 checkGroup inst_env (p1@(IParam _ ty, _) : ips)
   = 	-- For implicit parameters, all the types must match
-    [((emptyVarSet, ty, ty'), mkEqnMsg p1 p2) | p2@(IParam _ ty', _) <- ips, ty /= ty']
+    [ ((emptyVarSet, ty, ty'), mkEqnMsg p1 p2) 
+    | p2@(IParam _ ty', _) <- ips, not (ty `tcEqType` ty')]
 
 checkGroup inst_env clss@((ClassP cls _, _) : _)
   = 	-- For classes life is more complicated  

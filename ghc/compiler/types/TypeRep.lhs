@@ -5,9 +5,9 @@
 
 \begin{code}
 module TypeRep (
-	Type(..), TyNote(..), PredType(..), 		-- Representation visible to friends
+	Type(..), TyNote(..), SourceType(..), 		-- Representation visible to friends
 	
- 	Kind, ThetaType, RhoType, TauType, SigmaType,		-- Synonyms
+ 	Kind, TauType, PredType, ThetaType,		-- Synonyms
 	TyVarSubst,
 
 	superKind, superBoxity,				-- KX and BX respectively
@@ -92,6 +92,36 @@ ByteArray#	Yes		Yes		No		No
 (  a, b  )	No		Yes		Yes		Yes
 [a]		No		Yes		Yes		Yes
 
+
+
+	----------------------
+	A note about newtypes
+	----------------------
+
+Consider
+	newtype N = MkN Int
+
+Then we want N to be represented as an Int, and that's what we arrange.
+The front end of the compiler [TcType.lhs] treats N as opaque, 
+the back end treats it as transparent [Type.lhs].
+
+There's a bit of a problem with recursive newtypes
+	newtype P = MkP P
+	newtype Q = MkQ (Q->Q)
+
+Here the 'implicit expansion' we get from treating P and Q as transparent
+would give rise to infinite types, which in turn makes eqType diverge.
+Similarly splitForAllTys and splitFunTys can get into a loop.  
+
+Solution: for recursive newtypes use a coerce, and treat the newtype
+and its representation as distinct right through the compiler.  That's
+what you get if you use recursive newtypes.  (They are rare, so who
+cares if they are a tiny bit less efficient.)
+
+The TyCon still says "I'm a newtype", but we do not represent the
+newtype application as a SourceType; instead as a TyConApp.
+
+
 %************************************************************************
 %*									*
 \subsection{The data type}
@@ -102,6 +132,7 @@ ByteArray#	Yes		Yes		No		No
 \begin{code}
 type SuperKind = Type
 type Kind      = Type
+type TauType   = Type
 
 type TyVarSubst = TyVarEnv Type
 
@@ -125,8 +156,8 @@ data Type
 	TyVar
 	Type	
 
-  | PredTy		-- A Haskell predicate
-	PredType
+  | SourceTy		-- A high level source type 
+	SourceType	-- ...can be expanded to a representation type...
 
   | UsageTy		-- A usage-annotated type
 	Type		--   - Annotation of kind $ (i.e., usage annotation)
@@ -137,13 +168,11 @@ data Type
 	Type		-- The expanded version
 
 data TyNote
-  = SynNote Type	-- The unexpanded version of the type synonym; always a TyConApp
-  | FTVNote TyVarSet	-- The free type variables of the noted expression
+  = FTVNote TyVarSet	-- The free type variables of the noted expression
 
-type ThetaType 	  = [PredType]
-type RhoType   	  = Type
-type TauType   	  = Type
-type SigmaType    = Type
+  | SynNote Type	-- Used for type synonyms
+			-- The Type is always a TyConApp, and is the un-expanded form.
+			-- The type to which the note is attached is the expanded form.
 \end{code}
 
 INVARIANT: UsageTys are optional, but may *only* appear immediately
@@ -152,7 +181,19 @@ to be annotated (such as the type of an Id).  NoteTys are transparent
 for the purposes of this rule.
 
 -------------------------------------
- 		Predicates
+ 		Source types
+
+A type of the form
+	SourceTy sty
+represents a value whose type is the Haskell source type sty.
+It can be expanded into its representation, but: 
+
+	* The type checker must treat it as opaque
+	* The rest of the compiler treats it as transparent
+
+There are two main uses
+	a) Haskell predicates
+	b) newtypes
 
 Consider these examples:
 	f :: (Eq a) => a -> Int
@@ -163,8 +204,13 @@ Here the "Eq a" and "?x :: Int -> Int" and "r\l" are all called *predicates*
 Predicates are represented inside GHC by PredType:
 
 \begin{code}
-data PredType  = ClassP  Class [Type]
-	       | IParam Name  Type
+data SourceType  = ClassP Class [Type]		-- Class predicate
+	         | IParam Name  Type		-- Implicit parameter
+		 | NType TyCon [Type]		-- A *saturated*, *non-recursive* newtype application
+						-- [See notes at top about newtypes]
+
+type PredType  = SourceType	-- A subtype for predicates
+type ThetaType = [PredType]
 \end{code}
 
 (We don't support TREX records yet, but the setup is designed

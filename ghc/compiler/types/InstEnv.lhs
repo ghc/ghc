@@ -22,14 +22,14 @@ import VarSet
 import VarEnv
 import Maybes		( MaybeErr(..), returnMaB, failMaB, thenMaB, maybeToBool )
 import Name		( getSrcLoc )
-import Type		( Type, tyConAppTyCon, mkTyVarTy,
-			  splitDFunTy, tyVarsOfTypes
+import TcType		( Type, tcTyConAppTyCon, mkTyVarTy,
+			  tcSplitDFunTy, tyVarsOfTypes,
+			  matchTys, unifyTyListsX, allDistinctTyVars
 			)
 import PprType		( pprClassPred )
 import FunDeps		( checkClsFD )
 import TyCon		( TyCon )
 import Outputable
-import Unify		( matchTys, unifyTyListsX, allDistinctTyVars )
 import UniqFM		( UniqFM, lookupWithDefaultUFM, addToUFM, emptyUFM, eltsUFM )
 import Id		( idType )
 import ErrUtils		( Message )
@@ -52,8 +52,8 @@ simpleDFunClassTyCon :: DFunId -> (Class, TyCon)
 simpleDFunClassTyCon dfun
   = (clas, tycon)
   where
-    (_,_,clas,[ty]) = splitDFunTy (idType dfun)
-    tycon  	    = tyConAppTyCon ty 
+    (_,_,clas,[ty]) = tcSplitDFunTy (idType dfun)
+    tycon  	    = tcTyConAppTyCon ty 
 
 pprInstEnv :: InstEnv -> SDoc
 pprInstEnv env
@@ -319,7 +319,7 @@ addToInstEnv dflags (inst_env, errs) dfun_id
 
   where
     cls_inst_env = classInstEnv inst_env clas
-    (ins_tvs, _, clas, ins_tys) = splitDFunTy (idType dfun_id)
+    (ins_tvs, _, clas, ins_tys) = tcSplitDFunTy (idType dfun_id)
     bad_fundeps = badFunDeps cls_inst_env clas ins_tv_set ins_tys
     fundep_err  = fundepErr dfun_id (head bad_fundeps)
 
@@ -427,5 +427,5 @@ addInstErr what dfun1 dfun2
   where
     ppr_dfun dfun = ppr (getSrcLoc dfun) <> colon <+> pprClassPred clas tys
 		  where
-		    (_,_,clas,tys) = splitDFunTy (idType dfun)
+		    (_,_,clas,tys) = tcSplitDFunTy (idType dfun)
 \end{code}

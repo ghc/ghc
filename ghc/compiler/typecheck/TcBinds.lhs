@@ -33,10 +33,14 @@ import TcMonoType	( tcHsSigType, checkSigTyVars,
 			)
 import TcPat		( tcPat )
 import TcSimplify	( bindInstsOfLocalFuns )
-import TcType		( newTyVarTy, newTyVar, 
-			  zonkTcTyVarToTyVar
+import TcMType		( newTyVarTy, newTyVar, 
+			  zonkTcTyVarToTyVar, 
+			  unifyTauTy, unifyTauTyLists
 			)
-import TcUnify		( unifyTauTy, unifyTauTyLists )
+import TcType		( mkTyVarTy, mkForAllTys, mkFunTys, tyVarsOfType, 
+			  mkPredTy, mkForAllTy, isUnLiftedType, 
+			  unliftedTypeKind, liftedTypeKind, openTypeKind, eqKind
+			)
 
 import CoreFVs		( idFreeTyVars )
 import Id		( mkLocalId, setInlinePragma )
@@ -44,10 +48,6 @@ import Var		( idType, idName )
 import IdInfo		( InlinePragInfo(..) )
 import Name		( Name, getOccName, getSrcLoc )
 import NameSet
-import Type		( mkTyVarTy, mkForAllTys, mkFunTys, tyVarsOfType, 
-			  mkPredTy, mkForAllTy, isUnLiftedType, 
-			  unliftedTypeKind, liftedTypeKind, openTypeKind
-			)
 import Var		( tyVarKind )
 import VarSet
 import Bag
@@ -223,7 +223,7 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
 	-- TYPECHECK THE BINDINGS
     tcMonoBinds mbind tc_ty_sigs is_rec		`thenTc` \ (mbind', lie_req, binder_names, mono_ids) ->
     let
-	tau_tvs = varSetElems (foldr (unionVarSet . tyVarsOfType . idType) emptyVarSet mono_ids)
+	tau_tvs = foldr (unionVarSet . tyVarsOfType . idType) emptyVarSet mono_ids
     in
 
 	-- GENERALISE
@@ -309,7 +309,7 @@ attachNoInlinePrag no_inlines bndr
 	Nothing   -> bndr
 
 checkUnliftedBinds top_lvl is_rec real_tyvars_to_gen mbind zonked_mono_ids
-  = ASSERT( not (any ((== unliftedTypeKind) . tyVarKind) real_tyvars_to_gen) )
+  = ASSERT( not (any ((eqKind unliftedTypeKind) . tyVarKind) real_tyvars_to_gen) )
 		-- The instCantBeGeneralised stuff in tcSimplify should have
 		-- already raised an error if we're trying to generalise an 
 		-- unboxed tyvar (NB: unboxed tyvars are always introduced 
@@ -433,7 +433,7 @@ generalise binder_names mbind tau_tvs lie_req sigs
   = 	-- CHECKING CASE: Unrestricted group, there are type signatures
 	-- Check signature contexts are empty 
     checkSigsCtxts sigs				`thenTc` \ (sig_avails, sig_dicts) ->
-
+    
 	-- Check that the needed dicts can be
 	-- expressed in terms of the signature ones
     tcSimplifyInferCheck doc tau_tvs sig_avails lie_req	`thenTc` \ (forall_tvs, lie_free, dict_binds) ->

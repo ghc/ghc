@@ -50,7 +50,7 @@ import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, isAlgTyCon, tyCo
 			)
 import Class		( classExtraBigSig, classTyCon, DefMeth(..) )
 import FieldLabel	( fieldLabelType )
-import Type		( splitSigmaTy, tidyTopType, deNoteType, namesOfDFunHead )
+import TcType		( tcSplitSigmaTy, tidyTopType, deNoteType, namesOfDFunHead )
 import SrcLoc		( noSrcLoc )
 import Outputable
 import Module		( ModuleName )
@@ -160,7 +160,7 @@ ifaceTyCls (AClass clas) so_far
 	= ASSERT(sel_tyvars == clas_tyvars)
 	  ClassOpSig (getName sel_id) def_meth' (toHsType op_ty) noSrcLoc
 	where
-	  (sel_tyvars, _, op_ty) = splitSigmaTy (idType sel_id)
+	  (sel_tyvars, _, op_ty) = tcSplitSigmaTy (idType sel_id)
 	  def_meth' = case def_meth of
 			 NoDefMeth  -> NoDefMeth
 			 GenDefMeth -> GenDefMeth

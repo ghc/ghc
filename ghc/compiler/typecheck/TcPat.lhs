@@ -21,15 +21,14 @@ import Id		( mkLocalId )
 import Name		( Name )
 import FieldLabel	( fieldLabelName )
 import TcEnv		( tcLookupClass, tcLookupDataCon, tcLookupGlobalId, tcLookupSyntaxId )
-import TcType 		( TcType, TcTyVar, tcInstTyVars, newTyVarTy )
+import TcMType 		( tcInstTyVars, newTyVarTy, unifyTauTy, unifyListTy, unifyTupleTy )
+import TcType		( isTauTy, mkTyConApp, mkClassPred, liftedTypeKind )
 import TcMonoType	( tcHsSigType )
-import TcUnify 		( unifyTauTy, unifyListTy, unifyTupleTy	)
 
 import CmdLineOpts	( opt_IrrefutableTuples )
 import DataCon		( dataConSig, dataConFieldLabels, 
 			  dataConSourceArity
 			)
-import Type		( isTauTy, mkTyConApp, mkClassPred, liftedTypeKind )
 import Subst		( substTy, substTheta )
 import TysPrim		( charPrimTy, intPrimTy, floatPrimTy,
 			  doublePrimTy, addrPrimTy

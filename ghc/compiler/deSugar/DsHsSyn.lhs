@@ -13,7 +13,7 @@ import TcHsSyn		( TypecheckedPat,
 			  TypecheckedMonoBinds )
 
 import Id		( idType, Id )
-import Type             ( Type )
+import TcType           ( Type )
 import TysWiredIn	( mkListTy, mkTupleTy, unitTy )
 import BasicTypes	( Boxity(..) )
 \end{code}

@@ -30,24 +30,20 @@ module TysWiredIn (
 	consDataCon,
 	doubleDataCon,
 	doubleTy,
-	isDoubleTy,
 	doubleTyCon,
 	falseDataCon, falseDataConId,
 	floatDataCon,
 	floatTy,
-	isFloatTy,
 	floatTyCon,
 
 	intDataCon,
 	intTy,
 	intTyCon,
-	isIntTy,
 
 	integerTy,
 	integerTyCon,
 	smallIntegerDataCon,
 	largeIntegerDataCon,
-	isIntegerTy,
 
 	listTyCon,
 
@@ -82,9 +78,6 @@ module TysWiredIn (
         isFFIDynArgumentTy,  -- :: Type -> Bool
  	isFFIDynResultTy,    -- :: Type -> Bool
  	isFFILabelTy,        -- :: Type -> Bool
-	isAddrTy,	     -- :: Type -> Bool
-	isForeignPtrTy       -- :: Type -> Bool
-
     ) where
 
 #include "HsVersions.h"
@@ -115,7 +108,7 @@ import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed )
 
 import Type		( Type, mkTyConTy, mkTyConApp, mkTyVarTys, 
 			  mkArrowKinds, liftedTypeKind, unliftedTypeKind,
-			  splitTyConApp_maybe, repType,
+			  splitTyConApp_maybe,
 			  TauType, ThetaType )
 import Unique		( incrUnique, mkTupleTyConUnique, mkTupleDataConUnique )
 import PrelNames
@@ -319,13 +312,9 @@ intTy = mkTyConTy intTyCon
 
 intTyCon = pcNonRecDataTyCon intTyConName [] [] [intDataCon]
 intDataCon = pcDataCon intDataConName [] [] [intPrimTy] intTyCon
-
-isIntTy :: Type -> Bool
-isIntTy = isTyCon intTyConKey
 \end{code}
 
 \begin{code}
-
 wordTy = mkTyConTy wordTyCon
 
 wordTyCon = pcNonRecDataTyCon wordTyConName [] [] [wordDataCon]
@@ -337,9 +326,6 @@ addrTy = mkTyConTy addrTyCon
 
 addrTyCon = pcNonRecDataTyCon addrTyConName [] [] [addrDataCon]
 addrDataCon = pcDataCon addrDataConName [] [] [addrPrimTy] addrTyCon
-
-isAddrTy :: Type -> Bool
-isAddrTy = isTyCon addrTyConKey
 \end{code}
 
 \begin{code}
@@ -361,16 +347,10 @@ floatTy	= mkTyConTy floatTyCon
 
 floatTyCon   = pcNonRecDataTyCon floatTyConName   [] [] [floatDataCon]
 floatDataCon = pcDataCon         floatDataConName [] [] [floatPrimTy] floatTyCon
-
-isFloatTy :: Type -> Bool
-isFloatTy = isTyCon floatTyConKey
 \end{code}
 
 \begin{code}
 doubleTy = mkTyConTy doubleTyCon
-
-isDoubleTy :: Type -> Bool
-isDoubleTy = isTyCon doubleTyConKey
 
 doubleTyCon   = pcNonRecDataTyCon doubleTyConName     [] [] [doubleDataCon]
 doubleDataCon = pcDataCon	  doubleDataConName [] [] [doublePrimTy] doubleTyCon
@@ -404,9 +384,6 @@ foreignPtrTyCon
     foreignPtrDataCon
       = pcDataCon foreignPtrDataConName
 	    alpha_tyvar [] [foreignObjPrimTy] foreignPtrTyCon
-
-isForeignPtrTy :: Type -> Bool
-isForeignPtrTy = isTyCon foreignPtrTyConKey
 \end{code}
 
 %************************************************************************
@@ -427,10 +404,6 @@ smallIntegerDataCon = pcDataCon smallIntegerDataConName
 		[] [] [intPrimTy] integerTyCon
 largeIntegerDataCon = pcDataCon largeIntegerDataConName
 		[] [] [intPrimTy, byteArrayPrimTy] integerTyCon
-
-
-isIntegerTy :: Type -> Bool
-isIntegerTy = isTyCon integerTyConKey
 \end{code}
 
 
@@ -477,16 +450,10 @@ isFFILabelTy :: Type -> Bool
 isFFILabelTy = checkRepTyCon (\tc -> tc == ptrTyCon || tc == funPtrTyCon || tc == addrTyCon)
 
 checkRepTyCon :: (TyCon -> Bool) -> Type -> Bool
-	-- look through newtypes
-checkRepTyCon check_tc ty = checkTyCon check_tc (repType ty)
-
-checkTyCon :: (TyCon -> Bool) -> Type -> Bool
-checkTyCon check_tc ty = case splitTyConApp_maybe ty of
+	-- Look through newtypes
+checkRepTyCon check_tc ty = case splitTyConApp_maybe ty of
 				Just (tycon, _) -> check_tc tycon
 				Nothing		-> False
-
-isTyCon :: Unique -> Type -> Bool
-isTyCon uniq ty = checkTyCon (\tc -> uniq == getUnique tc) ty
 \end{code}
 
 ----------------------------------------------

@@ -28,7 +28,8 @@ import TysPrim		( charPrimTy, addrPrimTy, floatPrimTy, doublePrimTy,
 			  intPrimTy, wordPrimTy, int64PrimTy, word64PrimTy
 			)
 import PrimRep		( PrimRep(..) )
-import Type		( Type, typePrimRep )
+import TcType		( Type, tcCmpType )
+import Type		( typePrimRep )
 import PprType		( pprParendType )
 import CStrings		( pprFSInCStyle )
 
@@ -268,7 +269,7 @@ cmpLit (MachWord64    a)   (MachWord64	   b)   = a `compare` b
 cmpLit (MachFloat     a)   (MachFloat	   b)   = a `compare` b
 cmpLit (MachDouble    a)   (MachDouble	   b)   = a `compare` b
 cmpLit (MachLabel     a)   (MachLabel      b)   = a `compare` b
-cmpLit (MachLitLit    a b) (MachLitLit    c d)  = (a `compare` c) `thenCmp` (b `compare` d)
+cmpLit (MachLitLit    a b) (MachLitLit    c d)  = (a `compare` c) `thenCmp` (b `tcCmpType` d)
 cmpLit lit1		   lit2		        | litTag lit1 <# litTag lit2 = LT
 					        | otherwise  		       = GT
 

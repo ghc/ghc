@@ -17,7 +17,7 @@ import IO		( hPutStr, hPutStrLn, stdout )
 import CoreSyn
 import Rules            ( RuleBase, pprRuleBase )
 import CoreFVs		( idFreeVars )
-import CoreUtils	( exprOkForSpeculation, coreBindsSize, mkPiType )
+import CoreUtils	( findDefault, exprOkForSpeculation, coreBindsSize, mkPiType )
 
 import Bag
 import Literal		( literalType )
@@ -31,7 +31,7 @@ import ErrUtils		( doIfSet, dumpIfSet_core, ghcExit, Message, showPass,
 			  ErrMsg, addErrLocHdrLine, pprBagOfErrors,
                           WarnMsg, pprBagOfWarnings)
 import SrcLoc		( SrcLoc, noSrcLoc )
-import Type		( Type, tyVarsOfType,
+import Type		( Type, tyVarsOfType, eqType,
 			  splitFunTy_maybe, mkTyVarTy,
 			  splitForAllTy_maybe, splitTyConApp_maybe, splitTyConApp,
 			  isUnLiftedType, typeKind, 
@@ -304,7 +304,7 @@ lintCoreExpr e@(Case scrut var alts)
    addInScopeVars [var]				(
 
 	-- Check the alternatives
-   checkAllCasesCovered e scrut_ty alts	`seqL`
+   checkCaseAlts e scrut_ty alts		`seqL`
 
    mapL (lintCoreAlt scrut_ty) alts		`thenL` \ (alt_ty : alt_tys) ->
    mapL (check alt_ty) alt_tys			`seqL`
@@ -396,46 +396,30 @@ lintTyApps fun_ty (arg_ty : arg_tys)
 %************************************************************************
 
 \begin{code}
-checkAllCasesCovered :: CoreExpr -> Type -> [CoreAlt] -> LintM ()
+checkCaseAlts :: CoreExpr -> Type -> [CoreAlt] -> LintM ()
+-- a) Check that the alts are non-empty
+-- b) Check that the DEFAULT comes first, if it exists
+-- c) Check that there's a default for infinite types
+-- NB: Algebraic cases are not necessarily exhaustive, because
+--     the simplifer correctly eliminates case that can't 
+--     possibly match.
 
-checkAllCasesCovered e ty [] = addErrL (mkNullAltsMsg e)
+checkCaseAlts e ty [] 
+  = addErrL (mkNullAltsMsg e)
 
-checkAllCasesCovered e ty [(DEFAULT,_,_)] = nopL
+checkCaseAlts e ty alts
+  = checkL (all non_deflt con_alts) (mkNonDefltMsg e)	`seqL`
+    checkL (isJust maybe_deflt || not is_infinite_ty)
+	   (nonExhaustiveAltsMsg e)
+  where
+    (con_alts, maybe_deflt) = findDefault alts
 
-checkAllCasesCovered e scrut_ty alts
-  = case splitTyConApp_maybe scrut_ty of {
-	Nothing	-> addErrL (badAltsMsg e);
-	Just (tycon, tycon_arg_tys) ->
+    non_deflt (DEFAULT, _, _) = False
+    non_deflt alt	      = True
 
-    if isPrimTyCon tycon then
-	checkL (hasDefault alts) (nonExhaustiveAltsMsg e)
-    else
-{-		No longer needed
-#ifdef DEBUG
-	-- Algebraic cases are not necessarily exhaustive, because
-	-- the simplifer correctly eliminates case that can't 
-	-- possibly match.
-	-- This code just emits a message to say so
-    let
-	missing_cons    = filter not_in_alts (tyConDataCons tycon)
-	not_in_alts con = all (not_in_alt con) alts
-	not_in_alt con (DataCon con', _, _) = con /= con'
-	not_in_alt con other		    = True
-
-	case_bndr = case e of { Case _ bndr alts -> bndr }
-    in
-    if not (hasDefault alts || null missing_cons) then
-	pprTrace "Exciting (but not a problem)!  Non-exhaustive case:"
-		 (ppr case_bndr <+> ppr missing_cons)
-		 nopL
-    else
-#endif
--}
-    nopL }
-
-hasDefault []			  = False
-hasDefault ((DEFAULT,_,_) : alts) = True
-hasDefault (alt		  : alts) = hasDefault alts
+    is_infinite_ty = case splitTyConApp_maybe ty of
+			Nothing			    -> False
+			Just (tycon, tycon_arg_tys) -> isPrimTyCon tycon
 \end{code}
 
 \begin{code}
@@ -611,8 +595,8 @@ checkTys :: Type -> Type -> Message -> LintM ()
 -- check ty2 is subtype of ty1 (ie, has same structure but usage
 -- annotations need only be consistent, not equal)
 checkTys ty1 ty2 msg
-  | ty1 == ty2 = nopL
-  | otherwise  = addErrL msg
+  | ty1 `eqType` ty2 = nopL
+  | otherwise        = addErrL msg
 \end{code}
 
 
@@ -677,15 +661,13 @@ mkScrutMsg var scrut_ty
 	  text "Result binder type:" <+> ppr (idType var),
 	  text "Scrutinee type:" <+> ppr scrut_ty]
 
-badAltsMsg :: CoreExpr -> Message
-badAltsMsg e
-  = hang (text "Case statement scrutinee is not a data type:")
-	 4 (ppr e)
+
+mkNonDefltMsg e
+  = hang (text "Case expression with DEFAULT not at the beginnning") 4 (ppr e)
 
 nonExhaustiveAltsMsg :: CoreExpr -> Message
 nonExhaustiveAltsMsg e
-  = hang (text "Case expression with non-exhaustive alternatives")
-	 4 (ppr e)
+  = hang (text "Case expression with non-exhaustive alternatives") 4 (ppr e)
 
 mkBadPatMsg :: Type -> Type -> Message
 mkBadPatMsg con_result_ty scrut_ty

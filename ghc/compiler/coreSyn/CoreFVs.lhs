@@ -27,7 +27,8 @@ import Id		( Id, idType, idSpecialisation )
 import NameSet
 import VarSet
 import Var		( Var, isId, isLocalVar, varName )
-import Type		( tyVarsOfType, namesOfType )
+import Type		( tyVarsOfType )
+import TcType		( namesOfType )
 import Util		( mapAndUnzip )
 import Outputable
 \end{code}

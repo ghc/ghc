@@ -15,7 +15,8 @@ import HscTypes		( PackageRuleBase )
 import TcHsSyn		( TypecheckedRuleDecl, mkHsLet )
 import TcMonad
 import TcSimplify	( tcSimplifyToDicts, tcSimplifyInferCheck )
-import TcType		( newTyVarTy )
+import TcMType		( newTyVarTy )
+import TcType		( tyVarsOfTypes, openTypeKind )
 import TcIfaceSig	( tcCoreExpr, tcCoreLamBndrs, tcVar )
 import TcMonoType	( kcHsSigTypes, tcHsSigType, tcScopedTyVars, checkSigTyVars )
 import TcExpr		( tcExpr )
@@ -25,7 +26,6 @@ import Inst		( LIE, plusLIEs, instToId )
 import Id		( idName, idType, mkLocalId )
 import Module		( Module )
 import VarSet
-import Type		( tyVarsOfTypes, openTypeKind )
 import List		( partition )
 import Outputable
 \end{code}
@@ -115,7 +115,7 @@ tcSourceRule (HsRule name sig_tvs vars lhs rhs src_loc)
 	-- in the LHS, but not in the type of the lhs, nor in the binders.
 	-- They'll get zapped to (), but that's over-constraining really.
 	-- Let's see if we get a problem.
-	forall_tvs = varSetElems (tyVarsOfTypes (rule_ty : map idType tpl_ids))
+	forall_tvs = tyVarsOfTypes (rule_ty : map idType tpl_ids)
     in
 
 	-- RHS can be a bit more lenient.  In particular,

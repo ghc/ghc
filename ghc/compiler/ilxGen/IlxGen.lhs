@@ -13,11 +13,11 @@ import IdInfo   ( arityLowerBound )
 import Var	( Var, Id, TyVar, isId, isTyVar, tyVarKind, tyVarName )
 import VarEnv
 import TyCon	( TyCon,  tyConPrimRep, isUnboxedTupleTyCon, tyConDataCons, 
-		  newTyConRep, tyConTyVars, isDataTyCon, isAlgTyCon, tyConArity
+		  tyConTyVars, isDataTyCon, isAlgTyCon, tyConArity
 		)
 import Type	( liftedTypeKind, openTypeKind, unliftedTypeKind,
-		  isUnLiftedType, isTyVarTy, mkTyVarTy, predRepTy,
-		  splitForAllTys, splitFunTys, applyTy, applyTys
+		  isUnLiftedType, isTyVarTy, mkTyVarTy, sourceTypeRep,
+		  splitForAllTys, splitFunTys, applyTy, applyTys, eqKind
 		)
 import TypeRep	( Type(..) )
 import DataCon	( isUnboxedTupleCon, dataConTyCon, dataConRepType, dataConRepArgTys )
@@ -1115,11 +1115,7 @@ pprIlxTopVar env v
 isVoidIlxRepType (NoteTy   _ ty) = isVoidIlxRepType ty
 isVoidIlxRepType (TyConApp tc _) | (tyConPrimRep tc == VoidRep) = True
 isVoidIlxRepType (TyConApp tc tys) 
-  = case newTyConRep tc of
-	 Just rep_ty -> isVoidIlxRepType (applyTys rep_ty tys)
-	 Nothing     -> 
-            isUnboxedTupleTyCon tc && 
-            null (filter (not. isVoidIlxRepType) tys)
+  = isUnboxedTupleTyCon tc && null (filter (not. isVoidIlxRepType) tys)
 isVoidIlxRepType _ = False
 
 isVoidIlxRepId id = isVoidIlxRepType (idType id)
@@ -1132,15 +1128,7 @@ deepIlxRepType (FunTy l r)
   = FunTy (deepIlxRepType l) (deepIlxRepType r)
 
 deepIlxRepType ty@(TyConApp tc tys) 
-  = case newTyConRep tc of
-	 Just rep_ty -> 
-           let res = deepIlxRepType (applyTys rep_ty tys) in 
-           if not (length tys == tyConArity tc ) then 
-             --pprTrace "deepIlxRepType" (text "length tys <> tyConArity tc, ty = " <+> pprType ty <+> text ", length tys = " <+> ppr (length tys) <+> text ", tyConArity = " <+> ppr (tyConArity tc)) 
-             res 
-           else res
-	 Nothing     -> 
-           -- collapse UnboxedTupleTyCon down when it contains VoidRep types.
+  =        -- collapse UnboxedTupleTyCon down when it contains VoidRep types.
 	   -- e.g. 	(# State#, Int#, Int# #)  ===>   (# Int#, Int# #)
             if isUnboxedTupleTyCon tc then 
                let tys' = map deepIlxRepType (filter (not. isVoidIlxRepType) tys) in 
@@ -1149,10 +1137,10 @@ deepIlxRepType ty@(TyConApp tc tys)
                   _ -> mkTupleTy Unboxed (length tys') tys'
             else 
               TyConApp tc (map deepIlxRepType tys)
-deepIlxRepType (AppTy f x)  = AppTy (deepIlxRepType f) (deepIlxRepType x)
+deepIlxRepType (AppTy f x)     = AppTy (deepIlxRepType f) (deepIlxRepType x)
 deepIlxRepType (ForAllTy b ty) = ForAllTy b (deepIlxRepType ty)
 deepIlxRepType (NoteTy   _ ty) = deepIlxRepType ty
-deepIlxRepType (PredTy p)      = deepIlxRepType (predRepTy p)
+deepIlxRepType (SourceTy p)    = deepIlxRepType (sourceTypeRep p)
 deepIlxRepType ty@(TyVarTy tv) = ty
 
 idIlxRepType id = deepIlxRepType (idType id)
@@ -1254,9 +1242,9 @@ pprTyVarBinder_aux env tv =
 -- Only a subset of Haskell types can be generalized using the type quantification
 -- of ILX
 isIlxForAllKind h = 
-        ( h == liftedTypeKind) ||
-        ( h == unliftedTypeKind) ||
-        ( h == openTypeKind)
+        ( h `eqKind` liftedTypeKind) ||
+        ( h `eqKind` unliftedTypeKind) ||
+        ( h `eqKind` openTypeKind)
 
 isIlxTyVar v = isTyVar v && isIlxForAllKind (tyVarKind v)
 

@@ -29,8 +29,9 @@ import Id		( Id, mkVanillaGlobal, mkLocalId, idName, isDataConWrapId_maybe )
 import Module		( Module )
 import MkId		( mkFCallId )
 import IdInfo
+import TyCon		( tyConDataCons )
 import DataCon		( DataCon, dataConId, dataConSig, dataConArgTys )
-import Type		( mkTyVarTys, splitAlgTyConApp_maybe )
+import Type		( mkTyVarTys, splitTyConApp )
 import TysWiredIn	( tupleCon )
 import Var		( mkTyVar, tyVarKind )
 import Name		( Name, nameIsLocalOrFrom )
@@ -339,9 +340,8 @@ tcCoreAlt scrut_ty alt@(con, names, rhs)
     let
 	(main_tyvars, _, ex_tyvars, _, _, _) = dataConSig con
 
-	(_, inst_tys, cons) = case splitAlgTyConApp_maybe scrut_ty of
-				    Just stuff -> stuff
-				    Nothing -> pprPanic "tcCoreAlt" (ppr alt)
+	(tycon, inst_tys)   = splitTyConApp scrut_ty	-- NB: not tcSplitTyConApp
+							-- We are looking at Core here
 	ex_tyvars'	    = [mkTyVar name (tyVarKind tv) | (name,tv) <- names `zip` ex_tyvars] 
 	ex_tys'		    = mkTyVarTys ex_tyvars'
 	arg_tys		    = dataConArgTys con (inst_tys ++ ex_tys')
@@ -356,7 +356,7 @@ tcCoreAlt scrut_ty alt@(con, names, rhs)
 #endif
 		= zipWithEqual "tcCoreAlts" mkLocalId id_names arg_tys
     in
-    ASSERT( con `elem` cons && length inst_tys == length main_tyvars )
+    ASSERT( con `elem` tyConDataCons tycon && length inst_tys == length main_tyvars )
     tcExtendTyVarEnv ex_tyvars'			$
     tcExtendGlobalValEnv arg_ids		$
     tcCoreExpr rhs					`thenTc` \ rhs' ->

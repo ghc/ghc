@@ -90,14 +90,16 @@ collect_exports tyenv (AvailTC n ns) (tcons,dcons,vars) =
 
 
 collect_tdefs :: TyCon -> [C.Tdef] -> [C.Tdef]
-collect_tdefs tcon tdefs | isAlgTyCon tcon = tdef:tdefs
-  where 
-    tdef = 
-      case newTyConRep tcon of
-        Just rep -> 
-          C.Newtype (make_con_id (tyConName tcon)) (map make_tbind (tyConTyVars tcon)) (make_ty rep)
-        Nothing -> 
-          C.Data (make_con_id (tyConName tcon)) (map make_tbind (tyConTyVars tcon)) (map make_cdef (tyConDataCons tcon))
+collect_tdefs tcon tdefs 
+  | isAlgTyCon tcon = tdef : tdefs
+  where
+    tdef | isNewTyCon tcon
+	 = C.Newtype (make_con_id (tyConName tcon)) (map make_tbind tyvars) (make_ty rep)
+	 | otherwise
+	 = C.Data (make_con_id (tyConName tcon)) (map make_tbind tyvars) (map make_cdef (tyConDataCons tcon)) 
+    (_, rep) = newTyConRep tcon
+    tyvars   = tyConTyVars tcon
+
 collect_tdefs _ tdefs = tdefs
 
 
@@ -173,16 +175,16 @@ make_ty (AppTy t1 t2) = C.Tapp (make_ty t1) (make_ty t2)
 make_ty (TyConApp tc ts) = foldl C.Tapp (C.Tcon (make_con_qid (tyConName tc))) (map make_ty ts)
 make_ty (FunTy t1 t2) = make_ty (TyConApp funTyCon [t1,t2])
 make_ty (ForAllTy tv t) = C.Tforall (make_tbind tv) (make_ty t)
-make_ty (PredTy p) = make_ty (predRepTy p)
+make_ty (SourceTy p) = make_ty (sourceTypeRep p)
 make_ty (UsageTy _ t) = make_ty t
 make_ty (NoteTy _ t) = make_ty t
 
 
 make_kind :: Kind -> C.Kind
 make_kind (FunTy k1 k2) = C.Karrow (make_kind k1) (make_kind k2)
-make_kind k | k == liftedTypeKind = C.Klifted
-make_kind k | k == unliftedTypeKind = C.Kunlifted
-make_kind k | k == openTypeKind = C.Kopen
+make_kind k | k `eqKind` liftedTypeKind = C.Klifted
+make_kind k | k `eqKind` unliftedTypeKind = C.Kunlifted
+make_kind k | k `eqKind` openTypeKind = C.Kopen
 make_kind _ = error "MkExternalCore died: make_kind"
 
 {- Id generation. -}

@@ -17,7 +17,7 @@ import TcMonoType	( tcHsType )
 import TcSimplify	( tcSimplifyCheckThetas )
 
 import TysWiredIn	( integerTy, doubleTy )
-import Type             ( Type, mkClassPred )
+import TcType           ( Type, mkClassPred )
 import PrelNames	( numClassName )
 import Outputable
 import HscTypes		( TyThing(..) )
