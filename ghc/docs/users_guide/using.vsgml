@@ -359,6 +359,17 @@ This option is on by default, and warns you whenever an instance
 declaration is missing one or more methods, and the corresponding
 class declaration has no default declaration for them.
 
+<tag>@-fwarn-missing-fields@:</tag>
+<nidx>-fwarn-missing-fields option</nidx>
+<nidx>missing fields, warning</nidx>
+<nidx>fields, missing</nidx>
+
+This option is on by default, and warns you whenever the construction
+of a labelled field constructor isn't complete, missing initializers
+for one or more fields. While not an error (the missing fields are
+initialised with bottoms), it is often an indication of a programmer
+error.
+
 <tag>@-fwarn-unused-imports@:</tag>
 <nidx>-fwarn-unused-imports option</nidx>
 <nidx>unused imports, warning</nidx>
