@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Constants.h,v 1.11 2000/02/28 12:02:32 sewardj Exp $
+ * $Id: Constants.h,v 1.12 2000/07/26 13:27:54 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -157,6 +157,10 @@
 #define WORD64_SIZE 	2
 #define INT64_SIZE 	2
 #endif
+
+
+/*---- The size of StgWord, in bytes. */
+#define WORD_SIZE       SIZEOF_VOID_P
 
 /*---- Maximum number of constructors in a data type for direct-returns.  */
 
