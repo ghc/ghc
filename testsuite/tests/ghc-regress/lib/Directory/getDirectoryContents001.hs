@@ -7,3 +7,4 @@ main = do
 
 ok name = "getDirectoryContents" `isPrefixOf` name 
 	  && not ("bak" `isSuffixOf` name)
+	  && not ("prof" `isSuffixOf` name)
