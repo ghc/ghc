@@ -214,12 +214,17 @@ fromExitCode                :: ExitCode -> Int
 fromExitCode ExitSuccess     = 0
 fromExitCode (ExitFailure n) = n
 
--- Note. exitWith is supposed to flush and close all open or 
--- semi-open handles.  The code below doesn't do that -- 
--- we'd have to keep a list of them somewhere.
+-- see comment in Prelude.hs near primRunIO_hugs_toplevel
 exitWith :: ExitCode -> IO a
 exitWith c
-   = do nh_exitwith (fromExitCode c)
+   = do cleanup_action <- readIORef prelExitWithAction
+        case cleanup_action of
+           Just xx -> xx
+           Nothing -> return ()
+        nh_stderr >>= nh_flush
+        nh_stdout >>= nh_flush
+        nh_stdin  >>= nh_close
+        nh_exitwith (fromExitCode c)
         (ioError.IOError) "System.exitWith: should not return"
 
 system :: String -> IO ExitCode

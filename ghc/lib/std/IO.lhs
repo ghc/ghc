@@ -699,6 +699,7 @@ readLn          =  do l <- getLine
 
 \begin{code}
 import Ix(Ix)
+import Monad(when)
 
 unimp :: String -> a
 unimp s = error ("IO library: function not implemented: " ++ s)
@@ -718,6 +719,7 @@ data Handle
 data Handle_Mut
    = Handle_Mut { state :: HState 
                 }
+     deriving Show
 
 set_state :: Handle -> HState -> IO ()
 set_state hdl new_state
@@ -728,7 +730,9 @@ get_state hdl
 
 mkErr :: Handle -> String -> IO a
 mkErr h msg
-   = do nh_close (file h)
+   = do mut <- readIORef (mut h)
+        when (state mut /= HClosed) 
+             (nh_close (file h) >> set_state h HClosed)
         dummy <- nh_errno
         ioError (IOError msg)
 
@@ -761,7 +765,7 @@ instance Eq Handle where
    h1 == h2   = file h1 == file h2
 
 instance Show Handle where
-   showsPrec _ h = showString ("<<" ++ name h ++ ">>")
+   showsPrec _ h = showString ("`" ++ name h ++ "'")
 
 data HandlePosn
    = HandlePosn 
@@ -779,23 +783,105 @@ data SeekMode    =  AbsoluteSeek | RelativeSeek | SeekFromEnd
                     deriving (Eq, Ord, Ix, Bounded, Enum, Read, Show)
 
 data HState = HOpen | HSemiClosed | HClosed
-              deriving Eq
+              deriving (Show, Eq)
+
+
+-- A global variable holding a list of all open handles.
+-- Each handle is present as many times as it has been opened.
+-- Any given file is allowed to have _either_ one writeable handle
+-- or many readable handles in this list.  The list is used to
+-- enforce single-writer multiple reader semantics.  It also 
+-- provides a list of handles for System.exitWith to flush and
+-- close.  In order not to have to put all this stuff in the
+-- Prelude, System.exitWith merely runs prelExitWithAction,
+-- which is originally Nothing, but which we set to Just ...
+-- once handles appear in the list.
+
+allHandles :: IORef [Handle]
+allHandles  = primRunST (newIORef [])
+
+elemWriterHandles :: FilePath -> IO Bool
+elemAllHandles    :: FilePath -> IO Bool
+addHandle         :: Handle -> IO ()
+delHandle         :: Handle -> IO ()
+cleanupHandles    :: IO ()
+
+cleanupHandles
+   = do hdls <- readIORef allHandles
+        mapM_ cleanupHandle hdls
+     where
+        cleanupHandle h
+           | mode h == ReadMode
+           = nh_close (file h) 
+             >> nh_errno >>= \_ -> return ()
+           | otherwise
+           = nh_flush (file h) >> nh_close (file h) 
+             >> nh_errno >>= \_ -> return ()
+
+elemWriterHandles fname
+   = do hdls <- readIORef allHandles
+        let hdls_w = filter ((/= ReadMode).mode) hdls
+        return (fname `elem` (map name hdls_w))
+
+elemAllHandles fname
+   = do hdls <- readIORef allHandles
+        return (fname `elem` (map name hdls))
+
+addHandle hdl
+   = do cleanup_action <- readIORef prelCleanupAfterRunAction
+        case cleanup_action of
+           Nothing 
+              -> writeIORef prelCleanupAfterRunAction (Just cleanupHandles)
+           Just xx
+              -> return ()
+        hdls <- readIORef allHandles
+        writeIORef allHandles (hdl : hdls)
+
+delHandle hdl
+   = do hdls <- readIORef allHandles
+        let hdls' = takeWhile (/= hdl) hdls 
+                    ++ drop 1 (dropWhile (/= hdl) hdls)
+        writeIORef allHandles hdls'
+
+
 
 openFile :: FilePath -> IOMode -> IO Handle
 openFile f mode
+
+   | null f
+   =  (ioError.IOError) "openFile: empty file name"
+
+   | mode == ReadMode
+   = do not_ok <- elemWriterHandles f
+        if    not_ok 
+         then (ioError.IOError) 
+                 ("openFile: `" ++ f ++ "' in " ++ show mode 
+                  ++ ": is already open for writing")
+         else openFile_main f mode
+
+   | mode /= ReadMode
+   = do not_ok <- elemAllHandles f
+        if    not_ok 
+         then (ioError.IOError) 
+                 ("openFile: `" ++ f ++ "' in " ++ show mode 
+                  ++ ": is already open for reading or writing")
+         else openFile_main f mode
+
+   | otherwise
+   = openFile_main f mode
+
+openFile_main f mode
    = copy_String_to_cstring f >>= \nameptr ->
      nh_open nameptr (mode2num mode) >>= \fh ->
      nh_free nameptr >>
      if   fh == nULL
      then (ioError.IOError)
              ("openFile: can't open <<" ++ f ++ ">> in " ++ show mode)
-     else do r <- newIORef (Handle_Mut { state = HOpen })
-             return (Handle { 
-                        name = f,
-                        file = fh, 
-                        mut  = r,
-                        mode = mode
-                     })
+     else do r   <- newIORef (Handle_Mut { state = HOpen })
+             let hdl = Handle { name = f, file = fh, 
+                                mut  = r, mode = mode }
+             addHandle hdl
+             return hdl
      where
         mode2num :: IOMode -> Int
         mode2num ReadMode   = 0
@@ -808,11 +894,13 @@ openFile f mode
 hClose :: Handle -> IO ()
 hClose h
    = do mut <- readIORef (mut h)
+        putStrLn ( "hClose: state is " ++ show mut)
         if    state mut == HClosed
          then mkErr h
                  ("hClose on closed handle " ++ show h)
          else 
          do set_state h HClosed
+            delHandle h
             nh_close (file h)
             err <- nh_errno
             if    err == 0 
@@ -979,6 +1067,7 @@ bracket_ before after m = do
          case rs of
             Right r -> return r
             Left  e -> ioError e
+
 -- TODO: Hugs/slurpFile
 slurpFile = unimp "IO.slurpFile"
 \end{code}

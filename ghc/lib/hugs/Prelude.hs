@@ -119,7 +119,7 @@ module Prelude (
     ,unsafeInterleaveIO,nh_write,primCharToInt,
     nullAddr, incAddr, isNullAddr, 
     nh_filesize, nh_iseof, nh_system, nh_exitwith, nh_getPID,
-    nh_getCPUtime, nh_getCPUprec,
+    nh_getCPUtime, nh_getCPUprec, prelCleanupAfterRunAction,
 
     Word,
     primGtWord, primGeWord, primEqWord, primNeWord,
@@ -135,11 +135,7 @@ module Prelude (
     primAddrToInt, primIntToAddr,
 
     primDoubleToFloat, primFloatToDouble,
-    -- debugging hacks
-    --,ST(..)
-    --,primIntToAddr
-    --,primGetArgc
-    --,primGetArgv
+
   ) where
 
 -- Standard value bindings {Prelude} ----------------------------------------
@@ -1829,11 +1825,29 @@ instance Monad (ST s) where
    m >>= k   = ST (\s -> case unST m s of { (a,s') -> unST (k a) s' })
 
 
+-- Library IO has a global variable which accumulates Handles
+-- as they are opened.  We keep here a second global variable
+-- into which a cleanup action may be specified.  When evaluation
+-- finishes, either normally or as a result of System.exitWith,
+-- this cleanup action is run, closing all known-about Handles.
+-- Doing it like this means the Prelude does not have to know
+-- anything about the grotty details of the Handle implementation.
+prelCleanupAfterRunAction :: IORef (Maybe (IO ()))
+prelCleanupAfterRunAction = primRunST (newIORef Nothing)
+
 -- used when Hugs invokes top level function
-primRunIO :: IO () -> ()
-primRunIO m
-   = protect 5 (fst (unST m realWorld))
+primRunIO_hugs_toplevel :: IO () -> ()
+primRunIO_hugs_toplevel m
+   = protect 5 (fst (unST composite_action realWorld))
      where
+        composite_action
+           = do writeIORef prelCleanupAfterRunAction Nothing
+                m
+                cleanup_handles <- readIORef prelCleanupAfterRunAction
+                case cleanup_handles of
+                   Nothing -> return ()
+                   Just xx -> xx
+
         realWorld = error "primRunIO: entered the RealWorld"
         protect :: Int -> () -> ()
         protect 0 comp

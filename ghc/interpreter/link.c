@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.15 $
- * $Date: 1999/11/19 15:42:07 $
+ * $Revision: 1.16 $
+ * $Date: 1999/11/22 16:00:22 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -475,7 +475,7 @@ Void linkPreludeNames(void) {           /* Hook to names defined in Prelude */
         /* static(tidyInfix)                        */
         nameNegate         = linkName("negate");
         /* user interface                           */
-        nameRunIO          = linkName("primRunIO");
+        nameRunIO          = linkName("primRunIO_hugs_toplevel");
         namePrint          = linkName("print");
         /* desugar                                  */
         nameOtherwise      = linkName("otherwise");
