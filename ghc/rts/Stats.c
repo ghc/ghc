@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.12 1999/03/04 13:07:48 sof Exp $
+ * $Id: Stats.c,v 1.13 1999/05/20 10:23:43 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -354,7 +354,7 @@ stat_endGC(lnat alloc, lnat collect, lnat live, lnat copied, lnat gen)
 	double time = usertime();
 	double etime = elapsedtime();
 
-	if (RtsFlags.GcFlags.giveStats) {
+	if (RtsFlags.GcFlags.giveStats >= VERBOSE_GC_STATS) {
 	    nat faults = pagefaults();
 
 	    fprintf(sf, "%9ld %9ld %9ld",

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.13 1999/05/11 16:47:55 keithw Exp $
+ * $Id: RtsFlags.c,v 1.14 1999/05/20 10:23:42 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -525,9 +525,11 @@ error = rtsTrue;
 		}
 		break;
 
-	      case 'S':	/* NB: no difference at present ! */
+	      case 'S':
+		RtsFlags.GcFlags.giveStats ++;
+
 	      case 's':
-		RtsFlags.GcFlags.giveStats ++; /* will be VERBOSE_GC_STATS */
+		RtsFlags.GcFlags.giveStats ++;
 #ifdef PAR
 		/* Opening all those files would almost certainly fail... */
 		RtsFlags.ParFlags.parallelStats = rtsTrue;
