@@ -223,16 +223,11 @@ These are the default values, which may be changed by user flags.
 sub setupOptFlags {
    $Oopt_MaxSimplifierIterations  = '-fmax-simplifier-iterations4';
    $Oopt_PedanticBottoms	  = '-fpedantic-bottoms'; # ON by default
-   $Oopt_MonadEtaExpansion	  = '';
    $Oopt_FinalStgProfilingMassage = '';
    $Oopt_StgStats		  = '';
    $Oopt_DoSpecialise		  = '-fspecialise';
    $Oopt_FoldrBuild		  = 0; # *Off* by default!
-   $Oopt_FB_Support		  = ''; # was '-fdo-arity-expand';
-#  $Oopt_FoldrBuildWW		  = 0; # Off by default
-   $Oopt_FoldrBuildInline	  = ''; # was '-fdo-inline-foldr-build';
    $Oopt_UsageSPInf               = ''; # Off by default
-   $Oopt_ShowSimplifierProgress   = '';
 } # end of setupOptFlags
 
 # Assign defaults to these right away.
@@ -696,60 +691,42 @@ It really really wants to be the last STG-to-STG pass that is run.
 
 sub setupOptimiseFlags {
 
+	# this pass-ordering sequence was agreed by Simon and Andr\'e
+	# (WDP 94/07, 94/11).
+
    @HsC_minusNoO_flags 
-    = (	'-fsimplify',
-	  '[',
-	  $Oopt_FB_Support,
-	  '-ffloat-lets-exposing-whnf',
-	  '-ffloat-primops-ok',
-	  '-fcase-of-case',
-	  '-fdo-case-elim',
-#	  '-fdo-lambda-eta-expansion',	# too complicated
-	  '-freuse-con',
-#	  '-flet-to-case',		# no strictness analysis, so...
-	  $Oopt_PedanticBottoms,
-#	  $Oopt_MonadEtaExpansion,	# no thanks
-
-# These two work fine, if you really want no simplification at all,
-# for bizarre test reasons.  But you get really terrible code if you use them,
-#	for example: let x = e in x
-# with dozens of redundant thunks etc.  So I'm leaving them out.
-#
-#	  '-fsimpl-uf-use-threshold0',
-#	  '-fessential-unfoldings-only',
-
-	  #
-	  # The presence of -fclone-binds is *temporary* to work around
-          # the fact that the desugarer in 3.0{2.3} does generate
-	  # bindings with identical ids, and the type checker doesn't perform
-	  # properly cloned type substitutions. Instead, we make sure that all 
-	  # binders are cloned first time through the simplifier.
-          #
-	  # Will be properly fixed in the `new compiler` I hear, at which point
-	  # the cloning can be turned off here.
-	  #
-          # Let's find out..
-          #'-fclone-binds',
-
-	  $Oopt_MaxSimplifierIterations,
-	  $Oopt_ShowSimplifierProgress,
+    = (	
+	'-fsimplify',
+	  '[', 
+		'-finline-phase2',
+	 	$Oopt_MaxSimplifierIterations,
 	  ']',
-	$Oopt_AddAutoSccs,
-#	'-ffull-laziness',	# removed 95/04 WDP following Andr\'e's lead
 
+	$Oopt_AddAutoSccs,
 	$Oopt_FinalStgProfilingMassage
       );
 
    @HsC_minusO_flags # NOTE: used for *both* -O and -O2 (some conditional bits)
     = (
+	'-ffoldr-build-on',
+
         '-fdo-eta-reduction',
+	'-fdo-case-elim',
+	'-fdo-lambda-eta-expansion',
+	'-fcase-of-case',
+ 	'-fcase-merge',
+	'-flet-to-case',
+	$Oopt_PedanticBottoms,
 
 	# initial simplify: mk specialiser happy: minimum effort please
+
 	'-fsimplify',
 	  '[', 
-	  $Oopt_FB_Support,
-	  '-fkeep-spec-pragma-ids',	# required before specialisation
+	  '-finline-phase1',		# Don't inline rule Ids till specialisation has bitten
 
+#		APR 99: the stuff in this comment is now
+#		handled by -finline-phase1
+#
 # I don't understand why we want -fessential-unfoldings-only here
 # If we have it, the following nasty thing happens:
 #	f  = E
@@ -772,141 +749,44 @@ sub setupOptimiseFlags {
 #   This shows up in PrelArr.lhs - the specialised instance for newArray 
 #   calls the generic rangeSize, because rangeSize is strict and is
 #   replaced by its wrapper by the simplifier.
+#	  '-fessential-unfoldings-only',
+#	  '-fsimpl-uf-use-threshold0',
 
-	  '-fessential-unfoldings-only',
-	  '-fsimpl-uf-use-threshold0',
-
-	  # See remark re: cloning in defn of minusnotO
-	  '-fclone-binds',
-
-	  '-fdo-case-elim',
-	  '-fmax-simplifier-iterations1',
-	  $Oopt_PedanticBottoms,
+	  '-fmax-simplifier-iterations2',
 	  ']',
 
-	($Oopt_DoSpecialise) ? (
-	  $Oopt_DoSpecialise,
-	) : (),
+	($Oopt_DoSpecialise) ? ( $Oopt_DoSpecialise, ) : (),
 
         $Oopt_UsageSPInf, # infer usage information here in case we need it later.
                           # (add more of these where you need them --KSW 1999-04)
 
-	'-fsimplify', 		# need dependency anal after specialiser ...
-	  '[', 			# need tossing before calc-inlinings ...
-	  $Oopt_FB_Support,
-	  '-ffloat-lets-exposing-whnf',
-	  '-ffloat-primops-ok',
-	  '-fcase-of-case',
-	  '-fdo-case-elim',
-	  '-fcase-merge',
-#	  '-fdo-eta-reduction',
-	  '-fdo-lambda-eta-expansion',
-	  '-freuse-con',
-	  $Oopt_PedanticBottoms,
-	  $Oopt_MonadEtaExpansion,
-	  $Oopt_MaxSimplifierIterations,
-	  $Oopt_ShowSimplifierProgress,
-	  #
-	  # The presence of -fclone-binds is *crucial* here as
-	  # -ffull-laziness (which we're about to do next) floats
-	  # bindings outwards, so we better make sure that this
-	  # doesn't result in the floating out of bindings
-	  # with identical uniques, i.e., -ffull-laziness needs
-	  # to be preceeded by a simplifier pass with -fclone-binds
-	  # set.
-          '-fclone-binds',
+	'-fsimplify',
+	  '[', 
+	  	$Oopt_MaxSimplifierIterations,	
+
+		# Still don't inline transformation rule Ids, to give the
+		# rules a good chance to fire
+		'-finline-phase1',
 	  ']',
 
-#	($Oopt_FoldrBuildWW) ? (
-#		'-ffoldr-build-ww-anal',
-#		'-ffoldr-build-worker-wrapper',
-#		'-fsimplify', 
-#		  '[', 
-#		  $Oopt_FB_Support,
-#		  '-ffloat-lets-exposing-whnf',
-#		  '-ffloat-primops-ok',
-#		  '-fcase-of-case',
-#		  '-fdo-case-elim',
-#		  '-fcase-merge',
-#		  '-fdo-eta-reduction',
-#		  '-fdo-lambda-eta-expansion',
-#		  '-freuse-con',
-#		  $Oopt_PedanticBottoms,
-#		  $Oopt_MonadEtaExpansion,
-#		  $Oopt_MaxSimplifierIterations,
-#		  $Oopt_ShowSimplifierProgress,
-#		  ']',
-#	 ) : (),
-
-	# this pass-ordering sequence was agreed by Simon and Andr\'e
-	# (WDP 94/07, 94/11).
 	'-ffull-laziness',
-
-	($Oopt_FoldrBuild) ? (
-	  '-ffoldr-build-on',		# desugar list comprehensions for foldr/build
-
-	  '-fsimplify', 
-	    '[', 
-	    '-fignore-inline-pragma',	# **** NB!
-	    '-fdo-foldr-build',		# NB
-	    $Oopt_FB_Support,
-	    '-ffloat-lets-exposing-whnf',
-	    '-ffloat-primops-ok',
-	    '-fcase-of-case',
-	    '-fdo-case-elim',
-	    '-fcase-merge',
-#	    '-fdo-eta-reduction',
-	    '-fdo-lambda-eta-expansion',	# After full laziness
-	    '-freuse-con',
-	    $Oopt_PedanticBottoms,
-	    $Oopt_MonadEtaExpansion,
-	    $Oopt_MaxSimplifierIterations,
-	    $Oopt_ShowSimplifierProgress,
-	    ']',
-	) : (),
 
 	'-ffloat-inwards',
 
 	'-fsimplify',
 	  '[', 
-	  $Oopt_FB_Support,
-	  '-ffloat-lets-exposing-whnf',
-	  '-ffloat-primops-ok',
-	  '-fcase-of-case',
-	  '-fdo-case-elim',
-	  '-fcase-merge',
-	  '-fdo-eta-reduction',
-	  '-fdo-lambda-eta-expansion',
-	  '-freuse-con',
-  	  ($Oopt_FoldrBuildInline),
-			# you need to inline foldr and build
-	  ($Oopt_FoldrBuild) ? ('-fdo-foldr-build') : (), 
-			# but do reductions if you see them!
-	  $Oopt_PedanticBottoms,
-	  $Oopt_MonadEtaExpansion,
-	  $Oopt_MaxSimplifierIterations,
-	  $Oopt_ShowSimplifierProgress,
+	  	'-finline-phase2',
+		$Oopt_MaxSimplifierIterations,	
 	  ']',
 
 	'-fstrictness',
+	'-fcpr-analyse',
 	'-fworker-wrapper',
 
 	'-fsimplify',
 	  '[', 
-	  $Oopt_FB_Support,
-	  '-ffloat-lets-exposing-whnf',
-	  '-ffloat-primops-ok',
-	  '-fcase-of-case',
-	  '-fdo-case-elim',
-	  '-fcase-merge',
-#	  '-fdo-eta-reduction',
-	  '-fdo-lambda-eta-expansion',
-	  '-freuse-con',
-	  '-flet-to-case',		# Aha! Only done after strictness analysis
-	  $Oopt_PedanticBottoms,
-	  $Oopt_MonadEtaExpansion,
-	  $Oopt_MaxSimplifierIterations,
-	  $Oopt_ShowSimplifierProgress,
+		$Oopt_MaxSimplifierIterations,	
+		# No -finline-phase: allow all Ids to be inlined now
 	  ']',
 
 	'-ffloat-inwards',
@@ -916,38 +796,19 @@ sub setupOptimiseFlags {
 
 #	( ($OptLevel != 2)
 #        ? ''
-#	: "-fliberate-case -fsimplify [ $Oopt_FB_Support -ffloat-lets-exposing-whnf -ffloat-primops-ok -fcase-of-case -fdo-case-elim -fcase-merge -fdo-eta-reduction -fdo-lambda-eta-expansion -freuse-con -flet-to-case $Oopt_PedanticBottoms $Oopt_MonadEtaExpansion $Oopt_MaxSimplifierIterations $Oopt_ShowSimplifierProgress ]" ),
+#	: "-fliberate-case -fsimplify [ $Oopt_FB_Support -ffloat-lets-exposing-whnf -ffloat-primops-ok -fcase-of-case -fdo-case-elim -fcase-merge -fdo-lambda-eta-expansion -freuse-con -flet-to-case $Oopt_PedanticBottoms $Oopt_MaxSimplifierIterations $Oopt_ShowSimplifierProgress ]" ),
 
 # Final clean-up simplification:
 
 	'-fsimplify',
 	  '[', 
-	  $Oopt_FB_Support,
-	  '-ffloat-lets-exposing-whnf',
-	  '-ffloat-primops-ok',
-	  '-fcase-of-case',
-	  '-fdo-case-elim',
-	  '-fcase-merge',
-#	  '-fdo-eta-reduction',
-	  '-fdo-lambda-eta-expansion',
-	  '-freuse-con',
-	  '-flet-to-case',
-	  '-fignore-inline-pragma',	# **** NB!
-	  $Oopt_FoldrBuildInline,	
-	  ($Oopt_FoldrBuild) ? ('-fdo-foldr-build') : (), 
-			# but still do reductions if you see them!
-	  $Oopt_PedanticBottoms,
-	  $Oopt_MonadEtaExpansion,
-	  $Oopt_MaxSimplifierIterations,
-	  $Oopt_ShowSimplifierProgress,
+	  	$Oopt_MaxSimplifierIterations,	
 	  ']',
 
       #	'-fstatic-args',
 
-#LATER:	'-fcalc-inlinings2', -- pointless for 2.01
-
       # stg2stg passes
-	'-flambda-lift',
+#	'-flambda-lift',
 	$Oopt_FinalStgProfilingMassage,
 	$Oopt_StgStats,
 
@@ -3213,6 +3074,7 @@ arg: while($_ = $Args[0]) {
 
     /^-fallow-overlapping-instances$/ && do { push(@HsC_flags, $_); next arg; };
     /^-fallow-undecidable-instances$/ && do { push(@HsC_flags, $_); next arg; };
+    /^-fhistory-size.*$/ 	      && do { push(@HsC_flags, $_); next arg; };
     /^-fglasgow-exts$/
 		&& do { push(@HsC_flags, $_);
 			push(@HsP_flags, '-N');
@@ -3237,25 +3099,11 @@ arg: while($_ = $Args[0]) {
 
     /^-ffoldr-build$/
 		    && do { $Oopt_FoldrBuild = 1; 
-			    $Oopt_FB_Support = '-fdo-arity-expand';
 			    #print "Yes F/B\n";
 			    next arg; };
 
     /^-fno-foldr-build$/
 		    && do { $Oopt_FoldrBuild = 0; 
-			    $Oopt_FB_Support = ''; 
-			    next arg; };
-
-    /^-fno-foldr-build-rule$/
-		    && do { $Oopt_FoldrBuild = 0; 
-			    next arg; };
-
-    /^-fno-enable-tech$/
-		    && do { $Oopt_FB_Support = ''; 
-			    next arg; };
-
-    /^-fno-snapback-to-append$/
-		    && do { $Oopt_FoldrBuildInline .= ' -fdo-not-fold-back-append '; 
 			    next arg; };
 
     # --------------- Renamer -------------
@@ -3286,9 +3134,6 @@ arg: while($_ = $Args[0]) {
 
     /^-fno-pre-inlining$/
 		    && do { push(@HsC_flags, $_); next arg };
-
-    /^-fdo-monad-eta-expansion$/
-		    && do { $Oopt_MonadEtaExpansion = $_; next arg; };
 
     /^-fno-let-from-(case|app|strict-let)$/ # experimental, really (WDP 95/10)
 		    && do { push(@HsC_flags, $_); next arg; };

@@ -153,17 +153,16 @@ sub constructNewHiFile {
     }
 
     local($new_module_version) = &calcNewModuleVersion(@decl_names);
-    print NEWHI "__interface ", $ModuleName{'new'}, " $new_module_version $ProjectVersionInt where\n";
-
-    print NEWHI $Stuff{'new:usages'} unless $Stuff{'new:usages'} eq '';
-    print NEWHI $Stuff{'new:instance_modules'} unless $Stuff{'new:instance_modules'} eq '';
+    print NEWHI "__interface ", $ModuleName{'new'}, " $new_module_version $Orphan{'new'} $ProjectVersionInt where\n";
     print NEWHI $Stuff{'new:exports'};
+    print NEWHI $Stuff{'new:usages'} unless $Stuff{'new:usages'} eq '';
     print NEWHI $Stuff{'new:instances'} unless $Stuff{'new:instances'} eq '';
 
     foreach $v (@decl_names) {
 	&printNewItemVersion(NEWHI, $v, $new_module_version, $show_hi_diffs);		# Print new version number
 	print NEWHI $Decl{"new:$v"};		# Print the new decl itself
     }
+    print NEWHI $Stuff{'new:rules'} unless $Stuff{'new:rules'} eq '';
 
     close(NEWHI) || &tidy_up_and_die(1,"Failed writing to $new_hi\n");
 }
@@ -194,11 +193,11 @@ sub readHiFile {
     $HiExists{$mod}      = -1; # 1 <=> definitely exists; 0 <=> doesn't
     $HiHasBeenRead{$mod} = 0;
     $ModuleVersion{$mod} = 0;
-    $Stuff{"$mod:instance_modules"} = '';
     $Stuff{"$mod:usages"}	    = ''; # stuff glommed together
     $Stuff{"$mod:exports"}	    = '';
     $Stuff{"$mod:instances"}	    = '';
     $Stuff{"$mod:declarations"}	    = '';
+    $Stuff{"$mod:rules"}	    = '';
 
     if (! -f $hifile) { # no pre-existing .hi file
 	$HiExists{$mod} = 0;
@@ -210,17 +209,19 @@ sub readHiFile {
     hi_line: while (<HIFILE>) {
 	next if /^ *$/; # blank line
 
-	if ( /^__interface ([A-Z]\S*) (\d+)/ ) {
+	if ( /^__interface ([A-Z]\S*) (\d+)( \!)?/ ) {
 	    if ( $mod ne 'new' ) {
+		# Reading old .hi file
 		$ModuleVersion{$mod} = $2;
 	    }
-	    $ModuleName{$mod}    = $1; # used to decide name of iface file.
+
+	    $ModuleName{$mod} = $1; # used to decide name of iface file.
+	    $Orphan{$mod}     = $3;
+		# optional "!" indicates that the
+		# module contains orphan rules or instance decls
 
 	} elsif ( /^import / ) {
 	    $Stuff{"$mod:usages"} .= $_; # save the whole thing
-
-	} elsif ( /^__instimport/ ) {
-	    $Stuff{"$mod:instance_modules"} .= $_;
 
 	} elsif ( /^__export/ ) {
 	    $Stuff{"$mod:exports"} .= $_;
@@ -228,6 +229,9 @@ sub readHiFile {
 	} elsif ( /^instance / ) {
 	    $Stuff{"$mod:instances"} .= $_;
 
+	} elsif ( /^{-## __R / ) {
+	    $Stuff{"$mod:rules"} .= $_;
+	
 	} elsif ( /^-[-]+ .*/ ) { # silently ignore comment lines.
 	    ;
 	} else {  # We're in a declaration
@@ -303,7 +307,11 @@ sub calcNewModuleVersion {
     local($unchanged_version) = $ModuleVersion{'old'}; # will return one of these two
     local($changed_version)   = $unchanged_version + 1;
 
-    foreach $t ( 'usages' , 'exports', 'instance_modules', 'instances', 'fixities' ) {
+    if ($Orphan{'old'} ne $Orphan{'new'}) {
+	return(&mv_change($changed_version, "orphan-hood changed"));
+    }
+
+    foreach $t ( 'usages' , 'exports', 'instances', 'fixities', 'rules' ) {
 	return(&mv_change($changed_version,"$t changed")) if $Stuff{"old:$t"} ne $Stuff{"new:$t"};
     }
 
