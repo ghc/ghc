@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Select.c,v 1.14 2000/08/25 13:12:07 simonmar Exp $
+ * $Id: Select.c,v 1.15 2001/02/27 12:43:45 rrt Exp $
  *
  * (c) The GHC Team 1995-1999
  *
@@ -17,12 +17,16 @@
 #include "Itimer.h"
 #include "Signals.h"
 
-# if defined(HAVE_SYS_TYPES_H)
+# ifdef HAVE_SYS_TYPES_H
 #  include <sys/types.h>
 # endif
 
 # ifdef HAVE_SYS_TIME_H
 #  include <sys/time.h>
+# endif
+
+# ifdef mingw32_TARGET_OS
+#  include <w32api/windows.h>
 # endif
 
 /* last timestamp */
@@ -70,24 +74,23 @@ wakeUpSleepingThreads(nat ticks)
  * otherwise we wait (see Schedule.c).
  *
  * SMP note: must be called with sched_mutex locked.
+ *
+ * Windows: select only works on sockets, so this doesn't really work,
+ * though it makes things better than before. MsgWaitForMultipleObjects
+ * should really be used, though it only seems to work for read handles,
+ * not write handles.
+ *
  */
 void
 awaitEvent(rtsBool wait)
 {
-#ifdef mingw32_TARGET_OS
-/*
- * Win32 doesn't support select(). ToDo: use MsgWaitForMultipleObjects()
- * to achieve (similar) effect.
- *
- */
-    return;
-#else
-
     StgTSO *tso, *prev, *next;
     rtsBool ready;
     fd_set rfd,wfd;
+#ifndef mingw32_TARGET_OS
     int numFound;
     int maxfd = -1;
+#endif
     rtsBool select_succeeded = rtsTrue;
     struct timeval tv;
     lnat min, ticks;
@@ -125,6 +128,7 @@ awaitEvent(rtsBool wait)
 	  min = 0x7ffffff;
       }
 
+#ifndef mingw32_TARGET_OS
       /* 
        * Collect all of the fd's that we're interested in
        */
@@ -176,14 +180,20 @@ awaitEvent(rtsBool wait)
       tv.tv_usec = min % 1000000;
 
       while ((numFound = select(maxfd+1, &rfd, &wfd, NULL, &tv)) < 0) {
-
 	  if (errno != EINTR) {
-	      /* fflush(stdout); */
+
+	      printf("%d\n", errno);
+	      fflush(stdout);
 	      perror("select");
 	      barf("select failed");
 	  }
+#else /* on mingwin */
+      while (1) {
+	  Sleep(0); /* don't busy wait */
+#endif /* mingw32_TARGET_OS */
 	  ACQUIRE_LOCK(&sched_mutex);
-	
+
+#ifndef mingw32_TARGET_OS
 	  /* We got a signal; could be one of ours.  If so, we need
 	   * to start up the signal handler straight away, otherwise
 	   * we could block for a long time before the signal is
@@ -195,7 +205,8 @@ awaitEvent(rtsBool wait)
 	      ACQUIRE_LOCK(&sched_mutex);
 	      return; /* still hold the lock */
 	  }
-	  
+#endif
+
 	  /* we were interrupted, return to the scheduler immediately.
 	   */
 	  if (interrupted) {
@@ -260,5 +271,4 @@ awaitEvent(rtsBool wait)
       }
 
     } while (wait && !interrupted && run_queue_hd == END_TSO_QUEUE);
-#endif
 }

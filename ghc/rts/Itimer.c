@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.20 2001/02/13 11:10:28 rrt Exp $
+ * $Id: Itimer.c,v 1.21 2001/02/27 12:43:45 rrt Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -243,6 +243,6 @@ getourtimeofday(void)
 unsigned int
 getourtimeofday(void)
 {
-  return (unsigned int)GetTickCount() * 1000;
+  return ((unsigned int)GetTickCount() * TICK_FREQUENCY) / 1000;
 }
 #endif
