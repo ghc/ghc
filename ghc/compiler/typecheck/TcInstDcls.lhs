@@ -61,8 +61,9 @@ import Unify		( unifyTauTy, unifyTauTyLists )
 import Bag		( emptyBag, unitBag, unionBags, unionManyBags,
 			  concatBag, foldBag, bagToList, listToBag,
 			  Bag )
-import CmdLineOpts	( opt_GlasgowExts, opt_OmitDefaultInstanceMethods, 
-			  opt_PprUserLength, opt_SpecialiseOverloaded
+import CmdLineOpts	( opt_GlasgowExts,
+			  opt_PprUserLength, opt_SpecialiseOverloaded,
+			  opt_WarnMissingMethods
 			)
 import Class		( GenClass,
 			  classBigSig,
@@ -470,10 +471,12 @@ tcInstMethodBind clas inst_ty meth_binds (sel_id, maybe_dm_id)
 				  Nothing    -> mk_default_bind default_meth_name
     in
 
-	-- Warn if no method binding
-    warnTc (not (maybeToBool maybe_meth_bind) &&
+	-- Warn if no method binding, only if -fwarn-missing-methods
+    
+    warnTc (opt_WarnMissingMethods && 
+	    not (maybeToBool maybe_meth_bind) &&
 	    not (maybeToBool maybe_dm_id))	
-	   (omittedMethodWarn sel_id clas)		`thenNF_Tc_`
+	(omittedMethodWarn sel_id clas)		`thenNF_Tc_`
 
 	-- Typecheck the method binding
     tcMethodBind clas origin inst_ty sel_id the_meth_bind
@@ -754,7 +757,7 @@ nonBoxedPrimCCallErr clas inst_ty sty
     		        ppr sty inst_ty])
 
 omittedMethodWarn sel_id clas sty
-  = sep [ptext SLIT("No explicit method nor default method for") <+> ppr sty sel_id, 
+  = sep [ptext SLIT("Warning: no explicit method nor default method for") <+> ppr sty sel_id, 
 	 ptext SLIT("in an instance declaration for") <+> ppr sty clas]
 
 instMethodNotInClassErr occ clas sty
