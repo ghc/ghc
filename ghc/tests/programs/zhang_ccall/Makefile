@@ -1,7 +1,7 @@
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
 
-SRC_HC_OPTS += -fglasgow-exts
+SRC_HC_OPTS += -fglasgow-exts -package lang
 
 all :: runtest
 
