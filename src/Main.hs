@@ -126,6 +126,10 @@ run flags files = do
      putStrLn (usageInfo (usageHeader prog) options)
      exitWith ExitSuccess
 
+  when (Flag_Version `elem` flags) $ do
+     putStrLn ("Haddock version " ++ projectVersion ++ ", (c) Simon Marlow 2002")
+     exitWith ExitSuccess
+
   let title = case [str | Flag_Heading str <- flags] of
 		[] -> ""
 		(t:_) -> t
@@ -133,9 +137,6 @@ run flags files = do
       source_url = case [str | Flag_SourceURL str <- flags] of
 			[] -> Nothing
 			(t:_) -> Just t
-
-  when (Flag_Version `elem` flags) $
-     putStrLn ("Haddock version " ++ projectVersion ++ ", (c) Simon Marlow 2002")
 
   libdir <- case [str | Flag_Lib str <- flags] of
 		[] -> dieMsg "no --lib option"
