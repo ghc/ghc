@@ -416,6 +416,33 @@ package_details installing
          extra_cc_opts  = [],
          extra_ld_opts  = []
         }
+        ,Package {
+	 name = "objectio",
+	 import_dirs = if installing
+	               then ["$libdir/imports/objectio"]
+	               else ["$libdir/hslibs/object-io/ObjectIO","$libdir/hslibs/object-io/OSWindows"],
+	 source_dirs = [],
+	 library_dirs = if installing
+	                then [ "$libdir" ]
+	                else [ "$libdir/hslibs/object-io"],
+	 hs_libraries = ["HSobjectio"],
+	 extra_libraries =
+		       ["user32",
+			"gdi32",
+			"kernel32",
+			"comctl32",
+			"comdlg32",
+			"shell32",
+			"winmm",
+			"winspool",
+			"ole32"],
+	 include_dirs = [],
+	 c_includes = [],
+	 package_deps = ["concurrent", "lang"],
+	 extra_ghc_opts = [],
+	 extra_cc_opts = [],
+	 extra_ld_opts = []
+	}
 #endif
 
          ,Package {
