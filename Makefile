@@ -332,6 +332,7 @@ all ::
 	for i in $(SUBDIRS); do \
 	   if [ -d $$i ]; then \
 	      $(MAKE) -C $$i boot; \
+	      if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
 	      $(MAKE) -C $$i all; \
 	      if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
 	      fi; \
