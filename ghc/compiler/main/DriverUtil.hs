@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.48 2005/01/11 15:59:39 simonmar Exp $
+-- $Id: DriverUtil.hs,v 1.49 2005/01/11 16:21:53 simonmar Exp $
 --
 -- Utils for the driver
 --
@@ -73,13 +73,18 @@ matchOptions s
   = Nothing
  where
   matchOptions1 s
-    | Just s2 <- maybePrefixMatch "OPTIONS_GHC" s   = matchOptions2 s2
-    | Just s2 <- maybePrefixMatch "OPTIONS" s	    = matchOptions2 s2
-    | otherwise					    = Nothing
+    | Just s2 <- maybePrefixMatch "OPTIONS" s
+    = case () of
+	_ | Just s3 <- maybePrefixMatch "_GHC" s2, not (is_ident (head s3))
+	  -> matchOptions2 s3
+	  | not (is_ident (head s2))
+	  -> matchOptions2 s2
+	  | otherwise
+	  -> Just []  -- OPTIONS_anything is ignored, not treated as start of source
+    | otherwise = Nothing
   matchOptions2 s
-    | not (is_ident (head s)),
-      Just s3 <- maybePrefixMatch "}-#" (reverse s) = Just (reverse s3)
-    | otherwise					    = Nothing
+    | Just s3 <- maybePrefixMatch "}-#" (reverse s) = Just (reverse s3)
+    | otherwise = Nothing
 
 -----------------------------------------------------------------------------
 -- A version of getDirectoryContents that is non-fatal if the
