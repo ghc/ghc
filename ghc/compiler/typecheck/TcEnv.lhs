@@ -72,6 +72,7 @@ import Unique		( pprUnique10, Unique, Uniquable(..) )
 import UniqFM
 import Unique		( Uniquable(..) )
 import Util		( zipEqual, zipWith3Equal, mapAccumL )
+import VarEnv		( TyVarSubstEnv )
 import SrcLoc		( SrcLoc )
 import FastString	( FastString )
 import Maybes
