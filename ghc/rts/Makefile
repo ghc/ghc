@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.30 2000/07/21 08:37:30 rrt Exp $
+# $Id: Makefile,v 1.31 2000/07/31 10:12:19 simonmar Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -134,6 +134,9 @@ boot ::
 	if [ ! -f gmp/mpz/configure ] ; then ( cd gmp/mpz && autoconf ); fi;
 	cd gmp && ./configure --target=$(HOSTPLATFORM)
 # Slight cheatage here to past host as target, but x-compilation isn't supported by ghc.
+
+# make sure the various configure files are included in a source dist.
+SRC_DIST_FILES += gmp/configure gmp/mpn/configure gmp/mpz/configure
 
 all :: gmp/libgmp.a
 
