@@ -392,6 +392,9 @@ data TcSigInfo
 
 	SrcLoc			-- Of the signature
 
+instance Outputable TcSigInfo where
+    ppr (TySigInfo nm id tyvars theta tau _ inst loc) =
+	ppr nm <+> ptext SLIT("::") <+> ppr tyvars <+> ppr theta <+> ptext SLIT("=>") <+> ppr tau
 
 maybeSig :: [TcSigInfo] -> Name -> Maybe (TcSigInfo)
 	-- Search for a particular signature

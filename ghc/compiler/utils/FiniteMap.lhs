@@ -653,6 +653,10 @@ pprX (Branch key elt sz fm_l fm_r)
  = parens (hcat [pprX fm_l, space,
 		      ppr key, space, int (IF_GHC(I# sz, sz)), space,
 		      pprX fm_r])
+#else
+-- and when not debugging the package itself...
+instance (Outputable key, Outputable elt) => Outputable (FiniteMap key elt) where
+    ppr fm = ppr (fmToList fm)
 #endif
 
 #if 0

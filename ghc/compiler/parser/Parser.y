@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.25 2000/02/28 09:17:54 simonmar Exp $
+$Id: Parser.y,v 1.26 2000/02/28 21:59:32 lewie Exp $
 
 Haskell grammar.
 
@@ -36,7 +36,6 @@ import GlaExts
 -----------------------------------------------------------------------------
 Conflicts: 14 shift/reduce
 	(note: it's currently 21 -- JRL, 31/1/2000)
-        (note2: it's currently 36, but not because of me -- SUP, 15/2/2000 :-)
 
 8 for abiguity in 'if x then y else z + 1'
 	(shift parses as 'if x then y else (z + 1)', as per longest-parse rule)

@@ -190,7 +190,8 @@ tcSimplify
 		  LIE)			-- Remaining wanteds; no dups
 
 tcSimplify str local_tvs wanted_lie
-{-
+{- this is just an optimization, and interferes with implicit params,
+   disable it for now.  same goes for tcSimplifyAndCheck
   | isEmptyVarSet local_tvs
   = returnTc (wanted_lie, EmptyMonoBinds, emptyLIE)
 
@@ -270,12 +271,14 @@ tcSimplifyAndCheck
 		   TcDictBinds)	-- Bindings
 
 tcSimplifyAndCheck str local_tvs given_lie wanted_lie
+{-
   | isEmptyVarSet local_tvs
 	-- This can happen quite legitimately; for example in
 	-- 	instance Num Int where ...
   = returnTc (wanted_lie, EmptyMonoBinds)
 
   | otherwise
+-}
   = reduceContext str try_me givens wanteds	`thenTc` \ (binds, frees, irreds) ->
 
 	-- Complain about any irreducible ones
@@ -292,6 +295,7 @@ tcSimplifyAndCheck str local_tvs given_lie wanted_lie
     try_me inst 
       -- Does not constrain a local tyvar
       | isEmptyVarSet (tyVarsOfInst inst `intersectVarSet` local_tvs)
+        && (isDict inst || null (getIPs inst))
       = Free
 
       -- When checking against a given signature we always reduce
@@ -432,9 +436,12 @@ data RHS
 
 
 pprAvails avails = vcat (map pprAvail (eltsFM avails))
-    
+
 pprAvail (Avail main_id rhs ids)
   = ppr main_id <> colon <+> brackets (ppr ids) <+> pprRhs rhs
+
+instance Outputable Avail where
+    ppr = pprAvail
 
 pprRhs NoRhs = text "<no rhs>"
 pprRhs (Rhs rhs b) = ppr rhs
@@ -503,6 +510,7 @@ reduceContext str try_me givens wanteds
 	     text "wanted" <+> ppr wanteds,
 	     text "----", 
 	     text "avails" <+> pprAvails avails,
+	     text "frees" <+> ppr frees,
 	     text "irreds" <+> ppr irreds,
 	     text "----------------------"
 	     ]) $
