@@ -68,7 +68,7 @@ phase (x:+y)	 =  atan2 y x
 %*********************************************************
 
 \begin{code}
-instance  (RealFloat a) => Prelude.Num (Complex a)  where
+instance  (RealFloat a) => Num (Complex a)  where
     (x:+y) + (x':+y')	=  (x+x') :+ (y+y')
     (x:+y) - (x':+y')	=  (x-x') :+ (y-y')
     (x:+y) * (x':+y')	=  (x*x'-y*y') :+ (x*y'+y*x')
@@ -87,7 +87,7 @@ instance  (RealFloat a) => Fractional (Complex a)  where
 
     fromRational a	=  fromRational a :+ 0
 
-instance  (Prelude.RealFloat a) => Floating (Complex a)	where
+instance  (RealFloat a) => Floating (Complex a)	where
     pi             =  pi :+ 0
     exp (x:+y)     =  expx * cos y :+ expx * sin y
                       where expx = exp x
