@@ -738,9 +738,6 @@ extendSigsWithLam sigs id
 	Just (Eval (Prod ds)) -> extendVarEnv sigs id (cprSig, NotTopLevel)
 	other                 -> sigs
 
-cprSig :: StrictSig
-cprSig = StrictSig (mkDmdType emptyVarEnv [] RetCPR)
-	
 
 dmdTransform :: SigEnv		-- The strictness environment
 	     -> Id		-- The function

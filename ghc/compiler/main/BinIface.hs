@@ -575,7 +575,7 @@ instance Binary DmdResult where
 	    h <- getByte bh
 	    case h of
 	      0 -> do return TopRes
-	      1 -> do return RetCPR
+	      1 -> do return retCPR
 	      _ -> do return BotRes
 
 instance Binary StrictSig where

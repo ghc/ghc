@@ -248,8 +248,15 @@ simplTopBinds env binds
     drop_bs (NonRec _ _) (_ : bs) = bs
     drop_bs (Rec prs)    bs	  = drop (length prs) bs
 
-    simpl_bind env (NonRec b r) (b':_) = simplRecOrTopPair env TopLevel b b' r
-    simpl_bind env (Rec pairs)  bs'    = simplRecBind      env TopLevel pairs bs'
+    simpl_bind env bind bs 
+      = getDOptsSmpl				`thenSmpl` \ dflags ->
+        if dopt Opt_D_dump_inlinings dflags then
+	   pprTrace "SimplBind" (ppr (bindersOf bind)) $ simpl_bind1 env bind bs
+	else
+	   simpl_bind1 env bind bs
+
+    simpl_bind1 env (NonRec b r) (b':_) = simplRecOrTopPair env TopLevel b b' r
+    simpl_bind1 env (Rec pairs)  bs'    = simplRecBind      env TopLevel pairs bs'
 \end{code}
 
 

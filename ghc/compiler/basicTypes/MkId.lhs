@@ -80,7 +80,7 @@ import IdInfo		( IdInfo, noCafNoTyGenIdInfo,
 			  GlobalIdDetails(..), CafInfo(..)
 			)
 import NewDemand	( mkStrictSig, strictSigResInfo, DmdResult(..),
-			  mkTopDmdType, topDmd, evalDmd, lazyDmd, 
+			  mkTopDmdType, topDmd, evalDmd, lazyDmd, retCPR,
 			  Demand(..), Demands(..) )
 import FieldLabel	( mkFieldLabel, fieldLabelName, 
 			  firstFieldLabelTag, allFieldLabelTags, fieldLabelType
@@ -176,7 +176,7 @@ mkDataConId work_name data_con
     cpr_info | isProductTyCon tycon && 
 	       isDataTyCon tycon    &&
 	       arity > 0 	    &&
-	       arity <= mAX_CPR_SIZE	= RetCPR
+	       arity <= mAX_CPR_SIZE	= retCPR
 	     | otherwise 		= TopRes
 	-- RetCPR is only true for products that are real data types;
 	-- that is, not unboxed tuples or [non-recursive] newtypes

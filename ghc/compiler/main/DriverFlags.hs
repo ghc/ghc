@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.91 2002/04/05 23:24:29 sof Exp $
+-- $Id: DriverFlags.hs,v 1.92 2002/04/22 16:06:36 simonpj Exp $
 --
 -- Driver flags
 --
@@ -322,9 +322,6 @@ static_flags =
 	-- -fno-* pattern below doesn't work.  We therefore allow
 	-- certain optimisation passes to be turned off explicitly:
   ,  ( "fno-strictness"	   , NoArg (writeIORef v_Strictness False) )
-#ifdef OLD_STRICTNESS
-  ,  ( "fno-cpr"	   , NoArg (writeIORef v_CPR False) )
-#endif
   ,  ( "fno-cse"	   , NoArg (writeIORef v_CSE False) )
 
 	-- All other "-fno-<blah>" options cancel out "-f<blah>" on the hsc cmdline

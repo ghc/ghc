@@ -77,6 +77,7 @@ module CmdLineOpts (
 	opt_LiberateCaseThreshold,
 	opt_StgDoLetNoEscapes,
 	opt_UnfoldCasms,
+	opt_CprOff,
         opt_UsageSPOn,
 	opt_UnboxStrictFields,
 	opt_SimplNoPreInlining,
@@ -186,7 +187,7 @@ data CoreToDo		-- These are diff core-to-core passes,
   | CoreDoSpecialising
   | CoreDoSpecConstr
   | CoreDoUSPInf
-  | CoreDoCPResult
+  | CoreDoOldStrictness
   | CoreDoGlomBinds
   | CoreCSE
   | CoreDoRuleCheck Int{-CompilerPhase-} String	-- Check for non-application of rules 
@@ -585,6 +586,8 @@ opt_Flatten			= lookUp  FSLIT("-fflatten")
 opt_NoMethodSharing		= lookUp  FSLIT("-fno-method-sharing")
 opt_DoSemiTagging		= lookUp  FSLIT("-fsemi-tagging")
 opt_FoldrBuildOn		= lookUp  FSLIT("-ffoldr-build-on")
+opt_CprOff			= lookUp  FSLIT("-fcpr-off")
+	-- Switch off CPR analysis in the new demand analyser
 opt_LiberateCaseThreshold	= lookup_def_int "-fliberate-case-threshold" (10::Int)
 opt_StgDoLetNoEscapes		= lookUp  FSLIT("-flet-no-escape")
 opt_UnfoldCasms		        = lookUp  FSLIT("-funfold-casms-in-hi-file")
@@ -688,7 +691,8 @@ isStaticHscFlag f =
 	"static",
 	"funregisterised",
 	"fext-core",
-	"frule-check"
+	"frule-check",
+	"fcpr-off"
 	]
   || any (flip prefixMatch f) [
 	"fcontext-stack",

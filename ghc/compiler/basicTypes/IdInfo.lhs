@@ -189,7 +189,7 @@ mk_strict_sig name arity dmd_ty
     mkStrictSig dmd_ty
 
 newRes True  _ 	        = BotRes
-newRes False ReturnsCPR = RetCPR
+newRes False ReturnsCPR = retCPR
 newRes False NoCPRInfo  = TopRes
 
 newDemand :: Demand.Demand -> NewDemand.Demand

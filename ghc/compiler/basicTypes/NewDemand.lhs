@@ -12,17 +12,19 @@ module NewDemand(
 	DmdType(..), topDmdType, botDmdType, mkDmdType, mkTopDmdType, 
 		dmdTypeDepth, dmdTypeRes, seqDmdType,
 	DmdEnv, emptyDmdEnv,
-	DmdResult(..), isBotRes, returnsCPR, resTypeArgDmd,
+	DmdResult(..), retCPR, isBotRes, returnsCPR, resTypeArgDmd,
 	
 	Demands(..), mapDmds, zipWithDmds, allTop, seqDemands,
 
-	StrictSig(..), mkStrictSig, topSig, botSig, isTopSig,
+	StrictSig(..), mkStrictSig, topSig, botSig, cprSig,
+        isTopSig,
 	splitStrictSig, strictSigResInfo,
 	pprIfaceStrictSig, appIsBottom, isBottomingSig, seqStrictSig,
      ) where
 
 #include "HsVersions.h"
 
+import CmdLineOpts	( opt_CprOff )
 import BasicTypes	( Arity )
 import VarEnv		( VarEnv, emptyVarEnv, isEmptyVarEnv )
 import UniqFM		( ufmToList )
@@ -159,6 +161,14 @@ data DmdType = DmdType
 	-- Handwavey reason: these don't correspond to calling conventions
 	-- See DmdAnal.funArgDemand for details
 
+
+-- This guy lets us switch off CPR analysis
+-- by making sure that everything uses TopRes instead of RetCPR
+-- Assuming, of course, that they don't mention RetCPR by name.
+-- They should onlyu use retCPR
+retCPR | opt_CprOff = TopRes
+       | otherwise  = RetCPR
+
 seqDmdType (DmdType env ds res) = 
   {- ??? env `seq` -} seqDemandList ds `seq` res `seq` ()
 
@@ -194,8 +204,10 @@ instance Outputable DmdResult where
 			  -- without ambiguity
 
 emptyDmdEnv = emptyVarEnv
+
 topDmdType = DmdType emptyDmdEnv [] TopRes
 botDmdType = DmdType emptyDmdEnv [] BotRes
+cprDmdType = DmdType emptyVarEnv [] retCPR
 
 isTopDmdType :: DmdType -> Bool
 -- Only used on top-level types, hence the assert
@@ -288,8 +300,11 @@ strictSigResInfo (StrictSig (DmdType _ _ res)) = res
 
 isTopSig (StrictSig ty) = isTopDmdType ty
 
+topSig, botSig, cprSig :: StrictSig
 topSig = StrictSig topDmdType
 botSig = StrictSig botDmdType
+cprSig = StrictSig cprDmdType
+	
 
 -- appIsBottom returns true if an application to n args would diverge
 appIsBottom (StrictSig (DmdType _ ds BotRes)) n = listLengthCmp ds n /= GT

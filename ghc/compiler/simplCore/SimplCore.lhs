@@ -39,10 +39,12 @@ import SAT		( doStaticArgs )
 import Specialise	( specProgram)
 import SpecConstr	( specConstrProgram)
 import UsageSPInf       ( doUsageSPInf )
-import StrictAnal	( saBinds )
 import DmdAnal		( dmdAnalPgm )
 import WorkWrap	        ( wwTopBinds )
+#ifdef OLD_STRICTNESS
+import StrictAnal	( saBinds )
 import CprAnalyse       ( cprAnalyse )
+#endif
 
 import UniqSupply	( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
 import IO		( hPutStr, stderr )
@@ -152,7 +154,7 @@ doCorePass dfs rb us binds (CoreDoFloatOutwards f)
 doCorePass dfs rb us binds CoreDoStaticArgs	        
    = _scc_ "StaticArgs"    noStats dfs (doStaticArgs us binds)
 doCorePass dfs rb us binds CoreDoStrictness	        
-   = _scc_ "Stranal"       noStats dfs (strictAnal dfs binds)
+   = _scc_ "Stranal"       noStats dfs (dmdAnalPgm dfs binds)
 doCorePass dfs rb us binds CoreDoWorkerWrapper      
    = _scc_ "WorkWrap"      noStats dfs (wwTopBinds dfs us binds)
 doCorePass dfs rb us binds CoreDoSpecialising       
@@ -160,8 +162,8 @@ doCorePass dfs rb us binds CoreDoSpecialising
 doCorePass dfs rb us binds CoreDoSpecConstr
    = _scc_ "SpecConstr"    noStats dfs (specConstrProgram dfs us binds)
 #ifdef OLD_STRICTNESS
-doCorePass dfs rb us binds CoreDoCPResult	        
-   = _scc_ "CPResult"      noStats dfs (cprAnalyse dfs binds)
+doCorePass dfs rb us binds CoreDoOldStrictness
+   = _scc_ "OldStrictness"      noStats dfs (doOldStrictness dfs binds)
 #endif
 doCorePass dfs rb us binds CoreDoPrintCore	        
    = _scc_ "PrintCore"     noStats dfs (printCore binds)
@@ -174,11 +176,12 @@ doCorePass dfs rb us binds (CoreDoRuleCheck phase pat)
 doCorePass dfs rb us binds CoreDoNothing
    = noStats dfs (return binds)
 
-strictAnal dfs binds = do
 #ifdef OLD_STRICTNESS
-     binds <- saBinds dfs binds
+doOldStrictness dfs binds 
+  = do binds1 <- saBinds dfs binds
+       binds2 <- cprAnalyse dfs binds1
+       return binds2
 #endif
-     dmdAnalPgm dfs binds
 
 printCore binds = do dumpIfSet True "Print Core"
 			       (pprCoreBindings binds)
