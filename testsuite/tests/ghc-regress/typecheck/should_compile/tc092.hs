@@ -1,3 +1,6 @@
+{-# OPTIONS -fglasgow-exts #-}
+-- -fglasgow-exts because it uses local universal quantification
+
 module ShouldSucceed where
 
 data Empty q			=  Empty (Ord a => q a)
