@@ -21,3 +21,4 @@ test "cc007" { myvtc("") }
 test "cc008" { myvtc("") }
 test "cc009" { myvtc("") }
 test "cc010" { myvtc("") }
+test "cc011" { myvtc("") }
