@@ -42,11 +42,10 @@ import Id		( idType, nullIdEnv, addOneToIdEnv,
 			)
 import Literal		( mkMachInt, Literal(..) )
 import Name		( Name{--O only-} )
-import PprStyle		( PprStyle(..) )
+import Outputable	( PprStyle(..), Outputable(..) )
 import PprType		( GenType )
 import PrelVals		( rEC_CON_ERROR_ID, rEC_UPD_ERROR_ID, voidId )
 import Pretty		( Doc, hcat, ptext, text )
-import TyCon		( isDataTyCon, isNewTyCon )
 import Type		( splitSigmaTy, splitFunTy, typePrimRep, 
 			  getAppDataTyConExpandingDicts, maybeAppTyCon, getAppTyCon, applyTy,
 			  maybeBoxedPrimType, splitAppTy, SYN_IE(Type)
@@ -59,10 +58,6 @@ import TyVar		( nullTyVarEnv, addOneToTyVarEnv, GenTyVar{-instance Eq-} )
 import Usage		( SYN_IE(UVar) )
 import Maybes		( maybeToBool )
 import Util		( zipEqual, pprError, panic, assertPanic )
-
-#if __GLASGOW_HASKELL__ >= 202
-import Outputable
-#endif
 
 mk_nil_con ty = mkCon nilDataCon [] [ty] []  -- micro utility...
 \end{code}

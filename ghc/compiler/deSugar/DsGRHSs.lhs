@@ -29,7 +29,7 @@ import Id		( GenId )
 #endif
 import CoreUtils	( coreExprType, mkCoreIfThenElse )
 import PrelVals		( nON_EXHAUSTIVE_GUARDS_ERROR_ID )
-import PprStyle		( PprStyle(..) )
+import Outputable	( PprStyle(..) )
 import SrcLoc		( SrcLoc{-instance-} )
 import Type             ( SYN_IE(Type) )
 import Unique		( Unique, otherwiseIdKey )
