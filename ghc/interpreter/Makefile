@@ -1,6 +1,6 @@
 
 # ----------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.2 1999/01/12 14:13:51 sewardj Exp $                        #
+# $Id: Makefile,v 1.3 1999/01/14 18:08:26 sewardj Exp $                        #
 # ----------------------------------------------------------------------------- #
 
 TOP = ../..
@@ -21,13 +21,13 @@ C_SRCS = \
   machdep.c modules.c optimise.c output.c pat.c pmc.c pp.c static.c \
   stg.c stgSubst.c storage.c subst.c translate.c type.c
 
-SRC_CC_OPTS = -g -I$(GHC_DIR)/includes -D__HUGS__
+SRC_CC_OPTS = -g -I$(GHC_DIR)/includes -D__HUGS__ -Wall -Wno-unused
 
 GHC_LIBS_NEEDED = $(TOP)/ghc/rts/libHSrts.a $(TOP)/ghc/rts/gmp/libgmp.a
 GHC_DYN_CBITS_DIR = $(TOP)/ghc/lib/std/cbits
 GHC_DYN_CBITS = $(GHC_DYN_CBITS_DIR)/libHS_cbits.so
 
-all :: $(GHC_LIBS_NEEDED) $(GHC_DYN_CBITS) hugs
+all :: $(GHC_LIBS_NEEDED) $(GHC_DYN_CBITS) hugs Prelude.hs
 
 hugs: $(C_OBJS)
 	$(CC) -rdynamic -o $@ $(CC_OPTS) $^ $(GHC_LIBS_NEEDED) -lbfd -liberty -ldl -lm
@@ -141,6 +141,10 @@ check :: all
 	./test/runtests test/std/*.hs
 	./test/runtests test/exts/*.hs
 
+checkrun: all
+	./test/runtests test/runtime/*.hs
+	./test/runtests test/std/*.hs
+	./test/runtests test/exts/*.hs
 
 # --------------------------------------------------------------------- #
 # Cleanery & misc                                                       #
