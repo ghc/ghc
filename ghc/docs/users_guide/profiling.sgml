@@ -840,9 +840,9 @@ PostScript will be written to <Filename>&lt;file&gt;@.resid.ps</Filename>. If
 <Para>
 The plot can not be produced from the statistics file for a
 generational collector, though a suitable stats file can be produced
-using the <Option>-F2s</Option><IndexTerm><Primary>-F2s RTS option</Primary></IndexTerm> runtime option when the
-program has been compiled for generational garbage collection (the
-default).
+using the <Option>-G1</Option><IndexTerm><Primary>-G RTS
+option</Primary></IndexTerm> runtime option when the program has been
+compiled for generational garbage collection (the default).
 </Para>
 
 <Para>

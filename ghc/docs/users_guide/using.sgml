@@ -835,9 +835,10 @@ country.
 <Para>
 <IndexTerm><Primary>-syslib &lt;lib&gt; option</Primary></IndexTerm>
 If you are using a system-supplied non-Prelude library (e.g., the
-POSIX library), just use a <Option>-syslib posix</Option> option (for example).  The
-right interface files should then be available.  <XRef LinkEnd="ghc-prelude"> lists the
-libraries available by this mechanism.
+POSIX library), just use a <Option>-syslib posix</Option> option (for
+example).  The right interface files should then be available.  The
+accompanying HsLibs document lists the libraries available by this
+mechanism.
 </Para>
 </ListItem>
 </VarListEntry>
