@@ -53,11 +53,11 @@ import Int	( indexInt8OffAddr,  indexInt16OffAddr
 
 \begin{code}
 instance Show Addr where
-   showsPrec p (A# a) rs = pad_out (showHex int rs)
+   showsPrec p (A# a) rs = pad_out (showHex int "") rs
      where
         -- want 0s prefixed to pad it out to a fixed length.
-       pad_out ('0':'x':ls) = 
-	  '0':'x':(replicate (2*ADDR_SIZE_IN_BYTES - length ls) '0') ++  ls
+       pad_out ('0':'x':ls) rs = 
+	  '0':'x':(replicate (2*ADDR_SIZE_IN_BYTES - length ls) '0') ++ ls ++ rs
 
        int = 
 	case word2Integer# (int2Word# (addr2Int# a)) of
@@ -90,6 +90,7 @@ indexWordOffAddr   :: Addr -> Int -> Word
 --in PrelAddr: indexAddrOffAddr   :: Addr -> Int -> Addr
 indexFloatOffAddr  :: Addr -> Int -> Float
 indexDoubleOffAddr :: Addr -> Int -> Double
+indexStablePtrOffAddr :: Addr -> Int -> StablePtr a
 
 #ifdef __HUGS__
 indexCharOffAddr   = primIndexCharOffAddr  
@@ -123,6 +124,11 @@ indexDoubleOffAddr (A# addr#) n
   = case n  	    	 	    	of { I# n# ->
     case indexDoubleOffAddr# addr# n# 	of { r# ->
     (D# r#)}}
+
+indexStablePtrOffAddr (A# addr#) n
+  = case n  	    	 	    	 of { I# n# ->
+    case indexStablePtrOffAddr# addr# n# of { r# ->
+    (StablePtr r#)}}
 #endif
 \end{code}
 
@@ -135,6 +141,7 @@ readWordOffAddr    :: Addr -> Int -> IO Word
 readAddrOffAddr    :: Addr -> Int -> IO Addr
 readFloatOffAddr   :: Addr -> Int -> IO Float
 readDoubleOffAddr  :: Addr -> Int -> IO Double
+readStablePtrOffAddr  :: Addr -> Int -> IO (StablePtr a)
 
 #ifdef __HUGS__
 readCharOffAddr    = primReadCharOffAddr  
@@ -144,15 +151,13 @@ readAddrOffAddr    = primReadAddrOffAddr
 readFloatOffAddr   = primReadFloatOffAddr 
 readDoubleOffAddr  = primReadDoubleOffAddr
 #else
-readCharOffAddr   a i = _casm_ `` %r=(StgChar)(((StgChar*)%0)[(StgInt)%1]); '' a i
-readIntOffAddr    a i = _casm_ `` %r=(StgInt)(((StgInt*)%0)[(StgInt)%1]); '' a i
-readWordOffAddr   a i = _casm_ `` %r=(StgWord)(((StgWord*)%0)[(StgInt)%1]); '' a i
-readAddrOffAddr   a i = _casm_ `` %r=(StgAddr)(((StgAddr*)%0)[(StgInt)%1]); '' a i
-readFloatOffAddr  a i = _casm_ `` %r=(StgFloat)(((StgFloat*)%0)[(StgInt)%1]); '' a i
-readDoubleOffAddr a i = _casm_ `` %r=(StgDouble)(((StgDouble*)%0)[(StgInt)%1]); '' a i
-
-readStablePtrOffAddr    :: Addr -> Int -> IO (StablePtr a)
-readStablePtrOffAddr a i = _casm_ `` %r=(StgStablePtr)(((StgStablePtr*)%0)[(StgInt)%1]); '' a i
+readCharOffAddr a i = case indexCharOffAddr a i of { C# o# -> return (C# o#) }
+readIntOffAddr a i  = case indexIntOffAddr a i of { I# o# -> return (I# o#) }
+readWordOffAddr a i = case indexWordOffAddr a i of { W# o# -> return (W# o#) }
+readAddrOffAddr a i = case indexAddrOffAddr a i of { A# o# -> return (A# o#) }
+readFloatOffAddr a i = case indexFloatOffAddr a i of { F# o# -> return (F# o#) }
+readDoubleOffAddr a i = case indexDoubleOffAddr a i of { D# o# -> return (D# o#) }
+readStablePtrOffAddr a i = case indexStablePtrOffAddr a i of { StablePtr x -> return (StablePtr x) }
 #endif
 \end{code}
 
