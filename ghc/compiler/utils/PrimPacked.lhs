@@ -84,18 +84,18 @@ copyPrefixStr (A# a) len@(I# length#) =
    -- fill in packed string from "addr"
   fill_in ch_array 0#			     >>
    -- freeze the puppy:
-  freeze_ps_array ch_array length#	     `thenStrictlyST` \ barr ->
-  returnStrictlyST barr )
+  freeze_ps_array ch_array length#	     >>= \ barr ->
+  return barr )
   where
     fill_in :: MutableByteArray s Int -> Int# -> ST s ()
 
     fill_in arr_in# idx
       | idx ==# length#
-      = write_ps_array arr_in# idx (chr# 0#) `seqStrictlyST`
-	returnStrictlyST ()
+      = write_ps_array arr_in# idx (chr# 0#) >>
+	return ()
       | otherwise
       = case (indexCharOffAddr# a idx) of { ch ->
-	write_ps_array arr_in# idx ch `seqStrictlyST`
+	write_ps_array arr_in# idx ch >>
 	fill_in arr_in# (idx +# 1#) }
 
 \end{code}
@@ -121,9 +121,9 @@ copySubStrFO (ForeignObj fo) (I# start#) len@(I# length#) =
   {- allocate an array that will hold the string
     (not forgetting the NUL at the end)
   -}
-  new_ps_array (length# +# 1#)  `thenStrictlyST` \ ch_array ->
+  new_ps_array (length# +# 1#)  >>= \ ch_array ->
    -- fill in packed string from "addr"
-  fill_in ch_array 0#   `seqStrictlyST`
+  fill_in ch_array 0#   >>
    -- freeze the puppy:
   freeze_ps_array ch_array length#)
   where
@@ -131,11 +131,11 @@ copySubStrFO (ForeignObj fo) (I# start#) len@(I# length#) =
 
     fill_in arr_in# idx
       | idx ==# length#
-      = write_ps_array arr_in# idx (chr# 0#) `seqStrictlyST`
-	returnStrictlyST ()
+      = write_ps_array arr_in# idx (chr# 0#) >>
+	return ()
       | otherwise
       = case (indexCharOffForeignObj# fo (idx +# start#)) of { ch ->
-	write_ps_array arr_in# idx ch `seqStrictlyST`
+	write_ps_array arr_in# idx ch >>
 	fill_in arr_in# (idx +# 1#) }
 
 -- step on (char *) pointer by x units.
@@ -154,9 +154,9 @@ copySubStrBA (ByteArray _ barr#) (I# start#) len@(I# length#) =
   {- allocate an array that will hold the string
     (not forgetting the NUL at the end)
   -}
-  new_ps_array (length# +# 1#)  `thenStrictlyST` \ ch_array ->
+  new_ps_array (length# +# 1#)  >>= \ ch_array ->
    -- fill in packed string from "addr"
-  fill_in ch_array 0#   	`seqStrictlyST`
+  fill_in ch_array 0#   	>>
    -- freeze the puppy:
   freeze_ps_array ch_array length#)
   where
@@ -164,13 +164,12 @@ copySubStrBA (ByteArray _ barr#) (I# start#) len@(I# length#) =
 
     fill_in arr_in# idx
       | idx ==# length#
-      = write_ps_array arr_in# idx (chr# 0#) `seqStrictlyST`
-	returnStrictlyST ()
+      = write_ps_array arr_in# idx (chr# 0#) >>
+	return ()
       | otherwise
       = case (indexCharArray# barr# (start# +# idx)) of { ch ->
-	write_ps_array arr_in# idx ch `seqStrictlyST`
+	write_ps_array arr_in# idx ch >>
 	fill_in arr_in# (idx +# 1#) }
-
 \end{code}
 
 (Very :-) ``Specialised'' versions of some CharArray things...
