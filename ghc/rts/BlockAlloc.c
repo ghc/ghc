@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: BlockAlloc.c,v 1.10 2001/08/14 13:40:09 sewardj Exp $
+ * $Id: BlockAlloc.c,v 1.11 2001/11/08 10:18:49 simonmar Exp $
  *
  * (c) The GHC Team 1998-2000
  * 
@@ -53,6 +53,7 @@ initGroup(nat n, bdescr *head)
     head->free = head->start;
     for (i=1, bd = head+1; i < n; i++, bd++) {
       bd->free = 0;
+      bd->blocks = 0;
       bd->link = head;
     }
   }
