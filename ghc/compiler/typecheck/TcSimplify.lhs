@@ -46,7 +46,7 @@ import TcType		( ThetaType, PredType, mkClassPred, isOverloadedTy,
 import Id		( idType )
 import NameSet		( mkNameSet )
 import Class		( classBigSig )
-import FunDeps		( oclose, grow, improve )
+import FunDeps		( oclose, grow, improve, pprEquationDoc )
 import PrelInfo		( isNumericClass, isCreturnableClass, isCcallishClass )
 
 import Subst		( mkTopTyVarSubst, substTheta, substTy )
@@ -1128,7 +1128,7 @@ tcImprove avails
      if null eqns then
 	returnTc True
      else
-	traceTc (ptext SLIT("Improve:") <+> vcat (map ppr_eqn eqns))	`thenNF_Tc_`
+	traceTc (ptext SLIT("Improve:") <+> vcat (map pprEquationDoc eqns))	`thenNF_Tc_`
         mapTc_ unify eqns	`thenTc_`
 	returnTc False
   where
@@ -1136,10 +1136,6 @@ tcImprove avails
 	 = tcAddErrCtxt doc			$
 	   tcInstTyVars (varSetElems qtvs)	`thenNF_Tc` \ (_, _, tenv) ->
 	   unifyTauTy (substTy tenv t1) (substTy tenv t2)
-    ppr_eqn ((qtvs, t1, t2), doc)
-	= vcat [ptext SLIT("forall") <+> braces (pprWithCommas ppr (varSetElems qtvs))
-				     <+> ppr t1 <+> ptext SLIT(":=:") <+> ppr t2,
-		nest 2 doc]
 \end{code}
 
 The main context-reduction function is @reduce@.  Here's its game plan.

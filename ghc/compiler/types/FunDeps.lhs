@@ -7,6 +7,7 @@ It's better to read it as: "if we know these, then we're going to know these"
 
 \begin{code}
 module FunDeps (
+ 	Equation, pprEquation, pprEquationDoc,
 	oclose, grow, improve, checkInstFDs, checkClsFD, pprFundeps
     ) where
 
@@ -20,6 +21,7 @@ import TcType		( Type, ThetaType, SourceType(..), PredType,
 			  predTyUnique, mkClassPred, tyVarsOfTypes, tyVarsOfPred,
 			  unifyTyListsX, unifyExtendTysX, tcEqType
 			)
+import PprType		(  )
 import VarSet
 import VarEnv
 import Outputable
@@ -157,6 +159,10 @@ type Equation = (TyVarSet, Type, Type)	-- These two types should be equal, for s
 	--
 
 
+pprEquationDoc (eqn, doc) = vcat [pprEquation eqn, nest 2 doc]
+
+pprEquation (qtvs, t1, t2) = ptext SLIT("forall") <+> braces (pprWithCommas ppr (varSetElems qtvs))
+			     			  <+> ppr t1 <+> ptext SLIT(":=:") <+> ppr t2
 
 ----------
 improve :: InstEnv Id		-- Gives instances for given class
@@ -287,7 +293,10 @@ checkClsFD qtvs fd clas_tvs tys1 tys2
 -- unifyTyListsX will only bind variables in qtvs, so it's OK!
   = case unifyTyListsX qtvs ls1 ls2 of
 	Nothing   -> []
-	Just unif -> [ (qtvs', substTy full_unif r1, substTy full_unif r2)
+	Just unif -> -- pprTrace "checkFD" (vcat [ppr_fd fd,
+		     --			       ppr (varSetElems qtvs) <+> (ppr ls1 $$ ppr ls2),
+		     --			       ppr unif]) $ 
+		     [ (qtvs', substTy full_unif r1, substTy full_unif r2)
 		     | (r1,r2) <- rs1 `zip` rs2,
 		       not (maybeToBool (unifyExtendTysX qtvs unif r1 r2))]
 			-- Don't include any equations that already hold
