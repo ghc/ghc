@@ -284,15 +284,23 @@ AC_SUBST(exeext)
 dnl * Booting from .hc files?
 #--------------------------------------------------------------
 AC_ARG_ENABLE(hc-boot,
-   [
-Boot the Glasgow Haskell Compiler from intermediate .hc files.
-(This option is mostly of interest for porters.)
-   ],
-
-   BootingFromHc=YES,
-   BootingFromHc=NO
+[  --enable-hc-boot
+        Boot the Glasgow Haskell Compiler from intermediate .hc files.
+        (This option is mostly of interest to porters.)
+],
+[BootingFromHc=YES],
+[BootingFromHc=NO]
 )
 AC_SUBST(BootingFromHc)
+
+AC_ARG_WITH(gcc,
+[  --with-gcc=<gcc command>
+        Use a different command instead of 'gcc' for the GNU C compiler.
+],
+[WhatGccIsCalled="$withval"],
+[WhatGccIsCalled="gcc"]
+)
+AC_SUBST(WhatGccIsCalled)
 
 # -------------------------------------------------------------------------
 dnl
