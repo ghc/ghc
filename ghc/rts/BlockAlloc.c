@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: BlockAlloc.c,v 1.5 1999/03/26 14:54:43 simonm Exp $
+ * $Id: BlockAlloc.c,v 1.6 1999/07/01 13:48:22 panne Exp $
  *
  * (c) The GHC Team 1998-1999
  * 
@@ -128,7 +128,9 @@ allocMegaGroup(nat n)
 
     if (bd->blocks == BLOCKS_PER_MBLOCK) {	/* whole megablock found */
 
-      if (grp_start == NULL) {	/* is it the first one we've found? */
+      /* is it the first one we've found or a non-contiguous megablock? */
+      if (grp_start == NULL ||
+          bd->start != last->start + MBLOCK_SIZE/sizeof(W_)) {
 	grp_start = bd;
 	grp_prev  = last;
 	mbs_found = 1;
