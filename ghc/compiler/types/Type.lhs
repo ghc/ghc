@@ -908,7 +908,7 @@ eq_ty env (TyConApp tc1 tys1) (TyConApp tc2 tys2) = (tc1 == tc2) && (eq_tys env 
 eq_ty env t1		       t2		  = False
 
 eq_tys env []        []        = True
-eq_tys env (t1:tys1) (t2:tys2) = (eq_ty env t1 t2) && (eq_tys env tys2 tys2)
+eq_tys env (t1:tys1) (t2:tys2) = (eq_ty env t1 t2) && (eq_tys env tys1 tys2)
 eq_tys env tys1      tys2      = False
 \end{code}
 
