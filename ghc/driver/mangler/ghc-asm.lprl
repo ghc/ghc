@@ -834,7 +834,7 @@ sub mangle_asm {
 	# toss the register-windowing save/restore/ret* instructions
 	# directly:
 	if ( $TargetPlatform =~ /^sparc-/ ) {
-	    $c =~ s/^\t(save.*|restore|ret|retl)\n//g;
+	    $c =~ s/^\t(save.*|restore.*|ret|retl)\n//g;
 	    # throw away PROLOGUE comments
 	    $c =~ s/^\t!#PROLOGUE# 0\n\t!#PROLOGUE# 1\n//;
 	}
