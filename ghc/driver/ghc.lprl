@@ -2457,7 +2457,7 @@ sub add_syslib {
 
     push(@SysLibrary, "-lHS$syslib");
     push(@SysLibrary, "-lHS${syslib}_cbits")
-          unless $syslib eq 'contrib' || $syslib eq 'exts' || $syslib eq 'conc';
+          unless $syslib eq 'contrib' || $syslib eq 'exts' || $syslib eq 'concurrent';
 	  #HACK! they have no cbits
 }
 \end{code}
@@ -2766,7 +2766,7 @@ arg: while($_ = $Args[0]) {
     #--------- ticky/concurrent/parallel -----------------------------------
     # we sort out the details a bit later on
 
-    /^-concurrent$/ && do { $CONCURing = 'c'; &add_syslib('conc'); next arg; }; 
+    /^-concurrent$/ && do { $CONCURing = 'c'; &add_syslib('concurrent'); next arg; }; 
 			  # concurrent Haskell; implies -syslib conc
     /^-gransim$/    && do { $GRANing   = 'g'; next arg; }; # GranSim
     /^-ticky$/	    && do { $TICKYing  = 't'; next arg; }; # ticky-ticky

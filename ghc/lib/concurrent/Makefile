@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.4 1998/04/16 12:50:50 sof Exp $
+# $Id: Makefile,v 1.5 1998/05/05 12:53:29 sof Exp $
 #
 # Makefile for concurrent libraries.
 #
@@ -12,7 +12,7 @@ WAYS=$(GhcLibWays)
 # 	Setting the standard variables
 #
 
-LIBRARY = libHSconc$(_way).a
+LIBRARY = libHSconcurrent$(_way).a
 HS_SRCS	= $(wildcard *.lhs)
 HS_OBJS = $(HS_SRCS:.lhs=.$(way_)o)
 LIBOBJS = $(HS_OBJS)
