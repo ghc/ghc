@@ -232,9 +232,33 @@ instance  Integral Int	where
 		   then a `remInt` b
 		   else error "Integral.Int.rem{PreludeCore}: divide by 0\n"
 
-    x `div` y = if x > 0 && y < 0	then quotInt (x-y-1) y
-		else if x < 0 && y > 0	then quotInt (x-y+1) y
-		else quotInt x y
+    n `div` d
+     | n > 0 && d < 0 = mk_neg (quotInt (n-d-1) d)
+     | n < 0 && d > 0 = mk_neg (quotInt (n-d+1) d)
+     | otherwise      = quotInt n d
+      where
+       {-
+         - the result of (integral) division is
+           defined as being truncated towards
+           negative infinity. (see Sec 6.3.2 of
+           the Haskell 1.4 report.)
+
+         - in the case of Int, if either nominator or
+           denominator is negative, we adjust the nominator
+           to account for the above property before
+           computing the quotient.
+
+         - in the case of Int, the adjustment of the
+           nominator runs the risk of overflowing. If
+           we make the assumption that arithmetic is
+           modulo word size, and adjust the final result
+           to account for this.
+       -}
+
+       mk_neg r 
+        | r <= 0    = r
+        | otherwise = -(r+1)
+
     x `mod` y = if x > 0 && y < 0 || x < 0 && y > 0 then
 		    if r/=0 then r+y else 0
 	    	else
@@ -849,21 +873,23 @@ instance  (Integral a)	=> Enum (Ratio a)  where
     toEnum n            =  fromIntegral n :% 1
     fromEnum            =  fromInteger . truncate
 
-ratio_prec :: Int
-ratio_prec = 7
-
 instance  (Integral a)  => Show (Ratio a)  where
     showsPrec p (x:%y)	=  showParen (p > ratio_prec)
     	    	    	       (shows x . showString " % " . shows y)
+
+-- defn. also used by the Read (Ratio a) instance PrelRead.
+ratio_prec :: Int
+ratio_prec = 7
+
 \end{code}
 
 \begin{code}
 --Exported from std library Numeric, defined here to
 --avoid mut. rec. between PrelNum and Numeric.
 showSigned :: (Real a) => (a -> ShowS) -> Int -> a -> ShowS
-showSigned showPos p x = if x < 0 then showParen (p > 6)
-						 (showChar '-' . showPos (-x))
-				  else showPos x
+showSigned showPos p x
+  | x < 0     = showParen (p > 6) (showChar '-' . showPos (-x))
+  | otherwise = showPos x
 
 showSignedInteger :: Int -> Integer -> ShowS
 showSignedInteger p n r
@@ -871,18 +897,14 @@ showSignedInteger p n r
     if n < 0 && p > 6 then '(':jtos n++(')':r) else jtos n ++ r
 
 jtos :: Integer -> String
-jtos n 
-  = if n < 0 then
-        '-' : jtos' (-n) []
-    else 
-	jtos' n []
+jtos n
+ | n < 0     = '-' : jtos' (-n) []
+ | otherwise = jtos' n []
 
 jtos' :: Integer -> String -> String
 jtos' n cs
-  = if n < 10 then
-	chr (fromInteger (n + ord_0)) : cs
-    else 
-	jtos' q (chr (toInt r + (ord_0::Int)) : cs)
+  | n < 10    = chr (fromInteger (n + ord_0)) : cs
+  | otherwise = jtos' q (chr (toInt r + (ord_0::Int)) : cs)
   where
     (q,r) = n `quotRem` 10
 
@@ -896,16 +918,13 @@ formatRealFloat :: (RealFloat a) => FFFormat -> Maybe Int -> a -> String
 formatRealFloat fmt decs x = s
  where 
   base = 10
-  s = if isNaN x 
-      then "NaN"
-      else 
-       if isInfinite x then
-          if x < 0 then "-Infinity" else "Infinity"
-       else
-          if x < 0 || isNegativeZero x then
-            '-':doFmt fmt (floatToDigits (toInteger base) (-x))
-          else
-	    doFmt fmt (floatToDigits (toInteger base) x)
+  base_i = toInteger base
+
+  s 
+   | isNaN x      = "NaN"
+   | isInfinite x = (\ str -> if x < 0 then '-':str else str) "Infinity"
+   | x < 0 || isNegativeZero x = '-' : doFmt fmt (floatToDigits base_i (-x))
+   | otherwise    = doFmt fmt (floatToDigits base_i x)
 
   doFmt fmt (is, e) =
     let ds = map intToDigit is in
@@ -1160,10 +1179,10 @@ Now, here's Lennart's code.
 	Rational -> Float #-}
 
 --fromRat :: (RealFloat a) => Rational -> a
-fromRat x = 
-    if x == 0 then encodeFloat 0 0 		-- Handle exceptional cases
-    else if x < 0 then - fromRat' (-x)		-- first.
-    else fromRat' x
+fromRat x
+  | x == 0    = encodeFloat 0 0 	-- Handle exceptional cases
+  | x < 0     = - fromRat' (-x)		-- first.
+  | otherwise = fromRat' x
 
 -- Conversion process:
 -- Scale the rational number by the RealFloat base until
@@ -1177,13 +1196,18 @@ fromRat' :: (RealFloat a) => Rational -> a
 fromRat' x = r
   where b = floatRadix r
         p = floatDigits r
+
 	(minExp0, _) = floatRange r
+
 	minExp = minExp0 - p		-- the real minimum exponent
+
 	xMin = toRational (expt b (p-1))
 	xMax = toRational (expt b p)
+
 	p0 = (integerLogBase b (numerator x) - integerLogBase b (denominator x) - p) `max` minExp
 	f = if p0 < 0 then 1 % expt b (-p0) else expt b p0 % 1
 	(x', p') = scaleRat (toRational b) minExp xMin xMax p0 (x / f)
+
 	r = encodeFloat (round x') p'
 
 -- Scale x until xMin <= x < xMax, or p (the exponent) <= minExp.
@@ -1197,12 +1221,12 @@ scaleRat b minExp xMin xMax p x
 -- Exponentiation with a cache for the most common numbers.
 minExpt = 0::Int
 maxExpt = 1100::Int
+
 expt :: Integer -> Int -> Integer
-expt base n =
-    if base == 2 && n >= minExpt && n <= maxExpt then
-        expts!n
-    else
-        base^n
+expt base n
+ | base == 2 && n >= minExpt && n <= maxExpt = expts!n
+ | otherwise				     = base^n
+
 expts :: Array Int Integer
 expts = array (minExpt,maxExpt) [(n,2^n) | n <- [minExpt .. maxExpt]]
 
@@ -1210,15 +1234,16 @@ expts = array (minExpt,maxExpt) [(n,2^n) | n <- [minExpt .. maxExpt]]
 -- Simplest way would be just divide i by b until it's smaller then b, but that would
 -- be very slow!  We are just slightly more clever.
 integerLogBase :: Integer -> Integer -> Int
-integerLogBase b i =
-     if i < b then
-        0
-     else
+integerLogBase b i
+  | i < b     = 0
+  | otherwise = doDiv (i `div` (b^l)) l
+     where
 	-- Try squaring the base first to cut down the number of divisions.
-        let l = 2 * integerLogBase (b*b) i
-	    doDiv :: Integer -> Int -> Int
-	    doDiv i l = if i < b then l else doDiv (i `div` b) (l+1)
-	in  doDiv (i `div` (b^l)) l
+        l = 2 * integerLogBase (b*b) i
+
+        doDiv :: Integer -> Int -> Int
+	doDiv i l = if i < b then l else doDiv (i `div` b) (l+1)
+
 \end{code}
 
 %*********************************************************
