@@ -9,11 +9,12 @@ module TcExpr ( tcExpr, tcMonoExpr, tcId ) where
 #include "HsVersions.h"
 
 import HsSyn		( HsExpr(..), HsLit(..), ArithSeqInfo(..), 
-			  HsMatchContext(..), HsDoContext(..), 
-			  mkMonoBind 
+			  HsMatchContext(..), HsDoContext(..), MonoBinds(..),
+			  mkMonoBind, andMonoBindList
 			)
 import RnHsSyn		( RenamedHsExpr, RenamedRecordBinds )
-import TcHsSyn		( TcExpr, TcRecordBinds, simpleHsLitTy, mkHsDictApp, mkHsTyApp )
+import TcHsSyn		( TcExpr, TcRecordBinds, TypecheckedMonoBinds,
+			  simpleHsLitTy, mkHsDictApp, mkHsTyApp, mkHsLet )
 
 import TcMonad
 import TcUnify		( tcSubExp, tcGen, (<$>),
@@ -23,7 +24,7 @@ import BasicTypes	( RecFlag(..),  isMarkedStrict )
 import Inst		( InstOrigin(..), 
 			  LIE, mkLIE, emptyLIE, unitLIE, plusLIE, plusLIEs,
 			  newOverloadedLit, newMethodFromName, newIPDict,
-			  newDicts, newMethodWithGivenTy,
+			  newDicts, newMethodWithGivenTy, tcSyntaxName,
 			  instToId, tcInstCall, tcInstDataCon
 			)
 import TcBinds		( tcBindsAndThen )
@@ -46,7 +47,8 @@ import TcType		( TcType, TcSigmaType, TcRhoType, TyVarDetails(VanillaTv),
 			  tidyOpenType
 			)
 import FieldLabel	( FieldLabel, fieldLabelName, fieldLabelType, fieldLabelTyCon )
-import Id		( idType, recordSelectorFieldLabel, isRecordSelector, isDataConWrapId_maybe )
+import Id		( Id, idType, recordSelectorFieldLabel, isRecordSelector, 
+			  isDataConWrapId_maybe, mkSysLocal )
 import DataCon		( dataConFieldLabels, dataConSig, 
 			  dataConStrictMarks
 			)
@@ -55,12 +57,11 @@ import TyCon		( TyCon, tyConTyVars, tyConTheta, isAlgTyCon, tyConDataCons )
 import Subst		( mkTopTyVarSubst, substTheta, substTy )
 import VarSet		( emptyVarSet, elemVarSet )
 import TysWiredIn	( boolTy, mkListTy, mkPArrTy )
-import PrelNames	( cCallableClassName, 
-			  cReturnableClassName, 
+import PrelNames	( cCallableClassName, cReturnableClassName, 
 			  enumFromName, enumFromThenName, 
 			  enumFromToName, enumFromThenToName,
 			  enumFromToPName, enumFromThenToPName,
-			  ioTyConName
+			  ioTyConName, monadNames
 			)
 import ListSetOps	( minusList )
 import CmdLineOpts
@@ -839,11 +840,11 @@ tcDoStmts ListComp stmts method_names src_loc res_ty
 	      stmts_lie)
 
 tcDoStmts DoExpr stmts method_names src_loc res_ty
-  = newTyVarTy (mkArrowKind liftedTypeKind liftedTypeKind)	`thenNF_Tc` \ tc_ty ->
+  = newTyVarTy (mkArrowKind liftedTypeKind liftedTypeKind)	`thenNF_Tc` \ m_ty ->
     newTyVarTy liftedTypeKind 					`thenNF_Tc` \ elt_ty ->
-    unifyTauTy res_ty (mkAppTy tc_ty elt_ty)			`thenTc_`
+    unifyTauTy res_ty (mkAppTy m_ty elt_ty)			`thenTc_`
 
-    tcStmts (DoCtxt DoExpr) (mkAppTy tc_ty, elt_ty) stmts	`thenTc`   \ (stmts', stmts_lie) ->
+    tcStmts (DoCtxt DoExpr) (mkAppTy m_ty, elt_ty) stmts	`thenTc`   \ (stmts', stmts_lie) ->
 
 	-- Build the then and zero methods in case we need them
 	-- It's important that "then" and "return" appear just once in the final LIE,
@@ -853,14 +854,29 @@ tcDoStmts DoExpr stmts method_names src_loc res_ty
 	--	then = then
 	-- where the second "then" sees that it already exists in the "available" stuff.
 	--
-    mapNF_Tc (newMethodFromName DoOrigin tc_ty) method_names	`thenNF_Tc` \ insts ->
+    mapNF_Tc (tc_syn_name m_ty) 
+	     (zipEqual "tcDoStmts" monadNames method_names)	`thenNF_Tc` \ stuff ->
+    let
+	(binds, ids, lies) = unzip3 stuff
+    in	
 
-    returnTc (HsDo DoExpr stmts'
-		   (map instToId insts)
+    returnTc (mkHsLet (andMonoBindList binds) $
+	      HsDo DoExpr stmts' ids
 		   res_ty src_loc,
-	      stmts_lie `plusLIE` mkLIE insts)
-\end{code}
+	      stmts_lie `plusLIE` plusLIEs lies)
 
+  where
+    tc_syn_name :: TcType -> (Name,Name) -> TcM (TypecheckedMonoBinds, Id, LIE)
+    tc_syn_name m_ty (std_nm, usr_nm)
+	= tcSyntaxName DoOrigin m_ty std_nm usr_nm 	`thenTc` \ (expr, lie, expr_ty) ->
+	  case expr of
+	    HsVar v -> returnTc (EmptyMonoBinds, v, lie)
+	    other   -> tcGetUnique		`thenTc` \ uniq ->
+		       let
+			  id = mkSysLocal FSLIT("syn") uniq expr_ty
+		       in
+		       returnTc (VarMonoBind id expr, id, lie)
+\end{code}
 
 %************************************************************************
 %*									*
@@ -1016,6 +1032,14 @@ exprSigCtxt expr
   = hang (ptext SLIT("When checking the type signature of the expression:"))
 	 4 (ppr expr)
 
+exprCtxt expr
+  = hang (ptext SLIT("In the expression:")) 4 (ppr expr)
+
+funAppCtxt fun arg arg_no
+  = hang (hsep [ ptext SLIT("In the"), speakNth arg_no, ptext SLIT("argument of"), 
+		    quotes (ppr fun) <> text ", namely"])
+	 4 (quotes (ppr arg))
+
 listCtxt expr
   = hang (ptext SLIT("In the list element:")) 4 (ppr expr)
 
@@ -1024,14 +1048,6 @@ parrCtxt expr
 
 predCtxt expr
   = hang (ptext SLIT("In the predicate expression:")) 4 (ppr expr)
-
-exprCtxt expr
-  = hang (ptext SLIT("In the expression:")) 4 (ppr expr)
-
-funAppCtxt fun arg arg_no
-  = hang (hsep [ ptext SLIT("In the"), speakNth arg_no, ptext SLIT("argument of"), 
-		    quotes (ppr fun) <> text ", namely"])
-	 4 (quotes (ppr arg))
 
 wrongArgsCtxt too_many_or_few fun args
   = hang (ptext SLIT("Probable cause:") <+> quotes (ppr fun)

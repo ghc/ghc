@@ -41,7 +41,7 @@ import PrelNames	( hasKey, assertIdKey,
 			  zipPName, lengthPName, indexPName, toPName,
 			  enumFromToPName, enumFromThenToPName, 
 			  fromIntegerName, fromRationalName, minusName, negateName,
-			  failMName, bindMName, thenMName, returnMName )
+			  monadNames )
 import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon, 
 			  floatPrimTyCon, doublePrimTyCon )
 import TysWiredIn	( intTyCon )
@@ -96,19 +96,19 @@ rnPat (NPatIn lit mb_neg)
   = rnOverLit lit			`thenRn` \ (lit', fvs1) ->
     (case mb_neg of
 	Nothing -> returnRn (Nothing, emptyFVs)
-	Just _  -> lookupSyntaxName negateName	`thenRn` \ neg ->
-		   returnRn (Just neg, unitFV neg)
+	Just _  -> lookupSyntaxName negateName	`thenRn` \ (neg, fvs) ->
+		   returnRn (Just neg, fvs)
     )					`thenRn` \ (mb_neg', fvs2) ->
     returnRn (NPatIn lit' mb_neg', 
 	      fvs1 `plusFV` fvs2 `addOneFV` eqClassName)	
 	-- Needed to find equality on pattern
 
 rnPat (NPlusKPatIn name lit _)
-  = rnOverLit lit			`thenRn` \ (lit', fvs) ->
+  = rnOverLit lit			`thenRn` \ (lit', fvs1) ->
     lookupBndrRn name			`thenRn` \ name' ->
-    lookupSyntaxName minusName		`thenRn` \ minus ->
+    lookupSyntaxName minusName		`thenRn` \ (minus, fvs2) ->
     returnRn (NPlusKPatIn name' lit' minus, 
-	      fvs `addOneFV` ordClassName `addOneFV` minus)
+	      fvs1 `plusFV` fvs2 `addOneFV` ordClassName)
 
 rnPat (LazyPatIn pat)
   = rnPat pat		`thenRn` \ (pat', fvs) ->
@@ -343,9 +343,9 @@ rnExpr (OpApp e1 op _ e2)
 
 rnExpr (NegApp e _)
   = rnExpr e			`thenRn` \ (e', fv_e) ->
-    lookupSyntaxName negateName	`thenRn` \ neg_name ->
+    lookupSyntaxName negateName	`thenRn` \ (neg_name, fv_neg) ->
     mkNegAppRn e' neg_name	`thenRn` \ final_e ->
-    returnRn (final_e, fv_e `addOneFV` neg_name)
+    returnRn (final_e, fv_e `plusFV` fv_neg)
 
 rnExpr (HsPar e)
   = rnExpr e 		`thenRn` \ (e', fvs_e) ->
@@ -405,20 +405,20 @@ rnExpr e@(HsDo do_or_lc stmts _ ty src_loc)
 
 	-- Generate the rebindable syntax for the monad
     (case do_or_lc of
-	DoExpr -> mapRn lookupSyntaxName monad_names
-	other  -> returnRn []
-    )					`thenRn` \ monad_names' ->
+	DoExpr -> mapAndUnzipRn lookupSyntaxName monadNames
+	other  -> returnRn ([], [])
+    )					`thenRn` \ (monad_names', monad_fvs) ->
 
     returnRn (HsDo do_or_lc stmts' monad_names' placeHolderType src_loc, 
-	      fvs `plusFV` implicit_fvs)
+	      fvs `plusFV` implicit_fvs `plusFV` plusFVs monad_fvs)
   where
-    monad_names = [returnMName, failMName, bindMName, thenMName]
-
     implicit_fvs = case do_or_lc of
       PArrComp -> mkFVs [replicatePName, mapPName, filterPName,
 			 falseDataConName, trueDataConName, crossPName,
 			 zipPName]
-      _        -> mkFVs [foldrName, buildName, monadClassName]
+      ListComp -> mkFVs [foldrName, buildName]
+      other    -> emptyFVs
+	-- monadClassName pulls in the standard names
 	-- Monad stuff should not be necessary for a list comprehension
 	-- but the typechecker looks up the bind and return Ids anyway
 	-- Oh well.
@@ -859,32 +859,32 @@ litFVs lit		      = pprPanic "RnExpr.litFVs" (ppr lit)	-- HsInteger and HsRat on
 									-- in post-typechecker translations
 
 rnOverLit (HsIntegral i _)
-  = lookupSyntaxName fromIntegerName	`thenRn` \ from_integer_name ->
+  = lookupSyntaxName fromIntegerName	`thenRn` \ (from_integer_name, fvs) ->
     if inIntRange i then
-	returnRn (HsIntegral i from_integer_name, unitFV from_integer_name)
+	returnRn (HsIntegral i from_integer_name, fvs)
     else let
-	fvs = mkFVs [plusIntegerName, timesIntegerName]
+	extra_fvs = mkFVs [plusIntegerName, timesIntegerName]
 	-- Big integer literals are built, using + and *, 
 	-- out of small integers (DsUtils.mkIntegerLit)
 	-- [NB: plusInteger, timesInteger aren't rebindable... 
 	--	they are used to construct the argument to fromInteger, 
 	--	which is the rebindable one.]
     in
-    returnRn (HsIntegral i from_integer_name, fvs `addOneFV` from_integer_name)
+    returnRn (HsIntegral i from_integer_name, fvs `plusFV` extra_fvs)
 
 rnOverLit (HsFractional i _)
-  = lookupSyntaxName fromRationalName		`thenRn` \ from_rat_name ->
+  = lookupSyntaxName fromRationalName		`thenRn` \ (from_rat_name, fvs) ->
     let
-	fvs = mkFVs [ratioDataConName, plusIntegerName, timesIntegerName]
+	extra_fvs = mkFVs [ratioDataConName, plusIntegerName, timesIntegerName]
 	-- We have to make sure that the Ratio type is imported with
 	-- its constructor, because literals of type Ratio t are
 	-- built with that constructor.
 	-- The Rational type is needed too, but that will come in
-	-- when fractionalClass does.
+	-- as part of the type for fromRational.
 	-- The plus/times integer operations may be needed to construct the numerator
 	-- and denominator (see DsUtils.mkIntegerLit)
     in
-    returnRn (HsFractional i from_rat_name, fvs `addOneFV` from_rat_name)
+    returnRn (HsFractional i from_rat_name, fvs `plusFV` extra_fvs)
 \end{code}
 
 %************************************************************************

@@ -620,22 +620,27 @@ respectively.  Initially, we just store the "standard" name (PrelNames.fromInteg
 fromRationalName etc), but the renamer changes this to the appropriate user
 name if Opt_NoImplicitPrelude is on.  That is what lookupSyntaxName does.
 
+We treat the orignal (standard) names as free-vars too, because the type checker
+checks the type of the user thing against the type of the standard thing.
+
 \begin{code}
-lookupSyntaxName :: Name 	-- The standard name
-	         -> RnMS Name	-- Possibly a non-standard name
+lookupSyntaxName :: Name 			-- The standard name
+	         -> RnMS (Name, FreeVars)	-- Possibly a non-standard name
 lookupSyntaxName std_name
   = getModeRn				`thenRn` \ mode ->
     case mode of {
-	InterfaceMode -> returnRn std_name ;	-- Happens for 'derived' code
-						-- where we don't want to rebind
+	InterfaceMode -> returnRn (std_name, unitFV std_name) ;
+				-- Happens for 'derived' code
+				-- where we don't want to rebind
    	other ->
 
     doptRn Opt_NoImplicitPrelude	`thenRn` \ no_prelude -> 
     if not no_prelude then
-	returnRn std_name	-- Normal case
+	returnRn (std_name, unitFV std_name)	-- Normal case
     else
 	-- Get the similarly named thing from the local environment
-    lookupOccRn (mkRdrUnqual (nameOccName std_name)) }
+    lookupOccRn (mkRdrUnqual (nameOccName std_name)) `thenRn` \ usr_name ->
+    returnRn (usr_name, mkFVs [usr_name, std_name]) }
 \end{code}
 
 

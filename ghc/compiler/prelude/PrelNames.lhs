@@ -216,6 +216,9 @@ knownKeyNames
 	andName,
 	orName
     ]
+
+monadNames :: [Name]	-- The monad ops need by a HsDo
+monadNames = [returnMName, failMName, bindMName, thenMName]
 \end{code}
 
 

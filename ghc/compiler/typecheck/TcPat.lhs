@@ -17,7 +17,8 @@ import TcHsSyn		( TcPat, TcId, simpleHsLitTy )
 import TcMonad
 import Inst		( InstOrigin(..),
 			  emptyLIE, plusLIE, LIE, mkLIE, unitLIE, instToId, isEmptyLIE,
-			  newMethod, newMethodFromName, newOverloadedLit, newDicts, tcInstDataCon
+			  newMethod, newMethodFromName, newOverloadedLit, newDicts,
+			  tcInstDataCon, tcSyntaxName
 			)
 import Id		( mkLocalId, mkSysLocal )
 import Name		( Name )
@@ -35,7 +36,7 @@ import TcMonoType	( tcHsSigType, UserTypeCtxt(..) )
 import TysWiredIn	( stringTy )
 import CmdLineOpts	( opt_IrrefutableTuples )
 import DataCon		( dataConFieldLabels, dataConSourceArity )
-import PrelNames	( eqStringName, eqName, geName, cCallableClassName )
+import PrelNames	( eqStringName, eqName, geName, minusName, cCallableClassName )
 import BasicTypes	( isBoxed )
 import Bag
 import Outputable
@@ -347,13 +348,13 @@ tcPat tc_bndr pat@(NPlusKPatIn name lit@(HsIntegral i _) minus_name) pat_ty
     newMethodFromName origin pat_ty geName	`thenNF_Tc` \ ge ->
 
 	-- The '-' part is re-mappable syntax
-    tcLookupId minus_name			`thenNF_Tc` \ minus_sel_id ->
-    newMethod origin minus_sel_id [pat_ty]	`thenNF_Tc` \ minus ->
+    tcGetInstLoc origin					`thenNF_Tc` \ loc ->
+    tcSyntaxName loc pat_ty minusName minus_name	`thenTc` \ (minus_expr, minus_lie, _) ->
 
     returnTc (NPlusKPat bndr_id i pat_ty
 			(SectionR (HsVar (instToId ge)) over_lit_expr)
-			(SectionR (HsVar (instToId minus)) over_lit_expr),
-	      lie1 `plusLIE` lie2 `plusLIE` mkLIE [ge,minus],
+			(SectionR minus_expr over_lit_expr),
+	      lie1 `plusLIE` lie2 `plusLIE` minus_lie `plusLIE` unitLIE ge,
 	      emptyBag, unitBag (name, bndr_id), emptyLIE)
   where
     origin = PatOrigin pat

@@ -13,7 +13,8 @@ module Inst (
 
 	newDictsFromOld, newDicts, cloneDict,
 	newMethod, newMethodFromName, newMethodWithGivenTy, newMethodAtLoc,
-	newOverloadedLit, newIPDict, tcInstCall, tcInstDataCon,
+	newOverloadedLit, newIPDict, 
+	tcInstCall, tcInstDataCon, tcSyntaxName,
 
 	tyVarsOfInst, tyVarsOfInsts, tyVarsOfLIE, 
 	ipNamesOfInst, ipNamesOfInsts, predsOfInst, predsOfInsts,
@@ -34,12 +35,14 @@ module Inst (
 
 #include "HsVersions.h"
 
+import {-# SOURCE #-}	TcExpr( tcExpr )
+
 import HsSyn	( HsLit(..), HsOverLit(..), HsExpr(..) )
 import TcHsSyn	( TcExpr, TcId, TypecheckedHsExpr,
 		  mkHsTyApp, mkHsDictApp, mkHsConApp, zonkId
 		)
 import TcMonad
-import TcEnv	( TcIdSet, tcGetInstEnv, tcLookupId )
+import TcEnv	( TcIdSet, tcGetInstEnv, tcLookupId, tcLookupGlobalId, tcLookupTyCon )
 import InstEnv	( InstLookupResult(..), lookupInstEnv )
 import TcMType	( zonkTcType, zonkTcTypes, zonkTcPredType, zapToType,
 		  zonkTcThetaType, tcInstTyVar, tcInstType, tcInstTyVars
@@ -47,14 +50,14 @@ import TcMType	( zonkTcType, zonkTcTypes, zonkTcPredType, zapToType,
 import TcType	( Type, TcType, TcThetaType, TcPredType, TcTauType, TcTyVarSet,
 		  SourceType(..), PredType, ThetaType, TyVarDetails(VanillaTv),
 		  tcSplitForAllTys, tcSplitForAllTys, mkTyConApp,
-		  tcSplitMethodTy, tcSplitPhiTy, tcFunArgTy,
+		  tcSplitMethodTy, tcSplitPhiTy, mkGenTyConApp,
 		  isIntTy,isFloatTy, isIntegerTy, isDoubleTy,
 		  tcIsTyVarTy, mkPredTy, mkTyVarTy, mkTyVarTys,
 		  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tidyPred,
 		  isClassPred, isTyVarClassPred, isLinearPred,
 		  getClassPredTys, getClassPredTys_maybe, mkPredName,
-		  tidyType, tidyTypes, tidyFreeTyVars,
-		  tcCmpType, tcCmpTypes, tcCmpPred
+		  tidyType, tidyTypes, tidyFreeTyVars, 
+		  tcCmpType, tcCmpTypes, tcCmpPred, tcSplitSigmaTy
 		)
 import CoreFVs	( idFreeTyVars )
 import Class	( Class )
@@ -70,7 +73,7 @@ import Literal	( inIntRange )
 import VarEnv	( TidyEnv, lookupSubstEnv, SubstResult(..) )
 import VarSet	( elemVarSet, emptyVarSet, unionVarSet )
 import TysWiredIn ( floatDataCon, doubleDataCon )
-import PrelNames( fromIntegerName, fromRationalName )
+import PrelNames( fromIntegerName, fromRationalName, rationalTyConName )
 import Util	( thenCmp, equalLength )
 import BasicTypes( IPName(..), mapIPName, ipNameName )
 
@@ -158,6 +161,9 @@ data Inst
   | LitInst
 	Id
 	HsOverLit	-- The literal from the occurrence site
+			--	INVARIANT: never a rebindable-syntax literal
+			--	Reason: tcSyntaxName does unification, and we
+			--		don't want to deal with that during tcSimplify
 	TcType		-- The type at which the literal is used
 	InstLoc
 \end{code}
@@ -450,11 +456,32 @@ newOverloadedLit :: InstOrigin
 		 -> HsOverLit
 		 -> TcType
 		 -> NF_TcM (TcExpr, LIE)
-newOverloadedLit orig lit expected_ty
-  | Just expr <- shortCutLit lit expected_ty
+newOverloadedLit orig lit@(HsIntegral i fi) expected_ty
+  | fi /= fromIntegerName	-- Do not generate a LitInst for rebindable
+				-- syntax.  Reason: tcSyntaxName does unification
+				-- which is very inconvenient in tcSimplify
+  = tcSyntaxName orig expected_ty fromIntegerName fi	`thenTc` \ (expr, lie, _) ->
+    returnTc (HsApp expr (HsLit (HsInteger i)), lie)
+
+  | Just expr <- shortCutIntLit i expected_ty 
   = returnNF_Tc (expr, emptyLIE)
 
   | otherwise
+  = newLitInst orig lit expected_ty
+
+newOverloadedLit orig lit@(HsFractional r fr) expected_ty
+  | fr /= fromRationalName	-- c.f. HsIntegral case
+  = tcSyntaxName orig expected_ty fromRationalName fr	`thenTc` \ (expr, lie, _) ->
+    mkRatLit r						`thenNF_Tc` \ rat_lit ->
+    returnTc (HsApp expr rat_lit, lie)
+
+  | Just expr <- shortCutFracLit r expected_ty 
+  = returnNF_Tc (expr, emptyLIE)
+
+  | otherwise
+  = newLitInst orig lit expected_ty
+
+newLitInst orig lit expected_ty
   = tcGetInstLoc orig		`thenNF_Tc` \ loc ->
     tcGetUnique			`thenNF_Tc` \ new_uniq ->
     zapToType expected_ty	`thenNF_Tc_` 
@@ -466,21 +493,29 @@ newOverloadedLit orig lit expected_ty
     in
     returnNF_Tc (HsVar (instToId lit_inst), unitLIE lit_inst)
 
-shortCutLit :: HsOverLit -> TcType -> Maybe TcExpr
-shortCutLit (HsIntegral i fi) ty
-  | isIntTy ty && inIntRange i && fi == fromIntegerName		-- Short cut for Int
+shortCutIntLit :: Integer -> TcType -> Maybe TcExpr
+shortCutIntLit i ty
+  | isIntTy ty && inIntRange i 			-- Short cut for Int
   = Just (HsLit (HsInt i))
-  | isIntegerTy ty && fi == fromIntegerName			-- Short cut for Integer
+  | isIntegerTy ty 				-- Short cut for Integer
   = Just (HsLit (HsInteger i))
+  | otherwise = Nothing
 
-shortCutLit (HsFractional f fr) ty
-  | isFloatTy ty  && fr == fromRationalName 
+shortCutFracLit :: Rational -> TcType -> Maybe TcExpr
+shortCutFracLit f ty
+  | isFloatTy ty 
   = Just (mkHsConApp floatDataCon [] [HsLit (HsFloatPrim f)])
-  | isDoubleTy ty && fr == fromRationalName 
+  | isDoubleTy ty
   = Just (mkHsConApp doubleDataCon [] [HsLit (HsDoublePrim f)])
+  | otherwise = Nothing
 
-shortCutLit lit ty
-  = Nothing
+mkRatLit :: Rational -> NF_TcM TcExpr
+mkRatLit r
+  = tcLookupTyCon rationalTyConName 			`thenNF_Tc` \ rat_tc ->
+    let
+	rational_ty  = mkGenTyConApp rat_tc []
+    in
+    returnNF_Tc (HsLit (HsRat r rational_ty))
 \end{code}
 
 
@@ -633,26 +668,28 @@ lookupInst inst@(Method _ id tys theta _ loc)
 -- [Same shortcut as in newOverloadedLit, but we
 --  may have done some unification by now] 		
 
-lookupInst inst@(LitInst u lit ty loc)
-  | Just expr <- shortCutLit lit ty
+lookupInst inst@(LitInst u (HsIntegral i from_integer_name) ty loc)
+  | Just expr <- shortCutIntLit i ty
   = returnNF_Tc (GenInst [] expr)	-- GenInst, not SimpleInst, because 
 					-- expr may be a constructor application
-
-lookupInst inst@(LitInst u (HsIntegral i from_integer_name) ty loc)
-  = tcLookupId from_integer_name		`thenNF_Tc` \ from_integer ->
+  | otherwise
+  = ASSERT( from_integer_name == fromIntegerName )	-- A LitInst invariant
+    tcLookupGlobalId fromIntegerName		`thenNF_Tc` \ from_integer ->
     newMethodAtLoc loc from_integer [ty]	`thenNF_Tc` \ (method_inst, method_id) ->
-    returnNF_Tc (GenInst [method_inst] 
+    returnNF_Tc (GenInst [method_inst]
 			 (HsApp (HsVar method_id) (HsLit (HsInteger i))))
 
 
 lookupInst inst@(LitInst u (HsFractional f from_rat_name) ty loc)
-  = tcLookupId from_rat_name			`thenNF_Tc` \ from_rational ->
+  | Just expr <- shortCutFracLit f ty
+  = returnNF_Tc (GenInst [] expr)
+
+  | otherwise
+  = ASSERT( from_rat_name == fromRationalName )	-- A LitInst invariant
+    tcLookupGlobalId fromRationalName		`thenNF_Tc` \ from_rational ->
     newMethodAtLoc loc from_rational [ty]	`thenNF_Tc` \ (method_inst, method_id) ->
-    let
-	rational_ty  = tcFunArgTy (idType method_id)
-	rational_lit = HsLit (HsRat f rational_ty)
-    in
-    returnNF_Tc (GenInst [method_inst] (HsApp (HsVar method_id) rational_lit))
+    mkRatLit f					`thenNF_Tc` \ rat_lit ->
+    returnNF_Tc (GenInst [method_inst] (HsApp (HsVar method_id) rat_lit))
 \end{code}
 
 There is a second, simpler interface, when you want an instance of a
@@ -676,4 +713,73 @@ lookupSimpleInst clas tys
 	   (theta,_) = tcSplitPhiTy rho
 
       other  -> returnNF_Tc Nothing
+\end{code}
+
+
+%************************************************************************
+%*									*
+		Re-mappable syntax
+%*									*
+%************************************************************************
+
+
+Suppose we are doing the -fno-implicit-prelude thing, and we encounter
+a do-expression.  We have to find (>>) in the current environment, which is
+done by the rename. Then we have to check that it has the same type as
+Control.Monad.(>>).  Or, more precisely, a compatible type. One 'customer' had
+this:
+
+  (>>) :: HB m n mn => m a -> n b -> mn b
+
+So the idea is to generate a local binding for (>>), thus:
+
+	let then72 :: forall a b. m a -> m b -> m b
+	    then72 = ...something involving the user's (>>)...
+	in
+	...the do-expression...
+
+Now the do-expression can proceed using then72, which has exactly
+the expected type.
+
+In fact tcSyntaxName just generates the RHS for then72, because we only
+want an actual binding in the do-expression case. For literals, we can 
+just use the expression inline.
+
+\begin{code}
+tcSyntaxName :: InstOrigin
+	     -> TcType				-- Type to instantiate it at
+	     -> Name -> Name 			-- (Standard name, user name)
+	     -> TcM (TcExpr, LIE, TcType)	-- Suitable expression with its type
+
+-- NB: tcSyntaxName calls tcExpr, and hence can do unification.
+-- So we do not call it from lookupInst, which is called from tcSimplify
+
+tcSyntaxName orig ty std_nm user_nm
+  | std_nm == user_nm
+  = newMethodFromName orig ty std_nm	`thenNF_Tc` \ inst ->
+    let
+	id = instToId inst
+    in
+    returnTc (HsVar id, unitLIE inst, idType id)
+
+  | otherwise
+  = tcLookupGlobalId std_nm		`thenNF_Tc` \ std_id ->
+    let	
+	-- C.f. newMethodAtLoc
+	([tv], _, tau)  = tcSplitSigmaTy (idType std_id)
+ 	tau1		= substTy (mkTopTyVarSubst [tv] [ty]) tau
+    in
+    tcAddErrCtxtM (syntaxNameCtxt user_nm orig tau1)	$
+    tcExpr (HsVar user_nm) tau1				`thenTc` \ (user_fn, lie) ->
+    returnTc (user_fn, lie, tau1)
+
+syntaxNameCtxt name orig ty tidy_env
+  = tcGetInstLoc orig		`thenNF_Tc` \ inst_loc ->
+    let
+	msg = vcat [ptext SLIT("When checking that") <+> quotes (ppr name) <+> 
+				ptext SLIT("(needed by a syntactic construct)"),
+		    nest 2 (ptext SLIT("has the required type:") <+> ppr (tidyType tidy_env ty)),
+		    nest 2 (pprInstLoc inst_loc)]
+    in
+    returnNF_Tc (tidy_env, msg)
 \end{code}
