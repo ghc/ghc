@@ -78,7 +78,7 @@ dsMonoBinds _ (VarMonoBind var expr) rest
 
 dsMonoBinds auto_scc (FunMonoBind fun _ matches locn) rest
   = putSrcLocDs locn	$
-    matchWrapper (FunRhs fun) matches 			`thenDs` \ (args, body) ->
+    matchWrapper (FunRhs (idName fun)) matches		`thenDs` \ (args, body) ->
     addAutoScc auto_scc (fun, mkLams args body)		`thenDs` \ pair ->
     returnDs (pair : rest)
 

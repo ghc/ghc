@@ -1136,7 +1136,7 @@ missingStrictFields con fields
 	 | otherwise   = colon <+> pprWithCommas ppr fields
 
     header = ptext SLIT("Constructor") <+> quotes (ppr con) <+> 
-	     ptext SLIT("does not have the required strict fields") 
+	     ptext SLIT("does not have the required strict field(s)") 
 	  
 
 missingFields :: DataCon -> [FieldLabel] -> SDoc

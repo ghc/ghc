@@ -14,7 +14,8 @@ import {-# SOURCE #-}	TcExpr( tcMonoExpr )
 
 import HsSyn		( HsExpr(..), HsBinds(..), Match(..), GRHSs(..), GRHS(..),
 			  MonoBinds(..), Stmt(..), HsMatchContext(..), HsStmtContext(..),
-			  pprMatch, getMatchLoc, pprMatchContext, pprStmtCtxt, isDoExpr,
+			  pprMatch, getMatchLoc, isDoExpr,
+			  pprMatchContext, pprStmtContext, pprStmtResultContext,
 			  mkMonoBind, nullMonoBinds, collectSigTysFromPats, andMonoBindList
 			)
 import RnHsSyn		( RenamedMatch, RenamedGRHSs, RenamedStmt, 
@@ -192,13 +193,15 @@ tcGRHSs :: RenamedMatchContext -> RenamedGRHSs
 tcGRHSs ctxt (GRHSs grhss binds _) expected_ty
   = tcBindsAndThen glue_on binds (tc_grhss grhss)
   where
+    m_ty =  (\ty -> ty, expected_ty) 
+
     tc_grhss grhss
 	= mappM tc_grhs grhss	    `thenM` \ grhss' ->
 	  returnM (GRHSs grhss' EmptyBinds expected_ty)
 
     tc_grhs (GRHS guarded locn)
-	= addSrcLoc locn					$
-	  tcStmts PatGuard (\ty -> ty, expected_ty) guarded	`thenM` \ guarded' ->
+	= addSrcLoc locn			$
+	  tcStmts (PatGuard ctxt) m_ty guarded	`thenM` \ guarded' ->
 	  returnM (GRHS guarded' locn)
 \end{code}
 
@@ -317,7 +320,7 @@ tcCheckExistentialPat ex_tvs ex_ids ex_lie lie_req match_ty
 %************************************************************************
 
 \begin{code}
-tcDoStmts :: HsStmtContext -> [RenamedStmt] -> [Name] -> TcType
+tcDoStmts :: HsStmtContext Name -> [RenamedStmt] -> [Name] -> TcType
 	  -> TcM (TcMonoBinds, [TcStmt], [Id])
 tcDoStmts PArrComp stmts method_names res_ty
   = unifyPArrTy res_ty				  `thenM` \elt_ty ->
@@ -399,7 +402,7 @@ tcStmts do_or_lc m_ty stmts
 
 tcStmtsAndThen
 	:: (TcStmt -> thing -> thing)	-- Combiner
-	-> HsStmtContext
+	-> HsStmtContext Name
         -> (TcType -> TcType, TcType)	-- m, the relationship type of pat and rhs in pat <- rhs
 					-- elt_ty, where type of the comprehension is (m elt_ty)
         -> [RenamedStmt]
@@ -474,7 +477,7 @@ tcStmtAndThen combine do_or_lc m_ty (RecStmt recNames stmts) thing_inside
 
 	-- ExprStmt
 tcStmtAndThen combine do_or_lc m_ty@(m, res_elt_ty) stmt@(ExprStmt exp _ locn) thing_inside
-  = setErrCtxt (stmtCtxt do_or_lc stmt) (
+  = addErrCtxt (stmtCtxt do_or_lc stmt) (
 	if isDoExpr do_or_lc then
 		newTyVarTy openTypeKind 	`thenM` \ any_ty ->
 		tcMonoExpr exp (m any_ty)	`thenM` \ exp' ->
@@ -490,7 +493,7 @@ tcStmtAndThen combine do_or_lc m_ty@(m, res_elt_ty) stmt@(ExprStmt exp _ locn) t
 
 	-- Result statements
 tcStmtAndThen combine do_or_lc m_ty@(m, res_elt_ty) stmt@(ResultStmt exp locn) thing_inside
-  = setErrCtxt (stmtCtxt do_or_lc stmt) (
+  = addErrCtxt (resCtxt do_or_lc stmt) (
 	if isDoExpr do_or_lc then
 		tcMonoExpr exp (m res_elt_ty)
 	else
@@ -530,8 +533,9 @@ sameNoOfArgs matches = isSingleton (nub (map args_in_match matches))
 varyingArgsErr name matches
   = sep [ptext SLIT("Varying number of arguments for function"), quotes (ppr name)]
 
-matchCtxt ctxt  match  = hang (pprMatchContext ctxt <> colon) 4 (pprMatch ctxt match)
-stmtCtxt do_or_lc stmt = hang (pprStmtCtxt do_or_lc <> colon) 4 (ppr stmt)
+matchCtxt ctxt  match  = hang (ptext SLIT("In") <+> pprMatchContext ctxt <> colon) 4 (pprMatch ctxt match)
+stmtCtxt do_or_lc stmt = hang (ptext SLIT("In") <+> pprStmtContext do_or_lc <> colon) 4 (ppr stmt)
+resCtxt  do_or_lc stmt = hang (ptext SLIT("In") <+> pprStmtResultContext do_or_lc <> colon) 4 (ppr stmt)
 
 sigPatCtxt bound_tvs bound_ids match_ty tidy_env 
   = zonkTcType match_ty		`thenM` \ match_ty' ->

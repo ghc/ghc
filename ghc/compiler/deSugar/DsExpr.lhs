@@ -45,10 +45,11 @@ import CoreUtils	( exprType, mkIfThenElse, bindNonRec )
 
 import FieldLabel	( FieldLabel, fieldLabelTyCon )
 import CostCentre	( mkUserCC )
-import Id		( Id, idType, recordSelectorFieldLabel )
+import Id		( Id, idType, idName, recordSelectorFieldLabel )
 import PrelInfo		( rEC_CON_ERROR_ID, iRREFUT_PAT_ERROR_ID )
 import DataCon		( DataCon, dataConWrapId, dataConFieldLabels, dataConInstOrigArgTys )
 import DataCon		( isExistentialDataCon )
+import Name		( Name )
 import TyCon		( tyConDataCons )
 import TysWiredIn	( tupleCon, mkTupleTy )
 import BasicTypes	( RecFlag(..), Boxity(..), ipNameName )
@@ -102,8 +103,8 @@ dsLet bind@(MonoBind (AbsBinds [] [] exports inlines binds) sigs is_rec) body
 	--	 below.  Then pattern-match would fail.  Urk.)
     case binds of
       FunMonoBind fun _ matches loc
-	-> putSrcLocDs loc			$
-	   matchWrapper (FunRhs fun) matches 	`thenDs` \ (args, rhs) ->
+	-> putSrcLocDs loc				$
+	   matchWrapper (FunRhs (idName fun)) matches 	`thenDs` \ (args, rhs) ->
 	   ASSERT( null args )	-- Functions aren't lifted
 	   returnDs (bindNonRec fun rhs body_w_exports)
 
@@ -571,7 +572,7 @@ dsExpr (PArrSeqIn _)	    = panic "dsExpr:PArrSeqIn"
 Basically does the translation given in the Haskell~1.3 report:
 
 \begin{code}
-dsDo	:: HsStmtContext
+dsDo	:: HsStmtContext Name
 	-> [TypecheckedStmt]
 	-> [Id]		-- id for: [return,fail,>>=,>>] and possibly mfixName
 	-> Type		-- Element type; the whole expression has type (m t)

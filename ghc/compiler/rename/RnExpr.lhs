@@ -63,7 +63,7 @@ import FastString
 ************************************************************************
 
 \begin{code}
-rnMatch :: HsMatchContext RdrName -> RdrNameMatch -> RnM (RenamedMatch, FreeVars)
+rnMatch :: HsMatchContext Name -> RdrNameMatch -> RnM (RenamedMatch, FreeVars)
 
 rnMatch ctxt match@(Match pats maybe_rhs_sig grhss)
   = addSrcLoc (getMatchLoc match)	$
@@ -81,7 +81,7 @@ rnMatch ctxt match@(Match pats maybe_rhs_sig grhss)
 
 	-- Now the main event
     rnPatsAndThen ctxt pats	$ \ pats' ->
-    rnGRHSs grhss		`thenM` \ (grhss', grhss_fvs) ->
+    rnGRHSs ctxt grhss		`thenM` \ (grhss', grhss_fvs) ->
 
     returnM (Match pats' maybe_rhs_sig' grhss', grhss_fvs `plusFV` ty_fvs)
 	-- The bindPatSigTyVars and rnPatsAndThen will remove the bound FVs
@@ -100,20 +100,20 @@ rnMatch ctxt match@(Match pats maybe_rhs_sig grhss)
 %************************************************************************
 
 \begin{code}
-rnGRHSs :: RdrNameGRHSs -> RnM (RenamedGRHSs, FreeVars)
+rnGRHSs :: HsMatchContext Name -> RdrNameGRHSs -> RnM (RenamedGRHSs, FreeVars)
 
-rnGRHSs (GRHSs grhss binds _)
+rnGRHSs ctxt (GRHSs grhss binds _)
   = rnBindsAndThen binds	$ \ binds' ->
-    mapFvRn rnGRHS grhss	`thenM` \ (grhss', fvGRHSs) ->
+    mapFvRn (rnGRHS ctxt) grhss	`thenM` \ (grhss', fvGRHSs) ->
     returnM (GRHSs grhss' binds' placeHolderType, fvGRHSs)
 
-rnGRHS (GRHS guarded locn)
+rnGRHS ctxt (GRHS guarded locn)
   = addSrcLoc locn $		    
     doptM Opt_GlasgowExts		`thenM` \ opt_GlasgowExts ->
     checkM (opt_GlasgowExts || is_standard_guard guarded)
 	   (addWarn (nonStdGuardErr guarded))	`thenM_` 
 
-    rnStmts PatGuard guarded	`thenM` \ (guarded', fvs) ->
+    rnStmts (PatGuard ctxt) guarded	`thenM` \ (guarded', fvs) ->
     returnM (GRHS guarded' locn, fvs)
   where
 	-- Standard Haskell 1.4 guards are just a single boolean
@@ -471,16 +471,17 @@ rnBracket (DecBr ds) = rnSrcDecls ds	`thenM` \ (tcg_env, ds', fvs) ->
 %************************************************************************
 
 \begin{code}
-rnStmts :: HsStmtContext
-	-> [RdrNameStmt]
-	-> RnM ([RenamedStmt], FreeVars)
+rnStmts :: HsStmtContext Name -> [RdrNameStmt] -> RnM ([RenamedStmt], FreeVars)
 
 rnStmts MDoExpr stmts = rnMDoStmts         stmts
 rnStmts ctxt   stmts  = rnNormalStmts ctxt stmts
 
-rnNormalStmts :: HsStmtContext -> [RdrNameStmt] -> RnM ([RenamedStmt], FreeVars)	
+rnNormalStmts :: HsStmtContext Name -> [RdrNameStmt] -> RnM ([RenamedStmt], FreeVars)	
 -- Used for cases *other* than recursive mdo
 -- Implements nested scopes
+
+rnNormalStmts ctxt [] = returnM ([], emptyFVs)
+	-- Happens at the end of the sub-lists of a ParStmts
 
 rnNormalStmts ctxt (ExprStmt expr _ src_loc : stmts)
   = addSrcLoc src_loc 		$
@@ -534,13 +535,17 @@ rnNormalStmts ctxt (ParStmt stmtss : stmts)
     err v = ptext SLIT("Duplicate binding in parallel list comprehension for:")
 	    <+> quotes (ppr v)
 
-rnMDoStmts stmts
-  = bindLocalsRn doc (collectStmtsBinders stmts)	$ \ _ ->
-    mappM rn_mdo_stmt stmts				`thenM` \ segs ->
-    returnM (segsToStmts (glomSegments (addFwdRefs segs)))
-  where
-    doc = text "In a mdo-expression"
+rnNormalStmts ctxt stmts = pprPanic "rnNormalStmts" (ppr stmts)
+\end{code}
 
+
+%************************************************************************
+%*									*
+\subsubsection{Precedence Parsing}
+%*									*
+%************************************************************************
+
+\begin{code}
 type Defs    = NameSet
 type Uses    = NameSet	-- Same as FreeVars really
 type FwdRefs = NameSet
@@ -550,6 +555,40 @@ type Segment = (Defs,
 				--   (a) used before they are bound in this segment, or 
 				--   (b) used here, and bound in subsequent segments
 		[RenamedStmt])
+
+----------------------------------------------------
+rnMDoStmts :: [RdrNameStmt] -> RnM ([RenamedStmt], FreeVars)
+rnMDoStmts stmts
+  = 	-- Step1: bring all the binders of the mdo into scope
+    bindLocalsRn doc (collectStmtsBinders stmts)	$ \ _ ->
+	
+	-- Step 2: Rename each individual stmt, making a
+	--	   singleton segment.  At this stage the FwdRefs field
+	--	   isn't finished: it's empty for all except a BindStmt
+	--	   for which it's the fwd refs within the bind itself
+    mappM rn_mdo_stmt stmts				`thenM` \ segs ->
+    let
+	-- Step 3: Fill in the fwd refs.
+	-- 	   The segments are all singletons, but their fwd-ref
+	--	   field mentions all the things used by the segment
+	--	   that are bound after their use
+	segs_w_fwd_refs = addFwdRefs segs
+
+	-- Step 4: Group together the segments to make bigger segments
+	--	   Invariant: in the result, no segment uses a variable
+	--	   	      bound in a later segment
+	grouped_segs = glomSegments segs_w_fwd_refs
+
+	-- Step 5: Turn the segments into Stmts
+	--	   Use RecStmt when and only when there are fwd refs
+	--	   Also gather up the uses from the end towards the
+	--	   start, so we can tell the RecStmt which things are
+	--	   used 'after' the RecStmt
+	stmts_w_fvs = segsToStmts grouped_segs
+    in
+    returnM stmts_w_fvs
+  where
+    doc = text "In a mdo-expression"
 
 ----------------------------------------------------
 rn_mdo_stmt :: RdrNameStmt -> RnM Segment
@@ -603,7 +642,11 @@ addFwdRefs pairs
 		-- Add the downstream fwd refs here
 
 ----------------------------------------------------
--- 	Breaking a recursive 'do' into segments
+-- 	Glomming the singleton segments of an mdo into 
+--	minimal recursive groups.
+--
+-- At first I thought this was just strongly connected components, but
+-- there's an important constraint: the order of the stmts must not change.
 --
 -- Consider
 --	mdo { x <- ...y...
@@ -612,6 +655,11 @@ addFwdRefs pairs
 --	      q <- x
 --	      z <- y
 --	      r <- x }
+--
+-- Here, the first stmt mention 'y', which is bound in the third.  
+-- But that means that the innocent second stmt (p <- z) gets caught
+-- up in the recursion.  And that in turn means that the binding for
+-- 'z' has to be included... and so on.
 --
 -- Start at the tail { r <- x }
 -- Now add the next one { z <- y ; r <- x }

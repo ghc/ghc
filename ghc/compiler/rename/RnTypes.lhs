@@ -296,7 +296,7 @@ rnPred doc (HsIParam n ty)
 *********************************************************
 
 \begin{code}
-rnPatsAndThen :: HsMatchContext RdrName
+rnPatsAndThen :: HsMatchContext Name
 	      -> [RdrNamePat] 
 	      -> ([RenamedPat] -> RnM (a, FreeVars))
 	      -> RnM (a, FreeVars)
@@ -323,7 +323,7 @@ rnPatsAndThen ctxt pats thing_inside
   where
     pat_sig_tys = collectSigTysFromPats pats
     bndrs 	= collectPatsBinders    pats
-    doc_pat     = pprMatchContext ctxt
+    doc_pat     = ptext SLIT("In") <+> pprMatchContext ctxt
 
 rnPats :: [RdrNamePat] -> RnM ([RenamedPat], FreeVars)
 rnPats ps = mapFvRn rnPat ps

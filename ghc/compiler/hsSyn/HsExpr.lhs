@@ -88,7 +88,9 @@ data HsExpr id
 		Bool		-- True <=> this was a 'with' binding
 				--  (tmp, until 'with' is removed)
 
-  | HsDo	HsStmtContext
+  | HsDo	(HsStmtContext Name)	-- The parameterisation is unimportant
+					-- because in this context we never use
+					-- the FunRhs variant
 		[Stmt id]	-- "do":one or more stmts
 		[id]		-- Ids for [return,fail,>>=,>>]
 				--	Brutal but simple
@@ -233,8 +235,7 @@ ppr_expr (HsIPVar v)     = ppr v
 ppr_expr (HsLit lit)     = ppr lit
 ppr_expr (HsOverLit lit) = ppr lit
 
-ppr_expr (HsLam match)
-  = hsep [char '\\', nest 2 (pprMatch LambdaExpr match)]
+ppr_expr (HsLam match) = pprMatch LambdaExpr match
 
 ppr_expr expr@(HsApp e1 e2)
   = let (fun, args) = collect_args expr [] in
@@ -529,7 +530,9 @@ pprMatch ctxt (Match pats maybe_ty grhss)
   where
     pp_name (FunRhs fun) = ppr fun	-- Not pprBndr; the AbsBinds will
 					-- have printed the signature
+    pp_name LambdaExpr   = char '\\'
     pp_name other	 = empty
+
     ppr_maybe_ty = case maybe_ty of
 			Just ty -> dcolon <+> ppr ty
 			Nothing -> empty
@@ -643,7 +646,7 @@ pprStmt (ParStmtOut stmtss)
  = hsep (map (\stmts -> ptext SLIT("| ") <> ppr stmts) stmtss)
 pprStmt (RecStmt _ segment) = vcat (map ppr segment)
 
-pprDo :: OutputableBndr id => HsStmtContext -> [Stmt id] -> SDoc
+pprDo :: OutputableBndr id => HsStmtContext any -> [Stmt id] -> SDoc
 pprDo DoExpr stmts   = hang (ptext SLIT("do")) 2 (vcat (map ppr stmts))
 pprDo MDoExpr stmts  = hang (ptext SLIT("mdo")) 3 (vcat (map ppr stmts))
 pprDo ListComp stmts = pprComp brackets   stmts
@@ -721,24 +724,26 @@ pp_dotdot = ptext SLIT(" .. ")
 %************************************************************************
 
 \begin{code}
-data HsMatchContext id	-- Context of a Match or Stmt
-  = StmtCtxt HsStmtContext	-- Do-stmt or list comprehension
-  | FunRhs id		-- Function binding for f
-  | CaseAlt		-- Guard on a case alternative
-  | LambdaExpr		-- Lambda
-  | PatBindRhs		-- Pattern binding
-  | RecUpd		-- Record update
+data HsMatchContext id	-- Context of a Match
+  = FunRhs id			-- Function binding for f
+  | CaseAlt			-- Guard on a case alternative
+  | LambdaExpr			-- Pattern of a lambda
+  | PatBindRhs			-- Pattern binding
+  | RecUpd			-- Record update [used only in DsExpr to tell matchWrapper
+				-- 	what sort of runtime error message to generate]
+  | StmtCtxt (HsStmtContext id)	-- Pattern of a do-stmt or list comprehension
   deriving ()
 
-data HsStmtContext 
-	= ListComp 
-	| DoExpr 
-	| MDoExpr      -- recursive do-expression
-	| PArrComp	-- parallel array comprehension
-	| PatGuard	-- Never occurs in an HsDo expression, of course
+data HsStmtContext id
+  = ListComp 
+  | DoExpr 
+  | MDoExpr				-- Recursive do-expression
+  | PArrComp				-- Parallel array comprehension
+  | PatGuard (HsMatchContext id)	-- Pattern guard for specified thing
 \end{code}
 
 \begin{code}
+isDoExpr :: HsStmtContext id -> Bool
 isDoExpr DoExpr  = True
 isDoExpr MDoExpr = True
 isDoExpr other   = False
@@ -749,33 +754,46 @@ matchSeparator (FunRhs _)   = ptext SLIT("=")
 matchSeparator CaseAlt      = ptext SLIT("->") 
 matchSeparator LambdaExpr   = ptext SLIT("->") 
 matchSeparator PatBindRhs   = ptext SLIT("=") 
-matchSeparator (StmtCtxt _)   = ptext SLIT("<-")  
-matchSeparator RecUpd       = panic "When is this used?"
+matchSeparator (StmtCtxt _) = ptext SLIT("<-")  
+matchSeparator RecUpd       = panic "unused"
 \end{code}
 
 \begin{code}
-pprMatchContext (FunRhs fun) 	  = ptext SLIT("In the definition of") <+> quotes (ppr fun)
-pprMatchContext CaseAlt	     	  = ptext SLIT("In a case alternative")
-pprMatchContext RecUpd	     	  = ptext SLIT("In a record-update construct")
-pprMatchContext PatBindRhs   	  = ptext SLIT("In a pattern binding")
-pprMatchContext LambdaExpr   	  = ptext SLIT("In a lambda abstraction")
-pprMatchContext (StmtCtxt ctxt)   = pprStmtCtxt ctxt
+pprMatchContext (FunRhs fun) 	  = ptext SLIT("the definition of") <+> quotes (ppr fun)
+pprMatchContext CaseAlt	     	  = ptext SLIT("a case alternative")
+pprMatchContext RecUpd	     	  = ptext SLIT("a record-update construct")
+pprMatchContext PatBindRhs   	  = ptext SLIT("a pattern binding")
+pprMatchContext LambdaExpr   	  = ptext SLIT("a lambda abstraction")
+pprMatchContext (StmtCtxt ctxt)   = ptext SLIT("a pattern binding in") $$ pprStmtContext ctxt
 
-pprStmtCtxt PatGuard = ptext SLIT("In a pattern guard")
-pprStmtCtxt DoExpr   = ptext SLIT("In a 'do' expression pattern binding")
-pprStmtCtxt MDoExpr  = ptext SLIT("In an 'mdo' expression pattern binding")
-pprStmtCtxt ListComp = ptext SLIT("In a 'list comprehension' pattern binding")
-pprStmtCtxt PArrComp = ptext SLIT("In an 'array comprehension' pattern binding")
+pprMatchRhsContext (FunRhs fun) = ptext SLIT("a right-hand side of function") <+> quotes (ppr fun)
+pprMatchRhsContext CaseAlt	= ptext SLIT("the body of a case alternative")
+pprMatchRhsContext PatBindRhs	= ptext SLIT("the right-hand side of a pattern binding")
+pprMatchRhsContext LambdaExpr	= ptext SLIT("the body of a lambda")
+pprMatchRhsContext RecUpd	= panic "pprMatchRhsContext"
+
+pprStmtContext (PatGuard ctxt) = ptext SLIT("a pattern guard for") $$ pprMatchContext ctxt
+pprStmtContext DoExpr          = ptext SLIT("a 'do' expression")
+pprStmtContext MDoExpr         = ptext SLIT("an 'mdo' expression")
+pprStmtContext ListComp        = ptext SLIT("a list comprehension")
+pprStmtContext PArrComp        = ptext SLIT("an array comprehension")
+
+-- Used for the result statement of comprehension
+-- e.g. the 'e' in	[ e | ... ]
+--	or the 'r' in   f x = r
+pprStmtResultContext (PatGuard ctxt) = pprMatchRhsContext ctxt
+pprStmtResultContext other	     = ptext SLIT("the result of") <+> pprStmtContext other
+
 
 -- Used to generate the string for a *runtime* error message
-matchContextErrString (FunRhs fun)    	= "function " ++ showSDoc (ppr fun)
-matchContextErrString CaseAlt	      	= "case"
-matchContextErrString PatBindRhs      	= "pattern binding"
-matchContextErrString RecUpd	      	= "record update"
-matchContextErrString LambdaExpr      	= "lambda"
-matchContextErrString (StmtCtxt PatGuard) = "pattern gaurd"
-matchContextErrString (StmtCtxt DoExpr)   = "'do' expression"
-matchContextErrString (StmtCtxt MDoExpr)  = "'mdo' expression"
-matchContextErrString (StmtCtxt ListComp) = "list comprehension"
-matchContextErrString (StmtCtxt PArrComp) = "array comprehension"
+matchContextErrString (FunRhs fun)    	      = "function " ++ showSDoc (ppr fun)
+matchContextErrString CaseAlt	      	      = "case"
+matchContextErrString PatBindRhs      	      = "pattern binding"
+matchContextErrString RecUpd	      	      = "record update"
+matchContextErrString LambdaExpr      	      = "lambda"
+matchContextErrString (StmtCtxt (PatGuard _)) = "pattern gaurd"
+matchContextErrString (StmtCtxt DoExpr)       = "'do' expression"
+matchContextErrString (StmtCtxt MDoExpr)      = "'mdo' expression"
+matchContextErrString (StmtCtxt ListComp)     = "list comprehension"
+matchContextErrString (StmtCtxt PArrComp)     = "array comprehension"
 \end{code}

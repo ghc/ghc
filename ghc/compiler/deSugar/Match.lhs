@@ -114,7 +114,7 @@ pp_context NoMatchContext msg rest_of_msg_fun
 
 pp_context (DsMatchContext kind pats loc) msg rest_of_msg_fun
   = (loc, vcat [ptext SLIT("Pattern match(es)") <+> msg,
-	        sep [ppr_match <> char ':', nest 4 (rest_of_msg_fun pref)]])
+	        sep [ptext SLIT("In") <+> ppr_match <> char ':', nest 4 (rest_of_msg_fun pref)]])
   where
     (ppr_match, pref)
 	= case kind of

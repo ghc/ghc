@@ -303,7 +303,7 @@ flattenMonoBinds sigs (PatMonoBind pat grhss locn)
 	names_bound_here = mkNameSet (collectPatBinders pat')
     in
     sigsForMe names_bound_here sigs	`thenM` \ sigs_for_me ->
-    rnGRHSs grhss			`thenM` \ (grhss', fvs) ->
+    rnGRHSs PatBindRhs grhss		`thenM` \ (grhss', fvs) ->
     returnM 
 	[(names_bound_here,
 	  fvs `plusFV` pat_fvs,
@@ -317,7 +317,7 @@ flattenMonoBinds sigs (FunMonoBind name inf matches locn)
 	names_bound_here = unitNameSet new_name
     in
     sigsForMe names_bound_here sigs			`thenM` \ sigs_for_me ->
-    mapFvRn (rnMatch (FunRhs name)) matches		`thenM` \ (new_matches, fvs) ->
+    mapFvRn (rnMatch (FunRhs new_name)) matches		`thenM` \ (new_matches, fvs) ->
     mappM_ (checkPrecMatch inf new_name) new_matches	`thenM_`
     returnM
       [(unitNameSet new_name,
@@ -370,19 +370,20 @@ rnMethodBinds cls gen_tyvars (FunMonoBind name inf matches locn)
     lookupInstDeclBndr cls name				`thenM` \ sel_name -> 
 	-- We use the selector name as the binder
 
-    mapFvRn rn_match matches				`thenM` \ (new_matches, fvs) ->
+    mapFvRn (rn_match sel_name) matches			`thenM` \ (new_matches, fvs) ->
     mappM_ (checkPrecMatch inf sel_name) new_matches	`thenM_`
     returnM (FunMonoBind sel_name inf new_matches locn, fvs `addOneFV` sel_name)
   where
 	-- Gruesome; bring into scope the correct members of the generic type variables
 	-- See comments in RnSource.rnSourceDecl(ClassDecl)
-    rn_match match@(Match (TypePat ty : _) _ _)
-	= extendTyVarEnvFVRn gen_tvs (rnMatch (FunRhs name) match)
+    rn_match sel_name match@(Match (TypePat ty : _) _ _)
+	= extendTyVarEnvFVRn gen_tvs 	$
+	  rnMatch (FunRhs sel_name) match
 	where
 	  tvs     = map rdrNameOcc (extractHsTyRdrNames ty)
 	  gen_tvs = [tv | tv <- gen_tyvars, nameOccName tv `elem` tvs] 
 
-    rn_match match = rnMatch (FunRhs name) match
+    rn_match sel_name match = rnMatch (FunRhs sel_name) match
 	
 
 -- Can't handle method pattern-bindings which bind multiple methods.

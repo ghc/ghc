@@ -59,7 +59,7 @@ import TysWiredIn ( charTy, stringTy, intTy, integerTy,
 import TyCon	  ( mkPrimTyCon, tyConKind )
 import PrimRep	  ( PrimRep(VoidRep) )
 import CoreSyn    ( CoreExpr )
-import Name	  ( getOccName, mkInternalName, mkDerivedTyConOcc )
+import Name	  ( Name, getOccName, mkInternalName, mkDerivedTyConOcc )
 import Var	  ( isId, isLocalVar, tyVarKind )
 import VarSet
 import VarEnv
@@ -106,7 +106,6 @@ type TypecheckedHsExpr		= HsExpr	Id
 type TypecheckedArithSeqInfo	= ArithSeqInfo	Id
 type TypecheckedStmt		= Stmt		Id
 type TypecheckedMatch		= Match		Id
-type TypecheckedMatchContext	= HsMatchContext Id
 type TypecheckedGRHSs		= GRHSs		Id
 type TypecheckedGRHS		= GRHS		Id
 type TypecheckedRecordBinds	= HsRecordBinds Id
@@ -114,6 +113,9 @@ type TypecheckedHsModule	= HsModule	Id
 type TypecheckedForeignDecl     = ForeignDecl   Id
 type TypecheckedRuleDecl	= RuleDecl      Id
 type TypecheckedCoreBind        = (Id, CoreExpr)
+
+type TypecheckedMatchContext	= HsMatchContext Name	-- Keeps consistency with 
+							-- HsDo arg StmtContext
 \end{code}
 
 \begin{code}
