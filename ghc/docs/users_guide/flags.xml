@@ -509,13 +509,13 @@
 	      <entry><option>-fno-implicit-prelude</option></entry>
 	      <entry>Don't implicitly <literal>import Prelude</literal></entry>
 	      <entry>dynamic</entry>
-	      <entry>-</entry>
+	      <entry><option>-fimplicit-prelude</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-fno-monomorphism-restriction</option></entry>
 	      <entry>Disable the monomorphism restriction</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-</option></entry>
+	      <entry><option>-fmonomorphism-restriction</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-fth</option></entry>
