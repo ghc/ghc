@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.32 2000/08/02 14:13:27 rrt Exp $
+ * $Id: StgMacros.h,v 1.33 2000/08/15 14:18:43 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -684,7 +684,6 @@ SaveThreadState(void)
   tso = CurrentTSO;
   tso->sp       = Sp;
   tso->su       = Su;
-  tso->splim    = SpLim;
   CloseNursery(Hp);
 
 #ifdef REG_CurrentTSO
@@ -710,7 +709,7 @@ LoadThreadState (void)
   tso = CurrentTSO;
   Sp    = tso->sp;
   Su    = tso->su;
-  SpLim = tso->splim;
+  SpLim = (P_)&(tso->stack) + RESERVED_STACK_WORDS;
   OpenNursery(Hp,HpLim);
 
 #ifdef REG_CurrentNursery
@@ -726,6 +725,8 @@ LoadThreadState (void)
 /* -----------------------------------------------------------------------------
    Module initialisation
    -------------------------------------------------------------------------- */
+
+#if 1 /* old init stuff */
 
 #define PUSH_INIT_STACK(reg_function)		\
 	*(Sp++) = (W_)reg_function
@@ -752,6 +753,29 @@ LoadThreadState (void)
         }};					\
 	JMP_(POP_INIT_STACK());			\
 	FE_ }
+
+#else 
+
+#define PUSH_INIT_STACK(reg_function) /* nothing */
+#define POP_INIT_STACK()	      /* nothing */
+#define REGISTER_IMPORT(reg_mod_name) /* nothing */
+
+#define START_MOD_INIT(reg_mod_name)		\
+	FN_(reg_mod_name) {			\
+            EF_(StgReturn);			\
+            TEXT_SET(hs_init_set, reg_mod_name); \
+	    FB_;		
+	    /* extern decls go here, followed by init code */
+
+#define REGISTER_FOREIGN_EXPORT(reg_fe_binder)	\
+        STGCALL1(getStablePtr,reg_fe_binder)
+	
+	
+#define END_MOD_INIT()				\
+	    JMP_(StgReturn);			\
+	FE_ }					\
+
+#endif
 
 /* -----------------------------------------------------------------------------
    Support for _ccall_GC_ and _casm_GC.

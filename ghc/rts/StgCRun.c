@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.19 2000/08/07 23:37:23 qrczak Exp $
+ * $Id: StgCRun.c,v 1.20 2000/08/15 14:18:43 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -139,7 +139,7 @@ extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg)
 #if STACK_DETAILS
    fprintf(stderr, 
            "== SB = %p   SP = %p(%p)   SU = %p   SpLim = %p(%p)\n", 
-           sb, sp, tso->sp,   su, basereg->rSpLim, tso->splim);
+           sb, sp, tso->sp,   su, basereg->rSpLim, tso->stack + RESERVED_STACK_WORDS);
 #endif
 
    if (su >= sb) goto postloop;

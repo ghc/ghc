@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.83 2000/05/26 08:42:59 simonmar Exp $
+ * $Id: GC.c,v 1.84 2000/08/15 14:18:43 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1637,7 +1637,6 @@ loop:
 	/* relocate the stack pointers... */
 	new_tso->su = (StgUpdateFrame *) ((StgPtr)new_tso->su + diff);
 	new_tso->sp = (StgPtr)new_tso->sp + diff;
-	new_tso->splim = (StgPtr)new_tso->splim + diff;
 	
 	relocate_TSO(tso, new_tso);
 

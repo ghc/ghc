@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.16 2000/05/26 10:14:33 sewardj Exp $
+ * $Id: TSO.h,v 1.17 2000/08/15 14:18:43 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -147,6 +147,10 @@ typedef union {
  * storage manager, and won't be copied during garbage collection.
  */
 
+/* 
+ * ToDo: make this structure sensible on a non-32-bit arch.
+ */
+
 typedef struct StgTSO_ {
   StgHeader          header;
 
@@ -154,11 +158,12 @@ typedef struct StgTSO_ {
   StgMutClosure *    mut_link;	     /* TSO's are mutable of course! */
   struct StgTSO_*    global_link;    /* Links all threads together */
   
-  StgTSOWhatNext     what_next;
-  StgTSOBlockReason  why_blocked;
+  StgTSOWhatNext     what_next   : 16;
+  StgTSOBlockReason  why_blocked : 16;
   StgTSOBlockInfo    block_info;
   struct StgTSO_*    blocked_exceptions;
   StgThreadID        id;
+
   StgTSOTickyInfo    ticky; 
   StgTSOProfInfo     prof;
   StgTSOParInfo      par;
@@ -169,7 +174,6 @@ typedef struct StgTSO_ {
   StgWord            max_stack_size; /* maximum stack size in *words* */
   StgPtr             sp;
   StgUpdateFrame*    su;
-  StgPtr             splim;
   
   StgWord            stack[0];
 } StgTSO;
@@ -181,7 +185,6 @@ typedef struct StgTSO_ {
 
       tso->stack < tso->sp < tso->stack+tso->stack_size
       tso->stack_size <= tso->max_stack_size
-      tso->splim == tso->stack + RESERVED_STACK_WORDS;
       
       RESERVED_STACK_WORDS is large enough for any heap-check or
       stack-check failure.
