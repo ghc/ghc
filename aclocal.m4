@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.87 2001/11/07 20:13:26 sof Exp $
+dnl $Id: aclocal.m4,v 1.88 2001/12/05 17:21:43 simonmar Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -220,6 +220,10 @@ AC_SUBST(HappyVersion)
 # 1.9 and later is required, assume that we can use
 # the "-agc" options.
 HappyOpts="-agc"
+
+FPTOOLS_PROG_CHECK_VERSION([$fptools_cv_happy_version],-gt,[1.11],
+  [HappyOpts=-agcs])
+
 AC_SUBST(HappyOpts)
 ])
 
