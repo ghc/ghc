@@ -277,12 +277,31 @@ class Typeable a where
   -- any instance of 'Typeable', so that it is safe to pass 'undefined' as
   -- the argument.
 
+-- HACK HACK HACK
+#ifdef __HUGS__
+#define INSTANCE_TYPEABLE1x(tycon,tcname,str) \
+instance Typeable a => Typeable (tycon a) where { \
+  typeOf x = mkAppTy tcname [typeOf ((undefined :: tycon a -> a) x) ] }
+#define INSTANCE_TYPEABLE2x(tycon,tcname,str) \
+instance (Typeable a, Typeable b) => Typeable (tycon a b) where { \
+  typeOf x = mkAppTy tcname [typeOf ((undefined :: tycon a b -> a) x), \
+			     typeOf ((undefined :: tycon a b -> b) x)] }
+
+INSTANCE_TYPEABLE1x(Ratio,ratioTc,"Ratio")
+INSTANCE_TYPEABLE2x(Either,eitherTc,"Either")
+INSTANCE_TYPEABLE1(IO,ioTc,"IO")
+INSTANCE_TYPEABLE1x(Maybe,maybeTc,"Maybe")
+INSTANCE_TYPEABLE1(Ptr,ptrTc,"Ptr")
+INSTANCE_TYPEABLE1(StablePtr,stablePtrTc,"StablePtr")
+INSTANCE_TYPEABLE1(IORef,ioRefTc,"IORef")
+#endif
 
 -- | Variant for unary type constructors
 class Typeable1 t where
   typeOf1 :: t a -> TypeRep
 
 
+#ifndef __HUGS__
 -- | One Typeable instance for all Typeable1 instances
 instance (Typeable1 s, Typeable a)
        => Typeable (s a) where
@@ -290,6 +309,7 @@ instance (Typeable1 s, Typeable a)
    where
      argType :: t x -> x
      argType =  undefined
+#endif
 
 
 -- | Variant for binary type constructors
@@ -297,6 +317,7 @@ class Typeable2 t where
   typeOf2 :: t a b -> TypeRep
 
 
+#ifndef __HUGS__
 -- | One Typeable1 instance for all Typeable2 instances
 instance (Typeable2 s, Typeable a)
        => Typeable1 (s a) where
@@ -304,6 +325,7 @@ instance (Typeable2 s, Typeable a)
    where
      argType :: t x y -> x
      argType =  undefined
+#endif
 
 
 -- | Variant for 3-ary type constructors
@@ -311,6 +333,7 @@ class Typeable3 t where
   typeOf3 :: t a b c -> TypeRep
 
 
+#ifndef __HUGS__
 -- | One Typeable2 instance for all Typeable3 instances
 instance (Typeable3 s, Typeable a)
        => Typeable2 (s a) where
@@ -318,6 +341,7 @@ instance (Typeable3 s, Typeable a)
    where
      argType :: t x y z -> x
      argType =  undefined
+#endif
 
 
 -- | Variant for 4-ary type constructors
@@ -325,6 +349,7 @@ class Typeable4 t where
   typeOf4 :: t a b c d -> TypeRep
 
 
+#ifndef __HUGS__
 -- | One Typeable3 instance for all Typeable4 instances
 instance (Typeable4 s, Typeable a)
        => Typeable3 (s a) where
@@ -332,6 +357,7 @@ instance (Typeable4 s, Typeable a)
    where
      argType :: t x y z z' -> x
      argType =  undefined
+#endif
 
 
 -- | Variant for 5-ary type constructors
@@ -339,6 +365,7 @@ class Typeable5 t where
   typeOf5 :: t a b c d e -> TypeRep
 
 
+#ifndef __HUGS__
 -- | One Typeable4 instance for all Typeable5 instances
 instance (Typeable5 s, Typeable a)
        => Typeable4 (s a) where
@@ -346,6 +373,7 @@ instance (Typeable5 s, Typeable a)
    where
      argType :: t x y z z' z'' -> x
      argType =  undefined
+#endif
 
 
 -- | Variant for 6-ary type constructors
@@ -353,6 +381,7 @@ class Typeable6 t where
   typeOf6 :: t a b c d e f -> TypeRep
 
 
+#ifndef __HUGS__
 -- | One Typeable5 instance for all Typeable6 instances
 instance (Typeable6 s, Typeable a)
        => Typeable5 (s a) where
@@ -360,6 +389,7 @@ instance (Typeable6 s, Typeable a)
    where
      argType :: t x y z z' z'' z''' -> x
      argType =  undefined
+#endif
 
 
 -- | Variant for 7-ary type constructors
@@ -367,6 +397,7 @@ class Typeable7 t where
   typeOf7 :: t a b c d e f g -> TypeRep
 
 
+#ifndef __HUGS__
 -- | One Typeable6 instance for all Typeable7 instances
 instance (Typeable7 s, Typeable a)
        => Typeable6 (s a) where
@@ -374,6 +405,7 @@ instance (Typeable7 s, Typeable a)
    where
      argType :: t x y z z' z'' z''' z'''' -> x
      argType =  undefined
+#endif
 
 
 
