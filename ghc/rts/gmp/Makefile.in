@@ -29,7 +29,7 @@ includedir = $(prefix)/include
 
 CC = gcc
 LOCAL_CC = $(CC)
-CFLAGS = -O
+CFLAGS = @CFLAGS@
 XCFLAGS = 
 AR = ar
 AR_FLAGS = rc
