@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelCError.lhs,v 1.8 2001/05/18 16:54:05 simonmar Exp $
+% $Id: PrelCError.lhs,v 1.9 2001/05/18 21:45:43 qrczak Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -58,7 +58,6 @@ module PrelCError (
   throwErrnoIf,         -- :: (a -> Bool) -> String -> IO a       -> IO a
   throwErrnoIf_,        -- :: (a -> Bool) -> String -> IO a       -> IO ()
   throwErrnoIfRetry,    -- :: (a -> Bool) -> String -> IO a       -> IO a
-  throwErrnoIfRetry_,   -- :: (a -> Bool) -> String -> IO a       -> IO ()
   throwErrnoIfRetry_,   -- :: (a -> Bool) -> String -> IO a       -> IO ()
   throwErrnoIfMinus1,   -- :: Num a 
 			-- =>                String -> IO a       -> IO a
