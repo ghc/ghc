@@ -133,7 +133,7 @@ ptrToInt (Ptr a#) = I# (addr2Int# a#)
 
 type ItblCode = Word32
 mkJumpToAddr a
-   = let w32 = fromIntegral ()
+   = let w32 = fromIntegral (ptrToInt a)
 
          hi22, lo10 :: Word32 -> Word32
          lo10 x = x .&. 0x3FF
