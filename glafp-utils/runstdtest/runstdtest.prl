@@ -158,7 +158,7 @@ foreach $a ( @PgmArgs ) {
 # deal with system-specific timing options
 $TimingMagic = '';
 if ( $SysSpecificTiming =~ /^ghc/ ) {
-    $TimingMagic = "+RTS -s$StatsFile -RTS"
+    $TimingMagic = "+RTS -S$StatsFile -RTS"
 } elsif ( $SysSpecificTiming eq 'hbc' ) {
     $TimingMagic = "-S$StatsFile";
 }
