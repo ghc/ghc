@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.hc,v 1.24 2002/02/28 16:25:15 sof Exp $
+ * $Id: HeapStackCheck.hc,v 1.25 2002/02/28 18:54:53 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -669,9 +669,14 @@ INFO_TABLE_SRT_BITMAP(stg_gc_unpt_r1_info, stg_gc_unpt_r1_ret, 0/*BITMAP*/,
 EXTFUN(stg_gc_unpt_r1_ret)
 {
   FB_
+#ifdef REG_R1
   R1.w = Sp[0];
   Sp += 1;
   JMP_(ENTRY_CODE(Sp[0]));
+#else
+  /* Keep R1 on the stack */
+  JMP_(ENTRY_CODE(Sp[1]));
+#endif
   FE_
 }
 
