@@ -77,14 +77,16 @@ data SimplCont		-- Strict contexts
 	     InId [InAlt] SimplEnv	-- The case binder, alts, and subst-env
 	     SimplCont
 
-  | ArgOf    DupFlag		-- An arbitrary strict context: the argument 
+  | ArgOf    LetRhsFlag		-- An arbitrary strict context: the argument 
   	     			-- 	of a strict function, or a primitive-arg fn
 				-- 	or a PrimOp
-	     LetRhsFlag
+				-- No DupFlag because we never duplicate it
+	     OutType		-- arg_ty: type of the argument itself
 	     OutType		-- cont_ty: the type of the expression being sought by the context
 				--	f (error "foo") ==> coerce t (error "foo")
 				-- when f is strict
 				-- We need to know the type t, to which to coerce.
+
 	     (SimplEnv -> OutExpr -> SimplM FloatsWithExpr)	-- What to do with the result
 				-- The result expression in the OutExprStuff has type cont_ty
 
@@ -98,7 +100,7 @@ instance Outputable LetRhsFlag where
 instance Outputable SimplCont where
   ppr (Stop _ is_rhs _)  	     = ptext SLIT("Stop") <> brackets (ppr is_rhs)
   ppr (ApplyTo dup arg se cont)      = (ptext SLIT("ApplyTo") <+> ppr dup <+> ppr arg) $$ ppr cont
-  ppr (ArgOf   dup _ _ _)   	     = ptext SLIT("ArgOf...") <+> ppr dup
+  ppr (ArgOf _ _ _ _)   	     = ptext SLIT("ArgOf...")
   ppr (Select dup bndr alts se cont) = (ptext SLIT("Select") <+> ppr dup <+> ppr bndr) $$ 
 				       (nest 4 (ppr alts)) $$ ppr cont
   ppr (CoerceIt ty cont)	     = (ptext SLIT("CoerceIt") <+> ppr ty) $$ ppr cont
@@ -120,7 +122,7 @@ mkStop ty is_rhs = Stop ty is_rhs (canUpdateInPlace ty)
 
 contIsRhs :: SimplCont -> Bool
 contIsRhs (Stop _ AnRhs _)    = True
-contIsRhs (ArgOf _ AnRhs _ _) = True
+contIsRhs (ArgOf AnRhs _ _ _) = True
 contIsRhs other	              = False
 
 contIsRhsOrArg (Stop _ _ _)    = True
@@ -131,7 +133,6 @@ contIsRhsOrArg other	       = False
 contIsDupable :: SimplCont -> Bool
 contIsDupable (Stop _ _ _)     		 = True
 contIsDupable (ApplyTo  OkToDup _ _ _)   = True
-contIsDupable (ArgOf    OkToDup _ _ _)   = True
 contIsDupable (Select   OkToDup _ _ _ _) = True
 contIsDupable (CoerceIt _ cont)          = contIsDupable cont
 contIsDupable (InlinePlease cont)	 = contIsDupable cont

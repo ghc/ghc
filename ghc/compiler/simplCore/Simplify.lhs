@@ -45,7 +45,7 @@ import CoreUtils	( exprIsDupable, exprIsTrivial, needsCaseBinding,
 import Rules		( lookupRule )
 import BasicTypes	( isMarkedStrict )
 import CostCentre	( currentCCS )
-import Type		( isUnLiftedType, seqType, mkFunTy, tyConAppArgs,
+import Type		( isUnLiftedType, seqType, mkFunTy, tyConAppArgs, funArgTy,
 			  funResultTy, splitFunTy_maybe, splitFunTy, eqType
 			)
 import Subst		( mkSubst, substTy, substExpr,
@@ -295,8 +295,8 @@ simplNonRecBind env bndr rhs rhs_se cont_ty thing_inside
   | isStrictDmd (idNewDemandInfo bndr) || isStrictType (idType bndr)	-- A strict let
   =  	-- Don't use simplBinder because that doesn't keep 
 	-- fragile occurrence in the substitution
-    simplLetBndr env bndr				`thenSmpl` \ (env, bndr') ->
-    simplStrictArg env AnRhs rhs rhs_se cont_ty	$ \ env rhs1 ->
+    simplLetBndr env bndr					`thenSmpl` \ (env, bndr') ->
+    simplStrictArg AnRhs env rhs rhs_se (idType bndr') cont_ty	$ \ env rhs1 ->
 
 	-- Now complete the binding and simplify the body
     completeNonRecX env True {- strict -} bndr bndr' rhs1 thing_inside
@@ -627,7 +627,7 @@ might do the same again.
 
 \begin{code}
 simplExpr :: SimplEnv -> CoreExpr -> SimplM CoreExpr
-simplExpr env expr = simplExprC env expr (mkBoringStop expr_ty')
+simplExpr env expr = simplExprC env expr (mkStop expr_ty' AnArg)
 		   where
 		     expr_ty' = substTy (getSubst env) (exprType expr)
 	-- The type in the Stop continuation, expr_ty', is usually not used
@@ -854,8 +854,9 @@ completeCall env var occ_info cont
     let
 	chkr			       = getSwitchChecker env
 	(args, call_cont, inline_call) = getContArgs chkr var cont
+	fn_ty			       = idType var
     in
-    simplifyArgs env args (contResultType call_cont)	$ \ env args ->
+    simplifyArgs env fn_ty args (contResultType call_cont)	$ \ env args ->
 
 	-- Next, look for rules or specialisations that match
 	--
@@ -975,6 +976,7 @@ makeThatCall env var fun args cont
 --	Simplifying the arguments of a call
 
 simplifyArgs :: SimplEnv 
+	     -> OutType				-- Type of the function
 	     -> [(InExpr, SimplEnv, Bool)]	-- Details of the arguments
 	     -> OutType				-- Type of the continuation
 	     -> (SimplEnv -> [OutExpr] -> SimplM FloatsWithExpr)
@@ -1005,35 +1007,35 @@ simplifyArgs :: SimplEnv
 -- discard the entire application and replace it with (error "foo").  Getting
 -- all this at once is TOO HARD!
 
-simplifyArgs env args cont_ty thing_inside
-  = go env args thing_inside
+simplifyArgs env fn_ty args cont_ty thing_inside
+  = go env fn_ty args thing_inside
   where
-    go env []	      thing_inside = thing_inside env []
-    go env (arg:args) thing_inside = simplifyArg env arg cont_ty 	$ \ env arg' ->
-				     go env args 			$ \ env args' ->
-				     thing_inside env (arg':args')
+    go env fn_ty []	    thing_inside = thing_inside env []
+    go env fn_ty (arg:args) thing_inside = simplifyArg env fn_ty arg cont_ty 		$ \ env arg' ->
+					   go env (applyTypeToArg fn_ty arg') args 	$ \ env args' ->
+					   thing_inside env (arg':args')
 
-simplifyArg env (Type ty_arg, se, _) cont_ty thing_inside
+simplifyArg env fn_ty (Type ty_arg, se, _) cont_ty thing_inside
   = simplType (setInScope se env) ty_arg 	`thenSmpl` \ new_ty_arg ->
     thing_inside env (Type new_ty_arg)
 
-simplifyArg env (val_arg, arg_se, is_strict) cont_ty thing_inside 
+simplifyArg env fn_ty (val_arg, arg_se, is_strict) cont_ty thing_inside 
   | is_strict 
-  = simplStrictArg env AnArg val_arg arg_se cont_ty thing_inside
+  = simplStrictArg AnArg env val_arg arg_se arg_ty cont_ty thing_inside
 
   | otherwise
-  = let
-	arg_env = setInScope arg_se env
-    in
-    simplType arg_env (exprType val_arg) 		`thenSmpl` \ arg_ty ->
-    simplExprF arg_env val_arg (mkStop arg_ty AnArg)	`thenSmpl` \ (floats, arg1) ->
-    addFloats env floats				$ \ env ->
+  = simplExprF (setInScope arg_se env) val_arg
+	       (mkStop arg_ty AnArg)		`thenSmpl` \ (floats, arg1) ->
+    addFloats env floats			$ \ env ->
     thing_inside env arg1
+  where
+    arg_ty = funArgTy fn_ty
 
 
-simplStrictArg :: SimplEnv		-- The env of the call
-		-> LetRhsFlag
-	        -> InExpr -> SimplEnv	-- The arg plus its env
+simplStrictArg ::  LetRhsFlag
+	        -> SimplEnv		-- The env of the call
+		-> InExpr -> SimplEnv	-- The arg plus its env
+		-> OutType		-- arg_ty: type of the argument
 	        -> OutType		-- cont_ty: Type of thing computed by the context
 	        -> (SimplEnv -> OutExpr -> SimplM FloatsWithExpr)	
 	 			 	-- Takes an expression of type rhs_ty, 
@@ -1042,9 +1044,9 @@ simplStrictArg :: SimplEnv		-- The env of the call
 					-- env of the call, plus any new in-scope variables
 	        -> SimplM FloatsWithExpr	-- An expression of type cont_ty
 
-simplStrictArg call_env is_rhs arg arg_env cont_ty thing_inside
+simplStrictArg is_rhs call_env arg arg_env arg_ty cont_ty thing_inside
   = simplExprF (setInScope arg_env call_env) arg
-	       (ArgOf NoDup is_rhs cont_ty (\ new_env -> thing_inside (setInScope call_env new_env)))
+	       (ArgOf is_rhs arg_ty cont_ty (\ new_env -> thing_inside (setInScope call_env new_env)))
   -- Notice the way we use arg_env (augmented with in-scope vars from call_env) 
   --	to simplify the argument
   -- and call-env (augmented with in-scope vars from the arg) to pass to the continuation
@@ -1235,7 +1237,7 @@ rebuildCase env scrut case_bndr alts cont
 
 	-- Deal with the case binder, and prepare the continuation;
 	-- The new subst_env is in place
-    prepareCaseCont env better_alts cont		`thenSmpl` \ (floats, cont') ->
+    prepareCaseCont env better_alts cont		`thenSmpl` \ (floats, (dup_cont, nondup_cont)) ->
     addFloats env floats				$ \ env ->	
 
 	-- Deal with variable scrutinee
@@ -1243,14 +1245,14 @@ rebuildCase env scrut case_bndr alts cont
 
 	-- Deal with the case alternatives
     simplAlts alt_env zap_occ_info handled_cons
-	      case_bndr' better_alts cont'		`thenSmpl` \ alts' ->
+	      case_bndr' better_alts dup_cont		`thenSmpl` \ alts' ->
 
 	-- Put the case back together
     mkCase scrut handled_cons case_bndr' alts'		`thenSmpl` \ case_expr ->
 
 	-- Notice that rebuildDone returns the in-scope set from env, not alt_env
 	-- The case binder *not* scope over the whole returned case-expression
-    rebuildDone env case_expr
+    rebuild env case_expr nondup_cont
 \end{code}
 
 simplCaseBinder checks whether the scrutinee is a variable, v.  If so,
@@ -1487,81 +1489,71 @@ bind_args env (b:bs) (arg : args) thing_inside
 \begin{code}
 prepareCaseCont :: SimplEnv
 		-> [InAlt] -> SimplCont
-	        -> SimplM (FloatsWith SimplCont) 	-- Return a duplicatable continuation,
-							-- plus some extra bindings
+	        -> SimplM (FloatsWith (SimplCont,SimplCont)) 	
+			-- Return a duplicatable continuation, a non-duplicable part 
+			-- plus some extra bindings
 
-prepareCaseCont env [alt] cont = returnSmpl (emptyFloats env, cont)
 	-- No need to make it duplicatable if there's only one alternative
-
-prepareCaseCont env alts  cont = simplType env (coreAltsType alts)	`thenSmpl` \ alts_ty ->
-				 mkDupableCont env alts_ty cont
-	-- At one time I passed in the un-simplified type, and simplified
-	-- it only if we needed to construct a join binder, but that	
-	-- didn't work because we have to decompse function types
-	-- (using funResultTy) in mkDupableCont.
+prepareCaseCont env [alt] cont = returnSmpl (emptyFloats env, (cont, mkBoringStop (contResultType cont)))
+prepareCaseCont env alts  cont = mkDupableCont env cont
 \end{code}
 
 \begin{code}
-mkDupableCont :: SimplEnv
-	      -> OutType		-- Type of the thing to be given to the continuation
-	      -> SimplCont 
-	      -> SimplM (FloatsWith SimplCont) 	-- Return a duplicatable continuation,
-						-- plus some extra bindings
+mkDupableCont :: SimplEnv -> SimplCont 
+	      -> SimplM (FloatsWith (SimplCont, SimplCont))
 
-mkDupableCont env ty cont
+mkDupableCont env cont
   | contIsDupable cont
-  = returnSmpl (emptyFloats env, cont)
+  = returnSmpl (emptyFloats env, (cont, mkBoringStop (contResultType cont)))
 
-mkDupableCont env _ (CoerceIt ty cont)
-  = mkDupableCont env ty cont		`thenSmpl` \ (floats, cont') ->
-    returnSmpl (floats, CoerceIt ty cont')
+mkDupableCont env (CoerceIt ty cont)
+  = mkDupableCont env cont		`thenSmpl` \ (floats, (dup_cont, nondup_cont)) ->
+    returnSmpl (floats, (CoerceIt ty dup_cont, nondup_cont))
 
-mkDupableCont env ty (InlinePlease cont)
-  = mkDupableCont env ty cont		`thenSmpl` \ (floats, cont') ->
-    returnSmpl (floats, InlinePlease cont')
+mkDupableCont env (InlinePlease cont)
+  = mkDupableCont env cont		`thenSmpl` \ (floats, (dup_cont, nondup_cont)) ->
+    returnSmpl (floats, (InlinePlease dup_cont, nondup_cont))
 
-mkDupableCont env join_arg_ty (ArgOf _ is_rhs cont_ty cont_fn)
-  = 	-- e.g. 	(...strict-fn...) [...hole...]
+mkDupableCont env cont@(ArgOf _ arg_ty _ _)
+  =  returnSmpl (emptyFloats env, (mkBoringStop arg_ty, cont))
+  	-- Do *not* duplicate an ArgOf continuation
+	-- Because ArgOf continuations are opaque, we gain nothing by
+	-- propagating them into the expressions, and we do lose a lot.
+	-- Here's an example:
+	--	&& (case x of { T -> F; F -> T }) E
+	-- Now, && is strict so we end up simplifying the case with
+	-- an ArgOf continuation.  If we let-bind it, we get
+	--
+	--	let $j = \v -> && v E
+	--	in simplExpr (case x of { T -> F; F -> T })
+	--		     (ArgOf (\r -> $j r)
+	-- And after simplifying more we get
+	--
+	--	let $j = \v -> && v E
+	--	in case of { T -> $j F; F -> $j T }
+	-- Which is a Very Bad Thing
+	--
+	-- The desire not to duplicate is the entire reason that
+	-- mkDupableCont returns a pair of continuations.
+	--
+	-- The original plan had:
+  	-- e.g. 	(...strict-fn...) [...hole...]
 	--	==>
 	--		let $j = \a -> ...strict-fn...
 	--		in $j [...hole...]
 
-	-- Build the join Id and continuation
-	-- We give it a "$j" name just so that for later amusement
-	-- we can identify any join points that don't end up as let-no-escapes
-	-- [NOTE: the type used to be exprType join_rhs, but this seems more elegant.]
-    newId SLIT("$j") (mkFunTy join_arg_ty cont_ty)		`thenSmpl` \ join_id ->
-    newId SLIT("a") join_arg_ty					`thenSmpl` \ arg_id ->
-
-    cont_fn (addNewInScopeIds env [arg_id]) (Var arg_id)	`thenSmpl` \ (floats, rhs) ->
-    let
-	cont_fn env arg' = rebuildDone env (App (Var join_id) arg')
-	join_rhs	 = Lam (setOneShotLambda arg_id) (wrapFloats floats rhs)
-    in
-
-    tick (CaseOfCase join_id)						`thenSmpl_`
-	-- Want to tick here so that we go round again,
-	-- and maybe copy or inline the code;
-	-- not strictly CaseOf Case
-
-    returnSmpl (unitFloat env join_id join_rhs, 
-		ArgOf OkToDup is_rhs cont_ty cont_fn)
-
-mkDupableCont env ty (ApplyTo _ arg se cont)
+mkDupableCont env (ApplyTo _ arg se cont)
   = 	-- e.g. 	[...hole...] (...arg...)
 	--	==>
 	--		let a = ...arg... 
 	--		in [...hole...] a
     simplExpr (setInScope se env) arg			`thenSmpl` \ arg' ->
 
-    mkDupableCont env (applyTypeToArg ty arg') cont	`thenSmpl` \ (floats, cont') ->
-	-- It's possible (albeit unusual) that arg is a type 
-	-- argument, if the alternatives have a for-all type; 
-	-- hence the applyTypeToArg
+    mkDupableCont env cont				`thenSmpl` \ (floats, (dup_cont, nondup_cont)) ->
     addFloats env floats				$ \ env ->
 
     if exprIsDupable arg' then
-	returnSmpl (emptyFloats env, ApplyTo OkToDup arg' (zapSubstEnv se) cont')
+	returnSmpl (emptyFloats env, (ApplyTo OkToDup arg' (zapSubstEnv se) dup_cont, nondup_cont))
     else
     newId SLIT("a") (exprType arg')			`thenSmpl` \ arg_id ->
 
@@ -1571,13 +1563,14 @@ mkDupableCont env ty (ApplyTo _ arg se cont)
 	-- Not strictly CaseOfCase, but never mind
 
     returnSmpl (unitFloat env arg_id arg', 
-		ApplyTo OkToDup (Var arg_id) (zapSubstEnv se) cont')
+		(ApplyTo OkToDup (Var arg_id) (zapSubstEnv se) dup_cont,
+		 nondup_cont))
 	-- But what if the arg should be case-bound? 
 	-- This has been this way for a long time, so I'll leave it,
 	-- but I can't convince myself that it's right.
 
 
-mkDupableCont env ty (Select _ case_bndr alts se cont)
+mkDupableCont env (Select _ case_bndr alts se cont)
   = 	-- e.g.		(case [...hole...] of { pi -> ei })
 	--	===>
 	--		let ji = \xij -> ei 
@@ -1586,7 +1579,7 @@ mkDupableCont env ty (Select _ case_bndr alts se cont)
     let
 	alt_env = setInScope se env
     in
-    prepareCaseCont alt_env alts cont				`thenSmpl` \ (floats1, dupable_cont) ->
+    prepareCaseCont alt_env alts cont				`thenSmpl` \ (floats1, (dup_cont, nondup_cont)) ->
     addFloats alt_env floats1 					$ \ alt_env ->
 
     simplBinder alt_env case_bndr				`thenSmpl` \ (alt_env, case_bndr') ->
@@ -1599,10 +1592,12 @@ mkDupableCont env ty (Select _ case_bndr alts se cont)
 	-- In the new alts we build, we have the new case binder, so it must retain
 	-- its deadness.
 
-    mkDupableAlts alt_env case_bndr' alts dupable_cont	`thenSmpl` \ (floats2, alts') ->
+    mkDupableAlts alt_env case_bndr' alts dup_cont	`thenSmpl` \ (floats2, alts') ->
     addFloats alt_env floats2 				$ \ alt_env ->
-    returnSmpl (emptyFloats alt_env, Select OkToDup case_bndr' alts' (zapSubstEnv se) 
-					    (mkBoringStop (contResultType cont)))
+    returnSmpl (emptyFloats alt_env, 
+		(Select OkToDup case_bndr' alts' (zapSubstEnv se) 
+			(mkBoringStop (contResultType dup_cont)),
+		 nondup_cont))
 
 mkDupableAlts :: SimplEnv -> OutId -> [InAlt] -> SimplCont
 	      -> SimplM (FloatsWith [InAlt])
