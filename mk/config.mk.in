@@ -642,7 +642,7 @@ RUNTEST			= $(RUNTEST_PREFIX)runstdtest
 HAPPY			= @HappyCmd@
 HAPPY_VERSION		= @HappyVersion@		
 LX			= @LxCmd@
-GREENCARD		= @GreencardCmd@
+GREENCARD	        = $(FPTOOLS_TOP)/green-card/src/green-card
 
 #
 # Stuff from fptools/literate

@@ -418,11 +418,6 @@ dnl ** check for installed lx binary
 #
 AC_PATH_PROG(LxCmd,lx)
 
-#
-dnl ** check for installed green-card binary
-#
-AC_PATH_PROG(GreencardCmd,green-card)
-
 #### program checking section ends here ####
 
 ####--------------------------------------------------
