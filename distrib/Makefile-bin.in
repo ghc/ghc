@@ -190,10 +190,14 @@ mk-version-symlinks ::
 	  fi;\
 	done
 
+# Convert pwd's UNC reported path into DOS style
+# (cygwin32 only.)
+CURRENT_DIR = $(shell pwd | sed 's|^//\(.\)|\1:|' )
+
 in-place ::
-	$(MAKE) $(MFLAGS) config-pkgs bindir=`pwd`/bin/$(platform)/$(package)-$(version) libdir=`pwd`/lib/$(platform) datadir=`pwd`/share/$(package)-$(version)
+	$(MAKE) $(MFLAGS) config-pkgs bindir=$(CURRENT_DIR)/bin/$(platform)/$(package)-$(version) libdir=$(CURRENT_DIR)/lib/$(platform) datadir=$(CURRENT_DIR)/share/$(package)-$(version)
 	$(MAKE) $(MFLAGS) mk-version-symlinks
-	@echo "Finished configuring..to use, add `pwd`/bin/$(platform)/$(package)-$(version) to your PATH."
+	@echo "Finished configuring..to use, add $(CURRENT_DIR)/bin/$(platform)/$(package)-$(version) to your PATH."
 
 install-dirs ::
 	$(INSTALL_DIR) $(bindir)
