@@ -5,13 +5,12 @@
 
 <Para>
 Installing from binary distributions is easiest, and recommended!
-(Why binaries?  Because GHC is a Haskell compiler written in Haskell,
-so you've got to &ldquo;bootstrap&rdquo; it, somehow.  We provide
+(Why binaries? Because GHC is a Haskell compiler written in Haskell,
+so you've got to bootstrap it somehow.  We provide
 machine-generated C-files-from-Haskell for this purpose, but it's
 really quite a pain to use them.  If you must build GHC from its
 sources, using a binary-distributed GHC to do so is a sensible way to
-proceed. For the other <Literal>fptools</Literal> programs, many are written in Haskell,
-so binary distributions allow you to install them without having a Haskell compiler.)
+proceed. For the other <Literal>fptools</Literal> programs, many are written in Haskell, so binary distributions allow you to install them without having a Haskell compiler.)
 </Para>
 
 <Para>This guide is in two parts: installing on Unix-a-likes, and installing on Windows.</Para>
@@ -508,14 +507,13 @@ with a binary distribution, or in source form in
 Getting the Glasgow Haskell Compiler (GHC) to run on Windows platforms can
 be a bit of a trying experience. This document tries to simplify the task by
 enumerating the steps you need to follow in order to set up and configure
-your machine to run GHC (at least that's the intention ;-)
+your machine to run GHC.
 </Para>
 
 <Sect2><Title>System requirements</Title>
 
 <Para>
-An installation of GHC requires ca. 200M of disk space, which is split
-roughly 50-50 between GHC and the supporting software. To run GHC
+An installation of GHC requires about 50M of disk space (which can be lowered by choosing a &ldquo;compact&rdquo; installation). The Cygwin support tools take another 200M or so (though if you really need to this can be halved by installing only the following packages: bash, binutils, cygwin, diff, fileutils, findutils, gcc, grep, make, perl, mingw, sed, textutils, w32api; however, it's fiddly and not recommended). To run GHC
 comfortably, your machine should have at least 64M of memory.
 </Para>
 
@@ -528,14 +526,13 @@ comfortably, your machine should have at least 64M of memory.
 You need two chunks of software other than GHC itself: the Cygwin toolchain, and Perl.  Here's how to get and install them.
 </Para>
 
-<Sect3><Title>The cygwin toolchain (1.1)</Title>
+<Sect3><Title>The Cygwin toolchain (1.1.x)</Title>
 
 <Para>
-GHC depends at the moment on the cygwin tools to operate, which
-dresses up the Win32 environment into something more UNIX-like.
-(notably, it provides <Command>gcc</Command>, <Command>as</Command> and <Command>ld</Command>),
-so you'll need to install these tools first. You also need
-Cygwin to use CVS. (We don't yet support later versions of Cygwin.)
+At the moment you'll need Cygwin to use GHC. Cygwin dresses up the Win32
+environment into something more UNIX-like; (notably, it provides
+<Command>gcc</Command>, <Command>as</Command> and <Command>ld</Command>).
+You also need Cygwin to use CVS.
 </Para>
 
 <Para>
@@ -573,15 +570,14 @@ Here's how to install Cygwin.
 
 <ListItem>
 <Para>
-Install Cygwin 1.1 from <ULink
-URL="http://sources.redhat.com/cygwin/">sources.redhat.com</ULink>. If you
-have an earlier version, you must deinstall this first. Choose DOS text
-mode. After installation, start up a Cygwin shell and issue the following
-commands:
+Install the latest Cygwin 1.1.x from <ULink
+URL="http://sources.redhat.com/cygwin/">sources.redhat.com/cygwin</ULink>.
+If you have a pre-1.1 version, you should deinstall this first. Choose DOS
+text mode. After installation, start up a Cygwin shell and issue the
+following command:
 
 <Screen>
-mount -f c: /
-mount c:\\cygwin\\usr\\include /usr/include</Screen>
+mount -f c: /</Screen>
 
 assuming you installed Cygwin at <Filename>C:\cygwin</Filename>; otherwise
 change the drive and directory as appropriate.
@@ -590,19 +586,8 @@ change the drive and directory as appropriate.
 
 <ListItem>
 <Para>
-Create the following directories (if they aren't already there; substitute
-the drive you installed Cygwin on for <Filename>c:</Filename>):
-</Para>
-
-<ItemizedList>
-<ListItem><Para><Filename>c:/Temp</Filename></Para></ListItem>
-<ListItem><Para><Filename>c:/etc</Filename></Para></ListItem>
-<ListItem><Para><Filename>c:/bin</Filename></Para></ListItem>
-<ListItem><Para><Filename>c:/usr/local/bin</Filename></Para></ListItem>
-</ItemizedList>
-
-<Para>
-(using <Command>mkdir -p /bin</Command>, etc.)
+Create <Filename>C:/Temp</Filename> if it doesn't already exist; substitute
+the drive you installed Cygwin on for <Filename>C:</Filename>).
 </Para>
 </ListItem>
 
@@ -634,7 +619,7 @@ variable (for example), do the following:
 <ListItem><Para>Press Environment Variables</Para></ListItem>
 <ListItem><Para>Under System Variables, select <Constant>PATH</Constant></Para></ListItem>
 <ListItem><Para>Press Edit</Para></ListItem>
-<ListItem><Para>Add "<Filename>;C:/whatever/</Filename>" to the end of the string (for example)</Para></ListItem>
+<ListItem><Para>Add "<Filename>;C:\whatever</Filename>" to the end of the string (for example)</Para></ListItem>
 <ListItem><Para>Press OK</Para></ListItem>
 </ItemizedList>
 
@@ -656,7 +641,7 @@ it invokes <Filename>cvs.exe</Filename> without going via bash.
 
 <Para>
 On a Win9x machine you need to edit <Filename>autoexec.bat</Filename> using
-<Filename>Windows/system/Sysedit</Filename>.  You must reboot to make
+<Filename>Windows/System/Sysedit</Filename>.  You must reboot to make
 the new settings take effect.
 </Para>
 
@@ -675,11 +660,9 @@ The following environment variables must be set:
 <Entry><Constant>PATH</Constant></Entry>
 <Entry>System</Entry>
 <Entry><Para>
-Add <Filename>c:/bin</Filename> and <Filename>c:/usr/local/bin</Filename>.
-These should come <Emphasis>before</Emphasis> the Windows system directories
-(e.g. <Filename>\WINNT\system32</Filename>). You might want to set them in
-your <Filename>.bashrc</Filename> rather than in the system-wide
-<Constant>PATH</Constant>.
+Add <Filename>C:\usr\bin</Filename>.
+This should come <Emphasis>before</Emphasis> the Windows system directories
+(e.g. <Filename>\WINNT\system32</Filename>).
 </Para></Entry>
 </Row>
 
@@ -687,7 +670,7 @@ your <Filename>.bashrc</Filename> rather than in the system-wide
 <Entry><Constant>SHELL</Constant></Entry>
 <Entry>User</Entry>
 <Entry><Para>
-<Filename>c:/bin/sh</Filename>.
+<Filename>C:/usr/bin/bash</Filename>.
 </Para></Entry>
 </Row>
 
@@ -695,7 +678,8 @@ your <Filename>.bashrc</Filename> rather than in the system-wide
 <Entry><Constant>HOME</Constant></Entry>
 <Entry>User</Entry>
 <Entry><Para>
-Set to point to your home directory.  This is where, for example,
+Set to point to your home directory (normally under
+<Filename>C:/WINNT/Profiles</Filename> on Win2k).  This is where, for example,
 <Command>bash</Command> will look for your <Filename>.bashrc</Filename>
 file.
 </Para></Entry>
@@ -706,7 +690,7 @@ file.
 <Entry>User</Entry>
 <Entry><Para>
 Set to <Literal>UNIX</Literal>.  If you don't do
-this you get very weird messages when you type `<Command>make</Command>', such as:
+this you get very weird messages when you type <Command>make</Command>, such as:
 </Para><Screen>
 /c: /c: No such file or directory</Screen></Entry>
 </Row>
@@ -715,13 +699,13 @@ this you get very weird messages when you type `<Command>make</Command>', such a
 <Entry><Constant>TMPDIR</Constant></Entry>
 <Entry>User</Entry>
 <Entry><Para>
-Set to <Filename>c:/tmp</Filename>. For some reason, Win2k invisibly sets this variable to point to a temporary directory in your profile, that contains embedded spaces.  If GHC sees the <Constant>TMPDIR</Constant> variable set, it tries to use it for temporary files, but Cygwin doesn't grok filenames with spaces, so disaster results.
+Set to <Filename>C:/Temp</Filename>. For some reason, Win2k invisibly sets this variable to point to a temporary directory in your profile, that contains embedded spaces.  If GHC sees the <Constant>TMPDIR</Constant> variable set, it tries to use it for temporary files, but Cygwin doesn't grok filenames with spaces, so disaster results.
 </Para><Para>
 Furthermore, it seems that <Constant>TMPDIR</Constant> must be set to a directory in the same file system in which you invoke GHC.  Otherwise you get very weird messages when you invoke GHC, such as:
 <Screen>
 does not exist
 Action: openFile
-Reason: file does not exist /tmp/ghc11068.cpp</Screen>
+Reason: file does not exist /Temp/ghc11068.cpp</Screen>
 We think this is due to a bug in Cygwin.
 </Para></Entry>
 </Row>
@@ -742,32 +726,19 @@ environment variables. Known culprits from the past include
 
 </Sect3>
 
-
-<Sect3><Title>Perl5</Title>
-
-<Para>
-The driver script is written in Perl, so you'll need to have this
-installed too. However, the ghc binary distribution includes a
-perl binary for you to make use of, should you not already have a
-cygwin compatible one. Note: GHC does <Emphasis>not</Emphasis>
-work with the ActiveState port of perl.
-</Para>
-
-</Sect3>  <!-- Perl -->
-
 </Sect2>  <!-- Reqd software -->
 
 
 <Sect2><Title>Installing GHC</Title>
 
 <Para>
-Download a GHC distribution:
+Download the latest GHC distribution:
 </Para>
 
 <VariableList>
 
 <VarListEntry>
-<Term>ghc-4.08&mdash;InstallShield installer, 15M: <ULink
+<Term>ghc-4.08 InstallShield installer, 15M: <ULink
 URL="http://www.haskell.org/ghc/download.html">http</ULink>
 </Term>
 
@@ -786,11 +757,9 @@ in <Filename>/Program Files/</Filename>!)
 
 <Para>
 When the installer has completed, make sure you add the location of the
-ghc <Filename>bin/</Filename> directory to your path (i.e.
-<Filename>/path/to/wherever/ghc-4.08/bin </Filename>).
-You need to do this in order to bring the various GHC DLLs into scope;
-if not, then you need to copy the DLLs into a directory that is (the
-system directory, for example).
+ghc <Filename>bin/</Filename> directory to your path (e.g.
+<Filename>/ghc/ghc-4.08/bin </Filename>).
+You need to do this in order to bring the various GHC binaries into scope.
 </Para>
 
 <Para>
@@ -807,7 +776,7 @@ before continuing&mdash;the installer will not currently do this.
 
 <Para>
 Make sure that you set all the environment variables described above
-under Cygwin installation, including <Constant>TMPDIR</Constant>
+under Cygwin installation, including <Constant>TMPDIR</Constant>.
 </Para>
 <Para>
 To test the fruits of your labour, try now to compile a simple
@@ -819,7 +788,7 @@ bash$ cat main.hs
 module Main(main) where
 
 main = putStrLn "Hello, world!"
-bash$ /path/to/the/ghc/bin/directory/ghc-4.08 -o main main.hs
+bash$ ghc -o main main.hs
 ..
 bash$ ./main
 Hello, world!
@@ -848,29 +817,6 @@ manual. </Para>
 
 <Question>
 <Para>
-Invoking ghc doesn't seem to do anything, it immediately returns without having compiled the input file.
-</Para>
-</Question>
-
-<Answer>
-<Para> One cause of this is that <Filename>/bin/sh</Filename> is missing. To
-verify, open up a bash session and type <Command>ls -l
-/bin/sh.exe</Command>. If <Filename>sh.exe</Filename> is reported as not
-being there, copy <Filename>bash.exe</Filename> (which you'll find inside
-the cygwin installation tree as <Filename>bin/bash.exe</Filename>) to
-<Filename>/bin/sh.exe</Filename>. </Para>
-
-<Para>
-All being well, ghc should then start to function.
-</Para>
-</Answer>
-
-</QandAEntry>
-
-<QandAEntry>
-
-<Question>
-<Para>
 I'm having trouble with symlinks.
 </Para>
 </Question>
@@ -889,7 +835,7 @@ work with symlinks.
 
 <Question>
 <Para>
-I'm getting ``permission denied'' messages from <Command>rm</Command> or
+I'm getting &ldquote;permission denied&rdquote; messages from <Command>rm</Command> or
 <Command>mv</Command>.
 </Para>
 </Question>
@@ -920,73 +866,21 @@ unfortunately. Anyway, better to install 4.08 binaries and use those.
 
 </QandAEntry>
 
-<!--
 <QandAEntry>
 
 <Question>
 <Para>
-When compiling up the <Literal>Hello World</Literal> example, the following happens:
+My programs compile fine but do nothing when run.
 </Para>
-
-<Screen>
-bash$ /ghc/ghc-4.05/bin/ghc-4.05 main.hs
-&lt;stdin&gt;:0:25: Character literal '{-# LINE 1 "main.hs" -}' too long
-&lt;stdin&gt;:0:25:  on input: "'"
-bash$ </Screen>
-
-<Para>
-or
-</Para>
-
-<Screen>
-bash$ /ghc/ghc-4.05/bin/ghc-4.05 main.hs
-Program too big fit into memory under NT
-bash$ </Screen>
 </Question>
 
 <Answer>
 <Para>
-The cause of this is that you're using a version of <Command>perl</Command> that employs the Microsoft <Command>cmd</Command>/<Command>command</Command> shell when launching sub-processes to execute <Function>system()</Function> calls.
+Very recent versions of the mingw package in Cygwin seem to cause this. mingwin version 20001111-1 works fine; you should be able to find it on a <ULink
+URL="http://sources.redhat.com/cygwin/mirrors.html">Cygwin mirror</ULink>. Download the archive <Filename>mingw-20001111-1.tar.gz</Filename>, place it in a directory called <Filename>mingw</Filename>, place that in a directory called <Filename>latest</Filename>, then run the Cygwin installer again, choose installation from local disk, and select the directory containing <Filename>latest</Filename> as the source directory for the installation packages. You should then be able to downgrade mingw to the required version by clicking on the line in the installation window until the required version appears.
 </Para>
 
-<Para>
-The GHC driver really needs a <Command>perl</Command> which uses a `UNIX'y  shell instead, so
-make sure that the version you're using is of an compatible ilk. In particular, 
-if <Command>perl -v</Command> reports that you've got a copy of the (otherwise fine) port
-of perl done by ActiveState, you're in trouble.
-</Para>
-
-<Para>
-If you're stuck with an incompatible <Command>perl</Command>, the GHC installation comes with a very basic <Command>perl</Command> binary for you to use. Simply copy it into the <Command>/bin</Command> directory.
-</Para>
-
-<Para>
-Notice that copying <Filename>perl.exe</Filename> into <Filename>/bin</Filename> will not cause
-the GHC install to suddenly start functioning. If you don't want to
-re-run the InstallShield installer again, you need to edit the following
-files within the directory tree that the installer created:
-</Para>
-
-<Screen>
-bin/ghc-4.xx    where xx is the minor release number
-bin/stat2resid
-bin/hstags
-lib/mkdependHS</Screen>
-
-<Para>
-For each of these files, you need to edit the first line from instead
-saying <Command>#!/path/to/your/other/perl/install</Command> to <Command>#!/bin/perl</Command>.
-Once that is done, try compiling up the Hello, World example again.
-</Para>
-
-<Para>
-Should you want to pick up a complete installation of a ghc-friendly port
-of perl instead, a <ULink URL="http://cygutils.netpedia.net/">cygwin port</ULink> is available.
-</Para>
-</Answer>
-
-</QandAEntry>
--->
+</QAndAEntry>
 
 </QandASet>
 
