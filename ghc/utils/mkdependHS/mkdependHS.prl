@@ -104,6 +104,7 @@ $Makefile = '';
 @Src_files = ();
 $Include_prelude = 0;
 @Defines = ();
+$WarnOddOptions=1;
 
 # Delete temp. file if script is halted.
 sub quit_upon_signal { print STDERR "Deleting $Tmp_prefix.hs .. \n"; unlink "$Tmp_prefix.hs"; }
@@ -265,8 +266,10 @@ sub mangle_command_line_args {
 		local($suff)	=  &grab_arg_arg(*Args,'-s',$1);
 		push(@File_suffix, $suff);
 	    } elsif ( /^-/ ) {
-		print STDERR "$Pgm: unknown option ignored: $_\n";
-		$Status++;
+		if ($WarnOddOptions) {
+		   print STDERR "$Pgm: unknown option ignored: $_\n";
+		   $Status++;
+	        }
 	    } else {
 		push(@Src_files, $_);
 	    }
@@ -413,6 +416,7 @@ sub slurp_file_for_imports {
     $options = &check_for_source_options($file_to_read);
     if ($options ne "") {
       @Old_Syslibs=@Syslibs;
+      $WarnOddOptions=0;
       &mangle_command_line_args(split(/ /,$options));
       if (@Old_Syslibs ne @Syslibs) {
         $found_options=1;
