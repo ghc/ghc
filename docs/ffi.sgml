@@ -1,4 +1,4 @@
-<Sect1 id="sec-intro">
+<Sect1 id="sec-ffi-intro">
 <Title>Introduction
 </Title>
 
@@ -77,7 +77,7 @@ Haskell.
 
 </Sect1>
 
-<Sect1 id="sec-primitive">
+<Sect1 id="sec-ffi-primitive">
 <Title>Calling foreign functions
 </Title>
 
@@ -112,11 +112,11 @@ an unsafe thing to do, as the external name will in most cases be
 untyped. The onus is on the programmer using <Literal>foreign import</Literal> to
 ensure that the Haskell type given correctly maps on to the
 type of the external function. 
-<XRef LinkEnd="sec-mapping"> specifies the mapping from 
+<XRef LinkEnd="sec-ffi-mapping"> specifies the mapping from 
 Haskell types to external types.
 </Para>
 
-<Sect2 id="sec-prim-name">
+<Sect2 id="sec-ffi-prim-name">
 <Title>Giving the external function a Haskell name
 </Title>
 
@@ -144,7 +144,7 @@ varid : small ( small | large | udigit | ' )*
 
 </Sect2>
 
-<Sect2 id="sec-prim-ext-name">
+<Sect2 id="sec-ffi-prim-ext-name">
 <Title>Naming the external function
 </Title>
 
@@ -259,7 +259,7 @@ foreign import "sin" sin :: Double -&#62; IO Double
 
 </Sect2>
 
-<Sect2 id="sec-cconv">
+<Sect2 id="sec-ffi-cconv">
 <Title>Calling conventions
 </Title>
 
@@ -360,7 +360,7 @@ to leave out the specification of the calling convention, if possible.
 
 </Sect2>
 
-<Sect2 id="sec-prim-types">
+<Sect2 id="sec-ffi-prim-types">
 <Title>External function types
 </Title>
 
@@ -414,7 +414,7 @@ unsafe_arr_ty : ByteArray a
 
 GHC permits the passing of its byte array primitive types
 to external functions. There's some restrictions on when
-they can be used; see <XRef LinkEnd="sec-arguments">
+they can be used; see <XRef LinkEnd="sec-ffi-arguments">
 for more details.
 </Para>
 </ListItem>
@@ -424,12 +424,12 @@ for more details.
 </Para>
 
 <Para>
-<XRef LinkEnd="sec-results"> defines
-<Literal>prim&lowbar;result</Literal>; <XRef LinkEnd="sec-arguments">
+<XRef LinkEnd="sec-ffi-results"> defines
+<Literal>prim&lowbar;result</Literal>; <XRef LinkEnd="sec-ffi-arguments">
 defines <Literal>prim&lowbar;arg</Literal>.
 </Para>
 
-<Sect3 id="sec-arguments">
+<Sect3 id="sec-ffi-arguments">
 <Title>Argument types
 </Title>
 
@@ -467,7 +467,7 @@ C-like languages, although the numeric types are explicitly sized.
 
 The <Emphasis>stable pointer</Emphasis> <Literal>StablePtr</Literal> type looks out of place in
 this list of C-like types, but it has a well-defined and simple
-C mapping, see <XRef LinkEnd="sec-mapping">
+C mapping, see <XRef LinkEnd="sec-ffi-mapping">
 for details.
 
 </Para>
@@ -583,7 +583,7 @@ be withdrawn sometime in the future.)
 
 </Sect3>
 
-<Sect3 id="sec-results">
+<Sect3 id="sec-ffi-results">
 <Title>Result type
 </Title>
 
@@ -639,7 +639,7 @@ Haskell newtypes that wrap up <Literal>ext&lowbar;ty</Literal> are also permitte
 
 </Sect2>
 
-<Sect2 id="sec-mapping">
+<Sect2 id="sec-ffi-mapping">
 <Title>Type mapping
 </Title>
 
@@ -649,13 +649,13 @@ the various types that can be communicated between the Haskell world
 and the outside, needs to be precisely defined. We do this by
 presenting a mapping to C, as it is commonly used and most other
 languages define a mapping to it. Table
-<XRef LinkEnd="sec-mapping-table">
+<XRef LinkEnd="sec-ffi-mapping-table">
 defines the mapping between Haskell and C types.
 </Para>
 
 <Para>
 
-<Table id="sec-mapping-table">
+<Table id="sec-ffi-mapping-table">
 <Title>Mapping of Haskell types to C types</Title>
 
 <TGroup Cols="4">
@@ -931,7 +931,7 @@ macros starting with <Literal>HS&lowbar;</Literal> are reserved for the FFI.
 
 </Sect2>
 
-<Sect2 id="sec-prim-remarks">
+<Sect2 id="sec-ffi-prim-remarks">
 <Title>Some <Literal>foreign import</Literal> wrinkles
 </Title>
 
@@ -946,12 +946,12 @@ external function may cause a Haskell garbage collection as a result
 of being called. This will typically happen when the imported
 function end up calling Haskell functions that reside in the same
 'Haskell world' (i.e., shares the same storage manager heap) -- see
-<XRef LinkEnd="sec-entry"> for
+<XRef LinkEnd="sec-ffi-entry"> for
 details of how the FFI let's you call Haskell functions from the outside.
 
 If the programmer can guarantee that the imported function won't
 call back into Haskell, the <Literal>foreign import</Literal> can be marked as
-'unsafe' (see <XRef LinkEnd="sec-primitive"> for details of
+'unsafe' (see <XRef LinkEnd="sec-ffi-primitive"> for details of
 how to do this.)
 
 Unsafe calls are cheaper than safe ones, so distinguishing the two
@@ -1003,7 +1003,7 @@ valid) is avoided.
 
 </Sect1>
 
-<Sect1 id="sec-prim-dynamic">
+<Sect1 id="sec-ffi-prim-dynamic">
 <Title>Invoking external functions via a pointer
 </Title>
 
@@ -1056,7 +1056,7 @@ and execute code.
 
 </Sect1>
 
-<Sect1 id="sec-entry">
+<Sect1 id="sec-ffi-entry">
 <Title>Exposing Haskell functions
 </Title>
 
@@ -1165,7 +1165,7 @@ outside world.
 
 </Para>
 
-<Sect2 id="sec-callback">
+<Sect2 id="sec-ffi-callback">
 <Title>Exposing Haskell function values
 </Title>
 
@@ -1218,7 +1218,7 @@ typedef cType[[Res]] (*Varid_FunPtr)
 
 <Para>
 where <Literal>cType[[]]</Literal> is the Haskell to C type mapping presented
-in <XRef LinkEnd="sec-mapping">.
+in <XRef LinkEnd="sec-ffi-mapping">.
 </Para>
 
 <Para>
@@ -1297,7 +1297,7 @@ Foreign.freeHaskellFunctionPtr :: Addr -&#62; IO ()
 
 </Sect2>
 
-<Sect2 id="sec-foreign-label">
+<Sect2 id="sec-ffi-foreign-label">
 <Title>Code addresses
 </Title>
 
@@ -1328,7 +1328,7 @@ contain the address of the label <Literal>freeAtLast</Literal>.
 
 </Sect1>
 <!-- This doesn't need to be seen in the docs
-<Sect1 id="sec-changelog">
+<Sect1 id="sec-ffi-changelog">
 <Title>Change history
 </Title>
 
@@ -1353,7 +1353,7 @@ is the widest possible data pointer.
 
 <Para>
 Updated defnition of <Literal>varid</Literal> in
-<XRef LinkEnd="sec-prim-name"> to reflect Haskell98's.
+<XRef LinkEnd="sec-ffi-prim-name"> to reflect Haskell98's.
 </Para>
 </ListItem>
 <ListItem>
