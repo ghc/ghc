@@ -14,7 +14,7 @@ Changes in version 0.3:
   * Bird-tracked text is now literal.  If you want marked-up text in
     a code block, use the @...@ notation instead.
 
-  * Various changes to the layout, it generally looks nice now.
+  * Various changes to the layout, it generally looks nicer now.
 
   * Various bugs fixed.
 
