@@ -44,7 +44,7 @@ import Id		( GenId )
 import ErrUtils		( addErrLoc, addShortErrLocLine )
 import Name
 import Pretty
-import UniqFM		( lookupUFM{-, ufmToList ToDo:rm-} )
+import UniqFM		( lookupUFM, {- ToDo:rm-} isNullUFM )
 import UniqSet		( emptyUniqSet, unitUniqSet,
 			  unionUniqSets, unionManyUniqSets,
 			  SYN_IE(UniqSet)
@@ -225,15 +225,23 @@ rnGRHSsAndBinds (GRHSsAndBindsIn grhss binds)
 
 \begin{code}
 rnExprs :: [RdrNameHsExpr] -> RnMS s ([RenamedHsExpr], FreeVars)
-rnExprs ls =
- rnExprs' ls [] `thenRn` \  (exprs, fvExprs) ->
- returnRn (exprs, unionManyNameSets fvExprs)
+rnExprs ls = rnExprs' ls emptyUniqSet
+ where
+  rnExprs' [] acc = returnRn ([], acc)
+  rnExprs' (expr:exprs) acc
+   = rnExpr expr 	        `thenRn` \ (expr', fvExpr) ->
 
-rnExprs' [] acc = returnRn ([], acc)
-rnExprs' (expr:exprs) acc
-  = rnExpr expr 	        `thenRn` \ (expr', fvExpr) ->
-    rnExprs' exprs (fvExpr:acc)	`thenRn` \ (exprs', fvExprs) ->
+	-- Now we do a "seq" on the free vars because typically it's small
+	-- or empty, especially in very long lists of constants
+    let
+	acc' = acc `unionNameSets` fvExpr
+    in
+    (grubby_seqNameSet acc' rnExprs') exprs acc'	`thenRn` \ (exprs', fvExprs) ->
     returnRn (expr':exprs', fvExprs)
+
+-- Grubby little function to do "seq" on namesets; replace by proper seq when GHC can do seq
+grubby_seqNameSet ns result | isNullUFM ns = result
+			    | otherwise    = result
 \end{code}
 
 Variables. We look up the variable and return the resulting name.  The
