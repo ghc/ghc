@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.25 2001/11/22 14:25:12 simonmar Exp $
+ * $Id: Profiling.c,v 1.26 2001/11/22 16:33:06 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -544,6 +544,35 @@ DecBackEdge( CostCentreStack *ccs, CostCentreStack *oldccs )
    Generating a time & allocation profiling report.
    -------------------------------------------------------------------------- */
 
+/* We omit certain system-related CCs and CCSs from the default
+ * reports, so as not to cause confusion.
+ */
+static rtsBool
+cc_to_ignore (CostCentre *cc)
+{
+    if (    cc == CC_OVERHEAD 
+	 || cc == CC_DONT_CARE
+	 || cc == CC_GC 
+	 || cc == CC_SYSTEM) {
+	return rtsTrue;
+    } else {
+	return rtsFalse;
+    }
+}
+
+static rtsBool
+ccs_to_ignore (CostCentreStack *ccs)
+{
+    if (    ccs == CCS_OVERHEAD 
+	 || ccs == CCS_DONT_CARE
+	 || ccs == CCS_GC 
+	 || ccs == CCS_SYSTEM) {
+	return rtsTrue;
+    } else {
+	return rtsFalse;
+    }
+}
+
 /* -----------------------------------------------------------------------------
    Generating the aggregated per-cost-centre time/alloc report.
    -------------------------------------------------------------------------- */
@@ -609,17 +638,20 @@ report_per_cc_costs( void )
   fprintf(prof_file, "\n\n");
 
   for (cc = sorted_cc_list; cc != NULL; cc = cc->link) {
-    fprintf(prof_file, "%-20s %-10s", cc->label, cc->module);
-    fprintf(prof_file, "%6.1f %6.1f",
-	    total_prof_ticks == 0 ? 0.0 : (cc->time_ticks / (StgFloat) total_prof_ticks * 100),
-	    total_alloc == 0 ? 0.0 : (cc->mem_alloc / (StgFloat)
-				      total_alloc * 100)
-	    );
-
-    if (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
-      fprintf(prof_file, "  %5ld %9lld", cc->time_ticks, cc->mem_alloc);
-    }
-    fprintf(prof_file, "\n");
+      if (cc_to_ignore(cc)) {
+	  continue;
+      }
+      fprintf(prof_file, "%-20s %-10s", cc->label, cc->module);
+      fprintf(prof_file, "%6.1f %6.1f",
+	      total_prof_ticks == 0 ? 0.0 : (cc->time_ticks / (StgFloat) total_prof_ticks * 100),
+	      total_alloc == 0 ? 0.0 : (cc->mem_alloc / (StgFloat)
+					total_alloc * 100)
+	  );
+      
+      if (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
+	  fprintf(prof_file, "  %5ld %9lld", cc->time_ticks, cc->mem_alloc);
+      }
+      fprintf(prof_file, "\n");
   }
 
   fprintf(prof_file,"\n\n");
@@ -795,23 +827,6 @@ inherit_costs(CostCentreStack *ccs)
       }
   
   return;
-}
-
-/* return rtsTrue if it is one of the ones that
- * should not be reported normally (because it confuses
- * the users)
- */
-static rtsBool
-ccs_to_ignore (CostCentreStack *ccs)
-{
-    if (    ccs == CCS_OVERHEAD 
-	 || ccs == CCS_DONT_CARE
-	 || ccs == CCS_GC 
-	 || ccs == CCS_SYSTEM) {
-	return rtsTrue;
-    } else {
-	return rtsFalse;
-    }
 }
 
 static CostCentreStack *
