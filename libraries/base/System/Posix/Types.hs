@@ -42,7 +42,8 @@ module System.Posix.Types (
   ProcessGroupID,
   DeviceID,
   FileID,
-  FileMode
+  FileMode,
+  Limit
  ) where
 
 import Foreign
@@ -109,3 +110,5 @@ type FileMode       = CMode
 type ProcessID      = CPid
 type FileOffset     = COff
 type ProcessGroupID = CPid
+type Limit	    = CLong
+

@@ -391,17 +391,11 @@ foreign import ccall unsafe "HsBase.h fork"
 foreign import ccall unsafe "HsBase.h getpid"
    c_getpid :: IO CPid
 
-foreign import ccall unsafe "HsBase.h fpathconf"
-   c_fpathconf :: CInt -> CInt -> IO CLong
-
 foreign import ccall unsafe "HsBase.h link"
    c_link :: CString -> CString -> IO CInt
 
 foreign import ccall unsafe "HsBase.h mkfifo"
    c_mkfifo :: CString -> CMode -> IO CInt
-
-foreign import ccall unsafe "HsBase.h pathconf"
-   c_pathconf :: CString -> CInt -> IO CLong
 
 foreign import ccall unsafe "HsBase.h pipe"
    c_pipe :: Ptr CInt -> IO CInt
