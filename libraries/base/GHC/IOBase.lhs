@@ -733,11 +733,11 @@ throw exception = raise# exception
 -- raise an exception within the 'IO' monad because it guarantees
 -- ordering with respect to other 'IO' operations, whereas 'throw'
 -- does not.
-throwIO         :: Exception -> IO a 
-throwIO err	=  IO $ \s -> throw err s
+throwIO         :: Exception -> IO a
+throwIO err	=  IO $ raiseIO# err
 
 ioException	:: IOException -> IO a
-ioException err =  IO $ \s -> throw (IOException err) s
+ioException err =  IO $ raiseIO# (IOException err)
 
 ioError         :: IOError -> IO a 
 ioError		=  ioException
