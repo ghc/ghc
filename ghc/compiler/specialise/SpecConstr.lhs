@@ -202,9 +202,14 @@ emptyScEnv = emptyVarEnv
 
 data HowBound = RecFun		-- These are the recursive functions for which 
 				-- we seek interesting call patterns
+
 	      | RecArg		-- These are those functions' arguments; we are
 				-- interested to see if those arguments are scrutinised
+
 	      | Other		-- We track all others so we know what's in scope
+				-- This is used in spec_one to check what needs to be
+				-- passed as a parameter and what is in scope at the 
+				-- function definition site
 
 extendBndrs env bndrs = extendVarEnvList env [(b,Other) | b <- bndrs]
 extendBndr  env bndr  = extendVarEnv env bndr Other
