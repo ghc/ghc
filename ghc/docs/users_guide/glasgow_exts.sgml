@@ -918,12 +918,14 @@ written '<literal>%x</literal>' instead of '<literal>?x</literal>'.
 <para>
 For example:
 <programlisting>
+    import GHC.Exts( Splittable )
+
     data NameSupply = ...
     
     splitNS :: NameSupply -> (NameSupply, NameSupply)
     newName :: NameSupply -> Name
 
-    instance PrelSplit.Splittable NameSupply where
+    instance Splittable NameSupply where
 	split = splitNS
 
 
@@ -954,7 +956,7 @@ the parameter explicit:
 Notice the call to 'split' introduced by the type checker.
 How did it know to use 'splitNS'?  Because what it really did
 was to introduce a call to the overloaded function 'split',
-defined by
+defined by the class <literal>Splittable</literal>:
 <programlisting>
 	class Splittable a where
 	  split :: a -> (a,a)
@@ -968,8 +970,8 @@ and GHC will infer
 <programlisting>
 	g :: (Splittable a, %ns :: a) => b -> (b,a,a)
 </programlisting>
-The <literal>Splittable</literal> class is built into GHC.  It's defined in <literal>PrelSplit</literal>,
-and exported by <literal>GlaExts</literal>.
+The <literal>Splittable</literal> class is built into GHC.  It's exported by module 
+<literal>GHC.Exts</literal>.
 </para>
 <para>
 Other points:
