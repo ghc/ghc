@@ -148,7 +148,7 @@ ProjectPatchLevel = $($(Project)ProjectPatchLevel)
 
 GhcProjectName         = The Glorious Glasgow Haskell Compilation System
 GhcProjectNameShort    = ghc
-GhcProjectVersion      = 3.02
+GhcProjectVersion = proto-3.02-6-May
 GhcProjectVersionInt   = 302
 GhcProjectPatchLevel   = 0
 
@@ -274,6 +274,11 @@ ReadlineIncludePath=
 # Build the socket libraries?  (ToDo: is this used?)
 #
 GhcLibsWithSockets=YES
+
+# Strip local symbols from libraries?  This can make the libraries smaller,
+# but makes debugging somewhat more difficult.  Doesn't work with all ld's.
+#
+StripLibraries=NO
 
 # what to include in a binary distribution
 

@@ -324,6 +324,23 @@ endef
 endif # $(filter...
 endif
 
+#
+# Remove local symbols from library objects if requested.
+#
+
+ifneq "$(StripLibraries)" ""
+ifneq "$(filter -split-objs,$(HC_OPTS))" ""
+SRC_HC_POST_OPTS += \
+  for i in $(basename $@)/*; do \
+	ld -r -x -o $$i.tmp $$i; \
+	$(MV) $$i.tmp $$i; \
+  done
+else
+SRC_HC_POST_OPTS += \
+  ld -r -x -o $@.tmp; $(MV) $@.tmp $@
+endif
+endif
+
 $(LIBRARY) :: $(LIBOBJS)
 	$(BUILD_LIB)
 endif
