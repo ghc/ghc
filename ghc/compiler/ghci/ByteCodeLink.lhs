@@ -334,10 +334,10 @@ mkBits findLabel st proto_insns
           = addr st ret_itbl_addr
             where
                ret_itbl_addr = case pk of
-                                  CharRep   -> stg_gc_unbx_r1_info
-                                  IntRep    -> stg_gc_unbx_r1_info
-                                  FloatRep  -> stg_gc_f1_info
-                                  DoubleRep -> stg_gc_d1_info
+                                  CharRep   -> stg_gc_unbx_r1_ret_info
+                                  IntRep    -> stg_gc_unbx_r1_ret_info
+                                  FloatRep  -> stg_gc_f1_ret_info
+                                  DoubleRep -> stg_gc_d1_ret_info
                                   VoidRep   -> nullAddr  
                                   -- Interpreter.c spots this special case
                      
@@ -347,9 +347,9 @@ foreign label "stg_ctoi_ret_F1_info"  stg_ctoi_ret_F1_info :: Addr
 foreign label "stg_ctoi_ret_D1_info"  stg_ctoi_ret_D1_info :: Addr
 foreign label "stg_ctoi_ret_V_info"   stg_ctoi_ret_V_info :: Addr
 
-foreign label "stg_gc_unbx_r1_ret_info" stg_gc_unbx_r1_info :: Addr
-foreign label "stg_gc_f1_ret_info"      stg_gc_f1_info :: Addr
-foreign label "stg_gc_d1_ret_info"      stg_gc_d1_info :: Addr
+foreign label "stg_gc_unbx_r1_ret_info" stg_gc_unbx_r1_ret_info :: Addr
+foreign label "stg_gc_f1_ret_info"      stg_gc_f1_ret_info :: Addr
+foreign label "stg_gc_d1_ret_info"      stg_gc_d1_ret_info :: Addr
 
 -- The size in 16-bit entities of an instruction.
 instrSize16s :: BCInstr -> Int
