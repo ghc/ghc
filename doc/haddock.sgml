@@ -185,8 +185,9 @@
       <para>and probably several others I've forgotten.</para>
 
       <para>Thanks to the following people for useful feedback,
-      discussion, patches, and moral support: Simon Peyton Jones, Mark
-      Shields, Manuel Chakravarty, Ross Patterson, Brett Letner, the
+      discussion, patches, packaging, and moral support: Simon Peyton
+      Jones, Mark Shields, Manuel Chakravarty, Ross Patterson, Brett
+      Letner, Sven Panne, Hal Daume, George Russell, Oliver Braun, the
       members of <email>haskelldoc@haskell.org</email>, and everyone
       who contributed to the many libraries that Haddock makes use
       of.</para>
@@ -900,15 +901,15 @@ module A where
 --     f x = x + x
 -- @
 --
--- >  g x = x * 42
+-- &gt;  g x = x * 42
 </programlisting>
-      </section>
 
-      <para>There is an important difference between the two forms of
-      code block: in the bird-track form, the text to the right of the
-      &lsquo;<literal>></literal>&rsquo; is interpreted literally,
-      whereas the <literal>@...@</literal> form interprets markup as
-      normal inside the code block.</para>
+	<para>There is an important difference between the two forms
+        of code block: in the bird-track form, the text to the right
+        of the &lsquo;<literal>></literal>&rsquo; is interpreted
+        literally, whereas the <literal>@...@</literal> form
+        interprets markup as normal inside the code block.</para>
+      </section>
 
       <section>
 	<title>Hyperlinked Identifiers</title>
