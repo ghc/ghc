@@ -403,7 +403,8 @@ ppr_expr (HsType id) = ppr id
 
 ppr_expr (HsSpliceE s)       = pprSplice s
 ppr_expr (HsBracket b)       = pprHsBracket b
-ppr_expr (HsBracketOut e ps) = ppr e $$ ptext SLIT("where") <+> ppr ps
+ppr_expr (HsBracketOut e []) = ppr e	
+ppr_expr (HsBracketOut e ps) = ppr e $$ ptext SLIT("pending") <+> ppr ps
 
 ppr_expr (HsProc pat (L _ (HsCmdTop cmd _ _ _)))
   = hsep [ptext SLIT("proc"), ppr pat, ptext SLIT("->"), ppr cmd]
@@ -461,6 +462,8 @@ pprParendExpr expr
       ExplicitPArr _ _  -> pp_as_was
       ExplicitTuple _ _	-> pp_as_was
       HsPar _		-> pp_as_was
+      HsBracket _	-> pp_as_was
+      HsBracketOut _ []	-> pp_as_was
 			
       _			-> parens pp_as_was
 \end{code}
