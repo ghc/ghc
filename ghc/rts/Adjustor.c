@@ -38,15 +38,15 @@ Haskell side.
 */
 #include "Rts.h"
 #include "RtsUtils.h"
+#include "RtsFlags.h"
 
 /* Heavily arch-specific, I'm afraid.. */
 #if defined(i386_TARGET_ARCH)
-char*
+void*
 createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
 {
-  void *adjustor,*adj;
+  void *adjustor;
   unsigned char* adj_code;
-  int i;
   size_t sizeof_adjustor;
 
   if (cconv == 0) { /* the adjustor will be _stdcall'ed */
@@ -56,35 +56,33 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
        (offset and machine code prefixed):
 
      <0>:	58	          popl   %eax              # temp. remove ret addr..
-     <1>:	68 63 fd fc fe fa pushl  0xfafefcfd  	   # constant is large enough to
+     <1>:	68 fd fc fe fa    pushl  0xfafefcfd  	   # constant is large enough to
         			   	           	   # hold a StgStablePtr
      <6>:	50	          pushl  %eax		   # put back ret. addr
      <7>:	b8 fa ef ff 00	  movl   $0x00ffeffa, %eax # load up wptr
      <c>: 	ff e0             jmp    %eax        	   # and jump to it.
-		# the callee cleans up the it will then clean up the stack
+		# the callee cleans up the stack
     */
-    sizeof_adjustor = 15*sizeof(char);
+    sizeof_adjustor = 14*sizeof(char);
 
     if ((adjustor = stgMallocBytes(sizeof_adjustor,"createAdjustor")) == NULL) {
         return NULL;
     }
 
-    adj_code    = (unsigned char*)adjustor;
-    adj_code[0] = (unsigned char)0x58;  /* popl %eax  */
-    adj_code[1] = (unsigned char)0x68;  /* pushl hptr (which is a dword immediate ) */
+    adj_code       = (unsigned char*)adjustor;
+    adj_code[0x00] = (unsigned char)0x58;  /* popl %eax  */
 
-    adj = (StgStablePtr*)(adj_code+2);
-    *((StgStablePtr*)adj) = (StgStablePtr)hptr;
+    adj_code[0x01] = (unsigned char)0x68;  /* pushl hptr (which is a dword immediate ) */
+    *((StgStablePtr*)(adj_code + 0x02)) = (StgStablePtr)hptr;
 
-    i = 2 + sizeof(StgStablePtr);
-    adj_code[i]   = (unsigned char)0x50; /* pushl %eax */
-    adj_code[i+1] = (unsigned char)0xb8; /* movl  $wptr, %eax */
-    adj = (char*)(adj_code+i+2);
-    *((StgFunPtr*)adj) = (StgFunPtr)wptr;
+    adj_code[0x06] = (unsigned char)0x50; /* pushl %eax */
 
-    i = i+2+sizeof(StgFunPtr);
-    adj_code[i]   = (unsigned char)0xff;  /* jmp %eax */
-    adj_code[i+1] = (unsigned char)0xe0;
+    adj_code[0x07] = (unsigned char)0xb8; /* movl  $wptr, %eax */
+    *((StgFunPtr*)(adj_code + 0x08)) = (StgFunPtr)wptr;
+
+    adj_code[0x0c] = (unsigned char)0xff; /* jmp %eax */
+    adj_code[0x0d] = (unsigned char)0xe0;
+
 
   } else { /* the adjustor will be _ccall'ed */
 
@@ -92,60 +90,68 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
      the following assembly language snippet
      (offset and machine code prefixed):
 
-   <0>:	58	          popl   %eax              # temp. remove ret addr..
-   <1>:	68 63 fd fc fe fa pushl  0xfafefcfd  	   # constant is large enough to
+  <00>: 68 ef be ad de    pushl  $0xdeadbeef  	   # constant is large enough to
         			   	           # hold a StgStablePtr
-   <6>:	50	          pushl  %eax		   # put back ret. addr
-   <7>:	b8 fa ef ff 00	  movl   $0x00ffeffa, %eax # load up wptr
-   <c>: ff d0             call   %eax        	   # and call it.
-   <e>:	58	          popl   %eax		   # store away return address.
-   <f>:	83 c4 04	  addl   $0x4,%esp	   # remove stable pointer
-  <12>:	50	          pushl  %eax		   # put back return address.
-  <13>:	c3	          ret			   # return to where you came from.
+  <05>:	b8 fa ef ff 00	  movl   $0x00ffeffa, %eax # load up wptr
+  <0a>: ff d0             call   %eax        	   # and call it.
+  <0c>:	83 c4 04	  addl   $0x4,%esp	   # remove stable pointer.
+  <0f>:	c3	          ret			   # return to where you came from.
 
+    The ccall'ing version is a tad different, passing in the return
+    address of the caller to the auto-generated C stub (which enters
+    via the stable pointer.) (The auto-generated C stub is on this
+    game, don't worry :-)
+
+    The adjustor makes the assumption that any return value
+    coming back from the C stub is not stored on the stack.
+    That's (thankfully) the case here with the restricted set of 
+    return types that we support.
   */
-    sizeof_adjustor = 20*sizeof(char);
+    sizeof_adjustor = 16*sizeof(char);
 
     if ((adjustor = stgMallocBytes(sizeof_adjustor,"createAdjustor")) == NULL) {
         return NULL;
     }
 
-    adj_code    = (unsigned char*)adjustor;
-    adj_code[0] = (unsigned char)0x58;  /* popl %eax  */
-    adj_code[1] = (unsigned char)0x68;  /* pushl hptr (which is a dword immediate ) */
+    adj_code       = (unsigned char*)adjustor;
 
-    adj = (StgStablePtr*)(adj_code+2);
-    *((StgStablePtr*)adj) = (StgStablePtr)hptr;
+    adj_code[0x00] = (unsigned char)0x68;  /* pushl hptr (which is a dword immediate ) */
+    *((StgStablePtr*)(adj_code+0x01)) = (StgStablePtr)hptr;
 
-    i = 2 + sizeof(StgStablePtr);
-    adj_code[i]   = (unsigned char)0x50; /* pushl %eax */
-    adj_code[i+1] = (unsigned char)0xb8; /* movl  $wptr, %eax */
-    adj = (char*)(adj_code+i+2);
-    *((StgFunPtr*)adj) = (StgFunPtr)wptr;
+    adj_code[0x05] = (unsigned char)0xb8;  /* movl  $wptr, %eax */
+    *((StgFunPtr*)(adj_code + 0x06)) = (StgFunPtr)wptr;
+    
+    adj_code[0x0a] = (unsigned char)0xff; /* call %eax */
+    adj_code[0x0b] = (unsigned char)0xd0; 
+    
+    adj_code[0x0c] = (unsigned char)0x83; /* addl $0x4, %esp */
+    adj_code[0x0d] = (unsigned char)0xc4; 
+    adj_code[0x0e] = (unsigned char)0x04; 
 
-    i = i+2+sizeof(StgFunPtr);
-    adj_code[i]   = (unsigned char)0xff;  /* call %eax */
-    adj_code[i+1] = (unsigned char)0xd0;
-    adj_code[i+2] = (unsigned char)0x58;  /* popl %eax */
-    adj_code[i+3] = (unsigned char)0x83;  /* addl $0x4, %esp */
-    adj_code[i+4] = (unsigned char)0xc4;
-    adj_code[i+5] = (unsigned char)0x04;
-    adj_code[i+6] = (unsigned char)0x50; /* pushl %eax */
-    adj_code[i+7] = (unsigned char)0xc3; /* ret */
+    adj_code[0x0f] = (unsigned char)0xc3; /* ret */
+
   }
 
   /* Have fun! */
-  return (adjustor);
+  return ((void*)adjustor);
 }
 
 void
 freeHaskellFunctionPtr(void* ptr)
 {
- char* tmp;
- 
+ if ( *(unsigned char*)ptr != 0x68 &&
+      *(unsigned char*)ptr != 0x58 ) {
+   fprintf(stderr, "freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
+   return;
+ }
+
  /* Free the stable pointer first..*/
- tmp=(char*)ptr+2;
- freeStablePointer(*((StgStablePtr*)tmp));
+ if (*(unsigned char*)ptr == 0x68) { /* Aha, a ccall adjustor! */
+    freeStablePointer(*((StgStablePtr*)((unsigned char*)ptr + 0x01)));
+ } else {
+    freeStablePointer(*((StgStablePtr*)((unsigned char*)ptr + 0x02)));
+ }    
+ *((unsigned char*)ptr) = '\0';
 
  free(ptr);
 }
