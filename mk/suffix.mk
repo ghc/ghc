@@ -134,7 +134,7 @@ endif
 
 .PRECIOUS: %.gc
 
-%.hs : %.gc
+%.hs %_stub_ffi.c %_stub_ffi.h : %.gc
 	$(GREENCARD) $(GC_OPTS) $< -o $@
 
 %.lhs : %.gc

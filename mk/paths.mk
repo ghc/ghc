@@ -137,7 +137,7 @@ HAPPY_Y_SRCS  = $(filter %.y,   $(PRE_SRCS))
 HAPPY_LY_SRCS = $(filter %.ly,   $(PRE_SRCS))
 HAPPY_SRCS    = $(HAPPY_Y_SRCS) $(HAPPY_LY_SRCS)
 
-DERIVED_GC_SRCS       = $(patsubst %.gc,  %.hs, $(GC_SRCS)) \
+DERIVED_GC_SRCS       = $(patsubst %.gc, %.hs, $(GC_SRCS)) \
 			$(patsubst %.gc, %_stub_ffi.c, $(GC_SRCS)) \
 			$(patsubst %.gc, %_stub_ffi.h, $(GC_SRCS))
 
@@ -169,8 +169,8 @@ EXCLUDED_DERIVED_SRCS = $(patsubst %.hsc, %.hs, $(EXCLUDED_HSC_SRCS)) \
 			$(patsubst %.hsc, %_hsc.h, $(EXCLUDED_HSC_SRCS)) \
 			$(patsubst %.hsc, %_hsc.c, $(EXCLUDED_HSC_SRCS)) \
 			$(patsubst %.hsc, %.hc, $(EXCLUDED_HSC_SRCS)) \
-			$(patsubst %.gc, %_stub_ffi.c, $(EXCLUDED_GC_SRCS)) \
-			$(patsubst %.gc, %_stub_ffi.h, $(EXCLUDED_GC_SRCS)) \
+			$(patsubst %.gc,  %_stub_ffi.c, $(EXCLUDED_GC_SRCS)) \
+			$(patsubst %.gc,  %_stub_ffi.h, $(EXCLUDED_GC_SRCS)) \
                         $(patsubst %.y,   %.hs, $(EXCLUDED_HAPPY_Y_SRCS)) \
 			$(patsubst %.ly,  %.hs, $(EXCLUDED_HAPPY_LY_SRCS)) \
 			$(patsubst %.hs,  %.hc, $(EXCLUDED_HS_SRCS)) \
@@ -190,6 +190,7 @@ HS_SRCS	    = $(filter %.lhs %.hs, $(sort $(SRCS) $(BOOT_SRCS)))
 HS_OBJS     = $(addsuffix .$(way_)o,$(basename $(HS_SRCS)))
 HS_IFACES   = $(addsuffix .$(way_)hi,$(basename $(HS_SRCS)))
 
+GC_C_OBJS   = $(addsuffix _stub_ffi.$(way_)o,$(basename $(filter %.gc,$(SRCS))))
 HSC_C_OBJS  = $(addsuffix _hsc.$(way_)o,$(basename $(filter %.hsc,$(SRCS))))
 
 # Always remove $(EXCLUDED_C_SRCS) from C_SRCS
@@ -207,7 +208,7 @@ C_OBJS      = $(addsuffix .$(way_)o,$(basename $(C_SRCS)))
 SCRIPT_SRCS = $(filter %.lprl,$(SRCS))
 SCRIPT_OBJS = $(addsuffix .prl,$(basename $(SCRIPT_SRCS)))
 
-OBJS        = $(HS_OBJS) $(C_OBJS) $(SCRIPT_OBJS)
+OBJS        = $(HS_OBJS) $(C_OBJS) $(GC_C_OBJS) $(SCRIPT_OBJS)
 
 # The default is for $(LIBOBJS) to be the same as $(OBJS)
 LIBOBJS	    = $(OBJS)
@@ -234,8 +235,6 @@ MKDEPENDHS_SRCS=
 endif
 
 MKDEPENDC_SRCS=$(C_SRCS)
-
-MKDEPENDGC_SRCS = $(GC_SRCS)
 
 #------------------------------------------------------------------
 #
