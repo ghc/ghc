@@ -15,6 +15,7 @@ SRCS	= \
 	NHC/SizedTypes.hs \
 	System/IO.hs System/IO/Error.hs System/IO/Unsafe.hs \
 	System/Environment.hs System/Exit.hs System/Locale.hs \
+	System/FilePath.hs \
 	System/Directory.hs System/Mem.hs System/Cmd.hs System/Info.hs \
 	System/Console/GetOpt.hs System/Random.hs \
 	System/CPUTime.hsc System/Time.hsc \
