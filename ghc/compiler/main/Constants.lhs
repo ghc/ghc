@@ -49,8 +49,6 @@ module Constants (
 	mAX_Real_Double_REG,
 	mAX_Real_Long_REG,
 
-	oTHER_TAG,
-
 	mAX_INTLIKE, mIN_INTLIKE,
 	mAX_CHARLIKE, mIN_CHARLIKE,
 
@@ -106,13 +104,6 @@ mAX_SPEC_AP_SIZE        = (MAX_SPEC_AP_SIZE :: Int)
 -- closure sizes: these do NOT include the header (see below for header sizes)
 mIN_UPD_SIZE			= (MIN_UPD_SIZE::Int)
 mIN_SIZE_NonUpdHeapObject	= (MIN_NONUPD_SIZE::Int)
-\end{code}
-
-Constants for semi-tagging; the tags associated with the data
-constructors will start at 0 and go up.
-
-\begin{code}
-oTHER_TAG = (INFO_OTHER_TAG :: Integer)	-- (-1) unevaluated, probably
 \end{code}
 
 \begin{code}
