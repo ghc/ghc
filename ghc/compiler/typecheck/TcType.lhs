@@ -829,8 +829,7 @@ legalFEArgTyCon :: TyCon -> Bool
 -- bytearrays from a _ccall_ / foreign declaration
 -- (or be passed them as arguments in foreign exported functions).
 legalFEArgTyCon tc
-  | getUnique tc `elem` [ foreignObjTyConKey, 
-			  byteArrayTyConKey, mutableByteArrayTyConKey ] 
+  | getUnique tc `elem` [ byteArrayTyConKey, mutableByteArrayTyConKey ] 
   = False
   -- It's also illegal to make foreign exports that take unboxed
   -- arguments.  The RTS API currently can't invoke such things.  --SDM 7/2000
@@ -840,16 +839,14 @@ legalFEArgTyCon tc
 legalFIResultTyCon :: DynFlags -> TyCon -> Bool
 legalFIResultTyCon dflags tc
   | getUnique tc `elem`
-	[ foreignObjTyConKey,
-	  byteArrayTyConKey, mutableByteArrayTyConKey ]  = False
+	[ byteArrayTyConKey, mutableByteArrayTyConKey ]  = False
   | tc == unitTyCon = True
   | otherwise	    = marshalableTyCon dflags tc
 
 legalFEResultTyCon :: TyCon -> Bool
 legalFEResultTyCon tc
   | getUnique tc `elem` 
-	[ foreignObjTyConKey,
-	  byteArrayTyConKey, mutableByteArrayTyConKey ]  = False
+	[ byteArrayTyConKey, mutableByteArrayTyConKey ]  = False
   | tc == unitTyCon = True
   | otherwise       = boxedMarshalableTyCon tc
 
@@ -872,7 +869,7 @@ boxedMarshalableTyCon tc
 			 , word32TyConKey, word64TyConKey
 			 , floatTyConKey, doubleTyConKey
 			 , addrTyConKey, ptrTyConKey, funPtrTyConKey
-			 , charTyConKey, foreignObjTyConKey
+			 , charTyConKey
 			 , stablePtrTyConKey
 			 , byteArrayTyConKey, mutableByteArrayTyConKey
 			 , boolTyConKey
