@@ -211,7 +211,16 @@ lookupTopBndrRn rdr_name
 	-- The parser reads the special syntax and returns an Orig RdrName
 	-- But the global_env contains only Qual RdrNames, so we won't
 	-- find it there; instead just get the name via the Orig route
-  = lookupOrigName rdr_name
+	--
+  = 	-- This is a binding site for the name, so check first that it 
+	-- the current module is the correct one; otherwise GHC can get
+	-- very confused indeed.  This test rejects code like
+	--	data T = (,) Int Int
+	-- unless we are in GHC.Tup
+    getModuleRn				`thenRn` \ mod -> 
+    checkRn (moduleName mod == rdrNameModule rdr_name)
+	    (badOrigBinding rdr_name)	`thenRn_`
+    lookupOrigName rdr_name
 
   | otherwise
   = getModeRn	`thenRn` \ mode ->
@@ -1049,6 +1058,10 @@ unknownNameErr name
   = sep [text flavour, ptext SLIT("not in scope:"), quotes (ppr name)]
   where
     flavour = occNameFlavour (rdrNameOcc name)
+
+badOrigBinding name
+  = ptext SLIT("Illegal binding of built-in syntax:") <+> ppr (rdrNameOcc name)
+	-- The rdrNameOcc is because we don't want to print Prelude.(,)
 
 qualNameErr descriptor (name,loc)
   = pushSrcLocRn loc $
