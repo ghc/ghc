@@ -37,10 +37,6 @@ touch ghc/compiler/parser/Parser.hs
 touch ghc/compiler/main/ParsePkgConf.hs
 touch hslibs/hssource/HsParser.hs
 
-# We don't have genprimopcode yet so don't try to use it
-touch ghc/compiler/prelude/primops.txt
-touch libraries/base/GHC/PrimopWrappers.hs
-
 echo "*** Building compiler..."
 ./configure --enable-hc-boot $configopts
 
