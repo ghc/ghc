@@ -46,7 +46,7 @@ import Type		( Type, Kind, PredType(..), ThetaType, UsageAnn(..),
 			  mkArrowKinds, getTyVar_maybe, getTyVar, splitFunTy_maybe,
 		  	  tidyOpenType, tidyOpenTypes, tidyTyVar, tidyTyVars,
 			  tyVarsOfType, tyVarsOfPred, mkForAllTys,
-			  classesOfPreds, isUnboxedTupleType, isForAllTy
+			  classesOfPreds, isUnboxedTupleType
 			)
 import PprType		( pprType, pprPred )
 import Subst		( mkTopTyVarSubst, substTy )
@@ -332,19 +332,12 @@ tcHsType ty@(HsTyVar name)
   = tc_app ty []
 
 tcHsType (HsListTy ty)
-  = tcHsArgType ty		`thenTc` \ tau_ty ->
+  = tcHsType ty		`thenTc` \ tau_ty ->
     returnTc (mkListTy tau_ty)
 
-tcHsType (HsTupleTy (HsTupCon _ Boxed) tys)
-  = mapTc tcHsArgType tys	`thenTc` \ tau_tys ->
-    returnTc (mkTupleTy Boxed (length tys) tau_tys)
-
-tcHsType (HsTupleTy (HsTupCon _ Unboxed) tys)
-  =	-- Unboxed tuples can have polymorphic args.
-	-- This happens in the workers for functions returning
-	-- product types with polymorphic components
-    mapTc tcHsType tys		`thenTc` \ tau_tys ->
-    returnTc (mkTupleTy Unboxed (length tys) tau_tys)
+tcHsType (HsTupleTy (HsTupCon _ boxity) tys)
+  = mapTc tcHsType tys	`thenTc` \ tau_tys ->
+    returnTc (mkTupleTy boxity (length tys) tau_tys)
 
 tcHsType (HsFunTy ty1 ty2)
   = tcHsType ty1	`thenTc` \ tau_ty1 ->
@@ -355,10 +348,10 @@ tcHsType (HsNumTy n)
   = ASSERT(n== 1)
     returnTc (mkTyConApp genUnitTyCon [])
 
-tcHsType (HsOpTy ty1 op ty2)
-  = tcHsArgType ty1 `thenTc` \ tau_ty1 ->
-    tcHsArgType ty2 `thenTc` \ tau_ty2 ->
-    tc_fun_type op [tau_ty1,tau_ty2]
+tcHsType (HsOpTy ty1 op ty2) =
+  tcHsType ty1 `thenTc` \ tau_ty1 ->
+  tcHsType ty2 `thenTc` \ tau_ty2 ->
+  tc_fun_type op [tau_ty1,tau_ty2]
 
 tcHsType (HsAppTy ty1 ty2)
   = tc_app ty1 [ty2]
@@ -464,20 +457,13 @@ tc_app (HsAppTy ty1 ty2) tys
 
 tc_app ty tys
   = tcAddErrCtxt (appKindCtxt pp_app)	$
-    mapTc tcHsArgType tys		`thenTc` \ arg_tys ->
+    mapTc tcHsType tys			`thenTc` \ arg_tys ->
     case ty of
 	HsTyVar fun -> tc_fun_type fun arg_tys
 	other	    -> tcHsType ty		`thenTc` \ fun_ty ->
 		       returnNF_Tc (mkAppTys fun_ty arg_tys)
   where
     pp_app = ppr ty <+> sep (map pprParendHsType tys)
-
-tcHsArgType arg_ty	-- Check that the argument of a type appplication
-			-- isn't a for-all type
-  = tcHsType arg_ty				`thenTc` \ arg_ty' ->
-    checkTc (not (isForAllTy arg_ty'))
-	    (argTyErr arg_ty)			`thenTc_`
-    returnTc arg_ty'
 
 -- (tc_fun_type ty arg_tys) returns (mkAppTys ty arg_tys)
 -- But not quite; for synonyms it checks the correct arity, and builds a SynTy
@@ -522,7 +508,7 @@ tcContext context = mapTc (tcClassAssertion False) context
 
 tcClassAssertion ccall_ok assn@(HsPClass class_name tys)
   = tcAddErrCtxt (appKindCtxt (ppr assn))	$
-    mapTc tcHsArgType tys			`thenTc` \ arg_tys ->
+    mapTc tcHsType tys				`thenTc` \ arg_tys ->
     tcLookupTy class_name			`thenTc` \ thing ->
     case thing of
 	AClass clas -> checkTc (arity == n_tys) err				`thenTc_`
@@ -935,6 +921,4 @@ freeErr pred ty
 
 unboxedTupleErr ty
   = sep [ptext (SLIT("Illegal unboxed tuple as a function or contructor argument:")), nest 4 (ppr ty)]
-
-argTyErr ty = ptext SLIT("Illegal polymorphic type as argument:") <+> ppr ty
 \end{code}
