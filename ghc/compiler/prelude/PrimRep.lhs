@@ -58,9 +58,7 @@ data PrimRep
   | WeakPtrRep
   | ForeignObjRep	
 
-  | StablePtrRep	-- We could replace this with IntRep but maybe
-			-- there's some documentation gain from having
-			-- it special? [ADR]
+  | StablePtrRep	-- guaranteed to be a represented by a pointer
 
   | StableNameRep	-- A stable name is a real heap object, unpointed,
 			-- with one field containing an index into the
