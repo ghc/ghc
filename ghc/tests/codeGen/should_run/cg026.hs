@@ -10,6 +10,7 @@ import MutableArray
 import ByteArray
 import Addr
 import Int( Num(fromInt) )
+import CString (packString)
 	
 import Ratio
 import Array
@@ -31,7 +32,7 @@ test_chars
   = let str = reverse "Now is the time for all good men to come to...\n"
     in
     unsafePerformIO (
-	_ccall_ fprintf (``stdout''::Addr) "%d %s\n" (93::Int) str >>
+	_ccall_ fprintf (``stdout''::Addr) (packString "%d %s\n") (93::Int) (packString str) >>
 	_ccall_ fflush  (``stdout''::Addr)  >>
 	return ""
 	)
