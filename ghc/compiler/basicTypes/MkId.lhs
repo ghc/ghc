@@ -45,7 +45,7 @@ import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkTyConApp,
 			  tcSplitFunTys, tcSplitForAllTys, mkPredTy
 			)
 import Module		( Module )
-import CoreUtils	( mkInlineMe )
+import CoreUtils	( mkInlineMe, exprType )
 import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding, mkOtherCon )
 import Literal		( Literal(..), nullAddrLit )
 import TyCon		( TyCon, isNewTyCon, tyConTyVars, tyConDataCons,
@@ -233,7 +233,7 @@ mkDataConWrapId data_con
     work_id = dataConId data_con
 
     info = noCafNoTyGenIdInfo
-	   `setUnfoldingInfo`	mkTopUnfolding (mkInlineMe wrap_rhs)
+	   `setUnfoldingInfo`	wrap_unf
 		-- The NoCaf-ness is set by noCafNoTyGenIdInfo
 	   `setArityInfo`	arity
 		-- It's important to specify the arity, so that partial
@@ -248,7 +248,7 @@ mkDataConWrapId data_con
     mk_dmd str | isMarkedStrict str = Eval
 	       | otherwise	    = Lazy
 	-- The Cpr info can be important inside INLINE rhss, where the
-	-- wrapper constructor isn't inlined
+	-- wrapper constructor isn't inlined.
 	-- And the argument strictness can be important too; we
 	-- may not inline a contructor when it is partially applied.
 	-- For example:
@@ -256,34 +256,36 @@ mkDataConWrapId data_con
 	--	...(let w = C x in ...(w p q)...)...
 	-- we want to see that w is strict in its two arguments
 
-    wrap_rhs | isNewTyCon tycon
+    wrap_unf | isNewTyCon tycon
 	     = ASSERT( null ex_tyvars && null ex_dict_args && isSingleton orig_arg_tys )
 		-- No existentials on a newtype, but it can have a context
 		-- e.g. 	newtype Eq a => T a = MkT (...)
+		mkTopUnfolding $ Note InlineMe $
 		mkLams tyvars $ mkLams dict_args $ Lam id_arg1 $ 
-		mkNewTypeBody tycon result_ty id_arg1
+		mkNewTypeBody tycon result_ty (Var id_arg1)
 
 	     | null dict_args && not (any isMarkedStrict strict_marks)
-	     = Var work_id	-- The common case.  Not only is this efficient,
-				-- but it also ensures that the wrapper is replaced
-				-- by the worker even when there are no args.
-				-- 		f (:) x
-				-- becomes 
-				--		f $w: x
-				-- This is really important in rule matching,
-				-- (We could match on the wrappers,
-				-- but that makes it less likely that rules will match
-				-- when we bring bits of unfoldings together.)
+	     = mkCompulsoryUnfolding (Var work_id)
+			-- The common case.  Not only is this efficient,
+			-- but it also ensures that the wrapper is replaced
+			-- by the worker even when there are no args.
+			-- 		f (:) x
+			-- becomes 
+			--		f $w: x
+			-- This is really important in rule matching,
+			-- (We could match on the wrappers,
+			-- but that makes it less likely that rules will match
+			-- when we bring bits of unfoldings together.)
 		--
 		-- NB:	because of this special case, (map (:) ys) turns into
-		--	(map $w: ys), and thence into (map (\x xs. $w: x xs) ys)
-		--	in core-to-stg.  The top-level defn for (:) is never used.
+		--	(map $w: ys).  The top-level defn for (:) is never used.
 		--	This is somewhat of a bore, but I'm currently leaving it 
 		--	as is, so that there still is a top level curried (:) for
 		--	the interpreter to call.
 
 	     | otherwise
-	     = mkLams all_tyvars $ mkLams dict_args $ 
+	     = mkTopUnfolding $ Note InlineMe $
+	       mkLams all_tyvars $ mkLams dict_args $ 
 	       mkLams ex_dict_args $ mkLams id_args $
 	       foldr mk_case con_app 
 		     (zip (ex_dict_args++id_args) strict_marks) i3 []
@@ -471,15 +473,23 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
 	      mkLams dict_ids $ mkLams field_dict_ids $
 	      Lam data_id     $ sel_body
 
-    sel_body | isNewTyCon tycon = mkNewTypeBody tycon field_tau data_id
+    sel_body | isNewTyCon tycon = mkNewTypeBody tycon field_tau (mk_result data_id)
 	     | otherwise	= Case (Var data_id) data_id (default_alt ++ the_alts)
+
+    mk_result result_id = mkVarApps (mkVarApps (Var result_id) field_tyvars) field_dict_ids
+	-- We pull the field lambdas to the top, so we need to 
+	-- apply them in the body.  For example:
+	--	data T = MkT { foo :: forall a. a->a }
+	--
+	--	foo :: forall a. T -> a -> a
+	--	foo = /\a. \t:T. case t of { MkT f -> f a }
 
     mk_maybe_alt data_con 
 	  = case maybe_the_arg_id of
 		Nothing		-> Nothing
 		Just the_arg_id -> Just (DataAlt data_con, real_args, mkLets binds body)
 		  where
-	    	    body 	       = mkVarApps (mkVarApps (Var the_arg_id) field_tyvars) field_dict_ids
+	    	    body 	       = mk_result the_arg_id
 	    	    strict_marks       = dataConStrictMarks data_con
 	    	    (binds, real_args) = rebuildConArgs arg_ids strict_marks
 						        (map mkBuiltinUnique [unpack_base..])
@@ -604,16 +614,18 @@ mkDictSelId name clas
     (dict_id:arg_ids) = mkTemplateLocals (mkPredTy pred : arg_tys)
 
     rhs | isNewTyCon tycon = mkLams tyvars $ Lam dict_id $ 
-			     mkNewTypeBody tycon (head arg_tys) dict_id
+			     mkNewTypeBody tycon (head arg_tys) (Var dict_id)
 	| otherwise	   = mkLams tyvars $ Lam dict_id $
 			     Case (Var dict_id) dict_id
 			     	  [(DataAlt data_con, arg_ids, Var the_arg_id)]
 
-mkNewTypeBody tycon result_ty result_id
+mkNewTypeBody tycon result_ty result_expr
+	-- Adds a coerce where necessary
+	-- Used for both wrapping and unwrapping
   | isRecursiveTyCon tycon	-- Recursive case; use a coerce
-  = Note (Coerce result_ty (idType result_id)) (Var result_id)
+  = Note (Coerce result_ty (exprType result_expr)) result_expr
   | otherwise			-- Normal case
-  = Var result_id
+  = result_expr
 \end{code}
 
 
