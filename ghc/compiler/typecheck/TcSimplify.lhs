@@ -50,10 +50,10 @@ import Id		( idType, mkUserLocal )
 import Var		( TyVar )
 import Name		( getOccName, getSrcLoc )
 import NameSet		( NameSet, mkNameSet, elemNameSet )
-import Class		( classBigSig )
+import Class		( classBigSig, classKey )
 import FunDeps		( oclose, grow, improve, pprEquationDoc )
 import PrelInfo		( isNumericClass, isCreturnableClass, isCcallishClass ) 
-import PrelNames	( splitName, fstName, sndName, showClassKey )
+import PrelNames	( splitName, fstName, sndName, showClassKey, eqClassKey, ordClassKey)
 import HscTypes		( GhciMode(Interactive) )
 
 import Subst		( mkTopTyVarSubst, substTheta, substTy )
@@ -1770,7 +1770,8 @@ disambigGroup ghci_mode dicts
 
     std_default_class cls
       =  isNumericClass cls
-      || (ghci_mode == Interactive && cls `hasKey` showClassKey)
+      || (ghci_mode == Interactive && 
+	  classKey cls `elem` [showClassKey, eqClassKey, ordClassKey])
 	 	-- In interactive mode, we default Show a to Show ()
 		-- to avoid graututious errors on "show []"
 

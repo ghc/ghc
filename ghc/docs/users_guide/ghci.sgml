@@ -659,7 +659,8 @@ Wed Mar 14 12:23:13 GMT 2001
     However, it is tiresome for the user to have to specify the type, so GHCi extends Haskell's type-defaulting
     rules (Section 4.3.4 of the Haskell 98 Report (Revised)) as follows.  If the expression yields a set of
     type constraints that are all from standard classes (<literal>Num</literal>, <literal>Eq</literal> etc.), 
-   and at least one is either a numeric class <emphasis>or the <literal>Show</literal> class</emphasis>,
+   and at least one is either a numeric class <emphasis>or the <literal>Show</literal>, 
+   <literal>Eq</literal>, or <literal>Ord</literal> class</emphasis>,
    GHCi will try to use one of the <literal>default</literal> types, just as described in the Report.
    </para>
     </sect2>
