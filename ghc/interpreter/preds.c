@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: preds.c,v $
- * $Revision: 1.3 $
- * $Date: 1999/02/03 17:08:35 $
+ * $Revision: 1.4 $
+ * $Date: 1999/03/01 14:46:50 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -478,13 +478,14 @@ Int  o; {
                 return TRUE;
         }
         deRef(tyv,t,o);
-        if (tyv)
+        if (tyv) {
             if (tyv->offs == FIXED_TYVAR) {
                 numFixedVars++;
                 return FALSE;
             }
             else
                 return TRUE;
+        }
         else
             return FALSE;
     }

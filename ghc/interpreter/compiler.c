@@ -10,8 +10,8 @@
  * in the distribution for details.
  *
  * $RCSfile: compiler.c,v $
- * $Revision: 1.3 $
- * $Date: 1999/02/03 17:08:26 $
+ * $Revision: 1.4 $
+ * $Date: 1999/03/01 14:46:43 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -23,8 +23,6 @@
 #include "RtsAPI.h"                    /* for rts_eval and related stuff   */
 #include "Schedule.h"
 #include "link.h"
-
-/*#define DEBUG_SHOWSC*/               /* Must also be set in output.c     */
 
 Addr inputCode;                        /* Addr of compiled code for expr   */
 static Name currentName;               /* Top level name being processed   */
@@ -80,26 +78,9 @@ static Bool local isExtDiscr            Args((Cell));
 static Bool local eqExtDiscr            Args((Cell,Cell));
 #endif
 
-static Cell local lift                  Args((Int,List,Cell));
-static Void local liftPair              Args((Int,List,Pair));
-static Void local liftTriple            Args((Int,List,Triple));
-static Void local liftAlt               Args((Int,List,Cell));
-static Void local liftNumcase           Args((Int,List,Triple));
-static Cell local liftVar               Args((List,Cell));
-static Cell local liftLetrec            Args((Int,List,Cell));
-static Void local liftFundef            Args((Int,List,Triple));
-static Void local solve                 Args((List));
-
-static Cell local preComp               Args((Cell));
-static Cell local preCompPair           Args((Pair));
-static Cell local preCompTriple         Args((Triple));
-static Void local preCompCase           Args((Pair));
-static Cell local preCompOffset         Args((Int));
-
 static Void local compileGlobalFunction Args((Pair));
 static Void local compileGenFunction    Args((Name));
 static Name local compileSelFunction    Args((Pair));
-static Void local newGlobalFunction     Args((Name,Int,List,Int,Cell));
 
 /* --------------------------------------------------------------------------
  * Translation:    Convert input expressions into a less complex language
@@ -1487,14 +1468,15 @@ Void evalExp() {                    /* compile and run input expression    */
      * get inserted in the symbol table but never get removed.
      */
     Name n = newName(inventText(),NIL);
+    Cell e;
     StgVar v = mkStgVar(NIL,NIL);
     name(n).stgVar = v;
     compiler(RESET);
-    stgDefn(n,0,pmcTerm(0,NIL,translate(inputExpr)));
+    e = pmcTerm(0,NIL,translate(inputExpr));
+    stgDefn(n,0,e); //ppStg(name(n).stgVar);
     inputExpr = NIL;
     stgCGBinds(addGlobals(singleton(v)));
     
-
     /* Run thread (and any other runnable threads) */
 
     /* Re-initialise the scheduler - ToDo: do I need this? */
@@ -1535,7 +1517,7 @@ static List local addStgVar( List binds, Pair bind )
     StgVar nv = mkStgVar(NIL,NIL);
     Text   t  = textOf(fst(bind));
     Name   n  = findName(t);
-
+    //printf ( "addStgVar %s\n", textToStr(t));
     if (isNull(n)) {                   /* Lookup global name - the only way*/
         n = newName(t,NIL);            /* this (should be able to happen)  */
     }                                  /* is with new global var introduced*/
@@ -1548,8 +1530,17 @@ static List local addStgVar( List binds, Pair bind )
 Void compileDefns() {                  /* compile script definitions       */
     Target t = length(valDefns) + length(genDefns) + length(selDefns);
     Target i = 0;
-
     List binds = NIL;
+
+    /* a nasty hack.  But I don't know an easier way to make */
+    /* these things appear.                                  */
+    if (lastModule() == modulePrelude) {
+       //printf ( "------ Adding cons (:) [] () \n" );
+       implementCfun ( nameCons, NIL );
+       implementCfun ( nameNil, NIL );
+       implementCfun ( nameUnit, NIL );
+    }
+
     {
         List vss;
         List vs;
@@ -1593,6 +1584,7 @@ Void compileDefns() {                  /* compile script definitions       */
     binds = addGlobals(binds);
 #if USE_HUGS_OPTIMIZER
     mapProc(optimiseBind,binds);
+#error optimiser
 #endif
     stgCGBinds(binds);
 
@@ -1605,6 +1597,20 @@ Pair bind; {
     List defs  = snd(bind);
     Int  arity = length(fst(hd(defs)));
     assert(isName(n));
+
+    //{ Cell cc;
+    //  printf ( "compileGlobalFunction %s\n", textToStr(name(n).text));
+    //  cc = defs;
+    //  while (nonNull(cc)) {
+    //     printExp(stdout, fst(hd(cc)));
+    //     printf ( "\n   = " );
+    //     printExp(stdout, snd(hd(cc)));
+    //     printf( "\n" );
+    //     cc = tl(cc);
+    //  }
+    //  printf ( "\n\n\n" );
+    //}
+
     compiler(RESET);
     stgDefn(n,arity,match(arity,altsMatch(1,arity,NIL,defs)));
 }
@@ -1613,6 +1619,19 @@ static Void local compileGenFunction(n) /* Produce code for internally     */
 Name n; {                               /* generated function              */
     List defs  = name(n).defn;
     Int  arity = length(fst(hd(defs)));
+
+    //{ Cell cc;
+    //  printf ( "compileGenFunction %s\n", textToStr(name(n).text));
+    //  cc = defs;
+    //  while (nonNull(cc)) {
+    //     printExp(stdout, fst(hd(cc)));
+    //     printf ( "\n   = " );
+    //     printExp(stdout, snd(hd(cc)));
+    //     printf( "\n" );
+    //     cc = tl(cc);
+    //  }
+    //  printf ( "\n\n\n" );
+    //}
 
     compiler(RESET);
     currentName = n;
@@ -1633,32 +1652,6 @@ Pair p; {                               /* Should be merged with genDefns, */
     return s;
 }
 
-
-#if 0
-I think this is 98-specific.
-static Void local newGlobalFunction(n,arity,fvs,co,e)
-Name n;
-Int  arity;
-List fvs;
-Int  co;
-Cell e; {
-#ifdef DEBUG_SHOWSC
-    extern Void printSc Args((FILE*, Text, Int, Cell));
-#endif
-    extraVars     = fvs;
-    numExtraVars  = length(extraVars);
-    localOffset   = co;
-    localArity    = arity;
-    name(n).arity = arity+numExtraVars;
-    e             = preComp(e);
-#ifdef DEBUG_SHOWSC
-    if (debugCode) {
-        printSc(stdout,name(n).text,name(n).arity,e);
-    }
-#endif
-    name(n).code  = codeGen(n,name(n).arity,e);
-}
-#endif
 
 /* --------------------------------------------------------------------------
  * Compiler control:

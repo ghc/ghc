@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.3 $
- * $Date: 1999/02/03 17:08:29 $
+ * $Revision: 1.4 $
+ * $Date: 1999/03/01 14:46:45 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -105,7 +105,6 @@ static Bool   printing     = FALSE;     /* TRUE => currently printing value*/
 static Bool   showStats    = FALSE;     /* TRUE => print stats after eval  */
 static Bool   listScripts  = TRUE;      /* TRUE => list scripts after loading*/
 static Bool   addType      = FALSE;     /* TRUE => print type with value   */
-static Bool   useShow      = TRUE;      /* TRUE => use Text/show printer   */
 static Bool   chaseImports = TRUE;      /* TRUE => chase imports on load   */
 static Bool   useDots      = RISCOS;    /* TRUE => use dots in progress    */
 static Bool   quiet        = FALSE;     /* TRUE => don't show progress     */
@@ -124,7 +123,7 @@ static String currProject = 0;          /* Name of current project file    */
 static Bool   projectLoaded = FALSE;    /* TRUE => project file loaded     */
 
 static String lastEdit   = 0;           /* Name of script to edit (if any) */
-static Int    lastLine   = 0;           /* Editor line number (if possible)*/
+static Int    lastEdLine = 0;           /* Editor line number (if possible)*/
 static String prompt     = 0;           /* Prompt string                   */
 static Int    hpSize     = DEFAULTHEAP; /* Desired heap size               */
 String hugsEdit = 0;                    /* String for editor command       */
@@ -145,7 +144,6 @@ Main main Args((Int, String []));       /* now every func has a prototype  */
 Main main(argc,argv)
 int  argc;
 char *argv[]; {
-
 #ifdef HAVE_CONSOLE_H /* Macintosh port */
     _ftype = 'TEXT';
     _fcreator = 'R*ch';       /*  // 'KAHL';      //'*TEX';       //'ttxt'; */
@@ -179,6 +177,7 @@ char *argv[]; {
     interpreter(argc,argv);
     Printf("[Leaving Hugs]\n");
     everybody(EXIT);
+    shutdownHaskell();
     FlushStdout();
     fflush(stderr);
     exit(0);
@@ -219,7 +218,10 @@ String argv[]; {
 #endif /* USE_REGISTRY */
     readOptions(fromEnv("HUGSFLAGS",""));
 
-    for (i=1; i<argc; ++i) {            /* process command line arguments  */
+   startupHaskell ( argc, argv );
+   argc = prog_argc; argv = prog_argv;
+
+   for (i=1; i<argc; ++i) {            /* process command line arguments  */
         if (strcmp(argv[i],"+")==0 && i+1<argc) {
             if (proj) {
                 ERRMSG(0) "Multiple project filenames on command line"
@@ -232,11 +234,7 @@ String argv[]; {
             addScriptName(argv[i],TRUE);
         }
     }
-    /* ToDo: clean up this hack */
-    { 
-        static char* my_argv[] = {"Hugs"};
-        startupHaskell(sizeof(my_argv)/sizeof(char*),my_argv);
-    }
+
 #ifdef DEBUG
     DEBUG_LoadSymbols(argv[0]);
 #endif
@@ -534,7 +532,7 @@ String s; {
     Int    n = 0;
     String t = s;
 
-    if (*s=='\0' || !isascii(*s) || !isdigit(*s)) {
+    if (*s=='\0' || !isascii((int)(*s)) || !isdigit((int)(*s))) {
         ERRMSG(0) "Missing integer in option setting \"%s\"", t
         EEND;
     }
@@ -546,7 +544,7 @@ String s; {
             EEND;
         }
         n     = 10*n + d;
-    } while (isascii(*s) && isdigit(*s));
+    } while (isascii((int)(*s)) && isdigit((int)(*s)));
 
     if (*s=='K' || *s=='k') {
         if (n > (MAXPOSINT/1000)) {
@@ -956,7 +954,7 @@ static Void local find() {              /* edit file containing definition */
 }
 
 static Void local runEditor() {         /* run editor on script lastEdit   */
-    if (startEdit(lastLine,lastEdit))   /* at line lastLine                */
+    if (startEdit(lastEdLine,lastEdit)) /* at line lastEdLine              */
         readScripts(scriptBase);
 }
 
@@ -966,7 +964,7 @@ Int    line; {
     if (lastEdit)
         free(lastEdit);
     lastEdit = strCopy(fname);
-    lastLine = line;
+    lastEdLine = line;
 #if HUGS_FOR_WINDOWS
     DrawStatusLine(hWndMain);           /* Redo status line                */
 #endif
@@ -995,7 +993,6 @@ static Module local findEvalModule() { /*Module in which to eval expressions*/
 static Void local evaluator() {        /* evaluate expr and print value    */
     Type  type, bd;
     Kinds ks   = NIL;
-    Cell  temp = NIL;
 
     setCurrModule(findEvalModule());
     scriptFile = 0;
@@ -1030,6 +1027,8 @@ static Void local evaluator() {        /* evaluate expr and print value    */
 #ifdef WANT_TIMER
     updateTimers();
 #endif
+
+#if 1
     if (typeMatches(type,ap(typeIO,typeUnit))) {
         inputExpr = ap(nameRunIO,inputExpr);
         evalExp();
@@ -1043,15 +1042,30 @@ static Void local evaluator() {        /* evaluate expr and print value    */
             ERRTEXT   "\n"
             EEND;
         }
-        inputExpr = ap2(namePrint,d,inputExpr);
-        inputExpr = ap(nameRunIO,inputExpr);
-        evalExp();
+        //inputExpr = ap2(namePrint,d,inputExpr);
+        //inputExpr = ap(nameRunIO,inputExpr);
+
+        inputExpr = ap2(findName(findText("show")),d,inputExpr);
+        inputExpr = ap(findName(findText("putStr")), inputExpr);
+        inputExpr = ap(nameRunIO, inputExpr);
+
+        evalExp(); printf("\n");
         if (addType) {
             printf(" :: ");
             printType(stdout,type);
             Putchar('\n');
         }
     }
+#endif
+
+#if 0
+   printf ( "result type is " );
+   printType ( stdout, type );
+   printf ( "\n" );
+   evalExp();
+   printf ( "\n" );
+#endif
+
 }
 
 static Void local stopAnyPrinting() {  /* terminate printing of expression,*/
@@ -1170,7 +1184,7 @@ Text t; {
     Tycon  tc  = findTycon(t);
     Class  cl  = findClass(t);
     Name   nm  = findName(t);
-    Module mod = findEvalModule();
+    //Module mod = findEvalModule();
 
     if (nonNull(tc)) {                  /* as a type constructor           */
         Type t = tc;
@@ -1331,7 +1345,7 @@ Name nm; {
             case NON_ASS   : break;
         }
         Printf(" %i ",precOf(sy));
-        if (isascii(*s) && isalpha(*s)) {
+        if (isascii((int)(*s)) && isalpha((int)(*s))) {
             Printf("`%s`",s);
         } else {
             Printf("%s",s);
@@ -1745,9 +1759,9 @@ HugsStream *stream; {
 
 /* ----------------------------------------------------------------------- */
 
-static HugsStream outputStream;
+static HugsStream outputStreamH;
 /* ADR note: 
- * We rely on standard C semantics to initialise outputStream.next to 0.
+ * We rely on standard C semantics to initialise outputStreamH.next to 0.
  */
 
 Void hugsEnableOutput(f) 
@@ -1756,7 +1770,7 @@ Bool f; {
 }
 
 String hugsClearOutputBuffer() {
-    return bufferClear(&outputStream);
+    return bufferClear(&outputStreamH);
 }
 
 #ifdef HAVE_STDARG_H
@@ -1766,7 +1780,7 @@ Void hugsPrintf(const char *fmt, ...) {
     if (!disableOutput) {
         vprintf(fmt, ap);
     } else {
-        vBufferedPrintf(&outputStream, fmt, ap);
+        vBufferedPrintf(&outputStreamH, fmt, ap);
     }
     va_end(ap);                    /* clean up                             */
 }
@@ -1779,7 +1793,7 @@ va_dcl {
     if (!disableOutput) {
         vprintf(fmt, ap);
     } else {
-        vBufferedPrintf(&outputStream, fmt, ap);
+        vBufferedPrintf(&outputStreamH, fmt, ap);
     }
     va_end(ap);                    /* clean up                             */
 }
@@ -1790,7 +1804,7 @@ int c; {
     if (!disableOutput) {
         putchar(c);
     } else {
-        bufferedPutchar(&outputStream, c);
+        bufferedPutchar(&outputStreamH, c);
     }
 }
 
@@ -1814,7 +1828,7 @@ Void hugsFPrintf(FILE *fp, const char* fmt, ...) {
     if (!disableOutput) {
         vfprintf(fp, fmt, ap);
     } else {
-        vBufferedPrintf(&outputStream, fmt, ap);
+        vBufferedPrintf(&outputStreamH, fmt, ap);
     }
     va_end(ap);             
 }
@@ -1828,7 +1842,7 @@ va_dcl {
     if (!disableOutput) {
         vfprintf(fp, fmt, ap);
     } else {
-        vBufferedPrintf(&outputStream, fmt, ap);
+        vBufferedPrintf(&outputStreamH, fmt, ap);
     }
     va_end(ap);             
 }
@@ -1840,7 +1854,7 @@ FILE* fp; {
     if (!disableOutput) {
         putc(c,fp);
     } else {
-        bufferedPutchar(&outputStream, c);
+        bufferedPutchar(&outputStreamH, c);
     }
 }
     

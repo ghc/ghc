@@ -1,6 +1,6 @@
-/* -*- mode: hugs-c; -*- */
+
 /* -----------------------------------------------------------------------------
- * $Id: Assembler.h,v 1.4 1999/02/05 16:02:18 simonm Exp $
+ * $Id: Assembler.h,v 1.5 1999/03/01 14:47:09 sewardj Exp $
  *
  * (c) The GHC Team 1994-1998.
  *
@@ -139,10 +139,10 @@ typedef enum {
  * Allocating (top level) heap objects
  * ------------------------------------------------------------------------*/
 
-extern AsmBCO     asmBeginBCO        ( void );
+extern AsmBCO     asmBeginBCO        ( int /*StgExpr*/ e );
 extern void       asmEndBCO          ( AsmBCO bco );
 
-extern AsmBCO     asmBeginContinuation ( AsmSp sp );
+extern AsmBCO     asmBeginContinuation ( AsmSp sp, int /*List*/ alts );
 extern void       asmEndContinuation   ( AsmBCO bco );
 
 extern AsmObject  asmMkObject        ( AsmClosure c );
@@ -180,7 +180,7 @@ extern void   asmVar           ( AsmBCO bco, AsmVar v, AsmRep rep );
 extern AsmSp  asmBeginCase     ( AsmBCO bco );
 extern void   asmEndCase       ( AsmBCO bco );
 extern AsmSp  asmContinuation  ( AsmBCO bco, AsmBCO ret_addr );
-                               
+
 extern AsmSp  asmBeginAlt      ( AsmBCO bco );
 extern void   asmEndAlt        ( AsmBCO bco, AsmSp  sp );
 extern AsmPc  asmTest          ( AsmBCO bco, AsmWord tag );
@@ -232,6 +232,11 @@ extern const AsmPrim* asmFindPrim    ( char* s );
 extern const AsmPrim* asmFindPrimop  ( AsmInstr prefix, AsmInstr op );
 extern AsmSp          asmBeginPrim   ( AsmBCO bco );
 extern void           asmEndPrim     ( AsmBCO bco, const AsmPrim* prim, AsmSp base );
+
+extern AsmBCO asm_BCO_catch ( void );
+extern AsmBCO asm_BCO_raise ( void );
+extern AsmBCO asm_BCO_seq   ( void );
+
 
 /* --------------------------------------------------------------------------
  * Heap manipulation

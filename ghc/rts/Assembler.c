@@ -1,10 +1,12 @@
-/* -*- mode: hugs-c; -*- */
+
 /* --------------------------------------------------------------------------
- * $Id: Assembler.c,v 1.4 1999/02/05 16:02:34 simonm Exp $
- *
- * Copyright (c) The GHC Team 1994-1998.
- *
  * Bytecode assembler
+ *
+ * Copyright (c) 1994-1998.
+ *
+ * $RCSfile: Assembler.c,v $
+ * $Revision: 1.5 $
+ * $Date: 1999/03/01 14:47:02 $
  *
  * This module provides functions to construct BCOs and other closures
  * required by the bytecode compiler.
@@ -143,7 +145,8 @@ struct AsmCAF_ {
 
 struct AsmBCO_ {
     struct AsmObject_ object;  /* must be first in struct */
-    
+
+    int /*StgExpr*/  stgexpr;    
     Instrs   is;          
     NonPtrs  nps;
 
@@ -201,7 +204,7 @@ static void asmResolveRef( AsmObject obj, AsmNat i, AsmClosure reference )
         /* todo: free the queues */
 
         /* we don't print until all ptrs are resolved */
-        IF_DEBUG(codegen,printObj(obj->closure));
+        IF_DEBUG(codegen,printObj(obj->closure);printf("\n\n"));
     }
 }
 
@@ -234,11 +237,19 @@ static void asmEndObject( AsmObject obj, StgClosure* c )
     obj->closure = c;
     mapQueue(Ptrs,    AsmObject, obj->ptrs, asmAddRef(x,obj,i));
     mapQueue(Refs,    AsmRef,    obj->refs, asmResolveRef(x.ref,x.i,c));
+#if 0
     if (obj->num_unresolved == 0) {
         /* todo: free the queues */
         /* we don't print until all ptrs are resolved */
+        IF_DEBUG(codegen,
+                 if (obj->num_unresolved > 0) 
+                    fprintf(stderr, "{{%d unresolved}} ", obj->num_unresolved);
+                )
         IF_DEBUG(codegen,printObj(obj->closure));
     }
+    //printf( "unresolved %d\n", obj->num_unresolved);
+    //printObj(obj->closure);
+#endif
 }
 
 int asmObjectHasClosure ( AsmObject obj )
@@ -357,7 +368,7 @@ void asmEndCAF( AsmCAF caf, AsmBCO body )
     asmEndObject(&caf->object,c);
 }
 
-AsmBCO asmBeginBCO( void )
+AsmBCO asmBeginBCO( int /*StgExpr*/ e )
 {
     AsmBCO bco = malloc(sizeof(struct AsmBCO_));
     if (bco == NULL) {
@@ -367,6 +378,7 @@ AsmBCO asmBeginBCO( void )
     initInstrs(&bco->is);
     initNonPtrs(&bco->nps);
 
+    bco->stgexpr = e;
     bco->max_sp = bco->sp = 0;
     bco->max_hp = bco->hp = 0;
     return bco;
@@ -388,6 +400,7 @@ void asmEndBCO( AsmBCO bco )
     o->n_ptrs   = p;
     o->n_words  = np;
     o->n_instrs = is;
+    o->stgexpr  = bco->stgexpr;
     mapQueue(Ptrs,    AsmObject, bco->object.ptrs, bcoConstCPtr(o,i) = NULL);
     mapQueue(NonPtrs, StgWord,   bco->nps,  bcoConstWord(o,i) = x);
     {
@@ -430,6 +443,7 @@ static void asmWord( AsmBCO bco, StgWord i )
     {                                                    \
         union { ty a; AsmWord b[sizeofW(ty)]; } p;       \
         nat i;                                           \
+        if (sizeof(ty) < sizeof(AsmWord)) p.b[0]=0;      \
         p.a = x;                                         \
         for( i = 0; i < sizeofW(ty); i++ ) {             \
             asmWord(bco,p.b[i]);                         \
@@ -712,10 +726,11 @@ AsmVar asmUnbox( AsmBCO bco, AsmRep rep )
     case DOUBLE_REP:
             asmInstr(bco,i_UNPACK_DOUBLE);
             break;
+#ifdef PROVIDE_STABLE
     case STABLE_REP:
             asmInstr(bco,i_UNPACK_STABLE);
             break;
-
+#endif
     default:
             barf("asmUnbox %d",rep);
     }
@@ -889,9 +904,9 @@ AsmSp asmContinuation( AsmBCO bco, AsmBCO ret_addr )
     return bco->sp;
 }
 
-AsmBCO asmBeginContinuation ( AsmSp sp )
+AsmBCO asmBeginContinuation ( AsmSp sp, int /*List*/ alts )
 {
-    AsmBCO bco = asmBeginBCO();
+    AsmBCO bco = asmBeginBCO(alts);
     bco->sp = sp;
     return bco;
 }
@@ -900,6 +915,7 @@ void asmEndContinuation ( AsmBCO bco )
 {
     asmEndBCO(bco);
 }
+
 
 /* --------------------------------------------------------------------------
  * Branches
@@ -1005,9 +1021,9 @@ const AsmPrim asmPrimOps[] = {
     , { "primOrInt",                 "II", "I",  MONAD_Id, i_PRIMOP1, i_orInt }
     , { "primXorInt",                "II", "I",  MONAD_Id, i_PRIMOP1, i_xorInt }
     , { "primNotInt",                "I",  "I",  MONAD_Id, i_PRIMOP1, i_notInt }
-    , { "primShiftLInt",             "IW", "I",  MONAD_Id, i_PRIMOP1, i_shiftLInt }
-    , { "primShiftRAInt",            "IW", "I",  MONAD_Id, i_PRIMOP1, i_shiftRAInt }
-    , { "primShiftRLInt",            "IW", "I",  MONAD_Id, i_PRIMOP1, i_shiftRLInt }
+    , { "primShiftLInt",             "II", "I",  MONAD_Id, i_PRIMOP1, i_shiftLInt }
+    , { "primShiftRAInt",            "II", "I",  MONAD_Id, i_PRIMOP1, i_shiftRAInt }
+    , { "primShiftRLInt",            "II", "I",  MONAD_Id, i_PRIMOP1, i_shiftRLInt }
 
 #ifdef PROVIDE_INT64
     /* Int64# operations */
@@ -1093,7 +1109,9 @@ const AsmPrim asmPrimOps[] = {
 #ifdef PROVIDE_INT64
     , { "primIndexInt64OffAddr",     "AI", "z",  MONAD_Id, i_PRIMOP1, i_indexInt64OffAddr }
 #endif
+#ifdef PROVIDE_WORD
     , { "primIndexWordOffAddr",      "AI", "W",  MONAD_Id, i_PRIMOP1, i_indexWordOffAddr }
+#endif
     , { "primIndexAddrOffAddr",      "AI", "A",  MONAD_Id, i_PRIMOP1, i_indexAddrOffAddr }
     , { "primIndexFloatOffAddr",     "AI", "F",  MONAD_Id, i_PRIMOP1, i_indexFloatOffAddr }
     , { "primIndexDoubleOffAddr",    "AI", "D",  MONAD_Id, i_PRIMOP1, i_indexDoubleOffAddr }
@@ -1107,7 +1125,9 @@ const AsmPrim asmPrimOps[] = {
 #ifdef PROVIDE_INT64                 
     , { "primReadInt64OffAddr",      "AI", "z",  MONAD_ST, i_PRIMOP1, i_readInt64OffAddr }
 #endif                               
+#ifdef PROVIDE_WORD
     , { "primReadWordOffAddr",       "AI", "W",  MONAD_ST, i_PRIMOP1, i_readWordOffAddr }
+#endif
     , { "primReadAddrOffAddr",       "AI", "A",  MONAD_ST, i_PRIMOP1, i_readAddrOffAddr }
     , { "primReadFloatOffAddr",      "AI", "F",  MONAD_ST, i_PRIMOP1, i_readFloatOffAddr }
     , { "primReadDoubleOffAddr",     "AI", "D",  MONAD_ST, i_PRIMOP1, i_readDoubleOffAddr }
@@ -1121,7 +1141,9 @@ const AsmPrim asmPrimOps[] = {
 #ifdef PROVIDE_INT64
     , { "primWriteInt64OffAddr",     "AIz", "",  MONAD_ST, i_PRIMOP1, i_writeInt64OffAddr }
 #endif
+#ifdef PROVIDE_WORD
     , { "primWriteWordOffAddr",      "AIW", "",  MONAD_ST, i_PRIMOP1, i_writeWordOffAddr }
+#endif
     , { "primWriteAddrOffAddr",      "AIA", "",  MONAD_ST, i_PRIMOP1, i_writeAddrOffAddr }
     , { "primWriteFloatOffAddr",     "AIF", "",  MONAD_ST, i_PRIMOP1, i_writeFloatOffAddr }
     , { "primWriteDoubleOffAddr",    "AID", "",  MONAD_ST, i_PRIMOP1, i_writeDoubleOffAddr }
@@ -1142,8 +1164,10 @@ const AsmPrim asmPrimOps[] = {
     , { "primDivModInteger",         "ZZ", "ZZ", MONAD_Id, i_PRIMOP1, i_divModInteger }
     , { "primIntegerToInt",          "Z",  "I",  MONAD_Id, i_PRIMOP1, i_integerToInt }
     , { "primIntToInteger",          "I",  "Z",  MONAD_Id, i_PRIMOP1, i_intToInteger }
+#ifdef PROVIDE_INT64
     , { "primIntegerToInt64",        "Z",  "z",  MONAD_Id, i_PRIMOP1, i_integerToInt64 }
     , { "primInt64ToInteger",        "z",  "Z",  MONAD_Id, i_PRIMOP1, i_int64ToInteger }
+#endif
 #ifdef PROVIDE_WORD
     , { "primIntegerToWord",         "Z",  "W",  MONAD_Id, i_PRIMOP1, i_integerToWord }
     , { "primWordToInteger",         "W",  "Z",  MONAD_Id, i_PRIMOP1, i_wordToInteger }
@@ -1252,11 +1276,11 @@ const AsmPrim asmPrimOps[] = {
 
 
     /* Polymorphic force :: a -> (# #) */
-    , { "primForce",                 "a",  "",   MONAD_Id, i_PRIMOP2, i_force }
+      /* , { "primForce",                 "a",  "",   MONAD_Id, i_PRIMOP2, i_force } */
 
     /* Error operations - not in IO monad! */
-    , { "primRaise",                 "E",  "a",  MONAD_Id, i_PRIMOP2, i_raise }
-    , { "primCatch'",                "aH", "a",  MONAD_Id, i_PRIMOP2, i_catch }
+      //, { "primRaise",                 "E",  "a",  MONAD_Id, i_PRIMOP2, i_raise }
+      //, { "primCatch'",                "aH", "a",  MONAD_Id, i_PRIMOP2, i_catch }
 
 #ifdef PROVIDE_ARRAY
     /* Ref operations */
@@ -1367,6 +1391,7 @@ const AsmPrim asmPrimOps[] = {
 const AsmPrim ccall_Id = { "ccall", 0, 0, MONAD_IO, i_PRIMOP2, i_ccall_Id };
 const AsmPrim ccall_IO = { "ccall", 0, 0, MONAD_IO, i_PRIMOP2, i_ccall_IO };
 
+
 const AsmPrim* asmFindPrim( char* s )
 {
     int i;
@@ -1387,6 +1412,57 @@ const AsmPrim* asmFindPrimop( AsmInstr prefix, AsmInstr op )
         }
     }
     return 0;
+}
+
+/* --------------------------------------------------------------------------
+ * Handwritten primops
+ * ------------------------------------------------------------------------*/
+
+AsmBCO asm_BCO_catch ( void )
+{
+   AsmBCO bco = asmBeginBCO(0 /*NIL*/);
+   asmInstr(bco,i_ARG_CHECK); asmInstr(bco,2);
+   asmInstr(bco,i_PRIMOP1); asmInstr(bco,i_pushcatchframe);
+   bco->sp += (1-2)*sizeofW(StgPtr) + sizeofW(StgCatchFrame);
+   asmInstr(bco,i_ENTER);
+   asmEndBCO(bco);
+   return bco;
+}
+
+AsmBCO asm_BCO_raise ( void )
+{
+   AsmBCO bco = asmBeginBCO(0 /*NIL*/);
+   asmInstr(bco,i_ARG_CHECK); asmInstr(bco,1);
+   asmInstr(bco,i_PRIMOP2); asmInstr(bco,i_raise);
+   asmEndBCO(bco);
+   return bco;
+}
+
+AsmBCO asm_BCO_seq ( void )
+{
+   AsmBCO eval, cont;
+
+   cont = asmBeginBCO(0 /*NIL*/);
+   asmInstr(cont,i_ARG_CHECK); asmInstr(cont,2);
+   asmInstr(cont,i_VAR); asmInstr(cont,1);
+   asmInstr(cont,i_SLIDE); asmInstr(cont,1); asmInstr(cont,2);
+   asmInstr(cont,i_ENTER);
+   cont->sp += 3*sizeofW(StgPtr);
+   asmEndBCO(cont);
+
+   eval = asmBeginBCO(0 /*NIL*/);
+   asmInstr(eval,i_ARG_CHECK); asmInstr(eval,2);
+   asmInstr(eval,i_RETADDR);
+   asmInstr(eval,eval->object.ptrs.len);
+   asmPtr(eval,&(cont->object));
+   asmInstr(eval,i_VAR); asmInstr(eval,2);
+   asmInstr(eval,i_SLIDE); asmInstr(eval,3); asmInstr(eval,1);
+   asmInstr(eval,i_PRIMOP1); asmInstr(eval,i_pushseqframe);
+   asmInstr(eval,i_ENTER);
+   eval->sp += sizeofW(StgSeqFrame) + 4*sizeofW(StgPtr);
+   asmEndBCO(eval);
+
+   return eval;
 }
 
 /* --------------------------------------------------------------------------
@@ -1412,10 +1488,10 @@ AsmSp asmBeginPack( AsmBCO bco )
 void asmEndPack( AsmBCO bco, AsmVar v, AsmSp start, AsmInfo info )
 {
     nat size = bco->sp - start;
-    ASSERT(bco->sp >= start);
-    ASSERT(start >= v);
+    assert(bco->sp >= start);
+    assert(start >= v);
     /* only reason to include info is for this assertion */
-    ASSERT(info->layout.payload.ptrs == size);
+    assert(info->layout.payload.ptrs == size);
     asmInstr(bco,i_PACK);
     asmInstr(bco,bco->sp - v);
     bco->sp = start;

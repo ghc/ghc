@@ -9,8 +9,8 @@
  * in the distribution for details.
  *
  * $RCSfile: output.c,v $
- * $Revision: 1.3 $
- * $Date: 1999/02/03 17:08:33 $
+ * $Revision: 1.4 $
+ * $Date: 1999/03/01 14:46:50 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -19,17 +19,11 @@
 #include "errors.h"
 #include <ctype.h>
 
-/*#define DEBUG_SHOWSC*/                /* Must also be set in compiler.c  */
-
 #define DEPTH_LIMIT     15
 
 /* --------------------------------------------------------------------------
  * Local function prototypes:
  * ------------------------------------------------------------------------*/
-
-static Void local putChr         Args((Int));
-static Void local putStr         Args((String));
-static Void local putInt         Args((Int));
 
 static Void local put            Args((Int,Cell));
 static Void local putFlds        Args((Cell,List));
@@ -43,10 +37,7 @@ static Void local putInfix       Args((Int,Text,Syntax,Cell,Cell));
 static Void local putSimpleAp    Args((Cell,Int));
 static Void local putTuple       Args((Int,Cell));
 static Int  local unusedTups     Args((Int,Cell));
-static Void local unlexVar       Args((Text));
 static Void local unlexOp        Args((Text));
-static Void local unlexCharConst Args((Cell));
-static Void local unlexStrConst  Args((Text));
 
 static Void local putSigType     Args((Cell));
 static Void local putContext     Args((List,List,Int));
@@ -63,36 +54,37 @@ static Void local putKinds       Args((Kinds));
  * Basic output routines:
  * ------------------------------------------------------------------------*/
 
-static FILE *outputStream;             /* current output stream            */
-#ifdef DEBUG_SHOWSC                                                    
-static Int  outColumn = 0;             /* current output column number     */
-#endif                                                                 
+FILE *outputStream;                    /* current output stream            */
+Int  outColumn = 0;                    /* current output column number     */
                                                                        
 #define OPEN(b)    if (b) putChr('(');                                 
 #define CLOSE(b)   if (b) putChr(')');                                 
                                                                        
-static Void local putChr(c)            /* print single character           */
+Void putChr(c)                         /* print single character           */
 Int c; {                                                               
     Putc(c,outputStream);                                              
-#ifdef DEBUG_SHOWSC                                                    
     outColumn++;                                                       
-#endif                                                                 
 }                                                                      
                                                                        
-static Void local putStr(s)            /* print string                     */
+Void putStr(s)                        /* print string                     */
 String s; {                                                            
     for (; *s; s++) {                                                  
         Putc(*s,outputStream);                                         
-#ifdef DEBUG_SHOWSC                                                    
         outColumn++;                                                   
-#endif                                                                 
     }                                                                  
 }                                                                      
                                                                        
-static Void local putInt(n)            /* print integer                    */
+Void putInt(n)                        /* print integer                    */
 Int n; {
     static char intBuf[16];
     sprintf(intBuf,"%d",n);
+    putStr(intBuf);
+}
+
+Void putPtr(p)                        /* print pointer                    */
+Ptr p; {
+    static char intBuf[16];
+    sprintf(intBuf,"%p",p);
     putStr(intBuf);
 }
 
@@ -557,11 +549,12 @@ Cell e; {                               /* args not yet printed ...        */
     return ts;
 }
 
-static Void local unlexVar(t)          /* print text as a variable name    */
+Void unlexVar(t)                       /* print text as a variable name    */
 Text t; {                              /* operator symbols must be enclosed*/
     String s = textToStr(t);           /* in parentheses... except [] ...  */
 
-    if ((isascii(s[0]) && isalpha(s[0])) || s[0]=='_' || s[0]=='[' || s[0]=='(')
+    if ((isascii((int)(s[0])) && isalpha((int)(s[0]))) 
+       || s[0]=='_' || s[0]=='[' || s[0]=='(')
         putStr(s);
     else {
         putChr('(');
@@ -574,7 +567,7 @@ static Void local unlexOp(t)           /* print text as operator name      */
 Text t; {                              /* alpha numeric symbols must be    */
     String s = textToStr(t);           /* enclosed by backquotes           */
 
-    if (isascii(s[0]) && isalpha(s[0])) {
+    if (isascii((int)(s[0])) && isalpha((int)(s[0]))) {
         putChr('`');
         putStr(s);
         putChr('`');
@@ -583,14 +576,14 @@ Text t; {                              /* alpha numeric symbols must be    */
         putStr(s);
 }
 
-static Void local unlexCharConst(c)
+Void unlexCharConst(c)
 Cell c; {
     putChr('\'');
     putStr(unlexChar(c,'\''));
     putChr('\'');
 }
 
-static Void local unlexStrConst(t)
+Void unlexStrConst(t)
 Text t; {
     String s            = textToStr(t);
     static Char SO      = 14;          /* ASCII code for '\SO'             */
@@ -604,7 +597,8 @@ Text t; {
         Char   c  = ' ';
 
         if ((lastWasSO && *ch=='H') ||
-                (lastWasEsc && lastWasDigit && isascii(*ch) && isdigit(*ch)))
+                (lastWasEsc && lastWasDigit 
+                 && isascii((int)(*ch)) && isdigit((int)(*ch))))
             putStr("\\&");
 
         lastWasEsc   = (*ch=='\\');

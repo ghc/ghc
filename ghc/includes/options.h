@@ -13,8 +13,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: options.h,v $
- * $Revision: 1.3 $
- * $Date: 1999/01/13 16:26:37 $
+ * $Revision: 1.4 $
+ * $Date: 1999/03/01 14:47:09 $
  * ------------------------------------------------------------------------*/
 
 
@@ -104,7 +104,7 @@
 #define LARGE_HUGS   1
 
 #define NUM_SYNTAX         100
-#define NUM_TUPLES         100
+#define NUM_TUPLES         /*100*/ 10
 #define NUM_OFFSETS        1024
 #define NUM_CHARS          256
 #if TREX
@@ -124,7 +124,7 @@
 
 #define MINIMUMHEAP        Pick(7500,   19000,      19000)
 #define MAXIMUMHEAP        Pick(32765,  0,          0)
-#define DEFAULTHEAP        Pick(28000,  50000,      300000)
+#define DEFAULTHEAP        Pick(28000,  50000,      1500000 /*300000*/ )
 
 #define NUM_SCRIPTS        Pick(64,     100,        100)
 #define NUM_MODULE         NUM_SCRIPTS
@@ -189,16 +189,16 @@
  */
 
 #define	PROVIDE_INTEGER
-#define	PROVIDE_INT64
-#define	PROVIDE_WORD
+#undef	PROVIDE_INT64
+#undef	PROVIDE_WORD
 #define	PROVIDE_ADDR
-#define PROVIDE_STABLE
+#undef  PROVIDE_STABLE
 #define PROVIDE_FOREIGN
-#define PROVIDE_WEAK
+#undef  PROVIDE_WEAK
 #define PROVIDE_ARRAY
-#define PROVIDE_CONCURRENT
-#define PROVIDE_PTREQUALITY
-#define PROVIDE_COERCE
+#undef  PROVIDE_CONCURRENT
+#undef  PROVIDE_PTREQUALITY
+#undef  PROVIDE_COERCE
 
 /* The following aren't options at the moment - but could be
  * #define PROVIDE_FLOAT
@@ -229,12 +229,12 @@
 /* Should lambda lifter lift constant expressions out to top level?
  * Experimental optimisation.
  */
-#define LIFT_CONSTANTS 1
+#define LIFT_CONSTANTS 0
 
 /* Should we run optimizer on Hugs code?
  * Experimental optimisation.
  */
-#define USE_HUGS_OPTIMIZER 1
+#define USE_HUGS_OPTIMIZER 0
 
 /* Are things being used in an interactive setting or a batch setting?
  * In an interactive setting, System.exitWith should not call _exit
@@ -250,13 +250,13 @@
 
 /* Turn on debugging output and some sanity checks
  */
-/*#define DEBUG  */
+#define DEBUG  1
 /*#define NDEBUG */
 
 /* Make stack tags more informative than just their size.
  * Helps when printing the stack and when running sanity checks.
  */
-/*#define DEBUG_EXTRA */
+#define DEBUG_EXTRA 1
 
 /* Turn lazy blackholing on/off.
  * Warning: Lazy blackholing can't be disabled in GHC generated code.

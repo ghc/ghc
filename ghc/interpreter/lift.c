@@ -10,8 +10,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: lift.c,v $
- * $Revision: 1.3 $
- * $Date: 1999/02/03 17:08:31 $
+ * $Revision: 1.4 $
+ * $Date: 1999/03/01 14:46:47 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -63,6 +63,7 @@ static inline Bool isTopLevel( StgVar v )
         return TRUE;  /* those at top level are already there */
     } else {
 #if LIFT_CONSTANTS
+#error lift constants
         StgRhs rhs  = stgVarBody(v);
         switch (whatIs(rhs)) {
         case STGCON:
@@ -106,6 +107,7 @@ static List liftLetBinds( List binds )
         case STGCON:
         case STGAPP:
 #if LIFT_CONSTANTS
+#error lift constants
                 if (isNull(fvs)) {
                     StgVar v = mkStgVar(rhs,NONE);
                     stgVarBody(bind) = mkStgLet(singleton(v),v);
@@ -128,6 +130,7 @@ static List liftLetBinds( List binds )
                     stgVarBody(bind) = makeStgApp(v, fvs);
                 }
 #if LIFT_CONSTANTS
+#error lift constants
                 else {
                     StgVar r = mkStgVar(rhs,NIL); /* copy the var */
                     StgVar v = mkStgVar(mkStgLet(singleton(r),r),NONE);

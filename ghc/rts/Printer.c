@@ -1,6 +1,6 @@
-/* -*- mode: hugs-c; -*- */
+
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.6 1999/02/05 16:02:46 simonm Exp $
+ * $Id: Printer.c,v 1.7 1999/03/01 14:47:06 sewardj Exp $
  *
  * Copyright (c) 1994-1999.
  *
@@ -39,8 +39,20 @@ static void    printZcoded   ( const char *raw );
  * Printer
  * ------------------------------------------------------------------------*/
 
+
+extern void* itblNames[];
+extern int   nItblNames;
+char* lookupHugsItblName ( void* v )
+{
+   int i;
+   for (i = 0; i < nItblNames; i += 2)
+      if (itblNames[i] == v) return itblNames[i+1];
+   return NULL;
+}
+
 extern void printPtr( StgPtr p )
 {
+    char* str;
     const char *raw;
     if (lookupGHCName( p, &raw )) {
         printZcoded(raw);
@@ -48,6 +60,8 @@ extern void printPtr( StgPtr p )
     } else if ((raw = lookupHugsName(p)) != 0) {
         fprintf(stderr, "%s", raw);
 #endif
+    } else if ((str = lookupHugsItblName(p)) != 0) {
+        fprintf(stderr, "%p=%s", p, str);
     } else {
         fprintf(stderr, "%p", p);
     }
@@ -273,7 +287,8 @@ void printClosure( StgClosure *obj )
             break;
         }
     default:
-            barf("printClosure %d",get_itbl(obj)->type);
+            //barf("printClosure %d",get_itbl(obj)->type);
+            fprintf(stderr, "*** printClosure: unknown type %d ****\n",get_itbl(obj)->type );
             return;
     }
 }
@@ -331,8 +346,24 @@ StgPtr printStackObj( StgPtr sp )
 #endif
 
     } else {
+        StgClosure* c = (StgClosure*)(*sp);
         printPtr((StgPtr)*sp);
-        fprintf(stderr,"\n");
+        if (c == &ret_bco_info) {
+           fprintf(stderr, "\t\t");
+           fprintf(stderr, "ret_bco_info\n" );
+	} else
+        if (IS_HUGS_CONSTR_INFO(GET_INFO(c))) {
+           fprintf(stderr, "\t\t\t");
+           fprintf(stderr, "ConstrInfoTable\n" );
+        } else
+        if (get_itbl(c)->type == BCO) {
+           fprintf(stderr, "\t\t\t");
+           fprintf(stderr, "BCO(...)\n"); 
+        }
+        else {
+           fprintf(stderr, "\t\t\t");
+           printClosure ( (StgClosure*)(*sp));
+        }
         sp += 1;
     }
     return sp;

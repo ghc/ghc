@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: input.c,v $
- * $Revision: 1.3 $
- * $Date: 1999/02/03 17:08:30 $
+ * $Revision: 1.4 $
+ * $Date: 1999/03/01 14:46:46 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -118,7 +118,7 @@ static Text textWildcard;
 
 static Text textModule,  textImport;
 static Text textHiding,  textQualified, textAsMod;
-static Text textExport,  textInterface, textRequires, textUnsafe;
+static Text textExport,  textUnsafe;
 
 Text   textNum;                         /* Num                             */
 Text   textPrelude;                     /* Prelude                         */
@@ -767,11 +767,6 @@ static Cell local readNumber() {        /* read numeric constant           */
     }
 
     endToken();
-#ifndef HAVE_LIBM
-    ERRMSG(row) "No floating point numbers in this implementation"
-    EEND;
-#endif
-
     return mkFloat(stringToFloat(tokenStr));
 }
 

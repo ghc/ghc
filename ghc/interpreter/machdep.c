@@ -12,8 +12,8 @@
  * in the distribution for details.
  *
  * $RCSfile: machdep.c,v $
- * $Revision: 1.3 $
- * $Date: 1999/02/03 17:08:32 $
+ * $Revision: 1.4 $
+ * $Date: 1999/03/01 14:46:49 $
  * ------------------------------------------------------------------------*/
 
 #ifdef HAVE_SIGNAL_H
@@ -233,7 +233,7 @@ static String local hugsdir       Args((Void));
 #if HSCRIPT
 static String local hscriptDir    Args((Void));
 #endif
-static String local RealPath      Args((String));
+//static String local RealPath      Args((String));
 static int    local pathCmp       Args((String, String));
 static String local normPath      Args((String));
 static Void   local searchChr     Args((Int));
@@ -309,7 +309,7 @@ static String local hscriptDir() {  /* directory containing ?? what Daan?  */
 }
 #endif
 
-
+#if 0  /* apparently unused */
 static String local RealPath(s)         /* Find absolute pathname of file  */
 String s; {
 #if HAVE__FULLPATH  /* eg DOS */
@@ -324,6 +324,8 @@ String s; {
 #endif
     return path;
 }
+#endif
+
 
 static int local pathCmp(p1,p2)       /* Compare paths after normalisation */
 String p1;

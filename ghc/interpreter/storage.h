@@ -9,8 +9,8 @@
  * in the distribution for details.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.3 $
- * $Date: 1999/02/03 17:08:41 $
+ * $Revision: 1.4 $
+ * $Date: 1999/03/01 14:46:55 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -304,7 +304,6 @@ extern  Ptr             ptrOf           Args((Cell));
 #define STGPRIM      94           /* STGPRIM    snd :: (PrimOp,[Arg])      */
 #define STGCON       95           /* STGCON     snd :: (StgCon,[Arg])      */
 #define PRIMCASE     96           /* PRIMCASE   snd :: (Expr,[PrimAlt])    */
-
 /* Last constructor tag must be less than SPECMIN */
 
 /* --------------------------------------------------------------------------
@@ -461,7 +460,9 @@ struct strTycon {
     Kind  kind;                         /* kind (includes arity) of Tycon  */
     Cell  what;                         /* DATATYPE/SYNONYM/RESTRICTSYN... */
     Cell  defn;
-    Tycon nextTyconHash;
+    Name  conToTag;                     /* used in derived code            */
+    Name  tagToCon;
+  //Tycon nextTyconHash;
 };
 
 extern struct strTycon DECTABLE(tabTycon);
@@ -499,7 +500,7 @@ struct strName {
     Cell   defn;
     Cell   stgVar;        /* really StgVar   */
     const void*  primop;  /* really StgPrim* */
-    Name   nextNameHash;
+  //Name   nextNameHash;
 };
 
 extern int numNames Args(( Void ));
@@ -535,12 +536,13 @@ extern struct strName DECTABLE(tabName);
 #define mfunOf(n)       ((-1)-name(n).number)
 #define mfunNo(i)       ((-1)-(i))
 
-extern Name   newName      Args((Text,Cell));
-extern Name   findName     Args((Text));
-extern Name   addName      Args((Name));
-extern Name   findQualName Args((Cell));
-extern Name   addPrimCfun  Args((Text,Int,Int,Int));
-extern Int    sfunPos      Args((Name,Name));
+extern Name   newName         Args((Text,Cell));
+extern Name   findName        Args((Text));
+extern Name   addName         Args((Name));
+extern Name   findQualName    Args((Cell));
+extern Name   addPrimCfun     Args((Text,Int,Int,Cell));
+extern Name   addPrimCfunREP  Args((Text,Int,Int,Int));
+extern Int    sfunPos         Args((Name,Name));
 
 /* --------------------------------------------------------------------------
  * Type class values:
@@ -665,6 +667,7 @@ extern  List         dupOnto      Args((List,List));
 extern  List         dupList      Args((List));
 extern  List         revOnto      Args((List, List));   /* destructive     */
 #define rev(xs)      revOnto((xs),NIL)                  /* destructive     */
+#define reverse(xs)  revOnto(dupList(xs),NIL)           /* non-destructive */
 extern  Cell         cellIsMember Args((Cell,List));
 extern  Cell         cellAssoc    Args((Cell,List));
 extern  Cell         cellRevAssoc Args((Cell,List));
@@ -679,6 +682,7 @@ extern  List         take         Args((Int,List));     /* destructive     */
 extern  List         splitAt      Args((Int,List));     /* non-destructive */
 extern  Cell         nth          Args((Int,List));
 extern  List         removeCell   Args((Cell,List));    /* destructive     */
+extern  List         dupListOnto  Args((List,List));    /* non-destructive */ 
 
 /* The following macros provide `inline expansion' of some common ways of
  * traversing, using and modifying lists:

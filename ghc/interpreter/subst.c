@@ -9,8 +9,8 @@
  * in the distribution for details.
  *
  * $RCSfile: subst.c,v $
- * $Revision: 1.3 $
- * $Date: 1999/02/03 17:08:42 $
+ * $Revision: 1.4 $
+ * $Date: 1999/03/01 14:46:56 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -903,7 +903,7 @@ Int  o1,o2; {
     deRef(tyv1,t1,o1);
     deRef(tyv2,t2,o2);
 
-un: if (tyv1)
+un: if (tyv1) {
         if (tyv2)
             return varToVarBind(tyv1,tyv2);         /* t1, t2 variables    */
         else {
@@ -915,6 +915,7 @@ un: if (tyv1)
             }
             return varToTypeBind(tyv1,t2,o2);
         }
+    }
     else
         if (tyv2) {
             Cell h1 = getDerefHead(t1,o1);          /* t2 variable, t1 not */
@@ -994,11 +995,12 @@ un: if (tyv1)
                     deRef(tyv1,t1,o1);
                     deRef(tyv2,t2,o2);
 
-                    if (tyv1)                           /* unify heads!    */
+                    if (tyv1) {                         /* unify heads!    */
                         if (tyv2)
                             return varToVarBind(tyv1,tyv2);
                         else
                             return varToTypeBind(tyv1,t2,o2);
+                    }
                     else if (tyv2)
                         return varToTypeBind(tyv2,t1,o1);
 
@@ -1414,11 +1416,12 @@ Int  o1,o2; {
     deRef(kyv1,k1,o1);
     deRef(kyv2,k2,o2);
 
-    if (kyv1)
+    if (kyv1) {
         if (kyv2)
             return kvarToVarBind(kyv1,kyv2);        /* k1, k2 variables    */
         else
             return kvarToTypeBind(kyv1,k2,o2);      /* k1 variable, k2 not */
+    }
     else
         if (kyv2)
             return kvarToTypeBind(kyv2,k1,o1);      /* k2 variable, k1 not */

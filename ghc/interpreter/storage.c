@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.3 $
- * $Date: 1999/02/03 17:08:40 $
+ * $Revision: 1.4 $
+ * $Date: 1999/03/01 14:46:54 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -30,17 +30,13 @@ static Int  local saveText              Args((Text));
 #if !IGNORE_MODULES
 static Module local findQualifier       Args((Text));
 #endif
-static Void local hashTycon             Args((Tycon));
 static List local insertTycon           Args((Tycon,List));
-static Void local hashName              Args((Name));
 static List local insertName            Args((Name,List));
 static Void local patternError          Args((String));
 static Bool local stringMatch           Args((String,String));
 static Bool local typeInvolves          Args((Type,Type));
 static Cell local markCell              Args((Cell));
 static Void local markSnd               Args((Cell));
-static Cell local indirectChain         Args((Cell));
-static Bool local isMarked              Args((Cell));
 static Cell local lowLevelLastIn        Args((Cell));
 static Cell local lowLevelLastOut       Args((Cell));
 /* from STG */
@@ -260,16 +256,11 @@ Text t; {
  * the most recent entry at the front of the list.
  * ------------------------------------------------------------------------*/
 
-#define TYCONHSZ 256                            /* Size of Tycon hash table*/
-#define tHash(x) ((x)%TYCONHSZ)                 /* Tycon hash function     */
-static  Tycon    tyconHw;                       /* next unused Tycon       */
-static  Tycon    DEFTABLE(tyconHash,TYCONHSZ);  /* Hash table storage      */
+        Tycon    tyconHw;                       /* next unused Tycon       */
 struct  strTycon DEFTABLE(tabTycon,NUM_TYCON);  /* Tycon storage           */
 
 Tycon newTycon(t)                       /* add new tycon to tycon table    */
 Text t; {
-    Int h = tHash(t);
-
     if (tyconHw-TYCMIN >= NUM_TYCON) {
         ERRMSG(0) "Type constructor storage space exhausted"
         EEND;
@@ -278,44 +269,34 @@ Text t; {
     tycon(tyconHw).kind          = NIL;
     tycon(tyconHw).defn          = NIL;
     tycon(tyconHw).what          = NIL;
+    tycon(tyconHw).conToTag      = NIL;
+    tycon(tyconHw).tagToCon      = NIL;
 #if !IGNORE_MODULES
     tycon(tyconHw).mod           = currentModule;
     module(currentModule).tycons = cons(tyconHw,module(currentModule).tycons);
 #endif
-    tycon(tyconHw).nextTyconHash = tyconHash[h];
-    tyconHash[h]                 = tyconHw;
-
     return tyconHw++;
 }
 
-Tycon findTycon(t)                      /* locate Tycon in tycon table     */
-Text t; {
-    Tycon tc = tyconHash[tHash(t)];
-
-    while (nonNull(tc) && tycon(tc).text!=t)
-        tc = tycon(tc).nextTyconHash;
-    return tc;
+Tycon findTycon ( Text t )
+{
+   int n;
+   for (n = TYCMIN; n < tyconHw; n++)
+      if (tycon(n).text == t) return n;
+   return NIL;
 }
 
 Tycon addTycon(tc)  /* Insert Tycon in tycon table - if no clash is caused */
 Tycon tc; {
     Tycon oldtc = findTycon(tycon(tc).text);
     if (isNull(oldtc)) {
-        hashTycon(tc);
+      //        hashTycon(tc);
 #if !IGNORE_MODULES
         module(currentModule).tycons=cons(tc,module(currentModule).tycons);
 #endif
         return tc;
     } else
         return oldtc;
-}
-
-static Void local hashTycon(tc)         /* Insert Tycon into hash table    */
-Tycon tc; {
-    Text  t = tycon(tc).text;
-    Int   h = tHash(t);
-    tycon(tc).nextTyconHash = tyconHash[h];
-    tyconHash[h]            = tc;
 }
 
 Tycon findQualTycon(id) /*locate (possibly qualified) Tycon in tycon table */
@@ -408,14 +389,14 @@ List   ts; {                            /* Null pattern matches every tycon*/
 
 #define NAMEHSZ  256                            /* Size of Name hash table */
 #define nHash(x) ((x)%NAMEHSZ)                  /* hash fn :: Text->Int    */
-static  Name     nameHw;                        /* next unused name        */
+        Name     nameHw;                        /* next unused name        */
 static  Name     DEFTABLE(nameHash,NAMEHSZ);    /* Hash table storage      */
 struct  strName  DEFTABLE(tabName,NUM_NAME);    /* Name table storage      */
 
 Name newName(t,parent)                  /* Add new name to name table      */
 Text t; 
 Cell parent; {
-    Int h = nHash(t);
+    //Int h = nHash(t);
 
     if (nameHw-NAMEMIN >= NUM_NAME) {
         ERRMSG(0) "Name storage space exhausted"
@@ -432,43 +413,31 @@ Cell parent; {
     name(nameHw).type         = NIL;
     name(nameHw).primop       = 0;
     name(nameHw).mod          = currentModule;
-    hashName(nameHw);
     module(currentModule).names=cons(nameHw,module(currentModule).names);
-    name(nameHw).nextNameHash = nameHash[h];
-    nameHash[h]               = nameHw;
     return nameHw++;
 }
 
-Name findName(t)                        /* Locate name in name table       */
-Text t; {
-    Name n = nameHash[nHash(t)];
-
-    while (nonNull(n) && name(n).text!=t) {
-        n = name(n).nextNameHash;
-    }
-    assert(isNull(n) || (isName(n) && n < nameHw));
-    return n;
+Name findName ( Text t )
+{
+   int n;
+   for (n = NAMEMIN; n < nameHw; n++)
+      if (name(n).text == t) return n;
+   return NIL;
 }
+
+
 
 Name addName(nm)                        /* Insert Name in name table - if  */
 Name nm; {                              /* no clash is caused              */
     Name oldnm = findName(name(nm).text);
     if (isNull(oldnm)) {
-        hashName(nm);
+      //        hashName(nm);
 #if !IGNORE_MODULES
         module(currentModule).names=cons(nm,module(currentModule).names);
 #endif
         return nm;
     } else
         return oldnm;
-}
-
-static Void local hashName(nm)          /* Insert Name into hash table     */
-Name nm; {
-    Text t                = name(nm).text;
-    Int  h                = nHash(t);
-    name(nm).nextNameHash = nameHash[h];
-    nameHash[h]           = nm;
 }
 
 Name findQualName(id)              /* Locate (possibly qualified) name*/
@@ -527,8 +496,8 @@ Cell id; {                         /* in name table                   */
  * Primitive functions:
  * ------------------------------------------------------------------------*/
 
-Name addPrimCfun(t,arity,no,rep)        /* add primitive constructor func  */
-Text t;
+Name addPrimCfunREP(t,arity,no,rep)     /* add primitive constructor func  */
+Text t;                                 /* sets rep, not type              */
 Int  arity;
 Int  no;
 Int  rep; { /* Really AsmRep */
@@ -539,6 +508,20 @@ Int  rep; { /* Really AsmRep */
     name(n).primop  = (void*)rep;
     return n;
 }
+
+
+Name addPrimCfun(t,arity,no,type)       /* add primitive constructor func  */
+Text t;
+Int  arity;
+Int  no;
+Cell type; {
+    Name n         = newName(t,NIL);
+    name(n).arity  = arity;
+    name(n).number = cfunNo(no);
+    name(n).type   = type;
+    return n;
+}
+
 
 Int sfunPos(s,c)                        /* Find position of field with     */
 Name s;                                 /* selector s in constructor c.    */
@@ -708,7 +691,7 @@ Text t; {
     for (cs=classes; nonNull(cs); cs=tl(cs)) {
         cl=hd(cs);
         if (cclass(cl).text==t)
-            return cl;
+	    return cl;
     }
     return NIL;
 }
@@ -922,12 +905,14 @@ Cell c; {
 static local Module findQualifier(t)    /* locate Module in import list   */
 Text t; {
     Module ms;
-    if (t==module(modulePreludeHugs).text) {
+    ////if (t==module(modulePreludeHugs).text) {
+    if (t==module(modulePrelude).text) {
         /* The Haskell report (rightly) forbids this.
          * We added it to let the Prelude refer to itself
          * without having to import itself.
          */
-        return modulePreludeHugs;
+         ////return modulePreludeHugs;
+         return modulePrelude;
     }
     for (ms=module(currentModule).qualImports; nonNull(ms); ms=tl(ms)) {
         if (textOf(fst(hd(ms)))==t)
@@ -942,15 +927,17 @@ Text t; {
 
 Void setCurrModule(m)              /* set lookup tables for current module */
 Module m; {
-    Int i;
+    //Int i;
     if (m!=currentModule) {
         currentModule = m; /* This is the only assignment to currentModule */
+#if 0
         for (i=0; i<TYCONHSZ; ++i)
             tyconHash[i] = NIL;
         mapProc(hashTycon,module(m).tycons);
         for (i=0; i<NAMEHSZ; ++i)
             nameHash[i] = NIL;
         mapProc(hashName,module(m).names);
+#endif
         classes = module(m).classes;
     }
 }
@@ -1032,7 +1019,9 @@ String f; {                             /* of status for later restoration  */
 }
 
 Bool isPreludeScript() {                /* Test whether this is the Prelude*/
-    return (scriptHw==0);
+    return (scriptHw==0
+	    /*ToDo: jrs hack*/ || scriptHw==1
+           );
 }
 
 #if !IGNORE_MODULES
@@ -1149,12 +1138,14 @@ Script sno; {                           /* to reading script sno           */
         }
 #else /* !IGNORE_MODULES */
         currentModule=NIL;
+#if 0
         for (i=0; i<TYCONHSZ; ++i) {
             tyconHash[i] = NIL;
         }
         for (i=0; i<NAMEHSZ; ++i) {
             nameHash[i] = NIL;
         }
+#endif
 #endif /* !IGNORE_MODULES */
 
         for (i=CLASSMIN; i<classHw; i++) {
@@ -1332,7 +1323,7 @@ Cell c; {                               /* update snd component of cell    */
 
 ma: t = c;                              /* Keep pointer to original pair   */
     c = snd(c);
-mb: if (!isPair(c))
+    if (!isPair(c))
         return;
 
     {   register int place = placeInSet(c);
@@ -1370,7 +1361,10 @@ Void garbageCollect()     {             /* Run garbage collector ...       */
     register Int mask;
     register Int place;
     Int      recovered;
+
     jmp_buf  regs;                      /* save registers on stack         */
+printf("\n\n$$$$$$$$$$$ GARBAGE COLLECTION; aborting\n\n");
+exit(1);
     setjmp(regs);
 
     gcStarted();
@@ -1610,7 +1604,7 @@ Cell e; {
 
 static Cell local lowLevelLastIn(c)     /* Duplicate expression tree (i.e. */
 Cell c; {                               /* acyclic graph) for later recall */
-    if (isPair(c))                      /* Duplicating any text strings    */
+    if (isPair(c)) {                    /* Duplicating any text strings    */
         if (isBoxTag(fst(c)))           /* in case these are lost at some  */
             switch (fst(c)) {           /* point before the expr is reused */
                 case VARIDCELL :
@@ -1623,6 +1617,7 @@ Cell c; {                               /* acyclic graph) for later recall */
             }
         else
             return pair(lowLevelLastIn(fst(c)),lowLevelLastIn(snd(c)));
+    }
 #if TREX
     else if (isExt(c))
         return pair(EXTCOPY,saveText(extText(c)));
@@ -1637,7 +1632,7 @@ Cell getLastExpr() {                    /* recover previously saved expr   */
 
 static Cell local lowLevelLastOut(c)    /* As with lowLevelLastIn() above  */
 Cell c; {                               /* except that Cells refering to   */
-    if (isPair(c))                      /* Text values are restored to     */
+    if (isPair(c)) {                    /* Text values are restored to     */
         if (isBoxTag(fst(c)))           /* appropriate values              */
             switch (fst(c)) {
                 case VARIDCELL :
@@ -1654,6 +1649,7 @@ Cell c; {                               /* except that Cells refering to   */
             }
         else
             return pair(lowLevelLastOut(fst(c)),lowLevelLastOut(snd(c)));
+    }
     else
         return c;
 }
@@ -1675,12 +1671,12 @@ register Cell c; {
     if (c<TUPMIN)    return c;
     if (c>=INTMIN)   return INTCELL;
 
-    if (c>=NAMEMIN) if (c>=CLASSMIN)    if (c>=CHARMIN) return CHARCELL;
-                                        else            return CLASS;
+    if (c>=NAMEMIN){if (c>=CLASSMIN)   {if (c>=CHARMIN) return CHARCELL;
+                                        else            return CLASS;}
                     else                if (c>=INSTMIN) return INSTANCE;
-                                        else            return NAME;
-    else            if (c>=MODMIN)      if (c>=TYCMIN)  return TYCON;
-                                        else            return MODULE;
+                                        else            return NAME;}
+    else            if (c>=MODMIN)     {if (c>=TYCMIN)  return TYCON;
+                                        else            return MODULE;}
                     else                if (c>=OFFMIN)  return OFFSET;
 #if TREX
                                         else            return (c>=EXTMIN) ?
@@ -2074,6 +2070,12 @@ List ys; {
     for (; nonNull(xs); xs=tl(xs))
         ys = cons(hd(xs),ys);
     return ys;
+}
+
+List dupListOnto(xs,ys)              /* Duplicate spine of list xs onto ys */
+List xs;
+List ys; {
+    return revOnto(dupOnto(xs,NIL),ys);
 }
 
 List dupList(xs)                       /* Duplicate spine of list xs       */
@@ -2793,9 +2795,10 @@ Int what; {
 #endif
 
                        tyconHw  = TYCMIN;
+#if 0
                        for (i=0; i<TYCONHSZ; ++i)
                            tyconHash[i] = NIL;
-
+#endif
 #if GC_WEAKPTRS
                        finalizers   = NIL;
                        liveWeakPtrs = NIL;

@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.4 $
- * $Date: 1999/02/03 17:08:31 $
+ * $Revision: 1.5 $
+ * $Date: 1999/03/01 14:46:47 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -20,190 +20,231 @@
 
 #include "link.h"
 
-Module modulePreludeHugs;
+////Module modulePreludeHugs;
 
-Type typeArrow;                         /* Function spaces                 */
 
-Type typeChar;
-Type typeInt;
+Type typeArrow  =BOGUS(1);                         /* Function spaces                 */
+
+Type typeChar  =BOGUS(2);
+Type typeInt  =BOGUS(3);
 #ifdef PROVIDE_INT64
-Type typeInt64;
+Type typeInt64  =BOGUS(4);
 #endif
 #ifdef PROVIDE_INTEGER
-Type typeInteger;
+Type typeInteger  =BOGUS(5);
 #endif
 #ifdef PROVIDE_WORD
-Type typeWord;
+Type typeWord  =BOGUS(6);
 #endif
 #ifdef PROVIDE_ADDR
-Type typeAddr;
+Type typeAddr  =BOGUS(7);
 #endif
 #ifdef PROVIDE_ARRAY
-Type typePrimArray;            
-Type typePrimByteArray;
-Type typeRef;                  
-Type typePrimMutableArray;     
-Type typePrimMutableByteArray; 
+Type typePrimArray  =BOGUS(8);            
+Type typePrimByteArray  =BOGUS(9);
+Type typeRef  =BOGUS(10);                  
+Type typePrimMutableArray  =BOGUS(11);     
+Type typePrimMutableByteArray  =BOGUS(12); 
 #endif
-Type typeFloat;
-Type typeDouble;
+Type typeFloat  =BOGUS(13);
+Type typeDouble  =BOGUS(14);
 #ifdef PROVIDE_STABLE
-Type typeStable;
+Type typeStable  =BOGUS(15);
 #endif
 #ifdef PROVIDE_WEAK
-Type typeWeak;
+Type typeWeak  =BOGUS(16);
 #endif
 #ifdef PROVIDE_FOREIGN
-Type typeForeign;
+Type typeForeign  =BOGUS(17);
 #endif
 #ifdef PROVIDE_CONCURRENT
-Type typeThreadId;
-Type typeMVar;
+Type typeThreadId  =BOGUS(18);
+Type typeMVar  =BOGUS(19);
 #endif
 
-Type typeList;
-Type typeUnit;
-Type typeString;
-Type typeBool;
-Type typeST;
-Type typeIO;
-Type typeException;
+Type typeList  =BOGUS(20);
+Type typeUnit  =BOGUS(21);
+Type typeString  =BOGUS(22);
+Type typeBool  =BOGUS(23);
+Type typeST  =BOGUS(24);
+Type typeIO  =BOGUS(25);
+Type typeException  =BOGUS(26);
 
-Class classEq;                          /* `standard' classes              */
-Class classOrd;
-Class classShow;
-Class classRead;
-Class classIx;
-Class classEnum;
-Class classBounded;
+Class classEq  =BOGUS(27);                          /* `standard' classes              */
+Class classOrd  =BOGUS(28);
+Class classShow  =BOGUS(29);
+Class classRead  =BOGUS(30);
+Class classIx  =BOGUS(31);
+Class classEnum  =BOGUS(32);
+Class classBounded  =BOGUS(33);
 #if EVAL_INSTANCES
-Class classEval;
+Class classEval  =BOGUS(34);
 #endif
 
-Class classReal;                        /* `numeric' classes               */
-Class classIntegral;
-Class classRealFrac;
-Class classRealFloat;
-Class classFractional;
-Class classFloating;
-Class classNum;
+Class classReal  =BOGUS(35);                        /* `numeric' classes               */
+Class classIntegral  =BOGUS(36);
+Class classRealFrac  =BOGUS(37);
+Class classRealFloat  =BOGUS(38);
+Class classFractional  =BOGUS(39);
+Class classFloating  =BOGUS(40);
+Class classNum  =BOGUS(41);
 
-Class classMonad;                       /* Monads and monads with a zero   */
-/*Class classMonad0;*/
+Class classMonad  =BOGUS(42);                       /* Monads and monads with a zero   */
+/*Class classMonad0  =BOGUS();*/
 
-List stdDefaults;                       /* standard default values         */
+List stdDefaults  =BOGUS(43);                       /* standard default values         */
 
-Name nameTrue,    nameFalse;            /* primitive boolean constructors  */
-Name nameNil,     nameCons;             /* primitive list constructors     */
-Name nameUnit;                          /* primitive Unit type constructor */
+Name nameTrue  =BOGUS(44),    
+     nameFalse  =BOGUS(45);            /* primitive boolean constructors  */
+Name nameNil  =BOGUS(46),     
+     nameCons  =BOGUS(47);             /* primitive list constructors     */
+Name nameUnit  =BOGUS(48);                          /* primitive Unit type constructor */
 
-Name nameEq;    
-Name nameFromInt, nameFromDouble;       /* coercion of numerics            */
-Name nameFromInteger;
-Name nameReturn,  nameBind;             /* for translating monad comps     */
-Name nameZero;                          /* for monads with a zero          */
+Name nameEq  =BOGUS(49);    
+Name nameFromInt  =BOGUS(50),
+     nameFromDouble  =BOGUS(51);       /* coercion of numerics            */
+Name nameFromInteger  =BOGUS(52);
+Name nameReturn  =BOGUS(53),  
+     nameBind  =BOGUS(54);             /* for translating monad comps     */
+Name nameZero  =BOGUS(55);                          /* for monads with a zero          */
 #if EVAL_INSTANCES
-Name nameStrict;                        /* Members of class Eval           */
-Name nameSeq;   
+Name nameStrict  =BOGUS(56);                        /* Members of class Eval           */
+Name nameSeq  =BOGUS(57);   
 #endif
 
-Name nameId;
-Name nameRunIO;
-Name namePrint;
+Name nameId  =BOGUS(58);
+Name nameRunIO  =BOGUS(59);
+Name namePrint  =BOGUS(60);
 
-Name nameOtherwise;
-Name nameUndefined;                     /* generic undefined value         */
+Name nameOtherwise  =BOGUS(61);
+Name nameUndefined  =BOGUS(62);                     /* generic undefined value         */
 #if NPLUSK
-Name namePmSub; 
+Name namePmSub  =BOGUS(63); 
 #endif
-Name namePMFail;
-Name nameEqChar;
-Name nameEqInt;
+Name namePMFail  =BOGUS(64);
+Name nameEqChar  =BOGUS(65);
+Name nameEqInt  =BOGUS(66);
 #if !OVERLOADED_CONSTANTS
-Name nameEqInteger;
+Name nameEqInteger  =BOGUS(67);
 #endif
-Name nameEqDouble;
-Name namePmInt;
-Name namePmInteger;
-Name namePmDouble;
-Name namePmLe;
-Name namePmSubtract;
-Name namePmFromInteger;
-Name nameMkIO;
-Name nameUnpackString;
-Name nameError;
-Name nameInd;
+Name nameEqDouble  =BOGUS(68);
+Name namePmInt  =BOGUS(69);
+Name namePmInteger  =BOGUS(70);
+Name namePmDouble  =BOGUS(71);
+Name namePmLe  =BOGUS(72);
+Name namePmSubtract  =BOGUS(73);
+Name namePmFromInteger  =BOGUS(74);
+Name nameMkIO  =BOGUS(75);
+Name nameUnpackString  =BOGUS(76);
+Name nameError  =BOGUS(77);
+Name nameInd  =BOGUS(78);
 
-Name nameForce;
+Name nameForce  =BOGUS(79);
 
-Name nameAnd;
-Name nameHw;
-Name nameConCmp;
-Name nameCompAux;
-Name nameEnFrTh;
-Name nameEnFrTo;
-Name nameEnFrom;
-Name nameEnFrEn;
-Name nameEnToEn;
-Name nameEnInRng;
-Name nameEnIndex;
-Name nameEnRange;
-Name nameRangeSize;
-Name nameComp;
-Name nameShowField;
-Name nameApp;
-Name nameShowParen;
-Name nameReadParen;
-Name nameLex;
-Name nameReadField;
-Name nameFlip;
-Name nameFromTo;
-Name nameFromThen;
-Name nameFrom;
-Name nameFromThenTo;
-Name nameNegate;
+Name nameAnd  =BOGUS(80);
+Name nameConCmp  =BOGUS(82);
+Name nameCompAux  =BOGUS(83);
+Name nameEnFrTh  =BOGUS(84);
+Name nameEnFrTo  =BOGUS(85);
+Name nameEnFrom  =BOGUS(86);
+Name nameEnFrEn  =BOGUS(87);
+Name nameEnToEn  =BOGUS(88);
+Name nameEnInRng  =BOGUS(89);
+Name nameEnIndex  =BOGUS(90);
+Name nameEnRange  =BOGUS(91);
+Name nameRangeSize  =BOGUS(92);
+Name nameComp  =BOGUS(93);
+Name nameShowField  =BOGUS(94);
+Name nameApp  =BOGUS(95);
+Name nameShowParen  =BOGUS(96);
+Name nameReadParen  =BOGUS(97);
+Name nameLex  =BOGUS(98);
+Name nameReadField  =BOGUS(99);
+Name nameFlip  =BOGUS(100);
+Name nameFromTo  =BOGUS(101);
+Name nameFromThen  =BOGUS(102);
+Name nameFrom  =BOGUS(103);
+Name nameFromThenTo  =BOGUS(104);
+Name nameNegate  =BOGUS(105);
 
 /* these names are required before we've had a chance to do the right thing */
-Name nameSel;
-Name nameUnsafeUnpackCString;
+Name nameSel  =BOGUS(106);
+Name nameUnsafeUnpackCString  =BOGUS(107);
 
 /* constructors used during translation and codegen */
-Name nameMkC;                           /* Char#        -> Char           */
-Name nameMkI;                           /* Int#         -> Int            */
+Name nameMkC  =BOGUS(108);                           /* Char#        -> Char           */
+Name nameMkI  =BOGUS(109);                           /* Int#         -> Int            */
 #ifdef PROVIDE_INT64                                                       
-Name nameMkInt64;                       /* Int64#       -> Int64          */
+Name nameMkInt64  =BOGUS(110);                       /* Int64#       -> Int64          */
 #endif                                                                     
 #ifdef PROVIDE_INTEGER                                                     
-Name nameMkInteger;                     /* Integer#     -> Integer        */
+Name nameMkInteger  =BOGUS(111);                     /* Integer#     -> Integer        */
 #endif                                                                     
 #ifdef PROVIDE_WORD                                                        
-Name nameMkW;                           /* Word#        -> Word           */
+Name nameMkW  =BOGUS(112);                           /* Word#        -> Word           */
 #endif                                                                     
 #ifdef PROVIDE_ADDR                                                        
-Name nameMkA;                           /* Addr#        -> Addr            */
+Name nameMkA  =BOGUS(113);                           /* Addr#        -> Addr            */
 #endif                                                                     
-Name nameMkF;                           /* Float#       -> Float           */
-Name nameMkD;                           /* Double#      -> Double          */
+Name nameMkF  =BOGUS(114);                           /* Float#       -> Float           */
+Name nameMkD  =BOGUS(115);                           /* Double#      -> Double          */
 #ifdef PROVIDE_ARRAY
-Name nameMkPrimArray;            
-Name nameMkPrimByteArray;
-Name nameMkRef;                  
-Name nameMkPrimMutableArray;     
-Name nameMkPrimMutableByteArray; 
+Name nameMkPrimArray  =BOGUS(116);            
+Name nameMkPrimByteArray  =BOGUS(117);
+Name nameMkRef  =BOGUS(118);                  
+Name nameMkPrimMutableArray  =BOGUS(119);     
+Name nameMkPrimMutableByteArray  =BOGUS(120); 
 #endif
 #ifdef PROVIDE_STABLE
-Name nameMkStable;                      /* StablePtr# a -> StablePtr a     */
+Name nameMkStable  =BOGUS(121);                      /* StablePtr# a -> StablePtr a     */
 #endif
 #ifdef PROVIDE_WEAK
-Name nameMkWeak;                        /* Weak# a      -> Weak a          */
+Name nameMkWeak  =BOGUS(122);                        /* Weak# a      -> Weak a          */
 #endif
 #ifdef PROVIDE_FOREIGN
-Name nameMkForeign;                     /* ForeignObj#  -> ForeignObj      */
+Name nameMkForeign  =BOGUS(123);                     /* ForeignObj#  -> ForeignObj      */
 #endif
 #ifdef PROVIDE_CONCURRENT
-Name nameMkThreadId;                    /* ThreadId#    -> ThreadId        */
-Name nameMkMVar;                        /* MVar#        -> MVar            */
+Name nameMkThreadId  =BOGUS(124);                    /* ThreadId#    -> ThreadId        */
+Name nameMkMVar  =BOGUS(125);                        /* MVar#        -> MVar            */
 #endif
+
+
+
+Name nameMinBnd =BOGUS(400);
+Name  nameMaxBnd =BOGUS(401);
+Name  nameCompare =BOGUS(402);
+Name nameShowsPrec =BOGUS(403);
+Name  nameIndex =BOGUS(404);
+Name nameReadsPrec =BOGUS(405); 
+Name nameRange =BOGUS(406);
+Name nameEQ =BOGUS(407);
+Name nameInRange =BOGUS(408);
+Name nameGt =BOGUS(409);
+Name nameLe =BOGUS(410);
+Name namePlus =BOGUS(411);
+Name nameMult =BOGUS(412);
+Name nameMFail =BOGUS(413);
+Type typeOrdering =BOGUS(414);
+Module modulePrelude =BOGUS(415);
+
+#define QQ(lval) assert(lval != 0); assert(lval <= -900000); lval 
+
+/* --------------------------------------------------------------------------
+ * Frequently used type skeletons:
+ * ------------------------------------------------------------------------*/
+
+/* ToDo: move these to link.c and call them 'typeXXXX' */
+       Type  arrow=BOGUS(500);                     /* mkOffset(0) -> mkOffset(1)      */
+       Type  boundPair=BOGUS(500);;                 /* (mkOffset(0),mkOffset(0))       */
+       Type  listof=BOGUS(500);;                    /* [ mkOffset(0) ]                 */
+       Type  typeVarToVar=BOGUS(500);;              /* mkOffset(0) -> mkOffset(0)      */
+
+       Cell  predNum=BOGUS(500);;                   /* Num (mkOffset(0))               */
+       Cell  predFractional=BOGUS(500);;            /* Fractional (mkOffset(0))        */
+       Cell  predIntegral=BOGUS(500);;              /* Integral (mkOffset(0))          */
+       Kind  starToStar=BOGUS(500);;                /* Type -> Type                    */
+       Cell  predMonad=BOGUS(500);;                 /* Monad (mkOffset(0))             */
 
 /* --------------------------------------------------------------------------
  * 
@@ -212,7 +253,7 @@ Name nameMkMVar;                        /* MVar#        -> MVar            */
 static Tycon linkTycon ( String s );
 static Tycon linkClass ( String s );
 static Name  linkName  ( String s );
-static Void  mkTypes   ();
+static Void  mkTypes   ( void );
 
 
 static Tycon linkTycon( String s )
@@ -254,77 +295,78 @@ static Name  predefinePrim ( String s )
     return nm;
 }
 
-Void linkPreludeTC() {                  /* Hook to tycons and classes in   */
+Void linkPreludeTC(void) {              /* Hook to tycons and classes in   */
     static Bool initialised = FALSE;    /* prelude when first loaded       */
     if (!initialised) {
         Int i;
         initialised = TRUE;
-        setCurrModule(modulePreludeHugs);
+        ////setCurrModule(modulePreludeHugs);
+        setCurrModule(modulePrelude);
 
-        typeChar        = linkTycon("Char");
-        typeInt         = linkTycon("Int");
+        QQ(typeChar      )  = linkTycon("Char");
+        QQ(typeInt       )  = linkTycon("Int");
 #ifdef PROVIDE_INT64
-        typeInt64       = linkTycon("Int64");
+        QQ(typeInt64     )  = linkTycon("Int64");
 #endif
 #ifdef PROVIDE_INTEGER
-        typeInteger     = linkTycon("Integer");
+        QQ(typeInteger   )  = linkTycon("Integer");
 #endif
 #ifdef PROVIDE_WORD
-        typeWord        = linkTycon("Word");
+        QQ(typeWord      )  = linkTycon("Word");
 #endif
 #ifdef PROVIDE_ADDR
-        typeAddr        = linkTycon("Addr");
+        QQ(typeAddr      )  = linkTycon("Addr");
 #endif
 #ifdef PROVIDE_ARRAY
-        typePrimArray            = linkTycon("PrimArray");
-        typePrimByteArray        = linkTycon("PrimByteArray");
-        typeRef                  = linkTycon("Ref");
-        typePrimMutableArray     = linkTycon("PrimMutableArray");
-        typePrimMutableByteArray = linkTycon("PrimMutableByteArray");
+        QQ(typePrimArray )           = linkTycon("PrimArray");
+        QQ(typePrimByteArray)        = linkTycon("PrimByteArray");
+        QQ(typeRef       )           = linkTycon("Ref");
+        QQ(typePrimMutableArray)     = linkTycon("PrimMutableArray");
+        QQ(typePrimMutableByteArray) = linkTycon("PrimMutableByteArray");
 #endif
-        typeFloat       = linkTycon("Float");
-        typeDouble      = linkTycon("Double");
+        QQ(typeFloat     )  = linkTycon("Float");
+        QQ(typeDouble    )  = linkTycon("Double");
 #ifdef PROVIDE_STABLE
-        typeStable      = linkTycon("StablePtr");
+        QQ(typeStable    )  = linkTycon("StablePtr");
 #endif
 #ifdef PROVIDE_WEAK
-        typeWeak        = linkTycon("Weak");
+        QQ(typeWeak      )  = linkTycon("Weak");
 #endif
 #ifdef PROVIDE_FOREIGN
-        typeForeign     = linkTycon("ForeignObj");
+        QQ(typeForeign   )  = linkTycon("ForeignObj");
 #endif
 #ifdef PROVIDE_CONCURRENT
-        typeThreadId    = linkTycon("ThreadId");
-        typeMVar        = linkTycon("MVar");
+        QQ(typeThreadId  )  = linkTycon("ThreadId");
+        QQ(typeMVar      )  = linkTycon("MVar");
 #endif
 
-        typeBool        = linkTycon("Bool");
-        typeST          = linkTycon("ST");
-        typeIO          = linkTycon("IO");
-        typeException   = linkTycon("Exception");
-        typeList        = linkTycon("[]");
-        typeUnit        = linkTycon("()");
-        typeString      = linkTycon("String");
+        QQ(typeBool      )  = linkTycon("Bool");
+        QQ(typeST        )  = linkTycon("ST");
+        QQ(typeIO        )  = linkTycon("IO");
+        QQ(typeException )  = linkTycon("Exception");
+        //qqfail QQ(typeList      )  = linkTycon("[]");
+        //qqfail QQ(typeUnit      )  = linkTycon("()");
+        QQ(typeString    )  = linkTycon("String");
+        QQ(typeOrdering  )  = linkTycon("Ordering");
 
-        classEq         = linkClass("Eq");
-        classOrd        = linkClass("Ord");
-        classIx         = linkClass("Ix");
-        classEnum       = linkClass("Enum");
-        classShow       = linkClass("Show");
-        classRead       = linkClass("Read");
-        classBounded    = linkClass("Bounded");
+        QQ(classEq       )  = linkClass("Eq");
+        QQ(classOrd      )  = linkClass("Ord");
+        QQ(classIx       )  = linkClass("Ix");
+        QQ(classEnum     )  = linkClass("Enum");
+        QQ(classShow     )  = linkClass("Show");
+        QQ(classRead     )  = linkClass("Read");
+        QQ(classBounded  )  = linkClass("Bounded");
 #if EVAL_INSTANCES
         classEval       = linkClass("Eval");
 #endif
-        classReal       = linkClass("Real");
-        classIntegral   = linkClass("Integral");
-        classRealFrac   = linkClass("RealFrac");
-        classRealFloat  = linkClass("RealFloat");
-        classFractional = linkClass("Fractional");
-        classFloating   = linkClass("Floating");
-        classNum        = linkClass("Num");
-        classMonad      = linkClass("Monad");
-        /*classMonad0     = linkClass("MonadZero");*/
+        QQ(classReal     )  = linkClass("Real");
+        QQ(classIntegral )  = linkClass("Integral");
+        QQ(classRealFrac )  = linkClass("RealFrac");
+        QQ(classRealFloat)  = linkClass("RealFloat");
+        QQ(classFractional) = linkClass("Fractional");
+        QQ(classFloating )  = linkClass("Floating");
+        QQ(classNum      )  = linkClass("Num");
+        QQ(classMonad    )  = linkClass("Monad");
 
         stdDefaults     = NIL;
         stdDefaults     = cons(typeDouble,stdDefaults);
@@ -335,44 +377,67 @@ Void linkPreludeTC() {                  /* Hook to tycons and classes in   */
 #endif
         mkTypes();
 
-        nameMkC         = addPrimCfun(findText("C#"),1,0,CHAR_REP);
-        nameMkI         = addPrimCfun(findText("I#"),1,0,INT_REP);
+        QQ(nameMkC       )  = addPrimCfunREP(findText("C#"),1,0,CHAR_REP);
+        QQ(nameMkI       )  = addPrimCfunREP(findText("I#"),1,0,INT_REP);
 #ifdef PROVIDE_INT64
-        nameMkInt64     = addPrimCfun(findText("Int64#"),1,0,INT64_REP);
+        QQ(nameMkInt64   )  = addPrimCfunREP(findText("Int64#"),1,0,INT64_REP);
 #endif
 #ifdef PROVIDE_WORD
-        nameMkW         = addPrimCfun(findText("W#"),1,0,WORD_REP);
+        QQ(nameMkW       )  = addPrimCfunREP(findText("W#"),1,0,WORD_REP);
 #endif
 #ifdef PROVIDE_ADDR
-        nameMkA         = addPrimCfun(findText("A#"),1,0,ADDR_REP);
+        QQ(nameMkA       )  = addPrimCfunREP(findText("A#"),1,0,ADDR_REP);
 #endif
-        nameMkF         = addPrimCfun(findText("F#"),1,0,FLOAT_REP);
-        nameMkD         = addPrimCfun(findText("D#"),1,0,DOUBLE_REP);
+        QQ(nameMkF       )  = addPrimCfunREP(findText("F#"),1,0,FLOAT_REP);
+        QQ(nameMkD       )  = addPrimCfunREP(findText("D#"),1,0,DOUBLE_REP);
 #ifdef PROVIDE_STABLE
-        nameMkStable    = addPrimCfun(findText("Stable#"),1,0,STABLE_REP);
+        QQ(nameMkStable  )  = addPrimCfunREP(findText("Stable#"),1,0,STABLE_REP);
 #endif
 
 #ifdef PROVIDE_INTEGER
-        nameMkInteger   = addPrimCfun(findText("Integer#"),1,0,0);
+        QQ(nameMkInteger )  = addPrimCfunREP(findText("Integer#"),1,0,0);
 #endif
 #ifdef PROVIDE_FOREIGN
-        nameMkForeign   = addPrimCfun(findText("Foreign#"),1,0,0);
+        QQ(nameMkForeign )  = addPrimCfunREP(findText("Foreign#"),1,0,0);
 #endif
 #ifdef PROVIDE_WEAK
-        nameMkWeak      = addPrimCfun(findText("Weak#"),1,0,0);
+        QQ(nameMkWeak    )  = addPrimCfunREP(findText("Weak#"),1,0,0);
 #endif
 #ifdef PROVIDE_ARRAY
-        nameMkPrimArray            = addPrimCfun(findText("PrimArray#"),1,0,0);
-        nameMkPrimByteArray        = addPrimCfun(findText("PrimByteArray#"),1,0,0);
-        nameMkRef                  = addPrimCfun(findText("Ref#"),1,0,0);
-        nameMkPrimMutableArray     = addPrimCfun(findText("PrimMutableArray#"),1,0,0);
-        nameMkPrimMutableByteArray = addPrimCfun(findText("PrimMutableByteArray#"),1,0,0);
+        QQ(nameMkPrimArray           ) = addPrimCfunREP(findText("PrimArray#"),1,0,0);
+        QQ(nameMkPrimByteArray       ) = addPrimCfunREP(findText("PrimByteArray#"),1,0,0);
+        QQ(nameMkRef                 ) = addPrimCfunREP(findText("Ref#"),1,0,0);
+        QQ(nameMkPrimMutableArray    ) = addPrimCfunREP(findText("PrimMutableArray#"),1,0,0);
+        QQ(nameMkPrimMutableByteArray) = addPrimCfunREP(findText("PrimMutableByteArray#"),1,0,0);
 #endif
 #ifdef PROVIDE_CONCURRENT
-        nameMkThreadId  = addPrimCfun(findText("ThreadId#"),1,0,0);
-        nameMkMVar      = addPrimCfun(findText("MVar#"),1,0,0);
+        QQ(nameMkThreadId)  = addPrimCfun(findTextREP("ThreadId#"),1,0,0);
+        QQ(nameMkMVar    )  = addPrimCfun(findTextREP("MVar#"),1,0,0);
 #endif
-
+#if 1
+        /* The following primitives are referred to in derived instances and
+         * hence require types; the following types are a little more general
+         * than we might like, but they are the closest we can get without a
+         * special datatype class.
+         */
+        name(nameConCmp).type
+            = mkPolyType(starToStar,fn(aVar,fn(aVar,typeOrdering)));
+        name(nameEnRange).type
+            = mkPolyType(starToStar,fn(boundPair,listof));
+        name(nameEnIndex).type
+            = mkPolyType(starToStar,fn(boundPair,fn(aVar,typeInt)));
+        name(nameEnInRng).type
+            = mkPolyType(starToStar,fn(boundPair,fn(aVar,typeBool)));
+        name(nameEnToEn).type
+            = mkPolyType(starToStar,fn(aVar,fn(typeInt,aVar)));
+        name(nameEnFrEn).type
+            = mkPolyType(starToStar,fn(aVar,typeInt));
+        name(nameEnFrom).type
+            = mkPolyType(starToStar,fn(aVar,listof));
+        name(nameEnFrTo).type
+            = name(nameEnFrTh).type
+            = mkPolyType(starToStar,fn(aVar,fn(aVar,listof)));
+#endif
 #if EVAL_INSTANCES
         addEvalInst(0,typeArrow,2,NIL); /* Add Eval instances for (->)     */
 #endif
@@ -403,42 +468,55 @@ Void linkPreludeTC() {                  /* Hook to tycons and classes in   */
     }
 }
 
-static Void mkTypes()
+static Void mkTypes ( void )
 {
-    arrow          = fn(aVar,mkOffset(1));
-    listof         = ap(typeList,aVar);
-    predNum        = ap(classNum,aVar);
-    predFractional = ap(classFractional,aVar);
-    predIntegral   = ap(classIntegral,aVar);
-    predMonad      = ap(classMonad,aVar);
-    /*predMonad0     = ap(classMonad0,aVar);*/
+        //qqfail QQ(arrow         ) = fn(aVar,mkOffset(1));
+        //qqfail QQ(listof        ) = ap(typeList,aVar);
+        QQ(predNum       ) = ap(classNum,aVar);
+        QQ(predFractional) = ap(classFractional,aVar);
+        QQ(predIntegral  ) = ap(classIntegral,aVar);
+        QQ(predMonad     ) = ap(classMonad,aVar);
 }
 
-Void linkPreludeCM() {                  /* Hook to cfuns and mfuns in      */
+Void linkPreludeCM(void) {              /* Hook to cfuns and mfuns in      */
     static Bool initialised = FALSE;    /* prelude when first loaded       */
     if (!initialised) {
         Int i;
         initialised = TRUE;
-        setCurrModule(modulePreludeHugs);
+        ////setCurrModule(modulePreludeHugs);
+        setCurrModule(modulePrelude);
         /* constructors */
-        nameFalse       = linkName("False");
-        nameTrue        = linkName("True");
-        nameNil         = linkName("[]");
-        nameCons        = linkName(":");
-        nameUnit        = linkName("()");
+        QQ(nameFalse     )  = linkName("False");
+        QQ(nameTrue      )  = linkName("True");
+        //qqfail QQ(nameNil       )  = linkName("[]");
+        //qqfail QQ(nameCons      )  = linkName(":");
+        //qqfail QQ(nameUnit      )  = linkName("()");
         /* members */
-        nameEq          = linkName("==");
-        nameFromInt     = linkName("fromInt");
-        nameFromInteger = linkName("fromInteger");
-        nameFromDouble  = linkName("fromDouble");
+        QQ(nameEq        )  = linkName("==");
+        QQ(nameFromInt   )  = linkName("fromInt");
+        QQ(nameFromInteger) = linkName("fromInteger");
+        QQ(nameFromDouble)  = linkName("fromDouble");
 #if EVAL_INSTANCES
         nameStrict      = linkName("strict");
         nameSeq         = linkName("seq");
 #endif
-        nameReturn      = linkName("return");
-        nameBind        = linkName(">>=");
-        nameZero        = linkName("zero");
+        QQ(nameReturn    )  = linkName("return");
+        QQ(nameBind      )  = linkName(">>=");
 
+        QQ(nameLe        )  = linkName("<=");
+        QQ(nameGt        )  = linkName(">");
+        QQ(nameShowsPrec )  = linkName("showsPrec");
+        QQ(nameReadsPrec )  = linkName("readsPrec");
+        QQ(nameEQ        )  = linkName("EQ");
+        QQ(nameCompare   )  = linkName("compare");
+        QQ(nameMinBnd    )  = linkName("minBound");
+        QQ(nameMaxBnd    )  = linkName("maxBound");
+        QQ(nameRange     )  = linkName("range");
+        QQ(nameIndex     )  = linkName("index");
+        QQ(namePlus      )  = linkName("+");
+        QQ(nameMult      )  = linkName("*");
+        QQ(nameRangeSize )  = linkName("rangeSize");
+        QQ(nameInRange   )  = linkName("inRange");
         /* These come before calls to implementPrim */
         for(i=0; i<NUM_TUPLES; ++i) {
             implementTuple(i);
@@ -446,15 +524,16 @@ Void linkPreludeCM() {                  /* Hook to cfuns and mfuns in      */
     }
 }
 
-Void linkPreludeNames() {               /* Hook to names defined in Prelude */
+Void linkPreludeNames(void) {           /* Hook to names defined in Prelude */
     static Bool initialised = FALSE;
     if (!initialised) {
         Int i;
         initialised = TRUE;
-        setCurrModule(modulePreludeHugs);
+
+        setCurrModule(modulePrelude);
 
         /* primops */
-        nameMkIO          = linkName("primMkIO");
+        QQ(nameMkIO)          = linkName("primMkIO");
         for (i=0; asmPrimOps[i].name; ++i) {
             Text t = findText(asmPrimOps[i].name);
             Name n = findName(t);
@@ -471,41 +550,83 @@ Void linkPreludeNames() {               /* Hook to names defined in Prelude */
             implementPrim(n);
         }
 
+        /* hooks for handwritten bytecode */
+        {
+           StgVar vv = mkStgVar(NIL,NIL);
+           Text t = findText("primSeq");
+           Name n = newName(t,NIL);
+           name(n).line = name(n).defn = 0;
+           name(n).arity = 1;
+           name(n).type = primType(MONAD_Id, "ab", "b");
+           vv = mkStgVar(NIL,NIL);
+           stgVarInfo(vv) = mkPtr ( asm_BCO_seq() );
+           name(n).stgVar = vv;
+           stgGlobals=cons(pair(n,vv),stgGlobals);
+        }
+
+        {
+           StgVar vv = mkStgVar(NIL,NIL);
+           Text t = findText("primCatch");
+           Name n = newName(t,NIL);
+           name(n).line = name(n).defn = 0;
+           name(n).arity = 2;
+           name(n).type = primType(MONAD_Id, "aH", "a");
+           stgVarInfo(vv) = mkPtr ( asm_BCO_catch() );
+           name(n).stgVar = vv;
+           stgGlobals=cons(pair(n,vv),stgGlobals);
+        }
+
+        {
+           StgVar vv = mkStgVar(NIL,NIL);
+           Text t = findText("primRaise");
+           Name n = newName(t,NIL);
+           name(n).line = name(n).defn = 0;
+           name(n).arity = 1;
+           name(n).type = primType(MONAD_Id, "E", "a");
+           stgVarInfo(vv) = mkPtr ( asm_BCO_raise() );
+           name(n).stgVar = vv;
+           stgGlobals=cons(pair(n,vv),stgGlobals);
+        }
+
+        /* static(tidyInfix)                        */
+        QQ(nameNegate    )    = linkName("negate");
         /* user interface                           */
-        nameRunIO         = linkName("primRunIO");
-        namePrint         = linkName("print");
+        QQ(nameRunIO     )    = linkName("primRunIO");
+        QQ(namePrint     )    = linkName("print");
         /* typechecker (undefined member functions) */
-        nameError         = linkName("error");
+        //qqfail QQ(nameError     )    = linkName("error");
         /* desugar                                  */
-        nameId            = linkName("id");
-        nameOtherwise     = linkName("otherwise");
-        nameUndefined     = linkName("undefined");
+        //qqfail QQ(nameId        )    = linkName("id");
+        QQ(nameOtherwise )    = linkName("otherwise");
+        QQ(nameUndefined )    = linkName("undefined");
         /* pmc                                      */
 #if NPLUSK                      
         namePmSub         = linkName("primPmSub");
 #endif                          
         /* translator                               */
-        nameUnpackString  = linkName("primUnpackString");
-        namePMFail        = linkName("primPmFail");
-        nameEqChar        = linkName("primEqChar");
-        nameEqInt         = linkName("primEqInt");
+        ////nameUnpackString  = linkName("primUnpackString");
+        ////namePMFail        = linkName("primPmFail");
+        QQ(nameEqChar    )    = linkName("primEqChar");
+        QQ(nameEqInt     )    = linkName("primEqInt");
 #if !OVERLOADED_CONSTANTS
-        nameEqInteger     = linkName("primEqInteger");
+        QQ(nameEqInteger )    = linkName("primEqInteger");
 #endif /* !OVERLOADED_CONSTANTS */
-        nameEqDouble      = linkName("primEqDouble");
-        namePmInt         = linkName("primPmInt");
-        namePmInteger     = linkName("primPmInteger");
-        namePmDouble      = linkName("primPmDouble");
-        namePmLe          = linkName("primPmLe");
-        namePmSubtract    = linkName("primPmSubtract");
-        namePmFromInteger = linkName("primPmFromInteger");
+        QQ(nameEqDouble  )    = linkName("primEqDouble");
+        QQ(namePmInt     )    = linkName("primPmInt");
+        ////namePmInteger     = linkName("primPmInteger");
+        ////namePmDouble      = linkName("primPmDouble");
+        ////namePmLe          = linkName("primPmLe");
+        ////namePmSubtract    = linkName("primPmSubtract");
+        ////namePmFromInteger = linkName("primPmFromInteger");
     }
 }
 
+
+/* ToDo: fix pFun (or eliminate its use) */
+#define pFun(n,s)    QQ(n) = predefinePrim(s)
+
 Void linkControl(what)
 Int what; {
-    Int  i;
-
     switch (what) {
         case RESET   :
         case MARK    : 
@@ -513,219 +634,59 @@ Int what; {
 
         case INSTALL : linkControl(RESET);
 
-                       modulePreludeHugs = newModule(findText("PreludeBuiltin"));
-
-                       setCurrModule(modulePreludeHugs);
+                       modulePrelude = newModule(textPrelude);
+                       setCurrModule(modulePrelude);
 
                        typeArrow = addPrimTycon(findText("(->)"),
                                                 pair(STAR,pair(STAR,STAR)),
                                                 2,DATATYPE,NIL);
 
-                       /* ToDo: fix pFun (or eliminate its use) */
-#define pFun(n,s,t)    n = predefinePrim(s)
                        /* newtype and USE_NEWTYPE_FOR_DICTS     */
-                       pFun(nameId,             "id",       "id");
+                       pFun(nameId,             "id");
+
                        /* desugaring                            */
-                       pFun(nameInd,            "_indirect","error");
+                       pFun(nameInd,            "_indirect");
                        name(nameInd).number = DFUNNAME;
+
                        /* pmc                                   */
-                       pFun(nameSel,            "_SEL",     "sel");
+                       pFun(nameSel,            "_SEL");
+
                        /* strict constructors                   */
-                       pFun(nameForce,          "primForce","id");
+                       pFun(nameFlip,           "flip"     );
+
+                       /* parser                                */
+                       pFun(nameFromTo,         "enumFromTo");
+                       pFun(nameFromThenTo,     "enumFromThenTo");
+                       pFun(nameFrom,           "enumFrom");
+                       pFun(nameFromThen,       "enumFromThen");
+
+                       /* deriving                              */
+                       pFun(nameApp,            "++");
+                       pFun(nameReadParen,      "readParen");
+                       pFun(nameShowParen,      "showParen");
+                       pFun(nameLex,            "lex");
+                       pFun(nameEnToEn,         "toEnumPR"); //not sure
+                       pFun(nameEnFrEn,         "fromEnum"); //not sure
+                       pFun(nameEnFrom,         "enumFrom"); //not sure
+                       pFun(nameEnFrTh,         "enumFromThen"); //not sure
+                       pFun(nameEnFrTo,         "enumFromTo"); //not sure
+                       pFun(nameEnRange,        "range"); //not sure
+                       pFun(nameEnIndex,        "index"); //not sure
+                       pFun(nameEnInRng,        "inRange"); //not sure
+                       pFun(nameConCmp,         "_concmp"); //very not sure
+                       pFun(nameComp,           ".");
+                       pFun(nameAnd,            "&&");
+                       pFun(nameCompAux,        "primCompAux");
+
                        /* implementTagToCon                     */
-                       pFun(namePMFail,         "primPmFail","primPmFail");
-		       pFun(nameError,          "error","error");
-		       pFun(nameUnpackString, "primUnpackString", "primUnpackString");
-#undef pFun
+                       pFun(namePMFail,         "primPmFail");
+		       pFun(nameError,          "error");
+		       pFun(nameUnpackString,   "primUnpackString");
 
                        break;
     }
 }
+#undef pFun
+
 
 /*-------------------------------------------------------------------------*/
-
-
-#if 0
---## this stuff from 98
---## 
---## 
---## Void linkPreludeTC() {                  /* Hook to tycons and classes in   */
---##     if (isNull(typeBool)) {             /* prelude when first loaded       */
---##         Int i;
---## 
---##         typeBool     = findTycon(findText("Bool"));
---##         typeChar     = findTycon(findText("Char"));
---##         typeString   = findTycon(findText("String"));
---##         typeInt      = findTycon(findText("Int"));
---##         typeInteger  = findTycon(findText("Integer"));
---##         typeDouble   = findTycon(findText("Double"));
---##         typeAddr     = findTycon(findText("Addr"));
---##         typeMaybe    = findTycon(findText("Maybe"));
---##         typeOrdering = findTycon(findText("Ordering"));
---##         if (isNull(typeBool) || isNull(typeChar)   || isNull(typeString)  ||
---##             isNull(typeInt)  || isNull(typeDouble) || isNull(typeInteger) ||
---##             isNull(typeAddr) || isNull(typeMaybe)  || isNull(typeOrdering)) {
---##             ERRMSG(0) "Prelude does not define standard types"
---##             EEND;
---##         }
---##         stdDefaults  = cons(typeInteger,cons(typeDouble,NIL));
---## 
---##         classEq      = findClass(findText("Eq"));
---##         classOrd     = findClass(findText("Ord"));
---##         classIx      = findClass(findText("Ix"));
---##         classEnum    = findClass(findText("Enum"));
---##         classShow    = findClass(findText("Show"));
---##         classRead    = findClass(findText("Read"));
---## #if EVAL_INSTANCES
---##         classEval    = findClass(findText("Eval"));
---## #endif
---##         classBounded = findClass(findText("Bounded"));
---##         if (isNull(classEq)   || isNull(classOrd) || isNull(classRead) ||
---##             isNull(classShow) || isNull(classIx)  || isNull(classEnum) ||
---## #if EVAL_INSTANCES
---##             isNull(classEval) ||
---## #endif
---##             isNull(classBounded)) {
---##             ERRMSG(0) "Prelude does not define standard classes"
---##             EEND;
---##         }
---## 
---##         classReal       = findClass(findText("Real"));
---##         classIntegral   = findClass(findText("Integral"));
---##         classRealFrac   = findClass(findText("RealFrac"));
---##         classRealFloat  = findClass(findText("RealFloat"));
---##         classFractional = findClass(findText("Fractional"));
---##         classFloating   = findClass(findText("Floating"));
---##         classNum        = findClass(findText("Num"));
---##         if (isNull(classReal)       || isNull(classIntegral)  ||
---##             isNull(classRealFrac)   || isNull(classRealFloat) ||
---##             isNull(classFractional) || isNull(classFloating)  ||
---##             isNull(classNum)) {
---##             ERRMSG(0) "Prelude does not define numeric classes"
---##             EEND;
---##         }
---##         predNum         = ap(classNum,aVar);
---##         predFractional  = ap(classFractional,aVar);
---##         predIntegral    = ap(classIntegral,aVar);
---## 
---##         classMonad  = findClass(findText("Monad"));
---##         if (isNull(classMonad)) {
---##             ERRMSG(0) "Prelude does not define Monad class"
---##             EEND;
---##         }
---##         predMonad  = ap(classMonad,aVar);
---## 
---## #if IO_MONAD
---##         {   Type typeIO = findTycon(findText("IO"));
---##             if (isNull(typeIO)) {
---##                 ERRMSG(0) "Prelude does not define IO monad constructor"
---##                 EEND;
---##             }
---##             typeProgIO = ap(typeIO,aVar);
---##         }
---## #endif
---## 
---##         /* The following primitives are referred to in derived instances and
---##          * hence require types; the following types are a little more general
---##          * than we might like, but they are the closest we can get without a
---##          * special datatype class.
---##          */
---##         name(nameConCmp).type
---##             = mkPolyType(starToStar,fn(aVar,fn(aVar,typeOrdering)));
---##         name(nameEnRange).type
---##             = mkPolyType(starToStar,fn(boundPair,listof));
---##         name(nameEnIndex).type
---##             = mkPolyType(starToStar,fn(boundPair,fn(aVar,typeInt)));
---##         name(nameEnInRng).type
---##             = mkPolyType(starToStar,fn(boundPair,fn(aVar,typeBool)));
---##         name(nameEnToEn).type
---##             = mkPolyType(starToStar,fn(aVar,fn(typeInt,aVar)));
---##         name(nameEnFrEn).type
---##             = mkPolyType(starToStar,fn(aVar,typeInt));
---##         name(nameEnFrom).type
---##             = mkPolyType(starToStar,fn(aVar,listof));
---##         name(nameEnFrTo).type
---##             = name(nameEnFrTh).type
---##             = mkPolyType(starToStar,fn(aVar,fn(aVar,listof)));
---## 
---## #if EVAL_INSTANCES
---##         addEvalInst(0,typeArrow,2,NIL); /* Add Eval instances for builtins */
---##         addEvalInst(0,typeList,1,NIL);
---##         addEvalInst(0,typeUnit,0,NIL);
---## #endif
---##         for (i=2; i<=NUM_DTUPLES; i++) {/* Add derived instances of tuples */
---## #if EVAL_INSTANCES
---##             addEvalInst(0,mkTuple(i),i,NIL);
---## #endif
---##             addTupInst(classEq,i);
---##             addTupInst(classOrd,i);
---##             addTupInst(classShow,i);
---##             addTupInst(classRead,i);
---##             addTupInst(classIx,i);
---##         }
---##     }
---## }
---## 
---## 
---## static Void linkPreludeCM() {           /* Hook to cfuns and mfuns in      */
---##     if (isNull(nameFalse)) {            /* prelude when first loaded       */
---##         nameFalse   = findName(findText("False"));
---##         nameTrue    = findName(findText("True"));
---##         nameJust    = findName(findText("Just"));
---##         nameNothing = findName(findText("Nothing"));
---##         nameLeft    = findName(findText("Left"));
---##         nameRight   = findName(findText("Right"));
---##         nameLT      = findName(findText("LT"));
---##         nameEQ      = findName(findText("EQ"));
---##         nameGT      = findName(findText("GT"));
---##         if (isNull(nameFalse) || isNull(nameTrue)    ||
---##             isNull(nameJust)  || isNull(nameNothing) ||
---##             isNull(nameLeft)  || isNull(nameRight)   ||
---##             isNull(nameLT)    || isNull(nameEQ)      || isNull(nameGT)) {
---##             ERRMSG(0) "Prelude does not define standard constructors"
---##             EEND;
---##         }
---## 
---##         nameFromInt     = findName(findText("fromInt"));
---##         nameFromInteger = findName(findText("fromInteger"));
---##         nameFromDouble  = findName(findText("fromDouble"));
---##         nameEq          = findName(findText("=="));
---##         nameCompare     = findName(findText("compare"));
---##         nameLe          = findName(findText("<="));
---##         nameGt          = findName(findText(">"));
---##         nameShowsPrec   = findName(findText("showsPrec"));
---##         nameReadsPrec   = findName(findText("readsPrec"));
---##         nameIndex       = findName(findText("index"));
---##         nameInRange     = findName(findText("inRange"));
---##         nameRange       = findName(findText("range"));
---##         nameMult        = findName(findText("*"));
---##         namePlus        = findName(findText("+"));
---##         nameMinBnd      = findName(findText("minBound"));
---##         nameMaxBnd      = findName(findText("maxBound"));
---## #if EVAL_INSTANCES
---##         nameStrict      = findName(findText("strict"));
---##         nameSeq         = findName(findText("seq"));
---## #endif
---##         nameReturn      = findName(findText("return"));
---##         nameBind        = findName(findText(">>="));
---##         nameMFail       = findName(findText("fail"));
---##         if (isNull(nameFromInt)   || isNull(nameFromDouble)  ||
---##             isNull(nameEq)        || isNull(nameCompare)     ||
---##             isNull(nameLe)        || isNull(nameGt)          ||
---##             isNull(nameShowsPrec) || isNull(nameReadsPrec)   ||
---##             isNull(nameIndex)     || isNull(nameInRange)     ||
---##             isNull(nameRange)     || isNull(nameMult)        ||
---##             isNull(namePlus)      || isNull(nameFromInteger) ||
---##             isNull(nameMinBnd)    || isNull(nameMaxBnd)      ||
---## #if EVAL_INSTANCES
---##             isNull(nameStrict)    || isNull(nameSeq)         ||
---## #endif
---##             isNull(nameReturn)    || isNull(nameBind)        ||
---##             isNull(nameMFail)) {
---##             ERRMSG(0) "Prelude does not define standard members"
---##             EEND;
---##         }
---##     }
---## }
---## 
-#endif

@@ -1,11 +1,12 @@
-/* -*- mode: hugs-c; -*- */
+
 /* -----------------------------------------------------------------------------
- * $Id: Disassembler.c,v 1.3 1999/02/05 16:02:37 simonm Exp $
- *
- * Copyright (c) The GHC Team 1994-1999.
- *
  * Bytecode disassembler
  *
+ * Copyright (c) 1994-1998.
+ *
+ * $RCSfile: Disassembler.c,v $
+ * $Revision: 1.4 $
+ * $Date: 1999/03/01 14:47:05 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -115,7 +116,9 @@ static InstrPtr disConstAddr ( StgBCO *bco, InstrPtr pc, char* i )
 static InstrPtr disConstChar ( StgBCO *bco, InstrPtr pc, char* i )
 {
     StgChar x = bcoConstChar(bco,bcoInstr(bco,pc++));
-    fprintf(stderr,"%s '%c'",i,x);
+    if (isprint((int)x))
+       fprintf(stderr,"%s '%c'",i,x); else
+       fprintf(stderr,"%s 0x%x",i,(int)x);
     return pc;
 }
 
@@ -180,7 +183,6 @@ InstrPtr disInstr( StgBCO *bco, InstrPtr pc )
 
     case i_VOID:
             return disNone(bco,pc,"VOID");
-
     case i_RETURN_GENERIC:
             return disNone(bco,pc,"RETURN_GENERIC");
 
@@ -287,6 +289,10 @@ InstrPtr disInstr( StgBCO *bco, InstrPtr pc )
             switch (op) {
             case i_INTERNAL_ERROR1:
                     return disNone(bco,pc,"INTERNAL_ERROR1");
+            case i_pushseqframe:
+                    return disNone(bco,pc,"i_pushseqframe");
+            case i_pushcatchframe:
+                    return disNone(bco,pc,"i_pushcatchframe");
             default:
                 {
                     const AsmPrim* p = asmFindPrimop(i_PRIMOP1,op);
@@ -307,6 +313,8 @@ InstrPtr disInstr( StgBCO *bco, InstrPtr pc )
                     return disNone(bco,pc,"ccall_Id");
             case i_ccall_IO:
                     return disNone(bco,pc,"ccall_IO");
+            case i_raise:
+                    return disNone(bco,pc,"primRaise");
             default:
                 {
                     const AsmPrim* p = asmFindPrimop(i_PRIMOP2,op);
@@ -332,6 +340,12 @@ void  disassemble( StgBCO *bco, char* prefix )
         pc = disInstr(bco,pc);
         fprintf(stderr,"\n");
     }
+    if (bco->stgexpr) { 
+       ppStgExpr(bco->stgexpr);
+       fprintf(stderr, "\n");
+    }
+    else
+       fprintf(stderr, "\t(handwritten bytecode)\n" );
 }
 
 #endif /* INTERPRETER */

@@ -1,6 +1,6 @@
-/* -*- mode: hugs-c; -*- */
+
 /* -----------------------------------------------------------------------------
- * $Id: ForeignCall.c,v 1.3 1999/02/05 16:02:40 simonm Exp $
+ * $Id: ForeignCall.c,v 1.4 1999/03/01 14:47:06 sewardj Exp $
  *
  * (c) The GHC Team 1994-1999.
  *
@@ -33,6 +33,7 @@ void hcall( HFunDescriptor* d, StablePtr fun, void* as, void* rs)
 #endif
 }
 
+#if 0
 /* By experiment on an x86 box, we found that gcc's
  * __builtin_apply(fun,as,size) expects *as to look like this:
  *   as[0] = &first arg = &as[1]
@@ -111,6 +112,65 @@ void ccall( CFunDescriptor* d, void (*fun)(void) )
         }
     }
 }
+#endif
+
+
+
+
+#if 1
+/* HACK alert (red alert) */
+extern StgInt          PopTaggedInt       ( void ) ;
+extern void PushTaggedInt ( StgInt );
+extern StgPtr PopPtr ( void );
+
+int seqNr = 0;
+#define IF(sss) if (strcmp(sss,cdesc)==0)
+void ccall( CFunDescriptor* d, void (*fun)(void) )
+{
+   int i;
+   char cdesc[100];
+   strcpy(cdesc, d->result_tys);
+   strcat(cdesc, ":");
+   strcat(cdesc, d->arg_tys);
+   for (i = 0; cdesc[i] != 0; i++) {
+      switch (cdesc[i]) {
+         case 'x': cdesc[i] = 'A'; break;
+         default:  break;
+      }
+   }
+
+   //fprintf(stderr, "ccall: %d cdesc = `%s'\n", seqNr++, cdesc);
+
+   IF(":") { ((void(*)(void))(fun))(); return; };
+   IF(":I") { int a1=PopTaggedInt(); ((void(*)(int))(fun))(a1); return;};
+   IF("I:") { int r= ((int(*)(void))(fun))(); PushTaggedInt(r); return;};
+   IF(":II") { int a1=PopTaggedInt(); int a2=PopTaggedInt();
+               ((void(*)(int,int))(fun))(a1,a2); return; };
+   IF("I:I") { int a1=PopTaggedInt();
+              int r=((int(*)(int))(fun))(a1); PushTaggedInt(r); return; };
+   IF("I:II") { int a1=PopTaggedInt(); int a2=PopTaggedInt();
+              int r=((int(*)(int,int))(fun))(a1,a2); PushTaggedInt(r); return; };
+   IF("I:III") { int a1=PopTaggedInt(); int a2=PopTaggedInt(); int a3=PopTaggedInt();
+              int r=((int(*)(int,int,int))(fun))(a1,a2,a3); PushTaggedInt(r); return; };
+
+   //IF("I:AI") { void* a1=(void*)PopPtr(); int a2=PopTaggedInt();
+   //           int r=((int(*)(void*,int))(fun))(a1,a2); PushTaggedInt(r); return; };
+
+fprintf(stderr,"panic: ccall cdesc `%s' not implemented\n", cdesc );
+   exit(1);
+
+
+fprintf(stderr, 
+        "ccall: arg_tys %s arg_size %d result_tys %s result_size %d\n",
+        d->arg_tys, d->arg_size, d->result_tys, d->result_size );
+}
+#undef IF
+#endif
+
+
+
+
+
 
 CFunDescriptor* mkDescriptor( char* as, char* rs ) 
 { 

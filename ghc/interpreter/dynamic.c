@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: dynamic.c,v $
- * $Revision: 1.3 $
- * $Date: 1999/02/03 17:08:28 $
+ * $Revision: 1.4 $
+ * $Date: 1999/03/01 14:46:45 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <dlfcn.h>
 
+#if 0 /* apparently unused */
 ObjectFile loadLibrary(fn)
 String fn; {
     return dlopen(fn,RTLD_NOW | RTLD_GLOBAL);
@@ -31,6 +32,7 @@ ObjectFile file;
 String symbol; {
     return dlsym(file,symbol);
 }
+#endif
 
 void* getDLLSymbol(dll,symbol)  /* load dll and lookup symbol */
 String dll;

@@ -8,14 +8,15 @@
  * in the distribution for details.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.3 $
- * $Date: 1999/02/03 17:08:37 $
+ * $Revision: 1.4 $
+ * $Date: 1999/03/01 14:46:51 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
 #include "storage.h"
 #include "backend.h"
 #include "connect.h"
+#include "link.h"
 #include "errors.h"
 #include "subst.h"
 
@@ -80,7 +81,6 @@ static Type   local depCompType         Args((Int,List,Type));
 static Type   local depTypeExp          Args((Int,List,Type));
 static Type   local depTypeVar          Args((Int,List,Text));
 static List   local checkQuantVars      Args((Int,List,List,Cell));
-static List   local offsetTyvarsIn      Args((Type,List));
 static Void   local kindConstr          Args((Int,Int,Int,Constr));
 static Kind   local kindAtom            Args((Int,Constr));
 static Void   local kindPred            Args((Int,Int,Int,Cell));
@@ -107,20 +107,11 @@ static Cell   local copyAdj             Args((Cell,Int,Int));
 static Void   local tidyDerInst         Args((Inst));
 
 static Void   local addDerivImp         Args((Inst));
-static List   local getDiVars           Args((Int));
-static Cell   local mkBind              Args((String,List));
-static Cell   local mkVarAlts           Args((Int,Cell));
-
-static List   local makeDPats2          Args((Cell,Int));
-
-static Bool   local isEnumType          Args((Tycon));
 
 static Void   local checkDefaultDefns   Args((Void));
 
 static Void   local checkForeignImport Args((Name));
 static Void   local checkForeignExport Args((Name));
-
-static Name   local addNewPrim          Args((Int,Text,String,Cell));
 
 static Cell   local tidyInfix           Args((Int,Cell));
 static Pair   local attachFixity        Args((Int,Cell));
@@ -1060,8 +1051,6 @@ Name c; {                               /* CDICTS parameters               */
     return a;
 }
 
-static List cfunSfuns;                  /* List of (Cfun,[SelectorVar])    */
-                                        /*  - used for deriving Show       */
 
 static List local addSels(line,c,fs,ss) /* Add fields to selector list     */
 Int  line;                              /* line number of constructor      */
@@ -1554,6 +1543,7 @@ Class c; {                              /* and other parts of class struct.*/
     List ns  = NIL;                     /* List of names                   */
     Int  mno;                           /* Member function number          */
 
+//printf ( "\naddMembers: class = %s\n", textToStr ( cclass(c).text ) );
     for (mno=0; mno<cclass(c).numSupers; mno++) {
         ns = cons(newDSel(c,mno),ns);
     }
@@ -1597,6 +1587,8 @@ Class c; {                              /* and other parts of class struct.*/
 
     mno                  = cclass(c).numSupers + cclass(c).numMembers;
     cclass(c).dcon       = addPrimCfun(generateText("Make.%s",c),mno,0,NIL);
+    implementCfun(cclass(c).dcon,NIL); /* ADR addition */
+
     if (mno==1) {                       /* Single entry dicts use newtype  */
         name(cclass(c).dcon).defn = nameId;
         name(hd(cclass(c).members)).number = mfunNo(0);
@@ -1625,6 +1617,9 @@ Class parent; {
     name(m).arity  = 1;
     name(m).number = mfunNo(no);
     name(m).type   = t;
+//printf ( "   [%d %d] %s :: ", m, m-NAMEMIN, textToStr ( name(m).text ) );
+//printType(stdout, t );
+//printf ( "\n" );
     return m;
 }
 
@@ -2023,7 +2018,7 @@ Cell body; {                            /* type/constr for scope of vars   */
  * A type  Preds => type  is ambiguous if not (TV(P) `subset` TV(type))
  * ------------------------------------------------------------------------*/
 
-static List local offsetTyvarsIn(t,vs)  /* add list of offset tyvars in t  */
+List offsetTyvarsIn(t,vs)               /* add list of offset tyvars in t  */
 Type t;                                 /* to list vs                      */
 List vs; {
     switch (whatIs(t)) {
@@ -2467,7 +2462,7 @@ Inst in; {
                                         extractBindings(inst(in).implements));
     inst(in).builder    = newInstImp(in);
     /*ToDo*/
-fprintf(stderr, "\npreludeLoaded query\n" );
+    //fprintf(stderr, "\npreludeLoaded query\n" );
     if (/*!preludeLoaded &&*/ isNull(nameListMonad) && isAp(inst(in).head)
         && fun(inst(in).head)==classMonad && arg(inst(in).head)==typeList) {
         nameListMonad = inst(in).builder;
@@ -4102,8 +4097,12 @@ List bs; {                              /* top level, reporting on progress*/
     Int  i = 0;
 
     setGoal("Dependency analysis",(Target)(length(bs)));
+
     mapProc(addDepField,bs);           /* add extra field for dependents   */
     for (xs=bs; nonNull(xs); xs=tl(xs)) {
+
+      //Printf("\n-----------------------------------------\n" ); print(hd(xs),1000); Printf("\n");
+
         emptySubstitution();
         depBinding(hd(xs));
         soFar((Target)(i++));
@@ -4246,6 +4245,9 @@ static Void local depClassBindings(bs) /* dependency analysis on list of   */
 List bs; {                             /* bindings, possibly containing    */
     for (; nonNull(bs); bs=tl(bs)) {   /* NIL bindings ...                 */
         if (nonNull(hd(bs))) {         /* No need to add extra field for   */
+
+	  //Printf("\n=========================================\n" ); print(hd(bs),1000); Printf("\n");
+
            mapProc(depAlt,snd(hd(bs)));/* dependency information...        */
         }
     }
@@ -4295,6 +4297,8 @@ Cell g; {                              /* expression                       */
 static Cell local depExpr(line,e)      /* find dependents of expression    */
 Int  line;
 Cell e; {
+  //    Printf( "\n\n"); print(e,100); Printf("\n");
+  //printExp(stdout,e);
     switch (whatIs(e)) {
 
         case VARIDCELL  :
@@ -4396,7 +4400,7 @@ Cell e; {
                           EEND;
 #endif
 
-        default         : internal("depExpr");
+        default         : fprintf(stderr,"whatIs(e) == %d\n",whatIs(e));internal("depExpr");
    }
    return e;
 }
@@ -4825,6 +4829,8 @@ Void checkDefns() {                     /* Top level static analysis       */
     /* primDefns  = NIL; */
 #endif
     mapProc(allNoPrevDef,valDefns);     /* check against previous defns    */
+
+    linkPreludeNames();
 
     mapProc(checkForeignImport,foreignImports); /* check foreign imports   */
     mapProc(checkForeignExport,foreignExports); /* check foreign exports   */

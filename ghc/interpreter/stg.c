@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: stg.c,v $
- * $Revision: 1.3 $
- * $Date: 1999/02/03 17:08:39 $
+ * $Revision: 1.4 $
+ * $Date: 1999/03/01 14:46:53 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -79,7 +79,7 @@ StgExpr makeStgLambda( List args, StgExpr body )
         return body;
     } else {
         if (whatIs(body) == LAMBDA) {
-            return mkStgLambda(dupOnto(args,stgLambdaArgs(body)),
+            return mkStgLambda(dupListOnto(args,stgLambdaArgs(body)),
                                stgLambdaBody(body));
         } else {
             return mkStgLambda(args,body);
@@ -119,6 +119,7 @@ StgExpr makeStgIf( StgExpr cond, StgExpr e1, StgExpr e2 )
 
 Bool isStgVar(e)
 StgRhs e; {
+  //printf("{%d %d %d} ", namePMFail, e, whatIs(e) );
     switch (whatIs(e)) {
     case STGVAR:
             return TRUE;
@@ -159,8 +160,8 @@ StgVar mkStgVar( StgRhs rhs, Cell info )
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: stg.c,v $
- * $Revision: 1.3 $
- * $Date: 1999/02/03 17:08:39 $
+ * $Revision: 1.4 $
+ * $Date: 1999/03/01 14:46:53 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -168,9 +169,6 @@ StgVar mkStgVar( StgRhs rhs, Cell info )
  * ------------------------------------------------------------------------*/
 
 static Void local pIndent        Args((Int));
-static Void local unlexVar       Args((Text));
-static Void local unlexCharConst Args((Cell));
-static Void local unlexStrConst  Args((Text));
 
 static Void local putStgVar       Args((StgVar));
 static Void local putStgVars      Args((List));
@@ -182,45 +180,6 @@ static Void local putStgRhs       Args((StgRhs));
 static Void local putStgPat       Args((StgPat));
 static Void local putStgPrimPat   Args((StgPrimPat));
 
-/* --------------------------------------------------------------------------
- * Basic output routines:
- * ------------------------------------------------------------------------*/
-
-static FILE *outputStream;             /* current output stream            */
-static Int  outColumn = 0;             /* current output column number     */
-                                           
-static Void local putChr( Int c );
-static Void local putStr( String s );
-static Void local putInt( Int n );
-static Void local putPtr( Ptr p );
-                                           
-static Void local putChr(c)            /* print single character           */
-Int c; {                                       
-    Putc(c,outputStream);                              
-    outColumn++;                                   
-}                                          
-                                           
-static Void local putStr(s)            /* print string                     */
-String s; {                                    
-    for (; *s; s++) {                                  
-        Putc(*s,outputStream);                             
-        outColumn++;                                   
-    }                                          
-}                                          
-                                           
-static Void local putInt(n)            /* print integer                    */
-Int n; {
-    static char intBuf[16];
-    sprintf(intBuf,"%d",n);
-    putStr(intBuf);
-}
-
-static Void local putPtr(p)            /* print pointer                    */
-Ptr p; {
-    static char intBuf[16];
-    sprintf(intBuf,"%p",p);
-    putStr(intBuf);
-}
 
 /* --------------------------------------------------------------------------
  * Indentation and showing names/constants
@@ -234,58 +193,13 @@ Int n; {
     }
 }
 
-static Void local unlexVar(t)          /* print text as a variable name    */
-Text t; {                              /* operator symbols must be enclosed*/
-    String s = textToStr(t);           /* in parentheses... except [] ...  */
-
-    if ((isascii(s[0]) && isalpha(s[0])) || s[0]=='_' || s[0]=='[' || s[0]=='(')
-        putStr(s);
-    else {
-        putChr('(');
-        putStr(s);
-        putChr(')');
-    }
-}
-
-static Void local unlexCharConst(c)
-Cell c; {
-    putChr('\'');
-    putStr(unlexChar(c,'\''));
-    putChr('\'');
-}
-
-static Void local unlexStrConst(t)
-Text t; {
-    String s            = textToStr(t);
-    static Char SO      = 14;          /* ASCII code for '\SO'             */
-    Bool   lastWasSO    = FALSE;
-    Bool   lastWasDigit = FALSE;
-    Bool   lastWasEsc   = FALSE;
-
-    putChr('\"');
-    for (; *s; s++) {
-        String ch = unlexChar(*s,'\"');
-        Char   c  = ' ';
-
-        if ((lastWasSO && *ch=='H') ||
-                (lastWasEsc && lastWasDigit && isascii(*ch) && isdigit(*ch)))
-            putStr("\\&");
-
-        lastWasEsc   = (*ch=='\\');
-        lastWasSO    = (*s==SO);
-        for (; *ch; c = *ch++)
-            putChr(*ch);
-        lastWasDigit = (isascii(c) && isdigit(c));
-    }
-    putChr('\"');
-}
 
 /* --------------------------------------------------------------------------
  * Pretty printer for stg code:
  * ------------------------------------------------------------------------*/
 
 static Void putStgAlts    ( Int left, List alts );
-static Void putStgPrimAlt ( Int left, List vs, StgExpr body );
+//static Void putStgPrimAlt ( Int left, List vs, StgExpr body );
 
 static Void local putStgVar(StgVar v) 
 {
@@ -433,7 +347,7 @@ List binds; {
 
 static Void putStgAlts( Int left, List alts )
 {
-    if (length(alts) == 1) {
+  if (length(alts) == 1) {
         StgCaseAlt alt = hd(alts);
         putStr("{ ");
         putStgPat(stgCaseAltPat(alt));
@@ -447,7 +361,11 @@ static Void putStgAlts( Int left, List alts )
             StgCaseAlt alt = hd(alts);
             pIndent(left+2);
             putStgPat(stgCaseAltPat(alt));
-            putStr(" -> ");
+
+            //putStr(" -> ");
+            putStr(" ->\n");
+            pIndent(left+4);
+
             putStgExpr(stgCaseAltBody(alt));
             putStr("\n");
         }
@@ -532,8 +450,10 @@ Void putStgExpr( StgExpr e )                        /* pretty print expr */
             putStgVar(e);
             break;
     default: 
-            fprintf(stderr,"\nYoiks: "); printExp(stderr,e);
-            internal("putStgExpr");
+      //fprintf(stderr,"\nYoiks: "); printExp(stderr,e);
+      //internal("putStgExpr");
+      //ToDo: rm this appalling hack
+      fprintf(stderr, "   "); putStgAlts(3,e);
     }
 }
 
@@ -564,7 +484,7 @@ static void endStgPP( FILE* fp );
 static void beginStgPP( FILE* fp )
 {
     outputStream = fp;
-    putChr('\n');
+    //putChr('\n');
     outColumn = 0;
 }
 
@@ -585,18 +505,18 @@ StgVar b;
     endStgPP(fp);
 }
 
-#if DEBUG_PRINTER
+#if 1 /*DEBUG_PRINTER*/
 Void ppStg( StgVar v )
 {
-    if (debugCode) {
+  if ( 1 /*debugCode*/ ) {
         printStg(stdout,v);
     }
 }
 
 Void ppStgExpr( StgExpr e )
 {
-    if (debugCode) {
-        beginStgPP(stdout);
+    if ( 1 /*debugCode*/ ) {
+        beginStgPP(stderr);
         putStgExpr(e);
         endStgPP(stdout);
     }
@@ -604,7 +524,7 @@ Void ppStgExpr( StgExpr e )
 
 Void ppStgRhs( StgRhs rhs )
 {
-    if (debugCode) {
+  if (1 /*debugCode*/ ) {
         beginStgPP(stdout);
         putStgRhs(rhs);
         endStgPP(stdout);

@@ -7,8 +7,8 @@
  * in the distribution for details.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.3 $
- * $Date: 1999/02/03 17:08:27 $
+ * $Revision: 1.4 $
+ * $Date: 1999/03/01 14:46:43 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -17,7 +17,7 @@
 
 extern Bool   haskell98;                /* TRUE => Haskell 98 compatibility*/
 extern Module modulePrelude;
-extern Module modulePreludeHugs;
+//extern Module modulePreludeHugs;
 
 /* --------------------------------------------------------------------------
  * Primitive constructor functions 
@@ -319,7 +319,7 @@ extern Int     InstrAt          Args((Addr));
 extern  Void   abandon          Args((String,Cell));
 extern  Void   outputString     Args((FILE *));
 extern  Void   dialogue         Args((Cell));
-#define consChar(c) ap(conCons,mkChar(c))
+#define consChar(c) ap(nameCons,mkChar(c))
 
 #if BIGNUMS
 extern  Bignum bigInt           Args((Int));
@@ -532,3 +532,30 @@ extern  Void   linkControl      Args((Int));
 extern  Void   deriveControl    Args((Int));
 extern  Void   translateControl Args((Int));
 extern  Void   codegen          Args((Int));
+extern  Void   machdep          Args((Int));
+
+extern Void linkPreludeNames(void);
+
+extern  Kind  starToStar;                /* Type -> Type                    */
+extern Type  boundPair;                 /* (mkOffset(0),mkOffset(0))       */
+extern        Type typeOrdering;
+
+extern  Type   conToTagType     Args((Tycon));
+extern  Type   tagToConType     Args((Tycon));
+
+#define BOGUS(k) (-9000000-(k))
+
+extern Void putChr  Args((Int));
+extern Void putStr  Args((String));
+extern Void putInt  Args((Int));
+extern Void putPtr  Args((Ptr));
+
+extern Void unlexCharConst Args((Cell));
+extern FILE *outputStream;             /* current output stream            */
+extern Int  outColumn;                 /* current output column number     */
+
+extern Void unlexStrConst  Args((Text));
+extern Void unlexVar       Args((Text));
+extern List offsetTyvarsIn          Args((Type,List));
+
+extern List cfunSfuns;                  /* List of (Cfun,[SelectorVar])    */

@@ -1,11 +1,12 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Evaluator.c,v 1.9 1999/02/11 17:40:24 simonm Exp $
- *
- * Copyright (c) The GHC Team 1994-1999.
- *
  * Bytecode evaluator
  *
+ * Copyright (c) 1994-1998.
+ *
+ * $RCSfile: Evaluator.c,v $
+ * $Revision: 1.10 $
+ * $Date: 1999/03/01 14:47:03 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -104,7 +105,7 @@ void defaultsHook (void)
 
 #ifdef PROVIDE_INTEGER
 static /*inline*/ mpz_ptr mpz_alloc ( void );
-static /*inline*/ void    mpz_free  ( mpz_ptr );
+//static /*inline*/ void    mpz_free  ( mpz_ptr );
 
 static /*inline*/ mpz_ptr mpz_alloc ( void )
 {
@@ -113,85 +114,87 @@ static /*inline*/ mpz_ptr mpz_alloc ( void )
     return r;
 }
 
+#if 0  /* apparently unused */
 static /*inline*/ void    mpz_free  ( mpz_ptr a )
 {
     mpz_clear(a);
     free(a);
 }
 #endif
+#endif
 
 /* --------------------------------------------------------------------------
  * 
  * ------------------------------------------------------------------------*/
 
-static /*inline*/ void            PushTag            ( StackTag    t );
-static /*inline*/ void            PushPtr            ( StgPtr      x );
-static /*inline*/ void            PushCPtr           ( StgClosure* x );
-static /*inline*/ void            PushInt            ( StgInt      x );
-static /*inline*/ void            PushWord           ( StgWord     x );
+/*static*/ /*inline*/ void            PushTag            ( StackTag    t );
+/*static*/ /*inline*/ void            PushPtr            ( StgPtr      x );
+/*static*/ /*inline*/ void            PushCPtr           ( StgClosure* x );
+/*static*/ /*inline*/ void            PushInt            ( StgInt      x );
+/*static*/ /*inline*/ void            PushWord           ( StgWord     x );
                                                  
-static /*inline*/ void            PushTag            ( StackTag    t ) { *(--Sp) = t; }
-static /*inline*/ void            PushPtr            ( StgPtr      x ) { *(--stgCast(StgPtr*,Sp))  = x; }
-static /*inline*/ void            PushCPtr           ( StgClosure* x ) { *(--stgCast(StgClosure**,Sp)) = x; }
-static /*inline*/ void            PushInt            ( StgInt      x ) { *(--stgCast(StgInt*,Sp))  = x; }
-static /*inline*/ void            PushWord           ( StgWord     x ) { *(--stgCast(StgWord*,Sp)) = x; }
+/*static*/ /*inline*/ void            PushTag            ( StackTag    t ) { *(--Sp) = t; }
+/*static*/ /*inline*/ void            PushPtr            ( StgPtr      x ) { *(--stgCast(StgPtr*,Sp))  = x; }
+/*static*/ /*inline*/ void            PushCPtr           ( StgClosure* x ) { *(--stgCast(StgClosure**,Sp)) = x; }
+/*static*/ /*inline*/ void            PushInt            ( StgInt      x ) { *(--stgCast(StgInt*,Sp))  = x; }
+/*static*/ /*inline*/ void            PushWord           ( StgWord     x ) { *(--stgCast(StgWord*,Sp)) = x; }
                                                      
-static /*inline*/ void            checkTag           ( StackTag t1, StackTag t2 );
-static /*inline*/ void            PopTag             ( StackTag t );
-static /*inline*/ StgPtr          PopPtr             ( void );
-static /*inline*/ StgClosure*     PopCPtr            ( void );
-static /*inline*/ StgInt          PopInt             ( void );
-static /*inline*/ StgWord         PopWord            ( void );
+/*static*/ /*inline*/ void            checkTag           ( StackTag t1, StackTag t2 );
+/*static*/ /*inline*/ void            PopTag             ( StackTag t );
+/*static*/ /*inline*/ StgPtr          PopPtr             ( void );
+/*static*/ /*inline*/ StgClosure*     PopCPtr            ( void );
+/*static*/ /*inline*/ StgInt          PopInt             ( void );
+/*static*/ /*inline*/ StgWord         PopWord            ( void );
                                                  
-static /*inline*/ void            checkTag           ( StackTag t1, StackTag t2 ) { ASSERT(t1 == t2);}
-static /*inline*/ void            PopTag             ( StackTag t ) { checkTag(t,*(Sp++));    }
-static /*inline*/ StgPtr          PopPtr             ( void )       { return *stgCast(StgPtr*,Sp)++; }
-static /*inline*/ StgClosure*     PopCPtr            ( void )       { return *stgCast(StgClosure**,Sp)++; }
-static /*inline*/ StgInt          PopInt             ( void )       { return *stgCast(StgInt*,Sp)++;  }
-static /*inline*/ StgWord         PopWord            ( void )       { return *stgCast(StgWord*,Sp)++; }
+/*static*/ /*inline*/ void            checkTag           ( StackTag t1, StackTag t2 ) { ASSERT(t1 == t2);}
+/*static*/ /*inline*/ void            PopTag             ( StackTag t ) { checkTag(t,*(Sp++));    }
+/*static*/ /*inline*/ StgPtr          PopPtr             ( void )       { return *stgCast(StgPtr*,Sp)++; }
+/*static*/ /*inline*/ StgClosure*     PopCPtr            ( void )       { return *stgCast(StgClosure**,Sp)++; }
+/*static*/ /*inline*/ StgInt          PopInt             ( void )       { return *stgCast(StgInt*,Sp)++;  }
+/*static*/ /*inline*/ StgWord         PopWord            ( void )       { return *stgCast(StgWord*,Sp)++; }
 
-static /*inline*/ StgPtr          stackPtr           ( StgStackOffset i );
-static /*inline*/ StgInt          stackInt           ( StgStackOffset i );
-static /*inline*/ StgWord         stackWord          ( StgStackOffset i );
+/*static*/ /*inline*/ StgPtr          stackPtr           ( StgStackOffset i );
+/*static*/ /*inline*/ StgInt          stackInt           ( StgStackOffset i );
+/*static*/ /*inline*/ StgWord         stackWord          ( StgStackOffset i );
 
-static /*inline*/ StgPtr          stackPtr           ( StgStackOffset i ) { return *stgCast(StgPtr*, Sp+i); }
-static /*inline*/ StgInt          stackInt           ( StgStackOffset i ) { return *stgCast(StgInt*, Sp+i); }
-static /*inline*/ StgWord         stackWord          ( StgStackOffset i ) { return *stgCast(StgWord*,Sp+i); }
+/*static*/ /*inline*/ StgPtr          stackPtr           ( StgStackOffset i ) { return *stgCast(StgPtr*, Sp+i); }
+/*static*/ /*inline*/ StgInt          stackInt           ( StgStackOffset i ) { return *stgCast(StgInt*, Sp+i); }
+/*static*/ /*inline*/ StgWord         stackWord          ( StgStackOffset i ) { return *stgCast(StgWord*,Sp+i); }
                               
-static /*inline*/ void            setStackWord       ( StgStackOffset i, StgWord w );
+/*static*/ /*inline*/ void            setStackWord       ( StgStackOffset i, StgWord w );
 
-static /*inline*/ void            setStackWord       ( StgStackOffset i, StgWord w ) { Sp[i] = w; }
+/*static*/ /*inline*/ void            setStackWord       ( StgStackOffset i, StgWord w ) { Sp[i] = w; }
                               
-static /*inline*/ void            PushTaggedRealWorld( void         );
-static /*inline*/ void            PushTaggedInt      ( StgInt     x );
+/*static*/ /*inline*/ void            PushTaggedRealWorld( void         );
+/*static*/ /*inline*/ void            PushTaggedInt      ( StgInt     x );
 #ifdef PROVIDE_INT64
-static /*inline*/ void            PushTaggedInt64    ( StgInt64   x );
+/*static*/ /*inline*/ void            PushTaggedInt64    ( StgInt64   x );
 #endif
 #ifdef PROVIDE_INTEGER
-static /*inline*/ void            PushTaggedInteger  ( mpz_ptr    x );
+/*static*/ /*inline*/ void            PushTaggedInteger  ( mpz_ptr    x );
 #endif
 #ifdef PROVIDE_WORD
-static /*inline*/ void            PushTaggedWord     ( StgWord    x );
+/*static*/ /*inline*/ void            PushTaggedWord     ( StgWord    x );
 #endif
 #ifdef PROVIDE_ADDR
-static /*inline*/ void            PushTaggedAddr     ( StgAddr    x );
+/*static*/ /*inline*/ void            PushTaggedAddr     ( StgAddr    x );
 #endif
-static /*inline*/ void            PushTaggedChar     ( StgChar    x );
-static /*inline*/ void            PushTaggedFloat    ( StgFloat   x );
-static /*inline*/ void            PushTaggedDouble   ( StgDouble  x );
-static /*inline*/ void            PushTaggedStablePtr   ( StgStablePtr x );
-static /*inline*/ void            PushTaggedBool     ( int        x );
+/*static*/ /*inline*/ void            PushTaggedChar     ( StgChar    x );
+/*static*/ /*inline*/ void            PushTaggedFloat    ( StgFloat   x );
+/*static*/ /*inline*/ void            PushTaggedDouble   ( StgDouble  x );
+/*static*/ /*inline*/ void            PushTaggedStablePtr   ( StgStablePtr x );
+/*static*/ /*inline*/ void            PushTaggedBool     ( int        x );
 
-static /*inline*/ void            PushTaggedRealWorld( void            ) { PushTag(REALWORLD_TAG);  }
-static /*inline*/ void            PushTaggedInt      ( StgInt        x ) { Sp -= sizeofW(StgInt);        *Sp = x;          PushTag(INT_TAG);    }
+/*static*/ /*inline*/ void            PushTaggedRealWorld( void            ) { PushTag(REALWORLD_TAG);  }
+/*static*/ /*inline*/ void            PushTaggedInt      ( StgInt        x ) { Sp -= sizeofW(StgInt);        *Sp = x;          PushTag(INT_TAG);    }
 #ifdef PROVIDE_INT64
-static /*inline*/ void            PushTaggedInt64    ( StgInt64      x ) { Sp -= sizeofW(StgInt64);      ASSIGN_Int64(Sp,x); PushTag(INT64_TAG); }
+/*static*/ /*inline*/ void            PushTaggedInt64    ( StgInt64      x ) { Sp -= sizeofW(StgInt64);      ASSIGN_Int64(Sp,x); PushTag(INT64_TAG); }
 #endif
 #ifdef PROVIDE_INTEGER
-static /*inline*/ void            PushTaggedInteger  ( mpz_ptr    x )
+/*static*/ /*inline*/ void            PushTaggedInteger  ( mpz_ptr    x )
 {
     StgForeignObj *result;
-    StgWeak *w;
+    //StgWeak *w;
 
     result = stgCast(StgForeignObj*,allocate(sizeofW(StgForeignObj)));
     SET_HDR(result,&FOREIGN_info,CCCS);
@@ -202,7 +205,7 @@ static /*inline*/ void            PushTaggedInteger  ( mpz_ptr    x )
     SET_HDR(w, &WEAK_info, CCCS);
     w->key        = stgCast(StgClosure*,result);
     w->value      = stgCast(StgClosure*,result); /* or any other closure you have handy */
-    w->finalizer  = funPtrToIO(mpz_free);
+    w->finaliser  = funPtrToIO(mpz_free);
     w->link       = weak_ptr_list;
     weak_ptr_list = w;
     IF_DEBUG(weak, fprintf(stderr,"New weak pointer watching Foreign MPZ at %p\n",w));
@@ -212,84 +215,89 @@ static /*inline*/ void            PushTaggedInteger  ( mpz_ptr    x )
 }
 #endif
 #ifdef PROVIDE_WORD
-static /*inline*/ void            PushTaggedWord     ( StgWord       x ) { Sp -= sizeofW(StgWord);       *Sp = x;          PushTag(WORD_TAG);   }
+/*static*/ /*inline*/ void            PushTaggedWord     ( StgWord       x ) { Sp -= sizeofW(StgWord);       *Sp = x;          PushTag(WORD_TAG);   }
 #endif
 #ifdef PROVIDE_ADDR
-static /*inline*/ void            PushTaggedAddr     ( StgAddr       x ) { Sp -= sizeofW(StgAddr);       *Sp = (W_)x;      PushTag(ADDR_TAG);   }
+/*static*/ /*inline*/ void            PushTaggedAddr     ( StgAddr       x ) { Sp -= sizeofW(StgAddr);       *Sp = (W_)x;      PushTag(ADDR_TAG);   }
 #endif
-static /*inline*/ void            PushTaggedChar     ( StgChar       x ) { Sp -= sizeofW(StgChar);       *Sp = x;          PushTag(CHAR_TAG);   }
-static /*inline*/ void            PushTaggedFloat    ( StgFloat      x ) { Sp -= sizeofW(StgFloat);      ASSIGN_FLT(Sp,x); PushTag(FLOAT_TAG);  }
-static /*inline*/ void            PushTaggedDouble   ( StgDouble     x ) { Sp -= sizeofW(StgDouble);     ASSIGN_DBL(Sp,x); PushTag(DOUBLE_TAG); }
-static /*inline*/ void            PushTaggedStablePtr   ( StgStablePtr  x ) { Sp -= sizeofW(StgStablePtr);  *Sp = x;          PushTag(STABLE_TAG); }
-static /*inline*/ void            PushTaggedBool     ( int           x ) { PushTaggedInt(x); }
+/*static*/ /*inline*/ void            PushTaggedChar     ( StgChar       x ) 
+{ Sp -= sizeofW(StgChar);         *Sp = stgCast(StgWord,x);            PushTag(CHAR_TAG); }
 
-static /*inline*/ void            PopTaggedRealWorld ( void );
-static /*inline*/ StgInt          PopTaggedInt       ( void );
+/*static*/ /*inline*/ void            PushTaggedFloat    ( StgFloat      x ) { Sp -= sizeofW(StgFloat);      ASSIGN_FLT(Sp,x); PushTag(FLOAT_TAG);  }
+/*static*/ /*inline*/ void            PushTaggedDouble   ( StgDouble     x ) { Sp -= sizeofW(StgDouble);     ASSIGN_DBL(Sp,x); PushTag(DOUBLE_TAG); }
+/*static*/ /*inline*/ void            PushTaggedStablePtr   ( StgStablePtr  x ) { Sp -= sizeofW(StgStablePtr);  *Sp = x;          PushTag(STABLE_TAG); }
+/*static*/ /*inline*/ void            PushTaggedBool     ( int           x ) { PushTaggedInt(x); }
+
+/*static*/ /*inline*/ void            PopTaggedRealWorld ( void );
+/*static*/ /*inline*/ StgInt          PopTaggedInt       ( void );
 #ifdef PROVIDE_INT64
-static /*inline*/ StgInt64        PopTaggedInt64     ( void );
+/*static*/ /*inline*/ StgInt64        PopTaggedInt64     ( void );
 #endif
 #ifdef PROVIDE_INTEGER
-static /*inline*/ mpz_ptr         PopTaggedInteger   ( void );
+/*static*/ /*inline*/ mpz_ptr         PopTaggedInteger   ( void );
 #endif
 #ifdef PROVIDE_WORD
-static /*inline*/ StgWord         PopTaggedWord      ( void );
+/*static*/ /*inline*/ StgWord         PopTaggedWord      ( void );
 #endif
 #ifdef PROVIDE_ADDR
-static /*inline*/ StgAddr         PopTaggedAddr      ( void );
+/*static*/ /*inline*/ StgAddr         PopTaggedAddr      ( void );
 #endif
-static /*inline*/ StgChar         PopTaggedChar      ( void );
-static /*inline*/ StgFloat        PopTaggedFloat     ( void );
-static /*inline*/ StgDouble       PopTaggedDouble    ( void );
-static /*inline*/ StgStablePtr    PopTaggedStablePtr    ( void );
+/*static*/ /*inline*/ StgChar         PopTaggedChar      ( void );
+/*static*/ /*inline*/ StgFloat        PopTaggedFloat     ( void );
+/*static*/ /*inline*/ StgDouble       PopTaggedDouble    ( void );
+/*static*/ /*inline*/ StgStablePtr    PopTaggedStablePtr    ( void );
 
-static /*inline*/ void            PopTaggedRealWorld ( void ) { PopTag(REALWORLD_TAG); }
-static /*inline*/ StgInt          PopTaggedInt       ( void ) { StgInt    r; PopTag(INT_TAG);     r = *stgCast(StgInt*,  Sp);      Sp += sizeofW(StgInt);        return r;}
+/*static*/ /*inline*/ void            PopTaggedRealWorld ( void ) { PopTag(REALWORLD_TAG); }
+/*static*/ /*inline*/ StgInt          PopTaggedInt       ( void ) { StgInt    r; PopTag(INT_TAG);     r = *stgCast(StgInt*,  Sp);      Sp += sizeofW(StgInt);        return r;}
 #ifdef PROVIDE_INT64
-static /*inline*/ StgInt64        PopTaggedInt64     ( void ) { StgInt64  r; PopTag(INT64_TAG);   r = PK_Int64(Sp);                Sp += sizeofW(StgInt64);      return r;}
+/*static*/ /*inline*/ StgInt64        PopTaggedInt64     ( void ) { StgInt64  r; PopTag(INT64_TAG);   r = PK_Int64(Sp);                Sp += sizeofW(StgInt64);      return r;}
 #endif
 #ifdef PROVIDE_INTEGER
-static /*inline*/ mpz_ptr         PopTaggedInteger   ( void ) { StgForeignObj *r = *stgCast(StgForeignObj**,Sp); Sp += sizeofW(StgPtr); return stgCast(mpz_ptr,r->data);}
+/*static*/ /*inline*/ mpz_ptr         PopTaggedInteger   ( void ) { StgForeignObj *r = *stgCast(StgForeignObj**,Sp); Sp += sizeofW(StgPtr); return stgCast(mpz_ptr,r->data);}
 #endif
 #ifdef PROVIDE_WORD
-static /*inline*/ StgWord         PopTaggedWord      ( void ) { StgWord   r; PopTag(WORD_TAG);    r = *stgCast(StgWord*, Sp);      Sp += sizeofW(StgWord);       return r;}
+/*static*/ /*inline*/ StgWord         PopTaggedWord      ( void ) { StgWord   r; PopTag(WORD_TAG);    r = *stgCast(StgWord*, Sp);      Sp += sizeofW(StgWord);       return r;}
 #endif
 #ifdef PROVIDE_ADDR
-static /*inline*/ StgAddr         PopTaggedAddr      ( void ) { StgAddr   r; PopTag(ADDR_TAG);    r = *stgCast(StgAddr*, Sp);      Sp += sizeofW(StgAddr);       return r;}
+/*static*/ /*inline*/ StgAddr         PopTaggedAddr      ( void ) { StgAddr   r; PopTag(ADDR_TAG);    r = *stgCast(StgAddr*, Sp);      Sp += sizeofW(StgAddr);       return r;}
 #endif
-static /*inline*/ StgChar         PopTaggedChar      ( void ) { StgChar   r; PopTag(CHAR_TAG);    r = *stgCast(StgChar*, Sp);      Sp += sizeofW(StgChar);       return r;}
-static /*inline*/ StgFloat        PopTaggedFloat     ( void ) { StgFloat  r; PopTag(FLOAT_TAG);   r = PK_FLT(Sp);                  Sp += sizeofW(StgFloat);      return r;}
-static /*inline*/ StgDouble       PopTaggedDouble    ( void ) { StgDouble r; PopTag(DOUBLE_TAG);  r = PK_DBL(Sp);                  Sp += sizeofW(StgDouble);     return r;}
-static /*inline*/ StgStablePtr    PopTaggedStablePtr    ( void ) { StgInt    r; PopTag(STABLE_TAG);  r = *stgCast(StgStablePtr*, Sp); Sp += sizeofW(StgStablePtr);  return r;}
+/*static*/ /*inline*/ StgChar         PopTaggedChar      ( void ) { StgChar   r; PopTag(CHAR_TAG);    r = stgCast(StgChar, *Sp);       Sp += sizeofW(StgChar);       return r;}
+/*static*/ /*inline*/ StgFloat        PopTaggedFloat     ( void ) { StgFloat  r; PopTag(FLOAT_TAG);   r = PK_FLT(Sp);                  Sp += sizeofW(StgFloat);      return r;}
+/*static*/ /*inline*/ StgDouble       PopTaggedDouble    ( void ) { StgDouble r; PopTag(DOUBLE_TAG);  r = PK_DBL(Sp);                  Sp += sizeofW(StgDouble);     return r;}
+/*static*/ /*inline*/ StgStablePtr    PopTaggedStablePtr    ( void ) { StgInt    r; PopTag(STABLE_TAG);  r = *stgCast(StgStablePtr*, Sp); Sp += sizeofW(StgStablePtr);  return r;}
 
-static /*inline*/ StgInt          taggedStackInt     ( StgStackOffset i );
+/*static*/ /*inline*/ StgInt          taggedStackInt     ( StgStackOffset i );
 #ifdef PROVIDE_INT64
-static /*inline*/ StgInt64        taggedStackInt64   ( StgStackOffset i );
+/*static*/ /*inline*/ StgInt64        taggedStackInt64   ( StgStackOffset i );
 #endif
 #ifdef PROVIDE_WORD
-static /*inline*/ StgWord         taggedStackWord    ( StgStackOffset i );
+/*static*/ /*inline*/ StgWord         taggedStackWord    ( StgStackOffset i );
 #endif
 #ifdef PROVIDE_ADDR
-static /*inline*/ StgAddr         taggedStackAddr    ( StgStackOffset i );
+/*static*/ /*inline*/ StgAddr         taggedStackAddr    ( StgStackOffset i );
 #endif
-static /*inline*/ StgChar         taggedStackChar    ( StgStackOffset i );
-static /*inline*/ StgFloat        taggedStackFloat   ( StgStackOffset i );
-static /*inline*/ StgDouble       taggedStackDouble  ( StgStackOffset i );
-static /*inline*/ StgStablePtr    taggedStackStable  ( StgStackOffset i );
+/*static*/ /*inline*/ StgChar         taggedStackChar    ( StgStackOffset i );
+/*static*/ /*inline*/ StgFloat        taggedStackFloat   ( StgStackOffset i );
+/*static*/ /*inline*/ StgDouble       taggedStackDouble  ( StgStackOffset i );
+/*static*/ /*inline*/ StgStablePtr    taggedStackStable  ( StgStackOffset i );
 
-static /*inline*/ StgInt          taggedStackInt     ( StgStackOffset i ) { checkTag(INT_TAG,Sp[i]);     return *stgCast(StgInt*,         Sp+1+i); }
+/*static*/ /*inline*/ StgInt          taggedStackInt     ( StgStackOffset i ) { checkTag(INT_TAG,Sp[i]);     return *stgCast(StgInt*,         Sp+1+i); }
 #ifdef PROVIDE_INT64
-static /*inline*/ StgInt64        taggedStackInt64   ( StgStackOffset i ) { checkTag(INT64_TAG,Sp[i]);   return PK_Int64(Sp+1+i); }
+/*static*/ /*inline*/ StgInt64        taggedStackInt64   ( StgStackOffset i ) { checkTag(INT64_TAG,Sp[i]);   return PK_Int64(Sp+1+i); }
 #endif
 #ifdef PROVIDE_WORD
-static /*inline*/ StgWord         taggedStackWord    ( StgStackOffset i ) { checkTag(WORD_TAG,Sp[i]);    return *stgCast(StgWord*,        Sp+1+i); }
+/*static*/ /*inline*/ StgWord         taggedStackWord    ( StgStackOffset i ) { checkTag(WORD_TAG,Sp[i]);    return *stgCast(StgWord*,        Sp+1+i); }
 #endif
 #ifdef PROVIDE_ADDR
-static /*inline*/ StgAddr         taggedStackAddr    ( StgStackOffset i ) { checkTag(ADDR_TAG,Sp[i]);    return *stgCast(StgAddr*,        Sp+1+i); }
+/*static*/ /*inline*/ StgAddr         taggedStackAddr    ( StgStackOffset i ) { checkTag(ADDR_TAG,Sp[i]);    return *stgCast(StgAddr*,        Sp+1+i); }
 #endif
-static /*inline*/ StgChar         taggedStackChar    ( StgStackOffset i ) { checkTag(CHAR_TAG,Sp[i]);    return *stgCast(StgChar*,        Sp+1+i); }
-static /*inline*/ StgFloat        taggedStackFloat   ( StgStackOffset i ) { checkTag(FLOAT_TAG,Sp[i]);   return PK_FLT(Sp+1+i); }
-static /*inline*/ StgDouble       taggedStackDouble  ( StgStackOffset i ) { checkTag(DOUBLE_TAG,Sp[i]);  return PK_DBL(Sp+1+i); }
-static /*inline*/ StgStablePtr    taggedStackStable  ( StgStackOffset i ) { checkTag(STABLE_TAG,Sp[i]);  return *stgCast(StgStablePtr*,   Sp+1+i); }
+
+/*static*/ /*inline*/ StgChar         taggedStackChar    ( StgStackOffset i ) { checkTag(CHAR_TAG,Sp[i]);    return stgCast(StgChar, *(Sp+1+i))   ; }
+
+
+/*static*/ /*inline*/ StgFloat        taggedStackFloat   ( StgStackOffset i ) { checkTag(FLOAT_TAG,Sp[i]);   return PK_FLT(Sp+1+i); }
+/*static*/ /*inline*/ StgDouble       taggedStackDouble  ( StgStackOffset i ) { checkTag(DOUBLE_TAG,Sp[i]);  return PK_DBL(Sp+1+i); }
+/*static*/ /*inline*/ StgStablePtr    taggedStackStable  ( StgStackOffset i ) { checkTag(STABLE_TAG,Sp[i]);  return *stgCast(StgStablePtr*,   Sp+1+i); }
 
 
 /* --------------------------------------------------------------------------
@@ -340,7 +348,7 @@ static /*inline*/ void PopUpdateFrame( StgClosure* obj )
              printPtr(stgCast(StgPtr,Su->updatee)); 
              fprintf(stderr,  " with ");
              printObj(obj);
-             fprintf(stderr,"\nSp = %p\tSu = %p\n", Sp, Su);
+             fprintf(stderr,"Sp = %p\tSu = %p\n\n", Sp, Su);
              );
 #ifndef LAZY_BLACKHOLING
     ASSERT(get_itbl(Su->updatee)->type == BLACKHOLE
@@ -365,7 +373,7 @@ static /*inline*/ void PushCatchFrame( StgClosure* handler )
 {
     StgCatchFrame* fp;
     /* ToDo: stack check! */
-    Sp -= sizeofW(StgCatchFrame*);  /* ToDo: this can't be right */
+    Sp -= sizeofW(StgCatchFrame);
     fp = stgCast(StgCatchFrame*,Sp);
     SET_HDR(fp,&catch_frame_info,CCCS);
     fp->handler         = handler;
@@ -385,7 +393,7 @@ static /*inline*/ void PushSeqFrame( void )
 {
     StgSeqFrame* fp;
     /* ToDo: stack check! */
-    Sp -= sizeofW(StgSeqFrame*);  /* ToDo: this can't be right */
+    Sp -= sizeofW(StgSeqFrame);
     fp = stgCast(StgSeqFrame*,Sp);
     SET_HDR(fp,&seq_frame_info,CCCS);
     fp->link = Su;
@@ -404,7 +412,7 @@ static /*inline*/ StgClosure* raiseAnError( StgClosure* errObj )
     StgClosure *raise_closure;
 
     /* This closure represents the expression 'raise# E' where E
-     * is the exception raise.  It is used to overwrite all the
+     * is the exception raised.  It is used to overwrite all the
      * thunks which are currently under evaluataion.
      */
     raise_closure = (StgClosure *)allocate(sizeofW(StgClosure)+1);
@@ -429,9 +437,9 @@ static /*inline*/ StgClosure* raiseAnError( StgClosure* errObj )
                 Sp += sizeofW(StgCatchFrame); /* Pop */
                 PushCPtr(errObj);
                 return handler;
-            }
+	    }
         case STOP_FRAME:
-                barf("raiseError: STOP_FRAME");
+                barf("raiseError: uncaught exception: STOP_FRAME");
         default:
                 barf("raiseError: weird activation record");
         }
@@ -449,7 +457,7 @@ static StgClosure* raisePrim(char* msg)
     StgClosure* errObj = stgCast(StgClosure*,grabHpNonUpd(size));
     SET_INFO(errObj,&raise_info);
     errObj->payload[0] = errObj;
-
+fprintf(stderr, "\n\n\nRAISE PRIM %s\n", msg);
 #if 0
     belch(msg);
 #else
@@ -1048,15 +1056,20 @@ StgThreadReturnCode enter( StgClosure* obj )
      * iterations.
      */
     char enterCount = 0;
+    int  enterCountI = 0;
 enterLoop:
     /* ASSERT(StorageMgrInfo.hp_start <= Hp && Hp < HpLim && HpLim == StorageMgrInfo.hplim); */
     ASSERT(SpLim <= Sp && Sp <= stgCast(StgPtr,Su));
-#if 0
+#if DEBUG
     IF_DEBUG(evaluator,
+             fprintf(stderr, 
+             "\n---------------------------------------------------------------\n");
+             fprintf(stderr,"(%d) Entering: ",enterCountI++); printObj(obj);
              fprintf(stderr,"Sp = %p\tSu = %p\n", Sp, Su);
+             fprintf(stderr, "\n" );
              printStack(Sp,CurrentTSO->stack+CurrentTSO->stack_size,Su);
-             fprintf(stderr,"Entering: "); printObj(obj);
-    );
+             fprintf(stderr, "\n\n");
+	    );
 #endif
 #if 0
     IF_DEBUG(sanity,
@@ -1097,6 +1110,11 @@ enterLoop:
 #endif
             while (1) {
                 ASSERT(pc < bco->n_instrs);
+		if (0 /*enterCountI > 2*/ ) {
+		fprintf(stderr, "\n\n-----------------\n" );
+                printStack(Sp,CurrentTSO->stack+CurrentTSO->stack_size,Su);
+                fprintf(stderr, "\n");
+                }
                 IF_DEBUG(evaluator,
                          fprintf(stderr,"Sp = %p\tSu = %p\tpc = %d\t", Sp, Su, pc);
                          disInstr(bco,pc);
@@ -1161,12 +1179,35 @@ enterLoop:
                             }
 
                             /* now deal with "update frame" */
-                            /* as an optimisation, we process all on top of stack instead of just the top one */
+                            /* as an optimisation, we process all on top of stack */
+                            /* instead of just the top one */
                             ASSERT(Sp==(P_)Su);
                             do {
                                 switch (get_itbl(Su)->type) {
                                 case CATCH_FRAME:
                                         PopCatchFrame();
+                                        ASSERT(Sp != (P_)Su);
+                                        /* We hit a CATCH frame during an arg satisfaction 
+                                         * check.  So now return to bco_info which is under
+                                         * the CATCH frame.  The following code is copied 
+                                         * from a case RET_BCO further down.  
+                                         * (The reason why we're here is that something of
+                                         * functional type has been evaluated as a possibly
+                                         * exception-throwing computation, but has not thrown
+                                         * any exception, and is now returning to the
+                                         * algebraic-case-continuation which forced the
+                                         * evaluation in the first place.)
+					 */
+                                        {
+                                           StgClosure* ret;
+                                           PopPtr();
+                                           ret = PopCPtr();
+                                           PushPtr((P_)obj);
+                                           obj = ret;
+                                           goto enterLoop;
+                                        }
+                                        break;
+
                                         break;
                                 case UPDATE_FRAME:
                                         PopUpdateFrame(obj);
@@ -1176,6 +1217,24 @@ enterLoop:
                                         return ThreadFinished;
                                 case SEQ_FRAME:
                                         PopSeqFrame();
+                                        ASSERT(Sp != (P_)Su);
+                                        /* We hit a SEQ frame during an arg satisfaction check.
+                                         * So now return to bco_info which is under the 
+                                         * SEQ frame.  The following code is copied from a 
+                                         * case RET_BCO further down.  (The reason why we're
+                                         * here is that something of functional type has 
+                                         * been seq-d on, and we're now returning to the
+                                         * algebraic-case-continuation which forced the
+                                         * evaluation in the first place.)
+					 */
+                                        {
+                                           StgClosure* ret;
+                                           PopPtr();
+                                           ret = PopCPtr();
+                                           PushPtr((P_)obj);
+                                           obj = ret;
+                                           goto enterLoop;
+                                        }
                                         break;
                                 default:        
                                         barf("Invalid update frame during argcheck");
@@ -1629,6 +1688,22 @@ enterLoop:
                         case i_INTERNAL_ERROR1:
                                 barf("INTERNAL_ERROR1 at %p:%d",bco,pc-1);
 
+                        case i_pushseqframe:
+                            {
+                               StgClosure* c = PopCPtr();
+                               PushSeqFrame();
+                               PushCPtr(c);
+                               break;
+                            }
+                        case i_pushcatchframe:
+                            {
+                               StgClosure* e = PopCPtr();
+                               StgClosure* h = PopCPtr();
+                               PushCatchFrame(h);
+                               PushCPtr(e);
+                               break;
+                            }
+
                         case i_gtChar:          OP_CC_B(x>y);        break;
                         case i_geChar:          OP_CC_B(x>=y);       break;
                         case i_eqChar:          OP_CC_B(x==y);       break;
@@ -1692,9 +1767,9 @@ enterLoop:
                         case i_orInt:           OP_II_I(x|y);        break;
                         case i_xorInt:          OP_II_I(x^y);        break;
                         case i_notInt:          OP_I_I(~x);          break;
-                        case i_shiftLInt:       OP_IW_I(x<<y);       break;
-                        case i_shiftRAInt:      OP_IW_I(x>>y);       break; /* ToDo */
-                        case i_shiftRLInt:      OP_IW_I(x>>y);       break; /* ToDo */
+                        case i_shiftLInt:       OP_II_I(x<<y);       break;
+                        case i_shiftRAInt:      OP_II_I(x>>y);       break; /* ToDo */
+                        case i_shiftRLInt:      OP_II_I(x>>y);       break; /* ToDo */
 
 #ifdef PROVIDE_INT64
                         case i_gtInt64:         OP_zz_B(x>y);        break;
@@ -2096,54 +2171,11 @@ enterLoop:
                         switch (bcoInstr(bco,pc++)) {
                         case i_INTERNAL_ERROR2:
                                 barf("INTERNAL_ERROR2 at %p:%d",bco,pc-1);
-                        case i_catch:  /* catch#{e,h} */
-                            {
-                                StgClosure* h;
-                                obj = PopCPtr();
-                                h   = PopCPtr();
 
-                                /* catch suffers the same problem as takeMVar:
-                                 * it tries to do control flow even if it isn't
-                                 * the last instruction in the BCO.
-                                 * This can leave a mess on the stack if the 
-                                 * last instructions are anything important
-                                 * like SLIDE.  Our vile hack depends on the
-                                 * fact that with the current code generator,
-                                 * we know exactly that i_catch is followed
-                                 * by code that drops 2 variables off the
-				 * stack.
-                                 * What a vile hack!
-				 */
-                                Sp += 2; 
-
-                                PushCatchFrame(h);
-                                goto enterLoop;
-                            }
                         case i_raise:  /* raise#{err} */
                             {
                                 StgClosure* err = PopCPtr();
                                 obj = raiseAnError(err);
-                                goto enterLoop;
-                            }
-                        case i_force:    /* force#{x} (evaluate x, primreturn nothing) */
-                            {
-                                StgClosure* x;
-                                obj = PopCPtr();
-
-                                /* force suffers the same problem as takeMVar:
-                                 * it tries to do control flow even if it isn't
-                                 * the last instruction in the BCO.
-                                 * This can leave a mess on the stack if the 
-                                 * last instructions are anything important
-                                 * like SLIDE.  Our vile hack depends on the
-                                 * fact that with the current code generator,
-                                 * we know exactly that i_force is followed
-                                 * by code that drops 1 variable off the stack.
-                                 * What a vile hack!
-                                 */
-                                Sp += 1;
-
-                                PushSeqFrame();
                                 goto enterLoop;
                             }
 #ifdef PROVIDE_ARRAY
@@ -2330,7 +2362,7 @@ enterLoop:
                                 SET_HDR(w, &WEAK_info, CCCS);
                                 w->key        = PopCPtr();
                                 w->value      = PopCPtr();
-                                w->finalizer  = PopCPtr();
+                                w->finaliser  = PopCPtr();
                                 w->link       = weak_ptr_list;
                                 weak_ptr_list = w;
                                 IF_DEBUG(weak, fprintf(stderr,"New weak pointer at %p\n",w));
@@ -2753,9 +2785,11 @@ nat marshall(char arg_ty, void* arg)
             PushTaggedAddr(*((void**)arg));
             return ARG_SIZE(ADDR_TAG);
 #endif
+#ifdef PROVIDE_STABLE
     case STABLE_REP:
             PushTaggedStablePtr(*((StgStablePtr*)arg));
             return ARG_SIZE(STABLE_TAG);
+#endif
     case FOREIGN_REP:
             /* Not allowed in this direction - you have to
              * call makeForeignPtr explicitly
@@ -2814,9 +2848,11 @@ nat unmarshall(char res_ty, void* res)
             *((void**)res) = PopTaggedAddr();
             return ARG_SIZE(ADDR_TAG);
 #endif
+#ifdef PROVIDE_STABLE
     case STABLE_REP:
             *((StgStablePtr*)res) = PopTaggedStablePtr();
             return ARG_SIZE(STABLE_TAG);
+#endif
     case FOREIGN_REP:
         {
             StgForeignObj *result = stgCast(StgForeignObj*,PopPtr());

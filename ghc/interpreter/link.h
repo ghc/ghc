@@ -73,11 +73,11 @@ extern Type typeWord;
 extern Type typeAddr;
 #endif
 #ifdef PROVIDE_ARRAY
-Type typePrimArray;            
-Type typePrimByteArray;
-Type typeRef;                  
-Type typePrimMutableArray;     
-Type typePrimMutableByteArray; 
+extern Type typePrimArray;            
+extern Type typePrimByteArray;
+extern Type typeRef;                  
+extern Type typePrimMutableArray;     
+extern Type typePrimMutableByteArray; 
 #endif
 extern Type typeFloat;
 extern Type typeDouble;
@@ -149,3 +149,14 @@ extern Cell  predFractional;            /* Fractional (mkOffset(0))        */
 extern Cell  predIntegral;              /* Integral (mkOffset(0))          */
 extern Cell  predMonad;                 /* Monad (mkOffset(0))             */
 
+
+extern Type  arrow;                     /* mkOffset(0) -> mkOffset(1)      */
+extern       Type  boundPair;;                 /* (mkOffset(0),mkOffset(0))       */
+extern       Type  listof;;                    /* [ mkOffset(0) ]                 */
+extern       Type  typeVarToVar;;              /* mkOffset(0) -> mkOffset(0)      */
+
+extern       Cell  predNum;;                   /* Num (mkOffset(0))               */
+extern       Cell  predFractional;;            /* Fractional (mkOffset(0))        */
+extern       Cell  predIntegral;;              /* Integral (mkOffset(0))          */
+extern       Kind  starToStar;;                /* Type -> Type                    */
+extern       Cell  predMonad;;                 /* Monad (mkOffset(0))             */

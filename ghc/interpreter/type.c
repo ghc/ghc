@@ -8,14 +8,15 @@
  * in the distribution for details.
  *
  * $RCSfile: type.c,v $
- * $Revision: 1.3 $
- * $Date: 1999/02/03 17:08:44 $
+ * $Revision: 1.4 $
+ * $Date: 1999/03/01 14:46:57 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
 #include "storage.h"
 #include "backend.h"
 #include "connect.h"
+#include "link.h"
 #include "errors.h"
 #include "subst.h"
 #include "Assembler.h" /* for AsmCTypes */
@@ -31,78 +32,6 @@
 Bool catchAmbigs       = FALSE;         /* TRUE => functions with ambig.   */
                                         /*         types produce error     */
 
-#if 1
-//ToDo: perhaps this should be somewhere else (link.c?)
-//all this stuff came with 98, and not STG
-Type typeArrow,   typeList;             /* Important primitive types       */
-Type typeUnit;
-
-Module modulePrelude;
-
-static Type typeInt,     typeDouble;
-static Type typeInteger, typeAddr;
-static Type typeString,  typeChar;
-static Type typeBool,    typeMaybe;
-static Type typeOrdering;
-
-Class classEq,    classOrd;             /* `standard' classes              */
-Class classIx,    classEnum;
-Class classShow,  classRead;
-#if EVAL_INSTANCES
-Class classEval;
-#endif
-Class classBounded;
-
-Class classReal,       classIntegral;   /* `numeric' classes               */
-Class classRealFrac,   classRealFloat;
-Class classFractional, classFloating;
-Class classNum;
-
-List stdDefaults;                       /* standard default values         */
-
-Name nameFromInt, nameFromDouble;       /* coercion of numerics            */
-Name nameFromInteger;
-Name nameEq,      nameCompare;          /* derivable names                 */
-Name nameLe;
-Name nameShowsPrec;
-Name nameReadsPrec;
-Name nameMinBnd,  nameMaxBnd;
-Name nameIndex,   nameInRange;
-Name nameRange;
-Name nameMult,    namePlus;
-Name nameTrue,    nameFalse;            /* primitive boolean constructors  */
-Name nameNil,     nameCons;             /* primitive list constructors     */
-Name nameJust,    nameNothing;          /* primitive Maybe constructors    */
-Name nameLeft,    nameRight;            /* primitive Either constructors   */
-Name nameUnit;                          /* primitive Unit type constructor */
-Name nameLT,      nameEQ;               /* Ordering constructors           */
-Name nameGT;
-Class classMonad;                       /* Monads                          */
-Name nameReturn,  nameBind;             /* for translating monad comps     */
-Name nameMFail;
-Name nameGt;                            /* for readsPrec                   */
-#if EVAL_INSTANCES
-Name nameStrict,  nameSeq;              /* Members of class Eval           */
-#endif
-
-#if    IO_MONAD
-Type   typeProgIO;                      /* For the IO monad, IO ()         */
-Name   nameUserErr;                     /* loosely coupled IOError cfuns   */
-Name   nameNameErr,  nameSearchErr;
-#endif
-#if    IO_HANDLES
-Name   nameWriteErr, nameIllegal;
-Name   nameEOFErr;
-#endif
-
-#if TREX
-Type  typeNoRow;                        /* Empty row                       */
-Type  typeRec;                          /* Record formation                */
-Name  nameNoRec;                        /* Empty record                    */
-#endif
-
-//end ToDo
-#endif
 
 /* --------------------------------------------------------------------------
  * Local function prototypes:
@@ -177,26 +106,7 @@ static Bool   local equalTypes        Args((Type,Type));
 static Void   local typeDefnGroup     Args((List));
 static Pair   local typeSel           Args((Name));
 
-static List   offsetTyvarsIn          Args((Type,List));
-static Type   conToTagType            Args((Tycon));
-static Type   tagToConType            Args((Tycon));
 
-
-/* --------------------------------------------------------------------------
- * Frequently used type skeletons:
- * ------------------------------------------------------------------------*/
-
-/* ToDo: move these to link.c and call them 'typeXXXX' */
-       Type  arrow;                     /* mkOffset(0) -> mkOffset(1)      */
-static Type  boundPair;                 /* (mkOffset(0),mkOffset(0))       */
-       Type  listof;                    /* [ mkOffset(0) ]                 */
-static Type  typeVarToVar;              /* mkOffset(0) -> mkOffset(0)      */
-
-       Cell  predNum;                   /* Num (mkOffset(0))               */
-       Cell  predFractional;            /* Fractional (mkOffset(0))        */
-       Cell  predIntegral;              /* Integral (mkOffset(0))          */
-static Kind  starToStar;                /* Type -> Type                    */
-       Cell  predMonad;                 /* Monad (mkOffset(0))             */
 
 /* --------------------------------------------------------------------------
  * Assumptions:
@@ -650,7 +560,9 @@ Cell e; {
     static String aspat   = "as (@) pattern";
     static String typeSig = "type annotation";
     static String lambda  = "lambda expression";
-
+    //printf("\n\n+++++++++++++++++++++++++++++++\n");
+    //print(e,1000);
+    //printf("\n\n");
     switch (whatIs(e)) {
 
         /* The following cases can occur in either pattern or expr. mode   */
@@ -817,6 +729,8 @@ Cell e; {                               /* requires polymorphism, qualified*/
     Cell p = NIL;
     Cell a = e;
     Int  i;
+    //print(h,1000);
+    //printf("\n");
 
     switch (whatIs(h)) {
         case NAME      : typeIs = name(h).type;
@@ -847,8 +761,12 @@ Cell e; {                               /* requires polymorphism, qualified*/
                          break;
     }
 
-    if (isNull(typeIs))
+    if (isNull(typeIs)) {
+        //printf("\n NAME " );
+        //print(h,1000);
+        //printf(" TYPE " ); print(typeIs,1000);
         internal("typeAp1");
+    }
 
     instantiate(typeIs);                /* Deal with polymorphism ...      */
     if (nonNull(predsAre)) {            /* ... and with qualified types.   */
@@ -1311,7 +1229,8 @@ Cell e; {                               /* bizarre manner for the benefit  */
             assumeEvid(hd(predsAre),typeOff);
 
         if (whatIs(typeIs)==RANK2) {
-            ERRMSG(line) "Sorry, record update syntax cannot currently be used for datatypes with polymorphic components"
+            ERRMSG(line) "Sorry, record update syntax cannot currently be "
+                         "used for datatypes with polymorphic components"
             EEND;
         }
 
@@ -1740,7 +1659,7 @@ Class c; {                              /* defaults for class c            */
     List locs   = NIL;
     Cell l      = mkInt(cclass(c).line);
     List ps;
-
+//printf("\ntypeClassDefn %s\n", textToStr(cclass(c).text));
     for (ps=params; nonNull(ps); ps=tl(ps)) {
         Cell v = thd3(hd(ps));
         body   = ap(body,v);
@@ -1754,7 +1673,7 @@ Class c; {                              /* defaults for class c            */
     for (; nonNull(mems); mems=tl(mems)) {
         Cell v   = inventVar();         /* Pick a name for component       */
         Cell imp = NIL;
-
+//printf("   defaulti %s\n", textToStr(name(hd(mems)).text));
         if (nonNull(defs)) {            /* Look for default implementation */
             imp  = hd(defs);
             defs = tl(defs);
@@ -1815,6 +1734,7 @@ Class c; {                              /* defaults for class c            */
         args                = tl(args);
         genDefns            = cons(hd(mems),genDefns);
     }
+//printf("done\n" );
 }
 
 static Void local typeInstDefn(in)      /* Type check implementations of   */
@@ -1956,11 +1876,11 @@ Int    beta; {
     Type rt;
 
 #ifdef DEBUG_TYPES
-    Printf("Type check member: ");
+    Printf("\nType check member: ");
     printExp(stdout,mem);
     Printf(" :: ");
     printType(stdout,name(mem).type);
-    Printf("\nfor the instance: ");
+    Printf("\n   for the instance: ");
     printPred(stdout,head);
     Printf("\n");
 #endif
@@ -2011,7 +1931,7 @@ Int    beta; {
     ps = copyPreds(ps);
     t  = generalize(ps,liftRank2(t,o,m));
 #ifdef DEBUG_TYPES
-    Printf("Inferred type is: ");
+    Printf("   Inferred type is: ");
     printType(stdout,t);
     Printf("\n");
 #endif
@@ -2019,6 +1939,7 @@ Int    beta; {
         tooGeneral(line,mem,rt,t);
     if (nonNull(preds))
         cantEstablish(line,wh,mem,t,ps);
+//printf("done\n" );
 }
 
 /* --------------------------------------------------------------------------
@@ -2330,6 +2251,11 @@ Void typeCheckDefns() {                /* Type check top level bindings    */
 static Void local typeDefnGroup(bs)     /* type check group of value defns */
 List bs; {                              /* (one top level scc)             */
     List as;
+// printf("\n\n+++ DefnGroup ++++++++++++++++++++++++++++\n");
+//{ List qq; for (qq=bs;nonNull(qq);qq=tl(qq)){
+//   print(hd(qq),4);
+//   printf("\n");
+//}}
 
     emptySubstitution();
     hd(defnBounds) = NIL;
@@ -2484,39 +2410,12 @@ Name s; {                               /* particular selector, s.         */
 
 static Type local basicType Args((Char));
 
-/* --------------------------------------------------------------------------
- * 
- * ------------------------------------------------------------------------*/
 
-static List offsetTyvarsIn(t,vs)        /* add list of offset tyvars in t  */
-Type t;                                 /* to list vs                      */
-List vs; {
-    switch (whatIs(t)) {
-        case AP       : return offsetTyvarsIn(fun(t),
-                                              offsetTyvarsIn(arg(t),vs));
-
-        case OFFSET   : if (cellIsMember(t,vs)) {
-                            return vs;
-                        } else {
-                            return cons(t,vs);
-                        }
-        case QUAL     : return offsetTyvarsIn(snd(t),vs);
-
-        case POLYTYPE : return offsetTyvarsIn(monotypeOf(t),vs);
-                        /* slightly inaccurate, but won't matter here      */
-
-        case EXIST    :
-        case RANK2    : return offsetTyvarsIn(snd(snd(t)),vs);
-
-        default       : return vs;
-    }
-}
-
-static Type stateVar = NIL;
-static Type alphaVar = NIL;
-static Type betaVar  = NIL;
-static Type gammaVar = NIL;
-static Int  nextVar  = 0;
+static Type stateVar = BOGUS(600); //NIL;
+static Type alphaVar = BOGUS(601); //NIL;
+static Type betaVar  = BOGUS(602); //NIL;
+static Type gammaVar = BOGUS(603); //NIL;
+static Int  nextVar  = BOGUS(604); //0;
 
 static Void clearTyVars( void )
 {
@@ -2624,7 +2523,7 @@ Char k; {
     case BETA_REP:
             return mkBetaVar();   /* polymorphic */
     case GAMMA_REP:
-            return mkGammaVar();   /* polymorphic */
+            return mkGammaVar();  /* polymorphic */
     default:
             printf("Kind: '%c'\n",k);
             internal("basicType");
@@ -2689,7 +2588,7 @@ Type primType( Int /*AsmMonad*/ monad, String a_kinds, String r_kinds )
 }    
 
 /* forall a1 .. am. TC a1 ... am -> Int */
-static Type conToTagType(t)
+Type conToTagType(t)
 Tycon t; {
     Type   ty  = t;
     List   tvars = NIL;
@@ -2707,7 +2606,7 @@ Tycon t; {
 }
 
 /* forall a1 .. am. Int -> TC a1 ... am */
-static Type tagToConType(t)
+Type tagToConType(t)
 Tycon t; {
     Type   ty  = t;
     List   tvars = NIL;
@@ -2765,7 +2664,6 @@ Int what; {
                        dummyVar     = inventVar();
 
 #if !IGNORE_MODULES
-                       modulePrelude = newModule(textPrelude);
                        setCurrModule(modulePrelude);
 #endif
 

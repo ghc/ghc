@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: backend.h,v $
- * $Revision: 1.1 $
- * $Date: 1999/02/03 17:05:14 $
+ * $Revision: 1.2 $
+ * $Date: 1999/03/01 14:46:42 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -20,8 +20,8 @@
  *                                         
  *   Expr    -> LETREC   ([Var],Expr)      -- Vars contain their bound value
  *            | LAMBDA   ([Var],Expr)      -- all vars bound to NIL
- *            | CASE     (Expr,[Alt])      
- *            | PRIMCASE (Expr,[PrimAlt])  
+ *            | CASE     (Expr,[Alt])      -- algebraic case
+ *            | PRIMCASE (Expr,[PrimAlt])  -- primitive case
  *            | STGPRIM  (Prim,[Atom])     
  *            | STGAPP   (Var, [Atom])     -- tail call
  *            | Var                        -- Abbreviation for STGAPP(Var,[])

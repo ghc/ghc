@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: codegen.c,v $
- * $Revision: 1.3 $
- * $Date: 1999/02/03 17:08:25 $
+ * $Revision: 1.4 $
+ * $Date: 1999/03/01 14:46:42 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -19,6 +19,8 @@
 #include "Assembler.h"
 #include "link.h"
 
+#include "Rts.h"    /* IF_DEBUG */
+#include "RtsFlags.h"
 
 /* --------------------------------------------------------------------------
  * Local function prototypes:
@@ -40,7 +42,7 @@ static Void  cgExpr        ( AsmBCO bco, AsmSp root, StgExpr e );
              
 static AsmBCO cgAlts       ( AsmSp root, AsmSp sp, List alts );
 static void   testPrimPats ( AsmBCO bco, AsmSp root, List pats, StgExpr e );
-static void   cgPrimAlt    ( AsmBCO bco, AsmSp root, List vs, StgExpr e );
+//static void   cgPrimAlt    ( AsmBCO bco, AsmSp root, List vs, StgExpr e );
 static AsmBCO cgLambda     ( StgExpr e );
 static AsmBCO cgRhs        ( StgRhs rhs );
 static void   beginTop     ( StgVar v );
@@ -103,7 +105,11 @@ static void cgBind( AsmBCO bco, StgVar v )
 static Void pushVar( AsmBCO bco, StgVar v )
 {
     Cell info = stgVarInfo(v);
-    assert(isStgVar(v));
+    //    if (!isStgVar(v)) {
+    //printf("\n\nprefail\n");
+    //print(v,1000);
+       assert(isStgVar(v));
+    //}
     if (isPtr(info)) {
         asmClosure(bco,ptrOf(info));
     } else if (isInt(info)) {
@@ -169,14 +175,14 @@ static Void pushAtom( AsmBCO bco, StgAtom e )
 
 static AsmBCO cgAlts( AsmSp root, AsmSp sp, List alts )
 {
-    AsmBCO bco = asmBeginContinuation(sp);
+    AsmBCO bco = asmBeginContinuation(sp,alts);
     /* ppStgAlts(alts); */
     for(; nonNull(alts); alts=tl(alts)) {
         StgCaseAlt alt  = hd(alts);
         StgPat     pat  = stgCaseAltPat(alt);
         StgExpr    body = stgCaseAltBody(alt);
         if (isDefaultPat(pat)) {
-            AsmSp      begin = asmBeginAlt(bco);
+	    //AsmSp      begin = asmBeginAlt(bco);
             cgBind(bco,pat);
             cgExpr(bco,root,body);
             asmEndContinuation(bco);
@@ -191,7 +197,7 @@ static AsmBCO cgAlts( AsmSp root, AsmSp sp, List alts )
                 setPos(hd(vs),asmUnbox(bco,boxingConRep(con)));
             } else {
                 asmBeginUnpack(bco);
-                map1Proc(cgBind,bco,rev(vs));
+                map1Proc(cgBind,bco,reverse(vs));
                 asmEndUnpack(bco);
             }
             cgExpr(bco,root,body);
@@ -223,19 +229,22 @@ static void testPrimPats( AsmBCO bco, AsmSp root, List pats, StgExpr e )
     }
 }
 
+#if 0  /* appears to be unused */
 static void cgPrimAlt( AsmBCO bco, AsmSp root, List vs, StgExpr e )
 {
     assert(0); /* ToDo: test for patterns */
     map1Proc(cgBind,bco,vs); /* ToDo: are these in right order? */
     cgExpr(bco,root,e);
 }
+#endif
+
 
 static AsmBCO cgLambda( StgExpr e )
 {
-    AsmBCO bco = asmBeginBCO();
+    AsmBCO bco = asmBeginBCO(e);
 
     AsmSp root = asmBeginArgCheck(bco);
-    map1Proc(cgBind,bco,rev(stgLambdaArgs(e)));
+    map1Proc(cgBind,bco,reverse(stgLambdaArgs(e)));
     asmEndArgCheck(bco,root);
 
     /* ppStgExpr(e); */
@@ -247,7 +256,7 @@ static AsmBCO cgLambda( StgExpr e )
 
 static AsmBCO cgRhs( StgRhs rhs )
 {
-    AsmBCO bco = asmBeginBCO( );
+    AsmBCO bco = asmBeginBCO(rhs );
 
     AsmSp root = asmBeginArgCheck(bco);
     asmEndArgCheck(bco,root);
@@ -259,8 +268,10 @@ static AsmBCO cgRhs( StgRhs rhs )
     return bco;
 }
 
+
 static Void cgExpr( AsmBCO bco, AsmSp root, StgExpr e )
 {
+  //printf("cgExpr:");ppStgExpr(e);printf("\n");
     switch (whatIs(e)) {
     case LETREC:
         {
@@ -294,7 +305,7 @@ static Void cgExpr( AsmBCO bco, AsmSp root, StgExpr e )
 
                 /* No need to use return address or to Slide */
                 AsmSp beginPrim = asmBeginPrim(bco);
-                map1Proc(pushAtom,bco,rev(stgPrimArgs(scrut)));
+                map1Proc(pushAtom,bco,reverse(stgPrimArgs(scrut)));
                 asmEndPrim(bco,(AsmPrim*)name(stgPrimOp(scrut)).primop,beginPrim);
 
                 for(; nonNull(alts); alts=tl(alts)) {
@@ -302,7 +313,7 @@ static Void cgExpr( AsmBCO bco, AsmSp root, StgExpr e )
                     List    pats = stgPrimAltPats(alt);
                     StgExpr body = stgPrimAltBody(alt);
                     AsmSp altBegin = asmBeginAlt(bco);
-                    map1Proc(cgBind,bco,rev(pats));
+                    map1Proc(cgBind,bco,reverse(pats));
                     testPrimPats(bco,root,pats,body);
                     asmEndAlt(bco,altBegin);
                 }
@@ -341,7 +352,7 @@ static Void cgExpr( AsmBCO bco, AsmSp root, StgExpr e )
     case STGAPP: /* Tail call */
         {
             AsmSp env = asmBeginEnter(bco);
-            map1Proc(pushAtom,bco,rev(stgAppArgs(e)));
+            map1Proc(pushAtom,bco,reverse(stgAppArgs(e)));
             pushAtom(bco,stgAppFun(e));
             asmEndEnter(bco,env,root);
             break;
@@ -376,7 +387,7 @@ static Void cgExpr( AsmBCO bco, AsmSp root, StgExpr e )
     case STGPRIM: /* Tail call again */
         {
             AsmSp beginPrim = asmBeginPrim(bco);
-            map1Proc(pushAtom,bco,rev(stgPrimArgs(e)));
+            map1Proc(pushAtom,bco,reverse(stgPrimArgs(e)));
             asmEndPrim(bco,(AsmPrim*)name(e).primop,beginPrim);
             /* map1Proc(cgBind,bco,rs_vars); */
             assert(0); /* asmReturn_retty(); */
@@ -387,6 +398,9 @@ static Void cgExpr( AsmBCO bco, AsmSp root, StgExpr e )
             internal("cgExpr");
     }
 }
+
+void* itblNames[1000];
+int   nItblNames = 0;
 
 /* allocate space for top level variable
  * any change requires a corresponding change in 'build'.
@@ -404,7 +418,23 @@ static Void alloc( AsmBCO bco, StgVar v )
                 pushAtom(bco,hd(args));
                 setPos(v,asmBox(bco,boxingConRep(con)));
             } else {
-                setPos(v,asmAllocCONSTR(bco,stgConInfo(con)));
+
+                void* vv = stgConInfo(con);
+                assert (nItblNames < (1000-2));
+                if (isName(con)) {
+                   itblNames[nItblNames++] = vv;
+                   itblNames[nItblNames++] = textToStr(name(con).text);
+                } else
+                if (isTuple(con)) {
+                   char* cc = malloc(10);
+                   assert(cc);
+                   sprintf(cc, "Tuple%d", tupleOf(con) );
+                   itblNames[nItblNames++] = vv;
+                   itblNames[nItblNames++] = cc;
+                } else
+                assert ( /* cant identify constructor name */ 0 );
+
+                setPos(v,asmAllocCONSTR(bco, vv));
             }
             break;
         }
@@ -424,6 +454,7 @@ static Void build( AsmBCO bco, StgVar v )
 {
     StgRhs rhs = stgVarBody(v);
     assert(isStgVar(v));
+
     switch (whatIs(rhs)) {
     case STGCON:
         {
@@ -433,7 +464,7 @@ static Void build( AsmBCO bco, StgVar v )
                 doNothing();  /* already done in alloc */
             } else {
                 AsmSp start = asmBeginPack(bco);
-                map1Proc(pushAtom,bco,rev(args));
+                map1Proc(pushAtom,bco,reverse(args));
                 asmEndPack(bco,getPos(v),start,stgConInfo(con));
             }
             return;
@@ -449,12 +480,12 @@ static Void build( AsmBCO bco, StgVar v )
                 && whatIs(stgVarBody(fun)) == LAMBDA 
                 && length(stgLambdaArgs(stgVarBody(fun))) > length(args)) {
                 AsmSp  start = asmBeginMkPAP(bco);
-                map1Proc(pushAtom,bco,rev(args));
+                map1Proc(pushAtom,bco,reverse(args));
                 pushAtom(bco,fun);
                 asmEndMkPAP(bco,getPos(v),start); /* optimisation */
             } else {
                 AsmSp  start = asmBeginMkAP(bco);
-                map1Proc(pushAtom,bco,rev(args));
+                map1Proc(pushAtom,bco,reverse(args));
                 pushAtom(bco,fun);
                 asmEndMkAP(bco,getPos(v),start);
             }
@@ -498,6 +529,7 @@ static Void build( AsmBCO bco, StgVar v )
  * for each top level variable - this should be simpler!
  * ------------------------------------------------------------------------*/
 
+#if 0   /* appears to be unused */
 static void cgAddVar( AsmObject obj, StgAtom v )
 {
     if (isName(v)) {
@@ -506,6 +538,8 @@ static void cgAddVar( AsmObject obj, StgAtom v )
     assert(isStgVar(v));
     asmAddPtr(obj,getObj(v));
 }
+#endif
+
 
 /* allocate AsmObject for top level variables
  * any change requires a corresponding change in endTop
@@ -518,12 +552,12 @@ static void beginTop( StgVar v )
     switch (whatIs(rhs)) {
     case STGCON:
         {
-            List as = stgConArgs(rhs);
+	    //List as = stgConArgs(rhs);
             setObj(v,asmBeginCon(stgConInfo(stgConCon(rhs))));
             break;
         }
     case LAMBDA:
-            setObj(v,asmBeginBCO());
+            setObj(v,asmBeginBCO(rhs));
             break;
     default:
             setObj(v,asmBeginCAF());
@@ -534,7 +568,7 @@ static void beginTop( StgVar v )
 static void endTop( StgVar v )
 {
     StgRhs rhs = stgVarBody(v);
-    ppStgRhs(rhs);
+    //ppStgRhs(rhs);
     switch (whatIs(rhs)) {
     case STGCON:
         {
@@ -573,7 +607,7 @@ static void endTop( StgVar v )
             /* ToDo: merge this code with cgLambda */
             AsmBCO bco = (AsmBCO)getObj(v);
             AsmSp root = asmBeginArgCheck(bco);
-            map1Proc(cgBind,bco,rev(stgLambdaArgs(rhs)));
+            map1Proc(cgBind,bco,reverse(stgLambdaArgs(rhs)));
             asmEndArgCheck(bco,root);
             
             cgExpr(bco,root,stgLambdaBody(rhs));
@@ -592,16 +626,48 @@ static void endTop( StgVar v )
 
 static void zap( StgVar v )
 {
-    stgVarBody(v) = NIL;
+  // ToDo: reinstate
+  //    stgVarBody(v) = NIL;
 }
 
 /* external entry point */
 Void cgBinds( List binds )
 {
+    List b;
+    int i;
+
+    //if (lastModule() != modulePrelude) {
+    //    printf("\n\ncgBinds: before ll\n\n" );
+    //    for (b=binds; nonNull(b); b=tl(b)) {
+    //       printStg ( stdout, hd(b) ); printf("\n\n");
+    //    }
+    //}
+
     binds = liftBinds(binds);
-    mapProc(beginTop,binds);
-    mapProc(endTop,binds);
-    mapProc(zap,binds);
+
+    //if (lastModule() != modulePrelude) {
+    //    printf("\n\ncgBinds: after ll\n\n" );
+    //    for (b=binds; nonNull(b); b=tl(b)) {
+    //       printStg ( stdout, hd(b) ); printf("\n\n");
+    //    }
+    //}
+
+
+    //mapProc(beginTop,binds);
+    for (b=binds,i=0; nonNull(b); b=tl(b),i++) {
+      //printf("beginTop %d\n", i);
+       beginTop(hd(b));
+    }
+
+    //mapProc(endTop,binds);
+    for (b=binds,i=0; nonNull(b); b=tl(b),i++) {
+       endTop(hd(b));
+       //if (lastModule() != modulePrelude) {
+       //    printStg ( stdout, hd(b) ); printf("\n\n");
+       //}
+    }
+
+    //mapProc(zap,binds);
 }
 
 /* --------------------------------------------------------------------------

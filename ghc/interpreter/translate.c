@@ -8,8 +8,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.4 $
- * $Date: 1999/02/03 17:08:44 $
+ * $Revision: 1.5 $
+ * $Date: 1999/03/01 14:46:57 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -31,7 +31,8 @@ static StgExpr local stgExpr         Args((Cell,Int,List,StgExpr));
 
 /* ---------------------------------------------------------------- */
 
-/* Association list storing globals assigned to dictionaries, tuples, etc */
+/* Association list storing globals assigned to                     */
+/* dictionaries, tuples, etc                                        */
 List stgGlobals = NIL;
 
 static StgVar local getSTGTupleVar  Args((Cell));
@@ -149,7 +150,7 @@ StgExpr failExpr;
         }
     case GUARDED:
         {   
-            List guards = rev(snd(e));
+            List guards = reverse(snd(e));
             e = failExpr;
             for(; nonNull(guards); guards=tl(guards)) {
                 Cell g   = hd(guards);
@@ -174,18 +175,27 @@ StgExpr failExpr;
             } else if (isChar(fst(hd(alts)))) {
                 Cell     alt  = hd(alts);
                 StgDiscr d    = fst(alt);
-                StgVar   c    = mkStgVar(mkStgCon(nameMkC,singleton(d)),NIL);
+                StgVar   c    = mkStgVar(
+                                   mkStgCon(nameMkC,singleton(d)),NIL);
                 StgExpr  test = nameEqChar;
                 /* duplicates scrut but it should be atomic */
-                return makeStgIf(makeStgLet(singleton(c),makeStgApp(test,doubleton(scrut,c))),
-                                 stgExpr(snd(alt),co,sc,failExpr),
-                                 stgExpr(ap(CASE,pair(fst(snd(e)),tl(alts))),co,sc,failExpr));
+                return makeStgIf(
+                          makeStgLet(singleton(c),
+                             makeStgApp(test,doubleton(scrut,c))),
+                          stgExpr(snd(alt),co,sc,failExpr),
+                          stgExpr(ap(CASE,pair(fst(snd(e)),
+                             tl(alts))),co,sc,failExpr));
             } else {
                 List as    = NIL;
                 for(; nonNull(alts); alts=tl(alts)) {
                     as = cons(stgCaseAlt(hd(alts),co,sc,failExpr),as);
                 }
-                return mkStgCase(scrut, revOnto(as, singleton(mkStgDefault(mkStgVar(NIL,NIL),failExpr))));
+                return mkStgCase(
+                          scrut,
+                          revOnto(
+                             as, 
+                             singleton(mkStgDefault(mkStgVar(NIL,NIL),
+                                       failExpr))));
             }
         }
     case NUMCASE:
@@ -225,19 +235,24 @@ StgExpr failExpr;
                 binds = cons(n,binds);
 
                 /* coerce number to right type (using Integral dict) */
-                n = mkStgVar(mkStgApp(namePmFromInteger,doubleton(dIntegral,n)),NIL);
+                n = mkStgVar(mkStgApp(
+                       namePmFromInteger,doubleton(dIntegral,n)),NIL);
                 binds = cons(n,binds);
 
                 ++co;
-                v = mkStgVar(mkStgApp(namePmSubtract,tripleton(dIntegral,scrut,n)),NIL);
-                return mkStgLet(binds,
-                                makeStgIf(mkStgApp(namePmLe,tripleton(dIntegral,n,scrut)),
-                                          mkStgLet(singleton(v),
-                                                   stgExpr(r,
-                                                           co,
-                                                           cons(pair(mkOffset(co),v),sc),
-                                                           failExpr)),
-                                          failExpr));
+                v = mkStgVar(mkStgApp(
+                       namePmSubtract,tripleton(dIntegral,scrut,n)),NIL);
+                return 
+                   mkStgLet(
+                      binds,
+                      makeStgIf(
+                         mkStgApp(namePmLe,tripleton(dIntegral,n,scrut)),
+                         mkStgLet(singleton(v),
+                                  stgExpr(r,
+                                          co,
+                                          cons(pair(mkOffset(co),v),sc),
+                                          failExpr)),
+                         failExpr));
             }
 #endif /* NPLUSK */
 
@@ -260,7 +275,7 @@ StgExpr failExpr;
                 Cell   dict   = arg(fun(discr));
                 StgExpr d     = NIL;
                 List    binds = NIL;
-                StgExpr m     = NIL;
+                //StgExpr m     = NIL;
                 Name   box
                     = h == nameFromInt     ? nameMkI
                     : h == nameFromInteger ? nameMkBignum
@@ -288,10 +303,13 @@ StgExpr failExpr;
                 n = mkStgVar(mkStgCon(box,singleton(n)),NIL);
                 binds = cons(n,binds);
 
-                return makeStgIf(mkStgLet(binds,
-                                          mkStgApp(testFun,tripleton(d,n,scrut))),
-                                 stgExpr(r,co+da,altsc,failExpr),
-                                 failExpr);
+                return 
+                   makeStgIf(
+                      mkStgLet(binds,
+                               mkStgApp(testFun,tripleton(d,n,scrut))),
+                      stgExpr(r,co+da,altsc,failExpr),
+                      failExpr
+                   );
             }
         }
 #else /* ! OVERLOADED_CONSTANTS */
@@ -366,7 +384,10 @@ StgExpr failExpr;
                     as = cons(v,as);
                     funsc = cons(pair(mkOffset(co+i),v),funsc);
                 }
-                stgVarBody(nv) = mkStgLambda(as,stgExpr(thd3(thd3(fun)),co+arity,funsc,namePMFail));
+                stgVarBody(nv) 
+                   = mkStgLambda(
+                        as,
+                        stgExpr(thd3(thd3(fun)),co+arity,funsc,namePMFail));
             }
             /* transform expressions */
             for(bs = fst(fst(snd(e))); nonNull(bs); bs=tl(bs), vs=tl(vs)) {
@@ -405,9 +426,10 @@ StgExpr failExpr;
                     Cell nv = mkStgVar(NIL,NIL);
                     vs=cons(nv,vs);
                 }
-                return mkStgCase(v,
-                                 doubleton(mkStgCaseAlt(con,vs,nth(ix-1,vs)),
-                                 mkStgDefault(mkStgVar(NIL,NIL),namePMFail)));
+                return 
+                   mkStgCase(v,
+                             doubleton(mkStgCaseAlt(con,vs,nth(ix-1,vs)),
+                             mkStgDefault(mkStgVar(NIL,NIL),namePMFail)));
             }
             
             /* Arguments must be StgAtoms */
@@ -439,7 +461,7 @@ StgExpr failExpr;
     }
 }
 
-static Void ppExp( Name n, Int arity, Cell e );
+#if 0 /* apparently not used */
 static Void ppExp( Name n, Int arity, Cell e )
 {
 #if DEBUG_CODE
@@ -455,24 +477,24 @@ static Void ppExp( Name n, Int arity, Cell e )
     }
 #endif
 }
+#endif
+
 
 Void stgDefn( Name n, Int arity, Cell e )
 {
     List vs = NIL;
     List sc = NIL;
     Int i;
-//printf("\nBEGIN --------------- stgDefn-ppExp ----------------\n" );
-//    ppExp(n,arity,e);
-//printf("\nEND ----------------- stgDefn-ppExp ----------------\n" );
+    // ppExp(n,arity,e);
     for (i = 1; i <= arity; ++i) {
         Cell nv = mkStgVar(NIL,NIL);
         vs = cons(nv,vs);
         sc = cons(pair(mkOffset(i),nv),sc);
     }
-    stgVarBody(name(n).stgVar) = makeStgLambda(vs,stgExpr(e,arity,sc,namePMFail));
-//printf("\nBEGIN --------------- stgDefn-ppStg ----------------\n" );
-//    ppStg(name(n).stgVar);
-//printf("\nEND ----------------- stgDefn-ppStg ----------------\n" );
+    stgVarBody(name(n).stgVar) 
+       = makeStgLambda(vs,stgExpr(e,arity,sc,namePMFail));
+    //ppStg(name(n).stgVar);
+    //printStg(stdout, name(n).stgVar);
 }
 
 static StgExpr forceArgs( List is, List args, StgExpr e );
@@ -486,114 +508,12 @@ static StgExpr forceArgs( List is, List args, StgExpr e )
     return e;
 }
 
-#if 0
-ToDo: reinstate eventually
-/* \ v -> case v of { ...; Ci _ _ -> i; ... } */
-Void implementConToTag(t)
-Tycon t; {                    
-    if (isNull(tycon(t).conToTag)) {
-        List   cs  = tycon(t).defn;
-        Name   nm  = newName(inventText());
-        StgVar v   = mkStgVar(NIL,NIL);
-        List alts  = NIL; /* can't fail */
-
-        assert(isTycon(t) && (tycon(t).what==DATATYPE || tycon(t).what==NEWTYPE));
-        for (; hasCfun(cs); cs=tl(cs)) {
-            Name    c   = hd(cs);
-            Int     num = cfunOf(c) == 0 ? 0 : cfunOf(c)-1;
-            StgVar  r   = mkStgVar(mkStgCon(nameMkI,singleton(mkInt(num))),NIL);
-            StgExpr tag = mkStgLet(singleton(r),r);
-            List    vs  = NIL;
-            Int i;
-            for(i=0; i < name(c).arity; ++i) {
-                vs = cons(mkStgVar(NIL,NIL),vs);
-            }
-            alts = cons(mkStgCaseAlt(c,vs,tag),alts);
-        }
-
-        name(nm).line   = tycon(t).line;
-        name(nm).type   = conToTagType(t);
-        name(nm).arity  = 1;
-        name(nm).stgVar = mkStgVar(mkStgLambda(singleton(v),mkStgCase(v,alts)),NIL);
-        tycon(t).conToTag = nm;
-        /* hack to make it print out */
-        stgGlobals = cons(pair(nm,name(nm).stgVar),stgGlobals); 
-    }
-}
-
-/* \ v -> case v of { ...; i -> Ci; ... } */
-Void implementTagToCon(t)
-Tycon t; {                    
-    if (isNull(tycon(t).tagToCon)) {
-        String etxt;
-        String tyconname;
-        List   cs;
-        Name   nm;
-        StgVar v1;
-        StgVar v2;
-        Cell   txt0;
-        StgVar bind1;
-        StgVar bind2;
-        StgVar bind3;
-        List   alts;
-
-        assert(nameMkA);
-        assert(nameUnpackString);
-        assert(nameError);
-        assert(isTycon(t) && (tycon(t).what==DATATYPE || tycon(t).what==NEWTYPE));
-
-        tyconname  = textToStr(tycon(t).text);
-        etxt       = malloc(100+strlen(tyconname));
-        assert(etxt);
-        sprintf(etxt, 
-                "out-of-range arg for `toEnum' in (derived) `instance Enum %s'", 
-                tyconname);
-        
-        cs  = tycon(t).defn;
-        nm  = newName(inventText());
-        v1  = mkStgVar(NIL,NIL);
-        v2  = mkStgPrimVar(NIL,mkStgRep(INT_REP),NIL);
-
-        txt0  = mkStr(findText(etxt));
-        bind1 = mkStgVar(mkStgCon(nameMkA,singleton(txt0)),NIL);
-        bind2 = mkStgVar(mkStgApp(nameUnpackString,singleton(bind1)), NIL);
-        bind3 = mkStgVar(mkStgApp(nameError,singleton(bind2)), NIL);
-
-        alts  = singleton(
-                   mkStgPrimAlt(
-                      singleton(
-                         mkStgPrimVar(NIL,mkStgRep(INT_REP),NIL)
-                      ),
-                      makeStgLet ( tripleton(bind1,bind2,bind3), bind3 )
-                   )
-                );
-
-        for (; hasCfun(cs); cs=tl(cs)) {
-            Name   c   = hd(cs);
-            Int    num = cfunOf(c) == 0 ? 0 : cfunOf(c)-1;
-            StgVar pat = mkStgPrimVar(mkInt(num),mkStgRep(INT_REP),NIL);
-            assert(name(c).arity==0);
-            alts = cons(mkStgPrimAlt(singleton(pat),c),alts);
-        }
-
-        name(nm).line   = tycon(t).line;
-        name(nm).type   = tagToConType(t);
-        name(nm).arity  = 1;
-        name(nm).stgVar = mkStgVar(mkStgLambda(singleton(v1),
-                                               mkStgCase(v1,singleton(mkStgCaseAlt(nameMkI,singleton(v2),
-                                                                                   mkStgPrimCase(v2,alts))))),NIL);
-        tycon(t).tagToCon = nm;
-        /* hack to make it print out */
-        stgGlobals = cons(pair(nm,name(nm).stgVar),stgGlobals); 
-        if (etxt) free(etxt);
-    }
-}
-#endif
 
 Void implementCfun(c,scs)               /* Build implementation for constr */
 Name c;                                 /* fun c.  scs lists integers (1..)*/
 List scs; {                             /* in incr order of strict comps.  */
     Int a = name(c).arity;
+    //printf ( "implementCfun %s\n", textToStr(name(c).text) );
     if (name(c).arity > 0) {
         List    args = makeArgs(a);
         StgVar  tv   = mkStgVar(mkStgCon(c,args),NIL);
@@ -651,13 +571,16 @@ static Cell foreignResultTy( Type t )
     else if (t == typeFloat)  return mkChar(FLOAT_REP);
     else if (t == typeDouble) return mkChar(DOUBLE_REP);
 #ifdef PROVIDE_FOREIGN
-    else if (t == typeForeign)return mkChar(FOREIGN_REP); /* ToDo: argty only! */
+    else if (t == typeForeign)return mkChar(FOREIGN_REP); 
+         /* ToDo: argty only! */
 #endif
 #ifdef PROVIDE_ARRAY
-    else if (t == typePrimByteArray) return mkChar(BARR_REP); /* ToDo: argty only! */
+    else if (t == typePrimByteArray) return mkChar(BARR_REP); 
+         /* ToDo: argty only! */
     else if (whatIs(t) == AP) {
         Type h = getHead(t);
-        if (h == typePrimMutableByteArray) return mkChar(MUTBARR_REP); /* ToDo: argty only! */
+        if (h == typePrimMutableByteArray) return mkChar(MUTBARR_REP); 
+         /* ToDo: argty only! */
     }
 #endif
    /* ToDo: decent line numbers! */
@@ -783,7 +706,7 @@ static StgRhs unboxVars( String reps, List b_args, List u_args, StgExpr e )
     if (nonNull(b_args)) {
         StgVar b_arg = hd(b_args); /* boxed arg   */
         StgVar u_arg = hd(u_args); /* unboxed arg */
-        StgRep k     = mkStgRep(*reps);
+        //StgRep k     = mkStgRep(*reps);
         Name   box   = repToBox(*reps);
         e = unboxVars(reps+1,tl(b_args),tl(u_args),e);
         if (isNull(box)) {
@@ -823,13 +746,16 @@ String r_reps; {
 
     /* box results */
     if (strcmp(r_reps,"B") == 0) {
-        StgPrimAlt altF = mkStgPrimAlt(singleton(
-                                         mkStgPrimVar(mkInt(0),
-                                                      mkStgRep(INT_REP),NIL)
-                                       ),
-                                       nameFalse);
-        StgPrimAlt altT = mkStgPrimAlt(singleton(mkStgPrimVar(NIL,mkStgRep(INT_REP),NIL)),
-                                       nameTrue);
+        StgPrimAlt altF 
+           = mkStgPrimAlt(singleton(
+                            mkStgPrimVar(mkInt(0),
+                                         mkStgRep(INT_REP),NIL)
+                          ),
+                          nameFalse);
+        StgPrimAlt altT 
+           = mkStgPrimAlt(
+                singleton(mkStgPrimVar(NIL,mkStgRep(INT_REP),NIL)),
+                nameTrue);
         alts = doubleton(altF,altT); 
         assert(nonNull(nameTrue));
         assert(!addState);
@@ -839,19 +765,24 @@ String r_reps; {
     b_args = mkBoxedVars(a_reps);
     u_args = mkUnboxedVars(a_reps);
     if (addState) {
-        List actual_args = appendOnto(extra_args,dupOnto(u_args,singleton(s0)));
-        StgRhs rhs = makeStgLambda(singleton(s0),
-                                   unboxVars(a_reps,b_args,u_args,
-                                             mkStgPrimCase(mkStgPrim(op,actual_args),
-                                                           alts)));
+        List actual_args 
+           = appendOnto(extra_args,dupListOnto(u_args,singleton(s0)));
+        StgRhs rhs 
+           = makeStgLambda(singleton(s0),
+                           unboxVars(a_reps,b_args,u_args,
+                                     mkStgPrimCase(mkStgPrim(op,actual_args),
+                                                   alts)));
         StgVar m = mkStgVar(rhs,NIL);
         return makeStgLambda(b_args,
                              mkStgLet(singleton(m),
                                       mkStgApp(nameMkIO,singleton(m))));
     } else {
         List actual_args = appendOnto(extra_args,u_args);
-        return makeStgLambda(b_args,
-                             unboxVars(a_reps,b_args,u_args,mkStgPrimCase(mkStgPrim(op,actual_args),alts)));
+        return makeStgLambda(
+                  b_args,
+                  unboxVars(a_reps,b_args,u_args,
+                            mkStgPrimCase(mkStgPrim(op,actual_args),alts))
+               );
     }
 }    
 
@@ -883,7 +814,7 @@ Name n; {
  *	     }}})
  *	 in primMkIO m
  *	 ::
- *	 Addr -> (Int -> Float -> IO (Char,Addr)
+ *	 Addr -> (Int -> Float -> IO (Char,Addr))
  */
 Void implementForeignImport( Name n )
 {
@@ -916,8 +847,8 @@ Void implementForeignImport( Name n )
     } else {
         resultTys = singleton(resultTys);
     }
-    mapOver(foreignArgTy,argTys);      /* allows foreignObj, byteArrays, etc */
-    mapOver(foreignResultTy,resultTys);/* doesn't */
+    mapOver(foreignArgTy,argTys);  /* allows foreignObj, byteArrays, etc */
+    mapOver(foreignResultTy,resultTys); /* doesn't */
     descriptor = mkDescriptor(charListToString(argTys),
                               charListToString(resultTys));
     name(n).primop = addState ? &ccall_IO : &ccall_Id;
@@ -926,7 +857,8 @@ Void implementForeignImport( Name n )
         void*   funPtr  = getDLLSymbol(textToStr(textOf(fst(extName))),
                                        textToStr(textOf(snd(extName))));
         List extra_args = doubleton(mkPtr(descriptor),mkPtr(funPtr));
-        StgRhs rhs = makeStgPrim(n,addState,extra_args,descriptor->arg_tys,descriptor->result_tys);
+        StgRhs rhs = makeStgPrim(n,addState,extra_args,descriptor->arg_tys,
+                                 descriptor->result_tys);
         StgVar v   = mkStgVar(rhs,NIL);
         if (funPtr == 0) {
             ERRMSG(0) "Could not find foreign function \"%s\" in \"%s\"", 
@@ -934,10 +866,10 @@ Void implementForeignImport( Name n )
                 textToStr(textOf(fst(extName)))
             EEND;
         }
-        ppStg(v);
+        //ppStg(v);
         name(n).defn = NIL;
         name(n).stgVar = v; 
-        stgGlobals=cons(pair(n,v),stgGlobals);  /* so it will get codegened */
+        stgGlobals=cons(pair(n,v),stgGlobals);/*so it will get codegen'd */
     }
 }
 
@@ -957,7 +889,7 @@ Int size; {
         stgGlobals   = cons(pair(t,v),stgGlobals);   /* so we can see it */
     } else {
         StgVar  tv   = mkStgVar(mkStgCon(nameUnit,NIL),NIL);
-        stgGlobals   = cons(pair(nameUnit,tv),stgGlobals);   /* so we can see it */
+        stgGlobals   = cons(pair(nameUnit,tv),stgGlobals);      /* ditto */
     }        
 }
 
