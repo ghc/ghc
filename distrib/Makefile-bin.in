@@ -101,7 +101,7 @@ VERSION_SYMLINKS_FOR=ghc
 # local setup/install information prepended.
 #
 PACKAGE_SCRIPTS=ghc stat2resid hstags mkdependHS
-PACKAGE_LIB_SCRIPTS=hscpp
+PACKAGE_LIBSCRIPTS=hscpp
 
 # Binaries to install
 PACKAGE_BINS=$(PACKAGE_SCRIPTS) hp2ps
@@ -134,13 +134,12 @@ config-pkgs ::
 	   echo "Creating a configured version of $$i .."; \
 	   $(RM) bin/$(platform)/$(package)-$(version)/$$i.bak; \
 	   test -f bin/$(platform)/$(package)-$(version)/$$i && $(MV) bin/$(platform)/$(package)-$(version)/$$i bin/$(platform)/$(package)-$(version)/$$i.bak; \
-	   echo "eval 'exec $(PERL) -S $$$""0 $$""{1+\"$$$""@\"}'"         > bin/$(platform)/$(package)-$(version)/$$i; \
-	   echo "      if $$""running_under_some_shell;"                  >> bin/$(platform)/$(package)-$(version)/$$i; \
-	   echo $$"bindir='$(bindir)';"                                   >> bin/$(platform)/$(package)-$(version)/$$i; \
-	   echo $$"libdir='$(real_libdir)';"                              >> bin/$(platform)/$(package)-$(version)/$$i; \
-	   echo $$"libexecdir='$(real_libdir)';"                              >> bin/$(platform)/$(package)-$(version)/$$i; \
-	   echo $$"datadir='$(real_datadir)';"                            >> bin/$(platform)/$(package)-$(version)/$$i; \
-	   cat bin/$(platform)/$(package)-$(version)/$$i.prl              >> bin/$(platform)/$(package)-$(version)/$$i; \
+	   echo "#! $(PERL)" > $$i.tmp ; 		        > bin/$(platform)/$(package)-$(version)/$$i ; \
+	   echo $$"bindir='$(bindir)';"                        >> bin/$(platform)/$(package)-$(version)/$$i ; \
+	   echo $$"libdir='$(real_libdir)';"                   >> bin/$(platform)/$(package)-$(version)/$$i ; \
+	   echo $$"libexecdir='$(real_libdir)';"               >> bin/$(platform)/$(package)-$(version)/$$i ; \
+	   echo $$"datadir='$(real_datadir)';"                 >> bin/$(platform)/$(package)-$(version)/$$i ; \
+	   cat bin/$(platform)/$(package)-$(version)/$$i.prl   >> bin/$(platform)/$(package)-$(version)/$$i ; \
 	   $(CHMOD) $(BIN_PERMS) bin/$(platform)/$(package)-$(version)/$$i; \
 	   echo "Done."; \
 	done
@@ -148,25 +147,16 @@ config-pkgs ::
 	   echo "Creating a configured version of $$i .."; \
 	   $(RM) lib/$(platform)/$(package)-$(version)/$$i.bak; \
 	   test -f lib/$(platform)/$(package)-$(version)/$$i && $(MV) lib/$(platform)/$(package)-$(version)/$$i lib/$(platform)/$(package)-$(version)/$$i.bak; \
-	   echo "eval 'exec $(PERL) -S $$$""0 $$""{1+\"$$$""@\"}'"         > lib/$(platform)/$(package)-$(version)/$$i; \
-	   echo "      if $$""running_under_some_shell;"                  >> lib/$(platform)/$(package)-$(version)/$$i; \
-	   echo $$"bindir='$(bindir)';"                                   >> lib/$(platform)/$(package)-$(version)/$$i; \
-	   echo $$"libdir='$(real_libdir)';"                              >> lib/$(platform)/$(package)-$(version)/$$i; \
-	   echo $$"libexecdir='$(real_libdir)';"                              >> lib/$(platform)/$(package)-$(version)/$$i; \
-	   echo $$"datadir='$(real_datadir)';"                            >> lib/$(platform)/$(package)-$(version)/$$i; \
-	   cat lib/$(platform)/$(package)-$(version)/$$i.prl              >> lib/$(platform)/$(package)-$(version)/$$i; \
+	   echo "#! $(PERL)"                      > lib/$(platform)/$(package)-$(version)/$$i ; \
+	   echo $$"bindir='$(bindir)';"          >> lib/$(platform)/$(package)-$(version)/$$i ; \
+	   echo $$"libdir='$(real_libdir)';"     >> lib/$(platform)/$(package)-$(version)/$$i ; \
+	   echo $$"libexecdir='$(real_libdir)';" >> lib/$(platform)/$(package)-$(version)/$$i ; \
+	   echo $$"datadir='$(real_datadir)';"   >> lib/$(platform)/$(package)-$(version)/$$i ; \
+	   cat lib/$(platform)/$(package)-$(version)/$$i.prl >> lib/$(platform)/$(package)-$(version)/$$i; \
 	   $(CHMOD) $(BIN_PERMS) lib/$(platform)/$(package)-$(version)/$$i; \
 	   echo "Done."; \
 	done
 
-#
-# The vaguely funky eval 'exec ...' echo line above *might* be
-# a tad too much for some `make's - here's what it should return
-# if all is well:
-#
-#   eval 'exec /installed/path/for/perl -S $0 ${1+"$@"}'
-#         if $running_under_some_shell;
-#
 
 mk-version-symlinks ::
 	@for i in $(VERSION_SYMLINKS_FOR) ""; do \
