@@ -25,7 +25,7 @@ module BSD (
     getServiceByPort,       -- :: PortNumber  -> ProtocolName -> IO ServiceEntry
     getServicePortNumber,   -- :: ServiceName -> IO PortNumber
 
-#ifndef cygwin32_TARGET_OS
+#ifndef _WIN32
     getServiceEntry,	    -- :: IO ServiceEntry
     setServiceEntry,	    -- :: Bool -> IO ()
     endServiceEntry,	    -- :: IO ()
@@ -39,7 +39,7 @@ module BSD (
     getProtocolByNumber,    -- :: ProtocolNumber -> IO ProtcolEntry
     getProtocolNumber,	    -- :: ProtocolName   -> ProtocolNumber
 
-#ifndef cygwin32_TARGET_OS
+#ifndef _WIN32
     setProtocolEntry,	    -- :: Bool -> IO ()
     getProtocolEntry,	    -- :: IO ProtocolEntry
     endProtocolEntry,	    -- :: IO ()
@@ -54,7 +54,7 @@ module BSD (
     getHostByAddr,	    -- :: HostAddress -> Family -> IO HostEntry
     hostAddress,	    -- :: HostEntry -> HostAddress
 
-#ifndef cygwin32_TARGET_OS
+#ifndef _WIN32
     setHostEntry,	    -- :: Bool -> IO ()
     getHostEntry,	    -- :: IO HostEntry
     endHostEntry,	    -- :: IO ()
@@ -64,7 +64,7 @@ module BSD (
     NetworkName,
     NetworkAddr,
     NetworkEntry(..)
-#ifndef cygwin32_TARGET_OS
+#ifndef _WIN32
     , getNetworkByName	    -- :: NetworkName -> IO NetworkEntry
     , getNetworkByAddr     -- :: NetworkAddr -> Family -> IO NetworkEntry
     , setNetworkEntry	    -- :: Bool -> IO ()
@@ -178,7 +178,7 @@ getServicePortNumber name = do
     (ServiceEntry _ _ port _) <- getServiceByName name "tcp"
     return port
 
-#ifndef cygwin32_TARGET_OS
+#ifndef _WIN32
 getServiceEntry	:: IO ServiceEntry
 getServiceEntry = do
     ptr <- _ccall_ getservent
@@ -214,7 +214,7 @@ getProtocolByName   :: ProtocolName   -> IO ProtocolEntry
 getProtocolByNumber :: ProtocolNumber -> IO ProtocolEntry
 getProtocolNumber   :: ProtocolName   -> IO ProtocolNumber
 
-#ifndef cygwin32_TARGET_OS
+#ifndef _WIN32
 setProtocolEntry    :: Bool -> IO ()	-- Keep DB Open ?
 getProtocolEntry    :: IO ProtocolEntry	-- Next Protocol Entry from DB
 endProtocolEntry    :: IO ()
@@ -242,7 +242,7 @@ getProtocolNumber proto = do
  (ProtocolEntry _ _ num) <- getProtocolByName proto
  return num
 
-#ifndef cygwin32_TARGET_OS
+#ifndef _WIN32
 --getProtocolEntry :: IO ProtocolEntry	-- Next Protocol Entry from DB
 getProtocolEntry = do
  ptr <- _ccall_ getprotoent
@@ -284,7 +284,7 @@ getHostByAddr family addr = do
     then ioError (IOError Nothing NoSuchThing "getHostByAddr" "no such host entry")
     else unpackHostEntry ptr
 
-#ifndef cygwin32_TARGET_OS
+#ifndef _WIN32
 getHostEntry :: IO HostEntry
 getHostEntry = do
  ptr <- _ccall_ gethostent
@@ -328,7 +328,7 @@ data NetworkEntry =
      networkFamily	:: Family,	   -- type
      networkAddress	:: NetworkAddr
    }
-#ifndef cygwin32_TARGET_OS
+#ifndef _WIN32
 getNetworkByName :: NetworkName -> IO NetworkEntry
 getNetworkByName name = do
  ptr <- _ccall_ getnetbyname name

@@ -77,6 +77,8 @@ module SocketPrim (
     packSocketType,
     packSockAddr, unpackSockAddr
 
+    , withSocketsDo  -- :: IO a -> IO a
+
 ) where
  
 import GlaExts
@@ -86,6 +88,7 @@ import Weak	    ( addForeignFinalizer )
 import PrelIOBase  -- IOError, Handle representation
 import PrelHandle
 import Foreign
+import Addr	    ( nullAddr )
 
 import IO
 import IOExts	    ( IORef, newIORef, readIORef, writeIORef )
@@ -188,7 +191,7 @@ instance Num PortNumber where
    signum n  = mkPortNumber (signum (ntohs n))
 
 data SockAddr		-- C Names				
-#ifndef cygwin32_TARGET_OS
+#if !defined(cygwin32_TARGET_OS) && !defined(mingw32_TARGET_OS)
   = SockAddrUnix        -- struct sockaddr_un
         String          -- sun_path
   | SockAddrInet	-- struct sockaddr_in
@@ -266,7 +269,7 @@ bindSocket :: Socket	-- Unconnected Socket
 	   -> IO ()
 
 bindSocket (MkSocket s _family _stype _protocol socketStatus) addr = do
-#ifndef cygwin32_TARGET_OS
+#if !defined(cygwin32_TARGET_OS) && !defined(mingw32_TARGET_OS)
  let isDomainSocket = if _family == AF_UNIX then 1 else (0::Int)
 #else
  let isDomainSocket = 0
@@ -301,7 +304,7 @@ connect :: Socket	-- Unconnected Socket
 	-> IO ()
 
 connect (MkSocket s _family _stype _protocol socketStatus) addr = do
-#ifndef cygwin32_TARGET_OS
+#ifndef _WIN32
  let isDomainSocket = if _family == AF_UNIX then 1 else (0::Int)
 #else
  let isDomainSocket = 0
@@ -555,7 +558,9 @@ data SocketOption
     | RecvBuffer    {- SO_RCVBUF    -}
     | KeepAlive     {- SO_KEEPALIVE -}
     | OOBInline     {- SO_OOBINLINE -}
+#ifndef _WIN32
     | MaxSegment    {- TCP_MAXSEG   -}
+#endif
     | NoDelay       {- TCP_NODELAY  -}
 --    | Linger        {- SO_LINGER    -}
 #if 0
@@ -580,7 +585,9 @@ packSocketOption so =
     RecvBuffer    -> ``SO_RCVBUF''
     KeepAlive     -> ``SO_KEEPALIVE''
     OOBInline     -> ``SO_OOBINLINE''
+#ifndef _WIN32
     MaxSegment    -> ``TCP_MAXSEG''
+#endif
     NoDelay       -> ``TCP_NODELAY''
 #if 0
     ReusePort     -> ``SO_REUSEPORT''	-- BSD only?
@@ -708,7 +715,7 @@ unpackFamily family = (range (AF_UNSPEC, AF_IPX))!!family
 
 #endif
 
-#if cygwin32_TARGET_OS
+#if defined(cygwin32_TARGET_OS) || defined(mingw32_TARGET_OS)
  
 data Family = 
 	  AF_UNSPEC	-- unspecified
@@ -951,14 +958,13 @@ packSocketType stype = 1 + (index (Stream, SeqPacket) stype)
 
 -- This is for a box running cygwin32 toolchain.
 
-#if defined(cygwin32_TARGET_OS)
+#if defined(_WIN32)
 data SocketType = 
 	  Stream 
 	| Datagram
 	| Raw 
 	| RDM       -- reliably delivered msg
 	| SeqPacket
-	| Packet
 	deriving (Eq, Ord, Ix, Show)
 	
 packSocketType stype =
@@ -968,7 +974,6 @@ packSocketType stype =
    Raw       -> ``SOCK_RAW''
    RDM       -> ``SOCK_RDM'' 
    SeqPacket -> ``SOCK_SEQPACKET''
-   Packet    -> ``SOCK_PACKET''
 
 #endif
 
@@ -1081,7 +1086,7 @@ sIsWritable = sIsReadable -- sort of.
 -------------------------------------------------------------------------------
 
 sIsAcceptable :: Socket -> IO Bool
-#ifndef cygwin32_TARGET_OS
+#if !defined(cygwin32_TARGET_OS) && !defined(mingw32_TARGET_OS)
 sIsAcceptable (MkSocket _ AF_UNIX Stream _ status) = do
     value <- readIORef status
     return (value == Connected || value == Bound || value == Listening)
@@ -1127,7 +1132,7 @@ Marshaling and allocation helper functions:
 
 allocSockAddr :: Family -> IO (MutableByteArray RealWorld Int, Int)
 
-#ifndef cygwin32_TARGET_OS
+#if !defined(cygwin32_TARGET_OS) && !defined(mingw32_TARGET_OS)
 allocSockAddr AF_UNIX = do
     ptr <- allocChars ``sizeof(struct sockaddr_un)''
     let (_,sz) = boundsOfMutableByteArray ptr
@@ -1145,14 +1150,14 @@ unpackSockAddr :: MutableByteArray RealWorld Int -> Int -> IO SockAddr
 unpackSockAddr arr len = do
     fam <- _casm_ ``%r = ((struct sockaddr*)%0)->sa_family;'' arr
     case unpackFamily fam of
-#ifndef cygwin32_TARGET_OS
+#if !defined(cygwin32_TARGET_OS) && !defined(mingw32_TARGET_OS)
 	AF_UNIX -> unpackSockAddrUnix arr (len - ``sizeof(short)'')
 #endif
 	AF_INET -> unpackSockAddrInet arr
 
 -------------------------------------------------------------------------------
 
-#ifndef cygwin32_TARGET_OS
+#if !defined(cygwin32_TARGET_OS) && !defined(mingw32_TARGET_OS)
 
 {-
   sun_path is *not* NULL terminated, hence we *do* need to know the
@@ -1178,7 +1183,7 @@ unpackSockAddrInet ptr = do
 
 
 packSockAddr :: SockAddr -> IO (MutableByteArray RealWorld Int)
-#ifndef cygwin32_TARGET_OS
+#if !defined(cygwin32_TARGET_OS) && !defined(mingw32_TARGET_OS)
 packSockAddr (SockAddrUnix path) = do
     (ptr,_) <- allocSockAddr AF_UNIX
     _casm_ ``(((struct sockaddr_un *)%0)->sun_family) = AF_UNIX;''    ptr
@@ -1204,14 +1209,23 @@ it subsequently.
 socketToHandle :: Socket -> IOMode -> IO Handle
 
 socketToHandle (MkSocket fd _ _ _ _) m = do
-    fileobj <- _ccall_ openFd fd (file_mode::Int) (flush_on_close::Int)
-    fo <- mkForeignObj fileobj
-    addForeignFinalizer fo (freeFileObject fo)
-    mkBuffer__ fo 0  -- not buffered
-    hndl <- newHandle (Handle__ fo htype NoBuffering socket_str)
-    return hndl
+    fileobj <- _ccall_ openFd fd (file_mode::Int) (file_flags::Int)
+    if fileobj == nullAddr then
+       ioError (userError "socketHandle: Failed to open file desc")
+     else do
+       fo <- mkForeignObj fileobj
+       addForeignFinalizer fo (freeFileObject fo)
+       mkBuffer__ fo 0  -- not buffered
+       hndl <- newHandle (Handle__ fo htype NoBuffering socket_str)
+       return hndl
  where
   socket_str = "<socket: "++show fd
+#ifdef _WIN32
+  file_flags = flush_on_close + 1024{-I'm a socket fd, me!-}
+#else
+  file_flags = flush_on_close
+#endif
+
   (flush_on_close, file_mode) =
    case m of 
            AppendMode    -> (1, 0)
@@ -1231,3 +1245,28 @@ socketToHandle (MkSocket s family stype protocol status) m =
 #endif
 \end{code}
 
+If you're using WinSock, the programmer has to call a startup
+routine before starting to use the goods. So, if you want to
+stay portable across all ghc-supported platforms, you have to
+use @withSocketsDo@...:
+
+\begin{code}
+withSocketsDo :: IO a -> IO a
+#ifndef _WIN32
+withSocketsDo x = x
+#else
+withSocketsDo act = do
+   x <- initWinSock
+   if ( x /= 0 ) then
+     ioError (userError "Failed to initialise WinSock")
+    else do
+      v <- act
+      shutdownWinSock
+      return v
+
+foreign import "initWinSock" initWinSock :: IO Int
+foreign import "shutdownWinSock" shutdownWinSock :: IO ()
+
+#endif
+
+\end{code}

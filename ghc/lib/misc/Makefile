@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.11 1999/02/03 16:54:01 simonm Exp $
+# $Id: Makefile,v 1.12 1999/05/05 10:36:30 sof Exp $
 #
 # Makefile for miscellaneous libraries.
 #
@@ -41,6 +41,7 @@ SRC_HC_OPTS += -i../concurrent -recomp -cpp -fglasgow-exts -fvia-C -Rghc-timing 
 
 #
 # Profiling options
+# (what's this stuff doing here?)
 WAY_p_HC_OPTS += -GPrelude
 WAY_mr_HC_OPTS += -GPrelude
 
@@ -63,6 +64,15 @@ PackedString_HC_OPTS += -H12m
 # 	Dependency generation
 
 SRC_MKDEPENDHS_OPTS += -I$(GHC_INCLUDE_DIR)
+
+#-----------------------------------------------------------------------------
+# 	Win32 DLL setup
+
+DLL_NAME = HSmisc.dll
+DLL_IMPLIB_NAME = libHSmisc_imp.a
+SRC_BLD_DLL_OPTS += --export-all --output-def=HSmisc.def
+SRC_BLD_DLL_OPTS += -lwinmm -lwsock32 -lHSrts_imp -lHS_cbits_imp -lHSmisc_cbits_imp -lHS_imp -lHSexts_imp -lgmp -L. -L../../rts/gmp -L../../rts -L../std -L../std/cbits -L../exts -Lcbits
+
 
 #-----------------------------------------------------------------------------
 # 	Installation; need to install .hi files as well as libraries

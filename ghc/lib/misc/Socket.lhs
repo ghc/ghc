@@ -26,7 +26,12 @@ module Socket (
 	sendTo,		-- :: Hostname -> PortID -> String -> IO ()
 	recvFrom,	-- :: Hostname -> PortID -> IO String
 
-	socketPort	-- :: Socket -> IO PortID
+	socketPort,	-- :: Socket -> IO PortID
+	
+	withSocketsDo,  -- :: IO a   -> IO a
+	
+	PortNumber,
+	mkPortNumber	-- :: Int    -> PortNumber
 
        ) where
 
@@ -56,7 +61,7 @@ signalling that the current hostname applies.
 data PortID = 
 	  Service String		-- Service Name eg "ftp"
 	| PortNumber PortNumber		-- User defined Port Number
-#ifndef cygwin32_TARGET_OS
+#ifndef _WIN32
 	| UnixSocket String		-- Unix family socket in file system
 #endif
 
@@ -88,7 +93,7 @@ connectTo hostname (PortNumber port) = do
     connect sock (SockAddrInet port (hostAddress he))
     socketToHandle sock ReadWriteMode
 
-#ifndef cygwin32_TARGET_OS
+#ifndef _WIN32
 connectTo _ (UnixSocket path) = do
     sock    <- socket AF_UNIX Datagram 0
     connect sock (SockAddrUnix path)
@@ -119,7 +124,7 @@ listenOn (PortNumber port) = do
     listen sock maxListenQueue
     return sock
 
-#ifndef cygwin32_TARGET_OS
+#ifndef _WIN32
 listenOn (UnixSocket path) = do
     sock <- socket AF_UNIX Datagram 0
     bindSocket sock (SockAddrUnix path)
@@ -190,7 +195,7 @@ socketPort s = do
    portID sa =
     case sa of
      SockAddrInet port _    -> PortNumber port
-#ifndef cygwin32_TARGET_OS
+#ifndef _WIN32
      SockAddrUnix path	    -> UnixSocket path
 #endif
 
