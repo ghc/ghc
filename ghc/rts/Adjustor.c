@@ -42,7 +42,6 @@ Haskell side.
 #include "RtsFlags.h"
 
 /* Heavily arch-specific, I'm afraid.. */
-#if defined(i386_TARGET_ARCH) || defined(sparc_TARGET_ARCH) || defined(alpha_TARGET_ARCH) || defined(powerpc_TARGET_ARCH)
 
 #if defined(i386_TARGET_ARCH)
 /* Now here's something obscure for you:
@@ -365,7 +364,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
 		}
 	}
 #else
-#error Adjustor creation is not supported on this platform.
+    barf("adjustor creation not supported on this platform");
 #endif
     break;
   
@@ -378,7 +377,6 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
   return adjustor;
 }
 
-#endif
 
 void
 freeHaskellFunctionPtr(void* ptr)
