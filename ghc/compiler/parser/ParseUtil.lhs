@@ -335,8 +335,8 @@ checkValDef lhs opt_sig grhss loc
 
 -- A variable binding is parsed as an RdrNamePatBind.
 
-isFunLhs (OpApp l (HsVar op) fix r) []  | not (isRdrDataCon op)
-			  	= Just (op, True, [l,r])
+isFunLhs (OpApp l (HsVar op) fix r) es  | not (isRdrDataCon op)
+			  	= Just (op, True, (l:r:es))
 isFunLhs (HsVar f) es@(_:_)  | not (isRdrDataCon f)
 			 	= Just (f,False,es)
 isFunLhs (HsApp f e) es 	= isFunLhs f (e:es)

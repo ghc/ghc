@@ -684,7 +684,8 @@ checkPrecMatch :: Bool -> Name -> RenamedMatch -> RnMS ()
 checkPrecMatch False fn match
   = returnRn ()
 
-checkPrecMatch True op (Match _ [p1,p2] _ _)
+checkPrecMatch True op (Match _ (p1:p2:_) _ _)
+	-- True indicates an infix lhs
   = getModeRn 		`thenRn` \ mode ->
 	-- See comments with rnExpr (OpApp ...)
     case mode of
