@@ -28,6 +28,16 @@ SRC_DIST_DIRS += mk docs distrib $(ProjectsToBuild)
 SRC_DIST_FILES += configure.in config.guess config.sub configure aclocal.m4 acconfig.h README INSTALL Makefile install-sh
 
 # -----------------------------------------------------------------------------
+# Make sure configure is up-to-date
+
+all boot :: configure
+configure :: configure.in
+	@echo "WARNING: configure needs to be regenerated.  Type"
+	@echo "      make -f Makefile.config ./configure"
+	@echo "and rerun make."
+	@exit 16
+
+# -----------------------------------------------------------------------------
 # Making a binary distribution
 #
 # To make a particular binary distribution: 
