@@ -36,13 +36,14 @@ import HsSyn	( HsLit(..), HsExpr(..), HsBinds, Fixity, MonoBinds(..),
 		  InPat, OutPat, Stmt, DoOrListComp, Match, GRHSsAndBinds,
 		  ArithSeqInfo, HsType, Fake )
 import RnHsSyn	( SYN_IE(RenamedArithSeqInfo), SYN_IE(RenamedHsExpr) )
-import TcHsSyn	( TcIdOcc(..), SYN_IE(TcExpr), SYN_IE(TcIdBndr), 
+import TcHsSyn	( SYN_IE(TcExpr), 
 		  SYN_IE(TcDictBinds), SYN_IE(TcMonoBinds),
 		  mkHsTyApp, mkHsDictApp, tcIdTyVars )
 
 import TcMonad
 import TcEnv	( tcLookupGlobalValueByKey, tcLookupTyConByKey )
-import TcType	( SYN_IE(TcType), SYN_IE(TcRhoType), TcMaybe, SYN_IE(TcTyVarSet),
+import TcType	( TcIdOcc(..), SYN_IE(TcIdBndr), 
+		  SYN_IE(TcType), SYN_IE(TcRhoType), TcMaybe, SYN_IE(TcTyVarSet),
 		  tcInstType, zonkTcType, tcSplitForAllTy, tcSplitRhoTy )
 
 import Bag	( emptyBag, unitBag, unionBags, unionManyBags, bagToList,
@@ -68,7 +69,7 @@ import Type	( GenType, eqSimpleTy, instantiateTy,
 		)
 import TyVar	( unionTyVarSets, GenTyVar )
 import TysPrim	  ( intPrimTy )
-import TysWiredIn ( intDataCon, integerTy )
+import TysWiredIn ( intDataCon, integerTy, isIntTy, isIntegerTy, inIntRange )
 import Unique	( fromRationalClassOpKey, rationalTyConKey,
 		  fromIntClassOpKey, fromIntegerClassOpKey, Unique
 		)
@@ -246,14 +247,26 @@ newMethodAtLoc orig loc real_id tys	-- Local function, similar to newMethod but 
 newOverloadedLit :: InstOrigin s
 		 -> OverloadedLit
 		 -> TcType s
-		 -> NF_TcM s (LIE s, TcIdOcc s)
-newOverloadedLit orig lit ty
+		 -> NF_TcM s (TcExpr s, LIE s)
+newOverloadedLit orig (OverloadedIntegral i) ty
+  | isIntTy ty && inIntRange i		-- Short cut for Int
+  = returnNF_Tc (int_lit, emptyLIE)
+
+  | isIntegerTy ty 			-- Short cut for Integer
+  = returnNF_Tc (integer_lit, emptyLIE)
+
+  where
+    intprim_lit    = HsLitOut (HsIntPrim i) intPrimTy
+    integer_lit    = HsLitOut (HsInt i) integerTy
+    int_lit        = HsApp (HsVar (RealId intDataCon)) intprim_lit
+
+newOverloadedLit orig lit ty		-- The general case
   = tcGetSrcLoc			`thenNF_Tc` \ loc ->
     tcGetUnique			`thenNF_Tc` \ new_uniq ->
     let
 	lit_inst = LitInst new_uniq lit ty orig loc
     in
-    returnNF_Tc (unitLIE lit_inst, instToId lit_inst)
+    returnNF_Tc (HsVar (instToId lit_inst), unitLIE lit_inst)
 \end{code}
 
 
@@ -469,20 +482,27 @@ lookupInst inst@(Method _ id tys rho orig loc)
 -- Literals
 
 lookupInst inst@(LitInst u (OverloadedIntegral i) ty orig loc)
-  | i >= toInteger minInt && i <= toInteger maxInt
-  =	-- It's overloaded but small enough to fit into an Int
-    tcLookupGlobalValueByKey fromIntClassOpKey	`thenNF_Tc` \ from_int ->
-    newMethodAtLoc orig loc from_int [ty]		`thenNF_Tc` \ (method_inst, method_id) ->
-    returnTc ([method_inst], VarMonoBind (instToId inst) (HsApp (HsVar method_id) int_lit))
+  | isIntTy ty && in_int_range			-- Short cut for Int
+  = returnTc ([], VarMonoBind inst_id int_lit)
 
-  | otherwise 
-  =     -- Alas, it is overloaded and a big literal!
-    tcLookupGlobalValueByKey fromIntegerClassOpKey	`thenNF_Tc` \ from_integer ->
+  | isIntegerTy ty				-- Short cut for Integer
+  = returnTc ([], VarMonoBind inst_id integer_lit)
+
+  | in_int_range				-- It's overloaded but small enough to fit into an Int
+  = tcLookupGlobalValueByKey fromIntClassOpKey	`thenNF_Tc` \ from_int ->
+    newMethodAtLoc orig loc from_int [ty]	`thenNF_Tc` \ (method_inst, method_id) ->
+    returnTc ([method_inst], VarMonoBind inst_id (HsApp (HsVar method_id) int_lit))
+
+  | otherwise   				-- Alas, it is overloaded and a big literal!
+  = tcLookupGlobalValueByKey fromIntegerClassOpKey	`thenNF_Tc` \ from_integer ->
     newMethodAtLoc orig loc from_integer [ty]		`thenNF_Tc` \ (method_inst, method_id) ->
-    returnTc ([method_inst], VarMonoBind (instToId inst) (HsApp (HsVar method_id) (HsLitOut (HsInt i) integerTy)))
+    returnTc ([method_inst], VarMonoBind inst_id (HsApp (HsVar method_id) integer_lit))
   where
+    in_int_range   = inIntRange i
     intprim_lit    = HsLitOut (HsIntPrim i) intPrimTy
+    integer_lit    = HsLitOut (HsInt i) integerTy
     int_lit        = HsApp (HsVar (RealId intDataCon)) intprim_lit
+    inst_id	   = instToId inst
 
 lookupInst inst@(LitInst u (OverloadedFractional f) ty orig loc)
   = tcLookupGlobalValueByKey fromRationalClassOpKey	`thenNF_Tc` \ from_rational ->
