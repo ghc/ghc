@@ -291,7 +291,7 @@ dist-package-zip ::
 # HC file bundles
 
 hc-file-bundle : project-check
-	$(RM) $(ProjectNameShort)-$(ProjectVersion)
+	$(RM) -r $(ProjectNameShort)-$(ProjectVersion)
 	$(LN_S) . $(ProjectNameShort)-$(ProjectVersion)
 	find $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler \
 	     $(ProjectNameShort)-$(ProjectVersion)/ghc/driver \
@@ -302,7 +302,7 @@ hc-file-bundle : project-check
 	     $(ProjectNameShort)-$(ProjectVersion)/ghc/driver \
 	     $(ProjectNameShort)-$(ProjectVersion)/ghc/lib \
 	     $(ProjectNameShort)-$(ProjectVersion)/hslibs \
-	  -name "*.hsc" | sed 's/hsc$/hs$/g' >> hc-files-to-go
+	  -name "*.hsc" | sed 's/hsc$$/hs/g' >> hc-files-to-go
 	tar czf $(ProjectNameShort)-$(ProjectVersion)-$(TARGETPLATFORM)-hc.tar.gz `cat hc-files-to-go`
 
 CLEAN_FILES += hc-files-to-go *-hc.tar.gz
