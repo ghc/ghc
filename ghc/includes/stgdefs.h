@@ -33,6 +33,18 @@ void _stgAssert PROTO((char *, unsigned int));
 #define NON_POSIX_SOURCE
 #endif
 
+/* If _NEXT_SOURCE is defined, certain header files make more 
+ * constants visible to us.
+ * Perhaps it would have been wise, also to define NON_POSIX_SOURCE.
+ * Things seemed to work better without it however, so I have not
+ * done it. Nevertheless we do the signal stuff in a NON_POSIX way,
+ * see StgMacros.lh.
+ * CaS
+ */
+#ifdef nextstep3_TARGET_OS
+#define _NEXT_SOURCE
+#endif
+ 
 #ifdef NON_POSIX_SOURCE
 #undef _POSIX_SOURCE
 #undef _POSIX_C_SOURCE

@@ -1659,7 +1659,8 @@ IF_RTS(void blockVtAlrmSignal(STG_NO_ARGS);)
 IF_RTS(void unblockVtAlrmSignal(STG_NO_ARGS);)
 IF_RTS(void AwaitEvent(I_ delta);)
 
-#ifdef _POSIX_SOURCE
+#if  defined(_POSIX_SOURCE) && !defined(nextstep3_TARGET_OS)
+	/* For nextstep3_TARGET_OS comment see stgdefs.h. CaS */
 extern I_ sig_install PROTO((I_, I_, sigset_t *));
 #define stg_sig_ignore(s,m)	SAFESTGCALL3(I_,(void *, I_, I_),sig_install,s,STG_SIG_IGN,(sigset_t *)m)
 #define stg_sig_default(s,m)	SAFESTGCALL3(I_,(void *, I_, I_),sig_install,s,STG_SIG_DFL,(sigset_t *)m)
