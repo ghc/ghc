@@ -219,6 +219,11 @@ ifeq "$(Ghc2_0)" "NO"
 simplCore/OccurAnal_HC_OPTS	= -Onot
 endif
 
+# Strictness analyser misbehaving in 2.10, fails to terminate on
+# UpdAnal.lhs due to weird recursive datatype.  Bug was exposed by a
+# separate bugfix to the fixpoint finder.
+simplStg/UpdAnal_HC_OPTS	= -fno-strictness
+
 # ----------------------------------------------------------------------------
 #		C compilations
 
