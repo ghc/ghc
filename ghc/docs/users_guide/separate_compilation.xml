@@ -942,12 +942,19 @@ module A where
 newtype TA = MkTA GHC.Base.Int
 </programlisting>
 
+      <para>Notice that we only put the declaration for the newtype
+      <literal>TA</literal> in the <literal>hi-boot</literal> file,
+      not the signature for <function>f</function>, since
+      <function>f</function> isn't used by <literal>B</literal>.</para>
+
       <para>The syntax is similar to a normal Haskell source file, but
       with some important differences:</para>
 
       <itemizedlist>
 	<listitem>
-	  <para>Non-local entities must be qualified with their
+	  <para>Local entities (ones defined in the same <literal>hi-boot</literal> file may
+          be mentioned unqualified, but non-local entities (ones defined in other modules)
+          must be qualified with their
 	  <emphasis>original</emphasis> defining module.  Qualifying
 	  by a module which just re-exports the entity won't do.  In
 	  particular, most <literal>Prelude</literal> entities aren't
@@ -1002,10 +1009,14 @@ operations.  We could lift this restriction if it became tiresome.</para>
 </listitem>
       </itemizedlist>
 
-      <para>Notice that we only put the declaration for the newtype
-      <literal>TA</literal> in the <literal>hi-boot</literal> file,
-      not the signature for <function>f</function>, since
-      <function>f</function> isn't used by <literal>B</literal>.</para>
+<para>If <literal>M.hi-boot</literal> mentions an entity <literal>N.f</literal>, defined in some other
+module <literal>N</literal>, then GHC will by default go hunting for <literal>N.hi</literal>. If module
+<literal>N</literal> is not yet compiled either, GHC won't look for <literal>N.hi-boot</literal>; it'll just
+complain.  To fix this, in the source file that uses 
+<literal>import {-# SOURCE #-} M</literal>, add 
+<literal>import {-# SOURCE #-} N()</literal>.  (The "()" says that you don't want to import anything into
+your current scope, and will prevent unused-import warnings.)  You only need this if no other imported module 
+depends on <literal>N.hi-boot</literal>.</para>
 
     </sect2>
 
