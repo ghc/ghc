@@ -204,6 +204,7 @@ module Unique (
 	unpackCStringFoldrIdKey,
 	unpackCStringIdKey,
 	ureadListIdKey,
+	unsafeCoerceIdKey,
 	ushowListIdKey,
 	voidIdKey,
 	voidTyConKey,
@@ -666,48 +667,49 @@ unpackCString2IdKey	      = mkPreludeMiscIdUnique 36
 unpackCStringAppendIdKey      = mkPreludeMiscIdUnique 37
 unpackCStringFoldrIdKey	      = mkPreludeMiscIdUnique 38
 unpackCStringIdKey	      = mkPreludeMiscIdUnique 39
-voidIdKey		      = mkPreludeMiscIdUnique 40
-ushowListIdKey		      = mkPreludeMiscIdUnique 41
-ureadListIdKey		      = mkPreludeMiscIdUnique 42
+unsafeCoerceIdKey	      = mkPreludeMiscIdUnique 40
+voidIdKey		      = mkPreludeMiscIdUnique 41
+ushowListIdKey		      = mkPreludeMiscIdUnique 42
+ureadListIdKey		      = mkPreludeMiscIdUnique 43
 
-copyableIdKey		= mkPreludeMiscIdUnique 43
-noFollowIdKey		= mkPreludeMiscIdUnique 44
-parAtAbsIdKey		= mkPreludeMiscIdUnique 45
-parAtForNowIdKey	= mkPreludeMiscIdUnique 46
-parAtIdKey		= mkPreludeMiscIdUnique 47
-parAtRelIdKey		= mkPreludeMiscIdUnique 48
-parGlobalIdKey		= mkPreludeMiscIdUnique 49
-parLocalIdKey		= mkPreludeMiscIdUnique 50
+copyableIdKey		= mkPreludeMiscIdUnique 44
+noFollowIdKey		= mkPreludeMiscIdUnique 45
+parAtAbsIdKey		= mkPreludeMiscIdUnique 46
+parAtForNowIdKey	= mkPreludeMiscIdUnique 47
+parAtIdKey		= mkPreludeMiscIdUnique 48
+parAtRelIdKey		= mkPreludeMiscIdUnique 49
+parGlobalIdKey		= mkPreludeMiscIdUnique 50
+parLocalIdKey		= mkPreludeMiscIdUnique 51
 \end{code}
 
 Certain class operations from Prelude classes.  They get
 their own uniques so we can look them up easily when we want
 to conjure them up during type checking.        
 \begin{code}					  
-fromIntClassOpKey	= mkPreludeMiscIdUnique 51
-fromIntegerClassOpKey	= mkPreludeMiscIdUnique 52
-minusClassOpKey		= mkPreludeMiscIdUnique 53
-fromRationalClassOpKey	= mkPreludeMiscIdUnique 54
-enumFromClassOpKey	= mkPreludeMiscIdUnique 55
-enumFromThenClassOpKey	= mkPreludeMiscIdUnique 56
-enumFromToClassOpKey	= mkPreludeMiscIdUnique 57
-enumFromThenToClassOpKey= mkPreludeMiscIdUnique 58
-eqClassOpKey		= mkPreludeMiscIdUnique 59
-geClassOpKey		= mkPreludeMiscIdUnique 60
-zeroClassOpKey		= mkPreludeMiscIdUnique 61
-thenMClassOpKey		= mkPreludeMiscIdUnique 62 -- (>>=)
-unboundKey		= mkPreludeMiscIdUnique 63	-- Just a place holder for unbound
+fromIntClassOpKey	= mkPreludeMiscIdUnique 52
+fromIntegerClassOpKey	= mkPreludeMiscIdUnique 53
+minusClassOpKey		= mkPreludeMiscIdUnique 54
+fromRationalClassOpKey	= mkPreludeMiscIdUnique 55
+enumFromClassOpKey	= mkPreludeMiscIdUnique 56
+enumFromThenClassOpKey	= mkPreludeMiscIdUnique 57
+enumFromToClassOpKey	= mkPreludeMiscIdUnique 58
+enumFromThenToClassOpKey= mkPreludeMiscIdUnique 59
+eqClassOpKey		= mkPreludeMiscIdUnique 50
+geClassOpKey		= mkPreludeMiscIdUnique 61
+zeroClassOpKey		= mkPreludeMiscIdUnique 62
+thenMClassOpKey		= mkPreludeMiscIdUnique 63 -- (>>=)
+unboundKey		= mkPreludeMiscIdUnique 64	-- Just a place holder for unbound
 							-- variables produced by the renamer
-fromEnumClassOpKey	= mkPreludeMiscIdUnique 64
+fromEnumClassOpKey	= mkPreludeMiscIdUnique 65
 
-mainKey			= mkPreludeMiscIdUnique 65
-returnMClassOpKey	= mkPreludeMiscIdUnique 66
-otherwiseIdKey		= mkPreludeMiscIdUnique 67
-toEnumClassOpKey	= mkPreludeMiscIdUnique 68
+mainKey			= mkPreludeMiscIdUnique 66
+returnMClassOpKey	= mkPreludeMiscIdUnique 67
+otherwiseIdKey		= mkPreludeMiscIdUnique 68
+toEnumClassOpKey	= mkPreludeMiscIdUnique 69
 \end{code}
 
 \begin{code}
-inlineIdKey		= mkPreludeMiscIdUnique 69
-coerceIdKey		= mkPreludeMiscIdUnique 70
-assertIdKey		= mkPreludeMiscIdUnique 71
+inlineIdKey		= mkPreludeMiscIdUnique 70
+coerceIdKey		= mkPreludeMiscIdUnique 71
+assertIdKey		= mkPreludeMiscIdUnique 72
 \end{code}

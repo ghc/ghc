@@ -116,6 +116,21 @@ errorTy  = mkSigmaTy [openAlphaTyVar] [] (mkFunTys [mkListTy charTy] openAlphaTy
     -- returns, so the return type is irrelevant.
 \end{code}
 
+unsafeCoerce# isn't so much a PrimOp as a phantom identifier, that
+just gets expanded into a type coercion wherever it occurs.  Hence we
+add it as a built-in Id with an unfolding here.
+
+\begin{code}
+unsafeCoerceId
+  = pcMiscPrelId unsafeCoerceIdKey pREL_GHC SLIT("unsafeCoerce#") ty
+	(mk_inline_unfolding template)
+  where
+    ty = mkForAllTys [alphaTyVar,betaTyVar] (mkFunTy alphaTy betaTy)
+    [x] = mkTemplateLocals [alphaTy]
+    template = mkLam [alphaTyVar,betaTyVar] [x] (
+		  Note (Coerce betaTy alphaTy) (Var x))
+\end{code}
+
 We want \tr{GHCbase.trace} to be wired in
 because we don't want the strictness analyser to get ahold of it,
 decide that the second argument is strict, evaluate that first (!!),

@@ -208,6 +208,7 @@ wired_in_ids
     , unpackCStringAppendId
     , unpackCStringFoldrId
     , unpackCStringId
+    , unsafeCoerceId
     , voidId
 
 --  , copyableId
