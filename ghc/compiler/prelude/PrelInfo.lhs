@@ -339,12 +339,18 @@ deriving_occ_info
     , (boundedClassKey,	[intTyCon_RDR])
     , (showClassKey,	[intTyCon_RDR, numClass_RDR, ordClass_RDR, compose_RDR, showString_RDR, 
 			 showParen_RDR, showSpace_RDR, showList___RDR])
-    , (readClassKey,	[intTyCon_RDR, numClass_RDR, ordClass_RDR, append_RDR, 
+    , (readClassKey,	[intTyCon_RDR, numClass_RDR, ordClass_RDR, append_RDR,
+                         foldr_RDR, build_RDR,
+                             -- foldr and build required for list comprehension
+                             -- KSW 2000-06
 			 lex_RDR, readParen_RDR, readList___RDR, thenM_RDR])
 			     -- returnM (and the rest of the Monad class decl) 
 			     -- will be forced in as result of depending
 			     -- on thenM.   -- SOF 1/99
-    , (ixClassKey,	[intTyCon_RDR, numClass_RDR, and_RDR, map_RDR, enumFromTo_RDR, 
+    , (ixClassKey,	[intTyCon_RDR, numClass_RDR, and_RDR, map_RDR, enumFromTo_RDR,
+                         foldr_RDR, build_RDR,
+                             -- foldr and build required for list comprehension used
+                             -- with single constructor types  -- KSW 2000-06
 			 returnM_RDR, failM_RDR])
 			     -- the last two are needed to force returnM, thenM and failM
 			     -- in before typechecking the list(monad) comprehension
