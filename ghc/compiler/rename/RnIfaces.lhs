@@ -55,7 +55,7 @@ import TyCon		( TyCon, tyConDataCons, isSynTyCon, getSynTyConDefn )
 import Type		( namesOfType )
 import TyVar		( GenTyVar )
 import SrcLoc		( mkSrcLoc, SrcLoc )
-import PrelMods		( gHC__ )
+import PrelMods		( pREL_GHC )
 import PrelInfo		( cCallishTyKeys )
 import Bag
 import Maybes		( MaybeErr(..), expectJust, maybeToBool )
@@ -509,7 +509,7 @@ getWiredInDecl name mode
 	mod        = nameModule main_name
 	doc_str    = sep [ptext SLIT("need home module for wired in thing"), ppr name]
     in
-    (if not main_is_tc || mod == gHC__ then
+    (if not main_is_tc || mod == pREL_GHC then
 	returnRn ()		
     else
 	loadInterface doc_str mod (ifaceFlavour main_name)	`thenRn_`

@@ -284,8 +284,8 @@ Synonym for @-Wnot@.
 <tag>@-W@:</tag>
 <nidx>-W option</nidx>
 
-Provides the standard warnings plus @-fwarn-incomplete-patterns@
-and @-fwarn-unused-names@.
+Provides the standard warnings plus @-fwarn-incomplete-patterns@,
+@-fwarn-unused-imports@ and @-fwarn-unused-binds@.
 
 <tag>@-Wall@:</tag>
 <nidx>-Wall option</nidx>
@@ -353,12 +353,31 @@ This option is on by default, and warns you whenever an instance
 declaration is missing one or more methods, and the corresponding
 class declaration has no default declaration for them.
 
-<tag>@-fwarn-unused-names@:</tag>
-<nidx>-fwarn-unused-names option</nidx>
-<nidx>unused names, warning</nidx>
-<nidx>names, unused</nidx>
+<tag>@-fwarn-unused-imports@:</tag>
+<nidx>-fwarn-unused-imports option</nidx>
+<nidx>unused imports, warning</nidx>
+<nidx>imports, unused</nidx>
 
-Have the renamer report which locally defined names are not used/exported.
+Report any objects that are explicitly imported but never used.
+
+<tag>@-fwarn-unused-binds@:</tag>
+<nidx>-fwarn-unused-binds option</nidx>
+<nidx>unused binds, warning</nidx>
+<nidx>binds, unused</nidx>
+
+Report any function definitions (and local bindings) which are unused.
+For top-level functions, the warning is only given if the binding is
+not exported.
+
+<tag>@-fwarn-unused-matches@:</tag>
+<nidx>-fwarn-unused-matches option</nidx>
+<nidx>unused matches, warning</nidx>
+<nidx>matches, unused</nidx>
+
+Report all unused variables which arise from pattern matches,
+including patterns consisting of a single variable.  For instance @f x
+y = []@ would report @x@ and @y@ as unused.  To eliminate the warning,
+all unused variables can be replaced with wildcards.
 
 <tag>@-fwarn-duplicate-exports@:</tag>
 <nidx>-fwarn-duplicate-exports option</nidx>

@@ -151,7 +151,8 @@ rnMatch match
 	unused_binders = binder_set `minusNameSet` fvs
 	net_fvs	       = fvs `minusNameSet` binder_set
     in
-    warnUnusedNames unused_binders	`thenRn_`
+    warnUnusedMatches unused_binders		`thenRn_`
+    
     returnRn (match', net_fvs)
  where
     get_binders (GRHSMatch _)	     = []

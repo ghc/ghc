@@ -138,7 +138,6 @@ $InstLibDirGhc     = "${libdir}";
 #
 $InstLibExecDirGhc = "${libexecdir}";
 $InstDataDirGhc    = "${datadir}";
-$InstSysLibDir     = ( $INSTALLING ) ? "${InstLibDirGhc}/hslibs" : "$TopPwd/hslibs";
 
 $Status  = 0; # just used for exit() status
 $Verbose = '';
@@ -282,8 +281,10 @@ these are turned off by -Wnot.
 		     '-fwarn-duplicate-exports');
 @MinusWOpts    	  = (@StandardWarnings, 
 		     '-fwarn-incomplete-patterns', 
-		     '-fwarn-unused-names');
+		     '-fwarn-unused-binds',
+		     '-fwarn-unused-imports');
 @MinusWallOpts 	  = (@MinusWOpts, 
+		     '-fwarn-unused-matches',
 		     '-fwarn-name-shadowing');
 \end{code}
 
@@ -370,13 +371,10 @@ require special handling.
 @Import_dir	= ('.'); #-i things
 @Include_dir	= ('.'); #-I things; other default(s) stuck on AFTER option processing
 
-# where to look for interface files (system hi's, i.e., prelude and hslibs)
+# where to look for interface files (system hi's, i.e., prelude and syslibs)
 @SysImport_dir	= ( $INSTALLING )
-		    ? ( "$InstLibDirGhc/imports" )
-		    : ( "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/required"
-		      , "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/ghc"
-		      , "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/glaExts"
-		      , "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/concurrent" );
+		    ? ( "$InstLibDirGhc/imports/std" )
+		    : ( "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/std" );
 
 # We need to look in ghc/ and glaExts/ when searching for implicitly needed .hi files, but 
 # we should really *not* look there for explicitly imported modules.
@@ -392,8 +390,8 @@ $Haskell1Version = 4; # i.e., Haskell 1.4
 		    ? $InstLibDirGhc
 		    : ( "$TopPwd/$CURRENT_DIR/$GHC_RUNTIME_DIR"
 		      , "$TopPwd/$CURRENT_DIR/$GHC_RUNTIME_DIR/gmp"
-		      , "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR"
-		      , "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/cbits"
+		      , "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/std"
+		      , "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/std/cbits"
 		      )
 		  );
 @SysLibrary = (); # will be built up as we go along
@@ -2431,17 +2429,18 @@ sub add_syslib {
     local($syslib) = @_;
     
     unshift(@SysImport_dir,
-	    ${INSTALLING} ? "$InstSysLibDir/$syslib/imports"
-		          : "$TopPwd/hslibs/$syslib/src");
+	    ${INSTALLING} ? "$InstLibDir/imports/$syslib"
+		          : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/$syslib");
 
     push(@SysLibrary_dir,
-	 ${INSTALLING} ? ("$InstSysLibDir")
-                       : ("$TopPwd/hslibs/$syslib",
-			  "$TopPwd/hslibs/$syslib/cbits"));
+	 ${INSTALLING} ? ("$InstLibDir")
+                       : ("$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/$syslib",
+			  "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/$syslib/cbits"));
 
     push(@SysLibrary, "-lHS$syslib");
     push(@SysLibrary, "-lHS${syslib}_cbits")
-          unless $syslib eq 'contrib'; #HACK! it has no cbits
+          unless $syslib eq 'contrib' || $syslib eq 'exts';
+	  #HACK! they have no cbits
 }
 \end{code}
 
@@ -2746,7 +2745,8 @@ arg: while($_ = $Args[0]) {
     #--------- ticky/concurrent/parallel -----------------------------------
     # we sort out the details a bit later on
 
-    /^-concurrent$/ && do { $CONCURing = 'c'; next arg; }; # concurrent Haskell
+    /^-concurrent$/ && do { $CONCURing = 'c'; &add_syslib('conc'); next arg; }; 
+			  # concurrent Haskell; implies -syslib conc
     /^-gransim$/    && do { $GRANing   = 'g'; next arg; }; # GranSim
     /^-ticky$/	    && do { $TICKYing  = 't'; next arg; }; # ticky-ticky
     /^-parallel$/   && do { $PARing    = 'p'; next arg; }; # parallel Haskell
@@ -2891,6 +2891,9 @@ arg: while($_ = $Args[0]) {
 			push(@HsP_flags, '-N');
 
 #			push(@HsC_flags, '-fshow-import-specs');
+		
+			# -fglasgow-exts implies -syslib exts
+			&add_syslib('exts');
 
 			next arg; };
 

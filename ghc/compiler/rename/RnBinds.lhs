@@ -26,7 +26,7 @@ import RnHsSyn
 import RnMonad
 import RnExpr		( rnMatch, rnGRHSsAndBinds, rnPat, checkPrecMatch )
 import RnEnv		( bindLocatedLocalsRn, lookupBndrRn, lookupOccRn, 
-			  newLocalNames, isUnboundName, warnUnusedNames
+			  newLocalNames, isUnboundName, warnUnusedBinds
 			)
 import CmdLineOpts	( opt_SigsRequired )
 import Digraph		( stronglyConnComp, SCC(..) )
@@ -181,7 +181,7 @@ rnTopMonoBinds mbinds sigs
     let
 	unused_binders = binder_set `minusNameSet` (fv_set `unionNameSets` exported_binders)
     in
-    warnUnusedNames unused_binders	`thenRn_`
+    warnUnusedBinds unused_binders	`thenRn_`
     returnRn new_binds
   where
     binder_rdr_names = map fst (bagToList (collectMonoBinders mbinds))
@@ -233,7 +233,7 @@ rnMonoBinds mbinds sigs	thing_inside -- Non-empty monobinds
 	net_fvs        = all_fvs `minusNameSet` binder_set
 	unused_binders = binder_set `minusNameSet` all_fvs
     in
-    warnUnusedNames unused_binders	`thenRn_`
+    warnUnusedBinds unused_binders	`thenRn_`
     returnRn (result, net_fvs)
   where
     mbinders_w_srclocs = bagToList (collectMonoBinders mbinds)

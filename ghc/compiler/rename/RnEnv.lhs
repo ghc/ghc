@@ -8,7 +8,8 @@ module RnEnv where		-- Export everything
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_WarnNameShadowing, opt_WarnUnusedNames )
+import CmdLineOpts	( opt_WarnNameShadowing, opt_WarnUnusedMatches,
+			  opt_WarnUnusedBinds, opt_WarnUnusedImports )
 import HsSyn
 import RdrHsSyn		( RdrName(..), RdrNameIE,
 			  rdrNameOcc, ieOcc, isQual, qual
@@ -644,11 +645,24 @@ conflictFM bad fm key elt
 
 
 \begin{code}
+warnUnusedBinds, warnUnusedMatches, warnUnusedImports :: NameSet -> RnM s d ()
+
+warnUnusedBinds names
+  | opt_WarnUnusedBinds = warnUnusedNames names
+  | otherwise           = returnRn ()
+
+warnUnusedMatches names
+  | opt_WarnUnusedMatches = warnUnusedNames names
+  | otherwise           = returnRn ()
+
+warnUnusedImports names
+  | opt_WarnUnusedImports = warnUnusedNames names
+  | otherwise           = returnRn ()
+
 warnUnusedNames :: NameSet -> RnM s d ()
 warnUnusedNames names 
-  | not opt_WarnUnusedNames = returnRn ()
-  | otherwise		    = mapRn warn (nameSetToList names)	`thenRn_`
-			      returnRn ()
+  = mapRn warn (nameSetToList names)	`thenRn_`
+    returnRn ()
   where
     warn name = pushSrcLocRn (getSrcLoc name) $
 		addWarnRn (unusedNameWarn name)

@@ -14,7 +14,7 @@ import RnHsSyn		( RenamedHsModule, RenamedHsDecl, extractHsTyNames )
 
 import CmdLineOpts	( opt_HiMap, opt_WarnNameShadowing, opt_D_show_rn_trace,
 			  opt_D_dump_rn, opt_D_show_rn_stats,
-			  opt_WarnUnusedNames
+			  opt_WarnUnusedBinds, opt_WarnUnusedImports
 		        )
 import RnMonad
 import RnNames		( getGlobalNames )
@@ -33,7 +33,7 @@ import Name		( Name, PrintUnqualified, Provenance, ExportFlag(..),
 			)
 import TysWiredIn	( unitTyCon, intTyCon, doubleTyCon )
 import TyCon		( TyCon )
-import PrelMods		( mAIN, gHC_MAIN )
+import PrelMods		( mAIN, pREL_MAIN )
 import PrelInfo		( ioTyCon_NAME )
 import ErrUtils		( pprBagOfErrors, pprBagOfWarnings,
 			  doIfSet, dumpIfSet, ghcExit
@@ -174,7 +174,7 @@ addImplicits mod_name
 
 	-- Add occurrences for IO or PrimIO
     implicit_main |  mod_name == mAIN
-		  || mod_name == gHC_MAIN = [ioTyCon_NAME]
+		  || mod_name == pREL_MAIN = [ioTyCon_NAME]
 		  |  otherwise 		  = []
 \end{code}
 
@@ -266,10 +266,6 @@ rn_data_decl mode (tycon_name,ty_decl) = rn_iface_decl mod_name mode (TyD ty_dec
 
 \begin{code}
 reportUnusedNames explicit_avail_names
-  | not opt_WarnUnusedNames
-  = returnRn ()
-
-  | otherwise
   = getSlurpedNames			`thenRn` \ slurped_names ->
     let
 	unused	      = explicit_avail_names `minusNameSet` slurped_names
@@ -277,19 +273,19 @@ reportUnusedNames explicit_avail_names
 	imports_by_module = equivClasses cmp imported_unused
 	name1 `cmp` name2 = nameModule name1 `compare` nameModule name2 
 
-	pp_imp = sep [text "For information: the following unqualified imports are unused:",
+	pp_imp = sep [text "Warning: the following unqualified imports are unused:",
 			  nest 4 (vcat (map pp_group imports_by_module))]
 	pp_group (n:ns) = sep [hcat [text "Module ", pprModule (nameModule n), char ':'],
 				   nest 4 (sep (map (pprOccName . nameOccName) (n:ns)))]
 
-	pp_local = sep [text "For information: the following local top-level definitions are unused:",
+	pp_local = sep [text "Warning: the following local top-level definitions are unused:",
 			    nest 4 (sep (map (pprOccName . nameOccName) local_unused))]
     in
-    (if null imported_unused 
+    (if not opt_WarnUnusedImports || null imported_unused
      then returnRn ()
      else addWarnRn pp_imp)	`thenRn_`
 
-    (if null local_unused
+    (if not opt_WarnUnusedBinds || null local_unused
      then returnRn ()
      else addWarnRn pp_local)
 
