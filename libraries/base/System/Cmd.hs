@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Cmd.hs,v 1.1 2002/02/06 10:14:26 simonmar Exp $
+-- $Id: Cmd.hs,v 1.2 2002/04/24 16:09:12 simonmar Exp $
 --
 -- Executing a command.
 --
@@ -50,4 +50,4 @@ system cmd =
         0  -> return ExitSuccess
         n  -> return (ExitFailure n)
 
-foreign import ccall "systemCmd" unsafe primSystem :: CString -> IO Int
+foreign import ccall unsafe "systemCmd" primSystem :: CString -> IO Int

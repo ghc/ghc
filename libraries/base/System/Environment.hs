@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Environment.hs,v 1.4 2002/01/02 14:40:11 simonmar Exp $
+-- $Id: Environment.hs,v 1.5 2002/04/24 16:09:22 simonmar Exp $
 --
 -- Miscellaneous information about the system environment.
 --
@@ -47,7 +47,7 @@ getArgs =
    peekArray (p - 1) (advancePtr argv 1) >>= mapM peekCString
 
    
-foreign import "getProgArgv" unsafe 
+foreign import ccall unsafe "getProgArgv"
   getProgArgv :: Ptr CInt -> Ptr (Ptr CString) -> IO ()
 
 -- Computation `getProgName' returns the name of the program
@@ -97,5 +97,5 @@ getEnv name =
         else ioException (IOError Nothing NoSuchThing "getEnv"
 			  "no environment variable" (Just name))
 
-foreign import ccall "getenv" unsafe 
+foreign import ccall unsafe "getenv"
    c_getenv :: CString -> IO (Ptr CChar)
