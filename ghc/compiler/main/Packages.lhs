@@ -267,8 +267,10 @@ mkPackageState dflags pkg_db = do
 		(ps,_)   -> multiplePackagesErr str ps
 	procflags pkgs expl (IgnorePackage str : flags) = do
 	   case partition (matches str) pkgs of
-		([],_)  -> missingPackageErr str
 		(ps,qs) -> procflags qs expl flags
+		-- missing package is not an error for -ignore-package,
+		-- because a common usage is to -ignore-package P as
+		-- a preventative measure just in case P exists.
 
 	-- A package named on the command line can either include the
 	-- version, or just the name if it is unambiguous.
