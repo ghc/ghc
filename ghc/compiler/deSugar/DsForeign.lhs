@@ -450,9 +450,12 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
 
   -- various other bits for inside the fn
   declareResult = text "HaskellObj ret;"
+  declareCResult | res_hty_is_unit = empty
+                 | otherwise       = cResType <+> text "cret;"
 
-  return_what | res_hty_is_unit = empty
-	      | otherwise       = parens (unpackHObj res_hty <> parens (text "ret"))
+  assignCResult | res_hty_is_unit = empty
+	        | otherwise       =
+	        	text "cret=" <> unpackHObj res_hty <> parens (text "ret") <> semi
 
   -- an extern decl for the fn being called
   extern_decl
@@ -469,6 +472,8 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
      [ lbrace
      ,   text "SchedulerStatus rc;"
      ,   declareResult
+     ,   declareCResult
+     ,   text "rts_lock();"
 	  -- create the application + perform it.
      ,   text "rc=rts_evalIO" <> parens (
 		text "rts_apply" <> parens (
@@ -483,7 +488,10 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
 	     ) <> semi
      ,   text "rts_checkSchedStatus" <> parens (doubleQuotes (ftext c_nm)
 						<> comma <> text "rc") <> semi
-     ,   text "return" <> return_what <> semi
+     ,   assignCResult
+     ,   text "rts_unlock();"
+     ,   if res_hty_is_unit then empty
+            else text "return cret;"
      , rbrace
      ]
 

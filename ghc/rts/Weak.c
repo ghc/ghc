@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Weak.c,v 1.26 2002/12/11 15:36:54 simonmar Exp $
+ * $Id: Weak.c,v 1.27 2003/01/25 15:54:50 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -34,16 +34,28 @@ finalizeWeakPointersNow(void)
 {
   StgWeak *w;
   
+#if defined(RTS_SUPPORTS_THREADS)
+  rts_lock();
+#endif
   while ((w = weak_ptr_list)) {
     weak_ptr_list = w->link;
     if (w->header.info != &stg_DEAD_WEAK_info) {
 	w->header.info = &stg_DEAD_WEAK_info;
 	IF_DEBUG(weak,fprintf(stderr,"Finalising weak pointer at %p -> %p\n", w, w->key));
 	if (w->finalizer != &stg_NO_FINALIZER_closure) {
+#if defined(RTS_SUPPORTS_THREADS)
+	    rts_evalIO(w->finalizer,NULL);
+	    rts_unlock();
+	    rts_lock();
+#else
 	    rts_mainEvalIO(w->finalizer,NULL);
+#endif
 	}
     }
   }
+#if defined(RTS_SUPPORTS_THREADS)
+  rts_unlock();
+#endif
 } 
 
 /*

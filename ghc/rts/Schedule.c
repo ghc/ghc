@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.160 2002/12/13 15:16:29 simonmar Exp $
+ * $Id: Schedule.c,v 1.161 2003/01/25 15:54:49 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -134,6 +134,15 @@
  * Locks required: sched_mutex.
  */
 StgMainThread *main_threads = NULL;
+
+#ifdef THREADED_RTS
+// Pointer to the thread that executes main
+// When this thread is finished, the program terminates
+// by calling shutdownHaskellAndExit.
+// It would be better to add a call to shutdownHaskellAndExit
+// to the Main.main wrapper and to remove this hack.
+StgMainThread *main_main_thread = NULL;
+#endif
 
 /* Thread queues.
  * Locks required: sched_mutex.
@@ -306,8 +315,13 @@ taskStart(void)
 }
 #endif
 
-
-
+#if defined(RTS_SUPPORTS_THREADS)
+void
+startSchedulerTask(void)
+{
+    startTask(taskStart);
+}
+#endif
 
 //@node Main scheduling loop, Suspend and Resume, Prototypes, Main scheduling code
 //@subsection Main scheduling loop
@@ -373,6 +387,7 @@ schedule( void )
  
 #if defined(RTS_SUPPORTS_THREADS)
   waitForWorkCapability(&sched_mutex, &cap, rtsFalse);
+  IF_DEBUG(scheduler, sched_belch("worker thread (osthread %p): entering RTS", osThreadId()));
 #else
   /* simply initialise it in the non-threaded case */
   grabCapability(&cap);
@@ -426,9 +441,19 @@ schedule( void )
      */
     if (interrupted) {
       IF_DEBUG(scheduler, sched_belch("interrupted"));
-      deleteAllThreads();
       interrupted = rtsFalse;
       was_interrupted = rtsTrue;
+#if defined(RTS_SUPPORTS_THREADS)
+      // In the threaded RTS, deadlock detection doesn't work,
+      // so just exit right away.
+      prog_belch("interrupted");
+      releaseCapability(cap);
+      startTask(taskStart);	// thread-safe-call to shutdownHaskellAndExit
+      RELEASE_LOCK(&sched_mutex);
+      shutdownHaskellAndExit(EXIT_SUCCESS);
+#else
+      deleteAllThreads();
+#endif
     }
 
     /* Go through the list of main threads and wake up any
@@ -440,7 +465,7 @@ schedule( void )
     { 
       StgMainThread *m, **prev;
       prev = &main_threads;
-      for (m = main_threads; m != NULL; m = m->link) {
+      for (m = main_threads; m != NULL; prev = &m->link, m = m->link) {
 	switch (m->tso->what_next) {
 	case ThreadComplete:
 	  if (m->ret) {
@@ -453,6 +478,13 @@ schedule( void )
 #ifdef DEBUG
 	  removeThreadLabel((StgWord)m->tso);
 #endif
+          if(m == main_main_thread)
+          {
+              releaseCapability(cap);
+              startTask(taskStart);	// thread-safe-call to shutdownHaskellAndExit
+              RELEASE_LOCK(&sched_mutex);
+              shutdownHaskellAndExit(EXIT_SUCCESS);
+          }
 	  break;
 	case ThreadKilled:
 	  if (m->ret) *(m->ret) = NULL;
@@ -466,6 +498,13 @@ schedule( void )
 #ifdef DEBUG
 	  removeThreadLabel((StgWord)m->tso);
 #endif
+          if(m == main_main_thread)
+          {
+              releaseCapability(cap);
+              startTask(taskStart);	// thread-safe-call to shutdownHaskellAndExit
+              RELEASE_LOCK(&sched_mutex);
+              shutdownHaskellAndExit(EXIT_SUCCESS);
+          }
 	  break;
 	default:
 	  break;
@@ -562,10 +601,13 @@ schedule( void )
     /* Check whether any waiting threads need to be woken up.  If the
      * run queue is empty, and there are no other tasks running, we
      * can wait indefinitely for something to happen.
-     * ToDo: what if another client comes along & requests another
-     * main thread?
      */
-    if ( !EMPTY_QUEUE(blocked_queue_hd) || !EMPTY_QUEUE(sleeping_queue) ) {
+    if ( !EMPTY_QUEUE(blocked_queue_hd) || !EMPTY_QUEUE(sleeping_queue) 
+#if defined(RTS_SUPPORTS_THREADS) && !defined(SMP)
+		|| EMPTY_RUN_QUEUE()
+#endif
+        )
+    {
       awaitEvent( EMPTY_RUN_QUEUE()
 #if defined(SMP)
 	&& allFreeCapabilities()
@@ -586,7 +628,7 @@ schedule( void )
      * If no threads are black holed, we have a deadlock situation, so
      * inform all the main threads.
      */
-#ifndef PAR
+#if !defined(PAR) && !defined(RTS_SUPPORTS_THREADS)
     if (   EMPTY_THREAD_QUEUES()
 #if defined(RTS_SUPPORTS_THREADS)
 	&& EMPTY_QUEUE(suspended_ccalling_threads)
@@ -699,6 +741,8 @@ schedule( void )
     }
   not_deadlocked:
 
+#elif defined(RTS_SUPPORTS_THREADS)
+    /* ToDo: add deadlock detection in threaded RTS */
 #elif defined(PAR)
     /* ToDo: add deadlock detection in GUM (similar to SMP) -- HWL */
 #endif
@@ -714,6 +758,7 @@ schedule( void )
 #endif    
 
 #if defined(RTS_SUPPORTS_THREADS)
+#if defined(SMP)
     /* block until we've got a thread on the run queue and a free
      * capability.
      *
@@ -733,6 +778,11 @@ schedule( void )
       waitForWorkCapability(&sched_mutex, &cap, rtsTrue);
       IF_DEBUG(scheduler, sched_belch("thread %d: work now available", osThreadId()));
     }
+#else
+    if ( EMPTY_RUN_QUEUE() ) {
+      continue; // nothing to do
+    }
+#endif
 #endif
 
 #if defined(GRAN)
@@ -1016,7 +1066,7 @@ schedule( void )
     // expensive if there is lots of thread switching going on...
     IF_DEBUG(sanity,checkTSO(t));
 #endif
-    
+
     cap->r.rCurrentTSO = t;
     
     /* context switches are now initiated by the timer signal, unless
@@ -1031,6 +1081,8 @@ schedule( void )
     else
 	context_switch = 0;
 
+run_thread:
+
     RELEASE_LOCK(&sched_mutex);
 
     IF_DEBUG(scheduler, sched_belch("-->> running thread %ld %s ...", 
@@ -1043,7 +1095,6 @@ schedule( void )
     /* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
     /* Run the current thread 
      */
-    run_thread:
     prev_what_next = t->what_next;
     switch (prev_what_next) {
     case ThreadKilled:
@@ -1069,8 +1120,8 @@ schedule( void )
 #endif
     
     ACQUIRE_LOCK(&sched_mutex);
-
-#ifdef SMP
+    
+#ifdef RTS_SUPPORTS_THREADS
     IF_DEBUG(scheduler,fprintf(stderr,"scheduler (task %ld): ", osThreadId()););
 #elif !defined(GRAN) && !defined(PAR)
     IF_DEBUG(scheduler,fprintf(stderr,"scheduler: "););
@@ -1584,7 +1635,15 @@ suspendThread( StgRegTable *reg,
   suspended_ccalling_threads = cap->r.rCurrentTSO;
 
 #if defined(RTS_SUPPORTS_THREADS)
-  cap->r.rCurrentTSO->why_blocked  = BlockedOnCCall;
+  if(cap->r.rCurrentTSO->blocked_exceptions == NULL)
+  {
+      cap->r.rCurrentTSO->why_blocked = BlockedOnCCall;
+      cap->r.rCurrentTSO->blocked_exceptions = END_TSO_QUEUE;
+  }
+  else
+  {
+      cap->r.rCurrentTSO->why_blocked = BlockedOnCCall_NoUnblockExc;
+  }
 #endif
 
   /* Use the thread ID as the token; it should be unique */
@@ -1596,15 +1655,11 @@ suspendThread( StgRegTable *reg,
 #if defined(RTS_SUPPORTS_THREADS)
   /* Preparing to leave the RTS, so ensure there's a native thread/task
      waiting to take over.
-     
-     ToDo: optimise this and only create a new task if there's a need
-     for one (i.e., if there's only one Concurrent Haskell thread alive,
-     there's no need to create a new task).
   */
-  IF_DEBUG(scheduler, sched_belch("worker thread (%d): leaving RTS", tok));
-  if (concCall) {
-    startTask(taskStart);
-  }
+  IF_DEBUG(scheduler, sched_belch("worker thread (%d, osthread %p): leaving RTS", tok, osThreadId()));
+  //if (concCall) { // implementing "safe" as opposed to "threadsafe" is more difficult
+      startTask(taskStart);
+  //}
 #endif
 
   /* Other threads _might_ be available for execution; signal this */
@@ -1626,12 +1681,10 @@ resumeThread( StgInt tok,
 
 #if defined(RTS_SUPPORTS_THREADS)
   /* Wait for permission to re-enter the RTS with the result. */
-  if ( concCall ) {
-    ACQUIRE_LOCK(&sched_mutex);
-    grabReturnCapability(&sched_mutex, &cap);
-  } else {
-    grabCapability(&cap);
-  }
+  ACQUIRE_LOCK(&sched_mutex);
+  grabReturnCapability(&sched_mutex, &cap);
+
+  IF_DEBUG(scheduler, sched_belch("worker thread (%d, osthread %p): re-entering RTS", tok, osThreadId()));
 #else
   grabCapability(&cap);
 #endif
@@ -1650,11 +1703,22 @@ resumeThread( StgInt tok,
     barf("resumeThread: thread not found");
   }
   tso->link = END_TSO_QUEUE;
+  
+#if defined(RTS_SUPPORTS_THREADS)
+  if(tso->why_blocked == BlockedOnCCall)
+  {
+      awakenBlockedQueueNoLock(tso->blocked_exceptions);
+      tso->blocked_exceptions = NULL;
+  }
+#endif
+  
   /* Reset blocking status */
   tso->why_blocked  = NotBlocked;
 
   cap->r.rCurrentTSO = tso;
+#if defined(RTS_SUPPORTS_THREADS)
   RELEASE_LOCK(&sched_mutex);
+#endif
   return &cap->r;
 }
 
@@ -1974,15 +2038,10 @@ static SchedulerStatus waitThread_(/*out*/StgMainThread* m
  * on this thread's stack before the scheduler is invoked.
  * ------------------------------------------------------------------------ */
 
-static void scheduleThread_ (StgTSO* tso, rtsBool createTask);
+static void scheduleThread_ (StgTSO* tso);
 
 void
-scheduleThread_(StgTSO *tso
-	       , rtsBool createTask
-#if !defined(THREADED_RTS)
-		 STG_UNUSED
-#endif
-	      )
+scheduleThread_(StgTSO *tso)
 {
   // Precondition: sched_mutex must be held.
 
@@ -1992,14 +2051,6 @@ scheduleThread_(StgTSO *tso
    * soon as we release the scheduler lock below.
    */
   PUSH_ON_RUN_QUEUE(tso);
-#if defined(THREADED_RTS)
-  /* If main() is scheduling a thread, don't bother creating a 
-   * new task.
-   */
-  if ( createTask ) {
-    startTask(taskStart);
-  }
-#endif
   THREAD_RUNNABLE();
 
 #if 0
@@ -2010,13 +2061,13 @@ scheduleThread_(StgTSO *tso
 void scheduleThread(StgTSO* tso)
 {
   ACQUIRE_LOCK(&sched_mutex);
-  scheduleThread_(tso, rtsFalse);
+  scheduleThread_(tso);
   RELEASE_LOCK(&sched_mutex);
 }
 
 SchedulerStatus
 scheduleWaitThread(StgTSO* tso, /*[out]*/HaskellObj* ret)
-{
+{	// Precondition: sched_mutex must be held
   StgMainThread *m;
 
   m = stgMallocBytes(sizeof(StgMainThread), "waitThread");
@@ -2036,15 +2087,14 @@ scheduleWaitThread(StgTSO* tso, /*[out]*/HaskellObj* ret)
      signal the completion of the its work item for the main thread to
      see (==> it got stuck waiting.)    -- sof 6/02.
   */
-  ACQUIRE_LOCK(&sched_mutex);
   IF_DEBUG(scheduler, sched_belch("waiting for thread (%d)\n", tso->id));
   
   m->link = main_threads;
   main_threads = m;
 
-  scheduleThread_(tso, rtsTrue);
+  scheduleThread_(tso);
 #if defined(THREADED_RTS)
-  return waitThread_(m, rtsTrue);	// waitThread_ releases sched_mutex
+  return waitThread_(m, rtsTrue);
 #else
   return waitThread_(m);
 #endif
@@ -2232,6 +2282,7 @@ SchedulerStatus
 waitThread(StgTSO *tso, /*out*/StgClosure **ret)
 { 
   StgMainThread *m;
+  SchedulerStatus stat;
 
   m = stgMallocBytes(sizeof(StgMainThread), "waitThread");
   m->tso = tso;
@@ -2248,10 +2299,12 @@ waitThread(StgTSO *tso, /*out*/StgClosure **ret)
 
   IF_DEBUG(scheduler, sched_belch("waiting for thread %d", tso->id));
 #if defined(THREADED_RTS)
-  return waitThread_(m, rtsFalse);	// waitThread_ releases sched_mutex
+  stat = waitThread_(m, rtsFalse);
 #else
-  return waitThread_(m);
+  stat = waitThread_(m);
 #endif
+  RELEASE_LOCK(&sched_mutex);
+  return stat;
 }
 
 static
@@ -2275,8 +2328,11 @@ waitThread_(StgMainThread* m
      * gets to enter the RTS directly without going via another
      * task/thread.
      */
+    main_main_thread = m;
     RELEASE_LOCK(&sched_mutex);
     schedule();
+    ACQUIRE_LOCK(&sched_mutex);
+    main_main_thread = NULL;
     ASSERT(m->stat != NoStatus);
   } else 
 # endif
@@ -2309,12 +2365,7 @@ waitThread_(StgMainThread* m
 			      m->tso->id));
   free(m);
 
-#if defined(THREADED_RTS)
-  if (blockWaiting) 
-#endif
-    RELEASE_LOCK(&sched_mutex);
-
-  // Postcondition: sched_mutex must not be held
+  // Postcondition: sched_mutex still held
   return stat;
 }
 
@@ -2928,6 +2979,17 @@ awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node)
 }
 
 #else   /* !GRAN && !PAR */
+
+#ifdef RTS_SUPPORTS_THREADS
+void
+awakenBlockedQueueNoLock(StgTSO *tso)
+{
+  while (tso != END_TSO_QUEUE) {
+    tso = unblockOneLocked(tso);
+  }
+}
+#endif
+
 void
 awakenBlockedQueue(StgTSO *tso)
 {
@@ -3514,7 +3576,6 @@ detectBlackHoles( void )
 	if (tso->why_blocked != BlockedOnBlackHole) {
 	    continue;
 	}
-
 	blocked_on = tso->block_info.closure;
 
 	frame = (StgClosure *)tso->sp;
@@ -3522,7 +3583,6 @@ detectBlackHoles( void )
 	while(1) {
 	    info = get_ret_itbl(frame);
 	    switch (info->i.type) {
-
 	    case UPDATE_FRAME:
 		if (((StgUpdateFrame *)frame)->updatee == blocked_on) {
 		    /* We are blocking on one of our own computations, so
@@ -3598,6 +3658,9 @@ printThreadBlockage(StgTSO *tso)
 #if defined(RTS_SUPPORTS_THREADS)
   case BlockedOnCCall:
     fprintf(stderr,"is blocked on an external call");
+    break;
+  case BlockedOnCCall_NoUnblockExc:
+    fprintf(stderr,"is blocked on an external call (exceptions were already blocked)");
     break;
 #endif
   default:

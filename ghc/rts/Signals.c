@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.32 2003/01/10 22:08:20 wolfgang Exp $
+ * $Id: Signals.c,v 1.33 2003/01/25 15:54:50 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -48,6 +48,23 @@ StgPtr pending_handler_buf[N_PENDING_HANDLERS];
 StgPtr *next_pending_handler = pending_handler_buf;
 
 StgInt nocldstop = 0;
+
+
+#ifdef RTS_SUPPORTS_THREADS
+pthread_t signalHandlingThread;
+#endif
+
+	// Handle all signals in the current thread.
+	// Called from Capability.c whenever the main capability is granted to a thread
+	// and in installDefaultHandlers
+void
+handleSignalsInThisThread()
+{
+#ifdef RTS_SUPPORTS_THREADS
+    signalHandlingThread = pthread_self();
+#endif
+}
+
 
 /* -----------------------------------------------------------------------------
  * Allocate/resize the table of signal handlers.
@@ -104,6 +121,19 @@ static void
 generic_handler(int sig)
 {
     sigset_t signals;
+
+#if defined(THREADED_RTS)
+	// Make the thread that currently holds the main capability
+	// handle the signal.
+	// This makes sure that awaitEvent() is interrupted
+	// and it (hopefully) prevents race conditions
+	// (signal handlers are not atomic with respect to other threads)
+
+    if(pthread_self() != signalHandlingThread) {
+        pthread_kill(signalHandlingThread, sig);
+        return;
+    }
+#endif
 
     /* Can't call allocate from here.  Probably can't call malloc
        either.  However, we have to schedule a new thread somehow.
@@ -215,6 +245,8 @@ stg_sig_install(int sig, int spi, StgStablePtr *handler, void *mask)
 
     previous_spi = handlers[sig];
 
+    action.sa_flags = 0;
+    
     switch(spi) {
     case STG_SIG_IGN:
     	handlers[sig] = STG_SIG_IGN;
@@ -348,6 +380,17 @@ shutdown_handler(int sig STG_UNUSED)
 	pthread_kill(startup_guy, sig);
 	return;
     }
+    // ToDo: The code for the threaded RTS below does something very
+    // similar. Maybe the SMP special case is not needed
+    // -- Wolfgang Thaller
+#elif defined(THREADED_RTS)
+	// Make the thread that currently holds the main capability
+	// handle the signal.
+	// This makes sure that awaitEvent() is interrupted
+    if(pthread_self() != signalHandlingThread) {
+        pthread_kill(signalHandlingThread, sig);
+        return;
+    }
 #endif
 
     // If we're already trying to interrupt the RTS, terminate with
@@ -382,6 +425,9 @@ initDefaultHandlers()
 
 #ifdef SMP
     startup_guy = pthread_self();
+#endif
+#ifdef RTS_SUPPORTS_THREADS
+	handleSignalsInThisThread();
 #endif
 
     // install the SIGINT handler

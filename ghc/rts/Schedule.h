@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.36 2002/10/22 11:01:20 simonmar Exp $
+ * $Id: Schedule.h,v 1.37 2003/01/25 15:54:50 wolfgang Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -34,6 +34,9 @@ void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
 void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
 #else
 void awakenBlockedQueue(StgTSO *tso);
+#if defined(RTS_SUPPORTS_THREADS)
+void awakenBlockedQueueNoLock(StgTSO *tso);
+#endif
 #endif
 
 /* unblockOne()
@@ -60,9 +63,9 @@ StgTSO *unblockOne(StgTSO *tso);
 void raiseAsync(StgTSO *tso, StgClosure *exception);
 void raiseAsyncWithLock(StgTSO *tso, StgClosure *exception);
 
-/* awaitEvent()
+/* awaitEvent(rtsBool wait)
  *
- * Raises an exception asynchronously in the specified thread.
+ * Checks for blocked threads that need to be woken.
  *
  * Called from STG :  NO
  * Locks assumed   :  sched_mutex
@@ -77,6 +80,16 @@ void awaitEvent(rtsBool wait);  /* In Select.c */
  * Locks assumed   :  sched_mutex
  */
 rtsBool wakeUpSleepingThreads(nat);  /* In Select.c */
+
+/* wakeBlockedWorkerThread()
+ *
+ * If a worker thread is currently blocked in awaitEvent(), interrupt it.
+ *
+ * Called from STG :  NO
+ * Locks assumed   :  sched_mutex
+ */
+void wakeBlockedWorkerThread(void); /* In Select.c */
+
 
 /* GetRoots(evac_fn f)
  *
@@ -174,6 +187,10 @@ typedef struct StgMainThread_ {
   StgClosure **    ret;
 #if defined(RTS_SUPPORTS_THREADS)
   Condition        wakeup;
+#if defined(THREADED_RTS)
+  rtsBool          thread_bound;
+  Condition        bound_thread_cond;
+#endif
 #endif
   struct StgMainThread_ *link;
 } StgMainThread;
@@ -257,9 +274,7 @@ void labelThread(StgPtr tso, char *label);
  */
 #if defined(RTS_SUPPORTS_THREADS)
 #define THREAD_RUNNABLE()			\
-  if ( !noCapabilities() ) {	                \
-     signalCondition(&thread_ready_cond);	\
-  }						\
+  wakeBlockedWorkerThread();			\
   context_switch = 1;
 #else
 #define THREAD_RUNNABLE()  /* nothing */
@@ -276,5 +291,15 @@ void labelThread(StgPtr tso, char *label);
 #define EMPTY_THREAD_QUEUES()  (EMPTY_RUN_QUEUE() && \
 				EMPTY_BLOCKED_QUEUE() && \
 				EMPTY_SLEEPING_QUEUE())
+
+#if defined(RTS_SUPPORTS_THREADS)
+/* If no task is waiting for a capability,
+ * spawn a new worker thread.
+ *
+ * (Used by the RtsAPI)
+ */
+void
+startSchedulerTask(void);
+#endif
 
 #endif /* __SCHEDULE_H__ */

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.h,v 1.30 2002/09/05 08:58:55 simonmar Exp $
+ * $Id: RtsAPI.h,v 1.31 2003/01/25 15:54:48 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -37,6 +37,20 @@ extern void shutdownHaskell        ( void );
 extern void shutdownHaskellAndExit ( int exitCode );
 extern void setProgArgv            ( int argc, char *argv[] );
 extern void getProgArgv            ( int *argc, char **argv[] );
+
+
+/* ----------------------------------------------------------------------------
+   Locking.
+   
+   In a multithreaded environments, you have to surround all access to the
+   RtsAPI with these calls.
+   ------------------------------------------------------------------------- */
+   
+void
+rts_lock ( void );
+
+void
+rts_unlock ( void );
 
 /* ----------------------------------------------------------------------------
    Building Haskell objects from C datatypes.
@@ -85,6 +99,8 @@ HsBool       rts_getBool      ( HaskellObj );
    Evaluating Haskell expressions
 
    The versions ending in '_' allow you to specify an initial stack size.
+   Note that these calls may cause Garbage Collection, so all HaskellObj
+   references are rendered invalid by these calls.
    ------------------------------------------------------------------------- */
 SchedulerStatus 
 rts_eval ( HaskellObj p, /*out*/HaskellObj *ret );

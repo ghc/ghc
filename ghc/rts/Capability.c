@@ -21,6 +21,7 @@
 #include "OSThreads.h"
 #include "Capability.h"
 #include "Schedule.h"  /* to get at EMPTY_RUN_QUEUE() */
+#include "Signals.h" /* to get at handleSignalsInThisThread() */
 
 #if !defined(SMP)
 Capability MainCapability;     /* for non-SMP, we have one global capability */
@@ -44,7 +45,7 @@ Condition returning_worker_cond = INIT_COND_VAR;
  * there are one or more worker threads blocked waiting on
  * returning_worker_cond.
  */
-static nat rts_n_waiting_workers = 0;
+nat rts_n_waiting_workers = 0;
 
 /* thread_ready_cond: when signalled, a thread has become runnable for a
  * task to execute.
@@ -53,14 +54,10 @@ static nat rts_n_waiting_workers = 0;
  * exclusive access to the RTS and all its data structures (that are not
  * locked by the Scheduler's mutex).
  *
- * thread_ready_cond is signalled whenever COND_NO_THREADS_READY doesn't hold.
+ * thread_ready_cond is signalled whenever noCapabilities doesn't hold.
  *
  */
 Condition thread_ready_cond = INIT_COND_VAR;
-#if 0
-/* For documentation purposes only */
-#define COND_NO_THREADS_READY() (noCapabilities() || EMPTY_RUN_QUEUE())
-#endif
 
 /*
  * To be able to make an informed decision about whether or not 
@@ -119,6 +116,8 @@ initCapabilities()
 #if defined(SMP)
 /* Free capability list. */
 static Capability *free_capabilities; /* Available capabilities for running threads */
+static Capability *returning_capabilities; 
+	/* Capabilities being passed to returning worker threads */
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -138,9 +137,11 @@ static Capability *free_capabilities; /* Available capabilities for running thre
  */ 
 void grabCapability(Capability** cap)
 {
+  ASSERT(rts_n_free_capabilities > 0);
 #if !defined(SMP)
   rts_n_free_capabilities = 0;
   *cap = &MainCapability;
+  handleSignalsInThisThread();
 #else
   *cap = free_capabilities;
   free_capabilities = (*cap)->link;
@@ -161,16 +162,11 @@ void releaseCapability(Capability* cap
 		       STG_UNUSED
 #endif
 )
-{
-#if defined(SMP)
-  cap->link = free_capabilities;
-  free_capabilities = cap;
-  rts_n_free_capabilities++;
-#else
-  rts_n_free_capabilities = 1;
-#endif
-
+{	// Precondition: sched_mutex must be held
 #if defined(RTS_SUPPORTS_THREADS)
+#ifndef SMP
+  ASSERT(rts_n_free_capabilities == 0);
+#endif
   /* Check to see whether a worker thread can be given
      the go-ahead to return the result of an external call..*/
   if (rts_n_waiting_workers > 0) {
@@ -178,14 +174,27 @@ void releaseCapability(Capability* cap
      * thread that is yielding its capability will repeatedly
      * signal returning_worker_cond.
      */
+#if defined(SMP)
+	// SMP variant untested
+    cap->link = returning_capabilities;
+    returning_capabilities = cap;
+#else
+#endif
     rts_n_waiting_workers--;
     signalCondition(&returning_worker_cond);
-  } else if ( !EMPTY_RUN_QUEUE() ) {
-    /* Signal that work is available */
+  } else /*if ( !EMPTY_RUN_QUEUE() )*/ {
+#if defined(SMP)
+    cap->link = free_capabilities;
+    free_capabilities = cap;
+    rts_n_free_capabilities++;
+#else
+    rts_n_free_capabilities = 1;
+#endif
+    /* Signal that a capability is available */
     signalCondition(&thread_ready_cond);
   }
 #endif
-  return;
+ return;
 }
 
 #if defined(RTS_SUPPORTS_THREADS)
@@ -226,15 +235,25 @@ grabReturnCapability(Mutex* pMutex, Capability** pCap)
 {
   IF_DEBUG(scheduler,
 	   fprintf(stderr,"worker (%ld): returning, waiting for lock.\n", osThreadId()));
-  rts_n_waiting_workers++;
   IF_DEBUG(scheduler,
 	   fprintf(stderr,"worker (%ld): returning; workers waiting: %d\n",
 		   osThreadId(), rts_n_waiting_workers));
-  while ( noCapabilities() ) {
+  if ( noCapabilities() ) {
+    rts_n_waiting_workers++;
+    wakeBlockedWorkerThread();
+    context_switch = 1;	// make sure it's our turn soon
     waitCondition(&returning_worker_cond, pMutex);
+#if defined(SMP)
+    *pCap = returning_capabilities;
+    returning_capabilities = (*pCap)->link;
+#else
+    *pCap = &MainCapability;
+    ASSERT(rts_n_free_capabilities == 0);
+    handleSignalsInThisThread();
+#endif
+  } else {
+    grabCapability(pCap);
   }
-  
-  grabCapability(pCap);
   return;
 }
 
@@ -253,18 +272,21 @@ grabReturnCapability(Mutex* pMutex, Capability** pCap)
  *
  * Pre-condition:  pMutex is assumed held and the thread possesses
  *                 a Capability.
- * Post-condition: pMutex isn't held and the Capability has
+ * Post-condition: pMutex is held and the Capability has
  *                 been given back.
  */
 void
 yieldToReturningWorker(Mutex* pMutex, Capability** pCap)
 {
-  if ( rts_n_waiting_workers > 0 && noCapabilities() ) {
+  if ( rts_n_waiting_workers > 0 ) {
     IF_DEBUG(scheduler,
-	     fprintf(stderr,"worker thread (%ld): giving up RTS token\n", osThreadId()));
+	     fprintf(stderr,"worker thread (%p): giving up RTS token\n", osThreadId()));
     releaseCapability(*pCap);
-    /* And wait for work */
+        /* And wait for work */
     waitForWorkCapability(pMutex, pCap, rtsFalse);
+    IF_DEBUG(scheduler,
+	     fprintf(stderr,"worker thread (%p): got back RTS token (after yieldToReturningWorker)\n",
+	     	osThreadId()));
   }
   return;
 }
@@ -281,6 +303,7 @@ yieldToReturningWorker(Mutex* pMutex, Capability** pCap)
  *           call is made.
  *
  * Pre-condition: pMutex is held.
+ * Post-condition: pMutex is held and *pCap is held by the current thread
  */
 void 
 waitForWorkCapability(Mutex* pMutex, Capability** pCap, rtsBool runnable)
@@ -293,6 +316,7 @@ waitForWorkCapability(Mutex* pMutex, Capability** pCap, rtsBool runnable)
   grabCapability(pCap);
   return;
 }
+
 #endif /* RTS_SUPPORTS_THREADS */
 
 #if defined(SMP)
@@ -319,6 +343,7 @@ initCapabilities_(nat n)
   }
   free_capabilities = cap;
   rts_n_free_capabilities = n;
+  returning_capabilities = NULL;
   IF_DEBUG(scheduler,fprintf(stderr,"scheduler: Allocated %d capabilities\n", n_free_capabilities););
 }
 #endif /* SMP */

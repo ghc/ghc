@@ -157,15 +157,14 @@ startTask ( void (*taskStart)(void) )
   OSThreadId tid;
   
   /* If more than one worker thread is known to be blocked waiting
-     on thread_ready_cond, signal it rather than creating a new one.
+     on thread_ready_cond, don't create a new one.
   */
   if ( rts_n_waiting_tasks > 0) {
     IF_DEBUG(scheduler,fprintf(stderr,
 			       "scheduler: startTask: %d tasks waiting, not creating new one.\n", 
 			       rts_n_waiting_tasks););
-    signalCondition(&thread_ready_cond);
-    /* Not needed, but gives more 'interesting' thread schedules when testing */
-    yieldThread();
+    // the task will run as soon as a capability is available,
+    // so there's no need to wake it.
     return;
   }
 

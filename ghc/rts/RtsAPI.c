@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.38 2002/12/11 15:36:47 simonmar Exp $
+ * $Id: RtsAPI.c,v 1.39 2003/01/25 15:54:49 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -17,52 +17,9 @@
 #include "Prelude.h"
 #include "OSThreads.h"
 #include "Schedule.h"
+#include "Capability.h"
 
 #include <stdlib.h>
-
-#if defined(RTS_SUPPORTS_THREADS)
-/* Cheesy locking scheme while waiting for the 
- * RTS API to change.
- */
-static Mutex     alloc_mutex = INIT_MUTEX_VAR;
-static Condition alloc_cond  = INIT_COND_VAR;
-#define INVALID_THREAD_ID ((OSThreadId)(-1))
-
-/* Thread currently owning the allocator */
-static OSThreadId c_id = INVALID_THREAD_ID;
-
-static StgPtr alloc(nat n)
-{
-  OSThreadId tid = osThreadId();
-  ACQUIRE_LOCK(&alloc_mutex);
-  if (tid == c_id) {
-    /* I've got the lock, just allocate() */
-    ;
-  } else if (c_id == INVALID_THREAD_ID) {
-    c_id = tid;
-  } else {
-    waitCondition(&alloc_cond, &alloc_mutex);
-    c_id = tid;
-  }
-  RELEASE_LOCK(&alloc_mutex);
-  return allocate(n);
-}
-
-static void releaseAllocLock(void)
-{
-  ACQUIRE_LOCK(&alloc_mutex);
-  /* Reset the allocator owner */
-  c_id = INVALID_THREAD_ID;
-  RELEASE_LOCK(&alloc_mutex);
-
-  /* Free up an OS thread waiting to get in */
-  signalCondition(&alloc_cond);
-}
-#else
-# define alloc(n) allocate(n)
-# define releaseAllocLock() /* nothing */
-#endif
-
 
 /* ----------------------------------------------------------------------------
    Building Haskell objects from C datatypes.
@@ -70,7 +27,7 @@ static void releaseAllocLock(void)
 HaskellObj
 rts_mkChar (HsChar c)
 {
-  StgClosure *p = (StgClosure *)alloc(CONSTR_sizeW(0,1));
+  StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
   SET_HDR(p, Czh_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)(StgChar)c;
   return p;
@@ -79,7 +36,7 @@ rts_mkChar (HsChar c)
 HaskellObj
 rts_mkInt (HsInt i)
 {
-  StgClosure *p = (StgClosure *)alloc(CONSTR_sizeW(0,1));
+  StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
   SET_HDR(p, Izh_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)(StgInt)i;
   return p;
@@ -88,7 +45,7 @@ rts_mkInt (HsInt i)
 HaskellObj
 rts_mkInt8 (HsInt8 i)
 {
-  StgClosure *p = (StgClosure *)alloc(CONSTR_sizeW(0,1));
+  StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
   SET_HDR(p, I8zh_con_info, CCS_SYSTEM);
   /* Make sure we mask out the bits above the lowest 8 */
   p->payload[0]  = (StgClosure *)(StgInt)((unsigned)i & 0xff);
@@ -98,7 +55,7 @@ rts_mkInt8 (HsInt8 i)
 HaskellObj
 rts_mkInt16 (HsInt16 i)
 {
-  StgClosure *p = (StgClosure *)alloc(CONSTR_sizeW(0,1));
+  StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
   SET_HDR(p, I16zh_con_info, CCS_SYSTEM);
   /* Make sure we mask out the relevant bits */
   p->payload[0]  = (StgClosure *)(StgInt)((unsigned)i & 0xffff);
@@ -108,7 +65,7 @@ rts_mkInt16 (HsInt16 i)
 HaskellObj
 rts_mkInt32 (HsInt32 i)
 {
-  StgClosure *p = (StgClosure *)alloc(CONSTR_sizeW(0,1));
+  StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
   SET_HDR(p, I32zh_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)(StgInt)((unsigned)i & 0xffffffff);
   return p;
@@ -118,7 +75,7 @@ HaskellObj
 rts_mkInt64 (HsInt64 i)
 {
   long long *tmp;
-  StgClosure *p = (StgClosure *)alloc(CONSTR_sizeW(0,2));
+  StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,2));
   SET_HDR(p, I64zh_con_info, CCS_SYSTEM);
   tmp  = (long long*)&(p->payload[0]);
   *tmp = (StgInt64)i;
@@ -128,7 +85,7 @@ rts_mkInt64 (HsInt64 i)
 HaskellObj
 rts_mkWord (HsWord i)
 {
-  StgClosure *p = (StgClosure *)alloc(CONSTR_sizeW(0,1));
+  StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
   SET_HDR(p, Wzh_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)(StgWord)i;
   return p;
@@ -138,7 +95,7 @@ HaskellObj
 rts_mkWord8 (HsWord8 w)
 {
   /* see rts_mkInt* comments */
-  StgClosure *p = (StgClosure *)alloc(CONSTR_sizeW(0,1));
+  StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
   SET_HDR(p, W8zh_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)(StgWord)(w & 0xff);
   return p;
@@ -148,7 +105,7 @@ HaskellObj
 rts_mkWord16 (HsWord16 w)
 {
   /* see rts_mkInt* comments */
-  StgClosure *p = (StgClosure *)alloc(CONSTR_sizeW(0,1));
+  StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
   SET_HDR(p, W16zh_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)(StgWord)(w & 0xffff);
   return p;
@@ -158,7 +115,7 @@ HaskellObj
 rts_mkWord32 (HsWord32 w)
 {
   /* see rts_mkInt* comments */
-  StgClosure *p = (StgClosure *)alloc(CONSTR_sizeW(0,1));
+  StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
   SET_HDR(p, W32zh_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)(StgWord)(w & 0xffffffff);
   return p;
@@ -169,7 +126,7 @@ rts_mkWord64 (HsWord64 w)
 {
   unsigned long long *tmp;
 
-  StgClosure *p = (StgClosure *)alloc(CONSTR_sizeW(0,2));
+  StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,2));
   /* see mk_Int8 comment */
   SET_HDR(p, W64zh_con_info, CCS_SYSTEM);
   tmp  = (unsigned long long*)&(p->payload[0]);
@@ -180,7 +137,7 @@ rts_mkWord64 (HsWord64 w)
 HaskellObj
 rts_mkFloat (HsFloat f)
 {
-  StgClosure *p = (StgClosure *)alloc(CONSTR_sizeW(0,1));
+  StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
   SET_HDR(p, Fzh_con_info, CCS_SYSTEM);
   ASSIGN_FLT((P_)p->payload, (StgFloat)f);
   return p;
@@ -189,7 +146,7 @@ rts_mkFloat (HsFloat f)
 HaskellObj
 rts_mkDouble (HsDouble d)
 {
-  StgClosure *p = (StgClosure *)alloc(CONSTR_sizeW(0,sizeofW(StgDouble)));
+  StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,sizeofW(StgDouble)));
   SET_HDR(p, Dzh_con_info, CCS_SYSTEM);
   ASSIGN_DBL((P_)p->payload, (StgDouble)d);
   return p;
@@ -198,7 +155,7 @@ rts_mkDouble (HsDouble d)
 HaskellObj
 rts_mkStablePtr (HsStablePtr s)
 {
-  StgClosure *p = (StgClosure *)alloc(sizeofW(StgHeader)+1);
+  StgClosure *p = (StgClosure *)allocate(sizeofW(StgHeader)+1);
   SET_HDR(p, StablePtr_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)s;
   return p;
@@ -207,7 +164,7 @@ rts_mkStablePtr (HsStablePtr s)
 HaskellObj
 rts_mkPtr (HsPtr a)
 {
-  StgClosure *p = (StgClosure *)alloc(sizeofW(StgHeader)+1);
+  StgClosure *p = (StgClosure *)allocate(sizeofW(StgHeader)+1);
   SET_HDR(p, Ptr_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)a;
   return p;
@@ -236,7 +193,7 @@ rts_apply (HaskellObj f, HaskellObj arg)
 {
     StgClosure *ap;
 
-    ap = (StgClosure *)alloc(sizeofW(StgClosure) + 2);
+    ap = (StgClosure *)allocate(sizeofW(StgClosure) + 2);
     SET_HDR(ap, (StgInfoTable *)&stg_ap_2_upd_info, CCS_SYSTEM);
     ap->payload[0] = f;
     ap->payload[1] = arg;
@@ -414,7 +371,6 @@ rts_eval (HaskellObj p, /*out*/HaskellObj *ret)
     StgTSO *tso;
 
     tso = createGenThread(RtsFlags.GcFlags.initialStkSize, p);
-    releaseAllocLock();
     return scheduleWaitThread(tso,ret);
 }
 
@@ -424,7 +380,6 @@ rts_eval_ (HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret)
     StgTSO *tso;
     
     tso = createGenThread(stack_size, p);
-    releaseAllocLock();
     return scheduleWaitThread(tso,ret);
 }
 
@@ -438,7 +393,6 @@ rts_evalIO (HaskellObj p, /*out*/HaskellObj *ret)
     StgTSO* tso; 
     
     tso = createStrictIOThread(RtsFlags.GcFlags.initialStkSize, p);
-    releaseAllocLock();
     return scheduleWaitThread(tso,ret);
 }
 
@@ -446,13 +400,13 @@ rts_evalIO (HaskellObj p, /*out*/HaskellObj *ret)
  * Identical to rts_evalIO(), but won't create a new task/OS thread
  * to evaluate the Haskell thread. Used by main() only. Hack.
  */
+ 
 SchedulerStatus
 rts_mainEvalIO(HaskellObj p, /*out*/HaskellObj *ret)
 {
-    StgTSO* tso; 
+    StgTSO* tso;
     
     tso = createStrictIOThread(RtsFlags.GcFlags.initialStkSize, p);
-    releaseAllocLock();
     scheduleThread(tso);
     return waitThread(tso, ret);
 }
@@ -472,7 +426,6 @@ rts_evalStableIO (HsStablePtr s, /*out*/HsStablePtr *ret)
     
     p = (StgClosure *)deRefStablePtr(s);
     tso = createStrictIOThread(RtsFlags.GcFlags.initialStkSize, p);
-    releaseAllocLock();
     stat = scheduleWaitThread(tso,&r);
 
     if (stat == Success) {
@@ -492,7 +445,6 @@ rts_evalLazyIO (HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret)
     StgTSO *tso;
 
     tso = createIOThread(stack_size, p);
-    releaseAllocLock();
     return scheduleWaitThread(tso,ret);
 }
 
@@ -515,3 +467,34 @@ rts_checkSchedStatus ( char* site, SchedulerStatus rc )
 	stg_exit(EXIT_FAILURE);
     }
 }
+
+#ifdef RTS_SUPPORTS_THREADS
+void
+rts_lock()
+{
+	Capability *cap;
+	ACQUIRE_LOCK(&sched_mutex);
+	
+		// we request to get the capability immediately, in order to
+		// a) stop other threads from using allocate()
+		// b) wake the current worker thread from awaitEvent()
+		//       (so that a thread started by rts_eval* will start immediately)
+	grabReturnCapability(&sched_mutex,&cap);
+	
+		// now that we have the capability, we don't need it anymore
+		// (other threads will continue to run as soon as we release the sched_mutex)
+	releaseCapability(cap);
+	
+		// In the RTS hasn't been entered yet,
+		// start a RTS task.
+		// If there is already a task available (waiting for the work capability),
+		// this will do nothing.
+	startSchedulerTask();
+}
+
+void
+rts_unlock()
+{
+	RELEASE_LOCK(&sched_mutex);
+}
+#endif

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.h,v 1.8 2002/09/17 12:11:45 simonmar Exp $
+ * $Id: Signals.h,v 1.9 2003/01/25 15:54:50 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -26,6 +26,8 @@ extern void    awaitUserSignals(void);
 extern void startSignalHandlers(void);
 extern void markSignalHandlers (evac_fn evac);
 extern void initDefaultHandlers(void);
+
+extern void handleSignalsInThisThread(void);
 
 #else
 

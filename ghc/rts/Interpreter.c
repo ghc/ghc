@@ -1157,6 +1157,7 @@ run_BCO:
 	    int stk_offset            = BCO_NEXT;
 	    int o_itbl                = BCO_NEXT;
 	    void(*marshall_fn)(void*) = (void (*)(void*))BCO_LIT(o_itbl);
+	    StgTSO *tso		      = cap->r.rCurrentTSO;
 
 	    // There are a bunch of non-ptr words on the stack (the
 	    // ccall args, the ccall fun address and space for the
@@ -1175,12 +1176,17 @@ run_BCO:
 	    SAVE_STACK_POINTERS;
 	    tok = suspendThread(&cap->r,rtsFalse);
 
-	    // Careful: suspendThread might have shifted the stack
+	    // Careful:
+	    // suspendThread might have shifted the stack
 	    // around (stack squeezing), so we have to grab the real
-	    // Sp out of the TSO to find the ccall args again:
-	    marshall_fn ( (void*)(cap->r.rCurrentTSO->sp + RET_DYN_SIZE
-		+ sizeofW(StgRetDyn)) );
-
+	    // Sp out of the TSO to find the ccall args again.
+	    // We don't own the capability anymore, so we mustn't use it.
+	    // Instead, we have to save the TSO ptr beforehand.
+	    // Also note that GC may strike at any time now (from another thread).
+	    // FIXME - DANGER!! Can GC move our TSO?
+	    // If so, we have to copy the args elsewhere!
+	    marshall_fn ( (void*)(tso->sp + RET_DYN_SIZE + sizeofW(StgRetDyn)) );
+	    	    
 	    // And restart the thread again, popping the RET_DYN frame.
 	    cap = (Capability *)((void *)resumeThread(tok,rtsFalse) - sizeof(StgFunTable));
 	    LOAD_STACK_POINTERS;

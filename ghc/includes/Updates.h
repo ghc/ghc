@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.28 2002/12/11 15:36:40 simonmar Exp $
+ * $Id: Updates.h,v 1.29 2003/01/25 15:54:48 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -93,6 +93,30 @@
 			      (StgClosure *)updclosure,			\
 			      (StgClosure *)heapptr);			\
    }
+#elif defined(RTS_SUPPORTS_THREADS)
+
+# ifdef TICKY_TICKY
+#  define UPD_IND_NOLOCK(updclosure, heapptr)			\
+   {								\
+	const StgInfoTable *info;				\
+	info = ((StgClosure *)updclosure)->header.info;		\
+        AWAKEN_BQ_NOLOCK(info,updclosure);			\
+	updateWithPermIndirection(info,				\
+				  (StgClosure *)updclosure,	\
+				  (StgClosure *)heapptr);	\
+   }
+# else
+#  define UPD_IND_NOLOCK(updclosure, heapptr)		\
+   {							\
+	const StgInfoTable *info;			\
+	info = ((StgClosure *)updclosure)->header.info;	\
+        AWAKEN_BQ_NOLOCK(info,updclosure);		\
+	updateWithIndirection(info,			\
+			      (StgClosure *)updclosure,	\
+			      (StgClosure *)heapptr);	\
+   }
+# endif
+
 #else
 #define UPD_IND_NOLOCK(updclosure,heapptr) UPD_IND(updclosure,heapptr)
 #endif
@@ -171,6 +195,17 @@ extern void awakenBlockedQueue(StgTSO *q);
           DO_AWAKEN_BQ(closure);                                        \
 	}
 
+#ifdef RTS_SUPPORTS_THREADS
+extern void awakenBlockedQueueNoLock(StgTSO *q);
+#define DO_AWAKEN_BQ_NOLOCK(closure)					\
+        STGCALL1(awakenBlockedQueueNoLock,				\
+		 ((StgBlockingQueue *)closure)->blocking_queue);
+
+#define AWAKEN_BQ_NOLOCK(info,closure)					\
+     	if (info == &stg_BLACKHOLE_BQ_info) {				\
+          DO_AWAKEN_BQ_NOLOCK(closure);                                 \
+	}
+#endif
 #endif /* GRAN || PAR */
 
 /* -------------------------------------------------------------------------
