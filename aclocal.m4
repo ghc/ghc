@@ -248,9 +248,15 @@ AC_DEFUN(FPTOOLS_HAPPY,
 [
 if test -d $srcdir/happy; then
    SrcTreeHappyCmd=$hardtop/happy/src/happy-inplace
+else
+   SrcTreeHappyCmd=""
 fi
 if test x"$UseSrcTreeHappy" = xYES; then
-  HappyCmd=$SrcTreeHappyCmd
+  if test x"$SrcTreeHappyCmd" != x; then
+     HappyCmd=$SrcTreeHappyCmd
+  else
+     AC_MSG_ERROR([--enable-src-tree-happy given, but happy not found in source tree])
+  fi
 else
   AC_PATH_PROG(HappyCmd,happy,$SrcTreeHappyCmd)
 fi
@@ -282,9 +288,15 @@ AC_DEFUN(FPTOOLS_HADDOCK,
 [
 if test -d $srcdir/haddock; then
    SrcTreeHaddockCmd=$hardtop/haddock/src/haddock-inplace
+else
+   SrcTreeHaddockCmd=""
 fi
 if test x"$UseSrcTreeHaddock" = xYES; then
-  HaddockCmd=$SrcTreeHaddockCmd
+  if test x"$SrcTreeHaddockCmd" != x; then
+     HaddockCmd=$SrcTreeHaddockCmd
+  else
+     AC_MSG_ERROR([--enable-src-tree-haddock given, but haddock not found in source tree])
+  fi
 else
   AC_PATH_PROG(HaddockCmd,haddock,$SrcTreeHaddockCmd)
 fi
@@ -303,9 +315,15 @@ AC_DEFUN(FPTOOLS_ALEX,
 [
 if test -d $srcdir/alex; then
    SrcTreeAlexCmd=$hardtop/alex/src/alex-inplace
+else
+   SrcTreeAlexCmd=""
 fi
 if test x"$UseSrcTreeAlex" = xYES; then
-  AlexCmd=$SrcTreeAlexCmd
+  if test x"$SrcTreeAlexCmd" != x; then
+     AlexCmd=$SrcTreeAlexCmd
+  else
+     AC_MSG_ERROR([--enable-src-tree-alex given, but alex not found in source tree])
+  fi
 else
   AC_PATH_PROG(AlexCmd,alex,$SrcTreeAlexCmd)
 fi
