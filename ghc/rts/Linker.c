@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.15 2001/01/29 17:23:41 simonmar Exp $
+ * $Id: Linker.c,v 1.16 2001/02/01 12:37:44 simonmar Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -474,7 +474,9 @@ unloadObj( char *path )
 	    { 
 		SymbolVal *s;
 		for (s = oc->symbols; s < oc->symbols + oc->n_symbols; s++) {
-		    removeStrHashTable(symhash, s->lbl, NULL);
+		    if (s->lbl != NULL) {
+			removeStrHashTable(symhash, s->lbl, NULL);
+		    }
 		}
 	    }
 
@@ -1359,6 +1361,7 @@ ocGetNames_ELF ( ObjectCode* oc )
       stab = (Elf32_Sym*) (ehdrC + shdr[i].sh_offset);
       nent = shdr[i].sh_size / sizeof(Elf32_Sym);
       oc->symbols = malloc(nent * sizeof(SymbolVal));
+      oc->n_symbols = nent;
       for (j = 0; j < nent; j++) {
          if ( ( ELF32_ST_BIND(stab[j].st_info)==STB_GLOBAL /* ||
 	        ELF32_ST_BIND(stab[j].st_info)==STB_LOCAL */
