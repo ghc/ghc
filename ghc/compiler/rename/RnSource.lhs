@@ -99,6 +99,8 @@ rnSrcDecls decls
 	updGblEnv (\gbl -> gbl { tcg_fix_env = fix_env })
 		  $ do {
 
+	failIfErrsM ;	-- No point in continuing if (say) we have duplicate declarations
+
 		-- Rename remaining declarations
 	(rn_src_decls, src_fvs) <- rn_src_decls decls ;
 
