@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
-$Id: HsParser.ly,v 1.13 2002/06/03 13:05:58 simonmar Exp $
+$Id: HsParser.ly,v 1.14 2002/06/20 12:38:07 simonmar Exp $
 
 (c) Simon Marlow, Sven Panne 1997-2002
 
@@ -320,12 +320,10 @@ shift/reduce-conflict, so we don't handle this case here, but in bodyaux.
 >	| {- empty -}			{ [] }
 
 > decls :: { [HsDecl] }
->	: decls1 optsemi		{ reverse $1 }
->	| optsemi 			{ [] }
-
-> decls1 :: { [HsDecl] }
->	: decls1 ';' decl		{ $3 : $1 }
+>	: decls ';' decl		{ $3 : $1 }
+>	| decls ';'			{ $1 }
 >	| decl				{ [$1] }
+>	| {- empty -}			{ [] }
 
 > decl :: { HsDecl }
 >	: signdecl		{ $1 }
@@ -560,12 +558,10 @@ Instance declarations
 >	| {- empty -}				{ [] }
 
 > valdefs :: { [HsDecl] }
-> 	: valdefs1 optsemi			{ $1 }
->	| optsemi				{ [] }
-
-> valdefs1 :: { [HsDecl] }
->	: valdefs1 ';' valdef			{ $3 : $1 }
+>	: valdefs ';' valdef			{ $3 : $1 }
+>	| valdefs ';'				{ $1 }
 >	| valdef				{ [$1] }
+>	| {- empty -}				{ [] }
 
 -----------------------------------------------------------------------------
 Value definitions
