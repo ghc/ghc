@@ -479,10 +479,10 @@ ifneq "$(BIN_DIST)" "1"
 	@for i in $(INSTALL_SCRIPTS); do \
 	   $(RM) $$i.tmp; \
 	   echo "#! $(PERL)" > $$i.tmp ; \
-	   echo $$"bindir='$(bindir)';"                            >> $$i.tmp ; \
-	   echo $$"libdir='$(libdir)';"                            >> $$i.tmp ; \
-	   echo $$"libexecdir='$(libexecdir)';"                    >> $$i.tmp ; \
-	   echo $$"datadir='$(datadir)';"                          >> $$i.tmp ; \
+	   echo '$$'"bindir='$(bindir)';"                            >> $$i.tmp ; \
+	   echo '$$'"libdir='$(libdir)';"                            >> $$i.tmp ; \
+	   echo '$$'"libexecdir='$(libexecdir)';"                    >> $$i.tmp ; \
+	   echo '$$'"datadir='$(datadir)';"                          >> $$i.tmp ; \
 	   cat  $$i                                                >> $$i.tmp ; \
 	   echo $(INSTALL_PROGRAM) $(filter-out -s,$(INSTALL_OPTS)) $$i.tmp $(bindir)/$$i ;    \
 	   $(INSTALL_PROGRAM) $(filter-out -s,$(INSTALL_BIN_OPTS)) $$i.tmp $(bindir)/$$i ; \
@@ -508,10 +508,10 @@ ifneq "$(BIN_DIST)" "1"
 	@for i in $(INSTALL_LIB_SCRIPTS); do \
 	   $(RM) $$i.tmp; \
 	   echo "#! $(PERL)" > $$i.tmp ; \
-	   echo $$"bindir='$(bindir)';"                            >> $$i.tmp ; \
-	   echo $$"libdir='$(libdir)';"                            >> $$i.tmp ; \
-	   echo $$"libexecdir='$(libexecdir)';"                    >> $$i.tmp ; \
-	   echo $$"datadir='$(datadir)';"                          >> $$i.tmp ; \
+	   echo '$$'"bindir='$(bindir)';"                            >> $$i.tmp ; \
+	   echo '$$'"libdir='$(libdir)';"                            >> $$i.tmp ; \
+	   echo '$$'"libexecdir='$(libexecdir)';"                    >> $$i.tmp ; \
+	   echo '$$'"datadir='$(datadir)';"                          >> $$i.tmp ; \
 	   cat  $$i                                                >> $$i.tmp ; \
 	   echo $(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i $(libdir) ;    \
 	   $(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i.tmp $(libdir)/$$i ; \
@@ -537,10 +537,10 @@ ifneq "$(BIN_DIST)" "1"
 	@for i in $(INSTALL_LIBEXEC_SCRIPTS); do \
 	   $(RM) $$i.tmp; \
 	   echo "#! $(PERL)" > $$i.tmp ; \
-	   echo $$"bindir='$(bindir)';"                            >> $$i.tmp ; \
-	   echo $$"libdir='$(libdir)';"                            >> $$i.tmp ; \
-	   echo $$"libexecdir='$(libexecdir)';"                    >> $$i.tmp ; \
-	   echo $$"datadir='$(datadir)';"                          >> $$i.tmp ; \
+	   echo '$$'"bindir='$(bindir)';"                            >> $$i.tmp ; \
+	   echo '$$'"libdir='$(libdir)';"                            >> $$i.tmp ; \
+	   echo '$$'"libexecdir='$(libexecdir)';"                    >> $$i.tmp ; \
+	   echo '$$'"datadir='$(datadir)';"                          >> $$i.tmp ; \
 	   cat  $$i                                                >> $$i.tmp ; \
 	   echo $(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i $(libexecdir) ;    \
 	   $(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i.tmp $(libexecdir)/$$i ; \
