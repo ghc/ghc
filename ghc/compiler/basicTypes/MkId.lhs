@@ -148,7 +148,7 @@ mkDataConId work_name data_con
 	   `setNewStrictnessInfo`	Just strict_sig
 
     arity = dataConRepArity data_con
-    strict_sig = mkStrictSig id arity (mkTopDmdType (dataConRepStrictness data_con) cpr_info)
+    strict_sig = mkStrictSig id arity (mkTopDmdType (replicate arity topDmd) cpr_info)
 
     tycon = dataConTyCon data_con
     cpr_info | isProductTyCon tycon && 
