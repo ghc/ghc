@@ -2869,8 +2869,8 @@ genCCall fn cconv kind args
     let
         argcode = concatOL argcodes
         (move_sp_down, move_sp_up)
-           = let nn = length vregs - n_argRegs 
-                                   + 1 -- (for the road)
+           = let diff = length vregs - n_argRegs
+                 nn   = if odd diff then diff + 1 else diff -- keep 8-byte alignment
              in  if   nn <= 0
                  then (nilOL, nilOL)
                  else (unitOL (moveSp (-1*nn)), unitOL (moveSp (1*nn)))
