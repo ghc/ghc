@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.77 2000/08/23 12:51:03 simonmar Exp $
+ * $Id: Schedule.c,v 1.78 2000/08/25 13:12:07 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -144,6 +144,7 @@ StgTSO *ccalling_threadss[MAX_PROC];
 
 StgTSO *run_queue_hd, *run_queue_tl;
 StgTSO *blocked_queue_hd, *blocked_queue_tl;
+StgTSO *sleeping_queue;		/* perhaps replace with a hash table? */
 
 #endif
 
@@ -379,14 +380,7 @@ schedule( void )
      */
     if (interrupted) {
       IF_DEBUG(scheduler, sched_belch("interrupted"));
-      for (t = run_queue_hd; t != END_TSO_QUEUE; t = t->link) {
-	deleteThread(t);
-      }
-      for (t = blocked_queue_hd; t != END_TSO_QUEUE; t = t->link) {
-	deleteThread(t);
-      }
-      run_queue_hd = run_queue_tl = END_TSO_QUEUE;
-      blocked_queue_hd = blocked_queue_tl = END_TSO_QUEUE;
+      deleteAllThreads();
       interrupted = rtsFalse;
       was_interrupted = rtsTrue;
     }
@@ -506,7 +500,7 @@ schedule( void )
      * ToDo: what if another client comes along & requests another
      * main thread?
      */
-    if (blocked_queue_hd != END_TSO_QUEUE) {
+    if (blocked_queue_hd != END_TSO_QUEUE || sleeping_queue != END_TSO_QUEUE) {
       awaitEvent(
 	   (run_queue_hd == END_TSO_QUEUE)
 #ifdef SMP
@@ -538,6 +532,7 @@ schedule( void )
 #ifdef SMP
     if (blocked_queue_hd == END_TSO_QUEUE
 	&& run_queue_hd == END_TSO_QUEUE
+	&& sleeping_queue == END_TSO_QUEUE
 	&& (n_free_capabilities == RtsFlags.ParFlags.nNodes))
     {
 	IF_DEBUG(scheduler, sched_belch("deadlocked, checking for black holes..."));
@@ -554,7 +549,8 @@ schedule( void )
     }
 #else /* ! SMP */
     if (blocked_queue_hd == END_TSO_QUEUE
-	&& run_queue_hd == END_TSO_QUEUE)
+	&& run_queue_hd == END_TSO_QUEUE
+	&& sleeping_queue == END_TSO_QUEUE)
     {
 	IF_DEBUG(scheduler, sched_belch("deadlocked, checking for black holes..."));
 	detectBlackHoles();
@@ -858,7 +854,8 @@ schedule( void )
      */
     if (RtsFlags.ConcFlags.ctxtSwitchTicks == 0
 	&& (run_queue_hd != END_TSO_QUEUE
-	    || blocked_queue_hd != END_TSO_QUEUE))
+	    || blocked_queue_hd != END_TSO_QUEUE
+	    || sleeping_queue != END_TSO_QUEUE))
 	context_switch = 1;
     else
 	context_switch = 0;
@@ -1152,19 +1149,29 @@ schedule( void )
   } /* end of while(1) */
 }
 
-/* A hack for Hugs concurrency support.  Needs sanitisation (?) */
+/* ---------------------------------------------------------------------------
+ * deleteAllThreads():  kill all the live threads.
+ *
+ * This is used when we catch a user interrupt (^C), before performing
+ * any necessary cleanups and running finalizers.
+ * ------------------------------------------------------------------------- */
+   
 void deleteAllThreads ( void )
 {
   StgTSO* t;
-  IF_DEBUG(scheduler,sched_belch("deleteAllThreads()"));
+  IF_DEBUG(scheduler,sched_belch("deleting all threads"));
   for (t = run_queue_hd; t != END_TSO_QUEUE; t = t->link) {
-    deleteThread(t);
+      deleteThread(t);
   }
   for (t = blocked_queue_hd; t != END_TSO_QUEUE; t = t->link) {
-    deleteThread(t);
+      deleteThread(t);
+  }
+  for (t = sleeping_queue; t != END_TSO_QUEUE; t = t->link) {
+      deleteThread(t);
   }
   run_queue_hd = run_queue_tl = END_TSO_QUEUE;
   blocked_queue_hd = blocked_queue_tl = END_TSO_QUEUE;
+  sleeping_queue = END_TSO_QUEUE;
 }
 
 /* startThread and  insertThread are now in GranSim.c -- HWL */
@@ -1582,12 +1589,14 @@ initScheduler(void)
     blocked_queue_hds[i]  = END_TSO_QUEUE;
     blocked_queue_tls[i]  = END_TSO_QUEUE;
     ccalling_threadss[i]  = END_TSO_QUEUE;
+    sleeping_queue        = END_TSO_QUEUE;
   }
 #else
   run_queue_hd      = END_TSO_QUEUE;
   run_queue_tl      = END_TSO_QUEUE;
   blocked_queue_hd  = END_TSO_QUEUE;
   blocked_queue_tl  = END_TSO_QUEUE;
+  sleeping_queue    = END_TSO_QUEUE;
 #endif 
 
   suspended_ccalling_threads  = END_TSO_QUEUE;
@@ -1743,6 +1752,8 @@ howManyThreadsAvail ( void )
       i++;
    for (q = blocked_queue_hd; q != END_TSO_QUEUE; q = q->link)
       i++;
+   for (q = sleeping_queue; q != END_TSO_QUEUE; q = q->link)
+      i++;
    return i;
 }
 
@@ -1756,9 +1767,13 @@ finishAllThreads ( void )
       while (blocked_queue_hd != END_TSO_QUEUE) {
          waitThread ( blocked_queue_hd, NULL );
       }
+      while (sleeping_queue != END_TSO_QUEUE) {
+         waitThread ( blocked_queue_hd, NULL );
+      }
    } while 
       (blocked_queue_hd != END_TSO_QUEUE || 
-        run_queue_hd != END_TSO_QUEUE);
+       run_queue_hd     != END_TSO_QUEUE ||
+       sleeping_queue   != END_TSO_QUEUE);
 }
 
 SchedulerStatus
@@ -1924,6 +1939,7 @@ take_off_run_queue(StgTSO *tso) {
 
         - all the threads on the runnable queue
         - all the threads on the blocked queue
+        - all the threads on the sleeping queue
 	- all the thread currently executing a _ccall_GC
         - all the "main threads"
      
@@ -1969,6 +1985,10 @@ static void GetRoots(void)
     ASSERT(blocked_queue_tl != END_TSO_QUEUE);
     blocked_queue_hd  = (StgTSO *)MarkRoot((StgClosure *)blocked_queue_hd);
     blocked_queue_tl  = (StgTSO *)MarkRoot((StgClosure *)blocked_queue_tl);
+  }
+
+  if (sleeping_queue != END_TSO_QUEUE) {
+    sleeping_queue  = (StgTSO *)MarkRoot((StgClosure *)sleeping_queue);
   }
 #endif 
 
@@ -2127,8 +2147,6 @@ threadStackOverflow(StgTSO *tso)
 /* ---------------------------------------------------------------------------
    Wake up a queue that was blocked on some resource.
    ------------------------------------------------------------------------ */
-
-/* ToDo: check push_on_run_queue vs. PUSH_ON_RUN_QUEUE */
 
 #if defined(GRAN)
 static inline void
@@ -2500,7 +2518,6 @@ unblockThread(StgTSO *tso)
       barf("unblockThread (Exception): TSO not found");
     }
 
-  case BlockedOnDelay:
   case BlockedOnRead:
   case BlockedOnWrite:
     {
@@ -2518,6 +2535,23 @@ unblockThread(StgTSO *tso)
 	    if ((StgBlockingQueueElement *)blocked_queue_tl == t) {
 	      blocked_queue_tl = (StgTSO *)prev;
 	    }
+	  }
+	  goto done;
+	}
+      }
+      barf("unblockThread (I/O): TSO not found");
+    }
+
+  case BlockedOnDelay:
+    {
+      StgBlockingQueueElement *prev = NULL;
+      for (t = (StgBlockingQueueElement *)sleeping_queue; t != END_BQ_QUEUE; 
+	   prev = t, t = t->link) {
+	if (t == (StgBlockingQueueElement *)tso) {
+	  if (prev == NULL) {
+	    sleeping_queue = (StgTSO *)t->link;
+	  } else {
+	    prev->link = t->link;
 	  }
 	  goto done;
 	}
@@ -2603,7 +2637,6 @@ unblockThread(StgTSO *tso)
       barf("unblockThread (Exception): TSO not found");
     }
 
-  case BlockedOnDelay:
   case BlockedOnRead:
   case BlockedOnWrite:
     {
@@ -2621,6 +2654,23 @@ unblockThread(StgTSO *tso)
 	    if (blocked_queue_tl == t) {
 	      blocked_queue_tl = prev;
 	    }
+	  }
+	  goto done;
+	}
+      }
+      barf("unblockThread (I/O): TSO not found");
+    }
+
+  case BlockedOnDelay:
+    {
+      StgTSO *prev = NULL;
+      for (t = sleeping_queue; t != END_TSO_QUEUE; 
+	   prev = t, t = t->link) {
+	if (t == tso) {
+	  if (prev == NULL) {
+	    sleeping_queue = t->link;
+	  } else {
+	    prev->link = t->link;
 	  }
 	  goto done;
 	}
@@ -2864,7 +2914,7 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
       tso->su = (StgUpdateFrame *)(sp+1);
       tso->sp = sp;
       return;
-      
+
     default:
       barf("raiseAsync");
     }
@@ -2986,12 +3036,7 @@ printThreadBlockage(StgTSO *tso)
     fprintf(stderr,"blocked on write to fd %d", tso->block_info.fd);
     break;
   case BlockedOnDelay:
-#if defined(HAVE_SETITIMER) || defined(mingw32_TARGET_OS)
-    fprintf(stderr,"blocked on delay of %d ms", tso->block_info.delay);
-#else
-    fprintf(stderr,"blocked on delay of %d ms", 
-	    tso->block_info.target - getourtimeofday());
-#endif
+    fprintf(stderr,"blocked until %d", tso->block_info.target);
     break;
   case BlockedOnMVar:
     fprintf(stderr,"blocked on an MVar");

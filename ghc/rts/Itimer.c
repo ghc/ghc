@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.16 2000/08/03 11:28:35 simonmar Exp $
+ * $Id: Itimer.c,v 1.17 2000/08/25 13:12:07 simonmar Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -80,8 +80,10 @@ handle_tick(int unused STG_UNUSED)
   handleProfTick();
 #endif
 
-  /* For threadDelay etc., see Select.c */
-  ticks_since_select++;
+  /* so we can get a rough indication of the current time at any point
+   * without having to call gettimeofday() (see Select.c):
+   */
+  ticks_since_timestamp++;
 
   ticks_to_ctxt_switch--;
   if (ticks_to_ctxt_switch <= 0) {
@@ -156,6 +158,9 @@ initialize_virtual_timer(nat ms)
 # else
     struct itimerval it;
 
+    timestamp = getourtimeofday();
+    ticks_since_timestamp = 0;
+
     it.it_value.tv_sec = ms / 1000;
     it.it_value.tv_usec = 1000 * (ms - (1000 * it.it_value.tv_sec));
     it.it_interval = it.it_value;
@@ -173,6 +178,9 @@ initialize_virtual_timer(nat ms)
     struct sigevent se;
     struct itimerspec it;
     timer_t tid;
+
+    timestamp = getourtimeofday();
+    ticks_since_timestamp = 0;
 
     se.sigev_notify = SIGEV_SIGNAL;
     se.sigev_signo = SIGVTALRM;
@@ -232,12 +240,14 @@ unblock_vtalrm_signal(void)
 }
 #endif
 
-#if !defined(HAVE_SETITIMER) && !defined(mingw32_TARGET_OS)
+/* gettimeofday() takes around 1us on our 500MHz PIII.  Since we're
+ * only calling it 50 times/s, it shouldn't have any great impact.
+ */
 unsigned int 
 getourtimeofday(void)
 {
   struct timeval tv;
   gettimeofday(&tv, (struct timezone *) NULL);
-  return (tv.tv_sec * 1000000 + tv.tv_usec);
+  return (tv.tv_sec * TICK_FREQUENCY +
+	  tv.tv_usec * TICK_FREQUENCY / 1000000);
 }
-#endif

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Select.c,v 1.13 2000/08/23 12:51:03 simonmar Exp $
+ * $Id: Select.c,v 1.14 2000/08/25 13:12:07 simonmar Exp $
  *
  * (c) The GHC Team 1995-1999
  *
@@ -25,7 +25,44 @@
 #  include <sys/time.h>
 # endif
 
-nat ticks_since_select = 0;
+/* last timestamp */
+nat timestamp = 0;
+
+/* keep track of the number of ticks since we last called
+ * gettimeofday(), to avoid having to call it every time we need
+ * a timestamp.
+ */
+nat ticks_since_timestamp = 0;
+
+/* There's a clever trick here to avoid problems when the time wraps
+ * around.  Since our maximum delay is smaller than 31 bits of ticks
+ * (it's actually 31 bits of microseconds), we can safely check
+ * whether a timer has expired even if our timer will wrap around
+ * before the target is reached, using the following formula:
+ *
+ *        (int)((uint)current_time - (uint)target_time) < 0
+ *
+ * if this is true, then our time has expired.
+ * (idea due to Andy Gill).
+ */
+rtsBool
+wakeUpSleepingThreads(nat ticks)
+{
+    StgTSO *tso;
+    rtsBool flag = rtsFalse;
+
+    while (sleeping_queue != END_TSO_QUEUE &&
+	   (int)(ticks - sleeping_queue->block_info.target) > 0) {
+	tso = sleeping_queue;
+	sleeping_queue = tso->link;
+	tso->why_blocked = NotBlocked;
+	tso->link = END_TSO_QUEUE;
+	IF_DEBUG(scheduler,belch("Waking up sleeping thread %d\n", tso->id));
+	PUSH_ON_RUN_QUEUE(tso);
+	flag = rtsTrue;
+    }
+    return flag;
+}
 
 /* Argument 'wait' says whether to wait for I/O to become available,
  * or whether to just check and return immediately.  If there are
@@ -50,16 +87,21 @@ awaitEvent(rtsBool wait)
     rtsBool ready;
     fd_set rfd,wfd;
     int numFound;
-    nat min, delta;
     int maxfd = -1;
     rtsBool select_succeeded = rtsTrue;
-   
     struct timeval tv;
-#ifndef linux_TARGET_OS
-    struct timeval tv_before,tv_after;
-#endif
+    lnat min, ticks;
 
-    IF_DEBUG(scheduler,belch("Checking for threads blocked on I/O...\n"));
+    tv.tv_sec  = 0;
+    tv.tv_usec = 0;
+
+    IF_DEBUG(scheduler,
+	     belch("scheduler: checking for threads blocked on I/O");
+	     if (wait) {
+		 belch(" (waiting)");
+	     }
+	     belch("\n");
+	     );
 
     /* loop until we've woken up some threads.  This loop is needed
      * because the select timing isn't accurate, we sometimes sleep
@@ -68,18 +110,23 @@ awaitEvent(rtsBool wait)
      */
     do {
 
-      /* see how long it's been since we last checked the blocked queue.
-       * ToDo: make this check atomic, so we don't lose any ticks.
-       */
-      delta = ticks_since_select;
-      ticks_since_select = 0;
-      delta = delta * TICK_MILLISECS * 1000;
+      ticks = timestamp = getourtimeofday();
+      ticks_since_timestamp = 0;
+      if (wakeUpSleepingThreads(ticks)) { 
+	  return;
+      }
 
-      min = wait == rtsTrue ? 0x7fffffff : 0;
+      if (!wait) {
+	  min = 0;
+      } else if (sleeping_queue != END_TSO_QUEUE) {
+	  min = (sleeping_queue->block_info.target - ticks) 
+	      * TICK_MILLISECS * 1000;
+      } else {
+	  min = 0x7ffffff;
+      }
 
       /* 
-       * Collect all of the fd's that we're interested in, and capture
-       * the minimum waiting time (in microseconds) for the delayed threads.
+       * Collect all of the fd's that we're interested in
        */
       FD_ZERO(&rfd);
       FD_ZERO(&wfd);
@@ -104,23 +151,6 @@ awaitEvent(rtsBool wait)
 	    continue;
 	  }
 
-	case BlockedOnDelay:
-	  {
-	    int candidate; /* signed int is intentional */
-#if defined(HAVE_SETITIMER) || defined(mingw32_TARGET_OS)
-	    candidate = tso->block_info.delay;
-#else
-	    candidate = tso->block_info.target - getourtimeofday();
-	    if (candidate < 0) {
-	      candidate = 0;
-	    }
-#endif
-	    if ((nat)candidate < min) {
-	      min = candidate;
-	    }
-	    continue;
-	  }
-
 	default:
 	  barf("AwaitEvent");
 	}
@@ -141,139 +171,92 @@ awaitEvent(rtsBool wait)
       RELEASE_LOCK(&sched_mutex);
 
       /* Check for any interesting events */
-
-      tv.tv_sec = min / 1000000;
+      
+      tv.tv_sec  = min / 1000000;
       tv.tv_usec = min % 1000000;
 
-#ifndef linux_TARGET_OS
-      gettimeofday(&tv_before, (struct timezone *) NULL);
-#endif
+      while ((numFound = select(maxfd+1, &rfd, &wfd, NULL, &tv)) < 0) {
 
-      while (!interrupted &&
-	     (numFound = select(maxfd+1, &rfd, &wfd, NULL, &tv)) < 0) {
-	if (errno != EINTR) {
-	  /* fflush(stdout); */
-	  perror("select");
-	  barf("select failed");
-	}
-	ACQUIRE_LOCK(&sched_mutex);
-
-	/* We got a signal; could be one of ours.  If so, we need
-	 * to start up the signal handler straight away, otherwise
-	 * we could block for a long time before the signal is
-	 * serviced.
-	 */
-	if (signals_pending()) {
-	  RELEASE_LOCK(&sched_mutex);
-	  start_signal_handlers();
-	  /* Don't wake up any other threads that were waiting on I/O */
-	  select_succeeded = rtsFalse;
-	  break;
-	}
-
-	if (interrupted) {
-	    RELEASE_LOCK(&sched_mutex);
-	    select_succeeded = rtsFalse;
-	    break;
-	}
-
-	/* If new runnable threads have arrived, stop waiting for
-	 * I/O and run them.
-	 */
-	if (run_queue_hd != END_TSO_QUEUE) {
-	  RELEASE_LOCK(&sched_mutex);
-	  select_succeeded = rtsFalse;
-	  break;
-	}
+	  if (errno != EINTR) {
+	      /* fflush(stdout); */
+	      perror("select");
+	      barf("select failed");
+	  }
+	  ACQUIRE_LOCK(&sched_mutex);
 	
-	RELEASE_LOCK(&sched_mutex);
-      }	
-
-#ifdef linux_TARGET_OS
-      /* on Linux, tv is set to indicate the amount of time not
-       * slept, so we don't need to gettimeofday() to find out.
-       */
-      delta += min - (tv.tv_sec * 1000000 + tv.tv_usec);
-#else
-      gettimeofday(&tv_after, (struct timezone *) NULL);
-      delta += (tv_after.tv_sec - tv_before.tv_sec) * 1000000 +
-	tv_after.tv_usec - tv_before.tv_usec;
-#endif
-
-#if 0
-      if (delta != 0) { fprintf(stderr,"waited: %d %d %d\n", min, delta,
-				interrupted); }
-#endif
+	  /* We got a signal; could be one of ours.  If so, we need
+	   * to start up the signal handler straight away, otherwise
+	   * we could block for a long time before the signal is
+	   * serviced.
+	   */
+	  if (signals_pending()) {
+	      RELEASE_LOCK(&sched_mutex); /* ToDo: kill */
+	      start_signal_handlers();
+	      ACQUIRE_LOCK(&sched_mutex);
+	      return; /* still hold the lock */
+	  }
+	  
+	  /* we were interrupted, return to the scheduler immediately.
+	   */
+	  if (interrupted) {
+	      return; /* still hold the lock */
+	  }
+	  
+	  /* check for threads that need waking up 
+	   */
+	  wakeUpSleepingThreads(getourtimeofday());
+	  
+	  /* If new runnable threads have arrived, stop waiting for
+	   * I/O and run them.
+	   */
+	  if (run_queue_hd != END_TSO_QUEUE) {
+	      return; /* still hold the lock */
+	  }
+	  
+	  RELEASE_LOCK(&sched_mutex);
+      }
 
       ACQUIRE_LOCK(&sched_mutex);
 
       /* Step through the waiting queue, unblocking every thread that now has
        * a file descriptor in a ready state.
-	
-       * For the delayed threads, decrement the number of microsecs
-       * we've been blocked for. Unblock the threads that have thusly expired.
        */
 
       prev = NULL;
-      for(tso = blocked_queue_hd; tso != END_TSO_QUEUE; tso = next) {
-	next = tso->link;
-	switch (tso->why_blocked) {
-	case BlockedOnRead:
-	  ready = select_succeeded && FD_ISSET(tso->block_info.fd, &rfd);
-	  break;
-	
-	case BlockedOnWrite:
-	  ready = select_succeeded && FD_ISSET(tso->block_info.fd, &wfd);
-	  break;
-	
-	case BlockedOnDelay:
-	  {
-#if defined(HAVE_SETITIMER) || defined(mingw32_TARGET_OS)
-	    if (tso->block_info.delay > delta) {
-	      tso->block_info.delay -= delta;
-	      ready = 0;
-	    } else {
-	      tso->block_info.delay = 0;
-	      ready = 1;
-	    }
-#else
-	    int candidate; /* signed int is intentional */
-	    candidate = tso->block_info.target - getourtimeofday();
-	    if (candidate < 0) {
-	      candidate = 0;
-	    }
-	    if ((nat)candidate > delta) {
-	      ready = 0;
-	    } else {
-	      ready = 1;
-	    }
-#endif
-	    break;
-	  }
-	
-	default:
-	  barf("awaitEvent");
-	}
+      if (select_succeeded) {
+	  for(tso = blocked_queue_hd; tso != END_TSO_QUEUE; tso = next) {
+	      next = tso->link;
+	      switch (tso->why_blocked) {
+	      case BlockedOnRead:
+		  ready = FD_ISSET(tso->block_info.fd, &rfd);
+		  break;
+	      case BlockedOnWrite:
+		  ready = FD_ISSET(tso->block_info.fd, &wfd);
+		  break;
+	      default:
+		  barf("awaitEvent");
+	      }
       
-	if (ready) {
-	  IF_DEBUG(scheduler,belch("Waking up thread %d\n", tso->id));
-	  tso->why_blocked = NotBlocked;
-	  tso->link = END_TSO_QUEUE;
-	  PUSH_ON_RUN_QUEUE(tso);
-	} else {
-	  if (prev == NULL)
-	    blocked_queue_hd = tso;
-	  else
-	    prev->link = tso;
-	  prev = tso;
-	}
-      }
+	      if (ready) {
+		  IF_DEBUG(scheduler,belch("Waking up blocked thread %d\n", tso->id));
+		  tso->why_blocked = NotBlocked;
+		  tso->link = END_TSO_QUEUE;
+		  PUSH_ON_RUN_QUEUE(tso);
+	      } else {
+		  if (prev == NULL)
+		      blocked_queue_hd = tso;
+		  else
+		      prev->link = tso;
+		  prev = tso;
+	      }
+	  }
 
-      if (prev == NULL)
-	blocked_queue_hd = blocked_queue_tl = END_TSO_QUEUE;
-      else {
-	prev->link = END_TSO_QUEUE;
-	blocked_queue_tl = prev;
+	  if (prev == NULL)
+	      blocked_queue_hd = blocked_queue_tl = END_TSO_QUEUE;
+	  else {
+	      prev->link = END_TSO_QUEUE;
+	      blocked_queue_tl = prev;
+	  }
       }
 
     } while (wait && !interrupted && run_queue_hd == END_TSO_QUEUE);

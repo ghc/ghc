@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.53 2000/08/07 23:37:23 qrczak Exp $
+ * $Id: PrimOps.hc,v 1.54 2000/08/25 13:12:07 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1049,6 +1049,8 @@ FN_(waitWritezh_fast)
 
 FN_(delayzh_fast)
 {
+  StgTSO *t, *prev;
+  nat target;
   FB_
     /* args: R1.i */
     ASSERT(CurrentTSO->why_blocked == NotBlocked);
@@ -1056,20 +1058,26 @@ FN_(delayzh_fast)
 
     ACQUIRE_LOCK(&sched_mutex);
 
-    /* Add on ticks_since_select, since these will be subtracted at
-     * the next awaitEvent call.
-     */
-#if defined(HAVE_SETITIMER) || defined(mingw32_TARGET_OS)
-    CurrentTSO->block_info.delay = R1.i + ticks_since_select;
-#else
-    CurrentTSO->block_info.target = R1.i + getourtimeofday();
-#endif
+    target = (R1.i / (TICK_MILLISECS*1000)) + timestamp + ticks_since_timestamp;
+    CurrentTSO->block_info.target = target;
 
-    APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
+    /* Insert the new thread in the sleeping queue. */
+    prev = NULL;
+    t = sleeping_queue;
+    while (t != END_TSO_QUEUE && t->block_info.target < target) {
+	prev = t;
+	t = t->link;
+    }
+
+    CurrentTSO->link = t;
+    if (prev == NULL) {
+	sleeping_queue = CurrentTSO;
+    } else {
+	prev->link = CurrentTSO;
+    }
 
     RELEASE_LOCK(&sched_mutex);
     JMP_(stg_block_noregs);
   FE_
 }
-
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.18 2000/04/14 15:18:07 sewardj Exp $
+ * $Id: Schedule.h,v 1.19 2000/08/25 13:12:07 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -85,6 +85,15 @@ void raiseAsync(StgTSO *tso, StgClosure *exception);
  */
 void awaitEvent(rtsBool wait);  /* In Select.c */
 
+/* wakeUpSleepingThreads(nat ticks)
+ *
+ * Wakes up any sleeping threads whose timers have expired.
+ *
+ * Called from STG :  NO
+ * Locks assumed   :  sched_mutex
+ */
+rtsBool wakeUpSleepingThreads(nat);  /* In Select.c */
+
 // ToDo: check whether all fcts below are used in the SMP version, too
 //@cindex awaken_blocked_queue
 #if defined(GRAN)
@@ -112,7 +121,9 @@ void    initThread(StgTSO *tso, nat stack_size);
 extern nat context_switch;
 extern rtsBool interrupted;
 
-extern  nat ticks_since_select;
+/* In Select.c */
+extern nat timestamp;
+extern nat ticks_since_timestamp;
 
 //@cindex Capability
 /* Capability type
@@ -139,6 +150,7 @@ extern Capability MainRegTable;
 #else
 extern  StgTSO *run_queue_hd, *run_queue_tl;
 extern  StgTSO *blocked_queue_hd, *blocked_queue_tl;
+extern  StgTSO *sleeping_queue;
 #endif
 /* Linked list of all threads. */
 extern  StgTSO *all_threads;

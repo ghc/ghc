@@ -1,11 +1,13 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.17 2000/04/14 16:47:43 panne Exp $
+ * $Id: Signals.c,v 1.18 2000/08/25 13:12:07 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
  * Signal processing / handling.
  *
  * ---------------------------------------------------------------------------*/
+
+#define NON_POSIX_SOURCE
 
 #include "Rts.h"
 #include "SchedAPI.h"
@@ -299,6 +301,8 @@ init_default_handlers()
       /* Oh well, at least we tried. */
       prog_belch("failed to install SIGINT handler");
     }
+
+    siginterrupt(SIGINT, 1);
 }
 
 #endif /*! mingw32_TARGET_OS */
