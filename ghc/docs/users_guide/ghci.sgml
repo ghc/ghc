@@ -947,7 +947,7 @@ Prelude> :set -fno-glasgow-exts
     </sect2>
   </sect1>
 
-  <sect1>
+  <sect1 id="ghci-dot-files">
     <title>The <filename>.ghci</filename> file</title>
     <indexterm><primary><filename>.ghci</filename></primary><secondary>file</secondary>
     </indexterm>
@@ -977,6 +977,34 @@ Prelude> :set -fno-glasgow-exts
     a static one, but in fact it works to set it using
     <literal>:set</literal> like this.  The changes won't take effect
     until the next <literal>:load</literal>, though.)</para>
+
+    <para>Two command-line options control whether the
+    <filename>.ghci</filename> files are read:</para>
+
+    <variablelist>
+      <varlistentry>
+	<term><option>-ignore-dot-ghci</option></term>
+	<indexterm><primary><option>-ignore-dot-ghci</option></primary>
+	</indexterm>
+	<listitem>
+	  <para>Don't read either <filename>./.ghci</filename> or
+	  <filename>$HOME/.ghci</filename> when starting up.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-read-dot-ghci</option></term>
+	<indexterm><primary><option>-read-dot-ghci</option></primary>
+	</indexterm>
+	<listitem>
+	  <para>Read <filename>.ghci</filename> and
+	  <filename>$HOME/.ghci</filename>.  This is normally the
+	  default, but the <option>-read-dot-ghci</option> option may
+	  be used to override a previous
+	  <option>-ignore-dot-ghci</option> option.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+
   </sect1>
 
   <sect1>
