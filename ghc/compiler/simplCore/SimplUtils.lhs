@@ -25,12 +25,13 @@ import CmdLineOpts	( SimplifierSwitch(..),
 			  opt_SimplCaseMerge, opt_UF_UpdateInPlace
 			)
 import CoreSyn
-import CoreUtils	( cheapEqExpr, exprType, 
+import CoreFVs		( exprFreeVars )
+import CoreUtils	( cheapEqExpr, exprType, exprIsTrivial,
 			  etaExpand, exprEtaExpandArity, bindNonRec, mkCoerce2,
 			  findDefault, exprOkForSpeculation, exprIsValue
 			)
 import qualified Subst	( simplBndrs, simplBndr, simplLetId, simplLamBndr )
-import Id		( Id, idType, idInfo, 
+import Id		( Id, idType, idInfo, isDataConId,
 			  mkSysLocal, isDeadBinder, idNewDemandInfo,
 			  idUnfolding, idNewStrictness
 			)
@@ -44,6 +45,7 @@ import OccName		( EncodedFS )
 import TyCon		( tyConDataCons_maybe, isAlgTyCon, isNewTyCon )
 import DataCon		( dataConRepArity, dataConExistentialTyVars, dataConArgTys )
 import Var		( mkSysTyVar, tyVarKind )
+import VarSet
 import Util		( lengthExceeds, mapAccumL )
 import Outputable
 \end{code}
@@ -273,6 +275,9 @@ interestingArg :: OutExpr -> Bool
 interestingArg (Var v)	         = hasSomeUnfolding (idUnfolding v)
 					-- Was: isValueUnfolding (idUnfolding v')
 					-- But that seems over-pessimistic
+				 || isDataConId v
+					-- This accounts for an argument like
+					-- () or [], which is definitely interesting
 interestingArg (Type _)	         = False
 interestingArg (App fn (Type _)) = interestingArg fn
 interestingArg (Note _ a)	 = interestingArg a
@@ -540,17 +545,17 @@ tryEtaReduce bndrs body
 	-- efficient here:
 	--  (a) we already have the binders
 	--  (b) we can do the triviality test before computing the free vars
-	--	[in fact I take the simple path and look for just a variable]
   = go (reverse bndrs) body
   where
     go (b : bs) (App fun arg) | ok_arg b arg = go bs fun	-- Loop round
-    go []       (Var fun)     | ok_fun fun   = Just (Var fun)	-- Success!
+    go []       fun           | ok_fun fun   = Just fun		-- Success!
     go _        _			     = Nothing		-- Failure!
 
-    ok_fun fun = not (fun `elem` bndrs) && 
-		 (isEvaldUnfolding (idUnfolding fun) || all ok_lam bndrs)
+    ok_fun fun =  exprIsTrivial fun
+	       && not (any (`elemVarSet` (exprFreeVars fun)) bndrs)
+	       && (exprIsValue fun || all ok_lam bndrs)
     ok_lam v = isTyVar v || isDictTy (idType v)
-	-- The isEvaldUnfolding is because eta reduction is not 
+	-- The exprIsValue is because eta reduction is not 
 	-- valid in general:  \x. bot  /=  bot
 	-- So we need to be sure that the "fun" is a value.
 	--

@@ -576,33 +576,42 @@ type must be ok-for-speculation (or trivial).
 
 \begin{code}
 exprIsValue :: CoreExpr -> Bool		-- True => Value-lambda, constructor, PAP
-exprIsValue (Type ty)	  = True	-- Types are honorary Values; we don't mind
-					-- copying them
-exprIsValue (Lit l)	  = True
-exprIsValue (Lam b e)  	  = isRuntimeVar b || exprIsValue e
-exprIsValue (Note _ e) 	  = exprIsValue e
-exprIsValue (Var v)	  = idArity v > 0 || isEvaldUnfolding (idUnfolding v)
-	-- The idArity case catches data cons and primops that 
-	-- don't have unfoldings
+exprIsValue (Var v) 	-- NB: There are no value args at this point
+  =  isDataConId v 	-- Catches nullary constructors, 
+			--	so that [] and () are values, for example
+  || idArity v > 0 	-- Catches (e.g.) primops that don't have unfoldings
+  || isEvaldUnfolding (idUnfolding v)
+	-- Check the thing's unfolding; it might be bound to a value
 	-- A worry: what if an Id's unfolding is just itself: 
 	-- then we could get an infinite loop...
-exprIsValue other_expr
-  | (Var fun, args) <- collectArgs other_expr,
-    isDataConId fun || valArgCount args < idArity fun
-  = check (idType fun) args
-  | otherwise
-  = False
+
+exprIsValue (Lit l)	     = True
+exprIsValue (Type ty)	     = True	-- Types are honorary Values; 
+					-- we don't mind copying them
+exprIsValue (Lam b e)  	     = isRuntimeVar b || exprIsValue e
+exprIsValue (Note _ e) 	     = exprIsValue e
+exprIsValue (App e (Type _)) = exprIsValue e
+exprIsValue (App e a)        = app_is_value e [a]
+exprIsValue other	     = False
+
+-- There is at least one value argument
+app_is_value (Var fun) args
+  |  isDataConId fun 			-- Constructor apps are values
+  || idArity fun > valArgCount args	-- Under-applied function
+  = check_args (idType fun) args
+app_is_value (App f a) as = app_is_value f (a:as)
+app_is_value other     as = False
+
+	-- 'check_args' checks that unlifted-type args
+	-- are in fact guaranteed non-divergent
+check_args fun_ty []	          = True
+check_args fun_ty (Type _ : args) = case splitForAllTy_maybe fun_ty of
+				      Just (_, ty) -> check_args ty args
+check_args fun_ty (arg : args)
+  | isUnLiftedType arg_ty = exprOkForSpeculation arg
+  | otherwise		  = check_args res_ty args
   where
-	-- 'check' checks that unlifted-type args are in
-	-- fact guaranteed non-divergent
-    check fun_ty []		 = True
-    check fun_ty (Type _ : args) = case splitForAllTy_maybe fun_ty of
-				     Just (_, ty) -> check ty args
-    check fun_ty (arg : args)
-	| isUnLiftedType arg_ty = exprOkForSpeculation arg
-	| otherwise		= check res_ty args
-	where
-	  (arg_ty, res_ty) = splitFunTy fun_ty
+    (arg_ty, res_ty) = splitFunTy fun_ty
 \end{code}
 
 \begin{code}
