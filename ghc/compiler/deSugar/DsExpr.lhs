@@ -301,8 +301,8 @@ dsExpr (HsSCC cc expr)
 
 -- special case to handle unboxed tuple patterns.
 
-dsExpr (HsCase discrim matches@[Match _ [TuplePat ps boxed] _ _] src_loc)
- | not boxed && all var_pat ps 
+dsExpr (HsCase discrim matches src_loc)
+ | all ubx_tuple_match matches
  =  putSrcLocDs src_loc $
     dsExpr discrim			  `thenDs` \ core_discrim ->
     matchWrapper CaseMatch matches "case" `thenDs` \ ([discrim_var], matching_code) ->
@@ -310,6 +310,9 @@ dsExpr (HsCase discrim matches@[Match _ [TuplePat ps boxed] _ _] src_loc)
 	Case (Var x) bndr alts | x == discrim_var -> 
 		returnDs (Case core_discrim bndr alts)
 	_ -> panic ("dsExpr: tuple pattern:\n" ++ showSDoc (ppr matching_code))
+  where
+    ubx_tuple_match (Match _ [TuplePat ps False{-unboxed-}] _ _) = True
+    ubx_tuple_match _ = False
 
 dsExpr (HsCase discrim matches src_loc)
   = putSrcLocDs src_loc $
