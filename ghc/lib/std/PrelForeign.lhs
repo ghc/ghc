@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelForeign.lhs,v 1.19 2001/05/18 16:54:05 simonmar Exp $
+% $Id: PrelForeign.lhs,v 1.20 2001/07/16 00:39:04 sof Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -27,12 +27,8 @@ import PrelPtr
 data ForeignPtr a = ForeignPtr ForeignObj#
 instance CCallable (ForeignPtr a)
 
-eqForeignPtr :: ForeignPtr a -> ForeignPtr a -> Bool
-eqForeignPtr mp1 mp2
-  = unsafePerformIO (primEqForeignPtr mp1 mp2) /= (0::Int)
-
-foreign import "eqForeignObj" unsafe 
-  primEqForeignPtr :: ForeignPtr a -> ForeignPtr a -> IO Int
+eqForeignPtr  :: ForeignPtr a -> ForeignPtr a -> Bool
+eqForeignPtr (ForeignPtr fo1#) (ForeignPtr fo2#) = eqForeignObj# fo1# fo2#
 
 instance Eq (ForeignPtr a) where 
     p == q = eqForeignPtr p q
