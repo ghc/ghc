@@ -1,9 +1,10 @@
 
-tcfail010.hs:3:16:
+tcfail010.hs:3:17:
     No instance for (Num [a])
-      arising from use of `+' at tcfail010.hs:3:16
+      arising from the literal `2' at tcfail010.hs:3:17
     Possible cause: the monomorphism restriction applied to the following:
       q :: [a] -> [a] (bound at tcfail010.hs:3:0)
     Probable fix: give these definition(s) an explicit type signature
+    In the second argument of `(+)', namely `2'
     In a lambda abstraction: \ (y : z) -> z + 2
     In the definition of `q': q = \ (y : z) -> z + 2
