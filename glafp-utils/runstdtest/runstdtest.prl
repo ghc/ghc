@@ -62,13 +62,10 @@ $DefaultStderrFile = "$TmpPrefix/no_stderr$$";
 $PreScript = '';
 $PostScript = '';
 $TimeCmd = '';
-$Heimdall = 0;
-$HeimdallPrefix = '';
-$HeimdallStats = "heimdall.summary";
 $StatsFile = "$TmpPrefix/stats$$";
-$CacheProfStats = "cacheprof.out.summary";
+$CachegrindStats = "cachegrind.out.summary";
 $SysSpecificTiming = '';
-$CacheProf = 'no';
+$Cachegrind = 'no';
 
 die "$Pgm: program to run not given as first argument\n" if $#ARGV < 0;
 $ToRun = $ARGV[0]; shift(@ARGV);
@@ -114,13 +111,9 @@ arg: while ($_ = $ARGV[0]) {
 		    next arg; };
     /^-(ghc|hbc)-timing$/ && do { $SysSpecificTiming = $1;
 				  next arg; };
-    /^-cacheprof$/ && do { $SysSpecificTiming = 'ghc-instrs';
-			   $CacheProf = 'yes'; 
-			   next arg };
-    /^-heimdall$/ && do { $HeimdallPrefix = 'heimdall_cp ';  # must have trailing space!
-                          $SysSpecificTiming = 'ghc-instrs';
-                          $Heimdall = 1;
-                          next arg; };
+    /^-cachegrind$/ && do { $SysSpecificTiming = 'ghc-instrs';
+			    $Cachegrind = 'yes'; 
+			    next arg };
     /^-t(.*)/	&& do { $TimeCmd = &grab_arg_arg('-t', $1); next arg; };
 
     # anything else is taken to be a pgm arg
@@ -192,6 +185,12 @@ if ($PostScript ne '') {
 
 # OK, so we're gonna do the normal thing...
 
+if ($Cachegrind eq 'yes') {
+  $CachegrindPrefix = "cachegrind --logfile-fd=99 99>$CachegrindStats";
+} else {
+  $CachegrindPrefix = '';
+}
+
 $Script = <<EOSCRIPT;
 #! /bin/sh
 myexit=0
@@ -201,7 +200,8 @@ cat /dev/null > $DefaultStdoutFile
 cat /dev/null > $DefaultStderrFile
 $PreScriptLines
 $SpixifyLine1
-$TimeCmd /bin/sh -c \'$HeimdallPrefix$ToRun $TimingMagic @PgmArgs < $PgmStdinFile 1> $TmpPrefix/runtest$$.1 2> $TmpPrefix/runtest$$.2 3> $TmpPrefix/runtest$$.3\'
+echo $TimeCmd /bin/sh -c \'$CachegrindPrefix $ToRun $TimingMagic @PgmArgs < $PgmStdinFile 1> $TmpPrefix/runtest$$.1 2> $TmpPrefix/runtest$$.2 3> $TmpPrefix/runtest$$.3\'
+$TimeCmd /bin/sh -c \'$CachegrindPrefix $ToRun $TimingMagic @PgmArgs < $PgmStdinFile 1> $TmpPrefix/runtest$$.1 2> $TmpPrefix/runtest$$.2 3> $TmpPrefix/runtest$$.3\'
 progexit=\$?
 if [ \$progexit -eq 0 ] && [ $PgmFail -ne 0 ]; then
     echo $ToRun @PgmArgs \\< $PgmStdinFile
@@ -239,11 +239,6 @@ else
 	cp $TmpPrefix/runtest$$.1 $PgmStdoutFile[0]
     fi
 fi
-if [ "$Heimdall" = "1" ]; then
-  egrep '^=== HEIMDALL: ' < $TmpPrefix/runtest$$.2 > $HeimdallStats
-fi
-# egrep -v '^=== HEIMDALL: ' < $TmpPrefix/runtest$$.2 > $TmpPrefix/runtest$$.2b
-# mv -f $TmpPrefix/runtest$$.2b $TmpPrefix/runtest$$.2
 
 hit='NO'
 for out_file in @PgmStderrFile ; do
@@ -291,15 +286,14 @@ if ( $SysSpecificTiming eq '' ) {
 }
 
 &process_stats_file();
-&process_cacheprof_files() if $CacheProf eq 'yes';
-&process_heimdall_file() if $Heimdall;
+&process_cachegrind_files() if $Cachegrind eq 'yes';
 
 # print out what we found
 print STDERR "<<$SysSpecificTiming: ";
-if ( $CacheProf ne 'yes' && !$Heimdall) {
+if ( $Cachegrind ne 'yes') {
 	print STDERR "$BytesAlloc bytes, $GCs GCs, $AvgResidency/$MaxResidency avg/max bytes residency ($ResidencySamples samples), $GCWork bytes GC work, ${TotMem}M in use, $InitTime INIT ($InitElapsed elapsed), $MutTime MUT ($MutElapsed elapsed), $GcTime GC ($GcElapsed elapsed)";
 } else {
-	print STDERR "$BytesAlloc bytes, $GCs GCs, $AvgResidency/$MaxResidency avg/max bytes residency ($ResidencySamples samples), $GCWork bytes GC work, ${TotMem}M in use, $InitTime INIT ($InitElapsed elapsed), $MutTime MUT ($MutElapsed elapsed), $GcTime GC ($GcElapsed elapsed), $TotInstrs instructions, $TotReads memory reads, $TotWrites memory writes";
+	print STDERR "$BytesAlloc bytes, $GCs GCs, $AvgResidency/$MaxResidency avg/max bytes residency ($ResidencySamples samples), $GCWork bytes GC work, ${TotMem}M in use, $InitTime INIT ($InitElapsed elapsed), $MutTime MUT ($MutElapsed elapsed), $GcTime GC ($GcElapsed elapsed), $TotInstrs instructions, $TotReads memory reads, $TotWrites memory writes, $TotMisses L2 cache misses";
 };
 print STDERR " :$SysSpecificTiming>>\n";
 
@@ -446,39 +440,28 @@ sub process_stats_file {
     $GcElapsed =~ s/,//g;
 }
 
-sub process_cacheprof_files {
+sub process_cachegrind_files {
 
-    open(STATS, "< $CacheProfStats") || die("Can't open $CacheProfStats\n");
+    open(STATS, "< $CachegrindStats") || die("Can't open $CachegrindStats\n");
 
-    # the format of the info in this file is:
-    #    OTHER(intrs,reads,writes,read-misses,write-misses)
-    # where read-misses and write-misses will both be zero if we're
-    # just counting instructions.
     while (<STATS>) {
-       /OTHER\(\s*([0-9]+),\s*([0-9]+),\s*([0-9]+),\s*([0-9]+),\s*([0-9]+)\)/ && do {
+	/^==\d+==\s+I\s+refs:\s+([0-9,]*)/ && do {
 	   $TotInstrs = $1;
-	   $TotReads  = $2;
-	   $TotWrites = $3;
-      }
-  }
-  close(STATS);
-}
+	   $TotInstrs =~ s/,//g;
+	};
 
-sub process_heimdall_file {
+	/^==\d+==\s+D\s+refs:\s+[0-9,]+\s+\(([0-9,]+)\s+rd\s+\+\s+([0-9,]+)\s+wr/ && do {
+	   $TotReads  = $1;
+	   $TotWrites = $2;
+	   $TotReads  =~ s/,//g;
+	   $TotWrites =~ s/,//g;
+	};
 
-    open(STATS, "< $HeimdallStats") || die("Can't open $HeimdallStats\n");
-
-    # instruction counts from Julian Seward's HEIMDALL:
-    #
-    # === HEIMDALL: instruction counts: 815000 instrs, 230040 reads, 138692 writes
-    while (<STATS>) {
-       /^=== HEIMDALL: instruction counts: ([0-9]+) instrs, ([0-9]+) reads, ([0-9]+) writes/
-           && do {
-	   $TotInstrs = $1;
-	   $TotReads  = $2;
-	   $TotWrites = $3;
-      }
-  }
-  close(STATS);
+	/^==\d+==\s+L2d\s+misses:\s+([0-9,]+)/ && do {
+	   $TotMisses = $1;
+	   $TotMisses =~ s/,//g;
+	};
+    }
+    close(STATS);
 }
 
