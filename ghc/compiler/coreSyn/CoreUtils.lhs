@@ -1049,7 +1049,6 @@ eqExpr e1 e2
 				     where
 				       env' = extendVarEnvList env [(v1,v2) | ((v1,_),(v2,_)) <- zip ps1 ps2]
 				       eq_rhs (_,r1) (_,r2) = eq env' r1 r2
--- gaw 2004
     eq env (Case e1 v1 t1 a1)
 	   (Case e2 v2 t2 a2)	     = eq env e1 e2 &&
                                        t1 `eqType` t2 &&                      

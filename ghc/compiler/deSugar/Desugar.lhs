@@ -10,7 +10,7 @@ module Desugar ( deSugar, deSugarExpr ) where
 
 import CmdLineOpts	( DynFlag(..), DynFlags(..), dopt, opt_SccProfilingOn )
 import HscTypes		( ModGuts(..), ModGuts, HscEnv(..), GhciMode(..),
-			  Dependencies(..), TypeEnv, IsBootInterface, unQualInScope )
+			  Dependencies(..), TypeEnv, IsBootInterface )
 import HsSyn		( RuleDecl(..), RuleBndr(..), HsExpr(..), LHsExpr,
 			  HsBindGroup(..), LRuleDecl, HsBind(..) )
 import TcRnTypes	( TcGblEnv(..), ImportAvails(..) )
@@ -32,16 +32,16 @@ import RdrName	 	( GlobalRdrEnv )
 import NameSet
 import VarEnv
 import VarSet
-import Bag		( Bag, isEmptyBag, mapBag, emptyBag, bagToList )
+import Bag		( Bag, isEmptyBag, emptyBag, bagToList )
 import CoreLint		( showPass, endPass )
 import CoreFVs		( ruleRhsFreeVars )
 import Packages	  	( PackageState(thPackageId) )
 import ErrUtils		( doIfSet, dumpIfSet_dyn, pprBagOfWarnings, 
-			  mkWarnMsg, errorsFound, WarnMsg )
+			  errorsFound, WarnMsg )
 import ListSetOps	( insertList )
 import Outputable
 import UniqSupply	( mkSplitUniqSupply )
-import SrcLoc		( Located(..), SrcSpan, unLoc )
+import SrcLoc		( Located(..), unLoc )
 import DATA_IOREF	( readIORef )
 import FastString
 import Util		( sortLe )

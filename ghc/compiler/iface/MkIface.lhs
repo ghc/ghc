@@ -183,7 +183,7 @@ import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..),
 import LoadIface	( readIface, loadInterface, ifaceInstGates )
 import BasicTypes	( Version, initialVersion, bumpVersion )
 import TcRnMonad
-import TcRnTypes	( ImportAvails(..), mkModDeps )
+import TcRnTypes	( mkModDeps )
 import TcType		( isFFITy )
 import HscTypes		( ModIface(..), TyThing(..), IfacePackage(..),
 			  ModGuts(..), ModGuts, IfaceExport,

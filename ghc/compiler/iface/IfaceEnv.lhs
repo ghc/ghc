@@ -30,7 +30,7 @@ import Name		( Name, nameUnique, nameModule,
 import OccName		( OccName, isTupleOcc_maybe, tcName, dataName,
 			  lookupOccEnv, unitOccEnv, extendOccEnv, extendOccEnvList )
 import PrelNames	( gHC_PRIM, pREL_TUP )
-import Module		( Module, mkModule, emptyModuleEnv, 
+import Module		( Module, emptyModuleEnv, 
 			  lookupModuleEnv, extendModuleEnv_C )
 import UniqSupply	( UniqSupply, splitUniqSupply, uniqFromSupply, uniqsFromSupply )
 import FiniteMap	( emptyFM, lookupFM, addToFM )
