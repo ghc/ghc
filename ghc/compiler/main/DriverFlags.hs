@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.59 2001/06/15 08:29:58 simonpj Exp $
+-- $Id: DriverFlags.hs,v 1.60 2001/06/26 16:32:03 rrt Exp $
 --
 -- Driver flags
 --
@@ -302,8 +302,13 @@ dynamic_flags = [
   ,  ( "opta",		HasArg (addOpt_a) )
 
 	------ HsCpp opts ---------------------------------------------------
-  ,  ( "D",		Prefix (\s -> addOpt_P ("-D'"++s++"'") ) )
-  ,  ( "U",		Prefix (\s -> addOpt_P ("-U'"++s++"'") ) )
+	-- These options used to put ticks around their arguments for unknown
+	-- reasons. These quotes are stripped by the shell executing system()
+	-- on Unix, but not on Windows, where it therefore goes on to disturb
+	-- gcc. Hence they are now gone; if they need to be replaced later on
+	-- Unix, there will need to be #ifdefery.
+  ,  ( "D",		Prefix (\s -> addOpt_P ("-D"++s) ) )
+  ,  ( "U",		Prefix (\s -> addOpt_P ("-U"++s) ) )
 
 	------ Debugging ----------------------------------------------------
   ,  ( "dstg-stats",	NoArg (writeIORef v_StgStats True) )
