@@ -1107,6 +1107,101 @@ putMVar#    :: SynchVar# s elt -> State# s -> State# s
 
 </sect2>
 
+<sect2 id="glasgow-prim-arrays">
+<title>Primitive arrays, mutable and otherwise
+</title>
+
+<para>
+<indexterm><primary>primitive arrays (Glasgow extension)</primary></indexterm>
+<indexterm><primary>arrays, primitive (Glasgow extension)</primary></indexterm>
+</para>
+
+<para>
+GHC knows about quite a few flavours of Large Swathes of Bytes.
+</para>
+
+<para>
+First, GHC distinguishes between primitive arrays of (boxed) Haskell
+objects (type <literal>Array&num; obj</literal>) and primitive arrays of bytes (type
+<literal>ByteArray&num;</literal>).
+</para>
+
+<para>
+Second, it distinguishes between&hellip;
+<variablelist>
+
+<varlistentry>
+<term>Immutable:</term>
+<listitem>
+<para>
+Arrays that do not change (as with &ldquo;standard&rdquo; Haskell arrays); you
+can only read from them.  Obviously, they do not need the care and
+attention of the state-transformer monad.
+</para>
+</listitem>
+</varlistentry>
+<varlistentry>
+<term>Mutable:</term>
+<listitem>
+<para>
+Arrays that may be changed or &ldquo;mutated.&rdquo;  All the operations on them
+live within the state-transformer monad and the updates happen
+<emphasis>in-place</emphasis>.
+</para>
+</listitem>
+</varlistentry>
+<varlistentry>
+<term>&ldquo;Static&rdquo; (in C land):</term>
+<listitem>
+<para>
+A C routine may pass an <literal>Addr&num;</literal> pointer back into Haskell land.  There
+are then primitive operations with which you may merrily grab values
+over in C land, by indexing off the &ldquo;static&rdquo; pointer.
+</para>
+</listitem>
+</varlistentry>
+<varlistentry>
+<term>&ldquo;Stable&rdquo; pointers:</term>
+<listitem>
+<para>
+If, for some reason, you wish to hand a Haskell pointer (i.e.,
+<emphasis>not</emphasis> an unboxed value) to a C routine, you first make the
+pointer &ldquo;stable,&rdquo; so that the garbage collector won't forget that it
+exists.  That is, GHC provides a safe way to pass Haskell pointers to
+C.
+</para>
+
+<para>
+Please see <xref LinkEnd="sec-stable-pointers"> for more details.
+</para>
+</listitem>
+</varlistentry>
+<varlistentry>
+<term>&ldquo;Foreign objects&rdquo;:</term>
+<listitem>
+<para>
+A &ldquo;foreign object&rdquo; is a safe way to pass an external object (a
+C-allocated pointer, say) to Haskell and have Haskell do the Right
+Thing when it no longer references the object.  So, for example, C
+could pass a large bitmap over to Haskell and say &ldquo;please free this
+memory when you're done with it.&rdquo;
+</para>
+
+<para>
+Please see <xref LinkEnd="sec-ForeignObj"> for more details.
+</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</para>
+
+<para>
+The libraries documentatation gives more details on all these
+&ldquo;primitive array&rdquo; types and the operations on them.
+</para>
+
+</sect2>
+
 </sect1>
 
 <!-- Emacs stuff:

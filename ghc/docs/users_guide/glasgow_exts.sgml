@@ -16,160 +16,6 @@ performance because of the implementation costs of Haskell's
 </para>
 
 <para>
-Executive summary of our extensions:
-</para>
-
-  <variablelist>
-
-    <varlistentry>
-      <term>Unboxed types and primitive operations:</Term>
-      <listitem>
-	<para>You can get right down to the raw machine types and
-        operations; included in this are &ldquo;primitive
-        arrays&rdquo; (direct access to Big Wads of Bytes).  Please
-        see <XRef LinkEnd="glasgow-unboxed"> and following.</para>
-      </listitem>
-    </varlistentry>
-
-    <varlistentry>
-      <term>Type system extensions:</term>
-      <listitem>
-	<para> GHC supports a large number of extensions to Haskell's
-        type system.  Specifically:</para>
-
-	<variablelist>
-	  <varlistentry>
-	    <term>Class method types:</term>
-	    <listitem>
-	      <para><xref LinkEnd="classs-method-types"></para>
-	    </listitem>
-	  </varlistentry>
-
-	  <varlistentry>
-	    <term>Multi-parameter type classes:</term>
-	    <listitem>
-	      <para><xref LinkEnd="multi-param-type-classes"></para>
-	    </listitem>
-	  </varlistentry>
-
-	  <varlistentry>
-	    <term>Functional dependencies:</term>
-	    <listitem>
-	      <para><xref LinkEnd="functional-dependencies"></para>
-	    </listitem>
-	  </varlistentry>
-
-	  <varlistentry>
-	    <term>Implicit parameters:</term>
-	    <listitem>
-	      <para><xref LinkEnd="implicit-parameters"></para>
-	    </listitem>
-	  </varlistentry>
-
-	  <varlistentry>
-	    <term>Linear implicit parameters:</term>
-	    <listitem>
-	      <para><xref LinkEnd="linear-implicit-parameters"></para>
-	    </listitem>
-	  </varlistentry>
-
-	  <varlistentry>
-	    <term>Local universal quantification:</term>
-	    <listitem>
-	      <para><xref LinkEnd="universal-quantification"></para>
-	    </listitem>
-	  </varlistentry>
-
-	  <varlistentry>
-	    <term>Extistentially quantification in data types:</term>
-	    <listitem>
-	      <para><xref LinkEnd="existential-quantification"></para>
-	    </listitem>
-	  </varlistentry>
-
-	  <varlistentry>
-	    <term>Scoped type variables:</term>
-	    <listitem>
-	      <para>Scoped type variables enable the programmer to
-              supply type signatures for some nested declarations,
-              where this would not be legal in Haskell 98.  Details in
-              <xref LinkEnd="scoped-type-variables">.</para>
-	    </listitem>
-	  </varlistentry>
-	</variablelist>
-      </listitem>
-    </varlistentry>
-
-    <varlistentry>
-      <term>Pattern guards</term>
-      <listitem>
-	<para>Instead of being a boolean expression, a guard is a list
-	of qualifiers, exactly as in a list comprehension. See <xref
-	LinkEnd="pattern-guards">.</para>
-      </listitem>
-    </varlistentry>
-
-    <varlistentry>
-      <term>Data types with no constructors</term>
-      <listitem>
-	<para>See <xref LinkEnd="nullary-types">.</para>
-      </listitem>
-    </varlistentry>
-
-    <varlistentry>
-      <term>Parallel list comprehensions</term>
-      <listitem>
-	<para>An extension to the list comprehension syntax to support
-	<literal>zipWith</literal>-like functionality.  See <xref
-	linkend="parallel-list-comprehensions">.</para>
-      </listitem>
-    </varlistentry>
-
-    <varlistentry>
-      <term>Foreign calling:</term>
-      <listitem>
-	<para>Just what it sounds like.  We provide
-        <emphasis>lots</emphasis> of rope that you can dangle around
-        your neck.  Please see <xref LinkEnd="ffi">.</para>
-      </listitem>
-    </varlistentry>
-
-    <varlistentry>
-      <term>Pragmas</term>
-      <listitem>
-	<para>Pragmas are special instructions to the compiler placed
-        in the source file.  The pragmas GHC supports are described in
-        <xref LinkEnd="pragmas">.</para>
-      </listitem>
-    </varlistentry>
-
-    <varlistentry>
-      <term>Rewrite rules:</term>
-      <listitem>
-	<para>The programmer can specify rewrite rules as part of the
-        source program (in a pragma).  GHC applies these rewrite rules
-        wherever it can.  Details in <xref
-        LinkEnd="rewrite-rules">.</para>
-      </listitem>
-    </varlistentry>
-
-    <varlistentry>
-      <term>Generic classes:</term>
-      <listitem>
-	<para>(Note: support for generic classes is currently broken
-        in GHC 5.02).</para>
-
-	<para>Generic class declarations allow you to define a class
-        whose methods say how to work over an arbitrary data type.
-        Then it's really easy to make any new type into an instance of
-        the class.  This generalises the rather ad-hoc "deriving"
-        feature of Haskell 98.  Details in <xref
-        LinkEnd="generic-classes">.</para>
-      </listitem>
-    </varlistentry>
-  </variablelist>
-
-<para>
 Before you get too carried away working at the lowest level (e.g.,
 sloshing <literal>MutableByteArray&num;</literal>s around your
 program), you may wish to check if there are libraries that provide a
@@ -177,6 +23,7 @@ program), you may wish to check if there are libraries that provide a
 <xref linkend="book-hslibs">.
 </para>
 
+<!-- LANGUAGE OPTIONS -->
   <sect1 id="options-language">
     <title>Language options</title>
 
@@ -321,126 +168,15 @@ program), you may wish to check if there are libraries that provide a
   </sect1>
 
 <!-- UNBOXED TYPES AND PRIMITIVE OPERATIONS -->
+<!--    included from primitives.sgml  -->
 &primitives;
 
-<sect1 id="glasgow-ST-monad">
-<title>Primitive state-transformer monad</title>
 
-<para>
-<indexterm><primary>state transformers (Glasgow extensions)</primary></indexterm>
-<indexterm><primary>ST monad (Glasgow extension)</primary></indexterm>
-</para>
+<!-- TYPE SYSTEM EXTENSIONS -->
+<sect1 id="type-extensions">
+<title>Type system extensions</title>
 
-<para>
-This monad underlies our implementation of arrays, mutable and
-immutable, and our implementation of I/O, including &ldquo;C calls&rdquo;.
-</para>
-
-<para>
-The <literal>ST</literal> library, which provides access to the
-<function>ST</function> monad, is described in <xref
-linkend="sec-ST">.
-</para>
-
-</sect1>
-
-<sect1 id="glasgow-prim-arrays">
-<title>Primitive arrays, mutable and otherwise
-</title>
-
-<para>
-<indexterm><primary>primitive arrays (Glasgow extension)</primary></indexterm>
-<indexterm><primary>arrays, primitive (Glasgow extension)</primary></indexterm>
-</para>
-
-<para>
-GHC knows about quite a few flavours of Large Swathes of Bytes.
-</para>
-
-<para>
-First, GHC distinguishes between primitive arrays of (boxed) Haskell
-objects (type <literal>Array&num; obj</literal>) and primitive arrays of bytes (type
-<literal>ByteArray&num;</literal>).
-</para>
-
-<para>
-Second, it distinguishes between&hellip;
-<variablelist>
-
-<varlistentry>
-<term>Immutable:</term>
-<listitem>
-<para>
-Arrays that do not change (as with &ldquo;standard&rdquo; Haskell arrays); you
-can only read from them.  Obviously, they do not need the care and
-attention of the state-transformer monad.
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term>Mutable:</term>
-<listitem>
-<para>
-Arrays that may be changed or &ldquo;mutated.&rdquo;  All the operations on them
-live within the state-transformer monad and the updates happen
-<emphasis>in-place</emphasis>.
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term>&ldquo;Static&rdquo; (in C land):</term>
-<listitem>
-<para>
-A C routine may pass an <literal>Addr&num;</literal> pointer back into Haskell land.  There
-are then primitive operations with which you may merrily grab values
-over in C land, by indexing off the &ldquo;static&rdquo; pointer.
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term>&ldquo;Stable&rdquo; pointers:</term>
-<listitem>
-<para>
-If, for some reason, you wish to hand a Haskell pointer (i.e.,
-<emphasis>not</emphasis> an unboxed value) to a C routine, you first make the
-pointer &ldquo;stable,&rdquo; so that the garbage collector won't forget that it
-exists.  That is, GHC provides a safe way to pass Haskell pointers to
-C.
-</para>
-
-<para>
-Please see <xref LinkEnd="sec-stable-pointers"> for more details.
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term>&ldquo;Foreign objects&rdquo;:</term>
-<listitem>
-<para>
-A &ldquo;foreign object&rdquo; is a safe way to pass an external object (a
-C-allocated pointer, say) to Haskell and have Haskell do the Right
-Thing when it no longer references the object.  So, for example, C
-could pass a large bitmap over to Haskell and say &ldquo;please free this
-memory when you're done with it.&rdquo;
-</para>
-
-<para>
-Please see <xref LinkEnd="sec-ForeignObj"> for more details.
-</para>
-</listitem>
-</varlistentry>
-</variablelist>
-</para>
-
-<para>
-The libraries documentatation gives more details on all these
-&ldquo;primitive array&rdquo; types and the operations on them.
-</para>
-
-</sect1>
-
-
-<sect1 id="nullary-types">
+<sect2 id="nullary-types">
 <title>Data types with no constructors</title>
 
 <para>With the <option>-fglasgow-exts</option> flag, GHC lets you declare
@@ -456,186 +192,9 @@ types.</para>
 
 <para>Such data types have only one value, namely bottom.
 Nevertheless, they can be useful when defining "phantom types".</para>
-</sect1>
+</sect2>
 
-<sect1 id="pattern-guards">
-<title>Pattern guards</title>
-
-<para>
-<indexterm><primary>Pattern guards (Glasgow extension)</primary></indexterm>
-The discussion that follows is an abbreviated version of Simon Peyton Jones's original <ULink URL="http://research.microsoft.com/~simonpj/Haskell/guards.html">proposal</ULink>. (Note that the proposal was written before pattern guards were implemented, so refers to them as unimplemented.)
-</para>
-
-<para>
-Suppose we have an abstract data type of finite maps, with a
-lookup operation:
-
-<programlisting>
-lookup :: FiniteMap -> Int -> Maybe Int
-</programlisting>
-
-The lookup returns <function>Nothing</function> if the supplied key is not in the domain of the mapping, and <function>(Just v)</function> otherwise,
-where <VarName>v</VarName> is the value that the key maps to.  Now consider the following definition:
-</para>
-
-<programlisting>
-clunky env var1 var2 | ok1 && ok2 = val1 + val2
-| otherwise  = var1 + var2
-where
-  m1 = lookup env var1
-  m2 = lookup env var2
-  ok1 = maybeToBool m1
-  ok2 = maybeToBool m2
-  val1 = expectJust m1
-  val2 = expectJust m2
-</programlisting>
-
-<para>
-The auxiliary functions are 
-</para>
-
-<programlisting>
-maybeToBool :: Maybe a -&gt; Bool
-maybeToBool (Just x) = True
-maybeToBool Nothing  = False
-
-expectJust :: Maybe a -&gt; a
-expectJust (Just x) = x
-expectJust Nothing  = error "Unexpected Nothing"
-</programlisting>
-
-<para>
-What is <function>clunky</function> doing? The guard <literal>ok1 &&
-ok2</literal> checks that both lookups succeed, using
-<function>maybeToBool</function> to convert the <function>Maybe</function>
-types to booleans. The (lazily evaluated) <function>expectJust</function>
-calls extract the values from the results of the lookups, and binds the
-returned values to <VarName>val1</VarName> and <VarName>val2</VarName>
-respectively.  If either lookup fails, then clunky takes the
-<literal>otherwise</literal> case and returns the sum of its arguments.
-</para>
-
-<para>
-This is certainly legal Haskell, but it is a tremendously verbose and
-un-obvious way to achieve the desired effect.  Arguably, a more direct way
-to write clunky would be to use case expressions:
-</para>
-
-<programlisting>
-clunky env var1 var1 = case lookup env var1 of
-  Nothing -&gt; fail
-  Just val1 -&gt; case lookup env var2 of
-    Nothing -&gt; fail
-    Just val2 -&gt; val1 + val2
-where
-  fail = val1 + val2
-</programlisting>
-
-<para>
-This is a bit shorter, but hardly better.  Of course, we can rewrite any set
-of pattern-matching, guarded equations as case expressions; that is
-precisely what the compiler does when compiling equations! The reason that
-Haskell provides guarded equations is because they allow us to write down
-the cases we want to consider, one at a time, independently of each other. 
-This structure is hidden in the case version.  Two of the right-hand sides
-are really the same (<function>fail</function>), and the whole expression
-tends to become more and more indented. 
-</para>
-
-<para>
-Here is how I would write clunky:
-</para>
-
-<programlisting>
-clunky env var1 var1
-  | Just val1 &lt;- lookup env var1
-  , Just val2 &lt;- lookup env var2
-  = val1 + val2
-...other equations for clunky...
-</programlisting>
-
-<para>
-The semantics should be clear enough.  The qualifers are matched in order. 
-For a <literal>&lt;-</literal> qualifier, which I call a pattern guard, the
-right hand side is evaluated and matched against the pattern on the left. 
-If the match fails then the whole guard fails and the next equation is
-tried.  If it succeeds, then the appropriate binding takes place, and the
-next qualifier is matched, in the augmented environment.  Unlike list
-comprehensions, however, the type of the expression to the right of the
-<literal>&lt;-</literal> is the same as the type of the pattern to its
-left.  The bindings introduced by pattern guards scope over all the
-remaining guard qualifiers, and over the right hand side of the equation.
-</para>
-
-<para>
-Just as with list comprehensions, boolean expressions can be freely mixed
-with among the pattern guards.  For example:
-</para>
-
-<programlisting>
-f x | [y] <- x
-    , y > 3
-    , Just z <- h y
-    = ...
-</programlisting>
-
-<para>
-Haskell's current guards therefore emerge as a special case, in which the
-qualifier list has just one element, a boolean expression.
-</para>
-</sect1>
-
-  <sect1 id="parallel-list-comprehensions">
-    <title>Parallel List Comprehensions</title>
-    <indexterm><primary>list comprehensions</primary><secondary>parallel</secondary>
-    </indexterm>
-    <indexterm><primary>parallel list comprehensions</primary>
-    </indexterm>
-
-    <para>Parallel list comprehensions are a natural extension to list
-    comprehensions.  List comprehensions can be thought of as a nice
-    syntax for writing maps and filters.  Parallel comprehensions
-    extend this to include the zipWith family.</para>
-
-    <para>A parallel list comprehension has multiple independent
-    branches of qualifier lists, each separated by a `|' symbol.  For
-    example, the following zips together two lists:</para>
-
-<programlisting>
-   [ (x, y) | x <- xs | y <- ys ] 
-</programlisting>
-
-    <para>The behavior of parallel list comprehensions follows that of
-    zip, in that the resulting list will have the same length as the
-    shortest branch.</para>
-
-    <para>We can define parallel list comprehensions by translation to
-    regular comprehensions.  Here's the basic idea:</para>
-
-    <para>Given a parallel comprehension of the form: </para>
-
-<programlisting>
-   [ e | p1 <- e11, p2 <- e12, ... 
-       | q1 <- e21, q2 <- e22, ... 
-       ... 
-   ] 
-</programlisting>
-
-    <para>This will be translated to: </para>
-
-<programlisting>
-   [ e | ((p1,p2), (q1,q2), ...) <- zipN [(p1,p2) | p1 <- e11, p2 <- e12, ...] 
-                                         [(q1,q2) | q1 <- e21, q2 <- e22, ...] 
-                                         ... 
-   ] 
-</programlisting>
-
-    <para>where `zipN' is the appropriate zip for the given number of
-    branches.</para>
-
-  </sect1>
-
-<sect1 id="class-method-types">
+<sect2 id="class-method-types">
 <title>Class method types
 </title>
 <para>
@@ -654,9 +213,9 @@ class type variable (in this case <literal>a</literal>).
 With the <option>-fglasgow-exts</option> GHC lifts this restriction.
 </para>
 
-</sect1>
+</sect2>
 
-<sect1 id="multi-param-type-classes">
+<sect2 id="multi-param-type-classes">
 <title>Multi-parameter type classes
 </title>
 
@@ -683,7 +242,7 @@ Thanks to him, and to many others who have offered very useful
 feedback.
 </para>
 
-<sect2>
+<sect3>
 <title>Types</title>
 
 <para>
@@ -797,9 +356,9 @@ are perfectly OK
 This choice recovers principal types, a property that Haskell 1.4 does not have.
 </para>
 
-</sect2>
+</sect3>
 
-<sect2>
+<sect3>
 <title>Class declarations</title>
 
 <para>
@@ -959,9 +518,9 @@ class like this:
 
 </para>
 
-</sect2>
+</sect3>
 
-<sect2 id="instance-decls">
+<sect3 id="instance-decls">
 <title>Instance declarations</title>
 
 <para>
@@ -1224,11 +783,11 @@ with <option>-fcontext-stack</option><emphasis>N</emphasis>.
 
 </para>
 
+</sect3>
+
 </sect2>
 
-</sect1>
-
-<sect1 id="implicit-parameters">
+<sect2 id="implicit-parameters">
 <title>Implicit parameters
 </title>
 
@@ -1333,9 +892,9 @@ Easiest thing is to outlaw the offending types.</para>
 </itemizedlist>
 </para>
 
-</sect1>
+</sect2>
 
-<sect1 id="linear-implicit-parameters">
+<sect2 id="linear-implicit-parameters">
 <title>Linear implicit parameters
 </title>
 <para>
@@ -1427,7 +986,7 @@ are entirely distinct implicit parameters: you
 </itemizedlist>
 </para>
 
-<sect2><title>Warnings</title>
+<sect3><title>Warnings</title>
 
 <para>
 The monomorphism restriction is even more important than usual.
@@ -1459,11 +1018,11 @@ parameters we have already lost beta reduction anyway, and
 Haskell programs without knowing their typing.
 </para>
 
+</sect3>
+
 </sect2>
 
-</sect1>
-
-<sect1 id="functional-dependencies">
+<sect2 id="functional-dependencies">
 <title>Functional dependencies
 </title>
 
@@ -1476,11 +1035,11 @@ ESOP 2000, Berlin, Germany, March 2000, Springer-Verlag LNCS 1782.
 <para>
 There should be more documentation, but there isn't (yet).  Yell if you need it.
 </para>
-</sect1>
+</sect2>
 
 
-<sect1 id="universal-quantification">
-<title>Explicit universal quantification
+<sect2 id="universal-quantification">
+<title>Arbitrary-rank polymorphism
 </title>
 
 <para>
@@ -1554,7 +1113,7 @@ a type variable any more!
 </para>
 
 
-<sect2 id="univ">
+<sect3 id="univ">
 <title>Examples
 </title>
 
@@ -1686,9 +1245,9 @@ and <literal>bind</literal> to extract the polymorphic bind and return functions
 from the <literal>MonadT</literal> data structure, rather than using pattern
 matching.
 </para>
-</sect2>
+</sect3>
 
-<sect2>
+<sect3>
 <title>Type inference</title>
 
 <para>
@@ -1732,10 +1291,10 @@ it is an argument of constructor <literal>T1</literal> and that tells GHC all
 it needs to know.
 </para>
 
-</sect2>
+</sect3>
 
 
-<sect2 id="implicit-quant">
+<sect3 id="implicit-quant">
 <title>Implicit quantification</title>
 
 <para>
@@ -1780,16 +1339,17 @@ but at least the rule is simple.  If you want the latter type, you
 can write your for-alls explicitly.  Indeed, doing so is strongly advised
 for rank-2 types.
 </para>
+</sect3>
 </sect2>
-</sect1>
 
-<sect1 id="hoist">
-<title>Type synonyms and hoisting
+<sect2>
+<title>Liberalised type synonyms 
 </title>
 
 <para>
-Type synonmys are like macros at the type level, and GHC is much more liberal
-about them than Haskell 98.  In particular:
+Type synonmys are like macros at the type level, and
+GHC does validity checking on types <emphasis>only after expanding type synonyms</emphasis>.
+That means that GHC can be very much more liberal about type synonyms than Haskell 98:
 <itemizedlist>
 <listitem> <para>You can write a <literal>forall</literal> (including overloading)
 in a type synonym, thus:
@@ -1814,11 +1374,56 @@ You can write an unboxed tuple in a type synonym:
   h x = (# x, x #)
 </programlisting>
 </para></listitem>
+
+<listitem><para>
+You can apply a type synonym to a forall type:
+<programlisting>
+  type Foo a = a -> a -> Bool
+ 
+  f :: Foo (forall b. b->b)
+</programlisting>
+After epxanding the synonym, <literal>f</literal> has the legal (in GHC) type:
+<programlisting>
+  f :: (forall b. b->b) -> (forall b. b->b) -> Bool
+</programlisting>
+</para></listitem>
+
+<listitem><para>
+You can apply a type synonym to a partially applied type synonym:
+<programlisting>
+  type Generic i o = forall x. i x -> o x
+  type Id x = x
+  
+  foo :: Generic Id []
+</programlisting>
+After epxanding the synonym, <literal>foo</literal> has the legal (in GHC) type:
+<programlisting>
+  foo :: forall x. x -> [x]
+</programlisting>
+</para></listitem>
+
 </itemizedlist>
 </para>
+
 <para>
-GHC does validity checking on types <emphasis>after expanding type synonyms</emphasis> 
-so, for example,
+GHC currently does kind checking before expanding synonyms (though even that
+could be changed.)
+</para>
+<para>
+After expanding type synonyms, GHC does validity checking on types, looking for
+the following mal-formedness which isn't detected simply by kind checking:
+<itemizedlist>
+<listitem><para>
+Type constructor applied to a type involving for-alls.
+</para></listitem>
+<listitem><para>
+Unboxed tuple on left of an arrow.
+</para></listitem>
+<listitem><para>
+Partially-applied type synonym.
+</para></listitem>
+</itemizedlist>
+So, for example,
 this will be rejected:
 <programlisting>
   type Pr = (# Int, Int #)
@@ -1828,9 +1433,12 @@ this will be rejected:
 </programlisting>
 because GHC does not allow  unboxed tuples on the left of a function arrow.
 </para>
+</sect2>
 
+<sect2 id="hoist">
+<title>For-all hoisting</title>
 <para>
-However, it is often convenient to use these sort of generalised synonyms at the right hand
+It is often convenient to use generalised type synonyms at the right hand
 end of an arrow, thus:
 <programlisting>
   type Discard a = forall b. a -> b -> a
@@ -1862,10 +1470,10 @@ valid way to write <literal>g</literal>'s type signature:
   g :: Int -> Int -> forall b. b -> Int
 </programlisting>
 </para>
-</sect1>
+</sect2>
 
 
-<sect1 id="existential-quantification">
+<sect2 id="existential-quantification">
 <title>Existentially quantified data constructors
 </title>
 
@@ -1955,7 +1563,7 @@ that collection of packages in a uniform manner.  You can express
 quite a bit of object-oriented-like programming this way.
 </para>
 
-<sect2 id="existential">
+<sect3 id="existential">
 <title>Why existential?
 </title>
 
@@ -1978,9 +1586,9 @@ But Haskell programmers can safely think of the ordinary
 adding a new existential quantification construct.
 </para>
 
-</sect2>
+</sect3>
 
-<sect2>
+<sect3>
 <title>Type classes</title>
 
 <para>
@@ -2040,9 +1648,9 @@ Notice the way that the syntax fits smoothly with that used for
 universal quantification earlier.
 </para>
 
-</sect2>
+</sect3>
 
-<sect2>
+<sect3>
 <title>Restrictions</title>
 
 <para>
@@ -2186,11 +1794,11 @@ declarations.  Define your own instances!
 
 </para>
 
+</sect3>
+
 </sect2>
 
-</sect1>
-
-<sect1 id="scoped-type-variables">
+<sect2 id="scoped-type-variables">
 <title>Scoped Type Variables
 </title>
 
@@ -2241,7 +1849,7 @@ are noted.
 So much for the basic idea.  Here are the details.
 </para>
 
-<sect2>
+<sect3>
 <title>What a pattern type signature means</title>
 <para>
 A type variable brought into scope by a pattern type signature is simply
@@ -2279,9 +1887,9 @@ For example, all of these are legal:</para>
   w (x::a) = x                  -- a unifies with [b]
 </programlisting>
 
-</sect2>
+</sect3>
 
-<sect2>
+<sect3>
 <title>Scope and implicit quantification</title>
 
 <para>
@@ -2413,9 +2021,9 @@ scope over the methods defined in the <literal>where</literal> part.  For exampl
 
 </para>
 
-</sect2>
+</sect3>
 
-<sect2>
+<sect3>
 <title>Result type signatures</title>
 
 <para>
@@ -2456,9 +2064,9 @@ you want:
 Result type signatures are not yet implemented in Hugs.
 </para>
 
-</sect2>
+</sect3>
 
-<sect2>
+<sect3>
 <title>Where a pattern type signature can occur</title>
 
 <para>
@@ -2570,10 +2178,10 @@ in <literal>f4</literal>'s scope.
 </itemizedlist>
 </para>
 
+</sect3>
 </sect2>
-</sect1>
 
-<sect1 id="sec-kinding">
+<sect2 id="sec-kinding">
 <title>Explicitly-kinded quantification</title>
 
 <para>
@@ -2632,8 +2240,14 @@ The syntax is
 </Screen>
 The parentheses are required.
 </para>
+</sect2>
+
 </sect1>
+<!-- ==================== End of type system extensions =================  -->
   
+
+<!-- ==================== ASSERTIONS =================  -->
+
 <sect1 id="sec-assertions">
 <title>Assertions
 <indexterm><primary>Assertions</primary></indexterm>
@@ -2713,6 +2327,189 @@ for the details.
 </para>
 
 </sect1>
+
+<!-- ====================== PATTERN GUARDS =======================  -->
+
+<sect1 id="pattern-guards">
+<title>Pattern guards</title>
+
+<para>
+<indexterm><primary>Pattern guards (Glasgow extension)</primary></indexterm>
+The discussion that follows is an abbreviated version of Simon Peyton Jones's original <ULink URL="http://research.microsoft.com/~simonpj/Haskell/guards.html">proposal</ULink>. (Note that the proposal was written before pattern guards were implemented, so refers to them as unimplemented.)
+</para>
+
+<para>
+Suppose we have an abstract data type of finite maps, with a
+lookup operation:
+
+<programlisting>
+lookup :: FiniteMap -> Int -> Maybe Int
+</programlisting>
+
+The lookup returns <function>Nothing</function> if the supplied key is not in the domain of the mapping, and <function>(Just v)</function> otherwise,
+where <VarName>v</VarName> is the value that the key maps to.  Now consider the following definition:
+</para>
+
+<programlisting>
+clunky env var1 var2 | ok1 && ok2 = val1 + val2
+| otherwise  = var1 + var2
+where
+  m1 = lookup env var1
+  m2 = lookup env var2
+  ok1 = maybeToBool m1
+  ok2 = maybeToBool m2
+  val1 = expectJust m1
+  val2 = expectJust m2
+</programlisting>
+
+<para>
+The auxiliary functions are 
+</para>
+
+<programlisting>
+maybeToBool :: Maybe a -&gt; Bool
+maybeToBool (Just x) = True
+maybeToBool Nothing  = False
+
+expectJust :: Maybe a -&gt; a
+expectJust (Just x) = x
+expectJust Nothing  = error "Unexpected Nothing"
+</programlisting>
+
+<para>
+What is <function>clunky</function> doing? The guard <literal>ok1 &&
+ok2</literal> checks that both lookups succeed, using
+<function>maybeToBool</function> to convert the <function>Maybe</function>
+types to booleans. The (lazily evaluated) <function>expectJust</function>
+calls extract the values from the results of the lookups, and binds the
+returned values to <VarName>val1</VarName> and <VarName>val2</VarName>
+respectively.  If either lookup fails, then clunky takes the
+<literal>otherwise</literal> case and returns the sum of its arguments.
+</para>
+
+<para>
+This is certainly legal Haskell, but it is a tremendously verbose and
+un-obvious way to achieve the desired effect.  Arguably, a more direct way
+to write clunky would be to use case expressions:
+</para>
+
+<programlisting>
+clunky env var1 var1 = case lookup env var1 of
+  Nothing -&gt; fail
+  Just val1 -&gt; case lookup env var2 of
+    Nothing -&gt; fail
+    Just val2 -&gt; val1 + val2
+where
+  fail = val1 + val2
+</programlisting>
+
+<para>
+This is a bit shorter, but hardly better.  Of course, we can rewrite any set
+of pattern-matching, guarded equations as case expressions; that is
+precisely what the compiler does when compiling equations! The reason that
+Haskell provides guarded equations is because they allow us to write down
+the cases we want to consider, one at a time, independently of each other. 
+This structure is hidden in the case version.  Two of the right-hand sides
+are really the same (<function>fail</function>), and the whole expression
+tends to become more and more indented. 
+</para>
+
+<para>
+Here is how I would write clunky:
+</para>
+
+<programlisting>
+clunky env var1 var1
+  | Just val1 &lt;- lookup env var1
+  , Just val2 &lt;- lookup env var2
+  = val1 + val2
+...other equations for clunky...
+</programlisting>
+
+<para>
+The semantics should be clear enough.  The qualifers are matched in order. 
+For a <literal>&lt;-</literal> qualifier, which I call a pattern guard, the
+right hand side is evaluated and matched against the pattern on the left. 
+If the match fails then the whole guard fails and the next equation is
+tried.  If it succeeds, then the appropriate binding takes place, and the
+next qualifier is matched, in the augmented environment.  Unlike list
+comprehensions, however, the type of the expression to the right of the
+<literal>&lt;-</literal> is the same as the type of the pattern to its
+left.  The bindings introduced by pattern guards scope over all the
+remaining guard qualifiers, and over the right hand side of the equation.
+</para>
+
+<para>
+Just as with list comprehensions, boolean expressions can be freely mixed
+with among the pattern guards.  For example:
+</para>
+
+<programlisting>
+f x | [y] <- x
+    , y > 3
+    , Just z <- h y
+    = ...
+</programlisting>
+
+<para>
+Haskell's current guards therefore emerge as a special case, in which the
+qualifier list has just one element, a boolean expression.
+</para>
+</sect1>
+
+<!-- ===================== PARALLEL LIST COMPREHENSIONS ===================  -->
+
+  <sect1 id="parallel-list-comprehensions">
+    <title>Parallel List Comprehensions</title>
+    <indexterm><primary>list comprehensions</primary><secondary>parallel</secondary>
+    </indexterm>
+    <indexterm><primary>parallel list comprehensions</primary>
+    </indexterm>
+
+    <para>Parallel list comprehensions are a natural extension to list
+    comprehensions.  List comprehensions can be thought of as a nice
+    syntax for writing maps and filters.  Parallel comprehensions
+    extend this to include the zipWith family.</para>
+
+    <para>A parallel list comprehension has multiple independent
+    branches of qualifier lists, each separated by a `|' symbol.  For
+    example, the following zips together two lists:</para>
+
+<programlisting>
+   [ (x, y) | x <- xs | y <- ys ] 
+</programlisting>
+
+    <para>The behavior of parallel list comprehensions follows that of
+    zip, in that the resulting list will have the same length as the
+    shortest branch.</para>
+
+    <para>We can define parallel list comprehensions by translation to
+    regular comprehensions.  Here's the basic idea:</para>
+
+    <para>Given a parallel comprehension of the form: </para>
+
+<programlisting>
+   [ e | p1 <- e11, p2 <- e12, ... 
+       | q1 <- e21, q2 <- e22, ... 
+       ... 
+   ] 
+</programlisting>
+
+    <para>This will be translated to: </para>
+
+<programlisting>
+   [ e | ((p1,p2), (q1,q2), ...) <- zipN [(p1,p2) | p1 <- e11, p2 <- e12, ...] 
+                                         [(q1,q2) | q1 <- e21, q2 <- e22, ...] 
+                                         ... 
+   ] 
+</programlisting>
+
+    <para>where `zipN' is the appropriate zip for the given number of
+    branches.</para>
+
+  </sect1>
+
+<!-- =============================== PRAGMAS ===========================  -->
 
   <sect1 id="pragmas">
     <title>Pragmas</title>
@@ -2995,6 +2792,8 @@ GHC will print the specified message.
 </sect2>
 
 </sect1>
+
+<!--  ======================= REWRITE RULES ======================== -->
 
 <sect1 id="rewrite-rules">
 <title>Rewrite rules
