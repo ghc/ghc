@@ -186,9 +186,6 @@ PrelGHC.$(way_)o: PrelGHC.ilx.real
 	$(ILASM) /QUIET /DLL /OUT=$@ $@.il
 #	mv $@.tmp $@
 
-std.dll: $(HS_OBJS)
-	al -out:$@ $(HS_OBJS)
-
 std.$(way_)mvl: $(HS_IL)
 	((ILVALID_HOME=c:\\devel\\fcom\\src\\ ILVALID_MSCORLIB=mscorlib.vlb $(ILVALID) c:\\devel\\fcom\\src\\bin\\msilxlib$(ilx2il_suffix).vlb $(HS_IL)) 2>&1) | tee $@
 
