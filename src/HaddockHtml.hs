@@ -283,7 +283,7 @@ ppHtmlIndex odir doctitle maybe_contents_url ifaces = do
 	    besides [ td << anchor ! [href (subIndexHtmlFile c)] <<
 			 toHtml [c]
 		    | c <- initialChars
-                    , any ((==c) . head . fst) index ]
+                    , any ((==c) . toUpper . head . fst) index ]
 
   do_sub_index this_ix c
     = unless (null index_part) $
