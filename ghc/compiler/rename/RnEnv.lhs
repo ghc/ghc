@@ -45,7 +45,7 @@ import PrelNames	( mkUnboundName,
 			  boolTyConName, funTyConName,
 			  unpackCStringName, unpackCStringFoldrName, unpackCStringUtf8Name,
 			  eqStringName, printName, 
-			  bindIOName, returnIOName, failIOName
+			  bindIOName, returnIOName, failIOName, thenIOName
 			)
 import TysWiredIn	( unitTyCon )	-- A little odd
 import FiniteMap
@@ -420,7 +420,8 @@ mentioned explicitly, but which might be needed by the type checker.
 
 \begin{code}
 getImplicitStmtFVs 	-- Compiling a statement
-  = returnRn (mkFVs [printName, bindIOName, returnIOName, failIOName]
+  = returnRn (mkFVs [printName, bindIOName, thenIOName, 
+		     returnIOName, failIOName]
 	      `plusFV` ubiquitousNames)
 		-- These are all needed implicitly when compiling a statement
 		-- See TcModule.tc_stmts
