@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: Directory.hsc,v 1.14 2001/08/10 13:48:06 simonmar Exp $
+-- $Id: Directory.hsc,v 1.15 2001/08/21 08:53:22 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1994-2000
 --
@@ -300,7 +300,7 @@ Either path refers to an existing directory.
 
 renameFile :: FilePath -> FilePath -> IO ()
 renameFile opath npath =
-   withFileStatus opath $ \st -> do
+   withFileOrSymlinkStatus opath $ \st -> do
    is_dir <- isDirectory st
    if is_dir
 	then ioException (IOError Nothing InappropriateType "renameFile"
@@ -504,6 +504,17 @@ withFileStatus name f = do
         throwErrnoIfMinus1Retry_ "withFileStatus" (stat s p)
 	f p
 
+withFileOrSymlinkStatus :: FilePath -> (Ptr CStat -> IO a) -> IO a
+#ifdef HAVE_LSTAT
+withFileOrSymlinkStatus name f = do
+    allocaBytes (#const sizeof(struct stat)) $ \p ->
+      withCString name $ \s -> do
+        throwErrnoIfMinus1Retry_ "withFileOrSymlinkStatus" (lstat s p)
+	f p
+#else
+withFileOrSymlinkStatus = withFileStatus
+#endif
+
 modificationTime :: Ptr CStat -> IO ClockTime
 modificationTime stat = do
     mtime <- (#peek struct stat, st_mtime) stat
@@ -550,5 +561,9 @@ foreign import ccall unsafe readdir  :: Ptr CDir -> IO (Ptr CDirent)
 foreign import ccall unsafe closedir :: Ptr CDir -> IO CInt
 
 foreign import ccall unsafe stat     :: CString -> Ptr CStat -> IO CInt
+
+#ifdef HAVE_LSTAT
+foreign import ccall unsafe lstat    :: CString -> Ptr CStat -> IO CInt
+#endif
 
 type CDirent = ()
