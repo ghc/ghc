@@ -773,12 +773,12 @@ mkDictFunId dfun_name clas inst_tyvars inst_tys dfun_theta
 %*									*
 %************************************************************************
 
-These Ids can't be defined in Haskell.  They could be defined in 
-unfoldings in PrelGHC.hi-boot, but we'd have to ensure that they
-were definitely, definitely inlined, because there is no curried
-identifier for them.  That's what mkCompulsoryUnfolding does.
-If we had a way to get a compulsory unfolding from an interface file,
-we could do that, but we don't right now.
+These Ids can't be defined in Haskell.  They could be defined in
+unfoldings in the wired-in GHC.Prim interface file, but we'd have to
+ensure that they were definitely, definitely inlined, because there is
+no curried identifier for them.  That's what mkCompulsoryUnfolding
+does.  If we had a way to get a compulsory unfolding from an interface
+file, we could do that, but we don't right now.
 
 unsafeCoerce# isn't so much a PrimOp as a phantom identifier, that
 just gets expanded into a type coercion wherever it occurs.  Hence we
