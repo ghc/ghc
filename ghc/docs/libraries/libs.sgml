@@ -6,6 +6,7 @@
   <!ENTITY exception  SYSTEM "Exception.sgml">
   <!ENTITY foreign    SYSTEM "Foreign.sgml">
   <!ENTITY glaexts    SYSTEM "GlaExts.sgml">
+  <!ENTITY getopt     SYSTEM "GetOpt.sgml">
   <!ENTITY ioexts     SYSTEM "IOExts.sgml">
   <!ENTITY int	      SYSTEM "Int.sgml">
   <!ENTITY ndset      SYSTEM "NDSet.sgml">
@@ -88,6 +89,7 @@ the form <tt/getXContents/, e.g., <tt/Channel.getChanContents/ and
 
 &numexts
 &pretty
+&getopt
 &st
 
 <sect> <idx/LazyST/ 
