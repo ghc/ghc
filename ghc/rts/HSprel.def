@@ -1,0 +1,23 @@
+; list of entry points that the RTS imports from
+; the Prelude.
+EXPORTS
+PrelBase_False_static_closure
+PrelBase_True_static_closure
+PrelBase_Czh_con_info DATA
+PrelBase_Czh_static_info DATA
+PrelBase_Izh_con_info DATA
+PrelBase_Izh_static_info DATA
+PrelAddr_I64zh_con_info DATA
+PrelAddr_W64zh_con_info DATA
+PrelAddr_Azh_con_info DATA
+PrelAddr_Azh_static_info DATA
+PrelBase_Fzh_con_info DATA
+PrelBase_Fzh_static_info DATA
+PrelBase_Dzh_con_info DATA
+PrelBase_Dzh_static_info DATA
+PrelAddr_Wzh_con_info DATA
+PrelAddr_Wzh_static_info DATA
+PrelStable_StablePtr_con_info DATA
+PrelStable_StablePtr_static_info DATA 
+PrelPack_unpackCString_closure
+PrelException_stackOverflow_closure
