@@ -4,7 +4,7 @@
 \section[CmLink]{Linker for GHCI}
 
 \begin{code}
-module CmLink ( Linkable(..), 
+module CmLink ( Linkable(..),  Unlinked(..),
 		filterModuleLinkables, 
 		modname_of_linkable, is_package_linkable,
 		LinkResult(..),

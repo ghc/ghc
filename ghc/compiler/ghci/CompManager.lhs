@@ -501,9 +501,11 @@ downsweep rootNm finder
      where
         getSummary :: ModName -> IO ModSummary
         getSummary nm
-           = do loc     <- finder nm
-                summary <- summarise loc
-                return summary
+           = do found <- finder nm
+		case found of
+		   Just (mod, location) -> summarise mod location
+		   Nothing -> panic ("CompManager: can't find module `" ++ 
+					showSDoc (ppr nm) ++ "'")
 
         -- loop invariant: homeSummaries doesn't contain package modules
         loop :: [ModSummary] -> IO [ModSummary]
