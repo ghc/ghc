@@ -56,6 +56,7 @@ module Constants (
 	mAX_Real_Vanilla_REG,
 	mAX_Real_Float_REG,
 	mAX_Real_Double_REG,
+	mAX_Real_Long_REG,
 
 	oTHER_TAG,
 
@@ -175,10 +176,12 @@ sEQ_FRAME_SIZE = (SEQ_FRAME_SIZE::Int)
 mAX_Vanilla_REG	= (MAX_VANILLA_REG :: Int)
 mAX_Float_REG	= (MAX_FLOAT_REG :: Int)
 mAX_Double_REG	= (MAX_DOUBLE_REG :: Int)
+mAX_Long_REG    = (MAX_LONG_REG  :: Int)
 
 mAX_Real_Vanilla_REG	= (MAX_REAL_VANILLA_REG :: Int)
 mAX_Real_Float_REG	= (MAX_REAL_FLOAT_REG :: Int)
 mAX_Real_Double_REG	= (MAX_REAL_DOUBLE_REG :: Int)
+mAX_Real_Long_REG	= (MAX_REAL_LONG_REG :: Int)
 \end{code}
 
 Closure header sizes.
@@ -204,7 +207,6 @@ Size of a double in StgWords.
 
 \begin{code}
 dOUBLE_SIZE    = (DOUBLE_SIZE   :: Int)
-mAX_Long_REG   = (MAX_LONG_REG  :: Int)
 wORD64_SIZE    = (WORD64_SIZE   :: Int)
 iNT64_SIZE     = (INT64_SIZE   :: Int)
 \end{code}

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MachRegs.h,v 1.2 1998/12/02 13:21:13 simonm Exp $
+ * $Id: MachRegs.h,v 1.3 1999/01/18 14:31:50 sof Exp $
  *
  * Registers used in STG code.  Might or might not correspond to
  * actual machine registers.
@@ -214,6 +214,7 @@
 #define MAX_REAL_VANILLA_REG 1	/* always, since it defines the entry conv */
 #define MAX_REAL_FLOAT_REG   0
 #define MAX_REAL_DOUBLE_REG  0
+#define MAX_REAL_LONG_REG    0
 
 #endif /* iX86 */
 
