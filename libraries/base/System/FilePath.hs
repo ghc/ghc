@@ -352,21 +352,21 @@ mkSearchPath paths = concat (intersperse [searchPathSeparator] paths)
 -- * Separators
 --------------------------------------------------------------
 
--- | Checks whether the character is a valid path separator for the host platform.
--- The valid character is a 'pathSeparator' but since the Windows operating system 
--- also accepts a backslash (\"\\\") the function also checks for \"\/\" on this platform.
+-- | Checks whether the character is a valid path separator for the host
+-- platform. The valid character is a 'pathSeparator' but since the Windows
+-- operating system also accepts a slash (\"\/\") since DOS 2, the function
+-- checks for it on this platform, too.
 isPathSeparator :: Char -> Bool
-isPathSeparator ch =
 #ifdef mingw32_TARGET_OS
-  ch == '/' || ch == '\\'
+isPathSeparator ch = ch == '/' || ch == '\\'
 #else
-  ch == '/'
+isPathSeparator ch = ch == '/'
 #endif
 
--- | Provides a platform-specific character used to separate directory levels in a 
--- path string that reflects a hierarchical file system organization.
--- The separator is a slash (\"\/\") on Unix and Macintosh, and a backslash (\"\\\") on the 
--- Windows operating system.
+-- | Provides a platform-specific character used to separate directory levels in
+-- a path string that reflects a hierarchical file system organization. The
+-- separator is a slash (@\"\/\"@) on Unix and Macintosh, and a backslash
+-- (@\"\\\"@) on the Windows operating system.
 pathSeparator :: Char
 #ifdef mingw32_TARGET_OS
 pathSeparator = '\\'
@@ -374,9 +374,9 @@ pathSeparator = '\\'
 pathSeparator = '/'
 #endif
 
--- | A platform-specific character used to separate search path strings in 
--- environment variables. The separator is a colon (\":\") on Unix and Macintosh, 
--- and a semicolon (\";\") on the Windows operating system.
+-- | A platform-specific character used to separate search path strings in
+-- environment variables. The separator is a colon (@\":\"@) on Unix and
+-- Macintosh, and a semicolon (@\";\"@) on the Windows operating system.
 searchPathSeparator :: Char
 #ifdef mingw32_TARGET_OS
 searchPathSeparator = ';'
@@ -386,24 +386,29 @@ searchPathSeparator = ':'
 
 -- ToDo: This should be determined via autoconf (AC_EXEEXT)
 -- | Extension for executable files
--- (typically @""@ on Unix and @".exe"@ on Windows or OS/2)
+-- (typically @\"\"@ on Unix and @\".exe\"@ on Windows or OS\/2)
 exeExtension :: String
+#ifdef mingw32_TARGET_OS
+exeExtension = ".exe"
+#else
+exeExtension = ""
+#endif
 
 -- ToDo: This should be determined via autoconf (AC_OBJEXT)
 -- | Extension for object files
--- (typically @".o"@ on Unix and @".obj"@ on Windows)
+-- (typically @\".o\"@ on Unix and @\".obj\"@ on Windows)
 objExtension :: String
+#ifdef mingw32_TARGET_OS
+objExtension = ".obj"
+#else
+objExtension = ".o"
+#endif
 
 -- | Extension for dynamically linked (or shared) libraries
--- (typically @".so"@ on Unix and @".dll"@ on Windows)
+-- (typically @\".so\"@ on Unix and @\".dll\"@ on Windows)
 dllExtension :: String
-
 #ifdef mingw32_TARGET_OS
-exeExtension = ".exe"
-objExtension = ".obj"
 dllExtension = ".dll"
 #else
-exeExtension = ""
-objExtension = ".o"
 dllExtension = ".so"
 #endif
