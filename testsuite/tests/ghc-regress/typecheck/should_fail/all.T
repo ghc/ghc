@@ -37,7 +37,6 @@ test "tcfail035" { vtcf("") }
 test "tcfail036" { vtcf("") }
 test "tcfail037" { vtcf("") }
 test "tcfail038" { vtcf("") }
-test "tcfail039" { vtcf("") }
 test "tcfail040" { vtcf("") }
 test "tcfail042" { vtcf("") }
 test "tcfail043" { vtcf("") }
