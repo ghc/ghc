@@ -473,8 +473,7 @@ generalise binder_names mbind tau_tvs lie_req sigs
 
     tysig_names = [name | (TySigInfo name _ _ _ _ _ _ _) <- sigs]
 
-    doc | null sigs = ptext SLIT("banding(s) for")        <+> pprBinders binder_names
-	| otherwise = ptext SLIT("type signature(s) for") <+> pprBinders binder_names
+    doc = ptext SLIT("type signature(s) for") <+> pprBinders binder_names
 
 -----------------------
 	-- CHECK THAT ALL THE SIGNATURE CONTEXTS ARE UNIFIABLE
@@ -827,5 +826,5 @@ restrictedBindCtxtErr binder_names
 		ptext SLIT("that falls under the monomorphism restriction")])
 
 -- Used in error messages
-pprBinders bndrs = braces (pprWithCommas ppr bndrs)
+pprBinders bndrs = pprWithCommas ppr bndrs
 \end{code}

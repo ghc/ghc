@@ -729,7 +729,8 @@ check_tyvars dflags clas inst_taus
   | otherwise 				      = [the_err]
   where
     the_err = instTypeErr clas inst_taus msg
-    msg     = ptext SLIT("There must be at least one non-type-variable in the instance head")
+    msg     =  ptext SLIT("There must be at least one non-type-variable in the instance head")
+	    $$ ptext SLIT("Use -fallow-undecidable-instances to lift this restriction")
 
 check_fundeps dflags theta clas inst_taus
   | checkInstFDs theta clas inst_taus = []
