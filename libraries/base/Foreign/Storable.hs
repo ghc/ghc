@@ -113,7 +113,7 @@ class Storable a where
    --         @0@).  The following equality holds,
    -- 
    -- > peekElemOff addr idx = IOExts.fixIO $ \result ->
-   -- >   peek (addr \`plusPtr\` (idx * sizeOf result))
+   -- >   peek (addr `plusPtr` (idx * sizeOf result))
    --
    --         Note that this is only a specification, not
    --         necessarily the concrete implementation of the
@@ -124,19 +124,19 @@ class Storable a where
    --         values of the same kind.  The following equality holds:
    -- 
    -- > pokeElemOff addr idx x = 
-   -- >   poke (addr \`plusPtr\` (idx * sizeOf x)) x
+   -- >   poke (addr `plusPtr` (idx * sizeOf x)) x
 
    peekByteOff :: Ptr b -> Int      -> IO a
    -- ^       Read a value from a memory location given by a base
    --         address and offset.  The following equality holds:
    --
-   -- > peekByteOff addr off = peek (addr \`plusPtr\` off)
+   -- > peekByteOff addr off = peek (addr `plusPtr` off)
 
    pokeByteOff :: Ptr b -> Int -> a -> IO ()
    -- ^       Write a value to a memory location given by a base
    --         address and offset.  The following equality holds:
    --
-   -- > pokeByteOff addr off x = poke (addr \`plusPtr\` off) x
+   -- > pokeByteOff addr off x = poke (addr `plusPtr` off) x
   
    peek        :: Ptr a      -> IO a
    -- ^ Read a value from the given memory location.
