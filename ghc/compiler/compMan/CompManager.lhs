@@ -742,8 +742,8 @@ downsweep rootNm old_summaries
 		 hs_file = file ++ ".hs"
 		 lhs_file = file ++ ".lhs"
 
-        getSummaries :: ModuleName -> IO ModSummary
-        getSummaries nm
+        getSummary :: ModuleName -> IO ModSummary
+        getSummary nm
            -- | trace ("getSummary: "++ showSDoc (ppr nm)) True
            = do found <- findModule nm
 		case found of
