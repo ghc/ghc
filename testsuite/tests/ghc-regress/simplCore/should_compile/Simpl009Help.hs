@@ -24,8 +24,8 @@ instance Monad (Parser s) where
     Parser (\fut exp -> Fail exp [s])
 
 instance MonadPlus (Parser s) where
-  mzero =
-    Parser (\fut exp -> Fail exp [])
+  mplus = error "urk"
+  mzero = Parser (\fut exp -> Fail exp [])
 
 lookAhead :: Parser s s
 lookAhead =
