@@ -257,7 +257,7 @@ you simply want to try out the package and/or you don't have the
 necessary privileges (or inclination) to properly install the tools
 locally. Note that if you do decide to install the package `properly'
 at a later date, you have to go through the installation steps that
-follows.
+follow.
 </Para>
 
 <Para>
@@ -736,7 +736,7 @@ layout:</para>
     extra-bin/             Support binaries
 	 unlit             Remove literate markup
     
-	 touch.exe         [Win32 only]
+	 touchy.exe        [Win32 only]
 	 perl.exe          [Win32 only]
 	 gcc.exe           [Win32 only]
     
@@ -758,7 +758,7 @@ layout:</para>
         libmingw32.a        Standard
 	   ..etc..	    libraries
 
-        include/*.h         Include files
+        *.h                 Include files
 
     imports/                GHC interface files
         std/*.hi              'std' library
@@ -769,7 +769,7 @@ layout:</para>
         StgMacros.h           GHC-specific
         ..etc...              header files
 
-        mingw/*.h             Mingwin header files
+        mingw/*.h            [Win32 only] Mingwin header files
 
     libHSrts.a              GHC library archives
     libHSstd.a
@@ -791,7 +791,8 @@ file which invokes <filename>ghc</filename>.   </para>
 <para>The GHC executable is the Real Thing (no intervening
 shell scripts or <filename>.bat</filename> files).  
 Reason: we sometimes invoke GHC with very long command lines,
-and <filename>.bat</filename> truncate them.  [We assume people won't invoke ghci with very long
+and <filename>cmd.exe</filename> (which executes <filename>.bat</filename> files)
+truncates them.  [We assume people won't invoke ghci with very long
 command lines.]</para>
 
 <para>On Unix, the user-invokable <filename>ghc</filename> invokes <filename>$(libdir)/extra-bin/ghc</filename>,
@@ -816,7 +817,8 @@ All <filename>gcc</filename>'s support files are kept in  <filename>$(libdir)/gc
 </listitem>
 
 <listitem>
-<para> Similarly, we distribute <filename>perl</filename> and <filename>touch</filename>
+<para> Similarly, we distribute <filename>perl</filename> and a <filename>touch</filename> 
+replacement (<filaname>touchy.exe</filename>)
 with the Win32 distribution of GHC. </para> 
 </listitem>
 
