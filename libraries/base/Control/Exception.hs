@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Exception.hs,v 1.3 2001/10/18 11:10:19 rrt Exp $
+-- $Id: Exception.hs,v 1.4 2001/10/18 11:14:17 rrt Exp $
 --
 -- The External API for exceptions.  The functions provided in this
 -- module allow catching of exceptions in the IO monad.
@@ -47,7 +47,6 @@ module Control.Exception (
 	-- Throwing exceptions
 
 	throw,		-- :: Exception -> a
-	-- for now
 	throwTo,	-- :: ThreadId -> Exception -> a
 
 	-- Dynamic exceptions
