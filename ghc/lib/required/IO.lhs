@@ -41,6 +41,7 @@ import PackedString	( nilPS, packCBytesST, unpackPS )
 import PrelBase
 import GHC
 import Foreign          ( ForeignObj, Addr, makeForeignObj, writeForeignObj )
+import Char		( ord, chr )
 \end{code}
 
 %*********************************************************
