@@ -7,7 +7,8 @@
 module Rules (
 	RuleBase, prepareRuleBase, lookupRule, 
 	addIdSpecialisations,
-	ProtoCoreRule(..), pprProtoCoreRule, orphanRule
+	ProtoCoreRule(..), pprProtoCoreRule,
+	orphanRule
     ) where
 
 #include "HsVersions.h"
