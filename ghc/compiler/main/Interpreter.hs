@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Interpreter.hs,v 1.3 2000/11/08 14:52:06 simonpj Exp $
+-- $Id: Interpreter.hs,v 1.4 2000/11/16 15:57:05 simonmar Exp $
 --
 -- Interpreter subsystem wrapper
 --
@@ -39,6 +39,7 @@ import Outputable
 
 ---------------------------------------------
 --	NO!  No interpreter; generate stubs for all the bits
+
 ---------------------------------------------
 
 type ClosureEnv = ()
@@ -57,4 +58,5 @@ linkIModules	= error "linkIModules"
 stgToInterpSyn	= error "linkIModules"
 loadObjs	= error "loadObjs"
 resolveObjs	= error "loadObjs"
+interactiveUI   = error "interactiveUI"
 #endif

@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.23 2000/11/16 11:39:37 simonmar Exp $
+-- $Id: Main.hs,v 1.24 2000/11/16 15:57:06 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -16,7 +16,10 @@ module Main (main) where
 #include "HsVersions.h"
 
 import CompManager
+import Interpreter
+#ifdef GHCI
 import InteractiveUI
+#endif
 import DriverPipeline
 import DriverState
 import DriverFlags
@@ -281,6 +284,9 @@ beginMake pkg_details mods
 		     return ()
 	 _     -> throwDyn (UsageError "only one module allowed with --make")
 
+#ifndef GHCI
+beginInteractive = throwDyn (OtherError "not build for interactive use")
+#else
 beginInteractive pkg_details mods
   = do state <- cmInit pkg_details Interactive
        case mods of
@@ -289,5 +295,4 @@ beginInteractive pkg_details mods
 	   _     -> throwDyn (UsageError 
 				"only one module allowed with --interactive")
        interactiveUI state
-
-
+#endif

@@ -18,29 +18,33 @@ import Maybes		( maybeToBool )
 import Outputable
 import UniqFM		( emptyUFM, lookupUFM, addToUFM, delListFromUFM )
 import Digraph		( SCC(..), stronglyConnComp, flattenSCC, flattenSCCs )
-import Panic		( panic )
 
 import CmLink 		( PersistentLinkerState, emptyPLS, Linkable(..), 
 			  link, LinkResult(..), 
 			  filterModuleLinkables, modname_of_linkable,
 			  is_package_linkable, findModuleLinkable )
+import CmTypes
+import HscTypes
 import Interpreter	( HValue )
-import CmSummarise	( summarise, ModSummary(..), 
-			  name_of_summary, {-, is_source_import-} )
 import Module		( ModuleName, moduleName, packageOfModule, 
 			  isModuleInThisPackage, PackageName, moduleEnvElts,
 			  moduleNameUserString )
 import CmStaticInfo	( Package(..), PackageConfigInfo, GhciMode )
-import DriverPipeline 	( compile, preprocess, doLink, CompResult(..) )
+import DriverPipeline
+import GetImports
 import HscTypes		( HomeSymbolTable, HomeIfaceTable, 
 			  PersistentCompilerState, ModDetails(..) )
 import Name		( lookupNameEnv )
+import Module
 import PrelNames	( mainName )
 import HscMain		( initPersistentCompilerState )
 import Finder		( findModule, emptyHomeDirCache )
 import DriverUtil	( BarfKind(..) )
+import Util
+import Panic		( panic )
+
 import Exception	( throwDyn )
-import IO		( hPutStrLn, stderr )
+import IO
 \end{code}
 
 
@@ -143,7 +147,7 @@ cmLoadModule cmstate1 rootname
         -- Throw away the old home dir cache
         emptyHomeDirCache
 
-        putStr "cmLoadModule: downsweep begins\n"
+        hPutStr stderr "cmLoadModule: downsweep begins\n"
         mg2unsorted <- downsweep [rootname]
 
         let modnames1   = map name_of_summary mg1
@@ -159,8 +163,8 @@ cmLoadModule cmstate1 rootname
         -- upsweep.
         let mg2_with_srcimps = topological_sort True mg2unsorted
       
-        putStrLn "after tsort:\n"
-        putStrLn (showSDoc (vcat (map ppr mg2)))
+        hPutStrLn stderr "after tsort:\n"
+        hPutStrLn stderr (showSDoc (vcat (map ppr mg2)))
 
         -- Because we don't take into account source imports when doing
         -- the topological sort, there shouldn't be any cycles in mg2.
@@ -189,9 +193,9 @@ cmLoadModule cmstate1 rootname
 
          then 
            -- Easy; just relink it all.
-           do putStrLn "UPSWEEP COMPLETELY SUCCESSFUL"
+           do hPutStrLn stderr "UPSWEEP COMPLETELY SUCCESSFUL"
               linkresult 
-                 <- link doLink ghci_mode (any exports_main (moduleEnvElts hst3)) 
+                 <- link ghci_mode (any exports_main (moduleEnvElts hst3)) 
                          newLis pls1
               case linkresult of
                  LinkErrs _ _
@@ -208,7 +212,7 @@ cmLoadModule cmstate1 rootname
            -- Tricky.  We need to back out the effects of compiling any
            -- half-done cycles, both so as to clean up the top level envs
            -- and to avoid telling the interactive linker to link them.
-           do putStrLn "UPSWEEP PARTIALLY SUCCESSFUL"
+           do hPutStrLn stderr "UPSWEEP PARTIALLY SUCCESSFUL"
 
               let modsDone_names
                      = map name_of_summary modsDone
@@ -225,7 +229,7 @@ cmLoadModule cmstate1 rootname
               let linkables_to_link 
                      = map (findModuleLinkable ui4) mods_to_keep_names
 
-              linkresult <- link doLink ghci_mode False linkables_to_link pls1
+              linkresult <- link ghci_mode False linkables_to_link pls1
               case linkresult of
                  LinkErrs _ _
                     -> panic "cmLoadModule: link failed (2)"
@@ -407,7 +411,7 @@ downsweep rootNm
            | trace ("getSummary: "++ showSDoc (ppr nm)) True
            = do found <- findModule nm
 		case found of
-		   Just (mod, location) -> summarise preprocess mod location
+		   Just (mod, location) -> summarise mod location
 		   Nothing -> throwDyn (OtherError 
                                    ("no signs of life for module `" 
                                      ++ showSDoc (ppr nm) ++ "'"))
@@ -428,4 +432,24 @@ downsweep rootNm
                 if null newHomeSummaries
                  then return homeSummaries
                  else loop (newHomeSummaries ++ homeSummaries)
+
+
+summarise :: Module -> ModuleLocation -> IO ModSummary
+summarise mod location
+   | isModuleInThisPackage mod
+   = do let hs_fn = unJust (ml_hs_file location) "summarise"
+        hspp_fn <- preprocess hs_fn
+        modsrc <- readFile hspp_fn
+        let (srcimps,imps) = getImports modsrc
+
+--        maybe_timestamp
+--           <- case ml_hs_file location of 
+--                 Nothing     -> return Nothing
+--                 Just src_fn -> getModificationTime src_fn >>= Just
+
+        return (ModSummary mod location{ml_hspp_file=Just hspp_fn} 
+                               srcimps imps
+                                {-maybe_timestamp-} )
+   | otherwise
+   = return (ModSummary mod location [] [])
 \end{code}

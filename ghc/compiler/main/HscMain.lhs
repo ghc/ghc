@@ -173,7 +173,7 @@ hscRecomp dflags location maybe_checked_iface hst hit pcs_ch
       	     <- renameModule dflags hit hst pcs_ch this_mod rdr_module
       	; case maybe_rn_result of {
       	     Nothing -> return (HscFail pcs_rn);
-      	     Just (print_unqualified, (is_exported, new_iface, rn_hs_decls)) -> do {
+      	     Just (print_unqualified, is_exported, new_iface, rn_hs_decls) -> do {
     
  	    -------------------
  	    -- TYPECHECK
@@ -372,8 +372,7 @@ hscExpr
 
 hscExpr dflags hst hit pcs this_module expr
   = do	{ 	-- Parse it
-	  let unqual = unQualInScope 
-	; maybe_parsed <- myParseExpr dflags expr
+	  maybe_parsed <- myParseExpr dflags expr
 	; case maybe_parsed of {
       	     Nothing -> return (HscFail pcs_ch);
       	     Just parsed_expr -> do {

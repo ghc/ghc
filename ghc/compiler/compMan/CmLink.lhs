@@ -10,18 +10,25 @@ module CmLink ( Linkable(..),  Unlinked(..),
 		modname_of_linkable, is_package_linkable,
 		LinkResult(..),
                 link, 
-                PersistentLinkerState{-abstractly!-}, emptyPLS )
-where
+		unload,
+                PersistentLinkerState{-abstractly!-}, emptyPLS
+  ) where
 
 
 import Interpreter
-import CmStaticInfo	( PackageConfigInfo, GhciMode(..) )
+import DriverPipeline
+import CmTypes
+import CmStaticInfo	( GhciMode(..) )
 import Module		( ModuleName, PackageName )
 import Outputable	( SDoc )
 import FiniteMap
 import Digraph		( SCC(..), flattenSCC )
 import Outputable
+import Exception
+import DriverUtil
 import Panic		( panic )
+
+import IO
 
 #include "HsVersions.h"
 \end{code}
@@ -53,40 +60,6 @@ data LinkResult
    = LinkOK   PersistentLinkerState
    | LinkErrs PersistentLinkerState [SDoc]
 
-data Unlinked
-   = DotO FilePath
-   | DotA FilePath
-   | DotDLL FilePath
-   | Trees [UnlinkedIBind] ItblEnv  -- bunch of interpretable bindings, +
-				    -- a mapping from DataCons to their itbls
-
-instance Outputable Unlinked where
-   ppr (DotO path)   = text "DotO" <+> text path
-   ppr (DotA path)   = text "DotA" <+> text path
-   ppr (DotDLL path) = text "DotDLL" <+> text path
-   ppr (Trees binds _) = text "Trees" <+> ppr binds
-
-
-isObject (DotO _) = True
-isObject (DotA _) = True
-isObject (DotDLL _) = True
-isObject _ = False
-
-nameOfObject (DotO fn)   = fn
-nameOfObject (DotA fn)   = fn
-nameOfObject (DotDLL fn) = fn
-
-isInterpretable (Trees _ _) = True
-isInterpretable _ = False
-
-data Linkable
-   = LM ModuleName [Unlinked]
-   | LP PackageName
-
-instance Outputable Linkable where
-   ppr (LM mod_nm unlinkeds) = text "LinkableM" <+> ppr mod_nm <+> ppr unlinkeds
-   ppr (LP package_nm)       = text "LinkableP" <+> ptext package_nm
-
 findModuleLinkable :: [Linkable] -> ModuleName -> Linkable
 findModuleLinkable lis mod 
    = case [LM nm us | LM nm us <- lis, nm == mod] of
@@ -104,73 +77,53 @@ emptyPLS = return (PersistentLinkerState {})
 \end{code}
 
 \begin{code}
--- The first arg is supposed to be DriverPipeline.doLink.
--- Passed in here to avoid a hard-to-avoid circular dependency
--- between CmLink and DriverPipeline.  Same deal as with
--- CmSummarise.summarise.
-link :: ([String] -> IO ()) 
-     -> GhciMode		-- interactive or batch
+link :: GhciMode		-- interactive or batch
      -> Bool			-- attempt linking in batch mode?
      -> [Linkable] 		-- only contains LMs, not LPs
      -> PersistentLinkerState 
      -> IO LinkResult
 
-#ifndef GHCI_NOTYET
---link = panic "CmLink.link: not implemented"
+-- For the moment, in the batch linker, we don't bother to tell doLink
+-- which packages to link -- it just tries all that are available.
+-- batch_attempt_linking should only be *looked at* in batch mode.  It
+-- should only be True if the upsweep was successful and someone
+-- exports main, i.e., we have good reason to believe that linking
+-- will succeed.
 
--- For the moment, in the batch linker, we don't bother to
--- tell doLink which packages to link -- it just tries all that
--- are available.
--- batch_attempt_linking should only be *looked at* in 
--- batch mode.  It should only be True if the upsweep was
--- successful and someone exports main, i.e., we have good
--- reason to believe that linking will succeed.
-link doLink Batch batch_attempt_linking linkables pls1
+-- There will be (ToDo: are) two lists passed to link.  These
+-- correspond to
+--
+--	1. The list of all linkables in the current home package.  This is
+--	   used by the batch linker to link the program, and by the interactive
+--	   linker to decide which modules from the previous link it can 
+--	   throw away.
+--	2. The list of modules on which we just called "compile".  This list
+--	   is used by the interactive linker to decide which modules need
+--	   to be actually linked this time around (or unlinked and re-linked 
+--	   if the module was recompiled).
+
+link Batch batch_attempt_linking linkables pls1
    | batch_attempt_linking
-   = do putStrLn "LINK(batch): linkables are ..."
-        putStrLn (showSDoc (vcat (map ppr linkables)))
+   = do hPutStrLn stderr "CmLink.link(batch): linkables are ..."
+        hPutStrLn stderr (showSDoc (vcat (map ppr linkables)))
         let o_files = concatMap getOfiles linkables
         doLink o_files
 	-- doLink only returns if it succeeds
-        putStrLn "LINK(batch): done"
+        hPutStrLn stderr "CmLink.link(batch): done"
         return (LinkOK pls1)
    | otherwise
-   = do putStrLn "LINKER(batch): upsweep (partially?) failed OR main not exported;"
-        putStrLn "               -- not doing linking"
+   = do hPutStrLn stderr "CmLink.link(batch): upsweep (partially?) failed OR main not exported;"
+        hPutStrLn stderr "               -- not doing linking"
         return (LinkOK pls1)
    where
-      getOfiles (LP _)    = panic "link.getOfiles: shouldn't get package linkables"
+      getOfiles (LP _)    = panic "CmLink.link(getOfiles): shouldn't get package linkables"
       getOfiles (LM _ us) = map nameOfObject (filter isObject us)
 
-link doLink Interactive batch_attempt_linking linkables pls1
-   = do putStrLn "LINKER(interactive): not yet implemented"
-        return (LinkOK pls1)
+link Interactive batch_attempt_linking linkables pls1
+   = linkObjs linkables pls1
 
 ppLinkableSCC :: SCC Linkable -> SDoc
 ppLinkableSCC = ppr . flattenSCC
-
-#else
-
-
-link pci [] pls = return (LinkOK pls)
-link pci (groupSCC:groups) pls = do
-   let group = flattenSCC groupSCC
-   -- the group is either all objects or all interpretable, for now
-   if all isObject group
-	then do mapM loadObj [ file | DotO file <- group ]
-	        resolveObjs
-		link pci groups pls
-    else if all isInterpretable group
-	then do (new_closure_env, new_itbl_env) <-
-		   linkIModules	(closure_env pls)
-				(itbl_env pls)
-				[ trees | Trees trees <- group ]
-	        link pci groups (PersistentLinkerState{
-				   closure_env=new_closure_env,
-				   itbl_env=new_itbl_env})
-    else
-	return (LinkErrs pls (ptext SLIT("linker: group must contain all objects or all interpreted modules")))
-#endif
 
 
 modname_of_linkable (LM nm _) = nm
@@ -190,4 +143,58 @@ filterModuleLinkables p (li:lis)
      where
         dump   = filterModuleLinkables p lis
         retain = li : dump
+
+-----------------------------------------------------------------------------
+-- Linker for interactive mode
+
+#ifndef GHCI
+linkObjs = panic "CmLink.linkObjs: no interpreter"
+#else
+linkObjs [] pls = linkFinish pls [] []
+linkObjs (l@(LM _ uls) : ls) pls
+   | all isObject uls = do
+	mapM_ loadObj [ file | DotO file <- uls ] 
+	linkObjs ls pls
+   | all isInterpretable uls  = linkInterpretedCode (l:ls) [] [] pls
+   | otherwise                = invalidLinkable
+linkObjs _ pls = 
+   throwDyn (OtherError "CmLink.linkObjs: found package linkable")
+
+ 
+linkInterpretedCode [] mods ul_trees pls = linkFinish pls mods ul_trees
+linkInterpretedCode (LM m uls : ls) mods ul_trees pls
+   | all isInterpretable uls = 
+	linkInterpretedCode ls (m:mods) (uls++ul_trees) pls
+        
+   | any isObject uls
+        = throwDyn (OtherError "can't link object code that depends on interpreted code")
+   | otherwise = invalidLinkable
+linkInterpretedCode _ _ _ pls = 
+   throwDyn (OtherError "CmLink.linkInterpretedCode: found package linkable")
+
+invalidLinkable = throwDyn (OtherError "linkable doesn't contain entirely objects interpreted code")
+
+
+-- link all the interpreted code in one go.  We first remove from the
+-- various environments any previous versions of these modules.
+linkFinish pls mods ul_trees = do
+   let itbl_env'    = filterRdrNameEnv mods (itbl_env pls)
+       closure_env' = filterRdrNameEnv mods (closure_env pls)
+       stuff        = [ (trees,itbls) | Trees trees itbls <- ul_trees ]
+
+   (ibinds, new_itbl_env, new_closure_env) <-
+	linkIModules closure_env' itbl_env'  stuff
+
+   let new_pls = PersistentLinkerState {
+				  closure_env = new_closure_env,
+				  itbl_env    = new_itbl_env
+			}
+   resolveObjs
+   return (LinkOK new_pls)
+
+-- purge the current "linked image"
+unload :: PersistentLinkerState -> IO PersistentLinkerState
+unload pls = return pls{ closure_env = emptyFM, itbl_env = emptyFM }
+
+#endif
 \end{code}

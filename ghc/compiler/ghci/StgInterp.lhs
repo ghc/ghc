@@ -6,7 +6,7 @@
 \begin{code}
 
 module StgInterp ( 
-    ClosureEnv, ItblEnv,
+    ClosureEnv, ItblEnv, filterRdrNameEnv, 
     linkIModules,
     stgToInterpSyn,
  ) where
@@ -39,6 +39,7 @@ import Literal		( Literal(..) )
 import Type		( Type, typePrimRep, deNoteType, repType, funResultTy )
 import DataCon		( DataCon, dataConTag, dataConRepArgTys )
 import ClosureInfo	( mkVirtHeapOffsets )
+import Module		( ModuleName )
 import Name		( toRdrName )
 import UniqFM
 import UniqSet
@@ -75,6 +76,11 @@ import CTypes
 type ItblEnv    = FiniteMap RdrName (Ptr StgInfoTable)
 type ClosureEnv = FiniteMap RdrName HValue
 emptyClosureEnv = emptyFM
+
+-- remove all entries for a given set of modules from the environment
+filterRdrNameEnv :: [ModuleName] -> FiniteMap RdrName a -> FiniteMap RdrName a
+filterRdrNameEnv mods env 
+   = filterFM (\n _ -> rdrNameModule n `notElem` mods) env
 
 -- ---------------------------------------------------------------------------
 -- Run our STG program through the interpreter
@@ -421,7 +427,7 @@ linkIModules gce gie mods = do
   let {-rec-}
       new_gce = addListToFM gce (zip top_level_binders new_rhss)
       new_rhss = map (\b -> evalP (bindee b) emptyUFM) new_binds
-    ---vvvvvvvvv---------------------------------------^^^^^^^^^-- circular
+    --vvvvvvvvv----------------------------------------^^^^^^^^^-- circular
       new_binds = linkIBinds final_gie new_gce binds
 
   return (new_binds, final_gie, new_gce)
@@ -432,9 +438,6 @@ linkIModules gce gie mods = do
 -- lot of hassle so for now I'll look up external things as they crop
 -- up and not cache them in the source symbol tables.  The interpreted
 -- code will still be referenced in the source symbol tables.
-
--- JRS 001025: above comment is probably out of date ... interpret
--- with care.
 
 linkIBinds :: ItblEnv -> ClosureEnv -> [UnlinkedIBind] -> [LinkedIBind]
 linkIBinds ie ce binds = map (linkIBind ie ce) binds
@@ -1136,16 +1139,16 @@ vecret_entry 6 = mci_constr7_entry
 vecret_entry 7 = mci_constr8_entry
 
 -- entry point for direct returns for created constr itbls
-foreign label "mci_constr_entry" mci_constr_entry :: Addr
+foreign label "stg_mci_constr_entry" mci_constr_entry :: Addr
 -- and the 8 vectored ones
-foreign label "mci_constr1_entry" mci_constr1_entry :: Addr
-foreign label "mci_constr2_entry" mci_constr2_entry :: Addr
-foreign label "mci_constr3_entry" mci_constr3_entry :: Addr
-foreign label "mci_constr4_entry" mci_constr4_entry :: Addr
-foreign label "mci_constr5_entry" mci_constr5_entry :: Addr
-foreign label "mci_constr6_entry" mci_constr6_entry :: Addr
-foreign label "mci_constr7_entry" mci_constr7_entry :: Addr
-foreign label "mci_constr8_entry" mci_constr8_entry :: Addr
+foreign label "stg_mci_constr1_entry" mci_constr1_entry :: Addr
+foreign label "stg_mci_constr2_entry" mci_constr2_entry :: Addr
+foreign label "stg_mci_constr3_entry" mci_constr3_entry :: Addr
+foreign label "stg_mci_constr4_entry" mci_constr4_entry :: Addr
+foreign label "stg_mci_constr5_entry" mci_constr5_entry :: Addr
+foreign label "stg_mci_constr6_entry" mci_constr6_entry :: Addr
+foreign label "stg_mci_constr7_entry" mci_constr7_entry :: Addr
+foreign label "stg_mci_constr8_entry" mci_constr8_entry :: Addr
 
 
 
