@@ -81,7 +81,8 @@ cat >mk/build.mk <<END
 GhcHcOpts = -O -dcore-lint -H24m
 GhcCompilerWays =
 GhcLibWays = 
-GhcLibHcOpts = -O -H24m -split-objs -odir \$* 
+GhcLibHcOpts = -O -H24m
+SplitObjs = YES 
 GhcLibsWithReadline = YES
 StripLibraries = YES
 SRC_HAPPY_OPTS += -c
