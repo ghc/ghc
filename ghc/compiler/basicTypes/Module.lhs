@@ -183,9 +183,7 @@ instance Ord Module where
 \begin{code}
 pprModule :: Module -> SDoc
 pprModule (Module mod p) = getPprStyle $ \ sty ->
-			   if userStyle sty then
-				text (moduleNameUserString mod)				
-			   else if debugStyle sty then
+			   if debugStyle sty then
 				-- Print the package too
 				text (show p) <> dot <> pprModuleName mod
 			   else

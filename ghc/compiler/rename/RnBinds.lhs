@@ -379,12 +379,6 @@ rnMethodBinds (FunMonoBind name inf matches locn)
     mapRn_ (checkPrecMatch inf sel_name) new_matches	`thenRn_`
     returnRn (FunMonoBind sel_name inf new_matches locn, fvs `addOneFV` sel_name)
 
-rnMethodBinds (PatMonoBind (VarPatIn name) grhss locn)
-  = pushSrcLocRn locn			$
-    lookupGlobalOccRn name		`thenRn` \ sel_name -> 
-    rnGRHSs grhss			`thenRn` \ (grhss', fvs) ->
-    returnRn (PatMonoBind (VarPatIn sel_name) grhss' locn, fvs `addOneFV` sel_name)
-
 -- Can't handle method pattern-bindings which bind multiple methods.
 rnMethodBinds mbind@(PatMonoBind other_pat _ locn)
   = pushSrcLocRn locn	$

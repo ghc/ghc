@@ -476,7 +476,7 @@ badFieldCon con field
 
 polyPatSig :: TcType -> SDoc
 polyPatSig sig_ty
-  = hang (ptext SLIT("Polymorphic type signature in pattern"))
+  = hang (ptext SLIT("Illegal polymorphic type signature in pattern:"))
 	 4 (ppr sig_ty)
 \end{code}
 

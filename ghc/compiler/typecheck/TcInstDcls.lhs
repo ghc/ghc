@@ -538,12 +538,9 @@ scrutiniseInstanceHead clas inst_taus
     Just (tycon, arg_tys) = maybe_tycon_app
 
 	-- Stuff for an *algebraic* data type
-    alg_tycon_app_maybe	           = splitAlgTyConApp_maybe first_inst_tau
-					-- The "Alg" part looks through synonyms
-    is_alg_tycon_app		   = maybeToBool alg_tycon_app_maybe
-    Just (alg_tycon, _, data_cons) = alg_tycon_app_maybe
-
-    constructors_visible = not (null data_cons)
+    alg_tycon_app_maybe	   = splitAlgTyConApp_maybe first_inst_tau
+				-- The "Alg" part looks through synonyms
+    Just (alg_tycon, _, _) = alg_tycon_app_maybe
  
 ccallable_type   ty = isFFIArgumentTy False {- Not safe call -} ty
 creturnable_type ty = isFFIResultTy ty

@@ -54,6 +54,7 @@ import PprCore		()	-- Instances
 import Rules		( RuleBase )
 import CostCentre	( CostCentreStack, subsumedCCS )
 import Name		( isLocallyDefined )
+import OccName		( UserFS )
 import Var		( TyVar )
 import VarEnv
 import VarSet
@@ -674,20 +675,19 @@ setSimplBinderStuff (subst, us) m env _ sc
 
 
 \begin{code}
-newId :: Type -> (Id -> SimplM a) -> SimplM a
+newId :: UserFS -> Type -> (Id -> SimplM a) -> SimplM a
 	-- Extends the in-scope-env too
-newId ty m env@(SimplEnv {seSubst = subst}) us sc
+newId fs ty m env@(SimplEnv {seSubst = subst}) us sc
   =  case splitUniqSupply us of
 	(us1, us2) -> m v (env {seSubst = Subst.extendInScope subst v}) us2 sc
 		   where
-		      v = mkSysLocal SLIT("s") (uniqFromSupply us1) ty
+		      v = mkSysLocal fs (uniqFromSupply us1) ty
 
-newIds :: [Type] -> ([Id] -> SimplM a) -> SimplM a
-newIds tys m env@(SimplEnv {seSubst = subst}) us sc
+newIds :: UserFS -> [Type] -> ([Id] -> SimplM a) -> SimplM a
+newIds fs tys m env@(SimplEnv {seSubst = subst}) us sc
   =  case splitUniqSupply us of
 	(us1, us2) -> m vs (env {seSubst = Subst.extendInScopes subst vs}) us2 sc
 		   where
-		      vs = zipWithEqual "newIds" (mkSysLocal SLIT("s")) 
+		      vs = zipWithEqual "newIds" (mkSysLocal fs) 
 					(uniqsFromSupply (length tys) us1) tys
-
 \end{code}

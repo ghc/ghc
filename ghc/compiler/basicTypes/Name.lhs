@@ -37,7 +37,7 @@ module Name (
 
 	-- Class NamedThing and overloaded friends
 	NamedThing(..),
-	getSrcLoc, isLocallyDefined, getOccString
+	getSrcLoc, isLocallyDefined, getOccString, toRdrName
     ) where
 
 #include "HsVersions.h"
@@ -423,6 +423,12 @@ nameRdrName :: Name -> RdrName
 nameRdrName (Name { n_sort = Local, n_occ = occ }) = mkRdrUnqual occ
 nameRdrName (Name { n_sort = sort,  n_occ = occ }) = mkRdrQual (moduleName (nameSortModule sort)) occ
 
+ifaceNameRdrName :: Name -> RdrName
+-- Makes a qualified naem for imported things, 
+-- and an unqualified one for local things
+ifaceNameRdrName n | isLocallyDefined n = mkRdrUnqual (nameOccName n)
+		   | otherwise		= mkRdrQual   (moduleName (nameModule n)) (nameOccName n) 
+
 isUserExportedName (Name { n_prov = LocalDef _ Exported }) = True
 isUserExportedName other			           = False
 
@@ -622,10 +628,12 @@ class NamedThing a where
 getSrcLoc	    :: NamedThing a => a -> SrcLoc
 isLocallyDefined    :: NamedThing a => a -> Bool
 getOccString	    :: NamedThing a => a -> String
+toRdrName	    :: NamedThing a => a -> RdrName
 
 getSrcLoc	    = nameSrcLoc	   . getName
 isLocallyDefined    = isLocallyDefinedName . getName
 getOccString x	    = occNameString (getOccName x)
+toRdrName	    = ifaceNameRdrName	   . getName
 \end{code}
 
 \begin{code}

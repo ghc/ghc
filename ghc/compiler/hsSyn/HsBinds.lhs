@@ -103,13 +103,17 @@ data MonoBinds id pat
   | AndMonoBinds    (MonoBinds id pat)
 		    (MonoBinds id pat)
 
-  | PatMonoBind     pat
-		    (GRHSs id pat)
-		    SrcLoc
-
-  | FunMonoBind     id
+  | FunMonoBind     id		-- Used for both functions 	f x = e
+				-- and variables		f = \x -> e
+				-- Reason: the Match stuff lets us have an optional
+				--	   result type sig	f :: a->a = ...mentions a...
 		    Bool		-- True => infix declaration
 		    [Match id pat]
+		    SrcLoc
+
+  | PatMonoBind     pat		-- The pattern is never a simple variable;
+				-- That case is done by FunMonoBind
+		    (GRHSs id pat)
 		    SrcLoc
 
   | VarMonoBind	    id			-- TRANSLATION

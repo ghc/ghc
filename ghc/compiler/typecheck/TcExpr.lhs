@@ -384,7 +384,6 @@ tcMonoExpr (HsCCall lbl args may_gc is_asm ignored_fake_result_ty) res_ty
     newTyVarTy boxedTypeKind  		`thenNF_Tc` \ result_ty ->
     let
 	io_result_ty = mkTyConApp ioTyCon [result_ty]
-	[ioDataCon]  = tyConDataCons ioTyCon
     in
     unifyTauTy res_ty io_result_ty		`thenTc_`
 
@@ -568,8 +567,8 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
                                     splitSigmaTy (idType sel_id)	-- Selectors can be overloaded
 									-- when the data type has a context
 	Just (data_ty, _)     	  = splitFunTy_maybe tau	-- Must succeed since sel_id is a selector
-	(tycon, _, data_cons) 	  = splitAlgTyConApp data_ty
-	(con_tyvars, theta, _, _, _, _) = dataConSig (head data_cons)
+	(tycon, _, data_cons) 	    = splitAlgTyConApp data_ty
+	(con_tyvars, _, _, _, _, _) = dataConSig (head data_cons)
     in
     tcInstTyVars con_tyvars			`thenNF_Tc` \ (_, result_inst_tys, _) ->
 

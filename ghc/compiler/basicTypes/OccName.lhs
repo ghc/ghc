@@ -19,7 +19,7 @@ module OccName (
 	mkDictOcc, mkIPOcc, mkWorkerOcc, mkMethodOcc, mkDefaultMethodOcc,
  	mkDerivedTyConOcc, mkClassTyConOcc, mkClassDataConOcc, mkSpecOcc,
 	
-	isTvOcc, isUvOcc, isDataOcc, isDataSymOcc, isSymOcc, isIPOcc, isValOcc,
+	isSysOcc, isTvOcc, isUvOcc, isDataOcc, isDataSymOcc, isSymOcc, isIPOcc, isValOcc,
 
 	occNameFS, occNameString, occNameUserString, occNameSpace, occNameFlavour, 
 	setOccNameSpace,
@@ -310,6 +310,13 @@ mkSpecOcc	   = mk_simple_deriv varName  "$s"
 mkForeignExportOcc = mk_simple_deriv varName  "$f"
 
 mk_simple_deriv sp px occ = mk_deriv sp px (occNameString occ)
+
+
+isSysOcc ::  OccName -> Bool	-- True for all these '$' things
+isSysOcc occ = case occNameUserString occ of
+		   ('$' : _ ) -> True
+		   other      -> False	-- We don't care about the ':' ones
+					-- isSysOcc is only called for Ids anyway
 \end{code}
 
 \begin{code}

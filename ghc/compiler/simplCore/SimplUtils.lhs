@@ -567,7 +567,7 @@ tryEtaExpansion rhs
   = returnSmpl rhs
 
   | otherwise	-- Consider eta expansion
-  = newIds y_tys						$ ( \ y_bndrs ->
+  = newIds SLIT("y") y_tys					$ ( \ y_bndrs ->
     tick (EtaExpansion (head y_bndrs))				`thenSmpl_`
     mapAndUnzipSmpl bind_z_arg (args `zip` trivial_args)	`thenSmpl` (\ (maybe_z_binds, z_args) ->
     returnSmpl (mkLams x_bndrs				$ 
@@ -582,7 +582,7 @@ tryEtaExpansion rhs
 
     bind_z_arg (arg, trivial_arg) 
 	| trivial_arg = returnSmpl (Nothing, arg)
-        | otherwise   = newId (exprType arg)	$ \ z ->
+        | otherwise   = newId SLIT("z") (exprType arg)	$ \ z ->
 			returnSmpl (Just (NonRec z arg), Var z)
 
 	-- Note: I used to try to avoid the exprType call by using

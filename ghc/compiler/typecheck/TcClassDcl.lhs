@@ -13,8 +13,8 @@ module TcClassDcl ( kcClassDecl, tcClassDecl1, tcClassDecls2, mkImplicitClassBin
 import HsSyn		( HsDecl(..), TyClDecl(..), Sig(..), MonoBinds(..),
 			  InPat(..), HsBinds(..), GRHSs(..),
 			  HsExpr(..), HsLit(..), HsType(..), HsPred(..),
-			  pprHsClassAssertion, unguardedRHS,
-			  andMonoBinds, andMonoBindList, getTyVarName,
+			  pprHsClassAssertion, mkSimpleMatch,
+			  andMonoBinds, andMonoBindList, getTyVarName, 
 			  isClassDecl, isClassOpSig, isPragSig, collectMonoBinders
 			)
 import HsPragmas	( ClassPragmas(..) )
@@ -248,8 +248,6 @@ tcClassContext class_name rec_class rec_tyvars context sc_sel_names
     returnTc (sc_theta', sc_tys, sc_sel_ids)
 
   where
-    rec_tyvar_tys = mkTyVarTys rec_tyvars
-
     check_constraint (HsPClass c tys) = checkTc (all is_tyvar tys)
 					        (superClassErr class_name (c, tys))
 
@@ -605,8 +603,6 @@ tcMethodBind clas origin inst_tyvars inst_tys inst_theta
 	-- but we must use the method name; so we substitute it here.  Crude but simple.
    find_bind meth_name (FunMonoBind op_name fix matches loc)
 	| op_name == sel_name = Just (FunMonoBind meth_name fix matches loc)
-   find_bind meth_name (PatMonoBind (VarPatIn op_name) grhss loc)
-	| op_name == sel_name = Just (PatMonoBind (VarPatIn meth_name) grhss loc)
    find_bind meth_name (AndMonoBinds b1 b2)
 			      = find_bind meth_name b1 `seqMaybe` find_bind meth_name b2
    find_bind meth_name other  = Nothing	-- Default case
@@ -624,8 +620,9 @@ tcMethodBind clas origin inst_tyvars inst_tys inst_theta
    find_prags meth_name (prag:prags) = find_prags meth_name prags
 
    mk_default_bind local_meth_name loc
-      = PatMonoBind (VarPatIn local_meth_name)
-		    (GRHSs (unguardedRHS (default_expr loc) loc) EmptyBinds Nothing)
+      = FunMonoBind local_meth_name
+		    False	-- Not infix decl
+		    [mkSimpleMatch [] (default_expr loc) Nothing loc]
 		    loc
 
    default_expr loc 

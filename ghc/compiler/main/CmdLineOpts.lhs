@@ -38,6 +38,7 @@ module CmdLineOpts (
 	opt_D_dump_stg,
 	opt_D_dump_stranal,
 	opt_D_dump_tc,
+	opt_D_dump_types,
         opt_D_dump_usagesp,
 	opt_D_dump_worker_wrapper,
 	opt_D_show_passes,
@@ -324,6 +325,7 @@ opt_D_dump_spec			= opt_D_dump_most || lookUp  SLIT("-ddump-spec")
 opt_D_dump_stg			= opt_D_dump_most || lookUp  SLIT("-ddump-stg")
 opt_D_dump_stranal		= opt_D_dump_most || lookUp  SLIT("-ddump-stranal")
 opt_D_dump_tc			= opt_D_dump_most || lookUp  SLIT("-ddump-tc")
+opt_D_dump_types		= opt_D_dump_most || lookUp  SLIT("-ddump-types")
 opt_D_dump_rules		= opt_D_dump_most || lookUp  SLIT("-ddump-rules")
 opt_D_dump_usagesp              = opt_D_dump_most || lookUp  SLIT("-ddump-usagesp")
 opt_D_dump_cse 	                = opt_D_dump_most || lookUp  SLIT("-ddump-cse")

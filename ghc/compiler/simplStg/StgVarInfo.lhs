@@ -22,7 +22,8 @@ import IdInfo		( ArityInfo(..), OccInfo(..),
 import PrimOp		( PrimOp(..), ccallMayGC )
 import TysWiredIn       ( isForeignObjTy )
 import Maybes		( maybeToBool, orElse )
-import Name		( isLocallyDefined )
+import Name		( isLocallyDefined, getOccName )
+import OccName		( occNameUserString )
 import BasicTypes       ( Arity )
 import Outputable
 
@@ -543,12 +544,8 @@ vars_let let_no_escape bind body
 
 	-- Compute the new let-expression
     let
-	new_let = if let_no_escape then
-		     -- trace "StgLetNoEscape!" (
-		     StgLetNoEscape live_in_whole_let bind_lvs bind2 body2
-		     -- )
-		  else
-		     StgLet bind2 body2
+	new_let | let_no_escape = StgLetNoEscape live_in_whole_let bind_lvs bind2 body2
+		| otherwise	= StgLet bind2 body2
 
 	free_in_whole_let
 	  = (bind_fvs `unionFVInfo` body_fvs) `minusFVBinders` binders
@@ -568,6 +565,18 @@ vars_let let_no_escape bind body
 						-- this let(rec)
 
 	no_binder_escapes = isEmptyVarSet (set_of_binders `intersectVarSet` all_escs)
+
+#ifdef DEBUG
+	-- Debugging code as requested by Andrew Kennedy
+	checked_no_binder_escapes
+		| not no_binder_escapes && any is_join_var binders
+		= pprTrace "Interesting!  A join var that isn't let-no-escaped" (ppr binders)
+		  False
+		| otherwise = no_binder_escapes
+#else
+	checked_no_binder_escapes = no_binder_escapes
+#endif
+			    
 		-- Mustn't depend on the passed-in let_no_escape flag, since
 		-- no_binder_escapes is used by the caller to derive the flag!
     in
@@ -575,7 +584,7 @@ vars_let let_no_escape bind body
 	new_let,
 	free_in_whole_let,
 	let_escs,
-	no_binder_escapes
+	checked_no_binder_escapes
     ))
   where
     set_of_binders = mkVarSet binders
@@ -626,6 +635,11 @@ vars_let let_no_escape bind body
 		in
 		returnLne (StgRec (binders' `zip` rhss2), fvs, escs, env_ext)
 	))
+
+is_join_var :: Id -> Bool
+-- A hack (used only for compiler debuggging) to tell if
+-- a variable started life as a join point ($j)
+is_join_var j = occNameUserString (getOccName j) == "$j"
 \end{code}
 
 %************************************************************************

@@ -898,7 +898,7 @@ prepareArgs no_case_of_case fun orig_cont thing_inside
 	= simplValArg arg_ty dem val_arg se (contResultType cont) 	$ \ new_arg ->
 		    -- A data constructor whose argument is now non-trivial;
 		    -- so let/case bind it.
-	  newId arg_ty 						$ \ arg_id ->
+	  newId SLIT("a") arg_ty				$ \ arg_id ->
 	  addNonRecBind arg_id new_arg				$
 	  go (Var arg_id : acc) ds' res_ty cont
 
@@ -1345,10 +1345,10 @@ prepareCaseAlts bndr (Just (tycon, inst_tys)) scrut_cons alts
 		   let
 			ex_tyvars' = zipWithEqual "simpl_alt" mk tv_uniqs ex_tyvars
 			mk uniq tv = mkSysTyVar uniq (tyVarKind tv)
+			arg_tys    = dataConArgTys data_con
+					  	   (inst_tys ++ mkTyVarTys ex_tyvars')
 		   in
-    		   newIds (dataConArgTys
-				data_con
-				(inst_tys ++ mkTyVarTys ex_tyvars'))		$ \ bndrs ->
+    		   newIds SLIT("a") arg_tys		$ \ bndrs ->
 		   returnSmpl ((DataAlt data_con, ex_tyvars' ++ bndrs, rhs) : alts_no_deflt)
 
 	other -> returnSmpl filtered_alts
@@ -1452,13 +1452,15 @@ mkDupableCont ty (InlinePlease cont) thing_inside
 
 mkDupableCont join_arg_ty (ArgOf _ cont_ty cont_fn) thing_inside
   = 	-- Build the RHS of the join point
-    newId join_arg_ty					( \ arg_id ->
+    newId SLIT("a") join_arg_ty				( \ arg_id ->
 	cont_fn (Var arg_id)				`thenSmpl` \ (binds, (_, rhs)) ->
 	returnSmpl (Lam (setOneShotLambda arg_id) (mkLets binds rhs))
     )							`thenSmpl` \ join_rhs ->
    
 	-- Build the join Id and continuation
-    newId (exprType join_rhs)		$ \ join_id ->
+	-- We give it a "$j" name just so that for later amusement
+	-- we can identify any join points that don't end up as let-no-escapes
+    newId SLIT("$j") (exprType join_rhs)		$ \ join_id ->
     let
 	new_cont = ArgOf OkToDup cont_ty
 			 (\arg' -> rebuild_done (App (Var join_id) arg'))
@@ -1476,9 +1478,9 @@ mkDupableCont ty (ApplyTo _ arg se cont) thing_inside
     if exprIsDupable arg' then
 	thing_inside (ApplyTo OkToDup arg' emptySubstEnv cont')
     else
-    newId (exprType arg')						$ \ bndr ->
+    newId SLIT("a") (exprType arg')			$ \ bndr ->
 
-    tick (CaseOfCase bndr)						`thenSmpl_`
+    tick (CaseOfCase bndr)				`thenSmpl_`
 	-- Want to tick here so that we go round again,
 	-- and maybe copy or inline the code;
 	-- not strictly CaseOf Case
@@ -1574,14 +1576,15 @@ mkDupableAlt case_bndr case_bndr' cont alt@(con, bndrs, rhs)
 	--	            then 78
 	--		    else 5
 
-	then newId realWorldStatePrimTy  $ \ rw_id ->
+	then newId SLIT("w") realWorldStatePrimTy  $ \ rw_id ->
 	     returnSmpl ([rw_id], [Var realWorldPrimId])
 	else 
 	     returnSmpl (used_bndrs', map varToCoreExpr used_bndrs)
     )
 	`thenSmpl` \ (final_bndrs', final_args) ->
 
-    newId (foldr (mkFunTy . idType) rhs_ty' final_bndrs')	$ \ join_bndr ->
+	-- See comment about "$j" name above
+    newId SLIT("$j") (foldr (mkFunTy . idType) rhs_ty' final_bndrs')	$ \ join_bndr ->
 
 	-- Notice that we make the lambdas into one-shot-lambdas.  The
 	-- join point is sure to be applied at most once, and doing so

@@ -341,11 +341,11 @@ tcCoreAlt scrut_ty (UfDataAlt con_name, names, rhs)
 
 	(main_tyvars, _, ex_tyvars, _, _, _) = dataConSig con
 
-	(tycon, inst_tys, cons) = splitAlgTyConApp scrut_ty
-	ex_tyvars'		= [mkTyVar name (tyVarKind tv) | (name,tv) <- names `zip` ex_tyvars] 
-	ex_tys'			= mkTyVarTys ex_tyvars'
-	arg_tys			= dataConArgTys con (inst_tys ++ ex_tys')
-	id_names		= drop (length ex_tyvars) names
+	(_, inst_tys, cons) = splitAlgTyConApp scrut_ty
+	ex_tyvars'	    = [mkTyVar name (tyVarKind tv) | (name,tv) <- names `zip` ex_tyvars] 
+	ex_tys'		    = mkTyVarTys ex_tyvars'
+	arg_tys		    = dataConArgTys con (inst_tys ++ ex_tys')
+	id_names	    = drop (length ex_tyvars) names
 	arg_ids
 #ifdef DEBUG
 		| length id_names /= length arg_tys

@@ -11,7 +11,7 @@ module TcModule (
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_D_dump_tc )
+import CmdLineOpts	( opt_D_dump_tc, opt_D_dump_types, opt_PprStyle_Debug )
 import HsSyn		( HsModule(..), HsBinds(..), MonoBinds(..), HsDecl(..) )
 import RnHsSyn		( RenamedHsModule )
 import TcHsSyn		( TcMonoBinds, TypecheckedMonoBinds, 
@@ -27,7 +27,7 @@ import TcDefaults	( tcDefaults )
 import TcEnv		( tcExtendGlobalValEnv, tcExtendTypeEnv,
 			  getEnvTyCons, getEnvClasses, tcLookupValueMaybe,
 			  explicitLookupValueByKey, tcSetValueEnv,
-			  tcLookupTyCon, initEnv, 
+			  tcLookupTyCon, initEnv, valueEnvIds,
 			  ValueEnv, TcTyThing(..)
 			)
 import TcExpr		( tcId )
@@ -49,7 +49,10 @@ import Bag		( isEmptyBag )
 import ErrUtils		( Message, printErrorsAndWarnings, dumpIfSet )
 import Id		( Id, idType )
 import Module           ( pprModuleName )
-import Name		( Name, nameUnique, isLocallyDefined, NamedThing(..) )
+import OccName		( isSysOcc )
+import Name		( Name, nameUnique, nameOccName, isLocallyDefined, 
+			  toRdrName, NamedThing(..)
+			)
 import TyCon		( TyCon, tyConKind )
 import Class		( Class, classSelIds, classTyCon )
 import Type		( mkTyConApp, mkForAllTy,
@@ -104,17 +107,18 @@ typecheckModule us rn_name_supply iface_det mod
 	Nothing      -> return ()
     ) 									>>
 
-    dumpIfSet opt_D_dump_tc "Typechecked"
-	(case maybe_result of
-	    Just results -> ppr (tc_binds results) 
-			    $$ 
-			    pp_rules (tc_rules results)
-	    Nothing 	 -> text "Typecheck failed") 	>>
-
+    (case maybe_result of
+	Nothing -> return ()
+	Just results -> dumpIfSet opt_D_dump_tc    "Typechecked"     (dump_tc   results)
+    )						>>
+			
     return (if isEmptyBag errs then 
 		maybe_result 
 	    else 
 		Nothing)
+
+dump_tc results
+  = ppr (tc_binds results) $$ pp_rules (tc_rules results) 
 
 pp_rules [] = empty
 pp_rules rs = vcat [ptext SLIT("{-# RULES"),

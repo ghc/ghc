@@ -548,7 +548,7 @@ ifaceTyCon tycon
 		  braces $ hsep $ punctuate comma (map ppr_field (strict_marks `zip` field_labels))
 	 	]
           where
-	   (tyvars1, theta1, ex_tyvars, ex_theta, arg_tys, tycon1) = dataConSig data_con
+	   (tyvars1, _, ex_tyvars, ex_theta, arg_tys, tycon1) = dataConSig data_con
            field_labels   = dataConFieldLabels data_con
            strict_marks   = dataConStrictMarks data_con
 	   name           = getName            data_con

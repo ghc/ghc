@@ -373,8 +373,6 @@ dsExpr (TyApp expr tys)
 dsExpr (ExplicitListOut ty xs)
   = go xs
   where
-    list_ty   = mkListTy ty
-
     go []     = returnDs (mkNilExpr ty)
     go (x:xs) = dsExpr x				`thenDs` \ core_x ->
 		go xs					`thenDs` \ core_xs ->
@@ -490,10 +488,10 @@ dsExpr (RecordUpdOut record_expr record_out_ty dicts rbinds)
 	-- necessary so that we don't lose sharing
 
     let
-	record_in_ty		   = exprType record_expr'
-	(tycon, in_inst_tys, cons) = splitAlgTyConApp record_in_ty
-	(_,     out_inst_tys, _)   = splitAlgTyConApp record_out_ty
-	cons_to_upd  	 	   = filter has_all_fields cons
+	record_in_ty	       = exprType record_expr'
+	(_, in_inst_tys, cons) = splitAlgTyConApp record_in_ty
+	(_, out_inst_tys, _)   = splitAlgTyConApp record_out_ty
+	cons_to_upd  	       = filter has_all_fields cons
 
 	mk_val_arg field old_arg_id 
 	  = case [rhs | (sel_id, rhs, _) <- rbinds, 

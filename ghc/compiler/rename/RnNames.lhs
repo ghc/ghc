@@ -34,7 +34,6 @@ import PrelMods
 import PrelInfo ( main_RDR )
 import UniqFM	( lookupUFM )
 import Bag	( bagToList )
-import Maybes	( maybeToBool, catMaybes )
 import Module	( ModuleName, mkThisModule, pprModuleName, WhereFrom(..) )
 import NameSet
 import Name	( Name, ExportFlag(..), ImportReason(..), Provenance(..),
@@ -46,6 +45,8 @@ import OccName	( setOccNameSpace, dataName )
 import SrcLoc	( SrcLoc )
 import NameSet	( elemNameSet, emptyNameSet )
 import Outputable
+import Maybes	( maybeToBool, catMaybes, mapMaybe )
+import UniqFM   ( emptyUFM, listToUFM, plusUFM_C )
 import Unique	( getUnique )
 import Util	( removeDups, equivClassesByUniq, sortLt )
 import List	( partition )
@@ -241,27 +242,29 @@ importsFromImportDecl is_unqual (ImportDecl imp_mod_name from qual_only as_mod i
 	returnRn (emptyRdrEnv, mkEmptyExportAvails imp_mod_name)
     else
 
-    filterImports imp_mod_name import_spec avails
-    `thenRn` \ (filtered_avails, hides, explicits) ->
+    filterImports imp_mod_name import_spec avails   `thenRn` \ (filtered_avails, hides, explicits) ->
 
+    qualifyImports imp_mod_name
+		   (not qual_only)	-- Maybe want unqualified names
+		   as_mod hides
+		   (improveAvails imp_mod iloc explicits 
+				  is_unqual filtered_avails)
+
+
+improveAvails imp_mod iloc explicits is_unqual avails
 	-- We 'improve' the provenance by setting
 	--	(a) the import-reason field, so that the Name says how it came into scope
 	--		including whether it's explicitly imported
 	--	(b) the print-unqualified field
-	-- But don't fiddle with wired-in things or we get in a twist
-    let
-	improve_prov name =
-	 setNameProvenance name (NonLocalDef (UserImport imp_mod iloc (is_explicit name)) 
-					     (is_unqual name))
-	is_explicit name  = name `elemNameSet` explicits
-    in
-    qualifyImports imp_mod_name
-		   (not qual_only)	-- Maybe want unqualified names
-		   as_mod hides
-		   filtered_avails improve_prov
-    `thenRn` \ (rdr_name_env, mod_avails) ->
+  = map improve_avail avails
+  where
+    improve_avail (Avail n)      = Avail (improve n)
+    improve_avail (AvailTC n ns) = AvailTC n (map improve ns)	-- n doesn't matter
 
-    returnRn (rdr_name_env, mod_avails)
+    improve name = setNameProvenance name 
+			(NonLocalDef (UserImport imp_mod iloc (is_explicit name)) 
+				     (is_unqual name))
+    is_explicit name  = name `elemNameSet` explicits
 \end{code}
 
 
@@ -290,7 +293,6 @@ importsFromLocalDecls mod_name rec_exp_fn decls
 		   Nothing	-- no 'as M'
 		   []		-- Hide nothing
 		   avails
-		   (\n -> n)
 
   where
     mod = mkThisModule mod_name
@@ -437,9 +439,6 @@ filterImports mod (Just (want_hiding, import_items)) avails
 	  Nothing    -> bale_out item
 	  Just avail -> returnRn [(avail, availNames avail)]
 
-    ok_dotdot_item (AvailTC _ [n]) = False
-    ok_dotdot_item other = True
-
     check_item item
       | not (maybeToBool maybe_in_import_avails) ||
 	not (maybeToBool maybe_filtered_avail)
@@ -476,14 +475,9 @@ qualifyImports :: ModuleName		-- Imported module
 	       -> Maybe ModuleName	-- Optional "as M" part 
 	       -> [AvailInfo]		-- What's to be hidden
 	       -> Avails		-- Whats imported and how
-	       -> (Name -> Name) 	-- Improves the provenance on imported things
 	       -> RnMG (GlobalRdrEnv, ExportAvails)
-	-- NB: the Names in ExportAvails don't have the improve-provenance
-	--     function applied to them
-	-- We could fix that, but I don't think it matters
 
-qualifyImports this_mod unqual_imp as_mod hides
-	       avails improve_prov
+qualifyImports this_mod unqual_imp as_mod hides avails
   = 
  	-- Make the name environment.  We're talking about a 
 	-- single module here, so there must be no name clashes.
@@ -513,14 +507,49 @@ qualifyImports this_mod unqual_imp as_mod hides
 	| unqual_imp = env2
 	| otherwise  = env1
 	where
-	  env1 = addOneToGlobalRdrEnv env  (mkRdrQual qual_mod occ) better_name
-	  env2 = addOneToGlobalRdrEnv env1 (mkRdrUnqual occ) 	    better_name
-	  occ         = nameOccName name
-	  better_name = improve_prov name
+	  env1 = addOneToGlobalRdrEnv env  (mkRdrQual qual_mod occ) name
+	  env2 = addOneToGlobalRdrEnv env1 (mkRdrUnqual occ) 	    name
+	  occ  = nameOccName name
 
     del_avail env avail = foldl delOneFromGlobalRdrEnv env rdr_names
 			where
 			  rdr_names = map (mkRdrUnqual . nameOccName) (availNames avail)
+
+
+mkEmptyExportAvails :: ModuleName -> ExportAvails
+mkEmptyExportAvails mod_name = (unitFM mod_name [], emptyUFM)
+
+mkExportAvails :: ModuleName -> Bool -> GlobalRdrEnv -> [AvailInfo] -> ExportAvails
+mkExportAvails mod_name unqual_imp name_env avails
+  = (mod_avail_env, entity_avail_env)
+  where
+    mod_avail_env = unitFM mod_name unqual_avails 
+
+	-- unqual_avails is the Avails that are visible in *unqualfied* form
+	-- (1.4 Report, Section 5.1.1)
+	-- For example, in 
+	--	import T hiding( f )
+	-- we delete f from avails
+
+    unqual_avails | not unqual_imp = []	-- Short cut when no unqualified imports
+		  | otherwise      = mapMaybe prune avails
+
+    prune (Avail n) | unqual_in_scope n = Just (Avail n)
+    prune (Avail n) | otherwise		= Nothing
+    prune (AvailTC n ns) | null uqs     = Nothing
+			 | otherwise    = Just (AvailTC n uqs)
+			 where
+			   uqs = filter unqual_in_scope ns
+
+    unqual_in_scope n = unQualInScope name_env n
+
+    entity_avail_env = listToUFM [ (name,avail) | avail <- avails, 
+			  	   		  name  <- availNames avail]
+
+plusExportAvails ::  ExportAvails ->  ExportAvails ->  ExportAvails
+plusExportAvails (m1, e1) (m2, e2)
+  = (plusFM_C (++) m1 m2, plusAvailEnv e1 e2)
+	-- ToDo: wasteful: we do this once for each constructor!
 \end{code}
 
 

@@ -174,7 +174,7 @@ rnMatch match@(Match _ pats maybe_rhs_sig grhss)
 	tyvars_in_sigs = rhs_sig_tyvars `unionLists` tyvars_in_pats
 	rhs_sig_tyvars = case maybe_rhs_sig of
 				Nothing -> []
-				Just ty -> extractHsTyRdrNames ty
+				Just ty -> extractHsTyRdrTyVars ty
 	tyvars_in_pats = extractPatsTyVars pats
 	forall_tyvars  = filter (not . (`elemFM` name_env)) tyvars_in_sigs
 	doc_sig        = text "a pattern type-signature"
@@ -191,7 +191,7 @@ rnMatch match@(Match _ pats maybe_rhs_sig grhss)
     rnGRHSs grhss			`thenRn` \ (grhss', grhss_fvs) ->
     (case maybe_rhs_sig of
 	Nothing -> returnRn (Nothing, emptyFVs)
-	Just ty | opt_GlasgowExts -> rnHsType doc_sig ty	`thenRn` \ (ty', ty_fvs) ->
+	Just ty | opt_GlasgowExts -> rnHsPolyType doc_sig ty	`thenRn` \ (ty', ty_fvs) ->
 				     returnRn (Just ty', ty_fvs)
 		| otherwise	  -> addErrRn (patSigErr ty)	`thenRn_`
 				     returnRn (Nothing, emptyFVs)
@@ -638,7 +638,7 @@ mkOpAppRn e1 op1 fix1 e2@(NegApp neg_arg neg_op)	-- NegApp can occur on the righ
   = addErrRn (precParseErr (ppr_op op1, fix1) (pp_prefix_minus, negateFixity))	`thenRn_`
     returnRn (OpApp e1 op1 fix1 e2)
   where
-    (nofix_err, associate_right) = compareFixity fix1 negateFixity
+    (_, associate_right) = compareFixity fix1 negateFixity
 
 ---------------------------
 --	Default case

@@ -288,14 +288,15 @@ mkCoAlgCaseMatchResult var match_alts
   where
 	-- Common stuff
     scrut_ty = idType var
-    (tycon, tycon_arg_tys, _) = splitAlgTyConApp scrut_ty
+    (tycon, _, _) = splitAlgTyConApp scrut_ty
 
 	-- Stuff for newtype
-    (con_id, arg_ids, match_result) = head match_alts
-    arg_id 	   		    = head arg_ids
-    coercion_bind		    = NonRec arg_id
-			(Note (Coerce (unUsgTy (idType arg_id)) (unUsgTy scrut_ty)) (Var var))
-    newtype_sanity		    = null (tail match_alts) && null (tail arg_ids)
+    (_, arg_ids, match_result) = head match_alts
+    arg_id 	   	       = head arg_ids
+    coercion_bind	       = NonRec arg_id (Note (Coerce (unUsgTy (idType arg_id)) 
+							     (unUsgTy scrut_ty))
+						     (Var var))
+    newtype_sanity	       = null (tail match_alts) && null (tail arg_ids)
 
 	-- Stuff for data types
     data_cons = tyConDataCons tycon

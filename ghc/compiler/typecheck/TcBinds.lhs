@@ -13,7 +13,7 @@ import {-# SOURCE #-} TcMatches ( tcGRHSs, tcMatchesFun )
 import {-# SOURCE #-} TcExpr  ( tcExpr )
 
 import HsSyn		( HsExpr(..), HsBinds(..), MonoBinds(..), Sig(..), InPat(..), StmtCtxt(..),
-			  collectMonoBinders, andMonoBindList, andMonoBinds
+			  Match(..), collectMonoBinders, andMonoBindList, andMonoBinds
 			)
 import RnHsSyn		( RenamedHsBinds, RenamedSig, RenamedMonoBinds )
 import TcHsSyn		( TcHsBinds, TcMonoBinds, TcId, zonkId, mkHsLet )
@@ -573,13 +573,16 @@ isUnRestrictedGroup :: [Name]		-- Signatures given for these
 
 is_elem v vs = isIn "isUnResMono" v vs
 
-isUnRestrictedGroup sigs (PatMonoBind (VarPatIn v) _ _) = v `is_elem` sigs
 isUnRestrictedGroup sigs (PatMonoBind other        _ _) = False
 isUnRestrictedGroup sigs (VarMonoBind v _)	        = v `is_elem` sigs
-isUnRestrictedGroup sigs (FunMonoBind _ _ _ _)		= True
+isUnRestrictedGroup sigs (FunMonoBind v _ matches _)	= any isUnRestrictedMatch matches || 
+							  v `is_elem` sigs
 isUnRestrictedGroup sigs (AndMonoBinds mb1 mb2)		= isUnRestrictedGroup sigs mb1 &&
 							  isUnRestrictedGroup sigs mb2
 isUnRestrictedGroup sigs EmptyMonoBinds			= True
+
+isUnRestrictedMatch (Match _ [] Nothing _) = False	-- No args, no signature
+isUnRestrictedMatch other		   = True	-- Some args or a signature
 \end{code}
 
 

@@ -340,11 +340,12 @@ checkValSig (HsVar v) ty loc = returnP (RdrSig (Sig v ty loc))
 checkValSig other     ty loc = parseError "Type signature given for an expression"
 
 
--- A variable binding is parsed as an RdrNamePatBind.
+-- A variable binding is parsed as an RdrNameFunMonoBind.
+-- See comments with HsBinds.MonoBinds
 
 isFunLhs (OpApp l (HsVar op) fix r) es  | not (isRdrDataCon op)
 			  	= Just (op, True, (l:r:es))
-isFunLhs (HsVar f) es@(_:_)  | not (isRdrDataCon f)
+isFunLhs (HsVar f) es | not (isRdrDataCon f)
 			 	= Just (f,False,es)
 isFunLhs (HsApp f e) es 	= isFunLhs f (e:es)
 isFunLhs (HsPar e)   es 	= isFunLhs e es

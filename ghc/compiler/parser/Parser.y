@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.29 2000/03/24 17:49:30 simonpj Exp $
+$Id: Parser.y,v 1.30 2000/05/23 11:35:37 simonpj Exp $
 
 Haskell grammar.
 
@@ -397,10 +397,6 @@ opt_phase :: { Maybe Int }
           : INTEGER                     { Just (fromInteger $1) }
           | {- empty -}                 { Nothing }
 
-sigtypes :: { [RdrNameHsType] }
-	: sigtype			{ [ $1 ] }
-	| sigtypes ',' sigtype		{ $3 : $1 }
-
 wherebinds :: { RdrNameHsBinds }
 	: where			{ cvBinds cvValSig (groupBindings $1) }
 
@@ -420,13 +416,6 @@ fixdecl :: { RdrBinding }
 					    [ RdrSig (FixSig (FixitySig n 
 							    (Fixity $3 $2) $1))
 					    | n <- $4 ] }
-
-sigtype :: { RdrNameHsType }
-	: ctype				{ mkHsForAllTy Nothing [] $1 }
-
-sig_vars :: { [RdrName] }
-	 : sig_vars ',' var		{ $3 : $1 }
-	 | var				{ [ $1 ] }
 
 -----------------------------------------------------------------------------
 -- Transformation Rules
@@ -484,6 +473,29 @@ ext_name :: { Maybe ExtName }
 	| STRING		{ Just (ExtName $1 Nothing)   }
 	| STRING STRING		{ Just (ExtName $2 (Just $1)) }
 	| {- empty -}           { Nothing }
+
+
+-----------------------------------------------------------------------------
+-- Type signatures
+
+opt_sig :: { Maybe RdrNameHsType }
+	: {- empty -}			{ Nothing }
+	| '::' sigtype			{ Just $2 }
+
+opt_asig :: { Maybe RdrNameHsType }
+	: {- empty -}			{ Nothing }
+	| '::' atype			{ Just $2 }
+
+sigtypes :: { [RdrNameHsType] }
+	: sigtype			{ [ $1 ] }
+	| sigtypes ',' sigtype		{ $3 : $1 }
+
+sigtype :: { RdrNameHsType }
+	: ctype				{ mkHsForAllTy Nothing [] $1 }
+
+sig_vars :: { [RdrName] }
+	 : sig_vars ',' var		{ $3 : $1 }
+	 | var				{ [ $1 ] }
 
 -----------------------------------------------------------------------------
 -- Types
@@ -796,14 +808,6 @@ alt 	:: { RdrNameMatch }
 					{% checkPattern $1 `thenP` \p ->
 				   	   returnP (Match [] [p] $2
 					             (GRHSs $3 $4 Nothing)) }
-
-opt_sig :: { Maybe RdrNameHsType }
-	: {- empty -}			{ Nothing }
-	| '::' sigtype			{ Just $2 }
-
-opt_asig :: { Maybe RdrNameHsType }
-	: {- empty -}			{ Nothing }
-	| '::' atype			{ Just $2 }
 
 ralt :: { [RdrNameGRHS] }
 	: '->' srcloc exp		{ [GRHS [ExprStmt $3 $2] $2] }

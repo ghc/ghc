@@ -35,17 +35,15 @@ import OccName		( OccName,
 			)
 import TysWiredIn	( tupleTyCon, unboxedTupleTyCon, listTyCon )
 import Type		( funTyCon )
-import Module		( ModuleName, mkThisModule, moduleName, mkVanillaModule )
+import Module		( ModuleName, mkThisModule, moduleName, mkVanillaModule, pprModuleName )
 import TyCon		( TyCon )
 import FiniteMap
 import Unique		( Unique, Uniquable(..) )
-import UniqFM           ( emptyUFM, listToUFM, plusUFM_C )
 import UniqSupply
 import SrcLoc		( SrcLoc, noSrcLoc )
 import Outputable
 import Util		( removeDups, equivClasses, thenCmp )
 import List		( nub )
-import Maybes		( mapMaybe )
 \end{code}
 
 
@@ -595,46 +593,6 @@ will still have different provenances.
 
 
 
-\subsubsection{ExportAvails}%  ================
-
-\begin{code}
-mkEmptyExportAvails :: ModuleName -> ExportAvails
-mkEmptyExportAvails mod_name = (unitFM mod_name [], emptyUFM)
-
-mkExportAvails :: ModuleName -> Bool -> GlobalRdrEnv -> [AvailInfo] -> ExportAvails
-mkExportAvails mod_name unqual_imp name_env avails
-  = (mod_avail_env, entity_avail_env)
-  where
-    mod_avail_env = unitFM mod_name unqual_avails 
-
-	-- unqual_avails is the Avails that are visible in *unqualfied* form
-	-- (1.4 Report, Section 5.1.1)
-	-- For example, in 
-	--	import T hiding( f )
-	-- we delete f from avails
-
-    unqual_avails | not unqual_imp = []	-- Short cut when no unqualified imports
-		  | otherwise      = mapMaybe prune avails
-
-    prune (Avail n) | unqual_in_scope n = Just (Avail n)
-    prune (Avail n) | otherwise		= Nothing
-    prune (AvailTC n ns) | null uqs     = Nothing
-			 | otherwise    = Just (AvailTC n uqs)
-			 where
-			   uqs = filter unqual_in_scope ns
-
-    unqual_in_scope n = unQualInScope name_env n
-
-    entity_avail_env = listToUFM [ (name,avail) | avail <- avails, 
-			  	   		  name  <- availNames avail]
-
-plusExportAvails ::  ExportAvails ->  ExportAvails ->  ExportAvails
-plusExportAvails (m1, e1) (m2, e2)
-  = (plusFM_C (++) m1 m2, plusAvailEnv e1 e2)
-	-- ToDo: wasteful: we do this once for each constructor!
-\end{code}
-
-
 \subsubsection{AvailInfo}%  ================
 
 \begin{code}
@@ -768,7 +726,7 @@ warnUnusedModules mods
   | not opt_WarnUnusedImports = returnRn ()
   | otherwise 		      = mapRn_ (addWarnRn . unused_mod) mods
   where
-    unused_mod m = ptext SLIT("Module") <+> quotes (ppr m) <+> 
+    unused_mod m = ptext SLIT("Module") <+> quotes (pprModuleName m) <+> 
 		   ptext SLIT("is imported, but nothing from it is used")
 
 warnUnusedLocalBinds, warnUnusedImports, warnUnusedMatches :: [Name] -> RnM d ()

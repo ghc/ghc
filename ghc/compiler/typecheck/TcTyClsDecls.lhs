@@ -134,18 +134,12 @@ tcDecl  :: RecFlag 			-- True => recursive group
 
 tcDecl is_rec_group unf_env inst_mapper vrcs_env decl
   = tcAddDeclCtxt decl		$
---  traceTc (text "Starting" <+> ppr name)	`thenTc_`
     if isClassDecl decl then
 	tcClassDecl1 unf_env inst_mapper vrcs_env decl	`thenTc` \ clas ->
---	traceTc (text "Finished" <+> ppr name)		`thenTc_`
 	returnTc (getName clas, AClass clas)
     else
 	tcTyDecl is_rec_group vrcs_env decl	`thenTc` \ tycon ->
---	traceTc (text "Finished" <+> ppr name)	`thenTc_`
 	returnTc (getName tycon, ATyCon tycon)
-
-  where
-    name = tyClDeclName decl
 		
 
 tcAddDeclCtxt decl thing_inside
@@ -257,7 +251,6 @@ sortByDependency decls
     edges      = map mk_edges tycl_decls
     
     is_syn_decl (d, _, _) = isSynDecl d
-    is_cls_decl (d, _, _) = isClassDecl d
 \end{code}
 
 Edges in Type/Class decls
