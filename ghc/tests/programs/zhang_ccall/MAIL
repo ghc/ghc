@@ -1,0 +1,41 @@
+From: Xiaoming Zhang <X.M.Zhang@uk.ac.swansea>
+Date: Thu, 26 May 94 16:48:44 BST
+Message-Id: <1276.9405261548@csterra.swan.ac.uk>
+To: partain@uk.ac.glasgow.dcs
+Subject: ghc
+
+Hi Will,
+
+Have you got any update for ghc 0.20 recently?  The problem
+I am experiencing is that I cannot receive values from C
+subroutines.  The included program highlights the problem.
+The Haskell program gets a 0 instead of 1.  Any comment?
+By the way, is these any work going on over there in running
+Haskell on PVM?
+
+Regards,
+
+Xiaoming
+
+-----------------------
+
+Haskell program:
+
+module Main where
+
+import PreludePrimIO
+
+main =
+	appendChan stdout (shows res "\n")
+	exit done
+	where
+	res = unsafePerformPrimIO (
+		ca `thenPrimIO` \r -> returnPrimIO r)
+	ca :: PrimIO Float
+	ca = _ccall_ nn
+
+C subroutine:
+
+float nn () {return 1;}
+
+--------------------

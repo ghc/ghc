@@ -1,0 +1,122 @@
+From sah@ukc.ac.uk Thu Aug 13 16:22:15 1992
+Return-Path: <sah@ukc.ac.uk>
+Received: from dcs.glasgow.ac.uk by pp.dcs.gla.ac.uk with SMTP (PP) 
+          id <18256-0@pp.dcs.gla.ac.uk>; Thu, 13 Aug 1992 16:21:57 +0100
+Message-Id: <13760.9208131521@vanuata.dcs.glasgow.ac.uk>
+Via: uk.ac.ukc; Thu, 13 Aug 92 16:21:50 BST
+Received: from gos by mercury.ukc.ac.uk with UKC POP3+ id aa10412;
+          13 Aug 92 16:21 BST
+From: Steve Hill <sah@ukc.ac.uk>
+To: glasgow-haskell-bugs@dcs.gla.ac.uk
+Subject: Possible bug.
+Date: Thu, 13 Aug 92 16:21:53 +0100
+
+Report from Dr. Steve Hill, Computing Laboratory, University of Kent.
+(sah@ukc.ac.uk)
+
+--------
+The following (rather silly) program causes a stack overflow (the B
+stack I think):
+----------------
+module Main where
+
+#include "GhcPrelude.h"
+
+main :: Dialogue
+main = print (final nums)
+
+nums :: [Int]
+nums = fromn 1
+
+fromn :: Int -> [Int]
+fromn n = n : fromn (n+1)
+
+final :: [Int] -> Int
+final (a:l) = seq (force a) (final l)
+
+force :: Int -> Int
+force a | a == a = a
+
+seq :: Int -> Int -> Int
+seq a b | a == a = b
+-----------------
+
+I would expect it to be able to run in constant space - I may be wrong.
+
+This is the output:
+
+beech.ukc.ac.uk% a.out
+croaked in StackOverflow
+beech.ukc.ac.uk% 
+
+This is the output of a -v compilation:
+
+beech.ukc.ac.uk% ghc -v Try.hs -cpp
+The Glorious New Glasgow Haskell Compilation System, version 0.06
+project label: `ghc'; setup label: `std'
+using a `sun4' host to build a Haskell compiler to run on a
+`sun4' host that will generate `C' code
+
+Haskellised C pre-processor:
+        echo '{-# LINE 1 "Try.hs"-}' > /tmp/ghc15040.cpp;
+/proj/haskell/ghc-0.06/./driver/.././utils/scripts/hscpp  -v 
+-D__HASKELL1__=2 -D__GLASGOW_HASKELL__ -I.
+-I/proj/haskell/ghc-0.06/imports Try.hs >> /tmp/ghc15040.cpp
+        0.1 real         0.0 user         0.0 sys  
+hscpp:CPP invoked: /lib/cpp           -D__HASKELL1__=2
+-D__GLASGOW_HASKELL__ -I. -I/proj/haskell/ghc-0.06/imports Try.hs
+
+Haskell parser:
+        /proj/haskell/ghc-0.06/./driver/.././parsers/hsp/hsp -v  -I.
+-I/proj/haskell/ghc-0.06/imports /tmp/ghc15040.cpp > /tmp/ghc15040.hsp
+Glasgow Haskell parser, version 0.06
+Hash Table Contains 993 entries
+        1.2 real         0.4 user         0.2 sys  
+
+Haskell compiler:
+        /proj/haskell/ghc-0.06/./driver/.././compiler/hsc <
+/tmp/ghc15040.hsp  - -v > /tmp/ghc15040.hsc
+Glasgow Haskell Compiler, version 0.06
+
+       17.4 real         7.0 user         2.0 sys  
+
+Pin on Haskell consistency info:
+        echo 'static char ghc_hsc_ID[] = "@(#)hsc_comp Try.hs  
+ver=1.0,";' >> /tmp/ghc15040.hsc
+        0.1 real         0.0 user         0.0 sys  
+extracting C (/tmp/ghc15040.hc) and interface (Try.hi) from /tmp/ghc15040.hsc
+interface really going into: Main.hi
+
+Comparing old and new .hi files:
+        cmp -s /tmp/ghc15040.hi Main.hi || mv /tmp/ghc15040.hi Main.hi
+        0.2 real         0.0 user         0.0 sys  
+
+ANSI-C Haskell assembler:
+        cc -v -S -DDO_RUNTIME_PROFILING -DDO_RUNTIME_TRACE_UPDATES -g
+-DGC2s  -D__HASKELL1__=2 -D__GLASGOW_HASKELL__ -I.
+-I/proj/haskell/ghc-0.06/imports /tmp/ghc15040.c -o /tmp/ghc15040.s
+/lib/cpp -I. -I/proj/haskell/ghc-0.06/imports -undef -Dunix -Dsun
+-Dsparc -DDO_RUNTIME_PROFILING -DDO_RUNTIME_TRACE_UPDATES -DGC2s
+-D__HASKELL1__=2 -D__GLASGOW_HASKELL__ /tmp/ghc15040.c >/tmp/cpp.15067.0.i
+/lib/ccom - -Xg </tmp/cpp.15067.0.i >/tmp/ghc15040.s
+rm /tmp/cpp.15067.0.i
+        2.6 real         1.6 user         0.5 sys  
+
+Unix assembler:
+        as  /tmp/ghc15040.s -o Try.o
+        2.3 real         1.1 user         0.5 sys  
+
+Linker:
+        cc   Try.o
+/proj/haskell/ghc-0.06/./driver/.././runtime/main/Preloads.sun4.o
+-L/proj/haskell/ghc-0.06/./driver/.././runtime/objs-sun4
+-L/proj/haskell/ghc-0.06/./driver/.././lib/objs-sun4 -lHS_2s -lHSrts_2s
+       51.1 real        12.1 user         5.6 sys  
+Checking consistency of: a.out
+
+rm -f /tmp/ghc15040*
+beech.ukc.ac.uk% 
+
+
+Steve Hill.
+

@@ -1,0 +1,52 @@
+SCCS: %W% %G%
+
+Specimen Classifier Simulator
+-----------------------------
+Comments relate to ghc, version 0.19
+------------------------------------
+
+
+MODIFICATIONS
+-------------
+07-04-94 ipoole   added pi method for Lognum
+
+
+
+To make, type "make".
+
+To run, type "SpecClass".   The program prints a table (take several minutes).
+
+Some notes:
+
+1) SpecClass.lhs seems to take ~10 times longer to compile than any
+   of the other modules, even though it is not the biggest.  (Without
+   optimisation it seems normal).
+
+2) Execution appears to be ~ 4 times slower than interpreted gofer!
+   This is almost certainly due to the functions toDouble and toLognum
+   which in Haskell have to go via Rational.  What is clearly needed
+   is a method of type Real a => a -> Double, which could then be
+   defined efficiently for each Real type.   The default method
+   could still go via Rational.   I don't understand how
+   Haskell has survived for so long without such a method (which
+   makes me fear I've missed something...).
+
+3) When compiled *without* optimsation, the program now (7-04-94)
+   segmentation faults.   
+
+4) A very hacky "showFixed" is used, to force Reals < 0.0 to be displayed 
+   as 0.XXXXX, rather than in scientific form.   There must be better 
+   way to do this.
+
+5) The source is not pretty.
+
+6) To run with Gofer, you'll need our Haskellised Gofer prelude, which I
+   can provide (it originated from Andy Gill).
+
+7) Anyone interested in the statistics underlying the classifier model should
+   request: Ian Poole, "A statistical model for classifying cervical 
+   monolayers", RN94_003,  MRC Human Genetics Unit, Edinburgh.
+
+Ian Poole, MRC HGU
+
+18-01-93

@@ -1,0 +1,66 @@
+Hi,
+
+-- The Good News --
+
+I was able to compile my suite of programs for training phonetic
+hidden Markov models for speech recognizers using ghc.  The first
+program in the suite produced the same output as hbc, but with a
+reduction in run time of 35%.  Yeah!!
+
+
+-- The Bad News --
+
+The second program in the suite, the one that runs for 21 hours on an
+unloaded Sparc 10 (compiled with hbc -O) doesn't work.
+
+There appears to be a bug somewhere in your code for reading "Native"
+binary data.  I don't know what the source of the error is, but here
+is a simpler program that shows the problem.  I am sending you a C
+program for generating a binary test data file (called "test_data")
+and a Haskell program to read it and display the contents.  Here are
+the steps:
+
+% make
+
+% generate_vectors
+
+% ReadNative test_data
+
+
+If you look at the code for generate_vectors, it will be obvious that
+the program ReadNative is NOT reading the vectors properly :-( You can
+do
+
+        % od -fv test_data
+
+to look at the vector components, and 
+
+        % od -fd test_data
+
+to see the dimensions.  If you do, you'll notice that the output of
+ReadNative makes it look like there's an offset of 8 bytes.
+
+
+-- An observation --
+
+I don't know if this is the source of the error, but your definition
+of ``hasNElems'' in Native.hs has an ambiguous case:
+
+        hasNElems 0 []
+
+is assigned True by the first def and would be assigned False by the
+6th definition.  I know that the first def will be picked, but this
+overlap makes me wonder if there is a flaw in the logic that has
+something to do with the problem.
+
+
+-- The Begging --
+
+Here's hoping you can find and squash this one; if I get a 35%
+reduction on this second program, my 21 hour job will finish in less
+than 14 hours!  Until this is fixed, though, I can't even run the
+second program.
+
+Thanks, and good luck!
+
+dave goblirsch

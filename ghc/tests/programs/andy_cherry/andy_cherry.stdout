@@ -1,0 +1,7258 @@
+\documentstyle[twocolumn,a4wide,chess]{article}
+\textwidth 7.0 in
+\textheight 63\baselineskip
+\columnsep .4 in
+\columnseprule .5 pt
+\topmargin -0.5 in
+\headheight 0 pt
+\headsep 0 pt
+\oddsidemargin -0.3 in
+\font\sc=cmcsc10
+\pagestyle{empty}
+\begin{document}
+\thispagestyle{empty}
+
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Oct 1993 \hspace{.3 in} $1\!-\!0$\\
+\hline
+Foo C10\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} George Webb\\
+\rule[-1pt]{11pt}{11pt} Andy Gill\\
+Dunfermline Club Championship
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & Nf3 & d5\\
+2 & d4 & Nc6\\
+3 & Nc3 & Nf6\\
+\end{tabular}}|
+\end{center}
+|3\ldots~Bf5|
+is more natural.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+4 & e4?&\\
+\end{tabular}}|
+\end{center}
+|4.~Bf4|
+is better.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+4 & \ldots & e6?\\
+\end{tabular}}|
+\end{center}
+|4\ldots~d*e4; 5.~d5, e*f3; 6.~d*c6, Q*d1+; 7.~N*d1|
+and black is a clear pawn up.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+5 & e5 & Ne4\\
+\end{tabular}}|
+\end{center}
+
+\board
+{r*bqkb r}
+{ppp *ppp}
+{ *n*p* *}
+{* *pP * }
+{ * Pn* *}
+{* N *N* }
+{PPP* PPP}
+{R BQKB*R}
+$$\showboard$$
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+6 & N*e4?&\\
+\end{tabular}}|
+\end{center}
+Taking this knight looses a pawn
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+6 & \ldots & d*e4\\
+7 & Nd2 & Q*d4\\
+8 & Nc4 & Q*d1+\\
+9 & K*d1 & Bd7\\
+\end{tabular}}|
+\end{center}
+|9\ldots~Bc5; 10.~f3, e*f3; 11.~g*f3, 0-0; 12.~Bd3|
+White can get presure down the `g' file, but first needs to solve the
+problem of the Bishop on c5 guarding g8.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+10 & Bd2&\\
+\end{tabular}}|
+\end{center}
+|10.~Be3|
+is better.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+10 & \ldots & Bb4\\
+11 & c3 & Bc5\\
+12 & Ke1 & 0-0-0\\
+\end{tabular}}|
+\end{center}
+|12\ldots~b5; 13.~Ne3, B*e3; 14.~B*e3, N*e5|
+wins a pawn, but black might have problems because of queenside
+weaknesses.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+13 & g3&\\
+\end{tabular}}|
+\end{center}
+|13.~Bg5, Be7; 14.~B*e7, N*e7; 15.~Rd1|
+and white is starting to contest the `d' file.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+13 & \ldots & Rhf8\\
+14 & Bg2 & f5?\\
+\end{tabular}}|
+\end{center}
+black is throwing away a pawn.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+15 & e*f6 & g*f6\\
+\end{tabular}}|
+\end{center}
+|15\ldots~R*f6|
+gives black more piece activity.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+16 & B*e4&\\
+\end{tabular}}|
+\end{center}
+taking the weak pawn, and attacking h7.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+16 & \ldots & e5?\\
+\end{tabular}}|
+\end{center}
+|16\ldots~Rh8|
+is required to protect the weak h pawn.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+17 & B*h7&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ *kr r *}
+{pppb* *B}
+{ *n* p *}
+{* b p * }
+{ *N* * *}
+{* P * P }
+{PP B P P}
+{R * K *R}
+$$\showboard$$
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+17 & \ldots & f5\\
+\end{tabular}}|
+\end{center}
+|17\ldots~B*f2+; 18.~K*f2, Be6; 19.~N*e5, R*d2+; 20.~Ke1, R*b2|
+winning material, and striping whites king of protection.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+18 & b4 & Be6\\
+19 & b5&\\
+\end{tabular}}|
+\end{center}
+|19.~b*c5, B*c4|
+and white has the two bishops.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+19 & \ldots & B*c4\\
+20 & b*c6 & b*c6\\
+\end{tabular}}|
+\end{center}
+|20\ldots~B*f2+; 21.~K*f2, R*d2+; 22.~Ke1, Re2+; 23.~Kd1, b*c6; 24.~h4, Rd8+|
+with a winning attack on whites exposed king.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+21 & Rb1?&\\
+\end{tabular}}|
+\end{center}
+Throws away a pawn needlessly.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+21 & \ldots & B*a2\\
+\end{tabular}}|
+\end{center}
+|21\ldots~B*f2+; 22.~K*f2, R*d2+; 23.~Ke1, R*a2|
+winning two pawns rather than one.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+22 & Rb2 & Bd5\\
+23 & Rg1 & e4\\
+\end{tabular}}|
+\end{center}
+|23\ldots~a5; 24.~h4, a4; 25.~Bh6, Bf3; 26.~Rd2, R*d2; 27.~B*d2|
+is a better plan, with a dangerous passed `a' pawn.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+24 & Bh6? & Ba3\\
+\end{tabular}}|
+\end{center}
+|24\ldots~Rf7; 25.~Bg5, R*h7; 26.~B*d8, Ba3; 27.~Rd2, K*d8|
+two bishops vs a rook, a difficult win for black.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+25 & Rb1 & Rfe8?\\
+\end{tabular}}|
+\end{center}
+another missed opertunity.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+26 & B*f5+ & Be6\\
+27 & Bg6 & Rh8\\
+28 & Be3&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ *kr * r}
+{p p * * }
+{ *p*b*B*}
+{* * * * }
+{ * *p* *}
+{b P B P }
+{ * * P P}
+{*R* K R }
+$$\showboard$$
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+28 & \ldots & Rd3?\\
+\end{tabular}}|
+\end{center}
+|28\ldots~R*h2; 29.~B*e4, c5; 30.~Rb7, a5|
+and black has a fighting chance
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+29 & Bd4&\\
+\end{tabular}}|
+\end{center}
+|29.~B*e4, R*c3; 30.~Bd4, Rc4; 31.~B*h8, R*e4+|
+and black is lost.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+29 & \ldots & Bd5??\\
+30 & B*h8 & e3??\\
+31 & f3?&\\
+\end{tabular}}|
+\end{center}
+|31.~B*d3, e*f2+; 32.~K*f2, Bc5+; 33.~Bd4|
+and white is two rooks up.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+31 & \ldots & Rd2\\
+32 & Bf6 & Bb2\\
+33 & h4&\\
+\end{tabular}}|
+\end{center}
+|33.~Bf5+, Kb7; 34.~c4, B*c4; 35.~R*b2+, R*b2; 36.~B*b2|
+winning.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+33 & \ldots & Kb7\\
+34 & Bg5 & B*f3\\
+\end{tabular}}|
+\end{center}
+|34\ldots~Ba2; 35.~Bc2, B*b1; 36.~B*b1, Rh2; 37.~B*e3, B*c3+|
+and black is just a bishop down in a pawn race.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+35 & B*e3 & Re2+\\
+36 & Kf1 & R*e3\\
+37 & Re1??&\\
+\end{tabular}}|
+\end{center}
+giving black a chance to equalize.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+37 & \ldots & Re2??\\
+\end{tabular}}|
+\end{center}
+Returning the complement.
+|37\ldots~R*e1+; 38.~K*e1, B*c3+; 39.~Kf2, Bd4+; 40.~K*f3, B*g1|
+and White still has the edge with 2 connected passed pawns, but black
+has real chances.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+38 & R*e2&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * * *}
+{pkp * * }
+{ *p* *B*}
+{* * * * }
+{ * * * P}
+{* P *bP }
+{ b *R* *}
+{* * *KR }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Nov 1993 \hspace{.3 in} $1\!-\!0$\\
+\hline
+Foo C65\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} Barry Dunne\\
+Dunfermline Club Championship
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & e5\\
+2 & Nf3 & Nc6\\
+3 & Bb5 & Nf6\\
+4 & d3&\\
+\end{tabular}}|
+\end{center}
+|4.~0-0|
+Ruy Lopez, Berlin Defence
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+4 & \ldots & Be7\\
+\end{tabular}}|
+\end{center}
+|4\ldots~Bc5|
+is better.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+5 & 0-0&\\
+\end{tabular}}|
+\end{center}
+|5.~B*c6, d*c6; 6.~N*e5, Bd6; 7.~Nf3, 0-0; 8.~0-0, Be6|
+and white is a pawn up, but black has a lead in development.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+5 & \ldots & 0-0?\\
+\end{tabular}}|
+\end{center}
+|5\ldots~d6|
+is needed to protect e5.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+6 & Nc3&\\
+\end{tabular}}|
+\end{center}
+|6.~B*c6, d*c6; 7.~N*e5, Bd6; 8.~Nf3, Bg4; 9.~Be3|
+and white is a clean pawn up.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+6 & \ldots & b6?\\
+7 & a3 & Bb7\\
+8 & b4 & Nd4\\
+\end{tabular}}|
+\end{center}
+
+\board
+{r* q rk*}
+{pbppbppp}
+{ p * n *}
+{*B* p * }
+{ P nP* *}
+{P NP*N* }
+{ *P* PPP}
+{R BQ*RK }
+$$\showboard$$
+A bit ambitious.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+9 & N*e5&\\
+\end{tabular}}|
+\end{center}
+|9.~N*d4, e*d4; 10.~Ne2, d5; 11.~e5, Nd7|
+is whites best line.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+9 & \ldots & N*b5\\
+\end{tabular}}|
+\end{center}
+|9\ldots~d5; 10.~Bb2, d*e4; 11.~d*e4, N*e4|
+with equal chances.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+10 & N*b5 & d5\\
+11 & Bb2 & d*e4\\
+12 & d*e4&\\
+\end{tabular}}|
+\end{center}
+|12.~f3|
+is a better approach.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+12 & \ldots & Q*d1\\
+13 & Ra*d1 & Bd6\\
+\end{tabular}}|
+\end{center}
+
+\board
+{r* * rk*}
+{pbp *ppp}
+{ p b n *}
+{*N* N * }
+{ P *P* *}
+{P * * * }
+{ BP* PPP}
+{* *R*RK }
+$$\showboard$$
+|13\ldots~B*e4; 14.~Nd7, B*c2; 15.~B*f6, g*f6; 16.~Rd2|
+with a slight advantage for white.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+14 & Nf3&\\
+\end{tabular}}|
+\end{center}
+|14.~N*d6, c*d6; 15.~R*d6, B*e4; 16.~c4, Rfd8; 17.~c5, b*c5; 18.~b*c5|
+winning for white.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+14 & \ldots & B*e4\\
+\end{tabular}}|
+\end{center}
+|14\ldots~N*e4|
+is better.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+15 & N*d6 & c*d6\\
+16 & B*f6 & g*f6\\
+17 & R*d6 & B*c2\\
+\end{tabular}}|
+\end{center}
+|17\ldots~B*f3; 18.~g*f3, Rac8; 19.~Rc1, Rc3; 20.~Rd3, R*d3; 21.~c*d3|
+and whites passed pawn is a long way from queening.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+18 & R*f6&\\
+\end{tabular}}|
+\end{center}
+|18.~Nd4, Ba4; 19.~R*f6, Rfd8; 20.~Rf4, Rd7; 21.~Re4|
+a pawn up, but with chances for black, because of the powerful Bishop.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+18 & \ldots & Rfd8\\
+19 & Ne5 & Kg7\\
+\end{tabular}}|
+\end{center}
+|19\ldots~Bg6|
+is better, defending the weak pawn.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+20 & R*f7+ & Kg8\\
+21 & Rc7&\\
+\end{tabular}}|
+\end{center}
+|21.~f4, a6; 22.~g3, Rd2; 23.~Rb7, b5|
+and white should win.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+21 & \ldots & Re8\\
+\end{tabular}}|
+\end{center}
+|21\ldots~Rdc8; 22.~Rb7, Be4; 23.~Rd7, Rc2; 24.~Rfd1|
+with connected rooks for white.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+22 & Re1&\\
+\end{tabular}}|
+\end{center}
+|22.~f4|
+is better for protecting the knight.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+22 & \ldots & Rac8\\
+\end{tabular}}|
+\end{center}
+should have moved the `e' Rook.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+23 & R*a7 & Bf5\\
+\end{tabular}}|
+\end{center}
+|23\ldots~Ra8!?|
+planning to attack the weak `a' pawn.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+24 & f4 & Bg4\\
+\end{tabular}}|
+\end{center}
+|24\ldots~Rc2|
+penatraiting the 7th.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+25 & Kf2 & Rc2+\\
+26 & Kg3 & Re2\\
+27 & R*e2 & B*e2\\
+28 & Nc6?&\\
+\end{tabular}}|
+\end{center}
+where is that knight going ?
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+28 & \ldots & Re3+\\
+29 & Kf2 & Re4\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * *k*}
+{R * * *p}
+{ pN* * *}
+{* * * * }
+{ P *rP *}
+{P * * * }
+{ * *bKPP}
+{* * * * }
+$$\showboard$$
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+30 & f5&\\
+\end{tabular}}|
+\end{center}
+|30.~Ne7+, Kf8; 31.~Nd5, Bd3; 32.~N*b6, Re7|
+totally winning for white
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+30 & \ldots & Bg4\\
+31 & Ne7+&\\
+\end{tabular}}|
+\end{center}
+|31.~Kg3, h6; 32.~f6, Be6; 33.~Re7|
+looking very good for white.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+31 & \ldots & Kf8\\
+32 & f6 & Rf4+\\
+33 & Kg3 & Re4\\
+34 & h3&\\
+\end{tabular}}|
+\end{center}
+|34.~Nd5, Be6; 35.~N*b6, Rg4+; 36.~Kf3, Rg6; 37.~R*h7, R*f6+; 38.~Ke4|
+and with 4 connected passed white will win.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+34 & \ldots & Bh5\\
+35 & Nd5 & b5\\
+36 & R*h7 & Bg6\\
+37 & Rh4&\\
+\end{tabular}}|
+\end{center}
+|37.~Rh8+, Kf7; 38.~Rb8, Bf5; 39.~R*b5, Be6; 40.~Rb7+, Kg6; 41.~Rg7+|
+just look at whites advantage.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+37 & \ldots & R*h4\\
+38 & K*h4 & Be4\\
+39 & Nc3&\\
+\end{tabular}}|
+\end{center}
+|39.~Ne3, Kf7; 40.~Kg5, Bc6; 41.~g4, Be4; 42.~h4, Bd3; 43.~h5|
+winning.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+39 & \ldots & Bc6\\
+\end{tabular}}|
+\end{center}
+|39\ldots~B*g2; 40.~N*b5, Kf7; 41.~Kg5, B*h3; 42.~Nd6+, Kg8; 43.~a4, Kh7|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+40 & g4 & Kf7\\
+41 & g5&\\
+\end{tabular}}|
+\end{center}
+|41.~Kg5, Kg8; 42.~h4, Bd7; 43.~h5, Kf7; 44.~Ne4, Kg8; 45.~Nd6|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+41 & \ldots & Kg6\\
+42 & Kg4? & Bd7+\\
+43 & Kf4 & B*h3\\
+44 & N*b5 & Bd7\\
+\end{tabular}}|
+\end{center}
+|44\ldots~Kf7; 45.~Nd6+, Ke6; 46.~f7, Ke7; 47.~g6, Kf8; 48.~a4, Kg7|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+45 & a4 & Bc6\\
+46 & Nc3 & Bd7\\
+47 & b5&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * * *}
+{* *b* * }
+{ * * Pk*}
+{*P* * P }
+{P* * K *}
+{* N * * }
+{ * * * *}
+{* * * * }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Nov 1993 \hspace{.3 in} $0\!-\!1$\\
+\hline
+Foo C65\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} Rab Brown\\
+Dunfermline Club Championship
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & e5\\
+2 & Nf3 & Nc6\\
+3 & Bb5 & Bc5\\
+4 & 0-0 & Nf6\\
+5 & Nc3 & d6\\
+6 & a3 & Ng4?\\
+7 & Qe1&\\
+\end{tabular}}|
+\end{center}
+|7.~h3|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+7 & \ldots & 0-0\\
+\end{tabular}}|
+\end{center}
+
+\board
+{r*bq rk*}
+{ppp *ppp}
+{ *np * *}
+{*Bb p * }
+{ * *P*n*}
+{P N *N* }
+{ PPP PPP}
+{R B QRK }
+$$\showboard$$
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+8 & B*c6 & b*c6\\
+9 & b4 & Ba6\\
+10 & b*c5 & B*f1\\
+11 & K*f1&\\
+\end{tabular}}|
+\end{center}
+|11.~Q*f1, Qd7; 12.~Bb2, d*c5; 13.~d3, Rfb8; 14.~Rb1|
+clearly winning for white.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+11 & \ldots & Qf6\\
+\end{tabular}}|
+\end{center}
+
+\board
+{r* * rk*}
+{p p *ppp}
+{ *pp q *}
+{* P p * }
+{ * *P*n*}
+{P N *N* }
+{ *PP PPP}
+{R B QK* }
+$$\showboard$$
+|11\ldots~Rb8; 12.~Qe2, Qd7; 13.~Qa6, Ra8; 14.~h3, Nf6; 15.~d4, e*d4|
+is a better plan.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+12 & d3 & Qg6\\
+13 & Rb1&\\
+\end{tabular}}|
+\end{center}
+|13.~h3, Nh6|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+13 & \ldots & Qh5\\
+14 & Rb7&\\
+\end{tabular}}|
+\end{center}
+|14.~h3, Nf6; 15.~Rb7, Rfc8; 16.~Bg5, Qg6; 17.~Qe3, Ne8|
+and white has a commanding lead.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+14 & \ldots & N*h2+\\
+15 & N*h2 & Q*h2\\
+16 & R*c7 & Qh1+\\
+17 & Ke2 & Q*g2\\
+18 & R*c6&\\
+\end{tabular}}|
+\end{center}
+|18.~c*d6, Rfc8; 19.~R*c8+, R*c8; 20.~Be3, Rd8; 21.~Bc5, h5|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+18 & \ldots & d*c5\\
+\end{tabular}}|
+\end{center}
+|18\ldots~Qg4+; 19.~f3, Qg2+; 20.~Qf2, Q*f2+; 21.~K*f2, Rfc8; 22.~Nd5, R*c6; 23.~Ne7+|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+19 & R*c5 & f5\\
+20 & Be3 & Qg4+\\
+21 & f3 & Qg2+\\
+22 & Qf2 & Qh1\\
+23 & R*e5 & Qa1\\
+\end{tabular}}|
+\end{center}
+
+\board
+{r* * rk*}
+{p * * pp}
+{ * * * *}
+{* * Rp* }
+{ * *P* *}
+{P NPBP* }
+{ *P*KQ *}
+{q * * * }
+$$\showboard$$
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+24 & Bc5?&\\
+\end{tabular}}|
+\end{center}
+|24.~Qe1, Qb2; 25.~Qd2, Q*a3; 26.~Bc5, Qa5; 27.~e*f5|
+white has the advantage.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+24 & \ldots & Q*c3\\
+25 & R*f5&\\
+\end{tabular}}|
+\end{center}
+|25.~B*f8, Q*c2+; 26.~Kf1, Q*d3+; 27.~Qe2, Qb1+; 28.~Qe1, Q*e1+; 29.~K*e1|
+now black has only a slight advantage.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+25 & \ldots & Q*c2+\\
+\end{tabular}}|
+\end{center}
+|25\ldots~R*f5; 26.~e*f5, Q*c2+; 27.~Kf1, Q*d3+; 28.~Kg2, Rd8; 29.~f4|
+and black has a clear lead.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+26 & Ke3 & Q*f2+\\
+27 & K*f2 & R*f5\\
+28 & e*f5 & Rc8\\
+29 & d4 & a6\\
+30 & a4 & Kf7\\
+31 & Ke3&\\
+\end{tabular}}|
+\end{center}
+|31.~Kg3, Kf6; 32.~Kf4, g5+; 33.~f*g6, h*g6; 34.~a5, g5+; 35.~Kg4|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+31 & \ldots & h5\\
+\end{tabular}}|
+\end{center}
+|31\ldots~Kf6; 32.~Kf4, Rd8; 33.~a5, Rd5; 34.~Ke4, R*f5|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+32 & Kf4 & h4\\
+33 & Kg4 & Rh8\\
+34 & d5 & h3\\
+35 & Bd6 & g6\\
+\end{tabular}}|
+\end{center}
+|35\ldots~h2; 36.~B*h2, R*h2; 37.~Kf4, Rh4+; 38.~Ke5, R*a4; 39.~d6, Rc4|
+totaly won for black.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+36 & f*g6+ & K*g6\\
+37 & Bh2 & Kf6\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * * r}
+{* * * * }
+{p* * k *}
+{* *P* * }
+{P* * *K*}
+{* * *P*p}
+{ * * * B}
+{* * * * }
+$$\showboard$$
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+38 & f4&\\
+\end{tabular}}|
+\end{center}
+|38.~a5, Ke7; 39.~Kf5, Rh5+; 40.~Ke4, Rh4+; 41.~f4, Kd6; 42.~Kd4|
+holding the position.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+38 & \ldots & Ke7\\
+39 & f5 & a5\\
+\end{tabular}}|
+\end{center}
+|39\ldots~Kf6|
+is needed.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+40 & d6+ & Kd7\\
+\end{tabular}}|
+\end{center}
+|40\ldots~Kf6|
+is still needed.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+41 & Kg5 & Rb8\\
+\end{tabular}}|
+\end{center}
+|41\ldots~Ke8|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+42 & f6 & Rb2\\
+\end{tabular}}|
+\end{center}
+|42\ldots~Ke6; 43.~Kg4, Rb4+; 44.~K*h3, R*a4; 45.~d7, K*d7; 46.~Be5|
+but black should still win.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+43 & Kg6&\\
+\end{tabular}}|
+\end{center}
+|43.~f7, Rg2+; 44.~Kh6, Rf2; 45.~Kg7, Rg2+; 46.~Kh7, Rf2; 47.~Kg7|
+white has equalised!
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+43 & \ldots & Rf2\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * * *}
+{* *k* * }
+{ * P PK*}
+{p * * * }
+{P* * * *}
+{* * * *p}
+{ * * r B}
+{* * * * }
+$$\showboard$$
+$0\!-\!1$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Nov 1993 \hspace{.3 in} $0\!-\!1$\\
+\hline
+Foo C60\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} Ian Kennedy\\
+Dunfermline C vs Stirling B
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & e5\\
+2 & Nf3 & Nc6\\
+3 & Bb5 & Bd6\\
+4 & 0-0 & a6\\
+5 & Ba4 & b5\\
+6 & Bb3 & Bb7\\
+7 & d3 & Nf6\\
+\end{tabular}}|
+\end{center}
+|7\ldots~Na5; 8.~Nbd2, f6; 9.~a4, N*b3; 10.~N*b3, Bb4; 11.~a*b5, a*b5|
+with equality.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+8 & Nc3&\\
+\end{tabular}}|
+\end{center}
+|8.~a4, b4; 9.~Nbd2, Bc5; 10.~Nc4, d6|
+\wbetter{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+8 & \ldots & 0-0\\
+\end{tabular}}|
+\end{center}
+|8\ldots~Na5; 9.~Bd2, N*b3; 10.~a*b3, 0-0; 11.~Bg5, Rb8|
+=
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+9 & Be3 & Na5\\
+\end{tabular}}|
+\end{center}
+
+\board
+{r* q rk*}
+{*bpp*ppp}
+{p* b n *}
+{np* p * }
+{ * *P* *}
+{*BNPBN* }
+{PPP* PPP}
+{R *Q*RK }
+$$\showboard$$
+|9\ldots~Be7; 10.~a3, Ng4; 11.~Bd2|
+\wbetter{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+10 & Bd5?!&\\
+\end{tabular}}|
+\end{center}
+where is that bishop going.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+10 & \ldots & b4\\
+\end{tabular}}|
+\end{center}
+|10\ldots~c6; 11.~Bb3, Bc7; 12.~Bg5, N*b3; 13.~B*f6, Q*f6; 14.~a*b3|
+\bbetter{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+11 & B*b7 & N*b7\\
+12 & Nd5&\\
+\end{tabular}}|
+\end{center}
+|12.~Ne2, Ng4; 13.~Bd2, f5; 14.~e*f5, R*f5; 15.~Ng3, Rf6|
+\wbetter{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+12 & \ldots & c6\\
+\end{tabular}}|
+\end{center}
+|12\ldots~N*d5; 13.~e*d5, f6; 14.~c3, b*c3; 15.~b*c3, Be7; 16.~d4, d6|
+\bbetter{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+13 & N*f6+&\\
+\end{tabular}}|
+\end{center}
+|13.~Bb6, Qc8; 14.~N*f6+, g*f6; 15.~d4, Bc7; 16.~B*c7, Q*c7|
+\wbetter{} and the black king is exposed.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+13 & \ldots & Q*f6\\
+14 & Bb6?!&\\
+\end{tabular}}|
+\end{center}
+strange move.
+|14.~Qd2, Be7; 15.~c3, a5; 16.~a3, b*a3; 17.~b*a3|
+\wbetter{} with the plan ofs owning the `b' file.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+14 & \ldots & Bc5\\
+\end{tabular}}|
+\end{center}
+|14\ldots~Be7|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+15 & Bc7&\\
+\end{tabular}}|
+\end{center}
+|15.~N*e5|
+but black can easly win back the pawn.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+15 & \ldots & Rac8?\\
+\end{tabular}}|
+\end{center}
+|15\ldots~d6; 16.~d4, e*d4; 17.~e5, Qe7; 18.~e*d6, N*d6; 19.~B*d6, Q*d6|
+\bupperhand{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+16 & B*e5 & Qg6\\
+17 & d4&\\
+\end{tabular}}|
+\end{center}
+|17.~Bg3, Rfe8; 18.~Ne5, Qf6; 19.~N*d7, Q*b2; 20.~Re1|
+\wupperhand{} white should now try use his center pawns to push home
+his advantage.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+17 & \ldots & Bd6\\
+18 & B*d6&\\
+\end{tabular}}|
+\end{center}
+this is to early, leaving myself underdeveloped.
+|18.~Re1, f6; 19.~B*d6, N*d6; 20.~Qd3|
+\wupperhand{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+18 & \ldots & N*d6\\
+19 & Ne5&\\
+\end{tabular}}|
+\end{center}
+|19.~e5, Nc4; 20.~b3, Na3; 21.~Rc1, d6; 22.~Re1|
+\wupperhand{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+19 & \ldots & Q*e4\\
+20 & N*d7 & Rfe8\\
+21 & Nc5 & Qg6?\\
+\end{tabular}}|
+\end{center}
+|21\ldots~Qe2; 22.~Re1, Qc4; 23.~Qd2, Rcd8; 24.~Rad1, a5|
+\wupperhand{} white is a clear pawn up.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+22 & N*a6 & Nf5\\
+23 & N*b4&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ *r*r*k*}
+{* * *ppp}
+{ *p* *q*}
+{* * *n* }
+{ N P * *}
+{* * * * }
+{PPP* PPP}
+{R *Q*RK }
+$$\showboard$$
+ white should now win the endgame quite comfortably.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+23 & \ldots & Nh4\\
+\end{tabular}}|
+\end{center}
+|23\ldots~Rcd8; 24.~c3, c5; 25.~Nc2, c*d4; 26.~N*d4, Qf6; 27.~Qf3, N*d4|
+\wupperhand{} though still two clear pawns up.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+24 & g3&\\
+\end{tabular}}|
+\end{center}
+forced.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+24 & \ldots & c5\\
+25 & d*c5 & R*c5\\
+\end{tabular}}|
+\end{center}
+|25\ldots~Qe4; 26.~g*h4, Q*b4; 27.~a4, Q*h4; 28.~Qd5, Re2|
+\wupperhand{}, but whites king is dangerously exposed, and the `a'
+rook is not (yet) part of the game.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+26 & a4&\\
+\end{tabular}}|
+\end{center}
+crap plan! Its just too slow.
+|26.~Nd3, Rf5; 27.~f4, Rd5; 28.~a4, Qb6+; 29.~Rf2, Nf5|
+\wdecisive{} black will never stop 3 connected passed pawns!
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+26 & \ldots & f5\\
+27 & Nd5 & Rd8??\\
+\end{tabular}}|
+\end{center}
+|27\ldots~Qd6; 28.~Nf4, Q*d1; 29.~Rf*d1, Nf3+; 30.~Kg2, Ne5|
+\wdecisive{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+28 & Ne7+! & Kf7\\
+29 & Q*d8 & Qg5\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * Q * *}
+{* * Nkpp}
+{ * * * *}
+{* r *pq }
+{P* * * n}
+{* * * P }
+{ PP* P P}
+{R * *RK }
+$$\showboard$$
+|29\ldots~Nf3+; 30.~Kg2|
+is an idea.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+30 & a5&\\
+\end{tabular}}|
+\end{center}
+this plan is still to slow.
+|30.~Qg8+, K*e7; 31.~Rfe1+, Kd6; 32.~Qf8+, Kc6; 33.~Qc8+, Kb6; 34.~Re6+, Rc6; 35.~Q*c6+, Ka7; 36.~Qb6+, Ka8; 37.~Re8+, Qd8; 38.~R*d8 mate|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+30 & \ldots & f4\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * Q * *}
+{* * Nkpp}
+{ * * * *}
+{P r * q }
+{ * * p n}
+{* * * P }
+{ PP* P P}
+{R * *RK }
+$$\showboard$$
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+31 & f3??&\\
+\end{tabular}}|
+\end{center}
+|31.~Nc6, Nf3+; 32.~Kg2, f*g3; 33.~Qd7+, Kf8; 34.~Qc8+, Kf7; 35.~f*g3|
+\wdecisive{} but there are still some hairy tactics.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+31 & \ldots & f*g3\\
+32 & h*g3??&\\
+\end{tabular}}|
+\end{center}
+|32.~Qg8+, K*e7; 33.~Rfe1+, Re5; 34.~R*e5+, Q*e5; 35.~h3, N*f3+; 36.~Kg2|
+and white can still win!
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+32 & \ldots & Q*g3+\\
+33 & Kh1 & Qg2 mate\\
+\end{tabular}}|
+\end{center}
+painfull!
+
+\board
+{ * Q * *}
+{* * Nkpp}
+{ * * * *}
+{P r * * }
+{ * * * n}
+{* * *P* }
+{ PP* *q*}
+{R * *R*K}
+$$\showboard$$
+$0\!-\!1$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Nov 1993 \hspace{.3 in} $1\!-\!0$\\
+\hline
+Foo C41\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} Neil Langham\\
+Dunfermline Club Championship
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & e5\\
+2 & Nf3 & d6\\
+3 & Nc3 & Nf6\\
+4 & Bc4 & h6\\
+\end{tabular}}|
+\end{center}
+|4\ldots~Bg4; 5.~d3, Nc6; 6.~h3, Bh5; 7.~0-0, B*f3; 8.~Q*f3|
+=
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+5 & 0-0 & Bd7\\
+6 & d3 & Nc6\\
+7 & Bd2&\\
+\end{tabular}}|
+\end{center}
+|7.~Be3, Be7; 8.~Nd5, 0-0; 9.~h3, N*d5; 10.~B*d5, Bf6|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+7 & \ldots & Na5\\
+\end{tabular}}|
+\end{center}
+
+\board
+{r* qkb r}
+{pppb*pp }
+{ * p n p}
+{n * p * }
+{ *B*P* *}
+{* NP*N* }
+{PPPB PPP}
+{R *Q*RK }
+$$\showboard$$
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+8 & b4&\\
+\end{tabular}}|
+\end{center}
+|8.~Bd5, Bg4; 9.~a3, c6; 10.~Ba2, d5; 11.~Be3, d*e4; 12.~N*e4|
+but black is having the freer game
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+8 & \ldots & N*c4\\
+9 & d*c4 & Be6\\
+\end{tabular}}|
+\end{center}
+|9\ldots~Be7; 10.~Qe2, 0-0; 11.~Rfd1, Be6; 12.~c5, c6; 13.~c*d6, Q*d6|
+\bbetter{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+10 & Nd5? & N*e4\\
+11 & Qe2&\\
+\end{tabular}}|
+\end{center}
+|11.~Re1, N*d2; 12.~Q*d2, c6; 13.~Ne3, Be7; 14.~Rad1, 0-0|
+\bupperhand{}, with white a pawn and position down.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+11 & \ldots & N*d2\\
+12 & N*d2&\\
+\end{tabular}}|
+\end{center}
+|12.~Q*d2|
+is better.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+12 & \ldots & Qg5??\\
+\end{tabular}}|
+\end{center}
+
+\board
+{r* *kb r}
+{ppp *pp }
+{ * pb* p}
+{* *Np q }
+{ PP* * *}
+{* * * * }
+{P*PNQPPP}
+{R * *RK }
+$$\showboard$$
+|12\ldots~g6; 13.~Ne3, f5; 14.~c5, d*c5; 15.~b*c5, c6|
+\bupperhand{}, ready for a pawn charge on white's king.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+13 & N*c7+ & Ke7\\
+\end{tabular}}|
+\end{center}
+|13\ldots~Kd7|
+is better, stoping the future escape of the white knight.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+14 & N*a8 & Bh3\\
+\end{tabular}}|
+\end{center}
+going for the cheapo.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+15 & f4! & Qg6\\
+16 & Nc7&\\
+\end{tabular}}|
+\end{center}
+|16.~f*e5, Kd8; 17.~Qe4, Be6; 18.~Q*g6, f*g6|
+is the best line Fritz2 found.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+16 & \ldots & Kd7\\
+17 & Nd5 & Bg4\\
+18 & Qf2 & f6\\
+\end{tabular}}|
+\end{center}
+|18\ldots~Q*c2; 19.~Ne3, Qg6; 20.~f*e5, Be6; 21.~Nf3|
+rather cheeky, but still a rook down.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+19 & Ne3 & Ke6?\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * b r}
+{pp* * p }
+{ * pkpqp}
+{* * p * }
+{ PP* Pb*}
+{* * N * }
+{P*PN QPP}
+{R * *RK }
+$$\showboard$$
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+20 & f5+ & B*f5\\
+21 & Q*f5+&\\
+\end{tabular}}|
+\end{center}
+|21.~N*f5, Qg5; 22.~h4, Qg4|
+actually wins more material, but with this level of inequality, you
+want to swap of queens.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+21 & \ldots & Q*f5\\
+22 & N*f5 & g6\\
+23 & Ng3&\\
+\end{tabular}}|
+\end{center}
+At this point the score sheet goes wrong, but the game was won by now
+anyway!
+
+\board
+{ * * b r}
+{pp* * * }
+{ * pkppp}
+{* * p * }
+{ PP* * *}
+{* * * N }
+{P*PN *PP}
+{R * *RK }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Nov 1993 \hspace{.3 in} $1\!-\!0$\\
+\hline
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} Dennis Duncan\\
+Dunfermline Club Championship
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & e5\\
+2 & Nf3 & d6\\
+3 & Bc4 & Bg4\\
+4 & 0-0 & Nf6\\
+5 & Nc3&\\
+\end{tabular}}|
+\end{center}
+|5.~d3, Nc6; 6.~Be3, d5; 7.~e*d5, N*d5; 8.~Nbd2, N*e3; 9.~f*e3|
+=
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+5 & \ldots & c6\\
+\end{tabular}}|
+\end{center}
+|5\ldots~Nc6; 6.~Bb5, Qd7; 7.~h3, B*f3; 8.~Q*f3, 0-0-0|
+=
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+6 & Bb3 & d5\\
+7 & d3&\\
+\end{tabular}}|
+\end{center}
+|7.~e*d5, c*d5; 8.~Re1, e4; 9.~d3, B*f3|
+=
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+7 & \ldots & b5\\
+\end{tabular}}|
+\end{center}
+|7\ldots~d*e4; 8.~d*e4, Q*d1; 9.~R*d1, B*f3|
+\bbetter{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+8 & h3&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{rn qkb r}
+{p * *ppp}
+{ *p* n *}
+{*p*pp * }
+{ * *P*b*}
+{*BNP*N*P}
+{PPP* PP*}
+{R BQ*RK }
+$$\showboard$$
+|8.~e*d5, b4; 9.~Ne4, c*d5; 10.~N*f6+, g*f6; 11.~d4, e*d4; 12.~Q*d4|
+\wupperhand{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+8 & \ldots & Bc8\\
+\end{tabular}}|
+\end{center}
+|8\ldots~B*f3; 9.~Q*f3, d4; 10.~Ne2, Nbd7; 11.~Bg5, Be7|
+\wbetter{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+9 & N*e5&\\
+\end{tabular}}|
+\end{center}
+|9.~e*d5, N*d5; 10.~N*e5, Be6; 11.~N*d5|
+\wupperhand{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+9 & \ldots & Qc7\\
+\end{tabular}}|
+\end{center}
+|9\ldots~Bd6; 10.~Nf3, d*e4; 11.~N*e4, N*e4; 12.~Re1, B*h3; 13.~R*e4+, Be6|
+\wupperhand{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+10 & Nf3 & Nh5\\
+\end{tabular}}|
+\end{center}
+|10\ldots~Be6; 11.~Nd4, d*e4; 12.~B*e6|
+\wupperhand{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+11 & e*d5 & c5\\
+12 & N*b5&\\
+\end{tabular}}|
+\end{center}
+|12.~Re1+!, Be7; 13.~N*b5, Qb6; 14.~d6, Q*b5; 15.~R*e7+, Kd8; 16.~B*f7|
+\wdecisive{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+12 & \ldots & Qb6\\
+\end{tabular}}|
+\end{center}
+|12\ldots~Qb7; 13.~Re1+, Kd8; 14.~Ne5, Nf6; 15.~Bg5, Bf5; 16.~B*f6+, g*f6|
+\wdecisive{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+13 & Ba4&\\
+\end{tabular}}|
+\end{center}
+|13.~Re1+, Kd8; 14.~Ne5, Q*b5; 15.~N*f7+, Kc7; 16.~N*h8, Nf6; 17.~Bf4+|
+\wdecisive{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+13 & \ldots & Bd7\\
+14 & Qe2+ & Be7\\
+\end{tabular}}|
+\end{center}
+
+\board
+{rn *k* r}
+{p *bbppp}
+{ q * * *}
+{*NpP* *n}
+{B* * * *}
+{* *P*N*P}
+{PPP*QPP*}
+{R B *RK }
+$$\showboard$$
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+15 & d4&\\
+\end{tabular}}|
+\end{center}
+|15.~d6, 0-0; 16.~d*e7, Re8; 17.~d4, c*d4; 18.~Nf*d4|
+\wdecisive{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+15 & \ldots & B*b5\\
+16 & B*b5+ & Nd7\\
+\end{tabular}}|
+\end{center}
+|16\ldots~Kf8; 17.~Re1, Qd6; 18.~Nh4, Qf6; 19.~Q*h5|
+\wdecisive{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+17 & B*d7+ & K*d7\\
+18 & Ne5+ & Ke8\\
+19 & d*c5&\\
+\end{tabular}}|
+\end{center}
+|19.~Nc6, Qc7; 20.~Re1, c*d4; 21.~c4, Nf6|
+\wdecisive{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+19 & \ldots & Q*c5\\
+20 & Rd1&\\
+\end{tabular}}|
+\end{center}
+|20.~d6, Q*d6; 21.~Qf3, Rc8; 22.~N*f7, Qf6; 23.~Q*f6, N*f6; 24.~N*h8|
+\wdecisive{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+20 & \ldots & Ng3\\
+21 & Qe3&\\
+\end{tabular}}|
+\end{center}
+|21.~Qg4, Q*c2; 22.~Rd2, Qf5; 23.~Q*g3, Bf6|
+\wdecisive{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+21 & \ldots & Nf5\\
+22 & Q*c5&\\
+\end{tabular}}|
+\end{center}
+|22.~Qf3, Nd6; 23.~c4, Bf6; 24.~Re1, B*e5; 25.~R*e5+, Kf8|
+\wdecisive{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+22 & \ldots & B*c5\\
+\end{tabular}}|
+\end{center}
+
+\board
+{r* *k* r}
+{p * *ppp}
+{ * * * *}
+{* bPNn* }
+{ * * * *}
+{* * * *P}
+{PPP* PP*}
+{R BR* K }
+$$\showboard$$
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+23 & Be3?&\\
+\end{tabular}}|
+\end{center}
+|23.~Re1, Ne7; 24.~c4, f6; 25.~Nd3, Bd4|
+\wdecisive{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+23 & \ldots & N*e3\\
+\end{tabular}}|
+\end{center}
+|23\ldots~B*e3; 24.~f*e3, N*e3; 25.~Rd2, Rc8; 26.~Re2, N*d5; 27.~Ng6+, Kd7|
+Blacks best line
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+24 & f*e3 & B*e3+\\
+25 & Kf1 & Bf4\\
+26 & Re1&\\
+\end{tabular}}|
+\end{center}
+|26.~Nd3, Bd6; 27.~c4, Rc8; 28.~b3|
+\wdecisive{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+26 & \ldots & f6\\
+\end{tabular}}|
+\end{center}
+
+\board
+{r* *k* r}
+{p * * pp}
+{ * * p *}
+{* *PN * }
+{ * * b *}
+{* * * *P}
+{PPP* *P*}
+{R * RK* }
+$$\showboard$$
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+27 & Ng6+ & Kf7\\
+28 & N*f4 & Rhe8\\
+29 & R*e8&\\
+\end{tabular}}|
+\end{center}
+|29.~c4, Rac8; 30.~b3, h6; 31.~Kf2, R*e1; 32.~R*e1, Rc5|
+\wdecisive{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+29 & \ldots & R*e8\\
+30 & d6&\\
+\end{tabular}}|
+\end{center}
+|30.~Kf2, Re5; 31.~Rd1, g5; 32.~Ne2|
+\wdecisive{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+30 & \ldots & Rd8\\
+31 & Rd1 & g6\\
+32 & Nd5&\\
+\end{tabular}}|
+\end{center}
+|32.~c4, g5; 33.~Ne2, Ke6; 34.~Nd4+, Kd7; 35.~c5, h6|
+\wdecisive{},5.25
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+32 & \ldots & R*d6\\
+33 & c4&\\
+\end{tabular}}|
+\end{center}
+|33.~Ke2, Ke6; 34.~c4, Rc6; 35.~Kd3, f5; 36.~b3|
+\wdecisive{},4.53
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+33 & \ldots & f5\\
+34 & Ke1&\\
+\end{tabular}}|
+\end{center}
+|34.~b3|
+\wdecisive{},4.22
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+34 & \ldots & Ra6\\
+35 & a3 & f4??\\
+\end{tabular}}|
+\end{center}
+Simply throws away a pawn.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+36 & c5&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * * *}
+{p * *k*p}
+{r* * *p*}
+{* PN* * }
+{ * * p *}
+{P * * *P}
+{ P * *P*}
+{* *RK * }
+$$\showboard$$
+ why not take the pawn?
+|36.~N*f4, h6; 37.~g3, g5; 38.~Nd5, Re6+; 39.~Kd2, Re4|
+\wdecisive{},5.06 looks good to me.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+36 & \ldots & Ke6?\\
+37 & Nc7+&\\
+\end{tabular}}|
+\end{center}
+Black resigns
+
+\board
+{ * * * *}
+{p N * *p}
+{r* *k*p*}
+{* P * * }
+{ * * p *}
+{P * * *P}
+{ P * *P*}
+{* *RK * }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Nov 1993 \hspace{.3 in} $1\!-\!0$\\
+\hline
+Foo C70\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} Adam Rintoul\\
+Dunfermline Club Championship
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & e5\\
+2 & Nf3 & Nc6\\
+3 & Bb5 & a6\\
+4 & Ba4 & b5\\
+5 & Bb3 & Nf6\\
+6 & d3 & Bc5\\
+\end{tabular}}|
+\end{center}
+|6\ldots~Bb7; 7.~0-0, d5; 8.~e*d5, N*d5; 9.~Bg5, Be7; 10.~B*e7, Nd*e7|
+=
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+7 & Be3?&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{r*bqk* r}
+{* pp*ppp}
+{p*n* n *}
+{*pb p * }
+{ * *P* *}
+{*B*PBN* }
+{PPP* PPP}
+{RN*QK *R}
+$$\showboard$$
+|7.~Nc3|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+7 & \ldots & B*e3\\
+8 & f*e3 & 0-0\\
+9 & 0-0 & d6\\
+10 & Nbd2&\\
+\end{tabular}}|
+\end{center}
+|10.~a3, Bb7; 11.~Nc3, Rb8; 12.~Nd5, a5|
+\bbetter{},0.13
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+10 & \ldots & Bg4\\
+11 & d4?&\\
+\end{tabular}}|
+\end{center}
+|11.~a4, Rb8; 12.~a*b5, a*b5; 13.~h3, Bh5; 14.~Qe2, Nd7|
+\bbetter{},-0.22
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+11 & \ldots & B*f3\\
+\end{tabular}}|
+\end{center}
+|11\ldots~e*d4; 12.~Qe1, d*e3; 13.~Q*e3, Na5; 14.~Nd4, c6; 15.~c3, N*b3|
+\bupperhand{} a pawn up.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+12 & N*f3 & N*e4??\\
+\end{tabular}}|
+\end{center}
+
+\board
+{r* q rk*}
+{* p *ppp}
+{p*np * *}
+{*p* p * }
+{ * Pn* *}
+{*B* PN* }
+{PPP* *PP}
+{R *Q*RK }
+$$\showboard$$
+|12\ldots~Qe8; 13.~d5, Na5; 14.~Qd3, N*b3; 15.~a*b3, c6; 16.~Rad1|
+\bupperhand{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+13 & Bd5 & Qd7\\
+\end{tabular}}|
+\end{center}
+|13\ldots~Ng5; 14.~B*c6, N*f3+; 15.~B*f3, Rb8; 16.~d*e5, d*e5; 17.~a3|
+\wdecisive{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+14 & B*e4 & f5\\
+15 & Bd5+ & Kh8\\
+16 & Ng5 & e*d4\\
+17 & Qh5&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{r* * r k}
+{* pq* pp}
+{p*np * *}
+{*p*B*pNQ}
+{ * p * *}
+{* * P * }
+{PPP* *PP}
+{R * *RK }
+$$\showboard$$
+|17.~N*h7, Rfb8; 18.~Ng5, g6; 19.~Qf3, Ne5; 20.~Qh3+, Kg7; 21.~B*a8|
+\wdecisive{},4.44
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+17 & \ldots & h6?\\
+\end{tabular}}|
+\end{center}
+|17\ldots~g6; 18.~B*c6, g*h5; 19.~B*d7, d*e3; 20.~R*f5, R*f5; 21.~B*f5|
+\wdecisive{},4.90
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+18 & e*d4&\\
+\end{tabular}}|
+\end{center}
+|18.~Qg6, Qe8; 19.~Qh7 mate|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+18 & \ldots & Rae8\\
+\end{tabular}}|
+\end{center}
+|18\ldots~Rf6; 19.~Rae1, Raf8; 20.~Ne6, Re8; 21.~Qf3|
+\wdecisive{},2.66
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+19 & Rae1 & R*e1\\
+20 & R*e1 & Nd8\\
+21 & Qg6&\\
+\end{tabular}}|
+\end{center}
+I finally find the two move mate!
+
+\board
+{ * n r k}
+{* pq* p }
+{p* p *Qp}
+{*p*B*pN }
+{ * P * *}
+{* * * * }
+{PPP* *PP}
+{* * R K }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Nov 1993 \hspace{.3 in} $1\!-\!0$\\
+\hline
+Foo C30\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Ian Robertson (2150)\\
+\rule[-1pt]{11pt}{11pt} Andy Gill\\
+Dunfermline Club Championship
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & e5\\
+2 & f4 & d6\\
+3 & Nf3 & Nc6\\
+\end{tabular}}|
+\end{center}
+|3\ldots~e*f4|
+Just take the pawn, and then follow the main line KG.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+4 & Bb5 & Bd7\\
+5 & 0-0 & Nf6\\
+6 & Nc3 & Be7\\
+\end{tabular}}|
+\end{center}
+|6\ldots~a6; 7.~Ba4, e*f4; 8.~d3, b5; 9.~Bb3, b4|
+Who knows?
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+7 & d3&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{r* qk* r}
+{pppbbppp}
+{ *np n *}
+{*B* p * }
+{ * *PP *}
+{* NP*N* }
+{PPP* *PP}
+{R BQ*RK }
+$$\showboard$$
+ At this point white is winning.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+7 & \ldots & 0-0\\
+8 & Kh1!&\\
+\end{tabular}}|
+\end{center}
+A clever waiting move, to avoid temp gaining checks.
+|8.~Ne2|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+8 & \ldots & Nd4?\\
+\end{tabular}}|
+\end{center}
+losses a pawn
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+9 & B*d7 & Q*d7\\
+\end{tabular}}|
+\end{center}
+|9\ldots~N*f3; 10.~Bh3, Nd4; 11.~Be3, c5; 12.~f*e5, d*e5|
+\wbetter{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+10 & f*e5 & N*f3??\\
+\end{tabular}}|
+\end{center}
+
+\board
+{r* * rk*}
+{pppqbppp}
+{ * p n *}
+{* * P * }
+{ * *P* *}
+{* NP*n* }
+{PPP* *PP}
+{R BQ*R*K}
+$$\showboard$$
+ Losses the piece.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+11 & e*f6 & B*f6\\
+12 & Q*f3 & b5?\\
+\end{tabular}}|
+\end{center}
+what is this for?
+|12\ldots~Rae8|
+Planning taking control over the very white center.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+13 & Nd5&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{r* * rk*}
+{p pq*ppp}
+{ * p b *}
+{*p*N* * }
+{ * *P* *}
+{* *P*Q* }
+{PPP* *PP}
+{R B *R*K}
+$$\showboard$$
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+13 & \ldots & Qd8??\\
+\end{tabular}}|
+\end{center}
+Losses another pawn, as well as weakening the kingside, and allowing
+exchange of queens.
+|13\ldots~Bd8|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+14 & N*f6+ & Q*f6\\
+15 & Q*f6 & g*f6\\
+16 & R*f6 & Kg7\\
+17 & Bg5&\\
+\end{tabular}}|
+\end{center}
+Black is just out of good moves.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+17 & \ldots & Rae8?\\
+\end{tabular}}|
+\end{center}
+Blocking in the f rook, allowing the skew.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+18 & Raf1 & d5?\\
+\end{tabular}}|
+\end{center}
+again lack of vision
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+19 & Bh6+ & Kg8\\
+20 & e*d5 & Rd8\\
+21 & B*f8 & R*f8\\
+22 & Rc6&\\
+\end{tabular}}|
+\end{center}
+Planning an invasion of the 7th. Textbook play.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+22 & \ldots & Rd8\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * r *k*}
+{p p *p*p}
+{ *R* * *}
+{*p*P* * }
+{ * * * *}
+{* *P* * }
+{PPP* *PP}
+{* * *R*K}
+$$\showboard$$
+ Planing to remove the dangerous white pawn, but missing the connected
+rooks that arrive on the 7th.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+23 & R*c7 & R*d5\\
+24 & Rf*f7 & Rd8\\
+\end{tabular}}|
+\end{center}
+Silly, blocking the kings escape, athough its over anyway. I should
+have tried for at least one cheapo.
+|24\ldots~Re5|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+25 & R*h7 & Rf8??\\
+\end{tabular}}|
+\end{center}
+Again just missing the action.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+26 & Rcg7 mate&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * rk*}
+{p * * RR}
+{ * * * *}
+{*p* * * }
+{ * * * *}
+{* *P* * }
+{PPP* *PP}
+{* * * *K}
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Dec 1993 \hspace{.3 in} $1\!-\!0$\\
+\hline
+Foo B10\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} Bob Colquhoun\\
+Dunfermline Club Knockout
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & c6\\
+2 & Nf3 & d5\\
+3 & e*d5 & c*d5\\
+4 & c4&\\
+\end{tabular}}|
+\end{center}
+|4.~d4|
+Score: 0.06
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+4 & \ldots & Nf6\\
+\end{tabular}}|
+\end{center}
+|4\ldots~d4; 5.~b3, Nc6; 6.~Bb2, Nf6; 7.~Na3, e5|
+Score: -0.03
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+5 & c*d5&\\
+\end{tabular}}|
+\end{center}
+|5.~d4, e6; 6.~c*d5, N*d5; 7.~Nbd2, Bd6; 8.~Bc4|
+Score: 0.13
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+5 & \ldots & N*d5\\
+6 & Bc4 & e6\\
+\end{tabular}}|
+\end{center}
+|6\ldots~Nb6; 7.~Bb3, Nc6; 8.~d4, Bf5; 9.~Bg5, Be4|
+Score: 0.00
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+7 & 0-0 & Nc6\\
+8 & d4 & a6\\
+\end{tabular}}|
+\end{center}
+|8\ldots~Bb4; 9.~Bd2, B*d2; 10.~Nb*d2, Nf4; 11.~Nb3, 0-0|
+Score: -0.16
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+9 & Re1&\\
+\end{tabular}}|
+\end{center}
+|9.~Nc3|
+Score: -0.09
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+9 & \ldots & b5\\
+\end{tabular}}|
+\end{center}
+|9\ldots~Be7; 10.~Nc3, 0-0; 11.~Qd3, Qd7; 12.~N*d5|
+Score: -0.03
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+10 & B*d5 & Q*d5\\
+11 & Nc3 & Qf5\\
+\end{tabular}}|
+\end{center}
+|11\ldots~Qd8; 12.~d5, Ne7; 13.~d6, Nf5; 14.~Qd5, Bd7|
+Score: 0.41
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+12 & d5 & Nd8\\
+\end{tabular}}|
+\end{center}
+|12\ldots~Nb4; 13.~d6, Nd3; 14.~Re4, N*c1; 15.~R*c1, Rb8|
+Score: 0.34
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+13 & d*e6&\\
+\end{tabular}}|
+\end{center}
+|13.~d6, Nb7; 14.~Ne4, Nc5; 15.~Nd4|
+Score: 0.34
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+13 & \ldots & B*e6\\
+14 & Qd5&\\
+\end{tabular}}|
+\end{center}
+|14.~Nd5, Rc8; 15.~Nd4, Qg6; 16.~Bf4, Bc5; 17.~Nc7, Kf8; 18.~N*a6|
+Score: 0.75
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+14 & \ldots & Q*d5\\
+15 & N*d5 & Bd6\\
+16 & Bg5&\\
+\end{tabular}}|
+\end{center}
+|16.~Nd4, Rb8; 17.~Bf4, B*f4; 18.~N*f4, Rb6; 19.~Nd*e6, N*e6; 20.~N*e6|
+Score: 0.00
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+16 & \ldots & 0-0\\
+\end{tabular}}|
+\end{center}
+|16\ldots~h6; 17.~Bd2, 0-0; 18.~Bf4|
+Score: -0.25
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+17 & Rad1 & Nc6\\
+\end{tabular}}|
+\end{center}
+|17\ldots~Nb7; 18.~Be7, B*e7|
+Score: 0.00
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+18 & Nd4&\\
+\end{tabular}}|
+\end{center}
+|18.~Nb6, Bb4; 19.~R*e6, f*e6; 20.~N*a8, R*a8|
+Score: 0.16
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+18 & \ldots & B*d5\\
+\end{tabular}}|
+\end{center}
+|18\ldots~N*d4; 19.~R*d4, h6; 20.~Ne7, Kh7; 21.~R*d6, h*g5; 22.~Nd5|
+Score: -0.25
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+19 & N*c6 & B*h2+\\
+\end{tabular}}|
+\end{center}
+|19\ldots~Rfe8; 20.~R*e8, R*e8; 21.~h3, Re6; 22.~Nd4, Re4|
+Score: -0.13
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+20 & K*h2 & B*c6\\
+21 & Rd6 & Rfe8\\
+\end{tabular}}|
+\end{center}
+|21\ldots~Rac8|
+Score: -0.44
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+22 & R*e8+&\\
+\end{tabular}}|
+\end{center}
+|22.~Rc1, Be4; 23.~Rc7, h6; 24.~Be3, Kf8|
+Score: -0.41
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+22 & \ldots & B*e8\\
+23 & a3&\\
+\end{tabular}}|
+\end{center}
+|23.~Be3, h6; 24.~b3, Kh7; 25.~a3, g6; 26.~Bd4|
+Score: -0.78
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+23 & \ldots & a5\\
+\end{tabular}}|
+\end{center}
+|23\ldots~h6; 24.~Be3, Kh7; 25.~b3, f6; 26.~Bd4, Bf7; 27.~b4|
+Score: -0.88
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+24 & Kg3&\\
+\end{tabular}}|
+\end{center}
+|24.~b3, h6; 25.~Rd8, R*d8; 26.~B*d8, a4; 27.~b*a4, b*a4|
+Score: -0.81
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+24 & \ldots & a4\\
+\end{tabular}}|
+\end{center}
+|24\ldots~h6|
+Score: -0.91
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+25 & Bc1&\\
+\end{tabular}}|
+\end{center}
+|25.~Kh4, h6; 26.~Be3, Kh7; 27.~Bd4, Rc8; 28.~g3, Bc6|
+Score: -1.03
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+25 & \ldots & Rc8\\
+\end{tabular}}|
+\end{center}
+|25\ldots~h6; 26.~Be3, Kh7; 27.~Kh4, Rc8; 28.~Bd4, Bc6; 29.~f3|
+Score: -1.09
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+26 & Bd2&\\
+\end{tabular}}|
+\end{center}
+|26.~Be3, h6; 27.~Kh4, Kh7; 28.~Bd4, Bc6; 29.~f3|
+Score: -1.13
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+26 & \ldots & Rc4\\
+\end{tabular}}|
+\end{center}
+|26\ldots~Bc6; 27.~Be3, h6; 28.~f3, Kh7|
+Score: -1.16
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+27 & Rd8 & Re4\\
+28 & Bb4&\\
+\end{tabular}}|
+\end{center}
+|28.~f4|
+Score: -0.88
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+28 & \ldots & f6\\
+\end{tabular}}|
+\end{center}
+|28\ldots~h6; 29.~Kf3, Re6; 30.~Kg4, Kh7; 31.~f4, Re4; 32.~g3|
+Score: -1.13
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+29 & f4&\\
+\end{tabular}}|
+\end{center}
+|29.~Kf3, Re6; 30.~Kg4, Kf7; 31.~Kh4, Re2; 32.~Rd2|
+Score: -0.91
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+29 & \ldots & Kf7\\
+30 & Kf3&\\
+\end{tabular}}|
+\end{center}
+|30.~Rc8, Kg6; 31.~Kf3|
+Score: -1.16
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+30 & \ldots & Bc6\\
+31 & Rc8&\\
+\end{tabular}}|
+\end{center}
+|31.~Kg3, Re2; 32.~Rd2, R*d2; 33.~B*d2, Ke6; 34.~Be3|
+Score: -1.25
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+31 & \ldots & R*b4+\\
+32 & R*c6 & R*b2\\
+33 & g4&\\
+\end{tabular}}|
+\end{center}
+|33.~Rb6|
+Score: -2.06
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+33 & \ldots & Rb3+\\
+34 & Ke4 & R*a3\\
+35 & Rc7+&\\
+\end{tabular}}|
+\end{center}
+|35.~f5, h6; 36.~Rc7, Kg8; 37.~Rb7, Rb3; 38.~Rd7, Rb4; 39.~Kf3|
+Score: -3.28
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+35 & \ldots & Kg6\\
+36 & Rb7&\\
+\end{tabular}}|
+\end{center}
+|36.~f5, Kh6; 37.~Rc2, Rb3; 38.~g5, Kh5; 39.~g*f6, g*f6; 40.~Rh2|
+Score: -3.34
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+36 & \ldots & Rb3\\
+37 & f5+&\\
+\end{tabular}}|
+\end{center}
+|37.~Kd4|
+Score: -3.44
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+37 & \ldots & Kh6\\
+38 & g5+&\\
+\end{tabular}}|
+\end{center}
+|38.~Kd4, a3; 39.~Ra7, b4; 40.~Kc4, Rb2; 41.~Rb7, Rc2|
+Score: -3.59
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+38 & \ldots & f*g5\\
+39 & Rb6+ & Kh5\\
+40 & Rb7 & Rb4+\\
+\end{tabular}}|
+\end{center}
+|40\ldots~Kg4; 41.~R*g7, Rb4; 42.~Ke5, Rf4; 43.~f6, h5; 44.~Ra7, h4|
+Score: -4.09
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+41 & Ke5 & Rf4\\
+\end{tabular}}|
+\end{center}
+|41\ldots~Kg4; 42.~R*g7, Rf4; 43.~f6, h5; 44.~Ra7, Rf5; 45.~Ke6, h4|
+Score: -4.22
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+42 & R*b5 & Kg4\\
+43 & Ke6 & R*f5\\
+\end{tabular}}|
+\end{center}
+|43\ldots~h5; 44.~Re5, h4; 45.~Re1, a3; 46.~Ra1, Rf3; 47.~Rg1, Kh5|
+Score: -3.94
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+44 & R*f5&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * * *}
+{* * * pp}
+{ * *K* *}
+{* * *Rp }
+{p* * *k*}
+{* * * * }
+{ * * * *}
+{* * * * }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Dec 1993 \hspace{.3 in} $0\!-\!1$\\
+\hline
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} George Petrie\\
+Dunfermline Club Championship
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & c5\\
+2 & Nf3 & Nc6\\
+3 & Bc4 & d6\\
+\end{tabular}}|
+\end{center}
+|3\ldots~e6; 4.~Nc3, Nge7; 5.~d3, d5; 6.~Bb3, d4; 7.~Ne2, e5|
+Score: 0.09
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+4 & 0-0&\\
+\end{tabular}}|
+\end{center}
+|4.~c3|
+Score: 0.03
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+4 & \ldots & e6\\
+\end{tabular}}|
+\end{center}
+|4\ldots~g6; 5.~d4, c*d4; 6.~N*d4, Bg7; 7.~Be3, N*d4; 8.~B*d4, Nf6|
+Score: -0.16
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+5 & d3&\\
+\end{tabular}}|
+\end{center}
+|5.~Bb5, Nf6; 6.~d3, Bd7; 7.~Nc3, Be7; 8.~Bg5, 0-0|
+Score: 0.00
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+5 & \ldots & Be7\\
+\end{tabular}}|
+\end{center}
+|5\ldots~d5; 6.~Bb5, Nf6; 7.~Ne5, Bd7; 8.~N*d7, Q*d7; 9.~Bg5|
+Score: 0.03
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+6 & Nc3 & Bd7\\
+\end{tabular}}|
+\end{center}
+|6\ldots~Bf6|
+Score: 0.00
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+7 & Bf4&\\
+\end{tabular}}|
+\end{center}
+|7.~Re1, Nf6; 8.~Be3, 0-0; 9.~a3, Rc8; 10.~Bf4, Nd4; 11.~N*d4|
+Score: 0.06
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+7 & \ldots & a6\\
+\end{tabular}}|
+\end{center}
+|7\ldots~Na5; 8.~Nd2, N*c4; 9.~N*c4, e5; 10.~Bg3, Be6; 11.~Ne3|
+Score: -0.06
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+8 & d4&\\
+\end{tabular}}|
+\end{center}
+|8.~a3, Nf6; 9.~Re1, 0-0; 10.~Be3, e5; 11.~Nd5, Be6; 12.~N*e7|
+Score: 0.06
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+8 & \ldots & c*d4\\
+9 & Ne2 & e5\\
+\end{tabular}}|
+\end{center}
+|9\ldots~Na5|
+Score: -0.94
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+10 & Bg3 & Nf6\\
+11 & Bd5&\\
+\end{tabular}}|
+\end{center}
+|11.~c3, N*e4; 12.~c*d4, 0-0; 13.~Bd5, N*g3|
+Score: -0.97
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+11 & \ldots & 0-0\\
+\end{tabular}}|
+\end{center}
+|11\ldots~Nb4; 12.~c3, Nb*d5; 13.~e*d5, d3; 14.~Nc1, e4; 15.~Nd2|
+Score: -1.16
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+12 & c4&\\
+\end{tabular}}|
+\end{center}
+|12.~c3, d*c3; 13.~N*c3, b6; 14.~a3, Qc7; 15.~b3, Be6; 16.~B*e6|
+Score: -0.63
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+12 & \ldots & Qb6\\
+\end{tabular}}|
+\end{center}
+|12\ldots~Bg4; 13.~Qb3, Qc7; 14.~Rac1, Rac8; 15.~Qd3, b6|
+Score: -1.13
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+13 & Qd2&\\
+\end{tabular}}|
+\end{center}
+|13.~b3, Bg4; 14.~Nc1, Rac8; 15.~Nd3, Nh5; 16.~a3, N*g3; 17.~f*g3|
+Score: -1.22
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+13 & \ldots & Rac8\\
+\end{tabular}}|
+\end{center}
+|13\ldots~Nb4; 14.~b3, Bg4; 15.~Rfd1, Nb*d5|
+Score: -1.22
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+14 & Bh4&\\
+\end{tabular}}|
+\end{center}
+|14.~Rac1|
+Score: -1.25
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+14 & \ldots & Nb4\\
+\end{tabular}}|
+\end{center}
+|14\ldots~Bg4; 15.~Bg3, Nb4; 16.~b3, Nb*d5; 17.~e*d5, B*f3; 18.~g*f3|
+Score: -1.53
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+15 & Ne*d4&\\
+\end{tabular}}|
+\end{center}
+|15.~B*f6, B*f6; 16.~h3, N*d5; 17.~c*d5|
+Score: -1.44
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+15 & \ldots & Nb*d5\\
+\end{tabular}}|
+\end{center}
+|15\ldots~e*d4; 16.~b3, Bg4; 17.~Qf4, Nd3|
+Score: -3.34
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+16 & B*f6&\\
+\end{tabular}}|
+\end{center}
+|16.~e*d5, e*d4; 17.~Rfe1, Bd8; 18.~b3, Ng4; 19.~B*d8, Rf*d8; 20.~N*d4|
+Score: -1.94
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+16 & \ldots & N*f6\\
+17 & Ne2&\\
+\end{tabular}}|
+\end{center}
+|17.~Nf5, B*f5; 18.~e*f5, R*c4; 19.~b3, Ne4; 20.~Qd5, Rb4|
+Score: -4.75
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+17 & \ldots & R*c4\\
+18 & b3&\\
+\end{tabular}}|
+\end{center}
+|18.~Nc3, Rb4; 19.~b3, N*e4; 20.~N*e4, R*e4; 21.~Rfd1|
+Score: -5.13
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+18 & \ldots & R*e4\\
+19 & Nc3&\\
+\end{tabular}}|
+\end{center}
+|19.~Ng3, Rb4; 20.~Rfe1, Bg4; 21.~Qd3, Rf4; 22.~Qe3, Q*e3; 23.~f*e3|
+Score: -5.38
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+19 & \ldots & Rg4\\
+\end{tabular}}|
+\end{center}
+|19\ldots~Rf4; 20.~Qe3, Qc7|
+Score: -5.34
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+20 & Qd1&\\
+\end{tabular}}|
+\end{center}
+|20.~Rae1|
+Score: -5.41
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+20 & \ldots & Bc6\\
+21 & Na4&\\
+\end{tabular}}|
+\end{center}
+|21.~Rc1, Rf4; 22.~Re1, B*f3; 23.~g*f3, Re8; 24.~a3|
+Score: -5.66
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+21 & \ldots & Qb4\\
+\end{tabular}}|
+\end{center}
+|21\ldots~B*a4; 22.~b*a4, Qa5; 23.~Qb3, Rb4; 24.~Qc2, R*a4; 25.~Rfc1|
+Score: -5.94
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+22 & Rc1&\\
+\end{tabular}}|
+\end{center}
+|22.~h3, Rf4; 23.~Nb2, B*f3; 24.~g*f3, Rd4; 25.~Nd3, Qc3|
+Score: -5.81
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+22 & \ldots & R*g2+\\
+23 & K*g2 & Qg4+\\
+24 & Kh1 & B*f3+\\
+25 & Q*f3 & Q*f3+\\
+26 & Kg1 & Nh5\\
+\end{tabular}}|
+\end{center}
+|26\ldots~Nd5; 27.~Rc4, b5; 28.~Rfc1, b*c4; 29.~R*c4, Bf6|
+Score: -14.53
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+27 & Rc3 & Qd5\\
+\end{tabular}}|
+\end{center}
+|27\ldots~Qg4; 28.~Kh1, b5; 29.~Rg1, Qd4; 30.~Rh3, Nf4; 31.~Rhg3, b*a4|
+Score: -12.00
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+28 & Nb6&\\
+\end{tabular}}|
+\end{center}
+|28.~h3, Nf4; 29.~Rg3, Ne2; 30.~Kh2, N*g3; 31.~K*g3, Qd3; 32.~Kg2|
+Score: -11.94
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+28 & \ldots & Qd4\\
+29 & Rfc1&\\
+\end{tabular}}|
+\end{center}
+|29.~Na4, b5; 30.~h3, Nf4; 31.~Kh2, b*a4; 32.~Rc7, Re8|
+Score: -12.97
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+29 & \ldots & Q*b6\\
+30 & Rc8&\\
+\end{tabular}}|
+\end{center}
+|30.~R1c2, d5; 31.~h3, Qg6; 32.~Kh2, Nf4; 33.~f3, b6|
+Score: -13.97
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+30 & \ldots & Nf4\\
+31 & R1c7&\\
+\end{tabular}}|
+\end{center}
+|31.~R8c3, Ne2; 32.~Kf1, N*c1; 33.~R*c1, d5; 34.~h3, Bc5; 35.~f3|
+Score: -15.63
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+31 & \ldots & Bh4\\
+\end{tabular}}|
+\end{center}
+|31\ldots~Nh3; 32.~Kh1, Q*f2; 33.~Rc4, d5; 34.~Rc3, Qg1|
+Score: -#4
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+32 & Rc2&\\
+\end{tabular}}|
+\end{center}
+|32.~R*f8, K*f8; 33.~Rc8, Ke7; 34.~Rc2, Qd4; 35.~h3, B*f2; 36.~Kh2|
+Score: -18.41
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+32 & \ldots & Nd3\\
+\end{tabular}}|
+\end{center}
+|32\ldots~B*f2; 33.~Kf1, Qe3; 34.~R*f8, K*f8; 35.~Rc8, Ke7; 36.~Rc7, Kd8|
+Score: -19.53
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+33 & R*f8+&\\
+\end{tabular}}|
+\end{center}
+|33.~Kf1, B*f2; 34.~R*f8, K*f8; 35.~Rc8, Ke7; 36.~Rg8, Bg3; 37.~Ke2|
+Score: -14.78
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+33 & \ldots & K*f8\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * k *}
+{*p* *ppp}
+{pq p * *}
+{* * p * }
+{ * * * b}
+{*P*n* * }
+{P*R* P P}
+{* * * K }
+$$\showboard$$
+$0\!-\!1$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Dec 1993 \hspace{.3 in} $0\!-\!1$\\
+\hline
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} Peter Horne\\
+Dunfermline Club Championship
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & e6\\
+2 & Nf3 & Nc6\\
+3 & Bb5 & a6\\
+\end{tabular}}|
+\end{center}
+|3\ldots~d5; 4.~d3, d*e4; 5.~B*c6, b*c6; 6.~d*e4, Q*d1; 7.~K*d1|
+Score: 0.19
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+4 & Ba4&\\
+\end{tabular}}|
+\end{center}
+|4.~B*c6, d*c6; 5.~0-0, Nf6; 6.~Re1, Be7; 7.~d4, c5; 8.~e5|
+Score: 0.22
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+4 & \ldots & b5\\
+5 & Bb3 & Bb7\\
+\end{tabular}}|
+\end{center}
+|5\ldots~Na5; 6.~d3, N*b3; 7.~a*b3, Bb7; 8.~0-0, Bc5; 9.~Nc3|
+Score: -0.13
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+6 & d4&\\
+\end{tabular}}|
+\end{center}
+|6.~c3, Nf6; 7.~d3, Be7; 8.~Be3, 0-0; 9.~Nbd2, d5|
+Score: -0.09
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+6 & \ldots & Na5\\
+7 & Nbd2&\\
+\end{tabular}}|
+\end{center}
+|7.~e5, N*b3; 8.~a*b3, c5; 9.~Bg5, f6; 10.~Be3, c*d4; 11.~B*d4|
+Score: -0.38
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+7 & \ldots & Nf6\\
+\end{tabular}}|
+\end{center}
+|7\ldots~N*b3; 8.~a*b3, c5; 9.~0-0, d5; 10.~e*d5, B*d5|
+Score: -0.41
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+8 & e5 & Nd5\\
+\end{tabular}}|
+\end{center}
+|8\ldots~N*b3; 9.~N*b3, Ne4; 10.~0-0, Be7; 11.~c3, 0-0; 12.~Be3, d5|
+Score: -0.19
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+9 & 0-0 & d6\\
+\end{tabular}}|
+\end{center}
+|9\ldots~Nf4|
+Score: -0.09
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+10 & a4&\\
+\end{tabular}}|
+\end{center}
+|10.~B*d5, B*d5; 11.~a4, d*e5; 12.~a*b5, c5; 13.~b*a6, e*d4|
+Score: 0.09
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+10 & \ldots & b4\\
+\end{tabular}}|
+\end{center}
+|10\ldots~d*e5; 11.~B*d5, Q*d5; 12.~d*e5, c5; 13.~a*b5, a*b5; 14.~b3|
+Score: 0.06
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+11 & Nc4&\\
+\end{tabular}}|
+\end{center}
+|11.~B*d5, B*d5; 12.~c3, d*e5; 13.~N*e5, Bd6; 14.~c*b4, B*b4; 15.~Ndf3|
+Score: 0.03
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+11 & \ldots & N*b3\\
+12 & c*b3 & a5\\
+\end{tabular}}|
+\end{center}
+|12\ldots~Rb8; 13.~Qc2, Be7; 14.~Na5, c5; 15.~e*d6, Q*d6; 16.~N*b7, R*b7|
+Score: -0.34
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+13 & Qe2&\\
+\end{tabular}}|
+\end{center}
+|13.~Bg5, Be7; 14.~B*e7, Q*e7; 15.~Re1, d*e5|
+Score: -0.56
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+13 & \ldots & f6\\
+\end{tabular}}|
+\end{center}
+|13\ldots~Be7; 14.~Rd1, 0-0; 15.~Be3, d*e5; 16.~d*e5|
+Score: -0.63
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+14 & e*d6&\\
+\end{tabular}}|
+\end{center}
+|14.~e*f6, Bc8; 15.~f7, K*f7; 16.~Ng5, Ke7; 17.~Ne4, Qd7; 18.~Bg5|
+Score: 0.47
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+14 & \ldots & c*d6\\
+\end{tabular}}|
+\end{center}
+|14\ldots~B*d6; 15.~Q*e6, Be7; 16.~Bd2, Ra6; 17.~Qf5, c5; 18.~d*c5, B*c5|
+Score: 0.03
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+15 & Q*e6+ & Qe7\\
+\end{tabular}}|
+\end{center}
+|15\ldots~Be7; 16.~Re1, Ra6; 17.~Nh4, Nc7; 18.~Q*e7, Q*e7; 19.~R*e7, K*e7|
+Score: 0.72
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+16 & Qh3&\\
+\end{tabular}}|
+\end{center}
+|16.~N*d6, Kd8; 17.~Q*e7, B*e7; 18.~N*b7, Kc8; 19.~Nc5, Re8; 20.~Re1|
+Score: 4.66
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+16 & \ldots & Qf7\\
+\end{tabular}}|
+\end{center}
+|16\ldots~Qc7; 17.~Re1, Be7; 18.~Qe6, Ra6; 19.~Bd2, Qc8; 20.~Q*c8, B*c8|
+Score: 0.97
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+17 & Re1+ & Kd8\\
+18 & Bd2 & Qg6\\
+\end{tabular}}|
+\end{center}
+|18\ldots~g6|
+Score: 0.97
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+19 & Re2&\\
+\end{tabular}}|
+\end{center}
+|19.~Rac1, Ra6; 20.~Ne3, N*e3; 21.~B*e3, d5; 22.~Bf4, Bd6|
+Score: 0.88
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+19 & \ldots & Be7\\
+\end{tabular}}|
+\end{center}
+|19\ldots~Ra6; 20.~Rae1, Be7; 21.~Qe6, Re8; 22.~Ne3, N*e3; 23.~B*e3, B*f3|
+Score: 0.88
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+20 & Rae1&\\
+\end{tabular}}|
+\end{center}
+|20.~Nh4, Qh5; 21.~Rae1, Bc8; 22.~Qg3, Qg4; 23.~Bf4, N*f4; 24.~Q*g4|
+Score: 1.06
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+20 & \ldots & Re8\\
+\end{tabular}}|
+\end{center}
+|20\ldots~Bc8; 21.~Qh4, Bb7; 22.~Bf4, Ba6; 23.~Qg3|
+Score: 0.91
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+21 & Nh4&\\
+\end{tabular}}|
+\end{center}
+|21.~N*d6, Bc8; 22.~Nh4, Qh5; 23.~Qg3, Rg8; 24.~Nf3, Bg4|
+Score: 2.06
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+21 & \ldots & Qh5\\
+22 & Nf5&\\
+\end{tabular}}|
+\end{center}
+|22.~N*d6, Ba6; 23.~Re6, Bc8; 24.~g4, B*e6; 25.~R*e6, Nf4; 26.~B*f4|
+Score: 3.06
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+22 & \ldots & Q*h3\\
+23 & g*h3 & g6\\
+\end{tabular}}|
+\end{center}
+|23\ldots~Bc6; 24.~N*g7, Rg8; 25.~Bh6, Bd7; 26.~Nb6|
+Score: 1.53
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+24 & Nc*d6&\\
+\end{tabular}}|
+\end{center}
+|24.~Nf*d6, Bc6; 25.~N*e8, K*e8; 26.~Re6, Bd7; 27.~Nd6, Kd8; 28.~Nf7|
+Score: 3.41
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+24 & \ldots & g*f5\\
+25 & N*e8&\\
+\end{tabular}}|
+\end{center}
+|25.~N*b7, Kd7; 26.~Nc5, B*c5; 27.~d*c5, R*e2|
+Score: 1.66
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+25 & \ldots & K*e8\\
+26 & Bh6&\\
+\end{tabular}}|
+\end{center}
+|26.~f3, Kd7; 27.~Kf2, Rg8; 28.~Rd1, Bd6; 29.~Kf1, Bc6|
+Score: -0.16
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+26 & \ldots & Kf7\\
+\end{tabular}}|
+\end{center}
+|26\ldots~Kd7; 27.~f3, Rg8; 28.~Kf2, Bd6; 29.~Rg1, Rg6; 30.~R*g6, h*g6|
+Score: -0.47
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+27 & Bf4&\\
+\end{tabular}}|
+\end{center}
+|27.~f3, Rg8; 28.~Kf2, Bd6; 29.~Rg1, Rg6; 30.~R*g6, h*g6; 31.~Ke1|
+Score: -0.41
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+27 & \ldots & Rg8+\\
+28 & Kf1 & Ba6\\
+29 & Bd2 & Bd6\\
+30 & f3&\\
+\end{tabular}}|
+\end{center}
+|30.~Rc1, B*h2; 31.~f3, Bg1; 32.~Rc4, B*c4; 33.~b*c4, B*d4; 34.~Rg2|
+Score: -3.00
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+30 & \ldots & B*h2\\
+31 & Kf2&\\
+\end{tabular}}|
+\end{center}
+|31.~Rc1, Bg1; 32.~Rc4, B*c4; 33.~b*c4, B*d4; 34.~Re1, Ne7|
+Score: -3.13
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+31 & \ldots & Bg3+\\
+32 & Kf1 & B*e1\\
+33 & B*e1&\\
+\end{tabular}}|
+\end{center}
+|33.~K*e1, Rg1; 34.~Kf2, Rb1; 35.~Re1, R*b2; 36.~Rd1, Nc3; 37.~Ke1|
+Score: -4.84
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+33 & \ldots & Ne3+\\
+\end{tabular}}|
+\end{center}
+|33\ldots~Re8; 34.~Bg3, R*e2; 35.~Kg1, R*b2; 36.~Bd6, R*b3|
+Score: -8.31
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+34 & Kf2 & f4\\
+\end{tabular}}|
+\end{center}
+|34\ldots~Nd1; 35.~Kf1, Re8; 36.~Kg1, B*e2; 37.~f4, Rd8; 38.~Kg2, R*d4|
+Score: -7.81
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+35 & R*e3 & f*e3+\\
+36 & K*e3 & Re8+\\
+37 & Kd2 & Re2+\\
+38 & Kd1 & R*b2\\
+39 & d5&\\
+\end{tabular}}|
+\end{center}
+|39.~f4, R*b3; 40.~h4, Rd3; 41.~Kc1, R*d4; 42.~Bg3, Rd3; 43.~Bf2|
+Score: -6.09
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+39 & \ldots & R*b3\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * * *}
+{* * *k*p}
+{b* * p *}
+{p *P* * }
+{Pp * * *}
+{*r* *P*P}
+{ * * * *}
+{* *KB * }
+$$\showboard$$
+$0\!-\!1$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Jan 1994 \hspace{.3 in} $1\!-\!0$\\
+\hline
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} Brian Easton\\
+Dunfermline Club Championship
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & Nf6\\
+2 & Nc3 & e6\\
+3 & d4 & d5\\
+4 & e5 & Ne4\\
+5 & N*e4 & d*e4\\
+6 & Bc4 & Nc6\\
+7 & Be3 & Bb4+\\
+8 & c3 & Be7\\
+9 & Ne2 & Bg5\\
+10 & Qd2 & Na5\\
+11 & B*g5 & N*c4\\
+12 & Qf4 & Qd5\\
+13 & b3 & Nb2\\
+14 & 0-0 & b6\\
+15 & Ng3 & Ba6\\
+16 & c4 & Nd3\\
+17 & Q*e4 & Q*e4\\
+18 & N*e4 & Bb7\\
+19 & f3 & 0-0\\
+20 & Nf2 & f6\\
+21 & e*f6 & g*f6\\
+22 & Bh6 & Rf7\\
+23 & N*d3 & Rd8\\
+24 & Nf4 & Re7\\
+25 & Rfe1 & Kf7\\
+26 & Rad1 & e5\\
+27 & d*e5 & R*d1\\
+28 & R*d1 & f*e5\\
+29 & Nd5 & Rd7\\
+30 & f4 & e4\\
+31 & f5 & c6\\
+32 & Nc3 & c5\\
+33 & R*d7+ & Kf6\\
+34 & R*b7 & K*f5\\
+35 & R*h7 & Kg6\\
+36 & Rh8&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * * R}
+{p * * * }
+{ p * *kB}
+{* p * * }
+{ *P*p* *}
+{*PN * * }
+{P* * *PP}
+{* * * K }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Jan 1994 \hspace{.3 in} $1\!-\!0$\\
+\hline
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} George Plant\\
+\rule[-1pt]{11pt}{11pt} Andy Gill\\
+Wester-Hailes Congress
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & e5\\
+2 & Nf3 & Nc6\\
+3 & Bb5 & a6\\
+4 & Ba4 & Nf6\\
+5 & d4 & b5\\
+6 & Bb3 & d6\\
+7 & Ng5 & Qd7\\
+8 & B*f7+ & Kd8\\
+9 & d5 & Nb4\\
+10 & c3 & N*e4\\
+11 & Be6 & Qe8\\
+12 & c*b4 & N*g5\\
+13 & B*g5+ & Be7\\
+14 & B*e7+ & Q*e7\\
+15 & B*c8 & R*c8\\
+16 & 0-0 & c6\\
+17 & d*c6 & R*c6\\
+18 & Re1 & h5\\
+19 & Nc3 & Rc4\\
+20 & a3 & g5\\
+21 & Nd5 & Qg7\\
+22 & Ne3 & Rc7\\
+23 & Nf5 & Qf6\\
+24 & Q*d6+ & Q*d6\\
+25 & N*d6 & Re7\\
+26 & R*e5 & R*e5\\
+27 & Nf7+ & Ke7\\
+28 & N*e5 & Rc8\\
+29 & Nd3 & Kd6\\
+30 & Kf1 & h4\\
+31 & h3 & Kd5\\
+32 & Ne1 & Ke4\\
+33 & Nf3 & Kf4\\
+34 & Nd4 & Re8\\
+35 & Re1 & R*e1+\\
+36 & K*e1 & Ke5\\
+37 & Nc2 & Ke4\\
+38 & Ke2 & Kf4\\
+39 & Kd3 & Ke5\\
+40 & Ne3 & Kf4\\
+41 & Nd5+ & Kf5\\
+42 & Nc7&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * * *}
+{* N * * }
+{p* * * *}
+{*p* *kp }
+{ P * * p}
+{P *K* *P}
+{ P * PP*}
+{* * * * }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Jan 1994 \hspace{.3 in} $1\!-\!0$\\
+\hline
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} C. McIntee\\
+Wester-Hailes Congress
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & c5\\
+2 & Nf3 & Nc6\\
+3 & Be2 & Nf6\\
+4 & Nc3 & e6\\
+5 & 0-0 & d5\\
+6 & e*d5 & N*d5\\
+7 & N*d5 & Q*d5\\
+8 & c4 & Qd8\\
+9 & Re1 & h5\\
+10 & b3 & f6\\
+11 & Bb2 & h4\\
+12 & h3 & Qc7\\
+13 & d4 & Qf4\\
+14 & d5 & e*d5\\
+15 & c*d5 & Nd8\\
+16 & Bb5+ & Kf7\\
+17 & Qc1 & Qd6\\
+18 & Qe3 & Be7\\
+19 & Qe4 & g5\\
+20 & Bd3 & Ke8\\
+21 & Qg6+ & Kd7\\
+22 & Bb5+ & Kc7\\
+23 & Ne5 & Q*d5\\
+24 & Rad1 & Qg8\\
+25 & Bc4 & Ne6\\
+26 & Q*g8 & R*g8\\
+27 & B*e6 & B*e6\\
+28 & Nf3 & Rad8\\
+29 & R*d8 & R*d8\\
+30 & R*e6 & Rd1+\\
+31 & Kh2 & Bd6+\\
+32 & g3 & f5\\
+33 & Be5 & h*g3+\\
+34 & f*g3 & B*e5\\
+35 & R*e5 & Ra1\\
+36 & R*c5+ & Kb6\\
+37 & Rc2 & g4\\
+38 & h*g4 & f*g4\\
+39 & Ne5 & Kb5\\
+40 & N*g4 & a5\\
+41 & Ne3 & Re1\\
+42 & Nc4 & Re6\\
+43 & g4 & Rh6+\\
+44 & Kg3 & Rg6\\
+45 & Rg2 & a4\\
+46 & Ne5 & Rg5\\
+47 & b*a4+ & K*a4\\
+48 & Kf4 & Rg7\\
+49 & g5 & b5\\
+50 & g6 & b4\\
+51 & Kf5 & Ka3\\
+52 & Kf6 & Rg8\\
+53 & g7&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * *r*}
+{* * * P }
+{ * * K *}
+{* * N * }
+{ p * * *}
+{k * * * }
+{P* * *R*}
+{* * * * }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Jan 1994 \hspace{.3 in} $1\!-\!0$\\
+\hline
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} F. Robertson\\
+\rule[-1pt]{11pt}{11pt} Andy Gill\\
+Wester-Hailes Congress
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & d4 & d5\\
+2 & Nf3 & e6\\
+3 & Bf4 & Be7\\
+4 & e3 & Nf6\\
+5 & Bd3 & b6\\
+6 & 0-0 & 0-0\\
+7 & Re1 & Bb7\\
+8 & Nbd2 & c5\\
+9 & c3 & Nc6\\
+10 & Ne5 & Rc8\\
+11 & Ndf3 & c4\\
+12 & Bc2 & b5\\
+13 & b3 & Qa5\\
+14 & b4 & Qd8\\
+15 & a4 & a6\\
+16 & a*b5 & a*b5\\
+17 & N*c6 & B*c6\\
+18 & Ne5 & Bb7\\
+19 & Ra5 & Qe8\\
+20 & Ra7 & Ba8\\
+21 & Ng4 & Bc6\\
+22 & Be5 & Qd8\\
+23 & Qf3 & Ra8\\
+24 & R*a8 & B*a8\\
+25 & N*f6+ & B*f6\\
+26 & e4 & B*e5\\
+27 & d*e5 & d*e4\\
+28 & B*e4 & B*e4\\
+29 & Q*e4 & Qd3\\
+30 & Q*d3 & c*d3\\
+31 & Rd1 & Rd8\\
+32 & f4 & f5\\
+33 & Kf2 & Kf8\\
+34 & Ke3 & Ke7\\
+35 & R*d3 & R*d3+\\
+36 & K*d3 & Kd7\\
+37 & h3 & g6\\
+38 & Kd4 & Kc6\\
+39 & g3 & Kb6\\
+40 & g4 & Kc6\\
+41 & c4 & Kb6\\
+42 & c5+ & Kc6\\
+43 & Ke3 & Kc7\\
+44 & Ke2 & Kc6\\
+45 & Kf3 & Kd5\\
+46 & g*f5 & g*f5\\
+47 & h4 & Kc4\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * * *}
+{* * * *p}
+{ * *p* *}
+{*pP Pp* }
+{ Pk* P P}
+{* * *K* }
+{ * * * *}
+{* * * * }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Jan 1994 \hspace{.3 in} $0\!-\!1$\\
+\hline
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} A. McKerrow\\
+Wester-Hailes Congress
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & e5\\
+2 & Nf3 & Nc6\\
+3 & Bb5 & a6\\
+4 & Ba4 & Nf6\\
+5 & 0-0 & Be7\\
+6 & Nc3 & b5\\
+7 & Bb3 & 0-0\\
+8 & a3 & d6\\
+9 & Re1 & Rb8\\
+10 & d3 & Bg4\\
+11 & h3 & Bh5\\
+12 & Nd5 & N*d5\\
+13 & e*d5 & Nd4\\
+14 & g4 & N*f3+\\
+15 & Q*f3 & Bg6\\
+16 & a4 & b4\\
+17 & a5 & Qc8\\
+18 & Ba4 & f5\\
+19 & g*f5 & R*f5\\
+20 & Qg4 & Bh5\\
+21 & Qc4 & Rf6\\
+22 & Bg5 & Rg6\\
+23 & f4 & h6\\
+24 & R*e5 & d*e5\\
+25 & d6+ & Qe6\\
+26 & Q*e6+ & R*e6\\
+27 & Bb3 & h*g5\\
+28 & d*e7 & Bf7\\
+29 & f*g5 & Rg6\\
+30 & Rf1 & B*b3\\
+31 & c*b3 & R*g5+\\
+32 & Kh2 & Re8\\
+33 & h4 & Rg4\\
+34 & Kh3 & Rf4\\
+35 & R*f4 & e*f4\\
+36 & Kg4 & R*e7\\
+37 & K*f4 & Rd7\\
+38 & Ke4 & Rd6\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * *k*}
+{* p * p }
+{p* r * *}
+{P * * * }
+{ p *K* P}
+{*P*P* * }
+{ P * * *}
+{* * * * }
+$$\showboard$$
+$0\!-\!1$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Jan 1994 \hspace{.3 in} $1\!-\!0$\\
+\hline
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} S. McCluskey\\
+\rule[-1pt]{11pt}{11pt} Andy Gill\\
+Wester-Hailes Congress
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & e5\\
+2 & Nf3 & Nc6\\
+3 & Bb5 & a6\\
+4 & B*c6 & d*c6\\
+5 & d3 & Bd6\\
+6 & 0-0 & Bg4\\
+7 & h3 & Bh5\\
+8 & Be3 & Qe7\\
+9 & Nc3 & Nf6\\
+10 & Re1 & 0-0-0\\
+11 & Nb1 & Bb4\\
+12 & c3 & Ba5\\
+13 & b4 & Bb6\\
+14 & a3 & N*e4\\
+15 & B*b6 & B*f3\\
+16 & Q*f3 & Ng5\\
+17 & Qe3 & c*b6\\
+18 & d4 & Rhe8\\
+19 & h4 & Ne6\\
+20 & g3 & e*d4\\
+21 & c*d4 & R*d4\\
+22 & Nc3 & c5\\
+23 & Rac1 & Red8\\
+24 & b*c5 & b*c5\\
+25 & Ne4 & R8d7\\
+26 & N*c5 & Rc7\\
+27 & N*e6 & Q*e6\\
+28 & Q*d4 & R*c1\\
+29 & R*c1+ & Kb8\\
+30 & Q*g7&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ k * * *}
+{*p* *pQp}
+{p* *q* *}
+{* * * * }
+{ * * * P}
+{P * * P }
+{ * * P *}
+{* R * K }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Jan 1994 \hspace{.3 in} $1\!-\!0$\\
+\hline
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} Rab Brown\\
+Dunferline Club Knockout
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & e5\\
+2 & Nf3 & d6\\
+3 & d4 & Nc6\\
+4 & d*e5 & N*e5\\
+5 & N*e5 & d*e5\\
+6 & Q*d8+ & K*d8\\
+7 & Bc4 & Bb4+\\
+8 & Nc3 & B*c3+\\
+9 & b*c3 & Be6\\
+10 & B*e6 & f*e6\\
+11 & 0-0 & Nf6\\
+12 & Bb2 & N*e4\\
+13 & c4 & Nd2\\
+14 & Rfd1 & Ke7\\
+15 & R*d2 & c5\\
+16 & B*e5 & Rhg8\\
+17 & Rad1 & g5\\
+18 & Rd7+ & Ke8\\
+19 & R*b7 & g4\\
+20 & R*h7 & Rd8\\
+21 & R*d8+ & K*d8\\
+22 & Rh8 & R*h8\\
+23 & B*h8 & Kd7\\
+24 & f3 & g*f3\\
+25 & g*f3 & Ke7\\
+26 & Be5 & Kd7\\
+27 & Kg2 & Ke7\\
+28 & Kg3 & Kf7\\
+29 & Bd6 & Kf6\\
+30 & B*c5 & a5\\
+31 & Kf4 & e5+\\
+32 & Ke4 & Ke6\\
+33 & f4 & a4\\
+34 & f*e5 & a3\\
+35 & B*a3 & Kd7\\
+36 & Kd5 & Ke8\\
+37 & Ke6 & Kd8\\
+38 & Kf7 & Kd7\\
+39 & e6+ & Kc6\\
+40 & e7 & Kc7\\
+41 & e8=Q & Kb7\\
+42 & Qe6 & Kc7\\
+43 & Qd6+ & Kb7\\
+44 & Ke7 & Ka7\\
+45 & Qb4 & Ka8\\
+46 & Kd7 & Ka7\\
+47 & Kc7 & Ka6\\
+48 & Qb6 mate&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * * *}
+{* K * * }
+{kQ * * *}
+{* * * * }
+{ *P* * *}
+{B * * * }
+{P*P* * P}
+{* * * * }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Jan 1994 \hspace{.3 in} $0\!-\!1$\\
+\hline
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} Dick Patterson\\
+Dunfermline C vs Grangemouth B
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & c5\\
+2 & Nf3 & Nc6\\
+3 & Be2 & e6\\
+4 & b3 & a6\\
+5 & 0-0 & b5\\
+6 & Bb2 & Nf6\\
+7 & e5 & Nd5\\
+8 & d4 & Bb7\\
+9 & c4 & Nf4\\
+10 & c*b5 & N*e2+\\
+11 & Q*e2 & a*b5\\
+12 & Re1 & c*d4\\
+13 & N*d4 & N*d4\\
+14 & B*d4 & Qg5\\
+15 & g3 & Rc8\\
+16 & f4 & Qg6\\
+17 & Q*b5 & Bc6\\
+18 & Qe2 & Be7\\
+19 & a4 & 0-0\\
+20 & a5 & f6\\
+21 & e*f6 & B*f6\\
+22 & B*f6 & R*f6\\
+23 & b4 & R*f4\\
+24 & Qd2 & Rf3\\
+25 & Rf1 & R*f1+\\
+26 & K*f1 & Qf5+\\
+27 & Qf4 & Qd3+\\
+28 & Ke1 & Rf8\\
+29 & Q*f8+ & K*f8\\
+30 & a6 & Qd4\\
+31 & Ke2 & Q*a1\\
+32 & Nd2 & Q*a6+\\
+33 & Ke3 & Qa3+\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * k *}
+{* *p* pp}
+{ *b*p* *}
+{* * * * }
+{ P * * *}
+{q * K P }
+{ * N * P}
+{* * * * }
+$$\showboard$$
+$0\!-\!1$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Jan 1994 \hspace{.3 in} $1\!-\!0$\\
+\hline
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Ian Mitchell (1660)\\
+\rule[-1pt]{11pt}{11pt} Andy Gill\\
+Dunfermline Club Championship
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & e5\\
+2 & f4 & e*f4\\
+3 & Nf3 & Nc6\\
+4 & d4 & Nf6\\
+5 & Bd3 & d5\\
+6 & e5 & Ne4\\
+7 & 0-0 & g5\\
+8 & c3 & Qe7\\
+9 & Nfd2 & Bf5\\
+10 & Qe2 & N*d2\\
+11 & N*d2 & B*d3\\
+12 & Q*d3 & 0-0-0\\
+13 & a4 & Rg8\\
+14 & a5 & a6\\
+15 & b4 & h6\\
+16 & b5 & Nb8\\
+17 & Nb3 & a*b5\\
+18 & Q*b5 & Qd7\\
+19 & Qd3 & f6\\
+20 & e*f6 & Bd6\\
+21 & Bd2 & Qg4\\
+22 & a6 & N*a6\\
+23 & R*a6 & b*a6\\
+24 & Q*a6+ & Kd7\\
+25 & Qb5+ & Ke6\\
+26 & c4 & f3\\
+27 & R*f3 & Rb8\\
+28 & Q*d5+ & Kd7\\
+29 & Nc5+ & Kd8\\
+30 & Q*g8+&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ r k *Q*}
+{* p * * }
+{ * b P p}
+{* N * p }
+{ *PP *q*}
+{* * *R* }
+{ * B *PP}
+{* * * K }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Feb 1994 \hspace{.3 in} $0\!-\!1$\\
+\hline
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} Paul Burtwistle\\
+Dunfermline Club Championship
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & c5\\
+2 & Nf3 & e6\\
+3 & Be2 & Nc6\\
+4 & 0-0 & Nf6\\
+5 & Nc3 & d5\\
+6 & e5 & Nd7\\
+7 & Re1 & Nd*e5\\
+8 & N*e5 & N*e5\\
+9 & Bb5+ & Nc6\\
+10 & d4 & a6\\
+11 & B*c6+ & b*c6\\
+12 & Be3 & c*d4\\
+13 & B*d4 & c5\\
+14 & Be5 & Bb7\\
+15 & Qd2 & f6\\
+16 & Bc7 & Q*c7\\
+17 & R*e6+ & Kf7\\
+18 & Rae1 & d4\\
+19 & Nd1 & Bd6\\
+20 & f4 & Rhe8\\
+21 & f5 & Bd5\\
+22 & R*e8 & R*e8\\
+23 & c3 & R*e1+\\
+24 & Q*e1 & B*h2+\\
+25 & Kh1 & Be5\\
+26 & c*d4 & c*d4\\
+27 & Qe2 & Qc4\\
+28 & Qh5+ & Kf8\\
+29 & Kg1 & Qc2\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * k *}
+{* * * pp}
+{p* * p *}
+{* *bbP*Q}
+{ * p * *}
+{* * * * }
+{PPq* *P*}
+{* *N* K }
+$$\showboard$$
+$0\!-\!1$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Feb 1994 \hspace{.3 in} $0\!-\!1$\\
+\hline
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} Jim O'Neill (1875)\\
+Dunfermline Club Knockout
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & c5\\
+2 & Nf3 & d6\\
+3 & d4 & c*d4\\
+4 & N*d4 & Nf6\\
+5 & Bd3 & a6\\
+6 & 0-0 & e5\\
+7 & Nf3 & Bg4\\
+8 & Nc3 & Nbd7\\
+9 & Re1 & Rc8\\
+10 & Be3 & b5\\
+11 & Nd5 & N*d5\\
+12 & e*d5 & Nf6\\
+13 & Bg5 & Be7\\
+14 & B*f6 & B*f6\\
+15 & Be4 & 0-0\\
+16 & c3 & Bh4\\
+17 & Qc2 & f5\\
+18 & N*h4 & Q*h4\\
+19 & g3 & Qh5\\
+20 & Bg2 & Rf6\\
+21 & f3 & B*f3\\
+22 & B*f3 & Q*f3\\
+23 & Rad1 & f4\\
+24 & g*f4 & Rg6+\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ *r* *k*}
+{* * * pp}
+{p* p *r*}
+{*p*Pp * }
+{ * * P *}
+{* P *q* }
+{PPQ* * P}
+{* *RR K }
+$$\showboard$$
+$0\!-\!1$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Feb 1994 \hspace{.3 in} $1\!-\!0$\\
+\hline
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} Bill Bell\\
+Dunfermline Club Championship
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & e6\\
+2 & d4 & d5\\
+3 & Nf3 & d*e4\\
+4 & Nfd2 & Q*d4\\
+5 & c3 & Qd5\\
+6 & Be2 & e3\\
+7 & Nf3 & Q*d1+\\
+8 & B*d1 & e*f2+\\
+9 & K*f2 & Nc6\\
+10 & Be3 & Bd7\\
+11 & Re1 & h6\\
+12 & Nbd2 & 0-0-0\\
+13 & Ba4 & Kb8\\
+14 & Rad1 & Bd6\\
+15 & b4 & a6\\
+16 & Nc4 & Be7\\
+17 & Nfe5 & Be8\\
+18 & R*d8+ & B*d8\\
+19 & B*c6 & B*c6\\
+20 & N*f7 & Rh7\\
+21 & N*d8 & Bd5\\
+22 & Nd2 & g5\\
+23 & Rd1 & Kc8\\
+24 & Nb3 & Rd7\\
+25 & N*b7 & B*b7\\
+26 & R*d7 & K*d7\\
+27 & Nc5+ & Kc6\\
+28 & N*e6 & Nf6\\
+29 & Nd8+ & Kd7\\
+30 & N*b7 & Ne4+\\
+31 & Kf3 & N*c3\\
+32 & Nc5+ & Kc6\\
+33 & N*a6 & N*a2\\
+34 & Bd2 & Kb6\\
+35 & Nc5 & Kc6\\
+36 & Nd3 & Kb5\\
+37 & Ke4 & Kc4\\
+38 & g3 & Kb3\\
+39 & h4 & g*h4\\
+40 & g*h4 & Nc3+\\
+41 & B*c3 & K*c3\\
+42 & h5 & Kc4\\
+43 & Ne5+ & K*b4\\
+44 & Kd5 & c5\\
+45 & Nd3+ & Kb5\\
+46 & N*c5 & Kb6\\
+47 & Ne6 & Kb7\\
+48 & Nf8 & Kc7\\
+49 & Ke6 & Kd8\\
+50 & Kf7 & Kc8\\
+51 & Kg6 & Kd8\\
+52 & K*h6 & Ke8\\
+53 & Kg7&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * *kN *}
+{* * * K }
+{ * * * *}
+{* * * *P}
+{ * * * *}
+{* * * * }
+{ * * * *}
+{* * * * }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Feb 1994 \hspace{.3 in} $1\!-\!0$\\
+\hline
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} John MacArthur (1725)\\
+\rule[-1pt]{11pt}{11pt} Andy Gill\\
+Dunfermline Club Championship
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & d4 & e6\\
+2 & Nf3 & Nf6\\
+3 & c4 & d5\\
+4 & Nc3 & Nc6\\
+5 & e3 & Be7\\
+6 & Be2 & 0-0\\
+7 & 0-0 & Qd6\\
+8 & c5 & Qd7\\
+9 & Ne5 & N*e5\\
+10 & d*e5 & Ne4\\
+11 & N*e4 & d*e4\\
+12 & Qc2 & Qc6\\
+13 & b4 & Rd8\\
+14 & Bb2 & a5\\
+15 & a3 & a*b4\\
+16 & a*b4 & R*a1\\
+17 & R*a1 & b6\\
+18 & Bd4 & b*c5\\
+19 & b*c5 & Bb7\\
+20 & Ra5 & Ra8\\
+21 & Bb5 & Qd5\\
+22 & Qa4 & R*a5\\
+23 & Q*a5 & B*c5\\
+24 & Q*c7 & Bf8\\
+25 & Be8 & h6\\
+26 & Q*f7+ & Kh7\\
+27 & Q*f8 & Bc6\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * *BQ *}
+{* * * pk}
+{ *b*p* p}
+{* *qP * }
+{ * Bp* *}
+{* * P * }
+{ * * PPP}
+{* * * K }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Feb 1994 \hspace{.3 in} $1\!-\!0$\\
+\hline
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Ian Sneddon (1685)\\
+\rule[-1pt]{11pt}{11pt} Andy Gill\\
+Dunfermline Club Championship
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & c4 & e5\\
+2 & Nc3 & Nf6\\
+3 & Nf3 & Nc6\\
+4 & g3 & d5\\
+5 & c*d5 & N*d5\\
+6 & Bg2 & Be6\\
+7 & 0-0 & Bb4\\
+8 & Ne4 & Qd7\\
+9 & d4 & e*d4\\
+10 & N*d4 & 0-0-0\\
+11 & N*e6 & Q*e6\\
+12 & Qc2 & h6\\
+13 & Rd1 & f5\\
+14 & Nc5 & B*c5\\
+15 & Q*c5 & Nde7\\
+16 & Be3 & R*d1+\\
+17 & R*d1 & Rd8\\
+18 & R*d8+ & K*d8\\
+19 & b3 & a6\\
+20 & Qc3 & Qe5\\
+21 & Q*e5 & N*e5\\
+22 & B*b7 & N7c6\\
+23 & Bf4 & Na5\\
+24 & B*e5 & N*b7\\
+25 & B*g7 & h5\\
+26 & Kg2 & Nd6\\
+27 & f3 & Ne8\\
+28 & Be5 & c6\\
+29 & Kh3 & Ke7\\
+30 & Kh4 & Nf6\\
+31 & B*f6+ & K*f6\\
+32 & K*h5 & c5\\
+33 & g4 & f4\\
+34 & g5+ & Kg7\\
+35 & Kg4&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * * *}
+{* * * k }
+{p* * * *}
+{* p * P }
+{ * * pK*}
+{*P* *P* }
+{P* *P* P}
+{* * * * }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Mar 1994 \hspace{.3 in} $0\!-\!1$\\
+\hline
+Foo B70\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} Paul Connally\\
+Dunfermline Club Championship
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & c5\\
+2 & Nf3 & d6\\
+3 & d4 & c*d4\\
+4 & N*d4 & g6\\
+5 & Nc3 & Nf6\\
+6 & Bd3 & Bg7\\
+7 & 0-0 & 0-0\\
+8 & f4 & Nc6\\
+9 & N*c6 & b*c6\\
+10 & Kh1 & Rb8\\
+11 & Qe1 & Ng4\\
+12 & h3 & Nf6\\
+13 & b3 & e5\\
+14 & f*e5 & Nh5\\
+15 & Bb2 & d*e5\\
+16 & Rf3 & a5\\
+17 & g4 & Nf4\\
+18 & Rd1 & Qg5\\
+19 & Bc1 & B*g4\\
+20 & B*f4 & B*f3+\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ r * rk*}
+{* * *pbp}
+{ *p* *p*}
+{p * p q }
+{ * *PB *}
+{*PNB*b*P}
+{P*P* * *}
+{* *RQ *K}
+$$\showboard$$
+$0\!-\!1$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Mar 1994 \hspace{.3 in} ${1 \over 2}\!-\!{1 \over 2}$\\
+\hline
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Tom Hunt\\
+\rule[-1pt]{11pt}{11pt} Andy Gill\\
+Glenrothes Congress
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & Nf3 & Nc6\\
+2 & g3 & e5\\
+3 & Nc3 & d5\\
+4 & d3 & Be6\\
+5 & Bg2 & Qd7\\
+6 & Ng5 & d4\\
+7 & Nce4 & Bf5\\
+8 & a3 & Be7\\
+9 & 0-0 & B*g5\\
+10 & N*g5 & f6\\
+11 & Ne4 & Bh3\\
+12 & Nc5 & Qc8\\
+13 & B*h3 & Q*h3\\
+14 & N*b7 & Rb8\\
+15 & Nc5 & h5\\
+16 & e4 & g5\\
+17 & Qf3 & g4\\
+18 & Qf5 & Kf7\\
+19 & Bg5 & Nce7\\
+20 & Qe6+ & Kg6\\
+21 & f4 & e*f4\\
+22 & R*f4 & K*g5\\
+23 & Raf1 & h4\\
+24 & Qf7 & h*g3\\
+25 & Ne6+ & Kh4\\
+26 & h*g3+ & Q*g3+\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ r * *nr}
+{p p nQ* }
+{ * *Np *}
+{* * * * }
+{ * pPRpk}
+{P *P* q }
+{ PP* * *}
+{* * *RK }
+$$\showboard$$
+${1 \over 2}\!-\!{1 \over 2}$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Mar 1994 \hspace{.3 in} $1\!-\!0$\\
+\hline
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} Dan Husband\\
+Glenrothes Congress
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & c5\\
+2 & Nf3 & Nc6\\
+3 & d4 & N*d4\\
+4 & N*d4 & c*d4\\
+5 & Q*d4 & e6\\
+6 & Nc3 & Qb6\\
+7 & Q*b6 & a*b6\\
+8 & Bb5 & Bc5\\
+9 & 0-0 & Nf6\\
+10 & Be3 & 0-0\\
+11 & Rfe1 & d6\\
+12 & a4 & Bd7\\
+13 & Bg5 & Bc6\\
+14 & B*f6 & g*f6\\
+15 & Rad1 & Kh8\\
+16 & Rd3 & Rad8\\
+17 & Rh3 & Rg8\\
+18 & Bd3 & Rg7\\
+19 & Nb5 & B*b5\\
+20 & a*b5 & Rdg8\\
+21 & Rg3 & R*g3\\
+22 & h*g3 & h6\\
+23 & Kf1 & Kg7\\
+24 & c3 & d5\\
+25 & e*d5 & e*d5\\
+26 & Ra1 & d4\\
+27 & Ra7 & d*c3\\
+28 & b*c3 & Rd8\\
+29 & Be4 & Rd1+\\
+30 & Ke2 & Rc1\\
+31 & R*b7 & R*c3\\
+32 & Kf1 & Rb3\\
+33 & R*f7+ & Kh8\\
+34 & R*f6 & R*b5\\
+35 & R*h6+ & Kg7\\
+36 & Rg6+ & Kh7\\
+37 & R*b6+&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * * *}
+{* * * *k}
+{ R * * *}
+{*rb * * }
+{ * *B* *}
+{* * * P }
+{ * * PP*}
+{* * *K* }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Mar 1994 \hspace{.3 in} ${1 \over 2}\!-\!{1 \over 2}$\\
+\hline
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Keith Chance\\
+\rule[-1pt]{11pt}{11pt} Andy Gill\\
+Glenrothes Congress
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & Nf3 & Nc6\\
+2 & e4 & e5\\
+3 & d4 & e*d4\\
+4 & N*d4 & d6\\
+5 & N*c6 & b*c6\\
+6 & Bd3 & Bb7\\
+7 & 0-0 & Nf6\\
+8 & Re1 & Be7\\
+9 & e5 & d*e5\\
+10 & R*e5 & 0-0\\
+11 & h3 & Re8\\
+12 & Re1 & Qd7\\
+13 & Bg5 & Rad8\\
+14 & B*f6 & B*f6\\
+15 & R*e8+ & Q*e8\\
+16 & Nc3 & Ba6\\
+17 & Qe1 & Q*e1+\\
+18 & R*e1 & B*d3\\
+19 & c*d3 & g6\\
+20 & Rd1 & Rb8\\
+21 & Ne4 & B*b2\\
+22 & Rb1 & a5\\
+23 & Nc3 & Rb4\\
+24 & Nd1 & Ba3\\
+25 & R*b4 & B*b4\\
+26 & Kf1 & f5\\
+27 & Nb2 & Kf7\\
+28 & Nc4 & Ke6\\
+29 & Ke2 & Kd5\\
+30 & a3 & Bc5\\
+31 & N*a5 & B*a3\\
+32 & Nc4 & Bc5\\
+33 & f3 & h5\\
+34 & g4 & h*g4\\
+35 & h*g4 & f*g4\\
+36 & f*g4 & Ke6\\
+37 & Kf3 & Bd6\\
+38 & Ke4 & g5\\
+39 & Na5 & c5\\
+40 & Nc4 & Bf4\\
+41 & Na5 & Bd2\\
+42 & Nc4 & Bb4\\
+43 & Ne5 & Bd2\\
+44 & Nf3 & Bc1\\
+45 & Ne5 & Bf4\\
+46 & Ng6 & Bg3\\
+47 & Nf8+ & Kd6\\
+48 & Nh7 & Bf4\\
+49 & Kf5 & Kd5\\
+50 & N*g5 & B*g5\\
+51 & K*g5 & Kd4\\
+52 & Kf5 & K*d3\\
+53 & g5 & c4\\
+54 & g6 & c3\\
+55 & g7 & c2\\
+56 & g8=Q & c1=Q\\
+57 & Qd5+ & Ke2\\
+58 & Qg2+ & Kd1\\
+59 & Qg1+&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * * *}
+{* p * * }
+{ * * * *}
+{* * *K* }
+{ * * * *}
+{* * * * }
+{ * * * *}
+{* qk* Q }
+$$\showboard$$
+${1 \over 2}\!-\!{1 \over 2}$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Mar 1994 \hspace{.3 in} ${1 \over 2}\!-\!{1 \over 2}$\\
+\hline
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} Jim King\\
+Glenrothes Congress
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & c5\\
+2 & Nf3 & Nc6\\
+3 & d4 & c*d4\\
+4 & N*d4 & d6\\
+5 & Bb5 & Qc7\\
+6 & 0-0 & a6\\
+7 & Ba4 & b5\\
+8 & Bb3 & Nf6\\
+9 & Re1 & e6\\
+10 & Bg5 & Be7\\
+11 & c3 & 0-0\\
+12 & Nd2 & Bb7\\
+13 & Qe2 & Rfe8\\
+14 & Rac1 & d5\\
+15 & Bc2 & Rac8\\
+16 & e5 & Nd7\\
+17 & B*e7 & R*e7\\
+18 & N2f3 & h6\\
+19 & Qd3 & g6\\
+20 & Qe3 & Kg7\\
+21 & Nh4 & Nc*e5\\
+22 & b3 & Q*c3\\
+23 & Q*c3 & R*c3\\
+24 & Bb1 & b4\\
+25 & R*c3 & b*c3\\
+26 & Rc1 & g5\\
+27 & Nhf3 & N*f3+\\
+28 & N*f3 & g4\\
+29 & Nd4 & e5\\
+30 & Nf5+ & Kf6\\
+31 & N*e7 & K*e7\\
+32 & R*c3 & Kd6\\
+33 & h3 & Nf6\\
+34 & h*g4 & N*g4\\
+35 & Bf5 & Nf6\\
+36 & Bc8 & d4\\
+37 & Rc4 & Bd5\\
+38 & Rc2 & a5\\
+39 & f3 & Nh5\\
+40 & Ba6 & Nf4\\
+41 & Rd2 & f6\\
+42 & Bd3 & Bc6\\
+43 & Kf2 & h5\\
+44 & g3 & Ne6\\
+45 & a4 & Be8\\
+46 & Bb5 & Bg6\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * * *}
+{* * * * }
+{ * knpb*}
+{pB* p *p}
+{P* p * *}
+{*P* *PP }
+{ * R K *}
+{* * * * }
+$$\showboard$$
+${1 \over 2}\!-\!{1 \over 2}$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Mar 1994 \hspace{.3 in} $1\!-\!0$\\
+\hline
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} R. Gourley\\
+\rule[-1pt]{11pt}{11pt} Andy Gill\\
+Glenrothes Congress
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & Nf3 & Nc6\\
+2 & d4 & e6\\
+3 & c4 & d5\\
+4 & Nc3 & Bb4\\
+5 & e3 & Nf6\\
+6 & Bd2 & 0-0\\
+7 & Ne5 & N*e5\\
+8 & d*e5 & Ne4\\
+9 & N*e4 & d*e4\\
+10 & B*b4 & c5\\
+11 & B*c5 & Qa5+\\
+12 & b4 & Rd8\\
+13 & b*a5 & R*d1+\\
+14 & R*d1 & h6\\
+15 & Rd8+ & Kh7\\
+16 & Be7 & b6\\
+17 & a*b6 & a*b6\\
+\end{tabular}}|
+\end{center}
+
+\board
+{r*bR * *}
+{* * Bppk}
+{ p *p* p}
+{* * P * }
+{ *P*p* *}
+{* * P * }
+{P* * PPP}
+{* * KB*R}
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Mar 1994 \hspace{.3 in} $1\!-\!0$\\
+\hline
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} Grant Glynis\\
+Dunfermline Club Championship
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & c5\\
+2 & Nf3 & d6\\
+3 & d4 & c*d4\\
+4 & N*d4 & Nf6\\
+5 & Nc3 & a6\\
+6 & Bc4 & Nc6\\
+7 & N*c6 & b*c6\\
+8 & Be3 & e6\\
+9 & 0-0 & Be7\\
+10 & Bb3 & 0-0\\
+11 & Qe2 & Bb7\\
+12 & Rad1 & Qc7\\
+13 & f4 & e5\\
+14 & Kh1 & Rfd8\\
+15 & Qf3 & Qc8\\
+16 & f*e5 & d*e5\\
+17 & Qg3 & R*d1\\
+18 & N*d1 & Qg4\\
+19 & Q*e5 & Q*e4\\
+20 & Q*e4 & N*e4\\
+21 & R*f7 & Nd6\\
+22 & R*e7+ & Kh8\\
+23 & Re5 & Rf8\\
+24 & Kg1 & h6\\
+25 & Bc5 & Rf6\\
+26 & c3 & a5\\
+27 & g3 & Ba6\\
+28 & Bc2 & g5\\
+29 & Bd4 & Kg8\\
+30 & R*a5 & Rf1+\\
+31 & Kg2 & Rf8\\
+32 & R*a6 & Nc4\\
+33 & R*c6 & Na5\\
+34 & R*h6 & Rf7\\
+35 & Rh8 mate&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * *kR}
+{* * *r* }
+{ * * * *}
+{n * * p }
+{ * B * *}
+{* P * P }
+{PPB* *KP}
+{* *N* * }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Mar 1994 \hspace{.3 in} $0\!-\!1$\\
+\hline
+Foo B20\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Alistair Welshman\\
+\rule[-1pt]{11pt}{11pt} Andy Gill\\
+Dunfermline Club Championship
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & c5\\
+2 & Bc4 & d6\\
+3 & Nc3 & Nf6\\
+4 & Nf3 & e6\\
+5 & 0-0 & Be7\\
+6 & d3 & 0-0\\
+7 & Bg5 & Nc6\\
+8 & B*f6 & B*f6\\
+9 & Bb5 & Bd7\\
+10 & B*c6 & B*c6\\
+11 & Qe2 & Re8\\
+12 & Rae1 & B*c3\\
+13 & b*c3 & Qa5\\
+14 & e5 & d5\\
+15 & d4 & Bb5\\
+16 & Qe3 & B*f1\\
+17 & R*f1 & c*d4\\
+18 & Q*d4 & Rac8\\
+19 & Qb4 & Q*b4\\
+20 & c*b4 & R*c2\\
+21 & Ra1 & Rec8\\
+22 & Kf1 & Rc1+\\
+23 & R*c1 & R*c1+\\
+24 & Ke2 & Rc2+\\
+25 & Nd2 & R*a2\\
+26 & g4 & Rb2\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * *k*}
+{pp* *ppp}
+{ * *p* *}
+{* *pP * }
+{ P * *P*}
+{* * * * }
+{ r NKP P}
+{* * * * }
+$$\showboard$$
+$0\!-\!1$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Mar 1994 \hspace{.3 in} $1\!-\!0$\\
+\hline
+Foo C02\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Robin Taylor (1610)\\
+\rule[-1pt]{11pt}{11pt} Andy Gill\\
+Dunfermline Club Championship
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & d4 & e6\\
+2 & e4 & d5\\
+3 & e5 & c5\\
+4 & c3 & Nc6\\
+5 & Nf3 & Bd7\\
+6 & Bf4 & c*d4\\
+7 & c*d4 & Bb4+\\
+8 & Bd2 & B*d2+\\
+9 & Q*d2 & Nge7\\
+10 & Nc3 & a6\\
+11 & a3 & Qc7\\
+12 & Bd3 & 0-0-0\\
+13 & 0-0 & Rdf8\\
+14 & b4 & f6\\
+15 & b5 & N*d4\\
+16 & N*d4 & Q*e5\\
+17 & b*a6 & Q*d4\\
+18 & a*b7+ & Kb8\\
+19 & Ne2 & Qa7\\
+20 & Qb4 & Nf5\\
+21 & B*f5 & e*f5\\
+22 & Qd6+ & K*b7\\
+23 & Rab1+ & Kc8\\
+24 & Rfc1+ & Kd8\\
+25 & Rb8+ & Q*b8\\
+26 & Q*b8+ & Ke7\\
+27 & Qb4+ & Kf7\\
+28 & f4 & Rc8\\
+29 & R*c8 & R*c8\\
+30 & Qd6 & Be6\\
+31 & Nd4 & Rc1+\\
+32 & Kf2 & Rd1\\
+33 & Q*e6+ & Kf8\\
+34 & N*f5 & Rd2+\\
+35 & Ke3&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * k *}
+{* * * pp}
+{ * *Qp *}
+{* *p*N* }
+{ * * P *}
+{P * K * }
+{ * r *PP}
+{* * * * }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Mar 1994 \hspace{.3 in} $1\!-\!0$\\
+\hline
+Foo B92\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Steve Smith (1745)\\
+\rule[-1pt]{11pt}{11pt} Andy Gill\\
+Dunfermline C vs Stirling A
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & c5\\
+2 & Nf3 & d6\\
+3 & d4 & c*d4\\
+4 & N*d4 & Nf6\\
+5 & Nc3 & a6\\
+6 & Be2 & e5\\
+7 & Nb3 & Be7\\
+8 & 0-0 & 0-0\\
+9 & a4 & Be6\\
+10 & f4 & B*b3\\
+11 & c*b3 & Nc6\\
+12 & Be3 & Qd7\\
+13 & Bc4 & Rad8\\
+14 & f5 & Kh8\\
+15 & Qf3 & Nb4\\
+16 & Rfd1 & Nc2\\
+17 & Rac1 & N*e3\\
+18 & Q*e3 & Qc6\\
+19 & Nd5 & N*d5\\
+20 & B*d5 & Qd7\\
+21 & Qb6 & Rb8\\
+22 & Rc7 & Bd8\\
+23 & R*d7 & B*b6+\\
+24 & Kf1 & f6\\
+25 & B*b7 & Bd4\\
+26 & Rc1 & B*b2\\
+27 & Rcc7 & Rg8\\
+28 & B*a6 & h5\\
+29 & Bc4 & Rgc8\\
+30 & R*g7 & R*c7\\
+31 & R*c7 & Bd4\\
+32 & Rf7 & Rg8\\
+33 & R*f6 & Rg4\\
+34 & Bd5 & Rf4+\\
+35 & Ke1 & Bc3+\\
+36 & Ke2 & Bd4\\
+37 & Rh6+ & Kg7\\
+38 & R*h5 & Rf2+\\
+39 & Kd3 & R*g2\\
+40 & Kc4 & Bg1\\
+41 & h4 & Rc2+\\
+42 & Kd3 & Rg2\\
+43 & Rg5+ & R*g5\\
+44 & h*g5 & Bb6\\
+45 & Kc4 & Bd8\\
+46 & f6+ & Kg6\\
+47 & f7 & Be7\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * * *}
+{* * bP* }
+{ * p *k*}
+{* *Bp P }
+{P*K*P* *}
+{*P* * * }
+{ * * * *}
+{* * * * }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Apr 1994 \hspace{.3 in} $0\!-\!1$\\
+\hline
+Foo C10\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} Phillips Bill\\
+Dunfermline Club Championship
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & e6\\
+2 & d4 & d5\\
+3 & Nc3 & c5\\
+4 & e5 & Nc6\\
+5 & Nf3 & Qb6\\
+6 & Bb5 & Bd7\\
+7 & B*c6 & B*c6\\
+8 & 0-0 & Ne7\\
+9 & d*c5 & Q*c5\\
+10 & Be3 & Qa5\\
+11 & Qd3 & Nf5\\
+12 & Nd4 & N*e3\\
+13 & N*c6 & b*c6\\
+14 & Q*e3 & Bc5\\
+15 & Qd3 & 0-0\\
+16 & a3 & Qc7\\
+17 & b4 & Bb6\\
+18 & Rfe1 & a6\\
+19 & Na4 & Rfb8\\
+20 & N*b6 & R*b6\\
+21 & c4 & d*c4\\
+22 & Q*c4 & Rb5\\
+23 & Qe4 & Rd5\\
+24 & Rad1 & Rad8\\
+25 & R*d5 & c*d5\\
+26 & Qd4 & Rc8\\
+27 & f4 & g6\\
+28 & Re3 & h5\\
+29 & Kf2 & Qc2+\\
+30 & Kf3 & Rc4\\
+31 & Qd3 & Qc1\\
+32 & Qe2 & d4\\
+33 & Rd3 & Rc3\\
+34 & Ke4 & R*a3\\
+35 & R*a3 & Q*a3\\
+36 & Qc4 & Qe3 mate\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * *k*}
+{* * *p* }
+{p* *p*p*}
+{* * P *p}
+{ PQpKP *}
+{* * q * }
+{ * * *PP}
+{* * * * }
+$$\showboard$$
+$0\!-\!1$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Apr 1994 \hspace{.3 in} $0\!-\!1$\\
+\hline
+Foo C97\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} Andrew Watt\\
+Edinburgh Congress
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & e5\\
+2 & Nf3 & Nc6\\
+3 & Bb5 & a6\\
+4 & Ba4 & Nf6\\
+5 & 0-0 & Be7\\
+6 & Re1 & b5\\
+7 & Bb3 & d6\\
+8 & c3 & 0-0\\
+9 & h3 & Na5\\
+10 & Bc2 & c5\\
+11 & d4 & Qc7\\
+12 & b4 & c*b4\\
+13 & c*b4 & Nc4\\
+14 & Nbd2 & Bb7\\
+15 & N*c4 & Q*c4\\
+16 & d*e5 & d*e5\\
+17 & a3 & Rac8\\
+18 & Bd3 & Qc3\\
+19 & Bg5 & Rfd8\\
+20 & Re3 & B*e4\\
+21 & Rc1 & Q*c1\\
+22 & Q*c1 & R*c1+\\
+23 & Re1 & R*e1+\\
+24 & N*e1 & B*d3\\
+25 & Nf3 & Be4\\
+26 & N*e5 & Rd1+\\
+27 & Kh2 & Bd6\\
+28 & f4 & h6\\
+29 & Bh4 & g5\\
+30 & Bg3 & B*e5\\
+31 & f*e5 & Nh5\\
+32 & e6 & N*g3\\
+33 & e7 & Nf1+\\
+34 & Kg1 & Bc6\\
+35 & Kf2 & f6\\
+36 & Ke2 & Ra1\\
+37 & Kd3 & Kf7\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * * *}
+{* * Pk* }
+{p*b* p p}
+{*p* * p }
+{ P * * *}
+{P *K* *P}
+{ * * *P*}
+{r * *n* }
+$$\showboard$$
+$0\!-\!1$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Apr 1994 \hspace{.3 in} $0\!-\!1$\\
+\hline
+Foo B50\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Jake Milne\\
+\rule[-1pt]{11pt}{11pt} Andy Gill\\
+Edinburgh Congress
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & c5\\
+2 & Nf3 & d6\\
+3 & Bc4 & e6\\
+4 & d3 & Nf6\\
+5 & a3 & Nc6\\
+6 & Nc3 & Be7\\
+7 & 0-0 & 0-0\\
+8 & Be3 & b6\\
+9 & h3 & Bb7\\
+10 & Ne2 & d5\\
+11 & e*d5 & e*d5\\
+12 & Ba2 & Re8\\
+13 & c3 & Qc7\\
+14 & Bf4 & Bd6\\
+15 & B*d6 & Q*d6\\
+16 & d4 & c*d4\\
+17 & Ne*d4 & N*d4\\
+18 & N*d4 & Rad8\\
+19 & Qd2 & Ba6\\
+20 & Qg5 & Re5\\
+21 & Nf5 & R*f5\\
+22 & Q*f5 & B*f1\\
+23 & R*f1 & g6\\
+24 & Qf3 & Kg7\\
+25 & Rd1 & Qe5\\
+26 & g3 & a5\\
+27 & Kg2 & h5\\
+28 & h4 & Rd6\\
+29 & Bb1 & d4\\
+30 & Qd3 & Qd5+\\
+31 & Qf3 & Qb3\\
+32 & Qe2 & Qd5+\\
+33 & f3 & Qe6\\
+34 & Q*e6 & R*e6\\
+35 & Be4 & d*c3\\
+36 & b*c3 & N*e4\\
+37 & f*e4 & R*e4\\
+38 & Rd6 & Re2+\\
+39 & Kf3 & Rb2\\
+40 & Rd3 & a4\\
+41 & Ke4 & f5+\\
+42 & Kd5 & Re2\\
+43 & c4 & Re8\\
+44 & Kc6 & Rc8+\\
+45 & K*b6 & R*c4\\
+46 & Kb5 & Rg4\\
+47 & Rd7+ & Kf6\\
+48 & Ra7 & f4\\
+49 & g*f4 & R*f4\\
+50 & R*a4 & R*a4\\
+51 & K*a4 & g5\\
+52 & h*g5+ & K*g5\\
+53 & Kb5 & h4\\
+54 & a4 & h3\\
+55 & a5 & h2\\
+56 & a6 & h1=Q\\
+57 & Kb6 & Qb1+\\
+58 & Ka7 & Kf5\\
+59 & Ka8 & Qe4+\\
+60 & Kb8 & Qe8+\\
+61 & Kb7 & Qd7+\\
+62 & Kb6 & Qd8+\\
+63 & Kb7 & Qd5+\\
+64 & Kb6 & Qa8\\
+65 & Ka5 & Ke5\\
+66 & Kb6 & Kd5\\
+67 & Ka5 & Kc5\\
+68 & Ka4 & Q*a6+\\
+69 & Kb3 & Qc4+\\
+70 & Ka3 & Qb5\\
+71 & Ka2 & Kc4\\
+72 & Ka1 & Kc3\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * * *}
+{* * * * }
+{ * * * *}
+{*q* * * }
+{ * * * *}
+{* k * * }
+{ * * * *}
+{K * * * }
+$$\showboard$$
+$0\!-\!1$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Apr 1994 \hspace{.3 in} $0\!-\!1$\\
+\hline
+Foo C54\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} John Bourke\\
+Edinburgh Congress
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & e5\\
+2 & Nf3 & Nc6\\
+3 & Bc4 & Bc5\\
+4 & c3 & Nf6\\
+5 & d4 & e*d4\\
+6 & c*d4 & Bb4+\\
+7 & Bd2 & N*e4\\
+8 & B*b4 & N*b4\\
+9 & B*f7+ & K*f7\\
+10 & Qb3+ & d5\\
+11 & Q*b4 & Re8\\
+12 & 0-0 & Kg8\\
+13 & Nc3 & b6\\
+14 & Rfe1 & Bf5\\
+15 & Qb3 & c6\\
+16 & Rac1 & Qd6\\
+17 & Re3 & N*c3\\
+18 & Q*c3 & R*e3\\
+19 & Q*e3 & Rc8\\
+20 & Re1 & h6\\
+21 & Qe7 & Q*e7\\
+22 & R*e7 & a5\\
+23 & Rb7 & b5\\
+24 & Ne5 & c5\\
+25 & R*b5 & c*d4\\
+26 & f4 & Be4\\
+27 & R*a5 & Rc1+\\
+28 & Kf2 & Rc2+\\
+29 & Kg3 & R*g2+\\
+30 & Kh3 & R*b2\\
+31 & Ra3 & Rd2\\
+32 & Kg3 & Rg2+\\
+33 & Kh3 & Rd2\\
+34 & Kg3 & d3\\
+35 & Nf3 & Rb2\\
+36 & h4 & d2\\
+37 & N*d2 & R*d2\\
+38 & Kg4 & Rd3\\
+39 & R*d3 & B*d3\\
+40 & Kf3 & Bc4\\
+41 & a4 & Kf7\\
+42 & Ke3 & Ke6\\
+43 & Kd4 & Kf5\\
+44 & a5 & K*f4\\
+45 & a6 & B*a6\\
+46 & K*d5 & Kg4\\
+47 & Ke6 & K*h4\\
+48 & Kf7 & g5\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * * *}
+{* * *K* }
+{b* * * p}
+{* * * p }
+{ * * * k}
+{* * * * }
+{ * * * *}
+{* * * * }
+$$\showboard$$
+$0\!-\!1$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Apr 1994 \hspace{.3 in} $1\!-\!0$\\
+\hline
+Foo C70\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} David King\\
+Edinburgh Congress
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & e5\\
+2 & Nf3 & Nc6\\
+3 & Bb5 & a6\\
+4 & Ba4 & b5\\
+5 & Bb3 & Bc5\\
+6 & 0-0 & Nge7\\
+7 & c3 & d6\\
+8 & d4 & e*d4\\
+9 & c*d4 & Ba7\\
+10 & Be3 & Na5\\
+11 & Bc2 & 0-0\\
+12 & Nbd2 & f5\\
+13 & Bg5 & Qe8\\
+14 & Re1 & h6\\
+15 & B*e7 & Q*e7\\
+16 & e*f5 & Qf6\\
+17 & Be4 & Bb7\\
+18 & B*b7 & N*b7\\
+19 & Qb3+ & Kh8\\
+20 & Qd5 & Rab8\\
+21 & Rac1 & Bb6\\
+22 & g4 & Nd8\\
+23 & Ne4 & Qf7\\
+24 & Q*f7 & R*f7\\
+25 & h3&\\
+\end{tabular}}|
+\end{center}
+At this point the score sheet goes wrong. Black eventually looses on
+time!
+
+\board
+{ r n * k}
+{* p *rp }
+{pb p * p}
+{*p* *P* }
+{ * PN*P*}
+{* * *N*P}
+{PP * P *}
+{* R R K }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Apr 1994 \hspace{.3 in} $1\!-\!0$\\
+\hline
+Foo D20\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} C. Tait\\
+\rule[-1pt]{11pt}{11pt} Andy Gill\\
+Edinburgh Congress
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & d4 & d5\\
+2 & c4 & d*c4\\
+3 & e4 & c6\\
+4 & B*c4 & e6\\
+\end{tabular}}|
+\end{center}
+|4\ldots~Nf6; 5.~Nc3, e5; 6.~Be3, e*d4; 7.~B*d4, Bd6; 8.~f3|
+Score: 0.22
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+5 & Nf3 & Bb4+\\
+\end{tabular}}|
+\end{center}
+|5\ldots~Nf6; 6.~Qe2, Bb4; 7.~Bd2, Qb6; 8.~Nc3, 0-0; 9.~0-0, Nbd7|
+Score: 0.25
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+6 & Bd2 & B*d2+\\
+7 & Q*d2&\\
+\end{tabular}}|
+\end{center}
+|7.~Nb*d2, Nf6; 8.~0-0, 0-0; 9.~Rc1, Nbd7; 10.~Qe2, c5; 11.~Bd3|
+Score: 0.41
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+7 & \ldots & Nf6\\
+8 & Nc3 & 0-0\\
+\end{tabular}}|
+\end{center}
+|8\ldots~Nbd7; 9.~0-0, 0-0; 10.~Rad1, Qe7; 11.~Rfe1, e5|
+Score: 0.38
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+9 & 0-0 & b6\\
+10 & e5&\\
+\end{tabular}}|
+\end{center}
+|10.~Rac1, Bb7; 11.~Rfd1, c5; 12.~d*c5, Q*d2; 13.~R*d2, b*c5|
+Score: 0.28
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+10 & \ldots & Nfd7\\
+\end{tabular}}|
+\end{center}
+|10\ldots~Nd5; 11.~Rfd1, Ba6; 12.~B*a6, N*a6; 13.~Rac1, Nac7; 14.~N*d5, c*d5|
+Score: 0.28
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+11 & Rfd1 & Ba6\\
+\end{tabular}}|
+\end{center}
+|11\ldots~Bb7; 12.~Ne4, c5; 13.~d5, b5; 14.~B*b5, B*d5; 15.~Qe3, Qe7|
+Score: 0.34
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+12 & Bb3&\\
+\end{tabular}}|
+\end{center}
+|12.~B*a6, N*a6; 13.~Rac1, Qe7; 14.~Ne4, c5; 15.~Qe2, Nb4; 16.~d*c5|
+Score: 0.34
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+12 & \ldots & Re8\\
+\end{tabular}}|
+\end{center}
+|12\ldots~h6; 13.~Rac1, Qe7; 14.~Ne4, Rd8; 15.~Nd6, Nf6; 16.~Qe3|
+Score: 0.31
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+13 & Ne4 & c5\\
+\end{tabular}}|
+\end{center}
+|13\ldots~h6; 14.~Nd6, Re7; 15.~Rac1, c5; 16.~Bc2, Nc6; 17.~Be4, Qc7|
+Score: 0.44
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+14 & Nd6&\\
+\end{tabular}}|
+\end{center}
+|14.~d*c5, Bb7; 15.~Qe3, Re7; 16.~Nd6, Bc6; 17.~Ne4, b*c5; 18.~N*c5|
+Score: 1.25
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+14 & \ldots & Rf8\\
+\end{tabular}}|
+\end{center}
+|14\ldots~Re7; 15.~N*f7, R*f7; 16.~B*e6, c*d4; 17.~Bd5, Nc6; 18.~B*c6|
+Score: 0.44
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+15 & d5 & b5\\
+\end{tabular}}|
+\end{center}
+|15\ldots~Qe7; 16.~N*f7, c4; 17.~d*e6, N*e5; 18.~N3*e5, c*b3; 19.~Qd5|
+Score: 1.06
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+16 & d*e6 & f*e6\\
+\end{tabular}}|
+\end{center}
+|16\ldots~c4; 17.~N*f7, Qb6; 18.~e*d7, N*d7; 19.~Q*d7, R*f7; 20.~Qd5|
+Score: 3.75
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+17 & B*e6+ & Kh8\\
+18 & Nf7+&\\
+\end{tabular}}|
+\end{center}
+|18.~Qd5, Qe7; 19.~Nf7, R*f7; 20.~B*f7, h6|
+Score: 4.56
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+18 & \ldots & R*f7\\
+19 & B*f7 & Nc6\\
+\end{tabular}}|
+\end{center}
+|19\ldots~Bb7; 20.~Ng5, h6; 21.~Bd5|
+Score: 3.03
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+20 & e6&\\
+\end{tabular}}|
+\end{center}
+|20.~Q*d7, Nd4; 21.~Qg4, Qe7; 22.~N*d4, Q*f7; 23.~e6, Qf6|
+Score: 5.84
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+20 & \ldots & Qe7\\
+\end{tabular}}|
+\end{center}
+|20\ldots~Nf6; 21.~Rac1, c4; 22.~b3, Q*d2; 23.~R*d2, Rd8; 24.~R*d8, N*d8|
+Score: 3.06
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+21 & Q*d7 & Bc8\\
+\end{tabular}}|
+\end{center}
+|21\ldots~Bb7; 22.~Q*e7, N*e7; 23.~Rd7, B*f3; 24.~g*f3, Nc6; 25.~e7, N*e7|
+Score: 7.41
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+22 & Q*c6&\\
+\end{tabular}}|
+\end{center}
+|22.~Q*e7, B*e6; 23.~Q*e6, Nd4; 24.~N*d4, c*d4; 25.~R*d4, a6|
+Score: 17.72
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+22 & \ldots & Rb8\\
+\end{tabular}}|
+\end{center}
+|22\ldots~Bb7; 23.~Qd7, Q*d7; 24.~e*d7, Rd8; 25.~Re1, g6; 26.~Re8, Kg7|
+Score: 10.66
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+23 & Qe8+&\\
+\end{tabular}}|
+\end{center}
+|23.~Q*c5, B*e6; 24.~Q*e7, B*f7; 25.~Q*a7, Rf8; 26.~Q*f7, Rc8|
+Score: 18.22
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+23 & \ldots & Q*e8\\
+24 & B*e8 & Bb7\\
+\end{tabular}}|
+\end{center}
+|24\ldots~B*e6; 25.~Bd7, Bg8; 26.~Ne5, g6; 27.~Rac1, c4; 28.~a4, b*a4|
+Score: 7.88
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+25 & Bf7&\\
+\end{tabular}}|
+\end{center}
+|25.~B*b5, B*f3; 26.~g*f3, Kg8; 27.~e7, Kf7; 28.~Rd8, K*e7; 29.~R*b8|
+Score: 12.03
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+25 & \ldots & Bc6\\
+\end{tabular}}|
+\end{center}
+|25\ldots~g5; 26.~e7, Kg7; 27.~Rd8, Bc6; 28.~R*b8, K*f7; 29.~Ne5, K*e7|
+Score: 12.03
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+26 & Rd2&\\
+\end{tabular}}|
+\end{center}
+|26.~Ne5, B*g2; 27.~e7, g6; 28.~K*g2|
+Score: 15.75
+
+\board
+{ r * * k}
+{p * *Bpp}
+{ *b*P* *}
+{*pp * * }
+{ * * * *}
+{* * *N* }
+{PP R PPP}
+{R * * K }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Apr 1994 \hspace{.3 in} $1\!-\!0$\\
+\hline
+Foo B50\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} J. Comrie\\
+\rule[-1pt]{11pt}{11pt} Andy Gill\\
+Dunfermline C vs Alloa
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & c5\\
+2 & Nf3 & d6\\
+3 & Bc4 & e6\\
+4 & Nc3 & Be7\\
+5 & d4 & c*d4\\
+6 & Q*d4 & Nf6\\
+7 & e5 & d*e5\\
+8 & Q*d8+ & B*d8\\
+9 & N*e5 & 0-0\\
+10 & 0-0 & Nbd7\\
+11 & N*d7 & B*d7\\
+12 & Be3 & a6\\
+13 & a4 & Ba5\\
+14 & Ne2 & Bc6\\
+15 & Nd4 & Nd5\\
+16 & N*c6 & b*c6\\
+17 & B*d5 & c*d5\\
+18 & c3 & Rab8\\
+19 & b4 & Bc7\\
+20 & Rfd1 & Rfd8\\
+21 & Rac1 & Bb6\\
+22 & Kf1 & B*e3\\
+23 & f*e3 & f5\\
+24 & Rc2 & g5\\
+25 & Kf2 & Kf7\\
+26 & Kf3 & Rdc8\\
+27 & g4 & R*b4\\
+28 & g*f5 & Kf6\\
+29 & f*e6 & K*e6\\
+30 & Rd4 & R*d4\\
+31 & e*d4 & Rf8+\\
+32 & Kg4 & h6\\
+33 & Re2+ & Kd6\\
+34 & Rb2 & Rc8\\
+35 & Kh5 & R*c3\\
+36 & Rb6+ & Rc6\\
+37 & R*c6+ & K*c6\\
+38 & K*h6 & g4\\
+39 & Kg5 & Kd6\\
+40 & K*g4 & Ke6\\
+41 & Kg5 & Ke7\\
+42 & h4 & Kf7\\
+43 & h5 & Kg7\\
+44 & Kf5&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * * *}
+{* * * k }
+{p* * * *}
+{* *p*K*P}
+{P* P * *}
+{* * * * }
+{ * * * *}
+{* * * * }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Apr 1994 \hspace{.3 in} $1\!-\!0$\\
+\hline
+Foo C65\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} Scott Hunter\\
+Dunfermline Club Championship
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & e5\\
+2 & Nf3 & Nc6\\
+3 & Bb5 & Nf6\\
+4 & d3 & Bc5\\
+5 & 0-0 & 0-0\\
+6 & Re1 & d5\\
+7 & Be3 & B*e3\\
+8 & e*d5 & Q*d5\\
+9 & B*c6 & Q*c6\\
+10 & R*e3 & e4\\
+11 & d*e4 & N*e4\\
+12 & Nc3 & N*c3\\
+13 & R*c3 & Qd6\\
+14 & Q*d6 & c*d6\\
+15 & Rd1 & Re8\\
+16 & R*d6 & g5\\
+17 & g4 & B*g4\\
+18 & N*g5 & Re1+\\
+19 & Kg2 & Rae8\\
+20 & Rg3 & f5\\
+21 & h3 & Be2\\
+22 & Nf3+ & Kf7\\
+23 & N*e1 & f4\\
+24 & Rf3 & B*f3+\\
+25 & N*f3 & Re2\\
+26 & Rd7+ & Kf8\\
+27 & R*b7 & R*c2\\
+28 & R*a7 & R*b2\\
+29 & Ra4 & Kf7\\
+30 & R*f4+ & Kg6\\
+31 & a4 & h5\\
+32 & h4 & Ra2\\
+33 & Kg3 & Ra3\\
+34 & Rc4 & Rd3\\
+35 & Kf4 & Rd5\\
+36 & Ne5+ & Kf6\\
+37 & Re4 & Ra5\\
+38 & Nd7+ & Kg6\\
+39 & f3 & Rf5+\\
+40 & Ke3&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * * *}
+{* *N* * }
+{ * * *k*}
+{* * *r*p}
+{P* *R* P}
+{* * KP* }
+{ * * * *}
+{* * * * }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} May 1994 \hspace{.3 in} $1\!-\!0$\\
+\hline
+Foo B20\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} James Hepburn\\
+\rule[-1pt]{11pt}{11pt} Andy Gill\\
+Under 1500 Final
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & c5\\
+2 & Bc4 & d6\\
+3 & d3 & e6\\
+4 & Nc3 & Nf6\\
+5 & Nf3 & a6\\
+6 & Bd2 & Nc6\\
+7 & 0-0 & Be7\\
+8 & Re1 & 0-0\\
+9 & a3 & e5\\
+10 & h3 & b5\\
+11 & Bb3 & Bb7\\
+12 & Nd5 & N*d5\\
+13 & B*d5 & Qd7\\
+14 & c3 & Na5\\
+15 & b4 & B*d5\\
+16 & e*d5 & Nb7\\
+17 & Re4 & f5\\
+18 & Re2 & c*b4\\
+19 & a*b4 & Bf6\\
+20 & Qb3 & a5\\
+21 & Rae1 & a*b4\\
+22 & c*b4 & Rfe8\\
+23 & Bg5 & B*g5\\
+24 & N*g5 & Nd8\\
+25 & f4 & Nf7\\
+26 & N*f7 & Q*f7\\
+27 & f*e5 & d*e5\\
+28 & R*e5 & R*e5\\
+29 & R*e5 & Ra1+\\
+30 & Kh2 & g5\\
+31 & d4 & Kg7\\
+32 & Qd3 & Qd7\\
+33 & R*f5 & Qd6+\\
+34 & Re5 & Q*b4\\
+35 & R*g5+ & Kf7\\
+36 & Q*h7+ & Kf6\\
+37 & Qh6+ & Ke7\\
+38 & Rg7+ & Kd8\\
+39 & Qh8+&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * k * Q}
+{* * * R }
+{ * * * *}
+{*p*P* * }
+{ q P * *}
+{* * * *P}
+{ * * *PK}
+{r * * * }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} May 1994 \hspace{.3 in} $1\!-\!0$\\
+\hline
+Foo D02\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} D. Heron (1790)\\
+\rule[-1pt]{11pt}{11pt} Andy Gill\\
+East of Scotland Championship
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & Nf3 & Nc6\\
+2 & d4 & d5\\
+3 & Bf4 & Bf5\\
+4 & e3 & a6\\
+5 & c4 & e6\\
+6 & Nc3 & Nf6\\
+7 & a3 & Qd7\\
+8 & b4 & Bd6\\
+9 & B*d6 & Q*d6\\
+10 & Be2 & 0-0\\
+11 & 0-0 & Ne4\\
+12 & N*e4 & B*e4\\
+13 & Nd2 & Bg6\\
+14 & Qb3 & Ne7\\
+15 & c5 & Qd7\\
+16 & a4 & c6\\
+17 & b5 & Nf5\\
+18 & Ra3 & Rfe8\\
+19 & Qb2 & Kh8\\
+20 & Rb3 & Nh6\\
+21 & b*c6 & b*c6\\
+22 & Rb7 & Qc8\\
+23 & Nf3 & Rb8\\
+24 & B*a6 & R*b7\\
+25 & Q*b7 & Q*b7\\
+26 & B*b7 & f6\\
+27 & B*c6 & Rb8\\
+28 & Bb5 & Bc2\\
+29 & Rc1 & Be4\\
+30 & Nd2 & Bg6\\
+31 & Nb1 & Ng8\\
+32 & Nc3 & Ne7\\
+33 & a5 & Nc8\\
+34 & Bd7 & Bf5\\
+35 & N*d5 & e*d5\\
+36 & B*f5 & Ne7\\
+37 & Bd3 & Nc6\\
+38 & Rb1 & R*b1+\\
+39 & B*b1 & N*a5\\
+40 & Ba2&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * * k}
+{* * * pp}
+{ * * p *}
+{n Pp* * }
+{ * P * *}
+{* * P * }
+{B* * PPP}
+{* * * K }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} May 1994 \hspace{.3 in} ${1 \over 2}\!-\!{1 \over 2}$\\
+\hline
+Foo A15\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} W. Falconer\\
+East of Scotland Chalengers
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & c4 & Nf6\\
+2 & d3 & e6\\
+3 & Nf3 & d5\\
+4 & c*d5 & N*d5\\
+5 & a3 & Bd6\\
+6 & e3 & Nc6\\
+7 & Nbd2 & 0-0\\
+8 & Nc4 & Bd7\\
+9 & Be2 & b5\\
+10 & N*d6 & c*d6\\
+11 & 0-0 & Rc8\\
+12 & Bd2 & Qb6\\
+13 & Qb3 & Ne5\\
+14 & Rac1 & a6\\
+15 & Rc2 & R*c2\\
+16 & Q*c2 & Rc8\\
+17 & Qb1 & N*f3+\\
+18 & B*f3 & Bc6\\
+19 & Rc1 & Qd8\\
+20 & B*d5 & B*d5\\
+21 & Ba5 & Qd7\\
+22 & R*c8+ & Q*c8\\
+23 & Bb4 & Qc6\\
+24 & f3 & Bb3\\
+25 & Qe1 & Qc2\\
+26 & Qc3 & Q*c3\\
+27 & B*c3 & d5\\
+28 & Kf2 & f6\\
+29 & d4&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * *k*}
+{* * * pp}
+{p* *pp *}
+{*p*p* * }
+{ * P * *}
+{PbB PP* }
+{ P * KPP}
+{* * * * }
+$$\showboard$$
+${1 \over 2}\!-\!{1 \over 2}$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} May 1994 \hspace{.3 in} $0\!-\!1$\\
+\hline
+Foo A20\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} Walter Pearson (1650)\\
+East of Scotland Chalengers
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & c4 & e5\\
+2 & d3 & Ne7\\
+3 & Nf3 & d6\\
+4 & e3 & g6\\
+5 & Be2 & Bg7\\
+6 & 0-0 & 0-0\\
+7 & Nbd2 & Nd7\\
+8 & Nb3 & b6\\
+9 & d4 & e*d4\\
+10 & Nf*d4 & Bb7\\
+\end{tabular}}|
+\end{center}
+
+\board
+{r* q rk*}
+{pbpnnpbp}
+{ p p *p*}
+{* * * * }
+{ *PN * *}
+{*N* P * }
+{PP *BPPP}
+{R BQ*RK }
+$$\showboard$$
+$0\!-\!1$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} May 1994 \hspace{.3 in} $1\!-\!0$\\
+\hline
+Foo D61\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Douglas Heatlie (1650)\\
+\rule[-1pt]{11pt}{11pt} Andy Gill\\
+East of Scotland Chalengers
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & d4 & e6\\
+2 & c4 & d5\\
+3 & Nc3 & Nf6\\
+4 & Bg5 & Be7\\
+5 & e3 & Nbd7\\
+6 & Qc2 & 0-0\\
+7 & Nf3 & Re8\\
+8 & h4 & Nb6\\
+9 & b3 & d*c4\\
+10 & b*c4 & Bd7\\
+11 & Bd3 & g6\\
+12 & B*f6 & B*f6\\
+13 & h5 & B*d4\\
+14 & e*d4 & Qf6\\
+15 & h*g6 & f*g6\\
+16 & Ne4 & Qg7\\
+17 & Nc5 & Bc6\\
+18 & Ne5 & Nd5\\
+19 & c*d5 & e*d5\\
+20 & 0-0-0 & R*e5\\
+21 & d*e5 & Q*e5\\
+22 & g3 & Qg5+\\
+23 & Qd2 & Qe5\\
+24 & Nb3 & Ba4\\
+25 & Qh6 & Qc3+\\
+26 & Bc2 & B*b3\\
+27 & Q*h7+ & Kf8\\
+28 & Qh8+&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{r* * k Q}
+{ppp * * }
+{ * * *p*}
+{* *p* * }
+{ * * * *}
+{*bq * P }
+{P*B* P *}
+{* KR* *R}
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Jul 1994 \hspace{.3 in} $1\!-\!0$\\
+\hline
+Foo B50\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Graham Mill\\
+\rule[-1pt]{11pt}{11pt} Andy Gill\\
+Scottish Chess Minor
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & c5\\
+2 & Nf3 & d6\\
+3 & Bc4&\\
+\end{tabular}}|
+\end{center}
+This is an unusual way of opening, but is common at the Minor level.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+3 & \ldots & e6\\
+4 & Nc3 & Nf6\\
+5 & d3&\\
+\end{tabular}}|
+\end{center}
+|5.~0-0|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+5 & \ldots & Nc6\\
+\end{tabular}}|
+\end{center}
+|5\ldots~d5; 6.~Bb3, d*e4; 7.~N*e4, N*e4; 8.~d*e4, Q*d1+; 9.~K*d1|
+=
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+6 & Bf4&\\
+\end{tabular}}|
+\end{center}
+|6.~0-0, Be7|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+6 & \ldots & a6\\
+7 & 0-0 & Be7\\
+\end{tabular}}|
+\end{center}
+|7\ldots~Na5; 8.~Bb3, N*b3; 9.~a*b3, Be7; 10.~Re1, 0-0; 11.~Qd2|
+\bbetter{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+8 & Re1 & 0-0\\
+\end{tabular}}|
+\end{center}
+
+\board
+{r*bq rk*}
+{*p* bppp}
+{p*nppn *}
+{* p * * }
+{ *B*PB *}
+{* NP*N* }
+{PPP* PPP}
+{R *QR K }
+$$\showboard$$
+ I often find this sort of position when playing the sicilian, where
+white has the e file, pushes his pawn, and gains a winning advantage.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+9 & e5 & d*e5\\
+10 & N*e5 & Bd7\\
+\end{tabular}}|
+\end{center}
+|10\ldots~N*e5|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+11 & Ne4&\\
+\end{tabular}}|
+\end{center}
+|11.~Bb3|
+\wbetter{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+11 & \ldots & N*e5\\
+12 & B*e5 & Bc6\\
+\end{tabular}}|
+\end{center}
+
+\board
+{r* q rk*}
+{*p* bppp}
+{p*b*pn *}
+{* p B * }
+{ *B*N* *}
+{* *P* * }
+{PPP* PPP}
+{R *QR K }
+$$\showboard$$
+|12\ldots~N*e4; 13.~d*e4, b5; 14.~Bb3, Bc6; 15.~Qh5, Re8|
+=
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+13 & B*f6&\\
+\end{tabular}}|
+\end{center}
+|13.~Qf3, N*e4; 14.~d*e4, b6; 15.~Rad1, Qe8|
+\wbetter{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+13 & \ldots & B*e4??\\
+\end{tabular}}|
+\end{center}
+|13\ldots~B*f6; 14.~N*f6+, Q*f6; 15.~c3, b6; 16.~Qe2|
+\bbetter{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+14 & B*e7 & Q*e7\\
+15 & R*e4 & Rac8\\
+16 & f4&\\
+\end{tabular}}|
+\end{center}
+|16.~a4, Qf6; 17.~c3, Rfd8; 18.~Qe2, h6; 19.~Re1|
+\wdecisive{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+16 & \ldots & b5\\
+17 & Bb3 & Rc6\\
+\end{tabular}}|
+\end{center}
+|17\ldots~a5|
+and I might be able to stir up a queenside pawn charge.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+18 & c4&\\
+\end{tabular}}|
+\end{center}
+|18.~a4|
+striking at the ambushing pawns.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+18 & \ldots & Rd8\\
+\end{tabular}}|
+\end{center}
+|18\ldots~Rd6; 19.~c*b5, a*b5; 20.~a4, c4|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+19 & Qe2&\\
+\end{tabular}}|
+\end{center}
+|19.~c*b5, a*b5; 20.~a4, b*a4; 21.~Ra*a4, Rcd6; 22.~d4, c*d4; 23.~Re*d4|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+19 & \ldots & Rd4\\
+\end{tabular}}|
+\end{center}
+|19\ldots~b4|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+20 & R*d4&\\
+\end{tabular}}|
+\end{center}
+|20.~c*b5, a*b5; 21.~a4, b*a4; 22.~R*a4, Rd8; 23.~d4, c*d4; 24.~Re*d4|
+All variations just win for white.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+20 & \ldots & c*d4\\
+21 & Re1&\\
+\end{tabular}}|
+\end{center}
+|21.~c*b5|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+21 & \ldots & Rc5\\
+22 & Qe4&\\
+\end{tabular}}|
+\end{center}
+|22.~Qf2, b*c4; 23.~B*c4, Qd6|
+Blacks score is rapidly going down.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+22 & \ldots & Rh5\\
+\end{tabular}}|
+\end{center}
+|22\ldots~Qd7; 23.~Qa8+, Qc8; 24.~Q*c8+, R*c8; 25.~g3, b*c4; 26.~d*c4|
+a passed pawn for white! Blacks passed pawn will not live long.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+23 & g4&\\
+\end{tabular}}|
+\end{center}
+|23.~f5, Rh6; 24.~c*b5, a*b5|
+Totally won for white.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+23 & \ldots & Rh4\\
+24 & Qa8+ & Qf8\\
+25 & Q*f8+ & K*f8\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * k *}
+{* * *ppp}
+{p* *p* *}
+{*p* * * }
+{ *Pp PPr}
+{*B*P* * }
+{PP * * P}
+{* * R K }
+$$\showboard$$
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+26 & h3?&\\
+\end{tabular}}|
+\end{center}
+|26.~Bd1, Rh3; 27.~Be2, Ke7; 28.~Kg2, Re3; 29.~h3, Kd6|
+Just a piece up.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+26 & \ldots & R*h3\\
+27 & Bc2 & Rg3+\\
+28 & Kf2 & R*g4\\
+29 & Kf3 & h5\\
+\end{tabular}}|
+\end{center}
+|29\ldots~Rh4; 30.~Kg3, Rh6; 31.~Re4, Rg6+; 32.~Kh3, Rh6+; 33.~Kg2|
+And black has drawing chances.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+30 & Re4&\\
+\end{tabular}}|
+\end{center}
+|30.~Re5, g6; 31.~Re4, Rh4; 32.~R*d4, g5|
+Black is only a pawn or so down.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+30 & \ldots & Ke7\\
+31 & R*d4&\\
+\end{tabular}}|
+\end{center}
+|31.~c*b5, a*b5; 32.~Re5, g6; 33.~R*b5, Kd6; 34.~Ke4|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+31 & \ldots & e5\\
+\end{tabular}}|
+\end{center}
+|31\ldots~g5; 32.~c*b5, a*b5; 33.~a4, e5; 34.~Re4, R*f4+; 35.~R*f4, e*f4|
+Blacks is a `pawn` down, with 3 connected passed pawns. Not so bad,
+but still winning for white.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+32 & Re4 & R*f4+\\
+33 & R*f4 & e*f4\\
+34 & K*f4 & Kf6\\
+35 & c5 & Ke7\\
+36 & b4 & f6\\
+37 & d4 & g5+\\
+38 & Kg3 & h4+\\
+39 & Kg4 & Ke6\\
+40 & c6 & Kd6\\
+41 & d5 & Kc7\\
+42 & Be4 & Kd6\\
+43 & Bg2 & Kc7\\
+44 & Bh3 & Kd6\\
+45 & Kf5 & Kc7\\
+46 & K*f6 & Kb6\\
+47 & K*g5&\\
+\end{tabular}}|
+\end{center}
+I finally resigned here.
+
+\board
+{ * * * *}
+{* * * * }
+{pkP* * *}
+{*p*P* K }
+{ P * * p}
+{* * * *B}
+{P* * * *}
+{* * * * }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Jul 1994 \hspace{.3 in} $1\!-\!0$\\
+\hline
+Foo C67\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} A. McMonigle\\
+Scottish Chess Minor
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & e5\\
+2 & Nf3 & Nc6\\
+3 & Bb5 & Nf6\\
+4 & 0-0 & N*e4\\
+\end{tabular}}|
+\end{center}
+
+\board
+{r*bqkb r}
+{pppp*ppp}
+{ *n* * *}
+{*B* p * }
+{ * *n* *}
+{* * *N* }
+{PPPP PPP}
+{RNBQ*RK }
+$$\showboard$$
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+5 & Re1&\\
+\end{tabular}}|
+\end{center}
+|5.~d4, Be7; 6.~d*e5, 0-0; 7.~Be3, a6|
+and white has the edge.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+5 & \ldots & d5\\
+\end{tabular}}|
+\end{center}
+|5\ldots~Nd6; 6.~B*c6, d*c6; 7.~N*e5, Be6; 8.~Nc3, Be7; 9.~Kh1|
+\wbetter{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+6 & N*e5&\\
+\end{tabular}}|
+\end{center}
+|6.~d3|
+is a killer move.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+6 & \ldots & Qf6\\
+7 & Nf3&\\
+\end{tabular}}|
+\end{center}
+|7.~N*c6, b*c6; 8.~Qf3, Qg6; 9.~Bd3, Bf5; 10.~B*e4|
+\wbetter{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+7 & \ldots & Be7\\
+8 & d3! & Nd6\\
+\end{tabular}}|
+\end{center}
+
+\board
+{r*b*k* r}
+{ppp bppp}
+{ *nn q *}
+{*B*p* * }
+{ * * * *}
+{* *P*N* }
+{PPP* PPP}
+{RNBQR K }
+$$\showboard$$
+|8\ldots~N*f2; 9.~K*f2, Bg4; 10.~Nbd2, 0-0; 11.~B*c6, b*c6|
+\wupperhand{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+9 & B*c6+&\\
+\end{tabular}}|
+\end{center}
+|9.~Bg5, Q*b2; 10.~B*c6+, b*c6; 11.~R*e7+, Kf8; 12.~Nbd2, h6|
+White is a couple of pawns up, but the tactices are hairy!
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+9 & \ldots & b*c6\\
+10 & c3 & 0-0\\
+\end{tabular}}|
+\end{center}
+
+\board
+{r*b* rk*}
+{p p bppp}
+{ *pn q *}
+{* *p* * }
+{ * * * *}
+{* PP*N* }
+{PP * PPP}
+{RNBQR K }
+$$\showboard$$
+|10\ldots~h6; 11.~Be3, Nf5; 12.~Bf4, Rb8; 13.~Be5, Qg6|
+\wbetter{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+11 & Bg5 & Qg6\\
+\end{tabular}}|
+\end{center}
+|11\ldots~Q*f3; 12.~Q*f3, B*g5; 13.~b3, Bb7; 14.~Qg3, Bf6|
+Is blacks best line.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+12 & B*e7 & Re8\\
+13 & B*d6 & R*e1+\\
+14 & Q*e1 & Q*d6\\
+15 & Qe8+ & Qf8\\
+16 & Q*f8+&\\
+\end{tabular}}|
+\end{center}
+|16.~Q*c6, Rb8; 17.~Q*c7, R*b2; 18.~Q*a7, Bf5; 19.~Qd4, Qb8; 20.~Nfd2|
+\wdecisive{} The proper continuation, and well winning for white.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+16 & \ldots & K*f8\\
+17 & Ne5&\\
+\end{tabular}}|
+\end{center}
+|17.~h3|
+Still a \wdecisive{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+17 & \ldots & Bf5\\
+\end{tabular}}|
+\end{center}
+|17\ldots~c5; 18.~h3, f6; 19.~Nf3|
+and white moving the knight was a waste of two tempi.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+19 & \ldots & Rb8\\
+20 & b3 & Bf5\\
+\end{tabular}}|
+\end{center}
+\wdecisive{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+18 & d4&\\
+\end{tabular}}|
+\end{center}
+|18.~Nd2, Re8; 19.~Ndf3, c5; 20.~g4, f6; 21.~Kg2, f*e5; 22.~g*f5|
+\wdecisive{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+18 & \ldots & Re8\\
+19 & Nd2 & Re6\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * k *}
+{p p *ppp}
+{ *p*r* *}
+{* *pNb* }
+{ * P * *}
+{* P * * }
+{PP N PPP}
+{R * * K }
+$$\showboard$$
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+20 & Re1&\\
+\end{tabular}}|
+\end{center}
+|20.~g4, B*g4; 21.~N*g4, Rg6; 22.~h3, h5; 23.~f3, h*g4; 24.~h*g4|
+\wdecisive{} what a cou.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+20 & \ldots & f6\\
+21 & Nd7+ & Ke7\\
+22 & R*e6+ & B*e6\\
+23 & Nc5 & Bf5\\
+24 & f3&\\
+\end{tabular}}|
+\end{center}
+|24.~h3, h6; 25.~Kh2, Kd6; 26.~Nb7+, Ke7; 27.~g4, Bd3|
+\wdecisive{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+24 & \ldots & Bc8\\
+25 & g4&\\
+\end{tabular}}|
+\end{center}
+|25.~Kf2, Kd6; 26.~f4, g6; 27.~Kf3, h6; 28.~g3, f5|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+25 & \ldots & Kf7\\
+26 & Kg2&\\
+\end{tabular}}|
+\end{center}
+|26.~Kf2, Ke7; 27.~Ke3, Kd6; 28.~Kd3, h6; 29.~c4, d*c4+; 30.~N*c4+|
+\wdecisive{} with a plan
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+26 & \ldots & f5\\
+27 & Kg3 & Kg6\\
+28 & Nd3&\\
+\end{tabular}}|
+\end{center}
+|28.~g*f5+, B*f5; 29.~Na6, Kf6; 30.~h3, h6; 31.~N*c7|
+Attacking the weak backwards pawn.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+28 & \ldots & f*g4\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ *b* * *}
+{p p * pp}
+{ *p* *k*}
+{* *p* * }
+{ * P *p*}
+{* PN*PK }
+{PP N * P}
+{* * * * }
+$$\showboard$$
+|28\ldots~Kf6; 29.~g*f5, K*f5; 30.~Ne5, Bb7|
+Score: 3.19
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+29 & Ne5+ & Kf6\\
+30 & N*c6 & a6\\
+31 & f*g4 & g5\\
+32 & h4&\\
+\end{tabular}}|
+\end{center}
+|32.~Nb3, Bb7; 33.~Nb8, h6; 34.~Nc5, Bc8; 35.~b4, Kg6; 36.~Nb*a6|
+Successfully ganing up on the `a` pawn.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+32 & \ldots & g*h4+\\
+33 & K*h4 & Bd7\\
+34 & g5+&\\
+\end{tabular}}|
+\end{center}
+|34.~Nb4, c6; 35.~N*a6, h6; 36.~Kh5, Kg7|
+Totally won.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+34 & \ldots & Kg7\\
+35 & Ne5&\\
+\end{tabular}}|
+\end{center}
+|35.~Nb4, c6; 36.~N*a6, h6; 37.~Nc5, Bf5; 38.~a4, Kg6; 39.~g*h6|
+And either the 'a' or 'b' pawn will queen.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+35 & \ldots & Be8\\
+36 & Nb3 & Bg6\\
+\end{tabular}}|
+\end{center}
+At this point black resigned.
+
+\board
+{ * * * *}
+{* p * kp}
+{p* * *b*}
+{* *pN P }
+{ * P * K}
+{*NP * * }
+{PP * * *}
+{* * * * }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Jul 1994 \hspace{.3 in} $1\!-\!0$\\
+\hline
+Foo B86\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Brian Swanson\\
+\rule[-1pt]{11pt}{11pt} Andy Gill\\
+Scottish Chess Minor
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & c5\\
+2 & Nf3 & d6\\
+3 & d4 & c*d4\\
+4 & N*d4 & Nf6\\
+5 & Nc3 & a6\\
+6 & Bc4 & e6\\
+\end{tabular}}|
+\end{center}
+|6\ldots~e5; 7.~Nf3, Qc7; 8.~Bd5, Bg4; 9.~0-0, N*d5; 10.~N*d5|
+Is another line of the Sicilian.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+7 & Bg5&\\
+\end{tabular}}|
+\end{center}
+|7.~0-0, Qc7; 8.~Qd3, e5; 9.~Nf3, Bg4; 10.~Bg5|
+\wbetter{},0.25
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+7 & \ldots & Be7\\
+8 & f4 & b5\\
+\end{tabular}}|
+\end{center}
+
+\board
+{rnbqk* r}
+{* * bppp}
+{p* ppn *}
+{*p* * B }
+{ *BNPP *}
+{* N * * }
+{PPP* *PP}
+{R *QK *R}
+$$\showboard$$
+|8\ldots~d5; 9.~B*f6, B*f6; 10.~e*d5, Qc7; 11.~Be2, Q*f4|
+\bupperhand{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+9 & Bd3?&\\
+\end{tabular}}|
+\end{center}
+|9.~Bb3, h6; 10.~B*f6, B*f6; 11.~0-0, B*d4+; 12.~Q*d4|
+\bbetter{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+9 & \ldots & Bb7\\
+10 & b4&\\
+\end{tabular}}|
+\end{center}
+|10.~Qf3, Qb6; 11.~Nde2, d5|
+=
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+10 & \ldots & Nc6\\
+11 & Nf3?&\\
+\end{tabular}}|
+\end{center}
+|11.~N*c6, B*c6; 12.~0-0, d5; 13.~e*d5, N*d5; 14.~B*e7, Q*e7|
+\bbetter{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+11 & \ldots & N*b4\\
+12 & Qe2 & 0-0\\
+13 & 0-0&\\
+\end{tabular}}|
+\end{center}
+|13.~a3, Qc7; 14.~Qd2|
+\bupperhand{},by a pawn or so.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+13 & \ldots & Rc8\\
+\end{tabular}}|
+\end{center}
+|13\ldots~Qc7; 14.~Qd2, d5; 15.~B*f6, B*f6|
+\bupperhand{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+14 & Nd1 & d5\\
+15 & e*d5&\\
+\end{tabular}}|
+\end{center}
+|15.~e5, Ne4; 16.~B*e7, Q*e7; 17.~B*e4, d*e4; 18.~Nd4|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+15 & \ldots & B*d5\\
+16 & Ne3&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ *rq rk*}
+{* * bppp}
+{p* *pn *}
+{*p*b* B }
+{ n * P *}
+{* *BNN* }
+{P*P*Q*PP}
+{R * *RK }
+$$\showboard$$
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+16 & \ldots & Bc5\\
+\end{tabular}}|
+\end{center}
+|16\ldots~B*a2; 17.~Rad1, N*d3; 18.~c*d3, Nd5|
+\bdecisive{},2+ pawns up, but getting a bit tactical.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+17 & Kh1 & B*e3\\
+18 & Q*e3 & N*c2\\
+19 & B*c2 & R*c2\\
+20 & a4 & Ra2\\
+\end{tabular}}|
+\end{center}
+|20\ldots~h6|
+\bdecisive{}, just winning.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+21 & R*a2 & B*a2\\
+22 & a*b5&\\
+\end{tabular}}|
+\end{center}
+|22.~Ra1, Bd5; 23.~a*b5, a*b5; 24.~Rb1, Ng4|
+\bdecisive{}, to or so pawns up.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+22 & \ldots & Bc4\\
+\end{tabular}}|
+\end{center}
+|22\ldots~a*b5; 23.~Ra1, Bd5; 24.~Ra7, h6|
+\bupperhand{}, even with the rook on blacks 2nd. This rook should be
+able to get to 'b' pawn, though.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+23 & Rc1 & B*b5\\
+24 & Ne5&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * q rk*}
+{* * *ppp}
+{p* *pn *}
+{*b* N B }
+{ * * P *}
+{* * Q * }
+{ * * *PP}
+{* R * *K}
+$$\showboard$$
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+24 & \ldots & Nd5?\\
+\end{tabular}}|
+\end{center}
+A bit wild.
+|24\ldots~h6; 25.~B*f6, Q*f6; 26.~Rc7, a5; 27.~Qc5, Be2; 28.~Q*a5, Q*f4|
+\bdecisive{}, almost three pawns up, and threating the forced queen
+exchage on f1.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+25 & Qg3&\\
+\end{tabular}}|
+\end{center}
+Alarms bells !!!, the bishop is going to h6. Remember.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+25 & \ldots & f6\\
+\end{tabular}}|
+\end{center}
+I though I was going to win a piece for a pawn.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+26 & Bh6 & g6??\\
+\end{tabular}}|
+\end{center}
+|26\ldots~Qe7; 27.~Nc6, Qc7; 28.~Rc2, Ba4; 29.~Rc4, Nb6|
+Black still leads (two pawns up), but the tactics are hairy.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+27 & B*f8?&\\
+\end{tabular}}|
+\end{center}
+|27.~N*g6, Kf7; 28.~N*f8, Ke8; 29.~N*e6, Qd7; 30.~Re1|
+\wdecisive{},5.47
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+27 & \ldots & f*e5\\
+\end{tabular}}|
+\end{center}
+|27\ldots~K*f8; 28.~Qh4, a5; 29.~g3, a4|
+\bbetter{}, but critically depending on the weak a pawn.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+28 & Bh6 & e*f4\\
+29 & Qe1&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * q *k*}
+{* * * *p}
+{p* *p*pB}
+{*b*n* * }
+{ * * p *}
+{* * * * }
+{ * * *PP}
+{* R Q *K}
+$$\showboard$$
+|29.~B*f4, N*f4; 30.~Q*f4, a5; 31.~h3, g5; 32.~Qe5|
+\wupperhand{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+29 & \ldots & g5??\\
+\end{tabular}}|
+\end{center}
+My major blunder.
+|29\ldots~Kf7; 30.~g3, f3; 31.~Qf2, Qf6|
+\bupperhand{}, but tricky.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+30 & Q*e6+ & Kh8\\
+31 & Rc8&\\
+\end{tabular}}|
+\end{center}
+Mate is in a couple of moves.
+
+\board
+{ *Rq * k}
+{* * * *p}
+{p* *Q* B}
+{*b*n* p }
+{ * * p *}
+{* * * * }
+{ * * *PP}
+{* * * *K}
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Jul 1994 \hspace{.3 in} $1\!-\!0$\\
+\hline
+Foo B54\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} Brian Thomson\\
+Scottish Chess Minor
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & c5\\
+2 & Nf3 & d6\\
+3 & d4 & c*d4\\
+4 & N*d4 & Nc6\\
+5 & Bb5 & Bd7\\
+6 & Nc3&\\
+\end{tabular}}|
+\end{center}
+|6.~N*c6|
+Score: 0.06
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+6 & \ldots & Nf6\\
+\end{tabular}}|
+\end{center}
+|6\ldots~N*d4; 7.~Q*d4, B*b5; 8.~N*b5, Qa5; 9.~Nc3, e5; 10.~Qd5, Qc7|
+Score: -0.03
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+7 & Bg5 & h6\\
+\end{tabular}}|
+\end{center}
+|7\ldots~N*d4; 8.~B*d7, N*d7; 9.~Q*d4, e5; 10.~Qd2, Be7; 11.~Be3|
+Score: -0.03
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+8 & Bh4&\\
+\end{tabular}}|
+\end{center}
+|8.~B*f6, e*f6; 9.~f4, N*d4; 10.~B*d7, Q*d7; 11.~Q*d4, Be7|
+Score: 0.16
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+8 & \ldots & Qb6\\
+\end{tabular}}|
+\end{center}
+|8\ldots~g5; 9.~Bg3, N*d4; 10.~Q*d4, Bg7; 11.~0-0, 0-0|
+Score: -0.22
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+9 & N*c6&\\
+\end{tabular}}|
+\end{center}
+|9.~B*f6, g*f6; 10.~B*c6, b*c6; 11.~Na4, Qa5; 12.~c3, Bg7|
+Score: 0.06
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+9 & \ldots & b*c6\\
+10 & B*f6&\\
+\end{tabular}}|
+\end{center}
+|10.~Bd3, Q*b2; 11.~B*f6, e*f6; 12.~Na4, Qd4; 13.~c3|
+Score: -1.03
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+10 & \ldots & e*f6\\
+11 & Ba4&\\
+\end{tabular}}|
+\end{center}
+|11.~Bd3, Q*b2; 12.~Na4, Qa3; 13.~c3, Be6; 14.~Qc2, 0-0-0|
+Score: -1.31
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+11 & \ldots & Qc7\\
+\end{tabular}}|
+\end{center}
+|11\ldots~Q*b2; 12.~Kd2, Qb6; 13.~Qf3, Be6; 14.~e5, Qd4|
+Score: -1.44
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+12 & 0-0 & Be7\\
+13 & Re1&\\
+\end{tabular}}|
+\end{center}
+|13.~Rb1, 0-0; 14.~Qd3, Be6; 15.~f4, f5|
+Score: -0.09
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+13 & \ldots & 0-0\\
+14 & Qd4&\\
+\end{tabular}}|
+\end{center}
+|14.~Bb3|
+Score: -0.09
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+14 & \ldots & Be6\\
+\end{tabular}}|
+\end{center}
+|14\ldots~Rab8; 15.~b3, Be6; 16.~Rad1, Rb6; 17.~f4, Re8|
+Score: -0.16
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+15 & Nd1&\\
+\end{tabular}}|
+\end{center}
+|15.~f4, Rab8; 16.~Bb3, f5; 17.~e5, B*b3; 18.~a*b3|
+Score: -0.16
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+15 & \ldots & Qa5\\
+\end{tabular}}|
+\end{center}
+|15\ldots~Rab8; 16.~Qc3, Rb6; 17.~Ne3, Qb7; 18.~f4|
+Score: -0.09
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+16 & Nc3 & Qc7\\
+\end{tabular}}|
+\end{center}
+|16\ldots~Rab8; 17.~b3, Qc7; 18.~Rad1, Rfe8; 19.~f4, Rb6|
+Score: -0.13
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+17 & Ne2&\\
+\end{tabular}}|
+\end{center}
+|17.~Nd1|
+Score: 0.00
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+17 & \ldots & Rab8\\
+\end{tabular}}|
+\end{center}
+|17\ldots~Rfb8; 18.~Nf4, Rb6; 19.~N*e6, f*e6; 20.~Bb3, d5; 21.~e*d5, c*d5|
+Score: -0.06
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+18 & b3&\\
+\end{tabular}}|
+\end{center}
+|18.~Nf4|
+Score: -0.13
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+18 & \ldots & a5\\
+\end{tabular}}|
+\end{center}
+|18\ldots~f5; 19.~Rad1, f*e4; 20.~Q*e4, Bd5; 21.~Qd4|
+Score: -0.41
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+19 & Nf4&\\
+\end{tabular}}|
+\end{center}
+|19.~Qc3, c5; 20.~Nd4, Rb7; 21.~Nc6, Ra8; 22.~Rad1|
+Score: 0.06
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+19 & \ldots & Bd7\\
+\end{tabular}}|
+\end{center}
+|19\ldots~Rfc8; 20.~c4, Rd8; 21.~f3, Rd7|
+Score: 0.00
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+20 & Qd2&\\
+\end{tabular}}|
+\end{center}
+|20.~Qc3, Rb7; 21.~a3, Re8; 22.~Nd3, Reb8; 23.~f4|
+Score: -0.09
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+20 & \ldots & g5\\
+\end{tabular}}|
+\end{center}
+|20\ldots~Rfe8|
+Score: -0.09
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+21 & Nh5&\\
+\end{tabular}}|
+\end{center}
+|21.~Ne2, Rb7; 22.~Nd4, Re8; 23.~Qc3, c5; 24.~B*d7, Q*d7|
+Score: 0.13
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+21 & \ldots & Qb6\\
+\end{tabular}}|
+\end{center}
+|21\ldots~Bg4; 22.~Ng3, Rfe8; 23.~c4, Bf8; 24.~f3, Be6|
+Score: 0.13
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+22 & Qc3 & Qd8\\
+23 & Rad1&\\
+\end{tabular}}|
+\end{center}
+|23.~a3, Rc8; 24.~Ng3, Re8; 25.~Rad1, Bg4; 26.~B*c6, B*d1; 27.~R*d1|
+Score: 0.31
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+23 & \ldots & Bg4\\
+24 & Ng3 & B*d1\\
+25 & R*d1 & c5\\
+26 & Nh5&\\
+\end{tabular}}|
+\end{center}
+|26.~Nf5, h5; 27.~a3, Rb7; 28.~Qd3, Rb6; 29.~Qd2|
+Score: -0.06
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+26 & \ldots & Kh8\\
+\end{tabular}}|
+\end{center}
+|26\ldots~Rb4; 27.~Ng3, Qa8; 28.~a3, Rb6|
+Score: -0.75
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+27 & Rd3&\\
+\end{tabular}}|
+\end{center}
+|27.~Ng3, Rg8; 28.~Nf5, Bf8; 29.~Qd2, Qc7|
+Score: -0.34
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+27 & \ldots & Rg8\\
+\end{tabular}}|
+\end{center}
+|27\ldots~Rb4; 28.~Ng3, c4; 29.~Rd5, c*b3; 30.~c*b3, Qb6; 31.~Bc6|
+Score: -0.88
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+28 & Rf3&\\
+\end{tabular}}|
+\end{center}
+|28.~Ng3, Rg6; 29.~Nf5, Rb4; 30.~Bc6, Qc7; 31.~a3, Rb6|
+Score: -0.81
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+28 & \ldots & Rg6\\
+\end{tabular}}|
+\end{center}
+|28\ldots~d5; 29.~e*d5, Q*d5; 30.~Re3, Qd1; 31.~Re1, Qd8; 32.~Ng3|
+Score: -1.00
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+29 & Bc6&\\
+\end{tabular}}|
+\end{center}
+|29.~Rd3, Rb4; 30.~f3, c4; 31.~Re3, c*b3; 32.~c*b3|
+Score: -0.97
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+29 & \ldots & Kg8\\
+30 & Bd5&\\
+\end{tabular}}|
+\end{center}
+|30.~Ng3, Qc7; 31.~Nf5, Bf8; 32.~Bd5, Bg7; 33.~Rd3, Bh8|
+Score: -1.00
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+30 & \ldots & a4\\
+31 & Qc4 & Qe8\\
+32 & Qd3&\\
+\end{tabular}}|
+\end{center}
+|32.~Qc3, a*b3; 33.~c*b3, Qd8; 34.~a4, Rb6; 35.~Rd3|
+Score: -0.78
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+32 & \ldots & Rb4\\
+\end{tabular}}|
+\end{center}
+|32\ldots~Qb5; 33.~Ng3, a*b3; 34.~Nf5, Bf8|
+Score: -0.97
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+33 & e5&\\
+\end{tabular}}|
+\end{center}
+|33.~c3, Rb6; 34.~e5, Kf8; 35.~N*f6|
+Score: -0.25
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+33 & \ldots & d*e5\\
+\end{tabular}}|
+\end{center}
+|33\ldots~Kh8; 34.~c3, Rh4; 35.~e*f6, Bd8; 36.~Re3, Qd7|
+Score: -0.22
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+34 & Q*g6+&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * *q*k*}
+{* * bp* }
+{ * * pQp}
+{* pBp pN}
+{pr * * *}
+{*P* *R* }
+{P*P* PPP}
+{* * * K }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Jul 1994 \hspace{.3 in} ${1 \over 2}\!-\!{1 \over 2}$\\
+\hline
+Foo B50\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} M. Navmann\\
+\rule[-1pt]{11pt}{11pt} Andy Gill\\
+Scottish Chess Minor
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & c5\\
+2 & Nf3 & d6\\
+3 & Bc4 & e6\\
+\end{tabular}}|
+\end{center}
+|3\ldots~Nc6|
+Score: 0.00
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+4 & Nc3 & a6\\
+\end{tabular}}|
+\end{center}
+|4\ldots~Nf6; 5.~d3, d5; 6.~Bb3, d*e4; 7.~N*e4, N*e4; 8.~d*e4, Q*d1|
+Score: 0.00
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+5 & a4&\\
+\end{tabular}}|
+\end{center}
+|5.~d3, Nc6; 6.~Bf4, Na5; 7.~e5, d5; 8.~Bg5, Ne7|
+Score: 0.09
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+5 & \ldots & Nf6\\
+6 & d3&\\
+\end{tabular}}|
+\end{center}
+|6.~d4|
+Score: 0.06
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+6 & \ldots & Be7\\
+\end{tabular}}|
+\end{center}
+|6\ldots~d5; 7.~Ba2, d*e4; 8.~N*e4, N*e4; 9.~d*e4, Q*d1; 10.~K*d1|
+Score: 0.09
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+7 & b3&\\
+\end{tabular}}|
+\end{center}
+|7.~Bg5, h6; 8.~Bh4, d5; 9.~e*d5, N*d5; 10.~N*d5, e*d5|
+Score: 0.16
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+7 & \ldots & 0-0\\
+\end{tabular}}|
+\end{center}
+|7\ldots~d5; 8.~e*d5, e*d5; 9.~N*d5, N*d5; 10.~0-0, 0-0|
+Score: -1.59
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+8 & d4&\\
+\end{tabular}}|
+\end{center}
+|8.~Qe2, Nc6; 9.~0-0, d5; 10.~e*d5, e*d5|
+Score: 0.06
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+8 & \ldots & c*d4\\
+\end{tabular}}|
+\end{center}
+|8\ldots~d5; 9.~e*d5, e*d5; 10.~Bd3, b6; 11.~0-0, Nc6|
+Score: -0.09
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+9 & N*d4&\\
+\end{tabular}}|
+\end{center}
+|9.~Q*d4|
+Score: -0.09
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+9 & \ldots & d5\\
+\end{tabular}}|
+\end{center}
+|9\ldots~Qa5; 10.~Qd2, b5; 11.~Bd3, e5; 12.~Nf3, Bg4|
+Score: -0.16
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+10 & e*d5 & e*d5\\
+11 & Bd3 & Re8\\
+\end{tabular}}|
+\end{center}
+|11\ldots~Nc6; 12.~Nce2, N*d4; 13.~N*d4, Bb4; 14.~Bd2, Qa5; 15.~Ne2, B*d2|
+Score: -0.22
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+12 & 0-0 & Bb4\\
+\end{tabular}}|
+\end{center}
+|12\ldots~Nc6; 13.~Nce2, Bg4; 14.~f3, Bc5; 15.~c3|
+Score: -0.03
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+13 & Bd2&\\
+\end{tabular}}|
+\end{center}
+|13.~Nce2, Nc6; 14.~Bb2, Bg4; 15.~f3, N*d4; 16.~N*d4|
+Score: 0.00
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+13 & \ldots & Qa5\\
+\end{tabular}}|
+\end{center}
+|13\ldots~b6|
+Score: -0.09
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+14 & Nb1 & Kh8\\
+\end{tabular}}|
+\end{center}
+|14\ldots~Nc6; 15.~B*b4, N*b4; 16.~Re1, Bg4; 17.~Be2, Rad8|
+Score: -0.09
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+15 & B*b4 & Q*b4\\
+16 & c3 & Qe7\\
+\end{tabular}}|
+\end{center}
+|16\ldots~Qc5; 17.~Re1, R*e1; 18.~Q*e1, Nc6; 19.~Nf5, b6|
+Score: 0.09
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+17 & Nd2&\\
+\end{tabular}}|
+\end{center}
+|17.~Ra2, Qc7; 18.~Re2, R*e2; 19.~Q*e2, Nc6; 20.~Rd1, N*d4; 21.~c*d4|
+Score: 0.09
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+17 & \ldots & Bg4\\
+\end{tabular}}|
+\end{center}
+|17\ldots~Qc5; 18.~Qc2, Nc6; 19.~N2f3, N*d4; 20.~N*d4, Ne4|
+Score: 0.00
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+18 & Qc1&\\
+\end{tabular}}|
+\end{center}
+|18.~N2f3, Qc7; 19.~Qd2, Nc6; 20.~Rfe1, Rad8; 21.~R*e8, R*e8|
+Score: 0.00
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+18 & \ldots & Nc6\\
+19 & N*c6&\\
+\end{tabular}}|
+\end{center}
+|19.~Re1, Ne5; 20.~Qc2, Qc7; 21.~c4, N*d3; 22.~Q*d3|
+Score: 0.03
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+19 & \ldots & b*c6\\
+20 & Re1 & Qd7\\
+\end{tabular}}|
+\end{center}
+|20\ldots~Qb7; 21.~Qc2, Rad8; 22.~h3, Bh5; 23.~c4, R*e1; 24.~R*e1|
+Score: 0.03
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+21 & R*e8+ & Q*e8\\
+22 & Qe1&\\
+\end{tabular}}|
+\end{center}
+|22.~Qc2, c5; 23.~h3, Bh5; 24.~b4, c4; 25.~Bf5|
+Score: 0.03
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+22 & \ldots & a5\\
+\end{tabular}}|
+\end{center}
+|22\ldots~Qd7|
+Score: 0.09
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+23 & h3 & Bd7\\
+\end{tabular}}|
+\end{center}
+|23\ldots~Bh5; 24.~g4, Bg6; 25.~B*g6, h*g6; 26.~Rd1, Rd8; 27.~Q*e8, N*e8|
+Score: 0.19
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+24 & Nf3&\\
+\end{tabular}}|
+\end{center}
+|24.~Rd1, Rb8; 25.~c4, h6; 26.~Q*e8, R*e8; 27.~c*d5, c*d5|
+Score: 0.16
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+24 & \ldots & Q*e1+\\
+\end{tabular}}|
+\end{center}
+|24\ldots~Rb8; 25.~Bc2, c5; 26.~c4, Q*e1; 27.~R*e1, d4|
+Score: 0.16
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+25 & R*e1 & Re8\\
+\end{tabular}}|
+\end{center}
+|25\ldots~Rb8; 26.~Bc2, g6; 27.~Re7, Kg7; 28.~Ne5, Be8|
+Score: 0.44
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+26 & R*e8+&\\
+\end{tabular}}|
+\end{center}
+|26.~Ne5|
+Score: 0.53
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+26 & \ldots & B*e8\\
+27 & c4&\\
+\end{tabular}}|
+\end{center}
+|27.~g3|
+Score: 0.28
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+27 & \ldots & h6\\
+\end{tabular}}|
+\end{center}
+|27\ldots~g6; 28.~g3, Kg7; 29.~Kg2, h6; 30.~Ne5, d4; 31.~f4, c5|
+Score: 0.13
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+28 & Kf1&\\
+\end{tabular}}|
+\end{center}
+|28.~g3, g6; 29.~Ne5, Kg7; 30.~Kg2, d4; 31.~Kf3, c5|
+Score: 0.25
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+28 & \ldots & g6\\
+29 & Ke2&\\
+\end{tabular}}|
+\end{center}
+|29.~c*d5|
+Score: 0.31
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+29 & \ldots & Kg7\\
+30 & Ke3&\\
+\end{tabular}}|
+\end{center}
+|30.~Ne5|
+Score: 0.31
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+30 & \ldots & Nd7\\
+\end{tabular}}|
+\end{center}
+|30\ldots~c5; 31.~Ne5, d4; 32.~Kd2, Bd7; 33.~N*d7, N*d7; 34.~Be4, Ne5|
+Score: 0.09
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+31 & Kd4&\\
+\end{tabular}}|
+\end{center}
+|31.~c*d5, c*d5; 32.~Kd4, Nf6; 33.~Ne5, Kf8; 34.~g3, Kg7; 35.~f4|
+Score: 0.59
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+31 & \ldots & d*c4\\
+32 & B*c4&\\
+\end{tabular}}|
+\end{center}
+|32.~K*c4, f5; 33.~Kc3, Bf7; 34.~g3, Nc5; 35.~Bc2, Bd5|
+Score: 0.16
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+32 & \ldots & Kf6\\
+\end{tabular}}|
+\end{center}
+|32\ldots~f5; 33.~Ke3, Bf7; 34.~B*f7, K*f7; 35.~Kf4, Ke6; 36.~Nd4, Kd5|
+Score: -0.03
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+33 & Bd3&\\
+\end{tabular}}|
+\end{center}
+|33.~Nd2, Nb6; 34.~Ne4, Ke7; 35.~Bd3, f5; 36.~Nc5, Bf7|
+Score: 0.22
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+33 & \ldots & Ke6\\
+34 & Kc4&\\
+\end{tabular}}|
+\end{center}
+|34.~Ke3, Nb6; 35.~Nd4, Kd6; 36.~Kf3, Ke5; 37.~Ne2, f5|
+Score: 0.09
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+34 & \ldots & f6\\
+\end{tabular}}|
+\end{center}
+|34\ldots~f5; 35.~g4, f*g4; 36.~h*g4, Ne5; 37.~N*e5, K*e5; 38.~Kc3|
+Score: -0.13
+
+\board
+{ * *b* *}
+{* *n* * }
+{ *p*kppp}
+{p * * * }
+{P*K* * *}
+{*P*B*N*P}
+{ * * PP*}
+{* * * * }
+$$\showboard$$
+${1 \over 2}\!-\!{1 \over 2}$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Sep 1994 \hspace{.3 in} $1\!-\!0$\\
+\hline
+Foo B01\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} Stewart McKay\\
+Grangemouth Congress
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & d5\\
+2 & e*d5 & Nf6\\
+3 & Bb5+ & Bd7\\
+4 & B*d7+ & Q*d7\\
+5 & Nf3 & N*d5\\
+6 & 0-0 & Nc6\\
+7 & Re1 & e6\\
+8 & d3 & g6\\
+9 & Bg5 & Bg7\\
+10 & c3 & Nf6\\
+11 & d4 & h6\\
+12 & B*f6 & B*f6\\
+13 & d5 & Rd8\\
+14 & Qd2 & Q*d5\\
+15 & Qf4 & Bg7\\
+16 & Q*c7 & 0-0\\
+17 & Qf4 & g5\\
+18 & Qd2 & Qf5\\
+19 & Qe3 & Rd3\\
+20 & Qe4 & Q*e4\\
+21 & R*e4 & Rd1+\\
+22 & Re1 & Rfd8\\
+23 & h3 & Ne5\\
+24 & Na3 & N*f3+\\
+25 & g*f3 & R1d3\\
+26 & Kg2 & a6\\
+27 & Rac1 & b5\\
+28 & Re2 & Bf8\\
+29 & Nc2 & Bc5\\
+30 & Ne1 & Rd2\\
+31 & R*d2 & R*d2\\
+32 & Rc2 & Rd1\\
+33 & Kf1 & Be7\\
+34 & a3 & Bf6\\
+35 & Ke2 & Rd5\\
+36 & Nd3 & Rd8\\
+37 & Kd2 & Rc8\\
+38 & Ke3 & Bg7\\
+39 & f4 & Bf6\\
+40 & Ne5 & Rc5\\
+41 & Nd7 & g*f4+\\
+42 & K*f4 & Bg5+\\
+43 & Ke4 & f5+\\
+44 & Kf3 & Rd5\\
+45 & Nb8 & Rd6\\
+46 & c4 & b*c4\\
+47 & R*c4 & Rb6\\
+48 & Rb4 & Rd6\\
+49 & Ra4 & Rb6\\
+50 & N*a6 & R*b2\\
+51 & Nc7 & Rb3+\\
+52 & Kg2 & Be7\\
+53 & N*e6 & R*a3\\
+54 & R*a3 & B*a3\\
+55 & Kg3 & Kf7\\
+56 & Nd4 & Kg6\\
+57 & Kf4 & Kh5\\
+58 & N*f5&\\
+\end{tabular}}|
+\end{center}
+And White won by queening the f pawn.
+
+\board
+{ * * * *}
+{* * * * }
+{ * * * p}
+{* * *N*k}
+{ * * K *}
+{b * * *P}
+{ * * P *}
+{* * * * }
+$$\showboard$$
+$1\!-\!0$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Sep 1994 \hspace{.3 in} $0\!-\!1$\\
+\hline
+Foo D02\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Harward Shaughan\\
+\rule[-1pt]{11pt}{11pt} Andy Gill\\
+Grangemouth Minor Congress
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & d4 & e6\\
+2 & Bf4 & d5\\
+3 & Nf3 & Nf6\\
+4 & Nbd2 & c5\\
+5 & e3 & a6\\
+6 & c4 & Nc6\\
+7 & Ne5 & c*d4\\
+8 & N*c6 & b*c6\\
+9 & e*d4 & Qb6\\
+10 & c*d5 & c*d5\\
+11 & Qc2 & Bd7\\
+12 & Be3 & Bb4\\
+13 & a3 & B*d2+\\
+14 & Q*d2 & 0-0\\
+15 & Bd3 & Rfc8\\
+16 & 0-0 & Bb5\\
+17 & b3 & Rc6\\
+18 & f3 & Rac8\\
+19 & Rfc1 & B*d3\\
+20 & R*c6 & R*c6\\
+21 & Q*d3 & Qc7\\
+22 & Bd2 & h6\\
+23 & Rb1 & Nh5\\
+24 & b4 & Nf4\\
+25 & B*f4 & Q*f4\\
+26 & b5 & Rc1+\\
+27 & R*c1 & Q*c1+\\
+28 & Kf2 & Qb2+\\
+29 & Kg3 & Q*b5\\
+30 & Q*b5 & a*b5\\
+31 & Kf2 & Kf8\\
+32 & Ke3 & Ke7\\
+33 & Kd3 & Kd6\\
+34 & f4 & f6\\
+35 & h4 & e5\\
+36 & d*e5+ & f*e5\\
+37 & f5 & e4+\\
+38 & Kd4 & Ke7\\
+39 & g4 & Kf6\\
+40 & Ke3 & g6\\
+41 & g5+ & h*g5\\
+42 & h*g5+ & K*f5\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * * * *}
+{* * * * }
+{ * * *p*}
+{*p*p*kP }
+{ * *p* *}
+{P * K * }
+{ * * * *}
+{* * * * }
+$$\showboard$$
+$0\!-\!1$
+\clearpage
+\begin{center}
+\fbox{\fbox{\large\begin{tabular}{l}
+Game  \hspace{.3 in} Sep 1994 \hspace{.3 in} $1\!-\!0$\\
+\hline
+Foo C65\\
+\raisebox{2.5pt}[11pt]{\framebox[11pt]{\rule{0pt}{4.25pt}}} Andy Gill\\
+\rule[-1pt]{11pt}{11pt} Lindsay Ridland\\
+Grangemouth Minor Congress
+\end{tabular}}}
+\end{center}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+1 & e4 & e5\\
+2 & Nf3 & Nc6\\
+3 & Bb5 & Nf6\\
+4 & 0-0 & Bc5\\
+5 & Re1 & a6\\
+\end{tabular}}|
+\end{center}
+|5\ldots~Ng4; 6.~Re2, 0-0; 7.~d3, Nd4; 8.~N*d4, B*d4; 9.~Nd2|
+\wbetter{},0.13 but a bit messy for white.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+6 & Ba4&\\
+\end{tabular}}|
+\end{center}
+|6.~B*c6, d*c6; 7.~h3, Qe7; 8.~d3, 0-0; 9.~Bg5, h6; 10.~Bh4|
+=, taking the exchange way out.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+6 & \ldots & b5\\
+7 & Bb3 & d6\\
+\end{tabular}}|
+\end{center}
+
+\board
+{r*bqk* r}
+{* p *ppp}
+{p*np n *}
+{*pb p * }
+{ * *P* *}
+{*B* *N* }
+{PPPP PPP}
+{RNBQR K }
+$$\showboard$$
+ We have now reached a main line of the Ruy Lopez.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+8 & c3&\\
+\end{tabular}}|
+\end{center}
+|8.~a4, Ng4; 9.~Re2, Bb7; 10.~a*b5, a*b5|
+=, and very like Game 7 of the Short-Kasparov WC, where Kasparov as
+white scored a decisive victory.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+8 & \ldots & Bg4\\
+9 & d3 & h6\\
+10 & Be3 & 0-0\\
+\end{tabular}}|
+\end{center}
+|10\ldots~B*e3; 11.~R*e3, 0-0; 12.~a4, b4; 13.~h3, Bh5; 14.~Nbd2, Rb8|
+=
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+11 & B*c5 & d*c5\\
+12 & Bc2 & Qd7\\
+13 & Nbd2&\\
+\end{tabular}}|
+\end{center}
+|13.~h3, Bh5; 14.~Nbd2, Rfd8; 15.~Nb3, Qd6; 16.~Qe2, Rab8; 17.~Red1|
+Fritz is deperate to put h3, but I dont see why.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+13 & \ldots & Nh5\\
+\end{tabular}}|
+\end{center}
+
+\board
+{r* * rk*}
+{* pq*pp }
+{p*n* * p}
+{*pp p *n}
+{ * *P*b*}
+{* PP*N* }
+{PPBN PPP}
+{R *QR K }
+$$\showboard$$
+|13\ldots~Rad8|
+is an idea.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+14 & Nb3&\\
+\end{tabular}}|
+\end{center}
+|14.~h3|
+\wbetter{},0.33 I now agree with this, because the knight block the h5
+retreat square.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+14 & \ldots & Nf4?\\
+\end{tabular}}|
+\end{center}
+|14\ldots~Qd6; 15.~h3, Be6; 16.~Ng5, B*b3; 17.~a*b3, Nf4; 18.~Nf3|
+\bbetter{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+15 & N*c5 & Qc8\\
+\end{tabular}}|
+\end{center}
+|15\ldots~Qe7; 16.~Nb3, Rfd8; 17.~h3, Be6; 18.~d4, Qf6; 19.~Rc1, e*d4|
+=
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+16 & Re3&\\
+\end{tabular}}|
+\end{center}
+|16.~b4|
+White is just a pawn up.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+16 & \ldots & Rd8\\
+17 & Qd2 & Rd6\\
+\end{tabular}}|
+\end{center}
+|17\ldots~B*f3!; 18.~R*f3, Qg4; 19.~R*f4, e*f4; 20.~h3, Qh4; 21.~d4|
+and black has equalised!
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+18 & Bd1&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{r*q* *k*}
+{* p *pp }
+{p*nr * p}
+{*pN p * }
+{ * *Pnb*}
+{* PPRN* }
+{PP Q PPP}
+{R *B* K }
+$$\showboard$$
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+18 & \ldots & N*g2??\\
+\end{tabular}}|
+\end{center}
+Throws away a piece for a very temp. inititive.
+|18\ldots~Rb8; 19.~d4, e*d4; 20.~c*d4, Ne6; 21.~N*e6, Q*e6|
+and white is starting to push home his advantage.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+19 & K*g2 & Bh3+\\
+20 & Kh1 & Qg4\\
+\end{tabular}}|
+\end{center}
+|20\ldots~Rg6|
+is another idea, but the whole plan is conceptually flawed.
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+21 & Ne1 & Qg5\\
+22 & Qe2 & Be6\\
+23 & Rg3 & Qf6\\
+24 & N*e6&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{r* * *k*}
+{* p *pp }
+{p*nrNq p}
+{*p* p * }
+{ * *P* *}
+{* PP* R }
+{PP *QP P}
+{R *BN *K}
+$$\showboard$$
+|24.~Nf3, Ne7; 25.~N*e6, Q*e6; 26.~Bb3, Qf6; 27.~Rag1|
+\wdecisive{}
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+24 & \ldots & R*e6\\
+\end{tabular}}|
+\end{center}
+|24\ldots~Q*e6; 25.~Bb3, Qe7; 26.~Bd5, Rad8; 27.~Nf3, R8d7; 28.~Rd1|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+25 & Qf3&\\
+\end{tabular}}|
+\end{center}
+Crude plan of exchanging queens to avoid `acidents`.
+|25.~Bb3|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+25 & \ldots & Qe7\\
+26 & Bb3 & Rf6\\
+27 & Qe3&\\
+\end{tabular}}|
+\end{center}
+|27.~Qg2|
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+27 & \ldots & Rd8\\
+28 & Nc2 & Kh7\\
+29 & Rag1 & g6\\
+30 & Rf3&\\
+\end{tabular}}|
+\end{center}
+
+\board
+{ * r * *}
+{* p qp*k}
+{p*n* rpp}
+{*p* p * }
+{ * *P* *}
+{*BPPQR* }
+{PPN* P P}
+{* * * RK}
+$$\showboard$$
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+30 & \ldots & R*f3\\
+\end{tabular}}|
+\end{center}
+|30\ldots~Rfd6??; 31.~R*f7+|
+Trying to avoid the exchance, but black loses his Queen! Black
+actually moved his rook to d6, but before letting it go, spotted the
+danger, and then took the exchange. Shame...
+\begin{center}|
+{\bf\begin{tabular}{rp{50pt}p{50pt}}
+31 & Q*f3 & Rd7\\
+32 & Ne3 & h5?\\
+33 & Nd5!&\\
+\end{tabular}}|
+\end{center}
+At least winning the exchange. Black resigned here.
+
+\board
+{ * * * *}
+{* prqp*k}
+{p*n* *p*}
+{*p*Np *p}
+{ * *P* *}
+{*BPP*Q* }
+{PP * P P}
+{* * * RK}
+$$\showboard$$
+$1\!-\!0$
+
+\end{document}
