@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.71 2002/12/11 15:36:54 simonmar Exp $
+ * $Id: Storage.c,v 1.72 2002/12/13 19:17:02 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -28,22 +28,6 @@
 
 #include <stdlib.h>
 #include <string.h>
-
-#ifdef darwin_TARGET_OS
-#include <mach-o/getsect.h>
-unsigned long macho_etext = 0;
-unsigned long macho_edata = 0;
-
-static void macosx_get_memory_layout(void)
-{
-  struct segment_command *seg;
-
-  seg = getsegbyname("__TEXT");
-  macho_etext = seg->vmaddr + seg->vmsize;
-  seg = getsegbyname("__DATA");
-  macho_edata = seg->vmaddr + seg->vmsize;
-}
-#endif
 
 StgClosure    *caf_list         = NULL;
 
@@ -83,10 +67,6 @@ initStorage( void )
   nat g, s;
   step *stp;
   generation *gen;
-
-#if defined(darwin_TARGET_OS)
-    macosx_get_memory_layout();
-#endif
 
     /* Sanity check to make sure the LOOKS_LIKE_ macros appear to be
      * doing something reasonable.
