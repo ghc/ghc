@@ -63,9 +63,9 @@ import Linker		( lookupSymbol )
 import List		( intersperse, sortBy, zip4 )
 import Foreign		( Ptr, castPtr, mallocBytes, pokeByteOff, Word8 )
 import CTypes		( CInt )
-import Exception	( throwDyn )
+import Control.Exception	( throwDyn )
 
-import GlaExts		( Int(..), ByteArray# )
+import GHC.Exts		( Int(..), ByteArray# )
 
 import Monad		( when )
 import Maybe		( isJust )
