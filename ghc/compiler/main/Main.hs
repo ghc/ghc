@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.78 2001/06/29 15:30:49 simonmar Exp $
+-- $Id: Main.hs,v 1.79 2001/07/03 11:14:33 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -318,7 +318,8 @@ beginMake fileish_args
        case mods of
 	 []    -> throwDyn (UsageError "no input files")
 	 mod   -> do state <- cmInit Batch
-		     cmLoadModule state mods
+		     (_, ok, _) <- cmLoadModule state mods
+		     when (not ok) (exitWith (ExitFailure 1))
 		     return ()
 
 
