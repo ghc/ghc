@@ -1164,9 +1164,8 @@ run_BCO:
 	    // collection might move the TSO as soon as we call
 	    // suspendThread below.
 
-	    void *arguments;
+	    W_ arguments[stk_offset];
 	    
-	    arguments = stgMallocWords(stk_offset,"bci_CCALL");
 	    memcpy(arguments, Sp, sizeof(W_) * stk_offset);
 #endif
 		
@@ -1213,7 +1212,6 @@ run_BCO:
 	    // back to the TSO stack. It would of course be enough to
 	    // just copy the return value, but we don't know the offset.
 	    memcpy(Sp, arguments, sizeof(W_) * stk_offset);
-	    free(arguments);
 #endif
 
 	    goto nextInsn;
