@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.91 2001/02/12 13:14:13 simonmar Exp $
+ * $Id: Schedule.c,v 1.92 2001/03/02 14:25:04 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -2978,6 +2978,11 @@ detectBlackHoles( void )
 
     for (t = all_threads; t != END_TSO_QUEUE; t = t->global_link) {
 
+	while (t->what_next == ThreadRelocated) {
+	    t = t->link;
+	    ASSERT(get_itbl(t)->type == TSO);
+	}
+      
 	if (t->why_blocked != BlockedOnBlackHole) {
 	    continue;
 	}
