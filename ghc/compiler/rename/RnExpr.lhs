@@ -286,7 +286,7 @@ rnExpr e@(HsDo do_or_lc stmts _ _ src_loc)
 	-- Check the statement list ends in an expression
     case last stmts' of {
 	ResultStmt _ _ -> returnM () ;
-	_              -> addErr (doStmtListErr "do" e)
+	_              -> addErr (doStmtListErr (binder_name do_or_lc)  e)
     }					`thenM_`
 
 	-- Generate the rebindable syntax for the monad
@@ -304,6 +304,9 @@ rnExpr e@(HsDo do_or_lc stmts _ _ src_loc)
     syntax_names DoExpr  = monadNames
     syntax_names MDoExpr = monadNames ++ [mfixName]
     syntax_names other   = []
+
+    binder_name MDoExpr  = "mdo"
+    binder_name other    = "do"
 
 rnExpr (ExplicitList _ exps)
   = rnExprs exps		 	`thenM` \ (exps', fvs) ->
