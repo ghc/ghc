@@ -37,7 +37,7 @@ module Util (
 	mapAccumL, mapAccumR, mapAccumB, foldl2, count,
 
 	-- comparisons
-	thenCmp, cmpList,
+	thenCmp, cmpList, prefixMatch, postfixMatch,
 
 	-- strictness
 	seqList, ($!),
@@ -52,14 +52,15 @@ module Util (
 	, bracket
 #endif
 
+	, global
+
     ) where
 
 #include "HsVersions.h"
 
 import List		( zipWith4 )
 import Panic		( panic )
-import Unique		( Unique )
-import UniqFM		( eltsUFM, emptyUFM, addToUFM_C )
+import IOExts		( IORef, newIORef, unsafePerformIO )
 
 infixr 9 `thenCmp`
 \end{code}
@@ -622,16 +623,15 @@ cmpList cmp (a:as) (b:bs)
 \end{code}
 
 \begin{code}
-cmpString :: String -> String -> Ordering
+prefixMatch :: Eq a => [a] -> [a] -> Bool
+prefixMatch [] _str = True
+prefixMatch _pat [] = False
+prefixMatch (p:ps) (s:ss) | p == s    = prefixMatch ps ss
+			  | otherwise = False
 
-cmpString []     []	= EQ
-cmpString (x:xs) (y:ys) = if	  x == y then cmpString xs ys
-			  else if x  < y then LT
-			  else		      GT
-cmpString []     ys	= LT
-cmpString xs     []	= GT
+postfixMatch :: Eq a => [a] -> [a] -> Bool
+postfixMatch pat str = prefixMatch (reverse pat) (reverse str)
 \end{code}
-
 
 %************************************************************************
 %*									*
@@ -695,3 +695,11 @@ bracket before after thing = do
   return r
 #endif
 \end{code}
+
+Global variables:
+
+\begin{code}
+global :: a -> IORef a
+global a = unsafePerformIO (newIORef a)
+\end{code}
+
