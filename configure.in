@@ -545,10 +545,9 @@ AC_ARG_ENABLE(dotnet,
 [  --enable-dotnet
         Build .NET interop layer.
 ],
-[DotnetSupport=YES],
+[DotnetSupport=YES; AC_DEFINE(WANT_DOTNET_SUPPORT)],
 [DotnetSupport=NO]
 )
-AC_DEFINE(WANT_DOTNET_SUPPORT)
 AC_SUBST(DotnetSupport)
 
 dnl --------------------------------------------------------------
