@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.105 2000/11/02 13:36:44 simonmar Exp $
+# $Id: Makefile,v 1.106 2000/11/02 14:27:02 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -91,8 +91,7 @@ $(HS_PROG) :: $(HS_SRCS)
 DIRS = \
   utils basicTypes types hsSyn prelude rename typecheck deSugar coreSyn \
   specialise simplCore stranal stgSyn simplStg codeGen absCSyn main \
-  profiling parser usageSP cprAnalysis javaGen ghci
-
+  profiling parser usageSP cprAnalysis javaGen compMan
 
 ifeq ($(GhcWithNativeCodeGen),YES)
 DIRS += nativeGen
@@ -104,6 +103,14 @@ SRC_HC_OPTS += -DILX
 endif
 endif
 
+# Only include GHCi if we're bootstrapping with at least version 409
+ifeq "$(GhcWithInterpreter)" "YES"
+ghc_409_at_least = $(shell expr "$(GhcMinVersion)" \>= 9)
+ifeq "$(ghc_409_at_least)" "1"
+SRC_HC_OPTS += -DGHCI
+DIRS += ghci
+endif
+endif
 
 HS_SRCS = $(foreach dir,$(DIRS),$(wildcard $(dir)/*.lhs) $(wildcard $(dir)/*.hs))
 
@@ -149,7 +156,7 @@ SRC_MKDEPENDC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
 # driver when booting.
 #
 ifneq "$(GhcWithHscBuiltViaC)" "YES"
-HC=$(WithGhcHc)
+HC=$(GHC)
 else
 HC=$(GHC_INPLACE)
 endif

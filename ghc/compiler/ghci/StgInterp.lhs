@@ -63,8 +63,6 @@ import {-# SOURCE #-} MCI_make_constr
 import IOExts		( unsafePerformIO ) -- ToDo: remove
 import PrelGHC		--( unsafeCoerce#, dataToTag#,
 			--  indexPtrOffClosure#, indexWordOffClosure# )
-import IO		( hPutStr, stderr )
-import Char		( ord )
 import PrelAddr 	( Addr(..) )
 import PrelFloat	( Float(..), Double(..) )
 import Word

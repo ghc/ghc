@@ -141,22 +141,8 @@ IncludeTestDirsInBuild=NO
 #
 #---------------------------------------------------------------
 
-# Specify the Haskell compiler to be used to compile the compiler itself
-#
-#   WithGhcHc	   Path name of the compiler to use
-#
-#   WithGhcHcType  What "type" of compiler is being used
-#		   Valid options:
-#		       	     HC_CHALMERS_HBC
-#		       	     HC_GLASGOW_GHC
-#		       	     HC_ROJEMO_NHC
-#		       	     HC_UNSPECIFIED
-
-WithGhcHc = @WithHc@
-
-# Variable which is set to the version number of the $(WithGhcHc) we're using.
-# Not currently used, but might come in handy sometime soon.
-#WithGhcHcVersion = $(shell echo `if ( $(WithGhcHc) --version 2>/dev/null >/dev/null ) then $(WithGhcHc) --version 2>&1 | @SedCmd@ -e 's/^.*version [^0-9]*\([.0-9]*\).*/\1/;s/\.//'; else echo unknown; fi; ` )
+# The compiler used to build GHC is $(GHC).  To change the actual compiler
+# used, re-configure with --with-ghc=<path-to-ghc>.
 
 # Extra ways in which to build the compiler (for example, you might want to
 # build a profiled compiler so you can see where it spends its time)
@@ -184,6 +170,25 @@ GhcWithHscBuiltViaC=@BootingFromHc@
 # Target platforms supported:
 #   i386, alpha & sparc
 GhcWithNativeCodeGen=$(shell if (test x$(findstring $(HostArch_CPP),i386 alpha sparc) = x); then echo NO; else echo YES; fi)
+
+# Include GHCi in the compiler
+ifeq "$(linux_TARGET_OS)" "1"
+GhcWithInterpreter=YES
+else 
+ifeq "$(solaris_TARGET_OS)" "1"
+GhcWithInterpreter=YES
+else
+ifeq "$(freebsd_TARGET_OS)" "1"
+GhcWithInterpreter=YES
+else
+ifeq "$(netbsd_TARGET_OS)" "1"
+GhcWithInterpreter=YES
+else
+GhcWithInterpreter=NO
+endif
+endif
+endif
+endif
 
 #
 # Building various ways?
@@ -510,8 +515,11 @@ HSTAGS_PREFIX           = $(FPTOOLS_TOP)/ghc/utils/hstags/
 #
 # $(HC) is a generic Haskell 98 compiler, set to $(GHC) by default.
 # $(MKDEPENDHS) is the Haskell dependency generator (ghc -M).
+#
+# NOTE: Don't override $(GHC) in build.mk, use configure --with-ghc instead
+# (because the version numbers have to be calculated).
 
-GHC		= @GHC@
+GHC		= @WithGhc@
 GhcVersion	= @GhcVersion@
 GhcMajVersion	= @GhcMajVersion@
 GhcMinVersion	= @GhcMinVersion@

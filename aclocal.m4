@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.57 2000/10/10 04:55:28 chak Exp $
+dnl $Id: aclocal.m4,v 1.58 2000/11/02 14:27:01 simonmar Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -365,7 +365,7 @@ dnl
 AC_DEFUN(FPTOOLS_GHC_VERSION,
 [define([FPTOOLS_CV_GHC_VERSION], [fptools_cv_ghc_version])dnl
 AC_CACHE_CHECK([version of ghc], FPTOOLS_CV_GHC_VERSION, [dnl
-${GHC-ghc} --version > conftestghc 2>&1
+${WithGhc-ghc} --version > conftestghc 2>&1
   cat conftestghc >&AC_FD_CC
 dnl `Useless Use Of cat' award...
 changequote(<<, >>)dnl
@@ -820,7 +820,7 @@ dnl The variable LIBM (which is not an output variable by default) is
 dnl set to a value which is suitable for use in a Makefile (for example,
 dnl in make's LOADLIBES macro) provided you AC_SUBST it first.
 dnl
-dnl @version 0.01 $Id: aclocal.m4,v 1.57 2000/10/10 04:55:28 chak Exp $
+dnl @version 0.01 $Id: aclocal.m4,v 1.58 2000/11/02 14:27:01 simonmar Exp $
 dnl @author Matthew D. Langston <langston@SLAC.Stanford.EDU>
 
 # FPTOOLS_CHECK_LIBM - check for math library
@@ -908,7 +908,7 @@ dnl Please note that as the ac_opengl macro and the toy example evolves,
 dnl the version number increases, so you may have to adjust the above
 dnl URL accordingly.
 dnl
-dnl @version 0.01 $Id: aclocal.m4,v 1.57 2000/10/10 04:55:28 chak Exp $
+dnl @version 0.01 $Id: aclocal.m4,v 1.58 2000/11/02 14:27:01 simonmar Exp $
 dnl @author Matthew D. Langston <langston@SLAC.Stanford.EDU>
 
 AC_DEFUN(FPTOOLS_HAVE_OPENGL,

@@ -332,20 +332,6 @@ dnl AC_SUBST(TargetVendor_CPP)
 
 AC_SUBST(exeext)
 
-if test "$GHC" = ""; then
-  AC_PATH_PROG(GHC,ghc)
-fi
-if test "$GHC" != ""; then
-  FPTOOLS_GHC_VERSION([GhcVersion], [GhcMajVersion], [GhcMinVersion], [GhcPatchLevel])dnl
-  AC_SUBST(GhcVersion)dnl
-  AC_SUBST(GhcMajVersion)dnl
-  AC_SUBST(GhcMinVersion)dnl
-  AC_SUBST(GhcPatchLevel)dnl
-fi
-
-AC_PATH_PROGS(NHC,nhc nhc98)
-AC_PATH_PROG(HBC,hbc)
-
 dnl --------------------------------------------------------------
 dnl * Project specific configuration options
 dnl --------------------------------------------------------------
@@ -356,16 +342,39 @@ dnl use either is considered a Feature.
 
 dnl ** What command to use to compile compiler sources ?
 dnl --------------------------------------------------------------
+if test "$GHC" = ""; then
+  AC_PATH_PROG(GHC,ghc)
+fi
+
 AC_ARG_WITH(hc,
 [  --with-hc=<haskell compiler>
-        Use a command different from 'ghc' to compile up Haskell code.
-        (no claims currently made that this will work with a compiler other than a
-         recent version of GHC, but you could always try...)
+        Use a command different from 'ghc' to compile generic Haskell code.
 ],
 [WithHc="$withval"],
 [WithHc=$GHC]
 )
 AC_SUBST(WithHc)
+
+AC_ARG_WITH(ghc,
+[  --with-ghc=<haskell compiler>
+        Use a command different from 'ghc' to compile GHC-specific Haskell code
+	    (including GHC itself).
+],
+[WithGhc="$withval"],
+[WithGhc=$GHC]
+)
+AC_SUBST(WithGhc)
+
+if test "$WithGhc" != ""; then
+  FPTOOLS_GHC_VERSION([GhcVersion], [GhcMajVersion], [GhcMinVersion], [GhcPatchLevel])dnl
+  AC_SUBST(GhcVersion)dnl
+  AC_SUBST(GhcMajVersion)dnl
+  AC_SUBST(GhcMinVersion)dnl
+  AC_SUBST(GhcPatchLevel)dnl
+fi
+
+AC_PATH_PROGS(NHC,nhc nhc98)
+AC_PATH_PROG(HBC,hbc)
 
 dnl ** Which gcc to use?
 dnl --------------------------------------------------------------
