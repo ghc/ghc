@@ -18,7 +18,10 @@ module System.Process.Internals (
 	ProcessHandle(..), PHANDLE,
 #if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
 	 pPrPr_disableITimers, c_execvpe,
-	runProcessPosix, ignoreSignal, defaultSignal,
+# ifdef __GLASGOW_HASKELL__
+	runProcessPosix,
+# endif
+	ignoreSignal, defaultSignal,
 #endif
 	commandToProcess,
 	withFilePathException, withCEnvironment
@@ -28,8 +31,12 @@ import Prelude -- necessary to get dependencies right
 
 #if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
 import System.Posix.Types ( CPid )
+# ifdef __GLASGOW_HASKELL__
 import GHC.IOBase	( haFD, FD, Exception(..), IOException(..) )
 import GHC.Handle 	( stdin, stdout, stderr, withHandle_ )
+# elif __HUGS__
+import Hugs.Exception	( Exception(..), IOException(..) )
+# endif
 import System.IO 	( Handle )
 import Data.Maybe	( fromMaybe )
 #else
@@ -78,10 +85,11 @@ foreign import ccall unsafe "execvpe"
 
 #endif
 
+#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
+
+#ifdef __GLASGOW_HASKELL__
 -- -----------------------------------------------------------------------------
 -- POSIX runProcess with signal handling in the child
-
-#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
 
 runProcessPosix
   :: String
@@ -123,9 +131,6 @@ runProcessPosix fun cmd args mb_cwd mb_env mb_stdin mb_stdout mb_stderr
 			set_int inthand set_quit quithand
 	 return (ProcessHandle ph)
 
-ignoreSignal  = CONST_SIG_IGN :: CLong
-defaultSignal = CONST_SIG_DFL :: CLong
-
 foreign import ccall unsafe "runProcess" 
   c_runProcess
         :: Ptr CString			-- args
@@ -139,6 +144,11 @@ foreign import ccall unsafe "runProcess"
 	-> CInt				-- non-zero: set child's SIGQUIT handler
 	-> CLong			-- SIGQUIT handler
         -> IO PHANDLE
+
+#endif /* __GLASGOW_HASKELL__ */
+
+ignoreSignal  = CONST_SIG_IGN :: CLong
+defaultSignal = CONST_SIG_DFL :: CLong
 
 #endif
 
