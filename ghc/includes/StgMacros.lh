@@ -454,6 +454,7 @@ I_ stg_div PROTO((I_ a, I_ b));
 #define ZmZh(r,a,b)		r=(a)-(b)
 #define ZtZh(r,a,b)		r=(a)*(b)
 #define quotIntZh(r,a,b)	r=(a)/(b)
+/* ZdZh not used??? --SDM */
 #define ZdZh(r,a,b)		r=ULTRASAFESTGCALL2(I_,(void *, I_, I_),stg_div,(a),(b))
 #define remIntZh(r,a,b)		r=(a)%(b)
 #define negateIntZh(r,a)	r=-(a)
@@ -468,6 +469,9 @@ I_ stg_div PROTO((I_ a, I_ b));
 %************************************************************************
 
 \begin{code}
+#define quotWordZh(r,a,b)	r=((W_)a)/((W_)b)
+#define remWordZh(r,a,b)	r=((W_)a)%((W_)b)
+
 #define andZh(r,a,b)	r=(a)&(b)
 #define orZh(r,a,b)	r=(a)|(b)
 #define xorZh(r,a,b)	r=(a)^(b)

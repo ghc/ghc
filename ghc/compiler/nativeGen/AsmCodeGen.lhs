@@ -226,6 +226,7 @@ primOpt op args@[StInt x, StInt y]
     	IntNeOp -> StInt (if x /= y then 1 else 0)
     	IntLtOp -> StInt (if x < y  then 1 else 0)
     	IntLeOp -> StInt (if x <= y then 1 else 0)
+	-- ToDo: WordQuotOp, WordRemOp.
     	_ -> StPrim op args
 \end{code}
 

@@ -392,6 +392,9 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
       IntQuotOp -> trivialCode (DIV Q False) x y
       IntRemOp  -> trivialCode (REM Q False) x y
 
+      WordQuotOp -> trivialCode (DIV Q True) x y
+      WordRemOp  -> trivialCode (REM Q True) x y
+
       FloatAddOp -> trivialFCode  FloatRep (FADD TF) x y
       FloatSubOp -> trivialFCode  FloatRep (FSUB TF) x y
       FloatMulOp -> trivialFCode  FloatRep (FMUL TF) x y
