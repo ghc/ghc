@@ -188,7 +188,15 @@ sizeExpr bOMB_OUT_SIZE top_args expr
     size_up (Type t)	      = sizeZero	-- Types cost nothing
     size_up (Var v)           = sizeOne
 
-    size_up (Note _ body)     = size_up body	-- Notes cost nothing
+    size_up (Note InlineMe body) = sizeOne	-- Inline notes make it look very small
+	-- This can be important.  If you have an instance decl like this:
+	-- 	instance Foo a => Foo [a] where
+	--	   {-# INLINE op1, op2 #-}
+	--	   op1 = ...
+	--	   op2 = ...
+	-- then we'll get a dfun which is a pair of two INLINE lambdas
+
+    size_up (Note _        body) = size_up body	-- Other notes cost nothing
 
     size_up (App fun (Type t)) = size_up fun
     size_up (App fun arg)      = size_up_app fun [arg]
