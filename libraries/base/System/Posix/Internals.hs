@@ -382,6 +382,9 @@ foreign import ccall unsafe "HsBase.h __hscore_ftruncate"
 foreign import ccall unsafe "HsBase.h unlink"
    c_unlink :: CString -> IO CInt
 
+foreign import ccall unsafe "HsBase.h getpid"
+   c_getpid :: IO CPid
+
 #if !defined(mingw32_TARGET_OS) && !defined(__MINGW32__)
 foreign import ccall unsafe "HsBase.h fcntl"
    c_fcntl_read  :: CInt -> CInt -> IO CInt
@@ -394,9 +397,6 @@ foreign import ccall unsafe "HsBase.h fcntl"
 
 foreign import ccall unsafe "HsBase.h fork"
    c_fork :: IO CPid 
-
-foreign import ccall unsafe "HsBase.h getpid"
-   c_getpid :: IO CPid
 
 foreign import ccall unsafe "HsBase.h link"
    c_link :: CString -> CString -> IO CInt

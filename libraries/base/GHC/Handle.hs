@@ -34,7 +34,7 @@ module GHC.Handle (
   ioe_closedHandle, ioe_EOF, ioe_notReadable, ioe_notWritable,
 
   stdin, stdout, stderr,
-  IOMode(..), openFile, openBinaryFile, openFd, fdToHandle,
+  IOMode(..), openFile, openBinaryFile, openTempFile, openBinaryTempFile, openFd, fdToHandle,
   hFileSize, hSetFileSize, hIsEOF, isEOF, hLookAhead, hSetBuffering, hSetBinaryMode,
   hFlush, hDuplicate, hDuplicateTo,
 
@@ -63,6 +63,7 @@ import Foreign
 import Foreign.C
 import System.IO.Error
 import System.Posix.Internals
+import System.FilePath
 
 import GHC.Real
 
@@ -813,6 +814,51 @@ openFile' filepath mode binary =
 	-- ASSERT: if we just created the file, then openFd won't fail
 	-- (so we don't need to worry about removing the newly created file
 	--  in the event of an error).
+
+-- | The function creates a temporary file in ReadWrite mode.
+-- The created file isn\'t deleted automatically, so you need to delete it manually.
+openTempFile :: FilePath   -- ^ Directory in which to create the file
+             -> String     -- ^ File name template. If the template is \"foo.ext\" then
+                           -- the create file will be \"fooXXX.ext\" where XXX is some
+                           -- random number.
+             -> IO (FilePath, Handle)
+openTempFile tmp_dir template = openTempFile' "openTempFile" tmp_dir template dEFAULT_OPEN_IN_BINARY_MODE
+
+-- | Like 'openTempFile', but opens the file in binary mode. See 'openBinaryFile' for more comments.
+openBinaryTempFile :: FilePath -> String -> IO (FilePath, Handle)
+openBinaryTempFile tmp_dir template = openTempFile' "openBinaryTempFile" tmp_dir template True
+
+openTempFile' :: String -> FilePath -> String -> Bool -> IO (FilePath, Handle)
+openTempFile' loc tmp_dir template binary = do
+  pid <- c_getpid
+  findTempName pid
+  where
+    (prefix,suffix) = break (=='.') template
+
+    oflags1 = rw_flags .|. o_EXCL
+
+    binary_flags
+      | binary    = o_BINARY
+      | otherwise = 0
+
+    oflags = oflags1 .|. binary_flags
+
+    findTempName x = do
+      fd <- withCString filepath $ \ f ->
+              c_open f oflags 0o666
+      if fd < 0 
+       then do
+         errno <- getErrno
+         if errno == eEXIST
+           then findTempName (x+1)
+           else ioError (errnoToIOError loc errno Nothing (Just tmp_dir))
+       else do
+         h <- openFd (fromIntegral fd) Nothing False filepath ReadWriteMode True
+	        `catchException` \e -> do c_close (fromIntegral fd); throw e
+	 return (filepath, h)
+      where
+        filename        = prefix ++ show x ++ suffix
+        filepath        = tmp_dir `joinFileName` filename
 
 
 std_flags    = o_NONBLOCK   .|. o_NOCTTY

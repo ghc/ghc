@@ -155,6 +155,13 @@ module System.IO (
     hGetBufNonBlocking,	       -- :: Handle -> Ptr a -> Int -> IO Int
 #endif
 
+    -- * Temporary files
+
+#ifdef __GLASGOW_HASKELL__
+    openTempFile,
+    openBinaryTempFile,
+#endif
+
     module System.IO.Error,
   ) where
 
