@@ -1,9 +1,0 @@
- 
-drv004.hs:5: No instance for:
-		 `PrelBase.Eq (Foo a{-aIX-} b{-aIY-})'
-    drv004.hs:5:
-	in an instance declaration
-    When checking superclass constraints of an instance declaration
-
-
-Compilation had errors
