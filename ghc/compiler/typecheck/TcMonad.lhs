@@ -702,12 +702,16 @@ pprInstLoc (orig, locn, ctxt)
       	= hsep [ptext SLIT("use of implicit parameter"), quotes (char '?' <> ppr name)]
     pp_orig (IPBind name)
       	= hsep [ptext SLIT("binding for implicit parameter"), quotes (char '?' <> ppr name)]
+    pp_orig RecordUpdOrigin
+	= ptext SLIT("a record update")
+    pp_orig DataDeclOrigin
+	= ptext SLIT("the data type declaration")
+    pp_orig InstanceDeclOrigin
+	= ptext SLIT("the instance declaration")
     pp_orig (LiteralOrigin lit)
 	= hsep [ptext SLIT("the literal"), quotes (ppr lit)]
     pp_orig (PatOrigin pat)
 	= hsep [ptext SLIT("the pattern"), quotes (ppr pat)]
-    pp_orig (InstanceDeclOrigin)
-	=  ptext SLIT("the instance declaration")
     pp_orig (ArithSeqOrigin seq)
 	= hsep [ptext SLIT("the arithmetic sequence"), quotes (ppr seq)]
     pp_orig (SignatureOrigin)
