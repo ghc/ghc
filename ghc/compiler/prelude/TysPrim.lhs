@@ -50,7 +50,7 @@ module TysPrim(
 
 import Var		( TyVar, mkSysTyVar )
 import Name		( mkWiredInTyConName )
-import OccName		( mkSrcOccFS, tcName )
+import OccName		( mkOccFS, tcName )
 import PrimRep		( PrimRep(..), isFollowableRep )
 import TyCon		( mkPrimTyCon, TyCon, ArgVrcs )
 import Type		( Type, 
@@ -151,7 +151,7 @@ pcPrimTyCon :: Unique{-TyConKey-} -> FAST_STRING -> Int -> ArgVrcs -> PrimRep ->
 pcPrimTyCon key str arity arg_vrcs rep
   = the_tycon
   where
-    name      = mkWiredInTyConName key pREL_GHC (mkSrcOccFS tcName str) the_tycon
+    name      = mkWiredInTyConName key pREL_GHC (mkOccFS tcName str) the_tycon
     the_tycon = mkPrimTyCon name kind arity arg_vrcs rep
     kind      = mkArrowKinds (take arity (repeat boxedTypeKind)) result_kind
     result_kind | isFollowableRep rep = boxedTypeKind	-- Represented by a GC-ish ptr
