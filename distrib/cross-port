@@ -59,13 +59,17 @@ if [ ! -f b2-stamp ]; then
    ./configure --with-ghc=$base/b1/ghc/compiler/stage1/ghc-inplace
 
    touch mk/build.mk
-   echo "GhcHcOpts = -O -H32m -fvia-C -keep-hc-files" >> mk/build.mk
+   # The bootstrapped compiler should probably generate unregisterised
+   # code too.  If you don't want it to, then comment out this line:
+   echo "GhcUnregisterised = YES" >> mk/build.mk
+   echo "SRC_HC_OPTS += -keep-hc-file -fvia-C" >> mk/build.mk
    echo "GhcWithNativeCodeGen = NO" >> mk/build.mk
    echo "GhcWithInterpreter = NO" >> mk/build.mk
 
-   # we just need to build the compiler...
+   # we just need to build the compiler and utils...
    (cd glafp-utils && make boot && make)
    (cd ghc && make boot)
+   (cd ghc/utils && make)
    (cd ghc/compiler && make stage=1)
   cd ..
 
