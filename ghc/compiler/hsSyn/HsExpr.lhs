@@ -300,7 +300,7 @@ ppr_expr (OpApp e1 op fixity e2)
     pp_e2 = pprParendExpr e2
 
     pp_prefixly
-      = hang (pprExpr op) 4 (sep [pp_e1, pp_e2])
+      = hang (ppr_expr op) 4 (sep [pp_e1, pp_e2])
 
     pp_infixly v
       = sep [pp_e1, hsep [pprInfix v, pp_e2]]
@@ -345,7 +345,7 @@ ppr_expr (HsIf e1 e2 e3 _)
 -- special case: let ... in let ...
 ppr_expr (HsLet binds expr@(HsLet _ _))
   = sep [hang (ptext SLIT("let")) 2 (hsep [pprBinds binds, ptext SLIT("in")]),
-	 pprExpr expr]
+	 ppr_expr expr]
 
 ppr_expr (HsLet binds expr)
   = sep [hang (ptext SLIT("let")) 2 (pprBinds binds),
@@ -436,23 +436,23 @@ ppr_expr (HsProc pat (HsCmdTop cmd _ _ _) _)
   = hsep [ptext SLIT("proc"), ppr pat, ptext SLIT("->"), pprExpr cmd]
 
 ppr_expr (HsArrApp arrow arg _ HsFirstOrderApp True _)
-  = hsep [pprExpr arrow, ptext SLIT("-<"), pprExpr arg]
+  = hsep [ppr_expr arrow, ptext SLIT("-<"), ppr_expr arg]
 ppr_expr (HsArrApp arrow arg _ HsFirstOrderApp False _)
-  = hsep [pprExpr arg, ptext SLIT(">-"), pprExpr arrow]
+  = hsep [ppr_expr arg, ptext SLIT(">-"), ppr_expr arrow]
 ppr_expr (HsArrApp arrow arg _ HsHigherOrderApp True _)
-  = hsep [pprExpr arrow, ptext SLIT("-<<"), pprExpr arg]
+  = hsep [ppr_expr arrow, ptext SLIT("-<<"), ppr_expr arg]
 ppr_expr (HsArrApp arrow arg _ HsHigherOrderApp False _)
-  = hsep [pprExpr arg, ptext SLIT(">>-"), pprExpr arrow]
+  = hsep [ppr_expr arg, ptext SLIT(">>-"), ppr_expr arrow]
 
 ppr_expr (HsArrForm (HsVar v) (Just _) [arg1, arg2] _)
   = sep [pprCmdArg arg1, hsep [pprInfix v, pprCmdArg arg2]]
 ppr_expr (HsArrForm op _ args _)
-  = hang (ptext SLIT("(|") <> pprExpr op)
+  = hang (ptext SLIT("(|") <> ppr_expr op)
 	 4 (sep (map pprCmdArg args) <> ptext SLIT("|)"))
 
 pprCmdArg :: OutputableBndr id => HsCmdTop id -> SDoc
-pprCmdArg (HsCmdTop cmd@(HsArrForm _ Nothing [] _) _ _ _) = pprExpr cmd
-pprCmdArg (HsCmdTop cmd _ _ _) = parens (pprExpr cmd)
+pprCmdArg (HsCmdTop cmd@(HsArrForm _ Nothing [] _) _ _ _) = ppr_expr cmd
+pprCmdArg (HsCmdTop cmd _ _ _) = parens (ppr_expr cmd)
 
 -- Put a var in backquotes if it's not an operator already
 pprInfix :: Outputable name => name -> SDoc
@@ -473,20 +473,22 @@ pprParendExpr :: OutputableBndr id => HsExpr id -> SDoc
 
 pprParendExpr expr
   = let
-	pp_as_was = pprExpr expr
+	pp_as_was = ppr_expr expr
+	-- Using ppr_expr here avoids the call to 'deeper'
+	-- Not sure if that's always right.
     in
     case expr of
-      HsLit l		    -> ppr l
-      HsOverLit l 	    -> ppr l
-
-      HsVar _		    -> pp_as_was
-      HsIPVar _		    -> pp_as_was
-      ExplicitList _ _      -> pp_as_was
-      ExplicitPArr _ _      -> pp_as_was
-      ExplicitTuple _ _	    -> pp_as_was
-      HsPar _		    -> pp_as_was
-
-      _			    -> parens pp_as_was
+      HsLit l		-> ppr l
+      HsOverLit l 	-> ppr l
+			
+      HsVar _		-> pp_as_was
+      HsIPVar _		-> pp_as_was
+      ExplicitList _ _  -> pp_as_was
+      ExplicitPArr _ _  -> pp_as_was
+      ExplicitTuple _ _	-> pp_as_was
+      HsPar _		-> pp_as_was
+			
+      _			-> parens pp_as_was
 \end{code}
 
 %************************************************************************
