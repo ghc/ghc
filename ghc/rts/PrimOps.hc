@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.109 2003/07/12 00:08:28 sof Exp $
+ * $Id: PrimOps.hc,v 1.110 2003/07/23 13:39:11 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -188,7 +188,7 @@ StgWord GHC_ZCCReturnable_static_info[1];
 #define PUSHED(m)   Sp -= (m); JMP_(ENTRY_CODE(Sp[m]));
 
 # define RET_P(a)     PUSH(1,a); PUSHED(1)
-# define RET_N(a)     PUSH(1,a); PUSHED(2)
+# define RET_N(a)     PUSH(1,a); PUSHED(1)
 
 # define RET_PP(a,b)   PUSH(2,a); PUSH(1,b); PUSHED(2)
 # define RET_NN(a,b)   PUSH(2,a); PUSH(1,b); PUSHED(2)
