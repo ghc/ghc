@@ -278,7 +278,7 @@ myParseModule dflags src_filename
       buf <- hGetStringBuffer True{-expand tabs-} src_filename
 
       let glaexts | dopt Opt_GlasgowExts dflags = 1#
-	          | otherwise 		      = 0#
+	          | otherwise 		        = 0#
 
       case parse buf PState{ bol = 0#, atbol = 1#,
 	 		     context = [], glasgow_exts = glaexts,
