@@ -11,37 +11,35 @@ import Data.Typeable
 
 
 -- Heterogeneously typed lists
-data HList = HNil
-           | forall a. Typeable a => HCons a HList
+type HList = [DontKnow]
+
+data DontKnow = forall a. Typeable a => DontKnow a 
 
 -- The empty list
 initHList :: HList
-initHList = HNil
+initHList = []
 
 -- Add an entry
 addHList :: Typeable a => a -> HList -> HList
-addHList a l = HCons a l
+addHList a l = (DontKnow a:l)
 
 -- Test for an empty list
 nullHList :: HList -> Bool
-nullHList HNil = True
-nullHList (HCons _ _) = False
+nullHList = null
 
 -- Retrieve head by type case
 headHList :: Typeable a => HList -> Maybe a
-headHList HNil = Nothing
-headHList (HCons a _) = cast a
+headHList [] = Nothing
+headHList (DontKnow a:_) = cast a
 
--- Retrieve head by type case
+-- Retrieve tail by type case
 tailHList :: HList -> HList
-tailHList HNil = error "tailHList"
-tailHList (HCons _ l) = l
+tailHList = tail
 
 -- Access per index; starts at 1
 nth1HList :: Typeable a => Int -> HList -> Maybe a
-nth1HList i l | i < 1 || i == 0 && nullHList l = error "nth1HList"
-nth1HList 1 l = headHList l
-nth1HList i l = nth1HList (i-1) (tailHList l)
+nth1HList i l = case (l !! (i-1)) of (DontKnow a) -> cast a
+
 
 ----------------------------------------------------------------------------
 
