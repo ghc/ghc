@@ -35,7 +35,7 @@ module RegAllocInfo (
 	patchRegs,
 	regLiveness,
 	spillReg,
-	IF_ARCH_i386(findReservedRegs COMMA,)
+	findReservedRegs,
 
 	RegSet,
 	elementOfRegSet,
