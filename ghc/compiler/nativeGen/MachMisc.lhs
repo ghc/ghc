@@ -10,7 +10,7 @@
 module MachMisc (
 
 	fixedHdrSizeInWords, varHdrSizeInWords,
-	charLikeSize, intLikeSize, mutHS, dataHS,
+	charLikeSize, intLikeSize, mutHS, dataHS, foHS,
 	sizeOf, primRepToSize,
 
 	eXTRA_STK_ARGS_HERE,
@@ -201,10 +201,18 @@ blahLikeSize blah
     blahLikeRep = SpecialisedRep blah 0 1 SMNormalForm
 
 --------
-mutHS, dataHS :: StixTree
+mutHS, dataHS, foHS :: StixTree
 
 mutHS  = blah_hs (MuTupleRep 0)
 dataHS = blah_hs (DataRep 0)
+
+{- Semi-hack: to avoid introducing ForeignObjRep,
+   we hard-code the VHS for ForeignObj here.
+-}
+foHS   
+  = StInt (toInteger words)
+  where
+    words = fixedHdrSizeInWords + 1{-FOREIGN_VHS-}
 
 blah_hs blah
   = StInt (toInteger words)
