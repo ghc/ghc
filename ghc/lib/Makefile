@@ -66,7 +66,7 @@ ghc/PrelNum_HC_OPTS          += -H30m
 # to override the SRC_HC_OPTS of -O, and anything option coming
 # from the Makefile overrides what's in OPTIONS lines. (mumble_HC_OPTS
 # does override SRC_HC_OPTS settings)
-ghc/UnsafeST_HC_OPTS         += -Onot
+ghc/Unsafe_HC_OPTS           += -Onot
 
 ghc/PrelBase_HC_OPTS         += -H12m
 ghc/PrelRead_HC_OPTS         += -H8m
