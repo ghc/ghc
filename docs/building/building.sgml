@@ -258,6 +258,16 @@
             from the access control list.  Don't leave them there but
             deny them access, because 'they' may be a list that
             includes you!</para>
+	    <para>[March 2003] In fact <command>ssh</command> 3.6.1 now seems to <emphasis>require</emphasis>
+	      you to have Unix permissions 600 (read/write for owner only) 
+	      on the <literal>.ssh/identity</literal> file, else it 
+	      bombs out.  For your local C drive, it seems that <literal>chmod 600 identity</literal> works,
+	      but on Windows NT/XP, it doesn't work on a network drive (exact dteails obscure).  
+	      The solution seems to be to set the CYGWIN environment
+	      variable to "<literal>ntsec neta</literal>".  The CYGWIN environment variable is discussed
+	      in <ulink url="http://cygwin.com/cygwin-ug-net/using-cygwinenv.html">the Cygwin User's Guide</ulink>,
+	      and there are more details in <ulink url="http://cygwin.com/faq/faq_4.html#SEC44">the Cygwin FAQ</ulink>.
+	      </para>
 	  </listitem>
 
 	  <listitem>
@@ -4197,9 +4207,13 @@ but you do need it to <emphasis>build</emphasis> GHC.</para>
 
 <para> Install Cygwin from <ulink url="http://www.cygwin.com/">http://www.cygwin.com/</ulink>.
 The installation process is straightforward; we install it in <Filename>c:/cygwin</Filename>.
-Both <command>cvs</command> and <command>ssh</command>
-come with Cygwin, but you'll need them, so make sure you select them when running
-the Cygwin installer.
+During the installation dialogue, make sure that you select:
+<command>cvs</command>, <command>openssh</command>,
+<command>autoconf</command>,
+<command>binutils</command> (includes ld and (I think) ar),
+<command>gcc</command>,
+<command>flex</command>,
+<command>make</command>.
 
 </para>
 <para> Now set the following user environment variables:
