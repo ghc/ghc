@@ -26,7 +26,7 @@ returns the number of bytes taken.
     /* need the ANSI arg decl, so "short" and "float" args dont get promoted */
 #define X2BYTES(type)				\
 I_						\
-type##2bytes(type in, unsigned char *arr)	\
+type##2bytes__(type in, unsigned char *arr)	\
 { 						\
     union {					\
 	type i;					\
@@ -44,7 +44,7 @@ type##2bytes(type in, unsigned char *arr)	\
 #else /* not STDC */
 #define X2BYTES(type)				\
 I_						\
-type##2bytes(type in, unsigned char *arr)	\
+type##2bytes__(type in, unsigned char *arr)	\
 { 						\
     union {					\
 	type i;					\
