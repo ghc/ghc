@@ -14,18 +14,6 @@ typedef struct _IOFileObject {
    int     fd;
    void*   buf;
 
-   int     bufStart; /* offset of start of data waiting to
-			be written.  This may be non-zero in
-			the case where we wrote out some of the
-			buffer, and then blocked.
-
-			NOTE: this field should be non-zero *only*
-			when we just blocked on a call to writeBuffer,
-			and we're going to restart the call when
-			we unblock.  It should be zero at all other
-			times.
-		     */
-
    int     bufWPtr;  /* points to next position to write,
    			  bufRPtr >= bufWPtr <= bufSize.
 			  
@@ -44,6 +32,7 @@ typedef struct _IOFileObject {
    int     bufSize;
    int     flags;
    struct _IOFileObject*   connectedTo;
+
 } IOFileObject;
 
 #define FILEOBJ_LB       2

@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: readFile.c,v 1.14 2000/04/04 11:01:33 simonmar Exp $
+ * $Id: readFile.c,v 1.15 2000/04/12 17:33:16 simonmar Exp $
  *
  * hGetContents Runtime Support
  */
@@ -114,6 +114,7 @@ readBlock(StgForeignPtr ptr)
  *                                 buffer of connected handle.
  *  FILEOBJ_BLOCKED_READ           didn't read anything; would block
  *  n, where n > 0                 read n bytes into buffer.
+ *  0				   EOF has been reached
  */
 
 StgInt
@@ -134,9 +135,7 @@ readChunk(StgForeignPtr ptr, StgAddr buf, StgInt off, StgInt len)
        return -2;
 
     if ( FILEOBJ_IS_EOF(fo) ) {
-	ghc_errtype = ERR_EOF;
-	ghc_errstr = "";
-	return -1;
+        return 0;
     }
 
     /* if input stream is connect to an output stream, flush it first */
@@ -191,24 +190,20 @@ readChunk(StgForeignPtr ptr, StgAddr buf, StgInt off, StgInt len)
         /* EOF */
 	if ( count == 0 ) {
             FILEOBJ_SET_EOF(fo);
-            if ( total_count == 0 ) {
-                ghc_errtype = ERR_EOF;
-	        ghc_errstr = "";
-	        return -1;
-	    } else {
-                return total_count;
-	    }
+            return total_count;
+	}
 
         /* Blocking */
-	} else if ( count == -1 && errno == EAGAIN) {
+	else if ( count == -1 && errno == EAGAIN) {
 	    errno = 0;
             if (total_count > 0) 
                return total_count; /* partial read */
 	    else
 	       return FILEOBJ_BLOCKED_READ;
+	}
 
         /* Error */
-	} else if ( count == -1 && errno != EINTR) {
+	else if ( count == -1 && errno != EINTR) {
 	    cvtErrno();
 	    stdErrno();
 	    return -1;
@@ -268,9 +263,10 @@ readLine(StgForeignPtr ptr)
     fo->flags = (fo->flags & ~FILEOBJ_RW_WRITE) | FILEOBJ_RW_READ;
 
     if ( fo->bufRPtr < 0 || fo->bufRPtr >= fo->bufWPtr ) { /* Buffer is empty */
-       fo->bufRPtr=0; fo->bufWPtr=0;
-       rc = fill_up_line_buffer(fo);
-       if (rc < 0) return rc;
+        fo->bufRPtr=0; 
+	fo->bufWPtr=0;
+        rc = fill_up_line_buffer(fo);
+        if (rc < 0) return rc;
     }
 
     while (1) {

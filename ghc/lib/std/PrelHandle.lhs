@@ -36,7 +36,7 @@ import PrelWeak		( addForeignFinalizer )
 import PrelConc
 
 #ifndef __PARALLEL_HASKELL__
-import PrelForeign  ( makeForeignObj )
+import PrelForeign  ( makeForeignObj, mkForeignObj )
 #endif
 
 #endif /* ndef(__HUGS__) */
@@ -99,7 +99,8 @@ but we might want to revisit this in the future --SDM ].
 \begin{code}
 withHandle :: Handle -> (Handle__ -> IO (Handle__,a)) -> IO a
 {-# INLINE withHandle #-}
-withHandle (Handle h) act = do
+withHandle (Handle h) act =
+   blockAsyncExceptions $ do
    h_ <- takeMVar h
    (h',v)  <- catchException (act h_) (\ ex -> putMVar h h_ >> throw ex)
    putMVar h h'
@@ -107,7 +108,8 @@ withHandle (Handle h) act = do
 
 withHandle_ :: Handle -> (Handle__ -> IO a) -> IO a
 {-# INLINE withHandle_ #-}
-withHandle_ (Handle h) act = do
+withHandle_ (Handle h) act =
+   blockAsyncExceptions $ do
    h_ <- takeMVar h
    v  <- catchException (act h_) (\ ex -> putMVar h h_ >> throw ex)
    putMVar h h_
@@ -115,7 +117,8 @@ withHandle_ (Handle h) act = do
    
 withHandle__ :: Handle -> (Handle__ -> IO Handle__) -> IO ()
 {-# INLINE withHandle__ #-}
-withHandle__ (Handle h) act = do
+withHandle__ (Handle h) act =
+   blockAsyncExceptions $ do
    h_ <- takeMVar h
    h'  <- catchException (act h_) (\ ex -> putMVar h h_ >> throw ex)
    putMVar h h'
@@ -137,19 +140,21 @@ nullFile__ =
 
 mkClosedHandle__ :: Handle__
 mkClosedHandle__ = 
-  Handle__ 
-	   nullFile__
-	   ClosedHandle 
-	   NoBuffering
-	   "closed file"
+  Handle__ { haFO__         = nullFile__,
+	     haType__       = ClosedHandle,
+	     haBufferMode__ = NoBuffering,
+	     haFilePath__   = "closed file",
+	     haBuffers__    = []
+	   }
 
 mkErrorHandle__ :: IOError -> Handle__
 mkErrorHandle__ ioe =
-  Handle__
-           nullFile__ 
-	   (ErrorHandle ioe)
-	   NoBuffering
-	   "error handle"
+  Handle__ { haFO__         =  nullFile__,
+	     haType__       = (ErrorHandle ioe),
+	     haBufferMode__ = NoBuffering,
+	     haFilePath__   = "error handle",
+	     haBuffers__    = []
+	   }
 \end{code}
 
 %*********************************************************
@@ -159,11 +164,29 @@ mkErrorHandle__ ioe =
 %*********************************************************
 
 \begin{code}
-foreign import "libHS_cbits" "freeStdFileObject" unsafe
-        freeStdFileObject :: Addr -> IO ()
-foreign import "libHS_cbits" "freeFileObject" unsafe
-        freeFileObject :: Addr -> IO ()
+stdHandleFinalizer :: Handle -> IO ()
+stdHandleFinalizer (Handle hdl) = do
+  handle <- takeMVar hdl
+  let fo = haFO__ handle
+  freeStdFileObject fo
+  freeBuffers (haBuffers__ handle)
 
+handleFinalizer :: Handle -> IO ()
+handleFinalizer (Handle hdl) = do
+  handle <- takeMVar hdl
+  let fo = haFO__ handle
+  freeFileObject fo
+  freeBuffers (haBuffers__ handle)
+
+freeBuffers [] = return ()
+freeBuffers (b:bs) = do { free b; freeBuffers bs }
+
+foreign import "libHS_cbits" "freeStdFileObject" unsafe
+        freeStdFileObject :: FILE_OBJECT -> IO ()
+foreign import "libHS_cbits" "freeFileObject" unsafe
+        freeFileObject :: FILE_OBJECT -> IO ()
+foreign import "free" unsafe 
+	free :: Addr -> IO ()
 \end{code}
 
 %*********************************************************
@@ -190,7 +213,10 @@ stdout = unsafePerformIO (do
 			      (0::Int){-writeable-}  -- ConcHask: SAFE, won't block
 
 #ifndef __PARALLEL_HASKELL__
-            fo <- makeForeignObj fo (freeStdFileObject fo)
+	    fo <- mkForeignObj fo
+	  	-- I know this is deprecated, but I couldn't bring myself
+		-- to move fixIO into the prelude just so I could use makeForeignObj.
+		--      --SDM
 #endif
 
 #ifdef __HUGS__
@@ -202,7 +228,13 @@ stdout = unsafePerformIO (do
 	    (bm, bf_size)  <- getBMode__ fo
 	    mkBuffer__ fo bf_size
 #endif
-	    newHandle (Handle__ fo WriteHandle bm "stdout")
+	    hdl <- newHandle (Handle__ fo WriteHandle bm "stdout" [])
+
+#ifndef __PARALLEL_HASKELL__
+	    addForeignFinalizer fo (stdHandleFinalizer hdl)
+#endif
+	    return hdl
+
        _ -> do ioError <- constructError "stdout"
                newHandle (mkErrorHandle__ ioError)
   )
@@ -216,14 +248,17 @@ stdin = unsafePerformIO (do
 			      (1::Int){-readable-}  -- ConcHask: SAFE, won't block
 
 #ifndef __PARALLEL_HASKELL__
-            fo <- makeForeignObj fo (freeStdFileObject fo)
+            fo <- mkForeignObj fo
 #endif
 	    (bm, bf_size) <- getBMode__ fo
 	    mkBuffer__ fo bf_size
-	    hdl <- newHandle (Handle__ fo ReadHandle bm "stdin")
+	    hdl <- newHandle (Handle__ fo ReadHandle bm "stdin" [])
 	     -- when stdin and stdout are both connected to a terminal, ensure
-	     -- that anything buffered on stdout is flushed prior to reading from stdin.
-	     -- 
+	     -- that anything buffered on stdout is flushed prior to reading from 
+	     -- stdin.
+#ifndef __PARALLEL_HASKELL__
+	    addForeignFinalizer fo (stdHandleFinalizer hdl)
+#endif
 	    hConnectTerms stdout hdl
 	    return hdl
        _ -> do ioError <- constructError "stdin"
@@ -240,12 +275,15 @@ stderr = unsafePerformIO (do
 			      (0::Int){-writeable-} -- ConcHask: SAFE, won't block
 
 #ifndef __PARALLEL_HASKELL__
-            fo <- makeForeignObj fo (freeStdFileObject fo)
+            fo <- mkForeignObj fo
 #endif
-            hdl <- newHandle (Handle__ fo WriteHandle NoBuffering "stderr")
+            hdl <- newHandle (Handle__ fo WriteHandle NoBuffering "stderr" [])
 	    -- when stderr and stdout are both connected to a terminal, ensure
 	    -- that anything buffered on stdout is flushed prior to writing to
 	    -- stderr.
+#ifndef __PARALLEL_HASKELL__
+	    addForeignFinalizer fo (stdHandleFinalizer hdl)
+#endif
 	    hConnectTo stdout hdl
 	    return hdl
 
@@ -280,11 +318,15 @@ openFileEx f m = do
 		       (binary::Int)     -- ConcHask: SAFE, won't block
     if fo /= nullAddr then do
 #ifndef __PARALLEL_HASKELL__
-	fo  <- makeForeignObj fo (freeFileObject fo)
+	fo  <- mkForeignObj fo
 #endif
 	(bm, bf_size)  <- getBMode__ fo
         mkBuffer__ fo bf_size
-	newHandle (Handle__ fo htype bm f)
+	hdl <- newHandle (Handle__ fo htype bm f [])
+#ifndef __PARALLEL_HASKELL__
+	addForeignFinalizer fo (handleFinalizer hdl)
+#endif
+	return hdl
       else do
 	constructErrorAndFailWithInfo "openFile" f
   where
@@ -712,7 +754,7 @@ getBMode__ fo = do
     n  -> return (BlockBuffering (Just n), n)
  where
    default_buffer_size :: Int
-   default_buffer_size = (const_BUFSIZ - 1)
+   default_buffer_size = const_BUFSIZ
 \end{code}
 
 Querying how a handle buffers its data:
@@ -866,73 +908,6 @@ slurpFile fname = do
 	 then constructErrorAndFail "slurpFile"
 	 else return (chunk, rc)
 
-#ifndef __HUGS__ /* Hugs' Prelude doesn't need this */
-hFillBufBA :: Handle -> MutableByteArray RealWorld a -> Int -> IO Int
-hFillBufBA handle buf sz
-  | sz <= 0 = ioError (IOError (Just handle)
-			    InvalidArgument
-		            "hFillBufBA"
-			    ("illegal buffer size " ++ showsPrec 9 sz []))  -- 9 => should be parens'ified.
-  | otherwise = hFillBuf' sz 0
-  where
-  hFillBuf' sz len = do
-	r <- mayBlockRead "hFillBufBA" handle (\fo -> readChunkBA fo buf len sz)
-    	if r >= sz || r == 0  -- r == 0 indicates EOF
-	    then return (len+r)
-	    else hFillBuf' (sz-r) (len+r)
-#endif
-
-hFillBuf :: Handle -> Addr -> Int -> IO Int
-hFillBuf handle buf sz
-  | sz <= 0 = ioError (IOError (Just handle)
-			    InvalidArgument
-		            "hFillBuf"
-			    ("illegal buffer size " ++ showsPrec 9 sz [])) 
-					-- 9 => should be parens'ified.
-  | otherwise = hFillBuf' sz 0
-  where
-  hFillBuf' sz len = do
-	r <- mayBlockRead "hFillBuf" handle (\fo -> readChunk fo buf len sz)
-    	if r >= sz || r == 0  -- r == 0 indicates EOF
-	    then return (len+r)
-	    else hFillBuf' (sz-r) (len+r)
-\end{code}
-
-The @hPutBuf hdl buf len@ action writes an already packed sequence of
-bytes to the file/channel managed by @hdl@ - non-standard.
-
-\begin{code}
-hPutBuf :: Handle -> Addr -> Int -> IO ()
-hPutBuf handle buf sz
-  | sz <= 0 = ioError (IOError (Just handle)
-			    InvalidArgument
-		            "hPutBuf"
-			    ("illegal buffer size " ++ showsPrec 9 sz [])) 
-					-- 9 => should be parens'ified.
-  | otherwise = hPutBuf' sz 0
-  where
-  hPutBuf' sz len = do
-	r <- mayBlockWrite "hPutBuf" handle (\fo -> writeBuf fo buf len sz)
-    	if r >= sz
-	    then return ()
-	    else hPutBuf' (sz-r) (len+r) -- <= sz indicates blocking
-
-#ifndef __HUGS__ /* An_ one Hugs doesn't provide */
-hPutBufBA :: Handle -> MutableByteArray RealWorld a -> Int -> IO ()
-hPutBufBA handle buf sz
-  | sz <= 0 = ioError (IOError (Just handle)
-			    InvalidArgument
-		            "hPutBufBA"
-			    ("illegal buffer size " ++ showsPrec 9 sz [])) 
-					-- 9 => should be parens'ified.
-  | otherwise = hPutBuf' sz 0
-  where
-  hPutBuf' sz len = do
-	r <- mayBlockWrite "hPutBufBA" handle (\fo -> writeBufBA fo buf len sz)
-    	if r >= sz
-	    then return ()
-	    else hPutBuf' (sz-r) (len+r) -- <= sz indicates blocking
-#endif
 \end{code}
 
 Sometimes it's useful to get at the file descriptor that
@@ -1051,13 +1026,21 @@ wantReadableHandle fun handle act =
 
 wantWriteableHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
 wantWriteableHandle fun handle act = 
-    withHandle_ handle $ \ handle_ -> do
-    case haType__ handle_ of 
+    withHandle_ handle $ \ handle_ ->
+	checkWriteableHandle fun handle handle_ (act handle_)
+
+wantWriteableHandle_ :: String -> Handle -> (Handle__ -> IO (Handle__, a)) -> IO a
+wantWriteableHandle_ fun handle act = 
+    withHandle handle $ \ handle_ -> 
+	checkWriteableHandle fun handle handle_ (act handle_)
+
+checkWriteableHandle fun handle handle_ act
+  = case haType__ handle_ of 
       ErrorHandle theError -> ioError theError
       ClosedHandle 	   -> ioe_closedHandle fun handle
       SemiClosedHandle 	   -> ioe_closedHandle fun handle
       ReadHandle 	   -> ioError not_writeable_error
-      _ 		   -> act handle_
+      _ 		   -> act
   where
    not_writeable_error = 
 	   IOError (Just handle) IllegalOperation fun
@@ -1207,10 +1190,14 @@ foreign import "libHS_cbits" "writeFileObject" unsafe
            writeFileObject  :: FILE_OBJECT -> Int -> IO Int{-ret code-}
 foreign import "libHS_cbits" "filePutc" unsafe
            filePutc         :: FILE_OBJECT -> Char -> IO Int{-ret code-}
+foreign import "libHS_cbits" "write_" unsafe
+           write_           :: FILE_OBJECT -> Addr -> Int -> IO Int{-ret code-}
 foreign import "libHS_cbits" "getBufStart" unsafe
            getBufStart      :: FILE_OBJECT -> Int -> IO Addr
 foreign import "libHS_cbits" "getWriteableBuf" unsafe
            getWriteableBuf  :: FILE_OBJECT -> IO Addr
+foreign import "libHS_cbits" "getBuf" unsafe
+           getBuf           :: FILE_OBJECT -> IO Addr
 foreign import "libHS_cbits" "getBufWPtr" unsafe
            getBufWPtr       :: FILE_OBJECT -> IO Int
 foreign import "libHS_cbits" "setBufWPtr" unsafe
@@ -1249,14 +1236,6 @@ foreign import "libHS_cbits" "ungetChar" unsafe
            ungetChar        :: FILE_OBJECT -> Char -> IO Int{-ret code-}
 foreign import "libHS_cbits" "readChunk" unsafe
            readChunk        :: FILE_OBJECT -> Addr -> Int -> Int -> IO Int{-ret code-}
-foreign import "libHS_cbits" "readChunk" unsafe
-           readChunkBA      :: FILE_OBJECT -> MutableByteArray s a -> Int -> Int -> IO Int{-ret code-}
-foreign import "libHS_cbits" "writeBuf" unsafe
-           writeBuf         :: FILE_OBJECT -> Addr -> Int -> Int -> IO Int{-ret code-}
-#ifndef __HUGS__
-foreign import "libHS_cbits" "writeBufBA" unsafe
-           writeBufBA       :: FILE_OBJECT -> MutableByteArray s a -> Int -> Int -> IO Int{-ret code-}
-#endif
 foreign import "libHS_cbits" "getFileFd" unsafe
            getFileFd        :: FILE_OBJECT -> IO Int{-fd-}
 #ifdef __HUGS__

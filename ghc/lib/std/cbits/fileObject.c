@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: fileObject.c,v 1.8 1999/11/26 16:25:56 simonmar Exp $
+ * $Id: fileObject.c,v 1.9 2000/04/12 17:33:16 simonmar Exp $
  *
  * hPutStr Runtime Support
  */
@@ -155,5 +155,6 @@ fill_up_line_buffer(IOFileObject* fo)
       }
   }
   fo->bufWPtr += count;
+/* TODO: ipos doesn't change???? what's it for??? --SDM */
   return (fo->bufWPtr - ipos);
 }

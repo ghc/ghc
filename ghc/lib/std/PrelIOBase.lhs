@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.21 2000/04/10 16:02:58 simonpj Exp $
+% $Id: PrelIOBase.lhs,v 1.22 2000/04/12 17:33:16 simonmar Exp $
 % 
 % (c) The AQUA Project, Glasgow University, 1994-1998
 %
@@ -434,8 +434,9 @@ data Handle__
       haFO__	      :: FILE_OBJECT,
       haType__        :: Handle__Type,
       haBufferMode__  :: BufferMode,
-      haFilePath__    :: FilePath
-    }      
+      haFilePath__    :: FilePath,
+      haBuffers__     :: [Addr]
+    }
 
 {-
   Internally, we classify handles as being one

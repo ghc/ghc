@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: flushFile.c,v 1.6 1999/11/25 16:54:14 simonmar Exp $
+ * $Id: flushFile.c,v 1.7 2000/04/12 17:33:16 simonmar Exp $
  *
  * hFlush Runtime Support
  */
@@ -38,6 +38,10 @@ flushBuffer(StgForeignPtr ptr)
        if (rc<0) return rc;
     }
     
+    /* TODO: shouldn't we do the lseek stuff from flushReadBuffer
+     * here???? --SDM
+     */
+
     /* Reset read & write pointer for input buffers */
     if ( (fo->flags & FILEOBJ_READ) ) {
        fo->bufRPtr=0;

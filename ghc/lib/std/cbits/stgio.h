@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: stgio.h,v 1.18 2000/04/11 20:44:18 panne Exp $
+ * $Id: stgio.h,v 1.19 2000/04/12 17:33:16 simonmar Exp $
  *
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1999
  *
@@ -233,6 +233,7 @@ StgInt	writeBuf  (StgForeignPtr, StgAddr, StgInt, StgInt);
 StgInt	writeBufBA  (StgForeignPtr, StgByteArray, StgInt, StgInt);
 StgInt	writeFileObject (StgForeignPtr, StgInt);
 StgInt	writeBuffer (StgForeignPtr, StgInt);
+StgInt  write_ (StgForeignPtr ptr, StgAddr buf, StgInt len);
 
 #endif /* ! STGIO_H */
 

@@ -19,18 +19,18 @@ import PrelBase
 import PrelIOBase
 import PrelHandle	-- much of the real stuff is in here
 
+import PrelNum
 import PrelRead         ( readParen, Read(..), reads, lex,
 			  readIO 
 			)
 import PrelShow
 import PrelMaybe	( Either(..), Maybe(..) )
-import PrelAddr		( Addr(..), nullAddr )
+import PrelAddr		( Addr(..), AddrOff(..), nullAddr, plusAddr )
 import PrelByteArr	( ByteArray )
 import PrelPack		( unpackNBytesAccST )
-import PrelException    ( ioError, catch )
+import PrelException    ( ioError, catch, catchException, throw, blockAsyncExceptions )
 import PrelConc
 \end{code}
-
 
 
 %*********************************************************
@@ -304,38 +304,188 @@ buffering is enabled for @hdl@
 \begin{code}
 hPutChar :: Handle -> Char -> IO ()
 hPutChar handle c = 
+    c `seq` do   -- must evaluate c before grabbing the handle lock
     wantWriteableHandle "hPutChar" handle $ \ handle_  -> do
     let fo = haFO__ handle_
     flushConnectedBuf fo
-    rc       <- mayBlock fo (filePutc fo c)   -- ConcHask: UNSAFE, may block.
+    rc <- mayBlock fo (filePutc fo c)   -- ConcHask: UNSAFE, may block.
     if rc == 0
      then return ()
      else constructErrorAndFail "hPutChar"
 
+hPutChars :: Handle -> [Char] -> IO ()
+hPutChars handle [] = return ()
+hPutChars handle (c:cs) = hPutChar handle c >> hPutChars handle cs
 \end{code}
 
 @hPutStr hdl s@ writes the string @s@ to the file or
 channel managed by @hdl@, buffering the output if needs be.
 
+
 \begin{code}
 hPutStr :: Handle -> String -> IO ()
-hPutStr handle str = 
-    wantWriteableHandle "hPutStr" handle $ \ handle_ -> do
-    let fo = haFO__ handle_
-    flushConnectedBuf fo
-    case haBufferMode__ handle_ of
-       LineBuffering -> do
-	    buf <- getWriteableBuf fo
-	    pos <- getBufWPtr fo
-	    bsz <- getBufSize fo
-	    writeLines fo buf bsz pos str
-       BlockBuffering _ -> do
-	    buf <- getWriteableBuf fo
-	    pos <- getBufWPtr fo
-	    bsz <- getBufSize fo
-            writeBlocks fo buf bsz pos str
-       NoBuffering -> do
-	    writeChars fo str
+hPutStr handle str = do
+    buffer_mode <- wantWriteableHandle_ "hPutStr" handle 
+			(\ handle_ -> do getBuffer handle_)
+    case buffer_mode of
+       (NoBuffering, _, _) -> do
+	    hPutChars handle str	-- v. slow, but we don't care
+       (LineBuffering, buf, bsz) -> do
+	    writeLines handle buf bsz str
+       (BlockBuffering _, buf, bsz) -> do
+            writeBlocks handle buf bsz str
+	-- ToDo: async exceptions during writeLines & writeBlocks will cause
+	-- the buffer to get lost in the void.  Using ByteArrays instead of
+	-- malloced buffers is one way around this, but we really ought to
+	-- be able to handle it with exception handlers/block/unblock etc.
+
+getBuffer :: Handle__ -> IO (Handle__, (BufferMode, Addr, Int))
+getBuffer handle_ = do
+   let bufs = haBuffers__ handle_
+       fo   = haFO__ handle_
+       mode = haBufferMode__ handle_	
+   sz <- getBufSize fo
+   case mode of
+	NoBuffering -> return (handle_, (mode, nullAddr, 0))
+	_ -> case bufs of
+		[] -> do  buf <- allocMemory__ sz
+			  return (handle_, (mode, buf, sz))
+		(b:bs) -> return (handle_{ haBuffers__ = bs }, (mode, b, sz))
+
+freeBuffer :: Handle__ -> Addr -> Int -> IO Handle__
+freeBuffer handle_ buf sz = do
+   fo_sz <- getBufSize (haFO__ handle_)
+   if (sz /= fo_sz) 
+	then do { free buf; return handle_ }
+	else do { return handle_{ haBuffers__ = buf : haBuffers__ handle_ } }
+
+swapBuffers :: Handle__ -> Addr -> Int -> IO Handle__
+swapBuffers handle_ buf sz = do
+   let fo = haFO__ handle_
+   fo_buf <- getBuf fo
+   setBuf fo buf sz
+   return (handle_{ haBuffers__ = fo_buf : haBuffers__ handle_ })
+
+-- commitBuffer handle buf sz count flush
+-- 
+-- Write the contents of the buffer 'buf' ('sz' bytes long, containing
+-- 'count' bytes of data) to handle (handle must be block or line buffered).
+-- 
+-- Implementation:
+-- 
+--    for block/line buffering,
+-- 	 1. If there isn't room in the handle buffer, flush the handle
+-- 	    buffer.
+-- 
+-- 	 2. If the handle buffer is empty,
+-- 		 if flush, 
+-- 		     then write buf directly to the device.
+-- 		     else swap the handle buffer with buf.
+-- 
+-- 	 3. If the handle buffer is non-empty, copy buf into the
+-- 	    handle buffer.  Then, if flush != 0, flush
+-- 	    the buffer.
+
+commitAndReleaseBuffer
+	:: Handle			-- handle to commit to
+	-> Addr -> Int			-- address and size (in bytes) of buffer
+	-> Int				-- number of bytes of data in buffer
+	-> Bool				-- flush the handle afterward?
+	-> IO ()
+commitAndReleaseBuffer hdl@(Handle h) buf sz count flush = do
+      h_ <- takeMVar h
+
+	-- First deal with any possible exceptions by freeing the buffer.
+	-- Async exceptions are blocked, but there are still some interruptible
+	-- ops below.
+
+	-- note that commit doesn't *always* free the buffer, it might
+	-- swap it for the current handle buffer instead.  This makes things
+	-- a whole lot more complicated, because we can't just do 
+	-- "finally (... free buffer ...)" here.
+      catchException (commit hdl h_) 
+		     (\e -> do { h_ <- freeBuffer h_ buf sz; putMVar h h_ })
+
+  where
+   commit hdl@(Handle h) handle_ = 
+     checkWriteableHandle "commitAndReleaseBuffer" hdl handle_ $ do
+      let fo = haFO__ handle_
+      flushConnectedBuf fo		-- ????  -SDM
+      getWriteableBuf fo		-- flush read buf if necessary
+      fo_buf     <- getBuf fo
+      fo_wptr    <- getBufWPtr fo
+      fo_bufSize <- getBufSize fo
+
+      let ok    h_ = putMVar h h_ >> return ()
+
+      if (fo_bufSize - fo_wptr < count)	-- not enough room in handle buffer?
+
+	    then do rc <- mayBlock fo (flushFile fo)
+		    if (rc < 0) 
+			then constructErrorAndFail "commitBuffer"
+			else
+		     if flush || sz /= fo_bufSize
+			then do rc <- write_buf fo buf count
+		    		if (rc < 0)
+					then constructErrorAndFail "commitBuffer"
+			      		else do handle_ <- freeBuffer handle_ buf sz
+					        ok handle_
+
+			-- don't have to flush, and the new buffer is the
+			-- same size as the old one, so just swap them...
+			else do handle_ <- swapBuffers handle_ buf sz
+				setBufWPtr fo count
+				ok handle_
+
+	    else do memcpy (plusAddr fo_buf (AddrOff# fo_wptr)) buf count
+		    setBufWPtr fo (fo_wptr + count)
+		    if flush 
+			then do rc <- mayBlock fo (flushFile fo)
+				if (rc < 0) 
+					then constructErrorAndFail "commitBuffer"
+					else do handle_ <- freeBuffer handle_ buf sz
+						ok handle_
+			else do handle_ <- freeBuffer handle_ buf sz
+				ok handle_
+
+commitBuffer
+	:: Handle			-- handle to commit to
+	-> Addr -> Int			-- address and size (in bytes) of buffer
+	-> Int				-- number of bytes of data in buffer
+	-> Bool				-- flush the handle afterward?
+	-> IO ()
+commitBuffer handle buf sz count flush = do
+    wantWriteableHandle "commitBuffer" handle $ \handle_ -> do
+      let fo = haFO__ handle_
+      flushConnectedBuf fo		-- ????  -SDM
+      getWriteableBuf fo		-- flush read buf if necessary
+      fo_buf     <- getBuf fo
+      fo_wptr    <- getBufWPtr fo
+      fo_bufSize <- getBufSize fo
+
+      (if (fo_bufSize - fo_wptr < count)  -- not enough room in handle buffer?
+	    then mayBlock fo (flushFile fo)
+	    else return 0)
+
+      if (fo_bufSize < count)		-- committed buffer too large?
+
+	    then do rc <- write_buf fo buf count
+		    if rc < 0 then constructErrorAndFail "commitBuffer"
+			      else return ()
+
+	    else do memcpy (plusAddr fo_buf (AddrOff# fo_wptr)) buf count
+		    setBufWPtr fo (fo_wptr + count)
+		    (if flush then mayBlock fo (flushFile fo) else return 0)
+		    return ()
+
+write_buf fo buf 0 = return 0
+write_buf fo buf count = do
+  rc <- mayBlock fo (write_ fo buf count)
+  if (rc > 0)
+	then  write_buf fo buf (count - rc) -- partial write
+	else  return rc
+
+foreign import "memcpy" unsafe memcpy :: Addr -> Addr -> Int -> IO ()
 \end{code}
 
 Going across the border between Haskell and C is relatively costly,
@@ -350,193 +500,100 @@ before passing the external write routine a pointer to the buffer.
 #warning delayed update of buffer disnae work with killThread
 #endif
 
-#ifndef __PARALLEL_HASKELL__
-writeLines :: ForeignObj -> Addr -> Int -> Int -> String -> IO ()
-#else
-writeLines :: Addr -> Addr -> Int -> Int -> String -> IO ()
-#endif
-writeLines obj buf bufLen initPos s =
+writeLines :: Handle -> Addr -> Int -> String -> IO ()
+writeLines handle buf bufLen s =
   let
    shoveString :: Int -> [Char] -> IO ()
    shoveString n ls = 
      case ls of
-      [] ->   
-	  {-
-	    At the end of a buffer write, update the buffer position
-	    in the underlying file object, so that if the handle
-	    is subsequently dropped by the program, the whole
-	    buffer will be properly flushed.
-
-	    There's one case where this delayed up-date of the buffer
-	    position can go wrong: if a thread is killed, it might be
-	    in the middle of filling up a buffer, with the result that
-	    the partial buffer update is lost upon finalisation. Not
-	    that killing of threads is supported at the moment.
-
-	  -}
-	  setBufWPtr obj n
+      [] -> commitAndReleaseBuffer handle buf buflen n False{-no need to flush-}
 
       (x:xs) -> do
         primWriteCharOffAddr buf n x
           {- Flushing on buffer exhaustion or newlines (even if it isn't the last one) -}
-	if n == bufLen || x == '\n'
+	let next_n = n + 1
+	if next_n == bufLen || x == '\n'
 	 then do
-	   rc <-  mayBlock obj (writeFileObject obj (n + 1))  -- ConcHask: UNSAFE, may block.
-	   if rc == 0 
-	    then shoveString 0 xs
-	    else constructErrorAndFail "writeLines"
+	   commitBuffer hdl buf len next_n True{-needs flush-} 
+	   shoveString 0 xs
          else
-	   shoveString (n + 1) xs
+	   shoveString next_n xs
   in
-  shoveString initPos s
-#else /* ndef __HUGS__ */
-#ifndef __PARALLEL_HASKELL__
-writeLines :: ForeignObj -> Addr -> Int -> Int -> String -> IO ()
-#else
-writeLines :: Addr -> Addr -> Int -> Int -> String -> IO ()
-#endif
-writeLines obj buf (I# bufLen) (I# initPos#) s =
-  let
-   write_char :: Addr -> Int# -> Char# -> IO ()
-   write_char (A# buf#) n# c# =
-      IO $ \ s# ->
-      case (writeCharOffAddr# buf# n# c# s#) of s2# -> (# s2#, () #)
+  shoveString 0 s
 
+#else /* ndef __HUGS__ */
+
+writeLines :: Handle -> Addr -> Int -> String -> IO ()
+writeLines hdl buf len@(I# bufLen) s =
+  let
    shoveString :: Int# -> [Char] -> IO ()
    shoveString n ls = 
      case ls of
-      [] ->   
-	  {-
-	    At the end of a buffer write, update the buffer position
-	    in the underlying file object, so that if the handle
-	    is subsequently dropped by the program, the whole
-	    buffer will be properly flushed.
-
-	    There's one case where this delayed up-date of the buffer
-	    position can go wrong: if a thread is killed, it might be
-	    in the middle of filling up a buffer, with the result that
-	    the partial buffer update is lost upon finalisation. Not
-	    that killing of threads is supported at the moment.
-
-	  -}
-	  setBufWPtr obj (I# n)
+      [] -> commitAndReleaseBuffer hdl buf len (I# n) False{-no need to flush-}
 
       ((C# x):xs) -> do
         write_char buf n x
-          {- Flushing on buffer exhaustion or newlines (even if it isn't the last one) -}
-	if n ==# bufLen || x `eqChar#` '\n'#
+          -- Flushing on buffer exhaustion or newlines 
+	  -- (even if it isn't the last one)
+	let next_n = n +# 1#
+	if next_n ==# bufLen || x `eqChar#` '\n'#
 	 then do
-	   rc <-  mayBlock obj (writeFileObject obj (I# (n +# 1#)))  -- ConcHask: UNSAFE, may block.
-	   if rc == 0 
-	    then shoveString 0# xs
-	    else constructErrorAndFail "writeLines"
+	   commitBuffer hdl buf len (I# next_n) True{-needs flush-} 
+	   shoveString 0# xs
          else
-	   shoveString (n +# 1#) xs
+	   shoveString next_n xs
   in
-  shoveString initPos# s
+  shoveString 0# s
 #endif /* ndef __HUGS__ */
 
 #ifdef __HUGS__
-#ifndef __PARALLEL_HASKELL__
-writeBlocks :: ForeignObj -> Addr -> Int -> Int -> String -> IO ()
-#else
-writeBlocks :: Addr -> Addr -> Int -> Int -> String -> IO ()
-#endif
-writeBlocks obj buf bufLen initPos s =
+writeBlocks :: Handle -> Addr -> Int -> String -> IO ()
+writeBlocks hdl buf bufLen s =
   let
    shoveString :: Int -> [Char] -> IO ()
    shoveString n ls = 
      case ls of
-      [] ->   
-	  {-
-	    At the end of a buffer write, update the buffer position
-	    in the underlying file object, so that if the handle
-	    is subsequently dropped by the program, the whole
-	    buffer will be properly flushed.
-
-	    There's one case where this delayed up-date of the buffer
-	    position can go wrong: if a thread is killed, it might be
-	    in the middle of filling up a buffer, with the result that
-	    the partial buffer update is lost upon finalisation. However,
-	    by the time killThread is supported, Haskell finalisers are also
-	    likely to be in, which means the 'IOFileObject' hack can go
-	    alltogether.
-
-	  -}
-	  setBufWPtr obj n
+      [] -> commitAndReleaseBuffer hdl buf len n False{-no need to flush-} 
 
       (x:xs) -> do
         primWriteCharOffAddr buf n x
-	if n == bufLen
+	let next_n = n + 1
+	if next_n == bufLen
 	 then do
-	   rc <-  mayBlock obj (writeFileObject obj (n + 1))   -- ConcHask: UNSAFE, may block.
-	   if rc == 0 
-            then shoveString 0 xs
-	    else constructErrorAndFail "writeChunks"
+	   commitBuffer hdl buf len next_n True{-needs flush-}
+	   shoveString 0 xs
          else
-	   shoveString (n + 1) xs
+	   shoveString next_n xs
   in
-  shoveString initPos s
-#else /* ndef __HUGS__ */
-#ifndef __PARALLEL_HASKELL__
-writeBlocks :: ForeignObj -> Addr -> Int -> Int -> String -> IO ()
-#else
-writeBlocks :: Addr -> Addr -> Int -> Int -> String -> IO ()
-#endif
-writeBlocks obj buf (I# bufLen) (I# initPos#) s =
-  let
-   write_char :: Addr -> Int# -> Char# -> IO ()
-   write_char (A# buf#) n# c# =
-      IO $ \ s# ->
-      case (writeCharOffAddr# buf# n# c# s#) of s2# -> (# s2#, () #)
+  shoveString 0 s
 
+#else /* ndef __HUGS__ */
+
+writeBlocks :: Handle -> Addr -> Int -> String -> IO ()
+writeBlocks hdl buf len@(I# bufLen) s =
+  let
    shoveString :: Int# -> [Char] -> IO ()
    shoveString n ls = 
      case ls of
-      [] ->   
-	  {-
-	    At the end of a buffer write, update the buffer position
-	    in the underlying file object, so that if the handle
-	    is subsequently dropped by the program, the whole
-	    buffer will be properly flushed.
-
-	    There's one case where this delayed up-date of the buffer
-	    position can go wrong: if a thread is killed, it might be
-	    in the middle of filling up a buffer, with the result that
-	    the partial buffer update is lost upon finalisation. However,
-	    by the time killThread is supported, Haskell finalisers are also
-	    likely to be in, which means the 'IOFileObject' hack can go
-	    alltogether.
-
-	  -}
-	  setBufWPtr obj (I# n)
+      [] -> commitAndReleaseBuffer hdl buf len (I# n) False{-no need to flush-} 
 
       ((C# x):xs) -> do
         write_char buf n x
-	if n ==# bufLen
+	let next_n = n +# 1#
+	if next_n ==# bufLen
 	 then do
-	   rc <-  mayBlock obj (writeFileObject obj (I# (n +# 1#)))   -- ConcHask: UNSAFE, may block.
-	   if rc == 0 
-	    then shoveString 0# xs
-	    else constructErrorAndFail "writeChunks"
+	   commitBuffer hdl buf len (I# next_n) True{-needs flush-}
+	   shoveString 0# xs
          else
-	   shoveString (n +# 1#) xs
+	   shoveString next_n xs
   in
-  shoveString initPos# s
+  shoveString 0# s
+
+write_char :: Addr -> Int# -> Char# -> IO ()
+write_char (A# buf#) n# c# =
+   IO $ \ s# ->
+   case (writeCharOffAddr# buf# n# c# s#) of s2# -> (# s2#, () #)
 #endif /* ndef __HUGS__ */
-
-#ifndef __PARALLEL_HASKELL__
-writeChars :: ForeignObj -> String -> IO ()
-#else
-writeChars :: Addr -> String -> IO ()
-#endif
-writeChars _fo ""    = return ()
-writeChars fo (c:cs) = do
-  rc <- mayBlock fo (filePutc fo c)   -- ConcHask: UNSAFE, may block.
-  if rc == 0 
-   then writeChars fo cs
-   else constructErrorAndFail "writeChars"
-
 \end{code}
 
 Computation @hPrint hdl t@ writes the string representation of {\em t}

@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.14 2000/03/17 17:05:27 rrt Exp $
+# $Id: Makefile,v 1.15 2000/04/12 17:33:16 simonmar Exp $
 
 TOP = ../../..
 include $(TOP)/mk/boilerplate.mk
@@ -41,6 +41,15 @@ SRC_BLD_DLL_OPTS += -lwinmm -lwsock32 -lHSrts_imp -lgmp -L. -L../../../rts/gmp -
 CC=$(GHC_INPLACE)
 
 SRC_MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR)
+
+# -----------------------------------------------------------------------------
+
+SO_OBJS  = $(C_SRCS:.c=.$(way_)so)
+
+libHS_cbits.so : $(SO_OBJS)
+	$(CC) -shared -o libHS_cbits.so $(SO_OBJS)
+
+CC = $(WhatGccIsCalled)
 
 # -----------------------------------------------------------------------------
 # Installation

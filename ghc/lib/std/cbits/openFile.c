@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: openFile.c,v 1.15 1999/12/14 14:26:14 simonmar Exp $
+ * $Id: openFile.c,v 1.16 2000/04/12 17:33:16 simonmar Exp $
  *
  * openFile Runtime Support
  */
@@ -44,7 +44,6 @@ openStdFile(StgInt fd, StgInt rd)
     fo->buf      = NULL;
     fo->bufWPtr  = 0;
     fo->bufRPtr  = 0;
-    fo->bufStart = 0;
     fo->flags    = FILEOBJ_STD | ( rd ? FILEOBJ_READ : FILEOBJ_WRITE);
     fo->connectedTo = NULL;
  
@@ -281,7 +280,6 @@ openFile(StgByteArray file, StgInt how, StgInt binary)
 
     fo->fd       = fd;
     fo->buf      = NULL;
-    fo->bufStart = 0;
     fo->bufWPtr  = 0;
     fo->bufRPtr  = 0;
     fo->flags    = flags;
@@ -318,7 +316,6 @@ openFd(StgInt fd, StgInt oflags, StgInt flags)
        return NULL;
     fo->fd       = fd;
     fo->buf      = NULL;
-    fo->bufStart = 0;
     fo->bufWPtr  = 0;
     fo->bufRPtr  = 0;
     fo->flags    = flags | ( oflags & O_RDONLY ? FILEOBJ_READ 

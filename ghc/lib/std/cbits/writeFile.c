@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: writeFile.c,v 1.13 2000/03/10 15:23:40 simonmar Exp $
+ * $Id: writeFile.c,v 1.14 2000/04/12 17:33:16 simonmar Exp $
  *
  * hPutStr Runtime Support
  */
@@ -41,13 +41,13 @@ writeBuffer(StgForeignPtr ptr, StgInt bytes)
     int count;
     IOFileObject* fo = (IOFileObject*)ptr;
 
-    char *pBuf = (char *) fo->buf + fo->bufStart;
+    char *pBuf = (char *) fo->buf + fo->bufRPtr;
 
-    bytes -= fo->bufStart;
+    bytes -= fo->bufRPtr;
 
     /* Disallow short writes */
     if (bytes == 0  || fo->buf == NULL) {
-        fo->bufStart = 0;
+        fo->bufRPtr = 0;
 	return 0;
     }
 
@@ -72,12 +72,12 @@ writeBuffer(StgForeignPtr ptr, StgInt bytes)
         else {
 	    bytes -= count;
 	    pBuf  += count;
-            fo->bufStart += count;
+            fo->bufRPtr += count;
         }
     }
     /* Signal that we've emptied the buffer */
-    fo->bufStart = 0;
-    fo->bufWPtr  = 0;
+    fo->bufRPtr = 0;
+    fo->bufWPtr = 0;
     return 0;
 }
 
@@ -164,3 +164,35 @@ writeBufBA(StgForeignPtr ptr, StgByteArray buf, StgInt off, StgInt len)
 { 
     return (writeBuf(ptr,(StgAddr)buf, off, len)); 
 }
+
+/* -----------------------------------------------------------------------------
+ * write_  is just a simple wrapper around write/2 that restarts
+ * on EINTR and returns FILEOBJ_BLOCKED_WRITE on EAGAIN.
+ * -------------------------------------------------------------------------- */
+
+StgInt
+write_(StgForeignPtr ptr, StgAddr buf, StgInt len)
+{
+    IOFileObject* fo = (IOFileObject*)ptr;
+    int rc;
+
+    while ((rc = 
+               (
+#ifdef USE_WINSOCK
+	         fo->flags & FILEOBJ_WINSOCK ?
+		 send(fo->fd,  buf, (int)len, 0) :
+		 write(fo->fd, buf, (int)len))) < 0 ) {
+#else
+		 write(fo->fd, buf, (int)len))) < 0 ) {
+#endif
+	if ( errno == EAGAIN ) {
+            errno = 0;
+            return FILEOBJ_BLOCKED_WRITE;
+	} else if ( errno != EINTR ) {
+	    cvtErrno();
+	    stdErrno();
+	    return -1;
+	}
+    }
+    return rc;
+}  
