@@ -531,6 +531,9 @@
 /* Define to Haskell type for ptrdiff_t */
 #undef HTYPE_PTRDIFF_T
 
+/* Define to Haskell type for rlim_t */
+#undef HTYPE_RLIM_T
+
 /* Define to Haskell type for short */
 #undef HTYPE_SHORT
 

@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.114 2003/03/21 10:59:20 simonmar Exp $
+dnl $Id: aclocal.m4,v 1.115 2003/03/26 12:33:11 simonmar Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -667,6 +667,10 @@ AC_CACHE_VAL(AC_CV_NAME,
 
 #ifdef HAVE_GL_GL_H
 # include <GL/gl.h>
+#endif
+
+#ifdef HAVE_SYS_RESOURCE_H
+# include <sys/resource.h>
 #endif
 
 typedef $1 testing;
