@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.127 2002/02/15 17:49:23 sof Exp $
+ * $Id: Schedule.c,v 1.128 2002/02/15 20:58:14 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1469,6 +1469,7 @@ suspendThread( StgRegTable *reg )
   startTask(taskStart);
 #endif
 
+  /* Other threads _might_ be available for execution; signal this */
   THREAD_RUNNABLE();
   RELEASE_LOCK(&sched_mutex);
   return tok; 
