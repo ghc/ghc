@@ -242,7 +242,16 @@ stdout = unsafePerformIO (do
 	    (bm, bf_size)  <- getBMode__ fo
 	    mkBuffer__ fo bf_size
 #endif
-	    newHandle (Handle__ fo WriteHandle bm "stdout")
+	    hdl <- newHandle (Handle__ fo WriteHandle bm "stdout")
+	     -- when stdin and stdout are both connected to a terminal, ensure
+	     -- that anything buffered on stdout is flushed prior to reading from stdin.
+	     -- 
+	    hConnectTerms hdl stdin
+  	     -- when stderr and stdout are both connected to a terminal, ensure
+	     -- that anything buffered on stdout is flushed prior to writing to
+	     -- stderr.
+	    hConnectTo hdl stderr
+	    return hdl
        _ -> do ioError <- constructError "stdout"
                newHandle (mkErrorHandle__ ioError)
   )
@@ -268,12 +277,7 @@ stdin = unsafePerformIO (do
 #endif
 	    (bm, bf_size) <- getBMode__ fo
 	    mkBuffer__ fo bf_size
-	    hdl <- newHandle (Handle__ fo ReadHandle bm "stdin")
-	     -- when stdin and stdout are both connected to a terminal, ensure
-	     -- that anything buffered on stdout is flushed prior to reading from stdin.
-	     -- 
-	    hConnectTerms stdout hdl
-	    return hdl
+	    newHandle (Handle__ fo ReadHandle bm "stdin")
        _ -> do ioError <- constructError "stdin"
                newHandle (mkErrorHandle__ ioError)
   )
@@ -298,12 +302,7 @@ stderr = unsafePerformIO (do
             fo <- makeForeignObj fo
 	    addForeignFinalizer fo (freeStdFileObject fo)
 #endif
-            hdl <- newHandle (Handle__ fo WriteHandle NoBuffering "stderr")
-	    -- when stderr and stdout are both connected to a terminal, ensure
-	    -- that anything buffered on stdout is flushed prior to writing to
-	    -- stderr.
-	    hConnectTo stdout hdl
-	    return hdl
+            newHandle (Handle__ fo WriteHandle NoBuffering "stderr")
 
        _ -> do ioError <- constructError "stderr"
                newHandle (mkErrorHandle__ ioError)
