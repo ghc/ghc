@@ -52,7 +52,7 @@ import Type		( mkFunTy, mkAppTy, mkTyVarTys, ipName_maybe,
 			  splitRhoTy,
 			  isTauTy, tyVarsOfType, tyVarsOfTypes, 
 			  isSigmaTy, splitAlgTyConApp, splitAlgTyConApp_maybe,
-			  boxedTypeKind, openTypeKind, mkArrowKind,
+			  liftedTypeKind, openTypeKind, mkArrowKind,
 			  tidyOpenType
 			)
 import TyCon		( TyCon, tyConTyVars )
@@ -293,10 +293,10 @@ tcMonoExpr (HsCCall lbl args may_gc is_asm ignored_fake_result_ty) res_ty
     newTyVarTys (length tv_idxs) openTypeKind		`thenNF_Tc` \ arg_tys ->
     tcMonoExprs args arg_tys		   		`thenTc`    \ (args', args_lie) ->
 
-	-- The argument types can be unboxed or boxed; the result
-	-- type must, however, be boxed since it's an argument to the IO
+	-- The argument types can be unlifted or lifted; the result
+	-- type must, however, be lifted since it's an argument to the IO
 	-- type constructor.
-    newTyVarTy boxedTypeKind  		`thenNF_Tc` \ result_ty ->
+    newTyVarTy liftedTypeKind  		`thenNF_Tc` \ result_ty ->
     let
 	io_result_ty = mkTyConApp ioTyCon [result_ty]
     in
@@ -519,7 +519,7 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
 
 	mk_inst_ty (tyvar, result_inst_ty) 
 	  | tyvar `elemVarSet` common_tyvars = returnNF_Tc result_inst_ty	-- Same as result type
-	  | otherwise			            = newTyVarTy boxedTypeKind	-- Fresh type
+	  | otherwise			            = newTyVarTy liftedTypeKind	-- Fresh type
     in
     mapNF_Tc mk_inst_ty (zip con_tyvars result_inst_tys)	`thenNF_Tc` \ inst_tys ->
 
@@ -839,8 +839,8 @@ tcDoStmts do_or_lc stmts src_loc res_ty
     ASSERT( not (null stmts) )
     tcAddSrcLoc src_loc	$
 
-    newTyVarTy (mkArrowKind boxedTypeKind boxedTypeKind)	`thenNF_Tc` \ m ->
-    newTyVarTy boxedTypeKind 					`thenNF_Tc` \ elt_ty ->
+    newTyVarTy (mkArrowKind liftedTypeKind liftedTypeKind)	`thenNF_Tc` \ m ->
+    newTyVarTy liftedTypeKind 					`thenNF_Tc` \ elt_ty ->
     unifyTauTy res_ty (mkAppTy m elt_ty)			`thenTc_`
 
 	-- If it's a comprehension we're dealing with, 

@@ -53,7 +53,7 @@ import Name		( Name )
 import PrimRep		( PrimRep(..), isFollowableRep )
 import TyCon		( TyCon, ArgVrcs, mkPrimTyCon )
 import Type		( mkTyConApp, mkTyConTy, mkTyVarTys, mkTyVarTy,
-			  unboxedTypeKind, boxedTypeKind, openTypeKind, mkArrowKinds
+			  unliftedTypeKind, liftedTypeKind, openTypeKind, mkArrowKinds
 			)
 import Unique		( mkAlphaTyVarUnique )
 import PrelNames
@@ -103,7 +103,7 @@ primTyCons
 
 \begin{code}
 alphaTyVars :: [TyVar]
-alphaTyVars = [ mkSysTyVar u boxedTypeKind
+alphaTyVars = [ mkSysTyVar u liftedTypeKind
 	      | u <- map mkAlphaTyVarUnique [2..] ]
 
 betaTyVars = tail alphaTyVars
@@ -115,7 +115,7 @@ alphaTys = mkTyVarTys alphaTyVars
 (alphaTy:betaTy:gammaTy:deltaTy:_) = alphaTys
 
 	-- openAlphaTyVar is prepared to be instantiated
-	-- to a boxed or unboxed type variable.  It's used for the 
+	-- to a lifted or unlifted type variable.  It's used for the 
 	-- result type for "error", so that we can have (error Int# "Help")
 openAlphaTyVar :: TyVar
 openAlphaTyVar = mkSysTyVar (mkAlphaTyVarUnique 1) openTypeKind
@@ -149,10 +149,9 @@ pcPrimTyCon :: Name -> Int -> ArgVrcs -> PrimRep -> TyCon
 pcPrimTyCon name arity arg_vrcs rep
   = the_tycon
   where
-    the_tycon = mkPrimTyCon name kind arity arg_vrcs rep
-    kind      = mkArrowKinds (take arity (repeat boxedTypeKind)) result_kind
-    result_kind | isFollowableRep rep = boxedTypeKind	-- Represented by a GC-ish ptr
-	        | otherwise	      = unboxedTypeKind	-- Represented by a non-ptr
+    the_tycon   = mkPrimTyCon name kind arity arg_vrcs rep
+    kind        = mkArrowKinds (take arity (repeat liftedTypeKind)) result_kind
+    result_kind = unliftedTypeKind -- all primitive types are unlifted
 
 charPrimTy	= mkTyConTy charPrimTyCon
 charPrimTyCon	= pcPrimTyCon charPrimTyConName 0 [] CharRep
@@ -186,7 +185,7 @@ doublePrimTyCon	= pcPrimTyCon doublePrimTyConName 0 [] DoubleRep
 %*									*
 %************************************************************************
 
-State# is the primitive, unboxed type of states.  It has one type parameter,
+State# is the primitive, unlifted type of states.  It has one type parameter,
 thus
 	State# RealWorld
 or
@@ -200,14 +199,13 @@ mkStatePrimTy ty = mkTyConApp statePrimTyCon [ty]
 statePrimTyCon	 = pcPrimTyCon statePrimTyConName 1 vrcsZ VoidRep
 \end{code}
 
-@_RealWorld@ is deeply magical.  It {\em is primitive}, but it
-{\em is not unboxed} (hence PtrRep).
-We never manipulate values of type RealWorld; it's only used in the type
-system, to parameterise State#.
+RealWorld is deeply magical.  It is *primitive*, but it is not
+*unlifted* (hence PrimPtrRep).  We never manipulate values of type
+RealWorld; it's only used in the type system, to parameterise State#.
 
 \begin{code}
+realWorldTyCon = mkPrimTyCon realWorldTyConName liftedTypeKind 0 [] PrimPtrRep
 realWorldTy	     = mkTyConTy realWorldTyCon
-realWorldTyCon	     = pcPrimTyCon realWorldTyConName 0 [] PrimPtrRep
 realWorldStatePrimTy = mkStatePrimTy realWorldTy	-- State# RealWorld
 \end{code}
 
@@ -356,17 +354,17 @@ PrimRep (see PrimRep.lhs).  The following function returns the
 primitive TyCon for a given PrimRep.
 
 \begin{code}
-primRepTyCon CharRep   = charPrimTyCon
-primRepTyCon Int8Rep   = charPrimTyCon
-primRepTyCon IntRep    = intPrimTyCon
-primRepTyCon WordRep   = wordPrimTyCon
-primRepTyCon Int64Rep  = int64PrimTyCon
-primRepTyCon Word64Rep = word64PrimTyCon
-primRepTyCon AddrRep   = addrPrimTyCon
-primRepTyCon FloatRep  = floatPrimTyCon
-primRepTyCon DoubleRep = doublePrimTyCon
+primRepTyCon CharRep       = charPrimTyCon
+primRepTyCon Int8Rep       = charPrimTyCon
+primRepTyCon IntRep        = intPrimTyCon
+primRepTyCon WordRep       = wordPrimTyCon
+primRepTyCon Int64Rep      = int64PrimTyCon
+primRepTyCon Word64Rep     = word64PrimTyCon
+primRepTyCon AddrRep       = addrPrimTyCon
+primRepTyCon FloatRep      = floatPrimTyCon
+primRepTyCon DoubleRep     = doublePrimTyCon
 primRepTyCon StablePtrRep  = stablePtrPrimTyCon
 primRepTyCon ForeignObjRep = foreignObjPrimTyCon
-primRepTyCon WeakPtrRep = weakPrimTyCon
-primRepTyCon other     = pprPanic "primRepTyCon" (ppr other)
+primRepTyCon WeakPtrRep    = weakPrimTyCon
+primRepTyCon other         = pprPanic "primRepTyCon" (ppr other)
 \end{code}

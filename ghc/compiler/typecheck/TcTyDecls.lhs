@@ -17,7 +17,7 @@ import RnHsSyn		( RenamedTyClDecl, RenamedConDecl, RenamedContext )
 import BasicTypes	( NewOrData(..), RecFlag, isRec )
 
 import TcMonoType	( tcHsRecType, tcHsTyVars, tcRecClassContext,
-			  kcHsContext, kcHsSigType, kcHsBoxedSigType
+			  kcHsContext, kcHsSigType, kcHsLiftedSigType
 			)
 import TcEnv		( tcExtendTyVarEnv, 
 			  tcLookupTyCon, tcLookupRecId, 
@@ -122,9 +122,9 @@ kcConDetails new_or_data ex_ctxt details
   where
     kc_sig_type = case new_or_data of
 		    DataType -> kcHsSigType
-		    NewType  -> kcHsBoxedSigType
-	    -- Can't allow an unboxed type here, because we're effectively
-	    -- going to remove the constructor while coercing it to a boxed type.
+		    NewType  -> kcHsLiftedSigType
+	    -- Can't allow an unlifted type here, because we're effectively
+	    -- going to remove the constructor while coercing it to a lifted type.
 
 
 tcConDecl :: RecFlag -> NewOrData -> TyCon -> [TyVar] -> ClassContext -> RenamedConDecl -> TcM DataCon

@@ -17,7 +17,7 @@ module TcUnify ( unifyTauTy, unifyTauTyList, unifyTauTyLists,
 -- friends: 
 import TcMonad
 import TypeRep	( Type(..), PredType(..) )  -- friend
-import Type	( unboxedTypeKind, boxedTypeKind, openTypeKind, 
+import Type	( unliftedTypeKind, liftedTypeKind, openTypeKind, 
 		  typeCon, openKindCon, hasMoreBoxityInfo, 
 		  tyVarsOfType, typeKind,
 		  mkFunTy, splitFunTy_maybe, splitTyConApp_maybe,
@@ -371,9 +371,9 @@ uUnboundVar swapped tv1 maybe_ty1 ps_ty2 non_var_ty2
 
 checkKinds swapped tv1 ty2
 -- We're about to unify a type variable tv1 with a non-tyvar-type ty2.
--- We need to check that we don't unify a boxed type variable with an
--- unboxed type: e.g.  (id 3#) is illegal
-  | tk1 == boxedTypeKind && tk2 == unboxedTypeKind
+-- We need to check that we don't unify a lifted type variable with an
+-- unlifted type: e.g.  (id 3#) is illegal
+  | tk1 == liftedTypeKind && tk2 == unliftedTypeKind
   = tcAddErrCtxtM (unifyKindCtxt swapped tv1 ty2)	$
     unifyMisMatch k1 k2
   | otherwise
@@ -432,7 +432,7 @@ unifyListTy ty
 	other					    -> unify_list_ty_help ty
 
 unify_list_ty_help ty	-- Revert to ordinary unification
-  = newTyVarTy boxedTypeKind		`thenNF_Tc` \ elt_ty ->
+  = newTyVarTy liftedTypeKind		`thenNF_Tc` \ elt_ty ->
     unifyTauTy ty (mkListTy elt_ty)	`thenTc_`
     returnTc elt_ty
 \end{code}
@@ -459,7 +459,7 @@ unify_tuple_ty_help boxity arity ty
     unifyTauTy ty (mkTupleTy boxity arity arg_tys)	`thenTc_`
     returnTc arg_tys
   where
-    kind | isBoxed boxity = boxedTypeKind
+    kind | isBoxed boxity = liftedTypeKind
 	 | otherwise      = openTypeKind
 \end{code}
 

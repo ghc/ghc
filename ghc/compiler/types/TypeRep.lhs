@@ -11,10 +11,10 @@ module TypeRep (
 	TyVarSubst,
 
 	superKind, superBoxity,				-- KX and BX respectively
-	boxedBoxity, unboxedBoxity, 			-- :: BX
+	liftedBoxity, unliftedBoxity, 			-- :: BX
 	openKindCon, 					-- :: KX
 	typeCon,					-- :: BX -> KX
-	boxedTypeKind, unboxedTypeKind, openTypeKind, 	-- :: KX
+	liftedTypeKind, unliftedTypeKind, openTypeKind,	-- :: KX
 	mkArrowKind, mkArrowKinds,			-- :: KX -> KX -> KX
 
         usageKindCon,					-- :: KX
@@ -37,9 +37,10 @@ import TyCon	( TyCon, KindCon, mkFunTyCon, mkKindCon, mkSuperKindCon )
 import Class	( Class )
 
 -- others
-import PrelNames	( superKindName, superBoxityName, boxedConName, 
-			  unboxedConName, typeConName, openKindConName, funTyConName,
-			  usageKindConName, usOnceTyConName, usManyTyConName
+import PrelNames	( superKindName, superBoxityName, liftedConName, 
+			  unliftedConName, typeConName, openKindConName, 
+			  usageKindConName, usOnceTyConName, usManyTyConName,
+			  funTyConName
 			)
 \end{code}
 
@@ -52,15 +53,15 @@ import PrelNames	( superKindName, superBoxityName, boxedConName,
 A type is
 
 	*unboxed*	iff its representation is other than a pointer
-			Unboxed types cannot instantiate a type variable.
-			Unboxed types are always unlifted.
+			Unboxed types are also unlifted.
 
 	*lifted*	A type is lifted iff it has bottom as an element.
 			Closures always have lifted types:  i.e. any
 			let-bound identifier in Core must have a lifted
 			type.  Operationally, a lifted object is one that
 			can be entered.
-			(NOTE: previously "pointed").			
+
+			Only lifted types may be unified with a type variable.
 
 	*algebraic*	A type with one or more constructors, whether declared
 			with "data" or "newtype".   
@@ -189,18 +190,18 @@ Kinds
 ~~~~~
 kind :: KX = kind -> kind
 
-           | Type boxity	-- (Type *) is printed as just *
+           | Type liftedness	-- (Type *) is printed as just *
 				-- (Type #) is printed as just #
 
            | UsageKind		-- Printed '$'; used for usage annotations
 
-           | OpenKind		-- Can be boxed or unboxed
+           | OpenKind		-- Can be lifted or unlifted
 				-- Printed '?'
 
            | kv			-- A kind variable; *only* happens during kind checking
 
-boxity :: BX = *	-- Boxed
-	     | #	-- Unboxed
+boxity :: BX = *	-- Lifted
+	     | #	-- Unlifted
 	     | bv	-- A boxity variable; *only* happens during kind checking
 
 There's a little subtyping at the kind level:  
@@ -213,13 +214,14 @@ in two situations:
 
 1.  The universally quantified type variable(s) for special built-in 
     things like error :: forall (a::?). String -> a. 
-    Here, the 'a' can be instantiated to a boxed or unboxed type.  
+    Here, the 'a' can be instantiated to a lifted or unlifted type.  
 
 2.  Kind '?' is also used when the typechecker needs to create a fresh
     type variable, one that may very well later be unified with a type.
     For example, suppose f::a, and we see an application (f x).  Then a
     must be a function type, so we unify a with (b->c).  But what kind
-    are b and c?  They can be boxed or unboxed types, so we give them kind '?'.
+    are b and c?  They can be lifted or unlifted types, so we give them 
+    kind '?'.
 
     When the type checker generalises over a bunch of type variables, it
     makes any that still have kind '?' into kind '*'.  So kind '?' is never
@@ -242,10 +244,10 @@ superBoxity = TyConApp (mkSuperKindCon superBoxityName) []
 Define boxities: @*@ and @#@
 
 \begin{code}
-boxedBoxity, unboxedBoxity :: Kind		-- :: BX
-boxedBoxity  = TyConApp (mkKindCon boxedConName superBoxity) []
+liftedBoxity, unliftedBoxity :: Kind		-- :: BX
+liftedBoxity  = TyConApp (mkKindCon liftedConName superBoxity) []
 
-unboxedBoxity  = TyConApp (mkKindCon unboxedConName superBoxity) []
+unliftedBoxity  = TyConApp (mkKindCon unliftedConName superBoxity) []
 \end{code}
 
 ------------------------------------------
@@ -255,10 +257,10 @@ Define kinds: Type, Type *, Type #, OpenKind, and UsageKind
 typeCon :: KindCon	-- :: BX -> KX
 typeCon     = mkKindCon typeConName (superBoxity `FunTy` superKind)
 
-boxedTypeKind, unboxedTypeKind, openTypeKind :: Kind	-- Of superkind superKind
+liftedTypeKind, unliftedTypeKind, openTypeKind :: Kind	-- Of superkind superKind
 
-boxedTypeKind   = TyConApp typeCon [boxedBoxity]
-unboxedTypeKind = TyConApp typeCon [unboxedBoxity]
+liftedTypeKind   = TyConApp typeCon [liftedBoxity]
+unliftedTypeKind = TyConApp typeCon [unliftedBoxity]
 
 openKindCon     = mkKindCon openKindConName superKind
 openTypeKind    = TyConApp openKindCon []
@@ -288,7 +290,7 @@ mkArrowKinds arg_kinds result_kind = foldr mkArrowKind result_kind arg_kinds
 We define a few wired-in type constructors here to avoid module knots
 
 \begin{code}
-funTyCon = mkFunTyCon funTyConName (mkArrowKinds [boxedTypeKind, boxedTypeKind] boxedTypeKind)
+funTyCon = mkFunTyCon funTyConName (mkArrowKinds [liftedTypeKind, liftedTypeKind] liftedTypeKind)
 \end{code}
 
 ------------------------------------------

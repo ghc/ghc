@@ -50,7 +50,7 @@ import NameSet
 import Type		( mkTyVarTy, tyVarsOfTypes, mkTyConApp,
 			  mkForAllTys, mkFunTys, 
 			  mkPredTy, mkForAllTy, isUnLiftedType, 
-			  isUnboxedType, unboxedTypeKind, boxedTypeKind, openTypeKind
+			  unliftedTypeKind, liftedTypeKind, openTypeKind
 			)
 import FunDeps		( oclose )
 import Var		( tyVarKind )
@@ -142,7 +142,7 @@ tc_binds_and_then top_lvl combiner (MonoBind bind sigs is_rec) do_next
 
 	-- Create specialisations of functions bound here
 	-- We want to keep non-recursive things non-recursive
-	-- so that we desugar unboxed bindings correctly
+	-- so that we desugar unlifted bindings correctly
       case (top_lvl, is_rec) of
 
 		-- For the top level don't bother will all this bindInstsOfLocalFuns stuff
@@ -240,7 +240,7 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
 	-- If typechecking the binds fails, then return with each
 	-- signature-less binder given type (forall a.a), to minimise subsequent
 	-- error messages
-	newTyVar boxedTypeKind		`thenNF_Tc` \ alpha_tv ->
+	newTyVar liftedTypeKind		`thenNF_Tc` \ alpha_tv ->
 	let
 	  forall_a_a    = mkForAllTy alpha_tv (mkTyVarTy alpha_tv)
           binder_names  = collectMonoBinders mbind
@@ -281,7 +281,7 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
     getTyVarsToGen is_unrestricted mono_id_tys lie_req	`thenNF_Tc` \ (tyvars_not_to_gen, tyvars_to_gen) ->
 
 	-- Finally, zonk the generalised type variables to real TyVars
-	-- This commits any unbound kind variables to boxed kind
+	-- This commits any unbound kind variables to lifted kind
 	-- I'm a little worried that such a kind variable might be
 	-- free in the environment, but I don't think it's possible for
 	-- this to happen when the type variable is not free in the envt
@@ -362,10 +362,10 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
 	returnTc ()
     )							`thenTc_`
 
-    ASSERT( not (any ((== unboxedTypeKind) . tyVarKind) real_tyvars_to_gen_list) )
+    ASSERT( not (any ((== unliftedTypeKind) . tyVarKind) real_tyvars_to_gen_list) )
 		-- The instCantBeGeneralised stuff in tcSimplify should have
 		-- already raised an error if we're trying to generalise an 
-		-- unboxed tyvar (NB: unboxed tyvars are always introduced 
+		-- unlifted tyvar (NB: unlifted tyvars are always introduced 
 		-- along with a class constraint) and it's better done there 
 		-- because we have more precise origin information.
 		-- That's why we just use an ASSERT here.
@@ -410,10 +410,10 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
 	pat_binders :: [Name]
 	pat_binders = collectMonoBinders (justPatBindings mbind EmptyMonoBinds)
     in
-	-- CHECK FOR UNBOXED BINDERS IN PATTERN BINDINGS
+	-- CHECK FOR UNLIFTED BINDERS IN PATTERN BINDINGS
     mapTc (\id -> checkTc (not (idName id `elem` pat_binders
-				&& isUnboxedType (idType id)))
-			  (unboxedPatBindErr id)) zonked_mono_ids
+				&& isUnLiftedType (idType id)))
+			  (unliftedPatBindErr id)) zonked_mono_ids
 				`thenTc_`
 
 	 -- BUILD RESULTS
@@ -723,8 +723,8 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
 	-- Figure out the appropriate kind for the pattern,
 	-- and generate a suitable type variable 
     kind = case is_rec of
-		Recursive    -> boxedTypeKind	-- Recursive, so no unboxed types
-		NonRecursive -> openTypeKind 	-- Non-recursive, so we permit unboxed types
+		Recursive    -> liftedTypeKind	-- Recursive, so no unlifted types
+		NonRecursive -> openTypeKind 	-- Non-recursive, so we permit unlifted types
 \end{code}
 
 %************************************************************************
@@ -748,7 +748,7 @@ checkSigMatch top_lvl binder_names mono_ids sigs
   =	-- First unify the main_id with IO t, for any old t
     tcSetErrCtxt mainTyCheckCtxt (
 	tcLookupTyCon ioTyConName		`thenTc`    \ ioTyCon ->
-	newTyVarTy boxedTypeKind		`thenNF_Tc` \ t_tv ->
+	newTyVarTy liftedTypeKind		`thenNF_Tc` \ t_tv ->
 	unifyTauTy ((mkTyConApp ioTyCon [t_tv]))
 		   (idType main_mono_id)
     )						`thenTc_`
@@ -915,8 +915,8 @@ valSpecSigCtxt v ty
 	 nest 4 (ppr v <+> dcolon <+> ppr ty)]
 
 -----------------------------------------------
-unboxedPatBindErr id
-  = ptext SLIT("variable in a lazy pattern binding has unboxed type: ")
+unliftedPatBindErr id
+  = ptext SLIT("variable in a lazy pattern binding has unlifted type: ")
 	 <+> quotes (ppr id)
 
 -----------------------------------------------

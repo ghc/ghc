@@ -105,7 +105,7 @@ import TyCon		( TyCon, AlgTyConFlavour(..), tyConDataCons,
 import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed )
 
 import Type		( Type, mkTyConTy, mkTyConApp, mkTyVarTys, 
-			  mkArrowKinds, boxedTypeKind, unboxedTypeKind,
+			  mkArrowKinds, liftedTypeKind, unliftedTypeKind,
 			  splitTyConApp_maybe, repType,
 			  TauType, ClassContext )
 import Unique		( incrUnique, mkTupleTyConUnique, mkTupleDataConUnique )
@@ -175,7 +175,7 @@ pcTyCon new_or_data is_rec name tyvars argvrcs cons
 		gen_info
 
     mod      = nameModule name
-    kind     = mkArrowKinds (map tyVarKind tyvars) boxedTypeKind
+    kind     = mkArrowKinds (map tyVarKind tyvars) liftedTypeKind
     gen_info = mk_tc_gen_info mod (nameUnique name) name tycon
 
 -- We generate names for the generic to/from Ids by incrementing
@@ -245,8 +245,8 @@ mk_tuple boxity arity = (tycon, tuple_con)
 	tycon   = mkTupleTyCon tc_name tc_kind arity tyvars tuple_con boxity gen_info 
 	tc_name = mkWiredInName mod (mkOccFS tcName name_str) tc_uniq
     	tc_kind = mkArrowKinds (map tyVarKind tyvars) res_kind
-	res_kind | isBoxed boxity = boxedTypeKind
-		 | otherwise	  = unboxedTypeKind
+	res_kind | isBoxed boxity = liftedTypeKind
+		 | otherwise	  = unliftedTypeKind
 
 	tyvars   | isBoxed boxity = take arity alphaTyVars
 		 | otherwise	  = take arity openAlphaTyVars
@@ -285,7 +285,7 @@ unboxedPairDataCon = tupleCon   Unboxed 2
 --
 --		data Void =		-- No constructors!
 --
--- ) It's boxed; there is only one value of this
+-- ) It's lifted; there is only one value of this
 -- type, namely "void", whose semantics is just bottom.
 --
 -- Haskell 98 drops the definition of a Void type, so we just 'simulate'

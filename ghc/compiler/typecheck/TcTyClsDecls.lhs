@@ -25,7 +25,7 @@ import TcEnv		( TcEnv, RecTcEnv, TcTyThing(..), TyThing(..), TyThingDetails(..),
 			  tcExtendKindEnv, tcLookup, tcExtendGlobalEnv, tcExtendGlobalValEnv )
 import TcTyDecls	( tcTyDecl1, kcConDetails, mkNewTyConRep )
 import TcClassDcl	( tcClassDecl1 )
-import TcMonoType	( kcHsTyVars, kcHsType, kcHsBoxedSigType, kcHsContext, mkTyClTyVars )
+import TcMonoType	( kcHsTyVars, kcHsType, kcHsLiftedSigType, kcHsContext, mkTyClTyVars )
 import TcType		( TcKind, newKindVar, zonkKindEnv )
 
 import TcUnify		( unifyKind )
@@ -110,7 +110,7 @@ Step 5: 	tcTyClDecl1
 Step 6:		tcTyClDecl1 again
 	For a recursive group only, check all the decls again, just
 	but this time with the wimp flag off.  Now we can check things
-	like whether a function argument is an unboxed tuple, looking
+	like whether a function argument is an unlifted tuple, looking
 	through type synonyms properly.  We can't do that in Step 5.
 
 Step 7:		Extend environment
@@ -252,7 +252,7 @@ kcTyClDecl decl@(ClassDecl {tcdCtxt = context,  tcdSigs = class_sigs})
     kcHsContext context		`thenTc_`
     mapTc_ kc_sig (filter isClassOpSig class_sigs)
   where
-    kc_sig (ClassOpSig _ _ op_ty loc) = kcHsBoxedSigType op_ty
+    kc_sig (ClassOpSig _ _ op_ty loc) = kcHsLiftedSigType op_ty
 
 kcTyClDeclBody :: RenamedTyClDecl -> (Kind -> TcM a) -> TcM a
 -- Extend the env with bindings for the tyvars, taken from

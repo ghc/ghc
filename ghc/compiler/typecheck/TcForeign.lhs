@@ -27,7 +27,7 @@ import RnHsSyn		( RenamedHsDecl, RenamedForeignDecl )
 
 import TcMonad
 import TcEnv		( newLocalId )
-import TcMonoType	( tcHsBoxedSigType )
+import TcMonoType	( tcHsLiftedSigType )
 import TcHsSyn		( TcMonoBinds, TypecheckedForeignDecl,
 			  TcForeignExportDecl )
 import TcExpr		( tcPolyExpr )			
@@ -84,7 +84,7 @@ tcFImport :: RenamedForeignDecl -> TcM (Id, TypecheckedForeignDecl)
 tcFImport fo@(ForeignDecl nm FoExport hs_ty Dynamic cconv src_loc) =
    tcAddSrcLoc src_loc		     $
    tcAddErrCtxt (foreignDeclCtxt fo) $
-   tcHsBoxedSigType hs_ty	     `thenTc`	\ sig_ty ->
+   tcHsLiftedSigType hs_ty	     `thenTc`	\ sig_ty ->
    let
       -- drop the foralls before inspecting the structure
       -- of the foreign type.
@@ -99,7 +99,7 @@ tcFImport fo@(ForeignDecl nm FoExport hs_ty Dynamic cconv src_loc) =
 tcFImport fo@(ForeignDecl nm FoLabel hs_ty ext_nm cconv src_loc) =
    tcAddSrcLoc src_loc		     $
    tcAddErrCtxt (foreignDeclCtxt fo) $
-   tcHsBoxedSigType hs_ty	    `thenTc`	\ sig_ty ->
+   tcHsLiftedSigType hs_ty	    `thenTc`	\ sig_ty ->
    let
       -- drop the foralls before inspecting the structure
       -- of the foreign type.
@@ -114,7 +114,7 @@ tcFImport fo@(ForeignDecl nm imp_exp@(FoImport isUnsafe) hs_ty ext_nm cconv src_
    tcAddSrcLoc src_loc		     $
    tcAddErrCtxt (foreignDeclCtxt fo) $
 
-   tcHsBoxedSigType hs_ty		     `thenTc` \ ty ->
+   tcHsLiftedSigType hs_ty		     `thenTc` \ ty ->
     -- Check that the type has the right shape
     -- and that the argument and result types are acceptable.
    let
@@ -133,7 +133,7 @@ tcFExport fo@(ForeignDecl nm imp_exp hs_ty ext_nm cconv src_loc) =
    tcAddSrcLoc src_loc		     $
    tcAddErrCtxt (foreignDeclCtxt fo) $
 
-   tcHsBoxedSigType hs_ty	       `thenTc`	\ sig_ty ->
+   tcHsLiftedSigType hs_ty	       `thenTc`	\ sig_ty ->
    tcPolyExpr (HsVar nm) sig_ty     `thenTc`    \ (rhs, lie, _, _, _) ->
 
    let

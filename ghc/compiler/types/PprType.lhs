@@ -18,7 +18,7 @@ module PprType(
 
 -- friends:
 -- (PprType can see all the representations it's trying to print)
-import TypeRep		( Type(..), TyNote(..), Kind, boxedTypeKind )  -- friend
+import TypeRep		( Type(..), TyNote(..), Kind, liftedTypeKind ) -- friend
 import Type		( PredType(..), ThetaType,
 			  splitPredTy_maybe,
 			  splitForAllTys, splitSigmaTy, splitRhoTy,
@@ -237,7 +237,7 @@ and when in debug mode.
 \begin{code}
 pprTyVarBndr tyvar
   = getPprStyle $ \ sty ->
-    if (ifaceStyle sty  && kind /= boxedTypeKind) || debugStyle sty then
+    if (ifaceStyle sty  && kind /= liftedTypeKind) || debugStyle sty then
         hsep [ppr tyvar, dcolon, pprParendKind kind]
 		-- See comments with ppDcolon in PprCore.lhs
     else

@@ -32,7 +32,7 @@ import TysWiredIn	( boolTy )
 
 import BasicTypes	( RecFlag(..) )
 import Type		( tyVarsOfType, isTauTy, mkArrowKind, mkAppTy, mkFunTy,
-			  boxedTypeKind, openTypeKind )
+			  liftedTypeKind, openTypeKind )
 import SrcLoc		( SrcLoc )
 import VarSet
 import Var		( Id )
@@ -269,8 +269,8 @@ tcMatchPats (pat:pats) expected_ty
 
 \begin{code}
 tcParStep src_loc stmts
-  = newTyVarTy (mkArrowKind boxedTypeKind boxedTypeKind) `thenTc` \ m ->
-    newTyVarTy boxedTypeKind				 `thenTc` \ elt_ty ->
+  = newTyVarTy (mkArrowKind liftedTypeKind liftedTypeKind) `thenTc` \ m ->
+    newTyVarTy liftedTypeKind				 `thenTc` \ elt_ty ->
     unifyListTy (mkAppTy m elt_ty)			 `thenTc_`
 
     tcStmts ListComp (mkAppTy m) elt_ty src_loc stmts	 `thenTc` \ ((stmts', val_env), stmts_lie) ->
@@ -333,7 +333,7 @@ tcStmts do_or_lc m elt_ty loc (stmt@(GuardStmt exp src_loc) : stmts)
 tcStmts do_or_lc m elt_ty loc (stmt@(BindStmt pat exp src_loc) : stmts)
   = tcAddSrcLoc src_loc		(
 	tcSetErrCtxt (stmtCtxt do_or_lc stmt)	$
-    	newTyVarTy boxedTypeKind		`thenNF_Tc` \ pat_ty ->
+    	newTyVarTy liftedTypeKind		`thenNF_Tc` \ pat_ty ->
   	tcPat tcPatBndr_NoSigs pat pat_ty	`thenTc` \ (pat', pat_lie, pat_tvs, pat_ids, avail) ->  
       	tcExpr exp (m pat_ty)			`thenTc` \ (exp', exp_lie) ->
   	returnTc (pat', exp',

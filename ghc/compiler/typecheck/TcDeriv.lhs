@@ -44,7 +44,8 @@ import TyCon		( tyConTyVars, tyConDataCons,
 			  tyConTheta, maybeTyConSingleCon, isDataTyCon,
 			  isEnumerationTyCon, TyCon
 			)
-import Type		( TauType, PredType(..), mkTyVarTys, mkTyConApp, isUnboxedType )
+import Type		( TauType, PredType(..), mkTyVarTys, mkTyConApp, 
+			  isUnLiftedType )
 import Var		( TyVar )
 import PrelNames
 import Util		( zipWithEqual, sortLt )
@@ -317,7 +318,7 @@ makeDerivEqns tycl_decls
 	    mk_constraints data_con
 	       = [ (clas, [arg_ty])
 		 | arg_ty <- dataConArgTys data_con tyvar_tys,
-		   not (isUnboxedType arg_ty)	-- No constraints for unboxed types?
+		   not (isUnLiftedType arg_ty)	-- No constraints for unlifted types?
 		 ]
 	in
 	case chk_out clas tycon of
@@ -537,7 +538,7 @@ data Foo ... = ...
 
 con2tag_Foo :: Foo ... -> Int#
 tag2con_Foo :: Int -> Foo ...	-- easier if Int, not Int#
-maxtag_Foo  :: Int		-- ditto (NB: not unboxed)
+maxtag_Foo  :: Int		-- ditto (NB: not unlifted)
 
 
 We have a @con2tag@ function for a tycon if:

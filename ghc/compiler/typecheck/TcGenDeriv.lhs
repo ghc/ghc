@@ -53,7 +53,7 @@ import SrcLoc		( generatedSrcLoc, SrcLoc )
 import TyCon		( TyCon, isNewTyCon, tyConDataCons, isEnumerationTyCon,
 			  maybeTyConSingleCon, tyConFamilySize
 			)
-import Type		( isUnLiftedType, isUnboxedType, Type )
+import Type		( isUnLiftedType, Type )
 import TysPrim		( charPrimTy, intPrimTy, wordPrimTy, addrPrimTy,
 			  floatPrimTy, doublePrimTy
 			)
@@ -103,7 +103,7 @@ data Foo ... = N1 | N2 ... | Nn | O1 a b | O2 Int | O3 Double b b | ...
 (==) (O3 a1 b1 c1) (O3 a2 b2 c2) = a1 == a2 && b1 == b2 && c1 == c2
 \end{verbatim}
 
-  Note: if we're comparing unboxed things, e.g., if \tr{a1} and
+  Note: if we're comparing unlifted things, e.g., if \tr{a1} and
   \tr{a2} are \tr{Float#}s, then we have to generate
 \begin{verbatim}
 case (a1 `eqFloat#` a2) of
@@ -288,7 +288,7 @@ cmp_eq (O3 a1 b1 c1) (O3 a2 b2 c2)
     }
 \end{verbatim}
 
-  Again, we must be careful about unboxed comparisons.  For example,
+  Again, we must be careful about unlifted comparisons.  For example,
   if \tr{a1} and \tr{a2} were \tr{Int#}s in the 2nd example above, we'd need to
   generate:
 
@@ -621,7 +621,7 @@ instance ... Ix (Foo ...) where
 	  False
 	}}}
 \end{verbatim}
-(modulo suitable case-ification to handle the unboxed tags)
+(modulo suitable case-ification to handle the unlifted tags)
 
 For a single-constructor type (NB: this includes all tuples), e.g.,
 \begin{verbatim}
@@ -1088,7 +1088,7 @@ data Foo ... = ...
 
 con2tag_Foo :: Foo ... -> Int#
 tag2con_Foo :: Int -> Foo ...	-- easier if Int, not Int#
-maxtag_Foo  :: Int		-- ditto (NB: not unboxed)
+maxtag_Foo  :: Int		-- ditto (NB: not unlifted)
 \end{verbatim}
 
 The `tags' here start at zero, hence the @fIRST_TAG@ (currently one)
@@ -1223,7 +1223,7 @@ compare_gen_Case fun lt eq gt a b
       generatedSrcLoc
 
 careful_compare_Case ty lt eq gt a b
-  = if not (isUnboxedType ty) then
+  = if not (isUnLiftedType ty) then
        compare_gen_Case compare_RDR lt eq gt a b
 
     else -- we have to do something special for primitive things...
@@ -1270,7 +1270,7 @@ append_Expr a b = genOpApp a append_RDR b
 
 eq_Expr :: Type -> RdrNameHsExpr -> RdrNameHsExpr -> RdrNameHsExpr
 eq_Expr ty a b
-  = if not (isUnboxedType ty) then
+  = if not (isUnLiftedType ty) then
        genOpApp a eq_RDR  b
     else -- we have to do something special for primitive things...
        genOpApp a relevant_eq_op b

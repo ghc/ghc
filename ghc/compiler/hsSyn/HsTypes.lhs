@@ -28,7 +28,7 @@ module HsTypes (
 
 import Class		( FunDep )
 import Type		( Type, Kind, PredType(..), ClassContext,
-			  splitSigmaTy, boxedTypeKind
+			  splitSigmaTy, liftedTypeKind
 			)
 import TypeRep		( Type(..), TyNote(..) )	-- toHsType sees the representation
 import TyCon		( isTupleTyCon, tupleTyConBoxity, tyConArity, getSynTyConDefn )
@@ -166,8 +166,8 @@ instance Outputable name => Outputable (HsPred name) where
     ppr (HsPIParam n ty)    = hsep [char '?' <> ppr n, text "::", ppr ty]
 
 pprHsTyVarBndr :: Outputable name => name -> Kind -> SDoc
-pprHsTyVarBndr name kind | kind == boxedTypeKind = ppr name
-			 | otherwise 	         = hsep [ppr name, dcolon, pprParendKind kind]
+pprHsTyVarBndr name kind | kind == liftedTypeKind = ppr name
+			 | otherwise 	          = hsep [ppr name, dcolon, pprParendKind kind]
 
 pprHsForAll []  []  = empty
 pprHsForAll tvs cxt 

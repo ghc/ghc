@@ -10,10 +10,10 @@ module Type (
 	Kind, TyVarSubst,
 
 	superKind, superBoxity,				-- KX and BX respectively
-	boxedBoxity, unboxedBoxity, 			-- :: BX
+	liftedBoxity, unliftedBoxity, 			-- :: BX
 	openKindCon, 					-- :: KX
 	typeCon,					-- :: BX -> KX
-	boxedTypeKind, unboxedTypeKind, openTypeKind, 	-- :: KX
+	liftedTypeKind, unliftedTypeKind, openTypeKind,	-- :: KX
 	mkArrowKind, mkArrowKinds,			-- :: KX -> KX -> KX
 
 	funTyCon,
@@ -61,7 +61,7 @@ module Type (
 	getDFunTyKey,
 
 	-- Lifting and boxity
-	isUnLiftedType, isUnboxedType, isUnboxedTupleType, isAlgType, isDataType, isNewType,
+	isUnLiftedType, isUnboxedTupleType, isAlgType, isDataType, isNewType,
 
 	-- Free variables
 	tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta,
@@ -110,7 +110,7 @@ import TyCon	( TyCon,
 -- others
 import Maybes		( maybeToBool )
 import SrcLoc		( noSrcLoc )
-import PrimRep		( PrimRep(..), isFollowableRep )
+import PrimRep		( PrimRep(..) )
 import Unique		( Uniquable(..) )
 import Util		( mapAccumL, seqList, thenCmp )
 import Outputable
@@ -132,7 +132,7 @@ hasMoreBoxityInfo k1 k2
 
 defaultKind :: Kind -> Kind
 -- Used when generalising: default kind '?' to '*'
-defaultKind kind | kind == openTypeKind = boxedTypeKind
+defaultKind kind | kind == openTypeKind = liftedTypeKind
 	         | otherwise	 	= kind
 \end{code}
 
@@ -845,19 +845,19 @@ typeKind :: Type -> Kind
 typeKind (TyVarTy tyvar)	= tyVarKind tyvar
 typeKind (TyConApp tycon tys)	= foldr (\_ k -> funResultTy k) (tyConKind tycon) tys
 typeKind (NoteTy _ ty)		= typeKind ty
-typeKind (PredTy _)		= boxedTypeKind		-- Predicates are always 
-							-- represented by boxed types
+typeKind (PredTy _)		= liftedTypeKind -- Predicates are always 
+						 -- represented by lifted types
 typeKind (AppTy fun arg)	= funResultTy (typeKind fun)
 
 typeKind (FunTy arg res)	= fix_up (typeKind res)
 				where
 				  fix_up (TyConApp tycon _) |  tycon == typeCon
-							    || tycon == openKindCon = boxedTypeKind
+							    || tycon == openKindCon = liftedTypeKind
 				  fix_up (NoteTy _ kind) = fix_up kind
 				  fix_up kind	         = kind
 		-- The basic story is 
 		-- 	typeKind (FunTy arg res) = typeKind res
-		-- But a function is boxed regardless of its result type
+		-- But a function is lifted regardless of its result type
 		-- Hence the strange fix-up.
 		-- Note that 'res', being the result of a FunTy, can't have 
 		-- a strange kind like (*->*).
@@ -1023,14 +1023,11 @@ tidyTopType ty = tidyType emptyTidyEnv ty
 
 %************************************************************************
 %*									*
-\subsection{Boxedness and liftedness}
+\subsection{Liftedness}
 %*									*
 %************************************************************************
 
 \begin{code}
-isUnboxedType :: Type -> Bool
-isUnboxedType ty = not (isFollowableRep (typePrimRep ty))
-
 isUnLiftedType :: Type -> Bool
 	-- isUnLiftedType returns True for forall'd unlifted types:
 	--	x :: forall a. Int#

@@ -28,7 +28,7 @@ import CmdLineOpts	( opt_IrrefutableTuples )
 import DataCon		( dataConSig, dataConFieldLabels, 
 			  dataConSourceArity
 			)
-import Type		( isTauTy, mkTyConApp, mkClassPred, boxedTypeKind )
+import Type		( isTauTy, mkTyConApp, mkClassPred, liftedTypeKind )
 import Subst		( substTy, substClasses )
 import TysPrim		( charPrimTy, intPrimTy, floatPrimTy,
 			  doublePrimTy, addrPrimTy
@@ -234,7 +234,7 @@ tcPat tc_bndr pat@(RecPatIn name rpats) pat_ty
 		-- If foo isn't one of R's fields, we don't want to crash when
 		-- typechecking the "a+b".
 	   [] -> addErrTc (badFieldCon name field_label)	`thenNF_Tc_` 
-		 newTyVarTy boxedTypeKind			`thenNF_Tc_` 
+		 newTyVarTy liftedTypeKind			`thenNF_Tc_` 
 		 returnTc (error "Bogus selector Id", pat_ty)
 
 		-- The normal case, when the field comes from the right constructor

@@ -5,12 +5,12 @@
 
 \begin{code}
 module TcMonoType ( tcHsType, tcHsRecType, 
-		    tcHsSigType, tcHsBoxedSigType, 
+		    tcHsSigType, tcHsLiftedSigType, 
 		    tcRecClassContext, checkAmbiguity,
 
 			-- Kind checking
 		    kcHsTyVar, kcHsTyVars, mkTyClTyVars,
-		    kcHsType, kcHsSigType, kcHsBoxedSigType, kcHsContext,
+		    kcHsType, kcHsSigType, kcHsLiftedSigType, kcHsContext,
 		    tcTyVars, tcHsTyVars, mkImmutTyVars,
 
 		    TcSigInfo(..), tcTySig, mkTcSig, maybeSig,
@@ -42,7 +42,7 @@ import Type		( Type, Kind, PredType(..), ThetaType, SigmaType, TauType,
                           zipFunTys, hoistForAllTys,
 			  mkSigmaTy, mkPredTy, mkTyConApp,
 			  mkAppTys, splitForAllTys, splitRhoTy, mkRhoTy,
-			  boxedTypeKind, unboxedTypeKind, mkArrowKind,
+			  liftedTypeKind, unliftedTypeKind, mkArrowKind,
 			  mkArrowKinds, getTyVar_maybe, getTyVar, splitFunTy_maybe,
 		  	  tidyOpenType, tidyOpenTypes, tidyTyVar, tidyTyVars,
 			  tyVarsOfType, tyVarsOfPred, mkForAllTys,
@@ -161,45 +161,45 @@ newNamedKindVar name = newKindVar	`thenNF_Tc` \ kind ->
 		       returnNF_Tc (name, kind)
 
 ---------------------------
-kcBoxedType :: RenamedHsType -> TcM ()
-	-- The type ty must be a *boxed* *type*
-kcBoxedType ty
+kcLiftedType :: RenamedHsType -> TcM ()
+	-- The type ty must be a *lifted* *type*
+kcLiftedType ty
   = kcHsType ty				`thenTc` \ kind ->
     tcAddErrCtxt (typeKindCtxt ty)	$
-    unifyKind boxedTypeKind kind
+    unifyKind liftedTypeKind kind
     
 ---------------------------
 kcTypeType :: RenamedHsType -> TcM ()
-	-- The type ty must be a *type*, but it can be boxed or unboxed.
+	-- The type ty must be a *type*, but it can be lifted or unlifted.
 kcTypeType ty
   = kcHsType ty				`thenTc` \ kind ->
     tcAddErrCtxt (typeKindCtxt ty)	$
     unifyOpenTypeKind kind
 
 ---------------------------
-kcHsSigType, kcHsBoxedSigType :: RenamedHsType -> TcM ()
+kcHsSigType, kcHsLiftedSigType :: RenamedHsType -> TcM ()
 	-- Used for type signatures
 kcHsSigType  	 = kcTypeType
-kcHsBoxedSigType = kcBoxedType
+kcHsLiftedSigType = kcLiftedType
 
 ---------------------------
 kcHsType :: RenamedHsType -> TcM TcKind
 kcHsType (HsTyVar name)	      = kcTyVar name
 
 kcHsType (HsListTy ty)
-  = kcBoxedType ty		`thenTc` \ tau_ty ->
-    returnTc boxedTypeKind
+  = kcLiftedType ty		`thenTc` \ tau_ty ->
+    returnTc liftedTypeKind
 
 kcHsType (HsTupleTy (HsTupCon _ boxity _) tys)
   = mapTc kcTypeType tys	`thenTc_`
     returnTc (case boxity of
-		  Boxed   -> boxedTypeKind
-		  Unboxed -> unboxedTypeKind)
+		  Boxed   -> liftedTypeKind
+		  Unboxed -> unliftedTypeKind)
 
 kcHsType (HsFunTy ty1 ty2)
   = kcTypeType ty1	`thenTc_`
     kcTypeType ty2	`thenTc_`
-    returnTc boxedTypeKind
+    returnTc liftedTypeKind
 
 kcHsType ty@(HsOpTy ty1 op ty2)
   = kcTyVar op				`thenTc` \ op_kind ->
@@ -211,7 +211,7 @@ kcHsType ty@(HsOpTy ty1 op ty2)
    
 kcHsType (HsPredTy pred)
   = kcHsPred pred		`thenTc_`
-    returnTc boxedTypeKind
+    returnTc liftedTypeKind
 
 kcHsType ty@(HsAppTy ty1 ty2)
   = kcHsType ty1			`thenTc` \ tc_kind ->
@@ -224,7 +224,7 @@ kcHsType (HsForAllTy (Just tv_names) context ty)
     tcExtendKindEnv kind_env	$
     kcHsContext context		`thenTc_`
     kcHsType ty			`thenTc_`
-    returnTc boxedTypeKind
+    returnTc liftedTypeKind
 
 ---------------------------
 kcAppKind fun_kind arg_kind
@@ -244,13 +244,13 @@ kcHsContext ctxt = mapTc_ kcHsPred ctxt
 kcHsPred :: RenamedHsPred -> TcM ()
 kcHsPred pred@(HsPIParam name ty)
   = tcAddErrCtxt (appKindCtxt (ppr pred))	$
-    kcBoxedType ty
+    kcLiftedType ty
 
 kcHsPred pred@(HsPClass cls tys)
   = tcAddErrCtxt (appKindCtxt (ppr pred))	$
     kcClass cls					`thenTc` \ kind ->
     mapTc kcHsType tys				`thenTc` \ arg_kinds ->
-    unifyKind kind (mkArrowKinds arg_kinds boxedTypeKind)
+    unifyKind kind (mkArrowKinds arg_kinds liftedTypeKind)
 
  ---------------------------
 kcTyVar name	-- Could be a tyvar or a tycon
@@ -275,10 +275,10 @@ kcClass cls	-- Must be a class
 %*									*
 %************************************************************************
 
-tcHsSigType and tcHsBoxedSigType
+tcHsSigType and tcHsLiftedSigType
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-tcHsSigType and tcHsBoxedSigType are used for type signatures written by the programmer
+tcHsSigType and tcHsLiftedSigType are used for type signatures written by the programmer
 
   * We hoist any inner for-alls to the top
 
@@ -289,10 +289,10 @@ tcHsSigType and tcHsBoxedSigType are used for type signatures written by the pro
   	so the kind returned is indeed a Kind not a TcKind
 
 \begin{code}
-tcHsSigType, tcHsBoxedSigType :: RenamedHsType -> TcM Type
+tcHsSigType, tcHsLiftedSigType :: RenamedHsType -> TcM Type
   -- Do kind checking, and hoist for-alls to the top
 tcHsSigType      ty = kcTypeType ty  `thenTc_`  tcHsType ty	
-tcHsBoxedSigType ty = kcBoxedType ty `thenTc_`  tcHsType ty
+tcHsLiftedSigType ty = kcLiftedType ty `thenTc_`  tcHsType ty
 
 tcHsType    ::            RenamedHsType -> TcM Type
 tcHsRecType :: RecFlag -> RenamedHsType -> TcM Type

@@ -43,7 +43,7 @@ import BasicTypes	( Fixity(..), FixityDirection(..),
 			)
 import CostCentre       ( CostCentre(..), IsCafCC(..), IsDupdCC(..) )
 import CallConv         ( cCallConv )
-import Type		( Kind, mkArrowKind, boxedTypeKind, openTypeKind, usageTypeKind )
+import Type		( Kind, mkArrowKind, liftedTypeKind, openTypeKind, usageTypeKind )
 import IdInfo           ( exactArity, InlinePragInfo(..) )
 import PrimOp           ( CCall(..), CCallTarget(..) )
 import Lex		
@@ -693,7 +693,7 @@ tv_name		:: { RdrName }
 
 tv_bndr		:: { HsTyVarBndr RdrName }
 		:  tv_name '::' akind	{ IfaceTyVar $1 $3 }
-		|  tv_name		{ IfaceTyVar $1 boxedTypeKind }
+		|  tv_name		{ IfaceTyVar $1 liftedTypeKind }
 
 tv_bndrs	:: { [HsTyVarBndr RdrName] }
 		: tv_bndrs1		{ $1 }
@@ -726,7 +726,7 @@ kind		:: { Kind }
 
 akind		:: { Kind }
 		: VARSYM		{ if $1 == SLIT("*") then
-						boxedTypeKind
+						liftedTypeKind
 					  else if $1 == SLIT("?") then
 						openTypeKind
 					  else if $1 == SLIT("\36") then
@@ -895,7 +895,7 @@ core_val_bndr	: var_name '::' atype				{ UfValBinder $1 $3 }
 
 core_tv_bndr	:: { UfBinder RdrName }
 core_tv_bndr	:  '@' tv_name '::' akind		{ UfTyBinder $2 $4 }
-		|  '@' tv_name			        { UfTyBinder $2 boxedTypeKind }
+		|  '@' tv_name			        { UfTyBinder $2 liftedTypeKind }
 
 ccall_string	:: { FAST_STRING }
 		: STRING					{ $1 }

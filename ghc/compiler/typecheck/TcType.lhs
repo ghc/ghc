@@ -47,9 +47,9 @@ import Type		( PredType(..),
 			  getTyVar, mkAppTy, mkUTy,
 			  splitPredTy_maybe, splitForAllTys, 
 			  isTyVarTy, mkTyVarTy, mkTyVarTys, 
-			  openTypeKind, boxedTypeKind, 
+			  openTypeKind, liftedTypeKind, 
 			  superKind, superBoxity, 
-			  defaultKind, boxedBoxity
+			  defaultKind, liftedBoxity
 			)
 import Subst		( Subst, mkTopTyVarSubst, substTy )
 import TyCon		( mkPrimTyCon )
@@ -318,18 +318,18 @@ zonkKindEnv pairs
 	-- When zonking a kind, we want to
 	--	zonk a *kind* variable to (Type *)
 	--	zonk a *boxity* variable to *
-    zonk_unbound_kind_var kv | tyVarKind kv == superKind   = tcPutTyVar kv boxedTypeKind
-			     | tyVarKind kv == superBoxity = tcPutTyVar kv boxedBoxity
+    zonk_unbound_kind_var kv | tyVarKind kv == superKind   = tcPutTyVar kv liftedTypeKind
+			     | tyVarKind kv == superBoxity = tcPutTyVar kv liftedBoxity
 			     | otherwise		   = pprPanic "zonkKindEnv" (ppr kv)
 			
 zonkTcTypeToType :: TcType -> NF_TcM Type
 zonkTcTypeToType ty = zonkType zonk_unbound_tyvar ty
   where
 	-- Zonk a mutable but unbound type variable to
-	--	Void		if it has kind Boxed
+	--	Void		if it has kind Lifted
 	--	:Void		otherwise
     zonk_unbound_tyvar tv
-	| kind == boxedTypeKind
+	| kind == liftedTypeKind
 	= tcPutTyVar tv voidTy	-- Just to avoid creating a new tycon in
 				-- this vastly common case
 	| otherwise
@@ -359,7 +359,7 @@ zonkTcTyVarToTyVar :: TcTyVar -> NF_TcM TyVar
 zonkTcTyVarToTyVar tv
   = let
 		-- Make an immutable version, defaulting 
-		-- the kind to boxed if necessary
+		-- the kind to lifted if necessary
 	immut_tv    = mkTyVar (tyVarName tv) (defaultKind (tyVarKind tv))
 	immut_tv_ty = mkTyVarTy immut_tv
 
