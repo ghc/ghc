@@ -260,7 +260,7 @@ collect2s(W_ reqsize, smInfo *sm)
 #ifdef PAR
     RebuildGAtables(rtsTrue);
 #else
-    reportDeadForeignObjs( sm->ForeignObjList, NULL, &(sm->ForeignObjList) );
+    reportDeadForeignObjs( sm->ForeignObjList, NULL, &(sm->ForeignObjList));
 #endif /* PAR */
 
     /* TIDY UP AND RETURN */
@@ -521,7 +521,7 @@ collectHeap(reqsize, sm, do_full_collection)
     RebuildGAtables(rtsFalse);
 #else
     reportDeadForeignObjs(sm->ForeignObjList, 
-			  sm->OldForeignObjList, 
+  		          sm->OldForeignObjList, 
 			  &(sm->OldForeignObjList));
     sm->ForeignObjList = NULL;   /* all (new) ForeignObjs have been promoted */
 #endif /* PAR */
