@@ -161,8 +161,8 @@ Trace_ForeignObj( FOptr )
   P_ FOptr;
 {
   if (RTSflags.GcFlags.trace & DEBUG_TRACE_FOREIGNOBJS) {
-    printf("DEBUG: ForeignObj(%lx)=<%lx,_,%lx,%lx,%lx>\n", (W_) FOptr, (W_) FOptr[0], (W_) FOptr[1], (W_) FOptr[2], (W_) FOptr[3]);
-    printf(" Data = %lx, Finaliser = %lx, Next = %lx\n", 
+    printf("DEBUG: ForeignObj(%0x)=<%0x,%0x,%0x,%0x>\n", (W_) FOptr, (W_) FOptr[0], (W_) FOptr[1], (W_) FOptr[2], (W_) FOptr[3]);
+    printf(" Data = %0x, Finaliser = %0x, Next = %0x\n", 
 	(W_) ForeignObj_CLOSURE_DATA(FOptr), 
 	(W_) ForeignObj_CLOSURE_FINALISER(FOptr), 
 	(W_) ForeignObj_CLOSURE_LINK(FOptr) );
@@ -358,6 +358,74 @@ reportDeadForeignObjs(oldFOList, new, newFOList)
 
     VALIDATE_ForeignObjList( new );
     *newFOList = new;
+}
+#endif /* _INFO_COPYING */
+\end{code}
+
+@freeForeigns@ summarily calls the finaliser routines for
+all live foreign objects, done when closing down.
+(code is just a rip off of the above).
+
+\begin{code}
+#if defined(_INFO_COPYING)
+
+#if defined(DEBUG)
+# if defined(GCgn)
+
+EXTDATA_RO(Forward_Ref_New_info);
+EXTDATA_RO(Forward_Ref_Old_info);
+EXTDATA_RO(OldRoot_Forward_Ref_info);
+
+# else
+
+EXTDATA_RO(Forward_Ref_info);
+
+# endif
+#endif
+
+/* 
+  Call the ForeignObj finalising routine on all the live FOs,
+  used when shutting down.
+*/
+int
+freeForeigns(foList)
+  P_ foList;
+{
+    P_ FOptr, temp;
+    I_ FO_deaths = 0;
+
+    /* At this point, exitSSM() has been calledthe ForeignObjList is in an invalid state (since
+       some info ptrs will have been mangled) so we can't validate
+       it. ADR */
+
+    DEBUG_STRING("Freeing all live Foreign Objects:");
+    FOptr = foList;
+    while ( FOptr != NULL ) {
+
+	/* I'm not convinced that the situation of having
+	   indirections linked into the FO list can ever occur,
+	   but chasing indirections doesn't hurt. */
+       while(IS_INDIRECTION(INFO_PTR(FOptr))) {
+    	   FOptr = (P_) IND_CLOSURE_PTR(FOptr);
+       }
+
+       if ((P_) INFO_PTR(FOptr) == ForeignObj_info ) {
+          TRACE_ForeignObj(FOptr);
+          TRACE_FOdies(FOptr);
+          (*(void (*)(StgAddr))(ForeignObj_CLOSURE_FINALISER(FOptr)))((StgAddr)ForeignObj_CLOSURE_DATA(FOptr));
+          FO_deaths++;
+
+          temp  = FOptr;
+          FOptr = ForeignObj_CLOSURE_LINK(FOptr);
+     
+          /* Now trash the closure to encourage bugs to show themselves */
+          TRASH_ForeignObj_CLOSURE( temp );
+      } else {
+	  fprintf(stderr, "Warning: Foreign object list contained unexpected element, bailing out of FO cleanup.\n"); 
+	  return 1;
+      }
+    }
+    return 0;
 }
 #endif /* _INFO_COPYING */
 \end{code}

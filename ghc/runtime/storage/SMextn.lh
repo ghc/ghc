@@ -9,6 +9,7 @@ void initExtensions PROTO((smInfo *sm));
 
 void evacSPTable PROTO((smInfo *sm));
 void reportDeadForeignObjs PROTO((StgPtr oldMPList, StgPtr new, StgPtr *newMPLust));
+int  freeForeigns PROTO((StgPtr foList));
 
 # endif /* _INFO_COPYING */
 

@@ -23,8 +23,10 @@ A filehandle to which any storage-manager statistics should be written.
 rtsBool
 exitSM (smInfo *sm_info)
 {
+    int rc;
      /* Upon closing down the storage manager, we free all foreign objects */
-    freeForeigns(sm_info->ForeignObjList);
+    rc = freeForeigns(sm_info->ForeignObjList);
+     /* Return code ignored for now */
     stat_exit(sm_info->hp - hp_start);
 
     return rtsTrue; /* I'm happy */
