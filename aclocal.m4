@@ -999,16 +999,19 @@ else
 
     FP_CHECK_GL_HELPER([GL], [-lGL -lopengl32], [@%:@include <GL/gl.h>], [glEnd()])
 
-    # Ugly: To get wglGetProcAddress on Windows, we have to link with
-    # opengl32.dll, too, even when we are using Cygwin with X11.
-    case "$GL_LIBS" in
-      *-lopengl32*|*opengl32.lib*) ;;
-      *) fp_save_LIBS="$LIBS"
-         LIBS="$LIBS -lopengl32"
-         AC_TRY_LINK([@%:@include <GL/gl.h>], [glEnd()], [GL_LIBS="$GL_LIBS -lopengl32"])
-         LIBS="$fp_save_LIBS"
-         ;;
-    esac
+    if test x"$no_GL" != xyes; then
+      # Ugly: To get wglGetProcAddress on Windows, we have to link with
+      # opengl32.dll, too, even when we are using Cygwin with X11.
+      case "$GL_LIBS" in
+        *-lopengl32*|*opengl32.lib*) ;;
+        *) fp_save_LIBS="$LIBS"
+           LIBS="$LIBS -lopengl32"
+           AC_TRY_LINK([@%:@include <GL/gl.h>], [glEnd()],
+             [GL_LIBS="$GL_LIBS -lopengl32"; GL_LIBS0="$GL_LIBS0 -lopengl32"])
+           LIBS="$fp_save_LIBS"
+           ;;
+      esac
+    fi
   fi
 fi
 
