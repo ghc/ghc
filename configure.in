@@ -373,7 +373,7 @@ case $HostPlatform in
   i386-unknown-mingw32 | i386-unknown-cygwin32)
   	# convert $hardtop to a path that mingw will understand too
 	cyghardtop=${hardtop}
-	hardtop=`cygpath -m ${cyghardtop}`
+	hardtop=`cygpath -w ${cyghardtop} | sed -e 's@\\\\@/@g'`
   	hardtop_plat=`cygpath -w ${cyghardtop} | sed -e 's@\\\\@\\\\\\\\@g'`
 	;;
   *)
