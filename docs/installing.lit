@@ -83,12 +83,10 @@ confidence will work well by having tested it (more) thoroughly.
 
 Source-only distributions are either bugfix releases or snapshots of
 current state of development. The release has undergone some testing.
-
-GHC~2.08 is a source-only release, and it can be compiled up using
-either GHC~2.02 (or subsequent bugfix releases) or the Good Old
-Compiler, GHC~0.29. Compiling with 0.29 is recommended if you're
-a performance junkie, as 0.29 (still) generates zippier code, but
-GHC~2.08 is catching up.
+Source releases of 2.0x can be compiled up using 2.07 (or subsequent
+bugfix releases) or the Good Old Compiler, GHC~0.29. Compiling with
+0.29 is recommended if you're a performance junkie, as 0.29 (still)
+generates zippier code, but GHC~2.0x is catching up.
 
 \item[Build GHC from intermediate C \tr{.hc} files:] 
 You need a working GHC to use a source distribution. What if you don't
@@ -155,10 +153,10 @@ know the disk requirements for the non-GHC tools).
 \item
 Use an appropriate machine, compilers, and things.
 
-SPARC boxes and DEC Alphas running OSF/1 are fully supported.
-Linux, MIPS, AIX, Win32 and HP boxes are in pretty good shape.
-\Sectionref{port-info} gives the full run-down on ports or lack
-thereof.
+SPARC boxes, DEC Alphas running OSF/1, and PCs running Linux, FreeBSD,
+or Solaris are all fully supported.  MIPS, AIX, Win32 and HP boxes are
+in pretty good shape.  \Sectionref{port-info} gives the full run-down
+on ports or lack thereof.
 
 \item
 Be sure that the ``pre-supposed'' utilities are installed.
@@ -179,7 +177,7 @@ If in doubt, please send a message to \tr{glasgow-haskell-bugs@dcs.gla.ac.uk}.
 
 %************************************************************************
 %*									*
-\section[port-info]{What machines the Glasgow tools, version~2.08, run on}
+\section[port-info]{What machines the Glasgow tools run on}
 \index{ports, GHC}
 \index{GHC ports}
 \index{supported platforms}
@@ -226,8 +224,8 @@ unsurprisingly.  Both have native-code generators, for quicker
 compilations.  The native-code generator for iX86 platforms (e.g.,
 Linux ELF) is {\em nearly} working; but is not turned on by default.
 
-Here's everything that's known about GHC ports, as of 2.08. We
-identify platforms by their ``canonical'' CPU/Manufacturer/OS triple.
+Here's everything that's known about GHC ports.  We identify platforms
+by their ``canonical'' CPU/Manufacturer/OS triple.
 
 Note that some ports are fussy about which GCC version you use; or
 require GAS; or ...
@@ -267,7 +265,7 @@ Concurrent/Parallel Haskell probably don't work (yet).
 %-------------------------------------------------------------------
 \item[\tr{i386-*-linux} (PCs running Linux---ELF format):]
 \index{i386-*-linux: registerised port}
-GHC~2.08 works registerised.
+GHC works registerised.
 You {\em must} have GCC 2.7.x or later.
 The iX86 native-code generator is {\em nearly} there, but it
 isn't turned on by default.
@@ -284,7 +282,7 @@ On old Linux a.out systems: should be the same.
 %-------------------------------------------------------------------
 \item[\tr{i386-*-freebsd} (PCs running FreeBSD 2.2 or higher, and
 NetBSD/OpenBSD using FreeBSD emulation):] \index{i386-*-freebsd:
-registerised port} GHC~2.08 works registerised. Supports same set of
+registerised port} GHC works registerised. Supports same set of
 bundles as the above.
 
 \index{i386-*-freebsd: profiling---yes}
@@ -306,7 +304,7 @@ Profiling works, so does Concurrent Haskell.
 %-------------------------------------------------------------------
 \item[\tr{mips-sgi-irix5}:]
 \index{mips-sgi-irix5: registerised port}
-GHC~2.08 works registerised (no native-code generator).
+GHC works registerised (no native-code generator).
 I suspect any GCC~2.6.x (or later) is OK.  The GCC that I used
 was built with \tr{--with-gnu-as}; turns out that is important!
 
@@ -320,7 +318,7 @@ Profiling might work, but it is untested.
 \item[\tr{mips-sgi-irix6}:]
 \index{mips-sgi-irix6: registerised port}
 Thanks to the fine efforts of Tomasz Cholewo
-\tr{<tjchol01@mecca.spd.louisville.edu>}, GHC~2.08 works registerised
+\tr{<tjchol01@mecca.spd.louisville.edu>}, GHC works registerised
 (no native code generator) under IRIX 6.2 and 6.3. Depends on having
 specially tweaked version of gcc-2.7.2 around, which can be downloaded
 from
@@ -337,7 +335,7 @@ Profiling works, Concurrent/Parallel Haskell might work (AFAIK, untested).
 %-------------------------------------------------------------------
 \item[\tr{powerpc-ibm-aix}:]
 \index{powerpc-ibm-aix: registerised port}
-GHC~2.08 works registerised (no native-code generator..yet).
+GHC works registerised (no native-code generator..yet).
 I suspect 2.7.x is what you need together with this.
 
 Concurrent/Parallel Haskell probably don't work (yet).
@@ -370,7 +368,7 @@ Concurrent/Parallel Haskell probably won't work (yet).
 %-------------------------------------------------------------------
 \item[\tr{m68k-sun-sunos4} (Sun3):]
 \index{m68k-sun-sunos4: registerised port}
-GHC~2.08 hasn't been tried on a Sun3.  GHC~0.26 worked registerised.
+GHC 2.0x hasn't been tried on a Sun3.  GHC~0.26 worked registerised.
 No native-code generator.
 
 Concurrent/Parallel Haskell probably don't work (yet).
@@ -416,7 +414,7 @@ one bundle per file called \tr{<bundle>-<platform>.tar.gz}.
 Suppose that you untar a binary-distribution bundle, thus:
 \begin{verbatim}
   % cd /your/scratch/space
-  % gunzip < ghc-2.08-sun-sparc-solaris2.tar.gz | tar xvf -
+  % gunzip < ghc-x.xx-sun-sparc-solaris2.tar.gz | tar xvf -
 \end{verbatim}
 Then you should find a single directory, @fptools@, with the following
 structure:
@@ -431,8 +429,9 @@ structure:
 directly by the user.  These are the files that must end up in your path.
 \item[@lib/<platform>@] contains platform-specific support files for the installation.
 Typically there is a subdirectory for each @fptools@ project, whose name is
-the name of the project with its version number.
-For example, for GHC 2.08 there would be a sub-directory @ghc-2.08/@.
+the name of the project with its version number.  For example, for GHC 
+there would be a sub-directory @ghc-x.xx/@ where @x.xx@ is the version 
+number of GHC in the bundle.
 
 These sub-directories have the following general structure:
 \begin{description}
@@ -453,8 +452,8 @@ This structure is designed so that you can unpack multiple bundles (including
 ones from different releases or platforms) into a single @fptools@ directory:
 \begin{verbatim}
   % cd /your/scratch/space
-  % gunzip < ghc-2.08-sun-sparc-solaris2.tar.gz | tar xvf -
-  % gunzip < happy-1.09-sun-sparc-sunos4.tar.gz | tar xvf -
+  % gunzip < ghc-x.xx-sun-sparc-solaris2.tar.gz | tar xvf -
+  % gunzip < happy-x.xx-sun-sparc-sunos4.tar.gz | tar xvf -
 \end{verbatim}
 When you do multiple unpacks like this, the top level @Makefile@, @README@,
 and @INSTALL@ get overwritten each time.  That's fine -- they should be the same.
@@ -518,17 +517,17 @@ If things don't work as expected, check the list of know pitfalls
 \end{enumerate}
 
 When installing the user-invokable binaries, this installation
-procedure will install, say, @GHC@ version 2.08 as @ghc-2.08@.  It
-will also make a link (in the binary installation directory) from
-@ghc@ to @ghc-2.08@.  If you install multiple versions of GHC then the
-last one ``wins'', and ``@ghc@'' will invoke the last one installed.
-You can change this manually if you want.  But regardless, @ghc-2.08@
-should always invoke @GHC@ version 2.08.
+procedure will install GHC as @ghc-x.xx@ where @x.xx@ is the version
+number of GHC.  It will also make a link (in the binary installation
+directory) from @ghc@ to @ghc-x.xx@.  If you install multiple versions
+of GHC then the last one ``wins'', and ``@ghc@'' will invoke the last
+one installed.  You can change this manually if you want.  But
+regardless, @ghc-x.xx@ should always invoke GHC version @x.xx@.
 
 \subsection{What bundles there are}
 
 There are plenty of ``non-basic'' GHC bundles.  The files for them are
-called \tr{ghc-2.08-<bundle>-<platform>.tar.gz}, where the
+called \tr{ghc-x.xx-<bundle>-<platform>.tar.gz}, where the
 \tr{<platform>} is as above, and \tr{<bundle>} is one of these:
 \begin{description}
 \item[\tr{prof}:]  Profiling with cost-centres.  You probably want this.
@@ -571,7 +570,7 @@ main = putStr "Hello, world!\n"
 First, give yourself a convenient way to execute the driver script
 \tr{ghc/driver/ghc}, perhaps something like...
 \begin{verbatim}
-% ln -s /local/src/ghc-2.08/ghc/driver/ghc ~/bin/alpha/ghc
+% ln -s /local/src/ghc-x.xx/ghc/driver/ghc ~/bin/alpha/ghc
 % rehash
 \end{verbatim}
 
@@ -787,11 +786,10 @@ are needed to build others.  For example, you need @happy@ to build
 a version of @happy@ that's already installed on your system, or 
 grab a binary distribution of @happy@ and install it.
 
-The important thing to remember is that even if you want only
-one project (@happy@, say), you must have a source tree
-whose root directory contains @Makefile@, 
-@mk/@, @configure.in@, and the project(s) you 
-want (@happy/@ in this case).  You cannot get by with 
+The important thing to remember is that even if you want only one
+project (@happy@, say), you must have a source tree whose root
+directory contains @Makefile@, @mk/@, @configure.in@, and the
+project(s) you want (@happy/@ in this case).  You cannot get by with
 just the @happy/@ directory.
 
 \subsection{Build trees}
@@ -869,23 +867,20 @@ or off.  And so on.
 All of this stuff is called the {\em configuration} of your build.
 You set the configuration using an exciting three-step process.
 \begin{description}
-\item[Step 1: get ready for configuration.]
-Change directory to @$(FPTOOLS)@ and issue the following two commands (with no arguments):
-\begin{enumerate}
-\item @autoconf@. This GNU program
-converts @$(FPTOOLS)/configure.in@ to a shell script 
-called @$(FPTOOLS)/configure@.
 
-\item @autoheader@.  This second GNU program converts
-@$(FPTOOLS)/configure.in@ to @$(FPTOOLS)/mk/config.h.in@.
-\end{enumerate}
+\item[Step 1: get ready for configuration.]  Change directory to
+@$(FPTOOLS)@ and issue the command @autoconf@ (with no
+arguments). This GNU program converts @$(FPTOOLS)/configure.in@ to a
+shell script called @$(FPTOOLS)/configure@.
+
 Both these steps are completely platform-independent; they just mean
 that the human-written file (@configure.in@) can be short, although
-the resulting shell script, @configure@, and @mk/config.h.in@, are long.
+the resulting shell script, @configure@, and @mk/config.h.in@, are
+long.
 
-In case you don't have @autoconf@ and @autoheader@ we distribute
-the results, @configure@, and @mk/config.h.in@, with the source distribution.
-They aren't kept in the repository, though.
+In case you don't have @autoconf@ we distribute the results,
+@configure@, and @mk/config.h.in@, with the source distribution.  They
+aren't kept in the repository, though.
 
 \item[Step 2: system configuration.]
 Runs the newly-created @configure@ script, thus:
@@ -912,7 +907,9 @@ all Makefiles.
 The latter is @#include@d by various C programs, which
 can thereby make use of configuration information.
 \end{itemize}
-
+@configure@ caches the results of its run in @config.cache@.
+Quite often you don't want that; you're running @configure@ a second time
+because something has changed.  In that case, simply delete @config.cache@.
 
 \item[Step 3: build configuration.] Next, you say how this build
 of @fptools@ is to differ from the standard defaults by creating a new 
@@ -974,6 +971,13 @@ to use instead, that's fine. Just add this line to @mk/build.mk@:
 You do not {\em have} to have a @mk/build.mk@ file at all; if you don't,
 you'll get all the default settings from @mk/config.mk.in@.
 
+You can also use @build.mk@ to override anything that @configure@ got
+wrong.  One place where this happens often is with the definition of
+@FPTOOLS_TOP_ABS@: this variable is supposed to be the canonical path
+to the top of your source tree, but if your system uses an automounter
+then the correct directory is hard to find automatically.  If you find
+that @configure@ has got it wrong, just put the correct definition in
+@build.mk@.
 
 \subsection{The story so far}
 
@@ -1003,7 +1007,6 @@ to happen there now.
 \item Prepare for system configuration:
 \begin{verbatim}
     autoconf
-    autoheader
 \end{verbatim}
 (You can skip this step if you are starting from a source distribution,
 and you already have @configure@ and @mk/config.h.in@.)
@@ -1730,7 +1733,7 @@ installation, this bug also suggests that you have an old GCC.
 \item
 You {\em may} need to re-\tr{ranlib} your libraries (on Sun4s).
 \begin{verbatim}
-% cd $(libdir)/ghc-2.08/sparc-sun-sunos4
+% cd $(libdir)/ghc-x.xx/sparc-sun-sunos4
 % foreach i ( `find . -name '*.a' -print` ) # or other-shell equiv...
 ?    ranlib $i
 ?    # or, on some machines: ar s $i
@@ -1763,72 +1766,6 @@ Alas, \tr{cpp} doesn't tell you the offending file!
 
 Workaround: don't put wierd things in string args to \tr{cpp} macros.
 \end{enumerate}
-
-
-
-% ====================================================================
-%Here follow pitfalls that apply to pre-2.02 releases.  They should not
-%happen any more If they do crop up with 2.02 or later, please let us
-%know.
-
-\begin{enumerate}
-%%------------------------------------------------------------------------
-%\item
-%When configuring the support code (mkworld, glafp-utils, etc.), you
-%will see mention of \tr{NO_SPECIFIC_PROJECT} and
-%\tr{NO_SPECIFIC_VERSION}.  This is cool.
-
-
-%------------------------------------------------------------------------
-%\item
-%Sooner or later in your ``make-worlding'' life you will do and see
-%something like:
-%\begin{verbatim}
-% make Makefile
-%        rm -f Makefile.bak; mv Makefile Makefile.bak
-%../.././mkworld/jmake -P ghc -S std -I../.././mkworld -DTopDir=../../. -DTopDir=...
-%../.././mkworld/jrestoredeps
-%==== The new Makefile is for: ====
-%make: Fatal error in reader: Makefile, line 850: Unexpected end of line seen
-%Current working directory /export/users/fp/grasp/ghc-0.26/ghc/runtimes/standard
-%*** Error code 1
-%make: Fatal error: Command failed for target `Makefile'
-%\end{verbatim}
-
-%Don't panic!  It should restore your previous \tr{Makefile}, and
-%leave the junk one in \tr{Makefile.bad}.  Snoop around at your leisure.
-
-% ------------------------------------------------------------------------
-%\item
-%If you do corrupt a \tr{Makefile} totally, or you need to glue a new
-%directory into the directory structure (in \tr{newdir}---which must
-%have a \tr{Jmakefile}, even if empty), here's a neat trick:
-%\begin{verbatim}
-%#
-%# move to the directory just above the one where you want a Makefile...
-%cd ..
-%#
-%# make Makefiles, but lie about the directories below...
-%make Makefiles SUBDIRS=newdir
-%\end{verbatim}
-
-%This will create a \tr{Makefile} {\em ex nihilo} in \tr{newdir}, and
-%it will be properly wired into the general make-world structure.
-
-% ------------------------------------------------------------------------
-\item
-Don't configure/build/install using a variety of machines.  A
-mistake we've made is to do \tr{make Makefiles} on a Sun4, then try to
-build GHC (\tr{make all}) on a Sun3.
-
-%------------------------------------------------------------------------
-%\item
-%If you build an ``unregisterised'' build, you will get bazillions of
-%warnings about `ANSI C forbids braced-groups within expressions'.
-%Especially in \tr{ghc/lib}.  These are OK.
-
-\end{enumerate}
-
 
 \begin{onlystandalone}
 \printindex
