@@ -1,4 +1,4 @@
-__interface MCIzumakezuconstr 1 409 where
+__interface MCIzumakezuconstr 1 where
 __export MCIzumakezuconstr 
    mcizumakezuconstrI
    mcizumakezuconstr

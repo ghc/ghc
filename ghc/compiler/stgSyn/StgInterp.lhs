@@ -36,9 +36,17 @@ import Addr		-- again ...
 import Word
 import Bits
 
+
+runStgI :: [TyCon] -> [Class] -> [StgBinding] -> IO Int
+
+#ifndef GHCI
+runStgI tycons classes stgbinds
+   = panic "runStgI called in non-GHCI build"
+
+#else
+
 -- the bindings need to have a binding for stgMain, and the
 -- body of it had better represent something of type Int# -> Int#
-runStgI :: [TyCon] -> [Class] -> [StgBinding] -> IO Int
 runStgI tycons classes stgbinds
    = do itbl_env <- mkITbls (tycons ++ map classTyCon classes)
         let binds = concatMap (stg2bind itbl_env) stgbinds
@@ -1023,6 +1031,7 @@ load :: Storable a => Addr -> IO (Addr, a)
 load addr = do x <- peek addr
                return (addr `plusAddr` fromIntegral (sizeOf x), x)
 
+#endif /* ndef GHCI */
 
 \end{code}
 
