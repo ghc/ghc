@@ -1,6 +1,8 @@
 __interface RnSource 1 0 where
-__export RnSource rnHsSigType rnHsType;
+__export RnSource rnHsType rnHsSigType rnHsPolyType;
+1 rnHsType :: Outputable.SDoc -> RdrHsSyn.RdrNameHsType
+			         -> RnMonad.RnMS (RnHsSyn.RenamedHsType, RnEnv.FreeVars) ;
 1 rnHsSigType :: Outputable.SDoc -> RdrHsSyn.RdrNameHsType
 			         -> RnMonad.RnMS (RnHsSyn.RenamedHsType, RnEnv.FreeVars) ;
-1 rnHsType :: Outputable.SDoc -> RdrHsSyn.RdrNameHsType
-			      -> RnMonad.RnMS (RnHsSyn.RenamedHsType, RnEnv.FreeVars) ;
+1 rnHsPolyType :: Outputable.SDoc -> RdrHsSyn.RdrNameHsType
+			          -> RnMonad.RnMS (RnHsSyn.RenamedHsType, RnEnv.FreeVars) ;

@@ -312,8 +312,11 @@ zonkTcTyVars tyvars = mapNF_Tc zonkTcTyVar tyvars
 
 zonkTcTyVarBndr :: TcTyVar -> NF_TcM s TcTyVar
 zonkTcTyVarBndr tyvar
-  = zonkTcTyVar tyvar	`thenNF_Tc` \ (TyVarTy tyvar') ->
-    returnNF_Tc tyvar'
+  = zonkTcTyVar tyvar	`thenNF_Tc` \ ty ->
+    case ty of
+	TyVarTy tyvar' -> returnNF_Tc tyvar'
+	_	       -> pprTrace "zonkTcTyVarBndr" (ppr tyvar <+> ppr ty) $
+			  returnNF_Tc tyvar
 	
 zonkTcTyVar :: TcTyVar -> NF_TcM s TcType
 zonkTcTyVar tyvar = zonkTyVar (\ tv -> returnNF_Tc (TyVarTy tv)) tyvar

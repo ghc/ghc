@@ -1,9 +1,11 @@
 _interface_ RnSource 1
 _exports_
-RnSource rnHsType rnHsSigType;
+RnSource rnHsType rnHsPolyType rnHsSigType;
 _declarations_
+1 rnHsType _:_ Outputable.SDoc -> RdrHsSyn.RdrNameHsType
+			          -> RnMonad.RnMS (RnHsSyn.RenamedHsType, RnEnv.FreeVars) ;;
 1 rnHsSigType _:_ Outputable.SDoc -> RdrHsSyn.RdrNameHsType
 			          -> RnMonad.RnMS (RnHsSyn.RenamedHsType, RnEnv.FreeVars) ;;
-1 rnHsType _:_ Outputable.SDoc -> RdrHsSyn.RdrNameHsType
-			       -> RnMonad.RnMS (RnHsSyn.RenamedHsType, RnEnv.FreeVars) ;;
+1 rnHsPolyType _:_ Outputable.SDoc -> RdrHsSyn.RdrNameHsType
+			           -> RnMonad.RnMS (RnHsSyn.RenamedHsType, RnEnv.FreeVars) ;;
 

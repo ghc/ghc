@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.11 1999/07/26 16:06:28 simonpj Exp $
+$Id: Parser.y,v 1.12 1999/07/27 07:31:18 simonpj Exp $
 
 Haskell grammar.
 
@@ -403,9 +403,7 @@ signdecl :: { RdrBinding }
 					      [ RdrSig (Sig n $4 $2) | n <- $1 ] }
 
 sigtype :: { RdrNameHsType }
-	: ctype			{ case $1 of
-		    	      	    HsForAllTy _ _ _ -> $1
-		    	      	    other	     -> HsForAllTy Nothing [] $1 }
+	: ctype			{ mkHsForAllTy Nothing [] $1 }
 
 {-
   ATTENTION: Dirty Hackery Ahead! If the second alternative of vars is var
@@ -502,9 +500,10 @@ inst_type :: { RdrNameHsType }
 
 ctype	:: { RdrNameHsType }
 	: 'forall' tyvars '.' context type
-					{ HsForAllTy (Just $2) $4 $5 }
-	| 'forall' tyvars '.' type	{ HsForAllTy (Just $2) [] $4 }
-	| context type			{ HsForAllTy Nothing   $1 $2 }
+					{ mkHsForAllTy (Just $2) $4 $5 }
+	| 'forall' tyvars '.' type	{ mkHsForAllTy (Just $2) [] $4 }
+	| context type			{ mkHsForAllTy Nothing   $1 $2 }
+		-- A type of form (context => type) is an *implicit* HsForAllTy
 	| type				{ $1 }
 
 types0  :: { [RdrNameHsType] }

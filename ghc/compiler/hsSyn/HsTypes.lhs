@@ -66,8 +66,22 @@ data MonoUsageAnn name
   | MonoUsVar name
   
 
-mkHsForAllTy []  []   ty = ty
-mkHsForAllTy tvs ctxt ty = HsForAllTy (Just tvs) ctxt ty
+-- Combine adjacent for-alls. 
+-- The following awkward situation can happen otherwise:
+--	f :: forall a. ((Num a) => Int)
+-- might generate HsForAll (Just [a]) [] (HsForAll Nothing [Num a] t)
+-- Then a isn't discovered as ambiguous, and we abstract the AbsBinds wrt []
+-- but the export list abstracts f wrt [a].  Disaster.
+--
+-- A valid type must have one for-all at the top of the type, or of the fn arg types
+
+mkHsForAllTy (Just []) [] ty = ty	-- Explicit for-all with no tyvars
+mkHsForAllTy mtvs1     [] (HsForAllTy mtvs2 ctxt ty) = HsForAllTy (mtvs1 `plus` mtvs2) ctxt ty
+						     where
+						       mtvs1       `plus` Nothing     = mtvs1
+						       Nothing     `plus` mtvs2       = mtvs2 
+						       (Just tvs1) `plus` (Just tvs2) = Just (tvs1 ++ tvs2)
+mkHsForAllTy tvs ctxt ty = HsForAllTy tvs ctxt ty
 
 mkHsUsForAllTy uvs ty = foldr (\ uv ty -> MonoUsgForAllTy uv ty)
                               ty uvs
@@ -103,7 +117,8 @@ instance (Outputable name) => Outputable (HsTyVar name) where
     ppr (UserTyVar name)       = ppr name
     ppr (IfaceTyVar name kind) = hsep [ppr name, dcolon, ppr kind]
 
-pprForAll []  = empty
+-- Better to see those for-alls
+-- pprForAll []  = empty
 pprForAll tvs = ptext SLIT("forall") <+> interppSP tvs <> ptext SLIT(".")
 
 pprContext :: (Outputable name) => Context name -> SDoc
@@ -133,11 +148,11 @@ pprParendHsType ty = ppr_mono_ty pREC_CON ty
 
 ppr_mono_ty ctxt_prec (HsForAllTy maybe_tvs ctxt ty)
   = maybeParen (ctxt_prec >= pREC_FUN) $
-    sep [pprForAll tvs, pprContext ctxt, pprHsType ty]
+    sep [pp_tvs, pprContext ctxt, pprHsType ty]
   where
-    tvs = case maybe_tvs of
-		Just tvs -> tvs
-		Nothing  -> []
+    pp_tvs = case maybe_tvs of
+		Just tvs -> pprForAll tvs
+		Nothing  -> text "{- implicit forall -}"
 
 ppr_mono_ty ctxt_prec (MonoTyVar name)
   = ppr name

@@ -18,7 +18,7 @@ module RnExpr (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} RnBinds  ( rnBinds ) 
-import {-# SOURCE #-} RnSource ( rnHsSigType, rnHsType )
+import {-# SOURCE #-} RnSource ( rnHsSigType, rnHsPolyType, rnHsType )
 
 import HsSyn
 import RdrHsSyn
@@ -70,7 +70,7 @@ rnPat (VarPatIn name)
 rnPat (SigPatIn pat ty)
   | opt_GlasgowExts
   = rnPat pat		`thenRn` \ (pat', fvs1) ->
-    rnHsType doc ty	`thenRn` \ (ty',  fvs2) ->
+    rnHsPolyType doc ty	`thenRn` \ (ty',  fvs2) ->
     returnRn (SigPatIn pat' ty', fvs1 `plusFV` fvs2)
 
   | otherwise

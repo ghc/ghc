@@ -4,7 +4,7 @@
 \section[RnSource]{Main pass of renamer}
 
 \begin{code}
-module RnSource ( rnDecl, rnSourceDecls, rnHsType, rnHsSigType ) where
+module RnSource ( rnDecl, rnSourceDecls, rnHsType, rnHsSigType, rnHsPolyType ) where
 
 #include "HsVersions.h"
 
@@ -106,7 +106,7 @@ rnDecl (ValD binds) = rnTopBinds binds	`thenRn` \ (new_binds, fvs) ->
 rnDecl (SigD (IfaceSig name ty id_infos loc))
   = pushSrcLocRn loc $
     lookupBndrRn name		`thenRn` \ name' ->
-    rnHsType doc_str ty		`thenRn` \ (ty',fvs1) ->
+    rnHsPolyType doc_str ty	`thenRn` \ (ty',fvs1) ->
     mapFvRn rnIdInfo id_infos	`thenRn` \ (id_infos', fvs2) -> 
     returnRn (SigD (IfaceSig name' ty' id_infos' loc), fvs1 `plusFV` fvs2)
   where
@@ -420,7 +420,7 @@ rnDecl (RuleD (RuleDecl rule_name tvs vars lhs rhs src_loc))
     get_var (RuleBndrSig v _) = v
 
     rn_var (RuleBndr v, id)	 = returnRn (RuleBndr id, emptyFVs)
-    rn_var (RuleBndrSig v t, id) = rnHsType doc t	`thenRn` \ (t', fvs) ->
+    rn_var (RuleBndrSig v t, id) = rnHsPolyType doc t	`thenRn` \ (t', fvs) ->
 				   returnRn (RuleBndrSig id t', fvs)
 \end{code}
 
@@ -474,7 +474,7 @@ rnConDetails doc locn (InfixCon ty1 ty2)
     returnRn (InfixCon new_ty1 new_ty2, fvs1 `plusFV` fvs2)
 
 rnConDetails doc locn (NewCon ty mb_field)
-  = rnHsType doc ty			`thenRn` \ (new_ty, fvs) ->
+  = rnHsPolyType doc ty			`thenRn` \ (new_ty, fvs) ->
     rn_field mb_field			`thenRn` \ new_mb_field  ->
     returnRn (NewCon new_ty new_mb_field, fvs)
   where
@@ -496,15 +496,15 @@ rnField doc (names, ty)
     returnRn ((new_names, new_ty), fvs) 
 
 rnBangTy doc (Banged ty)
-  = rnHsType doc ty		`thenRn` \ (new_ty, fvs) ->
+  = rnHsPolyType doc ty		`thenRn` \ (new_ty, fvs) ->
     returnRn (Banged new_ty, fvs)
 
 rnBangTy doc (Unbanged ty)
-  = rnHsType doc ty 		`thenRn` \ (new_ty, fvs) ->
+  = rnHsPolyType doc ty 	`thenRn` \ (new_ty, fvs) ->
     returnRn (Unbanged new_ty, fvs)
 
 rnBangTy doc (Unpacked ty)
-  = rnHsType doc ty 		`thenRn` \ (new_ty, fvs) ->
+  = rnHsPolyType doc ty 	`thenRn` \ (new_ty, fvs) ->
     returnRn (Unpacked new_ty, fvs)
 
 -- This data decl will parse OK
@@ -534,36 +534,15 @@ rnHsSigType :: SDoc -> RdrNameHsType -> RnMS (RenamedHsType, FreeVars)
 	-- rnHsSigType is used for source-language type signatures,
 	-- which use *implicit* universal quantification.
 rnHsSigType doc_str ty
-  = rnHsType (text "the type signature for" <+> doc_str) ty
+  = rnHsPolyType (text "the type signature for" <+> doc_str) ty
     
-rnForAll doc forall_tyvars ctxt ty
-  = bindTyVarsFVRn doc forall_tyvars	$ \ new_tyvars ->
-    rnContext doc ctxt			`thenRn` \ (new_ctxt, cxt_fvs) ->
-    rnHsType doc ty			`thenRn` \ (new_ty, ty_fvs) ->
-    returnRn (mkHsForAllTy new_tyvars new_ctxt new_ty,
-	      cxt_fvs `plusFV` ty_fvs)
+---------------------------------------
+rnHsPolyType, rnHsType :: SDoc -> RdrNameHsType -> RnMS (RenamedHsType, FreeVars)
+-- rnHsPolyType is prepared to see a for-all; rnHsType is not
+-- The former is called for the top level of type sigs and function args.
 
--- Check that each constraint mentions at least one of the forall'd type variables
--- Since the forall'd type variables are a subset of the free tyvars
--- of the tau-type part, this guarantees that every constraint mentions
--- at least one of the free tyvars in ty
-checkConstraints explicit_forall doc forall_tyvars ctxt ty
-   = mapRn check ctxt			`thenRn` \ maybe_ctxt' ->
-     returnRn (catMaybes maybe_ctxt')
-	    -- Remove problem ones, to avoid duplicate error message.
-   where
-     check ct@(_,tys)
-	| forall_mentioned = returnRn (Just ct)
-	| otherwise	   = addErrRn (ctxtErr explicit_forall doc forall_tyvars ct ty)
-			     `thenRn_` returnRn Nothing
-        where
-	  forall_mentioned = foldr ((||) . any (`elem` forall_tyvars) . extractHsTyRdrTyVars)
-			     False
-			     tys
-
-rnHsType :: SDoc -> RdrNameHsType -> RnMS (RenamedHsType, FreeVars)
-
-rnHsType doc (HsForAllTy Nothing ctxt ty)
+---------------------------------------
+rnHsPolyType doc (HsForAllTy Nothing ctxt ty)
 	-- From source code (no kinds on tyvars)
 	-- Given the signature  C => T  we universally quantify 
 	-- over FV(T) \ {in-scope-tyvars} 
@@ -575,7 +554,7 @@ rnHsType doc (HsForAllTy Nothing ctxt ty)
     checkConstraints False doc forall_tyvars ctxt ty	`thenRn` \ ctxt' ->
     rnForAll doc (map UserTyVar forall_tyvars) ctxt' ty
 
-rnHsType doc (HsForAllTy (Just forall_tyvars) ctxt tau)
+rnHsPolyType doc (HsForAllTy (Just forall_tyvars) ctxt tau)
 	-- Explicit quantification.
 	-- Check that the forall'd tyvars are a subset of the
 	-- free tyvars in the tau-type part
@@ -601,13 +580,49 @@ rnHsType doc (HsForAllTy (Just forall_tyvars) ctxt tau)
     checkConstraints True doc forall_tyvar_names ctxt tau	`thenRn` \ ctxt' ->
     rnForAll doc forall_tyvars ctxt' tau
 
+rnHsPolyType doc other_ty = rnHsType doc other_ty
+
+
+-- Check that each constraint mentions at least one of the forall'd type variables
+-- Since the forall'd type variables are a subset of the free tyvars
+-- of the tau-type part, this guarantees that every constraint mentions
+-- at least one of the free tyvars in ty
+checkConstraints explicit_forall doc forall_tyvars ctxt ty
+   = mapRn check ctxt			`thenRn` \ maybe_ctxt' ->
+     returnRn (catMaybes maybe_ctxt')
+	    -- Remove problem ones, to avoid duplicate error message.
+   where
+     check ct@(_,tys)
+	| forall_mentioned = returnRn (Just ct)
+	| otherwise	   = addErrRn (ctxtErr explicit_forall doc forall_tyvars ct ty)
+			     `thenRn_` returnRn Nothing
+        where
+	  forall_mentioned = foldr ((||) . any (`elem` forall_tyvars) . extractHsTyRdrTyVars)
+			     False
+			     tys
+
+rnForAll doc forall_tyvars ctxt ty
+  = bindTyVarsFVRn doc forall_tyvars	$ \ new_tyvars ->
+    rnContext doc ctxt			`thenRn` \ (new_ctxt, cxt_fvs) ->
+    rnHsType doc ty			`thenRn` \ (new_ty, ty_fvs) ->
+    returnRn (mkHsForAllTy (Just new_tyvars) new_ctxt new_ty,
+	      cxt_fvs `plusFV` ty_fvs)
+
+---------------------------------------
+rnHsType doc ty@(HsForAllTy _ _ inner_ty)
+  = addErrRn (unexpectedForAllTy ty)	`thenRn_`
+    rnHsPolyType doc ty
+
 rnHsType doc (MonoTyVar tyvar)
   = lookupOccRn tyvar 		`thenRn` \ tyvar' ->
     returnRn (MonoTyVar tyvar', unitFV tyvar')
 
 rnHsType doc (MonoFunTy ty1 ty2)
-  = rnHsType doc ty1	`thenRn` \ (ty1', fvs1) ->
-    rnHsType doc ty2	`thenRn` \ (ty2', fvs2) ->
+  = rnHsPolyType doc ty1	`thenRn` \ (ty1', fvs1) ->
+	-- Might find a for-all as the arg of a function type
+    rnHsPolyType doc ty2	`thenRn` \ (ty2', fvs2) ->
+	-- Or as the result.  This happens when reading Prelude.hi
+	-- when we find return :: forall m. Monad m -> forall a. a -> m a
     returnRn (MonoFunTy ty1' ty2', fvs1 `plusFV` fvs2)
 
 rnHsType doc (MonoListTy ty)
@@ -711,7 +726,7 @@ rnRuleBody (UfRuleBody str vars args rhs)
 
 \begin{code}
 rnCoreExpr (UfType ty)
-  = rnHsType (text "unfolding type") ty	`thenRn` \ (ty', fvs) ->
+  = rnHsPolyType (text "unfolding type") ty	`thenRn` \ (ty', fvs) ->
     returnRn (UfType ty', fvs)
 
 rnCoreExpr (UfVar v)
@@ -770,7 +785,7 @@ rnCoreExpr (UfLet (UfRec pairs) body)
 
 \begin{code}
 rnCoreBndr (UfValBinder name ty) thing_inside
-  = rnHsType doc ty		`thenRn` \ (ty', fvs1) ->
+  = rnHsPolyType doc ty		`thenRn` \ (ty', fvs1) ->
     bindCoreLocalFVRn name	( \ name' ->
 	    thing_inside (UfValBinder name' ty')
     )				`thenRn` \ (result, fvs2) ->
@@ -798,7 +813,7 @@ rnCoreAlt (con, bndrs, rhs)
     returnRn (result, fvs1 `plusFV` fvs3)
 
 rnNote (UfCoerce ty)
-  = rnHsType (text "unfolding coerce") ty	`thenRn` \ (ty', fvs) ->
+  = rnHsPolyType (text "unfolding coerce") ty	`thenRn` \ (ty', fvs) ->
     returnRn (UfCoerce ty', fvs)
 
 rnNote (UfSCC cc)   = returnRn (UfSCC cc, emptyFVs)
@@ -817,7 +832,7 @@ rnUfCon (UfLitCon lit)
   = returnRn (UfLitCon lit, emptyFVs)
 
 rnUfCon (UfLitLitCon lit ty)
-  = rnHsType (text "litlit") ty		`thenRn` \ (ty', fvs) ->
+  = rnHsPolyType (text "litlit") ty		`thenRn` \ (ty', fvs) ->
     returnRn (UfLitLitCon lit ty', fvs)
 
 rnUfCon (UfPrimOp op)
@@ -909,6 +924,9 @@ ctxtErr explicit_forall doc tyvars constraint ty
     ]
     $$
     (ptext SLIT("In") <+> doc)
+
+unexpectedForAllTy ty
+  = ptext SLIT("Unexpected forall type:") <+> ppr ty
 
 badRuleLhsErr name lhs
   = sep [ptext SLIT("Rule") <+> ptext name <> colon,

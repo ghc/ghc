@@ -403,7 +403,7 @@ field		:  var_names1 '::' type		{ ($1, Unbanged $3) }
 type		:: { RdrNameHsType }
 type		: '__fuall'  fuall '=>' type    { mkHsUsForAllTy $2 $4 }
                 | '__forall' forall context '=>' type	
-						{ mkHsForAllTy $2 $3 $5 }
+						{ mkHsForAllTy (Just $2) $3 $5 }
 		| btype '->' type		{ MonoFunTy $1 $3 }
 		| btype				{ $1 }
 
