@@ -50,5 +50,10 @@ instance SecurityPolicy LinuxSecurityPolicy LinuxSecurityModel LinuxObject Linux
 model :: FiniteMap LinuxObjectId LinuxObject
 model =  listToFM [ (Left [], File []), (Left ["home"], File ["home"]) ]
 
+
+-- 	works
+-- model :: (LinuxObjectId, LinuxObject)
+-- model =  (Left [], File [])
+
 main :: IO ()
 main = do { putStrLn (show model) }
