@@ -1,13 +1,11 @@
 
-# ----------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.17 1999/11/12 17:32:37 sewardj Exp $                        #
-# ----------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------- #
+# $Id: Makefile,v 1.18 1999/11/19 15:36:55 andy Exp $                      #
+# --------------------------------------------------------------------------- #
 
-TOP = ../..
+TOP = ..
 include $(TOP)/mk/boilerplate.mk
-
-GHC_DIR = $(TOP)/ghc
-RTS_DIR = $(TOP)/ghc/rts
+SUBDIRS = lib
 
 # --------------------------------------------------------------------- #
 # interpreter and relevant .a/.so files                                 #
@@ -40,9 +38,9 @@ C_SRCS = link.c type.c static.c storage.c derive.c input.c compiler.c subst.c \
      translate.c codegen.c lift.c free.c stgSubst.c output.c   \
      hugs.c dynamic.c stg.c sainteger.c interface.c
 
-SRC_CC_OPTS = -g -O -I$(GHC_DIR)/interpreter -I$(GHC_DIR)/includes -I$(GHC_DIR)/rts -D__HUGS__ -DCOMPILING_RTS -Wall -Wstrict-prototypes -Wno-unused -DDEBUG -DDEBUG_EXTRA -Winline
+SRC_CC_OPTS = -g -O -I$(GHC_INTERPRETER_DIR) -I$(GHC_INCLUDE_DIR) -I$(GHC_RUNTIME_DIR) -D__HUGS__ -DCOMPILING_RTS -Wall -Wstrict-prototypes -Wno-unused -DDEBUG -DDEBUG_EXTRA -Winline
 
-GHC_LIBS_NEEDED = $(TOP)/ghc/rts/libHSrts.a
+GHC_LIBS_NEEDED = $(GHC_RUNTIME_DIR)/libHSrts.a
 
 all :: parser.c $(GHC_LIBS_NEEDED) nHandle.$(DYN_EXT) hugs
 
@@ -62,8 +60,8 @@ else
 	gcc -O -Wall -shared -fPIC -o nHandle.so nHandle.c
 endif
 
-$(TOP)/ghc/rts/libHSrts.a:
-	(cd $(TOP)/ghc/rts ; make clean ; make EXTRA_CC_OPTS=-I$(GHC_DIR)/interpreter)
+$(GHC_RUNTIME_DIR)/libHSrts.a:
+	(cd $(GHC_RUNTIME_DIR) ; make clean ; make EXTRA_CC_OPTS=-I$(GHC_INTERPRETER_DIR))
 
 cleanish:
 	/bin/rm *.o
@@ -109,21 +107,4 @@ depend :: $(LOOPS) $(SRCS_UGNHS)
 
 include $(TOP)/mk/target.mk
 
-HUGSCPP = ../utils/hscpp/hscpp -D__HUGS__ -DUSE_REPORT_PRELUDE
 
-libs:
-	$(HUGSCPP) ../lib/std/List.lhs > lib/List.lhs
-	$(HUGSCPP) ../lib/std/Ix.lhs > lib/Ix.lhs
-	$(HUGSCPP) ../lib/std/Complex.lhs > lib/Complex.lhs
-	$(HUGSCPP) ../lib/std/Char.lhs > lib/Char.lhs
-	$(HUGSCPP) ../lib/std/Ratio.lhs > lib/Ratio.lhs
-	$(HUGSCPP) ../lib/std/Random.lhs > lib/Random.lhs
-	$(HUGSCPP) ../lib/std/Array.lhs > lib/Array.lhs
-	$(HUGSCPP) ../lib/std/Maybe.lhs > lib/Maybe.lhs
-	$(HUGSCPP) ../lib/std/Monad.lhs > lib/Monad.lhs
-	$(HUGSCPP) ../lib/std/Numeric.lhs > lib/Numeric.lhs
-	$(HUGSCPP) ../lib/std/Directory.lhs > lib/Directory.lhs
-	$(HUGSCPP) ../lib/std/System.lhs > lib/System.lhs
-	$(HUGSCPP) ../lib/std/Locale.lhs > lib/Locale.lhs
-	$(HUGSCPP) ../lib/std/CPUTime.lhs > lib/CPUTime.lhs
-	$(HUGSCPP) ../lib/std/IO.lhs > lib/IO.lhs
