@@ -57,9 +57,9 @@ Current GHC team:
 Additional Contributors (in alphabetical order):
 
     Manuel Chakravarty   <chak@cse.unsw.edu.au>
-    Sigbjorn Finne	 <sof@microsoft.com>
+    Sigbjorn Finne	 <sof@galois.com>
     Kevin Glynn		 <keving@cs.mu.oz.au>
-    Jeff Lewis		 <jlewis@cse.ogi.edu>
+    Jeff Lewis		 <lewie@galois.com>
     Marcin Kowalczyk	 <qrczak@knm.org.pl>
     Hans Wolfgang Lloidl <hwloidl@cee.hw.ac.uk>
     Sven Panne		 <Sven.Panne@BetaResearch.de>
@@ -73,7 +73,7 @@ Past contributors and/or continuing advisors (all @dcs.gla.ac.uk):
     Thomas Nordin       (nordin)    [@cse.ogi.edu; Green Card Hero]
     Patrick Sansom	(sansom)    [hired hand, Bidirectional Analyses]
     Phil Trinder	(trinder)   [hired hand, Parade]
-    Andy Gill		(andy)	    [ex-PhD student; at OGI]
+    Andy Gill		(andy)	    [ex-PhD student; at Galois]
     Cordy Hall		(cvh) 	    [GRASP]
     Kevin Hammond	(kh)	    [GRASP; at St. Andrews]
     John Launchbury	(jl)	    [AQUA; at OGI]
