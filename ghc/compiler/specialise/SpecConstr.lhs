@@ -492,7 +492,6 @@ spec_one :: ScEnv
 
 spec_one env fn rhs (pats, rule_number)
   = getUniqueUs 		`thenUs` \ spec_uniq ->
-    getUniqueUs 		`thenUs` \ hack_uniq ->
     let 
 	fn_name      = idName fn
 	fn_loc       = nameSrcLoc fn_name
