@@ -23,12 +23,11 @@ import StgSyn		-- output
 import Bag		( emptyBag, unitBag, unionBags, unionManyBags, bagToList )
 import CoreUtils	( coreExprType )
 import CostCentre	( noCostCentre )
-import Id		( mkSysLocal, idType, isBottomingId, addIdArity,
+import Id		( mkSysLocal, idType, isBottomingId,
 			  externallyVisibleId,
 			  nullIdEnv, addOneToIdEnv, lookupIdEnv, growIdEnvList,
-			  SYN_IE(IdEnv), GenId{-instance NamedThing-}
+			  SYN_IE(IdEnv), GenId{-instance NamedThing-}, SYN_IE(Id)
 			)
-import IdInfo		( ArityInfo, exactArity )
 import Literal		( mkMachInt, Literal(..) )
 import PrelVals		( unpackCStringId, unpackCString2Id,
 			  integerZeroId, integerPlusOneId,
@@ -38,7 +37,7 @@ import PrimOp		( PrimOp(..) )
 import SpecUtils	( mkSpecialisedCon )
 import SrcLoc		( noSrcLoc )
 import TyCon		( TyCon{-instance Uniquable-} )
-import Type		( maybeAppDataTyCon, getAppDataTyConExpandingDicts )
+import Type		( maybeAppDataTyCon, getAppDataTyConExpandingDicts, SYN_IE(Type) )
 import TysWiredIn	( stringTy )
 import Unique		( integerTyConKey, ratioTyConKey, Unique{-instance Eq-} )
 import UniqSupply	-- all of it, really
@@ -63,12 +62,10 @@ The business of this pass is to convert Core to Stg.  On the way:
 	x = y t1 t2
   where t1, t2 are types
 
-* We pin correct arities on each let(rec)-bound binder, and propagate them
-  to their uses.  This is used
-	a) when emitting arity info into interface files
-	b) in the code generator, when deciding if a right-hand side
-		 is a saturated application so we can generate a VAP closure.
-  (b) is rather untidy, but the easiest compromise was to propagate arities here.
+* We don't pin on correct arities any more, because they can be mucked up
+  by the lambda lifter.  In particular, the lambda lifter can take a local
+  letrec-bound variable and make it a lambda argument, which shouldn't have
+  an arity.  So SetStgVarInfo sets arities now.
 
 * We do *not* pin on the correct free/live var info; that's done later.
   Instead we use bOGUS_LVS and _FVS as a placeholder.
@@ -137,9 +134,8 @@ coreBindToStg env (NonRec binder rhs)
   = coreRhsToStg env rhs	`thenUs` \ stg_rhs ->
     let
 	-- Binds to return if RHS is trivial
-	binder_w_arity = binder `addIdArity` (rhsArity stg_rhs)
-	triv_binds | externallyVisibleId binder = [StgNonRec binder_w_arity stg_rhs]	-- Retain it
-		   | otherwise	      	        = []					-- Discard it
+	triv_binds | externallyVisibleId binder = [StgNonRec binder stg_rhs]	-- Retain it
+		   | otherwise	      	        = []				-- Discard it
     in
     case stg_rhs of
       StgRhsClosure cc bi fvs upd [] (StgApp atom [] lvs) ->
@@ -155,10 +151,7 @@ coreBindToStg env (NonRec binder rhs)
 		new_env = addOneToIdEnv env binder (StgConArg con_id)
 
       other -> 	-- Non-trivial RHS, so don't augment envt
-		returnUs ([StgNonRec binder_w_arity stg_rhs], new_env)
-	   where
-		new_env = addOneToIdEnv env binder (StgVarArg binder_w_arity)
-		-- new_env propagates the arity
+		returnUs ([StgNonRec binder stg_rhs], env)
 
 coreBindToStg env (Rec pairs)
   = -- NB: *** WE DO NOT CHECK FOR TRIV_BINDS in REC BIND ****
@@ -167,14 +160,7 @@ coreBindToStg env (Rec pairs)
 	(binders, rhss) = unzip pairs
     in
     mapUs (coreRhsToStg env) rhss `thenUs` \ stg_rhss ->
-    let	
-	    binders_w_arities = [ b `addIdArity` rhsArity rhs 
-				| (b,rhs) <- binders `zip` stg_rhss]
-    in
-    returnUs ([StgRec (binders_w_arities `zip` stg_rhss)], env)
-
-rhsArity (StgRhsClosure _ _ _ _ args _) = exactArity (length args)
-rhsArity (StgRhsCon _ _ _)		= exactArity 0
+    returnUs ([StgRec (binders `zip` stg_rhss)], env)
 \end{code}
 
 
@@ -279,7 +265,7 @@ coreExprToStg env expr@(Lam _ _)
     else
 	newStgVar (coreExprType expr)	`thenUs` \ var ->
 	returnUs
-	  (StgLet (StgNonRec (var `addIdArity` exactArity (length binders))
+	  (StgLet (StgNonRec var
 				  (StgRhsClosure noCostCentre
 				  stgArgOcc
 				  bOGUS_FVs
