@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.169 2004/07/30 08:40:11 simonpj Exp $
+-- $Id: InteractiveUI.hs,v 1.170 2004/08/09 12:15:09 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -486,7 +486,7 @@ showThing :: String -> (IfaceDecl, Fixity, SrcLoc) -> SDoc
 showThing name (thing, fixity, src_loc) 
     = vcat [ showDecl (\occ -> name == occNameUserString occ) thing, 
 	     showFixity fixity,
-	     showLoc src_loc]
+	     text "-- " <> showLoc src_loc]
   where
     showFixity fix 
 	| fix == defaultFixity = empty
@@ -496,8 +496,8 @@ showThing name (thing, fixity, src_loc)
 	| isGoodSrcLoc loc = ptext SLIT("Defined at") <+> ppr loc
 	| otherwise	   = ppr loc
 
--- Now there is rather a lot of goop just to print declarations in a civilised way
--- with "..." for the parts we are less interested in.
+-- Now there is rather a lot of goop just to print declarations in a
+-- civilised way with "..." for the parts we are less interested in.
 
 showDecl :: (OccName -> Bool) -> IfaceDecl -> SDoc
 showDecl want_name (IfaceForeign {ifName = tc})
