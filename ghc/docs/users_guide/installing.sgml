@@ -1033,10 +1033,8 @@ of perl instead, a <ULink URL="http://cygutils.netpedia.net/">cygwin port</ULink
 <Para>
 We use the DocBook DTD, which is widely used; however, shrink-wrapped
 distributions of DocBook are few and far between, and getting it to work out
-of the box can be tricky. There are currently two supported ways of using
-DocBook: installing from sources yourself, and the Cygnus DocBook tools.
-Neither is ideal: installing by yourself is tricky, while the Cygnus tools
-are idiosyncratic, slightly broken, and only available as RedHat RPMs
+of the box can be tricky. There are currently three supported ways of using
+DocBook: installing from sources yourself, various flavours of RPM installation, and installing binaries on Windows (with some care).
 </Para>
 
 <Para>
@@ -1056,24 +1054,26 @@ find. You need all the RPMs except for psgml (i.e.
 <Filename>jadetex</Filename>, <Filename>sgmlcommon</Filename> and
 <Filename>stylesheets</Filename>). Note that most of these RPMs are
 architecture neutral, so are likely to be found in a
-<Filename>noarch</Filename> directory. N.B. The <Emphasis>Cygnus</Emphasis>
-version of the tools is assumed. Others, such as the SuSE version, may not
-work.
+<Filename>noarch</Filename> directory. The SuSE RPMs also work; the RedHat ones <Emphasis>don't</Emphasis> at the moment.
 </Para>
 
 </Sect2>
 
+
 <Sect2>
-<Title>Installing the DocBook tools from source</Title>
+<Title>Installing from binaries on Windows</Title>
 
 <Para>
-Especially if you're working in Windows, you may find Norman Walsh's <ULink
+It's a good idea to use Norman Walsh's <ULink
 URL="http://nwalsh.com/docbook/dsssl/doc/install.html">installation
-notes</ULink> a better way to install DocBook tools. You should get version
+notes</ULink> as a guide. You should get version
 3.1 of DocBook, and note that his file <Filename>test.sgm</Filename> won't
-work, as it needs version 3.0.
+work, as it needs version 3.0. You should unpack Jade into <Filename>\Jade</Filename>, along with the entities, DocBook into <Filename>\docbook</Filename>, and the DocBook stylesheets into <Filename>\docbook\stylesheets</Filename> (so they actually end up in <Filename>\docbook\stylesheets\docbook</Filename>).
 </Para>
 
+
+<Sect2>
+<Title>Installing the DocBook tools from source</Title>
 
 <Sect3>
 <Title>Jade</Title>
@@ -1134,14 +1134,8 @@ entities</ULink> into <Filename>/usr/[local/]lib/sgml</Filename>.
 <Title>Configuring the DocBook tools</Title>
 
 <Para>
-The supported way to do this is to edit one of the
-<Filename>CATALOG</Filename> files in
-<Filename>fptools/glafp-utils/docbook</Filename> to suit your system.
-<Filename>CATALOG.generic</Filename> should work on most Unix systems when the files have been installed as per these instructions; <Filename>CATALOG.cygnus</Filename> is for systems with the Cygnus DocBook tools. You need to edit all the paths so they match your system. The edited file should be called <Filename>CATALOG</Filename>, and placed in the same directory.
-</Para>
-
-<Para>
-Alternatively, if you have a properly working DocBook toolset (the FreeBSD package is likely to be one such), set <Constant>SGML_CATALOG_FILES</Constant> to point to the catalog in a pre-installed working system (even if it doesn't normally). The build system will complain if there's no <Filename>CATALOG</Filename> in <Filename>glafp-utils/docbook</Filename> and <Filename>SGML_CATALOG_FILES</Filename> is unset.
+You should either edit one of the <Filename>CATALOG</Filename> files in
+<Filename>fptools/glafp-utils/docbook</Filename> to suit your system, or set <Constant>SGML_CATALOG_FILES</Constant> to point to a valid catalog. SuSE systems should work out of the box. <Filename>CATALOG.generic</Filename> should work on most Unix systems when the files have been installed as per these instructions; <Filename>CATALOG.cygnus</Filename> is for systems with the Cygnus DocBook tools. <Filename>CATALOG.windows</Filename> is for Windows systems following the special instructions for that special OS. You may need to edit the paths so they match your system. The edited file should be called <Filename>CATALOG</Filename>, and placed in the same directory.
 </Para>
 
 <Para>
