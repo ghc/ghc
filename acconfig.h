@@ -372,9 +372,6 @@
 /* Define if C compiler supports long long types */
 #undef HAVE_LONG_LONG
 
-/* Define if you have dlopen() */
-#undef HAVE_DLOPEN
-
 /* Define if fcntl.h defines O_BINARY */
 #undef HAVE_O_BINARY
 
