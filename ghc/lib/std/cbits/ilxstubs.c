@@ -1,7 +1,7 @@
 /* 
  * (c) The GHC Team 2001
  *
- * $Id: ilxstubs.c,v 1.2 2001/07/16 09:23:24 rrt Exp $
+ * $Id: ilxstubs.c,v 1.3 2001/08/15 09:23:25 rrt Exp $
  *
  * ILX stubs for external function calls
  */
@@ -29,13 +29,26 @@
     /* StgPrimFloat Add to mini-RTS, which is put in a DLL */
 
     /* Need to be implemented in ILX RTS */
-     /*foreign label "prog_argv" prog_argv_label :: Ptr (Ptr (Ptr CChar))
-foreign label "prog_argc" prog_argc_label :: Ptr CInt
-foreign label "ErrorHdrHook" errorHdrHook :: Ptr ()
-../PrelStable.lhs:37:foreign import unsafe freeStablePtr :: StablePtr a -> IO ()
+/*../PrelStable.lhs:37:foreign import unsafe freeStablePtr :: StablePtr a -> IO ()
 ../PrelTopHandler.lhs:49:foreign import ccall "shutdownHaskellAndExit" 
 ../PrelTopHandler.lhs:77:foreign import ccall "stackOverflow" unsafe
 ../PrelTopHandler.lhs:80:foreign import ccall "stg_exit" unsafe */
+
+/* Fake this for now, as a DLL can't refer to main() */
+int argc = 0;
+char **argv = NULL;
+
+int
+prog_argc_addr(void)
+{
+  return &argc;
+}
+
+char ***
+prog_argv_addr(void)
+{
+  return &argv;
+}
 
 void
 stg_exit(I_ n)
