@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt,v 1.16 2001/02/14 12:59:35 simonmar Exp $
+-- $Id: primops.txt,v 1.17 2001/02/15 17:22:15 sewardj Exp $
 --
 -- Primitive Operations
 --
@@ -1020,7 +1020,7 @@ primop  TryPutMVarOp "tryPutMVar#" GenPrimOp
    MVar# s a -> a -> State# s -> (# State# s, Int# #)
    with
    strictness       = { \ arity -> StrictnessInfo [wwPrim, wwLazy, wwPrim] False }
-   usage            = { mangle PutMVarOp [mkM, mkM, mkP] mkR }
+   usage            = { mangle TryPutMVarOp [mkM, mkM, mkP] mkR }
    has_side_effects = True
    out_of_line      = True
 
