@@ -330,7 +330,7 @@ breakLabel s
                  "tbl:"     -> CTbl
                  _ -> error ("breakLabel: " ++ show (s,k,m))
      in
-        if   head m == '_' && dropWhile (== '_') m == "init"
+        if   head m == '_' && dropWhile (== '_') m == "stginit"
         then (init k, Init)
         else (m, kind)
 
