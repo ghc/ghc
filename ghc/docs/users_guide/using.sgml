@@ -393,11 +393,11 @@ module X where
 ghc &ndash;&ndash;make Main.hs
 </screen>
 
-    <para>The command line must contain one source file or module
-    name; GHC will figure out all the modules in the program by
-    following the imports from this initial module.  It will then
-    attempt to compile each module which is out of date, and finally
-    if the top module is <literal>Main</literal>, the program
+    <para>The command line may contain any number of source file names
+    or module names; GHC will figure out all the modules in the
+    program by following the imports from these initial modules.  It
+    will then attempt to compile each module which is out of date, and
+    finally if there is a <literal>Main</literal> module, the program
     will also be linked into an executable.</para>
 
     <para>The main advantages to using <literal>ghc &ndash;&ndash;make</literal>
@@ -434,8 +434,9 @@ ghc &ndash;&ndash;make Main.hs
     linkend="source-file-options">).</para>
 
     <para>If the program needs to be linked with additional objects
-    (say, some auxilliary C code), these can be specified on the
-    command line as usual.</para>
+    (say, some auxilliary C code), then the object files can be
+    given on the command line and GHC will include them when linking
+    the executable.</para>
 
     <para>Note that GHC can only follow dependencies if it has the
     source file available, so if your program includes a module for
