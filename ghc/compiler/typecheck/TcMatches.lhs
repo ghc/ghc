@@ -20,9 +20,9 @@ import TcHsSyn		( TcMatch, TcGRHSs, TcStmt )
 import TcMonad
 import TcMonoType	( checkSigTyVars, tcHsTyVar, tcHsType, sigPatCtxt )
 import Inst		( Inst, LIE, plusLIE, emptyLIE, plusLIEs )
-import TcEnv		( tcExtendLocalValEnv, tcExtendGlobalTyVars, tcExtendTyVarEnv )
+import TcEnv		( tcExtendLocalValEnv, tcExtendGlobalTyVars, tcExtendTyVarEnv, tcGetGlobalTyVars )
 import TcPat		( tcPat, tcPatBndr_NoSigs, polyPatSig )
-import TcType		( TcType, newTyVarTy, newTyVarTy_OpenKind )
+import TcType		( TcType, newTyVarTy, newTyVarTy_OpenKind, zonkTcTyVars )
 import TcBinds		( tcBindsAndThen )
 import TcSimplify	( tcSimplifyAndCheck, bindInstsOfLocalFuns )
 import TcUnify		( unifyFunTy, unifyTauTy )
@@ -135,7 +135,7 @@ tcMatch xve1 match@(Match sig_tvs pats maybe_rhs_sig grhss) expected_ty ctxt
 	returnTc match_and_lie
 
     else
-	-- If there are sig tve we must be careful *not* to use
+	-- If there are sig tvs we must be careful *not* to use
 	-- expected_ty right away, else we'll unify with tyvars free
 	-- in the envt.  So invent a fresh tyvar and use that instead
 	newTyVarTy_OpenKind		`thenNF_Tc` \ tyvar_ty ->
@@ -158,7 +158,7 @@ tcMatch xve1 match@(Match sig_tvs pats maybe_rhs_sig grhss) expected_ty ctxt
 	returnTc match_and_lie
 
   where
-    tc_match expexted_ty 	-- Any sig tyvars are in scope by now
+    tc_match expected_ty 	-- Any sig tyvars are in scope by now
       = -- STEP 1: Typecheck the patterns
 	tcMatchPats pats expected_ty	`thenTc` \ (rhs_ty, pats', lie_req1, ex_tvs, pat_bndrs, lie_avail) ->
         let
