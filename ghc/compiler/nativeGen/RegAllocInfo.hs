@@ -202,6 +202,8 @@ regUsage instr = case instr of
     GCOS   sz src dst	-> mkRU [src] [dst]
     GTAN   sz src dst	-> mkRU [src] [dst]
 
+    FETCHGOT reg        -> mkRU [] [reg]
+
     COMMENT _		-> noUsage
     DELTA   _           -> noUsage
 
@@ -503,7 +505,9 @@ patchRegs instr env = case instr of
 
     CALL (Left imm)	-> instr
     CALL (Right reg)	-> CALL (Right (env reg))
-
+    
+    FETCHGOT reg        -> FETCHGOT (env reg)
+    
     NOP			-> instr
     COMMENT _		-> instr
     DELTA _ 		-> instr

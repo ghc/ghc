@@ -796,6 +796,8 @@ pprDynamicLinkerAsmLabel GotSymbolPtr lbl
   = pprCLabel lbl <> text "@got"
 pprDynamicLinkerAsmLabel GotSymbolOffset lbl
   = pprCLabel lbl <> text "@gotoff"
+pprDynamicLinkerAsmLabel SymbolPtr lbl
+  = text ".LC_" <> pprCLabel lbl
 #elif mingw32_TARGET_OS
 pprDynamicLinkerAsmLabel SymbolPtr lbl
   = text "__imp_" <> pprCLabel lbl

@@ -1335,6 +1335,12 @@ pprInstr GFREE
             ptext SLIT("\tffree %st(4) ;ffree %st(5) ;ffree %st(6) ;ffree %st(7)") 
           ]
 
+pprInstr (FETCHGOT reg)
+   = vcat [ ptext SLIT("\tcall 1f"),
+            hcat [ ptext SLIT("1:\tpopl\t"), pprReg I32 reg ],
+            hcat [ ptext SLIT("\taddl\t$_GLOBAL_OFFSET_TABLE_+(.-1b), "),
+                   pprReg I32 reg ]
+          ]
 
 -- Emit code to make hi_reg:lo_reg be the 64-bit product of hi_reg and lo_reg
 pprInstr_imul64 hi_reg lo_reg

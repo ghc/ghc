@@ -55,7 +55,7 @@ import CLabel           ( CLabel, pprCLabel,
                           dynamicLinkerLabelInfo, mkPicBaseLabel,
                           labelDynamic, externallyVisibleCLabel )
 
-#if powerpc_TARGET_ARCH && linux_TARGET_OS
+#if linux_TARGET_OS
 import CLabel           ( mkForeignLabel )
 #endif
 
@@ -383,41 +383,66 @@ pprImportedSymbol importedLbl
 
     | otherwise = empty
 
-#elif powerpc_TARGET_ARCH && linux_TARGET_OS
+#elif linux_TARGET_OS && !powerpc32_TARGET_ARCH
 
--- PowerPC Linux
+-- ELF / Linux
 --
--- PowerPC Linux is just plain broken.
--- While it's theoretically possible to use GOT offsets larger
--- than 16 bit, the standard crt*.o files don't, which leads to
--- linker errors as soon as the GOT size exceeds 16 bit.
--- Also, the assembler doesn't support @gotoff labels.
--- In order to be able to use a larger GOT, we circumvent the
--- entire GOT mechanism and do it ourselves (this is what GCC does).
+-- In theory, we don't need to generate any stubs or symbol pointers
+-- by hand for Linux.
+--
+-- Reality differs from this in two areas.
+--
+-- 1) If we just use a dynamically imported symbol directly in a read-only
+--    section of the main executable (as GCC does), ld generates R_*_COPY
+--    relocations, which are fundamentally incompatible with reversed info
+--    tables. Therefore, we need a table of imported addresses in a writable
+--    section.
+--    The "official" GOT mechanism (label@got) isn't intended to be used
+--    in position dependent code, so we have to create our own "fake GOT"
+--    when not opt_PCI && not opt_Static.
+--
+-- 2) PowerPC Linux is just plain broken.
+--    While it's theoretically possible to use GOT offsets larger
+--    than 16 bit, the standard crt*.o files don't, which leads to
+--    linker errors as soon as the GOT size exceeds 16 bit.
+--    Also, the assembler doesn't support @gotoff labels.
+--    In order to be able to use a larger GOT, we have to circumvent the
+--    entire GOT mechanism and do it ourselves (this is also what GCC does).
 
--- In this scheme, we need to do _all data references_ (even refs
--- to static data) via a SymbolPtr when we are generating PIC.
 
--- We need to do this whenever we explicitly access something via
--- a symbol pointer.
+-- When needImportedSymbols is defined,
+-- the NCG will keep track of all DynamicLinkerLabels it uses
+-- and output each of them using pprImportedSymbol.
+#if powerpc_TARGET_ARCH
+    -- PowerPC Linux: -fPIC or -dynamic
 needImportedSymbols = opt_PIC || not opt_Static
+#else
+    -- i386 (and others?): -dynamic but not -fPIC
+needImportedSymbols = not opt_Static && not opt_PIC
+#endif
 
--- If we're generating PIC, we need to create our own "fake GOT".
-
+-- gotLabel
+-- The label used to refer to our "fake GOT" from
+-- position-independent code.
 gotLabel = mkForeignLabel -- HACK: it's not really foreign
                            FSLIT(".LCTOC1") Nothing False
 
+-- pprGotDeclaration
+-- Output whatever needs to be output once per .s file.
 -- The .LCTOC1 label is defined to point 32768 bytes into the table,
 -- to make the most of the PPC's 16-bit displacements.
+-- Only needed for PIC.
 
-pprGotDeclaration = vcat [
+pprGotDeclaration
+    | not opt_PIC = Pretty.empty
+    | otherwise = vcat [
         ptext SLIT(".section \".got2\",\"aw\""),
         ptext SLIT(".LCTOC1 = .+32768")
     ]
 
 -- We generate one .long literal for every symbol we import;
 -- the dynamic linker will relocate those addresses.
-    
+
 pprImportedSymbol importedLbl
     | Just (SymbolPtr, lbl) <- dynamicLinkerLabelInfo importedLbl
     = vcat [
@@ -490,18 +515,22 @@ initializePicBase picReg
                                : ADD picReg picReg (RIReg tmp)
                                : insns)
         return (CmmProc info lab params (b' : tail blocks) : gotOffset : statics)
-#else
-initializePicBase picReg proc = panic "initializePicBase"
+#elif i386_TARGET_ARCH && linux_TARGET_OS
 
--- TODO:
--- i386_TARGET_ARCH && linux_TARGET_OS:
--- generate something like:
+-- We cheat a bit here by defining a pseudo-instruction named FETCHGOT
+-- which pretty-prints as:
 --              call 1f
 -- 1:           popl %picReg
 --              addl __GLOBAL_OFFSET_TABLE__+.-1b, %picReg
--- It might be a good idea to use a FETCHPC pseudo-instruction (like for PowerPC)
--- in order to avoid having to create a new basic block.
--- ((FETCHPC reg) should pretty-print as call 1f; 1: popl reg)
+-- (See PprMach.lhs)
+
+initializePicBase picReg (CmmProc info lab params blocks : statics)
+    = return (CmmProc info lab params (b':tail blocks) : statics)
+    where BasicBlock bID insns = head blocks
+          b' = BasicBlock bID (FETCHGOT picReg : insns)
+
+#else
+initializePicBase picReg proc = panic "initializePicBase"
 
 -- mingw32_TARGET_OS: not needed, won't be called
 

@@ -33,10 +33,8 @@ import UniqFM
 import Unique		( Unique, getUnique )
 import UniqSupply
 import FastTypes
-#if darwin_TARGET_OS || (powerpc_TARGET_ARCH && linux_TARGET_OS)
 import List		( groupBy, sortBy )
 import CLabel           ( pprCLabel )
-#endif
 import ErrUtils		( dumpIfSet_dyn )
 import CmdLineOpts	( DynFlags, DynFlag(..), dopt, opt_Static,
 			  opt_EnsureSplittableC, opt_PIC )
@@ -133,7 +131,6 @@ nativeCodeGen dflags cmms us
 
     split_marker = CmmProc [] mkSplitMarkerLabel [] []
 
-#if darwin_TARGET_OS || (powerpc_TARGET_ARCH && linux_TARGET_OS)
      	 -- Generate "symbol stubs" for all external symbols that might
 	 -- come from a dynamic library.
 {-    dyld_stubs imps = Pretty.vcat $ map pprDyldSymbolStub $
@@ -155,9 +152,6 @@ nativeCodeGen dflags cmms us
         
         where doPpr lbl = (lbl, Pretty.render $ pprCLabel lbl astyle)
               astyle = mkCodeStyle AsmStyle
-#else
-    dyld_stubs imps = Pretty.empty
-#endif
 
 #ifndef NCG_DEBUG
     my_vcat sds = Pretty.vcat sds

@@ -465,6 +465,12 @@ bit or 64 bit precision.
 -- Other things.
 	| CLTD -- sign extend %eax into %edx:%eax
 
+	| FETCHGOT    Reg  -- pseudo-insn for position-independent code
+                           -- pretty-prints as
+                           --       call 1f
+                           -- 1:    popl %reg
+                           --       addl __GLOBAL_OFFSET_TABLE__+.-1b, %reg
+                    
 data Operand
   = OpReg  Reg	        -- register
   | OpImm  Imm	        -- immediate value
