@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.42 2003/02/06 10:04:57 simonmar Exp $
+ * $Id: RtsAPI.c,v 1.43 2003/03/18 10:28:15 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -415,16 +415,16 @@ rts_evalIO (HaskellObj p, /*out*/HaskellObj *ret)
 }
 
 /*
- * Identical to rts_evalIO(), but won't create a new task/OS thread
+ * Identical to rts_evalLazyIO(), but won't create a new task/OS thread
  * to evaluate the Haskell thread. Used by main() only. Hack.
  */
  
 SchedulerStatus
-rts_mainEvalIO(HaskellObj p, /*out*/HaskellObj *ret)
+rts_mainLazyIO(HaskellObj p, /*out*/HaskellObj *ret)
 {
     StgTSO* tso;
     
-    tso = createStrictIOThread(RtsFlags.GcFlags.initialStkSize, p);
+    tso = createIOThread(RtsFlags.GcFlags.initialStkSize, p);
     scheduleThread(tso);
     return waitThread(tso, ret);
 }
