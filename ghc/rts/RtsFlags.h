@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.13 1999/05/11 16:47:56 keithw Exp $
+ * $Id: RtsFlags.h,v 1.14 1999/06/25 09:18:49 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -14,9 +14,10 @@
 
 struct GC_FLAGS {
     FILE   *statsFile;
-    nat	    giveStats; /* ToDo: replace with enum type? */
+    nat	    giveStats;
 #define NO_GC_STATS	 0
-#define VERBOSE_GC_STATS 1
+#define SUMMARY_GC_STATS 1
+#define VERBOSE_GC_STATS 2
 
     nat     maxStkSize;         /* in *words* */
     nat     initialStkSize;     /* in *words* */
