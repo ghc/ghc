@@ -610,7 +610,7 @@ cmLoadModules cmstate1 dflags mg2unsorted
 
 	-- clean up between compilations
 	let cleanup = cleanTempFilesExcept verb 
-			  (ppFilesFromSummaries (flattenSCCs upsweep_these))
+			  (ppFilesFromSummaries (flattenSCCs mg2))
 
         (upsweep_complete_success, threaded3, modsUpswept, newLis)
            <- upsweep_mods ghci_mode dflags valid_linkables reachable_from 
