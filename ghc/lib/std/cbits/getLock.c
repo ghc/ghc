@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: getLock.c,v 1.4 1999/02/04 12:13:15 sof Exp $
+ * $Id: getLock.c,v 1.5 1999/03/01 09:11:39 sof Exp $
  *
  * stdin/stout/stderr Runtime Support
  */
@@ -65,8 +65,12 @@ int exclusive;
          we don't have any read locks on it already.. */
       for (i = 0; i < readLocks; i++) {
 	 if (readLock[i].inode == sb.st_ino && readLock[i].device == sb.st_dev) {
+#ifndef __MINGW32__
 	    errno = EAGAIN;
 	    return -1;
+#else
+	    break;    
+#endif
 	 }	    
       }
       /* If we're determined that there is only a single
@@ -76,8 +80,12 @@ int exclusive;
       if (exclusive) {
 	for (i = 0; i < writeLocks; i++) {
 	  if (writeLock[i].inode == sb.st_ino && writeLock[i].device == sb.st_dev) {
+#ifndef __MINGW32__
 	     errno = EAGAIN;
 	     return -1;
+#else
+	     break;
+#endif
 	  }
         }
       }
@@ -92,8 +100,12 @@ int exclusive;
          that there's no-one writing to the underlying file. */
       for (i = 0; i < writeLocks; i++) {
 	if (writeLock[i].inode == sb.st_ino && writeLock[i].device == sb.st_dev) {
-	    errno = EAGAIN;
-	    return -1;
+#ifndef __MINGW32__
+	     errno = EAGAIN;
+	     return -1;
+#else
+	     break;
+#endif
         }
       }
       /* Fit in new entry, reusing an existing table entry, if possible. */
