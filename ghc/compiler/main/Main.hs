@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.118 2003/01/09 10:49:21 simonmar Exp $
+-- $Id: Main.hs,v 1.119 2003/02/17 12:24:27 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -56,29 +56,11 @@ import CmdLineOpts	( dynFlag, restoreDynFlags,
 import BasicTypes	( failed )
 import Outputable
 import Util
-import Panic		( GhcException(..), panic )
+import Panic		( GhcException(..), panic, installSignalHandlers )
 
 import DATA_IOREF	( readIORef, writeIORef )
 import EXCEPTION	( throwDyn, Exception(..), 
 			  AsyncException(StackOverflow) )
-
-#ifndef mingw32_HOST_OS
-import CONCURRENT	( myThreadId )
-# if __GLASGOW_HASKELL__ < 500
-import EXCEPTION        ( raiseInThread )
-#define throwTo  raiseInThread
-# else
-import EXCEPTION	( throwTo )
-# endif
-
-#if __GLASGOW_HASKELL__ > 504
-import System.Posix.Signals
-#else
-import Posix		( Handler(Catch), installHandler, sigINT, sigQUIT )
-#endif
-
-import DYNAMIC		( toDyn )
-#endif
 
 -- Standard Haskell libraries
 import IO
@@ -145,14 +127,7 @@ main =
 	-- so there shouldn't be any difficulty if we receive further
 	-- signals.
 
-	-- install signal handlers
-#ifndef mingw32_HOST_OS
-   main_thread <- myThreadId
-   let sig_handler = Catch (throwTo main_thread 
-				(DynException (toDyn Interrupted)))
-   installHandler sigQUIT sig_handler Nothing 
-   installHandler sigINT  sig_handler Nothing
-#endif
+   installSignalHandlers
 
    argv <- getArgs
    let (minusB_args, argv') = partition (prefixMatch "-B") argv

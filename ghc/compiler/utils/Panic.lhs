@@ -14,6 +14,7 @@ module Panic
      GhcException(..), ghcError, progName, 
      panic, panic#, assertPanic, trace,
      showException, showGhcException, tryMost,
+     installSignalHandlers,
 
 #if __GLASGOW_HASKELL__ <= 408
      catchJust, ioErrors, throwTo,
@@ -24,6 +25,23 @@ module Panic
 
 import Config
 import FastTypes
+
+#if __GLASGOW_HASKELL__ > 504
+import System.Posix.Signals
+#else
+import Posix		( Handler(Catch), installHandler, sigINT, sigQUIT )
+#endif
+
+#ifndef mingw32_HOST_OS
+import CONCURRENT	( myThreadId )
+
+# if __GLASGOW_HASKELL__ < 500
+import EXCEPTION        ( raiseInThread )
+#define throwTo  raiseInThread
+# else
+import EXCEPTION	( throwTo )
+# endif
+#endif
 
 import DYNAMIC
 import qualified EXCEPTION as Exception
@@ -158,4 +176,21 @@ catchJust = Exception.catchIO
 ioErrors  = Exception.justIoErrors
 throwTo   = Exception.raiseInThread
 #endif
+\end{code}
+
+Standard signal handlers for catching ^C, which just throw an
+exception in the main thread.  NOTE: must be called from the main
+thread.
+
+\begin{code}
+installSignalHandlers :: IO ()
+installSignalHandlers = do
+#ifndef mingw32_HOST_OS
+  main_thread <- myThreadId
+  let sig_handler = Catch (throwTo main_thread 
+				(Exception.DynException (toDyn Interrupted)))
+  installHandler sigQUIT sig_handler Nothing 
+  installHandler sigINT  sig_handler Nothing
+#endif
+  return ()
 \end{code}

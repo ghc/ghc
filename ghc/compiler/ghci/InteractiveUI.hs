@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.144 2003/02/13 01:50:04 sof Exp $
+-- $Id: InteractiveUI.hs,v 1.145 2003/02/17 12:24:26 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -41,7 +41,7 @@ import Packages
 import Outputable
 import CmdLineOpts	( DynFlag(..), DynFlags(..), getDynFlags, saveDynFlags,
 			  restoreDynFlags, dopt_unset )
-import Panic		( GhcException(..), showGhcException )
+import Panic 		hiding ( showException )
 import Config
 
 #ifndef mingw32_TARGET_OS
@@ -355,6 +355,7 @@ runCommand c = ghciHandle handler (doCommand c)
 handler :: Exception -> GHCi Bool
 handler exception = do
   flushInterpBuffers
+  io installSignalHandlers
   ghciHandle handler (showException exception >> return False)
 
 showException (DynException dyn) =
@@ -396,6 +397,7 @@ finishEvalExpr names
       when b (mapM_ (showTypeOfName cmstate) names)
 
       flushInterpBuffers
+      io installSignalHandlers
       b <- isOptionSet RevertCAFs
       io (when b revertCAFs)
       return True
