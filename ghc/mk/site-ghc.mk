@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: site-ghc.mk,v 1.2 1996/11/21 16:48:03 simonm Exp $
+# $Id: site-ghc.mk,v 1.3 1996/11/25 14:45:22 simonm Exp $
 
 # GHC_BUILD_FLAG_x
 #	these are alternative flag names that can be given
@@ -9,13 +9,6 @@
 #	these are lists of flags to be added when the driver
 #	receives a $(GHC_BUILD_FLAG_x) flag.  Only valid for
 #	user build ways.
-
-# ================================================================
-# Set WAYS according to which ways you want to build ghc and its libs
-
-WAYS =
-
-#WAYS = mc mr mt mp mg 2s 1s du p t a b c d e f g h i j k l m n o p A B
 
 # ================================================================
 # BUILDS stuff: main sequential ones
