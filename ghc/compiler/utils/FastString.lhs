@@ -378,9 +378,9 @@ hashSubStrFO fo# start# len# =
    2# -> ((ord# c0 *# 631#) +# (ord# c1 *# 217#) +# len#) `remInt#` hASH_TBL_SIZE#
    _  -> ((ord# c0 *# 631#) +# (ord# c1 *# 217#) +# (ord# c2 *# 43#) +# len#) `remInt#` hASH_TBL_SIZE#
   where
-    c0 = indexCharOffFO# fo# 0#
-    c1 = indexCharOffFO# fo# (len# `quotInt#` 2# -# 1#)
-    c2 = indexCharOffFO# fo# (len# -# 1#)
+    c0 = indexCharOffForeignObj# fo# 0#
+    c1 = indexCharOffForeignObj# fo# (len# `quotInt#` 2# -# 1#)
+    c2 = indexCharOffForeignObj# fo# (len# -# 1#)
 
 --    c1 = indexCharOffFO# fo# 1#
 --    c2 = indexCharOffFO# fo# 2#
