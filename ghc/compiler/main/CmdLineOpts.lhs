@@ -384,11 +384,16 @@ defaultDynFlags = DynFlags {
 			-- applies to -O.
 	    Opt_CSE,
 			-- similarly for CSE.
-	    Opt_DoLambdaEtaExpansion
+	    Opt_DoLambdaEtaExpansion,
 			-- This one is important for a tiresome reason:
 			-- we want to make sure that the bindings for data 
 			-- constructors are eta-expanded.  This is probably
 			-- a good thing anyway, but it seems fragile.
+
+	    -- and the default no-optimisation options:
+	    Opt_IgnoreInterfacePragmas,
+	    Opt_OmitInterfacePragmas
+
            ] ++ standardWarnings,
   }
 
