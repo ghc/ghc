@@ -121,14 +121,21 @@ mkWwBodies :: Type				-- Type of original function
 
 mkWwBodies fun_ty demands res_info one_shots
   = mkWWargs fun_ty demands one_shots'	`thenUs` \ (wrap_args,   wrap_fn_args, work_fn_args, res_ty) ->
-    mkWWcpr res_ty res_info      	`thenUs` \ (wrap_fn_cpr, work_fn_cpr,  cpr_res_ty) ->
     mkWWstr wrap_args			`thenUs` \ (work_args,   wrap_fn_str,  work_fn_str) ->
     let
-	(work_lam_args, work_call_args) = mkWorkerArgs work_args cpr_res_ty
+	(work_lam_args, work_call_args) = mkWorkerArgs work_args res_ty
     in
+	-- Don't do CPR if the worker doesn't have any value arguments
+	-- Then the worker is just a constant, so we don't want to unbox it.
+    (if any isId work_args then
+	mkWWcpr res_ty res_info
+     else
+	returnUs (id, id, res_ty)
+    )					`thenUs` \ (wrap_fn_cpr, work_fn_cpr,  cpr_res_ty) ->
+
     returnUs ([idNewDemandInfo v | v <- work_args, isId v],
 	      Note InlineMe . wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var,
-	      mkLams work_lam_args . work_fn_str . work_fn_cpr . work_fn_args)
+	      mkLams work_lam_args. work_fn_str . work_fn_cpr . work_fn_args)
 	-- We use an INLINE unconditionally, even if the wrapper turns out to be
 	-- something trivial like
 	--	fw = ...
@@ -151,7 +158,7 @@ During worker-wrapper stuff we may end up with an unlifted thing
 which we want to let-bind without losing laziness.  So we
 add a void argument.  E.g.
 
-	f = /\a -> \x y z -> E::Int#	-- E does not mentione x,y,z
+	f = /\a -> \x y z -> E::Int#	-- E does not mention x,y,z
 ==>
 	fw = /\ a -> \void -> E
 	f  = /\ a -> \x y z -> fw realworld
@@ -418,8 +425,9 @@ mkWWcpr body_ty RetCPR
       let
 	work_wild = mk_ww_local work_uniq body_ty
 	arg	  = mk_ww_local arg_uniq  con_arg_ty1
+	con_app   = mkConApp data_con (map Type tycon_arg_tys ++ [Var arg])
       in
-      returnUs (\ wkr_call -> Case wkr_call arg [(DEFAULT, [], mkConApp data_con (map Type tycon_arg_tys ++ [Var arg]))],
+      returnUs (\ wkr_call -> Case wkr_call arg [(DEFAULT, [], con_app)],
 		\ body     -> workerCase body work_wild [(DataAlt data_con, [arg], Var arg)],
 		con_arg_ty1)
 

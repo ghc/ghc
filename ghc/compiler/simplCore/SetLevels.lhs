@@ -125,11 +125,19 @@ tOP_LEVEL   = Level 0 0
 iNLINE_CTXT = InlineCtxt
 
 incMajorLvl :: Level -> Level
-incMajorLvl InlineCtxt			= Level 1 0
+-- For InlineCtxt we ignore any inc's; we don't want
+-- to do any floating at all.  For example,
+--	f = __inline__ (\x -> g 3)
+-- Don't float the (g 3) because that will stop it being
+-- inlined.  One particular case is that of workers: we don't
+-- want to float the call to the worker outside the wrapper,
+-- otherwise the worker might get inlined into the floated expression, 
+-- and an importing module won't see the worker at all.
+incMajorLvl InlineCtxt		= InlineCtxt
 incMajorLvl (Level major minor) = Level (major+1) 0
 
 incMinorLvl :: Level -> Level
-incMinorLvl InlineCtxt			= Level 0 1
+incMinorLvl InlineCtxt		= InlineCtxt
 incMinorLvl (Level major minor) = Level major (minor+1)
 
 maxLvl :: Level -> Level -> Level
