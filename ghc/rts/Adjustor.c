@@ -41,7 +41,7 @@ Haskell side.
 #include "RtsFlags.h"
 
 /* Heavily arch-specific, I'm afraid.. */
-#if defined(i386_TARGET_ARCH)
+#if defined(i386_TARGET_ARCH) || defined(sparc_TARGET_ARCH)
 
 /* Now here's something obscure for you:
 
@@ -67,6 +67,7 @@ static unsigned char __obscure_ccall_ret_code [] =
   , 0xc3             /* ret */
   };
 
+
 void*
 createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
 {
@@ -75,6 +76,13 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
   size_t sizeof_adjustor;
   
   if (cconv == 0) { /* the adjustor will be _stdcall'ed */
+
+#if defined(sparc_TARGET_ARCH)
+    /* SPARC doesn't have a calling convention other than _ccall */
+    if (cconv == 0) {
+        return NULL;
+    }
+#endif
 
     /* Magic constant computed by inspecting the code length of
        the following assembly language snippet
@@ -111,6 +119,7 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
 
   } else { /* the adjustor will be _ccall'ed */
 
+#if defined(i386_TARGET_ARCH)
   /* Magic constant computed by inspecting the code length of
      the following assembly language snippet
      (offset and machine code prefixed):
@@ -156,6 +165,53 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
 
     adj_code[0x0f] = (unsigned char)0xff; /* jmp *%eax */
     adj_code[0x10] = (unsigned char)0xe0; 
+
+#elif defined(sparc_TARGET_ARCH)
+  /* Magic constant computed by inspecting the code length of
+     the following assembly language snippet
+     (offset and machine code prefixed):
+
+  <00>: 13 00 3f fb     sethi  %hi(0x00ffeffa), %o1 # load up wptr (1 of 2)
+  <04>: 11 37 ab 6f     sethi  %hi(0xdeadbeef), %o0 # load up hptr (1 of 2)
+  <08>: 81 c2 63 fa     jmp    %o1+%lo(0x00ffeffa)  # jump to wptr (load 2 of 2)
+  <0c>: 90 12 22 ef     or     %o0, %lo(0xdeadbeef), %o0 # load up hptr (2 of 2)
+                                                         # [in delay slot]
+  <10>: de ad be ef     # Place the value of the StgStablePtr somewhere readable
+
+    ccall'ing on a SPARC leaves little to be performed by the caller.
+    The callee shifts the window on entry and restores it on exit.
+    Input paramters and results are passed via registers. (%o0 in the
+    code above contains the input paramter to wptr.) The return address
+    is stored in %o7/%i7. Since we don't shift the window in this code,
+    the return address is preserved and wptr will return to our caller.
+
+  */
+    sizeof_adjustor = 28*sizeof(char);
+
+    if ((adjustor = stgMallocBytes(sizeof_adjustor,"createAdjustor")) == NULL) {
+        return NULL;
+    }
+
+    adj_code       = (unsigned char*)adjustor;
+
+    /* sethi %hi(wptr), %o1 */
+    *((unsigned long*)(adj_code+0x00)) = (unsigned long)0x13000000;
+    *((unsigned long*)(adj_code+0x00)) |= ((unsigned long)wptr) >> 10;
+
+    /* sethi %hi(hptr), %o0 */
+    *((unsigned long*)(adj_code+0x04)) = (unsigned long)0x11000000;
+    *((unsigned long*)(adj_code+0x04)) |= ((unsigned long)hptr) >> 10;
+    
+    /* jmp %o1+%lo(wptr) */
+    *((unsigned long*)(adj_code+0x08)) = (unsigned long)0x81c26000;
+    *((unsigned long*)(adj_code+0x08)) |= ((unsigned long)wptr) & 0x000003ff;
+    
+    /* or %o0, %lo(hptr), %o0 */
+    *((unsigned long*)(adj_code+0x0c)) = (unsigned long)0x90122000;
+    *((unsigned long*)(adj_code+0x0c)) |= ((unsigned long)hptr) & 0x000003ff;
+    
+    *((StgStablePtr*)(adj_code+0x10)) = (StgStablePtr)hptr;
+#endif
   
   }
 
@@ -166,6 +222,7 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
 void
 freeHaskellFunctionPtr(void* ptr)
 {
+#if defined(i386_TARGET_ARCH)
  if ( *(unsigned char*)ptr != 0x68 &&
       *(unsigned char*)ptr != 0x58 ) {
    fprintf(stderr, "freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
@@ -178,10 +235,19 @@ freeHaskellFunctionPtr(void* ptr)
  } else {
     freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 0x02)));
  }    
+#elif defined(sparc_TARGET_ARCH)
+ if ( *(unsigned char*)ptr != 0x13 ) {
+   fprintf(stderr, "freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
+   return;
+ }
+
+ /* Free the stable pointer first..*/
+ freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 0x10)));
+#endif
  *((unsigned char*)ptr) = '\0';
 
  free(ptr);
 }
 
-#endif /* i386_TARGET_ARCH */
+#endif /* i386_TARGET_ARCH || sparc_TARGET_ARCH */
 
