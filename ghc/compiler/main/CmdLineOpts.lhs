@@ -13,6 +13,7 @@ module CmdLineOpts (
 	HscLang(..),
 	DynFlag(..),	-- needed non-abstractly by DriverFlags
 	DynFlags(..),
+	PackageFlag(..),
 
 	v_Static_hsc_opts,
 
@@ -27,18 +28,8 @@ module CmdLineOpts (
 	dopt_HscLang,			-- DynFlags -> HscLang
 	dopt_OutName,			-- DynFlags -> String
 	getOpts,			-- (DynFlags -> [a]) -> IO [a]
-	setLang,
 	getVerbFlag,
-	setOptLevel,
-
-	-- Manipulating the DynFlags state
-	getDynFlags,			-- IO DynFlags
-	setDynFlags,			-- DynFlags -> IO ()
-	updDynFlags, 			-- (DynFlags -> DynFlags) -> IO ()
-	dynFlag,			-- (DynFlags -> a) -> IO a
-	setDynFlag, unSetDynFlag,	-- DynFlag -> IO ()
-	saveDynFlags, 		 	-- IO ()
-	restoreDynFlags,		-- IO DynFlags
+	updOptLevel,
 
 	-- sets of warning opts
 	minusWOpts,
@@ -84,7 +75,6 @@ module CmdLineOpts (
 
 	-- misc opts
 	opt_ErrorSpans,
-	opt_InPackage,
 	opt_EmitCExternDecls,
 	opt_EnsureSplittableC,
 	opt_GranMacros,
@@ -99,6 +89,7 @@ module CmdLineOpts (
 
 #include "HsVersions.h"
 
+import {-# SOURCE #-} Packages (PackageState)
 import Constants	-- Default values for some flags
 import Util
 import FastString	( FastString, mkFastString )
@@ -107,7 +98,7 @@ import Maybes		( firstJust )
 
 import Panic		( ghcError, GhcException(UsageError) )
 import GLAEXTS
-import DATA_IOREF	( IORef, readIORef, writeIORef )
+import DATA_IOREF	( IORef, readIORef )
 import UNSAFE_IO	( unsafePerformIO )
 \end{code}
 
@@ -314,6 +305,7 @@ data DynFlags = DynFlags {
   ppFlag                :: Bool,        -- preprocess with a Haskell Pp?
   stolen_x86_regs	:: Int,		
   cmdlineHcIncludes	:: [String],	-- -#includes
+  importPaths		:: [FilePath],
 
   -- options for particular phases
   opt_L			:: [String],
@@ -327,9 +319,29 @@ data DynFlags = DynFlags {
   opt_i			:: [String],
 #endif
 
+  -- ** Package flags
+  extraPkgConfs		:: [FilePath],
+	-- The -package-conf flags given on the command line, in the order
+	-- they appeared.
+
+  readUserPkgConf	:: Bool,
+	-- Whether or not to read the user package database
+	-- (-no-user-package-conf).
+
+  packageFlags		:: [PackageFlag],
+	-- The -package and -hide-package flags from the command-line
+
+  -- ** Package state
+  pkgState		:: PackageState,
+
   -- hsc dynamic flags
   flags      		:: [DynFlag]
  }
+
+data PackageFlag
+  = ExposePackage  String
+  | HidePackage    String
+  | IgnorePackage  String
 
 data HscLang
   = HscC
@@ -361,6 +373,7 @@ defaultDynFlags = DynFlags {
   ppFlag                = False,
   stolen_x86_regs	= 4,
   cmdlineHcIncludes	= [],
+  importPaths		= ["."],
   opt_L			= [],
   opt_P			= [],
   opt_F                 = [],
@@ -371,6 +384,12 @@ defaultDynFlags = DynFlags {
   opt_I                 = [],
   opt_i                 = [],
 #endif
+
+  extraPkgConfs		= [],
+  readUserPkgConf	= True,
+  packageFlags		= [],
+  pkgState		= error "pkgState",
+
   flags = [ 
 	    Opt_Generics,
 			-- Generating the helper-functions for
@@ -426,33 +445,18 @@ dopt_set dfs f = dfs{ flags = f : flags dfs }
 dopt_unset :: DynFlags -> DynFlag -> DynFlags
 dopt_unset dfs f = dfs{ flags = filter (/= f) (flags dfs) }
 
-getOpts :: (DynFlags -> [a]) -> IO [a]
+getOpts :: DynFlags -> (DynFlags -> [a]) -> [a]
 	-- We add to the options from the front, so we need to reverse the list
-getOpts opts = dynFlag opts >>= return . reverse
+getOpts dflags opts = reverse (opts dflags)
 
--- we can only switch between HscC, HscAsmm, and HscILX with dynamic flags 
--- (-fvia-C, -fasm, -filx respectively).
-setLang l = updDynFlags (\ dfs -> case hscLang dfs of
-					HscC   -> dfs{ hscLang = l }
-					HscAsm -> dfs{ hscLang = l }
-					HscILX -> dfs{ hscLang = l }
-					_      -> dfs)
-
-getVerbFlag = do
-   verb <- dynFlag verbosity
-   if verb >= 3  then return  "-v" else return ""
+getVerbFlag dflags 
+  | verbosity dflags >= 3  = "-v" 
+  | otherwise =  ""
 
 -----------------------------------------------------------------------------
 -- Setting the optimisation level
 
-setOptLevel :: Int -> IO ()
-setOptLevel n 
-  = do dflags <- getDynFlags
-       if hscLang dflags == HscInterpreted && n > 0
-	  then putStr "warning: -O conflicts with --interactive; -O ignored.\n"
-	  else updDynFlags (setOptLevel' n)
-
-setOptLevel' n dfs
+updOptLevel n dfs
   = if (n >= 1)
      then dfs2{ hscLang = HscC, optLevel = n } -- turn on -fvia-C with -O
      else dfs2{ optLevel = n }
@@ -611,50 +615,7 @@ buildCoreToDo dflags = core_todo
 	  MaxSimplifierIterations max_iter
 	]
      ]
-
--- --------------------------------------------------------------------------
--- Mess about with the mutable variables holding the dynamic arguments
-
--- v_InitDynFlags 
---	is the "baseline" dynamic flags, initialised from
--- 	the defaults and command line options, and updated by the
---	':s' command in GHCi.
---
--- v_DynFlags
---	is the dynamic flags for the current compilation.  It is reset
---	to the value of v_InitDynFlags before each compilation, then
---	updated by reading any OPTIONS pragma in the current module.
-
-GLOBAL_VAR(v_InitDynFlags, defaultDynFlags, DynFlags)
-GLOBAL_VAR(v_DynFlags,     defaultDynFlags, DynFlags)
-
-setDynFlags :: DynFlags -> IO ()
-setDynFlags dfs = writeIORef v_DynFlags dfs
-
-saveDynFlags :: IO ()
-saveDynFlags = do dfs <- readIORef v_DynFlags
-		  writeIORef v_InitDynFlags dfs
-
-restoreDynFlags :: IO DynFlags
-restoreDynFlags = do dfs <- readIORef v_InitDynFlags
-		     writeIORef v_DynFlags dfs
-		     return dfs
-
-getDynFlags :: IO DynFlags
-getDynFlags = readIORef v_DynFlags
-
-updDynFlags :: (DynFlags -> DynFlags) -> IO ()
-updDynFlags f = do dfs <- readIORef v_DynFlags
-		   writeIORef v_DynFlags (f dfs)
-
-dynFlag :: (DynFlags -> a) -> IO a
-dynFlag f = do dflags <- readIORef v_DynFlags; return (f dflags)
-
-setDynFlag, unSetDynFlag :: DynFlag -> IO ()
-setDynFlag f   = updDynFlags (\dfs -> dopt_set dfs f)
-unSetDynFlag f = updDynFlags (\dfs -> dopt_unset dfs f)
 \end{code}
-
 
 %************************************************************************
 %*									*
@@ -701,7 +662,6 @@ minusWallOpts
 GLOBAL_VAR(v_Static_hsc_opts, [], [String])
 
 lookUp	       	 :: FastString -> Bool
-lookup_int     	 :: String -> Maybe Int
 lookup_def_int   :: String -> Int -> Int
 lookup_def_float :: String -> Float -> Float
 lookup_str       :: String -> Maybe String
@@ -718,10 +678,6 @@ lookup_str sw
 	Just ('=' : str) -> Just str
 	Just str         -> Just str
 	Nothing		 -> Nothing	
-
-lookup_int sw = case (lookup_str sw) of
-		  Nothing -> Nothing
-		  Just xx -> Just (try_read sw xx)
 
 lookup_def_int sw def = case (lookup_str sw) of
 			    Nothing -> def		-- Use default
@@ -795,15 +751,6 @@ opt_RulesOff			= lookUp  FSLIT("-frules-off")
 	-- Switch off CPR analysis in the new demand analyser
 opt_LiberateCaseThreshold	= lookup_def_int "-fliberate-case-threshold" (10::Int)
 opt_MaxWorkerArgs		= lookup_def_int "-fmax-worker-args" (10::Int)
-
-{-
-   The optional '-inpackage=P' flag tells what package
-   we are compiling this module for.
-   The Prelude, for example is compiled with '-inpackage std'
--}
-opt_InPackage			= case lookup_str "-inpackage=" of
-				    Just p  -> mkFastString p
-				    Nothing -> FSLIT("Main")	-- The package name if none is specified
 
 opt_EmitCExternDecls	        = lookUp  FSLIT("-femit-extern-decls")
 opt_EnsureSplittableC		= lookUp  FSLIT("-fglobalise-toplev-names")

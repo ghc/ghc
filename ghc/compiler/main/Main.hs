@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.140 2004/11/11 16:07:46 simonmar Exp $
+-- $Id: Main.hs,v 1.141 2004/11/26 16:21:00 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -25,31 +25,24 @@ import InteractiveUI( ghciWelcomeMsg, interactiveUI )
 import CompManager	( cmInit, cmLoadModules, cmDepAnal )
 import HscTypes		( GhciMode(..) )
 import Config		( cBooterVersion, cGhcUnregisterised, cProjectVersion )
-import SysTools		( getPackageConfigPath, initSysTools, cleanTempFiles,
-			  normalisePath )
-import Packages		( showPackages, getPackageConfigMap, basePackage,
-			  haskell98Package
-			)
+import SysTools		( initSysTools, cleanTempFiles, normalisePath )
+import Packages		( dumpPackages, initPackages, haskell98PackageId )
 import DriverPipeline	( staticLink, doMkDLL, runPipeline )
 import DriverState	( buildStgToDo,
 			  findBuildTag, unregFlags, 
 			  v_GhcMode, v_GhcModeFlag, GhcMode(..),
 			  v_Keep_tmp_files, v_Ld_inputs, v_Ways, 
 			  v_Output_file, v_Output_hi, 
-			  readPackageConf, verifyOutputFiles, v_NoLink,
-			  v_Build_tag
+			  verifyOutputFiles, v_NoLink
 			)
-import DriverFlags	( buildStaticHscOpts,
-			  dynamic_flags, processArgs, static_flags)
+import DriverFlags
 
 import DriverMkDepend	( beginMkDependHS, endMkDependHS )
 import DriverPhases	( isSourceFilename )
 
 import DriverUtil	( add, handle, handleDyn, later, unknownFlagsErr )
-import CmdLineOpts	( dynFlag, restoreDynFlags,
-			  saveDynFlags, setDynFlags, getDynFlags, dynFlag,
-			  DynFlags(..), HscLang(..), v_Static_hsc_opts
-			)
+import CmdLineOpts	( DynFlags(..), HscLang(..), v_Static_hsc_opts,
+			  defaultDynFlags )
 import BasicTypes	( failed )
 import Outputable
 import Util
@@ -113,28 +106,14 @@ main =
 			     exitWith (ExitFailure 1)
 	    ) $ do
 
-   -- make sure we clean up after ourselves
-   later (do  forget_it <- readIORef v_Keep_tmp_files
-	      unless forget_it $ do
-	      verb <- dynFlag verbosity
-	      cleanTempFiles verb
-     ) $ do
-	-- exceptions will be blocked while we clean the temporary files,
-	-- so there shouldn't be any difficulty if we receive further
-	-- signals.
-
    installSignalHandlers
 
    argv <- getArgs
    let (minusB_args, argv') = partition (prefixMatch "-B") argv
    top_dir <- initSysTools minusB_args
 
-	-- Read the package configuration
-   conf_file <- getPackageConfigPath
-   readPackageConf conf_file
-
 	-- Process all the other arguments, and get the source files
-   non_static <- processArgs static_flags argv' []
+   non_static <- processStaticFlags argv'
    mode <- readIORef v_GhcMode
 
 	-- -O and --interactive are not a good combination
@@ -150,7 +129,7 @@ main =
    way_opts <- findBuildTag
    let unreg_opts | cGhcUnregisterised == "YES" = unregFlags
 		  | otherwise = []
-   extra_non_static <- processArgs static_flags (unreg_opts ++ way_opts) []
+   extra_non_static <- processStaticFlags (unreg_opts ++ way_opts)
 
 	-- Give the static flags to hsc
    static_opts <- buildStaticHscOpts
@@ -164,27 +143,38 @@ main =
    -- set the "global" HscLang.  The HscLang can be further adjusted on a module
    -- by module basis, using only the -fvia-C and -fasm flags.  If the global
    -- HscLang is not HscC or HscAsm, -fvia-C and -fasm have no effect.
-   dyn_flags <- getDynFlags
+   let dflags0 = defaultDynFlags
    let lang = case mode of 
 		 DoInteractive  -> HscInterpreted
 		 DoEval _	-> HscInterpreted
-		 _other		-> hscLang dyn_flags
+		 _other		-> hscLang dflags0
 
-   setDynFlags (dyn_flags{ stgToDo  = stg_todo,
-                  	   hscLang  = lang,
-			   -- leave out hscOutName for now
-	                   hscOutName = panic "Main.main:hscOutName not set",
-		  	   verbosity = case mode of
+   let dflags1 = dflags0{ stgToDo  = stg_todo,
+                  	  hscLang  = lang,
+			  -- leave out hscOutName for now
+	                  hscOutName = panic "Main.main:hscOutName not set",
+		  	  verbosity = case mode of
 				 	 DoEval _ -> 0
 				 	 _other   -> 1
-			})
+			}
 
 	-- The rest of the arguments are "dynamic"
 	-- Leftover ones are presumably files
-   fileish_args <- processArgs dynamic_flags (extra_non_static ++ non_static) []
+   (dflags2, fileish_args) <- processDynamicFlags 
+				(extra_non_static ++ non_static) dflags1
 
-	-- save the "initial DynFlags" away
-   saveDynFlags
+	-- make sure we clean up after ourselves
+   later (do  forget_it <- readIORef v_Keep_tmp_files
+	      unless forget_it $ do
+	      cleanTempFiles dflags2
+     ) $ do
+	-- exceptions will be blocked while we clean the temporary files,
+	-- so there shouldn't be any difficulty if we receive further
+	-- signals.
+
+	-- Read the package config(s), and process the package-related
+	-- command-line flags
+   dflags <- initPackages dflags2
 
    let
     {-
@@ -219,31 +209,32 @@ main =
    mapM_ (add v_Ld_inputs) (reverse objs)
 
 	---------------- Display banners and configuration -----------
-   showBanners mode conf_file static_opts
+   showBanners mode dflags static_opts
 
 	---------------- Final sanity checking -----------
    checkOptions mode srcs objs
 
-    -- We always link in the base package in
-    -- one-shot linking.  Any other packages
-    -- required must be given using -package
-    -- options on the command-line.
-   let def_hs_pkgs = [basePackage, haskell98Package]
-
 	---------------- Do the business -----------
+
+   -- Always link in the haskell98 package for static linking.  Other
+   -- packages have to be specified via the -package flag.
+   let link_pkgs
+	  | Just h98_id <- haskell98PackageId (pkgState dflags) = [h98_id]
+	  | otherwise = []
+
    case mode of
-	DoMake 	       -> doMake srcs
+	DoMake 	       -> doMake dflags srcs
 			       
 	DoMkDependHS   -> do { beginMkDependHS ; 
-			       compileFiles mode srcs; 
-			       endMkDependHS }
-	StopBefore p   -> do { compileFiles mode srcs; return () }
-	DoMkDLL	       -> do { o_files <- compileFiles mode srcs; 
-			       doMkDLL o_files def_hs_pkgs }
-	DoLink	       -> do { o_files <- compileFiles mode srcs; 
+			       compileFiles mode dflags srcs; 
+			       endMkDependHS dflags }
+	StopBefore p   -> do { compileFiles mode dflags srcs; return () }
+	DoMkDLL	       -> do { o_files <- compileFiles mode dflags srcs; 
+			       doMkDLL dflags o_files link_pkgs }
+	DoLink	       -> do { o_files <- compileFiles mode dflags srcs; 
 			       omit_linking <- readIORef v_NoLink;
 			       when (not omit_linking)
-				    (staticLink o_files def_hs_pkgs) }
+				    (staticLink dflags o_files link_pkgs) }
 
 #ifndef GHCI
 	DoInteractive -> noInteractiveError
@@ -251,8 +242,8 @@ main =
      where
        noInteractiveError = throwDyn (CmdLineError "not built for interactive use")
 #else
-	DoInteractive -> interactiveUI srcs Nothing
-	DoEval expr   -> interactiveUI srcs (Just expr)
+	DoInteractive -> interactiveUI dflags srcs Nothing
+	DoEval expr   -> interactiveUI dflags srcs (Just expr)
 #endif
 
 -- -----------------------------------------------------------------------------
@@ -294,17 +285,16 @@ isInteractive _             = False
 -- -----------------------------------------------------------------------------
 -- Compile files in one-shot mode.
 
-compileFiles :: GhcMode 
+compileFiles :: GhcMode
+	     -> DynFlags
 	     -> [String]	-- Source files
 	     -> IO [String]	-- Object files
-compileFiles mode srcs = do
+compileFiles mode dflags srcs = do
    stop_flag <- readIORef v_GhcModeFlag
-   mapM (compileFile mode stop_flag) srcs
+   mapM (compileFile mode dflags stop_flag) srcs
 
 
-compileFile mode stop_flag src = do
-   restoreDynFlags
-   
+compileFile mode dflags stop_flag src = do
    exists <- doesFileExist src
    when (not exists) $ 
    	throwDyn (CmdLineError ("file `" ++ src ++ "' does not exist"))
@@ -316,16 +306,16 @@ compileFile mode stop_flag src = do
 	  | mode==DoLink || mode==DoMkDLL  = Nothing
 	  | otherwise                      = o_file
 
-   runPipeline mode stop_flag True maybe_o_file src Nothing{-no ModLocation-}
+   runPipeline mode dflags stop_flag True maybe_o_file src 
+		Nothing{-no ModLocation-}
 
 
 -- ----------------------------------------------------------------------------
 -- Run --make mode
 
-doMake :: [String] -> IO ()
-doMake []    = throwDyn (UsageError "no input files")
-doMake srcs  = do 
-    dflags <- getDynFlags 
+doMake :: DynFlags -> [String] -> IO ()
+doMake dflags []    = throwDyn (UsageError "no input files")
+doMake dflags srcs  = do 
     state  <- cmInit Batch dflags
     graph  <- cmDepAnal state srcs
     (_, ok_flag, _) <- cmLoadModules state graph
@@ -335,9 +325,9 @@ doMake srcs  = do
 -- ---------------------------------------------------------------------------
 -- Various banners and verbosity output.
 
-showBanners :: GhcMode -> FilePath -> [String] -> IO ()
-showBanners mode conf_file static_opts = do
-   verb <- dynFlag verbosity
+showBanners :: GhcMode -> DynFlags -> [String] -> IO ()
+showBanners mode dflags static_opts = do
+   let verb = verbosity dflags
 
 	-- Show the GHCi banner
 #  ifdef GHCI
@@ -346,17 +336,14 @@ showBanners mode conf_file static_opts = do
 #  endif
 
 	-- Display details of the configuration in verbose mode
-   when (verb >= 2) 
-	(do hPutStr stderr "Glasgow Haskell Compiler, Version "
- 	    hPutStr stderr cProjectVersion
-	    hPutStr stderr ", for Haskell 98, compiled by GHC version "
-	    hPutStrLn stderr cBooterVersion)
+   when (verb >= 2) $
+	do hPutStr stderr "Glasgow Haskell Compiler, Version "
+ 	   hPutStr stderr cProjectVersion
+	   hPutStr stderr ", for Haskell 98, compiled by GHC version "
+	   hPutStrLn stderr cBooterVersion
 
-   when (verb >= 2) 
-	(hPutStrLn stderr ("Using package config file: " ++ conf_file))
+   when (verb >= 3) $
+	dumpPackages dflags
 
-   pkg_details <- getPackageConfigMap
-   showPackages pkg_details
-
-   when (verb >= 3) 
-	(hPutStrLn stderr ("Hsc static flags: " ++ unwords static_opts))
+   when (verb >= 3) $
+	hPutStrLn stderr ("Hsc static flags: " ++ unwords static_opts)

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgTailCall.lhs,v 1.40 2004/09/30 10:35:50 simonpj Exp $
+% $Id: CgTailCall.lhs,v 1.41 2004/11/26 16:20:12 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -118,8 +118,9 @@ performTailCall fun_info arg_amodes pending_assts
 	      opt_node_asst | nodeMustPointToIt lf_info = node_asst
 			    | otherwise		        = noStmts
 	; EndOfBlockInfo sp _ <- getEndOfBlockInfo
+	; dflags <- getDynFlags
 
-	; case (getCallMethod fun_name lf_info (length arg_amodes)) of
+	; case (getCallMethod dflags fun_name lf_info (length arg_amodes)) of
 
 	    -- Node must always point to things we enter
 	    EnterIt -> do

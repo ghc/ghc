@@ -50,7 +50,8 @@ module RdrHsSyn (
 
 import HsSyn		-- Lots of it
 import IfaceType
-import HscTypes		( ModIface(..), emptyModIface, mkIfaceVerCache )
+import HscTypes		( ModIface(..), emptyModIface, mkIfaceVerCache,
+			  IfacePackage(..) )
 import IfaceSyn		( IfaceDecl(..), IfaceIdInfo(..), IfaceConDecl(..), IfaceConDecls(..) )
 import RdrName		( RdrName, isRdrTyVar, mkUnqual, rdrNameOcc, 
 			  isRdrTyVar, isRdrDataCon, isUnqual, getRdrName, isQual,
@@ -65,9 +66,8 @@ import ForeignCall	( CCallConv, Safety, CCallTarget(..), CExportSpec(..),
 import OccName  	( OccName, srcDataName, varName, isDataOcc, isTcOcc, 
 			  occNameUserString, isValOcc )
 import BasicTypes	( initialVersion, StrictnessMark(..) )
-import Module		( ModuleName )
+import Module		( Module )
 import SrcLoc
-import CmdLineOpts	( opt_InPackage )
 import OrdList		( OrdList, fromOL )
 import Bag		( Bag, emptyBag, snocBag, consBag, foldrBag )
 import Outputable
@@ -206,11 +206,12 @@ to get hi-boot files right!
 
 
 \begin{code}
-mkBootIface :: ModuleName -> [HsDecl RdrName] -> ModIface
+mkBootIface :: Module -> [HsDecl RdrName] -> ModIface
 -- Make the ModIface for a hi-boot file
 -- The decls are of very limited form
+-- The package will be filled in later (see LoadIface.readIface)
 mkBootIface mod decls
-  = (emptyModIface opt_InPackage mod) {
+  = (emptyModIface ThisPackage{-fill in later-} mod) {
 	mi_boot     = True,
 	mi_exports  = [(mod, map mk_export decls')],
 	mi_decls    = decls_w_vers,

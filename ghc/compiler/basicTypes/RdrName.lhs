@@ -47,8 +47,8 @@ import OccName	( NameSpace, varName,
 		  elemOccEnv, plusOccEnv_C, extendOccEnv_C, foldOccEnv,
 		  occEnvElts
 		)
-import Module   ( ModuleName, mkModuleNameFS	)
-import Name	( Name, NamedThing(getName), nameModuleName, nameParent_maybe,
+import Module   ( Module, mkModuleFS )
+import Name	( Name, NamedThing(getName), nameModule, nameParent_maybe,
 		  nameOccName, isExternalName, nameSrcLoc )
 import SrcLoc	( isGoodSrcLoc, SrcSpan )
 import Outputable
@@ -67,13 +67,13 @@ data RdrName
   = Unqual OccName
 	-- Used for ordinary, unqualified occurrences 
 
-  | Qual ModuleName OccName
+  | Qual Module OccName
 	-- A qualified name written by the user in 
 	-- *source* code.  The module isn't necessarily 
 	-- the module where the thing is defined; 
 	-- just the one from which it is imported
 
-  | Orig ModuleName OccName
+  | Orig Module OccName
 	-- An original name; the module is the *defining* module.
 	-- This is used when GHC generates code that will be fed
 	-- into the renamer (e.g. from deriving clauses), but where
@@ -97,10 +97,10 @@ data RdrName
 %************************************************************************
 
 \begin{code}
-rdrNameModule :: RdrName -> ModuleName
+rdrNameModule :: RdrName -> Module
 rdrNameModule (Qual m _) = m
 rdrNameModule (Orig m _) = m
-rdrNameModule (Exact n)  = nameModuleName n
+rdrNameModule (Exact n)  = nameModule n
 rdrNameModule (Unqual n) = pprPanic "rdrNameModule" (ppr n)
 
 rdrNameOcc :: RdrName -> OccName
@@ -121,7 +121,7 @@ setRdrNameSpace :: RdrName -> NameSpace -> RdrName
 setRdrNameSpace (Unqual occ) ns = Unqual (setOccNameSpace ns occ)
 setRdrNameSpace (Qual m occ) ns = Qual m (setOccNameSpace ns occ)
 setRdrNameSpace (Orig m occ) ns = Orig m (setOccNameSpace ns occ)
-setRdrNameSpace (Exact n)    ns = Orig (nameModuleName n)
+setRdrNameSpace (Exact n)    ns = Orig (nameModule n)
 				       (setOccNameSpace ns (nameOccName n))
 \end{code}
 
@@ -130,16 +130,16 @@ setRdrNameSpace (Exact n)    ns = Orig (nameModuleName n)
 mkRdrUnqual :: OccName -> RdrName
 mkRdrUnqual occ = Unqual occ
 
-mkRdrQual :: ModuleName -> OccName -> RdrName
+mkRdrQual :: Module -> OccName -> RdrName
 mkRdrQual mod occ = Qual mod occ
 
-mkOrig :: ModuleName -> OccName -> RdrName
+mkOrig :: Module -> OccName -> RdrName
 mkOrig mod occ = Orig mod occ
 
 ---------------
 mkDerivedRdrName :: Name -> (OccName -> OccName) -> (RdrName)
 mkDerivedRdrName parent mk_occ
-  = mkOrig (nameModuleName parent) (mk_occ (nameOccName parent))
+  = mkOrig (nameModule parent) (mk_occ (nameOccName parent))
 
 ---------------
 	-- These two are used when parsing source files
@@ -151,7 +151,7 @@ mkVarUnqual :: UserFS -> RdrName
 mkVarUnqual n = Unqual (mkOccFS varName n)
 
 mkQual :: NameSpace -> (UserFS, UserFS) -> RdrName
-mkQual sp (m, n) = Qual (mkModuleNameFS m) (mkOccFS sp n)
+mkQual sp (m, n) = Qual (mkModuleFS m) (mkOccFS sp n)
 
 getRdrName :: NamedThing thing => thing -> RdrName
 getRdrName name = nameRdrName (getName name)
@@ -164,7 +164,7 @@ nameRdrName name = Exact name
 
 nukeExact :: Name -> RdrName
 nukeExact n 
-  | isExternalName n = Orig (nameModuleName n) (nameOccName n)
+  | isExternalName n = Orig (nameModule n) (nameOccName n)
   | otherwise	     = Unqual (nameOccName n)
 \end{code}
 
@@ -368,7 +368,7 @@ unQualOK :: GlobalRdrElt -> Bool
 unQualOK (GRE {gre_prov = LocalDef _})    = True
 unQualOK (GRE {gre_prov = Imported is _}) = not (all is_qual is)
 
-hasQual :: ModuleName -> GlobalRdrElt -> Bool
+hasQual :: Module -> GlobalRdrElt -> Bool
 -- A qualified version of this thing is in scope
 hasQual mod (GRE {gre_prov = LocalDef m})    = m == mod
 hasQual mod (GRE {gre_prov = Imported is _}) = any ((== mod) . is_as) is
@@ -411,7 +411,7 @@ The "provenance" of something says how it came to be in scope.
 \begin{code}
 data Provenance
   = LocalDef		-- Defined locally
-	ModuleName
+	Module
 
   | Imported 		-- Imported
 	[ImportSpec]	-- INVARIANT: non-empty
@@ -429,10 +429,10 @@ data ImportSpec		-- Describes a particular import declaration
 			-- Shared among all the Provenaces for a particular
 			-- import declaration
   = ImportSpec {
-	is_mod  :: ModuleName,		-- 'import Muggle'
+	is_mod  :: Module,		-- 'import Muggle'
 					-- Note the Muggle may well not be 
 					-- the defining module for this thing!
-	is_as   :: ModuleName,		-- 'as M' (or 'Muggle' if there is no 'as' clause)
+	is_as   :: Module,		-- 'as M' (or 'Muggle' if there is no 'as' clause)
 	is_qual :: Bool,		-- True <=> qualified (only)
 	is_loc  :: SrcSpan }		-- Location of import statment
 

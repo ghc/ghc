@@ -283,9 +283,7 @@ TH_TY_QUOTE	{ L _ ITtyQuote       }      -- ''T
 module 	:: { Located (HsModule RdrName) }
  	: 'module' modid maybemoddeprec maybeexports 'where' body 
 		{% fileSrcSpan >>= \ loc ->
-		   return (L loc (HsModule (Just (L (getLoc $2) 
-					(mkHomeModule (unLoc $2))))
-				$4 (fst $6) (snd $6) $3)) }
+		   return (L loc (HsModule (Just $2) $4 (fst $6) (snd $6) $3)) }
 	| missing_module_keyword top close
 		{% fileSrcSpan >>= \ loc ->
 		   return (L loc (HsModule Nothing Nothing 
@@ -397,7 +395,7 @@ optqualified :: { Bool }
       	: 'qualified'                           { True  }
       	| {- empty -}				{ False }
 
-maybeas :: { Located (Maybe ModuleName) }
+maybeas :: { Located (Maybe Module) }
       	: 'as' modid                            { LL (Just (unLoc $2)) }
       	| {- empty -}				{ noLoc Nothing }
 
@@ -1511,10 +1509,10 @@ close :: { () }
 -----------------------------------------------------------------------------
 -- Miscellaneous (mostly renamings)
 
-modid 	:: { Located ModuleName }
-	: CONID			{ L1 $ mkModuleNameFS (getCONID $1) }
+modid 	:: { Located Module }
+	: CONID			{ L1 $ mkModuleFS (getCONID $1) }
         | QCONID		{ L1 $ let (mod,c) = getQCONID $1 in
-				  mkModuleNameFS
+				  mkModuleFS
 				   (mkFastString
 				     (unpackFS mod ++ '.':unpackFS c))
 				}

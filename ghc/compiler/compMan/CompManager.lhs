@@ -41,6 +41,8 @@ module CompManager (
     cmGetModInfo,	-- :: CmState -> (ModuleGraph, HomePackageTable)
 
     cmSetDFlags,
+    cmGetDFlags,
+
     cmGetBindings, 	-- :: CmState -> [TyThing]
     cmGetPrintUnqual,	-- :: CmState -> PrintUnqualified
 #endif
@@ -49,19 +51,21 @@ where
 
 #include "HsVersions.h"
 
+import Packages		( isHomeModule )
 import DriverPipeline	( CompResult(..), preprocess, compile, link )
 import HscMain		( newHscEnv )
 import DriverState	( v_Output_file, v_NoHsMain, v_MainModIs )
 import DriverPhases
 import Finder
 import HscTypes
-import PrelNames        ( gHC_PRIM_Name )
-import Module		( Module, ModuleName, moduleName, mkModuleName, isHomeModule,
-			  ModuleEnv, lookupModuleEnvByName, mkModuleEnv, moduleEnvElts,
-			  extendModuleEnvList, extendModuleEnv,
-			  moduleNameUserString,
+import PrelNames        ( gHC_PRIM )
+import Module		( Module, mkModule,
+			  ModuleEnv, lookupModuleEnv, mkModuleEnv,
+			  moduleEnvElts, extendModuleEnvList, extendModuleEnv,
+			  moduleUserString,
 			  ModLocation(..) )
 import GetImports
+import LoadIface	( noIfaceErr )
 import UniqFM
 import Digraph		( SCC(..), stronglyConnComp, flattenSCC, flattenSCCs )
 import ErrUtils		( showPass )
@@ -70,7 +74,7 @@ import BasicTypes	( SuccessFlag(..), succeeded, failed )
 import Util
 import Outputable
 import Panic
-import CmdLineOpts	( DynFlags(..), getDynFlags )
+import CmdLineOpts	( DynFlags(..), DynFlag(..), dopt_unset )
 import Maybes		( expectJust, orElse, mapCatMaybes )
 
 import DATA_IOREF	( readIORef )
@@ -78,7 +82,7 @@ import DATA_IOREF	( readIORef )
 #ifdef GHCI
 import HscMain		( hscGetInfo, GetInfoResult, hscStmt, hscTcExpr, hscKcType )
 import TcRnDriver	( mkExportEnv, getModuleContents )
-import IfaceSyn		( IfaceDecl, IfaceInst )
+import IfaceSyn		( IfaceDecl )
 import RdrName		( GlobalRdrEnv, plusGlobalRdrEnv )
 import Name		( Name )
 import NameEnv
@@ -145,7 +149,7 @@ discardCMInfo cm_state
 
 type UnlinkedImage = [Linkable]	-- the unlinked images (should be a set, really)
 
-findModuleLinkable_maybe :: [Linkable] -> ModuleName -> Maybe Linkable
+findModuleLinkable_maybe :: [Linkable] -> Module -> Maybe Linkable
 findModuleLinkable_maybe lis mod
    = case [LM time nm us | LM time nm us <- lis, nm == mod] of
         []   -> Nothing
@@ -177,7 +181,7 @@ cmSetContext cmstate toplevs exports = do
       hsc_env = cm_hsc cmstate
       hpt     = hsc_HPT hsc_env
 
-  export_env  <- mkExportEnv hsc_env (map mkModuleName exports)
+  export_env  <- mkExportEnv hsc_env (map mkModule exports)
   toplev_envs <- mapM (mkTopLevEnv hpt) toplevs
 
   let all_env = foldr plusGlobalRdrEnv export_env toplev_envs
@@ -187,7 +191,7 @@ cmSetContext cmstate toplevs exports = do
 
 mkTopLevEnv :: HomePackageTable -> String -> IO GlobalRdrEnv
 mkTopLevEnv hpt mod
- = case lookupModuleEnvByName hpt (mkModuleName mod) of
+ = case lookupModuleEnv hpt (mkModule mod) of
       Nothing      -> throwDyn (ProgramError ("mkTopLevEnv: not a home module " ++ mod))
       Just details -> case hm_globals details of
 			Nothing  -> throwDyn (ProgramError ("mkTopLevEnv: not interpreted " ++ mod))
@@ -199,14 +203,18 @@ cmGetContext CmState{cm_ic=ic} =
 
 cmModuleIsInterpreted :: CmState -> String -> IO Bool
 cmModuleIsInterpreted cmstate str 
- = case lookupModuleEnvByName (cmHPT cmstate) (mkModuleName str) of
+ = case lookupModuleEnv (cmHPT cmstate) (mkModule str) of
       Just details       -> return (isJust (hm_globals details))
       _not_a_home_module -> return False
 
 -----------------------------------------------------------------------------
+
 cmSetDFlags :: CmState -> DynFlags -> CmState
 cmSetDFlags cm_state dflags 
   = cm_state { cm_hsc = (cm_hsc cm_state) { hsc_dflags = dflags } }
+
+cmGetDFlags :: CmState -> DynFlags
+cmGetDFlags cm_state = hsc_dflags (cm_hsc cm_state)
 
 -----------------------------------------------------------------------------
 -- cmInfoThing: convert a String to a TyThing
@@ -223,7 +231,7 @@ cmGetInfo cmstate id = hscGetInfo (cm_hsc cmstate) (cm_ic cmstate) id
 cmBrowseModule :: CmState -> String -> Bool -> IO [IfaceDecl]
 cmBrowseModule cmstate str exports_only
   = do { mb_decls <- getModuleContents (cm_hsc cmstate) (cm_ic cmstate) 
-		     		       (mkModuleName str) exports_only
+		     		       (mkModule str) exports_only
        ; case mb_decls of
 	   Nothing -> return []		-- An error of some kind
 	   Just ds -> return ds
@@ -241,7 +249,12 @@ data CmRunResult
 cmRunStmt :: CmState -> String -> IO (CmState, CmRunResult)		
 cmRunStmt cmstate@CmState{ cm_hsc=hsc_env, cm_ic=icontext } expr
    = do 
-        maybe_stuff <- hscStmt hsc_env icontext expr
+	-- Turn off -fwarn-unused-bindings when running a statement, to hide
+	-- warnings about the implicit bindings we introduce.
+	let dflags'  = dopt_unset (hsc_dflags hsc_env) Opt_WarnUnusedBinds
+	    hsc_env' = hsc_env{ hsc_dflags = dflags' }
+
+        maybe_stuff <- hscStmt hsc_env' icontext expr
 
         case maybe_stuff of
 	   Nothing -> return (cmstate, CmRunFailed)
@@ -423,7 +436,7 @@ cmDepAnal cmstate rootnames
            hPutStrLn stderr (showSDoc (hcat [
 	     text "Chasing modules from: ",
 	     hcat (punctuate comma (map text rootnames))]))
-       downsweep rootnames (cm_mg cmstate)
+       downsweep dflags rootnames (cm_mg cmstate)
   where
     hsc_env = cm_hsc cmstate
     dflags  = hsc_dflags hsc_env
@@ -455,13 +468,13 @@ cmLoadModules cmstate1 mg2unsorted
         let 
 	    main_mod = mb_main_mod `orElse` "Main"
 	    a_root_is_Main 
-               = any ((==main_mod).moduleNameUserString.modSummaryName) 
+               = any ((==main_mod).moduleUserString.ms_mod) 
                      mg2unsorted
 
-        let mg2unsorted_names = map modSummaryName mg2unsorted
+        let mg2unsorted_names = map ms_mod mg2unsorted
 
         -- reachable_from follows source as well as normal imports
-        let reachable_from :: ModuleName -> [ModuleName]
+        let reachable_from :: Module -> [Module]
             reachable_from = downwards_closure_of_module mg2unsorted
  
         -- should be cycle free; ignores 'import source's
@@ -480,8 +493,7 @@ cmLoadModules cmstate1 mg2unsorted
 
 	-- putStrLn (showSDoc (vcat [ppr valid_old_linkables, ppr new_linkables]))
 
-		-- Uniq of ModuleName is the same as Module, fortunately...
-	let hpt2 = delListFromUFM hpt1 (map linkableModName new_linkables)
+	let hpt2 = delListFromUFM hpt1 (map linkableModule new_linkables)
             hsc_env2 = hsc_env { hsc_HPT = hpt2 }
 
 	-- When (verb >= 2) $
@@ -505,12 +517,12 @@ cmLoadModules cmstate1 mg2unsorted
                = concatMap (findInSummaries mg2unsorted) stable_mods
 
 	    stable_linkables
-	       = filter (\m -> linkableModName m `elem` stable_mods) 
+	       = filter (\m -> linkableModule m `elem` stable_mods) 
 		    valid_old_linkables
 
         when (verb >= 2) $
            hPutStrLn stderr (showSDoc (text "Stable modules:" 
-                               <+> sep (map (text.moduleNameUserString) stable_mods)))
+                               <+> sep (map (text.moduleUserString) stable_mods)))
 
 	-- Unload any modules which are going to be re-linked this
 	-- time around.
@@ -525,7 +537,7 @@ cmLoadModules cmstate1 mg2unsorted
         -- done before the upsweep is abandoned.
         let upsweep_these
                = filter (\scc -> any (`notElem` stable_mods) 
-                                     (map modSummaryName (flattenSCC scc)))
+                                     (map ms_mod (flattenSCC scc)))
                         mg2
 
         --hPutStrLn stderr "after tsort:\n"
@@ -540,7 +552,7 @@ cmLoadModules cmstate1 mg2unsorted
         -- turn.  Final result is version 3 of everything.
 
 	-- clean up between compilations
-	let cleanup = cleanTempFilesExcept verb 
+	let cleanup = cleanTempFilesExcept dflags
 			  (ppFilesFromSummaries (flattenSCCs mg2))
 
         (upsweep_ok, hsc_env3, modsUpswept)
@@ -570,7 +582,7 @@ cmLoadModules cmstate1 mg2unsorted
 		 hPutStrLn stderr "Upsweep completely successful."
 
 	      -- clean up after ourselves
-	      cleanTempFilesExcept verb (ppFilesFromSummaries modsDone)
+	      cleanTempFilesExcept dflags (ppFilesFromSummaries modsDone)
 
 	      ofile <- readIORef v_Output_file
 	      no_hs_main <- readIORef v_NoHsMain
@@ -600,19 +612,19 @@ cmLoadModules cmstate1 mg2unsorted
 		hPutStrLn stderr "Upsweep partially successful."
 
               let modsDone_names
-                     = map modSummaryName modsDone
+                     = map ms_mod modsDone
               let mods_to_zap_names 
                      = findPartiallyCompletedCycles modsDone_names 
 			  mg2_with_srcimps
               let mods_to_keep
-                     = filter ((`notElem` mods_to_zap_names).modSummaryName) 
+                     = filter ((`notElem` mods_to_zap_names).ms_mod) 
 			  modsDone
 
-              let hpt4 = retainInTopLevelEnvs (map modSummaryName mods_to_keep) 
+              let hpt4 = retainInTopLevelEnvs (map ms_mod mods_to_keep) 
 					      (hsc_HPT hsc_env3)
 
 	      -- Clean up after ourselves
-	      cleanTempFilesExcept verb (ppFilesFromSummaries mods_to_keep)
+	      cleanTempFilesExcept dflags (ppFilesFromSummaries mods_to_keep)
 
 	      -- Link everything together
               linkresult <- link ghci_mode dflags False hpt4
@@ -633,7 +645,7 @@ cmLoadFinish ok Failed cmstate
 -- newly loaded module, or the Prelude if none were loaded.
 cmLoadFinish ok Succeeded cmstate
   = do let new_cmstate = cmstate { cm_ic = emptyInteractiveContext }
-           mods_loaded = map (moduleNameUserString.modSummaryName) 
+           mods_loaded = map (moduleUserString.ms_mod) 
 			     (cm_mg cmstate)
 
        return (new_cmstate, ok, mods_loaded)
@@ -669,7 +681,7 @@ ppFilesFromSummaries summaries
 getValidLinkables
 	:: GhciMode
 	-> [Linkable]		-- old linkables
-	-> [ModuleName]		-- all home modules
+	-> [Module]		-- all home modules
 	-> [SCC ModSummary]	-- all modules in the program, dependency order
 	-> IO ( [Linkable],	-- still-valid linkables 
 		[Linkable] 	-- new linkables we just found
@@ -689,7 +701,7 @@ getValidLinkables mode old_linkables all_home_mods module_graph = do
 getValidLinkablesSCC mode old_linkables all_home_mods new_linkables scc0
    = let 
 	  scc             = flattenSCC scc0
-          scc_names       = map modSummaryName scc
+          scc_names       = map ms_mod scc
 	  home_module m   = m `elem` all_home_mods && m `notElem` scc_names
           scc_allhomeimps = nub (filter home_module (concatMap ms_imps scc))
 		-- NB. ms_imps, not ms_allimps above.  We don't want to
@@ -729,7 +741,7 @@ getValidLinkable old_linkables objects_allowed new_linkables summary
 	-- have a .o-file linkable.  We only permit it if all the
 	-- modules it depends on also have .o files; a .o file can't
 	-- link to a bytecode module
-   = do let mod_name = modSummaryName summary
+   = do let mod_name = ms_mod summary
 
 	maybe_disk_linkable
           <- if (not objects_allowed)
@@ -795,21 +807,21 @@ hptLinkables hpt = map hm_linkable (moduleEnvElts hpt)
 --	* has an interface in the HPT (interactive mode only)
 
 preUpsweep :: [Linkable]	-- new valid linkables
-           -> [ModuleName]	-- names of all mods encountered in downsweep
-           -> [ModuleName]	-- accumulating stable modules
+           -> [Module]		-- names of all mods encountered in downsweep
+           -> [Module]		-- accumulating stable modules
            -> [SCC ModSummary]  -- scc-ified mod graph, including src imps
-           -> IO [ModuleName]	-- stable modules
+           -> IO [Module]	-- stable modules
 
 preUpsweep valid_lis all_home_mods stable []  = return stable
 preUpsweep valid_lis all_home_mods stable (scc0:sccs)
    = do let scc = flattenSCC scc0
-            scc_allhomeimps :: [ModuleName]
+            scc_allhomeimps :: [Module]
             scc_allhomeimps 
                = nub (filter (`elem` all_home_mods) (concatMap ms_allimps scc))
             all_imports_in_scc_or_stable
                = all in_stable_or_scc scc_allhomeimps
             scc_names
-		= map modSummaryName scc
+		= map ms_mod scc
             in_stable_or_scc m
                = m `elem` scc_names || m `elem` stable
 
@@ -817,7 +829,7 @@ preUpsweep valid_lis all_home_mods stable (scc0:sccs)
 	    -- have a valid linkable (see getValidLinkables above).
 	    has_valid_linkable new_summary
    	      = isJust (findModuleLinkable_maybe valid_lis modname)
-	       where modname = modSummaryName new_summary
+	       where modname = ms_mod new_summary
 
 	    scc_is_stable = all_imports_in_scc_or_stable
 			  && all has_valid_linkable scc
@@ -830,9 +842,9 @@ preUpsweep valid_lis all_home_mods stable (scc0:sccs)
 -- Helper for preUpsweep.  Assuming that new_summary's imports are all
 -- stable (in the sense of preUpsweep), determine if new_summary is itself
 -- stable, and, if so, in batch mode, return its linkable.
-findInSummaries :: [ModSummary] -> ModuleName -> [ModSummary]
+findInSummaries :: [ModSummary] -> Module -> [ModSummary]
 findInSummaries old_summaries mod_name
-   = [s | s <- old_summaries, modSummaryName s == mod_name]
+   = [s | s <- old_summaries, ms_mod s == mod_name]
 
 findModInSummaries :: [ModSummary] -> Module -> Maybe ModSummary
 findModInSummaries old_summaries mod
@@ -842,14 +854,14 @@ findModInSummaries old_summaries mod
 
 -- Return (names of) all those in modsDone who are part of a cycle
 -- as defined by theGraph.
-findPartiallyCompletedCycles :: [ModuleName] -> [SCC ModSummary] -> [ModuleName]
+findPartiallyCompletedCycles :: [Module] -> [SCC ModSummary] -> [Module]
 findPartiallyCompletedCycles modsDone theGraph
    = chew theGraph
      where
         chew [] = []
         chew ((AcyclicSCC v):rest) = chew rest    -- acyclic?  not interesting.
         chew ((CyclicSCC vs):rest)
-           = let names_in_this_cycle = nub (map modSummaryName vs)
+           = let names_in_this_cycle = nub (map ms_mod vs)
                  mods_in_this_cycle  
                     = nub ([done | done <- modsDone, 
                                    done `elem` names_in_this_cycle])
@@ -865,7 +877,7 @@ findPartiallyCompletedCycles modsDone theGraph
 -- There better had not be any cyclic groups here -- we check for them.
 upsweep_mods :: HscEnv			-- Includes up-to-date HPT
              -> [Linkable]		-- Valid linkables
-             -> (ModuleName -> [ModuleName])  -- to construct downward closures
+             -> (Module -> [Module])  -- to construct downward closures
 	     -> IO ()		      -- how to clean up unwanted tmp files
              -> [SCC ModSummary]      -- mods to do (the worklist)
                                       -- ...... RETURNING ......
@@ -880,16 +892,16 @@ upsweep_mods hsc_env oldUI reachable_from cleanup
 upsweep_mods hsc_env oldUI reachable_from cleanup
      ((CyclicSCC ms):_)
    = do hPutStrLn stderr ("Module imports form a cycle for modules:\n\t" ++
-                          unwords (map (moduleNameUserString.modSummaryName) ms))
+                          unwords (map (moduleUserString.ms_mod) ms))
         return (Failed, hsc_env, [])
 
 upsweep_mods hsc_env oldUI reachable_from cleanup
      ((AcyclicSCC mod):mods)
    = do -- putStrLn ("UPSWEEP_MOD: hpt = " ++ 
-	--	     show (map (moduleNameUserString.moduleName.mi_module.hm_iface) (eltsUFM (hsc_HPT hsc_env)))
+	--	     show (map (moduleUserString.moduleName.mi_module.hm_iface) (eltsUFM (hsc_HPT hsc_env)))
 
         (ok_flag, hsc_env1) <- upsweep_mod hsc_env oldUI mod 
-                  	    		    (reachable_from (modSummaryName mod))
+                  	    		    (reachable_from (ms_mod mod))
 
 	cleanup		-- Remove unwanted tmp files between compilations
 
@@ -906,7 +918,7 @@ upsweep_mods hsc_env oldUI reachable_from cleanup
 upsweep_mod :: HscEnv
             -> UnlinkedImage
             -> ModSummary
-            -> [ModuleName]
+            -> [Module]
             -> IO (SuccessFlag, 
 		   HscEnv)		-- With updated HPT
 
@@ -914,17 +926,16 @@ upsweep_mod hsc_env oldUI summary1 reachable_inc_me
    = do 
         let this_mod = ms_mod summary1
 	    location = ms_location summary1
-	    mod_name = moduleName this_mod
 	    hpt1     = hsc_HPT hsc_env
 
-        let mb_old_iface = case lookupModuleEnvByName hpt1 mod_name of
+        let mb_old_iface = case lookupModuleEnv hpt1 this_mod of
 			     Just mod_info -> Just (hm_iface mod_info)
 			     Nothing	   -> Nothing
 
-        let maybe_old_linkable = findModuleLinkable_maybe oldUI mod_name
+        let maybe_old_linkable = findModuleLinkable_maybe oldUI this_mod
             source_unchanged   = isJust maybe_old_linkable
 
-	    reachable_only = filter (/= mod_name) reachable_inc_me
+	    reachable_only = filter (/= this_mod) reachable_inc_me
 
 	   -- In interactive mode, all home modules below us *must* have an
 	   -- interface in the HPT.  We never demand-load home interfaces in
@@ -964,7 +975,7 @@ upsweep_mod hsc_env oldUI summary1 reachable_inc_me
            CompErrs -> return (Failed, hsc_env)
 
 -- Filter modules in the HPT
-retainInTopLevelEnvs :: [ModuleName] -> HomePackageTable -> HomePackageTable
+retainInTopLevelEnvs :: [Module] -> HomePackageTable -> HomePackageTable
 retainInTopLevelEnvs keep_these hpt
    = listToUFM (concatMap (maybeLookupUFM hpt) keep_these)
    where
@@ -973,13 +984,13 @@ retainInTopLevelEnvs keep_these hpt
 				Just val -> [(u, val)] 
 
 -- Needed to clean up HPT so that we don't get duplicates in inst env
-downwards_closure_of_module :: [ModSummary] -> ModuleName -> [ModuleName]
+downwards_closure_of_module :: [ModSummary] -> Module -> [Module]
 downwards_closure_of_module summaries root
-   = let toEdge :: ModSummary -> (ModuleName,[ModuleName])
-         toEdge summ = (modSummaryName summ, 
+   = let toEdge :: ModSummary -> (Module,[Module])
+         toEdge summ = (ms_mod summ, 
 			filter (`elem` all_mods) (ms_allimps summ))
 
-	 all_mods = map modSummaryName summaries
+	 all_mods = map ms_mod summaries
 
          res = simple_transitive_closure (map toEdge summaries) [root]
      in
@@ -1003,13 +1014,13 @@ simple_transitive_closure graph set
 topological_sort :: Bool -> [ModSummary] -> [SCC ModSummary]
 topological_sort include_source_imports summaries
    = let 
-         toEdge :: ModSummary -> (ModSummary,ModuleName,[ModuleName])
+         toEdge :: ModSummary -> (ModSummary,Module,[Module])
          toEdge summ
-             = (summ, modSummaryName summ, 
+             = (summ, ms_mod summ, 
                       (if include_source_imports 
                        then ms_srcimps summ else []) ++ ms_imps summ)
         
-         mash_edge :: (ModSummary,ModuleName,[ModuleName]) -> (ModSummary,Int,[Int])
+         mash_edge :: (ModSummary,Module,[Module]) -> (ModSummary,Int,[Int])
          mash_edge (summ, m, m_imports)
             = case lookup m key_map of
                  Nothing -> panic "reverse_topological_sort"
@@ -1018,7 +1029,7 @@ topological_sort include_source_imports summaries
                              mapCatMaybes (flip lookup key_map) m_imports)
 
          edges     = map toEdge summaries
-         key_map   = zip [nm | (s,nm,imps) <- edges] [1 ..] :: [(ModuleName,Int)]
+         key_map   = zip [nm | (s,nm,imps) <- edges] [1 ..] :: [(Module,Int)]
          scc_input = map mash_edge edges
          sccs      = stronglyConnComp scc_input
      in
@@ -1036,15 +1047,16 @@ topological_sort include_source_imports summaries
 -- cache to avoid recalculating a module summary if the source is
 -- unchanged.
 
-downsweep :: [FilePath] -> [ModSummary] -> IO [ModSummary]
-downsweep roots old_summaries
+downsweep :: DynFlags -> [FilePath] -> [ModSummary] -> IO [ModSummary]
+downsweep dflags roots old_summaries
    = do rootSummaries <- mapM getRootSummary roots
 	checkDuplicates rootSummaries
         all_summaries
            <- loop (concat (map (\ m -> zip (repeat (fromMaybe "<unknown>" (ml_hs_file (ms_location m))))
 	   				    (ms_imps m)) rootSummaries))
 		(mkModuleEnv [ (mod, s) | s <- rootSummaries, 
-					  let mod = ms_mod s, isHomeModule mod 
+					  let mod = ms_mod s, 
+					  isHomeModule dflags mod 
 			     ])
         return all_summaries
      where
@@ -1052,14 +1064,14 @@ downsweep roots old_summaries
 	getRootSummary file
 	   | isHaskellSrcFilename file
 	   = do exists <- doesFileExist file
-		if exists then summariseFile file else do
+		if exists then summariseFile dflags file else do
 		throwDyn (CmdLineError ("can't find file `" ++ file ++ "'"))	
 	   | otherwise
  	   = do exists <- doesFileExist hs_file
-		if exists then summariseFile hs_file else do
+		if exists then summariseFile dflags hs_file else do
 		exists <- doesFileExist lhs_file
-		if exists then summariseFile lhs_file else do
-		let mod_name = mkModuleName file
+		if exists then summariseFile dflags lhs_file else do
+		let mod_name = mkModule file
 		maybe_summary <- getSummary (file, mod_name)
 		case maybe_summary of
 		   Nothing -> packageModErr mod_name
@@ -1084,20 +1096,18 @@ downsweep roots old_summaries
 			   [ fromJust (ml_hs_file (ms_location summ'))
 			   | summ' <- summaries, ms_mod summ' == modl ]
 
-        getSummary :: (FilePath,ModuleName) -> IO (Maybe ModSummary)
-        getSummary (currentMod,nm)
-           = do found <- findModule nm
+        getSummary :: (FilePath,Module) -> IO (Maybe ModSummary)
+        getSummary (currentMod,mod)
+           = do found <- findModule dflags mod True{-explicit-}
 		case found of
-		   Right (mod, location) -> do
+		   Found location pkg -> do
 			let old_summary = findModInSummaries old_summaries mod
-			summarise mod location old_summary
+			summarise dflags mod location old_summary
 
-		   Left files -> do
-			dflags <- getDynFlags
-			throwDyn (noModError dflags currentMod nm files)
+		   err -> throwDyn (noModError dflags currentMod mod err)
 
         -- loop invariant: env doesn't contain package modules
-        loop :: [(FilePath,ModuleName)] -> ModuleEnv ModSummary -> IO [ModSummary]
+        loop :: [(FilePath,Module)] -> ModuleEnv ModSummary -> IO [ModSummary]
 	loop [] env = return (moduleEnvElts env)
         loop imps env
            = do -- imports for modules we don't already have
@@ -1116,16 +1126,8 @@ downsweep roots old_summaries
 				[ (ms_mod s, s) | s <- new_home_summaries ])
 
 -- ToDo: we don't have a proper line number for this error
-noModError dflags loc mod_nm files = ProgramError (showSDoc (
-  hang (text loc <> colon) 4 $
-    (text "Can't find module" <+> quotes (ppr mod_nm) $$ extra)
-  ))
-  where
-   extra
-    | verbosity dflags < 3 =
-        text "(use -v to see a list of the files searched for)"
-    | otherwise =
-        hang (ptext SLIT("locations searched:")) 4 (vcat (map text files))
+noModError dflags loc mod_nm err
+  = ProgramError (showSDoc (noIfaceErr dflags mod_nm err))
 
 -----------------------------------------------------------------------------
 -- Summarising modules
@@ -1140,19 +1142,19 @@ noModError dflags loc mod_nm files = ProgramError (showSDoc (
 --	a summary.  The finder is used to locate the file in which the module
 --	resides.
 
-summariseFile :: FilePath -> IO ModSummary
-summariseFile file
-   = do hspp_fn <- preprocess file
-        (srcimps,imps,mod_name) <- getImportsFromFile hspp_fn
+summariseFile :: DynFlags -> FilePath -> IO ModSummary
+summariseFile dflags file
+   = do hspp_fn <- preprocess dflags file
+        (srcimps,imps,mod) <- getImportsFromFile hspp_fn
 
         let -- GHC.Prim doesn't exist physically, so don't go looking for it.
-            the_imps = filter (/= gHC_PRIM_Name) imps
+            the_imps = filter (/= gHC_PRIM) imps
 
-	(mod, location) <- mkHomeModLocation mod_name file
+	location <- mkHomeModLocation mod file
 
         src_timestamp
            <- case ml_hs_file location of 
-                 Nothing     -> noHsFileErr mod_name
+                 Nothing     -> noHsFileErr mod
                  Just src_fn -> getModificationTime src_fn
 
         return (ModSummary { ms_mod = mod, 
@@ -1161,10 +1163,10 @@ summariseFile file
 			     ms_hs_date = src_timestamp })
 
 -- Summarise a module, and pick up source and timestamp.
-summarise :: Module -> ModLocation -> Maybe ModSummary
+summarise :: DynFlags -> Module -> ModLocation -> Maybe ModSummary
 	 -> IO (Maybe ModSummary)
-summarise mod location old_summary
-   | not (isHomeModule mod) = return Nothing
+summarise dflags mod location old_summary
+   | not (isHomeModule dflags mod) = return Nothing
    | otherwise
    = do let hs_fn = expectJust "summarise" (ml_hs_file location)
 
@@ -1179,17 +1181,17 @@ summarise mod location old_summary
 	   Just s | ms_hs_date s == src_timestamp -> return (Just s);
 	   _ -> do
 
-        hspp_fn <- preprocess hs_fn
+        hspp_fn <- preprocess dflags hs_fn
         (srcimps,imps,mod_name) <- getImportsFromFile hspp_fn
 	let
 	     -- GHC.Prim doesn't exist physically, so don't go looking for it.
-           the_imps = filter (/= gHC_PRIM_Name) imps
+           the_imps = filter (/= gHC_PRIM) imps
 
-	when (mod_name /= moduleName mod) $
+	when (mod_name /= mod) $
 		throwDyn (ProgramError 
 		   (showSDoc (text hs_fn
 			      <>  text ": file name does not match module name"
-			      <+> quotes (ppr (moduleName mod)))))
+			      <+> quotes (ppr mod))))
 
         return (Just (ModSummary mod location{ml_hspp_file=Just hspp_fn} 
                                  srcimps the_imps src_timestamp))
@@ -1237,8 +1239,8 @@ data ModSummary
    = ModSummary {
         ms_mod      :: Module,			-- name, package
         ms_location :: ModLocation,		-- location
-        ms_srcimps  :: [ModuleName],		-- source imports
-        ms_imps     :: [ModuleName],		-- non-source imports
+        ms_srcimps  :: [Module],		-- source imports
+        ms_imps     :: [Module],		-- non-source imports
         ms_hs_date  :: ClockTime		-- timestamp of summarised file
      }
 
@@ -1253,7 +1255,4 @@ instance Outputable ModSummary where
             ]
 
 ms_allimps ms = ms_srcimps ms ++ ms_imps ms
-
-modSummaryName :: ModSummary -> ModuleName
-modSummaryName = moduleName . ms_mod
 \end{code}

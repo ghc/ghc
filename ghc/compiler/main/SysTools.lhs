@@ -70,7 +70,7 @@ import Config
 import Outputable
 import Panic		( GhcException(..) )
 import Util		( global, notNull )
-import CmdLineOpts	( dynFlag, verbosity )
+import CmdLineOpts	( DynFlags(..) )
 
 import EXCEPTION	( throwDyn )
 import DATA_IOREF	( IORef, readIORef, writeIORef )
@@ -534,60 +534,71 @@ showOpt (Option s)  = s
 
 
 \begin{code}
-runUnlit :: [Option] -> IO ()
-runUnlit args = do p <- readIORef v_Pgm_L
-		   runSomething "Literate pre-processor" p args
+runUnlit :: DynFlags -> [Option] -> IO ()
+runUnlit dflags args = do 
+  p <- readIORef v_Pgm_L
+  runSomething dflags "Literate pre-processor" p args
 
-runCpp :: [Option] -> IO ()
-runCpp args =   do (p,baseArgs) <- readIORef v_Pgm_P
-		   runSomething "C pre-processor" p (baseArgs ++ args)
+runCpp :: DynFlags -> [Option] -> IO ()
+runCpp dflags args =   do 
+  (p,baseArgs) <- readIORef v_Pgm_P
+  runSomething dflags "C pre-processor" p (baseArgs ++ args)
 
-runPp :: [Option] -> IO ()
-runPp args =   do p <- readIORef v_Pgm_F
-		  runSomething "Haskell pre-processor" p args
+runPp :: DynFlags -> [Option] -> IO ()
+runPp dflags args =   do 
+  p <- readIORef v_Pgm_F
+  runSomething dflags "Haskell pre-processor" p args
 
-runCc :: [Option] -> IO ()
-runCc args =   do (p,args0) <- readIORef v_Pgm_c
-	          runSomething "C Compiler" p (args0++args)
+runCc :: DynFlags -> [Option] -> IO ()
+runCc dflags args =   do 
+  (p,args0) <- readIORef v_Pgm_c
+  runSomething dflags "C Compiler" p (args0++args)
 
-runMangle :: [Option] -> IO ()
-runMangle args = do (p,args0) <- readIORef v_Pgm_m
-		    runSomething "Mangler" p (args0++args)
+runMangle :: DynFlags -> [Option] -> IO ()
+runMangle dflags args = do 
+  (p,args0) <- readIORef v_Pgm_m
+  runSomething dflags "Mangler" p (args0++args)
 
-runSplit :: [Option] -> IO ()
-runSplit args = do (p,args0) <- readIORef v_Pgm_s
-		   runSomething "Splitter" p (args0++args)
+runSplit :: DynFlags -> [Option] -> IO ()
+runSplit dflags args = do 
+  (p,args0) <- readIORef v_Pgm_s
+  runSomething dflags "Splitter" p (args0++args)
 
-runAs :: [Option] -> IO ()
-runAs args = do (p,args0) <- readIORef v_Pgm_a
-		runSomething "Assembler" p (args0++args)
+runAs :: DynFlags -> [Option] -> IO ()
+runAs dflags args = do 
+  (p,args0) <- readIORef v_Pgm_a
+  runSomething dflags "Assembler" p (args0++args)
 
-runLink :: [Option] -> IO ()
-runLink args = do (p,args0) <- readIORef v_Pgm_l
-	          runSomething "Linker" p (args0++args)
+runLink :: DynFlags -> [Option] -> IO ()
+runLink dflags args = do 
+  (p,args0) <- readIORef v_Pgm_l
+  runSomething dflags "Linker" p (args0++args)
 
 #ifdef ILX
-runIlx2il :: [Option] -> IO ()
-runIlx2il args = do p <- readIORef v_Pgm_I
-	            runSomething "Ilx2Il" p args
+runIlx2il :: DynFlags -> [Option] -> IO ()
+runIlx2il dflags args = do 
+  p <- readIORef v_Pgm_I
+  runSomething dflags "Ilx2Il" p args
 
-runIlasm :: [Option] -> IO ()
-runIlasm args = do p <- readIORef v_Pgm_i
-	           runSomething "Ilasm" p args
+runIlasm :: DynFlags -> [Option] -> IO ()
+runIlasm dflags args = do 
+  p <- readIORef v_Pgm_i
+  runSomething dflags "Ilasm" p args
 #endif
 
-runMkDLL :: [Option] -> IO ()
-runMkDLL args = do (p,args0) <- readIORef v_Pgm_MkDLL
-	           runSomething "Make DLL" p (args0++args)
+runMkDLL :: DynFlags -> [Option] -> IO ()
+runMkDLL dflags args = do
+  (p,args0) <- readIORef v_Pgm_MkDLL
+  runSomething dflags "Make DLL" p (args0++args)
 
-touch :: String -> String -> IO ()
-touch purpose arg =  do p <- readIORef v_Pgm_T
-			runSomething purpose p [FileOption "" arg]
+touch :: DynFlags -> String -> String -> IO ()
+touch dflags purpose arg =  do 
+  p <- readIORef v_Pgm_T
+  runSomething dflags purpose p [FileOption "" arg]
 
-copy :: String -> String -> String -> IO ()
-copy purpose from to = do
-  verb <- dynFlag verbosity
-  when (verb >= 2) $ hPutStrLn stderr ("*** " ++ purpose)
+copy :: DynFlags -> String -> String -> String -> IO ()
+copy dflags purpose from to = do
+  when (verbosity dflags >= 2) $ hPutStrLn stderr ("*** " ++ purpose)
 
   h <- openFile to WriteMode
   ls <- readFile from -- inefficient, but it'll do for now.
@@ -653,17 +664,17 @@ setTmpDir dir = writeIORef v_TmpDir (canonicalise dir)
          _    -> path
 #endif
 
-cleanTempFiles :: Int -> IO ()
-cleanTempFiles verb
+cleanTempFiles :: DynFlags -> IO ()
+cleanTempFiles dflags
    = do fs <- readIORef v_FilesToClean
-	removeTmpFiles verb fs
+	removeTmpFiles dflags fs
 	writeIORef v_FilesToClean []
 
-cleanTempFilesExcept :: Int -> [FilePath] -> IO ()
-cleanTempFilesExcept verb dont_delete
+cleanTempFilesExcept :: DynFlags -> [FilePath] -> IO ()
+cleanTempFilesExcept dflags dont_delete
    = do files <- readIORef v_FilesToClean
 	let (to_keep, to_delete) = partition (`elem` dont_delete) files
-	removeTmpFiles verb to_delete
+	removeTmpFiles dflags to_delete
 	writeIORef v_FilesToClean to_keep
 
 
@@ -685,13 +696,15 @@ addFilesToClean :: [FilePath] -> IO ()
 -- May include wildcards [used by DriverPipeline.run_phase SplitMangle]
 addFilesToClean files = mapM_ (add v_FilesToClean) files
 
-removeTmpFiles :: Int -> [FilePath] -> IO ()
-removeTmpFiles verb fs
+removeTmpFiles :: DynFlags -> [FilePath] -> IO ()
+removeTmpFiles dflags fs
   = warnNon $
-    traceCmd "Deleting temp files" 
+    traceCmd dflags "Deleting temp files" 
 	     ("Deleting: " ++ unwords deletees)
 	     (mapM_ rm deletees)
   where
+    verb = verbosity dflags
+
      -- Flat out refuse to delete files that are likely to be source input
      -- files (is there a worse bug than having a compiler delete your source
      -- files?)
@@ -730,16 +743,17 @@ setDryRun = writeIORef v_Dry_run True
 -----------------------------------------------------------------------------
 -- Running an external program
 
-runSomething :: String		-- For -v message
+runSomething :: DynFlags
+	     -> String		-- For -v message
 	     -> String		-- Command name (possibly a full path)
 				-- 	assumed already dos-ified
 	     -> [Option]	-- Arguments
 				--	runSomething will dos-ify them
 	     -> IO ()
 
-runSomething phase_name pgm args = do
+runSomething dflags phase_name pgm args = do
   let real_args = filter notNull (map showOpt args)
-  traceCmd phase_name (unwords (pgm:real_args)) $ do
+  traceCmd dflags phase_name (unwords (pgm:real_args)) $ do
   exit_code <- rawSystem pgm real_args
   case exit_code of
      ExitSuccess -> 
@@ -754,11 +768,11 @@ runSomething phase_name pgm args = do
      ExitFailure _other ->
 	throwDyn (PhaseFailed phase_name exit_code)
 
-traceCmd :: String -> String -> IO () -> IO ()
+traceCmd :: DynFlags -> String -> String -> IO () -> IO ()
 -- a) trace the command (at two levels of verbosity)
 -- b) don't do it at all if dry-run is set
-traceCmd phase_name cmd_line action
- = do	{ verb <- dynFlag verbosity
+traceCmd dflags phase_name cmd_line action
+ = do	{ let verb = verbosity dflags
 	; when (verb >= 2) $ hPutStrLn stderr ("*** " ++ phase_name)
 	; when (verb >= 3) $ hPutStrLn stderr cmd_line
 	; hFlush stderr

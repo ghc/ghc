@@ -236,7 +236,12 @@ getCgIdInfo id
 	    Nothing   ->
 
 		-- Should be imported; make up a CgIdInfo for it
-	if isExternalName name then
+	let 
+	    name = idName id
+	in
+	if isExternalName name then do
+	    dflags <- getDynFlags 
+	    let ext_lbl = CmmLit (CmmLabel (mkClosureLabel dflags name))
 	    return (stableIdInfo id ext_lbl (mkLFImported id))
 	else
 	if isVoidArg (idCgRep id) then
@@ -246,9 +251,7 @@ getCgIdInfo id
 	-- Bug	
 	cgLookupPanic id
 	}}}}
-  where
-    name    = idName id
-    ext_lbl = CmmLit (CmmLabel (mkClosureLabel name))
+    
 			
 cgLookupPanic :: Id -> FCode a
 cgLookupPanic id

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgMonad.lhs,v 1.41 2004/09/10 14:53:47 simonmar Exp $
+% $Id: CgMonad.lhs,v 1.42 2004/11/26 16:20:10 simonmar Exp $
 %
 \section[CgMonad]{The code generation monad}
 
@@ -47,7 +47,7 @@ module CgMonad (
 	Sequel(..), -- ToDo: unabstract?
 
 	-- ideally we wouldn't export these, but some other modules access internal state
-	getState, setState, getInfoDown,
+	getState, setState, getInfoDown, getDynFlags,
 
 	-- more localised access to monad state	
 	getStkUsage, setStkUsage,
@@ -61,6 +61,7 @@ module CgMonad (
 
 import {-# SOURCE #-} CgBindery ( CgBindings, nukeVolatileBinds )
 
+import CmdLineOpts	( DynFlags )
 import Cmm
 import CmmUtils		( CmmStmts, isNopStmt )
 import CLabel
@@ -74,6 +75,8 @@ import Util		( mapAccumL )
 import UniqSupply	( UniqSupply, mkSplitUniqSupply, splitUniqSupply, uniqFromSupply )
 import FastString
 import Outputable
+
+import Control.Monad	( liftM )
 
 infixr 9 `thenC`	-- Right-associative!
 infixr 9 `thenFC`
@@ -92,6 +95,7 @@ along.
 \begin{code}
 data CgInfoDownwards	-- information only passed *downwards* by the monad
   = MkCgInfoDown {
+	cgd_dflags  :: DynFlags,
 	cgd_mod     :: Module,		-- Module being compiled
 	cgd_statics :: CgBindings,	-- [Id -> info] : static environment
 	cgd_srt     :: CLabel,		-- label of the current SRT
@@ -99,9 +103,10 @@ data CgInfoDownwards	-- information only passed *downwards* by the monad
 	cgd_eob     :: EndOfBlockInfo	-- Info for stuff to do at end of basic block:
   }
 
-initCgInfoDown :: Module -> CgInfoDownwards
-initCgInfoDown mod
-  = MkCgInfoDown {	cgd_mod    = mod,
+initCgInfoDown :: DynFlags -> Module -> CgInfoDownwards
+initCgInfoDown dflags mod
+  = MkCgInfoDown {	cgd_dflags  = dflags,
+			cgd_mod     = mod,
 			cgd_statics = emptyVarEnv,
 			cgd_srt     = error "initC: srt",
 			cgd_ticky   = mkTopTickyCtrLabel,
@@ -370,11 +375,11 @@ instance Monad FCode where
 The Abstract~C is not in the environment so as to improve strictness.
 
 \begin{code}
-initC :: Module -> FCode a -> IO a
+initC :: DynFlags -> Module -> FCode a -> IO a
 
-initC mod (FCode code)
+initC dflags mod (FCode code)
   = do	{ uniqs <- mkSplitUniqSupply 'c'
-	; case code (initCgInfoDown mod) (initCgState uniqs) of
+	; case code (initCgInfoDown dflags mod) (initCgState uniqs) of
 	      (res, _) -> return res
 	}
 
@@ -498,6 +503,9 @@ newUnique = do
 ------------------
 getInfoDown :: FCode CgInfoDownwards
 getInfoDown = FCode $ \info_down state -> (info_down,state)
+
+getDynFlags :: FCode DynFlags
+getDynFlags = liftM cgd_dflags getInfoDown
 
 withInfoDown :: FCode a -> CgInfoDownwards -> FCode a
 withInfoDown (FCode fcode) info_down = FCode $ \_ state -> fcode info_down state 
@@ -646,7 +654,7 @@ forkEvalHelp :: EndOfBlockInfo  -- For the body
 		       a)		-- Result of the FCode
 	-- A disturbingly complicated function
 forkEvalHelp body_eob_info env_code body_code
-  = do	{ info_down@(MkCgInfoDown cg_info statics srt ticky _) <- getInfoDown
+  = do	{ info_down <- getInfoDown
 	; us   <- newUniqSupply
 	; state <- getState
 	; let { info_down_for_body = info_down {cgd_eob = body_eob_info}

@@ -28,7 +28,6 @@ import Distribution.Package	( showPackageId )
 import PprC		( writeCs )
 import CmmLint		( cmmLint )
 import Packages
-import DriverState	( getExplicitPackagesAnd, getPackageCIncludes )
 import DriverUtil	( filenameOf )
 import FastString	( unpackFS )
 import Cmm		( Cmm )
@@ -125,7 +124,7 @@ outputC dflags filenm flat_absC
        --   * the _stub.h file, if there is one.
        --
        let packages = dep_pkgs dependencies
-       pkg_configs <- getExplicitPackagesAnd packages
+       pkg_configs <- getExplicitPackagesAnd dflags packages
        let pkg_names = map (showPackageId.package) pkg_configs
 
        c_includes <- getPackageCIncludes pkg_configs
@@ -244,8 +243,12 @@ outputForeignStubs dflags (ForeignStubs h_code c_code _ _)
                       "Foreign export header file" stub_h_output_d
 
 	-- we need the #includes from the rts package for the stub files
-	rts_pkgs <- getPackageDetails [rtsPackage]
- 	let rts_includes = concatMap mk_include (concatMap includes rts_pkgs)
+	let rtsid = rtsPackageId (pkgState dflags)
+ 	    rts_includes 
+		| Just pid <- rtsid = 
+			let rts_pkg = getPackageDetails (pkgState dflags) pid in
+			concatMap mk_include (includes rts_pkg)
+		| otherwise = []
 	    mk_include i = "#include \"" ++ i ++ "\"\n"
 
 	stub_h_file_exists

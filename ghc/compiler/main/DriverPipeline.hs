@@ -66,11 +66,10 @@ import Maybe
 -- Just preprocess a file, put the result in a temp. file (used by the
 -- compilation manager during the summary phase).
 
-preprocess :: FilePath -> IO FilePath
-preprocess filename =
+preprocess :: DynFlags -> FilePath -> IO FilePath
+preprocess dflags filename =
   ASSERT(isHaskellSrcFilename filename) 
-  do restoreDynFlags	-- Restore to state of last save
-     runPipeline (StopBefore Hsc) ("preprocess") 
+  do runPipeline (StopBefore Hsc) dflags ("preprocess") 
 	False{-temporary output file-}
 	Nothing{-no specific output file-}
 	filename
@@ -119,24 +118,24 @@ compile hsc_env this_mod location src_timestamp
 	source_unchanged have_object 
 	old_iface = do 
 
-   dyn_flags <- restoreDynFlags		-- Restore to the state of the last save
+   let dyn_flags = hsc_dflags hsc_env
 
-   showPass dyn_flags 
+   showPass dyn_flags
 	(showSDoc (text "Compiling" <+> ppr this_mod))
 
    let verb	  = verbosity dyn_flags
    let input_fn   = expectJust "compile:hs" (ml_hs_file location) 
    let input_fnpp = expectJust "compile:hspp" (ml_hspp_file location)
-   let mod_name   = moduleName this_mod
 
    when (verb >= 2) (hPutStrLn stderr ("compile: input file " ++ input_fnpp))
 
+   -- add in the OPTIONS from the source file
    opts <- getOptionsFromSource input_fnpp
-   processArgs dynamic_flags opts []
-   dyn_flags <- getDynFlags
+   (dyn_flags,unhandled_flags) <- processDynamicFlags opts dyn_flags
+   checkProcessArgsResult unhandled_flags input_fn
 
    let (basename, _) = splitFilename input_fn
-       
+
   -- We add the directory in which the .hs files resides) to the import path.
   -- This is needed when we try to compile the .hc file later, if it
   -- imports a _stub.h file that we created here.
@@ -204,14 +203,14 @@ compile hsc_env this_mod location src_timestamp
 		_other -> do
 		   let object_filename = ml_obj_file location
 
-		   runPipeline (StopBefore Ln) ""
+		   runPipeline (StopBefore Ln) dyn_flags ""
 			True Nothing output_fn (Just location)
 			-- the object filename comes from the ModLocation
 
 		   o_time <- getModificationTime object_filename
 		   return ([DotO object_filename], o_time)
 
-	   let linkable = LM unlinked_time mod_name
+	   let linkable = LM unlinked_time this_mod
 			     (hs_unlinked ++ stub_unlinked)
 
 	   return (CompOK details rdr_env iface (Just linkable))
@@ -224,7 +223,7 @@ compileStub dflags stub_c_exists
   | stub_c_exists = do
 	-- compile the _stub.c file w/ gcc
 	let stub_c = hscStubCOutName dflags
-	stub_o <- runPipeline (StopBefore Ln) "stub-compile"
+	stub_o <- runPipeline (StopBefore Ln) dflags "stub-compile"
 			True{-persistent output-} 
 			Nothing{-no specific output file-}
 			stub_c
@@ -285,7 +284,7 @@ link Batch dflags batch_attempt_linking hpt
 	    obj_files = concatMap getOfiles linkables
 
 	-- Don't showPass in Batch mode; doLink will do that for us.
-        staticLink obj_files pkg_deps
+        staticLink dflags obj_files pkg_deps
 
         when (verb >= 3) (hPutStrLn stderr "link: done")
 
@@ -303,8 +302,13 @@ link Batch dflags batch_attempt_linking hpt
 -- ---------------------------------------------------------------------------
 -- Run a compilation pipeline, consisting of multiple phases.
 
+-- The DynFlags can be modified by phases in the pipeline (eg. by
+-- OPTIONS pragmas), and the changes affect later phases in the
+-- pipeline, but we throw away the resulting DynFlags at the end.
+
 runPipeline
   :: GhcMode		-- when to stop
+  -> DynFlags		-- dynamic flags
   -> String		-- "stop after" flag
   -> Bool		-- final output is persistent?
   -> Maybe FilePath	-- where to put the output, optionally
@@ -312,7 +316,8 @@ runPipeline
   -> Maybe ModLocation  -- a ModLocation for this module, if we have one
   -> IO FilePath	-- output filename
 
-runPipeline todo stop_flag keep_output maybe_output_filename input_fn maybe_loc
+runPipeline todo dflags stop_flag keep_output 
+  maybe_output_filename input_fn maybe_loc
   = do
   split <- readIORef v_Split_object_files
   let (basename, suffix) = splitFilename input_fn
@@ -345,7 +350,7 @@ runPipeline todo stop_flag keep_output maybe_output_filename input_fn maybe_loc
 
   -- and execute the pipeline...
   (output_fn, maybe_loc) <- 
-	pipeLoop start_phase stop_phase input_fn basename suffix 
+	pipeLoop dflags start_phase stop_phase input_fn basename suffix 
 		 get_output_fn maybe_loc
 
   -- sometimes, a compilation phase doesn't actually generate any output
@@ -355,18 +360,18 @@ runPipeline todo stop_flag keep_output maybe_output_filename input_fn maybe_loc
   if keep_output
 	then do final_fn <- get_output_fn stop_phase maybe_loc
 	        when (final_fn /= output_fn) $
-	 	  copy ("Copying `" ++ output_fn ++ "' to `" ++ final_fn
+	 	  copy dflags ("Copying `" ++ output_fn ++ "' to `" ++ final_fn
 			++ "'") output_fn final_fn
 	        return final_fn
 	else
 	     return output_fn
 
 
-pipeLoop :: Phase -> Phase -> FilePath -> String -> Suffix
+pipeLoop :: DynFlags -> Phase -> Phase -> FilePath -> String -> Suffix
   -> (Phase -> Maybe ModLocation -> IO FilePath)
   -> Maybe ModLocation -> IO (FilePath, Maybe ModLocation)
 
-pipeLoop phase stop_phase input_fn orig_basename orig_suff 
+pipeLoop dflags phase stop_phase input_fn orig_basename orig_suff 
 	get_output_fn maybe_loc
 
   | phase == stop_phase  =  return (input_fn, maybe_loc)  -- all done
@@ -380,16 +385,16 @@ pipeLoop phase stop_phase input_fn orig_basename orig_suff
 		" but I wanted to stop at phase " ++ show stop_phase)
 
   | otherwise = do
-	maybe_next_phase <- runPhase phase orig_basename orig_suff input_fn
-				get_output_fn maybe_loc
+	maybe_next_phase <- runPhase phase dflags orig_basename 
+				orig_suff input_fn get_output_fn maybe_loc
 	case maybe_next_phase of
-	  (Nothing, maybe_loc, output_fn) -> do
+	  (Nothing, dflags, maybe_loc, output_fn) -> do
 		-- we stopped early, but return the *final* filename
 		-- (it presumably already exists)
 		final_fn <- get_output_fn stop_phase maybe_loc
 		return (final_fn, maybe_loc)
-	  (Just next_phase, maybe_loc, output_fn) ->
-		pipeLoop next_phase stop_phase output_fn
+	  (Just next_phase, dflags', maybe_loc, output_fn) ->
+		pipeLoop dflags' next_phase stop_phase output_fn
 			orig_basename orig_suff get_output_fn maybe_loc
 
   
@@ -459,84 +464,86 @@ genOutputFilenameFunc keep_final_output maybe_output_filename
 -- taking the via-C route to using the native code generator.
 
 runPhase :: Phase
-	  -> String	-- basename of original input source
-	  -> String	-- its extension
-	  -> FilePath	-- name of file which contains the input to this phase.
-	  -> (Phase -> Maybe ModLocation -> IO FilePath)
+	 -> DynFlags
+	 -> String	-- basename of original input source
+	 -> String	-- its extension
+	 -> FilePath	-- name of file which contains the input to this phase.
+	 -> (Phase -> Maybe ModLocation -> IO FilePath)
 			-- how to calculate the output filename
-	  -> Maybe ModLocation		-- the ModLocation, if we have one
-	  -> IO (Maybe Phase,  		-- next phase
-		 Maybe ModLocation,	-- the ModLocation, if we have one
-		 FilePath)		-- output filename
+	 -> Maybe ModLocation		-- the ModLocation, if we have one
+	 -> IO (Maybe Phase,  		-- next phase
+		DynFlags,		-- new dynamic flags
+		Maybe ModLocation,	-- the ModLocation, if we have one
+		FilePath)		-- output filename
 
 -------------------------------------------------------------------------------
 -- Unlit phase 
 
-runPhase Unlit _basename _suff input_fn get_output_fn maybe_loc
-  = do unlit_flags <- getOpts opt_L
+runPhase Unlit dflags _basename _suff input_fn get_output_fn maybe_loc
+  = do let unlit_flags = getOpts dflags opt_L
        -- The -h option passes the file name for unlit to put in a #line directive
        output_fn <- get_output_fn Cpp maybe_loc
 
-       SysTools.runUnlit (map SysTools.Option unlit_flags ++
+       SysTools.runUnlit dflags 
+		(map SysTools.Option unlit_flags ++
        			  [ SysTools.Option     "-h"
  			  , SysTools.Option     input_fn
 			  , SysTools.FileOption "" input_fn
 			  , SysTools.FileOption "" output_fn
 			  ])
 
-       return (Just Cpp, maybe_loc, output_fn)
+       return (Just Cpp, dflags, maybe_loc, output_fn)
 
 -------------------------------------------------------------------------------
 -- Cpp phase 
 
-runPhase Cpp basename suff input_fn get_output_fn maybe_loc
+runPhase Cpp dflags basename suff input_fn get_output_fn maybe_loc
   = do src_opts <- getOptionsFromSource input_fn
-       unhandled_flags <- processArgs dynamic_flags src_opts []
-       checkProcessArgsResult unhandled_flags basename suff
+       (dflags,unhandled_flags) <- processDynamicFlags src_opts dflags
+       checkProcessArgsResult unhandled_flags (basename++'.':suff)
 
-       do_cpp <- dynFlag cppFlag
-       if not do_cpp then
+       if not (cppFlag dflags) then
            -- no need to preprocess CPP, just pass input file along
 	   -- to the next phase of the pipeline.
-          return (Just HsPp, maybe_loc, input_fn)
+          return (Just HsPp, dflags, maybe_loc, input_fn)
 	else do
 	    output_fn <- get_output_fn HsPp maybe_loc
-	    doCpp True{-raw-} False{-no CC opts-} input_fn output_fn
-	    return (Just HsPp, maybe_loc, output_fn)
+	    doCpp dflags True{-raw-} False{-no CC opts-} input_fn output_fn
+	    return (Just HsPp, dflags, maybe_loc, output_fn)
 
 -------------------------------------------------------------------------------
 -- HsPp phase 
 
-runPhase HsPp basename suff input_fn get_output_fn maybe_loc
-  = do do_pp   <- dynFlag ppFlag
-       if not do_pp then
+runPhase HsPp dflags basename suff input_fn get_output_fn maybe_loc
+  = do if not (ppFlag dflags) then
            -- no need to preprocess, just pass input file along
 	   -- to the next phase of the pipeline.
-          return (Just Hsc, maybe_loc, input_fn)
+          return (Just Hsc, dflags, maybe_loc, input_fn)
 	else do
-	    hspp_opts	   <- getOpts opt_F
+	    let hspp_opts = getOpts dflags opt_F
        	    hs_src_pp_opts <- readIORef v_Hs_source_pp_opts
 	    let orig_fn = basename ++ '.':suff
 	    output_fn <- get_output_fn Hsc maybe_loc
-	    SysTools.runPp ( [ SysTools.Option     orig_fn
+	    SysTools.runPp dflags
+			   ( [ SysTools.Option     orig_fn
 			     , SysTools.Option     input_fn
 			     , SysTools.FileOption "" output_fn
 			     ] ++
 			     map SysTools.Option hs_src_pp_opts ++
 			     map SysTools.Option hspp_opts
 			   )
-	    return (Just Hsc, maybe_loc, output_fn)
+	    return (Just Hsc, dflags, maybe_loc, output_fn)
 
 -----------------------------------------------------------------------------
 -- Hsc phase
 
 -- Compilation of a single module, in "legacy" mode (_not_ under
 -- the direction of the compilation manager).
-runPhase Hsc basename suff input_fn get_output_fn _maybe_loc = do
+runPhase Hsc dflags basename suff input_fn get_output_fn _maybe_loc = do
   todo <- readIORef v_GhcMode
   if todo == DoMkDependHS then do
-       locn <- doMkDependHSPhase basename suff input_fn
-       return (Nothing, Just locn, input_fn)  -- Ln is a dummy stop phase 
+       locn <- doMkDependHSPhase dflags basename suff input_fn
+       return (Nothing, dflags, Just locn, input_fn)  -- Ln is a dummy stop phase 
 
    else do
       -- normal Hsc mode, not mkdependHS
@@ -555,12 +562,12 @@ runPhase Hsc basename suff input_fn get_output_fn _maybe_loc = do
 	     then do
                -- no explicit imports in ExtCore input.
 	       m <- getCoreModuleName input_fn
-	       return ([], [], mkModuleName m)
+	       return ([], [], mkModule m)
 	     else 
   	       getImportsFromFile input_fn
 
   -- build a ModLocation to pass to hscMain.
-	(mod, location') <- mkHomeModLocation mod_name (basename ++ '.':suff)
+	location' <- mkHomeModLocation mod_name (basename ++ '.':suff)
 
   -- take -ohi into account if present
 	ohi <- readIORef v_Output_hi
@@ -598,20 +605,19 @@ runPhase Hsc basename suff input_fn get_output_fn _maybe_loc = do
 				  else return False
 
   -- get the DynFlags
-        dyn_flags <- getDynFlags
-	hsc_lang <- hscMaybeAdjustLang (hscLang dyn_flags)
+	hsc_lang <- hscMaybeAdjustLang (hscLang dflags)
 	next_phase <- hscNextPhase hsc_lang
 	output_fn <- get_output_fn next_phase (Just location)
 
-        let dyn_flags' = dyn_flags { hscLang = hsc_lang,
-				     hscOutName = output_fn,
-		   		     hscStubCOutName = basename ++ "_stub.c",
-				     hscStubHOutName = basename ++ "_stub.h",
-				     extCoreName = basename ++ ".hcr" }
-	hsc_env <- newHscEnv OneShot dyn_flags'
+        let dflags' = dflags { hscLang = hsc_lang,
+			       hscOutName = output_fn,
+		   	       hscStubCOutName = basename ++ "_stub.c",
+			       hscStubHOutName = basename ++ "_stub.h",
+			       extCoreName = basename ++ ".hcr" }
+	hsc_env <- newHscEnv OneShot dflags'
 
   -- run the compiler!
-	result <- hscMain hsc_env printErrorsAndWarnings mod
+	result <- hscMain hsc_env printErrorsAndWarnings mod_name
 			  location{ ml_hspp_file=Just input_fn }
 			  source_unchanged
 			  False
@@ -622,49 +628,48 @@ runPhase Hsc basename suff input_fn get_output_fn _maybe_loc = do
 	    HscFail -> throwDyn (PhaseFailed "hsc" (ExitFailure 1))
 
             HscNoRecomp details iface -> do
-		SysTools.touch "Touching object file" o_file
-		return (Nothing, Just location, output_fn)
+		SysTools.touch dflags' "Touching object file" o_file
+		return (Nothing, dflags', Just location, output_fn)
 
 	    HscRecomp _details _rdr_env _iface 
 		      stub_h_exists stub_c_exists
 		      _maybe_interpreted_code -> do
 
 		-- deal with stubs
-		maybe_stub_o <- compileStub dyn_flags' stub_c_exists
+		maybe_stub_o <- compileStub dflags' stub_c_exists
 		case maybe_stub_o of
 		      Nothing -> return ()
 		      Just stub_o -> add v_Ld_inputs stub_o
-		case hscLang dyn_flags of
-                      HscNothing -> return (Nothing, Just location, output_fn)
-		      _ -> return (Just next_phase, Just location, output_fn)
+		case hscLang dflags' of
+                      HscNothing -> return (Nothing, dflags', Just location, output_fn)
+		      _ -> return (Just next_phase, dflags', Just location, output_fn)
 
 -----------------------------------------------------------------------------
 -- Cmm phase
 
-runPhase CmmCpp basename suff input_fn get_output_fn maybe_loc
+runPhase CmmCpp dflags basename suff input_fn get_output_fn maybe_loc
   = do
        output_fn <- get_output_fn Cmm maybe_loc
-       doCpp False{-not raw-} True{-include CC opts-} input_fn output_fn	
-       return (Just Cmm, maybe_loc, output_fn)
+       doCpp dflags False{-not raw-} True{-include CC opts-} input_fn output_fn	
+       return (Just Cmm, dflags, maybe_loc, output_fn)
 
-runPhase Cmm basename suff input_fn get_output_fn maybe_loc
+runPhase Cmm dflags basename suff input_fn get_output_fn maybe_loc
   = do
-        dyn_flags <- getDynFlags
-	hsc_lang <- hscMaybeAdjustLang (hscLang dyn_flags)
+	hsc_lang <- hscMaybeAdjustLang (hscLang dflags)
 	next_phase <- hscNextPhase hsc_lang
 	output_fn <- get_output_fn next_phase maybe_loc
 
-        let dyn_flags' = dyn_flags { hscLang = hsc_lang,
-				     hscOutName = output_fn,
-		   		     hscStubCOutName = basename ++ "_stub.c",
-				     hscStubHOutName = basename ++ "_stub.h",
-				     extCoreName = basename ++ ".hcr" }
+        let dflags' = dflags { hscLang = hsc_lang,
+			       hscOutName = output_fn,
+		   	       hscStubCOutName = basename ++ "_stub.c",
+			       hscStubHOutName = basename ++ "_stub.h",
+			       extCoreName = basename ++ ".hcr" }
 
-	ok <- hscCmmFile dyn_flags' input_fn
+	ok <- hscCmmFile dflags' input_fn
 
 	when (not ok) $ throwDyn (PhaseFailed "cmm" (ExitFailure 1))
 
-	return (Just next_phase, maybe_loc, output_fn)
+	return (Just next_phase, dflags, maybe_loc, output_fn)
 
 -----------------------------------------------------------------------------
 -- Cc phase
@@ -672,9 +677,9 @@ runPhase Cmm basename suff input_fn get_output_fn maybe_loc
 -- we don't support preprocessing .c files (with -E) now.  Doing so introduces
 -- way too many hacks, and I can't say I've ever used it anyway.
 
-runPhase cc_phase basename suff input_fn get_output_fn maybe_loc
+runPhase cc_phase dflags basename suff input_fn get_output_fn maybe_loc
    | cc_phase == Cc || cc_phase == HCc
-   = do	cc_opts <- getOpts opt_c
+   = do	let cc_opts = getOpts dflags opt_c
        	cmdline_include_paths <- readIORef v_Include_paths
 
 	split  <- readIORef v_Split_object_files
@@ -694,16 +699,16 @@ runPhase cc_phase basename suff input_fn get_output_fn maybe_loc
 	-- add package include paths even if we're just compiling .c
 	-- files; this is the Value Add(TM) that using ghc instead of
 	-- gcc gives you :)
-        pkg_include_dirs <- getPackageIncludePath pkgs
+        pkg_include_dirs <- getPackageIncludePath dflags pkgs
         let include_paths = foldr (\ x xs -> "-I" : x : xs) []
 			      (cmdline_include_paths ++ pkg_include_dirs)
 
 	mangle <- readIORef v_Do_asm_mangling
-	(md_c_flags, md_regd_c_flags) <- machdepCCOpts
+	(md_c_flags, md_regd_c_flags) <- machdepCCOpts dflags
 
-        verb <- getVerbFlag
+        let verb = getVerbFlag dflags
 
-	pkg_extra_cc_opts <- getPackageExtraCcOpts pkgs
+	pkg_extra_cc_opts <- getPackageExtraCcOpts dflags pkgs
 
 	split_objs <- readIORef v_Split_object_files
 	let split_opt | hcc && split_objs = [ "-DUSE_SPLIT_MARKERS" ]
@@ -717,7 +722,7 @@ runPhase cc_phase basename suff input_fn get_output_fn maybe_loc
 		| cc_phase == HCc = [ SysTools.Option "-x", SysTools.Option "c"]
 		| otherwise       = [ ]
 
-	SysTools.runCc (langopt ++
+	SysTools.runCc dflags (langopt ++
 			[ SysTools.FileOption "" input_fn
 			, SysTools.Option "-o"
 			, SysTools.FileOption "" output_fn
@@ -736,17 +741,17 @@ runPhase cc_phase basename suff input_fn get_output_fn maybe_loc
 		       ++ pkg_extra_cc_opts
 		       ))
 
-	return (Just next_phase, maybe_loc, output_fn)
+	return (Just next_phase, dflags, maybe_loc, output_fn)
 
 	-- ToDo: postprocess the output from gcc
 
 -----------------------------------------------------------------------------
 -- Mangle phase
 
-runPhase Mangle _basename _suff input_fn get_output_fn maybe_loc
-   = do mangler_opts <- getOpts opt_m
+runPhase Mangle dflags _basename _suff input_fn get_output_fn maybe_loc
+   = do let mangler_opts = getOpts dflags opt_m
         machdep_opts <- if (prefixMatch "i386" cTARGETPLATFORM)
-			  then do n_regs <- dynFlag stolen_x86_regs
+			  then do let n_regs = stolen_x86_regs dflags
 			          return [ show n_regs ]
 		          else return []
 
@@ -756,24 +761,25 @@ runPhase Mangle _basename _suff input_fn get_output_fn maybe_loc
 		| otherwise = As
 	output_fn <- get_output_fn next_phase maybe_loc
 
-	SysTools.runMangle (map SysTools.Option mangler_opts
+	SysTools.runMangle dflags (map SysTools.Option mangler_opts
 		          ++ [ SysTools.FileOption "" input_fn
 			     , SysTools.FileOption "" output_fn
 			     ]
 			  ++ map SysTools.Option machdep_opts)
 
-	return (Just next_phase, maybe_loc, output_fn)
+	return (Just next_phase, dflags, maybe_loc, output_fn)
 
 -----------------------------------------------------------------------------
 -- Splitting phase
 
-runPhase SplitMangle _basename _suff input_fn get_output_fn maybe_loc
+runPhase SplitMangle dflags _basename _suff input_fn get_output_fn maybe_loc
   = do  -- tmp_pfx is the prefix used for the split .s files
 	-- We also use it as the file to contain the no. of split .s files (sigh)
 	split_s_prefix <- SysTools.newTempName "split"
 	let n_files_fn = split_s_prefix
 
-	SysTools.runSplit [ SysTools.FileOption "" input_fn
+	SysTools.runSplit dflags
+			  [ SysTools.FileOption "" input_fn
 			  , SysTools.FileOption "" split_s_prefix
 			  , SysTools.FileOption "" n_files_fn
 			  ]
@@ -787,14 +793,14 @@ runPhase SplitMangle _basename _suff input_fn get_output_fn maybe_loc
 	addFilesToClean [ split_s_prefix ++ "__" ++ show n ++ ".s"
 			| n <- [1..n_files]]
 
-	return (Just SplitAs, maybe_loc, "**splitmangle**")
+	return (Just SplitAs, dflags, maybe_loc, "**splitmangle**")
 	  -- we don't use the filename
 
 -----------------------------------------------------------------------------
 -- As phase
 
-runPhase As _basename _suff input_fn get_output_fn maybe_loc
-  = do	as_opts		      <- getOpts opt_a
+runPhase As dflags _basename _suff input_fn get_output_fn maybe_loc
+  = do	let as_opts =  getOpts dflags opt_a
         cmdline_include_paths <- readIORef v_Include_paths
 
 	output_fn <- get_output_fn Ln maybe_loc
@@ -803,7 +809,8 @@ runPhase As _basename _suff input_fn get_output_fn maybe_loc
 	-- might be a hierarchical module.
 	createDirectoryHierarchy (directoryOf output_fn)
 
-	SysTools.runAs (map SysTools.Option as_opts
+	SysTools.runAs dflags	
+		       (map SysTools.Option as_opts
 		       ++ [ SysTools.Option ("-I" ++ p) | p <- cmdline_include_paths ]
 		       ++ [ SysTools.Option "-c"
 		          , SysTools.FileOption "" input_fn
@@ -811,11 +818,11 @@ runPhase As _basename _suff input_fn get_output_fn maybe_loc
 			  , SysTools.FileOption "" output_fn
 			  ])
 
-	return (Just Ln, maybe_loc, output_fn)
+	return (Just Ln, dflags, maybe_loc, output_fn)
 
 
-runPhase SplitAs basename _suff _input_fn get_output_fn maybe_loc
-  = do  as_opts <- getOpts opt_a
+runPhase SplitAs dflags basename _suff _input_fn get_output_fn maybe_loc
+  = do  let as_opts = getOpts dflags opt_a
 
 	(split_s_prefix, n) <- readIORef v_Split_info
 
@@ -830,7 +837,8 @@ runPhase SplitAs basename _suff _input_fn get_output_fn maybe_loc
 					(basename ++ "__" ++ show n ++ ".o")
 					 real_odir
 		    real_o <- osuf_ify output_o
-		    SysTools.runAs (map SysTools.Option as_opts ++
+		    SysTools.runAs dflags
+				 (map SysTools.Option as_opts ++
 		    		    [ SysTools.Option "-c"
 				    , SysTools.Option "-o"
 				    , SysTools.FileOption "" real_o
@@ -840,15 +848,15 @@ runPhase SplitAs basename _suff _input_fn get_output_fn maybe_loc
 	mapM_ assemble_file [1..n]
 
 	output_fn <- get_output_fn Ln maybe_loc
-	return (Just Ln, maybe_loc, output_fn)
+	return (Just Ln, dflags, maybe_loc, output_fn)
 
 #ifdef ILX
 -----------------------------------------------------------------------------
 -- Ilx2Il phase
 -- Run ilx2il over the ILX output, getting an IL file
 
-runPhase Ilx2Il _basename _suff input_fn get_output_fn maybe_loc
-  = do	ilx2il_opts <- getOpts opt_I
+runPhase Ilx2Il dflags _basename _suff input_fn get_output_fn maybe_loc
+  = do	let ilx2il_opts = getOpts dflags opt_I
         SysTools.runIlx2il (map SysTools.Option ilx2il_opts
                            ++ [ SysTools.Option "--no-add-suffix-to-assembly",
 				SysTools.Option "mscorlib",
@@ -861,8 +869,8 @@ runPhase Ilx2Il _basename _suff input_fn get_output_fn maybe_loc
 -- Ilasm phase
 -- Run ilasm over the IL, getting a DLL
 
-runPhase Ilasm _basename _suff input_fn get_output_fn maybe_loc
-  = do	ilasm_opts <- getOpts opt_i
+runPhase Ilasm dflags _basename _suff input_fn get_output_fn maybe_loc
+  = do	let ilasm_opts = getOpts dflags opt_i
         SysTools.runIlasm (map SysTools.Option ilasm_opts
 		           ++ [ SysTools.Option "/QUIET",
 				SysTools.Option "/DLL",
@@ -959,9 +967,9 @@ mk_pvm_wrapper_script pvm_executable pvm_executable_base sysMan = unlines $
 -----------------------------------------------------------------------------
 -- Complain about non-dynamic flags in OPTIONS pragmas
 
-checkProcessArgsResult flags basename suff
+checkProcessArgsResult flags filename
   = do when (notNull flags) (throwDyn (ProgramError (
-	  showSDoc (hang (text basename <> text ('.':suff) <> char ':')
+	  showSDoc (hang (text filename <> char ':')
 		      4 (text "unknown flags in  {-# OPTIONS #-} pragma:" <+>
 			  hsep (map text flags)))
 	)))
@@ -969,13 +977,13 @@ checkProcessArgsResult flags basename suff
 -----------------------------------------------------------------------------
 -- Look for the /* GHC_PACKAGES ... */ comment at the top of a .hc file
 
-getHCFilePackages :: FilePath -> IO [PackageName]
+getHCFilePackages :: FilePath -> IO [PackageId]
 getHCFilePackages filename =
   EXCEPTION.bracket (openFile filename ReadMode) hClose $ \h -> do
     l <- hGetLine h
     case l of
       '/':'*':' ':'G':'H':'C':'_':'P':'A':'C':'K':'A':'G':'E':'S':rest ->
-	  return (map mkPackageName (words rest))
+	  return (map stringToPackageId (words rest))
       _other ->
 	  return []
 
@@ -992,9 +1000,9 @@ getHCFilePackages filename =
 -- read any interface files), so the user must explicitly specify all
 -- the packages.
 
-staticLink :: [FilePath] -> [PackageName] -> IO ()
-staticLink o_files dep_packages = do
-    verb       <- getVerbFlag
+staticLink :: DynFlags -> [FilePath] -> [PackageId] -> IO ()
+staticLink dflags o_files dep_packages = do
+    let verb = getVerbFlag dflags
     static     <- readIORef v_Static
     no_hs_main <- readIORef v_NoHsMain
 
@@ -1009,22 +1017,22 @@ staticLink o_files dep_packages = do
     let output_fn = case o_file of { Just s -> s; Nothing -> "a.out"; }
 #endif
 
-    pkg_lib_paths <- getPackageLibraryPath dep_packages
+    pkg_lib_paths <- getPackageLibraryPath dflags dep_packages
     let pkg_lib_path_opts = map ("-L"++) pkg_lib_paths
 
     lib_paths <- readIORef v_Library_paths
     let lib_path_opts = map ("-L"++) lib_paths
 
-    pkg_link_opts <- getPackageLinkOpts dep_packages
+    pkg_link_opts <- getPackageLinkOpts dflags dep_packages
 
 #ifdef darwin_TARGET_OS
-    pkg_framework_paths <- getPackageFrameworkPath dep_packages
+    pkg_framework_paths <- getPackageFrameworkPath dflags dep_packages
     let pkg_framework_path_opts = map ("-F"++) pkg_framework_paths
 
     framework_paths <- readIORef v_Framework_paths
     let framework_path_opts = map ("-F"++) framework_paths
 
-    pkg_frameworks <- getPackageFrameworks dep_packages
+    pkg_frameworks <- getPackageFrameworks dflags dep_packages
     let pkg_framework_opts = concat [ ["-framework", fw] | fw <- pkg_frameworks ]
 
     frameworks <- readIORef v_Cmdline_frameworks
@@ -1038,7 +1046,13 @@ staticLink o_files dep_packages = do
 	-- opts from -optl-<blah> (including -l<blah> options)
     extra_ld_opts <- getStaticOpts v_Opt_l
 
-    [rts_pkg, std_pkg] <- getPackageDetails [rtsPackage, basePackage]
+    let pstate = pkgState dflags
+	rts_id | Just id <- rtsPackageId pstate = id
+	       | otherwise = panic "staticLink: rts package missing"
+	base_id | Just id <- basePackageId pstate = id
+	        | otherwise = panic "staticLink: base package missing"
+	rts_pkg  = getPackageDetails pstate rts_id
+        base_pkg = getPackageDetails pstate base_id
 
     ways <- readIORef v_Ways
 
@@ -1067,10 +1081,11 @@ staticLink o_files dep_packages = do
     let extra_os = if static || no_hs_main
                    then []
                    else [ head (libraryDirs rts_pkg) ++ "/Main.dll_o",
-                          head (libraryDirs std_pkg) ++ "/PrelMain.dll_o" ]
+                          head (libraryDirs base_pkg) ++ "/PrelMain.dll_o" ]
 
-    (md_c_flags, _) <- machdepCCOpts
-    SysTools.runLink ( [ SysTools.Option verb
+    (md_c_flags, _) <- machdepCCOpts dflags
+    SysTools.runLink dflags ( 
+		       [ SysTools.Option verb
     		       , SysTools.Option "-o"
 		       , SysTools.FileOption "" output_fn
 		       ]
@@ -1105,22 +1120,22 @@ staticLink o_files dep_packages = do
 -----------------------------------------------------------------------------
 -- Making a DLL (only for Win32)
 
-doMkDLL :: [String] -> [PackageName] -> IO ()
-doMkDLL o_files dep_packages = do
-    verb       <- getVerbFlag
+doMkDLL :: DynFlags -> [String] -> [PackageId] -> IO ()
+doMkDLL dflags o_files dep_packages = do
+    let verb = getVerbFlag dflags
     static     <- readIORef v_Static
     no_hs_main <- readIORef v_NoHsMain
 
     o_file <- readIORef v_Output_file
     let output_fn = case o_file of { Just s -> s; Nothing -> "HSdll.dll"; }
 
-    pkg_lib_paths <- getPackageLibraryPath dep_packages
+    pkg_lib_paths <- getPackageLibraryPath dflags dep_packages
     let pkg_lib_path_opts = map ("-L"++) pkg_lib_paths
 
     lib_paths <- readIORef v_Library_paths
     let lib_path_opts = map ("-L"++) lib_paths
 
-    pkg_link_opts <- getPackageLinkOpts dep_packages
+    pkg_link_opts <- getPackageLinkOpts dflags dep_packages
 
 	-- probably _stub.o files
     extra_ld_inputs <- readIORef v_Ld_inputs
@@ -1128,15 +1143,21 @@ doMkDLL o_files dep_packages = do
 	-- opts from -optdll-<blah>
     extra_ld_opts <- getStaticOpts v_Opt_dll
 
-    [rts_pkg, std_pkg] <- getPackageDetails [rtsPackage, basePackage]
+    let pstate = pkgState dflags
+	rts_id | Just id <- rtsPackageId pstate = id
+	       | otherwise = panic "staticLink: rts package missing"
+	base_id | Just id <- basePackageId pstate = id
+	        | otherwise = panic "staticLink: base package missing"
+	rts_pkg  = getPackageDetails pstate rts_id
+        base_pkg = getPackageDetails pstate base_id
 
     let extra_os = if static || no_hs_main
                    then []
                    else [ head (libraryDirs rts_pkg) ++ "/Main.dll_o",
-                          head (libraryDirs std_pkg) ++ "/PrelMain.dll_o" ]
+                          head (libraryDirs base_pkg) ++ "/PrelMain.dll_o" ]
 
-    (md_c_flags, _) <- machdepCCOpts
-    SysTools.runMkDLL
+    (md_c_flags, _) <- machdepCCOpts dflags
+    SysTools.runMkDLL dflags
 	 ([ SysTools.Option verb
 	  , SysTools.Option "-o"
 	  , SysTools.FileOption "" output_fn
@@ -1159,26 +1180,26 @@ doMkDLL o_files dep_packages = do
 -- -----------------------------------------------------------------------------
 -- Misc.
 
-doCpp :: Bool -> Bool -> FilePath -> FilePath -> IO ()
-doCpp raw include_cc_opts input_fn output_fn = do
-    hscpp_opts	    <- getOpts opt_P
+doCpp :: DynFlags -> Bool -> Bool -> FilePath -> FilePath -> IO ()
+doCpp dflags raw include_cc_opts input_fn output_fn = do
+    let hscpp_opts = getOpts dflags opt_P
 
     cmdline_include_paths <- readIORef v_Include_paths
 
-    pkg_include_dirs <- getPackageIncludePath []
+    pkg_include_dirs <- getPackageIncludePath dflags []
     let include_paths = foldr (\ x xs -> "-I" : x : xs) []
 			  (cmdline_include_paths ++ pkg_include_dirs)
 
-    verb <- getVerbFlag
+    let verb = getVerbFlag dflags
 
     cc_opts <- if not include_cc_opts 
 		  then return []
-		  else do optc <- getOpts opt_c
-			  (md_c_flags, _) <- machdepCCOpts
+		  else do let optc = getOpts dflags opt_c
+			  (md_c_flags, _) <- machdepCCOpts dflags
 			  return (optc ++ md_c_flags)
 
-    let cpp_prog args | raw       = SysTools.runCpp args
-	              | otherwise = SysTools.runCc (SysTools.Option "-E" : args)
+    let cpp_prog args | raw       = SysTools.runCpp dflags args
+	              | otherwise = SysTools.runCc dflags (SysTools.Option "-E" : args)
 
     let target_defs = 
 	  [ "-D" ++ cTARGETOS   ++ "_TARGET_OS=1",

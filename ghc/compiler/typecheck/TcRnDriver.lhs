@@ -21,12 +21,14 @@ import {-# SOURCE #-} TcSplice ( tcSpliceDecls )
 #endif
 
 import CmdLineOpts	( DynFlag(..), opt_PprStyle_Debug, dopt )
+import Packages		( moduleToPackageConfig, mkPackageId, package,
+			  isHomeModule )
 import DriverState	( v_MainModIs, v_MainFunIs )
 import HsSyn		( HsModule(..), HsExtCore(..), HsGroup(..), LHsDecl, SpliceDecl(..), HsBind(..),
 			  nlHsApp, nlHsVar, pprLHsBinds )
 import RdrHsSyn		( findSplice )
 
-import PrelNames	( runIOName, rootMainName, mAIN_Name,
+import PrelNames	( runIOName, rootMainName, mAIN,
 			  main_RDR_Unqual )
 import RdrName		( RdrName, mkRdrUnqual, emptyGlobalRdrEnv, 
 			  plusGlobalRdrEnv )
@@ -45,7 +47,6 @@ import TcIface		( tcExtCoreBindings )
 import TcSimplify	( tcSimplifyTop )
 import TcTyClsDecls	( tcTyAndClassDecls )
 import LoadIface	( loadOrphanModules, loadHiBootInterface )
-import IfaceEnv		( lookupOrig )
 import RnNames		( importsFromLocalDecls, rnImports, exportsFromAvail, 
 			  reportUnusedNames, reportDeprecations )
 import RnEnv		( lookupSrcOcc_maybe )
@@ -56,7 +57,7 @@ import DataCon		( dataConWrapId )
 import ErrUtils		( Messages, mkDumpDoc, showPass )
 import Id		( mkExportedLocalId, isLocalId, idName, idType )
 import Var		( Var )
-import Module           ( mkHomeModule, mkModuleName, moduleName, moduleEnvElts )
+import Module           ( mkModule, moduleEnvElts )
 import OccName		( mkVarOcc )
 import Name		( Name, isExternalName, getSrcLoc, getOccName )
 import NameSet
@@ -110,10 +111,10 @@ import IdInfo		( GlobalIdDetails(..) )
 import SrcLoc		( interactiveSrcLoc, unLoc )
 import Kind		( Kind )
 import Var		( globaliseId )
-import Name		( nameOccName, nameModuleName )
+import Name		( nameOccName, nameModule )
 import NameEnv		( delListFromNameEnv )
 import PrelNames	( iNTERACTIVE, ioTyConName, printName, monadNames, itName, returnIOName )
-import Module		( ModuleName, lookupModuleEnvByName )
+import Module		( Module, lookupModuleEnv )
 import HscTypes		( InteractiveContext(..), ExternalPackageState( eps_PTE ),
 			  HomeModInfo(..), typeEnvElts, typeEnvClasses,
 			  availNames, icPrintUnqual,
@@ -151,14 +152,17 @@ tcRnModule hsc_env (L loc (HsModule maybe_mod exports
  = do { showPass (hsc_dflags hsc_env) "Renamer/typechecker" ;
 
    let { this_mod = case maybe_mod of
-			Nothing  -> mkHomeModule mAIN_Name	
+			Nothing  -> mAIN	
 					-- 'module M where' is omitted
 			Just (L _ mod) -> mod } ;		
 					-- The normal case
 		
    initTc hsc_env this_mod $ 
    setSrcSpan loc $
-   do { 	-- Deal with imports; sets tcg_rdr_env, tcg_imports
+   do {
+	checkForPackageModule (hsc_dflags hsc_env) this_mod;
+
+		-- Deal with imports; sets tcg_rdr_env, tcg_imports
 	(rdr_env, imports) <- rnImports import_decls ;
 
 		-- Record boot-file info in the EPS, so that it's 
@@ -216,6 +220,22 @@ tcRnModule hsc_env (L loc (HsModule maybe_mod exports
 	tcDump final_env ;
 	return final_env
     }}}}
+
+-- This is really a sanity check that the user has given -package-name
+-- if necessary.  -package-name is only necessary when the package database
+-- already contains the current package, because then we can't tell
+-- whether a given module is in the current package or not, without knowing
+-- the name of the current package.
+checkForPackageModule dflags this_mod
+  | not (isHomeModule dflags this_mod),
+    Just (pkg,_) <- moduleToPackageConfig dflags this_mod =
+	let 
+		ppr_pkg = ppr (mkPackageId (package pkg))
+	in
+	addErr (ptext SLIT("Module") <+> quotes (ppr this_mod) <+>
+	        ptext SLIT("is a member of package") <+>  ppr_pkg <> char '.' $$
+		ptext SLIT("To compile this module, please use -ignore-package") <+> ppr_pkg <> char '.')
+  | otherwise = return ()
 \end{code}
 
 
@@ -608,8 +628,8 @@ checkMain
 	 mb_main_mod <- readMutVar v_MainModIs ;
 	 mb_main_fn  <- readMutVar v_MainFunIs ;
 	 let { main_mod = case mb_main_mod of {
-				Just mod -> mkModuleName mod ;
-				Nothing  -> mAIN_Name } ;
+				Just mod -> mkModule mod ;
+				Nothing  -> mAIN } ;
 	       main_fn  = case mb_main_fn of {
 				Just fn -> mkRdrUnqual (mkVarOcc (mkFastString fn)) ;
 				Nothing -> main_RDR_Unqual } } ;
@@ -624,7 +644,7 @@ check_main ghci_mode tcg_env main_mod main_fn
      --
      -- 
      -- Blimey: a whole page of code to do this...
- | mod_name /= main_mod
+ | mod /= main_mod
  = return tcg_env
 
  | otherwise
@@ -654,7 +674,7 @@ check_main ghci_mode tcg_env main_mod main_fn
 		 }) 
     }}}
   where
-    mod_name = moduleName (tcg_mod tcg_env) 
+    mod = tcg_mod tcg_env
  
     complain_no_main | ghci_mode == Interactive = return ()
 		     | otherwise 		= failWithTc noMainMsg
@@ -933,7 +953,7 @@ tcRnType hsc_env ictxt rdr_type
 
 \begin{code}
 #ifdef GHCI
-mkExportEnv :: HscEnv -> [ModuleName]	-- Expose these modules' exports only
+mkExportEnv :: HscEnv -> [Module]	-- Expose these modules' exports only
  	    -> IO GlobalRdrEnv
 mkExportEnv hsc_env exports
   = do	{ mb_envs <- initTcPrintErrors hsc_env iNTERACTIVE $
@@ -944,7 +964,7 @@ mkExportEnv hsc_env exports
 			     -- Some error; initTc will have printed it
     }
 
-getModuleExports :: ModuleName -> TcM GlobalRdrEnv
+getModuleExports :: Module -> TcM GlobalRdrEnv
 getModuleExports mod 
   = do	{ iface <- load_iface mod
 	; loadOrphanModules (dep_orphs (mi_deps iface))
@@ -955,7 +975,7 @@ getModuleExports mod
 			| avail <- avails, name <- availNames avail ] }
 	; returnM (mkGlobalRdrEnv gres) }
 
-vanillaProv :: ModuleName -> Provenance
+vanillaProv :: Module -> Provenance
 -- We're building a GlobalRdrEnv as if the user imported
 -- all the specified modules into the global interactive module
 vanillaProv mod = Imported [ImportSpec mod mod False 
@@ -966,7 +986,7 @@ vanillaProv mod = Imported [ImportSpec mod mod False
 getModuleContents
   :: HscEnv
   -> InteractiveContext
-  -> ModuleName			-- Module to inspect
+  -> Module			-- Module to inspect
   -> Bool			-- Grab just the exports, or the whole toplev
   -> IO (Maybe [IfaceDecl])
 
@@ -977,7 +997,7 @@ getModuleContents hsc_env ictxt mod exports_only
       | not exports_only  -- We want the whole top-level type env
  			  -- so it had better be a home module
       = do { hpt <- getHpt
- 	   ; case lookupModuleEnvByName hpt mod of
+ 	   ; case lookupModuleEnv hpt mod of
  	       Just mod_info -> return (map toIfaceDecl $
 					filter wantToSee $
  				        typeEnvElts $
@@ -1115,7 +1135,7 @@ toIfaceDecl thing
 		       emptyNameSet	-- Show data cons
 		       ext_nm (munge thing)
   where
-    ext_nm n = ExtPkg (nameModuleName n) (nameOccName n)
+    ext_nm n = ExtPkg (nameModule n) (nameOccName n)
 
 	-- munge transforms a thing to it's "parent" thing
     munge (ADataCon dc) = ATyCon (dataConTyCon dc)

@@ -69,12 +69,13 @@ import TcType	( Type, TcType, TcThetaType, TcTyVarSet, TcTyVar,
 import Type	( substTy, substTys, substTyWith, substTheta, zipTopTvSubst )
 import Unify	( matchTys )
 import Kind	( isSubKind )
+import Packages	( isHomeModule )
 import HscTypes	( ExternalPackageState(..) )
 import CoreFVs	( idFreeTyVars )
 import DataCon	( DataCon, dataConTyVars, dataConStupidTheta, dataConName )
 import Id	( Id, idName, idType, mkUserLocal, mkLocalId )
 import PrelInfo	( isStandardClass, isNoDictClass )
-import Name	( Name, mkMethodOcc, getOccName, getSrcLoc, isHomePackageName, 
+import Name	( Name, mkMethodOcc, getOccName, getSrcLoc, nameModule,
 		  isInternalName, setNameUnique, mkSystemNameEncoded )
 import NameSet	( addOneToNameSet )
 import Literal	( inIntRange )
@@ -741,14 +742,15 @@ instantiate_dfun tenv dfun_id pred loc
     in
     returnM (GenInst dicts rhs)
 
-record_dfun_usage dfun_id
-  | isInternalName dfun_name = return ()		-- From this module
-  | not (isHomePackageName dfun_name) = return ()	-- From another package package
-  | otherwise = getGblEnv 	`thenM` \ tcg_env ->
-		updMutVar (tcg_inst_uses tcg_env)
+record_dfun_usage dfun_id = do
+  dflags <- getDOpts
+  let  dfun_name = idName dfun_id
+       dfun_mod  = nameModule dfun_name
+  if isInternalName dfun_name || not (isHomeModule dflags dfun_mod)
+	then return () -- internal, or in another package
+	else do tcg_env <- getGblEnv
+	        updMutVar (tcg_inst_uses tcg_env)
 			  (`addOneToNameSet` idName dfun_id)
-  where
-    dfun_name = idName dfun_id
 
 tcGetInstEnvs :: TcM (InstEnv, InstEnv)
 -- Gets both the external-package inst-env

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.33 2004/09/30 10:37:10 simonpj Exp $
+-- $Id: DriverMkDepend.hs,v 1.34 2004/11/26 16:20:52 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -13,16 +13,17 @@ module DriverMkDepend (
 
 #include "HsVersions.h"
 
+import HscTypes		( IfacePackage(..) )
 import GetImports	( getImports )
+import CmdLineOpts	( DynFlags )
 import DriverState      
 import DriverUtil
 import DriverFlags
 import SysTools		( newTempName )
 import qualified SysTools
-import Module		( ModuleName, ModLocation(..),
-			  moduleNameUserString, isHomeModule )
+import Module		( Module, ModLocation(..), moduleUserString)
 import Finder		( findModule, hiBootExt, hiBootVerExt,
-			  mkHomeModLocation )
+			  mkHomeModLocation, FindResult(..) )
 import Util             ( global, maybePrefixMatch )
 import Panic
 
@@ -52,7 +53,6 @@ GLOBAL_VAR(v_Dep_warnings,		True, Bool);
 GLOBAL_VAR(v_Dep_makefile_hdl,  error "dep_makefile_hdl", Maybe Handle);
 GLOBAL_VAR(v_Dep_tmp_file,      error "dep_tmp_file", String);
 GLOBAL_VAR(v_Dep_tmp_hdl,       error "dep_tmp_hdl", Handle);
-GLOBAL_VAR(v_Dep_dir_contents,  error "dep_dir_contents", [(String,[String])]);
 
 depStartMarker = "# DO NOT DELETE: Beginning of Haskell dependencies"
 depEndMarker   = "# DO NOT DELETE: End of Haskell dependencies"
@@ -119,32 +119,22 @@ beginMkDependHS = do
 	-- write the magic marker into the tmp file
   hPutStrLn tmp_hdl depStartMarker
 
-  	-- cache the contents of all the import directories, for future
-	-- reference.
-  import_dirs <- readIORef v_Import_paths
-  pkg_import_dirs <- getPackageImportPath
-  import_dir_contents <- mapM softGetDirectoryContents import_dirs
-  pkg_import_dir_contents <- mapM softGetDirectoryContents pkg_import_dirs
-  writeIORef v_Dep_dir_contents 
-	(zip import_dirs import_dir_contents ++
-  	 zip pkg_import_dirs pkg_import_dir_contents)
-
   return ()
 
 
-doMkDependHSPhase basename suff input_fn
+doMkDependHSPhase dflags basename suff input_fn
  = do src <- readFile input_fn
       let (import_sources, import_normals, mod_name) = getImports src
       let orig_fn = basename ++ '.':suff
-      (_, location') <- mkHomeModLocation mod_name orig_fn
+      location' <- mkHomeModLocation mod_name orig_fn
 
       -- take -ohi into account if present
       ohi <- readIORef v_Output_hi
       let location | Just fn <- ohi = location'{ ml_hi_file = fn }
 		   | otherwise      = location'
 
-      deps_sources <- mapM (findDependency True  orig_fn) import_sources
-      deps_normals <- mapM (findDependency False orig_fn) import_normals
+      deps_sources <- mapM (findDependency dflags True  orig_fn) import_sources
+      deps_normals <- mapM (findDependency dflags False orig_fn) import_normals
       let deps = deps_sources ++ deps_normals
 
       osuf <- readIORef v_Object_suf
@@ -210,8 +200,8 @@ doMkDependHSPhase basename suff input_fn
    
 
 
-endMkDependHS :: IO ()
-endMkDependHS = do
+endMkDependHS :: DynFlags -> IO ()
+endMkDependHS dflags = do
   makefile     <- readIORef v_Dep_makefile
   makefile_hdl <- readIORef v_Dep_makefile_hdl
   tmp_file     <- readIORef v_Dep_tmp_file
@@ -239,25 +229,26 @@ endMkDependHS = do
 
 	-- Create a backup of the original makefile
   when (isJust makefile_hdl)
-       (SysTools.copy ("Backing up " ++ makefile) makefile (makefile++".bak"))
+       (SysTools.copy dflags ("Backing up " ++ makefile) 
+		makefile (makefile++".bak"))
 
   	-- Copy the new makefile in place
-  SysTools.copy "Installing new makefile" tmp_file makefile
+  SysTools.copy dflags "Installing new makefile" tmp_file makefile
 
 
-findDependency :: Bool -> FilePath -> ModuleName -> IO (Maybe (String, Bool))
-findDependency is_source src imp = do
+findDependency :: DynFlags -> Bool -> FilePath -> Module -> IO (Maybe (String, Bool))
+findDependency dflags is_source src imp = do
    excl_mods <- readIORef v_Dep_exclude_mods
    include_prelude <- readIORef v_Dep_include_prelude
-   let imp_mod = moduleNameUserString imp
+   let imp_mod = moduleUserString imp
    if imp_mod `elem` excl_mods 
       then return Nothing
       else do
-	r <- findModule imp
+	r <- findModule dflags imp True{-explicit-}
 	case r of 
-	   Right (mod,loc)
+	   Found loc pkg
 		-- not in this package: we don't need a dependency
-		| not (isHomeModule mod) && not include_prelude
+		| ExternalPackage _ <- pkg, not include_prelude
 		-> return Nothing
 
 		-- normal import: just depend on the .hi file
@@ -280,6 +271,6 @@ findDependency is_source src imp = do
 			   then return (Just (boot_hi_file, not is_source))
 		   	   else return (Just (hi_file, not is_source))
 
-	   Left _ -> throwDyn (ProgramError 
+	   _ -> throwDyn (ProgramError 
 		(src ++ ": " ++ "can't locate import `" ++ imp_mod ++ "'" ++
 		 if is_source then " (SOURCE import)" else ""))

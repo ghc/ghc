@@ -262,7 +262,7 @@ prepareRules hsc_env@(HscEnv { hsc_dflags = dflags, hsc_HPT = hpt })
 		       text "Imported rules", pprRuleBase imp_rule_base])
 
 #ifdef DEBUG
-	; let bad_rules = filter (idIsFrom (mg_mod guts)) 
+	; let bad_rules = filter (idIsFrom (mg_module guts)) 
 				 (varSetElems (ruleBaseIds imp_rule_base))
 	; WARN( not (null bad_rules), ppr bad_rules ) return ()
 #endif

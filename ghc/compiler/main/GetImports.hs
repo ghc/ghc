@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: GetImports.hs,v 1.10 2002/09/13 15:02:34 simonpj Exp $
+-- $Id: GetImports.hs,v 1.11 2004/11/26 16:20:57 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -18,7 +18,7 @@ import Char
 -- getImportsFromFile is careful to close the file afterwards, otherwise
 -- we can end up with a large number of open handles before the garbage
 -- collector gets around to closing them.
-getImportsFromFile :: String -> IO ([ModuleName], [ModuleName], ModuleName)
+getImportsFromFile :: String -> IO ([Module], [Module], Module)
 getImportsFromFile filename
   = do  hdl <- openFile filename ReadMode
         modsrc <- hGetContents hdl
@@ -27,11 +27,11 @@ getImportsFromFile filename
 	hClose hdl
 	return (srcimps,imps,mod_name)
 
-getImports :: String -> ([ModuleName], [ModuleName], ModuleName)
+getImports :: String -> ([Module], [Module], Module)
 getImports s
    = case f [{-accum source imports-}] [{-accum normal imports-}] 
           Nothing (clean s) of
-        (si, ni, Nothing) -> (si, ni, mkModuleName "Main")
+        (si, ni, Nothing) -> (si, ni, mkModule "Main")
         (si, ni, Just me) -> (si, ni, me)
      where
         -- Only pick up the name following 'module' the first time.
@@ -59,7 +59,7 @@ getImports s
         f si ni me (w:ws) = f si ni me ws
         f si ni me [] = (nub si, nub ni, me)
 
-        mkMN str = mkModuleName (takeWhile isModId (reverse str))
+        mkMN str = mkModule (takeWhile isModId (reverse str))
         isModId c = isAlphaNum c || c `elem` "'._"
 
 

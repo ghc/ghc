@@ -51,7 +51,7 @@ module Outputable (
 #include "HsVersions.h"
 
 
-import {-# SOURCE #-} 	Module( ModuleName )
+import {-# SOURCE #-} 	Module( Module )
 import {-# SOURCE #-} 	OccName( OccName )
 
 import CmdLineOpts	( opt_PprStyle_Debug, opt_PprUserLength )
@@ -91,7 +91,7 @@ data Depth = AllTheWay
            | PartWay Int	-- 0 => stop
 
 
-type PrintUnqualified = ModuleName -> OccName -> Bool
+type PrintUnqualified = Module -> OccName -> Bool
 	-- This function tells when it's ok to print 
 	-- a (Global) name unqualified
 

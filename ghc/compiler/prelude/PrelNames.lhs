@@ -49,7 +49,7 @@ module PrelNames (
 
 #include "HsVersions.h"
 
-import Module	  ( Module, mkBasePkgModule, mkHomeModule, mkModuleName )
+import Module	  ( Module, mkModule )
 import OccName	  ( dataName, tcName, clsName, varName, mkOccFS
 		  )
 		  
@@ -57,10 +57,10 @@ import RdrName	  ( RdrName, nameRdrName, mkOrig, rdrNameOcc, mkUnqual )
 import Unique	  ( Unique, Uniquable(..), hasKey,
 		    mkPreludeMiscIdUnique, mkPreludeDataConUnique,
 		    mkPreludeTyConUnique, mkPreludeClassUnique,
-		    mkTupleTyConUnique, isTupleKey
+		    mkTupleTyConUnique
 		  ) 
 import BasicTypes ( Boxity(..), Arity )
-import Name	  ( Name, mkInternalName, mkExternalName, nameUnique, nameModule )
+import Name	  ( Name, mkInternalName, mkExternalName, nameModule )
 import SrcLoc     ( noSrcLoc )
 import FastString
 \end{code}
@@ -218,89 +218,54 @@ genericTyConNames = [crossTyConName, plusTyConName, genUnitTyConName]
 
 --MetaHaskell Extension Add a new module here
 \begin{code}
-pRELUDE_Name      = mkModuleName "Prelude"
-gHC_PRIM_Name     = mkModuleName "GHC.Prim"	   -- Primitive types and values
-pREL_BASE_Name    = mkModuleName "GHC.Base"
-pREL_ENUM_Name    = mkModuleName "GHC.Enum"
-pREL_SHOW_Name    = mkModuleName "GHC.Show"
-pREL_READ_Name    = mkModuleName "GHC.Read"
-pREL_NUM_Name     = mkModuleName "GHC.Num"
-pREL_LIST_Name    = mkModuleName "GHC.List"
-pREL_PARR_Name    = mkModuleName "GHC.PArr"
-pREL_TUP_Name     = mkModuleName "Data.Tuple"
-pREL_EITHER_Name  = mkModuleName "Data.Either"
-pREL_PACK_Name    = mkModuleName "GHC.Pack"
-pREL_CONC_Name    = mkModuleName "GHC.Conc"
-pREL_IO_BASE_Name = mkModuleName "GHC.IOBase"
-pREL_ST_Name	  = mkModuleName "GHC.ST"
-pREL_ARR_Name     = mkModuleName "GHC.Arr"
-pREL_BYTEARR_Name = mkModuleName "PrelByteArr"
-pREL_STABLE_Name  = mkModuleName "GHC.Stable"
-pREL_ADDR_Name    = mkModuleName "GHC.Addr"
-pREL_PTR_Name     = mkModuleName "GHC.Ptr"
-pREL_ERR_Name     = mkModuleName "GHC.Err"
-pREL_REAL_Name    = mkModuleName "GHC.Real"
-pREL_FLOAT_Name   = mkModuleName "GHC.Float"
-pREL_TOP_HANDLER_Name = mkModuleName "GHC.TopHandler"
-sYSTEM_IO_Name	  = mkModuleName "System.IO"
-dYNAMIC_Name	  = mkModuleName "Data.Dynamic"
-tYPEABLE_Name	  = mkModuleName "Data.Typeable"
-gENERICS_Name	  = mkModuleName "Data.Generics.Basics"
-dOTNET_Name       = mkModuleName "GHC.Dotnet"
+pRELUDE		= mkModule "Prelude"
+gHC_PRIM	= mkModule "GHC.Prim"	   -- Primitive types and values
+pREL_BASE	= mkModule "GHC.Base"
+pREL_ENUM	= mkModule "GHC.Enum"
+pREL_SHOW	= mkModule "GHC.Show"
+pREL_READ	= mkModule "GHC.Read"
+pREL_NUM	= mkModule "GHC.Num"
+pREL_LIST	= mkModule "GHC.List"
+pREL_PARR	= mkModule "GHC.PArr"
+pREL_TUP	= mkModule "Data.Tuple"
+pREL_EITHER	= mkModule "Data.Either"
+pREL_PACK	= mkModule "GHC.Pack"
+pREL_CONC	= mkModule "GHC.Conc"
+pREL_IO_BASE	= mkModule "GHC.IOBase"
+pREL_ST		= mkModule "GHC.ST"
+pREL_ARR	= mkModule "GHC.Arr"
+pREL_BYTEARR	= mkModule "PrelByteArr"
+pREL_STABLE	= mkModule "GHC.Stable"
+pREL_ADDR	= mkModule "GHC.Addr"
+pREL_PTR	= mkModule "GHC.Ptr"
+pREL_ERR	= mkModule "GHC.Err"
+pREL_REAL	= mkModule "GHC.Real"
+pREL_FLOAT	= mkModule "GHC.Float"
+pREL_TOP_HANDLER= mkModule "GHC.TopHandler"
+sYSTEM_IO	= mkModule "System.IO"
+dYNAMIC		= mkModule "Data.Dynamic"
+tYPEABLE	= mkModule "Data.Typeable"
+gENERICS	= mkModule "Data.Generics.Basics"
+dOTNET		= mkModule "GHC.Dotnet"
 
-rEAD_PREC_Name = mkModuleName "Text.ParserCombinators.ReadPrec"
-lEX_Name       = mkModuleName "Text.Read.Lex"
+rEAD_PREC	= mkModule "Text.ParserCombinators.ReadPrec"
+lEX		= mkModule "Text.Read.Lex"
 
-mAIN_Name	  = mkModuleName "Main"
-pREL_INT_Name	  = mkModuleName "GHC.Int"
-pREL_WORD_Name	  = mkModuleName "GHC.Word"
-mONAD_FIX_Name	  = mkModuleName "Control.Monad.Fix"
-aRROW_Name	  = mkModuleName "Control.Arrow"
-aDDR_Name	  = mkModuleName "Addr"
+mAIN		= mkModule "Main"
+pREL_INT	= mkModule "GHC.Int"
+pREL_WORD	= mkModule "GHC.Word"
+mONAD_FIX	= mkModule "Control.Monad.Fix"
+aRROW		= mkModule "Control.Arrow"
+aDDR		= mkModule "Addr"
 
-gLA_EXTS_Name   = mkModuleName "GHC.Exts"
-
-gHC_PRIM     	= mkBasePkgModule gHC_PRIM_Name
-pREL_BASE    	= mkBasePkgModule pREL_BASE_Name
-pREL_TUP    	= mkBasePkgModule pREL_TUP_Name
-pREL_EITHER	= mkBasePkgModule pREL_EITHER_Name
-pREL_LIST	= mkBasePkgModule pREL_LIST_Name
-pREL_SHOW	= mkBasePkgModule pREL_SHOW_Name
-pREL_READ	= mkBasePkgModule pREL_READ_Name
-pREL_ADDR    	= mkBasePkgModule pREL_ADDR_Name
-pREL_WORD    	= mkBasePkgModule pREL_WORD_Name
-pREL_INT    	= mkBasePkgModule pREL_INT_Name
-pREL_PTR    	= mkBasePkgModule pREL_PTR_Name
-pREL_ST    	= mkBasePkgModule pREL_ST_Name
-pREL_STABLE  	= mkBasePkgModule pREL_STABLE_Name
-pREL_IO_BASE 	= mkBasePkgModule pREL_IO_BASE_Name
-pREL_PACK    	= mkBasePkgModule pREL_PACK_Name
-pREL_ERR     	= mkBasePkgModule pREL_ERR_Name
-pREL_NUM     	= mkBasePkgModule pREL_NUM_Name
-pREL_ENUM     	= mkBasePkgModule pREL_ENUM_Name
-pREL_REAL    	= mkBasePkgModule pREL_REAL_Name
-pREL_FLOAT   	= mkBasePkgModule pREL_FLOAT_Name
-pREL_ARR   	= mkBasePkgModule pREL_ARR_Name
-pREL_PARR   	= mkBasePkgModule pREL_PARR_Name
-pREL_BYTEARR   	= mkBasePkgModule pREL_BYTEARR_Name
-pREL_TOP_HANDLER= mkBasePkgModule pREL_TOP_HANDLER_Name
-pRELUDE		= mkBasePkgModule pRELUDE_Name
-sYSTEM_IO	= mkBasePkgModule sYSTEM_IO_Name
-aDDR		= mkBasePkgModule aDDR_Name
-aRROW		= mkBasePkgModule aRROW_Name
-gENERICS	= mkBasePkgModule gENERICS_Name
-tYPEABLE	= mkBasePkgModule tYPEABLE_Name
-dOTNET		= mkBasePkgModule dOTNET_Name
-gLA_EXTS	= mkBasePkgModule gLA_EXTS_Name
-mONAD_FIX	= mkBasePkgModule mONAD_FIX_Name
-
-rOOT_MAIN_Name = mkModuleName ":Main"		-- Root module for initialisation 
-rOOT_MAIN      = mkHomeModule rOOT_MAIN_Name	
+gLA_EXTS	= mkModule "GHC.Exts"
+rOOT_MAIN	= mkModule ":Main"		-- Root module for initialisation 
 	-- The ':xxx' makes a moudle name that the user can never
 	-- use himself.  The z-encoding for ':' is "ZC", so the z-encoded
 	-- module name still starts with a capital letter, which keeps
 	-- the z-encoded version consistent.
-iNTERACTIVE    = mkHomeModule (mkModuleName ":Interactive")
+
+iNTERACTIVE    = mkModule ":Interactive"
 \end{code}
 
 %************************************************************************
@@ -330,13 +295,13 @@ main_RDR_Unqual 	= mkUnqual varName FSLIT("main")
 
 eq_RDR 			= nameRdrName eqName
 ge_RDR 			= nameRdrName geName
-ne_RDR 			= varQual_RDR  pREL_BASE_Name FSLIT("/=")
-le_RDR 			= varQual_RDR  pREL_BASE_Name FSLIT("<=") 
-gt_RDR 			= varQual_RDR  pREL_BASE_Name FSLIT(">")  
-compare_RDR		= varQual_RDR  pREL_BASE_Name FSLIT("compare") 
-ltTag_RDR		= dataQual_RDR pREL_BASE_Name FSLIT("LT") 
-eqTag_RDR		= dataQual_RDR pREL_BASE_Name FSLIT("EQ")
-gtTag_RDR		= dataQual_RDR pREL_BASE_Name FSLIT("GT")
+ne_RDR 			= varQual_RDR  pREL_BASE FSLIT("/=")
+le_RDR 			= varQual_RDR  pREL_BASE FSLIT("<=") 
+gt_RDR 			= varQual_RDR  pREL_BASE FSLIT(">")  
+compare_RDR		= varQual_RDR  pREL_BASE FSLIT("compare") 
+ltTag_RDR		= dataQual_RDR pREL_BASE FSLIT("LT") 
+eqTag_RDR		= dataQual_RDR pREL_BASE FSLIT("EQ")
+gtTag_RDR		= dataQual_RDR pREL_BASE FSLIT("GT")
 
 eqClass_RDR		= nameRdrName eqClassName
 numClass_RDR 		= nameRdrName numClassName
@@ -344,8 +309,8 @@ ordClass_RDR 		= nameRdrName ordClassName
 enumClass_RDR		= nameRdrName enumClassName
 monadClass_RDR		= nameRdrName monadClassName
 
-map_RDR 		= varQual_RDR pREL_BASE_Name FSLIT("map")
-append_RDR 		= varQual_RDR pREL_BASE_Name FSLIT("++")
+map_RDR 		= varQual_RDR pREL_BASE FSLIT("map")
+append_RDR 		= varQual_RDR pREL_BASE FSLIT("++")
 
 foldr_RDR 		= nameRdrName foldrName
 build_RDR 		= nameRdrName buildName
@@ -358,8 +323,8 @@ and_RDR			= nameRdrName andName
 left_RDR		= nameRdrName leftDataConName
 right_RDR		= nameRdrName rightDataConName
 
-fromEnum_RDR		= varQual_RDR pREL_ENUM_Name FSLIT("fromEnum")
-toEnum_RDR		= varQual_RDR pREL_ENUM_Name FSLIT("toEnum")
+fromEnum_RDR		= varQual_RDR pREL_ENUM FSLIT("fromEnum")
+toEnum_RDR		= varQual_RDR pREL_ENUM FSLIT("toEnum")
 
 enumFrom_RDR		= nameRdrName enumFromName
 enumFromTo_RDR 		= nameRdrName enumFromToName
@@ -378,8 +343,8 @@ unpackCStringFoldr_RDR 	= nameRdrName unpackCStringFoldrName
 unpackCStringUtf8_RDR  	= nameRdrName unpackCStringUtf8Name
 
 newStablePtr_RDR 	= nameRdrName newStablePtrName
-addrDataCon_RDR		= dataQual_RDR aDDR_Name FSLIT("A#")
-wordDataCon_RDR		= dataQual_RDR pREL_WORD_Name FSLIT("W#")
+addrDataCon_RDR		= dataQual_RDR aDDR FSLIT("A#")
+wordDataCon_RDR		= dataQual_RDR pREL_WORD FSLIT("W#")
 
 bindIO_RDR	  	= nameRdrName bindIOName
 returnIO_RDR	  	= nameRdrName returnIOName
@@ -387,56 +352,56 @@ returnIO_RDR	  	= nameRdrName returnIOName
 fromInteger_RDR		= nameRdrName fromIntegerName
 fromRational_RDR	= nameRdrName fromRationalName
 minus_RDR		= nameRdrName minusName
-times_RDR		= varQual_RDR  pREL_NUM_Name FSLIT("*")
-plus_RDR                = varQual_RDR pREL_NUM_Name FSLIT("+")
+times_RDR		= varQual_RDR  pREL_NUM FSLIT("*")
+plus_RDR                = varQual_RDR pREL_NUM FSLIT("+")
 
-compose_RDR		= varQual_RDR pREL_BASE_Name FSLIT(".")
+compose_RDR		= varQual_RDR pREL_BASE FSLIT(".")
 
-not_RDR 		= varQual_RDR pREL_BASE_Name FSLIT("not")
-getTag_RDR	 	= varQual_RDR pREL_BASE_Name FSLIT("getTag")
-succ_RDR 		= varQual_RDR pREL_ENUM_Name FSLIT("succ")
-pred_RDR                = varQual_RDR pREL_ENUM_Name FSLIT("pred")
-minBound_RDR            = varQual_RDR pREL_ENUM_Name FSLIT("minBound")
-maxBound_RDR            = varQual_RDR pREL_ENUM_Name FSLIT("maxBound")
-range_RDR               = varQual_RDR pREL_ARR_Name FSLIT("range")
-inRange_RDR             = varQual_RDR pREL_ARR_Name FSLIT("inRange")
-index_RDR		= varQual_RDR pREL_ARR_Name FSLIT("index")
+not_RDR 		= varQual_RDR pREL_BASE FSLIT("not")
+getTag_RDR	 	= varQual_RDR pREL_BASE FSLIT("getTag")
+succ_RDR 		= varQual_RDR pREL_ENUM FSLIT("succ")
+pred_RDR                = varQual_RDR pREL_ENUM FSLIT("pred")
+minBound_RDR            = varQual_RDR pREL_ENUM FSLIT("minBound")
+maxBound_RDR            = varQual_RDR pREL_ENUM FSLIT("maxBound")
+range_RDR               = varQual_RDR pREL_ARR FSLIT("range")
+inRange_RDR             = varQual_RDR pREL_ARR FSLIT("inRange")
+index_RDR		= varQual_RDR pREL_ARR FSLIT("index")
 
-readList_RDR            = varQual_RDR pREL_READ_Name FSLIT("readList")
-readListDefault_RDR     = varQual_RDR pREL_READ_Name FSLIT("readListDefault")
-readListPrec_RDR        = varQual_RDR pREL_READ_Name FSLIT("readListPrec")
-readListPrecDefault_RDR = varQual_RDR pREL_READ_Name FSLIT("readListPrecDefault")
-readPrec_RDR            = varQual_RDR pREL_READ_Name FSLIT("readPrec")
-parens_RDR              = varQual_RDR pREL_READ_Name FSLIT("parens")
-choose_RDR              = varQual_RDR pREL_READ_Name FSLIT("choose")
-lexP_RDR                = varQual_RDR pREL_READ_Name FSLIT("lexP")
+readList_RDR            = varQual_RDR pREL_READ FSLIT("readList")
+readListDefault_RDR     = varQual_RDR pREL_READ FSLIT("readListDefault")
+readListPrec_RDR        = varQual_RDR pREL_READ FSLIT("readListPrec")
+readListPrecDefault_RDR = varQual_RDR pREL_READ FSLIT("readListPrecDefault")
+readPrec_RDR            = varQual_RDR pREL_READ FSLIT("readPrec")
+parens_RDR              = varQual_RDR pREL_READ FSLIT("parens")
+choose_RDR              = varQual_RDR pREL_READ FSLIT("choose")
+lexP_RDR                = varQual_RDR pREL_READ FSLIT("lexP")
 
-punc_RDR                = dataQual_RDR lEX_Name FSLIT("Punc")
-ident_RDR               = dataQual_RDR lEX_Name FSLIT("Ident")
-symbol_RDR              = dataQual_RDR lEX_Name FSLIT("Symbol")
+punc_RDR                = dataQual_RDR lEX FSLIT("Punc")
+ident_RDR               = dataQual_RDR lEX FSLIT("Ident")
+symbol_RDR              = dataQual_RDR lEX FSLIT("Symbol")
 
-step_RDR                = varQual_RDR  rEAD_PREC_Name FSLIT("step")
-alt_RDR                 = varQual_RDR  rEAD_PREC_Name FSLIT("+++") 
-reset_RDR               = varQual_RDR  rEAD_PREC_Name FSLIT("reset")
-prec_RDR                = varQual_RDR  rEAD_PREC_Name FSLIT("prec")
+step_RDR                = varQual_RDR  rEAD_PREC FSLIT("step")
+alt_RDR                 = varQual_RDR  rEAD_PREC FSLIT("+++") 
+reset_RDR               = varQual_RDR  rEAD_PREC FSLIT("reset")
+prec_RDR                = varQual_RDR  rEAD_PREC FSLIT("prec")
 
-showList_RDR            = varQual_RDR pREL_SHOW_Name FSLIT("showList")
-showList___RDR          = varQual_RDR pREL_SHOW_Name FSLIT("showList__")
-showsPrec_RDR           = varQual_RDR pREL_SHOW_Name FSLIT("showsPrec") 
-showString_RDR          = varQual_RDR pREL_SHOW_Name FSLIT("showString")
-showSpace_RDR           = varQual_RDR pREL_SHOW_Name FSLIT("showSpace") 
-showParen_RDR           = varQual_RDR pREL_SHOW_Name FSLIT("showParen") 
+showList_RDR            = varQual_RDR pREL_SHOW FSLIT("showList")
+showList___RDR          = varQual_RDR pREL_SHOW FSLIT("showList__")
+showsPrec_RDR           = varQual_RDR pREL_SHOW FSLIT("showsPrec") 
+showString_RDR          = varQual_RDR pREL_SHOW FSLIT("showString")
+showSpace_RDR           = varQual_RDR pREL_SHOW FSLIT("showSpace") 
+showParen_RDR           = varQual_RDR pREL_SHOW FSLIT("showParen") 
 
-typeOf_RDR     = varQual_RDR tYPEABLE_Name FSLIT("typeOf")
-mkTypeRep_RDR  = varQual_RDR tYPEABLE_Name FSLIT("mkTyConApp")
-mkTyConRep_RDR = varQual_RDR tYPEABLE_Name FSLIT("mkTyCon")
+typeOf_RDR     = varQual_RDR tYPEABLE FSLIT("typeOf")
+mkTypeRep_RDR  = varQual_RDR tYPEABLE FSLIT("mkTyConApp")
+mkTyConRep_RDR = varQual_RDR tYPEABLE FSLIT("mkTyCon")
 
-undefined_RDR = varQual_RDR pREL_ERR_Name FSLIT("undefined")
+undefined_RDR = varQual_RDR pREL_ERR FSLIT("undefined")
 
-crossDataCon_RDR   = dataQual_RDR pREL_BASE_Name FSLIT(":*:")
-inlDataCon_RDR     = dataQual_RDR pREL_BASE_Name FSLIT("Inl")
-inrDataCon_RDR     = dataQual_RDR pREL_BASE_Name FSLIT("Inr")
-genUnitDataCon_RDR = dataQual_RDR pREL_BASE_Name FSLIT("Unit")
+crossDataCon_RDR   = dataQual_RDR pREL_BASE FSLIT(":*:")
+inlDataCon_RDR     = dataQual_RDR pREL_BASE FSLIT("Inl")
+inrDataCon_RDR     = dataQual_RDR pREL_BASE FSLIT("Inr")
+genUnitDataCon_RDR = dataQual_RDR pREL_BASE FSLIT("Unit")
 
 ----------------------
 varQual_RDR  mod str = mkOrig mod (mkOccFS varName str)

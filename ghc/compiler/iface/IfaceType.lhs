@@ -30,8 +30,8 @@ import TyCon		( TyCon, isTupleTyCon, tyConArity, tupleTyConBoxity )
 import Var		( isId, tyVarKind, idType )
 import TysWiredIn	( listTyConName, parrTyConName, tupleTyCon, intTyConName, charTyConName, boolTyConName )
 import OccName		( OccName )
-import Name		( Name, getName, getOccName, nameModuleName, nameOccName )
-import Module		( ModuleName )
+import Name		( Name, getName, getOccName, nameModule, nameOccName )
+import Module		( Module )
 import BasicTypes	( IPName(..), Arity, Version, mapIPName, tupleParens, Boxity )
 import Outputable
 import FastString
@@ -46,11 +46,11 @@ import FastString
 
 \begin{code}
 data IfaceExtName
-  = ExtPkg ModuleName OccName		-- From an external package; no version #
+  = ExtPkg Module OccName		-- From an external package; no version #
 					-- Also used for wired-in things regardless
 					-- of whether they are home-pkg or not
 
-  | HomePkg ModuleName OccName Version	-- From another module in home package;
+  | HomePkg Module OccName Version	-- From another module in home package;
 					-- has version #
 
   | LocalTop OccName			-- Top-level from the same module as 
@@ -62,7 +62,7 @@ data IfaceExtName
 	-- LocalTopSub is written into iface files as LocalTop; the parent 
 	-- info is only used when computing version information in MkIface
 
-mkIfaceExtName name = ExtPkg (nameModuleName name) (nameOccName name)
+mkIfaceExtName name = ExtPkg (nameModule name) (nameOccName name)
 	-- Local helper for wired-in names
 \end{code}
 
@@ -182,7 +182,7 @@ instance Outputable IfaceExtName where
     ppr (LocalTop occ)	       = ppr occ	-- Do we want to distinguish these 
     ppr (LocalTopSub occ _)    = ppr occ	-- from an ordinary occurrence?
 
-pprExt :: ModuleName -> OccName -> SDoc
+pprExt :: Module -> OccName -> SDoc
 pprExt mod occ
   = getPprStyle $ \ sty ->
     if unqualStyle sty mod occ then

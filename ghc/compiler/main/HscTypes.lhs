@@ -15,14 +15,13 @@ module HscTypes (
 
 	ExternalPackageState(..), EpsStats(..), addEpsInStats,
 	PackageTypeEnv, PackageIfaceTable, emptyPackageIfaceTable,
-	lookupIface, lookupIfaceByModName, moduleNameToModule,
-	emptyModIface,
+	lookupIface, lookupIfaceByModule, emptyModIface,
 
 	InteractiveContext(..), emptyInteractiveContext, 
 	icPrintUnqual, unQualInScope,
 
 	ModIface(..), mkIfaceDepCache, mkIfaceVerCache, mkIfaceFixCache,
-		      emptyIfaceDepCache, 
+	IfacePackage(..), emptyIfaceDepCache, 
 
 	Deprecs(..), IfaceDeprecs,
 
@@ -64,7 +63,7 @@ import ByteCodeAsm	( CompiledByteCode )
 import RdrName		( GlobalRdrEnv, emptyGlobalRdrEnv,
 			  LocalRdrEnv, emptyLocalRdrEnv,
 			  GlobalRdrElt(..), mkRdrUnqual, lookupGRE_RdrName )
-import Name		( Name, NamedThing, getName, nameOccName, nameModule, nameModuleName )
+import Name		( Name, NamedThing, getName, nameOccName, nameModule )
 import NameEnv
 import NameSet	
 import OccName		( OccName, OccEnv, lookupOccEnv, mkOccEnv, emptyOccEnv, 
@@ -79,7 +78,7 @@ import Type		( TyThing(..) )
 import Class		( Class, classSelIds, classTyCon )
 import TyCon		( TyCon, tyConSelIds, tyConDataCons )
 import DataCon		( dataConImplicitIds )
-import Packages		( PackageName )
+import Packages		( PackageId )
 import CmdLineOpts	( DynFlags )
 
 import BasicTypes	( Version, initialVersion, IPName, 
@@ -176,23 +175,13 @@ lookupIface hpt pit mod
 	Just mod_info -> Just (hm_iface mod_info)
 	Nothing       -> lookupModuleEnv pit mod
 
-lookupIfaceByModName :: HomePackageTable -> PackageIfaceTable -> ModuleName -> Maybe ModIface
+lookupIfaceByModule :: HomePackageTable -> PackageIfaceTable -> Module -> Maybe ModIface
 -- We often have two IfaceTables, and want to do a lookup
-lookupIfaceByModName hpt pit mod
-  = case lookupModuleEnvByName hpt mod of
+lookupIfaceByModule hpt pit mod
+  = case lookupModuleEnv hpt mod of
 	Just mod_info -> Just (hm_iface mod_info)
-	Nothing       -> lookupModuleEnvByName pit mod
+	Nothing       -> lookupModuleEnv pit mod
 \end{code}
-
-\begin{code}
--- Use instead of Finder.findModule if possible: this way doesn't
--- require filesystem operations, and it is guaranteed not to fail
--- when the IfaceTables are properly populated (i.e. after the renamer).
-moduleNameToModule :: HomePackageTable -> PackageIfaceTable -> ModuleName -> Module
-moduleNameToModule hpt pit mod 
-   = mi_module (fromJust (lookupIfaceByModName hpt pit mod))
-\end{code}
-
 
 %************************************************************************
 %*									*
@@ -212,7 +201,7 @@ the declarations into a single indexed map in the @PersistentRenamerState@.
 \begin{code}
 data ModIface 
    = ModIface {
-	mi_package  :: !PackageName,	    -- Which package the module comes from
+	mi_package  :: !IfacePackage,	    -- Which package the module comes from
         mi_module   :: !Module,
         mi_mod_vers :: !Version,	    -- Module version: changes when anything changes
 
@@ -265,6 +254,8 @@ data ModIface
 			-- isn't in decls. It's useful to know that when
 			-- seeing if we are up to date wrt the old interface
      }
+
+data IfacePackage = ThisPackage | ExternalPackage PackageId
 
 -- Should be able to construct ModDetails from mi_decls in ModIface
 data ModDetails
@@ -348,10 +339,10 @@ data ForeignStubs = NoStubs
 \end{code}
 
 \begin{code}
-emptyModIface :: PackageName -> ModuleName -> ModIface
+emptyModIface :: IfacePackage -> Module -> ModIface
 emptyModIface pkg mod
   = ModIface { mi_package  = pkg,
-	       mi_module   = mkModule pkg mod,
+	       mi_module   = mod,
 	       mi_mod_vers = initialVersion,
 	       mi_orphan   = False,
 	       mi_boot	   = False,
@@ -421,7 +412,7 @@ unQualInScope :: GlobalRdrEnv -> PrintUnqualified
 -- [Out of date] Also checks for built-in syntax, which is always 'in scope'
 unQualInScope env mod occ
   = case lookupGRE_RdrName (mkRdrUnqual occ) env of
-	[gre] -> nameModuleName (gre_name gre) == mod
+	[gre] -> nameModule (gre_name gre) == mod
 	other -> False
 \end{code}
 
@@ -585,7 +576,7 @@ data GenAvailInfo name	= Avail name	 -- An ordinary identifier
 			deriving( Eq )
 			-- Equality used when deciding if the interface has changed
 
-type IfaceExport = (ModuleName, [GenAvailInfo OccName])
+type IfaceExport = (Module, [GenAvailInfo OccName])
 
 availsToNameSet :: [AvailInfo] -> NameSet
 availsToNameSet avails = foldl add emptyNameSet avails
@@ -662,9 +653,9 @@ type IsBootInterface = Bool
 -- Invariant: the dependencies of a module M never includes M
 -- Invariant: the lists are unordered, with no duplicates
 data Dependencies
-  = Deps { dep_mods  :: [(ModuleName,IsBootInterface)],	-- Home-package module dependencies
-	   dep_pkgs  :: [PackageName], 			-- External package dependencies
-	   dep_orphs :: [ModuleName] }			-- Orphan modules (whether home or external pkg)
+  = Deps { dep_mods  :: [(Module,IsBootInterface)],	-- Home-package module dependencies
+	   dep_pkgs  :: [PackageId], 			-- External package dependencies
+	   dep_orphs :: [Module] }			-- Orphan modules (whether home or external pkg)
   deriving( Eq )
 	-- Equality used only for old/new comparison in MkIface.addVersionInfo
 
@@ -672,7 +663,7 @@ noDependencies :: Dependencies
 noDependencies = Deps [] [] []
  	  
 data Usage
-  = Usage { usg_name     :: ModuleName,			-- Name of the module
+  = Usage { usg_name     :: Module,			-- Name of the module
 	    usg_mod      :: Version,			-- Module version
 	    usg_entities :: [(OccName,Version)],	-- Sorted by occurrence name
 	    usg_exports  :: Maybe Version,		-- Export-list version, if we depend on it
@@ -705,14 +696,14 @@ type PackageInstEnv  = InstEnv
 
 data ExternalPackageState
   = EPS {
-	eps_is_boot :: !(ModuleEnv (ModuleName, IsBootInterface)),
+	eps_is_boot :: !(ModuleEnv (Module, IsBootInterface)),
 		-- In OneShot mode (only), home-package modules accumulate in the
 		-- external package state, and are sucked in lazily.
 		-- For these home-pkg modules (only) we need to record which are
 		-- boot modules.  We set this field after loading all the 
 		-- explicitly-imported interfaces, but before doing anything else
 		--
-		-- The ModuleName part is not necessary, but it's useful for
+		-- The Module part is not necessary, but it's useful for
 		-- debug prints, and it's convenient because this field comes
 		-- direct from TcRnTypes.ImportAvails.imp_dep_mods
 
@@ -785,8 +776,8 @@ type OrigIParamCache = FiniteMap (IPName OccName) (IPName Name)
 \end{code}
 
 \begin{code}
-type Gated d = ([Name], (ModuleName, d))	-- The [Name] 'gate' the declaration; always non-empty
-						-- ModuleName records which iface file this
+type Gated d = ([Name], (Module, d))	-- The [Name] 'gate' the declaration; always non-empty
+						-- Module records which iface file this
 						-- decl came from
 
 type RulePool = [Gated IfaceRule]
@@ -840,7 +831,7 @@ data Linkable = LM {
   linkableTime     :: ClockTime,	-- Time at which this linkable was built
 					-- (i.e. when the bytecodes were produced,
 					--	 or the mod date on the files)
-  linkableModName  :: ModuleName,	-- Should be Module, but see below
+  linkableModule   :: Module,		-- Should be Module, but see below
   linkableUnlinked :: [Unlinked]
  }
 

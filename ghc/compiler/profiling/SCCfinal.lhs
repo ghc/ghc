@@ -29,7 +29,7 @@ module SCCfinal ( stgMassageForProfiling ) where
 
 import StgSyn
 
-import CmdLineOpts	( opt_AutoSccsOnIndividualCafs )
+import CmdLineOpts	( DynFlags, opt_AutoSccsOnIndividualCafs )
 import CostCentre	-- lots of things
 import Id		( Id )
 import Module		( Module )
@@ -44,12 +44,13 @@ infixr 9 `thenMM`, `thenMM_`
 
 \begin{code}
 stgMassageForProfiling
-	:: Module			-- module name
+	:: DynFlags
+	-> Module			-- module name
 	-> UniqSupply		    	-- unique supply
 	-> [StgBinding]		    	-- input
 	-> (CollectedCCs, [StgBinding])
 
-stgMassageForProfiling mod_name us stg_binds
+stgMassageForProfiling dflags mod_name us stg_binds
   = let
 	((local_ccs, extern_ccs, cc_stacks),
 	 stg_binds2)
@@ -100,7 +101,7 @@ stgMassageForProfiling mod_name us stg_binds
     do_top_rhs :: Id -> StgRhs -> MassageM StgRhs
 
     do_top_rhs binder (StgRhsClosure _ bi fv u srt [] (StgSCC cc (StgConApp con args)))
-      | not (isSccCountCostCentre cc) && not (isDllConApp con args)
+      | not (isSccCountCostCentre cc) && not (isDllConApp dflags con args)
 	-- Trivial _scc_ around nothing but static data
 	-- Eliminate _scc_ ... and turn into StgRhsCon
 

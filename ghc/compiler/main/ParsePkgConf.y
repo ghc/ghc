@@ -3,7 +3,7 @@ module ParsePkgConf( loadPackageConfig ) where
 
 #include "HsVersions.h"
 
-import Packages
+import PackageConfig
 import Lexer
 import CmdLineOpts
 import FastString

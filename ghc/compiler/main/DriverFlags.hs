@@ -7,10 +7,14 @@
 -----------------------------------------------------------------------------
 
 module DriverFlags ( 
-	processArgs, OptKind(..), static_flags, dynamic_flags, 
+	processDynamicFlags,
+ 	processStaticFlags,
+
 	addCmdlineHCInclude,
 	buildStaticHscOpts, 
-	machdepCCOpts
+	machdepCCOpts,
+
+	processArgs, OptKind(..), -- for DriverMkDepend only
   ) where
 
 #include "HsVersions.h"
@@ -25,9 +29,10 @@ import CmdLineOpts
 import Config
 import Util
 import Panic
+import FastString	( mkFastString )
 
 import EXCEPTION
-import DATA_IOREF	( readIORef, writeIORef )
+import DATA_IOREF	( IORef, readIORef, writeIORef )
 
 import System		( exitWith, ExitCode(..) )
 import IO
@@ -56,6 +61,9 @@ import Char
 
 -----------------------------------------------------------------------------
 -- Process command-line  
+
+processStaticFlags :: [String] -> IO [String]
+processStaticFlags opts = processArgs static_flags opts []
 
 data OptKind
 	= NoArg (IO ()) 		    -- flag with no argument
@@ -258,7 +266,6 @@ static_flags =
 				) )
 
 	------- Include/Import Paths ----------------------------------------
-  ,  ( "i"		, OptPrefix (addToOrDeleteDirList v_Import_paths) )
   ,  ( "I" 		, Prefix    (addToDirList v_Include_paths) )
 
 	------- Libraries ---------------------------------------------------
@@ -271,13 +278,6 @@ static_flags =
   ,  ( "framework-path" , HasArg (addToDirList v_Framework_paths) )
   ,  ( "framework"	, HasArg (add v_Cmdline_frameworks) )
 #endif
-        ------- Packages ----------------------------------------------------
-  ,  ( "package-name"   , HasArg (\s -> add v_Opt_C ("-inpackage="++s)) )
-
-  ,  ( "package-conf"   , HasArg (readPackageConf) )
-  ,  ( "package"        , HasArg (addPackage) )
-  ,  ( "syslib"         , HasArg (addPackage) )	-- for compatibility w/ old vsns
-
         ------- Specific phases  --------------------------------------------
   ,  ( "pgmL"           , HasArg setPgmL )
   ,  ( "pgmP"           , HasArg setPgmP )
@@ -340,9 +340,21 @@ dynamic_flags = [
   ,  ( "opti",		HasArg (addOpt_i) )
 #endif
 
+        ------- Packages ----------------------------------------------------
+  ,  ( "package-conf"   , HasArg extraPkgConf_ )
+  ,  ( "no-user-package-conf", NoArg noUserPkgConf_ )
+  ,  ( "package-name"   , HasArg ignorePackage ) -- for compatibility
+  ,  ( "package"        , HasArg exposePackage )
+  ,  ( "hide-package"   , HasArg hidePackage )
+  ,  ( "ignore-package" , HasArg ignorePackage )
+  ,  ( "syslib"         , HasArg exposePackage )  -- for compatibility
+
 	------ HsCpp opts ---------------------------------------------------
   ,  ( "D",		AnySuffix addOpt_P )
   ,  ( "U",		AnySuffix addOpt_P )
+
+        ------- Paths & stuff -----------------------------------------------
+  ,  ( "i"		, OptPrefix addImportPath )
 
 	------ Debugging ----------------------------------------------------
   ,  ( "dstg-stats",	NoArg (writeIORef v_StgStats True) )
@@ -480,6 +492,75 @@ glasgowExtsFlags = [ Opt_GlasgowExts, Opt_FFI, Opt_TH, Opt_ImplicitParams ]
 isFFlag f = f `elem` (map fst fFlags)
 getFFlag f = fromJust (lookup f fFlags)
 
+-- -----------------------------------------------------------------------------
+-- Parsing the dynamic flags.
+
+-- we use a temporary global variable, for convenience
+
+GLOBAL_VAR(v_DynFlags, defaultDynFlags, DynFlags)
+
+processDynamicFlags :: [String] -> DynFlags -> IO (DynFlags,[String])
+processDynamicFlags args dflags = do
+  writeIORef v_DynFlags dflags
+  spare <- processArgs dynamic_flags args []
+  dflags <- readIORef v_DynFlags
+  return (dflags,spare)
+
+updDynFlags :: (DynFlags -> DynFlags) -> IO ()
+updDynFlags f = do dfs <- readIORef v_DynFlags
+		   writeIORef v_DynFlags (f dfs)
+
+setDynFlag, unSetDynFlag :: DynFlag -> IO ()
+setDynFlag f   = updDynFlags (\dfs -> dopt_set dfs f)
+unSetDynFlag f = updDynFlags (\dfs -> dopt_unset dfs f)
+
+addOpt_L a = updDynFlags (\s -> s{opt_L = a : opt_L s})
+addOpt_P a = updDynFlags (\s -> s{opt_P = a : opt_P s})
+addOpt_F a = updDynFlags (\s -> s{opt_F = a : opt_F s})
+addOpt_c a = updDynFlags (\s -> s{opt_c = a : opt_c s})
+addOpt_a a = updDynFlags (\s -> s{opt_a = a : opt_a s})
+addOpt_m a = updDynFlags (\s -> s{opt_m = a : opt_m s})
+#ifdef ILX
+addOpt_I a = updDynFlags (\s -> s{opt_I = a : opt_I s})
+addOpt_i a = updDynFlags (\s -> s{opt_i = a : opt_i s})
+#endif
+
+setVerbosity "" = updDynFlags (\dfs -> dfs{ verbosity = 3 })
+setVerbosity n 
+  | all isDigit n = updDynFlags (\dfs -> dfs{ verbosity = read n })
+  | otherwise     = throwDyn (UsageError "can't parse verbosity flag (-v<n>)")
+
+addCmdlineHCInclude a = updDynFlags (\s -> s{cmdlineHcIncludes =  a : cmdlineHcIncludes s})
+
+extraPkgConf_  p = updDynFlags (\s -> s{ extraPkgConfs = p : extraPkgConfs s })
+noUserPkgConf_   = updDynFlags (\s -> s{ readUserPkgConf = False })
+
+exposePackage p = 
+  updDynFlags (\s -> s{ packageFlags = ExposePackage p : packageFlags s })
+hidePackage p = 
+  updDynFlags (\s -> s{ packageFlags = HidePackage p : packageFlags s })
+ignorePackage p = 
+  updDynFlags (\s -> s{ packageFlags = IgnorePackage p : packageFlags s })
+
+-- -i on its own deletes the import paths
+addImportPath "" = updDynFlags (\s -> s{importPaths = []})
+addImportPath p  = updDynFlags (\s -> s{importPaths = p : importPaths s})
+
+-- we can only switch between HscC, HscAsmm, and HscILX with dynamic flags 
+-- (-fvia-C, -fasm, -filx respectively).
+setLang l = updDynFlags (\dfs -> case hscLang dfs of
+					HscC   -> dfs{ hscLang = l }
+					HscAsm -> dfs{ hscLang = l }
+					HscILX -> dfs{ hscLang = l }
+					_      -> dfs)
+
+setOptLevel :: Int -> IO ()
+setOptLevel n 
+   = do dflags <- readIORef v_DynFlags
+	if hscLang dflags == HscInterpreted && n > 0
+	  then putStr "warning: -O conflicts with --interactive; -O ignored.\n"
+	  else writeIORef v_DynFlags (updOptLevel n dflags)
+
 -----------------------------------------------------------------------------
 -- convert sizes like "3.5M" into integers
 
@@ -547,7 +628,7 @@ setMainIs arg
 --		       , registerised HC compilations
 --		       )
 
-machdepCCOpts 
+machdepCCOpts dflags
    | prefixMatch "alpha"   cTARGETPLATFORM  
 	= return ( ["-w", "-mieee"
 #ifdef HAVE_THREADED_RTS_SUPPORT
@@ -580,7 +661,7 @@ machdepCCOpts
       --
       -- -fomit-frame-pointer : *must* in .hc files; because we're stealing
       --   the fp (%ebp) for our register maps.
-	= do n_regs <- dynFlag stolen_x86_regs
+	= do let n_regs = stolen_x86_regs dflags
 	     sta    <- readIORef v_Static
 	     return ( [ if sta then "-DDONT_WANT_WIN32_DLL_SUPPORT" else ""
 --                    , if suffixMatch "mingw32" cTARGETPLATFORM then "-mno-cygwin" else "" 
@@ -641,24 +722,6 @@ machdepCCOpts
 
 -----------------------------------------------------------------------------
 -- local utils
-
-addOpt_L a = updDynFlags (\s -> s{opt_L = a : opt_L s})
-addOpt_P a = updDynFlags (\s -> s{opt_P = a : opt_P s})
-addOpt_F a = updDynFlags (\s -> s{opt_F = a : opt_F s})
-addOpt_c a = updDynFlags (\s -> s{opt_c = a : opt_c s})
-addOpt_a a = updDynFlags (\s -> s{opt_a = a : opt_a s})
-addOpt_m a = updDynFlags (\s -> s{opt_m = a : opt_m s})
-#ifdef ILX
-addOpt_I a = updDynFlags (\s -> s{opt_I = a : opt_I s})
-addOpt_i a = updDynFlags (\s -> s{opt_i = a : opt_i s})
-#endif
-
-setVerbosity "" = updDynFlags (\dfs -> dfs{ verbosity = 3 })
-setVerbosity n 
-  | all isDigit n = updDynFlags (\dfs -> dfs{ verbosity = read n })
-  | otherwise     = throwDyn (UsageError "can't parse verbosity flag (-v<n>)")
-
-addCmdlineHCInclude a = updDynFlags (\s -> s{cmdlineHcIncludes =  a : cmdlineHcIncludes s})
 
 -- -----------------------------------------------------------------------------
 -- Version and usage messages

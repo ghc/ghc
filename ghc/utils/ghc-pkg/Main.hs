@@ -19,16 +19,14 @@ module Main (main) where
 import Version	( version, targetOS, targetARCH )
 import Distribution.InstalledPackageInfo
 import Distribution.Compat.ReadP
+import Distribution.ParseUtils	( showError )
 import Distribution.Package
-import Distribution.License
 import Distribution.Version
 import Compat.Directory 	( getAppUserDataDirectory )
 import Control.Exception	( evaluate )
 import qualified Control.Exception as Exception
 
 import Prelude
-
-import Package -- the old package config type
 
 #if __GLASGOW_HASKELL__ < 603
 #include "config.h"
@@ -47,14 +45,12 @@ import qualified Exception
 import Data.Char	( isSpace )
 import Monad
 import Directory
-import System	( getEnv, getArgs, getProgName,
+import System	( getArgs, getProgName,
 		  system, exitWith,
 		  ExitCode(..)
 		)
 import IO
 import List ( isPrefixOf, isSuffixOf )
-
-import ParsePkgConfLite
 
 #include "../../includes/ghcconfig.h"
 
@@ -319,14 +315,14 @@ registerPackage input defines db_stack auto_ghci_libs update force = do
 	putStr "Reading package info from stdin... "
         getContents
       f   -> do
-        putStr ("Reading package info from " ++ show f)
+        putStr ("Reading package info from " ++ show f ++ " ")
 	readFile f
 
   pkg <- parsePackageInfo s defines force
   putStrLn "done."
 
   validatePackageConfig pkg db_stack auto_ghci_libs update force
-  new_details <- updatePackageDB (snd db_to_operate_on) pkg
+  new_details <- updatePackageDB db_stack (snd db_to_operate_on) pkg
   savePackageConfig db_filename
   maybeRestoreOldConfig db_filename $
     writeNewConfig db_filename new_details
@@ -339,67 +335,11 @@ parsePackageInfo
 parsePackageInfo str defines force =
   case parseInstalledPackageInfo str of
     Right ok -> return ok
-    Left err -> do
-	old_pkg <- evaluate (parseOnePackageConfig str)
-		 	    `Exception.catch` \_ -> parse_failed
-	putStr "Expanding embedded variables... "
-	new_old_pkg <- expandEnvVars old_pkg defines force
-	return (convertOldPackage old_pkg)
- where
-   parse_failed = die "parse error in package info\n"
+    Left err -> die (showError err ++ "\n")
 
-convertOldPackage :: PackageConfig -> InstalledPackageInfo
-convertOldPackage
-   Package {
-	name 		= name,
-	auto 		= auto,
-	import_dirs     = import_dirs,
-	source_dirs     = source_dirs,
-	library_dirs    = library_dirs,
-	hs_libraries    = hs_libraries,
-	extra_libraries = extra_libraries,
-	include_dirs    = include_dirs,
-	c_includes      = c_includes,
-	package_deps    = package_deps,
-	extra_ghc_opts  = extra_ghc_opts,
-	extra_cc_opts   = extra_cc_opts,
-	extra_ld_opts   = extra_ld_opts,
-	framework_dirs  = framework_dirs,
-	extra_frameworks= extra_frameworks
-    }
-   = InstalledPackageInfo {
-        package          = pkgNameToId name,
-        license          = AllRightsReserved,
-        copyright        = "",
-        maintainer       = "",
-	author		 = "",
-        stability        = "",
-	homepage	 = "",
-	pkgUrl		 = "",
-	description	 = "",
-	category	 = "",
-        exposed          = auto,
-	exposedModules	 = [],
-	hiddenModules    = [],
-        importDirs       = import_dirs,
-        libraryDirs      = library_dirs,
-        hsLibraries      = hs_libraries,
-        extraLibraries   = extra_libraries,
-        includeDirs      = include_dirs,
-        includes	 = c_includes,
-        depends          = map pkgNameToId package_deps,
-        extraHugsOpts    = [],
-        extraCcOpts      = extra_cc_opts,
-        extraLdOpts      = extra_ld_opts,
-        frameworkDirs    = framework_dirs,
-        extraFrameworks  = extra_frameworks,
-	haddockInterfaces = [],
-	haddockHTMLs      = []
-    }
-
-
--- Used for converting old versionless package names to new PackageIdentifiers.
--- "Version [] []" is special: it means "no version" or "any version"
+-- Used for converting versionless package names to new
+-- PackageIdentifiers.  "Version [] []" is special: it means "no
+-- version" or "any version"
 pkgNameToId :: String -> PackageIdentifier
 pkgNameToId name = PackageIdentifier name (Version [] [])
 
@@ -603,11 +543,14 @@ checkDep db_stack force pkgid
   where
 	-- for backwards compat, we treat 0.0 as a special version,
 	-- and don't check that it actually exists.
- 	real_version = versionBranch (pkgVersion pkgid) /= []
+ 	real_version = realVersion pkgid
 	
 	all_pkgs = concat (map snd db_stack)
 	pkgids = map package all_pkgs
 	pkg_names = map pkgName pkgids
+
+realVersion :: PackageIdentifier -> Bool
+realVersion pkgid = versionBranch (pkgVersion pkgid) /= []
 
 checkHSLib :: [String] -> Bool -> Bool -> String -> IO ()
 checkHSLib dirs auto_ghci_libs force lib = do
@@ -660,11 +603,25 @@ autoBuildGHCiLib dir batch_file ghci_file = do
 -- Updating the DB with the new package.
 
 updatePackageDB
-	:: [InstalledPackageInfo]
+	:: PackageDBStack
+	-> [InstalledPackageInfo]
 	-> InstalledPackageInfo
 	-> IO [InstalledPackageInfo]
-updatePackageDB pkgs new_pkg = do
+updatePackageDB db_stack pkgs new_pkg = do
   let
+	-- we update dependencies without version numbers to
+	-- match the actual versions of the relevant packages instaled.
+	updateDeps p = p{depends = map resolveDep (depends p)}
+
+	resolveDep pkgid
+	   | realVersion pkgid  = pkgid
+	   | otherwise		= lookupDep (pkgName pkgid)
+	
+	lookupDep name
+	   = head [ pid | p <- concat (map snd db_stack), 
+			  let pid = package p,
+			  pkgName pid == name ]
+
 	is_exposed = exposed new_pkg
 	pkgid      = package new_pkg
 	name       = pkgName pkgid
@@ -679,7 +636,45 @@ updatePackageDB pkgs new_pkg = do
 	  | is_exposed && pkgName (package p) == name = p{ exposed = False }
 	  | otherwise = p
   --
-  return (pkgs'++[new_pkg])
+  return (pkgs'++[updateDeps new_pkg])
+
+-- -----------------------------------------------------------------------------
+-- Searching for modules
+
+#if not_yet
+
+findModules :: [FilePath] -> IO [String]
+findModules paths = 
+  mms <- mapM searchDir paths
+  return (concat mms)
+
+searchDir path prefix = do
+  fs <- getDirectoryEntries path `catch` \_ -> return []
+  searchEntries path prefix fs
+
+searchEntries path prefix [] = return []
+searchEntries path prefix (f:fs)
+  | looks_like_a_module  =  do
+	ms <- searchEntries path prefix fs
+	return (prefix `joinModule` f : ms)
+  | looks_like_a_component  =  do
+        ms <- searchDir (path `joinFilename` f) (prefix `joinModule` f)
+        ms' <- searchEntries path prefix fs
+	return (ms ++ ms')	
+  | otherwise
+	searchEntries path prefix fs
+
+  where
+	(base,suffix) = splitFileExt f
+	looks_like_a_module = 
+		suffix `elem` haskell_suffixes && 
+		all okInModuleName base
+	looks_like_a_component =
+		null suffix && all okInModuleName base
+
+okInModuleName c
+
+#endif
 
 -- -----------------------------------------------------------------------------
 -- The old command-line syntax, supported for backwards compatibility
@@ -776,6 +771,8 @@ oldRunit clis = do
 
 -- ---------------------------------------------------------------------------
 
+#ifdef OLD_STUFF
+-- ToDo: reinstate
 expandEnvVars :: PackageConfig -> [(String, String)]
 	-> Bool -> IO PackageConfig
 expandEnvVars pkg defines force = do
@@ -859,6 +856,7 @@ wordsBy :: (Char -> Bool) -> String -> [String]
 wordsBy p s = case dropWhile p s of
   "" -> []
   s' -> w : wordsBy p s'' where (w,s'') = break p s'
+#endif
 
 -----------------------------------------------------------------------------
 

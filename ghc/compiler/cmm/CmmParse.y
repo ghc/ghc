@@ -25,11 +25,11 @@ import CostCentre	( dontCareCCS )
 
 import Cmm
 import PprCmm
-import CmmUtils		( mkIntCLit, mkLblExpr )
+import CmmUtils		( mkIntCLit )
 import CmmLex
 import CLabel
 import MachOp
-import SMRep		( tablesNextToCode, fixedHdrSize, CgRep(..) )
+import SMRep		( fixedHdrSize, CgRep(..) )
 import Lexer
 
 import ForeignCall	( CCallConv(..) )
@@ -872,7 +872,7 @@ parseCmmFile dflags filename = do
   case unP cmmParse init_state of
     PFailed span err -> do printError span err; return Nothing
     POk _ code -> do
-	cmm <- initC no_module (getCmm (unEC code initEnv [] >> return ()))
+	cmm <- initC dflags no_module (getCmm (unEC code initEnv [] >> return ()))
 	dumpIfSet_dyn dflags Opt_D_dump_cmm "Cmm" (pprCmms [cmm])
 	return (Just cmm)
   where

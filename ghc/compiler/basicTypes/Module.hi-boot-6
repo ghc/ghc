@@ -1,4 +1,4 @@
 module Module where
 
-data ModuleName
+data Module
 

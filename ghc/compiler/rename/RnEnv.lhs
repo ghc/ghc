@@ -46,11 +46,11 @@ import HsTypes		( replaceTyVarName )
 import HscTypes		( availNames, ModIface(..), FixItem(..), lookupFixity )
 import TcRnMonad
 import Name		( Name, nameIsLocalOrFrom, mkInternalName, isInternalName,
-			  nameSrcLoc, nameOccName, nameModuleName, nameParent )
+			  nameSrcLoc, nameOccName, nameModule, nameParent )
 import NameSet
 import OccName		( tcName, isDataOcc, occNameFlavour, reportIfUnused )
-import Module		( Module, ModuleName, moduleName, mkHomeModule )
-import PrelNames	( mkUnboundName, rOOT_MAIN_Name, iNTERACTIVE, consDataConKey, hasKey )
+import Module		( Module )
+import PrelNames	( mkUnboundName, rOOT_MAIN, iNTERACTIVE, consDataConKey, hasKey )
 import UniqSupply
 import BasicTypes	( IPName, mapIPName )
 import SrcLoc		( SrcSpan, srcSpanStart, Located(..), eqLocated, unLoc,
@@ -83,12 +83,12 @@ newTopSrcBinder this_mod mb_parent (L loc rdr_name)
 	-- very confused indeed.  This test rejects code like
 	--	data T = (,) Int Int
 	-- unless we are in GHC.Tup
-  = do	checkErr (isInternalName name || this_mod_name == nameModuleName name)
+  = do	checkErr (isInternalName name || this_mod == nameModule name)
 	         (badOrigBinding rdr_name)
 	returnM name
 
   | isOrig rdr_name
-  = do	checkErr (rdr_mod_name == this_mod_name || rdr_mod_name == rOOT_MAIN_Name)
+  = do	checkErr (rdr_mod == this_mod || rdr_mod == rOOT_MAIN)
 	         (badOrigBinding rdr_name)
 	-- When reading External Core we get Orig names as binders, 
 	-- but they should agree with the module gotten from the monad
@@ -107,14 +107,13 @@ newTopSrcBinder this_mod mb_parent (L loc rdr_name)
 	-- the RdrName, not from the environment.  In principle, it'd be fine to 
 	-- have an arbitrary mixture of external core definitions in a single module,
 	-- (apart from module-initialisation issues, perhaps).
-	newGlobalBinder (mkHomeModule rdr_mod_name) (rdrNameOcc rdr_name) mb_parent 
+	newGlobalBinder rdr_mod (rdrNameOcc rdr_name) mb_parent 
 	    	        (srcSpanStart loc) --TODO, should pass the whole span
 
   | otherwise
   = newGlobalBinder this_mod (rdrNameOcc rdr_name) mb_parent (srcSpanStart loc)
   where
-    this_mod_name = moduleName this_mod
-    rdr_mod_name  = rdrNameModule rdr_name
+    rdr_mod  = rdrNameModule rdr_name
 \end{code}
 
 %*********************************************************
@@ -166,7 +165,7 @@ lookupTopBndrRn rdr_name
 	-- we don't bother to call newTopSrcBinder first
 	-- We assume there is no "parent" name
   = do	{ loc <- getSrcSpanM
-	; newGlobalBinder (mkHomeModule (rdrNameModule rdr_name)) 
+	; newGlobalBinder (rdrNameModule rdr_name)
 		          (rdrNameOcc rdr_name) Nothing (srcSpanStart loc) }
 
   | otherwise
@@ -427,7 +426,7 @@ lookupFixityRn name
 	returnM (mi_fix_fn iface (nameOccName name))
   where
     doc      = ptext SLIT("Checking fixity for") <+> ppr name
-    name_mod = nameModuleName name
+    name_mod = nameModule name
 
 dataTcOccs :: RdrName -> [RdrName]
 -- If the input is a data constructor, return both it and a type
@@ -671,7 +670,7 @@ mapFvRn f xs = mappM f xs	`thenM` \ stuff ->
 %************************************************************************
 
 \begin{code}
-warnUnusedModules :: [(ModuleName,SrcSpan)] -> RnM ()
+warnUnusedModules :: [(Module,SrcSpan)] -> RnM ()
 warnUnusedModules mods
   = ifOptM Opt_WarnUnusedImports (mappM_ bleat mods)
   where

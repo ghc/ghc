@@ -33,15 +33,14 @@ import CgClosure	( cgTopRhsClosure )
 import CgCon		( cgTopRhsCon, cgTyCon )
 import CgUtils		( cmmRegOffW, emitRODataLits, cmmNeWord, emitRtsCall )
 
-import CLabel		( mkSRTLabel, mkClosureLabel, moduleRegdLabel,
-			  mkPlainModuleInitLabel, mkModuleInitLabel )
+import CLabel
 import Cmm
 import CmmUtils		( zeroCLit, mkIntCLit, mkLblExpr )
 import PprCmm		( pprCmms )
 import MachOp		( wordRep, MachHint(..) )
 
 import StgSyn
-import PrelNames	( gHC_PRIM, rOOT_MAIN, mAIN_Name, pREL_TOP_HANDLER )
+import PrelNames	( gHC_PRIM, rOOT_MAIN, mAIN, pREL_TOP_HANDLER )
 import CmdLineOpts	( DynFlags, DynFlag(..), opt_EnsureSplittableC,
 			  opt_SccProfilingOn )
 
@@ -51,10 +50,9 @@ import Id               ( Id, idName, setIdName )
 import Name		( nameSrcLoc, nameOccName, nameUnique, isInternalName, mkExternalName )
 import OccName		( mkLocalOcc )
 import TyCon            ( isDataTyCon )
-import Module		( Module, mkModuleName )
+import Module		( Module, mkModule )
 import ErrUtils		( dumpIfSet_dyn, showPass )
 import Panic		( assertPanic )
-import qualified Module ( moduleName )
 
 #ifdef DEBUG
 import Outputable
@@ -86,14 +84,14 @@ codeGen dflags this_mod type_env foreign_stubs imported_mods
 -- Why?
 --   ; mapM_ (\x -> seq x (return ())) data_tycons
 
-  ; code_stuff <- initC this_mod $ do 
-			{ cmm_binds  <- mapM (getCmm . cgTopBinding) stg_binds
-			; cmm_tycons <- mapM cgTyCon data_tycons
-			; cmm_init   <- getCmm (mkModuleInit way cost_centre_info 
-						     this_mod mb_main_mod
-					  	     foreign_stubs imported_mods)
-			; return (cmm_binds ++ concat cmm_tycons ++ [cmm_init]) 
-			}
+  ; code_stuff <- initC dflags this_mod $ do 
+		{ cmm_binds  <- mapM (getCmm . cgTopBinding dflags) stg_binds
+		; cmm_tycons <- mapM cgTyCon data_tycons
+		; cmm_init   <- getCmm (mkModuleInit dflags way cost_centre_info 
+					     this_mod mb_main_mod
+				  	     foreign_stubs imported_mods)
+		; return (cmm_binds ++ concat cmm_tycons ++ [cmm_init]) 
+		}
 		-- Put datatype_stuff after code_stuff, because the
 		-- datatype closure table (for enumeration types) to
 		-- (say) PrelBase_True_closure, which is defined in
@@ -149,14 +147,15 @@ We initialise the module tree by keeping a work-stack,
 
 \begin{code}
 mkModuleInit 
-	:: String		-- the "way"
+	:: DynFlags
+	-> String		-- the "way"
 	-> CollectedCCs         -- cost centre info
 	-> Module
 	-> Maybe String		-- Just m ==> we have flag: -main-is Foo.baz 
 	-> ForeignStubs
 	-> [Module]
 	-> Code
-mkModuleInit way cost_centre_info this_mod mb_main_mod foreign_stubs imported_mods
+mkModuleInit dflags way cost_centre_info this_mod mb_main_mod foreign_stubs imported_mods
   = do	{ 	
 
 	-- Allocate the static boolean that records if this
@@ -184,31 +183,31 @@ mkModuleInit way cost_centre_info this_mod mb_main_mod foreign_stubs imported_mo
 	; emitSimpleProc plain_init_lbl jump_to_init
 
 	-- When compiling the module in which the 'main' function lives,
-	-- (that is, Module.moduleName this_mod == main_mod_name)
+	-- (that is, this_mod == main_mod)
 	-- we inject an extra stg_init procedure for stg_init_ZCMain, for the 
 	-- RTS to invoke.  We must consult the -main-is flag in case the
 	-- user specified a different function to Main.main
-	; whenC (Module.moduleName this_mod == main_mod_name)
+	; whenC (this_mod == main_mod)
 		(emitSimpleProc plain_main_init_lbl jump_to_init)
     }
   where
-    plain_init_lbl = mkPlainModuleInitLabel this_mod
-    real_init_lbl  = mkModuleInitLabel this_mod way
-    plain_main_init_lbl = mkPlainModuleInitLabel rOOT_MAIN
+    plain_init_lbl = mkPlainModuleInitLabel dflags this_mod
+    real_init_lbl  = mkModuleInitLabel dflags this_mod way
+    plain_main_init_lbl = mkPlainModuleInitLabel dflags rOOT_MAIN
 
     jump_to_init = stmtC (CmmJump (mkLblExpr real_init_lbl) [])
 
     mod_reg_val = CmmLoad (mkLblExpr moduleRegdLabel) wordRep
 
-    main_mod_name = case mb_main_mod of
-			Just mod_name -> mkModuleName mod_name
-			Nothing	      -> mAIN_Name
+    main_mod = case mb_main_mod of
+			Just mod_name -> mkModule mod_name
+			Nothing	      -> mAIN
 
     -- Main refers to GHC.TopHandler.runIO, so make sure we call the
     -- init function for GHC.TopHandler.
     extra_imported_mods
-	| Module.moduleName this_mod == main_mod_name = [pREL_TOP_HANDLER]
-	| otherwise			 	      = []
+	| this_mod == main_mod = [pREL_TOP_HANDLER]
+	| otherwise	       = []
 
     mod_init_code = do
 	{ 	-- Set mod_reg to 1 to record that we've been here
@@ -217,18 +216,19 @@ mkModuleInit way cost_centre_info this_mod mb_main_mod foreign_stubs imported_mo
 		-- Now do local stuff
 	; registerForeignExports foreign_stubs
 	; initCostCentres cost_centre_info
-	; mapCs (registerModuleImport way) (imported_mods++extra_imported_mods)
+	; mapCs (registerModuleImport dflags way) 
+		(imported_mods++extra_imported_mods)
 	} 
 
 
 -----------------------
-registerModuleImport :: String -> Module -> Code
-registerModuleImport way mod 
+registerModuleImport :: DynFlags -> String -> Module -> Code
+registerModuleImport dflags way mod 
   | mod == gHC_PRIM
   = nopC 
   | otherwise 	-- Push the init procedure onto the work stack
   = stmtsC [ CmmAssign spReg (cmmRegOffW spReg (-1))
-	   , CmmStore (CmmReg spReg) (mkLblExpr (mkModuleInitLabel mod way)) ]
+	   , CmmStore (CmmReg spReg) (mkLblExpr (mkModuleInitLabel dflags mod way)) ]
 
 -----------------------
 registerForeignExports :: ForeignStubs -> Code
@@ -239,7 +239,8 @@ registerForeignExports (ForeignStubs _ _ _ fe_bndrs)
   where
 	mk_export_register bndr
 	  = emitRtsCall SLIT("getStablePtr") 
-		[ (CmmLit (CmmLabel (mkClosureLabel (idName bndr))), PtrHint) ]
+		[ (CmmLit (CmmLabel (mkLocalClosureLabel (idName bndr))), 
+		   PtrHint) ]
 \end{code}
 
 
@@ -280,32 +281,32 @@ style, with the increasing static environment being plumbed as a state
 variable.
 
 \begin{code}
-cgTopBinding :: (StgBinding,[(Id,[Id])]) -> Code
-cgTopBinding (StgNonRec id rhs, srts)
+cgTopBinding :: DynFlags -> (StgBinding,[(Id,[Id])]) -> Code
+cgTopBinding dflags (StgNonRec id rhs, srts)
   = do	{ id' <- maybeExternaliseId id
-	; mapM_ (mkSRT [id']) srts
+	; mapM_ (mkSRT dflags [id']) srts
 	; (id,info) <- cgTopRhs id' rhs
 	; addBindC id info 	-- Add the *un-externalised* Id to the envt,
 				-- so we find it when we look up occurrences
 	}
 
-cgTopBinding (StgRec pairs, srts)
+cgTopBinding dflags (StgRec pairs, srts)
   = do	{ let (bndrs, rhss) = unzip pairs
 	; bndrs' <- mapFCs maybeExternaliseId bndrs
 	; let pairs' = zip bndrs' rhss
-	; mapM_ (mkSRT bndrs')  srts
+	; mapM_ (mkSRT dflags bndrs')  srts
 	; new_binds <- fixC (\ new_binds -> do 
 		{ addBindsC new_binds
 		; mapFCs ( \ (b,e) -> cgTopRhs b e ) pairs' })
 	; nopC }
 
-mkSRT :: [Id] -> (Id,[Id]) -> Code
-mkSRT these (id,[])  = nopC
-mkSRT these (id,ids)
+mkSRT :: DynFlags -> [Id] -> (Id,[Id]) -> Code
+mkSRT dflags these (id,[])  = nopC
+mkSRT dflags these (id,ids)
   = do	{ ids <- mapFCs remap ids
 	; id  <- remap id
 	; emitRODataLits (mkSRTLabel (idName id)) 
-		       (map (CmmLabel . mkClosureLabel . idName) ids)
+		       (map (CmmLabel . mkClosureLabel dflags . idName) ids)
 	}
   where
 	-- Sigh, better map all the ids against the environment in 

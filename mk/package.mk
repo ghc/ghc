@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.41 2004/11/23 12:35:12 ross Exp $
+# $Id: package.mk,v 1.42 2004/11/26 16:22:13 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -17,20 +17,35 @@ endif
 ifeq "$(way)" ""
 
 ifeq "$(STANDALONE_PACKAGE)" "NO"
-PKGCONF_CPP_EXTRA_OPTS = -I$(GHC_INCLUDE_DIR) -Iinclude
+PACKAGE_CPP_OPTS += -I$(GHC_INCLUDE_DIR) -Iinclude
 else
-PKGCONF_CPP_EXTRA_OPTS = -Iinclude
+PACKAGE_CPP_OPTS += -Iinclude
 endif
 
+PACKAGE_CPP_OPTS += -DPACKAGE=${PACKAGE}
+PACKAGE_CPP_OPTS += -DVERSION=${VERSION}
+
+IMPORT_DIR_INSTALLED = $$libdir/imports
+IMPORT_DIR_INPLACE   = $$libdir/libraries/$(PACKAGE)
+
+LIB_DIR_INSTALLED    = $$libdir
+LIB_DIR_INPLACE	     = $$libdir/libraries/$(PACKAGE)
+
 package.conf.inplace   : package.conf.in
-	$(CPP) $(RAWCPP_FLAGS) -P $(PKGCONF_CPP_EXTRA_OPTS) -x c $(PACKAGE_CPP_OPTS) $< | \
+	$(CPP) $(RAWCPP_FLAGS) -P \
+		-DIMPORT_DIR='"$(IMPORT_DIR_INPLACE)"' \
+		-DLIB_DIR='"$(LIB_DIR_INPLACE)"' \
+		-x c $(PACKAGE_CPP_OPTS) $< | \
 	grep -v '^#pragma GCC' | \
-	sed -e 's/""//g' -e 's/\[ *,/[ /g' >$@
+	sed -e 's/""//g' -e 's/:[ 	]*,/: /g' >$@
 
 package.conf.installed : package.conf.in
-	$(CPP) $(RAWCPP_FLAGS) -P $(PKGCONF_CPP_EXTRA_OPTS) -DINSTALLING -x c $(PACKAGE_CPP_OPTS) $< | \
+	$(CPP) $(RAWCPP_FLAGS) -P -DINSTALLING \
+		-DIMPORT_DIR='"$(IMPORT_DIR_INSTALLED)"' \
+		-DLIB_DIR='"$(LIB_DIR_INSTALLED)"' \
+		 -x c $(PACKAGE_CPP_OPTS) $< | \
 	grep -v '^#pragma GCC' | \
-	sed -e 's/""//g' -e 's/\[ *,/[ /g' >$@
+	sed -e 's/""//g' -e 's/:[ 	]*,/: /g' >$@
 
 # we could be more accurate here and add a dependency on
 # ghc/driver/package.conf, but that doesn't work too well because of
@@ -61,7 +76,6 @@ CLEAN_FILES += package.conf.installed package.conf.inplace
 
 else # $(STANDALONE_PACKAGE) == "YES"
 
-PACKAGE_CPP_OPTS += -DPACKAGE=\"${PACKAGE}\"
 PACKAGE_CPP_OPTS += -DPACKAGE_DEPS='$(subst " ","$(comma) ",$(patsubst %,"%",$(PACKAGE_DEPS)))'
 PACKAGE_CPP_OPTS += -DLIBRARY=\"HS$(PACKAGE)\"
 PACKAGE_CPP_OPTS += -DLIBDIR=\"$(libdir)\"
@@ -92,7 +106,7 @@ endif
 SRC_HSC2HS_OPTS += -I.
 
 ifeq "$(NON_HS_PACKAGE)" ""
-SRC_HC_OPTS 	+= -package-name $(PACKAGE)
+SRC_HC_OPTS 	+= -ignore-package $(PACKAGE)
 SRC_HC_OPTS 	+= $(GhcLibHcOpts)
 SRC_HC_OPTS     += $(patsubst %, -package %, $(PACKAGE_DEPS))
 endif

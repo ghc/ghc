@@ -8,7 +8,7 @@ import HsSyn
 import RdrName
 import OccName
 import Kind( Kind(..) )
-import Name( nameOccName, nameModuleName )
+import Name( nameOccName, nameModule )
 import Module
 import ParserCoreUtils
 import LexCore
@@ -69,11 +69,10 @@ import Char
 %%
 
 module	:: { HsExtCore RdrName }
-         : '%module' modid tdefs vdefgs
-		{ HsExtCore (mkHomeModule $2) $3 $4 }
+         : '%module' modid tdefs vdefgs { HsExtCore $2 $3 $4 }
 
-modid	:: { ModuleName }
-	: CNAME	                 { mkSysModuleNameFS (mkFastString $1) }
+modid	:: { Module }
+	: CNAME	                 { mkSysModuleFS (mkFastString $1) }
 
 -------------------------------------------------------------
 --     Type and newtype declarations are in HsSyn syntax
@@ -299,7 +298,7 @@ convRatLit i aty
 
 eqTc :: IfaceTyCon -> TyCon -> Bool   -- Ugh!
 eqTc (IfaceTc (ExtPkg mod occ)) tycon
-  = mod == nameModuleName nm && occ == nameOccName nm
+  = mod == nameModule nm && occ == nameOccName nm
   where
     nm = tyConName tycon
 

@@ -11,13 +11,9 @@ module DriverState where
 #include "../includes/ghcconfig.h"
 #include "HsVersions.h"
 
-import ParsePkgConf	( loadPackageConfig )
-import SysTools		( getTopDir )
-import Packages
 import CmdLineOpts
 import DriverPhases
 import DriverUtil
-import UniqFM		( eltsUFM )
 import Util
 import Config
 import Panic
@@ -200,8 +196,7 @@ buildStgToDo = do
 
 split_marker = ':'   -- not configurable (ToDo)
 
-v_Import_paths, v_Include_paths, v_Library_paths :: IORef [String]
-GLOBAL_VAR(v_Import_paths,  ["."], [String])
+v_Include_paths, v_Library_paths :: IORef [String]
 GLOBAL_VAR(v_Include_paths, [], [String])
 GLOBAL_VAR(v_Library_paths, [],	 [String])
 
@@ -279,189 +274,6 @@ addToDirList ref path
 #else
     splitUp xs = return (split split_marker xs)
 #endif
-
--- ----------------------------------------------------------------------------
--- Loading the package config file
-
-readPackageConf :: String -> IO ()
-readPackageConf conf_file = do
-  proto_pkg_configs <- loadPackageConfig conf_file
-  top_dir 	    <- getTopDir
-  let pkg_configs = mungePackagePaths top_dir proto_pkg_configs
-  extendPackageConfigMap pkg_configs
-
-mungePackagePaths :: String -> [PackageConfig] -> [PackageConfig]
--- Replace the string "$libdir" at the beginning of a path
--- with the current libdir (obtained from the -B option).
-mungePackagePaths top_dir ps = map munge_pkg ps
- where 
-  munge_pkg p = p{ importDirs  = munge_paths (importDirs p),
-		   includeDirs = munge_paths (includeDirs p),
-    		   libraryDirs = munge_paths (libraryDirs p),
-		   frameworkDirs = munge_paths (frameworkDirs p) }
-
-  munge_paths = map munge_path
-
-  munge_path p 
-	  | Just p' <- maybePrefixMatch "$libdir" p = top_dir ++ p'
-	  | otherwise				    = p
-
-
--- -----------------------------------------------------------------------------
--- The list of packages requested on the command line
-
--- The package list reflects what packages were given as command-line options,
--- plus their dependent packages.  It is maintained in dependency order;
--- earlier packages may depend on later ones, but not vice versa
-GLOBAL_VAR(v_ExplicitPackages, initPackageList, [PackageName])
-
-initPackageList = [basePackage, rtsPackage]
-	-- basePackage is part of this list entirely because of 
-	-- wired-in names in GHCi.  See the notes on wired-in names in
-	-- Linker.linkExpr.  By putting the base backage in initPackageList
-	-- we make sure that it'll always by linked.
-
-
--- add a package requested from the command-line
-addPackage :: String -> IO ()
-addPackage package = do
-  pkg_details <- getPackageConfigMap
-  ps  <- readIORef v_ExplicitPackages
-  ps' <- add_package pkg_details ps (mkPackageName package)
-		-- Throws an exception if it fails
-  writeIORef v_ExplicitPackages ps'
-
--- internal helper
-add_package :: PackageConfigMap -> [PackageName]
-	    -> PackageName -> IO [PackageName]
-add_package pkg_details ps p	
-  | p `elem` ps	-- Check if we've already added this package
-  = return ps
-  | Just details <- lookupPkg pkg_details p
-  -- Add the package's dependents also
-  = do ps' <- foldM (add_package pkg_details) ps (packageDependents details)
-       return (p : ps')
-  | otherwise
-  = throwDyn (CmdLineError ("unknown package name: " ++ packageNameString p))
-
-
--- -----------------------------------------------------------------------------
--- Extracting information from the packages in scope
-
--- Many of these functions take a list of packages: in those cases,
--- the list is expected to contain the "dependent packages",
--- i.e. those packages that were found to be depended on by the
--- current module/program.  These can be auto or non-auto packages, it
--- doesn't really matter.  The list is always combined with the list
--- of explicit (command-line) packages to determine which packages to
--- use.
-
-getPackageImportPath :: IO [String]
-getPackageImportPath = do
-  ps <- getExplicitAndAutoPackageConfigs
-		  -- import dirs are always derived from the 'auto' 
-		  -- packages as well as the explicit ones
-  return (nub (filter notNull (concatMap importDirs ps)))
-
-getPackageIncludePath :: [PackageName] -> IO [String]
-getPackageIncludePath pkgs = do
-  ps <- getExplicitPackagesAnd pkgs
-  return (nub (filter notNull (concatMap includeDirs ps)))
-
-	-- includes are in reverse dependency order (i.e. rts first)
-getPackageCIncludes :: [PackageConfig] -> IO [String]
-getPackageCIncludes pkg_configs = do
-  return (reverse (nub (filter notNull (concatMap includes pkg_configs))))
-
-getPackageLibraryPath :: [PackageName] -> IO [String]
-getPackageLibraryPath pkgs = do 
-  ps <- getExplicitPackagesAnd pkgs
-  return (nub (filter notNull (concatMap libraryDirs ps)))
-
-getPackageLinkOpts :: [PackageName] -> IO [String]
-getPackageLinkOpts pkgs = do
-  ps <- getExplicitPackagesAnd pkgs
-  tag <- readIORef v_Build_tag
-  rts_tag <- readIORef v_RTS_Build_tag
-  static <- readIORef v_Static
-  let 
-	imp        = if static then "" else "_imp"
-      	libs p     = map addSuffix (hACK (hsLibraries p)) ++ extraLibraries p
-	imp_libs p = map (++imp) (libs p)
-	all_opts p = map ("-l" ++) (imp_libs p) ++ extraLdOpts p
-
-	suffix     = if null tag then "" else  '_':tag
-	rts_suffix = if null rts_tag then "" else  '_':rts_tag
-
-        addSuffix rts@"HSrts"    = rts       ++ rts_suffix
-        addSuffix other_lib      = other_lib ++ suffix
-
-  return (concat (map all_opts ps))
-  where
-
-     -- This is a totally horrible (temporary) hack, for Win32.  Problem is
-     -- that package.conf for Win32 says that the main prelude lib is 
-     -- split into HSbase1, HSbase2 and HSbase3, which is needed due to a bug
-     -- in the GNU linker (PEi386 backend). However, we still only
-     -- have HSbase.a for static linking, not HSbase{1,2,3}.a
-     -- getPackageLibraries is called to find the .a's to add to the static
-     -- link line.  On Win32, this hACK detects HSbase{1,2,3} and 
-     -- replaces them with HSbase, so static linking still works.
-     -- Libraries needed for dynamic (GHCi) linking are discovered via
-     -- different route (in InteractiveUI.linkPackage).
-     -- See driver/PackageSrc.hs for the HSbase1/HSbase2 split definition.
-     -- THIS IS A STRICTLY TEMPORARY HACK (famous last words ...)
-     -- JRS 04 Sept 01: Same appalling hack for HSwin32[1,2]
-     -- KAA 29 Mar  02: Same appalling hack for HSobjectio[1,2,3,4]
-     hACK libs
-#      if !defined(mingw32_TARGET_OS) && !defined(cygwin32_TARGET_OS)
-       = libs
-#      else
-       = if   "HSbase1" `elem` libs && "HSbase2" `elem` libs && "HSbase3" `elem` libs
-         then "HSbase" : filter (not.(isPrefixOf "HSbase")) libs
-         else
-         if   "HSwin321" `elem` libs && "HSwin322" `elem` libs
-         then "HSwin32" : filter (not.(isPrefixOf "HSwin32")) libs
-         else 
-         if   "HSobjectio1" `elem` libs && "HSobjectio2" `elem` libs && "HSobjectio3" `elem` libs && "HSobjectio4" `elem` libs
-	 then "HSobjectio" : filter (not.(isPrefixOf "HSobjectio")) libs
-         else 
-         libs
-#      endif
-
-getPackageExtraCcOpts :: [PackageName] -> IO [String]
-getPackageExtraCcOpts pkgs = do
-  ps <- getExplicitPackagesAnd pkgs
-  return (concatMap extraCcOpts ps)
-
-#ifdef darwin_TARGET_OS
-getPackageFrameworkPath  :: [PackageName] -> IO [String]
-getPackageFrameworkPath pkgs = do
-  ps <- getExplicitPackagesAnd pkgs
-  return (nub (filter notNull (concatMap frameworkDirs ps)))
-
-getPackageFrameworks  :: [PackageName] -> IO [String]
-getPackageFrameworks pkgs = do
-  ps <- getExplicitPackagesAnd pkgs
-  return (concatMap extraFrameworks ps)
-#endif
-
--- -----------------------------------------------------------------------------
--- Package Utils
-
-getExplicitPackagesAnd :: [PackageName] -> IO [PackageConfig]
-getExplicitPackagesAnd pkg_names = do
-  pkg_map <- getPackageConfigMap
-  expl <- readIORef v_ExplicitPackages
-  all_pkgs <- foldM (add_package pkg_map) expl pkg_names
-  getPackageDetails all_pkgs
-
--- return all packages, including both the auto packages and the explicit ones
-getExplicitAndAutoPackageConfigs :: IO [PackageConfig]
-getExplicitAndAutoPackageConfigs = do
-  pkg_map <- getPackageConfigMap
-  let auto_packages = [ packageConfigName p | p <- eltsUFM pkg_map, exposed p ]
-  getExplicitPackagesAnd auto_packages
 
 -----------------------------------------------------------------------------
 -- Ways

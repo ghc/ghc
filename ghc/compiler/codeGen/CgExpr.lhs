@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.60 2004/09/30 10:35:43 simonpj Exp $
+% $Id: CgExpr.lhs,v 1.61 2004/11/26 16:20:07 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -152,7 +152,8 @@ cgExpr (StgOpApp (StgPrimOp TagToEnumOp) [arg] res_ty)
     do	{ (_,amode) <- getArgAmode arg
 	; amode' <- assignTemp amode	-- We're going to use it twice,
 					-- so save in a temp if non-trivial
-	; stmtC (CmmAssign nodeReg (tagToClosure tycon amode'))
+	; dflags <- getDynFlags
+	; stmtC (CmmAssign nodeReg (tagToClosure dflags tycon amode'))
 	; performReturn (emitAlgReturnCode tycon amode') }
    where
 	  -- If you're reading this code in the attempt to figure
@@ -184,8 +185,9 @@ cgExpr x@(StgOpApp op@(StgPrimOp primop) args res_ty)
   | ReturnsAlg tycon <- result_info, isEnumerationTyCon tycon
 	-- c.f. cgExpr (...TagToEnumOp...)
 	= do tag_reg <- newTemp wordRep
+	     dflags <- getDynFlags
 	     cgPrimOp [tag_reg] primop args emptyVarSet
-	     stmtC (CmmAssign nodeReg (tagToClosure tycon (CmmReg tag_reg)))
+	     stmtC (CmmAssign nodeReg (tagToClosure dflags tycon (CmmReg tag_reg)))
 	     performReturn (emitAlgReturnCode tycon (CmmReg tag_reg))
   where
 	result_info = getPrimOpResultInfo primop
@@ -280,7 +282,8 @@ cgRhs name (StgRhsCon maybe_cc con args)
 	; returnFC (name, idinfo) }
 
 cgRhs name (StgRhsClosure cc bi fvs upd_flag srt args body)
-  = mkRhsClosure name cc bi srt fvs upd_flag args body
+  = do dflags <- getDynFlags
+       mkRhsClosure dflags name cc bi srt fvs upd_flag args body
 \end{code}
 
 mkRhsClosure looks for two special forms of the right-hand side:
@@ -303,7 +306,7 @@ form:
 
 
 \begin{code}
-mkRhsClosure	bndr cc	bi srt
+mkRhsClosure	dflags bndr cc bi srt
 		[the_fv]   		-- Just one free var
 		upd_flag		-- Updatable thunk
 		[]			-- A thunk
@@ -323,9 +326,10 @@ mkRhsClosure	bndr cc	bi srt
     -- will evaluate to.
     cgStdRhsClosure bndr cc bi [the_fv] [] body lf_info [StgVarArg the_fv]
   where
-    lf_info 		  = mkSelectorLFInfo bndr offset_into_int (isUpdatable upd_flag)
-    (_, params_w_offsets) = layOutDynConstr con (addIdReps params)
-				-- Just want the layout
+    lf_info 		  = mkSelectorLFInfo bndr offset_into_int
+				 (isUpdatable upd_flag)
+    (_, params_w_offsets) = layOutDynConstr dflags con (addIdReps params)
+			-- Just want the layout
     maybe_offset	  = assocMaybe params_w_offsets selectee
     Just the_offset 	  = maybe_offset
     offset_into_int       = the_offset - fixedHdrSize
@@ -348,7 +352,7 @@ We only generate an Ap thunk if all the free variables are pointers,
 for semi-obvious reasons.
 
 \begin{code}
-mkRhsClosure 	bndr cc bi srt
+mkRhsClosure 	dflags bndr cc bi srt
 		fvs
 		upd_flag
 		[]			-- No args; a thunk
@@ -373,7 +377,7 @@ mkRhsClosure 	bndr cc bi srt
 The default case
 ~~~~~~~~~~~~~~~~
 \begin{code}
-mkRhsClosure bndr cc bi srt fvs upd_flag args body
+mkRhsClosure dflags bndr cc bi srt fvs upd_flag args body
   = cgRhsClosure bndr cc bi srt fvs upd_flag args body
 \end{code}
 

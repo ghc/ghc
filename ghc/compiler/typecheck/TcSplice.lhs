@@ -40,7 +40,7 @@ import NameEnv		( lookupNameEnv )
 import HscTypes		( lookupType, ExternalPackageState(..) )
 import OccName
 import Var		( Id, TyVar, idType )
-import Module		( moduleUserString, mkModuleName )
+import Module		( moduleUserString, mkModule )
 import TcRnMonad
 import IfaceEnv		( lookupOrig )
 import Class		( Class, classExtraBigSig )
@@ -456,7 +456,7 @@ reify th_name
 
 lookupThName :: TH.Name -> TcM Name
 lookupThName (TH.Name occ (TH.NameG th_ns mod))
-  = lookupOrig (mkModuleName (TH.modString mod))
+  = lookupOrig (mkModule (TH.modString mod))
 	       (OccName.mkOccName ghc_ns (TH.occString occ))
   where
     ghc_ns = case th_ns of

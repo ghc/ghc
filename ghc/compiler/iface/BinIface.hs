@@ -16,7 +16,6 @@ import IfaceSyn
 import VarEnv
 import Class		( DefMeth(..) )
 import CostCentre
-import Module		( moduleName, mkModule )
 import DriverState	( v_Build_tag )
 import CmdLineOpts	( opt_HiVersion )
 import Kind		( Kind(..) )
@@ -95,7 +94,7 @@ instance Binary ModIface where
    put_ bh (ModIface {
 		 mi_module    = mod,
 		 mi_mod_vers  = mod_vers,
-		 mi_package   = pkg_name,
+		 mi_package   = _, -- we ignore the package on output
 		 mi_orphan    = orphan,
 		 mi_deps      = deps,
 		 mi_usages    = usages,
@@ -110,8 +109,7 @@ instance Binary ModIface where
 	put_ bh (show opt_HiVersion)
 	build_tag <- readIORef v_Build_tag
 	put  bh build_tag
-	put_ bh pkg_name
-	put_ bh (moduleName mod)
+	put_ bh mod
 	put_ bh mod_vers
 	put_ bh orphan
 	lazyPut bh deps
@@ -145,7 +143,6 @@ instance Binary ModIface where
 		"mismatched interface file ways: expected "
 		++ build_tag ++ ", found " ++ check_way))
 
-	pkg_name  <- get bh
 	mod_name  <- get bh
 
 	mod_vers  <- get bh
@@ -161,12 +158,8 @@ instance Binary ModIface where
 	rules	  <- {-# SCC "bin_rules" #-} lazyGet bh
 	rule_vers <- get bh
 	return (ModIface {
-		 mi_package   = pkg_name,
-		 mi_module    = mkModule pkg_name mod_name,
-			-- We write the module as a ModuleName, becuase whether
-			-- or not it's a home-package module depends on the importer
-			-- mkModule reconstructs the Module, by comparing the static 
-			-- opt_InPackage flag with the package name in the interface file
+		 mi_package   = ThisPackage, -- to be filled in properly later
+		 mi_module    = mod_name,
 		 mi_mod_vers  = mod_vers,
 		 mi_boot      = False,		-- Binary interfaces are never .hi-boot files!
 		 mi_orphan    = orphan,

@@ -8,7 +8,7 @@ module Desugar ( deSugar, deSugarExpr ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( DynFlag(..), dopt, opt_SccProfilingOn )
+import CmdLineOpts	( DynFlag(..), DynFlags(..), dopt, opt_SccProfilingOn )
 import HscTypes		( ModGuts(..), ModGuts, HscEnv(..), GhciMode(..),
 			  Dependencies(..), TypeEnv, IsBootInterface, unQualInScope )
 import HsSyn		( RuleDecl(..), RuleBndr(..), HsExpr(..), LHsExpr,
@@ -26,7 +26,7 @@ import DsBinds		( dsHsBinds, AutoScc(..) )
 import DsForeign	( dsForeigns )
 import DsExpr		()	-- Forces DsExpr to be compiled; DsBinds only
 				-- depends on DsExpr.hi-boot.
-import Module		( Module, ModuleName, moduleEnvElts, delModuleEnv, moduleNameFS )
+import Module		( Module, moduleEnvElts, delModuleEnv, moduleFS )
 import Id		( Id )
 import RdrName	 	( GlobalRdrEnv )
 import NameSet
@@ -35,7 +35,7 @@ import VarSet
 import Bag		( Bag, isEmptyBag, mapBag, emptyBag, bagToList )
 import CoreLint		( showPass, endPass )
 import CoreFVs		( ruleRhsFreeVars )
-import Packages	  	( thPackage )
+import Packages	  	( PackageState(thPackageId) )
 import ErrUtils		( doIfSet, dumpIfSet_dyn, pprBagOfWarnings, 
 			  mkWarnMsg, errorsFound, WarnMsg )
 import ListSetOps	( insertList )
@@ -113,8 +113,11 @@ deSugar hsc_env
 	; dfun_uses <- readIORef dfun_uses_var		-- What dfuns are used
 	; th_used   <- readIORef th_var			-- Whether TH is used
 	; let used_names = allUses dus `unionNameSets` dfun_uses
-	      pkgs | th_used   = insertList thPackage (imp_dep_pkgs imports)
-	      	   | otherwise = imp_dep_pkgs imports
+	      thPackage = thPackageId (pkgState dflags)
+	      pkgs | Just th_id <- thPackage, th_used
+		   = insertList th_id  (imp_dep_pkgs imports)
+	      	   | otherwise
+		   = imp_dep_pkgs imports
 
 	      dep_mods = moduleEnvElts (delModuleEnv (imp_dep_mods imports) mod)
 		-- M.hi-boot can be in the imp_dep_mods, but we must remove
@@ -129,11 +132,11 @@ deSugar hsc_env
 	; usages <- mkUsageInfo hsc_env dir_imp_mods dep_mods used_names
 
 	; let 
-		-- ModuleNames don't compare lexicographically usually, 
+		-- Modules don't compare lexicographically usually, 
 		-- but we want them to do so here.
-	     le_mod :: ModuleName -> ModuleName -> Bool	 
-	     le_mod m1 m2 = moduleNameFS m1 <= moduleNameFS m2
-	     le_dep_mod :: (ModuleName, IsBootInterface) -> (ModuleName, IsBootInterface) -> Bool	 
+	     le_mod :: Module -> Module -> Bool	 
+	     le_mod m1 m2 = moduleFS m1 <= moduleFS m2
+	     le_dep_mod :: (Module, IsBootInterface) -> (Module, IsBootInterface) -> Bool	 
 	     le_dep_mod (m1,_) (m2,_) = m1 `le_mod` m2
 
 	     deps = Deps { dep_mods  = sortLe le_dep_mod dep_mods,

@@ -1013,7 +1013,7 @@ gen_Typeable_binds tycon
 
 mk_typeOf_RDR :: TyCon -> RdrName
 -- Use the arity of the TyCon to make the right typeOfn function
-mk_typeOf_RDR tycon = varQual_RDR tYPEABLE_Name (mkFastString ("typeOf" ++ suffix))
+mk_typeOf_RDR tycon = varQual_RDR tYPEABLE (mkFastString ("typeOf" ++ suffix))
 		where
 		  arity = tyConArity tycon
 		  suffix | arity == 0 = ""
@@ -1147,15 +1147,15 @@ gen_Data_binds fix_env tycon
 	  fixity | is_infix  = infix_RDR
 		 | otherwise = prefix_RDR
 
-gfoldl_RDR     = varQual_RDR gENERICS_Name FSLIT("gfoldl")
-gunfold_RDR    = varQual_RDR gENERICS_Name FSLIT("gunfold")
-toConstr_RDR   = varQual_RDR gENERICS_Name FSLIT("toConstr")
-dataTypeOf_RDR = varQual_RDR gENERICS_Name FSLIT("dataTypeOf")
-mkConstr_RDR   = varQual_RDR gENERICS_Name FSLIT("mkConstr")
-mkDataType_RDR = varQual_RDR gENERICS_Name FSLIT("mkDataType")
-conIndex_RDR   = varQual_RDR gENERICS_Name FSLIT("constrIndex")
-prefix_RDR     = dataQual_RDR gENERICS_Name FSLIT("Prefix")
-infix_RDR      = dataQual_RDR gENERICS_Name FSLIT("Infix")
+gfoldl_RDR     = varQual_RDR gENERICS FSLIT("gfoldl")
+gunfold_RDR    = varQual_RDR gENERICS FSLIT("gunfold")
+toConstr_RDR   = varQual_RDR gENERICS FSLIT("toConstr")
+dataTypeOf_RDR = varQual_RDR gENERICS FSLIT("dataTypeOf")
+mkConstr_RDR   = varQual_RDR gENERICS FSLIT("mkConstr")
+mkDataType_RDR = varQual_RDR gENERICS FSLIT("mkDataType")
+conIndex_RDR   = varQual_RDR gENERICS FSLIT("constrIndex")
+prefix_RDR     = dataQual_RDR gENERICS FSLIT("Prefix")
+infix_RDR      = dataQual_RDR gENERICS FSLIT("Infix")
 \end{code}
 
 %************************************************************************

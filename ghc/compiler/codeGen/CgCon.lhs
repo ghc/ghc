@@ -35,7 +35,7 @@ import CgTailCall	( performReturn, emitKnownConReturnCode, returnUnboxedTuple )
 import CgProf		( mkCCostCentreStack, ldvEnter, curCCS )
 import CgTicky
 import CgInfoTbls	( emitClosureCodeAndInfoTable, dataConTagZ )
-import CLabel		( mkClosureLabel, mkRtsDataLabel, mkClosureTblLabel )
+import CLabel
 import ClosureInfo	( mkConLFInfo, mkLFArgument )
 import CmmUtils		( mkLblExpr )
 import Cmm
@@ -70,17 +70,20 @@ cgTopRhsCon :: Id		-- Name of thing bound to this RHS
 	    -> [StgArg]		-- Args
 	    -> FCode (Id, CgIdInfo)
 cgTopRhsCon id con args
-  = ASSERT( not (isDllConApp con args) )
-    ASSERT( args `lengthIs` dataConRepArity con )
-    do	{ 	-- LAY IT OUT
+  = do { 
+	; dflags <- getDynFlags
+	; ASSERT( not (isDllConApp dflags con args) ) return ()
+	; ASSERT( args `lengthIs` dataConRepArity con ) return ()
+
+	-- LAY IT OUT
 	; amodes <- getArgAmodes args
 
 	; let
 	    name          = idName id
 	    lf_info	  = mkConLFInfo con
-    	    closure_label = mkClosureLabel name
+    	    closure_label = mkClosureLabel dflags name
 	    caffy         = any stgArgHasCafRefs args
-	    (closure_info, amodes_w_offsets) = layOutStaticConstr con amodes
+	    (closure_info, amodes_w_offsets) = layOutStaticConstr dflags con amodes
 	    closure_rep = mkStaticClosureFields
 	    		     closure_info
 	    		     dontCareCCS		-- Because it's static data
@@ -137,8 +140,9 @@ at all.
 
 \begin{code}
 buildDynCon binder cc con []
-  = returnFC (stableIdInfo binder
-			   (mkLblExpr (mkClosureLabel (dataConName con)))
+  = do dflags <- getDynFlags
+       returnFC (stableIdInfo binder
+			   (mkLblExpr (mkClosureLabel dflags (dataConName con)))
     			   (mkConLFInfo con))
 \end{code}
 
@@ -191,11 +195,15 @@ Now the general case.
 
 \begin{code}
 buildDynCon binder ccs con args
-  = do	{ hp_off <- allocDynClosure closure_info use_cc blame_cc amodes_w_offsets
+  = do	{ 
+	; dflags <- getDynFlags
+	; let
+	    (closure_info, amodes_w_offsets) = layOutDynConstr dflags con args
+
+	; hp_off <- allocDynClosure closure_info use_cc blame_cc amodes_w_offsets
  	; returnFC (heapIdInfo binder hp_off lf_info) }
   where
     lf_info = mkConLFInfo con
-    (closure_info, amodes_w_offsets) = layOutDynConstr con args
 
     use_cc	-- cost-centre to stick in the object
       | currentOrSubsumedCCS ccs = curCCS
@@ -220,11 +228,13 @@ found a $con$.
 \begin{code}
 bindConArgs :: DataCon -> [Id] -> Code
 bindConArgs con args
-  = ASSERT(not (isUnboxedTupleCon con))
-    mapCs bind_arg args_w_offsets
-   where
-     bind_arg (arg, offset) = bindNewToNode arg offset (mkLFArgument arg)
-     (_, args_w_offsets)    = layOutDynConstr con (addIdReps args)
+  = do dflags <- getDynFlags
+       let
+	  bind_arg (arg, offset) = bindNewToNode arg offset (mkLFArgument arg)
+	  (_, args_w_offsets)    = layOutDynConstr dflags con (addIdReps args)
+	--
+       ASSERT(not (isUnboxedTupleCon con)) return ()
+       mapCs bind_arg args_w_offsets
 \end{code}
 
 Unboxed tuples are handled slightly differently - the object is
@@ -385,9 +395,9 @@ cgTyCon tycon
 	    -- to (say) PrelBase_$wTrue_closure, which is defined in code_stuff
 	; extra <- 
 	   if isEnumerationTyCon tycon then do
-	        tbl <- getCmm (emitRODataLits (mkClosureTblLabel 
+	        tbl <- getCmm (emitRODataLits (mkLocalClosureTableLabel 
 						(tyConName tycon))
-			   [ CmmLabel (mkClosureLabel (dataConName con))
+			   [ CmmLabel (mkLocalClosureLabel (dataConName con))
     			   | con <- tyConDataCons tycon])
 		return [tbl]
 	   else
@@ -404,32 +414,41 @@ static closure, for a constructor.
 cgDataCon :: DataCon -> Code
 cgDataCon data_con
   = do	{     -- Don't need any dynamic closure code for zero-arity constructors
-	  whenC (not (isNullaryRepDataCon data_con))
+	  dflags <- getDynFlags
+
+	; let
+	    -- To allow the debuggers, interpreters, etc to cope with
+	    -- static data structures (ie those built at compile
+	    -- time), we take care that info-table contains the
+	    -- information we need.
+	    (static_cl_info, _) = 
+		layOutStaticConstr dflags data_con arg_reps
+
+	    (dyn_cl_info, arg_things) = 
+		layOutDynConstr    dflags data_con arg_reps
+
+	    emit_info cl_info ticky_code
+		= do { code_blks <- getCgStmts the_code
+		     ; emitClosureCodeAndInfoTable cl_info [] code_blks }
+		where
+		  the_code = do	{ ticky_code
+				; ldvEnter (CmmReg nodeReg)
+				; body_code }
+
+	    arg_reps :: [(CgRep, Type)]
+	    arg_reps = [(typeCgRep ty, ty) | ty <- dataConRepArgTys data_con]
+
+	    body_code = do { 	
+			-- NB: We don't set CC when entering data (WDP 94/06)
+			     tickyReturnOldCon (length arg_things)
+			   ; performReturn (emitKnownConReturnCode data_con) }
+				-- noStmts: Ptr to thing already in Node
+
+	; whenC (not (isNullaryRepDataCon data_con))
 	 	(emit_info dyn_cl_info tickyEnterDynCon)
 
 		-- Dynamic-Closure first, to reduce forward references
 	; emit_info static_cl_info tickyEnterStaticCon }
 
   where
-    emit_info cl_info ticky_code
-	= do { code_blks <- getCgStmts the_code
-	     ; emitClosureCodeAndInfoTable cl_info [] code_blks }
-	where
-	  the_code = do	{ ticky_code
-			; ldvEnter (CmmReg nodeReg)
-			; body_code }
-
-    arg_reps :: [(CgRep, Type)]
-    arg_reps = [(typeCgRep ty, ty) | ty <- dataConRepArgTys data_con]
-
-    -- To allow the debuggers, interpreters, etc to cope with static
-    -- data structures (ie those built at compile time), we take care that
-    -- info-table contains the information we need.
-    (static_cl_info, _)       = layOutStaticConstr data_con arg_reps
-    (dyn_cl_info, arg_things) = layOutDynConstr    data_con arg_reps
-
-    body_code = do { 	-- NB: We don't set CC when entering data (WDP 94/06)
-		     tickyReturnOldCon (length arg_things)
-		   ; performReturn (emitKnownConReturnCode data_con) }
-			-- noStmts: Ptr to thing already in Node
 \end{code}

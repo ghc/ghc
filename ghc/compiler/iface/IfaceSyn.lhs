@@ -60,9 +60,9 @@ import Class		( FunDep, DefMeth, classExtraBigSig, classTyCon )
 import OccName		( OccName, OccEnv, lookupOccEnv, emptyOccEnv, 
 			  lookupOccEnv, extendOccEnv, emptyOccEnv,
 			  OccSet, unionOccSets, unitOccSet )
-import Name		( Name, NamedThing(..), getOccName, nameOccName, nameModuleName, isExternalName )
+import Name		( Name, NamedThing(..), getOccName, nameOccName, nameModule, isExternalName )
 import NameSet		( NameSet, elemNameSet )
-import Module		( ModuleName )
+import Module		( Module )
 import CostCentre	( CostCentre, pprCostCentreCore )
 import Literal		( Literal )
 import ForeignCall	( ForeignCall )
@@ -558,7 +558,7 @@ dfunToIfaceInst dfun_id
 		ifInstHead = toIfaceType (mkLhsNameFn mod) tidy_ty }
   where
     dfun_name = idName dfun_id
-    mod = nameModuleName dfun_name
+    mod = nameModule dfun_name
     (tvs, _, cls, tys) = tcSplitDFunTy (idType dfun_id)
     head_ty = mkForAllTys tvs (mkPredTy (mkClassPred cls tys))
 	-- No need to record the instance context; 
@@ -617,7 +617,7 @@ toIfaceIdInfo ext id_info
 		  | otherwise	= Just (HsUnfold inline_prag (toIfaceExpr ext rhs))
 
 --------------------------
-coreRuleToIfaceRule :: ModuleName -> (Name -> IfaceExtName) -> IdCoreRule -> IfaceRule
+coreRuleToIfaceRule :: Module -> (Name -> IfaceExtName) -> IdCoreRule -> IfaceRule
 coreRuleToIfaceRule mod ext (IdCoreRule id _ (BuiltinRule _ _))
   = pprTrace "toHsRule: builtin" (ppr id) (bogusIfaceRule (mkIfaceExtName (getName id)))
 
@@ -701,12 +701,12 @@ toIfaceVar ext v
 -- mkLhsNameFn ignores versioning info altogether
 -- Used for the LHS of instance decls and rules, where we 
 -- there's no point in recording version info
-mkLhsNameFn :: ModuleName -> Name -> IfaceExtName
+mkLhsNameFn :: Module -> Name -> IfaceExtName
 mkLhsNameFn this_mod name	
   | mod == this_mod = LocalTop occ
   | otherwise	    = ExtPkg mod occ
   where
-    mod = nameModuleName name
+    mod = nameModule name
     occ	= nameOccName name
 \end{code}
 

@@ -17,16 +17,16 @@ module Name (
 	mkExternalName, mkWiredInName,
 
 	nameUnique, setNameUnique,
-	nameOccName, nameModule, nameModule_maybe, nameModuleName,
+	nameOccName, nameModule, nameModule_maybe,
 	setNameOcc, 
 	hashName, localiseName,
 
 	nameSrcLoc, nameParent, nameParent_maybe,
 
 	isSystemName, isInternalName, isExternalName,
-	isTyVarName, isDllName, isWiredInName, isBuiltInSyntax,
+	isTyVarName, isWiredInName, isBuiltInSyntax,
 	wiredInNameTyThing_maybe, 
-	nameIsLocalOrFrom, isHomePackageName,
+	nameIsLocalOrFrom,
 	
 	-- Class NamedThing and overloaded friends
 	NamedThing(..),
@@ -38,8 +38,7 @@ module Name (
 import {-# SOURCE #-} TypeRep( TyThing )
 
 import OccName		-- All of it
-import Module		( Module, ModuleName, moduleName, isHomeModule )
-import CmdLineOpts	( opt_Static )
+import Module		( Module )
 import SrcLoc		( noSrcLoc, wiredInSrcLoc, SrcLoc )
 import Unique		( Unique, Uniquable(..), getKey, pprUnique )
 import Maybes		( orElse )
@@ -120,7 +119,6 @@ All built-in syntax is for wired-in things.
 nameUnique		:: Name -> Unique
 nameOccName		:: Name -> OccName 
 nameModule		:: Name -> Module
-nameModuleName		:: Name -> ModuleName
 nameSrcLoc		:: Name -> SrcLoc
 
 nameUnique  name = n_uniq name
@@ -133,7 +131,6 @@ nameIsLocalOrFrom :: Module -> Name -> Bool
 isInternalName	  :: Name -> Bool
 isExternalName	  :: Name -> Bool
 isSystemName	  :: Name -> Bool
-isHomePackageName :: Name -> Bool
 isWiredInName	  :: Name -> Bool
 
 isWiredInName (Name {n_sort = WiredIn _ _ _ _}) = True
@@ -163,8 +160,6 @@ nameParent name = case nameParent_maybe name of
 			Nothing     -> name
 
 nameModule name = nameModule_maybe name `orElse` pprPanic "nameModule" (ppr name)
-nameModuleName name = moduleName (nameModule name)
-
 nameModule_maybe (Name { n_sort = External mod _})    = Just mod
 nameModule_maybe (Name { n_sort = WiredIn mod _ _ _}) = Just mod
 nameModule_maybe name				      = Nothing
@@ -172,13 +167,6 @@ nameModule_maybe name				      = Nothing
 nameIsLocalOrFrom from name
   | isExternalName name = from == nameModule name
   | otherwise		= True
-
-isHomePackageName name
-  | isExternalName name = isHomeModule (nameModule name)
-  | otherwise		= True  	-- Internal and system names
-
-isDllName :: Name -> Bool	-- Does this name refer to something in a different DLL?
-isDllName nm = not opt_Static && not (isHomePackageName nm)
 
 isTyVarName :: Name -> Bool
 isTyVarName name = isTvOcc (nameOccName name)
@@ -326,20 +314,18 @@ pprName (Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
       Internal    	      -> pprInternal sty uniq occ
 
 pprExternal sty uniq mod occ is_wired is_builtin
-  | codeStyle sty        = ppr mod_name <> char '_' <> ppr_occ_name occ
+  | codeStyle sty        = ppr mod <> char '_' <> ppr_occ_name occ
 	-- In code style, always qualify
 	-- ToDo: maybe we could print all wired-in things unqualified
 	-- 	 in code style, to reduce symbol table bloat?
-  | debugStyle sty       = ppr mod_name <> dot <> ppr_occ_name occ
+  | debugStyle sty       = ppr mod <> dot <> ppr_occ_name occ
 			   <> braces (hsep [if is_wired then ptext SLIT("(w)") else empty,
 					    text (briefOccNameFlavour occ), 
 		 			    pprUnique uniq])
   | BuiltInSyntax <- is_builtin  = ppr_occ_name occ
 	-- never qualify builtin syntax
-  | unqualStyle sty mod_name occ = ppr_occ_name occ
-  | otherwise		 	 = ppr mod_name <> dot <> ppr_occ_name occ
-  where
-    mod_name = moduleName mod
+  | unqualStyle sty mod occ = ppr_occ_name occ
+  | otherwise		    = ppr mod <> dot <> ppr_occ_name occ
 
 pprInternal sty uniq occ
   | codeStyle sty  = pprUnique uniq

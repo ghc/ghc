@@ -174,6 +174,7 @@ compiled with -O.  I think this is the case.]
 #include "HsVersions.h"
 
 import HsSyn
+import Packages		( isHomeModule )
 import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..),
 			  IfaceRule(..), IfaceInst(..), IfaceExtName(..), IfaceTyCon(..),
 			  eqIfDecl, eqIfRule, eqIfInst, IfaceEq(..), (&&&), bool, 
@@ -184,10 +185,9 @@ import BasicTypes	( Version, initialVersion, bumpVersion )
 import TcRnMonad
 import TcRnTypes	( ImportAvails(..), mkModDeps )
 import TcType		( isFFITy )
-import HscTypes		( ModIface(..), TyThing(..),
+import HscTypes		( ModIface(..), TyThing(..), IfacePackage(..),
 			  ModGuts(..), ModGuts, IfaceExport,
-			  GhciMode(..), isOneShot,
-			  HscEnv(..), hscEPS,
+			  GhciMode(..), HscEnv(..), hscEPS,
 			  Dependencies(..), FixItem(..), 
 			  mkIfaceDepCache, mkIfaceFixCache, mkIfaceVerCache,
 			  typeEnvElts, 
@@ -195,16 +195,18 @@ import HscTypes		( ModIface(..), TyThing(..),
 			  ExternalPackageState(..),
 			  Usage(..), IsBootInterface,
 			  Deprecs(..), IfaceDeprecs, Deprecations,
-			  lookupIfaceByModName
+			  lookupIfaceByModule
 			)
 
 
 import CmdLineOpts
-import Name		( Name, nameModule, nameOccName, nameParent, isExternalName,
-			  nameParent_maybe, isWiredInName, NamedThing(..), nameModuleName )
+import Name		( Name, nameModule, nameOccName, nameParent,
+			  isExternalName, nameParent_maybe, isWiredInName,
+			  NamedThing(..) )
 import NameEnv
 import NameSet
-import OccName		( OccName, OccEnv, mkOccEnv, lookupOccEnv, emptyOccEnv, extendOccEnv_C,
+import OccName		( OccName, OccEnv, mkOccEnv, lookupOccEnv, emptyOccEnv,
+			  extendOccEnv_C,
 			  OccSet, emptyOccSet, elemOccSet, occSetElts, 
 			  extendOccSet, extendOccSetList,
 			  isEmptyOccSet, intersectOccSet, intersectsOccSet,
@@ -212,10 +214,10 @@ import OccName		( OccName, OccEnv, mkOccEnv, lookupOccEnv, emptyOccEnv, extendOc
 import TyCon		( tyConDataCons, isNewTyCon, newTyConRep )
 import Class		( classSelIds )
 import DataCon		( dataConName, dataConFieldLabels )
-import Module		( Module, ModuleName, moduleNameFS, moduleName, isHomeModule,
-			  ModLocation(..), mkSysModuleNameFS, moduleUserString,
+import Module		( Module, moduleFS,
+			  ModLocation(..), mkSysModuleFS, moduleUserString,
 			  ModuleEnv, emptyModuleEnv, lookupModuleEnv,
-			  extendModuleEnv_C, moduleEnvElts
+			  extendModuleEnv_C
 			)
 import Outputable
 import DriverUtil	( createDirectoryHierarchy, directoryOf )
@@ -264,8 +266,7 @@ mkIface hsc_env location maybe_old_iface
 		      mg_rules = rules,
 		      mg_types = type_env }
   = do	{ eps <- hscEPS hsc_env
-	; let	{ this_mod_name = moduleName this_mod
-		; ext_nm = mkExtNameFn hsc_env eps this_mod_name
+	; let	{ ext_nm = mkExtNameFn hsc_env eps this_mod
 		; local_things = [thing | thing <- typeEnvElts type_env,
 					  not (isWiredInName (getName thing)) ]
 			-- Do not export anything about wired-in things
@@ -287,12 +288,12 @@ mkIface hsc_env location maybe_old_iface
 		; iface_rules 
 		     | omit_prags = []
 		     | otherwise  = sortLe le_rule $
-				    map (coreRuleToIfaceRule this_mod_name ext_nm) rules
+				    map (coreRuleToIfaceRule this_mod ext_nm) rules
 		; iface_insts = sortLe le_inst (map dfunToIfaceInst insts)
 
 	        ; intermediate_iface = ModIface { 
 			mi_module   = this_mod,
-			mi_package  = opt_InPackage,
+			mi_package  = ThisPackage,
 			mi_boot     = False,
 			mi_deps     = deps,
 			mi_usages   = usages,
@@ -383,36 +384,36 @@ wantDeclFor exports abstracts thing
 deliberatelyOmitted x = panic ("Deliberately omitted: " ++ x)
 
 -----------------------------
-mkExtNameFn :: HscEnv -> ExternalPackageState -> ModuleName -> Name -> IfaceExtName
+mkExtNameFn :: HscEnv -> ExternalPackageState -> Module -> Name -> IfaceExtName
 mkExtNameFn hsc_env eps this_mod
   = ext_nm
   where
+    dflags = hsc_dflags hsc_env
     hpt = hsc_HPT hsc_env
     pit = eps_PIT eps
 
     ext_nm name 
-      | mod_nm == this_mod = case nameParent_maybe name of
+      | mod == this_mod = case nameParent_maybe name of
     				Nothing  -> LocalTop occ
     				Just par -> LocalTopSub occ (nameOccName par)
-      | isWiredInName name = ExtPkg  mod_nm occ
-      | isHomeModule mod   = HomePkg mod_nm occ vers
-      | otherwise	   = ExtPkg  mod_nm occ
+      | isWiredInName name       = ExtPkg  mod occ
+      | isHomeModule dflags mod  = HomePkg mod occ vers
+      | otherwise	         = ExtPkg  mod occ
       where
     	mod      = nameModule name
-	mod_nm   = moduleName mod
     	occ	 = nameOccName name
     	par_occ  = nameOccName (nameParent name)
     		-- The version of the *parent* is the one want
-    	vers     = lookupVersion mod_nm par_occ
+    	vers     = lookupVersion mod par_occ
     	      
-    lookupVersion :: ModuleName -> OccName -> Version
+    lookupVersion :: Module -> OccName -> Version
 	-- Even though we're looking up a home-package thing, in
 	-- one-shot mode the imported interfaces may be in the PIT
     lookupVersion mod occ
       = mi_ver_fn iface occ `orElse` 
         pprPanic "lookupVers1" (ppr mod <+> ppr occ)
       where
-        iface = lookupIfaceByModName hpt pit mod `orElse` 
+        iface = lookupIfaceByModule hpt pit mod `orElse` 
 	        pprPanic "lookupVers2" (ppr mod <+> ppr occ)
 
 -----------------------------
@@ -666,21 +667,24 @@ bump_unless False v = bumpVersion v
 \begin{code}
 mkUsageInfo :: HscEnv 
 	    -> ModuleEnv (Module, Maybe Bool, SrcSpan)
-	    -> [(ModuleName, IsBootInterface)]
+	    -> [(Module, IsBootInterface)]
 	    -> NameSet -> IO [Usage]
 mkUsageInfo hsc_env dir_imp_mods dep_mods used_names
   = do	{ eps <- hscEPS hsc_env
-	; let usages = mk_usage_info (eps_PIT eps) (hsc_HPT hsc_env) 
+	; let usages = mk_usage_info (eps_PIT eps) hsc_env
 				     dir_imp_mods dep_mods used_names
 	; usages `seqList`  return usages }
 	 -- seq the list of Usages returned: occasionally these
 	 -- don't get evaluated for a while and we can end up hanging on to
 	 -- the entire collection of Ifaces.
 
-mk_usage_info pit hpt dir_imp_mods dep_mods proto_used_names
+mk_usage_info pit hsc_env dir_imp_mods dep_mods proto_used_names
   = mapCatMaybes mkUsage dep_mods
 	-- ToDo: do we need to sort into canonical order?
   where
+    dflags = hsc_dflags hsc_env
+    hpt = hsc_HPT hsc_env
+
     used_names = mkNameSet $			-- Eliminate duplicates
 		 [ nameParent n			-- Just record usage on the 'main' names
 		 | n <- nameSetToList proto_used_names
@@ -708,23 +712,23 @@ mk_usage_info pit hpt dir_imp_mods dep_mods proto_used_names
     --		(need to recompile if its export list changes: export_vers)
     --	c) is a home-package orphan module (need to recompile if its
     --	 	instance decls change: rules_vers)
-    mkUsage :: (ModuleName, Bool) -> Maybe Usage
+    mkUsage :: (Module, Bool) -> Maybe Usage
     mkUsage (mod_name, _)
       |  isNothing maybe_iface	-- We can't depend on it if we didn't
-      || not (isHomeModule mod)	-- even open the interface!
+      || not (isHomeModule dflags mod)	-- even open the interface!
       || (null used_occs
 	  && not all_imported
 	  && not orphan_mod)
       = Nothing			-- Record no usage info
     
       | otherwise	
-      = Just (Usage { usg_name     = moduleName mod,
+      = Just (Usage { usg_name     = mod,
     	  	      usg_mod      = mod_vers,
     		      usg_exports  = export_vers,
     		      usg_entities = ent_vers,
     		      usg_rules    = rules_vers })
       where
-	maybe_iface  = lookupIfaceByModName hpt pit mod_name
+	maybe_iface  = lookupIfaceByModule hpt pit mod_name
 		-- In one-shot mode, the interfaces for home-package 
 		-- modules accumulate in the PIT not HPT.  Sigh.
 
@@ -746,11 +750,11 @@ mk_usage_info pit hpt dir_imp_mods dep_mods proto_used_names
 \end{code}
 
 \begin{code}
-mkIfaceExports :: NameSet -> [(ModuleName, [GenAvailInfo OccName])]
+mkIfaceExports :: NameSet -> [(Module, [GenAvailInfo OccName])]
   -- Group by module and sort by occurrence
   -- This keeps the list in canonical order
 mkIfaceExports exports 
-  = [ (mkSysModuleNameFS fs, eltsFM avails)
+  = [ (mkSysModuleFS fs, eltsFM avails)
     | (fs, avails) <- fmToList groupFM
     ]
   where
@@ -763,7 +767,7 @@ mkIfaceExports exports
 			     (unitFM avail_fs avail)
       where
 	occ    = nameOccName name
-	mod_fs = moduleNameFS (nameModuleName name)
+	mod_fs = moduleFS (nameModule name)
 	avail | Just p <- nameParent_maybe name	= AvailTC (nameOccName p) [occ]
 	      | isTcOcc occ 			= AvailTC occ [occ]
 	      | otherwise			= Avail occ
@@ -821,7 +825,7 @@ check_old_iface this_mod iface_path source_unchanged maybe_iface
 
 	-- Try and read the old interface for the current module
 	-- from the .hi file left from the last time we compiled it
-    readIface (moduleName this_mod) iface_path False		`thenM` \ read_result ->
+    readIface this_mod iface_path False		`thenM` \ read_result ->
     case read_result of {
        Left err ->	-- Old interface file not found, or garbled; give up
 		   traceIf (text "FYI: cannot read old interface file:"
@@ -872,7 +876,7 @@ checkVersions source_unchanged iface
     }
   where
 	-- This is a bit of a hack really
-    mod_deps :: ModuleEnv (ModuleName, IsBootInterface)
+    mod_deps :: ModuleEnv (Module, IsBootInterface)
     mod_deps = mkModDeps (dep_mods (mi_deps iface))
 
 checkModUsage :: Usage -> IfG RecompileRequired
@@ -1001,7 +1005,7 @@ pprModIface :: ModIface -> SDoc
 -- Show a ModIface
 pprModIface iface
  = vcat [ ptext SLIT("interface")
-		<+> doubleQuotes (ftext (mi_package iface))
+		<+> ppr_package (mi_package iface)
 		<+> ppr (mi_module iface) <+> ppr (mi_mod_vers iface)
 		<+> pp_sub_vers
 		<+> (if mi_orphan iface then ptext SLIT("[orphan module]") else empty)
@@ -1017,6 +1021,9 @@ pprModIface iface
 	, pprDeprecs (mi_deprecs iface)
 	]
   where
+    ppr_package ThisPackage = empty
+    ppr_package (ExternalPackage id) = doubleQuotes (ftext id)
+
     exp_vers  = mi_exp_vers iface
     rule_vers = mi_rule_vers iface
 

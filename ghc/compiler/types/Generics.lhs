@@ -18,7 +18,7 @@ import DataCon          ( DataCon, dataConOrigArgTys, isVanillaDataCon,
 import TyCon            ( TyCon, tyConName, tyConDataCons, 
 			  isBoxedTupleTyCon
 			)
-import Name		( nameModuleName, nameOccName, getSrcLoc )
+import Name		( nameModule, nameOccName, getSrcLoc )
 import OccName		( mkGenOcc1, mkGenOcc2 )
 import RdrName		( RdrName, getRdrName, mkVarUnqual, mkOrig )
 import BasicTypes       ( EP(..), Boxity(..) )
@@ -392,7 +392,7 @@ mkGenericNames tycon
   where
     tc_name  = tyConName tycon
     tc_occ   = nameOccName tc_name
-    tc_mod   = nameModuleName tc_name
+    tc_mod   = nameModule tc_name
     from_RDR = mkOrig tc_mod (mkGenOcc1 tc_occ)
     to_RDR   = mkOrig tc_mod (mkGenOcc2 tc_occ)
 \end{code}

@@ -33,7 +33,7 @@ module ClosureInfo (
 	closureSingleEntry, closureReEntrant, isConstrClosure_maybe,
 	closureFunInfo,	isStandardFormThunk, isKnownFun,
 
-	enterIdLabel, enterReturnPtLabel,
+	enterIdLabel, enterLocalIdLabel, enterReturnPtLabel,
 
 	nodeMustPointToIt, 
 	CallMethod(..), getCallMethod,
@@ -61,7 +61,8 @@ import SMRep		-- all of it
 import CLabel
 
 import Constants	( mIN_UPD_SIZE, mIN_SIZE_NonUpdHeapObject )
-import CmdLineOpts	( opt_SccProfilingOn, opt_OmitBlackHoling,
+import Packages		( isDllName )
+import CmdLineOpts	( DynFlags, opt_SccProfilingOn, opt_OmitBlackHoling,
 			  opt_Parallel, opt_DoTickyProfiling,
 			  opt_SMP )
 import Id		( Id, idType, idArity, idName )
@@ -114,7 +115,8 @@ data ClosureInfo
   -- the constructor's info table), and they don't have an SRT.
   | ConInfo {
 	closureCon       :: !DataCon,
-	closureSMRep     :: !SMRep
+	closureSMRep     :: !SMRep,
+	closureDllCon	 :: !Bool	-- is in a separate DLL
     }
 
 -- C_SRT is what StgSyn.SRT gets translated to... 
@@ -318,13 +320,15 @@ mkClosureInfo is_static id lf_info tot_wds ptr_wds srt_info descr
     name   = idName id
     sm_rep = chooseSMRep is_static lf_info tot_wds ptr_wds
 
-mkConInfo :: Bool	-- Is static
+mkConInfo :: DynFlags
+	  -> Bool	-- Is static
 	  -> DataCon	
 	  -> Int -> Int	-- Total and pointer words
 	  -> ClosureInfo
-mkConInfo is_static data_con tot_wds ptr_wds
+mkConInfo dflags is_static data_con tot_wds ptr_wds
    = ConInfo {	closureSMRep = sm_rep,
-		closureCon = data_con }
+		closureCon = data_con,
+		closureDllCon = isDllName dflags (dataConName data_con) }
   where
     sm_rep = chooseSMRep is_static (mkConLFInfo data_con) tot_wds ptr_wds
 \end{code}
@@ -557,29 +561,30 @@ data CallMethod
 	CLabel 				--   The code label
 	Int 				--   Its arity
 
-getCallMethod :: Name		-- Function being applied
+getCallMethod :: DynFlags
+	      -> Name		-- Function being applied
 	      -> LambdaFormInfo	-- Its info
 	      -> Int		-- Number of available arguments
 	      -> CallMethod
 
-getCallMethod name lf_info n_args
+getCallMethod dflags name lf_info n_args
   | nodeMustPointToIt lf_info && opt_Parallel
   =	-- If we're parallel, then we must always enter via node.  
 	-- The reason is that the closure may have been 	
 	-- fetched since we allocated it.
     EnterIt
 
-getCallMethod name (LFReEntrant _ arity _ _) n_args
+getCallMethod dflags name (LFReEntrant _ arity _ _) n_args
   | n_args == 0    = ASSERT( arity /= 0 )
 		     ReturnIt	-- No args at all
   | n_args < arity = SlowCall	-- Not enough args
-  | otherwise      = DirectEntry (enterIdLabel name) arity
+  | otherwise      = DirectEntry (enterIdLabel dflags name) arity
 
-getCallMethod name (LFCon con) n_args
+getCallMethod dflags name (LFCon con) n_args
   = ASSERT( n_args == 0 )
     ReturnCon con
 
-getCallMethod name (LFThunk _ _ updatable std_form_info is_fun) n_args
+getCallMethod dflags name (LFThunk _ _ updatable std_form_info is_fun) n_args
   | is_fun 	-- Must always "call" a function-typed 
   = SlowCall	-- thing, cannot just enter it [in eval/apply, the entry code
 		-- is the fast-entry code]
@@ -592,24 +597,24 @@ getCallMethod name (LFThunk _ _ updatable std_form_info is_fun) n_args
 
   | otherwise	-- Jump direct to code for single-entry thunks
   = ASSERT( n_args == 0 )
-    JumpToIt (thunkEntryLabel name std_form_info updatable)
+    JumpToIt (thunkEntryLabel dflags name std_form_info updatable)
 
-getCallMethod name (LFUnknown True) n_args
+getCallMethod dflags name (LFUnknown True) n_args
   = SlowCall -- might be a function
 
-getCallMethod name (LFUnknown False) n_args
+getCallMethod dflags name (LFUnknown False) n_args
   = ASSERT2 ( n_args == 0, ppr name <+> ppr n_args ) 
     EnterIt -- Not a function
 
-getCallMethod name (LFBlackHole _) n_args
+getCallMethod dflags name (LFBlackHole _) n_args
   = SlowCall	-- Presumably the black hole has by now
 		-- been updated, but we don't know with
 		-- what, so we slow call it
 
-getCallMethod name (LFLetNoEscape 0) n_args
+getCallMethod dflags name (LFLetNoEscape 0) n_args
   = JumpToIt (enterReturnPtLabel (nameUnique name))
 
-getCallMethod name (LFLetNoEscape arity) n_args
+getCallMethod dflags name (LFLetNoEscape arity) n_args
   | n_args == arity = DirectEntry (enterReturnPtLabel (nameUnique name)) arity
   | otherwise = pprPanic "let-no-escape: " (ppr name <+> ppr arity)
 
@@ -810,35 +815,33 @@ infoTableLabelFromCI (ClosureInfo { closureName = name,
 	LFThunk _ _ upd_flag (ApThunk arity) _ -> 
 		mkApInfoTableLabel upd_flag arity
 
-	LFThunk{}      -> mkInfoTableLabel name
+	LFThunk{}      -> mkLocalInfoTableLabel name
 
-	LFReEntrant _ _ _ _ -> mkInfoTableLabel name
+	LFReEntrant _ _ _ _ -> mkLocalInfoTableLabel name
 
 	other -> panic "infoTableLabelFromCI"
 
-infoTableLabelFromCI (ConInfo { closureCon = con, closureSMRep = rep })
-  =  mkConInfoPtr con rep
-
-
-mkConInfoPtr :: DataCon -> SMRep -> CLabel
-mkConInfoPtr con rep
-  | isStaticRep rep = mkStaticInfoTableLabel  name
-  | otherwise	    = mkConInfoTableLabel     name
+infoTableLabelFromCI (ConInfo { closureCon = con, 
+				closureSMRep = rep,
+				closureDllCon = dll })
+  | isStaticRep rep = mkStaticInfoTableLabel  name dll
+  | otherwise	    = mkConInfoTableLabel     name dll
   where
     name = dataConName con
 
-closureLabelFromCI (ClosureInfo { closureName = nm }) = mkClosureLabel nm
+-- ClosureInfo for a closure (as opposed to a constructor) is always local
+closureLabelFromCI (ClosureInfo { closureName = nm }) = mkLocalClosureLabel nm
 closureLabelFromCI _ = panic "closureLabelFromCI"
 
 -- thunkEntryLabel is a local help function, not exported.  It's used from both
 -- entryLabelFromCI and getCallMethod.
 
-thunkEntryLabel thunk_id (ApThunk arity) is_updatable
+thunkEntryLabel dflags thunk_id (ApThunk arity) is_updatable
   = enterApLabel is_updatable arity
-thunkEntryLabel thunk_id (SelectorThunk offset) upd_flag
+thunkEntryLabel dflags thunk_id (SelectorThunk offset) upd_flag
   = enterSelectorLabel upd_flag offset
-thunkEntryLabel thunk_id _ is_updatable
-  = enterIdLabel thunk_id
+thunkEntryLabel dflags thunk_id _ is_updatable
+  = enterIdLabel dflags thunk_id
 
 enterApLabel is_updatable arity
   | tablesNextToCode = mkApInfoTableLabel is_updatable arity
@@ -848,9 +851,13 @@ enterSelectorLabel upd_flag offset
   | tablesNextToCode = mkSelectorInfoLabel upd_flag offset
   | otherwise        = mkSelectorEntryLabel upd_flag offset
 
-enterIdLabel id
-  | tablesNextToCode = mkInfoTableLabel id
-  | otherwise        = mkEntryLabel id
+enterIdLabel dflags id
+  | tablesNextToCode = mkInfoTableLabel dflags id
+  | otherwise        = mkEntryLabel dflags id
+
+enterLocalIdLabel id
+  | tablesNextToCode = mkLocalInfoTableLabel id
+  | otherwise        = mkLocalEntryLabel id
 
 enterReturnPtLabel name
   | tablesNextToCode = mkReturnInfoLabel name

@@ -8,7 +8,7 @@ module TidyPgm( tidyCorePgm, tidyCoreExpr ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( DynFlag(..), dopt )
+import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
 import CoreSyn
 import CoreUnfold	( noUnfolding, mkTopUnfolding )
 import CoreFVs		( ruleLhsFreeIds, exprSomeFreeVars )
@@ -157,7 +157,7 @@ tidyCorePgm hsc_env
 		-- The type environment is a convenient source of such things.
 
 	; (final_env, tidy_binds)
-		<- tidyTopBinds mod nc_var ext_ids init_env binds_in
+		<- tidyTopBinds dflags mod nc_var ext_ids init_env binds_in
 
 	; let tidy_rules = tidyIdRules final_env ext_rules
 
@@ -401,38 +401,40 @@ addExternal omit_iface_prags (id,rhs) needed
 --
 --   * subst_env: A Var->Var mapping that substitutes the new Var for the old
 
-tidyTopBinds :: Module
+tidyTopBinds :: DynFlags
+	     -> Module
 	     -> IORef NameCache	-- For allocating new unique names
 	     -> IdEnv Bool	-- Domain = Ids that should be external
 				-- True <=> their unfolding is external too
 	     -> TidyEnv -> [CoreBind]
 	     -> IO (TidyEnv, [CoreBind])
-tidyTopBinds mod nc_var ext_ids tidy_env []
+tidyTopBinds dflags mod nc_var ext_ids tidy_env []
   = return (tidy_env, [])
 
-tidyTopBinds mod nc_var ext_ids tidy_env (b:bs)
-  = do	{ (tidy_env1, b')  <- tidyTopBind  mod nc_var ext_ids tidy_env b
-	; (tidy_env2, bs') <- tidyTopBinds mod nc_var ext_ids tidy_env1 bs
+tidyTopBinds dflags mod nc_var ext_ids tidy_env (b:bs)
+  = do	{ (tidy_env1, b')  <- tidyTopBind  dflags mod nc_var ext_ids tidy_env b
+	; (tidy_env2, bs') <- tidyTopBinds dflags mod nc_var ext_ids tidy_env1 bs
 	; return (tidy_env2, b':bs') }
 
 ------------------------
-tidyTopBind :: Module
+tidyTopBind  :: DynFlags
+	     -> Module
 	     -> IORef NameCache	-- For allocating new unique names
 	     -> IdEnv Bool	-- Domain = Ids that should be external
 				-- True <=> their unfolding is external too
 	     -> TidyEnv -> CoreBind
 	     -> IO (TidyEnv, CoreBind)
 
-tidyTopBind mod nc_var ext_ids tidy_env1@(occ_env1,subst1) (NonRec bndr rhs)
+tidyTopBind dflags mod nc_var ext_ids tidy_env1@(occ_env1,subst1) (NonRec bndr rhs)
   = do	{ (occ_env2, name') <- tidyTopName mod nc_var ext_ids occ_env1 bndr
 	; let	{ (bndr', rhs') = tidyTopPair ext_ids tidy_env2 caf_info name' (bndr, rhs)
 		; subst2        = extendVarEnv subst1 bndr bndr'
 		; tidy_env2     = (occ_env2, subst2) }
 	; return (tidy_env2, NonRec bndr' rhs') }
   where
-    caf_info = hasCafRefs subst1 (idArity bndr) rhs
+    caf_info = hasCafRefs dflags subst1 (idArity bndr) rhs
 
-tidyTopBind mod nc_var ext_ids tidy_env1@(occ_env1,subst1) (Rec prs)
+tidyTopBind dflags mod nc_var ext_ids tidy_env1@(occ_env1,subst1) (Rec prs)
   = do	{ (occ_env2, names') <- tidyTopNames mod nc_var ext_ids occ_env1 bndrs
 	; let	{ prs'      = zipWith (tidyTopPair ext_ids tidy_env2 caf_info)
 				      names' prs
@@ -445,7 +447,7 @@ tidyTopBind mod nc_var ext_ids tidy_env1@(occ_env1,subst1) (Rec prs)
 	-- the CafInfo for a recursive group says whether *any* rhs in
 	-- the group may refer indirectly to a CAF (because then, they all do).
     caf_info 
-	| or [ mayHaveCafRefs (hasCafRefs subst1 (idArity bndr) rhs)
+	| or [ mayHaveCafRefs (hasCafRefs dflags subst1 (idArity bndr) rhs)
 	     | (bndr,rhs) <- prs ] = MayHaveCafRefs
 	| otherwise 		   = NoCafRefs
 
@@ -620,13 +622,13 @@ it as a CAF.  In these cases however, we would need to use an additional
 CAF list to keep track of non-collectable CAFs.  
 
 \begin{code}
-hasCafRefs  :: VarEnv Var -> Arity -> CoreExpr -> CafInfo
-hasCafRefs p arity expr 
+hasCafRefs  :: DynFlags -> VarEnv Var -> Arity -> CoreExpr -> CafInfo
+hasCafRefs dflags p arity expr 
   | is_caf || mentions_cafs = MayHaveCafRefs
   | otherwise 		    = NoCafRefs
  where
   mentions_cafs = isFastTrue (cafRefs p expr)
-  is_caf = not (arity > 0 || rhsIsStatic expr)
+  is_caf = not (arity > 0 || rhsIsStatic dflags expr)
   -- NB. we pass in the arity of the expression, which is expected
   -- to be calculated by exprArity.  This is because exprArity
   -- knows how much eta expansion is going to be done by 

@@ -52,10 +52,11 @@ import CLabel		( CLabel, mkStringLitLabel )
 import Digraph		( SCC(..), stronglyConnComp )
 import ListSetOps	( assocDefault )
 import Util		( filterOut, sortLe )
-import Char		( ord )
+import CmdLineOpts	( DynFlags )
 import FastString	( LitString, FastString, unpackFS )
 import Outputable
 
+import Char		( ord )
 import DATA_BITS
 import Maybe		( isNothing )
 
@@ -211,10 +212,11 @@ addToMemE rep ptr n
 --
 -------------------------------------------------------------------------
 
-tagToClosure :: TyCon -> CmmExpr -> CmmExpr
-tagToClosure tycon tag
+tagToClosure :: DynFlags -> TyCon -> CmmExpr -> CmmExpr
+tagToClosure dflags tycon tag
   = CmmLoad (cmmOffsetExprW closure_tbl tag) wordRep
-  where closure_tbl = CmmLit (CmmLabel (mkClosureTblLabel (tyConName tycon)))
+  where closure_tbl = CmmLit (CmmLabel lbl)
+	lbl = mkClosureTableLabel dflags (tyConName tycon)
 
 -------------------------------------------------------------------------
 --

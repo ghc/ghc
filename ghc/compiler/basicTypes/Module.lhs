@@ -1,72 +1,29 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-2002
+% (c) The University of Glasgow, 2004
 %
 
-ModuleName
+Module
 ~~~~~~~~~~
 Simply the name of a module, represented as a Z-encoded FastString.
 These are Uniquable, hence we can build FiniteMaps with ModuleNames as
 the keys.
 
-Module
-~~~~~~
-
-A ModuleName with some additional information, namely whether the
-module resides in the Home package or in a different package.  We need
-to know this for two reasons: 
-  
-  * generating cross-DLL calls is different from intra-DLL calls 
-    (see below).
-  * we don't record version information in interface files for entities
-    in a different package.
-
-The unique of a Module is identical to the unique of a ModuleName, so
-it is safe to look up in a Module map using a ModuleName and vice
-versa.
-
-Notes on DLLs
-~~~~~~~~~~~~~
-When compiling module A, which imports module B, we need to 
-know whether B will be in the same DLL as A.  
-	If it's in the same DLL, we refer to B_f_closure
-	If it isn't, we refer to _imp__B_f_closure
-When compiling A, we record in B's Module value whether it's
-in a different DLL, by setting the DLL flag.
-
-
-
-
 \begin{code}
 module Module 
     (
       Module, 		   	-- Abstract, instance of Eq, Ord, Outputable
+    , pprModule			-- :: ModuleName -> SDoc
 
     , ModLocation(..),
     , showModMsg
 
-    , ModuleName
-    , pprModuleName		-- :: ModuleName -> SDoc
-    , printModulePrefix
+    , moduleString		-- :: ModuleName -> EncodedString
+    , moduleUserString		-- :: ModuleName -> UserString
+    , moduleFS			-- :: ModuleName -> EncodedFS
 
-    , moduleName		-- :: Module -> ModuleName 
-    , moduleNameString		-- :: ModuleName -> EncodedString
-    , moduleNameUserString	-- :: ModuleName -> UserString
-    , moduleNameFS		-- :: ModuleName -> EncodedFS
-
-    , moduleString		-- :: Module -> EncodedString
-    , moduleUserString		-- :: Module -> UserString
-
-    , mkModule
-    , mkBasePkgModule		-- :: UserString -> Module
-    , mkHomeModule		-- :: ModuleName -> Module
-    , isHomeModule		-- :: Module -> Bool
-    , mkPackageModule		-- :: ModuleName -> Module
-
-    , mkModuleName		-- :: UserString -> ModuleName
-    , mkModuleNameFS		-- :: UserFS    -> ModuleName
-    , mkSysModuleNameFS		-- :: EncodedFS -> ModuleName
-
-    , pprModule,
+    , mkModule			-- :: UserString -> ModuleName
+    , mkModuleFS		-- :: UserFS    -> ModuleName
+    , mkSysModuleFS		-- :: EncodedFS -> ModuleName
  
     , ModuleEnv,
     , elemModuleEnv, extendModuleEnv, extendModuleEnvList, plusModuleEnv_C
@@ -74,7 +31,6 @@ module Module
     , lookupWithDefaultModuleEnv, mapModuleEnv, mkModuleEnv, emptyModuleEnv
     , moduleEnvElts, unitModuleEnv, isEmptyModuleEnv, foldModuleEnv
     , extendModuleEnv_C
-    , lookupModuleEnvByName, extendModuleEnvByName, unitModuleEnvByName
 
     , ModuleSet, emptyModuleSet, mkModuleSet, moduleSetElts, extendModuleSet, elemModuleSet
 
@@ -83,8 +39,6 @@ module Module
 #include "HsVersions.h"
 import OccName
 import Outputable
-import Packages		( PackageName, basePackage )
-import CmdLineOpts	( opt_InPackage )
 import Unique		( Uniquable(..) )
 import Maybes		( expectJust )
 import UniqFM
@@ -92,44 +46,6 @@ import UniqSet
 import Binary
 import FastString
 \end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Interface file flavour}
-%*									*
-%************************************************************************
-
-A further twist to the tale is the support for dynamically linked
-libraries under Win32. Here, dealing with the use of global variables
-that's residing in a DLL requires special handling at the point of use
-(there's an extra level of indirection, i.e., (**v) to get at v's
-value, rather than just (*v) .) When slurping in an interface file we
-then record whether it's coming from a .hi corresponding to a module
-that's packaged up in a DLL or not, so that we later can emit the
-appropriate code.
-
-The logic for how an interface file is marked as corresponding to a
-module that's hiding in a DLL is explained elsewhere (ToDo: give
-renamer href here.)
-
-\begin{code}
-data Module = Module ModuleName !PackageInfo
-
-data PackageInfo
-  = ThisPackage				-- A module from the same package 
-					-- as the one being compiled
-  | AnotherPackage			-- A module from a different package
-
-packageInfoPackage :: PackageInfo -> PackageName
-packageInfoPackage ThisPackage        = opt_InPackage
-packageInfoPackage AnotherPackage     = FSLIT("<pkg>")
-
-instance Outputable PackageInfo where
-	-- Just used in debug prints of lex tokens and in debug modde
-   ppr pkg_info = ppr (packageInfoPackage pkg_info)
-\end{code}
-
 
 %************************************************************************
 %*									*
@@ -187,124 +103,54 @@ where the object file will reside if/when it is created.
 %************************************************************************
 
 \begin{code}
-newtype ModuleName = ModuleName EncodedFS
+newtype Module = Module EncodedFS
 	-- Haskell module names can include the quote character ',
 	-- so the module names have the z-encoding applied to them
 
-instance Binary ModuleName where
-   put_ bh (ModuleName m) = put_ bh m
-   get bh = do m <- get bh; return (ModuleName m)
+instance Binary Module where
+   put_ bh (Module m) = put_ bh m
+   get bh = do m <- get bh; return (Module m)
 
-instance Uniquable ModuleName where
-  getUnique (ModuleName nm) = getUnique nm
+instance Uniquable Module where
+  getUnique (Module nm) = getUnique nm
 
-instance Eq ModuleName where
+instance Eq Module where
   nm1 == nm2 = getUnique nm1 == getUnique nm2
 
 -- Warning: gives an ordering relation based on the uniques of the
 -- FastStrings which are the (encoded) module names.  This is _not_
 -- a lexicographical ordering.
-instance Ord ModuleName where
+instance Ord Module where
   nm1 `compare` nm2 = getUnique nm1 `compare` getUnique nm2
 
-instance Outputable ModuleName where
-  ppr = pprModuleName
-
-
-pprModuleName :: ModuleName -> SDoc
-pprModuleName (ModuleName nm) = pprEncodedFS nm
-
-moduleNameFS :: ModuleName -> EncodedFS
-moduleNameFS (ModuleName mod) = mod
-
-moduleNameString :: ModuleName -> EncodedString
-moduleNameString (ModuleName mod) = unpackFS mod
-
-moduleNameUserString :: ModuleName -> UserString
-moduleNameUserString (ModuleName mod) = decode (unpackFS mod)
-
--- used to be called mkSrcModule
-mkModuleName :: UserString -> ModuleName
-mkModuleName s = ModuleName (mkFastString (encode s))
-
--- used to be called mkSrcModuleFS
-mkModuleNameFS :: UserFS -> ModuleName
-mkModuleNameFS s = ModuleName (encodeFS s)
-
--- used to be called mkSysModuleFS
-mkSysModuleNameFS :: EncodedFS -> ModuleName
-mkSysModuleNameFS s = ModuleName s 
-\end{code}
-
-\begin{code}
 instance Outputable Module where
   ppr = pprModule
 
-instance Uniquable Module where
-  getUnique (Module nm _) = getUnique nm
 
--- Same if they have the same name.
-instance Eq Module where
-  m1 == m2 = getUnique m1 == getUnique m2
-
--- Warning: gives an ordering relation based on the uniques of the
--- FastStrings which are the (encoded) module names.  This is _not_
--- a lexicographical ordering.
-instance Ord Module where
-  m1 `compare` m2 = getUnique m1 `compare` getUnique m2
-\end{code}
-
-
-\begin{code}
 pprModule :: Module -> SDoc
-pprModule (Module mod p) = getPprStyle $ \ sty ->
-			   if debugStyle sty then
-				-- Print the package too
-				-- Don't use '.' because it gets confused
-				-- 	with module names
-				brackets (ppr p) <> pprModuleName mod
-			   else
-				pprModuleName mod
-\end{code}
+pprModule (Module nm) = pprEncodedFS nm
 
-
-\begin{code}
-mkModule :: PackageName -> ModuleName -> Module
-mkModule pkg_name mod_name 
-  = Module mod_name pkg_info
-  where
-    pkg_info
-      | opt_InPackage == pkg_name = ThisPackage
-      | otherwise		  = AnotherPackage
-
-mkBasePkgModule :: ModuleName -> Module
-mkBasePkgModule mod_nm = mkModule basePackage mod_nm
-
-mkHomeModule :: ModuleName -> Module
-mkHomeModule mod_nm = Module mod_nm ThisPackage
-
-isHomeModule :: Module -> Bool
-isHomeModule (Module nm ThisPackage) = True
-isHomeModule _                       = False
-
-mkPackageModule :: ModuleName -> Module
-mkPackageModule mod_nm = Module mod_nm AnotherPackage
+moduleFS :: Module -> EncodedFS
+moduleFS (Module mod) = mod
 
 moduleString :: Module -> EncodedString
-moduleString (Module (ModuleName fs) _) = unpackFS fs
-
-moduleName :: Module -> ModuleName
-moduleName (Module mod pkg_info) = mod
+moduleString (Module mod) = unpackFS mod
 
 moduleUserString :: Module -> UserString
-moduleUserString (Module mod _) = moduleNameUserString mod
+moduleUserString (Module mod) = decode (unpackFS mod)
 
-printModulePrefix :: Module -> Bool
-  -- When printing, say M.x
-printModulePrefix (Module nm ThisPackage) = False
-printModulePrefix _                       = True
+-- used to be called mkSrcModule
+mkModule :: UserString -> Module
+mkModule s = Module (mkFastString (encode s))
+
+-- used to be called mkSrcModuleFS
+mkModuleFS :: UserFS -> Module
+mkModuleFS s = Module (encodeFS s)
+
+-- used to be called mkSysModuleFS
+mkSysModuleFS :: EncodedFS -> Module
+mkSysModuleFS s = Module s 
 \end{code}
-
 
 %************************************************************************
 %*                                                                      *
@@ -314,9 +160,6 @@ printModulePrefix _                       = True
 
 \begin{code}
 type ModuleEnv elt = UniqFM elt
--- A ModuleName and Module have the same Unique,
--- so both will work as keys.  
--- The 'ByName' variants work on ModuleNames
 
 emptyModuleEnv       :: ModuleEnv a
 mkModuleEnv          :: [(Module, a)] -> ModuleEnv a
@@ -338,14 +181,8 @@ lookupWithDefaultModuleEnv :: ModuleEnv a -> a -> Module -> a
 elemModuleEnv        :: Module -> ModuleEnv a -> Bool
 foldModuleEnv        :: (a -> b -> b) -> b -> ModuleEnv a -> b
 
--- The ByName variants
-lookupModuleEnvByName :: ModuleEnv a -> ModuleName -> Maybe a
-unitModuleEnvByName   :: ModuleName -> a -> ModuleEnv a
-extendModuleEnvByName :: ModuleEnv a -> ModuleName -> a -> ModuleEnv a
-
 elemModuleEnv       = elemUFM
 extendModuleEnv     = addToUFM
-extendModuleEnvByName = addToUFM
 extendModuleEnv_C   = addToUFM_C
 extendModuleEnvList = addListToUFM
 plusModuleEnv_C     = plusUFM_C
@@ -353,20 +190,17 @@ delModuleEnvList    = delListFromUFM
 delModuleEnv        = delFromUFM
 plusModuleEnv       = plusUFM
 lookupModuleEnv     = lookupUFM
-lookupModuleEnvByName = lookupUFM
 lookupWithDefaultModuleEnv = lookupWithDefaultUFM
 mapModuleEnv        = mapUFM
 mkModuleEnv         = listToUFM
 emptyModuleEnv      = emptyUFM
 moduleEnvElts       = eltsUFM
 unitModuleEnv       = unitUFM
-unitModuleEnvByName = unitUFM
 isEmptyModuleEnv    = isNullUFM
 foldModuleEnv       = foldUFM
 \end{code}
 
 \begin{code}
-
 type ModuleSet = UniqSet Module
 mkModuleSet	:: [Module] -> ModuleSet
 extendModuleSet :: ModuleSet -> Module -> ModuleSet

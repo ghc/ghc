@@ -37,7 +37,7 @@ import OccName	  ( isDataOcc, isTvOcc, occNameUserString )
 -- ws previously used in this file.
 import qualified OccName
 
-import Module	  ( Module, mkModule, mkModuleName, moduleUserString )
+import Module	  ( Module, mkModule, moduleUserString )
 import Id         ( Id, mkLocalId )
 import OccName	  ( mkOccFS )
 import Name       ( Name, mkExternalName, localiseName, nameOccName, nameModule, 
@@ -53,7 +53,6 @@ import SrcLoc	  ( noSrcLoc, unLoc, Located(..), SrcSpan, srcLocSpan )
 import Maybe	  ( catMaybes )
 import Unique	  ( mkPreludeTyConUnique, mkPreludeMiscIdUnique, getKey, Uniquable(..) )
 import BasicTypes ( isBoxed ) 
-import Packages	  ( thPackage )
 import Outputable
 import Bag	  ( bagToList )
 import FastString ( unpackFS )
@@ -1388,13 +1387,9 @@ templateHaskellNames = [
     typeTyConName, matchTyConName, clauseTyConName, patQTyConName,
     fieldPatQTyConName, fieldExpQTyConName, funDepTyConName]
 
-tH_SYN_Name = mkModuleName "Language.Haskell.TH.Syntax"
-tH_LIB_Name = mkModuleName "Language.Haskell.TH.Lib"
-
 thSyn :: Module
--- NB: the TH.Syntax module comes from the "template-haskell" package
-thSyn = mkModule thPackage  tH_SYN_Name
-thLib = mkModule thPackage  tH_LIB_Name
+thSyn = mkModule "Language.Haskell.TH.Syntax"
+thLib = mkModule "Language.Haskell.TH.Lib"
 
 mk_known_key_name mod space str uniq 
   = mkExternalName uniq mod (mkOccFS space str) 

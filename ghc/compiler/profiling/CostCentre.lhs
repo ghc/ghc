@@ -35,7 +35,7 @@ import Var		( Id )
 import Name		( UserFS, EncodedFS, encodeFS, decode,
 			  getOccName, occNameFS
 			)
-import Module		( Module, ModuleName, moduleName )
+import Module		( Module )
 import Outputable	
 import FastTypes
 import FastString
@@ -111,13 +111,13 @@ data CostCentre
 
   | NormalCC {  
 		cc_name :: CcName,	-- Name of the cost centre itself
-		cc_mod  :: ModuleName,	-- Name of module defining this CC.
+		cc_mod  :: Module,	-- Name of module defining this CC.
 		cc_is_dupd :: IsDupdCC,	-- see below
 		cc_is_caf  :: IsCafCC	-- see below
     }
 
   | AllCafsCC {	
-		cc_mod  :: ModuleName	-- Name of module defining this CC.
+		cc_mod  :: Module	-- Name of module defining this CC.
     }
 
 type CcName = EncodedFS
@@ -202,17 +202,17 @@ Building cost centres
 \begin{code}
 mkUserCC :: UserFS -> Module -> CostCentre
 mkUserCC cc_name mod
-  = NormalCC { cc_name = encodeFS cc_name, cc_mod =  moduleName mod,
+  = NormalCC { cc_name = encodeFS cc_name, cc_mod =  mod,
 	       cc_is_dupd = OriginalCC, cc_is_caf = NotCafCC {-might be changed-}
     }
 
 mkAutoCC :: Id -> Module -> IsCafCC -> CostCentre
 mkAutoCC id mod is_caf
-  = NormalCC { cc_name = occNameFS (getOccName id), cc_mod =  moduleName mod,
+  = NormalCC { cc_name = occNameFS (getOccName id), cc_mod =  mod,
 	       cc_is_dupd = OriginalCC, cc_is_caf = is_caf
     }
 
-mkAllCafsCC m = AllCafsCC  { cc_mod = moduleName m }
+mkAllCafsCC m = AllCafsCC  { cc_mod = m }
 
 
 
@@ -253,7 +253,7 @@ sccAbleCostCentre cc | isCafCC cc = False
 		     | otherwise  = True
 
 ccFromThisModule :: CostCentre -> Module -> Bool
-ccFromThisModule cc m = cc_mod cc == moduleName m
+ccFromThisModule cc m = cc_mod cc == m
 \end{code}
 
 \begin{code}

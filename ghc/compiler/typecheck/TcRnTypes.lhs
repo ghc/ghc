@@ -47,7 +47,7 @@ import HscTypes		( FixityEnv,
 			  HscEnv, TypeEnv, TyThing, 
 			  GenAvailInfo(..), AvailInfo,
 			  availName, IsBootInterface, Deprecations )
-import Packages		( PackageName )
+import Packages		( PackageId )
 import Type		( Type, TvSubstEnv )
 import TcType		( TcTyVarSet, TcType, TcTauType, TcThetaType, SkolemInfo,
 			  TcPredType, TcKind, tcCmpPred, tcCmpType, tcCmpTypes )
@@ -230,7 +230,7 @@ data IfLclEnv
 	-- The module for the current IfaceDecl
 	-- So if we see   f = \x -> x
 	-- it means M.f = \x -> x, where M is the if_mod
-	if_mod :: ModuleName,
+	if_mod :: Module,
 
 	if_tv_env  :: OccEnv TyVar,	-- Nested tyvar bindings
 	if_id_env  :: OccEnv Id		-- Nested id binding
@@ -489,29 +489,30 @@ data ImportAvails
 		--       need to recompile if the module version changes
 		--   (b) to specify what child modules to initialise
 
-	imp_dep_mods :: ModuleEnv (ModuleName, IsBootInterface),
+	imp_dep_mods :: ModuleEnv (Module, IsBootInterface),
 		-- Home-package modules needed by the module being compiled
 		--
-		-- It doesn't matter whether any of these dependencies are actually
-		-- *used* when compiling the module; they are listed if they are below
-		-- it at all.  For example, suppose M imports A which imports X.  Then
-		-- compiling M might not need to consult X.hi, but X is still listed
-		-- in M's dependencies.
+		-- It doesn't matter whether any of these dependencies
+		-- are actually *used* when compiling the module; they
+		-- are listed if they are below it at all.  For
+		-- example, suppose M imports A which imports X.  Then
+		-- compiling M might not need to consult X.hi, but X
+		-- is still listed in M's dependencies.
 
-	imp_dep_pkgs :: [PackageName],
+	imp_dep_pkgs :: [PackageId],
 		-- Packages needed by the module being compiled, whether
 		-- directly, or via other modules in this package, or via
 		-- modules imported from other packages.
 
- 	imp_orphs :: [ModuleName]
+ 	imp_orphs :: [Module]
 		-- Orphan modules below us in the import tree
       }
 
-mkModDeps :: [(ModuleName, IsBootInterface)]
-	  -> ModuleEnv (ModuleName, IsBootInterface)
+mkModDeps :: [(Module, IsBootInterface)]
+	  -> ModuleEnv (Module, IsBootInterface)
 mkModDeps deps = foldl add emptyModuleEnv deps
 	       where
-		 add env elt@(m,_) = extendModuleEnvByName env m elt
+		 add env elt@(m,_) = extendModuleEnv env m elt
 
 emptyImportAvails :: ImportAvails
 emptyImportAvails = ImportAvails { imp_env    	= emptyAvailEnv, 

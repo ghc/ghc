@@ -1,4 +1,4 @@
- \begin{code}
+\begin{code}
 module TcRnMonad(
 	module TcRnMonad,
 	module TcRnTypes,
@@ -17,7 +17,7 @@ import HscTypes		( HscEnv(..), ModGuts(..), ModIface(..),
 			  ModDetails(..), HomeModInfo(..), 
 			  Deprecs(..), FixityEnv, FixItem,
 			  GhciMode, lookupType, unQualInScope )
-import Module		( Module, ModuleName, unitModuleEnv, foldModuleEnv )
+import Module		( Module, unitModuleEnv, foldModuleEnv )
 import RdrName		( GlobalRdrEnv, emptyGlobalRdrEnv, 	
 			  LocalRdrEnv, emptyLocalRdrEnv )
 import Name		( Name, isInternalName )
@@ -34,7 +34,6 @@ import SrcLoc		( mkGeneralSrcSpan, isGoodSrcSpan, SrcSpan, Located(..) )
 import NameEnv		( emptyNameEnv )
 import NameSet		( NameSet, emptyDUs, emptyNameSet, unionNameSets, addOneToNameSet )
 import OccName		( emptyOccEnv )
-import Module		( moduleName )
 import Bag		( emptyBag )
 import Outputable
 import UniqSupply	( UniqSupply, mkSplitUniqSupply, uniqFromSupply, splitUniqSupply )
@@ -851,7 +850,7 @@ initIfaceExtCore thing_inside
 	; let { mod = tcg_mod tcg_env
 	      ; if_env = IfGblEnv { 
 			if_rec_types = Just (mod, return (tcg_type_env tcg_env)) }
-	      ; if_lenv = IfLclEnv { if_mod     = moduleName mod,
+	      ; if_lenv = IfLclEnv { if_mod     = mod,
 				     if_tv_env  = emptyOccEnv,
 				     if_id_env  = emptyOccEnv }
 	  }
@@ -873,7 +872,7 @@ initIfaceTc :: HscEnv -> ModIface
 initIfaceTc hsc_env iface do_this
  = do	{ tc_env_var <- newIORef emptyTypeEnv
 	; let { gbl_env = IfGblEnv { if_rec_types = Just (mod, readMutVar tc_env_var) } ;
-	      ; if_lenv = IfLclEnv { if_mod     = moduleName mod,
+	      ; if_lenv = IfLclEnv { if_mod     = mod,
 				     if_tv_env  = emptyOccEnv,
 				     if_id_env  = emptyOccEnv }
 	   }
@@ -895,7 +894,7 @@ initIfaceRules hsc_env guts do_this
 	; initTcRnIf 'i' hsc_env gbl_env () do_this
     }
 
-initIfaceLcl :: ModuleName -> IfL a -> IfM lcl a
+initIfaceLcl :: Module -> IfL a -> IfM lcl a
 initIfaceLcl mod thing_inside 
   = setLclEnv (IfLclEnv { if_mod      = mod,
 			   if_tv_env  = emptyOccEnv,

@@ -522,6 +522,7 @@ endif
 # from mkDependHS.
 SRC_MKDEPENDHS_OPTS += \
 	-optdep--exclude-module=Compat.RawSystem \
+	-optdep--exclude-module=Compat.Directory \
 	-optdep--exclude-module=Data.Version \
 	-optdep--exclude-module=Distribution.Package \
 	-optdep--exclude-module=Distribution.InstalledPackageInfo \

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.64 2004/09/30 10:35:39 simonpj Exp $
+% $Id: CgClosure.lhs,v 1.65 2004/11/26 16:20:03 simonmar Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -40,8 +40,7 @@ import MachOp		( MachHint(..) )
 import Cmm
 import CmmUtils		( CmmStmts, mkStmts, oneStmt, plusStmts, noStmts,
 			  mkLblExpr )
-import CLabel		( mkRtsDataLabel, mkClosureLabel, mkRednCountsLabel,
-			  mkSlowEntryLabel, mkIndStaticInfoLabel )
+import CLabel
 import StgSyn
 import CmdLineOpts	( opt_DoTickyProfiling )
 import CostCentre	
@@ -83,7 +82,7 @@ cgTopRhsClosure id ccs binder_info srt upd_flag args body = do
   ; mod_name <- moduleName
   ; let descr         = closureDescription mod_name name
 	closure_info  = mkClosureInfo True id lf_info 0 0 srt_info descr
-	closure_label = mkClosureLabel name
+	closure_label = mkLocalClosureLabel name
     	cg_id_info    = stableIdInfo id (mkLblExpr closure_label) lf_info
 	closure_rep   = mkStaticClosureFields closure_info ccs True []
 
@@ -366,7 +365,7 @@ mkSlowEntryCode cl_info reg_args
 
      stk_adj_pop   = CmmAssign spReg (cmmRegOffW spReg final_stk_offset)
      stk_adj_push  = CmmAssign spReg (cmmRegOffW spReg (- final_stk_offset))
-     jump_to_entry = CmmJump (mkLblExpr (enterIdLabel name)) []
+     jump_to_entry = CmmJump (mkLblExpr (enterLocalIdLabel name)) []
 \end{code}
 
 

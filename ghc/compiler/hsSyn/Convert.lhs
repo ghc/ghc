@@ -16,7 +16,7 @@ import Language.Haskell.TH.Syntax as TH
 import HsSyn as Hs
 import qualified Class (FunDep)
 import RdrName	( RdrName, mkRdrUnqual, mkRdrQual, mkOrig, nameRdrName, getRdrName )
-import Module   ( ModuleName, mkModuleName )
+import Module   ( Module, mkModule )
 import RdrHsSyn	( mkHsIntegral, mkHsFractional, mkClassDecl, mkTyData )
 import Name	( mkInternalName )
 import qualified OccName
@@ -422,8 +422,8 @@ mk_uniq u = mkUniqueGrimily (I# u)
 mk_occ :: OccName.NameSpace -> TH.OccName -> OccName.OccName
 mk_occ ns occ = OccName.mkOccFS ns (mkFastString (TH.occString occ))
 
-mk_mod :: TH.ModName -> ModuleName
-mk_mod mod = mkModuleName (TH.modString mod)
+mk_mod :: TH.ModName -> Module
+mk_mod mod = mkModule (TH.modString mod)
 
 mkDynName :: OccName.NameSpace -> TH.OccName -> RdrName
 -- Parse the string to see if it has a "." in it
@@ -440,6 +440,6 @@ mkDynName ns th_occ
     split occ (c:rev)   = split (c:occ) rev
 
     mk_occ occ = OccName.mkOccFS ns (mkFastString occ)
-    mk_mod mod = mkModuleName mod
+    mk_mod mod = mkModule mod
 \end{code}
 

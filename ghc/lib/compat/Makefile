@@ -34,10 +34,23 @@ EXCLUDED_SRCS += \
 	Distribution/Version.hs
 endif
 
+# Some explicit dependencies
+Data/Version.$(way_)o :  $(FPTOOLS_TOP)/libraries/base/Data/Version.hs
+System/FilePath.$(way_)o : $(FPTOOLS_TOP)/libraries/base/System/FilePath.hs
+Distribution/Compat/Error.$(way_)o : $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Compat/Error.hs
+Distribution/Compat/ReadP.$(way_) : $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Compat/ReadP.hs
+Distribution/Extension.$(way_)o    : $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Extension.hs
+Distribution/InstalledPackageInfo.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/InstalledPackageInfo.hs
+Distribution/License.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/License.hs
+Distribution/Package.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Package.hs
+Distribution/ParseUtils.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/ParseUtils.hs
+Distribution/Setup.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Setup.hs
+Distribution/Version.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Version.hs
+
 # Make the #includes in the stubs independent of the current location
 SRC_HC_OPTS += -I$(FPTOOLS_TOP)/libraries
 
-SRC_HC_OPTS +=  -fglasgow-exts
+SRC_HC_OPTS +=  -fglasgow-exts -no-recomp
 
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 Compat/Directory_HC_OPTS += -\#include shlobj.h

@@ -23,14 +23,12 @@ import LoadIface	( loadSrcInterface )
 import TcRnMonad
 
 import FiniteMap
-import PrelNames	( pRELUDE_Name, isUnboundName,
-			  main_RDR_Unqual )
-import Module		( Module, ModuleName, moduleName, mkPackageModule,
-			  moduleNameUserString, isHomeModule,
-			  unitModuleEnvByName, unitModuleEnv, 
-			  lookupModuleEnvByName, moduleEnvElts )
-import Name		( Name, nameSrcLoc, nameOccName, nameModuleName, isWiredInName,
-			  nameParent, nameParent_maybe, isExternalName, nameModule,
+import PrelNames	( pRELUDE, isUnboundName, main_RDR_Unqual )
+import Module		( Module, moduleUserString,
+			  unitModuleEnv, unitModuleEnv, 
+			  lookupModuleEnv, moduleEnvElts )
+import Name		( Name, nameSrcLoc, nameOccName, nameModule, isWiredInName,
+			  nameParent, nameParent_maybe, isExternalName,
 			  isBuiltInSyntax )
 import NameSet
 import OccName		( srcDataName, isTcOcc, occNameFlavour, OccEnv, 
@@ -38,8 +36,9 @@ import OccName		( srcDataName, isTcOcc, occNameFlavour, OccEnv,
 import HscTypes		( GenAvailInfo(..), AvailInfo, Avails, GhciMode(..),
 			  IfaceExport, HomePackageTable, PackageIfaceTable, 
 			  availName, availNames, availsToNameSet, unQualInScope, 
-			  Deprecs(..), ModIface(..), Dependencies(..), lookupIface,
-			  ExternalPackageState(..)
+			  Deprecs(..), ModIface(..), Dependencies(..), 
+			  lookupIface, ExternalPackageState(..),
+			  IfacePackage(..)
 			)
 import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace, 
 		  	  GlobalRdrEnv, mkGlobalRdrEnv, GlobalRdrElt(..), 
@@ -102,7 +101,7 @@ rnImports imports
 	-- because the former doesn't even look at Prelude.hi for instance 
 	-- declarations, whereas the latter does.
     mk_prel_imports this_mod no_prelude
-	|  moduleName this_mod == pRELUDE_Name
+	|  this_mod == pRELUDE
 	|| explicit_prelude_import
 	|| no_prelude
 	= []
@@ -111,11 +110,11 @@ rnImports imports
 
     explicit_prelude_import
       = notNull [ () | L _ (ImportDecl mod _ _ _ _) <- imports, 
-		       unLoc mod == pRELUDE_Name ]
+		       unLoc mod == pRELUDE ]
 
 preludeImportDecl
   = L loc $
-	ImportDecl (L loc pRELUDE_Name)
+	ImportDecl (L loc pRELUDE)
 	       False {- Not a boot interface -}
 	       False	{- Not qualified -}
 	       Nothing	{- No "as" -}
@@ -138,7 +137,6 @@ importsFromImportDecl this_mod
 	-- file not found) we get lots of spurious errors from 'filterImports'
     let
 	imp_mod_name = unLoc loc_imp_mod_name
-	this_mod_name = moduleName this_mod
 	doc = ppr imp_mod_name <+> ptext SLIT("is directly imported")
     in
     loadSrcInterface doc imp_mod_name want_boot	`thenM` \ iface ->
@@ -160,7 +158,7 @@ importsFromImportDecl this_mod
 	deps 	= mi_deps iface
 
 	filtered_exports = filter not_this_mod (mi_exports iface)
-	not_this_mod (mod,_) = mod /= this_mod_name
+	not_this_mod (mod,_) = mod /= this_mod
 	-- If the module exports anything defined in this module, just ignore it.
 	-- Reason: otherwise it looks as if there are two local definition sites
 	-- for the thing, and an error gets reported.  Easiest thing is just to
@@ -190,6 +188,8 @@ importsFromImportDecl this_mod
     filterImports iface imp_spec
 		  imp_details total_avails	`thenM` \ (avail_env, gbl_env) ->
 
+    getDOpts `thenM` \ dflags ->
+
     let
 	-- Compute new transitive dependencies
 
@@ -198,23 +198,27 @@ importsFromImportDecl this_mod
 		| otherwise = dep_orphs deps
 
 	(dependent_mods, dependent_pkgs) 
-	   | isHomeModule imp_mod 
-	   = 	-- Imported module is from the home package
+	   = case mi_package iface of
+		ThisPackage ->
+	    	-- Imported module is from the home package
 		-- Take its dependent modules and add imp_mod itself
 		-- Take its dependent packages unchanged
-		-- NB: (dep_mods deps) might include a hi-boot file for the module being
-		--	compiled, CM. Do *not* filter this out (as we used to), because when 
-		--	we've finished dealing with the direct imports we want to know if any 
-		--	of them depended on CM.hi-boot, in which case we should do the hi-boot
-		--	consistency check.  See LoadIface.loadHiBootInterface
-	     ((imp_mod_name, want_boot) : dep_mods deps, dep_pkgs deps)
+		--
+		-- NB: (dep_mods deps) might include a hi-boot file
+		-- for the module being compiled, CM. Do *not* filter
+		-- this out (as we used to), because when we've
+		-- finished dealing with the direct imports we want to
+		-- know if any of them depended on CM.hi-boot, in
+		-- which case we should do the hi-boot consistency
+		-- check.  See LoadIface.loadHiBootInterface
+		  ((imp_mod_name, want_boot) : dep_mods deps, dep_pkgs deps)
 
-	   | otherwise	
- 	   = 	-- Imported module is from another package
+		ExternalPackage pkg ->
+ 	   	-- Imported module is from another package
 		-- Dump the dependent modules
 		-- Add the package imp_mod comes from to the dependent packages
-	     ASSERT( not (mi_package iface `elem` dep_pkgs deps) )
-	     ([], mi_package iface : dep_pkgs deps)
+	         ASSERT2( not (pkg `elem` dep_pkgs deps), ppr pkg <+> ppr (dep_pkgs deps) )
+	         ([], pkg : dep_pkgs deps)
 
 	import_all = case imp_details of
 			Just (is_hiding, ls)	 -- Imports are spec'd explicitly
@@ -227,7 +231,7 @@ importsFromImportDecl this_mod
 	--	module M ( module P ) where ...
 	-- Then we must export whatever came from P unqualified.
 	imports   = ImportAvails { 
-			imp_qual     = unitModuleEnvByName qual_mod_name avail_env,
+			imp_qual     = unitModuleEnv qual_mod_name avail_env,
 			imp_env      = avail_env,
 			imp_mods     = unitModuleEnv imp_mod (imp_mod, import_all, loc),
 			imp_orphs    = orphans,
@@ -250,13 +254,12 @@ exportsToAvails exports
 	; return (concat avails_by_module) }
   where
     do_one (mod_name, exports) = mapM (do_avail mod_name) exports
-    do_avail mod_nm (Avail n)      = do { n' <- lookupOrig mod_nm n; 
+    do_avail mod (Avail n)      = do { n' <- lookupOrig mod n; 
 					; return (Avail n') }
-    do_avail mod_nm (AvailTC n ns) = do { n' <- lookupOrig mod_nm n
+    do_avail mod (AvailTC n ns) = do { n' <- lookupOrig mod n
 					; ns' <- mappM (lookup_sub n') ns
 					; return (AvailTC n' ns') }
 	where
-	  mod = mkPackageModule mod_nm	-- Not necessarily right yet
 	  lookup_sub parent occ = newGlobalBinder mod occ (Just parent) noSrcLoc
 		-- Hack alert! Notice the newGlobalBinder.  It ensures that the subordinate 
 		-- names record their parent; and that in turn ensures that the GlobalRdrEnv
@@ -310,8 +313,7 @@ importsFromLocalDecls group
 
     doptM Opt_NoImplicitPrelude 		`thenM` \ implicit_prelude ->
     let
-	mod_name = moduleName this_mod
-	prov     = LocalDef mod_name
+	prov     = LocalDef this_mod
 	gbl_env  = mkGlobalRdrEnv gres
 	gres     = [ GRE { gre_name = name, gre_prov = prov}
 		   | name <- all_names]
@@ -571,7 +573,7 @@ it re-exports @GHC@, which includes @takeMVar#@, whose type includes
 \begin{code}
 type ExportAccum	-- The type of the accumulating parameter of
 			-- the main worker function in exportsFromAvail
-     = ([ModuleName], 		-- 'module M's seen so far
+     = ([Module], 		-- 'module M's seen so far
 	ExportOccMap,		-- Tracks exported occurrence names
 	NameSet)		-- The accumulated exported stuff
 emptyExportAccum = ([], emptyOccEnv, emptyNameSet) 
@@ -635,7 +637,7 @@ exports_from_avail (Just export_items) rdr_env
 	       returnM acc }
 
 	| otherwise
-	= case lookupModuleEnvByName mod_avail_env mod of
+	= case lookupModuleEnv mod_avail_env mod of
 	    Nothing -> addErr (modExportErr mod)	`thenM_`
 		       returnM acc
 
@@ -745,7 +747,7 @@ reportDeprecations tcg_env
 		      (parens imp_msg),
 		      (ppr deprec_txt) ])
 	where
-	  name_mod = nameModuleName name
+	  name_mod = nameModule name
 	  imp_mod  = is_mod imp_spec
 	  imp_msg  = ptext SLIT("imported from") <+> ppr imp_mod <> extra
 	  extra | imp_mod == name_mod = empty
@@ -836,7 +838,7 @@ reportUnusedNames gbl_env
     -- To figure out the minimal set of imports, start with the things
     -- that are in scope (i.e. in gbl_env).  Then just combine them
     -- into a bunch of avails, so they are properly grouped
-    minimal_imports :: FiniteMap ModuleName AvailEnv
+    minimal_imports :: FiniteMap Module AvailEnv
     minimal_imports0 = emptyFM
     minimal_imports1 = foldr add_name     minimal_imports0 defined_and_used
     minimal_imports  = foldr add_inst_mod minimal_imports1 direct_import_mods
@@ -870,10 +872,9 @@ reportUnusedNames gbl_env
 		       | otherwise		 = Avail n
     
     add_inst_mod (mod,_,_) acc 
-      | mod_name `elemFM` acc = acc	-- We import something already
-      | otherwise             = addToFM acc mod_name emptyAvailEnv
+      | mod `elemFM` acc = acc	-- We import something already
+      | otherwise        = addToFM acc mod emptyAvailEnv
       where
-	mod_name = moduleName mod
     	-- Add an empty collection of imports for a module
     	-- from which we have sucked only instance decls
    
@@ -887,16 +888,15 @@ reportUnusedNames gbl_env
     -- that are not mentioned in minimal_imports1
     -- [Note: not 'minimal_imports', because that includes directly-imported
     --	      modules even if we use nothing from them; see notes above]
-    unused_imp_mods = [(mod_name,loc) | (mod,imp,loc) <- direct_import_mods,
-		       let mod_name = moduleName mod,
-    		       not (mod_name `elemFM` minimal_imports1),
-    		       mod_name /= pRELUDE_Name,
+    unused_imp_mods = [(mod,loc) | (mod,imp,loc) <- direct_import_mods,
+    		       not (mod `elemFM` minimal_imports1),
+    		       mod /= pRELUDE,
 		       imp /= Just False]
 	-- The Just False part is not to complain about
 	-- import M (), which is an idiom for importing
 	-- instance declarations
     
-    module_unused :: ModuleName -> Bool
+    module_unused :: Module -> Bool
     module_unused mod = any (((==) mod) . fst) unused_imp_mods
 
 ---------------------
@@ -910,7 +910,7 @@ warnDuplicateImports gres
 			      
 
 -- ToDo: deal with original imports with 'qualified' and 'as M' clauses
-printMinimalImports :: FiniteMap ModuleName AvailEnv	-- Minimal imports
+printMinimalImports :: FiniteMap Module AvailEnv	-- Minimal imports
 		    -> RnM ()
 printMinimalImports imps
  = ifOptM Opt_D_dump_minimal_imports $ do {
@@ -923,9 +923,9 @@ printMinimalImports imps
 				 (vcat (map ppr_mod_ie mod_ies)) })
    }
   where
-    mkFilename this_mod = moduleNameUserString (moduleName this_mod) ++ ".imports"
+    mkFilename this_mod = moduleUserString this_mod ++ ".imports"
     ppr_mod_ie (mod_name, ies) 
-	| mod_name == pRELUDE_Name 
+	| mod_name == pRELUDE 
 	= empty
 	| null ies	-- Nothing except instances comes from here
 	= ptext SLIT("import") <+> ppr mod_name <> ptext SLIT("()    -- Instances only")
@@ -956,7 +956,7 @@ printMinimalImports imps
 	where
 	  all_used avail_occs = all (`elem` map nameOccName ns) avail_occs
 	  doc = text "Compute minimal imports from" <+> ppr n
-	  n_mod = nameModuleName n
+	  n_mod = nameModule n
 \end{code}
 
 

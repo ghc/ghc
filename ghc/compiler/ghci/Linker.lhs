@@ -29,20 +29,20 @@ import ByteCodeItbls	( ItblEnv )
 import ByteCodeAsm	( CompiledByteCode(..), bcoFreeNames, UnlinkedBCO(..))
 
 import Packages
-import DriverState	( v_Library_paths, v_Opt_l, v_Ld_inputs, getStaticOpts, v_ExplicitPackages )
+import DriverState	( v_Library_paths, v_Opt_l, v_Ld_inputs, getStaticOpts )
 import DriverPhases	( isObjectFilename, isDynLibFilename )
 import DriverUtil	( getFileSuffix )
 #ifdef darwin_TARGET_OS
 import DriverState	( v_Cmdline_frameworks, v_Framework_paths )
 #endif
-import Finder		( findModule, findLinkable )
+import Finder		( findModule, findLinkable, FindResult(..) )
 import HscTypes
-import Name		( Name, nameModule, nameModuleName, isExternalName, isWiredInName )
+import Name		( Name, nameModule, isExternalName, isWiredInName )
 import NameEnv
 import NameSet		( nameSetToList )
 import Module
 import ListSetOps	( minusList )
-import CmdLineOpts	( DynFlags(verbosity), getDynFlags )
+import CmdLineOpts	( DynFlags(..) )
 import BasicTypes	( SuccessFlag(..), succeeded, failed )
 import Outputable
 import Panic            ( GhcException(..) )
@@ -106,22 +106,25 @@ data PersistentLinkerState
 	-- The currently-loaded packages; always object code
 	-- Held, as usual, in dependency order; though I am not sure if
 	-- that is really important
-	pkgs_loaded :: [PackageName]
+	pkgs_loaded :: [PackageId]
      }
 
-emptyPLS :: PersistentLinkerState
-emptyPLS = PersistentLinkerState { closure_env = emptyNameEnv,
-                                   itbl_env    = emptyNameEnv,
-				   pkgs_loaded = init_pkgs_loaded,
-				   bcos_loaded = [],
-				   objs_loaded = [] }
+emptyPLS :: DynFlags -> PersistentLinkerState
+emptyPLS dflags = PersistentLinkerState { 
+			closure_env = emptyNameEnv,
+			itbl_env    = emptyNameEnv,
+			pkgs_loaded = init_pkgs,
+			bcos_loaded = [],
+			objs_loaded = [] }
+  -- Packages that don't need loading, because the compiler 
+  -- shares them with the interpreted program.
+  --
+  -- The linker's symbol table is populated with RTS symbols using an
+  -- explicit list.  See rts/Linker.c for details.
+  where init_pkgs
+	  | Just rts_id <- rtsPackageId (pkgState dflags) = [rts_id]
+	  | otherwise = []
 
--- Packages that don't need loading, because the compiler 
--- shares them with the interpreted program.
---
--- The linker's symbol table is populated with RTS symbols using an
--- explicit list.  See rts/Linker.c for details.
-init_pkgs_loaded = [ FSLIT("rts") ]
 \end{code}
 
 \begin{code}
@@ -139,12 +142,12 @@ extendLinkEnv new_bindings
 --	(these are the temporary bindings from the command line).
 -- Used to filter both the ClosureEnv and ItblEnv
 
-filterNameMap :: [ModuleName] -> NameEnv (Name, a) -> NameEnv (Name, a)
+filterNameMap :: [Module] -> NameEnv (Name, a) -> NameEnv (Name, a)
 filterNameMap mods env 
    = filterNameEnv keep_elt env
    where
      keep_elt (n,_) = isExternalName n 
-		      && (nameModuleName n `elem` mods)
+		      && (nameModule n `elem` mods)
 \end{code}
 
 
@@ -184,28 +187,25 @@ d) Loading any .o/.dll files specified on the command line,
 e) Loading any MacOS frameworks
 
 \begin{code}
-initDynLinker :: IO ()
+initDynLinker :: DynFlags -> IO ()
 -- This function is idempotent; if called more than once, it does nothing
 -- This is useful in Template Haskell, where we call it before trying to link
-initDynLinker 
+initDynLinker dflags
   = do	{ done <- readIORef v_InitLinkerDone
 	; if done then return () 
 		  else do { writeIORef v_InitLinkerDone True
-			  ; reallyInitDynLinker }
+			  ; reallyInitDynLinker dflags }
 	}
 
-reallyInitDynLinker
-  = do  { dflags <- getDynFlags
-
-		-- Initialise the linker state
-	; writeIORef v_PersistentLinkerState emptyPLS
+reallyInitDynLinker dflags
+  = do  {  -- Initialise the linker state
+	; writeIORef v_PersistentLinkerState (emptyPLS dflags)
 
 	 	-- (a) initialise the C dynamic linker
 	; initObjLinker 
 
 		-- (b) Load packages from the command-line
-	; expl <- readIORef v_ExplicitPackages
-	; linkPackages dflags expl
+	; linkPackages dflags (explicitPackages (pkgState dflags))
 
 	   	-- (c) Link libraries from the command-line
 	; opt_l  <- getStaticOpts v_Opt_l
@@ -315,11 +315,12 @@ linkExpr :: HscEnv -> UnlinkedBCO -> IO HValue
 linkExpr hsc_env root_ul_bco
   = do {  
 	-- Initialise the linker (if it's not been done already)
-     initDynLinker
+     let dflags = hsc_dflags hsc_env
+   ; initDynLinker dflags
 
 	-- Find what packages and linkables are required
    ; eps <- readIORef (hsc_EPS hsc_env)
-   ; (lnks, pkgs) <- getLinkDeps hpt (eps_PIT eps) needed_mods
+   ; (lnks, pkgs) <- getLinkDeps dflags hpt (eps_PIT eps) needed_mods
 
 	-- Link the packages and modules required
    ; linkPackages dflags pkgs
@@ -354,12 +355,12 @@ linkExpr hsc_env root_ul_bco
  
 dieWith msg = throwDyn (ProgramError (showSDoc msg))
 
-getLinkDeps :: HomePackageTable -> PackageIfaceTable
+getLinkDeps :: DynFlags -> HomePackageTable -> PackageIfaceTable
 	    -> [Module]				-- If you need these
-	    -> IO ([Linkable], [PackageName])	-- ... then link these first
+	    -> IO ([Linkable], [PackageId])	-- ... then link these first
 -- Fails with an IO exception if it can't find enough files
 
-getLinkDeps hpt pit mods
+getLinkDeps dflags hpt pit mods
 -- Find all the packages and linkables that a set of modules depends on
  = do {	pls <- readIORef v_PersistentLinkerState ;
 	let {
@@ -371,7 +372,7 @@ getLinkDeps hpt pit mods
 	    mods_needed = nub (concat mods_s) `minusList` linked_mods     ;
 	    pkgs_needed = nub (concat pkgs_s) `minusList` pkgs_loaded pls ;
 
-	    linked_mods = map linkableModName (objs_loaded pls ++ bcos_loaded pls)
+	    linked_mods = map linkableModule (objs_loaded pls ++ bcos_loaded pls)
 	} ;
 	
 	-- 3.  For each dependent module, find its linkable
@@ -381,14 +382,14 @@ getLinkDeps hpt pit mods
 
 	return (lnks_needed, pkgs_needed) }
   where
-    get_deps :: Module -> ([ModuleName],[PackageName])
+    get_deps :: Module -> ([Module],[PackageId])
 	-- Get the things needed for the specified module
 	-- This is rather similar to the code in RnNames.importsFromImportDecl
     get_deps mod
-	| isHomeModule (mi_module iface) 
-	= (moduleName mod : [m | (m,_) <- dep_mods deps], dep_pkgs deps)
+	| ExternalPackage p <- mi_package iface
+	= ([], p : dep_pkgs deps)
 	| otherwise
-	= ([], mi_package iface : dep_pkgs deps)
+	= (mod : [m | (m,_) <- dep_mods deps], dep_pkgs deps)
 	where
 	  iface = get_iface mod
 	  deps  = mi_deps iface
@@ -403,22 +404,24 @@ getLinkDeps hpt pit mods
 	-- This one is a build-system bug
 
     get_linkable mod_name	-- A home-package module
-	| Just mod_info <- lookupModuleEnvByName hpt mod_name 
+	| Just mod_info <- lookupModuleEnv hpt mod_name 
 	= return (hm_linkable mod_info)
 	| otherwise	
 	=	-- It's not in the HPT because we are in one shot mode, 
 		-- so use the Finder to get a ModLocation...
-	  do { mb_stuff <- findModule mod_name ;
+	  do { mb_stuff <- findModule dflags mod_name False ;
 	       case mb_stuff of {
-		  Left _ -> no_obj mod_name ;
-		  Right (_, loc) -> do {
+		  Found loc _ -> found loc mod_name ;
+		  _ -> no_obj mod_name
+	     }}
 
+    found loc mod_name = do {
 		-- ...and then find the linkable for it
 	       mb_lnk <- findLinkable mod_name loc ;
 	       case mb_lnk of {
 		  Nothing -> no_obj mod_name ;
 		  Just lnk -> return lnk
-	  }}}} 
+	      }}
 \end{code}
 
 
@@ -461,7 +464,7 @@ partitionLinkable li
             other
                -> [li]
 
-findModuleLinkable_maybe :: [Linkable] -> ModuleName -> Maybe Linkable
+findModuleLinkable_maybe :: [Linkable] -> Module -> Maybe Linkable
 findModuleLinkable_maybe lis mod
    = case [LM time nm us | LM time nm us <- lis, nm == mod] of
         []   -> Nothing
@@ -470,7 +473,7 @@ findModuleLinkable_maybe lis mod
 
 linkableInSet :: Linkable -> [Linkable] -> Bool
 linkableInSet l objs_loaded =
-  case findModuleLinkable_maybe objs_loaded (linkableModName l) of
+  case findModuleLinkable_maybe objs_loaded (linkableModule l) of
 	Nothing -> False
 	Just m  -> linkableTime l == linkableTime m
 \end{code}
@@ -642,7 +645,7 @@ unload_wkr dflags linkables pls
 	objs_loaded' <- filterM (maybeUnload objs_to_keep) (objs_loaded pls)
         bcos_loaded' <- filterM (maybeUnload bcos_to_keep) (bcos_loaded pls)
 
-       	let bcos_retained = map linkableModName bcos_loaded'
+       	let bcos_retained = map linkableModule bcos_loaded'
 	    itbl_env'     = filterNameMap bcos_retained (itbl_env pls)
             closure_env'  = filterNameMap bcos_retained (closure_env pls)
   	    new_pls = pls { itbl_env = itbl_env',
@@ -713,7 +716,7 @@ showLS (DLL nm)       = "(dynamic) " ++ nm
 showLS (DLLPath nm)   = "(dynamic) " ++ nm
 showLS (Framework nm) = "(framework) " ++ nm
 
-linkPackages :: DynFlags -> [PackageName] -> IO ()
+linkPackages :: DynFlags -> [PackageId] -> IO ()
 -- Link exactly the specified packages, and their dependents
 -- (unless of course they are already linked)
 -- The dependents are linked automatically, and it doesn't matter
@@ -728,14 +731,14 @@ linkPackages :: DynFlags -> [PackageName] -> IO ()
 
 linkPackages dflags new_pkgs
    = do	{ pls 	  <- readIORef v_PersistentLinkerState
-	; pkg_map <- getPackageConfigMap
+	; let pkg_map = pkgIdMap (pkgState dflags)
 
 	; pkgs' <- link pkg_map (pkgs_loaded pls) new_pkgs
 
 	; writeIORef v_PersistentLinkerState (pls { pkgs_loaded = pkgs' })
 	}
    where
-     link :: PackageConfigMap -> [PackageName] -> [PackageName] -> IO [PackageName]
+     link :: PackageConfigMap -> [PackageId] -> [PackageId] -> IO [PackageId]
      link pkg_map pkgs new_pkgs 
 	= foldM (link_one pkg_map) pkgs new_pkgs
 
@@ -743,15 +746,15 @@ linkPackages dflags new_pkgs
 	| new_pkg `elem` pkgs	-- Already linked
 	= return pkgs
 
-	| Just pkg_cfg <- lookupPkg pkg_map new_pkg
+	| Just pkg_cfg <- lookupPackage pkg_map new_pkg
 	= do { 	-- Link dependents first
-	       pkgs' <- link pkg_map pkgs (packageDependents pkg_cfg)
+	       pkgs' <- link pkg_map pkgs (map mkPackageId (depends pkg_cfg))
 		-- Now link the package itself
 	     ; linkPackage dflags pkg_cfg
 	     ; return (new_pkg : pkgs') }
 
 	| otherwise
-	= throwDyn (CmdLineError ("unknown package name: " ++ packageNameString new_pkg))
+	= throwDyn (CmdLineError ("unknown package: " ++ packageIdString new_pkg))
 
 
 linkPackage :: DynFlags -> PackageConfig -> IO ()

@@ -49,11 +49,11 @@ import TyCon		( tyConDataCons, isTupleTyCon, mkForeignTyCon )
 import DataCon		( DataCon, dataConWorkId, dataConTyVars, dataConArgTys, isVanillaDataCon )
 import TysWiredIn	( tupleCon, tupleTyCon, listTyCon, intTyCon, boolTyCon, charTyCon, parrTyCon )
 import Var		( TyVar, mkTyVar, tyVarKind )
-import Name		( Name, nameModuleName, nameModule, nameIsLocalOrFrom, 
+import Name		( Name, nameModule, nameIsLocalOrFrom, 
 			  isWiredInName, wiredInNameTyThing_maybe, nameParent )
 import NameEnv
 import OccName		( OccName )
-import Module		( Module, ModuleName, moduleName )
+import Module		( Module )
 import UniqSupply	( initUs_ )
 import Outputable	
 import SrcLoc		( noSrcLoc )
@@ -168,10 +168,10 @@ typecheckIface hsc_env iface
 	      ; rules | ignore_prags = []
 		      | otherwise    = mi_rules iface
 	      ; dfuns    = mi_insts iface
-	      ; mod_name = moduleName (mi_module iface)
+	      ; mod      = mi_module iface
 	  }
 		-- Typecheck the decls
-	; names <- mappM (lookupOrig mod_name . ifName) decls
+	; names <- mappM (lookupOrig mod . ifName) decls
 	; ty_things <- fixM (\ rec_ty_things -> do
 		{ writeMutVar tc_env_var (mkNameEnv (names `zipLazy` rec_ty_things))
 			-- This only makes available the "main" things,
@@ -449,7 +449,7 @@ tcIfaceInst :: IfaceInst -> IfL DFunId
 tcIfaceInst (IfaceInst { ifDFun = dfun_occ })
   = tcIfaceExtId (LocalTop dfun_occ)
 
-selectInsts :: Name -> [Name] -> ExternalPackageState -> (ExternalPackageState, [(ModuleName, IfaceInst)])
+selectInsts :: Name -> [Name] -> ExternalPackageState -> (ExternalPackageState, [(Module, IfaceInst)])
 selectInsts cls tycons eps
   = (eps { eps_insts = insts', eps_stats = stats' }, iface_insts)
   where
@@ -521,7 +521,7 @@ loadImportedRules hsc_env guts
     }
 
 
-selectRules :: ExternalPackageState -> (ExternalPackageState, [(ModuleName, IfaceRule)])
+selectRules :: ExternalPackageState -> (ExternalPackageState, [(Module, IfaceRule)])
 -- Not terribly efficient.  Look at each rule in the pool to see if
 -- all its gates are in the type env.  If so, take it out of the pool.
 -- If not, trim its gates for next time.
@@ -701,7 +701,7 @@ tcIfaceAlt _ (IfaceLitAlt lit, names, rhs)
 -- by the fact that we omit type annotations because we can
 -- work them out.  True enough, but its not that easy!
 tcIfaceAlt (tycon, inst_tys) (IfaceDataAlt data_occ, arg_occs, rhs)
-  = do	{ let tycon_mod = nameModuleName (tyConName tycon)
+  = do	{ let tycon_mod = nameModule (tyConName tycon)
 	; con <- tcIfaceDataCon (ExtPkg tycon_mod data_occ)
 	; ASSERT2( con `elem` tyConDataCons tycon,
 		   ppr con $$ ppr tycon $$ ppr (tyConDataCons tycon) )

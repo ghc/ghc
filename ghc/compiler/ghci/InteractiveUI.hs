@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.179 2004/11/12 15:51:37 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.180 2004/11/26 16:20:36 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -16,9 +16,9 @@ module InteractiveUI (
 #include "HsVersions.h"
 
 import CompManager
-import HscTypes		( TyThing(..), HomeModInfo(hm_linkable), HomePackageTable,
+import HscTypes		( HomeModInfo(hm_linkable), HomePackageTable,
 			  isObjectLinkable, GhciMode(..) )
-import IfaceSyn		( IfaceType, IfaceDecl(..), IfaceClassOp(..), IfaceConDecls(..), IfaceConDecl(..), 
+import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecls(..), IfaceConDecl(..), 
 		   	  IfaceInst(..), pprIfaceDeclHead, pprParendIfaceType, pprIfaceForAllPart )
 import FunDeps		( pprFundeps )
 import DriverFlags
@@ -27,14 +27,11 @@ import DriverUtil	( remove_spaces )
 import Linker		( showLinkerState, linkPackages )
 import Util
 import Module		( showModMsg, lookupModuleEnv )
-import Name		( Name, isHomePackageName, nameSrcLoc, nameOccName,
-			  NamedThing(..) )
+import Name		( Name, NamedThing(..) )
 import OccName		( OccName, isSymOcc, occNameUserString )
-import BasicTypes	( StrictnessMark(..), Fixity, defaultFixity, SuccessFlag(..) )
-import Packages
+import BasicTypes	( StrictnessMark(..), defaultFixity, SuccessFlag(..) )
 import Outputable
-import CmdLineOpts	( DynFlag(..), DynFlags(..), getDynFlags, saveDynFlags,
-			  restoreDynFlags, dopt_unset )
+import CmdLineOpts	( DynFlag(..), DynFlags(..), dopt_unset )
 import Panic 		hiding ( showException )
 import Config
 import SrcLoc		( SrcLoc, isGoodSrcLoc )
@@ -154,9 +151,8 @@ helpText =
  "                         (eg. -v2, -fglasgow-exts, etc.)\n"
 
 
-interactiveUI :: [FilePath] -> Maybe String -> IO ()
-interactiveUI srcs maybe_expr = do
-   dflags <- getDynFlags
+interactiveUI :: DynFlags -> [FilePath] -> Maybe String -> IO ()
+interactiveUI dflags srcs maybe_expr = do
 
    cmstate <- cmInit Interactive dflags;
 
@@ -391,12 +387,10 @@ runStmt stmt
  | null (filter (not.isSpace) stmt) = return []
  | otherwise
  = do st <- getGHCiState
-      dflags <- io getDynFlags
-      let cm_state' = cmSetDFlags (cmstate st)
-			 	  (dopt_unset dflags Opt_WarnUnusedBinds)
+      cmstate <- getCmState
       (new_cmstate, result) <- 
 	io $ withProgName (progname st) $ withArgs (args st) $
-	     cmRunStmt cm_state' stmt
+	     cmRunStmt cmstate stmt
       setGHCiState st{cmstate = new_cmstate}
       case result of
 	CmRunFailed      -> return []
@@ -617,7 +611,7 @@ addModule files = do
   (cmstate1, ok, mods) <- io (cmLoadModules (cmstate state) graph)
   setGHCiState state{ cmstate = cmstate1, targets = new_targets }
   setContextAfterLoad mods
-  dflags <- io getDynFlags
+  dflags <- getDynFlags
   modulesLoadedMsg ok mods dflags
 
 changeDirectory :: String -> GHCi ()
@@ -697,7 +691,7 @@ loadModule' files = do
   setGHCiState state{ cmstate = cmstate2, targets = files }
 
   setContextAfterLoad mods
-  dflags <- io (getDynFlags)
+  dflags <- getDynFlags
   modulesLoadedMsg ok mods dflags
 
 
@@ -716,7 +710,7 @@ reloadModule "" = do
 		<- io (cmLoadModules (cmstate state) graph)
         setGHCiState state{ cmstate=cmstate1 }
 	setContextAfterLoad mods
-	dflags <- io getDynFlags
+	dflags <- getDynFlags
 	modulesLoadedMsg ok mods dflags
 
 reloadModule _ = noArgs ":reload"
@@ -894,26 +888,21 @@ setOptions wds =
       mapM_ setOpt plus_opts
 
       -- now, the GHC flags
-      pkgs_before <- io (readIORef v_ExplicitPackages)
-      leftovers   <- io (processArgs static_flags minus_opts [])
-      pkgs_after  <- io (readIORef v_ExplicitPackages)
-
-      -- update things if the users wants more packages
-      let new_packages = pkgs_after \\ pkgs_before
-      when (not (null new_packages)) $
-	 newPackages new_packages
-
-      -- don't forget about the extra command-line flags from the 
-      -- extra_ghc_opts fields in the new packages
-      new_package_details <- io (getPackageDetails new_packages)
+      leftovers <- io $ processStaticFlags minus_opts
 
       -- then, dynamic flags
-      io $ do 
-	restoreDynFlags
-        leftovers <- processArgs dynamic_flags leftovers []
-	saveDynFlags
+      dflags <- getDynFlags
+      (dflags',leftovers) <- io $ processDynamicFlags leftovers dflags
+      setDynFlags dflags'
 
-        if (not (null leftovers))
+        -- update things if the users wants more packages
+{- TODO:
+        let new_packages = pkgs_after \\ pkgs_before
+        when (not (null new_packages)) $
+  	   newPackages new_packages
+-}
+
+      if (not (null leftovers))
 		then throwDyn (CmdLineError ("unrecognised flags: " ++ 
 						unwords leftovers))
 		else return ()
@@ -968,7 +957,7 @@ newPackages new_pkgs = do	-- The new packages are already in v_Packages
   state    <- getGHCiState
   cmstate1 <- io (cmUnload (cmstate state))
   setGHCiState state{ cmstate = cmstate1, targets = [] }
-  dflags   <- io getDynFlags
+  dflags   <- getDynFlags
   io (linkPackages dflags new_pkgs)
   setContextAfterLoad []
 
@@ -1047,6 +1036,10 @@ setGHCiState s = GHCi $ \r -> writeIORef r s
 -- for convenience...
 getCmState = getGHCiState >>= return . cmstate
 setCmState cms = do s <- getGHCiState; setGHCiState s{cmstate=cms}
+
+getDynFlags = getCmState >>= return . cmGetDFlags
+
+setDynFlags dflags = do s <- getCmState; setCmState (cmSetDFlags s dflags)
 
 isOptionSet :: GHCiOption -> GHCi Bool
 isOptionSet opt

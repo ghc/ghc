@@ -1,29 +1,35 @@
+/* The RTS is just another package! */
+
 #include "ghcconfig.h"
 #include "RtsConfig.h"
 
-/* The RTS is just another package! */
-Package {
-	name           = "rts",
-        import_dirs    = [],
-        source_dirs    = [],
+name:		rts
+version:	1.0
+license:	BSD3
+maintainer:	glasgow-haskell-users@haskell.org
+exposed:	True
+
+exposed-modules:
+hidden-modules:
+
+import-dirs:
 
 #ifdef INSTALLING
-        library_dirs   =  [ "$libdir"
+library-dirs:		"$libdir"
 # ifdef mingw32_TARGET_OS
-			  /* force the dist-provided gcc-lib/ into scope. */
-			  , "$libdir/gcc-lib"
+			, "$libdir/gcc-lib"
+			/* force the dist-provided gcc-lib/ into scope. */
 # endif
 #else /* !INSTALLING */
-        library_dirs	= [ "$libdir/ghc/rts"
+library-dirs:		"$libdir/ghc/rts"
 # ifndef HAVE_LIBGMP
-			  , "$libdir/ghc/rts/gmp"
+			, "$libdir/ghc/rts/gmp"
 # endif
 #endif
-			  ],
 
-        hs_libraries      = [ "HSrts" ],
-	extra_libraries   = [
-			    "m"		/* for ldexp() */
+hs-libraries:   "HSrts"
+
+extra-libs:		"m"		/* for ldexp() */
 #ifndef HAVE_FRAMEWORK_HASKELLSUPPORT
 			      , "gmp"
 #ifdef HAVE_LIBDL
@@ -44,26 +50,22 @@ Package {
                               ,"mingwex"
 # endif
 #endif
-			    ],
 
 #ifdef INSTALLING
-        include_dirs	= [ "$libdir/include"
+include-dirs:		"$libdir/include"
 # ifdef mingw32_TARGET_OS
-			  , "$libdir/include/mingw"
+			, "$libdir/include/mingw"
 # endif
-			  ],
 #else /* !INSTALLING */
-	include_dirs	= [ "$libdir/ghc/includes" ],
+include-dirs:		"$libdir/ghc/includes"
 #endif
 
-        c_includes     = [ "Stg.h" ],
-        package_deps   = [],
-        extra_ghc_opts = [],
-        extra_cc_opts  = [],
-               /* the RTS forward-references to a bunch of stuff in the prelude,
-                  so we force it to be included with special options to ld. */
-        extra_ld_opts  =
-         [
+includes:		Stg.h
+depends:	 	
+extra-hugs-opts:
+extra-cc-opts:
+
+extra-ld-opts:
 #ifdef LEADING_UNDERSCORE
            "-u", "_GHCziBase_Izh_static_info"
          , "-u", "_GHCziBase_Czh_static_info"
@@ -133,8 +135,15 @@ Package {
          , "-u", "GHCziWeak_runFinalizzerBatch_closure"
          , "-u", "__stginit_Prelude"
 #endif
-         ]
+
+framework-dirs:
+
 #ifdef HAVE_FRAMEWORK_HASKELLSUPPORT
-        , extra_frameworks  = [ "HaskellSupport" ]
+extra-frameworks:	"HaskellSupport"
+#else
+extra-frameworks:
 #endif
-}
+
+haddock-interfaces:
+haddock-html:
+

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.71 2004/09/30 10:35:36 simonpj Exp $
+% $Id: CgCase.lhs,v 1.72 2004/11/26 16:19:59 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -336,9 +336,10 @@ cgInlinePrimOp primop args bndr (AlgAlt tycon) live_in_alts alts
 	 	-- Bind the default binder if necessary
 		-- (avoiding it avoids the assignment)
 		-- The deadness info is set by StgVarInfo
+	; dflags <- getDynFlags
 	; whenC (not (isDeadBinder bndr))
 		(do { tmp_reg <- bindNewToTemp bndr
-		    ; stmtC (CmmAssign tmp_reg (tagToClosure tycon tag_amode)) })
+		    ; stmtC (CmmAssign tmp_reg (tagToClosure dflags tycon tag_amode)) })
 
 		-- Compile the alts
 	; (branches, mb_deflt) <- cgAlgAlts NoGC Nothing{-cc_slot-}

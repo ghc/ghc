@@ -29,9 +29,9 @@ import Name		( Name, nameUnique, nameModule,
 			  mkExternalName, mkInternalName )
 import OccName		( OccName, isTupleOcc_maybe, tcName, dataName,
 			  lookupOccEnv, unitOccEnv, extendOccEnv, extendOccEnvList )
-import PrelNames	( gHC_PRIM_Name, pREL_TUP_Name )
-import Module		( Module, ModuleName, moduleName, mkPackageModule, 
-			  emptyModuleEnv, lookupModuleEnvByName, extendModuleEnv_C )
+import PrelNames	( gHC_PRIM, pREL_TUP )
+import Module		( Module, mkModule, emptyModuleEnv, 
+			  lookupModuleEnv, extendModuleEnv_C )
 import UniqSupply	( UniqSupply, splitUniqSupply, uniqFromSupply, uniqsFromSupply )
 import FiniteMap	( emptyFM, lookupFM, addToFM )
 import BasicTypes	( IPName(..), mapIPName )
@@ -71,7 +71,7 @@ allocateGlobalBinder
   -> Module -> OccName -> Maybe Name -> SrcLoc 
   -> (NameCache, Name)
 allocateGlobalBinder name_supply mod occ mb_parent loc
-  = case lookupOrigNameCache (nsNames name_supply) (moduleName mod) occ of
+  = case lookupOrigNameCache (nsNames name_supply) mod occ of
 	-- A hit in the cache!  We are at the binding site of the name.
 	-- This is the moment when we know the defining Module and SrcLoc
 	-- of the Name, so we set these fields in the Name we return.
@@ -126,12 +126,8 @@ newImplicitBinder base_name mk_sys_occ
 		    Just parent_name  -> parent_name
 		    Nothing 	      -> base_name
 
-lookupOrig :: ModuleName -> OccName -> TcRnIf a b Name
--- This one starts with a ModuleName, not a Module, because 
--- we may be simply looking at an occurrence M.x in an interface file.
--- We may enounter this well before finding the binding site for M.x
---
--- So, even if we get a miss in the original-name cache, we 
+lookupOrig :: Module -> OccName -> TcRnIf a b Name
+-- Even if we get a miss in the original-name cache, we 
 -- make a new External Name. 
 -- We fake up 
 --	Module to AnotherPackage
@@ -139,8 +135,8 @@ lookupOrig :: ModuleName -> OccName -> TcRnIf a b Name
 --	Parent no Nothing
 -- They'll be overwritten, in due course, by LoadIface.loadDecl.
 
-lookupOrig mod_name occ 
-  = do 	{ 	-- First ensure that mod_name and occ are evaluated
+lookupOrig mod occ 
+  = do 	{ 	-- First ensure that mod and occ are evaluated
 		-- If not, chaos can ensue:
 		-- 	we read the name-cache
 		-- 	then pull on mod (say)
@@ -149,20 +145,15 @@ lookupOrig mod_name occ
 	  mod `seq` occ `seq` return ()	
     
 	; name_supply <- getNameCache
-    	; case lookupOrigNameCache (nsNames name_supply) mod_name occ of {
+    	; case lookupOrigNameCache (nsNames name_supply) mod occ of {
 	      Just name -> returnM name ;
 	      Nothing   -> do 
 
 	{ let { (us', us1)      = splitUniqSupply (nsUniqs name_supply)
 	      ;	uniq   	  	= uniqFromSupply us1
-	      ;	name            = mkExternalName uniq tmp_mod occ Nothing noSrcLoc
-	      ;	new_cache       = extend_name_cache (nsNames name_supply) tmp_mod occ name
+	      ;	name            = mkExternalName uniq mod occ Nothing noSrcLoc
+	      ;	new_cache       = extend_name_cache (nsNames name_supply) mod occ name
 	      ;	new_name_supply = name_supply {nsUniqs = us', nsNames = new_cache}
-	      ;	tmp_mod    	= mkPackageModule mod_name 
-			-- Guess at the package-ness for now, becuase we don't know whether
-			-- this imported module is from the home package or not.
-			-- If we ever need it, we'll open its interface, and update the cache
-			-- with a better name (newGlobalBinder)
 	  }
 	; setNameCache new_name_supply
 	; return name }
@@ -191,10 +182,10 @@ newIPName occ_name_ip
 	Local helper functions (not exported)
 
 \begin{code}
-lookupOrigNameCache :: OrigNameCache -> ModuleName -> OccName -> Maybe Name
-lookupOrigNameCache nc mod_name occ
-  | mod_name == pREL_TUP_Name || mod_name == gHC_PRIM_Name,	-- Boxed tuples from one, 
-    Just tup_info <- isTupleOcc_maybe occ			-- unboxed from the other
+lookupOrigNameCache :: OrigNameCache -> Module -> OccName -> Maybe Name
+lookupOrigNameCache nc mod occ
+  | mod == pREL_TUP || mod == gHC_PRIM,		-- Boxed tuples from one, 
+    Just tup_info <- isTupleOcc_maybe occ	-- unboxed from the other
   = 	-- Special case for tuples; there are too many
 	-- of them to pre-populate the original-name cache
     Just (mk_tup_name tup_info)
@@ -204,8 +195,8 @@ lookupOrigNameCache nc mod_name occ
 	| ns == dataName = dataConName (tupleCon boxity arity)
 	| otherwise      = varName (dataConWorkId (tupleCon boxity arity))
 
-lookupOrigNameCache nc mod_name occ	-- The normal case
-  = case lookupModuleEnvByName nc mod_name of
+lookupOrigNameCache nc mod occ	-- The normal case
+  = case lookupModuleEnv nc mod of
 	Nothing      -> Nothing
 	Just occ_env -> lookupOccEnv occ_env occ
 

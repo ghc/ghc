@@ -43,7 +43,9 @@ import CoreSyn
 import PprCore		( pprCoreExpr )
 import Var		( Var, isId, isTyVar )
 import VarEnv
-import Name		( hashName, isDllName )
+import Name		( hashName )
+import Packages		( isDllName )
+import CmdLineOpts	( DynFlags )
 import Literal		( hashLiteral, literalType, litIsDupable, 
 			  litIsTrivial, isZeroLit, Literal( MachLabel ) )
 import DataCon		( DataCon, dataConRepArity, dataConArgTys,
@@ -1171,7 +1173,7 @@ If this happens we simply make the RHS into an updatable thunk,
 and 'exectute' it rather than allocating it statically.
 
 \begin{code}
-rhsIsStatic :: CoreExpr -> Bool
+rhsIsStatic :: DynFlags -> CoreExpr -> Bool
 -- This function is called only on *top-level* right-hand sides
 -- Returns True if the RHS can be allocated statically, with
 -- no thunks involved at all.
@@ -1230,33 +1232,33 @@ rhsIsStatic :: CoreExpr -> Bool
 -- When opt_RuntimeTypes is on, we keep type lambdas and treat
 -- them as making the RHS re-entrant (non-updatable).
 
-rhsIsStatic rhs = is_static False rhs
-
-is_static :: Bool	-- True <=> in a constructor argument; must be atomic
-	  -> CoreExpr -> Bool
-
-is_static False (Lam b e) = isRuntimeVar b || is_static False e
-
-is_static in_arg (Note (SCC _) e) = False
-is_static in_arg (Note _ e)       = is_static in_arg e
-
-is_static in_arg (Lit lit)
-  = case lit of
-	MachLabel _ _ -> False
-	other 	      -> True
-	-- A MachLabel (foreign import "&foo") in an argument
-	-- prevents a constructor application from being static.  The
-	-- reason is that it might give rise to unresolvable symbols
-	-- in the object file: under Linux, references to "weak"
-	-- symbols from the data segment give rise to "unresolvable
-	-- relocation" errors at link time This might be due to a bug
-	-- in the linker, but we'll work around it here anyway. 
-	-- SDM 24/2/2004
-
-is_static in_arg other_expr = go other_expr 0
+rhsIsStatic dflags rhs = is_static False rhs
   where
+  is_static :: Bool	-- True <=> in a constructor argument; must be atomic
+  	  -> CoreExpr -> Bool
+  
+  is_static False (Lam b e) = isRuntimeVar b || is_static False e
+  
+  is_static in_arg (Note (SCC _) e) = False
+  is_static in_arg (Note _ e)       = is_static in_arg e
+  
+  is_static in_arg (Lit lit)
+    = case lit of
+  	MachLabel _ _ -> False
+  	other 	      -> True
+  	-- A MachLabel (foreign import "&foo") in an argument
+  	-- prevents a constructor application from being static.  The
+  	-- reason is that it might give rise to unresolvable symbols
+  	-- in the object file: under Linux, references to "weak"
+  	-- symbols from the data segment give rise to "unresolvable
+  	-- relocation" errors at link time This might be due to a bug
+  	-- in the linker, but we'll work around it here anyway. 
+  	-- SDM 24/2/2004
+  
+  is_static in_arg other_expr = go other_expr 0
+   where
     go (Var f) n_val_args
-	| not (isDllName (idName f))
+	| not (isDllName dflags (idName f))
 	=  saturated_data_con f n_val_args
 	|| (in_arg && n_val_args == 0)	
 		-- A naked un-applied variable is *not* deemed a static RHS
