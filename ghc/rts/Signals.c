@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.28 2002/09/06 14:34:13 simonmar Exp $
+ * $Id: Signals.c,v 1.29 2002/09/17 12:11:45 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -284,6 +284,27 @@ startSignalHandlers(void)
   }
 
   unblockUserSignals();
+}
+
+/* ----------------------------------------------------------------------------
+ * Mark signal handlers during GC.
+ *
+ * We do this rather than trying to start all the signal handlers
+ * prior to GC, because that requires extra heap for the new threads.
+ * Signals must be blocked (see blockUserSignals() above) during GC to
+ * avoid race conditions.
+ * -------------------------------------------------------------------------- */
+
+void
+markSignalHandlers (evac_fn evac)
+{
+    StgPtr *p;
+
+    p = next_pending_handler;
+    while (p != pending_handler_buf) {
+	p--;
+	evac((StgClosure **)p);
+    }
 }
 
 #else // PAR

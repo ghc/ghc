@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.h,v 1.7 2002/03/12 13:57:14 simonmar Exp $
+ * $Id: Signals.h,v 1.8 2002/09/17 12:11:45 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -24,6 +24,7 @@ extern void    awaitUserSignals(void);
 /* sig_install declared in PrimOps.h */
 
 extern void startSignalHandlers(void);
+extern void markSignalHandlers (evac_fn evac);
 extern void initDefaultHandlers(void);
 
 #else

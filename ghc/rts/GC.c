@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.141 2002/09/10 10:43:52 simonmar Exp $
+ * $Id: GC.c,v 1.142 2002/09/17 12:11:44 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -27,6 +27,7 @@
 #include "Prelude.h"
 #include "ParTicky.h"		// ToDo: move into Rts.h
 #include "GCCompact.h"
+#include "Signals.h"
 #if defined(GRAN) || defined(PAR)
 # include "GranSimRts.h"
 # include "ParallelRts.h"
@@ -248,6 +249,9 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   IF_DEBUG(gc, belch("@@ Starting garbage collection at %ld (%lx)\n", 
 		     Now, Now));
 #endif
+
+  // block signals
+  blockUserSignals();
 
   // tell the stats department that we've started a GC 
   stat_startGC();
@@ -1029,6 +1033,9 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 
   // ok, GC over: tell the stats department what happened. 
   stat_endGC(allocated, collected, live, copied, N);
+
+  // unblock signals again
+  unblockUserSignals();
 
   //PAR_TICKY_TP();
 }
