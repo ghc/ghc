@@ -16,7 +16,8 @@ types that
 module BasicTypes(
 	Version, Arity, 
 	Unused, unused,
-	Fixity(..), FixityDirection(..), defaultFixity,
+	Fixity(..), FixityDirection(..), 
+	defaultFixity, maxPrecedence,
 	NewOrData(..), 
 	RecFlag(..), isRec, isNonRec,
 	TopLevelFlag(..), isTopLevel, isNotTopLevel
@@ -87,8 +88,8 @@ instance Outputable FixityDirection where
 instance Eq Fixity where		-- Used to determine if two fixities conflict
   (Fixity p1 dir1) == (Fixity p2 dir2) = p1==p2 && dir1 == dir2
 
-
-defaultFixity = Fixity 9 InfixL
+maxPrecedence = (9::Int)
+defaultFixity = Fixity maxPrecedence InfixL
 \end{code}
 
 
