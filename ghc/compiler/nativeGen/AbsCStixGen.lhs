@@ -158,7 +158,7 @@ Here we handle top-level things, like @CCodeBlock@s and
 	     : StSegment TextSegment
 	     : StLabel lbl
 	     : StCondJump tmp_lbl (StPrim IntNeOp 	
-				     [StInd IntRep StCLbl moduleRegdLabel, 
+				     [StInd IntRep (StCLbl moduleRegdLabel),
 				      StInt 0])
 	     : StAssign IntRep (StInd IntRep (StCLbl moduleRegdLabel)) (StInt 1)
 	     : code 
