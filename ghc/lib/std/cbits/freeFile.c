@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: freeFile.c,v 1.8 1999/11/26 16:25:56 simonmar Exp $
+ * $Id: freeFile.c,v 1.9 2000/03/28 08:49:56 simonmar Exp $
  *
  * Giving up files
  */
@@ -65,7 +65,11 @@ freeFileObject(StgForeignPtr ptr)
          * (via closeFile()), we will have given
 	 * up our process lock, so we break off and just return.
          */
-       return;
+      if ( fo->buf != NULL ) {
+	free(fo->buf);
+      }
+      free(fo);
+      return;
     }
 
     if (fo->buf != NULL && fo->bufWPtr > 0) {
@@ -83,6 +87,11 @@ freeFileObject(StgForeignPtr ptr)
     rc = close(fo->fd);
 #endif
     /* Error or no error, we don't care.. */
+
+    if ( fo->buf != NULL ) {
+       free(fo->buf);
+    }
+    free(fo);
 
     return;
 }

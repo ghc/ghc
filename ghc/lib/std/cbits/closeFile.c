@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: closeFile.c,v 1.8 2000/03/14 01:52:25 sof Exp $
+ * $Id: closeFile.c,v 1.9 2000/03/28 08:49:56 simonmar Exp $
  *
  * hClose Runtime Support
  */
@@ -60,6 +60,14 @@ closeFile(StgForeignPtr ptr, StgInt flush_buf)
 	
     }
 
+    /* Free the buffer straight away.  We can't free the file object
+     * itself until the finalizer runs.
+     */
+    if ( fo->buf != NULL ) {
+       free(fo->buf);
+       fo->buf = NULL;
+    }
+
     /* Closing file descriptors that refer to standard channels
        is problematic, so we back off from doing this by default,
        just closing them at the Handle level. If you insist on
@@ -89,6 +97,8 @@ closeFile(StgForeignPtr ptr, StgInt flush_buf)
 	}
       }
     }
+
     fo->fd = -1;
+
     return 0;
 }
