@@ -13,11 +13,11 @@ instance Data Test
   where
     gfoldl _ z x = z x -- folding without descent 
     toConstr (Test _) = testConstr
-    fromConstr c = case conIndex c of
+    fromConstr c = case constrIndex c of
                      1 -> Test undefined
     dataTypeOf _ = testDataType
 
-testConstr   = mkDataCon testDataType "Test" Prefix
+testConstr   = mkConstr testDataType "Test" [] Prefix
 testDataType = mkDataType "Main.Test" [testConstr]
 
 -- Test for compilation only

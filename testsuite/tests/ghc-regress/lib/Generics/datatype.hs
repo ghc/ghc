@@ -22,7 +22,7 @@ myTypeRep  = typeOf myTerm		-- type representation in Typeable
 myTyCon    = typerepTyCon myTypeRep	-- type constructor via Typeable
 myDataType = dataTypeOf myTerm		-- datatype representation in Data
 myString1  = tyconString myTyCon	-- type constructor via Typeable
-myString2  = dataTypeCon myDataType	-- type constructor via Data
+myString2  = dataTypeName myDataType	-- type constructor via Data
 
 -- Main function for testing
 main = print   ( myTypeRep

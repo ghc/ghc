@@ -52,8 +52,8 @@ mylist = addHList (1::Int)       $
          initHList
 
 -- Main function for testing
-main = print   ( show (nth1HList 1 mylist :: Maybe Int)    -- shows Maybe 1
+main = print   ( show (nth1HList 1 mylist :: Maybe Int)    -- shows Just 1
              , ( show (nth1HList 1 mylist :: Maybe Bool)   -- shows Nothing
-             , ( show (nth1HList 2 mylist :: Maybe Bool)   -- shows Maybe True
-             , ( show (nth1HList 3 mylist :: Maybe String) -- shows Maybe "42"
+             , ( show (nth1HList 2 mylist :: Maybe Bool)   -- shows Just True
+             , ( show (nth1HList 3 mylist :: Maybe String) -- shows Just "42"
              ))))

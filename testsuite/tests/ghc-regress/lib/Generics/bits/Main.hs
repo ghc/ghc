@@ -107,14 +107,14 @@ showBin t
 
   -- Obtain the maximum index for the type at hand
   max :: Int
-  max = maxConIndex myDataType
+  max = maxConstrIndex myDataType
 
   -- Obtain the index for the constructor at hand
   idx :: Int
-  idx = conIndex (toConstr t)
+  idx = constrIndex (toConstr t)
 
   -- Map basic values to strings, then to lists of bit streams
-  base = map (varNat2bin . ord) (conString (toConstr t))
+  base = map (varNat2bin . ord) (showConstr (toConstr t))
 
   -- Map constructors to bit streams of fixed length
   con2bin = fixedNat2bin (lengthNat (max - 1)) (idx - 1)
@@ -183,16 +183,16 @@ readBin = result
 
   -- Obtain the maximum index for the type at hand
   max :: Int
-  max = maxConIndex myDataType
+  max = maxConstrIndex myDataType
 
   -- Convert a bit stream into a constructor 
   bin2con :: Bin -> Constr
-  bin2con bin = indexCon myDataType ((bin2nat bin) + 1)
+  bin2con bin = indexConstr myDataType ((bin2nat bin) + 1)
 
   -- Convert string to constructor; could fail
   str2con :: String -> ReadB Constr
   str2con = maybe mzero return
-                . stringCon myDataType
+                . readConstr myDataType
 
 
 

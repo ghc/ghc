@@ -3,6 +3,7 @@
 {-
 
 This module illustrates permutation phrases.
+Disclaimer: this is a very simply, hardly debugged example.
 
 -}
 
@@ -87,7 +88,7 @@ buildT = result
   -- Turn string into constructor
   string2constr str = maybe mzero
                             return
-                            (stringCon (dataTypeOf myType) str)
+                            (readConstr (dataTypeOf myType) str)
 
   -- Specialise buildT per kid type
   buildT' :: Data a => a -> GenM

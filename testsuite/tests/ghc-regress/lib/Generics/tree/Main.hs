@@ -16,18 +16,18 @@ import CompanyDatatypes
 
 
 -- Trealise Data to Tree
-gtree :: forall a. Data a => a -> Tree String
-gtree = gdefault `extQ` string
+data2tree :: forall a. Data a => a -> Tree String
+data2tree = gdefault `extQ` atString
   where
-    string (x::String) = Node x []
-    gdefault x = Node (conString (toConstr x)) (gmapQ gtree x)
+    atString (x::String) = Node x []
+    gdefault x = Node (showConstr (toConstr x)) (gmapQ data2tree x)
 
 
 -- De-trealise Tree to Data
-gdetree :: forall a. Data a => Tree String -> Maybe a
-gdetree = gdefault `extR` string
+tree2data :: forall a. Data a => Tree String -> Maybe a
+tree2data = gdefault `extR` atString
   where
-    string (Node x []) = Just x
+    atString (Node x []) = Just x
     gdefault (Node x ts) = res
       where
 
@@ -38,10 +38,10 @@ gdetree = gdefault `extR` string
         ta   = fromJust res
 
 	-- construct constructor
-        con  = stringCon (dataTypeOf ta) x
+        con  = readConstr (dataTypeOf ta) x
 
         -- recursion per kid with accumulation
-        perkid ts = const (tail ts, gdetree (head ts)) 
+        perkid ts = const (tail ts, tree2data (head ts)) 
 
         -- recurse into kids
         kids x =
@@ -51,7 +51,7 @@ gdetree = gdefault `extR` string
 
 -- Main function for testing
 main = print $ (   genCom
-               , ( gtree genCom 
-               , ( (gdetree (gtree genCom)) :: Maybe Company 
-               , ( Just genCom == gdetree (gtree genCom)
+               , ( data2tree genCom 
+               , ( (tree2data (data2tree genCom)) :: Maybe Company 
+               , ( Just genCom == tree2data (data2tree genCom)
                ))))

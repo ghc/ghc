@@ -38,6 +38,6 @@ In fact, this is what Haskell's normal show would also do:
 
 gshow' :: Data a => a -> String
 gshow' t =     "("
-            ++ conString (toConstr t)
+            ++ showConstr (toConstr t)
             ++ concat (gmapQ ((++) " " . gshow') t)
             ++ ")"

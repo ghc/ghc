@@ -42,9 +42,12 @@ clean:
 	rm -f geq/geq
 	rm -f gmapQ-assoc
 	rm -f gread
+	rm -f gread2
 	rm -f gshow/gshow
 	rm -f gzip/gzip
+	rm -f hopat
 	rm -f local-quantors
+	rm -f labels
 	rm -f mega-model/mega-model
 	rm -f newtype
 	rm -f perm

@@ -47,7 +47,7 @@ data2content =         element
  where
 
   -- Handle an element
-  element x = [CElem (Elem (tyconUQname (dataTypeCon (dataTypeOf x)))
+  element x = [CElem (Elem (tyconUQname (dataTypeName (dataTypeOf x)))
                            [] -- no attributes 
                            (concat (gmapQ data2content x)))]
 
@@ -88,7 +88,7 @@ content2data = result
                case c of
                  (CElem (Elem x as cs))
                     |    as == [] -- no attributes
-                      && x  == (tyconUQname (dataTypeCon (dataTypeOf myType)))
+                      && x  == (tyconUQname (dataTypeName (dataTypeOf myType)))
                    -> alts cs
                  _ -> mzero
 
@@ -107,7 +107,7 @@ content2data = result
   shapes = map fromConstr consOf
 
   -- Retrieve all constructors of the requested type
-  consOf = algTypeCons
+  consOf = dataTypeConstrs
          $ dataTypeOf 
          $ myType
 
