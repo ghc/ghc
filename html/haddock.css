@@ -11,6 +11,7 @@ TD.topbar {
 TD.title {
   color: #ffffff;
   padding-left: 10px;
+  width: 100%
   }
 
 TD.topbut {
@@ -36,6 +37,10 @@ TD.topbut:hover {
 TD.modulebar { 
   background-color: #0077dd;
   padding: 5
+  }
+
+TD.children {
+  padding-left: 25px;
   }
 
 TD.synopsis {
