@@ -270,18 +270,18 @@ dmdAnal sigs dmd (Let (NonRec id rhs) body)
 	(body_ty1, id2)    	      = annotateBndr body_ty id1
 	body_ty2		      = addLazyFVs body_ty1 lazy_fv
     in
-#ifdef DEBUG
-	-- If the actual demand is better than the vanilla
-	-- demand, we might do better to re-analyse with the
-	-- stronger demand.
-    (let vanilla_dmd = vanillaCall (idArity id)
-	 actual_dmd  = idNewDemandInfo id2
-     in
-     if actual_dmd `betterDemand` vanilla_dmd && actual_dmd /= vanilla_dmd then
-	pprTrace "dmdLet: better demand" (ppr id <+> vcat [text "vanilla" <+> ppr vanilla_dmd,
-							   text "actual" <+> ppr actual_dmd])
-     else \x -> x)
-#endif
+	-- If the actual demand is better than the vanilla call
+	-- demand, you might think that we might do better to re-analyse 
+	-- the RHS with the stronger demand.
+	-- But (a) That seldom happens, because it means that *every* path in 
+	-- 	   the body of the let has to use that stronger demand
+	-- (b) It often happens temporarily in when fixpointing, because
+	--     the recursive function at first seems to place a massive demand.
+	--     But we don't want to go to extra work when the function will
+	--     probably iterate to something less demanding.  
+	-- In practice, all the times the actual demand on id2 is more than
+	-- the vanilla call demand seem to be due to (b).  So we don't
+	-- bother to re-analyse the RHS.
     (body_ty2, Let (NonRec id2 rhs') body')    
 
 dmdAnal sigs dmd (Let (Rec pairs) body) 
