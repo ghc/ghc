@@ -608,7 +608,7 @@ LITERATE_PREFIX    	= $(FPTOOLS_TOP)/literate/
 
 UNLIT_PREFIX    	= $(FPTOOLS_TOP)/ghc/utils/unlit/
 HP2PS_PREFIX            = $(FPTOOLS_TOP)/ghc/utils/hp2ps/
-HSTAGS_PREFIX           = $(FPTOOLS_TOP)/ghc/utils/hstags/
+HSTAGS_PREFIX           = $(FPTOOLS_TOP)/ghc/utils/hasktags/
 HSC2HS_PREFIX		= $(FPTOOLS_TOP)/ghc/utils/hsc2hs/
 
 #-----------------------------------------------------------------------------
@@ -880,7 +880,7 @@ LIT2TEXT 		= $(LITERATE_PREFIX)lit2text
 #
 UNLIT	 		= $(UNLIT_PREFIX)unlit$(exeext)
 HP2PS			= $(HP2PS_PREFIX)hp2ps$(exeext)
-HSTAGS			= $(HSTAGS_PREFIX)hstags
+HSTAGS			= $(HSTAGS_PREFIX)hasktags
 HSC2HS			= $(HSC2HS_PREFIX)hsc2hs-inplace
 
 #
