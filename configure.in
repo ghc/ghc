@@ -1067,11 +1067,8 @@ dnl ** check for math library
 FPTOOLS_CHECK_LIBM()
 AC_SUBST(LIBM)
 
-case $HostOS_CPP in
-cygwin32) ;;
-mingw32)  ;;
-*) AC_PATH_XTRA() ;;
-esac
+dnl ** check for X Window System
+AC_PATH_XTRA()
 
 dnl ** check for OpenGL/GLUT/GLX include paths and libraries
 if test $GhcLibsWithHOpenGL = YES ; then
