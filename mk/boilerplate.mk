@@ -53,6 +53,12 @@ ifneq "$(way)" ""
   _way := _$(way)
 endif
 
+
+# When using $(patsubst ...) and friends, you can't use a literal comma
+# freely - so we use ${comma} instead.  (See PACKAGE_CPP_OPTS in package.mk
+# for an example usage.)
+comma=,
+
 # -----------------------------------------------------------------------------
 # 	Now follow the pieces of boilerplate
 #	The "-" signs tell make not to complain if they don't exist
