@@ -449,6 +449,9 @@
 /* Define if you have the <windows.h> header file.  */
 #undef HAVE_WINDOWS_H
 
+/* Define if you have the <winsock.h> header file.  */
+#undef HAVE_WINSOCK_H
+
 /* Define if you have the bfd library (-lbfd).  */
 #undef HAVE_LIBBFD
 

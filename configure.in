@@ -475,7 +475,7 @@ dnl ** check for full ANSI header (.h) files
 AC_HEADER_STDC
 
 dnl ** check for specific header (.h) files that we are interested in
-AC_CHECK_HEADERS(Files.h assert.h console.h ctype.h dirent.h errno.h fcntl.h float.h ftw.h grp.h ieee754.h malloc.h memory.h nlist.h pascal.h pwd.h sgtty.h siginfo.h signal.h stat.h stdlib.h stdarg.h string.h sys/fault.h sys/file.h sys/ioctl.h sys/limits.h sys/mman.h sys/param.h sys/procfs.h sys/resource.h sys/signal.h sys/socket.h netinet/tcp.h sys/stat.h sys/syscall.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/types.h sys/utsname.h sys/vadvise.h sys/wait.h termio.h termios.h time.h types.h unistd.h utime.h values.h vfork.h readline/readline.h bfd.h)
+AC_CHECK_HEADERS(Files.h assert.h console.h ctype.h dirent.h errno.h fcntl.h float.h ftw.h grp.h ieee754.h malloc.h memory.h nlist.h pascal.h pwd.h sgtty.h siginfo.h signal.h stat.h stdlib.h stdarg.h string.h sys/fault.h sys/file.h sys/ioctl.h sys/limits.h sys/mman.h sys/param.h sys/procfs.h sys/resource.h sys/signal.h sys/socket.h netinet/tcp.h sys/stat.h sys/syscall.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/types.h sys/utsname.h sys/vadvise.h sys/wait.h termio.h termios.h time.h types.h unistd.h utime.h values.h vfork.h readline/readline.h bfd.h winsock.h)
 
 dnl ** check for DOS include files
 AC_CHECK_HEADERS(dos.h conio.h io.h std.h) 
