@@ -47,11 +47,6 @@ def runCmdDontFail( $cmd )
    fi
 }
 
-def runCmdIgnoreResult( $cmd )
-{
-   $res = runCmd($cmd)
-}
-
 -- (eg) "run.stdout"  -->  "testdir/testname.run.stdout"
 def qualify ( $_filename_frag )
 {
@@ -97,7 +92,7 @@ def say_fail_because_noteq ( $filename1, $filename2 )
 	runCmdDontFail($cp ++ " " ++ $filename2 ++ " " ++ $filename1)
    fi
    if defined $verbose then
-	runCmdIgnoreResult($diff ++ " " ++ $filename1 ++ " " ++ $filename2)
+	runCmd($diff ++ " " ++ $filename1 ++ " " ++ $filename2)
    fi
 }
 
@@ -168,16 +163,14 @@ def simple_build_Main_WRK ( $_extra_args, $compile_only )
    rm_or_fail($errname)
    rm_or_fail($exename)
    $cmd = $tool ++ " " ++ $flags ++ " " ++ $_extra_args ++ " "
-	  ++ if defined $extra_hc_flags
+	  ++ (if defined $extra_hc_flags
 		  then $extra_hc_flags 
-		  else ""
-	     fi
-          ++ if defined $compile_to_hc && $compile_to_hc
+		  else "")
+          ++ (if defined $compile_to_hc && $compile_to_hc
 		  then " -C "
 	     	  else if $compile_only 
                   	then " -c " 
-                  	else " -o " ++ $exename ++ " " 
-             fi fi
+                  	else " -o " ++ $exename ++ " ")
           ++ $srcname ++ " &> " ++ $errname
    $res = runCmd($cmd)
    return $res
@@ -199,7 +192,7 @@ def simple_run_main( $_extra_args )
    $run_stdout = qualify("run.stdout")
    $run_stderr = qualify("run.stderr")
    $use_stdin
-      = if exists($spec_stdin) then $spec_stdin else $devnull fi
+      = if exists($spec_stdin) then $spec_stdin else $devnull
 
    rm_or_fail($run_stdout)
    rm_or_fail($run_stderr)
@@ -252,7 +245,7 @@ def check_stderr_ok()
    $s_stderr  = qualify("stderr")
 
    if   not ( exists($s_stderr) )
-   then return (contents($r_stderr) == "")
+   then return ((contents $r_stderr) == "")
    fi
 
    return same($s_stderr, $r_stderr)
