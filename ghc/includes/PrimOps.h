@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.53 2000/05/10 11:02:00 simonmar Exp $
+ * $Id: PrimOps.h,v 1.54 2000/05/12 20:01:28 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -410,41 +410,41 @@ EF_(decodeDoublezh_fast);
 
 #ifdef SUPPORT_LONG_LONGS
 
-#define integerToWord64zh(r, sa,da)				\
-{ unsigned long int* d;						\
-  I_ aa;							\
-  StgWord64 res;						\
-								\
-  d		= (unsigned long int *) (BYTE_ARR_CTS(da));	\
-  aa = ((StgArrWords *)da)->words;				\
-  if ( (aa) == 0 ) {						\
-     res = (LW_)0;						\
-  } else if ( (aa) == 1) {					\
-     res = (LW_)d[0];						\
-  } else {							\
-     res = (LW_)d[0] + (LW_)d[1] * 0x100000000ULL;		\
-  }								\
-  (r) = res;							\
+#define integerToWord64zh(r, sa,da)			\
+{ unsigned long int* d;					\
+  I_ s;							\
+  StgWord64 res;					\
+							\
+  d = (unsigned long int *) (BYTE_ARR_CTS(da));		\
+  s = (sa);						\
+  if ( s == 0 ) {					\
+     res = (LW_)0;					\
+  } else if ( s == 1) {					\
+     res = (LW_)d[0];					\
+  } else {						\
+     res = (LW_)d[0] + (LW_)d[1] * 0x100000000ULL;	\
+  }							\
+  (r) = res;						\
 }
 
-#define integerToInt64zh(r, sa,da)				\
-{ unsigned long int* d;						\
-  I_ aa;							\
-  StgInt64 res;							\
-								\
-  d		= (unsigned long int *) (BYTE_ARR_CTS(da));	\
-  aa = ((StgArrWords *)da)->words;				\
-  if ( (aa) == 0 ) {						\
-     res = (LI_)0;						\
-  } else if ( (aa) == 1) {					\
-     res = (LI_)d[0];						\
-  } else {							\
-     res = (LI_)d[0] + (LI_)d[1] * 0x100000000LL;		\
-     if ( sa < 0 ) {						\
-	   res = (LI_)-res;					\
-     }								\
-  }								\
-  (r) = res;							\
+#define integerToInt64zh(r, sa,da)			\
+{ unsigned long int* d;					\
+  I_ s;							\
+  StgInt64 res;						\
+							\
+  d = (unsigned long int *) (BYTE_ARR_CTS(da));		\
+  s = (sa);						\
+  if ( s == 0 ) {					\
+     res = (LI_)0;					\
+  } else if ( s == 1) {					\
+     res = (LI_)d[0];					\
+  } else {						\
+     res = (LI_)d[0] + (LI_)d[1] * 0x100000000LL;	\
+     if ( s < 0 ) {					\
+	   res = (LI_)-res;				\
+     }							\
+  }							\
+  (r) = res;						\
 }
 
 /* Conversions */
