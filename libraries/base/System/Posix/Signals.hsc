@@ -57,9 +57,11 @@ module System.Posix.Signals (
   signalProcess,
   signalProcessGroup,
 
+#ifdef __GLASGOW_HASKELL__
   -- * Handling signals
   Handler(..),
   installHandler,
+#endif
 
   -- * Signal sets
   SignalSet,
@@ -75,8 +77,10 @@ module System.Posix.Signals (
   -- * Waiting for signals
   getPendingSignals, awaitSignal,
 
+#ifdef __GLASGOW_HASKELL__
   -- * The @NOCLDSTOP@ flag
   setStoppedChildFlag, queryStoppedChildFlag,
+#endif
 
   -- MISSING FUNCTIONALITY:
   -- sigaction(), (inc. the sigaction structure + flags etc.)
@@ -87,7 +91,11 @@ module System.Posix.Signals (
 #endif
   ) where
 
+#ifdef __GLASGOW_HASKELL__
 #include "Signals.h"
+#else
+#include "HsBase.h"
+#endif
 
 import Foreign
 import Foreign.C
@@ -106,6 +114,38 @@ type Signal = CInt
 nullSignal :: Signal
 nullSignal = 0
 
+#ifdef __HUGS__
+sigABRT   = (#const SIGABRT)   :: CInt
+sigALRM   = (#const SIGALRM)   :: CInt
+sigBUS    = (#const SIGBUS)    :: CInt
+sigCHLD   = (#const SIGCHLD)   :: CInt
+sigCONT   = (#const SIGCONT)   :: CInt
+sigFPE    = (#const SIGFPE)    :: CInt
+sigHUP    = (#const SIGHUP)    :: CInt
+sigILL    = (#const SIGILL)    :: CInt
+sigINT    = (#const SIGINT)    :: CInt
+sigKILL   = (#const SIGKILL)   :: CInt
+sigPIPE   = (#const SIGPIPE)   :: CInt
+sigQUIT   = (#const SIGQUIT)   :: CInt
+sigSEGV   = (#const SIGSEGV)   :: CInt
+sigSTOP   = (#const SIGSTOP)   :: CInt
+sigTERM   = (#const SIGTERM)   :: CInt
+sigTSTP   = (#const SIGTSTP)   :: CInt
+sigTTIN   = (#const SIGTTIN)   :: CInt
+sigTTOU   = (#const SIGTTOU)   :: CInt
+sigUSR1   = (#const SIGUSR1)   :: CInt
+sigUSR2   = (#const SIGUSR2)   :: CInt
+#if HAVE_SIGPOLL
+sigPOLL   = (#const SIGPOLL)   :: CInt
+#endif
+sigPROF   = (#const SIGPROF)   :: CInt
+sigSYS    = (#const SIGSYS)    :: CInt
+sigTRAP   = (#const SIGTRAP)   :: CInt
+sigURG    = (#const SIGURG)    :: CInt
+sigVTALRM = (#const SIGVTALRM) :: CInt
+sigXCPU   = (#const SIGXCPU)   :: CInt
+sigXFSZ   = (#const SIGXFSZ)   :: CInt
+#else
 foreign import ccall unsafe "__hsposix_SIGABRT"   sigABRT   :: CInt
 foreign import ccall unsafe "__hsposix_SIGALRM"   sigALRM   :: CInt
 foreign import ccall unsafe "__hsposix_SIGBUS"    sigBUS    :: CInt
@@ -136,6 +176,7 @@ foreign import ccall unsafe "__hsposix_SIGURG"    sigURG    :: CInt
 foreign import ccall unsafe "__hsposix_SIGVTALRM" sigVTALRM :: CInt
 foreign import ccall unsafe "__hsposix_SIGXCPU"   sigXCPU   :: CInt
 foreign import ccall unsafe "__hsposix_SIGXFSZ"   sigXFSZ   :: CInt
+#endif /* __HUGS__ */
 
 internalAbort ::Signal
 internalAbort = sigABRT
@@ -248,6 +289,7 @@ raiseSignal sig = throwErrnoIfMinus1_ "raiseSignal" (c_raise sig)
 foreign import ccall unsafe "raise"
   c_raise :: CInt -> IO CInt
 
+#ifdef __GLASGOW_HASKELL__
 data Handler = Default
              | Ignore
 	     -- not yet: | Hold 
@@ -302,7 +344,8 @@ foreign import ccall unsafe
   stg_sig_install :: CInt -> CInt -> Ptr (StablePtr (IO ())) -> Ptr CSigset
 	 -> IO CInt
 
-#endif // !__PARALLEL_HASKELL__
+#endif /* !__PARALLEL_HASKELL__ */
+#endif /* __GLASGOW_HASKELL__ */
 
 -- -----------------------------------------------------------------------------
 -- Alarms
@@ -315,6 +358,7 @@ scheduleAlarm secs = do
 foreign import ccall unsafe "alarm"
   c_alarm :: CUInt -> IO CUInt
 
+#ifdef __GLASGOW_HASKELL__
 -- -----------------------------------------------------------------------------
 -- The NOCLDSTOP flag
 
@@ -335,6 +379,7 @@ queryStoppedChildFlag :: IO Bool
 queryStoppedChildFlag = do
     rc <- peek nocldstop
     return (rc == (0::Int))
+#endif /* __GLASGOW_HASKELL__ */
 
 -- -----------------------------------------------------------------------------
 -- Manipulating signal sets
@@ -422,6 +467,16 @@ foreign import ccall unsafe "sigsuspend"
   c_sigsuspend :: Ptr CSigset -> IO CInt
 #endif
 
+#ifdef __HUGS__
+foreign import ccall unsafe "sigdelset"
+  c_sigdelset   :: Ptr CSigset -> CInt -> IO CInt
+
+foreign import ccall unsafe "sigfillset"
+  c_sigfillset  :: Ptr CSigset -> IO CInt
+
+foreign import ccall unsafe "sigismember"
+  c_sigismember :: Ptr CSigset -> CInt -> IO CInt
+#else
 foreign import ccall unsafe "__hscore_sigdelset"
   c_sigdelset   :: Ptr CSigset -> CInt -> IO CInt
 
@@ -430,13 +485,20 @@ foreign import ccall unsafe "__hscore_sigfillset"
 
 foreign import ccall unsafe "__hscore_sigismember"
   c_sigismember :: Ptr CSigset -> CInt -> IO CInt
+#endif /* __HUGS__ */
 
 foreign import ccall unsafe "sigpending"
   c_sigpending :: Ptr CSigset -> IO CInt
 
+#ifdef __HUGS__
+c_SIG_BLOCK   = (#const SIG_BLOCK)   :: CInt
+c_SIG_SETMASK = (#const SIG_SETMASK) :: CInt
+c_SIG_UNBLOCK = (#const SIG_UNBLOCK) :: CInt
+#else
 foreign import ccall unsafe "__hsposix_SIG_BLOCK"   c_SIG_BLOCK   :: CInt
 foreign import ccall unsafe "__hsposix_SIG_SETMASK" c_SIG_SETMASK :: CInt
 foreign import ccall unsafe "__hsposix_SIG_UNBLOCK" c_SIG_UNBLOCK :: CInt
+#endif /* __HUGS__ */
 
 #endif /* mingw32_TARGET_OS */
 
