@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.4 1999/01/27 14:51:21 simonpj Exp $
+ * $Id: RtsUtils.c,v 1.5 1999/01/29 09:30:51 simonm Exp $
  *
  * General utility functions used in the RTS.
  *
@@ -160,12 +160,12 @@ nat stg_strlen(char *s)
 I_ __GenSymCounter = 0;
 
 I_
-genSymzh(void)
+genSymZh(void)
 {
     return(__GenSymCounter++);
 }
 I_
-resetGenSymzh(void) /* it's your funeral */
+resetGenSymZh(void) /* it's your funeral */
 {
     __GenSymCounter=0;
     return(__GenSymCounter);
