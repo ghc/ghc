@@ -96,15 +96,13 @@ Laziness, you know it makes sense :-)
 
 \begin{code}
 data Token
-  = ITas  			-- Haskell keywords
-  | ITcase
+  = ITcase  			-- Haskell keywords
   | ITclass
   | ITdata
   | ITdefault
   | ITderiving
   | ITdo
   | ITelse
-  | IThiding
   | ITif
   | ITimport
   | ITin
@@ -116,7 +114,6 @@ data Token
   | ITmodule
   | ITnewtype
   | ITof
-  | ITqualified
   | ITthen
   | ITtype
   | ITwhere
@@ -245,7 +242,6 @@ pragmaKeywordsFM = listToUFM $
 haskellKeywordsFM = listToUFM $
       map (\ (x,y) -> (_PK_ x,y))
        [( "_",		ITunderscore ),
-	( "as",		ITas ),
 	( "case",	ITcase ),     
 	( "class",	ITclass ),    
 	( "data",	ITdata ),     
@@ -253,7 +249,6 @@ haskellKeywordsFM = listToUFM $
 	( "deriving",	ITderiving ), 
 	( "do",		ITdo ),       
 	( "else",	ITelse ),     
-	( "hiding",	IThiding ),
 	( "if",		ITif ),       
 	( "import",	ITimport ),   
 	( "in",		ITin ),       
@@ -265,7 +260,6 @@ haskellKeywordsFM = listToUFM $
 	( "module",	ITmodule ),   
 	( "newtype",	ITnewtype ),  
 	( "of",		ITof ),       
-	( "qualified",	ITqualified ),
 	( "then",	ITthen ),     
 	( "type",	ITtype ),     
 	( "where",	ITwhere ),
@@ -341,6 +335,10 @@ haskellKeySymsFM = listToUFM $
        ,("!",		ITbang)
        ,(".",		ITdot)		-- sadly, for 'forall a . t'
        ]
+
+not_special_op ITminus = False
+not_special_op ITbang  = False
+not_special_op _ = True
 \end{code}
 
 -----------------------------------------------------------------------------
@@ -980,8 +978,9 @@ lex_id3 cont glaexts mod buf just_a_conid
        new_buf = mergeLexemes buf buf'
      in
      case lookupUFM haskellKeySymsFM lexeme of {
-	Just kwd_token -> just_a_conid;	-- avoid M.:: etc.
-	Nothing        -> cont (mk_qvar_token mod lexeme) new_buf
+	Just kwd_token | not_special_op kwd_token
+			-> just_a_conid;	-- avoid M.::, but not M.!
+	other -> cont (mk_qvar_token mod lexeme) new_buf
      }}
 
   | otherwise   =
@@ -1003,8 +1002,6 @@ lex_id3 cont glaexts mod buf just_a_conid
      case _scc_ "Lex.haskellKeyword" lookupUFM haskellKeywordsFM lexeme of {
     	    Just kwd_token -> just_a_conid; -- avoid M.where etc.
     	    Nothing        -> is_a_qvarid
-	-- TODO: special ids (as, qualified, hiding) shouldn't be
-	-- recognised as keywords here.  ie.  M.as is a qualified varid.
      }}}
 
 

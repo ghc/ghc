@@ -14,6 +14,10 @@ module ParseUtil (
 	, mkRecConstrOrUpdate	-- HsExp -> [HsFieldUpdate] -> P HsExp
 	, groupBindings
 
+	, checkAs
+	, checkHiding
+	, checkQualified
+
 	, checkPrec 		-- String -> P String
 	, checkCallConv		-- FAST_STRING -> P CallConv
 	, checkContext		-- HsType -> P HsContext
@@ -33,10 +37,9 @@ module ParseUtil (
 	, funTyCon_RDR
 
 	-- pseudo-keywords, in var and tyvar forms (all :: RdrName)
-	, as_var_RDR, hiding_var_RDR, qualified_var_RDR, forall_var_RDR
+	, forall_var_RDR
 	, export_var_RDR, label_var_RDR, dynamic_var_RDR, unsafe_var_RDR
 
-	, as_tyvar_RDR, hiding_tyvar_RDR, qualified_tyvar_RDR
 	, export_tyvar_RDR, label_tyvar_RDR, dynamic_tyvar_RDR
 	, unsafe_tyvar_RDR
 
@@ -69,12 +72,27 @@ parseError s =
   getSrcLocP `thenP` \ loc ->
   failMsgP (hcat [ppr loc, text ": ", text s])
 
+parseErrorOnInput :: P a
+parseErrorOnInput buf PState{ loc = loc } = PFailed (srcParseErr buf loc)
+
 srcParseErr :: StringBuffer -> SrcLoc -> Message
 srcParseErr s l
   = hcat [ppr l, ptext SLIT(": parse error on input "),
           char '`', text (lexemeToString s), char '\'']
 
 cbot = panic "CCall:result_ty"
+
+-----------------------------------------------------------------------------
+-- Special Ids
+
+checkAs, checkQualified, checkHiding :: FAST_STRING -> P ()
+
+checkAs s 	 | s == SLIT("as") 	  = returnP ()
+ 	  	 | otherwise              = parseErrorOnInput
+checkQualified s | s == SLIT("qualified") = returnP ()
+ 		 | otherwise              = parseErrorOnInput
+checkHiding s  	 | s == SLIT("hiding")    = returnP ()
+ 		 | otherwise              = parseErrorOnInput
 
 -----------------------------------------------------------------------------
 -- splitForConApp
@@ -428,27 +446,18 @@ unitName = SLIT("()")
 funName  = SLIT("(->)")
 listName = SLIT("[]")
 
-asName              = SLIT("as")
-hidingName          = SLIT("hiding")
-qualifiedName       = SLIT("qualified")
 forallName          = SLIT("forall")
 exportName	    = SLIT("export")
 labelName	    = SLIT("label")
 dynamicName	    = SLIT("dynamic")
 unsafeName          = SLIT("unsafe")
 
-as_var_RDR          = mkSrcUnqual varName asName
-hiding_var_RDR      = mkSrcUnqual varName hidingName
-qualified_var_RDR   = mkSrcUnqual varName qualifiedName
 forall_var_RDR      = mkSrcUnqual varName forallName
 export_var_RDR      = mkSrcUnqual varName exportName
 label_var_RDR       = mkSrcUnqual varName labelName
 dynamic_var_RDR     = mkSrcUnqual varName dynamicName
 unsafe_var_RDR      = mkSrcUnqual varName unsafeName
 
-as_tyvar_RDR        = mkSrcUnqual tvName asName
-hiding_tyvar_RDR    = mkSrcUnqual tvName hidingName
-qualified_tyvar_RDR = mkSrcUnqual tvName qualifiedName
 export_tyvar_RDR    = mkSrcUnqual tvName exportName
 label_tyvar_RDR     = mkSrcUnqual tvName labelName
 dynamic_tyvar_RDR   = mkSrcUnqual tvName dynamicName

@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.7 1999/06/25 14:38:54 simonmar Exp $
+$Id: Parser.y,v 1.8 1999/06/28 15:42:33 simonmar Exp $
 
 Haskell grammar.
 
@@ -61,7 +61,6 @@ Conflicts: 14 shift/reduce
 
 %token
  '_'            { ITunderscore }		-- Haskell keywords
- 'as' 		{ ITas }
  'case' 	{ ITcase }  	
  'class' 	{ ITclass } 
  'data' 	{ ITdata } 
@@ -69,7 +68,6 @@ Conflicts: 14 shift/reduce
  'deriving' 	{ ITderiving }
  'do' 		{ ITdo }
  'else' 	{ ITelse }
- 'hiding' 	{ IThiding }
  'if' 		{ ITif }
  'import' 	{ ITimport }
  'in' 		{ ITin }
@@ -81,7 +79,6 @@ Conflicts: 14 shift/reduce
  'module' 	{ ITmodule }
  'newtype' 	{ ITnewtype }
  'of' 		{ ITof }
- 'qualified' 	{ ITqualified }
  'then' 	{ ITthen }
  'type' 	{ ITtype }
  'where' 	{ ITwhere }
@@ -860,9 +857,6 @@ qvarid :: { RdrName }
 
 varid :: { RdrName }
 	: VARID			{ mkSrcUnqual varName $1 }
-	| 'as'			{ as_var_RDR }
-	| 'qualified'		{ qualified_var_RDR }
-	| 'hiding'		{ hiding_var_RDR }
 	| 'forall'		{ forall_var_RDR }
 	| 'export'		{ export_var_RDR }
 	| 'label'		{ label_var_RDR }
@@ -871,13 +865,15 @@ varid :: { RdrName }
 
 varid_no_unsafe :: { RdrName }
 	: VARID			{ mkSrcUnqual varName $1 }
-	| 'as'			{ as_var_RDR }
-	| 'qualified'		{ qualified_var_RDR }
-	| 'hiding'		{ hiding_var_RDR }
 	| 'forall'		{ forall_var_RDR }
 	| 'export'		{ export_var_RDR }
 	| 'label'		{ label_var_RDR }
 	| 'dynamic'		{ dynamic_var_RDR }
+
+-- ``special'' Ids
+'as' 	    :: { () } : VARID	{% checkAs $1 }
+'qualified' :: { () } : VARID	{% checkQualified $1 }
+'hiding'    :: { () } : VARID	{% checkHiding $1 }
 
 -----------------------------------------------------------------------------
 -- ConIds
@@ -970,9 +966,6 @@ qtycls 	:: { RdrName }
 
 tyvar 	:: { RdrName }
 	: VARID			{ mkSrcUnqual tvName $1 }
-	| 'as'			{ as_tyvar_RDR }
-	| 'qualified'		{ qualified_tyvar_RDR }
-	| 'hiding'		{ hiding_tyvar_RDR }
 	| 'export'		{ export_var_RDR }
 	| 'label'		{ label_var_RDR }
 	| 'dynamic'		{ dynamic_var_RDR }
