@@ -290,19 +290,11 @@ printClosure( StgClosure *obj )
         }
 
     case CAF_BLACKHOLE:
-            debugBelch("CAF_BH("); 
-            printPtr((StgPtr)stgCast(StgBlockingQueue*,obj)->blocking_queue);
-            debugBelch(")\n"); 
+            debugBelch("CAF_BH"); 
             break;
 
     case BLACKHOLE:
             debugBelch("BH\n"); 
-            break;
-
-    case BLACKHOLE_BQ:
-            debugBelch("BQ("); 
-            printPtr((StgPtr)stgCast(StgBlockingQueue*,obj)->blocking_queue);
-            debugBelch(")\n"); 
             break;
 
     case SE_BLACKHOLE:

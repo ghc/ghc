@@ -29,6 +29,10 @@
 #include "RtsFlags.h"
 #include "Schedule.h"
 
+#if HAVE_SIGNAL_H
+#include <signal.h>
+#endif
+
 /* There's not all that much code that is shared between the
  * SMP and threads version of the 'task manager.' A sign
  * that the code ought to be structured differently..(Maybe ToDo).
@@ -39,12 +43,13 @@
  * accessed with the RTS lock in hand.
  */
 #if defined(SMP)
-static TaskInfo* taskTable;
+TaskInfo* taskTable;
 #endif
 /* upper bound / the number of tasks created. */
 static nat maxTasks;  
 /* number of tasks currently created */
 static nat taskCount; 
+static nat awaitDeath;
 
 #if defined(SMP)
 void
@@ -73,7 +78,7 @@ startTaskManager( nat maxCount, void (*taskStart)(void) )
   }
 }
 
-void
+rtsBool
 startTask ( void (*taskStart)(void) )
 {
   int r;
@@ -92,11 +97,11 @@ startTask ( void (*taskStart)(void) )
   taskTable[taskCount].elapsedtimestart = stat_getElapsedTime();
 
   IF_DEBUG(scheduler,debugBelch("scheduler: Started task: %ld\n",tid););
-  return;
+  return rtsTrue;
 }
 
 void
-stopTaskManager ()
+stopTaskManager (void)
 {
   nat i;
   OSThreadId tid = osThreadId();
@@ -120,14 +125,14 @@ stopTaskManager ()
 #endif
 
   /* Send 'em all a SIGHUP.  That should shut 'em up. */
-  await_death = maxCount - 1;
-  for (i = 0; i < maxCount; i++) {
+  awaitDeath = taskCount==0 ? 0 : taskCount-1;
+  for (i = 0; i < taskCount; i++) {
     /* don't cancel the thread running this piece of code. */
     if ( taskTable[i].id != tid ) {
       pthread_kill(taskTable[i].id,SIGTERM);
     }
   }
-  while (await_death > 0) {
+  while (awaitDeath > 0) {
     sched_yield();
   }
   
@@ -135,7 +140,7 @@ stopTaskManager ()
 }
 
 void
-resetTaskManagerAfterFork ()
+resetTaskManagerAfterFork (void)
 {
 	barf("resetTaskManagerAfterFork not implemented for SMP");
 }
@@ -180,7 +185,6 @@ startTask ( void (*taskStart)(void) )
     return rtsFalse;
   }
   
-
   r = createOSThread(&tid,taskStart);
   if (r != 0) {
     barf("startTask: Can't create new task");

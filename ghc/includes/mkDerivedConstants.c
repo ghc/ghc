@@ -273,9 +273,6 @@ main(int argc, char *argv[])
     opt_struct_size(StgTSOGranInfo,GRAN);
     opt_struct_size(StgTSODistInfo,DIST);
 
-    closure_size(StgBlockingQueue);
-    closure_field(StgBlockingQueue, blocking_queue);
-
     closure_field(StgUpdateFrame, updatee);
 
     closure_field(StgCatchFrame, handler);

@@ -146,10 +146,19 @@ extern lnat RTS_VAR(timestamp);
 #else
 extern  StgTSO *RTS_VAR(run_queue_hd), *RTS_VAR(run_queue_tl);
 extern  StgTSO *RTS_VAR(blocked_queue_hd), *RTS_VAR(blocked_queue_tl);
+extern  StgTSO *RTS_VAR(blackhole_queue);
 extern  StgTSO *RTS_VAR(sleeping_queue);
 #endif
 /* Linked list of all threads. */
 extern  StgTSO *RTS_VAR(all_threads);
+
+/* Set to rtsTrue if there are threads on the blackhole_queue, and
+ * it is possible that one or more of them may be available to run.
+ * This flag is set to rtsFalse after we've checked the queue, and
+ * set to rtsTrue just before we run some Haskell code.  It is used
+ * to decide whether we should yield the Capability or not.
+ */
+extern rtsBool blackholes_need_checking;
 
 #if defined(RTS_SUPPORTS_THREADS)
 /* Schedule.c has detailed info on what these do */
@@ -198,11 +207,7 @@ typedef struct StgMainThread_ {
   SchedulerStatus  stat;
   StgClosure **    ret;
 #if defined(RTS_SUPPORTS_THREADS)
-#if defined(THREADED_RTS)
   Condition        bound_thread_cond;
-#else
-  Condition        wakeup;
-#endif
 #endif
   struct StgMainThread_ *prev;
   struct StgMainThread_ *link;

@@ -179,7 +179,7 @@ stg_init_finish
 stg_init
 {
   W_ next;
-  Sp = W_[MainCapability + OFFSET_Capability_r + OFFSET_StgRegTable_rSp];
+  Sp = W_[BaseReg + OFFSET_StgRegTable_rSp];
   next = W_[Sp];
   Sp_adj(1);
   jump next;

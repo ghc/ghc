@@ -145,9 +145,15 @@ StgTSO *run_queue_hd = NULL;
 StgTSO *run_queue_tl = NULL;
 StgTSO *blocked_queue_hd = NULL;
 StgTSO *blocked_queue_tl = NULL;
+StgTSO *blackhole_queue = NULL;
 StgTSO *sleeping_queue = NULL;    /* perhaps replace with a hash table? */
 
 #endif
+
+/* The blackhole_queue should be checked for threads to wake up.  See
+ * Schedule.h for more thorough comment.
+ */
+rtsBool blackholes_need_checking = rtsFalse;
 
 /* Linked list of all threads.
  * Used for detecting garbage collected threads.
@@ -270,6 +276,7 @@ static void schedulePreLoop(void);
 static void scheduleHandleInterrupt(void);
 static void scheduleStartSignalHandlers(void);
 static void scheduleCheckBlockedThreads(void);
+static void scheduleCheckBlackHoles(void);
 static void scheduleDetectDeadlock(void);
 #if defined(GRAN)
 static StgTSO *scheduleProcessEvent(rtsEvent *event);
@@ -293,6 +300,7 @@ static void scheduleDoHeapProfile(void);
 static void scheduleDoGC(void);
 
 static void unblockThread(StgTSO *tso);
+static rtsBool checkBlackHoles(void);
 static SchedulerStatus waitThread_(/*out*/StgMainThread* m,
 				   Capability *initialCapability
 				   );
@@ -526,6 +534,12 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
 
     scheduleStartSignalHandlers();
 
+    // Only check the black holes here if we've nothing else to do.
+    // During normal execution, the black hole list only gets checked
+    // at GC time, to avoid repeatedly traversing this possibly long
+    // list each time around the scheduler.
+    if (EMPTY_RUN_QUEUE()) { scheduleCheckBlackHoles(); }
+
     scheduleCheckBlockedThreads();
 
     scheduleDetectDeadlock();
@@ -652,9 +666,9 @@ run_thread:
     startHeapProfTimer();
 #endif
 
-    /* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
-    /* Run the current thread 
-     */
+    // ----------------------------------------------------------------------
+    // Run the current thread 
+
     prev_what_next = t->what_next;
 
     errno = t->saved_errno;
@@ -680,6 +694,12 @@ run_thread:
       barf("schedule: invalid what_next field");
     }
 
+    // We have run some Haskell code: there might be blackhole-blocked
+    // threads to wake up now.
+    if ( blackhole_queue != END_TSO_QUEUE ) {
+	blackholes_need_checking = rtsTrue;
+    }
+
     in_haskell = rtsFalse;
 
     // The TSO might have moved, eg. if it re-entered the RTS and a GC
@@ -689,7 +709,7 @@ run_thread:
     // And save the current errno in this thread.
     t->saved_errno = errno;
 
-    /* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
+    // ----------------------------------------------------------------------
     
     /* Costs for the scheduler are assigned to CCS_SYSTEM */
 #if defined(PROFILING)
@@ -834,7 +854,22 @@ scheduleCheckBlockedThreads(void)
 	// We shouldn't be here...
 	barf("schedule: awaitEvent() in threaded RTS");
 #endif
-	awaitEvent( EMPTY_RUN_QUEUE() );
+	awaitEvent( EMPTY_RUN_QUEUE() && !blackholes_need_checking );
+    }
+}
+
+
+/* ----------------------------------------------------------------------------
+ * Check for threads blocked on BLACKHOLEs that can be woken up
+ * ASSUMES: sched_mutex
+ * ------------------------------------------------------------------------- */
+static void
+scheduleCheckBlackHoles( void )
+{
+    if ( blackholes_need_checking )
+    {
+	checkBlackHoles();
+	blackholes_need_checking = rtsFalse;
     }
 }
 
@@ -848,18 +883,13 @@ scheduleDetectDeadlock(void)
 {
     /* 
      * Detect deadlock: when we have no threads to run, there are no
-     * threads waiting on I/O or sleeping, and all the other tasks are
-     * waiting for work, we must have a deadlock of some description.
-     *
-     * We first try to find threads blocked on themselves (ie. black
-     * holes), and generate NonTermination exceptions where necessary.
-     *
-     * If no threads are black holed, we have a deadlock situation, so
-     * inform all the main threads.
+     * threads blocked, waiting for I/O, or sleeping, and all the
+     * other tasks are waiting for work, we must have a deadlock of
+     * some description.
      */
-#if !defined(PARALLEL_HASKELL) && !defined(RTS_SUPPORTS_THREADS)
     if ( EMPTY_THREAD_QUEUES() )
     {
+#if !defined(PARALLEL_HASKELL) && !defined(RTS_SUPPORTS_THREADS)
 	IF_DEBUG(scheduler, sched_belch("deadlocked, forcing major GC..."));
 
 	// Garbage collection can release some new threads due to
@@ -910,13 +940,13 @@ scheduleDetectDeadlock(void)
 		barf("deadlock: main thread blocked in a strange way");
 	    }
 	}
-    }
 
 #elif defined(RTS_SUPPORTS_THREADS)
     // ToDo: add deadlock detection in threaded RTS
 #elif defined(PARALLEL_HASKELL)
     // ToDo: add deadlock detection in GUM (similar to SMP) -- HWL
 #endif
+    }
 }
 
 /* ----------------------------------------------------------------------------
@@ -1883,6 +1913,9 @@ scheduleDoGC(void)
 	    }
 	}
 
+	// so this happens periodically:
+	scheduleCheckBlackHoles();
+
 	/* everybody back, start the GC.
 	 * Could do it in this thread, or signal a condition var
 	 * to do it in another thread.  Either way, we need to
@@ -2036,6 +2069,7 @@ deleteAllThreads ( void )
   // being GC'd, and we don't want the "main thread has been GC'd" panic.
 
   ASSERT(blocked_queue_hd == END_TSO_QUEUE);
+  ASSERT(blackhole_queue == END_TSO_QUEUE);
   ASSERT(sleeping_queue == END_TSO_QUEUE);
 }
 
@@ -2547,6 +2581,7 @@ initScheduler(void)
     blocked_queue_hds[i]  = END_TSO_QUEUE;
     blocked_queue_tls[i]  = END_TSO_QUEUE;
     ccalling_threadss[i]  = END_TSO_QUEUE;
+    blackhole_queue[i]    = END_TSO_QUEUE;
     sleeping_queue        = END_TSO_QUEUE;
   }
 #else
@@ -2554,6 +2589,7 @@ initScheduler(void)
   run_queue_tl      = END_TSO_QUEUE;
   blocked_queue_hd  = END_TSO_QUEUE;
   blocked_queue_tl  = END_TSO_QUEUE;
+  blackhole_queue   = END_TSO_QUEUE;
   sleeping_queue    = END_TSO_QUEUE;
 #endif 
 
@@ -2708,6 +2744,10 @@ GetRoots( evac_fn evac )
       evac((StgClosure **)&sleeping_queue);
   }
 #endif 
+
+  if (blackhole_queue != END_TSO_QUEUE) {
+      evac((StgClosure **)&blackhole_queue);
+  }
 
   if (suspended_ccalling_threads != END_TSO_QUEUE) {
       evac((StgClosure **)&suspended_ccalling_threads);
@@ -3365,12 +3405,9 @@ unblockThread(StgTSO *tso)
     }
 
   case BlockedOnBlackHole:
-    ASSERT(get_itbl(tso->block_info.closure)->type == BLACKHOLE_BQ);
     {
-      StgBlockingQueue *bq = (StgBlockingQueue *)(tso->block_info.closure);
-
-      last = &bq->blocking_queue;
-      for (t = bq->blocking_queue; t != END_TSO_QUEUE; 
+      last = &blackhole_queue;
+      for (t = blackhole_queue; t != END_TSO_QUEUE; 
 	   last = &t->link, t = t->link) {
 	if (t == tso) {
 	  *last = tso->link;
@@ -3460,6 +3497,49 @@ unblockThread(StgTSO *tso)
   APPEND_TO_RUN_QUEUE(tso);
 }
 #endif
+
+/* -----------------------------------------------------------------------------
+ * checkBlackHoles()
+ *
+ * Check the blackhole_queue for threads that can be woken up.  We do
+ * this periodically: before every GC, and whenever the run queue is
+ * empty.
+ *
+ * An elegant solution might be to just wake up all the blocked
+ * threads with awakenBlockedQueue occasionally: they'll go back to
+ * sleep again if the object is still a BLACKHOLE.  Unfortunately this
+ * doesn't give us a way to tell whether we've actually managed to
+ * wake up any threads, so we would be busy-waiting.
+ *
+ * -------------------------------------------------------------------------- */
+
+static rtsBool
+checkBlackHoles( void )
+{
+    StgTSO **prev, *t;
+    rtsBool any_woke_up = rtsFalse;
+    StgHalfWord type;
+
+    IF_DEBUG(scheduler, sched_belch("checking threads blocked on black holes"));
+
+    // ASSUMES: sched_mutex
+    prev = &blackhole_queue;
+    t = blackhole_queue;
+    while (t != END_TSO_QUEUE) {
+	ASSERT(t->why_blocked == BlockedOnBlackHole);
+	type = get_itbl(t->block_info.closure)->type;
+	if (type != BLACKHOLE && type != CAF_BLACKHOLE) {
+	    t = unblockOneLocked(t);
+	    *prev = t;
+	    any_woke_up = rtsTrue;
+	} else {
+	    prev = &t->link;
+	    t = t->link;
+	}
+    }
+
+    return any_woke_up;
+}
 
 /* -----------------------------------------------------------------------------
  * raiseAsync()
@@ -4161,25 +4241,6 @@ print_bq (StgClosure *node)
       break;
     }
   } /* for */
-  debugBelch("\n");
-}
-#else
-/* 
-   Nice and easy: only TSOs on the blocking queue
-*/
-void 
-print_bq (StgClosure *node)
-{
-  StgTSO *tso;
-
-  ASSERT(node!=(StgClosure*)NULL);         // sanity check
-  for (tso = ((StgBlockingQueue*)node)->blocking_queue;
-       tso != END_TSO_QUEUE; 
-       tso=tso->link) {
-    ASSERT(tso!=NULL && tso!=END_TSO_QUEUE);   // sanity check
-    ASSERT(get_itbl(tso)->type == TSO);  // guess what, sanity check
-    debugBelch(" TSO %d (%p),", tso->id, tso);
-  }
   debugBelch("\n");
 }
 # endif

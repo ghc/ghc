@@ -11,6 +11,7 @@
 #include "RtsAPI.h"
 #include "RtsUtils.h"
 #include "RtsFlags.h"  
+#include "OSThreads.h"
 #include "Storage.h"    /* initStorage, exitStorage */
 #include "Schedule.h"   /* initScheduler */
 #include "Stats.h"      /* initStats */

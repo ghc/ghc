@@ -187,18 +187,6 @@ extern void GarbageCollect(void (*get_roots)(evac_fn),rtsBool force_major_gc);
 
    -------------------------------------------------------------------------- */
 
-/*
- * Storage manager mutex
- */
-#if defined(SMP)
-extern Mutex sm_mutex;
-#define ACQUIRE_SM_LOCK   ACQUIRE_LOCK(&sm_mutex)
-#define RELEASE_SM_LOCK   RELEASE_LOCK(&sm_mutex)
-#else
-#define ACQUIRE_SM_LOCK
-#define RELEASE_SM_LOCK
-#endif
-
 /* ToDo: shouldn't recordMutable acquire some
  * kind of lock in the SMP case?  Or do we need per-processor
  * mutable lists?
@@ -277,7 +265,7 @@ INLINE_HEADER StgOffset THUNK_SELECTOR_sizeW ( void )
 { return stg_max(sizeofW(StgHeader)+MIN_UPD_SIZE, sizeofW(StgSelector)); }
 
 INLINE_HEADER StgOffset BLACKHOLE_sizeW ( void )
-{ return stg_max(sizeofW(StgHeader)+MIN_UPD_SIZE, sizeofW(StgBlockingQueue)); }
+{ return sizeofW(StgHeader)+MIN_UPD_SIZE; }
 
 /* --------------------------------------------------------------------------
    Sizes of closures

@@ -109,18 +109,6 @@ __stg_gc_enter_1
     GC_GENERIC
 }
 
-#ifdef SMP
-stg_gc_enter_1_hponly
-{
-    Sp_adj(-1);
-    Sp(0) = R1;
-    R1 = HeapOverflow;
-    SAVE_THREAD_STATE();
-    TSO_what_next(CurrentTSO) = ThreadRunGHC::I16;
-    jump StgReturn;
-}
-#endif
-
 #if defined(GRAN)
 /*
   ToDo: merge the block and yield macros, calling something like BLOCK(N)

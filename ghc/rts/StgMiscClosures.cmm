@@ -325,11 +325,9 @@ INFO_TABLE(stg_IND_OLDGEN_PERM,1,0,IND_OLDGEN_PERM,"IND_OLDGEN_PERM","IND_OLDGEN
    waiting for the evaluation of the closure to finish.
    ------------------------------------------------------------------------- */
 
-/* Note: a BLACKHOLE and BLACKHOLE_BQ must be big enough to be
+/* Note: a BLACKHOLE must be big enough to be
  * overwritten with an indirection/evacuee/catch.  Thus we claim it
- * has 1 non-pointer word of payload (in addition to the pointer word
- * for the blocking queue in a BQ), which should be big enough for an
- * old-generation indirection. 
+ * has 1 non-pointer word of payload. 
  */
 INFO_TABLE(stg_BLACKHOLE,0,1,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
 {
@@ -343,72 +341,17 @@ INFO_TABLE(stg_BLACKHOLE,0,1,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
     /* Actually this is not necessary because R1 is about to be destroyed. */
     LDV_ENTER(R1);
 
-    /* Put ourselves on the blocking queue for this black hole */
-    StgTSO_link(CurrentTSO) = stg_END_TSO_QUEUE_closure;
-    StgBlockingQueue_blocking_queue(R1) = CurrentTSO;
+    /* Put ourselves on the blackhole queue */
+    StgTSO_link(CurrentTSO) = W_[blackhole_queue];
+    W_[blackhole_queue] = CurrentTSO;
 
     /* jot down why and on what closure we are blocked */
     StgTSO_why_blocked(CurrentTSO) = BlockedOnBlackHole::I16;
     StgTSO_block_info(CurrentTSO) = R1;
 
-    /* Change the BLACKHOLE into a BLACKHOLE_BQ */
-#ifdef PROFILING
-    /* The size remains the same, so we call LDV_recordDead() - 
-	no need to fill slop. */
-    foreign "C" LDV_recordDead(R1 "ptr", BYTES_TO_WDS(SIZEOF_StgBlockingQueue));
-#endif
-    /*
-     * Todo: maybe use SET_HDR() and remove LDV_RECORD_CREATE()?
-     */ 
-    StgHeader_info(R1) = stg_BLACKHOLE_BQ_info;
-#ifdef PROFILING
-    foreign "C" LDV_RECORD_CREATE(R1);
-#endif
-
-    /* closure is mutable since something has just been added to its BQ */
-    foreign "C" recordMutable(R1 "ptr");
-
-    /* PAR: dumping of event now done in blockThread -- HWL */
-
     /* stg_gen_block is too heavyweight, use a specialised one */
     jump stg_block_1;
 }
-
-INFO_TABLE(stg_BLACKHOLE_BQ,1,0,BLACKHOLE_BQ,"BLACKHOLE_BQ","BLACKHOLE_BQ")
-{
-#if defined(GRAN)
-    /* Before overwriting TSO_LINK */
-    STGCALL3(GranSimBlock,CurrentTSO,CurrentProc,(StgClosure *)R1 /*Node*/);
-#endif
-
-    TICK_ENT_BH();
-    LDV_ENTER(R1);
-
-    /* Put ourselves on the blocking queue for this black hole */
-    StgTSO_link(CurrentTSO) = StgBlockingQueue_blocking_queue(R1);
-    StgBlockingQueue_blocking_queue(R1) = CurrentTSO;
-
-    /* jot down why and on what closure we are blocked */
-    StgTSO_why_blocked(CurrentTSO) = BlockedOnBlackHole::I16;
-    StgTSO_block_info(CurrentTSO) = R1;
-
-    /* PAR: dumping of event now done in blockThread -- HWL */
-
-    /* stg_gen_block is too heavyweight, use a specialised one */
-    jump stg_block_1;
-}
-
-/*
-   Revertible black holes are needed in the parallel world, to handle
-   negative acknowledgements of messages containing updatable closures.
-   The idea is that when the original message is transmitted, the closure
-   is turned into a revertible black hole...an object which acts like a
-   black hole when local threads try to enter it, but which can be reverted
-   back to the original closure if necessary.
-
-   It's actually a lot like a blocking queue (BQ) entry, because revertible
-   black holes are initially set up with an empty blocking queue.
-*/
 
 #if defined(PAR) || defined(GRAN)
 
@@ -455,40 +398,24 @@ INFO_TABLE(stg_CAF_BLACKHOLE,0,1,CAF_BLACKHOLE,"CAF_BLACKHOLE","CAF_BLACKHOLE")
     TICK_ENT_BH();
     LDV_ENTER(R1);
 
-    /* Put ourselves on the blocking queue for this black hole */
-    StgTSO_link(CurrentTSO) = stg_END_TSO_QUEUE_closure;
-    StgBlockingQueue_blocking_queue(R1) = CurrentTSO;
+    /* Put ourselves on the blackhole queue */
+    StgTSO_link(CurrentTSO) = W_[blackhole_queue];
+    W_[blackhole_queue] = CurrentTSO;
 
     /* jot down why and on what closure we are blocked */
     StgTSO_why_blocked(CurrentTSO) = BlockedOnBlackHole::I16;
     StgTSO_block_info(CurrentTSO) = R1;
-
-    /* Change the CAF_BLACKHOLE into a BLACKHOLE_BQ_STATIC */
-    StgHeader_info(R1) = stg_BLACKHOLE_BQ_info;
-
-    /* closure is mutable since something has just been added to its BQ */
-    foreign "C" recordMutable(R1 "ptr");
-
-    /* PAR: dumping of event now done in blockThread -- HWL */
 
     /* stg_gen_block is too heavyweight, use a specialised one */
     jump stg_block_1;
 }
 
 #ifdef EAGER_BLACKHOLING
-INFO_TABLE(stg_SE_BLACKHOLE_info, stg_SE_BLACKHOLE_entry,0,1,SE_BLACKHOLE,,IF_,"SE_BLACKHOLE","SE_BLACKHOLE");
-IF_(stg_SE_BLACKHOLE_entry)
-{
-    STGCALL3(fprintf,stderr,"SE_BLACKHOLE at %p entered!\n",R1);
-    STGCALL1(shutdownHaskellAndExit,EXIT_FAILURE);
-}
+INFO_TABLE(stg_SE_BLACKHOLE,0,1,SE_BLACKHOLE,"SE_BLACKHOLE","SE_BLACKHOLE")
+{ foreign "C" barf("SE_BLACKHOLE object entered!"); }
 
-INFO_TABLE(stg_SE_CAF_BLACKHOLE_info, SE_CAF_BLACKHOLE_entry,0,1,SE_CAF_BLACKHOLE,,IF_,"CAF_BLACKHOLE","CAF_BLACKHOLE");
-IF_(stg_SE_CAF_BLACKHOLE_entry)
-{
-    STGCALL3(fprintf,stderr,"SE_CAF_BLACKHOLE at %p entered!\n",R1);
-    STGCALL1(shutdownHaskellAndExit,EXIT_FAILURE);
-}
+INFO_TABLE(stg_SE_CAF_BLACKHOLE,0,1,SE_CAF_BLACKHOLE,"SE_CAF_BLACKHOLE","SE_CAF_BLACKHOLE")
+{ foreign "C" barf("SE_CAF_BLACKHOLE object entered!"); }
 #endif
 
 /* ----------------------------------------------------------------------------

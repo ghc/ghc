@@ -11,6 +11,7 @@
 #include "RtsFlags.h"
 #include "RtsUtils.h"
 #include "Apply.h"
+#include "OSThreads.h"
 #include "Storage.h"
 #include "LdvProfile.h"
 #include "Updates.h"
@@ -1624,7 +1625,9 @@ evacuate_large(StgPtr p)
 REGPARM1 static StgClosure *
 evacuate(StgClosure *q)
 {
+#if defined(PAR)
   StgClosure *to;
+#endif
   bdescr *bd = NULL;
   step *stp;
   const StgInfoTable *info;
@@ -1754,10 +1757,6 @@ loop:
   case SE_BLACKHOLE:
   case BLACKHOLE:
     return copyPart(q,BLACKHOLE_sizeW(),sizeofW(StgHeader),stp);
-
-  case BLACKHOLE_BQ:
-    to = copy(q,BLACKHOLE_sizeW(),stp); 
-    return to;
 
   case THUNK_SELECTOR:
     {
@@ -1919,7 +1918,7 @@ loop:
     }
 
 #if defined(PAR)
-  case RBH: // cf. BLACKHOLE_BQ
+  case RBH:
     {
       //StgInfoTable *rip = get_closure_info(q, &size, &ptrs, &nonptrs, &vhs, str);
       to = copy(q,BLACKHOLE_sizeW(),stp); 
@@ -2167,7 +2166,6 @@ selector_loop:
       case SE_CAF_BLACKHOLE:
       case SE_BLACKHOLE:
       case BLACKHOLE:
-      case BLACKHOLE_BQ:
 #if defined(PAR)
       case RBH:
       case BLOCKED_FETCH:
@@ -2614,16 +2612,6 @@ scavenge(step *stp)
 	p += BLACKHOLE_sizeW();
 	break;
 
-    case BLACKHOLE_BQ:
-    { 
-	StgBlockingQueue *bh = (StgBlockingQueue *)p;
-	bh->blocking_queue = 
-	    (StgTSO *)evacuate((StgClosure *)bh->blocking_queue);
-	failed_to_evac = rtsTrue;
-	p += BLACKHOLE_sizeW();
-	break;
-    }
-
     case THUNK_SELECTOR:
     { 
 	StgSelector *s = (StgSelector *)p;
@@ -2697,7 +2685,7 @@ scavenge(step *stp)
     }
 
 #if defined(PAR)
-    case RBH: // cf. BLACKHOLE_BQ
+    case RBH:
     { 
 #if 0
 	nat size, ptrs, nonptrs, vhs;
@@ -2740,7 +2728,7 @@ scavenge(step *stp)
 	p += sizeofW(StgFetchMe);
 	break; // nothing to do in this case
 
-    case FETCH_ME_BQ: // cf. BLACKHOLE_BQ
+    case FETCH_ME_BQ:
     { 
 	StgFetchMeBlockingQueue *fmbq = (StgFetchMeBlockingQueue *)p;
 	(StgClosure *)fmbq->blocking_queue = 
@@ -2969,15 +2957,6 @@ linear_scan:
 	case ARR_WORDS:
 	    break;
 
-	case BLACKHOLE_BQ:
-	{ 
-	    StgBlockingQueue *bh = (StgBlockingQueue *)p;
-	    bh->blocking_queue = 
-		(StgTSO *)evacuate((StgClosure *)bh->blocking_queue);
-	    failed_to_evac = rtsTrue;
-	    break;
-	}
-
 	case THUNK_SELECTOR:
 	{ 
 	    StgSelector *s = (StgSelector *)p;
@@ -3039,7 +3018,7 @@ linear_scan:
 	}
 
 #if defined(PAR)
-	case RBH: // cf. BLACKHOLE_BQ
+	case RBH:
 	{ 
 #if 0
 	    nat size, ptrs, nonptrs, vhs;
@@ -3078,7 +3057,7 @@ linear_scan:
 	case FETCH_ME:
 	    break; // nothing to do in this case
 
-	case FETCH_ME_BQ: // cf. BLACKHOLE_BQ
+	case FETCH_ME_BQ:
 	{ 
 	    StgFetchMeBlockingQueue *fmbq = (StgFetchMeBlockingQueue *)p;
 	    (StgClosure *)fmbq->blocking_queue = 
@@ -3271,16 +3250,6 @@ scavenge_one(StgPtr p)
     case BLACKHOLE:
 	break;
 	
-    case BLACKHOLE_BQ:
-    { 
-	StgBlockingQueue *bh = (StgBlockingQueue *)p;
-	evac_gen = 0;		// repeatedly mutable 
-	bh->blocking_queue = 
-	    (StgTSO *)evacuate((StgClosure *)bh->blocking_queue);
-	failed_to_evac = rtsTrue;
-	break;
-    }
-
     case THUNK_SELECTOR:
     { 
 	StgSelector *s = (StgSelector *)p;
@@ -3347,7 +3316,7 @@ scavenge_one(StgPtr p)
     }
   
 #if defined(PAR)
-    case RBH: // cf. BLACKHOLE_BQ
+    case RBH:
     { 
 #if 0
 	nat size, ptrs, nonptrs, vhs;
@@ -3387,7 +3356,7 @@ scavenge_one(StgPtr p)
     case FETCH_ME:
 	break; // nothing to do in this case
 
-    case FETCH_ME_BQ: // cf. BLACKHOLE_BQ
+    case FETCH_ME_BQ:
     { 
 	StgFetchMeBlockingQueue *fmbq = (StgFetchMeBlockingQueue *)p;
 	(StgClosure *)fmbq->blocking_queue = 
@@ -3941,7 +3910,7 @@ threadLazyBlackHole(StgTSO *tso)
 {
     StgClosure *frame;
     StgRetInfoTable *info;
-    StgBlockingQueue *bh;
+    StgClosure *bh;
     StgPtr stack_end;
     
     stack_end = &tso->stack[tso->stack_size];
@@ -3954,7 +3923,7 @@ threadLazyBlackHole(StgTSO *tso)
 	switch (info->i.type) {
 	    
 	case UPDATE_FRAME:
-	    bh = (StgBlockingQueue *)((StgUpdateFrame *)frame)->updatee;
+	    bh = ((StgUpdateFrame *)frame)->updatee;
 	    
 	    /* if the thunk is already blackholed, it means we've also
 	     * already blackholed the rest of the thunks on this stack,
@@ -3967,8 +3936,7 @@ threadLazyBlackHole(StgTSO *tso)
 		return;
 	    }
 	    
-	    if (bh->header.info != &stg_BLACKHOLE_BQ_info &&
-		bh->header.info != &stg_CAF_BLACKHOLE_info) {
+	    if (bh->header.info != &stg_CAF_BLACKHOLE_info) {
 #if (!defined(LAZY_BLACKHOLING)) && defined(DEBUG)
 		debugBelch("Unexpected lazy BHing required at 0x%04x",(int)bh);
 #endif
@@ -4072,7 +4040,6 @@ threadSqueezeStack(StgTSO *tso)
 		 * screw us up if we don't check.
 		 */
 		if (upd->updatee != updatee && !closure_IND(upd->updatee)) {
-		    // this wakes the threads up 
 		    UPD_IND_NOLOCK(upd->updatee, updatee);
 		}
 
@@ -4090,11 +4057,10 @@ threadSqueezeStack(StgTSO *tso)
 
 	    // single update frame, or the topmost update frame in a series
 	    else {
-		StgBlockingQueue *bh = (StgBlockingQueue *)upd->updatee;
+		StgClosure *bh = upd->updatee;
 
 		// Do lazy black-holing
 		if (bh->header.info != &stg_BLACKHOLE_info &&
-		    bh->header.info != &stg_BLACKHOLE_BQ_info &&
 		    bh->header.info != &stg_CAF_BLACKHOLE_info) {
 #if (!defined(LAZY_BLACKHOLING)) && defined(DEBUG)
 		    debugBelch("Unexpected lazy BHing required at 0x%04x",(int)bh);

@@ -28,9 +28,9 @@
 Capability MainCapability;     /* for non-SMP, we have one global capability */
 #endif
 
-#if defined(RTS_SUPPORTS_THREADS)
-
 nat rts_n_free_capabilities;
+
+#if defined(RTS_SUPPORTS_THREADS)
 
 /* returning_worker_cond: when a worker thread returns from executing an
  * external call, it needs to wait for an RTS Capability before passing
@@ -76,6 +76,13 @@ static Condition *passTarget = NULL;
 static rtsBool passingCapability = rtsFalse;
 #endif
 
+#if defined(SMP)
+/*
+ * Free capability list. 
+ */
+Capability *free_capabilities;
+#endif
+
 #ifdef SMP
 #define UNUSED_IF_NOT_SMP
 #else
@@ -83,9 +90,9 @@ static rtsBool passingCapability = rtsFalse;
 #endif
 
 #if defined(RTS_USER_SIGNALS)
-#define ANY_WORK_TO_DO() (!EMPTY_RUN_QUEUE() || interrupted || signals_pending())
+#define ANY_WORK_TO_DO() (!EMPTY_RUN_QUEUE() || interrupted || blackholes_need_checking || signals_pending())
 #else
-#define ANY_WORK_TO_DO() (!EMPTY_RUN_QUEUE() || interrupted)
+#define ANY_WORK_TO_DO() (!EMPTY_RUN_QUEUE() || interrupted || blackholes_need_checking)
 #endif
 
 /* ----------------------------------------------------------------------------
@@ -99,9 +106,34 @@ initCapability( Capability *cap )
     cap->f.stgGCFun        = (F_)__stg_gc_fun;
 }
 
+/* -----------------------------------------------------------------------------
+ * Function: initCapabilities_(nat)
+ *
+ * Purpose:  upon startup, allocate and fill in table
+ *           holding 'n' Capabilities. Only for SMP, since
+ *           it is the only build that supports multiple
+ *           capabilities within the RTS.
+ * -------------------------------------------------------------------------- */
 #if defined(SMP)
-static void initCapabilities_(nat n);
-#endif
+static void
+initCapabilities_(nat n)
+{
+  nat i;
+  Capability *cap, *prev;
+  cap  = NULL;
+  prev = NULL;
+  for (i = 0; i < n; i++) {
+    cap = stgMallocBytes(sizeof(Capability), "initCapabilities");
+    initCapability(cap);
+    cap->link = prev;
+    prev = cap;
+  }
+  free_capabilities = cap;
+  rts_n_free_capabilities = n;
+  IF_DEBUG(scheduler,
+	   sched_belch("allocated %d capabilities", rts_n_free_capabilities));
+}
+#endif /* SMP */
 
 /* ---------------------------------------------------------------------------
  * Function:  initCapabilities()
@@ -123,18 +155,10 @@ initCapabilities( void )
 #if defined(RTS_SUPPORTS_THREADS)
   initCondition(&returning_worker_cond);
   initCondition(&thread_ready_cond);
+#endif
+
   rts_n_free_capabilities = 1;
-#endif
-
-  return;
 }
-
-#if defined(SMP)
-/* Free capability list. */
-static Capability *free_capabilities; /* Available capabilities for running threads */
-static Capability *returning_capabilities; 
-	/* Capabilities being passed to returning worker threads */
-#endif
 
 /* ----------------------------------------------------------------------------
    grabCapability( Capability** )
@@ -149,17 +173,18 @@ static
 void
 grabCapability( Capability** cap )
 {
-#if !defined(SMP)
-#if defined(RTS_SUPPORTS_THREADS)
-  ASSERT(rts_n_free_capabilities == 1);
-  rts_n_free_capabilities = 0;
-#endif
-  *cap = &MainCapability;
-  handleSignalsInThisThread();
-#else
+#if defined(SMP)
+  ASSERT(rts_n_free_capabilities > 0);
   *cap = free_capabilities;
   free_capabilities = (*cap)->link;
   rts_n_free_capabilities--;
+#else
+# if defined(RTS_SUPPORTS_THREADS)
+  ASSERT(rts_n_free_capabilities == 1);
+  rts_n_free_capabilities = 0;
+# endif
+  *cap = &MainCapability;
+  handleSignalsInThisThread();
 #endif
 #if defined(RTS_SUPPORTS_THREADS)
   IF_DEBUG(scheduler, sched_belch("worker: got capability"));
@@ -179,7 +204,7 @@ releaseCapability( Capability* cap UNUSED_IF_NOT_SMP )
 {
     // Precondition: sched_mutex is held.
 #if defined(RTS_SUPPORTS_THREADS)
-#ifndef SMP
+#if !defined(SMP)
     ASSERT(rts_n_free_capabilities == 0);
 #endif
     // Check to see whether a worker thread can be given
@@ -191,8 +216,8 @@ releaseCapability( Capability* cap UNUSED_IF_NOT_SMP )
 
 #if defined(SMP)
 	// SMP variant untested
-	cap->link = returning_capabilities;
-	returning_capabilities = cap;
+	cap->link = free_capabilities;
+	free_capabilities = cap;
 #endif
 
 	rts_n_waiting_workers--;
@@ -272,13 +297,14 @@ waitForReturnCapability( Mutex* pMutex, Capability** pCap )
 	context_switch = 1;	// make sure it's our turn soon
 	waitCondition(&returning_worker_cond, pMutex);
 #if defined(SMP)
-	*pCap = returning_capabilities;
-	returning_capabilities = (*pCap)->link;
+	*pCap = free_capabilities;
+	free_capabilities = (*pCap)->link;
+	ASSERT(pCap != NULL);
 #else
 	*pCap = &MainCapability;
 	ASSERT(rts_n_free_capabilities == 0);
-	handleSignalsInThisThread();
 #endif
+	handleSignalsInThisThread();
     } else {
 	grabCapability(pCap);
     }
@@ -313,7 +339,7 @@ yieldCapability( Capability** pCap )
 	*pCap = NULL;
     }
 
-    // Post-condition:  pMutex is assumed held, and either:
+    // Post-condition:  either:
     //
     //  1. *pCap is NULL, in which case the current thread does not
     //     hold a capability now, or
@@ -418,36 +444,3 @@ threadRunnable ( void )
     startSchedulerTaskIfNecessary();
 #endif
 }
-
-/* ------------------------------------------------------------------------- */
-
-#if defined(SMP)
-/*
- * Function: initCapabilities_(nat)
- *
- * Purpose:  upon startup, allocate and fill in table
- *           holding 'n' Capabilities. Only for SMP, since
- *           it is the only build that supports multiple
- *           capabilities within the RTS.
- */
-static void
-initCapabilities_(nat n)
-{
-  nat i;
-  Capability *cap, *prev;
-  cap  = NULL;
-  prev = NULL;
-  for (i = 0; i < n; i++) {
-    cap = stgMallocBytes(sizeof(Capability), "initCapabilities");
-    initCapability(cap);
-    cap->link = prev;
-    prev = cap;
-  }
-  free_capabilities = cap;
-  rts_n_free_capabilities = n;
-  returning_capabilities = NULL;
-  IF_DEBUG(scheduler,
-	   sched_belch("allocated %d capabilities", n_free_capabilities));
-}
-#endif /* SMP */
-

@@ -13,6 +13,7 @@
 #include "Rts.h"
 #include "Hash.h"
 #include "RtsUtils.h"
+#include "OSThreads.h"
 #include "Storage.h"
 #include "RtsAPI.h"
 #include "RtsFlags.h"

@@ -8,13 +8,13 @@
 
 #include "PosixSource.h"
 #include "Rts.h"
+#include "OSThreads.h"
 #include "Storage.h"
 #include "RtsAPI.h"
 #include "SchedAPI.h"
 #include "RtsFlags.h"
 #include "RtsUtils.h"
 #include "Prelude.h"
-#include "OSThreads.h"
 #include "Schedule.h"
 #include "Capability.h"
 
@@ -501,6 +501,8 @@ rts_lock()
     // b) wake the current worker thread from awaitEvent()
     //       (so that a thread started by rts_eval* will start immediately)
     waitForReturnCapability(&sched_mutex,&rtsApiCapability);
+#else
+    grabCapability(&rtsApiCapability);
 #endif
 }
 

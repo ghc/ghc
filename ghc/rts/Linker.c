@@ -528,7 +528,6 @@ typedef struct _RtsSymbolVal {
       SymX(stable_ptr_table)			\
       SymX(stackOverflow)			\
       SymX(stg_CAF_BLACKHOLE_info)		\
-      SymX(stg_BLACKHOLE_BQ_info)		\
       SymX(awakenBlockedQueue)			\
       SymX(stg_CHARLIKE_closure)		\
       SymX(stg_EMPTY_MVAR_info)			\

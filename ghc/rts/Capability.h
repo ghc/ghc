@@ -80,6 +80,9 @@ extern void passCapability(Condition *pTargetThreadCond);
 extern void passCapabilityToWorker( void );
 
 extern nat rts_n_free_capabilities;  
+
+extern Capability *free_capabilities;
+
 /* number of worker threads waiting for a return capability
  */
 extern nat rts_n_waiting_workers;
@@ -101,7 +104,11 @@ static inline rtsBool noCapabilities (void)
 
 static inline rtsBool allFreeCapabilities (void)
 {
+#if defined(SMP)
+  return (rts_n_free_capabilities == RTS_DEREF(RtsFlags).ParFlags.nNodes);
+#else
   return (rts_n_free_capabilities == 1);
+#endif
 }
 
 #else // !RTS_SUPPORTS_THREADS

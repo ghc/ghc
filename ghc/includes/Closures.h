@@ -403,13 +403,6 @@ typedef struct StgRBH_ {
   struct StgBlockingQueueElement_  *blocking_queue; /* start of the BQ */
 } StgRBH;
 
-#else
-
-typedef struct StgBlockingQueue_ {
-  StgHeader          header;
-  struct StgTSO_    *blocking_queue;
-} StgBlockingQueue;
-
 #endif
 
 #if defined(PAR)

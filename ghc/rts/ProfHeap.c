@@ -150,7 +150,6 @@ static char *type_names[] = {
     , "STOP_FRAME"
 
     , "BLACKHOLE"
-    , "BLACKHOLE_BQ"
     , "MVAR"
 
     , "ARR_WORDS"
@@ -878,7 +877,6 @@ heapCensusChain( Census *census, bdescr *bd )
 	    case SE_CAF_BLACKHOLE:
 	    case SE_BLACKHOLE:
 	    case BLACKHOLE:
-	    case BLACKHOLE_BQ:
 	    case CONSTR_INTLIKE:
 	    case CONSTR_CHARLIKE:
 	    case FUN_1_0:

@@ -10,6 +10,7 @@
 #include "Rts.h"
 #include "RtsUtils.h"
 #include "RtsFlags.h"
+#include "OSThreads.h"
 #include "Storage.h"
 #include "BlockAlloc.h"
 #include "MBlock.h"
@@ -548,7 +549,6 @@ thread_obj (StgInfoTable *info, StgPtr p)
     case SE_CAF_BLACKHOLE:
     case SE_BLACKHOLE:
     case BLACKHOLE:
-    case BLACKHOLE_BQ:
     {
 	StgPtr end;
 	

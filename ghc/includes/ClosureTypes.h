@@ -59,7 +59,6 @@
 #define STOP_FRAME	        44
 #define CAF_BLACKHOLE		45
 #define BLACKHOLE	        46
-#define BLACKHOLE_BQ	        47
 #define SE_BLACKHOLE		48
 #define SE_CAF_BLACKHOLE	49
 #define MVAR		        50

@@ -17,11 +17,10 @@
 #include "Weak.h"
 #include "Sanity.h"
 #include "Arena.h"
-
+#include "OSThreads.h"
+#include "Capability.h"
 #include "Storage.h"
 #include "Schedule.h"
-#include "OSThreads.h"
-
 #include "RetainerProfile.h"	// for counting memory blocks (memInventory)
 
 #include <stdlib.h>
@@ -60,6 +59,18 @@ Mutex sm_mutex = INIT_MUTEX_VAR;
 static void *stgAllocForGMP   (size_t size_in_bytes);
 static void *stgReallocForGMP (void *ptr, size_t old_size, size_t new_size);
 static void  stgDeallocForGMP (void *ptr, size_t size);
+
+/*
+ * Storage manager mutex
+ */
+#if defined(SMP)
+extern Mutex sm_mutex;
+#define ACQUIRE_SM_LOCK   ACQUIRE_LOCK(&sm_mutex)
+#define RELEASE_SM_LOCK   RELEASE_LOCK(&sm_mutex)
+#else
+#define ACQUIRE_SM_LOCK
+#define RELEASE_SM_LOCK
+#endif
 
 void
 initStorage( void )
@@ -335,19 +346,12 @@ allocNurseries( void )
 { 
 #ifdef SMP
   Capability *cap;
-  bdescr *bd;
 
   g0s0->blocks = NULL;
   g0s0->n_blocks = 0;
   for (cap = free_capabilities; cap != NULL; cap = cap->link) {
     cap->r.rNursery = allocNursery(NULL, RtsFlags.GcFlags.minAllocAreaSize);
     cap->r.rCurrentNursery = cap->r.rNursery;
-    /* Set the back links to be equal to the Capability,
-     * so we can do slightly better informed locking.
-     */
-    for (bd = cap->r.rNursery; bd != NULL; bd = bd->link) {
-      bd->u.back = (bdescr *)cap;
-    }
   }
 #else /* SMP */
   g0s0->blocks      = allocNursery(NULL, RtsFlags.GcFlags.minAllocAreaSize);
@@ -368,7 +372,7 @@ resetNurseries( void )
   Capability *cap;
   
   /* All tasks must be stopped */
-  ASSERT(n_free_capabilities == RtsFlags.ParFlags.nNodes);
+  ASSERT(rts_n_free_capabilities == RtsFlags.ParFlags.nNodes);
 
   for (cap = free_capabilities; cap != NULL; cap = cap->link) {
     for (bd = cap->r.rNursery; bd; bd = bd->link) {
@@ -695,7 +699,7 @@ calcAllocated( void )
   /*  ASSERT(n_free_capabilities == RtsFlags.ParFlags.nNodes); */
 
   allocated = 
-    n_free_capabilities * RtsFlags.GcFlags.minAllocAreaSize * BLOCK_SIZE_W
+    rts_n_free_capabilities * RtsFlags.GcFlags.minAllocAreaSize * BLOCK_SIZE_W
     + allocated_bytes();
 
   for (cap = free_capabilities; cap != NULL; cap = cap->link) {

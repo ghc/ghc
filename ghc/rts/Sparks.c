@@ -42,7 +42,7 @@
 
 static void slide_spark_pool( StgSparkPool *pool );
 
-rtsBool
+void
 initSparkPools( void )
 {
   Capability *cap;
@@ -65,7 +65,6 @@ initSparkPools( void )
     pool->hd  = pool->base;
     pool->tl  = pool->base;
   }
-  return rtsTrue; /* Qapla' */
 }
 
 /* 

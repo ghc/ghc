@@ -466,11 +466,6 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
     case MUT_VAR:
 	*first_child = ((StgMutVar *)c)->var;
 	return;
-    case BLACKHOLE_BQ:
-	// blocking_queue must be TSO and the head of a linked list of TSOs.
-	// Shoule it be a child? Seems to be yes.
-	*first_child = (StgClosure *)((StgBlockingQueue *)c)->blocking_queue;
-	return;
     case THUNK_SELECTOR:
 	*first_child = ((StgSelector *)c)->selectee;
 	return;
@@ -894,7 +889,6 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
 	case ARR_WORDS:
 	    // one child (fixed), no SRT
 	case MUT_VAR:
-	case BLACKHOLE_BQ:
 	case THUNK_SELECTOR:
 	case IND_PERM:
 	case IND_OLDGEN_PERM:
@@ -1042,7 +1036,6 @@ isRetainer( StgClosure *c )
     case BLACKHOLE:
     case SE_BLACKHOLE:
     case SE_CAF_BLACKHOLE:
-    case BLACKHOLE_BQ:
 	// indirection
     case IND_PERM:
     case IND_OLDGEN_PERM:
@@ -2102,7 +2095,6 @@ sanityCheckHeapClosure( StgClosure *c )
     case BLACKHOLE:
     case SE_BLACKHOLE:
     case SE_CAF_BLACKHOLE:
-    case BLACKHOLE_BQ:
     case IND_PERM:
     case IND_OLDGEN:
     case IND_OLDGEN_PERM:

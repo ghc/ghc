@@ -249,9 +249,6 @@ checkClosure( StgClosure* p )
 	return stg_max(sizeW_fromITBL(info), sizeofW(StgHeader) + MIN_UPD_SIZE);
       }
 
-    case BLACKHOLE_BQ:
-      checkBQ(((StgBlockingQueue *)p)->blocking_queue, p);
-      /* fall through to basic ptr check */
     case FUN:
     case FUN_1_0:
     case FUN_0_1:
@@ -395,6 +392,7 @@ checkClosure( StgClosure* p )
 
     case MUT_ARR_PTRS:
     case MUT_ARR_PTRS_FROZEN:
+    case MUT_ARR_PTRS_FROZEN0:
 	{
 	    StgMutArrPtrs* a = (StgMutArrPtrs *)p;
 	    nat i;
@@ -644,8 +642,7 @@ checkTSO(StgTSO *tso)
       break;
     case BlockedOnBlackHole: 
       checkClosureShallow(tso->block_info.closure);
-      ASSERT(/* Can't be a BLACKHOLE because *this* closure is on its BQ */
-	     get_itbl(tso->block_info.closure)->type==BLACKHOLE_BQ ||
+      ASSERT(get_itbl(tso->block_info.closure)->type==BLACKHOLE ||
              get_itbl(tso->block_info.closure)->type==RBH);
       break;
     case BlockedOnRead:
@@ -830,8 +827,7 @@ checkBQ (StgBlockingQueueElement *bqe, StgClosure *closure)
   rtsBool end = rtsFalse;
   StgInfoTable *info = get_itbl(closure);
 
-  ASSERT(info->type == BLACKHOLE_BQ || info->type == MVAR
-	 || info->type == FETCH_ME_BQ || info->type == RBH);
+  ASSERT(info->type == MVAR || info->type == FETCH_ME_BQ || info->type == RBH);
 
   do {
     switch (get_itbl(bqe)->type) {
@@ -860,7 +856,7 @@ checkBQ (StgTSO *bqe, StgClosure *closure)
   rtsBool end = rtsFalse;
   StgInfoTable *info = get_itbl(closure);
 
-  ASSERT(info->type == BLACKHOLE_BQ || info->type == MVAR);
+  ASSERT(info->type == MVAR);
 
   do {
     switch (get_itbl(bqe)->type) {
@@ -884,7 +880,7 @@ checkBQ (StgTSO *bqe, StgClosure *closure)
   rtsBool end = rtsFalse;
   StgInfoTable *info = get_itbl(closure);
 
-  ASSERT(info->type == BLACKHOLE_BQ || info->type == MVAR);
+  ASSERT(info->type == MVAR);
 
   do {
     switch (get_itbl(bqe)->type) {

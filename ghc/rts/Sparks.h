@@ -25,7 +25,7 @@ void      markSparkQueue(void);
 #elif defined(PAR) || defined(SMP)
 
 StgClosure  *findSpark( rtsBool );
-rtsBool      initSparkPools( void );
+void         initSparkPools( void );
 void         markSparkQueue( void );
 #if defined(PAR)
 StgTSO      *activateSpark (rtsSpark spark) ;

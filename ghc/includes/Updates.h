@@ -64,8 +64,7 @@
         BLOCK_BEGIN						\
 	DECLARE_IPTR(info);					\
 	info = GET_INFO(updclosure);				\
-        AWAKEN_BQ(info,updclosure);				\
-	updateWithIndirection(GET_INFO(updclosure), ind_info,	\
+	updateWithIndirection(ind_info,				\
 			      updclosure,			\
 			      heapptr,				\
 			      and_then);			\
@@ -74,11 +73,7 @@
 #if defined(PROFILING) || defined(TICKY_TICKY)
 #define UPD_PERM_IND(updclosure, heapptr)	\
         BLOCK_BEGIN				\
-	DECLARE_IPTR(info);			\
-	info = GET_INFO(updclosure);		\
-        AWAKEN_BQ(info,updclosure);		\
-	updateWithPermIndirection(info,		\
-				  updclosure,	\
+	updateWithPermIndirection(updclosure,	\
 				  heapptr);	\
 	BLOCK_END
 #endif
@@ -88,20 +83,13 @@
 # ifdef TICKY_TICKY
 #  define UPD_IND_NOLOCK(updclosure, heapptr)	\
         BLOCK_BEGIN				\
-	DECLARE_IPTR(info);			\
-	info = GET_INFO(updclosure);		\
-        AWAKEN_BQ_NOLOCK(info,updclosure);	\
-	updateWithPermIndirection(info,		\
-				  updclosure,	\
+	updateWithPermIndirection(updclosure,	\
 				  heapptr);	\
 	BLOCK_END
 # else
 #  define UPD_IND_NOLOCK(updclosure, heapptr)			\
         BLOCK_BEGIN						\
-	DECLARE_IPTR(info);					\
-	info = GET_INFO(updclosure);				\
-        AWAKEN_BQ_NOLOCK(info,updclosure);			\
-	updateWithIndirection(info, INFO_PTR(stg_IND_info),	\
+	updateWithIndirection(INFO_PTR(stg_IND_info),		\
 			      updclosure,			\
 			      heapptr,); 			\
 	BLOCK_END
@@ -167,31 +155,6 @@ extern void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
 		DO_AWAKEN_BQ(((StgBlockingQueue *)closure)->blocking_queue, closure);     	                \
 	}
 
-
-#else /* !GRAN && !PAR */
-
-#define DO_AWAKEN_BQ(closure)  	\
-        FCALL awakenBlockedQueue(StgBlockingQueue_blocking_queue(closure) ARG_PTR);
-
-#define AWAKEN_BQ(info,closure)						\
-     	if (info == INFO_PTR(stg_BLACKHOLE_BQ_info)) {			\
-          DO_AWAKEN_BQ(closure);                                        \
-	}
-
-#define AWAKEN_STATIC_BQ(info,closure)					\
-     	if (info == INFO_PTR(stg_BLACKHOLE_BQ_STATIC_info)) {		\
-          DO_AWAKEN_BQ(closure);                                        \
-	}
-
-#ifdef RTS_SUPPORTS_THREADS
-#define DO_AWAKEN_BQ_NOLOCK(closure) \
-        FCALL awakenBlockedQueueNoLock(StgBlockingQueue_blocking_queue(closure) ARG_PTR);
-
-#define AWAKEN_BQ_NOLOCK(info,closure)					\
-     	if (info == INFO_PTR(stg_BLACKHOLE_BQ_info)) {			\
-          DO_AWAKEN_BQ_NOLOCK(closure);                                 \
-	}
-#endif
 #endif /* GRAN || PAR */
 
 /* -----------------------------------------------------------------------------
@@ -279,7 +242,7 @@ DEBUG_FILL_SLOP(StgClosure *p)
  */
 #ifdef CMINUSMINUS
 #define generation(n) (W_[generations] + n*SIZEOF_generation)
-#define updateWithIndirection(info, ind_info, p1, p2, and_then)	\
+#define updateWithIndirection(ind_info, p1, p2, and_then)	\
     W_ bd;							\
 								\
 /*    ASSERT( p1 != p2 && !closure_IND(p1) );			\
@@ -292,11 +255,9 @@ DEBUG_FILL_SLOP(StgClosure *p)
       TICK_UPD_NEW_IND();					\
       and_then;							\
     } else {							\
-      if (info != stg_BLACKHOLE_BQ_info) {			\
-        DEBUG_FILL_SLOP(p1);					\
-        foreign "C" recordMutableGen(p1 "ptr", 			\
+      DEBUG_FILL_SLOP(p1);					\
+      foreign "C" recordMutableGen(p1 "ptr", 			\
 		 generation(TO_W_(bdescr_gen_no(bd))) "ptr");	\
-      }								\
       StgInd_indirectee(p1) = p2;				\
       SET_INFO(p1, stg_IND_OLDGEN_info);			\
       LDV_RECORD_CREATE(p1);					\
@@ -304,7 +265,7 @@ DEBUG_FILL_SLOP(StgClosure *p)
       and_then;							\
   }
 #else
-#define updateWithIndirection(_info, ind_info, p1, p2, and_then)	\
+#define updateWithIndirection(ind_info, p1, p2, and_then)		\
   {									\
     bdescr *bd;								\
 									\
@@ -318,10 +279,8 @@ DEBUG_FILL_SLOP(StgClosure *p)
       TICK_UPD_NEW_IND();						\
       and_then;								\
     } else {								\
-      if (_info != &stg_BLACKHOLE_BQ_info) {				\
-        DEBUG_FILL_SLOP(p1);						\
-        recordMutableGen(p1, &generations[bd->gen_no]);			\
-      }									\
+      DEBUG_FILL_SLOP(p1);						\
+      recordMutableGen(p1, &generations[bd->gen_no]);			\
       ((StgInd *)p1)->indirectee = p2;					\
       SET_INFO(p1, &stg_IND_OLDGEN_info);				\
       TICK_UPD_OLD_IND();						\
@@ -335,8 +294,7 @@ DEBUG_FILL_SLOP(StgClosure *p)
  */
 #ifndef CMINUSMINUS
 INLINE_HEADER void
-updateWithPermIndirection(const StgInfoTable *info, 
-	                  StgClosure *p1,
+updateWithPermIndirection(StgClosure *p1,
 	                  StgClosure *p2) 
 {
   bdescr *bd;
@@ -361,9 +319,7 @@ updateWithPermIndirection(const StgInfoTable *info,
     LDV_RECORD_CREATE(p1);
     TICK_UPD_NEW_PERM_IND(p1);
   } else {
-    if (info != &stg_BLACKHOLE_BQ_info) {
-	recordMutableGen(p1, &generations[bd->gen_no]);
-    }
+    recordMutableGen(p1, &generations[bd->gen_no]);
     ((StgInd *)p1)->indirectee = p2;
     SET_INFO(p1, &stg_IND_OLDGEN_PERM_info);
     /*

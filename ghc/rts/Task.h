@@ -24,7 +24,7 @@ typedef struct _TaskInfo {
   double     gc_etime;
 } TaskInfo;
 
-extern TaskInfo *taskIds;
+extern TaskInfo *taskTable;
 
 extern void startTaskManager ( nat maxTasks, void (*taskStart)(void) );
 extern void stopTaskManager ( void );

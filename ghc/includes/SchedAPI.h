@@ -26,9 +26,6 @@ extern StgTSO *createThread(nat stack_size, StgInt pri);
 #else
 extern StgTSO *createThread(nat stack_size);
 #endif
-#if defined(PAR) || defined(SMP)
-extern void taskStart(void);
-#endif
 extern void scheduleThread(StgTSO *tso);
 extern SchedulerStatus scheduleWaitThread(StgTSO *tso, /*out*/HaskellObj* ret,
                                           Capability *initialCapability);

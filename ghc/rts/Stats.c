@@ -19,6 +19,7 @@
 #include "ParTicky.h"                       /* ToDo: move into Rts.h */
 #include "Profiling.h"
 #include "Storage.h"
+#include "Task.h"
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -477,15 +478,15 @@ stat_endGC(lnat alloc, lnat collect, lnat live, lnat copied, lnat gen)
 	GC_tot_time   += gc_time;
 	GCe_tot_time  += gc_etime;
 	
-#ifdef SMP
+#if defined(SMP)
 	{
 	    nat i;
 	    pthread_t me = pthread_self();
 
 	    for (i = 0; i < RtsFlags.ParFlags.nNodes; i++) {
-		if (me == task_ids[i].id) {
-		    task_ids[i].gc_time += gc_time;
-		    task_ids[i].gc_etime += gc_etime;
+		if (me == taskTable[i].id) {
+		    taskTable[i].gc_time += gc_time;
+		    taskTable[i].gc_etime += gc_etime;
 		    break;
 		}
 	    }
@@ -578,7 +579,7 @@ stat_endHeapCensus(void)
    stat_workerStop
 
    Called under SMP when a worker thread finishes.  We drop the timing
-   stats for this thread into the task_ids struct for that thread.
+   stats for this thread into the taskTable struct for that thread.
    -------------------------------------------------------------------------- */
 
 #if defined(SMP)
@@ -591,13 +592,13 @@ stat_workerStop(void)
     getTimes();
 
     for (i = 0; i < RtsFlags.ParFlags.nNodes; i++) {
-	if (task_ids[i].id == me) {
-	    task_ids[i].mut_time = CurrentUserTime - task_ids[i].gc_time;
-	    task_ids[i].mut_etime = CurrentElapsedTime
+	if (taskTable[i].id == me) {
+	    taskTable[i].mut_time = CurrentUserTime - taskTable[i].gc_time;
+	    taskTable[i].mut_etime = CurrentElapsedTime
 		- GCe_tot_time
-		- task_ids[i].elapsedtimestart;
-	    if (task_ids[i].mut_time < 0.0)  { task_ids[i].mut_time = 0.0;  }
-	    if (task_ids[i].mut_etime < 0.0) { task_ids[i].mut_etime = 0.0; }
+		- taskTable[i].elapsedtimestart;
+	    if (taskTable[i].mut_time < 0.0)  { taskTable[i].mut_time = 0.0;  }
+	    if (taskTable[i].mut_etime < 0.0) { taskTable[i].mut_etime = 0.0; }
 	}
     }
 }
@@ -650,7 +651,7 @@ stat_exit(int alloc)
 	{   nat i;
 	    MutUserTime = 0.0;
 	    for (i = 0; i < RtsFlags.ParFlags.nNodes; i++) {
-		MutUserTime += task_ids[i].mut_time;
+		MutUserTime += taskTable[i].mut_time;
 	    }
 	}
 	time = MutUserTime + GC_tot_time + InitUserTime + ExitUserTime;
@@ -696,10 +697,10 @@ stat_exit(int alloc)
 		    statsPrintf("  Task %2d:  MUT time: %6.2fs  (%6.2fs elapsed)\n"
 			    "            GC  time: %6.2fs  (%6.2fs elapsed)\n\n", 
 			    i, 
-			    TICK_TO_DBL(task_ids[i].mut_time),
-			    TICK_TO_DBL(task_ids[i].mut_etime),
-			    TICK_TO_DBL(task_ids[i].gc_time),
-			    TICK_TO_DBL(task_ids[i].gc_etime));
+			    TICK_TO_DBL(taskTable[i].mut_time),
+			    TICK_TO_DBL(taskTable[i].mut_etime),
+			    TICK_TO_DBL(taskTable[i].gc_time),
+			    TICK_TO_DBL(taskTable[i].gc_etime));
 		}
 	    }
 #endif
