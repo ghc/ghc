@@ -19,10 +19,10 @@ import Outputable
 
    Nomenclature: all ops indicate width and signedness, where
    appropriate.  Widths: 8/16/32/64 means the given size, obviously.
-   Nat means the native word size.  Signedness: S means signed, U
-   means unsigned.  For operations where signedness is irrelevant or
-   makes no difference (for example integer add), the signedness
-   component is omitted.
+   Nat means the operation works on STG word sized objects.
+   Signedness: S means signed, U means unsigned.  For operations where
+   signedness is irrelevant or makes no difference (for example
+   integer add), the signedness component is omitted.
 
    An exception: NatP is a ptr-typed native word.  From the point of
    view of the native code generators this distinction is irrelevant,
@@ -160,8 +160,8 @@ data MachOp
   | MO_32U_to_NatU
 
   -- Reading/writing arrays
-  | MO_ReadOSBI Int PrimRep   -- [base_ptr, index_value]
-  | MO_WriteOSBI Int PrimRep  -- [base_ptr, index_value, value_to_write]
+  | MO_ReadOSBI Int PrimRep   -- args: [base_ptr, index_value]
+  | MO_WriteOSBI Int PrimRep  -- args: [base_ptr, index_value, value_to_write]
     -- Read/write a value :: the PrimRep
     -- at byte address 
     --    sizeof(machine_word)*Int + base_ptr + sizeof(PrimRep)*index_value
