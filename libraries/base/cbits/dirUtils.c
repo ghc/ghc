@@ -81,7 +81,11 @@ __hscore_readdir( HsAddr dirPtr, HsAddr pDirEnt )
   if (p == NULL) return -1;
   res = readdir_r((DIR*)dirPtr, p, pDirE);
   if (res != 0) {
-    *pDirE = NULL;
+      *pDirE = NULL;
+      free(p);
+  }
+  else if (*pDirE == NULL) {
+    // end of stream
     free(p);
   }
   return res;
