@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Foo
+-- Module      :  Test
 -- Copyright   :  (c) Simon Marlow 2002
 -- License     :  BSD-style
 -- 
@@ -8,21 +8,21 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- This is the module comment for the "Foo" module
+-- This module illustrates & tests most of the features of Haddock.
 --
 -----------------------------------------------------------------------------
 
 -- This is plain comment, ignored by Haddock.
 
-module Foo ( 
+module Test ( 
 
 	-- Section headings are introduced with '-- *':
 	-- * Type declarations
 
 	-- Subsection headings are introduced with '-- **' and so on.
 	-- ** Data types
-	T(..), T2, T3(..), T4(..),
-	N1(..), N2(..), N3(..), N4,
+	T(..), T2, T3(..), T4(..), T5(..),
+	N1(..), N2(..), N3(..), N4, N5(..),
 
 	-- ** Records
 	R(..),
@@ -33,6 +33,7 @@ module Foo (
 	-- * Function types
 	f, g,
 
+	-- $aux2
 	-- * Auxiliary stuff
 
 	-- $aux1
@@ -59,8 +60,11 @@ module Foo (
 
 	{-| nested-style doc comments -}
 
-	-- * Existential / Universal types
+	-- * Existential \/ Universal types
 	Ex(..),
+
+	-- * Type signatures with argument docs
+	k, l, m,
    ) where
 
 
@@ -80,6 +84,11 @@ data T3 a b = A1 a | B1 b
 -- A data declaration with no documentation annotations at all
 data T4 a b = A2 a | B2 b
 
+-- A data declaration documentation on the constructors only
+data T5 a b
+  = A3 a -- ^ documents 'A3'
+  | B3 b -- ^ documents 'B3'
+
 -- | A newtype
 newtype N1 a b = N1 (a b)
 
@@ -93,6 +102,9 @@ newtype N3 a b = N3 {n3 :: a b -- ^ this is the 'n3' field
 -- | An abstract newtype - we show this one as data rather than newtype because
 -- the difference isn\'t visible to the programmer for an abstract type.
 newtype N4 a b = N4 a
+
+newtype N5 a b = N5 {n5 :: a b -- ^ no docs on the datatype or the constructor
+		    }
 
 class (D a) => C a  where
    -- |this is a description of the 'a' method
@@ -163,7 +175,7 @@ f :: C a => Int -> Int
 -- | we can export foreign declarations too
 foreign import ccall g :: Int -> IO CInt
 
--- | this doc string has a parse error in it: '
+-- | this doc string has a parse error in it: \'
 h :: Int
 h = 42
 
@@ -190,10 +202,27 @@ h = 42
    @ and a code block @
 -}
 
--- | A data-type using existential/universal types
+-- | A data-type using existential\/universal types
 data Ex a 
   = forall b . C b => Ex1 b
   | forall b . Ex2 b
   | C a => Ex3 b
   | Ex4 (forall a . a -> a)
 
+-- | This is a function with documentation for each argument
+k :: T 		-- ^ This argument has type 'T'
+  -> T2 	-- ^ This argument has type 'T2'
+  -> (T3 -> T4) -- ^ This argument has type @T3 -> T4@
+  -> T5		-- ^ This argument has a very long description that should
+		-- hopefully cause some wrapping to happen when it is finally
+		-- rendered by Haddock in the generated HTML page.
+  -> IO ()	-- ^ This is the result type
+
+-- This function has arg docs but no docs for the function itself
+l :: (Int, Int, Float) -- ^ takes a triple
+  -> Int -- ^ returns an 'Int'
+
+-- | This function has some arg docs 
+m :: R
+  -> N1		-- ^ one of the arguments
+  -> IO Int	-- ^ and the return value
