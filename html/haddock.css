@@ -64,8 +64,8 @@ TD.cbody  {
   }
 
 A:link    { color: #0000e0; text-decoration: none }
-A:visited { color: #0000a0 }
-A:hover { background-color: #e0e0ff; text-decoration: none }
+A:visited { color: #0000a0; text-decoration: none }
+A:hover   { background-color: #e0e0ff; text-decoration: none }
 
 TD.botbar {
   background-color: #000099;
