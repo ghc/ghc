@@ -812,6 +812,7 @@ integerPlusOneIdKey	      = mkPreludeMiscIdUnique 10
 integerPlusTwoIdKey	      = mkPreludeMiscIdUnique 11
 integerZeroIdKey	      = mkPreludeMiscIdUnique 12
 int2IntegerIdKey	      = mkPreludeMiscIdUnique 13
+seqIdKey		      = mkPreludeMiscIdUnique 14
 irrefutPatErrorIdKey	      = mkPreludeMiscIdUnique 15
 eqStringIdKey		      = mkPreludeMiscIdUnique 16
 noMethodBindingErrorIdKey     = mkPreludeMiscIdUnique 17

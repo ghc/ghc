@@ -32,11 +32,11 @@ module MkId (
 
 
 import BasicTypes	( Arity, StrictnessMark(..), isMarkedUnboxed, isMarkedStrict )
-import TysPrim		( openAlphaTyVars, alphaTyVar, alphaTy, 
+import TysPrim		( openAlphaTyVars, alphaTyVar, alphaTy, betaTyVar, betaTy,
 			  intPrimTy, realWorldStatePrimTy, addrPrimTy
 			)
 import TysWiredIn	( charTy, mkListTy )
-import PrelRules	( primOpRule )
+import PrelRules	( primOpRules )
 import Rules		( addRule )
 import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkTyConApp,
 			  mkTyVarTys, mkClassPred, tcEqPred,
@@ -125,6 +125,7 @@ wiredInIds
     , realWorldPrimId
     , unsafeCoerceId
     , getTagId
+    , seqId
     ]
 \end{code}
 
@@ -146,8 +147,24 @@ mkDataConId work_name data_con
 	   `setArityInfo`		arity
 	   `setNewStrictnessInfo`	Just strict_sig
 
-    arity = dataConRepArity data_con
+    arity      = dataConRepArity data_con
+
     strict_sig = mkStrictSig (mkTopDmdType (replicate arity topDmd) cpr_info)
+	-- Notice that we do *not* say the worker is strict
+	-- even if the data constructor is declared strict
+	--	e.g. 	data T = MkT !(Int,Int)
+	-- Why?  Because the *wrapper* is strict (and its unfolding has case
+	-- expresssions that do the evals) but the *worker* itself is not.
+	-- If we pretend it is strict then when we see
+	--	case x of y -> $wMkT y
+	-- the simplifier thinks that y is "sure to be evaluated" (because
+	-- $wMkT is strict) and drops the case.  No, $wMkT is not strict.
+	--
+	-- When the simplifer sees a pattern 
+	--	case e of MkT x -> ...
+	-- it uses the dataConRepStrictness of MkT to mark x as evaluated;
+	-- but that's fine... dataConRepStrictness comes from the data con
+	-- not from the worker Id.
 
     tycon = dataConTyCon data_con
     cpr_info | isProductTyCon tycon && 
@@ -222,9 +239,7 @@ mkDataConWrapId data_con
 		-- applications are treated as values
 	   `setNewStrictnessInfo` 	Just wrap_sig
 
-    wrap_ty = mkForAllTys all_tyvars $
-	      mkFunTys all_arg_tys
-	      result_ty
+    wrap_ty = mkForAllTys all_tyvars (mkFunTys all_arg_tys result_ty)
 
     res_info = strictSigResInfo (idNewStrictness work_id)
     wrap_sig = mkStrictSig (mkTopDmdType (replicate arity topDmd) res_info)
@@ -619,8 +634,7 @@ mkPrimOpId prim_op
 	   `setNewStrictnessInfo`	Just (mkNewStrictnessInfo id arity strict_info NoCPRInfo)
 	-- Until we modify the primop generation code
 
-    rules = maybe emptyCoreRules (addRule emptyCoreRules id)
-		(primOpRule prim_op)
+    rules = foldl (addRule id) emptyCoreRules (primOpRules prim_op)
 
 
 -- For each ccall we manufacture a separate CCallOpId, giving it
@@ -740,7 +754,12 @@ mkDictFunId dfun_name clas inst_tyvars inst_tys dfun_theta
 %*									*
 %************************************************************************
 
-These two can't be defined in Haskell.
+These Ids can't be defined in Haskell.  They could be defined in 
+unfoldings in PrelGHC.hi-boot, but we'd have to ensure that they
+were definitely, definitely inlined, because there is no curried
+identifier for them.  Thats what mkCompulsoryUnfolding does.
+If we had a way to get a compulsory unfolding from an interface file,
+we could do that, but we don't right now.
 
 unsafeCoerce# isn't so much a PrimOp as a phantom identifier, that
 just gets expanded into a type coercion wherever it occurs.  Hence we
@@ -762,8 +781,18 @@ unsafeCoerceId
     [x] = mkTemplateLocals [openAlphaTy]
     rhs = mkLams [openAlphaTyVar,openBetaTyVar,x] $
 	  Note (Coerce openBetaTy openAlphaTy) (Var x)
-\end{code}
 
+seqId
+  = pcMiscPrelId seqIdKey pREL_GHC SLIT("seq") ty info
+  where
+    info = noCafNoTyGenIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
+	   
+
+    ty  = mkForAllTys [alphaTyVar,betaTyVar]
+		      (mkFunTy alphaTy (mkFunTy betaTy betaTy))
+    [x,y] = mkTemplateLocals [alphaTy, betaTy]
+    rhs = mkLams [alphaTyVar,betaTyVar,x] (Case (Var x) x [(DEFAULT, [], Var y)])
+\end{code}
 
 @getTag#@ is another function which can't be defined in Haskell.  It needs to
 evaluate its argument and call the dataToTag# primitive.

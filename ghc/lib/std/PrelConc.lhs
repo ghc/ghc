@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelConc.lhs,v 1.24 2001/05/18 16:54:05 simonmar Exp $
+% $Id: PrelConc.lhs,v 1.25 2001/09/14 15:49:56 simonpj Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -19,7 +19,7 @@ module PrelConc
 	, killThread	-- :: ThreadId -> IO ()
 	, throwTo       -- :: ThreadId -> Exception -> IO ()
 	, par  		-- :: a -> b -> b
-	, seq  		-- :: a -> b -> b
+	, pseq 		-- :: a -> b -> b
 	, yield         -- :: IO ()
 
 	-- Waiting
@@ -47,7 +47,7 @@ import PrelIOBase	( IO(..), MVar(..) )
 import PrelBase		( Int(..) )
 import PrelException    ( Exception(..), AsyncException(..) )
 
-infixr 0 `par`, `seq`
+infixr 0 `par`, `pseq`
 \end{code}
 
 %************************************************************************
@@ -80,7 +80,10 @@ yield :: IO ()
 yield = IO $ \s -> 
    case (yield# s) of s1 -> (# s1, () #)
 
--- "seq" is defined a bit weirdly (see below)
+-- 	Nota Bene: 'pseq' used to be 'seq'
+--		   but 'seq' is now defined in PrelGHC
+--
+-- "pseq" is defined a bit weirdly (see below)
 --
 -- The reason for the strange "0# -> parError" case is that
 -- it fools the compiler into thinking that seq is non-strict in
@@ -91,9 +94,9 @@ yield = IO $ \s ->
 -- Just before converting from Core to STG there's a bit of magic
 -- that recognises the seq# and eliminates the duff case.
 
-{-# INLINE seq  #-}
-seq :: a -> b -> b
-seq  x y = case (seq#  x) of { 0# -> seqError; _ -> y }
+{-# INLINE pseq  #-}
+pseq :: a -> b -> b
+pseq  x y = case (seq#  x) of { 0# -> seqError; _ -> y }
 
 {-# INLINE par  #-}
 par :: a -> b -> b

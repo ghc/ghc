@@ -51,6 +51,9 @@ __export PrelGHC
   tryPutMVarzh
   isEmptyMVarzh
 
+  -- Seq
+  seq
+
   -- Parallel
   seqzh
   parzh
@@ -463,3 +466,4 @@ instance __forall s => {CCallable (StablePtrzh s)} = zdfCCallableStablePtrzh;
 1 zdfCCallableMutableByteArrayzh :: __forall s => {CCallable (MutableByteArrayzh s)} ;
 1 zdfCCallableForeignObjzh :: {CCallable ForeignObjzh} ;
 1 zdfCCallableStablePtrzh :: __forall a => {CCallable (StablePtrzh a)} ;
+
