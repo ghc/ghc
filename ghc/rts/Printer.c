@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.35 2001/02/09 13:09:16 simonmar Exp $
+ * $Id: Printer.c,v 1.36 2001/02/11 17:51:08 simonmar Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -82,11 +82,9 @@ void printClosure( StgClosure *obj )
     switch ( get_itbl(obj)->type ) {
     case INVALID_OBJECT:
             barf("Invalid object");
-#ifdef GHCI
     case BCO:
             disassemble( (StgBCO*)obj );
             break;
-#endif
 
     case AP_UPD:
         {
@@ -345,7 +343,6 @@ StgPtr printStackObj( StgPtr sp )
     } else {
         StgClosure* c = (StgClosure*)(*sp);
         printPtr((StgPtr)*sp);
-#ifdef GHCI
         if (c == (StgClosure*)&stg_ctoi_ret_R1p_info) {
            fprintf(stderr, "\t\t\tstg_ctoi_ret_R1p_info\n" );
 	} else
@@ -358,7 +355,6 @@ StgPtr printStackObj( StgPtr sp )
         if (c == (StgClosure*)&stg_ctoi_ret_D1_info) {
            fprintf(stderr, "\t\t\tstg_ctoi_ret_D1_info\n" );
 	} else
-#endif
         if (get_itbl(c)->type == BCO) {
            fprintf(stderr, "\t\t\t");
            fprintf(stderr, "BCO(...)\n"); 

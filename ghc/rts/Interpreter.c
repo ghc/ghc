@@ -5,11 +5,9 @@
  * Copyright (c) 1994-2000.
  *
  * $RCSfile: Interpreter.c,v $
- * $Revision: 1.16 $
- * $Date: 2001/02/06 12:09:42 $
+ * $Revision: 1.17 $
+ * $Date: 2001/02/11 17:51:07 $
  * ---------------------------------------------------------------------------*/
-
-#ifdef GHCI
 
 #include "Rts.h"
 #include "RtsAPI.h"
@@ -771,5 +769,3 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
 
     barf("fallen off end of object-type switch in interpretBCO()");
 }
-
-#endif /* GHCI */

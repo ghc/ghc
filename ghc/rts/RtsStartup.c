@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.48 2001/02/09 13:09:16 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.49 2001/02/11 17:51:08 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -22,11 +22,8 @@
 #include "StgRun.h"
 #include "StgStartup.h"
 #include "Prelude.h"		/* fixupRTStoPreludeRefs */
-
-#ifdef GHCI
 #include "HsFFI.h"
 #include "Linker.h"
-#endif
 
 #if defined(RTS_GTK_FRONTPANEL)
 #include "FrontPanel.h"
@@ -151,11 +148,6 @@ startupHaskell(int argc, char *argv[], void (*init_root)(void))
 
     /* initialize the storage manager */
     initStorage();
-
-    /* initialise the object linker, if necessary */
-#ifdef GHCI
-    initLinker();
-#endif
 
     /* initialise the stable pointer table */
     initStablePtrTable();

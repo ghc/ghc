@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.63 2001/02/08 14:36:21 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.64 2001/02/11 17:51:08 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -50,8 +50,6 @@ STGFUN(stg_##type##_entry)							\
 /* -----------------------------------------------------------------------------
    Support for the bytecode interpreter.
    -------------------------------------------------------------------------- */
-
-#ifdef GHCI
 
 /* 9 bits of return code for constructors created by the interpreter. */
 FN_(stg_interp_constr_entry) 
@@ -255,8 +253,6 @@ STGFUN(stg_BCO_entry) {
     JMP_(stg_yield_to_interpreter);
   FE_
 }
-
-#endif /* GHCI */
 
 
 /* -----------------------------------------------------------------------------

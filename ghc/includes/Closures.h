@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Closures.h,v 1.25 2001/01/29 17:23:41 simonmar Exp $
+ * $Id: Closures.h,v 1.26 2001/02/11 17:51:08 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -189,9 +189,7 @@ typedef struct {
     StgHeader     header;
     StgClosure   *indirectee;
     StgClosure   *static_link;
-#ifdef GHCI
     struct _StgInfoTable *saved_info;
-#endif
 } StgIndStatic;
 
 typedef struct {

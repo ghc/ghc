@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.70 2001/02/09 13:09:16 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.71 2001/02/11 17:51:07 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1011,7 +1011,6 @@ FN_(makeStableNamezh_fast)
    Bytecode object primitives
    -------------------------------------------------------------------------  */
 
-#ifdef GHCI
 FN_(newBCOzh_fast)
 {
   /* R1.p = instrs
@@ -1057,7 +1056,6 @@ FN_(mkApUpd0zh_fast)
   RET_P(ap);
   FE_
 }
-#endif
 
 /* -----------------------------------------------------------------------------
    Thread I/O blocking primitives

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.95 2001/02/08 18:04:49 sewardj Exp $
+ * $Id: GC.c,v 1.96 2001/02/11 17:51:07 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -53,10 +53,8 @@
 #  include "ParallelDebug.h"
 # endif
 #endif
-#if defined(GHCI)
-# include "HsFFI.h"
-# include "Linker.h"
-#endif
+#include "HsFFI.h"
+#include "Linker.h"
 #if defined(RTS_GTK_FRONTPANEL)
 #include "FrontPanel.h"
 #endif
@@ -164,10 +162,8 @@ static void         scavenge_mut_once_list  ( generation *g );
 static void         gcCAFs                  ( void );
 #endif
 
-#ifdef GHCI
 void revertCAFs   ( void );
 void scavengeCAFs ( void );
-#endif
 
 //@node Garbage Collect, Weak Pointers, Static function declarations
 //@subsection Garbage Collect
@@ -390,9 +386,7 @@ void GarbageCollect ( void (*get_roots)(void), rtsBool force_major_gc )
     }
   }
 
-#ifdef GHCI
   scavengeCAFs();
-#endif
 
   /* follow all the roots that the application knows about.
    */
@@ -743,8 +737,10 @@ void GarbageCollect ( void (*get_roots)(void), rtsBool force_major_gc )
   }
 
  /* mark the garbage collected CAFs as dead */
-#if defined(DEBUG) && !defined(GHCI)
-  if (major_gc) { gcCAFs(); } /* doesn't work w/ GHCI */
+#if 0 /* doesn't work at the moment */
+#if defined(DEBUG)
+  if (major_gc) { gcCAFs(); }
+#endif
 #endif
   
   /* zero the scavenged static object list */
@@ -1525,14 +1521,12 @@ loop:
     return q;
 
   case IND_STATIC:
-#ifdef GHCI
     /* a revertible CAF - it'll be on the CAF list, so don't do
      * anything with it here (we'll scavenge it later).
      */
     if (((StgIndStatic *)q)->saved_info != NULL) {
        return q;
     }
-#endif
     if (major_gc && IND_STATIC_LINK((StgClosure *)q) == NULL) {
        IND_STATIC_LINK((StgClosure *)q) = static_objects;
        static_objects = (StgClosure *)q;
@@ -3022,14 +3016,14 @@ zero_mutable_list( StgMutClosure *first )
    Reverting CAFs
    -------------------------------------------------------------------------- */
 
-#ifdef GHCI
-
 void
 revertCAFs( void )
 {
     StgIndStatic *c;
 
-    for (c = (StgIndStatic *)caf_list; c != NULL; c = (StgIndStatic *)c->static_link) {
+    for (c = (StgIndStatic *)caf_list; c != NULL; 
+	 c = (StgIndStatic *)c->static_link) 
+    {
 	c->header.info = c->saved_info;
 	c->saved_info = NULL;
 	/* could, but not necessary: c->static_link = NULL; */
@@ -3043,12 +3037,12 @@ scavengeCAFs( void )
     StgIndStatic *c;
 
     evac_gen = 0;
-    for (c = (StgIndStatic *)caf_list; c != NULL; c = (StgIndStatic *)c->static_link) {
+    for (c = (StgIndStatic *)caf_list; c != NULL; 
+	 c = (StgIndStatic *)c->static_link) 
+    {
 	c->indirectee = evacuate(c->indirectee);
     }
 }
-
-#endif /* GHCI */
 
 /* -----------------------------------------------------------------------------
    Sanity code for CAF garbage collection.

@@ -5,11 +5,11 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Disassembler.c,v $
- * $Revision: 1.18 $
- * $Date: 2001/01/05 15:24:28 $
+ * $Revision: 1.19 $
+ * $Date: 2001/02/11 17:51:07 $
  * ---------------------------------------------------------------------------*/
 
-#ifdef GHCI
+#ifdef DEBUG
 
 #include "Rts.h"
 #include "RtsAPI.h"
@@ -190,4 +190,4 @@ void disassemble( StgBCO *bco )
    ASSERT(pc == nbcs+1);
 }
 
-#endif /* GHCI */
+#endif /* DEBUG */

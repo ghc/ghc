@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.21 2001/02/11 13:13:37 simonmar Exp $
+ * $Id: Linker.c,v 1.22 2001/02/11 17:51:07 simonmar Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -12,6 +12,7 @@
 #include "HsFFI.h"
 #include "Hash.h"
 #include "Linker.h"
+#include "LinkerInternals.h"
 #include "RtsUtils.h"
 #include "StoragePriv.h"
 
@@ -27,68 +28,14 @@
 #include <dlfcn.h>
 #endif
 
-#ifdef GHCI /* endif is right at end of file */
-
 #if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS) || defined(freebsd_TARGET_OS)
 #define OBJFORMAT_ELF
 #elif defined(cygwin32_TARGET_OS) || defined (mingw32_TARGET_OS)
 #define OBJFORMAT_PEi386
 #endif
 
-/* A bucket in the symbol hash-table.  Primarily, maps symbol names to
- * absolute addresses.  All symbols from a given module are linked
- * together, so they can be freed at the same time.  There's also a
- * bucket link field for the hash table.
- */
-typedef struct _SymbolVal {
-    char   *lbl;
-    void   *addr;
-} SymbolVal;
-
-typedef enum { OBJECT_LOADED, OBJECT_RESOLVED } OStatus;
-
-/* Indication of section kinds for loaded objects.  Needed by
-   the GC for deciding whether or not a pointer on the stack
-   is a code pointer.
-*/
-typedef enum { SECTIONKIND_CODE_OR_RODATA,
-               SECTIONKIND_RWDATA,
-               SECTIONKIND_OTHER,
-               SECTIONKIND_NOINFOAVAIL } 
-   SectionKind;
-
-typedef struct { void* start; void* end; SectionKind kind; } 
-   Section;
-
-/* Top-level structure for an object module.  One of these is allocated
- * for each object file in use.
- */
-typedef struct _ObjectCode {
-    OStatus   status;
-    char*     fileName;
-    int       fileSize;
-    char*     formatName;            /* eg "ELF32", "DLL", "COFF", etc. */
-
-    SymbolVal *symbols;
-    int       n_symbols;
-
-    /* ptr to malloc'd lump of memory holding the obj file */
-    void*     image;
-
-    /* The section-kind entries for this object module.  Dynamically expands. */
-    Section*  sections;
-    int       n_sections;
-    
-    /* Allow a chain of these things */
-    struct _ObjectCode * next;
-} ObjectCode;
-
-
 /* Hash table mapping symbol names to Symbol */
 /*Str*/HashTable *symhash;
-
-/* List of currently loaded objects */
-ObjectCode *objects;
 
 #if defined(OBJFORMAT_ELF)
 static int ocVerifyImage_ELF    ( ObjectCode* oc );
@@ -1634,53 +1581,3 @@ ocResolve_ELF ( ObjectCode* oc )
 
 
 #endif /* ELF */
-
-/* -----------------------------------------------------------------------------
- * Look up an address to discover whether it is in text or data space.
- *
- * Used by the garbage collector when walking the stack.
- * -------------------------------------------------------------------------- */
-
-static __inline__ SectionKind
-lookupSection ( void* addr )
-{
-   int          i;
-   ObjectCode*  oc;
-   
-   for ( oc = objects; oc; oc = oc->next ) {
-       for (i = 0; i < oc->n_sections; i++) {
-	   if (oc->sections[i].start <= addr 
-	       && addr <= oc->sections[i].end)
-	       return oc->sections[i].kind;
-       }
-   }
-   return SECTIONKIND_OTHER;
-}
-
-int
-is_dynamically_loaded_code_or_rodata_ptr ( void* p )
-{
-   SectionKind sk = lookupSection(p);
-   ASSERT (sk != SECTIONKIND_NOINFOAVAIL);
-   return (sk == SECTIONKIND_CODE_OR_RODATA);
-}
-
-
-int
-is_dynamically_loaded_rwdata_ptr ( void* p )
-{
-   SectionKind sk = lookupSection(p);
-   ASSERT (sk != SECTIONKIND_NOINFOAVAIL);
-   return (sk == SECTIONKIND_RWDATA);
-}
-
-
-int
-is_not_dynamically_loaded_ptr ( void* p )
-{
-   SectionKind sk = lookupSection(p);
-   ASSERT (sk != SECTIONKIND_NOINFOAVAIL);
-   return (sk == SECTIONKIND_OTHER);
-}
-
-#endif /* GHCI */

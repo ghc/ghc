@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.28 2001/02/09 13:09:16 simonmar Exp $
+ * $Id: Storage.h,v 1.29 2001/02/11 17:51:08 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -80,11 +80,6 @@ extern void PleaseStopAllocating(void);
 
 extern void   GarbageCollect(void (*get_roots)(void),rtsBool force_major_gc);
 extern StgClosure *MarkRoot(StgClosure *p);
-
-/* Temporary measure to ensure we retain all the dynamically-loaded CAFs */
-#ifdef GHCI
-extern void markCafs( void );
-#endif
 
 /* -----------------------------------------------------------------------------
    Generational garbage collection support
@@ -336,7 +331,6 @@ void printMutableList(generation *gen);
 extern void* TEXT_SECTION_END_MARKER_DECL;
 extern void* DATA_SECTION_END_MARKER_DECL;
 
-#if defined(GHCI)
 /* Take into account code sections in dynamically loaded object files. */
 #define IS_CODE_PTR(p) (  ((P_)(p) < (P_)&TEXT_SECTION_END_MARKER) \
                        || is_dynamically_loaded_code_or_rodata_ptr((char *)p) )
@@ -345,11 +339,6 @@ extern void* DATA_SECTION_END_MARKER_DECL;
                        || is_dynamically_loaded_rwdata_ptr((char *)p) )
 #define IS_USER_PTR(p) ( ((P_)(p) >= (P_)&DATA_SECTION_END_MARKER) \
                        && is_not_dynamically_loaded_ptr((char *)p) )
-#else
-#define IS_CODE_PTR(p) ((P_)(p) < (P_)&TEXT_SECTION_END_MARKER)
-#define IS_DATA_PTR(p) ((P_)(p) >= (P_)&TEXT_SECTION_END_MARKER && (P_)(p) < (P_)&DATA_SECTION_END_MARKER)
-#define IS_USER_PTR(p) ((P_)(p) >= (P_)&DATA_SECTION_END_MARKER)
-#endif
 
 /* The HEAP_ALLOCED test below is called FOR EVERY SINGLE CLOSURE
  * during GC.  It needs to be FAST.
@@ -480,12 +469,9 @@ extern int is_heap_alloced(const void* x);
    infotables for constructors on the (writable) C heap.
    -------------------------------------------------------------------------- */
 
-#ifdef GHCI
-   /* not accurate by any means, but stops the assertions failing... */
-#  define IS_HUGS_CONSTR_INFO(info)  IS_USER_PTR(info)
-#else
-#  define IS_HUGS_CONSTR_INFO(info) 0 /* ToDo: more than mildly bogus */
-#endif
+/* not accurate by any means, but stops the assertions failing... */
+/* TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO */
+#define IS_HUGS_CONSTR_INFO(info)  IS_USER_PTR(info)
 
 /* LOOKS_LIKE_GHC_INFO is called moderately often during GC, but
  * Certainly not as often as HEAP_ALLOCED.

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.35 2001/01/31 11:04:29 simonmar Exp $
+ * $Id: Storage.c,v 1.36 2001/02/11 17:51:08 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -249,7 +249,6 @@ newCAF(StgClosure* caf)
    */
   ACQUIRE_LOCK(&sm_mutex);
 
-#ifdef GHCI
   if (is_dynamically_loaded_rwdata_ptr((StgPtr)caf)) {
       ((StgIndStatic *)caf)->saved_info  = (StgInfoTable *)caf->header.info;
       ((StgIndStatic *)caf)->static_link = caf_list;
@@ -259,11 +258,6 @@ newCAF(StgClosure* caf)
       ((StgMutClosure *)caf)->mut_link = oldest_gen->mut_once_list;
       oldest_gen->mut_once_list = (StgMutClosure *)caf;
   }
-#else
-  ASSERT( ((StgMutClosure*)caf)->mut_link == NULL );
-  ((StgMutClosure *)caf)->mut_link = oldest_gen->mut_once_list;
-  oldest_gen->mut_once_list = (StgMutClosure *)caf;
-#endif
 
   RELEASE_LOCK(&sm_mutex);
 }

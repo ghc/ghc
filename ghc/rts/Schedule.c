@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.89 2001/02/09 13:09:16 simonmar Exp $
+ * $Id: Schedule.c,v 1.90 2001/02/11 17:51:08 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -877,25 +877,18 @@ schedule( void )
     switch (cap->rCurrentTSO->what_next) {
     case ThreadKilled:
     case ThreadComplete:
-      /* Thread already finished, return to scheduler. */
-      ret = ThreadFinished;
-      break;
+	/* Thread already finished, return to scheduler. */
+	ret = ThreadFinished;
+	break;
     case ThreadEnterGHC:
-      ret = StgRun((StgFunPtr) stg_enterStackTop, cap);
-      break;
+	ret = StgRun((StgFunPtr) stg_enterStackTop, cap);
+	break;
     case ThreadRunGHC:
-      ret = StgRun((StgFunPtr) stg_returnToStackTop, cap);
-      break;
+	ret = StgRun((StgFunPtr) stg_returnToStackTop, cap);
+	break;
     case ThreadEnterInterp:
-#ifdef GHCI
-      {
-	 IF_DEBUG(scheduler,sched_belch("entering interpreter"));
-	 ret = interpretBCO(cap);
-         break;
-      }
-#else
-      barf("Panic: entered a BCO but no bytecode interpreter in this build");
-#endif
+	ret = interpretBCO(cap);
+	break;
     default:
       barf("schedule: invalid what_next field");
     }
