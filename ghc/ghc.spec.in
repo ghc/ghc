@@ -1,8 +1,8 @@
 # RPM spec file for GHC
 #
-# Copyright [1998..1999] Manuel M. T. Chakravarty <chak@acm.org>
-# Thanks to Zoltan Vorosbaranyi <vbzoli@vbzo.li> for help with earlier 
-# versions. 
+# Copyright [1998..2000] Manuel M. T. Chakravarty <chak@acm.org>
+# Thanks to Zoltan Vorosbaranyi <vbzoli@vbzo.li> for suggestions in 
+# earlier versions and Pixel <pixel@mandrakesoft.com> for coding tips.
 #
 # This file is subject to the same free software license as GHC.
 
@@ -24,9 +24,9 @@ Group: Development/Languages
 Source: http://haskell.org/ghc/dist/%{version}/ghc-%{version}-src.tar.gz
 URL: http://haskell.org/ghc/
 BuildRoot: /var/tmp/ghc-%{version}-%{release}-root
-Packager: Manuel M. T. Chakravarty <chak@is.tsukuba.ac.jp>
 Requires: gmp-devel
 Provides: haskell
+BuildRequires: happy >= 1.6, ghc, stylesheets
 
 %description
 The Glorious Glasgow Haskell Compilation System (GHC) is a robust,
@@ -43,9 +43,20 @@ online at http://www.haskell.org/ghc/.
 Haskell 98 is "the" standard lazy functional programming language.
 More info plus the language definition is at http://www.haskell.org/.
 
-** This package does not include libraries for profiling **
+%package prof
+Summary: Profiling libraries for GHC
+Group: Development/Libraries
+Requires: ghc = %{PACKAGE_VERSION}
+
+%description prof
+Profiling libraries for Glorious Glasgow Haskell Compilation System (GHC).
+They should be installed when GHC's profiling subsystem is needed.
 
 %changelog
+
+* Sun Apr 23 2000 Manuel Chakravarty
+- revised for ghc 4.07; added suggestions from Pixel <pixel@mandrakesoft.com>
+- added profiling package
 
 * Tue Dec 7 1999 Manuel Chakravarty
 - version for use from CVS
@@ -75,17 +86,11 @@ More info plus the language definition is at http://www.haskell.org/.
 
 # generate our own `build.mk'
 #
-# * this is a kludge, to be used until the `configure' script is improved
+# * this is a kludge
 #
 cat >mk/build.mk <<END
-GhcHcOpts = -O -dcore-lint -H24m
-GhcCompilerWays =
-GhcLibWays = 
-GhcLibHcOpts = -O -H24m
-SplitObjs = YES 
-GhcLibsWithReadline = YES
-StripLibraries = YES
-SRC_HAPPY_OPTS += -c
+GhcLibWays = p
+SRC_HAPPY_OPTS += -agc
 END
 
 
@@ -95,13 +100,13 @@ make boot
 make -C glafp-utils sgmlverb
 make all
 make -C docs ps html
-make -C ghc/docs/users_guide ps html
-make -C ghc/docs/libraries ps html
+make -C ghc/docs ps html
+make -C hslibs/doc ps html
 
 %install
 # compress the non-html docs
 #
-for j in docs ghc/docs; do
+for j in docs ghc/docs hslibs/doc; do
   dir=`pwd`
   cd $j
   for i in ps dvi sgml vsgml verb idx; do
@@ -113,15 +118,21 @@ rm -rf $RPM_BUILD_ROOT
 make prefix=$RPM_BUILD_ROOT%{prefix}\
      libdir=$RPM_BUILD_ROOT%{prefix}/lib/ghc-%{version} install
 
+# generate the file list for lib/ _excluding_ all files needed for profiling
+# only
+#
+ls -R %{prefix}/lib/* | grep -v -e ":$" -e "^$" -e ".p_hi" -e "_p.a"\
+  >rpm-noprof-lib-files
+
 %clean
 rm -rf $RPM_BUILD_ROOT
 
-%files
-%doc ghc/ANNOUNCE ghc/PATCHLEVEL ghc/README docs/ ghc/docs/ CONTRIB/
-%{prefix}/bin/ghc
-%{prefix}/bin/ghc-%{version}
-%{prefix}/bin/ghcprof
-%{prefix}/bin/hp2ps
-%{prefix}/bin/hstags
-%{prefix}/bin/stat2resid
-%{prefix}/lib/ghc-%{version}/
+%files -f rpm-noprof-lib-files
+%doc docs/ CONTRIB/
+%doc ghc/ANNOUNCE ghc/PATCHLEVEL ghc/README ghc/docs/
+%doc hslibs/doc/
+%{prefix}/bin/*
+
+%files prof
+%{prefix}/lib/ghc-%{version}/imports/*/*.p_hi
+%{prefix}/lib/ghc-%{version}/libHS*_p.a
