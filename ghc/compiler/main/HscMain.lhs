@@ -5,7 +5,7 @@
 \section[GHC_Main]{Main driver for Glasgow Haskell compiler}
 
 \begin{code}
-module HscMain ( HscResult(..), hscMain, 
+module HscMain ( HscResult(..), hscMain,
 #ifdef GHCI
 		 hscStmt, hscThing, hscModuleContents,
 #endif
@@ -32,7 +32,6 @@ import Module		( lookupModuleEnv )
 import RdrName		( rdrEnvElts )
 import PrelNames	( iNTERACTIVE )
 import StringBuffer	( stringToStringBuffer )
-import FastString       ( mkFastString )
 import Maybes		( catMaybes )
 
 import List		( nub )
@@ -52,7 +51,7 @@ import Rename		( checkOldIface, renameModule, closeIfaceDecls )
 import Rules		( emptyRuleBase )
 import PrelInfo		( wiredInThingEnv, wiredInThings )
 import PrelRules	( builtinRules )
-import PrelNames	( knownKeyNames )
+import PrelNames	( knownKeyNames, gHC_PRIM_Name )
 import MkIface		( mkFinalIface )
 import TcModule
 import InstEnv		( emptyInstEnv )
@@ -327,7 +326,11 @@ hscRecomp ghci_mode dflags have_object
 	    local_tycons     = typeEnvTyCons  env_tc
 	    local_classes    = typeEnvClasses env_tc
 
- 	    imported_module_names = map ideclName (hsModuleImports rdr_module)
+ 	    imported_module_names = 
+		filter (/= gHC_PRIM_Name) $
+		map ideclName (hsModuleImports rdr_module)
+		-- eek! doesn't this keep rdr_module live until code generation?
+		-- SDM 3/2002
 
 	    mod_name_to_Module nm
 		 = do m <- findModule nm ; return (fst (fromJust m))
