@@ -101,7 +101,7 @@ INSTALL_DIR  = ./mkdirhier
 VERSION_SYMLINKS_FOR=$(package)
 
 # Binaries to install
-PACKAGE_BIN_INSTALL=$(PACKAGE_PRL_SCRIPTS) $(PACKAGE_SH_SCRIPTS) $(PACKAGE_BINS)
+PACKAGE_BIN_INSTALL=$(PACKAGE_PRL_SCRIPTS) $(PACKAGE_SH_SCRIPTS)
 
 #----------end of user-serviceable parts------------
 #
@@ -201,6 +201,9 @@ install :: config-pkgs install-dirs install-bin install-libs install-datas
 install-bin:
 	for i in $(PACKAGE_BIN_INSTALL); do \
 	   $(INSTALL_BIN) bin/$(platform)/$(package)-$(version)/$$i $(bindir); \
+	done;
+	for i in $(PACKAGE_BINS); do \
+	   $(INSTALL_BIN) bin/$(platform)/$(package)-$(version)/$$i$(exeext) $(bindir); \
 	done;
 	for i in $(VERSION_SYMLINKS_FOR) ""; do \
 	   if [ "x$$i" != "x" ]; then 		\
