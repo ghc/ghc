@@ -27,7 +27,7 @@ import TcClassDcl	( tcClassDecls2, mkImplicitClassBinds )
 import TcDefaults	( tcDefaults )
 import TcEnv		( tcExtendGlobalValEnv, tcExtendTypeEnv,
 			  getEnvTyCons, getEnvClasses, tcLookupValueByKeyMaybe,
-			  explicitLookupValueByKey, tcSetValueEnv,
+			  explicitLookupValueByKey, tcSetValueEnv, tcSetInstEnv,
 			  initEnv, 
 			  ValueEnv, TcTyThing(..)
 			)
@@ -36,7 +36,7 @@ import TcRules		( tcRules )
 import TcForeign	( tcForeignImports, tcForeignExports )
 import TcIfaceSig	( tcInterfaceSigs )
 import TcInstDcls	( tcInstDecls1, tcInstDecls2 )
-import TcInstUtil	( buildInstanceEnvs, classDataCon, InstInfo )
+import TcInstUtil	( buildInstanceEnv, InstInfo )
 import TcSimplify	( tcSimplifyTop )
 import TcTyClsDecls	( tcTyAndClassDecls )
 import TcTyDecls	( mkImplicitDataBinds )
@@ -154,26 +154,19 @@ tcModule rn_name_supply fixities
 	-- unf_env is also used to get the pragam info
 	-- for imported dfuns and default methods
 
-    	    -- The knot for instance information.  This isn't used at all
-	    -- till we type-check value declarations
-    	fixTc ( \ ~(rec_inst_mapper, _, _, _) ->
-    
 		 -- Type-check the type and class decls
-		tcTyAndClassDecls unf_env rec_inst_mapper decls	`thenTc` \ env ->
+	tcTyAndClassDecls unf_env decls	`thenTc` \ env ->
     
 		    -- Typecheck the instance decls, includes deriving
-		tcSetEnv env (
-		tcInstDecls1 unf_env decls mod_name fixities rn_name_supply
-		)				`thenTc` \ (inst_info, deriv_binds) ->
+	tcSetEnv env $
+
+	tcInstDecls1 unf_env decls 
+		     mod_name fixities 
+		     rn_name_supply	`thenTc` \ (inst_info, deriv_binds) ->
     
-    		buildInstanceEnvs inst_info	`thenNF_Tc` \ inst_mapper ->
-    
-		returnTc (inst_mapper, env, inst_info, deriv_binds)
-    
-    	-- End of inner fix loop
-    	) `thenTc` \ (_, env, inst_info, deriv_binds) ->
-    
-    	tcSetEnv env 		(
+    	buildInstanceEnv inst_info	`thenNF_Tc` \ inst_env ->
+
+	tcSetInstEnv inst_env $
     	let
     	    tycons       = getEnvTyCons env
     	    classes      = getEnvClasses env
@@ -296,7 +289,6 @@ tcModule rn_name_supply fixities
 				tc_rules   = rules',
 				tc_env     = really_final_env
 		 }))
-	)
 
     -- End of outer fix loop
     ) `thenTc` \ (final_env, stuff) ->

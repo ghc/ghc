@@ -27,6 +27,10 @@ module TcEnv(
 	newLocalId, newSpecPragmaId,
 	tcGetGlobalTyVars, tcExtendGlobalTyVars,
 
+	InstEnv, emptyInstEnv, addToInstEnv, 
+	lookupInstEnv, InstLookupResult(..),
+	tcGetInstEnv, tcSetInstEnv, classInstEnv,
+
 	badCon, badPrimOp
   ) where
 
@@ -44,7 +48,7 @@ import TcType	( TcType, TcTyVar, TcTyVarSet, TcThetaType,
 		)
 import VarEnv
 import VarSet
-import Type	( Kind, superKind,
+import Type	( Kind, Type, superKind,
 		  tyVarsOfType, tyVarsOfTypes, mkTyVarTy,
 		  splitForAllTys, splitRhoTy, splitFunTys,
 		  splitAlgTyConApp_maybe, getTyVar
@@ -65,15 +69,16 @@ import Name		( Name, OccName, nameOccName, getSrcLoc,
 			  NameEnv, emptyNameEnv, addToNameEnv, 
 				   extendNameEnv, lookupNameEnv, nameEnvElts
 			)
+import Unify		( unifyTyListsX, matchTys )
 import Unique		( pprUnique10, Unique, Uniquable(..) )
 import FiniteMap	( lookupFM, addToFM )
 import UniqFM
 import Unique		( Uniquable(..) )
 import Util		( zipEqual, zipWith3Equal, mapAccumL )
 import Bag		( bagToList )
-import Maybes		( maybeToBool, catMaybes )
 import SrcLoc		( SrcLoc )
 import FastString	( FastString )
+import Maybes
 import Outputable
 \end{code}
 
@@ -144,6 +149,7 @@ data TcEnv = TcEnv
                   UsageEnv
 		  TypeEnv
 		  ValueEnv 
+		  InstEnv
 		  (TcTyVarSet,		-- The in-scope TyVars
 		   TcRef TcTyVarSet)	-- Free type variables of the value env
 					-- ...why mutable? see notes with tcGetGlobalTyVars
@@ -165,11 +171,11 @@ data TcTyThing = ATyVar TcTyVar		-- Mutable only so that the kind can be mutable
 
 
 initEnv :: TcRef TcTyVarSet -> TcEnv
-initEnv mut = TcEnv emptyNameEnv emptyNameEnv emptyNameEnv (emptyVarSet, mut)
+initEnv mut = TcEnv emptyNameEnv emptyNameEnv emptyNameEnv emptyInstEnv (emptyVarSet, mut)
 
-getEnvClasses (TcEnv _ te _ _) = [cl | (_, AClass cl _) <- nameEnvElts te]
+getEnvClasses (TcEnv _ te _ _ _) = [cl | (_, AClass cl _) <- nameEnvElts te]
 
-getEnvTyCons  (TcEnv _ te _ _) = catMaybes (map get_tc (nameEnvElts te))
+getEnvTyCons  (TcEnv _ te _ _ _) = catMaybes (map get_tc (nameEnvElts te))
     where
       get_tc (_, ADataTyCon tc)  = Just tc
       get_tc (_, ASynTyCon tc _) = Just tc
@@ -184,16 +190,20 @@ getEnvAllTyCons te_list = catMaybes (map get_tc te_list)
       get_tc other               = Nothing
 \end{code}
 
-The UsageEnv
-~~~~~~~~~~~~
 
-Extending the usage environment.
+%************************************************************************
+%*									*
+\subsection{The usage environment}
+%*									*
+%************************************************************************
+
+Extending the usage environment
 
 \begin{code}
 tcExtendUVarEnv :: Name -> UVar -> TcM s r -> TcM s r
 tcExtendUVarEnv uv_name uv scope
-  = tcGetEnv                                                 `thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
-    tcSetEnv (TcEnv (addToNameEnv ue uv_name uv) te ve gtvs) scope
+  = tcGetEnv                 `thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
+    tcSetEnv (TcEnv (addToNameEnv ue uv_name uv) te ve ie gtvs) scope
 \end{code}
 
 Looking up in the environments.
@@ -201,22 +211,23 @@ Looking up in the environments.
 \begin{code}
 tcLookupUVar :: Name -> NF_TcM s UVar
 tcLookupUVar uv_name
-  = tcGetEnv	`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
+  = tcGetEnv	`thenNF_Tc` \ (TcEnv ue te ve _ gtvs) ->
     case lookupNameEnv ue uv_name of
       Just uv -> returnNF_Tc uv
       Nothing -> failWithTc (uvNameOutOfScope uv_name)
 \end{code}	
 
 
-The TypeEnv
-~~~~~~~~~~~~
-
-Extending the type environment. 
+%************************************************************************
+%*									*
+\subsection{The type environment}
+%*									*
+%************************************************************************
 
 \begin{code}
 tcExtendTyVarEnv :: [TyVar] -> TcM s r -> TcM s r
 tcExtendTyVarEnv tyvars scope
-  = tcGetEnv				`thenNF_Tc` \ (TcEnv ue te ve (in_scope_tvs, gtvs)) ->
+  = tcGetEnv				`thenNF_Tc` \ (TcEnv ue te ve ie (in_scope_tvs, gtvs)) ->
     let
 	extend_list = [ (getName tv, (kindToTcKind (tyVarKind tv), ATyVar tv))
 		      | tv <- tyvars
@@ -232,7 +243,7 @@ tcExtendTyVarEnv tyvars scope
 	-- class and instance decls, when we mustn't generalise the class tyvars
 	-- when typechecking the methods.
     tc_extend_gtvs gtvs new_tv_set		`thenNF_Tc` \ gtvs' ->
-    tcSetEnv (TcEnv ue te' ve (in_scope_tvs', gtvs')) scope
+    tcSetEnv (TcEnv ue te' ve ie (in_scope_tvs', gtvs')) scope
 
 -- This variant, tcExtendTyVarEnvForMeths, takes *two* bunches of tyvars:
 --	the signature tyvars contain the original names
@@ -242,20 +253,20 @@ tcExtendTyVarEnv tyvars scope
 
 tcExtendTyVarEnvForMeths :: [TyVar] -> [TcTyVar] -> TcM s r -> TcM s r
 tcExtendTyVarEnvForMeths sig_tyvars inst_tyvars thing_inside
-  = tcGetEnv					`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
+  = tcGetEnv					`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
     let
 	te' = extendNameEnv te stuff
     in
-    tcSetEnv (TcEnv ue te' ve gtvs) thing_inside
+    tcSetEnv (TcEnv ue te' ve ie gtvs) thing_inside
   where
     stuff = [ (getName sig_tv, (kindToTcKind (tyVarKind inst_tv), ATyVar inst_tv))
 	    | (sig_tv, inst_tv) <- zipEqual "tcMeth" sig_tyvars inst_tyvars
 	    ]
 
 tcExtendGlobalTyVars extra_global_tvs scope
-  = tcGetEnv					`thenNF_Tc` \ (TcEnv ue te ve (in_scope,gtvs)) ->
+  = tcGetEnv					`thenNF_Tc` \ (TcEnv ue te ve ie (in_scope,gtvs)) ->
     tc_extend_gtvs gtvs	extra_global_tvs	`thenNF_Tc` \ gtvs' ->
-    tcSetEnv (TcEnv ue te ve (in_scope,gtvs')) scope
+    tcSetEnv (TcEnv ue te ve ie (in_scope,gtvs')) scope
 
 tc_extend_gtvs gtvs extra_global_tvs
   = tcReadMutVar gtvs			`thenNF_Tc` \ global_tvs ->
@@ -272,7 +283,7 @@ the environment.
 \begin{code}
 tcGetGlobalTyVars :: NF_TcM s TcTyVarSet
 tcGetGlobalTyVars
-  = tcGetEnv 						`thenNF_Tc` \ (TcEnv ue te ve (_,gtvs)) ->
+  = tcGetEnv 						`thenNF_Tc` \ (TcEnv ue te ve ie (_,gtvs)) ->
     tcReadMutVar gtvs					`thenNF_Tc` \ global_tvs ->
     zonkTcTyVars (varSetElems global_tvs)		`thenNF_Tc` \ global_tys' ->
     let
@@ -283,7 +294,7 @@ tcGetGlobalTyVars
 
 tcGetInScopeTyVars :: NF_TcM s [TcTyVar]
 tcGetInScopeTyVars
-  = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve (in_scope_tvs, gtvs)) ->
+  = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve ie (in_scope_tvs, gtvs)) ->
     returnNF_Tc (varSetElems in_scope_tvs)
 \end{code}
 
@@ -295,11 +306,11 @@ tcExtendTypeEnv :: [(Name, (TcKind, TcTyThing))] -> TcM s r -> TcM s r
 tcExtendTypeEnv bindings scope
   = ASSERT( null [tv | (_, (_,ATyVar tv)) <- bindings] )
 	-- Not for tyvars; use tcExtendTyVarEnv
-    tcGetEnv					`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
+    tcGetEnv					`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
     let
 	te' = extendNameEnv te bindings
     in
-    tcSetEnv (TcEnv ue te' ve gtvs) scope
+    tcSetEnv (TcEnv ue te' ve ie gtvs) scope
 \end{code}
 
 
@@ -308,7 +319,7 @@ Looking up in the environments.
 \begin{code}
 tcLookupTy :: Name ->  NF_TcM s (TcKind, TcTyThing)
 tcLookupTy name
-  = tcGetEnv	`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
+  = tcGetEnv	`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
     case lookupNameEnv te name of {
 	Just thing -> returnNF_Tc thing ;
  	Nothing    -> 
@@ -324,21 +335,21 @@ tcLookupTy name
 	
 tcLookupClassByKey :: Unique -> NF_TcM s Class
 tcLookupClassByKey key
-  = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
+  = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
     case lookupUFM_Directly te key of
 	Just (_, AClass cl _) -> returnNF_Tc cl
 	other		      -> pprPanic "tcLookupClassByKey:" (pprUnique10 key)
 
 tcLookupClassByKey_maybe :: Unique -> NF_TcM s (Maybe Class)
 tcLookupClassByKey_maybe key
-  = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
+  = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
     case lookupUFM_Directly te key of
 	Just (_, AClass cl _) -> returnNF_Tc (Just cl)
 	other		      -> returnNF_Tc Nothing
 
 tcLookupTyConByKey :: Unique -> NF_TcM s TyCon
 tcLookupTyConByKey key
-  = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
+  = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
     case lookupUFM_Directly te key of
 	Just (_, ADataTyCon tc)  -> returnNF_Tc tc
 	Just (_, ASynTyCon tc _) -> returnNF_Tc tc
@@ -357,22 +368,22 @@ tcLookupTyConByKey key
 \begin{code}
 tcExtendGlobalValEnv :: [Id] -> TcM s a -> TcM s a
 tcExtendGlobalValEnv ids scope
-  = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
+  = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
     let
 	ve' = addListToUFM_Directly ve [(getUnique id, id) | id <- ids]
     in
-    tcSetEnv (TcEnv ue te ve' gtvs) scope
+    tcSetEnv (TcEnv ue te ve' ie gtvs) scope
 
 tcExtendLocalValEnv :: [(Name,TcId)] -> TcM s a -> TcM s a
 tcExtendLocalValEnv names_w_ids scope
-  = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve (in_scope_tvs,gtvs)) ->
+  = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve ie (in_scope_tvs,gtvs)) ->
     tcReadMutVar gtvs	`thenNF_Tc` \ global_tvs ->
     let
 	ve'		    = extendNameEnv ve names_w_ids
 	extra_global_tyvars = tyVarsOfTypes (map (idType . snd) names_w_ids)
     in
     tc_extend_gtvs gtvs extra_global_tyvars	`thenNF_Tc` \ gtvs' ->
-    tcSetEnv (TcEnv ue te ve' (in_scope_tvs,gtvs')) scope
+    tcSetEnv (TcEnv ue te ve' ie (in_scope_tvs,gtvs')) scope
 \end{code}
 
 
@@ -381,7 +392,7 @@ tcLookupValue :: Name -> NF_TcM s Id	-- Panics if not found
 tcLookupValue name
   = case maybeWiredInIdName name of
 	Just id -> returnNF_Tc id
-	Nothing -> tcGetEnv 		`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
+	Nothing -> tcGetEnv 		`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
 		   returnNF_Tc (lookupWithDefaultUFM ve def name)
   where
     def = pprPanic "tcLookupValue:" (ppr name)
@@ -390,28 +401,29 @@ tcLookupValueMaybe :: Name -> NF_TcM s (Maybe Id)
 tcLookupValueMaybe name
   = case maybeWiredInIdName name of
 	Just id -> returnNF_Tc (Just id)
-	Nothing -> tcGetEnv 		`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
+	Nothing -> tcGetEnv 		`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
 		   returnNF_Tc (lookupNameEnv ve name)
 
 tcLookupValueByKey :: Unique -> NF_TcM s Id	-- Panics if not found
 tcLookupValueByKey key
-  = tcGetEnv 		`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
+  = tcGetEnv 		`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
     returnNF_Tc (explicitLookupValueByKey ve key)
 
 tcLookupValueByKeyMaybe :: Unique -> NF_TcM s (Maybe Id)
 tcLookupValueByKeyMaybe key
-  = tcGetEnv 		`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
+  = tcGetEnv 		`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
     returnNF_Tc (lookupUFM_Directly ve key)
 
 tcGetValueEnv :: NF_TcM s ValueEnv
 tcGetValueEnv
-  = tcGetEnv 		`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
+  = tcGetEnv 		`thenNF_Tc` \ (TcEnv ue te ve ie gtvs) ->
     returnNF_Tc ve
+
 
 tcSetValueEnv :: ValueEnv -> TcM s a -> TcM s a
 tcSetValueEnv ve scope
-  = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te _ gtvs) ->
-    tcSetEnv (TcEnv ue te ve gtvs) scope
+  = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te _ ie gtvs) ->
+    tcSetEnv (TcEnv ue te ve ie gtvs) scope
 
 -- Non-monadic version, environment given explicitly
 explicitLookupValueByKey :: ValueEnv -> Unique -> Id
@@ -443,12 +455,7 @@ tcAddImportedIdInfo unf_env id
 		-- ToDo: could check that types are the same
 \end{code}
 
-
-%************************************************************************
-%*									*
-\subsection{Constructing new Ids}
-%*									*
-%************************************************************************
+Constructing new Ids
 
 \begin{code}
 newLocalId :: OccName -> TcType -> SrcLoc -> NF_TcM s TcId
@@ -461,6 +468,274 @@ newSpecPragmaId name ty
   = tcGetUnique		`thenNF_Tc` \ uniq ->
     returnNF_Tc (mkSpecPragmaId (nameOccName name) uniq ty (getSrcLoc name))
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{The instance environment}
+%*									*
+%************************************************************************
+
+\begin{code}
+tcGetInstEnv :: NF_TcM s InstEnv
+tcGetInstEnv = tcGetEnv 	`thenNF_Tc` \ (TcEnv ue te ve ie (_,gtvs)) ->
+	       returnNF_Tc ie
+
+tcSetInstEnv :: InstEnv -> TcM s a -> TcM s a
+tcSetInstEnv ie scope
+  = tcGetEnv 	`thenNF_Tc` \ (TcEnv ue te ve _ gtvs) ->
+    tcSetEnv (TcEnv ue te ve ie gtvs) scope
+\end{code}    
+
+
+\begin{code}
+type InstEnv    = UniqFM ClsInstEnv		-- Maps Class to instances for that class
+type ClsInstEnv = [(TyVarSet, [Type], Id)]	-- The instances for a particular class
+
+classInstEnv :: InstEnv -> Class -> ClsInstEnv
+classInstEnv env cls = lookupWithDefaultUFM env [] cls
+\end{code}
+
+A @ClsInstEnv@ lives inside a class, and identifies all the instances
+of that class.  The @Id@ inside a ClsInstEnv mapping is the dfun for
+that instance.  
+
+If class C maps to a list containing the item ([a,b], [t1,t2,t3], dfun), then
+
+	forall a b, C t1 t2 t3  can be constructed by dfun
+
+or, to put it another way, we have
+
+	instance (...) => C t1 t2 t3,  witnessed by dfun
+
+There is an important consistency constraint in the elements of a ClsInstEnv:
+
+  * [a,b] must be a superset of the free vars of [t1,t2,t3]
+
+  * The dfun must itself be quantified over [a,b]
+
+Thus, the @ClassInstEnv@ for @Eq@ might contain the following entry:
+	[a] ===> dfun_Eq_List :: forall a. Eq a => Eq [a]
+The "a" in the pattern must be one of the forall'd variables in
+the dfun type.
+
+
+
+Notes on overlapping instances
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In some ClsInstEnvs, overlap is prohibited; that is, no pair of templates unify.
+
+In others, overlap is permitted, but only in such a way that one can make
+a unique choice when looking up.  That is, overlap is only permitted if
+one template matches the other, or vice versa.  So this is ok:
+
+  [a]  [Int]
+
+but this is not
+
+  (Int,a)  (b,Int)
+
+If overlap is permitted, the list is kept most specific first, so that
+the first lookup is the right choice.
+
+
+For now we just use association lists.
+
+\subsection{Avoiding a problem with overlapping}
+
+Consider this little program:
+
+\begin{pseudocode}
+     class C a        where c :: a
+     class C a => D a where d :: a
+
+     instance C Int where c = 17
+     instance D Int where d = 13
+
+     instance C a => C [a] where c = [c]
+     instance ({- C [a], -} D a) => D [a] where d = c
+
+     instance C [Int] where c = [37]
+
+     main = print (d :: [Int])
+\end{pseudocode}
+
+What do you think `main' prints  (assuming we have overlapping instances, and
+all that turned on)?  Well, the instance for `D' at type `[a]' is defined to
+be `c' at the same type, and we've got an instance of `C' at `[Int]', so the
+answer is `[37]', right? (the generic `C [a]' instance shouldn't apply because
+the `C [Int]' instance is more specific).
+
+Ghc-4.04 gives `[37]', while ghc-4.06 gives `[17]', so 4.06 is wrong.  That
+was easy ;-)  Let's just consult hugs for good measure.  Wait - if I use old
+hugs (pre-September99), I get `[17]', and stranger yet, if I use hugs98, it
+doesn't even compile!  What's going on!?
+
+What hugs complains about is the `D [a]' instance decl.
+
+\begin{pseudocode}
+     ERROR "mj.hs" (line 10): Cannot build superclass instance
+     *** Instance            : D [a]
+     *** Context supplied    : D a
+     *** Required superclass : C [a]
+\end{pseudocode}
+
+You might wonder what hugs is complaining about.  It's saying that you
+need to add `C [a]' to the context of the `D [a]' instance (as appears
+in comments).  But there's that `C [a]' instance decl one line above
+that says that I can reduce the need for a `C [a]' instance to the
+need for a `C a' instance, and in this case, I already have the
+necessary `C a' instance (since we have `D a' explicitly in the
+context, and `C' is a superclass of `D').
+
+Unfortunately, the above reasoning indicates a premature commitment to the
+generic `C [a]' instance.  I.e., it prematurely rules out the more specific
+instance `C [Int]'.  This is the mistake that ghc-4.06 makes.  The fix is to
+add the context that hugs suggests (uncomment the `C [a]'), effectively
+deferring the decision about which instance to use.
+
+Now, interestingly enough, 4.04 has this same bug, but it's covered up
+in this case by a little known `optimization' that was disabled in
+4.06.  Ghc-4.04 silently inserts any missing superclass context into
+an instance declaration.  In this case, it silently inserts the `C
+[a]', and everything happens to work out.
+
+(See `basicTypes/MkId:mkDictFunId' for the code in question.  Search for
+`Mark Jones', although Mark claims no credit for the `optimization' in
+question, and would rather it stopped being called the `Mark Jones
+optimization' ;-)
+
+So, what's the fix?  I think hugs has it right.  Here's why.  Let's try
+something else out with ghc-4.04.  Let's add the following line:
+
+    d' :: D a => [a]
+    d' = c
+
+Everyone raise their hand who thinks that `d :: [Int]' should give a
+different answer from `d' :: [Int]'.  Well, in ghc-4.04, it does.  The
+`optimization' only applies to instance decls, not to regular
+bindings, giving inconsistent behavior.
+
+Old hugs had this same bug.  Here's how we fixed it: like GHC, the
+list of instances for a given class is ordered, so that more specific
+instances come before more generic ones.  For example, the instance
+list for C might contain:
+    ..., C Int, ..., C a, ...  
+When we go to look for a `C Int' instance we'll get that one first.
+But what if we go looking for a `C b' (`b' is unconstrained)?  We'll
+pass the `C Int' instance, and keep going.  But if `b' is
+unconstrained, then we don't know yet if the more specific instance
+will eventually apply.  GHC keeps going, and matches on the generic `C
+a'.  The fix is to, at each step, check to see if there's a reverse
+match, and if so, abort the search.  This prevents hugs from
+prematurely chosing a generic instance when a more specific one
+exists.
+
+--Jeff
+
+\begin{code}
+emptyInstEnv :: InstEnv
+emptyInstEnv = emptyUFM
+\end{code}
+
+@lookupInstEnv@ looks up in a @InstEnv@, using a one-way match.  Since
+the env is kept ordered, the first match must be the only one.  The
+thing we are looking up can have an arbitrary "flexi" part.
+
+\begin{code}
+lookupInstEnv :: InstEnv 			-- The envt
+	      -> Class -> [Type]	-- Key
+	      -> InstLookupResult
+
+data InstLookupResult 
+  = FoundInst 			-- There is a (template,substitution) pair 
+				-- that makes the template match the key, 
+				-- and no template is an instance of the key
+	TyVarSubstEnv Id
+
+  | NoMatch Bool	-- Boolean is true iff there is at least one
+			-- template that matches the key.
+			-- (but there are other template(s) that are
+			--  instances of the key, so we don't report 
+			--  FoundInst)
+	-- The NoMatch True case happens when we look up
+	--	Foo [a]
+	-- in an InstEnv that has entries for
+	--	Foo [Int]
+	--	Foo [b]
+	-- Then which we choose would depend on the way in which 'a'
+	-- is instantiated.  So we say there is no match, but identify
+	-- it as ambiguous case in the hope of giving a better error msg.
+	-- See the notes above from Jeff Lewis
+
+lookupInstEnv env key_cls key_tys
+  = find (classInstEnv env key_cls)
+  where
+    key_vars = tyVarsOfTypes key_tys
+
+    find [] = NoMatch False
+    find ((tpl_tyvars, tpl, val) : rest)
+      = case matchTys tpl_tyvars tpl key_tys of
+	  Nothing                 ->
+	    case matchTys key_vars key_tys tpl of
+	      Nothing             -> find rest
+	      Just (_, _)         -> NoMatch (any_match rest)
+	  Just (subst, leftovers) -> ASSERT( null leftovers )
+				     FoundInst subst val
+
+    any_match rest = or [ maybeToBool (matchTys tvs tpl key_tys)
+		        | (tvs,tpl,_) <- rest
+			]
+\end{code}
+
+@addToClsInstEnv@ extends a @ClsInstEnv@, checking for overlaps.
+
+A boolean flag controls overlap reporting.
+
+True => overlap is permitted, but only if one template matches the other;
+        not if they unify but neither is 
+
+\begin{code}
+addToInstEnv :: Bool                   			-- True <=> overlap permitted
+             -> InstEnv					-- Envt
+	     -> Class -> [TyVar] -> [Type] -> Id	-- New item
+	     -> MaybeErr InstEnv		 	-- Success...
+		         ([Type], Id)			-- Failure: Offending overlap
+
+addToInstEnv overlap_ok inst_env clas ins_tvs ins_tys value
+  = case insert_into (classInstEnv inst_env clas) of
+	Failed stuff 	  -> Failed stuff
+	Succeeded new_env -> Succeeded (addToUFM inst_env clas new_env)
+	
+  where
+    ins_tv_set = mkVarSet ins_tvs
+    ins_item = (ins_tv_set, ins_tys, value)
+
+    insert_into [] = returnMaB [ins_item]
+    insert_into env@(cur_item@(tpl_tvs, tpl_tys, val) : rest)
+
+	-- FAIL if:
+	-- (a) they are the same, or
+	-- (b) they unify, and any sort of overlap is prohibited,
+	-- (c) they unify but neither is more specific than t'other
+      |  identical 
+      || (unifiable && not overlap_ok)
+      || (unifiable && not (ins_item_more_specific || cur_item_more_specific))
+      =  failMaB (tpl_tys, val)
+
+	-- New item is an instance of current item, so drop it here
+      | ins_item_more_specific	= returnMaB (ins_item : env)
+
+	-- Otherwise carry on
+      | otherwise  = insert_into rest     `thenMaB` \ rest' ->
+                     returnMaB (cur_item : rest')
+      where
+        unifiable = maybeToBool (unifyTyListsX (ins_tv_set `unionVarSet` tpl_tvs) tpl_tys ins_tys)
+        ins_item_more_specific = maybeToBool (matchTys tpl_tvs    tpl_tys ins_tys)
+        cur_item_more_specific = maybeToBool (matchTys ins_tv_set ins_tys tpl_tys)
+	identical = ins_item_more_specific && cur_item_more_specific
+\end{code}
+
 
 
 %************************************************************************

@@ -20,7 +20,6 @@ import RnHsSyn		( RenamedHsDecl, RenamedTyClDecl, listTyCon_name )
 import BasicTypes	( RecFlag(..), NewOrData(..), Arity )
 
 import TcMonad
-import Inst		( InstanceMapper )
 import TcClassDcl	( kcClassDecl, tcClassDecl1 )
 import TcEnv		( ValueEnv, TcTyThing(..),
 			  tcExtendTypeEnv, getEnvAllTyCons
@@ -54,22 +53,22 @@ import UniqFM		( listToUFM, lookupUFM )
 The main function
 ~~~~~~~~~~~~~~~~~
 \begin{code}
-tcTyAndClassDecls :: ValueEnv -> InstanceMapper	-- Knot tying stuff
+tcTyAndClassDecls :: ValueEnv		-- Knot tying stuff
 		  -> [RenamedHsDecl]
 		  -> TcM s TcEnv
 
-tcTyAndClassDecls unf_env inst_mapper decls
+tcTyAndClassDecls unf_env decls
   = sortByDependency decls 		`thenTc` \ groups ->
-    tcGroups unf_env inst_mapper groups
+    tcGroups unf_env groups
 
-tcGroups unf_env inst_mapper []
+tcGroups unf_env []
   = tcGetEnv	`thenNF_Tc` \ env ->
     returnTc env
 
-tcGroups unf_env inst_mapper (group:groups)
-  = tcGroup unf_env inst_mapper group	`thenTc` \ env ->
+tcGroups unf_env (group:groups)
+  = tcGroup unf_env group	`thenTc` \ env ->
     tcSetEnv env			$
-    tcGroups unf_env inst_mapper groups
+    tcGroups unf_env groups
 \end{code}
 
 Dealing with a group
@@ -79,8 +78,8 @@ The knot-tying parameters: @rec_tyclss@ is an alist mapping @Name@s to
 @TcTyThing@s.  @rec_vrcs@ is a finite map from @Name@s to @ArgVrcs@s.
 
 \begin{code}
-tcGroup :: ValueEnv -> InstanceMapper -> SCC RenamedTyClDecl -> TcM s TcEnv
-tcGroup unf_env inst_mapper scc
+tcGroup :: ValueEnv -> SCC RenamedTyClDecl -> TcM s TcEnv
+tcGroup unf_env scc
   = 	-- Do kind checking
     mapNF_Tc getTyBinding1 decls 			`thenNF_Tc` \ ty_env_stuff1 ->
     tcExtendTypeEnv ty_env_stuff1 (mapTc kcDecl decls)	`thenTc_`
@@ -97,8 +96,7 @@ tcGroup unf_env inst_mapper scc
 		-- Do type checking
 	mapNF_Tc (getTyBinding2 rec_env) ty_env_stuff1	`thenNF_Tc` \ ty_env_stuff2 ->
 	tcExtendTypeEnv ty_env_stuff2				$
-	mapTc (tcDecl is_rec_group unf_env inst_mapper rec_vrcs) decls
-                                                                `thenTc` \ tyclss ->
+	mapTc (tcDecl is_rec_group unf_env rec_vrcs) decls	`thenTc` \ tyclss ->
 
 	tcGetEnv						`thenTc` \ env -> 
 	returnTc (tyclss, env)
@@ -126,13 +124,13 @@ kcDecl decl
 	kcTyDecl    decl
 
 tcDecl  :: RecFlag 			-- True => recursive group
-	 -> ValueEnv -> InstanceMapper -> FiniteMap Name ArgVrcs
+	 -> ValueEnv -> FiniteMap Name ArgVrcs
 	 -> RenamedTyClDecl -> TcM s (Name, TcTyThing)
 
-tcDecl is_rec_group unf_env inst_mapper vrcs_env decl
+tcDecl is_rec_group unf_env vrcs_env decl
   = tcAddDeclCtxt decl		$
     if isClassDecl decl then
-	tcClassDecl1 unf_env inst_mapper vrcs_env decl
+	tcClassDecl1 unf_env vrcs_env decl
     else
 	tcTyDecl is_rec_group vrcs_env decl
 		

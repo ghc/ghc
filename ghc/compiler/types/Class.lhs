@@ -9,14 +9,13 @@ module Class (
 
 	mkClass, classTyVars,
 	classKey, className, classSelIds, classTyCon,
-	classBigSig, classExtraBigSig, classInstEnv, classTvsFds
+	classBigSig, classExtraBigSig, classTvsFds
     ) where
 
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TyCon	( TyCon )
 import {-# SOURCE #-} TypeRep	( Type )
-import {-# SOURCE #-} InstEnv	( InstEnv )
 
 import Var		( Id, TyVar )
 import Name		( NamedThing(..), Name )
@@ -49,8 +48,6 @@ data Class
 
 	classOpStuff :: [ClassOpItem],		-- Ordered by tag
 
-	classInstEnv :: InstEnv,	-- All the instances of this class
-
 	classTyCon :: TyCon		-- The data type constructor for dictionaries
   }					-- of this class
 
@@ -74,11 +71,10 @@ mkClass :: Name -> [TyVar]
 	-> [(Class,[Type])] -> [Id]
 	-> [(Id, Id, Bool)]
 	-> TyCon
-	-> InstEnv
 	-> Class
 
 mkClass name tyvars fds super_classes superdict_sels
-	op_stuff tycon class_insts
+	op_stuff tycon
   = Class {	classKey = getUnique name, 
 		className = name,
 		classTyVars = tyvars,
@@ -86,7 +82,6 @@ mkClass name tyvars fds super_classes superdict_sels
 		classSCTheta = super_classes,
 		classSCSels = superdict_sels,
 		classOpStuff = op_stuff,
-		classInstEnv = class_insts,
 		classTyCon = tycon }
 \end{code}
 

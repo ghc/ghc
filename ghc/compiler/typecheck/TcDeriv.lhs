@@ -16,10 +16,9 @@ import RnHsSyn		( RenamedHsBinds, RenamedMonoBinds )
 import CmdLineOpts	( opt_D_dump_deriv )
 
 import TcMonad
-import Inst		( InstanceMapper )
-import TcEnv		( getEnvTyCons )
+import TcEnv		( InstEnv, getEnvTyCons, tcSetInstEnv )
 import TcGenDeriv	-- Deriv stuff
-import TcInstUtil	( InstInfo(..), buildInstanceEnvs )
+import TcInstUtil	( InstInfo(..), buildInstanceEnv )
 import TcSimplify	( tcSimplifyThetas )
 
 import RnBinds		( rnMethodBinds, rnTopMonoBinds )
@@ -422,15 +421,15 @@ solveDerivEqns inst_decl_infos_in orig_eqns
 	    -- with the current set of solutions, giving a
 
 	add_solns inst_decl_infos_in orig_eqns current_solns
-				`thenNF_Tc` \ (new_inst_infos, inst_mapper) ->
-	let
-	   class_to_inst_env cls = inst_mapper cls
-	in
+				`thenNF_Tc` \ (new_inst_infos, inst_env) ->
+
 	    -- Simplify each RHS
 
-	listTc [ tcAddErrCtxt (derivCtxt tc) $
-		 tcSimplifyThetas class_to_inst_env deriv_rhs
-	       | (_,tc,_,deriv_rhs) <- orig_eqns ]  `thenTc` \ next_solns ->
+	tcSetInstEnv inst_env (
+	  listTc [ tcAddErrCtxt (derivCtxt tc) $
+		   tcSimplifyThetas deriv_rhs
+	         | (_,tc,_,deriv_rhs) <- orig_eqns ]  
+	)						`thenTc` \ next_solns ->
 
 	    -- Canonicalise the solutions, so they compare nicely
 	let canonicalised_next_solns
@@ -443,18 +442,18 @@ solveDerivEqns inst_decl_infos_in orig_eqns
 add_solns :: Bag InstInfo			-- The global, non-derived ones
 	  -> [DerivEqn] -> [DerivSoln]
 	  -> NF_TcM s ([InstInfo], 		-- The new, derived ones
-		       InstanceMapper)
+		       InstEnv)
     -- the eqns and solns move "in lockstep"; we have the eqns
     -- because we need the LHS info for addClassInstance.
 
 add_solns inst_infos_in eqns solns
 
-  = discardErrsTc (buildInstanceEnvs all_inst_infos)	`thenNF_Tc` \ inst_mapper ->
+  = discardErrsTc (buildInstanceEnv all_inst_infos)	`thenNF_Tc` \ inst_env ->
 	-- We do the discard-errs so that we don't get repeated error messages
 	-- about duplicate instances.
-	-- They'll appear later, when we do the top-level buildInstanceEnvs.
+	-- They'll appear later, when we do the top-level buildInstanceEnv.
 
-    returnNF_Tc (new_inst_infos, inst_mapper)
+    returnNF_Tc (new_inst_infos, inst_env)
   where
     new_inst_infos = zipWithEqual "add_solns" mk_deriv_inst_info eqns solns
 

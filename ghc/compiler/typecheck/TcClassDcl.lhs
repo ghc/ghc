@@ -140,7 +140,7 @@ kcClassDecl (ClassDecl	context class_name
 %************************************************************************
 
 \begin{code}
-tcClassDecl1 rec_env rec_inst_mapper rec_vrcs
+tcClassDecl1 rec_env rec_vrcs
       	     (ClassDecl context class_name
 			tyvar_names fundeps class_sigs def_methods pragmas 
 			tycon_name datacon_name datacon_wkr_name sc_sel_names src_loc)
@@ -166,11 +166,9 @@ tcClassDecl1 rec_env rec_inst_mapper rec_vrcs
 	-- MAKE THE CLASS OBJECT ITSELF
     let
 	(op_tys, op_items) = unzip sig_stuff
-	rec_class_inst_env = rec_inst_mapper rec_class
 	clas = mkClass class_name tyvars fds
 		       sc_theta sc_sel_ids op_items
 		       tycon
-		       rec_class_inst_env
 
 	dict_component_tys = sc_tys ++ op_tys
  	new_or_data = case dict_component_tys of

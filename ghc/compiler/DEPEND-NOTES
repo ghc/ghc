@@ -12,7 +12,7 @@ then
 then
 	VarEnv, VarSet, ThinAir
 then
-	Class (loop TyCon.TyCon, loop Type.Type, loop InstEnv.InstEnv)
+	Class (loop TyCon.TyCon, loop Type.Type)
 then
 	TyCon (loop Type.Type, loop Type.Kind, loop DataCon.DataCon)
 then
@@ -23,8 +23,6 @@ then
 	Unify, PprType (PprEnv)
 then
 	Literal (TysPrim, PprType), DataCon
-then
-	InstEnv (Unify)
 then
 	TysWiredIn (DataCon.mkDataCon, loop MkId.mkDataConId)
 then

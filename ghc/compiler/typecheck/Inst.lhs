@@ -11,8 +11,6 @@ module Inst (
 	Inst, OverloadedLit(..),
 	pprInst, pprInsts, pprInstsInFull, tidyInst, tidyInsts,
 
-        InstanceMapper,
-
 	newDictFromOld, newDicts, newClassDicts, newDictsAtLoc,
 	newMethod, newMethodWithGivenTy, newOverloadedLit,
 	newIPDict, instOverloadedFun,
@@ -45,21 +43,22 @@ import TcHsSyn	( TcExpr, TcId,
 		  mkHsTyApp, mkHsDictApp, mkHsConApp, zonkId
 		)
 import TcMonad
-import TcEnv	( TcIdSet, tcLookupValueByKey, tcLookupTyConByKey )
+import TcEnv	( TcIdSet, InstEnv, tcGetInstEnv, lookupInstEnv, InstLookupResult(..),
+		  tcLookupValueByKey, tcLookupTyConByKey
+		)
 import TcType	( TcThetaType,
 		  TcType, TcTauType, TcTyVarSet,
 		  zonkTcTyVars, zonkTcType, zonkTcTypes, 
 		  zonkTcThetaType
 		)
 import Bag
-import Class	( classInstEnv, Class, FunDep )
+import Class	( Class, FunDep )
 import FunDeps	( instantiateFdClassTys )
 import Id	( Id, idFreeTyVars, idType, mkUserLocal, mkSysLocal )
 import PrelInfo	( isStandardClass, isCcallishClass, isNoDictClass )
 import Name	( OccName, Name, mkDictOcc, mkMethodOcc, mkIPOcc,
 		  getOccName, nameUnique )
 import PprType	( pprPred )	
-import InstEnv	( InstEnv, lookupInstEnv, InstEnvResult(..) )
 import SrcLoc	( SrcLoc )
 import Type	( Type, PredType(..), ThetaType,
 		  mkTyVarTy, isTyVarTy, mkDictTy, mkPredTy,
@@ -67,7 +66,6 @@ import Type	( Type, PredType(..), ThetaType,
 		  splitRhoTy, tyVarsOfType, tyVarsOfTypes, tyVarsOfPred,
 		  mkSynTy, tidyOpenType, tidyOpenTypes
 		)
-import InstEnv	( InstEnv )
 import Subst	( emptyInScopeSet, mkSubst,
 		  substTy, substClasses, mkTyVarSubst, mkTopTyVarSubst
 		)
@@ -285,6 +283,7 @@ Predicates
 isDict :: Inst -> Bool
 isDict (Dict _ _ _) = True
 isDict other	    = False
+
 isClassDict :: Inst -> Bool
 isClassDict (Dict _ (Class _ _) _) = True
 isClassDict other		   = False
@@ -294,10 +293,8 @@ isMethod (Method _ _ _ _ _ _) = True
 isMethod other		      = False
 
 isMethodFor :: TcIdSet -> Inst -> Bool
-isMethodFor ids (Method uniq id tys _ _ loc) 
-  = id `elemVarSet` ids
-isMethodFor ids inst 
-  = False
+isMethodFor ids (Method uniq id tys _ _ loc) = id `elemVarSet` ids
+isMethodFor ids inst			     = False
 
 isTyVarDict :: Inst -> Bool
 isTyVarDict (Dict _ (Class _ tys) _) = all isTyVarTy tys
@@ -629,25 +626,6 @@ show_uniq u = ifPprDebug (text "{-" <> ppr u <> text "-}")
 %************************************************************************
 
 \begin{code}
-type InstanceMapper = Class -> InstEnv
-\end{code}
-
-A @ClassInstEnv@ lives inside a class, and identifies all the instances
-of that class.  The @Id@ inside a ClassInstEnv mapping is the dfun for
-that instance.  
-
-There is an important consistency constraint between the @MatchEnv@s
-in and the dfun @Id@s inside them: the free type variables of the
-@Type@ key in the @MatchEnv@ must be a subset of the universally-quantified
-type variables of the dfun.  Thus, the @ClassInstEnv@ for @Eq@ might
-contain the following entry:
-@
-	[a] ===> dfun_Eq_List :: forall a. Eq a => Eq [a]
-@
-The "a" in the pattern must be one of the forall'd variables in
-the dfun type.
-
-\begin{code}
 data LookupInstResult s
   = NoInstance
   | SimpleInst TcExpr		-- Just a variable, type application, or literal
@@ -659,7 +637,8 @@ lookupInst :: Inst
 -- Dictionaries
 
 lookupInst dict@(Dict _ (Class clas tys) loc)
-  = case lookupInstEnv (classInstEnv clas) tys of
+  = tcGetInstEnv		`thenNF_Tc` \ inst_env ->
+    case lookupInstEnv inst_env clas tys of
 
       FoundInst tenv dfun_id
 	-> let
@@ -754,13 +733,13 @@ appropriate dictionary if it exists.  It is used only when resolving
 ambiguous dictionaries.
 
 \begin{code}
-lookupSimpleInst :: InstEnv
-		 -> Class
+lookupSimpleInst :: Class
 		 -> [Type]				-- Look up (c,t)
 	         -> NF_TcM s (Maybe [(Class,[Type])])	-- Here are the needed (c,t)s
 
-lookupSimpleInst class_inst_env clas tys
-  = case lookupInstEnv class_inst_env tys of
+lookupSimpleInst clas tys
+  = tcGetInstEnv		`thenNF_Tc` \ inst_env -> 
+    case lookupInstEnv inst_env clas tys of
       FoundInst tenv dfun
 	-> returnNF_Tc (Just (substClasses (mkSubst emptyInScopeSet tenv) theta'))
         where
@@ -769,3 +748,5 @@ lookupSimpleInst class_inst_env clas tys
 
       other  -> returnNF_Tc Nothing
 \end{code}
+
+

@@ -8,7 +8,7 @@ The bits common to TcInstDcls and TcDeriv.
 \begin{code}
 module TcInstUtil (
 	InstInfo(..),
-	buildInstanceEnvs,
+	buildInstanceEnv,
 	classDataCon
     ) where
 
@@ -18,12 +18,10 @@ import RnHsSyn		( RenamedMonoBinds, RenamedSig )
 
 import CmdLineOpts	( opt_AllowOverlappingInstances )
 import TcMonad
-import Inst		( InstanceMapper )
-
+import TcEnv		( InstEnv, emptyInstEnv, addToInstEnv )
 import Bag		( bagToList, Bag )
 import Class		( Class )
 import Var		( TyVar, Id, idName )
-import InstEnv		( InstEnv, emptyInstEnv, addToInstEnv )
 import Maybes		( MaybeErr(..), mkLookupFunDef )
 import Name		( getSrcLoc, nameModule, isLocallyDefined )
 import SrcLoc		( SrcLoc )
@@ -77,32 +75,9 @@ classDataCon clas = case tyConDataCons (classTyCon clas) of
 %************************************************************************
 
 \begin{code}
-buildInstanceEnvs :: Bag InstInfo
-		  -> NF_TcM s InstanceMapper
+buildInstanceEnv :: Bag InstInfo -> NF_TcM s InstEnv
 
-buildInstanceEnvs info
-  = let
-    	i_uniq :: InstInfo -> Unique
-    	i_uniq (InstInfo c _ _ _ _ _ _ _) = getUnique c
-
-	info_by_class = equivClassesByUniq i_uniq (bagToList info)
-    in
-    mapNF_Tc buildInstanceEnv info_by_class    `thenNF_Tc` \ inst_env_entries ->
-    let
-	class_lookup_fn = mkLookupFunDef (==) inst_env_entries emptyInstEnv
-    in
-    returnNF_Tc class_lookup_fn
-\end{code}
-
-\begin{code}
-buildInstanceEnv :: [InstInfo]		-- Non-empty, and all for same class
-		 -> NF_TcM s (Class, InstEnv)
-
-buildInstanceEnv inst_infos@((InstInfo clas _ _ _ _ _ _ _) : _)
-  = foldrNF_Tc addClassInstance
-	    emptyInstEnv
-	    inst_infos				`thenNF_Tc` \ class_inst_env ->
-    returnNF_Tc (clas, class_inst_env)
+buildInstanceEnv info = foldrNF_Tc addClassInstance emptyInstEnv (bagToList info)
 \end{code}
 
 @addClassInstance@ adds the appropriate stuff to the @ClassInstEnv@
@@ -118,16 +93,16 @@ addClassInstance
 addClassInstance 
     (InstInfo clas inst_tyvars inst_tys _
 	      dfun_id _ src_loc _)
-    class_inst_env
+    inst_env
   = 	-- Add the instance to the class's instance environment
     case addToInstEnv opt_AllowOverlappingInstances 
-		      class_inst_env inst_tyvars inst_tys dfun_id of
+		      inst_env clas inst_tyvars inst_tys dfun_id of
 	Failed (tys', dfun_id')    -> addErrTc (dupInstErr clas (inst_tys, dfun_id) 
 							        (tys',     dfun_id'))
 						`thenNF_Tc_`
-				     returnNF_Tc class_inst_env
+				     returnNF_Tc inst_env
 
-	Succeeded class_inst_env' -> returnNF_Tc class_inst_env'
+	Succeeded inst_env' -> returnNF_Tc inst_env'
 \end{code}
 
 \begin{code}

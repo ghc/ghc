@@ -143,18 +143,19 @@ import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
 			  mkLIE, emptyLIE, unitLIE, consLIE, plusLIE,
 			  lieToList, listToLIE
 			)
-import TcEnv		( tcGetGlobalTyVars )
+import TcEnv		( tcGetGlobalTyVars, tcGetInstEnv,
+			  InstEnv, lookupInstEnv, InstLookupResult(..) 
+			)
 import TcType		( TcType, TcTyVarSet, typeToTcType )
 import TcUnify		( unifyTauTy )
 import Id		( idType )
-import Class		( Class, classBigSig, classInstEnv )
+import Class		( Class, classBigSig )
 import PrelInfo		( isNumericClass, isCreturnableClass, isCcallishClass )
 
 import Type		( Type, ThetaType, TauType, ClassContext,
 			  mkTyVarTy, getTyVar,
 			  isTyVarTy, splitSigmaTy, tyVarsOfTypes
 			)
-import InstEnv		( InstEnv, lookupInstEnv, InstEnvResult(..) )
 import Subst		( mkTopTyVarSubst, substClasses )
 import PprType		( pprConstraint )
 import TysWiredIn	( unitTy )
@@ -840,12 +841,11 @@ a,b,c are type variables.  This is required for the context of
 instance declarations.
 
 \begin{code}
-tcSimplifyThetas :: (Class -> InstEnv)		-- How to find the InstEnv
-	       	 -> ClassContext		-- Wanted
+tcSimplifyThetas :: ClassContext		-- Wanted
 	       	 -> TcM s ClassContext		-- Needed
 
-tcSimplifyThetas inst_mapper wanteds
-  = reduceSimple inst_mapper [] wanteds		`thenNF_Tc` \ irreds ->
+tcSimplifyThetas wanteds
+  = reduceSimple [] wanteds		`thenNF_Tc` \ irreds ->
     let
 	-- For multi-param Haskell, check that the returned dictionaries
  	-- don't have any of the form (C Int Bool) for which
@@ -874,7 +874,7 @@ tcSimplifyCheckThetas :: ClassContext	-- Given
 		      -> TcM s ()
 
 tcSimplifyCheckThetas givens wanteds
-  = reduceSimple classInstEnv givens wanteds    `thenNF_Tc`	\ irreds ->
+  = reduceSimple givens wanteds    `thenNF_Tc`	\ irreds ->
     if null irreds then
        returnTc ()
     else
@@ -888,40 +888,38 @@ type AvailsSimple = FiniteMap (Class,[Type]) Bool
 		    -- True  => irreducible 
 		    -- False => given, or can be derived from a given or from an irreducible
 
-reduceSimple :: (Class -> InstEnv) 
-	     -> ClassContext			-- Given
+reduceSimple :: ClassContext			-- Given
 	     -> ClassContext			-- Wanted
 	     -> NF_TcM s ClassContext		-- Irreducible
 
-reduceSimple inst_mapper givens wanteds
-  = reduce_simple (0,[]) inst_mapper givens_fm wanteds	`thenNF_Tc` \ givens_fm' ->
+reduceSimple givens wanteds
+  = reduce_simple (0,[]) givens_fm wanteds	`thenNF_Tc` \ givens_fm' ->
     returnNF_Tc [ct | (ct,True) <- fmToList givens_fm']
   where
     givens_fm     = foldl addNonIrred emptyFM givens
 
 reduce_simple :: (Int,ClassContext)		-- Stack
-	      -> (Class -> InstEnv) 
 	      -> AvailsSimple
 	      -> ClassContext
 	      -> NF_TcM s AvailsSimple
 
-reduce_simple (n,stack) inst_mapper avails wanteds
+reduce_simple (n,stack) avails wanteds
   = go avails wanteds
   where
     go avails []     = returnNF_Tc avails
-    go avails (w:ws) = reduce_simple_help (n+1,w:stack) inst_mapper avails w	`thenNF_Tc` \ avails' ->
+    go avails (w:ws) = reduce_simple_help (n+1,w:stack) avails w	`thenNF_Tc` \ avails' ->
 		       go avails' ws
 
-reduce_simple_help stack inst_mapper givens wanted@(clas,tys)
+reduce_simple_help stack givens wanted@(clas,tys)
   | wanted `elemFM` givens
   = returnNF_Tc givens
 
   | otherwise
-  = lookupSimpleInst (inst_mapper clas) clas tys	`thenNF_Tc` \ maybe_theta ->
+  = lookupSimpleInst clas tys	`thenNF_Tc` \ maybe_theta ->
 
     case maybe_theta of
       Nothing ->    returnNF_Tc (addIrred givens wanted)
-      Just theta -> reduce_simple stack inst_mapper (addNonIrred givens wanted) theta
+      Just theta -> reduce_simple stack (addNonIrred givens wanted) theta
 
 addIrred :: AvailsSimple -> (Class,[Type]) -> AvailsSimple
 addIrred givens ct@(clas,tys)
@@ -1265,45 +1263,52 @@ addTopInstanceErr dict
   where
     (tidy_env, tidy_dict) = tidyInst emptyTidyEnv dict
 
+-- The error message when we don't find a suitable instance
+-- is complicated by the fact that sometimes this is because
+-- there is no instance, and sometimes it's because there are
+-- too many instances (overlap).  See the comments in TcEnv.lhs
+-- with the InstEnv stuff.
 addNoInstanceErr str givens dict
-  = addInstErrTcM (instLoc dict) (tidy_env, doc)
-  where
-    doc = vcat [herald <+> quotes (pprInst tidy_dict),
-	        nest 4 $ ptext SLIT("from the context") <+> pprInsts tidy_givens,
-		ambig_doc,
-		ptext SLIT("Probable fix:"),
-		nest 4 fix1,
-		nest 4 fix2]
-
-    herald = ptext SLIT("Could not") <+> unambig_doc <+> ptext SLIT("deduce")
-    unambig_doc | ambig_overlap = ptext SLIT("unambiguously")	
-		| otherwise     = empty
-
-    ambig_doc 
-	| not ambig_overlap = empty
-	| otherwise 	    
-	= vcat [ptext SLIT("The choice of (overlapping) instance declaration"),
-		nest 4 (ptext SLIT("depends on the instantiation of") <+> 
-		     	quotes (pprWithCommas ppr (varSetElems (tyVarsOfInst tidy_dict))))]
-
-    fix1 = sep [ptext SLIT("Add") <+> quotes (pprInst tidy_dict),
-		ptext SLIT("to the") <+> str]
-
-    fix2 | isTyVarDict dict || ambig_overlap
-	   = empty
-	   | otherwise
-	   = ptext SLIT("Or add an instance declaration for") <+> quotes (pprInst tidy_dict)
-
-    (tidy_env, tidy_dict:tidy_givens) = tidyInsts emptyTidyEnv (dict:givens)
-
-	-- Checks for the ambiguous case when we have overlapping instances
-    ambig_overlap | isClassDict dict
-		  = case lookupInstEnv (classInstEnv clas) tys of
-			NoMatch ambig -> ambig
-		      	other 	    -> False
-		  | otherwise = False
-	 	  where
-		    (clas,tys) = getDictClassTys dict
+  = tcGetInstEnv	`thenNF_Tc` \ inst_env ->
+    let
+    	doc = vcat [herald <+> quotes (pprInst tidy_dict),
+		    nest 4 $ ptext SLIT("from the context") <+> pprInsts tidy_givens,
+		    ambig_doc,
+		    ptext SLIT("Probable fix:"),
+		    nest 4 fix1,
+		    nest 4 fix2]
+    
+    	herald = ptext SLIT("Could not") <+> unambig_doc <+> ptext SLIT("deduce")
+    	unambig_doc | ambig_overlap = ptext SLIT("unambiguously")	
+		    | otherwise     = empty
+    
+    	ambig_doc 
+	    | not ambig_overlap = empty
+	    | otherwise 	    
+	    = vcat [ptext SLIT("The choice of (overlapping) instance declaration"),
+		    nest 4 (ptext SLIT("depends on the instantiation of") <+> 
+			    quotes (pprWithCommas ppr (varSetElems (tyVarsOfInst tidy_dict))))]
+    
+    	fix1 = sep [ptext SLIT("Add") <+> quotes (pprInst tidy_dict),
+		    ptext SLIT("to the") <+> str]
+    
+    	fix2 | isTyVarDict dict || ambig_overlap
+	     = empty
+	     | otherwise
+	     = ptext SLIT("Or add an instance declaration for") <+> quotes (pprInst tidy_dict)
+    
+    	(tidy_env, tidy_dict:tidy_givens) = tidyInsts emptyTidyEnv (dict:givens)
+    
+	    -- Checks for the ambiguous case when we have overlapping instances
+    	ambig_overlap | isClassDict dict
+		      = case lookupInstEnv inst_env clas tys of
+			    NoMatch ambig -> ambig
+			    other 	  -> False
+		      | otherwise = False
+		      where
+    			(clas,tys) = getDictClassTys dict
+    in
+    addInstErrTcM (instLoc dict) (tidy_env, doc)
 
 -- Used for the ...Thetas variants; all top level
 addNoInstErr (c,ts)

@@ -4,17 +4,16 @@ module TcImprove ( tcImprove ) where
 #include "HsVersions.h"
 
 import Name		( Name )
-import Class		( Class, FunDep, className, classInstEnv, classExtraBigSig )
+import Class		( Class, FunDep, className, classExtraBigSig )
 import Unify		( unifyTyListsX, matchTys )
 import Subst		( mkSubst, substTy )
+import TcEnv		( tcGetInstEnv, classInstEnv )
 import TcMonad
 import TcType		( TcType, TcTyVar, TcTyVarSet, zonkTcType, zonkTcTypes )
 import TcUnify		( unifyTauTyLists )
 import Inst		( LIE, Inst, LookupInstResult(..),
 			  lookupInst, getFunDepsOfLIE, getIPsOfLIE,
 			  zonkLIE, zonkFunDeps {- for debugging -} )
-import InstEnv		( InstEnv )		-- Reqd for 4.02; InstEnv is a synonym, and
-						-- 4.02 doesn't "see" it soon enough
 import VarSet		( VarSet, emptyVarSet, unionVarSet )
 import VarEnv		( emptyVarEnv )
 import FunDeps		( instantiateFdClassTys )
@@ -26,44 +25,41 @@ import List		( elemIndex, nub )
 tcImprove :: LIE -> TcM s ()
 -- Do unifications based on functional dependencies in the LIE
 tcImprove lie 
-  | null nfdss = returnTc ()
-  | otherwise  = iterImprove nfdss
-  where
+  = tcGetInstEnv 	`thenNF_Tc` \ inst_env ->
+    let
 	nfdss, clas_nfdss, inst_nfdss, ip_nfdss :: [(TcTyVarSet, Name, [FunDep TcType])]
 	nfdss = ip_nfdss ++ clas_nfdss ++ inst_nfdss
 
 	cfdss :: [(Class, [FunDep TcType])]
-	cfdss = getFunDepsOfLIE lie
-	clas_nfdss = map (\(c, fds) -> (emptyVarSet, className c, fds)) cfdss
+	cfdss      = getFunDepsOfLIE lie
+	clas_nfdss = [(emptyVarSet, className c, fds) | (c,fds) <- cfdss]
 
-	classes = nub (map fst cfdss)
-	inst_nfdss = concatMap getInstNfdssOf classes
+	classes    = nub (map fst cfdss)
+	inst_nfdss = [ (free, className c, instantiateFdClassTys c ts)
+		     | c <- classes,
+		       (free, ts, i) <- classInstEnv inst_env c
+		     ]
 
-	ips = getIPsOfLIE lie
-	ip_nfdss = map (\(n, ty) -> (emptyVarSet, n, [([], [ty])])) ips
+	ip_nfdss = [(emptyVarSet, n, [([], [ty])]) | (n,ty) <- getIPsOfLIE lie]
 
-{- Example: we have
-	class C a b c  |  a->b where ...
-	instance C Int Bool c 
+	{- Example: we have
+		class C a b c  |  a->b where ...
+		instance C Int Bool c 
+	
+	   Given the LIE 	FD C (Int->t)
+	   we get	clas_nfdss = [({}, C, [Int->t,     t->Int])
+			inst_nfdss = [({c}, C, [Int->Bool, Bool->Int])]
+	
+	   Another way would be to flatten a bit
+	   we get	clas_nfdss = [({}, C, Int->t), ({}, C, t->Int)]
+			inst_nfdss = [({c}, C, Int->Bool), ({c}, C, Bool->Int)]
+	
+	   iterImprove then matches up the C and Int, and unifies t <-> Bool
+	-}	
 
-   Given the LIE 	FD C (Int->t)
-   we get	clas_nfdss = [({}, C, [Int->t,     t->Int])
-		inst_nfdss = [({c}, C, [Int->Bool, Bool->Int])]
+    in
+    iterImprove nfdss
 
-   Another way would be to flatten a bit
-   we get	clas_nfdss = [({}, C, Int->t), ({}, C, t->Int)]
-		inst_nfdss = [({c}, C, Int->Bool), ({c}, C, Bool->Int)]
-
-   iterImprove then matches up the C and Int, and unifies t <-> Bool
--}
-
-getInstNfdssOf :: Class -> [(TcTyVarSet, Name, [FunDep TcType])]
-getInstNfdssOf clas 
-  = [ (free, nm, instantiateFdClassTys clas ts)
-    | (free, ts, i) <- classInstEnv clas
-    ]
-  where
-	nm = className clas
 
 iterImprove :: [(VarSet, Name, [FunDep TcType])] -> TcM s ()
 iterImprove [] = returnTc ()
