@@ -922,6 +922,8 @@ repOf (LitI _)         = RepI
 repOf (LitF _)         = RepF
 repOf (LitD _)         = RepD
 
+repOf (Native _)       = RepP
+
 repOf (VarP _)         = RepI
 repOf (VarI _)         = RepI
 repOf (VarF _)         = RepF
