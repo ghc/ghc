@@ -54,4 +54,8 @@ module Data.Array.MArray (
 import Prelude
 
 import Data.Ix
+#ifdef __HUGS__
+import Hugs.Array.Base
+#else
 import Data.Array.Base
+#endif

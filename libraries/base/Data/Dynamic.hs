@@ -80,6 +80,7 @@ import GHC.IOBase
 
 #ifdef __HUGS__
 import Hugs.IO
+import Hugs.IORef
 import Hugs.IOExts
 #endif
 

@@ -17,9 +17,11 @@ module Data.Array.ST (
    -- * Boxed arrays
    STArray,		-- instance of: Eq, MArray
 
+#ifdef __GLASGOW_HASKELL__
    -- * Unboxed arrays
    STUArray,		-- instance of: Eq, MArray
    castSTUArray,	-- :: STUArray s i a -> ST s (STUArray s i b)
+#endif
 
    -- * Overloaded mutable array interface
    module Data.Array.MArray,
@@ -28,7 +30,11 @@ module Data.Array.ST (
 import Prelude
 
 import Data.Array.MArray
+#ifdef __HUGS__
+import Hugs.ST
+#else
 import Data.Array.Base	hiding (MArray(..))
+#endif
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Arr

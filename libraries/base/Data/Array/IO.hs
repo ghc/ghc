@@ -17,16 +17,20 @@ module Data.Array.IO (
    -- * @IO@ arrays with boxed elements
    IOArray,		-- instance of: Eq, Typeable
 
+#ifdef __GLASGOW_HASKELL__
    -- * @IO@ arrays with unboxed elements
    IOUArray,		-- instance of: Eq, Typeable
    castIOUArray,	-- :: IOUArray i a -> IO (IOUArray i b)
+#endif
 
    -- * Overloaded mutable array interface
    module Data.Array.MArray,
 
+#ifdef __GLASGOW_HASKELL__
    -- * Doing I\/O with @IOUArray@s
    hGetArray,		-- :: Handle -> IOUArray Int Word8 -> Int -> IO Int
    hPutArray,		-- :: Handle -> IOUArray Int Word8 -> Int -> IO ()
+#endif
  ) where
 
 import Prelude
@@ -37,12 +41,16 @@ import Data.Int
 import Data.Word
 import Data.Dynamic
 
-import Foreign.C
-import Foreign.Ptr		( Ptr, FunPtr )
-import Foreign.StablePtr	( StablePtr )
+#ifdef __HUGS__
+import Hugs.IOArray
+#endif
 
 #ifdef __GLASGOW_HASKELL__
 -- GHC only to the end of file
+
+import Foreign.C
+import Foreign.Ptr		( Ptr, FunPtr )
+import Foreign.StablePtr	( StablePtr )
 
 import Data.Array.Base
 import GHC.Arr    	( STArray, freezeSTArray, unsafeFreezeSTArray,
