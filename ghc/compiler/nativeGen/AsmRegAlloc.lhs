@@ -10,6 +10,7 @@ module AsmRegAlloc ( runRegAllocate ) where
 
 import MachCode		( InstrBlock )
 import MachMisc		( Instr(..) )
+import PprMach		( pprInstr )	-- Just for debugging
 import MachRegs
 import RegAllocInfo
 
@@ -65,7 +66,13 @@ runRegAllocate regs find_reserve_regs instrs
     --)
   where
     tryGeneral [] 
-       = error "nativeGen: spilling failed.  Workaround: compile with -fvia-C.\n"
+       = pprPanic "nativeGen: spilling failed.  Workaround: compile with -fvia-C.\n"
+            ( (text "reserves = " <> ppr reserves)
+              $$
+              (text "code = ")
+              $$
+              (vcat (map pprInstr flatInstrs))
+            )
     tryGeneral (resv:resvs)
        = case generalAlloc resv of
             Just success -> success
@@ -199,7 +206,16 @@ doGeneralAlloc
 
 doGeneralAlloc all_regs reserve_regs instrs
    -- succeeded without spilling
-   | prespill_ok        = Just prespill_insns
+   | --trace (showSDoc (
+     --   text "allocating with these regs" <+> ppr prespill_regs
+     --   $$
+     --   text "giving code" 
+     --   $$
+     --   vcat (map pprInstr prespill_insns)
+     --))
+     prespill_ok
+   = Just prespill_insns
+
    -- failed, and no spill regs avail, so pointless to attempt spilling 
    | null reserve_regs  = Nothing
    -- success after spilling

@@ -5,11 +5,11 @@
 
 \begin{code}
 module CmCompile ( cmCompile,
-                   ModDetails,     -- abstract
-                   ModIFace,       -- abstract
-                   PCS,            -- abstract
-                   HST,            -- not abstract (CM needs to see it)
-                   HIT,            -- ditto
+                   ModDetails,       -- abstract
+                   ModIFace,         -- abstract
+                   PCS, emptyPCS,    -- abstract
+                   HST,              -- not abstract (CM needs to see it)
+                   HIT,              -- ditto
                    CompResult(..)
                  )
 where
@@ -21,7 +21,7 @@ import Outputable	( SDoc )
 import CmFind		( Finder )
 import CmSummarise	( ModSummary )
 import CmStaticInfo	( SI )
-import FiniteMap	( FiniteMap )
+import FiniteMap	( FiniteMap, emptyFM )
 
 import Module		( Module )
 import RnMonad		( Avails, GlobalRdrEnv, DeclsMap, 
@@ -61,8 +61,9 @@ data CompResult
    | CompErrs PCS      -- updated PCS
               [SDoc]   -- warnings and errors
 
-newPCS :: IO PCS
-newPCS = return (error "newPCS:unimp")
+emptyPCS :: IO PCS
+emptyPCS = return (MkPCS emptyPIT emptyPST emptyHoldingPen)
+
 
 -- These two are only here to avoid recursion between CmCompile and
 -- CompManager.  They really ought to be in the latter.
@@ -76,6 +77,12 @@ data PCS = MkPCS PIT         -- Package interface table
 
 type PIT = FiniteMap Module ModIFace
 type PST = FiniteMap Module ModDetails
+
+emptyPIT :: PIT
+emptyPIT = emptyFM
+
+emptyPST :: PST
+emptyPST = emptyFM
 
 -- ModIFace is nearly the same as RnMonad.ParsedIface.
 -- Right now it's identical :)
@@ -118,4 +125,7 @@ data HoldingPen
         iRules :: IfaceRules
         -- Similar to instance decls, only for rules
      }
+
+emptyHoldingPen :: HoldingPen
+emptyHoldingPen = error "emptyHoldingPen:unimp"
 \end{code}

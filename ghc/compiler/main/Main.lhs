@@ -46,7 +46,10 @@ import BSD
 import IOExts		( unsafePerformIO )
 import NativeInfo       ( os, arch )
 #endif
+#ifdef GHCI
 import StgInterp	( runStgI )
+import CompManager
+#endif
 
 \end{code}
 

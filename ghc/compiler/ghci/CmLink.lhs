@@ -15,7 +15,7 @@ import CmStaticInfo	( PCI )
 import CmFind		( Path, PkgName )
 import Module		( Module )
 import Outputable	( SDoc )
-import FiniteMap	( FiniteMap )
+import FiniteMap	( FiniteMap, emptyFM )
 import RdrName		( RdrName )
 import Addr		( Addr )
 
@@ -52,5 +52,6 @@ data Linkable
    | LP PkgName
 
 emptyPLS :: IO PLS
-emptyPLS = return (error "emptyPLS:unimp")
+emptyPLS = return (MkPLS { source_symtab = emptyFM, 
+                           object_symtab = emptyFM })
 \end{code}

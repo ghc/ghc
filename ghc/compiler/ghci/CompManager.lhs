@@ -13,12 +13,13 @@ where
 #include "HsVersions.h"
 
 import Outputable	( SDoc )
+import FiniteMap	( emptyFM )
 
 import CmStaticInfo 	( FLAGS, PCI, SI, mkSI )
-import CmFind 		( Finder, ModName )
+import CmFind 		( Finder, newFinder, ModName )
 import CmSummarise 	( )
-import CmCompile 	( PCS, HST, HIT )
-import CmLink 		( PLS, HValue, Linkable )
+import CmCompile 	( PCS, emptyPCS, HST, HIT )
+import CmLink 		( PLS, emptyPLS, HValue, Linkable )
 
 
 
@@ -26,7 +27,7 @@ cmInit :: FLAGS
        -> PCI
        -> IO CmState
 cmInit flags pkginfo
-   = return (error "cmInit:unimp")
+   = emptyCmState flags pkginfo
 
 cmLoadModule :: CmState 
              -> ModName
@@ -55,6 +56,17 @@ data PCMS
           UI    -- the unlinked images
           MG    -- the module graph
 
+emptyPCMS :: PCMS
+emptyPCMS = PCMS emptyHST emptyHIT emptyUI emptyMG
+
+emptyHIT :: HIT
+emptyHIT = emptyFM
+
+emptyHST :: HST
+emptyHST = emptyFM
+
+
+
 -- Persistent state for the entire system
 data CmState
    = CmState PCMS      -- CM's persistent state
@@ -63,9 +75,24 @@ data CmState
              SI        -- static info, never changes
              Finder    -- the module finder
 
+emptyCmState :: FLAGS -> PCI -> IO CmState
+emptyCmState flags pci
+    = do let pcms = emptyPCMS
+         pcs     <- emptyPCS
+         pls     <- emptyPLS
+         let si   = mkSI flags pci
+         finder  <- newFinder pci
+         return (CmState pcms pcs pls si finder)
+
 -- CM internal types
 type UI = [Linkable]	-- the unlinked images (should be a set, really)
+emptyUI :: UI
+emptyUI = []
+
+
 data MG = MG            -- the module graph
+emptyMG :: MG
+emptyMG = MG
 
 
 
