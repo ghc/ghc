@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.29 1999/11/02 17:17:47 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.30 1999/11/30 11:43:26 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -348,7 +348,7 @@ INFO_TABLE_CONSTR(NO_FINALIZER_info,NO_FINALIZER_entry,0,0,0,CONSTR_NOCAF_STATIC
 NON_ENTERABLE_ENTRY_CODE(NO_FINALIZER);
 
 SET_STATIC_HDR(NO_FINALIZER_closure,NO_FINALIZER_info,0/*CC*/,,EI_)
-};
+, /*payload*/{} };
 
 /* -----------------------------------------------------------------------------
    Foreign Objects are unlifted and therefore never entered.
@@ -388,7 +388,7 @@ INFO_TABLE_CONSTR(END_TSO_QUEUE_info,END_TSO_QUEUE_entry,0,0,0,CONSTR_NOCAF_STAT
 NON_ENTERABLE_ENTRY_CODE(END_TSO_QUEUE);
 
 SET_STATIC_HDR(END_TSO_QUEUE_closure,END_TSO_QUEUE_info,0/*CC*/,,EI_)
-};
+, /*payload*/{} };
 
 /* -----------------------------------------------------------------------------
    Mutable lists
@@ -402,7 +402,7 @@ INFO_TABLE_CONSTR(END_MUT_LIST_info,END_MUT_LIST_entry,0,0,0,CONSTR_NOCAF_STATIC
 NON_ENTERABLE_ENTRY_CODE(END_MUT_LIST);
 
 SET_STATIC_HDR(END_MUT_LIST_closure,END_MUT_LIST_info,0/*CC*/,,EI_)
-};
+, /*payload*/{} };
 
 INFO_TABLE(MUT_CONS_info, MUT_CONS_entry, 1, 1, MUT_VAR, , EF_, 0, 0);
 NON_ENTERABLE_ENTRY_CODE(MUT_CONS);
@@ -415,7 +415,7 @@ INFO_TABLE_CONSTR(END_EXCEPTION_LIST_info,END_EXCEPTION_LIST_entry,0,0,0,CONSTR_
 NON_ENTERABLE_ENTRY_CODE(END_EXCEPTION_LIST);
 
 SET_STATIC_HDR(END_EXCEPTION_LIST_closure,END_EXCEPTION_LIST_info,0/*CC*/,,EI_)
-};
+, /*payload*/{} };
 
 INFO_TABLE(EXCEPTION_CONS_info, EXCEPTION_CONS_entry, 1, 1, CONSTR, , EF_, 0, 0);
 NON_ENTERABLE_ENTRY_CODE(EXCEPTION_CONS);
@@ -488,7 +488,7 @@ FN_(dummy_ret_entry)
   FE_
 }
 SET_STATIC_HDR(dummy_ret_closure,dummy_ret_info,CCS_DONTZuCARE,,EI_)
-};
+, /*payload*/{} };
 
 /* -----------------------------------------------------------------------------
     Strict IO application - performing an IO action and entering its result.
@@ -529,7 +529,7 @@ FN_(forceIO_entry)
   FE_
 }
 SET_STATIC_HDR(forceIO_closure,forceIO_info,CCS_DONTZuCARE,,EI_)
-};
+, /*payload*/{} };
 
 
 /* -----------------------------------------------------------------------------
