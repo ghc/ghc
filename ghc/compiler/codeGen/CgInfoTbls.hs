@@ -359,7 +359,6 @@ emitVectoredReturnInstr zero_indexed_tag
 			   stmtC (CmmAssign z info_amode)
 			   return (CmmReg z)
 		   else
-
 			return info_amode
 	; let target = retVec x zero_indexed_tag
 	; stmtC (CmmJump target []) }
