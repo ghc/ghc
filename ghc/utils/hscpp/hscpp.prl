@@ -15,20 +15,15 @@ $file = '';
 
 $Cpp = ${RAWCPP};
 
-foreach (@ARGV) {
-    /^-v$/ && do { $Verbose = 1; next; };
-
-    /^[^-]/ && do { 
-	if ($file ne '') { 
-	    die "usage: hscpp [arg...] file";
-	} else {
-	    $file = $_; 
-	};
-	next;
-    };
-
+while (@ARGV) {
+    $_ = $ARGV[0];
+    /^-v$/  && do { $Verbose = 1; shift(@ARGV); next; };
+    /^[^-]/ && $#ARGV == 0 && do { $file = $_; shift(@ARGV); next; };
     push @args, $_;
+    shift(@ARGV);
 }
+
+die "usage: hscpp [arg...] file" if ($file eq '');
 
 print STDERR "hscpp:CPP invoked: $Cpp @args - <$file\n" if $Verbose;
 open(INPIPE, "$Cpp @args - <$file |") 
