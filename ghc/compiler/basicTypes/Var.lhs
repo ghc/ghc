@@ -85,11 +85,14 @@ data VarDetails
   | TyVar
   | MutTyVar (IORef (Maybe Type)) 	-- Used during unification;
 	     TyVarDetails
+	-- TODO: the IORef should be unboxed here, but we don't want to unbox
+  	-- the Name above.
 
-	-- For a long time I tried to keep mutable Vars statically type-distinct
-	-- from immutable Vars, but I've finally given up.   It's just too painful.
-	-- After type checking there are no MutTyVars left, but there's no static check
-	-- of that fact.
+	-- For a long time I tried to keep mutable Vars statically
+	-- type-distinct from immutable Vars, but I've finally given
+	-- up.  It's just too painful.  After type checking there are
+	-- no MutTyVars left, but there's no static check of that
+	-- fact.
 
 data LocalIdDetails 
   = NotExported	-- Not exported
