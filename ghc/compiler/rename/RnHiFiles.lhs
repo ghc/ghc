@@ -17,6 +17,7 @@ module RnHiFiles (
 
 #include "HsVersions.h"
 
+import DriverState	( GhcMode(..), v_GhcMode )
 import DriverUtil	( splitFilename )
 import CmdLineOpts	( opt_IgnoreIfacePragmas )
 import HscTypes		( ModuleLocation(..),
@@ -43,24 +44,21 @@ import Name		( Name {-instance NamedThing-},
 			  nameModule, isLocalName, nameIsLocalOrFrom
 			 )
 import NameEnv
-import Module		( Module, 
-			  moduleName, isHomeModule,
-			  ModuleName, WhereFrom(..),
-			  extendModuleEnv, mkVanillaModule
-			)
+import Module
 import RdrName		( rdrNameOcc )
 import SrcLoc		( mkSrcLoc )
 import Maybes		( maybeToBool, orElse )
 import StringBuffer     ( hGetStringBuffer )
 import FastString	( mkFastString )
 import ErrUtils         ( Message )
-import Finder		( findModule )
+import Finder		( findModule, findPackageModule )
 import Lex
 import FiniteMap
 import Outputable
 import Bag
 import Config
 
+import IOExts
 import Directory
 \end{code}
 
@@ -118,7 +116,6 @@ tryLoadInterface doc_str mod_name from
 			ImportByUser	   -> not (mi_boot iface)
 			ImportByUserSource -> mi_boot iface
 			ImportBySystem 	   -> True
-			ImportByCmdLine    -> True
 		   -> returnRn (iface, Nothing) ;	-- Already loaded
 			-- The not (mi_boot iface) test checks that the already-loaded
 			-- interface isn't a boot iface.  This can conceivably happen,
@@ -134,7 +131,6 @@ tryLoadInterface doc_str mod_name from
 	  = case (from, mod_info) of
 		(ImportByUser,       _)    	    -> False 	-- Not hi-boot
 		(ImportByUserSource, _)		    -> True 	-- hi-boot
-		(ImportByCmdLine,    _)		    -> False
 		(ImportBySystem, Just (_, is_boot)) -> is_boot
 		(ImportBySystem, Nothing)	    -> False
 			-- We're importing a module we know absolutely
@@ -146,9 +142,6 @@ tryLoadInterface doc_str mod_name from
 	  = case (from, mod_info) of 
 		(ImportByUserSource, Just (_,False)) -> True
 		other				     -> False
-
-	home_allowed | ImportByCmdLine <- from = True
-		     | otherwise	       = False
    in
 
 	-- Issue a warning for a redundant {- SOURCE -} import
@@ -165,7 +158,7 @@ tryLoadInterface doc_str mod_name from
 	(warnSelfImport this_mod)		`thenRn_`
 
 	-- READ THE MODULE IN
-   findAndReadIface doc_str mod_name hi_boot_file home_allowed
+   findAndReadIface doc_str mod_name hi_boot_file
 					    `thenRn` \ read_result ->
    case read_result of {
 	Left err -> 	-- Not found, so add an empty export env to the Ifaces map
@@ -476,34 +469,45 @@ new_top_bndrs mod names_w_locs
 findAndReadIface :: SDoc -> ModuleName 
 		 -> IsBootInterface	-- True  <=> Look for a .hi-boot file
 					-- False <=> Look for .hi file
-		 -> Bool		-- True <=> can read home interface
 		 -> RnM d (Either Message (Module, ParsedIface))
 	-- Nothing <=> file not found, or unreadable, or illegible
 	-- Just x  <=> successfully found and parsed 
 
-findAndReadIface doc_str mod_name hi_boot_file home_allowed
+findAndReadIface doc_str mod_name hi_boot_file
   = traceRn trace_msg			`thenRn_`
 
-    ioToRnM (findModule mod_name)	`thenRn` \ maybe_found ->
+    -- In interactive or --make mode, we are *not allowed* to demand-load
+    -- a home package .hi file.  So don't even look for them.
+    -- This helps in the case where you are sitting in eg. ghc/lib/std
+    -- and start up GHCi - it won't complain that all the modules it tries
+    -- to load are found in the home location.
+    ioToRnM_no_fail (readIORef v_GhcMode) `thenRn` \ mode ->
+    let home_allowed = mode `notElem` [ DoInteractive, DoLink ]
+    in
+
+    ioToRnM (if home_allowed 
+		then findModule mod_name
+		else findPackageModule mod_name) `thenRn` \ maybe_found ->
+
     case maybe_found of
 
       Right (Just (wanted_mod,locn))
-        -> -- in CmdLineMode, we cannot demand-load home interfaces
-	   -- because the corresponding code won't be loaded, so we
-	   -- check for this here and emit an error message.
-	   if (home_allowed && isHomeModule wanted_mod)
-	      then returnRn (Left (notLoaded wanted_mod))
-	      else
-
-	   mkHiPath hi_boot_file locn `thenRn` \ file -> 
+        -> mkHiPath hi_boot_file locn `thenRn` \ file -> 
 	   readIface file `thenRn` \ read_result ->
 	   case read_result of
                 Left bad -> returnRn (Left bad)
                 Right iface 
                    -> let read_mod = pi_mod iface
-		      in warnCheckRn (wanted_mod == read_mod)
-		   	             (hiModuleNameMismatchWarn wanted_mod 
-					read_mod) `thenRn_`
+		      in -- check that the module names agree
+			 checkRn
+			   (wanted_mod == read_mod)
+		   	   (hiModuleNameMismatchWarn wanted_mod read_mod)
+					`thenRn_`
+			 -- check that the package names agree
+			 checkRn 
+			   (modulePackage wanted_mod == modulePackage read_mod)
+		   	   (packageNameMismatchWarn wanted_mod read_mod)
+					 `thenRn_`
 		         returnRn (Right (wanted_mod, iface))
 	-- Can't find it
       other   -> traceRn (ptext SLIT("...not found"))	`thenRn_`
@@ -627,6 +631,15 @@ hiModuleNameMismatchWarn requested_mod read_mod =
 	 , ptext SLIT("differs from name found in the interface file")
    	 , ppr read_mod
   	 ]
+
+packageNameMismatchWarn :: Module -> Module  -> Message
+packageNameMismatchWarn requested_mod read_mod = 
+    sep [ ptext SLIT("Module"), quotes (ppr requested_mod), 
+	  ptext SLIT("is located in package"), 
+	  quotes (ptext (modulePackage requested_mod)),
+	  ptext SLIT("but its interface file claims it is part of package"),
+	  quotes (ptext (modulePackage read_mod))
+	]
 
 warnRedundantSourceImport mod_name
   = ptext SLIT("Unnecessary {- SOURCE -} in the import of module")

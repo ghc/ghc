@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.83 2001/06/27 10:35:48 simonpj Exp $
+-- $Id: DriverPipeline.hs,v 1.84 2001/06/27 16:38:17 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -62,17 +62,6 @@ import MatchPS
 
 -----------------------------------------------------------------------------
 -- GHC modes of operation
-
-data GhcMode
-  = DoMkDependHS			-- ghc -M
-  | DoMkDLL				-- ghc --mk-dll
-  | StopBefore Phase			-- ghc -E | -C | -S | -c
-  | DoMake				-- ghc --make
-  | DoInteractive			-- ghc --interactive
-  | DoLink				-- [ the default ]
-  deriving (Eq)
-
-GLOBAL_VAR(v_GhcMode, error "todo", GhcMode)
 
 modeFlag :: String -> Maybe GhcMode
 modeFlag "-M" 		 = Just $ DoMkDependHS

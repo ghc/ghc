@@ -287,7 +287,7 @@ lookupQualifiedName rdr_name
        mod = rdrNameModule rdr_name
        occ = rdrNameOcc rdr_name
    in
-   loadInterface (ppr rdr_name) mod ImportByCmdLine `thenRn` \ iface ->
+   loadInterface (ppr rdr_name) mod ImportByUser `thenRn` \ iface ->
    case  [ name | (_,avails) <- mi_exports iface,
     	   avail	     <- avails,
     	   name 	     <- availNames avail,

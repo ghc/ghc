@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.45 2001/06/15 08:29:58 simonpj Exp $
+-- $Id: DriverState.hs,v 1.46 2001/06/27 16:38:17 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -14,6 +14,7 @@ module DriverState where
 
 import Packages		( PackageConfig(..) )
 import CmdLineOpts
+import DriverPhases
 import DriverUtil
 import Util
 import Config
@@ -29,6 +30,20 @@ import Monad
 -- non-configured things
 
 cHaskell1Version = "5" -- i.e., Haskell 98
+
+-----------------------------------------------------------------------------
+-- GHC modes of operation
+
+data GhcMode
+  = DoMkDependHS			-- ghc -M
+  | DoMkDLL				-- ghc --mk-dll
+  | StopBefore Phase			-- ghc -E | -C | -S | -c
+  | DoMake				-- ghc --make
+  | DoInteractive			-- ghc --interactive
+  | DoLink				-- [ the default ]
+  deriving (Eq)
+
+GLOBAL_VAR(v_GhcMode, error "mode not set", GhcMode)
 
 -----------------------------------------------------------------------------
 -- Global compilation flags
