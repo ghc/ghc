@@ -58,12 +58,12 @@
 #include <sys/wait.h>
 #endif
 
-#if defined(ia64_TARGET_ARCH) || defined(openbsd_TARGET_OS)
+#if defined(ia64_TARGET_ARCH) || defined(openbsd_TARGET_OS) || defined(linux_TARGET_OS)
 #define USE_MMAP
 #include <fcntl.h>
 #include <sys/mman.h>
 
-#if defined(openbsd_TARGET_OS) 
+#if defined(openbsd_TARGET_OS) || defined(linux_TARGET_OS)
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
