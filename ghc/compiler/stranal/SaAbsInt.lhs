@@ -18,7 +18,7 @@ module SaAbsInt (
 IMP_Ubiq(){-uitous-}
 
 import CoreSyn
-import CoreUnfold	( UnfoldingDetails(..), FormSummary )
+import CoreUnfold	( Unfolding(..), SimpleUnfolding(..), FormSummary )
 import CoreUtils	( unTagBinders )
 import Id		( idType, getIdStrictness, getIdUnfolding,
 			  dataConTyCon, dataConArgTys
@@ -393,7 +393,7 @@ absId anal var env
 	(Just abs_val, _, _) ->
 			abs_val	-- Bound in the environment
 
-	(Nothing, NoStrictnessInfo, GenForm _ unfolding _) ->
+	(Nothing, NoStrictnessInfo, CoreUnfolding (SimpleUnfolding _ _ unfolding)) ->
 			-- We have an unfolding for the expr
 			-- Assume the unfolding has no free variables since it
 			-- came from inside the Id
@@ -419,7 +419,7 @@ absId anal var env
 
 
 	(Nothing, strictness_info, _) ->
-			-- Includes MagicForm, IWantToBeINLINEd, NoUnfoldingDetails
+			-- Includes MagicUnfolding, NoUnfolding
 			-- Try the strictness info
 			absValFromStrictness anal strictness_info
     in

@@ -39,6 +39,7 @@ import Inst		( Inst, InstOrigin(..), SYN_IE(InstanceMapper),
 import TcBinds		( tcPragmaSigs )
 import TcDeriv		( tcDeriving )
 import TcEnv		( tcLookupClass, tcTyVarScope, newLocalId, tcExtendGlobalTyVars )
+import SpecEnv		( SpecEnv )
 import TcGRHSs		( tcGRHSsAndBinds )
 import TcInstUtil	( InstInfo(..), mkInstanceRelatedIds, buildInstanceEnvs )
 import TcKind		( TcKind, unifyKind )
@@ -631,7 +632,7 @@ processInstBinds1 clas avail_insts method_ids mbind
 		-- Make the method_tyvars into signature tyvars so they
 		-- won't get unified with anything.
 	tcInstSigTyVars method_tyvars		`thenNF_Tc` \ (sig_tyvars, sig_tyvar_tys, _) ->
-	unifyTauTyLists (mkTyVarTys method_tyvars) sig_tyvar_tys	`thenTc_`
+	unifyTauTyLists sig_tyvar_tys (mkTyVarTys method_tyvars)	`thenTc_`
 
 	newLocalId occ method_tau		`thenNF_Tc` \ local_id ->
 	newLocalId occ method_ty		`thenNF_Tc` \ copy_id ->

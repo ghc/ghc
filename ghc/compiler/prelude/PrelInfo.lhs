@@ -141,6 +141,19 @@ g_tycons
 g_con_tycons
   = listTyCon : mkTupleTyCon 0 : [mkTupleTyCon i | i <- [2..37] ]
 
+min_nonprim_tycon_list 	-- used w/ HideMostBuiltinNames
+  = [ boolTyCon
+    , charTyCon
+    , intTyCon
+    , floatTyCon
+    , doubleTyCon
+    , integerTyCon
+    , liftTyCon
+    , return2GMPsTyCon	-- ADR asked for these last two (WDP 94/11)
+    , returnIntAndGMPTyCon
+    ]
+
+
 data_tycons
   = [ addrTyCon
     , boolTyCon

@@ -31,6 +31,7 @@ import Id		( idType, getIdInfo, getIdStrictness, isTupleCon,
 			  nullIdEnv, SYN_IE(DataCon), GenId{-instances-}
 			)
 import IdInfo		( ppIdInfo, StrictnessInfo(..) )
+import IdLoop		( Unfolding )	-- Needed by IdInfo.hi?
 import Literal		( Literal{-instances-} )
 import Name		( isSymLexeme )
 import Outputable	-- quite a few things
@@ -387,7 +388,7 @@ pprBigCoreBinder sty binder
 
     pragmas =
 	ifnotPprForUser sty
-	 (ppIdInfo sty binder True{-specs, please-} id nullIdEnv
+	 (ppIdInfo sty binder False{-no specs, thanks-} id nullIdEnv
 	  (getIdInfo binder))
 
 pprBabyCoreBinder sty binder

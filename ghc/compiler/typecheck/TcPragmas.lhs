@@ -179,7 +179,7 @@ tc_strictness
 	-> Maybe Type
 	-> Id		-- final Id (do not *touch*)
 	-> ImpStrictness Name
-	-> Baby_TcM (StrictnessInfo, UnfoldingDetails)
+	-> Baby_TcM (StrictnessInfo, Unfolding)
 
 tc_strictness e ty_maybe rec_final_id info
   = getSwitchCheckerB_Tc    `thenB_Tc` \ sw_chkr ->
@@ -359,7 +359,7 @@ tc_unfolding e (ImpUnfolding guidance uf_core)
 	-- NB: We cant check the lint result and return noInfo_UF if
 	--     lintUnfolding failed as this is too strict
 	--     Instead getInfo_UF tests for BadUnfolding and converts
-	--     to NoUnfoldingDetails when the unfolding is accessed
+	--     to NoUnfolding when the unfolding is accessed
 
 	maybe_lint_expr = lintUnfolding locn core_expr
 

@@ -7,8 +7,7 @@
 #include "HsVersions.h"
 
 module SimplVar (
-	completeVar,
-	leastItCouldCost
+	completeVar
     ) where
 
 IMP_Ubiq(){-uitous-}
@@ -17,14 +16,18 @@ IMPORT_DELOOPER(SmplLoop)		( simplExpr )
 import CgCompInfo	( uNFOLDING_USE_THRESHOLD,
 			  uNFOLDING_CON_DISCOUNT_WEIGHT
 			)
-import CmdLineOpts	( intSwitchSet, switchIsOn, SimplifierSwitch(..) )
+import CmdLineOpts	( switchIsOn, SimplifierSwitch(..) )
 import CoreSyn
-import CoreUnfold	( whnfDetails, UnfoldingDetails(..), UnfoldingGuidance(..),
-			  FormSummary(..)
-			)
-import Id		( idType, getIdInfo,
+import CoreUnfold	( Unfolding(..), UnfoldingGuidance(..), SimpleUnfolding(..),
+			  FormSummary,
+			  smallEnoughToInline )
+import BinderInfo	( BinderInfo, noBinderInfo, okToInline )
+
+import CostCentre	( CostCentre, noCostCentreAttached )
+import Id		( idType, getIdInfo, getIdUnfolding, getIdSpecialisation,
 			  GenId{-instance Outputable-}
 			)
+import SpecEnv		( SpecEnv, lookupSpecEnv )
 import IdInfo		( DeforestInfo(..) )
 import Literal		( isNoRepLit )
 import MagicUFs		( applyMagicUnfoldingFun, MagicUnfoldingFun )
@@ -36,6 +39,7 @@ import SimplMonad
 import TyCon		( tyConFamilySize )
 import Type		( isPrimType, getAppDataTyConExpandingDicts, maybeAppDataTyConExpandingDicts )
 import Util		( pprTrace, assertPanic, panic )
+import Maybes		( maybeToBool )
 \end{code}
 
 %************************************************************************
@@ -46,289 +50,93 @@ import Util		( pprTrace, assertPanic, panic )
 
 This where all the heavy-duty unfolding stuff comes into its own.
 
-
+\begin{code}
 completeVar env var args
-  | has_magic_unfolding
+
+  | maybeToBool maybe_magic_result
   = tick MagicUnfold	`thenSmpl_`
-    doMagicUnfold
+    magic_result
 
-  | has_unfolding && ok_to_inline
+  | not do_deforest &&
+    maybeToBool maybe_unfolding_info &&
+    (always_inline || (ok_to_inline && not essential_unfoldings_only)) && 
+    costCentreOk (getEnclosingCC env) (getEnclosingCC unfold_env)
   = tick UnfoldingDone	`thenSmpl_`
-    simplExpr env the_unfolding args
+    simplExpr unfold_env unf_template args
 
-  | has_specialisation
+  | maybeToBool maybe_specialisation
   = tick SpecialisationDone	`thenSmpl_`
     simplExpr (extendTyEnvList env spec_bindings) 
-	      the_specialisation 
-	      remaining_args
+	      spec_template
+	      (map TyArg leftover_ty_args ++ remaining_args)
 
   | otherwise
-  = mkGenApp (Var var) args
+  = returnSmpl (mkGenApp (Var var) args)
 
   where
-    unfolding = lookupUnfolding env var
+    unfolding_from_id = getIdUnfolding var
 
-    (has_magic_unfolding, do_magic_unfold)
-	= case unfolding of
-	    MagicForm str magic_fn
-		   
-\begin{code}
-completeVar :: SimplEnv -> OutId -> [OutArg] -> SmplM OutExpr
+	---------- Magic unfolding stuff
+    maybe_magic_result	= case unfolding_from_id of
+				MagicUnfolding _ magic_fn -> applyMagicUnfoldingFun magic_fn 
+										    env args
+			        other 			  -> Nothing
+    (Just magic_result)	= maybe_magic_result
 
-completeVar env var args
-  = let
-	boring_result = mkGenApp (Var var) args
-    in
-    case (lookupUnfolding env var) of
+	---------- Unfolding stuff
+    maybe_unfolding_info 
+	= case (lookupOutIdEnv env var, unfolding_from_id) of
+	     (Just (_, occ_info, OutUnfolding enc_cc unf), _)
+		-> Just (occ_info, setEnclosingCC env enc_cc, unf)	
+	     (Just (_, occ_info, InUnfolding env_unf unf), _)
+		-> Just (occ_info, combineSimplEnv env env_unf, unf)	
+	     (_, CoreUnfolding unf)
+		-> Just (noBinderInfo, env, unf)
 
-      GenForm form_summary template guidance
-	-> considerUnfolding env var args
-			     (False{-ToDo:!-}{-txt_occ-}) form_summary template guidance
+	     other -> Nothing
 
-      MagicForm str magic_fun
-	->  applyMagicUnfoldingFun magic_fun env args `thenSmpl` \ result ->
-	    case result of
-	      Nothing	        -> returnSmpl boring_result
-	      Just magic_result ->
-		{- pprTrace "MagicForm:- " (ppAbove
-			(ppBesides [
-			   ppr PprDebug var,
-			   ppr PprDebug args])
-			(ppBesides [
-				ppStr "AFTER    :- ",
-			   ppr PprDebug magic_result])) (returnSmpl ()) `thenSmpl` \ () ->
-		-}
-		tick MagicUnfold		`thenSmpl_`
-		returnSmpl magic_result
+    Just (occ_info, unfold_env, simple_unfolding)     = maybe_unfolding_info
+    SimpleUnfolding form guidance unf_template = simple_unfolding
 
--- LATER:
---    IWantToBeINLINEd _ -> returnSmpl boring_result
-
-      other -> returnSmpl boring_result
-\end{code}
+	---------- Specialisation stuff
+    (ty_args, remaining_args) = initialTyArgs args
+    maybe_specialisation = lookupSpecEnv (getIdSpecialisation var) ty_args
+    (Just (spec_template, (spec_bindings, leftover_ty_args))) = maybe_specialisation
 
 
-%************************************************************************
-%*									*
-\subsection[considerUnfolding]{Given all the info, do (not) do the unfolding}
-%*									*
-%************************************************************************
+	---------- Switches
+    sw_chkr		      = getSwitchChecker env
+    essential_unfoldings_only = switchIsOn sw_chkr EssentialUnfoldingsOnly
+    always_inline	      = case guidance of {UnfoldAlways -> True; other -> False}
+    ok_to_inline	      = okToInline form 
+			      		   occ_info
+			      		   small_enough
+    small_enough = smallEnoughToInline con_disc unf_thresh arg_evals guidance
+    arg_evals = [is_evald arg | arg <- args, isValArg arg]
+  
+    is_evald (VarArg v) = isEvaluated (lookupRhsInfo env v)
+    is_evald (LitArg l) = True
 
-We have very limited information about an unfolding expression: (1)~so
-many type arguments and so many value arguments expected---for our
-purposes here, we assume we've got those.  (2)~A ``size'' or ``cost,''
-a single integer.  (3)~An ``argument info'' vector.  For this, what we
-have at the moment is a Boolean per argument position that says, ``I
-will look with great favour on an explicit constructor in this
-position.''
-
-Assuming we have enough type- and value arguments (if not, we give up
-immediately), then we see if the ``discounted size'' is below some
-(semi-arbitrary) threshold.  It works like this: for every argument
-position where we're looking for a constructor AND WE HAVE ONE in our
-hands, we get a (again, semi-arbitrary) discount [proportion to the
-number of constructors in the type being scrutinized].
-
-\begin{code}
-considerUnfolding
-	:: SimplEnv
-	-> OutId		-- Id we're thinking about
-	-> [OutArg]		-- Applied to these
-	-> Bool			-- If True then *always* inline,
-				-- because it's the only one
-	-> FormSummary
-	-> InExpr		-- Template for unfolding;
-	-> UnfoldingGuidance	-- To help us decide...
-	-> SmplM CoreExpr	-- Result!
-
-considerUnfolding env var args txt_occ form_summary template guidance
-  | switchIsOn sw_chkr EssentialUnfoldingsOnly
-  = dont_go_for_it -- we're probably in a hurry in this simpl round...
-
-  | do_deforest
-  = pprTrace "" (ppBesides [ppStr "not attempting to unfold `",
-				    ppr PprDebug var,
-				    ppStr "' due to DEFOREST pragma"])
-			dont_go_for_it
-
-  | txt_occ
-  = go_for_it
-
-  | (case form_summary of {BottomForm -> True; other -> False} &&
-    not (any isPrimType [ ty | (TyArg ty) <- args ]))
-		-- Always inline bottoming applications, unless
-		-- there's a primitive type lurking around...
-  = go_for_it
-
-  | otherwise
-  =
-    -- If this is a deforestable Id, then don't unfold it (the deforester
-    -- will do it).
-
-    case getInfo (getIdInfo var) of {
-       DoDeforest -> pprTrace "" (ppBesides [ppStr "not unfolding `",
-				    ppr PprDebug var,
-				    ppStr "' due to DEFOREST pragma"])
-			dont_go_for_it;
-       Don'tDeforest ->
-
-    case guidance of
-      UnfoldNever  -> dont_go_for_it
-
-      UnfoldAlways -> go_for_it
-
-      EssentialUnfolding -> go_for_it
-
-      UnfoldIfGoodArgs m_tys_wanted n_vals_wanted is_con_vec size
-	-> if m_tys_wanted > no_tyargs
-	   || n_vals_wanted > no_valargs then
-	      --pprTrace "dont_go_for_it1:" (ppAbove (ppr PprDebug guidance) (ppr PprDebug var))
-	      dont_go_for_it
-
-	   else if n_vals_wanted == 0
-		&& rhs_looks_like_a_Con then
-	      -- we are very keen on inlining data values
-	      -- (see comments elsewhere); we ignore any size issues!
-	      go_for_it
-
-	   else -- we try the fun stuff
-	      let
-		  discounted_size
-		    = discountedCost env con_discount size no_valargs is_con_vec valargs
-	      in
-	      if discounted_size <= unfold_use_threshold then
-		  go_for_it
-	      else
-		  --pprTrace "dont_go_for_it2:" (ppCat [ppr PprDebug var, ppInt size, ppInt discounted_size, ppInt unfold_use_threshold, ppr PprDebug guidance])
-		  dont_go_for_it
-    }
-  where
-    sw_chkr = getSwitchChecker env
-
-    unfold_use_threshold
-      = case (intSwitchSet sw_chkr SimplUnfoldingUseThreshold) of
-	  Nothing -> uNFOLDING_USE_THRESHOLD
-	  Just xx -> xx
-
-    con_discount  -- ToDo: ************ get from a switch *********
-      = uNFOLDING_CON_DISCOUNT_WEIGHT
-
-    (_, _, tyargs, valargs) = collectArgs args_in_dummy_expr
-    no_tyargs  = length tyargs
-    no_valargs = length valargs
-    args_in_dummy_expr = mkGenApp (Var (panic "SimplVar.dummy")) args
-    -- we concoct this dummy expr, just so we can use collectArgs
-    -- (rather than make up a special-purpose bit of code)
-
-    rhs_looks_like_a_Con
-      = let
-	    (_,_,val_binders,body) = collectBinders template
-    	in
-    	case (val_binders, body) of
-    	  ([], Con _ _) -> True
-	  other -> False
-
-    dont_go_for_it = returnSmpl (mkGenApp (Var var) args)
-
-    go_for_it      = --pprTrace "unfolding:" (ppCat [ppr PprDebug var, ppChar ':', ppr PprDebug template]) (
-		     tick UnfoldingDone		`thenSmpl_`
-		     simplExpr env template args
-		     --)
+    con_disc   = getSimplIntSwitch sw_chkr SimplUnfoldingConDiscount
+    unf_thresh = getSimplIntSwitch sw_chkr SimplUnfoldingUseThreshold
 
 #if OMIT_DEFORESTER
     do_deforest = False
 #else
     do_deforest = case (getInfo (getIdInfo var)) of { DoDeforest -> True; _ -> False }
 #endif
-\end{code}
 
-\begin{code}
-type ArgInfoVector = [Bool]
 
-discountedCost
-	:: SimplEnv	    -- so we can look up things about the args
-	-> Int		    -- the discount for a "constructor" hit;
-			    -- we multiply by the # of cons in the type.
-	-> Int		    -- the size/cost of the expr
-	-> Int		    -- the number of val args (== length args)
-	-> ArgInfoVector    -- what we know about the *use* of the arguments
-	-> [OutArg]	    -- *an actual set of value arguments*!
-	-> Int
+-- costCentreOk checks that it's ok to inline this thing
+-- The time it *isn't* is this:
+--
+--	f x = let y = E in
+--	      scc "foo" (...y...)
+--
+-- Here y has a subsumed cost centre, and we can't inline it inside "foo",
+-- regardless of whether E is a WHNF or not.
 
-    -- If we apply an expression (usually a function) of given "costs"
-    -- to a particular set of arguments (possibly none), what will
-    -- the resulting expression "cost"?
-
-discountedCost env con_discount_weight size no_args is_con_vec args
-  = ASSERT(no_args == length args)
-    disc (size - no_args) is_con_vec args
-	-- we start w/ a "discount" equal to the # of args...
-  where
-    disc size [] _ = size
-    disc size _ [] = size
-
-    disc size (want_con_here:want_cons) (arg:rest_args)
-      = let
-	    full_price	         = disc size
-	    take_something_off v = let
-				     (tycon, _, _) = getAppDataTyConExpandingDicts (idType v)
-				     no_cons = tyConFamilySize tycon
-				     reduced_size
-				       = size - (no_cons * con_discount_weight)
-				   in
-				   disc reduced_size
-	in
-	(if not want_con_here then
-	    full_price
-	else
-	    case arg of
-	      LitArg _ 					     -> full_price
-	      VarArg v | whnfDetails (lookupUnfolding env v) -> take_something_off v
-		       | otherwise			     -> full_price
-
-	) want_cons rest_args
-\end{code}
-
-We use this one to avoid exporting inlinings that we ``couldn't possibly
-use'' on the other side.  Can be overridden w/ flaggery.
-\begin{code}
-leastItCouldCost
-	:: Int
-	-> Int		    -- the size/cost of the expr
-	-> Int		    -- number of value args
-	-> ArgInfoVector    -- what we know about the *use* of the arguments
-	-> [Type]	    -- NB: actual arguments *not* looked at;
-			    -- but we know their types
-	-> Int
-
-leastItCouldCost con_discount_weight size no_val_args is_con_vec arg_tys
-  = ASSERT(no_val_args == length arg_tys)
-    disc (size - no_val_args) is_con_vec arg_tys
-	-- we start w/ a "discount" equal to the # of args...
-  where
-    -- ToDo: rather sad that this isn't commoned-up w/ the one above...
-
-    disc size [] _ = size
-    disc size _ [] = size
-
-    disc size (want_con_here:want_cons) (arg_ty:rest_arg_tys)
-      = let
-	    take_something_off tycon
-	      = let
-		    no_cons = tyConFamilySize tycon
-
-		    reduced_size
-		      = size - (no_cons * con_discount_weight)
-		in
-		reduced_size
-	in
-	if not want_con_here then
-	    disc size want_cons rest_arg_tys
-	else
-	    case (maybeAppDataTyConExpandingDicts arg_ty, isPrimType arg_ty) of
-	      (Just (tycon, _, _), False) ->
-		disc (take_something_off tycon) want_cons rest_arg_tys
-
-	      other -> disc size want_cons rest_arg_tys
-\end{code}
+costCentreOk cc_encl cc_rhs
+  = noCostCentreAttached cc_encl || not (noCostCentreAttached cc_rhs)
+\end{code}		   
 

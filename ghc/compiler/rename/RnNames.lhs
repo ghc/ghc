@@ -121,7 +121,7 @@ getGlobalNames iface_cache info us
 *********************************************************
 
 \begin{code}
-getSourceNames ::
+getSourceNames ::			-- Collects global *binders* (not uses)
 	   [RdrNameTyDecl]
 	-> [RdrNameClassDecl]
 	-> RdrNameHsBinds

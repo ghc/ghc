@@ -24,6 +24,7 @@ import HsTypes		( MonoType )
 
 -- others:
 import IdInfo
+import SpecEnv		( SpecEnv )
 import Outputable	( Outputable(..) )
 import Pretty
 \end{code}

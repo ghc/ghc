@@ -403,21 +403,25 @@ addStrictnessInfoToId
 	-> Id			-- Augmented with strictness
 
 addStrictnessInfoToId strflags str_val abs_val binder body
-  = if isWrapperId binder then
-	binder	-- Avoid clobbering existing strictness info
+
+{-		SCHEDULED FOR NUKING 
+  | isWrapperId binder
+  = binder	-- Avoid clobbering existing strictness info
 		-- (and, more importantly, worker info).
 		-- Deeply suspicious (SLPJ)
-    else
-    if (isBot str_val) then
-	binder `addIdStrictness` mkBottomStrictnessInfo
-    else
-	case (collectBinders body) of { (_, _, lambda_bounds, rhs) ->
-	let
-		tys        = map idType lambda_bounds
-		strictness = findStrictness strflags tys str_val abs_val
-	in
-	binder `addIdStrictness` mkStrictnessInfo strictness Nothing
-	}
+-}
+
+  | isBot str_val
+  = binder `addIdStrictness` mkBottomStrictnessInfo
+
+  | otherwise
+  = case (collectBinders body) of { (_, _, lambda_bounds, rhs) ->
+    let
+	tys        = map idType lambda_bounds
+	strictness = findStrictness strflags tys str_val abs_val
+    in
+    binder `addIdStrictness` mkStrictnessInfo strictness Nothing
+    }
 \end{code}
 
 \begin{code}

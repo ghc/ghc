@@ -736,30 +736,38 @@ types.
 matchTy :: GenType t1 u1		-- Template
 	-> GenType t2 u2		-- Proposed instance of template
 	-> Maybe [(t1,GenType t2 u2)]	-- Matching substitution
+					
 
 matchTys :: [GenType t1 u1]		-- Templates
 	 -> [GenType t2 u2]		-- Proposed instance of template
-	 -> Maybe [(t1,GenType t2 u2)]	-- Matching substitution
+	 -> Maybe ([(t1,GenType t2 u2)],-- Matching substitution
+		   [GenType t2 u2])	-- Left over instance types
 
-matchTy  ty1  ty2  = match  [] [] ty1 ty2
-matchTys tys1 tys2 = match' [] (zipEqual "matchTys" tys1 tys2)
+matchTy  ty1  ty2  = match  ty1 ty2 (\s -> Just s) []
+matchTys tys1 tys2 = go [] tys1 tys2
+		   where
+		     go s [] 	    tys2        = Just (s,tys2)
+		     go s (ty1:tys1) []	        = panic "matchTys"
+		     go s (ty1:tys1) (ty2:tys2) = match ty1 ty2 (\s' -> go s' tys1 tys2) s
+						    
+
 \end{code}
 
 @match@ is the main function.
 
 \begin{code}
-match :: [(t1, GenType t2 u2)]			-- r, the accumulating result
-      -> [(GenType t1 u1, GenType t2 u2)]	-- w, the work list
-      -> GenType t1 u1 -> GenType t2 u2		-- Current match pair
-      -> Maybe [(t1, GenType t2 u2)]
+match :: GenType t1 u1 -> GenType t2 u2			-- Current match pair
+      -> ([(t1, GenType t2 u2)] -> Maybe result)	-- Continuation
+      -> [(t1, GenType t2 u2)]				-- Current substitution
+      -> Maybe result
 
-match r w (TyVarTy v) 	       ty		    = match' ((v,ty) : r) w
-match r w (FunTy fun1 arg1 _)  (FunTy fun2 arg2 _)  = match r ((fun1,fun2):w) arg1 arg2
-match r w (AppTy fun1 arg1)  (AppTy fun2 arg2)      = match r ((fun1,fun2):w) arg1 arg2
-match r w (TyConTy con1 _)     (TyConTy con2 _)     | con1  == con2  = match' r w
-match r w (DictTy clas1 ty1 _) (DictTy clas2 ty2 _) | clas1 == clas2 = match r w ty1 ty2
-match r w (SynTy _ _ ty1)      ty2		    = match r w ty1 ty2
-match r w ty1		       (SynTy _ _ ty2)      = match r w ty1 ty2
+match (TyVarTy v) 	   ty		        k = \s -> k ((v,ty) : s)
+match (FunTy fun1 arg1 _)  (FunTy fun2 arg2 _)  k = match fun1 fun2 (match arg1 arg2 k)
+match (AppTy fun1 arg1)    (AppTy fun2 arg2)    k = match fun1 fun2 (match arg1 arg2 k)
+match (TyConTy con1 _)     (TyConTy con2 _)     k | con1  == con2  = k
+match (DictTy clas1 ty1 _) (DictTy clas2 ty2 _) k | clas1 == clas2 = match ty1 ty2 k
+match (SynTy _ _ ty1)      ty2		        k = match ty1 ty2 k
+match ty1		       (SynTy _ _ ty2)  k = match ty1 ty2 k
 
 	-- With type synonyms, we have to be careful for the exact
 	-- same reasons as in the unifier.  Please see the
@@ -767,10 +775,7 @@ match r w ty1		       (SynTy _ _ ty2)      = match r w ty1 ty2
 	-- here! (WDP 95/05)
 
 -- Catch-all fails
-match _ _ _ _ = Nothing
-
-match' r [] 	       = Just r
-match' r ((ty1,ty2):w) = match r w ty1 ty2
+match _ _ _ = \s -> Nothing
 \end{code}
 
 %************************************************************************

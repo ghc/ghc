@@ -16,7 +16,7 @@ import CmdLineOpts	( SimplifierSwitch, SwitchResult )
 import CoreSyn		( GenCoreArg, GenCoreBinder, GenCoreBinding, GenCoreExpr,
 			  GenCoreCaseAlts, GenCoreCaseDefault, Coercion
 			)
-import CoreUnfold	( UnfoldingDetails, UnfoldingGuidance )
+import CoreUnfold	( Unfolding, UnfoldingGuidance )
 import CostCentre	( CostCentre )
 import FieldLabel	( FieldLabel )
 import FiniteMap	( FiniteMap )
@@ -133,7 +133,7 @@ data UnfoldingCoreExpr a
 data UniqFM a
 data UpdateInfo
 data UniqSupply
-data UnfoldingDetails
+data Unfolding
 data UnfoldingGuidance
 data Unique	-- NB: fails the optimisation criterion
 

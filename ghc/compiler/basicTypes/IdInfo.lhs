@@ -77,7 +77,6 @@ IMPORT_DELOOPER(IdLoop)	-- IdInfo is a dependency-loop ranch, and
 
 import CmdLineOpts	( opt_OmitInterfacePragmas )
 import Maybes		( firstJust )
-import MatchEnv		( nullMEnv, isEmptyMEnv, mEnvToList, MatchEnv )
 import Outputable	( ifPprInterface, Outputable(..){-instances-} )
 import PprStyle		( PprStyle(..) )
 import Pretty
@@ -117,16 +116,13 @@ data IdInfo
 	DemandInfo		-- Whether or not it is definitely
 				-- demanded
 
-	(MatchEnv [Type] CoreExpr)
-				-- Specialisations of this function which exist
-				-- This corresponds to a SpecEnv which we do
-				-- not import directly to avoid loop
+	SpecEnv			-- Specialisations of this function which exist
 
 	StrictnessInfo		-- Strictness properties, notably
 				-- how to conjure up "worker" functions
 
-	UnfoldingDetails	-- Its unfolding; for locally-defined
-				-- things, this can *only* be NoUnfoldingDetails
+	Unfolding		-- Its unfolding; for locally-defined
+				-- things, this can *only* be NoUnfolding
 
 	UpdateInfo		-- Which args should be updated
 
@@ -162,7 +158,7 @@ boringIdInfo (IdInfo UnknownArity
 		     _ {- no f/b w/w -}
 		     _ {- src_loc: no effect on interfaces-}
 	      )
-	      |  null (mEnvToList specenv)
+	      |  isNullSpecEnv specenv
 	      && boring_strictness strictness
 	      && boring_unfolding unfolding
   = True
@@ -171,8 +167,8 @@ boringIdInfo (IdInfo UnknownArity
     boring_strictness BottomGuaranteed = False
     boring_strictness (StrictnessInfo wrap_args _) = all_present_WwLazies wrap_args
 
-    boring_unfolding NoUnfoldingDetails = True
-    boring_unfolding _	    	    	= False
+    boring_unfolding NoUnfolding = True
+    boring_unfolding _	    	 = False
 
 boringIdInfo _ = False
 
@@ -185,7 +181,7 @@ nasty loop, friends...)
 \begin{code}
 apply_to_IdInfo ty_fn idinfo@(IdInfo arity demand spec strictness unfold
 			      update deforest arg_usage fb_ww srcloc)
-  | isEmptyMEnv spec
+  | isNullSpecEnv spec
   = idinfo
   | otherwise
   = panic "IdInfo:apply_to_IdInfo"
@@ -253,7 +249,7 @@ ppIdInfo :: PprStyle
 	 -> Id		-- The Id for which we're printing this IdInfo
 	 -> Bool	-- True <=> print specialisations, please
 	 -> (Id -> Id)	-- to look up "better Ids" w/ better IdInfos;
-	 -> IdEnv UnfoldingDetails
+	 -> IdEnv Unfolding
 			-- inlining info for top-level fns in this module
 	 -> IdInfo	-- see MkIface notes
 	 -> Pretty
@@ -279,8 +275,8 @@ ppIdInfo sty for_this_id specs_please better_id_fn inline_env
 		    else pp_unfolding sty for_this_id inline_env unfold,
 
 		    if specs_please
-		    then ppSpecs sty (not (isDataCon for_this_id))
-				 better_id_fn inline_env (mEnvToList specenv)
+		    then panic "ppSpecs (ToDo)" -- sty (not (isDataCon for_this_id))
+					 -- better_id_fn inline_env (mEnvToList specenv)
 		    else pp_NONE,
 
 		    -- DemandInfo needn't be printed since it has no effect on interfaces
@@ -414,19 +410,16 @@ instance OptIdInfo DemandInfo where
 See SpecEnv.lhs
 
 \begin{code}
-instance OptIdInfo (MatchEnv [Type] CoreExpr) where
-    noInfo = nullMEnv
+instance OptIdInfo SpecEnv where
+    noInfo = nullSpecEnv
 
     getInfo (IdInfo _ _ spec _ _ _ _ _ _ _) = spec
 
-    addInfo id_info spec | null (mEnvToList spec) = id_info
+    addInfo id_info spec | isNullSpecEnv spec = id_info
     addInfo (IdInfo a b _ d e f g h i j) spec = IdInfo a b spec d e f g h i j
 
-    ppInfo sty better_id_fn spec
-      = ppSpecs sty True better_id_fn nullIdEnv (mEnvToList spec)
-
-ppSpecs sty print_spec_id_info better_id_fn inline_env spec_env
-  = if null spec_env then ppNil else panic "IdInfo:ppSpecs"
+    ppInfo sty better_id_fn spec = panic "IdInfo:ppSpecs"
+--      = ppSpecs sty True better_id_fn nullIdEnv (mEnvToList spec)
 \end{code}
 
 %************************************************************************
@@ -737,25 +730,18 @@ pp_strictness sty for_this_id_maybe better_id_fn inline_env
 
 \begin{code}
 mkUnfolding guide expr
-  = GenForm (mkFormSummary NoStrictnessInfo expr)
-	(occurAnalyseGlobalExpr expr)
-	guide
+  = CoreUnfolding (SimpleUnfolding (mkFormSummary expr)
+				   guide
+				   (occurAnalyseGlobalExpr expr))
 \end{code}
 
 \begin{code}
-noInfo_UF = NoUnfoldingDetails
+noInfo_UF = NoUnfolding
 
-getInfo_UF (IdInfo _ _ _ _ unfolding _ _ _ _ _)
-  = case unfolding of
-      GenForm _ _ BadUnfolding -> NoUnfoldingDetails
-      unfolding_as_was 	       -> unfolding_as_was
+getInfo_UF (IdInfo _ _ _ _ unfolding _ _ _ _ _) = unfolding
 
--- getInfo_UF ensures that any BadUnfoldings are never returned
--- We had to delay the test required in TcPragmas until now due
--- to strictness constraints in TcPragmas
-
-addInfo_UF id_info@(IdInfo a b c d e f g h i j) NoUnfoldingDetails = id_info
-addInfo_UF   (IdInfo a b d e _ f g h i j) uf = IdInfo a b d e uf f g h i j
+addInfo_UF id_info@(IdInfo a b c d e f g h i j) NoUnfolding = id_info
+addInfo_UF (IdInfo a b d e _ f g h i j) uf = IdInfo a b d e uf f g h i j
 \end{code}
 
 \begin{code}
@@ -764,14 +750,12 @@ pp_unfolding sty for_this_id inline_env uf_details
       Nothing -> pp uf_details
       Just dt -> pp dt
   where
-    pp NoUnfoldingDetails = pp_NONE
+    pp NoUnfolding = pp_NONE
 
-    pp (MagicForm tag _)
+    pp (MagicUnfolding tag _)
       = ppCat [ppPStr SLIT("_MF_"), pprUnique tag]
 
-    pp (GenForm _ _ BadUnfolding) = pp_NONE
-
-    pp (GenForm _ template guide)
+    pp (CoreUnfolding (SimpleUnfolding _ guide template))
       = let
 	    untagged = unTagBinders template
 	in

@@ -54,7 +54,7 @@ import Id	( GenId, idType, mkInstId )
 import MatchEnv	( lookupMEnv, insertMEnv )
 import Name	( mkLocalName, getLocalName, Name )
 import Outputable
-import PprType	( GenClass, TyCon, GenType, GenTyVar )	
+import PprType	( GenClass, TyCon, GenType, GenTyVar, pprParendGenType )	
 import PprStyle	( PprStyle(..) )
 import Pretty
 import SpecEnv	( SYN_IE(SpecEnv) )
@@ -364,7 +364,7 @@ ppr_inst sty hdr ppr_orig (LitInst u lit ty orig loc)
 
 ppr_inst sty hdr ppr_orig (Dict u clas ty orig loc)
   = ppHang (ppr_orig orig loc)
-	 4 (ppCat [ppr sty clas, ppr sty ty, show_uniq sty u])
+	 4 (ppCat [ppr sty clas, pprParendGenType sty ty, show_uniq sty u])
 
 ppr_inst sty hdr ppr_orig (Method u id tys rho orig loc)
   = ppHang (ppr_orig orig loc)

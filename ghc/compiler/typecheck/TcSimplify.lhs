@@ -29,6 +29,7 @@ import Inst		( lookupInst, lookupSimpleInst,
 			  plusLIE, unitLIE, consLIE, InstOrigin(..),
 			  OverloadedLit )
 import TcEnv		( tcGetGlobalTyVars )
+import SpecEnv		( SpecEnv )
 import TcType		( SYN_IE(TcType), SYN_IE(TcTyVar), SYN_IE(TcTyVarSet), TcMaybe, tcInstType )
 import Unify		( unifyTauTy )
 
@@ -686,7 +687,7 @@ disambigOne dict_infos
 	-- See if any default works, and if so bind the type variable to it
     try_default default_tys		`thenTc` \ chosen_default_ty ->
     tcInstType [] chosen_default_ty	`thenNF_Tc` \ chosen_default_tc_ty ->	-- Tiresome!
-    unifyTauTy (mkTyVarTy tyvar) chosen_default_tc_ty
+    unifyTauTy chosen_default_tc_ty (mkTyVarTy tyvar)
 
   where
     (_,_,tyvar) = head dict_infos		-- Should be non-empty

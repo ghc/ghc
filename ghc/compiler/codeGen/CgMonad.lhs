@@ -670,7 +670,7 @@ addBindsC new_bindings info_down (MkCgState absC binds usage)
 \begin{code}
 modifyBindC :: Id -> (CgIdInfo -> CgIdInfo) -> Code
 modifyBindC name mangle_fn info_down (MkCgState absC binds usage)
-  = MkCgState absC (modifyIdEnv binds mangle_fn name) usage
+  = MkCgState absC (modifyIdEnv mangle_fn binds name) usage
 \end{code}
 
 Lookup is expected to find a binding for the @Id@.

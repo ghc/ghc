@@ -16,9 +16,7 @@ IMPORT_DELOOPER(SmplLoop)		( simplBind, simplExpr, MagicUnfoldingFun )
 import BinderInfo	-- too boring to try to select things...
 import CmdLineOpts	( SimplifierSwitch(..) )
 import CoreSyn
-import CoreUnfold	( whnfDetails, mkConForm, mkLitForm,
-			  UnfoldingDetails(..), UnfoldingGuidance(..),
-			  FormSummary(..)
+import CoreUnfold	( Unfolding(..), UnfoldingGuidance(..), SimpleUnfolding 
 			)
 import CoreUtils	( coreAltsType, nonErrorRHSs, maybeErrorApp,
 			  unTagBindersAlts
@@ -34,7 +32,7 @@ import PrimOp		( primOpOkForSpeculation, PrimOp{-instance Eq-} )
 import SimplEnv
 import SimplMonad
 import SimplUtils	( mkValLamTryingEta )
-import Type		( isPrimType, maybeAppDataTyConExpandingDicts, mkFunTy, mkFunTys, eqTy )
+import Type		( isPrimType, getAppDataTyConExpandingDicts, mkFunTy, mkFunTys, eqTy )
 import TysPrim		( voidTy )
 import Unique		( Unique{-instance Eq-} )
 import Usage		( GenUsage{-instance Eq-} )
@@ -295,9 +293,9 @@ completeCase env scrut alts rhs_c
 
 		-- Eliminate unused rhss if poss
 	      rhss = case scrut_form of
-			OtherLitForm not_these -> [rhs | (alt_lit,rhs) <- alts,
-						       not (alt_lit `is_elem` not_these)
-						      ]
+			OtherLit not_these -> [rhs | (alt_lit,rhs) <- alts,
+						     not (alt_lit `is_elem` not_these)
+					      ]
 			other -> [rhs | (_,rhs) <- alts]
 
 	  AlgAlts alts deflt -> (deflt_binder_unused && all alt_binders_unused possible_alts,
@@ -308,7 +306,7 @@ completeCase env scrut alts rhs_c
 
 		-- Eliminate unused alts if poss
 	      possible_alts = case scrut_form of
-				OtherConForm not_these ->
+				OtherCon not_these ->
 					 	-- Remove alts which can't match
 					[alt | alt@(alt_con,_,_) <- alts,
 					       not (alt_con `is_elem` not_these)]
@@ -321,12 +319,12 @@ completeCase env scrut alts rhs_c
 
 	-- If the scrutinee is a variable, look it up to see what we know about it
     scrut_form = case scrut of
-		  Var v -> lookupUnfolding env v
-		  other   -> NoUnfoldingDetails
+		  Var v -> lookupRhsInfo env v
+		  other -> NoRhsInfo
 
 	-- If the scrut is already eval'd then there's no worry about
 	-- eliminating the case
-    scrut_is_evald = whnfDetails scrut_form
+    scrut_is_evald = isEvaluated scrut_form
 
     scrut_is_eliminable_primitive
       = case scrut of
@@ -360,9 +358,8 @@ completeCase env scrut alts rhs_c
     rhs1_is_scrutinee = case (scrut, rhs1) of
 			  (Var scrut_var, Var rhs_var)
 				-> case lookupId env rhs_var of
-				    Just (ItsAnAtom (VarArg rhs_var'))
-					-> rhs_var' == scrut_var
-				    other -> False
+				    VarArg rhs_var' -> rhs_var' == scrut_var
+				    other	    -> False
 			  other -> False
 
     is_elem x ys = isIn "completeCase" x ys
@@ -505,13 +502,17 @@ simplAlts env scrut (AlgAlts alts deflt) rhs_c
     simplDefault env scrut deflt deflt_form rhs_c	`thenSmpl` \ deflt' ->
     returnSmpl (AlgAlts alts' deflt')
   where
-    deflt_form = OtherConForm [con | (con,_,_) <- alts]
+    deflt_form = OtherCon [con | (con,_,_) <- alts]
     do_alt (con, con_args, rhs)
       = cloneIds env con_args				`thenSmpl` \ con_args' ->
 	let
 	    env1    = extendIdEnvWithClones env con_args con_args'
 	    new_env = case scrut of
-		       Var v -> extendUnfoldEnvGivenConstructor env1 v con con_args'
+		       Var v -> extendEnvGivenNewRhs env1 v (Con con args)
+			     where
+				(_, ty_args, _) = getAppDataTyConExpandingDicts (idType v)
+				args = map TyArg ty_args ++ map VarArg con_args'
+
 		       other -> env1
 	in
 	rhs_c new_env rhs 				`thenSmpl` \ rhs' ->
@@ -522,11 +523,11 @@ simplAlts env scrut (PrimAlts alts deflt) rhs_c
     simplDefault env scrut deflt deflt_form rhs_c	`thenSmpl` \ deflt' ->
     returnSmpl (PrimAlts alts' deflt')
   where
-    deflt_form = OtherLitForm [lit | (lit,_) <- alts]
+    deflt_form = OtherLit [lit | (lit,_) <- alts]
     do_alt (lit, rhs)
       = let
 	    new_env = case scrut of
-			Var v -> extendUnfoldEnvGivenFormDetails env v (mkLitForm lit)
+			Var v -> extendEnvGivenNewRhs env v (Lit lit)
 			other -> env
 	in
 	rhs_c new_env rhs 				`thenSmpl` \ rhs' ->
@@ -564,7 +565,7 @@ simplDefault
 	:: SimplEnv
 	-> OutExpr			-- Simplified scrutinee
 	-> InDefault 			-- Default alternative to be completed
-	-> UnfoldingDetails		-- Gives form of scrutinee
+	-> RhsInfo			-- Gives form of scrutinee
 	-> (SimplEnv -> InExpr -> SmplM OutExpr)		-- Old rhs handler
 	-> SmplM OutDefault
 
@@ -572,36 +573,27 @@ simplDefault env scrut NoDefault form rhs_c
   = returnSmpl NoDefault
 
 -- Special case for variable scrutinee; see notes above.
-simplDefault env (Var scrut_var) (BindDefault binder rhs) form_from_this_case rhs_c
+simplDefault env (Var scrut_var) (BindDefault binder@(_,occ_info) rhs) 
+	     info_from_this_case rhs_c
   = cloneId env binder 	`thenSmpl` \ binder' ->
     let
-      env1    = extendIdEnvWithAtom env binder (VarArg binder')
+      env1    = extendIdEnvWithClone env binder binder'
+      env2    = extendEnvGivenRhsInfo env1 binder' occ_info info_from_this_case
 
 	-- Add form details for the default binder
-      scrut_form = lookupUnfolding env scrut_var
-      final_form
-	= case (form_from_this_case, scrut_form) of
-	    (OtherConForm cs, OtherConForm ds) -> OtherConForm (cs++ds)
-	    (OtherLitForm cs, OtherLitForm ds) -> OtherLitForm (cs++ds)
-	    other 			       -> form_from_this_case
-
-      env2 = extendUnfoldEnvGivenFormDetails env1 binder' final_form
-
-	-- Change unfold details for scrut var.  We now want to unfold it
-	-- to binder'
-      new_scrut_var_form = GenForm WhnfForm (Var binder') UnfoldAlways
-
-      new_env    = extendUnfoldEnvGivenFormDetails env2 scrut_var new_scrut_var_form
-
+      scrut_info = lookupRhsInfo env scrut_var
+      env3       = extendEnvGivenRhsInfo env2 binder' occ_info scrut_info
+      new_env    = extendEnvGivenNewRhs env3 scrut_var (Var binder')
     in
     rhs_c new_env rhs			`thenSmpl` \ rhs' ->
     returnSmpl (BindDefault binder' rhs')
 
-simplDefault env scrut (BindDefault binder rhs) form rhs_c
+simplDefault env scrut (BindDefault binder@(_,occ_info) rhs) 
+	     info_from_this_case rhs_c
   = cloneId env binder 	`thenSmpl` \ binder' ->
     let
-	env1    = extendIdEnvWithAtom env binder (VarArg binder')
-	new_env = extendUnfoldEnvGivenFormDetails env1 binder' form
+	env1    = extendIdEnvWithClone env binder binder'
+	new_env = extendEnvGivenRhsInfo env1 binder' occ_info info_from_this_case
     in
     rhs_c new_env rhs			`thenSmpl` \ rhs' ->
     returnSmpl (BindDefault binder' rhs')
@@ -671,7 +663,8 @@ completeAlgCaseWithKnownCon env con con_args (AlgAlts alts deflt) rhs_c
       | alt_con == con
       = 	-- Matching alternative!
 	let
-	    new_env = extendIdEnvWithAtomList env (zipEqual "SimplCase" alt_args (filter isValArg con_args))
+	    new_env = extendIdEnvWithAtoms env 
+				(zipEqual "SimplCase" alt_args (filter isValArg con_args))
 	in
 	rhs_c new_env rhs
 
@@ -685,13 +678,11 @@ completeAlgCaseWithKnownCon env con con_args (AlgAlts alts deflt) rhs_c
 	  NoDefault 	 -> 	-- Blargh!
 	    panic "completeAlgCaseWithKnownCon: No matching alternative and no default"
 
-	  BindDefault binder rhs ->	-- OK, there's a default case
+	  BindDefault binder@(_,occ_info) rhs ->	-- OK, there's a default case
 			-- let-bind the binder to the constructor
 		cloneId env binder		`thenSmpl` \ id' ->
 		let
-		    env1    = extendIdEnvWithClone env binder id'
-		    new_env = extendUnfoldEnvGivenFormDetails env1 id'
-					(mkConForm con con_args)
+		    new_env = extendEnvGivenBinding env occ_info id' (Con con con_args)
 		in
 		rhs_c new_env rhs		`thenSmpl` \ rhs' ->
 		returnSmpl (Let (NonRec id' (Con con con_args)) rhs')
@@ -781,8 +772,8 @@ mkCoCase scrut (AlgAlts outer_alts
 	 v | scrut_is_var = Var scrut_var
 	   | otherwise    = Con con (map TyArg arg_tys ++ map VarArg args)
 
-    arg_tys = case (maybeAppDataTyConExpandingDicts (idType deflt_var)) of
-		Just (_, arg_tys, _) -> arg_tys
+    arg_tys = case (getAppDataTyConExpandingDicts (idType deflt_var)) of
+		(_, arg_tys, _) -> arg_tys
 
 mkCoCase scrut (PrimAlts
 		  outer_alts

@@ -132,7 +132,7 @@ tcMatchExpected expected_ty the_match@(PatMatch pat match)
 	Nothing ->			-- Not a function type (eg type variable)
 					-- So use tcMatch instead
 	    tcMatch the_match			`thenTc`   \ (match', lie_match, match_ty) ->
-	    unifyTauTy match_ty expected_ty 	`thenTc_`
+	    unifyTauTy expected_ty match_ty 	`thenTc_`
 	    returnTc (match', lie_match)
 
 	Just (arg_ty,rest_ty) ->	-- It's a function type!
@@ -140,7 +140,7 @@ tcMatchExpected expected_ty the_match@(PatMatch pat match)
 	    in
 	    newMonoIds binders mkTypeKind (\ _ ->
 		tcPat pat			`thenTc` \ (pat', lie_pat, pat_ty) ->
-		unifyTauTy arg_ty pat_ty	`thenTc_`
+		unifyTauTy pat_ty arg_ty	`thenTc_`
 		tcMatchExpected rest_ty  match	`thenTc` \ (match', lie_match) ->
 		returnTc (PatMatch pat' match',
 			  plusLIE lie_pat lie_match)
@@ -148,7 +148,7 @@ tcMatchExpected expected_ty the_match@(PatMatch pat match)
 
 tcMatchExpected expected_ty (GRHSMatch grhss_and_binds)
   = tcGRHSsAndBinds grhss_and_binds   	`thenTc` \ (grhss_and_binds', lie, grhss_ty) ->
-    unifyTauTy grhss_ty expected_ty 	`thenTc_`
+    unifyTauTy expected_ty grhss_ty 	`thenTc_`
     returnTc (GRHSMatch grhss_and_binds', lie)
 
 tcMatch	:: RenamedMatch -> TcM s (TcMatch s, LIE s, TcType s)

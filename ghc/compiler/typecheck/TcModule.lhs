@@ -34,6 +34,7 @@ import TcDefaults	( tcDefaults )
 import TcEnv		( tcExtendGlobalValEnv, getEnv_LocalIds,
 			  getEnv_TyCons, getEnv_Classes,
 			  tcLookupLocalValueByKey, tcLookupTyConByKey )
+import SpecEnv		( SpecEnv )
 import TcIfaceSig	( tcInterfaceSigs )
 import TcInstDcls	( tcInstDecls1, tcInstDecls2 )
 import TcInstUtil	( buildInstanceEnvs, InstInfo )

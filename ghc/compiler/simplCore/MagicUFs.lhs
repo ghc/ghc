@@ -37,7 +37,7 @@ data MagicUnfoldingFun
 				-- (note: we can get simplifier switches
 				-- from the SimplEnv)
 	-> [CoreArg]       -- arguments
-	-> SmplM (Maybe CoreExpr))
+	-> Maybe (SmplM CoreExpr))
 				-- Just result, or Nothing
 \end{code}
 
@@ -58,7 +58,7 @@ applyMagicUnfoldingFun
 	:: MagicUnfoldingFun
 	-> SimplEnv
 	-> [CoreArg]
-	-> SmplM (Maybe CoreExpr)
+	-> Maybe (SmplM CoreExpr)
 
 applyMagicUnfoldingFun (MUF fun) env args = fun env args
 \end{code}
@@ -94,44 +94,45 @@ magic_UFs_table
 
 build_fun :: SimplEnv
 	  -> [CoreArg]
-	  -> SmplM (Maybe CoreExpr)
+	  -> Maybe (SmplM CoreExpr)
 build_fun env [TypeArg ty,ValArg (VarArg e)]
-	| switchIsSet env SimplDoInlineFoldrBuild =
-	let
-		tyL     = mkListTy ty
-		ourCons = CoTyApp (Var consDataCon) ty
-		ourNil  = CoTyApp (Var nilDataCon) ty
-	in
-	newIds  [ mkFunTys [ty, tyL] tyL, tyL ]	`thenSmpl` \ [c,n] ->
-	returnSmpl(Just (Let (NonRec c ourCons)
-			(Let (NonRec n ourNil)
-			 (App (App (CoTyApp (Var e) tyL) (VarArg c)) (VarArg n)))))
+  | switchIsSet env SimplDoInlineFoldrBuild
+  = Just result
+  where
+    tyL     = mkListTy ty
+    ourCons = CoTyApp (Var consDataCon) ty
+    ourNil  = CoTyApp (Var nilDataCon) ty
+
+    result = newIds  [ mkFunTys [ty, tyL] tyL, tyL ]	`thenSmpl` \ [c,n] ->
+	     returnSmpl(Let (NonRec c ourCons)
+		       (Let (NonRec n ourNil)
+		       (App (App (CoTyApp (Var e) tyL) (VarArg c)) (VarArg n)))
+
 -- ToDo: add `build' without an argument instance.
 -- This is strange, because of g's type.
-build_fun env _ =
-	ASSERT (not (switchIsSet env SimplDoInlineFoldrBuild))
-	returnSmpl Nothing
+build_fun env _ = ASSERT (not (switchIsSet env SimplDoInlineFoldrBuild))
+	  	  Nothing
 \end{code}
 
 \begin{code}
 augment_fun :: SimplEnv
 	  -> [CoreArg]
-	  -> SmplM (Maybe CoreExpr)
+	  -> Maybe (SmplM CoreExpr)
 
 augment_fun env [TypeArg ty,ValArg (VarArg e),ValArg nil]
-	| switchIsSet env SimplDoInlineFoldrBuild =
-	let
-		tyL     = mkListTy ty
-		ourCons = CoTyApp (Var consDataCon) ty
-	in
-	newId  (mkFunTys [ty, tyL] tyL)    `thenSmpl` \ c ->
-	returnSmpl (Just (Let (NonRec c ourCons)
-			 (App (App (CoTyApp (Var e) tyL) (VarArg c)) nil)))
+ | switchIsSet env SimplDoInlineFoldrBuild
+ = Just result
+ where
+   tyL     = mkListTy ty
+   ourCons = CoTyApp (Var consDataCon) ty
+   result = newId  (mkFunTys [ty, tyL] tyL)    `thenSmpl` \ c ->
+	    returnSmpl (Let (NonRec c ourCons)
+		       (App (App (CoTyApp (Var e) tyL) (VarArg c)) nil))
 -- ToDo: add `build' without an argument instance.
 -- This is strange, because of g's type.
-augment_fun env _ =
-	ASSERT (not (switchIsSet env SimplDoInlineFoldrBuild))
-	returnSmpl Nothing
+
+augment_fun env _ = ASSERT (not (switchIsSet env SimplDoInlineFoldrBuild))
+		    Nothing
 \end{code}
 
 Now foldr, the way we consume lists.
@@ -139,49 +140,53 @@ Now foldr, the way we consume lists.
 \begin{code}
 foldr_fun :: SimplEnv
 	  -> [CoreArg]
-	  -> SmplM (Maybe CoreExpr)
+	  -> Maybe (SmplM CoreExpr)
 
 foldr_fun env (TypeArg ty1:TypeArg ty2:ValArg arg_k:ValArg arg_z:rest_args)
   | do_fb_red && isConsFun env arg_k && isNilForm env arg_z
-  =     -- foldr (:) [] ==> id
+        -- foldr (:) [] ==> id
 	-- this transformation is *always* benificial
 	-- cf.  foldr (:) [] (build g) == g (:) []
 	-- with foldr (:) [] (build g) == build g
 	-- after unfolding build, they are the same thing.
-     tick Foldr_Cons_Nil		`thenSmpl_`
-     newId (mkListTy ty1) 		`thenSmpl` \ x ->
-     returnSmpl({-trace "foldr (:) []"-} (Just (mkGenApp (Lam x (Var x)) rest_args)))
+  = Just (tick Foldr_Cons_Nil		`thenSmpl_`
+	  newId (mkListTy ty1) 		`thenSmpl` \ x ->
+          returnSmpl({-trace "foldr (:) []"-} (mkGenApp (Lam x (Var x)) rest_args))
+    )
  where
    do_fb_red		= switchIsSet env SimplDoFoldrBuild
 
 foldr_fun env (TypeArg ty1:TypeArg ty2:ValArg arg_k:ValArg arg_z:ValArg arg_list:rest_args)
  | do_fb_red && isNilForm env arg_list
-  =     -- foldr f z [] = z
+        -- foldr f z [] = z
 	-- again another short cut, helps with unroling of constant lists
-    tick Foldr_Nil	`thenSmpl_`
-    returnSmpl (Just (argToExpr arg_z))
+ = Just (tick Foldr_Nil	`thenSmpl_`
+	 returnSmpl (argToExpr arg_z)
+   )
 
   | do_fb_red && arg_list_isBuildForm
-  =     -- foldr k z (build g) ==> g k z
+        -- foldr k z (build g) ==> g k z
 	-- this next line *is* the foldr/build rule proper.
-    tick FoldrBuild	`thenSmpl_`
-    returnSmpl (Just (mkGenApp (Var g) (TypeArg ty2:ValArg arg_k:ValArg arg_z:rest_args)))
+  = Just (tick FoldrBuild	`thenSmpl_`
+	  returnSmpl (mkGenApp (Var g) (TypeArg ty2:ValArg arg_k:ValArg arg_z:rest_args))
+    )
 
   | do_fb_red && arg_list_isAugmentForm
-  =     -- foldr k z (augment g h) ==> let v = foldr k z h in g k v
+        -- foldr k z (augment g h) ==> let v = foldr k z h in g k v
 	-- this next line *is* the foldr/augment rule proper.
-    tick FoldrAugment	`thenSmpl_`
-    newId ty2				`thenSmpl` \ v ->
-    returnSmpl (Just
-		(Let (NonRec v (mkGenApp (Var foldrId)
+  = Just (tick FoldrAugment	`thenSmpl_`
+	  newId ty2				`thenSmpl` \ v ->
+	  returnSmpl (
+		Let (NonRec v (mkGenApp (Var foldrId)
 					[TypeArg ty1,TypeArg ty2,
 					 ValArg arg_k,
 					 ValArg arg_z,
 					 ValArg h]))
-		(mkGenApp (Var g') (TypeArg ty2:ValArg arg_k:ValArg (VarArg v):rest_args))))
+		(mkGenApp (Var g') (TypeArg ty2:ValArg arg_k:ValArg (VarArg v):rest_args)))
+    )
 
  | do_fb_red && arg_list_isListForm
- =      -- foldr k z (a:b:c:rest) =
+        -- foldr k z (a:b:c:rest) =
 	--	(\ f -> f a (f b (f c (foldr f z rest)))) k rest_args
 	-- NB: 'k' is used just one by foldr, but 'f' is used many
 	-- times inside the list structure. This means that
@@ -196,45 +201,46 @@ foldr_fun env (TypeArg ty1:TypeArg ty2:ValArg arg_k:ValArg arg_z:ValArg arg_list
 	--	    ele_3 = f b ele_2
 	--	in f a ele_3
 	--
-  tick Foldr_List	`thenSmpl_`
-  newIds (
+  = Just (tick Foldr_List	`thenSmpl_`
+	  newIds (
 		mkFunTys [ty1, ty2] ty2 :
 		nOfThem (length the_list) ty2
-	)			`thenSmpl` \ (f_id:ele_id1:ele_ids) ->
-  let
-	fst_bind = NonRec
+	  )			`thenSmpl` \ (f_id:ele_id1:ele_ids) ->
+	  let
+	    fst_bind = NonRec
 			ele_id1
 			(mkGenApp (Var foldrId)
 				[TypeArg ty1,TypeArg ty2,
 				 ValArg (VarArg f_id),
 				 ValArg arg_z,
 				 ValArg the_tl])
-	rest_binds = zipWith3Equal "Foldr:rest_binds"
+	    rest_binds = zipWith3Equal "Foldr:rest_binds"
 			 (\ e v e' -> NonRec e (mkRhs v e'))
 			 ele_ids
 			 (reverse (tail the_list))
 			 (init (ele_id1:ele_ids))
-	mkRhs v e = App (App (Var f_id) v) (VarArg e)
-	core_list = foldr
+	    mkRhs v e = App (App (Var f_id) v) (VarArg e)
+	    core_list = foldr
 			Let
 			(mkRhs (head the_list) (last (ele_id1:ele_ids)))
 			(fst_bind:rest_binds)
-  in
- 	returnSmpl (Just (mkGenApp (Lam f_id core_list)
-				      (ValArg arg_k:rest_args)))
+          in
+ 	  returnSmpl (mkGenApp (Lam f_id core_list) (ValArg arg_k:rest_args))
+    )
 
 
 	--
 
  | do_fb_red && arg_list_isStringForm	-- ok, its a string!
 	-- foldr f z "foo" => unpackFoldrPS__ f z "foo"#
-   = tick Str_FoldrStr				`thenSmpl_`
-     returnSmpl (Just (mkGenApp (Var unpackCStringFoldrId)
+ = Just (tick Str_FoldrStr				`thenSmpl_`
+	 returnSmpl (mkGenApp (Var unpackCStringFoldrId)
 				(TypeArg ty2:
 				 ValArg (LitArg (MachStr str_val)):
 				 ValArg arg_k:
 				 ValArg arg_z:
-				 rest_args)))
+				 rest_args))
+   )
  where
    do_fb_red		= switchIsSet env SimplDoFoldrBuild
 
@@ -261,19 +267,21 @@ foldr_fun env (TypeArg ty1:TypeArg ty2:ValArg arg_k:ValArg arg_z:ValArg arg_list
 
 foldr_fun env (TypeArg ty1:TypeArg ty2:ValArg arg_k:rest_args)
   | doing_inlining && isConsFun env arg_k && not dont_fold_back_append
-  =    -- foldr (:) z xs = xs ++ z
-     tick Foldr_Cons	`thenSmpl_`
-     newIds [ty2,mkListTy ty1] `thenSmpl` \ [z,x] ->
-     returnSmpl (Just (mkGenApp
+       -- foldr (:) z xs = xs ++ z
+  = Just (tick Foldr_Cons	`thenSmpl_`
+	   newIds [ty2,mkListTy ty1] `thenSmpl` \ [z,x] ->
+	   returnSmpl (mkGenApp
 			(Lam z (Lam x (mkGenApp
 					(Var appendId) [
 						TypeArg ty1,
 						ValArg (VarArg x),
-						ValArg (VarArg z)])))
+						ValArg (VarArg z)]))
 			rest_args))
+    )
+
   | doing_inlining && (isInterestingArg env arg_k
 		       || isConsFun env arg_k)
-  =   -- foldr k args =
+      -- foldr k args =
       --        (\ f z xs ->
       --          letrec
       --             h x = case x of
@@ -283,7 +291,7 @@ foldr_fun env (TypeArg ty1:TypeArg ty2:ValArg arg_k:rest_args)
       --             h xs) k args
       --
 --     tick FoldrInline		`thenSmpl_`
-     newIds [
+  = Just (newIds [
 		ty1,                    -- a :: t1
 		mkListTy ty1,           -- b :: [t1]
 		ty2,                    -- v :: t2
@@ -306,21 +314,23 @@ foldr_fun env (TypeArg ty1:TypeArg ty2:ValArg arg_k:rest_args)
 						  (VarArg a))
 						    (VarArg v))
 	   in
-	     returnSmpl (Just
-		     (mkGenApp
+	     returnSmpl (
+		     mkGenApp
 			 (Lam f (Lam z (Lam xs
 			  (Let (Rec [(h,h_rhs)])
 				 (App (Var h) (VarArg xs))))))
-		     (ValArg arg_k:rest_args)))
+		     (ValArg arg_k:rest_args))
+    )
    where
-	doing_inlining = switchIsSet env SimplDoInlineFoldrBuild
-	dont_fold_back_append = switchIsSet env SimplDontFoldBackAppend
-foldr_fun _ _ = returnSmpl Nothing
+     doing_inlining = switchIsSet env SimplDoInlineFoldrBuild
+     dont_fold_back_append = switchIsSet env SimplDontFoldBackAppend
+
+foldr_fun _ _ = Nothing
 
 isConsFun :: SimplEnv -> CoreArg -> Bool
 isConsFun env (VarArg v)
   = case lookupUnfolding env v of
-	GenForm _ (Lam (x,_) (Lam (y,_) (Con con tys [VarArg x',VarArg y']))) _
+	SimpleUnfolding _ (Lam (x,_) (Lam (y,_) (Con con tys [VarArg x',VarArg y']))) _
 	  | con == consDataCon && x==x' && y==y'
 	  -> ASSERT ( length tys == 1 ) True
 	_ -> False
@@ -329,19 +339,19 @@ isConsFun env _ = False
 isNilForm :: SimplEnv -> CoreArg -> Bool
 isNilForm env (VarArg v)
   = case lookupUnfolding env v of
-	GenForm _ (CoTyApp (Var id) _) _ | id == nilDataCon -> True
-	GenForm _ (Lit (NoRepStr s))   _ | _NULL_ s	      -> True
+	SimpleUnfolding _ (CoTyApp (Var id) _) _ | id == nilDataCon -> True
+	SimpleUnfolding _ (Lit (NoRepStr s))   _ | _NULL_ s	      -> True
 	_ 						      -> False
 isNilForm env _ = False
 
 getBuildForm :: SimplEnv -> CoreArg -> Maybe Id
 getBuildForm env (VarArg v)
   = case lookupUnfolding env v of
-	GenForm False _ _ _ -> Nothing
+	SimpleUnfolding False _ _ _ -> Nothing
 					-- not allowed to inline :-(
-	GenForm _ (App (CoTyApp (Var bld) _) (VarArg g)) _
+	SimpleUnfolding _ (App (CoTyApp (Var bld) _) (VarArg g)) _
 	  | bld == buildId -> Just g
-	GenForm _ (App (App (CoTyApp (Var bld) _)
+	SimpleUnfolding _ (App (App (CoTyApp (Var bld) _)
 					(VarArg g)) h) _
 	  | bld == augmentId && isNilForm env h  -> Just g
 	_ -> Nothing
@@ -352,9 +362,9 @@ getBuildForm env _ = Nothing
 getAugmentForm :: SimplEnv -> CoreArg -> Maybe (Id,CoreArg)
 getAugmentForm env (VarArg v)
   = case lookupUnfolding env v of
-	GenForm False _ _ _ -> Nothing
+	SimpleUnfolding False _ _ _ -> Nothing
 				-- not allowed to inline :-(
-	GenForm _ (App (App (CoTyApp (Var bld) _)
+	SimpleUnfolding _ (App (App (CoTyApp (Var bld) _)
 						(VarArg g)) h) _
 	  | bld == augmentId -> Just (g,h)
 	_ -> Nothing
@@ -368,8 +378,8 @@ getStringForm env _ = Nothing
 getAppendForm :: SimplEnv -> CoreArg -> Maybe (GenCoreAtom Id,GenCoreAtom Id)
 getAppendForm env (VarArg v) =
     case lookupUnfolding env v of
-	GenForm False _ _ _ -> Nothing	-- not allowed to inline :-(
-	GenForm _ (App (App (App (CoTyApp (CoTyApp (Var fld) _) _) con) ys) xs) _
+	SimpleUnfolding False _ _ _ -> Nothing	-- not allowed to inline :-(
+	SimpleUnfolding _ (App (App (App (CoTyApp (CoTyApp (Var fld) _) _) con) ys) xs) _
 	  | fld == foldrId && isConsFun env con -> Just (xs,ys)
 	_ -> Nothing
 getAppendForm env _ = Nothing
@@ -386,7 +396,7 @@ getListForm
 	-> Maybe ([CoreArg],CoreArg)
 getListForm env (VarArg v)
   = case lookupUnfolding env v of
-       GenForm _ (Con id [ty_arg,head,tail]) _
+       SimpleUnfolding _ (Con id [ty_arg,head,tail]) _
 	  | id == consDataCon ->
 		case getListForm env tail of
  		   Nothing -> Just ([head],tail)
@@ -397,36 +407,37 @@ getListForm env _ = Nothing
 isInterestingArg :: SimplEnv -> CoreArg -> Bool
 isInterestingArg env (VarArg v)
   = case lookupUnfolding env v of
-       GenForm False _ _ UnfoldNever -> False
-       GenForm _ exp guide -> True
+       SimpleUnfolding False _ _ UnfoldNever -> False
+       SimpleUnfolding _ exp guide -> True
        _ -> False
 isInterestingArg env _ = False
 
 foldl_fun env (TypeArg ty1:TypeArg ty2:ValArg arg_k:ValArg arg_z:ValArg arg_list:rest_args)
  | do_fb_red && isNilForm env arg_list
-  =     -- foldl f z [] = z
+        -- foldl f z [] = z
 	-- again another short cut, helps with unroling of constant lists
-    tick Foldl_Nil	`thenSmpl_`
-    returnSmpl (Just (argToExpr arg_z))
+ = Just (tick Foldl_Nil	`thenSmpl_`
+	 returnSmpl (argToExpr arg_z)
+   )
 
   | do_fb_red && arg_list_isBuildForm
-  =     -- foldl t1 t2 k z (build t3 g) ==>
+        -- foldl t1 t2 k z (build t3 g) ==>
 	--		   let c {- INLINE -} = \ b g' a -> g' (f a b)
 	--		       n {- INLINE -} = \ a -> a
 	--		   in g t1 c n z
 	-- this next line *is* the foldr/build rule proper.
-    tick FoldlBuild	`thenSmpl_`
+  = Just(tick FoldlBuild	`thenSmpl_`
 	-- c :: t2 -> (t1 -> t1) -> t1 -> t1
 	-- n :: t1 -> t1
-    newIds [
-	{- pre_c -}	mkFunTys [ty2, mkFunTys [ty1] ty1, ty1]  ty1,
-	{- pre_n -}	mkFunTys [ty1] ty1,
-	{- b -}		ty2,
-	{- g' -}	mkFunTys [ty1] ty1,
-	{- a -}		ty1,
-	{- a' -}	ty1,
-	{- t -}		ty1
-	]		`thenSmpl` \ [pre_c,
+         newIds [
+	  {- pre_c -}	mkFunTys [ty2, mkFunTys [ty1] ty1, ty1]  ty1,
+	  {- pre_n -}	mkFunTys [ty1] ty1,
+	  {- b -}	ty2,
+	  {- g' -}	mkFunTys [ty1] ty1,
+	  {- a -}	ty1,
+	  {- a' -}	ty1,
+	  {- t -}	ty1
+	  ]		`thenSmpl` \ [pre_c,
 				      pre_n,
 				      b,
 				      g',
@@ -434,39 +445,41 @@ foldl_fun env (TypeArg ty1:TypeArg ty2:ValArg arg_k:ValArg arg_z:ValArg arg_list
 				      a',
 				      t] ->
 
-    let
-	c     = addIdUnfolding pre_c (iWantToBeINLINEd UnfoldAlways)
-	c_rhs = Lam b (Lam g' (Lam a
-		 (Let (NonRec t (App (App (argToExpr arg_k) (VarArg a)) (VarArg b)))
+        let
+	  c     = addIdUnfolding pre_c (iWantToBeINLINEd UnfoldAlways)
+	  c_rhs = Lam b (Lam g' (Lam a
+		  (Let (NonRec t (App (App (argToExpr arg_k) (VarArg a)) (VarArg b)))
 			 (App (Var g') (VarArg t)))))
-	n     = addIdUnfolding pre_n (iWantToBeINLINEd UnfoldAlways)
-	n_rhs = Lam a' (Var a')
-    in
-    returnSmpl (Just (Let (NonRec c c_rhs) (Let (NonRec n n_rhs)
-		  (mkGenApp (Var g)
-		      (TypeArg (mkFunTys [ty1] ty1):ValArg (VarArg c):ValArg (VarArg n)
-				:ValArg arg_z:rest_args)))))
+	  n     = addIdUnfolding pre_n (iWantToBeINLINEd UnfoldAlways)
+	  n_rhs = Lam a' (Var a')
+        in
+        returnSmpl (Let (NonRec c c_rhs) $
+		    Let (NonRec n n_rhs) $
+		    mkGenApp (Var g) 
+		    (TypeArg (mkFunTys [ty1] ty1):ValArg (VarArg c):ValArg (VarArg n)
+				:ValArg arg_z:rest_args))
+    )
 
   | do_fb_red && arg_list_isAugmentForm
-  =     -- foldl t1 t2 k z (augment t3 g h) ==>
+        -- foldl t1 t2 k z (augment t3 g h) ==>
 	--		   let c {- INLINE -} = \ b g' a -> g' (f a b)
 	--		       n {- INLINE -} = \ a -> a
 	--		       r {- INLINE -} = foldr t2 (t1 -> t1) c n h
 	--		   in g t1 c r z
 	-- this next line *is* the foldr/build rule proper.
-    tick FoldlAugment	`thenSmpl_`
+  = Just (tick FoldlAugment	`thenSmpl_`
 	-- c :: t2 -> (t1 -> t1) -> t1 -> t1
 	-- n :: t1 -> t1
-    newIds [
-	{- pre_c -}	mkFunTys [ty2, mkFunTys [ty1] ty1, ty1] ty1,
-	{- pre_n -}	mkFunTys [ty1] ty1,
-	{- pre_r -}	mkFunTys [ty1] ty1,
-	{- b -}		ty2,
-	{- g_ -}	mkFunTys [ty1] ty1,
-	{- a -}		ty1,
-	{- a' -}	ty1,
-	{- t -}		ty1
-	]		`thenSmpl` \ [pre_c,
+          newIds [
+	   {- pre_c -}	mkFunTys [ty2, mkFunTys [ty1] ty1, ty1] ty1,
+	   {- pre_n -}	mkFunTys [ty1] ty1,
+	   {- pre_r -}	mkFunTys [ty1] ty1,
+	   {- b -}	ty2,
+	   {- g_ -}	mkFunTys [ty1] ty1,
+	   {- a -}	ty1,
+	   {- a' -}	ty1,
+	   {- t -}	ty1
+	   ]		`thenSmpl` \ [pre_c,
 				      pre_n,
 				      pre_r,
 				      b,
@@ -475,29 +488,30 @@ foldl_fun env (TypeArg ty1:TypeArg ty2:ValArg arg_k:ValArg arg_z:ValArg arg_list
 				      a',
 				      t] ->
 
-    let
-	c     = addIdUnfolding pre_c (iWantToBeINLINEd UnfoldAlways)
-	c_rhs = Lam b (Lam g_ (Lam a
-		 (Let (NonRec t (App (App (argToExpr arg_k) (VarArg a)) (VarArg b)))
+        let
+	  c     = addIdUnfolding pre_c (iWantToBeINLINEd UnfoldAlways)
+	  c_rhs = Lam b (Lam g_ (Lam a
+		  (Let (NonRec t (App (App (argToExpr arg_k) (VarArg a)) (VarArg b)))
 			 (App (Var g_) (VarArg t)))))
-	n     = addIdUnfolding pre_n (iWantToBeINLINEd UnfoldAlways)
-	n_rhs = Lam a' (Var a')
-	r     = addIdUnfolding pre_r (iWantToBeINLINEd UnfoldAlways)
-	r_rhs = mkGenApp (Var foldrId)
+	  n     = addIdUnfolding pre_n (iWantToBeINLINEd UnfoldAlways)
+	  n_rhs = Lam a' (Var a')
+	  r     = addIdUnfolding pre_r (iWantToBeINLINEd UnfoldAlways)
+	  r_rhs = mkGenApp (Var foldrId)
 					[TypeArg ty2,TypeArg (mkFunTys [ty1] ty1),
 					 ValArg (VarArg c),
 					 ValArg (VarArg n),
 					 ValArg h]
-    in
-    returnSmpl (Just (Let (NonRec c c_rhs)
-		     (Let (NonRec n n_rhs)
-		     (Let (NonRec r r_rhs)
-		  (mkGenApp (Var g')
+       in
+       returnSmpl (Let (NonRec c c_rhs) $
+		   Let (NonRec n n_rhs) $
+		   Let (NonRec r r_rhs) $
+		   mkGenApp (Var g')
 		      (TypeArg (mkFunTys [ty1] ty1):ValArg (VarArg c):ValArg (VarArg r)
-				:ValArg arg_z:rest_args))))))
+				:ValArg arg_z:rest_args))
+    )
 
  | do_fb_red && arg_list_isListForm
- =      -- foldl k z (a:b:c:rest) =
+        -- foldl k z (a:b:c:rest) =
 	--	(\ f -> foldl f (f (f (f z a) b) c) rest) k rest_args
 	-- NB: 'k' is used just one by foldr, but 'f' is used many
 	-- times inside the list structure. This means that
@@ -513,31 +527,32 @@ foldl_fun env (TypeArg ty1:TypeArg ty2:ValArg arg_k:ValArg arg_z:ValArg arg_list
 	--	    ele_3 = f ele_2 c
 	--	in foldl f ele_3 rest
 	--
-  tick Foldl_List	`thenSmpl_`
-  newIds (
+  = Just (tick Foldl_List	`thenSmpl_`
+          newIds (
 		mkFunTys [ty1, ty2] ty1 :
 		nOfThem (length the_list) ty1
-	)			`thenSmpl` \ (f_id:ele_ids) ->
-  let
-	rest_binds = zipWith3Equal "foldl:rest_binds"
+	  )			`thenSmpl` \ (f_id:ele_ids) ->
+          let
+	    rest_binds = zipWith3Equal "foldl:rest_binds"
 			 (\ e v e' -> NonRec e (mkRhs v e'))
 			 ele_ids				-- :: [Id]
 			 the_list				-- :: [CoreArg]
 			 (init (arg_z:map VarArg ele_ids))	-- :: [CoreArg]
-	mkRhs v e = App (App (Var f_id) e) v
+	    mkRhs v e = App (App (Var f_id) e) v
 
-	last_bind = mkGenApp (Var foldlId)
+	    last_bind = mkGenApp (Var foldlId)
 				[TypeArg ty1,TypeArg ty2,
 				 ValArg (VarArg f_id),
 				 ValArg (VarArg (last ele_ids)),
 				 ValArg the_tl]
-	core_list = foldr
+	    core_list = foldr
 			Let
 			last_bind
 			rest_binds
-  in
- 	returnSmpl (Just (mkGenApp (Lam f_id core_list)
-				      (ValArg arg_k:rest_args)))
+	  in
+ 	  returnSmpl (mkGenApp (Lam f_id core_list)
+				      (ValArg arg_k:rest_args))
+    )
 
  where
    do_fb_red		= switchIsSet env SimplDoFoldrBuild
@@ -563,7 +578,7 @@ foldl_fun env (TypeArg ty1:TypeArg ty2:ValArg arg_k:ValArg arg_z:ValArg arg_list
 foldl_fun env (TypeArg ty1:TypeArg ty2:ValArg arg_k:rest_args)
   | doing_inlining && (isInterestingArg env arg_k
 		       || isConsFun env arg_k)
-  =   -- foldl k args =
+      -- foldl k args =
       --        (\ f z xs ->
       --          letrec
       --             h x r = case x of
@@ -572,6 +587,7 @@ foldl_fun env (TypeArg ty1:TypeArg ty2:ValArg arg_k:rest_args)
       --          in
       --             h xs z) k args
       --
+  = Just (
 --     tick FoldrInline				`thenSmpl_`
      newIds [
 		ty2,                    -- a :: t1
@@ -598,17 +614,18 @@ foldl_fun env (TypeArg ty1:TypeArg ty2:ValArg arg_k:rest_args)
 						  (VarArg b))
 						    (VarArg v))
 	   in
-	     returnSmpl (Just
+	     returnSmpl (
 		     (mkGenApp
 			 (Lam f (Lam z (Lam xs
 			  (Let (Rec [(h,h_rhs)])
 				 (App (App (Var h) (VarArg xs))
 							 (VarArg z))))))
-		     (ValArg arg_k:rest_args)))
+		     (ValArg arg_k:rest_args))
+   )
    where
 	doing_inlining = switchIsSet env SimplDoInlineFoldrBuild
 
-foldl_fun env _ = returnSmpl Nothing
+foldl_fun env _ =  Nothing
 \end{code}
 
 
@@ -618,17 +635,19 @@ foldl_fun env _ = returnSmpl Nothing
 --
 unpack_foldr_fun env [TypeArg ty,ValArg str,ValArg arg_k,ValArg arg_z]
    | switchIsSet env SimplDoFoldrBuild && isConsFun env arg_k
-   = tick Str_UnpackCons		`thenSmpl_`
-     returnSmpl (Just (mkGenApp (Var unpackCStringAppendId)
+   = Just (tick Str_UnpackCons		`thenSmpl_`
+           returnSmpl (mkGenApp (Var unpackCStringAppendId)
 				[ValArg str,
-				 ValArg arg_z]))
-unpack_foldr_fun env _ = returnSmpl Nothing
+				 ValArg arg_z])
+     )
+unpack_foldr_fun env _ =  Nothing
 
 unpack_append_fun env
 	[ValArg (LitArg (MachStr str_val)),ValArg arg_z]
    | switchIsSet env SimplDoFoldrBuild && isNilForm env arg_z
-   = tick Str_UnpackNil		`thenSmpl_`
-     returnSmpl (Just (Lit (NoRepStr str_val)))
-unpack_append_fun env _ = returnSmpl Nothing
+   = Just (tick Str_UnpackNil		`thenSmpl_`
+	   returnSmpl (Lit (NoRepStr str_val))
+     )
+unpack_append_fun env _ =  Nothing
 -}
 \end{code}

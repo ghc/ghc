@@ -6,7 +6,7 @@ interface PrelLoop where
 import PreludePS	( _PackedString )
 
 import Class		( GenClass )
-import CoreUnfold	( mkMagicUnfolding, UnfoldingDetails )
+import CoreUnfold	( mkMagicUnfolding, Unfolding )
 import IdUtils		( primOpNameInfo )
 import Name		( Name, OrigName, mkPrimitiveName, mkWiredInName, ExportFlag )
 import PrimOp		( PrimOp )
@@ -16,7 +16,7 @@ import TyVar		( GenTyVar )
 import Unique		( Unique )
 import Usage		( GenUsage )
 
-mkMagicUnfolding :: Unique -> UnfoldingDetails
+mkMagicUnfolding :: Unique -> Unfolding
 mkPrimitiveName :: Unique -> OrigName -> Name
 mkWiredInName :: Unique -> OrigName -> ExportFlag -> Name
 mkSigmaTy :: [a] -> [(GenClass (GenTyVar (GenUsage Unique)) Unique, GenType a b)] -> GenType a b -> GenType a b

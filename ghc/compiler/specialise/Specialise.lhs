@@ -77,7 +77,7 @@ infixr 9 `thenSM`
 
 --ToDo:kill
 data SpecInfo = SpecInfo [Maybe Type] Int Id
-
+lookupSpecEnv = panic "Specialise.lookupSpecEnv (ToDo)"
 addIdSpecialisation = panic "Specialise.addIdSpecialisation (ToDo)"
 cmpUniTypeMaybeList = panic "Specialise.cmpUniTypeMaybeList (ToDo)"
 getIdSpecialisation = panic "Specialise.getIdSpecialisation (ToDo)"
@@ -88,7 +88,6 @@ isLocalSpecTyCon = panic "Specialise.isLocalSpecTyCon (ToDo)"
 isSpecId_maybe = panic "Specialise.isSpecId_maybe (ToDo)"
 isSpecPragmaId_maybe = panic "Specialise.isSpecPragmaId_maybe (ToDo)"
 lookupClassInstAtSimpleType = panic "Specialise.lookupClassInstAtSimpleType (ToDo)"
-lookupSpecEnv = panic "Specialise.lookupSpecEnv (ToDo)"
 mkSpecEnv = panic "Specialise.mkSpecEnv (ToDo)"
 mkSpecId = panic "Specialise.mkSpecId (ToDo)"
 selectIdInfoForSpecId = panic "Specialise.selectIdInfoForSpecId (ToDo)"
@@ -930,11 +929,11 @@ emptyUDs    :: UsageDetails
 unionUDs    :: UsageDetails -> UsageDetails -> UsageDetails
 unionUDList :: [UsageDetails] -> UsageDetails
 
-tickSpecCall :: Bool -> UsageDetails -> UsageDetails
+-- tickSpecCall :: Bool -> UsageDetails -> UsageDetails
 tickSpecInsts :: UsageDetails -> UsageDetails
 
-tickSpecCall found (UsageDetails cis ty_cis dbs fvs c i)
- = UsageDetails cis ty_cis dbs fvs (c + (if found then 1 else 0)) i
+-- tickSpecCall found (UsageDetails cis ty_cis dbs fvs c i)
+-- = UsageDetails cis ty_cis dbs fvs (c + (if found then 1 else 0)) i
 
 tickSpecInsts (UsageDetails cis ty_cis dbs fvs c i)
  = UsageDetails cis ty_cis dbs fvs c (i+1)
@@ -1298,14 +1297,14 @@ specExpr (Var v) args
        NoLift vatom@(VarArg new_v)
 	     -> mapSM specOutArg args			`thenSM` \ arg_info ->
 		mkCallInstance v new_v arg_info		`thenSM` \ call_uds ->
-    		mkCall new_v arg_info			`thenSM` \ ~(speced, call) ->
+    		mkCall new_v arg_info			`thenSM` \ call ->
 		let
 		    uds = unionUDList [call_uds,
 				       singleFvUDs vatom,
 				       unionUDList [uds | (_,uds,_) <- arg_info]
 				      ]
 		in
-    		returnSM (call, tickSpecCall speced uds)
+    		returnSM (call, {- tickSpecCall speced -} uds)
 
 specExpr expr@(Lit _) null_args
   = ASSERT (null null_args)
@@ -1975,7 +1974,7 @@ mkOneInst do_cis@(CallInstance _ spec_tys dict_args _ _) explicit_cis
 		-- "required" by one of the other Ids in the Rec
 	  | top_lev && maybeToBool lookup_orig_spec
 	  = (if opt_SpecialiseTrace
-	     then trace_nospec "  Exists: " exists_id
+	     then trace_nospec "  Exists: " orig_id
 	     else id) (
 
 	    returnSM (Nothing, emptyUDs, Nothing)
@@ -2023,7 +2022,6 @@ mkOneInst do_cis@(CallInstance _ spec_tys dict_args _ _) explicit_cis
 			  tickSpecInsts final_uds, spec_info)
 	  where
 	    lookup_orig_spec = lookupSpecEnv (getIdSpecialisation orig_id) arg_tys
-	    Just (exists_id, _, _) = lookup_orig_spec
 
 	    explicit_cis_for_this_id = filter (isCIofTheseIds [new_id]) explicit_cis
 	    [CallInstance _ _ _ _ (Just explicit_spec_info)] = explicit_cis_for_this_id
@@ -2199,9 +2197,11 @@ take_dict_args [] args = Just ([], args)
 \begin{code}
 mkCall :: Id
        -> [(CoreArg, UsageDetails, CoreExpr -> CoreExpr)]
-       -> SpecM (Bool, CoreExpr)
+       -> SpecM CoreExpr
 
-mkCall new_id args
+mkCall new_id arg_infos = returnSM (mkGenApp (Var new_id) [arg | (arg, _, _) <- arg_infos])
+
+{- 
   | maybeToBool (isSuperDictSelId_maybe new_id)
     && any isUnboxedType ty_args
 	-- No specialisations for super-dict selectors
@@ -2308,6 +2308,7 @@ checkSpecOK check_id tys spec_id tys_left
 			     ppCat [ppr PprDebug spec_id,
 				    ppInterleave ppNil (map (pprParendGenType PprDebug) tys_left)]])
     else id
+-}
 \end{code}
 
 \begin{code}

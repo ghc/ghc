@@ -27,7 +27,7 @@ IMPORT_DELOOPER(SmplLoop)		-- paranoia checking
 import BinderInfo
 import CmdLineOpts	( SimplifierSwitch(..) )
 import CoreSyn
-import CoreUtils	( manifestlyWHNF )
+import CoreUnfold	( SimpleUnfolding, mkFormSummary, FormSummary(..) )
 import Id		( idType, isBottomingId, idWantsToBeINLINEd, dataConArgTys,
 			  getIdArity, GenId{-instance Eq-}
 			)
@@ -76,8 +76,11 @@ floatExposesHNF float_lets float_primops ok_to_dup rhs
     try (App (App (Var bld) _) _)	  | bld == buildId   = True
     try (App (App (App (Var aug) _) _) _) | aug == augmentId = True
 
-    try other = manifestlyWHNF other
-	{- but *not* necessarily "manifestlyBottom other"...
+    try other = case mkFormSummary other of
+			VarForm   -> True
+			ValueForm -> True
+			other	  -> False
+	{- but *not* necessarily "BottomForm"...
 
 	   We may want to float a let out of a let to expose WHNFs,
 	    but to do that to expose a "bottom" is a Bad Idea:

@@ -90,6 +90,10 @@ module Id (
 	pprId,
 	showId,
 
+	-- Specialialisation
+	getIdSpecialisation,
+	addIdSpecialisation,
+
 	-- UNFOLDING, ARITY, UPDATE, AND STRICTNESS STUFF (etc)
 	addIdArity,
 	addIdDemandInfo,
@@ -126,6 +130,7 @@ module Id (
 	mkIdEnv,
 	mkIdSet,
 	modifyIdEnv,
+	modifyIdEnv_Directly,
 	nullIdEnv,
 	rngIdEnv,
 	unionIdSets,
@@ -160,6 +165,8 @@ import PprType		( getTypeString, typeMaybeString, specMaybeTysSuffix,
 			)
 import PprStyle
 import Pretty
+import SpecEnv		( SpecEnv(..) )
+import MatchEnv		( MatchEnv )
 import SrcLoc		( mkBuiltinSrcLoc )
 import TyCon		( TyCon, mkTupleTyCon, tyConDataCons )
 import Type		( mkSigmaTy, mkTyVarTys, mkFunTys, mkDictTy,
@@ -778,46 +785,7 @@ unfoldingUnfriendlyId	-- return True iff it is definitely a bad
 	-> Bool		-- mentions this Id.  Reason: it cannot
 			-- possibly be seen in another module.
 
-unfoldingUnfriendlyId id = True -- ToDo:panic "Id.unfoldingUnfriendlyId"
-{-LATER:
-
-unfoldingUnfriendlyId id
-  | not (externallyVisibleId id) -- that settles that...
-  = True
-
-unfoldingUnfriendlyId (Id _ _ _ (WorkerId wrapper) _ _)
-  = class_thing wrapper
-  where
-    -- "class thing": If we're going to use this worker Id in
-    -- an interface, we *have* to be able to untangle the wrapper's
-    -- strictness when reading it back in.  At the moment, this
-    -- is not always possible: in precisely those cases where
-    -- we pass tcGenPragmas a "Nothing" for its "ty_maybe".
-
-    class_thing (Id _ _ _ (SuperDictSelId _ _) _ _)    = True
-    class_thing (Id _ _ _ (MethodSelId _ _) _ _)  	   = True
-    class_thing (Id _ _ _ (DefaultMethodId _ _ _) _ _) = True
-    class_thing other				   = False
-
-unfoldingUnfriendlyId (Id _ _ _ (SpecId d@(Id _ _ _ dfun@(DictFunId _ t _)) _ _) _ _)
-    -- a SPEC of a DictFunId can end up w/ gratuitous
-    -- TyVar(Templates) in the i/face; only a problem
-    -- if -fshow-pragma-name-errs; but we can do without the pain.
-    -- A HACK in any case (WDP 94/05/02)
-  = naughty_DictFunId dfun
-
-unfoldingUnfriendlyId d@(Id _ _ _ dfun@(DictFunId _ t _) _ _)
-  = naughty_DictFunId dfun -- similar deal...
-
-unfoldingUnfriendlyId other_id   = False -- is friendly in all other cases
-
-naughty_DictFunId :: IdDetails -> Bool
-    -- True <=> has a TyVar(Template) in the "type" part of its "name"
-
-naughty_DictFunId (DictFunId _ _ _) = panic "False" -- came from outside; must be OK
-naughty_DictFunId (DictFunId _ ty _)
-  = not (isGroundTy ty)
--}
+unfoldingUnfriendlyId id = not (externallyVisibleId id)
 \end{code}
 
 @externallyVisibleId@: is it true that another module might be
@@ -1482,9 +1450,8 @@ Notice the ``big lambdas'' and type arguments to @Con@---we are producing
 %************************************************************************
 
 @getIdUnfolding@ takes a @Id@ (we are discussing the @DataCon@ case)
-and generates an @UnfoldingDetails@ for its unfolding.  The @Ids@ and
-@TyVars@ don't really have to be new, because we are only producing a
-template.
+and generates an @Unfolding@.  The @Ids@ and @TyVars@ don't really
+have to be new, because we are only producing a template.
 
 ToDo: what if @DataConId@'s type has a context (haven't thought about it
 --WDP)?
@@ -1497,16 +1464,16 @@ dictionaries, in the even of an overloaded data-constructor---none at
 present.)
 
 \begin{code}
-getIdUnfolding :: Id -> UnfoldingDetails
+getIdUnfolding :: Id -> Unfolding
 
 getIdUnfolding (Id _ _ _ _ _ info) = getInfo_UF info
 
 {-LATER:
-addIdUnfolding :: Id -> UnfoldingDetails -> Id
+addIdUnfolding :: Id -> Unfolding -> Id
 addIdUnfolding id@(Id u n ty info details) unfold_details
   = ASSERT(
     	case (isLocallyDefined id, unfold_details) of
-	(_,     NoUnfoldingDetails) -> True
+	(_,     NoUnfolding) -> True
 	(True,  IWantToBeINLINEd _) -> True
 	(False, IWantToBeINLINEd _) -> False -- v bad
 	(False, _)  	    	    -> True
@@ -1574,14 +1541,12 @@ addIdFBTypeInfo (Id u n ty info details) upd_info
 \end{code}
 
 \begin{code}
-{- LATER:
 getIdSpecialisation :: Id -> SpecEnv
 getIdSpecialisation (Id _ _ _ _ _ info) = getInfo info
 
 addIdSpecialisation :: Id -> SpecEnv -> Id
 addIdSpecialisation (Id u n ty details prags info) spec_info
   = Id u n ty details prags (info `addInfo` spec_info)
--}
 \end{code}
 
 Strictness: we snaffle the info out of the IdInfo.
@@ -1712,7 +1677,7 @@ delManyFromIdEnv  :: IdEnv a -> [GenId ty] -> IdEnv a
 delOneFromIdEnv	  :: IdEnv a -> GenId ty -> IdEnv a
 combineIdEnvs	  :: (a -> a -> a) -> IdEnv a -> IdEnv a -> IdEnv a
 mapIdEnv	  :: (a -> b) -> IdEnv a -> IdEnv b
-modifyIdEnv	  :: IdEnv a -> (a -> a) -> GenId ty -> IdEnv a
+modifyIdEnv	  :: (a -> a) -> IdEnv a -> GenId ty -> IdEnv a
 rngIdEnv	  :: IdEnv a -> [a]
 		  
 isNullIdEnv	  :: IdEnv a -> Bool
@@ -1740,10 +1705,15 @@ lookupNoFailIdEnv env id    = case (lookupIdEnv env id) of { Just xx -> xx }
 -- modifyIdEnv: Look up a thing in the IdEnv, then mash it with the
 -- modify function, and put it back.
 
-modifyIdEnv env mangle_fn key
+modifyIdEnv mangle_fn env key
   = case (lookupIdEnv env key) of
       Nothing -> env
       Just xx -> addOneToIdEnv env key (mangle_fn xx)
+
+modifyIdEnv_Directly mangle_fn env key
+  = case (lookupUFM_Directly env key) of
+      Nothing -> env
+      Just xx -> addToUFM_Directly env key (mangle_fn xx)
 \end{code}
 
 \begin{code}

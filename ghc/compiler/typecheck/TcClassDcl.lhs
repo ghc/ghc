@@ -25,6 +25,7 @@ import TcHsSyn		( TcIdOcc(..), SYN_IE(TcHsBinds), SYN_IE(TcMonoBinds), SYN_IE(Tc
 
 import Inst		( Inst, InstOrigin(..), SYN_IE(LIE), emptyLIE, plusLIE, newDicts, newMethod )
 import TcEnv		( tcLookupClass, tcLookupTyVar, tcLookupTyCon, newLocalIds, tcExtendGlobalTyVars )
+import SpecEnv		( SpecEnv )
 import TcInstDcls	( processInstBinds )
 import TcKind		( unifyKind, TcKind )
 import TcMonad		hiding ( rnMtoTcM )
@@ -39,7 +40,7 @@ import Class		( GenClass, mkClass, mkClassOp, classBigSig,
 			)
 import Id		( mkSuperDictSelId, mkMethodSelId, mkDefaultMethodId,
 			  idType )
-import IdInfo		( noIdInfo )
+import IdInfo
 import Name		( isLocallyDefined, origName, getLocalName )
 import PrelVals		( nO_DEFAULT_METHOD_ERROR_ID )
 import PprStyle
@@ -57,7 +58,8 @@ import Util
 
 -- import TcPragmas	( tcGenPragmas, tcClassOpPragmas )
 tcGenPragmas ty id ps = returnNF_Tc noIdInfo
-tcClassOpPragmas ty sel def spec ps = returnNF_Tc (noIdInfo, noIdInfo)
+tcClassOpPragmas ty sel def spec ps = returnNF_Tc (noIdInfo `addInfo` spec, 
+						   noIdInfo)
 \end{code}
 
 

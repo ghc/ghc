@@ -18,9 +18,10 @@ module CoreSyn (
 	mkApp, mkCon, mkPrim,
 	mkValLam, mkTyLam, mkUseLam,
 	mkLam,
-	collectBinders, isValBinder, notValBinder,
+	collectBinders, collectUsageAndTyBinders, collectValBinders, 
+	isValBinder, notValBinder,
 	
-	collectArgs, isValArg, notValArg, numValArgs,
+	collectArgs, initialTyArgs, initialValArgs, isValArg, notValArg, numValArgs,
 
 	mkCoLetAny, mkCoLetNoUnboxed, mkCoLetUnboxedToCase,
 	mkCoLetsAny, mkCoLetsNoUnboxed, mkCoLetsUnboxedToCase,
@@ -224,13 +225,8 @@ mkCoLetrecAny binds body = Let (Rec binds) body
 mkCoLetsAny []    expr = expr
 mkCoLetsAny binds expr = foldr mkCoLetAny expr binds
 
-mkCoLetAny bind@(Rec binds) body = mkCoLetrecAny binds body
-mkCoLetAny bind@(NonRec binder rhs) body
-  = case body of
-      Var binder2 | binder == binder2
-	 -> rhs   -- hey, I have the rhs
-      other
-	 -> Let bind body
+mkCoLetAny bind@(Rec binds)         body = mkCoLetrecAny binds body
+mkCoLetAny bind@(NonRec binder rhs) body = Let bind body
 \end{code}
 
 \begin{code}
@@ -384,24 +380,24 @@ collectBinders ::
   ([uvar], [tyvar], [val_bdr], GenCoreExpr val_bdr val_occ tyvar uvar)
 
 collectBinders expr
+  = (usages, tyvars, vals, body)
+  where
+    (usages, tyvars, body1) = collectUsageAndTyBinders expr
+    (vals, body) 	    = collectValBinders body1
+
+
+collectUsageAndTyBinders expr
   = usages expr []
   where
     usages (Lam (UsageBinder u) body) uacc = usages body (u:uacc)
     usages other uacc
-      = case (tyvars other []) of { (tacc, vacc, expr) ->
-	(reverse uacc, tacc, vacc, expr) }
+      = case (tyvars other []) of { (tacc, expr) ->
+	(reverse uacc, tacc, expr) }
 
-    tyvars (Lam (TyBinder t)    body) tacc = tyvars body (t:tacc)
+    tyvars (Lam (TyBinder t) body) tacc = tyvars body (t:tacc)
     tyvars other tacc
       = ASSERT(not (usage_lambda other))
-	case (valvars other []) of { (vacc, expr) ->
-	(reverse tacc, vacc, expr) }
-
-    valvars (Lam (ValBinder v)  body) vacc = valvars body (v:vacc)
-    valvars other vacc
-      = ASSERT(not (usage_lambda other))
-	ASSERT(not (tyvar_lambda other))
-	(reverse vacc, other)
+	(reverse tacc, other)
 
     ---------------------------------------
     usage_lambda (Lam (UsageBinder _) _) = True
@@ -409,6 +405,16 @@ collectBinders expr
 
     tyvar_lambda (Lam (TyBinder _) _)    = True
     tyvar_lambda _			 = False
+
+
+collectValBinders :: GenCoreExpr val_bdr val_occ tyvar uvar ->
+		     ([val_bdr], GenCoreExpr val_bdr val_occ tyvar uvar)
+collectValBinders expr
+  = go [] expr
+  where
+    go acc (Lam (ValBinder v) b) = go (v:acc) b
+    go acc body 		 = (reverse acc, body)
+
 \end{code}
 
 %************************************************************************
@@ -497,6 +503,21 @@ collectArgs expr
     usages fun uacc
       = (fun,uacc)
 \end{code}
+
+
+\begin{code}
+initialTyArgs :: [GenCoreArg val_occ tyvar uvar]
+	      -> ([GenType tyvar uvar], [GenCoreArg val_occ tyvar uvar])
+initialTyArgs (TyArg ty : args) = (ty:tys, args') 
+				where
+				  (tys, args') = initialTyArgs args
+initialTyArgs other 		= ([],other)
+
+initialValArgs :: [GenCoreArg val_occ tyvar uvar]
+	      -> ([GenCoreArg val_occ tyvar uvar], [GenCoreArg val_occ tyvar uvar])
+initialValArgs args = span isValArg args
+\end{code}
+
 
 %************************************************************************
 %*									*

@@ -15,7 +15,7 @@ module ConFold	( completePrim ) where
 IMP_Ubiq(){-uitous-}
 
 import CoreSyn
-import CoreUnfold	( whnfDetails, UnfoldingDetails(..), FormSummary(..) )
+import CoreUnfold	( Unfolding(..), SimpleUnfolding )
 import Id		( idType )
 import Literal		( mkMachInt, mkMachWord, Literal(..) )
 import MagicUFs		( MagicUnfoldingFun )
@@ -95,10 +95,8 @@ completePrim env SeqOp [TyArg ty, LitArg lit]
   = returnSmpl (Lit (mkMachInt 1))
 
 completePrim env op@SeqOp args@[TyArg ty, VarArg var]
-  | whnfDetails (lookupUnfolding env var)
-  = returnSmpl (Lit (mkMachInt 1))
-  | otherwise
-  = returnSmpl (Prim op args)
+  | isEvaluated (lookupRhsInfo env var) = returnSmpl (Lit (mkMachInt 1))  -- var is eval'd
+  | otherwise				= returnSmpl (Prim op args)	  -- var not eval'd
 \end{code}
 
 \begin{code}

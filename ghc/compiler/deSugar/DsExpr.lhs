@@ -32,8 +32,7 @@ import DsUtils		( mkAppDs, mkConDs, mkPrimDs, dsExprToAtom,
 			)
 import Match		( matchWrapper )
 
-import CoreUnfold	( UnfoldingDetails(..), UnfoldingGuidance(..),
-			  FormSummary )
+import CoreUnfold	( Unfolding )
 import CoreUtils	( coreExprType, substCoreExpr, argToExpr,
 			  mkCoreIfThenElse, unTagBinders )
 import CostCentre	( mkUserCC )
@@ -585,18 +584,20 @@ dsApp (TyApp expr tys) args
 
 -- we might should look out for SectionLs, etc., here, but we don't
 
-dsApp (HsVar v) args
-  = lookupEnvDs v	`thenDs` \ maybe_expr ->
+dsApp (HsVar v) args = mkAppDs (Var v) args
+
+{-	No need to do unfolding in desugarer now
+   = lookupEnvDs v	`thenDs` \ maybe_expr ->
     case maybe_expr of
       Just expr -> mkAppDs expr args
 
       Nothing -> -- we're only saturating constructors and PrimOps
 	case getIdUnfolding v of
-	  GenForm _ the_unfolding EssentialUnfolding
+	  SimpleUnfolding _ the_unfolding EssentialUnfolding
 	    -> do_unfold nullTyVarEnv nullIdEnv (unTagBinders the_unfolding) args
 
 	  _ -> mkAppDs (Var v) args
-
+-}
 
 dsApp anything_else args
   = dsExpr anything_else	`thenDs` \ core_expr ->
@@ -621,21 +622,21 @@ dsRbinds ((sel_id, rhs, pun_flag) : rbinds) continue_with
 \end{code}	
 
 \begin{code}
-do_unfold ty_env val_env (Lam (TyBinder tyvar) body) (TyArg ty : args)
-  = do_unfold (addOneToTyVarEnv ty_env tyvar ty) val_env body args
-
-do_unfold ty_env val_env (Lam (ValBinder binder) body) (arg@(VarArg expr) : args)
-  = dsExprToAtom arg  $ \ arg_atom ->
-    do_unfold ty_env
-	      (addOneToIdEnv val_env binder (argToExpr arg_atom))
-	      body args
-
-do_unfold ty_env val_env body args
-  = 	-- Clone the remaining part of the template
-    uniqSMtoDsM (substCoreExpr val_env ty_env body)	`thenDs` \ body' ->
-
-	-- Apply result to remaining arguments
-    mkAppDs body' args
+-- do_unfold ty_env val_env (Lam (TyBinder tyvar) body) (TyArg ty : args)
+--   = do_unfold (addOneToTyVarEnv ty_env tyvar ty) val_env body args
+-- 
+-- do_unfold ty_env val_env (Lam (ValBinder binder) body) (arg@(VarArg expr) : args)
+--   = dsExprToAtom arg  $ \ arg_atom ->
+--     do_unfold ty_env
+--      (addOneToIdEnv val_env binder (argToExpr arg_atom))
+--	      body args
+--
+-- do_unfold ty_env val_env body args
+--   = 	-- Clone the remaining part of the template
+--    uniqSMtoDsM (substCoreExpr val_env ty_env body)	`thenDs` \ body' ->
+--
+--	-- Apply result to remaining arguments
+--    mkAppDs body' args
 \end{code}
 
 Basically does the translation given in the Haskell~1.3 report:

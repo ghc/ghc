@@ -22,6 +22,7 @@ import TcHsSyn		( TcIdOcc )
 import TcMonad
 import Inst		( SYN_IE(InstanceMapper) )
 import TcEnv		( getEnv_TyCons, tcLookupClassByKey )
+import SpecEnv		( SpecEnv )
 import TcKind		( TcKind )
 import TcGenDeriv	-- Deriv stuff
 import TcInstUtil	( InstInfo(..), mkInstanceRelatedIds, buildInstanceEnvs )

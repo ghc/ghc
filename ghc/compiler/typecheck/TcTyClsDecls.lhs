@@ -25,6 +25,7 @@ import Inst		( SYN_IE(InstanceMapper) )
 import TcClassDcl	( tcClassDecl1 )
 import TcEnv		( tcExtendTyConEnv, tcExtendClassEnv,
 			  tcTyVarScope )
+import SpecEnv		( SpecEnv )
 import TcKind		( TcKind, newKindVars )
 import TcTyDecls	( tcTyDecl, mkDataBinds )
 

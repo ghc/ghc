@@ -96,6 +96,8 @@ import Argv
 
 CHK_Ubiq() -- debugging consistency check
 
+import CgCompInfo	-- Default values for some flags
+
 import Maybes		( assocMaybe, firstJust, maybeToBool )
 import Util		( startsWith, panic, panic#, assertPanic )
 \end{code}
@@ -193,6 +195,7 @@ data SimplifierSwitch
   | MaxSimplifierIterations Int
 
   | SimplUnfoldingUseThreshold      Int -- per-simplification variants
+  | SimplUnfoldingConDiscount       Int
   | SimplUnfoldingCreationThreshold Int
 
   | KeepSpecPragmaIds	    -- We normally *toss* Ids we can do without
@@ -337,7 +340,7 @@ classifyOpts = sep argv [] [] -- accumulators...
 	  ',' : _	-> IGNORE_ARG() -- it is for the parser
 
 	  "-fsimplify"  -> -- gather up SimplifierSwitches specially...
-			   simpl_sep opts [] core_td stg_td
+			   simpl_sep opts defaultSimplSwitches core_td stg_td
 
 	  "-fcalc-inlinings1"-> CORE_TD(CoreDoCalcInlinings1)
 	  "-fcalc-inlinings2"-> CORE_TD(CoreDoCalcInlinings2)
@@ -380,8 +383,7 @@ classifyOpts = sep argv [] [] -- accumulators...
 
     simpl_sep (opt1:opts) simpl_sw core_td stg_td
       = case (_UNPK_ opt1) of
-	  "(" -> ASSERT (null simpl_sw)
-		 simpl_sep opts [] core_td stg_td
+	  "(" -> simpl_sep opts simpl_sw core_td stg_td
 	  ")" -> let
 		    this_simpl = CoreDoSimplify (isAmongSimpl simpl_sw)
 		 in
@@ -418,15 +420,19 @@ classifyOpts = sep argv [] [] -- accumulators...
 	  o | starts_with_msi  -> SIMPL_SW(MaxSimplifierIterations (read after_msi))
 	    | starts_with_suut -> SIMPL_SW(SimplUnfoldingUseThreshold (read after_suut))
 	    | starts_with_suct -> SIMPL_SW(SimplUnfoldingCreationThreshold (read after_suct))
+	    | starts_with_sucd -> SIMPL_SW(SimplUnfoldingConDiscount (read after_sucd))
 	   where
 	    maybe_suut		= startsWith "-fsimpl-uf-use-threshold"      o
 	    maybe_suct		= startsWith "-fsimpl-uf-creation-threshold" o
+	    maybe_sucd		= startsWith "-fsimpl-uf-con-discount" o
 	    maybe_msi		= startsWith "-fmax-simplifier-iterations"   o
 	    starts_with_suut	= maybeToBool maybe_suut
 	    starts_with_suct	= maybeToBool maybe_suct
+	    starts_with_sucd	= maybeToBool maybe_sucd
 	    starts_with_msi	= maybeToBool maybe_msi
 	    (Just after_suut)	= maybe_suut
 	    (Just after_suct)	= maybe_suct
+	    (Just after_sucd)	= maybe_sucd
 	    (Just after_msi)	= maybe_msi
 
 	  _ -> -- NB: the driver is really supposed to handle bad options
@@ -470,13 +476,14 @@ tagOf_SimplSwitch EssentialUnfoldingsOnly	= ILIT(19)
 tagOf_SimplSwitch ShowSimplifierProgress	= ILIT(20)
 tagOf_SimplSwitch (MaxSimplifierIterations _)	= ILIT(21)
 tagOf_SimplSwitch (SimplUnfoldingUseThreshold _)      = ILIT(22)
-tagOf_SimplSwitch (SimplUnfoldingCreationThreshold _) = ILIT(23)
-tagOf_SimplSwitch KeepSpecPragmaIds		= ILIT(24)
-tagOf_SimplSwitch KeepUnusedBindings		= ILIT(25)
-tagOf_SimplSwitch SimplNoLetFromCase		= ILIT(26)
-tagOf_SimplSwitch SimplNoLetFromApp		= ILIT(27)
-tagOf_SimplSwitch SimplNoLetFromStrictLet	= ILIT(28)
-tagOf_SimplSwitch SimplDontFoldBackAppend       = ILIT(29)
+tagOf_SimplSwitch (SimplUnfoldingConDiscount _)       = ILIT(23)
+tagOf_SimplSwitch (SimplUnfoldingCreationThreshold _) = ILIT(24)
+tagOf_SimplSwitch KeepSpecPragmaIds		= ILIT(25)
+tagOf_SimplSwitch KeepUnusedBindings		= ILIT(26)
+tagOf_SimplSwitch SimplNoLetFromCase		= ILIT(27)
+tagOf_SimplSwitch SimplNoLetFromApp		= ILIT(28)
+tagOf_SimplSwitch SimplNoLetFromStrictLet	= ILIT(29)
+tagOf_SimplSwitch SimplDontFoldBackAppend       = ILIT(30)
 -- If you add anything here, be sure to change lAST_SIMPL_SWITCH_TAG, too!
 
 tagOf_SimplSwitch _ = panic# "tagOf_SimplSwitch"
@@ -504,9 +511,12 @@ lAST_SIMPL_SWITCH_TAG = IBOX(tagOf_SimplSwitch SimplDontFoldBackAppend)
 
 isAmongSimpl :: [SimplifierSwitch] -> SimplifierSwitch -> SwitchResult
 
-isAmongSimpl on_switches
+isAmongSimpl on_switches		-- Switches mentioned later occur *earlier*
+					-- in the list; defaults right at the end.
   = let
 	tidied_on_switches = foldl rm_dups [] on_switches
+		-- The fold*l* ensures that we keep the latest switches;
+		-- ie the ones that occur earliest in the list.
 
 	sw_tbl :: Array Int SwitchResult
 
@@ -527,12 +537,12 @@ isAmongSimpl on_switches
   where
     mk_assoc_elem k@(MaxSimplifierIterations lvl)       = IBOX(tagOf_SimplSwitch k) SET_TO SwInt lvl
     mk_assoc_elem k@(SimplUnfoldingUseThreshold      i) = IBOX(tagOf_SimplSwitch k) SET_TO SwInt i
+    mk_assoc_elem k@(SimplUnfoldingConDiscount       i) = IBOX(tagOf_SimplSwitch k) SET_TO SwInt i
     mk_assoc_elem k@(SimplUnfoldingCreationThreshold i) = IBOX(tagOf_SimplSwitch k) SET_TO SwInt i
 
     mk_assoc_elem k = IBOX(tagOf_SimplSwitch k) SET_TO SwBool   True -- I'm here, Mom!
 
     -- cannot have duplicates if we are going to use the array thing
-
     rm_dups switches_so_far switch
       = if switch `is_elem` switches_so_far
     	then switches_so_far
@@ -541,6 +551,16 @@ isAmongSimpl on_switches
 	sw `is_elem` []     = False
 	sw `is_elem` (s:ss) = (tagOf_SimplSwitch sw) _EQ_ (tagOf_SimplSwitch s)
 			    || sw `is_elem` ss
+\end{code}
+
+Default settings for simplifier switches
+
+\begin{code}
+defaultSimplSwitches = [SimplUnfoldingCreationThreshold uNFOLDING_CREATION_THRESHOLD,
+			SimplUnfoldingUseThreshold	uNFOLDING_USE_THRESHOLD,
+			SimplUnfoldingConDiscount	uNFOLDING_CON_DISCOUNT_WEIGHT,
+			MaxSimplifierIterations		1
+		       ]
 \end{code}
 
 %************************************************************************

@@ -26,7 +26,8 @@ IMP_Ubiq(){-uitous-}
 import AnnCoreSyn
 import CoreSyn
 
-import CoreUtils	( coreExprType, manifestlyWHNF, manifestlyBottom )
+import CoreUtils	( coreExprType )
+import CoreUnfold	( whnfOrBottom )
 import FreeVars		-- all of it
 import Id		( idType, mkSysLocal, toplevelishId,
 			  nullIdEnv, addOneToIdEnv, growIdEnvList,
@@ -466,7 +467,7 @@ setFloatLevel alreadyLetBound ctxt_lvl envs@(venv, tenv)
 
     offending tyvar = ids_only_lvl `ltLvl` tyvarLevel tenv tyvar
 
-    manifestly_whnf = manifestlyWHNF de_ann_expr || manifestlyBottom de_ann_expr
+    manifestly_whnf = whnfOrBottom de_ann_expr
 
     maybe_unTopify Top | not (canFloatToTop (ty, expr)) = Level 0 0
     maybe_unTopify lvl                                  = lvl
@@ -672,7 +673,7 @@ isWorthFloating alreadyLetBound expr
   | otherwise       = 	-- No point in adding a fresh let-binding for a WHNF, because
 			-- floating it isn't beneficial enough.
 		      isWorthFloatingExpr expr &&
-		      not (manifestlyWHNF expr || manifestlyBottom expr)
+		      not (whnfOrBottom expr)
 ********** -}
 
 isWorthFloatingExpr :: CoreExpr -> Bool
@@ -690,7 +691,7 @@ canFloatToTop :: (Type, CoreExprWithFVs) -> Bool
 canFloatToTop (ty, (FVInfo _ _ (LeakFree _), expr)) = True
 canFloatToTop (ty, (FVInfo _ _ MightLeak,    expr)) = isLeakFreeType [] ty
 
-valSuggestsLeakFree expr = manifestlyWHNF expr || manifestlyBottom expr
+valSuggestsLeakFree expr = whnfOrBottom expr
 \end{code}
 
 

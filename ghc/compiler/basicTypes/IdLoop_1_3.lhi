@@ -3,7 +3,7 @@ interface IdLoop_1_3 1
 __exports__
 CoreSyn CoreExpr
 CoreUnfold FormSummary (..)
-CoreUnfold UnfoldingDetails (..)
+CoreUnfold Unfolding (..)
 CoreUnfold UnfoldingGuidance (..)
 CoreUtils unTagBinders (..)
 Id IdEnv
@@ -19,5 +19,7 @@ MagicUFs MagicUnfoldingFun
 MagicUFs mkMagicUnfoldingFun (..)
 OccurAnal occurAnalyseGlobalExpr (..)
 PprType pprParendGenType (..)
+SpecEnv  isNullSpecEnv (..)
+SpecEnv  nullSpecEnv (..)
 WwLib mAX_WORKER_ARGS (..)
 \end{code}

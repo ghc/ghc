@@ -21,7 +21,7 @@ Class Class
 ClosureInfo ClosureInfo
 CmdLineOpts SwitchResult
 CoreSyn GenCoreExpr
-CoreUnfold UnfoldingDetails
+CoreUnfold Unfolding
 CoreUnfold UnfoldingGuidance
 CostCentre CostCentre
 HeapOffs HeapOffset

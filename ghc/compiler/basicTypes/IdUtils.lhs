@@ -12,9 +12,10 @@ IMP_Ubiq()
 IMPORT_DELOOPER(PrelLoop)		-- here for paranoia checking
 
 import CoreSyn
-import CoreUnfold	( UnfoldingGuidance(..) )
+import CoreUnfold	( UnfoldingGuidance(..), Unfolding )
 import Id		( mkImported, mkTemplateLocals )
 import IdInfo		-- quite a few things
+import SpecEnv		( SpecEnv )
 import Name		( mkPrimitiveName, OrigName(..) )
 import PrelMods		( gHC_BUILTINS )
 import PrimOp		( primOpInfo, tagOf_PrimOp, primOp_str,
@@ -63,7 +64,7 @@ primOpId op
     mk_prim_Id prim_op name tyvar_tmpls arg_tys ty arity
       = mkImported (mkPrimitiveName key (OrigName gHC_BUILTINS name)) ty
 	   (noIdInfo `addInfo` (mkArityInfo arity)
-	          `addInfo_UF` (mkUnfolding EssentialUnfolding
+	          `addInfo_UF` (mkUnfolding UnfoldAlways
 			         (mk_prim_unfold prim_op tyvar_tmpls arg_tys)))
       where
 	key = mkPrimOpIdUnique (IBOX(tagOf_PrimOp prim_op))

@@ -8,14 +8,17 @@ import PreludeStdIO	( Maybe )
 
 import BinderInfo	( BinderInfo )
 import CoreSyn		( CoreExpr(..), GenCoreExpr, GenCoreArg )
-import CoreUnfold 	( FormSummary(..), UnfoldingDetails(..), UnfoldingGuidance(..) )
+import CoreUnfold 	( Unfolding(..), UnfoldingGuidance(..), 
+			  SimpleUnfolding(..), FormSummary(..)  )
 import CoreUtils	( unTagBinders )
 import Id		( externallyVisibleId, isDataCon, isWorkerId, isWrapperId,
 			  unfoldingUnfriendlyId, getIdInfo, nmbrId,
 			  nullIdEnv, lookupIdEnv, IdEnv(..),
 			  Id(..), GenId
 			)
+import CostCentre	( CostCentre )
 import IdInfo		( IdInfo )
+import SpecEnv		( SpecEnv, nullSpecEnv, isNullSpecEnv )
 import Literal		( Literal )
 import MagicUFs		( mkMagicUnfoldingFun, MagicUnfoldingFun )
 import OccurAnal	( occurAnalyseGlobalExpr )
@@ -31,6 +34,9 @@ import Unique		( Unique )
 import Usage		( GenUsage )
 import Util		( Ord3(..) )
 import WwLib		( mAX_WORKER_ARGS )
+
+nullSpecEnv   :: SpecEnv
+isNullSpecEnv :: SpecEnv -> Bool
 
 occurAnalyseGlobalExpr  :: GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique -> GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique), BinderInfo) (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique
 externallyVisibleId	:: Id	    -> Bool
@@ -62,20 +68,28 @@ instance Outputable (GenTyVar a)
 instance (Outputable a) => Outputable (GenId a)
 instance (Eq a, Outputable a, Eq b, Outputable b) => Outputable (GenType a b)
 
+data SpecEnv
 data NmbrEnv
 data MagicUnfoldingFun
-data FormSummary   = WhnfForm | BottomForm | OtherForm
-data UnfoldingDetails
-  = NoUnfoldingDetails
-  | OtherLitForm [Literal]
-  | OtherConForm [GenId (GenType (GenTyVar (GenUsage Unique)) Unique)]
-  | GenForm FormSummary (GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique), BinderInfo) (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique) UnfoldingGuidance
-  | MagicForm Unique MagicUnfoldingFun
+data FormSummary = VarForm | ValueForm | BottomForm | OtherForm
+
+data Unfolding
+  = NoUnfolding
+  | CoreUnfolding SimpleUnfolding
+  | MagicUnfolding Unique MagicUnfoldingFun
+
+
+data SimpleUnfolding = SimpleUnfolding FormSummary UnfoldingGuidance (GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique), BinderInfo) (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique) 
+
 
 data UnfoldingGuidance
   = UnfoldNever
   | UnfoldAlways
-  | EssentialUnfolding
   | UnfoldIfGoodArgs Int Int [Bool] Int
-  | BadUnfolding
+
+data CostCentre
 \end{code}
+
+
+
+

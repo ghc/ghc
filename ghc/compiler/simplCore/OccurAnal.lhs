@@ -380,8 +380,27 @@ occAnal env (Var v)
   = (emptyDetails, Var v)
 
 occAnal env (Lit lit)	   = (emptyDetails, Lit lit)
-occAnal env (Con con args) = (occAnalArgs env args, Con con args)
 occAnal env (Prim op args) = (occAnalArgs env args, Prim op args)
+\end{code}
+
+We regard variables that occur as constructor arguments as "dangerousToDup":
+
+\begin{verbatim}
+module A where
+f x = let y = expensive x in 
+      let z = (True,y) in 
+      (case z of {(p,q)->q}, case z of {(p,q)->q})
+\end{verbatim}
+
+We feel free to duplicate the WHNF (True,y), but that means
+that y may be duplicated thereby.
+
+If we aren't careful we duplicate the (expensive x) call!
+Constructors are rather like lambdas in this way.
+
+\begin{code}
+occAnal env (Con con args) = (mapIdEnv markDangerousToDup (occAnalArgs env args), 
+			      Con con args)
 
 occAnal env (SCC cc body)
   = (mapIdEnv markInsideSCC usage, SCC cc body')
@@ -399,12 +418,21 @@ occAnal env (App fun arg)
     (fun_usage, fun') = occAnal    env fun
     arg_usage	      = occAnalArg env arg
 
-occAnal env (Lam (ValBinder binder) body)
+-- For value lambdas we do a special hack.  Consider
+-- 	(\x. \y. ...x...)
+-- If we did nothing, x is used inside the \y, so would be marked
+-- as dangerous to dup.  But in the common case where the abstraction
+-- is applied to two arguments this is over-pessimistic.
+-- So instead we don't take account of the \y when dealing with x's usage;
+-- instead, the simplifier is careful when partially applying lambdas
+
+occAnal env expr@(Lam (ValBinder binder) body)
   = (mapIdEnv markDangerousToDup final_usage,
-     Lam (ValBinder tagged_binder) body')
+     foldr ( \v b -> Lam (ValBinder v) b) body' tagged_binders)
   where
-    (body_usage, body') 	 = occAnal (env `addNewCand` binder) body
-    (final_usage, tagged_binder) = tagBinder body_usage binder
+    (binders,body)		  = collectValBinders expr
+    (body_usage, body') 	  = occAnal (env `addNewCands` binders) body
+    (final_usage, tagged_binders) = tagBinders body_usage binders
 
 -- ANDY: WE MUST THINK ABOUT THIS! (ToDo)
 occAnal env (Lam (TyBinder tyvar) body)

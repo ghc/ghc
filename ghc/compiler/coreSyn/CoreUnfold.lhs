@@ -6,22 +6,23 @@
 Unfoldings (which can travel across module boundaries) are in Core
 syntax (namely @CoreExpr@s).
 
-The type @UnfoldingDetails@ sits ``above'' simply-Core-expressions
+The type @Unfolding@ sits ``above'' simply-Core-expressions
 unfoldings, capturing ``higher-level'' things we know about a binding,
 usually things that the simplifier found out (e.g., ``it's a
-literal'').  In the corner of a @GenForm@ unfolding, you will
+literal'').  In the corner of a @SimpleUnfolding@ unfolding, you will
 find, unsurprisingly, a Core expression.
 
 \begin{code}
 #include "HsVersions.h"
 
 module CoreUnfold (
-	UnfoldingDetails(..), UnfoldingGuidance(..), -- types
-	FormSummary(..),
+	SimpleUnfolding(..), Unfolding(..), UnfoldingGuidance(..), -- types
 
-	mkFormSummary,
-	mkGenForm, mkLitForm, mkConForm,
-	whnfDetails,
+	FormSummary(..), mkFormSummary, whnfOrBottom, exprSmallEnoughToDup,
+
+	smallEnoughToInline, couldBeSmallEnoughToInline,
+
+	mkSimpleUnfolding,
 	mkMagicUnfolding,
 	calcUnfoldingGuidance,
 	mentionedInUnfolding
@@ -33,16 +34,17 @@ IMPORT_DELOOPER(IdLoop)	 -- for paranoia checking;
 IMPORT_DELOOPER(PrelLoop)  -- for paranoia checking
 
 import Bag		( emptyBag, unitBag, unionBags, Bag )
-import BinderInfo	( oneTextualOcc, oneSafeOcc )
 import CgCompInfo	( uNFOLDING_CHEAP_OP_COST,
 			  uNFOLDING_DEAR_OP_COST,
 			  uNFOLDING_NOREP_LIT_COST
 			)
 import CoreSyn
-import CoreUtils	( coreExprType, manifestlyWHNF )
+import CoreUtils	( coreExprType )
 import CostCentre	( ccMentionsId )
-import Id		( SYN_IE(IdSet), GenId{-instances-} )
-import IdInfo		( bottomIsGuaranteed )
+import Id		( idType, getIdArity,  isBottomingId, 
+			  SYN_IE(IdSet), GenId{-instances-} )
+import PrimOp		( fragilePrimOp, PrimOp(..) )
+import IdInfo		( arityMaybe, bottomIsGuaranteed )
 import Literal		( isNoRepLit, isLitLitLit )
 import Pretty
 import PrimOp		( primOpCanTriggerGC, PrimOp(..) )
@@ -52,7 +54,7 @@ import UniqSet		( emptyUniqSet, unitUniqSet, mkUniqSet,
 			  addOneToUniqSet, unionUniqSets
 			)
 import Usage		( SYN_IE(UVar) )
-import Util		( isIn, panic )
+import Util		( isIn, panic, assertPanic )
 
 whatsMentionedInId = panic "whatsMentionedInId (CoreUnfold)"
 getMentionedTyConsAndClassesFromType = panic "getMentionedTyConsAndClassesFromType (CoreUnfold)"
@@ -60,150 +62,144 @@ getMentionedTyConsAndClassesFromType = panic "getMentionedTyConsAndClassesFromTy
 
 %************************************************************************
 %*									*
-\subsection{@UnfoldingDetails@ and @UnfoldingGuidance@ types}
+\subsection{@Unfolding@ and @UnfoldingGuidance@ types}
 %*									*
 %************************************************************************
 
-(And @FormSummary@, too.)
-
 \begin{code}
-data UnfoldingDetails
-  = NoUnfoldingDetails
-
-  | OtherLitForm
-	[Literal]		-- It is a literal, but definitely not one of these
-
-  | OtherConForm
-	[Id]			-- It definitely isn't one of these constructors
-				-- This captures the situation in the default branch of
-				-- a case:  case x of
-				--		c1 ... -> ...
-				--		c2 ... -> ...
-				--		v -> default-rhs
-				-- Then in default-rhs we know that v isn't c1 or c2.
-				--
-				-- NB.  In the degenerate: case x of {v -> default-rhs}
-				-- x will be bound to
-				--	OtherConForm []
-				-- which captures the idea that x is eval'd but we don't
-				-- know which constructor.
-
-
-  | GenForm
-	FormSummary		-- Tells whether the template is a WHNF or bottom
-	TemplateOutExpr		-- The template
-	UnfoldingGuidance	-- Tells about the *size* of the template.
-
-  | MagicForm
+data Unfolding
+  = NoUnfolding
+  | CoreUnfolding SimpleUnfolding
+  | MagicUnfolding
 	Unique			-- of the Id whose magic unfolding this is
 	MagicUnfoldingFun
+
+
+data SimpleUnfolding
+  = SimpleUnfolding	FormSummary		-- Tells whether the template is a WHNF or bottom
+			UnfoldingGuidance	-- Tells about the *size* of the template.
+			TemplateOutExpr		-- The template
 
 type TemplateOutExpr = GenCoreExpr (Id, BinderInfo) Id TyVar UVar
 	-- An OutExpr with occurrence info attached.  This is used as
 	-- a template in GeneralForms.
 
-mkMagicUnfolding :: Unique -> UnfoldingDetails
-mkMagicUnfolding tag  = MagicForm tag (mkMagicUnfoldingFun tag)
 
-data FormSummary
-  = WhnfForm 		-- Expression is WHNF
-  | BottomForm		-- Expression is guaranteed to be bottom. We're more gung
-			-- ho about inlining such things, because it can't waste work
-  | OtherForm		-- Anything else
+mkSimpleUnfolding form guidance    template 
+  = SimpleUnfolding form guidance template
 
-instance Outputable FormSummary where
-   ppr sty WhnfForm   = ppStr "WHNF"
-   ppr sty BottomForm = ppStr "Bot"
-   ppr sty OtherForm  = ppStr "Other"
+mkMagicUnfolding :: Unique -> Unfolding
+mkMagicUnfolding tag  = MagicUnfolding tag (mkMagicUnfoldingFun tag)
 
---???mkFormSummary :: StrictnessInfo -> GenCoreExpr bndr Id -> FormSummary
-mkFormSummary si expr
-  | manifestlyWHNF     expr = WhnfForm
-  | bottomIsGuaranteed si   = BottomForm
 
-  -- Chances are that the Id will be decorated with strictness info
-  -- telling that the RHS is definitely bottom.  This *might* not be the
-  -- case, if it's been a while since strictness analysis, but leaving out
-  -- the test for manifestlyBottom makes things a little more efficient.
-  -- We can always put it back...
-  -- | manifestlyBottom expr  = BottomForm
-
-  | otherwise = OtherForm
-
-whnfDetails :: UnfoldingDetails -> Bool		-- True => thing is evaluated
-whnfDetails (GenForm WhnfForm _ _) = True
-whnfDetails (OtherLitForm _)	   = True
-whnfDetails (OtherConForm _)	   = True
-whnfDetails other		   = False
-\end{code}
-
-\begin{code}
 data UnfoldingGuidance
-  = UnfoldNever			-- Don't do it!
-
+  = UnfoldNever
   | UnfoldAlways		-- There is no "original" definition,
 				-- so you'd better unfold.  Or: something
 				-- so cheap to unfold (e.g., 1#) that
 				-- you should do it absolutely always.
 
-  | EssentialUnfolding		-- Like UnfoldAlways, but you *must* do
-				-- it absolutely always.
-				-- This is what we use for data constructors
-				-- and PrimOps, because we don't feel like
-				-- generating curried versions "just in case".
-
-  | UnfoldIfGoodArgs	Int	-- if "m" type args and "n" value args; and
-			Int	-- those val args are manifestly data constructors
-			[Bool]	-- the val-arg positions marked True
+  | UnfoldIfGoodArgs	Int	-- if "m" type args 
+			Int	-- and "n" value args
+			[Int]	-- Discount if the argument is evaluated.
 				-- (i.e., a simplification will definitely
-				-- be possible).
+				-- be possible).  One elt of the list per *value* arg.
 			Int	-- The "size" of the unfolding; to be elaborated
 				-- later. ToDo
-
-  | BadUnfolding		-- This is used by TcPragmas if the *lazy*
-				-- lintUnfolding test fails
-				-- It will never escape from the IdInfo as
-				-- it is caught by getInfo_UF and converted
-				-- to NoUnfoldingDetails
 \end{code}
 
 \begin{code}
 instance Outputable UnfoldingGuidance where
-    ppr sty UnfoldNever	    	= ppStr "_N_"
     ppr sty UnfoldAlways    	= ppStr "_ALWAYS_"
-    ppr sty EssentialUnfolding	= ppStr "_ESSENTIAL_" -- shouldn't appear in an iface
+--    ppr sty EssentialUnfolding	= ppStr "_ESSENTIAL_" -- shouldn't appear in an iface
     ppr sty (UnfoldIfGoodArgs t v cs size)
       = ppCat [ppStr "_IF_ARGS_", ppInt t, ppInt v,
 	       if null cs	-- always print *something*
 	       	then ppChar 'X'
-		else ppBesides (map pp_c cs),
+		else ppBesides (map (ppStr . show) cs),
 	       ppInt size ]
-      where
-	pp_c False = ppChar 'X'
-	pp_c True  = ppChar 'C'
 \end{code}
 
 
 %************************************************************************
 %*									*
-\subsection{@mkGenForm@ and friends}
+\subsection{Figuring out things about expressions}
 %*									*
 %************************************************************************
 
 \begin{code}
-mkGenForm :: FormSummary
-	  -> TemplateOutExpr	-- Template
-	  -> UnfoldingGuidance	-- Tells about the *size* of the template.
-	  -> UnfoldingDetails
+data FormSummary
+  = VarForm		-- Expression is a variable (or scc var, etc)
+  | ValueForm		-- Expression is a value: i.e. a value-lambda,constructor, or literal
+  | BottomForm		-- Expression is guaranteed to be bottom. We're more gung
+			-- ho about inlining such things, because it can't waste work
+  | OtherForm		-- Anything else
 
-mkGenForm = GenForm
+instance Outputable FormSummary where
+   ppr sty VarForm    = ppStr "Var"
+   ppr sty ValueForm  = ppStr "Value"
+   ppr sty BottomForm = ppStr "Bot"
+   ppr sty OtherForm  = ppStr "Other"
 
--- two shorthand variants:
-mkLitForm lit      = mk_go_for_it (Lit lit)
-mkConForm con args = mk_go_for_it (Con con args)
+mkFormSummary ::GenCoreExpr bndr Id tyvar uvar -> FormSummary
 
-mk_go_for_it expr = mkGenForm WhnfForm expr UnfoldAlways
+mkFormSummary expr
+  = go (0::Int) expr		-- The "n" is the number of (value) arguments so far
+  where
+    go n (Lit _)	= ASSERT(n==0) ValueForm
+    go n (Con _ _)      = ASSERT(n==0) ValueForm
+    go n (SCC _ e)      = go n e
+    go n (Coerce _ _ e) = go n e
+    go n (Let _ e)      = OtherForm
+    go n (Case _ _)     = OtherForm
+
+    go 0 (Lam (ValBinder x) e) = ValueForm	-- NB: \x.bottom /= bottom!
+    go n (Lam (ValBinder x) e) = go (n-1) e	-- Applied lambda
+    go n (Lam other_binder e)  = go n e
+
+    go n (App fun arg) | isValArg arg = go (n+1) fun
+    go n (App fun other_arg)          = go n fun
+
+    go n (Var f) | isBottomingId f = BottomForm
+    go 0 (Var f)		   = VarForm
+    go n (Var f)		   = case (arityMaybe (getIdArity f)) of
+					  Just arity | n < arity -> ValueForm
+					  other			 -> OtherForm
+
+whnfOrBottom :: GenCoreExpr bndr Id tyvar uvar -> Bool
+whnfOrBottom e = case mkFormSummary e of 
+			VarForm    -> True
+			ValueForm  -> True
+			BottomForm -> True
+			OtherForm  -> False
 \end{code}
+
+
+\begin{code}
+exprSmallEnoughToDup (Con _ _)   = True	-- Could check # of args
+exprSmallEnoughToDup (Prim op _) = not (fragilePrimOp op) -- Could check # of args
+exprSmallEnoughToDup (Lit lit)   = not (isNoRepLit lit)
+exprSmallEnoughToDup expr
+  = case (collectArgs expr) of { (fun, _, _, vargs) ->
+    case fun of
+      Var v | length vargs == 0 -> True
+      _				-> False
+    }
+
+{- LATER:
+WAS: MORE CLEVER:
+exprSmallEnoughToDup expr  -- for now, just: <var> applied to <args>
+  = case (collectArgs expr) of { (fun, _, _, vargs) ->
+    case fun of
+      Var v -> v /= buildId
+		 && v /= augmentId
+		 && length vargs <= 6 -- or 10 or 1 or 4 or anything smallish.
+      _       -> False
+    }
+-}
+\end{code}
+Question (ADR): What is the above used for?  Is a _ccall_ really small
+enough?
 
 %************************************************************************
 %*									*
@@ -213,9 +209,9 @@ mk_go_for_it expr = mkGenForm WhnfForm expr UnfoldAlways
 
 \begin{code}
 calcUnfoldingGuidance
-	:: Bool		    -- True <=> OK if _scc_s appear in expr
-	-> Int		    -- bomb out if size gets bigger than this
-	-> CoreExpr    -- expression to look at
+	:: Bool		    	-- True <=> OK if _scc_s appear in expr
+	-> Int		    	-- bomb out if size gets bigger than this
+	-> CoreExpr    		-- expression to look at
 	-> UnfoldingGuidance
 
 calcUnfoldingGuidance scc_s_OK bOMB_OUT_SIZE expr
@@ -231,8 +227,12 @@ calcUnfoldingGuidance scc_s_OK bOMB_OUT_SIZE expr
 	       uf = UnfoldIfGoodArgs
 			(length ty_binders)
 			(length val_binders)
-			[ b `is_elem` cased_args | b <- val_binders ]
+			(map discount_for val_binders)
 			size
+	       discount_for b | b `is_elem` cased_args = tyConFamilySize tycon
+			      | otherwise	       = 0
+			      where
+				(tycon, _, _) = getAppDataTyConExpandingDicts (idType b)
 	   in
 	   -- pprTrace "calcUnfold:" (ppAbove (ppr PprDebug uf) (ppr PprDebug expr))
 	   uf
@@ -316,7 +316,7 @@ sizeExpr scc_s_OK bOMB_OUT_SIZE args expr
 	size_alg_alt (con,args,rhs) = size_up rhs
 	    -- Don't charge for args, so that wrappers look cheap
 
-	(tycon, _, _) = --trace "CoreUnfold.getAppDataTyConExpandingDicts" $
+	(tycon, _, _) = --trace "CoreUnfold.getAppDataTyConExpandingDicts" $ 
 			getAppDataTyConExpandingDicts scrut_ty
 
     size_up_alts _ (PrimAlts alts deflt)
@@ -362,6 +362,61 @@ sizeExpr scc_s_OK bOMB_OUT_SIZE args expr
       where
 	tot = n+m
 	xys = xs ++ ys
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[considerUnfolding]{Given all the info, do (not) do the unfolding}
+%*									*
+%************************************************************************
+
+We have very limited information about an unfolding expression: (1)~so
+many type arguments and so many value arguments expected---for our
+purposes here, we assume we've got those.  (2)~A ``size'' or ``cost,''
+a single integer.  (3)~An ``argument info'' vector.  For this, what we
+have at the moment is a Boolean per argument position that says, ``I
+will look with great favour on an explicit constructor in this
+position.''
+
+Assuming we have enough type- and value arguments (if not, we give up
+immediately), then we see if the ``discounted size'' is below some
+(semi-arbitrary) threshold.  It works like this: for every argument
+position where we're looking for a constructor AND WE HAVE ONE in our
+hands, we get a (again, semi-arbitrary) discount [proportion to the
+number of constructors in the type being scrutinized].
+
+\begin{code}
+smallEnoughToInline :: Int -> Int	-- Constructor discount and size threshold
+	      -> [Bool]			-- Evaluated-ness of value arguments
+	      -> UnfoldingGuidance
+	      -> Bool			-- True => unfold it
+
+smallEnoughToInline con_discount size_threshold _ UnfoldAlways = True
+smallEnoughToInline con_discount size_threshold _ UnfoldNever  = False
+smallEnoughToInline con_discount size_threshold arg_is_evald_s
+	      (UnfoldIfGoodArgs m_tys_wanted n_vals_wanted discount_vec size)
+  = n_vals_wanted <= length arg_is_evald_s &&
+    discounted_size <= size_threshold
+
+  where
+    discounted_size = size - sum (zipWith arg_discount discount_vec arg_is_evald_s)
+
+    arg_discount no_of_constrs is_evald
+      | is_evald  = 1 + no_of_constrs * con_discount
+      | otherwise = 1
+\end{code}
+
+We use this one to avoid exporting inlinings that we ``couldn't possibly
+use'' on the other side.  Can be overridden w/ flaggery.
+Just the same as smallEnoughToInline, except that it has no actual arguments.
+
+\begin{code}
+couldBeSmallEnoughToInline :: Int -> Int	-- Constructor discount and size threshold
+	      	       	   -> UnfoldingGuidance
+		      	   -> Bool		-- True => unfold it
+
+couldBeSmallEnoughToInline con_discount size_threshold guidance
+  = smallEnoughToInline con_discount size_threshold (repeat True) guidance
 \end{code}
 
 %************************************************************************

@@ -18,6 +18,7 @@ import TcMonad		hiding ( rnMtoTcM )
 import Inst		( Inst, InstOrigin(..), SYN_IE(LIE), plusLIE, 
 			  newDicts, tyVarsOfInst, instToId )
 import TcEnv		( tcGetGlobalTyVars, tcExtendGlobalTyVars )
+import SpecEnv		( SpecEnv )
 import TcSimplify	( tcSimplify, tcSimplifyAndCheck )
 import TcType		( SYN_IE(TcType), SYN_IE(TcThetaType), SYN_IE(TcTauType), 
 			  SYN_IE(TcTyVarSet), SYN_IE(TcTyVar),
@@ -166,7 +167,7 @@ genBinds binder_names mono_ids bind lie sig_infos prag_info_fn
 	unresolved_kind_tyvars = filter (isTypeKind    . tyVarKind) tyvars
 
 	box_it tyvar = newTyVarTy mkBoxedTypeKind	`thenNF_Tc` \ boxed_ty ->
-		       unifyTauTy (mkTyVarTy tyvar) boxed_ty
+		       unifyTauTy boxed_ty (mkTyVarTy tyvar) 
 
     in
     ASSERT( null unboxed_kind_tyvars )	-- The instCantBeGeneralised stuff in tcSimplify

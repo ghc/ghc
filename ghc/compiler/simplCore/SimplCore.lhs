@@ -34,7 +34,7 @@ import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..), switchIsOn,
 import CoreLint		( lintCoreBindings )
 import CoreSyn
 import CoreUnfold
-import CoreUtils	( substCoreBindings, manifestlyWHNF )
+import CoreUtils	( substCoreBindings, whnfOrBottom )
 import ErrUtils		( ghcExit )
 import FiniteMap	( FiniteMap )
 import FloatIn		( floatInwards )
@@ -58,7 +58,6 @@ import Pretty		( ppShow, ppAboves, ppAbove, ppCat, ppStr )
 import SAT		( doStaticArgs )
 import SimplMonad	( zeroSimplCount, showSimplCount, SimplCount )
 import SimplPgm		( simplifyPgm )
-import SimplVar		( leastItCouldCost )
 import Specialise
 import SpecUtils	( pprSpecErrs )
 import StrictAnal	( saWwTopBinds )
@@ -86,7 +85,7 @@ core2core :: [CoreToDo]			-- spec of what core-to-core passes to do
 	  -> [CoreBinding]		-- input...
 	  -> IO
 	      ([CoreBinding],	-- results: program, plus...
-	       IdEnv UnfoldingDetails,	--  unfoldings to be exported from here
+	       IdEnv Unfolding,	--  unfoldings to be exported from here
 	      SpecialiseData)		--  specialisation data
 
 core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
@@ -305,9 +304,9 @@ will be visible on the other side of an interface, too.
 
 \begin{code}
 calcInlinings :: Bool	-- True => inlinings with _scc_s are OK
-	      -> IdEnv UnfoldingDetails
+	      -> IdEnv Unfolding
 	      -> [CoreBinding]
-	      -> IdEnv UnfoldingDetails
+	      -> IdEnv Unfolding
 
 calcInlinings scc_s_OK inline_env_so_far top_binds
   = let
@@ -319,9 +318,9 @@ calcInlinings scc_s_OK inline_env_so_far top_binds
     pp_item (binder, details)
       = ppCat [ppr PprDebug binder, ppStr "=>", pp_det details]
       where
-    	pp_det NoUnfoldingDetails   = ppStr "_N_"
+    	pp_det NoUnfolding   = ppStr "_N_"
 --LATER:	pp_det (IWantToBeINLINEd _) = ppStr "INLINE"
-    	pp_det (GenForm _ expr guide)
+    	pp_det (CoreUnfolding (SimpleUnfolding _ guide expr))
     	  = ppAbove (ppr PprDebug guide) (ppr PprDebug expr)
     	pp_det other	    	    = ppStr "???"
 
@@ -362,7 +361,7 @@ calcInlinings scc_s_OK inline_env_so_far top_binds
 
       | rhs_mentions_an_unmentionable
       || (not explicit_INLINE_requested
-	  && (rhs_looks_like_a_caf || guidance_says_don't || guidance_size_too_big))
+	  && (rhs_looks_like_a_caf || guidance_size_too_big))
       = let
 	    my_my_trace
 	      = if explicit_INLINE_requested
@@ -429,38 +428,16 @@ calcInlinings scc_s_OK inline_env_so_far top_binds
 	guidance_size
 	  = case guidance of
 	      UnfoldAlways  	    	  -> 0 -- *extremely* small
-	      EssentialUnfolding    	  -> 0 -- ditto
 	      UnfoldIfGoodArgs _ _ _ size -> size
-
-	guidance_says_don't = case guidance of { UnfoldNever -> True; _ -> False }
 
 	guidance_size_too_big
 	    -- Does the guidance suggest that this unfolding will
 	    -- be of no use *no matter* the arguments given to it?
 	    -- Could be more sophisticated...
-	  = case guidance of
-	      UnfoldAlways  	 -> False
-	      EssentialUnfolding -> False
-	      UnfoldIfGoodArgs _ no_val_args arg_info_vec size
-
-		-> if explicit_creation_threshold then
-		      False 	-- user set threshold; don't second-guess...
-
-		   else if no_val_args == 0 && rhs_looks_like_a_data_val then
-		      False	-- we'd like a top-level data constr to be
-				-- visible even if it is never unfolded
-		   else
-		      let
-			  cost
-			    = leastItCouldCost con_discount_weight size no_val_args
-				arg_info_vec rhs_arg_tys
-		      in
---		      (if (unfold_use_threshold < cost) then (pprTrace "cost:" (ppInt cost)) else \x->x ) (
-		      unfold_use_threshold < cost
---		      )
+	  = not (couldBeSmallEnoughToInline con_discount_weight unfold_use_threshold guidance)
 
 
-	rhs_looks_like_a_caf = not (manifestlyWHNF rhs)
+	rhs_looks_like_a_caf = not (whnfOrBottom rhs)
 
 	rhs_looks_like_a_data_val
 	  = case (collectBinders rhs) of

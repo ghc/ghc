@@ -28,6 +28,7 @@ import AsmCodeGen	( dumpRealAsm, writeRealAsm )
 
 import AbsCSyn		( absCNop, AbstractC )
 import AbsCUtils	( flattenAbsC )
+import CoreUnfold	( Unfolding )
 import Bag		( emptyBag, isEmptyBag )
 import CmdLineOpts
 import ErrUtils		( pprBagOfErrors, ghcExit )

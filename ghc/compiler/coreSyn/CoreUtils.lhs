@@ -7,18 +7,17 @@
 #include "HsVersions.h"
 
 module CoreUtils (
-	coreExprType, coreAltsType,
+	coreExprType, coreAltsType, coreExprCc,
 
 	substCoreExpr, substCoreBindings
 
 	, mkCoreIfThenElse
 	, argToExpr
 	, unTagBinders, unTagBindersAlts
-	, manifestlyWHNF, manifestlyBottom
+
 	, maybeErrorApp
 	, nonErrorRHSs
 	, squashableDictishCcExpr
-	, exprSmallEnoughToDup
 {-	
 	coreExprArity,
 	isWrapperFor,
@@ -30,7 +29,7 @@ IMPORT_DELOOPER(IdLoop)	-- for pananoia-checking purposes
 
 import CoreSyn
 
-import CostCentre	( isDictCC )
+import CostCentre	( isDictCC, CostCentre, noCostCentre )
 import Id		( idType, mkSysLocal, getIdArity, isBottomingId,
 			  toplevelishId, mkIdWithNewUniq, applyTypeEnvToId,
 			  addOneToIdEnv, growIdEnvList, lookupIdEnv,
@@ -43,9 +42,9 @@ import Maybes		( catMaybes, maybeToBool )
 import PprCore
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instances-} )
-import Pretty		( ppAboves )
+import Pretty		( ppAboves, ppStr )
 import PrelVals		( augmentId, buildId )
-import PrimOp		( primOpType, fragilePrimOp, PrimOp(..) )
+import PrimOp		( primOpType, PrimOp(..) )
 import SrcLoc		( mkUnknownSrcLoc )
 import TyVar		( cloneTyVar,
 			  isNullTyVarEnv, addOneToTyVarEnv, SYN_IE(TyVarEnv)
@@ -141,6 +140,16 @@ applyTypeToArg op_ty val_or_lit_arg = case (getFunTy_maybe op_ty) of
 					Just (_, res_ty) -> res_ty
 \end{code}
 
+coreExprCc gets the cost centre enclosing an expression, if any.
+It looks inside lambdas because (scc "foo" \x.e) = \x.scc "foo" e
+
+\begin{code}
+coreExprCc :: GenCoreExpr val_bdr val_occ tyvar uvar -> CostCentre
+coreExprCc (SCC cc e) = cc
+coreExprCc (Lam _ e)  = coreExprCc e
+coreExprCc other      = noCostCentre
+\end{code}
+
 %************************************************************************
 %*									*
 \subsection{Routines to manufacture bits of @CoreExpr@}
@@ -210,112 +219,6 @@ argToExpr ::
 
 argToExpr (VarArg v)   = Var v
 argToExpr (LitArg lit) = Lit lit
-\end{code}
-
-\begin{code}
-exprSmallEnoughToDup (Con _ _)   = True	-- Could check # of args
-exprSmallEnoughToDup (Prim op _) = not (fragilePrimOp op) -- Could check # of args
-exprSmallEnoughToDup (Lit lit)   = not (isNoRepLit lit)
-exprSmallEnoughToDup expr
-  = case (collectArgs expr) of { (fun, _, _, vargs) ->
-    case fun of
-      Var v | length vargs == 0 -> True
-      _				-> False
-    }
-
-{- LATER:
-WAS: MORE CLEVER:
-exprSmallEnoughToDup expr  -- for now, just: <var> applied to <args>
-  = case (collectArgs expr) of { (fun, _, _, vargs) ->
-    case fun of
-      Var v -> v /= buildId
-		 && v /= augmentId
-		 && length vargs <= 6 -- or 10 or 1 or 4 or anything smallish.
-      _       -> False
-    }
--}
-\end{code}
-Question (ADR): What is the above used for?  Is a _ccall_ really small
-enough?
-
-@manifestlyWHNF@ looks at a Core expression and returns \tr{True} if
-it is obviously in weak head normal form.  It isn't a disaster if it
-errs on the conservative side (returning \tr{False})---I've probably
-left something out... [WDP]
-
-\begin{code}
-manifestlyWHNF :: GenCoreExpr bndr Id tyvar uvar -> Bool
-
-manifestlyWHNF (Var _)	      = True
-manifestlyWHNF (Lit _)	      = True
-manifestlyWHNF (Con _ _)      = True
-manifestlyWHNF (SCC _ e)      = manifestlyWHNF e
-manifestlyWHNF (Coerce _ _ e) = manifestlyWHNF e
-manifestlyWHNF (Let _ e)      = False
-manifestlyWHNF (Case _ _)     = False
-
-manifestlyWHNF (Lam x e)  = if isValBinder x then True else manifestlyWHNF e
-
-manifestlyWHNF other_expr   -- look for manifest partial application
-  = case (collectArgs other_expr) of { (fun, _, _, vargs) ->
-    case fun of
-      Var f ->  let
-		    num_val_args = length vargs
-		in
-		num_val_args == 0 -- Just a type application of
-				  -- a variable (f t1 t2 t3);
-				  -- counts as WHNF.
-		||
-		case (arityMaybe (getIdArity f)) of
-		  Nothing     -> False
-		  Just arity  -> num_val_args < arity
-
-      _ -> False
-    }
-\end{code}
-
-@manifestlyBottom@ looks at a Core expression and returns \tr{True} if
-it is obviously bottom, that is, it will certainly return bottom at
-some point.  It isn't a disaster if it errs on the conservative side
-(returning \tr{False}).
-
-\begin{code}
-manifestlyBottom :: GenCoreExpr bndr Id tyvar uvar -> Bool
-
-manifestlyBottom (Var v)     	= isBottomingId v
-manifestlyBottom (Lit _)     	= False
-manifestlyBottom (Con  _ _)  	= False
-manifestlyBottom (Prim _ _)  	= False
-manifestlyBottom (SCC _ e)   	= manifestlyBottom e
-manifestlyBottom (Coerce _ _ e) = manifestlyBottom e
-manifestlyBottom (Let _ e)	= manifestlyBottom e
-
-  -- We do not assume \x.bottom == bottom:
-manifestlyBottom (Lam x e) = if isValBinder x then False else manifestlyBottom e
-
-manifestlyBottom (Case e a)
-  = manifestlyBottom e
-  || (case a of
-	AlgAlts  alts def -> all mbalg  alts && mbdef def
-	PrimAlts alts def -> all mbprim alts && mbdef def
-     )
-  where
-    mbalg  (_,_,e') = manifestlyBottom e'
-
-    mbprim (_,e')   = manifestlyBottom e'
-
-    mbdef NoDefault          = True
-    mbdef (BindDefault _ e') = manifestlyBottom e'
-
-manifestlyBottom other_expr   -- look for manifest partial application
-  = case (collectArgs other_expr) of { (fun, _, _, _) ->
-    case fun of
-      Var f | isBottomingId f -> True
-		-- Application of a function which always gives
-		-- bottom; we treat this as a WHNF, because it
-		-- certainly doesn't need to be shared!
-      _ -> False
-    }
 \end{code}
 
 \begin{code}

@@ -14,11 +14,11 @@ module BinderInfo (
 	BinderInfo(..),
 	FunOrArg, DuplicationDanger, InsideSCC,  -- NB: all abstract (yay!)
 
-	inlineUnconditionally, oneTextualOcc, oneSafeOcc,
+	inlineUnconditionally, okToInline,
 
-	addBinderInfo, orBinderInfo,
+	addBinderInfo, orBinderInfo, 
 
-	argOccurrence, funOccurrence,
+	argOccurrence, funOccurrence, dangerousArgOcc, noBinderInfo,
 	markMany, markDangerousToDup, markInsideSCC,
 	getBinderInfoArity,
 	setBinderInfoArityToZero,
@@ -28,6 +28,7 @@ module BinderInfo (
 
 IMP_Ubiq(){-uitous-}
 
+import CoreUnfold	( FormSummary(..) )
 import Pretty
 import Util		( panic )
 \end{code}
@@ -95,30 +96,43 @@ data DuplicationDanger
 data InsideSCC
   = InsideSCC	    -- Inside an SCC; so be careful when substituting.
   | NotInsideSCC    -- It's ok.
+
+noBinderInfo = ManyOcc 0	-- A non-committal value
 \end{code}
 
 
 Predicates
 ~~~~~~~~~~
 
-@oneTextualOcc@ checks for one occurrence, in any position.
-The occurrence may be inside a lambda, that's all right.
-
 \begin{code}
-oneTextualOcc :: Bool -> BinderInfo -> Bool
+okToInline
+	:: FormSummary	-- What the thing to be inlined is like
+	-> BinderInfo 	-- How the thing to be inlined occurs
+	-> Bool		-- True => it's small enough to inline
+	-> Bool		-- True => yes, inline it
 
-oneTextualOcc ok_to_dup (OneOcc _ _ _ n_alts _) = n_alts <= 1 || ok_to_dup
-oneTextualOcc _         other		        = False
-\end{code}
+-- Always inline bottoms
+okToInline BottomForm occ_info small_enough
+  = True	-- Unless one of the type args is unboxed??
+		-- This used to be checked for, but I can't
+		-- see why so I've left it out.
 
-@safeSingleOcc@ detects single occurences of values that are safe to
-inline, {\em including} ones in an argument position.
+-- Non-WHNFs can be inlined if they occur once, or are small
+okToInline OtherForm (OneOcc _ _ _ n_alts _) small_enough | n_alts <= 1 = True
+okToInline OtherForm any_occ 		     small_enough 		= small_enough
 
-\begin{code}
-oneSafeOcc :: Bool -> BinderInfo -> Bool
-oneSafeOcc ok_to_dup (OneOcc _ NoDupDanger NotInsideSCC n_alts _)
-						     = n_alts <= 1 || ok_to_dup
-oneSafeOcc _         other			     = False
+-- A WHNF can be inlined if it doesn't occur inside a lambda,
+-- and occurs exactly once or 
+--     occurs once in each branch of a case and is small
+okToInline form (OneOcc _ NoDupDanger _ n_alts _) small_enough 
+  = is_whnf_form form && 
+    (n_alts <= 1 || small_enough)
+  where
+    is_whnf_form VarForm   = True
+    is_whnf_form ValueForm = True
+    is_whnf_form other     = False
+
+okToInline form any_occ small_enough = False
 \end{code}
 
 @inlineUnconditionally@ decides whether a let-bound thing can
@@ -165,6 +179,8 @@ markMany DeadCode	     = panic "markMany"
 markDangerousToDup (OneOcc posn _ in_scc n_alts ar)
   = OneOcc posn DupDanger in_scc n_alts ar
 markDangerousToDup other = other
+
+dangerousArgOcc = OneOcc ArgOcc DupDanger NotInsideSCC 1 0
 
 markInsideSCC (OneOcc posn dup_danger _ n_alts ar)
   = OneOcc posn dup_danger InsideSCC n_alts ar

@@ -18,6 +18,7 @@ import TcHsSyn		( TcIdOcc )
 import TcMonad		hiding ( rnMtoTcM )
 import Inst		( InstOrigin(..) )
 import TcEnv		( tcLookupClassByKey )
+import SpecEnv		( SpecEnv )
 import TcMonoType	( tcMonoType )
 import TcSimplify	( tcSimplifyCheckThetas )
 

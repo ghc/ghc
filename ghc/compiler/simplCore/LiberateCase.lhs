@@ -180,11 +180,12 @@ libCaseBind env (Rec pairs)
 	-- to think that something is top-level when it isn't.
 
     rhs_small_enough rhs
-      = case (calcUnfoldingGuidance True{-sccs OK-} lIBERATE_BOMB_SIZE rhs) of
+      = case (calcUnfoldingGuidance True{-sccs OK-} lIBERATE_BOMB_SIZE cON_DISCOUNT rhs) of
 	  UnfoldNever -> False
 	  _ 	      -> True	-- we didn't BOMB, so it must be OK
 
     lIBERATE_BOMB_SIZE = bombOutSize env
+    cON_DISCOUNT = error "libCaseBind"
 \end{code}
 
 

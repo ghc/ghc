@@ -26,6 +26,7 @@ IMPORT_1_3(Ix)
 IMPORT_DELOOPER(SmplLoop)		-- well, cheating sort of
 
 import Id		( mkSysLocal, mkIdWithNewUniq )
+import CoreUnfold	( SimpleUnfolding )
 import SimplEnv
 import SrcLoc		( mkUnknownSrcLoc )
 import TyVar		( cloneTyVar )
@@ -126,6 +127,7 @@ data TickType
   | CaseOfError
   | TyBetaReduction
   | BetaReduction
+  | SpecialisationDone
   {- BEGIN F/B ENTRIES -}
   -- the 8 rules
   | FoldrBuild	     	-- foldr f z (build g) ==>
@@ -165,6 +167,9 @@ instance Text TickType where
     showsPrec p CaseOfError	= showString "CaseOfError      "
     showsPrec p TyBetaReduction	= showString "TyBetaReduction  "
     showsPrec p BetaReduction	= showString "BetaReduction    "
+    showsPrec p SpecialisationDone 
+				= showString "Specialisation   "
+
 	-- Foldr/Build Stuff:
     showsPrec p FoldrBuild	= showString "FoldrBuild       "
     showsPrec p FoldrAugment	= showString "FoldrAugment     "
@@ -212,6 +217,7 @@ zeroSimplCount
 	(CaseOfError, 0),
 	(TyBetaReduction,0),
 	(BetaReduction,0),
+	(SpecialisationDone,0),
 	-- Foldr/Build Stuff:
 	(FoldrBuild, 0),
 	(FoldrAugment, 0),
@@ -257,6 +263,8 @@ tick tick_type us (SimplCount n stuff)
 
 tickN :: TickType -> Int -> SmplM ()
 
+tickN tick_type 0 us counts 
+  = ((), counts)
 tickN tick_type IBOX(increment) us (SimplCount n stuff)
   = ((), SimplCount (n _ADD_ increment)
 #ifdef OMIT_SIMPL_COUNTS

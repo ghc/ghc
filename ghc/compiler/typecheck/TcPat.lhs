@@ -23,6 +23,7 @@ import Inst		( Inst, OverloadedLit(..), InstOrigin(..),
 			)
 import TcEnv		( tcLookupGlobalValue, tcLookupGlobalValueByKey, 
 			  tcLookupLocalValueOK )
+import SpecEnv		( SpecEnv )
 import TcType 		( SYN_IE(TcType), TcMaybe, newTyVarTy, newTyVarTys, tcInstId )
 import Unify 		( unifyTauTy, unifyTauTyList, unifyTauTyLists )
 
@@ -341,7 +342,7 @@ matchConArgTys con arg_tys
     checkTc (con_arity == no_of_args)
 	    (arityErr "Constructor" con_id con_arity no_of_args)	`thenTc_`
 
-    unifyTauTyLists arg_tys con_args	 				`thenTc_`
+    unifyTauTyLists con_args arg_tys	 				`thenTc_`
     returnTc (con_id, con_result)
 \end{code}
 

@@ -11,9 +11,10 @@ module SimplPgm ( simplifyPgm ) where
 IMP_Ubiq(){-uitous-}
 
 import CmdLineOpts	( opt_D_verbose_core2core,
-			  switchIsOn, intSwitchSet, SimplifierSwitch(..)
+			  switchIsOn, SimplifierSwitch(..)
 			)
 import CoreSyn
+import CoreUnfold	( SimpleUnfolding )
 import CoreUtils	( substCoreExpr )
 import Id		( externallyVisibleId,
 			  mkIdEnv, lookupIdEnv, SYN_IE(IdEnv),
@@ -50,10 +51,7 @@ simplifyPgm binds s_sw_chkr simpl_stats us
 
     occur_anal = occurAnalyseBinds
 
-    max_simpl_iterations
-      = case (intSwitchSet s_sw_chkr MaxSimplifierIterations) of
-	  Nothing  -> 1    -- default
-	  Just max -> max
+    max_simpl_iterations = getSimplIntSwitch s_sw_chkr MaxSimplifierIterations
 
     simpl_pgm :: Int -> Int -> [CoreBinding] -> SmplM ([CoreBinding], Int, SimplCount)
 

@@ -33,6 +33,7 @@ import TcEnv		( tcLookupLocalValue, tcLookupGlobalValue, tcLookupClassByKey,
 			  tcLookupGlobalValueByKey, newMonoIds, tcGetGlobalTyVars,
 			  tcExtendGlobalTyVars
 			)
+import SpecEnv		( SpecEnv )
 import TcMatches	( tcMatchesCase, tcMatch )
 import TcMonoType	( tcPolyType )
 import TcPat		( tcPat )
@@ -229,7 +230,7 @@ tcExpr in_expr@(SectionR op expr)
     newTyVarTy mkTypeKind	`thenNF_Tc` \ ty1 ->
     newTyVarTy mkTypeKind	`thenNF_Tc` \ ty2 ->
     tcAddErrCtxt (sectionRAppCtxt in_expr) $
-    unifyTauTy op_ty (mkFunTys [ty1, expr_ty] ty2)     `thenTc_`
+    unifyTauTy (mkFunTys [ty1, expr_ty] ty2) op_ty      `thenTc_`
 
     returnTc (SectionR op' expr', lie1 `plusLIE` lie2, mkFunTy ty1 ty2)
 \end{code}
@@ -303,7 +304,7 @@ tcExpr (HsIf pred b1 b2 src_loc)
     tcExpr pred			`thenTc`    \ (pred',lie1,predTy) ->
 
     tcAddErrCtxt (predCtxt pred) (
-      unifyTauTy predTy boolTy
+      unifyTauTy boolTy predTy
     )				`thenTc_`
 
     tcExpr b1			`thenTc`    \ (b1',lie2,result_ty) ->
@@ -469,7 +470,7 @@ tcExpr in_expr@(ExprWithTySig expr poly_ty)
    let
 	(sig_tyvars', sig_theta', sig_tau') = splitSigmaTy sigma_sig'
    in
-   unifyTauTy tau_ty sig_tau'		`thenTc_`
+   unifyTauTy sig_tau' tau_ty		`thenTc_`
 
 	-- Check the type variables of the signature
    checkSigTyVars sig_tyvars' sig_tau'	`thenTc_`
@@ -783,7 +784,7 @@ tcDoStmts stmts src_loc
 		-- See comments with tcListComp on GeneratorQual
 
 		get_m_arg exp_ty	`thenTc` \ a ->
-		unifyTauTy a pat_ty	`thenTc_`
+		unifyTauTy pat_ty a	`thenTc_`
 		returnTc (a, pat', exp', pat_lie `plusLIE` exp_lie)
 	  ))				`thenTc` \ (a, pat', exp', stmt_lie) ->
 	  go stmts			`thenTc` \ (stmts', stmts_lie, stmts_ty) ->

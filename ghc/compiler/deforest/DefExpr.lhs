@@ -20,7 +20,7 @@
 >			  SYN_IE(SigmaType), Type
 >			)
 > import CmdLineOpts	( SwitchResult, switchIsOn )
-> import CoreUnfold	( UnfoldingDetails(..) )
+> import CoreUnfold	( Unfolding(..) )
 > import CoreUtils	( mkValLam, unTagBinders, coreExprType )
 > import Id		( applyTypeEnvToId, getIdUnfolding, isTopLevId, Id,
 > 			  isInstId_maybe
@@ -292,8 +292,8 @@ should an unfolding be required.
 >	  	then  no_unfold
 >
 >		else case (getIdUnfolding id) of
->			GenForm _ expr guidance ->
->			  panic "DefExpr:GenForm has changed a little; needs mod here"
+>			SimpleUnfolding _ expr guidance ->
+>			  panic "DefExpr:SimpleUnfolding has changed a little; needs mod here"
 >			  -- SLPJ March 95
 >
 >--???			  -- ToDo: too much overhead here.
