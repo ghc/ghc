@@ -5,7 +5,25 @@
 \section[PrelUnsafe]{Module @PrelUnsafe@}
 
 These functions have their own module because we definitely don't want
-them to be inlined.
+them to be inlined. The reason is that we may end up turning an action
+into a constant when it is not:
+
+  new :: IORef Int
+  new = 
+   let
+    foo = unsafePerformIO getNextValue
+   in
+   newIORef foo 
+
+If unsafePerformIO is inlined here, the application of getNextValue to the realWorld# 
+token might be floated out, leaving us with
+
+  foo' = getNextValue realWorld#
+
+  new :: IORef Int
+  new = newIORef foo'
+
+which is not what we want.
 
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
@@ -40,11 +58,15 @@ unsafePerformIO (IO m)
 unsafeInterleaveIO :: IO a -> IO a
 unsafeInterleaveIO (IO m) = IO ( \ s ->
 	let
-	    IOok _ r = m s
+         res =
+	   case m s of
+	     IOok _ r   -> r
+	     IOfail _ e -> error ("unsafeInterleaveIO: I/O error: " ++ show e ++ "\n")
 	in
-	IOok s r)
+	IOok s res
+    )
 
-{-# GENERATE_SPECS _trace a #-}
+
 trace :: String -> a -> a
 trace string expr
   = unsafePerformIO (
@@ -55,4 +77,3 @@ trace string expr
   where
     sTDERR = (``stderr'' :: Addr)
 \end{code}
-
