@@ -1,6 +1,6 @@
 {-# OPTIONS -W #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.53 2000/08/09 09:56:08 simonmar Exp $
+-- $Id: Main.hs,v 1.54 2000/08/18 04:04:48 qrczak Exp $
 --
 -- GHC Driver program
 --
@@ -1828,7 +1828,7 @@ run_phase cc_phase _basename _suff input_fn output_fn
 	cmdline_includes <- readState cmdline_hc_includes -- -#include options
 
 	let cc_injects | hcc = unlines (map mk_include 
-					(c_includes ++ reverse cmdline_includes))
+					(reverse cmdline_includes ++ c_includes))
 		       | otherwise = ""
 	    mk_include h_file = 
 		case h_file of 
