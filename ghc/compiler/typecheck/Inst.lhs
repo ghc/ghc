@@ -47,7 +47,7 @@ import TcMType	( zonkTcType, zonkTcTypes, zonkTcPredType,
 import TcType	( Type, TcType, TcThetaType, TcPredType, TcTauType, TcTyVarSet,
 		  SourceType(..), PredType, ThetaType, TyVarDetails(VanillaTv),
 		  tcSplitForAllTys, tcSplitForAllTys, 
-		  tcSplitMethodTy, tcSplitRhoTy, tcFunArgTy,
+		  tcSplitMethodTy, tcSplitPhiTy, tcFunArgTy,
 		  isIntTy,isFloatTy, isIntegerTy, isDoubleTy,
 		  tcIsTyVarTy, mkPredTy, mkTyVarTy, mkTyVarTys,
 		  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tidyPred,
@@ -399,7 +399,7 @@ newMethodAtLoc inst_loc real_id tys
 	(tyvars,rho)  = tcSplitForAllTys (idType real_id)
 	rho_ty	      = ASSERT( equalLength tyvars tys )
 			substTy (mkTopTyVarSubst tyvars tys) rho
-	(theta, tau)  = tcSplitRhoTy rho_ty
+	(theta, tau)  = tcSplitPhiTy rho_ty
     in
     newMethodWith inst_loc real_id tys theta tau	`thenNF_Tc` \ meth_inst ->
     returnNF_Tc (meth_inst, instToId meth_inst)
@@ -565,7 +565,7 @@ lookupInst dict@(Dict _ (ClassP clas tys) loc)
 	   mapNF_Tc mk_ty_arg tyvars	`thenNF_Tc` \ ty_args ->
 	   let
 		dfun_rho   = substTy (mkTyVarSubst tyvars ty_args) rho
-		(theta, _) = tcSplitRhoTy dfun_rho
+		(theta, _) = tcSplitPhiTy dfun_rho
 		ty_app     = mkHsTyApp (HsVar dfun_id) ty_args
 	   in
 	   if null theta then
@@ -635,7 +635,7 @@ lookupSimpleInst clas tys
 	-> returnNF_Tc (Just (substTheta (mkSubst emptyInScopeSet tenv) theta))
         where
 	   (_, rho)  = tcSplitForAllTys (idType dfun)
-	   (theta,_) = tcSplitRhoTy rho
+	   (theta,_) = tcSplitPhiTy rho
 
       other  -> returnNF_Tc Nothing
 \end{code}

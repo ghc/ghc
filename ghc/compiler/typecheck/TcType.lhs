@@ -17,7 +17,7 @@ is the principal client.
 module TcType (
   --------------------------------
   -- Types 
-  TcType, TcSigmaType, TcPhiType, TcTauType, TcPredType, TcThetaType, 
+  TcType, TcSigmaType, TcRhoType, TcTauType, TcPredType, TcThetaType, 
   TcTyVar, TcTyVarSet, TcKind, 
 
   --------------------------------
@@ -27,12 +27,12 @@ module TcType (
 
   --------------------------------
   -- Builders
-  mkRhoTy, mkSigmaTy, 
+  mkPhiTy, mkSigmaTy, 
 
   --------------------------------
   -- Splitters  
   -- These are important because they do not look through newtypes
-  tcSplitForAllTys, tcSplitRhoTy, 
+  tcSplitForAllTys, tcSplitPhiTy, 
   tcSplitFunTy_maybe, tcSplitFunTys, tcFunArgTy, tcFunResultTy,
   tcSplitTyConApp, tcSplitTyConApp_maybe, tcTyConAppTyCon, tcTyConAppArgs,
   tcSplitAppTy_maybe, tcSplitAppTy, tcSplitSigmaTy,
@@ -155,7 +155,7 @@ import Outputable
 The type checker divides the generic Type world into the 
 following more structured beasts:
 
-sigma ::= forall tyvars. theta => phi
+sigma ::= forall tyvars. phi
 	-- A sigma type is a qualified type
 	--
 	-- Note that even if 'tyvars' is empty, theta
@@ -166,7 +166,9 @@ sigma ::= forall tyvars. theta => phi
 	-- A 'phi' type has no foralls to the right of
 	-- an arrow
 
-phi ::= sigma -> phi
+phi :: theta => rho
+
+rho ::= sigma -> rho
      |  tau
 
 -- A 'tau' type has no quantification anywhere
@@ -182,7 +184,7 @@ tau ::= tyvar
 
 \begin{code}
 type SigmaType = Type
-type PhiType   = Type
+type RhoType   = Type
 type TauType   = Type
 \end{code}
 
@@ -199,7 +201,7 @@ type TcType = Type 		-- A TcType can have mutable type variables
 type TcPredType     = PredType
 type TcThetaType    = ThetaType
 type TcSigmaType    = TcType
-type TcPhiType      = TcType
+type TcRhoType      = TcType
 type TcTauType      = TcType
 type TcKind         = TcType
 \end{code}
@@ -287,10 +289,10 @@ tyVarBindingInfo tv
 %************************************************************************
 
 \begin{code}
-mkSigmaTy tyvars theta tau = mkForAllTys tyvars (mkRhoTy theta tau)
+mkSigmaTy tyvars theta tau = mkForAllTys tyvars (mkPhiTy theta tau)
 
-mkRhoTy :: [SourceType] -> Type -> Type
-mkRhoTy theta ty = foldr (\p r -> FunTy (mkPredTy p) r) ty theta
+mkPhiTy :: [SourceType] -> Type -> Type
+mkPhiTy theta ty = foldr (\p r -> FunTy (mkPredTy p) r) ty theta
 \end{code}
 
 
@@ -348,8 +350,8 @@ tcIsForAllTy (ForAllTy tv ty) = True
 tcIsForAllTy (NoteTy n ty)    = tcIsForAllTy ty
 tcIsForAllTy t		      = False
 
-tcSplitRhoTy :: Type -> ([PredType], Type)
-tcSplitRhoTy ty = split ty ty []
+tcSplitPhiTy :: Type -> ([PredType], Type)
+tcSplitPhiTy ty = split ty ty []
  where
   split orig_ty (FunTy arg res) ts = case tcSplitPredTy_maybe arg of
 					Just p  -> split res res (p:ts)
@@ -358,7 +360,7 @@ tcSplitRhoTy ty = split ty ty []
   split orig_ty ty		ts = (reverse ts, orig_ty)
 
 tcSplitSigmaTy ty = case tcSplitForAllTys ty of
-			(tvs, rho) -> case tcSplitRhoTy rho of
+			(tvs, rho) -> case tcSplitPhiTy rho of
 					(theta, tau) -> (tvs, theta, tau)
 
 tcTyConAppTyCon :: Type -> TyCon

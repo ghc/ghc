@@ -23,12 +23,13 @@ import Id		( mkLocalId, mkSysLocal )
 import Name		( Name )
 import FieldLabel	( fieldLabelName )
 import TcEnv		( tcLookupClass, tcLookupDataCon, tcLookupGlobalId, tcLookupId )
-import TcMType 		( tcInstTyVars, newTyVarTy, getTcTyVar, putTcTyVar )
+import TcMType 		( tcInstTyVars, newTyVarTy, getTcTyVar, putTcTyVar, zapToType )
 import TcType		( TcType, TcTyVar, TcSigmaType, TyVarDetails(VanillaTv),
 			  mkTyConApp, mkClassPred, liftedTypeKind, tcGetTyVar_maybe,
 			  isHoleTyVar, openTypeKind )
-import TcUnify		( tcSub, unifyTauTy, unifyListTy, unifyPArrTy,
-			  unifyTupleTy,  mkCoercion, idCoercion, isIdCoercion,
+import TcUnify		( tcSubOff, TcHoleType, 
+			  unifyTauTy, unifyListTy, unifyPArrTy, unifyTupleTy,  
+			  mkCoercion, idCoercion, isIdCoercion,
 			  (<$>), PatCoFn )
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..) )
 
@@ -69,8 +70,7 @@ tcMonoPatBndr :: BinderChecker
   -- so there's no polymorphic guy to worry about
 
 tcMonoPatBndr binder_name pat_ty 
-  | Just tv <- tcGetTyVar_maybe pat_ty,
-    isHoleTyVar tv
+  = zapToType pat_ty	`thenNF_Tc` \ pat_ty' ->
 	-- If there are *no constraints* on the pattern type, we
 	-- revert to good old H-M typechecking, making
 	-- the type of the binder into an *ordinary* 
@@ -79,14 +79,8 @@ tcMonoPatBndr binder_name pat_ty
 	-- What we are trying to avoid here is giving a binder
 	-- a type that is a 'hole'.  The only place holes should
 	-- appear is as an argument to tcPat and tcExpr/tcMonoExpr.
-  = getTcTyVar tv	`thenNF_Tc` \ maybe_ty ->
-    case maybe_ty of
-	Just ty -> tcMonoPatBndr binder_name ty
-	Nothing -> newTyVarTy openTypeKind	`thenNF_Tc` \ ty ->
-		   putTcTyVar tv ty		`thenNF_Tc_`
-		   returnTc (idCoercion, emptyLIE, mkLocalId binder_name ty)
-  | otherwise
-  = returnTc (idCoercion, emptyLIE, mkLocalId binder_name pat_ty)
+
+    returnTc (idCoercion, emptyLIE, mkLocalId binder_name pat_ty')
 \end{code}
 
 
@@ -100,7 +94,7 @@ tcMonoPatBndr binder_name pat_ty
 tcPat :: BinderChecker
       -> RenamedPat
 
-      -> TcSigmaType	-- Expected type derived from the context
+      -> TcHoleType	-- Expected type derived from the context
 			--	In the case of a function with a rank-2 signature,
 			--	this type might be a forall type.
 
@@ -461,10 +455,10 @@ tcSubPat does the work
 		(forall a. a->a in the example)
 
 \begin{code}
-tcSubPat :: TcSigmaType -> TcSigmaType -> TcM (PatCoFn, LIE)
+tcSubPat :: TcSigmaType -> TcHoleType -> TcM (PatCoFn, LIE)
 
 tcSubPat sig_ty exp_ty
- = tcSub sig_ty exp_ty			`thenTc` \ (co_fn, lie) ->
+ = tcSubOff sig_ty exp_ty		`thenTc` \ (co_fn, lie) ->
 	-- co_fn is a coercion on *expressions*, and we
 	-- need to make a coercion on *patterns*
    if isIdCoercion co_fn then

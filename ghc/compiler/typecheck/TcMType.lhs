@@ -11,11 +11,13 @@ module TcMType (
 
   --------------------------------
   -- Creating new mutable type variables
-  newTyVar, newHoleTyVarTy,
+  newTyVar, 
   newTyVarTy,		-- Kind -> NF_TcM TcType
   newTyVarTys,		-- Int -> Kind -> NF_TcM [TcType]
   newKindVar, newKindVars, newBoxityVar,
   putTcTyVar, getTcTyVar,
+
+  newHoleTyVarTy, readHoleResult, zapToType,
 
   --------------------------------
   -- Instantiation
@@ -45,10 +47,10 @@ import TypeRep		( Type(..), SourceType(..), TyNote(..),	 -- Friend; can see repr
 import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  TcTyVarSet, TcKind, TcTyVar, TyVarDetails(..),
 			  tcEqType, tcCmpPred,
-			  tcSplitRhoTy, tcSplitPredTy_maybe, tcSplitAppTy_maybe, 
+			  tcSplitPhiTy, tcSplitPredTy_maybe, tcSplitAppTy_maybe, 
 			  tcSplitTyConApp_maybe, tcSplitForAllTys,
 			  tcIsTyVarTy, tcSplitSigmaTy, 
-			  isUnLiftedType, isIPPred, 
+			  isUnLiftedType, isIPPred, isHoleTyVar,
 
 			  mkAppTy, mkTyVarTy, mkTyVarTys, 
 			  tyVarsOfPred, getClassPredTys_maybe,
@@ -106,11 +108,6 @@ newTyVarTy kind
   = newTyVar kind	`thenNF_Tc` \ tc_tyvar ->
     returnNF_Tc (TyVarTy tc_tyvar)
 
-newHoleTyVarTy :: NF_TcM TcType
-  = tcGetUnique 	`thenNF_Tc` \ uniq ->
-    tcNewMutTyVar (mkSystemName uniq FSLIT("h")) openTypeKind HoleTv	`thenNF_Tc` \ tv ->
-    returnNF_Tc (TyVarTy tv)
-
 newTyVarTys :: Int -> Kind -> NF_TcM [TcType]
 newTyVarTys n kind = mapNF_Tc newTyVarTy (nOfThem n kind)
 
@@ -130,6 +127,42 @@ newBoxityVar
     returnNF_Tc (TyVarTy kv)
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{'hole' type variables}
+%*									*
+%************************************************************************
+
+\begin{code}
+newHoleTyVarTy :: NF_TcM TcType
+  = tcGetUnique 	`thenNF_Tc` \ uniq ->
+    tcNewMutTyVar (mkSystemName uniq FSLIT("h")) openTypeKind HoleTv	`thenNF_Tc` \ tv ->
+    returnNF_Tc (TyVarTy tv)
+
+readHoleResult :: TcType -> NF_TcM TcType
+-- Read the answer out of a hole, constructed by newHoleTyVarTy
+readHoleResult (TyVarTy tv)
+  = ASSERT( isHoleTyVar tv )
+    getTcTyVar tv		`thenNF_Tc` \ maybe_res ->
+    case maybe_res of
+	Just ty -> returnNF_Tc ty
+	Nothing ->  pprPanic "readHoleResult: empty" (ppr tv)
+readHoleResult ty = pprPanic "readHoleResult: not hole" (ppr ty)
+
+zapToType :: TcType -> NF_TcM TcType
+zapToType (TyVarTy tv)
+  | isHoleTyVar tv
+  = getTcTyVar tv		`thenNF_Tc` \ maybe_res ->
+    case maybe_res of
+	Nothing -> newTyVarTy openTypeKind	`thenNF_Tc` \ ty ->
+		   putTcTyVar tv ty		`thenNF_Tc_`
+		   returnNF_Tc ty
+	Just ty  -> returnNF_Tc ty	-- No need to loop; we never
+					-- have chains of holes
+
+zapToType other_ty = returnNF_Tc other_ty
+\end{code}		   
 
 %************************************************************************
 %*									*
@@ -175,13 +208,13 @@ tcInstType tv_details ty
 	([],     rho) -> 	-- There may be overloading despite no type variables;
 				-- 	(?x :: Int) => Int -> Int
 			 let
-			   (theta, tau) = tcSplitRhoTy rho
+			   (theta, tau) = tcSplitPhiTy rho
 			 in
 			 returnNF_Tc ([], theta, tau)
 
 	(tyvars, rho) -> tcInstTyVars tv_details tyvars		`thenNF_Tc` \ (tyvars', _, tenv) ->
 			 let
-			   (theta, tau) = tcSplitRhoTy (substTy tenv rho)
+			   (theta, tau) = tcSplitPhiTy (substTy tenv rho)
 			 in
 			 returnNF_Tc (tyvars', theta, tau)
 \end{code}

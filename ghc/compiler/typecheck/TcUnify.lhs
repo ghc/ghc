@@ -6,7 +6,7 @@
 \begin{code}
 module TcUnify (
 	-- Full-blown subsumption
-  tcSub, tcGen, subFunTy,
+  tcSubOff, tcSubExp, tcGen, subFunTy, TcHoleType,
   checkSigTyVars, checkSigTyVarsWrt, sigCtxt, 
 
 	-- Various unifications
@@ -30,12 +30,12 @@ import TypeRep		( Type(..), SourceType(..), TyNote(..),
 			  openKindCon, typeCon )
 
 import TcMonad          -- TcType, amongst others
-import TcType		( TcKind, TcType, TcSigmaType, TcPhiType, TcTyVar, TcTauType,
+import TcType		( TcKind, TcType, TcSigmaType, TcRhoType, TcTyVar, TcTauType,
 			  TcTyVarSet, TcThetaType, TyVarDetails(SigTv),
 			  isTauTy, isSigmaTy, 
 			  tcSplitAppTy_maybe, tcSplitTyConApp_maybe, 
 			  tcGetTyVar_maybe, tcGetTyVar, 
-			  mkTyConApp, mkFunTy, tyVarsOfType, mkRhoTy,
+			  mkTyConApp, mkFunTy, tyVarsOfType, mkPhiTy,
 			  typeKind, tcSplitFunTy_maybe, mkForAllTys,
 			  isHoleTyVar, isSkolemTyVar, isUserTyVar, 
 			  tidyOpenType, tidyOpenTypes, tidyOpenTyVar, tidyOpenTyVars,
@@ -46,7 +46,7 @@ import qualified Type	( getTyVar_maybe )
 import Inst		( LIE, emptyLIE, plusLIE, 
 			  newDicts, instToId, tcInstCall
 			)
-import TcMType		( getTcTyVar, putTcTyVar, tcInstType, 
+import TcMType		( getTcTyVar, putTcTyVar, tcInstType, readHoleResult,
 			  newTyVarTy, newTyVarTys, newBoxityVar, newHoleTyVarTy,
 			  zonkTcType, zonkTcTyVars, zonkTcTyVarsAndFV, zonkTcTyVar )
 import TcSimplify	( tcSimplifyCheck )
@@ -66,6 +66,9 @@ import Maybe		( isNothing )
 import Outputable
 \end{code}
 
+Notes on holes
+~~~~~~~~~~~~~~
+* A hole is always filled in with an ordinary type, not another hole.
 
 %************************************************************************
 %*									*
@@ -73,22 +76,57 @@ import Outputable
 %*									*
 %************************************************************************
 
-\begin{code}
-tcSub :: TcSigmaType		-- expected_ty; can be a type scheme;
-				--		can be a "hole" type variable
-      -> TcSigmaType		-- actual_ty; can be a type scheme
-      -> TcM (ExprCoFn, LIE)
-\end{code}
+All the tcSub calls have the form
+	
+		tcSub expected_ty offered_ty
+which checks
+		offered_ty <= expected_ty
 
-(tcSub expected_ty actual_ty) checks that 
-	actual_ty <= expected_ty
-That is, that a value of type actual_ty is acceptable in
+That is, that a value of type offered_ty is acceptable in
 a place expecting a value of type expected_ty.
 
 It returns a coercion function 
-	co_fn :: actual_ty -> expected_ty
-which takes an HsExpr of type actual_ty into one of type
+	co_fn :: offered_ty -> expected_ty
+which takes an HsExpr of type offered_ty into one of type
 expected_ty.
+
+\begin{code}
+type TcHoleType = TcSigmaType	-- Either a TcSigmaType, 
+				-- or else a hole
+
+tcSubExp :: TcHoleType  -> TcSigmaType -> TcM (ExprCoFn, LIE)
+tcSubOff :: TcSigmaType -> TcHoleType  -> TcM (ExprCoFn, LIE)
+tcSub    :: TcSigmaType -> TcSigmaType -> TcM (ExprCoFn, LIE)
+\end{code}
+
+These two check for holes
+
+\begin{code}
+tcSubExp expected_ty offered_ty
+  = checkHole expected_ty offered_ty tcSub
+
+tcSubOff expected_ty offered_ty
+  = checkHole offered_ty expected_ty (\ off exp -> tcSub exp off)
+
+-- checkHole looks for a hole in its first arg; 
+-- If so, and it is uninstantiated, it fills in the hole 
+--	  with its second arg
+-- Otherwise it calls thing_inside, passing the two args, looking
+-- through any instantiated hole
+
+checkHole (TyVarTy tv) other_ty thing_inside
+  | isHoleTyVar tv
+  = getTcTyVar tv	`thenNF_Tc` \ maybe_ty ->
+    case maybe_ty of
+	Just ty -> thing_inside ty other_ty
+	Nothing -> putTcTyVar tv other_ty	`thenNF_Tc_`
+		   returnTc (idCoercion, emptyLIE)
+
+checkHole ty other_ty thing_inside 
+  = thing_inside ty other_ty
+\end{code}
+
+No holes expected now.  Add some error-check context info.
 
 \begin{code}
 tcSub expected_ty actual_ty
@@ -113,24 +151,6 @@ tc_sub :: TcSigmaType		-- expected_ty, before expanding synonyms
 -- Expand synonyms
 tc_sub exp_sty (NoteTy _ exp_ty) act_sty act_ty = tc_sub exp_sty exp_ty act_sty act_ty
 tc_sub exp_sty exp_ty act_sty (NoteTy _ act_ty) = tc_sub exp_sty exp_ty act_sty act_ty
-
------------------------------------
--- "Hole type variable" case
--- Do this case before unwrapping for-alls in the actual_ty
-
-tc_sub _ (TyVarTy tv) act_sty act_ty
-  | isHoleTyVar tv
-  = 	-- It's a "hole" type variable
-    getTcTyVar tv	`thenNF_Tc` \ maybe_ty ->
-    case maybe_ty of
-
-	Just ty ->    	-- Already been assigned
-		    tc_sub ty ty act_sty act_ty ;
-
-	Nothing ->	-- Assign it
-		    putTcTyVar tv act_sty		`thenNF_Tc_`
-		    returnTc (idCoercion, emptyLIE)
-
 
 -----------------------------------
 -- Generalisation case
@@ -185,14 +205,16 @@ tc_sub _ (FunTy exp_arg exp_res) _ (FunTy act_arg act_res)
 --	is perfectly fine!
 
 tc_sub exp_sty exp_ty@(FunTy exp_arg exp_res) _ (TyVarTy tv)
-  = getTcTyVar tv	`thenNF_Tc` \ maybe_ty ->
+  = ASSERT( not (isHoleTyVar tv) )
+    getTcTyVar tv	`thenNF_Tc` \ maybe_ty ->
     case maybe_ty of
 	Just ty -> tc_sub exp_sty exp_ty ty ty
 	Nothing -> imitateFun tv exp_sty	`thenNF_Tc` \ (act_arg, act_res) ->
 		   tcSub_fun exp_arg exp_res act_arg act_res
 
 tc_sub _ (TyVarTy tv) act_sty act_ty@(FunTy act_arg act_res)
-  = getTcTyVar tv	`thenNF_Tc` \ maybe_ty ->
+  = ASSERT( not (isHoleTyVar tv) )
+    getTcTyVar tv	`thenNF_Tc` \ maybe_ty ->
     case maybe_ty of
 	Just ty -> tc_sub ty ty act_sty act_ty
 	Nothing -> imitateFun tv act_sty	`thenNF_Tc` \ (exp_arg, exp_res) ->
@@ -214,9 +236,9 @@ tc_sub exp_sty expected_ty act_sty actual_ty
 
 \begin{code}
 tcSub_fun exp_arg exp_res act_arg act_res
-  = tcSub act_arg exp_arg	`thenTc` \ (co_fn_arg, lie1) ->
-    tcSub exp_res act_res	`thenTc` \ (co_fn_res, lie2) ->
-    tcGetUnique			`thenNF_Tc` \ uniq ->
+  = tc_sub act_arg act_arg exp_arg exp_arg	`thenTc` \ (co_fn_arg, lie1) ->
+    tc_sub exp_res exp_res act_res act_res	`thenTc` \ (co_fn_res, lie2) ->
+    tcGetUnique					`thenNF_Tc` \ uniq ->
     let
 	-- co_fn_arg :: HsExpr exp_arg -> HsExpr act_arg
 	-- co_fn_res :: HsExpr act_res -> HsExpr exp_res
@@ -265,7 +287,7 @@ tcGen :: TcSigmaType				-- expected_ty
       -> TcTyVarSet				-- Extra tyvars that the universally
 						--	quantified tyvars of expected_ty
 						-- 	must not be unified
-      -> (TcPhiType -> TcM (result, LIE))	-- spec_ty
+      -> (TcRhoType -> TcM (result, LIE))	-- spec_ty
       -> TcM (ExprCoFn, result, LIE)
 	-- The expression has type: spec_ty -> expected_ty
 
@@ -713,32 +735,46 @@ creation of type variables.
   type variables, so we should create new ordinary type variables
 
 \begin{code}
-subFunTy :: TcSigmaType	 		-- Fail if ty isn't a function type
-	 -> TcM (TcType, TcType)	-- otherwise return arg and result types
-subFunTy ty@(TyVarTy tyvar)
-  
-  = getTcTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
-    case maybe_ty of
-	Just ty -> subFunTy ty
-	Nothing | isHoleTyVar tyvar
-		-> newHoleTyVarTy 	`thenNF_Tc` \ arg ->
-		   newHoleTyVarTy 	`thenNF_Tc` \ res ->
-		   putTcTyVar tyvar (mkFunTy arg res)	`thenNF_Tc_` 
-	   	   returnTc (arg,res)
-		| otherwise 
-		-> unify_fun_ty_help ty
+subFunTy :: TcHoleType	-- Fail if ty isn't a function type
+			-- If it's a hole, make two holes, feed them to...
+	 -> (TcHoleType -> TcHoleType -> TcM a)	-- the thing inside
+	 -> TcM a	-- and bind the function type to the hole
 
-subFunTy ty
-  = case tcSplitFunTy_maybe ty of
-	Just arg_and_res -> returnTc arg_and_res
-	Nothing 	 -> unify_fun_ty_help ty
+subFunTy ty@(TyVarTy tyvar) thing_inside
+  | isHoleTyVar tyvar
+  = 	-- This is the interesting case
+    getTcTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
+    case maybe_ty of {
+	Just ty' -> subFunTy ty' thing_inside ;
+	Nothing  -> 
+
+    newHoleTyVarTy 		`thenNF_Tc` \ arg_ty ->
+    newHoleTyVarTy 		`thenNF_Tc` \ res_ty ->
+
+	-- Do the business
+    thing_inside arg_ty res_ty	`thenTc` \ answer ->
+
+	-- Extract the answers
+    readHoleResult arg_ty	`thenNF_Tc` \ arg_ty' ->
+    readHoleResult res_ty	`thenNF_Tc` \ res_ty' ->
+
+	-- Write the answer into the incoming hole
+    putTcTyVar tyvar (mkFunTy arg_ty' res_ty')	`thenNF_Tc_` 
+
+	-- And return the answer
+    returnTc answer }
+
+subFunTy ty thing_inside
+  = unifyFunTy ty 	`thenTc` \ (arg,res) ->
+    thing_inside arg res
 
 		 
-unifyFunTy :: TcPhiType	 		-- Fail if ty isn't a function type
+unifyFunTy :: TcRhoType	 		-- Fail if ty isn't a function type
 	   -> TcM (TcType, TcType)	-- otherwise return arg and result types
 
 unifyFunTy ty@(TyVarTy tyvar)
-  = getTcTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
+  = ASSERT( not (isHoleTyVar tyvar) )
+    getTcTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
     case maybe_ty of
 	Just ty' -> unifyFunTy ty'
 	Nothing  -> unify_fun_ty_help ty
@@ -1159,7 +1195,7 @@ sigCtxt id sig_tvs sig_theta sig_tau tidy_env
   = zonkTcType sig_tau		`thenNF_Tc` \ actual_tau ->
     let
 	(env1, tidy_sig_tvs)    = tidyOpenTyVars tidy_env sig_tvs
-	(env2, tidy_sig_rho)	= tidyOpenType env1 (mkRhoTy sig_theta sig_tau)
+	(env2, tidy_sig_rho)	= tidyOpenType env1 (mkPhiTy sig_theta sig_tau)
 	(env3, tidy_actual_tau) = tidyOpenType env2 actual_tau
 	sub_msg = vcat [ptext SLIT("Signature type:    ") <+> pprType (mkForAllTys tidy_sig_tvs tidy_sig_rho),
 		        ptext SLIT("Type to generalise:") <+> pprType tidy_actual_tau

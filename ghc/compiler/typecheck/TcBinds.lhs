@@ -34,7 +34,7 @@ import TcMonoType	( tcHsSigType, UserTypeCtxt(..), TcSigInfo(..),
 import TcPat		( tcPat, tcSubPat, tcMonoPatBndr )
 import TcSimplify	( bindInstsOfLocalFuns )
 import TcMType		( newTyVar, newTyVarTy, newHoleTyVarTy,
-			  zonkTcTyVarToTyVar
+			  zonkTcTyVarToTyVar, readHoleResult
 			)
 import TcType		( mkTyVarTy, mkForAllTys, mkFunTys, tyVarsOfType, 
 			  mkPredTy, mkForAllTy, isUnLiftedType, 
@@ -647,7 +647,7 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
 	let
 	   bndr_ty	   = idType bndr_id
 	   complete_it xve = tcAddSrcLoc locn				$
-			     tcMatchesFun xve name bndr_ty  matches	`thenTc` \ (matches', lie) ->
+			     tcMatchesFun xve name bndr_ty matches	`thenTc` \ (matches', lie) ->
 			     returnTc (FunMonoBind bndr_id inf matches' locn, lie)
 	in
 	returnTc (complete_it, emptyLIE, emptyBag, unitBag (name, bndr_id), emptyLIE)
@@ -665,11 +665,12 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
 		-- so we don't have to do anything here.
 
 	tcPat tc_pat_bndr pat pat_ty		`thenTc` \ (pat', lie_req, tvs, ids, lie_avail) ->
+	readHoleResult pat_ty			`thenTc` \ pat_ty' ->
 	let
 	   complete_it xve = tcAddSrcLoc locn		 		$
 			     tcAddErrCtxt (patMonoBindsCtxt bind)	$
 			     tcExtendLocalValEnv2 xve			$
-			     tcGRHSs PatBindRhs grhss pat_ty		`thenTc` \ (grhss', lie) ->
+			     tcGRHSs PatBindRhs grhss pat_ty'		`thenTc` \ (grhss', lie) ->
 			     returnTc (PatMonoBind pat' grhss' locn, lie)
 	in
 	returnTc (complete_it, lie_req, tvs, ids, lie_avail)
@@ -689,7 +690,7 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
 		   tcMonoPatBndr bndr_name pat_ty
 
 	    Just sig -> tcAddSrcLoc (getSrcLoc name)		$
-			tcSubPat pat_ty (idType mono_id)	`thenTc` \ (co_fn, lie) ->
+			tcSubPat (idType mono_id) pat_ty	`thenTc` \ (co_fn, lie) ->
 			returnTc (co_fn, lie, mono_id)
 		     where
 			mono_id = tcSigMonoId sig

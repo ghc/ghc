@@ -15,7 +15,7 @@ import RnHsSyn		( RenamedHsExpr, RenamedRecordBinds )
 import TcHsSyn		( TcExpr, TcRecordBinds, simpleHsLitTy  )
 
 import TcMonad
-import TcUnify		( tcSub, tcGen, (<$>),
+import TcUnify		( tcSubExp, tcGen, (<$>),
 			  unifyTauTy, unifyFunTy, unifyListTy, unifyPArrTy,
 			  unifyTupleTy )
 import BasicTypes	( RecFlag(..),  isMarkedStrict )
@@ -33,9 +33,9 @@ import TcMatches	( tcMatchesCase, tcMatchLambda, tcStmts )
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..) )
 import TcPat		( badFieldCon )
 import TcSimplify	( tcSimplifyIPs )
-import TcMType		( tcInstTyVars, tcInstType, newHoleTyVarTy,
-			  newTyVarTy, newTyVarTys, zonkTcType )
-import TcType		( TcType, TcSigmaType, TcPhiType, TyVarDetails(VanillaTv),
+import TcMType		( tcInstTyVars, tcInstType, newHoleTyVarTy, zapToType,
+			  newTyVarTy, newTyVarTys, zonkTcType, readHoleResult )
+import TcType		( TcType, TcSigmaType, TcRhoType, TyVarDetails(VanillaTv),
 			  tcSplitFunTys, tcSplitTyConApp, mkTyVarTys,
 			  isSigmaTy, mkFunTy, mkAppTy, mkTyConTy,
 			  mkTyConApp, mkClassPred, tcFunArgTy,
@@ -100,14 +100,14 @@ tcExpr expr expected_ty
 
 \begin{code}
 tcMonoExpr :: RenamedHsExpr		-- Expession to type check
-	   -> TcPhiType 		-- Expected type (could be a type variable)
+	   -> TcRhoType 		-- Expected type (could be a type variable)
 					-- Definitely no foralls at the top
 					-- Can be a 'hole'.
 	   -> TcM (TcExpr, LIE)
 
 tcMonoExpr (HsVar name) res_ty
   = tcId name			`thenNF_Tc` \ (expr', lie1, id_ty) ->
-    tcSub res_ty id_ty 		`thenTc` \ (co_fn, lie2) ->
+    tcSubExp res_ty id_ty 	`thenTc` \ (co_fn, lie2) ->
     returnTc (co_fn <$> expr', lie1 `plusLIE` lie2)
 
 tcMonoExpr (HsIPVar ip) res_ty
@@ -117,7 +117,7 @@ tcMonoExpr (HsIPVar ip) res_ty
 	-- be a tau-type.)
     newTyVarTy openTypeKind		`thenNF_Tc` \ ip_ty ->
     newIPDict (IPOcc ip) ip ip_ty 	`thenNF_Tc` \ (ip', inst) ->
-    tcSub res_ty ip_ty			`thenTc` \ (co_fn, lie) ->
+    tcSubExp res_ty ip_ty		`thenTc` \ (co_fn, lie) ->
     returnNF_Tc (co_fn <$> HsIPVar ip', lie `plusLIE` unitLIE inst)
 \end{code}
 
@@ -138,7 +138,7 @@ tcMonoExpr in_expr@(ExprWithTySig expr poly_ty) res_ty
 	-- which breaks the invariant that tcMonoExpr only returns phi-types
    tcAddErrCtxt (exprSigCtxt in_expr)	$
    tcInstCall SignatureOrigin sig_tc_ty	`thenNF_Tc` \ (inst_fn, lie2, inst_sig_ty) ->
-   tcSub res_ty inst_sig_ty		`thenTc` \ (co_fn, lie3) ->
+   tcSubExp res_ty inst_sig_ty		`thenTc` \ (co_fn, lie3) ->
 
    returnTc (co_fn <$> inst_fn expr', lie1 `plusLIE` lie2 `plusLIE` lie3)
 \end{code}
@@ -182,7 +182,7 @@ tcMonoExpr in_expr@(SectionL arg1 op) res_ty
     split_fun_ty op_ty 2 {- two args -}		`thenTc` \ ([arg1_ty, arg2_ty], op_res_ty) ->
     tcArg op (arg1, arg1_ty, 1)			`thenTc` \ (arg1',lie2) ->
     tcAddErrCtxt (exprCtxt in_expr)		$
-    tcSub res_ty (mkFunTy arg2_ty op_res_ty)	`thenTc` \ (co_fn, lie3) ->
+    tcSubExp res_ty (mkFunTy arg2_ty op_res_ty)	`thenTc` \ (co_fn, lie3) ->
     returnTc (co_fn <$> SectionL arg1' op', lie1 `plusLIE` lie2 `plusLIE` lie3)
 
 -- Right sections, equivalent to \ x -> x op expr, or
@@ -193,7 +193,7 @@ tcMonoExpr in_expr@(SectionR op arg2) res_ty
     split_fun_ty op_ty 2 {- two args -}		`thenTc` \ ([arg1_ty, arg2_ty], op_res_ty) ->
     tcArg op (arg2, arg2_ty, 2)			`thenTc` \ (arg2',lie2) ->
     tcAddErrCtxt (exprCtxt in_expr)		$
-    tcSub res_ty (mkFunTy arg1_ty op_res_ty)	`thenTc` \ (co_fn, lie3) ->
+    tcSubExp res_ty (mkFunTy arg1_ty op_res_ty)	`thenTc` \ (co_fn, lie3) ->
     returnTc (co_fn <$> SectionR op' arg2', lie1 `plusLIE` lie2 `plusLIE` lie3)
 
 -- equivalent to (op e1) e2:
@@ -204,7 +204,7 @@ tcMonoExpr in_expr@(OpApp arg1 op fix arg2) res_ty
     tcArg op (arg1, arg1_ty, 1)			`thenTc` \ (arg1',lie2a) ->
     tcArg op (arg2, arg2_ty, 2)			`thenTc` \ (arg2',lie2b) ->
     tcAddErrCtxt (exprCtxt in_expr)		$
-    tcSub res_ty op_res_ty			`thenTc` \ (co_fn, lie3) ->
+    tcSubExp res_ty op_res_ty			`thenTc` \ (co_fn, lie3) ->
     returnTc (OpApp arg1' op' fix arg2', 
 	      lie1 `plusLIE` lie2a `plusLIE` lie2b `plusLIE` lie3)
 \end{code}
@@ -313,8 +313,11 @@ tcMonoExpr (HsIf pred b1 b2 src_loc) res_ty
     tcAddErrCtxt (predCtxt pred) (
     tcMonoExpr pred boolTy	)	`thenTc`    \ (pred',lie1) ->
 
-    tcMonoExpr b1 res_ty		`thenTc`    \ (b1',lie2) ->
-    tcMonoExpr b2 res_ty		`thenTc`    \ (b2',lie3) ->
+    zapToType res_ty			`thenTc`    \ res_ty' ->
+	-- C.f. the call to zapToType in TcMatches.tcMatches
+
+    tcMonoExpr b1 res_ty'		`thenTc`    \ (b1',lie2) ->
+    tcMonoExpr b2 res_ty'		`thenTc`    \ (b2',lie3) ->
     returnTc (HsIf pred' b1' b2' src_loc, plusLIE lie1 (plusLIE lie2 lie3))
 \end{code}
 
@@ -639,6 +642,7 @@ tcApp fun args res_ty
     tcExpr_id fun  				`thenTc` \ (fun', lie_fun, fun_ty) ->
 
     tcAddErrCtxt (wrongArgsCtxt "too many" fun args) (
+	traceTc (text "tcApp" <+> (ppr fun $$ ppr fun_ty)) 	`thenNF_Tc_`
 	split_fun_ty fun_ty (length args)
     )						`thenTc` \ (expected_arg_tys, actual_result_ty) ->
 
@@ -652,7 +656,7 @@ tcApp fun args res_ty
 	-- (One can think of cases when the opposite order would give
 	-- a better error message.)
     tcAddErrCtxtM (checkArgsCtxt fun args res_ty actual_result_ty)
-		  (tcSub res_ty actual_result_ty)	`thenTc` \ (co_fn, lie_res) ->
+		  (tcSubExp res_ty actual_result_ty)	`thenTc` \ (co_fn, lie_res) ->
 
     returnTc (co_fn <$> foldl HsApp fun' args', 
 	      lie_res `plusLIE` lie_fun `plusLIE` plusLIEs lie_args_s)
@@ -781,7 +785,8 @@ tcExpr_id :: RenamedHsExpr -> TcM (TcExpr, LIE, TcType)
 tcExpr_id (HsVar name) = tcId name
 tcExpr_id expr         = newHoleTyVarTy			`thenNF_Tc` \ id_ty ->
 			 tcMonoExpr expr id_ty		`thenTc`    \ (expr', lie_id) ->
-		         returnTc (expr', lie_id, id_ty) 
+			 readHoleResult id_ty		`thenTc`    \ id_ty' ->
+		         returnTc (expr', lie_id, id_ty') 
 \end{code}
 
 
