@@ -14,7 +14,7 @@ import HscTypes		( ModIface(..) )
 import HsSyn
 import RdrHsSyn		( RdrNameIE )
 import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual, isOrig,
-			  mkRdrUnqual, mkRdrQual, qualifyRdrName, lookupRdrEnv, foldRdrEnv
+			  mkRdrUnqual, mkRdrQual, lookupRdrEnv, foldRdrEnv
 			)
 import HsTypes		( hsTyVarName, replaceTyVarName )
 import HscTypes		( Provenance(..), pprNameProvenance, hasBetterProv,
@@ -25,7 +25,7 @@ import HscTypes		( Provenance(..), pprNameProvenance, hasBetterProv,
 			)
 import RnMonad
 import Name		( Name,
-			  getSrcLoc, 
+			  getSrcLoc, nameIsLocalOrFrom,
 			  mkLocalName, mkGlobalName,
 			  mkIPName, nameOccName, nameModule_maybe,
 			  setNameModuleAndLoc
@@ -194,16 +194,29 @@ lookupBndrRn rdr_name
 	  Nothing   -> lookupTopBndrRn rdr_name
 
 lookupTopBndrRn rdr_name
+-- Look up a top-level local binder.   We may be looking up an unqualified 'f',
+-- and there may be several imported 'f's too, which must not confuse us.
+-- So we have to filter out the non-local ones.
+-- A separate function (importsFromLocalDecls) reports duplicate top level
+-- decls, so here it's safe just to choose an arbitrary one.
   = getModeRn	`thenRn` \ mode ->
     if isInterfaceMode mode
 	then lookupIfaceName rdr_name	
-	else     -- Source mode, so look up a *qualified* version
-	         -- of the name, so that we get the right one even
-		 -- if there are many with the same occ name
-		 -- There must *be* a binding
-		getModuleRn		`thenRn` \ mod ->
-		getGlobalNameEnv	`thenRn` \ global_env ->
-    		lookupSrcName global_env (qualifyRdrName (moduleName mod) rdr_name)
+    else 
+    getModuleRn		`thenRn` \ mod ->
+    getGlobalNameEnv	`thenRn` \ global_env ->
+    case lookup_local mod global_env rdr_name of
+	Just name -> returnRn name
+	Nothing	  -> failWithRn (mkUnboundName rdr_name)
+		  	        (unknownNameErr rdr_name)
+  where
+    lookup_local mod global_env rdr_name
+      = case lookupRdrEnv global_env rdr_name of
+	  Nothing   -> Nothing
+	  Just gres -> case [n | GRE n _ _ <- gres, nameIsLocalOrFrom mod n] of
+			 []     -> Nothing
+			 (n:ns) -> Just n
+
 
 -- lookupSigOccRn is used for type signatures and pragmas
 -- Is this valid?
