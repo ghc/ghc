@@ -1,5 +1,7 @@
 --!!! 500 defns chained together with "where"s
+module Main(main) where
 
+main = undefined
 a500 =	let a000 = []
 	    a001 = a000
 	    a002 = a001

@@ -4,3 +4,4 @@ module Main where
 
 import Rn016
 
+main = undefined

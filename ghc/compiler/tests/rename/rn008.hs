@@ -1,8 +1,9 @@
+--!!! two sets of mutually-recursive blobs:
+--!!!  f, g, h are mut rec
+--!!!  i, j, k are mut rec
 module Test where
 
--- two sets of mutually-recursive blobs:
---  f, g, h are mut rec
---  i, j, k are mut rec
+data Foo a = Foo a Int Int
 
 (f1@(f2@(f3@f)), 1) = g 1 1
 (i1@(i2@(i3@i)), 1) = j 1 1

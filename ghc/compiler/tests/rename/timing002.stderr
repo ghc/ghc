@@ -1,0 +1,1520 @@
+Renamer stats: 6 interfaces read
+	       0 class decls imported, out of 17 read
+	       0 data decls imported (of which 0 abstractly), out of 14 read
+	       1 newtype decls imported (of which 1 abstractly), out of 1 read
+	       0 type synonym decls imported, out of 6 read
+	       1 value signatures imported, out of 1200 read
+	       0 instance decls imported, out of 130 read
+
+
+================================================================================
+Renamer:
+module Main where
+newtype IOBase.IO{-3e,p-} rAg_rTk =
+Prelude.undefined{-r3d,p-} ::
+    _forall_ [a_rsr] => a_rsr
+{- nonrec -}
+a500{-r6o,l-}
+    =   let
+	  {- nonrec -}
+	  a000_r6q
+	      =   PrelBase.[]{-5i,i-}
+	  {- nonrec -}
+	  a001_r6r
+	      =   a000_r6q
+	  {- nonrec -}
+	  a002_r6s
+	      =   a001_r6r
+	  {- nonrec -}
+	  a003_r6t
+	      =   a002_r6s
+	  {- nonrec -}
+	  a004_r6u
+	      =   a003_r6t
+	  {- nonrec -}
+	  a005_r6v
+	      =   a004_r6u
+	  {- nonrec -}
+	  a006_r6w
+	      =   a005_r6v
+	  {- nonrec -}
+	  a007_r6x
+	      =   a006_r6w
+	  {- nonrec -}
+	  a008_r6y
+	      =   a007_r6x
+	  {- nonrec -}
+	  a009_r6z
+	      =   a008_r6y
+	  {- nonrec -}
+	  a010_r6A
+	      =   a009_r6z
+	  {- nonrec -}
+	  a011_r6B
+	      =   a010_r6A
+	  {- nonrec -}
+	  a012_r6C
+	      =   a011_r6B
+	  {- nonrec -}
+	  a013_r6D
+	      =   a012_r6C
+	  {- nonrec -}
+	  a014_r6E
+	      =   a013_r6D
+	  {- nonrec -}
+	  a015_r6F
+	      =   a014_r6E
+	  {- nonrec -}
+	  a016_r6G
+	      =   a015_r6F
+	  {- nonrec -}
+	  a017_r6H
+	      =   a016_r6G
+	  {- nonrec -}
+	  a018_r6I
+	      =   a017_r6H
+	  {- nonrec -}
+	  a019_r6J
+	      =   a018_r6I
+	  {- nonrec -}
+	  a020_r6K
+	      =   a019_r6J
+	  {- nonrec -}
+	  a021_r6L
+	      =   a020_r6K
+	  {- nonrec -}
+	  a022_r6M
+	      =   a021_r6L
+	  {- nonrec -}
+	  a023_r6N
+	      =   a022_r6M
+	  {- nonrec -}
+	  a024_r6O
+	      =   a023_r6N
+	  {- nonrec -}
+	  a025_r6P
+	      =   a024_r6O
+	  {- nonrec -}
+	  a026_r6Q
+	      =   a025_r6P
+	  {- nonrec -}
+	  a027_r6R
+	      =   a026_r6Q
+	  {- nonrec -}
+	  a028_r6S
+	      =   a027_r6R
+	  {- nonrec -}
+	  a029_r6T
+	      =   a028_r6S
+	  {- nonrec -}
+	  a030_r6U
+	      =   a029_r6T
+	  {- nonrec -}
+	  a031_r6V
+	      =   a030_r6U
+	  {- nonrec -}
+	  a032_r6W
+	      =   a031_r6V
+	  {- nonrec -}
+	  a033_r6X
+	      =   a032_r6W
+	  {- nonrec -}
+	  a034_r6Y
+	      =   a033_r6X
+	  {- nonrec -}
+	  a035_r6Z
+	      =   a034_r6Y
+	  {- nonrec -}
+	  a036_r70
+	      =   a035_r6Z
+	  {- nonrec -}
+	  a037_r71
+	      =   a036_r70
+	  {- nonrec -}
+	  a038_r72
+	      =   a037_r71
+	  {- nonrec -}
+	  a039_r73
+	      =   a038_r72
+	  {- nonrec -}
+	  a040_r74
+	      =   a039_r73
+	  {- nonrec -}
+	  a041_r75
+	      =   a040_r74
+	  {- nonrec -}
+	  a042_r76
+	      =   a041_r75
+	  {- nonrec -}
+	  a043_r77
+	      =   a042_r76
+	  {- nonrec -}
+	  a044_r78
+	      =   a043_r77
+	  {- nonrec -}
+	  a045_r79
+	      =   a044_r78
+	  {- nonrec -}
+	  a046_r7a
+	      =   a045_r79
+	  {- nonrec -}
+	  a047_r7b
+	      =   a046_r7a
+	  {- nonrec -}
+	  a048_r7c
+	      =   a047_r7b
+	  {- nonrec -}
+	  a049_r7d
+	      =   a048_r7c
+	  {- nonrec -}
+	  a050_r7e
+	      =   a049_r7d
+	  {- nonrec -}
+	  a051_r7f
+	      =   a050_r7e
+	  {- nonrec -}
+	  a052_r7g
+	      =   a051_r7f
+	  {- nonrec -}
+	  a053_r7h
+	      =   a052_r7g
+	  {- nonrec -}
+	  a054_r7i
+	      =   a053_r7h
+	  {- nonrec -}
+	  a055_r7j
+	      =   a054_r7i
+	  {- nonrec -}
+	  a056_r7k
+	      =   a055_r7j
+	  {- nonrec -}
+	  a057_r7l
+	      =   a056_r7k
+	  {- nonrec -}
+	  a058_r7m
+	      =   a057_r7l
+	  {- nonrec -}
+	  a059_r7n
+	      =   a058_r7m
+	  {- nonrec -}
+	  a060_r7o
+	      =   a059_r7n
+	  {- nonrec -}
+	  a061_r7p
+	      =   a060_r7o
+	  {- nonrec -}
+	  a062_r7q
+	      =   a061_r7p
+	  {- nonrec -}
+	  a063_r7r
+	      =   a062_r7q
+	  {- nonrec -}
+	  a064_r7s
+	      =   a063_r7r
+	  {- nonrec -}
+	  a065_r7t
+	      =   a064_r7s
+	  {- nonrec -}
+	  a066_r7u
+	      =   a065_r7t
+	  {- nonrec -}
+	  a067_r7v
+	      =   a066_r7u
+	  {- nonrec -}
+	  a068_r7w
+	      =   a067_r7v
+	  {- nonrec -}
+	  a069_r7x
+	      =   a068_r7w
+	  {- nonrec -}
+	  a070_r7y
+	      =   a069_r7x
+	  {- nonrec -}
+	  a071_r7z
+	      =   a070_r7y
+	  {- nonrec -}
+	  a072_r7A
+	      =   a071_r7z
+	  {- nonrec -}
+	  a073_r7B
+	      =   a072_r7A
+	  {- nonrec -}
+	  a074_r7C
+	      =   a073_r7B
+	  {- nonrec -}
+	  a075_r7D
+	      =   a074_r7C
+	  {- nonrec -}
+	  a076_r7E
+	      =   a075_r7D
+	  {- nonrec -}
+	  a077_r7F
+	      =   a076_r7E
+	  {- nonrec -}
+	  a078_r7G
+	      =   a077_r7F
+	  {- nonrec -}
+	  a079_r7H
+	      =   a078_r7G
+	  {- nonrec -}
+	  a080_r7I
+	      =   a079_r7H
+	  {- nonrec -}
+	  a081_r7J
+	      =   a080_r7I
+	  {- nonrec -}
+	  a082_r7K
+	      =   a081_r7J
+	  {- nonrec -}
+	  a083_r7L
+	      =   a082_r7K
+	  {- nonrec -}
+	  a084_r7M
+	      =   a083_r7L
+	  {- nonrec -}
+	  a085_r7N
+	      =   a084_r7M
+	  {- nonrec -}
+	  a086_r7O
+	      =   a085_r7N
+	  {- nonrec -}
+	  a087_r7P
+	      =   a086_r7O
+	  {- nonrec -}
+	  a088_r7Q
+	      =   a087_r7P
+	  {- nonrec -}
+	  a089_r7R
+	      =   a088_r7Q
+	  {- nonrec -}
+	  a090_r7S
+	      =   a089_r7R
+	  {- nonrec -}
+	  a091_r7T
+	      =   a090_r7S
+	  {- nonrec -}
+	  a092_r7U
+	      =   a091_r7T
+	  {- nonrec -}
+	  a093_r7V
+	      =   a092_r7U
+	  {- nonrec -}
+	  a094_r7W
+	      =   a093_r7V
+	  {- nonrec -}
+	  a095_r7X
+	      =   a094_r7W
+	  {- nonrec -}
+	  a096_r7Y
+	      =   a095_r7X
+	  {- nonrec -}
+	  a097_r7Z
+	      =   a096_r7Y
+	  {- nonrec -}
+	  a098_r80
+	      =   a097_r7Z
+	  {- nonrec -}
+	  a099_r81
+	      =   a098_r80
+	  {- nonrec -}
+	  a100_r82
+	      =   a099_r81
+	  {- nonrec -}
+	  a101_r83
+	      =   a100_r82
+	  {- nonrec -}
+	  a102_r84
+	      =   a101_r83
+	  {- nonrec -}
+	  a103_r85
+	      =   a102_r84
+	  {- nonrec -}
+	  a104_r86
+	      =   a103_r85
+	  {- nonrec -}
+	  a105_r87
+	      =   a104_r86
+	  {- nonrec -}
+	  a106_r88
+	      =   a105_r87
+	  {- nonrec -}
+	  a107_r89
+	      =   a106_r88
+	  {- nonrec -}
+	  a108_r8a
+	      =   a107_r89
+	  {- nonrec -}
+	  a109_r8b
+	      =   a108_r8a
+	  {- nonrec -}
+	  a110_r8c
+	      =   a109_r8b
+	  {- nonrec -}
+	  a111_r8d
+	      =   a110_r8c
+	  {- nonrec -}
+	  a112_r8e
+	      =   a111_r8d
+	  {- nonrec -}
+	  a113_r8f
+	      =   a112_r8e
+	  {- nonrec -}
+	  a114_r8g
+	      =   a113_r8f
+	  {- nonrec -}
+	  a115_r8h
+	      =   a114_r8g
+	  {- nonrec -}
+	  a116_r8i
+	      =   a115_r8h
+	  {- nonrec -}
+	  a117_r8j
+	      =   a116_r8i
+	  {- nonrec -}
+	  a118_r8k
+	      =   a117_r8j
+	  {- nonrec -}
+	  a119_r8l
+	      =   a118_r8k
+	  {- nonrec -}
+	  a120_r8m
+	      =   a119_r8l
+	  {- nonrec -}
+	  a121_r8n
+	      =   a120_r8m
+	  {- nonrec -}
+	  a122_r8o
+	      =   a121_r8n
+	  {- nonrec -}
+	  a123_r8p
+	      =   a122_r8o
+	  {- nonrec -}
+	  a124_r8q
+	      =   a123_r8p
+	  {- nonrec -}
+	  a125_r8r
+	      =   a124_r8q
+	  {- nonrec -}
+	  a126_r8s
+	      =   a125_r8r
+	  {- nonrec -}
+	  a127_r8t
+	      =   a126_r8s
+	  {- nonrec -}
+	  a128_r8u
+	      =   a127_r8t
+	  {- nonrec -}
+	  a129_r8v
+	      =   a128_r8u
+	  {- nonrec -}
+	  a130_r8w
+	      =   a129_r8v
+	  {- nonrec -}
+	  a131_r8x
+	      =   a130_r8w
+	  {- nonrec -}
+	  a132_r8y
+	      =   a131_r8x
+	  {- nonrec -}
+	  a133_r8z
+	      =   a132_r8y
+	  {- nonrec -}
+	  a134_r8A
+	      =   a133_r8z
+	  {- nonrec -}
+	  a135_r8B
+	      =   a134_r8A
+	  {- nonrec -}
+	  a136_r8C
+	      =   a135_r8B
+	  {- nonrec -}
+	  a137_r8D
+	      =   a136_r8C
+	  {- nonrec -}
+	  a138_r8E
+	      =   a137_r8D
+	  {- nonrec -}
+	  a139_r8F
+	      =   a138_r8E
+	  {- nonrec -}
+	  a140_r8G
+	      =   a139_r8F
+	  {- nonrec -}
+	  a141_r8H
+	      =   a140_r8G
+	  {- nonrec -}
+	  a142_r8I
+	      =   a141_r8H
+	  {- nonrec -}
+	  a143_r8J
+	      =   a142_r8I
+	  {- nonrec -}
+	  a144_r8K
+	      =   a143_r8J
+	  {- nonrec -}
+	  a145_r8L
+	      =   a144_r8K
+	  {- nonrec -}
+	  a146_r8M
+	      =   a145_r8L
+	  {- nonrec -}
+	  a147_r8N
+	      =   a146_r8M
+	  {- nonrec -}
+	  a148_r8O
+	      =   a147_r8N
+	  {- nonrec -}
+	  a149_r8P
+	      =   a148_r8O
+	  {- nonrec -}
+	  a150_r8Q
+	      =   a149_r8P
+	  {- nonrec -}
+	  a151_r8R
+	      =   a150_r8Q
+	  {- nonrec -}
+	  a152_r8S
+	      =   a151_r8R
+	  {- nonrec -}
+	  a153_r8T
+	      =   a152_r8S
+	  {- nonrec -}
+	  a154_r8U
+	      =   a153_r8T
+	  {- nonrec -}
+	  a155_r8V
+	      =   a154_r8U
+	  {- nonrec -}
+	  a156_r8W
+	      =   a155_r8V
+	  {- nonrec -}
+	  a157_r8X
+	      =   a156_r8W
+	  {- nonrec -}
+	  a158_r8Y
+	      =   a157_r8X
+	  {- nonrec -}
+	  a159_r8Z
+	      =   a158_r8Y
+	  {- nonrec -}
+	  a160_r90
+	      =   a159_r8Z
+	  {- nonrec -}
+	  a161_r91
+	      =   a160_r90
+	  {- nonrec -}
+	  a162_r92
+	      =   a161_r91
+	  {- nonrec -}
+	  a163_r93
+	      =   a162_r92
+	  {- nonrec -}
+	  a164_r94
+	      =   a163_r93
+	  {- nonrec -}
+	  a165_r95
+	      =   a164_r94
+	  {- nonrec -}
+	  a166_r96
+	      =   a165_r95
+	  {- nonrec -}
+	  a167_r97
+	      =   a166_r96
+	  {- nonrec -}
+	  a168_r98
+	      =   a167_r97
+	  {- nonrec -}
+	  a169_r99
+	      =   a168_r98
+	  {- nonrec -}
+	  a170_r9a
+	      =   a169_r99
+	  {- nonrec -}
+	  a171_r9b
+	      =   a170_r9a
+	  {- nonrec -}
+	  a172_r9c
+	      =   a171_r9b
+	  {- nonrec -}
+	  a173_r9d
+	      =   a172_r9c
+	  {- nonrec -}
+	  a174_r9e
+	      =   a173_r9d
+	  {- nonrec -}
+	  a175_r9f
+	      =   a174_r9e
+	  {- nonrec -}
+	  a176_r9g
+	      =   a175_r9f
+	  {- nonrec -}
+	  a177_r9h
+	      =   a176_r9g
+	  {- nonrec -}
+	  a178_r9i
+	      =   a177_r9h
+	  {- nonrec -}
+	  a179_r9j
+	      =   a178_r9i
+	  {- nonrec -}
+	  a180_r9k
+	      =   a179_r9j
+	  {- nonrec -}
+	  a181_r9l
+	      =   a180_r9k
+	  {- nonrec -}
+	  a182_r9m
+	      =   a181_r9l
+	  {- nonrec -}
+	  a183_r9n
+	      =   a182_r9m
+	  {- nonrec -}
+	  a184_r9o
+	      =   a183_r9n
+	  {- nonrec -}
+	  a185_r9p
+	      =   a184_r9o
+	  {- nonrec -}
+	  a186_r9q
+	      =   a185_r9p
+	  {- nonrec -}
+	  a187_r9r
+	      =   a186_r9q
+	  {- nonrec -}
+	  a188_r9s
+	      =   a187_r9r
+	  {- nonrec -}
+	  a189_r9t
+	      =   a188_r9s
+	  {- nonrec -}
+	  a190_r9u
+	      =   a189_r9t
+	  {- nonrec -}
+	  a191_r9v
+	      =   a190_r9u
+	  {- nonrec -}
+	  a192_r9w
+	      =   a191_r9v
+	  {- nonrec -}
+	  a193_r9x
+	      =   a192_r9w
+	  {- nonrec -}
+	  a194_r9y
+	      =   a193_r9x
+	  {- nonrec -}
+	  a195_r9z
+	      =   a194_r9y
+	  {- nonrec -}
+	  a196_r9A
+	      =   a195_r9z
+	  {- nonrec -}
+	  a197_r9B
+	      =   a196_r9A
+	  {- nonrec -}
+	  a198_r9C
+	      =   a197_r9B
+	  {- nonrec -}
+	  a199_r9D
+	      =   a198_r9C
+	  {- nonrec -}
+	  a200_r9E
+	      =   a199_r9D
+	  {- nonrec -}
+	  a201_r9F
+	      =   a200_r9E
+	  {- nonrec -}
+	  a202_r9G
+	      =   a201_r9F
+	  {- nonrec -}
+	  a203_r9H
+	      =   a202_r9G
+	  {- nonrec -}
+	  a204_r9I
+	      =   a203_r9H
+	  {- nonrec -}
+	  a205_r9J
+	      =   a204_r9I
+	  {- nonrec -}
+	  a206_r9K
+	      =   a205_r9J
+	  {- nonrec -}
+	  a207_r9L
+	      =   a206_r9K
+	  {- nonrec -}
+	  a208_r9M
+	      =   a207_r9L
+	  {- nonrec -}
+	  a209_r9N
+	      =   a208_r9M
+	  {- nonrec -}
+	  a210_r9O
+	      =   a209_r9N
+	  {- nonrec -}
+	  a211_r9P
+	      =   a210_r9O
+	  {- nonrec -}
+	  a212_r9Q
+	      =   a211_r9P
+	  {- nonrec -}
+	  a213_r9R
+	      =   a212_r9Q
+	  {- nonrec -}
+	  a214_r9S
+	      =   a213_r9R
+	  {- nonrec -}
+	  a215_r9T
+	      =   a214_r9S
+	  {- nonrec -}
+	  a216_r9U
+	      =   a215_r9T
+	  {- nonrec -}
+	  a217_r9V
+	      =   a216_r9U
+	  {- nonrec -}
+	  a218_r9W
+	      =   a217_r9V
+	  {- nonrec -}
+	  a219_r9X
+	      =   a218_r9W
+	  {- nonrec -}
+	  a220_r9Y
+	      =   a219_r9X
+	  {- nonrec -}
+	  a221_r9Z
+	      =   a220_r9Y
+	  {- nonrec -}
+	  a222_ra0
+	      =   a221_r9Z
+	  {- nonrec -}
+	  a223_ra1
+	      =   a222_ra0
+	  {- nonrec -}
+	  a224_ra2
+	      =   a223_ra1
+	  {- nonrec -}
+	  a225_ra3
+	      =   a224_ra2
+	  {- nonrec -}
+	  a226_ra4
+	      =   a225_ra3
+	  {- nonrec -}
+	  a227_ra5
+	      =   a226_ra4
+	  {- nonrec -}
+	  a228_ra6
+	      =   a227_ra5
+	  {- nonrec -}
+	  a229_ra7
+	      =   a228_ra6
+	  {- nonrec -}
+	  a230_ra8
+	      =   a229_ra7
+	  {- nonrec -}
+	  a231_ra9
+	      =   a230_ra8
+	  {- nonrec -}
+	  a232_raa
+	      =   a231_ra9
+	  {- nonrec -}
+	  a233_rab
+	      =   a232_raa
+	  {- nonrec -}
+	  a234_rac
+	      =   a233_rab
+	  {- nonrec -}
+	  a235_rad
+	      =   a234_rac
+	  {- nonrec -}
+	  a236_rae
+	      =   a235_rad
+	  {- nonrec -}
+	  a237_raf
+	      =   a236_rae
+	  {- nonrec -}
+	  a238_rag
+	      =   a237_raf
+	  {- nonrec -}
+	  a239_rah
+	      =   a238_rag
+	  {- nonrec -}
+	  a240_rai
+	      =   a239_rah
+	  {- nonrec -}
+	  a241_raj
+	      =   a240_rai
+	  {- nonrec -}
+	  a242_rak
+	      =   a241_raj
+	  {- nonrec -}
+	  a243_ral
+	      =   a242_rak
+	  {- nonrec -}
+	  a244_ram
+	      =   a243_ral
+	  {- nonrec -}
+	  a245_ran
+	      =   a244_ram
+	  {- nonrec -}
+	  a246_rao
+	      =   a245_ran
+	  {- nonrec -}
+	  a247_rap
+	      =   a246_rao
+	  {- nonrec -}
+	  a248_raq
+	      =   a247_rap
+	  {- nonrec -}
+	  a249_rar
+	      =   a248_raq
+	  {- nonrec -}
+	  a250_ras
+	      =   a249_rar
+	  {- nonrec -}
+	  a251_rat
+	      =   a250_ras
+	  {- nonrec -}
+	  a252_rau
+	      =   a251_rat
+	  {- nonrec -}
+	  a253_rav
+	      =   a252_rau
+	  {- nonrec -}
+	  a254_raw
+	      =   a253_rav
+	  {- nonrec -}
+	  a255_rax
+	      =   a254_raw
+	  {- nonrec -}
+	  a256_ray
+	      =   a255_rax
+	  {- nonrec -}
+	  a257_raz
+	      =   a256_ray
+	  {- nonrec -}
+	  a258_raA
+	      =   a257_raz
+	  {- nonrec -}
+	  a259_raB
+	      =   a258_raA
+	  {- nonrec -}
+	  a260_raC
+	      =   a259_raB
+	  {- nonrec -}
+	  a261_raD
+	      =   a260_raC
+	  {- nonrec -}
+	  a262_raE
+	      =   a261_raD
+	  {- nonrec -}
+	  a263_raF
+	      =   a262_raE
+	  {- nonrec -}
+	  a264_raG
+	      =   a263_raF
+	  {- nonrec -}
+	  a265_raH
+	      =   a264_raG
+	  {- nonrec -}
+	  a266_raI
+	      =   a265_raH
+	  {- nonrec -}
+	  a267_raJ
+	      =   a266_raI
+	  {- nonrec -}
+	  a268_raK
+	      =   a267_raJ
+	  {- nonrec -}
+	  a269_raL
+	      =   a268_raK
+	  {- nonrec -}
+	  a270_raM
+	      =   a269_raL
+	  {- nonrec -}
+	  a271_raN
+	      =   a270_raM
+	  {- nonrec -}
+	  a272_raO
+	      =   a271_raN
+	  {- nonrec -}
+	  a273_raP
+	      =   a272_raO
+	  {- nonrec -}
+	  a274_raQ
+	      =   a273_raP
+	  {- nonrec -}
+	  a275_raR
+	      =   a274_raQ
+	  {- nonrec -}
+	  a276_raS
+	      =   a275_raR
+	  {- nonrec -}
+	  a277_raT
+	      =   a276_raS
+	  {- nonrec -}
+	  a278_raU
+	      =   a277_raT
+	  {- nonrec -}
+	  a279_raV
+	      =   a278_raU
+	  {- nonrec -}
+	  a280_raW
+	      =   a279_raV
+	  {- nonrec -}
+	  a281_raX
+	      =   a280_raW
+	  {- nonrec -}
+	  a282_raY
+	      =   a281_raX
+	  {- nonrec -}
+	  a283_raZ
+	      =   a282_raY
+	  {- nonrec -}
+	  a284_rb0
+	      =   a283_raZ
+	  {- nonrec -}
+	  a285_rb1
+	      =   a284_rb0
+	  {- nonrec -}
+	  a286_rb2
+	      =   a285_rb1
+	  {- nonrec -}
+	  a287_rb3
+	      =   a286_rb2
+	  {- nonrec -}
+	  a288_rb4
+	      =   a287_rb3
+	  {- nonrec -}
+	  a289_rb5
+	      =   a288_rb4
+	  {- nonrec -}
+	  a290_rb6
+	      =   a289_rb5
+	  {- nonrec -}
+	  a291_rb7
+	      =   a290_rb6
+	  {- nonrec -}
+	  a292_rb8
+	      =   a291_rb7
+	  {- nonrec -}
+	  a293_rb9
+	      =   a292_rb8
+	  {- nonrec -}
+	  a294_rba
+	      =   a293_rb9
+	  {- nonrec -}
+	  a295_rbb
+	      =   a294_rba
+	  {- nonrec -}
+	  a296_rbc
+	      =   a295_rbb
+	  {- nonrec -}
+	  a297_rbd
+	      =   a296_rbc
+	  {- nonrec -}
+	  a298_rbe
+	      =   a297_rbd
+	  {- nonrec -}
+	  a299_rbf
+	      =   a298_rbe
+	  {- nonrec -}
+	  a300_rbg
+	      =   a299_rbf
+	  {- nonrec -}
+	  a301_rbh
+	      =   a300_rbg
+	  {- nonrec -}
+	  a302_rbi
+	      =   a301_rbh
+	  {- nonrec -}
+	  a303_rbj
+	      =   a302_rbi
+	  {- nonrec -}
+	  a304_rbk
+	      =   a303_rbj
+	  {- nonrec -}
+	  a305_rbl
+	      =   a304_rbk
+	  {- nonrec -}
+	  a306_rbm
+	      =   a305_rbl
+	  {- nonrec -}
+	  a307_rbn
+	      =   a306_rbm
+	  {- nonrec -}
+	  a308_rbo
+	      =   a307_rbn
+	  {- nonrec -}
+	  a309_rbp
+	      =   a308_rbo
+	  {- nonrec -}
+	  a310_rbq
+	      =   a309_rbp
+	  {- nonrec -}
+	  a311_rbr
+	      =   a310_rbq
+	  {- nonrec -}
+	  a312_rbs
+	      =   a311_rbr
+	  {- nonrec -}
+	  a313_rbt
+	      =   a312_rbs
+	  {- nonrec -}
+	  a314_rbu
+	      =   a313_rbt
+	  {- nonrec -}
+	  a315_rbv
+	      =   a314_rbu
+	  {- nonrec -}
+	  a316_rbw
+	      =   a315_rbv
+	  {- nonrec -}
+	  a317_rbx
+	      =   a316_rbw
+	  {- nonrec -}
+	  a318_rby
+	      =   a317_rbx
+	  {- nonrec -}
+	  a319_rbz
+	      =   a318_rby
+	  {- nonrec -}
+	  a320_rbA
+	      =   a319_rbz
+	  {- nonrec -}
+	  a321_rbB
+	      =   a320_rbA
+	  {- nonrec -}
+	  a322_rbC
+	      =   a321_rbB
+	  {- nonrec -}
+	  a323_rbD
+	      =   a322_rbC
+	  {- nonrec -}
+	  a324_rbE
+	      =   a323_rbD
+	  {- nonrec -}
+	  a325_rbF
+	      =   a324_rbE
+	  {- nonrec -}
+	  a326_rbG
+	      =   a325_rbF
+	  {- nonrec -}
+	  a327_rbH
+	      =   a326_rbG
+	  {- nonrec -}
+	  a328_rbI
+	      =   a327_rbH
+	  {- nonrec -}
+	  a329_rbJ
+	      =   a328_rbI
+	  {- nonrec -}
+	  a330_rbK
+	      =   a329_rbJ
+	  {- nonrec -}
+	  a331_rbL
+	      =   a330_rbK
+	  {- nonrec -}
+	  a332_rbM
+	      =   a331_rbL
+	  {- nonrec -}
+	  a333_rbN
+	      =   a332_rbM
+	  {- nonrec -}
+	  a334_rbO
+	      =   a333_rbN
+	  {- nonrec -}
+	  a335_rbP
+	      =   a334_rbO
+	  {- nonrec -}
+	  a336_rbQ
+	      =   a335_rbP
+	  {- nonrec -}
+	  a337_rbR
+	      =   a336_rbQ
+	  {- nonrec -}
+	  a338_rbS
+	      =   a337_rbR
+	  {- nonrec -}
+	  a339_rbT
+	      =   a338_rbS
+	  {- nonrec -}
+	  a340_rbU
+	      =   a339_rbT
+	  {- nonrec -}
+	  a341_rbV
+	      =   a340_rbU
+	  {- nonrec -}
+	  a342_rbW
+	      =   a341_rbV
+	  {- nonrec -}
+	  a343_rbX
+	      =   a342_rbW
+	  {- nonrec -}
+	  a344_rbY
+	      =   a343_rbX
+	  {- nonrec -}
+	  a345_rbZ
+	      =   a344_rbY
+	  {- nonrec -}
+	  a346_rc0
+	      =   a345_rbZ
+	  {- nonrec -}
+	  a347_rc1
+	      =   a346_rc0
+	  {- nonrec -}
+	  a348_rc2
+	      =   a347_rc1
+	  {- nonrec -}
+	  a349_rc3
+	      =   a348_rc2
+	  {- nonrec -}
+	  a350_rc4
+	      =   a349_rc3
+	  {- nonrec -}
+	  a351_rc5
+	      =   a350_rc4
+	  {- nonrec -}
+	  a352_rc6
+	      =   a351_rc5
+	  {- nonrec -}
+	  a353_rc7
+	      =   a352_rc6
+	  {- nonrec -}
+	  a354_rc8
+	      =   a353_rc7
+	  {- nonrec -}
+	  a355_rc9
+	      =   a354_rc8
+	  {- nonrec -}
+	  a356_rca
+	      =   a355_rc9
+	  {- nonrec -}
+	  a357_rcb
+	      =   a356_rca
+	  {- nonrec -}
+	  a358_rcc
+	      =   a357_rcb
+	  {- nonrec -}
+	  a359_rcd
+	      =   a358_rcc
+	  {- nonrec -}
+	  a360_rce
+	      =   a359_rcd
+	  {- nonrec -}
+	  a361_rcf
+	      =   a360_rce
+	  {- nonrec -}
+	  a362_rcg
+	      =   a361_rcf
+	  {- nonrec -}
+	  a363_rch
+	      =   a362_rcg
+	  {- nonrec -}
+	  a364_rci
+	      =   a363_rch
+	  {- nonrec -}
+	  a365_rcj
+	      =   a364_rci
+	  {- nonrec -}
+	  a366_rck
+	      =   a365_rcj
+	  {- nonrec -}
+	  a367_rcl
+	      =   a366_rck
+	  {- nonrec -}
+	  a368_rcm
+	      =   a367_rcl
+	  {- nonrec -}
+	  a369_rcn
+	      =   a368_rcm
+	  {- nonrec -}
+	  a370_rco
+	      =   a369_rcn
+	  {- nonrec -}
+	  a371_rcp
+	      =   a370_rco
+	  {- nonrec -}
+	  a372_rcq
+	      =   a371_rcp
+	  {- nonrec -}
+	  a373_rcr
+	      =   a372_rcq
+	  {- nonrec -}
+	  a374_rcs
+	      =   a373_rcr
+	  {- nonrec -}
+	  a375_rct
+	      =   a374_rcs
+	  {- nonrec -}
+	  a376_rcu
+	      =   a375_rct
+	  {- nonrec -}
+	  a377_rcv
+	      =   a376_rcu
+	  {- nonrec -}
+	  a378_rcw
+	      =   a377_rcv
+	  {- nonrec -}
+	  a379_rcx
+	      =   a378_rcw
+	  {- nonrec -}
+	  a380_rcy
+	      =   a379_rcx
+	  {- nonrec -}
+	  a381_rcz
+	      =   a380_rcy
+	  {- nonrec -}
+	  a382_rcA
+	      =   a381_rcz
+	  {- nonrec -}
+	  a383_rcB
+	      =   a382_rcA
+	  {- nonrec -}
+	  a384_rcC
+	      =   a383_rcB
+	  {- nonrec -}
+	  a385_rcD
+	      =   a384_rcC
+	  {- nonrec -}
+	  a386_rcE
+	      =   a385_rcD
+	  {- nonrec -}
+	  a387_rcF
+	      =   a386_rcE
+	  {- nonrec -}
+	  a388_rcG
+	      =   a387_rcF
+	  {- nonrec -}
+	  a389_rcH
+	      =   a388_rcG
+	  {- nonrec -}
+	  a390_rcI
+	      =   a389_rcH
+	  {- nonrec -}
+	  a391_rcJ
+	      =   a390_rcI
+	  {- nonrec -}
+	  a392_rcK
+	      =   a391_rcJ
+	  {- nonrec -}
+	  a393_rcL
+	      =   a392_rcK
+	  {- nonrec -}
+	  a394_rcM
+	      =   a393_rcL
+	  {- nonrec -}
+	  a395_rcN
+	      =   a394_rcM
+	  {- nonrec -}
+	  a396_rcO
+	      =   a395_rcN
+	  {- nonrec -}
+	  a397_rcP
+	      =   a396_rcO
+	  {- nonrec -}
+	  a398_rcQ
+	      =   a397_rcP
+	  {- nonrec -}
+	  a399_rcR
+	      =   a398_rcQ
+	  {- nonrec -}
+	  a400_rcS
+	      =   a399_rcR
+	  {- nonrec -}
+	  a401_rcT
+	      =   a400_rcS
+	  {- nonrec -}
+	  a402_rcU
+	      =   a401_rcT
+	  {- nonrec -}
+	  a403_rcV
+	      =   a402_rcU
+	  {- nonrec -}
+	  a404_rcW
+	      =   a403_rcV
+	  {- nonrec -}
+	  a405_rcX
+	      =   a404_rcW
+	  {- nonrec -}
+	  a406_rcY
+	      =   a405_rcX
+	  {- nonrec -}
+	  a407_rcZ
+	      =   a406_rcY
+	  {- nonrec -}
+	  a408_rd0
+	      =   a407_rcZ
+	  {- nonrec -}
+	  a409_rd1
+	      =   a408_rd0
+	  {- nonrec -}
+	  a410_rd2
+	      =   a409_rd1
+	  {- nonrec -}
+	  a411_rd3
+	      =   a410_rd2
+	  {- nonrec -}
+	  a412_rd4
+	      =   a411_rd3
+	  {- nonrec -}
+	  a413_rd5
+	      =   a412_rd4
+	  {- nonrec -}
+	  a414_rd6
+	      =   a413_rd5
+	  {- nonrec -}
+	  a415_rd7
+	      =   a414_rd6
+	  {- nonrec -}
+	  a416_rd8
+	      =   a415_rd7
+	  {- nonrec -}
+	  a417_rd9
+	      =   a416_rd8
+	  {- nonrec -}
+	  a418_rda
+	      =   a417_rd9
+	  {- nonrec -}
+	  a419_rdb
+	      =   a418_rda
+	  {- nonrec -}
+	  a420_rdc
+	      =   a419_rdb
+	  {- nonrec -}
+	  a421_rdd
+	      =   a420_rdc
+	  {- nonrec -}
+	  a422_rde
+	      =   a421_rdd
+	  {- nonrec -}
+	  a423_rdf
+	      =   a422_rde
+	  {- nonrec -}
+	  a424_rdg
+	      =   a423_rdf
+	  {- nonrec -}
+	  a425_rdh
+	      =   a424_rdg
+	  {- nonrec -}
+	  a426_rdi
+	      =   a425_rdh
+	  {- nonrec -}
+	  a427_rdj
+	      =   a426_rdi
+	  {- nonrec -}
+	  a428_rdk
+	      =   a427_rdj
+	  {- nonrec -}
+	  a429_rdl
+	      =   a428_rdk
+	  {- nonrec -}
+	  a430_rdm
+	      =   a429_rdl
+	  {- nonrec -}
+	  a431_rdn
+	      =   a430_rdm
+	  {- nonrec -}
+	  a432_rdo
+	      =   a431_rdn
+	  {- nonrec -}
+	  a433_rdp
+	      =   a432_rdo
+	  {- nonrec -}
+	  a434_rdq
+	      =   a433_rdp
+	  {- nonrec -}
+	  a435_rdr
+	      =   a434_rdq
+	  {- nonrec -}
+	  a436_rds
+	      =   a435_rdr
+	  {- nonrec -}
+	  a437_rdt
+	      =   a436_rds
+	  {- nonrec -}
+	  a438_rdu
+	      =   a437_rdt
+	  {- nonrec -}
+	  a439_rdv
+	      =   a438_rdu
+	  {- nonrec -}
+	  a440_rdw
+	      =   a439_rdv
+	  {- nonrec -}
+	  a441_rdx
+	      =   a440_rdw
+	  {- nonrec -}
+	  a442_rdy
+	      =   a441_rdx
+	  {- nonrec -}
+	  a443_rdz
+	      =   a442_rdy
+	  {- nonrec -}
+	  a444_rdA
+	      =   a443_rdz
+	  {- nonrec -}
+	  a445_rdB
+	      =   a444_rdA
+	  {- nonrec -}
+	  a446_rdC
+	      =   a445_rdB
+	  {- nonrec -}
+	  a447_rdD
+	      =   a446_rdC
+	  {- nonrec -}
+	  a448_rdE
+	      =   a447_rdD
+	  {- nonrec -}
+	  a449_rdF
+	      =   a448_rdE
+	  {- nonrec -}
+	  a450_rdG
+	      =   a449_rdF
+	  {- nonrec -}
+	  a451_rdH
+	      =   a450_rdG
+	  {- nonrec -}
+	  a452_rdI
+	      =   a451_rdH
+	  {- nonrec -}
+	  a453_rdJ
+	      =   a452_rdI
+	  {- nonrec -}
+	  a454_rdK
+	      =   a453_rdJ
+	  {- nonrec -}
+	  a455_rdL
+	      =   a454_rdK
+	  {- nonrec -}
+	  a456_rdM
+	      =   a455_rdL
+	  {- nonrec -}
+	  a457_rdN
+	      =   a456_rdM
+	  {- nonrec -}
+	  a458_rdO
+	      =   a457_rdN
+	  {- nonrec -}
+	  a459_rdP
+	      =   a458_rdO
+	  {- nonrec -}
+	  a460_rdQ
+	      =   a459_rdP
+	  {- nonrec -}
+	  a461_rdR
+	      =   a460_rdQ
+	  {- nonrec -}
+	  a462_rdS
+	      =   a461_rdR
+	  {- nonrec -}
+	  a463_rdT
+	      =   a462_rdS
+	  {- nonrec -}
+	  a464_rdU
+	      =   a463_rdT
+	  {- nonrec -}
+	  a465_rdV
+	      =   a464_rdU
+	  {- nonrec -}
+	  a466_rdW
+	      =   a465_rdV
+	  {- nonrec -}
+	  a467_rdX
+	      =   a466_rdW
+	  {- nonrec -}
+	  a468_rdY
+	      =   a467_rdX
+	  {- nonrec -}
+	  a469_rdZ
+	      =   a468_rdY
+	  {- nonrec -}
+	  a470_re0
+	      =   a469_rdZ
+	  {- nonrec -}
+	  a471_re1
+	      =   a470_re0
+	  {- nonrec -}
+	  a472_re2
+	      =   a471_re1
+	  {- nonrec -}
+	  a473_re3
+	      =   a472_re2
+	  {- nonrec -}
+	  a474_re4
+	      =   a473_re3
+	  {- nonrec -}
+	  a475_re5
+	      =   a474_re4
+	  {- nonrec -}
+	  a476_re6
+	      =   a475_re5
+	  {- nonrec -}
+	  a477_re7
+	      =   a476_re6
+	  {- nonrec -}
+	  a478_re8
+	      =   a477_re7
+	  {- nonrec -}
+	  a479_re9
+	      =   a478_re8
+	  {- nonrec -}
+	  a480_rea
+	      =   a479_re9
+	  {- nonrec -}
+	  a481_reb
+	      =   a480_rea
+	  {- nonrec -}
+	  a482_rec
+	      =   a481_reb
+	  {- nonrec -}
+	  a483_red
+	      =   a482_rec
+	  {- nonrec -}
+	  a484_ree
+	      =   a483_red
+	  {- nonrec -}
+	  a485_ref
+	      =   a484_ree
+	  {- nonrec -}
+	  a486_reg
+	      =   a485_ref
+	  {- nonrec -}
+	  a487_reh
+	      =   a486_reg
+	  {- nonrec -}
+	  a488_rei
+	      =   a487_reh
+	  {- nonrec -}
+	  a489_rej
+	      =   a488_rei
+	  {- nonrec -}
+	  a490_rek
+	      =   a489_rej
+	  {- nonrec -}
+	  a491_rel
+	      =   a490_rek
+	  {- nonrec -}
+	  a492_rem
+	      =   a491_rel
+	  {- nonrec -}
+	  a493_ren
+	      =   a492_rem
+	  {- nonrec -}
+	  a494_reo
+	      =   a493_ren
+	  {- nonrec -}
+	  a495_rep
+	      =   a494_reo
+	  {- nonrec -}
+	  a496_req
+	      =   a495_rep
+	  {- nonrec -}
+	  a497_rer
+	      =   a496_req
+	  {- nonrec -}
+	  a498_res
+	      =   a497_rer
+	in
+	  a498_res
+{- nonrec -}
+main{-814,x-}
+    =   Prelude.undefined{-r3d,i-}

@@ -1,73 +1,228 @@
-Renamed-pass4:
+Renamer stats: 5 interfaces read
+	       4 class decls imported, out of 17 read
+	       0 data decls imported (of which 0 abstractly), out of 9 read
+	       0 newtype decls imported (of which 0 abstractly), out of 0 read
+	       1 type synonym decls imported, out of 5 read
+	       37 value signatures imported, out of 1098 read
+	       25 instance decls imported, out of 114 read
+
+
+================================================================================
+Renamer:
 module Test where
-infixl 9 PreludeArray.!
-infixl 9 PreludeList.!!
-infixl 7 PreludeRatio.%
-infixl 7 (*)
-infixl 6 (+)
-infixl 6 (-)
-infixl 7 (/)
-infixl 9 PreludeArray.//
-infixl 7 `div`
-infixl 7 `mod`
-infixl 7 `quot`
-infixl 7 `rem`
-infixr 0 $
-infixr 3 &&
-infixr 8 (**)
-infixr 9 .
-infixr 8 Prelude.^
-infixr 8 Prelude.^^
-infixr 2 ||
-infix  4 (/=)
-infix  6 :+
-infix  1 :=
-infix  4 (<)
-infix  4 (<=)
-infix  4 (==)
-infix  4 (>)
-infix  4 (>=)
-infix  5 PreludeList.\\
-class Test.K a where
-    op1{op 1 cls Test.K} :: a -> a -> a
-    op2{op 2 cls Test.K} :: Int -> a
-instance (Eq a, Eq b) => Eq (a, b)
-instance (Eq a, Eq b, Eq c) => Eq (a, b, c)
-instance (Eq a, Eq b, Eq c, Eq d) => Eq (a, b, c, d)
-instance (Ix a, Ix b) => Ix (a, b)
-instance (Ix a, Ix b, Ix c) => Ix (a, b, c)
-instance (Ix a, Ix b, Ix c, Ix d) => Ix (a, b, c, d)
-instance (Binary a, Binary b) => Binary (a, b)
-instance (Binary a, Binary b, Binary c) => Binary (a, b, c)
-instance (Binary a, Binary b, Binary c, Binary d) => Binary (a, b, c, d)
-instance Test.K Bool where
-    op1{op 1 cls Test.K}
-	a b = a
-instance Test.K Int where
-    op1{op 1 cls Test.K}
-	a b = a (+) b
-    op2{op 2 cls Test.K}
-	x = x
-instance Test.K [a] where
-    *UNBOUND*op3
-	a = a
-instance (Ord a, Ord b) => Ord (a, b)
-instance (Ord a, Ord b, Ord c) => Ord (a, b, c)
-instance (Ord a, Ord b, Ord c, Ord d) => Ord (a, b, c, d)
-instance (Text a, Text b) => Text (a, b)
-instance (Text a, Text b, Text c) => Text (a, b, c)
-instance (Text a, Text b, Text c, Text d) => Text (a, b, c, d)
-PreludeArray.! :: Ix a => Array a b -> a -> b
-PreludeList.!! :: Integral a => [b] -> a -> b
-PreludeRatio.% :: Integral a => a -> a -> Ratio a
-PreludeArray.// :: Ix a => Array a b -> [Assoc a b] -> Array a b
-PreludeList.\\ :: Eq a => [a] -> [a] -> [a]
-Prelude.^ :: (Num b, Integral a) => b -> a -> b
-Prelude.^^ :: (Fractional b, Integral a) => b -> a -> b
-PreludeList.or :: [Bool] -> Bool
-
+PrelNum.$d35{-ryc,p-} ::
+    {PrelBase.Eq{-23,p-} PrelBase.Integer{-3h,p-}}
+PrelNum.$d33{-rya,p-} ::
+    {PrelBase.Num{-2c,p-} PrelBase.Integer{-3h,p-}}
+PrelNum.$d29{-ry5,p-} ::
+    {PrelBase.Show{-2i,p-} PrelBase.Integer{-3h,p-}}
+PrelNum.$d18{-rxT,p-} ::
+    {PrelBase.Eq{-23,p-} PrelBase.Double{-3a,p-}}
+PrelNum.$d16{-rxR,p-} ::
+    {PrelBase.Num{-2c,p-} PrelBase.Double{-3a,p-}}
+PrelNum.$d10{-rxL,p-} ::
+    {PrelBase.Show{-2i,p-} PrelBase.Double{-3a,p-}}
+PrelBase.$d8{-rc9,p-} ::
+    {PrelBase.Show{-2i,p-} PrelBase.Char{-38,p-}}
+PrelBase.$d7{-rc8,p-} ::
+    {PrelBase.Eq{-23,p-} PrelBase.Int{-3g,p-}}
+PrelBase.$d54{-rc3,p-} ::
+    {PrelBase.Show{-2i,p-} PrelBase.Bool{-34,p-}}
+PrelBase.$d46{-rbU,p-} ::
+    {PrelBase.Eval{-24,p-} PrelBase.(){-40,p-}}
+PrelBase.$d44{-rbS,p-} ::
+    _forall_ [a_rH3] => {PrelBase.Eval{-24,p-} [a_rH3]}
+PrelBase.$d42{-rbQ,p-} ::
+    {PrelBase.Eval{-24,p-} PrelBase.Integer{-3h,p-}}
+PrelBase.$d41{-rbP,p-} ::
+    {PrelBase.Eval{-24,p-} PrelBase.Int{-3g,p-}}
+PrelBase.$d39{-rbM,p-} ::
+    {PrelBase.Eval{-24,p-} PrelBase.Double{-3a,p-}}
+PrelBase.$d38{-rbL,p-} ::
+    {PrelBase.Eval{-24,p-} PrelBase.Char{-38,p-}}
+PrelBase.$d37{-rbK,p-} ::
+    {PrelBase.Eval{-24,p-} PrelBase.Bool{-34,p-}}
+PrelBase.$d33{-rbG,p-} ::
+    {PrelBase.Eq{-23,p-} PrelBase.Char{-38,p-}}
+PrelBase.$d32{-rbF,p-} ::
+    {PrelBase.Eq{-23,p-} PrelBase.Bool{-34,p-}}
+PrelBase.$d3{-rbC,p-} ::
+    {PrelBase.Num{-2c,p-} PrelBase.Int{-3g,p-}}
+PrelBase.$d27{-rbz,p-} ::
+    _forall_
+    [a_rH1]
+    {PrelBase.Eq{-23,p-} a_rH1}
+    =>
+    {PrelBase.Eq{-23,p-} [a_rH1]}
+PrelBase.$d21{-rbt,p-} ::
+    _forall_
+    [a_rGZ]
+    {PrelBase.Show{-2i,p-} a_rGZ}
+    =>
+    {PrelBase.Show{-2i,p-} [a_rGZ]}
+PrelBase.$d2{-rbr,p-} ::
+    {PrelBase.Show{-2i,p-} PrelBase.Int{-3g,p-}}
+PrelBase.$d15{-rbm,p-} ::
+    {PrelBase.Eq{-23,p-} PrelBase.(){-40,p-}}
+PrelBase.$d11{-rbi,p-} ::
+    {PrelBase.Show{-2i,p-} PrelBase.(){-40,p-}}
+PrelBase.$d1{-rbg,p-} ::
+    _forall_ [a_rGW b_rGX] => {PrelBase.Show{-2i,p-} (a_rGW -> b_rGX)}
+instance {PrelBase.Eq{-23,p-} PrelBase.Integer{-3h,p-}}
+instance {PrelBase.Num{-2c,p-} PrelBase.Integer{-3h,p-}}
+instance {PrelBase.Show{-2i,p-} PrelBase.Integer{-3h,p-}}
+instance {PrelBase.Eq{-23,p-} PrelBase.Double{-3a,p-}}
+instance {PrelBase.Num{-2c,p-} PrelBase.Double{-3a,p-}}
+instance {PrelBase.Show{-2i,p-} PrelBase.Double{-3a,p-}}
+instance {PrelBase.Show{-2i,p-} PrelBase.Char{-38,p-}}
+instance {PrelBase.Eq{-23,p-} PrelBase.Int{-3g,p-}}
+instance {PrelBase.Show{-2i,p-} PrelBase.Bool{-34,p-}}
+instance {PrelBase.Eval{-24,p-} PrelBase.(){-40,p-}}
+instance _forall_ [a_rvk] => {PrelBase.Eval{-24,p-} [a_rvk]}
+instance {PrelBase.Eval{-24,p-} PrelBase.Integer{-3h,p-}}
+instance {PrelBase.Eval{-24,p-} PrelBase.Int{-3g,p-}}
+instance {PrelBase.Eval{-24,p-} PrelBase.Double{-3a,p-}}
+instance {PrelBase.Eval{-24,p-} PrelBase.Char{-38,p-}}
+instance {PrelBase.Eval{-24,p-} PrelBase.Bool{-34,p-}}
+instance {PrelBase.Eq{-23,p-} PrelBase.Char{-38,p-}}
+instance {PrelBase.Eq{-23,p-} PrelBase.Bool{-34,p-}}
+instance {PrelBase.Num{-2c,p-} PrelBase.Int{-3g,p-}}
+instance _forall_
+	 [a_rvm]
+	 {PrelBase.Eq{-23,p-} a_rvm}
+	 =>
+	 {PrelBase.Eq{-23,p-} [a_rvm]}
+instance _forall_
+	 [a_rvo]
+	 {PrelBase.Show{-2i,p-} a_rvo}
+	 =>
+	 {PrelBase.Show{-2i,p-} [a_rvo]}
+instance {PrelBase.Show{-2i,p-} PrelBase.Int{-3g,p-}}
+instance {PrelBase.Eq{-23,p-} PrelBase.(){-40,p-}}
+instance {PrelBase.Show{-2i,p-} PrelBase.(){-40,p-}}
+instance _forall_
+	 [a_rvq b_rvr]
+	 =>
+	 {PrelBase.Show{-2i,p-} (a_rvq -> b_rvr)}
+PrelBase.$m=={-rci,p-} ::
+    _forall_
+    [a_rjb]
+    {PrelBase.Eq{-23,p-} a_rjb}
+    =>
+    a_rjb -> a_rjb -> PrelBase.Bool{-34,p-}
+PrelBase.$m/={-rcf,p-} ::
+    _forall_
+    [a_rj9]
+    {PrelBase.Eq{-23,p-} a_rj9}
+    =>
+    a_rj9 -> a_rj9 -> PrelBase.Bool{-34,p-}
+class PrelBase.Eq{-23,p-} rlg_rj7 where {
+    == ::
+	rlg_rj7 -> rlg_rj7 -> PrelBase.Bool{-34,p-};
+    /= ::
+	rlg_rj7 -> rlg_rj7 -> PrelBase.Bool{-34,p-};
+    }
+PrelBase.$mshowsPrec{-rcE,p-} ::
+    _forall_
+    [a_rj5]
+    {PrelBase.Show{-2i,p-} a_rj5}
+    =>
+    PrelBase.Int{-3g,p-}
+    -> a_rj5 -> PrelBase.String{-rdn,p-} -> PrelBase.String{-rdn,p-}
+type PrelBase.String{-rdn,p-} =
+    [PrelBase.Char{-38,p-}]
+PrelBase.$mshowList{-rcD,p-} ::
+    _forall_
+    [a_rj2]
+    {PrelBase.Show{-2i,p-} a_rj2}
+    =>
+    [a_rj2] -> PrelBase.String{-rdn,p-} -> PrelBase.String{-rdn,p-}
+class PrelBase.Show{-2i,p-} riq_rj0 where {
+    showsPrec ::
+	PrelBase.Int{-3g,p-}
+	-> riq_rj0 -> PrelBase.String{-rdn,p-} -> PrelBase.String{-rdn,p-};
+    showList ::
+	[riq_rj0] -> PrelBase.String{-rdn,p-} -> PrelBase.String{-rdn,p-};
+    }
+class PrelBase.Eval{-24,p-} rk6_riY
+PrelBase.$m+{-rcc,p-} ::
+    _forall_
+    [a_riW]
+    {PrelBase.Num{-2c,p-} a_riW}
+    =>
+    a_riW -> a_riW -> a_riW
+PrelBase.$m-{-rce,p-} ::
+    _forall_
+    [a_riU]
+    {PrelBase.Num{-2c,p-} a_riU}
+    =>
+    a_riU -> a_riU -> a_riU
+PrelBase.$m*{-rcb,p-} ::
+    _forall_
+    [a_riS]
+    {PrelBase.Num{-2c,p-} a_riS}
+    =>
+    a_riS -> a_riS -> a_riS
+PrelBase.$mnegate{-rcB,p-} ::
+    _forall_ [a_riQ] {PrelBase.Num{-2c,p-} a_riQ} => a_riQ -> a_riQ
+PrelBase.$mabs{-rcn,p-} ::
+    _forall_ [a_riO] {PrelBase.Num{-2c,p-} a_riO} => a_riO -> a_riO
+PrelBase.$msignum{-rcF,p-} ::
+    _forall_ [a_riM] {PrelBase.Num{-2c,p-} a_riM} => a_riM -> a_riM
+PrelBase.$mfromInteger{-rcv,p-} ::
+    _forall_
+    [a_riK]
+    {PrelBase.Num{-2c,p-} a_riK}
+    =>
+    PrelBase.Integer{-3h,p-} -> a_riK
+PrelBase.$mfromInt{-rcu,p-} ::
+    _forall_
+    [a_riI]
+    {PrelBase.Num{-2c,p-} a_riI}
+    =>
+    PrelBase.Int{-3g,p-} -> a_riI
+class {PrelBase.Eq{-23,p-} riC_riG, PrelBase.Show{-2i,p-} riC_riG, PrelBase.Eval{-24,p-} riC_riG} => PrelBase.Num{-2c,p-} riC_riG where {
+    + ::
+	riC_riG -> riC_riG -> riC_riG;
+    - ::
+	riC_riG -> riC_riG -> riC_riG;
+    * ::
+	riC_riG -> riC_riG -> riC_riG;
+    negate ::
+	riC_riG -> riC_riG;
+    abs ::
+	riC_riG -> riC_riG;
+    signum ::
+	riC_riG -> riC_riG;
+    fromInteger ::
+	PrelBase.Integer{-3h,p-} -> riC_riG;
+    fromInt ::
+	PrelBase.Int{-3g,p-} -> riC_riG;
+    }
+instance _forall_ [a_r3f] => {K{-r3J,x-} [a_r3f]} where
+    []
+    op3_r3h
+	a_r3j   =   a_r3j
+instance {K{-r3J,x-} PrelBase.Bool{-34,i-}} where
+    []
+    op1_r3n
+	a_r3p b_r3r
+		=   a_r3p
+instance {K{-r3J,x-} PrelBase.Int{-3g,i-}} where
+    []
+    op1_r3v
+	a_r3x b_r3z
+		=   a_r3x PrelBase.+{-rb3,i-} b_r3z
+    op2_r3B
+	x_r3D   =   x_r3D
+class K{-r3J,x-} a_r3G where {
+    op1 ::
+	a_r3G -> a_r3G -> a_r3G;
+    op2 ::
+	PrelBase.Int{-3g,i-} -> a_r3G;
+    }
  
-"rn015.hs", line 18: "op3" is not an operation of class "K"
-Fail: Compilation errors found
+rn015.hs:18: Class `K' does not have a method `op3'
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

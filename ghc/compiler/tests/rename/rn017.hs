@@ -1,4 +1,5 @@
-module Test ( Test.. , Rn017.. ) where
+--!! Rexporting
+module Test ( module Test , module Rn017 ) where
 
 import Rn017
 

@@ -1,17 +1,29 @@
-TOP = ../../../..
-GhcRunTestRules = YES
-# These options apply to all tests
-RUNSTDTEST_OPTS = -ddump-rn -noC
-include $(TOP)/ghc/mk/ghc.mk
+TOP = ../../..
+include $(TOP)/mk/boilerplate.mk
 
-runtests :: $(patsubst %.hs, %.runtest, $(wildcard *.hs))
+HS_SRCS = $(wildcard *.hs)
+
+SRC_RUNTEST_OPTS += -o1 $*.stdout -o2 $*.stderr -x 0
+HC_OPTS += -noC -ddump-rn -dcore-lint
 
 #SUBDIRS = bevan-bug-1
 
-rn001_flags = -x1
-rn002_flags = -x1
-rn004_flags = -x1
-rn007_flags = -x1
-rn008_flags = -x1
-rn015_flags = -x1
-rn017_flags = -hi
+rn001_HC_OPTS = -x 1
+rn002_HC_OPTS = -x 1
+rn004_HC_OPTS = -x 1
+rn007_HC_OPTS = -x 1
+rn008_HC_OPTS = -x 1
+rn014_HC_OPTS = -x 1
+rn015_HC_OPTS = -x 1
+rn017_HC_OPTS = -hi
+
+%.o : %.hs
+
+%.o : %.hs
+	$(RUNTEST) $(HC) $(RUNTEST_OPTS) -- $(HC_OPTS) -c $< -o $@ -osuf $(subst .,,$(suffix $@)) 
+
+all :: $(HS_OBJS)
+
+include $(TOP)/mk/target.mk
+
+

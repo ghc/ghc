@@ -1,6 +1,5 @@
-module Foo where
-
 --!!! multiple definitions, but hidden in patterns
+module Foo where
 
 f x = x
   where

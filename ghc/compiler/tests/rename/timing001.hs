@@ -1,5 +1,6 @@
 --!!! 500 defns chained together at the top-level
-
+module Main(main) where
+main = undefined
 a000 = a001
 a001 = a002
 a002 = a003

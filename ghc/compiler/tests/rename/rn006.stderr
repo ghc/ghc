@@ -1,68 +1,38 @@
-Renamed-pass4:
-module Test where
-infixl 9 PreludeArray.!
-infixl 9 PreludeList.!!
-infixl 7 PreludeRatio.%
-infixl 7 (*)
-infixl 6 (+)
-infixl 6 (-)
-infixl 7 (/)
-infixl 9 PreludeArray.//
-infixl 7 `div`
-infixl 7 `mod`
-infixl 7 `quot`
-infixl 7 `rem`
-infixr 0 $
-infixr 3 &&
-infixr 8 (**)
-infixr 9 .
-infixr 8 Prelude.^
-infixr 8 Prelude.^^
-infixr 2 ||
-infix  4 (/=)
-infix  6 :+
-infix  1 :=
-infix  4 (<)
-infix  4 (<=)
-infix  4 (==)
-infix  4 (>)
-infix  4 (>=)
-infix  5 PreludeList.\\
-instance (Eq a, Eq b) => Eq (a, b)
-instance (Eq a, Eq b, Eq c) => Eq (a, b, c)
-instance (Eq a, Eq b, Eq c, Eq d) => Eq (a, b, c, d)
-instance (Ord a, Ord b) => Ord (a, b)
-instance (Ord a, Ord b, Ord c) => Ord (a, b, c)
-instance (Ord a, Ord b, Ord c, Ord d) => Ord (a, b, c, d)
-instance (Ix a, Ix b) => Ix (a, b)
-instance (Ix a, Ix b, Ix c) => Ix (a, b, c)
-instance (Ix a, Ix b, Ix c, Ix d) => Ix (a, b, c, d)
-instance (Text a, Text b) => Text (a, b)
-instance (Text a, Text b, Text c) => Text (a, b, c)
-instance (Text a, Text b, Text c, Text d) => Text (a, b, c, d)
-instance (Binary a, Binary b) => Binary (a, b)
-instance (Binary a, Binary b, Binary c) => Binary (a, b, c)
-instance (Binary a, Binary b, Binary c, Binary d) => Binary (a, b, c, d)
-{- rec -}
-Test.f
-    x = Test.g x x
-Test.g
-    x y = Test.h x x y
-Test.h
-    x y z = Test.f z
-{- rec -}
-Test.i
-    x = Test.j x x
-Test.j
-    x y = Test.k x x y
-Test.k
-    x y z = Test.i z
-PreludeArray.! :: Ix a => Array a b -> a -> b
-PreludeList.!! :: Integral a => [b] -> a -> b
-PreludeRatio.% :: Integral a => a -> a -> Ratio a
-PreludeArray.// :: Ix a => Array a b -> [Assoc a b] -> Array a b
-PreludeList.\\ :: Eq a => [a] -> [a] -> [a]
-Prelude.^ :: (Num b, Integral a) => b -> a -> b
-Prelude.^^ :: (Fractional b, Integral a) => b -> a -> b
-PreludeList.or :: [Bool] -> Bool
+Renamer stats: 5 interfaces read
+	       0 class decls imported, out of 17 read
+	       0 data decls imported (of which 0 abstractly), out of 9 read
+	       0 newtype decls imported (of which 0 abstractly), out of 0 read
+	       0 type synonym decls imported, out of 5 read
+	       0 value signatures imported, out of 1098 read
+	       0 instance decls imported, out of 114 read
 
+
+================================================================================
+Renamer:
+module Test where
+{- rec -}
+i{-r3J,x-}
+    x_r3k   =   j{-r3H,x-}
+		    x_r3k x_r3k
+j{-r3H,x-}
+    x_r3q y_r3s
+	    =   k{-r3F,x-}
+		    x_r3q x_r3q y_r3s
+k{-r3F,x-}
+    x_r3A y_r3C z_r3E
+	    =   i{-r3J,x-}
+		    z_r3E
+{- rec -}
+f{-r3K,x-}
+    x_r3i   =   g{-r3I,x-}
+		    x_r3i x_r3i
+g{-r3I,x-}
+    x_r3m y_r3o
+	    =   h{-r3G,x-}
+		    x_r3m x_r3m y_r3o
+h{-r3G,x-}
+    x_r3u y_r3w z_r3y
+	    =   f{-r3K,x-}
+		    z_r3y
+
+NOTE: Simplifier still going after 4 iterations; bailing out.

@@ -1,5 +1,7 @@
 --!!! 500 defns, not chained together
+module Main(main) where
 
+main = undefined
 a000 = []
 a001 = []
 a002 = []

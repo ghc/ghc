@@ -3,6 +3,8 @@
 --
 module Test where
 
+data Foo a = Foo a Int Int
+
 -- a recursive blob of one node
 a = a
 
