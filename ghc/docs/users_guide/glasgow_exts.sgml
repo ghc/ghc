@@ -3519,21 +3519,13 @@ Assertion failures can be caught, see the documentation for the
 <sect2 id="inline-pragma">
 <title>INLINE pragma
 
-<indexterm><primary>INLINE pragma</primary></indexterm>
+<indexterm><primary>INLINE and NOINLINE pragmas</primary></indexterm>
 <indexterm><primary>pragma, INLINE</primary></indexterm></title>
 
 <para>
 GHC (with <option>-O</option>, as always) tries to inline (or &ldquo;unfold&rdquo;)
 functions/values that are &ldquo;small enough,&rdquo; thus avoiding the call
 overhead and possibly exposing other more-wonderful optimisations.
-</para>
-
-<para>
-You will probably see these unfoldings (in Core syntax) in your
-interface files.
-</para>
-
-<para>
 Normally, if GHC decides a function is &ldquo;too expensive&rdquo; to inline, it
 will not do so, nor will it export that unfolding for other modules to
 use.
@@ -3550,7 +3542,6 @@ key_function :: Int -> String -> (Bool, Double)
 {-# INLINE key_function #-}
 #endif
 </programlisting>
-
 (You don't need to do the C pre-processor carry-on unless you're going
 to stick the code through HBC&mdash;it doesn't like <literal>INLINE</literal> pragmas.)
 </para>
@@ -3562,7 +3553,7 @@ very keen to inline it.
 </para>
 
 <para>
-An <literal>INLINE</literal> pragma for a function can be put anywhere its type
+Syntactially, an <literal>INLINE</literal> pragma for a function can be put anywhere its type
 signature could be put.
 </para>
 
@@ -3580,11 +3571,8 @@ For example, in GHC's own <literal>UniqueSupply</literal> monad code, we have:
 
 </para>
 
-</sect2>
-
-<sect2 id="noinline-pragma">
-<title>NOINLINE pragma
-</title>
+<sect3 id="noinline-pragma">
+<title>The NOINLINE pragma </title>
 
 <indexterm><primary>NOINLINE pragma</primary></indexterm>
 <indexterm><primary>pragma</primary><secondary>NOINLINE</secondary></indexterm>
@@ -3602,8 +3590,74 @@ size.
 <literal>NOINLINE</literal> (<literal>NOTINLINE</literal> is specified
 by Haskell 98 as the standard way to disable inlining, so it should be
 used if you want your code to be portable).</para>
+</sect3>
+
+
+<sect3 id="phase-control">
+<title>Phase control</title>
+
+<para> Sometimes you want to control exactly when in GHC's pipeline
+the INLINE pragma is switched on.  Inlining happens only during runs of
+the <emphasis>simplifier</emphasis>.  Each run of the simplifier has a different
+<emphasis>phase number</emphasis>; the phase number decreases towards zero.
+If you use <option>-dverbose-core2core</option>
+you'll see the sequence of phase numbers for successive runs of the simpifier.
+In an INLINE pragma you can optionally specify a phase number, thus:
+<itemizedlist>
+<listitem> <para>You can say "inline <literal>f</literal> in Phase 2 and all subsequent
+phases":
+<programlisting>
+  {-# INLINE [2] f #-}
+</programlisting>
+</para></listitem>
+
+<listitem> <para>You can say "inline <literal>g</literal> in all phases up to, but
+not including, Phase 3":
+<programlisting>
+  {-# INLINE [~3] g #-}
+</programlisting>
+</para></listitem>
+
+<listitem> <para>If you omit the phase indicator, you mean "inline in all phases".
+</para></listitem>
+</itemizedlist>
+You can use a phase number on a NOINLINE pragma too:
+<itemizedlist>
+<listitem> <para>You can say "do not inline <literal>f</literal> until Phase 2; in 
+Phase 2 and subsequently behave as if there was no pragma at all":
+<programlisting>
+  {-# NOINLINE [2] f #-}
+</programlisting>
+</para></listitem>
+
+<listitem> <para>You can say "do not inline <literal>g</literal> in Phase 3 or any subsequent phase; 
+before that, behave as if there was no pragma":
+<programlisting>
+  {-# NOINLINE [~3] g #-}
+</programlisting>
+</para></listitem>
+
+<listitem> <para>If you omit the phase indicator, you mean "never inline this function".
+</para></listitem>
+</itemizedlist>
+</para>
+<para>The same phase-numbering control is available for RULES (<xref LinkEnd="rewrite-rules">).</para>
+</sect3>
+
+
 
 </sect2>
+
+<sect2 id="rules">
+<title>RULES pragma</title>
+
+<para>
+The RULES pragma lets you specify rewrite rules.  It is described in
+<xref LinkEnd="rewrite-rules">.
+</para>
+
+</sect2>
+
 
     <sect2 id="specialize-pragma">
       <title>SPECIALIZE pragma</title>
@@ -3727,16 +3781,6 @@ pragma.
 
 </sect2>
 
-<sect2 id="rules">
-<title>RULES pragma</title>
-
-<para>
-The RULES pragma lets you specify rewrite rules.  It is described in
-<xref LinkEnd="rewrite-rules">.
-</para>
-
-</sect2>
-
 <sect2 id="deprecated-pragma">
 <title>DEPRECATED pragma</title>
 
@@ -3810,16 +3854,34 @@ From a syntactic point of view:
 <listitem>
 
 <para>
+ There may be zero or more rules in a <literal>RULES</literal> pragma.
+</para>
+</listitem>
+
+<listitem>
+
+<para>
  Each rule has a name, enclosed in double quotes.  The name itself has
 no significance at all.  It is only used when reporting how many times the rule fired.
 </para>
 </listitem>
-<listitem>
 
+<listitem>
 <para>
- There may be zero or more rules in a <literal>RULES</literal> pragma.
+A rule may optionally have a phase-control number (see <xref LinkEnd="phase-control">),
+immediately after the name of the rule.  Thus:
+<programlisting>
+  {-# RULES
+        "map/map" [2]  forall f g xs. map f (map g xs) = map (f.g) xs
+  #-}
+</programlisting>
+The "[2]" means that the rule is active in Phase 2 and subsequent phases.  The inverse
+notation "[~2]" is also accepted, meaning that the rule is active up to, but not including,
+Phase 2.
 </para>
 </listitem>
+
+
 <listitem>
 
 <para>
@@ -3828,6 +3890,7 @@ is set, so you must lay out your rules starting in the same column as the
 enclosing definitions.
 </para>
 </listitem>
+
 <listitem>
 
 <para>
