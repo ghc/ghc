@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.38 1999/11/02 15:05:51 simonmar Exp $
+ * $Id: PrimOps.h,v 1.39 1999/11/09 10:05:07 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -127,7 +127,7 @@ I_ stg_div (I_ a, I_ b);
 
 #define mulIntCzh(r,c,a,b)				\
 {							\
-  __asm__("xor %1,%1\n\t				\
+  __asm__("xorl %1,%1\n\t				\
 	   imull %2,%3\n\t				\
 	   jno 1f\n\t					\
 	   movl $1,%1\n\t				\
