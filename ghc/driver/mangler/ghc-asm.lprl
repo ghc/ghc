@@ -142,7 +142,7 @@ sub init_TARGET_STUFF {
     $T_HDR_direct   = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$CODE\$\n\t\.align 4\n";
 
     #--------------------------------------------------------#
-    } elsif ( $TargetPlatform =~ /^i386-.*-(linuxaout|freebsd2|netbsd|openbsd|nextstep3|cygwin32|mingw32)$/ ) {
+    } elsif ( $TargetPlatform =~ /^i386-.*-(linuxaout|freebsd2|netbsd_aout|openbsd|nextstep3|cygwin32|mingw32)$/ ) {
 				# NeXT added but not tested. CaS
 
     $T_STABBY	    = 1; # 1 iff .stab things (usually if a.out format)
@@ -173,7 +173,7 @@ sub init_TARGET_STUFF {
     $T_HDR_direct   = "\.text\n\t\.align 2,0x90\n";
 
     #--------------------------------------------------------#
-    } elsif ( $TargetPlatform =~ /^i386-.*-(solaris2|linux|freebsd|netbsd_elf)$/ ) {
+    } elsif ( $TargetPlatform =~ /^i386-.*-(solaris2|linux|freebsd|netbsd)$/ ) {
 
     $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
     $T_US	    = ''; # _ if symbols have an underscore on the front
