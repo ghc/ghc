@@ -114,7 +114,7 @@ sub constructNewHiFile {
     }
 
     local($new_module_version) = &calcNewModuleVersion(@decl_names);
-    print NEWHI "_interface_ ", $ModuleName{'new'}, " $new_module_version\n";
+    print NEWHI "_interface_ ", $ModuleName{'new'}, " $new_module_version $GhcVersionInfo\n";
 
     if ( $Stuff{'new:instance_modules'} ) {
 	print NEWHI "_instance_modules_\n";
@@ -199,11 +199,11 @@ sub readHiFile {
 	    last hi_line;
 	}
 
-	if ( /^_interface_ ([A-Z]\S*) (\d+)/ ) {
+	if ( /^_interface_ ([A-Z]\S*) (\d+)/ && $mod ne 'new' ) {
 	    $ModuleName{$mod}	 = $1; # used to decide name of interface file.
 	    $ModuleVersion{$mod} = $2;
 
-	} elsif ( /^_interface_ ([A-Z]\S*)/ && $mod eq 'new' ) { # special case: no version
+	} elsif ( /^_interface_ ([A-Z]\S*) (\d+)/ && $mod eq 'new' ) { # special case: no version
 	    $ModuleName{'new'} = $1;
 
 	} elsif ( /^_([a-z_]+)_$/ ) {

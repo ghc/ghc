@@ -21,7 +21,9 @@ module SrcLoc (
 
 	mkGeneratedSrcLoc,	-- Code generated within the compiler
 
-	incSrcLine
+	incSrcLine,
+	
+	srcLocFile		-- return the file name part.
     ) where
 
 #include "HsVersions.h"
@@ -71,6 +73,9 @@ mkGeneratedSrcLoc   = UnhelpfulSrcLoc SLIT("<compiler-generated-code>")
 
 isNoSrcLoc NoSrcLoc = True
 isNoSrcLoc other    = False
+
+srcLocFile :: SrcLoc -> FAST_STRING
+srcLocFile (SrcLoc fname _) = fname
 
 incSrcLine :: SrcLoc -> SrcLoc
 incSrcLine (SrcLoc s l) = SrcLoc s (l +# 1#)

@@ -12,7 +12,8 @@ module MkIface (
 
 #include "HsVersions.h"
 
-import IO		( Handle, hPutStr, openFile, hClose, IOMode(..) )
+import IO		( Handle, hPutStr, openFile, 
+			  hClose, hPutStrLn, IOMode(..) )
 
 import HsSyn
 import RdrHsSyn		( RdrName(..) )
@@ -99,9 +100,9 @@ endIface    :: Maybe Handle -> IO ()
 startIface mod
   = case opt_ProduceHi of
       Nothing -> return Nothing -- not producing any .hi file
-      Just fn ->
-	openFile fn WriteMode	>>= \ if_hdl ->
-	hPutStr if_hdl ("{-# GHC_PRAGMA INTERFACE VERSION 20 #-}\n_interface_ "++ _UNPK_ mod ++ "\n") >>
+      Just fn -> do
+	if_hdl <- openFile fn WriteMode
+	hPutStrLn if_hdl ("_interface_ "++ _UNPK_ mod ++ ' ':show (PROJECTVERSION :: Int))
 	return (Just if_hdl)
 
 endIface Nothing	= return ()

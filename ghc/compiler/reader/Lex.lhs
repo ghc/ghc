@@ -25,6 +25,7 @@ module Lex (
 
 	-- Monad for parser
 	IfaceToken(..), lexIface, IfM, thenIf, returnIf, getSrcLocIf,
+	checkVersion, 
 	happyError,
 	StringBuffer
 
@@ -33,6 +34,7 @@ module Lex (
 #include "HsVersions.h"
 
 import Char 		(isDigit, isAlphanum, isUpper,isLower, isSpace, ord )
+import List             ( isSuffixOf )
 
 import {-# SOURCE #-} CostCentre
 
@@ -40,7 +42,7 @@ import CmdLineOpts	( opt_IgnoreIfacePragmas )
 import Demand		( Demand(..) {- instance Read -} )
 import UniqFM           ( UniqFM, listToUFM, lookupUFM)
 import BasicTypes	( NewOrData(..), IfaceFlavour(..) )
-import SrcLoc		( SrcLoc, incSrcLine )
+import SrcLoc		( SrcLoc, incSrcLine, srcLocFile )
 
 import Maybes		( MaybeErr(..) )
 import ErrUtils		( ErrMsg(..) )
@@ -872,9 +874,39 @@ getSrcLocIf s l = Succeeded l
 happyError :: IfM a
 happyError s l = Failed (ifaceParseErr l ([]::[IfaceToken]){-Todo-})
 
+
+{- 
+ Note that if the file we're processing ends with `hi-boot',
+ we accept it on faith as having the right version.
+ This is done so that .hi-boot files  that comes with hsc
+ don't have to be updated before every release, and it
+ allows us to share .hi-boot files with versions of hsc
+ that don't have .hi version checking (e.g., ghc-2.10's)
+
+ If the version number is 0, the checking is also turned off.
+-}
+checkVersion :: Maybe Integer -> IfM ()
+checkVersion mb@(Just v) s l
+ | (v==0) || (v == PROJECTVERSION) = Succeeded ()
+ | otherwise = Failed (ifaceVersionErr mb l ([]::[IfaceToken]){-Todo-})
+checkVersion mb@Nothing  s l 
+ | "hi-boot" `isSuffixOf` (_UNPK_ (srcLocFile l)) = Succeeded ()
+ | otherwise = Failed (ifaceVersionErr mb l ([]::[IfaceToken]){-Todo-})
+
 -----------------------------------------------------------------
 
 ifaceParseErr l toks
   = hsep [ppr l, ptext SLIT("Interface-file parse error;"),
           ptext SLIT("toks="), text (show (take 10 toks))]
+
+ifaceVersionErr hi_vers l toks
+  = hsep [ppr l, ptext SLIT("Interface file version error;"),
+          ptext SLIT("Expected"), int PROJECTVERSION, 
+	  ptext SLIT(" found "), pp_version]
+    where
+     pp_version =
+      case hi_vers of
+        Nothing -> ptext SLIT("pre ghc-3.02 version")
+	Just v  -> ptext SLIT("version") <+> integer v
+
 \end{code}

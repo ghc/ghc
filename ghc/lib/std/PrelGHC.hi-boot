@@ -5,7 +5,7 @@
 --	primitive operations and types that GHC knows about.
 ---------------------------------------------------------------------------
 
-_interface_ PrelGHC 2
+_interface_ PrelGHC 2 0
 _exports_
 PrelGHC
   ->

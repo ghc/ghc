@@ -50,10 +50,12 @@ import Outputable
 \begin{code}
 renameModule :: UniqSupply
 	     -> RdrNameHsModule
-	     -> IO (Maybe (RenamedHsModule, 	-- Output, after renaming
-			   InterfaceDetails,	-- Interface; for interface file generatino
-			   RnNameSupply,	-- Final env; for renaming derivings
-			   [Module]))	   	-- Imported modules; for profiling
+	     -> IO (Maybe 
+	              ( RenamedHsModule   -- Output, after renaming
+		      , InterfaceDetails  -- Interface; for interface file generatino
+		      , RnNameSupply      -- Final env; for renaming derivings
+		      , [Module]	  -- Imported modules; for profiling
+		      ))
 
 renameModule us this_mod@(HsModule mod_name vers exports imports fixities local_decls loc)
   = 	-- Initialise the renamer monad

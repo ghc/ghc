@@ -125,7 +125,7 @@ iface_stuff : iface		{ PIface  $1 }
 
 
 iface		:: { ParsedIface }
-iface		: INTERFACE CONID INTEGER
+iface		: INTERFACE CONID INTEGER checkVersion
 		  inst_modules_part 
 		  usages_part
 		  exports_part fixities_part
@@ -134,12 +134,12 @@ iface		: INTERFACE CONID INTEGER
 		  { ParsedIface 
 			$2 			-- Module name
 			(fromInteger $3) 	-- Module version
-			$5  		        -- Usages
-			$6  		        -- Exports
-			$4  		        -- Instance modules
-			$7  		        -- Fixities
-			$9  		        -- Decls
-			$8 			-- Local instances
+			$6  		        -- Usages
+			$7  		        -- Exports
+			$5  		        -- Instance modules
+			$8  		        -- Fixities
+			$10  		        -- Decls
+			$9 			-- Local instances
 		    }
 
 
@@ -607,11 +607,14 @@ prim_rep  :: { Char }
 	  : VARID						{ head (_UNPK_ $1) }
 	  | CONID						{ head (_UNPK_ $1) }
 
-
 -------------------------------------------------------------------
 
 src_loc :: { SrcLoc }
 src_loc : 				{% getSrcLocIf }
+
+checkVersion :: { () }
+	   : {-empty-}			{% checkVersion Nothing }
+	   | INTEGER			{% checkVersion (Just (fromInteger $1)) }
 
 ------------------------------------------------------------------- 
 
