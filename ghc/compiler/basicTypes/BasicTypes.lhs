@@ -14,17 +14,15 @@ types that
 
 \begin{code}
 module BasicTypes(
-	Version, bumpVersion, initialVersion, bogusVersion,
+	Version, bumpVersion, initialVersion,
 
 	Arity, 
 	
 	DeprecTxt,
 
-	Unused, unused,
-
 	Fixity(..), FixityDirection(..),
 	defaultFixity, maxPrecedence, 
-	arrowFixity, negateFixity, negatePrecedence,
+	negateFixity,
 	compareFixity,
 
 	IPName(..), ipNameName, mapIPName,
@@ -37,7 +35,7 @@ module BasicTypes(
 
 	Boxity(..), isBoxed, 
 
-	TupCon(..), tupParens, tupleParens,
+	TupCon(..), tupleParens,
 
 	OccInfo(..), seqOccInfo, isFragileOcc, isOneOcc, 
 	isDeadOcc, isLoopBreaker,
@@ -63,22 +61,6 @@ import Outputable
 
 %************************************************************************
 %*									*
-\subsection[Unused]{Unused}
-%*									*
-%************************************************************************
-
-Used as a placeholder in types.
-
-\begin{code}
-type Unused = ()
-
-unused :: Unused
-unused = error "Unused is used!"
-\end{code}
-
-
-%************************************************************************
-%*									*
 \subsection[Arity]{Arity}
 %*									*
 %************************************************************************
@@ -96,9 +78,6 @@ type Arity = Int
 
 \begin{code}
 type Version = Int
-
-bogusVersion :: Version	-- Shouldn't look at these
-bogusVersion = error "bogusVersion"
 
 bumpVersion :: Version -> Version 
 bumpVersion v = v+1
@@ -180,9 +159,6 @@ defaultFixity = Fixity maxPrecedence InfixL
 
 negateFixity :: Fixity
 negateFixity     = Fixity negatePrecedence InfixL  	-- Precedence of unary negate is wired in as infixl 6!
-
-arrowFixity :: Fixity 	-- Fixity of '->' in types
-arrowFixity = Fixity 0 InfixR
 
 negatePrecedence :: Int
 negatePrecedence = 6
@@ -316,9 +292,6 @@ data TupCon = TupCon Boxity Arity
 instance Eq TupCon where
   (TupCon b1 a1) == (TupCon b2 a2) = b1==b2 && a1==a2
    
-tupParens :: TupCon -> SDoc -> SDoc
-tupParens (TupCon b _) p = tupleParens b p
-
 tupleParens :: Boxity -> SDoc -> SDoc
 tupleParens Boxed   p = parens p
 tupleParens Unboxed p = ptext SLIT("(#") <+> p <+> ptext SLIT("#)")
