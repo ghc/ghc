@@ -1695,34 +1695,37 @@ construction of interface files, is (allegedly) in the works.
       <para>A package specification looks like this:</para>
 
 <screen>
- ("mypkg",
-  "4.08",
-  Package
-       {
-        import_dirs     =  ["/usr/local/lib/imports/mypkg"],
-	library_dirs    =  ["/usr/local/lib"],
-	hs_libraries    =  ["HSmypkg" ],
-	extra_libraries =  ["HSmypkg_cbits"],
-	include_dirs    =  [],
-	c_includes      =  ["HsMyPkg.h"],
-	package_deps    =  ["text", "data"],
-	extra_ghc_opts  =  [],
-	extra_cc_opts   =  [],
-	extra_ld_opts   =  ["-lmy_clib"]
-       }
- )
+  Package {
+     name            = "mypkg",
+     import_dirs     = ["/usr/local/lib/imports/mypkg"],
+     library_dirs    = ["/usr/local/lib"],
+     hs_libraries    = ["HSmypkg" ],
+     extra_libraries = ["HSmypkg_cbits"],
+     include_dirs    = [],
+     c_includes      = ["HsMyPkg.h"],
+     package_deps    = ["text", "data"],
+     extra_ghc_opts  = [],
+     extra_cc_opts   = [],
+     extra_ld_opts   = ["-lmy_clib"]
+  }
 </screen>
 
-      <para>The first line is the name of the package, for use with
-      the <literal>-package</literal> flag and as listed in the
-      <literal>--list-packages</literal> list.  The second line is the
-      version of GHC that was used to compile any Haskell code in this
-      package (GHC will refuse to add the package if its version
-      number differs from this one).  The rest of the components of
-      the package specification may be specified in any order, and
-      are:</para>
+      <para>Components of a package specification may be specified in
+      any order, and are:</para>
 
       <variablelist>
+	<varlistentry>
+	  <term><literal>name</literal></term>
+	  <indexterm><primary><literal>name</literal></primary>
+	    <secondary>package specification</secondary></indexterm>
+	  <listitem>
+            <para>The package's name, for use with
+            the <literal>-package</literal> flag and as listed in the
+            <literal>--list-packages</literal> list. 
+            </para>
+	  </listitem>
+	</varlistentry>
+
 	<varlistentry>
 	  <term><literal>import_dirs</literal></term>
 	  <indexterm><primary><literal>import_dirs</literal></primary>
