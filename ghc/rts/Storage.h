@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.42 2002/03/21 11:24:00 sebc Exp $
+ * $Id: Storage.h,v 1.43 2002/03/26 10:43:15 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -551,13 +551,17 @@ extern unsigned long macho_edata;
                      (MAX_INTLIKE-MIN_INTLIKE) * sizeof(StgIntCharlikeClosure)) )
 
 #define LOOKS_LIKE_STATIC_CLOSURE(r) (((*(((unsigned long *)(r))-1)) == 0) || IS_CHARLIKE_CLOSURE(r) || IS_INTLIKE_CLOSURE(r))
-#elif defined(darwin_TARGET_OS) && defined(USE_MINIINTERPRETER)
+
+#elif defined(darwin_TARGET_OS) && !defined(TABLES_NEXT_TO_CODE)
+
 #define LOOKS_LIKE_STATIC(r) (!(HEAP_ALLOCED(r)))
-#  define LOOKS_LIKE_STATIC_CLOSURE(r) \
-      (IS_DATA_PTR(r) && !LOOKS_LIKE_GHC_INFO(r))
+#define LOOKS_LIKE_STATIC_CLOSURE(r) (IS_DATA_PTR(r) && !LOOKS_LIKE_GHC_INFO(r))
+
 #else
+
 #define LOOKS_LIKE_STATIC(r) IS_DATA_PTR(r)
 #define LOOKS_LIKE_STATIC_CLOSURE(r) IS_DATA_PTR(r)
+
 #endif
 
 
@@ -577,9 +581,9 @@ extern unsigned long macho_edata;
 /* LOOKS_LIKE_GHC_INFO is called moderately often during GC, but
  * Certainly not as often as HEAP_ALLOCED.
  */
-#if defined(darwin_TARGET_OS) && defined(USE_MINIINTERPRETER)
+#if defined(darwin_TARGET_OS) && !defined(TABLES_NEXT_TO_CODE)
 	/* Plan C, see above */
-# define LOOKS_LIKE_GHC_INFO(info) IS_CODE_PTR(((P_*)(info))[0])
+#define LOOKS_LIKE_GHC_INFO(info) IS_CODE_PTR(((StgInfoTable *)info).entry)
 #else
 #define LOOKS_LIKE_GHC_INFO(info) (!HEAP_ALLOCED(info) \
                                    && !LOOKS_LIKE_STATIC_CLOSURE(info))
