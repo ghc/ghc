@@ -268,7 +268,8 @@ dmdFix top_lvl sigs pairs
 		-- processing the RHSs with sigs (= sigs'), whereas pairs 
 		-- is the result of processing the RHSs with the *previous* 
 		-- iteration of sigs.
-      | n >= 5		    = pprTrace "dmdFix" (ppr n <+> ppr pairs)   (loop (n+1) sigs' pairs')
+      | n >= 5		    = pprTrace "dmdFix" (ppr n <+> (ppr [(id,lookup sigs id, lookup sigs' id) | (id,_) <- pairs] $$ ppr pairs))
+			      (loop (n+1) sigs' pairs')
       | otherwise	    = {- pprTrace "dmdFixLoop" (ppr id_sigs) -} (loop (n+1) sigs' pairs')
       where
 		-- Use the new signature to do the next pair
