@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
-$Id: HsParser.ly,v 1.5 2002/04/26 11:18:57 simonmar Exp $
+$Id: HsParser.ly,v 1.6 2002/04/29 15:28:54 simonmar Exp $
 
 (c) Simon Marlow, Sven Panne 1997-2000
 
@@ -16,6 +16,7 @@ ToDo: Differentiate between record updates and labeled construction.
 > {
 > module HsParser (parse) where
 > 
+> import Monad
 > import HsSyn
 > import HsParseMonad
 > import HsLexer
@@ -442,15 +443,19 @@ Datatype declarations
 >	| constr			{ [$1] }
 
 > constr :: { HsConDecl }
->	: srcloc scontype maybe_doc
->		{ HsConDecl $1 (fst $2) (snd $2) $3 }
->	| srcloc sbtype conop sbtype maybe_doc
->		{ HsConDecl $1 $3 [$2,$4] $5 }
->	| srcloc con '{' fielddecls '}' maybe_doc
->		{ HsRecDecl $1 $2 $4 $6 }
+>	: srcloc maybe_docnext scontype maybe_docprev
+>		{ HsConDecl $1 (fst $3) (snd $3) ($2 `mplus` $4) }
+>	| srcloc maybe_docnext sbtype conop sbtype maybe_docprev
+>		{ HsConDecl $1 $4 [$3,$5] ($2 `mplus` $6) }
+>	| srcloc maybe_docnext con '{' fielddecls '}' maybe_docprev
+>		{ HsRecDecl $1 $3 $5 ($2 `mplus` $7) }
 
-> maybe_doc :: { Maybe String }
+> maybe_docprev :: { Maybe String }
 > 	: DOCPREV			{ Just $1 }
+>	| {- empty -}			{ Nothing }
+
+> maybe_docnext :: { Maybe String }
+> 	: DOCNEXT			{ Just $1 }
 >	| {- empty -}			{ Nothing }
 
 > scontype :: { (HsName, [HsBangType]) }
@@ -481,7 +486,8 @@ Datatype declarations
 >	| {- empty -}			{ [] }
 
 > fielddecl :: { HsFieldDecl }
->	: vars '::' stype		{ HsFieldDecl (reverse $1) $3 Nothing }
+>	: maybe_docnext vars '::' stype maybe_docprev
+>		{ HsFieldDecl (reverse $2) $4 ($1 `mplus` $5) }
 
 > stype :: { HsBangType }
 >	: ctype				{ HsUnBangedTy $1 }	

@@ -17,6 +17,7 @@ import FiniteMap
 import List 	( sortBy )
 import Char	( toUpper, toLower )
 import Monad	( when )
+import IOExts
 
 import Html
 import qualified Html
@@ -461,15 +462,14 @@ keepDecl _ = False
 -- -----------------------------------------------------------------------------
 -- Data & newtype declarations
 
-ppShortDataDecl doc_map summary is_newty 
+ppShortDataDecl :: Bool -> Bool -> HsDecl -> Html
+ppShortDataDecl summary is_newty 
 	(HsDataDecl loc ctx nm args [con] drv) =
-   declBox (  -- single constructor special case
-      ppHsDataHeader summary is_newty nm args      
-      <+> equals <+> ppShortConstr summary con
-   )
-ppShortDataDecl doc_map summary is_newty
+   ppHsDataHeader summary is_newty nm args      
+     <+> equals <+> ppShortConstr summary con
+ppShortDataDecl summary is_newty
 	(HsDataDecl loc ctx nm args cons drv) = 
-   declBox << vanillaTable << (
+   vanillaTable << (
      aboves (
 	(declBox (ppHsDataHeader summary is_newty nm args) :
  	zipWith do_constr ('=':repeat '|') cons
@@ -488,8 +488,9 @@ ppHsDataDecl doc_map summary is_newty (HsDataDecl loc ctx nm args [] drv) =
 -- The rest of the cases:
 
 ppHsDataDecl doc_map summary is_newty decl@(HsDataDecl loc ctx nm args cons drv)
-  | summary || (isNothing doc && all constr_has_no_doc cons)
-	= ppShortDataDecl doc_map summary is_newty decl
+  | summary || no_constr_docs
+	= declWithDoc summary (lookupFM doc_map nm)
+     		(ppShortDataDecl summary is_newty decl)
 
   | otherwise
         = td << vanillaTable << (header </> datadoc </> constrs)
@@ -512,10 +513,15 @@ ppHsDataDecl doc_map summary is_newty decl@(HsDataDecl loc ctx nm args cons drv)
 	Just c = declMainBinder decl
 	doc = lookupFM doc_map c
 
+	no_constr_docs = all constr_has_no_doc cons
+
 	constr_has_no_doc (HsConDecl _ nm _ _) 
 	   = isNothing (lookupFM doc_map nm)
-	constr_has_no_doc (HsRecDecl _ nm _ _) 
-	   = isNothing (lookupFM doc_map nm)
+	constr_has_no_doc (HsRecDecl _ nm fields _)
+	   = isNothing (lookupFM doc_map nm) && all field_has_no_doc fields
+
+ 	field_has_no_doc (HsFieldDecl nms _ _)
+	   = trace (show nms ++ show (map (isNothing . lookupFM doc_map) nms)) $ all isNothing (map (lookupFM doc_map) nms)
 
 
 ppShortConstr :: Bool -> HsConDecl -> Html

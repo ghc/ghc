@@ -445,7 +445,7 @@ collect name doc_so_far (decl:ds) =
 	   Nothing -> collect name (doc_so_far ++ str) ds
 	   Just n  -> finishedDoc n doc_so_far (collect Nothing str ds)
 
-      HsDocCommentPrev str -> collect name (doc_so_far++str) ds
+      HsDocCommentPrev str -> collect name (doc_so_far ++ str) ds
 
       _other -> 
 	docsFromDecl decl ++
