@@ -323,6 +323,23 @@ details.</para>
       </listitem>
     </varlistentry>
 
+    <varlistentry> 
+
+      <term>If I explicitely set the buffering on a Handle to
+      "NoBuffering" I'm not able to > enter EOF by typing
+      "Ctrl-D".</term>
+
+      <listitem>
+	<para>This is a consequence of Unixy terminal semantics.  Unix
+        does line buffering on terminals in the kernel as part of the
+        terminal processing, unless you turn it off.  However, the
+        Ctrl-D processing is also part of the terminal processing
+        which gets turned off when the kernel line buffering is
+        disabled.  So GHC tries its best to get NoBuffering semantics
+        by turning off the kernel line buffering, but as a result you
+        lose Ctrl-D.  C'est la vie.</para>
+      </listitem>
+    </varlistentry>
   </variablelist>
 </chapter>
 
