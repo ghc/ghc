@@ -36,7 +36,6 @@ module Control.Concurrent.MVar
 #ifdef __HUGS__
 import Hugs.ConcBase ( MVar, newEmptyMVar, newMVar, takeMVar, putMVar,
 		  tryTakeMVar, tryPutMVar, isEmptyMVar,
-                  readMVar, swapMVar,
 		)
 import Hugs.Exception ( throwIO )
 #endif
@@ -56,7 +55,6 @@ throw :: Exception -> IO a
 throw = throwIO
 #endif
 
-#ifdef __GLASGOW_HASKELL__
 {-|
   This is a combination of 'takeMVar' and 'putMVar'; ie. it takes the value
   from the 'MVar', puts it back, and also returns it.
@@ -70,8 +68,11 @@ readMVar m =
 
 -- |Swap the contents of an 'MVar' for a new value.
 swapMVar :: MVar a -> a -> IO a
-swapMVar mvar new = modifyMVar mvar (\old -> return (new,old))
-#endif
+swapMVar mvar new =
+  block $ do
+    old <- takeMVar mvar
+    putMVar mvar new
+    return old
 
 {-|
   'withMVar' is a safe wrapper for operating on the contents of an
