@@ -626,7 +626,7 @@ is used:
 Now give it to the simplifier and the _Lifting will be optimised away.
 
 The benfit is that we have given the specialised "unboxed" values a
-very simple lifted semantics and then leave it up to the simplifier to
+very simplep lifted semantics and then leave it up to the simplifier to
 optimise it --- knowing that the overheads will be removed in nearly
 all cases.
 
@@ -687,6 +687,411 @@ and in future GHC is likely to support full fledged type signatures
 like
 	f ;: Eq [(a,b)] => ...
 
+
+%************************************************************************
+%*									*
+\subsubsection{The new specialiser}
+%*									*
+%************************************************************************
+
+Our basic game plan is this.  For let(rec) bound function
+	f :: (C a, D c) => (a,b,c,d) -> Bool
+
+* Find any specialised calls of f, (f ts ds), where 
+  ts are the type arguments t1 .. t4, and
+  ds are the dictionary arguments d1 .. d2.
+
+* Add a new definition for f1 (say):
+
+	f1 = /\ b d -> (..body of f..) t1 b t3 d d1 d2
+
+  Note that we abstract over the unconstrained type arguments.
+
+* Add the mapping
+
+	[t1,b,t3,d]  |->  \d1 d2 -> f1 b d
+
+  to the specialisations of f.  This will be used by the
+  simplifier to replace calls 
+		(f t1 t2 t3 t4) da db
+  by
+		(\d1 d1 -> f1 t2 t4) da db
+
+  All the stuff about how many dictionaries to discard, and what types
+  to apply the specialised function to, are handled by the fact that the
+  SpecEnv contains a template for the result of the specialisation.
+
+We don't build *partial* specialisations for f.  For example:
+
+  f :: Eq a => a -> a -> Bool
+  {-# SPECIALISE f :: (Eq b, Eq c) => (b,c) -> (b,c) -> Bool #-}
+
+Here, little is gained by making a specialised copy of f.
+There's a distinct danger that the specialised version would
+first build a dictionary for (Eq b, Eq c), and then select the (==) 
+method from it!  Even if it didn't, not a great deal is saved.
+
+We do, however, generate polymorphic, but not overloaded, specialisations:
+
+  f :: Eq a => [a] -> b -> b -> b
+  {#- SPECIALISE f :: [Int] -> b -> b -> b #-}
+
+The invariant is this: 
+
+	*** no specialised version is overloaded ***
+
+
+\begin{code}
+specExpr :: CoreExpr -> SpecM (CoreExpr, UsageDetails)
+
+---------------- First the easy cases --------------------
+specExpr e@(Var _)    = returnSM (e, emptyUDs)
+specExpr e@(Lit _)    = returnSM (e, emptyUDs)
+specExpr e@(Con _ _)  = returnSM (e, emptyUDs)
+specExpr e@(Prim _ _) = returnSM (e, emptyUDs)
+
+specExpr (Coerce co ty body)
+  = specExpr body 	`thenSM` \ (body', uds) ->
+    returnSM (Coerce co ty body')
+
+specExpr (SCC cc body)
+  = specExpr body 	`thenSM` \ (body', uds) ->
+    returnSM (SCC cc body')
+
+
+---------------- Applications might generate a call instance --------------------
+specExpr e@(App fun arg)
+  = go fun [arg]
+  where
+    go (App fun arg) args = go fun (arg:args)
+    go (Var f)       args = returnSM (e, mkCallUDs f args)
+    go other	     args = specExpr other	`thenSM` \ (e', uds) ->
+			    returnSM (foldl App e' args, uds)
+
+---------------- Lambda/case require dumping of usage details --------------------
+specExpr e@(Lam _ _)
+  = specExpr body 	`thenSM` \ (body', uds) ->
+    let
+	(filtered_uds, body'') = dumpUDs bndrs uds body'
+    in
+    returnSM (Lam bndr body'', filtered_uds)
+  where
+    (bndrs, body) = go [] e
+
+	-- More efficient to collect a group of binders together all at once
+    go bndrs (Lam bndr e) = go (bndr:bndrs) e
+    go bndrs e            = (reverse bndrs, e)
+
+
+specExpr (Case scrut alts)
+  = specExpr scrut	`thenSM` \ (scrut', uds_scrut) ->
+    spec_alts alts	`thenSM` \ (alts', uds_alts) ->
+    returnSM (Case scrut' alts', uds_scrut `plusUDs` uds_alts)
+  where
+    spec_alts (AlgAlts alts deflt)
+	= mapAndCombineSM spec_alg_alt alts	`thenSM` \ (alts', uds1) ->
+	  spec_deflt deflt			`thenSM` \ (deflt', uds2) ->
+	  returnSM (AlgAlts alts' deflt', uds1 `plusUDs` uds2)
+
+    spec_alts (PrimAlts alts deflt)
+	= mapAndCombineSM spec_prim_alt alts	`thenSM` \ (alts', uds1) ->
+	  spec_deflt deflt			`thenSM` \ (deflt', uds2) ->
+	  returnSM (AlgAlts alts' deflt', uds1 `plusUDs` uds2)
+
+    spec_alg_alt (con, args, rhs)
+	= specExpr rhs		`thenSM` \ (rhs', uds) ->
+	  let
+	     (uds', rhs'') = dumpUDs (map ValBinder args) uds rhs'
+	  in
+	  returnSM ((con, args, rhs''), uds')
+
+    spec_prim_alt (lit, rhs)
+	= specExpr rhs		`thenSM` \ (rhs', uds) ->
+	  returnSM ((lit, rhs'), uds)
+
+    spec_deflt NoDefault = (NoDefault, emptyUDs)
+    spec_deflt (BindDefault arg rhs)
+	= specExpr rhs		`thenSM` \ (rhs', uds) ->
+	  let
+	     (uds', rhs'') = dumpManyUDs [ValBinder arg] uds rhs'
+	  in
+	  returnSM (BindDefault arg rhs'', uds')
+
+---------------- Finally, let is the interesting case --------------------
+specExpr (Let (NonRec bndr rhs) body)
+  = specExpr body				`thenSM` \ (body', body_uds) ->
+    specDefn (calls body_uds) (bndr,rhs)	`thenSM` \ ((bndr',rhs'), spec_defns, spec_uds) ->
+
+    let
+	all_uds = rhs_uds `plusUDs` body_uds
+    in
+    if bndr `elementOfIdSet` free_dicts body_uds then
+	-- This is a dictionary binding; we must pick it up
+	-- and float it outwards.
+	ASSERT( null spec_defns )
+	returnSM (body', addDictBind all_uds bndr' rhs')
+
+    else if isSpecPragmaId bnd then
+	-- SpecPragmaIds are there solely to generate specialisations
+	-- Just drop the whole binding
+	ASSERT( null spec_defns )
+	returnSM (body', all_uds)
+
+    else
+	-- An ordinary binding, so glue it all together
+    returnSM (
+	Let (NonRec bndr' rhs') (mkLets spec_defns body'),
+	deleteCalls all_uds bndr'
+    )
+
+specDefn :: CallDetails			-- Info on how it is used in its scope
+	 -> (Id, CoreExpr)		-- The thing being bound and its un-processed RHS
+	 -> SpecM ((Id, CoreExpr),	-- The thing and its processed RHS
+					-- 	the Id may now have specialisations attached
+		   [(Id, CoreExpr)],	-- Extra, specialised bindings
+		   UsageDetails		-- Stuff to fling upwards from the RHS and its
+	    )				-- 	specialised versions
+
+specDefn calls (fn, rhs)
+	-- The first case is the interesting one
+  |  n_tyvars == length rhs_tyvars	-- Rhs of fn's defn has right number of big lambdas
+  && n_dicts <= length rhs_bndrs	-- and enough dict args
+  && not (null calls_for_me)		-- And there are some calls to specialise
+  = specExpr body					`thenSM` \ (body', body_uds) ->
+    mapSM (specCall body_uds) calls_for_me		`thenSM` \ stuff ->
+    let
+	(spec_defns, spec_uds, spec_env_stuff) = unzip3 stuff
+
+	(rhs_uds, body'') = dumpUDs rhs_bndrs body_uds body'
+	rhs'		  = foldr Lam bndrs body''
+
+	fn' = addIdSpecialisations fn spec_env_stuff
+    in
+    returnSM ((fn',rhs'), spec_defns, rhs_uds `plusUDs` plusUDList spec_uds)
+
+  | otherwise	-- No calls or RHS doesn't fit our preconceptions
+  = specExpr rhs			`thenSM` \ (rhs', rhs_uds) ->
+    returnSM ((fn, rhs'), [], rhs_uds)
+  
+  where
+    (tyvars, theta, tau)  = splitSigmaTy (idType fn)
+    n_tyvars		  = length tyvars
+    n_dicts		  = length theta
+
+    (rhs_tyvars, rhs_ids, rhs_body) = collectBinders rhs
+    rhs_dicts = take n_dicts rhs_ids
+    rhs_bndrs = map TyBinder rhs_tyvars ++ map ValBinder rhs_dicts
+    body      = mkValLam (drop n_dicts rhs_ids) rhs_body
+		-- Glue back on the non-dict lambdas
+
+    calls_for_me = case lookupFM calls fn of
+			Nothing -> []
+			Just cs -> fmToList cs
+
+
+	-- Specialise to one particular call pattern
+    spec_call body_uds (call_ts, call_ds)
+      = ASSERT( length call_ts == n_tyvars && length call_ds == n_dicts )
+		-- The calls are only recorded for properly-saturated applications
+	
+		-- Construct the new binding
+		-- 	f1 = /\ b d -> (..body of f..) t1 b t3 d d1 d2
+		-- and the type of this binder
+        let
+	   spec_tys = zipNothings call_ts tyvars
+	   spec_rhs = mkTyLam tyvars (mkGenApp rhs (map TyArg spec_tys ++ map VarArg call_ds))
+  	   spec_ty  = mkForAllTys tyvars (applyTys (idType f) spec_tys)
+	in
+	newIdSM f spec_ty		`thenSM` \ spec_f ->
+
+
+		-- Construct the stuff for f's spec env
+		--	[t1,b,t3,d]  |->  \d1 d2 -> f1 b d
+	let
+	   spec_env_rhs = mkValLam call_ds $
+			  mkTyApp (Var spec_f) $
+			  map mkTyVarTy tyvars
+        in
+
+		-- Specialise the UDs from f's RHS
+        specUDs (zipEqual defn_tvs call_ts)
+		(zipEqual rhs_dicts call_ds)
+		body_uds				`thenSM` \ spec_uds ->
+
+        returnSM ((spec_f, spec_rhs),
+	          spec_uds,
+		  (spec_tys, spec_env_rhs)
+	)
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection{UsageDetails and suchlike}
+%*									*
+%************************************************************************
+
+\begin{code}
+type FreeDicts = IdSet
+
+data UsageDetails 
+  = MkUD {
+ 	free_dicts :: !FreeDicts,	-- Dicts free in any of the calls or dict binds
+
+	dict_binds :: !Bag (DictVar, CoreExpr, FreeDicts),
+			-- Floated dictionary bindings
+			-- The order is important; 
+			-- in ds1 `union` ds2, bindings in ds2 can depend on those in ds1
+			-- (Remember, Bags preserve order in GHC.)
+			-- The FreeDicts is the free vars of the RHS
+
+	calls     :: !CallDetails
+    }
+
+type CallMap  = FiniteMap Id CallInfo
+type CallInfo = FiniteMap [Maybe Type]	-- Nothing => unconstrained type argument
+		          [DictVar]	-- Dict args
+	-- The finite maps eliminate duplicates
+	-- The list of types and dictionaries is guaranteed to
+	-- match the type of f
+
+			
+plusUDs :: UsageDetails -> UsageDetails -> UsageDetails
+plusUDs (MkUD {fvs = fvs1, dictBinds = db1, calls = calls1})
+	(MkUD {fvs = fvs2, dictBinds = db2, calls = calls2})
+  = MkUD {fvs, dictBinds, calls}
+  where
+    fvs       = fvs1   `unionIdSets` fvs2
+    dictBinds = db1    `unionBags`   db2 
+    calls     = calls1 `unionBags`   calls2
+
+
+tyVarsOfUDs (MkUD {fvs}) = tyVarsOfTypes (map idType (idSetToList fvs))
+
+deleteCalls uds bndr = uds { calls = delFromFM (calls uds) bndr }
+
+addDictBind uds dict rhs = uds { free_dicts = addToIdSet (free_dicts uds) dict,
+				 dict_binds = (dict, rhs, f
+
+dumpUDs :: [CoreBinder]
+	-> UsageDetails -> CoreExpr
+	-> (UsageDetails, CoreExpr)
+
+dumpUDs bndrs uds@(MkUDs {fvs = orig_fvs, dictBinds = orig_dbs, calls = orig_calls}) body
+  = ASSERT( isEmptyTyVarSet (tyvar_set `intersectTyVarSets` ftvs)
+	-- The tyvars shouldn't be free in any of the usage details
+	-- If it was, then we should have found a dictionary lambda first
+
+    if isEmptyIdSet (id_set `intersectIdSets` fvs) then
+   	-- Common case: binder doesn't affect floats
+	(uds, body)	
+
+    else
+  	-- Binders bind some of the fvs of the floats
+  	(MkUDs {fvs = filtered_fvs, 
+	       dictBinds = filtered_dbs, 
+	       calls = filtered_calls},
+	 foldrBag mk_dict_bind body dump_dbs)
+
+  where
+    tyvar_set  = mkTyVarSet [tv | TyBinder tv <- bndrs]
+    id_list    = [id | ValBinder id <- bndrs]
+    id_set     = mkIdSet id_list
+    ftvs       = tyVarsOfUDs uds
+    filtered_fvs = orig_fvs `minusIdSet` id_set
+
+    (filtered_dbs, dump_dbs, dump_idset) 
+	  = foldlBag dump (emptyBag, emptyBag, id_set) orig_dbs
+		-- Important that it's foldl not foldr;
+		-- we're accumulating the set of dumped ids in dump_set
+
+	-- Filter out any calls that mention things that are being dumped
+	-- It's a bit tiresome because of the two-level finite map
+    filtered_calls = mapFM del (foldr delFromFM orig_calls id_list)
+    del _ dicts    = filter (not (`elementOfIdSet` dump_id_set)) dicts 
+
+    dump (ok_dbs, dump_dbs, dump_idset) db@(dict, rhs, fvs)
+	| isEmptyIdSet (dump_idset `intersectIdSets` fvs)
+	= (ok_dbs `snocBag` db, dump_dbs, dump_idset)
+
+	| otherwise	-- Dump it
+	= (ok_dbs, dump_dbs `snocBag` db, idEmptyIdSet (dump_idset `intersectIdSets` fvs)
+
+    mk_dict_bind (dict, rhs, _) body = Let (NonRec dict rhs) body
+\end{code}
+
+Given a type and value substitution, specUDs creates a specialised copy of
+the given UDs
+
+\begin{code}
+specUDs tv_assoc id_assoc (MkUDs {fvs = orig_fvs, dictBinds = orig_dbs, calls = orig_calls})
+  = mapAccumLSM spec_bind 
+		(tv_env, id_env) 
+		(bagToList orig_dbs)	`thenSM` \ ((tv_env', id_env'), new_dbs) ->
+    let
+      subst_call call_info = listToFM [(map (instantiateTy ty_env') ts, 
+					map (lookupId id_env') call_ds)
+				      | (call_ts, call_ds) <- fmToList call_info
+				      ]
+    in
+    MkUDs { fvs       = substFVSet id_env orig_fvs,
+	    dictBinds = listToBag new_dbs,
+	    calls     = mapFM orig_calls subst_call
+    }
+  where
+    tv_env = mkTyVarEnv tv_assoc
+    id_env = mkIdEnv    id_assoc
+
+    spec_bind (ty_env, id_env) (dict, rhs, fvs)
+      = newIdSM dict spec_ty		`thenSM` \ spec_dict -> 
+	returnSM ((ty_env, addOneToIdEnv id_env dict spec_dict), (spec_dict, spec_rhs))
+      where
+	spec_ty = instantiateTy ty_env (idType dict)
+	spec_rhs = instantiateDictRhs ty_env id_env rhs
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsubsection{Boring helper functions}
+%*									*
+%************************************************************************
+
+\begin{code}
+substFVSet :: IdEnv Id -> IdSet -> IdSet
+substFVSet env s = mkIdSet [lookupId env id | id <- idSetToList s]
+
+lookupId:: IdEnv Id -> Id -> Id
+lookupId env id = case lookupIdEnv env id of
+			Nothing  -> id
+			Just id' -> id'
+
+instantiateDictRhs :: TyVarEnv Type -> IdEnv Id -> CoreExpr -> CoreExpr
+	-- Cheapo function for simple RHSs
+instantiateDictRhs ty_env id_env rhs
+  = go rhs
+  where
+    go (App e1 (ValArg a)) = App (go e1) (ValArg (lookupId id_env a))
+    go (App e1 (TyArg t))  = App (go e1) (TyArg (instantiateTy ty_env t))
+    go (Var v)		   = Var (lookupId id_env v)
+    go (Lit l)		   = Lit l
+
+dictRhsFVs :: CoreExpr -> IdSet
+	-- Cheapo function for simple RHSs
+dictRhsFVs (App e1 (ValArg a)) = dictRhsFVs e1 `addOneToIdSet` a
+    go (App e1 (TyArg t))      = dictRhsFVs e1
+    go (Var v)		       = singletonIdSet v
+    go (Lit l)		       = emptyIdSet
+
+mkLets []		  body = body
+mkLets ((bndr,rhs):binds) body = Let (NonRec bndr rhs) (mkLets binds body)
+
+zipNothings [] 		    []		     = []
+zipNothings (Nothing : tys) (tyvar : tyvars) = mkTyVarTy tyvar : zipNothings tys tyvars
+zipNothings (Just ty : tys) tyvars	     = ty 	       : zipNothings tys tyvars
+\end{code}
+
+
+=========================== OLD STUFF =================================
 
 %************************************************************************
 %*									*
