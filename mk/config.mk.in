@@ -272,7 +272,7 @@ WithHappyHc = $(WithGhcHc)
 # HappyHcOpts gives the flags to pass to the Haskell compiler used
 # 	      to compile the Happy sources with.
 #
-HappyHcOpts = 
+HappyHcOpts = -O
 
 #################################################################################
 #
