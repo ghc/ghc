@@ -529,11 +529,6 @@ readIface file_path
     case parseIface contents init_parser_state of
 	POk _ iface          -> returnRn (Right iface)
 	PFailed err 	     -> bale_out err
-	parse_result 	     -> bale_out empty
-	 	-- This last case can happen if the interface file is (say) empty
-		-- in which case the parser thinks it looks like an IdInfo or
-		-- something like that.  Just an artefact of the fact that the
-		-- parser is used for several purposes at once.
     }
   where
     init_parser_state = PState{ bol = 0#, atbol = 1#,
