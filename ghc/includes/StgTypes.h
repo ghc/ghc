@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgTypes.h,v 1.11 2000/04/13 15:37:11 panne Exp $
+ * $Id: StgTypes.h,v 1.12 2000/06/12 11:04:12 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -160,7 +160,7 @@ typedef StgFunPtr StgFun(void);
 typedef union {
     StgWord        w;
     StgAddr        a;
-    StgChar        c;
+    StgWord        c;
     StgFloat       f;
     StgInt         i;
     StgPtr         p;
