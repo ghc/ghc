@@ -1,6 +1,11 @@
 /* 
  * (c) The University of Glasgow 1994-2004
  *
+ * WARNING: this file is here for backwards compatibility only.  It is
+ * not included as part of the base package, but is #included into the
+ * compiler and the runghc utility when building either of these with 
+ * an old version of GHC.
+ *
  * shell-less system Runtime Support (see System.Cmd.rawSystem).
  */
 

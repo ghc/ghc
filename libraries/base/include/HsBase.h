@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The University of Glasgow 2001-2002
+ * (c) The University of Glasgow 2001-2004
  *
  * Definitions for package `base' which are visible in Haskell land.
  *
@@ -109,21 +109,13 @@
 #include "lockFile.h"
 #include "dirUtils.h"
 
+#include "runProcess.h"
+
 #if defined(mingw32_TARGET_OS)
 #include <io.h>
 #include <fcntl.h>
 #include "timeUtils.h"
 #include <shlobj.h>
-#endif
-
-/* in system.c */
-HsInt systemCmd(HsAddr cmd);
-
-/* in rawSystem.c */
-#if defined(mingw32_TARGET_OS)
-HsInt rawSystem(HsAddr cmd);
-#else
-HsInt rawSystem(HsAddr cmd, HsAddr args);
 #endif
 
 /* in inputReady.c */
@@ -134,6 +126,10 @@ void writeErrString__(HsAddr msg, HsInt len);
 
 /* in Signals.c */
 extern HsInt nocldstop;
+
+/* in execvpe.c */
+extern int execvpe(char *name, char *const argv[], char **envp);
+extern void pPrPr_disableITimers (void);
 
 /* -----------------------------------------------------------------------------
    64-bit operations, defined in longlong.c

@@ -26,6 +26,7 @@ ALL_DIRS = \
 	System/Mem \
 	System/IO \
 	System/Posix \
+	System/Process \
 	Text \
 	Text/Html \
 	Text/PrettyPrint \

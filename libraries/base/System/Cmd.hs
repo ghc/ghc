@@ -22,11 +22,9 @@ module System.Cmd
 import Prelude
 
 #ifdef __GLASGOW_HASKELL__
-import Foreign
-import Foreign.C
-import System.Exit
-import GHC.IOBase
-#include "ghcconfig.h"
+import System.Process
+import System.Exit 	( ExitCode )
+import GHC.IOBase	( ioException, IOException(..), IOErrorType(..) )
 #endif
 
 #ifdef __HUGS__
@@ -63,19 +61,12 @@ passes the command to the Windows command interpreter (@CMD.EXE@ or
 #ifdef __GLASGOW_HASKELL__
 system :: String -> IO ExitCode
 system "" = ioException (IOError Nothing InvalidArgument "system" "null command" Nothing)
-system cmd =
-  withCString cmd $ \s -> do
-    status <- throwErrnoIfMinus1 "system" (primSystem s)
-    case status of
-        0  -> return ExitSuccess
-        n  -> return (ExitFailure n)
+system cmd = do
+  p <- runCommand cmd
+  waitForProcess p
 
-foreign import ccall unsafe "systemCmd" primSystem :: CString -> IO Int
-
--- ---------------------------------------------------------------------------
--- rawSystem
-
--- rawSystem is in a separate file, so we can #include it various places.
-#include "RawSystem.hs-inc"
-
+rawSystem :: String -> [String] -> IO ExitCode
+rawSystem cmd args = do
+  p <- runProcess cmd args Nothing Nothing Nothing Nothing Nothing
+  waitForProcess p
 #endif  /* __GLASGOW_HASKELL__ */
