@@ -790,7 +790,7 @@ linkPackage dflags pkg
         maybePutStr dflags "linking ... "
         ok <- resolveObjs
 	if succeeded ok then maybePutStrLn dflags "done."
-	      else panic ("can't load package `" ++ name pkg ++ "'")
+	      else throwDyn (InstallationError ("unable to load package `" ++ name pkg ++ "'"))
 
 load_dyn dirs dll = do r <- loadDynamic dirs dll
 		       case r of
