@@ -2,8 +2,6 @@
 %
 %				Version 2.02
 %				Feb 1997
-
-
 			
 
 \begin{onlystandalone}
@@ -27,7 +25,7 @@ Email: glasgow-haskell-\{users,bugs\}\@dcs.gla.ac.uk}
 
 This guide is intended for people who want to install or modify
 programs from the Glasgow @fptools@ suite (as distinct from those
-who merely want to {\em run} them.
+who merely want to {\em run} them).
 
 The whole install-and-make system has been completely re-done
 between GHC 2.01 and 2.02, so it will be worth your while to re-read this guide
@@ -586,7 +584,7 @@ It is pretty easy to install.
 
 Perl~5 is the current version; GHC should be Perl~4 friendly though.
 For Win32 platforms, Perl~5 is recommended, we even strongly suggest
-you pick up our quick-and-dirty port of Perl~5, as the common
+you pick up a port of Perl~5 for \tr{cygwin32}, as the common
 Hip/ActiveWare port of Perl is not Cool Enough for our purposes.
 
 Perl should be put somewhere so that it can be invoked by the \tr{#!}
@@ -687,9 +685,9 @@ build-configuration.  2.0.5 is ok. Others are probably ok too
 Two @fptools@ projects are worth a quick note at this point, because
 they are useful for all the others:
 \begin{itemize}
-\item @glafp-utils@ contains several small utilities 
-which aren't particularly Glasgow-ish, but which are sometimes not
-available on Unix systems. 
+\item @glafp-utils@ contains several utilities which aren't
+particularly Glasgow-ish, but Occasionally Indispensable.
+
 
 \item @literate@ contains the Glasgow-built tools for generating
 documentation.  (The unoriginal idea is to be able to generate @latex@, @info@,
@@ -738,12 +736,12 @@ operating system.
 \end{itemize}
 All the other directories are individual {\em projects} of the
 @fptools@ system --- for example, the Glasgow Haskell Compiler (@ghc@),
-the Happy parser generator (@happy@), the @nofib@ benchmark stuite, 
+the Happy parser generator (@happy@), the @nofib@ benchmark suite, 
 and so on.
 You can have zero or more of these.  Needless to say, some of them
 are needed to build others.  For example, you need @happy@ to build
 @ghc@.  You can either grab @happy@ too, or else you can use
-an version of @happy@ that's already installed on your system, or 
+a version of @happy@ that's already installed on your system, or 
 grab a binary distribution of @happy@ and install it.
 
 The important thing to remember is that even if you want only
