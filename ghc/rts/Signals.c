@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.24 2002/03/26 23:51:27 sof Exp $
+ * $Id: Signals.c,v 1.25 2002/07/02 12:24:48 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -363,12 +363,24 @@ initDefaultHandlers()
     }
 
     // install the SIGFPE handler
+
+    // In addition to handling SIGINT, also handle SIGFPE by ignoring it.
+    // Apparently IEEE requires floating-point exceptions to be ignored by
+    // default, but alpha-dec-osf3 doesn't seem to do so.
+
+    // Commented out by SDM 2/7/2002: this causes an infinite loop on
+    // some architectures when an integer division by zero occurs: we
+    // don't recover from the floating point exception, and the
+    // program just generates another one immediately.
+#if 0
     action.sa_handler = SIG_IGN;
     sigemptyset(&action.sa_mask);
     action.sa_flags = 0;
     if (sigaction(SIGFPE, &action, &oact) != 0) {
 	prog_belch("warning: failed to install SIGFPE handler");
     }
+#endif
+
 #ifdef alpha_TARGET_ARCH
     ieee_set_fp_control(0);
 #endif
