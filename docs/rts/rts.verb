@@ -520,7 +520,7 @@ pushing an \emph{update frame} onto the stack and overwriting the
 thunk with a \emph{black hole} (see Black Holes, below).  When
 evaluation of the thunk completes, the update frame will cause the
 thunk to be overwritten again with an \emph{indirection} to the result
-of the thunk, which is always a constructor.
+of the thunk, which is always a constructor or a partial application.
 
 \begin{center}
 \begin{tabular}{|l|l|l|l|}\hline
@@ -606,9 +606,9 @@ an update in place.)
 \end{tabular}
 \end{center}
 
-Indirections needn't always point to a constructor.  They can point to
-a chain of indirections which point to an evaluated closure.  When
-revertible black holes are added, they may also point to reverted
+Indirections needn't always point to a closure in WHNF.  They can
+point to a chain of indirections which point to an evaluated closure.
+When revertible black holes are added, they may also point to reverted
 black holes.
 
 \item[Thread State Objects (@TSO@s)] represent Haskell threads.  Their
