@@ -155,11 +155,6 @@ genPipeline todo stop_flag persistent_output lang (filename,suffix)
 	        | split	       	  -> not_valid
 	        | otherwise       -> [ Hsc, HCc, As ]
 
-	HscCore | split && mangle -> [ Hsc, HCc, Mangle, SplitMangle, SplitAs ]
-	        | mangle          -> [ Hsc, HCc, Mangle, As ]
-	        | split	       	  -> not_valid
-	        | otherwise       -> [ Hsc, HCc, As ]
-
 	HscAsm  | split           -> [ Hsc, SplitMangle, SplitAs ]
 	        | otherwise       -> [ Hsc, As ]
 

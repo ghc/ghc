@@ -335,7 +335,6 @@ data HscLang
   | HscAsm
   | HscJava
   | HscILX
-  | HscCore
   | HscInterpreted
   | HscNothing
     deriving (Eq, Show)

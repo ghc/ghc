@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.97 2002/06/12 22:04:26 wolfgang Exp $
+-- $Id: DriverFlags.hs,v 1.98 2002/07/03 15:15:24 sof Exp $
 --
 -- Driver flags
 --
@@ -433,7 +433,6 @@ dynamic_flags = [
   ,  ( "fvia-c",	NoArg (setLang HscC) )
   ,  ( "fvia-C",	NoArg (setLang HscC) )
   ,  ( "filx",		NoArg (setLang HscILX) )
-  ,  ( "fcore",		NoArg (setLang HscCore) )
 
 	-- "active negatives"
   ,  ( "fno-implicit-prelude",  NoArg (setDynFlag Opt_NoImplicitPrelude) )
@@ -565,8 +564,9 @@ machdepCCOpts
       --   the fp (%ebp) for our register maps.
 	= do n_regs <- dynFlag stolen_x86_regs
 	     sta    <- readIORef v_Static
-	     return ( [ if sta then "-DDONT_WANT_WIN32_DLL_SUPPORT" else "",
-                        if suffixMatch "mingw32" cTARGETPLATFORM then "-mno-cygwin" else "" ],
+	     return ( [ if sta then "-DDONT_WANT_WIN32_DLL_SUPPORT" else ""
+--                    , if suffixMatch "mingw32" cTARGETPLATFORM then "-mno-cygwin" else "" 
+		      ],
 		      [ "-fno-defer-pop", "-fomit-frame-pointer",
 	                "-DSTOLEN_X86_REGS="++show n_regs ]
 		    )
