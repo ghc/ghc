@@ -423,7 +423,11 @@ Other printing bits-and-bobs used with the general @pprCoreBinding@
 and @pprCoreExpr@ functions.
 
 \begin{code}
-pprBigCoreBinder sty binder = pprTypedCoreBinder sty binder
+pprBigCoreBinder sty binder 
+  = vcat [pragmas,
+	  pprTypedCoreBinder sty binder] 
+  where
+    pragmas = ppIdInfo sty False{-no specs, thanks-} (getIdInfo binder)
 
 pprBabyCoreBinder sty binder
   = hsep [ppr sty binder, pp_strictness]
