@@ -1,3 +1,4 @@
+{-# OPTIONS -fno-implicit-prelude #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  System.IO.Unsafe
@@ -17,8 +18,6 @@ module System.IO.Unsafe (
    unsafePerformIO,	-- :: IO a -> a
    unsafeInterleaveIO,	-- :: IO a -> IO a
   ) where
-
-import Prelude
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.IOBase
