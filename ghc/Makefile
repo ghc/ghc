@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.20 2002/02/12 15:17:13 simonmar Exp $
+# $Id: Makefile,v 1.21 2002/07/02 14:15:22 simonmar Exp $
 #
 
 TOP=.
@@ -29,11 +29,6 @@ else
 # No RTS for ILX
 SUBDIRS = includes utils driver docs compiler
 endif
-endif
-
-# Easier to copy
-ifeq "$(BIN_DIST)" "1"
-SUBDIRS := $(filter-out docs,$(SUBDIRS))
 endif
 
 ifeq ($(IncludeTestDirsInBuild),YES)
