@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.40 2001/11/26 16:54:22 simonmar Exp $
+ * $Id: RtsFlags.h,v 1.41 2001/12/12 14:58:26 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -108,6 +108,7 @@ struct PROFILING_FLAGS {
     char*               descrSelector;
     char*               typeSelector;
     char*               ccSelector;
+    char*               ccsSelector;
     char*               retainerSelector;
     char*               bioSelector;
 
