@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.27 2001/07/02 13:52:10 rrt Exp $
+ * $Id: Stats.c,v 1.28 2001/07/02 18:05:10 rrt Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -242,20 +242,21 @@ stat_startInit(void)
 	fprintf(stderr, "stat_init: bad call to 'sysconf'!\n");
     	stg_exit(EXIT_FAILURE);
     }
-    TicksPerSecond = (double) ticks;
+    TicksPerSecond = ticks;
 
 /* no "sysconf" or CLK_TCK; had better guess */
 #elif defined(HZ)
-    TicksPerSecond = (StgDouble) (HZ);
+    TicksPerSecond = HZ;
 
 #elif defined(CLOCKS_PER_SEC)
-    TicksPerSecond = (StgDouble) (CLOCKS_PER_SEC);
+    TicksPerSecond = CLOCKS_PER_SEC;
+
 #else /* had better guess wildly */
     /* We will #ifdef around the fprintf for machines
        we *know* are unsupported. (WDP 94/05)
     */
     fprintf(stderr, "NOTE: Guessing `TicksPerSecond = 60'!\n");
-    TicksPerSecond = 60.0;
+    TicksPerSecond = 60;
 #endif
 
     getTimes();
@@ -590,12 +591,14 @@ stat_exit(int alloc)
 	}
 
 	if (RtsFlags.GcFlags.giveStats == ONELINE_GC_STATS && sf != NULL) {
-	    fprintf(sf, "<<ghc: %lld bytes, %d GCs, %ld/%ld avg/max bytes residency (%ld samples), %ldM in use, %.2f INIT (%.2f elapsed), %.2f MUT (%.2f elapsed), %.2f GC (%.2f elapsed) :ghc>>\n",
-		    GC_tot_alloc*sizeof(W_), total_collections,
+	  /* print the long long separately to avoid bugginess on mingwin (2001-07-02, mingw-0.5) */
+	  fprintf(sf, "<<ghc: %llu bytes, ", GC_tot_alloc*sizeof(W_));
+	  fprintf(sf, "%d GCs, %ld/%ld avg/max bytes residency (%ld samples), %luM in use, %.2f INIT (%.2f elapsed), %.2f MUT (%.2f elapsed), %.2f GC (%.2f elapsed) :ghc>>\n",
+		    total_collections,
 		    AvgResidency*sizeof(W_)/ResidencySamples, 
 		    MaxResidency*sizeof(W_), 
-		    ResidencySamples, 
-		    mblocks_allocated * MBLOCK_SIZE / (1024 * 1024),
+		    ResidencySamples,
+		    (unsigned long)(mblocks_allocated * MBLOCK_SIZE / (1024L * 1024L)),
 		    TICK_TO_DBL(InitUserTime), TICK_TO_DBL(InitElapsedTime),
 		    TICK_TO_DBL(MutUserTime), TICK_TO_DBL(MutElapsedTime),
 		    TICK_TO_DBL(GC_tot_time), TICK_TO_DBL(GCe_tot_time));
