@@ -25,6 +25,8 @@ H_CONFIG = config.h
 H_FILES = stgdefs.h rtsdefs.h StgDirections.h StgMachDeps.h error.h \
   ieee-flpt.h gmp.h LLC.h HLC.h
 
+MKDEPENDC_SRCS=mkNativeHdr.c
+
 ALL_FILES = $(DELIT_H_FILES) $(H_FILES)
 ifeq ($(GhcWithNativeCodeGen),YES)
 ALL_FILES += $(TARGETPLATFORM).h
@@ -88,7 +90,7 @@ $(TARGETPLATFORM).h : mkNativeHdr
 #
 mkNativeHdr : $(HLIT) $(HFILES) mkNativeHdr.c
 	$(HC) -c mkNativeHdr.c
-	$(CC) $(CFLAGS) -o mkNativeHdr mkNativeHdr.c
+	$(HC) -o mkNativeHdr mkNativeHdr.o
 
 all :: $(H_CONFIG) $(ALL_FILES)
 
