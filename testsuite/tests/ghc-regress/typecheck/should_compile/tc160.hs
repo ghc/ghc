@@ -11,4 +11,4 @@ foo :: Foo (Foo ())
 --  NOT   forall a. a -> a -> ()
 foo =  undefined
 
--- baz = foo 'c' True
+baz = foo 'c' True
