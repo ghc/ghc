@@ -31,7 +31,7 @@ import TysPrim		( foreignObjPrimTyCon )
 import Maybes		( maybeToBool )
 import Name		( getOccName, isExternallyVisibleName, isDllName )
 import OccName		( occNameUserString )
-import BasicTypes       ( TopLevelFlag(..), isNotTopLevel )
+import BasicTypes       ( TopLevelFlag(..), isNotTopLevel, Arity )
 import CmdLineOpts	( DynFlags, opt_KeepStgTypes )
 import FastTypes	hiding ( fastOr )
 import Outputable
@@ -157,8 +157,9 @@ coreTopBindToStg
 coreTopBindToStg env body_fvs (NonRec id rhs)
   = let 
 	caf_info = hasCafRefs env rhs
+	arity = exprArity rhs
 
-	env' = extendVarEnv env id (LetBound how_bound emptyVarSet)
+	env' = extendVarEnv env id (LetBound how_bound emptyVarSet arity)
 
 	how_bound | mayHaveCafRefs caf_info = TopLevelHasCafs
 		  | otherwise               = TopLevelNoCafs
@@ -184,12 +185,14 @@ coreTopBindToStg env body_fvs (Rec pairs)
 	-- to calculate caf_info, we initially map all the binders to
 	-- TopLevelNoCafs.
 	env1 = extendVarEnvList env 
-		[ (b, LetBound TopLevelNoCafs emptyVarSet) | b <- binders ]
+		[ (b, LetBound TopLevelNoCafs emptyVarSet (error "no arity"))
+	        | b <- binders ]
 
 	caf_info = hasCafRefss env1{-NB: not env'-} rhss
 
 	env' = extendVarEnvList env 
-		[ (b, LetBound how_bound emptyVarSet) | b <- binders ]
+		[ (b, LetBound how_bound emptyVarSet (exprArity rhs)) 
+	        | (b,rhs) <- pairs ]
 
 	how_bound | mayHaveCafRefs caf_info = TopLevelHasCafs
 		  | otherwise               = TopLevelNoCafs
@@ -529,8 +532,9 @@ coreToStgApp maybe_thunk_body f args
 	--	let f = \ab -> e in f
 	-- No point in having correct arity info for f!
 	-- Hence the hasArity stuff below.
-	f_arity_info     = idArityInfo f
-	f_arity		 = arityLowerBound f_arity_info		-- Zero if no info
+	f_arity = case how_bound of 
+			LetBound _ _ arity -> arity
+			_                  -> 0
 
 	fun_occ 
 	 | not_letrec_bound		    = noBinderInfo	-- Uninteresting variable
@@ -539,8 +543,7 @@ coreToStgApp maybe_thunk_body f args
 
 	fun_escs
 	 | not_letrec_bound  = emptyVarSet	-- Only letrec-bound escapees are interesting
-	 | hasArity f_arity_info &&
-	   f_arity == n_args = emptyVarSet	-- A function *or thunk* with an exactly
+	 | f_arity == n_args = emptyVarSet	-- A function *or thunk* with an exactly
 						-- saturated call doesn't escape
 						-- (let-no-escape applies to 'thunks' too)
 
@@ -692,9 +695,9 @@ coreToStgLet let_no_escape bind body
 			NonRec binder rhs -> [binder]
 			Rec pairs         -> map fst pairs
 
-    mk_binding bind_lvs binder
+    mk_binding bind_lvs binder rhs
 	= (binder,  LetBound  NotTopLevelBound	-- Not top level
-			live_vars
+			live_vars (exprArity rhs)
 	   )
 	where
 	   live_vars = if let_no_escape then
@@ -717,7 +720,7 @@ coreToStgLet let_no_escape bind body
 
 	freeVarsToLiveVars bind_fvs `thenLne` \ (bind_lvs, bind_cafs) ->
 	let
-	    env_ext_item@(binder', _) = mk_binding bind_lvs binder
+	    env_ext_item@(binder', _) = mk_binding bind_lvs binder rhs
 	in
 	returnLne (StgNonRec (SRTEntries bind_cafs) binder' rhs2, 
 			bind_fvs, escs, bind_lvs, [env_ext_item])
@@ -728,7 +731,7 @@ coreToStgLet let_no_escape bind body
 	   let
 		rec_scope_fvs = unionFVInfo body_fvs rec_rhs_fvs
 	        binders = map fst pairs
-	        env_ext = map (mk_binding bind_lvs) binders
+	        env_ext = [ mk_binding bind_lvs b rhs | (b,rhs) <- pairs ]
 	   in
 	   extendVarEnvLne env_ext (
 	      mapAndUnzip3Lne (coreToStgRhs rec_scope_fvs NotTopLevel) pairs 
@@ -772,9 +775,10 @@ data HowBound
   | LetBound
 	TopLevelCafInfo
 	StgLiveVars	-- Live vars... see notes below
+ 	Arity		-- its arity (local Ids don't have arity info at this point)
 
-isLetBound (LetBound _ _) = True
-isLetBound other 	  = False
+isLetBound (LetBound _ _ _) = True
+isLetBound other 	    = False
 \end{code}
 
 For a let(rec)-bound variable, x, we record StgLiveVars, the set of
@@ -874,17 +878,17 @@ freeVarsToLiveVars fvs env live_in_cont
     do_one v
       = if isLocalId v then
 	    case (lookupVarEnv env v) of
-	      Just (LetBound _ lvs) -> extendVarSet lvs v
-	      Just _		    -> unitVarSet v
+	      Just (LetBound _ lvs _) -> extendVarSet lvs v
+	      Just _		      -> unitVarSet v
 	      Nothing -> pprPanic "lookupLiveVarsForSet/do_one:" (ppr v)
 	else
 	    emptyVarSet
 
     is_caf_one v
 	 = case lookupVarEnv env v of
-		Just (LetBound TopLevelHasCafs lvs) ->
+		Just (LetBound TopLevelHasCafs lvs _) ->
 		    ASSERT( isEmptyVarSet lvs ) True
-	        Just (LetBound _ _) -> False
+	        Just (LetBound _ _ _) -> False
 		_otherwise 	    -> mayHaveCafRefs (idCafInfo v)
 \end{code}
 
@@ -924,7 +928,7 @@ singletonFVInfo :: Id -> HowBound -> StgBinderInfo -> FreeVarsInfo
 singletonFVInfo id ImportBound info
    | mayHaveCafRefs (idCafInfo id) = unitVarEnv id (id, TopLevelHasCafs, info)
    | otherwise         		   = emptyVarEnv
-singletonFVInfo id (LetBound top_level _) info 
+singletonFVInfo id (LetBound top_level _ _) info 
    = unitVarEnv id (id, top_level, info)
 singletonFVInfo id other info
    = unitVarEnv id (id, NotTopLevelBound, info)
@@ -1055,8 +1059,8 @@ cafRefs p (Var id)
   | isLocalId id = fastBool False
   | otherwise = 
       case lookupVarEnv p id of
-	Just (LetBound TopLevelHasCafs _) -> fastBool True
-        Just (LetBound _ _) -> fastBool False
+	Just (LetBound TopLevelHasCafs _ _) -> fastBool True
+        Just (LetBound _ _ _) -> fastBool False
 	Nothing -> fastBool (cgMayHaveCafRefs (idCgInfo id)) --  imported Ids
 
 cafRefs p (Lit l) 	     = fastBool False
