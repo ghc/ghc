@@ -174,7 +174,7 @@ gen_Eq_binds tycon
 		case maybeTyConSingleCon tycon of
 		  Just _ -> []
 		  Nothing -> -- if cons don't match, then False
-		     [([a_Pat, b_Pat], false_Expr)]
+		     [([wildPat, wildPat], false_Expr)]
 	    else -- calc. and compare the tags
 		 [([a_Pat, b_Pat],
 		    untag_Expr tycon [(a_RDR,ah_RDR), (b_RDR,bh_RDR)]
@@ -650,7 +650,7 @@ gen_Ix_binds tycon
 
     enum_index
       = mk_easy_FunMonoBind tycon_loc index_RDR 
-		[AsPatIn c_RDR (TuplePatIn [a_Pat, b_Pat] True{-boxed-}), 
+		[AsPatIn c_RDR (TuplePatIn [a_Pat, wildPat] True{-boxed-}), 
 				d_Pat] [] (
 	HsIf (HsPar (mk_easy_App inRange_RDR [c_RDR, d_RDR])) (
 	   untag_Expr tycon [(a_RDR, ah_RDR)] (
@@ -780,7 +780,7 @@ gen_Read_binds fixities tycon
 	    read_con_comprehensions
 	      = map read_con (tyConDataCons tycon)
 	in
-	mk_easy_FunMonoBind tycon_loc readsPrec_RDR [a_Pat, b_Pat] [] (
+	mk_easy_FunMonoBind tycon_loc readsPrec_RDR [_a_Pat, b_Pat] [] (
 	      foldr1 append_Expr read_con_comprehensions
 	)
       where
@@ -897,8 +897,7 @@ gen_Read_binds fixities tycon
 
 	   read_paren_arg   -- parens depend on precedence...
 	    | nullary_con  = false_Expr -- it's optional.
-	    | otherwise    = HsPar (genOpApp a_Expr gt_RDR (HsLit (HsInt paren_prec_limit)))
-
+	    | otherwise    = HsPar (genOpApp _a_Expr gt_RDR (HsLit (HsInt paren_prec_limit)))
 \end{code}
 
 %************************************************************************
@@ -923,7 +922,7 @@ gen_Show_binds fixs_assoc tycon
 	pats_etc data_con
 	  | nullary_con =  -- skip the showParen junk...
 	     ASSERT(null bs_needed)
-	     ([a_Pat, con_pat], show_con)
+	     ([wildPat, con_pat], show_con)
 	  | otherwise   =
 	     ([a_Pat, con_pat],
 		  showParen_Expr (HsPar (genOpApp a_Expr gt_RDR (HsLit (HsInt paren_prec_limit))))
@@ -1333,6 +1332,7 @@ genOpApp e1 op e2 = mkOpApp e1 op e2
 qual_orig_name n = nameRdrName (getName n)
 varUnqual n      = mkSrcUnqual varName n
 
+_a_RDR		= varUnqual SLIT("_a")
 a_RDR		= varUnqual SLIT("a")
 b_RDR		= varUnqual SLIT("b")
 c_RDR		= varUnqual SLIT("c")
@@ -1350,6 +1350,7 @@ cs_RDRs		= [ varUnqual (_PK_ ("c"++show i)) | i <- [(1::Int) .. ] ]
 
 mkHsString s = HsString (_PK_ s)
 
+_a_Expr		= HsVar _a_RDR
 a_Expr		= HsVar a_RDR
 b_Expr		= HsVar b_RDR
 c_Expr		= HsVar c_RDR
@@ -1364,6 +1365,8 @@ getTag_Expr  	= HsVar getTag_RDR
 tagToEnum_Expr 	= HsVar tagToEnumH_RDR
 con2tag_Expr tycon = HsVar (con2tag_RDR tycon)
 
+wildPat		= WildPatIn
+_a_Pat		= VarPatIn _a_RDR
 a_Pat		= VarPatIn a_RDR
 b_Pat		= VarPatIn b_RDR
 c_Pat		= VarPatIn c_RDR
