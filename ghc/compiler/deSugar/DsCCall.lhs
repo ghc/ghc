@@ -10,6 +10,7 @@ module DsCCall ( dsCCall ) where
 
 IMP_Ubiq()
 
+import CmdLineOpts (opt_PprUserLength)
 import CoreSyn
 
 import DsMonad
@@ -18,7 +19,7 @@ import DsUtils
 import CoreUtils	( coreExprType )
 import Id		( dataConArgTys )
 import Maybes		( maybeToBool )
-import PprStyle		( PprStyle(..) )
+import Outputable	( PprStyle(..), Outputable(..) )
 import PprType		( GenType{-instances-} )
 import Pretty
 import PrelVals		( packStringForCId )
@@ -32,9 +33,6 @@ import TysWiredIn	( getStatePairingConInfo,
 			  stringTy
 			)
 import Util		( pprPanic, pprError, panic )
-#if __GLASGOW_HASKELL__ >= 202
-import Outputable       ( Outputable(..) )
-#endif
 
 \end{code}
 
@@ -176,7 +174,7 @@ unboxArg arg
 
 can't_see_datacons_error thing ty
   = pprError "ERROR: Can't see the data constructor(s) for _ccall_/_casm_ "
-	     (hcat [text thing, text "; type: ", ppr PprForUser ty])
+	     (hcat [text thing, text "; type: ", ppr (PprForUser opt_PprUserLength) ty])
 \end{code}
 
 
