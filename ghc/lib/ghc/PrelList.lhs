@@ -22,7 +22,7 @@ module PrelList (
    zip, zip3, zipWith, zipWith3, unzip, unzip3
  ) where
 
-import {-# SOURCE #-} Error ( error )
+import {-# SOURCE #-} GHCerr ( error )
 import PrelTup
 import PrelMaybe
 import PrelBase

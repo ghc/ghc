@@ -11,7 +11,7 @@ types and operations.
 
 module ArrBase where
 
-import {-# SOURCE #-} Error ( error )
+import {-# SOURCE #-} GHCerr ( error )
 import Ix
 import PrelList (foldl)
 import STBase

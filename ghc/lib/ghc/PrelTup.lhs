@@ -11,7 +11,7 @@ This modules defines the typle data types.
 
 module PrelTup where
 
-import {-# SOURCE #-} Error ( error )
+import {-# SOURCE #-} GHCerr ( error )
 import PrelBase
 \end{code}
 

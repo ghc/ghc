@@ -13,7 +13,7 @@ concretely; the @IO@ module itself exports abstractly.
 
 module IOBase where
 
-import {-# SOURCE #-} Error
+import {-# SOURCE #-} GHCerr ( error )
 import STBase
 import PrelTup
 import PrelMaybe

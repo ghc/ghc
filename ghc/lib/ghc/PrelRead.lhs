@@ -11,7 +11,7 @@ Instances of the Read class.
 
 module PrelRead where
 
-import {-# SOURCE #-} Error ( error )
+import {-# SOURCE #-} GHCerr ( error )
 import PrelNum
 import PrelList
 import PrelTup

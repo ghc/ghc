@@ -71,8 +71,7 @@ import PrelEither
 import PrelBounded
 import Monad
 import Maybe
-import Error	( error )
-import GHCerr
+import GHCerr   ( error, seqError )
 
 -- These can't conveniently be defined in PrelBase because they use numbers,
 -- or I/O, so here's a convenient place to do them.
@@ -95,9 +94,6 @@ strict f x  = x `seq` f x
 {-# INLINE seq  #-}
 seq :: Eval a => a -> b -> b
 seq  x y = case (seq#  x) of { 0# -> seqError; _ -> y }
-
-seqError :: a
-seqError = error "Oops! Entered seqError (a GHC bug -- please report it!)\n"
 
 -- It is expected that compilers will recognize this and insert error
 -- messages which are more appropriate to the context in which undefined 

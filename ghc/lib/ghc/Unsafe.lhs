@@ -21,7 +21,7 @@ module Unsafe
 import PrelBase
 import IOBase
 import Addr
-import {-# SOURCE #-} Error ( error )
+import {-# SOURCE #-} GHCerr ( error )
 \end{code}
 
 %*********************************************************

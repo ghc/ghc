@@ -20,7 +20,7 @@ module Maybe
     unfoldr
    ) where
 
-import Error	( error )
+import GHCerr	( error )
 import Monad	( filter )
 import PrelList
 import PrelMaybe

@@ -13,7 +13,7 @@ module Ix
 	rangeSize
     ) where
 
-import {-# SOURCE #-} Error ( error )
+import {-# SOURCE #-} GHCerr ( error )
 import PrelTup
 import PrelBase
 \end{code}

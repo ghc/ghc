@@ -27,7 +27,7 @@ import PrelMaybe
 import PrelBase
 import GHC
 import Addr
-import Error
+import GHCerr   ( error )
 
 #ifndef __PARALLEL_HASKELL__
 import Foreign  ( ForeignObj, makeForeignObj, writeForeignObj )

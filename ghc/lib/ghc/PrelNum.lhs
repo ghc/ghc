@@ -21,7 +21,7 @@ module PrelNum where
 
 import PrelBase
 import GHC
-import {-# SOURCE #-} Error ( error )
+import {-# SOURCE #-} GHCerr ( error )
 import PrelList
 import PrelMaybe
 

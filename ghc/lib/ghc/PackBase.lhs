@@ -47,7 +47,7 @@ module PackBase
 	where
 
 import PrelBase
-import {-# SOURCE #-} Error ( error )
+import {-# SOURCE #-} GHCerr ( error )
 import PrelList ( length )
 import STBase
 import ArrBase
