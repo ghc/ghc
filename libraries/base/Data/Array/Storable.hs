@@ -74,13 +74,6 @@ instance Storable e => MArray StorableArray e IO where
     unsafeWrite (StorableArray _ _ fp) i e =
         withForeignPtr fp $ \a -> pokeElemOff a i e
 
--- adapted from Foreign.Marshall.Array.mallocArray
-mallocForeignPtrArray :: Storable a => Int -> IO (ForeignPtr a)
-mallocForeignPtrArray  = doMalloc undefined
-  where
-    doMalloc            :: Storable a => a -> Int -> IO (ForeignPtr a)
-    doMalloc dummy size  = mallocForeignPtrBytes (size * sizeOf dummy)
-
 withStorableArray :: StorableArray i e -> (Ptr e -> IO a) -> IO a
 withStorableArray (StorableArray _ _ fp) f = withForeignPtr fp f
 
