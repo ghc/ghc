@@ -15,7 +15,7 @@ module SpecEnv (
 IMP_Ubiq()
 
 import MatchEnv
-import Type		( matchTys, isTyVarTy )
+import Type		--( matchTys, isTyVarTy )
 import Usage		( SYN_IE(UVar) )
 import OccurAnal	( occurAnalyseGlobalExpr )
 import CoreSyn		( SYN_IE(CoreExpr), SYN_IE(SimplifiableCoreExpr) )
@@ -27,7 +27,7 @@ import Maybes		( MaybeErr(..) )
 --import Pretty--ToDo:rm
 --import PprCore--ToDo:rm
 --import Id--ToDo:rm
---import TyVar--ToDo:rm
+import TyVar --ToDo:rm
 --import Unique--ToDo:rm
 --import IdInfo--ToDo:rm
 --import PprEnv--ToDo:rm
@@ -79,7 +79,7 @@ isNullSpecEnv (SpecEnv env) = null (mEnvToList env)
 
 addOneToSpecEnv :: SpecEnv -> [Type] -> CoreExpr -> MaybeErr SpecEnv ([Type], SimplifiableCoreExpr)
 addOneToSpecEnv (SpecEnv env) tys rhs 
-  = --pprTrace "addOneToSpecEnv" (ppAbove (ppr PprDebug tys) (ppr PprDebug rhs)) $
+  = --pprTrace "addOneToSpecEnv" (($$) (ppr PprDebug tys) (ppr PprDebug rhs)) $
     case (insertMEnv matchTys env tys (occurAnalyseGlobalExpr rhs)) of
 	Succeeded menv -> Succeeded (SpecEnv menv)
 	Failed err     -> Failed err

@@ -14,6 +14,8 @@
 >
 > IMP_Ubiq(){-uitous-}
 >
+> import Prelude hiding ( lookup )
+>
 > import StgSyn
 > import Id		( SYN_IE(IdEnv), growIdEnv, addOneToIdEnv, combineIdEnvs, nullIdEnv, 
 >			  unitIdEnv, mkIdEnv, rngIdEnv, lookupIdEnv, 
