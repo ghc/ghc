@@ -67,7 +67,7 @@ ghc/PrelNum_HC_OPTS          += -H30m
 # does override SRC_HC_OPTS settings)
 ghc/UnsafeST_HC_OPTS         += -Onot
 
-ghc/PrelBase_HC_OPTS         += -H8m
+ghc/PrelBase_HC_OPTS         += -H12m
 ghc/PrelRead_HC_OPTS         += -H8m
 ghc/IOHandle_HC_OPTS         += -H8m
 
