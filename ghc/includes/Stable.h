@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.h,v 1.5 2000/04/13 15:37:11 panne Exp $
+ * $Id: Stable.h,v 1.6 2000/09/04 15:09:49 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -48,7 +48,8 @@ freeStablePtr(StgStablePtr sp)
 	 && stable_ptr_table[sn].addr != NULL
 	 && stable_ptr_table[sn].weight > 0);
   
-  stable_ptr_table[sn].weight += (stgCast(StgWord,sp) & STABLEPTR_WEIGHT_MASK) >> STABLEPTR_WEIGHT_SHIFT;
+  stable_ptr_table[sn].weight += 
+      1 << ((((StgWord)sp & STABLEPTR_WEIGHT_MASK) >> STABLEPTR_WEIGHT_SHIFT) - 1);
 }
 
 extern inline StgStablePtr
