@@ -551,7 +551,7 @@ URL="http://www.haskell.org/ghc">haskell.org</ULink>.
 On Windows, all of GHC's files are installed in a single directory.
 If you choose ``Custom'' from the list of install options, you will be given a 
 choice about where this directory is; otherwise it will be installed 
-in <filename>c:/ghc/<emphasis>ghc-version</emphasis></filename>.
+in <filename>c:/ghc/<replaceable>ghc-version</replaceable></filename>.
 The executable binary for GHC will be installed in the <filename>bin/</filename> sub-directory
 of the installation directory you choose.
 </para>
@@ -567,7 +567,7 @@ available in your Start menu under "Start/Programs/Glasgow Haskell Compiler".
 
 <listitem><para>
 The final dialogue box from the install process reminds you where the GHC binary 
-has been installed (usually <filename>c:/ghc/<emphasis>ghc-version</emphasis>/bin/</filename>.  
+has been installed (usually <filename>c:/ghc/<replaceable>ghc-version</replaceable>/bin/</filename>.  
 If you want to invoke GHC from a command line, add this 
 to your PATH environment variable.  
 </para></listitem>
