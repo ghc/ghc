@@ -16,6 +16,12 @@
 
 .SUFFIXES:
 
+# This declaration tells GNU make to delete the target if it has
+# changed and the command which created it exited with a non-zero exit
+# code.
+
+.DELETE_ON_ERROR:
+
 # However, if $(way) is set then we have to define $(way_) and $(_way)
 # from it in the obvious fashion.
 # This must be done here (or earlier), but not in target.mk with the other
@@ -165,7 +171,7 @@ else
 
 %.$(way_)o : %.$(way_)s
 	@$(RM) $@
-	$(AS) $(AS_OPTS) -o $@ $< || ( $(RM) $@ && exit 1 )
+	$(AS) $(AS_OPTS) -o $@ $<
 
 %.$(way_)o : %.c
 	@$(RM) $@
@@ -190,10 +196,10 @@ endif
 
 %.c : %.flex
 	@$(RM) $@
-	$(FLEX) -t $(FLEX_OPTS) $< > $@ || ( $(RM) $@ && exit 1 )
+	$(FLEX) -t $(FLEX_OPTS) $< > $@
 %.c : %.lex
 	@$(RM) $@
-	$(FLEX) -t $(FLEX_OPTS) $< > $@ || ( $(RM) $@ && exit 1 )
+	$(FLEX) -t $(FLEX_OPTS) $< > $@
 
 #-----------------------------------------------------------------------------
 # Yacc stuff
