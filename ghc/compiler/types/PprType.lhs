@@ -18,9 +18,8 @@ module PprType(
 
 -- friends:
 -- (PprType can see all the representations it's trying to print)
-import TypeRep		( Type(..), TyNote(..), 
-			  Kind, liftedTypeKind ) -- friend
-import Type		( SourceType(..), eqKind )
+import TypeRep		( Type(..), TyNote(..), Kind  ) -- friend
+import Type		( SourceType(..) )
 import TcType		( ThetaType, PredType,
 			  tcSplitSigmaTy, isPredTy, isDictTy,
 			  tcSplitTyConApp_maybe, tcSplitFunTy_maybe

@@ -35,8 +35,7 @@ module Name (
 
 import OccName		-- All of it
 import Module		( Module, moduleName, mkVanillaModule, isHomeModule )
-import RdrName		( RdrName, mkRdrOrig, mkRdrUnqual, rdrNameOcc,
-			  rdrNameModule, mkRdrQual )
+import RdrName		( RdrName, mkRdrOrig, mkRdrUnqual, rdrNameOcc, rdrNameModule )
 import CmdLineOpts	( opt_Static )
 import SrcLoc		( builtinSrcLoc, noSrcLoc, SrcLoc )
 import Unique		( Unique, Uniquable(..), u2i, pprUnique )
