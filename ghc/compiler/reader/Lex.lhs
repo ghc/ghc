@@ -657,6 +657,7 @@ ifaceKeywordsFM = listToUFM $
         ("__Ux",		ITunfold IAmALoopBreaker),
 	
         ("__ccall",		ITccall (False, False, False)),
+        ("__ccall_GC",		ITccall (False, False, True)),
         ("__dyn_ccall",		ITccall (True,  False, False)),
         ("__dyn_ccall_GC",	ITccall (True,  False, True)),
         ("__casm",		ITccall (False, True,  False)),
