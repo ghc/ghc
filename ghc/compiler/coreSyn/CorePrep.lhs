@@ -27,7 +27,9 @@ import Id	( mkSysLocal, idType, idNewDemandInfo, idArity,
 		  hasNoBinding, idNewStrictness, setIdArity
 		)
 import HscTypes ( ModDetails(..) )
-import BasicTypes ( Arity, TopLevelFlag(..), isTopLevel )
+import BasicTypes ( Arity, TopLevelFlag(..), isTopLevel, isNotTopLevel,
+		    RecFlag(..), isNonRec
+		  )
 import UniqSupply
 import Maybes
 import OrdList
@@ -118,12 +120,14 @@ instance Outputable FloatingBind where
 
 type CloneEnv = IdEnv Id	-- Clone local Ids
 
-allLazy :: OrdList FloatingBind -> Bool
-allLazy floats 
+allLazy :: TopLevelFlag -> RecFlag -> OrdList FloatingBind -> Bool
+allLazy top_lvl is_rec floats 
   = foldrOL check True floats
   where
+    unboxed_ok = isNotTopLevel top_lvl && isNonRec is_rec
+
     check (FloatLet _)  	      y = y
-    check (FloatCase _ _ ok_for_spec) y = ok_for_spec && y
+    check (FloatCase _ _ ok_for_spec) y = unboxed_ok && ok_for_spec && y
 	-- The ok-for-speculation flag says that it's safe to
 	-- float this Case out of a let, and thereby do it more eagerly
 	-- We need the top-level flag because it's never ok to float
@@ -157,8 +161,8 @@ corePrepTopBinds env (bind : binds)
 
 corePrepTopBind :: CloneEnv -> CoreBind -> UniqSM (CloneEnv, OrdList FloatingBind)
 corePrepTopBind env (NonRec bndr rhs) 
-  = cloneBndr env bndr				`thenUs` \ (env', bndr') ->
-    corePrepRhs TopLevel env (bndr, rhs)	`thenUs` \ (floats, rhs') -> 
+  = cloneBndr env bndr					`thenUs` \ (env', bndr') ->
+    corePrepRhs TopLevel NonRecursive env (bndr, rhs)	`thenUs` \ (floats, rhs') -> 
     returnUs (env', floats `snocOL` FloatLet (NonRec bndr' rhs'))
 
 corePrepTopBind env (Rec pairs) = corePrepRecPairs TopLevel env pairs
@@ -179,17 +183,25 @@ corePrepRecPairs :: TopLevelFlag -> CloneEnv
 		 -> UniqSM (CloneEnv, OrdList FloatingBind)
 -- Used for all recursive bindings, top level and otherwise
 corePrepRecPairs lvl env pairs
-  = cloneBndrs env (map fst pairs)		`thenUs` \ (env', bndrs') ->
-    mapAndUnzipUs (corePrepRhs lvl env') pairs	`thenUs` \ (floats_s, rhss') ->
-    returnUs (env', concatOL floats_s `snocOL` FloatLet (Rec (bndrs' `zip` rhss')))
+  = cloneBndrs env (map fst pairs)				`thenUs` \ (env', bndrs') ->
+    mapAndUnzipUs (corePrepRhs lvl Recursive env') pairs	`thenUs` \ (floats_s, rhss') ->
+    returnUs (env', unitOL (FloatLet (Rec (flatten (concatOL floats_s) bndrs' rhss'))))
+  where
+	-- Flatten all the floats, and the currrent
+	-- group into a single giant Rec
+    flatten floats bndrs rhss = foldrOL get (bndrs `zip` rhss) floats
+
+    get (FloatLet (NonRec b r)) prs2 = (b,r) : prs2
+    get (FloatLet (Rec prs1))   prs2 = prs1 ++ prs2
 
 --------------------------------
-corePrepRhs :: TopLevelFlag -> CloneEnv -> (Id, CoreExpr)
+corePrepRhs :: TopLevelFlag -> RecFlag
+	    -> CloneEnv -> (Id, CoreExpr)
 	    -> UniqSM (OrdList FloatingBind, CoreExpr)
 -- Used for top-level bindings, and local recursive bindings
-corePrepRhs top_lvl env (bndr, rhs)
+corePrepRhs top_lvl is_rec env (bndr, rhs)
   = corePrepExprFloat env rhs		`thenUs` \ floats_w_rhs ->
-    floatRhs top_lvl bndr floats_w_rhs
+    floatRhs top_lvl is_rec bndr floats_w_rhs
 
 
 -- ---------------------------------------------------------------------------
@@ -389,14 +401,15 @@ maybeSaturate fn expr n_args ty
 -- Precipitating the floating bindings
 -- ---------------------------------------------------------------------------
 
-floatRhs :: TopLevelFlag -> Id
+floatRhs :: TopLevelFlag -> RecFlag
+	 -> Id
 	 -> (OrdList FloatingBind, CoreExpr)	-- Rhs: let binds in body
 	 -> UniqSM (OrdList FloatingBind, 	-- Floats out of this bind
 		    CoreExpr)			-- Final Rhs
 
-floatRhs top_lvl bndr (floats, rhs)
+floatRhs top_lvl is_rec bndr (floats, rhs)
   | isTopLevel top_lvl || exprIsValue rhs,	-- Float to expose value or 
-    allLazy floats 				-- at top level
+    allLazy top_lvl is_rec floats 		-- at top level
   = 	-- Why the test for allLazy? 
 	--	v = f (x `divInt#` y)
 	-- we don't want to float the case, even if f has arity 2,
@@ -431,7 +444,7 @@ mkLocalNonRec bndr dem floats rhs
     returnUs (floats `snocOL` float)
 
   | otherwise
-  = floatRhs NotTopLevel bndr (floats, rhs)	`thenUs` \ (floats', rhs') ->
+  = floatRhs NotTopLevel NonRecursive bndr (floats, rhs)	`thenUs` \ (floats', rhs') ->
     returnUs (floats' `snocOL` FloatLet (NonRec bndr rhs'))
 
 mkBinds :: OrdList FloatingBind -> CoreExpr -> UniqSM CoreExpr
