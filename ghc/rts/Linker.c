@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.85 2002/03/29 20:46:50 krasimir Exp $
+ * $Id: Linker.c,v 1.86 2002/04/01 11:18:18 panne Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -2144,9 +2144,11 @@ do_Elf32_Rela_relocations ( ObjectCode* oc, char* ehdrC,
    for (j = 0; j < nent; j++) {
       Elf32_Addr  offset = rtab[j].r_offset;
       Elf32_Word  info   = rtab[j].r_info;
+#     if defined(sparc_TARGET_ARCH) || defined(DEBUG)
       Elf32_Sword addend = rtab[j].r_addend;
+      Elf32_Addr  A  = addend;
+#     endif
       Elf32_Addr  P  = ((Elf32_Addr)targ) + offset;
-      Elf32_Addr  A  = addend; /* Do not delete this; it is used on sparc. */
       Elf32_Addr  S;
 #     if defined(sparc_TARGET_ARCH)
       /* This #ifdef only serves to avoid unused-var warnings. */

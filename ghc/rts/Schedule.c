@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.134 2002/03/12 13:57:11 simonmar Exp $
+ * $Id: Schedule.c,v 1.135 2002/04/01 11:18:19 panne Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -2248,8 +2248,6 @@ take_off_run_queue(StgTSO *tso) {
 void
 GetRoots(evac_fn evac)
 {
-  StgMainThread *m;
-
 #if defined(GRAN)
   {
     nat i;
@@ -3087,7 +3085,9 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
      * top of the CATCH_FRAME ready to enter.
      */
     if (get_itbl(su)->type == CATCH_FRAME && exception != NULL) {
+#ifdef PROFILING
       StgCatchFrame *cf = (StgCatchFrame *)su;
+#endif
       StgClosure *raise;
 
       /* we've got an exception to raise, so let's pass it to the
