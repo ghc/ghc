@@ -161,6 +161,8 @@ in the range for an @Ix@ pair:
 
 \begin{code}
 rangeSize :: (Ix a) => (a,a) -> Int
-rangeSize b@(_,high) = index b high + 1
+rangeSize b@(l,h)
+ | l > h     = 0
+ | otherwise = index b h + 1
 
 \end{code}
