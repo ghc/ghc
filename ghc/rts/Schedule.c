@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.142 2002/05/11 00:16:11 sof Exp $
+ * $Id: Schedule.c,v 1.143 2002/05/11 13:58:18 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -189,7 +189,7 @@ nat context_switch;
 rtsBool interrupted;
 
 /* Next thread ID to allocate.
- * Locks required: sched_mutex
+ * Locks required: thread_id_mutex
  */
 //@cindex next_thread_id
 StgThreadID next_thread_id = 1;
@@ -224,17 +224,18 @@ StgTSO *CurrentTSO;
 StgTSO dummy_tso;
 
 rtsBool ready_to_gc;
-rtsBool shutting_down_scheduler = rtsFalse;
+
+/*
+ * Set to TRUE when entering a shutdown state (via shutdownHaskellAndExit()) --
+ * in an MT setting, needed to signal that a worker thread shouldn't hang around
+ * in the scheduler when it is out of work.
+ */
+static rtsBool shutting_down_scheduler = rtsFalse;
 
 void            addToBlockedQueue ( StgTSO *tso );
 
 static void     schedule          ( void );
        void     interruptStgRts   ( void );
-#if defined(GRAN)
-static StgTSO * createThread_     ( nat size, rtsBool have_lock, StgInt pri );
-#else
-static StgTSO * createThread_     ( nat size, rtsBool have_lock );
-#endif
 
 static void     detectBlackHoles  ( void );
 
@@ -248,6 +249,13 @@ static void sched_belch(char *s, ...);
  */
 Mutex     sched_mutex       = INIT_MUTEX_VAR;
 Mutex     term_mutex        = INIT_MUTEX_VAR;
+
+/*
+ * A heavyweight solution to the problem of protecting
+ * the thread_id from concurrent update.
+ */
+Mutex     thread_id_mutex   = INIT_MUTEX_VAR;
+
 
 # if defined(SMP)
 static Condition gc_pending_cond = INIT_COND_VAR;
@@ -1668,25 +1676,12 @@ void labelThread(StgTSO *tso, char *label)
 #if defined(GRAN)
 /*   currently pri (priority) is only used in a GRAN setup -- HWL */
 StgTSO *
-createThread(nat stack_size, StgInt pri)
-{
-  return createThread_(stack_size, rtsFalse, pri);
-}
-
-static StgTSO *
-createThread_(nat size, rtsBool have_lock, StgInt pri)
-{
+createThread(nat size, StgInt pri)
 #else
 StgTSO *
-createThread(nat stack_size)
-{
-  return createThread_(stack_size, rtsFalse);
-}
-
-static StgTSO *
-createThread_(nat size, rtsBool have_lock)
-{
+createThread(nat size)
 #endif
+{
 
     StgTSO *tso;
     nat stack_size;
@@ -1733,13 +1728,9 @@ createThread_(nat size, rtsBool have_lock)
    * protect the increment operation on next_thread_id.
    * In future, we could use an atomic increment instead.
    */
-#ifdef SMP
-  if (!have_lock) { ACQUIRE_LOCK(&sched_mutex); }
-#endif
+  ACQUIRE_LOCK(&thread_id_mutex);
   tso->id = next_thread_id++; 
-#ifdef SMP
-  if (!have_lock) { RELEASE_LOCK(&sched_mutex); }
-#endif
+  RELEASE_LOCK(&thread_id_mutex);
 
   tso->why_blocked  = NotBlocked;
   tso->blocked_exceptions = NULL;
@@ -1876,7 +1867,7 @@ createSparkThread(rtsSpark spark)
   }
   else
   { threadsCreated++;
-    tso = createThread_(RtsFlags.GcFlags.initialStkSize, rtsTrue);
+    tso = createThread(RtsFlags.GcFlags.initialStkSize);
     if (tso==END_TSO_QUEUE)	
       barf("createSparkThread: Cannot create TSO");
 #if defined(DIST)
@@ -2030,6 +2021,7 @@ initScheduler(void)
    * the scheduler. */
   initMutex(&sched_mutex);
   initMutex(&term_mutex);
+  initMutex(&thread_id_mutex);
 
   initCondition(&thread_ready_cond);
 #endif
