@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-implicit-prelude -optc-DNON_POSIX_SOURCE #-}
 
 -- ---------------------------------------------------------------------------
--- $Id: PrelPosix.hsc,v 1.2 2001/05/18 18:27:20 qrczak Exp $
+-- $Id: PrelPosix.hsc,v 1.3 2001/05/18 21:46:58 qrczak Exp $
 --
 -- POSIX support layer for the standard libraries
 --
@@ -26,6 +26,7 @@ import PrelMarshalAlloc
 import PrelMarshalUtils
 import PrelBits
 import PrelIOBase
+import Monad
 
 
 -- ---------------------------------------------------------------------------
@@ -136,14 +137,12 @@ setCooked fd cooked =
     (#poke struct termios, c_lflag) p_tios (new_c_lflag :: CTcflag)
 
     -- set VMIN & VTIME to 1/0 respectively
-    if cooked
-	then do
+    when cooked $ do
 	    let c_cc  = (#ptr struct termios, c_cc) p_tios
 		vmin  = c_cc `plusPtr` (#const VMIN)  :: Ptr Word8
 		vtime = c_cc `plusPtr` (#const VTIME) :: Ptr Word8
 	    poke vmin  1
 	    poke vtime 0
-	else return ()
 
     tcSetAttr fd (#const TCSANOW) p_tios
 
