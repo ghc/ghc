@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.49 2001/08/14 13:40:09 sewardj Exp $
+ * $Id: RtsFlags.c,v 1.50 2001/08/31 11:42:44 sewardj Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -2002,6 +2002,7 @@ set_debug_options(nat n) {
         case 9: RtsFlags.DebugFlags.prof        = rtsTrue; break;
         case 10:  RtsFlags.DebugFlags.gran       = rtsTrue; break;
         case 11:  RtsFlags.DebugFlags.par        = rtsTrue; break;
+        case 12:  RtsFlags.DebugFlags.linker     = rtsTrue; break;
         default: barf("set_debug_options: only %d debug options expected",
 		      MAX_DEBUG_OPTION);
       } /* switch */
