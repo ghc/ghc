@@ -1,5 +1,4 @@
 -----------------------------------------------------------------------------
--- $Id: SysTools.lhs,v 1.54 2001/08/17 12:43:24 sewardj Exp $
 --
 -- (c) The University of Glasgow 2001
 --
@@ -444,16 +443,17 @@ between filepaths and 'other stuff'. [The reason being, of course, that
 this type gives us a handle on transforming filenames, and filenames only,
 to whatever format they're expected to be on a particular platform.]
 
-
 \begin{code}
 data Option
- = FileOption String
+ = FileOption -- an entry that _contains_ filename(s) / filepaths.
+              String  -- a non-filepath prefix that shouldn't be transformed (e.g., "/out=" 
+ 	      String  -- the filepath/filename portion
  | Option     String
  
 showOptions :: [Option] -> String
 showOptions ls = unwords (map (quote.showOpt) ls)
  where
-   showOpt (FileOption f) = dosifyPath f
+   showOpt (FileOption pre f) = pre ++ dosifyPath f
    showOpt (Option s)     = s
 
 #if defined(mingw32_TARGET_OS)
@@ -518,7 +518,7 @@ runMkDLL args = do p <- readIORef v_Pgm_MkDLL
 
 touch :: String -> String -> IO ()
 touch purpose arg =  do p <- readIORef v_Pgm_T
-			runSomething purpose p [FileOption arg]
+			runSomething purpose p [FileOption "" arg]
 
 copy :: String -> String -> String -> IO ()
 copy purpose from to = do

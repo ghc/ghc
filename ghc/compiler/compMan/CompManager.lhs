@@ -1073,7 +1073,7 @@ summariseFile file
         let (path, basename, ext) = splitFilename3 file
 
 	(mod, location)
-	   <- mkHomeModuleLocn mod_name (path ++ '/':basename) (Just file)
+	   <- mkHomeModuleLocn mod_name (path ++ '/':basename) file
 
         src_timestamp
            <- case ml_hs_file location of 

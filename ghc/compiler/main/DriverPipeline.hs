@@ -1,5 +1,4 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.100 2001/08/16 14:43:59 rrt Exp $
 --
 -- GHC Driver
 --
@@ -332,8 +331,8 @@ run_phase Unlit _basename _suff input_fn output_fn
        SysTools.runUnlit (map SysTools.Option unlit_flags ++
        			  [ SysTools.Option     "-h"
  			  , SysTools.Option     input_fn
-			  , SysTools.FileOption input_fn
-			  , SysTools.FileOption output_fn
+			  , SysTools.FileOption "" input_fn
+			  , SysTools.FileOption "" output_fn
 			  ])
        return (Just output_fn)
 
@@ -369,9 +368,9 @@ run_phase Cpp basename suff input_fn output_fn
 			    ++ map SysTools.Option md_c_flags
 			    ++ [ SysTools.Option     "-x"
 			       , SysTools.Option     "c"
-			       , SysTools.FileOption input_fn
+			       , SysTools.FileOption "" input_fn
 			       , SysTools.Option     "-o"
-			       , SysTools.FileOption output_fn
+			       , SysTools.FileOption "" output_fn
 			       ])
 	    return (Just output_fn)
 
@@ -471,7 +470,7 @@ run_phase Hsc basename suff input_fn output_fn
 
   -- build a ModuleLocation to pass to hscMain.
 	(mod, location')
-	   <- mkHomeModuleLocn mod_name basename (Just (basename ++ '.':suff))
+	   <- mkHomeModuleLocn mod_name basename (basename ++ '.':suff)
 
   -- take -ohi into account if present
 	ohi <- readIORef v_Output_hi
@@ -582,9 +581,9 @@ run_phase cc_phase basename suff input_fn output_fn
 
 	excessPrecision <- readIORef v_Excess_precision
 	SysTools.runCc ([ SysTools.Option "-x", SysTools.Option "c"
-	                , SysTools.FileOption input_fn
+	                , SysTools.FileOption "" input_fn
 			, SysTools.Option "-o"
-			, SysTools.FileOption output_fn
+			, SysTools.FileOption "" output_fn
 			]
 		       ++ map SysTools.Option (
 		          md_c_flags
@@ -614,8 +613,8 @@ run_phase Mangle _basename _suff input_fn output_fn
 		       else return []
 
        SysTools.runMangle (map SysTools.Option mangler_opts
-		          ++ [ SysTools.FileOption input_fn
-			     , SysTools.FileOption output_fn
+		          ++ [ SysTools.FileOption "" input_fn
+			     , SysTools.FileOption "" output_fn
 			     ]
 			  ++ map SysTools.Option machdep_opts)
        return (Just output_fn)
@@ -629,9 +628,9 @@ run_phase SplitMangle _basename _suff input_fn output_fn
 	split_s_prefix <- SysTools.newTempName "split"
 	let n_files_fn = split_s_prefix
 
-	SysTools.runSplit [ SysTools.FileOption input_fn
-			  , SysTools.FileOption split_s_prefix
-			  , SysTools.FileOption n_files_fn
+	SysTools.runSplit [ SysTools.FileOption "" input_fn
+			  , SysTools.FileOption "" split_s_prefix
+			  , SysTools.FileOption "" n_files_fn
 			  ]
 
 	-- Save the number of split files for future references
@@ -655,9 +654,9 @@ run_phase As _basename _suff input_fn output_fn
 	SysTools.runAs (map SysTools.Option as_opts
 		       ++ [ SysTools.Option ("-I" ++ p) | p <- cmdline_include_paths ]
 		       ++ [ SysTools.Option "-c"
-		          , SysTools.FileOption input_fn
+		          , SysTools.FileOption "" input_fn
 			  , SysTools.Option "-o"
-			  , SysTools.FileOption output_fn
+			  , SysTools.FileOption "" output_fn
 			  ])
 	return (Just output_fn)
 
@@ -679,8 +678,8 @@ run_phase SplitAs basename _suff _input_fn output_fn
 		    SysTools.runAs (map SysTools.Option as_opts ++
 		    		    [ SysTools.Option "-c"
 				    , SysTools.Option "-o"
-				    , SysTools.FileOption real_o
-				    , SysTools.FileOption input_s
+				    , SysTools.FileOption "" real_o
+				    , SysTools.FileOption "" input_s
 				    ])
 	
 	mapM_ assemble_file [1..n]
@@ -697,8 +696,8 @@ run_phase Ilx2Il _basename _suff input_fn output_fn
                            ++ [ SysTools.Option "--no-add-suffix-to-assembly",
 				SysTools.Option "mscorlib",
 				SysTools.Option "-o",
-				SysTools.FileOption output_fn,
-				SysTools.FileOption input_fn ])
+				SysTools.FileOption "" output_fn,
+				SysTools.FileOption "" input_fn ])
 	return (Just output_fn)
 
 -----------------------------------------------------------------------------
@@ -710,8 +709,8 @@ run_phase Ilasm _basename _suff input_fn output_fn
         SysTools.runIlasm (map SysTools.Option ilasm_opts
 		           ++ [ SysTools.Option "/QUIET",
 				SysTools.Option "/DLL",
-				SysTools.Option ("/OUT="++output_fn),
-				SysTools.FileOption input_fn ])
+				SysTools.FileOption "/OUT=" output_fn,
+				SysTools.FileOption "" input_fn ])
 	return (Just output_fn)
 
 #endif -- ILX
@@ -853,7 +852,7 @@ doLink o_files = do
     (md_c_flags, _) <- machdepCCOpts
     SysTools.runLink ( [ SysTools.Option verb
     		       , SysTools.Option "-o"
-		       , SysTools.FileOption output_fn
+		       , SysTools.FileOption "" output_fn
 		       ]
 		      ++ map SysTools.Option (
 		         md_c_flags
@@ -929,7 +928,7 @@ doMkDLL o_files = do
     SysTools.runMkDLL
 	 ([ SysTools.Option verb
 	  , SysTools.Option "-o"
-	  , SysTools.FileOption output_fn
+	  , SysTools.FileOption "" output_fn
 	  ]
 	 ++ map SysTools.Option (
 	    md_c_flags
