@@ -873,6 +873,7 @@ gadt_constrlist :: { Located [LConDecl RdrName] }
 
 gadt_constrs :: { Located [LConDecl RdrName] }
         : gadt_constrs ';' gadt_constr  { LL ($3 : unLoc $1) }
+        | gadt_constrs ';' 		{ $1 }
         | gadt_constr                   { L1 [$1] } 
 
 gadt_constr :: { LConDecl RdrName }
