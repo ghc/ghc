@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.18 2000/04/14 16:17:49 rrt Exp $
+# $Id: Makefile,v 1.19 2000/05/12 11:48:30 rrt Exp $
 
 TOP = ../../..
 include $(TOP)/mk/boilerplate.mk
@@ -49,7 +49,9 @@ INSTALL_LIBS+=$(LIBRARY)
 
 ifeq "$(EnableWin32DLLs)" "YES"
 INSTALL_PROGS  += $(DLL_NAME)
+ifneq "$(way)" "dll"
 INSTALL_LIBS += $(patsubst %.a, %_imp.a, $(LIBRARY))
+endif
 endif
 
 # install header files for the I/O library.  Other code might want to
