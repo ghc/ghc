@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.c,v 1.17 2000/03/17 13:30:24 simonmar Exp $
+ * $Id: Sanity.c,v 1.18 2000/03/17 14:37:21 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -246,7 +246,7 @@ checkClosure( StgClosure* p )
       {
 	nat i;
 	for (i = 0; i < info->layout.payload.ptrs; i++) {
-	  ASSERT(LOOKS_LIKE_PTR(payloadPtr(p,i)));
+	  ASSERT(LOOKS_LIKE_PTR(p->payload[i]));
 	}
 	return stg_max(sizeW_fromITBL(info), sizeofW(StgHeader) + MIN_UPD_SIZE);
       }
@@ -288,7 +288,7 @@ checkClosure( StgClosure* p )
 	{
 	    nat i;
 	    for (i = 0; i < info->layout.payload.ptrs; i++) {
-		ASSERT(LOOKS_LIKE_PTR(payloadPtr(p,i)));
+		ASSERT(LOOKS_LIKE_PTR(p->payload[i]));
 	    }
 	    return sizeW_fromITBL(info);
 	}

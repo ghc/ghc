@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Assembler.c,v $
- * $Revision: 1.22 $
- * $Date: 1999/12/07 11:49:09 $
+ * $Revision: 1.23 $
+ * $Date: 2000/03/17 14:37:21 $
  *
  * This module provides functions to construct BCOs and other closures
  * required by the bytecode compiler.
@@ -178,8 +178,8 @@ static void asmResolveRef( AsmObject obj, AsmNat i, AsmClosure reference )
     case CONSTR:
         {
             StgClosure* con = stgCast(StgClosure*,obj->closure);
-            ASSERT(i < get_itbl(con)->layout.payload.nptrs && payloadCPtr(con,i) == NULL);
-            payloadCPtr(con,i) = reference;
+            ASSERT(i < get_itbl(con)->layout.payload.nptrs && con->payload[i] == NULL);
+            con->payload[i] = reference;
             break;
         }
     case AP_UPD:
@@ -190,8 +190,8 @@ static void asmResolveRef( AsmObject obj, AsmNat i, AsmClosure reference )
                 ASSERT(ap->fun == NULL);
                 ap->fun = reference;
             } else {
-                ASSERT(payloadCPtr(ap,i-1) == NULL);
-                payloadCPtr(ap,i-1) = reference;
+                ASSERT(ap->payload[i-1] == NULL);
+                ap->payload[i-1] = reference;
             }
             break;
         }
@@ -323,8 +323,8 @@ void asmEndCon( AsmCon con )
     StgClosure* c = asmAlloc(CONSTR_sizeW(p,np));
     StgClosure* o = stgCast(StgClosure*,c);
     SET_HDR(o,con->info,??);
-    mapQueue(Ptrs,    AsmObject, con->object.ptrs, payloadCPtr(o,i) = NULL);
-    { nat i; for( i=0; i<np; ++i ) { payloadWord(o,p+i) = 0xdeadbeef; } }
+    mapQueue(Ptrs,    AsmObject, con->object.ptrs, o->payload[i] = NULL);
+    { nat i; for( i=0; i<np; ++i ) { o->payload[p+i] = (StgClosure *)0xdeadbeef; }}
     asmEndObject(&con->object,c);
 }
 

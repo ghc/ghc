@@ -1,6 +1,6 @@
 /* 
    Time-stamp: <Thu Dec 16 1999 18:21:17 Stardate: [-30]4058.61 software>
-   $Id: Pack.c,v 1.2 2000/01/13 14:34:08 hwloidl Exp $
+   $Id: Pack.c,v 1.3 2000/03/17 14:37:22 simonmar Exp $
 
    Graph packing and unpacking code for sending it to another processor
    and retrieving the original graph structure from the packet.
@@ -1185,10 +1185,10 @@ StgClosure *closure;
     Pack(closure);         
     for (i = 0; i < ptrs; ++i) {
       /* extract i-th pointer from closure */
-      QueueClosure((StgClosure *)payloadPtr(closure,i));
+      QueueClosure((StgClosure *)(closure->payload[i]));
       IF_GRAN_DEBUG(pack,
 		    belch("**    [%p (%s) (Queueing closure) ....]",
-			  payloadPtr(closure,i), info_type(payloadPtr(closure,i))));
+			  closure->payload[i], info_type(payloadPtr(closure,i))));
     }
 
     /* 

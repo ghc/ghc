@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.41 $
- * $Date: 2000/03/17 13:30:23 $
+ * $Revision: 1.42 $
+ * $Date: 2000/03/17 14:37:21 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -41,7 +41,8 @@
 #include <ieee754.h> /* These are for primops */
 #endif
 
-
+/* Allegedly useful macro */
+#define payloadWord( c, i )   (*stgCast(StgWord*,      ((c)->payload+(i))))
 
 /* An incredibly useful abbreviation.
  * Interestingly, there are some uses of END_TSO_QUEUE_closure that
@@ -772,7 +773,7 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                     nat np = info->layout.payload.nptrs; 
                     nat i;
                     for(i=0; i < p; ++i) {
-                        payloadCPtr(o,i) = xPopCPtr();
+                        o->payload[i] = xPopCPtr();
                     }
                     for(i=0; i < np; ++i) {
                         payloadWord(o,p+i) = 0xdeadbeef;
@@ -794,7 +795,7 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                     nat np = info->layout.payload.nptrs; 
                     nat i;
                     for(i=0; i < p; ++i) {
-                        payloadCPtr(o,i) = xPopCPtr();
+                        o->payload[i] = xPopCPtr();
                     }
                     for(i=0; i < np; ++i) {
                         payloadWord(o,p+i) = 0xdeadbeef;
@@ -867,7 +868,7 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                           || itbl->type == CONSTR_0_2
                           );
                     while (--i>=0) {
-                        xPushCPtr(payloadCPtr(o,i));
+                        xPushCPtr(o->payload[i]);
                     }
                     Continue;
                 }

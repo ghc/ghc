@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.20 1999/10/27 09:57:48 simonmar Exp $
+ * $Id: ClosureMacros.h,v 1.21 2000/03/17 14:37:21 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -213,28 +213,17 @@ static __inline__ StgOffset CAF_sizeW ( void )
  * Sizes of closures
  * ------------------------------------------------------------------------*/
 
-static __inline__ StgOffset size_fromITBL( const StgInfoTable* itbl ) 
-{ return sizeof(StgClosure) 
-       + sizeof(StgPtr)  * itbl->layout.payload.ptrs 
-       + sizeof(StgWord) * itbl->layout.payload.nptrs; }
-
 static __inline__ StgOffset sizeW_fromITBL( const StgInfoTable* itbl ) 
 { return sizeofW(StgClosure) 
        + sizeofW(StgPtr)  * itbl->layout.payload.ptrs 
        + sizeofW(StgWord) * itbl->layout.payload.nptrs; }
 
-static __inline__ StgOffset pap_size( StgPAP* x )
-{ return sizeof(StgPAP) 
-       + sizeof(StgWord)  * x->n_args; }
-
 static __inline__ StgOffset pap_sizeW( StgPAP* x )
 { return PAP_sizeW(x->n_args); }
 
-/* These two functions give the same result - but have slightly
- * different types. 
- */
 static __inline__ StgOffset arr_words_sizeW( StgArrWords* x )
 { return sizeofW(StgArrWords) + x->words; }
+
 static __inline__ StgOffset mut_arr_ptrs_sizeW( StgMutArrPtrs* x )
 { return sizeofW(StgMutArrPtrs) + x->ptrs; }
 
@@ -264,8 +253,6 @@ static __inline__ StgWord tso_sizeW ( StgTSO *tso )
 #define SET_STATIC_GRAN_HDR
 #endif
 
-/* there is no PAR header, as far as I can tell -- SDM */
-
 #ifdef PAR
 #define SET_PAR_HDR(c,stuff)
 #define SET_STATIC_PAR_HDR(stuff)
@@ -275,47 +262,47 @@ static __inline__ StgWord tso_sizeW ( StgTSO *tso )
 #endif
 
 #ifdef TICKY_TICKY
-#define SET_TICKY_HDR(c,stuff)		/* old: (c)->header.ticky.updated = stuff */
-#define SET_STATIC_TICKY_HDR(stuff)	/* old: ticky : { updated : stuff } */
+#define SET_TICKY_HDR(c,stuff)	     /* old: (c)->header.ticky.updated = stuff */
+#define SET_STATIC_TICKY_HDR(stuff)  /* old: ticky : { updated : stuff } */
 #else
 #define SET_TICKY_HDR(c,stuff)
 #define SET_STATIC_TICKY_HDR(stuff)
 #endif
-#define SET_HDR(c,info,ccs) \
-   {					\
-	SET_INFO(c,info); 	                        \
+#define SET_HDR(c,info,ccs)				\
+   {							\
+	SET_INFO(c,info);				\
 	SET_GRAN_HDR((StgClosure *)(c),ThisPE);		\
 	SET_PAR_HDR((StgClosure *)(c),LOCAL_GA);	\
 	SET_PROF_HDR((StgClosure *)(c),ccs);		\
 	SET_TICKY_HDR((StgClosure *)(c),0);		\
    }
 
-#define SET_ARR_HDR(c,info,costCentreStack,n_words) \
-   SET_HDR(c,info,costCentreStack); \
+#define SET_ARR_HDR(c,info,costCentreStack,n_words)	\
+   SET_HDR(c,info,costCentreStack);			\
    (c)->words = n_words;
 
 /* -----------------------------------------------------------------------------
    Static closures are defined as follows:
 
 
-SET_STATIC_HDR(PrelBase_CZh_closure,PrelBase_CZh_info,costCentreStack,const);
+   SET_STATIC_HDR(PrelBase_CZh_closure,PrelBase_CZh_info,costCentreStack,const);
 
    The info argument must have type 'StgInfoTable' or
    'StgSRTInfoTable', since we use '&' to get its address in the macro.
    -------------------------------------------------------------------------- */
 
-#define SET_STATIC_HDR(label,info,costCentreStack,closure_class,info_class) \
-   info_class info;                        \
-   closure_class StgClosure label = {                   \
+#define SET_STATIC_HDR(label,info,costCentreStack,closure_class,info_class)	\
+   info_class info;								\
+   closure_class StgClosure label = {						\
    STATIC_HDR(info,costCentreStack)
 
-#define STATIC_HDR(info,ccs) \
-	header : { 			      \
-		INIT_INFO(info),              \
-		SET_STATIC_GRAN_HDR	      \
-		SET_STATIC_PAR_HDR(LOCAL_GA)  \
-		SET_STATIC_PROF_HDR(ccs)       \
-		SET_STATIC_TICKY_HDR(0)       \
+#define STATIC_HDR(info,ccs)			\
+	header : {				\
+		INIT_INFO(info),		\
+		SET_STATIC_GRAN_HDR		\
+		SET_STATIC_PAR_HDR(LOCAL_GA)	\
+		SET_STATIC_PROF_HDR(ccs)	\
+		SET_STATIC_TICKY_HDR(0)		\
 	}
 
 /* how to get hold of the static link field for a static closure.
@@ -323,9 +310,10 @@ SET_STATIC_HDR(PrelBase_CZh_closure,PrelBase_CZh_info,costCentreStack,const);
  * Note that we have to use (*cast(T*,&e)) instead of cast(T,e)
  * because C won't let us take the address of a casted expression. Huh?
  */
-#define STATIC_LINK(info,p) \
-   (*stgCast(StgClosure**,&((p)->payload[info->layout.payload.ptrs + \
+#define STATIC_LINK(info,p)						\
+   (*(StgClosure**)(&((p)->payload[info->layout.payload.ptrs +		\
 					info->layout.payload.nptrs])))
+
 /* These macros are optimised versions of the above for certain
  * closure types.  They *must* be equivalent to the generic
  * STATIC_LINK.
@@ -334,8 +322,8 @@ SET_STATIC_HDR(PrelBase_CZh_closure,PrelBase_CZh_info,costCentreStack,const);
 #define THUNK_STATIC_LINK(p) ((p)->payload[2])
 #define IND_STATIC_LINK(p)   ((p)->payload[1])
 
-#define STATIC_LINK2(info,p) \
-   (*stgCast(StgClosure**,&((p)->payload[info->layout.payload.ptrs + \
+#define STATIC_LINK2(info,p)							\
+   (*(StgClosure**)(&((p)->payload[info->layout.payload.ptrs +			\
 					info->layout.payload.nptrs + 1])))
 
 /* -----------------------------------------------------------------------------
@@ -350,14 +338,6 @@ SET_STATIC_HDR(PrelBase_CZh_closure,PrelBase_CZh_info,costCentreStack,const);
    -------------------------------------------------------------------------- */
 
 #define CLOSURE_TBL(lbl) const StgClosure *lbl[] = {
-
-/* -----------------------------------------------------------------------------
-   Payload access
-   -------------------------------------------------------------------------- */
-
-#define payloadPtr( c, i )    (*stgCast(StgPtr*,       ((c)->payload+(i))))
-#define payloadCPtr( c, i )   (*stgCast(StgClosure**,  ((c)->payload+(i))))
-#define payloadWord( c, i )   (*stgCast(StgWord*,      ((c)->payload+(i))))
 
 /* -----------------------------------------------------------------------------
    CONSTRs.

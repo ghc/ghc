@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.21 2000/02/14 10:59:30 sewardj Exp $
+ * $Id: Printer.c,v 1.22 2000/03/17 14:37:21 simonmar Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -89,10 +89,10 @@ static void printStdObject( StgClosure *obj, char* tag )
     printPtr((StgPtr)obj->header.info);
     for (i = 0; i < info->layout.payload.ptrs; ++i) {
         fprintf(stderr,", ");
-        printPtr(payloadPtr(obj,i));
+        printPtr((StgPtr)obj->payload[i]);
     }
     for (j = 0; j < info->layout.payload.nptrs; ++j) {
-        fprintf(stderr,", %xd#",payloadWord(obj,i+j));
+        fprintf(stderr,", %pd#",obj->payload[i+j]);
     }
     fprintf(stderr,")\n");
 }
@@ -116,7 +116,7 @@ void printClosure( StgClosure *obj )
             fprintf(stderr,"AP_UPD("); printPtr((StgPtr)ap->fun);
             for (i = 0; i < ap->n_args; ++i) {
                 fprintf(stderr,", ");
-                printPtr(payloadPtr(ap,i));
+                printPtr(ap->payload[i]);
             }
             fprintf(stderr,")\n");
             break;
@@ -129,7 +129,7 @@ void printClosure( StgClosure *obj )
             fprintf(stderr,"PAP("); printPtr((StgPtr)pap->fun);
             for (i = 0; i < pap->n_args; ++i) {
                 fprintf(stderr,", ");
-                printPtr(payloadPtr(pap,i));
+                printPtr((StgPtr)pap->payload[i]);
             }
             fprintf(stderr,")\n");
             break;
@@ -229,10 +229,10 @@ void printClosure( StgClosure *obj )
             fprintf(stderr,"(tag=%d)",info->srt_len);
             for (i = 0; i < info->layout.payload.ptrs; ++i) {
                 fprintf(stderr,", ");
-                printPtr(payloadPtr(obj,i));
+                printPtr((StgPtr)obj->payload[i]);
             }
             for (j = 0; j < info->layout.payload.nptrs; ++j) {
-                fprintf(stderr,", %x#",payloadWord(obj,i+j));
+                fprintf(stderr,", %p#", obj->payload[i+j]);
             }
             fprintf(stderr,")\n");
             break;

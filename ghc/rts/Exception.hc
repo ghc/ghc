@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Exception.hc,v 1.10 2000/03/17 13:30:23 simonmar Exp $
+ * $Id: Exception.hc,v 1.11 2000/03/17 14:37:21 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -283,8 +283,8 @@ INFO_TABLE(catch_info,catch_entry,2,0,FUN,,EF_,0,0);
 STGFUN(catch_entry)
 {
   FB_
-  R2.cl = payloadCPtr(R1.cl,1); /* h */
-  R1.cl = payloadCPtr(R1.cl,0); /* x */
+  R2.cl = R1.cl->payload[1]; /* h */
+  R1.cl = R1.cl->payload[0]; /* x */
   JMP_(catchzh_fast);
   FE_
 }

@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.55 2000/03/17 13:30:24 simonmar Exp $
+ * $Id: Schedule.c,v 1.56 2000/03/17 14:37:21 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -2304,7 +2304,7 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
 	o = (StgClosure *)allocate(sizeofW(StgClosure)+1);
 	TICK_ALLOC_SE_THK(1,0);
 	SET_HDR(o,&seq_info,su->header.prof.ccs /* ToDo */);
-	payloadCPtr(o,0) = (StgClosure *)ap;
+	o->payload[0] = (StgClosure *)ap;
 	
 	IF_DEBUG(scheduler,
 		 fprintf(stderr,  "scheduler: Built ");
