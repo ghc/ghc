@@ -9,7 +9,7 @@
 
 <title>The Hugs-GHC Extension Libraries
 <author>The Hugs/GHC Team
-<date>July 1998
+<date>August 1998
 <abstract>
 Hugs and GHC provide a common set of libraries to aid portability.
 This document specifies the interfaces to these libraries and documents
@@ -205,6 +205,8 @@ instance Show IOModeEx
 performGC           :: IO ()
 trace               :: String -> a -> a
 unsafePtrEq         :: a -> a -> Bool
+
+unsafeIOToST        :: IO a -> ST s a
 </verb></tscreen>
 
 <itemize>
@@ -262,7 +264,12 @@ simplified memoisation function:
 >		 return a
 </verb></tscreen>
 
-
+<item>
+The <tt/unsafeIOToST/ action provides a loop hole for lifting an
+<tt/IO/ action into the <tt/ST/ monad. This is a potentially unsafe
+thing to do, so the onus is on the programmer to ensure that the
+use of <tt/unsafeIOToST/ does not ruin underlying program properties
+such as referential transparency.
 </itemize>
 
 <!--
@@ -842,6 +849,10 @@ a value with the same type as its second argument. If this fails, the
 default second argument is just returned. <tt/fromDynamic/ returns a
 <tt/Maybe/ type instead, <tt/Nothing/ coming back if the conversion
 was not possible.
+<item>
+The <tt/Dynamic/ type has got a <tt/Show/ instance which returns
+a pretty printed string of the type of the dynamic value. (Useful when
+debugging).
 </itemize>
 
 <sect1>  The <tt/Dynamic/ type
@@ -925,7 +936,22 @@ representation associated with a type.
 carry type information around so that overloading can be resolved.
 <tt/Typeable/ instances should never, ever look at this argument.
 <item> The <tt/Dynamic/ library provide <tt/Typeable/ instances 
-for all Prelude and Hugs/GHC extension library types.
+for all Prelude and Hugs/GHC extension library types. They are:
+
+<tscreen><verb>
+Prelude types: 
+   Int, Char, Bool, Float, Double, Integer, (IO a),
+   [a], (Either a b), (Maybe a), (a->b), 
+   (), (,), (,,), (,,,), (,,,,),
+   Ordering, Complex, Array, Handle
+Hugs/GHC types:
+   Addr, Word8, Word16, Word32, Word64,
+   Int8,Int16,Int32,Int64,
+   ForeignObj, MVar, (ST s a), (StablePtr a)
+GHC types:
+   Word, ByteArray, MutableByteArray
+</verb></tscreen>
+
 </itemize>
 
 <sect1>  <idx/Utility functions/ 
@@ -939,6 +965,100 @@ also provided:
 <tscreen> <verb>
 dynApply   :: Dynamic -> Dynamic -> Dynamic -- unsafe.
 dynApplyMb :: Dynamic -> Dynamic -> Maybe Dynamic
+</verb></tscreen>
+
+
+<sect> <idx/GetOpt/
+<label id="sec:GetOpt">
+<p>
+
+The <tt/GetOpt/ library contains Sven Panne's Haskell implementation
+of <tt/getopt/, providing features nigh-on identical to GNU <tt/getopt/:
+
+<tscreen><verb>
+module GetOpt where
+
+-- representing a single option:
+data OptDescr a
+ = Option [Char]         --    list of short option characters
+          [String]       --    list of long option strings (without "--")
+          (ArgDescr a)   --    argument descriptor
+          String         --    explanation of option for user
+
+-- argument option:
+data ArgDescr a
+   = NoArg                   a         --    no argument expected
+   | ReqArg (String       -> a) String --    option requires argument
+   | OptArg (Maybe String -> a) String --    optional argument
+
+usageInfo :: String          -- header
+          -> [OptDescr a]    -- options recognised 
+          -> String          -- nicely formatted decription of options
+
+getOpt :: ArgOrder a    -- non-option handling
+       -> [OptDescr a]  -- options recognised
+       -> [String]      -- the command-line
+       -> ( [a]         -- options
+          , [String]    -- non-options
+	  ,[String]     -- error messages
+	  )
+
+data ArgOrder a
+  = RequireOrder
+  | Permute
+  | ReturnInOrder (String -> a)
+
+</verb></tscreen>
+
+<itemize>
+<item> The command-line options recognised is described by a list of
+<tt/OptDescr/ values. The <tt/OptDescr/ describes the long and short
+strings that recognise the option, together with a help string and
+info on whether the option takes extra arguments, if any.
+<item>
+From a list of option values, <tt/usageInfo/ returns a nicely
+formatted string that enumerates the different options supported
+together with a short message about what
+<item>
+To decode a command-line with respect to a list of options,
+<tt/getOpt/ is used. It processes the command-line, and returns
+the list of values that matched (and those that didn't). The first
+argument to <tt/getOpt/ controls whether the user is to give the
+options in any old order or not.
+</itemize>
+
+To hopefully illuminate the role of the different <tt/GetOpt/ data
+structures, here's the command-line options for a (very simple)
+compilere:
+
+<tscreen><verb>
+data Flag 
+ = Verbose  | Version 
+ | Input String | Output String 
+   deriving Show
+
+options :: [OptDescr Flag]
+options =
+ [ Option ['v']     ["verbose"] (NoArg Verbose)       "chatty output on stderr"
+ , Option ['V','?'] ["version"] (NoArg Version)       "show version number"
+ , Option ['o']     ["output"]  (OptArg out "FILE")   "output FILE"
+ , Option ['c']     []          (OptArg in  "FILE")   "input FILE"
+ ]
+
+out :: Maybe String -> Flag
+out Nothing   = Output "stdout"
+out (Just of) = Output of
+
+in :: Maybe String -> Flag
+in Nothing  = Input "stdin"
+in (Just i) = Input i
+
+compilerOpts :: [String] -> IO (String, String)
+compilerOpts argv = 
+   case (getOpt NoOrder options argv) of
+      (o,n,[]  ) -> return (o,n)
+      (_,_,errs) -> fail (userError (concat errs ++ usageInfo header options))
+  where header = "Usage: ic [OPTION...] files..."
 </verb></tscreen>
 
 
