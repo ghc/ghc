@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.56 2000/06/04 18:27:45 panne Exp $
+ * $Id: PrimOps.h,v 1.57 2000/06/04 20:32:49 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -373,11 +373,11 @@ typedef union {
 /* mp_limb_t must be able to hold an StgInt for this to work properly */
 #define gcdIntzh(r,a,b) \
 { mp_limb_t aa = (mp_limb_t)(a); \
-  RET_STGCALL3(StgInt, mpn_gcd_1, (mp_limb_t *)(&aa), 1, (mp_limb_t)(b)); \
+  r = RET_STGCALL3(StgInt, mpn_gcd_1, (mp_limb_t *)(&aa), 1, (mp_limb_t)(b)); \
 }
 
 #define gcdIntegerIntzh(r,sa,a,b) \
-   r = RET_STGCALL3(StgInt, mpn_gcd_1, (mp_limb_t *)(BYTE_ARR_CTS(a)), sa, b)
+  r = RET_STGCALL3(StgInt, mpn_gcd_1, (mp_limb_t *)(BYTE_ARR_CTS(a)), sa, b)
 
 /* The rest are all out-of-line: -------- */
 
