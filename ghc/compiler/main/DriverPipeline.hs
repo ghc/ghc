@@ -6,8 +6,6 @@
 --
 -----------------------------------------------------------------------------
 
-#include "../includes/ghcconfig.h"
-
 module DriverPipeline (
 
 	-- Interfaces for the batch-mode driver
