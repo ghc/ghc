@@ -673,6 +673,44 @@ strmod = "\
 	    <literal>Main</literal>).</para>
 	  </listitem>
 	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-debug</option></term>
+	  <indexterm><primary><option>-debug</option></primary>
+	  </indexterm>
+	  <listitem>
+	    <para>Link the program with a debugging version of the
+	    runtime system.  The debugging runtime turns on numerous
+	    assertions and sanity checks, and provides extra options
+	    for producing debugging output at runtime (run the program
+	    with <literal>+RTS&nbsp;-?</literal> to see a list).</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-threaded</option></term>
+	  <indexterm><primary><option>-threaded</option></primary>
+	  </indexterm>
+	  <listitem>
+	    <para>Link the program with the "threaded" runtime system.
+	    This version of the runtime is designed to be used in
+	    programs that use multiple operating-system threads.  It
+	    supports calls to foreign-exported functions from multiple
+	    OS threads.  Calls to foreign functions are made using the
+	    same OS thread that created the Haskell thread (if it was
+	    created by a call-in), or an arbitrary OS thread otherwise
+	    (if the Haskell thread was created by
+	    <literal>forkIO</literal>).</para>
+
+	    <para>The threaded RTS does <emphasis>not</emphasis>
+	    support using multiple CPUs to speed up execution of a
+	    multi-threaded Haskell program.  The GHC runtime platform
+	    is still single-threaded, but using the
+	    <option>-threaded</option> option it can be used safely in
+	    a multi-threaded environment.</para>
+	  </listitem>
+	</varlistentry>
+
       </variablelist>
     </sect2>
 

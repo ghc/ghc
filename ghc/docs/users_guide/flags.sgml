@@ -1161,6 +1161,18 @@
 	      <entry>static</entry>
 	      <entry>-</entry>
 	    </row>
+	    <row>
+	      <entry><option>-threaded</option></entry>
+	      <entry>Use the threaded runtime</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-debug</option></entry>
+	      <entry>Use the debugging runtime</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
 	  </tbody>
 	</tgroup>
       </informaltable>
