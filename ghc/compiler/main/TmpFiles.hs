@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: TmpFiles.hs,v 1.15 2001/02/12 13:33:47 simonmar Exp $
+-- $Id: TmpFiles.hs,v 1.16 2001/03/08 09:50:18 simonmar Exp $
 --
 -- Temporary file management
 --
@@ -15,13 +15,15 @@ module TmpFiles (
    newTempName,		 -- :: Suffix -> IO FilePath
    addFilesToClean,	 -- :: [FilePath] -> IO ()
    removeTmpFiles,	 -- :: Int -> [FilePath] -> IO ()
-   v_TmpDir
+   v_TmpDir,
+   kludgedSystem
  ) where
 
 -- main
-import Config
-import Util
 import DriverUtil
+import Config
+import Panic
+import Util
 
 -- hslibs
 import Exception
@@ -90,3 +92,25 @@ removeTmpFiles verb fs = do
 	   (\_ -> when verbose (hPutStrLn stderr 
 				("Warning: can't remove tmp file " ++ f)))
   mapM_ blowAway fs
+
+
+-- system that works feasibly under Windows (i.e. passes the command line to sh,
+-- because system() under Windows doesn't look at SHELL, and always uses CMD.EXE)
+kludgedSystem cmd phase_name
+ = do
+#ifndef mingw32_TARGET_OS
+   exit_code <- system cmd `catchAllIO` 
+		   (\_ -> throwDyn (PhaseFailed phase_name (ExitFailure 1)))
+#else
+   pid <- myGetProcessID
+   tmp_dir <- readIORef v_TmpDir
+   let tmp = tmp_dir++"/sh"++show pid
+   h <- openFile tmp WriteMode
+   hPutStrLn h cmd
+   hClose h
+   exit_code <- system ("sh - " ++ tmp) `catchAllIO` 
+		   (\_ -> removeFile tmp >>
+                          throwDyn (PhaseFailed phase_name (ExitFailure 1)))
+   removeFile tmp
+#endif
+   return exit_code

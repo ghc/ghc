@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.18 2001/03/07 10:28:40 rrt Exp $
+-- $Id: DriverUtil.hs,v 1.19 2001/03/08 09:50:18 simonmar Exp $
 --
 -- Utils for the driver
 --
@@ -14,7 +14,6 @@ module DriverUtil where
 
 import Util
 import Panic
-import TmpFiles ( v_TmpDir )
 
 import IOExts
 import Exception
@@ -23,7 +22,6 @@ import RegexString
 
 import IO
 import System
-import Directory ( removeFile )
 import List
 import Char
 import Monad
@@ -162,24 +160,3 @@ newdir dir s = dir ++ '/':drop_longest_prefix s '/'
 remove_spaces :: String -> String
 remove_spaces = reverse . dropWhile isSpace . reverse . dropWhile isSpace
 
-
--- system that works feasibly under Windows (i.e. passes the command line to sh,
--- because system() under Windows doesn't look at SHELL, and always uses CMD.EXE)
-kludgedSystem cmd phase_name
- = do
-#ifndef mingw32_TARGET_OS
-   exit_code <- system cmd `catchAllIO` 
-		   (\_ -> throwDyn (PhaseFailed phase_name (ExitFailure 1)))
-#else
-   pid <- myGetProcessID
-   tmp_dir <- readIORef v_TmpDir
-   let tmp = tmp_dir++"/sh"++show pid
-   h <- openFile tmp WriteMode
-   hPutStrLn h cmd
-   hClose h
-   exit_code <- system ("sh - " ++ tmp) `catchAllIO` 
-		   (\_ -> removeFile tmp >>
-                          throwDyn (PhaseFailed phase_name (ExitFailure 1)))
-   removeFile tmp
-#endif
-   return exit_code

@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.46 2001/03/05 10:05:58 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.47 2001/03/08 09:50:18 simonmar Exp $
 --
 -- Driver flags
 --
@@ -23,7 +23,7 @@ module DriverFlags (
 import PackageMaintenance
 import DriverState
 import DriverUtil
-import TmpFiles 	( v_TmpDir )
+import TmpFiles 	( v_TmpDir, kludgedSystem )
 import CmdLineOpts
 import Config
 import Util
