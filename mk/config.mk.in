@@ -124,6 +124,13 @@ LeadingUnderscore=@LeadingUnderscore@
 # Pin a suffix on executables? If so, what (Windows only).
 exeext=@exeext@
 
+# Windows=YES if on a Windows platform
+ifneq "$(findstring $(HostOS_CPP), mingw32 cygwin32)" ""
+Windows=YES
+else
+Windows=NO
+endif
+
 ################################################################################
 #
 #		project-wide flags
