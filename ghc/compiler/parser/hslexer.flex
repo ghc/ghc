@@ -7,7 +7,8 @@
 *                                                                     *
 **********************************************************************/
 
-#include "../../includes/config.h"
+/* The includes/config.h one */
+#include "config.h"
 
 #include <stdio.h>
 
@@ -254,6 +255,23 @@ NL  	    	    	[\n\r]
 %%
 
 %{
+    /*
+     * Simple comments and whitespace.  Normally, we would just ignore these, but
+     * in case we're processing a string escape, we need to note that we've seen
+     * a gap.
+     *
+     * Note that we cater for a comment line that *doesn't* end in a newline.
+     * This is incorrect, strictly speaking, but seems like the right thing
+     * to do.  Reported by Rajiv Mirani.  (WDP 95/08)
+     *
+     * Hackily moved up here so that --<<EOF>> will match     -- SOF 5/97
+     */
+%}
+
+<Code,GlaExt,StringEsc>"--"[^\n\r]*{NL}?{WS}* |
+<Code,GlaExt,UserPragma,StringEsc>{WS}+	{ noGap = FALSE; }
+
+%{
     /* 
      * Special GHC pragma rules.  Do we need a start state for interface files,
      * so these won't be matched in source files? --JSM
@@ -308,15 +326,18 @@ NL  	    	    	[\n\r]
                               PUSH_STATE(Comment);
 			    }
 <Code,GlaExt>"{-#"{WS}*"OPTIONS" {
-			      /* these are by the driver! */
+			      /* these are for the driver! */
 			      nested_comments =1;
                               PUSH_STATE(Comment);
 			    }
-<Code,GlaExt>"{-#"{WS}*"SOURCE" {
-			      /* these are used by `make depend' (temp) */
+<Code,GlaExt>"{-#"{WS}*"SOURCE"{WS}*"#"?"-}" {
+			      /* these are used by `make depend' and the
+			         compiler to indicate that a module should
+				 be imported from source */
 			      nested_comments =1;
-                              PUSH_STATE(Comment);
+                              RETURN(SOURCE_UPRAGMA); 
 			    }
+
 <Code,GlaExt>"{-#"{WS}*[A-Z_]+ {
     	    	    	      fprintf(stderr, "%s:%d: Warning: Unrecognised pragma '",
     	    	    	        input_filename, hsplineno);
@@ -767,20 +788,6 @@ NL  	    	    	[\n\r]
     	    	    	  POP_STATE;
 			}
 
-%{
-    /*
-     * Simple comments and whitespace.  Normally, we would just ignore these, but
-     * in case we're processing a string escape, we need to note that we've seen
-     * a gap.
-     *
-     * Note that we cater for a comment line that *doesn't* end in a newline.
-     * This is incorrect, strictly speaking, but seems like the right thing
-     * to do.  Reported by Rajiv Mirani.  (WDP 95/08)
-     */
-%}
-
-<Code,GlaExt,StringEsc>"--".*{NL}?{WS}* |
-<Code,GlaExt,UserPragma,StringEsc>{WS}+	{ noGap = FALSE; }
 
 %{
     /*
