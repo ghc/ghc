@@ -217,20 +217,20 @@ cvtd (Val p body ds)	    = PatMonoBind (cvtp p) (GRHSs (cvtguard body)
 cvtd x = panic "Illegal kind of declaration in where clause" 
 
 
-cvtclause :: Meta.Clause (Meta.Pat) (Meta.Exp) (Meta.Dec) -> Hs.Match RdrName
+cvtclause :: Meta.Clause -> Hs.Match RdrName
 cvtclause (Clause ps body wheres)
     = Match (map cvtp ps) Nothing (GRHSs (cvtguard body) (cvtdecs wheres) void)
 
 
 
-cvtdd :: Meta.DDt -> ArithSeqInfo RdrName
+cvtdd :: Meta.DotDot -> ArithSeqInfo RdrName
 cvtdd (Meta.From x) 	      = (Hs.From (cvt x))
 cvtdd (Meta.FromThen x y)     = (Hs.FromThen (cvt x) (cvt y))
 cvtdd (Meta.FromTo x y)	      = (Hs.FromTo (cvt x) (cvt y))
 cvtdd (Meta.FromThenTo x y z) = (Hs.FromThenTo (cvt x) (cvt y) (cvt z))
 
 
-cvtstmts :: [Meta.Stm] -> [Hs.Stmt RdrName]
+cvtstmts :: [Meta.Statement] -> [Hs.Stmt RdrName]
 cvtstmts [] = [] -- this is probably an error as every [stmt] should end with ResultStmt
 cvtstmts [NoBindSt e]      = [ResultStmt (cvt e) loc0]      -- when its the last element use ResultStmt
 cvtstmts (NoBindSt e : ss) = ExprStmt (cvt e) void loc0     : cvtstmts ss
@@ -239,11 +239,11 @@ cvtstmts (LetSt ds : ss)   = LetStmt (cvtdecs ds)	    : cvtstmts ss
 cvtstmts (ParSt dss : ss)  = ParStmt(map cvtstmts dss)      : cvtstmts ss
 
 
-cvtm :: Meta.Mat -> Hs.Match RdrName
-cvtm (Mat p body wheres)
+cvtm :: Meta.Match -> Hs.Match RdrName
+cvtm (Match p body wheres)
     = Match [cvtp p] Nothing (GRHSs (cvtguard body) (cvtdecs wheres) void)
                              
-cvtguard :: Meta.Rhs -> [GRHS RdrName]
+cvtguard :: Meta.RightHandSide -> [GRHS RdrName]
 cvtguard (Guarded pairs) = map cvtpair pairs
 cvtguard (Normal e) 	 = [GRHS [  ResultStmt (cvt e) loc0 ] loc0]
 
