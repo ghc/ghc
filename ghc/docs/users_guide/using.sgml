@@ -2593,3 +2593,10 @@ computation speed.
 &debug
 
 </Chapter>
+
+<!-- Emacs stuff:
+     ;;; Local Variables: ***
+     ;;; mode: sgml ***
+     ;;; sgml-parent-document: ("users_guide.sgml" "book" "chapter") ***
+     ;;; End: ***
+ -->

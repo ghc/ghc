@@ -359,3 +359,10 @@ Some Haskell-related discussion takes place in the Usenet newsgroup
 &relnotes
 
 </Chapter>
+
+<!-- Emacs stuff:
+     ;;; Local Variables: ***
+     ;;; mode: sgml ***
+     ;;; sgml-parent-document: ("users_guide.sgml" "book" "chapter") ***
+     ;;; End: ***
+ -->

@@ -367,3 +367,10 @@ The code is distributed with GHC in <Filename>ghc/CONTRIB/pphs</Filename>.
 </Sect1>
 
 </Chapter>
+
+<!-- Emacs stuff:
+     ;;; Local Variables: ***
+     ;;; mode: sgml ***
+     ;;; sgml-parent-document: ("users_guide.sgml" "book" "chapter") ***
+     ;;; End: ***
+ -->

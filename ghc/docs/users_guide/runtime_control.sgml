@@ -568,3 +568,10 @@ PostTraceHook (FILE *where)
 </Sect2>
 
 </Sect1>
+
+<!-- Emacs stuff:
+     ;;; Local Variables: ***
+     ;;; mode: sgml ***
+     ;;; sgml-parent-document: ("users_guide.sgml" "book" "chapter" "sect1") ***
+     ;;; End: ***
+ -->
