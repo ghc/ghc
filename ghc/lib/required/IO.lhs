@@ -38,7 +38,7 @@ import UnsafeST		( unsafePerformPrimIO, unsafeInterleavePrimIO )
 import IOBase
 import ArrBase		( MutableByteArray(..), newCharArray )
 import IOHandle		-- much of the real stuff is in here
-import PackedString	( nilPS, packCBytesST, unpackPS )
+import PackBase		( unpackNBytesST )
 import PrelBase
 import GHC
 import Foreign          ( ForeignObj, Addr, makeForeignObj, writeForeignObj )
@@ -117,6 +117,10 @@ instance Eq Handle where
       _ -> False))
 
 instance Show Handle where {showsPrec p h = showString "<<Handle>>"}
+
+--Type declared in IOHandle, instance here because it depends on Eq.Handle
+instance Eq HandlePosn where
+    (HandlePosn h1 p1) == (HandlePosn h2 p2) = p1==p2 && h1==h2
 
 \end{code}
 
@@ -334,8 +338,8 @@ lazyReadBlock handle =
       SemiClosedHandle fp (buf, size) ->
 	  _ccall_ readBlock buf fp size		    >>= \ bytes ->
 	  (if bytes <= 0
-	  then return nilPS
-	  else packCBytesST bytes buf)		    >>= \ some ->
+	  then return ""
+	  else unpackNBytesST buf bytes)            >>= \ some ->
           if bytes < 0 then
               _ccall_ free buf			    >>= \ () ->
               _ccall_ closeFile fp	            >>
@@ -345,12 +349,12 @@ lazyReadBlock handle =
 #else
 	      ioToST (writeHandle handle (SemiClosedHandle ``NULL'' (``NULL'', 0))) >>
 #endif
-	      returnPrimIO (unpackPS some)
+	      returnPrimIO some
 	  else
 	      ioToST (writeHandle handle htype)	    >>
               unsafeInterleavePrimIO (lazyReadBlock handle)
 						    >>= \ more ->
-	      returnPrimIO (unpackPS some ++ more)
+	      returnPrimIO (some ++ more)
 
 lazyReadLine handle =
     ioToST (readHandle handle)                      >>= \ htype ->
@@ -362,8 +366,8 @@ lazyReadLine handle =
       SemiClosedHandle fp (buf, size) ->
 	  _ccall_ readLine buf fp size		    >>= \ bytes ->
 	  (if bytes <= 0
-	  then return nilPS
-	  else packCBytesST bytes buf)		    >>= \ some ->
+	  then return ""
+	  else unpackNBytesST buf bytes)            >>= \ some ->
           if bytes < 0 then
               _ccall_ free buf			    >>= \ () ->
               _ccall_ closeFile fp	            >>
@@ -373,12 +377,12 @@ lazyReadLine handle =
 #else
 	      ioToST (writeHandle handle (SemiClosedHandle ``NULL'' (``NULL'', 0))) >>
 #endif
-	      returnPrimIO (unpackPS some)
+	      return some
 	  else
 	      ioToST (writeHandle handle htype)	    >>
               unsafeInterleavePrimIO (lazyReadLine handle)
 						    >>= \ more ->
-	      returnPrimIO (unpackPS some ++ more)
+	      return (some ++ more)
 
 lazyReadChar handle =
     ioToST (readHandle handle)                      >>= \ htype ->
