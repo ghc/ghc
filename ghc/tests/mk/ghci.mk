@@ -12,6 +12,6 @@ RUNTESTS = $(filter-out $(OMITTED_RUNTESTS), $(patsubst %.script,%.run,$(SCRIPTS
 all :: $(RUNTESTS)
 
 %.run : %.script
-	HC=$(HC) HC_OPTS="$(HC_OPTS)" $(RUNTEST) $(HC) -i$< $(RUNTEST_OPTS) -- --interactive
+	HC=$(HC) HC_OPTS="$(HC_OPTS)" $(RUNTEST) $(HC) -i$< $(RUNTEST_OPTS) -- --interactive -ignore-dot-ghci
 
 include $(TOP)/mk/target.mk
