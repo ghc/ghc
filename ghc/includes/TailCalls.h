@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TailCalls.h,v 1.14 2003/09/21 13:22:02 igloo Exp $
+ * $Id: TailCalls.h,v 1.15 2003/10/12 13:24:52 igloo Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -98,7 +98,7 @@ extern void __DISCARD__(void);
 
 #ifdef alpha_TARGET_ARCH
 
-#ifdef IN_STG_CODE
+#if IN_STG_CODE
 register void *_procedure __asm__("$27");
 #endif
 
