@@ -11,11 +11,7 @@
   target module is imported without hiding any of its exports (otherwise
   we should inline just the exported bits).
 
-* pay attention to import specs!
-
 * remove the s/r conflicts I added to the grammar
-
-* check handling of special types ([], (), (,) etc.)
 
 * Support for the rest of GHC extensions in the parser:
   - implicit parameters
@@ -27,8 +23,6 @@
 
 -----------------------------------------------------------------------------
 -- features
-
-* Top-level package docs
 
 * Do the unlitting/CPPing from Haddock itself so we get the source file
   links right.
@@ -42,8 +36,7 @@
 
   #long, #short, #noinstances (on a type or class)
 
-* facilities for saving interfaces so that you can run Haddock against
-  something that isn't the Prelude.
+  #inline, #noinline on a module export
 
 * Allow documentation annotations to explicitly name the entity they
   refer to.
