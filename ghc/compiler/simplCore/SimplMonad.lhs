@@ -561,8 +561,10 @@ noInlineBlackList :: BlackList
 	-- We may as well do the same here.
 noInlineBlackList v = not (isCompulsoryUnfolding (idUnfolding v)) &&
 		      not (isDataConWrapId v)
-	--				((v `isInScope` subst) || not (isLocallyDefined v))
-	-- I don't see why we have these conditions
+	-- NB: this implementation means that even inlinings *completely within*
+	-- an INLINE won't happen, which is perhaps overkill. 
+	-- An earlier verion had: (v `isInScope` subst) || not (isLocallyDefined v)
+	-- but it's more expensive, and it probably doesn't matter.
 \end{code}
 
 
