@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
-   $Id: Arena.c,v 1.3 2002/07/26 09:35:46 simonmar Exp $ 
+   $Id: Arena.c,v 1.4 2002/07/28 02:31:11 sof Exp $ 
    (c) The University of Glasgow 2001
 
    Arena allocation.  Arenas provide fast memory allocation at the
@@ -19,6 +19,7 @@
    which most allocations are small.
    -------------------------------------------------------------------------- */
 
+#include <stdlib.h>
 #include "Rts.h"
 #include "RtsUtils.h"
 #include "BlockAlloc.h"
