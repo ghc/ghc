@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.135 2002/10/14 14:54:16 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.136 2002/10/15 13:18:51 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -1038,14 +1038,6 @@ printTimes allocs psecs
 	putStrLn (showSDoc (
 		 parens (text (secs_str "") <+> text "secs" <> comma <+> 
 			 int allocs <+> text "bytes")))
-
------------------------------------------------------------------------------
--- utils
-
-looksLikeModuleName [] = False
-looksLikeModuleName (c:cs) = isUpper c && all isAlphaNumEx cs
-
-isAlphaNumEx c = isAlphaNum c || c == '_' || c == '.'
 
 -----------------------------------------------------------------------------
 -- reverting CAFs
