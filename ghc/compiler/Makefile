@@ -282,7 +282,7 @@ endif
 ifeq "$(GhcWithInterpreter) $(bootstrapped)" "YES YES"
 
 # Yes, include the interepreter, readline, and Template Haskell extensions
-SRC_HC_OPTS += -DGHCI -package template-haskell -package Cabal
+SRC_HC_OPTS += -DGHCI -package template-haskell
 
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 SRC_HC_OPTS += -package unix
@@ -315,6 +315,10 @@ else
 EXCLUDED_SRCS += deSugar/DsMeta.hs typecheck/TcSplice.lhs hsSyn/Convert.lhs
 
 endif # bootstrapped with interpreter
+
+ifeq "$(bootstrapped)" "YES"
+SRC_HC_OPTS += -package Cabal
+endif
 
 # -----------------------------------------------
 # mkdependC stuff
