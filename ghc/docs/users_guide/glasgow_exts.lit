@@ -32,9 +32,6 @@ Please see \Sectionref{glasgow-unboxed} and following.
 lots} of rope that you can dangle around your neck.
 Please see \Sectionref{glasgow-ccalls}.
 
-\item[Low-level monadic I/O:] Monadic I/O is now standard with Haskell~1.3;
-you can still get access to the system at a lower level (the ``PrimIO'' level).
-
 \item[``HBC-ish'' extensions:] Extensions implemented because people said,
 ``HBC does Y.  Could you teach GHC to do the same?''  Please see
 \Sectionref{glasgow-hbc-exts} for a quick list.
@@ -45,13 +42,8 @@ sloshing \tr{MutableByteArray#}s around your program), you may wish to
 check if there are system libraries that provide a ``Haskellised
 veneer'' over the features you want.  See \Sectionref{syslibs}.
 
-\Sectionref{ghc-prelude} is the definitive guide for many of the low-level facilities in GHC.
-
-%Pieter Hartel led an interesting comparison-of-many-compilers (and
-%many languages) in which GHC got to show off its extensions.  We did
-%very well!  For the full details, check out
-%\tr{pub/computer-systems/functional/packages/pseudoknot.tar.Z} on \tr{ftp.fwi.uva.nl}.
-%Good clean fun!
+\Sectionref{ghc-prelude} is the definitive guide for many of the
+low-level facilities in GHC.
 
 %************************************************************************
 %*                                                                      *
@@ -78,6 +70,7 @@ unboxed types and the operations on them.
 %*                                                                      *
 \subsection[glasgow-ST-monad]{Primitive state-transformer monad}
 \index{state transformers (Glasgow extensions)}
+\index{ST monad (Glasgow extension)}
 %*                                                                      *
 %************************************************************************
 
@@ -146,30 +139,41 @@ The libraries section give more details on all these
 
 %************************************************************************
 %*									*
-\subsection[own-mainPrimIO]{Using your own @mainPrimIO@}
-\index{mainPrimIO, rolling your own}
+\subsection[own-mainIO]{Using your own @mainIO@}
+\index{mainIO, rolling your own}
+\index{GHCmain, module containing mainIO}
 %*									*
 %************************************************************************
 
 Normally, the GHC runtime system begins things by called an internal
-function @mainPrimIO :: PrimIO ()@ which, in turn, fires up
-your @Main.main@.
+function @mainIO :: IO ()@ which, in turn, fires up your @Main.main@.
+The standard definition of @mainIO@ looks like this:
 
-To subvert the above process, you need only provide a
-@mainPrimIO :: PrimIO ()@ of your own (in a module named \tr{GHCmain}).
+\begin{verbatim}
+mainIO = catch Main.main 
+	   (\err -> error ("I/O error: " ++ showsPrec 0 err "\n"))
+\end{verbatim}
+
+\noindent that is, all it does is to run @Main.main@, catching any I/O
+errors that occur and displaying them on standard error before exiting
+the program.
+
+To subvert the above process, you need only provide a @mainIO :: IO
+()@ of your own (in a module named \tr{GHCmain}).
 
 Here's a little example, stolen from Alastair Reid:
+
 \begin{verbatim}
-module GHCmain ( mainPrimIO ) where
+module GHCmain ( mainIO ) where
 
 import GlaExts
 
-mainPrimIO :: PrimIO ()
-mainPrimIO = do
+mainIO :: IO ()
+mainIO = do
 	 sleep 5
 	 _ccall_ printf "%d\n" (14::Int)
 
-sleep :: Int -> PrimIO ()
+sleep :: Int -> IO ()
 sleep t = _ccall_ sleep t
 \end{verbatim}
 
@@ -181,11 +185,6 @@ sleep t = _ccall_ sleep t
 \index{_casm_ (Glasgow extension)}
 %*                                                                      *
 %************************************************************************
-
-%Besides using a \tr{-fglasgow-exts} flag, your modules need to include...
-%\begin{verbatim}
-%import PreludePrimIO
-%\end{verbatim}
 
 GOOD ADVICE: Because this stuff is not Entirely Stable as far as names
 and things go, you would be well-advised to keep your C-callery
@@ -213,19 +212,11 @@ double fooC( FILE *in, char c, int i, double d, unsigned int u )
 \end{verbatim}
 is to provide a Haskell wrapper:
 \begin{verbatim}
-fooH :: Char -> Int -> Double -> Word -> PrimIO Double
+fooH :: Char -> Int -> Double -> Word -> IO Double
 fooH c i d w = _ccall_ fooC (``stdin''::Addr) c i d w
 \end{verbatim}
 The function @fooH@ will unbox all of its arguments, call the C
 function \tr{fooC} and box the corresponding arguments.
-
-So, if you want to do C-calling, you have to confront the underlying
-I/O system (at the ``PrimIO'' level).
-
-%The code in \tr{ghc/lib/glaExts/*.lhs} is not too obtuse.
-%That code, plus \tr{lib/prelude/Builtin.hs}, give examples
-%of its use.  The latter includes the implementations of \tr{error} and
-%\tr{trace}.
 
 One of the annoyances about \tr{_ccall_}s is when the C types don't quite
 match the Haskell compiler's ideas.  For this, the \tr{_casm_} variant
@@ -325,11 +316,11 @@ pointer'' to a value and passing the stable pointer instead.  For example, to
 pass/return an integer lazily to C functions \tr{storeC} and
 \tr{fetchC}, one might write:
 \begin{verbatim}
-storeH :: Int -> PrimIO ()
+storeH :: Int -> IO ()
 storeH x = makeStablePtr x              >>= \ stable_x ->
            _ccall_ storeC stable_x
 
-fetchH :: PrimIO Int
+fetchH :: IO Int
 fetchH x = _ccall_ fetchC               >>= \ stable_x ->
            deRefStablePtr stable_x      >>= \ x ->
            freeStablePtr stable_x       >>
@@ -340,7 +331,7 @@ The garbage collector will refrain from throwing a stable pointer away
 until you explicitly call one of the following from C or Haskell.
 \begin{verbatim}
 void freeStablePointer( StgStablePtr stablePtrToToss )
-freeStablePtr :: StablePtr a -> PrimIO ()
+freeStablePtr :: StablePtr a -> IO ()
 \end{verbatim}
 
 As with the use of \tr{free} in C programs, GREAT CARE SHOULD BE
@@ -348,20 +339,22 @@ EXERCISED to ensure these functions are called at the right time: too
 early and you get dangling references (and, if you're lucky, an error
 message from the runtime system); too late and you get space leaks.
 
-%Doesn't work in ghc-0.23 - best to just keep quiet about them.
-%
-%And to force evaluation of the argument within \tr{fooC}, one would
-%call one of the following C functions (according to type of argument).
-%
-%\begin{verbatim}
-%void     performIO  ( StgStablePtr stableIndex /* StablePtr s (PrimIO ()) */ );
-%StgInt   enterInt   ( StgStablePtr stableIndex /* StablePtr s Int */ );
-%StgFloat enterFloat ( StgStablePtr stableIndex /* StablePtr s Float */ );
-%\end{verbatim}
-%
-%ToDo ADR: test these functions!
-%
-%Note Bene: \tr{_ccall_GC_} must be used if any of these functions are used.
+And to force evaluation of the argument within \tr{fooC}, one would
+call one of the following C functions (according to type of argument).
+
+\begin{verbatim}
+void     performIO  ( StgStablePtr stableIndex /* StablePtr s (IO ()) */ );
+StgInt   enterInt   ( StgStablePtr stableIndex /* StablePtr s Int */ );
+StgFloat enterFloat ( StgStablePtr stableIndex /* StablePtr s Float */ );
+\end{verbatim}
+
+\index{performIO, call a haskell IO computation from C}
+\index{enterInt, call a haskell function from C}
+\index{enterFloat, call a haskell function from C}
+
+% ToDo ADR: test these functions!
+
+Note Bene: \tr{_ccall_GC_} must be used if any of these functions are used.
 
 
 %************************************************************************
@@ -394,39 +387,41 @@ we provide ways of triggering a garbage collection from within C and
 from within Haskell.
 \begin{verbatim}
 void StgPerformGarbageCollection()
-performGC :: PrimIO ()
+performGC :: IO ()
 \end{verbatim}
 
 %************************************************************************
 %*                                                                      *
 \subsubsection[glasgow-avoiding-monads]{Avoiding monads}
 \index{C calls to `pure C'}
-\index{unsafePerformPrimIO (GlaExts)}
+\index{unsafePerformIO (GlaExts)}
 %*                                                                      *
 %************************************************************************
 
-The \tr{_ccall_} construct is part of the \tr{PrimIO} monad because 9
-out of 10 uses will be to call imperative functions with side effects
-such as \tr{printf}.  Use of the monad ensures that these operations
-happen in a predictable order in spite of laziness and compiler
+The \tr{_ccall_} construct is part of the \tr{IO} monad because 9 out
+of 10 uses will be to call imperative functions with side effects such
+as \tr{printf}.  Use of the monad ensures that these operations happen
+in a predictable order in spite of laziness and compiler
 optimisations.
 
-There are three situations where one might like to use
-@unsafePerformPrimIO@ to avoid the monad:
+To avoid having to be in the monad to call a C function, it is
+possible to use @unsafePerformIO@, which is available from the
+@IOExts@ module.  There are three situations where one might like to
+call a C function from outside the IO world:
+
 \begin{itemize}
 \item
 Calling a function with no side-effects:
 \begin{verbatim}
 atan2d :: Double -> Double -> Double
-atan2d y x = unsafePerformPrimIO (_ccall_ atan2d y x)
+atan2d y x = unsafePerformIO (_ccall_ atan2d y x)
 
 sincosd :: Double -> (Double, Double)
-sincosd x = unsafePerformPrimIO $
-        newDoubleArray (0, 1)           >>= \ da ->
+sincosd x = unsafePerformIO $ do
+        da <- newDoubleArray (0, 1)
         _casm_ ``sincosd( %0, &((double *)%1[0]), &((double *)%1[1]) );'' x da
-                                        >>
-        readDoubleArray da 0            >>= \ s ->
-        readDoubleArray da 1            >>= \ c ->
+        s <- readDoubleArray da 0
+        c <- readDoubleArray da 1
         return (s, c)
 \end{verbatim}
 
@@ -441,13 +436,13 @@ empty  :: EFS x
 update :: EFS x -> Int -> x -> EFS x
 lookup :: EFS a -> Int -> a
 
-empty = unsafePerformPrimIO (_ccall_ emptyEFS)
+empty = unsafePerformIO (_ccall_ emptyEFS)
 
-update a i x = unsafePerformPrimIO $
+update a i x = unsafePerformIO $
         makeStablePtr x         >>= \ stable_x ->
         _ccall_ updateEFS a i stable_x
 
-lookup a i = unsafePerformPrimIO $
+lookup a i = unsafePerformIO $
         _ccall_ lookupEFS a i   >>= \ stable_x ->
         deRefStablePtr stable_x
 \end{verbatim}
@@ -460,11 +455,11 @@ be unpredictable.  For example the \tr{trace} function is defined by:
 \begin{verbatim}
 trace :: String -> a -> a
 trace string expr
-  = unsafePerformPrimIO (
-	((_ccall_ PreTraceHook sTDERR{-msg-}):: PrimIO ())  >>
-	fputs sTDERR string				    >>
-	((_ccall_ PostTraceHook sTDERR{-msg-}):: PrimIO ()) >>
-	returnPrimIO expr )
+  = unsafePerformIO (
+	((_ccall_ PreTraceHook sTDERR{-msg-}):: IO ())  >>
+	fputs sTDERR string			        >>
+	((_ccall_ PostTraceHook sTDERR{-msg-}):: IO ()) >>
+	return expr )
   where
     sTDERR = (``stderr'' :: Addr)
 \end{verbatim}
@@ -484,16 +479,18 @@ And some advice, too.
 
 \begin{itemize}
 \item
-\tr{_ccall_} is part of the \tr{PrimIO} monad --- not the 1.3 \tr{IO} Monad.
-Use the function 
+\tr{_ccall_} is part of the \tr{IO} monad --- not the \tr{ST} monad.
+Use the functions
 \begin{verbatim}
-primIOToIO :: PrimIO a -> IO a
+ioToST :: IO a -> ST RealWorld a
+stToIO :: ST RealWorld a -> IO a
 \end{verbatim}
-to promote a \tr{_ccall_} to the \tr{IO} monad.
+\index{ioToST function}
+\index{stToIO function}
+to coerce computations back and forth between the two monads.
 
-\item
-For modules that use \tr{_ccall_}s, etc., compile with \tr{-fvia-C}.\index{-fvia-C option}
-You don't have to, but you should.
+\item For modules that use \tr{_ccall_}s, etc., compile with
+\tr{-fvia-C}.\index{-fvia-C option} You don't have to, but you should.
 
 Also, use the \tr{-#include "prototypes.h"} flag (hack) to inform the
 C compiler of the fully-prototyped types of all the C functions you
@@ -531,7 +528,7 @@ f x = _ccall_ foo x
 is not good enough, because the compiler can't work out what type @x@ is, nor 
 what type the @_ccall_@ returns.  You have to write, say:
 \begin{verbatim}
-f :: Int -> PrimIO Double
+f :: Int -> IO Double
 f x = _ccall_ foo x
 \end{verbatim}
 
@@ -593,7 +590,7 @@ data MyVoid = MyVoid
 instance CReturnable MyVoid
 \end{verbatim}
 
-\item As at version 2.02, \tr{String} (i.e., \tr{[Char]}) is still
+\item As at version 2.09, \tr{String} (i.e., \tr{[Char]}) is still
 not a \tr{CReturnable} type.
 
 Also, the now-builtin type \tr{PackedString} is neither
@@ -603,65 +600,17 @@ the PackedString interface to let you get at the necessary bits...)
 
 \item
 The code-generator will complain if you attempt to use \tr{%r}
-in a \tr{_casm_} whose result type is \tr{PrimIO ()}; or if you don't
+in a \tr{_casm_} whose result type is \tr{IO ()}; or if you don't
 use \tr{%r} {\em precisely\/} once for any other result type.  These
 messages are supposed to be helpful and catch bugs---please tell us
 if they wreck your life.
 
-\item
-If you call out to C code which may trigger the Haskell garbage
+\item If you call out to C code which may trigger the Haskell garbage
 collector (examples of this later...), then you must use the
-\tr{_ccall_GC_} or \tr{_casm_GC_} variant of C-calls.  (This does not
-work with the native code generator - use \tr{\fvia-C}.) This stuff is
-hairy with a capital H!
-\end{itemize}
-
-%************************************************************************
-%*                                                                      *
-%\subsubsection[ccall-good-practice]{C-calling ``good practice'' checklist}
-%*                                                                      *
-%************************************************************************
-
-%************************************************************************
-%*									*
-\subsubsection[glasgow-prim-interface]{Access to the \tr{PrimIO} monad}
-\index{PrimIO monad (Glasgow extension)}
-\index{I/O, primitive (Glasgow extension)}
-%*									*
-%************************************************************************
-
-The \tr{IO} monad (new in Haskell~1.3) catches errors and passes them
-along.  It is built on top of the \tr{ST} state-transformer monad.
-
-A related (and inter-operable-with) monad is the \tr{PrimIO} monad
-(NB: the level at which @_ccall_@s work...), where you handle errors
-yourself.
-
-Should you wish to use the \tr{PrimIO} monad directly, you can import
-\tr{GlaExts}.  It makes available the usual monadic stuff (@>>=@,
-@>>@, @return@, etc.), as well as these functions:
-\begin{verbatim}
--- for backward compatibility:
-returnPrimIO    :: a -> PrimIO a
-thenPrimIO      :: PrimIO a -> (a -> PrimIO b) -> PrimIO b
-seqPrimIO	:: PrimIO a -> PrimIO b -> PrimIO b
-
--- still useful:
-fixPrimIO	:: (a -> PrimIO a) -> PrimIO a
-forkPrimIO	:: PrimIO a -> PrimIO a
-listPrimIO	:: [PrimIO a] -> PrimIO [a]
-mapAndUnzipPrimIO :: (a -> PrimIO (b,c)) -> [a] -> PrimIO ([b],[c])
-mapPrimIO	:: (a -> PrimIO b) -> [a] -> PrimIO [b]
-
-unsafePerformPrimIO	:: PrimIO a -> a
-unsafeInterleavePrimIO	:: PrimIO a -> PrimIO a
-  -- and they are not called "unsafe" for nothing!
-
--- to convert back and forth between IO and PrimIO
-ioToPrimIO :: IO     a -> PrimIO a
-primIOToIO :: PrimIO a -> IO     a
-\end{verbatim}
-
+\tr{_ccall_GC_}\index{_ccall_GC_ primitive} or
+\tr{_casm_GC_}\index{_casm_GC_ primitive} variant of C-calls.  (This
+does not work with the native code generator - use \tr{\fvia-C}.) This
+stuff is hairy with a capital H!  \end{itemize}
 
 %************************************************************************
 %*                                                                      *
@@ -696,85 +645,4 @@ As Lennart says, ``This is a dubious feature and should not be used
 carelessly.''
 
 See also: \tr{SPECIALIZE instance} pragmas, in \Sectionref{faster}.
-% 
-%-------------------------------------------------------------------
-% \item[Signal-handling I/O request:]
-% \index{signal handling (extension)}
-% \index{SigAction I/O request}
-% The Haskell-1.2 I/O request \tr{SigAction n act} installs a signal handler for signal
-% \tr{n :: Int}.  The number is the usual UNIX signal number.  The action
-% is of this type:
-% \begin{verbatim}
-% data SigAct
-%   = SAIgnore
-%   | SADefault
-%   | SACatch Dialogue
-% \end{verbatim}
-% 
-% The corresponding continuation-style I/O function is the unsurprising:
-% \begin{verbatim}
-% sigAction :: Int -> SigAct -> FailCont -> SuccCont -> Dialogue
-% \end{verbatim}
-% 
-% When a signal handler is installed with \tr{SACatch}, receipt of the
-% signal causes the current top-level computation to be abandoned, and
-% the specified dialogue to be executed instead.  The abandoned
-% computation may leave some partially evaluated expressions in a
-% non-resumable state.  If you believe that your top-level computation
-% and your signal handling dialogue may share subexpressions, you should
-% execute your program with the \tr{-N} RTS option, to prevent
-% black-holing.
-% 
-% The \tr{-N} option is not available with concurrent/parallel programs,
-% so great care should be taken to avoid shared subexpressions between
-% the top-level computation and any signal handlers when using threads.
-% 
-%-------------------------------------------------------------------
-%\item[Simple time-out mechanism, in ``monadic I/O'':]
-%\index{time-outs (extension)}
-%
-%This function is available: 
-%\begin{verbatim} 
-%timeoutIO :: Int -> IO Void -> IO (IO Void) 
-%\end{verbatim} 
-%
-%Wait that many seconds, then abandon the current computation and
-%perform the given I/O operation (second argument).  Uses the
-%signal-handling, so it returns the previous signal-handler (in case
-%you want to re-install it).  As above, you may need to execute your
-%program with the RTS flag \tr{-N}, to prevent black-holing.
-%
 \end{description}
-
-%************************************************************************
-%*                                                                      *
-%\subsection[glasgow-compiler-namespace]{Fiddlings the compiler's built-in namespaces}
-%*                                                                      *
-%************************************************************************
-
-%This is really only used for compiling the prelude.  It's turgid and
-%will probably change.
-
-% \begin{description}
-% \item[\tr{-no-implicit-prelude}:]
-% \index{-no-implicit-prelude option}
-% 
-% ???? (Tells the parser not to read \tr{Prelude.hi}).
-% 
-% \item[\tr{-fhide-builtin-names}:]
-% \index{-fhide-builtin-names option}
-% This hides {\em all} Prelude names built-in to the compiler.
-% 
-% \item[\tr{-fmin-builtin-names}:]
-% \index{-fmin-builtin-names option}
-% This hides all but a few of the Prelude names that are built-in to the
-% compiler.  @:@ (cons) is an example of one that would remain visible.
-% 
-% \item[\tr{-fhide-builtin-instances}:]
-% \index{-fhide-builtin-instances option}
-% This suppresses the compiler's own ideas about what instances already
-% exist (e.g., \tr{instance Eq Int}).
-% 
-% This flag is used when actually compiling the various instance
-% declarations in the Prelude.
-% \end{description}
