@@ -37,7 +37,7 @@ endif
 
 GHC_DRIVER_DIR	    	= $(TOP)/driver
 GHC_COMPILER_DIR  	= $(TOP)/compiler
-GHC_RUNTIME_DIR   	= $(TOP)/runtime
+GHC_RUNTIME_DIR   	= $(TOP)/rts
 GHC_LIB_DIR	 	= $(TOP)/lib
 GHC_INCLUDE_DIR   	= $(TOP)/includes
 GHC_UTILS_DIR	 	= $(TOP)/utils
@@ -69,6 +69,3 @@ MKDEPENDHS_SRCS = $(HS_SRCS)
 else
 MKDEPENDHS_SRCS =
 endif
-
-# temporary until the new RTS is merged in.
-MOSTLY_CLEAN_FILES += *.hc

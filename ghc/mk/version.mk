@@ -21,8 +21,8 @@
 
 ProjectName       = The Glorious Glasgow Haskell Compilation System
 ProjectNameShort  = ghc
-ProjectVersion    = 3.03
-ProjectVersionInt = 303
+ProjectVersion    = 4.01
+ProjectVersionInt = 401
 ProjectPatchLevel = 0
 
 #
@@ -35,7 +35,15 @@ ProjectPatchLevel = 0
 # version - one (semi-valid) reason for having them separate is that
 # object files produced by different versions of the compiler need
 # not be incompatible..
-HscMajorVersion=33
+HscMajorVersion=40
 HscMinorVersion=0
 CcMajorVersion=36
 CcMinorVersion=1
+
+#
+# Interface file version
+#
+# If you should happen to make changes to the interface file format
+# that will break compatibility with older versions, up this variable.
+# 
+HscIfaceFileVersion=5
