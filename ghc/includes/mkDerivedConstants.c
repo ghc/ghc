@@ -196,9 +196,7 @@ main(int argc, char *argv[])
     field_offset(StgRegTable, rF4);
     field_offset(StgRegTable, rD1);
     field_offset(StgRegTable, rD2);
-#ifdef SUPPORT_LONG_LONGS
     field_offset(StgRegTable, rL1);
-#endif
     field_offset(StgRegTable, rSp);
     field_offset(StgRegTable, rSpLim);
     field_offset(StgRegTable, rHp);
