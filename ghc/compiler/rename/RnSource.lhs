@@ -656,26 +656,6 @@ rnHsTupConWkr (HsTupCon n boxity)
 \end{code}
 
 \begin{code}
--- Check that each constraint mentions at least one of the forall'd type variables
--- Since the forall'd type variables are a subset of the free tyvars
--- of the tau-type part, this guarantees that every constraint mentions
--- at least one of the free tyvars in ty
-checkConstraints doc forall_tyvars tau_vars ctxt ty
-   = mapRn (checkPred doc forall_tyvars ty) ctxt `thenRn` \ maybe_ctxt' ->
-     returnRn (catMaybes maybe_ctxt')
-	    -- Remove problem ones, to avoid duplicate error message.
-	
-checkPred doc forall_tyvars ty p@(HsPClass clas tys)
-  | not_univ  = failWithRn Nothing (univErr  doc p ty)
-  | otherwise = returnRn (Just p)
-  where
-      ct_vars  = extractHsTysRdrTyVars tys
-      not_univ =  -- At least one of the tyvars in each constraint must
-		  -- be universally quantified. This restriction isn't in Hugs
-		  not (any (`elem` forall_tyvars) ct_vars)
-checkPred doc forall_tyvars ty p@(HsPIParam _ _)
-  = returnRn (Just p)
-
 rnForAll doc forall_tyvars ctxt ty
   = bindTyVarsFVRn doc forall_tyvars	$ \ new_tyvars ->
     rnContext doc ctxt			`thenRn` \ (new_ctxt, cxt_fvs) ->
@@ -951,15 +931,6 @@ forAllErr doc ty tyvar
 	   nest 4 (ptext SLIT("does not appear in the type") <+> quotes (ppr ty))]
       $$
       (ptext SLIT("In") <+> doc))
-
-univErr doc constraint ty
-  = sep [ptext SLIT("All of the type variable(s) in the constraint")
-          <+> quotes (ppr constraint) 
-	  <+> ptext SLIT("are already in scope"),
-	 nest 4 (ptext SLIT("At least one must be universally quantified here"))
-    ]
-    $$
-    (ptext SLIT("In") <+> doc)
 
 badRuleLhsErr name lhs
   = sep [ptext SLIT("Rule") <+> ptext name <> colon,
