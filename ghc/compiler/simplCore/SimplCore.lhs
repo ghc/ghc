@@ -403,8 +403,8 @@ simplifyPgm mode switches hsc_env us rule_base guts
   = do {
 	showPass dflags "Simplify";
 
-	(termination_msg, it_count, counts_out, rule_base', guts') 
-	   <- do_iteration us rule_base 1 (zeroSimplCount dflags) guts;
+	(termination_msg, it_count, counts_out, rule_base', binds') 
+	   <- do_iteration us rule_base 1 (zeroSimplCount dflags) (mg_binds guts) ;
 
 	dumpIfSet (dopt Opt_D_verbose_core2core dflags 
                    && dopt Opt_D_dump_simpl_stats dflags)
@@ -413,9 +413,9 @@ simplifyPgm mode switches hsc_env us rule_base guts
 			 text "",
 			 pprSimplCount counts_out]);
 
-	endPass dflags "Simplify" Opt_D_verbose_core2core (mg_binds guts');
+	endPass dflags "Simplify" Opt_D_verbose_core2core binds';
 
-	return (counts_out, rule_base', guts')
+	return (counts_out, rule_base', guts { mg_binds = binds' })
     }
   where
     dflags 	      = hsc_dflags hsc_env
@@ -426,7 +426,7 @@ simplifyPgm mode switches hsc_env us rule_base guts
     sw_chkr	      = isAmongSimpl switches
     max_iterations    = intSwitchSet sw_chkr MaxSimplifierIterations `orElse` 2
  
-    do_iteration us rule_base iteration_no counts guts
+    do_iteration us rule_base iteration_no counts binds
 	-- iteration_no is the number of the iteration we are
 	-- about to begin, with '1' for the first
       | iteration_no > max_iterations	-- Stop if we've run out of iterations
@@ -441,20 +441,15 @@ simplifyPgm mode switches hsc_env us rule_base guts
 #endif
 		-- Subtract 1 from iteration_no to get the
 		-- number of iterations we actually completed
-	    return ("Simplifier baled out", iteration_no - 1, counts, rule_base, guts)
+	    return ("Simplifier baled out", iteration_no - 1, counts, rule_base, binds)
 	}
 
       -- Try and force thunks off the binds; significantly reduces
       -- space usage, especially with -O.  JRS, 000620.
-      | let sz = coreBindsSize (mg_binds guts) in sz == sz
+      | let sz = coreBindsSize binds in sz == sz
       = do {
 		-- Occurrence analysis
-	   let { short_inds   = _scc_ "ZapInd" shortOutIndirections (mg_binds guts) ;
-		 tagged_binds = _scc_ "OccAnal" occurAnalysePgm short_inds } ;
-
-	   dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Short indirections"
-		     (pprCoreBindings short_inds);
-
+	   let { tagged_binds = _scc_ "OccAnal" occurAnalysePgm binds } ;
 	   dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
 		     (pprCoreBindings tagged_binds);
 
@@ -488,8 +483,7 @@ simplifyPgm mode switches hsc_env us rule_base guts
 	   case initSmpl dflags us1 (_scc_ "SimplTopBinds" simplTopBinds simpl_env tagged_binds) of {
 	  	(binds', counts') -> do {
 
-	   let	{ guts'      = guts { mg_binds = binds' }
-		; all_counts = counts `plusSimplCount` counts'
+	   let	{ all_counts = counts `plusSimplCount` counts'
 		; herald     = "Simplifier phase " ++ phase_info ++ 
 			      ", iteration " ++ show iteration_no ++
 			      " out of " ++ show max_iterations
@@ -498,17 +492,22 @@ simplifyPgm mode switches hsc_env us rule_base guts
 		-- Stop if nothing happened; don't dump output
 	   if isZeroSimplCount counts' then
 		return ("Simplifier reached fixed point", iteration_no, 
-			all_counts, rule_base', guts')
+			all_counts, rule_base', binds')
 	   else do {
+		-- Short out indirections
+		-- We do this *after* at least one run of the simplifier 
+		-- because indirection-shorting uses the export flag on *occurrences*
+		-- and that isn't guaranteed to be ok until after the first run propagates
+		-- stuff from the binding site to its occurrences
+	   let { binds'' = _scc_ "ZapInd" shortOutIndirections binds' } ;
 
 		-- Dump the result of this iteration
 	   dumpIfSet_dyn dflags Opt_D_dump_simpl_iterations herald
 		         (pprSimplCount counts') ;
-
-	   endPass dflags herald Opt_D_dump_simpl_iterations binds' ;
+	   endPass dflags herald Opt_D_dump_simpl_iterations binds'' ;
 
 		-- Loop
-  	   do_iteration us2 rule_base' (iteration_no + 1) all_counts guts'
+  	   do_iteration us2 rule_base' (iteration_no + 1) all_counts binds''
 	}  } } }
       where
   	  (us1, us2) = splitUniqSupply us
@@ -517,13 +516,11 @@ simplifyPgm mode switches hsc_env us rule_base guts
 
 %************************************************************************
 %*									*
-		Top-level occurrence analysis
-	[In here, not OccurAnal, because it uses 
- 	 Rules.lhs, which depends on OccurAnal]
+		Shorting out indirections
 %*									*
 %************************************************************************
 
-In @occAnalPgm@ we do indirection-shorting.  That is, if we have this:
+If we have this:
 
 	x_local = <expression>
 	...bindings...
