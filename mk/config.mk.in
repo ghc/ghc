@@ -529,7 +529,7 @@ CONTEXT_DIFF		= @ContextDiffCmd@
 CP			= cp
 CPP			= @CPP@
 CTAGS 			= $(ETAGS)
-RAWCPP                  = @RAWCPP@
+RAWCPP                  = $(CPP) -undef -traditional
 INSTALL			= @INSTALL@
 #
 # Sigh - the autoconf macro for INSTALL will subst a relative path to the fallback
