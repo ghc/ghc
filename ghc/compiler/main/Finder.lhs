@@ -183,7 +183,7 @@ maybePackageModule mod_name = do
 		then return "hi"
 		else return (tag ++ "_hi")
 
-  let basename = moduleNameString mod_name
+  let basename = moduleNameUserString mod_name
       hi = basename ++ '.':package_hisuf
 
   case lookupFM pkg_cache hi of
