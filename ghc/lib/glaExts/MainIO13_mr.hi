@@ -1,6 +1,0 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
-interface Main where
-import PreludeBuiltin(Tuple0, Tuple2, _RealWorld(..), _State(..))
-mainPrimIO13 :: _State _RealWorld -> ((), _State _RealWorld)
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
-

@@ -1,7 +1,0 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
-interface QSort where
-sort :: Ord a => [a] -> [a]
-	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "LS" _N_ _N_ #-}
-sortLe :: (a -> a -> Bool) -> [a] -> [a]
-	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
-

@@ -1,5 +1,0 @@
-interface PreludeMainIO_help where
-import PreludeIO(Request,Response)
-import Main ( main )
-
-main :: [Response] -> [Request]

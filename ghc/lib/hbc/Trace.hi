@@ -1,5 +1,0 @@
-{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
-interface Trace where
-trace :: [Char] -> a -> a
-	{-# GHC_PRAGMA _A_ 0 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _trace _N_ #-}
-
