@@ -429,7 +429,7 @@ addVersionInfo (Just old_iface@(ModIface { mi_version = old_version,
 	-- mi_globals field set to anything reasonable.
 
   | otherwise		-- Add updated version numbers
-  = pprTrace "completeIface" (ppr (dcl_tycl old_decls))
+  = --pprTrace "completeIface" (ppr (dcl_tycl old_decls))
     (final_iface, Just pp_tc_diffs)
 	
   where
