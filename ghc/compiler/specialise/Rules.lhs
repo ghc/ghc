@@ -5,10 +5,10 @@
 
 \begin{code}
 module Rules (
-	RuleBase, prepareRuleBase, lookupRule, addRule,
-	addIdSpecialisations,
+	RuleBase, prepareLocalRuleBase, prepareOrphanRuleBase,
+        unionRuleBase, lookupRule, addRule, addIdSpecialisations,
 	ProtoCoreRule(..), pprProtoCoreRule,
-	orphanRule
+	localRule, orphanRule
     ) where
 
 #include "HsVersions.h"
@@ -464,6 +464,9 @@ lookupRule in_scope fn args
   = case idSpecialisation fn of
 	Rules rules _ -> matchRules in_scope rules args
 
+localRule :: ProtoCoreRule -> Bool
+localRule (ProtoCoreRule local _ _) = local
+
 orphanRule :: ProtoCoreRule -> Bool
 -- An "orphan rule" is one that is defined in this 
 -- module, but for an *imported* function.  We need
@@ -484,17 +487,32 @@ type RuleBase = (IdSet,		-- Imported Ids that have rules attached
 		 IdSet)		-- Ids (whether local or imported) mentioned on 
 				-- LHS of some rule; these should be black listed
 
+unionRuleBase (rule_ids1, black_ids1) (rule_ids2, black_ids2)
+  = (plusUFM_C merge_rules rule_ids1 rule_ids2,
+     unionVarSet black_ids1 black_ids2)
+  where
+    merge_rules id1 id2 = let rules1 = idSpecialisation id1
+                              rules2 = idSpecialisation id2
+                              new_rules = foldl (addRule id1) rules1 (rulesRules rules2)
+                          in
+                          setIdSpecialisation id1 new_rules
+
+-- prepareLocalRuleBase takes the CoreBinds and rules defined in this module.
+-- It attaches those rules that are for local Ids to their binders, and
+-- returns the remainder attached to Ids in an IdSet.  It also returns
+-- Ids mentioned on LHS of some rule; these should be blacklisted.
+
 -- The rule Ids and LHS Ids are black-listed; that is, they aren't inlined
 -- so that the opportunity to apply the rule isn't lost too soon
 
-prepareRuleBase :: [CoreBind] -> [ProtoCoreRule] -> ([CoreBind], RuleBase)
-prepareRuleBase binds all_rules
-  = (map zap_bind binds, (imported_rule_ids, rule_lhs_fvs))
+prepareLocalRuleBase :: [CoreBind] -> [ProtoCoreRule] -> ([CoreBind], RuleBase)
+prepareLocalRuleBase binds local_rules
+  = (map zap_bind binds, (imported_id_rule_ids, rule_lhs_fvs))
   where
-    (rule_ids, rule_lhs_fvs) = foldr add_rule (emptyVarSet, emptyVarSet) all_rules
-    imported_rule_ids = filterVarSet (not . isLocallyDefined) rule_ids
+    (rule_ids, rule_lhs_fvs) = foldr add_rule (emptyVarSet, emptyVarSet) local_rules
+    imported_id_rule_ids = filterVarSet (not . isLocallyDefined) rule_ids
 
-	-- rule_fvs is the set of all variables mentioned in rules
+	-- rule_fvs is the set of all variables mentioned in this module's rules
     rule_fvs = foldVarSet (unionVarSet . idRuleVars) rule_lhs_fvs rule_ids
 
 	-- Attach the rules for each locally-defined Id to that Id.
@@ -533,4 +551,11 @@ add_rule (ProtoCoreRule _ id rule)
 	-- locally defined ones!!
 
 addRuleToId id rule = setIdSpecialisation id (addRule id (idSpecialisation id) rule)
+
+-- prepareOrphanRuleBase does exactly the same as prepareLocalRuleBase, except that
+-- it assumes that none of the rules can be attached to local Ids.
+
+prepareOrphanRuleBase :: [ProtoCoreRule] -> RuleBase
+prepareOrphanRuleBase imported_rules
+  = foldr add_rule (emptyVarSet, emptyVarSet) imported_rules
 \end{code}

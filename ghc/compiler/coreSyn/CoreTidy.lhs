@@ -15,12 +15,12 @@ import CmdLineOpts	( opt_D_dump_simpl, opt_D_verbose_core2core, opt_UsageSPOn )
 import CoreSyn
 import CoreUnfold	( noUnfolding )
 import CoreLint		( beginPass, endPass )
-import Rules		( ProtoCoreRule(..) )
+import Rules		( ProtoCoreRule(..), RuleBase )
 import UsageSPInf       ( doUsageSPInf )
 import VarEnv
 import VarSet
 import Var		( Id, Var )
-import Id		( idType, idInfo, idName, 
+import Id		( idType, idInfo, idName, idSpecialisation,
 			  mkVanillaId, mkId, exportWithOrigOccName,
 			  idStrictness, setIdStrictness,
 			  idDemandInfo, setIdDemandInfo,
@@ -52,34 +52,38 @@ import Outputable
 
 Several tasks are done by @tidyCorePgm@
 
-1.  Make certain top-level bindings into Globals. The point is that 
+1. If @opt_UsageSPOn@ then compute usage information (which is
+   needed by Core2Stg).  ** NOTE _scc_ HERE **
+   Do this first, because it may introduce new binders.
+
+2.  Make certain top-level bindings into Globals. The point is that 
     Global things get externally-visible labels at code generation
     time
 
 
-2. Give all binders a nice print-name.  Their uniques aren't changed;
+3. Give all binders a nice print-name.  Their uniques aren't changed;
    rather we give them lexically unique occ-names, so that we can
    safely print the OccNae only in the interface file.  [Bad idea to
    change the uniques, because the code generator makes global labels
    from the uniques for local thunks etc.]
 
-
-3. If @opt_UsageSPOn@ then compute usage information (which is
-   needed by Core2Stg).  ** NOTE _scc_ HERE **
-
 \begin{code}
-tidyCorePgm :: UniqSupply -> Module -> [CoreBind] -> [ProtoCoreRule]
+tidyCorePgm :: UniqSupply -> Module -> [CoreBind] -> RuleBase
 	    -> IO ([CoreBind], [ProtoCoreRule])
-tidyCorePgm us module_name binds_in rules
+tidyCorePgm us module_name binds_in rulebase_in
   = do
 	beginPass "Tidy Core"
 
-	let (tidy_env1, binds_tidy) = mapAccumL (tidyBind (Just module_name)) init_tidy_env binds_in
-	    rules_out	  	    = tidyProtoRules tidy_env1 rules
+        (binds_in1,mrulebase_in1) <- if opt_UsageSPOn
+                                     then _scc_ "CoreUsageSPInf"
+                                          doUsageSPInf us binds_in rulebase_in
+                                     else return (binds_in,Nothing)
 
-        binds_out <- if opt_UsageSPOn
-                     then _scc_ "CoreUsageSPInf" doUsageSPInf us binds_tidy
-                     else return binds_tidy
+	let rulebase_in1            = maybe rulebase_in id mrulebase_in1
+
+            (tidy_env1, binds_out)  = mapAccumL (tidyBind (Just module_name))
+                                                init_tidy_env binds_in1
+	    rules_out	  	    = tidyProtoRules tidy_env1 (mk_local_protos rulebase_in1)
 
 	endPass "Tidy Core" (opt_D_dump_simpl || opt_D_verbose_core2core) binds_out
 	return (binds_out, rules_out)
@@ -95,6 +99,11 @@ tidyCorePgm us module_name binds_in rules
     init_tidy_env = (initTidyOccEnv avoids, emptyVarEnv)
     avoids	  = [getOccName bndr | bndr <- bindersOfBinds binds_in,
 				       exportWithOrigOccName bndr]
+
+    mk_local_protos :: RuleBase -> [ProtoCoreRule]
+    mk_local_protos (rule_ids, _)
+      = [ProtoCoreRule True id rule | id <- varSetElems rule_ids,
+                                      rule <- rulesRules (idSpecialisation id)]
 
 tidyBind :: Maybe Module		-- (Just m) for top level, Nothing for nested
 	 -> TidyEnv

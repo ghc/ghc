@@ -21,7 +21,8 @@ import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..),
 import CoreLint		( beginPass, endPass )
 import CoreSyn
 import CSE		( cseProgram )
-import Rules		( RuleBase, ProtoCoreRule(..), pprProtoCoreRule, prepareRuleBase, orphanRule )
+import Rules		( RuleBase, ProtoCoreRule(..), pprProtoCoreRule, prepareLocalRuleBase,
+                          prepareOrphanRuleBase, unionRuleBase, localRule, orphanRule )
 import CoreUnfold
 import PprCore		( pprCoreBindings )
 import OccurAnal	( occurAnalyseBinds )
@@ -68,6 +69,7 @@ import IO		( hPutStr, stderr )
 import Outputable
 
 import Ratio 		( numerator, denominator )
+import List             ( partition )
 \end{code}
 
 %************************************************************************
@@ -79,8 +81,8 @@ import Ratio 		( numerator, denominator )
 \begin{code}
 core2core :: [CoreToDo]		-- Spec of what core-to-core passes to do
 	  -> [CoreBind]		-- Binds in
-	  -> [ProtoCoreRule]	-- Rules
-	  -> IO ([CoreBind], [ProtoCoreRule])
+	  -> [ProtoCoreRule]	-- Rules in
+	  -> IO ([CoreBind], RuleBase)  -- binds, local orphan rules out
 
 core2core core_todos binds rules
   = do
@@ -88,58 +90,83 @@ core2core core_todos binds rules
 	let (cp_us, us1)   = splitUniqSupply us
 	    (ru_us, ps_us) = splitUniqSupply us1
 
-        better_rules <- simplRules ru_us rules binds
+        let (local_rules, imported_rules) = partition localRule rules
 
-	let all_rules = builtinRules ++ better_rules
+        better_local_rules <- simplRules ru_us local_rules binds
+
+	let all_imported_rules = builtinRules ++ imported_rules
 	-- Here is where we add in the built-in rules
 
-	let (binds1, rule_base) = prepareRuleBase binds all_rules
+        let (binds1, local_rule_base) = prepareLocalRuleBase binds better_local_rules
+            imported_rule_base        = prepareOrphanRuleBase all_imported_rules
 
 	-- Do the main business
-	(stats, processed_binds) <- doCorePasses zeroSimplCount cp_us binds1 
-						 rule_base core_todos
+	(stats, processed_binds, processed_local_rules)
+            <- doCorePasses zeroSimplCount cp_us binds1 local_rule_base
+			    imported_rule_base Nothing core_todos
 
 	dumpIfSet opt_D_dump_simpl_stats
 		  "Grand total simplifier statistics"
 		  (pprSimplCount stats)
 
 	-- Return results
-	return (processed_binds, filter orphanRule better_rules)
-   
+        -- We only return local orphan rules, i.e., local rules not attached to an Id
+	return (processed_binds, processed_local_rules)
 
-doCorePasses stats us binds irs []
-  = return (stats, binds)
 
-doCorePasses stats us binds irs (to_do : to_dos) 
+doCorePasses :: SimplCount      -- simplifier stats
+             -> UniqSupply      -- uniques
+             -> [CoreBind]      -- local binds in (with rules attached)
+             -> RuleBase        -- local orphan rules
+             -> RuleBase        -- imported and builtin rules
+             -> Maybe RuleBase  -- combined rulebase, or Nothing to ask for it to be rebuilt
+             -> [CoreToDo]      -- which passes to do
+             -> IO (SimplCount, [CoreBind], RuleBase)  -- stats, binds, local orphan rules
+
+doCorePasses stats us binds lrb irb rb0 []
+  = return (stats, binds, lrb)
+
+doCorePasses stats us binds lrb irb rb0 (to_do : to_dos) 
   = do
-	let (us1, us2) =  splitUniqSupply us
-	(stats1, binds1) <- doCorePass us1 binds irs to_do
-	doCorePasses (stats `plusSimplCount` stats1) us2 binds1 irs to_dos
+	let (us1, us2) = splitUniqSupply us
 
-doCorePass us binds rb (CoreDoSimplify sw_chkr) = _scc_ "Simplify"      simplifyPgm rb sw_chkr us binds
-doCorePass us binds rb CoreCSE		        = _scc_ "CommonSubExpr" noStats (cseProgram binds)
-doCorePass us binds rb CoreLiberateCase	        = _scc_ "LiberateCase"  noStats (liberateCase binds)
-doCorePass us binds rb CoreDoFloatInwards       = _scc_ "FloatInwards"  noStats (floatInwards binds)
-doCorePass us binds rb (CoreDoFloatOutwards f)  = _scc_ "FloatOutwards" noStats (floatOutwards f us binds)
-doCorePass us binds rb CoreDoStaticArgs	        = _scc_ "StaticArgs"    noStats (doStaticArgs us binds)
-doCorePass us binds rb CoreDoStrictness	        = _scc_ "Stranal"       noStats (saBinds binds)
-doCorePass us binds rb CoreDoWorkerWrapper      = _scc_ "WorkWrap"      noStats (wwTopBinds us binds)
-doCorePass us binds rb CoreDoSpecialising       = _scc_ "Specialise"    noStats (specProgram us binds)
-doCorePass us binds rb CoreDoCPResult	        = _scc_ "CPResult"      noStats (cprAnalyse binds)
-doCorePass us binds rb CoreDoPrintCore	        = _scc_ "PrintCore"     noStats (printCore binds)
-doCorePass us binds rb CoreDoUSPInf
+        -- recompute rulebase if necessary
+        let rb         = maybe (irb `unionRuleBase` lrb) id rb0
+
+	(stats1, binds1, mlrb1) <- doCorePass us1 binds lrb rb to_do
+
+        -- request rulebase recomputation if pass returned a new local rulebase
+        let (lrb1,rb1) = maybe (lrb, Just rb) (\ lrb1 -> (lrb1, Nothing)) mlrb1
+
+	doCorePasses (stats `plusSimplCount` stats1) us2 binds1 lrb1 irb rb1 to_dos
+
+doCorePass us binds lrb rb (CoreDoSimplify sw_chkr) = _scc_ "Simplify"      simplifyPgm rb sw_chkr us binds
+doCorePass us binds lrb rb CoreCSE		    = _scc_ "CommonSubExpr" noStats (cseProgram binds)
+doCorePass us binds lrb rb CoreLiberateCase	    = _scc_ "LiberateCase"  noStats (liberateCase binds)
+doCorePass us binds lrb rb CoreDoFloatInwards       = _scc_ "FloatInwards"  noStats (floatInwards binds)
+doCorePass us binds lrb rb (CoreDoFloatOutwards f)  = _scc_ "FloatOutwards" noStats (floatOutwards f us binds)
+doCorePass us binds lrb rb CoreDoStaticArgs	    = _scc_ "StaticArgs"    noStats (doStaticArgs us binds)
+doCorePass us binds lrb rb CoreDoStrictness	    = _scc_ "Stranal"       noStats (saBinds binds)
+doCorePass us binds lrb rb CoreDoWorkerWrapper      = _scc_ "WorkWrap"      noStats (wwTopBinds us binds)
+doCorePass us binds lrb rb CoreDoSpecialising       = _scc_ "Specialise"    noStats (specProgram us binds)
+doCorePass us binds lrb rb CoreDoCPResult	    = _scc_ "CPResult"      noStats (cprAnalyse binds)
+doCorePass us binds lrb rb CoreDoPrintCore	    = _scc_ "PrintCore"     noStats (printCore binds)
+doCorePass us binds lrb rb CoreDoUSPInf
   = _scc_ "CoreUsageSPInf" 
     if opt_UsageSPOn then
-      noStats (doUsageSPInf us binds)
+      do
+         (binds1, rules1) <- doUsageSPInf us binds lrb
+         return (zeroSimplCount, binds1, rules1)
     else
       trace "WARNING: ignoring requested -fusagesp pass; requires -fusagesp-on" $
-      noStats (return binds)
+      return (zeroSimplCount, binds, Nothing)
 
 printCore binds = do dumpIfSet True "Print Core"
 			       (pprCoreBindings binds)
 		     return binds
 
-noStats thing = do { result <- thing; return (zeroSimplCount, result) }
+-- most passes return no stats and don't change rules
+noStats thing = do { binds <- thing; return (zeroSimplCount, binds, Nothing) }
 \end{code}
 
 
@@ -209,8 +236,8 @@ simpl_arg e
 simplifyPgm :: RuleBase
 	    -> (SimplifierSwitch -> SwitchResult)
 	    -> UniqSupply
-	    -> [CoreBind]				-- Input
-	    -> IO (SimplCount, [CoreBind])		-- New bindings
+	    -> [CoreBind]				    -- Input
+	    -> IO (SimplCount, [CoreBind], Maybe RuleBase)  -- New bindings
 
 simplifyPgm (imported_rule_ids, rule_lhs_fvs) 
 	    sw_chkr us binds
@@ -248,7 +275,7 @@ simplifyPgm (imported_rule_ids, rule_lhs_fvs)
 		(opt_D_verbose_core2core && not opt_D_dump_simpl_iterations)
 		binds' ;
 
-	return (counts_out, binds')
+	return (counts_out, binds', Nothing)
     }
   where
     max_iterations = getSimplIntSwitch sw_chkr MaxSimplifierIterations

@@ -1,4 +1,4 @@
-
+%
 % (c) The AQUA Project, Glasgow University, 1993-1998
 %
 \section[Simplify]{The main module of the simplifier}

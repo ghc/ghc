@@ -18,6 +18,7 @@ import UsageSPLint
 import UConSet
 
 import CoreSyn
+import Rules            ( RuleBase )
 import TypeRep          ( Type(..), TyNote(..) ) -- friend
 import Type             ( UsageAnn(..),
                           applyTy, applyTys,
@@ -90,9 +91,11 @@ monad.
 \begin{code}
 doUsageSPInf :: UniqSupply
              -> [CoreBind]
-             -> IO [CoreBind]
+             -> RuleBase
+             -> IO ([CoreBind], Maybe RuleBase)
 
-doUsageSPInf us binds = do
+doUsageSPInf us binds local_rules
+                      = do
                            let binds1      = doUnAnnotBinds binds
 
                            dumpIfSet opt_D_dump_usagesp "UsageSPInf unannot'd" $
@@ -118,7 +121,7 @@ doUsageSPInf us binds = do
                            dumpIfSet opt_D_dump_usagesp "UsageSPInf" $
                              pprCoreBindings binds3
 
-                           return binds3
+                           return (binds3, Nothing)
 \end{code}
 
 ======================================================================
