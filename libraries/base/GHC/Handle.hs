@@ -1511,26 +1511,37 @@ foreign import ccall unsafe "__hscore_setmode"
 -- -----------------------------------------------------------------------------
 -- Duplicating a Handle
 
--- |Returns a duplicate of the original handle, with its own buffer
--- and file pointer.  The original handle's buffer is flushed, including
--- discarding any input data, before the handle is duplicated.
+-- | Returns a duplicate of the original handle, with its own buffer.
+-- The two Handles will share a file pointer, however.  The original
+-- handle's buffer is flushed, including discarding any input data,
+-- before the handle is duplicated.
 
 hDuplicate :: Handle -> IO Handle
 hDuplicate h@(FileHandle path m) = do
-  new_h_ <- withHandle' "hDuplicate" h m (dupHandle_ Nothing)
+  new_h_ <- withHandle' "hDuplicate" h m (dupHandle Nothing)
   newFileHandle path (handleFinalizer path) new_h_
 hDuplicate h@(DuplexHandle path r w) = do
-  new_w_ <- withHandle' "hDuplicate" h w (dupHandle_ Nothing)
+  new_w_ <- withHandle' "hDuplicate" h w (dupHandle Nothing)
   new_w <- newMVar new_w_
-  new_r_ <- withHandle' "hDuplicate" h r (dupHandle_ (Just new_w))
+  new_r_ <- withHandle' "hDuplicate" h r (dupHandle (Just new_w))
   new_r <- newMVar new_r_
   addMVarFinalizer new_w (handleFinalizer path new_w)
   return (DuplexHandle path new_r new_w)
 
-dupHandle_ other_side h_ = do
+dupHandle other_side h_ = do
   -- flush the buffer first, so we don't have to copy its contents
   flushBuffer h_
-  new_fd <- c_dup (fromIntegral (haFD h_))
+  new_fd <- throwErrnoIfMinus1 "dupHandle" $ 
+		c_dup (fromIntegral (haFD h_))
+  dupHandle_ other_side h_ new_fd
+
+dupHandleTo other_side h_ hto_ = do
+  flushBuffer h_
+  new_fd <- throwErrnoIfMinus1 "dupHandleTo" $ 
+	        c_dup2 (fromIntegral (haFD hto_)) (fromIntegral (haFD h_))
+  dupHandle_ other_side h_ new_fd
+
+dupHandle_ other_side h_ new_fd = do
   buffer <- allocateBuffer dEFAULT_BUFFER_SIZE (initBufferState (haType h_))
   ioref <- newIORef buffer
   ioref_buffers <- newIORef BufferListNil
@@ -1558,14 +1569,14 @@ hDuplicateTo :: Handle -> Handle -> IO ()
 hDuplicateTo h1@(FileHandle _ m1) h2@(FileHandle _ m2)  = do
  withHandle__' "hDuplicateTo" h2 m2 $ \h2_ -> do
    _ <- hClose_help h2_
-   withHandle' "hDuplicateTo" h1 m1 (dupHandle_ Nothing)
+   withHandle' "hDuplicateTo" h1 m1 (dupHandleTo Nothing h2_)
 hDuplicateTo h1@(DuplexHandle _ r1 w1) h2@(DuplexHandle _ r2 w2)  = do
  withHandle__' "hDuplicateTo" h2 w2  $ \w2_ -> do
    _ <- hClose_help w2_
-   withHandle' "hDuplicateTo" h1 r1 (dupHandle_ Nothing)
+   withHandle' "hDuplicateTo" h1 r1 (dupHandleTo Nothing w2_)
  withHandle__' "hDuplicateTo" h2 r2  $ \r2_ -> do
    _ <- hClose_help r2_
-   withHandle' "hDuplicateTo" h1 r1 (dupHandle_ (Just w1))
+   withHandle' "hDuplicateTo" h1 r1 (dupHandleTo (Just w1) r2_)
 hDuplicateTo h1 _ =
    ioException (IOError (Just h1) IllegalOperation "hDuplicateTo" 
 		"handles are incompatible" Nothing)
