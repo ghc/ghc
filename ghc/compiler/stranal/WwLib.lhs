@@ -15,7 +15,7 @@ module WwLib (
 import Ubiq{-uitous-}
 
 import CoreSyn
-import Id		( idType, mkSysLocal )
+import Id		( idType, mkSysLocal, dataConArgTys )
 import IdInfo		( mkStrictnessInfo, nonAbsentArgs, Demand(..) )
 import PrelInfo		( aBSENT_ERROR_ID )
 import SrcLoc		( mkUnknownSrcLoc )
@@ -26,7 +26,6 @@ import UniqSupply	( returnUs, thenUs, thenMaybeUs,
 import Util		( zipWithEqual, assertPanic, panic )
 
 quantifyTy = panic "WwLib.quantifyTy"
-getInstantiatedDataConSig = panic "WwLib.getInstantiatedDataConSig"
 \end{code}
 
 %************************************************************************
@@ -327,8 +326,7 @@ mk_ww_arg_processing (arg : args) (WwUnpack cmpnt_infos : infos) max_extra_args
 			-- The main event: a single-constructor data type
 
 	    let
-		(_,inst_con_arg_tys,_)
-		  = getInstantiatedDataConSig data_con tycon_arg_tys
+		inst_con_arg_tys = dataConArgTys data_con tycon_arg_tys
 	    in
 	    getUniques (length inst_con_arg_tys)    `thenUs` \ uniqs ->
 

@@ -70,8 +70,19 @@ pc_bottoming_Id key mod name ty
 eRROR_ID
   = pc_bottoming_Id errorIdKey pRELUDE_BUILTIN SLIT("error") errorTy
 
+generic_ERROR_ID u n
+  = pc_bottoming_Id u pRELUDE_BUILTIN n errorTy
+
 pAT_ERROR_ID
-  = pc_bottoming_Id patErrorIdKey pRELUDE_BUILTIN SLIT("patError#") errorTy
+  = generic_ERROR_ID patErrorIdKey SLIT("patError#")
+rEC_CON_ERROR_ID
+  = generic_ERROR_ID recConErrorIdKey SLIT("recConError#")
+rEC_UPD_ERROR_ID
+  = generic_ERROR_ID recUpdErrorIdKey SLIT("recUpdError#")
+iRREFUT_PAT_ERROR_ID
+  = generic_ERROR_ID irrefutPatErrorIdKey SLIT("irrefutPatError#")
+nON_EXHAUSTIVE_GUARDS_ERROR_ID
+  = generic_ERROR_ID nonExhaustiveGuardsErrorIdKey SLIT("nonExhaustiveGuardsError#")
 
 aBSENT_ERROR_ID
   = pc_bottoming_Id absentErrorIdKey pRELUDE_BUILTIN SLIT("absent#")

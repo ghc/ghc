@@ -19,7 +19,7 @@ module Kind (
 import Ubiq{-uitous-}
 
 import Util		( panic )
-import Outputable	( Outputable(..) )
+--import Outputable	( Outputable(..) )
 import Pretty
 \end{code}
 

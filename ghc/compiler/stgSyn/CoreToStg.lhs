@@ -28,7 +28,7 @@ import Id		( mkSysLocal, idType, isBottomingId,
 			  IdEnv(..), GenId{-instance NamedThing-}
 			)
 import Literal		( mkMachInt, Literal(..) )
-import Outputable	( isExported )
+import Name		( isExported )
 import PrelInfo		( unpackCStringId, unpackCString2Id, stringTy,
 			  integerTy, rationalTy, ratioDataCon,
 			  integerZeroId, integerPlusOneId,

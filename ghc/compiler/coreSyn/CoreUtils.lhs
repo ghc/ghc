@@ -12,7 +12,7 @@ module CoreUtils (
 	substCoreExpr, substCoreBindings
 
 	, mkCoreIfThenElse
-	, mkErrorApp, escErrorMsg
+	, escErrorMsg -- ToDo: kill
 	, argToExpr
 	, unTagBinders, unTagBindersAlts
 	, manifestlyWHNF, manifestlyBottom
@@ -44,8 +44,7 @@ import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instances-} )
 import Pretty		( ppAboves )
 import PrelInfo		( trueDataCon, falseDataCon,
-			  augmentId, buildId,
-			  pAT_ERROR_ID
+			  augmentId, buildId
 			)
 import PrimOp		( primOpType, PrimOp(..) )
 import SrcLoc		( mkUnknownSrcLoc )
@@ -153,15 +152,20 @@ mkCoreIfThenElse guard then_expr else_expr
 \end{code}
 
 \begin{code}
-mkErrorApp :: Type -> Id -> String -> CoreExpr
+{- OLD:
+mkErrorApp :: Id -> Type -> Id -> String -> CoreExpr
 
-mkErrorApp ty str_var error_msg
+mkErrorApp err_fun ty str_var error_msg
   = Let (NonRec str_var (Lit (NoRepStr (_PK_ error_msg)))) (
-    mkApp (Var pAT_ERROR_ID) [] [ty] [VarArg str_var])
+    mkApp (Var err_fun) [] [ty] [VarArg str_var])
+-}
 
+escErrorMsg = panic "CoreUtils.escErrorMsg: To Die"
+{- OLD:
 escErrorMsg [] = []
 escErrorMsg ('%':xs) = '%' : '%' : escErrorMsg xs
 escErrorMsg (x:xs)   = x : escErrorMsg xs
+-}
 \end{code}
 
 For making @Apps@ and @Lets@, we must take appropriate evasive

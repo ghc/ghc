@@ -27,7 +27,6 @@ import DsUtils
 import Match		( matchWrapper )
 
 import CmdLineOpts	( opt_SccProfilingOn, opt_CompilingPrelude )
-import CoreUtils	( escErrorMsg )
 import CostCentre	( mkAllDictsCC, preludeDictsCostCentre )
 import Id		( idType, DictVar(..), GenId )
 import ListSetOps	( minusList, intersectLists )
@@ -472,23 +471,19 @@ dsMonoBinds is_rec tyvars dicts binder_subst (VarMonoBind var expr)
 
 \begin{code}
 dsMonoBinds is_rec tyvars dicts binder_subst (FunMonoBind fun matches locn)
-  = putSrcLocDs locn	(
+  = putSrcLocDs locn	$
     let
-	new_fun = binder_subst fun
+	new_fun      = binder_subst fun
+	error_string = "function " ++ showForErr fun
     in
-    matchWrapper (FunMatch fun) matches (error_msg new_fun) `thenDs` \ (args, body) ->
+    matchWrapper (FunMatch fun) matches error_string	`thenDs` \ (args, body) ->
     returnDs [(new_fun,
 	       mkLam tyvars (dicts ++ args) body)]
-    )
-  where
-    error_msg fun = "%F" -- "incomplete pattern(s) to match in function \""
-		++ (escErrorMsg (ppShow 80 (ppr PprForUser fun))) ++ "\""
 
 dsMonoBinds is_rec tyvars dicts binder_subst (PatMonoBind (VarPat v) grhss_and_binds locn)
-  = putSrcLocDs locn	(
-    dsGuarded grhss_and_binds locn `thenDs` \ body_expr ->
+  = putSrcLocDs locn	$
+    dsGuarded grhss_and_binds 		`thenDs` \ body_expr ->
     returnDs [(binder_subst v, mkLam tyvars dicts body_expr)]
-    )
 \end{code}
 
 %==============================================
@@ -531,9 +526,9 @@ Then we transform to:
 
 \begin{code}
 dsMonoBinds is_rec tyvars [] binder_subst (PatMonoBind pat grhss_and_binds locn)
-  = putSrcLocDs locn (
+  = putSrcLocDs locn $
 
-    dsGuarded grhss_and_binds locn `thenDs` \ body_expr ->
+    dsGuarded grhss_and_binds		`thenDs` \ body_expr ->
 
 {- KILLED by Sansom. 95/05
 	-- make *sure* there are no primitive types in the pattern
@@ -549,7 +544,6 @@ dsMonoBinds is_rec tyvars [] binder_subst (PatMonoBind pat grhss_and_binds locn)
     mkSelectorBinds tyvars pat
 	[(binder, binder_subst binder) | binder <- pat_binders]
 	body_expr
-    )
   where
     pat_binders = collectTypedPatBinders pat
 	-- NB For a simple tuple pattern, these binders

@@ -21,6 +21,7 @@ module TcHsSyn (
 	TypecheckedQual(..), TypecheckedStmt(..),
 	TypecheckedMatch(..), TypecheckedHsModule(..),
 	TypecheckedGRHSsAndBinds(..), TypecheckedGRHS(..),
+	TypecheckedRecordBinds(..),
 
 	mkHsTyApp, mkHsDictApp,
 	mkHsTyLam, mkHsDictLam,
@@ -95,6 +96,7 @@ type TypecheckedStmt		= Stmt		TyVar UVar Id TypecheckedPat
 type TypecheckedMatch		= Match		TyVar UVar Id TypecheckedPat
 type TypecheckedGRHSsAndBinds	= GRHSsAndBinds TyVar UVar Id TypecheckedPat
 type TypecheckedGRHS		= GRHS		TyVar UVar Id TypecheckedPat
+type TypecheckedRecordBinds	= HsRecordBinds TyVar UVar Id TypecheckedPat
 type TypecheckedHsModule	= HsModule	TyVar UVar Id TypecheckedPat
 \end{code}
 

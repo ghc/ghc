@@ -2,10 +2,11 @@
 
 interface HsLoop where
 
-import HsExpr( HsExpr )
-import Outputable( NamedThing, Outputable )
-import HsBinds ( Bind, HsBinds, MonoBinds, Sig, nullBinds, nullMonoBinds )
-import HsDecls ( ConDecl )
+import HsExpr	( HsExpr )
+import HsBinds	( Bind, HsBinds, MonoBinds, Sig, nullBinds, nullMonoBinds )
+import HsDecls	( ConDecl )
+import Name	( NamedThing )
+import Outputable ( Outputable )
 
 -- HsExpr outputs
 data HsExpr tyvar uvar id pat

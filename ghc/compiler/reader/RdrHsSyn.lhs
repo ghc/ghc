@@ -52,7 +52,7 @@ module RdrHsSyn (
 import Ubiq
 
 import HsSyn
-import Outputable	( ExportFlag(..) )
+import Name		( ExportFlag(..) )
 \end{code}
 
 \begin{code}

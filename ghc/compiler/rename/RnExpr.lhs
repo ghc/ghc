@@ -25,8 +25,7 @@ import RnHsSyn
 import RnMonad
 
 import ErrUtils		( addErrLoc )
-import Name		( isLocallyDefinedName, Name, RdrName )
-import Outputable	( pprOp )
+import Name		( isLocallyDefinedName, pprOp, Name, RdrName )
 import Pretty
 import UniqFM		( lookupUFM )
 import UniqSet		( emptyUniqSet, unitUniqSet,

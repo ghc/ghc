@@ -41,7 +41,7 @@ import CoreUtils	( escErrorMsg )
 import Id		( mkSuperDictSelId, mkMethodSelId, mkDefaultMethodId,
 			  idType )
 import IdInfo		( noIdInfo )
-import Outputable	( isLocallyDefined, getOrigName, getLocalName )
+import Name		( isLocallyDefined, getOrigName, getLocalName )
 import PrelVals		( pAT_ERROR_ID )
 import PprStyle
 import Pretty

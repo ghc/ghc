@@ -377,8 +377,8 @@ maybeBoxedPrimType :: Type -> Maybe (Id, Type)
 maybeBoxedPrimType ty
   = case (maybeAppDataTyCon ty) of		-- Data type,
       Just (tycon, tys_applied, [data_con]) 	-- with exactly one constructor
-        -> case (getInstantiatedDataConSig data_con tys_applied) of
-	     (_, [data_con_arg_ty], _)	    	-- Applied to exactly one type,
+        -> case (dataConArgTys data_con tys_applied) of
+	     [data_con_arg_ty]		    	-- Applied to exactly one type,
 	        | isPrimType data_con_arg_ty 	-- which is primitive
 	        -> Just (data_con, data_con_arg_ty)
 	     other_cases -> Nothing

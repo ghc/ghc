@@ -30,8 +30,7 @@ import ErrUtils		( addShortErrLocLine, addErrLoc )
 import FiniteMap	( FiniteMap, emptyFM, isEmptyFM,
 			  lookupFM, addListToFM, addToFM )
 import Maybes		( maybeToBool )
-import Name		( RdrName(..), isQual )
-import Outputable	( pprNonOp, getLocalName )
+import Name		( RdrName(..), isQual, pprNonOp, getLocalName )
 import PprStyle		( PprStyle(..) )
 import Pretty
 import RnHsSyn		( RnName )

@@ -44,8 +44,8 @@ import Ubiq{-uitous-}
 import CostCentre	( showCostCentre )
 import Id		( idPrimRep, GenId{-instance NamedThing-} )
 import Literal		( literalPrimRep, isLitLitLit, Literal{-instance Outputable-} )
-import Outputable	( isExported, isOpLexeme, ifPprDebug,
-			  interppSP, interpp'SP,
+import Name		( isExported, isOpLexeme )
+import Outputable	( ifPprDebug, interppSP, interpp'SP,
 			  Outputable(..){-instance * Bool-}
 			)
 import PprStyle		( PprStyle(..) )

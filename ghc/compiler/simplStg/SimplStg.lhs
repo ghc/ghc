@@ -14,7 +14,7 @@ import StgSyn
 import StgUtils
 
 import LambdaLift	( liftProgram )
-import Outputable	( isLocallyDefined )
+import Name		( isLocallyDefined )
 import SCCfinal		( stgMassageForProfiling )
 import SatStgRhs	( satStgRhs )
 import StgLint		( lintStgBindings )
@@ -33,7 +33,7 @@ import Id		( nullIdEnv, lookupIdEnv, addOneToIdEnv,
 			)
 import MainMonad	( writeMn, thenMn_, thenMn, returnMn, MainIO(..) )
 import Maybes		( maybeToBool )
-import Outputable	( isExported )
+import Name		( isExported )
 import PprType		( GenType{-instance Outputable-} )
 import Pretty		( ppShow, ppAbove, ppAboves, ppStr )
 import UniqSupply	( splitUniqSupply )

@@ -35,8 +35,8 @@ module Id {- (
 	idPrimRep, getInstIdModule,
 	getMentionedTyConsAndClassesFromId,
 
-	dataConTag,
-	dataConSig, getInstantiatedDataConSig,
+	dataConTag, dataConStrictMarks,
+	dataConSig, dataConArgTys,
 	dataConTyCon, dataConArity,
 	dataConFieldLabels,
 
@@ -104,14 +104,13 @@ import Maybes		( maybeToBool )
 import Name		( appendRdr, nameUnique, mkLocalName, isLocalName,
 			  isLocallyDefinedName, isPreludeDefinedName,
 			  nameOrigName,
+			  isAvarop, isAconop, getLocalName,
+			  isLocallyDefined, isPreludeDefined,
+			  getOrigName, getOccName,
+			  isExported, ExportFlag(..),
 			  RdrName(..), Name
 			)
 import FieldLabel	( fieldLabelName, FieldLabel{-instances-} )
-import Outputable	( isAvarop, isAconop, getLocalName,
-			  isLocallyDefined, isPreludeDefined,
-			  getOrigName, getOccName,
-			  isExported, ExportFlag(..)
-			)
 import PragmaInfo	( PragmaInfo(..) )
 import PrelMods		( pRELUDE_BUILTIN )
 import PprType		( getTypeString, typeMaybeString, specMaybeTysSuffix,
@@ -133,7 +132,7 @@ import UniqSupply	( getBuiltinUniques )
 import Unique		( mkTupleDataConUnique, pprUnique, showUnique,
 			  Unique{-instance Ord3-}
 			)
-import Util		( mapAccumL, nOfThem,
+import Util		( mapAccumL, nOfThem, zipEqual,
 			  panic, panic#, pprPanic, assertPanic
 			)
 \end{code}
@@ -1379,7 +1378,7 @@ mkDataCon n stricts fields tvs ctxt args_tys tycon
       = let
 	    (inst_env, tyvars, tyvar_tys)
 	      = instantiateTyVarTemplates tvs
-					  (map getItsUnique tvs)
+					  (map uniqueOf tvs)
 	in
 	    -- the "context" and "arg_tys" have TyVarTemplates in them, so
 	    -- we instantiate those types to have the right TyVars in them
@@ -1446,7 +1445,7 @@ mkTupleCon arity
 	BEND
       where
 	tyvar_tmpls	= take arity alphaTyVars
-	(_, tyvars, tyvar_tys) = instantiateTyVarTemplates tyvar_tmpls (map getItsUnique tyvar_tmpls)
+	(_, tyvars, tyvar_tys) = instantiateTyVarTemplates tyvar_tmpls (map uniqueOf tyvar_tmpls)
 -}
 
 fIRST_TAG :: ConTag
@@ -1477,6 +1476,21 @@ dataConSig (Id _ _ (TupleConId _ arity) _ _)
 
 dataConFieldLabels :: DataCon -> [FieldLabel]
 dataConFieldLabels (Id _ _ (DataConId _ _ _ fields _ _ _ _) _ _) = fields
+dataConFieldLabels (Id _ _ (TupleConId _ _)		    _ _) = []
+
+dataConStrictMarks :: DataCon -> [StrictnessMark]
+dataConStrictMarks (Id _ _ (DataConId _ _ stricts _ _ _ _ _) _ _) = stricts
+dataConStrictMarks (Id _ _ (TupleConId _ arity)		     _ _) 
+  = take arity (repeat NotMarkedStrict)
+
+dataConArgTys :: DataCon 
+	      -> [Type] 	-- Instantiated at these types
+	      -> [Type]		-- Needs arguments of these types
+dataConArgTys con_id inst_tys
+ = map (instantiateTy tenv) arg_tys
+ where
+    (tyvars, _, arg_tys, _) = dataConSig con_id
+    tenv 		    = tyvars `zipEqual` inst_tys
 \end{code}
 
 \begin{code}
@@ -1493,62 +1507,6 @@ recordSelectorFieldLabel :: Id -> FieldLabel
 recordSelectorFieldLabel (Id _ _ (RecordSelId lbl) _ _) = lbl
 \end{code}
 
-{- LATER
-dataConTyCon	(Id _ _ _ (SpecId unspec tys _))
-  = mkSpecTyCon (dataConTyCon unspec) tys
-
-dataConSig (Id _ _ _ (SpecId unspec ty_maybes _))
-  = (spec_tyvars, spec_theta_ty, spec_arg_tys, spec_tycon)
-  where
-    (tyvars, theta_ty, arg_tys, tycon) = dataConSig unspec
-
-    ty_env = tyvars `zip` ty_maybes
-
-    spec_tyvars = foldr nothing_tyvars [] ty_env
-    nothing_tyvars (tyvar, Nothing) l = tyvar : l
-    nothing_tyvars (tyvar, Just ty) l = l
-
-    spec_env = foldr just_env [] ty_env
-    just_env (tyvar, Nothing) l = l
-    just_env (tyvar, Just ty) l = (tyvar, ty) : l
-    spec_arg_tys = map (instantiateTauTy spec_env) arg_tys
-
-    spec_theta_ty = if null theta_ty then []
-		    else panic "dataConSig:ThetaTy:SpecDataCon"
-    spec_tycon    = mkSpecTyCon tycon ty_maybes
--}
-\end{code}
-
-\begin{pseudocode}
-@getInstantiatedDataConSig@ takes a constructor and some types to which
-it is applied; it returns its signature instantiated to these types.
-
-\begin{code}
-getInstantiatedDataConSig ::
-	   DataCon	-- The data constructor
-			--   Not a specialised data constructor
-	-> [TauType]	-- Types to which applied
-			--   Must be fully applied i.e. contain all types of tycon
-	-> ([TauType],	-- Types of dict args
-	    [TauType],	-- Types of regular args
-	    TauType	-- Type of result
-	   )
-
-getInstantiatedDataConSig data_con inst_tys
-  = ASSERT(isDataCon data_con)
-    let
-	(tvs, theta, arg_tys, tycon) = dataConSig data_con
-
-	inst_env = ASSERT(length tvs == length inst_tys)
-		   tvs `zip` inst_tys
-
-	theta_tys = [ instantiateTy inst_env (mkDictTy c t) | (c,t) <- theta ]
-	cmpnt_tys = [ instantiateTy inst_env arg_ty | arg_ty <- arg_tys ]
-	result_ty = instantiateTy inst_env (applyTyCon tycon inst_tys)
-    in
-    -- Are the first/third results ever used?
-    (theta_tys, cmpnt_tys, result_ty)
-\end{code}
 
 Data type declarations are of the form:
 \begin{verbatim}

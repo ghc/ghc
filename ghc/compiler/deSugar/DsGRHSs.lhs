@@ -21,8 +21,8 @@ import CoreSyn		( CoreBinding(..), CoreExpr(..), mkCoLetsAny )
 import DsMonad
 import DsUtils
 
-import CoreUtils	( escErrorMsg, mkErrorApp, mkCoreIfThenElse )
-import PrelInfo		( stringTy )
+import CoreUtils	( mkCoreIfThenElse )
+import PrelInfo		( stringTy, nON_EXHAUSTIVE_GUARDS_ERROR_ID )
 import PprStyle		( PprStyle(..) )
 import Pretty		( ppShow )
 import SrcLoc		( SrcLoc{-instance-} )
@@ -42,23 +42,15 @@ necessary.  The type argument gives the type of the ei.
 
 \begin{code}
 dsGuarded :: TypecheckedGRHSsAndBinds
-	  -> SrcLoc
 	  -> DsM CoreExpr
 
-dsGuarded (GRHSsAndBindsOut grhss binds err_ty) err_loc
+dsGuarded (GRHSsAndBindsOut grhss binds err_ty)
   = dsBinds binds				`thenDs` \ core_binds ->
     dsGRHSs err_ty PatBindMatch [] grhss 	`thenDs` \ (MatchResult can_it_fail _ core_grhss_fn _) ->
     case can_it_fail of
 	CantFail -> returnDs (mkCoLetsAny core_binds (core_grhss_fn (panic "It can't fail")))
-	CanFail  -> newSysLocalDs stringTy	`thenDs` \ str_var -> -- to hold the String
-		    returnDs (mkCoLetsAny core_binds (core_grhss_fn (error_expr str_var)))
-  where
-    unencoded_part_of_msg = escErrorMsg (ppShow 80 (ppr PprForUser err_loc))
-
-    error_expr :: Id -> CoreExpr
-    error_expr str_var = mkErrorApp err_ty str_var
-			  (unencoded_part_of_msg
-			  ++ "%N") --> ": non-exhaustive guards"
+	CanFail  -> mkErrorAppDs nON_EXHAUSTIVE_GUARDS_ERROR_ID err_ty "" `thenDs` \ error_expr ->
+		    returnDs (mkCoLetsAny core_binds (core_grhss_fn error_expr))
 \end{code}
 
 Desugar a list of (grhs, expr) pairs [grhs = guarded

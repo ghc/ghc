@@ -40,7 +40,7 @@ import Id		( dataConTag, dataConSig,
 			  emptyIdSet,
 			  GenId{-instance NamedThing-}
 			)
-import Outputable	( getLocalName )
+import Name		( getLocalName )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
 import TyCon		( tyConDataCons, mkSpecTyCon )
 import Type		( typePrimRep )

@@ -23,9 +23,9 @@ import CmdLineOpts	( opt_AutoSccsOnAllToplevs,
 			  opt_SccGroup
 			)
 import CoreSyn
-import Id		( isTopLevId, GenId{-instances-} )
-import Outputable	( isExported )
 import CostCentre	( mkAutoCC, IsCafCC(..) )
+import Id		( isTopLevId, GenId{-instances-} )
+import Name		( isExported )
 \end{code}
 
 \begin{code}

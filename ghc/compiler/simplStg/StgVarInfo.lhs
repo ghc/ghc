@@ -25,7 +25,7 @@ import Id		( emptyIdSet, mkIdSet, minusIdSet,
 			  GenId{-instance Eq-}
 			)
 import Maybes		( maybeToBool )
-import Outputable	( isLocallyDefined )
+import Name		( isLocallyDefined )
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instance Outputable-} )
 import Util		( panic, pprPanic, assertPanic )

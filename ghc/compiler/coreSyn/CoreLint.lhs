@@ -19,12 +19,11 @@ import Bag
 import Kind		( Kind{-instance-} )
 import Literal		( literalType, Literal{-instance-} )
 import Id		( idType, isBottomingId,
-			  getInstantiatedDataConSig, GenId{-instances-}
+			  dataConArgTys, GenId{-instances-}
 			)
 import Maybes		( catMaybes )
-import Outputable	( isLocallyDefined, getSrcLoc,
-			  Outputable(..){-instance * []-}
-			)
+import Name		( isLocallyDefined, getSrcLoc )
+import Outputable	( Outputable(..){-instance * []-} )
 import PprCore
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType, GenTyVar, TyCon )
@@ -344,7 +343,7 @@ lintAlgAlt scrut_ty tycon{-ToDo: use it!-} (con,args,rhs)
 	 addErrL (mkAlgAltMsg1 scrut_ty)
       Just (tycon, tys_applied, cons) ->
 	 let
-	   (_, arg_tys, _) = getInstantiatedDataConSig con tys_applied
+	   arg_tys = dataConArgTys con tys_applied
 	 in
 	 checkL (con `elem` cons) (mkAlgAltMsg2 scrut_ty con) `seqL`
 	 checkL (length arg_tys == length args) (mkAlgAltMsg3 con args)

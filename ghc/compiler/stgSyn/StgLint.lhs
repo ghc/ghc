@@ -13,7 +13,7 @@ import Ubiq{-uitous-}
 import StgSyn
 
 import Bag		( emptyBag, isEmptyBag, snocBag, foldBag )
-import Id		( idType, isDataCon,
+import Id		( idType, isDataCon, dataConArgTys,
 			  emptyIdSet, isEmptyIdSet, elementOfIdSet,
 			  mkIdSet, intersectIdSets,
 			  unionIdSets, idSetToList, IdSet(..),
@@ -21,9 +21,8 @@ import Id		( idType, isDataCon,
 			)
 import Literal		( literalType, Literal{-instance Outputable-} )
 import Maybes		( catMaybes )
-import Outputable	( Outputable(..){-instance * []-},
-			  isLocallyDefined, getSrcLoc
-			)
+import Name		( isLocallyDefined, getSrcLoc )
+import Outputable	( Outputable(..){-instance * []-} )
 import PprType		( GenType{-instance Outputable-}, TyCon )
 import Pretty		-- quite a bit of it
 import PrimOp		( primOpType )
@@ -35,7 +34,6 @@ import Util		( zipEqual, pprPanic, panic, panic# )
 
 infixr 9 `thenL`, `thenL_`, `thenMaybeL`, `thenMaybeL_`
 
-getInstantiatedDataConSig = panic "StgLint.getInstantiatedDataConSig (ToDo)"
 splitTypeWithDictsAsArgs = panic "StgLint.splitTypeWithDictsAsArgs (ToDo)"
 unDictifyTy = panic "StgLint.unDictifyTy (ToDo)"
 \end{code}
@@ -228,7 +226,7 @@ lintAlgAlt scrut_ty (con, args, _, rhs)
 	 addErrL (mkAlgAltMsg1 scrut_ty)
       Just (tycon, tys_applied, cons) ->
 	 let
-	   (_, arg_tys, _) = getInstantiatedDataConSig con tys_applied
+	   arg_tys = dataConArgTys con tys_applied
 	 in
 	 checkL (con `elem` cons) (mkAlgAltMsg2 scrut_ty con) `thenL_`
 	 checkL (length arg_tys == length args) (mkAlgAltMsg3 con args)

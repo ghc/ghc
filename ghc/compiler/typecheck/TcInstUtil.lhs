@@ -30,7 +30,7 @@ import CoreSyn		( GenCoreExpr(..), mkValLam, mkTyApp )
 import Id		( GenId, mkDictFunId, mkConstMethodId, mkSysLocal )
 import MatchEnv		( nullMEnv, insertMEnv )
 import Maybes		( MaybeErr(..), mkLookupFunDef )
-import Outputable	( getSrcLoc )
+import Name		( getSrcLoc )
 import PprType		( GenClass, GenType, GenTyVar )
 import Pretty
 import SpecEnv		( SpecEnv(..), nullSpecEnv, addOneToSpecEnv )

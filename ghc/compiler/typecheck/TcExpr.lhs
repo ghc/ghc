@@ -30,21 +30,20 @@ import Inst		( Inst, InstOrigin(..), OverloadedLit(..),
 			  newMethod, newMethodWithGivenTy, newDicts )
 import TcBinds		( tcBindsAndThen )
 import TcEnv		( tcLookupLocalValue, tcLookupGlobalValue, tcLookupClassByKey,
-			  tcLookupGlobalValueByKey, newMonoIds, tcGetGlobalTyVars,
-			  tcGlobalOcc
+			  tcLookupGlobalValueByKey, newMonoIds, tcGetGlobalTyVars
 			)
 import TcMatches	( tcMatchesCase, tcMatch )
 import TcMonoType	( tcPolyType )
 import TcPat		( tcPat )
 import TcSimplify	( tcSimplifyAndCheck, tcSimplifyRank2 )
 import TcType		( TcType(..), TcMaybe(..),
-			  tcInstType, tcInstTcType, tcInstTyVars,
+			  tcInstId, tcInstType, tcInstTheta, tcInstTcType, tcInstTyVars,
 			  newTyVarTy, zonkTcTyVars, zonkTcType )
 import TcKind		( TcKind )
 
 import Class		( Class(..), getClassSig )
 import FieldLabel	( fieldLabelName )
-import Id		( Id(..), GenId, idType, dataConFieldLabels )
+import Id		( Id(..), GenId, idType, dataConFieldLabels, dataConSig )
 import Kind		( Kind, mkBoxedTypeKind, mkTypeKind, mkArrowKind )
 import GenSpecEtc	( checkSigTyVars, checkSigTyVarsGivenGlobals )
 import Name		( Name{-instance Eq-} )
@@ -56,7 +55,7 @@ import Type		( mkFunTy, mkAppTy, mkTyVarTy, mkTyVarTys,
 			  getTyVar_maybe, getFunTy_maybe,
 			  splitForAllTy, splitRhoTy, splitSigmaTy, splitFunTy,
 			  isTauTy, mkFunTys, tyVarsOfType, getForAllTy_maybe,
-			  maybeAppDataTyCon
+			  getAppDataTyCon, maybeAppDataTyCon
 			)
 import TyVar		( GenTyVar, TyVarSet(..), unionTyVarSets, mkTyVarSet )
 import Unify		( unifyTauTy, unifyTauTyList, unifyTauTyLists, unifyFunTy )
@@ -85,7 +84,7 @@ tcExpr :: RenamedHsExpr -> TcM s (TcExpr s, LIE s, TcType s)
 
 \begin{code}
 tcExpr (HsVar name)
-  = tcId name		`thenTc` \ (expr', lie, res_ty) ->
+  = tcId name		`thenNF_Tc` \ (expr', lie, res_ty) ->
 
     -- Check that the result type doesn't have any nested for-alls.
     -- For example, a "build" on its own is no good; it must be
@@ -356,40 +355,55 @@ tcExpr (ExplicitTuple exprs)
     returnTc (ExplicitTuple exprs', lie, mkTupleTy (length tys) tys)
 
 tcExpr (RecordCon (HsVar con) rbinds)
-  = tcGlobalOcc con		`thenNF_Tc` \ (con_id, arg_tys, con_rho) ->
+  = tcId con				`thenNF_Tc` \ (con_expr, con_lie, con_tau) ->
     let
-	(con_theta, con_tau) = splitRhoTy con_rho
 	(_, record_ty)       = splitFunTy con_tau
-	con_expr	     = mkHsTyApp (HsVar (RealId con_id)) arg_tys
     in
-	-- TEMPORARY ASSERT
-    ASSERT( null con_theta )
-
 	-- Con is syntactically constrained to be a data constructor
     ASSERT( maybeToBool (maybeAppDataTyCon record_ty ) )
 
     tcRecordBinds record_ty rbinds		`thenTc` \ (rbinds', rbinds_lie) ->
 
+	-- Check that the record bindings match the constructor
+    tcLookupGlobalValue con			`thenNF_Tc` \ con_id ->
     checkTc (checkRecordFields rbinds con_id)
 	    (badFieldsCon con rbinds)		`thenTc_`
 
-    returnTc (RecordCon con_expr rbinds', panic "tcExpr:RecordCon:con_lie???" {-con_lie???-} `plusLIE` rbinds_lie, record_ty)
+    returnTc (RecordCon con_expr rbinds', con_lie `plusLIE` rbinds_lie, record_ty)
+
+-- One small complication in RecordUpd is that we have to generate some 
+-- dictionaries for the data type context, since we are going to
+-- do some construction.
+--
+-- What dictionaries do we need?  For the moment we assume that all
+-- data constructors have the same context, and grab it from the first
+-- constructor.  If they have varying contexts then we'd have to 
+-- union the ones that could participate in the update.
 
 tcExpr (RecordUpd record_expr rbinds)
-  = tcExpr record_expr			`thenTc` \ (record_expr', record_lie, record_ty) ->
+  = ASSERT( not (null rbinds) )
+    tcAddErrCtxt recordUpdCtxt			$
+
+    tcExpr record_expr			`thenTc` \ (record_expr', record_lie, record_ty) ->
     tcRecordBinds record_ty rbinds	`thenTc` \ (rbinds', rbinds_lie) ->
 
 	-- Check that the field names are plausible
     zonkTcType record_ty		`thenNF_Tc` \ record_ty' ->
     let
-	maybe_tycon_stuff = maybeAppDataTyCon record_ty'
-	Just (tycon, args_tys, data_cons) = maybe_tycon_stuff
+	(tycon, inst_tys, data_cons) = getAppDataTyCon record_ty'
+	-- The record binds are non-empty (syntax); so at least one field
+	-- label will have been unified with record_ty by tcRecordBinds;
+	-- field labels must be of data type; hencd the getAppDataTyCon must succeed.
+	(tyvars, theta, _, _) = dataConSig (head data_cons)
     in
-    checkTc (maybeToBool maybe_tycon_stuff)
-	    (panic "TcExpr:Records:mystery error message") `thenTc_`
+    tcInstTheta (tyvars `zipEqual` inst_tys) theta	`thenNF_Tc` \ theta' ->
+    newDicts RecordUpdOrigin theta'			`thenNF_Tc` \ (con_lie, dicts) ->
     checkTc (any (checkRecordFields rbinds) data_cons)
 	    (badFieldsUpd rbinds)		`thenTc_`
-    returnTc (RecordUpd record_expr' rbinds', record_lie `plusLIE` rbinds_lie, record_ty)
+
+    returnTc (RecordUpdOut record_expr' dicts rbinds', 
+	      con_lie `plusLIE` record_lie `plusLIE` rbinds_lie, 
+	      record_ty)
 
 tcExpr (ArithSeqIn seq@(From expr))
   = tcExpr expr					`thenTc`    \ (expr', lie1, ty) ->
@@ -505,7 +519,7 @@ tcApp fun args
 	-- In the HsVar case we go straight to tcId to avoid hitting the
 	-- rank-2 check, which we check later here anyway
     (case fun of
-	HsVar name -> tcId name
+	HsVar name -> tcId name	`thenNF_Tc` \ stuff -> returnTc stuff
 	other	   -> tcExpr fun
     )					`thenTc` \ (fun', lie_fun, fun_ty) ->
 
@@ -623,7 +637,7 @@ tcArg expected_arg_ty arg
 %************************************************************************
 
 \begin{code}
-tcId :: RnName -> TcM s (TcExpr s, LIE s, TcType s)
+tcId :: RnName -> NF_TcM s (TcExpr s, LIE s, TcType s)
 
 tcId name
   = 	-- Look up the Id and instantiate its type
@@ -637,20 +651,25 @@ tcId name
 		      tcInstTcType tenv rho		`thenNF_Tc` \ rho' ->
 		      returnNF_Tc (TcId tc_id, arg_tys', rho')
 
-	Nothing ->    tcGlobalOcc name			`thenNF_Tc` \ (id, arg_tys, rho) ->
-		      returnNF_Tc (RealId id, arg_tys, rho)
+	Nothing ->    tcLookupGlobalValue name	`thenNF_Tc` \ id ->
+		      let
+			(tyvars, rho) = splitForAllTy (idType id)
+		      in
+		      tcInstTyVars tyvars		`thenNF_Tc` \ (tyvars', arg_tys, tenv) ->
+		      tcInstType tenv rho		`thenNF_Tc` \ rho' ->
+		      returnNF_Tc (RealId id, arg_tys, rho')
 
     )					`thenNF_Tc` \ (tc_id_occ, arg_tys, rho) ->
 
 	-- Is it overloaded?
     case splitRhoTy rho of
       ([], tau)    -> 	-- Not overloaded, so just make a type application
-		    	returnTc (mkHsTyApp (HsVar tc_id_occ) arg_tys, emptyLIE, tau)
+		    	returnNF_Tc (mkHsTyApp (HsVar tc_id_occ) arg_tys, emptyLIE, tau)
 
       (theta, tau) ->	-- Overloaded, so make a Method inst
 			newMethodWithGivenTy (OccurrenceOf tc_id_occ)
 				tc_id_occ arg_tys rho		`thenNF_Tc` \ (lie, meth_id) ->
-			returnTc (HsVar meth_id, lie, tau)
+			returnNF_Tc (HsVar meth_id, lie, tau)
 \end{code}
 
 
@@ -808,7 +827,8 @@ tcRecordBinds expected_record_ty rbinds
     returnTc (rbinds', plusLIEs lies)
   where
     do_bind (field_label, rhs, pun_flag)
-      = tcGlobalOcc field_label		`thenNF_Tc` \ (sel_id, _, tau) ->
+      = tcLookupGlobalValue field_label	`thenNF_Tc` \ sel_id ->
+	tcInstId sel_id			`thenNF_Tc` \ (_, _, tau) ->
 
 		-- Record selectors all have type
 		-- 	forall a1..an.  T a1 .. an -> tau
@@ -918,10 +938,12 @@ rank2ArgCtxt arg expected_arg_ty sty
 		   ppr sty expected_arg_ty])
 
 badFieldsUpd rbinds sty
-  = ppHang (ppStr "In a record update construct, no constructor has all these fields:")
+  = ppHang (ppStr "No constructor has all these fields:")
 	 4 (interpp'SP sty fields)
   where
     fields = [field | (field, _, _) <- rbinds]
+
+recordUpdCtxt sty = ppStr "In a record update construct"
 
 badFieldsCon con rbinds sty
   = ppHang (ppBesides [ppStr "Inconsistent constructor:", ppr sty con])

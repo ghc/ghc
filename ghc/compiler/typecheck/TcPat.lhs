@@ -22,8 +22,8 @@ import Inst		( Inst, OverloadedLit(..), InstOrigin(..),
 			  newMethod, newOverloadedLit
 			)
 import TcEnv		( tcLookupGlobalValue, tcLookupGlobalValueByKey, 
-			  tcLookupLocalValueOK, tcGlobalOcc )
-import TcType 		( TcType(..), TcMaybe, tcInstType, newTyVarTy, newTyVarTys )
+			  tcLookupLocalValueOK )
+import TcType 		( TcType(..), TcMaybe, tcInstType, newTyVarTy, newTyVarTys, tcInstId )
 import Unify 		( unifyTauTy, unifyTauTyList, unifyTauTyLists )
 
 import Bag		( Bag )
@@ -181,9 +181,9 @@ tcPat pat_in@(ConOpPatIn pat1 op pat2) -- & in binary-op form...
 
 \begin{code}
 tcPat pat_in@(RecPatIn name rpats)
-  = tcGlobalOcc name		`thenNF_Tc` \ (con_id, _, con_rho) ->
+  = tcLookupGlobalValue name		`thenNF_Tc` \ con_id ->
+    tcInstId con_id			`thenNF_Tc` \ (_, _, con_tau) ->
     let
-	(_, con_tau) = splitRhoTy con_rho
 	     -- Ignore the con_theta; overloaded constructors only
 	     -- behave differently when called, not when used for
 	     -- matching.
@@ -200,7 +200,8 @@ tcPat pat_in@(RecPatIn name rpats)
 
   where
     do_bind expected_record_ty (field_label, rhs_pat, pun_flag)
-      = tcGlobalOcc field_label		`thenNF_Tc` \ (sel_id, _, tau) ->
+      = tcLookupGlobalValue field_label		`thenNF_Tc` \ sel_id ->
+	tcInstId sel_id				`thenNF_Tc` \ (_, _, tau) ->
 
 		-- Record selectors all have type
 		-- 	forall a1..an.  T a1 .. an -> tau
@@ -316,13 +317,12 @@ unifies the actual args against the expected ones.
 matchConArgTys :: RnName -> [TcType s] -> TcM s (Id, TcType s)
 
 matchConArgTys con arg_tys
-  = tcGlobalOcc con		`thenNF_Tc` \ (con_id, _, con_rho) ->
-    let
-	(con_theta, con_tau) = splitRhoTy con_rho
+  = tcLookupGlobalValue con		`thenNF_Tc` \ con_id ->
+    tcInstId con_id			`thenNF_Tc` \ (_, _, con_tau) ->
 	     -- Ignore the con_theta; overloaded constructors only
 	     -- behave differently when called, not when used for
 	     -- matching.
-
+    let
 	(con_args, con_result) = splitFunTy con_tau
 	con_arity  = length con_args
 	no_of_args = length arg_tys

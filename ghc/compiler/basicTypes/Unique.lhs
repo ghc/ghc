@@ -21,7 +21,7 @@ Haskell).
 --<mkdependHS:friends> UniqSupply
 
 module Unique (
-	Unique, Uniquable(..),
+	Unique,
 	u2i,				-- hack: used in UniqFM
 
 	pprUnique, pprUnique10, showUnique,
@@ -54,6 +54,7 @@ module Unique (
 	charPrimTyConKey,
 	charTyConKey,
 	consDataConKey,
+	dataClassKey,
 	doubleDataConKey,
 	doublePrimTyConKey,
 	doubleTyConKey,
@@ -114,6 +115,10 @@ module Unique (
 	parErrorIdKey,
 	parIdKey,
 	patErrorIdKey,
+	recConErrorIdKey,
+	recUpdErrorIdKey,
+	irrefutPatErrorIdKey,
+	nonExhaustiveGuardsErrorIdKey,
 	primIoTyConKey,
 	ratioDataConKey,
 	ratioTyConKey,
@@ -290,9 +295,6 @@ instance Ord3 Unique where
     cmp = cmpUnique
 
 -----------------
-class Uniquable a where
-    uniqueOf :: a -> Unique
-
 instance Uniquable Unique where
     uniqueOf u = u
 \end{code}
@@ -415,6 +417,7 @@ monadZeroClassKey	= mkPreludeClassUnique 15
 binaryClassKey		= mkPreludeClassUnique 16
 cCallableClassKey	= mkPreludeClassUnique 17	
 cReturnableClassKey	= mkPreludeClassUnique 18
+dataClassKey		= mkPreludeClassUnique 19
 \end{code}
 
 %************************************************************************
@@ -531,40 +534,44 @@ wordDataConKey				= mkPreludeDataConUnique 41
 %************************************************************************
 
 \begin{code}
-absentErrorIdKey	= mkPreludeMiscIdUnique	 1
-appendIdKey 		= mkPreludeMiscIdUnique  2
-augmentIdKey		= mkPreludeMiscIdUnique	 3
-buildIdKey		= mkPreludeMiscIdUnique	 4
-errorIdKey		= mkPreludeMiscIdUnique	 5
-foldlIdKey		= mkPreludeMiscIdUnique	 6
-foldrIdKey		= mkPreludeMiscIdUnique	 7
-forkIdKey   	    	= mkPreludeMiscIdUnique  8
-int2IntegerIdKey	= mkPreludeMiscIdUnique	 9
-integerMinusOneIdKey	= mkPreludeMiscIdUnique	10
-integerPlusOneIdKey	= mkPreludeMiscIdUnique	11
-integerPlusTwoIdKey	= mkPreludeMiscIdUnique	12
-integerZeroIdKey	= mkPreludeMiscIdUnique	13
-packCStringIdKey	= mkPreludeMiscIdUnique	14
-parErrorIdKey		= mkPreludeMiscIdUnique	15
-parIdKey		= mkPreludeMiscIdUnique	16
-patErrorIdKey		= mkPreludeMiscIdUnique	17
-realWorldPrimIdKey	= mkPreludeMiscIdUnique 18
-runSTIdKey		= mkPreludeMiscIdUnique 19
-seqIdKey		= mkPreludeMiscIdUnique 20
-traceIdKey		= mkPreludeMiscIdUnique	21
-unpackCString2IdKey	= mkPreludeMiscIdUnique	22
-unpackCStringAppendIdKey= mkPreludeMiscIdUnique	23
-unpackCStringFoldrIdKey	= mkPreludeMiscIdUnique 24
-unpackCStringIdKey	= mkPreludeMiscIdUnique	25
-voidPrimIdKey		= mkPreludeMiscIdUnique	26
-mainIdKey		= mkPreludeMiscIdUnique	27
-mainPrimIOIdKey		= mkPreludeMiscIdUnique	28
+absentErrorIdKey	      = mkPreludeMiscIdUnique  1
+appendIdKey 		      = mkPreludeMiscIdUnique  2
+augmentIdKey		      = mkPreludeMiscIdUnique  3
+buildIdKey		      = mkPreludeMiscIdUnique  4
+errorIdKey		      = mkPreludeMiscIdUnique  5
+foldlIdKey		      = mkPreludeMiscIdUnique  6
+foldrIdKey		      = mkPreludeMiscIdUnique  7
+forkIdKey   	    	      = mkPreludeMiscIdUnique  8
+int2IntegerIdKey	      = mkPreludeMiscIdUnique  9
+integerMinusOneIdKey	      = mkPreludeMiscIdUnique 10
+integerPlusOneIdKey	      = mkPreludeMiscIdUnique 11
+integerPlusTwoIdKey	      = mkPreludeMiscIdUnique 12
+integerZeroIdKey	      = mkPreludeMiscIdUnique 13
+packCStringIdKey	      = mkPreludeMiscIdUnique 14
+parErrorIdKey		      = mkPreludeMiscIdUnique 15
+parIdKey		      = mkPreludeMiscIdUnique 16
+patErrorIdKey		      = mkPreludeMiscIdUnique 17
+realWorldPrimIdKey	      = mkPreludeMiscIdUnique 18
+runSTIdKey		      = mkPreludeMiscIdUnique 19
+seqIdKey		      = mkPreludeMiscIdUnique 20
+traceIdKey		      = mkPreludeMiscIdUnique 21
+unpackCString2IdKey	      = mkPreludeMiscIdUnique 22
+unpackCStringAppendIdKey      = mkPreludeMiscIdUnique 23
+unpackCStringFoldrIdKey	      = mkPreludeMiscIdUnique 24
+unpackCStringIdKey	      = mkPreludeMiscIdUnique 25
+voidPrimIdKey		      = mkPreludeMiscIdUnique 26
+mainIdKey		      = mkPreludeMiscIdUnique 27
+mainPrimIOIdKey		      = mkPreludeMiscIdUnique 28
+recConErrorIdKey	      = mkPreludeMiscIdUnique 29
+recUpdErrorIdKey	      = mkPreludeMiscIdUnique 30
+irrefutPatErrorIdKey	      = mkPreludeMiscIdUnique 31
+nonExhaustiveGuardsErrorIdKey = mkPreludeMiscIdUnique 32
 
 #ifdef GRAN
-parLocalIdKey		= mkPreludeMiscIdUnique 29
-parGlobalIdKey		= mkPreludeMiscIdUnique 30
-noFollowIdKey		= mkPreludeMiscIdUnique 31
-copyableIdKey		= mkPreludeMiscIdUnique 32
+parLocalIdKey		= mkPreludeMiscIdUnique 33
+parGlobalIdKey		= mkPreludeMiscIdUnique 34
+noFollowIdKey		= mkPreludeMiscIdUnique 35
+copyableIdKey		= mkPreludeMiscIdUnique 36
 #endif
 \end{code}
 
@@ -572,15 +579,15 @@ Certain class operations from Prelude classes.  They get
 their own uniques so we can look them up easily when we want
 to conjure them up during type checking.        
 \begin{code}					  
-fromIntClassOpKey	= mkPreludeMiscIdUnique 33
-fromIntegerClassOpKey	= mkPreludeMiscIdUnique 34
-fromRationalClassOpKey	= mkPreludeMiscIdUnique 35
-enumFromClassOpKey	= mkPreludeMiscIdUnique 36
-enumFromThenClassOpKey	= mkPreludeMiscIdUnique 37
-enumFromToClassOpKey	= mkPreludeMiscIdUnique 38
-enumFromThenToClassOpKey= mkPreludeMiscIdUnique 39
-eqClassOpKey		= mkPreludeMiscIdUnique 40
-geClassOpKey		= mkPreludeMiscIdUnique 41
+fromIntClassOpKey	= mkPreludeMiscIdUnique 37
+fromIntegerClassOpKey	= mkPreludeMiscIdUnique 38
+fromRationalClassOpKey	= mkPreludeMiscIdUnique 39
+enumFromClassOpKey	= mkPreludeMiscIdUnique 40
+enumFromThenClassOpKey	= mkPreludeMiscIdUnique 41
+enumFromToClassOpKey	= mkPreludeMiscIdUnique 42
+enumFromThenToClassOpKey= mkPreludeMiscIdUnique 43
+eqClassOpKey		= mkPreludeMiscIdUnique 44
+geClassOpKey		= mkPreludeMiscIdUnique 45
 \end{code}
 
 

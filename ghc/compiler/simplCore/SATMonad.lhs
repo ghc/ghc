@@ -217,7 +217,7 @@ saTransform binder rhs
 	    -- tag (or Exported tag) modified.
 	    fake_binder = mkSysLocal
 			    (getOccName binder _APPEND_ SLIT("_fsat"))
-			    (getItsUnique binder)
+			    (uniqueOf binder)
 			    (idType binder)
 			    mkUnknownSrcLoc
 	    rec_body = mkValLam non_static_args

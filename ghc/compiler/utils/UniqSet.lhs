@@ -20,12 +20,12 @@ module UniqSet (
 	isEmptyUniqSet
     ) where
 
-CHK_Ubiq() -- debugging consistency check
+import Ubiq{-uitous-}
 
 import Maybes		( maybeToBool, Maybe )
 import UniqFM
-import Unique		( Uniquable(..), Unique )
-import Outputable	( Outputable(..), ExportFlag )
+import Unique		( Unique )
+--import Outputable	( Outputable(..), ExportFlag )
 import SrcLoc		( SrcLoc )
 import Pretty		( Pretty(..), PrettyRep )
 import PprStyle		( PprStyle )
@@ -44,7 +44,7 @@ import Util		( Ord3(..) )
 %*									*
 %************************************************************************
 
-We use @UniqFM@, with a (@getItsUnique@-able) @Unique@ as ``key''
+We use @UniqFM@, with a (@uniqueOf@-able) @Unique@ as ``key''
 and the thing itself as the ``value'' (for later retrieval).
 
 \begin{code}

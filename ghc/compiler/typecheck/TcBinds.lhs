@@ -36,7 +36,7 @@ import Kind		( mkBoxedTypeKind, mkTypeKind )
 import Id		( GenId, idType, mkUserId )
 import IdInfo		( noIdInfo )
 import Maybes		( assocMaybe, catMaybes, Maybe(..) )
-import Outputable	( pprNonOp )
+import Name		( pprNonOp )
 import PragmaInfo	( PragmaInfo(..) )
 import Pretty
 import RnHsSyn		( RnName )	-- instances
@@ -212,6 +212,175 @@ tcBindAndSigs binder_rn_names bind sigs prag_info_fn
 	  	NonRecBind _ -> mkBoxedTypeKind	-- Recursive, so no unboxed types
 		RecBind _    -> mkTypeKind	-- Non-recursive, so we permit unboxed types
 \end{code}
+
+
+===========
+\begin{code}
+{-
+
+data SigInfo
+  = SigInfo	RnName
+		(TcIdBndr s)		-- Polymorpic version
+		(TcIdBndr s)		-- Monomorphic verstion
+		[TcType s] [TcIdOcc s] 	-- Instance information for the monomorphic version
+
+
+
+	-- Deal with type signatures
+    tcTySigs sigs		`thenTc` \ sig_infos ->
+    let
+	sig_binders   = [binder      | SigInfo binder _ _ _ _  <- sig_infos]
+	poly_sigs     = [(name,poly) | SigInfo name poly _ _ _ <- sig_infos]
+	mono_sigs     = [(name,mono) | SigInfo name _ mono _ _ <- sig_infos]
+	nosig_binders = binders `minusList` sig_binders
+    in
+
+
+	-- Typecheck the binding group
+    tcExtendLocalEnv poly_sigs		(
+    newMonoIds nosig_binders kind	(\ nosig_local_ids ->
+	    tcMonoBinds mono_sigs mono_binds	`thenTc` \ binds_w_lies ->
+	    returnTc (nosig_local_ids, binds_w_lies)
+    ))					`thenTc` \ (nosig_local_ids, binds_w_lies) ->
+
+
+	-- Decide what to generalise over
+    getImplicitStuffToGen sig_ids binds_w_lies	
+			`thenTc` \ (tyvars_not_to_gen, tyvars_to_gen, lie_to_gen) ->
+
+
+	-- Make poly_ids for all the binders that don't have type signatures
+    let
+	dicts_to_gen = map instToId (bagToList lie_to_gen)
+	dict_tys = map tcIdType dicts_to_gen
+
+	mk_poly binder local_id = mkUserId (getName binder) ty noPragmaInfo
+		       where
+			  ty = mkForAllTys tyvars_to_gen $
+			       mkFunTys dict_tys $
+			       tcIdType local_id
+
+	tys_to_gen     = mkTyVarTys tyvars_to_gen
+	more_sig_infos = [ SigInfo binder (mk_poly binder local_id) 
+				   local_id tys_to_gen dicts_to_gen lie_to_gen
+			 | (binder, local_id) <- nosig_binders `zipEqual` nosig_local_ids
+			 ]
+
+	local_binds = [ (local_id, DictApp (mkHsTyApp (HsVar local_id) inst_tys) dicts)
+		      | SigInfo _ _ local_id inst_tys dicts <- more_sig_infos
+		      ]
+
+	all_sig_infos = sig_infos ++ more_sig_infos	-- Contains a "signature" for each binder
+    in
+
+
+	-- Now generalise the bindings
+    let
+      find_sig lid = head [ (pid, tvs, ds, lie) 
+		          | SigInfo _ pid lid' tvs ds lie, 
+			    lid==lid'
+			  ]
+	-- Do it again, but with increased free_tyvars/reduced_tyvars_to_gen:
+	-- We still need to do this simplification, because some dictionaries 
+	-- may gratuitously constrain some tyvars over which we *are* going 
+	-- to generalise. 
+	-- For example d::Eq (Foo a b), where Foo is instanced as above.
+      gen_bind (bind, lie)
+	= tcSimplifyWithExtraGlobals tyvars_not_to_gen tyvars_to_gen avail lie
+				    `thenTc` \ (lie_free, dict_binds) ->
+	  returnTc (AbsBind tyvars_to_gen_here
+			    dicts
+			    (local_ids `zipEqual` poly_ids)
+			    (dict_binds ++ local_binds)
+			    bind,
+		    lie_free)
+	where
+	  local_ids  = bindersOf bind
+	  local_sigs = [sig | sig@(SigInfo _ _ local_id _ _) <- all_sig_infos,
+			      local_id `elem` local_ids
+		       ]
+
+	  (tyvars_to_gen_here, dicts, avail) 
+		= case (local_ids, sigs) of
+
+		    ([local_id], [SigInfo _ _ _ tyvars_to_gen dicts lie])
+			  -> (tyvars_to_gen, dicts, lie)
+
+		    other -> (tyvars_to_gen, dicts, avail)
+\end{code}
+
+@getImplicitStuffToGen@ decides what type variables
+and LIE to generalise over.
+
+For a "restricted group" -- see the monomorphism restriction
+for a definition -- we bind no dictionaries, and
+remove from tyvars_to_gen any constrained type variables
+
+*Don't* simplify dicts at this point, because we aren't going
+to generalise over these dicts.  By the time we do simplify them
+we may well know more.  For example (this actually came up)
+	f :: Array Int Int
+	f x = array ... xs where xs = [1,2,3,4,5]
+We don't want to generate lots of (fromInt Int 1), (fromInt Int 2)
+stuff.  If we simplify only at the f-binding (not the xs-binding)
+we'll know that the literals are all Ints, and we can just produce
+Int literals!
+
+Find all the type variables involved in overloading, the "constrained_tyvars"
+These are the ones we *aren't* going to generalise.
+We must be careful about doing this:
+ (a) If we fail to generalise a tyvar which is not actually
+	constrained, then it will never, ever get bound, and lands
+	up printed out in interface files!  Notorious example:
+		instance Eq a => Eq (Foo a b) where ..
+	Here, b is not constrained, even though it looks as if it is.
+	Another, more common, example is when there's a Method inst in
+	the LIE, whose type might very well involve non-overloaded
+	type variables.
+ (b) On the other hand, we mustn't generalise tyvars which are constrained,
+	because we are going to pass on out the unmodified LIE, with those
+	tyvars in it.  They won't be in scope if we've generalised them.
+
+So we are careful, and do a complete simplification just to find the
+constrained tyvars. We don't use any of the results, except to
+find which tyvars are constrained.
+
+\begin{code}
+getImplicitStuffToGen is_restricted sig_ids binds_w_lies
+  | isUnRestrictedGroup tysig_vars bind
+  = tcSimplify tyvars_to_gen lie	`thenTc` \ (_, _, dicts_to_gen) ->
+    returnNF_Tc (emptyTyVarSet, tyvars_to_gen, dicts_to_gen)
+
+  | otherwise
+  = tcSimplify tyvars_to_gen lie	    `thenTc` \ (_, _, constrained_dicts) ->
+     let
+	  -- ASSERT: dicts_sig is already zonked!
+	  constrained_tyvars    = foldBag unionTyVarSets tyVarsOfInst emptyTyVarSet constrained_dicts
+	  reduced_tyvars_to_gen = tyvars_to_gen `minusTyVarSet` constrained_tyvars
+     in
+     returnTc (constrained_tyvars, reduced_tyvars_to_gen, emptyLIE)
+
+  where
+    sig_ids   = [sig_var | (TySigInfo sig_id _ _ _ _) <- ty_sigs]
+
+    (tyvars_to_gen, lie) = foldBag (\(tv1,lie2) (tv2,lie2) -> (tv1 `unionTyVarSets` tv2,
+							       lie1 `plusLIE` lie2))
+				    get
+				    (emptyTyVarSet, emptyLIE)
+				    binds_w_lies
+    get (bind, lie)
+      = case bindersOf bind of
+	  [local_id] | local_id `in` sig_ids -> 	-- A simple binding with
+							-- a type signature
+			(emptyTyVarSet, emptyLIE)
+
+	  local_ids ->					-- Complex binding or no type sig
+			(foldr (unionTyVarSets . tcIdType) emptyTyVarSet local_ids, 
+			 lie)
+-}
+\end{code}
+			   
+
 
 \begin{code}
 tc_bind :: RenamedBind -> TcM s (TcBind s, LIE s)

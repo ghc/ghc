@@ -26,8 +26,10 @@ import RnUtils		( RnEnv(..), emptyRnEnv, extendGlobalRnEnv, qualNameErr, dupName
 import Bag		( emptyBag, unitBag, unionBags, unionManyBags, mapBag, listToBag, bagToList )
 import ErrUtils		( Error(..), Warning(..), addShortErrLocLine )
 import FiniteMap	( fmToList )
-import Name		( RdrName(..), isQual, mkTopLevName, mkImportedName, nameExportFlag, Name )
-import Outputable	( getLocalName, getSrcLoc, pprNonOp )
+import Name		( RdrName(..), Name, isQual, mkTopLevName,
+			  mkImportedName, nameExportFlag,
+			  getLocalName, getSrcLoc, pprNonOp
+			)
 import PrelInfo		( BuiltinNames(..), BuiltinKeys(..) )
 import PrelMods		( fromPrelude )
 import Pretty

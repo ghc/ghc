@@ -20,7 +20,10 @@ import HsPragmas	( DataPragmas, ClassPragmas,
 import HsTypes
 
 -- others:
-import Outputable
+import Name		( pprOp, pprNonOp )
+import Outputable	( interppSP, interpp'SP,
+			  Outputable(..){-instance * []-}
+			)
 import Pretty
 import SrcLoc		( SrcLoc )
 import Util		( cmpList, panic#{-ToDo:rm eventually-} )

@@ -21,7 +21,7 @@ import CoreSyn
 import CoreUnfold	( UnfoldingDetails(..), FormSummary )
 import CoreUtils	( unTagBinders )
 import Id		( idType, getIdStrictness, getIdUnfolding,
-			  dataConSig
+			  dataConSig, dataConArgTys
 			)
 import IdInfo		( StrictnessInfo(..), Demand(..),
 			  wwPrim, wwStrict, wwEnum, wwUnpack
@@ -44,7 +44,6 @@ import Util		( isIn, isn'tIn, nOfThem, zipWithEqual,
 			  pprTrace, panic, pprPanic, assertPanic
 			)
 
-getInstantiatedDataConSig = panic "SaAbsInt.getInstantiatedDataConSig (ToDo)"
 returnsRealWorld = panic "SaAbsInt.returnsRealWorld (ToDo)"
 \end{code}
 
@@ -848,7 +847,7 @@ findRecDemand strflags seen str_fn abs_fn ty
 	 Just (tycon,tycon_arg_tys,[data_con]) | tycon `not_elem` seen ->
 	   -- Single constructor case, tycon not already seen higher up
 	   let
-	      (_,cmpnt_tys,_) = getInstantiatedDataConSig data_con tycon_arg_tys
+	      cmpnt_tys = dataConArgTys data_con tycon_arg_tys
 	      prod_len = length cmpnt_tys
 
 	      compt_strict_infos

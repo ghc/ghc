@@ -34,7 +34,7 @@ import Class		( isNumericClass, isStandardClass, isCcallishClass,
 			  isSuperClassOf, getSuperDictSelId )
 import Id		( GenId )
 import Maybes		( expectJust, firstJust, catMaybes, seqMaybe, maybeToBool, Maybe(..) )
-import Outputable	( Outputable(..) )
+import Outputable	( Outputable(..){-instance * []-} )
 import PprType		( GenType, GenTyVar )
 import Pretty
 import SrcLoc		( mkUnknownSrcLoc )

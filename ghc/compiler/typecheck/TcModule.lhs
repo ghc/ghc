@@ -39,7 +39,7 @@ import Bag		( listToBag )
 import Class		( GenClass )
 import Id		( GenId, isDataCon, isMethodSelId, idType )
 import Maybes		( catMaybes )
-import Outputable	( isExported, isLocallyDefined )
+import Name		( isExported, isLocallyDefined )
 import PrelInfo		( unitTy, mkPrimIoTy )
 import Pretty
 import RnUtils		( GlobalNameMappers(..), GlobalNameMapper(..) )

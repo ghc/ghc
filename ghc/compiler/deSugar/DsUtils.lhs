@@ -15,7 +15,7 @@ module DsUtils (
 	combineMatchResults,
 	dsExprToAtom,
 	mkCoAlgCaseMatchResult,
-	mkAppDs, mkConDs, mkPrimDs,
+	mkAppDs, mkConDs, mkPrimDs, mkErrorAppDs,
 	mkCoLetsMatchResult,
 	mkCoPrimCaseMatchResult,
 	mkFailurePair,
@@ -23,7 +23,8 @@ module DsUtils (
 	mkSelectorBinds,
 	mkTupleBind,
 	mkTupleExpr,
-	selectMatchVars
+	selectMatchVars,
+	showForErr
     ) where
 
 import Ubiq
@@ -37,10 +38,13 @@ import CoreSyn
 
 import DsMonad
 
-import CoreUtils	( coreExprType, escErrorMsg, mkCoreIfThenElse, mkErrorApp )
-import PrelInfo		( stringTy )
-import Id		( idType, getInstantiatedDataConSig, mkTupleCon,
+import CoreUtils	( coreExprType, mkCoreIfThenElse )
+import PprStyle		( PprStyle(..) )
+import PrelInfo		( stringTy, iRREFUT_PAT_ERROR_ID )
+import Pretty		( ppShow )
+import Id		( idType, dataConArgTys, mkTupleCon,
 			  DataCon(..), DictVar(..), Id(..), GenId )
+import Literal		( Literal(..) )
 import TyCon		( mkTupleTyCon )
 import Type		( mkTyVarTys, mkRhoTy, mkFunTys, isUnboxedType,
 			  applyTyCon, getAppDataTyCon
@@ -141,7 +145,7 @@ mkCoAlgCaseMatchResult var alts
 		     -- We need to build new locals for the args of the constructor,
 		     -- and figuring out their types is somewhat tiresome.
 		let
-			(_,arg_tys,_) = getInstantiatedDataConSig con tycon_arg_tys
+			arg_tys = dataConArgTys con tycon_arg_tys
 		in
 		newSysLocalsDs arg_tys	`thenDs` \ arg_ids ->
 
@@ -252,8 +256,6 @@ dsExprsToAtoms (arg:args) continue_with
 %*									*
 %************************************************************************
 
-Plumb the desugarer's @UniqueSupply@ in/out of the @UniqSupply@ monad
-world.
 \begin{code}
 mkAppDs  :: CoreExpr -> [Type] -> [CoreExpr] -> DsM CoreExpr
 mkConDs  :: Id       -> [Type] -> [CoreExpr] -> DsM CoreExpr
@@ -270,6 +272,24 @@ mkConDs con tys arg_exprs
 mkPrimDs op tys arg_exprs
   = dsExprsToAtoms arg_exprs $ \ vals ->
     returnDs (mkPrim op [] tys vals)
+\end{code}
+
+\begin{code}
+showForErr :: Outputable a => a -> String		-- Boring but useful
+showForErr thing = ppShow 80 (ppr PprForUser thing)
+
+mkErrorAppDs :: Id 		-- The error function
+	     -> Type		-- Type to which it should be applied
+	     -> String		-- The error message string to pass
+	     -> DsM CoreExpr
+
+mkErrorAppDs err_id ty msg
+  = getSrcLocDs			`thenDs` \ (file, line) ->
+    let
+	full_msg = file ++ "|" ++ line ++ "|" ++msg
+	msg_lit  = NoRepStr (_PK_ full_msg)
+    in
+    returnDs (mkApp (Var err_id) [] [ty] [LitArg msg_lit])
 \end{code}
 
 %************************************************************************
@@ -303,17 +323,10 @@ mkSelectorBinds :: [TyVar]	    -- Variables wrt which the pattern is polymorphic
 		-> DsM [(Id,CoreExpr)]
 
 mkSelectorBinds tyvars pat locals_and_globals val_expr
-  = getSrcLocDs		`thenDs` \ (src_file, src_line) ->
-
-    if is_simple_tuple_pat pat then
+  = if is_simple_tuple_pat pat then
 	mkTupleBind tyvars [] locals_and_globals val_expr
     else
-	newSysLocalDs stringTy	`thenDs` \ str_var -> -- to hold the string
-	let
-	    src_loc_str   = escErrorMsg ('"' : src_file) ++ "%l" ++ src_line
-	    error_string  = src_loc_str ++ "%~" --> ": pattern-match failed on an irrefutable pattern"
-	    error_msg     = mkErrorApp res_ty str_var error_string
-	in
+	mkErrorAppDs iRREFUT_PAT_ERROR_ID res_ty ""	`thenDs` \ error_msg ->
 	matchSimply val_expr pat res_ty local_tuple error_msg `thenDs` \ tuple_expr ->
 	mkTupleBind tyvars [] locals_and_globals tuple_expr
   where

@@ -50,7 +50,7 @@ import SST
 import Bag		( Bag, emptyBag, isEmptyBag,
 			  foldBag, unitBag, unionBags, snocBag )
 import FiniteMap	( FiniteMap, emptyFM )
-import Outputable	( Outputable(..), NamedThing(..), ExportFlag )
+--import Outputable	( Outputable(..), NamedThing(..), ExportFlag )
 import ErrUtils		( Error(..) )
 import Maybes		( MaybeErr(..) )
 --import Name		( Name )

@@ -27,17 +27,18 @@ module CostCentre (
 	cmpCostCentre	-- used for removing dups in a list
     ) where
 
+import Ubiq{-uitous-}
+
 import Id		( externallyVisibleId, GenId, Id(..) )
 import CStrings		( identToC, stringToC )
 import Maybes		( Maybe(..) )
-import Name		( showRdr, RdrName )
-import Outputable
+import Name		( showRdr, getOccName, RdrName )
 import Pretty		( ppShow, prettyToUn )
 import PprStyle		( PprStyle(..) )
 import UniqSet
 import Unpretty
 import Util
-import Ubiq
+
 showId = panic "Whoops"
 pprIdInUnfolding = panic "Whoops"
 \end{code}

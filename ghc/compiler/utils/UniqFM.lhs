@@ -21,6 +21,7 @@ Basically, the things need to be in class @Uniquable@, and we use the
 
 module UniqFM (
 	UniqFM,   -- abstract type
+	Uniquable(..), -- class to go with it
 
 	emptyUFM,
 	unitUFM,
@@ -54,12 +55,12 @@ module UniqFM (
     ) where
 
 #if defined(COMPILING_GHC)
-CHK_Ubiq() -- debugging consistency check
+import Ubiq{-uitous-}
 #endif
 
-import Unique		( Unique, Uniquable(..), u2i, mkUniqueGrimily )
+import Unique		( Unique, u2i, mkUniqueGrimily )
 import Util
-import Outputable	( Outputable(..), ExportFlag )
+--import Outputable	( Outputable(..), ExportFlag )
 import Pretty		( Pretty(..), PrettyRep )
 import PprStyle		( PprStyle )
 import SrcLoc		( SrcLoc )
@@ -260,6 +261,9 @@ data UniqFM ele
 	    FAST_INT	    -- the delta
 	    (UniqFM ele)
 	    (UniqFM ele)
+
+class Uniquable a where
+    uniqueOf :: a -> Unique
 
 -- for debugging only :-)
 {-

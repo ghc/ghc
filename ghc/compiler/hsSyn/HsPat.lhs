@@ -26,7 +26,8 @@ import HsLoop		( HsExpr )
 -- others:
 import Id		( GenId, dataConSig )
 import Maybes		( maybeToBool )
-import Outputable
+import Name		( pprOp, pprNonOp )
+import Outputable	( interppSP, interpp'SP, ifPprShowAll )
 import PprStyle		( PprStyle(..) )
 import Pretty
 import TyCon		( maybeTyConSingleCon )

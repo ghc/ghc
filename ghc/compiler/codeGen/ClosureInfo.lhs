@@ -86,7 +86,7 @@ import Id		( idType, idPrimRep, getIdArity,
 			)
 import IdInfo		( arityMaybe )
 import Maybes		( assocMaybe, maybeToBool )
-import Outputable	( isLocallyDefined, getLocalName )
+import Name		( isLocallyDefined, getLocalName )
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instance Outputable-} )
 import PrimRep		( getPrimRepSize, separateByPtrFollowness )

@@ -13,7 +13,7 @@ module TcEnv(
 
 	tcExtendGlobalValEnv, tcExtendLocalValEnv,
 	tcLookupLocalValue, tcLookupLocalValueOK, tcLookupLocalValueByKey, 
-	tcLookupGlobalValue, tcLookupGlobalValueByKey, tcGlobalOcc,
+	tcLookupGlobalValue, tcLookupGlobalValueByKey,
 
 	newMonoIds, newLocalIds, newLocalId,
 	tcGetGlobalTyVars
@@ -36,8 +36,7 @@ import Class	( Class(..), GenClass, getClassSig )
 
 import TcMonad
 
-import Name		( Name{-instance NamedThing-} )
-import Outputable 	( getOccName, getSrcLoc )
+import Name		( getOccName, getSrcLoc, Name{-instance NamedThing-} )
 import PprStyle
 import Pretty
 import RnHsSyn		( RnName(..) )
@@ -255,23 +254,6 @@ tcLookupGlobalValue name
 #else
     def = panic "tcLookupGlobalValue"
 #endif
-
--- A useful function that takes an occurrence of a global thing
--- and instantiates its type with fresh type variables
-tcGlobalOcc :: RnName 
-	    -> NF_TcM s (Id, 		-- The Id
-			  [TcType s], 	-- Instance types
-			  TcType s)	-- Rest of its type
-
-tcGlobalOcc name
-  = tcLookupGlobalValue name	`thenNF_Tc` \ id ->
-    let
-      (tyvars, rho) = splitForAllTy (idType id)
-    in
-    tcInstTyVars tyvars		`thenNF_Tc` \ (tyvars', arg_tys, tenv) ->
-    tcInstType tenv rho		`thenNF_Tc` \ rho' ->
-    returnNF_Tc (id, arg_tys, rho')
-
 
 tcLookupGlobalValueByKey :: Unique -> NF_TcM s Id
 tcLookupGlobalValueByKey uniq

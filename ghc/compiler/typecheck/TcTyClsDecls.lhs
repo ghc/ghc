@@ -27,19 +27,19 @@ import TcEnv		( tcExtendTyConEnv, tcExtendClassEnv,
 			  tcExtendGlobalValEnv, 
 			  tcTyVarScope, tcGetEnv )
 import TcKind		( TcKind, newKindVars )
-import TcTyDecls	( tcTyDecl, tcRecordSelectors )
+import TcTyDecls	( tcTyDecl, mkDataBinds )
 
 import Bag	
 import Class		( Class(..), getClassSelIds )
 import Digraph		( findSCCs, SCC(..) )
-import Outputable	( getSrcLoc )
+import Name		( getSrcLoc )
 import PprStyle
 import Pretty
 import UniqSet		( UniqSet(..), emptyUniqSet,
 			  unitUniqSet, unionUniqSets, 
 			  unionManyUniqSets, uniqSetToList ) 
 import SrcLoc		( SrcLoc )
-import TyCon		( TyCon, tyConDataCons )
+import TyCon		( TyCon, tyConDataCons, isDataTyCon )
 import Unique		( Unique )
 import Util		( panic, pprTrace )
 
@@ -121,7 +121,7 @@ tcGroup inst_mapper decls
 
 
 	-- Create any necessary record selector Ids and their bindings
-    mapAndUnzipTc tcRecordSelectors tycons	`thenTc` \ (sel_ids_s, binds) ->
+    mapAndUnzipTc mkDataBinds (filter isDataTyCon tycons)	`thenTc` \ (data_ids_s, binds) ->
 	
 	-- Extend the global value environment with 
 	--	a) constructors
@@ -129,8 +129,7 @@ tcGroup inst_mapper decls
 	--	c) class op selectors
 
     tcSetEnv final_env						$
-    tcExtendGlobalValEnv (concat (map tyConDataCons tycons))	$
-    tcExtendGlobalValEnv (concat sel_ids_s)			$
+    tcExtendGlobalValEnv (concat data_ids_s)			$
     tcExtendGlobalValEnv (concat (map getClassSelIds classes))  $
     tcGetEnv			`thenNF_Tc` \ really_final_env ->
 

@@ -19,7 +19,8 @@ import HsTypes		( PolyType )
 
 -- others:
 import Id		( DictVar(..), GenId, Id(..) )
-import Outputable
+import Name		( isOpLexeme, pprOp )
+import Outputable	( interppSP, interpp'SP, ifnotPprForUser )
 import PprType		( pprGenType, pprParendGenType, GenType{-instance-} )
 import Pretty
 import PprStyle		( PprStyle(..) )
@@ -109,6 +110,10 @@ data HsExpr tyvar uvar id pat
   | RecordUpd	(HsExpr tyvar uvar id pat)
 		(HsRecordBinds tyvar uvar id pat)
 
+  | RecordUpdOut	(HsExpr tyvar uvar id pat)	-- TRANSLATION
+			[id]				-- Dicts needed for construction
+			(HsRecordBinds tyvar uvar id pat)
+
   | ExprWithTySig		-- signature binding
 		(HsExpr tyvar uvar id pat)
 		(PolyType id)
@@ -164,6 +169,11 @@ Everything from here on appears only in typechecker output.
 
   |  SingleDict			-- a simple special case of Dictionary
 		id		-- local dictionary name
+
+  |  HsCon 			-- TRANSLATION; a constructor application
+	Id			-- used only in the RHS of constructor definitions
+	[GenType tyvar uvar]
+	[HsExpr tyvar uvar id pat]
 
 type HsRecordBinds tyvar uvar id pat
   = [(id, HsExpr tyvar uvar id pat, Bool)]

@@ -18,16 +18,16 @@ import TcHsSyn		( TypecheckedPat(..), TypecheckedMatch(..),
 import DsHsSyn		( outPatType, collectTypedPatBinders )
 import CoreSyn
 
+import CoreUtils	( coreExprType )
 import DsMonad
 import DsGRHSs		( dsGRHSs )
 import DsUtils
 import MatchCon		( matchConFamily )
 import MatchLit		( matchLiterals )
 
-import CoreUtils	( escErrorMsg, mkErrorApp )
 import FieldLabel	( allFieldLabelTags, fieldLabelTag )
 import Id		( idType, mkTupleCon, dataConSig,
-			  recordSelectorFieldLabel,
+			  dataConArgTys, recordSelectorFieldLabel,
 			  GenId{-instance-}
 			)
 import PprStyle		( PprStyle(..) )
@@ -38,7 +38,9 @@ import PrelInfo		( nilDataCon, consDataCon, mkTupleTy, mkListTy,
 			  integerTy, intPrimTy, charPrimTy,
 			  floatPrimTy, doublePrimTy, stringTy,
 			  addrTy, addrPrimTy, addrDataCon,
-			  wordTy, wordPrimTy, wordDataCon )
+			  wordTy, wordPrimTy, wordDataCon,
+			  pAT_ERROR_ID
+			)
 import Type		( isPrimType, eqTy, getAppDataTyCon,
 			  instantiateTauTy
 			)
@@ -329,14 +331,12 @@ tidy1 v (ConOpPat pat1 id pat2 ty) match_result
 tidy1 v (RecPat con_id pat_ty rpats) match_result
   = returnDs (ConPat con_id pat_ty pats, match_result)
   where
-    pats 		    = map mk_pat tagged_arg_tys
+    pats 	     = map mk_pat tagged_arg_tys
 
 	-- Boring stuff to find the arg-tys of the constructor
-    (tyvars, _, arg_tys, _) = dataConSig con_id
-    (_, inst_tys, _) 	    = getAppDataTyCon pat_ty
-    tenv 		    = tyvars `zip` inst_tys
-    con_arg_tys'	    = map (instantiateTauTy tenv) arg_tys
-    tagged_arg_tys	    = con_arg_tys' `zip` allFieldLabelTags
+    (_, inst_tys, _) = getAppDataTyCon pat_ty
+    con_arg_tys'     = dataConArgTys con_id inst_tys 
+    tagged_arg_tys   = con_arg_tys' `zip` allFieldLabelTags
 
 	-- mk_pat picks a WildPat of the appropriate type for absent fields,
 	-- and the specified pattern for present fields
@@ -613,16 +613,12 @@ matchWrapper kind [(GRHSMatch
 matchWrapper kind matches error_string
   = flattenMatches kind matches	`thenDs` \ eqns_info@(EqnInfo arg_pats (MatchResult _ result_ty _ _) : _) ->
 
-    selectMatchVars arg_pats	`thenDs` \ new_vars ->
-    match new_vars eqns_info []	`thenDs` \ match_result ->
+    selectMatchVars arg_pats				`thenDs` \ new_vars ->
+    match new_vars eqns_info []				`thenDs` \ match_result ->
 
-    getSrcLocDs			`thenDs` \ (src_file, src_line) ->
-    newSysLocalDs stringTy	`thenDs` \ str_var -> -- to hold the String
-    let
-	src_loc_str = escErrorMsg ('"' : src_file) ++ "%l" ++ src_line
-	fail_expr   = mkErrorApp result_ty str_var (src_loc_str++": "++error_string)
-    in
-    extractMatchResult match_result fail_expr	`thenDs` \ result_expr ->
+    mkErrorAppDs pAT_ERROR_ID result_ty error_string	`thenDs` \ fail_expr ->
+    extractMatchResult match_result fail_expr		`thenDs` \ result_expr ->
+
     returnDs (new_vars, result_expr)
 \end{code}
 
@@ -701,6 +697,17 @@ flattenMatches kind (match : matches)
       = dsBinds binds				`thenDs` \ core_binds ->
 	dsGRHSs ty kind pats grhss 		`thenDs` \ match_result ->
 	returnDs (EqnInfo pats (mkCoLetsMatchResult core_binds match_result))
+      where
+	pats = reverse pats_so_far	-- They've accumulated in reverse order
+
+    flatten_match pats_so_far (SimpleMatch expr) 
+      = dsExpr expr		`thenDs` \ core_expr ->
+	returnDs (EqnInfo pats
+		    (MatchResult CantFail (coreExprType core_expr) 
+			      (\ ignore -> core_expr)
+			      NoMatchContext))
+	-- The NoMatchContext is just a place holder.  In a simple match,
+	-- the matching can't fail, so we won't generate an error message.
       where
 	pats = reverse pats_so_far	-- They've accumulated in reverse order
 \end{code}

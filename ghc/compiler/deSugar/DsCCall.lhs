@@ -16,7 +16,7 @@ import DsMonad
 import DsUtils
 
 import CoreUtils	( coreExprType )
-import Id		( getInstantiatedDataConSig, mkTupleCon )
+import Id		( dataConArgTys, mkTupleCon )
 import Maybes		( maybeToBool )
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instances-} )
@@ -192,7 +192,7 @@ we decide what's happening with enumerations. ADR
     (Just (tycon, tycon_arg_tys, data_cons)) = maybe_data_type
     (the_data_con : other_data_cons)       = data_cons
 
-    (_, data_con_arg_tys, _) = getInstantiatedDataConSig the_data_con tycon_arg_tys
+    data_con_arg_tys = dataConArgTys the_data_con tycon_arg_tys
     (data_con_arg_ty1 : data_con_arg_ty2 : _) = data_con_arg_tys
 
 can't_see_datacons_error thing ty
@@ -292,7 +292,7 @@ boxResult result_ty
     Just (tycon, tycon_arg_tys, data_cons) = maybe_data_type
     (the_data_con : other_data_cons)       = data_cons
 
-    (_, data_con_arg_tys, _)               = getInstantiatedDataConSig the_data_con tycon_arg_tys
+    data_con_arg_tys		           = dataConArgTys the_data_con tycon_arg_tys
     (the_prim_result_ty : other_args_tys)  = data_con_arg_tys
 
     (state_and_prim_datacon, state_and_prim_ty) = getStatePairingConInfo the_prim_result_ty

@@ -32,6 +32,7 @@ import Id		( idType, getIdInfo, getIdStrictness,
 			)
 import IdInfo		( ppIdInfo, StrictnessInfo(..) )
 import Literal		( Literal{-instances-} )
+import Name		( isOpLexeme )
 import Outputable	-- quite a few things
 import PprEnv
 import PprType		( GenType{-instances-}, GenTyVar{-instance-} )

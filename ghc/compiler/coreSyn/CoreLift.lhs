@@ -25,7 +25,7 @@ import Id		( idType, mkSysLocal,
 			  nullIdEnv, growIdEnvList, lookupIdEnv, IdEnv(..),
 			  GenId{-instances-}
 			)
-import Outputable	( isLocallyDefined, getSrcLoc )
+import Name		( isLocallyDefined, getSrcLoc )
 import PrelInfo		( liftDataCon, mkLiftTy, statePrimTyCon )
 import TyCon		( isBoxedTyCon, TyCon{-instance-} )
 import Type		( maybeAppDataTyCon, eqTy )

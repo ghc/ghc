@@ -33,7 +33,8 @@ import Id		( idWantsToBeINLINEd, isConstMethodId,
 			  GenId{-instance Eq-}
 			)
 import Maybes		( maybeToBool )
-import Outputable	( isExported, Outputable(..){-instance * (,) -} )
+import Name		( isExported )
+import Outputable	( Outputable(..){-instance * (,) -} )
 import PprCore
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instance Outputable-}, GenTyVar{-ditto-} )

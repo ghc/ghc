@@ -12,11 +12,11 @@ import Ubiq
 
 import HsSyn
 
-import Name		( isLocalName, nameUnique, Name, RdrName )
 import Id		( GenId, Id(..) )
-import Outputable	( Outputable(..) )
-import PprType		( GenType, GenTyVar, TyCon )
+import Name		( isLocalName, nameUnique, Name, RdrName )
+import Outputable	( Outputable(..){-instance * []-} )
 import PprStyle		( PprStyle(..) )
+import PprType		( GenType, GenTyVar, TyCon )
 import Pretty
 import TyCon		( TyCon )
 import TyVar		( GenTyVar )

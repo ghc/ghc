@@ -22,7 +22,10 @@ import HsTypes		( PolyType )
 
 --others:
 import Id		( DictVar(..), Id(..), GenId )
-import Outputable
+import Name		( pprNonOp )
+import Outputable	( interpp'SP, ifnotPprForUser,
+			  Outputable(..){-instance * (,)-}
+			)
 import Pretty
 import SrcLoc		( SrcLoc{-instances-} )
 --import TyVar		( GenTyVar{-instances-} )

@@ -45,6 +45,8 @@ data Match tyvar uvar id pat
   = PatMatch	    pat
 		    (Match tyvar uvar id pat)
   | GRHSMatch	    (GRHSsAndBinds tyvar uvar id pat)
+
+  | SimpleMatch	    (HsExpr tyvar uvar id pat)		-- Used in translations
 \end{code}
 
 Sets of guarded right hand sides (GRHSs). In:

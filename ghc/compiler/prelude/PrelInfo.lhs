@@ -18,7 +18,13 @@ module PrelInfo (
 	BuiltinKeys(..), BuiltinIdInfos(..),
 
 	-- *odd* values that need to be reached out and grabbed:
-	eRROR_ID, pAT_ERROR_ID, aBSENT_ERROR_ID,
+	eRROR_ID,
+	pAT_ERROR_ID,
+	rEC_CON_ERROR_ID,
+	rEC_UPD_ERROR_ID,
+	iRREFUT_PAT_ERROR_ID,
+	nON_EXHAUSTIVE_GUARDS_ERROR_ID,
+	aBSENT_ERROR_ID,
 	packStringForCId,
 	unpackCStringId, unpackCString2Id,
 	unpackCStringAppendId, unpackCStringFoldrId,
@@ -104,8 +110,7 @@ import CmdLineOpts	( opt_HideBuiltinNames,
 import FiniteMap	( FiniteMap, emptyFM, listToFM )
 import Id		( mkTupleCon, GenId, Id(..) )
 import Maybes		( catMaybes )
-import Name		( mkBuiltinName )
-import Outputable	( getOrigName )
+import Name		( mkBuiltinName, getOrigName )
 import RnHsSyn		( RnName(..) )
 import TyCon		( tyConDataCons, mkFunTyCon, mkTupleTyCon, TyCon )
 import Type

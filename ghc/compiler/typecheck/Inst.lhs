@@ -45,7 +45,7 @@ import Bag	( emptyBag, unitBag, unionBags, unionManyBags, listToBag, consBag )
 import Class	( Class(..), GenClass, ClassInstEnv(..), getClassInstEnv )
 import Id	( GenId, idType, mkInstId )
 import MatchEnv	( lookupMEnv, insertMEnv )
-import Name	( mkLocalName, Name )
+import Name	( mkLocalName, getLocalName, Name )
 import Outputable
 import PprType	( GenClass, TyCon, GenType, GenTyVar )	
 import PprStyle	( PprStyle(..) )
@@ -537,6 +537,10 @@ don't appear in the original source code.  Doubtless this type will evolve...
 data InstOrigin s
   = OccurrenceOf (TcIdOcc s)	-- Occurrence of an overloaded identifier
   | OccurrenceOfCon Id		-- Occurrence of a data constructor
+
+  | RecordUpdOrigin
+
+  | DataDeclOrigin		-- Typechecking a data declaration
 
   | InstanceDeclOrigin		-- Typechecking an instance decl
 

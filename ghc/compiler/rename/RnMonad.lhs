@@ -48,10 +48,9 @@ import ErrUtils		( Error(..), Warning(..) )
 import FiniteMap	( FiniteMap, emptyFM, lookupFM, addToFM )
 import Maybes		( assocMaybe )
 import Name		( Module(..), RdrName(..), isQual,
-			  Name, mkLocalName, mkImplicitName
+			  Name, mkLocalName, mkImplicitName,
+			  getOccName
 			)
-import Outputable	( getOccName )
-import PprStyle		( PprStyle )
 import Pretty		( Pretty(..), PrettyRep )
 import SrcLoc		( SrcLoc, mkUnknownSrcLoc )
 import UniqFM		( UniqFM, emptyUFM )

@@ -26,8 +26,7 @@ import MainMonad
 import Bag		( isEmptyBag, unionBags, bagToList, listToBag )
 import ErrUtils		( Error(..), Warning(..) )
 import FiniteMap	( emptyFM, eltsFM )
-import Name		( Name, RdrName(..) )
-import Outputable	( getOrigNameRdr, isLocallyDefined )
+import Name		( getOrigNameRdr, isLocallyDefined, Name, RdrName(..) )
 import PrelInfo		( BuiltinNames(..), BuiltinKeys(..) )
 import UniqFM		( emptyUFM, lookupUFM, addListToUFM_C, eltsUFM )
 import UniqSupply	( splitUniqSupply )
@@ -67,7 +66,7 @@ renameModule b_names b_keys us
   = findHiFiles			`thenPrimIO` \ hi_files ->
     newVar (emptyFM, hi_files)	`thenPrimIO` \ iface_var ->
 
-    fixPrimIO ( \ (_, _, _, _, rec_occ_fm, rec_export_fn) ->
+    fixPrimIO ( \ ~(_, _, _, _, rec_occ_fm, rec_export_fn) ->
     let
 	rec_occ_fn :: Name -> [RdrName]
 	rec_occ_fn n = case lookupUFM rec_occ_fm n of

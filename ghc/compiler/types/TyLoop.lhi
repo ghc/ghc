@@ -9,7 +9,7 @@ import Unique ( Unique )
 
 import FieldLabel ( FieldLabel )
 import Id      ( Id, GenId, StrictnessMark, mkTupleCon, mkDataCon,
-		 dataConSig, getInstantiatedDataConSig )
+		 dataConSig, dataConArgTys )
 import PprType ( specMaybeTysSuffix )
 import Name    ( Name )
 import TyCon   ( TyCon )
@@ -36,7 +36,7 @@ specMaybeTysSuffix :: [Maybe Type] -> _PackedString
 instance Eq (GenClass a b)
 
 -- Needed in Type
-getInstantiatedDataConSig :: Id -> [Type] -> ([Type],[Type],Type)
+dataConArgTys :: Id -> [Type] -> [Type]
 
 -- Needed in TysWiredIn
 data StrictnessMark = MarkedStrict | NotMarkedStrict

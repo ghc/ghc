@@ -38,10 +38,10 @@ import Kind		( Kind(..) )
 import CStrings		( identToC )
 import CmdLineOpts	( opt_OmitInterfacePragmas )
 import Maybes		( maybeToBool )
-import Name		( Name )
-import Outputable	( isAvarop, isPreludeDefined, getOrigName,
-			  ifPprShowAll, interpp'SP
+import Name		( isAvarop, isPreludeDefined, getOrigName,
+			  Name{-instance Outputable-}
 			)
+import Outputable	( ifPprShowAll, interpp'SP )
 import PprStyle		( PprStyle(..), codeStyle, showUserishTypes )
 import Pretty
 import TysWiredIn	( listTyCon )

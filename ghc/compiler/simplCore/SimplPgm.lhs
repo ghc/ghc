@@ -20,8 +20,8 @@ import Id		( externallyVisibleId,
 			  GenId{-instance Ord3-}
 			)
 import Maybes		( catMaybes )
+import Name		( isExported )
 import OccurAnal	( occurAnalyseBinds )
-import Outputable	( isExported )
 import Pretty		( ppAboves, ppBesides, ppInt, ppChar, ppStr )
 import SimplEnv
 import SimplMonad

@@ -44,7 +44,7 @@ import Id		( idPrimRep, toplevelishId, isDataCon,
 			  GenId{-instance NamedThing-}
 			)
 import Maybes		( catMaybes )
-import Outputable	( isLocallyDefined )
+import Name		( isLocallyDefined )
 import PprAbsC		( pprAmode )
 import PprStyle		( PprStyle(..) )
 import StgSyn		( StgArg(..), StgLiveVars(..), GenStgArg(..) )

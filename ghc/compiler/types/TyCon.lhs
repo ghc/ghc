@@ -53,7 +53,6 @@ import PrelMods		( pRELUDE_BUILTIN )
 import Maybes
 import Name		( Name, RdrName(..), appendRdr, nameUnique )
 import Unique		( Unique, funTyConKey, mkTupleTyConUnique )
-import Outputable
 import Pretty		( Pretty(..), PrettyRep )
 import PprStyle		( PprStyle )
 import SrcLoc		( SrcLoc, mkBuiltinSrcLoc )

@@ -20,7 +20,7 @@ module TcType (
 
   tcInstTyVars,    -- TyVar -> NF_TcM s (TcTyVar s)
   tcInstSigTyVars, 
-  tcInstType, tcInstTcType, tcInstTheta,
+  tcInstType, tcInstTcType, tcInstTheta, tcInstId,
 
     zonkTcTyVars,	-- TcTyVarSet s -> NF_TcM s (TcTyVarSet s)
     zonkTcType,		-- TcType s -> NF_TcM s (TcType s)
@@ -32,17 +32,21 @@ module TcType (
 
 
 -- friends:
-import Type	( Type(..), ThetaType(..), GenType(..), tyVarsOfTypes, getTyVar_maybe )
+import Type	( Type(..), ThetaType(..), GenType(..),
+		  tyVarsOfTypes, getTyVar_maybe,
+		  splitForAllTy, splitRhoTy
+		)
 import TyVar	( TyVar(..), GenTyVar(..), TyVarSet(..), GenTyVarSet(..), 
 		  tyVarSetToList
 		)
 
 -- others:
-import Kind	( Kind )
-import Usage	( Usage(..), GenUsage, UVar(..), duffUsage )
 import Class	( GenClass )
+import Id	( idType )
+import Kind	( Kind )
 import TcKind	( TcKind )
 import TcMonad
+import Usage	( Usage(..), GenUsage, UVar(..), duffUsage )
 
 import Ubiq
 import Unique		( Unique )
@@ -193,7 +197,24 @@ tcInstTheta tenv theta
     go (clas,ty) = tcInstType tenv ty 	`thenNF_Tc` \ tc_ty ->
 		   returnNF_Tc (clas, tc_ty)
 
---???tcSpecTy :: Type -> NF_TcM s (
+-- A useful function that takes an occurrence of a global thing
+-- and instantiates its type with fresh type variables
+tcInstId :: Id
+	 -> NF_TcM s ([TcTyVar s], 	-- It's instantiated type
+		      TcThetaType s,	--
+		      TcType s)		--
+
+tcInstId id
+  = let
+      (tyvars, rho) = splitForAllTy (idType id)
+    in
+    tcInstTyVars tyvars		`thenNF_Tc` \ (tyvars', arg_tys, tenv) ->
+    tcInstType tenv rho		`thenNF_Tc` \ rho' ->
+    let
+	(theta', tau') = splitRhoTy rho'
+    in
+    returnNF_Tc (tyvars', theta', tau')
+
 
 tcInstTcType ::  [(TcTyVar s,TcType s)] -> TcType s -> NF_TcM s (TcType s)
 tcInstTcType tenv ty_to_inst

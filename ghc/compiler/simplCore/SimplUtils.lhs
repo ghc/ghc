@@ -27,7 +27,7 @@ import BinderInfo
 import CmdLineOpts	( SimplifierSwitch(..) )
 import CoreSyn
 import CoreUtils	( manifestlyWHNF )
-import Id		( idType, isBottomingId, idWantsToBeINLINEd,
+import Id		( idType, isBottomingId, idWantsToBeINLINEd, dataConArgTys,
 			  getIdArity, GenId{-instance Eq-}
 			)
 import IdInfo		( arityMaybe )
@@ -40,7 +40,6 @@ import Type		( eqTy, isPrimType, maybeAppDataTyCon, getTyVar_maybe )
 import TyVar		( GenTyVar{-instance Eq-} )
 import Util		( isIn, panic )
 
-getInstantiatedDataConSig =  panic "SimplUtils.getInstantiatedDataConSig (ToDo)"
 \end{code}
 
 
@@ -375,7 +374,7 @@ mkIdentityAlts rhs_ty
   = case (maybeAppDataTyCon rhs_ty) of
 	Just (tycon, ty_args, [data_con]) ->  -- algebraic type suitable for unpacking
 	    let
-		(_,inst_con_arg_tys,_) = getInstantiatedDataConSig data_con ty_args
+		inst_con_arg_tys = dataConArgTys data_con ty_args
 	    in
 	    newIds inst_con_arg_tys	`thenSmpl` \ new_bindees ->
 	    let

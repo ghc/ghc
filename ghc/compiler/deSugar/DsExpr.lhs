@@ -13,13 +13,17 @@ import DsLoop		-- partly to get dsBinds, partly to chk dsExpr
 
 import HsSyn		( HsExpr(..), HsLit(..), ArithSeqInfo(..),
 			  Match, Qual, HsBinds, Stmt, PolyType )
-import TcHsSyn		( TypecheckedHsExpr(..), TypecheckedHsBinds(..) )
+import TcHsSyn		( TypecheckedHsExpr(..), TypecheckedHsBinds(..),
+			  TypecheckedRecordBinds(..)
+			)
 import CoreSyn
 
 import DsMonad
 import DsCCall		( dsCCall )
 import DsListComp	( dsListComp )
-import DsUtils		( mkAppDs, mkConDs, mkPrimDs, dsExprToAtom )
+import DsUtils		( mkAppDs, mkConDs, mkPrimDs, dsExprToAtom,
+			  mkErrorAppDs, showForErr
+			)
 import Match		( matchWrapper )
 
 import CoreUnfold	( UnfoldingDetails(..), UnfoldingGuidance(..),
@@ -27,19 +31,26 @@ import CoreUnfold	( UnfoldingDetails(..), UnfoldingGuidance(..),
 import CoreUtils	( coreExprType, substCoreExpr, argToExpr,
 			  mkCoreIfThenElse, unTagBinders )
 import CostCentre	( mkUserCC )
+import FieldLabel	( FieldLabel{-instance Eq/Outputable-} )
 import Id		( mkTupleCon, idType, nullIdEnv, addOneToIdEnv,
-			  getIdUnfolding )
+			  getIdUnfolding, dataConArgTys, dataConFieldLabels,
+			  recordSelectorFieldLabel
+			)
 import Literal		( mkMachInt, Literal(..) )
 import MagicUFs		( MagicUnfoldingFun )
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType )
 import PrelInfo		( mkTupleTy, unitTy, nilDataCon, consDataCon,
-			  charDataCon, charTy )
+			  charDataCon, charTy, rEC_CON_ERROR_ID,
+			  rEC_UPD_ERROR_ID
+			)
 import Pretty		( ppShow, ppBesides, ppPStr, ppStr )
-import Type		( splitSigmaTy, typePrimRep )
+import Type		( splitSigmaTy, splitFunTy, typePrimRep,
+			  getAppDataTyCon
+			)
 import TyVar		( nullTyVarEnv, addOneToTyVarEnv )
 import Usage		( UVar(..) )
-import Util		( pprError, panic )
+import Util		( zipEqual, pprError, panic, assertPanic )
 
 maybeBoxedPrimType = panic "DsExpr.maybeBoxedPrimType"
 splitTyArgs = panic "DsExpr.splitTyArgs"
@@ -170,10 +181,7 @@ dsExpr (HsLitOut (HsStringPrim s) _)
 -- end of literals magic. --
 
 dsExpr expr@(HsLam a_Match)
-  = let
-	error_msg = "%L" --> "pattern-matching failed in lambda"
-    in
-    matchWrapper LambdaMatch [a_Match] error_msg `thenDs` \ (binders, matching_code) ->
+  = matchWrapper LambdaMatch [a_Match] "lambda"	`thenDs` \ (binders, matching_code) ->
     returnDs ( mkValLam binders matching_code )
 
 dsExpr expr@(HsApp e1 e2)    = dsApp expr []
@@ -247,11 +255,8 @@ dsExpr (HsSCC cc expr)
 
 dsExpr expr@(HsCase discrim matches src_loc)
   = putSrcLocDs src_loc $
-    dsExpr discrim		`thenDs` \ core_discrim ->
-    let
-	error_msg = "%C" --> "pattern-matching failed in case"
-    in
-    matchWrapper CaseMatch matches error_msg `thenDs` \ ([discrim_var], matching_code) ->
+    dsExpr discrim				`thenDs` \ core_discrim ->
+    matchWrapper CaseMatch matches "case"	`thenDs` \ ([discrim_var], matching_code) ->
     returnDs ( mkCoLetAny (NonRec discrim_var core_discrim) matching_code )
 
 dsExpr (ListComp expr quals)
@@ -267,6 +272,30 @@ dsExpr (HsDoOut stmts m_id mz_id src_loc)
   = putSrcLocDs src_loc $
     panic "dsExpr:HsDoOut"
 
+dsExpr (HsIf guard_expr then_expr else_expr src_loc)
+  = putSrcLocDs src_loc $
+    dsExpr guard_expr	`thenDs` \ core_guard ->
+    dsExpr then_expr	`thenDs` \ core_then ->
+    dsExpr else_expr	`thenDs` \ core_else ->
+    returnDs (mkCoreIfThenElse core_guard core_then core_else)
+
+\end{code}
+
+
+Type lambda and application
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+\begin{code}
+dsExpr (TyLam tyvars expr)
+  = dsExpr expr `thenDs` \ core_expr ->
+    returnDs (mkTyLam tyvars core_expr)
+
+dsExpr expr@(TyApp e tys) = dsApp expr []
+\end{code}
+
+
+Various data construction things
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+\begin{code}
 dsExpr (ExplicitListOut ty xs)
   = case xs of
       []     -> returnDs (mk_nil_con ty)
@@ -281,15 +310,9 @@ dsExpr (ExplicitTuple expr_list)
 	    (map coreExprType core_exprs)
 	    core_exprs
 
-dsExpr (RecordCon con  rbinds) = panic "dsExpr:RecordCon"
-dsExpr (RecordUpd aexp rbinds) = panic "dsExpr:RecordUpd"
-
-dsExpr (HsIf guard_expr then_expr else_expr src_loc)
-  = putSrcLocDs src_loc $
-    dsExpr guard_expr	`thenDs` \ core_guard ->
-    dsExpr then_expr	`thenDs` \ core_then ->
-    dsExpr else_expr	`thenDs` \ core_else ->
-    returnDs (mkCoreIfThenElse core_guard core_then core_else)
+dsExpr (HsCon con tys args)
+  = mapDs dsExpr args	`thenDs` \ args_exprs ->
+    mkConDs con tys args_exprs
 
 dsExpr (ArithSeqOut expr (From from))
   = dsExpr expr		  `thenDs` \ expr2 ->
@@ -316,38 +339,119 @@ dsExpr (ArithSeqOut expr (FromThenTo from thn two))
     mkAppDs expr2 [] [from2, thn2, two2]
 \end{code}
 
-
-Type lambda and application
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-\begin{code}
-dsExpr (TyLam tyvars expr)
-  = dsExpr expr `thenDs` \ core_expr ->
-    returnDs (mkTyLam tyvars core_expr)
-
-dsExpr expr@(TyApp e tys) = dsApp expr []
-\end{code}
-
-
 Record construction and update
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For record construction we do this (assuming T has three arguments)
+
+	T { op2 = e }
+==>
+	let err = /\a -> recConErr a 
+	T (recConErr t1 "M.lhs/230/op1") 
+	  e 
+	  (recConErr t1 "M.lhs/230/op3")
+
+recConErr then converts its arugment string into a proper message
+before printing it as
+
+	M.lhs, line 230: missing field op1 was evaluated
+
+
 \begin{code}
-{-
 dsExpr (RecordCon con_expr rbinds)
   = dsExpr con_expr	`thenDs` \ con_expr' ->
     let
-	con_args = map mk_arg (arg_tys `zip` fieldLabelTags)
-	(arg_tys, data_ty) = splitFunTy (coreExprType con_expr')
+	con_id   = get_con_id con_expr'
+	(arg_tys, data_ty) = splitFunTy (idType con_id)
 
-	mk_arg (arg_ty, tag) = case [  | (sel_id,rhs) <- rbinds,
-					 fieldLabelTag (recordSelectorFieldLabel sel_id) == tag
+	mk_arg (arg_ty, lbl) = case [rhs | (sel_id,rhs,_) <- rbinds,
+					   lbl == recordSelectorFieldLabel sel_id
 				    ] of
 				 (rhs:rhss) -> ASSERT( null rhss )
 					       dsExpr rhs
 
-				 [] -> returnDs ......GONE HOME!>>>>>
+				 [] -> mkErrorAppDs rEC_CON_ERROR_ID arg_ty (showForErr lbl)
+    in
+    mapDs mk_arg (arg_tys `zip` dataConFieldLabels con_id) `thenDs` \ con_args ->
 
-    mkAppDs con_expr [] con_args
--}
+    mkAppDs con_expr' [] con_args
+  where
+	-- The "con_expr'" is simply an application of the constructor Id
+	-- to types and (perhaps) dictionaries.  This boring little 
+	-- function gets the constructor out.
+    get_con_id (App fun _) = get_con_id fun
+    get_con_id (Var con)   = con
+\end{code}
+
+Record update is a little harder. Suppose we have the decl:
+
+	data T = T1 {op1, op2, op3 :: Int}
+	       | T2 {op4, op1 :: Int}
+	       | T3
+
+Then we translate as follows:
+
+	r { op2 = e }
+===>
+	let op2 = e in
+	case r of
+	  T1 op1 _ op3 -> T1 op1 op2 op3
+	  T2 op4 _     -> T2 op4 op2
+	  other	       -> recUpdError "M.lhs/230"
+
+It's important that we use the constructor Ids for T1, T2 etc on the
+RHSs, and do not generate a Core Con directly, because the constructor
+might do some argument-evaluation first; and may have to throw away some
+dictionaries.
+
+\begin{code}
+dsExpr (RecordUpdOut record_expr dicts rbinds)
+  = dsExpr record_expr	`thenDs` \ record_expr' ->
+
+	-- Desugar the rbinds, and generate let-bindings if
+	-- necessary so that we don't lose sharing
+--    dsRbinds rbinds		$ \ rbinds' ->
+    let rbinds' = panic "dsExpr:RecordUpdOut:rbinds'" in
+    let
+	record_ty		= coreExprType record_expr'
+	(tycon, inst_tys, cons) = getAppDataTyCon record_ty
+	cons_to_upd  	 	= filter has_all_fields cons
+
+	-- initial_args are passed to every constructor
+	initial_args		= map TyArg inst_tys ++ map VarArg dicts
+		
+	mk_val_arg (field, arg_id) 
+	  = case [arg | (f, arg) <- rbinds', f==field] of
+		(arg:args) -> ASSERT(null args)
+			      arg
+		[]	   -> VarArg arg_id
+
+	mk_alt con
+	  = newSysLocalsDs (dataConArgTys con inst_tys)	`thenDs` \ arg_ids ->
+	    let 
+		val_args = map mk_val_arg (dataConFieldLabels con `zipEqual` arg_ids)
+	    in
+	    returnDs (con, arg_ids, mkGenApp (mkGenApp (Var con) initial_args) val_args)
+
+	mk_default
+	  | length cons_to_upd == length cons 
+	  = returnDs NoDefault
+	  | otherwise			    
+	  = newSysLocalDs record_ty			`thenDs` \ deflt_id ->
+	    mkErrorAppDs rEC_UPD_ERROR_ID record_ty ""	`thenDs` \ err ->
+	    returnDs (BindDefault deflt_id err)
+    in
+    mapDs mk_alt cons_to_upd	`thenDs` \ alts ->
+    mk_default			`thenDs` \ deflt ->
+
+    returnDs (Case record_expr' (AlgAlts alts deflt))
+
+  where
+    has_all_fields :: Id -> Bool
+    has_all_fields con_id 
+      = all ok rbinds
+      where
+	con_fields        = dataConFieldLabels con_id
+	ok (sel_id, _, _) = recordSelectorFieldLabel sel_id `elem` con_fields
 \end{code}
 
 Dictionary lambda and application
@@ -502,6 +606,24 @@ apply_to_args fun args
     sep a@(TyArg ty)   (tys,vals) = (ty:tys, vals)
     sep a@(UsageArg _) _	  = panic "DsExpr:apply_to_args:UsageArg"
 \end{code}
+
+
+\begin{code}
+dsRbinds :: TypecheckedRecordBinds		-- The field bindings supplied
+	 -> ([(Id, CoreArg)] -> DsM CoreExpr)	-- A continuation taking the field
+						-- bindings with atomic rhss
+	 -> DsM CoreExpr			-- The result of the continuation,
+						-- wrapped in suitable Lets
+
+dsRbinds [] continue_with 
+  = continue_with []
+
+dsRbinds ((sel_id, rhs, pun_flag) : rbinds) continue_with
+  = dsExpr rhs		`thenDs` \ rhs' ->
+    dsExprToAtom rhs'	$ \ rhs_atom ->
+    dsRbinds rbinds	$ \ rbinds' ->
+    continue_with ((panic "dsRbinds:field_label?"{-sel_id-}, rhs_atom) : rbinds')
+\end{code}	
 
 \begin{code}
 do_unfold ty_env val_env (Lam (TyBinder tyvar) body) (TyArg ty : args)

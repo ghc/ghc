@@ -39,7 +39,6 @@ import CmdLineOpts	( opt_CompilingPrelude )
 import ErrUtils		( pprBagOfErrors, addErrLoc, Error(..) )
 import Id		( dataConSig, dataConArity )
 import Maybes		( assocMaybe, maybeToBool, Maybe(..) )
---import Name		( Name(..) )
 import Outputable
 import PprType		( GenType, GenTyVar, GenClass, TyCon )
 import PprStyle

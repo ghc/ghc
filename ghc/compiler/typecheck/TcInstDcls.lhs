@@ -63,7 +63,7 @@ import CoreUtils	( escErrorMsg )
 import Id		( GenId, idType, isDefaultMethodId_maybe )
 import ListSetOps	( minusList )
 import Maybes 		( maybeToBool, expectJust )
-import Outputable	( getLocalName, getOrigName )
+import Name		( getLocalName, getOrigName )
 import PrelInfo		( pAT_ERROR_ID )
 import PprType		( GenType, GenTyVar, GenClass, GenClassOp, TyCon,
 			  pprParendGenType )
@@ -663,8 +663,7 @@ processInstBinds1 inst_tyvars avail_insts method_ids mbind
     let tag       = panic "processInstBinds1:getTagFromClassOpName"{-getTagFromClassOpName op-}
 	method_id = method_ids !! (tag-1)
 
-	TcId method_bndr = method_id
-	method_ty = idType method_bndr
+	method_ty = tcIdType method_id
 	(method_tyvars, method_theta, method_tau) = splitSigmaTy method_ty
     in
     newDicts origin method_theta		`thenNF_Tc` \ (method_dicts,method_dict_ids) ->

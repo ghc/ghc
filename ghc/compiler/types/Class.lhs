@@ -37,9 +37,9 @@ import TyVar		( TyVar(..), GenTyVar )
 import Usage		( GenUsage, Usage(..), UVar(..) )
 
 import Maybes		( assocMaybe, Maybe )
-import Name		( Name )
+--import Name		( Name )
 import Unique		-- Keys for built-in classes
-import Outputable	( Outputable(..), NamedThing(..), ExportFlag )
+--import Outputable	( Outputable(..), NamedThing(..), ExportFlag )
 import Pretty		( Pretty(..), PrettyRep )
 import PprStyle		( PprStyle )
 import SrcLoc		( SrcLoc )
