@@ -44,7 +44,7 @@ module Module
 #include "HsVersions.h"
 import OccName
 import Outputable
-import CmdLineOpts ( opt_Static, opt_CompilingPrelude )
+import CmdLineOpts ( opt_Static )
 
 \end{code}
 
@@ -165,8 +165,8 @@ mkPrelModule :: UserString -> Module
 mkPrelModule s = Module (_PK_ (encode s)) ilk
  where 
   ilk
-   | opt_Static || opt_CompilingPrelude = HiFile
-   | otherwise				= HiDllFile
+   | opt_Static = HiFile
+   | otherwise	= HiDllFile
 
 mkSrcModuleFS :: UserFS -> Module
 mkSrcModuleFS s = Module (encodeFS s) HiFile

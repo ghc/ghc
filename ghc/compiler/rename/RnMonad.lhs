@@ -444,7 +444,7 @@ getAllFilesMatching dirs hims (dir_path, suffix) = ( do
     -- fpaths entries do not have dir_path prepended
   fpaths  <- getDirectoryContents dir_path
   is_dyns <- catch
-		(if dir_path == "." || opt_Static then
+		(if opt_Static || dir_path == "." then
 		     return False
 		 else
 		     doesFileExist (dir_path ++ '/': dir_contain_dll_his))
