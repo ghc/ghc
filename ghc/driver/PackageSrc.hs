@@ -128,7 +128,14 @@ package_details installing
                             then [ "$libdir" ]
                             else [ ghc_src_dir cGHC_LIB_DIR ++ "/std"
                                  , ghc_src_dir cGHC_LIB_DIR ++ "/std/cbits" ],
-        hs_libraries      = [ "HSstd" ],
+
+        hs_libraries      = 
+#                           ifndef mingw32_TARGET_OS
+                            [ "HSstd" ]
+#                           else
+                            [ "HSstd1", "HSstd2" ]
+#                           endif
+                            ,
 	extra_libraries   = [ "HSstd_cbits" ] ++
 #                           ifdef mingw32_TARGET_OS
                             ["wsock32", "msvcrt"]
