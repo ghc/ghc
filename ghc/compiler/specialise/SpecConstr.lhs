@@ -14,9 +14,12 @@ import CoreSyn
 import CoreLint		( showPass, endPass )
 import CoreUtils	( exprType, exprIsConApp_maybe, eqExpr )
 import CoreFVs 		( exprsFreeVars )
-import DataCon		( isExistentialDataCon )
+import DataCon		( dataConRepArity )
+import Type		( tyConAppArgs )
 import PprCore		( pprCoreRules )
-import Id		( Id, idName, idSpecialisation, mkUserLocal, mkSysLocal )
+import Id		( Id, idName, idType, idSpecialisation,
+			  isDataConId_maybe,
+			  mkUserLocal, mkSysLocal )
 import Var		( Var )
 import VarEnv
 import VarSet
@@ -191,14 +194,22 @@ dump_specs var = pprCoreRules var (idSpecialisation var)
 
 %************************************************************************
 %*									*
-\subsection{Environments and such}
+\subsection{Environment: goes downwards}
 %*									*
 %************************************************************************
 
 \begin{code}
-type ScEnv = VarEnv HowBound
+data ScEnv = SCE { scope :: VarEnv HowBound,
+			-- Binds all non-top-level variables in scope
 
-emptyScEnv = emptyVarEnv
+		   cons  :: ConstrEnv
+	     }
+
+type ConstrEnv = IdEnv (AltCon, [CoreArg])
+	-- Variables known to be bound to a constructor
+	-- in a particular case alternative
+
+emptyScEnv = SCE { scope = emptyVarEnv, cons = emptyVarEnv }
 
 data HowBound = RecFun		-- These are the recursive functions for which 
 				-- we seek interesting call patterns
@@ -211,18 +222,63 @@ data HowBound = RecFun		-- These are the recursive functions for which
 				-- passed as a parameter and what is in scope at the 
 				-- function definition site
 
-extendBndrs env bndrs = extendVarEnvList env [(b,Other) | b <- bndrs]
-extendBndr  env bndr  = extendVarEnv env bndr Other
+lookupScopeEnv env v = lookupVarEnv (scope env) v
 
+extendBndrs env bndrs = env { scope = extendVarEnvList (scope env) [(b,Other) | b <- bndrs] }
+extendBndr  env bndr  = env { scope = extendVarEnv (scope env) bndr Other }
+
+    -- When we encounter
+    --	case scrut of b
+    --	    C x y -> ...
+    -- we want to bind b, and perhaps scrut too, to (C x y)
+extendCaseBndr env case_bndr scrut con alt_bndrs
+  = case scrut of
+	Var v ->   -- Bind the scrutinee in the ConstrEnv if it's a variable
+		   -- Also forget if the scrutinee is a RecArg, because we're
+		   -- now in the branch of a case, and we don't want to
+		   -- record a non-scrutinee use of v if we have
+		   --	case v of { (a,b) -> ...(f v)... }
+		 SCE { scope = extendVarEnv (scope env1) v Other,
+		       cons  = extendVarEnv (cons env1)  v (con,args) }
+	other -> env1
+
+  where
+    env1 = SCE { scope = extendVarEnvList (scope env) [(b,Other) | b <- case_bndr : alt_bndrs],
+		 cons  = extendVarEnv     (cons  env) case_bndr (con,args) }
+
+    args = map Type (tyConAppArgs (idType case_bndr)) ++
+	   map varToCoreExpr alt_bndrs
+
+    -- When we encounter a recursive function binding
+    --	f = \x y -> ...
+    -- we want to extend the scope env with bindings 
+    -- that record that f is a RecFn and x,y are RecArgs
+extendRecBndr env fn bndrs
+  =  env { scope = scope env `extendVarEnvList` 
+		   ((fn,RecFun): [(bndr,RecArg) | bndr <- bndrs]) }
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Usage information: flows upwards}
+%*									*
+%************************************************************************
+
+\begin{code}
 data ScUsage
    = SCU {
-	calls :: !(IdEnv ([[CoreArg]])),	-- Calls
-						-- The functions are a subset of the 
-						-- 	RecFuns in the ScEnv
+	calls :: !(IdEnv ([Call])),	-- Calls
+					-- The functions are a subset of the 
+					-- 	RecFuns in the ScEnv
 
 	occs :: !(IdEnv ArgOcc)		-- Information on argument occurrences
      }					-- The variables are a subset of the 
 					--	RecArg in the ScEnv
+
+type Call = (ConstrEnv, [CoreArg])
+	-- The arguments of the call, together with the
+	-- env giving the constructor bindings at the call site
 
 nullUsage = SCU { calls = emptyVarEnv, occs = emptyVarEnv }
 
@@ -253,6 +309,9 @@ combineOcc _	     _	       = Both
 %*									*
 %************************************************************************
 
+The main recursive function gathers up usage information, and
+creates specialised versions of functions.
+
 \begin{code}
 scExpr :: ScEnv -> CoreExpr -> UniqSM (ScUsage, CoreExpr)
 	-- The unique supply is needed when we invent
@@ -275,10 +334,10 @@ scExpr env (Case scrut b alts)
     sc_scrut e@(Var v) = returnUs (varUsage env v CaseScrut, e)
     sc_scrut e	       = scExpr env e
 
-    sc_alt (con,bs,rhs) = scExpr env rhs	`thenUs` \ (usg,rhs') ->
+    sc_alt (con,bs,rhs) = scExpr env1 rhs	`thenUs` \ (usg,rhs') ->
 			  returnUs (usg, (con,bs,rhs'))
 			where
-			  env1 = extendBndrs env (b:bs)
+			  env1 = extendCaseBndr env b scrut con bs
 
 scExpr env (Let bind body)
   = scBind env bind	`thenUs` \ (env', bind_usg, bind') ->
@@ -293,8 +352,9 @@ scExpr env e@(App _ _)
     let
 	arg_usg = combineUsages usgs
 	fn_usg  | Var f <- fn,
-		  Just RecFun <- lookupVarEnv env f
-		= SCU { calls = unitVarEnv f [args], occs = emptyVarEnv }
+		  Just RecFun <- lookupScopeEnv env f
+		= SCU { calls = unitVarEnv f [(cons env, args)], 
+			occs  = emptyVarEnv }
 		| otherwise
 		= nullUsage
     in
@@ -306,7 +366,10 @@ scExpr env e@(App _ _)
 scBind :: ScEnv -> CoreBind -> UniqSM (ScEnv, ScUsage, CoreBind)
 scBind env (Rec [(fn,rhs)])
   | not (null val_bndrs)
-  = scExpr env' body			`thenUs` \ (usg@(SCU { calls = calls, occs = occs }), body') ->
+  = scExpr env' body			`thenUs` \ (usg, body') ->
+    let
+	SCU { calls = calls, occs = occs } = usg
+    in
     specialise env fn bndrs body usg	`thenUs` \ (rules, spec_prs) ->
     returnUs (extendBndrs env bndrs,
 	      SCU { calls = calls `delVarEnv` fn, occs = occs `delVarEnvList` val_bndrs},
@@ -314,7 +377,7 @@ scBind env (Rec [(fn,rhs)])
   where
     (bndrs,body) = collectBinders rhs
     val_bndrs    = filter isId bndrs
-    env' = env `extendVarEnvList` ((fn,RecFun): [(bndr,RecArg) | bndr <- bndrs])
+    env'	 = extendRecBndr env fn bndrs
 
 scBind env (Rec prs)
   = mapAndUnzipUs do_one prs	`thenUs` \ (usgs, prs') ->
@@ -329,8 +392,9 @@ scBind env (NonRec bndr rhs)
 
 ----------------------
 varUsage env v use 
-  | Just RecArg <- lookupVarEnv env v = SCU { calls = emptyVarEnv, occs = unitVarEnv v use }
-  | otherwise		   	      = nullUsage
+  | Just RecArg <- lookupScopeEnv env v = SCU { calls = emptyVarEnv, 
+						occs = unitVarEnv v use }
+  | otherwise		   	        = nullUsage
 \end{code}
 
 
@@ -355,11 +419,11 @@ specialise env fn bndrs body (SCU {calls=calls, occs=occs})
 
 	good_calls :: [[CoreArg]]
 	good_calls = [ pats
-		     | call_args <- all_calls,
-		       length call_args >= n_bndrs,	-- App is saturated
+		     | (con_env, call_args) <- all_calls,
+		       length call_args >= n_bndrs,	    -- App is saturated
 		       let call = (bndrs `zip` call_args),
-		       any (good_arg occs) call,
-		       let (_, pats) = argsToPats us call_args
+		       any (good_arg con_env occs) call,    -- At least one arg is a constr app
+		       let (_, pats) = argsToPats con_env us call_args
 		     ]
     in
     pprTrace "specialise" (ppr all_calls $$ ppr good_calls) $
@@ -370,11 +434,10 @@ specialise env fn bndrs body (SCU {calls=calls, occs=occs})
     same_call as1 as2 = and (zipWith eqExpr as1 as2)
 
 ---------------------
-good_arg :: IdEnv ArgOcc -> (CoreBndr, CoreArg) -> Bool
-good_arg arg_occs (bndr, arg)
-  = case exprIsConApp_maybe arg of			-- exprIsConApp_maybe looks
-	Just (dc,_) -> not (isExistentialDataCon dc)	-- through unfoldings
-		       && bndr_usg_ok arg_occs bndr arg
+good_arg :: ConstrEnv -> IdEnv ArgOcc -> (CoreBndr, CoreArg) -> Bool
+good_arg con_env arg_occs (bndr, arg)
+  = case is_con_app_maybe con_env arg of	
+	Just _ ->  bndr_usg_ok arg_occs bndr arg
 	other   -> False
 
 bndr_usg_ok :: IdEnv ArgOcc -> Var -> CoreArg -> Bool
@@ -389,35 +452,15 @@ bndr_usg_ok arg_occs bndr arg
     
 
 ---------------------
-argsToPats :: UniqSupply -> [CoreArg] -> (UniqSupply, [CoreExpr])
-argsToPats us args = mapAccumL argToPat us args
-
-argToPat   :: UniqSupply -> CoreArg   -> (UniqSupply, CoreExpr)
---    C a (D (f x) (g y))  ==>  C p1 (D p2 p3)
-argToPat us (Type ty) 
-  = (us, Type ty)
-
-argToPat us arg
-  | Just (dc,args) <- exprIsConApp_maybe arg
-  = let
-	(us',args') = argsToPats us args
-    in
-    (us', mkConApp dc args')
-
-argToPat us (Var v)	-- Don't uniqify existing vars,
-  = (us, Var v)		-- so that we can spot when we pass them twice
-
-argToPat us arg
-  = (us1, Var (mkSysLocal SLIT("sc") (uniqFromSupply us2) (exprType arg)))
-  where
-    (us1,us2) = splitUniqSupply us
-
----------------------
 spec_one :: ScEnv
 	 -> Id					-- Function
 	 -> CoreExpr				-- Rhs of the original function
 	 -> ([CoreArg], Int)
 	 -> UniqSM (CoreRule, (Id,CoreExpr))	-- Rule and binding
+
+-- spec_one creates a specialised copy of the function, together
+-- with a rule for using it.  I'm very proud of how short this
+-- function is, considering what it does :-).
 
 {- 
   Example
@@ -445,7 +488,7 @@ spec_one env fn rhs (pats, n)
 	spec_occ     = mkSpecOcc (nameOccName fn_name)
 	pat_fvs	     = varSetElems (exprsFreeVars pats)
 	vars_to_bind = filter not_avail pat_fvs
-	not_avail v  = not (v `elemVarEnv` env)
+	not_avail v  = not (v `elemVarEnv` scope env)
 		-- Put the type variables first just for tidiness
 	(tvs, ids)   = partition isTyVar vars_to_bind
 	bndrs  	     = tvs ++ ids
@@ -456,4 +499,69 @@ spec_one env fn rhs (pats, n)
 	rule      = Rule rule_name pat_fvs pats (mkVarApps (Var spec_id) bndrs)
     in
     returnUs (rule, (spec_id, spec_rhs))
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Argument analysis}
+%*									*
+%************************************************************************
+
+This code deals with analysing call-site arguments to see whether
+they are constructor applications.
+
+\begin{code}
+    -- argToPat takes an actual argument, and returns an abstracted
+    -- version, consisting of just the "constructor skeleton" of the
+    -- argument, with non-constructor sub-expression replaced by new
+    -- placeholder variables.  For example:
+    --    C a (D (f x) (g y))  ==>  C p1 (D p2 p3)
+
+argToPat   :: ConstrEnv -> UniqSupply -> CoreArg   -> (UniqSupply, CoreExpr)
+argToPat env us (Type ty) 
+  = (us, Type ty)
+
+argToPat env us arg
+  | Just (dc,args) <- is_con_app_maybe env arg
+  = let
+	(us',args') = argsToPats env us args
+    in
+    (us', mk_con_app dc args')
+
+argToPat env us (Var v)	-- Don't uniqify existing vars,
+  = (us, Var v)		-- so that we can spot when we pass them twice
+
+argToPat env us arg
+  = (us1, Var (mkSysLocal SLIT("sc") (uniqFromSupply us2) (exprType arg)))
+  where
+    (us1,us2) = splitUniqSupply us
+
+argsToPats :: ConstrEnv -> UniqSupply -> [CoreArg] -> (UniqSupply, [CoreExpr])
+argsToPats env us args = mapAccumL (argToPat env) us args
+\end{code}
+
+
+\begin{code}
+is_con_app_maybe :: ConstrEnv -> CoreExpr -> Maybe (AltCon, [CoreExpr])
+is_con_app_maybe env (Var v)
+  = lookupVarEnv env v
+	-- You might think we could look in the idUnfolding here
+	-- but that doesn't take account of which branch of a 
+	-- case we are in, which is the whole point
+
+is_con_app_maybe env (Lit lit)
+  = Just (LitAlt lit, [])
+
+is_con_app_maybe env expr
+  = case collectArgs expr of
+	(Var fun, args) | Just con <- isDataConId_maybe fun,
+			  length args >= dataConRepArity con
+		-- Might be > because the arity excludes type args
+		        -> Just (DataAlt con,args)
+
+	other -> Nothing
+
+mk_con_app :: AltCon -> [CoreArg] -> CoreExpr
+mk_con_app (LitAlt lit)  []   = Lit lit
+mk_con_app (DataAlt con) args = mkConApp con args
 \end{code}
