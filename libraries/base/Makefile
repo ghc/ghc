@@ -128,6 +128,9 @@ System/Posix/Types.o Foreign/C/Types.o: include/CTypes.h
 
 # -----------------------------------------------------------------------------
 
+DIST_CLEAN_FILES += HsBaseConfig.h base.buildinfo config.cache config.status 
+LATE_DIST_CLEAN_FILES += config.mk
+
 include $(TOP)/mk/target.mk
 
 ifeq "$(OBJECT_FILEFORMAT)" "PEi"
