@@ -47,52 +47,20 @@ emitExternalCore _ _ _
 mkExternalCore :: ModIface -> ModDetails -> C.Module
 mkExternalCore (ModIface {mi_module=mi_module,mi_exports=mi_exports}) 
 	       (ModDetails {md_types=md_types,md_binds=md_binds}) =
-    C.Module mname {- exports -} tdefs vdefs
+    C.Module mname tdefs vdefs
   where
     mname = make_mid mi_module
-{-  exports = foldr (collect_exports md_types) ([],[],[]) all_avails 
-    all_avails = concat (map snd (filter ((== moduleName mi_module) . fst) mi_exports))
--}
     tdefs = foldr collect_tdefs [] (typeEnvTyCons md_types)
     vdefs = map make_vdef md_binds
-
-{-
-collect_exports :: TypeEnv -> AvailInfo -> ([C.Tcon],[C.Dcon],[C.Var]) -> ([C.Tcon],[C.Dcon],[C.Var])
-collect_exports tyenv (Avail n) (tcons,dcons,vars) = (tcons,dcons,make_var_id n:vars) 	    
-collect_exports tyenv (AvailTC n ns) (tcons,dcons,vars) = 
-  case lookupNameEnv_NF tyenv n of
-     ATyCon tc | isAlgTyCon tc -> 
-         (tcon ++ tcons,workers ++ dcons,wrappers ++ vars)
-         where 
-           tcon = if elem n ns then [make_con_id n] else []
-	   workers = if isNewTyCon tc then []
-	             else map  (make_con_id . idName . dataConId) exported_dcs
-	   exported_dcs = filter (\dc -> elem ((idName . dataConWrapId) dc) ns') dcs
-	   dcs = tyConDataConsIfAvailable tc
-	   wrappers = map make_var_id ns'
-           ns' = filter (\n' -> n' /= n && not (elem n' recordSels)) ns
-           recordSels = map idName (tyConSelIds tc)
-     AClass cl ->  {- maybe a little too free about exports -}
-        (tcon : tcons,workers ++ dcons,wrappers ++ vars)
-        where 
-          tcon = make_con_id (tyConName tc)
-	  workers = if isNewTyCon tc then []
-                    else map (make_con_id . idName . dataConId) dcs 
-	  wrappers = map (make_var_id . idName . dataConWrapId) dcs
-          dcs = tyConDataConsIfAvailable tc
-          tc = classTyCon cl
-     _ -> (tcons,dcons,vars)
--}
-
 
 collect_tdefs :: TyCon -> [C.Tdef] -> [C.Tdef]
 collect_tdefs tcon tdefs 
   | isAlgTyCon tcon = tdef: tdefs
   where
     tdef | isNewTyCon tcon = 
-                C.Newtype (make_con_id (tyConName tcon)) (map make_tbind tyvars) repclause 
+                C.Newtype (make_con_qid (tyConName tcon)) (map make_tbind tyvars) repclause 
          | otherwise = 
-                C.Data (make_con_id (tyConName tcon)) (map make_tbind tyvars) (map make_cdef (tyConDataCons tcon)) 
+                C.Data (make_con_qid (tyConName tcon)) (map make_tbind tyvars) (map make_cdef (tyConDataCons tcon)) 
          where repclause | isRecursiveTyCon tcon = Nothing
 		         | otherwise = Just (make_ty rep)
                                            where (_, rep) = newTyConRep tcon
@@ -104,7 +72,7 @@ collect_tdefs _ tdefs = tdefs
 make_cdef :: DataCon -> C.Cdef
 make_cdef dcon =  C.Constr dcon_name existentials tys
   where 
-    dcon_name = make_con_id (idName (dataConId dcon))
+    dcon_name = make_con_qid (idName (dataConId dcon))
     existentials = map make_tbind ex_tyvars
           where (_,_,ex_tyvars,_,_,_) = dataConSig dcon
     tys = map make_ty (dataConRepArgTys dcon)
@@ -115,14 +83,12 @@ make_tbind tv = (make_var_id (tyVarName tv), make_kind (tyVarKind tv))
 make_vbind :: Var -> C.Vbind
 make_vbind v = (make_var_id  (Var.varName v), make_ty (varType v))
 
-make_vdef :: CoreBind -> (Bool, C.Vdefg)
+make_vdef :: CoreBind -> C.Vdefg
 make_vdef b = 
   case b of
-    NonRec v e -> (isGlobalId v,C.Nonrec (f (v,e)))
-    Rec ves -> (or (map g ves),C.Rec (map f ves))
-  where f (v,e) = (n,t,make_exp e)
-                  where (n,t) = make_vbind v
-        g (v,e) = isGlobalId v
+    NonRec v e -> C.Nonrec (f (v,e))
+    Rec ves -> C.Rec (map f ves)
+  where f (v,e) = (make_var_qid (Var.varName v), make_ty (varType v),make_exp e)
 
 make_exp :: CoreExpr -> C.Exp
 make_exp (Var v) =  
@@ -137,7 +103,7 @@ make_exp (App e (Type t)) = C.Appt (make_exp e) (make_ty t)
 make_exp (App e1 e2) = C.App (make_exp e1) (make_exp e2)
 make_exp (Lam v e) | isTyVar v = C.Lam (C.Tb (make_tbind v)) (make_exp e)
 make_exp (Lam v e) | otherwise = C.Lam (C.Vb (make_vbind v)) (make_exp e)
-make_exp (Let b e) = C.Let (snd (make_vdef b)) (make_exp e)
+make_exp (Let b e) = C.Let (make_vdef b) (make_exp e)
 make_exp (Case e v alts) = C.Case (make_exp e) (make_vbind v) (map make_alt alts)
 make_exp (Note (SCC cc) e) = C.Note "SCC"  (make_exp e) -- temporary
 make_exp (Note (Coerce t_to t_from) e) = C.Coerce (make_ty t_to) (make_exp e)
@@ -204,9 +170,6 @@ make_id is_var nm =
 make_var_id :: Name -> C.Id
 make_var_id = make_id True
 
-make_con_id :: Name -> C.Id
-make_con_id = make_id False
-
 make_mid :: Module -> C.Id
 make_mid = moduleNameString . moduleName
 
@@ -215,7 +178,7 @@ make_qid is_var n = (mname,make_id is_var n)
     where mname = 
            case nameModule_maybe n of
             Just m -> make_mid m
-            Nothing -> ""   -- for now!
+            Nothing -> "" 
 
 make_var_qid :: Name -> C.Qual C.Id
 make_var_qid = make_qid True

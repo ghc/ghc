@@ -39,30 +39,23 @@ instance Show Lit where
 
 indent = nest 2
 
-pmodule (Module mname {- (texports,dexports,vexports) -}  tdefs vdefs) =
+pmodule (Module mname tdefs vdefgs) =
   (text "%module" <+> text mname)
-{-  $$ indent (parens (((fsep (map pname texports) <> char ',')
-			$$ (fsep (map pname dexports) <> char ',')
-			$$ (fsep (map pname vexports)))) 
--}
     $$ indent ((vcat (map ((<> char ';') . ptdef) tdefs))
-	       $$ (vcat (map ((<> char ';') . pgvdef) vdefs)))
-
-pgvdef (False,vdef) = text "%local" <+> pvdefg vdef
-pgvdef (True,vdef) = pvdefg vdef
+	       $$ (vcat (map ((<> char ';') . pvdefg) vdefgs)))
 
 ptdef (Data tcon tbinds cdefs) =
-  (text "%data" <+> pname tcon <+> (hsep (map ptbind tbinds)) <+> char '=')
+  (text "%data" <+> pqname tcon <+> (hsep (map ptbind tbinds)) <+> char '=')
   $$ indent (braces ((vcat (punctuate (char ';') (map pcdef cdefs)))))
 
 ptdef (Newtype tcon tbinds rep ) =
-  text "%newtype" <+> pname tcon <+> (hsep (map ptbind tbinds)) <+> repclause
+  text "%newtype" <+> pqname tcon <+> (hsep (map ptbind tbinds)) <+> repclause
        where repclause = case rep of
                            Just ty -> char '=' <+> pty ty 
 			   Nothing -> empty
 
 pcdef (Constr dcon tbinds tys)  =
-  (pname dcon) <+> (sep [hsep (map pattbind tbinds),sep (map paty tys)])
+  (pqname dcon) <+> (sep [hsep (map pattbind tbinds),sep (map paty tys)])
 
 pname id = text id
 
@@ -103,7 +96,7 @@ pforall tbs t = hsep (map ptbind tbs) <+> char '.' <+> pty t
 pvdefg (Rec vtes) = text "%rec" $$ braces (indent (vcat (punctuate (char ';') (map pvte vtes))))
 pvdefg (Nonrec vte) = pvte vte
 
-pvte (v,t,e) = sep [pname v <+> text "::" <+> pty t <+> char '=',
+pvte (v,t,e) = sep [pqname v <+> text "::" <+> pty t <+> char '=',
 		    indent (pexp e)]
 
 paexp (Var x) = pqname x
