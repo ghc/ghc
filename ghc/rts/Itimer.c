@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.28 2001/11/27 01:51:23 sof Exp $
+ * $Id: Itimer.c,v 1.29 2001/11/27 01:57:59 sof Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -178,7 +178,7 @@ startVirtTimer(nat ms)
 # else
     struct itimerval it;
 
-    install_vtalrm_handler(void)
+    install_vtalrm_handler();
 
     timestamp = getourtimeofday();
 
