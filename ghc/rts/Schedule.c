@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.87 2001/01/24 15:46:19 simonmar Exp $
+ * $Id: Schedule.c,v 1.88 2001/01/31 11:04:29 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -2005,10 +2005,6 @@ static void GetRoots(void)
 
 #if defined(SMP) || defined(PAR) || defined(GRAN)
   markSparkQueue();
-#endif
-
-#if defined(GHCI)
-  markCafs();
 #endif
 }
 

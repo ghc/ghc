@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.34 2001/01/29 17:23:41 simonmar Exp $
+ * $Id: Storage.c,v 1.35 2001/01/31 11:04:29 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -267,18 +267,6 @@ newCAF(StgClosure* caf)
 
   RELEASE_LOCK(&sm_mutex);
 }
-
-#ifdef GHCI
-void
-markCafs( void )
-{
-    StgClosure *p;
-
-    for (p = caf_list; p != NULL; p = STATIC_LINK2(get_itbl(p),p)) {
-	MarkRoot(p);
-    }
-}
-#endif /* GHCI */
 
 /* -----------------------------------------------------------------------------
    Nursery management.
