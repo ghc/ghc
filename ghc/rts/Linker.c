@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.128 2003/09/10 14:45:25 simonmar Exp $
+ * $Id: Linker.c,v 1.129 2003/09/11 15:12:25 wolfgang Exp $
  *
  * (c) The GHC Team, 2000-2003
  *
@@ -71,6 +71,7 @@
 #  include <mach-o/loader.h>
 #  include <mach-o/nlist.h>
 #  include <mach-o/reloc.h>
+#  include <mach-o/dyld.h>
 #endif
 
 /* Hash table mapping symbol names to Symbol */
@@ -819,8 +820,15 @@ lookupSymbol( char *lbl )
     val = lookupStrHashTable(symhash, lbl);
 
     if (val == NULL) {
-#       if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
+#       if defined(OBJFORMAT_ELF)
 	return dlsym(dl_prog_handle, lbl);
+#       elif defined(OBJFORMAT_MACHO)
+	if(NSIsSymbolNameDefined(lbl)) {
+	    NSSymbol symbol = NSLookupAndBindSymbol(lbl);
+	    return NSAddressOfSymbol(symbol);
+	} else {
+	    return NULL;
+	}
 #       elif defined(OBJFORMAT_PEi386)
         OpenedDLL* o_dll;
         void* sym;
@@ -3028,13 +3036,16 @@ static int resolveImports(
 	    return 0;
 	}
 	ASSERT(addr);
+	checkProddableBlock(oc,((void**)(image + sect->offset)) + i);
 	((void**)(image + sect->offset))[i] = addr;
     }
     
     return 1;
 }
 
-static int relocateSection(char *image, 
+static int relocateSection(
+    ObjectCode* oc,
+    char *image, 
     struct symtab_command *symLC, struct nlist *nlist,
     struct section* sections, struct section *sect)
 {
@@ -3062,6 +3073,7 @@ static int relocateSection(char *image,
 		{
 		    unsigned long* word = (unsigned long*) (image + sect->offset + scat->r_address);
 		    
+		    checkProddableBlock(oc,word);
 		    *word = scat->r_value + sect->offset + ((long) image);
 		}
 	    }
@@ -3079,6 +3091,7 @@ static int relocateSection(char *image,
 		unsigned long word = 0;
 
 		unsigned long* wordPtr = (unsigned long*) (image + sect->offset + reloc->r_address);
+		checkProddableBlock(oc,wordPtr);
 		
 		if(reloc->r_type == GENERIC_RELOC_VANILLA)
 		{
@@ -3213,6 +3226,10 @@ static int ocGetNames_MachO(ObjectCode* oc)
 	    addSection(oc, SECTIONKIND_RWDATA, 
 		(void*) (image + sections[i].offset),
 		(void*) (image + sections[i].offset + sections[i].size));
+		
+	if(sections[i].size > 0)    // size 0 segments do exist
+	    addProddableBlock(oc, (void*) (image + sections[i].offset),
+					    sections[i].size);
     }
 
 	// count external symbols defined here
@@ -3329,7 +3346,7 @@ static int ocResolve_MachO(ObjectCode* oc)
     
     for(i=0;i<segLC->nsects;i++)
     {
-	if(!relocateSection(image,symLC,nlist,sections,&sections[i]))
+	if(!relocateSection(oc,image,symLC,nlist,sections,&sections[i]))
 	    return 0;
     }
 
