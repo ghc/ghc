@@ -21,7 +21,7 @@ import HscTypes		( implicitTyThings )
 import BuildTyCl	( buildClass, buildAlgTyCon, buildSynTyCon, buildDataCon,
 			  mkDataTyConRhs, mkNewTyConRhs )
 import TcRnMonad
-import TcEnv		( TcTyThing(..), TyThing(..), 
+import TcEnv		( TyThing(..), 
 			  tcLookupLocated, tcLookupLocatedGlobal, 
 			  tcExtendGlobalEnv, tcExtendKindEnv,
 			  tcExtendRecEnv, tcLookupTyVar )
@@ -29,7 +29,7 @@ import TcTyDecls	( calcTyConArgVrcs, calcRecFlags, calcClassCycles, calcSynCycle
 import TcClassDcl	( tcClassSigs, tcAddDeclCtxt )
 import TcHsType		( kcHsTyVars, kcHsLiftedSigType, kcHsType, 
 			  kcHsContext, tcTyVarBndrs, tcHsKindedType, tcHsKindedContext,
-			  kcHsSigType, tcHsBangType, tcLHsConSig )
+			  kcHsSigType, tcHsBangType, tcLHsConSig, tcDataKindSig )
 import TcMType		( newKindVar, checkValidTheta, checkValidType, checkFreeness, 
 			  UserTypeCtxt(..), SourceTyCtxt(..) ) 
 import TcUnify		( unifyKind )
@@ -41,7 +41,7 @@ import Generics		( validGenericMethodType, canDoGenerics )
 import Class		( Class, className, classTyCon, DefMeth(..), classBigSig, classTyVars )
 import TyCon		( TyCon, ArgVrcs, 
 			  tyConDataCons, mkForeignTyCon, isProductTyCon, isRecursiveTyCon,
-			  tyConStupidTheta, getSynTyConDefn, tyConDataCons, isSynTyCon, tyConName )
+			  tyConStupidTheta, getSynTyConDefn, isSynTyCon, tyConName )
 import DataCon		( DataCon, dataConWrapId, dataConName, dataConSig, 
 			  dataConFieldLabels, dataConOrigArgTys, dataConTyCon )
 import Type		( zipTopTvSubst, substTys )
@@ -328,7 +328,7 @@ kcTyClDeclBody decl thing_inside
 	; thing_inside kinded_tvs }
   where
     result_kind (TyData { tcdKindSig = Just kind }) = kind
-    result_kind other				   = liftedTypeKind
+    result_kind other				    = liftedTypeKind
 	-- On GADT-style declarations we allow a kind signature
 	--	data T :: *->* where { ... }
 
@@ -366,21 +366,23 @@ tcTyClDecl calc_vrcs calc_isrec decl
 
 tcTyClDecl1 calc_vrcs calc_isrec 
   (TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdTyVars = tvs,
-	   tcdLName = L _ tc_name, tcdCons = cons})
-  = tcTyVarBndrs tvs		$ \ tvs' -> do 
-  { stupid_theta <- tcStupidTheta ctxt cons
+	   tcdLName = L _ tc_name, tcdKindSig = mb_ksig, tcdCons = cons})
+  = tcTyVarBndrs tvs	$ \ tvs' -> do 
+  { extra_tvs <- tcDataKindSig mb_ksig
+  ; let final_tvs = tvs' ++ extra_tvs
+  ; stupid_theta <- tcStupidTheta ctxt cons
   ; want_generic <- doptM Opt_Generics
   ; tycon <- fixM (\ tycon -> do 
 	{ unbox_strict <- doptM Opt_UnboxStrictFields
 	; gla_exts <- doptM Opt_GlasgowExts
 	; checkTc (gla_exts || h98_syntax) (badGadtDecl tc_name)
 
-	; data_cons <- mappM (addLocM (tcConDecl unbox_strict new_or_data tycon tvs')) cons
+	; data_cons <- mappM (addLocM (tcConDecl unbox_strict new_or_data tycon final_tvs)) cons
 	; let tc_rhs = case new_or_data of
 			DataType -> mkDataTyConRhs stupid_theta data_cons
 			NewType  -> ASSERT( isSingleton data_cons )
 				    mkNewTyConRhs tycon (head data_cons)
-	; buildAlgTyCon tc_name tvs' tc_rhs arg_vrcs is_rec
+	; buildAlgTyCon tc_name final_tvs tc_rhs arg_vrcs is_rec
 			(want_generic && canDoGenerics data_cons)
 	})
   ; return (ATyCon tycon)
@@ -612,7 +614,7 @@ checkValidDataCon tc con
 --	; checkFreeness tvs ex_theta }
   where
     ctxt = ConArgCtxt (dataConName con) 
-    (tvs, ex_theta, _, _, _) = dataConSig con
+--    (tvs, ex_theta, _, _, _) = dataConSig con
 
 
 -------------------------------

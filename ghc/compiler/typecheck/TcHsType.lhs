@@ -14,7 +14,7 @@ module TcHsType (
 	
 		-- Typechecking kinded types
 	tcHsKindedContext, tcHsKindedType, tcHsBangType,
-	tcTyVarBndrs, dsHsType, tcLHsConSig,
+	tcTyVarBndrs, dsHsType, tcLHsConSig, tcDataKindSig,
 
 	tcHsPatSigType, tcAddLetBoundTyVars,
 	
@@ -28,13 +28,10 @@ import HsSyn		( HsType(..), LHsType, HsTyVarBndr(..), LHsTyVarBndr, HsBang,
 			  LHsContext, HsPred(..), LHsPred, LHsBinds,
 			  getBangStrictness, collectSigTysFromHsBinds )
 import RnHsSyn		( extractHsTyVars )
-import TcHsSyn		( TcId )
-
 import TcRnMonad
 import TcEnv		( tcExtendTyVarEnv, tcExtendKindEnv,
 			  tcLookup, tcLookupClass, tcLookupTyCon,
-		 	  TyThing(..), TcTyThing(..), 
-			  getInLocalScope, wrongThingErr
+		 	  TyThing(..), getInLocalScope, wrongThingErr
 			)
 import TcMType		( newKindVar, tcSkolType, newMetaTyVar, 
 			  zonkTcKindToKind, 
@@ -48,21 +45,22 @@ import TcType		( Type, PredType(..), ThetaType,
 		 	  mkForAllTys, mkFunTys, tcEqType, isPredTy,
 			  mkSigmaTy, mkPredTy, mkGenTyConApp, mkTyConApp, mkAppTys, 
 			  tcSplitFunTy_maybe, tcSplitForAllTys )
-import Kind 		( liftedTypeKind, ubxTupleKind, openTypeKind, argTypeKind )
-import Inst		( InstOrigin(..) )
-
+import Kind 		( Kind, isLiftedTypeKind, liftedTypeKind, ubxTupleKind, 
+			  openTypeKind, argTypeKind, splitKindFunTys )
 import Id		( idName, idType )
 import Var		( TyVar, mkTyVar, tyVarKind )
 import TyCon		( TyCon, tyConKind )
 import Class		( Class, classTyCon )
-import Name		( Name )
+import Name		( Name, mkInternalName )
+import OccName		( mkOccName, tvName )
 import NameSet
 import PrelNames	( genUnitTyConName )
 import Type		( deShadowTy )
 import TysWiredIn	( mkListTy, mkPArrTy, mkTupleTy )
 import Bag		( bagToList )
 import BasicTypes	( Boxity(..) )
-import SrcLoc		( Located(..), unLoc, noLoc )
+import SrcLoc		( Located(..), unLoc, noLoc, srcSpanStart )
+import UniqSupply	( uniqsFromSupply )
 import Outputable
 import List		( nubBy )
 \end{code}
@@ -618,6 +616,36 @@ tcTyVarBndrs bndrs thing_inside
 				   returnM (mkTyVar name kind')
     zonk (UserTyVar name) = pprTrace "Un-kinded tyvar" (ppr name) $
 			    returnM (mkTyVar name liftedTypeKind)
+
+-----------------------------------
+tcDataKindSig :: Maybe Kind -> TcM [TyVar]
+-- GADT decls can have a (perhpas partial) kind signature
+--	e.g.  data T :: * -> * -> * where ...
+-- This function makes up suitable (kinded) type variables for 
+-- the argument kinds, and checks that the result kind is indeed *
+tcDataKindSig Nothing = return []
+tcDataKindSig (Just kind)
+  = do	{ checkTc (isLiftedTypeKind res_kind) (badKindSig kind)
+	; span <- getSrcSpanM
+	; us   <- newUniqueSupply 
+	; let loc   = srcSpanStart span
+	      uniqs = uniqsFromSupply us
+	; return [ mk_tv loc uniq str kind 
+		 | ((kind, str), uniq) <- arg_kinds `zip` names `zip` uniqs ] }
+  where
+    (arg_kinds, res_kind) = splitKindFunTys kind
+    mk_tv loc uniq str kind = mkTyVar name kind
+	where
+	   name = mkInternalName uniq occ loc
+	   occ  = mkOccName tvName str
+
+    names :: [String]	-- a,b,c...aa,ab,ac etc
+    names = [ c:cs | cs <- "" : names, c <- ['a'..'z'] ] 
+
+badKindSig :: Kind -> SDoc
+badKindSig kind 
+ = hang (ptext SLIT("Kind signature on data type declaration has non-* return kind"))
+	2 (ppr kind)
 \end{code}
 
 

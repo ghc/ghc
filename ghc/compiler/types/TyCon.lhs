@@ -91,8 +91,8 @@ data TyCon
 	tyConKind   :: Kind,
 	tyConArity  :: Arity,
 	
-	tyConTyVars :: [TyVar],		-- Scopes over (a) the [PredType] in DataTyCon
-					--	       (b) the cached types in NewTyCon
+	tyConTyVars :: [TyVar],		-- Scopes over (a) the [PredType] in AlgTyConRhs.DataTyCon
+					--	       (b) the cached types in AlgTyConRhs.NewTyCon
 					--	       (c) the types in algTcFields
 					-- But not over the data constructors
 	argVrcs     :: ArgVrcs,
