@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.61 2001/04/03 13:18:35 sewardj Exp $
+# $Id: Makefile,v 1.62 2001/04/06 01:07:23 lewie Exp $
 #
 
 TOP=..
@@ -27,7 +27,7 @@ PKGCONF_OPTS = "$(TARGETPLATFORM)"		\
 	       "$(GHC_INCLUDE_DIR)"		\
 	       "$(FPTOOLS_TOP_ABS)"
 
-ghc_407_at_least = $(shell expr "$(GhcMinVersion)" \>= 7)
+ghc_407_at_least = $(shell expr "$(GhcVersion)" \>= 4.07)
 ifeq "$(ghc_407_at_least)" "1"
 ifneq "$(mingw32_TARGET_OS)" "1"
 SRC_HC_OPTS += -fglasgow-exts -cpp -package concurrent -package posix -package text
