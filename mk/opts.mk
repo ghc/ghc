@@ -5,7 +5,7 @@
 #	This file defines Make variables for the
 #	option flags for each utility program
 #
-# 	$Id: opts.mk,v 1.11 1999/06/03 07:12:10 sof Exp $
+# 	$Id: opts.mk,v 1.12 2000/01/05 11:55:29 rrt Exp $
 #
 #################################################################################
 
@@ -113,9 +113,9 @@ MKDEPENDHS_OPTS    = $(SRC_MKDEPENDHS_OPTS) $(WAY$(_way)_MKDEPENDHS_OPTS) \
                      $(EXTRA_MKDEPENDHS_OPTS)
 MKDEPENDLIT_OPTS   = $(SRC_MKDEPENDLIT_OPTS) $(WAY$(_way)_MKDEPENDLIT_OPTS) \
                      $(EXTRA_MKDEPENDLIT_OPTS)
-SGML2LATEX_OPTS    = $(SRC_SGML2LATEX_OPTS) $(WAY$(_way)_SGML2LATEX_OPTS) $(EXTRA_SGML2LATEX_OPTS)
+SGML2DVI_OPTS      = $(SRC_SGML2DVI_OPTS) $(WAY$(_way)_SGML2DVI_OPTS) $(EXTRA_SGML2DVI_OPTS)
 SGML2INFO_OPTS     = $(SRC_SGML2INFO_OPTS) $(WAY$(_way)_SGML2INFO_OPTS) $(EXTRA_INFO_OPTS)
-SGML2TXT_OPTS      = $(SRC_SGML2TXT_OPTS) $(WAY$(_way)_SGML2TXT_OPTS) $(EXTRA_SGML2TXT_OPTS)
+SGML2RTF_OPTS      = $(SRC_SGML2RTF_OPTS) $(WAY$(_way)_SGML2RTF_OPTS) $(EXTRA_SGML2RTF_OPTS)
 SGML2HTML_OPTS     = $(SRC_SGML2HTML_OPTS) $(WAY$(_way)_SGML2HTML_OPTS) $(EXTRA_SGML2HTML_OPTS)
 UGEN_OPTS          = $(SRC_UGEN_OPTS) $(WAY$(_way)_UGEN_OPTS) $(EXTRA_UGEN_OPTS)
 UNLIT_OPTS         = $(SRC_UNLIT_OPTS) $(WAY$(_way)_UNLIT_OPTS) $(EXTRA_UNLIT_OPTS)

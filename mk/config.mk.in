@@ -632,10 +632,10 @@ YACC			= @YaccCmd@
 #-----------------------------------------------------------------------------
 # SGML stuff (currently not configured - we assume you have it)
 
-SGML2LATEX		= sgml2latex
-SGML2HTML		= sgml2html
-SGML2INFO		= sgml2info
-SGML2TXT		= sgml2txt
+SGML2DVI		= db2dvi
+SGML2HTML		= db2html
+SGML2INFO		= db2info
+SGML2RTF		= db2rtf
 
 #-----------------------------------------------------------------------------
 # 		FPtools support software
@@ -649,7 +649,6 @@ MSUB			= $(MSUB_PREFIX)msub
 ETAGS			= $(ETAGS_PREFIX)etags
 VERBATIM		= $(VERBATIM_PREFIX)verbatim
 SGMLVERB		= $(SGMLVERB_PREFIX)sgmlverb
-SGML2LATEX		= sgml2latex
 RUNTEST			= $(RUNTEST_PREFIX)runstdtest
 HAPPY			= @HappyCmd@
 HAPPY_VERSION		= @HappyVersion@		
