@@ -18,3 +18,4 @@ test "ffi003"   { skip when $platform == "alpha-dec-osf3" -- no NCG on Alpha yet
 
 test "ffi004"   { vtr("-fglasgow-exts", "", "") }
 
+test "ffi005"   { vtr("-fglasgow-exts", "", "3") }
