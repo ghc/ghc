@@ -846,14 +846,12 @@ dnl ################################################################
 dnl Check for libraries
 dnl ################################################################
 
-AC_CHECK_LIB(dl, dlopen, [
-	HaveLibDL=YES
-	AC_DEFINE(HAVE_LIBDL)], [HaveLibDL=NO])
-if test x$HaveLibDL = xYES; then
-   AC_DEFINE(HAVE_DLOPEN)
-else
-   AC_CHECK_FUNCS(dlopen)
-fi
+AC_CHECK_LIB(dl, dlopen, 
+	[HaveLibDL=YES
+	 AC_DEFINE(HAVE_LIBDL)
+	 LIBS="$LIBS -ldl"], 
+	[HaveLibDL=NO])
+AC_CHECK_FUNCS(dlopen)
 AC_SUBST(HaveLibDL)
 
 FPTOOLS_CHECK_LIB_NOWARN(m, atan)
