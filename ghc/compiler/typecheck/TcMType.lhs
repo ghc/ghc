@@ -394,7 +394,7 @@ zonkTcPredType (IParam n t)
 \begin{code}
 zonkQuantifiedTyVar :: TcTyVar -> TcM TyVar
 -- zonkQuantifiedTyVar is applied to the a TcTyVar when quantifying over it.
--- It might be a meta TyVar, in which case we freeze it inot ano ordinary TyVar.
+-- It might be a meta TyVar, in which case we freeze it into an ordinary TyVar.
 -- When we do this, we also default the kind -- see notes with Kind.defaultKind
 -- The meta tyvar is updated to point to the new regular TyVar.  Now any 
 -- bound occurences of the original type variable will get zonked to 
@@ -764,7 +764,13 @@ check_tau_type :: Rank -> UbxTupFlag -> Type -> TcM ()
 check_tau_type rank ubx_tup ty@(ForAllTy _ _)       = failWithTc (forAllTyErr ty)
 check_tau_type rank ubx_tup ty@(FunTy (PredTy _) _) = failWithTc (forAllTyErr ty)
 	-- Reject e.g. (Maybe (?x::Int => Int)), with a decent error message
-check_tau_type rank ubx_tup ty@(PredTy _) = pprPanic "check_tau_type" (ppr ty)
+
+-- Naked PredTys don't usually show up, but they can as a result of
+--	{-# SPECIALISE instance Ord Char #-}
+-- The Right Thing would be to fix the way that SPECIALISE instance pragmas
+-- are handled, but the quick thing is just to permit PredTys here.
+check_tau_type rank ubx_tup (PredTy sty) = getDOpts		`thenM` \ dflags ->
+					   check_source_ty dflags TypeCtxt sty
 
 check_tau_type rank ubx_tup (TyVarTy _)       = returnM ()
 check_tau_type rank ubx_tup ty@(FunTy arg_ty res_ty)
