@@ -5,6 +5,14 @@
     <title>User-visible compiler changes</title>
 
     <itemizedlist>
+
+      <listitem>
+	<para>Majorly improved support for Windows platforms.  Binary
+	builds are now entirely freestanding.  There is no longer any
+	need to install Cygwin or Mingwin to use it.  It's a
+	one-click-install-and-off-you-go story now.</para>
+      </listitem>
+
       <listitem>
 	<para>Several small changes to bring GHC into line with the
 	newest Haskell&nbsp;98 report.</para>
@@ -27,7 +35,8 @@
 	<para>Thanks to the heroic efforts of Ken Shan
 	<email>ken@digitas.harvard.edu</email>, GHC now works again on
 	the Alpha architecture (just Tru64 at the moment), and many
-	(all?) of the 64-bit bugs have been shaken out.</para>
+	64-bit bugs have been shaken out.  Interactive mode and the
+        native code generator do not currently work, sorry.</para>
       </listitem>
 
       <listitem>
@@ -35,24 +44,84 @@
 	to omit code generation and all future compilation stages (see
 	<xref linkend="options-codegen">).</para>
       </listitem>
+
+      <listitem>
+        <para>New option <option>-package-conf
+        <replaceable>file</replaceable></option>.  This makes GHC read
+        additional package descriptions from
+        <replaceable>file</replaceable>.</para>
+      </listitem>
+
+      <listitem>
+	<para><option>+RTS
+	-i<replaceable>seconds</replaceable></option> flag reinstated
+	for heap profiling.</para>
+      </listitem>
+
+      <listitem>
+	<para><option>-funbox-strict-fields</option> now works
+	correctly.</para>
+      </listitem>
+
+      <listitem>
+	<para>
+        Many bug fixes related to implicit-parameter support.</para>
+      </listitem>
+
+      <listitem>
+	<para>
+        Data declarations with no constructors are allowed.</para>
+      </listitem>
+
     </itemizedlist>
   </sect2>
 
   <sect2>
-    <title>New experimental features</title>
+    <title>User-visible interpreter (GHCi) changes</title>
 
     <itemizedlist>
-      <!-- don't forget: 31-bit support -->
+      <listitem>
+         <para>GHCi now works on Windows.</para>
+      </listitem>
 
       <listitem>
-	<para>A compacting garbage collector has been added.  It isn't
-	on by default, because it is somewhat slower than the existing
-	copying collector, but can be automatically enabled when
-	memory gets tight by setting the maximum heap size (see <xref
-	linkend="rts-options-gc">).  Compaction works together with
-	the existing generational scheme: it is only used on the
-	oldest generation.</para>
+	<para>Partial FFI support in GHCi.  At the moment, foreign
+        import (static and dynamic) are supported on x86 and sparc
+        platforms.</para>
       </listitem>
+
+      <listitem>
+	<para>New interpreter command <literal>:add</literal>, to add
+	modules to the current bunch.</para>
+      </listitem>
+
+      <listitem>
+	<para>New interpreter command <literal>:info</literal>, to provide
+	information on values, types and classes, a la Hugs.</para>
+      </listitem>
+
+      <listitem>
+	<para>Multiple target modules are supported.  You may specify
+	multiple modules for the <literal>:add</literal> and
+	<literal>:load</literal> commands.  From the command line, you
+	may specify multiple modules when starting GHCi and when
+	compiling in <option>--make</option> mode.</para>
+      </listitem>
+
+      <listitem>
+	<para>New flags <option>-ignore-dot-ghci</option> and
+	<option>-read-dot-ghci</option>.</para>
+      </listitem>
+
+      <listitem>
+	<para>When starting GHCi from the command line, you may now
+	use the flags
+	<option>-L<replaceable>library-path</replaceable></option> and
+	<option>-l<replaceable>library-name</replaceable></option> to
+	specify libraries to be loaded into the interactive
+	session.</para>
+      </listitem>
+
     </itemizedlist>
   </sect2>
 
@@ -149,6 +218,40 @@
   </sect2>
 
   <sect2>
+    <title>New experimental features</title>
+
+    <itemizedlist>
+      <!-- don't forget: 31-bit support -->
+
+      <listitem>
+	<para>Support for hierarchical module names.</para>
+      </listitem>
+
+      <listitem>
+         <para>.NET code generator.</para>
+      </listitem>
+
+      <listitem>
+         <para>Emission of external Core format.</para>
+      </listitem>
+
+      <listitem>
+         <para>Experimental FFI extensions.</para>
+      </listitem>
+
+      <listitem>
+	<para>A compacting garbage collector has been added.  It isn't
+	on by default, because it is somewhat slower than the existing
+	copying collector, but can be automatically enabled when
+	memory gets tight by setting the maximum heap size (see <xref
+	linkend="rts-options-gc">).  Compaction works together with
+	the existing generational scheme: it is only used on the
+	oldest generation.</para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
     <title>Internal changes</title>
     <itemizedlist>
       <listitem>
@@ -164,6 +267,17 @@
 	by one written using the FFI.  No externally visible
 	changes.</para>
       </listitem>
+
+      <listitem>
+	<para>The compiler has a new strictness-and-absence analyser,
+        which is alleged to help it generate better code.</para>
+      </listitem>
+
+      <listitem>
+	<para>Improved temporary (<literal>alloca</literal>-style)
+	memory support in the RTS: pinned objects.</para>
+      </listitem>
+
     </itemizedlist>
   </sect2>
 
