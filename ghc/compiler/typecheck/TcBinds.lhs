@@ -51,7 +51,7 @@ import Type		( mkTyVarTy, tyVarsOfTypes, mkTyConApp,
 			  mkPredTy, mkForAllTy, isUnLiftedType, 
 			  isUnboxedType, unboxedTypeKind, boxedTypeKind, openTypeKind
 			)
-import FunDeps		( tyVarFunDep, oclose )
+import FunDeps		( oclose )
 import Var		( tyVarKind )
 import VarSet
 import Bag
@@ -557,8 +557,8 @@ getTyVarsToGen is_unrestricted mono_id_tys lie
 	  -- Then we should generalise over b too; otherwise it will be
 	  -- reported as ambiguous.
 	zonkFunDeps fds		`thenNF_Tc` \ fds' ->
-	let tvFundep 	    = tyVarFunDep fds'
-	    extended_tyvars = oclose tvFundep body_tyvars
+	let 
+	    extended_tyvars = oclose fds' body_tyvars
  	in
 	returnNF_Tc (emptyVarSet, extended_tyvars)
     else

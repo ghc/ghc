@@ -126,7 +126,5 @@ zonkUnifyTys free ts1 ts2
   = mapTc zonkTcType ts1 `thenTc` \ ts1' ->
     mapTc zonkTcType ts2 `thenTc` \ ts2' ->
     -- pprTrace "zMT" (ppr (ts1', free, ts2')) $
-    case unifyTyListsX free ts2' ts1' of
-      Just subst -> returnTc (Just subst)
-      Nothing    -> returnTc Nothing
+    returnTc (unifyTyListsX free ts2' ts1')
 \end{code}

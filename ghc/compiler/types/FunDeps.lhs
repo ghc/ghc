@@ -9,7 +9,6 @@ It's better to read it as: "if we know these, then we're going to know these"
 module FunDeps (
 	oclose,
         instantiateFdClassTys,
-        tyVarFunDep,
         pprFundeps
     ) where
 
@@ -22,16 +21,18 @@ import Outputable	( Outputable, SDoc, interppSP, ptext, empty, hsep, punctuate, 
 import UniqSet
 import VarSet
 import VarEnv
-import Unique		( Uniquable )
 import Util		( zipEqual )
 \end{code}
 
 
 \begin{code}
-oclose :: Uniquable a => [FunDep a] -> UniqSet a -> UniqSet a
+oclose :: [FunDep Type] -> TyVarSet -> TyVarSet
 -- (oclose fds tvs) closes the set of type variables tvs, 
 -- wrt the functional dependencies fds.  The result is a superset
 -- of the argument set.
+--
+-- In fact the functional dependencies are *instantiated*, so we
+-- first have to extract the free vars.
 --
 -- For example,
 --	oclose [a -> b] {a}     = {a,b}
@@ -40,10 +41,16 @@ oclose :: Uniquable a => [FunDep a] -> UniqSet a -> UniqSet a
 -- If all of the things on the left of an arrow are in the set, add
 -- the things on the right of that arrow.
 
-oclose fds vs =
-    case oclose1 fds vs of
-      (vs', False) -> vs'
-      (vs', True)  -> oclose fds vs'
+oclose fds vs
+  = go vs
+  where
+    go vs = case oclose1 tv_fds vs of
+		(vs', False) -> vs'
+		(vs', True)  -> go vs'
+
+    tv_fds  :: [FunDep TyVar]
+    tv_fds  = [(get_tvs xs, get_tvs ys) | (xs, ys) <- fds]
+    get_tvs = varSetElems . tyVarsOfTypes
 
 oclose1 [] vs = (vs, False)
 oclose1 (fd@(ls, rs):fds) vs =
@@ -74,11 +81,6 @@ instantiateFdClassTys clas tys
     env       = mkVarEnv (zipEqual "instantiateFdClassTys" tyvars tys)
     lookup tv = lookupVarEnv_NF env tv
 
-tyVarFunDep :: [FunDep Type] -> [FunDep TyVar]
-tyVarFunDep fdtys 
-  = [(getTyvars xs, getTyvars ys) | (xs, ys) <- fdtys]
-  where 
-    getTyvars = varSetElems . tyVarsOfTypes
 
 pprFundeps :: Outputable a => [FunDep a] -> SDoc
 pprFundeps [] = empty
