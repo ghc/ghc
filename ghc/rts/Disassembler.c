@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Disassembler.c,v $
- * $Revision: 1.20 $
- * $Date: 2001/03/21 10:56:04 $
+ * $Revision: 1.21 $
+ * $Date: 2001/05/01 13:11:16 $
  * ---------------------------------------------------------------------------*/
 
 #ifdef DEBUG
@@ -44,6 +44,9 @@ int disInstr ( StgBCO *bco, int pc )
    StgInfoTable** itbls       = (StgInfoTable**)(&itbls_arr->payload[0]);
 
    switch (instrs[pc++]) {
+      case bci_STKCHECK: 
+         fprintf(stderr, "STKCHECK %d\n", instrs[pc] );
+         pc += 1; break;
       case bci_ARGCHECK: 
          fprintf(stderr, "ARGCHECK %d\n", instrs[pc] );
          pc += 1; break;
