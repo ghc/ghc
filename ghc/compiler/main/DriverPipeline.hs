@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.2 2000/10/11 16:26:04 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.3 2000/10/16 15:16:59 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -16,7 +16,6 @@ module DriverPipeline (
 
 #include "HsVersions.h"
 
-import CmSummarise -- for mkdependHS stuff
 import DriverState
 import DriverUtil
 import DriverMkDepend
@@ -71,67 +70,6 @@ getGhcMode flags
 	(_    , _   ) -> 
 	  throwDyn (OtherError 
 		"only one of the flags -M, -E, -C, -S, -c, --make, --interactive is allowed")
-
------------------------------------------------------------------------------
--- Phases
-
-{-
-Phase of the           | Suffix saying | Flag saying   | (suffix of)
-compilation system     | ``start here''| ``stop after''| output file
-
-literate pre-processor | .lhs          | -             | -
-C pre-processor (opt.) | -             | -E            | -
-Haskell compiler       | .hs           | -C, -S        | .hc, .s
-C compiler (opt.)      | .hc or .c     | -S            | .s
-assembler              | .s  or .S     | -c            | .o
-linker                 | other         | -             | a.out
--}
-
-data Phase 
-	= MkDependHS	-- haskell dependency generation
-	| Unlit
-	| Cpp
-	| Hsc
-	| Cc
-	| HCc		-- Haskellised C (as opposed to vanilla C) compilation
-	| Mangle	-- assembly mangling, now done by a separate script.
-	| SplitMangle	-- after mangler if splitting
-	| SplitAs
-	| As
-	| Ln 
-  deriving (Eq)
-
--- the first compilation phase for a given file is determined
--- by its suffix.
-startPhase "lhs"   = Unlit
-startPhase "hs"    = Cpp
-startPhase "hc"    = HCc
-startPhase "c"     = Cc
-startPhase "raw_s" = Mangle
-startPhase "s"     = As
-startPhase "S"     = As
-startPhase "o"     = Ln     
-startPhase _       = Ln	   -- all unknown file types
-
--- the output suffix for a given phase is uniquely determined by
--- the input requirements of the next phase.
-phase_input_ext Unlit       = "lhs"
-phase_input_ext	Cpp         = "lpp"	-- intermediate only
-phase_input_ext	Hsc         = "cpp"	-- intermediate only
-phase_input_ext	HCc         = "hc"
-phase_input_ext Cc          = "c"
-phase_input_ext	Mangle      = "raw_s"
-phase_input_ext	SplitMangle = "split_s"	-- not really generated
-phase_input_ext	As          = "s"
-phase_input_ext	SplitAs     = "split_s" -- not really generated
-phase_input_ext	Ln          = "o"
-phase_input_ext MkDependHS  = "dep"
-
-haskellish_suffix = (`elem` [ "hs", "lhs", "hc" ])
-cish_suffix       = (`elem` [ "c", "s", "S" ])  -- maybe .cc et al.??
-
-haskellish_file f = haskellish_suffix suf where (_,suf) = splitFilename f
-cish_file f       = cish_suffix suf       where (_,suf) = splitFilename f
 
 -----------------------------------------------------------------------------
 -- genPipeline
@@ -253,7 +191,7 @@ genPipeline todo stop_flag filename
       annotatePipeline []     _    = []
       annotatePipeline (Ln:_) _    = []
       annotatePipeline (phase:next_phase:ps) stop = 
-     	  (phase, keep_this_output, phase_input_ext next_phase)
+     	  (phase, keep_this_output, phaseInputExt next_phase)
 	     : annotatePipeline (next_phase:ps) stop
      	  where
      		keep_this_output
@@ -470,7 +408,7 @@ run_phase Hsc	basename suff input_fn output_fn
   -- date wrt M.hs (or M.o doesn't exist) so we must recompile regardless.
 	do_recomp <- readIORef recomp
 	todo <- readIORef v_GhcMode
-        o_file <- odir_ify (basename ++ '.':phase_input_ext Ln)
+        o_file <- odir_ify (basename ++ '.':phaseInputExt Ln)
 	source_unchanged <- 
           if not (do_recomp && ( todo == DoLink || todo == StopBefore Ln ))
 	     then return ""

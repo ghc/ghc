@@ -394,16 +394,16 @@ data CompResult
 -- generate Linkables.
 
 data HscResult
-   = HscOK   ModDetails  		-- new details (HomeSymbolTable additions)
-	     (Maybe ModIFace)		-- new iface (if any compilation was done)
-	     (Maybe String)  		-- generated stub_h
-	     (Maybe String)  		-- generated stub_c
-             PersistentCompilerState 	-- updated PCS
-             [SDoc]                  	-- warnings
+   = HscOK   ModDetails  	     -- new details (HomeSymbolTable additions)
+	     (Maybe ModIFace)	     -- new iface (if any compilation was done)
+	     (Maybe String)  	     -- generated stub_h filename (in /tmp)
+	     (Maybe String)  	     -- generated stub_c filename (in /tmp)
+             PersistentCompilerState -- updated PCS
+             [SDoc]                  -- warnings
 
-   | HscErrs PersistentCompilerState 	-- updated PCS
-             [SDoc]                  	-- errors
-             [SDoc]                  	-- warnings
+   | HscErrs PersistentCompilerState -- updated PCS
+             [SDoc]                  -- errors
+             [SDoc]                  -- warnings
 
 	
 -- These two are only here to avoid recursion between CmCompile and

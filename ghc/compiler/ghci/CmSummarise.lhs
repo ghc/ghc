@@ -14,9 +14,10 @@ where
 
 import List 		( nub )
 import Char		( ord, isAlphaNum )
+import Finder
+import FastTypes
 
-import Module		( Module, mod_name, mod_kind, 
-			  ModuleName, mkModuleName, ModuleKind(..) )
+import Module		( Module, ModuleName, mkModuleName)
 import Outputable
 \end{code}
 
@@ -32,7 +33,8 @@ import Outputable
 -- and let @compile@ read from that file on the way back up.
 data ModSummary
    = ModSummary {
-        ms_mod      :: Module,                          -- location and kind
+        ms_mod      :: Module,                          -- name, package
+	ms_location :: ModuleLocation,			-- location
         ms_ppsource :: (Maybe (FilePath, Fingerprint)), -- preprocessed and sig if .hs
         ms_imports  :: (Maybe [ModImport])              -- imports if .hs or .hi
      }
@@ -64,7 +66,7 @@ mi_name (MINormal nm) = nm
 mi_name (MISource nm) = nm
 
 name_of_summary :: ModSummary -> ModuleName
-name_of_summary = mod_name . ms_mod
+name_of_summary = moduleName . ms_mod
 
 deps_of_summary :: ModSummary -> [ModuleName]
 deps_of_summary = map mi_name . ms_get_imports
@@ -93,15 +95,16 @@ summarise mod
 
 fingerprint :: String -> Int
 fingerprint s
-   = dofp s 3# 3#
+   = dofp s (_ILIT 3) (_ILIT 3)
      where
         -- Copied from hash() in Hugs' storage.c.
-        dofp :: String -> Int# -> Int# -> Int
-        dofp []     m fp = I# fp
-        dofp (c:cs) m fp = dofp cs (m +# 1#) (iabs (fp +# m *# unbox (ord c)))
-        unbox (I# i) = i
-        iabs :: Int# -> Int#
-        iabs n = if n <# 0# then 0# -# n else n
+        dofp :: String -> FastInt -> FastInt -> Int
+        dofp []     m fp = iBox fp
+        dofp (c:cs) m fp = dofp cs (m +# _ILIT 1) 
+				(iabs (fp +# m *# iUnbox (ord c)))
+
+        iabs :: FastInt -> FastInt
+        iabs n = if n <# _ILIT 0 then (_ILIT 0) -# n else n
 \end{code}
 
 Collect up the imports from a Haskell source module.  This is

@@ -1,0 +1,174 @@
+%
+% (c) The University of Glasgow, 2000
+%
+\section[Finder]{Module Finder}
+
+\begin{code}
+module Finder (
+    Finder, 		-- =  ModuleName -> IO (Maybe (Module, ModuleLocation))
+    newFinder, 		-- :: PackageConfigInfo -> IO Finder, 
+    ModuleLocation(..)
+  ) where
+
+#include "HsVersions.h"
+
+import CmStaticInfo
+import DriverPhases
+import DriverState
+import Module
+import FiniteMap
+import Util
+import Panic
+
+import IOExts
+import Directory
+import List
+import IO
+import Monad
+\end{code}
+
+\begin{code}
+type Finder = ModuleName -> IO (Maybe (Module, ModuleLocation))
+
+data ModuleLocation
+   = ModuleLocation {
+	hs_file  :: FilePath,
+	hi_file  :: FilePath,
+	obj_file :: FilePath
+      }
+
+-- caches contents of package directories, never expunged
+GLOBAL_VAR(pkgDirCache,    Nothing,  Maybe (FiniteMap String (PackageName, FilePath)))
+
+-- caches contents of home directories, expunged whenever we
+-- create a new finder.
+GLOBAL_VAR(homeDirCache,   emptyFM,  FiniteMap String FilePath)
+
+-- caches finder mapping, expunged whenever we create a new finder.
+GLOBAL_VAR(finderMapCache, emptyFM, FiniteMap ModuleName Module)
+
+
+newFinder :: PackageConfigInfo -> IO Finder
+newFinder (PackageConfigInfo pkgs) = do
+  -- expunge our caches
+  writeIORef homeDirCache   emptyFM
+  writeIORef finderMapCache emptyFM
+
+  -- populate the home dir cache, using the import path (the import path
+  -- is changed by -i flags on the command line, and defaults to ["."]).
+  home_imports <- readIORef import_paths
+  let extendFM fm path = do
+	  contents <- getDirectoryContents' path
+          return (addListToFM fm (zip contents (repeat path)))
+  home_map <- foldM extendFM emptyFM home_imports
+  writeIORef homeDirCache home_map
+
+  -- populate the package cache, if necessary
+  pkg_cache <- readIORef pkgDirCache
+  case pkg_cache of 
+    Nothing -> do
+
+	let extendFM fm pkg = do
+		let dirs = import_dirs pkg
+		    pkg_name = _PK_ (name pkg)
+		let addDir fm dir = do
+			contents <- getDirectoryContents' dir
+			return (addListToFM fm (zip contents 
+						   (repeat (pkg_name,dir))))
+                foldM addDir fm dirs
+
+  	pkg_map <- foldM extendFM emptyFM pkgs
+	writeIORef pkgDirCache (Just pkg_map)
+
+    Just _ -> 
+        return ()
+
+  -- and return the finder
+  return finder
+
+  
+finder :: ModuleName -> IO (Maybe (Module, ModuleLocation))
+finder name = do
+  j <- maybeHomeModule name
+  case j of
+	Just home_module -> return (Just home_module)
+	Nothing -> maybePackageModule name
+
+maybeHomeModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
+maybeHomeModule mod_name = do
+   home_cache <- readIORef homeDirCache
+
+   let basename = moduleNameString mod_name
+       hs  = basename ++ ".hs"
+       lhs = basename ++ ".lhs"
+
+   case lookupFM home_cache hs of {
+	Just path -> mkHomeModuleLocn mod_name basename path hs;
+	Nothing ->
+
+   case lookupFM home_cache lhs of {
+	Just path ->  mkHomeModuleLocn mod_name basename path lhs;
+	Nothing -> return Nothing
+
+   }}
+
+mkHomeModuleLocn mod_name basename path source_fn = do
+
+   -- figure out the .hi file name: it lives in the same dir as the
+   -- source, unless there's a -ohi flag on the command line.
+   ohi    <- readIORef output_hi
+   hisuf  <- readIORef hi_suf
+   let hifile = case ohi of
+		   Nothing -> path ++ '/':basename ++ hisuf
+		   Just fn -> fn
+
+   -- figure out the .o file name.  It also lives in the same dir
+   -- as the source, but can be overriden by a -odir flag.
+   o_file <- odir_ify (path ++ '/':basename ++ '.':phaseInputExt Ln)
+
+   return (Just (mkHomeModule mod_name,
+                 ModuleLocation{
+		    hs_file  = source_fn,
+		    hi_file  = hifile,
+		    obj_file = o_file
+	         }
+	))
+
+maybePackageModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
+maybePackageModule mod_name = do
+  maybe_pkg_cache <- readIORef pkgDirCache
+  case maybe_pkg_cache of {
+     Nothing -> panic "maybePackageModule: no pkg_cache";
+     Just pkg_cache -> do
+
+  -- hi-suffix for packages depends on the build tag.
+  package_hisuf <-
+	do tag <- readIORef build_tag
+	   if null tag
+		then return "hi"
+		else return (tag ++ "_hi")
+
+  let basename = moduleNameString mod_name
+      hi  = basename ++ '.':package_hisuf
+
+  case lookupFM pkg_cache hi of
+	Nothing -> return Nothing
+	Just (pkg_name,path) -> 
+	    return (Just (mkModule mod_name pkg_name,
+			  ModuleLocation{ 
+				hs_file  = error "package module; no source",
+				hi_file  = hi,
+				obj_file = error "package module; no object"
+			   }
+		   ))
+
+   }
+
+getDirectoryContents' d
+   = IO.catch (getDirectoryContents d)
+	  (\_ -> do hPutStr stderr 
+		          ("WARNING: error while reading directory " ++ d)
+		    return []
+	  )
+	 
+\end{code}
