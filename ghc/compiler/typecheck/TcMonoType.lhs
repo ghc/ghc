@@ -747,29 +747,33 @@ checkSigTyVars sig_tyvars free_tyvars
 
 	main_msg = ptext SLIT("Inferred type is less polymorphic than expected")
 
-	check (env, acc, msgs) (sig_tyvar,ty)
+	check (tidy_env, acc, msgs) (sig_tyvar,ty)
 		-- sig_tyvar is from the signature;
 		-- ty is what you get if you zonk sig_tyvar and then tidy it
 		--
 		-- acc maps a zonked type variable back to a signature type variable
 	  = case getTyVar_maybe ty of {
 	      Nothing ->			-- Error (a)!
-			returnNF_Tc (env, acc, unify_msg sig_tyvar (ppr ty) : msgs) ;
+			returnNF_Tc (tidy_env, acc, unify_msg sig_tyvar (ppr ty) : msgs) ;
 
 	      Just tv ->
 
 	    case lookupVarEnv acc tv of {
 		Just sig_tyvar' -> 	-- Error (b) or (d)!
-			returnNF_Tc (env, acc, unify_msg sig_tyvar (ppr sig_tyvar') : msgs) ;
+			returnNF_Tc (tidy_env, acc, unify_msg sig_tyvar (ppr sig_tyvar') : msgs) ;
 
 		Nothing ->
 
 	    if tv `elemVarSet` globals	-- Error (c)! Type variable escapes
 					-- The least comprehensible, so put it last
-	    then   tcGetEnv 						`thenNF_Tc` \ env ->
-        	   find_globals tv env  [] (tcEnvTcIds)			`thenNF_Tc` \ (env1, globs) ->
-        	   find_frees   tv env1 [] (varSetElems free_tyvars)	`thenNF_Tc` \ (env2, frees) ->
-		   returnNF_Tc (env2, acc, escape_msg sig_tyvar tv globs frees : msgs)
+			-- Game plan: 
+			--    a) get the local TcIds from the environment,
+			-- 	 and pass them to find_globals (they might have tv free)
+			--    b) similarly, find any free_tyvars that mention tv
+	    then   tcGetEnv 							`thenNF_Tc` \ tc_env ->
+        	   find_globals tv tidy_env  [] (tcEnvTcIds tc_env)		`thenNF_Tc` \ (tidy_env1, globs) ->
+        	   find_frees   tv tidy_env1 [] (varSetElems free_tyvars)	`thenNF_Tc` \ (tidy_env2, frees) ->
+		   returnNF_Tc (tidy_env2, acc, escape_msg sig_tyvar tv globs frees : msgs)
 
 	    else 	-- All OK
 	    returnNF_Tc (env, extendVarEnv acc tv sig_tyvar, msgs)
@@ -783,8 +787,7 @@ find_globals tv tidy_env acc []
   = returnNF_Tc (tidy_env, acc)
 
 find_globals tv tidy_env acc (id:ids) 
-  | not (isLocallyDefined id) ||
-    isEmptyVarSet (idFreeTyVars id)
+  | isEmptyVarSet (idFreeTyVars id)
   = find_globals tv tidy_env acc ids
 
   | otherwise
