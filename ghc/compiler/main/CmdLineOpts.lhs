@@ -133,17 +133,18 @@ module CmdLineOpts (
 	opt_NoImplicitPrelude,
 	opt_OmitBlackHoling,
 	opt_OmitInterfacePragmas,
-	opt_ProduceC,
 	opt_ProduceExportCStubs,
 	opt_ProduceExportHStubs,
 	opt_ProduceHi,
-	opt_ProduceS,
 	opt_NoPruneDecls,
 	opt_ReportCompile,
 	opt_SourceUnchanged,
 	opt_Static,
 	opt_Unregisterised,
 	opt_Verbose,
+
+	opt_OutputLanguage,
+	opt_OutputFile,
 
 	-- Code generation
 	opt_UseVanillaRegs,
@@ -412,10 +413,19 @@ opt_NoHiCheck                   = lookUp  SLIT("-fno-hi-version-check")
 opt_NoImplicitPrelude		= lookUp  SLIT("-fno-implicit-prelude")
 opt_OmitBlackHoling		= lookUp  SLIT("-dno-black-holing")
 opt_OmitInterfacePragmas	= lookUp  SLIT("-fomit-interface-pragmas")
-opt_ProduceC  			= lookup_str "-C="
 opt_ProduceExportCStubs		= lookup_str "-F="
 opt_ProduceExportHStubs		= lookup_str "-FH="
 opt_ProduceHi 			= lookup_str "-hifile=" -- the one to produce this time 
+
+-- Language for output: "C", "asm", "java", maybe more
+-- Nothing => don't output anything
+opt_OutputLanguage :: Maybe String
+opt_OutputLanguage = lookup_str "-olang="
+
+opt_OutputFile :: String
+opt_OutputFile 	   = case lookup_str "-ofile=" of
+			Nothing -> panic "No output file specified (-ofile=xxx)"
+			Just f  -> f
 
 -- Simplifier switches
 opt_SimplNoPreInlining		= lookUp SLIT("-fno-pre-inlining")
@@ -439,7 +449,6 @@ opt_UF_KeenessFactor		= lookup_def_float "-funfolding-keeness-factor"	   (1.5::F
 opt_UF_CheapOp  = ( 1 :: Int)	-- Only one instruction; and the args are charged for
 opt_UF_DearOp   = ( 4 :: Int)
 			
-opt_ProduceS  			= lookup_str "-S="
 opt_ReportCompile               = lookUp SLIT("-freport-compile")
 opt_NoPruneDecls		= lookUp SLIT("-fno-prune-decls")
 opt_SourceUnchanged		= lookUp SLIT("-fsource-unchanged")

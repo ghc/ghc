@@ -208,7 +208,8 @@ doIt (core_cmds, stg_cmds)
 	--------------------------  Code output -------------------------------
     show_pass "CodeOutput" 				>>
     _scc_     "CodeOutput"
-    codeOutput this_mod local_tycons local_classes stg_binds2
+    codeOutput this_mod local_tycons local_classes
+	       tidy_binds stg_binds2
 	       c_code h_code abstractC 
 	       ncg_uniqs				>>
 

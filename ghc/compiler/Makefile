@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.73 2000/03/31 03:09:35 hwloidl Exp $
+# $Id: Makefile,v 1.74 2000/04/21 12:57:54 simonpj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -37,7 +37,7 @@ $(HS_PROG) :: $(HS_SRCS)
 DIRS = \
   utils basicTypes types hsSyn prelude rename typecheck deSugar coreSyn \
   specialise simplCore stranal stgSyn simplStg codeGen absCSyn main \
-  profiling parser usageSP cprAnalysis
+  profiling parser usageSP cprAnalysis javaGen
 
 
 ifeq ($(GhcWithNativeCodeGen),YES)

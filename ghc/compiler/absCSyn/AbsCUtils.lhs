@@ -27,7 +27,7 @@ import PrimRep		( getPrimRepSize, PrimRep(..) )
 import Unique		( Unique{-instance Eq-} )
 import UniqSupply	( uniqFromSupply, uniqsFromSupply, splitUniqSupply, 
 			  UniqSupply )
-import CmdLineOpts      ( opt_ProduceC, opt_EmitCExternDecls )
+import CmdLineOpts      ( opt_OutputLanguage, opt_EmitCExternDecls )
 import Maybes		( maybeToBool )
 import PrimOp		( PrimOp(..), CCall(..), CCallTarget(..) )
 import Panic		( panic )
@@ -330,7 +330,7 @@ flatAbsC (CSwitch discrim alts deflt)
 	returnFlt ( (tag, alt_heres), alt_tops )
 
 flatAbsC stmt@(COpStmt results (CCallOp ccall) args vol_regs)
-  | isCandidate && maybeToBool opt_ProduceC
+  | isCandidate && opt_OutputLanguage == Just "C"	-- Urgh
   = returnFlt (stmt, tdef)
   where
     (isCandidate, isDyn) =
