@@ -108,7 +108,7 @@ now - worth putting them in a file by themselves?? [ADR] */
 
 #if !defined(PAR) /* && !defined(GRAN) */
 
-/* Ditto for Foreign Objectr entry point and info tables. [ADR]
+/* Ditto for Foreign Object entry point and info tables. [ADR]
 
    BTW Will, I copied most of this blindly from above - what's with
    this TAG stuff? And what kind of description/ type is wanted here?
@@ -124,7 +124,7 @@ STATICFUN(ForeignObj_entry)
     FE_
 }
 
-ForeignObj_ITBL(ForeignObj_info,ForeignObj_entry,UpdErr,0,INFO_OTHER_TAG,,,const,EF_,ForeignObj_K,"FOREIGN OBJ","ForeignObj");
+ForeignObj_ITBL(ForeignObj_info,ForeignObj_entry,UpdErr,0,INFO_OTHER_TAG,,,const,EF_,ForeignObj_K,"FOREIGN_OBJ","ForeignObj");
 
 /* End of ForeignObj stuff */
 
@@ -145,7 +145,7 @@ STATICFUN(UnusedSP_entry)
     FE_
 }
 
-STATIC_ITBL(UnusedSP_info,UnusedSP_entry,UpdErr,0,INFO_OTHER_TAG,0,0,const,IF_,CON_K,"UNUSED STABLE PTR","USP");
+STATIC_ITBL(UnusedSP_info,UnusedSP_entry,UpdErr,0,INFO_OTHER_TAG,0,0,const,IF_,CON_K,"UNUSED_STABLE_PTR","USP");
 
 SET_STATIC_HDR(UnusedSP_closure,UnusedSP_info,CC_SUBSUMED,,ED_RO_)
 };
