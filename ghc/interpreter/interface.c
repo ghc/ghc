@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.11 $
- * $Date: 1999/12/16 16:34:40 $
+ * $Revision: 1.12 $
+ * $Date: 1999/12/16 16:42:56 $
  * ------------------------------------------------------------------------*/
 
 /* ToDo:
@@ -40,6 +40,7 @@
 extern void print ( Cell, Int );
 
 /* --------------------------------------------------------------------------
+ * (This comment is now out of date.  JRS, 991216).
  * The "addGHC*" functions act as "impedence matchers" between GHC
  * interface files and Hugs.  Their main job is to convert abstract
  * syntax trees into Hugs' internal representations.
@@ -69,6 +70,65 @@ extern void print ( Cell, Int );
  *   contain lists of decls that haven't been completed yet.
  *
  * ------------------------------------------------------------------------*/
+
+
+/*
+New comment, 991216, explaining roughly how it all works.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Interfaces can contain references to unboxed types, and these need to
+be handled carefully.  The following is a summary of how the interface
+loader now works.  It is applied to groups of interfaces simultaneously,
+viz, the entire Prelude at once:
+
+0.  Parse interfaces, chasing imports until a complete
+    strongly-connected-component of ifaces has been parsed.
+    All interfaces in this scc are processed together, in
+    steps 1 .. 8 below.
+
+1.  Throw away any entity not mentioned in the export lists.
+
+2.  Delete type (not data or newtype) definitions which refer to 
+    unknown types in their right hand sides.  Because Hugs doesn't
+    know of any unboxed types, this has the side effect of removing
+    all type defns referring to unboxed types.  Repeat step 2 until
+    a fixed point is reached.
+
+3.  Make abstract all data/newtype defns which refer to an unknown
+    type.  eg, data Word = MkW Word# becomes data Word, because 
+    Word# is unknown.  Hugs is happy to know about abstract boxed
+    Words, but not about Word#s.
+
+4.  Step 2 could delete types referred to by values, instances and
+    classes.  So filter all entities, and delete those referring to
+    unknown types _or_ classes.  This could cause other entities
+    to become invalid, so iterate step 4 to a fixed point.
+
+    After step 4, the interfaces no longer contain anything
+    unpalatable to Hugs.
+
+5.  Steps 1-4 operate purely on the iface syntax trees.  We now start
+    creating symbol table entries.  First, create a module table
+    entry for each interface, and locate and read in the corresponding
+    object file.  This is done by the startGHCModule function.
+
+6.  Traverse all interfaces.  For each entity, create an entry in
+    the name, tycon, class or instance table, and fill in relevant
+    fields, but do not attempt to link tycon/class/instance/name uses
+    to their symbol table entries.  This is done by the startGHC*
+    functions.
+
+7.  Revisit all symbol table entries created in step 6.  We should
+    now be able to replace all references to tycons/classes/instances/
+    names with the relevant symbol table entries.  This is done by
+    the finishGHC* functions.
+
+8.  Traverse all interfaces.  For each iface, examine the export lists
+    and use it to build export lists in the module table.  Do the
+    implicit 'import Prelude' thing if necessary.  Finally, resolve
+    references in the object code for this module.  This is done
+    by the finishGHCModule function.
+*/
 
 /* --------------------------------------------------------------------------
  * local function prototypes:
