@@ -56,7 +56,7 @@ module Type (
 	TauType, RhoType, SigmaType, PredType(..), ThetaType,
 	ClassPred, ClassContext, mkClassPred,
 	getClassTys_maybe, ipName_maybe, classesOfPreds,
-	isTauTy, mkRhoTy, splitRhoTy,
+	isTauTy, mkRhoTy, splitRhoTy, splitMethodTy,
 	mkSigmaTy, isSigmaTy, splitSigmaTy,
 	getDFunTyKey,
 
@@ -771,6 +771,26 @@ splitRhoTy ty = split ty ty []
   split orig_ty (NoteTy _ ty)	ts = split orig_ty ty ts
   split orig_ty (UsageTy _ ty)  ts = split orig_ty ty ts
   split orig_ty ty		ts = (reverse ts, orig_ty)
+\end{code}
+
+The type of a method for class C is always of the form:
+	Forall a1..an. C a1..an => sig_ty
+where sig_ty is the type given by the method's signature, and thus in general
+is a ForallTy.  At the point that splitMethodTy is called, it is expected
+that the outer Forall has already been stripped off.  splitMethodTy then
+returns (C a1..an, sig_ty') where sig_ty' is sig_ty with any Notes or
+Usages stripped off.
+
+\begin{code}
+splitMethodTy :: Type -> (PredType, Type)
+splitMethodTy ty = split ty
+ where
+  split (FunTy arg res) = case splitPredTy_maybe arg of
+			    Just p  -> (p, res)
+			    Nothing -> panic "splitMethodTy"
+  split (NoteTy _ ty)	= split ty
+  split (UsageTy _ ty)  = split ty
+  split _               = panic "splitMethodTy"
 \end{code}
 
 
