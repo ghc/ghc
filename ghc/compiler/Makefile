@@ -748,6 +748,10 @@ VERSION = $(ProjectVersion)
 PKG_DEPENDS += base haskell98
 PACKAGE_CPP_OPTS += -DPKG_DEPENDS='$(PKG_DEPENDS)'
 
+# disable splitting: it won't really help with GHC, and the specialised
+# build system for ghc/compiler isn't set up to handle it.
+SplitObjs = NO
+
 # override default definition of HS_IFACES so we can add $(odir)
 HS_IFACES   = $(addsuffix .$(way_)hi,$(basename $(HS_OBJS)))
 endif
