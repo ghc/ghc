@@ -1,8 +1,7 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
 <HTML>
 <HEAD>
-   <TITLE>Access To The GHC CVS Repository</TITLE>
-   <META NAME="GENERATOR" CONTENT="Mozilla/3.04Gold (X11; I; SunOS 5.5.1 i86pc) [Netscape]">
+   <TITLE>GHC Style Guidelines for C code</TITLE>
 </HEAD>
 <BODY>
 
@@ -11,12 +10,10 @@
 <h2>Comments</h2>
 
 NB These are just suggestions.  They're not set in stone.  Some of
-them are probably misguided.  If you disagree with them, feel free to 
-modify this document (and make your commit message reasonably informative)
-or mail someone (eg <a href="fp-cvs-fptools@dcs.gla.ac.uk">The FP-CVS mailing list</a> or
-<a
-href="mailto:reid-alastair@cs.yale.edu">reid-alastair@cs.yale.edu</a>).
-
+them are probably misguided.  If you disagree with them, feel free to
+modify this document (and make your commit message reasonably
+informative) or mail someone (eg. <a
+href="glasgow-haskell-users@haskell.org">The GHC mailing list</a>)
 
 <h2>References</h2>
 
@@ -29,23 +26,23 @@ Writing Solid Code, Microsoft Press.  (Highly recommended.  Possibly
 the only Microsoft Press book that's worth reading.  SimonPJ has a
 copy.)
 
-<li>
+<p><li>
 Autoconf documentation (which doesn't seem to be on the web).
 See also <a href="http://peti.gmd.de/autoconf-archive/">The autoconf macro archive</a> and 
 <a href="http://www.cyclic.com/cyclic-pages/autoconf.html">Cyclic Software's description</a>
 
-<li>
-<a href="http://www.cs.umd.edu/users/cml/cstyle/indhill-cstyle.html">Indian Hill C Style and Coding Standards</a>.
+<p><li> <a
+href="http://www.cs.umd.edu/users/cml/cstyle/indhill-cstyle.html">Indian
+Hill C Style and Coding Standards</a>.
 
-<li>
+<p><li>
 <a href="http://www.cs.umd.edu/users/cml/cstyle/">A list of C programming style links</a>
 
-<li>
+<p><li>
 <a href="http://www.lysator.liu.se/c/c-www.html">A very large list of C programming links</a>
 
-<li>
+<p><li>
 <a href="http://www.geek-girl.com/unix.html">A list of Unix programming links</a>
-
 
 </ul>
 
@@ -53,7 +50,7 @@ See also <a href="http://peti.gmd.de/autoconf-archive/">The autoconf macro archi
 <h2>Portability issues</h2>
 
 <ul>
-<li>
+<p><li>
 We use ANSI C with some extensions.  In particular, we use:
 <ul>
 <li>enum
@@ -61,8 +58,36 @@ We use ANSI C with some extensions.  In particular, we use:
 <li>#elsif, #error, #warning, ## and other cpp features
 </ul>
 
-<li> Our POSIX policy: try to write code that only uses POSIX (IEEE
-Std 1003.1) interfaces and APIs.  When you include <code>Rts.h<code>,
+<p><li>
+We use the following gcc extensions (see gcc documentation):
+
+<ul>
+<p><li>zero length arrays (useful as the last field of a struct)
+
+<p><li>inline annotations on functions (see later)
+
+<p><li>Labeled elements in initialisers
+
+<p><li>Function attributes (mostly just <code>no_return</code> and
+<code>unused</code>)
+</ul>
+
+<p>Some of these gcc/ANSI features could be avoided (for example, we
+could use __inline__ instead of inline or use the usual PROTO((...))
+trick in function prototypes) - but some of them can't be avoided
+so we don't try with the others.</p>
+
+<p>Most of these features are actually part of the new C9X standard,
+so we hope to have mostly conformant code at some point in the future.
+
+<p><li>
+Please don't use C++ style comments, they aren't standard C.
+
+<p><li>
+char can be signed or unsigned - always say which you mean
+
+<p><li> Our POSIX policy: try to write code that only uses POSIX (IEEE
+Std 1003.1) interfaces and APIs.  When you include <code>Rts.h</code>,
 <code>POSIX_SOURCE</code> is automatically defined for you before any
 system headers are slurped in, unless you define
 <code>NON_POSIX_SOURCE</code> prior to including <code>Rts.h</code>.
@@ -70,28 +95,7 @@ A good C library will use the <code>POSIX_SOURCE</code> define to
 eliminate non-posix types and function prototypes, so the compiler
 should complain if you venture outside the POSIX spec.</li>
 
-<li>
-We use the following gcc extensions (see gcc documentation):
-<ul>
-<li>zero length arrays (useful as the last field of a struct)
-<li>inline annotations on functions (see later)
-<li>Labeled elements in initialisers
-<li>Function attributes (mostly just no_return)
-<li>Macro varargs (actually, we don't use them yet but I'm very tempted)
-<li>Alastair really likes to use C++ style comments - but
-    he'll probably regret it later.
-<li>other stuff I've forgotten about...
-</ul>
-
-Some of these gcc/ANSI features could be avoided (for example, we
-could use __inline__ instead of inline or use the usual PROTO((...))
-trick in function prototypes) - but some of them can't be avoided
-so we don't try with the others.
-
-<li>
-char can be signed or unsigned - always say which you mean
-
-<li>
+<p><li>
 Some architectures have memory alignment constraints.
 Others don't have any constraints but go faster if you align things.
 These macros tell you which alignment to use
@@ -110,20 +114,19 @@ These macros tell you which alignment to use
   #define ALIGNMENT_DOUBLE 4
 </pre>
 
-<li>
+<p><li>
 Use StgInt, StgWord and StgPtr when reading/writing ints and ptrs to
 the stack or heap.  Note that, by definition, StgInt, StgWord and
 StgPtr are the same size and have the same alignment constraints
 even if sizeof(int) != sizeof(ptr) on that platform.
 
-<li>
+<p><li>
 Use StgInt8, StgInt16, etc when you need a certain minimum number of
 bits in a type.  Use int and nat when there's no particular
 constraint.  ANSI C only guarantees that ints are at least 16 bits but
-within GHC we assume they are 32 bits.  (I'm not sure if this is a
-good idea - ADR)
+within GHC we assume they are 32 bits (do we? --SDM).
 
-<li>
+<p><li>
 Use StgFloat and StgDouble for floating point values which will go
 on/have come from the stack or heap.  Note that StgFloat may be the
 same as StgDouble on some architectures (eg Alphas) and that it might
@@ -153,7 +156,7 @@ accesses and one that just imposes a performance penalty (this is most
 of them).  Perhaps have PREFERRED_ALIGNMENT and REQUIRED_ALIGMENT
 configurations?
 
-<li>
+<p><li>
 Avoid conditional code like this:
 
 <pre>
@@ -193,23 +196,23 @@ cause of the problem.
 The ideas in this section are mostly aimed at this issue:
 
 <ul>
-<li>
+<p><li>
 Use assertions.  Use lots of assertions.  If you write a comment
 that says "takes a +ve number" add an assertion.  If you're casting
 an int to a nat, add an assertion.  If you're casting an int to a char,
 add an assertion.
 
-<li>
+<p><li>
 Write special debugging code to check the integrity of your data structures.
 (Most of the runtime checking code is in <tt>src/Sanity.c</tt>)
 Add extra assertions which call this code at the start and end of any
 code that operates on your data structures.
 
-<li>
+<p><li>
 When you find a hard-to-spot bug, try to think of some assertions,
 sanity checks or whatever that would have made the bug easier to find.
 
-<li>
+<p><li>
 When defining an enumeration, it's a good idea not to use 0 for normal
 values.  Instead, make 0 raise an internal error.  The idea here is to
 make it easier to detect pointer-related errors on the assumption that
@@ -224,9 +227,9 @@ typedef enum
     ...
 </pre>
 
-<li> Use #warning or #error whenever you write a piece of incomplete/broken code.
+<p><li> Use #warning or #error whenever you write a piece of incomplete/broken code.
 
-<li> When testing, try to make infrequent things happen often.
+<p><li> When testing, try to make infrequent things happen often.
      For example, make a context switch/gc/etc happen every time a 
      context switch/gc/etc can happen.  The system will run like a 
      pig but it'll catch a lot of bugs.
@@ -236,7 +239,7 @@ typedef enum
 <h2>Syntactic details</h2>
 
 <ul>
-<li><b>Important:</b> Put "redundant" braces or parens in your code.
+<p><li><b>Important:</b> Put "redundant" braces or parens in your code.
 Omitting braces and parens leads to very hard to spot bugs -
 especially if you use macros (and you might have noticed that GHC does
 this a lot!)
@@ -244,12 +247,12 @@ this a lot!)
 <p>
 In particular:
 <ul>
-<li>
+<p><li>
 Put braces round the body of for loops, while loops, if statements, etc.
 even if they "aren't needed" because it's really hard to find the resulting
 bug if you mess up.  Indent them any way you like but put them in there!
 
-<li>
+<p><li>
 When defining a macro, always put parens round args - just in case.
 For example, write:
 <pre>
@@ -260,7 +263,7 @@ instead of
   #define add(x,y) x+y
 </pre>
 
-<li>
+<p><li>
 Don't define macros that expand to a list of statements.  
 You could just use braces as in:
 
@@ -320,7 +323,7 @@ A:      The usual goal is to write a macro that can be invoked as if it
         References: H&S Sec. 3.3.2 p. 45; CT&P Sec. 6.3 pp. 82-3.
 </pre>
 
-<li>
+<p><li>
 Don't even write macros that expand to 0 statements - they can mess you 
 up as well.  Use the doNothing macro instead.
 <pre>
@@ -328,21 +331,21 @@ up as well.  Use the doNothing macro instead.
 </pre>
 </ul>
 
-<li>
+<p><li>
 Use inline functions instead of macros if possible - they're a lot
 less tricky to get right and don't suffer from the usual problems
 of side effects, evaluation order, multiple evaluation, etc.
 
 <ul>
-<li>Inline functions get the naming issue right.  E.g. they
+<p><li>Inline functions get the naming issue right.  E.g. they
   can have local variables which (in an expression context)
   macros can't.
 
-<li> Inline functions have call-by-value semantics whereas macros
+<p><li> Inline functions have call-by-value semantics whereas macros
   are call-by-name.  You can be bitten by duplicated computation
   if you aren't careful.
 
-<li> You can use inline functions from inside gdb if you compile with
+<p><li> You can use inline functions from inside gdb if you compile with
   -O0 or -fkeep-inline-functions.  If you use macros, you'd better
   know what they expand to.
 </ul>
@@ -358,13 +361,13 @@ can be "polymorphic" as these examples show:
   #define min(x,y) (((x)<=(y)) ? (x) : (y))
 </pre>
 
-<li>
+<p><li>
 Inline functions should be "static inline" because:
 <ul>
-<li>
+<p><li>
 gcc will delete static inlines if not used or theyre always inlined.
 
-<li>
+<p><li>
   if they're externed, we could get conflicts between 2 copies of the 
   same function if, for some reason, gcc is unable to delete them.
   If they're static, we still get multiple copies but at least they don't conflict.
@@ -408,7 +411,7 @@ If any uses of the function remain, they will refer to the single copy
 in the library.
 </pre>
 
-<li>
+<p><li>
 This code
 <pre>
 int* p, q;
@@ -423,9 +426,9 @@ You could also write this:
 <pre>
 int *p, *q;
 </pre>
-but Alastair prefers to split the declarations.
+but it is preferrable to split the declarations.
 
-<li>
+<p><li>
 Try to use ANSI C's enum feature when defining lists of constants of
 the same type.  Among other benefits, you'll notice that gdb uses the
 name instead of its (usually inscrutable) number when printing values
@@ -475,23 +478,16 @@ instead of
     # define TYPEchar  'Y'
     # define TIMEchar  'T'
 </pre>
-ToDo: at the time of writing, we still use the former.
 
-<li>
-Alastair likes to use stgCast instead of C syntax.  He claims
-it's easier to write and easier to grep for. YMMV.
-<pre>
-#define stgCast(ty,e) ((ty)(e))
-</pre>
-
-<li> Please keep to 80 columns: the line has to be drawn somewhere,
+<p><li> Please keep to 80 columns: the line has to be drawn somewhere,
 and by keeping it to 80 columns we can ensure that code looks OK on
 everyone's screen.  Long lines are hard to read, and a sign that the
 code needs to be restructured anyway.
 
-<li> We don't care too much about your indentation style but, if
+<p><li> We don't care too much about your indentation style but, if
 you're modifying a function, please try to use the same style as the
-rest of the function (or file).  
+rest of the function (or file).  If you're writing new code, a
+tab width of 4 is preferred.
 
 <p>
 On which note:
@@ -523,7 +519,7 @@ within Hugs.  Add this to your .emacs file.
 <h2>CVS issues</h2>
 
 <ul>
-<li>
+<p><li>
 Don't be tempted to reindent or reorganise large chunks of code - it
 generates large diffs in which it's hard to see whether anything else
 was changed.
