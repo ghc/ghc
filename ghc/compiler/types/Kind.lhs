@@ -26,7 +26,8 @@ module Kind (
 IMP_Ubiq(){-uitous-}
 
 import Util		( panic, assertPanic )
---import Outputable	( Outputable(..) )
+
+import Outputable	( Outputable(..), pprQuote )
 import Pretty
 \end{code}
 
@@ -89,13 +90,13 @@ Printing
 ~~~~~~~~
 \begin{code}
 instance Outputable Kind where
-  ppr sty kind = pprKind kind
+  ppr sty kind = pprQuote sty $ \ _ -> pprKind kind
 
-pprKind TypeKind        = ppChar '*'	-- Can be boxed or unboxed
-pprKind BoxedTypeKind   = ppChar '*'
-pprKind UnboxedTypeKind = ppStr  "*#"	-- Unboxed
-pprKind (ArrowKind k1 k2) = ppSep [pprParendKind k1, ppStr "->", pprKind k2]
+pprKind TypeKind        = char '*'	-- Can be boxed or unboxed
+pprKind BoxedTypeKind   = char '*'
+pprKind UnboxedTypeKind = text  "*#"	-- Unboxed
+pprKind (ArrowKind k1 k2) = sep [pprParendKind k1, text "->", pprKind k2]
 
-pprParendKind k@(ArrowKind _ _) = ppBesides [ppLparen, pprKind k, ppRparen]
+pprParendKind k@(ArrowKind _ _) = parens (pprKind k)
 pprParendKind k		 	= pprKind k
 \end{code}
