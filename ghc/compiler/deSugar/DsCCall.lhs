@@ -29,7 +29,8 @@ import ForeignCall	( ForeignCall, CCallTarget(..) )
 import TcType		( tcSplitTyConApp_maybe )
 import Type		( Type, isUnLiftedType, mkFunTys, mkFunTy,
 			  tyVarsOfType, mkForAllTys, mkTyConApp, 
-			  isPrimitiveType, splitTyConApp_maybe, splitNewType_maybe
+			  isPrimitiveType, splitTyConApp_maybe, 
+			  splitNewType_maybe, splitForAllTy_maybe,
 			)
 
 import PrimOp		( PrimOp(..) )
@@ -308,6 +309,14 @@ resultWrapper result_ty
         (maybe_ty, wrapper) = resultWrapper rep_ty
     in
     (maybe_ty, \e -> mkCoerce2 result_ty rep_ty (wrapper e))
+
+  -- The type might contain foralls (eg. for dummy type arguments,
+  -- referring to 'Ptr a' is legal).
+  | Just (tyvar, rest) <- splitForAllTy_maybe result_ty
+  = let
+        (maybe_ty, wrapper) = resultWrapper rest
+    in
+    (maybe_ty, \e -> Lam tyvar (wrapper e))
 
   -- Data types with a single constructor, which has a single arg
   | Just (tycon, tycon_arg_tys, data_con, data_con_arg_tys) <- splitProductType_maybe result_ty,
