@@ -168,6 +168,8 @@ $(AUTO_APPLY): $(GHC_GENAPPLY)
 
 EXTRA_SRCS += $(AUTO_APPLY)
 
+CLEAN_FILES += $(AUTO_APPLY)
+
 # -----------------------------------------------------------------------------
 #
 #  Building DLLs is only supported on mingw32 at the moment.
