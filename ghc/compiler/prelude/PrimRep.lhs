@@ -119,7 +119,7 @@ Identify anything which is one word large and not a pointer.
 isNonPtrRep :: PrimRep -> Bool
 isNonPtrRep PtrRep  = False
 isNonPtrRep VoidRep = False
-isNonPtrRep r       = not (isFloatingRep r)
+isNonPtrRep r       = not (isFloatingRep r) && not (is64BitRep r)
 \end{code}
 
 \begin{code}
