@@ -665,6 +665,14 @@ lex_id2 cont module_dot buf =
      ','# -> lex_tuple cont module_dot (stepOnBy# buf 2#)
      _    -> lex_id3 cont module_dot buf
   ':'# -> lex_id3 cont module_dot (incLexeme buf)
+  '-'# ->
+     case module_dot of
+       Nothing  -> lex_id3 cont module_dot buf
+       Just ghc -> -- this should be "GHC" (current home of (->))
+         case lookAhead# buf 1# of
+          '>'# -> end_lex_id cont module_dot (ITconid SLIT("->")) 
+			(stepOnBy# buf 2#)
+          _    -> lex_id3 cont module_dot buf
   _    -> lex_id3 cont module_dot buf
 
 
