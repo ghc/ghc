@@ -15,6 +15,9 @@ LIBRARY = libghccompat.a
 # Just to silence warnings
 MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR)
 
+# Needed so that the libraries can #include relative to this directory.
+SRC_HC_OPTS += -I.
+
 UseGhcForCc = YES
 
 # This library is linked to the compiler, at least in stage1, so we
