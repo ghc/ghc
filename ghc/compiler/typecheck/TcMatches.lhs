@@ -224,9 +224,9 @@ tcMatchPats pats expected_ty thing_inside
 	-- I'm a bit concerned that lie_req1 from an 'inner' pattern in the list
 	-- might need (via lie_req2) something made available from an 'outer' 
 	-- pattern.  But it's inconvenient to deal with, and I can't find an example
-    tcCheckExistentialPat pat_ids ex_tvs lie_avail lie_req1 rhs_ty	`thenTc` \ (lie_req1', ex_binds) ->
+    tcCheckExistentialPat pat_ids ex_tvs lie_avail lie_req2 rhs_ty	`thenTc` \ (lie_req2', ex_binds) ->
 
-    returnTc (result, lie_req1' `plusLIE` lie_req2, ex_binds)
+    returnTc (result, lie_req1 `plusLIE` lie_req2', ex_binds)
 
 tcAddScopedTyVars :: [RenamedHsType] -> TcM a -> TcM a
 -- Find the not-already-in-scope signature type variables,
