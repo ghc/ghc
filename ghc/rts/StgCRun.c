@@ -551,7 +551,7 @@ static void StgRunIsImplementedInAssembler(void)
 		"\tla r1,%0(r1)\n"
 		"\tlmw r13,-220(r1)\n"
 		"\tb restFP # f14\n"
-	: : "i"(RESERVED_C_STACK_BYTES+288 /*stack frame size*/));
+	: : "i"(RESERVED_C_STACK_BYTES+224 /*stack frame size*/));
 }
 #else
 
@@ -626,8 +626,133 @@ static void StgRunIsImplementedInAssembler(void)
 		"\tlwz 0,4(1)\n"
 		"\tmtlr 0\n"
 		"\tblr\n"
-	: : "i"(RESERVED_C_STACK_BYTES+288 /*stack frame size*/));
+	: : "i"(RESERVED_C_STACK_BYTES+224 /*stack frame size*/));
 }
+#endif
+
+#endif
+
+/* -----------------------------------------------------------------------------
+   PowerPC 64 architecture
+
+   Everything is in assembler, so we don't have to deal with GCC...
+   
+   -------------------------------------------------------------------------- */
+
+#ifdef powerpc64_TARGET_ARCH
+
+#ifdef linux_TARGET_OS
+extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg);
+
+static void StgRunIsImplementedInAssembler(void)
+{
+        // r0 volatile
+	// r1 stack pointer
+	// r2 toc - needs to be saved
+	// r3-r10 argument passing, volatile
+	// r11, r12 very volatile (not saved across cross-module calls)
+	// r13 thread local state (never modified, don't need to save)
+	// r14-r31 callee-save
+	__asm__ volatile (
+		"\t.globl StgRun\n"
+		"\t.type StgRun,@function\n"
+		"StgRun:\n"
+			"\tmflr 0\n"
+			"\tmr 5, 1\n"
+			"\tstd 0, 16(1)\n"
+			"\tstdu 1, -%0(1)\n"
+			"\tstd 2, -296(5)\n"
+			"\tstd 14, -288(5)\n"
+			"\tstd 15, -280(5)\n"
+			"\tstd 16, -272(5)\n"
+			"\tstd 17, -264(5)\n"
+			"\tstd 18, -256(5)\n"
+			"\tstd 19, -248(5)\n"
+			"\tstd 20, -240(5)\n"
+			"\tstd 21, -232(5)\n"
+			"\tstd 22, -224(5)\n"
+			"\tstd 23, -216(5)\n"
+			"\tstd 24, -208(5)\n"
+			"\tstd 25, -200(5)\n"
+			"\tstd 26, -192(5)\n"
+			"\tstd 27, -184(5)\n"
+			"\tstd 28, -176(5)\n"
+			"\tstd 29, -168(5)\n"
+			"\tstd 30, -160(5)\n"
+			"\tstd 31, -152(5)\n"
+			"\tstfd 14, -144(5)\n"
+			"\tstfd 15, -136(5)\n"
+			"\tstfd 16, -128(5)\n"
+			"\tstfd 17, -120(5)\n"
+			"\tstfd 18, -112(5)\n"
+			"\tstfd 19, -104(5)\n"
+			"\tstfd 20, -96(5)\n"
+			"\tstfd 21, -88(5)\n"
+			"\tstfd 22, -80(5)\n"
+			"\tstfd 23, -72(5)\n"
+			"\tstfd 24, -64(5)\n"
+			"\tstfd 25, -56(5)\n"
+			"\tstfd 26, -48(5)\n"
+			"\tstfd 27, -40(5)\n"
+			"\tstfd 28, -32(5)\n"
+			"\tstfd 29, -24(5)\n"
+			"\tstfd 30, -16(5)\n"
+			"\tstfd 31, -8(5)\n"
+			"\tmr 27, 4\n"  // BaseReg == r27
+			"\tld 2, 8(3)\n"
+			"\tld 3, 0(3)\n"
+			"\tmtctr 3\n"
+			"\tbctr\n"
+		".globl StgReturn\n"
+		"\t.type StgReturn,@function\n"
+		"StgReturn:\n"
+			"\tmr 3,14\n"
+			"\tla 5, %0(1)\n" // load address == addi r5, r1, %0
+			"\tld 2, -296(5)\n"
+			"\tld 14, -288(5)\n"
+			"\tld 15, -280(5)\n"
+			"\tld 16, -272(5)\n"
+			"\tld 17, -264(5)\n"
+			"\tld 18, -256(5)\n"
+			"\tld 19, -248(5)\n"
+			"\tld 20, -240(5)\n"
+			"\tld 21, -232(5)\n"
+			"\tld 22, -224(5)\n"
+			"\tld 23, -216(5)\n"
+			"\tld 24, -208(5)\n"
+			"\tld 25, -200(5)\n"
+			"\tld 26, -192(5)\n"
+			"\tld 27, -184(5)\n"
+			"\tld 28, -176(5)\n"
+			"\tld 29, -168(5)\n"
+			"\tld 30, -160(5)\n"
+			"\tld 31, -152(5)\n"
+			"\tlfd 14, -144(5)\n"
+			"\tlfd 15, -136(5)\n"
+			"\tlfd 16, -128(5)\n"
+			"\tlfd 17, -120(5)\n"
+			"\tlfd 18, -112(5)\n"
+			"\tlfd 19, -104(5)\n"
+			"\tlfd 20, -96(5)\n"
+			"\tlfd 21, -88(5)\n"
+			"\tlfd 22, -80(5)\n"
+			"\tlfd 23, -72(5)\n"
+			"\tlfd 24, -64(5)\n"
+			"\tlfd 25, -56(5)\n"
+			"\tlfd 26, -48(5)\n"
+			"\tlfd 27, -40(5)\n"
+			"\tlfd 28, -32(5)\n"
+			"\tlfd 29, -24(5)\n"
+			"\tlfd 30, -16(5)\n"
+			"\tlfd 31, -8(5)\n"
+			"\tmr 1, 5\n"
+			"\tld 0, 16(1)\n"
+			"\tmtlr 0\n"
+			"\tblr\n"
+	: : "i"(RESERVED_C_STACK_BYTES+304 /*stack frame size*/));
+}
+#else // linux_TARGET_OS
+#error Only linux support for power64 right now.
 #endif
 
 #endif
@@ -699,4 +824,3 @@ static void StgRunIsImplementedInAssembler(void)
 #endif
 
 #endif /* !USE_MINIINTERPRETER */
-
