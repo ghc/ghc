@@ -8,7 +8,7 @@ Loading package std ... linking ... done.
 *** WARNING: . is writable by someone else, IGNORING!
 *** WARNING: ./.ghci is writable by someone else, IGNORING!
 Prelude> :unset +s +t
-Prelude> :s -fglasgow-exts
+Prelude> :set -fglasgow-exts
 Prelude> -- test for contexts on existential types crashing the interpreter
 Prelude> :l ghci006
 Ok, modules loaded: Ghci006.
