@@ -36,13 +36,16 @@ import VarSet
 import Bag		( Bag, isEmptyBag, mapBag, emptyBag, bagToList )
 import CoreLint		( showPass, endPass )
 import CoreFVs		( ruleRhsFreeVars )
+import Packages	  	( thPackage )
 import ErrUtils		( doIfSet, dumpIfSet_dyn, pprBagOfWarnings, 
 			  mkWarnMsg, errorsFound, WarnMsg )
+import ListSetOps	( insertList )
 import Outputable
 import UniqSupply	( mkSplitUniqSupply )
 import SrcLoc		( Located(..), SrcSpan, unLoc )
 import DATA_IOREF	( readIORef )
 import FastString
+import Data.List	( sort )
 \end{code}
 
 %************************************************************************
@@ -62,6 +65,7 @@ deSugar hsc_env
 		    	    tcg_exports   = exports,
 		    	    tcg_dus	  = dus, 
 		    	    tcg_inst_uses = dfun_uses_var,
+			    tcg_th_used   = th_var,
 		    	    tcg_rdr_env   = rdr_env,
 		    	    tcg_fix_env   = fix_env,
 	    	    	    tcg_deprecs   = deprecs,
@@ -92,10 +96,17 @@ deSugar hsc_env
 	; dfun_uses <- readIORef dfun_uses_var		-- What dfuns are used
 	; let used_names = allUses dus `unionNameSets` dfun_uses
 	; usages <- mkUsageInfo hsc_env imports used_names
+
+	; th_used <- readIORef th_var
 	; let 
+	     pkgs | th_used   = insertList thPackage (imp_dep_pkgs imports)
+		  | otherwise = imp_dep_pkgs imports
+
 	     deps = Deps { dep_mods = moduleEnvElts (imp_dep_mods imports), 
-			   dep_pkgs = imp_dep_pkgs imports,
-			   dep_orphs = imp_orphs imports }
+			   dep_pkgs  = sort pkgs,	
+			   dep_orphs = sort (imp_orphs imports) }
+		-- sort to get into canonical order
+
 	     mod_guts = ModGuts {	
 		mg_module   = mod,
 		mg_exports  = exports,

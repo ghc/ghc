@@ -5,7 +5,7 @@
 
 \begin{code}
 module ListSetOps (
-	unionLists, minusList,
+	unionLists, minusList, insertList,
 
 	-- Association lists
 	Assoc, assoc, assocMaybe, assocUsing, assocDefault, assocDefaultUsing,
@@ -30,22 +30,24 @@ import List	( union )
 
 %************************************************************************
 %*									*
-\subsection{Treating lists as sets}
+	Treating lists as sets
+	Assumes the lists contain no duplicates, but are unordered
 %*									*
 %************************************************************************
 
 \begin{code}
+insertList :: Eq a => a -> [a] -> [a]
+-- Assumes the arg list contains no dups; guarantees the result has no dups
+insertList x xs | isIn "insert" x xs = xs
+	    | otherwise		 = x : xs
+
 unionLists :: (Eq a) => [a] -> [a] -> [a]
-unionLists = union
-\end{code}
+-- Assumes that the arguments contain no duplicates
+unionLists xs ys = [x | x <- xs, isn'tIn "unionLists" x ys] ++ ys
 
-Everything in the first list that is not in the second list:
-
-\begin{code}
 minusList :: (Eq a) => [a] -> [a] -> [a]
-minusList xs ys = [ x | x <- xs, x `not_elem` ys]
-  where
-    not_elem = isn'tIn "minusList"
+-- Everything in the first list that is not in the second list:
+minusList xs ys = [ x | x <- xs, isn'tIn "minusList" x ys]
 \end{code}
 
 

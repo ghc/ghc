@@ -100,6 +100,7 @@ tcBracket brack res_ty
    	-- Typecheck expr to make sure it is valid,
 	-- but throw away the results.  We'll type check
 	-- it again when we actually use it.
+    recordThUse				`thenM_`
     newMutVar []	 		`thenM` \ pending_splices ->
     getLIEVar				`thenM` \ lie_var ->
 
@@ -159,8 +160,8 @@ tcSpliceExpr (HsSplice name expr) res_ty
 	Just next_level -> 
 
     case level of {
-	Comp 		       -> do { e <- tcTopSplice expr res_ty ;
-				       returnM (unLoc e) };
+	Comp 		       -> do { e <- tcTopSplice expr res_ty
+				     ; returnM (unLoc e) } ;
 	Brack _ ps_var lie_var ->  
 
 	-- A splice inside brackets
@@ -226,16 +227,19 @@ tcTopSpliceExpr expr meta_ty
   = checkNoErrs $	-- checkNoErrs: must not try to run the thing
 			--	        if the type checker fails!
 
-    setStage topSpliceStage $
+    setStage topSpliceStage $ do
+
+	
+    do	{ recordThUse	-- Record that TH is used (for pkg depdendency)
 
 	-- Typecheck the expression
-    getLIE (tcCheckRho expr meta_ty)	`thenM` \ (expr', lie) ->
-
+	; (expr', lie) <- getLIE (tcCheckRho expr meta_ty)
+	
 	-- Solve the constraints
-    tcSimplifyTop lie			`thenM` \ const_binds ->
+	; const_binds <- tcSimplifyTop lie
 	
 	-- And zonk it
-    zonkTopLExpr (mkHsLet const_binds expr')
+	; zonkTopLExpr (mkHsLet const_binds expr') }
 \end{code}
 
 

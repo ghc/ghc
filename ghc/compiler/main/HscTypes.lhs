@@ -658,6 +658,7 @@ type IsBootInterface = Bool
 -- in the import hierarchy.  See TcRnTypes.ImportAvails for details.
 --
 -- Invariant: the dependencies of a module M never includes M
+-- Invariant: the lists are unordered, with no duplicates
 data Dependencies
   = Deps { dep_mods  :: [(ModuleName,IsBootInterface)],	-- Home-package module dependencies
 	   dep_pkgs  :: [PackageName], 			-- External package dependencies

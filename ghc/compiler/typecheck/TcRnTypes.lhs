@@ -156,6 +156,13 @@ data TcGblEnv
 		-- rather like the free variables of the program, but
 		-- are implicit instead of explicit.
 
+	tcg_th_used :: TcRef Bool,	-- True <=> Template Haskell syntax used
+		-- We need this so that we can generate a dependency on the
+		-- Template Haskell package, becuase the desugarer is going to
+		-- emit loads of references to TH symbols.  It's rather like 
+		-- tcg_inst_uses; the reference is implicit rather than explicit,
+		-- so we have to zap a mutable variable.
+
 		-- Now a bunch of things about this module that are simply 
 		-- accumulated, but never consulted until the end.  
 		-- Nevertheless, it's convenient to accumulate them along 

@@ -74,6 +74,7 @@ initTc hsc_env mod do_this
       	tvs_var      <- newIORef emptyVarSet ;
 	type_env_var <- newIORef emptyNameEnv ;
 	dfuns_var    <- newIORef emptyNameSet ;
+	th_var	     <- newIORef False ;
 
       	let {
 	     gbl_env = TcGblEnv {
@@ -85,6 +86,7 @@ initTc hsc_env mod do_this
 		tcg_type_env_var = type_env_var,
 		tcg_inst_env  = mkImpInstEnv hsc_env,
 		tcg_inst_uses = dfuns_var,
+		tcg_th_used   = th_var,
 		tcg_exports  = emptyNameSet,
 		tcg_imports  = init_imports,
 		tcg_dus      = emptyDUs,
@@ -733,6 +735,9 @@ setLclTypeEnv lcl_env thing_inside
 %************************************************************************
 
 \begin{code}
+recordThUse :: TcM ()
+recordThUse = do { env <- getGblEnv; writeMutVar (tcg_th_used env) True }
+
 getStage :: TcM ThStage
 getStage = do { env <- getLclEnv; return (tcl_th_ctxt env) }
 

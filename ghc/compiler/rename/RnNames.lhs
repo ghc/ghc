@@ -54,7 +54,7 @@ import SrcLoc		( noSrcLoc, Located(..), mkGeneralSrcSpan,
 import BasicTypes	( DeprecTxt )
 import ListSetOps	( removeDups )
 import Util		( sortLt, notNull, isSingleton )
-import List		( partition, insert )
+import List		( partition )
 import IO		( openFile, IOMode(..) )
 \end{code}
 
@@ -192,7 +192,9 @@ importsFromImportDecl this_mod
 
     let
 	-- Compute new transitive dependencies
- 	orphans | is_orph   = insert imp_mod_name (dep_orphs deps)
+
+ 	orphans | is_orph   = ASSERT( not (imp_mod_name `elem` dep_orphs deps) )
+			      imp_mod_name : dep_orphs deps
 		| otherwise = dep_orphs deps
 
 	(dependent_mods, dependent_pkgs) 
@@ -208,8 +210,8 @@ importsFromImportDecl this_mod
  	   = 	-- Imported module is from another package
 		-- Dump the dependent modules
 		-- Add the package imp_mod comes from to the dependent packages
-		-- from imp_mod
-	     ([], insert (mi_package iface) (dep_pkgs deps))
+	     ASSERT( not (mi_package iface `elem` dep_pkgs deps) )
+	     ([], mi_package iface : dep_pkgs deps)
 
 	not_self (m, _) = m /= this_mod_name
 
