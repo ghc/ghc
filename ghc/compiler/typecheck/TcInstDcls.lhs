@@ -13,7 +13,8 @@ import CmdLineOpts	( DynFlag(..) )
 
 import HsSyn		( HsDecl(..), InstDecl(..), TyClDecl(..), HsType(..),
 			  MonoBinds(..), HsExpr(..),  HsLit(..), Sig(..), HsTyVarBndr(..),
-			  andMonoBindList, collectMonoBinders, isClassDecl, toHsType
+			  andMonoBindList, collectMonoBinders, 
+			  isClassDecl, isIfaceInstDecl, toHsType
 			)
 import RnHsSyn		( RenamedHsBinds, RenamedInstDecl, RenamedHsDecl, 
 			  RenamedMonoBinds, RenamedTyClDecl, RenamedHsType, 
@@ -34,7 +35,7 @@ import Inst		( InstOrigin(..),
 			  LIE, mkLIE, emptyLIE, plusLIE, plusLIEs )
 import TcDeriv		( tcDeriving )
 import TcEnv		( TcEnv, tcExtendGlobalValEnv, 
-			  tcExtendTyVarEnvForMeths, 
+			  tcExtendTyVarEnvForMeths, tcLookupId,
 			  tcAddImportedIdInfo, tcLookupClass,
  			  InstInfo(..), pprInstInfo, simpleInstInfoTyCon, 
 			  simpleInstInfoTy, newDFunName,
@@ -176,9 +177,11 @@ tcInstDecls1 inst_env0 prs hst unf_env get_fixity this_mod decls
 	inst_decls = [inst_decl | InstD inst_decl <- decls]	
 	tycl_decls = [decl      | TyClD decl <- decls]
 	clas_decls = filter isClassDecl tycl_decls
+	(imported_inst_ds, local_inst_ds) = partition isIfaceInstDecl inst_decls
     in
    	-- (1) Do the ordinary instance declarations
-    mapNF_Tc tcInstDecl1 inst_decls		`thenNF_Tc` \ inst_infos ->
+    mapNF_Tc tcInstDecl1 local_inst_ds		`thenNF_Tc` \ local_inst_infos ->
+    mapNF_Tc tcInstDecl1 imported_inst_ds	`thenNF_Tc` \ imported_inst_infos ->
 
 	-- (2) Instances from generic class declarations
     getGenericInstances clas_decls		`thenTc` \ generic_inst_info -> 
@@ -191,17 +194,14 @@ tcInstDecls1 inst_env0 prs hst unf_env get_fixity this_mod decls
 	--	e) generic instances					inst_env4
 	-- The result of (b) replaces the cached InstEnv in the PCS
     let
-	(local_inst_info, imported_inst_info) 
-		= partition (isLocalThing this_mod . iDFunId) (concat inst_infos)
-
-	imported_dfuns	 = map (tcAddImportedIdInfo unf_env . iDFunId) 
-			       imported_inst_info
-	hst_dfuns	 = foldModuleEnv ((++) . md_insts) [] hst
+	local_inst_info    = concat local_inst_infos
+	imported_inst_info = concat imported_inst_infos
+	hst_dfuns	   = foldModuleEnv ((++) . md_insts) [] hst
     in 
 
 --    pprTrace "tcInstDecls" (vcat [ppr imported_dfuns, ppr hst_dfuns]) $
 
-    addInstDFuns inst_env0 imported_dfuns	`thenNF_Tc` \ inst_env1 ->
+    addInstInfos inst_env0 imported_inst_info	`thenNF_Tc` \ inst_env1 ->
     addInstDFuns inst_env1 hst_dfuns		`thenNF_Tc` \ inst_env2 ->
     addInstInfos inst_env2 local_inst_info	`thenNF_Tc` \ inst_env3 ->
     addInstInfos inst_env3 generic_inst_info	`thenNF_Tc` \ inst_env4 ->
@@ -210,7 +210,7 @@ tcInstDecls1 inst_env0 prs hst unf_env get_fixity this_mod decls
 	--     note that we only do derivings for things in this module; 
 	--     we ignore deriving decls from interfaces!
 	-- This stuff computes a context for the derived instance decl, so it
-	-- needs to know about all the instances possible; hecne inst_env4
+	-- needs to know about all the instances possible; hence inst_env4
     tcDeriving prs this_mod inst_env4 get_fixity tycl_decls
 					`thenTc` \ (deriv_inst_info, deriv_binds) ->
     addInstInfos inst_env4 deriv_inst_info		`thenNF_Tc` \ final_inst_env ->
@@ -266,14 +266,15 @@ tcInstDecl1 decl@(InstDecl poly_ty binds uprags maybe_dfun_name src_loc)
     	    checkValidInstHead tau			`thenTc_`
 	    checkTc (checkInstFDs theta clas inst_tys)
 		    (instTypeErr (pprClassPred clas inst_tys) msg)	`thenTc_`
-	    newDFunName clas inst_tys src_loc
+	    newDFunName clas inst_tys src_loc				`thenTc` \ dfun_name ->
+	    returnTc (mkDictFunId dfun_name clas tyvars inst_tys theta)
 
 	Just dfun_name -> 	-- An interface-file instance declaration
-			    returnNF_Tc dfun_name
-    )								`thenNF_Tc` \ dfun_name ->
-    let
-	dfun_id = mkDictFunId dfun_name clas tyvars inst_tys theta
-    in
+				-- Should be in scope by now, because we should
+				-- have sucked in its interface-file definition
+				-- So it will be replete with its unfolding etc
+			  tcLookupId dfun_name
+    )							`thenNF_Tc` \ dfun_id ->
     returnTc [InstInfo { iDFunId = dfun_id, iBinds = binds, iPrags = uprags }]
   where
     msg  = parens (ptext SLIT("the instance types do not agree with the functional dependencies of the class"))

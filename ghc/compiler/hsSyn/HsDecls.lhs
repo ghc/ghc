@@ -17,7 +17,7 @@ module HsDecls (
 	hsDeclName, instDeclName, 
 	tyClDeclName, tyClDeclNames, tyClDeclSysNames, tyClDeclTyVars,
 	isClassDecl, isSynDecl, isDataDecl, isIfaceSigDecl, countTyClDecls,
-	mkClassDeclSysNames, isIfaceRuleDecl, ifaceRuleDeclName,
+	mkClassDeclSysNames, isIfaceRuleDecl, isIfaceInstDecl, ifaceRuleDeclName,
 	getClassDeclSysNames, conDetailsTys,
 	collectRuleBndrSigTys
     ) where
@@ -47,7 +47,7 @@ import Util		( eqListBy, count )
 import SrcLoc		( SrcLoc )
 import FastString
 
-import Maybe		( isNothing, fromJust )	
+import Maybe		( isNothing, isJust, fromJust )	
 \end{code}
 
 
@@ -661,6 +661,9 @@ data InstDecl name pat
 					-- Nothing for source-file instance decls
 
 		SrcLoc
+
+isIfaceInstDecl :: InstDecl name pat -> Bool
+isIfaceInstDecl (InstDecl _ _ _ maybe_dfun _) = isJust maybe_dfun
 \end{code}
 
 \begin{code}

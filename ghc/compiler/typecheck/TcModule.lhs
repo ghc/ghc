@@ -553,23 +553,24 @@ tcImports unf_env pcs hst get_fixity this_mod decls
     tcTyAndClassDecls unf_env this_mod tycl_decls	`thenTc` \ env ->
     tcSetEnv env 					$
     
+	-- Interface type signatures
+	-- We tie a knot so that the Ids read out of interfaces are in scope
+	--   when we read their pragmas.
+	-- What we rely on is that pragmas are typechecked lazily; if
+	--   any type errors are found (ie there's an inconsistency)
+	--   we silently discard the pragma
+    traceTc (text "Tc2")			`thenNF_Tc_`
+    tcInterfaceSigs unf_env this_mod tycl_decls	`thenTc` \ sig_ids ->
+    tcExtendGlobalValEnv sig_ids		$
+    
     	-- Typecheck the instance decls, includes deriving
-    traceTc (text "Tc2")	`thenNF_Tc_`
+	-- Note that imported dictionary functions are already
+	-- in scope from the preceding tcInterfaceSigs
+    traceTc (text "Tc3")	`thenNF_Tc_`
     tcInstDecls1 (pcs_insts pcs) (pcs_PRS pcs) 
     	     hst unf_env get_fixity this_mod 
     	     decls			`thenTc` \ (new_pcs_insts, inst_env, local_insts, deriv_binds) ->
     tcSetInstEnv inst_env			$
-    
-    -- Interface type signatures
-    -- We tie a knot so that the Ids read out of interfaces are in scope
-    --   when we read their pragmas.
-    -- What we rely on is that pragmas are typechecked lazily; if
-    --   any type errors are found (ie there's an inconsistency)
-    --   we silently discard the pragma
-    traceTc (text "Tc3")			`thenNF_Tc_`
-    tcInterfaceSigs unf_env this_mod tycl_decls	`thenTc` \ sig_ids ->
-    tcExtendGlobalValEnv sig_ids		$
-    
     
     tcIfaceRules unf_env (pcs_rules pcs) this_mod iface_rules	`thenNF_Tc` \ (new_pcs_rules, local_rules) ->
     	-- When relinking this module from its interface-file decls
