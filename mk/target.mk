@@ -585,8 +585,7 @@ install:: $(INSTALL_LIBS)
 		case $$i in \
 		  *.a) \
 		    $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(libdir); \
-		    $(RANLIB) $(libdir)/`basename $$i` ; \
-		    break;; \
+		    $(RANLIB) $(libdir)/`basename $$i` ;; \
 		  *) \
 		    $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(libdir); \
 		esac; \
