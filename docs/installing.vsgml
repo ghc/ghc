@@ -2,7 +2,7 @@
 <article>
 
 <title>Building and Installing the Glasgow Functional Programming Tools Suite
-Version 3.02
+Version 4.00
 <author>The GHC Team,
 Department of Computing Science,
 University of Glasgow,
@@ -63,15 +63,15 @@ yourself; (b)~you want to build something ``extra''---e.g., a set of
 libraries with strictness-analysis turned off; or (c)~you want to hack
 on GHC yourself.
 
-A source distribution contains complete sources for the @fptools@
-suite.  Not only that, but the more awkward machine-independent steps
-are done for you.  For example, if you don't have @flex@<ncdx/flex/
-you'll find it convenient that the source distribution contains the
-result of running @flex@ on the lexical analyser specification.  If
-you don't want to alter the lexical analyser then this saves you
-having to find and install @flex@. You will still need a working
-version of GHC on your machine in order to compile (most of) the
-sources, however.
+A source distribution contains complete sources for one or more
+projects in the @fptools@ suite.  Not only that, but the more awkward
+machine-independent steps are done for you.  For example, if you don't
+have @flex@<ncdx/flex/ you'll find it convenient that the source
+distribution contains the result of running @flex@ on the lexical
+analyser specification.  If you don't want to alter the lexical
+analyser then this saves you having to find and install @flex@. You
+will still need a working version of GHC on your machine in order to
+compile (most of) the sources, however.
 
 We make source distributions more frequently than binary
 distributions; a release that comes with pre-compiled binaries
@@ -80,9 +80,7 @@ confidence will work well by having tested it (more) thoroughly.
 
 Source-only distributions are either bugfix releases or snapshots of
 current state of development. The release has undergone some testing.
-Source releases of 3.xx can be compiled up using 2.10 or later.
-Compiling with version 0.29 won't work any more: we use Haskell 1.4
-features in the compiler.
+Source releases of 4.xx can be compiled up using 2.10 or later.
 
 <tag/Build GHC from intermediate C @.hc@ files<nidx/hc files/:/ You
 need a working GHC to use a source distribution. What if you don't
@@ -114,10 +112,9 @@ generated files at all.  So if you check out a source tree from CVS
 you will need to install every utility so that you can build all the
 derived files from scratch.
 
-Giving you access to the repository entails some systems administration
-at our end; and we are a bit nervous about being submerged in bug reports
-about our current working copy (which is, by definition, in flux).  So
-we are a bit cautious about offering CVS access.  Feel free to ask though!
+More information about our CVS repository is available at <url
+name="The Fptools CVS Cheat Sheet"
+url="http://www.dcs.gla.ac.uk/fp/software/ghc/cvs-cheat-sheet.html">.
 </descrip>
 
 If you are going to do any building from sources (either from a source
@@ -149,6 +146,11 @@ SPARC boxes, DEC Alphas running OSF/1, and PCs running Linux, FreeBSD,
 or Solaris are all fully supported.  MIPS, AIX, Win32 and HP boxes are
 in pretty good shape.  Section <ref id="sec:port-info" name="Port Info">
 gives the full run-down on ports or lack thereof.
+
+NOTE: as of version 4.00, we lost a few ports.  All of the x86 ports
+are working, as is the Sparc/Solaris port, but the rest will need a
+little work.  Please contact us if you can provide hardware cycles
+and/or porting expertise.
 
 <item> Be sure that the ``pre-supposed'' utilities are installed.
 Section <ref id="sec:pre-supposed" name="Installing Pre-Supposed
@@ -663,10 +665,9 @@ script will tell you if you are missing something.
 for doing shell-scripty tasks that involve lots of text processing.
 It is pretty easy to install.
 
-Perl~5 is the current version; GHC is Perl~4 friendly though.  For
-Win32 platforms, Perl~5 is recommended, we even strongly suggest you
-pick up a port of Perl~5 for @cygwin32@, as the common Hip/ActiveWare
-port of Perl is not Cool Enough for our purposes.
+Perl~5 is required.  For Win32 platforms, we strongly suggest you pick
+up a port of Perl~5 for @cygwin32@, as the common Hip/ActiveWare port
+of Perl is not Cool Enough for our purposes.
 
 Perl should be put somewhere so that it can be invoked by the @#!@
 script-invoking mechanism. (I believe @/usr/bin/perl@ is preferred;
@@ -676,26 +677,25 @@ be less than 32 characters long.
 <tag>GNU C (@gcc@):</tag>
 <nidx>pre-supposed: GCC (GNU C compiler)</nidx>
 <nidx>GCC (GNU C compiler), pre-supposed</nidx>
-The current version is 2.7.2.
+Version 2.7.2.x is known to work.
 
 If your GCC dies with ``internal error'' on some GHC source file,
 please let us know, so we can report it and get things improved.
 (Exception: on @iX86@ boxes---you may need to fiddle with GHC's
-@-monly-N-regs@ option; ask if confused...)
+@-monly-N-regs@ option; see the User's Guide)
 
-<nidx/EGCS/
-EGCS (the Enhanced GNU Compiler Suite) may or may not work, we haven't
-tested it fully yet.
+<nidx/EGCS/ EGCS (the Enhanced GNU Compiler Suite) may or may not
+work, we haven't tested it fully yet.
 
 <tag>PVM version 3:</tag>
 <nidx>pre-supposed: PVM3 (Parallel Virtual Machine)</nidx>
 <nidx>PVM3 (Parallel Virtual Machine), pre-supposed</nidx>
+
 PVM is the Parallel Virtual Machine on which Parallel Haskell programs
-run.  (You only need this if you plan to run Parallel Haskell.  
+run.  (You only need this if you plan to run Parallel Haskell.
 Concurent Haskell, which runs concurrent threads on a uniprocessor
-doesn't need it.)
-Underneath PVM, you can have (for example) a network of
-workstations (slow) or a multiprocessor box (faster).
+doesn't need it.)  Underneath PVM, you can have (for example) a
+network of workstations (slow) or a multiprocessor box (faster).
 
 The current version of PVM is 3.3.11; we use 3.3.7.  It is readily
 available on the net; I think I got it from @research.att.com@, in
@@ -724,8 +724,10 @@ library.
 <tag>Autoconf:</tag>
 <nidx>pre-supposed: Autoconf</nidx>
 <nidx>Autoconf, pre-supposed</nidx>
+
 GNU Autoconf is used to build the @configure@ script from
-@configure.in@ in a source distribution.  If you modify @configure.in@, you'll need @autoconf@ to regenerate @configure@.
+@configure.in@ in a source distribution.  If you modify
+@configure.in@, you'll need @autoconf@ to regenerate @configure@.
 
 <tag>@bash@ (Parallel Haskell only):</tag>
 <nidx>bash, presupposed (Parallel Haskell only)</nidx>
@@ -740,7 +742,7 @@ This bug will be fixed (someday).
 This is a quite-a-bit-better-than-Lex lexer.  Used to build GHC's
 lexer, and a couple of utilities in @glafp-utils@.  On our machines,
 the version in @/bin@ doesn't work; you need the GNU version.  Find
-out by saying @flex --version@ (our current version is 2.5.3, but
+out by saying @flex --version@ (our current version is 2.5.4, but
 maybe earlier ones will work).  If it doesn't know about the
 @--version@ flag, it ain't the right @flex@.
 
@@ -755,20 +757,19 @@ yacc, @byacc@, is not OK.
 <tag>@sed@</tag>
 <nidx>pre-supposed: sed</nidx>
 <nidx>sed, pre-supposed</nidx>
-You need a working @sed@ if you are going to build from sources.
-The build-configuration stuff needs it.
-GNU sed version 2.0.4 is no good! It has a bug in it that is tickled
-by the build-configuration.  2.0.5 is ok. Others are probably ok too
-(assuming we don't create too elaborate configure scripts..)
+
+You need a working @sed@ if you are going to build from sources.  The
+build-configuration stuff needs it.  GNU sed version 2.0.4 is no good!
+It has a bug in it that is tickled by the build-configuration.  2.0.5
+is ok. Others are probably ok too (assuming we don't create too
+elaborate configure scripts..)
+
 </descrip>
 
-One @fptools@ projects is worth a quick note at this point, because
-it is useful for all the others:
-<itemize>
-<item> @glafp-utils@ contains several utilities which aren't
-particularly Glasgow-ish, but Occasionally Indispensable. Like
-@lndir@ for creating symbolic link trees.
-</itemize>
+One @fptools@ project is worth a quick note at this point, because it
+is useful for all the others: @glafp-utils@ contains several utilities
+which aren't particularly Glasgow-ish, but Occasionally Indispensable.
+Like @lndir@ for creating symbolic link trees.
 
 <sect1> Tools for building the Documentation
 <label id="pre-supposed-doc-tools">
@@ -781,6 +782,7 @@ documentation that comes with the @fptools@ projects:
 <tag>SGML-Tools:</tag>
 <nidx>pre-supposed: SGML-Tools</nidx>
 <nidx>SGML-Tools, pre-supposed</nidx>
+
 All our documentation is written in SGML, using the LinuxDoc DTD that
 comes with the SGML-Tools, which is the most shrink-wrapped SGML suite
 that we could find.  Should unpack and build painlessly on most
@@ -788,7 +790,7 @@ architectures, and you can use it to generate HTML, Info, LaTeX (and
 hence DVI and Postscript), Groff, and plain text output from any
 LinuxDoc source file (including this manual).  Sources are available
 from <url name="The SGML-Tools Web Page"
-url="http://www.xs4all.nl/~cg/sgmltools/">.
+url="http://www.sgmltools.org/">
 
 <tag>TeX:</tag>
 <nidx>pre-supposed: TeX</nidx>
@@ -812,13 +814,13 @@ from the CVS repository or from a source distribution, and
 now you're sitting looking at a huge mound of bits, wondering
 what to do next.
 
-Gingerly, you type @make all@.  Wrong already!
+Gingerly, you type @make@.  Wrong already!
 
-This rest of this guide is intended for duffers like me, who aren't really
-interested in Makefiles and systems configurations, but who need
-a mental model of the interlocking pieces so that they can 
-make them work, extend them consistently when adding new
-software, and lay hands on them gently when they don't work.
+This rest of this guide is intended for duffers like me, who aren't
+really interested in Makefiles and systems configurations, but who
+need a mental model of the interlocking pieces so that they can make
+them work, extend them consistently when adding new software, and lay
+hands on them gently when they don't work.
 
 <sect1>Your source tree
 <label id="sec:source-tree">
@@ -898,9 +900,9 @@ file unchanged; but the danger is that you think you've edited the
 source file whereas actually all you've done is edit the build-tree
 copy.  More commonly you do want to edit the source file.)
 
-Like the source tree, the top level of your build tree must (a linked
-copy of) the root directory of the @fptools@ suite.  Inside Makefiles,
-the root of your build tree is called
+Like the source tree, the top level of your build tree must be (a
+linked copy of) the root directory of the @fptools@ suite.  Inside
+Makefiles, the root of your build tree is called
 @$(FPTOOLS_TOP)@<ncdx/FPTOOLS_TOP/.  In the rest of this document path
 names are relative to @$(FPTOOLS_TOP)@ unless otherwise stated.  For
 example, the file @ghc/mk/target.mk@ is actually
@@ -1883,9 +1885,9 @@ in all cases.
 
 
 <item>
-In compiling some support-code bits, e.g., in @ghc/runtime/gmp@ and
-even in @ghc/lib@, you may get a few C-compiler warnings.  We think
-these are OK.
+In compiling some support-code bits, e.g., in @ghc/rts/gmp@ and even
+in @ghc/lib@, you may get a few C-compiler warnings.  We think these
+are OK.
 
 <item>
 When compiling via C, you'll sometimes get ``warning: assignment from
@@ -1900,44 +1902,32 @@ ar: filename GlaIOMonad__2_2s.o truncated to GlaIOMonad_
 ...
 </verb></tscreen>
 
-
-<item>
-Also harmless are some specialisation messages that you may see when
-compiling GHC; e.g.:
-<tscreen><verb>
-SPECIALISATION MESSAGES (Desirable):
-*** INSTANCES
-{-# SPECIALIZE instance Eq [Class] #-}
-{-# SPECIALIZE instance Eq (Class, [Class]) #-}
-{-# SPECIALIZE instance Outputable [ClassOp] #-}
-{-# SPECIALIZE instance Outputable [Id] #-}
-</verb></tscreen>
-
-
 <item> In compiling the compiler proper (in @compiler/@), you <em/may/
 get an ``Out of heap space'' error message.  These can vary with the
 vagaries of different systems, it seems.  The solution is simple:
-(1)~add a suitable @-H@ flag to the @<module>_HC_OPTS@ @make@ variable
-in the appropriate @Makefile@; (2)~try again: @gmake@.  (Section~<ref
-id="sec:suffix" name="Pattern Rules and Options">.)
+
+<itemize> 
+
+<item> If you're compiling with GHC 4.00 or above, then the
+<em/maximum/ heap size must have been reached.  This is somewhat
+unlikely, since the maximum is set to 64M by default.  Anyway, you can
+raise it with the @-optCrts-M&lt;size&gt;@ flag (add this flag to
+@<module>_HC_OPTS@ @make@ variable in the appropriate @Makefile@).
+
+<item> For GHC < 4.00, add a suitable @-H@ flag to the @Makefile@, as
+above.
+
+</itemize>
+
+and try again: @gmake@.  (see Section~<ref id="sec:suffix"
+name="Pattern Rules and Options"> for information about
+@<module>_HC_OPTS@.)
 
 Alternatively, just cut to the chase scene:
 <tscreen><verb>
 % cd ghc/compiler
-% make EXTRA_HC_OPTS=-H32m  # or some nice big number
+% make EXTRA_HC_OPTS=-optCrts-M128M
 </verb></tscreen>
-
-
-<item>
-Not too long into the build process, you may get a huge complaint
-of the form:
-<tscreen><verb>
-Giant error 'do'ing getopts.pl:  at ./lit2pgm.BOOT line 27.
-</verb></tscreen>
-This indicates that your @perl@ was mis-installed; the binary is
-unable to find the files for its ``built-in'' library.  Speak to your
-perl installer, then re-try.
-
 
 <item>
 If you try to compile some Haskell, and you get errors from GCC about
@@ -1960,14 +1950,6 @@ You <em/may/ need to re-@ranlib@<ncdx/ranlib/ your libraries (on Sun4s).
 </verb></tscreen>
 
 We'd be interested to know if this is still necessary.
-
-
-<item>
-If you end up making documents that involve (La)TeX and/or @tib@
-(Simon's favourite), the odds are that something about your/our setup
-will reach out and bite you.  Yes, please complain; meanwhile, you can
-do @make -n whatever.dvi@ to see the intended commands, then try to
-muddle through, doing them by hand.
 
 
 <item>
