@@ -276,10 +276,8 @@
     symbols are defined by your local GHC installation, the following
     trick is useful:</para>
 
-<screen>
-  $ ghc -E -optP-dM -cpp foo.hs
-  $ cat foo.hspp
-</screen>
+<screen>$ ghc -E -optP-dM -cpp foo.hs
+$ cat foo.hspp</screen>
 
     <para>(you need a file <filename>foo.hs</filename>, but it isn't
     actually used).</para>
@@ -424,11 +422,9 @@
       gaps vs -cpp</primary></indexterm>.  In other words, strings
       such as the following:</para>
 
-rogramlisting>
-rmod = "\
-p \
-"
-programlisting>
+<programlisting>strmod = "\
+\ p \
+\ "</programlisting>
       
       <para>don't work with <option>-cpp</option>;
       <filename>/usr/bin/cpp</filename> elides the backslash-newline
@@ -508,9 +504,7 @@ programlisting>
     way to do this, but you can use this hack from the
     command-line:</para>
 
-creen>
-ghc -c '-#include &lt;X/Xlib.h&gt;' Xstuff.lhs
-screen>
+<screen>% ghc -c '-#include &lt;X/Xlib.h&gt;' Xstuff.lhs</screen>
 
   </sect2>
 
