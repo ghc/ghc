@@ -12,7 +12,7 @@ f x = do
 read007.hs:6:
     `+' is not a data constructor
     In the pattern: 2 + 2
-    In a do statement:: (2 + 2) <- 2
+    In a do statement: (2 + 2) <- 2
 
 Compilation had errors
 
