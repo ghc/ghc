@@ -404,6 +404,7 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
 
       AndOp  -> trivialCode AND x y
       OrOp   -> trivialCode OR  x y
+      XorOp  -> trivialCode XOR x y
       SllOp  -> trivialCode SLL x y
       SraOp  -> trivialCode SRA x y
       SrlOp  -> trivialCode SRL x y
@@ -662,6 +663,7 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
 
       AndOp -> trivialCode (AND L) x y {-True-}
       OrOp  -> trivialCode (OR L)  x y {-True-}
+      XorOp -> trivialCode (XOR L) x y {-True-}
 
 	{- Shift ops on x86s have constraints on their source, it
 	   either has to be Imm, CL or 1
@@ -1071,7 +1073,8 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
       DoubleDivOp -> trivialFCode DoubleRep FDIV x y
 
       AndOp -> trivialCode (AND False) x y
-      OrOp  -> trivialCode (OR False) x y
+      OrOp  -> trivialCode (OR  False) x y
+      XorOp -> trivialCode (XOR False) x y
       SllOp -> trivialCode SLL x y
       SraOp -> trivialCode SRA x y
       SrlOp -> trivialCode SRL x y

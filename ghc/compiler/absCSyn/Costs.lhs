@@ -518,7 +518,7 @@ data PrimOp
     -- Rest is unchecked so far -- HWL
 
     -- Word#-related ops:
-    | AndOp   | OrOp  | NotOp | ShiftLOp | ShiftROp
+    | AndOp   | OrOp  | NotOp | XorOp | ShiftLOp | ShiftROp
     | Int2WordOp | Word2IntOp -- casts
 
     -- Addr#-related ops:

@@ -248,6 +248,7 @@ primOpt op args@[x, y@(StInt 0)]
     	IntMulOp -> y
     	AndOp  	 -> y
     	OrOp   	 -> x
+    	XorOp  	 -> x
     	SllOp  	 -> x
     	SraOp  	 -> x
     	SrlOp  	 -> x

@@ -470,6 +470,7 @@ I_ stg_div PROTO((I_ a, I_ b));
 \begin{code}
 #define andZh(r,a,b)	r=(a)&(b)
 #define orZh(r,a,b)	r=(a)|(b)
+#define xorZh(r,a,b)	r=(a)^(b)
 #define notZh(r,a)	r=~(a)
 
 #define shiftLZh(r,a,b)	  r=(a)<<(b)
