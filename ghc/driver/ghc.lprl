@@ -420,8 +420,6 @@ sub initDriverGlobals {
 # reset the following options:
 # RTS flags to use while compiling
 @HsC_rts_flags      = ();
-@HsP_flags	= (); # these are the flags destined solely for
-		      # the flex/yacc parser
 @HsC_flags	= ();
 @HsC_antiflags  = ();
 \end{code}
@@ -780,7 +778,7 @@ sub setupOptimiseFlags {
 	  ']',
 
 	'-fstrictness',
-	'-fcpr-analyse',
+	# '-fcpr-analyse',
 	'-fworker-wrapper',
 
 	'-fsimplify',
@@ -870,9 +868,6 @@ sub setupBuildFlags {
 
    # PROFILING stuff after argv mangling:
    if ( ! $PROFing ) {
-     # warn about any scc exprs found (in case scc used as identifier)
-     push(@HsP_flags, '-W');
-
      # add -auto sccs even if not profiling !
      push(@HsC_flags, $UNPROFscc_auto) if $UNPROFscc_auto;
 
@@ -885,8 +880,6 @@ sub setupBuildFlags {
 
       # Ignore user sccs when auto annotating, but warn when doing so.
       $PROFignore_scc = '-W' if $PROFauto; 
-
-      push(@HsP_flags, (($PROFignore_scc) ? $PROFignore_scc : '-S'));
   }
   #if ( $BuildTag ne '' ) {
   #    local($b) = $BuildDescr{$BuildTag};
@@ -1714,9 +1707,6 @@ sub runHscAndProcessInterfaces {
 sub runHsc {
     local($ifile_root, $hsc_out, $hsc_hi, $hsc_out_c_stub, $hsc_out_h_stub, $going_interactive) = @_;
 
-    # prepend comma to HsP flags (so hsc can tell them apart...)
-    foreach $a ( @HsP_flags ) { $a = ",$a" unless $a =~ /^,/; }
-
     &makeHiMap() unless $HiMapDone;
     push(@HsC_flags, "-himap=$HiIncludeString");
 
@@ -1772,11 +1762,11 @@ sub runHsc {
       open(OPTS, "> $Tmp_prefix.opts") || &tidy_up_and_die(1,"Can't open $Tmp_prefix.opts\n");
       print OPTS "$dump @HsC_flags $CoreLint $USPLint $StgLint $Verbose";
       close(OPTS);
-      $to_do = "$HsC @HsP_flags ,$hscpp_hsc \@$Tmp_prefix.opts $output +RTS @HsC_rts_flags";
+      $to_do = "$HsC $hscpp_hsc \@$Tmp_prefix.opts $output +RTS @HsC_rts_flags";
 
     } else {
 
-      $to_do = "$HsC @HsP_flags ,$hscpp_hsc $dump @HsC_flags $CoreLint $USPLint $StgLint $Verbose $output +RTS @HsC_rts_flags";
+    $to_do = "$HsC $hscpp_hsc $dump @HsC_flags $CoreLint $USPLint $StgLint $Verbose $output +RTS @HsC_rts_flags";
     }
     &run_something($to_do, 'Haskell compiler');
 
@@ -3014,7 +3004,6 @@ arg: while($_ = $Args[0]) {
     /^-optP(.*)$/   && do { push(@HsCpp_flags,      $1); next arg; };
     /^-optCrts(.*)$/&& do { push(@HsC_rts_flags,    $1); next arg; };
     /^-optC(.*)$/   && do { push(@HsC_flags,        $1); next arg; };
-    /^-optp(.*)$/   && do { push(@HsP_flags,        $1); next arg; };
     /^-optcpp(.*)$/ && do { push(@Cpp_define,       $1); $Only_preprocess_hc = ($1 eq "-E"); next arg; };
     /^-optc(.*)$/   && do { push(@CcBoth_flags,     $1); next arg; };
     /^-opta(.*)$/   && do { push(@As_flags,         $1); next arg; };
@@ -3077,7 +3066,6 @@ arg: while($_ = $Args[0]) {
     /^-fhistory-size.*$/ 	      && do { push(@HsC_flags, $_); next arg; };
     /^-fglasgow-exts$/
 		&& do { push(@HsC_flags, $_);
-			push(@HsP_flags, '-N');
 
 			# -fglasgow-exts implies -syslib exts
 			&add_syslib('exts');
