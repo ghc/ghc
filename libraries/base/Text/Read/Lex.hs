@@ -340,12 +340,21 @@ lexNumberBase base =
  where
   value xs mFrac mExp = valueFracExp (val (fromIntegral base) 0 xs) mFrac mExp
   
-  valueFracExp a Nothing   mExp = Left (valueExp a mExp)
+  valueFracExp a Nothing   mExp 
+    | validIntExp mExp   = Left (valueExpInt a mExp)
+    | otherwise          = Right (valueExp (fromIntegral a) mExp)
   valueFracExp a (Just fs) mExp =
     Right (valueExp (fromInteger a + frac (fromIntegral base) 0 1 fs) mExp)
 
+   -- only positive exponents allowed
+  validIntExp Nothing = True
+  validIntExp (Just e) = e >= 0
+
+  valueExpInt a Nothing    = a
+  valueExpInt a (Just exp) = a * ((fromIntegral base) ^ exp)
+
   valueExp a Nothing    = a
-  valueExp a (Just exp) = a * (fromIntegral base ^ exp)
+  valueExp a (Just exp) = a * ((fromIntegral base) ^^ exp)
 
 lexFrac :: Base -> ReadP (Maybe Digits)
 lexFrac base =
