@@ -104,7 +104,7 @@ module System.Time
 
 #ifdef __NHC__
 #include <time.h>
-#  ifdef __sun
+#  if defined(__sun) || defined(__CYGWIN32__)
 #    define HAVE_TZNAME 1
 #  else
 #    define HAVE_TM_ZONE 1
