@@ -24,6 +24,9 @@ module Compat.Directory (
 
 #if !defined(mingw32_TARGET_OS)
 import System.Environment (getEnv)
+#else
+import Foreign
+import Foreign.C
 #endif
 
 getAppUserDataDirectory :: String -> IO FilePath
@@ -39,11 +42,16 @@ getAppUserDataDirectory appName = do
 #endif
 
 #if __GLASGOW_HASKELL__ && defined(mingw32_TARGET_OS)
-foreign import stdcall unsafe "SHGetFolderPath" 
+foreign import stdcall unsafe "SHGetFolderPathA"
             c_SHGetFolderPath :: Ptr () 
                               -> CInt 
                               -> Ptr () 
                               -> CInt 
                               -> CString 
                               -> IO CInt
+
+foreign import ccall unsafe "__hscore_long_path_size"
+  long_path_size :: Int
+
+foreign import ccall unsafe "__hscore_CSIDL_APPDATA"  csidl_APPDATA  :: CInt
 #endif
