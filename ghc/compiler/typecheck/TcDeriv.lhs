@@ -358,13 +358,13 @@ makeDerivEqns tycl_decls
 	    ]
 
     mk_eqn_help gla_exts NewType tycon clas tys
-      | can_derive_via_isomorphism && (gla_exts || standard_class gla_exts clas)
+      | can_derive_via_isomorphism && (gla_exts || std_class_via_iso clas)
       =		-- Go ahead and use the isomorphism
 	   traceTc (text "newtype deriving:" <+> ppr tycon <+> ppr rep_tys)	`thenM_`
        	   new_dfun_name clas tycon  		`thenM` \ dfun_name ->
 	   returnM (Nothing, Just (InstInfo { iDFunId = mk_dfun dfun_name,
 					      iBinds = NewTypeDerived rep_tys }))
-      | standard_class gla_exts clas
+      | std_class gla_exts clas
       = mk_eqn_help gla_exts DataType tycon clas tys	-- Go via bale-out route
 
       | otherwise 				-- Non-standard instance
@@ -509,12 +509,18 @@ makeDerivEqns tycl_decls
 				       ptext SLIT("Try -fglasgow-exts for GHC's newtype-deriving extension")])
 
     bale_out err = addErrTc err `thenM_` returnM (Nothing, Nothing) 
-    standard_class gla_exts clas =  key `elem` derivableClassKeys
-				 || (gla_exts && (key == typeableClassKey || key == dataClassKey))
-	where
-	  key = classKey clas
 
-
+std_class gla_exts clas 
+  =  key `elem` derivableClassKeys
+  || (gla_exts && (key == typeableClassKey || key == dataClassKey))
+  where
+     key = classKey clas
+    
+std_class_via_iso clas	-- These standard classes can be derived for a newtype
+			-- using the isomorphism trick *even if no -fglasgow-exts*
+  = classKey clas `elem`  [eqClassKey, ordClassKey, ixClassKey, boundedClassKey]
+	-- Not Read/Show because they respect the type
+	-- Not Enum, becuase newtypes are never in Enum
 
 
 new_dfun_name clas tycon 	-- Just a simple wrapper
