@@ -10,7 +10,7 @@
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
 --
--- The 'Storable' class.
+-- Helper functions for "Foreign.Storable"
 --
 -----------------------------------------------------------------------------
 
@@ -58,8 +58,6 @@ import GHC.Float
 import GHC.IOBase
 import GHC.Base
 \end{code}
-
-Helper functions for Foreign.Storable
 
 \begin{code}
 
