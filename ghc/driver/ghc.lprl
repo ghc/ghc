@@ -234,6 +234,7 @@ sub setupOptFlags {
    $Oopt_FB_Support		  = ''; # was '-fdo-arity-expand';
 #  $Oopt_FoldrBuildWW		  = 0; # Off by default
    $Oopt_FoldrBuildInline	  = ''; # was '-fdo-inline-foldr-build';
+   $Oopt_ShowSimplifierProgress   = '';
 } # end of setupOptFlags
 
 # Assign defaults to these right away.
@@ -453,9 +454,10 @@ $HscOut = '-C='; # '-C=' ==> .hc output; '-S=' ==> .s output; '-N=' ==> neither
 $HscOut = '-S='
     if $HaveNativeCodeGen && $TargetPlatform =~ /^(alpha|sparc)-/;
 # TEMP: disable x86  if $HaveNativeCodeGen && $TargetPlatform =~ /^(i386|alpha|sparc)-/;
-$ProduceHi   = '-hifile=';
-$HiOnStdout  = 0;
-$HiDiff_flag = '';
+$ProduceHi    = '-hifile=';
+$HiOnStdout   = 0;
+$HiDiff_flag  = '';
+$Keep_HiDiffs = 0;
 
 $CollectingGCstats = 0;
 $CollectGhcTimings = 0;
@@ -712,6 +714,7 @@ sub setupOptimiseFlags {
 
 	  $Oopt_UnfoldingUseThreshold,
 	  $Oopt_MaxSimplifierIterations,
+	  $Oopt_ShowSimplifierProgress,
 	  '\)',
 	$Oopt_AddAutoSccs,
 #	'-ffull-laziness',	# removed 95/04 WDP following Andr\'e's lead
@@ -770,6 +773,7 @@ sub setupOptimiseFlags {
 	  $Oopt_MonadEtaExpansion,
 	  $Oopt_UnfoldingUseThreshold,
 	  $Oopt_MaxSimplifierIterations,
+	  $Oopt_ShowSimplifierProgress,
 	  '\)',
 
 #LATER:	'-fcalc-inlinings1', -- pointless for 2.01
@@ -792,6 +796,7 @@ sub setupOptimiseFlags {
 #		  $Oopt_MonadEtaExpansion,
 #		  $Oopt_UnfoldingUseThreshold,
 #		  $Oopt_MaxSimplifierIterations,
+#		  $Oopt_ShowSimplifierProgress,
 #		  '\)',
 #	 ) : (),
 
@@ -819,6 +824,7 @@ sub setupOptimiseFlags {
 	    $Oopt_MonadEtaExpansion,
 	    $Oopt_UnfoldingUseThreshold,
 	    $Oopt_MaxSimplifierIterations,
+	    $Oopt_ShowSimplifierProgress,
 	    '\)',
 	) : (),
 
@@ -843,6 +849,7 @@ sub setupOptimiseFlags {
 	  $Oopt_MonadEtaExpansion,
 	  $Oopt_UnfoldingUseThreshold,
 	  $Oopt_MaxSimplifierIterations,
+	  $Oopt_ShowSimplifierProgress,
 	  '\)',
 
 	'-fstrictness',
@@ -863,6 +870,7 @@ sub setupOptimiseFlags {
 	  $Oopt_MonadEtaExpansion,
 	  $Oopt_UnfoldingUseThreshold,
 	  $Oopt_MaxSimplifierIterations,
+	  $Oopt_ShowSimplifierProgress,
 	  '\)',
 
 	'-ffloat-inwards',
@@ -872,7 +880,7 @@ sub setupOptimiseFlags {
 
 #	( ($OptLevel != 2)
 #        ? ''
-#	: "-fliberate-case -fsimplify \\( $Oopt_FB_Support -ffloat-lets-exposing-whnf -ffloat-primops-ok -fcase-of-case -fdo-case-elim -fcase-merge -fdo-eta-reduction -fdo-lambda-eta-expansion -freuse-con -flet-to-case $Oopt_PedanticBottoms $Oopt_MonadEtaExpansion $Oopt_UnfoldingUseThreshold $Oopt_MaxSimplifierIterations \\)" ),
+#	: "-fliberate-case -fsimplify \\( $Oopt_FB_Support -ffloat-lets-exposing-whnf -ffloat-primops-ok -fcase-of-case -fdo-case-elim -fcase-merge -fdo-eta-reduction -fdo-lambda-eta-expansion -freuse-con -flet-to-case $Oopt_PedanticBottoms $Oopt_MonadEtaExpansion $Oopt_UnfoldingUseThreshold $Oopt_MaxSimplifierIterations $Oopt_ShowSimplifierProgress \\)" ),
 
 # Final clean-up simplification:
 
@@ -896,6 +904,7 @@ sub setupOptimiseFlags {
 	  $Oopt_MonadEtaExpansion,
 	  $Oopt_UnfoldingUseThreshold,
 	  $Oopt_MaxSimplifierIterations,
+	  $Oopt_ShowSimplifierProgress,
 	  '\)',
 
       #	'-fstatic-args',
@@ -1882,6 +1891,7 @@ sub runHsc {
     if ( $CollectGhcTimings ) { # assume $RTS_style eq 'ghc'
 	# emit nofibbish time/bytes-alloc stats to stderr;
 	# see later .stat file post-processing
+	print STDERR "warning: both -Rgc-stats and -Rghc-timing used, -Rghc-timing wins." if $CollectingGCstats;
 	push(@HsC_rts_flags, "-s$Tmp_prefix.stat");
 	push(@Files_to_tidy, "$Tmp_prefix.stat");
     }
@@ -2221,18 +2231,23 @@ sub process_ghc_timings {
     local($SysSpecificTiming) = 'ghc';
 
     open(STATS, $StatsFile) || die "Failed when opening $StatsFile\n";
-    local($tot_live) = 0; # for calculating avg residency
+    local($max_live)    = 0; 
+    local($tot_live)    = 0; # for calculating residency stuff
+    local($tot_samples) = 0;
 
     while (<STATS>) {
-	$tot_live += $1 if /^\s*\d+\s+\d+\s+\d+\.\d+\%\s+(\d+)\s+\d+\.\d+\%/;
-
-	$BytesAlloc = $1 if /^\s*([0-9,]+) bytes allocated in the heap/;
+	if (! /Minor/ && /^\s*\d+\s+\d+\s+(\d+)\s+\d+\.\d+\%/ ) {
+	 	$max_live = $1 if $max_live < $1;
+		$tot_live += $1;
+		$tot_samples += 1;
+	}
+        $BytesAlloc = $1 if /^\s*([0-9,]+) bytes allocated in the heap/;
 
 	if ( /^\s*([0-9,]+) bytes maximum residency .* (\d+) sample/ ) {
 	    $MaxResidency = $1; $ResidencySamples = $2;
 	}
 
-	$GCs = $1 if /^\s*([0-9,]+) garbage collections? performed/;
+        $GCs = $1 if /^\s*([0-9,]+) garbage collections? performed/;
 
 	if ( /^\s*INIT\s+time\s*(\d+\.\d\d)s\s*\(\s*(\d+\.\d\d)s elapsed\)/ ) {
 	    $InitTime = $1; $InitElapsed = $2;
@@ -2243,8 +2258,10 @@ sub process_ghc_timings {
 	}
     }
     close(STATS) || die "Failed when closing $StatsFile\n";
-    if ( defined($ResidencySamples) && $ResidencySamples > 0 ) {
-	$AvgResidency = int ($tot_live / $ResidencySamples) ;
+    if ( $tot_samples > 0 ) {
+	$ResidencySamples = $tot_samples;
+	$MaxResidency = $max_live;
+	$AvgResidency = int ($tot_live / $tot_samples) ;
     }
 
     # warn about what we didn't find
@@ -2329,7 +2346,7 @@ nonsensical).
 sub grab_arg_arg {
     local(*Args, $option, $rest_of_arg) = @_;
     
-    if ($rest_of_arg) {
+    if ($rest_of_arg ne '') {
 	return($rest_of_arg);
     } elsif ($#Args >= 0) {
 	local($temp) = $Args[0]; shift(@Args); 
@@ -2439,7 +2456,7 @@ sub splitCmdLine {
 arg: while($_ = $args[0]) {
     shift(@args);
     # sigh, we have to deal with these -option arg specially here.
-    /^-(tmpdir|odir|o|isuf|osuf|hisuf|hisuf-prelude|odump|syslib)$/ && 
+    /^-(tmpdir|odir|ohi|o|isuf|osuf|hisuf|hisuf-prelude|odump|syslib)$/ && 
        do { push(@Cmd_opts, $_); push(@Cmd_opts,$args[0]); shift(@args); next arg; };
     /^--?./  && do { push(@Cmd_opts, $_); next arg; };
 
@@ -2530,9 +2547,11 @@ arg: while($_ = $Args[0]) {
     /^-nohi$/	    && do { $ProduceHi = '-nohifile='; next arg; };
     # don't generate an interface (even if generating C)
 
-    /^-hi-diffs$/             && do { $HiDiff_flag = 'normal'; next arg; };
-    /^-hi-diffs-with-usages$/ && do { $HiDiff_flag = 'usages'; next arg; };
-    /^-no-hi-diffs$/          && do { $HiDiff_flag = '';       next arg; };
+    /^-hi-diffs$/             && do { $HiDiff_flag  = 'normal'; next arg; };
+    /^-hi-diffs-with-usages$/ && do { $HiDiff_flag  = 'usages'; next arg; };
+    /^-no-hi-diffs$/          && do { $HiDiff_flag  = '';       next arg; };
+    /^-keep-hi-diffs$/	      && do { $Keep_HiDiffs = 1; next arg; };
+
     # show/disable diffs if the interface file changes
 
     /^-E$/	    && do { push(@CcBoth_flags, '-E');
@@ -2881,6 +2900,9 @@ arg: while($_ = $Args[0]) {
     /^(-fmax-simplifier-iterations)(.*)$/
 		    && do { $Oopt_MaxSimplifierIterations = $1 . &grab_arg_arg(*Args,$1, $2);
 			    next arg; };
+    /^(-fshow-simplifier-progress)/
+		    && do { $Oopt_ShowSimplifierProgress = $1;
+			    next arg; };
 
     /^-fno-pedantic-bottoms$/
 		    && do { $Oopt_PedanticBottoms = ''; next arg; };
@@ -2905,7 +2927,7 @@ arg: while($_ = $Args[0]) {
 
     # --------------- Warnings etc. ------
 
-    /^-f(show-import-specs)/
+    /^-fshow-import-specs/
 		    && do { push(@HsC_flags, $_); next arg; };
 
     # for now, just -fwarn-name-shadowing
