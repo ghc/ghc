@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.78 2001/06/30 00:12:52 sof Exp $
+dnl $Id: aclocal.m4,v 1.79 2001/07/19 09:03:24 simonmar Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -386,6 +386,19 @@ rm -fr conftest*
 ])
 
 dnl
+dnl FPTOOLS_NOCACHE_CHECK prints a message, then sets the
+dnl values of the second argument to the result of running
+dnl the commands given by the third. It does not cache its
+dnl result, so it is suitable for checks which should be
+dnl run every time.
+dnl
+AC_DEFUN(FPTOOLS_NOCACHE_CHECK,
+[AC_MSG_CHECKING([$1])
+ $3
+ AC_MSG_RESULT([$][$2])
+])
+
+dnl
 dnl FPTOOLS_GHC_VERSION(version)
 dnl FPTOOLS_GHC_VERSION(major, minor [, patchlevel])
 dnl FPTOOLS_GHC_VERSION(version, major, minor, patchlevel)
@@ -394,47 +407,44 @@ dnl Test for version of installed ghc.  Uses $GHC.
 dnl [original version pinched from c2hs]
 dnl
 AC_DEFUN(FPTOOLS_GHC_VERSION,
-[define([FPTOOLS_CV_GHC_VERSION], [fptools_cv_ghc_version])dnl
-AC_CACHE_CHECK([version of ghc], FPTOOLS_CV_GHC_VERSION, [dnl
-${WithGhc-ghc} --version > conftestghc 2>&1
+[FPTOOLS_NOCACHE_CHECK([version of ghc], [fptools_version_of_ghc],
+[${WithGhc-ghc} --version > conftestghc 2>&1
   cat conftestghc >&AC_FD_CC
-dnl `Useless Use Of cat' award...
-changequote(<<, >>)dnl
-  FPTOOLS_CV_GHC_VERSION=`cat conftestghc | sed -n -e 's/, patchlevel *\([0-9]\)/.\1/;s/.* version \([0-9][0-9.]*\).*/\1/p'`
-changequote([, ])dnl
+#Useless Use Of cat award...
+  fptools_version_of_ghc=`cat conftestghc | sed -n -e 's/, patchlevel *\([[0-9]]\)/.\1/;s/.* version \([[0-9]][[0-9.]]*\).*/\1/p'`
   rm -fr conftest*
-  if test "[$]FPTOOLS_CV_GHC_VERSION" = ""
+  if test "[$]fptools_version_of_ghc" = ""
   then
-    FPTOOLS_CV_GHC_VERSION='unknown'
-  fi])
-changequote(<<, >>)dnl
-FPTOOLS_CV_GHC_VERSION<<_major>>=`echo <<$>>FPTOOLS_CV_GHC_VERSION | sed -e 's/^\([0-9]\).*/\1/'`
-FPTOOLS_CV_GHC_VERSION<<_minor>>=`echo <<$>>FPTOOLS_CV_GHC_VERSION | sed -e 's/^[0-9]\.\([0-9]*\).*/\1/'`
-FPTOOLS_CV_GHC_VERSION<<_pl>>=`echo <<$>>FPTOOLS_CV_GHC_VERSION | sed -n -e 's/^[0-9]\.[0-9]*\.\([0-9]*\)/\1/p'`
-changequote([, ])dnl
-if test "[$]FPTOOLS_CV_GHC_VERSION[_pl]" = ""
+    fptools_version_of_ghc='unknown'
+  fi
+fptools_version_of_ghc[_major]=`echo [$]fptools_version_of_ghc | sed -e 's/^\([[0-9]]\).*/\1/'`
+fptools_version_of_ghc[_minor]=`echo [$]fptools_version_of_ghc | sed -e 's/^[[0-9]]\.\([[0-9]]*\).*/\1/'`
+fptools_version_of_ghc[_pl]=`echo [$]fptools_version_of_ghc | sed -n -e 's/^[[0-9]]\.[[0-9]]*\.\([[0-9]]*\)/\1/p'`
+#
+if test "[$]fptools_version_of_ghc[_pl]" = ""
 then
-  FPTOOLS_CV_GHC_VERSION[_all]="[$]FPTOOLS_CV_GHC_VERSION[_major].[$]FPTOOLS_CV_GHC_VERSION[_minor]"
-  FPTOOLS_CV_GHC_VERSION[_pl]="0"
+  fptools_version_of_ghc[_all]="[$]fptools_version_of_ghc[_major].[$]fptools_version_of_ghc[_minor]"
+  fptools_version_of_ghc[_pl]="0"
 else
-  FPTOOLS_CV_GHC_VERSION[_all]="[$]FPTOOLS_CV_GHC_VERSION[_major].[$]FPTOOLS_CV_GHC_VERSION[_minor].[$]FPTOOLS_CV_GHC_VERSION[_pl]"
+  fptools_version_of_ghc[_all]="[$]fptools_version_of_ghc[_major].[$]fptools_version_of_ghc[_minor].[$]fptools_version_of_ghc[_pl]"
 fi
+#
 ifelse($#, [1], [dnl
-[$1]="[$]FPTOOLS_CV_GHC_VERSION[_all]"
+[$1]="[$]fptools_version_of_ghc[_all]"
 ], $#, [2], [dnl
-[$1]="[$]FPTOOLS_CV_GHC_VERSION[_major]"
-[$2]="[$]FPTOOLS_CV_GHC_VERSION[_minor]"
+[$1]="[$]fptools_version_of_ghc[_major]"
+[$2]="[$]fptools_version_of_ghc[_minor]"
 ], $#, [3], [dnl
-[$1]="[$]FPTOOLS_CV_GHC_VERSION[_major]"
-[$2]="[$]FPTOOLS_CV_GHC_VERSION[_minor]"
-[$3]="[$]FPTOOLS_CV_GHC_VERSION[_pl]"
+[$1]="[$]fptools_version_of_ghc[_major]"
+[$2]="[$]fptools_version_of_ghc[_minor]"
+[$3]="[$]fptools_version_of_ghc[_pl]"
 ], $#, [4], [dnl
-[$1]="[$]FPTOOLS_CV_GHC_VERSION[_all]"
-[$2]="[$]FPTOOLS_CV_GHC_VERSION[_major]"
-[$3]="[$]FPTOOLS_CV_GHC_VERSION[_minor]"
-[$4]="[$]FPTOOLS_CV_GHC_VERSION[_pl]"
-], [AC_MSG_ERROR([wrong number of arguments to [$0]])])dnl
-undefine([FPTOOLS_CV_GHC_VERSION])dnl
+[$1]="[$]fptools_version_of_ghc[_all]"
+[$2]="[$]fptools_version_of_ghc[_major]"
+[$3]="[$]fptools_version_of_ghc[_minor]"
+[$4]="[$]fptools_version_of_ghc[_pl]"
+])
+])
 ])dnl
 
 
@@ -579,7 +589,7 @@ main()
 }], 
 eval "$cv_name=`cat conftestval`",
 eval "$cv_name=-1",
-ifelse([$2], , , eval "$cv_name=$2"))])dnl
+eval "$cv_name=-1")])dnl
 eval "fptools_check_cconst_result=`echo '$'{$cv_name}`"
 AC_MSG_RESULT($fptools_check_cconst_result)
 AC_DEFINE_UNQUOTED($def_name, $fptools_check_cconst_result)
@@ -640,63 +650,112 @@ fi
 
 dnl *** Helper function **
 dnl 
-AC_DEFUN(FPTOOLS_IN_SCOPE,AC_TRY_LINK([extern char* $1;],[return (int)&$2], $3=yes, $3=no))
+AC_DEFUN(FPTOOLS_IN_SCOPE,
+[AC_TRY_LINK([extern char* $1;],[return (int)&$2], $3=yes, $3=no)
+])
 
 dnl *** What's the end-of-text-section marker called? ***
 dnl
-AC_DEFUN(FPTOOLS_END_TEXT_SECTION,
-[AC_MSG_CHECKING([for end of text section marker])
-not_done=1
-for i in data_start _data_start etext _etext __etext; do
-  FPTOOLS_IN_SCOPE($i,$i,fptools_end_of_text)
-  if test "$fptools_end_of_text" = yes; then
-   AC_CACHE_VAL([fptools_cv_end_of_text_decl], AC_DEFINE_UNQUOTED(TEXT_SECTION_END_MARKER_DECL, $i))
-   AC_CACHE_VAL([fptools_cv_end_of_text], AC_DEFINE_UNQUOTED(TEXT_SECTION_END_MARKER, $i))
-   not_done=0
-   break
-  fi
-done
-if test "$not_done" = 1; then
-FPTOOLS_IN_SCOPE(etext asm("etext"),etext,fptools_end_of_text);
-if test "$fptools_end_of_text" = yes; then
-  AC_CACHE_VAL([fptools_cv_end_of_text], AC_DEFINE_UNQUOTED(TEXT_SECTION_END_MARKER, etext))
-  AC_CACHE_VAL([fptools_cv_end_of_text_decl], AC_DEFINE_UNQUOTED(TEXT_SECTION_END_MARKER_DECL, etext asm("etext")))
-else
-  AC_DEFINE_UNQUOTED(TEXT_SECTION_END_MARKER_DECL, dunno_what_it_is)
-  AC_DEFINE_UNQUOTED(TEXT_SECTION_END_MARKER, dunno_what_it_is)
-fi
-fi
-AC_MSG_RESULT([$]fptools_cv_end_of_text)
-])
-
+AC_DEFUN([FPTOOLS_END_TEXT_SECTION],
+[AC_CACHE_CHECK([for end of text section marker],
+                [fptools_cv_end_of_text],
+		[fptools_cv_end_of_text=""
+		 not_done=1
+		 for i in data_start _data_start etext _etext __etext; do
+		   FPTOOLS_IN_SCOPE($i,$i,fptools_end_of_text)
+		   if test "$fptools_end_of_text" = yes; then
+		     fptools_cv_end_of_text=$i
+		     not_done=0
+		     break
+		   fi
+		 done
+		 if test "$not_done" = 1; then
+		   FPTOOLS_IN_SCOPE(etext asm("etext"),etext,fptools_end_of_text)
+		   if test "$fptools_end_of_text" = yes; then
+		     fptools_cv_end_of_text="etext asm("etext")"
+		   fi
+		 fi])
+		 if test -n $fptools_cv_end_of_text; then
+		   AC_DEFINE_UNQUOTED([TEXT_SECTION_END_MARKER], $fptools_cv_end_of_text)
+		 else
+		   AC_DEFINE_UNQUOTED([TEXT_SECTION_END_MARKER], dunno_end_of_text)
+		 fi
+ AC_CACHE_CHECK([for end of text section marker declaration],
+		[fptools_cv_end_of_text_decl],
+		[fptools_cv_end_of_text_decl=""
+		 not_done=1
+		 for i in data_start _data_start etext _etext __etext; do
+		   FPTOOLS_IN_SCOPE($i,$i,fptools_end_of_text_decl)
+		   if test "$fptools_end_of_text_decl" = yes; then
+		     fptools_cv_end_of_text_decl=$i
+		     not_done=0
+		     break
+		   fi
+		 done
+		 if test "$not_done" = 1; then
+		   FPTOOLS_IN_SCOPE(etext asm("etext"),etext,fptools_end_of_text_decl)
+		   if test "$fptools_end_of_text_decl" = yes; then
+		     fptools_cv_end_of_text_decl=etext
+		   fi
+		 fi])
+		 if test -n $fptools_cv_end_of_text_decl; then
+		   AC_DEFINE_UNQUOTED([TEXT_SECTION_END_MARKER_DECL], $fptools_cv_end_of_text_decl)
+		 else
+		   AC_DEFINE_UNQUOTED([TEXT_SECTION_END_MARKER_DECL], dunno_end_of_text_decl)
+		 fi
+])		   
+ 
 dnl *** What's the end-of-data-section marker called? ***
 dnl
-AC_DEFUN(FPTOOLS_END_DATA_SECTION,
-[AC_MSG_CHECKING([for end of data section marker])
-not_done=1
-for i in end _end __end; do
-  FPTOOLS_IN_SCOPE($i,$i,fptools_end_of_data)
-  if test "$fptools_end_of_data" = yes; then
-   AC_CACHE_VAL([fptools_cv_end_of_data_decl], [AC_DEFINE_UNQUOTED(DATA_SECTION_END_MARKER_DECL, $i)])
-   AC_CACHE_VAL([fptools_cv_end_of_data], [AC_DEFINE_UNQUOTED(DATA_SECTION_END_MARKER, $i)])
-   not_done=0
-   break
-  fi
-done
-if test "$not_done" = 1; then
-FPTOOLS_IN_SCOPE(end asm("end"),end,fptools_end_of_data);
-if test "$fptools_end_of_data" = yes; then
-  AC_CACHE_VAL([fptools_cv_end_of_data_decl], [AC_DEFINE_UNQUOTED(DATA_SECTION_END_MARKER_DECL, end asm("end"))])
-  AC_CACHE_VAL([fptools_cv_end_of_data], [AC_DEFINE_UNQUOTED(DATA_SECTION_END_MARKER, end)])
-else
-  AC_CACHE_VAL([fptools_cv_end_of_data_decl], [AC_DEFINE_UNQUOTED(DATA_SECTION_END_MARKER_DECL, dunno_what_it_is)])
-  AC_CACHE_VAL([fptools_cv_end_of_data], [AC_DEFINE_UNQUOTED(DATA_SECTION_END_MARKER, dunno_what_it_is)])
-fi
-fi
-AC_MSG_RESULT([$]fptools_cv_end_of_data)
-])
-
-
+AC_DEFUN([FPTOOLS_END_DATA_SECTION],
+[AC_CACHE_CHECK([for end of data section marker],
+                [fptools_cv_end_of_data],
+		[fptools_cv_end_of_data=""
+		 not_done=1
+		 for i in end _end __end; do
+		   FPTOOLS_IN_SCOPE($i,$i,fptools_end_of_data)
+		   if test "$fptools_end_of_data" = yes; then
+		     fptools_cv_end_of_data=$i
+		     not_done=0
+		     break
+		   fi
+		 done
+		 if test "$not_done" = 1; then
+		   FPTOOLS_IN_SCOPE(end asm("end"),end,fptools_end_of_data)
+		   if test "$fptools_end_of_data" = yes; then
+		     fptools_cv_end_of_data=end
+		   fi
+		 fi])
+		 if test -n $fptools_cv_end_of_data; then
+		   AC_DEFINE_UNQUOTED([DATA_SECTION_END_MARKER], $fptools_cv_end_of_data)
+		 else
+		   AC_DEFINE_UNQUOTED([DATA_SECTION_END_MARKER], dunno_end_of_data)
+		 fi
+ AC_CACHE_CHECK([for end of data section marker declaration],
+		[fptools_cv_end_of_data_decl],
+		[fptools_cv_end_of_data_decl=""
+		 not_done=1
+		 for i in end _end __end; do
+		   FPTOOLS_IN_SCOPE($i,$i,fptools_end_of_data_decl)
+		   if test "$fptools_end_of_data_decl" = yes; then
+		     fptools_cv_end_of_data_decl=$i
+		     not_done=0
+		     break
+		   fi
+		 done
+		 if test "$not_done" = 1; then
+		   FPTOOLS_IN_SCOPE(end asm("end"),end,fptools_end_of_data_decl)
+		   if test "$fptools_end_of_data_decl" = yes; then
+		     fptools_cv_end_of_data_decl=end
+		   fi
+		 fi])
+		 if test -n $fptools_cv_end_of_data_decl; then
+		   AC_DEFINE_UNQUOTED([DATA_SECTION_END_MARKER_DECL], $fptools_cv_end_of_data_decl)
+		 else
+		   AC_DEFINE_UNQUOTED([DATA_SECTION_END_MARKER_DECL], dunno_end_of_data_decl)
+		 fi
+])		   
+ 
 
 dnl Based on AC_TRY_LINK - run iftrue if links cleanly with no warning
 
@@ -772,7 +831,7 @@ AC_DEFUN(FPTOOLS_CHECK_LIB_NOWARN,
 
 dnl check for prototypes
 dnl
-AC_DEFUN(AC_C_PROTOTYPES,
+AC_DEFUN([AC_C_PROTOTYPES],
 [AC_CACHE_CHECK([prototypes], ac_cv_prototypes,
 [AC_TRY_COMPILE([
 void foo(int);
@@ -785,7 +844,7 @@ return;
 ac_cv_prototypes=yes,
 ac_cv_prototypes=no)])
 if test "$ac_cv_prototypes" = yes; then
-AC_DEFINE(HAVE_PROTOTYPES)
+AC_DEFINE([HAVE_PROTOTYPES])
 fi
 ])
 
