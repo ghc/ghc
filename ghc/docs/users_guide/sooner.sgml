@@ -16,7 +16,7 @@ Please advise us of other ``helpful hints'' that should go here!
 <VariableList>
 
 <VarListEntry>
-<Term>Don't use <Literal>-O</Literal> or (especially) <Literal>-O2</Literal>:</Term>
+<Term>Don't use <Option>-O</Option> or (especially) <Option>-O2</Option>:</Term>
 <ListItem>
 <Para>
 By using them, you are telling GHC that you are willing to suffer
@@ -24,7 +24,7 @@ longer compilation times for better-quality code.
 </Para>
 
 <Para>
-GHC is surprisingly zippy for normal compilations without <Literal>-O</Literal>!
+GHC is surprisingly zippy for normal compilations without <Option>-O</Option>!
 </Para>
 </ListItem>
 </VarListEntry>
@@ -34,8 +34,8 @@ GHC is surprisingly zippy for normal compilations without <Literal>-O</Literal>!
 <Para>
 Within reason, more memory for heap space means less garbage
 collection for GHC, which means less compilation time.  If you use
-the <Literal>-Rgc-stats</Literal> option, you'll get a garbage-collector report.
-(Again, you can use the cheap-and-nasty <Literal>-optCrts-Sstderr</Literal> option to
+the <Option>-Rgc-stats</Option> option, you'll get a garbage-collector report.
+(Again, you can use the cheap-and-nasty <Option>-optCrts-Sstderr</Option> option to
 send the GC stats straight to standard error.)
 </Para>
 
@@ -47,13 +47,13 @@ collecting, then more memory would help.
 <Para>
 If the heap size is approaching the maximum (64M by default), and you
 have lots of memory, try increasing the maximum with the
-<Literal>-M&lt;size&gt;</Literal><IndexTerm><Primary>-M&lt;size&gt; option</Primary></IndexTerm> option, e.g.: <Literal>ghc -c -O
--M1024m Foo.hs</Literal>.
+<Option>-M&lt;size&gt;</Option><IndexTerm><Primary>-M&lt;size&gt; option</Primary></IndexTerm> option, e.g.: <Command>ghc -c -O
+-M1024m Foo.hs</Command>.
 </Para>
 
 <Para>
 Increasing the default allocation area size used by the compiler's RTS
-might also help: use the <Literal>-A&lt;size&gt;</Literal><IndexTerm><Primary>-A&lt;size&gt; option</Primary></IndexTerm>
+might also help: use the <Option>-A&lt;size&gt;</Option><IndexTerm><Primary>-A&lt;size&gt; option</Primary></IndexTerm>
 option.
 </Para>
 
@@ -71,7 +71,7 @@ As soon as GHC plus its ``fellow citizens'' (other processes on your
 machine) start using more than the <Emphasis>real memory</Emphasis> on your
 machine, and the machine starts ``thrashing,'' <Emphasis>the party is
 over</Emphasis>.  Compile times will be worse than terrible!  Use something
-like the csh-builtin <Literal>time</Literal> command to get a report on how many page
+like the csh-builtin <Command>time</Command> command to get a report on how many page
 faults you're getting.
 </Para>
 
@@ -99,7 +99,7 @@ your disks directly mounted.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term>Don't derive/use <Literal>Read</Literal> unnecessarily:</Term>
+<Term>Don't derive/use <Function>Read</Function> unnecessarily:</Term>
 <ListItem>
 <Para>
 It's ugly and slow.
@@ -123,20 +123,20 @@ to correct it.
 The parts of the compiler that seem most prone to wandering off for a
 long time are the abstract interpreters (strictness and update
 analysers).  You can turn these off individually with
-<Literal>-fno-strictness</Literal><IndexTerm><Primary>-fno-strictness anti-option</Primary></IndexTerm> and
-<Literal>-fno-update-analysis</Literal>.<IndexTerm><Primary>-fno-update-analysis anti-option</Primary></IndexTerm>
+<Option>-fno-strictness</Option><IndexTerm><Primary>-fno-strictness anti-option</Primary></IndexTerm> and
+<Option>-fno-update-analysis</Option>.<IndexTerm><Primary>-fno-update-analysis anti-option</Primary></IndexTerm>
 </Para>
 
 <Para>
 To figure out which part of the compiler is badly behaved, the
-<Literal>-dshow-passes</Literal><IndexTerm><Primary>-dshow-passes option</Primary></IndexTerm> option is your
+<Option>-dshow-passes</Option><IndexTerm><Primary>-dshow-passes option</Primary></IndexTerm> option is your
 friend.
 </Para>
 
 <Para>
 If your module has big wads of constant data, GHC may produce a huge
 basic block that will cause the native-code generator's register
-allocator to founder.  Bring on <Literal>-fvia-C</Literal><IndexTerm><Primary>-fvia-C option</Primary></IndexTerm>
+allocator to founder.  Bring on <Option>-fvia-C</Option><IndexTerm><Primary>-fvia-C option</Primary></IndexTerm>
 (not that GCC will be that quick about it, either).
 </Para>
 </ListItem>
@@ -145,7 +145,7 @@ allocator to founder.  Bring on <Literal>-fvia-C</Literal><IndexTerm><Primary>-f
 <Term>Avoid the consistency-check on linking:</Term>
 <ListItem>
 <Para>
-Use <Literal>-no-link-chk</Literal><IndexTerm><Primary>-no-link-chk</Primary></IndexTerm>; saves effort.  This is
+Use <Option>-no-link-chk</Option><IndexTerm><Primary>-no-link-chk</Primary></IndexTerm>; saves effort.  This is
 probably safe in a I-only-compile-things-one-way setup.
 </Para>
 </ListItem>
@@ -211,16 +211,16 @@ faster''&hellip;
 <VariableList>
 
 <VarListEntry>
-<Term>Optimise, using <Literal>-O</Literal> or <Literal>-O2</Literal>:</Term>
+<Term>Optimise, using <Option>-O</Option> or <Option>-O2</Option>:</Term>
 <ListItem>
 <Para>
 This is the most basic way
 to make your program go faster.  Compilation time will be slower,
-especially with <Literal>-O2</Literal>.
+especially with <Option>-O2</Option>.
 </Para>
 
 <Para>
-At present, <Literal>-O2</Literal> is nearly indistinguishable from <Literal>-O</Literal>.
+At present, <Option>-O2</Option> is nearly indistinguishable from <Option>-O</Option>.
 </Para>
 </ListItem>
 </VarListEntry>
@@ -228,7 +228,7 @@ At present, <Literal>-O2</Literal> is nearly indistinguishable from <Literal>-O<
 <Term>Compile via C and crank up GCC:</Term>
 <ListItem>
 <Para>
-Even with <Literal>-O</Literal>, GHC tries to
+Even with <Option>-O</Option>, GHC tries to
 use a native-code generator, if available.  But the native
 code-generator is designed to be quick, not mind-bogglingly clever.
 Better to let GCC have a go, as it tries much harder on register
@@ -236,7 +236,7 @@ allocation, etc.
 </Para>
 
 <Para>
-So, when we want very fast code, we use: <Literal>-O -fvia-C -O2-for-C</Literal>.
+So, when we want very fast code, we use: <Option>-O -fvia-C -O2-for-C</Option>.
 </Para>
 </ListItem>
 </VarListEntry>
@@ -258,12 +258,12 @@ loop.  How can you squash it?
 <Para>
 Signatures are the basic trick; putting them on exported, top-level
 functions is good software-engineering practice, anyway.  (Tip: using
-<Literal>-fwarn-missing-signatures</Literal><IndexTerm><Primary>-fwarn-missing-signatures
+<Option>-fwarn-missing-signatures</Option><IndexTerm><Primary>-fwarn-missing-signatures
 option</Primary></IndexTerm> can help enforce good signature-practice).
 </Para>
 
 <Para>
-The automatic specialisation of overloaded functions (with <Literal>-O</Literal>)
+The automatic specialisation of overloaded functions (with <Option>-O</Option>)
 should take care of overloaded local and/or unexported functions.
 </Para>
 </ListItem>
@@ -377,22 +377,22 @@ Don't guess&mdash;look it up.
 <Para>
 Look for your function in the interface file, then for the third field
 in the pragma; it should say <Literal>&lowbar;S&lowbar; &lt;string&gt;</Literal>.  The <Literal>&lt;string&gt;</Literal>
-gives the strictness of the function's arguments.  <Literal>L</Literal> is lazy
-(bad), <Literal>S</Literal> and <Literal>E</Literal> are strict (good), <Literal>P</Literal> is ``primitive'' (good),
-<Literal>U(...)</Literal> is strict and
-``unpackable'' (very good), and <Literal>A</Literal> is absent (very good).
+gives the strictness of the function's arguments.  <Function>L</Function> is lazy
+(bad), <Function>S</Function> and <Function>E</Function> are strict (good), <Function>P</Function> is ``primitive'' (good),
+<Function>U(...)</Function> is strict and
+``unpackable'' (very good), and <Function>A</Function> is absent (very good).
 </Para>
 
 <Para>
-For an ``unpackable'' <Literal>U(...)</Literal> argument, the info inside
+For an ``unpackable'' <Function>U(...)</Function> argument, the info inside
 tells the strictness of its components.  So, if the argument is a
-pair, and it says <Literal>U(AU(LSS))</Literal>, that means ``the first component of the
+pair, and it says <Function>U(AU(LSS))</Function>, that means ``the first component of the
 pair isn't used; the second component is itself unpackable, with three
 components (lazy in the first, strict in the second \&#38; third).''
 </Para>
 
 <Para>
-If the function isn't exported, just compile with the extra flag <Literal>-ddump-simpl</Literal>;
+If the function isn't exported, just compile with the extra flag <Option>-ddump-simpl</Option>;
 next to the signature for any binder, it will print the self-same
 pragmatic information as would be put in an interface file.
 (Besides, Core syntax is fun to look at!)
@@ -431,7 +431,7 @@ they are not exported.
 <ListItem>
 <Para>
 (The form in which GHC manipulates your code.)  Just run your
-compilation with <Literal>-ddump-simpl</Literal> (don't forget the <Literal>-O</Literal>).
+compilation with <Option>-ddump-simpl</Option> (don't forget the <Option>-O</Option>).
 </Para>
 
 <Para>
@@ -454,7 +454,7 @@ types.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term>Use <Literal>&lowbar;ccall&lowbar;s</Literal> (a GHC extension) to plug into fast libraries:</Term>
+<Term>Use <Function>&lowbar;ccall&lowbar;s</Function> (a GHC extension) to plug into fast libraries:</Term>
 <ListItem>
 <Para>
 This may take real work, but&hellip; There exist piles of
@@ -496,11 +496,11 @@ true on a 64-bit machine.
 <Term>Use a bigger heap!</Term>
 <ListItem>
 <Para>
-If your program's GC stats (<Literal>-S</Literal><IndexTerm><Primary>-S RTS option</Primary></IndexTerm> RTS option)
+If your program's GC stats (<Option>-S</Option><IndexTerm><Primary>-S RTS option</Primary></IndexTerm> RTS option)
 indicate that it's doing lots of garbage-collection (say, more than
 20&percnt; of execution time), more memory might help&mdash;with the
-<Literal>-M&lt;size&gt;</Literal><IndexTerm><Primary>-M&lt;size&gt; RTS option</Primary></IndexTerm> or
-<Literal>-A&lt;size&gt;</Literal><IndexTerm><Primary>-A&lt;size&gt; RTS option</Primary></IndexTerm> RTS options (see
+<Option>-M&lt;size&gt;</Option><IndexTerm><Primary>-M&lt;size&gt; RTS option</Primary></IndexTerm> or
+<Option>-A&lt;size&gt;</Option><IndexTerm><Primary>-A&lt;size&gt; RTS option</Primary></IndexTerm> RTS options (see
 <XRef LinkEnd="rts-options-gc">).
 </Para>
 </ListItem>
@@ -521,7 +521,7 @@ indicate that it's doing lots of garbage-collection (say, more than
 <Para>
 Decrease the ``go-for-it'' threshold for unfolding smallish
 expressions.  Give a
-<Literal>-funfolding-use-threshold0</Literal><IndexTerm><Primary>-funfolding-use-threshold0
+<Option>-funfolding-use-threshold0</Option><IndexTerm><Primary>-funfolding-use-threshold0
 option</Primary></IndexTerm> option for the extreme case. (``Only unfoldings with
 zero cost should proceed.'')  Warning: except in certain specialiised
 cases (like Happy parsers) this is likely to actually
@@ -530,7 +530,7 @@ generally enables extra simplifying optimisations to be performed.
 </Para>
 
 <Para>
-Avoid <Literal>Read</Literal>.
+Avoid <Function>Read</Function>.
 </Para>
 
 <Para>
@@ -551,10 +551,10 @@ Use <Literal>strip</Literal> on your executables.
 
 <Para>
 ``I think I have a space leak&hellip;''  Re-run your program with
-<Literal>+RTS -Sstderr</Literal>,<IndexTerm><Primary>-Sstderr RTS option</Primary></IndexTerm> and remove all doubt!
+<Option>+RTS -Sstderr</Option>,<IndexTerm><Primary>-Sstderr RTS option</Primary></IndexTerm> and remove all doubt!
 (You'll see the heap usage get bigger and bigger&hellip;)  &lsqb;Hmmm&hellip;this
-might be even easier with the <Literal>-F2s</Literal><IndexTerm><Primary>-F2s RTS option</Primary></IndexTerm> RTS
-option; so&hellip; <Literal>./a.out +RTS -Sstderr -F2s</Literal>...]
+might be even easier with the <Option>-F2s</Option><IndexTerm><Primary>-F2s RTS option</Primary></IndexTerm> RTS
+option; so&hellip; <Command>./a.out +RTS -Sstderr -F2s</Command>...]
 </Para>
 
 <Para>

@@ -19,11 +19,11 @@ HACKER TERRITORY. HACKER TERRITORY.
 <IndexTerm><Primary>GHC phases, changing</Primary></IndexTerm>
 <IndexTerm><Primary>phases, changing GHC</Primary></IndexTerm>
 You may specify that a different program be used for one of the phases
-of the compilation system, in place of whatever the driver <Literal>ghc</Literal> has
+of the compilation system, in place of whatever the driver <Command>ghc</Command> has
 wired into it.  For example, you might want to try a different
 assembler.  The
-<Literal>-pgm&lt;phase-code&gt;&lt;program-name&gt;</Literal><IndexTerm><Primary>-pgm&lt;phase&gt;&lt;stuff&gt;
-option</Primary></IndexTerm> option to <Literal>ghc</Literal> will cause it to use <Literal>&lt;program-name&gt;</Literal>
+<Option>-pgm&lt;phase-code&gt;&lt;program-name&gt;</Option><IndexTerm><Primary>-pgm&lt;phase&gt;&lt;stuff&gt;
+option</Primary></IndexTerm> option to <Command>ghc</Command> will cause it to use <Literal>&lt;program-name&gt;</Literal>
 for phase <Literal>&lt;phase-code&gt;</Literal>, where the codes to indicate the phases are:
 </Para>
 
@@ -93,23 +93,23 @@ dep </Entry>
 <Para>
 The preceding sections describe driver options that are mostly
 applicable to one particular phase.  You may also <Emphasis>force</Emphasis> a
-specific option <Literal>&lt;option&gt;</Literal> to be passed to a particular phase
+specific option <Option>&lt;option&gt;</Option> to be passed to a particular phase
 <Literal>&lt;phase-code&gt;</Literal> by feeding the driver the option
-<Literal>-opt&lt;phase-code&gt;&lt;option&gt;</Literal>.<IndexTerm><Primary>-opt&lt;phase&gt;&lt;stuff&gt;
+<Option>-opt&lt;phase-code&gt;&lt;option&gt;</Option>.<IndexTerm><Primary>-opt&lt;phase&gt;&lt;stuff&gt;
 option</Primary></IndexTerm> The codes to indicate the phases are the same as in the
 previous section.
 </Para>
 
 <Para>
-So, for example, to force an <Literal>-Ewurble</Literal> option to the assembler, you
-would tell the driver <Literal>-opta-Ewurble</Literal> (the dash before the E is
+So, for example, to force an <Option>-Ewurble</Option> option to the assembler, you
+would tell the driver <Option>-opta-Ewurble</Option> (the dash before the E is
 required).
 </Para>
 
 <Para>
-Besides getting options to the Haskell compiler with <Literal>-optC&lt;blah&gt;</Literal>,
+Besides getting options to the Haskell compiler with <Option>-optC&lt;blah&gt;</Option>,
 you can get options through to its runtime system with
-<Literal>-optCrts&lt;blah&gt;</Literal><IndexTerm><Primary>-optCrts&lt;blah&gt; option</Primary></IndexTerm>.
+<Option>-optCrts&lt;blah&gt;</Option><IndexTerm><Primary>-optCrts&lt;blah&gt; option</Primary></IndexTerm>.
 </Para>
 
 <Para>
@@ -142,29 +142,29 @@ exec /local/grasp_tmp3/simonpj/ghc-BUILDS/working-alpha/ghc/driver/ghc \
 <VariableList>
 
 <VarListEntry>
-<Term><Literal>-noC</Literal>:</Term>
+<Term><Option>-noC</Option>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>-noC option</Primary></IndexTerm>
 Don't bother generating C output <Emphasis>or</Emphasis> an interface file.  Usually
-used in conjunction with one or more of the <Literal>-ddump-*</Literal> options; for
-example: <Literal>ghc -noC -ddump-simpl Foo.hs</Literal>
+used in conjunction with one or more of the <Option>-ddump-*</Option> options; for
+example: <Command>ghc -noC -ddump-simpl Foo.hs</Command>
 </Para>
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-hi</Literal>:</Term>
+<Term><Option>-hi</Option>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>-hi option</Primary></IndexTerm>
 <Emphasis>Do</Emphasis> generate an interface file.  This would normally be used in
-conjunction with <Literal>-noC</Literal>, which turns off interface generation;
-thus: <Literal>-noC -hi</Literal>.
+conjunction with <Option>-noC</Option>, which turns off interface generation;
+thus: <Option>-noC -hi</Option>.
 </Para>
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-dshow-passes</Literal>:</Term>
+<Term><Option>-dshow-passes</Option>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>-dshow-passes option</Primary></IndexTerm>
@@ -175,13 +175,13 @@ happening.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-ddump-&lt;pass&gt;</Literal>:</Term>
+<Term><Option>-ddump-&lt;pass&gt;</Option>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>-ddump-&lt;pass&gt; options</Primary></IndexTerm>
 Make a debugging dump after pass <Literal>&lt;pass&gt;</Literal> (may be common enough to
 need a short form&hellip;).  You can get all of these at once (<Emphasis>lots</Emphasis> of
-output) by using <Literal>-ddump-all</Literal>, or most of them with <Literal>-ddump-most</Literal>.
+output) by using <Option>-ddump-all</Option>, or most of them with <Option>-ddump-most</Option>.
 Some of the most useful ones are:
 </Para>
 
@@ -189,7 +189,7 @@ Some of the most useful ones are:
 <VariableList>
 
 <VarListEntry>
-<Term><Literal>-ddump-parsed</Literal>:</Term>
+<Term><Option>-ddump-parsed</Option>:</Term>
 <ListItem>
 <Para>
 oarser output
@@ -197,7 +197,7 @@ oarser output
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-ddump-rn</Literal>:</Term>
+<Term><Option>-ddump-rn</Option>:</Term>
 <ListItem>
 <Para>
 renamer output
@@ -205,7 +205,7 @@ renamer output
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-ddump-tc</Literal>:</Term>
+<Term><Option>-ddump-tc</Option>:</Term>
 <ListItem>
 <Para>
 typechecker output
@@ -213,7 +213,7 @@ typechecker output
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-ddump-deriv</Literal>:</Term>
+<Term><Option>-ddump-deriv</Option>:</Term>
 <ListItem>
 <Para>
 derived instances
@@ -221,7 +221,7 @@ derived instances
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-ddump-ds</Literal>:</Term>
+<Term><Option>-ddump-ds</Option>:</Term>
 <ListItem>
 <Para>
 desugarer output
@@ -229,7 +229,7 @@ desugarer output
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-ddump-spec</Literal>:</Term>
+<Term><Option>-ddump-spec</Option>:</Term>
 <ListItem>
 <Para>
 output of specialisation pass
@@ -237,7 +237,7 @@ output of specialisation pass
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-ddump-rules</Literal>:</Term>
+<Term><Option>-ddump-rules</Option>:</Term>
 <ListItem>
 <Para>
 dumps all rewrite rules (including those generated by the specialisation pass)
@@ -245,7 +245,7 @@ dumps all rewrite rules (including those generated by the specialisation pass)
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-ddump-simpl</Literal>:</Term>
+<Term><Option>-ddump-simpl</Option>:</Term>
 <ListItem>
 <Para>
 simplifer output (Core-to-Core passes)
@@ -253,7 +253,7 @@ simplifer output (Core-to-Core passes)
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-ddump-usagesp</Literal>:</Term>
+<Term><Option>-ddump-usagesp</Option>:</Term>
 <ListItem>
 <Para>
 UsageSP inference pre-inf and output
@@ -261,7 +261,7 @@ UsageSP inference pre-inf and output
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-ddump-cpranal</Literal>:</Term>
+<Term><Option>-ddump-cpranal</Option>:</Term>
 <ListItem>
 <Para>
 CPR analyser output
@@ -269,7 +269,7 @@ CPR analyser output
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-ddump-stranal</Literal>:</Term>
+<Term><Option>-ddump-stranal</Option>:</Term>
 <ListItem>
 <Para>
 strictness analyser output
@@ -277,7 +277,7 @@ strictness analyser output
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-ddump-workwrap</Literal>:</Term>
+<Term><Option>-ddump-workwrap</Option>:</Term>
 <ListItem>
 <Para>
 worker/wrapper split output
@@ -285,7 +285,7 @@ worker/wrapper split output
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-ddump-occur-anal</Literal>:</Term>
+<Term><Option>-ddump-occur-anal</Option>:</Term>
 <ListItem>
 <Para>
 `occurrence analysis' output
@@ -293,7 +293,7 @@ worker/wrapper split output
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-ddump-stg</Literal>:</Term>
+<Term><Option>-ddump-stg</Option>:</Term>
 <ListItem>
 <Para>
 output of STG-to-STG passes
@@ -301,7 +301,7 @@ output of STG-to-STG passes
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-ddump-absC</Literal>:</Term>
+<Term><Option>-ddump-absC</Option>:</Term>
 <ListItem>
 <Para>
 <Emphasis>un</Emphasis>flattened Abstract&nbsp;C
@@ -309,7 +309,7 @@ output of STG-to-STG passes
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-ddump-flatC</Literal>:</Term>
+<Term><Option>-ddump-flatC</Option>:</Term>
 <ListItem>
 <Para>
 <Emphasis>flattened</Emphasis> Abstract&nbsp;C
@@ -317,7 +317,7 @@ output of STG-to-STG passes
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-ddump-realC</Literal>:</Term>
+<Term><Option>-ddump-realC</Option>:</Term>
 <ListItem>
 <Para>
 same as what goes to the C compiler
@@ -325,7 +325,7 @@ same as what goes to the C compiler
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-ddump-asm</Literal>:</Term>
+<Term><Option>-ddump-asm</Option>:</Term>
 <ListItem>
 <Para>
 assembly language from the native-code generator
@@ -333,9 +333,6 @@ assembly language from the native-code generator
 </ListItem>
 </VarListEntry>
 </VariableList>
-</Para>
-
-<Para>
 <IndexTerm><Primary>-ddump-all option</Primary></IndexTerm>
 <IndexTerm><Primary>-ddump-most option</Primary></IndexTerm>
 <IndexTerm><Primary>-ddump-parsed option</Primary></IndexTerm>
@@ -360,7 +357,7 @@ assembly language from the native-code generator
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-dverbose-simpl</Literal> and <Literal>-dverbose-stg</Literal>:</Term>
+<Term><Option>-dverbose-simpl</Option> and <Option>-dverbose-stg</Option>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>-dverbose-simpl option</Primary></IndexTerm>
@@ -377,18 +374,18 @@ really desperate:
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-ddump-simpl-iterations</Literal>:</Term>
+<Term><Option>-ddump-simpl-iterations</Option>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>-ddump-simpl-iterations option</Primary></IndexTerm>
 Show the output of each <Emphasis>iteration</Emphasis> of the simplifier (each run of
 the simplifier has a maximum number of iterations, normally 4).  Used
-when even <Literal>-dverbose-simpl</Literal> doesn't cut it.
+when even <Option>-dverbose-simpl</Option> doesn't cut it.
 </Para>
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-dppr-&lcub;user,debug</Literal>&rcub;:</Term>
+<Term><Option>-dppr-&lcub;user,debug</Option>&rcub;:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>-dppr-user option</Primary></IndexTerm>
@@ -404,17 +401,17 @@ can check for things that look the same but aren't).
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-ddump-simpl-stats</Literal>:</Term>
+<Term><Option>-ddump-simpl-stats</Option>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>-ddump-simpl-stats option</Primary></IndexTerm>
 Dump statistics about how many of each kind
-of transformation too place.  If you add <Literal>-dppr-debug</Literal> you get more detailed information.
+of transformation too place.  If you add <Option>-dppr-debug</Option> you get more detailed information.
 </Para>
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-ddump-raw-asm</Literal>:</Term>
+<Term><Option>-ddump-raw-asm</Option>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>-ddump-raw-asm option</Primary></IndexTerm>
@@ -423,7 +420,7 @@ Dump out the assembly-language stuff, before the ``mangler'' gets it.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-ddump-rn-trace</Literal>:</Term>
+<Term><Option>-ddump-rn-trace</Option>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>-ddump-rn-trace</Primary></IndexTerm>
@@ -432,7 +429,7 @@ Make the renamer be *real* chatty about what it is upto.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-dshow-rn-stats</Literal>:</Term>
+<Term><Option>-dshow-rn-stats</Option>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>-dshow-rn-stats</Primary></IndexTerm>
@@ -442,7 +439,7 @@ in.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-dshow-unused-imports</Literal>:</Term>
+<Term><Option>-dshow-unused-imports</Option>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>-dshow-unused-imports</Primary></IndexTerm>
@@ -468,7 +465,7 @@ Have the renamer report what imports does not contribute.
 <VariableList>
 
 <VarListEntry>
-<Term><Literal>-dcore-lint</Literal>:</Term>
+<Term><Option>-dcore-lint</Option>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>-dcore-lint option</Primary></IndexTerm>
@@ -478,7 +475,7 @@ level.  (It checks GHC's sanity, not yours.)
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-dstg-lint</Literal>:</Term>
+<Term><Option>-dstg-lint</Option>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>-dstg-lint option</Primary></IndexTerm>
@@ -487,11 +484,11 @@ Ditto for STG level.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-dusagesp-lint</Literal>:</Term>
+<Term><Option>-dusagesp-lint</Option>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>-dstg-lint option</Primary></IndexTerm>
-Turn on checks around UsageSP inference (<Literal>-fusagesp</Literal>).  This verifies
+Turn on checks around UsageSP inference (<Option>-fusagesp</Option>).  This verifies
 various simple properties of the results of the inference, and also
 warns if any identifier with a used-once annotation before the
 inference has a used-many annotation afterwards; this could indicate a
@@ -505,7 +502,7 @@ non-worksafe transformation is being applied.
 </Sect2>
 
 <Sect2>
-<Title>How to read Core syntax (from some <Literal>-ddump-*</Literal> flags)</Title>
+<Title>How to read Core syntax (from some <Option>-ddump-*</Option> flags)</Title>
 
 <Para>
 <IndexTerm><Primary>reading Core syntax</Primary></IndexTerm>
@@ -514,7 +511,7 @@ non-worksafe transformation is being applied.
 
 <Para>
 Let's do this by commenting an example.  It's from doing
-<Literal>-ddump-ds</Literal> on this code:
+<Option>-ddump-ds</Option> on this code:
 
 <ProgramListing>
 skip2 m = m : skip2 (m+2)
@@ -633,7 +630,7 @@ and the command-line options it requires quite tight. For instance,
 if a (Glasgow) Haskell source file uses <Literal>casm</Literal>s, the C back-end
 often needs to be told about which header files to include. Rather than
 maintaining the list of files the source depends on in a
-<Literal>Makefile</Literal> (using the <Literal>-&num;include</Literal> command-line option), it is
+<Filename>Makefile</Filename> (using the <Option>-&num;include</Option> command-line option), it is
 possible to do this directly in the source file using the <Literal>OPTIONS</Literal>
 pragma <IndexTerm><Primary>OPTIONS pragma</Primary></IndexTerm>: 
 </Para>
@@ -666,7 +663,7 @@ via the command line.
 <Para>
 It is not recommended to move all the contents of your Makefiles into
 your source files, but in some circumstances, the <Literal>OPTIONS</Literal> pragma
-is the Right Thing. (If you use <Literal>-keep-hc-file-too</Literal> and have OPTION
+is the Right Thing. (If you use <Option>-keep-hc-file-too</Option> and have OPTION
 flags in your module, the OPTIONS will get put into the generated .hc
 file).
 </Para>

@@ -56,8 +56,8 @@ unsafeThawArray     :: Ix ix =&#62; Array ix elt -&#62; ST s (MutableArray s ix 
 <ListItem>
 
 <Para>
-The <Literal>freezeArray</Literal> action converts a mutable array into an
-immutable one by copying, whereas <Literal>unsafeFreezeArray</Literal> returns
+The <Function>freezeArray</Function> action converts a mutable array into an
+immutable one by copying, whereas <Function>unsafeFreezeArray</Function> returns
 an immutable array that is effectively just the type cast version
 of the mutable array. Should you write to the mutable array after
 it has been (unsafely) frozen, you'll side-effect the immutable
@@ -68,11 +68,11 @@ array in the process. Please don't :-)
 <ListItem>
 
 <Para>
-The operation <Literal>thawArray</Literal> goes the other way, converting
+The operation <Function>thawArray</Function> goes the other way, converting
 an immutable <Literal>Array</Literal> into a mutable one. This is done by
-copying. The operation <Literal>unsafeThawArray</Literal> is also provided,
+copying. The operation <Function>unsafeThawArray</Function> is also provided,
 which places the same kind of proof obligation on the programmer
-as <Literal>unsafeFreezeArray</Literal> does.
+as <Function>unsafeFreezeArray</Function> does.
 </Para>
 </ListItem>
 
@@ -239,24 +239,24 @@ contain is a bug or a feature..
 <ListItem>
 <Para>
 As for mutable arrays, operations for turning mutable byte arrays
-into immutable byte arrays are also provided by the <Literal>freeze*</Literal>
+into immutable byte arrays are also provided by the <Function>freeze*</Function>
 class of actions. There's also the non-copying
-<Literal>unsafeFreezeByteArray</Literal>.
+<Function>unsafeFreezeByteArray</Function>.
 </Para>
 </ListItem>
 <ListItem>
 
 <Para>
 Operations for going the other way, where an immutable byte
-array is 'thawed' are also provided. <Literal>thawByteArray</Literal> does
-this by copying, whereas <Literal>unsafeThawByteArray</Literal> does not
+array is 'thawed' are also provided. <Function>thawByteArray</Function> does
+this by copying, whereas <Function>unsafeThawByteArray</Function> does not
 
 </Para>
 </ListItem>
 <ListItem>
 
 <Para>
-The operation <Literal>sizeofMutableByteArray</Literal> returns the size of
+The operation <Function>sizeofMutableByteArray</Function> returns the size of
 the array, <Emphasis>in bytes.</Emphasis>
 </Para>
 </ListItem>

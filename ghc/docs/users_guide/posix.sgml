@@ -12,7 +12,7 @@ The <Literal>Posix</Literal> interface gives you access to the set of OS
 services standardised by POSIX 1003.1b (or the <Emphasis>IEEE Portable
 Operating System Interface for Computing Environments</Emphasis> - IEEE Std.
 1003.1). The interface is accessed by <Literal>import Posix</Literal> and
-adding <Literal>-syslib posix</Literal> on your command-line.
+adding <Option>-syslib posix</Option> on your command-line.
 </Para>
 
 <Sect2 id="Posix-data-types">
@@ -377,8 +377,8 @@ forkProcess :: IO (Maybe ProcessID)
 </Para>
 
 <Para>
-<Literal>forkProcess</Literal> calls <Literal>fork</Literal>, returning
-<Literal>Just pid</Literal> to the parent, where <Literal>pid</Literal> is the
+<Function>forkProcess</Function> calls <Function>fork</Function>, returning
+<Literal>Just pid</Literal> to the parent, where <VarName>pid</VarName> is the
 ProcessID of the child, and returning <Literal>Nothing</Literal> to the
 child.
 </Para>
@@ -397,13 +397,12 @@ executeFile :: FilePath                   -- Command
 
 <Para>
 <Literal>executeFile cmd args env</Literal> calls one of the
-<Literal>execv*</Literal> family, depending on whether or not the current
+<Function>execv*</Function> family, depending on whether or not the current
 PATH is to be searched for the command, and whether or not an
 environment is provided to supersede the process's current
 environment.  The basename (leading directory names suppressed) of
-the command is passed to <Literal>execv*</Literal> as <Literal>arg[0]</Literal>;
-the argument list passed to <Literal>executeFile</Literal> therefore begins 
-with <Literal>arg[1]</Literal>.
+the command is passed to <Function>execv*</Function> as <VarName>arg[0]</VarName>;
+the argument list passed to <Function>executeFile</Function> therefore begins with <VarName>arg[1]</VarName>.
 </Para>
 
 <Para>
@@ -420,7 +419,7 @@ True            True                    execvpe*
 </Para>
 
 <Para>
-Note that <Literal>execvpe</Literal> is not provided by the POSIX standard, and must
+Note that <Function>execvpe</Function> is not provided by the POSIX standard, and must
 be written by hand.  Care must be taken to ensure that the search path
 is extracted from the original environment, and not from the
 environment to be passed on to the new image.
@@ -429,17 +428,17 @@ environment to be passed on to the new image.
 <Para>
 NOTE: In general, sharing open files between parent and child
 processes is potential bug farm, and should be avoided unless you
-really depend on this `feature' of POSIX' <Literal>fork()</Literal> semantics. Using
+really depend on this `feature' of POSIX' <Function>fork()</Function> semantics. Using
 Haskell, there's the extra complication that arguments to
-<Literal>executeFile</Literal> might come from files that are read lazily (using
-<Literal>hGetContents</Literal>, or some such.) If this is the case, then for your own
-sanity, please ensure that the arguments to <Literal>executeFile</Literal> have been
-fully evaluated before calling <Literal>forkProcess</Literal> (followed by
-<Literal>executeFile</Literal>.) Consider yourself warned :-)
+<Function>executeFile</Function> might come from files that are read lazily (using
+<Function>hGetContents</Function>, or some such.) If this is the case, then for your own
+sanity, please ensure that the arguments to <Function>executeFile</Function> have been
+fully evaluated before calling <Function>forkProcess</Function> (followed by
+<Function>executeFile</Function>.) Consider yourself warned :-)
 </Para>
 
 <Para>
-A successful <Literal>executeFile</Literal> overlays the current process image with 
+A successful <Function>executeFile</Function> overlays the current process image with 
 a new one, so it only returns on failure.
 </Para>
 
@@ -459,12 +458,12 @@ runProcess :: FilePath                    -- Command
 </Para>
 
 <Para>
-<Literal>runProcess</Literal> is our candidate for the high-level OS-independent
+<Function>runProcess</Function> is our candidate for the high-level OS-independent
 primitive.
 </Para>
 
 <Para>
-<Literal>runProcess cmd args env wd inhdl outhdl errhdl</Literal> runs <Literal>cmd</Literal>
+<Literal>runProcess cmd args env wd inhdl outhdl errhdl</Literal> runs <Command>cmd</Command>
 (searching the current <Literal>PATH</Literal>) with arguments <Literal>args</Literal>.  If
 <Literal>env</Literal> is <Literal>Just pairs</Literal>, the command is executed with the
 environment specified by <Literal>pairs</Literal> of variables and values;
@@ -489,12 +488,12 @@ getProcessStatus :: Bool              -- Block?
 </Para>
 
 <Para>
-<Literal>getProcessStatus blk stopped pid</Literal> calls <Literal>waitpid</Literal>, returning
+<Literal>getProcessStatus blk stopped pid</Literal> calls <Function>waitpid</Function>, returning
 <Literal>Just tc</Literal>, the <Literal>ProcessStatus</Literal> for process <Literal>pid</Literal> if it is
 available, <Literal>Nothing</Literal> otherwise.  If <Literal>blk</Literal> is <Literal>False</Literal>, then
-<Literal>WNOHANG</Literal> is set in the options for <Literal>waitpid</Literal>, otherwise not.
+<Literal>WNOHANG</Literal> is set in the options for <Function>waitpid</Function>, otherwise not.
 If <Literal>stopped</Literal> is <Literal>True</Literal>, then <Literal>WUNTRACED</Literal> is set in the
-options for <Literal>waitpid</Literal>, otherwise not.
+options for <Function>waitpid</Function>, otherwise not.
 </Para>
 
 <Para>
@@ -509,13 +508,13 @@ getGroupProcessStatus :: Bool         -- Block?
 </Para>
 
 <Para>
-<Literal>getGroupProcessStatus blk stopped pgid</Literal> calls <Literal>waitpid</Literal>,
+<Literal>getGroupProcessStatus blk stopped pgid</Literal> calls <Function>waitpid</Function>,
 returning <Literal>Just (pid, tc)</Literal>, the <Literal>ProcessID</Literal> and
 <Literal>ProcessStatus</Literal> for any process in group <Literal>pgid</Literal> if one is
 available, <Literal>Nothing</Literal> otherwise.  If <Literal>blk</Literal> is <Literal>False</Literal>, then
-<Literal>WNOHANG</Literal> is set in the options for <Literal>waitpid</Literal>, otherwise not.
+<Literal>WNOHANG</Literal> is set in the options for <Function>waitpid</Function>, otherwise not.
 If <Literal>stopped</Literal> is <Literal>True</Literal>, then <Literal>WUNTRACED</Literal> is set in the
-options for <Literal>waitpid</Literal>, otherwise not.
+options for <Function>waitpid</Function>, otherwise not.
 </Para>
 
 <Para>
@@ -529,12 +528,12 @@ getAnyProcessStatus :: Bool           -- Block?
 </Para>
 
 <Para>
-<Literal>getAnyProcessStatus blk stopped</Literal> calls <Literal>waitpid</Literal>, returning
+<Literal>getAnyProcessStatus blk stopped</Literal> calls <Function>waitpid</Function>, returning
 <Literal>Just (pid, tc)</Literal>, the <Literal>ProcessID</Literal> and <Literal>ProcessStatus</Literal> for any
 child process if one is available, <Literal>Nothing</Literal> otherwise.  If
 <Literal>blk</Literal> is <Literal>False</Literal>, then <Literal>WNOHANG</Literal> is set in the options for
-<Literal>waitpid</Literal>, otherwise not.  If <Literal>stopped</Literal> is <Literal>True</Literal>, then
-<Literal>WUNTRACED</Literal> is set in the options for <Literal>waitpid</Literal>, otherwise not.
+<Function>waitpid</Function>, otherwise not.  If <Literal>stopped</Literal> is <Literal>True</Literal>, then
+<Literal>WUNTRACED</Literal> is set in the options for <Function>waitpid</Function>, otherwise not.
 </Para>
 
 <Para>
@@ -546,7 +545,7 @@ exitImmediately :: ExitCode -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>exitImmediately status</Literal> calls <Literal>&lowbar;exit</Literal> to terminate the process
+<Literal>exitImmediately status</Literal> calls <Function>&lowbar;exit</Function> to terminate the process
 with the indicated exit <Literal>status</Literal>.
 The operation never returns.
 </Para>
@@ -560,7 +559,7 @@ getEnvironment :: IO [(String, String)]
 </Para>
 
 <Para>
-<Literal>getEnvironment</Literal> parses the environment variable mapping provided by
+<Function>getEnvironment</Function> parses the environment variable mapping provided by
 <Literal>environ</Literal>, returning <Literal>(variable, value)</Literal> pairs. 
 The operation never fails.
 </Para>
@@ -574,7 +573,7 @@ setEnvironment :: [(String, String)] -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>setEnvironment</Literal> replaces the process environment with the provided
+<Function>setEnvironment</Function> replaces the process environment with the provided
 mapping of <Literal>(variable, value)</Literal> pairs. 
 </Para>
 
@@ -587,9 +586,9 @@ getEnvVar :: String -&#62; IO String
 </Para>
 
 <Para>
-<Literal>getEnvVar var</Literal> returns the value associated with variable <Literal>var</Literal> 
+<Literal>getEnvVar var</Literal> returns the value associated with variable <VarName>var</VarName> 
 in the current environment (identical functionality provided through
-standard Haskell library function <Literal>System.getEnv</Literal>).
+standard Haskell library function <Function>System.getEnv</Function>).
 </Para>
 
 <Para>
@@ -619,7 +618,7 @@ setEnvVar :: String -&#62; String -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>setEnvVar var val</Literal> sets the value associated with variable <Literal>var</Literal> 
+<Literal>setEnvVar var val</Literal> sets the value associated with variable <VarName>var</VarName> 
 in the current environment to be <Literal>val</Literal>.  Any previous mapping is 
 superseded.
 </Para>
@@ -633,7 +632,7 @@ removeEnvVar :: String -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>removeEnvVar var</Literal> removes any value associated with variable <Literal>var</Literal> 
+<Literal>removeEnvVar var</Literal> removes any value associated with variable <VarName>var</VarName> 
 in the current environment.  Deleting a variable for which there is no mapping
 does not generate an error.
 </Para>
@@ -670,7 +669,7 @@ signalProcess :: Signal -&#62; ProcessID -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>signalProcess int pid</Literal> calls <Literal>kill</Literal> to signal 
+<Literal>signalProcess int pid</Literal> calls <Function>kill</Function> to signal 
 process <Literal>pid</Literal> with interrupt signal <Literal>int</Literal>.
 </Para>
 
@@ -683,7 +682,7 @@ raiseSignal :: Signal -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>raiseSignal int</Literal> calls <Literal>kill</Literal> to signal the current process
+<Literal>raiseSignal int</Literal> calls <Function>kill</Function> to signal the current process
 with interrupt signal <Literal>int</Literal>. 
 </Para>
 
@@ -696,7 +695,7 @@ signalProcessGroup :: Signal -&#62; ProcessGroupID -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>signalProcessGroup int pgid</Literal> calls <Literal>kill</Literal> to signal 
+<Literal>signalProcessGroup int pgid</Literal> calls <Function>kill</Function> to signal 
 all processes in group <Literal>pgid</Literal> with interrupt signal <Literal>int</Literal>.
 </Para>
 
@@ -710,9 +709,9 @@ setStoppedChildFlag :: Bool -&#62; IO Bool
 
 <Para>
 <Literal>setStoppedChildFlag bool</Literal> sets a flag which controls whether or
-not the <Literal>NOCLDSTOP</Literal> option will be used the next time a signal
-handler is installed for <Literal>SIGCHLD</Literal>.  If <Literal>bool</Literal> is <Literal>True</Literal> (the
-default), <Literal>NOCLDSTOP</Literal> will not be used; otherwise it will be.  The
+not the <Constant>NOCLDSTOP</Constant> option will be used the next time a signal
+handler is installed for <Constant>SIGCHLD</Constant>.  If <Literal>bool</Literal> is <Literal>True</Literal> (the
+default), <Constant>NOCLDSTOP</Constant> will not be used; otherwise it will be.  The
 operation never fails.
 </Para>
 
@@ -725,10 +724,10 @@ queryStoppedChildFlag :: IO Bool
 </Para>
 
 <Para>
-<Literal>queryStoppedChildFlag</Literal> queries the flag which
-controls whether or not the <Literal>NOCLDSTOP</Literal> option will be used
-the next time a signal handler is installed for <Literal>SIGCHLD</Literal>.
-If <Literal>NOCLDSTOP</Literal> will be used, it returns <Literal>False</Literal>; 
+<Function>queryStoppedChildFlag</Function> queries the flag which
+controls whether or not the <Constant>NOCLDSTOP</Constant> option will be used
+the next time a signal handler is installed for <Constant>SIGCHLD</Constant>.
+If <Constant>NOCLDSTOP</Constant> will be used, it returns <Literal>False</Literal>; 
 otherwise (the default) it returns <Literal>True</Literal>.  
 The operation never fails.
 </Para>
@@ -751,9 +750,9 @@ installHandler :: Signal
 </Para>
 
 <Para>
-<Literal>installHandler int handler iset</Literal> calls <Literal>sigaction</Literal> to install an
+<Literal>installHandler int handler iset</Literal> calls <Constant>sigaction</Constant> to install an
 interrupt handler for signal <Literal>int</Literal>.  If <Literal>handler</Literal> is <Literal>Default</Literal>,
-<Literal>SIG&lowbar;DFL</Literal> is installed; if <Literal>handler</Literal> is <Literal>Ignore</Literal>, <Literal>SIG&lowbar;IGN</Literal> is
+<Constant>SIG&lowbar;DFL</Constant> is installed; if <Literal>handler</Literal> is <Literal>Ignore</Literal>, <Constant>SIG&lowbar;IGN</Constant> is
 installed; if <Literal>handler</Literal> is <Literal>Catch action</Literal>, a handler is installed
 which will invoke <Literal>action</Literal> in a new thread when (or shortly after) the
 signal is received.  See <XRef LinkEnd="concurrent-haskell"> for details on how to communicate between
@@ -761,7 +760,7 @@ threads.
 </Para>
 
 <Para>
-If <Literal>iset</Literal> is <Literal>Just s</Literal>, then the <Literal>sa&lowbar;mask</Literal> of the <Literal>sigaction</Literal> structure
+If <Literal>iset</Literal> is <Literal>Just s</Literal>, then the <VarName>sa&lowbar;mask</VarName> of the <Literal>sigaction</Literal> structure
 is set to <Literal>s</Literal>; otherwise it is cleared.  The previously installed
 signal handler for <Literal>int</Literal> is returned.
 </Para>
@@ -775,7 +774,7 @@ getSignalMask :: IO SignalSet
 </Para>
 
 <Para>
-<Literal>getSignalMask</Literal> calls <Literal>sigprocmask</Literal> to determine the
+<Function>getSignalMask</Function> calls <Function>sigprocmask</Function> to determine the
 set of interrupts which are currently being blocked.
 </Para>
 
@@ -788,8 +787,8 @@ setSignalMask :: SignalSet -&#62; IO SignalSet
 </Para>
 
 <Para>
-<Literal>setSignalMask mask</Literal> calls <Literal>sigprocmask</Literal> with
-<Literal>SIG&lowbar;SETMASK</Literal> to block all interrupts in <Literal>mask</Literal>.  The
+<Literal>setSignalMask mask</Literal> calls <Function>sigprocmask</Function> with
+<Constant>SIG&lowbar;SETMASK</Constant> to block all interrupts in <Literal>mask</Literal>.  The
 previous set of blocked interrupts is returned.
 </Para>
 
@@ -802,8 +801,8 @@ blockSignals :: SignalSet -&#62; IO SignalSet
 </Para>
 
 <Para>
-<Literal>setSignalMask mask</Literal> calls <Literal>sigprocmask</Literal> with
-<Literal>SIG&lowbar;BLOCK</Literal> to add all interrupts in <Literal>mask</Literal> to the
+<Literal>setSignalMask mask</Literal> calls <Function>sigprocmask</Function> with
+<Constant>SIG&lowbar;BLOCK</Constant> to add all interrupts in <Literal>mask</Literal> to the
 set of blocked interrupts.  The previous set of blocked interrupts is returned.
 </Para>
 
@@ -816,8 +815,8 @@ unBlockSignals :: SignalSet -&#62; IO SignalSet
 </Para>
 
 <Para>
-<Literal>setSignalMask mask</Literal> calls <Literal>sigprocmask</Literal> with
-<Literal>SIG&lowbar;UNBLOCK</Literal> to remove all interrupts in <Literal>mask</Literal> from the
+<Literal>setSignalMask mask</Literal> calls <Function>sigprocmask</Function> with
+<Constant>SIG&lowbar;UNBLOCK</Constant> to remove all interrupts in <Literal>mask</Literal> from the
 set of blocked interrupts.  The previous set of blocked interrupts is returned.
 </Para>
 
@@ -830,7 +829,7 @@ getPendingSignals :: IO SignalSet
 </Para>
 
 <Para>
-<Literal>getPendingSignals</Literal> calls <Literal>sigpending</Literal> to obtain
+<Function>getPendingSignals</Function> calls <Function>sigpending</Function> to obtain
 the set of interrupts which have been received but are currently blocked.
 </Para>
 
@@ -844,11 +843,11 @@ awaitSignal :: Maybe SignalSet -&#62; IO ()
 
 <Para>
 <Literal>awaitSignal iset</Literal> suspends execution until an interrupt is received.
-If <Literal>iset</Literal> is <Literal>Just s</Literal>, <Literal>awaitSignal</Literal> calls <Literal>sigsuspend</Literal>, installing
+If <Literal>iset</Literal> is <Literal>Just s</Literal>, <Function>awaitSignal</Function> calls <Function>sigsuspend</Function>, installing
 <Literal>s</Literal> as the new signal mask before suspending execution; otherwise, it
-calls <Literal>pause</Literal>.  <Literal>awaitSignal</Literal> returns on receipt of a signal.  If you
-have installed any signal handlers with <Literal>installHandler</Literal>, it may be
-wise to call <Literal>yield</Literal> directly after <Literal>awaitSignal</Literal> to ensure that the
+calls <Function>pause</Function>.  <Function>awaitSignal</Function> returns on receipt of a signal.  If you
+have installed any signal handlers with <Function>installHandler</Function>, it may be
+wise to call <Function>yield</Function> directly after <Function>awaitSignal</Function> to ensure that the
 signal handler runs as promptly.
 </Para>
 
@@ -861,7 +860,7 @@ scheduleAlarm :: Int -&#62; IO Int
 </Para>
 
 <Para>
-<Literal>scheduleAlarm i</Literal> calls <Literal>alarm</Literal> to schedule a real time
+<Literal>scheduleAlarm i</Literal> calls <Function>alarm</Function> to schedule a real time
 alarm at least <Literal>i</Literal> seconds in the future.
 </Para>
 
@@ -874,7 +873,7 @@ sleep :: Int -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>sleep i</Literal> calls <Literal>sleep</Literal> to suspend execution of the
+<Literal>sleep i</Literal> calls <Function>sleep</Function> to suspend execution of the
 program until at least <Literal>i</Literal> seconds have elapsed or a signal is
 received.
 </Para>
@@ -898,7 +897,7 @@ getProcessID :: IO ProcessID
 </Para>
 
 <Para>
-<Literal>getProcessID</Literal> calls <Literal>getpid</Literal> to obtain the <Literal>ProcessID</Literal> for
+<Function>getProcessID</Function> calls <Function>getpid</Function> to obtain the <Literal>ProcessID</Literal> for
 the current process.
 </Para>
 
@@ -911,7 +910,7 @@ getParentProcessID :: IO ProcessID
 </Para>
 
 <Para>
-<Literal>getProcessID</Literal> calls <Literal>getppid</Literal> to obtain the <Literal>ProcessID</Literal> for
+<Function>getProcessID</Function> calls <Function>getppid</Function> to obtain the <Literal>ProcessID</Literal> for
 the parent of the current process.
 </Para>
 
@@ -924,7 +923,7 @@ getRealUserID :: IO UserID
 </Para>
 
 <Para>
-<Literal>getRealUserID</Literal> calls <Literal>getuid</Literal> to obtain the real <Literal>UserID</Literal>
+<Function>getRealUserID</Function> calls <Function>getuid</Function> to obtain the real <Literal>UserID</Literal>
 associated with the current process.
 </Para>
 
@@ -937,7 +936,7 @@ getEffectiveUserID :: IO UserID
 </Para>
 
 <Para>
-<Literal>getRealUserID</Literal> calls <Literal>geteuid</Literal> to obtain the effective
+<Function>getRealUserID</Function> calls <Function>geteuid</Function> to obtain the effective
 <Literal>UserID</Literal> associated with the current process.
 </Para>
 
@@ -950,7 +949,7 @@ setUserID :: UserID -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>setUserID uid</Literal> calls <Literal>setuid</Literal> to set the real, effective, and
+<Literal>setUserID uid</Literal> calls <Function>setuid</Function> to set the real, effective, and
 saved set-user-id associated with the current process to <Literal>uid</Literal>.
 </Para>
 
@@ -963,7 +962,7 @@ getLoginName :: IO String
 </Para>
 
 <Para>
-<Literal>getLoginName</Literal> calls <Literal>getlogin</Literal> to obtain the login name
+<Function>getLoginName</Function> calls <Function>getlogin</Function> to obtain the login name
 associated with the current process.
 </Para>
 
@@ -976,7 +975,7 @@ getRealGroupID :: IO GroupID
 </Para>
 
 <Para>
-<Literal>getRealGroupID</Literal> calls <Literal>getgid</Literal> to obtain the real <Literal>GroupID</Literal>
+<Function>getRealGroupID</Function> calls <Function>getgid</Function> to obtain the real <Literal>GroupID</Literal>
 associated with the current process.
 </Para>
 
@@ -989,7 +988,7 @@ getEffectiveGroupID :: IO GroupID
 </Para>
 
 <Para>
-<Literal>getEffectiveGroupID</Literal> calls <Literal>getegid</Literal> to obtain the effective
+<Function>getEffectiveGroupID</Function> calls <Function>getegid</Function> to obtain the effective
 <Literal>GroupID</Literal> associated with the current process.
 </Para>
 
@@ -1002,7 +1001,7 @@ setGroupID :: GroupID -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>setGroupID gid</Literal> calls <Literal>setgid</Literal> to set the real, effective, and
+<Literal>setGroupID gid</Literal> calls <Function>setgid</Function> to set the real, effective, and
 saved set-group-id associated with the current process to <Literal>gid</Literal>.
 </Para>
 
@@ -1015,7 +1014,7 @@ getGroups :: IO [GroupID]
 </Para>
 
 <Para>
-<Literal>getGroups</Literal> calls <Literal>getgroups</Literal> to obtain the list of
+<Function>getGroups</Function> calls <Function>getgroups</Function> to obtain the list of
 supplementary <Literal>GroupID</Literal>s associated with the current process.
 </Para>
 
@@ -1028,7 +1027,7 @@ getEffectiveUserName :: IO String
 </Para>
 
 <Para>
-<Literal>getEffectiveUserName</Literal> calls <Literal>cuserid</Literal> to obtain a name
+<Function>getEffectiveUserName</Function> calls <Function>cuserid</Function> to obtain a name
 associated with the effective <Literal>UserID</Literal> of the process.
 </Para>
 
@@ -1041,7 +1040,7 @@ getProcessGroupID :: IO ProcessGroupID
 </Para>
 
 <Para>
-<Literal>getProcessGroupID</Literal> calls <Literal>getpgrp</Literal> to obtain the
+<Function>getProcessGroupID</Function> calls <Function>getpgrp</Function> to obtain the
 <Literal>ProcessGroupID</Literal> for the current process.
 </Para>
 
@@ -1054,7 +1053,7 @@ createProcessGroup :: ProcessID -&#62; IO ProcessGroupID
 </Para>
 
 <Para>
-<Literal>createProcessGroup pid</Literal> calls <Literal>setpgid</Literal> to make
+<Literal>createProcessGroup pid</Literal> calls <Function>setpgid</Function> to make
 process <Literal>pid</Literal> a new process group leader.
 </Para>
 
@@ -1067,7 +1066,7 @@ joinProcessGroup :: ProcessGroupID -&#62; IO ProcessGroupID
 </Para>
 
 <Para>
-<Literal>joinProcessGroup pgid</Literal> calls <Literal>setpgid</Literal> to set the
+<Literal>joinProcessGroup pgid</Literal> calls <Function>setpgid</Function> to set the
 <Literal>ProcessGroupID</Literal> of the current process to <Literal>pgid</Literal>.
 </Para>
 
@@ -1080,7 +1079,7 @@ setProcessGroupID :: ProcessID -&#62; ProcessGroupID -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>setProcessGroupID pid pgid</Literal> calls <Literal>setpgid</Literal> to set the
+<Literal>setProcessGroupID pid pgid</Literal> calls <Function>setpgid</Function> to set the
 <Literal>ProcessGroupID</Literal> for process <Literal>pid</Literal> to <Literal>pgid</Literal>.
 </Para>
 
@@ -1093,7 +1092,7 @@ createSession :: IO ProcessGroupID
 </Para>
 
 <Para>
-<Literal>createSession</Literal> calls <Literal>setsid</Literal> to create a new session
+<Function>createSession</Function> calls <Function>setsid</Function> to create a new session
 with the current process as session leader.
 </Para>
 
@@ -1112,7 +1111,7 @@ getSystemID :: IO SystemID
 </Para>
 
 <Para>
-<Literal>getSystemID</Literal> calls <Literal>uname</Literal> to obtain information
+<Function>getSystemID</Function> calls <Function>uname</Function> to obtain information
 about the current operating system.
 </Para>
 
@@ -1125,7 +1124,7 @@ about the current operating system.
 </Para>
 
 <Para>
-<Literal>epochTime</Literal> calls <Literal>time</Literal> to obtain the number of 
+<Function>epochTime</Function> calls <Function>time</Function> to obtain the number of 
 seconds that have elapsed since the epoch (Jan 01 00:00:00 GMT 1970).
 </Para>
 
@@ -1144,7 +1143,7 @@ getProcessTimes :: IO ProcessTimes
 </Para>
 
 <Para>
-<Literal>getProcessTimes</Literal> calls <Literal>times</Literal> to obtain time-accounting
+<Function>getProcessTimes</Function> calls <Function>times</Function> to obtain time-accounting
 information for the current process and its children.
 </Para>
 
@@ -1157,10 +1156,10 @@ getControllingTerminalName :: IO FilePath
 </Para>
 
 <Para>
-<Literal>getControllingTerminalName</Literal> calls <Literal>ctermid</Literal> to obtain
+<Function>getControllingTerminalName</Function> calls <Function>ctermid</Function> to obtain
 a name associated with the controlling terminal for the process.  If a
 controlling terminal exists,
-<Literal>getControllingTerminalName</Literal> returns the name of the
+<Function>getControllingTerminalName</Function> returns the name of the
 controlling terminal.
 </Para>
 
@@ -1199,9 +1198,9 @@ getTerminalName :: Fd -&#62; IO FilePath
 </Para>
 
 <Para>
-<Literal>getTerminalName fd</Literal> calls <Literal>ttyname</Literal> to obtain a name associated
+<Literal>getTerminalName fd</Literal> calls <Function>ttyname</Function> to obtain a name associated
 with the terminal for <Literal>Fd</Literal> <Literal>fd</Literal>. If <Literal>fd</Literal> is associated
-with a terminal, <Literal>getTerminalName</Literal> returns the name of the
+with a terminal, <Function>getTerminalName</Function> returns the name of the
 terminal.
 </Para>
 
@@ -1248,7 +1247,7 @@ queryTerminal :: Fd -&#62; IO Bool
 </Para>
 
 <Para>
-<Literal>queryTerminal fd</Literal> calls <Literal>isatty</Literal> to determine whether or
+<Literal>queryTerminal fd</Literal> calls <Function>isatty</Function> to determine whether or
 not <Literal>Fd</Literal> <Literal>fd</Literal> is associated with a terminal.
 </Para>
 
@@ -1261,10 +1260,10 @@ getSysVar :: SysVar -&#62; IO Limit
 </Para>
 
 <Para>
-<Literal>getSysVar var</Literal> calls <Literal>sysconf</Literal> to obtain the
+<Literal>getSysVar var</Literal> calls <Function>sysconf</Function> to obtain the
 dynamic value of the requested configurable system limit or option.
-For defined system limits, <Literal>getSysVar</Literal> returns the associated
-value.  For defined system options, the result of <Literal>getSysVar</Literal>
+For defined system limits, <Function>getSysVar</Function> returns the associated
+value.  For defined system options, the result of <Function>getSysVar</Function>
 is undefined, but not failure.
 </Para>
 
@@ -1305,7 +1304,7 @@ openDirStream :: FilePath -&#62; IO DirStream
 </Para>
 
 <Para>
-<Literal>openDirStream dir</Literal> calls <Literal>opendir</Literal> to obtain a
+<Literal>openDirStream dir</Literal> calls <Function>opendir</Function> to obtain a
 directory stream for <Literal>dir</Literal>.
 </Para>
 
@@ -1318,9 +1317,9 @@ readDirStream :: DirStream -&#62; IO String
 </Para>
 
 <Para>
-<Literal>readDirStream dp</Literal> calls <Literal>readdir</Literal> to obtain the
+<Literal>readDirStream dp</Literal> calls <Function>readdir</Function> to obtain the
 next directory entry (<Literal>struct dirent</Literal>) for the open directory
-stream <Literal>dp</Literal>, and returns the <Literal>d&lowbar;name</Literal> member of that
+stream <Literal>dp</Literal>, and returns the <VarName>d&lowbar;name</VarName> member of that
 structure.
 </Para>
 
@@ -1359,7 +1358,7 @@ rewindDirStream :: DirStream -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>rewindDirStream dp</Literal> calls <Literal>rewinddir</Literal> to reposition
+<Literal>rewindDirStream dp</Literal> calls <Function>rewinddir</Function> to reposition
 the directory stream <Literal>dp</Literal> at the beginning of the directory.
 </Para>
 
@@ -1372,7 +1371,7 @@ closeDirStream :: DirStream -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>closeDirStream dp</Literal> calls <Literal>closedir</Literal> to close
+<Literal>closeDirStream dp</Literal> calls <Function>closedir</Function> to close
 the directory stream <Literal>dp</Literal>.
 </Para>
 
@@ -1385,7 +1384,7 @@ getWorkingDirectory :: IO FilePath
 </Para>
 
 <Para>
-<Literal>getWorkingDirectory</Literal> calls <Literal>getcwd</Literal> to obtain the name
+<Function>getWorkingDirectory</Function> calls <Function>getcwd</Function> to obtain the name
 of the current working directory.
 </Para>
 
@@ -1398,7 +1397,7 @@ changeWorkingDirectory :: FilePath -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>changeWorkingDirectory dir</Literal> calls <Literal>chdir</Literal> to change
+<Literal>changeWorkingDirectory dir</Literal> calls <Function>chdir</Function> to change
 the current working directory to <Literal>dir</Literal>.
 </Para>
 
@@ -1455,13 +1454,13 @@ openFd :: FilePath
 
 <Para>
 <Literal>openFd path acc mode (OpenFileFlags app excl noctty nonblock trunc)</Literal> calls
-<Literal>open</Literal> to obtain a <Literal>Fd</Literal> for the file <Literal>path</Literal> with access
-mode <Literal>acc</Literal>.  If <Literal>mode</Literal> is <Literal>Just m</Literal>, the <Literal>O&lowbar;CREAT</Literal> flag is
+<Function>open</Function> to obtain a <Literal>Fd</Literal> for the file <Literal>path</Literal> with access
+mode <Literal>acc</Literal>.  If <Literal>mode</Literal> is <Literal>Just m</Literal>, the <Constant>O&lowbar;CREAT</Constant> flag is
 set and the file's permissions will be based on <Literal>m</Literal> if it does not
-already exist; otherwise, the <Literal>O&lowbar;CREAT</Literal> flag is not set.  The
+already exist; otherwise, the <Constant>O&lowbar;CREAT</Constant> flag is not set.  The
 arguments <Literal>app</Literal>, <Literal>excl</Literal>, <Literal>noctty</Literal>, <Literal>nonblock</Literal>, and
-<Literal>trunc</Literal> control whether or not the flags <Literal>O&lowbar;APPEND</Literal>,
-<Literal>O&lowbar;EXCL</Literal>, <Literal>O&lowbar;NOCTTY</Literal>, <Literal>O&lowbar;NONBLOCK</Literal>, and <Literal>O&lowbar;TRUNC</Literal> are set,
+<Literal>trunc</Literal> control whether or not the flags <Constant>O&lowbar;APPEND</Constant>,
+<Constant>O&lowbar;EXCL</Constant>, <Constant>O&lowbar;NOCTTY</Constant>, <Constant>O&lowbar;NONBLOCK</Constant>, and <Constant>O&lowbar;TRUNC</Constant> are set,
 respectively.
 </Para>
 
@@ -1474,7 +1473,7 @@ createFile :: FilePath -&#62; FileMode -&#62; IO Fd
 </Para>
 
 <Para>
-<Literal>createFile path mode</Literal> calls <Literal>creat</Literal> to obtain a <Literal>Fd</Literal>
+<Literal>createFile path mode</Literal> calls <Function>creat</Function> to obtain a <Literal>Fd</Literal>
 for file <Literal>path</Literal>, which will be created with permissions based on
 <Literal>mode</Literal> if it does not already exist.
 </Para>
@@ -1488,7 +1487,7 @@ setFileCreationMask :: FileMode -&#62; IO FileMode
 </Para>
 
 <Para>
-<Literal>setFileCreationMask mode</Literal> calls <Literal>umask</Literal> to set
+<Literal>setFileCreationMask mode</Literal> calls <Function>umask</Function> to set
 the process's file creation mask to <Literal>mode</Literal>.  The previous file
 creation mask is returned.
 </Para>
@@ -1502,7 +1501,7 @@ createLink :: FilePath -&#62; FilePath -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>createLink old new</Literal> calls <Literal>link</Literal> to create a 
+<Literal>createLink old new</Literal> calls <Function>link</Function> to create a 
 new path, <Literal>new</Literal>, linked to an existing file, <Literal>old</Literal>.
 
 <ProgramListing>
@@ -1512,7 +1511,7 @@ createDirectory :: FilePath -&#62; FileMode -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>createDirectory dir mode</Literal> calls <Literal>mkdir</Literal> to 
+<Literal>createDirectory dir mode</Literal> calls <Function>mkdir</Function> to 
 create a new directory, <Literal>dir</Literal>, with permissions based on
 <Literal>mode</Literal>.
 </Para>
@@ -1526,7 +1525,7 @@ createNamedPipe :: FilePath -&#62; FileMode -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>createNamedPipe fifo mode</Literal> calls <Literal>mkfifo</Literal> to 
+<Literal>createNamedPipe fifo mode</Literal> calls <Function>mkfifo</Function> to 
 create a new named pipe, <Literal>fifo</Literal>, with permissions based on
 <Literal>mode</Literal>.
 </Para>
@@ -1540,7 +1539,7 @@ removeLink :: FilePath -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>removeLink path</Literal> calls <Literal>unlink</Literal> to remove the link
+<Literal>removeLink path</Literal> calls <Function>unlink</Function> to remove the link
 named <Literal>path</Literal>.
 </Para>
 
@@ -1553,7 +1552,7 @@ removeDirectory :: FilePath -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>removeDirectory dir</Literal> calls <Literal>rmdir</Literal> to remove the 
+<Literal>removeDirectory dir</Literal> calls <Function>rmdir</Function> to remove the 
 directory named <Literal>dir</Literal>.
 </Para>
 
@@ -1566,7 +1565,7 @@ rename :: FilePath -&#62; FilePath -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>rename old new</Literal> calls <Literal>rename</Literal> to rename a 
+<Literal>rename old new</Literal> calls <Function>rename</Function> to rename a 
 file or directory from <Literal>old</Literal> to <Literal>new</Literal>.
 </Para>
 
@@ -1600,7 +1599,7 @@ getFileStatus     :: FilePath -&#62; IO FileStatus
 </Para>
 
 <Para>
-<Literal>getFileStatus path</Literal> calls <Literal>stat</Literal> to get the
+<Literal>getFileStatus path</Literal> calls <Function>stat</Function> to get the
 <Literal>FileStatus</Literal> information for the file <Literal>path</Literal>.
 </Para>
 
@@ -1613,7 +1612,7 @@ getFdStatus :: Fd -&#62; IO FileStatus
 </Para>
 
 <Para>
-<Literal>getFdStatus fd</Literal> calls <Literal>fstat</Literal> to get the
+<Literal>getFdStatus fd</Literal> calls <Function>fstat</Function> to get the
 <Literal>FileStatus</Literal> information for the file associated with
 <Literal>Fd</Literal> <Literal>fd</Literal>.
 </Para>
@@ -1627,10 +1626,10 @@ queryAccess :: FilePath -&#62; Bool -&#62; Bool -&#62; Bool -&#62; IO Bool
 </Para>
 
 <Para>
-<Literal>queryAccess path r w x</Literal> calls <Literal>access</Literal> to test the access
+<Literal>queryAccess path r w x</Literal> calls <Function>access</Function> to test the access
 permissions for file <Literal>path</Literal>.  The three arguments, <Literal>r</Literal>, <Literal>w</Literal>,
-and <Literal>x</Literal> control whether or not <Literal>access</Literal> is called with
-<Literal>R&lowbar;OK</Literal>, <Literal>W&lowbar;OK</Literal>, and <Literal>X&lowbar;OK</Literal> respectively.
+and <Literal>x</Literal> control whether or not <Function>access</Function> is called with
+<Constant>R&lowbar;OK</Constant>, <Constant>W&lowbar;OK</Constant>, and <Constant>X&lowbar;OK</Constant> respectively.
 </Para>
 
 <Para>
@@ -1642,7 +1641,7 @@ queryFile :: FilePath -&#62; IO Bool
 </Para>
 
 <Para>
-<Literal>queryFile path</Literal> calls <Literal>access</Literal> with <Literal>F&lowbar;OK</Literal> to test for the
+<Literal>queryFile path</Literal> calls <Function>access</Function> with <Constant>F&lowbar;OK</Constant> to test for the
 existence for file <Literal>path</Literal>.
 </Para>
 
@@ -1655,7 +1654,7 @@ setFileMode :: FilePath -&#62; FileMode -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>setFileMode path mode</Literal> calls <Literal>chmod</Literal> to set the
+<Literal>setFileMode path mode</Literal> calls <Function>chmod</Function> to set the
 permission bits associated with file <Literal>path</Literal> to <Literal>mode</Literal>.
 </Para>
 
@@ -1668,7 +1667,7 @@ setOwnerAndGroup :: FilePath -&#62; UserID -&#62; GroupID -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>setOwnerAndGroup path uid gid</Literal> calls <Literal>chown</Literal> to
+<Literal>setOwnerAndGroup path uid gid</Literal> calls <Function>chown</Function> to
 set the <Literal>UserID</Literal> and <Literal>GroupID</Literal> associated with file
 <Literal>path</Literal> to <Literal>uid</Literal> and <Literal>gid</Literal>, respectively.
 </Para>
@@ -1682,7 +1681,7 @@ setFileTimes :: FilePath -&#62; EpochTime -&#62; EpochTime -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>setFileTimes path atime mtime</Literal> calls <Literal>utime</Literal> to
+<Literal>setFileTimes path atime mtime</Literal> calls <Function>utime</Function> to
 set the access and modification times associated with file
 <Literal>path</Literal> to <Literal>atime</Literal> and <Literal>mtime</Literal>, respectively.
 </Para>
@@ -1696,7 +1695,7 @@ touchFile :: FilePath -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>touchFile path</Literal> calls <Literal>utime</Literal> to
+<Literal>touchFile path</Literal> calls <Function>utime</Function> to
 set the access and modification times associated with file
 <Literal>path</Literal> to the current time.
 </Para>
@@ -1710,11 +1709,11 @@ getPathVar :: PathVar -&#62; FilePath -&#62; IO Limit
 </Para>
 
 <Para>
-<Literal>getPathVar var path</Literal> calls <Literal>pathconf</Literal> to obtain the
+<Literal>getPathVar var path</Literal> calls <Function>pathconf</Function> to obtain the
 dynamic value of the requested configurable file limit or option associated
 with file or directory <Literal>path</Literal>.  For
-defined file limits, <Literal>getPathVar</Literal> returns the associated
-value.  For defined file options, the result of <Literal>getPathVar</Literal>
+defined file limits, <Function>getPathVar</Function> returns the associated
+value.  For defined file options, the result of <Function>getPathVar</Function>
 is undefined, but not failure.
 The operation may fail with:
 <VariableList>
@@ -1747,11 +1746,11 @@ getFdVar :: PathVar -&#62; Fd -&#62; IO Limit
 </Para>
 
 <Para>
-<Literal>getFdVar var fd</Literal> calls <Literal>fpathconf</Literal> to obtain the
+<Literal>getFdVar var fd</Literal> calls <Function>fpathconf</Function> to obtain the
 dynamic value of the requested configurable file limit or option associated
 with the file or directory attached to the open channel <Literal>fd</Literal>.
-For defined file limits, <Literal>getFdVar</Literal> returns the associated
-value.  For defined file options, the result of <Literal>getFdVar</Literal>
+For defined file limits, <Function>getFdVar</Function> returns the associated
+value.  For defined file options, the result of <Function>getFdVar</Function>
 is undefined, but not failure.
 </Para>
 
@@ -1800,7 +1799,7 @@ createPipe :: IO (Fd, Fd)
 </Para>
 
 <Para>
-<Literal>createPipe</Literal> calls <Literal>pipe</Literal> to create a pipe and returns a pair of
+<Function>createPipe</Function> calls <Function>pipe</Function> to create a pipe and returns a pair of
 <Literal>Fd</Literal>s, the first for reading and the second for writing.
 </Para>
 
@@ -1813,7 +1812,7 @@ dup :: Fd -&#62; IO Fd
 </Para>
 
 <Para>
-<Literal>dup fd</Literal> calls <Literal>dup</Literal> to duplicate <Literal>Fd</Literal> <Literal>fd</Literal> to
+<Literal>dup fd</Literal> calls <Function>dup</Function> to duplicate <Literal>Fd</Literal> <Literal>fd</Literal> to
 another <Literal>Fd</Literal>.
 </Para>
 
@@ -1826,7 +1825,7 @@ dupTo :: Fd -&#62; Fd -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>dupTo src dst</Literal> calls <Literal>dup2</Literal> to duplicate <Literal>Fd</Literal>
+<Literal>dupTo src dst</Literal> calls <Function>dup2</Function> to duplicate <Literal>Fd</Literal>
 <Literal>src</Literal> to <Literal>Fd</Literal> <Literal>dst</Literal>.
 </Para>
 
@@ -1839,7 +1838,7 @@ fdClose :: Fd -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>fdClose fd</Literal> calls <Literal>close</Literal> to close <Literal>Fd</Literal> <Literal>fd</Literal>.
+<Literal>fdClose fd</Literal> calls <Function>close</Function> to close <Literal>Fd</Literal> <Literal>fd</Literal>.
 </Para>
 
 <Para>
@@ -1851,7 +1850,7 @@ fdRead :: Fd -&#62; ByteCount -&#62; IO (String, ByteCount)
 </Para>
 
 <Para>
-<Literal>fdRead fd nbytes</Literal> calls <Literal>read</Literal> to read at most <Literal>nbytes</Literal>
+<Literal>fdRead fd nbytes</Literal> calls <Function>read</Function> to read at most <Literal>nbytes</Literal>
 bytes from <Literal>Fd</Literal> <Literal>fd</Literal>, and returns the result as a string
 paired with the number of bytes actually read.
 </Para>
@@ -1891,7 +1890,7 @@ fdWrite :: Fd -&#62; String -&#62; IO ByteCount
 </Para>
 
 <Para>
-<Literal>fdWrite fd s</Literal> calls <Literal>write</Literal> to write
+<Literal>fdWrite fd s</Literal> calls <Function>write</Function> to write
 the string <Literal>s</Literal> to <Literal>Fd</Literal> <Literal>fd</Literal> as a
 contiguous sequence of bytes.  It returns the number of bytes successfully
 written.
@@ -1906,7 +1905,7 @@ queryFdOption :: FdOption -&#62; Fd -&#62; IO Bool
 </Para>
 
 <Para>
-<Literal>getFdOption opt fd</Literal> calls <Literal>fcntl</Literal> to determine whether or
+<Literal>getFdOption opt fd</Literal> calls <Function>fcntl</Function> to determine whether or
 not the flag associated with <Literal>FdOption</Literal> <Literal>opt</Literal> is set for
 <Literal>Fd</Literal> <Literal>fd</Literal>.
 </Para>
@@ -1920,7 +1919,7 @@ setFdOption :: Fd -&#62; FdOption -&#62; Bool -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>setFdOption fd opt val</Literal> calls <Literal>fcntl</Literal> to set the flag
+<Literal>setFdOption fd opt val</Literal> calls <Function>fcntl</Function> to set the flag
 associated with <Literal>FdOption</Literal> <Literal>opt</Literal> on <Literal>Fd</Literal> <Literal>fd</Literal> to
 <Literal>val</Literal>.
 </Para>
@@ -1934,9 +1933,9 @@ getLock :: Fd -&#62; FileLock -&#62; IO (Maybe (ProcessID, FileLock))
 </Para>
 
 <Para>
-<Literal>getLock fd lock</Literal> calls <Literal>fcntl</Literal> to get the first <Literal>FileLock</Literal>
+<Literal>getLock fd lock</Literal> calls <Function>fcntl</Function> to get the first <Literal>FileLock</Literal>
 for <Literal>Fd</Literal> <Literal>fd</Literal> which blocks the <Literal>FileLock</Literal> <Literal>lock</Literal>.  If
-no such <Literal>FileLock</Literal> exists, <Literal>getLock</Literal> returns <Literal>Nothing</Literal>.
+no such <Literal>FileLock</Literal> exists, <Function>getLock</Function> returns <Literal>Nothing</Literal>.
 Otherwise, it returns <Literal>Just (pid, block)</Literal>, where <Literal>block</Literal> is the
 blocking <Literal>FileLock</Literal> and <Literal>pid</Literal> is the <Literal>ProcessID</Literal> of the
 process holding the blocking <Literal>FileLock</Literal>.
@@ -1951,9 +1950,9 @@ setLock :: Fd -&#62; FileLock -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>setLock fd lock</Literal> calls <Literal>fcntl</Literal> with <Literal>F&lowbar;SETLK</Literal> to set or
+<Literal>setLock fd lock</Literal> calls <Function>fcntl</Function> with <Constant>F&lowbar;SETLK</Constant> to set or
 clear a lock segment for <Literal>Fd</Literal> <Literal>fd</Literal> as indicated by the
-<Literal>FileLock</Literal> <Literal>lock</Literal>.  <Literal>setLock</Literal> does not block, but fails with
+<Literal>FileLock</Literal> <Literal>lock</Literal>.  <Function>setLock</Function> does not block, but fails with
 <Literal>SystemError</Literal> if the request cannot be satisfied immediately.
 </Para>
 
@@ -1966,10 +1965,10 @@ waitToSetLock :: Fd -&#62; FileLock -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>waitToSetLock fd lock</Literal> calls <Literal>fcntl</Literal> with <Literal>F&lowbar;SETLKW</Literal> to set
+<Literal>waitToSetLock fd lock</Literal> calls <Function>fcntl</Function> with <Constant>F&lowbar;SETLKW</Constant> to set
 or clear a lock segment for <Literal>Fd</Literal> <Literal>fd</Literal> as indicated by the
 <Literal>FileLock</Literal> <Literal>lock</Literal>. If the request cannot be satisfied
-immediately, <Literal>waitToSetLock</Literal> blocks until the request can be
+immediately, <Function>waitToSetLock</Function> blocks until the request can be
 satisfied.
 </Para>
 
@@ -1982,7 +1981,7 @@ fdSeek :: Fd -&#62; SeekMode -&#62; FileOffset -&#62; IO FileOffset
 </Para>
 
 <Para>
-<Literal>fdSeek fd whence offset</Literal> calls <Literal>lseek</Literal> to position the
+<Literal>fdSeek fd whence offset</Literal> calls <Function>lseek</Function> to position the
 <Literal>Fd</Literal> <Literal>fd</Literal> at the given <Literal>offset</Literal> from the starting location
 indicated by <Literal>whence</Literal>.  It returns the resulting offset from the
 start of the file in bytes.
@@ -2034,7 +2033,7 @@ getTerminalAttributes :: Fd -&#62; IO TerminalAttributes
 </Para>
 
 <Para>
-<Literal>getTerminalAttributes fd</Literal> calls <Literal>tcgetattr</Literal> to obtain
+<Literal>getTerminalAttributes fd</Literal> calls <Function>tcgetattr</Function> to obtain
 the <Literal>TerminalAttributes</Literal> associated with <Literal>Fd</Literal> <Literal>fd</Literal>.
 </Para>
 
@@ -2050,7 +2049,7 @@ setTerminalAttributes :: Fd
 </Para>
 
 <Para>
-<Literal>setTerminalAttributes fd attr ts</Literal> calls <Literal>tcsetattr</Literal> to change
+<Literal>setTerminalAttributes fd attr ts</Literal> calls <Function>tcsetattr</Function> to change
 the <Literal>TerminalAttributes</Literal> associated with <Literal>Fd</Literal> <Literal>fd</Literal> to
 <Literal>attr</Literal>, when the terminal is in the state indicated by <Literal>ts</Literal>.
 </Para>
@@ -2064,7 +2063,7 @@ sendBreak :: Fd -&#62; Int -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>sendBreak fd duration</Literal> calls <Literal>tcsendbreak</Literal> to transmit a
+<Literal>sendBreak fd duration</Literal> calls <Function>tcsendbreak</Function> to transmit a
 continuous stream of zero-valued bits on <Literal>Fd</Literal> <Literal>fd</Literal> for the
 specified implementation-dependent <Literal>duration</Literal>.
 </Para>
@@ -2078,7 +2077,7 @@ drainOutput :: Fd -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>drainOutput fd</Literal> calls <Literal>tcdrain</Literal> to block until all output
+<Literal>drainOutput fd</Literal> calls <Function>tcdrain</Function> to block until all output
 written to <Literal>Fd</Literal> <Literal>fd</Literal> has been transmitted.
 </Para>
 
@@ -2091,7 +2090,7 @@ discardData :: Fd -&#62; QueueSelector -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>discardData fd queues</Literal> calls <Literal>tcflush</Literal> to discard
+<Literal>discardData fd queues</Literal> calls <Function>tcflush</Function> to discard
 pending input and/or output for <Literal>Fd</Literal> <Literal>fd</Literal>,
 as indicated by the <Literal>QueueSelector</Literal> <Literal>queues</Literal>.
 </Para>
@@ -2105,7 +2104,7 @@ controlFlow :: Fd -&#62; FlowAction -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>controlFlow fd action</Literal> calls <Literal>tcflow</Literal> to control the 
+<Literal>controlFlow fd action</Literal> calls <Function>tcflow</Function> to control the 
 flow of data on <Literal>Fd</Literal> <Literal>fd</Literal>, as indicated by
 <Literal>action</Literal>.
 </Para>
@@ -2119,7 +2118,7 @@ getTerminalProcessGroupID :: Fd -&#62; IO ProcessGroupID
 </Para>
 
 <Para>
-<Literal>getTerminalProcessGroupID fd</Literal> calls <Literal>tcgetpgrp</Literal> to
+<Literal>getTerminalProcessGroupID fd</Literal> calls <Function>tcgetpgrp</Function> to
 obtain the <Literal>ProcessGroupID</Literal> of the foreground process group 
 associated with the terminal attached to <Literal>Fd</Literal> <Literal>fd</Literal>.
 </Para>
@@ -2133,7 +2132,7 @@ setTerminalProcessGroupID :: Fd -&#62; ProcessGroupID -&#62; IO ()
 </Para>
 
 <Para>
-<Literal>setTerminalProcessGroupID fd pgid</Literal> calls <Literal>tcsetpgrp</Literal> to
+<Literal>setTerminalProcessGroupID fd pgid</Literal> calls <Function>tcsetpgrp</Function> to
 set the <Literal>ProcessGroupID</Literal> of the foreground process group 
 associated with the terminal attached to <Literal>Fd</Literal> 
 <Literal>fd</Literal> to <Literal>pgid</Literal>.
@@ -2162,7 +2161,7 @@ getGroupEntryForID :: GroupID -&#62; IO GroupEntry
 </Para>
 
 <Para>
-<Literal>getGroupEntryForID gid</Literal> calls <Literal>getgrgid</Literal> to obtain
+<Literal>getGroupEntryForID gid</Literal> calls <Function>getgrgid</Function> to obtain
 the <Literal>GroupEntry</Literal> information associated with <Literal>GroupID</Literal>
 <Literal>gid</Literal>.
 </Para>
@@ -2194,7 +2193,7 @@ getGroupEntryForName :: String -&#62; IO GroupEntry
 </Para>
 
 <Para>
-<Literal>getGroupEntryForName name</Literal> calls <Literal>getgrnam</Literal> to obtain
+<Literal>getGroupEntryForName name</Literal> calls <Function>getgrnam</Function> to obtain
 the <Literal>GroupEntry</Literal> information associated with the group called
 <Literal>name</Literal>.
 </Para>
@@ -2232,7 +2231,7 @@ getUserEntryForID :: UserID -&#62; IO UserEntry
 </Para>
 
 <Para>
-<Literal>getUserEntryForID gid</Literal> calls <Literal>getpwuid</Literal> to obtain
+<Literal>getUserEntryForID gid</Literal> calls <Function>getpwuid</Function> to obtain
 the <Literal>UserEntry</Literal> information associated with <Literal>UserID</Literal>
 <Literal>uid</Literal>.
 The operation may fail with:
@@ -2261,7 +2260,7 @@ getUserEntryForName :: String -&#62; IO UserEntry
 </Para>
 
 <Para>
-<Literal>getUserEntryForName name</Literal> calls <Literal>getpwnam</Literal> to obtain
+<Literal>getUserEntryForName name</Literal> calls <Function>getpwnam</Function> to obtain
 the <Literal>UserEntry</Literal> information associated with the user login
 <Literal>name</Literal>.
 </Para>
@@ -2303,8 +2302,8 @@ getErrorCode :: IO ErrorCode
 </Para>
 
 <Para>
-<Literal>getErrorCode</Literal> returns the current value of the external
-variable <Literal>errno</Literal>.  It never fails.
+<Function>getErrorCode</Function> returns the current value of the external
+variable <Function>errno</Function>.  It never fails.
 </Para>
 
 <Para>
@@ -2317,7 +2316,7 @@ setErrorCode :: ErrorCode -&#62; IO ()
 
 <Para>
 <Literal>setErrorCode err</Literal> sets the external
-variable <Literal>errno</Literal> to <Literal>err</Literal>.  It never fails.
+variable <Function>errno</Function> to <Literal>err</Literal>.  It never fails.
 </Para>
 
 <Para>

@@ -43,13 +43,13 @@ These events are <Emphasis>always</Emphasis> bugs in the GHC system&mdash;please
 <Term>``The compiler ran out of heap (or stack) when compiling itself!''</Term>
 <ListItem>
 <Para>
-It happens.  We try to supply reasonable <Literal>-H&lt;n&gt;</Literal> flags for
-<Literal>ghc/compiler/</Literal> and <Literal>ghc/lib/</Literal>, but GHC's memory consumption
+It happens.  We try to supply reasonable <Option>-H&lt;n&gt;</Option> flags for
+<Filename>ghc/compiler/</Filename> and <Filename>ghc/lib/</Filename>, but GHC's memory consumption
 can vary by platform (e.g., on a 64-bit machine).
 </Para>
 
 <Para>
-Just say <Literal>make all EXTRA&lowbar;HC&lowbar;OPTS=-H&lt;a reasonable number&gt;</Literal> and see
+Just say <Command>make all EXTRA&lowbar;HC&lowbar;OPTS=-H&lt;a reasonable number&gt;</Command> and see
 how you get along.
 </Para>
 
@@ -89,9 +89,9 @@ Almost surely not a problem.  About some specific cases&hellip;
 <ListItem>
 <Para>
 Sad, but harmless.  You can change the number with a
-<Literal>-fmax-simplifier-iterations&lt;N&gt;</Literal><IndexTerm><Primary>-fmax-simplifier-iterations&lt;N&gt; option</Primary></IndexTerm> option (no space);
+<Option>-fmax-simplifier-iterations&lt;N&gt;</Option><IndexTerm><Primary>-fmax-simplifier-iterations&lt;N&gt; option</Primary></IndexTerm> option (no space);
 and you can see what actions took place in each iteration by
-turning on the <Literal>-fshow-simplifier-progress</Literal>
+turning on the <Option>-fshow-simplifier-progress</Option>
 <IndexTerm><Primary>-fshow-simplifier-progress option</Primary></IndexTerm> option.
 </Para>
 
@@ -115,13 +115,13 @@ Unsightly, but shouldn't be a problem.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term>Sensitivity to <Literal>.hi</Literal> interface files:</Term>
+<Term>Sensitivity to <Filename>.hi</Filename> interface files:</Term>
 <ListItem>
 <Para>
 GHC is very sensitive about interface files.  For example, if it picks
-up a non-standard <Literal>Prelude.hi</Literal> file, pretty terrible things will
+up a non-standard <Filename>Prelude.hi</Filename> file, pretty terrible things will
 happen.  If you turn on
-<Literal>-fno-implicit-prelude</Literal><IndexTerm><Primary>-fno-implicit-prelude option</Primary></IndexTerm>, the
+<Option>-fno-implicit-prelude</Option><IndexTerm><Primary>-fno-implicit-prelude option</Primary></IndexTerm>, the
 compiler will almost surely die, unless you know what you are doing.
 </Para>
 
@@ -136,9 +136,9 @@ running programs compiled using unstable interfaces.
 <ListItem>
 <Para>
 Unlikely :-) A useful be-more-paranoid option to give to GHC is
-<Literal>-dcore-lint</Literal><IndexTerm><Primary>-dcore-lint option</Primary></IndexTerm>; this causes a ``lint''
+<Option>-dcore-lint</Option><IndexTerm><Primary>-dcore-lint option</Primary></IndexTerm>; this causes a ``lint''
 pass to check for errors (notably type errors) after each Core-to-Core
-transformation pass.  We run with <Literal>-dcore-lint</Literal> on all the time; it
+transformation pass.  We run with <Option>-dcore-lint</Option> on all the time; it
 costs about 5&percnt; in compile time.
 </Para>
 </ListItem>
@@ -168,8 +168,8 @@ with an incompatible newer version.
 </Para>
 
 <Para>
-If you run <Literal>nm -o *.o &verbar; egrep 't (cc&verbar;hsc)\.'</Literal> (or, on
-unregisterised files: <Literal>what *.o</Literal>), you'll see all the consistency
+If you run <Command>nm -o *.o &verbar; egrep 't (cc&verbar;hsc)\.'</Command> (or, on
+unregisterised files: <Command>what *.o</Command>), you'll see all the consistency
 tags/strings in your object files.  They must all be the same!
 (ToDo: tell you what they mean&hellip;)
 </Para>
@@ -220,10 +220,10 @@ please see <XRef LinkEnd="sooner-faster-quicker">).
 </Para>
 
 <Para>
-If your program has no <Literal>&lowbar;ccall&lowbar;</Literal>s/<Literal>&lowbar;casm&lowbar;</Literal>s in it, then a crash is
+If your program has no <Function>&lowbar;ccall&lowbar;</Function>s/<Function>&lowbar;casm&lowbar;</Function>s in it, then a crash is
 always a BUG in the GHC system, except in one case: If your program is
 made of several modules, each module must have been compiled after any
-modules on which it depends (unless you use <Literal>.hi-boot</Literal> files, in which
+modules on which it depends (unless you use <Filename>.hi-boot</Filename> files, in which
 case these <Emphasis>must</Emphasis> be correct with respect to the module source). 
 </Para>
 
@@ -242,19 +242,19 @@ the modules that import that interface <Emphasis>must</Emphasis> be re-compiled.
 
 <Para>
 A useful option to alert you when interfaces change is
-<Literal>-hi-diffs</Literal><IndexTerm><Primary>-hi-diffs option</Primary></IndexTerm>.  It will run <Literal>diff</Literal> on the
+<Option>-hi-diffs</Option><IndexTerm><Primary>-hi-diffs option</Primary></IndexTerm>.  It will run <Command>diff</Command> on the
 changed interface file, before and after, when applicable.
 </Para>
 
 <Para>
-If you are using <Literal>make</Literal>, a useful tool to make sure that every module
+If you are using <Command>make</Command>, a useful tool to make sure that every module
 <Emphasis>is</Emphasis> up-to-date with respect to its imported interfaces is
-<Literal>mkdependHS</Literal> (which comes with GHC).  Please see <XRef LinkEnd="mkdependHS">.
+<Command>mkdependHS</Command> (which comes with GHC).  Please see <XRef LinkEnd="mkdependHS">.
 </Para>
 
 <Para>
 If you are down to your last-compile-before-a-bug-report, we would
-recommend that you add a <Literal>-dcore-lint</Literal> option (for extra checking) to your compilation options.
+recommend that you add a <Option>-dcore-lint</Option> option (for extra checking) to your compilation options.
 </Para>
 
 <Para>
@@ -270,7 +270,7 @@ So, before you report a bug because of a core dump, you should probably:
 </Para>
 
 <Para>
-Of course, if you have <Literal>&lowbar;ccall&lowbar;</Literal>s/<Literal>&lowbar;casm&lowbar;</Literal>s in your program then all
+Of course, if you have <Function>&lowbar;ccall&lowbar;</Function>s/<Function>&lowbar;casm&lowbar;</Function>s in your program then all
 bets are off, because you can trash the heap, the stack, or whatever.
 </Para>
 
@@ -315,10 +315,7 @@ exception (please report it if it does).
 
 <Para>
 Glasgow Haskell is a changing system so there are sure to be bugs in
-it.  Please report them to <ULink
-URL="mailto:glasgow-haskell-bugs@haskell.org"
->glasgow-haskell-bugs@haskell.org</ULink
->!  (However, please
+it.  Please report them to <Email>glasgow-haskell-bugs@haskell.org</Email>!  (However, please
 check the earlier part of this section to be sure it's not a known
 not-really-a problem.)
 </Para>
@@ -335,15 +332,15 @@ Don't omit them because ``Oh, they won't be interested&hellip;''
 
 <Para>
  What kind of machine are you running on, and exactly what
-version of the operating system are you using? (<Literal>uname -a</Literal> or <Literal>cat
-/etc/motd</Literal> will show the desired information.)
+version of the operating system are you using? (<Command>uname -a</Command> or <Command>cat
+/etc/motd</Command> will show the desired information.)
 
 </Para>
 </ListItem>
 <ListItem>
 
 <Para>
- What version of GCC are you using? <Literal>gcc -v</Literal> will tell you.
+ What version of GCC are you using? <Command>gcc -v</Command> will tell you.
 
 </Para>
 </ListItem>
@@ -360,7 +357,7 @@ thing.
 <ListItem>
 
 <Para>
- Be sure any Haskell compilations are run with a <Literal>-v</Literal> (verbose)
+ Be sure any Haskell compilations are run with a <Option>-v</Option> (verbose)
 flag, so we can see exactly what was run, what versions of things you
 have, etc.
 
@@ -416,7 +413,7 @@ This section suggests ways to Make Further Progress Anyway.
 
 <Para>
 The first thing to establish is: Is it a garbage-collection (GC) bug?
-Try your program with a very large heap and a <Literal>-Sstderr</Literal> RTS
+Try your program with a very large heap and a <Option>-Sstderr</Option> RTS
 flag.
 
 <ItemizedList>
@@ -438,7 +435,7 @@ it <Emphasis>probably is</Emphasis> a GC bug.
 
 <Para>
 If it crashes with the normal
-collector, but not when you force two-space collection (<Literal>-F2s</Literal>
+collector, but not when you force two-space collection (<Option>-F2s</Option>
 runtime flag), then it <Emphasis>probably is</Emphasis> a GC bug.
 </Para>
 </ListItem>
@@ -449,7 +446,7 @@ runtime flag), then it <Emphasis>probably is</Emphasis> a GC bug.
 
 <Para>
 If it <Emphasis>is</Emphasis> a GC bug, you may be able to avoid it by using a
-particular heap size or by using a <Literal>-F2s</Literal> runtime flag.  (But don't
+particular heap size or by using a <Option>-F2s</Option> runtime flag.  (But don't
 forget to report the bug!!!)
 </Para>
 

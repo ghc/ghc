@@ -36,7 +36,7 @@ as you like.
 </Para>
 
 <Para>
-Bear in mind that string gaps and the <Literal>-cpp</Literal><IndexTerm><Primary>-cpp option</Primary></IndexTerm>
+Bear in mind that string gaps and the <Option>-cpp</Option><IndexTerm><Primary>-cpp option</Primary></IndexTerm>
 option don't mix very well (see <XRef LinkEnd="c-pre-processor">).
 </Para>
 </ListItem>

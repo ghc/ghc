@@ -10,7 +10,7 @@
 <Para>
 This section describes a collection of Haskell libraries we've
 collected over the years.  Access to any of these modules is provided
-by giving the <Literal>-syslib misc</Literal><IndexTerm><Primary>-syslib misc option</Primary></IndexTerm>.
+by giving the <Option>-syslib misc</Option><IndexTerm><Primary>-syslib misc option</Primary></IndexTerm>.
 </Para>
 
 <Sect2 id="Bag">
@@ -237,22 +237,22 @@ mapMaybe    :: (a -&#62; Maybe b) -&#62; [a] -&#62; Maybe [b]
 </Para>
 
 <Para>
-NB: <Literal>catMaybes</Literal> which used to be here, is now available via the
+NB: <Function>catMaybes</Function> which used to be here, is now available via the
 standard <Literal>Maybe</Literal> interface (<Literal>Maybe</Literal> is an instance of <Literal>MonadPlus</Literal>).
 </Para>
 
 <Para>
-<Literal>allMaybes</Literal> collects a list of <Literal>Justs</Literal> into a single <Literal>Just</Literal>, returning
+<Function>allMaybes</Function> collects a list of <Literal>Justs</Literal> into a single <Literal>Just</Literal>, returning
 <Literal>Nothing</Literal> if there are any <Literal>Nothings</Literal>.
 </Para>
 
 <Para>
-<Literal>firstJust</Literal> takes a list of <Literal>Maybes</Literal> and returns the
+<Function>firstJust</Function> takes a list of <Literal>Maybes</Literal> and returns the
 first <Literal>Just</Literal> if there is one, or <Literal>Nothing</Literal> otherwise.
 </Para>
 
 <Para>
-<Literal>assocMaybe</Literal> looks up in an association list, returning
+<Function>assocMaybe</Function> looks up in an association list, returning
 <Literal>Nothing</Literal> if it fails.
 </Para>
 
@@ -275,13 +275,13 @@ foldlMaybeErrs :: (acc -&#62; input -&#62; MaybeErr acc err)
 </Para>
 
 <Para>
-<Literal>listMaybeErrs</Literal> takes a list of <Literal>MaybeErrs</Literal> and, if they all succeed,
+<Function>listMaybeErrs</Function> takes a list of <Literal>MaybeErrs</Literal> and, if they all succeed,
 returns a <Literal>Succeeded</Literal> of a list of their values.  If any fail, it
 returns a <Literal>Failed</Literal> of the list of all the errors in the list.
 </Para>
 
 <Para>
-<Literal>foldlMaybeErrs</Literal> works along a list, carrying an accumulator; it
+<Function>foldlMaybeErrs</Function> works along a list, carrying an accumulator; it
 applies the given function to the accumulator and the next list item,
 accumulating any errors that occur.
 </Para>
@@ -310,7 +310,7 @@ memo :: (a -&#62; b) -&#62; a -&#62; b
 </Para>
 
 <Para>
-So, for example, <Literal>memo f</Literal> is a version of <Literal>f</Literal> that caches the results
+So, for example, <Function>memo f</Function> is a version of <Function>f</Function> that caches the results
 of previous calls.
 </Para>
 
@@ -339,7 +339,7 @@ becomes garbage.  We plan to fix this in a future version.
 </Para>
 
 <Para>
-There's another version of <Literal>memo</Literal> if you want to explicitly give a
+There's another version of <Function>memo</Function> if you want to explicitly give a
 size for the hash table (the default size is 1001 buckets):
 </Para>
 
@@ -363,7 +363,7 @@ memo_sized :: Int -&#62; (a -&#62; b) -&#62; a -&#62; b
 
 <Para>
 You need to <Literal>import PackedString</Literal> and heave in your
-<Literal>-syslib ghc</Literal> to use <Literal>PackedString</Literal>s.
+<Option>-syslib ghc</Option> to use <Literal>PackedString</Literal>s.
 </Para>
 
 <Para>
@@ -614,7 +614,7 @@ unzipWith   :: (a -&#62; b -&#62; c) -&#62; [(a, b)] -&#62; [c]
 </Para>
 
 <Para>
-The GHC system library (<Literal>-syslib misc</Literal>) also provides interfaces to
+The GHC system library (<Option>-syslib misc</Option>) also provides interfaces to
 several useful C libraries, mostly from the GNU project.
 </Para>
 
@@ -634,12 +634,12 @@ several useful C libraries, mostly from the GNU project.
 <Para>
 The <Literal>Readline</Literal> module is a straightforward interface to the GNU
 Readline library.  As such, you will need to look at the GNU
-documentation (and have a <Literal>libreadline.a</Literal> file around somewhere&hellip;)
+documentation (and have a <Filename>libreadline.a</Filename> file around somewhere&hellip;)
 </Para>
 
 <Para>
-You'll need to link any Readlining program with <Literal>-lreadline -ltermcap</Literal>,
-besides the usual <Literal>-syslib ghc</Literal> (and <Literal>-fhaskell-1.3</Literal>).
+You'll need to link any Readlining program with <Option>-lreadline -ltermcap</Option>,
+besides the usual <Option>-syslib ghc</Option> (and <Option>-fhaskell-1.3</Option>).
 </Para>
 
 <Para>
@@ -763,8 +763,8 @@ re_search2 :: PatBuffer         -- Double buffer search
 The <Literal>MatchPS</Literal> module provides Perl-like ``higher-level'' facilities
 to operate on <Literal>PackedStrings</Literal>.  The regular expressions in
 question are in Perl syntax.  The ``flags'' on various functions can
-include: <Literal>i</Literal> for case-insensitive, <Literal>s</Literal> for single-line mode, and
-<Literal>g</Literal> for global.  (It's probably worth your time to peruse the
+include: <Option>i</Option> for case-insensitive, <Option>s</Option> for single-line mode, and
+<Option>g</Option> for global.  (It's probably worth your time to peruse the
 source code&hellip;)
 </Para>
 
@@ -887,7 +887,7 @@ matchRegex
 <Para>
 Your best bet for documentation is to look at the code&mdash;really!&mdash;
 normally in
-<Literal>fptools/ghc/lib/misc/&lcub;BSD,Socket,SocketPrim</Literal>.lhs&rcub;.
+<Filename>fptools/ghc/lib/misc/&lcub;BSD,Socket,SocketPrim</Filename>.lhs&rcub;.
 </Para>
 
 <Para>
@@ -975,7 +975,7 @@ Various examples of networking Haskell code are provided in
 </Para>
 
 <Para>
-The <Literal>Select</Literal> interface provides a Haskell wrapper for the <Literal>select()</Literal>
+The <Literal>Select</Literal> interface provides a Haskell wrapper for the <Function>select()</Function>
 OS call supplied by many modern UNIX variants. <Literal>Select</Literal> exports the
 following:
 </Para>
@@ -1028,15 +1028,15 @@ main = do
 </Para>
 
 <Para>
-where the call to <Literal>hSelect</Literal> makes the process go to sleep
-until there's input available on <Literal>stdin</Literal>.
+where the call to <Function>hSelect</Function> makes the process go to sleep
+until there's input available on <VarName>stdin</VarName>.
 </Para>
 
 <Para>
-Notice that this particular use of <Literal>hSelect</Literal> is now really a no-op
+Notice that this particular use of <Function>hSelect</Function> is now really a no-op
 with GHC compiled code, as its implementation of IO will take care to
 avoid blocking the process (i.e., all running Haskell threads), and
-call <Literal>select()</Literal> for you, if needs be. However, <Literal>hSelect</Literal> exposes
+call <Function>select()</Function> for you, if needs be. However, <Function>hSelect</Function> exposes
 functionality that is useful in other contexts (e.g., you want to
 wait for input on two <Literal>Handles</Literal> for 3 seconds, but no longer.)
 </Para>

@@ -5,9 +5,6 @@
 <Para>
 <IndexTerm><Primary>Concurrent Haskell</Primary></IndexTerm>
 <IndexTerm><Primary>Parallel Haskell</Primary></IndexTerm>
-</Para>
-
-<Para>
 Concurrent and Parallel Haskell are Glasgow extensions to Haskell
 which let you structure your program as a group of independent
 `threads'.
@@ -102,14 +99,14 @@ already been evaluated to WHNF.
 
 <Para>
 The expression <Literal>(x `seq` y)</Literal> evaluates <Literal>x</Literal> to weak head normal
-form and then returns <Literal>y</Literal>.  The <Literal>seq</Literal> primitive can be used to
+form and then returns <Literal>y</Literal>.  The <Function>seq</Function> primitive can be used to
 force evaluation of an expression beyond WHNF, or to impose a desired
 execution sequence for the evaluation of an expression.
 </Para>
 
 <Para>
 For example, consider the following parallel version of our old
-nemesis, <Literal>nfib</Literal>:
+nemesis, <Function>nfib</Function>:
 </Para>
 
 <Para>
@@ -127,14 +124,14 @@ nfib n | n &#60;= 1 = 1
 </Para>
 
 <Para>
-For values of <Literal>n</Literal> greater than 1, we use <Literal>par</Literal> to spark a thread
-to evaluate <Literal>nfib (n-1)</Literal>, and then we use <Literal>seq</Literal> to force the
+For values of <VarName>n</VarName> greater than 1, we use <Function>par</Function> to spark a thread
+to evaluate <Literal>nfib (n-1)</Literal>, and then we use <Function>seq</Function> to force the
 parent thread to evaluate <Literal>nfib (n-2)</Literal> before going on to add
 together these two subexpressions.  In this divide-and-conquer
 approach, we only spark a new thread for one branch of the computation
 (leaving the parent to evaluate the other branch).  Also, we must use
-<Literal>seq</Literal> to ensure that the parent will evaluate <Literal>n2</Literal> <Emphasis>before</Emphasis>
-<Literal>n1</Literal> in the expression <Literal>(n1 + n2 + 1)</Literal>.  It is not sufficient to
+<Function>seq</Function> to ensure that the parent will evaluate <VarName>n2</VarName> <Emphasis>before</Emphasis>
+<VarName>n1</VarName> in the expression <Literal>(n1 + n2 + 1)</Literal>.  It is not sufficient to
 reorder the expression as <Literal>(n2 + n1 + 1)</Literal>, because the compiler may
 not generate code to evaluate the addends from left to right.
 </Para>
@@ -147,10 +144,10 @@ not generate code to evaluate the addends from left to right.
 <IndexTerm><Primary>primitives for parallelism</Primary></IndexTerm></Title>
 
 <Para>
-The functions <Literal>par</Literal> and <Literal>seq</Literal> are wired into GHC, and unfold
-into uses of the <Literal>par&num;</Literal> and <Literal>seq&num;</Literal> primitives, respectively.  If
+The functions <Function>par</Function> and <Function>seq</Function> are wired into GHC, and unfold
+into uses of the <Function>par&num;</Function> and <Function>seq&num;</Function> primitives, respectively.  If
 you'd like to see this with your very own eyes, just run GHC with the
-<Literal>-ddump-simpl</Literal> option.  (Anything for a good time&hellip;)
+<Option>-ddump-simpl</Option> option.  (Anything for a good time&hellip;)
 </Para>
 
 </Sect3>
@@ -164,7 +161,7 @@ you'd like to see this with your very own eyes, just run GHC with the
 Runnable threads are scheduled in round-robin fashion.  Context
 switches are signalled by the generation of new sparks or by the
 expiry of a virtual timer (the timer interval is configurable with the
-<Literal>-C[&lt;num&gt;]</Literal><IndexTerm><Primary>-C&lt;num&gt; RTS option (concurrent,
+<Option>-C[&lt;num&gt;]</Option><IndexTerm><Primary>-C&lt;num&gt; RTS option (concurrent,
 parallel)</Primary></IndexTerm> RTS option).  However, a context switch doesn't
 really happen until the current heap block is full.  You can't get any
 faster context switching than this.
@@ -175,7 +172,7 @@ When a context switch occurs, pending sparks which have not already
 been reduced to weak head normal form are turned into new threads.
 However, there is a limit to the number of active threads (runnable or
 blocked) which are allowed at any given time.  This limit can be
-adjusted with the <Literal>-t&lt;num&gt;</Literal><IndexTerm><Primary>-t &lt;num&gt; RTS option (concurrent, parallel)</Primary></IndexTerm>
+adjusted with the <Option>-t&lt;num&gt;</Option><IndexTerm><Primary>-t &lt;num&gt; RTS option (concurrent, parallel)</Primary></IndexTerm>
 RTS option (the default is 32).  Once the
 thread limit is reached, any remaining sparks are deferred until some
 of the currently active threads are completed.

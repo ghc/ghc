@@ -40,7 +40,7 @@ sh$
 </Para>
 
 <Para>
-will give you a binary as before, but the <Literal>main.exe</Literal> generated
+will give you a binary as before, but the <Filename>main.exe</Filename> generated
 will use the Prelude and RTS DLLs instead.
 </Para>
 
@@ -56,13 +56,13 @@ will use the Prelude and RTS DLLs instead.
 
 <Para>
 If you want to build an executable that doesn't depend on any
-ghc-compiled DLLs, use the <Literal>-static</Literal> option to link in
+ghc-compiled DLLs, use the <Option>-static</Option> option to link in
 the code statically.
 </Para>
 
 <Para>
 Notice that you cannot mix code that has been compiled with
-<Literal>-static</Literal> and not, so you have to use the <Literal>-static</Literal>
+<Option>-static</Option> and not, so you have to use the <Option>-static</Option>
 option on all the Haskell modules that make up your application.
 </Para>
 
@@ -87,7 +87,7 @@ sh$ ghc --mk-dll -o HSsuper.dll A.o Super.o B.o libmine.a -lgdi32
 </Para>
 
 <Para>
-By feeding the ghc compiler driver the option <Literal>--mk-dll</Literal>, it
+By feeding the ghc compiler driver the option <Option>--mk-dll</Option>, it
 will build a DLL rather than produce an executable. The DLL will
 consist of all the object files and archives given on the command
 line.
@@ -125,14 +125,14 @@ same-directory imports are considered 'DLL imports'.
 
 <Para>
 If a directory contains the (probably empty) file
-<Literal>dLL&lowbar;ifs.hi</Literal>, the code corresponding to the interface
+<Filename>dLL&lowbar;ifs.hi</Filename>, the code corresponding to the interface
 files found in that directory are assumed to live in a DLL
 separate from the one being compiled. 
 
 Notice that the first rule takes precedence over this one, so if
 you're compiling a module that imports from a Haskell module whose
 interface file live in the same directory, <Emphasis>and</Emphasis> that directory
-also contains the file <Literal>dLL&lowbar;ifs.hi</Literal>, the import is still not
+also contains the file <Filename>dLL&lowbar;ifs.hi</Filename>, the import is still not
 being considered to be a 'DLL import'.
 
 </Para>
@@ -140,7 +140,7 @@ being considered to be a 'DLL import'.
 <ListItem>
 
 <Para>
-If compiling with the option <Literal>-static</Literal>, the previous rule
+If compiling with the option <Option>-static</Option>, the previous rule
 is disabled.
 </Para>
 </ListItem>
@@ -149,7 +149,7 @@ is disabled.
 
 
 So, in short, after having built your Haskell DLL, make sure you
-create the file <Literal>dLL&lowbar;ifs.hi</Literal> in the directory that contains
+create the file <Filename>dLL&lowbar;ifs.hi</Filename> in the directory that contains
 its interface files. If you don't, Haskell code that calls upon entry
 points in that DLL, will do so incorrectly, and a crash will result.
 (it is unfortunate that this isn't currently caught at compile-time).
@@ -160,7 +160,7 @@ points in that DLL, will do so incorrectly, and a crash will result.
 
 <Para>
 By default, the entry points of all the object files will
-be exported from the DLL when using <Literal>--mk-dll</Literal>. Should you want
+be exported from the DLL when using <Option>--mk-dll</Option>. Should you want
 to constrain this, you can specify the <Emphasis>module definition file</Emphasis>
 to use on the command line as follows:
 
@@ -189,7 +189,7 @@ EXPORTS
 <ListItem>
 
 <Para>
-In addition to creating a DLL, the <Literal>--mk-dll</Literal> option will also
+In addition to creating a DLL, the <Option>--mk-dll</Option> option will also
 create an import library. The import library name is derived from the
 name of the DLL, as follows:
 
@@ -200,12 +200,12 @@ DLL: HScool.dll  ==&#62; import lib: libHScool_imp.a
 
 The naming scheme may look a bit weird, but it has the purpose of
 allowing the co-existence of import libraries with ordinary static
-libraries (e.g., <Literal>libHSfoo.a</Literal> and <Literal>libHSfoo&lowbar;imp.a</Literal>.
+libraries (e.g., <Filename>libHSfoo.a</Filename> and <Filename>libHSfoo&lowbar;imp.a</Filename>.
 
 Additionally, when the compiler driver is linking in non-static mode,
-it will rewrite occurrence of <Literal>-lHSfoo</Literal> on the command line to
-<Literal>-lHSfoo&lowbar;imp</Literal>. By doing this for you, switching from non-static
-to static linking is simply a question of adding <Literal>-static</Literal> to
+it will rewrite occurrence of <Option>-lHSfoo</Option> on the command line to
+<Option>-lHSfoo&lowbar;imp</Option>. By doing this for you, switching from non-static
+to static linking is simply a question of adding <Option>-static</Option> to
 your command line.
 
 </Para>

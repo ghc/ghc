@@ -59,7 +59,7 @@ GHC's prelude contains the following non-standard extensions:
 <VariableList>
 
 <VarListEntry>
-<Term><Literal>fromInt</Literal> method in class <Literal>Num</Literal>:</Term>
+<Term><Function>fromInt</Function> method in class <Literal>Num</Literal>:</Term>
 <ListItem>
 <Para>
 It's there.  Converts from
@@ -68,7 +68,7 @@ an <Literal>Int</Literal> to the type.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>toInt</Literal> method in class <Literal>Integral</Literal>:</Term>
+<Term><Function>toInt</Function> method in class <Literal>Integral</Literal>:</Term>
 <ListItem>
 <Para>
 Converts from Integral
@@ -85,7 +85,7 @@ string <Literal>Prel</Literal><IndexTerm><Primary>Prel module prefix</Primary></
 don't recommend that you use any module names beginning with <Literal>Prel</Literal> in
 your own programs.  The <Literal>Prel</Literal> modules are always available: in fact,
 you can get access to several extensions this way (for some you might
-need to give the <Literal>-fglasgow-exts</Literal><IndexTerm><Primary>-fglasgow-exts option</Primary></IndexTerm>
+need to give the <Option>-fglasgow-exts</Option><IndexTerm><Primary>-fglasgow-exts option</Primary></IndexTerm>
 flag).
 </Para>
 
@@ -98,9 +98,7 @@ flag).
 The extension libraries provided by both GHC and Hugs are described in
 the
 <ULink
-URL="http://www.dcs.gla.ac.uk/fp/software/ghc/hg-libs/hg-libs.html"
->GHC/Hugs Extension Library Document</ULink
->
+URL="libs.html">GHC/Hugs Extension Library Document</ULink>
 </Para>
 
 </Sect1>
@@ -116,13 +114,13 @@ URL="http://www.dcs.gla.ac.uk/fp/software/ghc/hg-libs/hg-libs.html"
 <Para>
 If you rely on the implicit <Literal>import Prelude</Literal> that GHC normally does
 for you, and if you don't use any weird flags (notably
-<Literal>-fglasgow-exts</Literal>), and if you don't import the Glasgow extensions
+<Option>-fglasgow-exts</Option>), and if you don't import the Glasgow extensions
 interface, <Literal>GlaExts</Literal>, then GHC should work <Emphasis>exactly</Emphasis> as the
 Haskell report says (modulo a few minor issues, see <XRef LinkEnd="vs-Haskell-defn">).
 </Para>
 
 <Para>
-If you turn on <Literal>-fglasgow-exts</Literal>, a new world opesn up to you and the compiler
+If you turn on <Option>-fglasgow-exts</Option>, a new world opesn up to you and the compiler
 will recognise and parse unboxed values properly, and provide access to the
 various interfaces libraries described here (and piles of other goodies.)
 </Para>
@@ -136,13 +134,13 @@ various interfaces libraries described here (and piles of other goodies.)
 <Para>
 The <Literal>CCall</Literal> module defines the classes <Literal>CCallable</Literal> and <Literal>CReturnable</Literal>,
 along with instances for the primitive types (<Literal>Int</Literal>, <Literal>Int&num;</Literal>, <Literal>Float</Literal>,
-<Literal>Float&num;</Literal> etc.)  GHC knows to import this module if you use <Literal>&lowbar;ccall&lowbar;</Literal>,
+<Literal>Float&num;</Literal> etc.)  GHC knows to import this module if you use <Function>&lowbar;ccall&lowbar;</Function>,
 but if you need to define your own instances of these classes, you
 will need to import <Literal>CCall</Literal> explicitly.
 </Para>
 
 <Para>
-More information on how to use <Literal>&lowbar;ccall&lowbar;</Literal> can be found in <XRef LinkEnd="glasgow-ccalls">.
+More information on how to use <Function>&lowbar;ccall&lowbar;</Function> can be found in <XRef LinkEnd="glasgow-ccalls">.
 </Para>
 
 </Sect2>
@@ -158,7 +156,7 @@ More information on how to use <Literal>&lowbar;ccall&lowbar;</Literal> can be f
 The <Literal>GlaExts</Literal> interface provides access to extensions that only GHC
 implements.  These currently are: unboxed types, including the
 representations of the primitive types (Int, Float, etc.), and the
-GHC primitive operations (<Literal>+&num;</Literal>, <Literal>==&num;</Literal>, etc.).
+GHC primitive operations (<Function>+&num;</Function>, <Function>==&num;</Function>, etc.).
 </Para>
 
 <Para>
@@ -232,7 +230,7 @@ primitive value.
 
 <Para>
 Unboxed tuples aren't really exported by <Literal>PrelGHC</Literal>, they're available
-by default with <Literal>-fglasgow-exts</Literal>.  An unboxed tuple looks like this:
+by default with <Option>-fglasgow-exts</Option>.  An unboxed tuple looks like this:
 </Para>
 
 <Para>
@@ -311,7 +309,7 @@ f x = x
 </ProgramListing>
 
 
-because <Literal>x</Literal> has an unboxed tuple type.
+because <VarName>x</VarName> has an unboxed tuple type.
 
 </Para>
 </ListItem>
@@ -362,7 +360,7 @@ type Double#
 
 <Para>
 If you really want to know their exact equivalents in C, see
-<Literal>ghc/includes/StgTypes.h</Literal> in the GHC source tree.
+<Filename>ghc/includes/StgTypes.h</Filename> in the GHC source tree.
 </Para>
 
 <Para>
@@ -578,7 +576,7 @@ double2Float#   :: Double# -&#62; Float#
 </Para>
 
 <Para>
-The primitive versions of <Literal>encodeDouble</Literal>/<Literal>decodeDouble</Literal>:
+The primitive versions of <Function>encodeDouble</Function>/<Function>decodeDouble</Function>:
 </Para>
 
 <Para>
@@ -618,8 +616,8 @@ multiple-precision (GMP) package (version 2.0.2).
 <Para>
 The data type for <Literal>Integer</Literal> is either a small integer,
 represented by an <Literal>Int</Literal>, or a large integer represented
-using the pieces requird by GMP's <Literal>MP&lowbar;INT</Literal> in <Literal>gmp.h</Literal>
-(see <Literal>gmp.info</Literal> in <Literal>ghc/includes/runtime/gmp</Literal>).  It comes out as:
+using the pieces required by GMP's <Literal>MP&lowbar;INT</Literal> in <Filename>gmp.h</Filename>
+(see <Filename>gmp.info</Filename> in <Filename>ghc/includes/runtime/gmp</Filename>).  It comes out as:
 </Para>
 
 <Para>
@@ -790,7 +788,7 @@ type Array# elt
 Haskell <Literal>Array</Literal> interface is implemented using <Literal>Array&num;</Literal>&mdash;in that an
 <Literal>Array&num;</Literal> is indexed only by <Literal>Int&num;</Literal>s, starting at zero.  It is also
 more primitive by virtue of being unboxed.  That doesn't mean that it
-isn't a heap-allocated object - of course, it is.  Rather, being
+isn't a heap-allocated object&mdash;of course, it is.  Rather, being
 unboxed means that it is represented by a pointer to the array itself,
 and not to a thunk which will evaluate to the array (or to bottom).
 The components of an <Literal>Array&num;</Literal> are themselves boxed.
@@ -899,7 +897,7 @@ indexAddrOffAddr#   :: Addr# -&#62; Int# -&#62; Addr#
 </Para>
 
 <Para>
-The last of these, <Literal>indexAddrOffAddr&num;</Literal>, extracts an <Literal>Addr&num;</Literal> using an offset
+The last of these, <Function>indexAddrOffAddr&num;</Function>, extracts an <Literal>Addr&num;</Literal> using an offset
 from another <Literal>Addr&num;</Literal>, thereby providing the ability to follow a chain of
 C pointers.
 </Para>
@@ -1136,7 +1134,7 @@ sameMutableByteArray# :: MutableByteArray# s -&#62; MutableByteArray# s -&#62; B
 
 <Para>
 Only unsafe-freeze has a primitive.  (Safe freeze is done directly in Haskell
-by copying the array and then using <Literal>unsafeFreeze</Literal>.)
+by copying the array and then using <Function>unsafeFreeze</Function>.)
 </Para>
 
 <Para>
@@ -1190,7 +1188,7 @@ A stable pointer is represented by an index into the (static)
 </Para>
 
 <Para>
-The <Literal>makeStablePointer</Literal> function converts a value into a stable
+The <Function>makeStablePointer</Function> function converts a value into a stable
 pointer.  It is part of the <Literal>IO</Literal> monad, because we want to be sure
 we don't allocate one twice by accident, and then only free one of the
 copies.
@@ -1210,7 +1208,7 @@ deRefStablePointer# :: StablePtr# a -&#62; State# RealWorld -&#62; (# State# Rea
 </Para>
 
 <Para>
-There is also a C procedure <Literal>FreeStablePtr</Literal> which frees a stable pointer.
+There is also a C procedure <Function>FreeStablePtr</Function> which frees a stable pointer.
 </Para>
 
 </Sect2>

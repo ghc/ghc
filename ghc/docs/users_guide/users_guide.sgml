@@ -1,4 +1,4 @@
-<!DOCTYPE BOOK PUBLIC "-//Davenport//DTD DocBook V3.0//EN" [
+<!DOCTYPE BOOK PUBLIC "-//OASIS//DTD DocBook V3.1//EN" [
         <!ENTITY license        SYSTEM "license.sgml">
         <!ENTITY intro          SYSTEM "intro.sgml" >
         <!ENTITY relnotes       SYSTEM "4-04-notes.sgml" >

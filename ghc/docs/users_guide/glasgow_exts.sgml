@@ -2,7 +2,7 @@
 <IndexTerm><Primary>language, GHC</Primary></IndexTerm>
 <IndexTerm><Primary>extensions, GHC</Primary></IndexTerm>
 As with all known Haskell systems, GHC implements some extensions to
-the language.  To use them, you'll need to give a <Literal>-fglasgow-exts</Literal>
+the language.  To use them, you'll need to give a <Option>-fglasgow-exts</Option>
 <IndexTerm><Primary>-fglasgow-exts option</Primary></IndexTerm> option.
 </Para>
 
@@ -137,11 +137,11 @@ machine-addition that we all know and love&mdash;usually one instruction.
 There are some restrictions on the use of unboxed types, the main one
 being that you can't pass an unboxed value to a polymorphic function
 or store one in a polymorphic data type.  This rules out things like
-<Literal>[Int&num;]</Literal> (ie. lists of unboxed integers).  The reason for this
+<Literal>[Int&num;]</Literal> (i.e. lists of unboxed integers).  The reason for this
 restriction is that polymorphic arguments and constructor fields are
 assumed to be pointers: if an unboxed integer is stored in one of
 these, the garbage collector would attempt to follow it, leading to
-unpredictable space leaks.  Or a <Literal>seq</Literal> operation on the polymorphic
+unpredictable space leaks.  Or a <Function>seq</Function> operation on the polymorphic
 component may attempt to dereference the pointer, with disastrous
 results.  Even worse, the unboxed value might be larger than a pointer
 (<Literal>Double&num;</Literal> for instance).
@@ -175,7 +175,7 @@ immutable, and our implementation of I/O, including ``C calls''.
 </Para>
 
 <Para>
-The <Literal>ST</Literal> library, which provides access to the <Literal>ST</Literal> monad, is a
+The <Literal>ST</Literal> library, which provides access to the <Function>ST</Function> monad, is a
 GHC/Hugs extension library and is described in the separate <ULink
 URL="libs.html"
 >GHC/Hugs Extension Libraries</ULink
@@ -303,7 +303,7 @@ It will then be quite easy to update later on.
 </Para>
 
 <Sect2 id="ccall-intro">
-<Title><Literal>&lowbar;ccall&lowbar;</Literal> and <Literal>&lowbar;casm&lowbar;</Literal>: an introduction
+<Title><Function>&lowbar;ccall&lowbar;</Function> and <Function>&lowbar;casm&lowbar;</Function>: an introduction
 </Title>
 
 <Para>
@@ -332,13 +332,13 @@ fooH c i d w = _ccall_ fooC (``stdin''::Addr) c i d w
 </Para>
 
 <Para>
-The function <Literal>fooH</Literal> will unbox all of its arguments, call the C
-function <Literal>fooC</Literal> and box the corresponding arguments.
+The function <Function>fooH</Function> unbox all of its arguments, call the C
+function <Function>fooC</Function> and box the corresponding arguments.
 </Para>
 
 <Para>
-One of the annoyances about <Literal>&lowbar;ccall&lowbar;</Literal>s is when the C types don't quite
-match the Haskell compiler's ideas.  For this, the <Literal>&lowbar;casm&lowbar;</Literal> variant
+One of the annoyances about <Function>&lowbar;ccall&lowbar;</Function>s is when the C types don't quite
+match the Haskell compiler's ideas.  For this, the <Function>&lowbar;casm&lowbar;</Function> variant
 may be just the ticket (NB: <Emphasis>no chance</Emphasis> of such code going
 through a native-code generator):
 </Para>
@@ -362,26 +362,26 @@ oldGetEnv name
 </Para>
 
 <Para>
-The first literal-literal argument to a <Literal>&lowbar;casm&lowbar;</Literal> is like a <Literal>printf</Literal>
-format: <Literal>&percnt;r</Literal> is replaced with the ``result,'' <Literal>&percnt;0</Literal>--<Literal>&percnt;n-1</Literal> are
-replaced with the 1st--nth arguments.  As you can see above, it is an
-easy way to do simple C&nbsp;casting.  Everything said about <Literal>&lowbar;ccall&lowbar;</Literal> goes
-for <Literal>&lowbar;casm&lowbar;</Literal> as well.
+The first literal-literal argument to a <Function>&lowbar;casm&lowbar;</Function> is like a <Function>printf</Function>
+format: <Literal>&percnt;r</Literal> is replaced with the ``result,'' <Literal>&percnt;0</Literal>&ndash;<Literal>&percnt;n-1</Literal> are
+replaced with the 1st&ndash;nth arguments.  As you can see above, it is an
+easy way to do simple C&nbsp;casting.  Everything said about <Function>&lowbar;ccall&lowbar;</Function> goes
+for <Function>&lowbar;casm&lowbar;</Function> as well.
 </Para>
 
 <Para>
-The use of <Literal>&lowbar;casm&lowbar;</Literal> in your code does pose a problem to the compiler
+The use of <Function>&lowbar;casm&lowbar;</Function> in your code does pose a problem to the compiler
 when it comes to generating an interface file for a freshly compiled
 module. Included in an interface file is the unfolding (if any) of a
 declaration. However, if a declaration's unfolding happens to contain
-a <Literal>&lowbar;casm&lowbar;</Literal>, its unfolding will <Emphasis>not</Emphasis> be emitted into the interface
+a <Function>&lowbar;casm&lowbar;</Function>, its unfolding will <Emphasis>not</Emphasis> be emitted into the interface
 file even if it qualifies by all the other criteria. The reason why
-the compiler prevents this from happening is that unfolding <Literal>&lowbar;casm&lowbar;</Literal>s
+the compiler prevents this from happening is that unfolding <Function>&lowbar;casm&lowbar;</Function>s
 into an interface file unduly constrains how code that import your
 module have to be compiled. If an imported declaration is unfolded and
-it contains a <Literal>&lowbar;casm&lowbar;</Literal>, you now have to be using a compiler backend
+it contains a <Function>&lowbar;casm&lowbar;</Function>, you now have to be using a compiler backend
 capable of dealing with it (i.e., the C compiler backend). If you are
-using the C compiler backend, the unfolded <Literal>&lowbar;casm&lowbar;</Literal> may still cause you
+using the C compiler backend, the unfolded <Function>&lowbar;casm&lowbar;</Function> may still cause you
 problems since the C code snippet it contains may mention CPP symbols
 that were in scope when compiling the original module are not when
 compiling the importing module.
@@ -390,23 +390,19 @@ compiling the importing module.
 <Para>
 If you're willing to put up with the drawbacks of doing cross-module
 inlining of C code (GHC - A Better C Compiler :-), the option
-<Literal>-funfold-casms-in-hi-file</Literal> will turn off the default behaviour.
+<Option>-funfold-casms-in-hi-file</Option> will turn off the default behaviour.
 <IndexTerm><Primary>-funfold-casms-in-hi-file option</Primary></IndexTerm>
 </Para>
 
 </Sect2>
 
 <Sect2 id="glasgow-literal-literals">
-<Title>Literal-literals
-</Title>
+<Title>Literal-literals</Title>
 
 <Para>
 <IndexTerm><Primary>Literal-literals</Primary></IndexTerm>
-</Para>
-
-<Para>
-The literal-literal argument to <Literal>&lowbar;casm&lowbar;</Literal> can be made use of separately
-from the <Literal>&lowbar;casm&lowbar;</Literal> construct itself. Indeed, we've already used it:
+The literal-literal argument to <Function>&lowbar;casm&lowbar;</Function> can be made use of separately
+from the <Function>&lowbar;casm&lowbar;</Function> construct itself. Indeed, we've already used it:
 </Para>
 
 <Para>
@@ -419,9 +415,9 @@ fooH c i d w = _ccall_ fooC (``stdin''::Addr) c i d w
 </Para>
 
 <Para>
-The first argument that's passed to <Literal>fooC</Literal> is given as a literal-literal,
+The first argument that's passed to <Function>fooC</Function> is given as a literal-literal,
 that is, a literal chunk of C code that will be inserted into the generated
-<Literal>.hc</Literal> code at the right place.
+<Filename>.hc</Filename> code at the right place.
 </Para>
 
 <Para>
@@ -447,9 +443,9 @@ make use of them in your code.
 </Para>
 
 <Para>
-When generating C (using the <Literal>-fvia-C</Literal> directive), one can assist the
-C compiler in detecting type errors by using the <Literal>-&num;include</Literal> directive
-to provide <Literal>.h</Literal> files containing function headers.
+When generating C (using the <Option>-fvia-C</Option> directive), one can assist the
+C compiler in detecting type errors by using the <Command>-&num;include</Command> directive
+to provide <Filename>.h</Filename> files containing function headers.
 </Para>
 
 <Para>
@@ -473,8 +469,8 @@ StgInt        lookupEFS (StgForeignObj a, StgInt i);
 
 <Para>
 You can find appropriate definitions for <Literal>StgInt</Literal>, <Literal>StgForeignObj</Literal>,
-etc using <Literal>gcc</Literal> on your architecture by consulting
-<Literal>ghc/includes/StgTypes.h</Literal>.  The following table summarises the
+etc using <Command>gcc</Command> on your architecture by consulting
+<Filename>ghc/includes/StgTypes.h</Filename>.  The following table summarises the
 relationship between Haskell types and C types.
 </Para>
 
@@ -574,7 +570,7 @@ solid code.  You're crazy not to do it.
 </Para>
 
 <Para>
-The arguments of a <Literal>&lowbar;ccall&lowbar;</Literal> are automatically unboxed before the
+The arguments of a <Function>&lowbar;ccall&lowbar;</Function> automatically unboxed before the
 call.  There are two reasons why this is usually the Right Thing to
 do:
 </Para>
@@ -607,8 +603,8 @@ to boxed objects are not <Emphasis>stable</Emphasis>.
 <Para>
 It is possible to subvert the unboxing process by creating a ``stable
 pointer'' to a value and passing the stable pointer instead.  For
-example, to pass/return an integer lazily to C functions <Literal>storeC</Literal> and
-<Literal>fetchC</Literal>, one might write:
+example, to pass/return an integer lazily to C functions <Function>storeC</Function> and
+<Function>fetchC</Function> might write:
 </Para>
 
 <Para>
@@ -642,14 +638,14 @@ freeStablePtr :: StablePtr a -&#62; IO ()
 </Para>
 
 <Para>
-As with the use of <Literal>free</Literal> in C programs, GREAT CARE SHOULD BE
+As with the use of <Function>free</Function> in C programs, GREAT CARE SHOULD BE
 EXERCISED to ensure these functions are called at the right time: too
 early and you get dangling references (and, if you're lucky, an error
 message from the runtime system); too late and you get space leaks.
 </Para>
 
 <Para>
-And to force evaluation of the argument within <Literal>fooC</Literal>, one would
+And to force evaluation of the argument within <Function>fooC</Function>, one would
 call one of the following C functions (according to type of argument).
 </Para>
 
@@ -670,7 +666,7 @@ StgFloat enterFloat ( StgStablePtr stableIndex /* StablePtr s Float */ );
 </Para>
 
 <Para>
-Nota Bene: <Literal>&lowbar;ccall&lowbar;GC&lowbar;</Literal><IndexTerm><Primary>&lowbar;ccall&lowbar;GC&lowbar;</Primary></IndexTerm> must be used if any of
+Nota Bene: <Function>&lowbar;ccall&lowbar;GC&lowbar;</Function><IndexTerm><Primary>&lowbar;ccall&lowbar;GC&lowbar;</Primary></IndexTerm> must be used if any of
 these functions are used.
 </Para>
 
@@ -685,7 +681,7 @@ these functions are used.
 </Para>
 
 <Para>
-There are two types that <Literal>ghc</Literal> programs can use to reference
+There are two types that GHC programs can use to reference
 (heap-allocated) objects outside the Haskell world: <Literal>Addr</Literal> and
 <Literal>ForeignObj</Literal>.
 </Para>
@@ -696,7 +692,7 @@ allocation and deallocation of the objects.
 </Para>
 
 <Para>
-If you use <Literal>ForeignObj</Literal>, <Literal>ghc</Literal>'s garbage collector will call upon the
+If you use <Literal>ForeignObj</Literal>, GHC's garbage collector will call upon the
 user-supplied <Emphasis>finaliser</Emphasis> function to free the object when the
 Haskell world no longer can access the object.  (An object is
 associated with a finaliser function when the abstract
@@ -745,15 +741,15 @@ found in the library documentation.
 </Para>
 
 <Para>
-The <Literal>&lowbar;ccall&lowbar;</Literal> construct is part of the <Literal>IO</Literal> monad because 9 out of 10
+The <Function>&lowbar;ccall&lowbar;</Function> construct is part of the <Literal>IO</Literal> monad because 9 out of 10
 uses will be to call imperative functions with side effects such as
-<Literal>printf</Literal>.  Use of the monad ensures that these operations happen in a
+<Function>printf</Function>.  Use of the monad ensures that these operations happen in a
 predictable order in spite of laziness and compiler optimisations.
 </Para>
 
 <Para>
 To avoid having to be in the monad to call a C function, it is
-possible to use <Literal>unsafePerformIO</Literal>, which is available from the
+possible to use <Function>unsafePerformIO</Function>, which is available from the
 <Literal>IOExts</Literal> module.  There are three situations where one might like to
 call a C function from outside the IO world:
 </Para>
@@ -817,7 +813,7 @@ You will almost always want to use <Literal>ForeignObj</Literal>s with this.
 
 <Para>
  Calling a side-effecting function even though the results will
-be unpredictable.  For example the <Literal>trace</Literal> function is defined by:
+be unpredictable.  For example the <Function>trace</Function> function is defined by:
 
 
 <ProgramListing>
@@ -864,32 +860,32 @@ And some advice, too.
 <ListItem>
 
 <Para>
- For modules that use <Literal>&lowbar;ccall&lowbar;</Literal>s, etc., compile with
-<Literal>-fvia-C</Literal>.<IndexTerm><Primary>-fvia-C option</Primary></IndexTerm> You don't have to, but you should.
+ For modules that use <Function>&lowbar;ccall&lowbar;</Function>s, etc., compile with
+<Option>-fvia-C</Option>.<IndexTerm><Primary>-fvia-C option</Primary></IndexTerm> You don't have to, but you should.
 
-Also, use the <Literal>-&num;include "prototypes.h"</Literal> flag (hack) to inform the C
+Also, use the <Option>-&num;include "prototypes.h"</Option> flag (hack) to inform the C
 compiler of the fully-prototyped types of all the C functions you
 call.  (<XRef LinkEnd="glasgow-foreign-headers"> says more about this&hellip;)
 
 This scheme is the <Emphasis>only</Emphasis> way that you will get <Emphasis>any</Emphasis>
-typechecking of your <Literal>&lowbar;ccall&lowbar;</Literal>s.  (It shouldn't be that way, but&hellip;).
-GHC will pass the flag <Literal>-Wimplicit</Literal> to gcc so that you'll get warnings
-if any <Literal>&lowbar;ccall&lowbar;</Literal>ed functions have no prototypes.
+typechecking of your <Function>&lowbar;ccall&lowbar;</Function>s.  (It shouldn't be that way, but&hellip;).
+GHC will pass the flag <Option>-Wimplicit</Option> to <Command>gcc</Command> so that you'll get warnings
+if any <Function>&lowbar;ccall&lowbar;</Function>ed functions have no prototypes.
 
 </Para>
 </ListItem>
 <ListItem>
 
 <Para>
-Try to avoid <Literal>&lowbar;ccall&lowbar;</Literal>s to C&nbsp;functions that take <Literal>float</Literal>
+Try to avoid <Function>&lowbar;ccall&lowbar;</Function>s to C&nbsp;functions that take <Literal>float</Literal>
 arguments or return <Literal>float</Literal> results.  Reason: if you do, you will
 become entangled in (ANSI?) C's rules for when arguments/results are
 promoted to <Literal>doubles</Literal>.  It's a nightmare and just not worth it.
 Use <Literal>doubles</Literal> if possible.
 
 If you do use <Literal>floats</Literal>, check and re-check that the right thing is
-happening.  Perhaps compile with <Literal>-keep-hc-file-too</Literal> and look at
-the intermediate C (<Literal>.hc</Literal> file).
+happening.  Perhaps compile with <Option>-keep-hc-file-too</Option> and look at
+the intermediate C (<Function>.hc</Function>).
 
 </Para>
 </ListItem>
@@ -897,8 +893,8 @@ the intermediate C (<Literal>.hc</Literal> file).
 
 <Para>
  The compiler uses two non-standard type-classes when
-type-checking the arguments and results of <Literal>&lowbar;ccall&lowbar;</Literal>: the arguments
-(respectively result) of <Literal>&lowbar;ccall&lowbar;</Literal> must be instances of the class
+type-checking the arguments and results of <Function>&lowbar;ccall&lowbar;</Function>: the arguments
+(respectively result) of <Function>&lowbar;ccall&lowbar;</Function> must be instances of the class
 <Literal>CCallable</Literal> (respectively <Literal>CReturnable</Literal>).  Both classes may be
 imported from the module <Literal>CCall</Literal>, but this should only be
 necessary if you want to define a new instance.  (Neither class
@@ -915,8 +911,8 @@ f x = _ccall_ foo x
 </ProgramListing>
 
 
-is not good enough, because the compiler can't work out what type <Literal>x</Literal>
-is, nor what type the <Literal>&lowbar;ccall&lowbar;</Literal> returns.  You have to write, say:
+is not good enough, because the compiler can't work out what type <VarName>x</VarName>
+is, nor what type the <Function>&lowbar;ccall&lowbar;</Function> returns.  You have to write, say:
 
 
 <ProgramListing>
@@ -1136,9 +1132,9 @@ your life.
 <Para>
  If you call out to C code which may trigger the Haskell garbage
 collector or create new threads (examples of this later&hellip;), then you
-must use the <Literal>&lowbar;ccall&lowbar;GC&lowbar;</Literal><IndexTerm><Primary>&lowbar;ccall&lowbar;GC&lowbar; primitive</Primary></IndexTerm> or
-<Literal>&lowbar;casm&lowbar;GC&lowbar;</Literal><IndexTerm><Primary>&lowbar;casm&lowbar;GC&lowbar; primitive</Primary></IndexTerm> variant of C-calls.  (This
-does not work with the native code generator - use <Literal>\fvia-C</Literal>.) This
+must use the <Function>&lowbar;ccall&lowbar;GC&lowbar;</Function><IndexTerm><Primary>&lowbar;ccall&lowbar;GC&lowbar; primitive</Primary></IndexTerm> or
+<Function>&lowbar;casm&lowbar;GC&lowbar;</Function><IndexTerm><Primary>&lowbar;casm&lowbar;GC&lowbar; primitive</Primary></IndexTerm> variant of C-calls.  (This
+does not work with the native code generator&mdash;use <Option>-fvia-C</Option>.) This
 stuff is hairy with a capital H!
 </Para>
 </ListItem>
@@ -1479,7 +1475,7 @@ declarations
 "overlap" if <Literal>type1</Literal> and <Literal>type2</Literal> unify
 
 However, if you give the command line option
-<Literal>-fallow-overlapping-instances</Literal><IndexTerm><Primary>-fallow-overlapping-instances
+<Option>-fallow-overlapping-instances</Option><IndexTerm><Primary>-fallow-overlapping-instances
 option</Primary></IndexTerm> then two overlapping instance declarations are permitted
 iff
 
@@ -1622,7 +1618,7 @@ instead of
 
 I'm on the lookout for a simple rule that preserves decidability while
 allowing these idioms.  The experimental flag
-<Literal>-fallow-undecidable-instances</Literal><IndexTerm><Primary>-fallow-undecidable-instances
+<Option>-fallow-undecidable-instances</Option><IndexTerm><Primary>-fallow-undecidable-instances
 option</Primary></IndexTerm> lifts this restriction, allowing all the types in an
 instance head to be type variables.
 
@@ -1692,11 +1688,11 @@ reduction terminates.
 
 Voluminous correspondence on the Haskell mailing list has convinced me
 that it's worth experimenting with a more liberal rule.  If you use
-the flag <Literal>-fallow-undecidable-instances</Literal> you can use arbitrary
+the flag <Option>-fallow-undecidable-instances</Option> can use arbitrary
 types in an instance context.  Termination is ensured by having a
 fixed-depth recursion stack.  If you exceed the stack depth you get a
 sort of backtrace, and the opportunity to increase the stack depth
-with <Literal>-fcontext-stack</Literal><Emphasis>N</Emphasis>.
+with <Option>-fcontext-stack</Option><Emphasis>N</Emphasis>.
 
 </Para>
 </ListItem>
@@ -1803,7 +1799,7 @@ MkSwizzle :: (Ord a =&#62; [a] -&#62; [a]) -&#62; Swizzle
 <Para>
 Notice that you don't need to use a <Literal>forall</Literal> if there's an
 explicit context.  For example in the first argument of the
-constructor <Literal>MkSwizzle</Literal>, an implicit "<Literal>forall a.</Literal>" is
+constructor <Function>MkSwizzle</Function>, an implicit "<Literal>forall a.</Literal>" is
 prefixed to the argument type.  The implicit <Literal>forall</Literal>
 quantifies all type variables that are not already in scope, and are
 mentioned in the type quantified over.
@@ -1859,7 +1855,7 @@ the constructor to suitable values, just as usual.  For example,
 
 <Para>
 The type of the argument can, as usual, be more general than the type
-required, as <Literal>(MkSwizzle reverse)</Literal> shows.  (<Literal>reverse</Literal>
+required, as <Literal>(MkSwizzle reverse)</Literal> shows.  (<Function>reverse</Function>
 does not need the <Literal>Ord</Literal> constraint.)
 </Para>
 
@@ -1892,7 +1888,7 @@ polymorphic types.  For example:
 </Para>
 
 <Para>
-In the function <Literal>h</Literal> we use the record selectors <Literal>return</Literal>
+In the function <Function>h</Function> we use the record selectors <Literal>return</Literal>
 and <Literal>bind</Literal> to extract the polymorphic bind and return functions
 from the <Literal>MonadT</Literal> data structure, rather than using pattern
 matching.
@@ -1968,7 +1964,7 @@ expression is OK:
 </Para>
 
 <Para>
-even though it involves a partial application of <Literal>T1</Literal>, because
+even though it involves a partial application of <Function>T1</Function>, because
 the sub-expression <Literal>T1 (\a b -&#62; a)</Literal> has type <Literal>Int -&#62; T
 Int</Literal>.
 </Para>
@@ -1981,7 +1977,7 @@ Int</Literal>.
 
 <Para>
 Once you have data constructors with universally-quantified fields, or
-constants such as <Literal>runST</Literal> that have rank-2 types, it isn't long
+constants such as <Constant>runST</Constant> that have rank-2 types, it isn't long
 before you discover that you need more!  Consider:
 </Para>
 
@@ -1994,13 +1990,13 @@ before you discover that you need more!  Consider:
 </Para>
 
 <Para>
-<Literal>mkTs</Literal> is a fuction that constructs some values of type
+<Function>mkTs</Function> is a fuction that constructs some values of type
 <Literal>T</Literal>, using some pieces passed to it.  The trouble is that since
 <Literal>f</Literal> is a function argument, Haskell assumes that it is
-monomorphic, so we'll get a type error when applying <Literal>T1</Literal> to
+monomorphic, so we'll get a type error when applying <Function>T1</Function> to
 it.  This is a rather silly example, but the problem really bites in
 practice.  Lots of people trip over the fact that you can't make
-"wrappers functions" for <Literal>runST</Literal> for exactly the same reason.
+"wrappers functions" for <Constant>runST</Constant> for exactly the same reason.
 In short, it is impossible to build abstractions around functions with
 rank-2 types.
 </Para>
@@ -2023,8 +2019,8 @@ constructors), thus:
 <Para>
 This type signature tells the compiler to attribute <Literal>f</Literal> with
 the polymorphic type <Literal>(forall b. b -&#62; b -&#62; b)</Literal> when type
-checking the body of <Literal>mkTs</Literal>, so now the application of
-<Literal>T1</Literal> is fine.
+checking the body of <Function>mkTs</Function>, so now the application of
+<Function>T1</Function> is fine.
 </Para>
 
 <Para>
@@ -2042,10 +2038,10 @@ grammar:
 
 
 <ProgramListing>
-   rank2type ::= [forall tyvars .] [context =&#62;] funty
-   funty     ::= ([forall tyvars .] [context =&#62;] ty) -&#62; funty
-               | ty
-   ty        ::= ...current Haskell monotype syntax...
+rank2type ::= [forall tyvars .] [context =&#62;] funty
+funty     ::= ([forall tyvars .] [context =&#62;] ty) -&#62; funty
+            | ty
+ty        ::= ...current Haskell monotype syntax...
 </ProgramListing>
 
 
@@ -2060,12 +2056,12 @@ or at the top level of a function argument.
  There is a restriction on the definition of a function whose
 type signature is a rank-2 type: the polymorphic arguments must be
 matched on the left hand side of the "<Literal>=</Literal>" sign.  You can't
-define <Literal>mkTs</Literal> like this:
+define <Function>mkTs</Function> like this:
 
 
 <ProgramListing>
-  mkTs :: (forall b. b -&#62; b -&#62; b) -&#62; a -&#62; [T a]
-  mkTs = \ f x y -&#62; [T1 f x, T1 f y]
+mkTs :: (forall b. b -&#62; b -&#62; b) -&#62; a -&#62; [T a]
+mkTs = \ f x y -&#62; [T1 f x, T1 f y]
 </ProgramListing>
 
 
@@ -2092,7 +2088,7 @@ rank-2 types as applied to data constructors.
 The idea of using existential quantification in data type declarations
 was suggested by Laufer (I believe, thought doubtless someone will
 correct me), and implemented in Hope+. It's been in Lennart
-Augustsson's <Literal>hbc</Literal> Haskell compiler for several years, and
+Augustsson's <Command>hbc</Command> Haskell compiler for several years, and
 proved very useful.  Here's the idea.  Consider the declaration:
 </Para>
 
@@ -2119,7 +2115,7 @@ The data type <Literal>Foo</Literal> has two constructors with types:
 </Para>
 
 <Para>
-Notice that the type variable <Literal>a</Literal> in the type of <Literal>MkFoo</Literal>
+Notice that the type variable <Literal>a</Literal> in the type of <Function>MkFoo</Function>
 does not appear in the data type itself, which is plain <Literal>Foo</Literal>.
 For example, the following expression is fine:
 </Para>
@@ -2134,14 +2130,14 @@ For example, the following expression is fine:
 
 <Para>
 Here, <Literal>(MkFoo 3 even)</Literal> packages an integer with a function
-<Literal>even</Literal> that maps an integer to <Literal>Bool</Literal>; and <Literal>MkFoo 'c'
-isUpper</Literal> packages a character with a compatible function.  These
+<Function>even</Function> that maps an integer to <Literal>Bool</Literal>; and <Function>MkFoo 'c'
+isUpper</Function> packages a character with a compatible function.  These
 two things are each of type <Literal>Foo</Literal> and can be put in a list.
 </Para>
 
 <Para>
 What can we do with a value of type <Literal>Foo</Literal>?.  In particular,
-what happens when we pattern-match on <Literal>MkFoo</Literal>?
+what happens when we pattern-match on <Function>MkFoo</Function>?
 </Para>
 
 <Para>
@@ -2153,9 +2149,9 @@ what happens when we pattern-match on <Literal>MkFoo</Literal>?
 </Para>
 
 <Para>
-Since all we know about <Literal>val</Literal> and <Literal>fn</Literal> is that they
+Since all we know about <Literal>val</Literal> and <Function>fn</Function> is that they
 are compatible, the only (useful) thing we can do with them is to
-apply <Literal>fn</Literal> to <Literal>val</Literal> to get a boolean.  For example:
+apply <Function>fn</Function> to <Literal>val</Literal> to get a boolean.  For example:
 </Para>
 
 <Para>
@@ -2180,7 +2176,7 @@ quite a bit of object-oriented-like programming this way.
 
 <Para>
 What has this to do with <Emphasis>existential</Emphasis> quantification?
-Simply that <Literal>MkFoo</Literal> has the (nearly) isomorphic type
+Simply that <Function>MkFoo</Function> has the (nearly) isomorphic type
 </Para>
 
 <Para>
@@ -2203,15 +2199,15 @@ adding a new existential quantification construct.
 <Title>Type classes</Title>
 
 <Para>
-An easy extension (implemented in <Literal>hbc</Literal>) is to allow
+An easy extension (implemented in <Command>hbc</Command>) is to allow
 arbitrary contexts before the constructor.  For example:
 </Para>
 
 <Para>
 
 <ProgramListing>
-  data Baz = forall a. Eq a =&#62; Baz1 a a
-           | forall b. Show b =&#62; Baz2 b (b -&#62; b)
+data Baz = forall a. Eq a =&#62; Baz1 a a
+         | forall b. Show b =&#62; Baz2 b (b -&#62; b)
 </ProgramListing>
 
 </Para>
@@ -2223,15 +2219,15 @@ The two constructors have the types you'd expect:
 <Para>
 
 <ProgramListing>
-  Baz1 :: forall a. Eq a =&#62; a -&#62; a -&#62; Baz
-  Baz2 :: forall b. Show b =&#62; b -&#62; (b -&#62; b) -&#62; Baz
+Baz1 :: forall a. Eq a =&#62; a -&#62; a -&#62; Baz
+Baz2 :: forall b. Show b =&#62; b -&#62; (b -&#62; b) -&#62; Baz
 </ProgramListing>
 
 </Para>
 
 <Para>
-But when pattern matching on <Literal>Baz1</Literal> the matched values can be compared
-for equality, and when pattern matching on <Literal>Baz2</Literal> the first matched
+But when pattern matching on <Function>Baz1</Function> the matched values can be compared
+for equality, and when pattern matching on <Function>Baz2</Function> the first matched
 value can be converted to a string (as well as applying the function to it).
 So this program is legal:
 </Para>
@@ -2249,7 +2245,7 @@ So this program is legal:
 
 <Para>
 Operationally, in a dictionary-passing implementation, the
-constructors <Literal>Baz1</Literal> and <Literal>Baz2</Literal> must store the
+constructors <Function>Baz1</Function> and <Function>Baz2</Function> must store the
 dictionaries for <Literal>Eq</Literal> and <Literal>Show</Literal> respectively, and
 extract it on pattern matching.
 </Para>
@@ -2282,13 +2278,13 @@ the pattern match.  For example, these fragments are incorrect:
 
 
 <ProgramListing>
-  f1 (MkFoo a f) = a
+f1 (MkFoo a f) = a
 </ProgramListing>
 
 
-Here, the type bound by <Literal>MkFoo</Literal> "escapes", because <Literal>a</Literal>
-is the result of <Literal>f1</Literal>.  One way to see why this is wrong is to
-ask what type <Literal>f1</Literal> has:
+Here, the type bound by <Function>MkFoo</Function> "escapes", because <Literal>a</Literal>
+is the result of <Function>f1</Function>.  One way to see why this is wrong is to
+ask what type <Function>f1</Function> has:
 
 
 <ProgramListing>
@@ -2315,7 +2311,7 @@ The original program is just plain wrong.  Here's another sort of error
 
 It's ok to say <Literal>a==b</Literal> or <Literal>p==q</Literal>, but
 <Literal>a==q</Literal> is wrong because it equates the two distinct types arising
-from the two <Literal>Baz1</Literal> constructors.
+from the two <Function>Baz1</Function> constructors.
 
 
 </Para>
@@ -2383,18 +2379,18 @@ data type with existentially quantified data constructors.
 Reason: in most cases it would not make sense. For example:&num;
 
 <ProgramListing>
-  data T = forall a. MkT [a] deriving( Eq )
+data T = forall a. MkT [a] deriving( Eq )
 </ProgramListing>
 
 To derive <Literal>Eq</Literal> in the standard way we would need to have equality
-between the single component of two <Literal>MkT</Literal> constructors:
+between the single component of two <Function>MkT</Function> constructors:
 
 <ProgramListing>
-  instance Eq T where
-    (MkT a) == (MkT b) = ???
+instance Eq T where
+  (MkT a) == (MkT b) = ???
 </ProgramListing>
 
-But <Literal>a</Literal> and <Literal>b</Literal> have distinct types, and so can't be compared.
+But <VarName>a</VarName> and <VarName>b</VarName> have distinct types, and so can't be compared.
 It's just about possible to imagine examples in which the derived instance
 would make sense, but it seems altogether simpler simply to prohibit such
 declarations.  Define your own instances!
@@ -2435,15 +2431,15 @@ an assertion failed, but which and where?
 </Para>
 
 <Para>
-One way out is to define an extended <Literal>assert</Literal> function which also
+One way out is to define an extended <Function>assert</Function> function which also
 takes a descriptive string to include in the error message and
 perhaps combine this with the use of a pre-processor which inserts
-the source location where <Literal>assert</Literal> was used.
+the source location where <Function>assert</Function> was used.
 </Para>
 
 <Para>
 Ghc offers a helping hand here, doing all of this for you. For every
-use of <Literal>assert</Literal> in the user's source:
+use of <Function>assert</Function> in the user's source:
 </Para>
 
 <Para>
@@ -2470,14 +2466,14 @@ assert pred val ==&#62; assertError "Main.hs|15" pred val
 
 <Para>
 The rewrite is only performed by the compiler when it spots
-applications of <Literal>Exception.assert</Literal>, so you can still define and
-use your own versions of <Literal>assert</Literal>, should you so wish. If not,
-import <Literal>Exception</Literal> to make use <Literal>assert</Literal> in your code.
+applications of <Function>Exception.assert</Function>, so you can still define and
+use your own versions of <Function>assert</Function>, should you so wish. If not,
+import <Literal>Exception</Literal> to make use <Function>assert</Function> in your code.
 </Para>
 
 <Para>
 To have the compiler ignore uses of assert, use the compiler option
-<Literal>-fignore-asserts</Literal>. <IndexTerm><Primary>-fignore-asserts option</Primary></IndexTerm> That is,
+<Option>-fignore-asserts</Option>. <IndexTerm><Primary>-fignore-asserts option</Primary></IndexTerm> That is,
 expressions of the form <Literal>assert pred e</Literal> will be rewritten to <Literal>e</Literal>.
 </Para>
 
@@ -2509,21 +2505,21 @@ f (xs::[a]) = ys ++ ys
 </Para>
 
 <Para>
-The pattern <Literal>(xs::[a])</Literal> includes a type signature for <Literal>xs</Literal>.
+The pattern <Literal>(xs::[a])</Literal> includes a type signature for <VarName>xs</VarName>.
 This brings the type variable <Literal>a</Literal> into scope; it scopes over
-all the patterns and right hand sides for this equation for <Literal>f</Literal>.
-In particular, it is in scope at the type signature for <Literal>y</Literal>.
+all the patterns and right hand sides for this equation for <Function>f</Function>.
+In particular, it is in scope at the type signature for <VarName>y</VarName>.
 </Para>
 
 <Para>
-At ordinary type signatures, such as that for <Literal>ys</Literal>, any type variables
+At ordinary type signatures, such as that for <VarName>ys</VarName>, any type variables
 mentioned in the type signature <Emphasis>that are not in scope</Emphasis> are
 implicitly universally quantified.  (If there are no type variables in
 scope, all type variables mentioned in the signature are universally
-quantified, which is just as in Haskell 98.)  In this case, since <Literal>a</Literal>
-is in scope, it is not universally quantified, so the type of <Literal>ys</Literal> is
-the same as that of <Literal>xs</Literal>.  In Haskell 98 it is not possible to declare
-a type for <Literal>ys</Literal>; a major benefit of scoped type variables is that
+quantified, which is just as in Haskell 98.)  In this case, since <VarName>a</VarName>
+is in scope, it is not universally quantified, so the type of <VarName>ys</VarName> is
+the same as that of <VarName>xs</VarName>.  In Haskell 98 it is not possible to declare
+a type for <VarName>ys</VarName>; a major benefit of scoped type variables is that
 it becomes possible to do so.
 </Para>
 
@@ -2583,7 +2579,7 @@ into scope (except in the type signature itself!). So this is illegal:
 </ProgramListing>
 
 
-It's illegal because <Literal>a</Literal> is not in scope in the body of <Literal>f</Literal>,
+It's illegal because <VarName>a</VarName> is not in scope in the body of <Function>f</Function>,
 so the ordinary signature <Literal>x::a</Literal> is equivalent to <Literal>x::forall a.a</Literal>;
 and that is an incorrect typing.
 
@@ -2742,7 +2738,7 @@ thus:
 </ProgramListing>
 
 
-The final <Literal>":: [a]"</Literal> after all the patterns gives a signature to the
+The final <Literal>:: [a]</Literal> after all the patterns gives a signature to the
 result type.  Sometimes this is the only way of naming the type variable
 you want:
 
@@ -2810,9 +2806,9 @@ For example:
 </ProgramListing>
 
 
-Here, <Literal>f1</Literal> is OK, but <Literal>f2</Literal> is not, because <Literal>c</Literal> gets unified
+Here, <Function>f1</Function> is OK, but <Function>f2</Function> is not, because <VarName>c</VarName> gets unified
 with a type variable free in the environment, in this
-case, the type of <Literal>f2</Literal>, which is in the environment when
+case, the type of <Function>f2</Function>, which is in the environment when
 the lambda abstraction is checked.
 
 </Para>
@@ -2918,8 +2914,8 @@ restriction.  Thus:
 </Para>
 
 <Para>
-Here <Literal>g</Literal> has type <Literal>forall a. Eq a =&gt; a -&gt; a -&gt; Bool</Literal>, just as if
-<Literal>g</Literal> had a separate type signature.  Lacking a type signature, <Literal>g</Literal>
+Here <Function>g</Function> has type <Literal>forall a. Eq a =&gt; a -&gt; a -&gt; Bool</Literal>, just as if
+<Function>g</Function> had a separate type signature.  Lacking a type signature, <Function>g</Function>
 would get a monomorphic type.
 </Para>
 
@@ -2976,7 +2972,7 @@ but they might affect the efficiency of the generated code.
 <IndexTerm><Primary>pragma, INLINE</Primary></IndexTerm></Title>
 
 <Para>
-GHC (with <Literal>-O</Literal>, as always) tries to inline (or ``unfold'')
+GHC (with <Option>-O</Option>, as always) tries to inline (or ``unfold'')
 functions/values that are ``small enough,'' thus avoiding the call
 overhead and possibly exposing other more-wonderful optimisations.
 </Para>
@@ -3094,8 +3090,8 @@ the specialised value, by adding <Literal>= blah</Literal>, as in:
 {-# SPECIALIZE hammeredLookup :: ...as before... = blah #-}
 </ProgramListing>
 
-It's <Emphasis>Your Responsibility</Emphasis> to make sure that <Literal>blah</Literal> really
-behaves as a specialised version of <Literal>hammeredLookup</Literal>!!!
+It's <Emphasis>Your Responsibility</Emphasis> to make sure that <Function>blah</Function> really
+behaves as a specialised version of <Function>hammeredLookup</Function>!!!
 </Para>
 
 <Para>
@@ -3113,7 +3109,7 @@ toDouble = fromRational . toRational
 i2d (I# i) = D# (int2Double# i) -- uses Glasgow prim-op directly
 </ProgramListing>
 
-The <Literal>i2d</Literal> function is virtually one machine instruction; the
+The <Function>i2d</Function> function is virtually one machine instruction; the
 default conversion&mdash;via an intermediate <Literal>Rational</Literal>&mdash;is obscenely
 expensive by comparison.
 </Para>
@@ -3174,7 +3170,7 @@ number and filename of the original code; for example
 </Para>
 
 <Para>
-if you'd generated the current file from something called <Literal>Foo.vhs</Literal>
+if you'd generated the current file from something called <Filename>Foo.vhs</Filename>
 and this line corresponds to line 42 in the original.  GHC will adjust
 its error messages to refer to the line/file named in the <Literal>LINE</Literal>
 pragma.
@@ -3248,8 +3244,8 @@ enclosing definitions.
 <ListItem>
 
 <Para>
- Each variable mentioned in a rule must either be in scope (e.g. <Literal>map</Literal>),
-or bound by the <Literal>forall</Literal> (e.g. <Literal>f</Literal>, <Literal>g</Literal>, <Literal>xs</Literal>).  The variables bound by
+ Each variable mentioned in a rule must either be in scope (e.g. <Function>map</Function>),
+or bound by the <Literal>forall</Literal> (e.g. <Function>f</Function>, <Function>g</Function>, <Function>xs</Function>).  The variables bound by
 the <Literal>forall</Literal> are called the <Emphasis>pattern</Emphasis> variables.  They are separated
 by spaces, just like in a type <Literal>forall</Literal>.
 </Para>
@@ -3262,23 +3258,23 @@ If the type of the pattern variable is polymorphic, it <Emphasis>must</Emphasis>
 For example, here is the <Literal>foldr/build</Literal> rule:
 
 <ProgramListing>
-  "fold/build"  forall k z (g::forall b. (a-&#62;b-&#62;b) -&#62; b -&#62; b) .
-                foldr k z (build g) = g k z
+"fold/build"  forall k z (g::forall b. (a-&#62;b-&#62;b) -&#62; b -&#62; b) .
+              foldr k z (build g) = g k z
 </ProgramListing>
 
-Since <Literal>g</Literal> has a polymorphic type, it must have a type signature.
+Since <Function>g</Function> has a polymorphic type, it must have a type signature.
 
 </Para>
 </ListItem>
 <ListItem>
 
 <Para>
- The left hand side of a rule must consist of a top-level variable applied
+The left hand side of a rule must consist of a top-level variable applied
 to arbitrary expressions.  For example, this is <Emphasis>not</Emphasis> OK:
 
 <ProgramListing>
-  "wrong1"   forall e1 e2.  case True of { True -&#62; e1; False -&#62; e2 } = e1
-  "wrong2"   forall f.      f True = True
+"wrong1"   forall e1 e2.  case True of { True -&#62; e1; False -&#62; e2 } = e1
+"wrong2"   forall f.      f True = True
 </ProgramListing>
 
 In <Literal>"wrong1"</Literal>, the LHS is not an application; in <Literal>"wrong1"</Literal>, the LHS has a pattern variable
@@ -3315,12 +3311,11 @@ From a semantic point of view:
 <ListItem>
 
 <Para>
- Rules are only applied if you use the <Literal>-O</Literal> flag.
-
+Rules are only applied if you use the <Option>-O</Option> flag.
 </Para>
 </ListItem>
-<ListItem>
 
+<ListItem>
 <Para>
  Rules are regarded as left-to-right rewrite rules.
 When GHC finds an expression that is a substitution instance of the LHS
@@ -3398,8 +3393,8 @@ For example, consider:
 </ProgramListing>
 
 The expression <Literal>s (t xs)</Literal> does not match the rule <Literal>"map/map"</Literal>, but GHC
-will substitute for <Literal>s</Literal> and <Literal>t</Literal>, giving an expression which does match.
-If <Literal>s</Literal> or <Literal>t</Literal> was (a) used more than once, and (b) large or a redex, then it would
+will substitute for <VarName>s</VarName> and <VarName>t</VarName>, giving an expression which does match.
+If <VarName>s</VarName> or <VarName>t</VarName> was (a) used more than once, and (b) large or a redex, then it would
 not be substituted, and the rule would not fire.
 
 </Para>
@@ -3421,20 +3416,20 @@ It will only match something written with explicit use of ".".
 Well, not quite.  It <Emphasis>will</Emphasis> match the expression
 
 <ProgramListing>
-        wibble f g xs
+wibble f g xs
 </ProgramListing>
 
-where <Literal>wibble</Literal> is defined:
+where <Function>wibble</Function> is defined:
 
 <ProgramListing>
-        wibble f g = map f . map g
+wibble f g = map f . map g
 </ProgramListing>
 
-because <Literal>wibble</Literal> will be inlined (it's small).
+because <Function>wibble</Function> will be inlined (it's small).
 
 Later on in compilation, GHC starts inlining even things on the
 LHS of rules, but still leaves the rules enabled.  This inlining
-policy is controlled by the per-simplification-pass flag <Literal>-finline-phase</Literal>n.
+policy is controlled by the per-simplification-pass flag <Option>-finline-phase</Option><Emphasis>n</Emphasis>.
 
 </Para>
 </ListItem>
@@ -3495,31 +3490,31 @@ The following are good producers:
 <ListItem>
 
 <Para>
- <Literal>++</Literal>
+ <Function>++</Function>
 </Para>
 </ListItem>
 <ListItem>
 
 <Para>
- <Literal>map</Literal>
+ <Function>map</Function>
 </Para>
 </ListItem>
 <ListItem>
 
 <Para>
- <Literal>filter</Literal>
+ <Function>filter</Function>
 </Para>
 </ListItem>
 <ListItem>
 
 <Para>
- <Literal>iterate</Literal>, <Literal>repeat</Literal>
+ <Function>iterate</Function>, <Function>repeat</Function>
 </Para>
 </ListItem>
 <ListItem>
 
 <Para>
- <Literal>zip</Literal>, <Literal>zipWith</Literal>
+ <Function>zip</Function>, <Function>zipWith</Function>
 </Para>
 </ListItem>
 
@@ -3540,86 +3535,86 @@ The following are good consumers:
 <ListItem>
 
 <Para>
- <Literal>array</Literal> (on its second argument)
+ <Function>array</Function> (on its second argument)
 </Para>
 </ListItem>
 <ListItem>
 
 <Para>
- <Literal>length</Literal>
+ <Function>length</Function>
 </Para>
 </ListItem>
 <ListItem>
 
 <Para>
- <Literal>++</Literal> (on its first argument)
+ <Function>++</Function> (on its first argument)
 </Para>
 </ListItem>
 <ListItem>
 
 <Para>
- <Literal>map</Literal>
+ <Function>map</Function>
 </Para>
 </ListItem>
 <ListItem>
 
 <Para>
- <Literal>filter</Literal>
+ <Function>filter</Function>
 </Para>
 </ListItem>
 <ListItem>
 
 <Para>
- <Literal>concat</Literal>
+ <Function>concat</Function>
 </Para>
 </ListItem>
 <ListItem>
 
 <Para>
- <Literal>unzip</Literal>, <Literal>unzip2</Literal>, <Literal>unzip3</Literal>, <Literal>unzip4</Literal>
+ <Function>unzip</Function>, <Function>unzip2</Function>, <Function>unzip3</Function>, <Function>unzip4</Function>
 </Para>
 </ListItem>
 <ListItem>
 
 <Para>
- <Literal>zip</Literal>, <Literal>zipWith</Literal> (but on one argument only; if both are good producers, <Literal>zip</Literal>
+ <Function>zip</Function>, <Function>zipWith</Function> (but on one argument only; if both are good producers, <Function>zip</Function>
 will fuse with one but not the other)
 </Para>
 </ListItem>
 <ListItem>
 
 <Para>
- <Literal>partition</Literal>
+ <Function>partition</Function>
 </Para>
 </ListItem>
 <ListItem>
 
 <Para>
- <Literal>head</Literal>
+ <Function>head</Function>
 </Para>
 </ListItem>
 <ListItem>
 
 <Para>
- <Literal>and</Literal>, <Literal>or</Literal>, <Literal>any</Literal>, <Literal>all</Literal>
+ <Function>and</Function>, <Function>or</Function>, <Function>any</Function>, <Function>all</Function>
 </Para>
 </ListItem>
 <ListItem>
 
 <Para>
- <Literal>sequence&lowbar;</Literal>
+ <Function>sequence&lowbar;</Function>
 </Para>
 </ListItem>
 <ListItem>
 
 <Para>
- <Literal>msum</Literal>
+ <Function>msum</Function>
 </Para>
 </ListItem>
 <ListItem>
 
 <Para>
- <Literal>sortBy</Literal>
+ <Function>sortBy</Function>
 </Para>
 </ListItem>
 
@@ -3631,7 +3626,7 @@ will fuse with one but not the other)
 So, for example, the following should generate no intermediate lists:
 
 <ProgramListing>
-        array (1,10) [(i,i*i) | i &#60;- map (+ 1) [0..9]]
+array (1,10) [(i,i*i) | i &#60;- map (+ 1) [0..9]]
 </ProgramListing>
 
 </Para>
@@ -3660,10 +3655,10 @@ present in earlier version of GHC:
   {-# SPECIALIZE fromIntegral :: Int8 -&#62; Int16 = int8ToInt16 #-}
 </ProgramListing>
 
-This told GHC to use <Literal>int8ToInt16</Literal> instead of <Literal>fromIntegral</Literal> whenever
+This told GHC to use <Function>int8ToInt16</Function> instead of <Function>fromIntegral</Function> whenever
 the latter was called with type <Literal>Int8 -&gt; Int16</Literal>.  That is, rather than
-specialising the original definition of <Literal>fromIntegral</Literal> the programmer is
-promising that it is safe to use <Literal>int8ToInt16</Literal> instead.
+specialising the original definition of <Function>fromIntegral</Function> the programmer is
+promising that it is safe to use <Function>int8ToInt16</Function> instead.
 </Para>
 
 <Para>
@@ -3671,18 +3666,18 @@ This feature is no longer in GHC.  But rewrite rules let you do the
 same thing:
 
 <ProgramListing>
-  {-# RULES
-    "fromIntegral/Int8/Int16" fromIntegral = int8ToInt16
-  #-}
+{-# RULES
+  "fromIntegral/Int8/Int16" fromIntegral = int8ToInt16
+#-}
 </ProgramListing>
 
-This slightly odd-looking rule instructs GHC to replace <Literal>fromIntegral</Literal>
-by <Literal>int8ToInt16</Literal> <Emphasis>whenever the types match</Emphasis>.  Speaking more operationally,
+This slightly odd-looking rule instructs GHC to replace <Function>fromIntegral</Function>
+by <Function>int8ToInt16</Function> <Emphasis>whenever the types match</Emphasis>.  Speaking more operationally,
 GHC adds the type and dictionary applications to get the typed rule
 
 <ProgramListing>
-        forall (d1::Integral Int8) (d2::Num Int16) .
-                fromIntegral Int8 Int16 d1 d2 = int8ToInt16
+forall (d1::Integral Int8) (d2::Num Int16) .
+        fromIntegral Int8 Int16 d1 d2 = int8ToInt16
 </ProgramListing>
 
 What is more,
@@ -3702,20 +3697,20 @@ have an original definition available to specialise).
 <ListItem>
 
 <Para>
- Use <Literal>-ddump-rules</Literal> to see what transformation rules GHC is using.
+ Use <Option>-ddump-rules</Option> to see what transformation rules GHC is using.
 </Para>
 </ListItem>
 <ListItem>
 
 <Para>
- Use <Literal>-ddump-simpl-stats</Literal> to see what rules are being fired.
-If you add <Literal>-dppr-debug</Literal> you get a more detailed listing.
+ Use <Option>-ddump-simpl-stats</Option> to see what rules are being fired.
+If you add <Option>-dppr-debug</Option> you get a more detailed listing.
 </Para>
 </ListItem>
 <ListItem>
 
 <Para>
- The defintion of (say) <Literal>build</Literal> in <Literal>PrelBase.lhs</Literal> looks llike this:
+ The defintion of (say) <Function>build</Function> in <FileName>PrelBase.lhs</FileName> looks llike this:
 
 <ProgramListing>
         build   :: forall a. (forall b. (a -&#62; b -&#62; b) -&#62; b -&#62; b) -&#62; [a]
@@ -3733,9 +3728,9 @@ in the RHS of the <Literal>INLINE</Literal> thing.  I regret the delicacy of thi
 <ListItem>
 
 <Para>
- In <Literal>ghc/lib/std/PrelBase.lhs</Literal> look at the rules for <Literal>map</Literal> to
+ In <Filename>ghc/lib/std/PrelBase.lhs</Filename> look at the rules for <Function>map</Function> to
 see how to write rules that will do fusion and yet give an efficient
-program even if fusion doesn't happen.  More rules in <Literal>PrelList.lhs</Literal>.
+program even if fusion doesn't happen.  More rules in <Filename>PrelList.lhs</Filename>.
 </Para>
 </ListItem>
 

@@ -49,14 +49,14 @@ sizeofByteArray    :: Ix ix =&#62; ByteArray ix -&#62; Int
 <ListItem>
 
 <Para>
-The operation <Literal>newByteArray</Literal> creates a byte array of length
+The operation <Function>newByteArray</Function> creates a byte array of length
 equal to the range of its indices <Emphasis>in bytes</Emphasis>.
 </Para>
 </ListItem>
 <ListItem>
 
 <Para>
-<Literal>sizeofByteArray</Literal> returns the size of the byte array, <Emphasis>in bytes</Emphasis>.
+<Function>sizeofByteArray</Function> returns the size of the byte array, <Emphasis>in bytes</Emphasis>.
 
 </Para>
 </ListItem>

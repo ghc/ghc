@@ -13,21 +13,21 @@
 <ItemizedList>
 <ListItem>
 <Para>
-Finalise is now spelt finalize in all function names.
+``Finalise'' is now spelt ``finalize'' in all function names.
 </Para>
 </ListItem>
 
 <ListItem>
 <Para>
-<Literal>finalize</Literal> now runs the finalizer immediately, and
+<Function>finalize</Function> now runs the finalizer immediately, and
 waits for it to complete before returning.
 </Para>
 </ListItem>
 
 <ListItem>
 <Para>
-<Literal>mkWeak</Literal> now takes a <Literal>Maybe (IO ())</Literal> for the finalizer,
-and <Literal>mkWeakNoFinalizer</Literal> is removed.
+<Function>mkWeak</Function> now takes a <Literal>Maybe (IO ())</Literal> for the finalizer,
+and <Function>mkWeakNoFinalizer</Function> is removed.
 </Para>
 </ListItem>
 
@@ -46,8 +46,8 @@ thing.
 <Para>
 Changed representation of <Literal>Integer</Literal> type to speed up
 computations on small integers.  The performance of <Literal>Integer</Literal> is now
-only slightly slower than <Literal>Int</Literal> for values between <Literal>minBound::Int</Literal>
-and <Literal>maxBound::Int</Literal>.
+only slightly slower than <Literal>Int</Literal> for values between <Constant>minBound::Int</Constant>
+and <Constant>maxBound::Int</Constant>.
 </Para>
 </ListItem>
 
@@ -60,21 +60,21 @@ link libraries (DLLs) containing ghc-compiled code.
 
 <ListItem>
 <Para>
-Added <Literal>-funbox-strict-fields</Literal> for unboxing/unpacking strict
+Added <Option>-funbox-strict-fields</Option> for unboxing/unpacking strict
 constructor fields.
 </Para>
 </ListItem>
 
 <ListItem>
 <Para>
-GHC now has a license!  Check out <Literal>fptools/ghc/LICENSE/</Literal>.
+GHC now has a license!  See <XRef LinkEnd="License">.
 </Para>
 </ListItem>
 
 <ListItem>
 <Para>
 Added CPR analysis, which reduces allocation by unboxing function results
-(thanks to Kevin Glynn <Literal>&lt;keving@cs.mu.OZ.AU&gt;</Literal>).
+(thanks to Kevin Glynn <Email>keving@cs.mu.oz.au</Email>).
 </Para>
 </ListItem>
 
@@ -105,13 +105,13 @@ Fixed several Haskell 98 non-conformance issues in the process.
 
 <ListItem>
 <Para>
-Added <Literal>Concurrent.yield :: IO ()</Literal>.
+Added <Function>Concurrent.yield :: IO ()</Function>.
 </Para>
 </ListItem>
 
 <ListItem>
 <Para>
-Added RULES pragms&mdash;transformation rules for Haskell source.
+Added <Literal>RULES</Literal> pragma&mdash;transformation rules for Haskell source.
 This is used for list fusion: now intermediate lists between map,
 foldr, list comprehensions are removed automatically.
 </Para>
@@ -132,7 +132,7 @@ compilers.
 
 <ListItem>
 <Para>
-GHC now defines <Literal>&lowbar;&lowbar;HASKELL98&lowbar;&lowbar;</Literal> when compiling files with <Literal>-cpp</Literal>.
+GHC now defines <Literal>&lowbar;&lowbar;HASKELL98&lowbar;&lowbar;</Literal> when compiling files with <Option>-cpp</Option>.
 </Para>
 </ListItem>
 
@@ -145,47 +145,48 @@ GHC now defines <Literal>&lowbar;&lowbar;HASKELL98&lowbar;&lowbar;</Literal> whe
 <ListItem>
 <Para>
 New operations for unsafely thawing byte arrays:
-<Literal>unsafeThaw&lcub;Byte,ST,IO&rcub;Array</Literal>.
+<Function>unsafeThaw&lcub;Byte,ST,IO&rcub;Array</Function>.
 </Para>
 </ListItem>
 
 <ListItem>
 <Para>
-<Literal>mkdependHS</Literal> now lives in GHC's lib directory, not the
+<Command>mkdependHS</Command> now lives in GHC's lib directory, not the
 binary directory.  It isn't intended to be run standalone, only via
-<Literal>ghc -M</Literal>.
+<Command>ghc -M</Command>.
 </Para>
 </ListItem>
 
 <ListItem>
 <Para>
-Asynchronous exceptions are now supported (see <XRef LinkEnd="concurrent-interface">).  New operations:
+Asynchronous exceptions are now supported (see the libary documentation for Concurrent Haskell).  New operations:
+<!-- Want to add external ref here -->
 
 <ItemizedList>
 
 <ListItem>
 <Para>
-<Literal>Exception.killThread</Literal> now raises an exception 
-(<Literal>AsyncException.KilledThread</Literal>) in the killed thread.
+<Function>Exception.killThread</Function> now raises an exception 
+(<Function>AsyncException.KilledThread</Function>) in the killed thread.
 </Para>
 </ListItem>
 
 <ListItem>
 <Para>
-<Literal>Exception.raiseInThread</Literal> allows a thread to raise an
+<Function>Exception.raiseInThread</Function> allows a thread to raise an
 exception in another thread.
 </Para>
 </ListItem>
 
 <ListItem>
 <Para>
-<Literal>Concurrent.myThreadId</Literal> returns the <Literal>ThreadId</Literal> of the calling thread.
+<Function>Concurrent.myThreadId</Function> returns the <Literal>ThreadId</Literal> of the calling thread.
 </Para>
 </ListItem>
 
 <ListItem>
 <Para>
-Stack overflow results in <Literal>AsyncException.StackOverflow</Literal>
+Stack overflow results in <Constant>AsyncException.StackOverflow</Constant>
 being raised in the offending thread.
 </Para>
 </ListItem>
@@ -197,7 +198,7 @@ being raised in the offending thread.
 
 <ListItem>
 <Para>
-Assertion failures now raise an <Literal>AssertionFailed</Literal> exception.
+Assertion failures now raise an <Constant>AssertionFailed</Constant> exception.
 </Para>
 </ListItem>
 
@@ -209,19 +210,19 @@ Added simple high-level interface to the Regex library, see <XRef LinkEnd="Regex
 
 <ListItem>
 <Para>
-<Literal>forkIO</Literal> now handles any uncaught exceptions cleanly.
+<Function>forkIO</Function> now handles any uncaught exceptions cleanly.
 </Para>
 </ListItem>
 
 <ListItem>
 <Para>
-<Literal>integer2Int&num;</Literal> isn't sign preserving any longer, but modulo <Literal>(maxBound::Int + 1) * 2</Literal>.
+<Function>integer2Int&num;</Function> isn't sign preserving any longer, but modulo <Constant>(maxBound::Int + 1) * 2</Constant>.
 </Para>
 </ListItem>
 
 <ListItem>
 <Para>
-<Literal>-ddump-rdr</Literal> is now called <Literal>-ddump-parsed</Literal>.
+<Option>-ddump-rdr</Option> is now called <Option>-ddump-parsed</Option>.
 </Para>
 </ListItem>
 

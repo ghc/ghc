@@ -21,8 +21,8 @@ command-line arguments to your program.
 
 <Para>
 When your Haskell program starts up, its RTS extracts command-line
-arguments bracketed between <Literal>+RTS</Literal><IndexTerm><Primary>+RTS option</Primary></IndexTerm> and
-<Literal>-RTS</Literal><IndexTerm><Primary>-RTS option</Primary></IndexTerm> as its own.  For example:
+arguments bracketed between <Option>+RTS</Option><IndexTerm><Primary>+RTS option</Primary></IndexTerm> and
+<Option>-RTS</Option><IndexTerm><Primary>-RTS option</Primary></IndexTerm> as its own.  For example:
 </Para>
 
 <Para>
@@ -34,13 +34,13 @@ arguments bracketed between <Literal>+RTS</Literal><IndexTerm><Primary>+RTS opti
 </Para>
 
 <Para>
-The RTS will snaffle <Literal>-p -S</Literal> for itself, and the remaining arguments
-<Literal>-f -h foo bar</Literal> will be handed to your program if/when it calls
-<Literal>System.getArgs</Literal>.
+The RTS will snaffle <Option>-p -S</Option> for itself, and the remaining arguments
+<Option>-f -h foo bar</Option> will be handed to your program if/when it calls
+<Function>System.getArgs</Function>.
 </Para>
 
 <Para>
-No <Literal>-RTS</Literal> option is required if the runtime-system options extend to
+No <Option>-RTS</Option> option is required if the runtime-system options extend to
 the end of the command line, as in this example:
 </Para>
 
@@ -55,7 +55,7 @@ the end of the command line, as in this example:
 <Para>
 If you absolutely positively want all the rest of the options in a
 command line to go to the program (and not the RTS), use a
-<Literal>--RTS</Literal><IndexTerm><Primary>--RTS option</Primary></IndexTerm>.
+<Option>--RTS</Option><IndexTerm><Primary>--RTS option</Primary></IndexTerm>.
 </Para>
 
 <Para>
@@ -66,17 +66,17 @@ counters is <Emphasis>your</Emphasis> fault!)
 </Para>
 
 <Para>
-Giving a <Literal>+RTS -f</Literal><IndexTerm><Primary>-f RTS option</Primary></IndexTerm> option will print out the
+Giving a <Option>+RTS -f</Option><IndexTerm><Primary>-f RTS option</Primary></IndexTerm> option will print out the
 RTS options actually available in your program (which vary, depending
 on how you compiled).
 </Para>
 
 <Para>
 NOTE: to send RTS options to the compiler itself, you need to prefix
-the option with <Literal>-optCrts</Literal>, eg. to increase the maximum heap size for
-a compilation to 128M, you would add <Literal>-optCrts-M128m</Literal> to the command
+the option with <Option>-optCrts</Option>, eg. to increase the maximum heap size for
+a compilation to 128M, you would add <Option>-optCrts-M128m</Option> to the command
 line.  The compiler understands some options directly without needing
-<Literal>-optCrts</Literal>: these are <Literal>-H</Literal> and <Literal>-K</Literal>.
+<Option>-optCrts</Option>: these are <Option>-H</Option> and <Option>-K</Option>.
 </Para>
 
 <Sect2 id="rts-options-gc">
@@ -98,7 +98,7 @@ maximum performance.
 <VariableList>
 
 <VarListEntry>
-<Term><Literal>-A&lt;size&gt;</Literal>:</Term>
+<Term><Option>-A&lt;size&gt;</Option>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>-A&lt;size&gt; RTS option</Primary></IndexTerm>
@@ -108,7 +108,7 @@ maximum performance.
 <Para>
 &lsqb;Default: 256k&rsqb; Set the allocation area size used by the garbage
 collector.  The allocation area (actually generation 0 step 0) is
-fixed and is never resized (unless you use <Literal>-H</Literal>, below).
+fixed and is never resized (unless you use <Option>-H</Option>, below).
 </Para>
 
 <Para>
@@ -118,15 +118,15 @@ fewer garbage collections and less promotion).
 </Para>
 
 <Para>
-With only 1 generation (<Literal>-G1</Literal>) the <Literal>-A</Literal> option specifies the
+With only 1 generation (<Option>-G1</Option>) the <Option>-A</Option> option specifies the
 minimum allocation area, since the actual size of the allocation area
 will be resized according to the amount of data in the heap (see
-<Literal>-F</Literal>, below).
+<Option>-F</Option>, below).
 </Para>
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-F&lt;factor&gt;</Literal>:</Term>
+<Term><Option>-F&lt;factor&gt;</Option>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>-F&lt;factor&gt; RTS option</Primary></IndexTerm>
@@ -144,19 +144,19 @@ to 4M before collecting it again.
 
 <Para>
 The default seems to work well here.  If you have plenty of memory, it
-is usually better to use <Literal>-H&lt;size&gt;</Literal> than to increase
-<Literal>-F&lt;factor&gt;</Literal>.
+is usually better to use <Option>-H&lt;size&gt;</Option> than to increase
+<Option>-F&lt;factor&gt;</Option>.
 </Para>
 
 <Para>
-The <Literal>-F</Literal> setting will be automatically reduced by the garbage
-collector when the maximum heap size (the <Literal>-M&lt;size&gt;</Literal> setting)
+The <Option>-F</Option> setting will be automatically reduced by the garbage
+collector when the maximum heap size (the <Option>-M&lt;size&gt;</Option> setting)
 is approaching.
 </Para>
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-G&lt;generations&gt;</Literal>:</Term>
+<Term><Option>-G&lt;generations&gt;</Option>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>-G&lt;generations&gt; RTS option</Primary></IndexTerm>
@@ -173,17 +173,17 @@ collected.
 </Para>
 
 <Para>
-Specifying 1 generation with <Literal>+RTS -G1</Literal> gives you a simple 2-space
-collector, as you would expect.  In a 2-space collector, the <Literal>-A</Literal>
+Specifying 1 generation with <Option>+RTS -G1</Option> gives you a simple 2-space
+collector, as you would expect.  In a 2-space collector, the <Option>-A</Option>
 option (see above) specifies the <Emphasis>minimum</Emphasis> allocation area size,
 since the allocation area will grow with the amount of live data in
 the heap.  In a multi-generational collector the allocation area is a
-fixed size (unless you use the <Literal>-H</Literal> option, see below).
+fixed size (unless you use the <Option>-H</Option> option, see below).
 </Para>
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-H&lt;size&gt;</Literal>:</Term>
+<Term><Option>-H&lt;size&gt;</Option>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>-H&lt;size&gt; RTS option</Primary></IndexTerm>
@@ -200,14 +200,14 @@ expanded to retain reasonable performance.
 <Para>
 By default, the heap will start small, and grow and shrink as
 necessary.  This can be bad for performance, so if you have plenty of
-memory it's worthwhile supplying a big <Literal>-H&lt;size&gt;</Literal>.  For
-improving GC performance, using <Literal>-H&lt;size&gt;</Literal> is usually a better
-bet than <Literal>-A&lt;size&gt;</Literal>.
+memory it's worthwhile supplying a big <Option>-H&lt;size&gt;</Option>.  For
+improving GC performance, using <Option>-H&lt;size&gt;</Option> is usually a better
+bet than <Option>-A&lt;size&gt;</Option>.
 </Para>
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-k&lt;size&gt;</Literal>:</Term>
+<Term><Option>-k&lt;size&gt;</Option>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>-k&lt;size&gt; RTS option</Primary></IndexTerm>
@@ -229,7 +229,7 @@ down on unnecessary stack growth while the program is starting up.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-K&lt;size&gt;</Literal>:</Term>
+<Term><Option>-K&lt;size&gt;</Option>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>-K&lt;size&gt; RTS option</Primary></IndexTerm>
@@ -245,7 +245,7 @@ infinite loop.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-m&lt;n&gt;</Literal>:</Term>
+<Term><Option>-m&lt;n&gt;</Option>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>-m&lt;n&gt; RTS option</Primary></IndexTerm>
@@ -256,7 +256,7 @@ The default is 3&percnt;.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-M&lt;size&gt;</Literal>:</Term>
+<Term><Option>-M&lt;size&gt;</Option>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>-M&lt;size&gt; RTS option</Primary></IndexTerm>
@@ -274,15 +274,15 @@ by the operating system.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-s&lt;file&gt;</Literal> or <Literal>-S&lt;file&gt;</Literal>:</Term>
+<Term><Option>-s&lt;file&gt;</Option> or <Option>-S&lt;file&gt;</Option>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>-S&lt;file&gt; RTS option</Primary></IndexTerm>
 <IndexTerm><Primary>-s&lt;file&gt; RTS option</Primary></IndexTerm>
-Write modest (<Literal>-s</Literal>) or verbose (<Literal>-S</Literal>) garbage-collector
-statistics into file <Literal>&lt;file&gt;</Literal>. The default <Literal>&lt;file&gt;</Literal> is
-<Literal>&lt;program&gt;@.stat</Literal>. The <Literal>&lt;file&gt;</Literal> <Literal>stderr</Literal> is treated
-specially, with the output really being sent to <Literal>stderr</Literal>.
+Write modest (<Option>-s</Option>) or verbose (<Option>-S</Option>) garbage-collector
+statistics into file <Filename>&lt;file&gt;</Filename>. The default <Filename>&lt;file&gt;</Filename> is
+<Filename>&lt;program&gt;@.stat</Filename>. The <Filename>&lt;file&gt;</Filename> <Constant>stderr</Constant> is treated
+specially, with the output really being sent to <Constant>stderr</Constant>.
 </Para>
 
 <Para>
@@ -323,7 +323,7 @@ recommended for everyday use!
 <VariableList>
 
 <VarListEntry>
-<Term><Literal>-B</Literal>:</Term>
+<Term><Option>-B</Option>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>-B RTS option</Primary></IndexTerm>
@@ -342,19 +342,19 @@ others in the same office&hellip;''
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-r&lt;file&gt;</Literal>:</Term>
+<Term><Option>-r&lt;file&gt;</Option>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>-r &lt;file&gt; RTS option</Primary></IndexTerm>
 <IndexTerm><Primary>ticky ticky profiling</Primary></IndexTerm>
 Produce ``ticky-ticky'' statistics at the end of the program run.
-The <Literal>&lt;file&gt;</Literal> business works just like on the <Literal>-S</Literal> RTS option (above).
+The <Filename>&lt;file&gt;</Filename> business works just like on the <Option>-S</Option> RTS option (above).
 </Para>
 
 <Para>
 ``Ticky-ticky'' statistics are counts of various program actions
 (updates, enters, etc.)  The program must have been compiled using
-<Literal>-ticky</Literal><IndexTerm><Primary>-ticky option</Primary></IndexTerm> (a.k.a. ``ticky-ticky profiling''),
+<Option>-ticky</Option><IndexTerm><Primary>-ticky option</Primary></IndexTerm> (a.k.a. ``ticky-ticky profiling''),
 and, for it to be really useful, linked with suitable system
 libraries.  Not a trivial undertaking: consult the installation guide
 on how to set things up for easy ``ticky-ticky'' profiling.  For more
@@ -363,18 +363,18 @@ information, see <XRef LinkEnd="ticky-ticky">.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-D&lt;num&gt;</Literal>:</Term>
+<Term><Option>-D&lt;num&gt;</Option>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>-D RTS option</Primary></IndexTerm>
 An RTS debugging flag; varying quantities of output depending on which
 bits are set in <Literal>&lt;num&gt;</Literal>.  Only works if the RTS was compiled with the
-<Literal>DEBUG</Literal> option.
+<Option>DEBUG</Option> option.
 </Para>
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>-Z</Literal>:</Term>
+<Term><Option>-Z</Option>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>-Z RTS option</Primary></IndexTerm>
@@ -409,10 +409,10 @@ command line, you can override the defaults.
 </Para>
 
 <Para>
-The function <Literal>defaultsHook</Literal><IndexTerm><Primary>defaultHook</Primary></IndexTerm> lets you change various
+The function <Function>defaultsHook</Function><IndexTerm><Primary>defaultHook</Primary></IndexTerm> lets you change various
 RTS options.  The commonest use for this is to give your program a
 default heap and/or stack size that is greater than the default.  For
-example, to set <Literal>-H8m -K1m</Literal>:
+example, to set <Option>-H8m -K1m</Option>:
 </Para>
 
 <Para>
@@ -431,7 +431,7 @@ void defaultsHook (void) {
 <Para>
 Don't use powers of two for heap/stack sizes: these are more likely to
 interact badly with direct-mapped caches.  The full set of flags is
-defined in <Literal>ghc/rts/RtsFlags.h</Literal> the the GHC source tree.
+defined in <Filename>ghc/rts/RtsFlags.h</Filename> the the GHC source tree.
 </Para>
 
 <Para>
@@ -444,16 +444,16 @@ follows:
 <VariableList>
 
 <VarListEntry>
-<Term><Literal>void ErrorHdrHook (FILE *)</Literal>:</Term>
+<Term><Function>void ErrorHdrHook (FILE *)</Function>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>ErrorHdrHook</Primary></IndexTerm>
-What's printed out before the message from <Literal>error</Literal>.
+What's printed out before the message from <Function>error</Function>.
 </Para>
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>void OutOfHeapHook (unsigned long, unsigned long)</Literal>:</Term>
+<Term><Function>void OutOfHeapHook (unsigned long, unsigned long)</Function>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>OutOfHeapHook</Primary></IndexTerm>
@@ -462,7 +462,7 @@ The heap-overflow message.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>void StackOverflowHook (long int)</Literal>:</Term>
+<Term><Function>void StackOverflowHook (long int)</Function>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>StackOverflowHook</Primary></IndexTerm>
@@ -471,16 +471,16 @@ The stack-overflow message.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>void MallocFailHook (long int)</Literal>:</Term>
+<Term><Function>void MallocFailHook (long int)</Function>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>MallocFailHook</Primary></IndexTerm>
-The message printed if <Literal>malloc</Literal> fails.
+The message printed if <Function>malloc</Function> fails.
 </Para>
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>void PatErrorHdrHook (FILE *)</Literal>:</Term>
+<Term><Function>void PatErrorHdrHook (FILE *)</Function>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>PatErrorHdrHook</Primary></IndexTerm>
@@ -490,20 +490,20 @@ that were not handled by the Haskell programmer).
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>void PreTraceHook (FILE *)</Literal>:</Term>
+<Term><Function>void PreTraceHook (FILE *)</Function>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>PreTraceHook</Primary></IndexTerm>
-What's printed out before a <Literal>trace</Literal> message.
+What's printed out before a <Function>trace</Function> message.
 </Para>
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Literal>void PostTraceHook (FILE *)</Literal>:</Term>
+<Term><Function>void PostTraceHook (FILE *)</Function>:</Term>
 <ListItem>
 <Para>
 <IndexTerm><Primary>PostTraceHook</Primary></IndexTerm>
-What's printed out after a <Literal>trace</Literal> message.
+What's printed out after a <Function>trace</Function> message.
 </Para>
 </ListItem>
 </VarListEntry>
