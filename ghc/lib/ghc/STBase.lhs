@@ -43,9 +43,11 @@ instance Monad (ST s) where
 	case (k r) of { ST k2 ->
 	(k2 new_s) }}
 
-{-# INLINE returnST #-}
+
 
 -- here for backward compatibility:
+
+{-# INLINE returnST #-}
 returnST :: a -> ST s a
 thenST	 :: ST s a -> (a -> ST s b) -> ST s b
 seqST	 :: ST s a -> ST s b -> ST s b
