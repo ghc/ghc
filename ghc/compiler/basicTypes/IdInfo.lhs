@@ -160,6 +160,8 @@ newDemand WwEnum	     = Eval
 oldDemand :: NewDemand.Demand -> Demand.Demand
 oldDemand Abs	       = WwLazy True
 oldDemand Lazy	       = WwLazy False
+oldDemand Bot	       = WwStrict
+oldDemand Err	       = WwStrict
 oldDemand Eval	       = WwStrict
 oldDemand (Seq _ _ ds) = WwUnpack True (map oldDemand ds)
 oldDemand (Call _)     = WwStrict
