@@ -1,8 +1,11 @@
  
-"tcfail032.hs", line 14: Type signature is too polymorphic:
-    Signature: a -> Int
-    Monomorphic type variables: a
-    In an expression with a type signature: x:: a -> Int
-Fail: Compilation errors found
+tcfail032.hs:14: A type signature is more polymorphic than the inferred type
+		     Some type variables in the inferred type can't be forall'd, namely:
+		     `a{-aG1-}'
+		     Possible cause: the RHS mentions something subject to the monomorphism restriction
+    In an expression with a type signature:
+	`x ::
+	   _forall_ [a] {PrelBase.Eq a} => a -> PrelBase.Int'
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

@@ -1,7 +1,12 @@
  
-"tcfail009.hs", line 3:
-    Couldn't match type "Integer" against "Int".
-    In an arithmetic sequence: [ (1 :: Int) .. (2 :: Integer) ]
-Fail: Compilation errors found
+tcfail009.hs:3: Couldn't match the type
+		    `PrelBase.Integer' against `PrelBase.Int'
+    Expected: `PrelBase.Int'
+    Inferred: `PrelBase.Integer'
+    In an arithmetic sequence:
+	`[(1 ::
+	     PrelBase.Int) .. (2 ::
+				 PrelBase.Integer)]'
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

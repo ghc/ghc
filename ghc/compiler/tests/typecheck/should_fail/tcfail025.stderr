@@ -1,6 +1,8 @@
  
-"tcfail025.hs", line 6: multiple declarations of type synonym:
-    A ( "tcfail025.hs", line 6,  "tcfail025.hs", line 2)
-Fail: Compilation errors found
+tcfail025.hs:2:
+    Conflicting exports for local name:  A
+	module Main
+	module Main
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

@@ -1,6 +1,12 @@
  
-"tcfail031.hs", line 2:
-    Couldn't match type "Char" against "Bool". In a predicate expression: 'a'
-Fail: Compilation errors found
+tcfail031.hs:3: Couldn't match the type
+		    `PrelBase.Bool' against `PrelBase.Char'
+    Expected: `PrelBase.Bool'
+    Inferred: `PrelBase.Char'
+    In a predicate expression:
+	`'a''
+    In an equation for function `f':
+	`f x       =   if 'a' then 1 else 2'
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

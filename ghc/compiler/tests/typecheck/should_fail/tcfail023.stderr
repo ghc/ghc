@@ -1,11 +1,27 @@
  
-"tcfail023.hs", line 8: Duplicate/overlapping instances:
-    class "A", type "B"; at "tcfail023.hs", line 8 and "tcfail023.hs", line 11
+tcfail023.hs:2: Duplicate or overlapping instance declarations
+    Class `A' type `B'
+	at tcfail023.hs:8 and tcfail023.hs:11
  
-"tcfail023.hs", line 11:
-    Couldn't match type "Bool" against "B".
-    Inside a function binding:
-	op ... C = True
-Fail: Compilation errors found
+tcfail023.hs:2: Duplicate or overlapping instance declarations
+    Class `A' type `B'
+	at tcfail023.hs:8 and tcfail023.hs:11
+ 
+tcfail023.hs:11: Couldn't match the type
+		     `B' against `PrelBase.Bool'
+    Expected: `B'
+    Inferred: `PrelBase.Bool'
+    In an equation for function `op':
+	`op C       =   PrelBase.True'
+ 
+tcfail023.hs:8: Couldn't match the type
+		    `B' against `PrelBase.Bool'
+    Expected: `B'
+    Inferred: `PrelBase.Bool'
+    In an equation for function `op':
+	`op C       =   PrelBase.True'
+ 
+tcfail023.hs:2: Module Main must include a definition for `Main.main'
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

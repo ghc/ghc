@@ -1,6 +1,8 @@
  
-"tcfail015.hs", line 7: No such instance:
-    class "Num", type "Bool" (at an overloaded literal: 2)
-Fail: Compilation errors found
+tcfail015.hs:7: No instance for:
+		    `PrelBase.Num PrelBase.Bool'
+    tcfail015.hs:7:
+	at an overloaded literal: 2
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

@@ -1,6 +1,5 @@
  
-"tcfail024.hs", line 2: multiple declarations of variable:
-    A ( "tcfail024.hs", line 2,  "tcfail024.hs", line 4)
-Fail: Compilation errors found
+tcfail024.hs:2: Module Main must include a definition for `Main.main'
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

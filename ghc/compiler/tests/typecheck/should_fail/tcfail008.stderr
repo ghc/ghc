@@ -1,6 +1,18 @@
  
-"tcfail008.hs", line 3: No such instance:
-    class "Num", type "[tt3]" (at an overloaded literal: 2)
-Fail: Compilation errors found
+tcfail008.hs:3: No instance for:
+		    `PrelBase.Num [t{-aHf-}]'
+    tcfail008.hs:3:
+	at an overloaded literal: 2
+ 
+tcfail008.hs:3: No instance for:
+		    `PrelBase.Num [t{-aHf-}]'
+    tcfail008.hs:3:
+	at an overloaded literal: 2
+ 
+tcfail008.hs:3: No instance for:
+		    `PrelBase.Num [PrelBase.Int]'
+    tcfail008.hs:3:
+	at an overloaded literal: 2
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

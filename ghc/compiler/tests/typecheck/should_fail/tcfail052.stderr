@@ -1,5 +1,6 @@
  
-"tcfail052.hs", line 2: undefined type variable: c
-Fail: Compilation errors found
+tcfail052.hs:4:
+    Type variable not in scope: `c'
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

@@ -1,7 +1,8 @@
  
-These overloadings don't match type signature:
-    "tcfail034.hs", line 15; class "Integral", type "a"
-    (at a use of an overloaded identifier: mod)
-Fail: Compilation errors found
+tcfail034.hs:13: tcfail034.hs:17: Context required by inferred type, but missing on a type signature:
+		     at a use of an overloaded identifier: `PrelNum.mod'
+		     `PrelNum.Integral' `a{-aZO-}'
+    When checking signature(s) for: `test'
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

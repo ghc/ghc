@@ -1,6 +1,9 @@
  
-"tcfail028.hs", line 3: Type has too few arguments:
-    "A" should have 2 argument(s), but has been given 1 argument(s) instead
-Fail: Compilation errors found
+tcfail028.hs:4: Couldn't match the kind
+		    ka2865 -> * against *
+    When unifying two kinds
+	ka2865 -> * and *
+    In the data declaration for `A'
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

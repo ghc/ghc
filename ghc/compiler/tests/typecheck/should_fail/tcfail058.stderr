@@ -1,5 +1,5 @@
  
-"tcfail058.hs", line 5: undefined class: Array
-Fail: Compilation errors found
+tcfail058.hs:6: Type constructor used as a class: `ArrBase.Array'
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

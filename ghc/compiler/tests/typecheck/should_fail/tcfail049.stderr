@@ -1,5 +1,6 @@
  
-"tcfail049.hs", line 2: undefined value: g
-Fail: Compilation errors found
+tcfail049.hs:3:
+    Value not in scope: `g'
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

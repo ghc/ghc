@@ -1,8 +1,12 @@
  
-"tcfail033.hs", line 3:
-    Type variable "tt2" occurs within the type "(tt2, tt3)".
+tcfail033.hs:4: Cannot construct the infinite type (occur check)
+		    `t{-aKn-}' = `(t{-aKn-}, t{-aKq-})'
+    Expected: `a{-aKs-} (t{-aKn-}, t{-aKq-})'
+    Inferred: `a{-aKs-} t{-aKn-}'
     In a pattern binding:
-	buglet = [ x | (x, y) <- buglet ]
-Fail: Compilation errors found
+	`buglet'
+	    =   `[ x |
+		     (x, y) <- buglet ]'
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

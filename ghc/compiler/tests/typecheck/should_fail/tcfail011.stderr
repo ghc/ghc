@@ -1,5 +1,6 @@
  
-"tcfail011.hs", line 3: undefined value: y
-Fail: Compilation errors found
+tcfail011.hs:3:
+    Value not in scope: `y'
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

@@ -1,8 +1,11 @@
  
-"tcfail012.hs", line 3:
-    Couldn't match type "Bool" against "[tt0]".
+tcfail012.hs:3: Couldn't match the type
+		    `PrelBase.Bool' against `[t{-amB-}]'
+    Expected: `PrelBase.Bool'
+    Inferred: `[t{-amB-}]'
     In a pattern binding:
-	True = []
-Fail: Compilation errors found
+	`PrelBase.True'
+	    =   `PrelBase.[]'
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

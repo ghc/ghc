@@ -1,0 +1,8 @@
+ 
+tcfail039.hs:3:
+    Conflicting definitions for: `=='
+	Defined at tcfail039.hs:7
+	Imported from Prelude at tcfail039.hs:3
+
+
+Compilation had errors

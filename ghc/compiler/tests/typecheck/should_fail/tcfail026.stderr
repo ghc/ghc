@@ -1,6 +1,13 @@
  
-"tcfail026.hs", line 9: multiple declarations of class:
-    A ( "tcfail026.hs", line 9,  "tcfail026.hs", line 3)
-Fail: Compilation errors found
+tcfail026.hs:2:
+    Conflicting exports for local name:  A
+	module Main
+	module Main
+ 
+tcfail026.hs:6:
+    Class type variable ``a'' does not appear in method signature:
+	op2 ::
+	    `b' -> `b'
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

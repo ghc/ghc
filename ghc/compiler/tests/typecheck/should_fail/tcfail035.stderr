@@ -1,0 +1,11 @@
+ 
+tcfail035.hs:3: Duplicate or overlapping instance declarations
+    Class `PrelBase.Num' type `NUM'
+	at tcfail035.hs:6 and tcfail035.hs:7
+ 
+tcfail035.hs:3: Duplicate or overlapping instance declarations
+    Class `PrelBase.Num' type `NUM'
+	at tcfail035.hs:6 and tcfail035.hs:7
+
+
+Compilation had errors

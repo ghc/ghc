@@ -1,10 +1,21 @@
  
-"tcfail014.hs", line 5:
-    Type variable "ot8" occurs within the type "ot8 -> ot9".
-    Too many arguments in application of function "z"
+tcfail014.hs:5: Cannot construct the infinite type (occur check)
+		    `o{-aHw-}' = `o{-aHw-} -> o{-aIe-}'
+    Expected: `o{-aHw-}'
+    Inferred: `o{-aHw-} -> o{-aIe-}'
+    In the first argument of `z', namely
+	`z'
+    In an equation for function `h':
+	`h z       =   z   z'
+    In an equation for function `g':
+	`g y       =   h PrelBase.+ 2
+		   where
+		       h   z       =   z   z'
  
-"tcfail014.hs", line 6: No such instance:
-    class "Num", type "tt19 -> tt20" (at an overloaded literal: 1)
-Fail: Compilation errors found
+tcfail014.hs:5: No instance for:
+		    `PrelBase.Num (t{-aHZ-} -> t{-aI0-})'
+    tcfail014.hs:5:
+	at a use of an overloaded identifier: `PrelBase.+'
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

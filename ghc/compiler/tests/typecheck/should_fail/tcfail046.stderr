@@ -1,0 +1,35 @@
+ 
+tcfail046.hs:4: No instance for class
+		`PrelBase.Eq'
+		at type
+		`Process a{-r7b-}'
+ 
+tcfail046.hs:4: No instance for class
+		`PrelBase.Eq'
+		at type
+		`Process a{-r7g-}'
+ 
+tcfail046.hs:4: No instance for class
+		`PrelBase.Eq'
+		at type
+		`Process a{-r7b-}'
+ 
+tcfail046.hs:4: No instance for class
+		`PrelBase.Eq'
+		at type
+		`Process a{-r7g-}'
+ 
+tcfail046.hs:23: No instance for:
+		     `PrelBase.Eq (Process a{-a11o-})'
+    tcfail046.hs:23:
+	at a use of an overloaded identifier: `PrelBase.=='
+    When checking methods of an instance declaration
+ 
+tcfail046.hs:15: No instance for:
+		     `PrelBase.Eq (Process a{-a14I-})'
+    tcfail046.hs:15:
+	at a use of an overloaded identifier: `PrelBase.=='
+    When checking methods of an instance declaration
+
+
+Compilation had errors

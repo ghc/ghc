@@ -1,0 +1,10 @@
+ 
+tcfail042.hs:16: tcfail042.hs:16: Context required by inferred type, but missing on a type signature:
+		     in an instance declaration
+		     `PrelBase.Num' `a{-aN7-}'
+    When checking superclass constraints of an instance declaration
+ 
+tcfail042.hs:4: Module Main must include a definition for `Main.main'
+
+
+Compilation had errors

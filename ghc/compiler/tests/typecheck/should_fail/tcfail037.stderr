@@ -1,0 +1,8 @@
+ 
+tcfail037.hs:3:
+    Conflicting definitions for: `+'
+	Defined at tcfail037.hs:10
+	Imported from Prelude at tcfail037.hs:3
+
+
+Compilation had errors

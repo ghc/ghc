@@ -1,6 +1,9 @@
  
-"tcfail020.hs", line 12: No such instance:
-    class "A", type "[a]" (at an instance declaration)
-Fail: Compilation errors found
+tcfail020.hs:12: No instance for:
+		     `A [a{-aGH-}]'
+    tcfail020.hs:12:
+	in an instance declaration
+    When checking superclass constraints of an instance declaration
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

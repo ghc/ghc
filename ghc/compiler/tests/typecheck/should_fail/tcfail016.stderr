@@ -1,11 +1,15 @@
  
-"tcfail016.hs", line 8:
-    Couldn't match type "(a, Expr a)" against "Expr a".
-    Inside a function binding:
-	g ... (Var name)
-		      = [name]
-	      (App e1 e2)
-		      = (g e1) ++ (g e2)
-Fail: Compilation errors found
+tcfail016.hs:9: Couldn't match the type
+		    `PrelTup.(,) a{-aX1-}' against `Expr'
+    Expected: `Expr a{-aWV-}'
+    Inferred: `AnnExpr a{-aX1-}'
+    In the first argument of `g', namely
+	`e1'
+    In the first argument of `PrelBase.++', namely
+	(`g' `e1')
+    In an equation for function `g':
+	`g (App e1 e2)
+		   =   (g   e1) PrelBase.++ (g   e2)'
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

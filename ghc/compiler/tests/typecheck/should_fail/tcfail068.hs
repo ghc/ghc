@@ -4,7 +4,7 @@
 module IndTree(IndTree(..), itgen, itiap, itrap, itrapstate) where
 
 --partain: import Auxiliary
-import PreludeGlaST
+import GlaExts
 
 type IndTree s t = MutableArray s (Int,Int) t
 

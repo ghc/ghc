@@ -1,0 +1,15 @@
+ 
+tcfail061.hs:11:
+    Type variable not in scope: `b'
+ 
+tcfail061.hs:11:
+    Type variable not in scope: `b'
+ 
+tcfail061.hs:5:
+    Type variable not in scope: `b'
+ 
+tcfail061.hs:5:
+    Type variable not in scope: `b'
+
+
+Compilation had errors

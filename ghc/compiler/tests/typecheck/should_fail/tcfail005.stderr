@@ -1,8 +1,11 @@
  
-"tcfail005.hs", line 3:
-    Couldn't match type "[tt4]" against "(tt5, Char)".
+tcfail005.hs:3: Couldn't match the type
+		    `PrelBase.[]' against `PrelTup.(,) t{-aWN-}'
+    Expected: `[t{-aWJ-}]'
+    Inferred: `(t{-aWN-}, PrelBase.Char)'
     In a pattern binding:
-	(h : i) = (1, 'a')
-Fail: Compilation errors found
+	(`h' `PrelBase.:' `i')
+	    =   `(1, ('a'))'
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

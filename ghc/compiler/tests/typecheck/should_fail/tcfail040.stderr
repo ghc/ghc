@@ -1,0 +1,7 @@
+ 
+tcfail040.hs:3: tcfail040.hs:19: Ambiguous overloading:
+		    at a use of an overloaded identifier: `<<'
+		    `ORD' `a{-aGQ-}'
+
+
+Compilation had errors

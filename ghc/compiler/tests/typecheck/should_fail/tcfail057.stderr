@@ -1,5 +1,5 @@
  
-"tcfail057.hs", line 5: undefined type constructor: RealFrac
-Fail: Compilation errors found
+tcfail057.hs:5: Class used as a type constructor: `PrelNum.RealFrac'
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

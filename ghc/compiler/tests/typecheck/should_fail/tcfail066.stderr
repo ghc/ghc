@@ -1,0 +1,74 @@
+
+
+--================================================================================
+Typechecked:
+`IMonadOk' =
+    `_/\_ a{-r44-} -> \ tpl tpl ->
+	 IMonadOk
+	     {_@_ a{-r44-} tpl tpl}'
+`IMonadFail' =
+    `_/\_ a{-r44-} -> \ tpl tpl ->
+	 IMonadFail
+	     {_@_ a{-r44-} tpl tpl}'
+AbsBinds [`a{-aKg-}'] [] [([`a{-aKg-}'], `$d1', `d.Eval')]
+    `d.Eval' =
+	({-dict-} [] [])
+`d.Num' =
+    `PrelBase.$d3'
+`+' =
+    `PrelBase.+'
+	`IMonadState'
+	`d.Num'
+AbsBinds [] [] [([], `tickI', `tickI')]
+    `tickI'
+	`n'     =   `\ s0      ->  IMonadOk
+				       PrelBase.()
+				       s0 + n PrelBase.()'
+AbsBinds
+[`t{-aJ6-}', `a{-aIN-}', `a{-aIR-}']
+[]
+[([`t{-aJ6-}', `a{-aIN-}', `a{-aIR-}'], `thenI', `thenI')]
+    `thenI'
+	`m' `k' =   `\ s0      ->  case m   s0 of
+				     (IMonadFail s1 msg)
+					     ->  IMonadFail
+						     a{-aIN-}
+						     s1 msg
+				     (IMonadOk s1 r1)
+					     ->  k   r1 s1'
+AbsBinds [`a{-aJg-}'] [] [([`a{-aJg-}'], `failI', `failI')]
+    `failI'
+	`msg'   =   `\ s0      ->  IMonadFail
+				       a{-aJg-}
+				       s0 msg'
+AbsBinds [`a{-aJn-}'] [] [([`a{-aJn-}'], `returnI', `returnI')]
+    `returnI'
+	`r'     =   `\ s0      ->  IMonadOk
+				       a{-aJn-}
+				       s0 r'
+AbsBinds
+[`t{-aJz-}', `t{-aJC-}']
+[]
+[([`t{-aJz-}', `t{-aJC-}'], `mapI', `mapI')]
+    `mapI'
+	`f' `PrelBase.[]'
+		=   `returnI
+			 [t{-aJz-}]
+			 PrelBase.[]
+			     t{-aJz-}'
+    `mapI'
+	`f' (`x' `PrelBase.:' `xs')
+		=   `thenI
+			 [IMonadState, [t{-aJz-}], t{-aJz-}]
+			 (f   x)
+			 (\ fx      ->  thenI
+					    [IMonadState, [t{-aJz-}], [t{-aJz-}]]
+					    (mapI
+						 f xs)
+					    (\ fxs     ->  returnI
+							       [t{-aJz-}]
+							       PrelBase.:
+								   t{-aJz-}
+								   fx fxs))'
+
+NOTE: Simplifier still going after 4 iterations; bailing out.

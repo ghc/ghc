@@ -1,9 +1,10 @@
  
-"tcfail002.hs", line 3:
-    Type variable "tt4" occurs within the type "[tt4]".
-    Inside two equations or case alternatives:
-	... (x : y) -> x
-	... z -> z
-Fail: Compilation errors found
+tcfail002.hs:4: Cannot construct the infinite type (occur check)
+		    `t{-amM-}' = `[t{-amM-}]'
+    Expected: `[t{-amM-}] -> t{-amM-}'
+    Inferred: `[t{-amM-}] -> [t{-amM-}]'
+    In an equation for function `c':
+	`c z       =   z'
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

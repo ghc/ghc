@@ -1,7 +1,7 @@
  
-The following classes form a cycle:
-    "tcfail027.hs", line 4:  A
-    "tcfail027.hs", line 7:  B
-Fail: Compilation errors found
+tcfail027.hs:3: Cycle in class declarations ...
+		    `A' tcfail027.hs:4
+		    `B' tcfail027.hs:7
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

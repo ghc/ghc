@@ -1,6 +1,8 @@
  
-"tcfail029.hs", line 5: No such instance:
-    class "Ord", type "Foo" (at a use of an overloaded identifier: >)
-Fail: Compilation errors found
+tcfail029.hs:6: No instance for:
+		    `PrelBase.Ord Foo'
+    tcfail029.hs:6:
+	at a use of an overloaded identifier: `PrelBase.>'
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

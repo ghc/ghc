@@ -1,5 +1,13 @@
  
-"tcfail056.hs", line 9: "<=" is not an operation of class "Eq".
-Fail: Compilation errors found
+tcfail056.hs:1: Duplicate or overlapping instance declarations
+    Class `PrelBase.Eq' type `Foo'
+	at tcfail056.hs:6 and tcfail056.hs:10
+ 
+tcfail056.hs:1: Duplicate or overlapping instance declarations
+    Class `PrelBase.Eq' type `Foo'
+	at tcfail056.hs:6 and tcfail056.hs:10
+ 
+tcfail056.hs:10: Class `PrelBase.Eq' does not have a method `<='
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

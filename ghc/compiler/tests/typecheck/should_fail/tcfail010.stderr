@@ -1,6 +1,13 @@
  
-"tcfail010.hs", line 3: No such instance:
-    class "Num", type "[tt4]" (at a use of an overloaded identifier: +)
-Fail: Compilation errors found
+tcfail010.hs:3: No instance for:
+		    `PrelBase.Num [t{-aHi-}]'
+    tcfail010.hs:3:
+	at a use of an overloaded identifier: `PrelBase.+'
+ 
+tcfail010.hs:3: No instance for:
+		    `PrelBase.Num [t{-aHi-}]'
+    tcfail010.hs:3:
+	at a use of an overloaded identifier: `PrelBase.+'
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

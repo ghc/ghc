@@ -1,6 +1,17 @@
- 
-"tcfail021.hs", line 2: multiple declarations of variable in pattern:
-    x ( "tcfail021.hs", line 2,  "tcfail021.hs", line 2)
-Fail: Compilation errors found
 
-ghc: execution of the Haskell compiler had trouble
+
+--================================================================================
+Typechecked:
+AbsBinds
+[`t{-aHp-}', `t{-aHr-}', `t{-aHm-}']
+[`d.Num']
+[([`t{-aHp-}', `t{-aHr-}', `t{-aHm-}'], `f', `f')]
+    `fromInt' =
+	`PrelBase.fromInt'
+	    `t{-aHm-}'
+	    `d.Num'
+    `lit' =
+	`fromInt'
+	    `PrelBase.I#'
+		2#
+    `f' `x' `x' =   `lit'

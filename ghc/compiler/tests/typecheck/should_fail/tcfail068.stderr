@@ -1,0 +1,69 @@
+ 
+tcfail068.hs:4:
+    Conflicting definitions for: `Just'
+	Defined at tcfail068.hs:68
+	Imported from Prelude at tcfail068.hs:4
+ 
+tcfail068.hs:4:
+    Conflicting definitions for: `Nothing'
+	Defined at tcfail068.hs:70
+	Imported from Prelude at tcfail068.hs:4
+ 
+tcfail068.hs:4:
+    Conflicting definitions for: `Maybe'
+	Defined at tcfail068.hs:68
+	Imported from Prelude at tcfail068.hs:4
+ 
+tcfail068.hs:14:
+    Value not in scope: `runST'
+ 
+tcfail068.hs:21:
+    Value not in scope: `runST'
+ 
+tcfail068.hs:19:
+    Value not in scope: `returnStrictlyST'
+ 
+tcfail068.hs:19:
+    Value not in scope: `seqStrictlyST'
+ 
+tcfail068.hs:21:
+    Value not in scope: `thenStrictlyST'
+ 
+tcfail068.hs:26:
+    Value not in scope: `returnStrictlyST'
+ 
+tcfail068.hs:26:
+    Value not in scope: `seqStrictlyST'
+ 
+tcfail068.hs:29:
+    Value not in scope: `returnStrictlyST'
+ 
+tcfail068.hs:30:
+    Value not in scope: `seqStrictlyST'
+ 
+tcfail068.hs:29:
+    Value not in scope: `thenStrictlyST'
+ 
+tcfail068.hs:32:
+    Value not in scope: `runST'
+ 
+tcfail068.hs:38:
+    Value not in scope: `returnStrictlyST'
+ 
+tcfail068.hs:38:
+    Value not in scope: `thenStrictlyST'
+ 
+tcfail068.hs:41:
+    Value not in scope: `returnStrictlyST'
+ 
+tcfail068.hs:42:
+    Value not in scope: `seqStrictlyST'
+ 
+tcfail068.hs:41:
+    Value not in scope: `thenStrictlyST'
+ 
+tcfail068.hs:45:
+    Value not in scope: `runST'
+
+
+Compilation had errors

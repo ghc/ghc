@@ -1,6 +1,6 @@
-TOP = ../../../..
-include $(TOP)/ghc/mk/ghc.mk
+TOP = ../../..
+include $(TOP)/mk/boilerplate.mk
 
 SUBDIRS = should_fail should_succeed stress
 
-include $(TOP)/mk/subdir.mk
+include $(TOP)/mk/target.mk

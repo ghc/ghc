@@ -1,6 +1,27 @@
  
-"tcfail019.hs", line 20: No such instance:
-    class "B", type "[a]" (at an instance declaration)
-Fail: Compilation errors found
+tcfail019.hs:20: No instance for:
+		     `B [a{-anU-}]'
+    tcfail019.hs:20:
+	in an instance declaration
+    When checking methods of an instance declaration
+ 
+tcfail019.hs:20: No instance for:
+		     `C [a{-anU-}]'
+    tcfail019.hs:20:
+	in an instance declaration
+    When checking methods of an instance declaration
+ 
+tcfail019.hs:20: No instance for:
+		     `B [a{-anU-}]'
+    tcfail019.hs:20:
+	in an instance declaration
+    When checking superclass constraints of an instance declaration
+ 
+tcfail019.hs:20: No instance for:
+		     `C [a{-anU-}]'
+    tcfail019.hs:20:
+	in an instance declaration
+    When checking superclass constraints of an instance declaration
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

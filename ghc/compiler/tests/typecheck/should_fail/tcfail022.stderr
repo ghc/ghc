@@ -1,6 +1,8 @@
  
-"tcfail022.hs", line 2: multiple declarations of variable:
-    f ( "tcfail022.hs", line 2,  "tcfail022.hs", line 6)
-Fail: Compilation errors found
+tcfail022.hs:2:
+    Conflicting exports for local name:  f
+	module Main
+	module Main
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

@@ -1,0 +1,13 @@
+ 
+tcfail067.hs:1: tcfail067.hs:76: Context required by inferred type, but missing on a type signature:
+		    at a use of an overloaded identifier: `SubRange'
+		    `PrelBase.Ord' `a{-a1dZ-}'
+    When checking signature(s) for: `numSubRangeBinOp'
+ 
+tcfail067.hs:65: tcfail067.hs:61: Context required by inferred type, but missing on a type signature:
+		     at a use of an overloaded identifier: `numSubRangeNegate'
+		     `PrelBase.Ord' `a{-a1fx-}'
+    When checking methods of an instance declaration
+
+
+Compilation had errors

@@ -1,5 +1,6 @@
  
-"tcfail054.hs", line 2: undefined value: B
-Fail: Compilation errors found
+tcfail054.hs:3:
+    Data constructor not in scope: `B'
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

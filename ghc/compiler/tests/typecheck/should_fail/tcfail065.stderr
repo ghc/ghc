@@ -1,0 +1,9 @@
+ 
+<NoSrcLoc>: A type signature is more polymorphic than the inferred type
+		Some type variables in the inferred type can't be forall'd, namely:
+		`x{-aNe-}'
+		Possible cause: the RHS mentions something subject to the monomorphism restriction
+    When checking signature for `setX'
+
+
+Compilation had errors

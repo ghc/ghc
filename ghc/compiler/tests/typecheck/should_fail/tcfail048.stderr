@@ -1,5 +1,6 @@
  
-"tcfail048.hs", line 3: undefined class: B
-Fail: Compilation errors found
+tcfail048.hs:4:
+    Type constructor or class not in scope: `B'
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

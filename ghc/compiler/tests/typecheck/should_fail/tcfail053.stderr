@@ -1,5 +1,6 @@
  
-"tcfail053.hs", line 2: undefined type constructor: A
-Fail: Compilation errors found
+tcfail053.hs:3:
+    Type constructor or class not in scope: `A'
 
-ghc: execution of the Haskell compiler had trouble
+
+Compilation had errors

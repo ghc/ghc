@@ -1,19 +1,34 @@
-TOP = ../../../../..
-GhcRunTestRules = YES
-# These options apply to all tests
-RUNSTDTEST_OPTS = -noC -ddump-tc -x1
-include $(TOP)/ghc/mk/ghc.mk
+TOP = ../../../..
+include $(TOP)/mk/boilerplate.mk
 
-runtests :: $(patsubst %.hs, %.runtest, $(wildcard *.hs))
+HS_SRCS = $(wildcard *.hs)
 
-tcfail045_flags = -fglasgow-exts
-tcfail059_flags = -hi		     
-tcfail060_flags = -hi
-tcfail061_flags = -hi
-tcfail062_flags = -hi
-tcfail063_flags = -hi
-tcfail064_flags = -hi
-tcfail065_flags = -hi
-tcfail066_flags = -hi
-tcfail067_flags = -hi
-tcfail068_flags = -fglasgow-exts
+SRC_RUNTEST_OPTS += -o1 $*.stdout -o2 $*.stderr -x 1
+HC_OPTS += -noC -ddump-tc -dppr-user
+
+%.o : %.hs
+
+%.o : %.hs
+	$(RUNTEST) $(HC) $(RUNTEST_OPTS) -- $(HC_OPTS) -c $< -o $@ -osuf $(subst .,,$(suffix $@)) 
+
+all :: $(HS_OBJS)
+
+# Not all of them fail, allthough they're advertised as doing so..
+tcfail021_RUNTEST_OPTS = -x 0
+tcfail041_RUNTEST_OPTS = -x 0
+tcfail045_HC_OPTS = -fglasgow-exts
+tcfail059_HC_OPTS = -hi		     
+tcfail059_RUNTEST_OPTS = -x 0
+tcfail060_HC_OPTS = -hi
+tcfail060_RUNTEST_OPTS = -x 0
+tcfail061_HC_OPTS = -hi
+tcfail062_HC_OPTS = -hi
+tcfail063_HC_OPTS = -hi
+tcfail064_HC_OPTS = -hi
+tcfail065_HC_OPTS = -hi
+tcfail066_HC_OPTS = -hi
+tcfail066_RUNTEST_OPTS = -x 0
+tcfail067_HC_OPTS = -hi
+tcfail068_HC_OPTS = -fglasgow-exts
+
+include $(TOP)/mk/target.mk
