@@ -1,10 +1,7 @@
 _interface_ Id 1
 _exports_
 Id Id GenId StrictnessMark(MarkedStrict NotMarkedStrict) dataConArgTys idType isNullaryDataCon mkDataCon mkTupleCon nmbrId pprId;
--- _instances_
--- instance {Outputable.Outputable Id} = $d4;
 _declarations_
--- 1 $4 _:_ {Outputable.Outputable Id} ;;
 1 type Id = Id.GenId Type.Type ;
 1 data GenId ty ;
 1 data StrictnessMark = MarkedStrict | NotMarkedStrict ;
