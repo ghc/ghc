@@ -39,10 +39,12 @@ module OccName (
 #include "HsVersions.h"
 
 #if __HASKELL1__ > 4
-import Char	( isAlpha, isUpper, isLower, isAlphaNum{-sigh-}, ord )
+#define ISALPHANUM isAlphaNum
 #else
-import Char	( isAlpha, isUpper, isLower, isAlphanum, ord )
+#define ISALPHANUM isAlphanum
 #endif
+
+import Char	( isAlpha, isUpper, isLower, ISALPHANUM, ord )
 import Util	( thenCmp )
 import FiniteMap ( FiniteMap, emptyFM, lookupFM, addToFM, elemFM )
 import Outputable
@@ -553,7 +555,7 @@ We provide two interfaces for efficiency.
 \begin{code}
 identToC :: String -> FAST_STRING
 identToC str
-  | all isAlphanum str && not std = _PK_ str
+  | all ISALPHANUM str && not std = _PK_ str
   | std 			  = _PK_ ("Zs" ++ encode str)
   | otherwise			  = _PK_ (encode str)
   where
@@ -561,7 +563,7 @@ identToC str
 
 identFsToC :: FAST_STRING -> FAST_STRING
 identFsToC fast_str
-  | all isAlphanum str && not std = fast_str
+  | all ISALPHANUM str && not std = fast_str
   | std				  = _PK_ ("Zs" ++ encode str)
   | otherwise			  = _PK_ (encode str)
   where
@@ -577,7 +579,7 @@ encode [] = []
 encode (c:cs) = encode_ch c ++ encode cs
 
 encode_ch :: Char -> String
-encode_ch c | isAlphanum c = [c]
+encode_ch c | ISALPHANUM c = [c]
 	-- Common case first
 encode_ch 'Z'  = "ZZ"
 encode_ch '&'  = "Za"
