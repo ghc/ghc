@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.45 2000/12/04 12:31:21 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.46 2000/12/19 14:30:58 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -93,7 +93,7 @@ startupHaskell(int argc, char *argv[], void *init_root)
     /* The very first thing we do is grab the start time...just in case we're
      * collecting timing statistics.
      */
-    start_time();
+    stat_startInit();
 
 #ifdef PAR
 /*
@@ -207,7 +207,7 @@ startupHaskell(int argc, char *argv[], void *init_root)
 #endif
 
     /* Record initialization times */
-    end_init();
+    stat_endInit();
 }
 
 /* -----------------------------------------------------------------------------
