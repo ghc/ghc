@@ -438,7 +438,7 @@ mkPrintUnqualFn env
   where
     lookup name = case lookupRdrEnv env (Unqual (nameOccName name)) of
 			   Just [name'] -> name == name'
-			   Nothing      -> False
+			   other        -> False
 \end{code}
 
 %************************************************************************
