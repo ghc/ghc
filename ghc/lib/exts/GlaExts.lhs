@@ -68,7 +68,7 @@ import PrelIOBase
 import ByteArray
 import MutableArray
 import Monad
-import Foreign
+import PrelCCall   ( Word(..) )
 
 type PrimIO a = IO a
 primIOToIO io = io
