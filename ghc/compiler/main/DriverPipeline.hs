@@ -949,7 +949,6 @@ doLink o_files = do
 #endif
 	 	      ++ pkg_extra_ld_opts
 	 	      ++ extra_ld_opts
-		      ++ (if static then [ "-static" ] else [])
 	              ++ if static && not no_hs_main then
 			    [ "-u", prefixUnderscore "Main_zdmain_closure"] 
 			 else []))
