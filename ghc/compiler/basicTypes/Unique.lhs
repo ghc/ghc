@@ -17,13 +17,12 @@ Haskell).
 \begin{code}
 module Unique (
 	Unique, Uniquable(..), hasKey,
-	u2i,				-- hack: used in UniqFM
 
 	pprUnique, pprUnique10,
 
 	mkUnique,			-- Used in UniqSupply
 	mkUniqueGrimily,		-- Used in UniqSupply only!
-	getKey,				-- Used in Var only!
+	getKey,				-- Used in Var, UniqFM, Name only!
 
 	incrUnique,			-- Used for renumbering
 	deriveUnique,			-- Ditto
@@ -69,11 +68,6 @@ Fast comparison is everything on @Uniques@:
 
 \begin{code}
 data Unique = MkUnique Int#
-\end{code}
-
-\begin{code}
-u2i :: Unique -> FastInt
-u2i (MkUnique i) = i
 \end{code}
 
 Now come the functions which construct uniques from their pieces, and vice versa.
