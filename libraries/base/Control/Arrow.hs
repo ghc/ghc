@@ -93,6 +93,23 @@ class Arrow a where
 	(&&&) :: a b c -> a b c' -> a b (c,c')
 	f &&& g = arr (\b -> (b,b)) >>> f *** g
 
+{-# RULES
+"compose/arr"	forall f g .
+		arr f >>> arr g = arr (f >>> g)
+"first/arr"	forall f .
+		first (arr f) = arr (first f)
+"second/arr"	forall f .
+		second (arr f) = arr (second f)
+"product/arr"	forall f g .
+		arr f *** arr g = arr (f *** g)
+"fanout/arr"	forall f g .
+		arr f &&& arr g = arr (f &&& g)
+"compose/first"	forall f g .
+		first f >>> first g = first (f >>> g)
+"compose/second" forall f g .
+		second f >>> second g = second (f >>> g)
+ #-}
+
 -- Ordinary functions are arrows.
 
 instance Arrow (->) where
@@ -174,6 +191,21 @@ class Arrow a => ArrowChoice a where
 	f ||| g = f +++ g >>> arr untag
 			where	untag (Left x) = x
 				untag (Right y) = y
+
+{-# RULES
+"left/arr"	forall f .
+		left (arr f) = arr (left f)
+"right/arr"	forall f .
+		right (arr f) = arr (right f)
+"sum/arr"	forall f g .
+		arr f +++ arr g = arr (f +++ g)
+"fanin/arr"	forall f g .
+		arr f ||| arr g = arr (f ||| g)
+"compose/left"	forall f g .
+		left f >>> left g = left (f >>> g)
+"compose/right"	forall f g .
+		right f >>> right g = right (f >>> g)
+ #-}
 
 instance ArrowChoice (->) where
 	left f = f +++ id
