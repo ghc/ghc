@@ -93,10 +93,13 @@ ioToRnMG :: IO r -> RnMG (Either IOError13 r)
 ioToRnMG (MkIO io) rn_down g_down = stToSST io
 
 traceRn :: Doc -> RnMG ()
-traceRn msg | opt_D_show_rn_trace = ioToRnMG (hPutStr stderr (show msg) >> 
-					      hPutStr stderr "\n")	`thenRn_`
-				    returnRn ()
+traceRn msg | opt_D_show_rn_trace = putDocRn msg
 	    | otherwise		  = returnRn ()
+
+putDocRn :: Doc -> RnMG ()
+putDocRn msg = ioToRnMG (hPutStr stderr (show msg) >> 
+	       hPutStr stderr "\n")	`thenRn_`
+	       returnRn ()
 \end{code}
 
 
