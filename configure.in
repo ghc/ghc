@@ -74,6 +74,7 @@ fi
 # Suitable names to slam in *_CPP are in platform.h.in.
 # We also record the architecture, vendor, and operating system (OS)
 # separately.
+HostPlatformFull=$HostPlatform
 case $HostPlatform in
 alpha-dec-osf[[1234]]*)
 	HostPlatform=alpha-dec-osf1   # canonicalise for our purposes
@@ -248,6 +249,7 @@ TargetVendor_CPP=$HostVendor_CPP
 
 dnl Cannot afford all these SUBSTs (because of braindead seds w/ 99 cmd limits)
 dnl AC_SUBST(BuildPlatform)
+AC_SUBST(HostPlatformFull)
 AC_SUBST(HostPlatform)
 AC_SUBST(TargetPlatform)
 AC_SUBST(HostPlatform_CPP)
@@ -577,9 +579,13 @@ dnl ** check if it is safe to include both <time.h> and <sys/time.h>
 #
 AC_HEADER_TIME
 #
-dnl ** how do we get a timezone name?
+dnl ** how do we get a timezone name, and UTC offset ?
 #
 AC_STRUCT_TIMEZONE
+HaveAltZone=yes
+AC_MSG_CHECKING([for altzone])
+AC_TRY_LINK([#include <time.h>], [return altzone;], AC_DEFINE(HAVE_ALTZONE),HaveAltZone=no)
+AC_MSG_RESULT($HaveAltZone)
 # 
 dnl ** determine the type of signal()
 #
