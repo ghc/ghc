@@ -50,14 +50,14 @@ main = do
 
 testSin f g = [ (f x == g x) | x <- [0,0.01 .. 1] ]
 
-foreign import ccall "sin" mysin :: Double -> Double
-foreign import ccall "dynamic" dyn_sin :: FunPtr (Double -> Double) -> (Double -> Double)
-foreign import ccall "dynamic" dyn_sinIO :: FunPtr (Double -> IO Double) -> (Double -> IO Double)
-foreign import ccall "&sin" sin_addr :: FunPtr (Double -> Double)
-foreign import ccall "wrapper" wrapId :: (Double -> Double) -> IO (FunPtr (Double -> Double))
-foreign import ccall "wrapper" wrapIO :: (Double -> IO Double) -> IO (FunPtr (Double -> IO Double))
+foreign import ccall "sin" mysin :: CDouble -> CDouble
+foreign import ccall "dynamic" dyn_sin :: FunPtr (CDouble -> CDouble) -> (CDouble -> CDouble)
+foreign import ccall "dynamic" dyn_sinIO :: FunPtr (CDouble -> IO CDouble) -> (CDouble -> IO CDouble)
+foreign import ccall "&sin" sin_addr :: FunPtr (CDouble -> CDouble)
+foreign import ccall "wrapper" wrapId :: (CDouble -> CDouble) -> IO (FunPtr (CDouble -> CDouble))
+foreign import ccall "wrapper" wrapIO :: (CDouble -> IO CDouble) -> IO (FunPtr (CDouble -> IO CDouble))
 
-foreign import ccall safe "static stdlib.h &errno" errno :: Ptr Int
+foreign import ccall safe "static stdlib.h &errno" errno :: Ptr CInt
 
 withBuffer sz m = do
   b <- mallocArray sz
@@ -66,20 +66,20 @@ withBuffer sz m = do
   free b
   return s
 
-foreign import ccall puts :: CString -> IO Int
+foreign import ccall puts :: CString -> IO CInt
 
-foreign import ccall "open" open'  :: CString -> Int -> IO Int
-foreign import ccall "open" open2' :: CString -> Int -> Int -> IO Int
-foreign import ccall "creat" creat' :: CString -> Int -> IO Int
-foreign import ccall        close :: Int -> IO Int
-foreign import ccall "read" read' :: Int -> CString -> Int -> IO Int
-foreign import ccall "write" write' :: Int -> CString -> Int -> IO Int
+foreign import ccall "open" open'  :: CString -> CInt -> IO CInt
+foreign import ccall "open" open2' :: CString -> CInt -> CInt -> IO CInt
+foreign import ccall "creat" creat' :: CString -> CInt -> IO CInt
+foreign import ccall        close :: CInt -> IO CInt
+foreign import ccall "read" read' :: CInt -> CString -> CInt -> IO CInt
+foreign import ccall "write" write' :: CInt -> CString -> CInt -> IO CInt
 
 creat s m   = withCString s $ \s' -> unix "creat" $ creat' s' m
 open s m    = withCString s $ \s' -> unix "open"  $ open' s' m
 open2 s m n = withCString s $ \s' -> unix "open2" $ open2' s' m n
-write fd s  = withCString s $ \s' -> unix "write" $ write' fd s' (length s)
-read  fd sz = withBuffer sz $ \s' -> unix "read"  $ read' fd s' sz
+write fd s  = withCString s $ \s' -> unix "write" $ write' fd s' (fromIntegral (length s))
+read  fd sz = withBuffer sz $ \s' -> unix "read"  $ read' fd s' (fromIntegral sz)
 
 unix s m = do
   x <- m
@@ -87,7 +87,7 @@ unix s m = do
    then do
      err <- peek errno
      ioError $ userError $ s ++ ": " ++ show (x,err)
-   else return x
+   else return (fromIntegral x)
 
 testRead fn sz = bracket (open fn 0) close (flip read sz)
 testWrite fn s = bracket (open2 fn (512+64+1) 511) close (flip write s)
