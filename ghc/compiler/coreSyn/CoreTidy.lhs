@@ -25,10 +25,10 @@ import Id		( idType, idInfo, idName, isExportedId,
 			  mkVanillaGlobal, mkGlobalId, isLocalId, 
 			  isDataConId, mkUserLocal, isGlobalId, globalIdDetails,
 			  idNewDemandInfo, setIdNewDemandInfo, 
-			  idNewStrictness_maybe, setIdNewStrictness
+			  idNewStrictness, setIdNewStrictness
 			) 
 import IdInfo		{- loads of stuff -}
-import NewDemand	( isBottomingSig, topSig, isStrictDmd )
+import NewDemand	( isBottomingSig, topSig, isStrictDmd, isTopSig )
 import BasicTypes	( isNeverActive )
 import Name		( getOccName, nameOccName, globaliseName, setNameOcc, 
 		  	  localiseName, isGlobalName, setNameUnique
@@ -642,15 +642,15 @@ tidyLetBndr env (id,rhs)
     final_id
 	| totally_boring_info = new_id
 	| otherwise = new_id `setIdNewDemandInfo` dmd_info
-			     `setIdNewStrictness` fromJust maybe_new_strictness
+			     `setIdNewStrictness` new_strictness
 
     -- override the env we get back from tidyId with the new IdInfo
     -- so it gets propagated to the usage sites.
     new_var_env = extendVarEnv var_env id final_id
 
     dmd_info		 = idNewDemandInfo id
-    maybe_new_strictness = idNewStrictness_maybe id
-    totally_boring_info  = isNothing maybe_new_strictness && not (isStrictDmd dmd_info) 
+    new_strictness       = idNewStrictness id
+    totally_boring_info  = isTopSig new_strictness && not (isStrictDmd dmd_info) 
 
 tidyIdBndr :: TidyEnv -> Id -> (TidyEnv, Id)
 tidyIdBndr env@(tidy_env, var_env) id

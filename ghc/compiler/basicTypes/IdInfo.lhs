@@ -249,7 +249,10 @@ data IdInfo
 	inlinePragInfo	:: InlinePragInfo,	-- Inline pragma
 	occInfo		:: OccInfo,		-- How it occurs
 
-	newStrictnessInfo :: Maybe StrictSig,
+	newStrictnessInfo :: Maybe StrictSig,	-- Reason for Maybe: the DmdAnal phase needs to
+						-- know whether whether this is the first visit,
+						-- so it can assign botSig.  Other customers want
+						-- topSig.  So Nothing is good.
 	newDemandInfo	  :: Demand
     }
 

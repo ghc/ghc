@@ -13,7 +13,7 @@ module NewDemand(
 	DmdEnv, emptyDmdEnv,
 	DmdResult(..), isBotRes, returnsCPR,
 
-	StrictSig(..), mkStrictSig, topSig, botSig, 
+	StrictSig(..), mkStrictSig, topSig, botSig, isTopSig,
 	splitStrictSig, strictSigResInfo,
 	pprIfaceStrictSig, appIsBottom, isBottomingSig
      ) where
@@ -79,6 +79,11 @@ instance Outputable DmdResult where
 emptyDmdEnv = emptyVarEnv
 topDmdType = DmdType emptyDmdEnv [] TopRes
 botDmdType = DmdType emptyDmdEnv [] BotRes
+
+isTopDmdType :: DmdType -> Bool
+-- Only used on top-level types, hence the assert
+isTopDmdType (DmdType _ [] TopRes) = ASSERT( isEmptyVarEnv env) True	
+isTopDmdType other		   = False
 
 isBotRes :: DmdResult -> Bool
 isBotRes BotRes = True
@@ -151,6 +156,8 @@ splitStrictSig (StrictSig (DmdType _ dmds res)) = (dmds, res)
 
 strictSigResInfo :: StrictSig -> DmdResult
 strictSigResInfo (StrictSig (DmdType _ _ res)) = res
+
+isTopSig (StrictSig ty) = isTopDmdType ty
 
 topSig = StrictSig topDmdType
 botSig = StrictSig botDmdType
