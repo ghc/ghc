@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.12 1999/08/25 16:11:44 simonmar Exp $
+ * $Id: Updates.h,v 1.13 1999/10/20 10:14:47 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -53,12 +53,10 @@
 
 extern void awakenBlockedQueue(StgTSO *q);
 
-#define AWAKEN_BQ(closure)						\
-     	if (closure->header.info == &BLACKHOLE_BQ_info) {		\
-		StgTSO *bq = ((StgBlockingQueue *)closure)->blocking_queue;\
-		if (bq != (StgTSO *)&END_TSO_QUEUE_closure) {		\
-			STGCALL1(awakenBlockedQueue, bq);		\
-		}							\
+#define AWAKEN_BQ(closure)						 \
+     	if (closure->header.info == &BLACKHOLE_BQ_info) {		 \
+		STGCALL1(awakenBlockedQueue, 				 \
+			 ((StgBlockingQueue *)closure)->blocking_queue); \
 	}
 
 
@@ -78,8 +76,8 @@ extern DLL_IMPORT_DATA const StgPolyInfoTable Upd_frame_info;
 	{							\
 		StgUpdateFrame *__frame;			\
 		TICK_UPDF_PUSHED(target, GET_INFO((StgClosure*)target)); \
-		__frame = stgCast(StgUpdateFrame*,Sp + (Sp_offset)) - 1; \
-		SET_INFO(__frame,stgCast(StgInfoTable*,&Upd_frame_info));   \
+		__frame = (StgUpdateFrame *)(Sp + (Sp_offset)) - 1; \
+		SET_INFO(__frame, (StgInfoTable *)&Upd_frame_info);   \
 		__frame->link = Su;				\
 		__frame->updatee = (StgClosure *)(target);	\
 		PUSH_STD_CCCS(__frame);				\
