@@ -457,6 +457,8 @@ I_ stg_div PROTO((I_ a, I_ b));
 #define ZdZh(r,a,b)		r=ULTRASAFESTGCALL2(I_,(void *, I_, I_),stg_div,(a),(b))
 #define remIntZh(r,a,b)		r=(a)%(b)
 #define negateIntZh(r,a)	r=-(a)
+/* Ever used ? -- SOF */
+#define absIntZh(a)		r=(( (a) >= 0 ) ? (a) : (-(a)))
 \end{code}
 
 %************************************************************************
