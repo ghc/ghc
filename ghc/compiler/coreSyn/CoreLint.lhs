@@ -12,8 +12,6 @@ module CoreLint (
 
 #include "HsVersions.h"
 
-import IO		( hPutStr, hPutStrLn, stdout )
-
 import CoreSyn
 import CoreFVs		( idFreeVars )
 import CoreUtils	( findDefault, exprOkForSpeculation, coreBindsSize, mkPiType )
@@ -26,7 +24,7 @@ import VarSet
 import Subst		( substTyWith )
 import Name		( getSrcLoc )
 import PprCore
-import ErrUtils		( doIfSet, dumpIfSet_core, ghcExit, Message, showPass,
+import ErrUtils		( dumpIfSet_core, ghcExit, Message, showPass,
 			  addErrLocHdrLine )
 import SrcLoc		( SrcLoc, noSrcLoc )
 import Type		( Type, tyVarsOfType, eqType,
@@ -40,8 +38,9 @@ import TyCon		( isPrimTyCon )
 import BasicTypes	( RecFlag(..), isNonRec )
 import CmdLineOpts
 import Maybe
-import Util		( notNull )
 import Outputable
+
+import IO		( hPutStrLn, stderr )
 
 infixr 9 `thenL`, `seqL`
 \end{code}
@@ -116,7 +115,7 @@ lintCoreBindings dflags whoDunnit binds
 
 lintCoreBindings dflags whoDunnit binds
   = case (initL (lint_binds binds)) of
-      Nothing       -> done_lint
+      Nothing       -> showPass dflags ("Core Linted result of " ++ whoDunnit)
       Just bad_news -> printDump (display bad_news)	>>
 		       ghcExit 1
   where
@@ -129,9 +128,6 @@ lintCoreBindings dflags whoDunnit binds
     lint_bind (Rec prs)		= mapL (lintSingleBinding Recursive) prs	`seqL`
 				  returnL ()
     lint_bind (NonRec bndr rhs) = lintSingleBinding NonRecursive (bndr,rhs)
-
-    done_lint = doIfSet (verbosity dflags >= 2)
-		        (hPutStr stdout ("*** Core Linted result of " ++ whoDunnit ++ "\n"))
 
     display bad_news
       = vcat [  text ("*** Core Lint Errors: in result of " ++ whoDunnit ++ " ***"),
