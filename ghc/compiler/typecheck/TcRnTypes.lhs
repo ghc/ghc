@@ -278,18 +278,35 @@ data TcLclEnv		-- Changes as we move inside an expression
 	tcl_env  :: NameEnv TcTyThing,  -- The local type environment: Ids and TyVars
 					-- defined in this module
 					
-	tcl_gadt :: GadtRefinement,	-- The current type refinement for GADTs
-
 	tcl_tyvars :: TcRef TcTyVarSet,	-- The "global tyvars"
-			-- Namely, the in-scope TyVars bound in tcl_lenv, 
+			-- Namely, the in-scope TyVars bound in tcl_env, 
 			-- plus the tyvars mentioned in the types of Ids bound in tcl_lenv
 			-- Why mutable? see notes with tcGetGlobalTyVars
 
-	tcl_lie :: TcRef LIE		-- Place to accumulate type constraints
+	tcl_lie   :: TcRef LIE,		-- Place to accumulate type constraints
+	tcl_gadt  :: GadtRefinement	-- The current type refinement for GADTs
+
+-----------------------------------------------------------
+-- Not yet; it's a new complication and I want to see whether it bites
+--	tcl_given :: [Inst]		-- Insts available in the current context (see Note [Given Insts])
+-----------------------------------------------------------
     }
 
 type GadtRefinement = TvSubstEnv	-- Binds rigid type variables to their refinements
 
+{- Note [Given Insts]
+   ~~~~~~~~~~~~~~~~~~
+Because of GADTs, we have to pass inwards the Insts provided by type signatures 
+and existential contexts. Consider
+	data T a where { T1 :: b -> b -> T [b] }
+	f :: Eq a => T a -> Bool
+	f (T1 x y) = [x]==[y]
+
+The constructor T1 binds an existential variable 'b', and we need Eq [b].
+Well, we have it, because Eq a refines to Eq [b], but we can only spot that if we 
+pass it inwards.
+
+-}
 
 ---------------------------
 -- Template Haskell levels 
