@@ -589,18 +589,25 @@ dmdTransform sigs var dmd
 
 ------ 	DATA CONSTRUCTOR
   | isDataConId var,		-- Data constructor
-    Seq k ds <- res_dmd,	-- and the demand looks inside its fields
-    let StrictSig dmd_ty = idNewStrictness var,	-- It must have a strictness sig
-    let DmdType _ _ con_res = dmd_ty
-  = if idArity var == call_depth then		-- Saturated, so unleash the demand
-	-- ds can be empty, when we are just seq'ing the thing
+    Seq k ds <- res_dmd		-- and the demand looks inside its fields
+  = let 
+	StrictSig dmd_ty    = idNewStrictness var	-- It must have a strictness sig
+	DmdType _ _ con_res = dmd_ty
+	arity		    = idArity var
+    in
+    if arity == call_depth then		-- Saturated, so unleash the demand
 	let 
+		-- ds can be empty, when we are just seq'ing the thing
+		-- If so we must make up a suitable bunch of demands
+	   dmd_ds | null ds   = replicate arity Abs
+		  | otherwise = ASSERT( length ds == arity ) ds
+
 	   arg_ds = case k of
-			Keep  -> bothLazy_s ds
-			Drop  -> ds
+			Keep  -> bothLazy_s dmd_ds
+			Drop  -> dmd_ds
 			Defer -> pprTrace "dmdTransform: surprising!" (ppr var) 
 					-- I don't think this can happen
-				 ds
+				 dmd_ds
 		-- Important!  If we Keep the constructor application, then
 		-- we need the demands the constructor places (always lazy)
 		-- If not, we don't need to.  For example:
