@@ -253,7 +253,7 @@ problems, so I'm turing on the warnings -- SDM 4/5/98)
 \begin{code}
 $CcRegd	 	= $GHC_OPT_HILEV_ASM;
 @CcBoth_flags	= ('-S','-Wimplicit');   # flags for *any* C compilation
-@CcInjects	= ();
+@CcInjects	= ("#include \"Stg.h\"\n", "#include \"HsStd.h\"\n");
 
 # GCC flags: 
 #    those for all files, 
@@ -2120,11 +2120,7 @@ sub runGcc {
     # a tmp .c file which #include's the needful.
     open(TMP, "> $cc_help") || &tidy_up_and_die(1,"$Pgm: failed to open `$cc_help' (to write)\n");
     if ( $is_hc_file ) {
-	print TMP <<EOINCL;
-#include "Stg.h"
-EOINCL
-	# user may have asked for #includes to be injected...
-	print TMP @CcInjects if $#CcInjects >= 0;
+	print TMP @CcInjects;
     } else {
 	# Straight .c files may want to know that they're being used
 	# with a particular version of GHC, so we define __GLASGOW_HASKELL__ for their benefit.
@@ -2713,6 +2709,9 @@ sub add_syslib {
        $Status++;
        return;
     }
+
+    # Make sure that header file HsFoo.h is included for syslib foo.
+    push(@CcInjects, "#include \"Hs\u$syslib.h\"\n") unless ( exists $Syslibs_added{$syslib} );
 
     # This check is here to avoid syslib loops from
     # spoiling the party. A side-effect of it is that
