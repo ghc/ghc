@@ -42,7 +42,7 @@ import ByteCodeItbls	( ItblEnv, mkITbls )
 import ByteCodeLink	( UnlinkedBCO, UnlinkedBCOExpr, assembleBCO,
 			  ClosureEnv, HValue, linkSomeBCOs, filterNameMap )
 
-import List		( intersperse )
+import List		( intersperse, sortBy )
 import Foreign		( Ptr(..), mallocBytes )
 import Addr		( addrToInt, writeCharOffAddr )
 import CTypes		( CInt )
@@ -155,6 +155,14 @@ type Sequel = Int	-- back off to this depth before ENTER
 -- to mess with it after each push/pop.
 type BCEnv = FiniteMap Id Int	-- To find vars on the stack
 
+ppBCEnv :: BCEnv -> SDoc
+ppBCEnv p
+   = text "begin-env"
+     $$ nest 4 (vcat (map pp_one (sortBy cmp_snd (fmToList p))))
+     $$ text "end-env"
+     where
+        pp_one (var, offset) = int offset <> colon <+> ppr var
+        cmp_snd x y = compare (snd x) (snd y)
 
 -- Create a BCO and do a spot of peephole optimisation on the insns
 -- at the same time.
@@ -199,12 +207,11 @@ collect xs not_lambda
 
 schemeR_wrk original_body nm (args, body)
    = let fvs       = filter (not.isTyVar) (varSetElems (fst original_body))
-         all_args  = reverse args ++ fvs --ORIG: fvs ++ reverse args
+         all_args  = reverse args ++ fvs
          szsw_args = map taggedIdSizeW all_args
          szw_args  = sum szsw_args
          p_init    = listToFM (zip all_args (mkStackOffsets 0 szsw_args))
-         argcheck  = --if null args then nilOL else
-                     unitOL (ARGCHECK szw_args)
+         argcheck  = unitOL (ARGCHECK szw_args)
      in
      schemeE szw_args 0 p_init body 		`thenBc` \ body_code ->
      emitBc (mkProtoBCO (getName nm) (appOL argcheck body_code) (Right original_body))
@@ -305,22 +312,11 @@ schemeE d s p (fvs, AnnCase scrut bndr alts)
         -- given an alt, return a discr and code for it.
         codeAlt alt@(discr, binds_f, rhs)
            | isAlgCase 
-           = let -- The constr args in r->l order
-                 binds_r = reverse binds_f
-                 -- r->l order, but nptrs first, then ptrs
-                 -- this is the reverse order of the heap representation
-                 binds_r_split = filter (not.isPtr) binds_r ++ filter isPtr binds_r
-                 isPtr = isFollowableRep . typePrimRep . idType
-
-                 binds_r_tszsw = map taggedIdSizeW binds_r_split
-                 binds_tszw = sum binds_r_tszsw
-                 p'' = addListToFM 
-                          p' (zip (reverse binds_r_split) (mkStackOffsets d' (reverse binds_r_tszsw)))
-                 d'' = d' + binds_tszw
-                 unpack_code = mkUnpackCode (map (typePrimRep.idType) 
-                                                 (reverse binds_r_split))
-             in schemeE d'' s p'' rhs	`thenBc` \ rhs_code -> 
-                returnBc (my_discr alt, unpack_code `appOL` rhs_code)
+           = let (unpack_code, d_after_unpack, p_after_unpack)
+                    = mkUnpackCode binds_f d' p'
+             in  schemeE d_after_unpack s p_after_unpack rhs
+					`thenBc` \ rhs_code -> 
+                 returnBc (my_discr alt, unpack_code `appOL` rhs_code)
            | otherwise 
            = ASSERT(null binds_f) 
              schemeE d' s p' rhs	`thenBc` \ rhs_code ->
@@ -378,7 +374,9 @@ schemeT :: Int 		-- Stack depth
         -> BCInstrList
 
 schemeT d s p app
-   = code
+   = --trace ("schemeT: env in = \n" ++ showSDocDebug (ppBCEnv p)) (
+     code
+     --)
      where
          -- Extract the args (R->L) and fn
          (args_r_to_l_raw, fn) = chomp app
@@ -435,25 +433,66 @@ atomRep (AnnNote n b) = atomRep (snd b)
 atomRep (AnnApp f (_, AnnType _)) = atomRep (snd f)
 atomRep other = pprPanic "atomRep" (ppr (deAnnotate (undefined,other)))
 
+
 -- Make code to unpack the top-of-stack constructor onto the stack, 
 -- adding tags for the unboxed bits.  Takes the PrimReps of the 
 -- constructor's arguments.  off_h and off_s are travelling offsets
 -- along the constructor and the stack.
--- 
--- The supplied PrimReps are in heap rep order, that is,
--- left to right, but with all the ptrs first, then the nonptrs.
-mkUnpackCode :: [PrimRep] -> BCInstrList
-mkUnpackCode reps
-   = all_code
+--
+-- Supposing a constructor in the heap has layout
+--
+--      Itbl p_1 ... p_i np_1 ... np_j
+--
+-- then we add to the stack, shown growing down, the following:
+--
+--    (previous stack)
+--         p_i
+--         ...
+--         p_1
+--         np_j
+--         tag_for(np_j)
+--         ..
+--         np_1
+--         tag_for(np_1)
+--
+-- so that in the common case (ptrs only) a single UNPACK instr can
+-- copy all the payload of the constr onto the stack with no further ado.
+
+mkUnpackCode :: [Id] 	-- constr args
+             -> Int 	-- depth before unpack
+             -> BCEnv 	-- env before unpack
+             -> (BCInstrList, Int, BCEnv)
+mkUnpackCode vars d p
+   = --trace ("mkUnpackCode: " ++ showSDocDebug (ppr vars)
+     --       ++ " --> " ++ show d' ++ "\n" ++ showSDocDebug (ppBCEnv p')
+     --       ++ "\n") (
+     (code_p `appOL` code_np, d', p')
+     --)
      where
-        all_code = ptrs_code `appOL` do_nptrs ptrs_szw ptrs_szw reps_nptr
+        -- vars with reps
+        vreps = [(var, typePrimRep (idType var)) | var <- vars]
 
-        (reps_ptr, reps_nptr) = span isFollowableRep reps
-        
-        ptrs_szw  = sum (map untaggedSizeW reps_ptr)
-        ptrs_code | null reps_ptr = nilOL
-                  | otherwise     = unitOL (UNPACK ptrs_szw)
+        -- ptrs and nonptrs, forward
+        vreps_p  = filter (isFollowableRep.snd) vreps
+        vreps_np = filter (not.isFollowableRep.snd) vreps
 
+        -- the order in which we will augment the environment
+        vreps_env = reverse vreps_p ++ reverse vreps_np
+
+        -- new env and depth
+        vreps_env_tszsw = map (taggedSizeW.snd) vreps_env
+        p' = addListToFM p (zip (map fst vreps_env) 
+                                (mkStackOffsets d vreps_env_tszsw))
+        d' = d + sum vreps_env_tszsw
+
+        -- code to unpack the ptrs
+        ptrs_szw = sum (map (untaggedSizeW.snd) vreps_p)
+        code_p | null vreps_p = nilOL
+               | otherwise    = unitOL (UNPACK ptrs_szw)
+
+        -- code to unpack the nonptrs
+        vreps_env_uszw = sum (map (untaggedSizeW.snd) vreps_env)
+        code_np = do_nptrs vreps_env_uszw ptrs_szw (reverse (map snd vreps_np))
         do_nptrs off_h off_s [] = nilOL
         do_nptrs off_h off_s (npr:nprs)
            = case npr of
@@ -461,8 +500,8 @@ mkUnpackCode reps
                 DoubleRep -> approved ; AddrRep -> approved
                 _ -> pprPanic "ByteCodeGen.mkUnpackCode" (ppr npr)
              where
-                approved = UPK_TAG usizeW off_h off_s   `consOL` theRest
-                theRest  = do_nptrs (off_h + usizeW) (off_s + tsizeW) nprs
+                approved = UPK_TAG usizeW (off_h-usizeW) off_s   `consOL` theRest
+                theRest  = do_nptrs (off_h-usizeW) (off_s + tsizeW) nprs
                 usizeW   = untaggedSizeW npr
                 tsizeW   = taggedSizeW npr
 
@@ -497,10 +536,12 @@ pushAtom tagged d p (AnnVar v)
                ++ " :: " ++ showSDocDebug (pprType (idType v))
                ++ ", depth = " ++ show d
                ++ ", tagged = " ++ show tagged ++ ", env =\n" ++ 
-               showSDocDebug (nest 4 (vcat (map ppr (fmToList p))))
+               showSDocDebug (ppBCEnv p)
                ++ " --> words: " ++ show (snd result) ++ "\n" ++
                showSDoc (nest 4 (vcat (map ppr (fromOL (fst result)))))
                ++ "\nendPushAtom " ++ showSDocDebug (ppr v)
+                  where
+                     cmp_snd x y = compare (snd x) (snd y)
          str' = if str == str then str else str
 
          result
@@ -516,7 +557,7 @@ pushAtom tagged d p (AnnVar v)
          sz_u   = untaggedIdSizeW v
          nwords = if tagged then sz_t else sz_u
      in
-         trace str'
+         --trace str'
          result
 
 pushAtom True d p (AnnLit lit)

@@ -409,7 +409,7 @@ GLOBAL_VAR(v_cafTable, [], [HValue])
 
 addCAF :: HValue -> IO ()
 addCAF x = do xs <- readIORef v_cafTable
-              putStrLn ("addCAF " ++ show (1 + length xs))
+              --putStrLn ("addCAF " ++ show (1 + length xs))
               writeIORef v_cafTable (x:xs)
 
 
