@@ -1,64 +1,41 @@
-TOP=../../..
-include $(TOP)/ghc/mk/ghc.mk
+TOP=../..
+include $(TOP)/mk/boilerplate.mk
 
-PROGRAMS = \
-  grs2gr gr2ps gr2qp qp2ps ghc-fool-sort ghc-unfool-sort gr2pe gr2java gr2jv \
-  gr2ap qp2ap gr2gran gr2RTS RTS2gran gran-extr gp-ext-imp tf avg-RTS SPLIT \
+# Ways? what ways?
+WAYS=
+
+PERL_PROGS = \
+  grs2gr gr2qp qp2ps ghc-fool-sort ghc-unfool-sort gr2pe gr2java \
+  qp2ap gr2RTS RTS2gran gran-extr gp-ext-imp tf avg-RTS SPLIT \
   AVG SN get_SN sn_filter ps-scale-y
 
-#MsubProgramScriptTarget(PerlCmd,grs2gr,grs2gr.pl,,)
-#MsubProgramScriptTarget(/usr/local/bin/bash,gr2ps,gr2ps.bash,,)
-#MsubProgramScriptTarget(PerlCmd,gr2qp,gr2qp.pl,,)
-#MsubProgramScriptTarget(PerlCmd,qp2ps,qp2ps.pl,,)
-#MsubProgramScriptTarget(PerlCmd,ghc-fool-sort,ghc-fool-sort.pl,,)
-#MsubProgramScriptTarget(PerlCmd,ghc-unfool-sort,ghc-unfool-sort.pl,,)
 
-#MsubProgramScriptTarget(PerlCmd,gr2pe,gr2pe.pl,,)
-#MsubProgramScriptTarget(PerlCmd,gr2java,gr2java.pl,,)
-#MsubProgramScriptTarget(/usr/local/bin/bash,gr2jv,gr2jv.bash,,)
-#MsubProgramScriptTarget(/usr/local/bin/bash,gr2ap,gr2ap.bash,,)
-#MsubProgramScriptTarget(PerlCmd,qp2ap,qp2ap.pl,,)
+BASH_PROGS = gr2ps gr2jv gr2ap gr2gran
 
-#MsubProgramScriptTarget(/usr/local/bin/bash,gr2gran,gr2gran.bash,,)
-#MsubProgramScriptTarget(PerlCmd,gr2RTS,gr2RTS.pl,,)
-#MsubProgramScriptTarget(PerlCmd,RTS2gran,RTS2gran.pl,,)
-#MsubProgramScriptTarget(PerlCmd,gran-extr,gran-extr.pl,,)
+#
+# One rule fits all, not particularly selective.
+#
+$(PERL_PROGS) : $(patsubst %,%.pl,$(PERL_PROGS))
+$(BASH_PROGS) : $(patsubst %,%.bash,$(BASH_PROGS))
 
-#MsubProgramScriptTarget(PerlCmd,gp-ext-imp,gp-ext-imp.pl,,)
-#MsubProgramScriptTarget(PerlCmd,tf,tf.pl,,)
-#MsubProgramScriptTarget(PerlCmd,avg-RTS,avg-RTS.pl,,)
-#MsubProgramScriptTarget(PerlCmd,SPLIT,SPLIT.pl,,)
-#MsubProgramScriptTarget(PerlCmd,AVG,AVG.pl,,)
-#MsubProgramScriptTarget(PerlCmd,SN,SN.pl,,)
-#MsubProgramScriptTarget(PerlCmd,get_SN,get_SN.pl,,)
-#MsubProgramScriptTarget(PerlCmd,sn_filter,sn_filter.pl,,)
-#MsubProgramScriptTarget(PerlCmd,ps-scale-y,ps-scale-y.pl,,)
 
-#MakeDirectories(install,    $(INSTSCRIPTDIR))
-#InstallScriptTarget(grs2gr, $(INSTSCRIPTDIR))
-#InstallScriptTarget(gr2ps,  $(INSTSCRIPTDIR))
-#InstallScriptTarget(gr2qp,  $(INSTSCRIPTDIR))
-#InstallScriptTarget(qp2ps,  $(INSTSCRIPTDIR))
-#InstallScriptTarget(ghc-fool-sort,  $(INSTSCRIPTDIR))
-#InstallScriptTarget(ghc-unfool-sort,$(INSTSCRIPTDIR))
+all :: $(PERL_PROGS) $(BASH_PROGS)
 
-#InstallScriptTarget(gr2pe,  $(INSTSCRIPTDIR))
-#InstallScriptTarget(gr2java,  $(INSTSCRIPTDIR))
-#InstallScriptTarget(gr2jv,  $(INSTSCRIPTDIR))
-#InstallScriptTarget(gr2ap,  $(INSTSCRIPTDIR))
-#InstallScriptTarget(qp2ap,  $(INSTSCRIPTDIR))
+$(PERL_PROGS) :
+	$(RM) $@
+	@echo Creating $@...
+	@echo "#!"$(PERL) > $@
+	@cat $@.pl >> $@
+	@chmod a+x $@
 
-#InstallScriptTarget(gr2gran,  $(INSTSCRIPTDIR))
-#InstallScriptTarget(gr2RTS,  $(INSTSCRIPTDIR))
-#InstallScriptTarget(RTS2gran,  $(INSTSCRIPTDIR))
-#InstallScriptTarget(gran-extr,  $(INSTSCRIPTDIR))
+$(BASH_PROGS) :
+	$(RM) $@
+	@echo Creating $@...
+	@echo "#!"$(BASH) > $@
+	@cat $@.bash >> $@
+	@chmod a+x $@
 
-#InstallScriptTarget(gp-ext-imp,  $(INSTSCRIPTDIR))
-#InstallScriptTarget(tf,  $(INSTSCRIPTDIR))
-#InstallScriptTarget(avg-RTS,  $(INSTSCRIPTDIR))
-#InstallScriptTarget(SPLIT,  $(INSTSCRIPTDIR))
-#InstallScriptTarget(AVG,  $(INSTSCRIPTDIR))
-#InstallScriptTarget(SN,  $(INSTSCRIPTDIR))
-#InstallScriptTarget(get_SN,  $(INSTSCRIPTDIR))
-#InstallScriptTarget(sn_filter,  $(INSTSCRIPTDIR))
-#InstallScriptTarget(ps-scale-y,  $(INSTSCRIPTDIR))
+INSTALL_PROGS += $(BASH_PROGS) $(PERL_PROGS)
+CLEAN_FILES   += $(BASH_PROGS) $(PERL_PROGS)
+
+include $(TOP)/mk/target.mk
