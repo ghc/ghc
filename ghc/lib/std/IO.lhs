@@ -736,12 +736,13 @@ readLn          =  do l <- getLine
 
 \end{code}
 
-#else
+#else /* __HUGS__ */
+
 \begin{code}
 import Ix(Ix)
 
 unimp :: String -> a
-unimp s = error ("function not implemented: " ++ s)
+unimp s = error ("IO library: function not implemented: " ++ s)
 
 type FILE_STAR = Addr
 type Ptr       = Addr
@@ -749,20 +750,59 @@ nULL           = nullAddr
 
 data Handle 
    = Handle { name     :: FilePath,
-              file     :: FILE_STAR,    -- C handle
-              state    :: HState,       -- open/closed/semiclosed
+              file     :: FILE_STAR,         -- C handle
+              mut      :: IORef Handle_Mut,  -- open/closed/semiclosed
               mode     :: IOMode,
-              --seekable :: Bool,
-              bmode    :: BufferMode,
-              buff     :: Ptr,
-              buffSize :: Int
+              seekable :: Bool
             }
+
+data Handle_Mut
+   = Handle_Mut { state :: HState 
+                }
+
+set_state :: Handle -> HState -> IO ()
+set_state hdl new_state
+   = writeIORef (mut hdl) (Handle_Mut { state = new_state })
+get_state :: Handle -> IO HState
+get_state hdl
+   = readIORef (mut hdl) >>= \m -> return (state m)
+
+mkErr :: Handle -> String -> IO a
+mkErr h msg
+   = do nh_close (file h)
+        dummy <- nh_errno
+        ioError (IOError msg)
+
+stdin
+   = Handle {
+        name = "stdin",
+        file = primRunST nh_stdin,
+        mut  = primRunST (newIORef (Handle_Mut { state = HOpen })),
+        mode = ReadMode
+     }
+
+stdout
+   = Handle {
+        name = "stdout",
+        file = primRunST nh_stdout,
+        mut  = primRunST (newIORef (Handle_Mut { state = HOpen })),
+        mode = WriteMode
+     }
+
+stderr
+   = Handle {
+        name = "stderr",
+        file = primRunST nh_stderr,
+        mut  = primRunST (newIORef (Handle_Mut { state = HOpen })),
+        mode = WriteMode
+     }
+
 
 instance Eq Handle where
    h1 == h2   = file h1 == file h2
 
 instance Show Handle where
-   showsPrec _ h = showString ("<<handle " ++ name h ++ ">>")
+   showsPrec _ h = showString ("<<" ++ name h ++ ">>")
 
 data HandlePosn
    = HandlePosn 
@@ -782,41 +822,99 @@ data SeekMode    =  AbsoluteSeek | RelativeSeek | SeekFromEnd
 data HState = HOpen | HSemiClosed | HClosed
               deriving Eq
 
-stdin  = Handle "stdin"  (primRunST nh_stdin)  HOpen ReadMode  NoBuffering   nULL 0
-stdout = Handle "stdout" (primRunST nh_stdout) HOpen WriteMode LineBuffering nULL 0
-stderr = Handle "stderr" (primRunST nh_stderr) HOpen WriteMode NoBuffering   nULL 0
-
 openFile :: FilePath -> IOMode -> IO Handle
 openFile f mode
    = copy_String_to_cstring f >>= \nameptr ->
      nh_open nameptr (mode2num mode) >>= \fh ->
      nh_free nameptr >>
      if   fh == nULL
-     then (ioError.IOError) ("openFile: can't open " ++ f ++ " in " ++ show mode)
-     else return (Handle f fh HOpen mode BlockBuffering nULL 0)
+     then (ioError.IOError)
+             ("openFile: can't open <<" ++ f ++ ">> in " ++ show mode)
+     else do r <- newIORef (Handle_Mut { state = HOpen })
+             return (Handle { 
+                        name = f,
+                        file = fh, 
+                        mut  = r,
+                        mode = mode
+                     })
      where
         mode2num :: IOMode -> Int
         mode2num ReadMode   = 0
         mode2num WriteMode  = 1
         mode2num AppendMode = 2
-        
+        mode2num ReadWriteMode
+           = error
+                ("openFile <<" ++ f ++ ">>: ReadWriteMode not supported")
+
 hClose :: Handle -> IO ()
 hClose h
-   | not (state h == HOpen)
-   = (ioError.IOError) ("hClose on non-open handle " ++ show h)
-   | otherwise
-   = nh_close (file h) >> 
-     nh_errno >>= \err ->
-     if   err == 0 
-     then return ()
-     else (ioError.IOError) ("hClose: error closing " ++ name h)
+   = do mut <- readIORef (mut h)
+        if    state mut == HClosed
+         then mkErr h
+                 ("hClose on closed handle " ++ show h)
+         else 
+         do set_state h HClosed
+            nh_close (file h)
+            err <- nh_errno
+            if    err == 0 
+             then return ()
+             else mkErr h
+                     ("hClose: error closing " ++ name h)
 
-hFileSize             :: Handle -> IO Integer
-hFileSize              = unimp "IO.hFileSize"
-hIsEOF                :: Handle -> IO Bool
-hIsEOF                 = unimp "IO.hIsEOF"
-isEOF                 :: IO Bool
-isEOF                  = hIsEOF stdin
+hGetContents :: Handle -> IO String
+hGetContents h
+   | mode h /= ReadMode
+   = mkErr h ("hGetContents on non-ReadMode handle " ++ show h)
+   | otherwise 
+   = do mut <- readIORef (mut h)
+        if    state mut /= HOpen
+         then mkErr h
+                 ("hGetContents on closed/semiclosed handle " ++ show h)
+         else
+         do set_state h HSemiClosed
+            read_all (file h)
+            where
+               read_all f 
+                  = nh_read f >>= \ci ->
+                    if   ci == -1
+                    then return []
+                    else read_all f >>= \rest -> 
+                         return ((primIntToChar ci):rest)
+
+hPutStr :: Handle -> String -> IO ()
+hPutStr h s
+   | mode h == ReadMode
+   = mkErr h ("hPutStr on ReadMode handle " ++ show h)
+   | otherwise
+   = do mut <- readIORef (mut h)
+        if    state mut /= HOpen
+         then mkErr h
+                 ("hPutStr on closed/semiclosed handle " ++ show h)
+         else write_all (file h) s
+              where
+                 write_all f []
+                    = return ()
+                 write_all f (c:cs)
+                    = nh_write f c >> write_all f cs
+
+hFileSize :: Handle -> IO Integer
+hFileSize h
+   = do sz <- nh_filesize (file h)
+        er <- nh_errno
+        if    er == 0
+         then return (fromIntegral sz)
+         else mkErr h ("hFileSize on " ++ show h)
+
+hIsEOF :: Handle -> IO Bool
+hIsEOF h
+   = do iseof <- nh_iseof (file h)
+        er    <- nh_errno
+        if    er == 0
+         then return (iseof /= 0)
+         else mkErr h ("hIsEOF on " ++ show h)
+
+isEOF :: IO Bool
+isEOF = hIsEOF stdin
 
 hSetBuffering         :: Handle  -> BufferMode -> IO ()
 hSetBuffering          = unimp "IO.hSetBuffering"
@@ -824,10 +922,12 @@ hGetBuffering         :: Handle  -> IO BufferMode
 hGetBuffering          = unimp "IO.hGetBuffering"
 
 hFlush :: Handle -> IO ()
-hFlush h   
-   = if   state h /= HOpen
-     then (ioError.IOError) ("hFlush on closed/semiclosed file " ++ name h)
-     else nh_flush (file h)
+hFlush h
+   = do mut <- readIORef (mut h)
+        if    state mut /= HOpen
+         then mkErr h
+                 ("hFlush on closed/semiclosed file " ++ name h)
+         else nh_flush (file h)
 
 hGetPosn              :: Handle -> IO HandlePosn
 hGetPosn               = unimp "IO.hGetPosn"
@@ -838,7 +938,7 @@ hSeek                  = unimp "IO.hSeek"
 hWaitForInput	      :: Handle -> Int -> IO Bool
 hWaitForInput          = unimp "hWaitForInput"
 hReady                :: Handle -> IO Bool 
-hReady h	       = hWaitForInput h 0
+hReady h	       = unimp "hReady" -- hWaitForInput h 0
 
 hGetChar    :: Handle -> IO Char
 hGetChar h
@@ -854,34 +954,6 @@ hGetLine h             = do c <- hGetChar h
 hLookAhead            :: Handle -> IO Char
 hLookAhead             = unimp "IO.hLookAhead"
 
-hGetContents :: Handle -> IO String
-hGetContents h
-   | not (state h == HOpen && mode h == ReadMode)
-   = (ioError.IOError) ("hGetContents on invalid handle " ++ show h)
-   | otherwise
-   = read_all (file h)
-     where
-        read_all f 
-           = unsafeInterleaveIO (
-             nh_read f >>= \ci ->
-             if   ci == -1
-             then hClose h >> return []
-             else read_all f >>= \rest -> 
-                  return ((primIntToChar ci):rest)
-             )
-
-hPutStr :: Handle -> String -> IO ()
-hPutStr h s
-   | not (state h == HOpen && mode h /= ReadMode)
-   = (ioError.IOError) ("hPutStr on invalid handle " ++ show h)
-   | otherwise
-   = write_all (file h) s
-     where
-        write_all f []
-           = return ()
-        write_all f (c:cs)
-           = nh_write f c >>
-             write_all f cs
 
 hPutChar              :: Handle -> Char -> IO ()
 hPutChar h c           = hPutStr h [c]
@@ -893,10 +965,10 @@ hPrint                :: Show a => Handle -> a -> IO ()
 hPrint h               = hPutStrLn h . show
 
 hIsOpen, hIsClosed, hIsReadable, hIsWritable :: Handle -> IO Bool
-hIsOpen h              = return (state h == HOpen)
-hIsClosed h            = return (state h == HClosed)
+hIsOpen h              = do { s <- get_state h; return (s == HOpen) }
+hIsClosed h            = do { s <- get_state h; return (s == HClosed) }
 hIsReadable h          = return (mode h == ReadMode)
-hIsWritable h          = return (mode h == WriteMode)
+hIsWritable h          = return (mode h `elem` [WriteMode, AppendMode])
 
 hIsSeekable           :: Handle -> IO Bool
 hIsSeekable            = unimp "IO.hIsSeekable"
@@ -921,11 +993,11 @@ isUserError           = unimp "IO.isUserError"
 
 
 ioeGetErrorString :: IOError -> String
-ioeGetErrorString = unimp "ioeGetErrorString"
+ioeGetErrorString = unimp "IO.ioeGetErrorString"
 ioeGetHandle      :: IOError -> Maybe Handle
-ioeGetHandle      = unimp "ioeGetHandle"
+ioeGetHandle      = unimp "IO.ioeGetHandle"
 ioeGetFileName    :: IOError -> Maybe FilePath
-ioeGetFileName    = unimp "ioeGetFileName"
+ioeGetFileName    = unimp "IO.ioeGetFileName"
 
 try       :: IO a -> IO (Either IOError a)
 try p      = catch (p >>= (return . Right)) (return . Left)
@@ -949,6 +1021,7 @@ bracket_ before after m = do
             Right r -> return r
             Left  e -> ioError e
 -- TODO: Hugs/slurpFile
-slurpFile = unimp "slurpFile"
+slurpFile = unimp "IO.slurpFile"
 \end{code}
-#endif
+
+#endif /* #ifndef __HUGS__ */

@@ -108,15 +108,16 @@ module Prelude (
     ,trace
 
     , STRef, newSTRef, readSTRef, writeSTRef
+    , IORef, newIORef, readIORef, writeIORef
 
-    -- Arrrggghhh!!! Help! Help! Help!
-    -- What?!  Prelude.hs doesn't even _define_ most of these things!
+    -- This lot really shouldn't be exported, but are needed to
+    -- implement various libs.
     ,primCompAux,PrimArray,primRunST,primNewArray,primWriteArray
     ,primUnsafeFreezeArray,primIndexArray,primGetRawArgs,primGetEnv
     ,nh_stdin,nh_stdout,nh_stderr,copy_String_to_cstring,nh_open
     ,nh_free,nh_close,nh_errno,nh_flush,nh_read,primIntToChar
     ,unsafeInterleaveIO,nh_write,primCharToInt,
-    nullAddr, incAddr, isNullAddr,
+    nullAddr, incAddr, isNullAddr, nh_filesize, nh_iseof,
 
     Word,
     primGtWord, primGeWord, primEqWord, primNeWord,
@@ -1716,21 +1717,23 @@ data IOResult  = IOResult  deriving (Show)
 
 type FILE_STAR = Addr   -- FILE *
 
-foreign import "nHandle" "nh_stdin"  nh_stdin  :: IO FILE_STAR
-foreign import "nHandle" "nh_stdout" nh_stdout :: IO FILE_STAR
-foreign import "nHandle" "nh_stderr" nh_stderr :: IO FILE_STAR
-foreign import "nHandle" "nh_write"  nh_write  :: FILE_STAR -> Char -> IO ()
-foreign import "nHandle" "nh_read"   nh_read   :: FILE_STAR -> IO Int
-foreign import "nHandle" "nh_open"   nh_open   :: Addr -> Int -> IO FILE_STAR
-foreign import "nHandle" "nh_flush"  nh_flush  :: FILE_STAR -> IO ()
-foreign import "nHandle" "nh_close"  nh_close  :: FILE_STAR -> IO ()
-foreign import "nHandle" "nh_errno"  nh_errno  :: IO Int
+foreign import "nHandle" "nh_stdin"    nh_stdin    :: IO FILE_STAR
+foreign import "nHandle" "nh_stdout"   nh_stdout   :: IO FILE_STAR
+foreign import "nHandle" "nh_stderr"   nh_stderr   :: IO FILE_STAR
+foreign import "nHandle" "nh_write"    nh_write    :: FILE_STAR -> Char -> IO ()
+foreign import "nHandle" "nh_read"     nh_read     :: FILE_STAR -> IO Int
+foreign import "nHandle" "nh_open"     nh_open     :: Addr -> Int -> IO FILE_STAR
+foreign import "nHandle" "nh_flush"    nh_flush    :: FILE_STAR -> IO ()
+foreign import "nHandle" "nh_close"    nh_close    :: FILE_STAR -> IO ()
+foreign import "nHandle" "nh_errno"    nh_errno    :: IO Int
 
-foreign import "nHandle" "nh_malloc" nh_malloc :: Int -> IO Addr
-foreign import "nHandle" "nh_free"   nh_free   :: Addr -> IO ()
-foreign import "nHandle" "nh_store"  nh_store  :: Addr -> Char -> IO ()
-foreign import "nHandle" "nh_load"   nh_load   :: Addr -> IO Char
-foreign import "nHandle" "nh_getenv" nh_getenv :: Addr -> IO Addr
+foreign import "nHandle" "nh_malloc"   nh_malloc   :: Int -> IO Addr
+foreign import "nHandle" "nh_free"     nh_free     :: Addr -> IO ()
+foreign import "nHandle" "nh_store"    nh_store    :: Addr -> Char -> IO ()
+foreign import "nHandle" "nh_load"     nh_load     :: Addr -> IO Char
+foreign import "nHandle" "nh_getenv"   nh_getenv   :: Addr -> IO Addr
+foreign import "nHandle" "nh_filesize" nh_filesize :: FILE_STAR -> IO Int
+foreign import "nHandle" "nh_iseof"    nh_iseof    :: FILE_STAR -> IO Int
 
 copy_String_to_cstring :: String -> IO Addr
 copy_String_to_cstring s
@@ -1901,6 +1904,12 @@ writeSTRef :: STRef s a -> a -> ST s ()
 writeSTRef  = primWriteRef
 
 type IORef a = STRef RealWorld a
+newIORef   :: a -> IO (IORef a)
+newIORef    = primNewRef
+readIORef  :: IORef a -> IO a
+readIORef   = primReadRef
+writeIORef :: IORef a -> a -> IO ()
+writeIORef  = primWriteRef
 
 
 ------------------------------------------------------------------------------

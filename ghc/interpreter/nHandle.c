@@ -9,6 +9,26 @@
 #include <malloc.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+int nh_iseof ( FILE* f )
+{
+   int c;
+   errno = 0;
+   c = fgetc ( f );
+   if (c == EOF) return 1;
+   ungetc ( c, f );
+   return 0;
+}
+
+int nh_filesize ( FILE* f )
+{
+   struct stat buf;
+   errno = 0;
+   fstat ( fileno(f), &buf );
+   return buf.st_size;
+}
 
 int nh_stdin ( void )
 {
@@ -65,7 +85,9 @@ int nh_read ( FILE* f )
 
 int nh_errno ( void )
 {
-   return errno;
+   int t = errno;
+   errno = 0;
+   return t;
 }
 
 int nh_malloc ( int n )
