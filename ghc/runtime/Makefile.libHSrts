@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile.libHSrts,v 1.3 1997/01/07 13:18:15 simonm Exp $
+# $Id: Makefile.libHSrts,v 1.4 1997/01/21 09:15:23 sof Exp $
 
 # The is the makefile for libHSrts, invoked once for each different build.
 
@@ -147,6 +147,10 @@ RTS_GHC = $(GHC) -c -o $@ $(GHCFLAGS) $($*_flags)
 	@$(RM) $@
 	$(RTS_GHC) $(GHC_OPTS_$(suffix)) $*.c
 
+%.o : %.hc
+	@$(RM) $@
+	$(RTS_GHC) $*.hc
+
 %.$(suffix)_o : %.hc
 	@$(RM) $@
 	$(RTS_GHC) $(GHC_OPTS_$(suffix)) $*.hc
@@ -175,12 +179,27 @@ endif
 
 #-----------------------------------------------------------------------------
 # creating and installing libHSrts.a (in its many flavors)
-
+#
+# Special pleading for way `norm', archive does not have _way appended, nor
+# do the object files.  -- SOF 1/97
+#
 ifeq ($(suffix), norm)
 ARCHIVE = libHSrts.a 		# this one is special
 else
 ARCHIVE = libHSrts_$(suffix).a
 endif 
+
+ifeq ($(suffix), norm)
+RTS_OBJS = $(RTS_LC:.lc=.o)  $(RTS_LHC:.lhc=.o)
+else
+RTS_OBJS = $(RTS_LC:.lc=.$(suffix)_o)  $(RTS_LHC:.lhc=.$(suffix)_o)
+endif
+
+all :: $(RTS_LIB) 
+
+install :: $(RTS_LIB)
+	$(INSTALL) $(INSTLIBFLAGS) $(RTS_LIB) $(INSTLIBDIR_GHC)/$(RTS_LIB)
+	$(RANLIB) $(INSTLIBDIR_GHC)/$(RTS_LIB)
 
 LIBOBJS = $(RTS_LC:.lc=.$(suffix)_o)  $(RTS_LHC:.lhc=.$(suffix)_o)
 DESTDIR = $(INSTLIBDIR_GHC)
