@@ -19,7 +19,7 @@ import Type
 import TyCon		( isAlgTyCon )
 import Id
 import Var		( Var, globalIdDetails, idType )
-import TyCon		( isUnboxedTupleTyCon, isPrimTyCon, isFunTyCon )
+import TyCon		( isUnboxedTupleTyCon, isPrimTyCon, isFunTyCon, isHiBootTyCon )
 #ifdef ILX
 import MkId		( unsafeCoerceId )
 #endif
@@ -411,7 +411,8 @@ mkStgAltType scrut_ty
   = case splitTyConApp_maybe (repType scrut_ty) of
 	Just (tc,_) | isUnboxedTupleTyCon tc -> UbxTupAlt tc
 		    | isPrimTyCon tc	     -> PrimAlt tc
-		    | isAlgTyCon tc	     -> AlgAlt tc
+		    | isHiBootTyCon tc	     -> PolyAlt	-- Algebraic, but no constructors visible
+		    | isAlgTyCon tc 	     -> AlgAlt tc
 		    | isFunTyCon tc	     -> PolyAlt
 		    | otherwise		     -> pprPanic "mkStgAlts" (ppr tc)
 	Nothing				     -> PolyAlt
