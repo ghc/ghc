@@ -120,9 +120,6 @@ import System.IO.Unsafe		( unsafePerformIO )
 {-# CBITS errno.c #-}
 #endif
 
-#ifdef __NHC__
-import NHC.FFI			( CInt(..) )
-#endif
 
 -- "errno" type
 -- ------------

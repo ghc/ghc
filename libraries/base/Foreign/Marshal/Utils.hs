@@ -64,7 +64,7 @@ import GHC.Base
 #endif
 
 #ifdef __NHC__
-import NHC.FFI			( CInt(..) )
+import Foreign.C.Types		( CInt(..) )
 #endif
 
 -- combined allocation and marshalling

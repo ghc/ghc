@@ -16,6 +16,7 @@
 
 -- #hide
 module Foreign.C.TypesISO
+#ifndef __NHC__
 	( -- Integral types, instances of: Eq, Ord, Num, Read, Show, Enum,
 	  -- Typeable, Storable, Bounded, Real, Integral, Bits
 	  CPtrdiff, CSize, CWchar, CSigAtomic
@@ -23,6 +24,12 @@ module Foreign.C.TypesISO
 	  -- Numeric types, instances of: Eq, Ord, Num, Read, Show, Enum,
 	  -- Typeable, Storable
 	, CClock,   CTime
+#else
+	( -- For nhc98, these are exported non-abstractly to work around
+	  -- an interface-file problem.
+	  CPtrdiff(..), CSize(..), CWchar(..), CSigAtomic(..)
+	, CClock(..),   CTime(..)
+#endif
 
           -- Instances of: Eq and Storable
 	, CFile,        CFpos,     CJmpBuf
@@ -30,12 +37,12 @@ module Foreign.C.TypesISO
 
 #ifdef __NHC__
 import NHC.FFI
-  ( CPtrdiff
-  , CSize
-  , CWchar
-  , CSigAtomic
-  , CClock
-  , CTime
+  ( CPtrdiff(..)
+  , CSize(..)
+  , CWchar(..)
+  , CSigAtomic(..)
+  , CClock(..)
+  , CTime(..)
   , CFile
   , CFpos
   , CJmpBuf

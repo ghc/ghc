@@ -14,6 +14,7 @@
 -----------------------------------------------------------------------------
 
 module Foreign.C.Types
+#ifndef __NHC__
 	( -- Integral types, instances of: Eq, Ord, Num, Read, Show, Enum,
 	  -- Typeable, Storable, Bounded, Real, Integral, Bits
 	  CChar,  CSChar,  CUChar
@@ -29,6 +30,16 @@ module Foreign.C.Types
 	  -- Typeable, Storable, Real, Fractional, Floating, RealFrac,
 	  -- RealFloat 
 	, CFloat,  CDouble, CLDouble
+#else
+	( -- Exported non-abstractly in nhc98 to fix an interface file problem.
+	  CChar(..),    CSChar(..),  CUChar(..)
+	, CShort(..),   CUShort(..), CInt(..),   CUInt(..)
+	, CLong(..),    CULong(..)
+	, CPtrdiff(..), CSize(..),   CWchar(..), CSigAtomic(..)
+        , CLLong(..),   CULLong(..)
+	, CClock(..),   CTime(..)
+	, CFloat(..),   CDouble(..), CLDouble(..)
+#endif
 
           -- Instances of: Eq and Storable
 	, CFile,        CFpos,     CJmpBuf
@@ -36,13 +47,13 @@ module Foreign.C.Types
 
 #ifdef __NHC__
 import NHC.FFI
-  ( CChar,  CSChar,  CUChar
-  , CShort, CUShort, CInt,   CUInt
-  , CLong,  CULong, CLLong, CULLong
-  , CPtrdiff, CSize, CWchar, CSigAtomic
-  , CClock,   CTime
-  , CFloat,  CDouble, CLDouble
-  , CFile,        CFpos,     CJmpBuf
+  ( CChar(..),    CSChar(..),  CUChar(..)
+  , CShort(..),   CUShort(..), CInt(..),   CUInt(..)
+  , CLong(..),    CULong(..),  CLLong(..), CULLong(..)
+  , CPtrdiff(..), CSize(..),   CWchar(..), CSigAtomic(..)
+  , CClock(..),   CTime(..)
+  , CFloat(..),   CDouble(..), CLDouble(..)
+  , CFile,        CFpos,       CJmpBuf
   , Storable(..)
   )
 #else
