@@ -1127,8 +1127,8 @@ if test $HaveLibMingwEx = YES ; then
 fi
 
 if test "$HaveLibGmp" = "NO"; then
-if test "$HostArch_CPP" = "ia64"; then
-AC_MSG_ERROR([You need to install libgmp (the in-tree version does not work on IA64).])
+if test "$HostArch_CPP" = "ia64" -o "$HostArch_CPP" = "mipseb" ; then
+AC_MSG_ERROR([You need to install libgmp (the in-tree version does not work on IA64 or mips64).])
 fi;
 fi;
 
