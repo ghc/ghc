@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.22 2000/11/14 08:07:12 simonpj Exp $
+-- $Id: DriverPipeline.hs,v 1.23 2000/11/14 14:30:40 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -410,8 +410,7 @@ run_phase Hsc basename suff input_fn output_fn
 	ohi    <- readIORef v_Output_hi
 	hisuf  <- readIORef v_Hi_suf
 	let hifile = case ohi of
-			   Nothing -> current_dir ++ "/" ++ basename
-					++ "." ++ hisuf
+			   Nothing -> basename ++ '.':hisuf
 			   Just fn -> fn
 
   -- figure out if the source has changed, for recompilation avoidance.
