@@ -127,15 +127,8 @@ sub mangle_command_line_args {
 		push(@Src_files, $_);
 	    }
 
-	} elsif ($Dashdashes_seen == 1) {
-	    if ( /^-package-name$/ ) {
-		# Skip option argument
-		shift(@ARGV);
-	    } elsif ( /^-/ ) {
-		# Ignore unknown option
-	    } else {
-		push(@Src_files,$_);
-	    }
+	} elsif ($Dashdashes_seen == 1) { # where we ignore unknown options
+	    push(@Src_files,$_) if ! /^-/;
 	}
     }
 }
