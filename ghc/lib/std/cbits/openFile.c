@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: openFile.c,v 1.4 1999/01/07 15:48:40 simonm Exp $
+ * $Id: openFile.c,v 1.5 1999/01/23 17:44:40 sof Exp $
  *
  * openFile Runtime Support
  */
@@ -67,11 +67,6 @@ StgInt flags;
     int created = 0;
     struct stat sb;
     IOFileObject* fo;
-
-#ifdef __CONCURRENT_HASKELL__
-#warning FixMe: Ignoring bogus bit 7 in openFiles 2nd argument
-    how = how & 0x7f;
-#endif
 
     /*
      * Since we aren't supposed to succeed when we're opening for writing and
