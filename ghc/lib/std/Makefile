@@ -18,11 +18,12 @@ else
 SUBDIRS=
 endif
 
-HC = $(GHC_INPLACE)
-
 #-----------------------------------------------------------------------------
 # 	Setting the standard variables
 #
+
+HC 	   = $(GHC_INPLACE)
+MKDEPENDHS = $(GHC_INPLACE)
 
 LIBRARY = libHS$(_way).a
 LIBOBJS = $(HS_OBJS)

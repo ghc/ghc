@@ -312,6 +312,7 @@ HappyHcOpts = -O
 #
 ################################################################################
 
+WithNofibHc = $(GHC_INPLACE)
 
 # NoFibSubDirs controls which set of tests should be run
 # You can run one or more of
@@ -503,6 +504,12 @@ NHC		= @NHC@
 
 HC		= @WithHc@
 MKDEPENDHS	= $(GHC)
+
+# Sometimes we want to invoke ghc from the build tree in different
+# projects (eg. it's handy to have a nofib & a ghc build in the same
+# tree).  We can refer to "this ghc" as $(GHC_INPLACE):
+
+GHC_INPLACE 	= $(FPTOOLS_TOP)/ghc/driver/ghc-inplace
 
 #-----------------------------------------------------------------------------
 # C compiler
