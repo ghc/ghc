@@ -62,7 +62,7 @@ import TyCon		( tyConHasGenerics )
 import SrcLoc		( srcLocSpan, Located(..), noLoc )
 import Outputable
 import HscTypes		( ModGuts(..), HscEnv(..),
-			  GhciMode(..), noDependencies,
+			  GhciMode(..), Dependencies(..), noDependencies,
 			  Deprecs( NoDeprecs ), plusDeprecs,
 			  ForeignStubs(NoStubs), TypeEnv, 
 			  extendTypeEnvWithIds, typeEnvIds, typeEnvTyCons,
@@ -847,6 +847,9 @@ mkExportEnv hsc_env exports
 getModuleExports :: ModuleName -> TcM GlobalRdrEnv
 getModuleExports mod 
   = do	{ iface <- load_iface mod
+	; loadOrphanModules (dep_orphs (mi_deps iface))
+			-- Load any orphan-module interfaces,
+			-- so their instances are visible
 	; avails <- exportsToAvails (mi_exports iface)
 	; let { gres =  [ GRE  { gre_name = name, gre_prov = vanillaProv mod }
 			| avail <- avails, name <- availNames avail ] }
