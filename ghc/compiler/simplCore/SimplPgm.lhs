@@ -11,7 +11,7 @@ module SimplPgm ( simplifyPgm ) where
 IMP_Ubiq(){-uitous-}
 
 import CmdLineOpts	( opt_D_verbose_core2core, opt_D_dump_simpl_iterations,
-			  switchIsOn, SimplifierSwitch(..)
+			  switchIsOn, SimplifierSwitch(..), SYN_IE(SwitchResult)
 			)
 import CoreSyn
 import CoreUnfold	( SimpleUnfolding )
@@ -21,16 +21,17 @@ import Id		( mkIdEnv, lookupIdEnv, SYN_IE(IdEnv),
 			)
 import Maybes		( catMaybes )
 import OccurAnal	( occurAnalyseBinds )
-import Pretty		( ppAboves, ppBesides, ppInt, ppChar, ppStr, ppPStr,
-                          ppNil
-                        )
+import Pretty		( Doc, vcat, hcat, int, char, text, ptext, empty )
 import PprStyle         ( PprStyle(..) )   -- added SOF
 import PprCore          ( pprCoreBinding ) -- added SOF
 import SimplEnv
 import SimplMonad
 import Simplify		( simplTopBinds )
 import TyVar		( nullTyVarEnv, SYN_IE(TyVarEnv) )
-import UniqSupply	( thenUs, returnUs, mapUs, splitUniqSupply, SYN_IE(UniqSM) )
+import UniqSupply	( thenUs, returnUs, mapUs, 
+			  splitUniqSupply, SYN_IE(UniqSM),
+			  UniqSupply
+			 )
 import Util		( isIn, isn'tIn, removeDups, pprTrace )
 \end{code}
 
@@ -70,13 +71,16 @@ simplifyPgm binds s_sw_chkr simpl_stats us
 	simplCount				`thenSmpl` \ r ->
 	detailedSimplCount			`thenSmpl` \ dr ->
 	let
-	    show_status = pprTrace "Simplifer run: " (ppAboves [
-		ppBesides [ppPStr SLIT("iteration "), ppInt iterations, ppPStr SLIT(" out of "), ppInt max_simpl_iterations],
-		ppStr (showSimplCount dr),
+	    show_status = pprTrace "Simplifer run: " (vcat [
+		hcat [ptext SLIT("iteration "), 
+			   int iterations, 
+			   ptext SLIT(" out of "), 
+			   int max_simpl_iterations],
+		text (showSimplCount dr),
 		if opt_D_dump_simpl_iterations then
-			ppAboves (map (pprCoreBinding PprDebug) new_pgm)
+			vcat (map (pprCoreBinding PprDebug) new_pgm)
 		else
-			ppNil
+			empty
 		])
 	in
 
