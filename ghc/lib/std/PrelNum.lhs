@@ -268,9 +268,6 @@ instance  Integral Int	where
     divMod x@(I# _) y@(I# _) = (x `div` y, x `mod` y)
     -- Stricter.  Sorry if you don't like it.  (WDP 94/10)
 
---OLD:   even x = eqInt (x `mod` 2) 0
---OLD:   odd x  = neInt (x `mod` 2) 0
-
     toInteger (I# n#) = int2Integer# n#  -- give back a full-blown Integer
     toInt x	      = x
 
