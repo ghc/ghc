@@ -679,7 +679,7 @@ tc_rn_src_decls ds
 	-- Glue them on the front of the remaining decls and loop
 	(tc_envs, src_dus2) <- tc_rn_src_decls (spliced_decls ++ rest_ds) ;
 
-	return (tcg_envs, src_dus1 `plusDU` usesOnly splice_fvs `plusDU` src_dus2)
+	return (tc_envs, src_dus1 `plusDU` usesOnly splice_fvs `plusDU` src_dus2)
     }
 #endif /* GHCI */
     }}}

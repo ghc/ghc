@@ -167,7 +167,7 @@ tc_binds_and_then top_lvl combiner (MonoBind bind sigs is_rec) do_next
 		   returnM (combiner (mkMonoBind Recursive (poly_binds `andMonoBinds` prag_binds)) 
 				     thing)
 
-	NotTopLevel	-- For nested bindings we must
+	NotTopLevel	-- For nested bindings we must do teh bindInstsOfLocalFuns thing
 		-> getLIE (tc_body poly_ids)		`thenM` \ ((prag_binds, thing), lie) ->
 
 			-- Create specialisations of functions bound here
@@ -194,7 +194,7 @@ tc_binds_and_then top_lvl combiner (MonoBind bind sigs is_rec) do_next
   where
     tc_body poly_ids 	-- Type check the pragmas and "thing inside"
       =   -- Extend the environment to bind the new polymorphic Ids
-	  tcExtendLocalValEnv poly_ids			$
+	  tcExtendLocalValEnv poly_ids	$
   
 	  -- Build bindings and IdInfos corresponding to user pragmas
 	  tcSpecSigs sigs		`thenM` \ prag_binds ->
