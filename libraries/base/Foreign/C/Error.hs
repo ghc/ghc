@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Error.hs,v 1.2 2001/07/03 11:37:50 simonmar Exp $
+-- $Id: Error.hs,v 1.3 2001/07/31 12:59:30 simonmar Exp $
 --
 -- C-specific Marshalling support: Handling of C "errno" error codes
 --
@@ -118,7 +118,8 @@ import System.IO		( IOError, Handle, ioError )
 -- ------------
 
 -- import of C function that gives address of errno
---
+-- This function exists because errno is a variable on some systems, but on
+-- Windows it is a macro for a function...
 foreign import "ghcErrno" unsafe _errno :: Ptr CInt
 
 -- Haskell representation for "errno" values
