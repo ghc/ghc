@@ -26,7 +26,7 @@ import Id		( idType, idInfo, idName, isExportedId,
 			) 
 import IdInfo		{- loads of stuff -}
 import Name		( getOccName, nameOccName, globaliseName, setNameOcc, 
-		  	  localiseName, isGlobalName
+		  	  localiseName, isGlobalName, setNameUnique
 			)
 import NameEnv		( filterNameEnv )
 import OccName		( TidyOccEnv, initTidyOccEnv, tidyOccName )
@@ -34,7 +34,7 @@ import Type		( tidyTopType, tidyType, tidyTyVar )
 import Module		( Module, moduleName )
 import HscTypes		( PersistentCompilerState( pcs_PRS ), 
 			  PersistentRenamerState( prsOrig ),
-			  NameSupply( nsNames ), OrigNameCache,
+			  NameSupply( nsNames, nsUniqs ),
 			  TypeEnv, extendTypeEnvList, 
 			  ModDetails(..), TyThing(..)
 			)
@@ -43,6 +43,7 @@ import Maybes		( maybeToBool, orElse )
 import ErrUtils		( showPass )
 import SrcLoc		( noSrcLoc )
 import UniqFM		( mapUFM )
+import UniqSupply	( splitUniqSupply, uniqFromSupply )
 import List		( partition )
 import Util		( mapAccumL )
 import Outputable
@@ -76,21 +77,31 @@ IdEnv Bool
 
 Step 2: Tidy the program
 ~~~~~~~~~~~~~~~~~~~~~~~~
-Next we traverse the bindings top to bottom.  For each top-level
+Next we traverse the bindings top to bottom.  For each *top-level*
 binder
 
-  - Make all external Ids have Global names and vice versa
+ 1. Make it into a GlobalId
+
+ 2. Give it a system-wide Unique.
+    [Even non-exported things need system-wide Uniques because the
+    byte-code generator builds a single Name->BCO symbol table.]
+
+    We use the NameSupply kept in the PersistentRenamerState as the
+    source of such system-wide uniques.
+
+    For external Ids, use the original-name cache in the NameSupply 
+    to ensure that the unique assigned is the same as the Id had 
+    in any previous compilation run.
+  
+ 3. If it's an external Id, make it have a global Name and vice versa.
     This is used by the code generator to decide whether
     to make the label externally visible
 
-  - Give external ids a "tidy" occurrence name.  This means
+ 4. Give external Ids a "tidy" occurrence name.  This means
     we can print them in interface files without confusing 
     "x" (unique 5) with "x" (unique 10).
   
-  - Give external Ids the same Unique as they had before
-    if the name is in the renamer's name cache
-  
-  - Give the Id its UTTERLY FINAL IdInfo; in ptic, 
+ 5. Give it its UTTERLY FINAL IdInfo; in ptic, 
 	* Its IdDetails becomes VanillaGlobal, reflecting the fact that
 	  from now on we regard it as a global, not local, Id
 
@@ -121,13 +132,28 @@ tidyCorePgm dflags mod pcs cg_info_env
 	; let ext_ids   = findExternalSet   binds_in orphans_in
 	; let ext_rules = findExternalRules binds_in orphans_in ext_ids
 
-	; let ((orig_env', occ_env, subst_env), tidy_binds) 
+	-- We also make sure to avoid any exported binders.  Consider
+	--	f{-u1-} = 1	-- Local decl
+	--	...
+	--	f{-u2-} = 2	-- Exported decl
+	--
+	-- The second exported decl must 'get' the name 'f', so we
+	-- have to put 'f' in the avoids list before we get to the first
+	-- decl.  tidyTopId then does a no-op on exported binders.
+	; let   prs	      = pcs_PRS pcs
+		orig_ns       = prsOrig prs
+
+		init_tidy_env = (orig_ns, initTidyOccEnv avoids, emptyVarEnv)
+		avoids	      = [getOccName bndr | bndr <- bindersOfBinds binds_in,
+				 	           isGlobalName (idName bndr)]
+
+	; let ((orig_ns', occ_env, subst_env), tidy_binds) 
 	       		= mapAccumL (tidyTopBind mod ext_ids cg_info_env) 
 				    init_tidy_env binds_in
 
 	; let tidy_rules = tidyIdRules (occ_env,subst_env) ext_rules
 
-	; let prs' = prs { prsOrig = orig { nsNames = orig_env' } }
+	; let prs' = prs { prsOrig = orig_ns' }
 	      pcs' = pcs { pcs_PRS = prs' }
 
 	; let final_ids  = [ id | bind <- tidy_binds
@@ -152,22 +178,6 @@ tidyCorePgm dflags mod pcs cg_info_env
 
 	; return (pcs', tidy_details)
 	}
-  where
-	-- We also make sure to avoid any exported binders.  Consider
-	--	f{-u1-} = 1	-- Local decl
-	--	...
-	--	f{-u2-} = 2	-- Exported decl
-	--
-	-- The second exported decl must 'get' the name 'f', so we
-	-- have to put 'f' in the avoids list before we get to the first
-	-- decl.  tidyTopId then does a no-op on exported binders.
-    prs	 	     = pcs_PRS pcs
-    orig	     = prsOrig prs
-    orig_env 	     = nsNames orig
-
-    init_tidy_env    = (orig_env, initTidyOccEnv avoids, emptyVarEnv)
-    avoids	     = [getOccName bndr | bndr <- bindersOfBinds binds_in,
-				          isGlobalName (idName bndr)]
 
 tidyCoreExpr :: CoreExpr -> IO CoreExpr
 tidyCoreExpr expr = return (tidyExpr emptyTidyEnv expr)
@@ -333,10 +343,11 @@ addExternal (id,rhs) needed
 
 
 \begin{code}
-type TopTidyEnv = (OrigNameCache, TidyOccEnv, VarEnv Var)
+type TopTidyEnv = (NameSupply, TidyOccEnv, VarEnv Var)
 
 -- TopTidyEnv: when tidying we need to know
---   * orig_env: Any pre-ordained Names.  These may have arisen because the
+--   * ns: The NameSupply, containing a unique supply and any pre-ordained Names.  
+--	  These may have arisen because the
 --	  renamer read in an interface file mentioning M.$wf, say,
 --	  and assigned it unique r77.  If, on this compilation, we've
 --	  invented an Id whose name is $wf (but with a different unique)
@@ -391,7 +402,7 @@ tidyTopBinder :: Module -> IdEnv Bool
   -- NB: tidyTopBinder doesn't affect the unique supply
 
 tidyTopBinder mod ext_ids cg_info_env tidy_env rhs
-	      env@(orig_env2, occ_env2, subst_env2) id
+	      env@(ns2, occ_env2, subst_env2) id
 
   | isDataConWrapId id	-- Don't tidy constructor wrappers
   = (env, id)		-- The Id is stored in the TyCon, so it would be bad
@@ -431,7 +442,7 @@ tidyTopBinder mod ext_ids cg_info_env tidy_env rhs
 	
   = ((orig_env', occ_env', subst_env'), id')
   where
-    (orig_env', occ_env', name') = tidyTopName mod orig_env2 occ_env2
+    (orig_env', occ_env', name') = tidyTopName mod ns2 occ_env2
 					       is_external
 					       (idName id)
     ty'	    = tidyTopType (idType id)
@@ -476,31 +487,42 @@ tidyIdInfo tidy_env is_external unfold_info cg_info id
 -- externally visible (see comment at the top of this module).  If the name
 -- was previously local, we have to give it a unique occurrence name if
 -- we intend to globalise it.
-tidyTopName mod orig_env occ_env external name
-  | global && internal = (orig_env, occ_env, localiseName name)
+tidyTopName mod ns occ_env external name
+  | global && internal = (ns, occ_env, localiseName name)
 
-  | local  && internal = (orig_env, occ_env', setNameOcc name occ')
-	-- Even local, internal names must get a unique occurrence, because
-	-- if we do -split-objs we globalise the name later, n the code generator
-
-  | global && external = (orig_env, occ_env, name)
+  | global && external = (ns, occ_env, name)
 	-- Global names are assumed to have been allocated by the renamer,
 	-- so they already have the "right" unique
+	-- And it's a system-wide unique too
 
-  | local  && external = case lookupFM orig_env key of
-			   Just orig -> (orig_env,			   occ_env', orig)
-			   Nothing   -> (addToFM orig_env key global_name, occ_env', global_name)
+  | local  && internal = (ns { nsUniqs = us2 }, occ_env', unique_name)
+	-- Even local, internal names must get a unique occurrence, because
+	-- if we do -split-objs we globalise the name later, in the code generator
+	--
+	-- Similarly, we must make sure it has a system-wide Unique, because
+	-- the byte-code generator builds a system-wide Name->BCO symbol table
+
+  | local  && external = case lookupFM ns_names key of
+			   Just orig -> (ns,			 		    occ_env', orig)
+			   Nothing   -> (ns { nsUniqs = us2, nsNames = ns_names' }, occ_env', global_name)
 	-- If we want to globalise a currently-local name, check
 	-- whether we have already assigned a unique for it.
 	-- If so, use it; if not, extend the table
 
   where
-    (occ_env', occ') = tidyOccName occ_env (nameOccName name)
-    key		     = (moduleName mod, occ')
-    global_name      = globaliseName (setNameOcc name occ') mod
     global	     = isGlobalName name
     local	     = not global
     internal	     = not external
+
+    (occ_env', occ') = tidyOccName occ_env (nameOccName name)
+    key		     = (moduleName mod, occ')
+    ns_names	     = nsNames ns
+    ns_uniqs	     = nsUniqs ns
+    (us1, us2)	     = splitUniqSupply ns_uniqs
+    unique_name	     = setNameUnique (setNameOcc name occ') (uniqFromSupply us1)
+    global_name      = globaliseName unique_name mod
+    ns_names' 	     = addToFM ns_names key global_name
+
 
 ------------  Worker  --------------
 tidyWorker tidy_env (HasWorker work_id wrap_arity) 
