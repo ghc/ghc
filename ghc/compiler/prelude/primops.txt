@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt,v 1.3 2000/09/11 11:17:09 sewardj Exp $
+-- $Id: primops.txt,v 1.4 2000/09/11 12:20:57 sewardj Exp $
 --
 -- Primitive Operations
 --
@@ -982,12 +982,17 @@ primop  NewBCOOp "newBCO#" GenPrimOp
    Int# -> Int# -> Int# -> a -> State# RealWorld -> (# State# RealWorld, BCO# #)
    with
    has_side_effects = True
-   out_of_line    = True
+   out_of_line      = True
+   strictness       = { \ arity -> StrictnessInfo 
+                                   [wwPrim, wwPrim, wwPrim, wwLazy, wwPrim] False }
+   usage            = { mangle NewBCOOp [mkP, mkP, mkP, mkM, mkP] mkR }
 
 primop  WriteBCOPtrOp "writeBCOPtr#" GenPrimOp
    BCO# -> Int# -> o -> State# RealWorld -> State# RealWorld
    with
-   usage            = { mangle WriteBCOPtrOp [mkP, mkP, mkM] mkR }
+   usage            = { mangle WriteBCOPtrOp [mkP, mkP, mkM, mkP] mkR }
+   strictness       = { \ arity -> StrictnessInfo 
+                                   [wwPrim, wwPrim, wwLazy, wwPrim] False }
    has_side_effects = True
 
 primop  WriteBCONonPtrOp "writeBCONonPtr#" GenPrimOp
@@ -1010,6 +1015,13 @@ primop  ReadBCONonPtrOp "readBCONonPtr#"  GenPrimOp
 
 primop  ReadBCOInstrOp "readBCOInstr#" GenPrimOp
    BCO# -> Int# -> State# RealWorld -> (# State# RealWorld, Word# #)
+
+primop  SameBCOOp "sameBCO#" GenPrimOp
+   BCO# -> BCO# -> Bool
+   with
+   -- is this usage right?
+   usage = { mangle SameMutableArrayOp [mkP, mkP] mkM }
+
 
 ------------------------------------------------------------------------
 --- Weak pointers                                                    ---

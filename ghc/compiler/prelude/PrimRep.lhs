@@ -241,6 +241,7 @@ showPrimRep ThreadIdRep	   = "StgTSO*"
 showPrimRep WeakPtrRep     = "P_"
 showPrimRep ForeignObjRep  = "StgAddr"
 showPrimRep VoidRep	   = "!!VOID_KIND!!"
+showPrimRep BCORep         = "P_"  	-- not sure -- JRS 000708
 
 primRepString CharRep   	= "Char"
 primRepString Int8Rep   	= "Char" -- To have names like newCharArray#

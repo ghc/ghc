@@ -46,6 +46,7 @@ import BSD
 import IOExts		( unsafePerformIO )
 import NativeInfo       ( os, arch )
 #endif
+import StgInterp	( runStgI )
 
 \end{code}
 
@@ -173,11 +174,17 @@ doIt (core_cmds, stg_cmds)
     in
 
 	--------------------------  Simplify STG code -------------------------------
-    show_pass "Stg2Stg" 			>>
+    show_pass "Stg2Stg" 			 >>
     _scc_     "Stg2Stg"
     stg2stg stg_cmds this_mod st_uniqs stg_binds >>= \ (stg_binds2, cost_centre_info) ->
 
+#ifdef GHCI
+    runStgI local_tycons local_classes 
+                         (map fst stg_binds2)    >>= \ i_result ->
+    putStr ("\nANSWER = " ++ show i_result ++ "\n\n")
+    >>
 
+#else
 	--------------------------  Interface file -------------------------------
 	-- Dump instance decls and type signatures into the interface file
     _scc_     "Interface"
@@ -210,6 +217,9 @@ doIt (core_cmds, stg_cmds)
 
 	--------------------------  Final report -------------------------------
     reportCompile mod_name (showSDoc (ppSourceStats True rdr_module)) >>
+
+#endif
+
 
     ghcExit 0
     } }

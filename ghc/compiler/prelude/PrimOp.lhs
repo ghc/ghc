@@ -543,7 +543,8 @@ getPrimOpResultInfo op
 	let rep = typePrimRep ty in
 	case rep of
 	   PtrRep -> case splitAlgTyConApp_maybe ty of
-			Nothing -> panic "getPrimOpResultInfo"
+			Nothing -> pprPanic "getPrimOpResultInfo" 
+                                            (ppr ty <+> ppr op)
 			Just (tc,_,_) -> ReturnsAlg tc
 	   other -> ReturnsPrim other
 \end{code}

@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.91 2000/08/22 10:08:14 simonmar Exp $
+# $Id: Makefile,v 1.92 2000/09/11 12:20:56 sewardj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -221,6 +221,8 @@ utils/PrimPacked_HC_OPTS	= -fvia-C -monly-3-regs -optC-funfolding-interface-thre
 # UpdAnal.lhs due to weird recursive datatype.  Bug was exposed by a
 # separate bugfix to the fixpoint finder.
 simplStg/UpdAnal_HC_OPTS	= -fno-strictness
+
+stgSyn/StgInterp_HC_OPTS	= -fvia-C
 
 # ----------------------------------------------------------------------------
 #		C compilations

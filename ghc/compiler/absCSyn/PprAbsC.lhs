@@ -1306,6 +1306,7 @@ pprUnionTag ThreadIdRep		= char 't'
 
 pprUnionTag ArrayRep		= char 'p'
 pprUnionTag ByteArrayRep	= char 'b'
+pprUnionTag BCORep		= char 'p'
 
 pprUnionTag _                   = panic "pprUnionTag:Odd kind"
 \end{code}
