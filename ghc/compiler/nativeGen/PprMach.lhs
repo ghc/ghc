@@ -407,10 +407,28 @@ pprInstr (ASCII False{-no backslash conversion-} str)
   = hcat [ ptext SLIT("\t.asciz "), char '\"', text str, char '"' ]
 
 pprInstr (ASCII True str)
-  = (<>) (text "\t.ascii \"") (asciify str 60)
+  = --(<>) (text "\t.ascii \"") (asciify 60 str)
+    asciify str
   where
-    asciify :: String -> Int -> SDoc
+    asciify :: String -> SDoc
+    asciify "" = text "\t.ascii \"\\0\""
+    asciify str
+       = let fst  = take 16 str
+             rest = drop 16 str
+             this = text ("\t.ascii \"" 
+                          ++ concat (map asciify_char fst)
+                          ++ "\"")
+         in  this $$ asciify rest
+    asciify_char :: Char -> String
+    asciify_char c = '\\' : 'x' : hshow (ord c)
 
+    hshow :: Int -> String
+    hshow n | n >= 0 && n <= 255
+            = [ tab !! (n `div` 16), tab !! (n `mod` 16)]
+    tab = "0123456789abcdef"
+
+{-
+    asciify :: String -> Int -> SDoc
     asciify [] _ = text "\\0\""
     asciify s     n | n <= 0 = (<>) (text "\"\n\t.ascii \"") (asciify s 60)
     asciify ('\\':cs)      n = (<>) (text "\\\\") (asciify cs (n-1))
@@ -420,6 +438,8 @@ pprInstr (ASCII True str)
     asciify (c:(cs@(d:_))) n
       | isDigit d = (<>) (text (charToC c)) (asciify cs 0)
       | otherwise = (<>) (text (charToC c)) (asciify cs (n-1))
+    asciify [] _ = text "\\0\
+-}
 
 #if 0
 pprInstr (DATA s xs)
