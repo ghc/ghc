@@ -338,14 +338,10 @@ ifneq "$(BootingFromHc)" "YES"
 	$(HC_POST_OPTS)
 
 %.$(way_)hc : %.cmm $(H_FILES)
-	$(HC_PRE_OPTS)
 	$(HC) $(HC_OPTS) -C $< -o $@
-	$(HC_POST_OPTS)
 
 %.$(way_)s : %.cmm $(H_FILES)
-	$(HC_PRE_OPTS)
 	$(HC) $(HC_OPTS) -S $< -o $@
-	$(HC_POST_OPTS)
 endif
 
 #-----------------------------------------------------------------------------

@@ -55,7 +55,7 @@
 	  /* ToDo: it might be a PAP, so we should check... */		\
 	  TICK_UPD_CON_IN_NEW(sizeW_fromITBL(%GET_STD_INFO(updatee)));	\
 									\
-	  UPD_SPEC_IND(updatee, ind_info, R1, jump (ret));		\
+	  NOBH_UPD_SPEC_IND(updatee, ind_info, R1, jump (ret));		\
 	}
 
 UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_0_ret,stg_IND_0_info,%RET_VEC(Sp(0),0))
@@ -99,6 +99,62 @@ INFO_TABLE_RET( stg_upd_frame,
 	    stg_upd_frame_5_ret,
 	    stg_upd_frame_6_ret,
 	    stg_upd_frame_7_ret
+	    )
+UPD_FRAME_ENTRY_TEMPLATE(,stg_IND_direct_info,%ENTRY_CODE(Sp(0)))
+
+/* -----------------------------------------------------------------------------
+ * Update frames that check for BLACKHOLE_BQ
+ *
+ * A normal update frame doesn't check whether the closure has been
+ * overwritten with BLACKHOLE_BQ, because it can't until lazy blackholing
+ * has happened.  Lazy blackholing overwrites the update frames pointing
+ * to BLACKHOLE with stg_bh_upd_frame_info.
+ * -------------------------------------------------------------------------- */
+
+#define BH_UPD_FRAME_ENTRY_TEMPLATE(label,ind_info,ret)			\
+        label								\
+	{								\
+          W_ updatee;							\
+									\
+          updatee = StgUpdateFrame_updatee(Sp);				\
+									\
+	  /* remove the update frame from the stack */			\
+	  Sp = Sp + SIZEOF_StgUpdateFrame;				\
+									\
+	  /* ToDo: it might be a PAP, so we should check... */		\
+	  TICK_UPD_CON_IN_NEW(sizeW_fromITBL(%GET_STD_INFO(updatee)));	\
+									\
+	  UPD_SPEC_IND(updatee, ind_info, R1, jump (ret));		\
+	}
+
+BH_UPD_FRAME_ENTRY_TEMPLATE(stg_bh_upd_frame_0_ret,stg_IND_0_info,%RET_VEC(Sp(0),0))
+BH_UPD_FRAME_ENTRY_TEMPLATE(stg_bh_upd_frame_1_ret,stg_IND_1_info,%RET_VEC(Sp(0),1))
+BH_UPD_FRAME_ENTRY_TEMPLATE(stg_bh_upd_frame_2_ret,stg_IND_2_info,%RET_VEC(Sp(0),2))
+BH_UPD_FRAME_ENTRY_TEMPLATE(stg_bh_upd_frame_3_ret,stg_IND_3_info,%RET_VEC(Sp(0),3))
+BH_UPD_FRAME_ENTRY_TEMPLATE(stg_bh_upd_frame_4_ret,stg_IND_4_info,%RET_VEC(Sp(0),4))
+BH_UPD_FRAME_ENTRY_TEMPLATE(stg_bh_upd_frame_5_ret,stg_IND_5_info,%RET_VEC(Sp(0),5))
+BH_UPD_FRAME_ENTRY_TEMPLATE(stg_bh_upd_frame_6_ret,stg_IND_6_info,%RET_VEC(Sp(0),6))
+BH_UPD_FRAME_ENTRY_TEMPLATE(stg_bh_upd_frame_7_ret,stg_IND_7_info,%RET_VEC(Sp(0),7))
+
+#if MAX_VECTORED_RTN > 8
+#error MAX_VECTORED_RTN has changed: please modify stg_bh_upd_frame too.
+#endif
+
+/* this bitmap indicates that the first word of an update frame is a
+ * non-pointer - this is the update frame link.  (for profiling,
+ * there's a cost-centre-stack in there too).
+ */
+
+INFO_TABLE_RET( stg_bh_upd_frame, 
+	    UPD_FRAME_WORDS, UPD_FRAME_BITMAP, UPDATE_FRAME,
+	    stg_bh_upd_frame_0_ret,
+	    stg_bh_upd_frame_1_ret,
+	    stg_bh_upd_frame_2_ret,
+	    stg_bh_upd_frame_3_ret,
+	    stg_bh_upd_frame_4_ret,
+	    stg_bh_upd_frame_5_ret,
+	    stg_bh_upd_frame_6_ret,
+	    stg_bh_upd_frame_7_ret
 	    )
 UPD_FRAME_ENTRY_TEMPLATE(,stg_IND_direct_info,%ENTRY_CODE(Sp(0)))
 

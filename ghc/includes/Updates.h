@@ -28,12 +28,16 @@
    UPD_PERM_IND(updclosure,heapptr)
 # define UPD_SPEC_IND(updclosure, ind_info, heapptr, and_then) \
    UPD_PERM_IND(updclosure,heapptr); and_then
+# define NOBH_UPD_SPEC_IND(updclosure, ind_info, heapptr, and_then) \
+   NOBH_UPD_PERM_IND(updclosure,heapptr); and_then
 #else
 #  define SEMI ;
 # define UPD_IND(updclosure, heapptr) \
    UPD_REAL_IND(updclosure,INFO_PTR(stg_IND_info),heapptr,SEMI)
 # define UPD_SPEC_IND(updclosure, ind_info, heapptr, and_then) \
    UPD_REAL_IND(updclosure,ind_info,heapptr,and_then)
+# define NOBH_UPD_SPEC_IND(updclosure, ind_info, heapptr, and_then) \
+   NOBH_UPD_REAL_IND(updclosure,ind_info,heapptr,and_then)
 #endif
 
 /* These macros have to work in both C and C--, so here's the
@@ -71,6 +75,14 @@
 			      and_then);			\
 	BLOCK_END
 
+#define NOBH_UPD_REAL_IND(updclosure, ind_info, heapptr, and_then)	\
+        BLOCK_BEGIN						\
+	updateWithIndirection(GET_INFO(updclosure), ind_info,	\
+			      updclosure,			\
+			      heapptr,				\
+			      and_then);			\
+	BLOCK_END
+
 #if defined(PROFILING) || defined(TICKY_TICKY)
 #define UPD_PERM_IND(updclosure, heapptr)	\
         BLOCK_BEGIN				\
@@ -78,6 +90,13 @@
 	info = GET_INFO(updclosure);		\
         AWAKEN_BQ(info,updclosure);		\
 	updateWithPermIndirection(info,		\
+				  updclosure,	\
+				  heapptr);	\
+	BLOCK_END
+
+#define NOBH_UPD_PERM_IND(updclosure, heapptr)	\
+        BLOCK_BEGIN				\
+	updateWithPermIndirection(GET_INFO(updclosure),		\
 				  updclosure,	\
 				  heapptr);	\
 	BLOCK_END
