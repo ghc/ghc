@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.80 2002/01/29 06:15:03 sof Exp $
+ * $Id: Linker.c,v 1.81 2002/02/01 02:05:52 sof Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -870,6 +870,33 @@ static void addSection ( ObjectCode* oc, SectionKind kind,
       and Common Object File Format Specification
       revision 5.1 January 1998
    which SimonM says comes from the MS Developer Network CDs.
+   
+   It can be found there (on older CDs), but can also be found 
+   online at:
+
+      http://www.microsoft.com/hwdev/hardware/PECOFF.asp
+
+   (this is Rev 6.0 from February 1999).
+
+   Things move, so if that fails, try searching for it via
+
+      http://www.google.com/search?q=PE+COFF+specification     
+
+   The ultimate reference for the PE format is the Winnt.h 
+   header file that comes with the Platform SDKs; as always,
+   implementations will drift wrt their documentation.
+   
+   A good background article on the PE format is Matt Pietrek's
+   March 1994 article in Microsoft System Journal (MSJ)
+   (Vol.9, No. 3): "Peering Inside the PE: A Tour of the
+   Win32 Portable Executable File Format." The info in there
+   has recently been updated in a two part article in 
+   MSDN magazine, issues Feb and March 2002,
+   "Inside Windows: An In-Depth Look into the Win32 Portable
+   Executable File Format"
+
+   John Levine's book "Linkers and Loaders" contains useful
+   info on PE too.
 */
       
 
