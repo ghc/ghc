@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.86 2002/12/12 17:36:19 simonmar Exp $
+-- $Id: DriverState.hs,v 1.87 2002/12/17 13:50:29 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -96,6 +96,7 @@ GLOBAL_VAR(v_Keep_ilx_files,		False,		Bool)
 -- Misc
 GLOBAL_VAR(v_Scale_sizes_by,    	1.0,		Double)
 GLOBAL_VAR(v_Static, 			True,		Bool)
+GLOBAL_VAR(v_NoLink, 			False,		Bool)
 GLOBAL_VAR(v_NoHsMain, 			False, 		Bool)
 GLOBAL_VAR(v_Recomp,  			True,		Bool)
 GLOBAL_VAR(v_Collect_ghc_timing, 	False,		Bool)

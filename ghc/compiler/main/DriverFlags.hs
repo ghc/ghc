@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.107 2002/12/12 17:36:18 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.108 2002/12/17 13:50:29 simonmar Exp $
 --
 -- Driver flags
 --
@@ -294,6 +294,7 @@ static_flags =
   ,  ( "optdll"		, HasArg (add v_Opt_dll) )
 
 	----- Linker --------------------------------------------------------
+  ,  ( "no-link"	, NoArg (writeIORef v_NoLink True) )
   ,  ( "static" 	, NoArg (writeIORef v_Static True) )
   ,  ( "dynamic"        , NoArg (writeIORef v_Static False) )
   ,  ( "rdynamic"       , NoArg (return ()) ) -- ignored for compat w/ gcc

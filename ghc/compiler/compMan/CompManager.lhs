@@ -490,7 +490,7 @@ cmDepAnal cmstate dflags rootnames
   = do showPass dflags "Chasing dependencies"
        when (verbosity dflags >= 1 && gmode cmstate == Batch) $
            hPutStrLn stderr (showSDoc (hcat [
-	     text progName, text ": chasing modules from: ",
+	     text "Chasing modules from: ",
 	     hcat (punctuate comma (map text rootnames))]))
        downsweep rootnames (mg cmstate)
 

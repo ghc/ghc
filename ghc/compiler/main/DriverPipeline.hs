@@ -301,8 +301,17 @@ link' Interactive dflags batch_attempt_linking linkables
 
 link' Batch dflags batch_attempt_linking linkables
    | batch_attempt_linking
-   = do when (verb >= 1) $
-             hPutStrLn stderr "ghc: linking ..."
+   = do 
+	-- check for the -no-link flag
+	omit_linking <- readIORef v_NoLink
+	if omit_linking 
+	  then do when (verb >= 3) $
+		    hPutStrLn stderr "link(batch): linking omitted (-no-link flag given)."
+	          return Succeeded
+	  else do
+
+	when (verb >= 1) $
+             hPutStrLn stderr "Linking ..."
 
 	-- Don't showPass in Batch mode; doLink will do that for us.
         staticLink (concatMap getOfiles linkables)

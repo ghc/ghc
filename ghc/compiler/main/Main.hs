@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.114 2002/10/25 16:54:59 simonpj Exp $
+-- $Id: Main.hs,v 1.115 2002/12/17 13:50:29 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -37,7 +37,7 @@ import DriverState	( buildCoreToDo, buildStgToDo,
 			  v_GhcMode, v_GhcModeFlag, GhcMode(..),
 			  v_Keep_tmp_files, v_Ld_inputs, v_Ways, 
 			  v_OptLevel, v_Output_file, v_Output_hi, 
-			  readPackageConf, verifyOutputFiles
+			  readPackageConf, verifyOutputFiles, v_NoLink
 			)
 import DriverFlags	( buildStaticHscOpts,
 			  dynamic_flags, processArgs, static_flags)
@@ -304,8 +304,10 @@ main =
 
    o_files <- mapM compileFile srcs
 
+   omit_linking <- readIORef v_NoLink
+
    when (mode == DoMkDependHS) endMkDependHS
-   when (mode == DoLink) (staticLink o_files)
+   when (mode == DoLink && not omit_linking) (staticLink o_files)
    when (mode == DoMkDLL) (doMkDLL o_files)
 
 
