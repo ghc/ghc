@@ -305,12 +305,7 @@ tcHsSigType and tcHsLiftedSigType are used for type signatures written by the pr
 \begin{code}
 tcHsSigType, tcHsLiftedSigType :: RenamedHsType -> TcM Type
   -- Do kind checking, and hoist for-alls to the top
-tcHsSigType       ty = traceTc (text "tcHsSig1:" <+> ppr ty) `thenTc_`
-			kcTypeType   ty `thenTc_` 
-			traceTc (text "tcHsSig2:" <+> ppr ty) `thenTc_`
-			tcHsType ty			`thenTc` \ sig_ty -> 
-			traceTc (text "tcHsSig3:" <+> ppr sig_ty) `thenTc_`
-			returnTc sig_ty
+tcHsSigType       ty = kcTypeType   ty `thenTc_` tcHsType ty
 tcHsLiftedSigType ty = kcLiftedType ty `thenTc_` tcHsType ty
 
 tcHsType    ::            RenamedHsType -> TcM Type

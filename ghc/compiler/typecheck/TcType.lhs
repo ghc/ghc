@@ -52,7 +52,7 @@ module TcType (
   PredType, mkPredTy, mkPredTys, getClassPredTys_maybe, getClassPredTys, 
   isPredTy, isClassPred, isTyVarClassPred, predHasFDs,
   mkDictTy, tcSplitPredTy_maybe, predTyUnique,
-  isDictTy, tcSplitDFunTy,
+  isDictTy, tcSplitDFunTy, predTyUnique, 
   mkClassPred, predMentionsIPs, inheritablePred, isIPPred, mkPredName,
 
   ---------------------------------
@@ -63,20 +63,23 @@ module TcType (
 
   --------------------------------
   -- Rexported from Type
-  Kind, Type, SourceType(..), PredType, ThetaType, 
-  unliftedTypeKind, liftedTypeKind, openTypeKind, mkArrowKind, mkArrowKinds,
+  Kind, 	-- Stuff to do with kinds is insensitive to pre/post Tc
+  unliftedTypeKind, liftedTypeKind, openTypeKind, mkArrowKind, mkArrowKinds, 
+  superBoxity, liftedBoxity, hasMoreBoxityInfo, defaultKind, superKind,
+
+  Type, SourceType(..), PredType, ThetaType, 
   mkForAllTy, mkForAllTys, 
   mkFunTy, mkFunTys, zipFunTys, 
   mkTyConApp, mkAppTy, mkAppTys, mkSynTy, applyTy, applyTys,
-  mkTyVarTy, mkTyVarTys, mkTyConTy,
-  predTyUnique, mkClassPred, 
+  mkTyVarTy, mkTyVarTys, mkTyConTy, 
+
   isUnLiftedType,	-- Source types are always lifted
   isUnboxedTupleType,	-- Ditto
+
   tidyTopType, tidyType, tidyPred, tidyTypes, tidyFreeTyVars, tidyOpenType, tidyOpenTypes,
   tidyTyVar, tidyTyVars,
-  eqKind, eqUsage,
+  typeKind, eqKind, eqUsage,
 
-  -- Reexported ???
   tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta
   ) where
 
@@ -86,8 +89,22 @@ module TcType (
 import {-# SOURCE #-} PprType( pprType )
 
 -- friends:
-import TypeRep		( Type(..), TyNote(..) )  -- friend
-import Type		-- Lots and lots
+import TypeRep		( Type(..), TyNote(..), funTyCon )  -- friend
+import Type		( mkUTyM, unUTy )	-- Used locally
+
+import Type		(	-- Re-exports
+			  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta,
+			  Kind, Type, TauType, SourceType(..), PredType, ThetaType, 
+			  unliftedTypeKind, liftedTypeKind, openTypeKind, mkArrowKind, mkArrowKinds,
+			  mkForAllTy, mkForAllTys, defaultKind,
+			  mkFunTy, mkFunTys, zipFunTys, 
+			  mkTyConApp, mkAppTy, mkAppTys, mkSynTy, applyTy, applyTys,
+			  mkTyVarTy, mkTyVarTys, mkTyConTy,
+			  isUnLiftedType, isUnboxedTupleType,
+			  tidyTopType, tidyType, tidyPred, tidyTypes, tidyFreeTyVars, tidyOpenType, tidyOpenTypes,
+			  tidyTyVar, tidyTyVars, eqKind, eqUsage,
+			  hasMoreBoxityInfo, liftedBoxity, superBoxity, typeKind, superKind
+			)
 import TyCon		( TyCon, isPrimTyCon, tyConArity, isNewTyCon )
 import Class		( classTyCon, classHasFDs, Class )
 import Var		( TyVar, tyVarKind )
@@ -137,7 +154,7 @@ isTauTy (TyVarTy v)	 = True
 isTauTy (TyConApp _ tys) = all isTauTy tys
 isTauTy (AppTy a b)	 = isTauTy a && isTauTy b
 isTauTy (FunTy a b)	 = isTauTy a && isTauTy b
-isTauTy (SourceTy p)	 = isTauTy (sourceTypeRep p)
+isTauTy (SourceTy p)	 = True		-- Don't look through source types
 isTauTy (NoteTy _ ty)	 = isTauTy ty
 isTauTy (UsageTy _ ty)   = isTauTy ty
 isTauTy other		 = False
@@ -360,7 +377,7 @@ isClassPred :: SourceType -> Bool
 isClassPred (ClassP clas tys) = True
 isClassPred other	      = False
 
-isTyVarClassPred (ClassP clas tys) = all isTyVarTy tys
+isTyVarClassPred (ClassP clas tys) = all tcIsTyVarTy tys
 isTyVarClassPred other		   = False
 
 getClassPredTys_maybe :: SourceType -> Maybe (Class, [Type])
@@ -548,7 +565,7 @@ isPrimitiveType :: Type -> Bool
 -- Returns types that are opaque to Haskell.
 -- Most of these are unlifted, but now that we interact with .NET, we
 -- may have primtive (foreign-imported) types that are lifted
-isPrimitiveType ty = case splitTyConApp_maybe ty of
+isPrimitiveType ty = case tcSplitTyConApp_maybe ty of
 			Just (tc, ty_args) -> ASSERT( length ty_args == tyConArity tc )
 					      isPrimTyCon tc
 			other		   -> False

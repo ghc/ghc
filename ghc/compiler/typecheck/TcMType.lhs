@@ -10,11 +10,6 @@ module TcMType (
   TcTyVar, TcKind, TcType, TcTauType, TcThetaType, TcRhoType, TcTyVarSet,
 
   --------------------------------
-  -- Find the type to which a type variable is bound
-  tcPutTyVar,		-- :: TcTyVar -> TcType -> NF_TcM TcType
-  tcGetTyVar,		-- :: TcTyVar -> NF_TcM (Maybe TcType)	does shorting out
-
-  --------------------------------
   -- Creating new mutable type variables
   newTyVar,
   newTyVarTy,		-- Kind -> NF_TcM TcType
@@ -45,11 +40,20 @@ module TcMType (
 
 
 -- friends:
-import TypeRep		( Type(..), Kind, TyNote(..) )  -- friend
-import Type		-- Lots and lots
+import TypeRep		( Type(..), SourceType(..), Kind, TyNote(..),	 -- friend
+			  openKindCon, typeCon
+			) 
 import TcType		( tcEqType,
 			  tcSplitRhoTy, tcSplitPredTy_maybe, tcSplitAppTy_maybe, 
-			  tcSplitTyConApp_maybe, tcSplitFunTy_maybe
+			  tcSplitTyConApp_maybe, tcSplitFunTy_maybe, tcSplitForAllTys,
+			  tcGetTyVar, tcIsTyVarTy,
+
+			  mkAppTy, mkTyVarTy, mkTyVarTys, mkFunTy, mkTyConApp,
+
+			  liftedTypeKind, unliftedTypeKind, openTypeKind, defaultKind, superKind,
+			  superBoxity, liftedBoxity, hasMoreBoxityInfo, typeKind,
+			  tyVarsOfType, tyVarsOfTypes, tidyOpenType, tidyOpenTypes, tidyTyVar,
+			  eqKind,
 			)
 import Subst		( Subst, mkTopTyVarSubst, substTy )
 import TyCon		( TyCon, mkPrimTyCon, isTupleTyCon, tyConArity, tupleTyConBoxity )
@@ -132,10 +136,10 @@ tcSplitRhoTyM t
 					Just pair -> go res res (pair:ts)
 					Nothing   -> returnNF_Tc (reverse ts, syn_t)
     go syn_t (NoteTy n t)    ts = go syn_t t ts
-    go syn_t (TyVarTy tv)    ts = tcGetTyVar tv		`thenNF_Tc` \ maybe_ty ->
+    go syn_t (TyVarTy tv)    ts = getTcTyVar tv		`thenNF_Tc` \ maybe_ty ->
 				  case maybe_ty of
-				    Just ty | not (isTyVarTy ty) -> go syn_t ty ts
-				    other			 -> returnNF_Tc (reverse ts, syn_t)
+				    Just ty | not (tcIsTyVarTy ty) -> go syn_t ty ts
+				    other			   -> returnNF_Tc (reverse ts, syn_t)
     go syn_t (UsageTy _ t)   ts = go syn_t t ts
     go syn_t t		     ts = returnNF_Tc (reverse ts, syn_t)
 \end{code}
@@ -192,7 +196,7 @@ fresh type variables, splits off the dictionary part, and returns the results.
 \begin{code}
 tcInstType :: TcType -> NF_TcM ([TcTyVar], TcThetaType, TcType)
 tcInstType ty
-  = case splitForAllTys ty of
+  = case tcSplitForAllTys ty of
 	([],     rho) -> 	-- There may be overloading but no type variables;
 				-- 	(?x :: Int) => Int -> Int
 			 let
@@ -216,16 +220,16 @@ tcInstType ty
 %************************************************************************
 
 \begin{code}
-tcPutTyVar :: TcTyVar -> TcType -> NF_TcM TcType
-tcGetTyVar :: TcTyVar -> NF_TcM (Maybe TcType)
+putTcTyVar :: TcTyVar -> TcType -> NF_TcM TcType
+getTcTyVar :: TcTyVar -> NF_TcM (Maybe TcType)
 \end{code}
 
 Putting is easy:
 
 \begin{code}
-tcPutTyVar tyvar ty 
+putTcTyVar tyvar ty 
   | not (isMutTyVar tyvar)
-  = pprTrace "tcPutTyVar" (ppr tyvar) $
+  = pprTrace "putTcTyVar" (ppr tyvar) $
     returnNF_Tc ty
 
   | otherwise
@@ -238,7 +242,7 @@ tcPutTyVar tyvar ty
 Getting is more interesting.  The easy thing to do is just to read, thus:
 
 \begin{verbatim}
-tcGetTyVar tyvar = tcReadMutTyVar tyvar
+getTcTyVar tyvar = tcReadMutTyVar tyvar
 \end{verbatim}
 
 But it's more fun to short out indirections on the way: If this
@@ -248,9 +252,9 @@ any other type, then there might be bound TyVars embedded inside it.
 We return Nothing iff the original box was unbound.
 
 \begin{code}
-tcGetTyVar tyvar
+getTcTyVar tyvar
   | not (isMutTyVar tyvar)
-  = pprTrace "tcGetTyVar" (ppr tyvar) $
+  = pprTrace "getTcTyVar" (ppr tyvar) $
     returnNF_Tc (Just (mkTyVarTy tyvar))
 
   | otherwise
@@ -306,7 +310,7 @@ zonkTcSigTyVars :: [TcTyVar] -> NF_TcM [TcTyVar]
 -- that is overkill, so we use this simpler chap
 zonkTcSigTyVars tyvars
   = zonkTcTyVars tyvars	`thenNF_Tc` \ tys ->
-    returnNF_Tc (map (getTyVar "zonkTcSigTyVars") tys)
+    returnNF_Tc (map (tcGetTyVar "zonkTcSigTyVars") tys)
 \end{code}
 
 -----------------  Types
@@ -349,8 +353,8 @@ zonkKindEnv pairs
 	-- When zonking a kind, we want to
 	--	zonk a *kind* variable to (Type *)
 	--	zonk a *boxity* variable to *
-    zonk_unbound_kind_var kv | tyVarKind kv `eqKind` superKind   = tcPutTyVar kv liftedTypeKind
-			     | tyVarKind kv `eqKind` superBoxity = tcPutTyVar kv liftedBoxity
+    zonk_unbound_kind_var kv | tyVarKind kv `eqKind` superKind   = putTcTyVar kv liftedTypeKind
+			     | tyVarKind kv `eqKind` superBoxity = putTcTyVar kv liftedBoxity
 			     | otherwise		 	 = pprPanic "zonkKindEnv" (ppr kv)
 			
 zonkTcTypeToType :: TcType -> NF_TcM Type
@@ -361,10 +365,10 @@ zonkTcTypeToType ty = zonkType zonk_unbound_tyvar ty
 	--	:Void		otherwise
     zonk_unbound_tyvar tv
 	| kind `eqKind` liftedTypeKind || kind `eqKind` openTypeKind
-	= tcPutTyVar tv voidTy	-- Just to avoid creating a new tycon in
+	= putTcTyVar tv voidTy	-- Just to avoid creating a new tycon in
 				-- this vastly common case
 	| otherwise
-	= tcPutTyVar tv (TyConApp (mk_void_tycon tv kind) [])
+	= putTcTyVar tv (TyConApp (mk_void_tycon tv kind) [])
 	where
 	  kind = tyVarKind tv
 
@@ -394,7 +398,7 @@ zonkTcTyVarToTyVar tv
 	immut_tv    = mkTyVar (tyVarName tv) (defaultKind (tyVarKind tv))
 	immut_tv_ty = mkTyVarTy immut_tv
 
-        zap tv = tcPutTyVar tv immut_tv_ty
+        zap tv = putTcTyVar tv immut_tv_ty
 		-- Bind the mutable version to the immutable one
     in 
 	-- If the type variable is mutable, then bind it to immut_tv_ty
@@ -451,7 +455,7 @@ zonkType unbound_var_fn ty
 
     go (UsageTy u ty)             = go u                `thenNF_Tc` \ u'  ->
                                     go ty               `thenNF_Tc` \ ty' ->
-                                    returnNF_Tc (mkUTy u' ty')
+                                    returnNF_Tc (UsageTy u' ty')
 
 	-- The two interesting cases!
     go (TyVarTy tyvar)     = zonkTyVar unbound_var_fn tyvar
@@ -477,7 +481,7 @@ zonkTyVar unbound_var_fn tyvar
     returnNF_Tc (TyVarTy tyvar)
 
   | otherwise
-  =  tcGetTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
+  =  getTcTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
      case maybe_ty of
 	  Nothing	-> unbound_var_fn tyvar			-- Mutable and unbound
 	  Just other_ty	-> zonkType unbound_var_fn other_ty	-- Bound
@@ -512,7 +516,7 @@ unifyOpenTypeKind :: TcKind -> TcM ()
 -- for some boxity bx
 
 unifyOpenTypeKind ty@(TyVarTy tyvar)
-  = tcGetTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
+  = getTcTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
     case maybe_ty of
 	Just ty' -> unifyOpenTypeKind ty'
 	other	 -> unify_open_kind_help ty
@@ -726,7 +730,7 @@ uVar :: Bool		-- False => tyvar is the "expected"
      -> TcM ()
 
 uVar swapped tv1 ps_ty2 ty2
-  = tcGetTyVar tv1	`thenNF_Tc` \ maybe_ty1 ->
+  = getTcTyVar tv1	`thenNF_Tc` \ maybe_ty1 ->
     case maybe_ty1 of
 	Just ty1 | swapped   -> uTys ps_ty2 ty2 ty1 ty1	-- Swap back
 		 | otherwise -> uTys ty1 ty1 ps_ty2 ty2	-- Same order
@@ -747,19 +751,19 @@ uUnboundVar swapped tv1 maybe_ty1 ps_ty2 ty2@(TyVarTy tv2)
 	-- Distinct type variables
 	-- ASSERT maybe_ty1 /= Just
   | otherwise
-  = tcGetTyVar tv2	`thenNF_Tc` \ maybe_ty2 ->
+  = getTcTyVar tv2	`thenNF_Tc` \ maybe_ty2 ->
     case maybe_ty2 of
 	Just ty2' -> uUnboundVar swapped tv1 maybe_ty1 ty2' ty2'
 
 	Nothing | update_tv2
 
 		-> WARN( not (k1 `hasMoreBoxityInfo` k2), (ppr tv1 <+> ppr k1) $$ (ppr tv2 <+> ppr k2) )
-		   tcPutTyVar tv2 (TyVarTy tv1)		`thenNF_Tc_`
+		   putTcTyVar tv2 (TyVarTy tv1)		`thenNF_Tc_`
 		   returnTc ()
 		|  otherwise
 
 		-> WARN( not (k2 `hasMoreBoxityInfo` k1), (ppr tv2 <+> ppr k2) $$ (ppr tv1 <+> ppr k1) )
-                   (tcPutTyVar tv1 ps_ty2		`thenNF_Tc_`
+                   (putTcTyVar tv1 ps_ty2		`thenNF_Tc_`
 	  	    returnTc ())
   where
     k1 = tyVarKind tv1
@@ -808,14 +812,14 @@ uUnboundVar swapped tv1 maybe_ty1 ps_ty2 non_var_ty2
 	-- That's why we have this two-state occurs-check
     zonkTcType ps_ty2					`thenNF_Tc` \ ps_ty2' ->
     if not (tv1 `elemVarSet` tyVarsOfType ps_ty2') then
-	tcPutTyVar tv1 ps_ty2'				`thenNF_Tc_`
+	putTcTyVar tv1 ps_ty2'				`thenNF_Tc_`
 	returnTc ()
     else
     zonkTcType non_var_ty2				`thenNF_Tc` \ non_var_ty2' ->
     if not (tv1 `elemVarSet` tyVarsOfType non_var_ty2') then
 	-- This branch rarely succeeds, except in strange cases
 	-- like that in the example above
-	tcPutTyVar tv1 non_var_ty2'			`thenNF_Tc_`
+	putTcTyVar tv1 non_var_ty2'			`thenNF_Tc_`
 	returnTc ()
     else
     failWithTcM (unifyOccurCheck tv1 ps_ty2')
@@ -851,7 +855,7 @@ unifyFunTy :: TcType	 			-- Fail if ty isn't a function type
 	   -> TcM (TcType, TcType)	-- otherwise return arg and result types
 
 unifyFunTy ty@(TyVarTy tyvar)
-  = tcGetTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
+  = getTcTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
     case maybe_ty of
 	Just ty' -> unifyFunTy ty'
 	other	    -> unify_fun_ty_help ty
@@ -873,7 +877,7 @@ unifyListTy :: TcType              -- expected list type
 	    -> TcM TcType      -- list element type
 
 unifyListTy ty@(TyVarTy tyvar)
-  = tcGetTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
+  = getTcTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
     case maybe_ty of
 	Just ty' -> unifyListTy ty'
 	other	 -> unify_list_ty_help ty
@@ -892,7 +896,7 @@ unify_list_ty_help ty	-- Revert to ordinary unification
 \begin{code}
 unifyTupleTy :: Boxity -> Arity -> TcType -> TcM [TcType]
 unifyTupleTy boxity arity ty@(TyVarTy tyvar)
-  = tcGetTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
+  = getTcTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
     case maybe_ty of
 	Just ty' -> unifyTupleTy boxity arity ty'
 	other	 -> unify_tuple_ty_help boxity arity ty
