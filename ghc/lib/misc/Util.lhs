@@ -87,17 +87,13 @@ module Util (
 	, assertPanic
 #endif {- COMPILING_GHC -}
 
+	, unvectorize        
+
     ) where
 
-#if defined(COMPILING_GHC)
-
-CHK_Ubiq() -- debugging consistency check
-IMPORT_1_3(List(zipWith4))
-
-import Pretty
-#else
 import List(zipWith4)
-#endif
+import PackedString ( unpackCStringIO )
+import Addr
 
 infixr 9 `thenCmp`
 \end{code}
@@ -813,4 +809,20 @@ assertPanic :: String -> Int -> a
 assertPanic file line = panic ("ASSERT failed! file "++file++", line "++show line)
 
 #endif {- COMPILING_GHC -}
+\end{code}
+
+Turn a NULL-terminated vector of null-terminated strings into a string list
+(ToDo: create a module of common marshaling functions)
+
+\begin{code}
+unvectorize :: Addr -> Int -> IO [String]
+unvectorize ptr n
+  | str == ``NULL'' = return []
+  | otherwise = do
+	x  <- unpackCStringIO str
+	xs <- unvectorize ptr (n+1)
+	return (x : xs)
+  where
+   str = indexAddrOffAddr ptr n
+
 \end{code}
