@@ -1,246 +1,168 @@
-<Chapter id="wrong">
-<Title>What to do when something goes wrong
-</Title>
+<chapter id="wrong">
+  <title>What to do when something goes wrong</title>
 
-<Para>
-<IndexTerm><Primary>problems</Primary></IndexTerm>
-</Para>
+  <Indexterm><Primary>problems</Primary></Indexterm>
 
-<Para>
-If you still have a problem after consulting this section, then you
-may have found a <Emphasis>bug</Emphasis>&mdash;please report it!  See
-<XRef LinkEnd="bug-reporting"> for details on how to report a bug and
-a list of things we'd like to know about your bug.  If in doubt, send
-a report&mdash;we love mail from irate users :-!
-</Para>
+  <para>If you still have a problem after consulting this section,
+  then you may have found a <Emphasis>bug</Emphasis>&mdash;please
+  report it!  See <XRef LinkEnd="bug-reporting"> for details on how to
+  report a bug and a list of things we'd like to know about your bug.
+  If in doubt, send a report&mdash;we love mail from irate users
+  :-!</para>
 
-<Para>
-(<XRef LinkEnd="vs-Haskell-defn">, which describes Glasgow
-Haskell's shortcomings vs.&nbsp;the Haskell language definition, may also
-be of interest.)
-</Para>
+  <para>(<XRef LinkEnd="vs-Haskell-defn">, which describes Glasgow
+  Haskell's shortcomings vs.&nbsp;the Haskell language definition, may
+  also be of interest.)</para>
 
-<Sect1 id="wrong-compiler">
-<Title>When the compiler &ldquo;does the wrong thing&rdquo;
-</Title>
+  <sect1 id="wrong-compiler">
+    <title>When the compiler &ldquo;does the wrong thing&rdquo;</title>
 
-<Para>
-<IndexTerm><Primary>compiler problems</Primary></IndexTerm>
-<IndexTerm><Primary>problems with the compiler</Primary></IndexTerm>
-</Para>
+    <Indexterm><Primary>compiler problems</Primary></Indexterm>
+    <Indexterm><Primary>problems with the compiler</Primary></Indexterm>
 
-<Para>
-<VariableList>
+    <variablelist>
+      <varlistentry>
+	<term>&ldquo;Help! The compiler crashed (or `panic'd)!&rdquo;</term>
+	<listitem>
+	  <para>These events are <Emphasis>always</Emphasis> bugs in
+	  the GHC system&mdash;please report them.</para>
+	</listitem>
+      </varlistentry>
 
-<VarListEntry>
-<Term>&ldquo;Help! The compiler crashed (or `panic'd)!&rdquo;</Term>
-<ListItem>
-<Para>
-These events are <Emphasis>always</Emphasis> bugs in the GHC system&mdash;please report them.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term>&ldquo;The compiler ran out of heap (or stack) when compiling itself!&rdquo;</Term>
-<ListItem>
-<Para>
-It happens.  We try to supply reasonable <Option>-H&lt;n&gt;</Option> flags for
-<Filename>ghc/compiler/</Filename> and <Filename>ghc/lib/</Filename>, but GHC's memory consumption
-can vary by platform (e.g., on a 64-bit machine).
-</Para>
+      <varlistentry>
+	<term>&ldquo;This is a terrible error message.&rdquo;</term>
+	<listitem>
+	  <para>If you think that GHC could have produced a better
+          error message, please report it as a bug.</para>
+	</listitem>
+      </varlistentry>
 
-<Para>
-Just say <Command>make all EXTRA&lowbar;HC&lowbar;OPTS=-H&lt;a reasonable number&gt;</Command> and see
-how you get along.
-</Para>
+      <varlistentry>
+	<term>&ldquo;What about this warning from the C
+	compiler?&rdquo;</term>
+	<listitem>
+	  <para>For example: &ldquo;&hellip;warning: `Foo' declared
+          `static' but never defined.&rdquo; Unsightly, but shouldn't
+          be a problem.</para>
+	</listitem>
+      </varlistentry>
 
-<Para>
-Note that this is less likely to happen if you are compiling with GHC
-4.00 or later, since the introduction of the dynamically expanding
-heap.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term>&ldquo;The compiler died with a pattern-matching error.&rdquo;</Term>
-<ListItem>
-<Para>
-This is a bug just as surely as a &ldquo;panic.&rdquo; Please report it.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term>&ldquo;This is a terrible error message.&rdquo;</Term>
-<ListItem>
-<Para>
-If you think that GHC could have produced a better error message,
-please report it as a bug.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term>&ldquo;What about these `trace' messages from GHC?&rdquo;</Term>
-<ListItem>
-<Para>
-Almost surely not a problem.  About some specific cases&hellip;
-<VariableList>
+      <varlistentry>
+	<term>Sensitivity to <Filename>.hi</Filename> interface files:</term>
+	<listitem>
+	  <para>GHC is very sensitive about interface files.  For
+          example, if it picks up a non-standard
+          <filename>Prelude.hi</filename> file, pretty terrible things
+          will happen.  If you turn on
+          <option>-fno-implicit-prelude</option><indexterm><primary>-fno-implicit-prelude
+          option</primary></indexterm>, the compiler will almost
+          surely die, unless you know what you are doing.</para>
 
-<VarListEntry>
-<Term>Simplifier still going after N iterations:</Term>
-<ListItem>
-<Para>
-Sad, but harmless.  You can change the number with a
-<Option>-fmax-simplifier-iterations&lt;N&gt;</Option><IndexTerm><Primary>-fmax-simplifier-iterations&lt;N&gt; option</Primary></IndexTerm> option (no space);
-and you can see what actions took place in each iteration by
-turning on the <Option>-fshow-simplifier-progress</Option>
-<IndexTerm><Primary>-fshow-simplifier-progress option</Primary></IndexTerm> option.
-</Para>
+	  <para>Furthermore, as sketched below, you may have big
+          problems running programs compiled using unstable
+          interfaces.</para>
+	</listitem>
+      </varlistentry>
 
-<Para>
-If the simplifier definitely seems to be &ldquo;looping,&rdquo; please report
-it.
-</Para>
-</ListItem>
-</VarListEntry>
-</VariableList>
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term>&ldquo;What about this warning from the C compiler?&rdquo;</Term>
-<ListItem>
-<Para>
-For example: &ldquo;&hellip;warning: `Foo' declared `static' but never defined.&rdquo;
-Unsightly, but shouldn't be a problem.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term>Sensitivity to <Filename>.hi</Filename> interface files:</Term>
-<ListItem>
-<Para>
-GHC is very sensitive about interface files.  For example, if it picks
-up a non-standard <Filename>Prelude.hi</Filename> file, pretty terrible things will
-happen.  If you turn on
-<Option>-fno-implicit-prelude</Option><IndexTerm><Primary>-fno-implicit-prelude option</Primary></IndexTerm>, the
-compiler will almost surely die, unless you know what you are doing.
-</Para>
+      <varlistentry>
+	<term>&ldquo;I think GHC is producing incorrect code&rdquo;:</term>
+	<listitem>
+	  <para>Unlikely :-) A useful be-more-paranoid option to give
+          to GHC is
+          <option>-dcore-lint</option><indexterm><primary>-dcore-lint
+          option</primary></indexterm>; this causes a
+          &ldquo;lint&rdquo; pass to check for errors (notably type
+          errors) after each Core-to-Core transformation pass.  We run
+          with <option>-dcore-lint</option> on all the time; it costs
+          about 5&percnt; in compile time.</para>
+	</listitem>
+      </varlistentry>
 
-<Para>
-Furthermore, as sketched below, you may have big problems
-running programs compiled using unstable interfaces.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term>&ldquo;I think GHC is producing incorrect code&rdquo;:</Term>
-<ListItem>
-<Para>
-Unlikely :-) A useful be-more-paranoid option to give to GHC is
-<Option>-dcore-lint</Option><IndexTerm><Primary>-dcore-lint option</Primary></IndexTerm>; this causes a &ldquo;lint&rdquo;
-pass to check for errors (notably type errors) after each Core-to-Core
-transformation pass.  We run with <Option>-dcore-lint</Option> on all the time; it
-costs about 5&percnt; in compile time.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term>&ldquo;Why did I get a link error?&rdquo;</Term>
-<ListItem>
-<Para>
-If the linker complains about not finding <Literal>&lowbar;&lt;something&gt;&lowbar;fast</Literal>, then
-something is inconsistent: you probably didn't compile modules in the
-proper dependency order.
-</Para>
-</ListItem>
-</VarListEntry>
+      <varlistentry>
+	<term>&ldquo;Why did I get a link error?&rdquo;</term>
+	<listitem>
+	  <para>If the linker complains about not finding
+          <literal>&lowbar;&lt;something&gt;&lowbar;fast</literal>,
+          then something is inconsistent: you probably didn't compile
+          modules in the proper dependency order.</para>
+	</listitem>
+      </varlistentry>
 
-<VarListEntry>
-<Term>&ldquo;Is this line number right?&rdquo;</Term>
-<ListItem>
-<Para>
-On this score, GHC usually does pretty well, especially
-if you &ldquo;allow&rdquo; it to be off by one or two.  In the case of an
-instance or class declaration, the line number
-may only point you to the declaration, not to a specific method.
-</Para>
+      <varlistentry>
+	<term>&ldquo;Is this line number right?&rdquo;</term>
+	<listitem>
+	  <para>On this score, GHC usually does pretty well,
+          especially if you &ldquo;allow&rdquo; it to be off by one or
+          two.  In the case of an instance or class declaration, the
+          line number may only point you to the declaration, not to a
+          specific method.</para>
 
-<Para>
-Please report line-number errors that you find particularly unhelpful.
-</Para>
-</ListItem>
-</VarListEntry>
-</VariableList>
-</Para>
+	  <para>Please report line-number errors that you find
+	  particularly unhelpful.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+  </sect1>
 
-</Sect1>
+  <sect1 id="wrong-compilee">
+    <title>When your program &ldquo;does the wrong thing&rdquo;</title>
 
-<Sect1 id="wrong-compilee">
-<Title>When your program &ldquo;does the wrong thing&rdquo;
-</Title>
+    <Indexterm><Primary>problems running your program</Primary></Indexterm>
 
-<Para>
-<IndexTerm><Primary>problems running your program</Primary></IndexTerm>
-</Para>
+    <para>(For advice about overly slow or memory-hungry Haskell
+    programs, please see <XRef
+    LinkEnd="sooner-faster-quicker">).</para>
 
-<Para>
-(For advice about overly slow or memory-hungry Haskell programs,
-please see <XRef LinkEnd="sooner-faster-quicker">).
-</Para>
+    <variablelist>
 
-<Para>
-<VariableList>
+      <varlistentry>
+	<term>&ldquo;Help! My program crashed!&rdquo;</term>
+	<listitem>
+	  <para>(e.g., a `segmentation fault' or `core dumped')
+          <indexterm><primary>segmentation
+          fault</primary></indexterm></para>
 
-<VarListEntry>
-<Term>&ldquo;Help! My program crashed!&rdquo;</Term>
-<ListItem>
-<Para>
-(e.g., a `segmentation fault' or `core dumped')
-<IndexTerm><Primary>segmentation fault</Primary></IndexTerm>
-</Para>
+	  <para>If your program has no foreign calls in it, and no
+          calls to known-unsafe functions (such as
+          <literal>unsafePerformIO</literal>) then a crash is always a
+          BUG in the GHC system, except in one case: If your program
+          is made of several modules, each module must have been
+          compiled after any modules on which it depends (unless you
+          use <filename>.hi-boot</filename> files, in which case these
+          <emphasis>must</emphasis> be correct with respect to the
+          module source).</para>
 
-<Para>
-If your program has no foreign calls in it, then a crash is always a BUG in
-the GHC system, except in one case: If your program is made of several
-modules, each module must have been compiled after any modules on which it
-depends (unless you use <Filename>.hi-boot</Filename> files, in which case
-these <Emphasis>must</Emphasis> be correct with respect to the module
-source).
-</Para>
+	  <para>For example, if an interface is lying about the type
+          of an imported value then GHC may well generate duff code
+          for the importing module.  <Emphasis>This applies to pragmas
+          inside interfaces too!</Emphasis> If the pragma is lying
+          (e.g., about the &ldquo;arity&rdquo; of a value), then duff
+          code may result.  Furthermore, arities may change even if
+          types do not.</para>
 
-<Para>
-For example, if an interface is lying about the type of an imported
-value then GHC may well generate duff code for the importing module.
-<Emphasis>This applies to pragmas inside interfaces too!</Emphasis>  If the pragma is
-lying (e.g., about the &ldquo;arity&rdquo; of a value), then duff code may result.
-Furthermore, arities may change even if types do not.
-</Para>
+	  <para>In short, if you compile a module and its interface
+          changes, then all the modules that import that interface
+          <emphasis>must</emphasis> be re-compiled.</para>
 
-<Para>
-In short, if you compile a module and its interface changes, then all
-the modules that import that interface <Emphasis>must</Emphasis> be re-compiled.
-</Para>
+	  <para>A useful option to alert you when interfaces change is
+          <option>-hi-diffs</option><indexterm><primary>-hi-diffs
+          option</primary></indexterm>.  It will run
+          <command>diff</command> on the changed interface file,
+          before and after, when applicable.</para>
 
-<Para>
-A useful option to alert you when interfaces change is
-<Option>-hi-diffs</Option><IndexTerm><Primary>-hi-diffs option</Primary></IndexTerm>.  It will run <Command>diff</Command> on the
-changed interface file, before and after, when applicable.
-</Para>
+	  <para>If you are using <command>make</command>, GHC can
+          automatically generate the dependencies required in order to
+          make sure that every module <emphasis>is</emphasis>
+          up-to-date with respect to its imported interfaces.  Please
+          see <xref linkend="sec-makefile-dependencies">.</para>
 
-<Para>
-If you are using <Command>make</Command>, GHC can automatically
-generate the dependencies required in order to make sure that every
-module <Emphasis>is</Emphasis> up-to-date with respect to its imported
-interfaces.  Please see <XRef LinkEnd="sec-makefile-dependencies">.
-</Para>
+	  <para>If you are down to your
+          last-compile-before-a-bug-report, we would recommend that
+          you add a <option>-dcore-lint</option> option (for extra
+          checking) to your compilation options.</para>
 
-<Para>
-If you are down to your last-compile-before-a-bug-report, we would
-recommend that you add a <Option>-dcore-lint</Option> option (for extra checking) to your compilation options.
-</Para>
-
-<Para>
-So, before you report a bug because of a core dump, you should probably:
+	  <para>So, before you report a bug because of a core dump,
+	  you should probably:</para>
 
 <Screen>
 % rm *.o        # scrub your object files
@@ -249,108 +171,42 @@ So, before you report a bug because of a core dump, you should probably:
 % ./my_prog ... # retry...
 </Screen>
 
-</Para>
+	  <para>Of course, if you have foreign calls in your program
+          then all bets are off, because you can trash the heap, the
+          stack, or whatever.</para>
 
-<Para>
-Of course, if you have foreign calls in your program then all
-bets are off, because you can trash the heap, the stack, or whatever.
-</Para>
+	  <para>If you are interested in hard-core debugging of a
+          crashing GHC-compiled program, please see <xref
+          linkend="hard-core-debug">.</para>
+	</listitem>
+      </varlistentry>
 
-<Para>
-If you are interested in hard-core debugging of a crashing
-GHC-compiled program, please see <XRef LinkEnd="hard-core-debug">.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term>&ldquo;My program entered an `absent' argument.&rdquo;</Term>
-<ListItem>
-<Para>
-This is definitely caused by a bug in GHC. Please report it (see <xref
-linkend="bug-reporting">).
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term>&ldquo;What's with this `arithmetic (or `floating') exception' &rdquo;?</Term>
-<ListItem>
-<Para>
-<Literal>Int</Literal>, <Literal>Float</Literal>, and <Literal>Double</Literal> arithmetic is <Emphasis>unchecked</Emphasis>.
-Overflows, underflows and loss of precision are either silent or
-reported as an exception by the operating system (depending on the
-architecture).  Divide-by-zero <Emphasis>may</Emphasis> cause an untrapped
-exception (please report it if it does).
-</Para>
-</ListItem>
-</VarListEntry>
-</VariableList>
-</Para>
+      <varlistentry>
+	<term>&ldquo;My program entered an `absent' argument.&rdquo;</term>
+	<listitem>
+	  <para>This is definitely caused by a bug in GHC. Please
+          report it (see <xref linkend="bug-reporting">).</para>
+	</listitem>
+      </varlistentry>
 
-</Sect1>
+      <varlistentry>
+	<term>&ldquo;What's with this `arithmetic (or `floating')
+	exception' &rdquo;?</term>
+	<listitem>
+	  <para><literal>Int</literal>, <literal>Float</literal>, and
+          <literal>Double</literal> arithmetic is
+          <emphasis>unchecked</emphasis>.  Overflows, underflows and
+          loss of precision are either silent or reported as an
+          exception by the operating system (depending on the
+          platform).  Divide-by-zero <emphasis>may</emphasis> cause an
+          untrapped exception (please report it if it does).</para>
+	</listitem>
+      </varlistentry>
 
-<Sect1 id="hard-core-debug">
-<Title>Hard-core debugging of GHC-compiled programs
-</Title>
+    </variablelist>
+  </sect1>
 
-<Para>
-<IndexTerm><Primary>debugging, hard-core</Primary></IndexTerm>
-</Para>
-
-<Para>
-If your program is crashing, you should almost surely file a bug
-report, as outlined in <xref linkend="bug-reporting">.
-</Para>
-
-<Para>
-This section suggests ways to Make Further Progress Anyway.
-</Para>
-
-<Para>
-The first thing to establish is: Is it a garbage-collection (GC) bug?
-Try your program with a very large heap and a <Option>-Sstderr</Option> RTS
-flag.
-
-<ItemizedList>
-<ListItem>
-
-<Para>
-If it crashes <Emphasis>without</Emphasis> garbage-collecting, then it is
-definitely <Emphasis>not</Emphasis> a GC bug.
-</Para>
-</ListItem>
-<ListItem>
-
-<Para>
-If you can make it crash with one heap size but not with another, then
-it <Emphasis>probably is</Emphasis> a GC bug.
-</Para>
-</ListItem>
-<ListItem>
-
-<Para>
-If it crashes with the normal collector, but not when you force
-two-space collection (<Option>-G1</Option> runtime flag), then it
-<Emphasis>probably is</Emphasis> a GC bug.
-</Para>
-</ListItem>
-
-</ItemizedList>
-
-</Para>
-
-<Para>
-If it <Emphasis>is</Emphasis> a GC bug, you may be able to avoid it by
-using a particular heap size or by using a <Option>-G1</Option>
-runtime flag.  (But don't forget to report the bug!!!)
-</Para>
-
-<Para>
-ToDo: more here?
-</Para>
-
-</Sect1>
-
-</Chapter>
+</chapter>
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***
