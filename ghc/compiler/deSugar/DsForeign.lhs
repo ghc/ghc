@@ -22,7 +22,7 @@ import CallConv
 import TcHsSyn		( TypecheckedForeignDecl )
 import CoreUtils	( exprType, mkInlineMe )
 import DataCon		( DataCon, dataConWrapId )
-import Id		( Id, idType, idName, mkWildId, mkVanillaId )
+import Id		( Id, idType, idName, mkWildId, mkVanillaId, mkSysLocal )
 import MkId		( mkWorkerId )
 import Literal		( Literal(..) )
 import Module		( Module, moduleUserString )
@@ -151,7 +151,7 @@ dsFImport fn_id ty may_not_gc ext_name cconv
 	the_ccall     = CCall lbl False (not may_not_gc) cconv
  	the_ccall_app = mkCCall ccall_uniq the_ccall val_args ccall_result_ty
 	work_rhs      = mkLams tvs (mkLams work_arg_ids the_ccall_app)
-	work_id       = mkWorkerId work_uniq fn_id worker_ty
+	work_id       = mkSysLocal SLIT("$wccall") work_uniq worker_ty
 
 	-- Build the wrapper
 	work_app     = mkApps (mkVarApps (Var work_id) tvs) val_args
