@@ -148,7 +148,7 @@ ProjectPatchLevel = $($(Project)ProjectPatchLevel)
 
 GhcProjectName         = The Glorious Glasgow Haskell Compilation System
 GhcProjectNameShort    = ghc
-GhcProjectVersion      = 3.03
+GhcProjectVersion = proto-3.03-9-Aug
 GhcProjectVersionInt   = 303
 GhcProjectPatchLevel   = 0
 
@@ -529,6 +529,7 @@ endif
 # GMP Library
 #
 HaveLibGmp	= @HaveLibGmp@
+LibGmp		= @LibGmp@
 
 #-----------------------------------------------------------------------------
 # Flex
