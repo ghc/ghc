@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.46 1999/03/03 17:22:11 simonm Exp $
+ * $Id: GC.c,v 1.47 1999/03/03 18:58:53 sof Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1125,7 +1125,7 @@ evacuate(StgClosure *q)
   const StgInfoTable *info;
 
 loop:
-  if (!LOOKS_LIKE_STATIC(q)) {
+  if (HEAP_ALLOCED(q)) {
     bd = Bdescr((P_)q);
     if (bd->gen->no > N) {
       /* Can't evacuate this object, because it's in a generation
@@ -1238,7 +1238,7 @@ loop:
 	   * with the evacuation, just update the source address with
 	   * a pointer to the (evacuated) constructor field.
 	   */
-	  if (IS_USER_PTR(q)) {
+	  if (HEAP_ALLOCED(q)) {
 	    bdescr *bd = Bdescr((P_)q);
 	    if (bd->evacuated) {
 	      if (bd->gen->no < evac_gen) {
@@ -1508,7 +1508,24 @@ scavenge_srt(const StgInfoTable *info)
   srt = stgCast(StgClosure **,info->srt);
   srt_end = srt + info->srt_len;
   for (; srt < srt_end; srt++) {
-    evacuate(*srt);
+    /* Special-case to handle references to closures hiding out in DLLs, since
+       double indirections required to get at those. The code generator knows
+       which is which when generating the SRT, so it stores the (indirect)
+       reference to the DLL closure in the table by first adding one to it.
+       We check for this here, and undo the addition before evacuating it.
+
+       If the SRT entry hasn't got bit 0 set, the SRT entry points to a
+       closure that's fixed at link-time, and no extra magic is required.
+    */
+#ifdef HAVE_WIN32_DLL_SUPPORT
+    if ( stgCast(unsigned long,*srt) & 0x1 ) {
+       evacuate(*stgCast(StgClosure**,(stgCast(unsigned long, *srt) & ~0x1)));
+    } else {
+       evacuate(*srt);
+    }
+#else
+       evacuate(*srt);
+#endif
   }
 }
 
@@ -2244,14 +2261,13 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
      
     /* Is q a pointer to a closure?
      */
-    if (! LOOKS_LIKE_GHC_INFO(q)) {
 
+    if (! LOOKS_LIKE_GHC_INFO(q)) {
 #ifdef DEBUG
-      if (LOOKS_LIKE_STATIC(q)) { /* Is it a static closure? */
+      if ( 0 && LOOKS_LIKE_STATIC_CLOSURE(q) ) {  /* Is it a static closure? */
 	ASSERT(closure_STATIC(stgCast(StgClosure*,q)));
-      } 
-      /* otherwise, must be a pointer into the allocation space.
-       */
+      }
+      /* otherwise, must be a pointer into the allocation space. */
 #endif
 
       (StgClosure *)*p = evacuate((StgClosure *)q);
