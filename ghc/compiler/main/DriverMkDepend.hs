@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.34 2004/11/26 16:20:52 simonmar Exp $
+-- $Id: DriverMkDepend.hs,v 1.35 2005/01/14 17:57:46 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -14,7 +14,7 @@ module DriverMkDepend (
 #include "HsVersions.h"
 
 import HscTypes		( IfacePackage(..) )
-import GetImports	( getImports )
+import GetImports	( getImportsFromFile )
 import CmdLineOpts	( DynFlags )
 import DriverState      
 import DriverUtil
@@ -123,8 +123,8 @@ beginMkDependHS = do
 
 
 doMkDependHSPhase dflags basename suff input_fn
- = do src <- readFile input_fn
-      let (import_sources, import_normals, mod_name) = getImports src
+ = do (import_sources, import_normals, mod_name) 
+		<- getImportsFromFile dflags input_fn
       let orig_fn = basename ++ '.':suff
       location' <- mkHomeModLocation mod_name orig_fn
 

@@ -280,7 +280,8 @@ mkPackageModLocation pkg_info hisuf mod path basename _ext = do
 hiOnlyModLocation path basename hisuf 
  = do let full_basename = path++'/':basename
       obj_fn <- mkObjPath full_basename basename
-      return ModLocation{ ml_hspp_file = Nothing,
+      return ModLocation{    ml_hspp_file = Nothing,
+			     ml_hspp_buf  = Nothing,
  	        	     ml_hs_file   = Nothing,
  	        	     ml_hi_file   = full_basename ++ '.':hisuf,
 		 		-- Remove the .hi-boot suffix from
@@ -338,6 +339,7 @@ mkHomeModLocation' mod src_basename ext = do
    hi_fn  <- mkHiPath  src_basename mod_basename
 
    let loc = ModLocation{ ml_hspp_file = Nothing,
+			  ml_hspp_buf  = Nothing,
 	   		  ml_hs_file   = Just (src_basename ++ '.':ext),
 			  ml_hi_file   = hi_fn,
 			  ml_obj_file  = obj_fn }

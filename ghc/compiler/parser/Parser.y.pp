@@ -8,7 +8,8 @@
 -- ---------------------------------------------------------------------------
 
 {
-module Parser ( parseModule, parseStmt, parseIdentifier, parseIface, parseType ) where
+module Parser ( parseModule, parseStmt, parseIdentifier, parseIface, parseType,
+		parseHeader ) where
 
 #define INCLUDE #include 
 INCLUDE "HsVersions.h"
@@ -276,6 +277,7 @@ TH_TY_QUOTE	{ L _ ITtyQuote       }      -- ''T
 %name parseIdentifier  identifier
 %name parseIface iface
 %name parseType ctype
+%partial parseHeader header
 %tokentype { Located Token }
 %%
 
@@ -316,6 +318,21 @@ top 	:: { ([LImportDecl RdrName], [LHsDecl RdrName]) }
 
 cvtopdecls :: { [LHsDecl RdrName] }
 	: topdecls				{ cvTopDecls $1 }
+
+-----------------------------------------------------------------------------
+-- Module declaration & imports only
+
+header 	:: { Located (HsModule RdrName) }
+ 	: 'module' modid maybemoddeprec maybeexports 'where' header_body
+		{% fileSrcSpan >>= \ loc ->
+		   return (L loc (HsModule (Just $2) $4 $6 [] $3)) }
+	| missing_module_keyword importdecls
+		{% fileSrcSpan >>= \ loc ->
+		   return (L loc (HsModule Nothing Nothing $2 [] Nothing)) }
+
+header_body :: { [LImportDecl RdrName] }
+	:  '{'            importdecls		{ $2 }
+ 	|      vocurly    importdecls		{ $2 }
 
 -----------------------------------------------------------------------------
 -- Interfaces (.hi-boot files)

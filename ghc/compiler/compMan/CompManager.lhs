@@ -71,6 +71,7 @@ import Digraph		( SCC(..), stronglyConnComp, flattenSCC, flattenSCCs )
 import ErrUtils		( showPass )
 import SysTools		( cleanTempFilesExcept )
 import BasicTypes	( SuccessFlag(..), succeeded, failed )
+import StringBuffer	( hGetStringBuffer )
 import Util
 import Outputable
 import Panic
@@ -1146,7 +1147,13 @@ noModError dflags loc mod_nm err
 summariseFile :: DynFlags -> FilePath -> IO ModSummary
 summariseFile dflags file
    = do hspp_fn <- preprocess dflags file
-        (srcimps,imps,mod) <- getImportsFromFile hspp_fn
+
+	-- Read the file into a buffer.  We're going to cache
+	-- this buffer in the ModLocation (ml_hspp_buf) so that it
+	-- doesn't have to be slurped again when hscMain parses the
+	-- file later.
+	buf <- hGetStringBuffer hspp_fn
+        (srcimps,imps,mod) <- getImports dflags buf hspp_fn
 
         let -- GHC.Prim doesn't exist physically, so don't go looking for it.
             the_imps = filter (/= gHC_PRIM) imps
@@ -1159,7 +1166,8 @@ summariseFile dflags file
                  Just src_fn -> getModificationTime src_fn
 
         return (ModSummary { ms_mod = mod, 
-                             ms_location = location{ml_hspp_file=Just hspp_fn},
+                             ms_location = location{ ml_hspp_file = Just hspp_fn,
+						     ml_hspp_buf  = Just buf },
                              ms_srcimps = srcimps, ms_imps = the_imps,
 			     ms_hs_date = src_timestamp })
 
@@ -1183,7 +1191,9 @@ summarise dflags mod location old_summary
 	   _ -> do
 
         hspp_fn <- preprocess dflags hs_fn
-        (srcimps,imps,mod_name) <- getImportsFromFile hspp_fn
+	
+	buf <- hGetStringBuffer hspp_fn
+        (srcimps,imps,mod_name) <- getImports dflags buf hspp_fn
 	let
 	     -- GHC.Prim doesn't exist physically, so don't go looking for it.
            the_imps = filter (/= gHC_PRIM) imps
@@ -1194,7 +1204,8 @@ summarise dflags mod location old_summary
 			      <>  text ": file name does not match module name"
 			      <+> quotes (ppr mod))))
 
-        return (Just (ModSummary mod location{ml_hspp_file=Just hspp_fn} 
+        return (Just (ModSummary mod location{ ml_hspp_file = Just hspp_fn,
+					       ml_hspp_buf  = Just buf }
                                  srcimps the_imps src_timestamp))
         }
       }

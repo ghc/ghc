@@ -44,6 +44,7 @@ import Maybes		( expectJust )
 import UniqFM
 import UniqSet
 import Binary
+import StringBuffer	( StringBuffer )
 import FastString
 \end{code}
 
@@ -57,19 +58,26 @@ import FastString
 data ModLocation
    = ModLocation {
         ml_hs_file   :: Maybe FilePath,
+		-- the source file, if we have one.  Package modules
+		-- probably don't have source files.
 
-        ml_hspp_file :: Maybe FilePath, -- Path of preprocessed source
+        ml_hspp_file :: Maybe FilePath,
+		-- filename of preprocessed source, if we have
+		-- preprocessed it.
+	ml_hspp_buf  :: Maybe StringBuffer,
+		-- the actual preprocessed source, maybe.
 
-        ml_hi_file   :: FilePath,	-- Where the .hi file is, whether or not it exists
-					-- Always of form foo.hi, even if there is an hi-boot
-					-- file (we add the -boot suffix later)
+        ml_hi_file   :: FilePath,
+		-- Where the .hi file is, whether or not it exists
+		-- yet.  Always of form foo.hi, even if there is an
+		-- hi-boot file (we add the -boot suffix later)
 
-        ml_obj_file  :: FilePath	-- Where the .o file is, whether or not it exists
-					-- (might not exist either because the module
-					--  hasn't been compiled yet, or because
-					--  it is part of a package with a .a file)
-     }
-     deriving Show
+        ml_obj_file  :: FilePath
+		-- Where the .o file is, whether or not it exists yet.
+		-- (might not exist either because the module hasn't
+		-- been compiled yet, or because it is part of a
+		-- package with a .a file)
+  } deriving Show
 
 instance Outputable ModLocation where
    ppr = text . show

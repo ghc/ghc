@@ -44,6 +44,7 @@ import Config
 import RdrName		( GlobalRdrEnv )
 import Panic
 import Util
+import StringBuffer	( hGetStringBuffer )
 import BasicTypes	( SuccessFlag(..) )
 import Maybes		( expectJust )
 
@@ -557,14 +558,16 @@ runPhase Hsc dflags basename suff input_fn get_output_fn _maybe_loc = do
 	writeIORef v_Include_paths (current_dir : paths)
 	
   -- gather the imports and module name
-        (_,_,mod_name) <- 
+        (hspp_buf,mod_name) <- 
             if isExtCoreFilename ('.':suff)
 	     then do
                -- no explicit imports in ExtCore input.
 	       m <- getCoreModuleName input_fn
-	       return ([], [], mkModule m)
-	     else 
-  	       getImportsFromFile input_fn
+	       return (Nothing, mkModule m)
+	     else do
+	       buf <- hGetStringBuffer input_fn
+  	       (_,_,mod_name) <- getImports dflags buf input_fn
+	       return (Just buf, mod_name)
 
   -- build a ModLocation to pass to hscMain.
 	location' <- mkHomeModLocation mod_name (basename ++ '.':suff)
@@ -618,7 +621,8 @@ runPhase Hsc dflags basename suff input_fn get_output_fn _maybe_loc = do
 
   -- run the compiler!
 	result <- hscMain hsc_env printErrorsAndWarnings mod_name
-			  location{ ml_hspp_file=Just input_fn }
+			  location{ ml_hspp_file = Just input_fn,
+				    ml_hspp_buf  = hspp_buf }
 			  source_unchanged
 			  False
 			  Nothing	 -- no iface

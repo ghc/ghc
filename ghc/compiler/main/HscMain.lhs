@@ -224,7 +224,7 @@ hscRecomp hsc_env msg_act have_object
 	; front_res <- if toCore then 
 			  hscCoreFrontEnd hsc_env msg_act hspp_file
 		       else 
-			  hscFileFrontEnd hsc_env msg_act hspp_file
+			  hscFileFrontEnd hsc_env msg_act hspp_file (ml_hspp_buf location)
 
 	; case front_res of
 	    Left flure -> return flure;
@@ -350,11 +350,11 @@ hscCoreFrontEnd hsc_env msg_act hspp_file = do {
 	}}}
 	 
 
-hscFileFrontEnd hsc_env msg_act hspp_file = do {
+hscFileFrontEnd hsc_env msg_act hspp_file hspp_buf = do {
  	    -------------------
  	    -- PARSE
  	    -------------------
-	; maybe_parsed <- myParseModule (hsc_dflags hsc_env)  hspp_file
+	; maybe_parsed <- myParseModule (hsc_dflags hsc_env)  hspp_file hspp_buf
 
 	; case maybe_parsed of {
       	     Left err -> do { msg_act (unitBag err, emptyBag) ;
@@ -388,7 +388,7 @@ hscFileCheck hsc_env msg_act hspp_file = do {
  	    -------------------
  	    -- PARSE
  	    -------------------
-	; maybe_parsed <- myParseModule (hsc_dflags hsc_env)  hspp_file
+	; maybe_parsed <- myParseModule (hsc_dflags hsc_env)  hspp_file Nothing
 
 	; case maybe_parsed of {
       	     Left err -> do { msg_act (unitBag err, emptyBag) ;
@@ -488,11 +488,17 @@ hscCmmFile dflags filename = do
 	no_mod = panic "hscCmmFile: no_mod"
 
 
-myParseModule dflags src_filename
+myParseModule dflags src_filename maybe_src_buf
  = do --------------------------  Parser  ----------------
       showPass dflags "Parser"
       _scc_  "Parser" do
-      buf <- hGetStringBuffer src_filename
+
+	-- sometimes we already have the buffer in memory, perhaps
+	-- because we needed to parse the imports out of it, or get the 
+	-- module name.
+      buf <- case maybe_src_buf of
+		Just b  -> return b
+		Nothing -> hGetStringBuffer src_filename
 
       let loc  = mkSrcLoc (mkFastString src_filename) 1 0
 
