@@ -27,6 +27,9 @@ module System.IO.Error (
     mkIOError,			-- :: IOErrorType -> String -> Maybe Handle
 				--    -> Maybe FilePath -> IOError
 
+    annotateIOError,		-- :: IOError -> String -> Maybe FilePath 
+				--    -> Maybe Handle -> IOError 
+
     alreadyExistsErrorType,	-- :: IOErrorType
     doesNotExistErrorType,
     alreadyInUseErrorType,
