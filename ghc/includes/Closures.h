@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Closures.h,v 1.8 1999/02/11 14:22:56 simonm Exp $
+ * $Id: Closures.h,v 1.9 1999/02/19 18:26:04 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -158,6 +158,7 @@ typedef struct {
     StgWord    n_ptrs;
     StgWord    n_words;
     StgWord    n_instrs;
+    StgWord    stgexpr;
     StgPtr     payload[0];
 } StgBCO;
 
