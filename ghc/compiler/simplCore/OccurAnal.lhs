@@ -23,7 +23,7 @@ import CmdLineOpts	( SimplifierSwitch(..) )
 import CoreSyn
 import CoreUtils	( exprIsTrivial, idSpecVars )
 import Const		( Con(..), Literal(..) )
-import Id		( idWantsToBeINLINEd, 
+import Id		( idWantsToBeINLINEd, isSpecPragmaId,
 			  getInlinePragma, setInlinePragma,
 			  omitIfaceSigForId,
 			  getIdSpecialisation, 

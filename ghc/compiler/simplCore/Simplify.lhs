@@ -758,7 +758,7 @@ completeBindNonRec bndr rhs thing_inside
      simplPrags bndr bndr' etad_rhs		`thenSmpl` \ bndr'' ->
      modifyInScope bndr''			$ 
      thing_inside				`thenSmpl` \ stuff ->
-     returnSmpl (addBind (NonRec bndr' etad_rhs) stuff)
+     returnSmpl (addBind (NonRec bndr'' etad_rhs) stuff)
   where
      etad_rhs = etaCoreExpr rhs
 
@@ -774,12 +774,12 @@ simplPrags old_bndr new_bndr new_rhs
   = returnSmpl (bndr_w_unfolding)
 
   | otherwise
-  = pprTrace "simplPrags" (ppr old_bndr) $
-    getSimplBinderStuff `thenSmpl` \ (ty_subst, id_subst, in_scope, us) ->
+  = getSimplBinderStuff		`thenSmpl` \ (ty_subst, id_subst, in_scope, us) ->
     let
-	spec_env' = substSpecEnv ty_subst in_scope (subst_val id_subst) spec_env
+	spec_env'  = substSpecEnv ty_subst in_scope (subst_val id_subst) spec_env
+	final_bndr = bndr_w_unfolding `setIdSpecialisation` spec_env'
     in
-    returnSmpl (bndr_w_unfolding `setIdSpecialisation` spec_env')
+    returnSmpl final_bndr
   where
     bndr_w_unfolding = new_bndr `setIdUnfolding` mkUnfolding new_rhs
 
