@@ -48,43 +48,11 @@ include ../Makefile.common
 extra:
 	if [ -f Prelude.hs ]; then mv Prelude.hs Prelude.hs.unused; fi
 	if [ -f Numeric.hs ]; then mv Numeric.hs Numeric.hs.unused; fi
+extracfiles:
+	if [ -f Prelude.hs ]; then mv Prelude.hs Prelude.hs.unused; fi
+	if [ -f Numeric.hs ]; then mv Numeric.hs Numeric.hs.unused; fi
 
 # Here are any extra dependencies.
 
 # C-files dependencies.
-Data/FiniteMap.$C: Data/Maybe.$C
-Data/Set.$C:       Data/Monoid.$C Data/List.$C Data/Typeable.$C
-Data/Array.$C:     Data/Ix.$C Data/Typeable.$C
-Data/Dynamic.$C:   Data/HashTable.$C Data/Typeable.$C
-Data/Typeable.$C:  Data/Maybe.$C Data/Either.$C Data/Int.$C Data/Word.$C \
-		   Data/List.$C Data/HashTable.$C
-Data/HashTable.$C: Control/Monad.$C
-Data/Int.$C:       NHC/SizedTypes.$C
-Data/Word.$C:      NHC/SizedTypes.$C
-Data/Tree.$C:      Control/Monad.$C Data/Maybe.$C Data/Queue.$C
-Data/Map.$C:       Data/Monoid.$C Data/Set.$C Data/List.$C Data/Typeable.$C
-Data/IntMap.$C:    Data/Monoid.$C Data/Bits.$C Data/Int.$C Data/IntSet.$C \
-		   Data/Typeable.$C
-Data/IntSet.$C:    Data/Monoid.$C Data/Bits.$C Data/Int.$C Data/List.$C \
-		   Data/Typeable.$C
-Data/FunctorM.$C:  Data/Array.$C
-Data/Version.$C:   Text/ParserCombinators/ReadP.$C Data/Typeable.$C \
-		   Data/List.$C Data/Char.$C Control/Monad.$C
-NHC/SizedTypes.$C: Data/Bits.$C
-System/IO.$C:      System/IO/Error.$C
-System/Info.$C:    Data/Version.$C
-System/Random.$C:  Data/Char.$C Data/IORef.$C System/IO/Unsafe.$C
-Debug/Trace.$C:    System/IO.$C System/IO/Unsafe.$C
-System/Directory.$C:       System/Directory/Internals.$C
-Control/Monad/Fix.$C:      System/IO.$C
-Foreign/Marshal/Alloc.$C:  Data/Maybe.$C Foreign/Ptr.$C Foreign/Storable.$C \
-			   Foreign/C/Types.$C
-Foreign/Marshal/Array.$C:  Control/Monad.$C Foreign/Ptr.$C Foreign/Storable.$C \
-			   Foreign/Marshal/Alloc.$C Foreign/Marshal/Utils.$C
-Foreign/Marshal/Utils.$C:  Data/Maybe.$C Foreign/Ptr.$C Foreign/Storable.$C \
-			   Foreign/C/Types.$C Foreign/Marshal/Alloc.$C
-Foreign/Marshal/Error.$C:  Foreign/Ptr.$C
-Foreign/C/String.$C:       Data/Word.$C Foreign/Ptr.$C Foreign/C/Types.$C \
-			   Foreign/Marshal/Array.$C
-Foreign/C.$C:      Foreign/C/Types.$C Foreign/C/Error.$C Foreign/C/String.$C
-Text/Regex.$C:     Text/Regex/Posix.$C
+
