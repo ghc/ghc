@@ -260,8 +260,9 @@
       <listitem>
 	<para>The compiler can now read in files containing Core
 	syntax (such as those produced by the
-	<option>-fext-core</option> option) and compile them.  This is
-	enabled with the <option>-fcore</option> flag.</para>
+	<option>-fext-core</option> option) and compile them. Input
+	files with the <literal>.hcr</literal> file extension are
+	assumed to contain Core syntax.</para>
       </listitem>
     </itemizedlist>
   </sect2>
