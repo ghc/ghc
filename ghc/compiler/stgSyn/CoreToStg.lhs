@@ -407,16 +407,20 @@ coreToStgExpr (Case scrut bndr alts)
 	    returnLne ((lit, rhs2), rhs_fvs, rhs_escs)
 
 	vars_alg_alt (DataAlt con, binders, rhs)
-	  = extendVarEnvLne [(b, CaseBound) | b <- binders]	$
+	  = let
+		-- remove type variables
+		binders' = filter isId binders
+	    in	
+	    extendVarEnvLne [(b, CaseBound) | b <- binders']	$
 	    coreToStgExpr rhs	`thenLne` \ (rhs2, rhs_fvs, rhs_escs) ->
 	    let
-		good_use_mask = [ b `elementOfFVInfo` rhs_fvs | b <- binders ]
+		good_use_mask = [ b `elementOfFVInfo` rhs_fvs | b <- binders' ]
 		-- records whether each param is used in the RHS
 	    in
 	    returnLne (
-		(con, binders, good_use_mask, rhs2),
-		rhs_fvs	 `minusFVBinders` binders,
-		rhs_escs `minusVarSet`   mkVarSet binders
+		(con, binders', good_use_mask, rhs2),
+		rhs_fvs	 `minusFVBinders` binders',
+		rhs_escs `minusVarSet`   mkVarSet binders'
 			-- ToDo: remove the minusVarSet;
 			-- since escs won't include any of these binders
 	    )
