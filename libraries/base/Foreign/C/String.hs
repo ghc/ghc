@@ -86,14 +86,14 @@ peekCString    :: CString -> IO String
 #ifndef __GLASGOW_HASKELL__
 peekCString cp  = do cs <- peekArray0 nUL cp; return (cCharsToChars cs)
 #else
-peekCString cp = loop 0
+peekCString cp = do
+  l <- lengthArray0 nUL cp
+  if l <= 0 then return "" else loop "" (l-1)
   where
-    loop i = do
+    loop s i = do
         xval <- peekElemOff cp i
 	let val = castCCharToChar xval
-        if (val `seq` (xval == nUL)) then return [] else do
-            rest <- loop (i+1)
-            return (val : rest)
+	val `seq` if i <= 0 then return (val:s) else loop (val:s) (i-1)
 #endif
 
 -- marshal a C string with explicit length into a Haskell string 
