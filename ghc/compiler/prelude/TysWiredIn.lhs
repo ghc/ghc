@@ -65,10 +65,11 @@ module TysWiredIn (
 	wordTy,
 	wordTyCon,
 
-	isFFIArgumentTy,  -- :: Type -> Bool
+	isFFIArgumentTy,  -- :: Bool -> Type -> Bool
 	isFFIResultTy,    -- :: Type -> Bool
 	isFFIExternalTy,  -- :: Type -> Bool
 	isAddrTy,	  -- :: Type -> Bool
+	isForeignObjTy    -- :: Type -> Bool
 
     ) where
 
@@ -399,11 +400,16 @@ restricted set of types as arguments and results (the restricting factor
 being the )
 
 \begin{code}
-isFFIArgumentTy :: Type -> Bool
-isFFIArgumentTy ty =
-  (opt_GlasgowExts && isUnLiftedType ty) || --leave out for now: maybeToBool (maybeBoxedPrimType ty))) ||
+isFFIArgumentTy :: Bool -> Type -> Bool
+isFFIArgumentTy forASafeCall ty =
+  (opt_GlasgowExts && isUnLiftedType ty) ||
   case (splitAlgTyConApp_maybe ty) of
-    Just (tycon, _, _) -> (getUnique tycon) `elem` primArgTyConKeys
+    Just (tycon, _, _) -> 
+    		let
+		 u = getUnique tycon
+		in
+		u `elem` primArgTyConKeys &&   -- it has a suitable prim type, and
+		(not forASafeCall || not ( u `elem` notSafeExternalTyCons)) -- it is safe to pass out.
     _		       -> False
 
 -- types that can be passed as arguments to "foreign" functions
@@ -449,6 +455,18 @@ isFFIResultTy ty =
 -- (or be passed them as arguments in foreign exported functions).
 notLegalExternalTyCons =
   [ foreignObjTyConKey, byteArrayTyConKey, mutableByteArrayTyConKey ]
+
+-- it's really unsafe to pass out references to objects in the heap,
+-- so for safe call-outs we simply disallow it.
+notSafeExternalTyCons =
+  [ byteArrayTyConKey, mutableByteArrayTyConKey ]
+
+
+isForeignObjTy :: Type -> Bool
+isForeignObjTy ty =
+  case (splitAlgTyConApp_maybe ty) of
+    Just (tycon, _, _) -> (getUnique tycon) == foreignObjTyConKey
+    _		       -> False
     
 \end{code}
 

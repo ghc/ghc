@@ -117,7 +117,7 @@ tcFImport fo@(ForeignDecl nm FoLabel hs_ty ext_nm cconv src_loc) =
    let i = (mkVanillaId nm sig_ty) in
    returnTc (i, (ForeignDecl i FoLabel undefined ext_nm cconv src_loc))
 
-tcFImport fo@(ForeignDecl nm imp_exp hs_ty ext_nm cconv src_loc) =
+tcFImport fo@(ForeignDecl nm imp_exp@(FoImport isUnsafe) hs_ty ext_nm cconv src_loc) =
    tcAddSrcLoc src_loc		     $
    tcAddErrCtxt (foreignDeclCtxt fo) $
 
@@ -131,7 +131,7 @@ tcFImport fo@(ForeignDecl nm imp_exp hs_ty ext_nm cconv src_loc) =
    in
    case splitFunTys t_ty of
      (arg_tys, res_ty) ->
-        checkForeignImport (isDynamic ext_nm) ty arg_tys res_ty `thenTc_`
+        checkForeignImport (isDynamic ext_nm) (not isUnsafe) ty arg_tys res_ty `thenTc_`
 	let i = (mkVanillaId nm ty) in
 	returnTc (i, (ForeignDecl i imp_exp undefined ext_nm cconv src_loc))
 
@@ -168,18 +168,18 @@ tcFExport fo@(ForeignDecl nm imp_exp hs_ty ext_nm cconv src_loc) =
 
 
 \begin{code}
-checkForeignImport :: Bool -> Type -> [Type] -> Type -> TcM s ()
-checkForeignImport is_dynamic ty args res
+checkForeignImport :: Bool -> Bool -> Type -> [Type] -> Type -> TcM s ()
+checkForeignImport is_dynamic is_safe ty args res
  | is_dynamic =
     -- * first arg has got to be an Addr
    case args of
      []     -> check False (illegalForeignTyErr True{-Arg-} ty)
      (x:xs) ->
         check (isAddrTy x) (illegalForeignTyErr True{-Arg-} ty) `thenTc_`
-        mapTc (checkForeignArg isFFIArgumentTy) xs		`thenTc_`
+        mapTc (checkForeignArg (isFFIArgumentTy is_safe)) xs	`thenTc_`
 	checkForeignRes (isFFIResultTy) res
  | otherwise =
-     mapTc (checkForeignArg isFFIArgumentTy) args	        `thenTc_`
+     mapTc (checkForeignArg (isFFIArgumentTy is_safe)) args     `thenTc_`
      checkForeignRes (isFFIResultTy) res
 
 checkForeignExport :: Bool -> Type -> [Type] -> Type -> TcM s ()

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.29 1999/06/28 16:29:45 simonpj Exp $
+% $Id: CgExpr.lhs,v 1.30 1999/10/25 13:21:16 sof Exp $
 %
 %********************************************************
 %*							*
@@ -139,6 +139,14 @@ cgExpr (StgCon (PrimOp TagToEnumOp) [arg] res_ty)
 	    (\ sequel -> mkDynamicAlgReturnCode tycon dyn_tag sequel)
    where
         dyn_tag = CTemp (mkBuiltinUnique 0) IntRep
+	  --
+	  -- if you're reading this code in the attempt to figure
+	  -- out why the compiler panic'ed here, it is probably because
+	  -- you used tagToEnum# in a non-monomorphic setting, e.g., 
+	  --         intToTg :: Enum a => Int -> a ; intToTg (I# x#) = tagToEnum# x#
+          --
+	  -- That won't work.
+          --
 	(Just (tycon,_)) = splitTyConApp_maybe res_ty
 
 

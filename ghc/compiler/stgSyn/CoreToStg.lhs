@@ -273,8 +273,8 @@ exprToRhs dem _ (StgLam _ bndrs body)
   We reject the following candidates for 'static constructor'dom:
   
     - any dcon that takes a lit-lit as an arg.
-    - [Win32 DLLs only]: any dcon that is (or takes as arg)
-      that's living in a DLL.
+    - [Win32 DLLs only]: any dcon that resides in a DLL
+      (or takes as arg something that is.)
 
   These constraints are necessary to ensure that the code
   generated in the end for the static constructors, which

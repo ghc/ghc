@@ -17,9 +17,12 @@ import Id		( setIdArity, getIdArity, Id )
 import VarSet
 import VarEnv
 import Var
+import Const		( Con(..) )
 import IdInfo		( ArityInfo(..), InlinePragInfo(..), 
 			  setInlinePragInfo )
-import Maybes		( maybeToBool )
+import PrimOp		( PrimOp(..) )
+import TysWiredIn       ( isForeignObjTy )
+import Maybes		( maybeToBool, orElse )
 import Name		( isLocallyDefined )
 import BasicTypes       ( Arity )
 import Outputable
@@ -294,11 +297,21 @@ varsExpr (StgCase scrut _ _ bndr srt alts)
 		  then modifyIdInfo (`setInlinePragInfo` NoInlinePragInfo) bndr
 		  else modifyIdInfo (`setInlinePragInfo` IAmDead)	   bndr
 
+	 -- for a _ccall_GC_, some of the *arguments* need to live across the
+	 -- call (see findLiveArgs comments.), so we annotate them as being live
+	 -- in the alts to achieve the desired effect.
+	mb_live_across_case =
+	  case scrut of
+	    StgCon (PrimOp (CCallOp _ _ True{- _ccall_GC_ -} _)) args _ ->
+	         Just (foldl findLiveArgs emptyVarSet args)
+	    _ -> Nothing
+
 	-- don't consider the default binder as being 'live in alts',
 	-- since this is from the point of view of the case expr, where
 	-- the default binder is not free.
-	live_in_alts = live_in_cont `unionVarSet` 
-				(alts_lvs `minusVarSet` unitVarSet bndr)
+	live_in_alts = orElse (FMAP unionVarSet mb_live_across_case) id $
+		       live_in_cont `unionVarSet` 
+		       (alts_lvs `minusVarSet` unitVarSet bndr)
     in
 	-- we tell the scrutinee that everything live in the alts
 	-- is live in it, too.
@@ -393,6 +406,19 @@ varsExpr (StgLet bind body)
 
     returnLne (new_let, fvs, escs)
 \end{code}
+
+If we've got a case containing a _ccall_GC_ primop, we need to
+ensure that the arguments are kept live for the duration of the
+call. This only an issue
+
+\begin{code}
+findLiveArgs :: StgLiveVars -> StgArg -> StgLiveVars
+findLiveArgs lvs (StgConArg _) = lvs
+findLiveArgs lvs (StgVarArg x) 
+   | isForeignObjTy (idType x) = extendVarSet lvs x
+   | otherwise		       = lvs
+\end{code}
+
 
 Applications:
 \begin{code}
