@@ -30,11 +30,11 @@ module Foreign.Marshal.Alloc (
 
 import Data.Maybe
 import Foreign.Ptr	 	( Ptr, nullPtr, FunPtr )
-import Foreign.ForeignPtr	( FinalizerPtr )
 import Foreign.C.Types	 	( CSize )
 import Foreign.Storable  	( Storable(sizeOf) )
 
 #ifdef __GLASGOW_HASKELL__
+import Foreign.ForeignPtr	( FinalizerPtr )
 import GHC.IOBase
 import GHC.Real
 import GHC.Ptr
@@ -46,6 +46,9 @@ import IO			( bracket )
 import Control.Exception	( bracket )
 #endif
 
+#ifdef __HUGS__
+import Hugs.ForeignPtr		( FinalizerPtr )
+#endif
 
 -- exported functions
 -- ------------------
