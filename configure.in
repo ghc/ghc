@@ -470,12 +470,20 @@ dnl ** check for specific library functions that we are interested in
 AC_CHECK_FUNCS(access ftime getclock getpagesize getrusage gettimeofday mktime mprotect setitimer stat sysconf timelocal times vadvise vfork)
 
 #
+dnl ** check whether this machine has GMP 2.0 installed
+#
+AC_CHECK_LIB(gmp, mpz_fdiv_qr, HaveLibGmp=YES, HaveLibGmp=NO)
+AC_SUBST(HaveLibGmp)
+
+#
 # Misc
 #
 dnl ** can we get alloca?
 AC_FUNC_ALLOCA
 dnl ** determine whether or not const works
 AC_C_CONST
+dnl ** are we big endian?
+AC_C_BIGENDIAN
 dnl ** determine the type of signal()
 AC_TYPE_SIGNAL
 
