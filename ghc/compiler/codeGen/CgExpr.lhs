@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.23 1999/04/23 13:53:29 simonm Exp $
+% $Id: CgExpr.lhs,v 1.24 1999/05/07 13:44:00 simonm Exp $
 %
 %********************************************************
 %*							*
@@ -126,17 +126,19 @@ cgExpr (StgCon (PrimOp op@(CCallOp _ _ may_gc@True _)) args res_ty)
 -- and perform an appropriate return.
 
 cgExpr (StgCon (PrimOp TagToEnumOp) [arg] res_ty) 
-  | isEnumerationTyCon tycon =
-	getArgAmode arg `thenFC` \amode ->
-	performReturn (CAssign (CReg node) 
+  = ASSERT(isEnumerationTyCon tycon)
+    getArgAmode arg `thenFC` \amode ->
+	-- save the tag in a temporary in case amode overlaps
+	-- with node.
+    absC (CAssign dyn_tag amode)	`thenC`
+    performReturn (
+		CAssign (CReg node) 
 			(CTableEntry 
 		          (CLbl (mkClosureTblLabel tycon) PtrRep)
-		          amode PtrRep))
-		  (\ sequel -> mkDynamicAlgReturnCode tycon amode sequel)
-
-  | otherwise = panic "cgExpr: tagToEnum# of non-enumerated type"
-
+		          dyn_tag PtrRep))
+	    (\ sequel -> mkDynamicAlgReturnCode tycon dyn_tag sequel)
    where
+        dyn_tag = CTemp (mkBuiltinUnique 0) IntRep
 	(Just (tycon,_)) = splitTyConApp_maybe res_ty
 
 
