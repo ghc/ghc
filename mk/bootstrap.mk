@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: bootstrap.mk,v 1.22 2002/08/14 14:06:25 sof Exp $
+# $Id: bootstrap.mk,v 1.23 2003/07/24 10:38:33 simonmar Exp $
 #
 # Makefile rules for booting from .hc files without a driver.
 #
@@ -65,7 +65,7 @@ PLATFORM_CC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
 
 HC_BOOT_CC_OPTS = $(PLATFORM_HC_BOOT_CC_OPTS) $(PLATFORM_CC_OPTS) $(CC_OPTS)
 
-SRC_CC_OPTS += -I$(FPTOOLS_TOP_ABS)/ghc/includes -I$(FPTOOLS_TOP_ABS)/libraries/base/include -I$(FPTOOLS_TOP_ABS)/hslibs/lang/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/posix/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/util/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/text/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/hssource/cbits
+SRC_CC_OPTS += -I$(FPTOOLS_TOP_ABS)/ghc/includes -I$(FPTOOLS_TOP_ABS)/libraries/base/include -I$(FPTOOLS_TOP_ABS)/libraries/unix/include
 
 # -----------------------------------------------------------------------------
 # Linking: we have to give all the libraries explicitly.
@@ -86,16 +86,6 @@ HC_BOOT_LD_OPTS =				\
    -L$(FPTOOLS_TOP_ABS)/libraries/base		\
    -L$(FPTOOLS_TOP_ABS)/libraries/base/cbits	\
    -L$(FPTOOLS_TOP_ABS)/libraries/haskell98	\
-   -L$(FPTOOLS_TOP_ABS)/hslibs/lang		\
-   -L$(FPTOOLS_TOP_ABS)/hslibs/lang/cbits	\
-   -L$(FPTOOLS_TOP_ABS)/hslibs/concurrent	\
-   -L$(FPTOOLS_TOP_ABS)/hslibs/concurrent/cbits	\
-   -L$(FPTOOLS_TOP_ABS)/hslibs/posix		\
-   -L$(FPTOOLS_TOP_ABS)/hslibs/posix/cbits	\
-   -L$(FPTOOLS_TOP_ABS)/hslibs/util		\
-   -L$(FPTOOLS_TOP_ABS)/hslibs/util/cbits	\
-   -L$(FPTOOLS_TOP_ABS)/hslibs/text		\
-   -L$(FPTOOLS_TOP_ABS)/hslibs/text/cbits	\
    -u "$(UNDERSCORE)GHCziBase_Izh_static_info" \
    -u "$(UNDERSCORE)GHCziBase_Czh_static_info" \
    -u "$(UNDERSCORE)GHCziFloat_Fzh_static_info" \
