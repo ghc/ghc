@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.6 1999/09/16 08:33:54 sof Exp $
+ * $Id: Itimer.c,v 1.7 1999/12/01 14:19:36 simonmar Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -52,6 +52,10 @@ static void handle_tick(int unused STG_UNUSED);
 
    We use the ticker for two things: supporting threadDelay, and time
    profiling.
+
+   SMP note: this signal could be delivered to *any* thread.  We have
+   to ensure that it doesn't matter which thread actually runs the
+   signal handler.
    -------------------------------------------------------------------------- */
 
 static void
