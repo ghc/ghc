@@ -18,8 +18,15 @@ MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR)
 UseGhcForCc = YES
 
 # This library is linked to the compiler, at least in stage1, so we
-# better make sure it is built the same "way":
-SRC_HC_OPTS += $(GhcHcOpts)
+# better make sure it is built the same "way".
+#
+# BUT, if GhcHcOpts includes -DDEBUG we *don't* want to compile
+# lib/compat with -DDEBUG, because the preprocessor symbols used
+# by the compiler may be understood differently by library code.
+# In this particular case, it turned out that -DDEBUG made Cabal 
+# import HUnit, which might not be installed for the compiler we are
+# compiling with (e.g. 6.2.1). Hence the filter-out.
+SRC_HC_OPTS += $(filter-out -D%, $(GhcHcOpts)) 
 
 ifeq "$(ghc_ge_603)" "YES"
 # These modules are all provided in GHC 6.3+
