@@ -107,7 +107,7 @@ I_ n;
     else
       WaitForPEOp(PP_FINISH, SysManTask);
     PEShutDown();
-    fprintf(stderr,"PE %lx shutting down, %ld Threads run, %ld Sparks Ignored\n", (W_) mytid, threadId, sparksIgnored);
+    fprintf(stderr,"PE %lx shutting down, %ld Threads run, %ld Sparks created, %ld Sparks ignored\n", (W_) mytid, threadId, sparksCreated, sparksIgnored); /* HWL */
 
     /* And actually terminate -- always with code 0 */
     longjmp(exit_parallel_system, 1);
