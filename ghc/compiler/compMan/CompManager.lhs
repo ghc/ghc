@@ -576,7 +576,7 @@ cmLoadModules cmstate1 mg2unsorted
 	      let do_linking = a_root_is_Main || no_hs_main
 	      when (ghci_mode == Batch && isJust ofile && not do_linking
 		     && verb > 0) $
-	         hPutStrLn stderr "Warning: output was redirected with -o, but no output will be generated\nbecause there is no Main module."
+	         hPutStrLn stderr ("Warning: output was redirected with -o, but no output will be generated\nbecause there is no " ++ main_mod ++ " module.")
 
 	      -- link everything together
               linkresult <- link ghci_mode dflags do_linking (hsc_HPT hsc_env3)
