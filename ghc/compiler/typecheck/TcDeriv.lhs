@@ -194,18 +194,23 @@ tcDeriving  :: PersistentRenamerState
 
 tcDeriving prs mod inst_env get_fixity tycl_decls
   = recoverTc (returnTc ([], EmptyBinds)) $
+    getDOptsTc				  `thenNF_Tc` \ dflags ->
 
   	-- Fish the "deriving"-related information out of the TcEnv
 	-- and make the necessary "equations".
-    makeDerivEqns tycl_decls		    		`thenTc` \ (ordinary_eqns, inst_info2) ->
-    
-    deriveOrdinaryStuff mod prs inst_env get_fixity 
-			ordinary_eqns			`thenTc` \ (inst_info1, binds) ->
+    makeDerivEqns tycl_decls		    		`thenTc` \ (ordinary_eqns, newtype_inst_info) ->
     let
-	inst_info  = inst_info2 ++ inst_info1	-- info2 usually empty
+	-- Add the newtype-derived instances to the inst env
+	-- before tacking the "ordinary" ones
+	inst_env1 = extend_inst_env dflags inst_env 
+				    (map iDFunId newtype_inst_info)
+    in    
+    deriveOrdinaryStuff mod prs inst_env1 get_fixity 
+			ordinary_eqns			`thenTc` \ (ordinary_inst_info, binds) ->
+    let
+	inst_info  = newtype_inst_info ++ ordinary_inst_info
     in
 
-    getDOptsTc				`thenNF_Tc` \ dflags ->
     ioToTc (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances" 
 	 	          (ddump_deriving inst_info binds))	`thenTc_`
 
@@ -508,8 +513,11 @@ solveDerivEqns inst_env_in orig_eqns
       =	    -- Extend the inst info from the explicit instance decls
 	    -- with the current set of solutions, giving a
 	getDOptsTc				`thenNF_Tc` \ dflags ->
-        let (new_dfuns, inst_env) =
-		add_solns dflags inst_env_in orig_eqns current_solns
+        let 
+	    new_dfuns = zipWithEqual "add_solns" mk_deriv_dfun orig_eqns current_solns
+	    inst_env  = extend_inst_env dflags inst_env_in new_dfuns
+	    -- the eqns and solns move "in lockstep"; we have the eqns
+	    -- because we need the LHS info for addClassInstance.
         in
 	    -- Simplify each RHS
 	tcSetInstEnv inst_env (
@@ -526,26 +534,18 @@ solveDerivEqns inst_env_in orig_eqns
 \end{code}
 
 \begin{code}
-add_solns :: DynFlags
-	  -> InstEnv				-- The global, non-derived ones
-	  -> [DerivEqn] -> [DerivSoln]
-	  -> ([DFunId], InstEnv)
-    -- the eqns and solns move "in lockstep"; we have the eqns
-    -- because we need the LHS info for addClassInstance.
-
-add_solns dflags inst_env_in eqns solns
-  = (new_dfuns, inst_env)
-    where
-      new_dfuns     = zipWithEqual "add_solns" mk_deriv_dfun eqns solns
-      (inst_env, _) = extendInstEnv dflags inst_env_in new_dfuns
+extend_inst_env dflags inst_env new_dfuns
+  = new_inst_env
+  where
+    (new_inst_env, _errs) = extendInstEnv dflags inst_env new_dfuns
 	-- Ignore the errors about duplicate instances.
 	-- We don't want repeated error messages
 	-- They'll appear later, when we do the top-level extendInstEnvs
 
-      mk_deriv_dfun (dfun_name, clas, tycon, tyvars, _) theta
-        = mkDictFunId dfun_name clas tyvars 
-		      [mkTyConApp tycon (mkTyVarTys tyvars)] 
-		      theta
+mk_deriv_dfun (dfun_name, clas, tycon, tyvars, _) theta
+  = mkDictFunId dfun_name clas tyvars 
+		[mkTyConApp tycon (mkTyVarTys tyvars)] 
+		theta
 \end{code}
 
 %************************************************************************
