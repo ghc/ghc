@@ -256,14 +256,14 @@ MAIN                     MAIN             0    0.0   0.0    100.0 100.0
       <para>The syntax of a cost centre annotation is</para>
 
       <programlisting>
-     _scc_ "name" &lt;expression&gt;
+     {-# SCC "name" #-} &lt;expression&gt;
 </programlisting>
 
       <para>where <literal>"name"</literal> is an aribrary string,
       that will become the name of your cost centre as it appears
       in the profiling output, and
       <literal>&lt;expression&gt;</literal> is any Haskell
-      expression.  An <literal>_scc_</literal> annotation extends as
+      expression.  An <literal>SCC</literal> annotation extends as
       far to the right as possible when parsing.</para>
 
     </sect2>
@@ -279,14 +279,14 @@ MAIN                     MAIN             0    0.0   0.0    100.0 100.0
 	  <para>If the expression is part of the
 	  <firstterm>one-off</firstterm> costs of evaluating the
 	  enclosing top-level definition, then costs are attributed to
-	  the stack of lexically enclosing <literal>_scc_</literal>
+	  the stack of lexically enclosing <literal>SCC</literal>
 	  annotations on top of the special <literal>CAF</literal>
 	  cost-centre. </para>
 	</listitem>
 
 	<listitem>
 	  <para>Otherwise, costs are attributed to the stack of
-	  lexically-enclosing <literal>_scc_</literal> annotations,
+	  lexically-enclosing <literal>SCC</literal> annotations,
 	  appended to the cost-centre stack in effect at the
 	  <firstterm>call site</firstterm> of the current top-level
 	  definition<footnote> <para>The call-site is just the place
