@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.9 1999/02/05 16:02:53 simonm Exp $
+ * $Id: Schedule.c,v 1.10 1999/02/26 12:32:51 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -509,16 +509,17 @@ SchedulerStatus schedule(StgTSO *main, StgClosure **ret_val)
        * t->link is already set to END_TSO_QUEUE.
        */
       ASSERT(t->link == END_TSO_QUEUE);
-      if (run_queue_tl != END_TSO_QUEUE) {
+      if (run_queue_tl == END_TSO_QUEUE) {
+        run_queue_hd = run_queue_tl = t;
+      } else {
         ASSERT(get_itbl(run_queue_tl)->type == TSO);
 	if (run_queue_hd == run_queue_tl) {
 	  run_queue_hd->link = t;
 	  run_queue_tl = t;
 	} else {
 	  run_queue_tl->link = t;
+	  run_queue_tl = t;
 	}
-      } else {
-        run_queue_hd = run_queue_tl = t;
       }
       break;
 
