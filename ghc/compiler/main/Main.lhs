@@ -10,7 +10,7 @@ module Main ( main ) where
 
 import IO	( IOMode(..),
 		  hGetContents, hPutStr, hClose, openFile,
-		  stdin,stderr
+		  stdin,stderr, hPutStrLn
 		)
 import HsSyn
 import RdrHsSyn		( RdrName )
@@ -49,6 +49,14 @@ import PprAbsC		( dumpRealC, writeRealC )
 import PprCore		( pprCoreBinding )
 import FiniteMap	( emptyFM )
 import Outputable
+import Char		( isSpace )
+#if REPORT_TO_MOTHERLODE && __GLASGOW_HASKELL__ >= 303
+import SocketPrim
+import BSD
+import IOExts		( unsafePerformIO )
+import NativeInfo       ( os, arch )
+#endif
+
 \end{code}
 
 \begin{code}
@@ -63,11 +71,11 @@ main =
 \begin{code}
 doIt :: ([CoreToDo], [StgToDo]) -> IO ()
 
-doIt (core_cmds, stg_cmds)
-  = doIfSet opt_Verbose 
-	(hPutStr stderr ("Glasgow Haskell Compiler, version\ 
-			 \ PROJECTVERSION\ 
-			 \, for Haskell 1.4\n"))		>>
+doIt (core_cmds, stg_cmds) =
+    doIfSet opt_Verbose 
+	(hPutStr stderr "Glasgow Haskell Compiler, version" >>
+	 hPutStr stderr compiler_version                    >>
+	 hPutStr stderr ", for Haskell 1.4\n")		    >>
 
     -- ******* READER
     show_pass "Reader"	>>
@@ -77,7 +85,7 @@ doIt (core_cmds, stg_cmds)
     dumpIfSet opt_D_dump_rdr "Reader" (ppr rdr_module)		>>
 
     dumpIfSet opt_D_source_stats "Source Statistics"
-	(ppSourceStats rdr_module)	 	>>
+	(ppSourceStats False rdr_module)	 	>>
 
     -- UniqueSupplies for later use (these are the only lower case uniques)
 --    _scc_     "spl-rn"
@@ -106,6 +114,7 @@ doIt (core_cmds, stg_cmds)
     case maybe_rn_stuff of {
 	Nothing -> 	-- Hurrah!  Renamer reckons that there's no need to
 			-- go any further
+			reportCompile (_UNPK_ mod_name) "Compilation NOT required!" >>
 			return ();
 	
 	Just (rn_mod, iface_file_stuff, rn_name_supply, imported_modules) ->
@@ -128,14 +137,15 @@ doIt (core_cmds, stg_cmds)
 	Nothing -> ghcExit 1;	-- Type checker failed
 
 	Just (all_binds,
-	      local_tycons, local_classes, inst_info, 
+	      local_tycons, local_classes, inst_info,
+	      fo_decls,
 	      ddump_deriv) ->
 
 
     -- ******* DESUGARER
-    show_pass "DeSugar" 			>>
+    show_pass "DeSugar"					>>
     _scc_     "DeSugar"
-    deSugar ds_uniqs mod_name all_binds		>>= \ desugared ->
+    deSugar ds_uniqs mod_name all_binds	fo_decls	>>= \ (desugared, hc_code, h_code, c_code) ->
 
 
     -- ******* CORE-TO-CORE SIMPLIFICATION
@@ -174,7 +184,6 @@ doIt (core_cmds, stg_cmds)
     endIface if_handle						>>
     -- We are definitely done w/ interface-file stuff at this point:
     -- (See comments near call to "startIface".)
-    
 
     -- ******* "ABSTRACT", THEN "FLAT", THEN *REAL* C!
     show_pass "CodeGen" 			>>
@@ -197,10 +206,10 @@ doIt (core_cmds, stg_cmds)
     	flat_abstractC = flattenAbsC fl_uniqs abstractC
     in
     dumpIfSet opt_D_dump_absC "Abstract C"
-	(dumpRealC abstractC)		  	>>
+	(dumpRealC abstractC hc_code)	 	>>
 
     dumpIfSet opt_D_dump_flatC "Flat Abstract C"
-	(dumpRealC flat_abstractC)		>>
+	(dumpRealC flat_abstractC hc_code)	>>
 
     show_pass "CodeOutput" 			>>
     _scc_     "CodeOutput"
@@ -216,8 +225,16 @@ doIt (core_cmds, stg_cmds)
 	     (False, False) -> (absCNop, absCNop)
 	     (True,  True)  -> error "ERROR: Can't do both .hc and .s at the same time"
 
-	c_output_d = dumpRealC flat_absC_c
-	c_output_w = (\ f -> writeRealC f flat_absC_c)
+	c_output_d = dumpRealC flat_absC_c hc_code
+	c_output_w = (\ f -> writeRealC f flat_absC_c hc_code)
+
+        -- C stubs for "foreign export"ed functions.
+	stub_c_output_d = pprCode CStyle c_code
+        stub_c_output_w = showSDoc stub_c_output_d
+
+        -- Header file protos for "foreign export"ed functions.
+	stub_h_output_d = pprCode CStyle h_code
+        stub_h_output_w = showSDoc stub_h_output_d
 
 #if OMIT_NATIVE_CODEGEN
 	ncg_output_d = error "*** GHC not built with a native-code generator ***"
@@ -234,6 +251,14 @@ doIt (core_cmds, stg_cmds)
     dumpIfSet opt_D_dump_realC "Real C" c_output_d 	>>
     doOutput opt_ProduceC c_output_w 			>>
 
+    dumpIfSet opt_D_dump_foreign "Foreign export header file" stub_h_output_d >>
+    outputStub opt_ProduceExportHStubs stub_h_output_w	>>
+
+    dumpIfSet opt_D_dump_foreign "Foreign export stubs" stub_c_output_d >>
+    outputStub opt_ProduceExportCStubs stub_c_output_w	>>
+
+    reportCompile (_UNPK_ mod_name) (showSDoc (ppSourceStats True rdr_module)) >>
+
     ghcExit 0
     } }
   where
@@ -247,15 +272,24 @@ doIt (core_cmds, stg_cmds)
 
     doOutput switch io_action
       = case switch of
-	  Nothing -> return ()
+	  Nothing    -> return ()
 	  Just fname ->
 	    openFile fname WriteMode	>>= \ handle ->
 	    io_action handle		>>
 	    hClose handle
 
+    -- don't use doOutput for dumping the f. export stubs
+    -- since it is more than likely that the stubs file will
+    -- turn out to be empty, in which case no file should be created.
+    outputStub switch "" = return ()
+    outputStub switch doc_str
+      = case switch of
+	  Nothing    -> return ()
+	  Just fname -> writeFile fname ("#include \"rtsdefs.h\"\n"++doc_str)
 
-ppSourceStats (HsModule name version exports imports fixities decls src_loc)
- = vcat (map pp_val
+ppSourceStats short (HsModule name version exports imports fixities decls src_loc)
+ = (if short then hcat else vcat)
+        (map pp_val
 	       [("ExportAll        ", export_all), -- 1 if no export list
 		("ExportDecls      ", export_ds),
 		("ExportModules    ", export_ms),
@@ -289,7 +323,11 @@ ppSourceStats (HsModule name version exports imports fixities decls src_loc)
 	       ])
   where
     pp_val (str, 0) = empty
-    pp_val (str, n) = hcat [text str, int n]
+    pp_val (str, n) 
+      | not short   = hcat [text str, int n]
+      | otherwise   = hcat [text (trim str), equals, int n, semi]
+    
+    trim ls     = takeWhile (not.isSpace) (dropWhile isSpace ls)
 
     fixity_ds   = length fixities
     type_decls 	= [d | TyD d@(TySynonym _ _ _ _)    <- decls]
@@ -373,4 +411,55 @@ ppSourceStats (HsModule name version exports imports fixities decls src_loc)
     add4 (x1,x2,x3,x4) (y1,y2,y3,y4) = (x1+y1,x2+y2,x3+y3,x4+y4)
     add5 (x1,x2,x3,x4,x5) (y1,y2,y3,y4,y5) = (x1+y1,x2+y2,x3+y3,x4+y4,x5+y5)
     add6 (x1,x2,x3,x4,x5,x6) (y1,y2,y3,y4,y5,y6) = (x1+y1,x2+y2,x3+y3,x4+y4,x5+y5,x6+y6)
+\end{code}
+
+\begin{code}
+compiler_version :: String
+compiler_version =
+     case (show opt_HiVersion) of
+	[x]	 -> ['0','.',x]
+	ls@[x,y] -> "0." ++ ls
+	ls       -> go ls
+ where
+  -- 10232353 => 10232.53
+  go ls@[x,y] = '.':ls
+  go (x:xs)   = x:go xs
+
+\end{code}
+
+\begin{code}
+reportCompile :: String -> String -> IO ()
+#if REPORT_TO_MOTHERLODE && __GLASGOW_HASKELL__ >= 303
+reportCompile mod_name info
+  | not opt_ReportCompile = return ()
+  | otherwise = (do 
+      sock <- udpSocket 0
+      addr <- motherShip
+      sendTo sock (mod_name++ ';': compiler_version ++ ';': os ++ ';':arch ++ '\n':' ':info ++ "\n") addr
+      return ()) `catch` (\ _ -> return ())
+
+motherShip :: IO SockAddr
+motherShip = do
+  he <- getHostByName "laysan.dcs.gla.ac.uk"
+  case (hostAddresses he) of
+    []    -> fail (userError "No address!")
+    (x:_) -> return (SockAddrInet motherShipPort x)
+
+--magick
+motherShipPort :: PortNumber
+motherShipPort = mkPortNumber 12345
+
+-- creates a socket capable of sending datagrams,
+-- binding it to a port
+--  ( 0 => have the system pick next available port no.)
+udpSocket :: Int -> IO Socket
+udpSocket p = do
+  pr <- getProtocolNumber "udp"
+  s  <- socket AF_INET Datagram pr
+  bindSocket s (SockAddrInet (mkPortNumber p) iNADDR_ANY)
+  return s
+#else
+reportCompile _ _ = return ()
+#endif
+
 \end{code}
