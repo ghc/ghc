@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: openFile.c,v 1.14 1999/12/08 15:47:08 simonmar Exp $
+ * $Id: openFile.c,v 1.15 1999/12/14 14:26:14 simonmar Exp $
  *
  * openFile Runtime Support
  */
@@ -48,14 +48,21 @@ openStdFile(StgInt fd, StgInt rd)
     fo->flags    = FILEOBJ_STD | ( rd ? FILEOBJ_READ : FILEOBJ_WRITE);
     fo->connectedTo = NULL;
  
-    /* MS Win32 CRT doesn't support fcntl() -- the workaround is to
-       start using 'completion ports', but I'm punting on implementing
-       support for using those.
-    */
 #if !defined(_WIN32) || defined(__CYGWIN__) || defined(__CYGWIN32__)
-    /* set the non-blocking flag on this file descriptor */
-    fd_flags = fcntl(fd, F_GETFL);
-    fcntl(fd, F_SETFL, fd_flags | O_NONBLOCK);
+    /* Set the non-blocking flag on this file descriptor.
+     *
+     * Don't do it for stdout and stderr: some shells (actually most)
+     * don't reset the nonblocking flag after running a program, and
+     * this causes all sorts of problems.  --SDM (12/99)
+     *
+     * MS Win32 CRT doesn't support fcntl() -- the workaround is to
+     * start using 'completion ports', but I'm punting on implementing
+     * support for using those.
+     */
+    if (fd != 1 && fd != 2) {
+      fd_flags = fcntl(fd, F_GETFL);
+      fcntl(fd, F_SETFL, fd_flags | O_NONBLOCK);
+    }
 #endif
 
    return fo;
