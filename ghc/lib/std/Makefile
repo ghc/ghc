@@ -84,18 +84,20 @@ PrelGHC.$(way_)hi	: PrelGHC.hi-boot
 boot :: PrelGHC.hi $(foreach way, $(WAYS), PrelGHC.$(way)_hi)
 
 DLL_NAME = HSprel.dll
+DLL_DESCRIPTION="GHC-compiled Haskell Prelude"
 DLL_IMPLIB_NAME = libHS_imp.a
-SRC_BLD_DLL_OPTS += --export-all --output-def=HSprel.def
+SRC_BLD_DLL_OPTS += --export-all --output-def=HSprel.def DllVersionInfo.o
 SRC_BLD_DLL_OPTS += -lwinmm -lHSrts_imp -lHScbits_imp -lgmp -L. -L../../rts/gmp -L../../rts -Lcbits
-
 
 ifeq "$(way)" "dll"
 HS_SRCS := $(filter-out PrelMain.lhs, $(HS_SRCS))
 endif
 
-# PrelMain.dll_o isn't to be included in the final .a
+# PrelMain.dll_o isn't to be included in the final .a, 
+# but it needs to be generated
 ifeq "$(way)" "dll"
-all :: PrelMain.dll_o
+all :: PrelMain.dll_o DllVersionInfo.o
+
 endif
 
 #
