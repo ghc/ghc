@@ -52,6 +52,8 @@ module IOExts
 #endif
 	
 	, unsafePtrEq
+	
+	, freeHaskellFunctionPtr
 
         ) where
 
@@ -73,6 +75,7 @@ import PrelGHC
 import PrelHandle
 import PrelErr
 import IO 	( hPutStr, hPutChar )
+import PrelAddr ( Addr )
 #endif
 import Ix
 
@@ -182,5 +185,20 @@ the heap or make sure you've got room enough
 performGC :: IO ()
 performGC = _ccall_GC_ performGC
 #endif
+\end{code}
+
+When using 'foreign export dynamic' to dress up a Haskell
+IO action to look like a C function pointer, a little bit
+of memory is allocated (along with a stable pointer to
+the Haskell IO action). When done with the C function
+pointer, you'll need to call @freeHaskellFunctionPtr()@ to
+let go of these resources - here's the Haskell wrapper for
+that RTS entry point, should you want to free it from
+within Haskell.
+
+\begin{code}
+foreign import ccall "freeHaskellFunctionPtr" 
+  freeHaskellFunctionPtr :: Addr -> IO ()
+
 \end{code}
 
