@@ -1,1 +1,71 @@
-ghc-6.1.20030727: unknown package name: lang
+
+tcfail068.hs:13:
+    Inferred type is less polymorphic than expected
+	Quantified type variable `s' escapes
+    In the first argument of `runST', namely
+	`(newSTArray ((1, 1), n) x)'
+    In the definition of `itgen':
+	itgen n x = runST (newSTArray ((1, 1), n) x)
+
+tcfail068.hs:18:
+    Inferred type is less polymorphic than expected
+	Quantified type variable `s' escapes
+	It is mentioned in the environment:
+	  arr :: IndTree s a (bound at tcfail068.hs:18)
+    In the first argument of `runST', namely
+	`((readSTArray arr i)
+	  >>= (\ val -> (writeSTArray arr i (f val)) >> (return arr)))'
+    In the definition of `itiap':
+	itiap i f arr
+		= runST ((readSTArray arr i)
+			 >>= (\ val -> (writeSTArray arr i (f val)) >> (return arr)))
+
+tcfail068.hs:24:
+    Inferred type is less polymorphic than expected
+	Quantified type variable `s' escapes
+	It is mentioned in the environment:
+	  itrapsnd :: Int -> Int -> GHC.ST.ST s (IndTree s a)
+	    (bound at tcfail068.hs:29)
+	  itrap' :: Int -> Int -> GHC.ST.ST s (IndTree s a)
+	    (bound at tcfail068.hs:26)
+	  arr :: IndTree s a (bound at tcfail068.hs:24)
+    In the first argument of `runST', namely `(itrap' i k)'
+    In the definition of `itrap':
+	itrap ((i, k), (j, l)) f arr
+		= runST (itrap' i k)
+		where
+		    itrapsnd i k
+			       = if i > j then
+				     return arr
+				 else
+				     ((readSTArray arr (i, k)) >>= (\ val -> ...))
+		    itrap' i k
+			     = if k > l then
+				   return arr
+			       else
+				   ((itrapsnd i k) >> (itrap' i (k + 1)))
+
+tcfail068.hs:36:
+    Inferred type is less polymorphic than expected
+	Quantified type variable `s' escapes
+	It is mentioned in the environment:
+	  itrapstatesnd :: Int -> Int -> c -> GHC.ST.ST s (c, IndTree s b)
+	    (bound at tcfail068.hs:41)
+	  itrapstate' :: Int -> Int -> c -> GHC.ST.ST s (c, IndTree s b)
+	    (bound at tcfail068.hs:38)
+	  arr :: IndTree s b (bound at tcfail068.hs:36)
+    In the first argument of `runST', namely `(itrapstate' i k s)'
+    In the definition of `itrapstate':
+	itrapstate ((i, k), (j, l)) f c d s arr
+		     = runST (itrapstate' i k s)
+		     where
+			 itrapstatesnd i k s
+					 = if i > j then
+					       return (s, arr)
+					   else
+					       ((readSTArray arr (i, k)) >>= (\ val -> ...))
+			 itrapstate' i k s
+				       = if k > l then
+					     return (s, arr)
+					 else
+					     ((itrapstatesnd i k s) >>= (\ (s, arr) -> ...))
