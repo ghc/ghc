@@ -1,6 +1,6 @@
 
-rn046.hs:3:0: Warning: Imported from `Char' but not used: ord
-
 rn046.hs:
     Warning: Module `List' is imported, but nothing from it is used
 	     (except perhaps instances visible in `List')
+
+rn046.hs:3:0: Warning: Imported from `Char' but not used: ord
