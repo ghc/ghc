@@ -337,7 +337,6 @@ HC_SPLIT_POST = \
     echo "INPUT(" *.$(way_)o ")" >>ld.script; \
     $(LD) -r $(LD_X) -o ../$(notdir $@) ld.script; \
   )
-CLEAN_FILES += *_split/ld.script
 else
 HC_SPLIT_POST = \
   ( cd $(basename $@)_split; \
@@ -358,7 +357,7 @@ SRC_HC_POST_OPTS += $(HC_SPLIT_POST);
 #
 
 extraclean ::
-	$(FIND) $(patsubst %.$(way_)o,%_split,$(HS_OBJS)) -name '*.$(way_)o' -print | xargs $(RM) __rm_food
+	$(FIND) $(patsubst %.$(way_)o,%_split,$(HS_OBJS)) -name '*.$(way_)o' -print -o -name ld.script -print | xargs $(RM) __rm_food
 	-rmdir $(patsubst %.$(way_)o,%_split,$(HS_OBJS)) > /dev/null 2>&1
 
 endif # $(SplitObjs)
