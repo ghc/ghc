@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
- * $Id: Hash.h,v 1.2 2000/01/13 14:34:03 hwloidl Exp $
+ * $Id: Hash.h,v 1.3 2000/10/06 15:34:29 simonmar Exp $
  *
  * (c) The GHC Team, 1999
  *
@@ -9,9 +9,27 @@
 
 typedef struct hashtable HashTable; /* abstract */
 
+/* Hash table access where the keys are StgWords */
+HashTable * allocHashTable    ( void );
 void *      lookupHashTable ( HashTable *table, StgWord key );
 void        insertHashTable ( HashTable *table, StgWord key, void *data );
 void *      removeHashTable ( HashTable *table, StgWord key, void *data );
-void        freeHashTable   ( HashTable *table, void (*freeDataFun)(void *) );
-HashTable * allocHashTable  ( void );
 
+/* Hash table access where the keys are C strings (the strings are
+ * assumed to be allocated by the caller, and mustn't be deallocated
+ * until the corresponding hash table entry has been removed).
+ */
+HashTable * allocStrHashTable ( void );
+
+#define lookupStrHashTable(table, key)  \
+   (lookupHashTable(table, (StgWord)key))
+
+#define insertStrHashTable(table, key, data)  \
+   (insertHashTable(table, (StgWord)key, data))
+
+#define removeStrHashTable(table, key, data) \
+   (removeHashTable(table, (StgWord)key, data))
+
+/* Freeing hash tables 
+ */
+void freeHashTable ( HashTable *table, void (*freeDataFun)(void *) );

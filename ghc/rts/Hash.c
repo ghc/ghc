@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
- * $Id: Hash.c,v 1.1 1999/01/27 12:11:25 simonm Exp $
+ * $Id: Hash.c,v 1.2 2000/10/06 15:34:29 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1995-1998
  * (c) The GHC Team, 1999
@@ -32,6 +32,9 @@ struct hashlist {
 
 typedef struct hashlist HashList;
 
+typedef int HashFunction(HashTable *table, StgWord key);
+typedef int CompareFunction(StgWord key1, StgWord key2);
+
 struct hashtable {
     int split;		    /* Next bucket to split when expanding */
     int max;		    /* Max bucket of smaller table */
@@ -40,6 +43,8 @@ struct hashtable {
     int kcount;		    /* Number of keys */
     int bcount;		    /* Number of buckets */
     HashList **dir[HDIRSIZE];	/* Directory of segments */
+    HashFunction *hash;		/* hash function */
+    CompareFunction *compare;   /* key comparison function */
 };
 
 /* -----------------------------------------------------------------------------
@@ -48,7 +53,7 @@ struct hashtable {
  * -------------------------------------------------------------------------- */
 
 static int
-hash(HashTable *table, W_ key)
+hashWord(HashTable *table, StgWord key)
 {
     int bucket;
 
@@ -64,6 +69,43 @@ hash(HashTable *table, W_ key)
     }
     return bucket;
 }
+
+static int
+hashStr(HashTable *table, char *key)
+{
+    int h, bucket;
+    char *s;
+
+    s = key;
+    for (h=0; *s; s++) {
+	h *= 128;
+	h += *s;
+	h = h % 1048583;	/* some random large prime */
+    }
+
+    /* Mod the size of the hash table (a power of 2) */
+    bucket = h & table->mask1;
+
+    if (bucket < table->split) {
+	/* Mod the size of the expanded hash table (also a power of 2) */
+	bucket = h & table->mask2;
+    }
+
+    return bucket;
+}
+
+static int
+compareWord(StgWord key1, StgWord key2)
+{
+    return (key1 == key2);
+}
+
+static int
+compareStr(StgWord key1, StgWord key2)
+{
+    return (strcmp((char *)key1, (char *)key2) == 0);
+}
+
 
 /* -----------------------------------------------------------------------------
  * Allocate a new segment of the dynamically growing hash table.
@@ -125,7 +167,7 @@ expand(HashTable *table)
     old = new = NULL;
     for (hl = table->dir[oldsegment][oldindex]; hl != NULL; hl = next) {
 	next = hl->next;
-	if (hash(table, hl->key) == newbucket) {
+	if (table->hash(table, hl->key) == newbucket) {
 	    hl->next = new;
 	    new = hl;
 	} else {
@@ -147,12 +189,12 @@ lookupHashTable(HashTable *table, StgWord key)
     int index;
     HashList *hl;
 
-    bucket = hash(table, key);
+    bucket = table->hash(table, key);
     segment = bucket / HSEGSIZE;
     index = bucket % HSEGSIZE;
 
     for (hl = table->dir[segment][index]; hl != NULL; hl = hl->next)
-	if (hl->key == key)
+	if (table->compare(hl->key, key))
 	    return hl->data;
 
     /* It's not there */
@@ -207,7 +249,7 @@ insertHashTable(HashTable *table, StgWord key, void *data)
     if (++table->kcount >= HLOAD * table->bcount)
 	expand(table);
 
-    bucket = hash(table, key);
+    bucket = table->hash(table, key);
     segment = bucket / HSEGSIZE;
     index = bucket % HSEGSIZE;
 
@@ -229,12 +271,12 @@ removeHashTable(HashTable *table, StgWord key, void *data)
     HashList *hl;
     HashList *prev = NULL;
 
-    bucket = hash(table, key);
+    bucket = table->hash(table, key);
     segment = bucket / HSEGSIZE;
     index = bucket % HSEGSIZE;
 
     for (hl = table->dir[segment][index]; hl != NULL; hl = hl->next) {
-	if (hl->key == key && (data == NULL || hl->data == data)) {
+	if (table->compare(hl->key,key) && (data == NULL || hl->data == data)) {
 	    if (prev == NULL)
 		table->dir[segment][index] = hl->next;
 	    else
@@ -290,8 +332,8 @@ freeHashTable(HashTable *table, void (*freeDataFun)(void *) )
  * initializing all of the first segment's hash buckets to NULL.
  * -------------------------------------------------------------------------- */
 
-HashTable *
-allocHashTable(void)
+static HashTable *
+allocHashTable_(HashFunction *hash, CompareFunction *compare)
 {
     HashTable *table;
     HashList **hb;
@@ -309,6 +351,21 @@ allocHashTable(void)
     table->mask2 = 2 * HSEGSIZE - 1;
     table->kcount = 0;
     table->bcount = HSEGSIZE;
+    table->hash = hash;
+    table->compare = compare;
 
     return table;
+}
+
+HashTable *
+allocHashTable(void)
+{
+    return allocHashTable_(hashWord, compareWord);
+}
+
+HashTable *
+allocStrHashTable(void)
+{
+    return allocHashTable_((HashFunction *)hashStr, 
+			   (CompareFunction *)compareStr);
 }
