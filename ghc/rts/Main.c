@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Main.c,v 1.36 2003/03/17 14:47:47 simonmar Exp $
+ * $Id: Main.c,v 1.37 2003/03/25 18:00:19 sof Exp $
  *
  * (c) The GHC Team 1998-2000
  *
@@ -13,6 +13,7 @@
 #include "Rts.h"
 #include "RtsAPI.h"
 #include "SchedAPI.h"
+#include "Schedule.h"
 #include "RtsFlags.h"
 #include "RtsUtils.h"
 #include "Prelude.h"
