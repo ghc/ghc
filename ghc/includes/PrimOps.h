@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.31 1999/05/10 09:56:50 sof Exp $
+ * $Id: PrimOps.h,v 1.32 1999/06/25 10:09:19 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -473,11 +473,11 @@ LI_ stg_word64ToInt64 (StgWord64);
 
 #ifdef DEBUG
 #define BYTE_ARR_CTS(a)				  \
- ({ ASSERT(GET_INFO(a) == &ARR_WORDS_info); 	  \
+ ({ ASSERT(GET_INFO((StgArrWords *)(a)) == &ARR_WORDS_info); 	  \
     REAL_BYTE_ARR_CTS(a); })
 #define PTRS_ARR_CTS(a)				  \
- ({ ASSERT((GET_INFO(a) == &ARR_PTRS_info)	  \
-	|| (GET_INFO(a) == &MUT_ARR_PTRS_info));  \
+ ({ ASSERT((GET_INFO((StgMutArrPtrs  *)(a)) == &MUT_ARR_PTRS_FROZEN_info)	  \
+	|| (GET_INFO((StgMutArrPtrs  *)(a)) == &MUT_ARR_PTRS_info));  \
     REAL_PTRS_ARR_CTS(a); })
 #else
 #define BYTE_ARR_CTS(a)		REAL_BYTE_ARR_CTS(a)
