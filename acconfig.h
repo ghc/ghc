@@ -393,6 +393,12 @@
 /* Define if usleep returns void */
 #undef USLEEP_RETURNS_VOID
 
+/* Define if it looks like a Linux sendfile(2) implementation */
+#undef HAVE_LINUX_SENDFILE
+
+/* Define if it looks like a BSDish sendfile(2) implementation */
+#undef HAVE_BSD_SENDFILE
+
 /* Define if C compiler supports long long types */
 #undef HAVE_LONG_LONG
 
