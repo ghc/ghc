@@ -104,7 +104,8 @@ sub init_TARGET_STUFF {
     $T_HDR_direct   = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$CODE\$\n\t\.align 4\n";
 
     #--------------------------------------------------------#
-    } elsif ( $TargetPlatform =~ /^i386-.*-(linuxaout|freebsd|cygwin32)/ ) {
+    } elsif ( $TargetPlatform =~ /^i386-.*-(linuxaout|freebsd|nextstep3|cygwin32)/ ) {
+				# NeXT added but not tested. CaS
 
     $T_STABBY	    = 1; # 1 iff .stab things (usually if a.out format)
     $T_US	    = '_'; # _ if symbols have an underscore on the front
@@ -580,6 +581,11 @@ sub mangle_asm {
                     $p =~ s/^\tmovl \$\d+,\%eax\n\tcall __alloca\n// if ($TargetPlatform =~ /^.*-cygwin32/);
 		} elsif ($TargetPlatform =~ /^m68k-/) {
 		    $p =~ s/^\tlink a6,#-?\d.*\n//;
+ 		    $p =~ s/^\tpea a6@\n\tmovel sp,a6\n//;    
+ 				# The above showed up in the asm code,
+ 				# so I added it here.
+ 				# I hope it's correct.
+ 				# CaS
 		    $p =~ s/^\tmovel d2,sp\@-\n//;
 		    $p =~ s/^\tmovel d5,sp\@-\n//; # SMmark.* only?
 		    $p =~ s/^\tmoveml \#0x[0-9a-f]+,sp\@-\n//; # SMmark.* only?

@@ -1126,7 +1126,12 @@ sub setupMachOpts {
   } elsif ($TargetPlatform =~ /^i386-/) {
       # we know how to *mangle* asm for X86
       unshift(@CcRegd_flags, ('-D__STG_REV_TBLS__'));
-      unshift(@CcRegd_flags, ('-DSTACK_CHECK_BY_PAGE_FAULT=1')) if $StkChkByPageFaultOK;
+      unshift(@CcRegd_flags, ('-DSTACK_CHECK_BY_PAGE_FAULT=1')) 
+      			if $StkChkByPageFaultOK;
+			   && $TargetPlatform !~ /nextstep/;
+      # I do not know how to do STACK_CHECK_BY_PAGE_FAULT
+      # on NeXTs (my fault, not theirs), so I don't.
+      # CaS
 
       # -fno-defer-pop : basically the same game as for m68k
       #
@@ -1141,8 +1146,13 @@ sub setupMachOpts {
   } elsif ($TargetPlatform =~ /^m68k-/) {
       # we know how to *mangle* asm for m68k
       unshift (@CcRegd_flags, ('-D__STG_REV_TBLS__'));
-      unshift (@CcRegd_flags, ('-DSTACK_CHECK_BY_PAGE_FAULT=1')) if $StkChkByPageFaultOK;
-
+      unshift (@CcRegd_flags, ('-DSTACK_CHECK_BY_PAGE_FAULT=1')) 
+			if $StkChkByPageFaultOK;
+		           && $TargetPlatform !~ /nextstep/;
+      # I do not know how to do STACK_CHECK_BY_PAGE_FAULT
+      # on NeXTs (my fault, not theirs), so I don't.
+      # CaS
+                           && 
       # -fno-defer-pop : for the .hc files, we want all the pushing/
       #    popping of args to routines to be explicit; if we let things
       #    be deferred 'til after an STGJUMP, imminent death is certain!
