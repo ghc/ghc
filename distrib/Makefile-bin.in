@@ -38,11 +38,11 @@
 #     if it clashes with your reality, I guess.
 #
 #  * htmldir
-#     where to install the documentation HTML files.
-#  * dvidir
-#     where to install the DVI files.
-#  * infodir
-#     where to install the Emacs info files
+#     where to install the HTML documentation files.
+#  * pdfdir
+#     where to install the PDF documentation files.
+#  * psdir
+#     where to install the Postscript documentation files.
 #
 # Installing the documentation is not done as part of the `install' rule, but
 # via `install-docs' (or if you want to be selective: `install-html', `install-dvi'
@@ -66,9 +66,9 @@ prefix      = @prefix@
 exec_prefix = @exec_prefix@
 
 # default
-infodir   = $(datadir)
-htmldir   = $(datadir)
-dvidir    = $(datadir)
+htmldir     = $(datadir)
+psdir       = $(datadir)
+pdfdir      = $(datadir)
 
 
 PERL        = @PerlCmd@
@@ -196,17 +196,15 @@ install :: config-pkgs install-dirs install-bin install-libs install-datas insta
 
 denounce:
 	@echo
-	@echo Installation of ghc-5.00 was successful.
+	@echo =======================================================================
+	@echo Installation of $(package)-$(version) was successful.
 	@echo To use, add $(bindir) to your PATH.
 	@if test -d html ; then \
-	   echo Docs: ;\
-	   echo "   GHC User Guide  is $(htmldir)/set/book-users-guide.html" ; \
-	   echo "   Libraries Guide is $(htmldir)/set/book-hslibs.html" ; \
-	   echo "   .ps form of both is in $(htmldir)/set/set.ps" ; \
-	   echo ; \
+	   echo Docs can be found in $(htmldir). ; \
 	else \
 	   echo "Warning: this binary distribution does NOT contain documentation!" ; \
 	fi
+	@echo =======================================================================
 
 postinstall:
 	@if test -x "./post-install-script" ; then \
@@ -259,7 +257,7 @@ show-install-setup:
 
 install-docs : install-dirs-docs
 	if test -d html ; then $(CP) -r html/* $(htmldir) ; fi
-	if test -f ps/set.ps ; then $(CP) ps/set.ps $(htmldir)/set/set.ps ; fi
+	if test -f ps/*.ps ; then $(CP) ps/*.ps $(psdir) ; fi
 
 install-dirs-docs:
 	$(INSTALL_DIR) $(htmldir) 
