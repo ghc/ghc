@@ -133,8 +133,7 @@ SRC_HC_OPTS += \
 
 # -syslib ghc just needed for use of PackedString.hPutPS
 
-
-SRC_CC_OPTS += -Iparser -I. -I$(TOP)/includes
+SRC_CC_OPTS += -Iparser -I. -I$(TOP)/includes -O
 
 ifeq "$(Ghc2_0)" "NO"
 SRC_HC_OPTS += -fomit-derived-read -fomit-reexported-instances
@@ -178,7 +177,6 @@ parser/U_either_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"'
 parser/U_qid_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
 parser/U_tree_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
 parser/U_ttype_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
-parser/hslexer_CC_OPTS          = -I$(TOP)/includes
 prelude/PrimOp_HC_OPTS 		= -K3m
 reader/Lex_HC_OPTS		= -K2m -H16m -fvia-C
 ifeq "$(Ghc2_0)" "NO"
@@ -296,9 +294,10 @@ hi-boot ::
 # Have the collector *Loop.hs interface files be generated just after having
 # created the .hi's from the .hi-boot's. 
 
-#hi-boot :: $(patsubst %.hs,%.hi,$(LOOPS_HS))
 
 else
+hi-boot :: $(LOOPS)
+
 %.hi : %.lhi
 	$(RM) $@
 	$(UNLIT) $<  $@ || ( $(RM) $@ && exit 1 )
