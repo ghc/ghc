@@ -49,7 +49,7 @@ import Type		( Type, ClassContext, mkDictTy, mkDictTys, mkTyConApp, mkTyVarTys,
 			)
 import PprType		( pprParendType )
 import Module		( Module )
-import CoreUtils	( mkInlineMe )
+import CoreUtils	( exprType, mkInlineMe )
 import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding, mkOtherCon )
 import Subst		( mkTopTyVarSubst, substClasses )
 import TyCon		( TyCon, isNewTyCon, tyConTyVars, tyConDataCons, isDataTyCon, 
@@ -429,9 +429,10 @@ there's nothing to do.
 ToDo: unify with mkRecordSelId.
 
 \begin{code}
-mkDictSelId name clas ty
+mkDictSelId name clas
   = sel_id
   where
+    ty	      = exprType rhs
     sel_id    = mkId name ty info
     field_lbl = mkFieldLabel name ty tag
     tag       = assoc "MkId.mkDictSelId" (classSelIds clas `zip` allFieldLabelTags) sel_id

@@ -132,12 +132,8 @@ instance Outputable SrcLoc where
 	   hcat [text "{-# LINE ", int IBOX(src_line), space,
 		 char '\"', ptext src_path, text " #-}"]
       where
-	src_file = remove_directory_prefix (unpackFS src_path)
-
-	remove_directory_prefix path = case break (== '/') path of
-					  (filename, [])           -> filename
-					  (prefix,   slash : rest) -> ASSERT( slash == '/' )
-								      remove_directory_prefix rest
+	src_file = unpackFS src_path	-- Leave the directory prefix intact,
+					-- so emacs can find the file
 
     ppr (UnhelpfulSrcLoc s) = ptext s
 
