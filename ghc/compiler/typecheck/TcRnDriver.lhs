@@ -52,6 +52,7 @@ import RnEnv		( lookupSrcOcc_maybe )
 import RnSource		( rnSrcDecls, rnTyClDecls, checkModDeprec )
 import PprCore		( pprIdRules, pprCoreBindings )
 import CoreSyn		( IdCoreRule, bindersOfBinds )
+import DataCon		( dataConWrapId )
 import ErrUtils		( Messages, mkDumpDoc, showPass )
 import Id		( mkExportedLocalId, isLocalId, idName, idType )
 import Var		( Var )
@@ -266,7 +267,7 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 
 	-- Typecheck them all together so that
 	-- any mutually recursive types are done right
-   tcg_env <- checkNoErrs (tcTyAndClassDecls rn_decls) ;
+   tcg_env <- checkNoErrs (tcTyAndClassDecls [{- no boot names -}] rn_decls) ;
 	-- Make the new type env available to stuff slurped from interface files
 
    setGblEnv tcg_env $ do {
@@ -323,10 +324,10 @@ tcRnSrcDecls :: [LHsDecl RdrName] -> TcM TcGblEnv
 	-- Returns the variables free in the decls
 	-- Reason: solely to report unused imports and bindings
 tcRnSrcDecls decls
- = do { mb_boot_iface <- loadHiBootInterface ;
+ = do { boot_names <- loadHiBootInterface ;
 
 	  	-- Do all the declarations
-	(tc_envs, lie) <- getLIE (tc_rn_src_decls decls) ;
+	(tc_envs, lie) <- getLIE (tc_rn_src_decls boot_names decls) ;
 
 	     -- tcSimplifyTop deals with constant or ambiguous InstIds.  
 	     -- How could there be ambiguous ones?  They can only arise if a
@@ -353,7 +354,7 @@ tcRnSrcDecls decls
 	let { final_type_env = extendTypeEnvWithIds type_env bind_ids } ;
 
 	-- Compre the hi-boot iface (if any) with the real thing
- 	checkHiBootIface final_type_env mb_boot_iface ;
+ 	checkHiBootIface final_type_env boot_names ;
 
 	-- Make the new type env available to stuff slurped from interface files
 	writeMutVar (tcg_type_env_var tcg_env) final_type_env ;
@@ -362,15 +363,15 @@ tcRnSrcDecls decls
 			  tcg_binds = binds', tcg_rules = rules', tcg_fords = fords' }) 
    }
 
-tc_rn_src_decls :: [LHsDecl RdrName] -> TcM (TcGblEnv, TcLclEnv)
+tc_rn_src_decls :: [Name] -> [LHsDecl RdrName] -> TcM (TcGblEnv, TcLclEnv)
 -- Loops around dealing with each top level inter-splice group 
 -- in turn, until it's dealt with the entire module
-tc_rn_src_decls ds
+tc_rn_src_decls boot_names ds
  = do { let { (first_group, group_tail) = findSplice ds } ;
 		-- If ds is [] we get ([], Nothing)
 
 	-- Type check the decls up to, but not including, the first splice
-	tc_envs@(tcg_env,tcl_env) <- tcRnGroup first_group ;
+	tc_envs@(tcg_env,tcl_env) <- tcRnGroup boot_names first_group ;
 
 	-- Bale out if errors; for example, error recovery when checking
 	-- the RHS of 'main' can mean that 'main' is not in the envt for 
@@ -401,7 +402,7 @@ tc_rn_src_decls ds
 
 	-- Glue them on the front of the remaining decls and loop
 	setGblEnv (tcg_env `addTcgDUs` usesOnly splice_fvs) $
-	tc_rn_src_decls (spliced_decls ++ rest_ds)
+	tc_rn_src_decls boot_names (spliced_decls ++ rest_ds)
 #endif /* GHCI */
     }}}
 \end{code}
@@ -419,21 +420,15 @@ the hi-boot stuff in the EPT.  We do so here, using the export list of
 the hi-boot interface as our checklist.
 
 \begin{code}
-checkHiBootIface :: TypeEnv -> Maybe ModIface -> TcM ()
+checkHiBootIface :: TypeEnv -> [Name] -> TcM ()
 -- Compare the hi-boot file for this module (if there is one)
 -- with the type environment we've just come up with
-checkHiBootIface env Nothing 		-- No hi-boot 
-  = return ()
+checkHiBootIface env boot_names
+  = mapM_ (check_one env) boot_names
 
-checkHiBootIface env (Just iface)
-  = mapM_ (check_one env) exports
-  where
-    exports = [ (mod, availName avail) | (mod,avails) <- mi_exports iface,
-			   		 avail <- avails]
 ----------------
-check_one local_env (mod,occ)
-  = do	{ name <- lookupOrig mod occ
- 	; eps  <- getEps
+check_one local_env name
+  = do	{ eps  <- getEps
 
 		-- Look up the hi-boot one; 
 		-- it should jolly well be there (else GHC bug)
@@ -463,6 +458,12 @@ check_thing (ATyCon boot_tc) (ATyCon real_tc)
 check_thing (AnId boot_id) (AnId real_id)
   | idType boot_id `tcEqType` idType real_id
   = return ()
+
+check_thing (ADataCon dc1) (ADataCon dc2)
+  | idType (dataConWrapId dc1) `tcEqType` idType (dataConWrapId dc2)
+  = return ()
+
+	-- Can't declare a class in a hi-boot file
 
 check_thing boot_thing real_thing	-- Default case; failure
   = addErrAt (srcLocSpan (getSrcLoc real_thing))
@@ -494,15 +495,15 @@ declarations.  It expects there to be an incoming TcGblEnv in the
 monad; it augments it and returns the new TcGblEnv.
 
 \begin{code}
-tcRnGroup :: HsGroup RdrName -> TcM (TcGblEnv, TcLclEnv)
+tcRnGroup :: [Name] -> HsGroup RdrName -> TcM (TcGblEnv, TcLclEnv)
 	-- Returns the variables free in the decls, for unused-binding reporting
-tcRnGroup decls
+tcRnGroup boot_names decls
  = do {		-- Rename the declarations
 	(tcg_env, rn_decls) <- rnTopSrcDecls decls ;
 	setGblEnv tcg_env $ do {
 
 		-- Typecheck the declarations
-	tcTopSrcDecls rn_decls 
+	tcTopSrcDecls boot_names rn_decls 
   }}
 
 ------------------------------------------------
@@ -528,8 +529,8 @@ rnTopSrcDecls group
    }}
 
 ------------------------------------------------
-tcTopSrcDecls :: HsGroup Name -> TcM (TcGblEnv, TcLclEnv)
-tcTopSrcDecls
+tcTopSrcDecls :: [Name] -> HsGroup Name -> TcM (TcGblEnv, TcLclEnv)
+tcTopSrcDecls boot_names
 	(HsGroup { hs_tyclds = tycl_decls, 
 		   hs_instds = inst_decls,
 		   hs_fords  = foreign_decls,
@@ -540,7 +541,7 @@ tcTopSrcDecls
 		-- The latter come in via tycl_decls
         traceTc (text "Tc2") ;
 
-	tcg_env <- checkNoErrs (tcTyAndClassDecls tycl_decls) ;
+	tcg_env <- checkNoErrs (tcTyAndClassDecls boot_names tycl_decls) ;
 	-- tcTyAndClassDecls recovers internally, but if anything gave rise to
 	-- an error we'd better stop now, to avoid a cascade
 	

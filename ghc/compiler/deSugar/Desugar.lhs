@@ -10,7 +10,7 @@ module Desugar ( deSugar, deSugarExpr ) where
 
 import CmdLineOpts	( DynFlag(..), dopt, opt_SccProfilingOn )
 import HscTypes		( ModGuts(..), ModGuts, HscEnv(..), GhciMode(..),
-			  Dependencies(..), TypeEnv, unQualInScope )
+			  Dependencies(..), TypeEnv, IsBootInterface, unQualInScope )
 import HsSyn		( RuleDecl(..), RuleBndr(..), HsExpr(..), LHsExpr,
 			  HsBindGroup(..), LRuleDecl, HsBind(..) )
 import TcRnTypes	( TcGblEnv(..), ImportAvails(..) )
@@ -26,7 +26,7 @@ import DsBinds		( dsHsBinds, AutoScc(..) )
 import DsForeign	( dsForeigns )
 import DsExpr		()	-- Forces DsExpr to be compiled; DsBinds only
 				-- depends on DsExpr.hi-boot.
-import Module		( Module, moduleEnvElts )
+import Module		( Module, ModuleName, moduleEnvElts, delModuleEnv, moduleNameFS )
 import Id		( Id )
 import RdrName	 	( GlobalRdrEnv )
 import NameSet
@@ -44,7 +44,7 @@ import UniqSupply	( mkSplitUniqSupply )
 import SrcLoc		( Located(..), SrcSpan, unLoc )
 import DATA_IOREF	( readIORef )
 import FastString
-import Data.List	( sort )
+import Util		( sortLe )
 \end{code}
 
 %************************************************************************
@@ -100,9 +100,20 @@ deSugar hsc_env
 	     pkgs | th_used   = insertList thPackage (imp_dep_pkgs imports)
 		  | otherwise = imp_dep_pkgs imports
 
-	     deps = Deps { dep_mods = moduleEnvElts (imp_dep_mods imports), 
-			   dep_pkgs  = sort pkgs,	
-			   dep_orphs = sort (imp_orphs imports) }
+	     mods = moduleEnvElts (delModuleEnv (imp_dep_mods imports) mod)
+		-- M.hi-boot can be in the imp_dep_mods, but we must remove
+		-- it before recording the modules on which this one depends!
+
+		-- ModuleNames don't compare lexicographically usually, 
+		-- but we want them to do so here.
+	     le_mod :: ModuleName -> ModuleName -> Bool	 
+	     le_mod m1 m2 = moduleNameFS m1 <= moduleNameFS m2
+	     le_dep_mod :: (ModuleName, IsBootInterface) -> (ModuleName, IsBootInterface) -> Bool	 
+	     le_dep_mod (m1,_) (m2,_) = m1 `le_mod` m2
+
+	     deps = Deps { dep_mods  = sortLe le_dep_mod mods,
+			   dep_pkgs  = sortLe (<=)   pkgs,	
+			   dep_orphs = sortLe le_mod (imp_orphs imports) }
 		-- sort to get into canonical order
 
 	     mod_guts = ModGuts {	

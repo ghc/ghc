@@ -283,13 +283,14 @@ repC (L loc con_decl)
 -- gaw 2004 FIX! Need a case for GadtDecl
 
 repBangTy :: LBangType Name -> DsM (Core (TH.StrictTypeQ))
-repBangTy (L _ (HsBangTy str ty)) = do 
-  MkC s <- rep2 strName []
-  MkC t <- repLTy ty
+repBangTy ty= do 
+  MkC s <- rep2 str []
+  MkC t <- repLTy ty'
   rep2 strictTypeName [s, t]
-  where strName = case str of
-			HsNoBang -> notStrictName
-			other    -> isStrictName
+  where 
+    (str, ty') = case ty of
+		   L _ (HsBangTy _ ty) -> (isStrictName,  ty)
+		   other	       -> (notStrictName, ty)
 
 -------------------------------------------------------
 -- 			Deriving clause

@@ -213,8 +213,6 @@ importsFromImportDecl this_mod
 	     ASSERT( not (mi_package iface `elem` dep_pkgs deps) )
 	     ([], mi_package iface : dep_pkgs deps)
 
-	not_self (m, _) = m /= this_mod_name
-
 	import_all = case imp_details of
 			Just (is_hiding, ls)	 -- Imports are spec'd explicitly
 			  | not is_hiding -> Just (not (null ls))

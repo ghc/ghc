@@ -919,7 +919,6 @@ getTyDescription ty
       TyVarTy _	       	     -> "*"
       AppTy fun _      	     -> getTyDescription fun
       FunTy _ res      	     -> '-' : '>' : fun_result res
-      NewTcApp tycon _ 	     -> getOccString tycon
       TyConApp tycon _ 	     -> getOccString tycon
       NoteTy (FTVNote _) ty  -> getTyDescription ty
       NoteTy (SynNote ty1) _ -> getTyDescription ty1

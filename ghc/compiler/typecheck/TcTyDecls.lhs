@@ -95,7 +95,6 @@ synTyConsOfType ty
      go :: Type -> NameEnv TyCon  -- The NameEnv does duplicate elim
      go (TyVarTy v)	  	  = emptyNameEnv
      go (TyConApp tc tys) 	  = go_tc tc tys	-- See note (a)
-     go (NewTcApp tc tys)	  = go_s tys	-- Ignore tycon
      go (AppTy a b)	  	  = go a `plusNameEnv` go b
      go (FunTy a b)	  	  = go a `plusNameEnv` go b
      go (PredTy (IParam _ ty))    = go ty	
@@ -153,22 +152,34 @@ a "loop breaker".  Labelling more than necessary as recursive is OK,
 provided the invariant is maintained.
 
 A newtype M.T is defined to be "recursive" iff
-	(a) its rhs mentions an abstract (hi-boot) TyCon
-   or	(b) one can get from T's rhs to T via type 
+	(a) it is declared in an hi-boot file (see RdrHsSyn.hsIfaceDecl)
+	(b) it is declared in a source file, but that source file has a
+	    companion hi-boot file which declares the type
+   or	(c) one can get from T's rhs to T via type 
 	    synonyms, or non-recursive newtypes *in M*
- e.g.  newtype T = MkT (T -> Int)
+	     e.g.  newtype T = MkT (T -> Int)
 
-(a)	is conservative; it assumes that the hi-boot type can loop
-	around to T.  That's why in (b) we can restrict attention
+(a) is conservative; declarations in hi-boot files are always 
+	made loop breakers. That's why in (b) we can restrict attention
 	to tycons in M, because any loops through newtypes outside M
 	will be broken by those newtypes
+(b) ensures that a newtype is not treated as a loop breaker in one place
+and later as a non-loop-breaker.  This matters in GHCi particularly, when
+a newtype T might be embedded in many types in the environment, and then
+T's source module is compiled.  We don't want T's recursiveness to change.
+
+The "recursive" flag for algebraic data types is irrelevant (never consulted)
+for types with more than one constructor.
 
 An algebraic data type M.T is "recursive" iff
 	it has just one constructor, and 
-	(a) its arg types mention an abstract (hi-boot) TyCon
- or	(b) one can get from its arg types to T via type synonyms, 
+	(a) it is declared in an hi-boot file (see RdrHsSyn.hsIfaceDecl)
+	(b) it is declared in a source file, but that source file has a
+	    companion hi-boot file which declares the type
+ or	(c) one can get from its arg types to T via type synonyms, 
 	    or by non-recursive newtypes or non-recursive product types in M
- e.g.  data T = MkT (T -> Int) Bool
+	     e.g.  data T = MkT (T -> Int) Bool
+Just like newtype in fact
 
 A type synonym is recursive if one can get from its
 right hand side back to it via type synonyms.  (This is
@@ -202,17 +213,27 @@ recursiveness, because we need only look at the type decls in the module being
 compiled, plus the outer structure of directly-mentioned types.
 
 \begin{code}
-calcRecFlags :: [TyThing] -> (Name -> RecFlag)
-calcRecFlags tyclss
+calcRecFlags :: [Name] -> [TyThing] -> (Name -> RecFlag)
+-- The 'boot_names' are the things declared in M.hi-boot, if M is the current module.
+-- Any type constructors in boot_names are automatically considered loop breakers
+calcRecFlags boot_names tyclss
   = is_rec
   where
     is_rec n | n `elemNameSet` rec_names = Recursive
 	     | otherwise		 = NonRecursive
 
-    rec_names = nt_loop_breakers `unionNameSets` prod_loop_breakers
+    boot_name_set = mkNameSet boot_names
+    rec_names = boot_name_set	  `unionNameSets` 
+		nt_loop_breakers  `unionNameSets`
+	        prod_loop_breakers
 
-    all_tycons = map getTyCon tyclss	-- Recursion of newtypes/data types
-					-- can happen via the class TyCon
+    all_tycons = [ tc | tycls <- tyclss,
+			   -- Recursion of newtypes/data types can happen via 
+			   -- the class TyCon, so tyclss includes the class tycons
+			let tc = getTyCon tycls,
+			not (tyConName tc `elemNameSet` boot_name_set) ]
+			   -- Remove the boot_name_set because they are going 
+			   -- to be loop breakers regardless.
 
 	-------------------------------------------------
 	-- 			NOTE
@@ -238,10 +259,8 @@ calcRecFlags tyclss
 
     mk_nt_edges1 nt tc 
 	| tc `elem` new_tycons = [tc]		-- Loop
-	| isHiBootTyCon tc     = [nt]		-- Make it self-recursive if 
-						-- it mentions an hi-boot TyCon
-		-- At this point we know that either it's a local data type,
-		-- or it's imported.  Either way, it can't form part of a cycle
+		-- At this point we know that either it's a local *data* type,
+		-- or it's imported.  Either way, it can't form part of a newtype cycle
 	| otherwise = []
 
 	--------------- Product types ----------------------
@@ -262,8 +281,6 @@ calcRecFlags tyclss
  	| tc `elem` new_tycons    = if is_rec_nt tc 	-- Local newtype
 				    then []
 				    else mk_prod_edges1 ptc (new_tc_rhs tc)
-	| isHiBootTyCon tc	  = [ptc]	-- Make it self-recursive if 
-						-- it mentions an hi-boot TyCon
 		-- At this point we know that either it's a local non-product data type,
 		-- or it's imported.  Either way, it can't form part of a cycle
 	| otherwise = []
@@ -298,7 +315,6 @@ tcTyConsOfType ty
      go :: Type -> NameEnv TyCon  -- The NameEnv does duplicate elim
      go (TyVarTy v)	  	  = emptyNameEnv
      go (TyConApp tc tys) 	  = go_tc tc tys
-     go (NewTcApp tc tys) 	  = go_tc tc tys
      go (AppTy a b)	  	  = go a `plusNameEnv` go b
      go (FunTy a b)	  	  = go a `plusNameEnv` go b
      go (PredTy (IParam _ ty))    = go ty
@@ -437,10 +453,6 @@ vrcInTy fao v (ForAllTy v' ty)          = if v==v'
     					  else vrcInTy fao v ty
 
 vrcInTy fao v (TyConApp tc tys)         = let pms1 = map (vrcInTy fao v) tys
-    					      pms2 = fao tc
-    				          in  orVrcs (zipWith timesVrc pms1 pms2)
-
-vrcInTy fao v (NewTcApp tc tys)         = let pms1 = map (vrcInTy fao v) tys
     					      pms2 = fao tc
     				          in  orVrcs (zipWith timesVrc pms1 pms2)
 

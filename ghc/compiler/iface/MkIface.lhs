@@ -482,8 +482,8 @@ addVersionInfo (Just old_iface@(ModIface { mi_mod_vers  = old_mod_vers,
     no_deprec_change = mi_deprecs new_iface == mi_deprecs old_iface
 
 	-- If the usages havn't changed either, we don't need to write the interface file
-	-- Question: should we also check for equality of mi_deps?
-    no_other_changes = mi_usages new_iface == mi_usages old_iface
+    no_other_changes = mi_usages new_iface == mi_usages old_iface && 
+		       mi_deps new_iface == mi_deps old_iface
     no_change_at_all = no_output_change && no_other_changes
  
     pp_diffs = vcat [pp_change no_export_change "Export list" 

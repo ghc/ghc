@@ -16,8 +16,8 @@ import Var		( Var, TyVar, tyVarKind )
 import VarEnv
 import VarSet
 import Kind		( isSubKind )
-import Type		( predTypeRep, newTypeRep, typeKind, 
-			  tyVarsOfType, tyVarsOfTypes, 
+import Type		( predTypeRep, typeKind, 
+			  tyVarsOfType, tyVarsOfTypes, coreView,
 			  TvSubstEnv, TvSubst(..), substTy )
 import TypeRep          ( Type(..), PredType(..), funTyCon )
 import Util		( snocView )
@@ -158,23 +158,15 @@ unify :: SrcFlag                -- True, unifying source types, false core types
 -- nor guarantee that the outgoing one is.  That's fixed up by
 -- the wrappers.
 
--- ToDo: remove debugging junk
 unify s subst ty1 ty2 = -- pprTrace "unify" (ppr subst <+> pprParendType ty1 <+> pprParendType ty2) $
-			unify_ s subst ty1 ty2
+			unify_ s subst (rep s ty1) (rep s ty2)
 
--- Look through NoteTy in the obvious fashion
-unify_ s subst (NoteTy _ ty1) ty2  = unify s subst ty1 ty2
-unify_ s subst ty1 (NoteTy _ ty2)  = unify s subst ty1 ty2
+rep :: SrcFlag -> Type -> Type	-- Strip off the clutter
+rep Src (NoteTy _ ty)		      = rep Src  ty
+rep Core ty | Just ty' <- coreView ty = rep Core ty'
+rep s    ty 			      = ty
 
--- In Core mode, look through NewTcApps and Preds
-unify_ Core subst (NewTcApp tc tys) ty2 = unify Core subst (newTypeRep tc tys) ty2
-unify_ Core subst ty1 (NewTcApp tc tys) = unify Core subst ty1 (newTypeRep tc tys)
-
-unify_ Core subst (PredTy p) ty2 = unify Core subst (predTypeRep p) ty2
-unify_ Core subst ty1 (PredTy p) = unify Core subst ty1 (predTypeRep p)
-
--- From now on, any NewTcApps/Preds should be taken at face value
-
+-- in unify_, any NewTcApps/Preds should be taken at face value
 unify_ s subst (TyVarTy tv1) ty2  = uVar s False subst tv1 ty2
 unify_ s subst ty1 (TyVarTy tv2)  = uVar s True  subst tv2 ty1
 
@@ -182,8 +174,7 @@ unify_ s subst (PredTy p1) (PredTy p2) = unify_pred s subst p1 p2
 
 unify_ s subst t1@(TyConApp tyc1 tys1) t2@(TyConApp tyc2 tys2) 
   | tyc1 == tyc2 = unify_tys s subst tys1 tys2
-unify_ Src subst t1@(NewTcApp tc1 tys1) t2@(NewTcApp tc2 tys2)  
-  | tc1 == tc2 = unify_tys Src subst tys1 tys2
+
 unify_ s subst (FunTy ty1a ty1b) (FunTy ty2a ty2b) 
   = do { subst' <- unify s subst ty1a ty2a
        ; unify s subst' ty1b ty2b }
@@ -217,9 +208,6 @@ unifySplitAppTy_maybe (FunTy ty1 ty2)   = Just (TyConApp funTyCon [ty1], ty2)
 unifySplitAppTy_maybe (AppTy ty1 ty2)   = Just (ty1, ty2)
 unifySplitAppTy_maybe (TyConApp tc tys) = case snocView tys of
 						Just (tys', ty') -> Just (TyConApp tc tys', ty')
-						Nothing		 -> Nothing
-unifySplitAppTy_maybe (NewTcApp tc tys) = case snocView tys of
-						Just (tys', ty') -> Just (NewTcApp tc tys', ty')
 						Nothing		 -> Nothing
 unifySplitAppTy_maybe other = Nothing
 

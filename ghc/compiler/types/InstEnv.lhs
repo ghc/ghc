@@ -21,7 +21,7 @@ import Var		( Id )
 import VarSet
 import Type		( TvSubstEnv )
 import TcType		( Type, tcTyConAppTyCon, tcIsTyVarTy,
-			  tcSplitDFunTy, tyVarsOfTypes, isSkolemTyVar
+			  tcSplitDFunTy, tyVarsOfTypes, isExistentialTyVar
 			)
 import Unify		( matchTys, unifyTys )
 import FunDeps		( checkClsFD )
@@ -315,7 +315,7 @@ lookup_inst_env env key_cls key_tys key_all_tvs
 	  | otherwise -> find insts [] []
   where
     key_vars = filterVarSet not_existential (tyVarsOfTypes key_tys)
-    not_existential tv = not (isSkolemTyVar tv)
+    not_existential tv = not (isExistentialTyVar tv)
 	-- The key_tys can contain skolem constants, and we can guarantee that those
 	-- are never going to be instantiated to anything, so we should not involve
 	-- them in the unification test.  Example:
@@ -328,6 +328,11 @@ lookup_inst_env env key_cls key_tys key_all_tvs
 	-- The op [x,x] means we need (Foo [a]).  Without the filterVarSet we'd
 	-- complain, saying that the choice of instance depended on the instantiation
 	-- of 'a'; but of course it isn't *going* to be instantiated.
+	--
+	-- We do this only for pattern-bound skolems.  For example we reject
+	--	g :: forall a => [a] -> Int
+	--	g x = op x
+	-- on the grounds that the correct instance depends on the instantiation of 'a'
 
     find [] ms us = (ms, us)
     find (item@(tpl_tyvars, tpl, dfun_id) : rest) ms us

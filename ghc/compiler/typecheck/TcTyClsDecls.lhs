@@ -108,10 +108,10 @@ The knot-tying parameters: @rec_details_list@ is an alist mapping @Name@s to
 @TyThing@s.  @rec_vrcs@ is a finite map from @Name@s to @ArgVrcs@s.
 
 \begin{code}
-tcTyAndClassDecls :: [LTyClDecl Name]
+tcTyAndClassDecls :: [Name] -> [LTyClDecl Name]
    	           -> TcM TcGblEnv 	-- Input env extended by types and classes 
 					-- and their implicit Ids,DataCons
-tcTyAndClassDecls decls
+tcTyAndClassDecls boot_names decls
   = do	{ 	-- First check for cyclic type synonysm or classes
 		-- See notes with checkCycleErrs
 	  checkCycleErrs decls
@@ -133,7 +133,7 @@ tcTyAndClassDecls decls
 		{ (kc_syn_decls, kc_alg_decls) <- kcTyClDecls syn_decls alg_decls
 
 		; let {	calc_vrcs = calcTyConArgVrcs (rec_syn_tycons ++ rec_alg_tyclss)
-		      ; calc_rec  = calcRecFlags     rec_alg_tyclss
+		      ; calc_rec  = calcRecFlags boot_names rec_alg_tyclss
 		      ; tc_decl   = addLocM (tcTyClDecl calc_vrcs calc_rec) }
 			-- Type-check the type synonyms, and extend the envt
 		; syn_tycons <- tcSynDecls calc_vrcs kc_syn_decls

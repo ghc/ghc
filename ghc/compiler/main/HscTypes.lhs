@@ -665,6 +665,8 @@ data Dependencies
   = Deps { dep_mods  :: [(ModuleName,IsBootInterface)],	-- Home-package module dependencies
 	   dep_pkgs  :: [PackageName], 			-- External package dependencies
 	   dep_orphs :: [ModuleName] }			-- Orphan modules (whether home or external pkg)
+  deriving( Eq )
+	-- Equality used only for old/new comparison in MkIface.addVersionInfo
 
 noDependencies :: Dependencies
 noDependencies = Deps [] [] []

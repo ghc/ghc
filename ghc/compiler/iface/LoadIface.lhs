@@ -25,12 +25,12 @@ import Parser		( parseIface )
 import IfaceSyn		( IfaceDecl(..), IfaceConDecl(..), IfaceClassOp(..), IfaceConDecls(..),
 			  IfaceInst(..), IfaceRule(..), IfaceExpr(..), IfaceTyCon(..), IfaceIdInfo(..), 
 			  IfaceType(..), IfacePredType(..), IfaceExtName, mkIfaceExtName )
-import IfaceEnv		( newGlobalBinder, lookupIfaceExt, lookupIfaceTc )
+import IfaceEnv		( newGlobalBinder, lookupIfaceExt, lookupIfaceTc, lookupOrig )
 import HscTypes		( ModIface(..), TyThing, emptyModIface, EpsStats(..), addEpsInStats,
 			  ExternalPackageState(..), PackageTypeEnv, emptyTypeEnv, 
 			  lookupIfaceByModName, emptyPackageIfaceTable,
 			  IsBootInterface, mkIfaceFixCache, Gated, implicitTyThings,
-			  addRulesToPool, addInstsToPool
+			  addRulesToPool, addInstsToPool, availNames
 			 )
 
 import BasicTypes	( Version, Fixity(..), FixityDirection(..), isMarkedStrict )
@@ -100,27 +100,32 @@ loadSrcInterface doc mod_name want_boot
     elaborate err = hang (ptext SLIT("Failed to load interface for") <+> 
 			 quotes (ppr mod_name) <> colon) 4 err
 
-loadHiBootInterface :: TcRn (Maybe ModIface)
+loadHiBootInterface :: TcRn [Name]
 -- Load the hi-boot iface for the module being compiled,
 -- if it indeed exists in the transitive closure of imports
+-- Return the list of names exported by the hi-boot file
 loadHiBootInterface
   = do 	{ eps <- getEps
 	; mod <- getModule
 
 	-- We're read all the direct imports by now, so eps_is_boot will
 	-- record if any of our imports mention us by way of hi-boot file
-	; case lookupModuleEnv (eps_is_boot eps) mod of
-	    Nothing             -> return Nothing	-- The typical case
-
-	    Just (mod_nm, True) -> 	-- There's a hi-boot interface below us
-		-- Load it (into the PTE), and return its interface
-		do { iface <- loadSrcInterface (mk_doc mod_nm) mod_nm True
-		   ; return (Just iface) }
+	; case lookupModuleEnv (eps_is_boot eps) mod of {
+	    Nothing             -> return [] ;	-- The typical case
 
 	    Just (_, False) -> 		-- Someone below us imported us!
 		-- This is a loop with no hi-boot in the way
-		failWithTc (moduleLoop mod)
-    }
+		failWithTc (moduleLoop mod) ;
+
+	    Just (mod_nm, True) -> 	-- There's a hi-boot interface below us
+		
+
+    do	{ 	-- Load it (into the PTE, and return the exported names
+	  iface <- loadSrcInterface (mk_doc mod_nm) mod_nm True
+	; sequenceM [ lookupOrig mod_nm occ
+		    | (mod,avails) <- mi_exports iface, 
+		      avail <- avails, occ <- availNames avail]
+    }}}
   where
     mk_doc mod = ptext SLIT("Need the hi-boot interface for") <+> ppr mod
 		 <+> ptext SLIT("to compare against the Real Thing")

@@ -78,8 +78,8 @@ dsForeigns fos
   combine (ForeignStubs acc_h acc_c acc_hdrs acc_feb, acc_f) 
 	  (L loc (ForeignImport id _ spec depr))
     = traceIf (text "fi start" <+> ppr id)	`thenDs` \ _ ->
-      dsFImport (unLoc id) spec	           `thenDs` \ (bs, h, c, mbhd) -> 
-      warnDepr depr loc		   `thenDs` \ _                ->
+      dsFImport (unLoc id) spec	                `thenDs` \ (bs, h, c, mbhd) -> 
+      warnDepr depr loc				`thenDs` \ _                ->
       traceIf (text "fi end" <+> ppr id)	`thenDs` \ _ ->
       returnDs (ForeignStubs (h $$ acc_h)
       			     (c $$ acc_c)

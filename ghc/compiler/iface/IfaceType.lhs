@@ -311,7 +311,6 @@ toIfaceType :: (Name -> IfaceExtName) -> Type -> IfaceType
 toIfaceType ext (TyVarTy tv)     	     = IfaceTyVar (getOccName tv)
 toIfaceType ext (AppTy t1 t2)    	     = IfaceAppTy (toIfaceType ext t1) (toIfaceType ext t2)
 toIfaceType ext (FunTy t1 t2)    	     = IfaceFunTy (toIfaceType ext t1) (toIfaceType ext t2)
-toIfaceType ext (NewTcApp tc tys) 	     = IfaceTyConApp (mkIfaceTc ext tc) (toIfaceTypes ext tys)
 toIfaceType ext (TyConApp tc tys) 	     = IfaceTyConApp (mkIfaceTc ext tc) (toIfaceTypes ext tys)
 toIfaceType ext (ForAllTy tv t)  	     = IfaceForAllTy (toIfaceTvBndr tv) (toIfaceType ext t)
 toIfaceType ext (PredTy st)     	     = IfacePredTy (toIfacePred ext st)

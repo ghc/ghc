@@ -700,12 +700,7 @@ uTys r1 _ (PredTy (ClassP c1 tys1)) r2 _ (PredTy (ClassP c2 tys2))
 uTys r1 _ (FunTy fun1 arg1) r2 _ (FunTy fun2 arg2)
   = uTys r1 fun1 fun1 r2 fun2 fun2	`thenM_`    uTys r1 arg1 arg1 r2 arg2 arg2
 
-	-- NewType constructors must match
-uTys r1 _ (NewTcApp tc1 tys1) r2 _ (NewTcApp tc2 tys2)
-  | tc1 == tc2 = unifyTauTyLists r1 tys1 r2 tys2
-	-- See Note [TyCon app]
-
-	-- Ordinary type constructors must match
+	-- Type constructors must match
 uTys r1 ps_ty1 (TyConApp con1 tys1) r2 ps_ty2 (TyConApp con2 tys2)
   | con1 == con2 = unifyTauTyLists r1 tys1 r2 tys2
 	-- See Note [TyCon app]
@@ -983,7 +978,6 @@ okToUnifyWith tv ty
     ok (AppTy t1 t2)   		= ok t1 `and` ok t2
     ok (FunTy t1 t2)   		= ok t1 `and` ok t2
     ok (TyConApp _ ts) 		= oks ts
-    ok (NewTcApp _ ts) 		= oks ts
     ok (ForAllTy _ _)  		= Just NotMonoType
     ok (PredTy st)   		= ok_st st
     ok (NoteTy (FTVNote _) t)   = ok t

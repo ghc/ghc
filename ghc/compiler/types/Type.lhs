@@ -29,13 +29,13 @@ module Type (
 
 	mkSynTy, 
 
-	repType, typePrimRep,
+	repType, typePrimRep, coreView,
 
 	mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
 	applyTy, applyTys, isForAllTy, dropForAlls,
 
 	-- Source types
-	predTypeRep, newTypeRep, mkPredTy, mkPredTys,
+	predTypeRep, mkPredTy, mkPredTys,
 
 	-- Newtypes
 	splitRecNewType_maybe,
@@ -95,7 +95,7 @@ import Class	( Class, classTyCon )
 import TyCon	( TyCon, isRecursiveTyCon, isPrimTyCon,
 		  isUnboxedTupleTyCon, isUnLiftedTyCon,
 		  isFunTyCon, isNewTyCon, newTyConRep, newTyConRhs,
-		  isAlgTyCon, isSynTyCon, tyConArity, 
+		  isAlgTyCon, isSynTyCon, tyConArity, newTyConRhs_maybe,
 	          tyConKind, getSynTyConDefn, PrimRep(..), tyConPrimRep,
 		)
 
@@ -107,6 +107,49 @@ import Util		( mapAccumL, seqList, lengthIs, snocView )
 import Outputable
 import UniqSet		( sizeUniqSet )		-- Should come via VarSet
 import Maybe		( isJust )
+\end{code}
+
+
+%************************************************************************
+%*									*
+		Type representation
+%*									*
+%************************************************************************
+
+In Core, we "look through" non-recursive newtypes and PredTypes.
+
+\begin{code}
+{-# INLINE coreView #-}
+coreView :: Type -> Maybe Type
+-- Srips off the *top layer only* of a type to give 
+-- its underlying representation type. 
+-- Returns Nothing if there is nothing to look through.
+--
+-- By being non-recursive and inlined, this case analysis gets efficiently
+-- joined onto the case analysis that the caller is already doing
+coreView (NoteTy _ ty) 	   = Just ty
+coreView (PredTy p)    	   = Just (predTypeRep p)
+coreView (TyConApp tc tys) = expandNewTcApp tc tys
+coreView ty		   = Nothing
+
+expandNewTcApp :: TyCon -> [Type] -> Maybe Type
+-- A local helper function (not exported)
+-- Expands *the outermoset level of* a newtype application to 
+--	*either* a vanilla TyConApp (recursive newtype, or non-saturated)
+--	*or*     the newtype representation (otherwise), meaning the
+--			type written in the RHS of the newtype decl,
+--			which may itself be a newtype
+--
+-- Example: newtype R = MkR S
+--	    newtype S = MkS T
+--	    newtype T = MkT (T -> T)
+--   expandNewTcApp on R gives Just S
+--	            on S gives Just T
+--		    on T gives Nothing	 (no expansion)
+
+expandNewTcApp tc tys = case newTyConRhs_maybe tc tys of
+			  Nothing          -> Nothing
+			  Just (tenv, rhs) -> Just (substTy (mkTopTvSubst tenv) rhs)
 \end{code}
 
 
@@ -136,11 +179,9 @@ isTyVarTy :: Type -> Bool
 isTyVarTy ty = isJust (getTyVar_maybe ty)
 
 getTyVar_maybe :: Type -> Maybe TyVar
-getTyVar_maybe (TyVarTy tv) 	 = Just tv
-getTyVar_maybe (NoteTy _ t) 	 = getTyVar_maybe t
-getTyVar_maybe (PredTy p) 	 = getTyVar_maybe (predTypeRep p)
-getTyVar_maybe (NewTcApp tc tys) = getTyVar_maybe (newTypeRep tc tys)
-getTyVar_maybe other	         = Nothing
+getTyVar_maybe ty | Just ty' <- coreView ty = getTyVar_maybe ty'
+getTyVar_maybe (TyVarTy tv) 	 	    = Just tv  
+getTyVar_maybe other	         	    = Nothing
 \end{code}
 
 
@@ -156,7 +197,6 @@ mkAppTy orig_ty1 orig_ty2
   = mk_app orig_ty1
   where
     mk_app (NoteTy _ ty1)    = mk_app ty1
-    mk_app (NewTcApp tc tys) = NewTcApp tc (tys ++ [orig_ty2])
     mk_app (TyConApp tc tys) = mkGenTyConApp tc (tys ++ [orig_ty2])
     mk_app ty1		     = AppTy orig_ty1 orig_ty2
 	-- We call mkGenTyConApp because the TyConApp could be an 
@@ -179,22 +219,17 @@ mkAppTys orig_ty1 orig_tys2
   = mk_app orig_ty1
   where
     mk_app (NoteTy _ ty1)    = mk_app ty1
-    mk_app (NewTcApp tc tys) = NewTcApp tc (tys ++ orig_tys2)
-    mk_app (TyConApp tc tys) = mkTyConApp tc (tys ++ orig_tys2)
-				-- Use mkTyConApp in case tc is (->)
+    mk_app (TyConApp tc tys) = mkGenTyConApp tc (tys ++ orig_tys2)
+				-- mkGenTyConApp: see notes with mkAppTy
     mk_app ty1		     = foldl AppTy orig_ty1 orig_tys2
 
 splitAppTy_maybe :: Type -> Maybe (Type, Type)
+splitAppTy_maybe ty | Just ty' <- coreView ty = splitAppTy_maybe ty'
 splitAppTy_maybe (FunTy ty1 ty2)   = Just (TyConApp funTyCon [ty1], ty2)
 splitAppTy_maybe (AppTy ty1 ty2)   = Just (ty1, ty2)
-splitAppTy_maybe (NoteTy _ ty)     = splitAppTy_maybe ty
-splitAppTy_maybe (PredTy p)        = splitAppTy_maybe (predTypeRep p)
-splitAppTy_maybe (NewTcApp tc tys) = splitAppTy_maybe (newTypeRep tc tys)
 splitAppTy_maybe (TyConApp tc tys) = case snocView tys of
-					Nothing -> Nothing
-					Just (tys',ty') -> Just (mkGenTyConApp tc tys', ty')
-						-- mkGenTyConApp just in case the tc is a newtype
-
+					Nothing         -> Nothing
+					Just (tys',ty') -> Just (TyConApp tc tys', ty')
 splitAppTy_maybe other	     	   = Nothing
 
 splitAppTy :: Type -> (Type, Type)
@@ -205,12 +240,9 @@ splitAppTy ty = case splitAppTy_maybe ty of
 splitAppTys :: Type -> (Type, [Type])
 splitAppTys ty = split ty ty []
   where
+    split orig_ty ty args | Just ty' <- coreView ty = split orig_ty ty' args
     split orig_ty (AppTy ty arg)        args = split ty ty (arg:args)
-    split orig_ty (NoteTy _ ty)         args = split orig_ty ty args
-    split orig_ty (PredTy p)            args = split orig_ty (predTypeRep p) args
-    split orig_ty (NewTcApp tc tc_args) args = split orig_ty (newTypeRep tc tc_args) args
-    split orig_ty (TyConApp tc tc_args) args = (mkGenTyConApp tc [], tc_args ++ args)
-						-- mkGenTyConApp just in case the tc is a newtype
+    split orig_ty (TyConApp tc tc_args) args = (TyConApp tc [], tc_args ++ args)
     split orig_ty (FunTy ty1 ty2)       args = ASSERT( null args )
 					       (TyConApp funTyCon [], [ty1,ty2])
     split orig_ty ty		        args = (orig_ty, args)
@@ -232,26 +264,20 @@ isFunTy :: Type -> Bool
 isFunTy ty = isJust (splitFunTy_maybe ty)
 
 splitFunTy :: Type -> (Type, Type)
+splitFunTy ty | Just ty' <- coreView ty = splitFunTy ty'
 splitFunTy (FunTy arg res)   = (arg, res)
-splitFunTy (NoteTy _ ty)     = splitFunTy ty
-splitFunTy (PredTy p)        = splitFunTy (predTypeRep p)
-splitFunTy (NewTcApp tc tys) = splitFunTy (newTypeRep tc tys)
 splitFunTy other	     = pprPanic "splitFunTy" (ppr other)
 
 splitFunTy_maybe :: Type -> Maybe (Type, Type)
+splitFunTy_maybe ty | Just ty' <- coreView ty = splitFunTy_maybe ty'
 splitFunTy_maybe (FunTy arg res)   = Just (arg, res)
-splitFunTy_maybe (NoteTy _ ty)     = splitFunTy_maybe ty
-splitFunTy_maybe (PredTy p)        = splitFunTy_maybe (predTypeRep p)
-splitFunTy_maybe (NewTcApp tc tys) = splitFunTy_maybe (newTypeRep tc tys)
 splitFunTy_maybe other	           = Nothing
 
 splitFunTys :: Type -> ([Type], Type)
 splitFunTys ty = split [] ty ty
   where
+    split args orig_ty ty | Just ty' <- coreView ty = split args orig_ty ty'
     split args orig_ty (FunTy arg res) 	 = split (arg:args) res res
-    split args orig_ty (NoteTy _ ty)   	 = split args orig_ty ty
-    split args orig_ty (PredTy p)     	 = split args orig_ty (predTypeRep p)
-    split args orig_ty (NewTcApp tc tys) = split args orig_ty (newTypeRep tc tys)
     split args orig_ty ty                = (reverse args, orig_ty)
 
 splitFunTysN :: Int -> Type -> ([Type], Type)
@@ -265,24 +291,19 @@ zipFunTys :: Outputable a => [a] -> Type -> ([(a,Type)], Type)
 zipFunTys orig_xs orig_ty = split [] orig_xs orig_ty orig_ty
   where
     split acc []     nty ty  	           = (reverse acc, nty)
+    split acc xs     nty ty 
+	  | Just ty' <- coreView ty 	   = split acc xs nty ty'
     split acc (x:xs) nty (FunTy arg res)   = split ((x,arg):acc) xs res res
-    split acc xs     nty (NoteTy _ ty)     = split acc           xs nty ty
-    split acc xs     nty (PredTy p)        = split acc           xs nty (predTypeRep p)
-    split acc xs     nty (NewTcApp tc tys) = split acc           xs nty (newTypeRep tc tys)
     split acc (x:xs) nty ty                = pprPanic "zipFunTys" (ppr orig_xs <+> ppr orig_ty)
     
 funResultTy :: Type -> Type
+funResultTy ty | Just ty' <- coreView ty = funResultTy ty'
 funResultTy (FunTy arg res)   = res
-funResultTy (NoteTy _ ty)     = funResultTy ty
-funResultTy (PredTy p)        = funResultTy (predTypeRep p)
-funResultTy (NewTcApp tc tys) = funResultTy (newTypeRep tc tys)
 funResultTy ty		      = pprPanic "funResultTy" (ppr ty)
 
 funArgTy :: Type -> Type
+funArgTy ty | Just ty' <- coreView ty = funArgTy ty'
 funArgTy (FunTy arg res)   = arg
-funArgTy (NoteTy _ ty)     = funArgTy ty
-funArgTy (PredTy p)        = funArgTy (predTypeRep p)
-funArgTy (NewTcApp tc tys) = funArgTy (newTypeRep tc tys)
 funArgTy ty		   = pprPanic "funArgTy" (ppr ty)
 \end{code}
 
@@ -304,9 +325,6 @@ mkTyConApp :: TyCon -> [Type] -> Type
 mkTyConApp tycon tys
   | isFunTyCon tycon, [ty1,ty2] <- tys
   = FunTy ty1 ty2
-
-  | isNewTyCon tycon
-  = NewTcApp tycon tys
 
   | otherwise
   = ASSERT(not (isSynTyCon tycon))
@@ -331,11 +349,9 @@ splitTyConApp ty = case splitTyConApp_maybe ty of
 			Nothing	   -> pprPanic "splitTyConApp" (ppr ty)
 
 splitTyConApp_maybe :: Type -> Maybe (TyCon, [Type])
+splitTyConApp_maybe ty | Just ty' <- coreView ty = splitTyConApp_maybe ty'
 splitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
 splitTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [arg,res])
-splitTyConApp_maybe (NoteTy _ ty)     = splitTyConApp_maybe ty
-splitTyConApp_maybe (PredTy p)        = splitTyConApp_maybe (predTypeRep p)
-splitTyConApp_maybe (NewTcApp tc tys) = splitTyConApp_maybe (newTypeRep tc tys)
 splitTyConApp_maybe other	      = Nothing
 \end{code}
 
@@ -392,7 +408,7 @@ repType looks through
 	(b) synonyms
 	(c) predicates
 	(d) usage annotations
-	(e) [recursive] newtypes
+	(e) all newtypes, including recursive ones
 It's useful in the back end.
 
 \begin{code}
@@ -401,10 +417,10 @@ repType :: Type -> Type
 repType (ForAllTy _ ty)   = repType ty
 repType (NoteTy   _ ty)   = repType ty
 repType (PredTy  p)       = repType (predTypeRep p)
-repType (NewTcApp tc tys) = ASSERT( tys `lengthIs` tyConArity tc )
+repType (TyConApp tc tys) 
+  | isNewTyCon tc 	  = ASSERT( tys `lengthIs` tyConArity tc )
 			    repType (new_type_rep tc tys)
 repType ty	 	  = ty
-
 
 -- ToDo: this could be moved to the code generator, using splitTyConApp instead
 -- of inspecting the type directly.
@@ -449,19 +465,15 @@ isForAllTy other_ty	  = False
 splitForAllTy_maybe :: Type -> Maybe (TyVar, Type)
 splitForAllTy_maybe ty = splitFAT_m ty
   where
-    splitFAT_m (NoteTy _ ty)		= splitFAT_m ty
-    splitFAT_m (PredTy p)		= splitFAT_m (predTypeRep p)
-    splitFAT_m (NewTcApp tc tys)	= splitFAT_m (newTypeRep tc tys)
-    splitFAT_m (ForAllTy tyvar ty)	= Just(tyvar, ty)
-    splitFAT_m _			= Nothing
+    splitFAT_m ty | Just ty' <- coreView ty = splitFAT_m ty'
+    splitFAT_m (ForAllTy tyvar ty)	    = Just(tyvar, ty)
+    splitFAT_m _			    = Nothing
 
 splitForAllTys :: Type -> ([TyVar], Type)
 splitForAllTys ty = split ty ty []
    where
+     split orig_ty ty tvs | Just ty' <- coreView ty = split orig_ty ty' tvs
      split orig_ty (ForAllTy tv ty)  tvs = split ty ty (tv:tvs)
-     split orig_ty (NoteTy _ ty)     tvs = split orig_ty ty tvs
-     split orig_ty (PredTy p)	     tvs = split orig_ty (predTypeRep p) tvs
-     split orig_ty (NewTcApp tc tys) tvs = split orig_ty (newTypeRep tc tys) tvs
      split orig_ty t		     tvs = (reverse tvs, orig_ty)
 
 dropForAlls :: Type -> Type
@@ -480,11 +492,9 @@ the expression.
 
 \begin{code}
 applyTy :: Type -> Type -> Type
-applyTy (PredTy p) 	  arg = applyTy (predTypeRep p) arg
-applyTy (NewTcApp tc tys) arg = applyTy (newTypeRep tc tys) arg
-applyTy (NoteTy _ fun)    arg = applyTy fun arg
-applyTy (ForAllTy tv ty)  arg = substTyWith [tv] [arg] ty
-applyTy other		  arg = panic "applyTy"
+applyTy ty arg | Just ty' <- coreView ty = applyTy ty' arg
+applyTy (ForAllTy tv ty) arg = substTyWith [tv] [arg] ty
+applyTy other		 arg = panic "applyTy"
 
 applyTys :: Type -> [Type] -> Type
 -- This function is interesting because 
@@ -540,10 +550,10 @@ predTypeRep :: PredType -> Type
 -- Convert a PredType to its "representation type";
 -- the post-type-checking type used by all the Core passes of GHC.
 -- Unwraps only the outermost level; for example, the result might
--- be a NewTcApp; c.f. newTypeRep
+-- be a newtype application
 predTypeRep (IParam _ ty)     = ty
 predTypeRep (ClassP clas tys) = mkTyConApp (classTyCon clas) tys
-	-- Result might be a NewTcApp, but the consumer will
+	-- Result might be a newtype application, but the consumer will
 	-- look through that too if necessary
 \end{code}
 
@@ -556,52 +566,19 @@ predTypeRep (ClassP clas tys) = mkTyConApp (classTyCon clas) tys
 
 \begin{code}
 splitRecNewType_maybe :: Type -> Maybe Type
--- Newtypes are always represented by a NewTcApp
 -- Sometimes we want to look through a recursive newtype, and that's what happens here
 -- It only strips *one layer* off, so the caller will usually call itself recursively
 -- Only applied to types of kind *, hence the newtype is always saturated
-splitRecNewType_maybe (NoteTy _ ty) = splitRecNewType_maybe ty  
-splitRecNewType_maybe (PredTy p)    = splitRecNewType_maybe (predTypeRep p)
-splitRecNewType_maybe (NewTcApp tc tys)
-  | isRecursiveTyCon tc
-  = ASSERT( tys `lengthIs` tyConArity tc && isNewTyCon tc )
-	-- The assert should hold because splitRecNewType_maybe
-	-- should only be applied to *types* (of kind *)
-    Just (new_type_rhs tc tys)
-splitRecNewType_maybe other = Nothing
-			
------------------------------
-newTypeRep :: TyCon -> [Type] -> Type
--- A local helper function (not exported)
--- Expands *the outermoset level of* a newtype application to 
---	*either* a vanilla TyConApp (recursive newtype, or non-saturated)
---	*or*     the newtype representation (otherwise), meaning the
---			type written in the RHS of the newtype decl,
---			which may itself be a newtype
---
--- Example: newtype R = MkR S
---	    newtype S = MkS T
---	    newtype T = MkT (T -> T)
---   newTypeRep on R gives NewTcApp S
---		on S gives NewTcApp T
---		on T gives TyConApp T
---
--- NB: the returned TyConApp is always deconstructed immediately by the 
---     caller... a TyConApp with a newtype type constructor never lives
---     in an ordinary type
-newTypeRep tc tys
-  | not (isRecursiveTyCon tc),		-- Not recursive and saturated
-    tys `lengthIs` tyConArity tc 	-- treat as equivalent to expansion
-  = new_type_rhs tc tys
-  | otherwise
-  = TyConApp tc tys
-	-- ToDo: Consider caching this substitution in a NType
+splitRecNewType_maybe ty | Just ty' <- coreView ty = splitRecNewType_maybe ty'
+splitRecNewType_maybe (TyConApp tc tys)
+  | isNewTyCon tc
+  = ASSERT( tys `lengthIs` tyConArity tc )	-- splitRecNewType_maybe only be applied 
+						-- 	to *types* (of kind *)
+    ASSERT( isRecursiveTyCon tc ) 		-- Guaranteed by coreView
+    case newTyConRhs tc of
+	(tvs, rep_ty) -> Just (substTyWith tvs tys rep_ty)
 
--- new_type_rhs doesn't ask any questions: 
--- it just expands newtype one level, whether recursive or not
-new_type_rhs tc tys 
-  = case newTyConRhs tc of
-	(tvs, rep_ty) -> substTyWith tvs tys rep_ty
+splitRecNewType_maybe other = Nothing
 \end{code}
 
 
@@ -619,7 +596,6 @@ typeKind :: Type -> Kind
 
 typeKind (TyVarTy tyvar)	= tyVarKind tyvar
 typeKind (TyConApp tycon tys)	= foldr (\_ k -> kindFunResult k) (tyConKind tycon) tys
-typeKind (NewTcApp tycon tys)	= foldr (\_ k -> kindFunResult k) (tyConKind tycon) tys
 typeKind (NoteTy _ ty)		= typeKind ty
 typeKind (PredTy _)		= liftedTypeKind -- Predicates are always 
 						 -- represented by lifted types
@@ -636,7 +612,6 @@ typeKind (ForAllTy tv ty)	= typeKind ty
 tyVarsOfType :: Type -> TyVarSet
 tyVarsOfType (TyVarTy tv)		= unitVarSet tv
 tyVarsOfType (TyConApp tycon tys)	= tyVarsOfTypes tys
-tyVarsOfType (NewTcApp tycon tys)	= tyVarsOfTypes tys
 tyVarsOfType (NoteTy (FTVNote tvs) ty2) = tvs
 tyVarsOfType (NoteTy (SynNote ty1) ty2)	= tyVarsOfType ty2	-- See note [Syn] below
 tyVarsOfType (PredTy sty)		= tyVarsOfPred sty
@@ -724,8 +699,6 @@ tidyType env@(tidy_env, subst) ty
 				Just tv' -> TyVarTy tv'
     go (TyConApp tycon tys) = let args = map go tys
 			      in args `seqList` TyConApp tycon args
-    go (NewTcApp tycon tys) = let args = map go tys
-			      in args `seqList` NewTcApp tycon args
     go (NoteTy note ty)     = (NoteTy $! (go_note note)) $! (go ty)
     go (PredTy sty)	    = PredTy (tidyPred env sty)
     go (AppTy fun arg)	    = (AppTy $! (go fun)) $! (go arg)
@@ -778,11 +751,9 @@ isUnLiftedType :: Type -> Bool
 	-- They are pretty bogus types, mind you.  It would be better never to
 	-- construct them
 
+isUnLiftedType ty | Just ty' <- coreView ty = isUnLiftedType ty'
 isUnLiftedType (ForAllTy tv ty)  = isUnLiftedType ty
-isUnLiftedType (NoteTy _ ty)	 = isUnLiftedType ty
 isUnLiftedType (TyConApp tc _)   = isUnLiftedTyCon tc
-isUnLiftedType (PredTy _)	 = False		-- All source types are lifted
-isUnLiftedType (NewTcApp tc tys) = isUnLiftedType (newTypeRep tc tys)
 isUnLiftedType other		 = False	
 
 isUnboxedTupleType :: Type -> Bool
@@ -806,11 +777,10 @@ this function should be in TcType, but isStrictType is used by DataCon,
 which is below TcType in the hierarchy, so it's convenient to put it here.
 
 \begin{code}
-isStrictType (ForAllTy tv ty)  = isStrictType ty
-isStrictType (NoteTy _ ty)     = isStrictType ty
-isStrictType (TyConApp tc _)   = isUnLiftedTyCon tc
-isStrictType (NewTcApp tc tys) = isStrictType (newTypeRep tc tys)
 isStrictType (PredTy pred)     = isStrictPred pred
+isStrictType ty | Just ty' <- coreView ty = isStrictType ty'
+isStrictType (ForAllTy tv ty)  = isStrictType ty
+isStrictType (TyConApp tc _)   = isUnLiftedTyCon tc
 isStrictType other	       = False	
 
 isStrictPred (ClassP clas _) = opt_DictsStrict && not (isNewTyCon (classTyCon clas))
@@ -847,7 +817,6 @@ seqType (FunTy t1 t2) 	  = seqType t1 `seq` seqType t2
 seqType (NoteTy note t2)  = seqNote note `seq` seqType t2
 seqType (PredTy p) 	  = seqPred p
 seqType (TyConApp tc tys) = tc `seq` seqTypes tys
-seqType (NewTcApp tc tys) = tc `seq` seqTypes tys
 seqType (ForAllTy tv ty)  = tv `seq` seqType ty
 
 seqTypes :: [Type] -> ()
@@ -886,15 +855,9 @@ I don't think this is harmful, but it's soemthing to watch out for.
 \begin{code}
 eqType t1 t2 = eq_ty emptyVarEnv t1 t2
 
--- Look through Notes
-eq_ty env (NoteTy _ t1)       t2	  	  = eq_ty env t1 t2
-eq_ty env t1		      (NoteTy _ t2)       = eq_ty env t1 t2
-
--- Look through PredTy and NewTcApp.  This is where the looping danger comes from.
--- We don't bother to check for the PredType/PredType case, no good reason
--- Hmm: maybe there is a good reason: see the notes below about newtypes
-eq_ty env (PredTy sty1)     t2		  = eq_ty env (predTypeRep sty1) t2
-eq_ty env t1		    (PredTy sty2) = eq_ty env t1 (predTypeRep sty2)
+-- Look through Notes, PredTy, newtype applications
+eq_ty env t1 t2 | Just t1' <- coreView t1 = eq_ty env t1' t2
+eq_ty env t1 t2 | Just t2' <- coreView t2 = eq_ty env t1 t2'
 
 -- NB: we *cannot* short-cut the newtype comparison thus:
 -- eq_ty env (NewTcApp tc1 tys1) (NewTcApp tc2 tys2) 
@@ -912,9 +875,6 @@ eq_ty env t1		    (PredTy sty2) = eq_ty env t1 (predTypeRep sty2)
 -- We end up with w2 = w1; so we need that Foo T = Foo []
 -- but we can only expand saturated newtypes, so just comparing
 -- T with [] won't do. 
-
-eq_ty env (NewTcApp tc1 tys1) t2		  = eq_ty env (newTypeRep tc1 tys1) t2
-eq_ty env t1		      (NewTcApp tc2 tys2) = eq_ty env t1 (newTypeRep tc2 tys2)
 
 -- The rest is plain sailing
 eq_ty env (TyVarTy tv1)       (TyVarTy tv2)       = case lookupVarEnv env tv1 of
@@ -1096,9 +1056,6 @@ subst_ty subst@(TvSubst in_scope env) ty
 					
     go (TyConApp tc tys)	   = let args = map go tys
 				     in  args `seqList` TyConApp tc args
-
-    go (NewTcApp tc tys)	   = let args = map go tys
-				     in  args `seqList` NewTcApp tc args
 
     go (PredTy p)  		   = PredTy $! (substPred subst p)
 

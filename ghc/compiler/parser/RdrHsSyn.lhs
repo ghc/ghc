@@ -257,7 +257,7 @@ hsIfaceDecl (TyClD decl@(TyData {}))
   = IfaceData { ifName = rdrNameOcc (tcdName decl), 
 	        ifTyVars = tvs,
 		ifCons = hsIfaceCons tvs decl,
-		ifRec = NonRecursive,
+		ifRec = Recursive,	-- Hi-boot decls are always loop-breakers
 		ifVrcs = [], ifGeneric = False }
 	-- I'm not sure that [] is right for ifVrcs, but
 	-- since we don't use them I'm not going to fiddle

@@ -24,7 +24,7 @@ module TcType (
   -- MetaDetails
   TcTyVarDetails(..),
   MetaDetails(Flexi, Indirect), SkolemInfo(..), pprSkolemTyVar,
-  isImmutableTyVar, isSkolemTyVar, isMetaTyVar, skolemTvInfo, metaTvRef,
+  isImmutableTyVar, isSkolemTyVar, isMetaTyVar, isExistentialTyVar, skolemTvInfo, metaTvRef,
   isFlexi, isIndirect,
 
   --------------------------------
@@ -290,7 +290,7 @@ instance Outputable MetaDetails where
   ppr Flexi 	    = ptext SLIT("Flexi")
   ppr (Indirect ty) = ptext SLIT("Indirect") <+> ppr ty
 
-isImmutableTyVar, isSkolemTyVar, isMetaTyVar :: TyVar -> Bool
+isImmutableTyVar, isSkolemTyVar, isExistentialTyVar, isMetaTyVar :: TyVar -> Bool
 isImmutableTyVar tv
   | isTcTyVar tv = isSkolemTyVar tv
   | otherwise    = True
@@ -300,6 +300,12 @@ isSkolemTyVar tv
     case tcTyVarDetails tv of
 	SkolemTv _ -> True
 	MetaTv _   -> False
+
+isExistentialTyVar tv 	-- Existential type variable, bound by a pattern
+  = ASSERT( isTcTyVar tv )
+    case tcTyVarDetails tv of
+	SkolemTv (PatSkol _ _) -> True
+	other 		       -> False
 
 isMetaTyVar tv 
   = ASSERT( isTcTyVar tv )
@@ -347,7 +353,6 @@ mkPhiTy theta ty = foldr (\p r -> FunTy (mkPredTy p) r) ty theta
 isTauTy :: Type -> Bool
 isTauTy (TyVarTy v)	 = True
 isTauTy (TyConApp _ tys) = all isTauTy tys
-isTauTy (NewTcApp _ tys) = all isTauTy tys
 isTauTy (AppTy a b)	 = isTauTy a && isTauTy b
 isTauTy (FunTy a b)	 = isTauTy a && isTauTy b
 isTauTy (PredTy p)	 = True		-- Don't look through source types
@@ -360,7 +365,6 @@ getDFunTyKey :: Type -> OccName	-- Get some string from a type, to be used to
 				-- construct a dictionary function name
 getDFunTyKey (TyVarTy tv)    = getOccName tv
 getDFunTyKey (TyConApp tc _) = getOccName tc
-getDFunTyKey (NewTcApp tc _) = getOccName tc
 getDFunTyKey (AppTy fun _)   = getDFunTyKey fun
 getDFunTyKey (NoteTy _ t)    = getDFunTyKey t
 getDFunTyKey (FunTy arg _)   = getOccName funTyCon
@@ -422,7 +426,6 @@ tcSplitTyConApp ty = case tcSplitTyConApp_maybe ty of
 
 tcSplitTyConApp_maybe :: Type -> Maybe (TyCon, [Type])
 tcSplitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
-tcSplitTyConApp_maybe (NewTcApp tc tys) = Just (tc, tys)
 tcSplitTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [arg,res])
 tcSplitTyConApp_maybe (NoteTy n ty)     = tcSplitTyConApp_maybe ty
 	-- Newtypes are opaque, so they may be split
@@ -452,9 +455,6 @@ tcSplitAppTy_maybe (AppTy ty1 ty2)   = Just (ty1, ty2)
 tcSplitAppTy_maybe (NoteTy n ty)     = tcSplitAppTy_maybe ty
 tcSplitAppTy_maybe (TyConApp tc tys) = case snocView tys of
 					Just (tys', ty') -> Just (TyConApp tc tys', ty')
-					Nothing		 -> Nothing
-tcSplitAppTy_maybe (NewTcApp tc tys) = case snocView tys of
-					Just (tys', ty') -> Just (NewTcApp tc tys', ty')
 					Nothing		 -> Nothing
 tcSplitAppTy_maybe other	     = Nothing
 
@@ -632,10 +632,9 @@ cmpTy env (PredTy p1) (PredTy p2) = cmpPredTy env p1 p2
 cmpTy env (AppTy f1 a1) (AppTy f2 a2) = cmpTy env f1 f2 `thenCmp` cmpTy env a1 a2
 cmpTy env (FunTy f1 a1) (FunTy f2 a2) = cmpTy env f1 f2 `thenCmp` cmpTy env a1 a2
 cmpTy env (TyConApp tc1 tys1) (TyConApp tc2 tys2) = (tc1 `compare` tc2) `thenCmp` (cmpTys env tys1 tys2)
-cmpTy env (NewTcApp tc1 tys1) (NewTcApp tc2 tys2) = (tc1 `compare` tc2) `thenCmp` (cmpTys env tys1 tys2)
 cmpTy env (ForAllTy tv1 t1)   (ForAllTy tv2 t2)   = cmpTy (extendVarEnv env tv1 tv2) t1 t2
     
-    -- Deal with the rest: TyVarTy < AppTy < FunTy < TyConApp < NewTcApp < ForAllTy < PredTy
+    -- Deal with the rest: TyVarTy < AppTy < FunTy < TyConApp < ForAllTy < PredTy
 cmpTy env (AppTy _ _) (TyVarTy _) = GT
     
 cmpTy env (FunTy _ _) (TyVarTy _) = GT
@@ -645,16 +644,10 @@ cmpTy env (TyConApp _ _) (TyVarTy _) = GT
 cmpTy env (TyConApp _ _) (AppTy _ _) = GT
 cmpTy env (TyConApp _ _) (FunTy _ _) = GT
     
-cmpTy env (NewTcApp _ _) (TyVarTy _) 	= GT
-cmpTy env (NewTcApp _ _) (AppTy _ _) 	= GT
-cmpTy env (NewTcApp _ _) (FunTy _ _) 	= GT
-cmpTy env (NewTcApp _ _) (TyConApp _ _) = GT
-    
 cmpTy env (ForAllTy _ _) (TyVarTy _)    = GT
 cmpTy env (ForAllTy _ _) (AppTy _ _)    = GT
 cmpTy env (ForAllTy _ _) (FunTy _ _)    = GT
 cmpTy env (ForAllTy _ _) (TyConApp _ _) = GT
-cmpTy env (ForAllTy _ _) (NewTcApp _ _) = GT
 
 cmpTy env (PredTy _)   t2		= GT
 
@@ -739,7 +732,6 @@ deNoteType :: Type -> Type
 	-- Remove synonyms, but not predicate types
 deNoteType ty@(TyVarTy tyvar)	= ty
 deNoteType (TyConApp tycon tys) = TyConApp tycon (map deNoteType tys)
-deNoteType (NewTcApp tycon tys) = NewTcApp tycon (map deNoteType tys)
 deNoteType (PredTy p)		= PredTy (deNotePredType p)
 deNoteType (NoteTy _ ty)	= deNoteType ty
 deNoteType (AppTy fun arg)	= AppTy (deNoteType fun) (deNoteType arg)
@@ -758,7 +750,6 @@ end of the compiler.
 tyClsNamesOfType :: Type -> NameSet
 tyClsNamesOfType (TyVarTy tv)		    = emptyNameSet
 tyClsNamesOfType (TyConApp tycon tys)	    = unitNameSet (getName tycon) `unionNameSets` tyClsNamesOfTypes tys
-tyClsNamesOfType (NewTcApp tycon tys)	    = unitNameSet (getName tycon) `unionNameSets` tyClsNamesOfTypes tys
 tyClsNamesOfType (NoteTy (SynNote ty1) ty2) = tyClsNamesOfType ty1
 tyClsNamesOfType (NoteTy other_note    ty2) = tyClsNamesOfType ty2
 tyClsNamesOfType (PredTy (IParam n ty))   = tyClsNamesOfType ty

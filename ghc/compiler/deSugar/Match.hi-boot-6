@@ -12,7 +12,7 @@ matchWrapper
 
 matchSimply
 	:: CoreSyn.CoreExpr
-	-> HsExpr.HsMatchContext Var.Id
+	-> HsExpr.HsMatchContext Name.Name
 	-> HsPat.LPat Var.Id
 	-> CoreSyn.CoreExpr
 	-> CoreSyn.CoreExpr

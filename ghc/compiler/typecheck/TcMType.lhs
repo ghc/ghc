@@ -486,9 +486,6 @@ zonkType unbound_var_fn rflag ty
     go (TyConApp tycon tys)	  = mappM go tys	`thenM` \ tys' ->
 				    returnM (TyConApp tycon tys')
 
-    go (NewTcApp tycon tys)	  = mappM go tys	`thenM` \ tys' ->
-				    returnM (NewTcApp tycon tys')
-
     go (NoteTy (SynNote ty1) ty2) = go ty1		`thenM` \ ty1' ->
 				    go ty2		`thenM` \ ty2' ->
 				    returnM (NoteTy (SynNote ty1') ty2')
@@ -801,9 +798,6 @@ check_tau_type rank ubx_tup (NoteTy (SynNote syn) ty)
 
 check_tau_type rank ubx_tup (NoteTy other_note ty)
   = check_tau_type rank ubx_tup ty
-
-check_tau_type rank ubx_tup (NewTcApp tc tys)
-  = mappM_ check_arg_type tys
 
 check_tau_type rank ubx_tup ty@(TyConApp tc tys)
   | isSynTyCon tc	

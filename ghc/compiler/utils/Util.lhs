@@ -373,34 +373,24 @@ Carsten
 
 \begin{code}
 group :: (a -> a -> Bool) -> [a] -> [[a]]
+-- Given a <= function, group finds maximal contiguous up-runs 
+-- or down-runs in the input list.
+-- It's stable, in the sense that it never re-orders equal elements
+--
+-- Date: Mon, 12 Feb 1996 15:09:41 +0000
+-- From: Andy Gill <andy@dcs.gla.ac.uk>
+-- Here is a `better' definition of group.
 
-{-
-Date: Mon, 12 Feb 1996 15:09:41 +0000
-From: Andy Gill <andy@dcs.gla.ac.uk>
-
-Here is a `better' definition of group.
--}
 group p []     = []
 group p (x:xs) = group' xs x x (x :)
   where
     group' []     _     _     s  = [s []]
     group' (x:xs) x_min x_max s 
-	| not (x `p` x_max) = group' xs x_min x (s . (x :)) 
-	| x `p` x_min       = group' xs x x_max ((x :) . s) 
+	|      x_max `p` x  = group' xs x_min x (s . (x :)) 
+	| not (x_min `p` x) = group' xs x x_max ((x :) . s) 
 	| otherwise         = s [] : group' xs x x (x :) 
-
--- This one works forwards *and* backwards, as well as also being
--- faster that the one in Util.lhs.
-
-{- ORIG:
-group p [] = [[]]
-group p (x:xs) =
-   let ((h1:t1):tt1) = group p xs
-       (t,tt) = if null xs then ([],[]) else
-		if x `p` h1 then (h1:t1,tt1) else
-		   ([], (h1:t1):tt1)
-   in ((x:t):tt)
--}
+	-- NB: the 'not' is essential for stablity
+	--	x `p` x_min would reverse equal elements
 
 generalMerge :: (a -> a -> Bool) -> [a] -> [a] -> [a]
 generalMerge p xs [] = xs

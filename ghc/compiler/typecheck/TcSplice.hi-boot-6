@@ -5,7 +5,7 @@ tcSpliceExpr :: HsExpr.HsSplice Name.Name
 	     -> TcRnTypes.TcM (HsExpr.HsExpr Var.Id)
 
 kcSpliceType :: HsExpr.HsSplice Name.Name
-	     -> TcRnTypes.TcM (HsType.HsType Name.Name, TcType.TcKind)
+	     -> TcRnTypes.TcM (HsTypes.HsType Name.Name, TcType.TcKind)
 
 tcBracket :: HsExpr.HsBracket Name.Name 
 	  -> TcUnify.Expected TcType.TcType

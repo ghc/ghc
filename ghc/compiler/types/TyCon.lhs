@@ -16,7 +16,7 @@ module TyCon(
 	isAlgTyCon, isDataTyCon, isSynTyCon, isNewTyCon, isPrimTyCon,
 	isEnumerationTyCon, 
 	isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon, tupleTyConBoxity,
-	isRecursiveTyCon, newTyConRep, newTyConRhs, isHiBootTyCon,
+	isRecursiveTyCon, newTyConRep, newTyConRhs, newTyConRhs_maybe, isHiBootTyCon,
 
 	mkForeignTyCon, isForeignTyCon,
 
@@ -63,6 +63,7 @@ import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed )
 import Name		( Name, nameUnique, NamedThing(getName) )
 import PrelNames	( Unique, Uniquable(..) )
 import Maybes		( orElse )
+import Util		( equalLength )
 import Outputable
 import FastString
 \end{code}
@@ -492,11 +493,27 @@ tyConSelIds tc = [id | (_,_,id) <- tyConFields tc]
 \end{code}
 
 \begin{code}
-newTyConRep :: TyCon -> ([TyVar], Type)
-newTyConRep (AlgTyCon {tyConTyVars = tvs, algTcRhs = NewTyCon _ _ rep}) = (tvs, rep)
-
 newTyConRhs :: TyCon -> ([TyVar], Type)
 newTyConRhs (AlgTyCon {tyConTyVars = tvs, algTcRhs = NewTyCon _ rhs _}) = (tvs, rhs)
+
+newTyConRhs_maybe :: TyCon 
+		  -> [Type]			-- Args to tycon
+		  -> Maybe ([(TyVar,Type)], 	-- Substitution
+			    Type)		-- Body type (not yet substituted)
+-- Non-recursive newtypes are transparent to Core; 
+-- Given an application to some types, return Just (tenv, ty)
+-- if it's a saturated, non-recursive newtype.
+newTyConRhs_maybe (AlgTyCon {tyConTyVars = tvs, 
+			     algTcRec = NonRecursive,	-- Not recursive
+			     algTcRhs = NewTyCon _ rhs _}) tys
+   | tvs `equalLength` tys 	-- Saturated
+   = Just (tvs `zip` tys, rhs)
+	
+newTyConRhs_maybe other_tycon tys = Nothing
+
+
+newTyConRep :: TyCon -> ([TyVar], Type)
+newTyConRep (AlgTyCon {tyConTyVars = tvs, algTcRhs = NewTyCon _ _ rep}) = (tvs, rep)
 
 tyConPrimRep :: TyCon -> PrimRep
 tyConPrimRep (PrimTyCon {primTyConRep = rep}) = rep

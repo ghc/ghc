@@ -140,7 +140,7 @@ tc_bracket (TypBr typ)
 	-- Result type is Type (= Q Typ)
 
 tc_bracket (DecBr decls)
-  = tcTopSrcDecls decls		`thenM_`
+  = tcTopSrcDecls [{- no boot-names -}] decls		`thenM_`
 	-- Typecheck the declarations, dicarding the result
 	-- We'll get all that stuff later, when we splice it in
 
@@ -618,7 +618,6 @@ reifyClass cls
 reifyType :: TypeRep.Type -> TcM TH.Type
 reifyType (TyVarTy tv)	    = return (TH.VarT (reifyName tv))
 reifyType (TyConApp tc tys) = reify_tc_app (reifyName tc) tys
-reifyType (NewTcApp tc tys) = reify_tc_app (reifyName tc) tys
 reifyType (NoteTy _ ty)     = reifyType ty
 reifyType (AppTy t1 t2)     = do { [r1,r2] <- reifyTypes [t1,t2] ; return (r1 `TH.AppT` r2) }
 reifyType (FunTy t1 t2)     = do { [r1,r2] <- reifyTypes [t1,t2] ; return (TH.ArrowT `TH.AppT` r1 `TH.AppT` r2) }

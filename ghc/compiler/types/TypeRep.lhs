@@ -35,7 +35,7 @@ import VarSet     ( TyVarSet )
 import Name	  ( Name, NamedThing(..), BuiltInSyntax(..), mkWiredInName )
 import OccName	  ( mkOccFS, tcName )
 import BasicTypes ( IPName, tupleParens )
-import TyCon	  ( TyCon, mkFunTyCon, tyConArity, tupleTyConBoxity, isTupleTyCon, isRecursiveTyCon )
+import TyCon	  ( TyCon, mkFunTyCon, tyConArity, tupleTyConBoxity, isTupleTyCon, isRecursiveTyCon, isNewTyCon )
 import Class	  ( Class )
 
 -- others
@@ -114,7 +114,7 @@ Similarly splitForAllTys and splitFunTys can get into a loop.
 
 Solution: 
 
-* Newtypes are always represented using NewTcApp, never as TyConApp.
+* Newtypes are always represented using TyConApp.
 
 * For non-recursive newtypes, P, treat P just like a type synonym after 
   type-checking is done; i.e. it's opaque during type checking (functions
@@ -148,26 +148,16 @@ data Type
   = TyVarTy TyVar	
 
   | AppTy
-	Type		-- Function is *not* a TyConApp or NewTcApp
+	Type		-- Function is *not* a TyConApp
 	Type		-- It must be another AppTy, or TyVarTy
 			-- (or NoteTy of these)
 
-  | TyConApp		-- Application of a TyCon
+  | TyConApp		-- Application of a TyCon, including newtypes
 	TyCon		-- *Invariant* saturated appliations of FunTyCon and
 			-- 	synonyms have their own constructors, below.
-	[Type]		-- Might not be saturated.
-
-  | NewTcApp		-- Application of a NewType TyCon.   All newtype applications
-	TyCon		-- show up like this until they are fed through newTypeRep,
-			-- which returns 
-			--	* an ordinary TyConApp for non-saturated, 
-			--	 or recursive newtypes
-			--
-			--	* the representation type of the newtype for satuarted, 
-			--	  non-recursive ones
-			-- [But the result of a call to newTypeRep is always consumed
-			--  immediately; it never lives on in another type.  So in any
-			--  type, newtypes are always represented with NewTcApp.]
+			-- However, *unsaturated* type synonyms, and FunTyCons
+			-- 	do appear as TyConApps.  (Unsaturated type synonyms
+			--	can appear as the RHS of a type synonym, for exmaple.)
 	[Type]		-- Might not be saturated.
 
   | FunTy		-- Special case of TyConApp: TyConApp FunTyCon [t1,t2]
@@ -357,11 +347,6 @@ ppr_type p (NoteTy (SynNote ty1) ty2) = ppr_type p ty1
 ppr_type p (NoteTy other         ty2) = ppr_type p ty2
 
 ppr_type p (TyConApp tc tys) = ppr_tc_app p tc tys
-ppr_type p (NewTcApp tc tys) = ifPprDebug (if isRecursiveTyCon tc 
-					   then ptext SLIT("<recnt>")
-					   else ptext SLIT("<nt>")
-				  ) <> 
-			       ppr_tc_app p tc tys
 
 ppr_type p (AppTy t1 t2) = maybeParen p TyConPrec $
 			   pprType t1 <+> ppr_type TyConPrec t2
@@ -393,7 +378,7 @@ ppr_type p ty@(ForAllTy _ _)
 
 ppr_tc_app :: Prec -> TyCon -> [Type] -> SDoc
 ppr_tc_app p tc [] 
-  = ppr tc
+  = ppr_tc tc
 ppr_tc_app p tc [ty] 
   | tc `hasKey` listTyConKey = brackets (pprType ty)
   | tc `hasKey` parrTyConKey = ptext SLIT("[:") <> pprType ty <> ptext SLIT(":]")
@@ -402,8 +387,16 @@ ppr_tc_app p tc tys
   = tupleParens (tupleTyConBoxity tc) (sep (punctuate comma (map pprType tys)))
   | otherwise
   = maybeParen p TyConPrec $
-    ppr tc <+> sep (map (ppr_type TyConPrec) tys)
+    ppr_tc tc <+> sep (map (ppr_type TyConPrec) tys)
 
+ppr_tc :: TyCon -> SDoc
+ppr_tc tc
+  | isNewTyCon tc = ifPprDebug (if isRecursiveTyCon tc 
+			     	then ptext SLIT("<recnt>")
+			     	else ptext SLIT("<nt>")
+		    ) <> ppr tc
+  | otherwise = ppr tc
+			       
 -------------------
 pprForAll tvs = ptext SLIT("forall") <+> sep (map pprTvBndr tvs) <> dot
 
