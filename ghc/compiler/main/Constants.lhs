@@ -125,6 +125,12 @@ wORD_SIZE = (SIZEOF_HSWORD :: Int)
 wORD_SIZE_IN_BITS = wORD_SIZE * 8 :: Int
 \end{code}
 
+Size of a C int, in bytes. May be smaller than wORD_SIZE.
+
+\begin{code}
+cINT_SIZE = (SIZEOF_INT :: Int)
+\end{code}
+
 Size of a storage manager block (in bytes).
 
 \begin{code}

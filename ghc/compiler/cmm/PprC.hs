@@ -270,11 +270,11 @@ pprSwitch e maybe_ids
     caseify (ix:ixs, ident) = vcat (map do_fallthrough ixs) $$ final_branch ix
 	where 
 	do_fallthrough ix =
-                 hsep [ ptext SLIT("case") , pprHexVal ix <> colon ,
+                 hsep [ ptext SLIT("case") , pprHexVal ix wordRep <> colon ,
                         ptext SLIT("/* fall through */") ]
 
 	final_branch ix = 
-	        hsep [ ptext SLIT("case") , pprHexVal ix <> colon ,
+	        hsep [ ptext SLIT("case") , pprHexVal ix wordRep <> colon ,
                        ptext SLIT("goto") , (pprBlockId ident) <> semi ]
 
 -- ---------------------------------------------------------------------
@@ -362,13 +362,7 @@ pprMachOpApp mop args
 
 pprLit :: CmmLit -> SDoc
 pprLit lit = case lit of
-    CmmInt i I64 | machRepByteWidth I32 == wORD_SIZE 
-		       -> pprHexVal i <> ptext SLIT("LL")
-	-- Append an 'LL' suffix to 64-bit integers on a 32-bit
-	-- platform.  This might not be strictly necessary (the
-	-- type will always be apparent from the context), but
-	-- it avoids some warnings from gcc.
-    CmmInt i _rep      -> pprHexVal i
+    CmmInt i rep      -> pprHexVal i rep
     CmmFloat f rep     -> parens (machRepCType rep) <> (rational f)
     CmmLabel clbl      -> mkW_ <> pprCLabel clbl
     CmmLabelOff clbl i -> mkW_ <> pprCLabel clbl <> char '+' <> int i
@@ -979,12 +973,19 @@ commafy :: [SDoc] -> SDoc
 commafy xs = hsep $ punctuate comma xs
 
 -- Print in C hex format: 0x13fa
-pprHexVal :: Integer -> SDoc
-pprHexVal 0 = ptext SLIT("0x0")
-pprHexVal w 
-  | w < 0     = parens (char '-' <> ptext SLIT("0x") <> go (-w))
-  | otherwise = ptext SLIT("0x") <> go w
+pprHexVal :: Integer -> MachRep -> SDoc
+pprHexVal 0 _ = ptext SLIT("0x0")
+pprHexVal w rep
+  | w < 0     = parens (char '-' <> ptext SLIT("0x") <> go (-w) <> repsuffix rep)
+  | otherwise = ptext SLIT("0x") <> go w <> repsuffix rep
   where
+  	-- type suffix for literals:
+	-- on 32-bit platforms, add "LL" to 64-bit literals
+      repsuffix I64 | wORD_SIZE == 4 = ptext SLIT("LL")
+      	-- on 64-bit platforms with 32-bit int, add "L" to 64-bit literals
+      repsuffix I64 | cINT_SIZE == 4 = ptext SLIT("L")
+      repsuffix _ = empty
+      
       go 0 = empty
       go w' = go q <> dig
            where
