@@ -8,10 +8,6 @@ source.
 
 \begin{code}
 
-#if (defined (sun) && !defined(i386)) || defined(hp300) || defined(_IBMR2) || defined(sgi) || defined(hppa)
-#define BIGENDIAN
-#endif
-
 #include "rtsdefs.h"
 #include "ieee-flpt.h"
 #include "floatExtreme.h"
