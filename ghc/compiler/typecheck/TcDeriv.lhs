@@ -39,12 +39,12 @@ import MkId		( mkDictFunId )
 import DataCon		( dataConOrigArgTys, isNullaryDataCon, isExistentialDataCon )
 import Maybes		( maybeToBool, catMaybes )
 import Name		( Name, getSrcLoc )
-import Unique		( getUnique )
+import Unique		( Unique, getUnique )
 import NameSet
 import RdrName		( RdrName )
 
 import TyCon		( tyConTyVars, tyConDataCons, tyConArity, 
-			  tyConTheta, maybeTyConSingleCon, isDataTyCon,
+			  tyConTheta, isProductTyCon, isDataTyCon,
 			  isEnumerationTyCon, isRecursiveTyCon, TyCon
 			)
 import TcType		( TcType, ThetaType, mkTyVarTy, mkTyVarTys, mkTyConApp, 
@@ -334,7 +334,7 @@ makeDerivEqns tycl_decls
 
     ------------------------------------------------------------------
     mk_eqn_help gla_exts DataType tycon clas tys
-      | Just err <- chk_out gla_exts clas tycon tys
+      | Just err <- checkSideConditions gla_exts clas tycon tys
       = bale_out (derivingThingErr clas tys tycon tyvars err)
       | otherwise 
       = new_dfun_name clas tycon	 `thenM` \ dfun_name ->
@@ -512,45 +512,102 @@ makeDerivEqns tycl_decls
 				       ptext SLIT("Try -fglasgow-exts for GHC's newtype-deriving extension")])
 
     bale_out err = addErrTc err `thenM_` returnM (Nothing, Nothing) 
-
     standard_class gla_exts clas =  key `elem` derivableClassKeys
 				 || (gla_exts && (key == typeableClassKey || key == dataClassKey))
 	where
 	  key = classKey clas
-    ------------------------------------------------------------------
-    chk_out :: Bool -> Class -> TyCon -> [TcType] -> Maybe SDoc
-    chk_out gla_exts clas tycon tys
-	| notNull tys						        = Just ty_args_why
-	| not (standard_class gla_exts clas)				= Just (non_std_why clas)
-	| clas `hasKey` enumClassKey    && not is_enumeration 	        = Just nullary_why
-	| clas `hasKey` boundedClassKey && not is_enumeration_or_single = Just single_nullary_why
-	| clas `hasKey` ixClassKey      && not is_enumeration_or_single = Just single_nullary_why
-        | clas `hasKey` typeableClassKey && not all_type_kind		= Just not_type_kind_why
-	| null data_cons		    			 	= Just no_cons_why
-	| any isExistentialDataCon data_cons 				= Just existential_why     
-	| otherwise			     				= Nothing
-	where
-	    data_cons = tyConDataCons tycon
-	    is_enumeration = isEnumerationTyCon tycon
-	    is_single_con  = maybeToBool (maybeTyConSingleCon tycon)
-	    is_enumeration_or_single = is_enumeration || is_single_con
-	    all_type_kind = all (isTypeKind . tyVarKind) (tyConTyVars tycon)
 
-	    single_nullary_why = ptext SLIT("one constructor data type or type with all nullary constructors expected")
-	    nullary_why        = quotes (ppr tycon) <+> ptext SLIT("has non-nullary constructors")
-	    no_cons_why	       = quotes (ppr tycon) <+> ptext SLIT("has no data constructors")
-	    ty_args_why	       = quotes (ppr pred) <+> ptext SLIT("is not a class")
-	    existential_why    = quotes (ppr tycon) <+> ptext SLIT("has existentially-quantified constructor(s)")
-	    not_type_kind_why  = quotes (ppr tycon) <+> ptext SLIT("is parameterised over arguments of kind other than `*'")
 
-	    pred = mkClassPred clas tys
 
-non_std_why clas = quotes (ppr clas) <+> ptext SLIT("is not a derivable class")
 
 new_dfun_name clas tycon 	-- Just a simple wrapper
   = newDFunName clas [mkTyConApp tycon []] (getSrcLoc tycon)
 	-- The type passed to newDFunName is only used to generate
 	-- a suitable string; hence the empty type arg list
+
+
+------------------------------------------------------------------
+-- Check side conditions that dis-allow derivability for particular classes
+-- This is *apart* from the newtype-deriving mechanism
+
+checkSideConditions :: Bool -> Class -> TyCon -> [TcType] -> Maybe SDoc
+checkSideConditions gla_exts clas tycon tys
+  | notNull tys	
+  = Just ty_args_why	-- e.g. deriving( Foo s )
+  | otherwise
+  = case [cond | (key,cond) <- sideConditions, key == getUnique clas] of
+	[]     -> Just (non_std_why clas)
+	[cond] -> cond (gla_exts, tycon)
+	other  -> pprPanic "checkSideConditions" (ppr clas)
+  where
+    ty_args_why	     = quotes (ppr (mkClassPred clas tys)) <+> ptext SLIT("is not a class")
+
+non_std_why clas = quotes (ppr clas) <+> ptext SLIT("is not a derivable class")
+
+sideConditions :: [(Unique, Condition)]
+sideConditions
+  = [	(eqClassKey, 	   cond_std),
+	(ordClassKey,	   cond_std),
+	(readClassKey,	   cond_std),
+	(showClassKey,	   cond_std),
+	(enumClassKey,	   cond_std `andCond` cond_isEnumeration),
+	(ixClassKey,	   cond_std `andCond` (cond_isEnumeration `orCond` cond_isProduct)),
+	(boundedClassKey,  cond_std `andCond` (cond_isEnumeration `orCond` cond_isProduct)),
+ 	(typeableClassKey, cond_glaExts `andCond` cond_allTypeKind),
+	(dataClassKey,	   cond_glaExts `andCond` cond_std)
+    ]
+
+type Condition = (Bool, TyCon) -> Maybe SDoc	-- Nothing => OK
+
+orCond :: Condition -> Condition -> Condition
+orCond c1 c2 tc 
+  = case c1 tc of
+	Nothing -> Nothing		-- c1 succeeds
+	Just x  -> case c2 tc of	-- c1 fails
+		     Nothing -> Nothing
+		     Just y  -> Just (x $$ ptext SLIT("  and") $$ y)
+					-- Both fail
+
+andCond c1 c2 tc = case c1 tc of
+		     Nothing -> c2 tc	-- c1 succeeds
+		     Just x  -> Just x	-- c1 fails
+
+cond_std :: Condition
+cond_std (gla_exts, tycon)
+  | any isExistentialDataCon data_cons 	= Just existential_why     
+  | null data_cons		    	= Just no_cons_why
+  | otherwise      			= Nothing
+  where
+    data_cons       = tyConDataCons tycon
+    no_cons_why	    = quotes (ppr tycon) <+> ptext SLIT("has no data constructors")
+    existential_why = quotes (ppr tycon) <+> ptext SLIT("has existentially-quantified constructor(s)")
+  
+cond_isEnumeration :: Condition
+cond_isEnumeration (gla_exts, tycon)
+  | isEnumerationTyCon tycon = Nothing
+  | otherwise		     = Just why
+  where
+    why = quotes (ppr tycon) <+> ptext SLIT("has non-nullary constructors")
+
+cond_isProduct :: Condition
+cond_isProduct (gla_exts, tycon)
+  | isProductTyCon tycon = Nothing
+  | otherwise	         = Just why
+  where
+    why = quotes (ppr tycon) <+> ptext SLIT("has more than one constructor")
+
+cond_allTypeKind :: Condition
+cond_allTypeKind (gla_exts, tycon)
+  | all (isTypeKind . tyVarKind) (tyConTyVars tycon) = Nothing
+  | otherwise	  				     = Just why
+  where
+    why  = quotes (ppr tycon) <+> ptext SLIT("is parameterised over arguments of kind other than `*'")
+
+cond_glaExts :: Condition
+cond_glaExts (gla_exts, tycon) | gla_exts  = Nothing
+			       | otherwise = Just why
+  where
+    why  = ptext SLIT("You need -fglasgow-exts to derive an instance for this class")
 \end{code}
 
 %************************************************************************
@@ -767,7 +824,7 @@ gen_taggery_Names dfuns
         ((we_are_deriving eqClassKey tycon
 	    && any isNullaryDataCon (tyConDataCons tycon))
 	 || (we_are_deriving ordClassKey  tycon
-	    && not (maybeToBool (maybeTyConSingleCon tycon)))
+	    && not (isProductTyCon tycon))
 	 || (we_are_deriving enumClassKey tycon)
 	 || (we_are_deriving ixClassKey   tycon))
 	
