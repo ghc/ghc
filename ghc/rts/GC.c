@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.100 2001/03/22 03:51:10 hwloidl Exp $
+ * $Id: GC.c,v 1.101 2001/04/02 14:18:05 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -137,6 +137,11 @@ bdescr *old_to_space;
  */
 lnat new_blocks;		/* blocks allocated during this GC */
 lnat g0s0_pcnt_kept = 30;	/* percentage of g0s0 live at last minor GC */
+
+/* Used to avoid long recursion due to selector thunks
+ */
+lnat thunk_selector_depth = 0;
+#define MAX_THUNK_SELECTOR_DEPTH 256
 
 //@node Static function declarations, Garbage Collect, STATIC OBJECT LIST
 //@subsection Static function declarations
@@ -1481,6 +1486,23 @@ loop:
 	selectee = ((StgEvacuated *)selectee)->evacuee;
 	goto selector_loop;
 
+      case THUNK_SELECTOR:
+	  /* we can't recurse indefinitely in evacuate(), so set a
+	   * limit on the number of times we can go around this
+	   * loop.
+	   */
+	  if (thunk_selector_depth < MAX_THUNK_SELECTOR_DEPTH) {
+	      bdescr *bd;
+	      bd = Bdescr((P_)selectee);
+	      if (!bd->evacuated) {
+		  thunk_selector_depth++;
+		  selectee = evacuate(selectee);
+		  thunk_selector_depth--;
+		  goto selector_loop;
+	      }
+	  }
+	  /* otherwise, fall through... */
+
       case AP_UPD:
       case THUNK:
       case THUNK_1_0:
@@ -1489,8 +1511,6 @@ loop:
       case THUNK_1_1:
       case THUNK_0_2:
       case THUNK_STATIC:
-      case THUNK_SELECTOR:
-	/* aargh - do recursively???? */
       case CAF_BLACKHOLE:
       case SE_CAF_BLACKHOLE:
       case SE_BLACKHOLE:
