@@ -44,7 +44,7 @@ import FiniteMap	( FiniteMap, sizeFM, emptyFM, delFromFM,
 			  fmToList
 			)
 import Name		( Name {-instance NamedThing-},
-			  nameModule, moduleString, pprModule, isLocallyDefined,
+			  nameModule, moduleUserString, pprModule, isLocallyDefined,
 			  isWiredInName, maybeWiredInTyConName,  pprModule,
 			  maybeWiredInIdName, nameUnique, NamedThing(..)
 			 )
@@ -1041,7 +1041,7 @@ findAndReadIface doc_str mod_name
       -- one for 'normal' ones, the other for .hi-boot files,
       -- hence the need to signal which kind we're interested.
     getModuleHiMap from_hi_boot		`thenRn` \ himap ->
-    case (lookupFM himap (moduleString mod_name)) of
+    case (lookupFM himap (moduleUserString mod_name)) of
          -- Found the file
        Just fpath -> readIface fpath
     	 -- Hack alert!  When compiling PrelBase we have to load the
