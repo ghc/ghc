@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.55 2001/05/28 03:31:19 sof Exp $
+-- $Id: DriverFlags.hs,v 1.56 2001/05/31 11:32:25 simonmar Exp $
 --
 -- Driver flags
 --
@@ -208,6 +208,7 @@ static_flags =
   ,  ( "osuf"		, HasArg (writeIORef v_Object_suf  . Just) )
   ,  ( "hcsuf"		, HasArg (writeIORef v_HC_suf      . Just) )
   ,  ( "hisuf"		, HasArg (writeIORef v_Hi_suf) )
+  ,  ( "hidir"		, HasArg (writeIORef v_Hi_dir . Just) )
   ,  ( "buildtag"	, HasArg (writeIORef v_Build_tag) )
   ,  ( "tmpdir"		, HasArg (writeIORef v_TmpDir . (++ "/")) )
   ,  ( "ohi"		, HasArg (writeIORef v_Output_hi   . Just) )

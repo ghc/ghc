@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.72 2001/05/29 17:53:59 sof Exp $
+-- $Id: DriverPipeline.hs,v 1.73 2001/05/31 11:32:25 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -445,13 +445,6 @@ run_phase Hsc basename suff input_fn output_fn
 	paths <- readIORef v_Include_paths
 	writeIORef v_Include_paths (current_dir : paths)
 	
-  -- figure out where to put the .hi file
-	ohi    <- readIORef v_Output_hi
-	hisuf  <- readIORef v_Hi_suf
-	let hifile = case ohi of
-			   Nothing -> basename ++ '.':hisuf
-			   Just fn -> fn
-
   -- figure out which header files to #include in a generated .hc file
 	c_includes <- getPackageCIncludes
 	cmdline_includes <- dynFlag cmdlineHcIncludes -- -#include options
@@ -466,6 +459,18 @@ run_phase Hsc basename suff input_fn output_fn
 
 	writeIORef v_HCHeader cc_injects
 
+  -- gather the imports and module name
+        (srcimps,imps,mod_name) <- getImportsFromFile input_fn
+
+  -- build a ModuleLocation to pass to hscMain.
+	Just (mod, location')
+	   <- mkHomeModuleLocn mod_name basename (basename ++ '.':suff)
+
+  -- take -ohi into account if present
+	ohi <- readIORef v_Output_hi
+	let location | Just fn <- ohi = location'{ ml_hi_file = fn }
+		     | otherwise      = location'
+
   -- figure out if the source has changed, for recompilation avoidance.
   -- only do this if we're eventually going to generate a .o file.
   -- (ToDo: do when generating .hc files too?)
@@ -477,8 +482,7 @@ run_phase Hsc basename suff input_fn output_fn
   -- date wrt M.hs (or M.o doesn't exist) so we must recompile regardless.
 	do_recomp <- readIORef v_Recomp
 	todo <- readIORef v_GhcMode
-        o_file' <- odir_ify (basename ++ '.':phaseInputExt Ln)
-        o_file <- osuf_ify o_file'
+        let o_file = unJust "source_unchanged" (ml_obj_file location)
 	source_unchanged <- 
           if not (do_recomp && ( todo == DoLink || todo == StopBefore Ln ))
 	     then return False
@@ -490,12 +494,6 @@ run_phase Hsc basename suff input_fn output_fn
 			        if t2 > t1
 				  then return True
 				  else return False
-
-	 -- build a ModuleLocation to pass to hscMain.
-        (srcimps,imps,mod_name) <- getImportsFromFile input_fn
-
-	Just (mod, location)
-	   <- mkHomeModuleLocn mod_name basename (basename ++ '.':suff)
 
   -- get the DynFlags
         dyn_flags <- readIORef v_DynFlags

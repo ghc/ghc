@@ -55,7 +55,7 @@ import Type		( splitSigmaTy, tidyTopType, deNoteType, namesOfDFunHead )
 import SrcLoc		( noSrcLoc )
 import Outputable
 import Module		( ModuleName )
-import Util		( sortLt, unJust )
+import Util		( sortLt )
 import ErrUtils		( dumpIfSet_dyn )
 
 import Monad		( when )
@@ -112,7 +112,7 @@ mkFinalIface ghci_mode dflags location
 		--     so there's no need to write a new interface file.  But even if 
 		--     the usages have changed, the module version may not have.
 
-     hi_file_path = unJust "mkFinalIface" (ml_hi_file location)
+     hi_file_path = ml_hi_file location
      new_decls    = mkIfaceDecls ty_cls_dcls rule_dcls inst_dcls
      inst_dcls    = map ifaceInstance (md_insts new_details)
      ty_cls_dcls  = foldNameEnv ifaceTyCls [] (md_types new_details)

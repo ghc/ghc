@@ -129,8 +129,7 @@ hscMain ghci_mode dflags mod location source_unchanged have_object
 
       (pcs_ch, errs_found, (recomp_reqd, maybe_checked_iface))
          <- _scc_ "checkOldIface"
-	    checkOldIface ghci_mode dflags hit hst pcs 
-		(unJust "hscMain" (ml_hi_file location))
+	    checkOldIface ghci_mode dflags hit hst pcs (ml_hi_file location)
 		source_unchanged maybe_old_iface;
 
       if errs_found then

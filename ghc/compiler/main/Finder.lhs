@@ -138,8 +138,12 @@ maybeHomeModule mod_name = do
 mkHomeModuleLocn mod_name basename source_fn = do
 
    hisuf  <- readIORef v_Hi_suf
-   let hifile = getdir basename ++ '/':moduleNameUserString mod_name 
-				++ '.':hisuf
+   hidir  <- readIORef v_Hi_dir
+
+   let dir | Just d <- hidir = d
+	   | otherwise       = getdir basename 
+
+       hifile = dir ++ '/':moduleNameUserString mod_name ++ '.':hisuf
 
    -- figure out the .o file name.  It also lives in the same dir
    -- as the source, but can be overriden by a -odir flag.
@@ -149,7 +153,7 @@ mkHomeModuleLocn mod_name basename source_fn = do
                  ModuleLocation{
                     ml_hspp_file = Nothing,
 		    ml_hs_file   = Just source_fn,
-		    ml_hi_file   = Just hifile,
+		    ml_hi_file   = hifile,
 		    ml_obj_file  = Just o_file
 	         }
 	))
@@ -191,7 +195,7 @@ maybePackageModule mod_name = do
 			  ModuleLocation{ 
                                 ml_hspp_file = Nothing,
 				ml_hs_file   = Nothing,
-				ml_hi_file   = Just (path ++ '/':hi),
+				ml_hi_file   = path ++ '/':hi,
 				ml_obj_file  = Nothing
 			   }
 		   ))

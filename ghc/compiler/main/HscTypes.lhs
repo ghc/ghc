@@ -93,7 +93,7 @@ data ModuleLocation
    = ModuleLocation {
         ml_hs_file   :: Maybe FilePath,
         ml_hspp_file :: Maybe FilePath,  -- path of preprocessed source
-        ml_hi_file   :: Maybe FilePath,
+        ml_hi_file   :: FilePath,
         ml_obj_file  :: Maybe FilePath
      }
      deriving Show

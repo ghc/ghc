@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.66 2001/05/28 03:31:19 sof Exp $
+-- $Id: Main.hs,v 1.67 2001/05/31 11:32:25 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -63,7 +63,6 @@ import Maybe
 -----------------------------------------------------------------------------
 -- ToDo:
 
--- -nohi doesn't work
 -- new mkdependHS doesn't support all the options that the old one did (-X et al.)
 -- time commands when run with -v
 -- split marker

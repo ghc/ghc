@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.40 2001/05/28 03:31:19 sof Exp $
+-- $Id: DriverState.hs,v 1.41 2001/05/31 11:32:25 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -98,6 +98,7 @@ GLOBAL_VAR(v_Output_hi,   Nothing, Maybe String)
 
 GLOBAL_VAR(v_Object_suf,  Nothing, Maybe String)
 GLOBAL_VAR(v_HC_suf,  	  Nothing, Maybe String)
+GLOBAL_VAR(v_Hi_dir,      Nothing, Maybe String)
 GLOBAL_VAR(v_Hi_suf,      "hi",	   String)
 
 GLOBAL_VAR(v_Ld_inputs,	[],      [String])
