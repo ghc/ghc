@@ -326,6 +326,15 @@ m68k-sun-sunos4*)
         HostVendor_CPP='sun'
         HostOS_CPP='sunos4'
         ;;
+m88k-*-openbsd*)
+	HostPlatform=m88k-unknown-openbsd
+	TargetPlatform=m88k-unknown-openbsd
+	BuildPlatform=m88k-unknown-openbsd
+        HostPlatform_CPP='m88k_unknown_openbsd'
+        HostArch_CPP='m88k'
+        HostVendor_CPP='unknown'
+        HostOS_CPP='openbsd'
+        ;;
 mips-*-linux*)
         HostPlatform=mips-unknown-linux # hack again
         TargetPlatform=mips-unknown-linux
@@ -437,6 +446,24 @@ sparc-*-openbsd*)
         BuildPlatform=sparc-unknown-openbsd
         HostPlatform_CPP='sparc_unknown_openbsd'
         HostArch_CPP='sparc'
+        HostVendor_CPP='unknown'
+        HostOS_CPP='openbsd'
+        ;;
+sparc64-*-openbsd*)
+        HostPlatform=sparc64-unknown-openbsd
+        TargetPlatform=sparc64-unknown-openbsd
+        BuildPlatform=sparc64-unknown-openbsd
+        HostPlatform_CPP='sparc64_unknown_openbsd'
+        HostArch_CPP='sparc64'
+        HostVendor_CPP='unknown'
+        HostOS_CPP='openbsd'
+        ;;
+vax-*-openbsd*)
+        HostPlatform=vax-unknown-openbsd
+        TargetPlatform=vax-unknown-openbsd
+        BuildPlatform=vax-unknown-openbsd
+        HostPlatform_CPP='vax_unknown_openbsd'
+        HostArch_CPP='vax'
         HostVendor_CPP='unknown'
         HostOS_CPP='openbsd'
         ;;
