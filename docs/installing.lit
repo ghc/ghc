@@ -43,12 +43,14 @@ Happily, such complications don't apply to most people.  A few common
 as suggested:
 
 \begin{description}
-\item[Binary distribution.]  If your only purpose is to install
-some of the @fptools@ suite then the easiest thing to do is to
-get a binary distribution. In the binary distribution everything is
-pre-compiled for your particular machine architecture and operating
-system, so all you should have to do is install the binaries and libraries
-in suitable places.  {\em Need pointer to info about doing binary installation.}
+
+\item[Binary distribution.]  If your only purpose is to install some
+of the @fptools@ suite then the easiest thing to do is to get a binary
+distribution. In the binary distribution everything is pre-compiled
+for your particular machine architecture and operating system, so all
+you should have to do is install the binaries and libraries in
+suitable places.  Section~\ref{installing-bin-distrib} describes
+how to do this.
 
 A binary distribution may not work for you for two reasons.  First, we
 may not have built the suite for the particular architecture/OS
@@ -104,10 +106,10 @@ certainly doesn't work any more (for tedious reasons).
 
 \item[The CVS repository.]
 
-We make source distributions at the same time as binary distributions;
-i.e. infrequently.  They should, however, be pretty thoroughly tested.
-If you want more up-to-the minute (but less tested) source code then you 
-need to get access to our CVS repository.
+We make source distributions slightly more often than binary
+distributions; but still infrequently.  If you want more up-to-the
+minute (but less tested) source code then you need to get access to
+our CVS repository.
 
 All the @fptools@ source code is held in a CVS repository. CVS is a
 pretty good source-code control system, and best of all it works over
@@ -122,7 +124,7 @@ Giving you access to the repository entails some systems administration
 at our end; and we are a bit nervous about being submerged in bug reports
 about our current working copy (which is, by definition, in flux).  So
 we are a bit cautious about offering CVS access.  Feel free to ask though!
-\end{description} 
+\end{description}
 
 If you are going to do any building from sources (either from a source
 distribution or the CVS repository) then you need to read all of this
@@ -162,16 +164,22 @@ on ports or lack thereof.
 Be sure that the ``pre-supposed'' utilities are installed.
 Section~\ref{sect_std-utils} elaborates.
 
-\item
-If you have any problem when building or installing the Glasgow tools,
-please check the ``known pitfalls'' (\sectionref{build-pitfalls}).  If
-you feel there is still some shortcoming in our procedure or
+\item If you have any problem when building or installing the Glasgow
+tools, please check the ``known pitfalls''
+(\sectionref{build-pitfalls}).  Also check the ``known bugs'' web page
+for GHC: 
+
+\begin{center}
+@http://www.dcs.gla.ac.uk/fp/software/ghc/ghc-bugs.html@
+\end{center}
+
+If you feel there is still some shortcoming in our procedure or
 instructions, please report it.
 
 For GHC, please see the bug-reporting section of the User's guide
 (separate document), to maximise the usefulness of your report.
 
-If in doubt, please send a message to \tr{glasgow-haskell-bugs@dcs.gla.ac.uk}.
+If in doubt, please send a message to @glasgow-haskell-bugs@@dcs.gla.ac.uk@.
 \end{enumerate}
 
 
@@ -188,13 +196,12 @@ If in doubt, please send a message to \tr{glasgow-haskell-bugs@dcs.gla.ac.uk}.
 The main question is whether or not the Haskell compiler (GHC) runs on
 your platform.
 
-A ``platform'' is a
-architecture/manufacturer/operating-system combination,
-such as @sparc-sun-solaris2.5.1@.  Other common ones are
+A ``platform'' is a architecture/manufacturer/operating-system
+combination, such as @sparc-sun-solaris2@.  Other common ones are
 @alpha-dec-osf2@, @hppa1.1-hp-hpux9@, @i386-unknown-linux@,
-@i386-unknown-solaris2@, @i386-unknown-freebsd@, @i386-unknown-cygwin32@,
-@m68k-sun-sunos4@, @mips-sgi-irix5@, @sparc-sun-sunos4@,
-@sparc-sun-solaris2@, @powerpc-ibm-aix@.
+@i386-unknown-solaris2@, @i386-unknown-freebsd@,
+@i386-unknown-cygwin32@, @m68k-sun-sunos4@, @mips-sgi-irix5@,
+@sparc-sun-sunos4@, @sparc-sun-solaris2@, @powerpc-ibm-aix@.
 
 Bear in mind that certain ``bundles'', e.g. parallel Haskell, may not
 work on all machines for which basic Haskell compiling is supported.
@@ -281,9 +288,9 @@ On old Linux a.out systems: should be the same.
 
 %-------------------------------------------------------------------
 \item[\tr{i386-*-freebsd} (PCs running FreeBSD 2.2 or higher, and
-NetBSD/OpenBSD using FreeBSD emulation):] \index{i386-*-freebsd:
-registerised port} GHC works registerised. Supports same set of
-bundles as the above.
+NetBSD/OpenBSD using FreeBSD emulation):] 
+\index{i386-*-freebsd:registerised port} 
+GHC works registerised. Supports same set of bundles as the above.
 
 \index{i386-*-freebsd: profiling---yes}
 \index{i386-*-freebsd: concurrent---yes}
@@ -423,9 +430,11 @@ structure:
 \item[@configure@] the configuration script (\sectionref{sect_install}).
 \item[@README@] Contains this file summary.
 \item[@INSTALL@] Contains this description of how to install the bundle.
-\item[@ANNOUNCE-<bundle>@] The announcement message for the bundle.
-\item[@NEWS-<bundle>@] release notes for the bundle -- a longer version of @ANNOUNCE@.
-\item[@bin/<platform>/@] contains platform-specific executable files to be invoked
+\item[@ANNOUNCE@] The announcement message for the bundle.
+\item[@NEWS@] release notes for the bundle -- a longer version of
+@ANNOUNCE@.  For GHC, the release notes are contained in the User
+Guide and this file isn't present.
+\item[@bin/<platform>@] contains platform-specific executable files to be invoked
 directly by the user.  These are the files that must end up in your path.
 \item[@lib/<platform>@] contains platform-specific support files for the installation.
 Typically there is a subdirectory for each @fptools@ project, whose name is
@@ -465,20 +474,22 @@ unpacks for one bundle on different platforms.
 
 \subsection[sect_install]{Installing}
 
-OK, so let's assume that you have unpacked your chosen bundles into
-a scratch directory @fptools@. What next? Well, you will at least need
-to run the @configure@ script by changing your directory to @fptools@.
-That should convert @Makefile.in@ to @Makefile@.
+OK, so let's assume that you have unpacked your chosen bundles into a
+scratch directory @fptools@. What next? Well, you will at least need
+to run the @configure@ script by changing your directory to @fptools@
+and typing @./configure@.  That should convert @Makefile.in@ to
+@Makefile@.
 
 You can now either start using the tools {\em in-situ} without going
 through any installation process, just type @make in-place@ to set the
-tools up for this (you have to be in the @fptools@ directory for
-this). You'll also want to add the path which @make@ will now echo to
-your @PATH@ environment variable. This option is useful if you simply want
-to try out the package and/or you don't have the necessary priviledges (or
-inclination) to properly install the tools locally. Note that if you
-do decide to install the package `properly' at a later date, you have
-to go through the installation steps that follows.
+tools up for this (where @make@ is GNU make - you might have to type
+@gmake@ to get it). You'll also want to add the path which @make@ will
+now echo to your @PATH@ environment variable. This option is useful if
+you simply want to try out the package and/or you don't have the
+necessary priviledges (or inclination) to properly install the tools
+locally. Note that if you do decide to install the package `properly'
+at a later date, you have to go through the installation steps that
+follows.
 
 To install an @fptools@ package, you'll have to do the following:
 
@@ -1463,7 +1474,7 @@ what the rules do.  Hopefully, you will also get enough of an idea of what is su
 to happen that you can read and understand any wierd special cases yourself.
 
 \begin{description}
-\item{@HS_PROG@.}  If @HS_PROG@ is defined, you get rules with the
+\item[@HS_PROG@.]  If @HS_PROG@ is defined, you get rules with the
 following targets:
 \begin{description}
 \item[@HS_PROG@] itself.  This rule links @$(OBJS)@ with the Haskell
