@@ -237,7 +237,9 @@ run flags files = do
 	writeBinMem bh fn
       where
 	prepared_ifaces = 
-	  [ (mdl, fmToList (iface_env iface), fmToList (iface_sub iface))
+	  [ (mdl, fmToList (iface_env iface), 
+		  fmToList (iface_reexported iface),
+		  fmToList (iface_sub iface))
 	  | (mdl, iface) <- these_mod_ifaces ]
 
 parseIfaceOption :: String -> (FilePath,FilePath)
@@ -252,13 +254,13 @@ readIface filename = do
   stuff <- get bh
   return (map to_interface stuff)
  where 
-   to_interface (mdl, env, sub) = 
+   to_interface (mdl, env, reexported, sub) = 
 	  (mdl, Interface { 
 		   iface_filename     = "",
 		   iface_env          = listToFM env,
 		   iface_import_env   = emptyFM,
 		   iface_sub	      = listToFM sub,
-		   iface_reexported   = emptyFM,
+		   iface_reexported   = listToFM reexported,
 		   iface_exports      = [],
 		   iface_orig_exports = [],
 		   iface_insts	      = [],
@@ -420,7 +422,14 @@ mkInterface no_implicit_prelude verbose mod_map filename
 
   let missing_names = missing_names1 ++ missing_names2 ++ missing_names4
 			 --ignore missing_names3 & missing_names5 for now
-      name_strings = nub (map show missing_names)
+      filtered_missing_names = filter (`notElem` ignore) missing_names
+
+      -- ignore certain builtin names ((),[], etc.), because these
+      -- cannot be exported anyway.
+      ignore = [unit_tycon_qname, fun_tycon_qname, list_tycon_qname,
+		unit_con_name, nil_con_name]	
+
+      name_strings = nub (map show filtered_missing_names)
 
   when (not (null name_strings)) $
 	  tell ["Warning: " ++ show mdl ++ 
