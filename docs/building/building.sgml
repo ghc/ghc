@@ -127,6 +127,11 @@ machine in order to compile (most of) the sources, however.
       <varlistentry>
 	<term>Build GHC from intermediate C <Filename>.hc</Filename> files<indexterm><primary>hc files</primary></indexterm>:</term>
 	<listitem>
+	  <para><emphasis>NOTE: GHC version 5.xx is significantly
+	  harder to bootstrap from C than previous versions.  We
+	  recommend starting from version 4.08.2 if you need to
+	  bootstrap in this way.</emphasis></para>
+
 	  <para>You need a working GHC to use a source distribution.
           What if you don't have a working GHC? Then you may be able
           to bootstrap up from the intermediate C
@@ -3305,6 +3310,11 @@ the canned rules being included, and conflicting with yours.
 <indexterm><primary>building GHC from .hc files</primary></indexterm>
 <indexterm><primary>booting GHC from .hc files</primary></indexterm>
 <indexterm><primary>porting GHC</primary></indexterm></Title>
+
+    <para><emphasis>NOTE: GHC version 5.xx is significantly harder to
+    bootstrap from C than previous versions.  We recommend starting
+    from version 4.08.2 if you need to bootstrap in this
+    way.</emphasis></para>
 
 <para>
 This section is for people trying to get GHC going by using the supplied
