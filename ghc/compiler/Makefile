@@ -757,6 +757,9 @@ SplitObjs = NO
 # set GhcCompilerWays instead.
 GhcLibWays = $(GhcCompilerWays)
 
+# override $(GhcLibHcOpts): we want GhcStage2HcOpts to take precedence
+GhcLibHcOpts =
+
 # override default definition of HS_IFACES so we can add $(odir)
 HS_IFACES   = $(addsuffix .$(way_)hi,$(basename $(HS_OBJS)))
 endif
