@@ -5,8 +5,8 @@
  * Copyright (c) 1994-2000.
  *
  * $RCSfile: Interpreter.c,v $
- * $Revision: 1.13 $
- * $Date: 2001/01/15 16:55:25 $
+ * $Revision: 1.14 $
+ * $Date: 2001/02/05 17:27:48 $
  * ---------------------------------------------------------------------------*/
 
 #ifdef GHCI
@@ -31,7 +31,24 @@
  * The new bytecode interpreter
  * ------------------------------------------------------------------------*/
 
-/* Sp points to the lowest live word on the stack. */
+/* The interpreter can be compiled so it just interprets BCOs and
+   hands literally everything else to the scheduler.  This gives a
+   "reference interpreter" which is correct but slow -- useful for
+   debugging.  By default, we handle certain closures specially so as
+   to dramatically cut down on the number of deferrals to the
+   scheduler.  Ie normally you don't want REFERENCE_INTERPRETER to be
+   defined. */
+
+/* #define REFERENCE_INTERPRETER */
+
+/* Gather stats about entry, opcode, opcode-pair frequencies.  For
+   tuning the interpreter. */
+
+/* #define INTERP_STATS */
+
+
+
+/* iSp points to the lowest live word on the stack. */
 
 #define StackWord(n)  iSp[n]
 #define BCO_NEXT      instrs[bciPtr++]
@@ -51,21 +68,92 @@
 
 static __inline__ StgPtr allocate_UPD ( int n_words )
 {
-  //fprintf(stderr, "alloc_UPD    %d -> ", n_words );
    if (n_words - sizeofW(StgHeader) < MIN_UPD_SIZE)
       n_words = MIN_UPD_SIZE + sizeofW(StgHeader);
-   //fprintf(stderr, "%d\n", n_words );
    return allocate(n_words);
 }
 
 static __inline__ StgPtr allocate_NONUPD ( int n_words )
 {
-  //fprintf(stderr, "alloc_NONUPD %d -> ", n_words );
    if (n_words - sizeofW(StgHeader) < MIN_NONUPD_SIZE)
       n_words = MIN_NONUPD_SIZE + sizeofW(StgHeader);
-   //fprintf(stderr, "%d\n", n_words );
    return allocate(n_words);
 }
+
+
+#ifdef INTERP_STATS
+/* Hacky stats, for tuning the interpreter ... */
+int it_unknown_entries[N_CLOSURE_TYPES];
+int it_total_unknown_entries;
+int it_total_entries;
+
+int it_retto_BCO;
+int it_retto_UPDATE;
+int it_retto_other;
+
+int it_slides;
+int it_insns;
+int it_BCO_entries;
+
+int it_ofreq[26];
+int it_oofreq[26][26];
+int it_lastopc;
+
+void interp_startup ( void )
+{
+   int i, j;
+   it_retto_BCO = it_retto_UPDATE = it_retto_other = 0;
+   it_total_entries = it_total_unknown_entries = 0;
+   for (i = 0; i < N_CLOSURE_TYPES; i++)
+      it_unknown_entries[i] = 0;
+   it_slides = it_insns = it_BCO_entries = 0;
+   for (i = 0; i < 26; i++) it_ofreq[i] = 0;
+   for (i = 0; i < 26; i++) 
+     for (j = 0; j < 26; j++)
+        it_oofreq[i][j] = 0;
+   it_lastopc = 0;
+}
+
+void interp_shutdown ( void )
+{
+   int i, j, k, o_max, i_max, j_max;
+   fprintf(stderr, "%d constrs entered -> (%d BCO, %d UPD, %d ???)\n",
+                   it_retto_BCO + it_retto_UPDATE + it_retto_other,
+                   it_retto_BCO, it_retto_UPDATE, it_retto_other );
+   fprintf(stderr, "%d total entries, %d unknown entries \n", 
+                   it_total_entries, it_total_unknown_entries);
+   for (i = 0; i < N_CLOSURE_TYPES; i++) {
+     if (it_unknown_entries[i] == 0) continue;
+     fprintf(stderr, "   type %2d: unknown entries (%4.1f%%) == %d\n",
+	     i, 100.0 * ((double)it_unknown_entries[i]) / 
+                        ((double)it_total_unknown_entries),
+             it_unknown_entries[i]);
+   }
+   fprintf(stderr, "%d insns, %d slides, %d BCO_entries\n", 
+                   it_insns, it_slides, it_BCO_entries);
+   for (i = 0; i < 26; i++) 
+      fprintf(stderr, "opcode %2d got %d\n", i, it_ofreq[i] );
+
+   for (k = 1; k < 20; k++) {
+      o_max = 0;
+      i_max = j_max = 0;
+      for (i = 0; i < 26; i++) {
+         for (j = 0; j < 26; j++) {
+	    if (it_oofreq[i][j] > o_max) {
+               o_max = it_oofreq[i][j];
+	       i_max = i; j_max = j;
+	    }
+	 }
+      }
+      
+      fprintf ( stderr, "%d:  count (%4.1f%%) %6d   is %d then %d\n",
+                k, ((double)o_max) * 100.0 / ((double)it_insns), o_max,
+                   i_max, j_max );
+      it_oofreq[i_max][j_max] = 0;
+
+   }
+}
+#endif
 
 
 StgThreadReturnCode interpretBCO ( Capability* cap )
@@ -83,6 +171,7 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
 
     LOAD_STACK_POINTERS;
 
+    /* We don't change this ... */
     iSpLim = cap->rCurrentTSO->stack + RESERVED_STACK_WORDS;
 
     /* Main object-entering loop.  Object to be entered is on top of
@@ -90,6 +179,12 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
     nextEnter:
 
     obj = (StgClosure*)StackWord(0); iSp++;
+
+    nextEnter_obj:
+
+#   ifdef INTERP_STATS
+    it_total_entries++;
+#   endif
 
     IF_DEBUG(evaluator,
              fprintf(stderr, 
@@ -107,22 +202,85 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
              fprintf(stderr, "\n\n");
             );
 
+
+
     switch ( get_itbl(obj)->type ) {
+
        case INVALID_OBJECT:
                barf("Invalid object %p",(StgPtr)obj);
 
-#if 0
+#      ifndef REFERENCE_INTERPRETER
+
+       case IND:
+       case IND_OLDGEN:
+       case IND_PERM:
+       case IND_OLDGEN_PERM:
+       case IND_STATIC:
+       { 
+          obj = ((StgInd*)obj)->indirectee;
+          goto nextEnter_obj;
+       }
+
+       case CONSTR:
+       case CONSTR_1_0:
+       case CONSTR_0_1:
+       case CONSTR_2_0:
+       case CONSTR_1_1:
+       case CONSTR_0_2:
+       case CONSTR_INTLIKE:
+       case CONSTR_CHARLIKE:
+       case CONSTR_STATIC:
+       case CONSTR_NOCAF_STATIC:
+       nextEnter_obj_CONSTR:
+       {
+          StgInfoTable* ret_itbl = (StgInfoTable*)StackWord(0);
+          if (ret_itbl == (StgInfoTable*)&stg_ctoi_ret_R1p_info) {
+#            ifdef INTERP_STATS
+             it_retto_BCO++;
+#            endif
+             /* Returning this constr to a BCO.  Push the constr on
+                the stack and enter the return continuation BCO, which
+                is immediately underneath ret_itbl. */
+             StackWord(-1) = (W_)obj;
+             obj = (StgClosure*)StackWord(1);
+             iSp --;
+	     if (get_itbl(obj)->type == BCO) 
+                goto nextEnter_obj_BCO; /* fast-track common case */
+             else
+                goto nextEnter_obj; /* a safe fallback */
+	  } else
+	  if (ret_itbl == (StgInfoTable*)&stg_upd_frame_info) {
+#            ifdef INTERP_STATS
+	     it_retto_UPDATE++;
+#            endif
+             /* Returning this constr to an update frame.  Do the
+                update and re-enter the constr. */
+             ASSERT((W_*)iSu == iSp);
+             UPD_IND(iSu->updatee, obj); 
+             iSu = iSu->link;
+             iSp += sizeofW(StgUpdateFrame);
+             goto nextEnter_obj_CONSTR;
+          }
+#         ifdef INTERP_STATS
+          else it_retto_other++;
+#         endif
+          goto defer_to_sched;
+       }
+
        case AP_UPD:
-        { nat Words;
-          nat i;
+       /* Copied from stg_AP_UPD_entry. */
+       { 
+          nat i, words;
           StgAP_UPD *ap = (StgAP_UPD*)obj;
-          Words = ap->n_args;
+          words = ap->n_args;
 
-	  /* WARNING: do a stack overflow check here !
-             This code (copied from stg_AP_UPD_entry) is not correct without it. */
+	  /* Stack check.  If a stack overflow might occur, don't enter
+             the closure; let the scheduler handle it instead. */
+          if (iSp - (words+sizeofW(StgUpdateFrame)) < iSpLim)
+             goto defer_to_sched;
 
+	  /* Ok; we're safe.  Party on.  Push an update frame. */
           iSp -= sizeofW(StgUpdateFrame);
-
           {
               StgUpdateFrame *__frame;
               __frame = (StgUpdateFrame *)iSp;
@@ -132,21 +290,75 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
               iSu = __frame;
           }
 
-          iSp -= Words;
-
           /* Reload the stack */
-          for (i=0; i<Words; i++) StackWord(i) = (W_)ap->payload[i];
+          iSp -= words;
+          for (i=0; i < words; i++) StackWord(i) = (W_)ap->payload[i];
 
-          iSp--; StackWord(0) = (W_)ap->fun;
-          goto nextEnter;
-        }
-#endif
+          obj = (StgClosure*)ap->fun;
+          goto nextEnter_obj;
+       }
+
+       case PAP:
+       /* Copied from stg_PAP_entry. */
+       {
+          nat     words, i;
+          StgPAP* pap = (StgPAP *)obj;
+  
+          /*
+           * remove any update frames on the top of the stack, by just
+           * performing the update here.
+           */
+          while ((W_)iSu - (W_)iSp == 0) {
+
+             switch (get_itbl(iSu)->type) {
+
+             case UPDATE_FRAME:
+                /* We're sitting on top of an update frame, so let's
+                   do the business. */
+                UPD_IND(iSu->updatee, pap);
+                iSu = iSu->link;
+                iSp += sizeofW(StgUpdateFrame);
+                continue;
+
+             case SEQ_FRAME:
+                /* Too complicated ... adopt the Usual Solution. */
+                fprintf(stderr, "!!! SEQ frame in PAP update\n");
+                goto defer_to_sched;
+
+             case CATCH_FRAME:
+                /* can't happen, see stg_update_PAP */
+                barf("interpretBCO: PAP_entry: CATCH_FRAME");
+
+             default:
+                barf("interpretBCO: PAP_entry: strange activation record");
+             }
+          }
+
+          words = pap->n_args;
+
+	  /* Stack check.  If a stack overflow might occur, don't enter
+             the closure; let the scheduler handle it instead. */
+          if (iSp - words < iSpLim)
+             goto defer_to_sched;
+
+          /* Ok; safe. */         
+          iSp -= words;
+          for (i=0; i < words; i++) StackWord(i) = (W_)pap->payload[i];
+
+          obj = (StgClosure*)pap->fun;
+          goto nextEnter_obj;
+       }
+
+#      endif /* ndef REFERENCE_INTERPRETER */
 
        case BCO:
-
        /* ---------------------------------------------------- */
        /* Start of the bytecode interpreter                    */
        /* ---------------------------------------------------- */
+       nextEnter_obj_BCO:
+#      ifdef INTERP_STATS
+       it_BCO_entries++;
+#      endif
        {
           int do_print_stack = 1;
           register int       bciPtr     = 1; /* instruction pointer */
@@ -159,8 +371,13 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
 
           if (doYouWantToGC()) {
 	     iSp--; StackWord(0) = (W_)bco;
+             cap->rCurrentTSO->what_next = ThreadEnterGHC;
              RETURN(HeapOverflow);
           }
+
+#         ifdef INTERP_STATS
+          it_lastopc = 0; /* no opcode */
+#         endif
 
           nextInsn:
 
@@ -183,6 +400,13 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
 		    //if (do_print_stack) checkStack(iSp,cap->rCurrentTSO->stack+cap->rCurrentTSO->stack_size,iSu);
                   );
 
+#         ifdef INTERP_STATS
+          it_insns++;
+          ASSERT( (int)instrs[bciPtr] >= 0 && (int)instrs[bciPtr] < 26 );
+          it_ofreq[ (int)instrs[bciPtr] ] ++;
+          it_oofreq[ it_lastopc ][ (int)instrs[bciPtr] ] ++;
+          it_lastopc = (int)instrs[bciPtr];
+#         endif
 
           switch (BCO_NEXT) {
 
@@ -192,15 +416,31 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                  int arg_words_reqd = BCO_NEXT;
                  int arg_words_avail = ((W_*)iSu) - ((W_*)iSp);
                  if (arg_words_avail >= arg_words_reqd) goto nextInsn;
-                 /* Handle arg check failure.  Copy the spare args
-                    into a PAP frame. */
-		 /* fprintf(stderr, "arg check fail %d %d\n", arg_words_reqd, arg_words_avail ); */
+
+#                ifndef REFERENCE_INTERPRETER
+
+                 /* Optimisation: if there are no args avail and the
+                    t-o-s is an update frame, do the update, and
+                    re-enter the object. */
+                 if (arg_words_avail == 0 
+                    && get_itbl(iSu)->type == UPDATE_FRAME) {
+                    UPD_IND(iSu->updatee, obj); 
+                    iSu = iSu->link;
+                    iSp += sizeofW(StgUpdateFrame);
+                    goto nextEnter_obj_BCO;
+		 }
+
+#                endif /* ndef REFERENCE_INTERPRETER */
+
+                 /* Handle arg check failure.  General case: copy the
+                    spare args into a PAP frame. */
                  pap = (StgPAP*)allocate_UPD(PAP_sizeW(arg_words_avail));
                  SET_HDR(pap,&stg_PAP_info,CCS_SYSTEM/*ToDo*/);
                  pap->n_args = arg_words_avail;
                  pap->fun = obj;
                  for (i = 0; i < arg_words_avail; i++)
                     pap->payload[i] = (StgClosure*)StackWord(i);
+
                  /* Push on the stack and defer to the scheduler. */
                  iSp = (StgPtr)iSu;
                  iSp --;
@@ -209,7 +449,8 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                           fprintf(stderr,"\tBuilt "); 
                           printObj((StgClosure*)pap);
 		         );
-                 RETURN(ThreadEnterGHC);
+                 cap->rCurrentTSO->what_next = ThreadEnterGHC;
+                 RETURN(ThreadYielding);
               }
               case bci_PUSH_L: {
                  int o1 = BCO_NEXT;
@@ -222,6 +463,8 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
               case bci_PUSH_LL: {
                  int o1 = BCO_NEXT;
                  int o2 = BCO_NEXT;
+                 ASSERT((W_*)iSp+o1 < (W_*)iSu);
+                 ASSERT((W_*)iSp+o2 < (W_*)iSu);
                  StackWord(-1) = StackWord(o1);
                  StackWord(-2) = StackWord(o2);
                  iSp -= 2;
@@ -231,6 +474,9 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                  int o1 = BCO_NEXT;
                  int o2 = BCO_NEXT;
                  int o3 = BCO_NEXT;
+                 ASSERT((W_*)iSp+o1 < (W_*)iSu);
+                 ASSERT((W_*)iSp+o2 < (W_*)iSu);
+                 ASSERT((W_*)iSp+o3 < (W_*)iSu);
                  StackWord(-1) = StackWord(o1);
                  StackWord(-2) = StackWord(o2);
                  StackWord(-3) = StackWord(o3);
@@ -276,6 +522,9 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                     StackWord(n+by) = StackWord(n);
                  }
                  iSp += by;
+#                ifdef INTERP_STATS
+                 it_slides++;
+#                endif
                  goto nextInsn;
               }
               case bci_ALLOC: {
@@ -341,9 +590,6 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                  int request        = CONSTR_sizeW( itbl->layout.payload.ptrs, 
                                                     itbl->layout.payload.nptrs );
                  StgClosure* con = (StgClosure*)allocate_NONUPD(request);
-		 //fprintf(stderr, "---PACK p %d, np %d\n",
-		 //	 (int) itbl->layout.payload.ptrs,
-		 //	 (int) itbl->layout.payload.nptrs );
                  ASSERT( itbl->layout.payload.ptrs + itbl->layout.payload.nptrs > 0);
                  SET_HDR(con, BCO_ITBL(o_itbl), CCS_SYSTEM/*ToDo*/);
                  for (i = 0; i < n_words; i++)
@@ -447,7 +693,8 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                         compiled-code return. */
                      StgInfoTable* magic_itbl = BCO_ITBL(o_itoc_itbl);
                      StackWord(0) = (W_)magic_itbl;
-                     RETURN(ThreadRunGHC);
+                     cap->rCurrentTSO->what_next = ThreadRunGHC;
+                     RETURN(ThreadYielding);
                  }
               }
         
@@ -471,14 +718,23 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
        /* End of the bytecode interpreter                      */
        /* ---------------------------------------------------- */
 
+       defer_to_sched:
        default: {
+#         ifdef INTERP_STATS
+          { int j = get_itbl(obj)->type;
+            ASSERT(j >= 0 && j < N_CLOSURE_TYPES);
+            it_unknown_entries[j]++;
+            it_total_unknown_entries++;
+          }
+#         endif
+
           /* Can't handle this object; yield to sched. */
           IF_DEBUG(evaluator,
                    fprintf(stderr, "entering unknown closure -- yielding to sched\n"); 
                    printObj(obj);
-                  )
-          cap->rCurrentTSO->what_next = ThreadEnterGHC;
+                  );
           iSp--; StackWord(0) = (W_)obj;
+          cap->rCurrentTSO->what_next = ThreadEnterGHC;
           RETURN(ThreadYielding);
        }
     } /* switch on object kind */
