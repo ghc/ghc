@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.97 2002/03/04 23:06:40 qrczak Exp $
+dnl $Id: aclocal.m4,v 1.98 2002/03/12 09:23:01 simonmar Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -407,7 +407,6 @@ AC_DEFUN(FPTOOLS_HAVE_GCC,
 else
 changequote(, )dnl
     is_gcc_v1="`$CC -v 2>&1 | grep 'version ' | sed -e 's/.*version [^0-9]*\([0-9][0-9]*\)\.\([0-9][0-9]*\).*/expr 2000 \\\>= \1 \\\* 1000 + \2/g' `"
-    is_gcc_v3="`$CC -v 2>&1 | grep 'version ' | sed -e 's/.*version [^0-9]*\([0-9][0-9]*\)\.\([0-9][0-9]*\).*/expr 3000 \\\<= \1 \\\* 1000 + \2/g' `"
 changequote([, ])dnl
     fptools_cv_have_gcc='yes'
     if test `eval $is_gcc_v1 2>/dev/null` = "1"; then
@@ -492,7 +491,7 @@ dnl [original version pinched from c2hs]
 dnl
 AC_DEFUN(FPTOOLS_GHC_VERSION,
 [FPTOOLS_NOCACHE_CHECK([version of ghc], [fptools_version_of_ghc],
-[${WithGhc-ghc} --version > conftestghc 2>&1
+["${WithGhc-ghc}" --version > conftestghc 2>&1
   cat conftestghc >&AC_FD_CC
 #Useless Use Of cat award...
   fptools_version_of_ghc=`cat conftestghc | sed -n -e 's/, patchlevel *\([[0-9]]\)/.\1/;s/.* version \([[0-9]][[0-9.]]*\).*/\1/p'`
