@@ -17,7 +17,7 @@ import STBase
 import UnsafeST
 import PrelTup
 import Foreign
-import PackedString	( unpackCString )
+import PackBase	( unpackCString )
 import PrelBase
 import ArrBase	( ByteArray(..), MutableVar(..) )
 import PrelRead
@@ -283,8 +283,10 @@ Showing @IOError@s
 instance Show IOError where
     showsPrec p (IOError _ UserError s) rs =
       showString s rs
+{-
     showsPrec p (IOError _ EOF _) rs =
       showsPrec p EOF rs
+-}
     showsPrec p (IOError _ iot s) rs =
       showsPrec p 
                 iot 
@@ -331,7 +333,7 @@ information.
 constructError	      :: String -> PrimIO IOError
 constructError call_site =
  _casm_ ``%r = ghc_errtype;''    >>= \ (I# errtype#) ->
- _casm_ ``%r = ghc_errstr;''	    >>= \ str ->
+ _casm_ ``%r = ghc_errstr;''	 >>= \ str ->
  let
   iot =
    case errtype# of
@@ -356,10 +358,10 @@ constructError call_site =
      _			         -> OtherError
 
   msg = 
+   call_site ++ ':' : ' ' : unpackCString str ++
    case iot of
-     EOF -> ""
-     OtherError -> "bad error construct"
-     _   -> call_site ++ ':' : ' ' : unpackCString str
+     OtherError -> "(error code: " ++ show (I# errtype#) ++ ")"
+     _ -> ""
  in
  return (IOError Nothing iot msg)
 \end{code}
