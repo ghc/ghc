@@ -745,7 +745,7 @@ rawSystem cmd args =
             0  -> return ExitSuccess
             n  -> return (ExitFailure n)
 
-foreign import ccall unsafe "rawSystem"
+foreign import ccall "rawSystem" unsafe
   c_rawSystem :: CString -> Ptr CString -> IO Int
 
 #else
@@ -770,7 +770,7 @@ translate str = '"' : foldr escape "\"" str
 	escape '\\' str = '\\' : '\\' : str
 	escape c    str = c : str
 
-foreign import ccall unsafe "rawSystem"
+foreign import ccall "rawSystem" unsafe
   c_rawSystem :: CString -> IO Int
 
 #endif
