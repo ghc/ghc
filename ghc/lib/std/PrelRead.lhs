@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelRead.lhs,v 1.19 2001/05/22 19:25:49 qrczak Exp $
+% $Id: PrelRead.lhs,v 1.20 2001/05/23 09:28:44 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -22,10 +22,6 @@ import PrelList
 import PrelMaybe
 import PrelShow		-- isAlpha etc
 import PrelBase
-
--- needed for readIO and instance Read Buffermode
---import PrelIOBase ( IO, userError, BufferMode(..) )
---import PrelException ( ioError )
 \end{code}
 
 %*********************************************************
