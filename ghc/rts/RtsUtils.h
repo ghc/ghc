@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.h,v 1.12 2001/10/31 10:30:29 simonmar Exp $
+ * $Id: RtsUtils.h,v 1.13 2003/03/19 18:56:14 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -34,4 +34,6 @@ char *ullong_format_string(ullong, char *, rtsBool);
 
 ullong   msTime(void);
 
-
+#ifdef DEBUG
+extern void heapCheckFail( void );
+#endif

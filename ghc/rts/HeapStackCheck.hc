@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.hc,v 1.28 2003/02/21 05:34:15 sof Exp $
+ * $Id: HeapStackCheck.hc,v 1.29 2003/03/19 18:56:14 sof Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -13,9 +13,14 @@
 #include "StgRun.h"	/* for StgReturn and register saving */
 #include "Schedule.h"   /* for context_switch */
 #include "RtsFlags.h"
+#include "RtsUtils.h"
 #include "Apply.h"
 
 #include <stdio.h>
+
+#ifdef mingw32_TARGET_OS
+#include <stdlib.h>
+#endif
 
 /* Stack/Heap Check Failure
  * ------------------------
