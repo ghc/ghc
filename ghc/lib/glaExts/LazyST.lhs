@@ -100,8 +100,11 @@ unsafeFreezeSTArray (STArray arr) = strictToLazyST (unsafeFreezeArray arr)
 
 strictToLazyST :: STBase.ST s a -> ST s a
 strictToLazyST (STBase.ST m) = ST $ \s ->
-        let STBase.S# s# = s in
-	case m s# of { STBase.STret s2# r -> (r, STBase.S# s2#) }
+        let 
+	    STBase.S# s# = s
+	    STBase.STret s2# r = m s# 
+	in
+	(r, STBase.S# s2#)
 
 lazyToStrictST :: ST s a -> STBase.ST s a
 lazyToStrictST (ST m) = STBase.ST $ \s ->
