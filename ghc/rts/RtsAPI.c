@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.44 2003/05/23 08:28:48 simonmar Exp $
+ * $Id: RtsAPI.c,v 1.45 2003/08/28 16:33:42 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -29,7 +29,7 @@ rts_mkChar (HsChar c)
 {
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
   SET_HDR(p, Czh_con_info, CCS_SYSTEM);
-  p->payload[0]  = (StgClosure *)(StgChar)c;
+  p->payload[0]  = (StgClosure *)(StgWord)(StgChar)c;
   return p;
 }
 
@@ -258,7 +258,7 @@ rts_getInt32 (HaskellObj p)
     // See comment above:
     // ASSERT(p->header.info == I32zh_con_info ||
     //        p->header.info == I32zh_static_info);
-    return (HsInt32)(p->payload[0]);
+    return (HsInt32)(HsInt)(p->payload[0]);
 }
 
 HsInt64
@@ -304,7 +304,7 @@ rts_getWord32 (HaskellObj p)
     // See comment above:
     // ASSERT(p->header.info == W32zh_con_info ||
     //        p->header.info == W32zh_static_info);
-    return (HsWord32)(p->payload[0]);
+    return (HsWord32)(HsWord)(p->payload[0]);
 }
 
 
