@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.74 2001/06/25 05:25:31 sof Exp $
+dnl $Id: aclocal.m4,v 1.75 2001/06/26 23:12:19 sof Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -197,7 +197,9 @@ AC_DEFUN(FPTOOLS_HAPPY,
 if test -d $srcdir/happy; then
    SrcTreeHappyCmd=$hardtop/happy/src/happy-inplace
 fi
-AC_PATH_PROG(HappyCmd,happy,$SrcTreeHappyCmd)
+#AC_PATH_PROG(HappyCmd,happy,$SrcTreeHappyCmd)
+HappyCmd=$SrcTreeHappyCmd
+AC_SUBST(HappyCmd)
 AC_CACHE_CHECK([for version of happy], fptools_cv_happy_version,
 changequote(, )dnl
 [if test x"$HappyCmd" = x"$SrcTreeHappyCmd"; then
@@ -1063,4 +1065,22 @@ then
   AC_CHECK_PROG(LEX,lex,lex)
   test -z "$LEX" && AC_MSG_ERROR(['lex' or 'flex' is required to compile GHC.])
 fi
+])
+
+dnl
+dnl Check to see whether CC (gcc) supports the -mwin32 option.
+dnl 
+AC_DEFUN(FPTOOLS_CC_MWIN32,
+[AC_CACHE_CHECK([whether $CC accepts -mwin32], ac_cv_cc_supports_mwin32,
+[save_CFLAGS="$CFLAGS"
+ CFLAGS="$CFLAGS -mwin32"
+ AC_LANG_C
+ AC_TRY_COMPILE(,[int main(){return(0);}], ac_cv_cc_supports_mwin32=yes, ac_cv_cc_supports_mwin32=no)
+ CFLAGS="$CFLAGS_save"])
+if test "$ac_cv_cc_supports_mwin32" = yes; then
+  CC_MWIN32_FLAG="-mwin32";
+else
+  CC_MWIN32_FLAG="";
+fi;
+AC_SUBST(CC_MWIN32_FLAG)
 ])
