@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.11 2002/02/11 12:31:30 simonmar Exp $
+# $Id: Makefile,v 1.12 2002/02/11 17:10:56 simonmar Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -40,6 +40,10 @@ ALL_DIRS = \
 PKG = base
 
 SRC_HC_OPTS += -fglasgow-exts -cpp -Iinclude
+SRC_HSC2HS_OPTS += -Iinclude
+
+# ESSENTIAL, for getting reasonable performance from the I/O library:
+GHC/IOBase_HC_OPTS   = -funbox-strict-fields 
 
 # -----------------------------------------------------------------------------
 # PrimOpWrappers
