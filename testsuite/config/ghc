@@ -27,6 +27,7 @@ config.way_flags = { 'normal' : [],
 		     'opt'    : ['-O'],
 		     'optasm' : ['-O -fasm'],
 	  	     'prof'   : ['-O -prof -auto-all'],
-		     'unreg'  : ['-unreg'],
-		     'ghci'   : ['--interactive', '-v0']
+		     'unreg'  : ['-unreg']
 		   }
+
+#		     'ghci'   : ['--interactive', '-v0']
