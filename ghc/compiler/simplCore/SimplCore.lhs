@@ -35,7 +35,8 @@ import FiniteMap	( FiniteMap )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
 import FoldrBuildWW	( mkFoldrBuildWW )
-import Id		( mkSysLocal, setIdVisibility, mkIdWithNewName, getIdDemandInfo, idType,
+import Id		( mkSysLocal, setIdVisibility, replaceIdInfo, replacePragmaInfo, getIdDemandInfo, idType,
+			  getIdInfo, getPragmaInfo,
 			  nullIdEnv, addOneToIdEnv, delOneFromIdEnv,
  			  lookupIdEnv, SYN_IE(IdEnv), omitIfaceSigForId,
 			  GenId{-instance Outputable-}, SYN_IE(Id)
@@ -52,9 +53,8 @@ import Type		( maybeAppDataTyCon, isPrimType, SYN_IE(Type) )
 import TysWiredIn	( stringTy )
 import LiberateCase	( liberateCase )
 import MagicUFs		( MagicUnfoldingFun )
-import Outputable	( Outputable(..){-instance * (,) -} )
+import Outputable	( PprStyle(..), Outputable(..){-instance * (,) -} )
 import PprCore
-import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instance Outputable-}, GenTyVar{-ditto-} )
 import Pretty		( Doc, vcat, ($$), hsep )
 import SAT		( doStaticArgs )
@@ -425,7 +425,8 @@ tidyCorePgm mod us binds_in
 				Var rhs_id -> Just rhs_id
 				other	   -> Nothing
 	   Just rhs_id  = maybe_rhs_id
-	   new_rhs_id   = mkIdWithNewName rhs_id (getName exported_binder)
+	   new_rhs_id   = exported_binder `replaceIdInfo`     getIdInfo rhs_id
+					  `replacePragmaInfo` getPragmaInfo rhs_id
 				-- NB: we keep the Pragmas and IdInfo for the old rhs_id!
 				-- This is important; it might be marked "no-inline" by
 				-- the occurrence analyser (because it's recursive), and
