@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.63 2002/05/11 00:16:12 sof Exp $
+ * $Id: RtsStartup.c,v 1.64 2002/06/26 08:18:41 stolz Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -25,6 +25,7 @@
 #include "Prelude.h"		/* fixupRTStoPreludeRefs */
 #include "HsFFI.h"
 #include "Linker.h"
+#include "ThreadLabels.h"
 
 #if defined(RTS_GTK_FRONTPANEL)
 #include "FrontPanel.h"
@@ -155,6 +156,9 @@ startupHaskell(int argc, char *argv[], void (*init_root)(void))
 
     /* initialise the stable pointer table */
     initStablePtrTable();
+
+    /* initialise thread label table (tso->char*) */
+    initThreadLabelTable();
 
 #if defined(PROFILING) || defined(DEBUG)
     initProfiling1();

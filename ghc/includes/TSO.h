@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.26 2002/04/10 11:43:44 stolz Exp $
+ * $Id: TSO.h,v 1.27 2002/06/26 08:18:41 stolz Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -178,9 +178,6 @@ typedef struct StgTSO_ {
   StgTSOBlockInfo    block_info;
   struct StgTSO_*    blocked_exceptions;
   StgThreadID        id;
-#ifdef DEBUG
-  char*              label;
-#endif
 
   StgTSOTickyInfo    ticky; 
   StgTSOProfInfo     prof;

@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.145 2002/06/19 20:45:15 sof Exp $
+ * $Id: Schedule.c,v 1.146 2002/06/26 08:18:42 stolz Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -96,6 +96,7 @@
 #include "Stats.h"
 #include "Itimer.h"
 #include "Prelude.h"
+#include "ThreadLabels.h"
 #ifdef PROFILING
 #include "Proftimer.h"
 #include "ProfHeap.h"
@@ -451,8 +452,7 @@ schedule( void )
 	  m->stat = Success;
 	  broadcastCondition(&m->wakeup);
 #ifdef DEBUG
-	  free(m->tso->label);
-	  m->tso->label = NULL;
+	  removeThreadLabel(m->tso);
 #endif
 	  break;
 	case ThreadKilled:
@@ -465,8 +465,7 @@ schedule( void )
 	  }
 	  broadcastCondition(&m->wakeup);
 #ifdef DEBUG
-	  free(m->tso->label);
-	  m->tso->label = NULL;
+	  removeThreadLabel(m->tso);
 #endif
 	  break;
 	default:
@@ -488,8 +487,7 @@ schedule( void )
       if (m->tso->what_next == ThreadComplete
 	  || m->tso->what_next == ThreadKilled) {
 #ifdef DEBUG
-	free(m->tso->label);
-	m->tso->label = NULL;
+	removeThreadLabel((StgWord)m->tso);
 #endif
 	main_threads = main_threads->link;
 	if (m->tso->what_next == ThreadComplete) {
@@ -1648,14 +1646,13 @@ void labelThread(StgTSO *tso, char *label)
 
   /* Caveat: Once set, you can only set the thread name to "" */
   len = strlen(label)+1;
-  buf = realloc(tso->label,len);
+  buf = malloc(len);
   if (buf == NULL) {
     fprintf(stderr,"insufficient memory for labelThread!\n");
-    free(tso->label);
-    tso->label = NULL;
   } else
     strncpy(buf,label,len);
-  tso->label = buf;
+  /* Update will free the old memory for us */
+  updateThreadLabel((StgWord)tso,buf);
 }
 #endif /* DEBUG */
 
@@ -1719,10 +1716,6 @@ createThread(nat size)
   SET_GRAN_HDR(tso, ThisPE);
 #endif
   tso->what_next     = ThreadEnterGHC;
-
-#ifdef DEBUG
-  tso->label = NULL;
-#endif
 
   /* tso->id needs to be unique.  For now we use a heavyweight mutex to
    * protect the increment operation on next_thread_id.
@@ -3583,6 +3576,7 @@ void
 printAllThreads(void)
 {
   StgTSO *t;
+  void *label;
 
 # if defined(GRAN)
   char time_string[TIME_STR_LEN], node_str[NODE_STR_LEN];
@@ -3601,8 +3595,9 @@ printAllThreads(void)
 # endif
 
   for (t = all_threads; t != END_TSO_QUEUE; t = t->global_link) {
-    fprintf(stderr, "\tthread %d ", t->id);
-    if (t->label) fprintf(stderr,"[\"%s\"] ",t->label);
+    fprintf(stderr, "\tthread %d @ %p ", t->id, (void *)t);
+    label = lookupThreadLabel((StgWord)t);
+    if (label) fprintf(stderr,"[\"%s\"] ",(char *)label);
     printThreadStatus(t);
     fprintf(stderr,"\n");
   }

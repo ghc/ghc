@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.98 2002/04/23 11:22:12 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.99 2002/06/26 08:18:41 stolz Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1059,9 +1059,11 @@ FN_(myThreadIdzh_fast)
 FN_(labelThreadzh_fast)
 {
   FB_
-  /* args: R1.p = Addr# */
+  /* args: 
+	R1.p = ThreadId#
+	R2.p = Addr# */
 #ifdef DEBUG
-  STGCALL2(labelThread,CurrentTSO,(char *)R1.p);
+  STGCALL2(labelThread,(StgTSO *)R1.p,(char *)R2.p);
 #endif
   JMP_(ENTRY_CODE(Sp[0]));
   FE_

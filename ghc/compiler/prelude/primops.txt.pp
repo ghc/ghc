@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.20 2002/06/18 13:58:24 simonpj Exp $
+-- $Id: primops.txt.pp,v 1.21 2002/06/26 08:18:38 stolz Exp $
 --
 -- Primitive Operations
 --
@@ -1442,7 +1442,7 @@ primop  MyThreadIdOp "myThreadId#" GenPrimOp
    out_of_line = True
 
 primop LabelThreadOp "labelThread#" GenPrimOp
-   Addr# -> State# RealWorld -> State# RealWorld
+   ThreadId# -> Addr# -> State# RealWorld -> State# RealWorld
    with
    has_side_effects = True
    out_of_line      = True
