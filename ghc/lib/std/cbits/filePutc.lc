@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1994
 %
-\subsection[filePuc.lc]{hPutChar Runtime Support}
+\subsection[filePut.lc]{hPutChar Runtime Support}
 
 \begin{code}
 
@@ -16,7 +16,7 @@ StgInt c;
 {
     int rc;
 
-    /* Try to read a character */
+    /* Try to write a character */
     while ((rc = putc((int) c, (FILE *) fp)) == EOF && errno == EINTR)
 	clearerr((FILE *) fp);
 
