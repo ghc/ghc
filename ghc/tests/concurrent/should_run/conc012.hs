@@ -2,13 +2,18 @@ module Main where
 
 import Concurrent
 import Exception
+import GlaExts
 
 data Result = Died Exception | Finished
 
 -- Test stack overflow catching.  Should print "Died: stack overflow".
 
+stackoverflow :: Int -> Int
+stackoverflow 0 = 1
+stackoverflow n = n + stackoverflow n
+
 main = do
-  let x = sum [1..100000]  -- relies on sum being implemented badly :-)
+  let x = stackoverflow 1
   result <- newEmptyMVar 
   forkIO (catchAllIO (x `seq` putMVar result Finished) 
 		     (\e -> putMVar result (Died e)))
