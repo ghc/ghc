@@ -912,6 +912,22 @@ Plan C (brutal)
   Return the bindings from Step 1.
   
 
+A note about Plan C (arising from "bug" reported by George Russel March 2004)
+Consider this:
+
+      instance (HasBinary ty IO) => HasCodedValue ty
+
+      foo :: HasCodedValue a => String -> IO a
+
+      doDecodeIO :: HasCodedValue a => () -> () -> IO a
+      doDecodeIO codedValue view  
+        = let { act = foo "foo" } in  act
+
+You might think this should work becuase the call to foo gives rise to a constraint
+(HasCodedValue t), which can be satisfied by the type sig for doDecodeIO.  But the
+restricted binding act = ... calls tcSimplifyRestricted, and PlanC simplifies the
+constraint using the (rather bogus) instance declaration, and now we are stuffed.
+I claim this is not really a bug.  
 
 \begin{code}
 tcSimplifyRestricted 	-- Used for restricted binding groups
