@@ -26,7 +26,6 @@ module GHC.Conc
 	, pseq 		-- :: a -> b -> b
 	, yield         -- :: IO ()
 	, labelThread	-- :: ThreadId -> String -> IO ()
-	, forkProcessPrim -- :: IO Int
 
 	-- Waiting
 	, threadDelay	  	-- :: Int -> IO ()
@@ -153,29 +152,6 @@ labelThread (ThreadId t) str = IO $ \ s ->
    let ps  = packCString# str
        adr = byteArrayContents# ps in
      case (labelThread# t adr s) of s1 -> (# s1, () #)
-
-{- | This function is a replacement for 'System.Posix.Process.forkProcessAll':
-This implementation /will stop all other Concurrent Haskell threads/ in the
-(heavyweight) forked copy.
-'forkProcessPrim' returns the pid of the child process to the parent, 0 to the
-child, and a value less than 0 in case of errors. See also:
-'System.Posix.Process.forkProcess' in package @unix@.
-
-Without this function, you need excessive and often impractical
-explicit synchronization using the regular Concurrent Haskell constructs to assure
-that only the desired thread is running after the fork().
-
-The stopped threads are /not/ garbage collected! This behaviour may change in
-future releases.
-
-NOTE: currently, main threads are not stopped in the child process.
-To work around this problem, call 'forkProcessPrim' from the main thread. 
--}
-
--- XXX RTS should know about 'pid_t'.
-
-forkProcessPrim :: IO Int
-forkProcessPrim = IO $ \s -> case (forkProcess# s) of (# s1, id #) -> (# s1, (I# id) #)
 
 -- 	Nota Bene: 'pseq' used to be 'seq'
 --		   but 'seq' is now defined in PrelGHC
