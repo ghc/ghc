@@ -33,11 +33,13 @@ module PrelConc
 	, putMVar  	-- :: MVar a -> a -> IO ()
 	, readMVar 	-- :: MVar a -> IO a
 	, swapMVar 	-- :: MVar a -> a -> IO a
+	, takeMaybeMVar -- :: MVar a -> IO (Maybe a)
 	, isEmptyMVar	-- :: MVar a -> IO Bool
 
     ) where
 
 import PrelBase
+import PrelMaybe
 import PrelErr ( parError, seqError )
 import PrelST	  	( liftST )
 import PrelIOBase	( IO(..), MVar(..), unsafePerformIO )
@@ -115,48 +117,51 @@ writes.
 --Defined in IOBase to avoid cycle: data MVar a = MVar (SynchVar# RealWorld a)
 
 newEmptyMVar  :: IO (MVar a)
-
 newEmptyMVar = IO $ \ s# ->
     case newMVar# s# of
          (# s2#, svar# #) -> (# s2#, MVar svar# #)
 
 takeMVar :: MVar a -> IO a
-
 takeMVar (MVar mvar#) = IO $ \ s# -> takeMVar# mvar# s#
 
 putMVar  :: MVar a -> a -> IO ()
-
 putMVar (MVar mvar#) x = IO $ \ s# ->
     case putMVar# mvar# x s# of
         s2# -> (# s2#, () #)
 
 newMVar :: a -> IO (MVar a)
-
 newMVar value =
     newEmptyMVar	>>= \ mvar ->
     putMVar mvar value	>>
     return mvar
 
 readMVar :: MVar a -> IO a
-
 readMVar mvar =
     takeMVar mvar	>>= \ value ->
     putMVar mvar value	>>
     return value
 
 swapMVar :: MVar a -> a -> IO a
-
 swapMVar mvar new =
     takeMVar mvar	>>= \ old ->
     putMVar mvar new	>>
     return old
+
+-- takeMaybeMVar is a non-blocking takeMVar
+takeMaybeMVar :: MVar a -> IO (Maybe a)
+takeMaybeMVar (MVar m) = IO $ \ s ->
+    case takeMaybeMVar# m s of
+	(# s, 0#, _ #) -> (# s, Nothing #)	-- MVar is empty
+	(# s, _,  a #) -> (# s, Just a  #)	-- MVar is full
 
 {- 
  Low-level op. for checking whether an MVar is filled-in or not.
  Notice that the boolean value returned  is just a snapshot of
  the state of the MVar. By the time you get to react on its result,
  the MVar may have been filled (or emptied) - so be extremely
- careful when using this operation.
+ careful when using this operation.  
+
+ Use takeMaybeMVar instead if possible.
 
  If you can re-work your abstractions to avoid having to
  depend on isEmptyMVar, then you're encouraged to do so,
