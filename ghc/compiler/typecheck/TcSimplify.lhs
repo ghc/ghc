@@ -1487,7 +1487,7 @@ addAvailAndSCs avails inst avail
   | otherwise		   = addSCs is_loop avails1 inst 
   where
     avails1 = addToFM avails inst avail
-    is_loop inst = inst `elem` deps
+    is_loop inst = inst `elem` deps	-- Note: this compares by *type*, not by Unique
     deps         = findAllDeps avails avail
 
 findAllDeps :: Avails -> Avail -> [Inst]
@@ -1509,10 +1509,6 @@ addSCs :: (Inst -> Bool) -> Avails -> Inst -> NF_TcM Avails
 	-- Invariant: the Inst is already in Avails.
 
 addSCs is_loop avails dict
-  | is_loop dict	-- See Note [SUPERCLASS-LOOP]
-  = returnNF_Tc avails
-
-  | otherwise	-- No loop
   = newDictsFromOld dict sc_theta'	`thenNF_Tc` \ sc_dicts ->
     foldlNF_Tc add_sc avails (zipEqual "add_scs" sc_dicts sc_sels)
   where
@@ -1524,8 +1520,10 @@ addSCs is_loop avails dict
       = case lookupFM avails sc_dict of
 	  Just (Given _ _) -> returnNF_Tc avails	-- Given is cheaper than
 							--   a superclass selection
-	  Just other       -> returnNF_Tc avails'	-- SCs already added
-	  Nothing	   -> addSCs is_loop avails' sc_dict
+	  Just other | is_loop sc_dict -> returnNF_Tc avails	-- See Note [SUPERCLASS-LOOP]
+		     | otherwise       -> returnNF_Tc avails'	-- SCs already added
+
+	  Nothing -> addSCs is_loop avails' sc_dict
       where
 	sc_sel_rhs = DictApp (TyApp (HsVar sc_sel) tys) [instToId dict]
 	avail      = Rhs sc_sel_rhs [dict]
