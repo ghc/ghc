@@ -28,6 +28,10 @@ import TcExpr		( tcCheckSigma )
 
 import ErrUtils		( Message )
 import Id		( Id, mkLocalId, mkExportedLocalId )
+#if alpha_TARGET_ARCH
+import PrimRep		( getPrimRepSize, isFloatingRep )
+import Type		( typePrimRep )
+#endif
 import OccName		( mkForeignExportOcc )
 import Name		( Name, NamedThing(..), mkExternalName )
 import TcType		( Type, tcSplitFunTys, tcSplitTyConApp_maybe,
