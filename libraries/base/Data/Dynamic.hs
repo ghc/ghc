@@ -193,6 +193,7 @@ dynApp f x = case dynApply f x of
                                "Can't apply function " ++ show f ++
                                " to argument " ++ show x)
 
+#ifndef __HUGS__
 -------------------------------------------------------------
 --
 --		Type representations
@@ -201,7 +202,6 @@ dynApp f x = case dynApply f x of
 
 -- | A concrete representation of a (monomorphic) type.  'TypeRep'
 -- supports reasonably efficient equality.
-#ifndef __HUGS__
 data TypeRep = TypeRep !Key TyCon [TypeRep] 
 
 -- Compare keys for equality
