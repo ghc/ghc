@@ -250,7 +250,7 @@ schemeR_wrk is_top original_body nm (args, body)
      where
         maybe_toplevel_null_con_rhs
            | is_top && null args
-           = case snd body of
+           = case nukeTyArgs (snd body) of
                 AnnVar v_wrk 
                    -> case isDataConId_maybe v_wrk of
                          Nothing -> Nothing
@@ -261,6 +261,10 @@ schemeR_wrk is_top original_body nm (args, body)
                 other -> Nothing
            | otherwise
            = Nothing
+
+        nukeTyArgs (AnnApp f (_, AnnType _)) = nukeTyArgs (snd f)
+        nukeTyArgs other                     = other
+
 
 -- Let szsw be the sizes in words of some items pushed onto the stack,
 -- which has initial depth d'.  Return the values which the stack environment
@@ -492,11 +496,13 @@ schemeE d s p other
 --     (the VoidRep takes up zero stack space).  Also, spot
 --     (# b #) and treat it as  b.
 --
--- 3.  Application of a non-nullary constructor, by defn saturated.
+-- 3.  The fn denotes a ccall.  Defer to generateCCall.
+--
+-- 4.  Application of a non-nullary constructor, by defn saturated.
 --     Split the args into ptrs and non-ptrs, and push the nonptrs, 
 --     then the ptrs, and then do PACK and RETURN.
 --
--- 4.  Otherwise, it must be a function call.  Push the args
+-- 5.  Otherwise, it must be a function call.  Push the args
 --     right to left, SLIDE and ENTER.
 
 schemeT :: Int 		-- Stack depth
@@ -513,7 +519,7 @@ schemeT d s p app
 --   | trace ("\nschemeT\n" ++ showSDoc (pprCoreExpr (deAnnotate app)) ++ "\n") False
 --   = error "?!?!" 
 
-   -- Handle case 0
+   -- Case 0
    | Just (arg, constr_names) <- maybe_is_tagToEnum_call
    = pushAtom True d p arg 		`thenBc` \ (push, arg_words) ->
      implement_tagToId constr_names	`thenBc` \ tagToId_sequence ->
@@ -521,14 +527,14 @@ schemeT d s p app
                     `appOL`  mkSLIDE 1 (d+arg_words-s)
                     `snocOL` ENTER)
 
-   -- Handle case 1
+   -- Case 1
    | is_con_call && null args_r_to_l
    = returnBc (
         (PUSH_G (Left (getName con)) `consOL` mkSLIDE 1 (d-s))
         `snocOL` ENTER
      )
 
-   -- Handle case 2
+   -- Case 2
    | let isVoidRepAtom (_, AnnVar v)    = VoidRep == typePrimRep (idType v)
          isVoidRepAtom (_, AnnNote n e) = isVoidRepAtom e
      in  is_con_call && isUnboxedTupleCon con 
@@ -541,10 +547,11 @@ schemeT d s p app
      schemeT d s p (head args_r_to_l)
      --)
 
+   -- Case 3
    | Just (CCall ccall_spec) <- isFCallId_maybe fn
    = generateCCall d s p ccall_spec fn args_r_to_l
 
-   -- Cases 3 and 4
+   -- Cases 4 and 5
    | otherwise
    = if   is_con_call && isUnboxedTupleCon con
      then unboxedTupleException
