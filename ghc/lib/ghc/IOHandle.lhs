@@ -510,8 +510,6 @@ hFlush handle =
 \begin{code}
 data HandlePosn = HandlePosn Handle Int
 
-instance Eq HandlePosn{-partain-}
-
 data SeekMode    =  AbsoluteSeek | RelativeSeek | SeekFromEnd
                     deriving (Eq, Ord, Ix, Enum, Read, Show)
 \end{code}
