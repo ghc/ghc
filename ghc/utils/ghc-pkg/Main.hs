@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.25 2002/06/12 22:04:27 wolfgang Exp $
+-- $Id: Main.hs,v 1.26 2002/07/02 10:31:39 wolfgang Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -298,8 +298,13 @@ autoBuildGHCiLib dir batch_file ghci_file = do
   let ghci_lib_file  = dir ++ '/':ghci_file
       batch_lib_file = dir ++ '/':batch_file
   hPutStr stderr ("building GHCi library `" ++ ghci_lib_file ++ "'...")
+#ifdef darwin_TARGET_OS
+  system("ld -r -x -o " ++ ghci_lib_file ++ 
+	 " -all_load " ++ batch_lib_file)
+#else
   system("ld -r -x -o " ++ ghci_lib_file ++ 
 	 " --whole-archive " ++ batch_lib_file)
+#endif
   hPutStrLn stderr (" done.")
 
 -----------------------------------------------------------------------------
