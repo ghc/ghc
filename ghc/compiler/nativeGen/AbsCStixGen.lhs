@@ -46,7 +46,7 @@ import DataCon		( dataConWrapId )
 import BitSet 		( intBS )
 import Name             ( NamedThing(..) )
 import Char		( ord )
-import CmdLineOpts	( opt_Static )
+import CmdLineOpts	( opt_Static, opt_EnsureSplittableC )
 \end{code}
 
 For each independent chunk of AbstractC code, we generate a list of
@@ -263,7 +263,9 @@ split-mangler later on and used to split the assembly into chunks.
 
 \begin{code}
 
- gencode CSplitMarker = returnUs (\xs -> StLabel mkSplitMarkerLabel : xs)
+ gencode CSplitMarker
+   | opt_EnsureSplittableC = returnUs (\xs -> StLabel mkSplitMarkerLabel : xs)
+   | otherwise             = returnUs id
 
 \end{code}
 
