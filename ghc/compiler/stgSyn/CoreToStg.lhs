@@ -228,22 +228,7 @@ coreBindToStg top_lev env (NonRec binder rhs)
 		-- But we don't want to discard exported things.  They can
 		-- occur; e.g. an exported user binding f = g
 
-{-
-	([], StgLam _ bndrs (StgApp var args))
-		| bndrs `eqArgs` args && not (isExportedId binder)
-		     -> returnUs (NoBindF, extendVarEnv env binder var)
-		-- a binding of the form  z = \x1..xn -> f x1..xn we can
-	  	-- eta-reduce to z = f, which will be inlined as above
-		-- These bindings sometimes occur after things like type 
-		-- coercions have been removed.
-
-		where eqArgs [] [] = True
-		      eqArgs (x:xs) (StgVarArg y : ys) = x == y && eqArgs xs ys
-		      eqArgs _ _ = False
--}
-
-	other -> newLocalId top_lev env binder 
-			`thenUs` \ (new_env, new_binder) ->
+	other -> newLocalId top_lev env binder		`thenUs` \ (new_env, new_binder) ->
 		 returnUs (NonRecF new_binder stg_rhs dem floats, new_env)
   where
     dem = bdrDem binder
@@ -674,6 +659,7 @@ mkStgApp env fn args ty
            let ccall' = setCCallUnique ccall uniq in
 	   returnUs (StgPrimApp (CCallOp ccall') args' ty')
 	   
+
       PrimOpId op 
 	-> saturate fn_alias args ty	$ \ args' ty' ->
 	   returnUs (StgPrimApp op args' ty')
