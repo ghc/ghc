@@ -38,6 +38,23 @@ module Text.ParserCombinators.ReadP
   munch1,     -- :: (Char -> Bool) -> ReadP String
   skipSpaces, -- :: ReadP ()
   choice,     -- :: [ReadP a] -> ReadP a
+  count,      -- :: Int -> ReadP a -> ReadP [a]
+  between,    -- :: ReadP open -> ReadP close -> ReadP a -> ReadP a
+  option,     -- :: a -> ReadP a -> ReadP a
+  optional,   -- :: ReadP a -> ReadP ()
+  many,       -- :: ReadP a -> ReadP [a]
+  many1,      -- :: ReadP a -> ReadP [a]
+  skipMany,   -- :: ReadP a -> ReadP ()
+  skipMany1,  -- :: ReadP a -> ReadP ()
+  sepBy,      -- :: ReadP a -> ReadP sep -> ReadP [a]
+  sepBy1,     -- :: ReadP a -> ReadP sep -> ReadP [a]
+  endBy,      -- :: ReadP a -> ReadP sep -> ReadP [a]
+  endBy1,     -- :: ReadP a -> ReadP sep -> ReadP [a]
+  chainr,     -- :: ReadP a -> ReadP (a -> a -> a) -> a -> ReadP a
+  chainl,     -- :: ReadP a -> ReadP (a -> a -> a) -> a -> ReadP a
+  chainl1,    -- :: ReadP a -> ReadP (a -> a -> a) -> ReadP a
+  chainr1,    -- :: ReadP a -> ReadP (a -> a -> a) -> ReadP a
+  manyTill,   -- :: ReadP a -> ReadP end -> ReadP [a]
   
   -- * Running a parser
   ReadS,      -- :: *; = String -> [(a,String)]
@@ -49,11 +66,13 @@ module Text.ParserCombinators.ReadP
   )
  where
 
-import Control.Monad( MonadPlus(..) )
+import Control.Monad( MonadPlus(..), sequence, liftM2 )
+
 #ifdef __GLASGOW_HASKELL__
 #ifndef __HADDOCK__
 import {-# SOURCE #-} GHC.Unicode ( isSpace  )
 #endif
+import GHC.List ( replicate )
 import GHC.Base
 #else
 import Data.Char( isSpace )
@@ -276,6 +295,101 @@ skipSpaces =
  where
   skip (c:s) | isSpace c = do get; skip s
   skip _                 = do return ()
+
+count :: Int -> ReadP a -> ReadP [a]
+-- ^ @count n p@ parses @n@ occurrences of @p@ in sequence. A list of
+--   results is returned.
+count n p = sequence (replicate n p)
+
+between :: ReadP open -> ReadP close -> ReadP a -> ReadP a
+-- ^ @between open close p@ parses @open@, followed by @p@ and finally
+--   @close@. Only the value of @p@ is returned.
+between open close p = do open
+                          x <- p
+                          close
+                          return x
+
+option :: a -> ReadP a -> ReadP a
+-- ^ @option x p@ will either parse @p@ or return @x@ without consuming
+--   any input.
+option x p = p +++ return x
+
+optional :: ReadP a -> ReadP ()
+-- ^ @optional p@ optionally parses @p@ and always returns @()@.
+optional p = (p >> return ()) +++ return ()
+
+many :: ReadP a -> ReadP [a]
+-- ^ Parses zero or more occurrences of the given parser.
+many p = return [] +++ many1 p
+
+many1 :: ReadP a -> ReadP [a]
+-- ^ Parses one or more occurrences of the given parser.
+many1 p = liftM2 (:) p (many p)
+
+skipMany :: ReadP a -> ReadP ()
+-- ^ Like 'many', but discards the result.
+skipMany p = many p >> return ()
+
+skipMany1 :: ReadP a -> ReadP ()
+-- ^ Like 'many1', but discards the result.
+skipMany1 p = p >> skipMany p
+
+sepBy :: ReadP a -> ReadP sep -> ReadP [a]
+-- ^ @sepBy p sep@ parses zero or more occurrences of @p@, separated by @sep@.
+--   Returns a list of values returned by @p@.
+sepBy p sep = sepBy1 p sep +++ return []
+
+sepBy1 :: ReadP a -> ReadP sep -> ReadP [a]
+-- ^ @sepBy1 p sep@ parses one or more occurrences of @p@, separated by @sep@.
+--   Returns a list of values returned by @p@.
+sepBy1 p sep = liftM2 (:) p (many (sep >> p))
+
+endBy :: ReadP a -> ReadP sep -> ReadP [a]
+-- ^ @endBy p sep@ parses zero or more occurrences of @p@, separated and ended
+--   by @sep@.
+endBy p sep = many (do x <- p ; sep ; return x)
+
+endBy1 :: ReadP a -> ReadP sep -> ReadP [a]
+-- ^ @endBy p sep@ parses one or more occurrences of @p@, separated and ended
+--   by @sep@.
+endBy1 p sep = many1 (do x <- p ; sep ; return x)
+
+chainr :: ReadP a -> ReadP (a -> a -> a) -> a -> ReadP a
+-- ^ @chainr p op x@ parses zero or more occurrences of @p@, separated by @op@.
+--   Returns a value produced by a /right/ associative application of all
+--   functions returned by @op@. If there are no occurrences of @p@, @x@ is
+--   returned.
+chainr p op x = chainr1 p op +++ return x
+
+chainl :: ReadP a -> ReadP (a -> a -> a) -> a -> ReadP a
+-- ^ @chainl p op x@ parses zero or more occurrences of @p@, separated by @op@.
+--   Returns a value produced by a /left/ associative application of all
+--   functions returned by @op@. If there are no occurrences of @p@, @x@ is
+--   returned.
+chainl p op x = chainl1 p op +++ return x
+
+chainr1 :: ReadP a -> ReadP (a -> a -> a) -> ReadP a
+-- ^ Like 'chainr', but parses one or more occurrences of @p@.
+chainr1 p op = scan
+  where scan   = p >>= rest
+        rest x = do f <- op
+                    y <- scan
+                    return (f x y)
+                 +++ return x
+
+chainl1 :: ReadP a -> ReadP (a -> a -> a) -> ReadP a
+-- ^ Like 'chainl', but parses one or more occurrences of @p@.
+chainl1 p op = p >>= rest
+  where rest x = do f <- op
+                    y <- p
+                    rest (f x y)
+                 +++ return x
+
+manyTill :: ReadP a -> ReadP end -> ReadP [a]
+-- ^ @manyTill p end@ parses zero or more occurrences of @p@, until @end@
+--   succeeds. Returns a list of values returned by @p@.
+manyTill p end = scan
+  where scan = (end >> return []) <++ (liftM2 (:) p scan)
 
 -- ---------------------------------------------------------------------------
 -- Converting between ReadP and Read
