@@ -42,13 +42,38 @@ Haskell side.
 
 /* Heavily arch-specific, I'm afraid.. */
 #if defined(i386_TARGET_ARCH)
+
+/* Now here's something obscure for you:
+
+   When generating an adjustor thunk that uses the C calling
+   convention, we have to make sure that the thunk kicks off
+   the process of jumping into Haskell with a tail jump. Why?
+   Because as a result of jumping in into Haskell we may end
+   up freeing the very adjustor thunk we came from using
+   freeHaskellFunctionPtr(). Hence, we better not return to
+   the adjustor code on our way  out, since it could by then
+   point to junk.
+
+   The fix is readily at hand, just include the opcodes
+   for the C stack fixup code that we need to perform when
+   returning in some static piece of memory and arrange
+   to return to it before tail jumping from the adjustor thunk.
+
+   For this to work we make the assumption that bytes in .data
+   are considered executable.
+*/
+static unsigned char __obscure_ccall_ret_code [] = 
+  { 0x83, 0xc4, 0x04 /* addl $0x4, %esp */
+  , 0xc3             /* ret */
+  };
+
 void*
 createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
 {
   void *adjustor;
   unsigned char* adj_code;
   size_t sizeof_adjustor;
-
+  
   if (cconv == 0) { /* the adjustor will be _stdcall'ed */
 
     /* Magic constant computed by inspecting the code length of
@@ -90,24 +115,29 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
      the following assembly language snippet
      (offset and machine code prefixed):
 
-  <00>: 68 ef be ad de    pushl  $0xdeadbeef  	   # constant is large enough to
+  <00>: 68 ef be ad de     pushl  $0xdeadbeef  	   # constant is large enough to
         			   	           # hold a StgStablePtr
-  <05>:	b8 fa ef ff 00	  movl   $0x00ffeffa, %eax # load up wptr
-  <0a>: ff d0             call   %eax        	   # and call it.
-  <0c>:	83 c4 04	  addl   $0x4,%esp	   # remove stable pointer.
-  <0f>:	c3	          ret			   # return to where you came from.
+  <05>:	b8 fa ef ff 00	   movl   $0x00ffeffa, %eax # load up wptr
+  <0a>: 68 ef be ad de     pushl  $__obscure_ccall_ret_code # push the return address
+  <0f>: ff e0              jmp    *%eax            # jump to wptr
 
     The ccall'ing version is a tad different, passing in the return
     address of the caller to the auto-generated C stub (which enters
     via the stable pointer.) (The auto-generated C stub is in on this
     game, don't worry :-)
 
-    The adjustor makes the assumption that any return value
+    See the comment next to __obscure_ccall_ret_code why we need to
+    perform a tail jump instead of a call, followed by some C stack
+    fixup.
+
+    Note: The adjustor makes the assumption that any return value
     coming back from the C stub is not stored on the stack.
     That's (thankfully) the case here with the restricted set of 
     return types that we support.
+
+
   */
-    sizeof_adjustor = 16*sizeof(char);
+    sizeof_adjustor = 17*sizeof(char);
 
     if ((adjustor = stgMallocBytes(sizeof_adjustor,"createAdjustor")) == NULL) {
         return NULL;
@@ -121,15 +151,12 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
     adj_code[0x05] = (unsigned char)0xb8;  /* movl  $wptr, %eax */
     *((StgFunPtr*)(adj_code + 0x06)) = (StgFunPtr)wptr;
     
-    adj_code[0x0a] = (unsigned char)0xff; /* call %eax */
-    adj_code[0x0b] = (unsigned char)0xd0; 
-    
-    adj_code[0x0c] = (unsigned char)0x83; /* addl $0x4, %esp */
-    adj_code[0x0d] = (unsigned char)0xc4; 
-    adj_code[0x0e] = (unsigned char)0x04; 
+    adj_code[0x0a] = (unsigned char)0x68;  /* pushl __obscure_ccall_ret_code */
+    *((StgFunPtr*)(adj_code + 0x0b)) = (StgFunPtr)__obscure_ccall_ret_code;
 
-    adj_code[0x0f] = (unsigned char)0xc3; /* ret */
-
+    adj_code[0x0f] = (unsigned char)0xff; /* jmp *%eax */
+    adj_code[0x10] = (unsigned char)0xe0; 
+  
   }
 
   /* Have fun! */
