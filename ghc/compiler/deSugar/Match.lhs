@@ -738,7 +738,7 @@ flattenMatches kind matches
     ASSERT( all (tcEqType result_ty) result_tys )
     returnDs (result_ty, eqn_infos)
   where
-    flatten_match (Match _ pats _ grhss, n)
+    flatten_match (Match pats _ grhss, n)
       = dsGRHSs kind pats grhss 		`thenDs` \ (ty, match_result) ->
         getSrcLocDs				`thenDs` \ locn ->
 	returnDs (ty, EqnInfo n (DsMatchContext kind pats locn) pats match_result)

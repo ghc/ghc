@@ -596,24 +596,8 @@ bindTyVars2Rn doc_str tyvar_names enclosed_scope
     bindLocatedLocalsRn doc_str located_tyvars	$ \ names ->
     enclosed_scope names (zipWith replaceTyVarName tyvar_names names)
 
-bindTyVarsFVRn :: SDoc -> [HsTyVarBndr RdrName]
-	      -> ([HsTyVarBndr Name] -> RnMS (a, FreeVars))
-	      -> RnMS (a, FreeVars)
-bindTyVarsFVRn doc_str rdr_names enclosed_scope
-  = bindTyVars2Rn doc_str rdr_names	$ \ names tyvars ->
-    enclosed_scope tyvars		`thenRn` \ (thing, fvs) ->
-    returnRn (thing, delListFromNameSet fvs names)
-
-bindTyVarsFV2Rn :: SDoc -> [HsTyVarBndr RdrName]
-	      -> ([Name] -> [HsTyVarBndr Name] -> RnMS (a, FreeVars))
-	      -> RnMS (a, FreeVars)
-bindTyVarsFV2Rn doc_str rdr_names enclosed_scope
-  = bindTyVars2Rn doc_str rdr_names	$ \ names tyvars ->
-    enclosed_scope names tyvars		`thenRn` \ (thing, fvs) ->
-    returnRn (thing, delListFromNameSet fvs names)
-
 bindPatSigTyVars :: [RdrNameHsType]
-		 -> ([Name] -> RnMS (a, FreeVars))
+		 -> RnMS (a, FreeVars)
 	  	 -> RnMS (a, FreeVars)
   -- Find the type variables in the pattern type 
   -- signatures that must be brought into scope
@@ -634,7 +618,7 @@ bindPatSigTyVars tys enclosed_scope
 	doc_sig        = text "In a pattern type-signature"
     in
     bindLocatedLocalsRn doc_sig located_tyvars	$ \ names ->
-    enclosed_scope names			`thenRn` \ (thing, fvs) ->
+    enclosed_scope 				`thenRn` \ (thing, fvs) ->
     returnRn (thing, delListFromNameSet fvs names)
 
 

@@ -27,7 +27,7 @@ import RnMonad
 import RnTypes		( rnHsSigType, rnHsType )
 import RnExpr		( rnMatch, rnGRHSs, rnPat, checkPrecMatch )
 import RnEnv		( bindLocatedLocalsRn, lookupBndrRn, 
-			  lookupGlobalOccRn, lookupSigOccRn,
+			  lookupGlobalOccRn, lookupSigOccRn, bindPatSigTyVars,
 			  warnUnusedLocalBinds, mapFvRn, extendTyVarEnvFVRn,
 			)
 import CmdLineOpts	( DynFlag(..) )
@@ -217,7 +217,8 @@ rnMonoBinds mbinds sigs	thing_inside -- Non-empty monobinds
   =	-- Extract all the binders in this group,
 	-- and extend current scope, inventing new names for the new binders
 	-- This also checks that the names form a set
-    bindLocatedLocalsRn doc mbinders_w_srclocs	$ \ new_mbinders ->
+    bindLocatedLocalsRn doc mbinders_w_srclocs			$ \ new_mbinders ->
+    bindPatSigTyVars (collectSigTysFromMonoBinds mbinds)	$ 
     let
 	binder_set = mkNameSet new_mbinders
     in
@@ -388,7 +389,7 @@ rnMethodBinds gen_tyvars (FunMonoBind name inf matches locn)
   where
 	-- Gruesome; bring into scope the correct members of the generic type variables
 	-- See comments in RnSource.rnSourceDecl(ClassDecl)
-    rn_match match@(Match _ (TypePatIn ty : _) _ _)
+    rn_match match@(Match (TypePatIn ty : _) _ _)
 	= extendTyVarEnvFVRn gen_tvs (rnMatch (FunRhs name) match)
 	where
 	  tvs     = map rdrNameOcc (extractHsTyRdrNames ty)

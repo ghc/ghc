@@ -25,6 +25,7 @@ module HsSyn (
 
 	collectHsBinders, collectLocatedHsBinders, 
 	collectMonoBinders, collectLocatedMonoBinders,
+	collectSigTysFromMonoBinds,
 	hsModuleName, hsModuleImports
      ) where
 
@@ -149,3 +150,30 @@ collectMonoBinders binds
     go (FunMonoBind f _ _ loc) acc = f : acc
     go (AndMonoBinds bs1 bs2)  acc = go bs1 (go bs2 acc)
 \end{code}
+
+%************************************************************************
+%*									*
+\subsection{Getting patterns out of bindings}
+%*									*
+%************************************************************************
+
+Get all the pattern type signatures out of a bunch of bindings
+
+\begin{code}
+collectSigTysFromMonoBinds :: MonoBinds name (InPat name) -> [HsType name]
+collectSigTysFromMonoBinds bind
+  = go bind []
+  where
+    go EmptyMonoBinds           acc = acc
+    go (PatMonoBind pat _ loc)  acc = collectSigTysFromPat pat ++ acc
+    go (FunMonoBind f _ ms loc) acc = go_matches ms acc
+    go (AndMonoBinds bs1 bs2)   acc = go bs1 (go bs2 acc)
+
+	-- A binding like    x :: a = f y
+	-- is parsed as FunMonoBind, but for this purpose we 	
+	-- want to treat it as a pattern binding
+    go_matches []				 acc = acc
+    go_matches (Match [] (Just sig) _ : matches) acc = sig : go_matches matches acc
+    go_matches (match		      : matches) acc = go_matches matches acc
+\end{code}
+

@@ -790,8 +790,19 @@ seems a bit fragile.
 \begin{code}
 preInlineUnconditionally :: SimplEnv -> TopLevelFlag -> InId -> Bool
 preInlineUnconditionally env top_lvl bndr
---  | isTopLevel top_lvl     = False
--- 	Top-level fusion lost if we do this for (e.g. string constants)
+  | isTopLevel top_lvl     = False
+-- If we don't have this test, consider
+--	x = length [1,2,3]
+-- The full laziness pass carefully floats all the cons cells to
+-- top level, and preInlineUnconditionally floats them all back in.
+-- Result is (a) static allocation replaced by dynamic allocation
+--	     (b) many simplifier iterations because this tickles
+--		 a related problem
+-- 
+-- On the other hand, I have seen cases where top-level fusion is
+-- lost if we don't inline top level thing (e.g. string constants)
+-- We'll have to see
+
   | not active 		   = False
   | opt_SimplNoPreInlining = False
   | otherwise = case idOccInfo bndr of
@@ -859,19 +870,23 @@ gentle we are being.
 activeInline :: SimplEnv -> OutId -> OccInfo -> Bool
 activeInline env id occ
   = case getMode env of
-	SimplGently -> isDataConWrapId id || isOneOcc occ
-		-- No inlining at all when doing gentle stuff,
-		-- except (a) things that occur once
-		-- and (b) (hack alert) data con wrappers
-		-- 	   We want to inline data con wrappers even 
-		--	   in gentle mode because rule LHSs match better then
--- The reason for (a) is that too little clean-up happens if you 
--- don't inline use-once things.   Also a bit of inlining is *good* for
--- full laziness; it can expose constant sub-expressions.
--- Example in spectral/mandel/Mandel.hs, where the mandelset 
--- function gets a useful let-float if you inline windowToViewport
+      SimplGently -> isOneOcc occ
+	-- No inlining at all when doing gentle stuff,
+	-- except for things that occur once
+	-- The reason is that too little clean-up happens if you 
+	-- don't inline use-once things.   Also a bit of inlining is *good* for
+	-- full laziness; it can expose constant sub-expressions.
+	-- Example in spectral/mandel/Mandel.hs, where the mandelset 
+	-- function gets a useful let-float if you inline windowToViewport
 
-	SimplPhase n -> isActive n (idInlinePragma id)
+	-- NB: we used to have a second exception, for data con wrappers.
+	-- On the grounds that we use gentle mode for rule LHSs, and 
+	-- they match better when data con wrappers are inlined.
+	-- But that only really applies to the trivial wrappers (like (:)),
+	-- and they are now constructed as Compulsory unfoldings (in MkId)
+	-- so they'll happen anyway.
+
+      SimplPhase n -> isActive n (idInlinePragma id)
 
 -- Belongs in BasicTypes; this frag occurs in OccurAnal too
 isOneOcc (OneOcc _ _) = True

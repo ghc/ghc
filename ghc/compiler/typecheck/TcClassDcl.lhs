@@ -32,8 +32,9 @@ import TcEnv		( RecTcEnv, TyThingDetails(..), tcAddImportedIdInfo,
 import TcBinds		( tcBindWithSigs, tcSpecSigs )
 import TcMonoType	( tcHsType, tcHsTheta, checkSigTyVars, sigCtxt, mkTcSig )
 import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
-import TcMType		( tcInstTyVars, checkValidTheta, checkValidType, SourceTyCtxt(..), UserTypeCtxt(..) )
-import TcType		( Type, mkSigmaTy, mkTyVarTys, mkPredTys, mkClassPred, 
+import TcMType		( tcInstSigTyVars, checkValidTheta, checkValidType, SourceTyCtxt(..), UserTypeCtxt(..) )
+import TcType		( Type, TyVarDetails(..), TcType, TcThetaType, TcTyVar, 
+			  mkSigmaTy, mkTyVarTys, mkPredTys, mkClassPred, 
 			  tcIsTyVarTy, tcSplitTyConApp_maybe, tcSplitSigmaTy
 			)
 import TcMonad
@@ -420,9 +421,10 @@ tcDefMeth clas tyvars binds_in prags (_, GenDefMeth) = returnTc (EmptyMonoBinds,
 	-- (If necessary we can fix that, but we don't have a convenient Id to hand.)
 
 tcDefMeth clas tyvars binds_in prags op_item@(_, DefMeth dm_id)
-  = tcInstTyVars tyvars			`thenNF_Tc` \ (clas_tyvars, inst_tys, _) ->
+  = tcInstSigTyVars ClsTv tyvars			`thenNF_Tc` \ clas_tyvars ->
     let
-        theta = [(mkClassPred clas inst_tys)]
+	inst_tys    = mkTyVarTys clas_tyvars
+        theta       = [mkClassPred clas inst_tys]
 	local_dm_id = setIdLocalExported dm_id
 		-- Reason for setIdLocalExported: see notes with MkId.mkDictFunId
     in

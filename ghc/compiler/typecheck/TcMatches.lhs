@@ -22,14 +22,14 @@ import RnHsSyn		( RenamedMatch, RenamedGRHSs, RenamedStmt, RenamedPat, RenamedHs
 import TcHsSyn		( TcMatch, TcGRHSs, TcStmt, TcDictBinds, TypecheckedPat )
 
 import TcMonad
-import TcMonoType	( kcHsSigTypes, tcScopedTyVars, checkSigTyVars, tcHsSigType, UserTypeCtxt(..), sigPatCtxt )
+import TcMonoType	( kcHsSigTypes, tcAddScopedTyVars, checkSigTyVars, tcHsSigType, UserTypeCtxt(..), sigPatCtxt )
 import Inst		( LIE, isEmptyLIE, plusLIE, emptyLIE, plusLIEs, lieToList )
 import TcEnv		( TcId, tcLookupLocalIds, tcExtendLocalValEnv, tcExtendGlobalTyVars,
 			  tcInLocalScope )
 import TcPat		( tcPat, tcMonoPatBndr, polyPatSig )
 import TcMType		( newTyVarTy, unifyFunTy, unifyTauTy )
-import TcType		( tyVarsOfType, isTauTy,  mkFunTy, isOverloadedTy,
-			  liftedTypeKind, openTypeKind  )
+import TcType		( TcType, TcTyVar, tyVarsOfType, isTauTy,  
+			  mkFunTy, isOverloadedTy, liftedTypeKind, openTypeKind  )
 import TcBinds		( tcBindsAndThen )
 import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
 import Name		( Name )
@@ -136,12 +136,12 @@ tcMatch :: [(Name,Id)]
 			-- where there are n patterns.
 	-> TcM (TcMatch, LIE)
 
-tcMatch xve1 ctxt match@(Match sig_tvs pats maybe_rhs_sig grhss) expected_ty
+tcMatch xve1 ctxt match@(Match pats maybe_rhs_sig grhss) expected_ty
   = tcAddSrcLoc (getMatchLoc match)		$	-- At one stage I removed this;
     tcAddErrCtxt (matchCtxt ctxt match)		$	-- I'm not sure why, so I put it back
     
     tcMatchPats pats expected_ty tc_grhss	`thenTc` \ ((pats', grhss'), lie, ex_binds) ->
-    returnTc (Match [] pats' Nothing (glue_on Recursive ex_binds grhss'), lie)
+    returnTc (Match pats' Nothing (glue_on Recursive ex_binds grhss'), lie)
 
   where
     tc_grhss pats' rhs_ty 
@@ -243,27 +243,6 @@ tcMatchPats pats expected_ty thing_inside
 	-- Here, result_ty will be simply Int, but expected_ty is (a -> Int).
 
     returnTc (result, lie_req1 `plusLIE` lie_req2', ex_binds)
-
-tcAddScopedTyVars :: [RenamedHsType] -> TcM a -> TcM a
--- Find the not-already-in-scope signature type variables,
--- kind-check them, and bring them into scope
---
--- We no longer specify that these type variables must be univerally 
--- quantified (lots of email on the subject).  If you want to put that 
--- back in, you need to
---	a) Do a checkSigTyVars after thing_inside
---	b) More insidiously, don't pass in expected_ty, else
---	   we unify with it too early and checkSigTyVars barfs
---	   Instead you have to pass in a fresh ty var, and unify
---	   it with expected_ty afterwards
-tcAddScopedTyVars sig_tys thing_inside
-  = tcGetEnv					`thenNF_Tc` \ env ->
-    let
-	all_sig_tvs = foldr (unionNameSets . extractHsTyVars) emptyNameSet sig_tys
-	sig_tvs = filter not_in_scope (nameSetToList all_sig_tvs)
- 	not_in_scope tv = not (tcInLocalScope env tv)
-    in	      
-    tcScopedTyVars sig_tvs (kcHsSigTypes sig_tys) thing_inside
 
 tcCheckExistentialPat :: [TcId]		-- Ids bound by this pattern
 		      -> Bag TcTyVar	-- Existentially quantified tyvars bound by pattern
@@ -462,7 +441,7 @@ sameNoOfArgs :: [RenamedMatch] -> Bool
 sameNoOfArgs matches = isSingleton (nub (map args_in_match matches))
   where
     args_in_match :: RenamedMatch -> Int
-    args_in_match (Match _ pats _ _) = length pats
+    args_in_match (Match pats _ _) = length pats
 \end{code}
 
 \begin{code}

@@ -343,11 +343,11 @@ zonkMonoBinds (AbsBinds tyvars dicts exports inlines val_bind)
 \begin{code}
 zonkMatch :: TcMatch -> NF_TcM TypecheckedMatch
 
-zonkMatch (Match _ pats _ grhss)
+zonkMatch (Match pats _ grhss)
   = zonkPats pats				`thenNF_Tc` \ (new_pats, new_ids) ->
     tcExtendGlobalValEnv (bagToList new_ids)	$
     zonkGRHSs grhss 				`thenNF_Tc` \ new_grhss ->
-    returnNF_Tc (Match [] new_pats Nothing new_grhss)
+    returnNF_Tc (Match new_pats Nothing new_grhss)
 
 -------------------------------------------------------------------------
 zonkGRHSs :: TcGRHSs
@@ -716,13 +716,12 @@ zonkForeignExport (ForeignExport i hs_ty spec src_loc) =
 zonkRules :: [TcRuleDecl] -> NF_TcM [TypecheckedRuleDecl]
 zonkRules rs = mapNF_Tc zonkRule rs
 
-zonkRule (HsRule name act tyvars vars lhs rhs loc)
-  = mapNF_Tc zonkTcTyVarToTyVar tyvars			`thenNF_Tc` \ new_tyvars ->
-    mapNF_Tc zonkIdBndr [v | RuleBndr v <- vars]	`thenNF_Tc` \ new_bndrs ->
+zonkRule (HsRule name act vars lhs rhs loc)
+  = mapNF_Tc zonkIdBndr [v | RuleBndr v <- vars]	`thenNF_Tc` \ new_bndrs ->
     tcExtendGlobalValEnv new_bndrs			$
     zonkExpr lhs					`thenNF_Tc` \ new_lhs ->
     zonkExpr rhs					`thenNF_Tc` \ new_rhs ->
-    returnNF_Tc (HsRule name act new_tyvars (map RuleBndr new_bndrs) new_lhs new_rhs loc)
+    returnNF_Tc (HsRule name act (map RuleBndr new_bndrs) new_lhs new_rhs loc)
 	-- I hate this map RuleBndr stuff
 
 zonkRule (IfaceRuleOut fun rule)

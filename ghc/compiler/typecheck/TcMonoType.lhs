@@ -11,7 +11,7 @@ module TcMonoType ( tcHsSigType, tcHsType, tcIfaceType, tcHsTheta,
 		    kcHsTyVar, kcHsTyVars, mkTyClTyVars,
 		    kcHsType, kcHsSigType, kcHsSigTypes, 
 		    kcHsLiftedSigType, kcHsContext,
-		    tcScopedTyVars, tcHsTyVars, mkImmutTyVars,
+		    tcAddScopedTyVars, tcHsTyVars, mkImmutTyVars,
 
 		    TcSigInfo(..), tcTySig, mkTcSig, maybeSig,
 		    checkSigTyVars, sigCtxt, sigPatCtxt
@@ -21,43 +21,45 @@ module TcMonoType ( tcHsSigType, tcHsType, tcIfaceType, tcHsTheta,
 
 import HsSyn		( HsType(..), HsTyVarBndr(..),
                           Sig(..), HsPred(..), pprParendHsType, HsTupCon(..), hsTyVarNames )
-import RnHsSyn		( RenamedHsType, RenamedHsPred, RenamedContext, RenamedSig )
+import RnHsSyn		( RenamedHsType, RenamedHsPred, RenamedContext, RenamedSig, extractHsTyVars )
 import TcHsSyn		( TcId )
 
 import TcMonad
 import TcEnv		( tcExtendTyVarEnv, tcLookup, tcLookupGlobal,
-			  tcGetGlobalTyVars, tcEnvTcIds, tcEnvTyVars,
+			  tcGetGlobalTyVars, tcLEnvElts, tcInLocalScope,
 		 	  TyThing(..), TcTyThing(..), tcExtendKindEnv
 			)
-import TcMType		( newKindVar, tcInstSigVars, 
+import TcMType		( newKindVar, tcInstSigTyVars, 
 			  zonkKindEnv, zonkTcType, zonkTcTyVars, zonkTcTyVar,
 			  unifyKind, unifyOpenTypeKind,
 			  checkValidType, UserTypeCtxt(..), pprUserTypeCtxt
 			)
-import TcType		( Type, Kind, SourceType(..), ThetaType,
+import TcType		( Type, Kind, SourceType(..), ThetaType, TyVarDetails(..),
+			  TcTyVar, TcTyVarSet, TcType, TcKind, TcThetaType, TcTauType,
 			  mkTyVarTy, mkTyVarTys, mkFunTy, mkSynTy,
-			  tcSplitForAllTys, tcSplitRhoTy,
-		 	  hoistForAllTys, allDistinctTyVars,
-                          zipFunTys, 
-			  mkSigmaTy, mkPredTy, mkTyConApp,
-			  mkAppTys, mkRhoTy,
+			  tcSplitForAllTys, tcSplitRhoTy, 
+		 	  hoistForAllTys, allDistinctTyVars, zipFunTys, 
+			  mkSigmaTy, mkPredTy, mkTyConApp, mkAppTys, mkRhoTy,
 			  liftedTypeKind, unliftedTypeKind, mkArrowKind,
 			  mkArrowKinds, tcGetTyVar_maybe, tcGetTyVar, tcSplitFunTy_maybe,
 		  	  tidyOpenType, tidyOpenTypes, tidyOpenTyVar, tidyOpenTyVars,
 			  tyVarsOfType, mkForAllTys
 			)
+import qualified Type	( getTyVar_maybe )
+
 import Inst		( Inst, InstOrigin(..), newMethodWithGivenTy, instToId )
 import PprType		( pprType )
 import Subst		( mkTopTyVarSubst, substTy )
 import CoreFVs		( idFreeTyVars )
 import Id		( mkLocalId, idName, idType )
-import Var		( Id, Var, TyVar, mkTyVar, tyVarKind )
+import Var		( Id, Var, TyVar, mkTyVar, tyVarKind, isMutTyVar, mutTyVarDetails )
 import VarEnv
 import VarSet
 import ErrUtils		( Message )
 import TyCon		( TyCon, isSynTyCon, tyConArity, tyConKind )
 import Class		( classTyCon )
-import Name		( Name )
+import Name		( Name, getSrcLoc )
+import NameSet
 import TysWiredIn	( mkListTy, mkTupleTy, genUnitTyCon )
 import BasicTypes	( Boxity(..) )
 import SrcLoc		( SrcLoc )
@@ -194,21 +196,41 @@ tcHsTyVars tv_names kind_check thing_inside
     in
     tcExtendTyVarEnv tyvars (thing_inside tyvars)
 
--- tcScopedTyVars is used for scoped type variables
+
+
+tcAddScopedTyVars :: [RenamedHsType] -> TcM a -> TcM a
+-- tcAddScopedTyVars is used for scoped type variables
+-- added by pattern type signatures
 --	e.g.  \ (x::a) (y::a) -> x+y
 -- They never have explicit kinds (because this is source-code only)
 -- They are mutable (because they can get bound to a more specific type)
-tcScopedTyVars :: [Name] 
-	       -> TcM a				-- The kind checker
-	       -> TcM b
-	       -> TcM b
-tcScopedTyVars [] kind_check thing_inside = thing_inside
 
-tcScopedTyVars tv_names kind_check thing_inside
-  = mapNF_Tc newNamedKindVar tv_names		`thenTc` \ kind_env ->
-    tcExtendKindEnv kind_env kind_check		`thenTc_`
-    zonkKindEnv kind_env			`thenNF_Tc` \ tvs_w_kinds ->
-    listTc [tcNewMutTyVar name kind | (name, kind) <- tvs_w_kinds]	`thenNF_Tc` \ tyvars ->
+-- Find the not-already-in-scope signature type variables,
+-- kind-check them, and bring them into scope
+--
+-- We no longer specify that these type variables must be univerally 
+-- quantified (lots of email on the subject).  If you want to put that 
+-- back in, you need to
+--	a) Do a checkSigTyVars after thing_inside
+--	b) More insidiously, don't pass in expected_ty, else
+--	   we unify with it too early and checkSigTyVars barfs
+--	   Instead you have to pass in a fresh ty var, and unify
+--	   it with expected_ty afterwards
+tcAddScopedTyVars [] thing_inside
+  = thing_inside	-- Quick get-out for the empty case
+
+tcAddScopedTyVars sig_tys thing_inside
+  = tcGetEnv					`thenNF_Tc` \ env ->
+    let
+	all_sig_tvs	= foldr (unionNameSets . extractHsTyVars) emptyNameSet sig_tys
+	sig_tvs 	= filter not_in_scope (nameSetToList all_sig_tvs)
+ 	not_in_scope tv = not (tcInLocalScope env tv)
+    in	      
+    mapNF_Tc newNamedKindVar sig_tvs			`thenTc` \ kind_env ->
+    tcExtendKindEnv kind_env (kcHsSigTypes sig_tys)	`thenTc_`
+    zonkKindEnv kind_env				`thenNF_Tc` \ tvs_w_kinds ->
+    listTc [ tcNewMutTyVar name kind PatSigTv
+	   | (name, kind) <- tvs_w_kinds]		`thenNF_Tc` \ tyvars ->
     tcExtendTyVarEnv tyvars thing_inside
 \end{code}
     
@@ -561,7 +583,7 @@ mkTcSig poly_id src_loc
    let
 	(tyvars, rho) = tcSplitForAllTys (idType poly_id)
    in
-   tcInstSigVars tyvars			`thenNF_Tc` \ tyvars' ->
+   tcInstSigTyVars SigTv tyvars			`thenNF_Tc` \ tyvars' ->
 	-- Make *signature* type variables
 
    let
@@ -668,29 +690,12 @@ checkSigTyVars sig_tyvars free_tyvars
 
   where
     complain sig_tys globals
-      = -- For the in-scope ones, zonk them and construct a map
-	-- from the zonked tyvar to the in-scope one
-	-- If any of the in-scope tyvars zonk to a type, then ignore them;
-	-- that'll be caught later when we back up to their type sig
- 	tcGetEnv				`thenNF_Tc` \ env ->
- 	let
- 	   in_scope_tvs = tcEnvTyVars env
- 	in
-	zonkTcTyVars in_scope_tvs		`thenNF_Tc` \ in_scope_tys ->
-	let
-	    in_scope_assoc = [ (zonked_tv, in_scope_tv) 
-			     | (z_ty, in_scope_tv) <- in_scope_tys `zip` in_scope_tvs,
-			       Just zonked_tv <- [tcGetTyVar_maybe z_ty]
-    			     ]
-	    in_scope_env = mkVarEnv in_scope_assoc
-	in
-
-	-- "check" checks each sig tyvar in turn
+      = -- "check" checks each sig tyvar in turn
         foldlNF_Tc check
-		   (env2, in_scope_env, [])
+		   (env2, emptyVarEnv, [])
 		   (tidy_tvs `zip` tidy_tys)	`thenNF_Tc` \ (env3, _, msgs) ->
 
-        failWithTcM (env3, main_msg $$ nest 4 (vcat msgs))
+        failWithTcM (env3, main_msg $$ vcat msgs)
       where
 	(env1, tidy_tvs) = tidyOpenTyVars emptyTidyEnv sig_tyvars
 	(env2, tidy_tys) = tidyOpenTypes  env1	       sig_tys
@@ -709,21 +714,21 @@ checkSigTyVars sig_tyvars free_tyvars
 	      Just tv ->
 
 	    case lookupVarEnv acc tv of {
-		Just sig_tyvar' -> 	-- Error (b) or (d)!
+		Just sig_tyvar' -> 	-- Error (b)!
 			returnNF_Tc (tidy_env, acc, unify_msg sig_tyvar thing : msgs)
 		    where
 			thing = ptext SLIT("another quantified type variable") <+> quotes (ppr sig_tyvar')
 
 	      ; Nothing ->
 
-	    if tv `elemVarSet` globals	-- Error (c)! Type variable escapes
+	    if tv `elemVarSet` globals	-- Error (c) or (d)! Type variable escapes
 					-- The least comprehensible, so put it last
 			-- Game plan: 
-			--    a) get the local TcIds from the environment,
+			--    a) get the local TcIds and TyVars from the environment,
 			-- 	 and pass them to find_globals (they might have tv free)
 			--    b) similarly, find any free_tyvars that mention tv
 	    then   tcGetEnv 							`thenNF_Tc` \ ve ->
-        	   find_globals tv tidy_env  [] (tcEnvTcIds ve)			`thenNF_Tc` \ (tidy_env1, globs) ->
+        	   find_globals tv tidy_env  (tcLEnvElts ve)			`thenNF_Tc` \ (tidy_env1, globs) ->
         	   find_frees   tv tidy_env1 [] (varSetElems free_tyvars)	`thenNF_Tc` \ (tidy_env2, frees) ->
 		   returnNF_Tc (tidy_env2, acc, escape_msg sig_tyvar tv globs frees : msgs)
 
@@ -731,6 +736,7 @@ checkSigTyVars sig_tyvars free_tyvars
 	    returnNF_Tc (tidy_env, extendVarEnv acc tv sig_tyvar, msgs)
 	    }}
 
+-----------------------
 -- find_globals looks at the value environment and finds values
 -- whose types mention the offending type variable.  It has to be 
 -- careful to zonk the Id's type first, so it has to be in the monad.
@@ -738,28 +744,56 @@ checkSigTyVars sig_tyvars free_tyvars
 
 find_globals :: Var 
              -> TidyEnv 
-             -> [(Name,Type)] 
-             -> [Id] 
-             -> NF_TcM (TidyEnv,[(Name,Type)])
+             -> [TcTyThing] 
+             -> NF_TcM (TidyEnv, [SDoc])
 
-find_globals tv tidy_env acc []
-  = returnNF_Tc (tidy_env, acc)
+find_globals tv tidy_env things
+  = go tidy_env [] things
+  where
+    go tidy_env acc [] = returnNF_Tc (tidy_env, acc)
+    go tidy_env acc (thing : things)
+      = find_thing ignore_it tidy_env thing 	`thenNF_Tc` \ (tidy_env1, maybe_doc) ->
+	case maybe_doc of
+	  Just d  -> go tidy_env1 (d:acc) things
+	  Nothing -> go tidy_env1 acc     things
 
-find_globals tv tidy_env acc (id:ids) 
-  | isEmptyVarSet (idFreeTyVars id)
-  = find_globals tv tidy_env acc ids
+    ignore_it ty = not (tv `elemVarSet` tyVarsOfType ty)
 
-  | otherwise
-  = zonkTcType (idType id)	`thenNF_Tc` \ id_ty ->
-    if tv `elemVarSet` tyVarsOfType id_ty then
-    	let 
-    	   (tidy_env', id_ty') = tidyOpenType tidy_env id_ty
-	   acc'		       = (idName id, id_ty') : acc
-    	in
-    	find_globals tv tidy_env' acc' ids
-    else
-    	find_globals tv tidy_env  acc  ids
+-----------------------
+find_thing ignore_it tidy_env (ATcId id)
+  = zonkTcType  (idType id)	`thenNF_Tc` \ id_ty ->
+    if ignore_it id_ty then
+	returnNF_Tc (tidy_env, Nothing)
+    else let
+	(tidy_env', tidy_ty) = tidyOpenType tidy_env id_ty
+	msg = sep [ppr id <+> dcolon <+> ppr tidy_ty, 
+		   nest 2 (sep [quotes (ppr id) <+> ptext SLIT("is bound at"),
+				ptext SLIT("at") <+> ppr (getSrcLoc id)])]
+    in
+    returnNF_Tc (tidy_env', Just msg)
 
+find_thing ignore_it tidy_env (ATyVar tv)
+  = zonkTcTyVar tv		`thenNF_Tc` \ tv_ty ->
+    if ignore_it tv_ty then
+	returnNF_Tc (tidy_env, Nothing)
+    else let
+	(tidy_env1, tv1)     = tidyOpenTyVar tidy_env  tv
+	(tidy_env2, tidy_ty) = tidyOpenType  tidy_env1 tv_ty
+	msg = sep [ptext SLIT("Type variable") <+> quotes (ppr tv1) <+> eq_stuff, nest 2 bound_at]
+
+	eq_stuff | Just tv' <- Type.getTyVar_maybe tv_ty, tv == tv' = empty
+		 | otherwise	  				    = equals <+> ppr tv_ty
+		-- It's ok to use Type.getTyVar_maybe because ty is zonked by now
+	
+	bound_at | isMutTyVar tv = mut_info	-- The expected case
+		 | otherwise     = empty
+	
+	mut_info = sep [ptext SLIT("is bound by") <+> ppr (mutTyVarDetails tv),
+	     	        ptext SLIT("at") <+> ppr (getSrcLoc tv)]
+    in
+    returnNF_Tc (tidy_env2, Just msg)
+
+-----------------------
 find_frees tv tidy_env acc []
   = returnNF_Tc (tidy_env, acc)
 find_frees tv tidy_env acc (ftv:ftvs)
@@ -776,10 +810,7 @@ find_frees tv tidy_env acc (ftv:ftvs)
 escape_msg sig_tv tv globs frees
   = mk_msg sig_tv <+> ptext SLIT("escapes") $$
     if not (null globs) then
-	vcat [pp_it <+> ptext SLIT("is mentioned in the environment"),
-	      ptext SLIT("The following variables in the environment mention") <+> quotes (ppr tv),
-	      nest 2 (vcat_first 10 [ppr name <+> dcolon <+> ppr ty | (name,ty) <- globs])
-	]
+	vcat [pp_it <+> ptext SLIT("is mentioned in the environment:"), vcat globs]
      else if not (null frees) then
 	vcat [ptext SLIT("It is reachable from the type variable(s)") <+> pprQuotedList frees,
 	      nest 2 (ptext SLIT("which") <+> is_are <+> ptext SLIT("free in the signature"))
@@ -797,6 +828,7 @@ escape_msg sig_tv tv globs frees
     vcat_first n []     = empty
     vcat_first 0 (x:xs) = text "...others omitted..."
     vcat_first n (x:xs) = x $$ vcat_first (n-1) xs
+
 
 unify_msg tv thing = mk_msg tv <+> ptext SLIT("is unified with") <+> thing
 mk_msg tv          = ptext SLIT("Quantified type variable") <+> quotes (ppr tv)

@@ -4,7 +4,7 @@ TcGRHSs tcGRHSsAndBinds;
 _declarations_
 2 tcGRHSsAndBinds _:_ _forall_ [s] => 
 		RnHsSyn.RenamedGRHSsAndBinds
-		-> TcMonad.TcType s
+		-> TcType.TcType s
 		-> HsExpr.StmtCtxt
 		-> TcMonad.TcM s (TcHsSyn.TcGRHSsAndBinds s, Inst.LIE s) ;;
 

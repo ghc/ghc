@@ -44,7 +44,7 @@ import InstEnv	( InstLookupResult(..), lookupInstEnv )
 import TcMType	( zonkTcType, zonkTcTypes, zonkTcPredType,
 		  zonkTcThetaType, tcInstTyVar, tcInstType,
 		)
-import TcType	( Type, 
+import TcType	( Type, TcType, TcThetaType, TcPredType, TcTauType, TcTyVarSet,
 		  SourceType(..), PredType, ThetaType,
 		  tcSplitForAllTys, tcSplitForAllTys, 
 		  tcSplitMethodTy, tcSplitRhoTy, tcFunArgTy,

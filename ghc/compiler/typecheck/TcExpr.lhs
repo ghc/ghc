@@ -35,9 +35,8 @@ import TcMType		( tcInstTyVars, tcInstType,
 			  newTyVarTy, newTyVarTys, zonkTcType,
 			  unifyTauTy, unifyFunTy, unifyListTy, unifyTupleTy
 			)
-import TcType		( tcSplitFunTys, tcSplitTyConApp,
-			  isQualifiedTy, 
-			  mkFunTy, mkAppTy, mkTyConTy,
+import TcType		( TcType, TcTauType, tcSplitFunTys, tcSplitTyConApp,
+			  isQualifiedTy, mkFunTy, mkAppTy, mkTyConTy,
 			  mkTyConApp, mkClassPred, tcFunArgTy,
 			  isTauTy, tyVarsOfType, tyVarsOfTypes, 
 			  liftedTypeKind, openTypeKind, mkArrowKind,

@@ -17,7 +17,12 @@ is the principal client.
 module TcType (
   --------------------------------
   -- Types 
-  TauType, RhoType, SigmaType, 
+  TcType, TcTauType, TcPredType, TcThetaType, TcRhoType,
+  TcTyVar, TcTyVarSet, TcKind,
+
+  --------------------------------
+  -- TyVarDetails
+  TyVarDetails(..), isUserTyVar, isSkolemTyVar,
 
   --------------------------------
   -- Builders
@@ -142,14 +147,83 @@ import Outputable
 
 %************************************************************************
 %*									*
+\subsection{Types}
+%*									*
+%************************************************************************
+
+\begin{code}
+type TcTyVar    = TyVar		-- Might be a mutable tyvar
+type TcTyVarSet = TyVarSet
+
+type TcType = Type 		-- A TcType can have mutable type variables
+	-- Invariant on ForAllTy in TcTypes:
+	-- 	forall a. T
+	-- a cannot occur inside a MutTyVar in T; that is,
+	-- T is "flattened" before quantifying over a
+
+type TcPredType     = PredType
+type TcThetaType    = ThetaType
+type TcRhoType      = Type
+type TcTauType      = TauType
+type TcKind         = TcType
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{TyVarDetails}
+%*									*
+%************************************************************************
+
+TyVarDetails gives extra info about type variables, used during type
+checking.  It's attached to mutable type variables only.
+
+\begin{code}
+data TyVarDetails
+  = SigTv	-- Introduced when instantiating a type signature,
+		-- prior to checking that the defn of a fn does 
+		-- have the expected type.  Should not be instantiated.
+		--
+		-- 	f :: forall a. a -> a
+		-- 	f = e
+		-- When checking e, with expected type (a->a), we 
+		-- should not instantiate a
+
+   | ClsTv	-- Scoped type variable introduced by a class decl
+		--	class C a where ...
+
+   | InstTv	-- Ditto, but instance decl
+
+   | PatSigTv	-- Scoped type variable, introduced by a pattern
+		-- type signature
+		--	\ x::a -> e
+
+   | VanillaTv	-- Everything else
+
+isUserTyVar :: TyVarDetails -> Bool	-- Avoid unifying these if possible
+isUserTyVar VanillaTv = False
+isUserTyVar other     = True
+
+isSkolemTyVar :: TyVarDetails -> Bool
+isSkolemTyVar SigTv = True
+isSkolemTyVar other = False
+
+instance Outputable TyVarDetails where
+  ppr SigTv	= ptext SLIT("type signature")
+  ppr ClsTv     = ptext SLIT("class declaration")
+  ppr InstTv    = ptext SLIT("instance declaration")
+  ppr PatSigTv  = ptext SLIT("pattern type signature")
+  ppr VanillaTv = ptext SLIT("???")
+\end{code}
+
+
+%************************************************************************
+%*									*
 \subsection{Tau, sigma and rho}
 %*									*
 %************************************************************************
 
 \begin{code}
-type SigmaType    = Type
-type RhoType   	  = Type
-
 mkSigmaTy tyvars theta tau = mkForAllTys tyvars (mkRhoTy theta tau)
 
 mkRhoTy :: [SourceType] -> Type -> Type

@@ -165,13 +165,13 @@ dsRule :: IdSet -> TypecheckedRuleDecl -> DsM (Id, CoreRule)
 dsRule in_scope (IfaceRuleOut fun rule)	-- Built-in rules come this way
   = returnDs (fun, rule)
 
-dsRule in_scope (HsRule name act sig_tvs vars lhs rhs loc)
+dsRule in_scope (HsRule name act vars lhs rhs loc)
   = putSrcLocDs loc		$
     ds_lhs all_vars lhs		`thenDs` \ (fn, args) ->
     dsExpr rhs			`thenDs` \ core_rhs ->
     returnDs (fn, Rule name act tpl_vars args core_rhs)
   where
-    tpl_vars = sig_tvs ++ [var | RuleBndr var <- vars]
+    tpl_vars = [var | RuleBndr var <- vars]
     all_vars = mkInScopeSet (in_scope `unionVarSet` mkVarSet tpl_vars)
 
 ds_lhs all_vars lhs

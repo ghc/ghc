@@ -245,7 +245,7 @@ checkValDef lhs opt_sig grhss loc
  = case isFunLhs lhs [] of
 	   Just (f,inf,es) -> 
 		checkPatterns loc es `thenP` \ps ->
-		returnP (RdrValBinding (FunMonoBind f inf [Match [] ps opt_sig grhss] loc))
+		returnP (RdrValBinding (FunMonoBind f inf [Match ps opt_sig grhss] loc))
 
            Nothing ->
 		checkPattern loc lhs `thenP` \lhs ->
@@ -324,7 +324,7 @@ groupBindings binds = group Nothing binds
 		-- than pattern bindings (tests/rename/should_fail/rnfail002).
 	group (Just (FunMonoBind f inf1 mtchs ignore_srcloc))
 		    (RdrValBinding (FunMonoBind f' _ 
-					[mtch@(Match _ (_:_) _ _)] loc)
+					[mtch@(Match (_:_) _ _)] loc)
 			: binds)
 	    | f == f' = group (Just (FunMonoBind f inf1 (mtch:mtchs) loc)) binds
 

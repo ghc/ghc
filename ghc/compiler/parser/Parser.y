@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.75 2001/10/22 09:37:24 simonpj Exp $
+$Id: Parser.y,v 1.76 2001/10/31 15:22:54 simonpj Exp $
 
 Haskell grammar.
 
@@ -454,7 +454,7 @@ rules	:: { RdrBinding }
 
 rule  	:: { RdrBinding }
 	: STRING activation rule_forall infixexp '=' srcloc exp
-	     { RdrHsDecl (RuleD (HsRule $1 $2 [] $3 $4 $7 $6)) }
+	     { RdrHsDecl (RuleD (HsRule $1 $2 $3 $4 $7 $6)) }
 
 activation :: { Activation }           -- Omitted means AlwaysActive
         : {- empty -}                           { AlwaysActive }
@@ -725,7 +725,7 @@ infixexp :: { RdrNameHsExpr }
 exp10 :: { RdrNameHsExpr }
 	: '\\' srcloc aexp aexps opt_asig '->' srcloc exp	
 			{% checkPatterns $2 ($3 : reverse $4) `thenP` \ ps -> 
-			   returnP (HsLam (Match [] ps $5 
+			   returnP (HsLam (Match ps $5 
 					    (GRHSs (unguardedRHS $8 $7) 
 						   EmptyBinds placeHolderType))) }
   	| 'let' declbinds 'in' exp		{ HsLet $2 $4 }
@@ -852,7 +852,7 @@ alts1 	:: { [RdrNameMatch] }
 alt 	:: { RdrNameMatch }
 	: srcloc infixexp opt_sig ralt wherebinds
 					{% (checkPattern $1 $2 `thenP` \p ->
-				   	   returnP (Match [] [p] $3
+				   	   returnP (Match [p] $3
 					             (GRHSs $4 $5 placeHolderType))  )}
 
 ralt :: { [RdrNameGRHS] }

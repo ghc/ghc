@@ -1,8 +1,5 @@
 \begin{code}
 module TcMonad(
-	TcType, TcTauType, TcPredType, TcThetaType, TcRhoType,
-	TcTyVar, TcTyVarSet, TcKind,
-
 	TcM, NF_TcM, TcDown, TcEnv, 
 
 	initTc,
@@ -32,7 +29,7 @@ module TcMonad(
 	tcAddErrCtxtM, tcSetErrCtxtM,
 	tcAddErrCtxt, tcSetErrCtxt, tcPopErrCtxt,
 
-	tcNewMutVar, tcNewSigTyVar, tcReadMutVar, tcWriteMutVar, TcRef,
+	tcNewMutVar, tcReadMutVar, tcWriteMutVar, TcRef,
 	tcNewMutTyVar, tcReadMutTyVar, tcWriteMutTyVar,
 
 	InstOrigin(..), InstLoc, pprInstLoc, 
@@ -47,14 +44,14 @@ import {-# SOURCE #-} TcEnv  ( TcEnv )
 
 import HsLit		( HsOverLit )
 import RnHsSyn		( RenamedPat, RenamedArithSeqInfo, RenamedHsExpr )
-import TcType		( Type, Kind, PredType, ThetaType, TauType, RhoType )
+import TcType		( Type, Kind, PredType, ThetaType, TyVarDetails )
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine, ErrMsg, Message, WarnMsg )
 
 import Bag		( Bag, emptyBag, isEmptyBag,
 			  foldBag, unitBag, unionBags, snocBag )
 import Class		( Class )
 import Name		( Name )
-import Var		( Id, TyVar, newMutTyVar, newSigTyVar, readMutTyVar, writeMutTyVar )
+import Var		( Id, TyVar, newMutTyVar, readMutTyVar, writeMutTyVar )
 import VarEnv		( TidyEnv, emptyTidyEnv )
 import VarSet		( TyVarSet )
 import UniqSupply	( UniqSupply, uniqFromSupply, uniqsFromSupply, 
@@ -72,30 +69,6 @@ import IOExts		( IORef, newIORef, readIORef, writeIORef,
 
 
 infixr 9 `thenTc`, `thenTc_`, `thenNF_Tc`, `thenNF_Tc_` 
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Types}
-%*									*
-%************************************************************************
-
-\begin{code}
-type TcTyVar    = TyVar		-- Might be a mutable tyvar
-type TcTyVarSet = TyVarSet
-
-type TcType = Type 		-- A TcType can have mutable type variables
-	-- Invariant on ForAllTy in TcTypes:
-	-- 	forall a. T
-	-- a cannot occur inside a MutTyVar in T; that is,
-	-- T is "flattened" before quantifying over a
-
-type TcPredType     = PredType
-type TcThetaType    = ThetaType
-type TcRhoType      = RhoType
-type TcTauType      = TauType
-type TcKind         = TcType
 \end{code}
 
 
@@ -469,11 +442,8 @@ tcWriteMutVar var val down env = writeIORef var val
 tcReadMutVar :: TcRef a -> NF_TcM a
 tcReadMutVar var down env = readIORef var
 
-tcNewMutTyVar :: Name -> Kind -> NF_TcM TyVar
-tcNewMutTyVar name kind down env = newMutTyVar name kind
-
-tcNewSigTyVar :: Name -> Kind -> NF_TcM TyVar
-tcNewSigTyVar name kind down env = newSigTyVar name kind
+tcNewMutTyVar :: Name -> Kind -> TyVarDetails -> NF_TcM TyVar
+tcNewMutTyVar name kind details down env = newMutTyVar name kind details
 
 tcReadMutTyVar :: TyVar -> NF_TcM (Maybe Type)
 tcReadMutTyVar tyvar down env = readMutTyVar tyvar

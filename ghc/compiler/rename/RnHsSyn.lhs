@@ -167,8 +167,8 @@ instDeclFVs (InstDecl inst_ty _ _ maybe_dfun _)
     (case maybe_dfun of { Just n -> unitFV n; Nothing -> emptyFVs })
 
 ----------------
-ruleDeclFVs (HsRule _ _ _ _ _ _ _) = emptyFVs
-ruleDeclFVs (IfaceRuleOut _ _)	   = emptyFVs
+ruleDeclFVs (HsRule _ _ _ _ _ _) = emptyFVs
+ruleDeclFVs (IfaceRuleOut _ _)	 = emptyFVs
 ruleDeclFVs (IfaceRule _ _ vars _ args rhs _)
   = delFVs (map ufBinderName vars) $
     ufExprFVs rhs `plusFV` plusFVs (map ufExprFVs args)
@@ -236,8 +236,8 @@ maybeGenericMatch :: RenamedMatch -> Maybe (RenamedHsType, RenamedMatch)
   -- Tells whether a Match is for a generic definition
   -- and extract the type from a generic match and put it at the front
 
-maybeGenericMatch (Match tvs (TypePatIn ty : pats) sig_ty grhss)
-  = Just (ty, Match tvs pats sig_ty grhss)
+maybeGenericMatch (Match (TypePatIn ty : pats) sig_ty grhss)
+  = Just (ty, Match pats sig_ty grhss)
 
 maybeGenericMatch other_match = Nothing
 \end{code}

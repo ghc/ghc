@@ -8,7 +8,7 @@ module TcRules ( tcIfaceRules, tcSourceRules ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( RuleDecl(..), RuleBndr(..) )
+import HsSyn		( RuleDecl(..), RuleBndr(..), collectRuleBndrSigTys )
 import CoreSyn		( CoreRule(..) )
 import RnHsSyn		( RenamedRuleDecl )
 import HscTypes		( PackageRuleBase )
@@ -18,7 +18,7 @@ import TcSimplify	( tcSimplifyToDicts, tcSimplifyInferCheck )
 import TcMType		( newTyVarTy )
 import TcType		( tyVarsOfTypes, openTypeKind )
 import TcIfaceSig	( tcCoreExpr, tcCoreLamBndrs, tcVar, tcDelay )
-import TcMonoType	( kcHsSigTypes, tcHsSigType, UserTypeCtxt(..), tcScopedTyVars )
+import TcMonoType	( kcHsSigTypes, tcHsSigType, UserTypeCtxt(..), tcAddScopedTyVars )
 import TcExpr		( tcExpr )
 import TcEnv		( RecTcEnv, tcExtendLocalValEnv, isLocalThing )
 import Rules		( extendRuleBase )
@@ -72,13 +72,13 @@ tcSourceRules decls
   = mapAndUnzipTc tcSourceRule decls	`thenTc` \ (lies, decls') ->
     returnTc (plusLIEs lies, decls')
 
-tcSourceRule (HsRule name act sig_tvs vars lhs rhs src_loc)
+tcSourceRule (HsRule name act vars lhs rhs src_loc)
   = tcAddSrcLoc src_loc 				$
     tcAddErrCtxt (ruleCtxt name)			$
     newTyVarTy openTypeKind				`thenNF_Tc` \ rule_ty ->
 
 	-- Deal with the tyvars mentioned in signatures
-    tcScopedTyVars sig_tvs (kcHsSigTypes sig_tys) 	(
+    tcAddScopedTyVars (collectRuleBndrSigTys vars) (
 
 		-- Ditto forall'd variables
 	mapNF_Tc new_id vars					`thenNF_Tc` \ ids ->
@@ -130,14 +130,12 @@ tcSourceRule (HsRule name act sig_tvs vars lhs rhs src_loc)
 			 forall_tvs
 			 lhs_dicts rhs_lie	`thenTc` \ (forall_tvs1, lie', rhs_binds) ->
 
-    returnTc (lie', HsRule	name act forall_tvs1
-				(map RuleBndr tpl_ids)	-- yuk
+    returnTc (lie', HsRule	name act
+				(map RuleBndr (forall_tvs1 ++ tpl_ids))	-- yuk
 				(mkHsLet lhs_binds lhs')
 				(mkHsLet rhs_binds rhs')
 				src_loc)
   where
-    sig_tys = [t | RuleBndrSig _ t <- vars]
-
     new_id (RuleBndr var) 	   = newTyVarTy openTypeKind			`thenNF_Tc` \ ty ->
 		          	     returnNF_Tc (mkLocalId var ty)
     new_id (RuleBndrSig var rn_ty) = tcHsSigType (RuleSigCtxt var) rn_ty	`thenTc` \ ty ->

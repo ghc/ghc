@@ -14,8 +14,7 @@ module Var (
 	tyVarName, tyVarKind,
 	setTyVarName, setTyVarUnique,
 	mkTyVar, mkSysTyVar, 
-	newMutTyVar, newSigTyVar,
-	readMutTyVar, writeMutTyVar, makeTyVarImmutable,
+	newMutTyVar, readMutTyVar, writeMutTyVar, makeTyVarImmutable,
 
 	-- Ids
 	Id, DictId,
@@ -27,7 +26,7 @@ module Var (
 
 	mkLocalId, mkGlobalId, mkSpecPragmaId,
 
-	isTyVar, isMutTyVar, isSigTyVar,
+	isTyVar, isMutTyVar, mutTyVarDetails,
 	isId, isLocalVar, isLocalId,
 	isGlobalId, isExportedId, isSpecPragmaId,
 	mustHaveLocalBinding
@@ -36,6 +35,7 @@ module Var (
 #include "HsVersions.h"
 
 import {-# SOURCE #-}	TypeRep( Type, Kind )
+import {-# SOURCE #-}	TcType( TyVarDetails )
 import {-# SOURCE #-}	IdInfo( GlobalIdDetails, notGlobalId,
 				IdInfo, seqIdInfo )
 
@@ -84,8 +84,7 @@ data VarDetails
 
   | TyVar
   | MutTyVar (IORef (Maybe Type)) 	-- Used during unification;
-	     Bool			-- True <=> this is a type signature variable, which
-					--	    should not be unified with a non-tyvar type
+	     TyVarDetails
 
 	-- For a long time I tried to keep mutable Vars statically type-distinct
 	-- from immutable Vars, but I've finally given up.   It's just too painful.
@@ -198,24 +197,15 @@ mkSysTyVar uniq kind = Var { varName    = name
 		     where
 		       name = mkSysLocalName uniq SLIT("t")
 
-newMutTyVar :: Name -> Kind -> IO TyVar
-newMutTyVar name kind = newTyVar name kind False
-
-newSigTyVar :: Name -> Kind -> IO TyVar
--- Type variables from type signatures are still mutable, because
--- they may get unified with type variables from other signatures
--- But they do contain a flag to distinguish them, so we can tell if
--- we unify them with a non-type-variable.
-newSigTyVar name kind = newTyVar name kind True
-
-newTyVar name kind is_sig
- = do loc <- newIORef Nothing
-      return (Var { varName    = name
-		  , realUnique = getKey (nameUnique name)
-		  , varType    = kind
-		  , varDetails = MutTyVar loc is_sig
-		  , varInfo    = pprPanic "newMutTyVar" (ppr name)
-		  })
+newMutTyVar :: Name -> Kind -> TyVarDetails -> IO TyVar
+newMutTyVar name kind details 
+  = do loc <- newIORef Nothing
+       return (Var { varName    = name
+		   , realUnique = getKey (nameUnique name)
+		   , varType    = kind
+		   , varDetails = MutTyVar loc details
+		   , varInfo    = pprPanic "newMutTyVar" (ppr name)
+		   })
 
 readMutTyVar :: TyVar -> IO (Maybe Type)
 readMutTyVar (Var {varDetails = MutTyVar loc _}) = readIORef loc
@@ -225,6 +215,9 @@ writeMutTyVar (Var {varDetails = MutTyVar loc _}) val = writeIORef loc val
 
 makeTyVarImmutable :: TyVar -> TyVar
 makeTyVarImmutable tyvar = tyvar { varDetails = TyVar}
+
+mutTyVarDetails :: TyVar -> TyVarDetails
+mutTyVarDetails (Var {varDetails = MutTyVar _ details}) = details
 \end{code}
 
 
@@ -308,7 +301,7 @@ mkGlobalId details name ty info = mkId name ty (GlobalId details) info
 \end{code}
 
 \begin{code}
-isTyVar, isMutTyVar, isSigTyVar		 :: Var -> Bool
+isTyVar, isMutTyVar			 :: Var -> Bool
 isId, isLocalVar, isLocalId    		 :: Var -> Bool
 isGlobalId, isExportedId, isSpecPragmaId :: Var -> Bool
 mustHaveLocalBinding			 :: Var -> Bool
@@ -321,8 +314,6 @@ isTyVar var = case varDetails var of
 isMutTyVar (Var {varDetails = MutTyVar _ _}) = True
 isMutTyVar other			     = False
 
-isSigTyVar (Var {varDetails = MutTyVar _ is_sig}) = is_sig
-isSigTyVar other			          = False
 
 isId var = case varDetails var of
 		LocalId _  -> True

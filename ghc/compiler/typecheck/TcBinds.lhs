@@ -15,7 +15,8 @@ import {-# SOURCE #-} TcExpr  ( tcExpr )
 import CmdLineOpts	( opt_NoMonomorphismRestriction )
 import HsSyn		( HsExpr(..), HsBinds(..), MonoBinds(..), Sig(..), 
 			  Match(..), HsMatchContext(..), 
-			  collectMonoBinders, andMonoBinds
+			  collectMonoBinders, andMonoBinds,
+			  collectSigTysFromMonoBinds
 			)
 import RnHsSyn		( RenamedHsBinds, RenamedSig, RenamedMonoBinds )
 import TcHsSyn		( TcMonoBinds, TcId, zonkId, mkHsLet )
@@ -29,7 +30,7 @@ import TcEnv		( tcExtendLocalValEnv,
 			)
 import TcSimplify	( tcSimplifyInfer, tcSimplifyInferCheck, tcSimplifyRestricted, tcSimplifyToDicts )
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..), checkSigTyVars,
-			  TcSigInfo(..), tcTySig, maybeSig, sigCtxt
+			  TcSigInfo(..), tcTySig, maybeSig, sigCtxt, tcAddScopedTyVars
 			)
 import TcPat		( tcPat )
 import TcSimplify	( bindInstsOfLocalFuns )
@@ -118,7 +119,14 @@ tc_binds_and_then top_lvl combiner (ThenBinds b1 b2) do_next
     do_next
 
 tc_binds_and_then top_lvl combiner (MonoBind bind sigs is_rec) do_next
-  =   	-- TYPECHECK THE SIGNATURES
+  =   	-- BRING ANY SCOPED TYPE VARIABLES INTO SCOPE
+	-- Notice that they scope over 
+	--	a) the type signatures in the binding group
+	--	b) the bindings in the group
+	--	c) the scope of the binding group (the "in" part)
+      tcAddScopedTyVars (collectSigTysFromMonoBinds bind)	$
+
+	-- TYPECHECK THE SIGNATURES
       mapTc tcTySig [sig | sig@(Sig name _ _) <- sigs]	`thenTc` \ tc_ty_sigs ->
   
       tcBindWithSigs top_lvl bind tc_ty_sigs
@@ -536,14 +544,14 @@ is_elem v vs = isIn "isUnResMono" v vs
 
 isUnRestrictedGroup sigs (PatMonoBind other        _ _) = False
 isUnRestrictedGroup sigs (VarMonoBind v _)	        = v `is_elem` sigs
-isUnRestrictedGroup sigs (FunMonoBind v _ matches _)	= any isUnRestrictedMatch matches || 
+isUnRestrictedGroup sigs (FunMonoBind v _ matches _)	= isUnRestrictedMatch matches || 
 							  v `is_elem` sigs
 isUnRestrictedGroup sigs (AndMonoBinds mb1 mb2)		= isUnRestrictedGroup sigs mb1 &&
 							  isUnRestrictedGroup sigs mb2
 isUnRestrictedGroup sigs EmptyMonoBinds			= True
 
-isUnRestrictedMatch (Match _ [] Nothing _) = False	-- No args, no signature
-isUnRestrictedMatch other		   = True	-- Some args or a signature
+isUnRestrictedMatch (Match [] _ _ : _) = False	-- No args => like a pattern binding
+isUnRestrictedMatch other	       = True	-- Some args => a function binding
 \end{code}
 
 

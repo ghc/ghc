@@ -443,8 +443,6 @@ patterns in each equation.
 \begin{code}
 data Match id pat
   = Match
-	[id] 			-- Tyvars wrt which this match is universally quantified
-				-- empty after typechecking
 	[pat]			-- The patterns
 	(Maybe (HsType id))	-- A type signature for the result of the match
 				--	Nothing after typechecking
@@ -465,7 +463,7 @@ data GRHS id pat
 
 mkSimpleMatch :: [pat] -> HsExpr id pat -> Type -> SrcLoc -> Match id pat
 mkSimpleMatch pats rhs rhs_ty locn
-  = Match [] pats Nothing (GRHSs (unguardedRHS rhs locn) EmptyBinds rhs_ty)
+  = Match pats Nothing (GRHSs (unguardedRHS rhs locn) EmptyBinds rhs_ty)
 
 unguardedRHS :: HsExpr id pat -> SrcLoc -> [GRHS id pat]
 unguardedRHS rhs loc = [GRHS [ResultStmt rhs loc] loc]
@@ -477,7 +475,7 @@ THis is something of a nuisance, but no more.
 
 \begin{code}
 getMatchLoc :: Match id pat -> SrcLoc
-getMatchLoc (Match _ _ _ (GRHSs (GRHS _ loc : _) _ _)) = loc
+getMatchLoc (Match _ _ (GRHSs (GRHS _ loc : _) _ _)) = loc
 \end{code}
 
 We know the list must have at least one @Match@ in it.
@@ -500,7 +498,7 @@ pprPatBind pat grhss = sep [ppr pat, nest 4 (pprGRHSs PatBindRhs grhss)]
 
 pprMatch :: (Outputable id, Outputable pat)
 	   => HsMatchContext id -> Match id pat -> SDoc
-pprMatch ctxt (Match _ pats maybe_ty grhss)
+pprMatch ctxt (Match pats maybe_ty grhss)
   = pp_name ctxt <+> sep [sep (map ppr pats), 
 		     ppr_maybe_ty,
 		     nest 2 (pprGRHSs ctxt grhss)]

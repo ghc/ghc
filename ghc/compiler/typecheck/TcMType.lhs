@@ -19,7 +19,7 @@ module TcMType (
   --------------------------------
   -- Instantiation
   tcInstTyVar, tcInstTyVars,
-  tcInstSigVars, tcInstType,
+  tcInstSigTyVars, tcInstType,
   tcSplitRhoTyM,
 
   --------------------------------
@@ -50,10 +50,13 @@ import TypeRep		( Type(..), SourceType(..), TyNote(..),	 -- Friend; can see repr
 			  Kind, TauType, ThetaType, 
 			  openKindCon, typeCon
 			) 
-import TcType		( tcEqType, tcCmpPred,
+import TcType		( TcType, TcRhoType, TcThetaType, TcTauType, TcPredType,
+			  TcTyVarSet, TcKind, TcTyVar, TyVarDetails(..),
+			  tcEqType, tcCmpPred,
 			  tcSplitRhoTy, tcSplitPredTy_maybe, tcSplitAppTy_maybe, 
 			  tcSplitTyConApp_maybe, tcSplitFunTy_maybe, tcSplitForAllTys,
-			  tcGetTyVar, tcIsTyVarTy, tcSplitSigmaTy, isUnLiftedType, isIPPred,
+			  tcGetTyVar, tcIsTyVarTy, tcSplitSigmaTy, 
+			  isUnLiftedType, isIPPred, isUserTyVar, isSkolemTyVar,
 
 			  mkAppTy, mkTyVarTy, mkTyVarTys, mkFunTy, mkTyConApp,
 			  tyVarsOfPred, getClassPredTys_maybe,
@@ -71,7 +74,7 @@ import TyCon		( TyCon, mkPrimTyCon, isSynTyCon, isUnboxedTupleTyCon,
 			  isTupleTyCon, tyConArity, tupleTyConBoxity, tyConName )
 import PrimRep		( PrimRep(VoidRep) )
 import Var		( TyVar, varName, tyVarKind, tyVarName, isTyVar, mkTyVar,
-			  isMutTyVar, isSigTyVar )
+			  isMutTyVar, mutTyVarDetails )
 
 -- others:
 import TcMonad          -- TcType, amongst others
@@ -104,7 +107,7 @@ import Outputable
 newTyVar :: Kind -> NF_TcM TcTyVar
 newTyVar kind
   = tcGetUnique 	`thenNF_Tc` \ uniq ->
-    tcNewMutTyVar (mkSysLocalName uniq SLIT("t")) kind
+    tcNewMutTyVar (mkSysLocalName uniq SLIT("t")) kind VanillaTv
 
 newTyVarTy  :: Kind -> NF_TcM TcType
 newTyVarTy kind
@@ -116,8 +119,8 @@ newTyVarTys n kind = mapNF_Tc newTyVarTy (nOfThem n kind)
 
 newKindVar :: NF_TcM TcKind
 newKindVar
-  = tcGetUnique 						`thenNF_Tc` \ uniq ->
-    tcNewMutTyVar (mkSysLocalName uniq SLIT("k")) superKind	`thenNF_Tc` \ kv ->
+  = tcGetUnique 							`thenNF_Tc` \ uniq ->
+    tcNewMutTyVar (mkSysLocalName uniq SLIT("k")) superKind VanillaTv	`thenNF_Tc` \ kv ->
     returnNF_Tc (TyVarTy kv)
 
 newKindVars :: Int -> NF_TcM [TcKind]
@@ -125,8 +128,8 @@ newKindVars n = mapNF_Tc (\ _ -> newKindVar) (nOfThem n ())
 
 newBoxityVar :: NF_TcM TcKind
 newBoxityVar
-  = tcGetUnique 						`thenNF_Tc` \ uniq ->
-    tcNewMutTyVar (mkSysLocalName uniq SLIT("bx")) superBoxity	`thenNF_Tc` \ kv ->
+  = tcGetUnique 							  `thenNF_Tc` \ uniq ->
+    tcNewMutTyVar (mkSysLocalName uniq SLIT("bx")) superBoxity VanillaTv  `thenNF_Tc` \ kv ->
     returnNF_Tc (TyVarTy kv)
 \end{code}
 
@@ -195,12 +198,13 @@ tcInstTyVar tyvar
 	-- Better watch out for this.  If worst comes to worst, just
 	-- use mkSysLocalName.
     in
-    tcNewMutTyVar name (tyVarKind tyvar)
+    tcNewMutTyVar name (tyVarKind tyvar) VanillaTv
 
-tcInstSigVars tyvars	-- Very similar to tcInstTyVar
+tcInstSigTyVars :: TyVarDetails -> [TyVar] -> NF_TcM [TcTyVar]
+tcInstSigTyVars details tyvars	-- Very similar to tcInstTyVar
   = tcGetUniques 	`thenNF_Tc` \ uniqs ->
     listTc [ ASSERT( not (kind `eqKind` openTypeKind) )	-- Shouldn't happen
-	     tcNewSigTyVar name kind 
+	     tcNewMutTyVar name kind details
 	   | (tyvar, uniq) <- tyvars `zip` uniqs,
 	     let name = setNameUnique (tyVarName tyvar) uniq, 
 	     let kind = tyVarKind tyvar
@@ -1269,7 +1273,7 @@ uUnboundVar swapped tv1 maybe_ty1 ps_ty2 ty2@(TyVarTy tv2)
     update_tv2 = (k2 `eqKind` openTypeKind) || (not (k1 `eqKind` openTypeKind) && nicer_to_update_tv2)
 			-- Try to get rid of open type variables as soon as poss
 
-    nicer_to_update_tv2 =  isSigTyVar tv1 
+    nicer_to_update_tv2 =  isUserTyVar (mutTyVarDetails tv1)
 				-- Don't unify a signature type variable if poss
 			|| isSystemName (varName tv2)
 				-- Try to update sys-y type variables in preference to sig-y ones
@@ -1280,7 +1284,7 @@ uUnboundVar swapped tv1 maybe_ty1 ps_ty2 non_var_ty2
     checkKinds swapped tv1 non_var_ty2			`thenTc_`
 
 	-- Check that tv1 isn't a type-signature type variable
-    checkTcM (not (isSigTyVar tv1))
+    checkTcM (not (isSkolemTyVar (mutTyVarDetails tv1)))
 	     (failWithTcM (unifyWithSigErr tv1 ps_ty2))	`thenTc_`
 
 	-- Check that we aren't losing boxity info (shouldn't happen)

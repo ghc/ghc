@@ -14,7 +14,7 @@ import HsSyn
 import HscTypes		( GlobalRdrEnv )
 import RdrName		( RdrName, isRdrDataCon, elemRdrEnv )
 import RdrHsSyn		( RdrNameConDecl, RdrNameTyClDecl,
-			  extractRuleBndrsTyVars, extractGenericPatTyVars
+			  extractGenericPatTyVars
 			)
 import RnHsSyn
 import HsCore
@@ -24,9 +24,9 @@ import RnTypes		( rnHsType, rnHsSigType, rnHsTypeFVs, rnContext )
 import RnBinds		( rnTopBinds, rnMethodBinds, renameSigs, renameSigsFVs )
 import RnEnv		( lookupTopBndrRn, lookupOccRn, lookupIfaceName,
 			  lookupOrigNames, lookupSysBinder, newLocalsRn,
-			  bindLocalsFVRn, 
+			  bindLocalsFVRn, bindPatSigTyVars,
 			  bindTyVarsRn, bindTyVars2Rn,
-			  bindTyVarsFV2Rn, extendTyVarEnvFVRn,
+			  extendTyVarEnvFVRn,
 			  bindCoreLocalRn, bindCoreLocalsRn, bindLocalNames,
 			  checkDupOrQualNames, checkDupNames, mapFvRn
 			)
@@ -229,11 +229,10 @@ rnIfaceRuleDecl (IfaceRuleOut fn rule)		-- Builtin rules come this way
   = lookupOccRn fn		`thenRn` \ fn' ->
     returnRn (IfaceRuleOut fn' rule)
 
-rnHsRuleDecl (HsRule rule_name act tvs vars lhs rhs src_loc)
-  = ASSERT( null tvs )
-    pushSrcLocRn src_loc			$
+rnHsRuleDecl (HsRule rule_name act vars lhs rhs src_loc)
+  = pushSrcLocRn src_loc				$
+    bindPatSigTyVars (collectRuleBndrSigTys vars)	$
 
-    bindTyVarsFV2Rn doc (map UserTyVar sig_tvs)	$ \ sig_tvs' _ ->
     bindLocalsFVRn doc (map get_var vars)	$ \ ids ->
     mapFvRn rn_var (vars `zip` ids)		`thenRn` \ (vars', fv_vars) ->
 
@@ -245,11 +244,10 @@ rnHsRuleDecl (HsRule rule_name act tvs vars lhs rhs src_loc)
 	bad_vars = [var | var <- ids, not (var `elemNameSet` fv_lhs)]
     in
     mapRn (addErrRn . badRuleVar rule_name) bad_vars	`thenRn_`
-    returnRn (HsRule rule_name act sig_tvs' vars' lhs' rhs' src_loc,
+    returnRn (HsRule rule_name act vars' lhs' rhs' src_loc,
 	      fv_vars `plusFV` fv_lhs `plusFV` fv_rhs)
   where
     doc = text "In the transformation rule" <+> ptext rule_name
-    sig_tvs = extractRuleBndrsTyVars vars
   
     get_var (RuleBndr v)      = v
     get_var (RuleBndrSig v _) = v

@@ -22,7 +22,7 @@ import Name		( Name )
 import FieldLabel	( fieldLabelName )
 import TcEnv		( tcLookupClass, tcLookupDataCon, tcLookupGlobalId, tcLookupId )
 import TcMType 		( tcInstTyVars, newTyVarTy, unifyTauTy, unifyListTy, unifyTupleTy )
-import TcType		( isTauTy, mkTyConApp, mkClassPred, liftedTypeKind )
+import TcType		( TcType, TcTyVar, isTauTy, mkTyConApp, mkClassPred, liftedTypeKind )
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..) )
 
 import CmdLineOpts	( opt_IrrefutableTuples )

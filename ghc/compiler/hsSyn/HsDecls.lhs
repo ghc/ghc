@@ -18,7 +18,8 @@ module HsDecls (
 	tyClDeclName, tyClDeclNames, tyClDeclSysNames, tyClDeclTyVars,
 	isClassDecl, isSynDecl, isDataDecl, isIfaceSigDecl, countTyClDecls,
 	mkClassDeclSysNames, isIfaceRuleDecl, ifaceRuleDeclName,
-	getClassDeclSysNames, conDetailsTys
+	getClassDeclSysNames, conDetailsTys,
+	collectRuleBndrSigTys
     ) where
 
 #include "HsVersions.h"
@@ -768,9 +769,7 @@ data RuleDecl name pat
   = HsRule			-- Source rule
 	RuleName		-- Rule name
 	Activation
-	[name]			-- Forall'd tyvars, filled in by the renamer with
-				-- tyvars mentioned in sigs; then filled out by typechecker
-	[RuleBndr name]		-- Forall'd term vars
+	[RuleBndr name]		-- Forall'd vars; after typechecking this includes tyvars
 	(HsExpr name pat)	-- LHS
 	(HsExpr name pat)	-- RHS
 	SrcLoc		
@@ -789,17 +788,20 @@ data RuleDecl name pat
 	CoreRule
 
 isIfaceRuleDecl :: RuleDecl name pat -> Bool
-isIfaceRuleDecl (HsRule _ _ _ _ _ _ _) = False
-isIfaceRuleDecl other		       = True
+isIfaceRuleDecl (HsRule _ _ _ _ _ _) = False
+isIfaceRuleDecl other		     = True
 
 ifaceRuleDeclName :: RuleDecl name pat -> name
 ifaceRuleDeclName (IfaceRule _ _ _ n _ _ _) = n
 ifaceRuleDeclName (IfaceRuleOut n r)	    = n
-ifaceRuleDeclName (HsRule fs _ _ _ _ _ _)   = pprPanic "ifaceRuleDeclName" (ppr fs)
+ifaceRuleDeclName (HsRule fs _ _ _ _ _)     = pprPanic "ifaceRuleDeclName" (ppr fs)
 
 data RuleBndr name
   = RuleBndr name
   | RuleBndrSig name (HsType name)
+
+collectRuleBndrSigTys :: [RuleBndr name] -> [HsType name]
+collectRuleBndrSigTys bndrs = [ty | RuleBndrSig _ ty <- bndrs]
 
 instance (NamedThing name, Ord name) => Eq (RuleDecl name pat) where
   -- Works for IfaceRules only; used when comparing interface file versions
@@ -810,15 +812,13 @@ instance (NamedThing name, Ord name) => Eq (RuleDecl name pat) where
 
 instance (NamedThing name, Outputable name, Outputable pat)
 	      => Outputable (RuleDecl name pat) where
-  ppr (HsRule name act tvs ns lhs rhs loc)
+  ppr (HsRule name act ns lhs rhs loc)
 	= sep [text "{-# RULES" <+> doubleQuotes (ptext name) <+> ppr act,
 	       pp_forall, ppr lhs, equals <+> ppr rhs,
                text "#-}" ]
 	where
-	  pp_forall | null tvs && null ns = empty
-		    | otherwise		  = text "forall" <+> 
-					    fsep (map ppr tvs ++ map ppr ns)
-					    <> dot
+	  pp_forall | null ns   = empty
+		    | otherwise	= text "forall" <+> fsep (map ppr ns) <> dot
 
   ppr (IfaceRule name act tpl_vars fn tpl_args rhs loc) 
     = hsep [ doubleQuotes (ptext name), ppr act,

@@ -239,7 +239,7 @@ dsExpr (HsCase discrim matches src_loc)
 		returnDs (Case core_discrim bndr alts)
 	_ -> panic ("dsExpr: tuple pattern:\n" ++ showSDoc (ppr matching_code))
   where
-    ubx_tuple_match (Match _ [TuplePat ps Unboxed] _ _) = True
+    ubx_tuple_match (Match [TuplePat ps Unboxed] _ _) = True
     ubx_tuple_match _ = False
 
 dsExpr (HsCase discrim matches src_loc)

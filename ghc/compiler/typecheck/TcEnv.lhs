@@ -5,7 +5,7 @@ module TcEnv(
 
 	-- Getting stuff from the environment
 	TcEnv, initTcEnv, 
-	tcEnvTyCons, tcEnvClasses, tcEnvIds, tcEnvTcIds, tcEnvTyVars,
+	tcEnvTyCons, tcEnvClasses, tcEnvIds, tcLEnvElts,
 	getTcGEnv,
 	
 	-- Instance environment, and InstInfo type
@@ -42,7 +42,7 @@ module TcEnv(
 import RnHsSyn		( RenamedMonoBinds, RenamedSig )
 import TcMonad
 import TcMType		( zonkTcTyVarsAndFV )
-import TcType		( Type, ThetaType, 
+import TcType		( Type, ThetaType, TcType, TcKind, TcTyVar, TcTyVarSet, 
 			  tyVarsOfTypes, tcSplitDFunTy,
 			  getDFunTyKey, tcTyConAppTyCon
 			)
@@ -130,18 +130,6 @@ used thus:
 
 
 \begin{code}
-data TcTyThing
-  = AGlobal TyThing	-- Used only in the return type of a lookup
-  | ATcId  TcId		-- Ids defined in this module
-  | ATyVar TyVar	-- Type variables
-  | AThing TcKind	-- Used temporarily, during kind checking
--- Here's an example of how the AThing guy is used
--- Suppose we are checking (forall a. T a Int):
---	1. We first bind (a -> AThink kv), where kv is a kind variable. 
---	2. Then we kind-check the (T a Int) part.
---	3. Then we zonk the kind variable.
---	4. Now we know the kind for 'a', and we add (a -> ATyVar a::K) to the environment
-
 initTcEnv :: HomeSymbolTable -> PackageTypeEnv -> IO TcEnv
 initTcEnv hst pte 
   = do { gtv_var <- newIORef emptyVarSet ;
@@ -159,22 +147,38 @@ initTcEnv hst pte
 tcEnvClasses env = typeEnvClasses (tcGEnv env)
 tcEnvTyCons  env = typeEnvTyCons  (tcGEnv env) 
 tcEnvIds     env = typeEnvIds     (tcGEnv env) 
-tcEnvTyVars  env = [tv | ATyVar tv <- nameEnvElts (tcLEnv env)]
-tcEnvTcIds   env = [id | ATcId  id <- nameEnvElts (tcLEnv env)]
+tcLEnvElts   env = nameEnvElts (tcLEnv env)
 
 getTcGEnv (TcEnv { tcGEnv = genv }) = genv
 
 tcInLocalScope :: TcEnv -> Name -> Bool
 tcInLocalScope env v = v `elemNameEnv` (tcLEnv env)
+\end{code}
 
--- This data type is used to help tie the knot
--- when type checking type and class declarations
+\begin{code}
+data TcTyThing
+  = AGlobal TyThing		-- Used only in the return type of a lookup
+  | ATcId   TcId		-- Ids defined in this module
+  | ATyVar  TyVar 		-- Type variables
+  | AThing  TcKind		-- Used temporarily, during kind checking
+-- Here's an example of how the AThing guy is used
+-- Suppose we are checking (forall a. T a Int):
+--	1. We first bind (a -> AThink kv), where kv is a kind variable. 
+--	2. Then we kind-check the (T a Int) part.
+--	3. Then we zonk the kind variable.
+--	4. Now we know the kind for 'a', and we add (a -> ATyVar a::K) to the environment
+
+\end{code}
+
+This data type is used to help tie the knot
+ when type checking type and class declarations
+
+\begin{code}
 data TyThingDetails = SynTyDetails Type
 		    | DataTyDetails ThetaType [DataCon] [Id]
 		    | ClassDetails ThetaType [Id] [ClassOpItem] DataCon
 		    | ForeignTyDetails	-- Nothing yet
 \end{code}
-
 
 %************************************************************************
 %*									*

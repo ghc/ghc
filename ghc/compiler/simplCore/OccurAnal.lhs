@@ -507,6 +507,20 @@ occAnalRhs env id rhs
   = (final_usage, rhs')
   where
     (rhs_usage, rhs') = occAnal (rhsCtxt env) rhs
+	-- Note that we use an rhsCtxt.  This tells the occ anal that it's
+	-- looking at an RHS, which has an effect in occAnalApp
+	--
+	-- But there's a problem.  Consider
+	--	x1 = a0 : []
+	--	x2 = a1 : x1
+	--	x3 = a2 : x2
+	--	g  = f x2
+	-- First time round, it looks as if x1 and x2 occur as an arg of a 
+	-- let-bound constructor ==> give them a many-occurrence.
+	-- But then x3 is inlined (unconditionally as it happens) and
+	-- next time round, x2 will be, and the next time round x1 will be
+	-- Result: multiple simplifier iterations.  Sigh.  
+	-- Possible solution: use rhsCtxt for things that occur just once...
 
 	-- [March 98] A new wrinkle is that if the binder has specialisations inside
 	-- it then we count the specialised Ids as "extra rhs's".  That way

@@ -23,10 +23,11 @@ import TcHsSyn		( TcMonoBinds, mkHsConApp )
 import TcBinds		( tcSpecSigs )
 import TcClassDcl	( tcMethodBind, badMethodErr )
 import TcMonad       
-import TcMType		( tcInstTyVars, checkValidTheta, checkValidInstHead, instTypeErr,
+import TcMType		( tcInstSigTyVars, checkValidTheta, checkValidInstHead, instTypeErr, 
 			  UserTypeCtxt(..), SourceTyCtxt(..) )
-import TcType		( tcSplitDFunTy, mkClassPred, mkTyVarTy,
-			  tcSplitSigmaTy, tcSplitPredTy_maybe, getClassPredTys
+import TcType		( tcSplitDFunTy, mkClassPred, mkTyVarTy, mkTyVarTys,
+			  tcSplitSigmaTy, tcSplitPredTy_maybe, getClassPredTys,
+			  TyVarDetails(..)
 			)
 import Inst		( InstOrigin(..),
 			  newDicts, instToId,
@@ -524,8 +525,9 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id,
     let
 	(inst_tyvars, dfun_theta, clas, inst_tys) = tcSplitDFunTy (idType dfun_id)
     in
-    tcInstTyVars inst_tyvars		`thenNF_Tc` \ (inst_tyvars', _, tenv) ->
+    tcInstSigTyVars InstTv inst_tyvars		`thenNF_Tc` \ inst_tyvars' ->
     let
+	tenv	    = mkTopTyVarSubst inst_tyvars (mkTyVarTys inst_tyvars')
 	inst_tys'   = map (substTy tenv) inst_tys
 	dfun_theta' = substTheta tenv dfun_theta
 	origin	    = InstanceDeclOrigin

@@ -1155,7 +1155,7 @@ mk_FunMonoBind loc fun pats_and_exprs
 		loc
 
 mk_match loc pats expr binds
-  = Match [] (map paren pats) Nothing 
+  = Match (map paren pats) Nothing 
 	  (GRHSs (unguardedRHS expr loc) binds placeHolderType)
   where
     paren p@(VarPatIn _) = p

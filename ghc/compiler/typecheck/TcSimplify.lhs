@@ -40,7 +40,8 @@ import TcEnv		( tcGetGlobalTyVars, tcGetInstEnv )
 import InstEnv		( lookupInstEnv, classInstEnv, InstLookupResult(..) )
 
 import TcMType		( zonkTcTyVarsAndFV, tcInstTyVars, unifyTauTy )
-import TcType		( ThetaType, PredType, mkClassPred, isOverloadedTy,
+import TcType		( TcTyVar, TcTyVarSet, ThetaType, PredType, 
+			  mkClassPred, isOverloadedTy,
 			  mkTyVarTy, tcGetTyVar, isTyVarClassPred,
 			  tyVarsOfPred, getClassPredTys_maybe, isClassPred, isIPPred,
 			  inheritablePred, predHasFDs )

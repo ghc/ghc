@@ -44,7 +44,6 @@ module RdrHsSyn (
 	SigConverter,
 
 	extractHsTyRdrNames,  extractHsTyRdrTyVars, 
-	extractRuleBndrsTyVars,
 	extractHsCtxtRdrTyVars, extractGenericPatTyVars,
  
 	mkHsOpApp, mkClassDecl, mkClassOpSigDM, mkConDecl,
@@ -130,12 +129,6 @@ extractHsTyRdrNames ty = nub (extract_ty ty [])
 extractHsTyRdrTyVars :: RdrNameHsType -> [RdrName]
 extractHsTyRdrTyVars ty = nub (filter isRdrTyVar (extract_ty ty []))
 
-extractRuleBndrsTyVars :: [RuleBndr RdrName] -> [RdrName]
-extractRuleBndrsTyVars bndrs = filter isRdrTyVar (nub (foldr go [] bndrs))
-                           where
-                             go (RuleBndr _)       acc = acc
-                             go (RuleBndrSig _ ty) acc = extract_ty ty acc
-
 extractHsCtxtRdrNames :: HsContext RdrName -> [RdrName]
 extractHsCtxtRdrNames ty = nub (extract_ctxt ty [])
 extractHsCtxtRdrTyVars :: HsContext RdrName -> [RdrName]
@@ -176,8 +169,8 @@ extractGenericPatTyVars binds
     get (FunMonoBind _ _ ms _) acc = foldr get_m acc ms
     get other		       acc = acc
 
-    get_m (Match _ (TypePatIn ty : _) _ _) acc = extract_ty ty acc
-    get_m other				   acc = acc
+    get_m (Match (TypePatIn ty : _) _ _) acc = extract_ty ty acc
+    get_m other				 acc = acc
 \end{code}
 
 

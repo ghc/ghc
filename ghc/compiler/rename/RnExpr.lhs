@@ -159,7 +159,7 @@ rnPat (TypePatIn name) =
 \begin{code}
 rnMatch :: HsMatchContext RdrName -> RdrNameMatch -> RnMS (RenamedMatch, FreeVars)
 
-rnMatch ctxt match@(Match _ pats maybe_rhs_sig grhss)
+rnMatch ctxt match@(Match pats maybe_rhs_sig grhss)
   = pushSrcLocRn (getMatchLoc match)	$
 
 	-- Bind pattern-bound type variables
@@ -171,7 +171,7 @@ rnMatch ctxt match@(Match _ pats maybe_rhs_sig grhss)
 	doc_sig     = text "In a result type-signature"
  	doc_pat     = pprMatchContext ctxt
     in
-    bindPatSigTyVars (rhs_sig_tys ++ pat_sig_tys)	$ \ sig_tyvars ->
+    bindPatSigTyVars (rhs_sig_tys ++ pat_sig_tys)	$ 
 
 	-- Note that we do a single bindLocalsRn for all the
 	-- matches together, so that we spot the repeated variable in
@@ -196,7 +196,7 @@ rnMatch ctxt match@(Match _ pats maybe_rhs_sig grhss)
     in
     warnUnusedMatches unused_binders		`thenRn_`
     
-    returnRn (Match sig_tyvars pats' maybe_rhs_sig' grhss', all_fvs)
+    returnRn (Match pats' maybe_rhs_sig' grhss', all_fvs)
 	-- The bindLocals and bindTyVars will remove the bound FVs
 \end{code}
 
@@ -571,7 +571,7 @@ rnStmt (ParStmt stmtss) thing_inside
 rnStmt (BindStmt pat expr src_loc) thing_inside
   = pushSrcLocRn src_loc $
     rnExpr expr					`thenRn` \ (expr', fv_expr) ->
-    bindPatSigTyVars (collectSigTysFromPat pat)	$ \ sig_tyvars ->
+    bindPatSigTyVars (collectSigTysFromPat pat)	$ 
     bindLocalsFVRn doc (collectPatBinders pat)	$ \ new_binders ->
     rnPat pat					`thenRn` \ (pat', fv_pat) ->
     thing_inside (BindStmt pat' expr' src_loc)	`thenRn` \ ((rest_binders, result), fvs) ->
@@ -719,7 +719,7 @@ checkPrecMatch :: Bool -> Name -> RenamedMatch -> RnMS ()
 checkPrecMatch False fn match
   = returnRn ()
 
-checkPrecMatch True op (Match _ (p1:p2:_) _ _)
+checkPrecMatch True op (Match (p1:p2:_) _ _)
 	-- True indicates an infix lhs
   = getModeRn 		`thenRn` \ mode ->
 	-- See comments with rnExpr (OpApp ...)
