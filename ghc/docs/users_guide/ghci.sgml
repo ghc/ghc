@@ -640,6 +640,17 @@ $ ghci -lm
 
     <variablelist>
       <varlistentry>
+	<term><literal>:add</literal>
+	<replaceable>module</replaceable> ...</term>
+	<indexterm><primary><literal>:add</literal></primary></indexterm>
+	<listitem>
+	  <para>Add <replaceable>module</replaceable>(s) to the
+	  current <firstterm>target set</firstterm>, and perform a
+	  reload.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term><literal>:cd</literal> <replaceable>dir</replaceable></term>
 	<indexterm><primary><literal>:cd</literal></primary></indexterm>
 	<listitem>
@@ -716,18 +727,19 @@ Prelude> :def make (\_ -> return ":! ghc --make Main")
       </varlistentry>
 
       <varlistentry>
-	<term><literal>:load</literal> <replaceable>module</replaceable></term>
+	<term><literal>:load</literal>
+	<replaceable>module</replaceable> ...</term>
 	<indexterm><primary><literal>:load</literal></primary></indexterm>
 	<listitem>
-	  <para>Recursively loads <replaceable>module</replaceable>,
-	  and all the modules it depends on.  Here,
-	  <replaceable>module</replaceable> must be a module name or
-	  filename, but may not be the name of a module in a
-	  package.</para> 
+	  <para>Recursively loads the specified
+	  <replaceable>module</replaceable>s, and all the modules they
+	  depend on.  Here, each <replaceable>module</replaceable>
+	  must be a module name or filename, but may not be the name
+	  of a module in a package.</para>
 
 	  <para>All previously loaded modules, except package modules,
-	  are forgotten.  The module <replaceable>module</replaceable>
-	  is known as the <firstterm>target</firstterm>.</para>
+	  are forgotten.  The new set of modules is known as the
+	  <firstterm>target set</firstterm>.</para>
 
 	  <para>After a <literal>:load</literal> command, the current
 	  context is set to:</para>
@@ -775,11 +787,11 @@ Prelude> :def make (\_ -> return ":! ghc --make Main")
 	<term><literal>:reload</literal></term>
 	<indexterm><primary><literal>:reload</literal></primary></indexterm>
 	<listitem>
-	  <para>Attempts to reload the current target (see
-	  <literal>:load</literal>) if it, or any module it depends
-	  on, has changed.  Note that this may entail loading new
-	  modules, or even dropping modules which are no longer
-	  indirectly required by the target.</para>
+	  <para>Attempts to reload the current target set (see
+	  <literal>:load</literal>) if any of the modules in the set,
+	  or any dependent module, has changed.  Note that this may
+	  entail loading new modules, or dropping modules which are no
+	  longer indirectly required by the target.</para>
 	</listitem>
       </varlistentry>
 
