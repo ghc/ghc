@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.42 $
- * $Date: 2000/02/08 17:50:46 $
+ * $Revision: 1.43 $
+ * $Date: 2000/02/15 13:16:20 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1643,12 +1643,13 @@ String f; {                             /* of status for later restoration  */
 }
 
 Bool isPreludeScript() {                /* Test whether this is the Prelude*/
-    return (scriptHw==0);
+    return (scriptHw < N_PRELUDE_SCRIPTS /*==0*/ );
 }
 
 Bool moduleThisScript(m)                /* Test if given module is defined */
 Module m; {                             /* in current script file          */
-    return scriptHw<1 || m>=scripts[scriptHw-1].moduleHw;
+    return scriptHw < 1
+           || m>=scripts[scriptHw-1].moduleHw;
 }
 
 Module lastModule() {              /* Return module in current script file */

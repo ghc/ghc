@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.38 $
- * $Date: 2000/02/08 15:32:29 $
+ * $Revision: 1.39 $
+ * $Date: 2000/02/15 13:16:19 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -39,8 +39,6 @@ Bool showInstRes = FALSE;
 #if MULTI_INST
 Bool multiInstRes = FALSE;
 #endif
-
-#define N_PRELUDE_SCRIPTS (combined ? 30 : 1)
 
 /* --------------------------------------------------------------------------
  * Local function prototypes:

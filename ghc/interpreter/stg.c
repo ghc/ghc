@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: stg.c,v $
- * $Revision: 1.10 $
- * $Date: 1999/12/07 11:14:56 $
+ * $Revision: 1.11 $
+ * $Date: 2000/02/15 13:16:20 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -25,32 +25,40 @@
  * Utility functions
  * ------------------------------------------------------------------------*/
 
-void* stgConInfo( StgDiscr d )
+/* Make an info table for a constructor or tuple. */
+void* stgConInfo ( StgDiscr d )
 {
+    int tag;
     switch (whatIs(d)) {
-       case NAME:
+       case NAME: {
+          tag = cfunOf(d);
+          if (tag > 0) tag--;
           if (!name(d).itbl)
-             name(d).itbl = asmMkInfo(cfunOf(d),name(d).arity);
+             name(d).itbl = asmMkInfo(tag,name(d).arity);
           return name(d).itbl;
-       case TUPLE: 
+       }
+       case TUPLE: {
+          tag = 0;
           if (!tycon(d).itbl)
-             tycon(d).itbl = asmMkInfo(0,tupleOf(d));
+             tycon(d).itbl = asmMkInfo(tag,tupleOf(d));
           return tycon(d).itbl;
+       }
        default: 
           internal("stgConInfo");
     }
 }
 
-int stgDiscrTag( StgDiscr d )
+/* Return the tag for a constructor or tuple, starting at zero. */
+int stgDiscrTag ( StgDiscr d )
 {
+    int tag;
     switch (whatIs(d)) {
-    case NAME:
-            return cfunOf(d);
-    case TUPLE: 
-            return 0;
-    default: 
-            internal("stgDiscrTag");
+       case NAME:  tag = cfunOf(d); break;
+       case TUPLE: tag = 0;
+       default:    internal("stgDiscrTag");   
     }
+    if (tag > 0) tag--;
+    return tag;
 }
 
 /* --------------------------------------------------------------------------

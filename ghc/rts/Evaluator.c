@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.32 $
- * $Date: 2000/02/14 11:04:58 $
+ * $Revision: 1.33 $
+ * $Date: 2000/02/15 13:16:20 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -851,7 +851,7 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                 {
                     int  tag       = BCO_INSTR_8;
                     StgWord offset = BCO_INSTR_16;
-                    if (constrTag(stgCast(StgClosure*,xStackPtr(0))) != tag) {
+                    if (constrTag( (StgClosure*)xStackPtr(0) ) != tag) {
                         bciPtr += offset;
                     }
                     Continue;
@@ -1448,7 +1448,9 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                 case RET_VEC_SMALL:
                 case RET_BIG:
                 case RET_VEC_BIG:
-		  //       barf("todo: RET_[VEC_]{BIG,SMALL}");
+                        cap->rCurrentTSO->whatNext = ThreadEnterGHC;
+                        xPushCPtr(obj);
+                        RETURN(ThreadYielding);
                 default:
                         belch("entered CONSTR with invalid continuation on stack");
                         IF_DEBUG(evaluator,
