@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelRead.lhs,v 1.20 2001/05/23 09:28:44 simonmar Exp $
+% $Id: PrelRead.lhs,v 1.21 2001/08/28 09:55:35 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -552,23 +552,22 @@ point type to obtain the same results.
 		    ReadS Double,
 		    ReadS Float	    #-} 
 readFloat :: (RealFloat a) => ReadS a
-readFloat r = do
-    (x,t) <- readRational r
-    return (fromRational x,t)
-
-readRational :: ReadS Rational -- NB: doesn't handle leading "-"
-
-readRational r =
-   (do 
-      (n,d,s) <- readFix r
-      (k,t)   <- readExp s
-      return ((n%1)*10^^(k-d), t )) ++
+readFloat r =
+   (do
+      (x,t) <- readRational r
+      return (fromRational x,t) ) ++
    (do
       ("NaN",t) <- lex r
       return (0/0,t) ) ++
    (do
       ("Infinity",t) <- lex r
       return (1/0,t) )
+
+readRational :: ReadS Rational -- NB: doesn't handle leading "-"
+readRational r = do 
+     (n,d,s) <- readFix r
+     (k,t)   <- readExp s
+     return ((n%1)*10^^(k-d), t)
  where
      readFix r = do
 	(ds,s)  <- lexDecDigits r
