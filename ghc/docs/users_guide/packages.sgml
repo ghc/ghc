@@ -372,6 +372,13 @@
 	  <listitem>
 	    <para>A list of directories containing interface files
 	    (<literal>.hi</literal> files) for this package.</para>
+
+	    <para>If the package contains profiling libraries, then
+	    the interface files for those library modules should have
+	    the suffix <literal>.p_hi</literal>.  So the package can
+	    contain both normal and profiling versions of the same
+	    library without conflict (see also
+	    <literal>library_dirs</literal> below).</para>
 	  </listitem>
 	</varlistentry>
 
