@@ -266,8 +266,8 @@ partition		:: (a -> Bool) -> [a] -> ([a],[a])
 {-# INLINE partition #-}
 partition p xs = foldr (select p) ([],[]) xs
 
-select p x (ts,fs) | p x       = (x:ts,fs)
-                   | otherwise = (ts, x:fs)
+select p x ~(ts,fs) | p x       = (x:ts,fs)
+                    | otherwise = (ts, x:fs)
 \end{code}
 
 @mapAccumL@ behaves like a combination
@@ -515,3 +515,35 @@ unfoldr f b  =
    Just (a,new_b) -> a : unfoldr f new_b
    Nothing        -> []
 \end{code}
+
+#if 0  /* should go in PrelList, but dependency problems */
+foldl' is a strict version of foldl; that is, it doesn't build up a
+huge suspension in its first argument as it traverses the list.  Valid
+when f is strict.
+
+\begin{code}
+foldl'                   :: (a -> b -> a) -> a -> [b] -> a
+foldl' _ z []            =  z
+foldl' f z (x:xs)        =  let a = f z x in seq a (foldl f a xs)
+
+foldl1'			 :: (a -> a -> a) -> [a] -> a
+foldl1'	f (x:xs)         =  foldl' f x xs
+foldl1'	_ []             =  errorEmptyList "foldl1'"
+
+{-# RULES
+"maximumInt" 	 maximum = maximum' :: [Int]     -> Int
+"maximumInteger" maximum = maximum' :: [Integer] -> Integer
+"minimumInt"     minimum = minimum' :: [Int]     -> Int
+"minimumInteger" minimum = minimum' :: [Integer] -> Integer
+ #-}
+
+{-# SPECIALISE  maximum' :: [Int] -> Int #-}
+{-# SPECIALISE  minimum' :: [Int] -> Int #-}
+
+maximum' []             =  errorEmptyList "maximum'"
+maximum' xs             =  foldl1' max xs
+
+minimum' []             =  errorEmptyList "minimum'"
+minimum' xs             =  foldl1' min xs
+\end{code}
+#endif

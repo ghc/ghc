@@ -1,4 +1,4 @@
-%
+e%
 % (c) The GRASP/AQUA Project, Glasgow University, 1995-99
 %
 \section[Time]{Haskell 1.4 Time of Day Library}
@@ -7,6 +7,61 @@ The {\em Time} library provides standard functionality for
 clock times, including timezone information (i.e, the functionality of
 "time.h",  adapted to the Haskell environment), It follows RFC 1129 in
 its use of Coordinated Universal Time (UTC).
+
+2000/06/17 <michael.weber@post.rwth-aachen.de>:
+RESTRICTIONS:
+  * min./max. time diff currently is restricted to
+    [minBound::Int, maxBound::Int]
+
+  * surely other restrictions wrt. min/max bounds
+
+
+NOTES:
+  * printing times
+
+    `showTime' (used in `instance Show ClockTime') always prints time
+    converted to the local timezone (even if it is taken from
+    `(toClockTime . toUTCTime)'), whereas `calendarTimeToString'
+    honors the tzone & tz fields and prints UTC or whatever timezone
+    is stored inside CalendarTime.
+
+    Maybe `showTime' should be changed to use UTC, since it would
+    better correspond to the actual representation of `ClockTime'
+    (can be done by replacing localtime(3) by gmtime(3)).
+
+
+BUGS:
+  * obvious bugs now should be fixed, but there are surely more (and
+    less obvious one's) lurking around :-}
+
+  * gettimeofday(2) returns secs and _microsecs_, not pico-secs!
+    this should be changed accordingly (also means updating the H98
+    report)
+
+  * add proper handling of microsecs, currently, they're mostly
+    ignored
+
+  * `formatFOO' case of `%s' is currently broken...
+
+
+TODO:
+  * check for unusual date cases, like 1970/1/1 00:00h, and conversions
+    between different timezone's etc.
+
+  * check, what needs to be in the IO monad, the current situation
+    seems to be a bit inconsistent to me
+
+  * sync #ifdef'ed __HUGS__ parts with current changes (only few)
+
+  * check whether `isDst = -1' works as expected on other arch's
+    (Solaris anyone?)
+
+  * add functions to parse strings to `CalendarTime' (some day...)
+
+  * implement padding capabilities ("%_", "%-") in `formatFOO'
+
+  * add rfc822 timezone (+0200 is CEST) representation ("%z") in `formatFOO'
+
 
 \begin{code}
 {-# OPTIONS -#include "cbits/timezone.h" -#include "cbits/stgio.h"  #-}
@@ -23,6 +78,7 @@ module Time
      ,  diffClockTimes
      ,  addToClockTime
 
+     ,  normalizeTimeDiff -- non-standard
      ,  timeDiffToString  -- non-standard
      ,  formatTimeDiff    -- non-standard
 
@@ -255,7 +311,7 @@ addToClockTime (TimeDiff year mon day hour min sec psec)
 	let
 	  sec_diff = fromInt sec + 60 * fromInt min + 3600 * fromInt hour + 24 * 3600 * fromInt day
 	  cal      = toUTCTime (TOD (c_sec + sec_diff) (c_psec + psec))
-
+                                                       -- FIXME! ^^^^
           new_mon  = fromEnum (ctMonth cal) + r_mon 
 	  (month', yr_diff)
 	    | new_mon < 0  = (toEnum (12 + new_mon), (-1))
@@ -269,18 +325,51 @@ addToClockTime (TimeDiff year mon day hour min sec psec)
 	toClockTime cal{ctMonth=month', ctYear=year'}
 
 diffClockTimes  :: ClockTime -> ClockTime -> TimeDiff
-diffClockTimes tod_a tod_b =
+-- diffClockTimes is meant to be the dual to `addToClockTime'.
+-- If you want to have the TimeDiff properly splitted, use
+-- `normalizeTimeDiff' on this function's result
+--
+-- CAVEAT: see comment of normalizeTimeDiff
+diffClockTimes (TOD sa pa) (TOD sb pb) =
+    noTimeDiff{ tdSec     = fromIntegral (sa - sb) 
+                -- FIXME: can handle just 68 years...
+              , tdPicosec = pa - pb
+              }
+
+
+normalizeTimeDiff :: TimeDiff -> TimeDiff
+-- FIXME: handle psecs properly
+-- FIXME: ?should be called by formatTimeDiff automagically?
+--
+-- when applied to something coming out of `diffClockTimes', you loose
+-- the duality to `addToClockTime', since a year does not always have
+-- 365 days, etc.
+--
+-- apply this function as late as possible to prevent those "rounding"
+-- errors
+normalizeTimeDiff td =
   let
-   CalendarTime year_a mon_a day_a hour_a min_a sec_a psec_a _ _ _ _ _ = toUTCTime tod_a
-   CalendarTime year_b mon_b day_b hour_b min_b sec_b psec_b _ _ _ _ _ = toUTCTime tod_b
+      rest0 = tdSec td 
+               + 60 * (tdMin td 
+                    + 60 * (tdHour td 
+                         + 24 * (tdDay td 
+                              + 30 * (tdMonth td 
+                                   + 365 * tdYear td))))
+
+      (diffYears,  rest1)    = rest0 `quotRem` (365 * 24 * 3600)
+      (diffMonths, rest2)    = rest1 `quotRem` (30 * 24 * 3600)
+      (diffDays,   rest3)    = rest2 `quotRem` (24 * 3600)
+      (diffHours,  rest4)    = rest3 `quotRem` 3600
+      (diffMins,   diffSecs) = rest4 `quotRem` 60
   in
-  TimeDiff (year_a - year_b) 
-	   (fromEnum mon_a  - fromEnum mon_b) 
-	   (day_a  - day_b)
-	   (hour_a - hour_b)
-	   (min_a  - min_b)
-	   (sec_a  - sec_b)
-	   (psec_a - psec_b)
+      td{ tdYear = diffYears
+        , tdMonth = diffMonths
+        , tdDay   = diffDays
+        , tdHour  = diffHours
+        , tdMin   = diffMins
+        , tdSec   = diffSecs
+        }
+
 \end{code}
 
 @toCalendarTime@ {\em t} converts {\em t} to a local time, modified by
@@ -354,6 +443,7 @@ toClockTime (CalendarTime year mon mday hour min sec psec wday yday tzname tz is
         )
     where
      isDst = if isdst then (1::Int) else 0
+
 #else
 toCalendarTime :: ClockTime -> IO CalendarTime
 toCalendarTime (TOD (S# i) psec) 
@@ -421,7 +511,7 @@ toClockTime (CalendarTime year mon mday hour min sec psec _wday _yday _tzname tz
     else
         unsafePerformIO ( do
 	    res <- malloc1
-	    rc  <- toClockSec year (fromEnum mon) mday hour min sec isDst res
+	    rc  <- toClockSec year (fromEnum mon) mday hour min sec tz isDst res
             if rc /= 0
              then do
 	       i <- cvtUnsigned res
@@ -429,7 +519,12 @@ toClockTime (CalendarTime year mon mday hour min sec psec _wday _yday _tzname tz
 	     else error "Time.toClockTime: can't perform conversion"
         )
     where
-     isDst = if isdst then (1::Int) else 0
+     -- `isDst' causes the date to be wrong by one hour...
+     -- FIXME: check, whether this works on other arch's than Linux, too...
+     -- 
+     -- so we set it to (-1) (means `unknown') and let `mktime' determine
+     -- the real value...
+     isDst = -1     -- if isdst then (1::Int) else 0
 #endif
 
 
@@ -468,7 +563,9 @@ formatCalendarTime :: TimeLocale -> String -> CalendarTime -> String
 formatCalendarTime l fmt (CalendarTime year mon day hour min sec _
                                        wday yday tzname _ _) =
         doFmt fmt
-  where doFmt ('%':c:cs) = decode c ++ doFmt cs
+  where doFmt ('%':'-':cs) = doFmt ('%':cs) -- padding not implemented
+        doFmt ('%':'_':cs) = doFmt ('%':cs) -- padding not implemented
+        doFmt ('%':c:cs)   = decode c ++ doFmt cs
         doFmt (c:cs) = c : doFmt cs
         doFmt "" = ""
 
@@ -539,10 +636,12 @@ timeDiffToString :: TimeDiff -> String
 timeDiffToString = formatTimeDiff defaultTimeLocale "%c"
 
 formatTimeDiff :: TimeLocale -> String -> TimeDiff -> String
-formatTimeDiff l fmt (TimeDiff year month day hour min sec _)
+formatTimeDiff l fmt td@(TimeDiff year month day hour min sec _)
  = doFmt fmt
   where 
    doFmt ""         = ""
+   doFmt ('%':'-':cs) = doFmt ('%':cs) -- padding not implemented
+   doFmt ('%':'_':cs) = doFmt ('%':cs) -- padding not implemented
    doFmt ('%':c:cs) = decode c ++ doFmt cs
    doFmt (c:cs)     = c : doFmt cs
 
@@ -551,6 +650,7 @@ formatTimeDiff l fmt (TimeDiff year month day hour min sec _)
       'B' -> fst (months l !! fromEnum month)
       'b' -> snd (months l !! fromEnum month)
       'h' -> snd (months l !! fromEnum month)
+      'c' -> defaultTimeDiffFmt td
       'C' -> show2 (year `quot` 100)
       'D' -> doFmt "%m/%d/%y"
       'd' -> show2 day
@@ -576,6 +676,17 @@ formatTimeDiff l fmt (TimeDiff year month day hour min sec _)
       '%' -> "%"
       c   -> [c]
 
+   defaultTimeDiffFmt (TimeDiff year month day hour min sec _) =
+       foldr (\ (v,s) rest -> 
+                  (if v /= 0 
+                     then show v ++ ' ':(addS v s)
+                       ++ if null rest then "" else ", "
+                     else "") ++ rest
+             )
+             ""
+             (zip [year, month, day, hour, min, sec] (intervals l))
+
+   addS v s = if abs v == 1 then fst s else snd s
 \end{code}
 
 \begin{code}
@@ -619,7 +730,7 @@ foreign import "libHS_cbits" "GMTOFF"    unsafe get_GMTOFF :: MBytes -> IO Int
 
 foreign import "libHS_cbits" "toClockSec" unsafe 
             toClockSec   :: Int -> Int -> Int -> Int -> Int 
-	    		 -> Int -> Int -> MBytes -> IO Int
+	    		 -> Int -> Int -> Int -> MBytes -> IO Int
 
 foreign import "libHS_cbits" "getClockTime"  unsafe 
            primGetClockTime :: MutableByteArray RealWorld Int
