@@ -607,11 +607,6 @@ instance  Eq Integer  where
 %*********************************************************
 
 \begin{code}
-instance  Show (a -> b)  where
-    showsPrec _ _  =  showString "<<function>>"
-    showList ls	   = showList__ (showsPrec 0) ls
-
-
 -- identity function
 id			:: a -> a
 id x			=  x
