@@ -39,11 +39,14 @@ import IOBase
 import STBase
 import Unsafe
 import GHC
+import ArrBase
+import Ix
 
 reallyUnsafePtrEq a b =
     case reallyUnsafePtrEquality# a b of
 	 0# -> False
 	 _  -> True
+\end{code}
 
 \begin{code}
 newtype IORef a = IORef (MutableVar RealWorld a) 
@@ -73,7 +76,7 @@ newIOArray ixs elt =
     stToIO (newArray ixs elt) >>= \arr -> 
     return (IOArray arr)
 
-boundsIOArray (IOArray arr) = boundsOfArray
+boundsIOArray (IOArray arr) = boundsOfArray arr
 
 readIOArray (IOArray arr) ix = stToIO (readArray arr ix)
 
