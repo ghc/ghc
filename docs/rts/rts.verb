@@ -192,18 +192,6 @@ versa.
 \item The thread is preempted.
 \end{itemize}
 
-A world-switch (i.e. when compiled code encounters interpreted code,
-and vice-versa) can happen in six ways:
-
-\begin{itemize}
-\item A GHC thread enters a Hugs-built thunk.
-\item A GHC thread calls a Hugs-compiled function.
-\item A GHC thread returns to a Hugs-compiled return address.
-\item A Hugs thread enters a GHC-built thunk.
-\item A Hugs thread calls a GHC-compiled function.
-\item A Hugs thread returns to a Hugs-compiled return address.
-\end{itemize}
-
 A running system has a global state, consisting of
 
 \begin{itemize}
@@ -266,6 +254,11 @@ How do we invoke GC, ccalls, etc.
 General ccall (@ccall-GC@) and optimised ccall.
 
 \section{Evaluation}
+
+This section describes the framework in which compiled code evaluates
+expressions.  Only at certain points will compiled code need to be
+able to talk to the interpreted world; these are discussed in Section
+\ref{sec:hugs-ghc-interaction}.
 
 \subsection{Calling conventions}
 
@@ -438,11 +431,18 @@ a @case@ expression.  For example:
 @
   case x of (a,b) -> E
 @
-In a stack-based evaluator such as the STG machine,
-a @case@ expression is evaluated by pushing a {\em return address} on the stack
-before evaluating the scrutinee (@x@ in this case).  Once evaluation of the  
-scrutinee is complete, execution resumes at the return address, which 
-points to the code for the expression @E@.  
+
+The code for a @case@ expression looks like this:
+
+\begin{itemize}
+\item Push the free variables of the branches on the stack (fv(@E@) in
+this case).
+\item  Push a \emph{return address} on the stack.
+\item  Evaluate the scrutinee (@x@ in this case).
+\end{itemize}
+
+Once evaluation of the scrutinee is complete, execution resumes at the
+return address, which points to the code for the expression @E@.
 
 When execution resumes at the return point, there must be some {\em
 return convention} that defines where the components of the pair, @a@
@@ -490,7 +490,7 @@ unboxed constructor.  Unboxed tuples are \emph{never} built on the
 heap.
 
 When passing an unboxed tuple to a function, the components are
-flattened out and passed on the stack/in registers as usual.
+flattened out and passed in \Arg{1} \ldots \Arg{n} as usual.
 
 \end{itemize}
 
@@ -501,8 +501,9 @@ example, the @Maybe@ type is defined like this:
 @
   data Maybe a = Nothing | Just a
 @
-How does the return convention encode which of the two constructors is being returned?
-A @case@ expression scrutinising a value of @Maybe@ type would look like this:
+How does the return convention encode which of the two constructors is
+being returned?  A @case@ expression scrutinising a value of @Maybe@
+type would look like this: 
 @
   case E of 
     Nothing -> ...
@@ -553,15 +554,17 @@ returned in \Arg{1} as usual, and also loads the tag into \Arg{2}.
 The code at the return address will test the tag and jump to the
 appropriate code for the case branch.
 
-\ToDo{Decide whether it's better to load the tag into \Arg{2} or not.
-May be affected by whether \Arg{2} is a real register.}
-
 The choice of whether to use a vectored return or a direct return is
 made on a type-by-type basis --- up to a certain maximum number of
 constructors imposed by the update mechanism
 (section~\ref{sect:data-updates}).
 
+Single-constructor data types also use direct returns, although in
+that case there is no need to return a tag in \Arg{2}.
+
 \ToDo{Say whether we pop the return address before returning}
+
+\ToDo{Stack stubbing?}
 
 \subsection{Updates}
 \label{sect:data-updates}
@@ -615,6 +618,25 @@ vectored-return type, then the tag is in \Arg{2}.
 \item The update frame is still on the stack.
 \end{itemize}
 
+We can safely share a single statically-compiled update function
+between all types.  However, the code must be able to handle both
+vectored and direct-return datatypes.  This is done by arranging that
+the update code looks like this:
+
+@
+		|	^	|
+		| return vector |
+		|---------------|
+		|  fixed-size   |
+		|  info table	|
+		|---------------|  <- update code pointer
+		|  update code  |
+		|       v       |
+@
+
+Each entry in the return vector (which is large enough to cover the
+largest vectored-return type) points to the update code.
+
 The update code:
 \begin{itemize}
 \item overwrites the {\em updatee} with an indirection to \Arg{1};
@@ -623,17 +645,10 @@ The update code:
 \item enters \Arg{1}.
 \end{itemize}
 
-This update code is the same for all data types, and can therefore be
-compiled statically in the runtime system.
-
-Since Haskell is polymorphic, we sometimes have to compile code for
-updatable thunks without knowing the type that will be returned.  In
-this case, the update frame must work for both direct and vectored
-returns.  This requires that we generate an infotable containing both
-a valid direct return address (which will perform the update and then
-perform a direct return) and a valid return vector (each entry of
-which will perform the update and then perform a vectored return).
-
+We enter \Arg{1} again, having probably just come from there, because
+it knows whether to perform a direct or vectored return.  This could
+be optimised by compiling special update code for each slot in the
+return vector, which performs the correct return.
 
 \subsection{Semi-tagging}
 \label{sect:semi-tagging}
@@ -727,6 +742,85 @@ May have to keep C stack pointer in register to placate OS?
 May have to revert black holes - ouch!
 @
 
+\section{Switching Worlds}
+
+Because this is a combined compiled/interpreted system, the
+interpreter will sometimes encounter compiled code, and vice-versa.
+
+There are six cases we need to consider:
+
+\begin{enumerate}
+\item A GHC thread enters a Hugs-built thunk.
+\item A GHC thread calls a Hugs-compiled function.
+\item A GHC thread returns to a Hugs-compiled return address.
+\item A Hugs thread enters a GHC-built thunk.
+\item A Hugs thread calls a GHC-compiled function.
+\item A Hugs thread returns to a Hugs-compiled return address.
+\end{enumerate}
+
+\subsection{A GHC thread enters a Hugs-built thunk}
+
+A Hugs-built thunk looks like this:
+
+\begin{center}
+\begin{tabular}{|l|l|}
+\hline
+\emph{Hugs} & \emph{Hugs-specific information} \\
+\hline
+\end{tabular}
+\end{center}
+
+\noindent where \emph{Hugs} is a pointer to a small
+statically-compiled piece of code that does the following:
+
+\begin{itemize}
+\item Push the address of the thunk on the stack.
+\item Push @entertop@ on the stack.
+\item Save the current state of the thread in the TSO.
+\item Return to the scheduler, with the @whatNext@ field set to
+@RunHugs@.
+\end{itemize}
+
+\noindent where @entertop@ is a small statically-compiled piece of
+code that does the following:
+
+\begin{itemize}
+\item pop the return address from the stack.
+\item pop the next word off the stack into \Arg{1}.
+\item enter \Arg{1}.
+\end{itemize}
+
+The infotable for @entertop@ has some byte-codes attached that do
+essentially the same thing if the code is entered from Hugs.
+
+\subsection{A GHC thread calls a Hugs-compiled function}
+
+How do we do this?
+
+\subsection{A GHC thread returns to a Hugs-compiled return address}
+
+\subsection{A Hugs thread enters a GHC-compiled thunk}
+
+When Hugs is called on to enter a non-Hugs closure (these are
+recognisable by the lack of a \emph{Hugs} pointer at the front), the
+following sequence of instructions is executed:
+
+\begin{itemize}
+\item Push the address of the thunk on the stack.
+\item Push @entertop@ on the stack.
+\item Save the current state of the thread in the TSO.
+\item Return to the scheduler, with the @whatNext@ field set to
+@RunGHC@.
+\end{itemize}
+
+\subsection{A Hugs thread calls a GHC-compiled function}
+
+Hugs never calls GHC-functions directly, it only enters closures
+(which point to the slow entry point for the function).  Hence in this
+case, we just push the arguments on the stack and proceed as for a
+thunk.
+
+\subsection{A Hugs thread returns to a GHC-compiled return address}
 
 \section{Heap objects}
 \label{sect:fixed-header}
