@@ -95,8 +95,8 @@ Transliterator: Lennart Augustsson
 
 -}
 
--- |RandomGen
--- The class 'RandomGen' provides a common interface to random number generators.
+-- | The class 'RandomGen' provides a common interface to random number
+-- generators.
 
 class RandomGen g where
 
@@ -109,26 +109,44 @@ class RandomGen g where
    -- generators. This is very useful in functional programs (for example, when
    -- passing a random number generator down to recursive calls), but very
    -- little work has been done on statistically robust implementations of
-   -- @split ([1,4]@ are the only examples we know of).
+   -- 'split' ([1,4] are the only examples we know of).
    split    :: g -> (g, g)
 
+   -- |The 'genRange' operation yields the range of values returned by
+   -- the generator.
+   --
+   -- It is required that:
+   --
+   -- * If @(a,b) = 'genRange' g@, then @a < b@.
+   --
+   -- * 'genRange' is not strict.
+   --
+   -- The second condition ensures that 'genRange' cannot examine its
+   -- argument, and hence the value it returns can be determined only by the
+   -- instance of 'RandomGen'.  That in turn allows an implementation to make
+   -- a single call to 'genRange' to establish a generator's range, without
+   -- being concerned that the generator returned by (say) 'next' might have
+   -- a different range to the generator passed to 'next'.
    genRange :: g -> (Int,Int)
 
-   -- default mathod
+   -- default method
    genRange g = (minBound,maxBound)
 
 {- |The "System.Random" library provides one instance of 'RandomGen', the
 abstract data type 'StdGen'.
 
-The result of repeatedly using next should be at least as statistically robust
-as the /Minimal Standard Random Number Generator/ described by
-["System.Random\#Park", "System.Random\#Carta"]. Until more
-is known about implementations of 'split', all we require is that 'split' deliver
-generators that are (a) not identical and (b) independently robust in the sense
-just given.
+The 'StdGen' instance of 'RandomGen' has a 'genRange' of at least 30 bits.
 
-The 'show'\/'Read' instances of 'StdGen' provide a primitive way to save the
-state of a random number generator. It is required that @read (show g) == g@.
+The result of repeatedly using 'next' should be at least as statistically
+robust as the /Minimal Standard Random Number Generator/ described by
+["System.Random\#Park", "System.Random\#Carta"].
+Until more is known about implementations of 'split', all we require is
+that 'split' deliver generators that are (a) not identical and
+(b) independently robust in the sense just given.
+
+The 'Show'\/'Read' instances of 'StdGen' provide a primitive way to save the
+state of a random number generator.
+It is required that @'read' ('show' g) == g@.
 
 In addition, 'read' may be used to map an arbitrary string (not necessarily one
 produced by 'show') onto a value of type 'StdGen'. In general, the 'read'
@@ -136,15 +154,9 @@ instance of 'StdGen' has the following properties:
 
 * It guarantees to succeed on any string. 
 
-*It guarantees to consume only a finite portion of the string. 
+* It guarantees to consume only a finite portion of the string. 
 
 * Different argument strings are likely to result in different results.
-
-The function 'mkStdGen' provides an alternative way of producing an initial
-generator, by mapping an 'Int' into a generator. Again, distinct arguments
-should be likely to produce distinct generators.
-
-Programmers may, of course, supply their own instances of 'RandomGen'.
 
 -}
 
@@ -182,6 +194,13 @@ stdFromString s        = (mkStdGen num, rest)
               num        = foldl (\a x -> x + 3 * a) 1 (map ord cs)
 
 
+{- |
+The function 'mkStdGen' provides an alternative way of producing an initial
+generator, by mapping an 'Int' into a generator. Again, distinct arguments
+should be likely to produce distinct generators.
+
+Programmers may, of course, supply their own instances of 'RandomGen'.
+-}
 mkStdGen :: Int -> StdGen -- why not Integer ?
 mkStdGen s
  | s < 0     = mkStdGen (-s)
@@ -200,50 +219,53 @@ createStdGen s
 
 -- FIXME: 1/2/3 below should be ** (vs@30082002) XXX
 
-{- |The 'Random' class
+{- |
 With a source of random number supply in hand, the 'Random' class allows the
 programmer to extract random values of a variety of types.
 
-* 'randomR' takes a range /(lo,hi)/ and a random number generator /g/, and returns
-a random value uniformly distributed in the closed interval /[lo,hi]/, together
-with a new generator. It is unspecified what happens if /lo>hi/. For continuous
-types there is no requirement that the values /lo/ and /hi/ are ever produced,
-but they may be, depending on the implementation and the interval.
+Minimal complete definition: 'randomR' and 'random'.
 
-* 'random' does the same as 'randomR', but does not take a range.
-
-(1) For bounded types (instances of 'Bounded', such as 'Char'), the range is
-normally the whole type.
-
-(2) For fractional types, the range is normally the semi-closed interval @[0,1)@.
-
-(3) For 'Integer', the range is (arbitrarily) the range of 'Int'.
-
-* The plural versions, 'randomRs' and 'randoms', produce an infinite list of
-random values, and do not return a new generator.
-
-* The 'IO' versions, 'randomRIO' and 'randomIO', use the global random number
-generator (see Section 17.3
-<http://www.haskell.org/onlinelibrary/random.html#global-rng>).
 -}
 
 class Random a where
-  -- |Minimal complete definition: 'random' and 'randomR'
-  random  :: RandomGen g => g -> (a, g)
+  -- | Takes a range /(lo,hi)/ and a random number generator
+  -- /g/, and returns a random value uniformly distributed in the closed
+  -- interval /[lo,hi]/, together with a new generator. It is unspecified
+  -- what happens if /lo>hi/. For continuous types there is no requirement
+  -- that the values /lo/ and /hi/ are ever produced, but they may be,
+  -- depending on the implementation and the interval.
   randomR :: RandomGen g => (a,a) -> g -> (a,g)
 
-  -- |Default methods  
-  randoms  :: RandomGen g => g -> [a]
-  randoms  g      = (\(x,g') -> x : randoms g') (random g)
+  -- | The same as 'randomR', but using a default range determined by the type:
+  --
+  -- * For bounded types (instances of 'Bounded', such as 'Char'),
+  --   the range is normally the whole type.
+  --
+  -- * For fractional types, the range is normally the semi-closed interval
+  -- @[0,1)@.
+  --
+  -- * For 'Integer', the range is (arbitrarily) the range of 'Int'.
+  random  :: RandomGen g => g -> (a, g)
 
+  -- | Plural variant of 'randomR', producing an infinite list of
+  -- random values instead of returning a new generator.
   randomRs :: RandomGen g => (a,a) -> g -> [a]
   randomRs ival g = x : randomRs ival g' where (x,g') = randomR ival g
 
-  randomIO  :: IO a
-  randomIO	   = getStdRandom random
+  -- | Plural variant of 'random', producing an infinite list of
+  -- random values instead of returning a new generator.
+  randoms  :: RandomGen g => g -> [a]
+  randoms  g      = (\(x,g') -> x : randoms g') (random g)
 
+  -- | A variant of 'randomR' that uses the global random number generator
+  -- (see "System.Random#globalrng").
   randomRIO :: (a,a) -> IO a
   randomRIO range  = getStdRandom (randomR range)
+
+  -- | A variant of 'random' that uses the global random number generator
+  -- (see "System.Random#globalrng").
+  randomIO  :: IO a
+  randomIO	   = getStdRandom random
 
 
 instance Random Int where
@@ -355,7 +377,7 @@ stdSplit std@(StdGen s1 s2)
 
 -- The global random number generator
 
-{- $globalrng
+{- $globalrng #globalrng#
 
 There is a single, implicit, global random number generator of type
 'StdGen', held in some global variable maintained by the 'IO' monad. It is
@@ -364,21 +386,21 @@ using the time of day, or Linux's kernel random number generator. To get
 deterministic behaviour, use 'setStdGen'.
 -}
 
--- |'setStdGen' sets the global random number generator.
+-- |Sets the global random number generator.
 setStdGen :: StdGen -> IO ()
 setStdGen sgen = writeIORef theStdGen sgen
 
--- |'getStdGen' gets the global random number generator.
+-- |Gets the global random number generator.
 getStdGen :: IO StdGen
 getStdGen  = readIORef theStdGen
 
--- |'newStdGen' applies 'split' to the current global random generator, updates it
--- with one of the results, and returns the other.
 theStdGen :: IORef StdGen
 theStdGen  = unsafePerformIO $ do
    rng <- mkStdRNG 0
    newIORef rng
 
+-- |Applies 'split' to the current global random generator,
+-- updates it with one of the results, and returns the other.
 newStdGen :: IO StdGen
 newStdGen = do
   rng <- getStdGen
@@ -386,9 +408,10 @@ newStdGen = do
   setStdGen a
   return b
 
-{- |'getStdRandom' uses the supplied function to get a value from the current
-global random generator, and updates the global generator with the new generator
-returned by the function. For example, @rollDice@ gets a random integer between 1 and 6: 
+{- |Uses the supplied function to get a value from the current global
+random generator, and updates the global generator with the new generator
+returned by the function. For example, @rollDice@ gets a random integer
+between 1 and 6:
 
 >  rollDice :: IO Int
 >  rollDice = getStdRandom (randomR (1,6))
@@ -404,16 +427,16 @@ getStdRandom f = do
 
 {- $references
 
-* [1] FW Burton and RL Page, /Distributed random number generation/,
+1. FW Burton and RL Page, /Distributed random number generation/,
 Journal of Functional Programming, 2(2):203-212, April 1992.
 
-* [2] SK #Park# Park, and KW Miller, /Random number generators -
+2. SK #Park# Park, and KW Miller, /Random number generators -
 good ones are hard to find/, Comm ACM 31(10), Oct 1988, pp1192-1201.
 
-* [3] DG #Carta# Carta, /Two fast implementations of the minimal standard
+3. DG #Carta# Carta, /Two fast implementations of the minimal standard
 random number generator/, Comm ACM, 33(1), Jan 1990, pp87-88.
 
-* [4] P Hellekalek, /Don\'t trust parallel Monte Carlo/,
+4. P Hellekalek, /Don\'t trust parallel Monte Carlo/,
 Department of Mathematics, University of Salzburg,
 <http://random.mat.sbg.ac.at/~peter/pads98.ps>, 1998.
 
