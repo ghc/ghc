@@ -1,7 +1,9 @@
 __interface Var 1 0 where
-__export Var Var Id setIdName ;
+__export Var Var TyVar Id setIdName ;
 -- Used by Name
 1 type Id = Var;
+1 type TyVar = Var;
+1 type UVar = Var;
 1 data Var ;
 1 setIdName :: Id -> Name.Name -> Id ;
 
