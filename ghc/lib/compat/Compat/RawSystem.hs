@@ -16,6 +16,10 @@
 
 module Compat.RawSystem (rawSystem) where
 
+#if __GLASGOW_HASKELL__ < 603
+#include "config.h"
+#endif
+
 #if __GLASGOW_HASKELL__ >= 603
 
 import System.Cmd (rawSystem)
