@@ -296,7 +296,7 @@ SRC_HC_OPTS += -split-objs
 ifeq "$(ArSupportsInput)" ""
 define BUILD_LIB
 $(RM) $@ $@.tmp
-(echo $(STUBOBJS); $(FIND) $(patsubst %.$(way_)o,%,$(LIBOBJS)) -name '*.$(way_)o') | xargs ar q $@.tmp
+(echo $(STUBOBJS); $(FIND) $(patsubst %.$(way_)o,%_split,$(HS_OBJS)) -name '*.$(way_)o') | xargs ar q $@.tmp
 $(RANLIB) $@.tmp
 $(MV) $@.tmp $@
 endef
@@ -304,7 +304,7 @@ else
 define BUILD_LIB
 $(RM) $@ $@.tmp
 echo $(STUBOBJS) > $@.list
-$(FIND) $(patsubst %.$(way_)o,%,$(LIBOBJS)) -name '*.$(way_)o' >> $@.list
+$(FIND) $(patsubst %.$(way_)o,%_split,$(HS_OBJS)) -name '*.$(way_)o' >> $@.list
 $(AR) $(AR_OPTS) $@.tmp $(ArSupportsInput) $@.list
 $(RM) $@.list
 $(RANLIB) $@.tmp
@@ -315,10 +315,10 @@ endif
 # Extra stuff for compiling Haskell files with $(SplitObjs):
 
 HC_SPLIT_PRE = \
-    $(RM) $@; if [ ! -d $(basename $@) ]; then mkdir $(basename $@); else \
-    $(FIND) $(basename $@) -name '*.$(way_)o' | xargs $(RM) __rm_food; fi
+    $(RM) $@; if [ ! -d $(basename $@)_split ]; then mkdir $(basename $@)_split; else \
+    $(FIND) $(basename $@)_split -name '*.$(way_)o' | xargs $(RM) __rm_food; fi
 ifeq "$(GhcWithInterpreter)" "YES"
-HC_SPLIT_POST = $(LD) -r $(LD_X) -o $@ $(basename $@)/*.$(way_)o
+HC_SPLIT_POST = $(LD) -r $(LD_X) -o $@ $(basename $@)_split/*.$(way_)o
 else
 HC_SPLIT_POST = touch $@
 endif # GhcWithInterpreter == YES
@@ -333,8 +333,8 @@ SRC_HC_POST_OPTS += $(HC_SPLIT_POST);
 #
 
 extraclean ::
-	$(FIND) $(patsubst %.$(way_)o,%,$(HS_OBJS)) -name '*.$(way_)o' -print | xargs $(RM) __rm_food
-	-rmdir $(patsubst %.$(way_)o,%,$(HS_OBJS)) > /dev/null 2>&1
+	$(FIND) $(patsubst %.$(way_)o,%_split,$(HS_OBJS)) -name '*.$(way_)o' -print | xargs $(RM) __rm_food
+	-rmdir $(patsubst %.$(way_)o,%_split,$(HS_OBJS)) > /dev/null 2>&1
 
 endif # $(way) == u
 endif # $(SplitObjs)
@@ -347,7 +347,7 @@ endif # $(HS_SRCS)
 ifeq "$(StripLibraries)" "YES"
 ifeq "$(SplitObjs)" "YES"
 SRC_HC_POST_OPTS += \
-  for i in $(basename $@)/*; do \
+  for i in $(basename $@)_split/*; do \
 	$(LD) -r $(LD_X) -o $$i.tmp $$i; \
 	$(MV) $$i.tmp $$i; \
   done

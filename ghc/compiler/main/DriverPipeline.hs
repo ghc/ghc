@@ -712,7 +712,7 @@ run_phase SplitAs basename _suff _input_fn output_fn
 
 	odir <- readIORef v_Output_dir
 	let real_odir = case odir of
-				Nothing -> basename
+				Nothing -> basename ++ "_split"
 				Just d  -> d
 
 	let assemble_file n
