@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.87 2002/02/12 03:52:08 chak Exp $
+$Id: Parser.y,v 1.88 2002/02/13 14:05:51 simonpj Exp $
 
 Haskell grammar.
 
@@ -21,9 +21,9 @@ import RdrName
 import PrelNames	( mAIN_Name, unitTyCon_RDR, funTyCon_RDR, 
 			  listTyCon_RDR, parrTyCon_RDR, tupleTyCon_RDR, 
 			  unitCon_RDR, nilCon_RDR, tupleCon_RDR )
-import ForeignCall	( Safety(..), CExportSpec(..), CCallSpec(..), 
+import ForeignCall	( Safety(..), CExportSpec(..), 
 			  CCallConv(..), CCallTarget(..), defaultCCallConv,
-			  DNCallSpec(..) )
+			)
 import OccName		( UserFS, varName, tcName, dataName, tcClsName, tvName )
 import SrcLoc		( SrcLoc )
 import Module

@@ -30,7 +30,7 @@ import RnEnv		( bindLocatedLocalsRn )
 import RnMonad		( renameDerivedCode, thenRn, mapRn, returnRn )
 import HscTypes		( DFunId, PersistentRenamerState, FixityEnv )
 
-import BasicTypes	( Fixity, NewOrData(..) )
+import BasicTypes	( NewOrData(..) )
 import Class		( className, classKey, classTyVars, Class )
 import ErrUtils		( dumpIfSet_dyn )
 import MkId		( mkDictFunId )
@@ -47,7 +47,7 @@ import TyCon		( tyConTyVars, tyConDataCons, tyConArity, newTyConRep,
 			)
 import TcType		( TcType, ThetaType, mkTyVarTys, mkTyConApp, getClassPredTys_maybe,
 			  isUnLiftedType, mkClassPred, tyVarsOfTypes, tcSplitFunTys, 
-			  tcSplitTyConApp_maybe, tcEqTypes, tyVarsOfTheta )
+			  tcSplitTyConApp_maybe, tcEqTypes )
 import Var		( TyVar, tyVarKind )
 import VarSet		( mkVarSet, subVarSet )
 import PrelNames

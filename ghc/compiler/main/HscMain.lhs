@@ -45,7 +45,7 @@ import Id		( idName )
 import IdInfo		( CafInfo(..), CgInfoEnv, CgInfo(..) )
 import StringBuffer	( hGetStringBuffer, freeStringBuffer )
 import Parser
-import Lex		( PState(..), ParseResult(..), ExtFlags(..), mkPState )
+import Lex		( ParseResult(..), ExtFlags(..), mkPState )
 import SrcLoc		( mkSrcLoc )
 import Finder		( findModule )
 import Rename		( checkOldIface, renameModule, closeIfaceDecls )
@@ -81,7 +81,7 @@ import HscStats		( ppSourceStats )
 import HscTypes
 import FiniteMap	( FiniteMap, plusFM, emptyFM, addToFM )
 import OccName		( OccName )
-import Name		( Name, nameModule, nameOccName, getName, isGlobalName )
+import Name		( Name, nameModule, nameOccName, getName )
 import NameEnv		( emptyNameEnv, mkNameEnv )
 import Module		( Module )
 

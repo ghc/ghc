@@ -30,15 +30,12 @@ import Name		( Name, mkWiredInName )
 import RdrName		( RdrName, mkRdrOrig )
 import OccName		( OccName, pprOccName, mkVarOcc )
 import TyCon		( TyCon, isPrimTyCon, tyConPrimRep )
-import Type		( Type, mkForAllTys, mkFunTy, mkFunTys, typePrimRep,
-			  splitFunTy_maybe, tyConAppTyCon, splitTyConApp
-			)
+import Type		( Type, mkForAllTys, mkFunTy, mkFunTys, typePrimRep, tyConAppTyCon )
 import PprType          () -- get at Outputable Type instance.
 import Unique		( mkPrimOpIdUnique )
 import BasicTypes	( Arity, Boxity(..) )
 import PrelNames	( pREL_GHC, pREL_GHC_Name )
 import Outputable
-import Util		( zipWithEqual )
 import FastTypes
 \end{code}
 

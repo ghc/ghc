@@ -22,7 +22,7 @@ import TcHsSyn		( TypecheckedHsExpr, TypecheckedHsBinds, TypecheckedStmt, outPat
 --     So WATCH OUT; check each use of split*Ty functions.
 -- Sigh.  This is a pain.
 
-import TcType		( tcSplitAppTy, tcSplitFunTys, tcSplitTyConApp_maybe, tcTyConAppArgs,
+import TcType		( tcSplitAppTy, tcSplitFunTys, tcTyConAppArgs,
 			  isIntegerTy, tcSplitTyConApp, isUnLiftedType, Type )
 import Type		( splitFunTys )
 import CoreSyn
@@ -46,7 +46,7 @@ import DataCon		( DataCon, dataConWrapId, dataConFieldLabels, dataConInstOrigArg
 import DataCon		( isExistentialDataCon )
 import Literal		( Literal(..) )
 import TyCon		( tyConDataCons )
-import TysWiredIn	( tupleCon, listTyCon, charDataCon, intDataCon )
+import TysWiredIn	( tupleCon, charDataCon, intDataCon )
 import BasicTypes	( RecFlag(..), Boxity(..), ipNameName )
 import Maybes		( maybeToBool )
 import PrelNames	( hasKey, ratioTyConKey, toPName )

@@ -23,7 +23,7 @@ import Module		( Module )
 
 import TcMonad
 import TcEnv		( TcEnv, RecTcEnv, TcTyThing(..), TyThing(..), TyThingDetails(..),
-			  tcExtendKindEnv, tcLookup, tcExtendGlobalEnv, tcExtendGlobalValEnv,
+			  tcExtendKindEnv, tcLookup, tcExtendGlobalEnv,
 			  isLocalThing )
 import TcTyDecls	( tcTyDecl, kcConDetails, checkValidTyCon )
 import TcClassDcl	( tcClassDecl1, checkValidClass )

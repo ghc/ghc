@@ -33,7 +33,6 @@ import TyCon		( TyCon, isPrimTyCon, isTupleTyCon, tupleTyConBoxity,
 			)
 
 -- others:
-import CmdLineOpts	( opt_PprStyle_RawTypes )
 import Maybes		( maybeToBool )
 import Name		( getOccString, getOccName )
 import OccName		( occNameUserString )

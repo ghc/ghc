@@ -34,7 +34,6 @@ import Inst		( emptyLIE, LIE, plusLIE )
 
 import ErrUtils		( Message )
 import Id		( Id, mkLocalId )
-import Name		( nameOccName )
 import PrimRep		( getPrimRepSize, isFloatingRep )
 import Type		( typePrimRep )
 import TcType		( Type, tcSplitFunTys, tcSplitTyConApp_maybe,

@@ -11,7 +11,6 @@ module DsListComp ( dsListComp, dsPArrComp ) where
 import {-# SOURCE #-} DsExpr ( dsExpr, dsLet )
 
 import BasicTypes	( Boxity(..) )
-import DataCon		( dataConId )
 import TyCon		( tyConName )
 import HsSyn		( OutPat(..), HsExpr(..), Stmt(..),
 			  HsMatchContext(..), HsDoContext(..),
