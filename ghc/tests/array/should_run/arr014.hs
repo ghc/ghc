@@ -18,7 +18,7 @@ setup = let isz = 10
 --	    x <- newArray (0, omax) (error "uninitialised")
 	    dmy <- newArray (0, imax) 0      
 	    x <- newArray (0, omax) dmy
-	    as <- (accumulate . replicate osz) (newArray (0, imax) 6)
+	    as <- (sequence . replicate osz) (newArray (0, imax) 6)
 	    mapM_ (\(i,v) -> writeArray x i v) (zip [0..omax] as)
 	    return x	  
 

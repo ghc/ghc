@@ -2,5 +2,3 @@
 ds043.hs:8: Pattern match(es) are overlapped in a group of case alternatives beginning
 						 (B _ _ _ _ True False):
 	    B {e = True, f = False} -> ...
-
-

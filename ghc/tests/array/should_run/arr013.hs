@@ -9,7 +9,7 @@ main = putStr (shows sub_b "\n")
 	sub_b = ixmap (102, 113) id b
 
 	b :: Array Int Double
-    	b = map ( \ r -> fromRational r / pi )
+    	b = fmap ( \ r -> fromRational r / pi )
 		 (ixmap (101,200) (\ i -> toInteger i - 100) a)
 
 	a :: Array Integer (Ratio Integer)

@@ -5,5 +5,3 @@ ds002.hs:7: Pattern match(es) are overlapped in the definition of function `f':
 
 ds002.hs:11: Pattern match(es) are overlapped in the definition of function `g':
 	    g x y z = ...
-
-

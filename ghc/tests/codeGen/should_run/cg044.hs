@@ -3,8 +3,8 @@ module Main(main) where
 
 main :: IO ()
 main = do
- sequence (map putStrLn double_tests)
- sequence (map putStrLn float_tests)
+ sequence_ (map putStrLn double_tests)
+ sequence_ (map putStrLn float_tests)
   where
    double_tests = run_tests double_numbers
    float_tests  = run_tests float_numbers  

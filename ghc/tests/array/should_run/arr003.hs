@@ -12,8 +12,5 @@
 import Array
 
 main =
- let a1 = array (1,3) (zip ([1..4]) ['a'..'d']) in
+ let a1 = array (1::Int,3) (zip ([1..4]) ['a'..'d']) in
  print (a1!2)
-
-
-

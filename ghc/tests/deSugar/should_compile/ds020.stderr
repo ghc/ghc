@@ -11,5 +11,3 @@ ds020.hs:13: Pattern match(es) are overlapped in the definition of function `d':
 
 ds020.hs:19: Pattern match(es) are overlapped in the definition of function `f':
 	    f (x@~[]) = ...
-
-

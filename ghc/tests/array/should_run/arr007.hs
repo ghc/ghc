@@ -6,6 +6,6 @@ import Array
 
 main =
  let 
-  a1 = array (1,0) [(1,'a')]
+  a1 = array (1::Int,0) [(1,'a')]
  in
  print (a1!0)

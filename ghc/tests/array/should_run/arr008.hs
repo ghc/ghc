@@ -8,7 +8,7 @@ import Array
 
 main = 
  let 
-  a1 = array (1,0) []
-  a2 = array (0,1) (zip [0..] ['a'..'z'])
+  a1 = array (1::Int,0) []
+  a2 = array (0::Int,1) (zip [0..] ['a'..'z'])
  in
  print (a1::Array Int Int) >> print a2

@@ -4,4 +4,4 @@ module ShouldCompile where
 
 fubar :: IO Int
 fubar = _ccall_ f >>_ccall_ b
-		     --^ result type of f "lost" (never gets generalised)
+		     -- ^ result type of f "lost" (never gets generalised)

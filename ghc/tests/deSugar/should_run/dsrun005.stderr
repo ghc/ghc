@@ -1,2 +1,4 @@
-dsrun005.hs:42: Non-exhaustive patterns in function f
+
+Fail: dsrun005.hs:42: Non-exhaustive patterns in function f
+
 
