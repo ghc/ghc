@@ -55,6 +55,10 @@ module System.Directory
     , getModificationTime       -- :: FilePath -> IO ClockTime
    ) where
 
+#ifdef __NHC__
+import Directory
+#else
+
 import Prelude
 
 import Control.Exception       ( bracket )
@@ -621,3 +625,5 @@ foreign import ccall unsafe "__hscore_X_OK" x_OK :: CMode
 foreign import ccall unsafe "__hscore_S_IRUSR" s_IRUSR :: CMode
 foreign import ccall unsafe "__hscore_S_IWUSR" s_IWUSR :: CMode
 foreign import ccall unsafe "__hscore_S_IXUSR" s_IXUSR :: CMode
+
+#endif

@@ -13,7 +13,9 @@
 --
 -----------------------------------------------------------------------------
 
+#ifndef __NHC__
 #include "MachDeps.h"
+#endif
 
 module System.Info
    (
@@ -23,8 +25,15 @@ module System.Info
 
 import Prelude
 
+#ifndef __NHC__
+
 arch :: String
 arch = HOST_ARCH
 
 os :: String
 os = HOST_OS
+
+#else
+os,arch ::String
+#include "OSInfo.hs"
+#endif

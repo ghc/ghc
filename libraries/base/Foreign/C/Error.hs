@@ -82,7 +82,9 @@ module Foreign.C.Error (
 -- this is were we get the CCONST_XXX definitions from that configure
 -- calculated for us
 --
+#ifndef __NHC__
 #include "config.h"
+#endif
 
 -- system dependent imports
 -- ------------------------
@@ -121,7 +123,11 @@ import System.IO.Unsafe		( unsafePerformIO )
 -- This function exists because errno is a variable on some systems, but on
 -- Windows it is a macro for a function...
 -- [yes, global variables and thread safety don't really go hand-in-hand. -- sof]
+#ifdef __NHC__
+foreign import ccall unsafe "errno.h &errno" _errno :: Ptr CInt
+#else
 foreign import ccall unsafe "HsBase.h ghcErrno" _errno :: Ptr CInt
+#endif
 
 -- Haskell representation for "errno" values
 --
@@ -153,6 +159,9 @@ eOK, e2BIG, eACCES, eADDRINUSE, eADDRNOTAVAIL, eADV, eAFNOSUPPORT, eAGAIN,
 -- configure 
 --
 eOK             = Errno 0
+#ifdef __NHC__
+#include "Errno.hs"
+#else
 e2BIG           = Errno (CCONST_E2BIG)
 eACCES		= Errno (CCONST_EACCES)
 eADDRINUSE	= Errno (CCONST_EADDRINUSE)
@@ -251,6 +260,7 @@ eTXTBSY		= Errno (CCONST_ETXTBSY)
 eUSERS		= Errno (CCONST_EUSERS)
 eWOULDBLOCK	= Errno (CCONST_EWOULDBLOCK)
 eXDEV		= Errno (CCONST_EXDEV)
+#endif
 
 -- checks whether the given errno value is supported on the current
 -- architecture
