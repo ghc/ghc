@@ -60,6 +60,11 @@ module System.Directory
 
 #ifdef __NHC__
 import Directory
+getHomeDirectory :: IO FilePath
+getHomeDirectory = getEnv "HOME"
+getAppUserDataDirectory :: String -> IO FilePath
+getAppUserDataDirectory appName = do path <- getEnv "HOME"
+                                     return (path++'/':'.':appName)
 #elif defined(__HUGS__)
 import Hugs.Directory
 #else
