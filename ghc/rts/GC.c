@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.149 2003/03/24 14:46:53 simonmar Exp $
+ * $Id: GC.c,v 1.150 2003/03/24 15:33:25 simonmar Exp $
  *
  * (c) The GHC Team 1998-2003
  *
@@ -2002,9 +2002,22 @@ eval_thunk_selector( nat field, StgSelector * p )
 
 selector_loop:
 
+    // We don't want to end up in to-space, because this causes
+    // problems when the GC later tries to evacuate the result of
+    // eval_thunk_selector().  There are various ways this could
+    // happen:
+    //
+    // - following an IND_STATIC
+    //
+    // - when the old generation is compacted, the mark phase updates
+    //   from-space pointers to be to-space pointers, and we can't
+    //   reliably tell which we're following (eg. from an IND_STATIC).
+    // 
+    // So we use the block-descriptor test to find out if we're in
+    // to-space.
+    //
     if (Bdescr((StgPtr)selectee)->flags & BF_EVACUATED) {
-	SET_INFO(p, info_ptr);
-	return NULL;
+	goto bale_out;
     }
 
     info = get_itbl(selectee);
@@ -2021,12 +2034,15 @@ selector_loop:
 	  ASSERT(field <  (StgWord32)(info->layout.payload.ptrs + 
 				      info->layout.payload.nptrs));
 	  
+	  // ToDo: shouldn't we test whether this pointer is in
+	  // to-space?
 	  return selectee->payload[field];
 
       case IND:
       case IND_PERM:
       case IND_OLDGEN:
       case IND_OLDGEN_PERM:
+      case IND_STATIC:
 	  selectee = ((StgInd *)selectee)->indirectee;
 	  goto selector_loop;
 
@@ -2034,11 +2050,6 @@ selector_loop:
 	  // We don't follow pointers into to-space; the constructor
 	  // has already been evacuated, so we won't save any space
 	  // leaks by evaluating this selector thunk anyhow.
-	  break;
-
-      case IND_STATIC:
-	  // We can't easily tell whether the indirectee is into 
-	  // from or to-space, so just bail out here.
 	  break;
 
       case THUNK_SELECTOR:
@@ -2113,6 +2124,7 @@ selector_loop:
 	     (int)(info->type));
     }
 
+bale_out:
     // We didn't manage to evaluate this thunk; restore the old info pointer
     SET_INFO(p, info_ptr);
     return NULL;
