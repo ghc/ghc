@@ -352,6 +352,7 @@ interface_pragma : /* empty */
         ;
 
 maybeexports :	/* empty */			{ $$ = mknothing(); }
+        |  OPAREN CPAREN			{ $$ = mknothing(); }
 	|  OPAREN export_list CPAREN		{ $$ = mkjust($2); }
 	|  OPAREN export_list COMMA CPAREN	{ $$ = mkjust($2); }
 	;
