@@ -58,12 +58,12 @@ module Id (
 	cmpId_withSpecDataCon,
 	externallyVisibleId,
 	idHasNoFreeTyVars,
-	idWantsToBeINLINEd, getInlinePragma,
+	idWantsToBeINLINEd, getInlinePragma, 
 	idMustBeINLINEd, idMustNotBeINLINEd,
 	isBottomingId,
 	isConstMethodId,
 	isConstMethodId_maybe,
-	isDataCon,
+	isDataCon, isAlgCon, isNewCon,
 	isDefaultMethodId,
 	isDefaultMethodId_maybe,
 	isDictFunId,
@@ -102,6 +102,7 @@ module Id (
 	addIdDemandInfo,
 	addIdStrictness,
 	addIdUpdateInfo,
+	addIdDeforestInfo,
 	getIdArity,
 	getIdDemandInfo,
 	getIdInfo,
@@ -109,7 +110,7 @@ module Id (
 	getIdUnfolding,
 	getIdUpdateInfo,
 	getPragmaInfo,
-	replaceIdInfo,
+	replaceIdInfo, replacePragmaInfo,
 	addInlinePragma, nukeNoInlinePragma, addNoInlinePragma,
 
 	-- IdEnvs AND IdSets
@@ -153,14 +154,15 @@ import Bag
 import Class		( classOpString, SYN_IE(Class), GenClass, SYN_IE(ClassOp), GenClassOp )
 import IdInfo
 import Maybes		( maybeToBool )
-import Name	{- 	( nameUnique, mkLocalName, mkSysLocalName, isLocalName,
+import Name	 	( nameUnique, mkLocalName, mkSysLocalName, isLocalName,
 			  mkCompoundName, mkInstDeclName,
 			  isLocallyDefinedName, occNameString, modAndOcc,
 			  isLocallyDefined, changeUnique, isWiredInName,
 			  nameString, getOccString, setNameVisibility,
 			  isExported, ExportFlag(..), DefnInfo, Provenance,
-			  OccName(..), Name
-			) -}
+			  OccName(..), Name, SYN_IE(Module),
+			  NamedThing(..)
+			) 
 import PrelMods		( pREL_TUP, pREL_BASE )
 import Lex		( mkTupNameStr )
 import FieldLabel	( fieldLabelName, FieldLabel(..){-instances-} )
@@ -173,7 +175,6 @@ import PprType		( getTypeString, specMaybeTysSuffix,
 			  nmbrType, nmbrTyVar,
 			  GenType, GenTyVar
 			)
-import PprStyle
 import Pretty
 import MatchEnv		( MatchEnv )
 import SrcLoc		--( mkBuiltinSrcLoc )
@@ -192,7 +193,7 @@ import Unique		( getBuiltinUniques, pprUnique, showUnique,
 			  incrUnique, 
 			  Unique{-instance Ord3-}
 			)
-import Outputable	( ifPprDebug, Outputable(..) )
+import Outputable	( ifPprDebug, Outputable(..), PprStyle(..) )
 import Util	{-	( mapAccumL, nOfThem, zipEqual, assoc,
 			  panic, panic#, pprPanic, assertPanic
 			) -}
@@ -244,7 +245,9 @@ data IdDetails
 
   ---------------- Data constructors
 
-  | DataConId	ConTag
+  | AlgConId			-- Used for both data and newtype constructors.
+				-- You can tell the difference by looking at the TyCon
+		ConTag
 		[StrictnessMark] -- Strict args; length = arity
 		[FieldLabel]	-- Field labels for this constructor; 
 				--length = 0 (not a record) or arity
@@ -399,7 +402,7 @@ class method.
 
 \begin{description}
 %----------------------------------------------------------------------
-\item[@DataConId@:] For the data constructors declared by a @data@
+\item[@AlgConId@:] For the data constructors declared by a @data@
 declaration.  Their type is kept in {\em two} forms---as a regular
 @Type@ (in the usual place), and also in its constituent pieces (in
 the ``details''). We are frequently interested in those pieces.
@@ -486,27 +489,24 @@ properties, but they may not.
 %************************************************************************
 
 \begin{code}
-isDataCon (Id _ _ _ (DataConId _ __ _ _ _ _ _ _) _ _) = True
-isDataCon (Id _ _ _ (TupleConId _) _ _)		      = True
-isDataCon (Id _ _ _ (SpecId unspec _ _) _ _)	      = isDataCon unspec
-isDataCon other					      = False
+-- isDataCon returns False for @newtype@ constructors
+isDataCon (Id _ _ _ (AlgConId _ _ _ _ _ _ _ _ tc) _ _) = isDataTyCon tc
+isDataCon (Id _ _ _ (TupleConId _) _ _)		        = True
+isDataCon (Id _ _ _ (SpecId unspec _ _) _ _)	        = isDataCon unspec
+isDataCon other					        = False
+
+isNewCon (Id _ _ _ (AlgConId _ _ _ _ _ _ _ _ tc) _ _) = isNewTyCon tc
+isNewCon other					       = False
+
+-- isAlgCon returns True for @data@ or @newtype@ constructors
+isAlgCon (Id _ _ _ (AlgConId _ _ _ _ _ _ _ _ _) _ _) = True
+isAlgCon (Id _ _ _ (TupleConId _) _ _)		      = True
+isAlgCon (Id _ _ _ (SpecId unspec _ _) _ _)	      = isAlgCon unspec
+isAlgCon other					      = False
 
 isTupleCon (Id _ _ _ (TupleConId _) _ _)	 = True
 isTupleCon (Id _ _ _ (SpecId unspec _ _) _ _)	 = isTupleCon unspec
 isTupleCon other				 = False
-
-{-LATER:
-isSpecId_maybe (Id _ _ _ (SpecId unspec ty_maybes _) _ _)
-  = ASSERT(not (maybeToBool (isSpecId_maybe unspec)))
-    Just (unspec, ty_maybes)
-isSpecId_maybe other_id
-  = Nothing
-
-isSpecPragmaId_maybe (Id _ _ _ (SpecPragmaId specid _) _ _)
-  = Just specid
-isSpecPragmaId_maybe other_id
-  = Nothing
--}
 \end{code}
 
 @toplevelishId@ tells whether an @Id@ {\em may} be defined in a nested
@@ -522,7 +522,7 @@ idHasNoFreeTyVars :: Id -> Bool
 toplevelishId (Id _ _ _ details _ _)
   = chk details
   where
-    chk (DataConId _ __ _ _ _ _ _ _)   = True
+    chk (AlgConId _ __ _ _ _ _ _ _)   = True
     chk (TupleConId _)    	    = True
     chk (RecordSelId _)   	    = True
     chk ImportedId	    	    = True
@@ -543,7 +543,7 @@ toplevelishId (Id _ _ _ details _ _)
 idHasNoFreeTyVars (Id _ _ _ details _ info)
   = chk details
   where
-    chk (DataConId _ _ _ _ _ _ _ _ _) = True
+    chk (AlgConId _ _ _ _ _ _ _ _ _) = True
     chk (TupleConId _)    	  = True
     chk (RecordSelId _)   	  = True
     chk ImportedId	    	  = True
@@ -581,7 +581,7 @@ omitIfaceSigForId (Id _ name _ details _ _)
 	-- remember that all type and class decls appear in the interface file.
 	-- The dfun id must *not* be omitted, because it carries version info for
 	-- the instance decl
-        (DataConId _ _ _ _ _ _ _ _ _) -> True
+        (AlgConId _ _ _ _ _ _ _ _ _) -> True
         (TupleConId _)    	  -> True
         (RecordSelId _)   	  -> True
         (SuperDictSelId _ _)	  -> True
@@ -963,15 +963,10 @@ getIdInfo     (Id _ _ _ _ _ info) = info
 getPragmaInfo (Id _ _ _ _ info _) = info
 
 replaceIdInfo :: Id -> IdInfo -> Id
-
 replaceIdInfo (Id u n ty details pinfo _) info = Id u n ty details pinfo info
 
-{-LATER:
-selectIdInfoForSpecId :: Id -> IdInfo
-selectIdInfoForSpecId unspec
-  = ASSERT(not (maybeToBool (isSpecId_maybe unspec)))
-    noIdInfo `addUnfoldInfo` getIdUnfolding unspec
--}
+replacePragmaInfo :: Id -> PragmaInfo -> Id
+replacePragmaInfo (Id u sn ty details _ info) prag = Id u sn ty details prag info
 \end{code}
 
 %************************************************************************
@@ -987,12 +982,23 @@ besides the code-generator need arity info!)
 \begin{code}
 getIdArity :: Id -> ArityInfo
 getIdArity id@(Id _ _ _ _ _ id_info)
-  = --ASSERT( not (isDataCon id))
-    arityInfo id_info
+  = arityInfo id_info
 
 addIdArity :: Id -> ArityInfo -> Id
 addIdArity (Id u n ty details pinfo info) arity
   = Id u n ty details pinfo (info `addArityInfo` arity)
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[Id-arities]{Deforestation related functions}
+%*									*
+%************************************************************************
+
+\begin{code}
+addIdDeforestInfo :: Id -> DeforestInfo -> Id
+addIdDeforestInfo (Id u n ty details pinfo info) def_info
+  = Id u n ty details pinfo (info `addDeforestInfo` def_info)
 \end{code}
 
 %************************************************************************
@@ -1020,7 +1026,7 @@ mkDataCon n stricts fields tvs ctxt con_tvs con_ctxt args_tys tycon
       = Id (nameUnique n)
 	   n
 	   data_con_ty
-	   (DataConId data_con_tag stricts fields tvs ctxt con_tvs con_ctxt args_tys tycon)
+	   (AlgConId data_con_tag stricts fields tvs ctxt con_tvs con_ctxt args_tys tycon)
 	   IWantToBeINLINEd	-- Always inline constructors if possible
 	   noIdInfo
 
@@ -1062,18 +1068,18 @@ isNullaryDataCon con = dataConNumFields con == 0 -- function of convenience
 
 \begin{code}
 dataConTag :: DataCon -> ConTag	-- will panic if not a DataCon
-dataConTag (Id _ _ _ (DataConId tag _ _ _ _ _ _ _ _) _ _) = tag
+dataConTag (Id _ _ _ (AlgConId tag _ _ _ _ _ _ _ _) _ _) = tag
 dataConTag (Id _ _ _ (TupleConId _) _ _)	      = fIRST_TAG
 dataConTag (Id _ _ _ (SpecId unspec _ _) _ _)	      = dataConTag unspec
 
 dataConTyCon :: DataCon -> TyCon	-- will panic if not a DataCon
-dataConTyCon (Id _ _ _ (DataConId _ _ _ _ _ _ _ _ tycon) _ _) = tycon
+dataConTyCon (Id _ _ _ (AlgConId _ _ _ _ _ _ _ _ tycon) _ _) = tycon
 dataConTyCon (Id _ _ _ (TupleConId a) _ _)	          = tupleTyCon a
 
 dataConSig :: DataCon -> ([TyVar], ThetaType, [TyVar], ThetaType, [TauType], TyCon)
 					-- will panic if not a DataCon
 
-dataConSig (Id _ _ _ (DataConId _ _ _ tyvars theta con_tyvars con_theta arg_tys tycon) _ _)
+dataConSig (Id _ _ _ (AlgConId _ _ _ tyvars theta con_tyvars con_theta arg_tys tycon) _ _)
   = (tyvars, theta, con_tyvars, con_theta, arg_tys, tycon)
 
 dataConSig (Id _ _ _ (TupleConId arity) _ _)
@@ -1102,11 +1108,11 @@ dataConRepType con
     (tyvars, theta, tau) = splitSigmaTy (idType con)
 
 dataConFieldLabels :: DataCon -> [FieldLabel]
-dataConFieldLabels (Id _ _ _ (DataConId _ _ fields _ _ _ _ _ _) _ _) = fields
+dataConFieldLabels (Id _ _ _ (AlgConId _ _ fields _ _ _ _ _ _) _ _) = fields
 dataConFieldLabels (Id _ _ _ (TupleConId _)		    _ _) = []
 
 dataConStrictMarks :: DataCon -> [StrictnessMark]
-dataConStrictMarks (Id _ _ _ (DataConId _ stricts _ _ _ _ _ _ _) _ _) = stricts
+dataConStrictMarks (Id _ _ _ (AlgConId _ stricts _ _ _ _ _ _ _) _ _) = stricts
 dataConStrictMarks (Id _ _ _ (TupleConId arity)		     _ _) 
   = nOfThem arity NotMarkedStrict
 
@@ -1510,7 +1516,7 @@ nmbrId id@(Id u n ty det prag info) nenv@(NmbrEnv ui ut uu idenv tvenv uvenv)
 nmbrDataCon id@(Id _ _ _ (TupleConId _) _ _) nenv
   = (nenv, id) -- nothing to do for tuples
 
-nmbrDataCon id@(Id u n ty (DataConId tag marks fields tvs theta con_tvs con_theta arg_tys tc) prag info)
+nmbrDataCon id@(Id u n ty (AlgConId tag marks fields tvs theta con_tvs con_theta arg_tys tc) prag info)
 	    nenv@(NmbrEnv ui ut uu idenv tvenv uvenv)
   = case (lookupUFM_Directly idenv u) of
       Just xx -> trace "nmbrDataCon: in env???\n" (nenv, xx)
@@ -1519,7 +1525,7 @@ nmbrDataCon id@(Id u n ty (DataConId tag marks fields tvs theta con_tvs con_thet
 	    (nenv2, new_fields)  = (mapNmbr nmbrField  fields)  nenv
 	    (nenv3, new_arg_tys) = (mapNmbr nmbrType   arg_tys) nenv2
 
-	    new_det = DataConId tag marks new_fields (bottom "tvs") (bottom "theta") (bottom "tvs") (bottom "theta") new_arg_tys tc
+	    new_det = AlgConId tag marks new_fields (bottom "tvs") (bottom "theta") (bottom "tvs") (bottom "theta") new_arg_tys tc
 	    new_id  = Id u n (bottom "ty") new_det prag info
 	in
 	(nenv3, new_id)
@@ -1529,14 +1535,14 @@ nmbrDataCon id@(Id u n ty (DataConId tag marks fields tvs theta con_tvs con_thet
 ------------
 nmbr_details :: IdDetails -> NmbrM IdDetails
 
-nmbr_details (DataConId tag marks fields tvs theta con_tvs con_theta arg_tys tc)
+nmbr_details (AlgConId tag marks fields tvs theta con_tvs con_theta arg_tys tc)
   = mapNmbr nmbrTyVar  tvs	`thenNmbr` \ new_tvs ->
     mapNmbr nmbrTyVar  con_tvs	`thenNmbr` \ new_con_tvs ->
     mapNmbr nmbrField  fields	`thenNmbr` \ new_fields ->
     mapNmbr nmbr_theta theta	`thenNmbr` \ new_theta ->
     mapNmbr nmbr_theta con_theta	`thenNmbr` \ new_con_theta ->
     mapNmbr nmbrType   arg_tys	`thenNmbr` \ new_arg_tys ->
-    returnNmbr (DataConId tag marks new_fields new_tvs new_theta new_con_tvs new_con_theta new_arg_tys tc)
+    returnNmbr (AlgConId tag marks new_fields new_tvs new_theta new_con_tvs new_con_theta new_arg_tys tc)
   where
     nmbr_theta (c,t)
       = --nmbrClass c	`thenNmbr` \ new_c ->
