@@ -37,6 +37,14 @@ module TysWiredIn (
 	isIntTy,
 	inIntRange,
 
+	int8TyCon,
+	int16TyCon,
+	int32TyCon,
+
+	int64TyCon,
+	int64DataCon,
+--	int64Ty,
+
 	integerTy,
 	integerTyCon,
 	integerDataCon,
@@ -73,13 +81,16 @@ module TysWiredIn (
 	stateAndDoublePrimTyCon,
 	stateAndFloatPrimTyCon,
 	stateAndIntPrimTyCon,
+	stateAndInt64PrimTyCon,
 	stateAndForeignObjPrimTyCon,
 	stateAndMutableArrayPrimTyCon,
 	stateAndMutableByteArrayPrimTyCon,
 	stateAndPtrPrimTyCon,
+	stateAndPtrPrimDataCon,
 	stateAndStablePtrPrimTyCon,
 	stateAndSynchVarPrimTyCon,
 	stateAndWordPrimTyCon,
+	stateAndWord64PrimTyCon,
 	stateDataCon,
 	stateTyCon,
 
@@ -89,7 +100,21 @@ module TysWiredIn (
 	unitTy,
 	wordDataCon,
 	wordTy,
-	wordTyCon
+	wordTyCon,
+
+	word8TyCon,
+	word16TyCon,
+	word32TyCon,
+
+	word64DataCon,
+--	word64Ty,
+	word64TyCon,
+	
+	isFFIArgumentTy,  -- :: Type -> Bool
+	isFFIResultTy,    -- :: Type -> Bool
+	isFFIExternalTy,  -- :: Type -> Bool
+	isAddrTy,	  -- :: Type -> Bool
+
     ) where
 
 #include "HsVersions.h"
@@ -110,11 +135,13 @@ import TyCon		( mkDataTyCon, mkTupleTyCon, mkSynTyCon,
 import BasicTypes	( Module, NewOrData(..), RecFlag(..) )
 import Type		( Type, mkTyConTy, mkTyConApp, mkSigmaTy, mkTyVarTys, 
 			  mkFunTy, mkFunTys, splitTyConApp_maybe, splitAlgTyConApp_maybe,
-			  GenType(..), ThetaType, TauType )
+			  GenType(..), ThetaType, TauType, isUnpointedType )
 import TyVar		( GenTyVar, TyVar, tyVarKind, alphaTyVars, alphaTyVar, betaTyVar )
 import Lex		( mkTupNameStr )
 import Unique
+import CmdLineOpts      ( opt_GlasgowExts )
 import Util		( assoc, panic )
+
 
 alpha_tyvar	  = [alphaTyVar]
 alpha_ty	  = [alphaTy]
@@ -233,13 +260,48 @@ inIntRange i = (min_int <= i) && (i <= max_int)
 max_int, min_int :: Integer
 max_int = toInteger maxInt  
 min_int = toInteger minInt
+
+int8TyCon = pcNonRecDataTyCon int8TyConKey iNT SLIT("Int8") [] [int8DataCon]
+  where
+   int8DataCon = pcDataCon int8DataConKey iNT SLIT("I8#") [] [] [intPrimTy] int8TyCon
+
+int16TyCon = pcNonRecDataTyCon int16TyConKey iNT SLIT("Int16") [] [int16DataCon]
+  where
+   int16DataCon = pcDataCon int16DataConKey iNT SLIT("I16#") [] [] [intPrimTy] int16TyCon
+
+int32TyCon = pcNonRecDataTyCon int32TyConKey iNT SLIT("Int32") [] [int32DataCon]
+  where
+   int32DataCon = pcDataCon int32DataConKey iNT SLIT("I32#") [] [] [intPrimTy] int32TyCon
+
+int64Ty = mkTyConTy int64TyCon 
+
+int64TyCon = pcNonRecDataTyCon int64TyConKey iNT SLIT("Int64") [] [int64DataCon]
+int64DataCon = pcDataCon int64DataConKey iNT SLIT("I64#") [] [] [int64PrimTy] int64TyCon
 \end{code}
 
 \begin{code}
+
 wordTy = mkTyConTy wordTyCon
 
 wordTyCon = pcNonRecDataTyCon wordTyConKey   pREL_FOREIGN SLIT("Word") [] [wordDataCon]
 wordDataCon = pcDataCon wordDataConKey pREL_FOREIGN SLIT("W#") [] [] [wordPrimTy] wordTyCon
+
+word8TyCon = pcNonRecDataTyCon word8TyConKey   wORD SLIT("Word8") [] [word8DataCon]
+  where
+   word8DataCon = pcDataCon word8DataConKey wORD SLIT("W8#") [] [] [wordPrimTy] word8TyCon
+
+word16TyCon = pcNonRecDataTyCon word16TyConKey   wORD SLIT("Word16") [] [word16DataCon]
+  where
+   word16DataCon = pcDataCon word16DataConKey wORD SLIT("W16#") [] [] [wordPrimTy] word16TyCon
+
+word32TyCon = pcNonRecDataTyCon word32TyConKey   wORD SLIT("Word32") [] [word32DataCon]
+  where
+   word32DataCon = pcDataCon word32DataConKey wORD SLIT("W32#") [] [] [wordPrimTy] word32TyCon
+
+word64Ty = mkTyConTy word64TyCon
+
+word64TyCon = pcNonRecDataTyCon word64TyConKey   wORD SLIT("Word64") [] [word64DataCon]
+word64DataCon = pcDataCon word64DataConKey wORD SLIT("W64#") [] [] [word64PrimTy] word64TyCon
 \end{code}
 
 \begin{code}
@@ -247,6 +309,13 @@ addrTy = mkTyConTy addrTyCon
 
 addrTyCon = pcNonRecDataTyCon addrTyConKey   pREL_ADDR SLIT("Addr") [] [addrDataCon]
 addrDataCon = pcDataCon addrDataConKey pREL_ADDR SLIT("A#") [] [] [addrPrimTy] addrTyCon
+
+isAddrTy :: GenType flexi -> Bool
+isAddrTy ty
+  = case (splitAlgTyConApp_maybe ty) of
+	Just (tycon, [], _) -> uniqueOf tycon == addrTyConKey
+	_		    -> False
+
 \end{code}
 
 \begin{code}
@@ -298,11 +367,11 @@ stablePtrTyCon
 
 \begin{code}
 foreignObjTyCon
-  = pcNonRecDataTyCon foreignObjTyConKey pREL_FOREIGN SLIT("ForeignObj")
+  = pcNonRecDataTyCon foreignObjTyConKey pREL_IO_BASE SLIT("ForeignObj")
 	[] [foreignObjDataCon]
   where
     foreignObjDataCon
-      = pcDataCon foreignObjDataConKey pREL_FOREIGN SLIT("ForeignObj")
+      = pcDataCon foreignObjDataConKey pREL_IO_BASE SLIT("ForeignObj")
 	    [] [] [foreignObjPrimTy] foreignObjTyCon
 \end{code}
 
@@ -385,6 +454,14 @@ stateAndIntPrimDataCon
 		alpha_tyvar [] [mkStatePrimTy alphaTy, intPrimTy]
 		stateAndIntPrimTyCon
 
+stateAndInt64PrimTyCon
+  = pcNonRecDataTyCon stateAndInt64PrimTyConKey pREL_ST SLIT("StateAndInt64#")
+		alpha_tyvar [stateAndInt64PrimDataCon]
+stateAndInt64PrimDataCon
+  = pcDataCon stateAndInt64PrimDataConKey pREL_ST SLIT("StateAndInt64#")
+		alpha_tyvar [] [mkStatePrimTy alphaTy, int64PrimTy]
+		stateAndInt64PrimTyCon
+
 stateAndWordPrimTyCon
   = pcNonRecDataTyCon stateAndWordPrimTyConKey pREL_ST SLIT("StateAndWord#")
 		alpha_tyvar [stateAndWordPrimDataCon]
@@ -392,6 +469,14 @@ stateAndWordPrimDataCon
   = pcDataCon stateAndWordPrimDataConKey pREL_ST SLIT("StateAndWord#")
 		alpha_tyvar [] [mkStatePrimTy alphaTy, wordPrimTy]
 		stateAndWordPrimTyCon
+
+stateAndWord64PrimTyCon
+  = pcNonRecDataTyCon stateAndWord64PrimTyConKey pREL_ST SLIT("StateAndWord64#")
+		alpha_tyvar [stateAndWord64PrimDataCon]
+stateAndWord64PrimDataCon
+  = pcDataCon stateAndWord64PrimDataConKey pREL_ST SLIT("StateAndWord64#")
+		alpha_tyvar [] [mkStatePrimTy alphaTy, word64PrimTy]
+		stateAndWord64PrimTyCon
 
 stateAndAddrPrimTyCon
   = pcNonRecDataTyCon stateAndAddrPrimTyConKey pREL_ST SLIT("StateAndAddr#")
@@ -411,10 +496,10 @@ stateAndStablePtrPrimDataCon
 		stateAndStablePtrPrimTyCon
 
 stateAndForeignObjPrimTyCon
-  = pcNonRecDataTyCon stateAndForeignObjPrimTyConKey pREL_FOREIGN SLIT("StateAndForeignObj#")
+  = pcNonRecDataTyCon stateAndForeignObjPrimTyConKey pREL_IO_BASE SLIT("StateAndForeignObj#")
 		alpha_tyvar [stateAndForeignObjPrimDataCon]
 stateAndForeignObjPrimDataCon
-  = pcDataCon stateAndForeignObjPrimDataConKey pREL_FOREIGN SLIT("StateAndForeignObj#")
+  = pcDataCon stateAndForeignObjPrimDataConKey pREL_IO_BASE SLIT("StateAndForeignObj#")
 		alpha_tyvar []
 		[mkStatePrimTy alphaTy, mkTyConTy foreignObjPrimTyCon]
 		stateAndForeignObjPrimTyCon
@@ -502,6 +587,8 @@ getStatePairingConInfo prim_ty
 	(charPrimTyCon, (stateAndCharPrimDataCon, stateAndCharPrimTyCon, 0)),
 	(intPrimTyCon, (stateAndIntPrimDataCon, stateAndIntPrimTyCon, 0)),
 	(wordPrimTyCon, (stateAndWordPrimDataCon, stateAndWordPrimTyCon, 0)),
+	(int64PrimTyCon, (stateAndInt64PrimDataCon, stateAndInt64PrimTyCon, 0)),
+	(word64PrimTyCon, (stateAndWord64PrimDataCon, stateAndWord64PrimTyCon, 0)),
 	(addrPrimTyCon, (stateAndAddrPrimDataCon, stateAndAddrPrimTyCon, 0)),
 	(stablePtrPrimTyCon, (stateAndStablePtrPrimDataCon, stateAndStablePtrPrimTyCon, 0)),
 	(foreignObjPrimTyCon, (stateAndForeignObjPrimDataCon, stateAndForeignObjPrimTyCon, 0)),
@@ -515,6 +602,71 @@ getStatePairingConInfo prim_ty
 	-- (PtrPrimTyCon, (stateAndPtrPrimDataCon, stateAndPtrPrimTyCon, 0)),
 	]
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection[TysWiredIn-ext-type]{External types}
+%*									*
+%************************************************************************
+
+The compiler's foreign function interface supports the passing of a
+restricted set of types as arguments and results (the restricting factor
+being the )
+
+\begin{code}
+isFFIArgumentTy :: Type -> Bool
+isFFIArgumentTy ty =
+  (opt_GlasgowExts && isUnpointedType ty) || --leave out for now: maybeToBool (maybeBoxedPrimType ty))) ||
+  case (splitAlgTyConApp_maybe ty) of
+    Just (tycon, _, _) -> (uniqueOf tycon) `elem` primArgTyConKeys
+    _		       -> False
+
+-- types that can be passed as arguments to "foreign" functions
+primArgTyConKeys 
+  = [ intTyConKey, int8TyConKey, int16TyConKey, int32TyConKey, int64TyConKey
+    , wordTyConKey, word8TyConKey, word16TyConKey, word32TyConKey, word64TyConKey
+    , floatTyConKey, doubleTyConKey
+    , addrTyConKey, charTyConKey, foreignObjTyConKey
+    , stablePtrTyConKey, byteArrayTyConKey, mutableByteArrayTyConKey
+    ]
+
+-- types that can be passed from the outside world into Haskell.
+-- excludes (mutable) byteArrays.
+isFFIExternalTy :: Type -> Bool
+isFFIExternalTy ty = 
+  (opt_GlasgowExts && isUnpointedType ty) || --leave out for now: maybeToBool (maybeBoxedPrimType ty))) ||
+  case (splitAlgTyConApp_maybe ty) of
+    Just (tycon, _, _) -> 
+       let 
+        u_tycon = uniqueOf tycon
+       in  
+       (u_tycon `elem` primArgTyConKeys) &&
+       not (u_tycon `elem` notLegalExternalTyCons)
+    _		       -> False
+
+
+isFFIResultTy :: Type -> Bool
+isFFIResultTy ty =
+   not (isUnpointedType ty) &&
+   case (splitAlgTyConApp_maybe ty) of
+    Just (tycon, _, _) -> 
+	let
+	 u_tycon = uniqueOf tycon
+	in
+	(u_tycon == uniqueOf unitTyCon) ||
+        ((u_tycon `elem` primArgTyConKeys) && 
+	 not (u_tycon `elem` notLegalExternalTyCons))
+    _		       -> False
+
+-- it's illegal to return foreign objects and (mutable)
+-- bytearrays from a _ccall_ / foreign declaration
+-- (or be passed them as arguments in foreign exported functions).
+notLegalExternalTyCons =
+  [ foreignObjTyConKey, byteArrayTyConKey, mutableByteArrayTyConKey ]
+    
+\end{code}
+
 
 %************************************************************************
 %*									*
