@@ -54,24 +54,95 @@ Minimal complete definition: sizeOf, alignment, and one definition
 in each of the peek/poke families.
 
 \begin{code}
+{- |
+The member functions of this class facilitate writing values of
+primitive types to raw memory (which may have been allocated with the
+above mentioned routines) and reading values from blocks of raw
+memory.  The class, furthermore, includes support for computing the
+storage requirements and alignment restrictions of storable types.
+
+Memory addresses are represented as values of type @'Ptr' a@, for some
+@a@ which is an instance of class 'Storable'.  The type argument to
+'Ptr' helps provide some valuable type safety in FFI code (you can\'t
+mix pointers of different types without an explicit cast), while
+helping the Haskell type system figure out which marshalling method is
+needed for a given pointer.
+
+All marshalling between Haskell and a foreign language ultimately
+boils down to translating Haskell data structures into the binary
+representation of a corresponding data structure of the foreign
+language and vice versa.  To code this marshalling in Haskell, it is
+necessary to manipulate primtive data types stored in unstructured
+memory blocks.  The class 'Storable' facilitates this manipulation on
+all types for which it is instantiated, which are the standard basic
+types of Haskell, the fixed size @Int@ types ('Int8', 'Int16',
+'Int32', 'Int64'), the fixed size @Word@ types ('Word8', 'Word16',
+'Word32', 'Word64'), 'StablePtr', all types from "CTypes" and
+"CTypesISO", as well as 'Ptr'.
+
+Minimal complete definition: 'sizeOf', 'alignment', one of 'peek',
+'peekElemOff' and 'peekByteOff', and one of 'poke', 'pokeElemOff' and
+'pokeByteOff'.
+-}
+
 class Storable a where
 
-   -- sizeOf/alignment *never* use their first argument
    sizeOf      :: a -> Int
+   -- ^ Computes the storage requirements (in bytes) of the argument.
+   -- The value of the argument is not used.
+
    alignment   :: a -> Int
+   -- ^ Computes the alignment constraint of the argument.  An
+   -- alignment constraint @x@ is fulfilled by any address divisible
+   -- by @x@.  The value of the argument is not used.
 
-   -- replacement for read-/write???OffAddr
    peekElemOff :: Ptr a -> Int      -> IO a
+   -- ^       Read a value from a memory area regarded as an array
+   --         of values of the same kind.  The first argument specifies
+   --         the start address of the array and the second the index into
+   --         the array (the first element of the array has index
+   --         @0@).  The following equality holds,
+   -- 
+   -- > peekElemOff addr idx = IOExts.fixIO $ \result ->
+   -- >   peek (addr \`plusPtr\` (idx * sizeOf result))
+   --
+   --         Note that this is only a specification, not
+   --         necessarily the concrete implementation of the
+   --         function.
+
    pokeElemOff :: Ptr a -> Int -> a -> IO ()
+   -- ^       Write a value to a memory area regarded as an array of
+   --         values of the same kind.  The following equality holds:
+   -- 
+   -- > pokeElemOff addr idx x = 
+   -- >   poke (addr \`plusPtr\` (idx * sizeOf x)) x
 
-   -- the same with *byte* offsets
    peekByteOff :: Ptr b -> Int      -> IO a
+   -- ^       Read a value from a memory location given by a base
+   --         address and offset.  The following equality holds:
+   --
+   -- > peekByteOff addr off = peek (addr \`plusPtr\` off)
+
    pokeByteOff :: Ptr b -> Int -> a -> IO ()
-
-   -- ... and with no offsets at all
+   -- ^       Write a value to a memory location given by a base
+   --         address and offset.  The following equality holds:
+   --
+   -- > pokeByteOff addr off x = poke (addr \`plusPtr\` off) x
+  
    peek        :: Ptr a      -> IO a
-   poke        :: Ptr a -> a -> IO ()
+   -- ^ Read a value from the given memory location.
+   --
+   --  Note that the peek and poke functions might require properly
+   --  aligned addresses to function correctly.  This is architecture
+   --  dependent; thus, portable code should ensure that when peeking or
+   --  poking values of some type @a@, the alignment
+   --  constraint for @a@, as given by the function
+   --  'alignment' is fulfilled.
 
+   poke        :: Ptr a -> a -> IO ()
+   -- ^ Write the given value to the given memory location.  Alignment
+   -- restrictions might apply; see 'peek'.
+ 
    -- circular default instances
    peekElemOff = peekElemOff_ undefined
       where peekElemOff_ :: a -> Ptr a -> Int -> IO a

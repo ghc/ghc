@@ -14,6 +14,7 @@
 -----------------------------------------------------------------------------
 
 module Foreign.Marshal.Alloc (
+  -- * Allocation
   malloc,       -- :: Storable a =>        IO (Ptr a)
   mallocBytes,  -- ::               Int -> IO (Ptr a)
 
@@ -43,7 +44,9 @@ import GHC.Base
 -- exported functions
 -- ------------------
 
--- allocate space for storable type
+-- |Allocate space for storable type.  The size of the area allocated
+-- is determined by the 'sizeOf' method from the instance of
+-- 'Storable' for the appropriate type.
 --
 malloc :: Storable a => IO (Ptr a)
 malloc  = doMalloc undefined
@@ -51,16 +54,16 @@ malloc  = doMalloc undefined
     doMalloc       :: Storable a => a -> IO (Ptr a)
     doMalloc dummy  = mallocBytes (sizeOf dummy)
 
--- allocate given number of bytes of storage
+-- |Allocate given number of bytes of storage, equivalent to C\'s @malloc()@.
 --
 mallocBytes      :: Int -> IO (Ptr a)
 mallocBytes size  = failWhenNULL "malloc" (_malloc (fromIntegral size))
 
--- temporarily allocate space for a storable type
+-- |Temporarily allocate space for a storable type.
 --
--- * the pointer passed as an argument to the function must *not* escape from
---   this function; in other words, in `alloca f' the allocated storage must
---   not be used after `f' returns
+-- * the pointer passed as an argument to the function must /not/ escape from
+--   this function; in other words, in @alloca f@ the allocated storage must
+--   not be used after @f@ returns
 --
 alloca :: Storable a => (Ptr a -> IO b) -> IO b
 alloca  = doAlloca undefined
@@ -68,11 +71,11 @@ alloca  = doAlloca undefined
     doAlloca       :: Storable a => a -> (Ptr a -> IO b) -> IO b
     doAlloca dummy  = allocaBytes (sizeOf dummy)
 
--- temporarily allocate the given number of bytes of storage
+-- |Temporarily allocate the given number of bytes of storage.
 --
--- * the pointer passed as an argument to the function must *not* escape from
---   this function; in other words, in `allocaBytes n f' the allocated storage
---   must not be used after `f' returns
+-- * the pointer passed as an argument to the function must /not/ escape from
+--   this function; in other words, in @allocaBytes n f@ the allocated storage
+--   must not be used after @f@ returns
 --
 #ifdef __GLASGOW_HASKELL__
 allocaBytes :: Int -> (Ptr a -> IO b) -> IO b
@@ -90,13 +93,15 @@ allocaBytes      :: Int -> (Ptr a -> IO b) -> IO b
 allocaBytes size  = bracket (mallocBytes size) free
 #endif
 
--- adjust a malloc'ed storage area to the given size
+-- |Adjust a malloc\'ed storage area to the given size (equivalent to
+-- C\'s @realloc()@).
 --
 reallocBytes          :: Ptr a -> Int -> IO (Ptr a)
 reallocBytes ptr size  = 
   failWhenNULL "realloc" (_realloc ptr (fromIntegral size))
 
--- free malloc'ed storage
+-- |Free malloc\'ed storage (equivalent to
+-- C\'s @free()@)
 --
 free :: Ptr a -> IO ()
 free  = _free

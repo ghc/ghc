@@ -14,8 +14,9 @@
 -----------------------------------------------------------------------------
 
 module Foreign.Marshal.Error (
+  -- * Error utilities
 
-  -- throw an exception on specific return values
+  -- |Throw an exception on specific return values
   --
   throwIf,       -- :: (a -> Bool) -> (a -> String) -> IO a       -> IO a
   throwIf_,      -- :: (a -> Bool) -> (a -> String) -> IO a       -> IO ()
@@ -25,7 +26,7 @@ module Foreign.Marshal.Error (
 	         -- =>                (a -> String) -> IO a       -> IO ()
   throwIfNull,   -- ::                String        -> IO (Ptr a) -> IO (Ptr a)
 
-  -- discard return value
+  -- Discard return value
   --
   void           -- IO a -> IO ()
 ) where
@@ -41,10 +42,10 @@ import GHC.IOBase
 -- exported functions
 -- ------------------
 
--- guard an IO operation and throw an exception if the result meets the given
+-- |Guard an 'IO' operation and throw an exception if the result meets the given
 -- predicate 
 --
--- * the second argument computes an error message from the result of the IO
+-- * the second argument computes an error message from the result of the 'IO'
 --   operation
 --
 throwIf                 :: (a -> Bool) -> (a -> String) -> IO a -> IO a
@@ -53,27 +54,27 @@ throwIf pred msgfct act  =
     res <- act
     (if pred res then ioError . userError . msgfct else return) res
 
--- like `throwIf', but discarding the result
+-- |Like 'throwIf', but discarding the result
 --
 throwIf_                 :: (a -> Bool) -> (a -> String) -> IO a -> IO ()
 throwIf_ pred msgfct act  = void $ throwIf pred msgfct act
 
--- guards against negative result values
+-- |Guards against negative result values
 --
 throwIfNeg :: (Ord a, Num a) => (a -> String) -> IO a -> IO a
 throwIfNeg  = throwIf (< 0)
 
--- like `throwIfNeg', but discarding the result
+-- |Like 'throwIfNeg', but discarding the result
 --
 throwIfNeg_ :: (Ord a, Num a) => (a -> String) -> IO a -> IO ()
 throwIfNeg_  = throwIf_ (< 0)
 
--- guards against null pointers
+-- |Guards against null pointers
 --
 throwIfNull :: String -> IO (Ptr a) -> IO (Ptr a)
 throwIfNull  = throwIf (== nullPtr) . const
 
--- discard the return value of an IO action
+-- |Discard the return value of an 'IO' action
 --
 void     :: IO a -> IO ()
 void act  = act >> return ()

@@ -9,25 +9,26 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- Pointer types.
+-- The "Ptr" module provides typed pointers to foreign data.  It is part
+-- of the Foreign Function Interface (FFI) and will normally be
+-- imported via the "Foreign" module.
 --
 -----------------------------------------------------------------------------
 
 module Foreign.Ptr (
-    --------------------------------------------------------------------
-    -- Data pointers.
+
+    -- * Data pointers
     
-    Ptr(..),      -- data Ptr a
+    Ptr,      -- data Ptr a
     nullPtr,      -- :: Ptr a
     castPtr,      -- :: Ptr a -> Ptr b
     plusPtr,      -- :: Ptr a -> Int -> Ptr b
     alignPtr,     -- :: Ptr a -> Int -> Ptr a
     minusPtr,     -- :: Ptr a -> Ptr b -> Int
     
-    --------------------------------------------------------------------
-    -- Function pointers.
+    -- * Function pointers
     
-    FunPtr(..),      -- data FunPtr a
+    FunPtr,      -- data FunPtr a
     nullFunPtr,      -- :: FunPtr a
     castFunPtr,      -- :: FunPtr a -> FunPtr b
     castFunPtrToPtr, -- :: FunPtr a -> Ptr b

@@ -14,19 +14,20 @@
 -----------------------------------------------------------------------------
 
 module Foreign.Marshal.Utils (
+  -- * General marshalling utilities
 
-  -- combined allocation and marshalling
+  -- ** Combined allocation and marshalling
   --
   withObject,    -- :: Storable a => a -> (Ptr a -> IO b) -> IO b
   {- FIXME: should be `with' -}
   new,           -- :: Storable a => a -> IO (Ptr a)
 
-  -- marshalling of Boolean values (non-zero corresponds to `True')
+  -- ** Marshalling of Boolean values (non-zero corresponds to 'True')
   --
   fromBool,      -- :: Num a => Bool -> a
   toBool,	 -- :: Num a => a -> Bool
 
-  -- marshalling of Maybe values
+  -- ** Marshalling of Maybe values
   --
   maybeNew,      -- :: (      a -> IO (Ptr a))
 		 -- -> (Maybe a -> IO (Ptr a))
@@ -35,13 +36,13 @@ module Foreign.Marshal.Utils (
   maybePeek,     -- :: (Ptr a -> IO        b )
 		 -- -> (Ptr a -> IO (Maybe b))
 
-  -- marshalling lists of storable objects
+  -- ** Marshalling lists of storable objects
   --
   withMany,      -- :: (a -> (b -> res) -> res) -> [a] -> ([b] -> res) -> res
 
-  -- Haskellish interface to memcpy and memmove
-  -- (argument order: destination, source)
-  --
+  -- ** Haskellish interface to memcpy and memmove
+
+  -- | (argument order: destination, source)
   copyBytes,     -- :: Ptr a -> Ptr a -> Int -> IO ()
   moveBytes      -- :: Ptr a -> Ptr a -> Int -> IO ()
 ) where
@@ -62,7 +63,7 @@ import GHC.Base
 -- combined allocation and marshalling
 -- -----------------------------------
 
--- allocate storage for a value and marshal it into this storage
+-- |Allocate storage for a value and marshal it into this storage
 --
 new     :: Storable a => a -> IO (Ptr a)
 new val  = 
@@ -71,9 +72,9 @@ new val  =
     poke ptr val
     return ptr
 
--- allocate temporary storage for a value and marshal it into this storage
+-- |Allocate temporary storage for a value and marshal it into this storage
 --
--- * see the life time constraints imposed by `alloca'
+-- * see the life time constraints imposed by 'alloca'
 --
 {- FIXME: should be called `with' -}
 withObject       :: Storable a => a -> (Ptr a -> IO b) -> IO b
@@ -84,16 +85,16 @@ withObject val f  =
     return res
 
 
--- marshalling of Boolean values (non-zero corresponds to `True')
+-- marshalling of Boolean values (non-zero corresponds to 'True')
 -- -----------------------------
 
--- convert a Haskell Boolean to its numeric representation
+-- |Convert a Haskell 'Bool' to its numeric representation
 --
 fromBool       :: Num a => Bool -> a
 fromBool False  = 0
 fromBool True   = 1
 
--- convert a Boolean in numeric representation to a Haskell value
+-- |Convert a Boolean in numeric representation to a Haskell value
 --
 toBool :: Num a => a -> Bool
 toBool  = (/= 0)
@@ -102,23 +103,23 @@ toBool  = (/= 0)
 -- marshalling of Maybe values
 -- ---------------------------
 
--- allocate storage and marshall a storable value wrapped into a `Maybe'
+-- |Allocate storage and marshall a storable value wrapped into a 'Maybe'
 --
--- * the `nullPtr' is used to represent `Nothing'
+-- * the 'nullPtr' is used to represent 'Nothing'
 --
 maybeNew :: (      a -> IO (Ptr a))
 	 -> (Maybe a -> IO (Ptr a))
 maybeNew  = maybe (return nullPtr)
 
--- converts a withXXX combinator into one marshalling a value wrapped into a
--- `Maybe'
+-- |Converts a @withXXX@ combinator into one marshalling a value wrapped into a
+-- 'Maybe'
 --
 maybeWith :: (      a -> (Ptr b -> IO c) -> IO c) 
 	  -> (Maybe a -> (Ptr b -> IO c) -> IO c)
 maybeWith  = maybe ($ nullPtr)
 
--- convert a peek combinator into a one returning `Nothing' if applied to a
--- `nullPtr' 
+-- |Convert a peek combinator into a one returning 'Nothing' if applied to a
+-- 'nullPtr' 
 --
 maybePeek                           :: (Ptr a -> IO b) -> Ptr a -> IO (Maybe b)
 maybePeek peek ptr | ptr == nullPtr  = return Nothing
@@ -128,7 +129,7 @@ maybePeek peek ptr | ptr == nullPtr  = return Nothing
 -- marshalling lists of storable objects
 -- -------------------------------------
 
--- replicates a withXXX combinator over a list of objects, yielding a list of
+-- |Replicates a @withXXX@ combinator over a list of objects, yielding a list of
 -- marshalled objects
 --
 withMany :: (a -> (b -> res) -> res)  -- withXXX combinator for one object
@@ -143,14 +144,14 @@ withMany withFoo (x:xs) f = withFoo x $ \x' ->
 -- Haskellish interface to memcpy and memmove
 -- ------------------------------------------
 
--- copies the given number of bytes from the second area (source) into the
--- first (destination); the copied areas may *not* overlap
+-- |Copies the given number of bytes from the second area (source) into the
+-- first (destination); the copied areas may /not/ overlap
 --
 copyBytes               :: Ptr a -> Ptr a -> Int -> IO ()
 copyBytes dest src size  = memcpy dest src (fromIntegral size)
 
--- copies the given number of elements from the second area (source) into the
--- first (destination); the copied areas *may* overlap
+-- |Copies the given number of elements from the second area (source) into the
+-- first (destination); the copied areas /may/ overlap
 --
 moveBytes               :: Ptr a -> Ptr a -> Int -> IO ()
 moveBytes dest src size  = memmove dest src (fromIntegral size)
@@ -159,7 +160,7 @@ moveBytes dest src size  = memmove dest src (fromIntegral size)
 -- auxilliary routines
 -- -------------------
 
--- basic C routines needed for memory copying
+-- |Basic C routines needed for memory copying
 --
 foreign import ccall unsafe memcpy  :: Ptr a -> Ptr a -> CSize -> IO ()
 foreign import ccall unsafe memmove :: Ptr a -> Ptr a -> CSize -> IO ()

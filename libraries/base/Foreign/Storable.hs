@@ -9,12 +9,16 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- A class for primitive marshaling
+-- The module "Storable" provides most elementary support for
+-- marshalling and is part of the language-independent portion of the
+-- Foreign Function Interface (FFI), and will normally be imported via
+-- the "Foreign" module.
 --
 -----------------------------------------------------------------------------
 
 module Foreign.Storable
-	( Storable(
+	( -- * The 'Storable' class
+	  Storable(
 	     sizeOf,         -- :: a -> Int
 	     alignment,      -- :: a -> Int
 	     peekElemOff,    -- :: Ptr a -> Int      -> IO a
