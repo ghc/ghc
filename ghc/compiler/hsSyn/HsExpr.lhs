@@ -686,5 +686,5 @@ pprMatchContext RecUpd	     = ptext SLIT("In a record-update construct")
 pprMatchContext PatBindRhs   = ptext SLIT("In a pattern binding")
 pprMatchContext LambdaExpr   = ptext SLIT("In a lambda abstraction")
 pprMatchContext DoExpr       = ptext SLIT("In a 'do' expression pattern binding")
-pprMatchContext ListComp     = ptext SLIT("In a 'list comprension' pattern binding")
+pprMatchContext ListComp     = ptext SLIT("In a 'list comprehension' pattern binding")
 \end{code}
