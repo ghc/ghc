@@ -514,7 +514,9 @@ hscStmt hsc_env pcs icontext stmt
 
 		-- Then desugar, code gen, and link it
 	; hval <- compileExpr hsc_env pcs1 iNTERACTIVE 
-			      (icPrintUnqual new_ic) tc_expr
+			      (ic_rn_gbl_env new_ic) 
+			      (ic_type_env new_ic)
+			      tc_expr
 
 	; return (pcs1, Just (new_ic, bound_names, hval))
 	}}}}}
@@ -632,15 +634,15 @@ myParseIdentifier dflags str
 #ifdef GHCI
 compileExpr :: HscEnv 
 	    -> PersistentCompilerState
-	    -> Module -> PrintUnqualified
+	    -> Module -> GlobalRdrEnv -> TypeEnv
 	    -> TypecheckedHsExpr
 	    -> IO HValue
 
-compileExpr hsc_env pcs this_mod print_unqual tc_expr
+compileExpr hsc_env pcs this_mod type_env rdr_env tc_expr
   = do	{ let dflags = hsc_dflags hsc_env
 
 	 	-- Desugar it
-	; ds_expr <- deSugarExpr hsc_env pcs this_mod print_unqual tc_expr
+	; ds_expr <- deSugarExpr hsc_env pcs this_mod rdr_env type_env tc_expr
 	
 		-- Flatten it
 	; flat_expr <- flattenExpr hsc_env pcs ds_expr

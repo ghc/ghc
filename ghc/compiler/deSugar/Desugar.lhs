@@ -10,7 +10,7 @@ module Desugar ( deSugar, deSugarExpr ) where
 
 import CmdLineOpts	( DynFlag(..), dopt, opt_SccProfilingOn )
 import HscTypes		( ModGuts(..), ModGuts, HscEnv(..), ExternalPackageState(..), 
-			  PersistentCompilerState(..), Dependencies(..),
+			  PersistentCompilerState(..), Dependencies(..), TypeEnv, GlobalRdrEnv,
 	  		  lookupType, unQualInScope )
 import HsSyn		( MonoBinds, RuleDecl(..), RuleBndr(..), 
 			  HsExpr(..), HsBinds(..), MonoBinds(..) )
@@ -38,6 +38,7 @@ import ErrUtils		( doIfSet, dumpIfSet_dyn, pprBagOfWarnings, addShortWarnLocLine
 import Outputable
 import qualified Pretty
 import UniqSupply	( mkSplitUniqSupply )
+import Maybes		( orElse )
 import SrcLoc		( SrcLoc )
 import FastString
 import DATA_IOREF	( readIORef )
@@ -136,18 +137,16 @@ deSugar hsc_env pcs
 
 deSugarExpr :: HscEnv
 	    -> PersistentCompilerState
-	    -> Module -> PrintUnqualified
+	    -> Module -> GlobalRdrEnv -> TypeEnv 
  	    -> TypecheckedHsExpr
 	    -> IO CoreExpr
-deSugarExpr hsc_env pcs mod_name unqual tc_expr
+deSugarExpr hsc_env pcs mod_name rdr_env type_env tc_expr
   = do	{ showPass dflags "Desugar"
 	; us <- mkSplitUniqSupply 'd'
 
 	-- Do desugaring
 	; let (core_expr, ds_warns) = initDs dflags us lookup mod_name (dsExpr tc_expr)    
 	      warn_doc = pprBagOfWarnings (mapBag mk_warn ds_warns)
-	      mk_warn :: (SrcLoc,SDoc) -> (SrcLoc, Pretty.Doc)
-	      mk_warn (loc,sdoc) = addShortWarnLocLine loc unqual sdoc
 
 	-- Display any warnings
         ; doIfSet (not (isEmptyBag ds_warns))
@@ -162,9 +161,15 @@ deSugarExpr hsc_env pcs mod_name unqual tc_expr
     dflags   = hsc_dflags hsc_env
     hpt      = hsc_HPT hsc_env
     pte      = eps_PTE (pcs_EPS pcs)
-    lookup n = case lookupType hpt pte n of
-		 Just v -> v 
-		 other	-> pprPanic "Desugar: lookup:" (ppr n)
+    lookup n = lookupNameEnv type_env n	`orElse`	-- Look in the type env of the
+							-- current module first
+	       lookupType hpt pte n 	`orElse`	-- Then other modules
+	       pprPanic "Desugar: lookup:" (ppr n)
+
+    mk_warn :: (SrcLoc,SDoc) -> (SrcLoc, Pretty.Doc)
+    mk_warn (loc,sdoc) = addShortWarnLocLine loc print_unqual sdoc
+
+    print_unqual = unQualInScope rdr_env
 
 dsProgram all_binds rules fo_decls
   = dsMonoBinds auto_scc all_binds []	`thenDs` \ core_prs ->
