@@ -178,7 +178,10 @@ inst_tyvars initial_cts tyvars
 inst_tyvar initial_cts (TyVar _ kind name _) 
   = tcGetUnique 		`thenNF_Tc` \ uniq ->
     tcNewMutVar initial_cts	`thenNF_Tc` \ box ->
-    returnNF_Tc (TyVar uniq kind name box)
+    returnNF_Tc (TyVar uniq kind Nothing box)
+	-- The "Nothing" means that it'll always print with its 
+	-- unique (or something similar).  If we leave the original (Just Name)
+	-- in there then error messages will say "can't match (T a) against (T a)"
 \end{code}
 
 @tcInstType@ and @tcInstSigType@ both create a fresh instance of a

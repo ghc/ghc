@@ -1,6 +1,6 @@
 _interface_ TcType 1
 _exports_
-TcType TcMaybe;
+TcType TcMaybe TcTyVarSet;
 _declarations_
 1 data TcMaybe a;
-
+1 type TcTyVarSet a = TyVar.GenTyVarSet (ArrBase.MutableVar a (TcMaybe a));
