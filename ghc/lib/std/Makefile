@@ -33,7 +33,7 @@ endif
 
 PACKAGE = std
 
-BOOT_SRCS += PrelPrimopWrappers.hs
+ALL_SRCS    += PrelPrimopWrappers.hs
 CLEAN_FILES += PrelPrimopWrappers.hs
 
 #-----------------------------------------------------------------------------
@@ -89,14 +89,13 @@ endif
 DLL_DESCRIPTION="GHC-compiled Haskell Prelude"
 
 ifeq "$(DLLized)" "YES"
-HS_SRCS := $(filter-out PrelMain.lhs, $(HS_SRCS))
+EXCLUDED_SRCS += Prelmain.lhs
 # PrelMain.dll_o isn't to be included in the final .a, 
 # but it needs to be generated
 all :: PrelMain.dll_o
 endif
 
 CLEAN_FILES += PrelGHC.hi-boot PrelGHC.hi $(foreach way, $(WAYS), PrelGHC.$(way)_hi)
-
 
 #-----------------------------------------------------------------------------
 # 	Building the library for GHCi
