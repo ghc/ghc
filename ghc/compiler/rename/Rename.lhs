@@ -558,7 +558,9 @@ warnDeprec :: (Name, DeprecTxt) -> RnM d ()
 warnDeprec (name, txt)
   = pushSrcLocRn (getSrcLoc name)	$
     addWarnRn				$
-    sep [ text "Using deprecated entity" <+> ppr name <> colon, nest 4 (ppr txt) ]
+    sep [ text (occNameFlavour (nameOccName name)) <+> ppr name <+>
+          text "is deprecated:", nest 4 (ppr txt) ]
+
 
 rnDump  :: [RenamedHsDecl] 	-- Renamed imported decls
 	-> [RenamedHsDecl] 	-- Renamed local decls
