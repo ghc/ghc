@@ -379,6 +379,7 @@ checkAllCasesCovered e scrut_ty alts
     if isPrimTyCon tycon then
 	checkL (hasDefault alts) (nonExhaustiveAltsMsg e)
     else
+{-		No longer needed
 #ifdef DEBUG
 	-- Algebraic cases are not necessarily exhaustive, because
 	-- the simplifer correctly eliminates case that can't 
@@ -398,6 +399,7 @@ checkAllCasesCovered e scrut_ty alts
 		 nopL
     else
 #endif
+-}
     nopL }
 
 hasDefault []			  = False

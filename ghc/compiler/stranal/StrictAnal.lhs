@@ -328,7 +328,8 @@ addStrictnessInfoToId str_val abs_val binder body
 	-- We could use 'collectBindersIgnoringNotes', but then the 
 	-- strictness info may have more items than the visible binders
 	-- used by WorkWrap.tryWW
-	(binders, rhs) -> binder `setIdStrictness` 
+	(binders, rhs) -> -- pprTrace "addStr" (ppr binder $$ ppr strictness) $
+			  binder `setIdStrictness` 
 			  mkStrictnessInfo strictness
 		where
 		    tys        = [idType id | id <- binders, isId id]

@@ -36,11 +36,6 @@ import FloatOut		( floatOutwards )
 import Id		( Id, mkSysLocal, mkVanillaId, isBottomingId,
 			  idType, setIdType, idName, idInfo, setIdNoDiscard
 			)
-import IdInfo		( InlinePragInfo(..), specInfo, setSpecInfo,
-			  inlinePragInfo, setInlinePragInfo,
-			  setUnfoldingInfo, setDemandInfo
-			)
-import Demand		( wwLazy )
 import VarEnv
 import VarSet
 import Module		( Module )
@@ -305,25 +300,6 @@ Several tasks are performed by the post-simplification pass
 			let x = y in e
     with a floated "foo".  What a bore.
     
-2.  *Mangle* cases involving par# in the discriminant.  The unfolding
-    for par in PrelConc.lhs include case expressions with integer
-    results solely to fool the strictness analyzer, the simplifier,
-    and anyone else who might want to fool with the evaluation order.
-    At this point in the compiler our evaluation order is safe.
-    Therefore, we convert expressions of the form:
-
-    	case par# e of
-    	  0# -> rhs
-    	  _  -> parError#
-    ==>
-    	case par# e of
-    	  _ -> rhs
-
-    fork# isn't handled like this - it's an explicit IO operation now.
-    The reason is that fork# returns a ThreadId#, which gets in the
-    way of the above scheme.  And anyway, IO is the only guaranteed
-    way to enforce ordering  --SDM.
-
 4. Do eta reduction for lambda abstractions appearing in:
 	- the RHS of case alternatives
 	- the body of a let
@@ -458,16 +434,6 @@ postSimplExpr (Note note body)
   = postSimplExprEta body	`thenPM` \ body' ->
     returnPM (Note note body')
 
--- par#: see notes above.
-postSimplExpr (Case scrut@(Con (PrimOp op) args) bndr alts)
-  | funnyParallelOp op && maybeToBool maybe_default
-  = postSimplExpr scrut			`thenPM` \ scrut' ->
-    postSimplExprEta default_rhs	`thenPM` \ rhs' ->
-    returnPM (Case scrut' bndr [(DEFAULT,[],rhs')])
-  where
-    (other_alts, maybe_default)  = findDefault alts
-    Just default_rhs		 = maybe_default
-
 postSimplExpr (Case scrut case_bndr alts)
   = postSimplExpr scrut			`thenPM` \ scrut' ->
     mapPM ps_alt alts			`thenPM` \ alts' ->
@@ -479,11 +445,6 @@ postSimplExpr (Case scrut case_bndr alts)
 postSimplExprEta e = postSimplExpr e	`thenPM` \ e' ->
 		     returnPM (etaCoreExpr e')
 \end{code}
-
-\begin{code}
-funnyParallelOp ParOp  = True
-funnyParallelOp _      = False
-\end{code}  
 
 
 %************************************************************************

@@ -905,8 +905,13 @@ primOpStrictness :: PrimOp -> ([Demand], Bool)
 	-- the list of demands may be infinite!
 	-- Use only the ones you ned.
 
-primOpStrictness SeqOp            = ([wwLazy], False)
+primOpStrictness SeqOp            = ([wwStrict], False)
+	-- Seq is strict in its argument; see notes in ConFold.lhs
+
 primOpStrictness ParOp            = ([wwLazy], False)
+	-- But Par is lazy, to avoid that the sparked thing
+	-- gets evaluted strictly, which it should *not* be
+
 primOpStrictness ForkOp		  = ([wwLazy, wwPrim], False)
 
 primOpStrictness NewArrayOp       = ([wwPrim, wwLazy, wwPrim], False)

@@ -42,10 +42,9 @@ import CmdLineOpts	( opt_UF_CreationThreshold,
 			)
 import CoreSyn
 import PprCore		( pprCoreExpr )
-import CoreUtils	( whnfOrBottom )
 import OccurAnal	( occurAnalyseGlobalExpr )
 import BinderInfo	( )
-import CoreUtils	( coreExprType, exprIsTrivial, mkFormSummary, 
+import CoreUtils	( coreExprType, exprIsTrivial, mkFormSummary, whnfOrBottom,
 			  FormSummary(..) )
 import Id		( Id, idType, idUnique, isId, 
 			  getIdSpecialisation, getInlinePragma, getIdUnfolding

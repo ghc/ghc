@@ -21,7 +21,8 @@ import TysWiredIn	( trueDataCon, falseDataCon )
 import TyCon		( tyConDataCons, isEnumerationTyCon )
 import DataCon		( dataConTag, fIRST_TAG )
 import Const		( conOkForAlt )
-import CoreUnfold	( Unfolding(..) )
+import CoreUnfold	( Unfolding(..), isEvaldUnfolding )
+import CoreUtils	( exprIsValue )
 import Type		( splitTyConApp_maybe )
 
 import Char		( ord, chr )
@@ -89,13 +90,13 @@ NB: If we ever do case-floating, we have an extra worry:
 
 The second case must never be floated outside of the first!
 
-\begin{code}p
-tryPrimOp SeqOp [Type ty, Con (Literal lit) _]
+\begin{code}
+tryPrimOp SeqOp [Type ty, arg]
+  | is_evald arg
   = Just (Con (Literal (mkMachInt 1)) [])
-
-tryPrimOp SeqOp args@[Type ty, Var var]
-  | isEvaluated (getIdUnfolding var) = Just (Con (Literal (mkMachInt 1)) []))	-- var is eval'd
-  | otherwise			     = Nothing 					-- var not eval'd
+  where
+    is_evald (Var v) = isEvaldUnfolding (getIdUnfolding v)
+    is_evald arg     = exprIsValue arg
 \end{code}
 
 \begin{code}

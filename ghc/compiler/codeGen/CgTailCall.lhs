@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgTailCall.lhs,v 1.19 1999/05/13 17:30:58 simonm Exp $
+% $Id: CgTailCall.lhs,v 1.20 1999/05/28 19:24:28 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -47,7 +47,7 @@ import CmdLineOpts	( opt_DoSemiTagging )
 import Id		( Id, idType, idName )
 import DataCon		( DataCon, dataConTyCon, dataConTag, fIRST_TAG )
 import Const		( mkMachInt )
-import Maybes		( assocMaybe )
+import Maybes		( assocMaybe, maybeToBool )
 import PrimRep		( PrimRep(..) )
 import StgSyn		( StgArg, GenStgArg(..) )
 import Type		( isUnLiftedType )
@@ -390,7 +390,8 @@ doTailCall
 	-> (Sequel->Code)		-- code to perform jump
 	-> Int				-- number of "fast" stack arguments
 	-> AbstractC			-- pending assignments
-	-> Maybe VirtualSpOffset	-- sp offset to trim stack to
+	-> Maybe VirtualSpOffset	-- sp offset to trim stack to: 
+					-- USED iff destination is a let-no-escape
 	-> Bool				-- node points to the closure to enter
 	-> Code
 
@@ -449,7 +450,13 @@ doTailCall arg_amodes arg_regs finish_code arity pending_assts
 		-- push a return address if necessary
 		-- (after the assignments above, in case we clobber a live
 		--  stack location)
-	pushReturnAddress eob		`thenC`
+
+		-- DONT push the return address when we're about
+		-- to jump to a let-no-escape: the final tail call
+		-- in the let-no-escape will do this.
+	(if (maybeToBool maybe_join_sp)
+		then nopC
+		else pushReturnAddress eob)		`thenC`
 
 		-- Final adjustment of stack pointer
 	adjustRealSp final_sp		`thenC`

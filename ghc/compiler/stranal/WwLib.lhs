@@ -15,8 +15,9 @@ module WwLib (
 
 import CoreSyn
 import Id		( Id, idType, mkSysLocal, getIdDemandInfo, setIdDemandInfo,
-                          mkWildId )
-import IdInfo		( CprInfo(..), noCprInfo )
+                          mkWildId, setIdInfo
+			)
+import IdInfo		( CprInfo(..), noCprInfo, vanillaIdInfo )
 import Const		( Con(..), DataCon )
 import DataCon		( dataConArgTys )
 import Demand		( Demand(..) )
@@ -561,14 +562,27 @@ mk_unpk_case NewType arg unpk_args boxing_con boxing_tycon body
   	-- A newtype!  Use a coercion not a case
   = ASSERT( null other_args )
     Case (Note (Coerce (idType unpk_arg) (idType arg)) (Var arg))
-	 unpk_arg
+	 (sanitiseCaseBndr unpk_arg)
 	 [(DEFAULT,[],body)]
   where
     (unpk_arg:other_args) = unpk_args
 
 mk_unpk_case DataType arg unpk_args boxing_con boxing_tycon body
 	-- A data type
-  = Case (Var arg) arg [(DataCon boxing_con, unpk_args, body)]
+  = Case (Var arg) 
+	 (sanitiseCaseBndr arg)
+	 [(DataCon boxing_con, unpk_args, body)]
+
+sanitiseCaseBndr :: Id -> Id
+-- The argument we are scrutinising has the right type to be
+-- a case binder, so it's convenient to re-use it for that purpose.
+-- But we *must* throw away all its IdInfo.  In particular, the argument
+-- will have demand info on it, and that demand info may be incorrect for
+-- the case binder.  e.g.  	case ww_arg of ww_arg { I# x -> ... }
+-- Quite likely ww_arg isn't used in '...'.  The case may get discarded
+-- if the case binder says "I'm demanded".  This happened in a situation 
+-- like		(x+y) `seq` ....
+sanitiseCaseBndr id = id `setIdInfo` vanillaIdInfo
 
 mk_pk_let NewType arg boxing_con con_tys unpk_args body
   = ASSERT( null other_args )

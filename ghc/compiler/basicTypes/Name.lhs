@@ -463,8 +463,8 @@ instance Eq Name where
     a /= b = case (a `compare` b) of { EQ -> False; _ -> True }
 
 instance Ord Name where
-    a <= b = case (a `compare` b) of { LT -> True;	EQ -> True;  GT -> False }
-    a <	 b = case (a `compare` b) of { LT -> True;	EQ -> False; GT -> False }
+    a <= b = case (a `compare` b) of { LT -> True;  EQ -> True;  GT -> False }
+    a <	 b = case (a `compare` b) of { LT -> True;  EQ -> False; GT -> False }
     a >= b = case (a `compare` b) of { LT -> False; EQ -> True;  GT -> True  }
     a >	 b = case (a `compare` b) of { LT -> False; EQ -> False; GT -> True  }
     compare a b = cmpName a b

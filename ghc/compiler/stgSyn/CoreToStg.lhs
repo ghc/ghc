@@ -463,10 +463,16 @@ coreExprToStgFloat env expr@(Lam _ _) dem
 \begin{code}
 coreExprToStgFloat env expr@(App _ _) dem
   = let
-        (fun,rads,_,_) = collect_args expr
-        ads            = reverse rads
+        (fun,rads,_,ss)       = collect_args expr
+        ads                   = reverse rads
+	final_ads | null ss   = ads
+		  | otherwise = zap ads	-- Too few args to satisfy strictness info
+					-- so we have to ignore all the strictness info
+					-- e.g. + (error "urk")
+					-- Here, we can't evaluate the arg strictly,
+					-- because this partial application might be seq'd
     in
-    coreArgsToStg env ads		`thenUs` \ (arg_floats, stg_args) ->
+    coreArgsToStg env final_ads		`thenUs` \ (arg_floats, stg_args) ->
 
 	-- Now deal with the function
     case (fun, stg_args) of
@@ -504,12 +510,11 @@ coreExprToStgFloat env expr@(App _ _) dem
     collect_args (App fun (Type tyarg)) = let (the_fun,ads,fun_ty,ss) = collect_args fun
                                           in  (the_fun,ads,applyTy fun_ty tyarg,ss)
     collect_args (App fun arg) 
-	= case ss of
-	    []		  ->	-- Strictness info has run out
-	    		     (the_fun, (arg, mkDemTy wwLazy arg_ty) : zap ads, res_ty, repeat wwLazy)
-	    (ss1:ss_rest) ->  	-- Enough strictness info
-			     (the_fun, (arg, mkDemTy ss1 arg_ty)    : ads,     res_ty, ss_rest)
+	= (the_fun, (arg, mkDemTy ss1 arg_ty) : ads, res_ty, ss_rest)
 	where
+	  (ss1, ss_rest) 	     = case ss of 
+					 (ss1:ss_rest) -> (ss1, ss_rest)
+					 []	       -> (wwLazy, [])
 	  (the_fun, ads, fun_ty, ss) = collect_args fun
           (arg_ty, res_ty)           = expectJust "coreExprToStgFloat:collect_args" $
                                        splitFunTy_maybe fun_ty
@@ -582,33 +587,68 @@ coreExprToStgFloat env expr@(Con con args) dem
 %*									*
 %************************************************************************
 
-Mangle cases involving seq# in the discriminant.  Up to this
-point, seq# will appear like this:
+First, two special cases.  We mangle cases involving 
+		par# and seq#
+inthe scrutinee.
+
+Up to this point, seq# will appear like this:
 
 	  case seq# e of
 		0# -> seqError#
-		_  -> ...
+		_  -> <stuff>
 
-where the 0# branch is purely to bamboozle the strictness analyser
-This code comes from an unfolding for 'seq' in Prelude.hs.  We
-translate this into
+This code comes from an unfolding for 'seq' in Prelude.hs.
+The 0# branch is purely to bamboozle the strictness analyser.
+For example, if <stuff> is strict in x, and there was no seqError#
+branch, the strictness analyser would conclude that the whole expression
+was strict in x, and perhaps evaluate x first -- but that would be a DISASTER.
+
+Now that the evaluation order is safe, we translate this into
 
 	  case e of
 		_ -> ...
-
-Now that the evaluation order is safe.
 
 This used to be done in the post-simplification phase, but we need
 unfoldings involving seq# to appear unmangled in the interface file,
 hence we do this mangling here.
 
+Similarly, par# has an unfolding in PrelConc.lhs that makes it show
+up like this:
+
+    	case par# e of
+    	  0# -> rhs
+    	  _  -> parError#
+
+
+    ==>
+    	case par# e of
+    	  _ -> rhs
+
+fork# isn't handled like this - it's an explicit IO operation now.
+The reason is that fork# returns a ThreadId#, which gets in the
+way of the above scheme.  And anyway, IO is the only guaranteed
+way to enforce ordering  --SDM.
+
+
 \begin{code}
 coreExprToStgFloat env 
 	(Case scrut@(Con (PrimOp SeqOp) [Type ty, e]) bndr alts) dem
   = coreExprToStgFloat env (Case e new_bndr [(DEFAULT,[],default_rhs)]) dem
-  where new_bndr = setIdType bndr ty
-    	(other_alts, maybe_default)  = findDefault alts
-    	Just default_rhs	     = maybe_default
+  where 
+    new_bndr 			= setIdType bndr ty
+    (other_alts, maybe_default) = findDefault alts
+    Just default_rhs	        = maybe_default
+
+coreExprToStgFloat env 
+	(Case scrut@(Con (PrimOp ParOp) args) bndr alts) dem
+  | maybeToBool maybe_default
+  = coreExprToStgFloat env scrut (bdrDem bndr)	`thenUs` \ (binds, scrut') ->
+    newEvaldLocalId env bndr			`thenUs` \ (env', bndr') ->
+    coreExprToStg env' default_rhs dem 		`thenUs` \ default_rhs' ->
+    returnUs (binds, mkStgCase scrut' bndr' (StgPrimAlts (idType bndr) [] (StgBindDefault default_rhs')))
+  where
+    (other_alts, maybe_default) = findDefault alts
+    Just default_rhs		= maybe_default
 \end{code}
 
 Now for normal case expressions...
