@@ -108,7 +108,7 @@
       Haddock sources are under <literal>fptools/haddock</literal> in
       the <literal>fptools</literal> CVS repository, which also
       contains GHC, Happy, and several other projects.  See <ulink
-      url="http://www.haskell.org/ghc/docs/latest/building/sec-cvs.html">Using
+      url="http://www.haskell.org/ghc/docs/latest/html/building/sec-cvs.html">Using
       The CVS Repository</ulink> for information on how to access the
       CVS repository.  Note that you need to check out the
       <literal>fpconfig</literal> module first to get the generic
