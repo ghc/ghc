@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.5 2001/08/17 12:50:34 simonmar Exp $
+# $Id: Makefile,v 1.6 2001/09/13 11:35:09 simonmar Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -28,6 +28,7 @@ ALL_DIRS = \
 	Network \
 	NHC \
 	System \
+	System/Mem \
 	System/IO \
 	Text \
 	Text/PrettyPrint \
