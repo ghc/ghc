@@ -206,14 +206,7 @@ doGeneralAlloc
 
 doGeneralAlloc all_regs reserve_regs instrs
    -- succeeded without spilling
-   | --trace (showSDoc (
-     --   text "allocating with these regs" <+> ppr prespill_regs
-     --   $$
-     --   text "giving code" 
-     --   $$
-     --   vcat (map pprInstr prespill_insns)
-     --))
-     prespill_ok
+   | prespill_ok
    = Just prespill_insns
 
    -- failed, and no spill regs avail, so pointless to attempt spilling 
