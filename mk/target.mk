@@ -54,7 +54,7 @@ include $(TOP)/mk/suffix.mk
 #
 # depend:
 #
-#  The Depend target has to cope with a set of files that may have
+#  The depend target has to cope with a set of files that may have
 #  different ways of computing their dependencies, i.e., a Haskell
 #  module's dependencies are computed differently from C files.
 #
@@ -83,19 +83,17 @@ else
 PKGCONF_DEP =
 endif
 
-depend :: .depend
-
-.depend: $(MKDEPENDHS_SRCS) $(MKDEPENDC_SRCS) $(STAMP_PKG_CONF)
-	@$(RM) $@
-	@touch $@
+depend :: $(MKDEPENDHS_SRCS) $(MKDEPENDC_SRCS) $(STAMP_PKG_CONF)
+	@$(RM) .depend
+	@touch .depend
 ifneq "$(DOC_SRCS)" ""
-	$(MKDEPENDLIT) -o $@ $(MKDEPENDLIT_OPTS) $(filter %.lit,$(DOC_SRCS))
+	$(MKDEPENDLIT) -o .depend $(MKDEPENDLIT_OPTS) $(filter %.lit,$(DOC_SRCS))
 endif
 ifneq "$(MKDEPENDC_SRCS)" ""
-	$(MKDEPENDC) -f $@ $(MKDEPENDC_OPTS) $(foreach way,$(WAYS),-s $(way)) -- $(CC_OPTS) -- $(MKDEPENDC_SRCS) 
+	$(MKDEPENDC) -f .depend $(MKDEPENDC_OPTS) $(foreach way,$(WAYS),-s $(way)) -- $(CC_OPTS) -- $(MKDEPENDC_SRCS) 
 endif
 ifneq "$(MKDEPENDHS_SRCS)" ""
-	$(MKDEPENDHS) -M -optdep-f -optdep$@ $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(foreach obj,$(MKDEPENDHS_OBJ_SUFFICES),-osuf $(obj)) $(MKDEPENDHS_OPTS) $(filter-out -split-objs, $(HC_OPTS)) $(MKDEPENDHS_SRCS)
+	$(MKDEPENDHS) -M -optdep-f -optdep.depend $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(foreach obj,$(MKDEPENDHS_OBJ_SUFFICES),-osuf $(obj)) $(MKDEPENDHS_OPTS) $(filter-out -split-objs, $(HC_OPTS)) $(MKDEPENDHS_SRCS)
 endif
 
 
