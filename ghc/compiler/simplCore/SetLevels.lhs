@@ -23,13 +23,13 @@ module SetLevels (
 import AnnCoreSyn
 import CoreSyn
 
-import CoreUtils	( coreExprType )
+import CoreUtils	( coreExprType, idSpecVars )
 import CoreUnfold	( FormSummary, whnfOrBottom, mkFormSummary )
 import FreeVars		-- all of it
 import MkId		( mkSysLocal )
 import Id		( idType,
 			  nullIdEnv, addOneToIdEnv, growIdEnvList,
-			  unionManyIdSets, minusIdSet, mkIdSet,
+			  unionManyIdSets, unionIdSets, minusIdSet, mkIdSet,
 			  idSetToList, Id,
 			  lookupIdEnv, IdEnv
 			)
@@ -643,7 +643,9 @@ decideRecFloatLevel ctxt_lvl envs@(venv, tenv) ids rhss
   where
     tys  = map idType ids
 
-    fvs  = unionManyIdSets [freeVarsOf   rhs | rhs <- rhss] `minusIdSet` mkIdSet ids
+    fvs  = (unionManyIdSets [freeVarsOf   rhs | rhs <- rhss] `unionIdSets`
+	    mkIdSet (concat (map idSpecVars ids)))
+	   `minusIdSet` mkIdSet ids
     tfvs = unionManyTyVarSets [freeTyVarsOf rhs | rhs <- rhss]
 	   `unionTyVarSets`
 	   tyVarsOfTypes tys
