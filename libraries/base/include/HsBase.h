@@ -112,6 +112,7 @@
 #include <io.h>
 #include <fcntl.h>
 #include "timeUtils.h"
+#include <shlobj.h>
 #endif
 
 /* in system.c */
@@ -708,6 +709,12 @@ INLINE int __hscore_stat(char *file, struct stat *buf) {
 INLINE int __hscore_fstat(int fd, struct stat *buf) {
 	return (fstat(fd,buf));
 }
+
+#if defined(mingw32_TARGET_OS)
+INLINE int __hscore_CSIDL_PROFILE() { return CSIDL_PROFILE; }
+INLINE int __hscore_CSIDL_APPDATA() { return CSIDL_APPDATA; }
+INLINE int __hscore_CSIDL_WINDOWS() { return CSIDL_WINDOWS; }
+#endif
 
 #endif /* __HSBASE_H__ */
 

@@ -24,6 +24,8 @@ module System.Directory
     , getDirectoryContents      -- :: FilePath -> IO [FilePath]
     , getCurrentDirectory       -- :: IO FilePath
     , setCurrentDirectory       -- :: FilePath -> IO ()
+    , getHomeDirectory
+    , getAppUserDataDirectory 
 
     -- * Actions on files
     , removeFile		-- :: FilePath -> IO ()
@@ -76,6 +78,10 @@ import Foreign.C
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.IOBase	( IOException(..), IOErrorType(..), ioException )
+#endif
+
+#ifndef mingw32_TARGET_OS
+import System.Environment
 #endif
 
 {- $intro
@@ -601,6 +607,44 @@ setCurrentDirectory path = do
     withCString path $ \s -> 
        throwErrnoIfMinus1Retry_ "setCurrentDirectory" (c_chdir s)
 	-- ToDo: add path to error
+
+getHomeDirectory :: IO FilePath
+getHomeDirectory =
+#ifdef mingw32_TARGET_OS
+  allocaBytes long_path_size $ \pPath -> do
+     r <- c_SHGetFolderPath nullPtr csidl_PROFILE nullPtr 0 pPath
+     if (r < 0)
+       then c_SHGetFolderPath nullPtr csidl_WINDOWS nullPtr 0 pPath
+       else return 0
+     peekCString pPath
+#else
+  getEnv "HOME"
+#endif
+
+getAppUserDataDirectory :: String -> IO FilePath
+getAppUserDataDirectory appName = do
+#ifdef mingw32_TARGET_OS
+  allocaBytes long_path_size $ \pPath -> do
+     r <- c_SHGetFolderPath nullPtr csidl_APPDATA nullPtr 0 pPath
+     s <- peekCString pPath
+     return (s++'\\':appName)
+#else
+  path <- getEnv "HOME"
+  return (path++'/':'.':appName)
+#endif
+
+#ifdef mingw32_TARGET_OS
+foreign import stdcall unsafe "SHGetFolderPath" 
+            c_SHGetFolderPath :: Ptr () 
+                              -> CInt 
+                              -> Ptr () 
+                              -> CInt 
+                              -> CString 
+                              -> IO CInt
+foreign import ccall unsafe "__hscore_CSIDL_PROFILE" csidl_PROFILE :: Int
+foreign import ccall unsafe "__hscore_CSIDL_APPDATA" csidl_APPDATA :: Int
+foreign import ccall unsafe "__hscore_CSIDL_WINDOWS" csidl_WINDOWS :: Int
+#endif
 
 {- |The operation 'doesDirectoryExist' returns 'True' if the argument file
 exists and is a directory, and 'False' otherwise.
