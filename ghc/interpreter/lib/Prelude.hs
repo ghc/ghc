@@ -4,7 +4,7 @@ __   __ __  __  ____   ___    _______________________________________________
 ||___|| ||__|| ||__||  __||   Copyright (c) 1994-1999
 ||---||         ___||         World Wide Web: http://haskell.org/hugs
 ||   ||                       Report bugs to: hugs-bugs@haskell.org
-||   || Version: January 1999 _______________________________________________
+||   || Version: STG Hugs     _______________________________________________
 
  This is the Hugs 98 Standard Prelude, based very closely on the Standard
  Prelude for Haskell 98.
