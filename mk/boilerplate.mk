@@ -26,9 +26,24 @@ FPTOOLS_TOP := $(TOP)
 default: all
 
 
+# -----------------------------------------------------------------------------
+# 	make sure the autoconf stuff is up to date...
 
-# 		Now follow the pieces of boilerplate
-#		The "-" signs tell make not to complain if they don't exist
+$(TOP)/mk/config.mk : $(TOP)/mk/config.mk.in $(TOP)/mk/config.h.in $(TOP)/configure 
+	@if test ! -f $(FPTOOLS_TOP)/config.status; then \
+		echo "You haven't run $(FPTOOLS_TOP)/configure yet."; \
+		exit 1; \
+	fi
+	@echo "Running $(FPTOOLS_TOP)/config.status to update configuration info..."
+	@( cd $(FPTOOLS_TOP) && ./config.status )
+
+$(TOP)/configure : $(TOP)/configure.in $(TOP)/aclocal.m4
+	@echo "Regenerating $(FPTOOLS_TOP)/configure..."
+	@( cd $(FPTOOLS_TOP) && make -f Makefile.config ./configure )
+
+# -----------------------------------------------------------------------------
+# 	Now follow the pieces of boilerplate
+#	The "-" signs tell make not to complain if they don't exist
 
 include $(TOP)/mk/config.mk
 # All configuration information
