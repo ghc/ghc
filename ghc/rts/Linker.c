@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.73 2001/11/08 12:46:31 simonmar Exp $
+ * $Id: Linker.c,v 1.74 2001/11/22 15:15:27 simonmar Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -255,6 +255,7 @@ typedef struct _RtsSymbolVal {
       SymX(rts_getInt32)			\
       SymX(rts_getPtr)				\
       SymX(rts_getStablePtr)			\
+      SymX(rts_getThreadId)			\
       SymX(rts_getWord)				\
       SymX(rts_getWord32)			\
       SymX(rts_mkAddr)				\
