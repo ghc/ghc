@@ -301,19 +301,8 @@ else
 $(HS_PROG) :: $(HS_OBJS)
 	$(CC) -o $@ $(HC_BOOT_CC_OPTS) $(HC_BOOT_LD_OPTS) $(HS_OBJS) $(HC_BOOT_LIBS)
 endif
-endif
 
-# Object and interface files have suffixes tagged with their ways
-ifneq "$(way)" ""
-SRC_HC_OPTS += -hisuf $(way_)hi -hcsuf $(way_)hc -osuf $(way_)o
-endif
-
-# add syslib dependencies and current package name
-SRC_HC_OPTS += $(patsubst %, -package %, $(PACKAGE_DEPS))
-ifneq "$(PACKAGE)" ""
-SRC_HC_OPTS += -package-name $(PACKAGE)
-else
-# No library, we are actually building the tools
+# for building a Haskell program, we add FptoolsHcOpts
 SRC_HC_OPTS += $(FptoolsHcOpts)
 endif
 
@@ -346,6 +335,10 @@ endif
 # override this by setting $(LIBOBJS) yourself
 
 ifneq "$(PACKAGE)" ""
+
+# add syslib dependencies and current package name
+SRC_HC_OPTS += -package-name $(PACKAGE)
+SRC_HC_OPTS += $(patsubst %, -package %, $(PACKAGE_DEPS))
 
 ifeq "$(IS_CBITS_LIB)" "YES"
 _cbits := _cbits
@@ -987,11 +980,11 @@ install-strip::
 	@$(MAKE) EXTRA_INSTALL_OPTS='-s' install                                	
 endif
 
-###########################################
+##############################################################################
 #
 #	Targets: check tags show
 #
-###########################################
+##############################################################################
 
 #------------------------------------------------------------
 # 			Check
@@ -1029,11 +1022,14 @@ endif
 #
 
 show:
-	@echo '$(VALUE)=$($(VALUE))'
+	@echo '$(VALUE)="$($(VALUE))"'
 
-#--------------------------------------------------------------------------
-# SGML Documentation
+################################################################################
 #
+#			SGML Documentation
+#
+################################################################################
+
 .PHONY: dvi ps html pdf rtf
 
 ifneq "$(SGML_DOC)" ""
@@ -1072,11 +1068,11 @@ extraclean ::
 	$(RM) -rf $(SGML_DOC)
 endif
 
-###########################################
+##############################################################################
 #
 #	Targets: clean
 #
-###########################################
+##############################################################################
 
 # we have to be careful about recursion here; since all the clean
 # targets are recursive, we don't want to make eg. distclean depend on
@@ -1101,11 +1097,11 @@ maintainer-clean:: extraclean
 	@echo 'deletes files that may need special tools to rebuild.'
 	rm -f $(MOSTLY_CLEAN_FILES) $(CLEAN_FILES) $(DIST_CLEAN_FILES) $(MAINTAINER_CLEAN_FILES)
 
-#################################################################################
+################################################################################
 #
 #			Way management
 #
-#################################################################################
+################################################################################
 
 # Here is the ingenious jiggery pokery that allows you to build multiple versions
 # of a program in a single build tree.
@@ -1159,6 +1155,16 @@ $(LIB_WAY_TARGETS) :
 	$(MAKE) $(MFLAGS) $@ way=$(subst .,,$(suffix $(subst _,.,$(basename $@))))
 
 endif	# if way
+
+# -------------------------------------------------------------------------
+# Object and interface files have suffixes tagged with their ways
+
+ifneq "$(way)" ""
+SRC_HC_OPTS += -hisuf $(way_)hi -hcsuf $(way_)hc -osuf $(way_)o
+endif
+
+# -------------------------------------------------------------------------
+# Rules to invoke the current target recursively for each way
 
 ifneq "$(WAYS)" ""
 ifeq "$(way)" ""
