@@ -14,9 +14,9 @@ module Read003 where
  
 read003.hs:8:
     Occurs check: cannot construct the infinite type:
-	    aMm = (aMm, aMp, aMs)
-    Expected: (aMm, [aMA], aMs)
-    Inferred: aMm
+	    aKy = (aKy, aKB, aKE)
+    Expected: (aKy, [aKM], aKE)
+    Inferred: aKy
     In a pattern binding:
 	~(a, b, c)
 	    | nullity b = a
