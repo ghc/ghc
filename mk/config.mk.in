@@ -290,13 +290,13 @@ GhcLibsWithReadline=@HaveReadlineHeaders@
 # Libraries needed for linking with readline
 LibsReadline=@LibsReadline@
 
-# Math library
-LIBM=@LIBM@
-
 # Include path to readline.h
 # (no path == in standard include path)
 #
 ReadlineIncludePath=
+
+# Math library
+LIBM=@LIBM@
 
 # Build the Haskell OpenGL/GLUT binding?
 #
