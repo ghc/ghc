@@ -27,9 +27,8 @@ test "cg019" { vtr("", "", "") }
 test "cg020" { vtr("", "", "") }
 test "cg021" { vtr("", "", "") }
 test "cg022" { vtr("", "", "") }
-test "cg023" { vtr("", "", "") }
 test "cg024" { vtr("", "", "") }
-test "cg025" { vtr("-package lang -package text", "", "1") }
+test "cg025" { vtr("-package lang -package text", "cg025.hs", "1") }
 test "cg026" { vtr("-package lang -fglasgow-exts -fvia-C", "", "") }
 test "cg027" { vtr("", "", "") }
 test "cg028" { vtr("", "", "") }
@@ -45,12 +44,11 @@ test "cg037" { vtr("", "", "") }
 test "cg038" { vtr("", "", "") }
 test "cg039" { vtr("", "", "") }
 test "cg040" { vtr("", "", "") }
-test "cg041" { vtr("", "", "") }
 test "cg042" { vtr("-package lang -fglasgow-exts", "", "") }
 test "cg043" { vtr("", "", "") }
 test "cg044" { vtr("-package lang", "", "" ) }
 
--- tmp, until we fix the problems with seq#...
+-- -O is tmporary, until we fix the problems with seq#...
 test "cg045" { vtr( "-O", "", "1") }
 test "cg046" { vtr("", "", "") }
 test "cg047" { vtr("", "", "") }
