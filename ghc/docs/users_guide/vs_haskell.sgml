@@ -19,6 +19,75 @@ phenomena.
 The limitations here are listed in Haskell-Report order (roughly).
 </Para>
 
+  <sect2 id="infelicities-lexical">
+    <title>Lexical syntax</title>
+    
+    <itemizedlist>
+      <listitem>
+	<para>The Haskell report specifies that programs may be
+	written using Unicode.  GHC only accepts the ISO-8879-1
+	character set at the moment.</para>
+      </listitem>
+
+      <listitem>
+	<para>Certain lexical rules regarding qualified identifiers
+	are slightly different in GHC compared to the Haskell report.
+	When you have
+	<replaceable>module</replaceable><literal>.</literal><replaceable>reservedop</replaceable>,
+	such as <literal>M.\</literal>, GHC will interpret it as a
+	single qualified operator rather than the two lexemes
+	<literal>M</literal> and <literal>.\</literal>.</para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+
+  <sect2 id="infelicities-syntax">
+    <title>Context-free syntax</title>
+
+    <itemizedlist>
+      <listitem>
+	<para>GHC doesn't do fixity resolution on the left hand side
+	of a binding before deciding which symbol is the function
+	symbol.  For example, the following fails, because GHC makes
+	the assumption that the function symbol is
+	<literal>|-</literal>:</para>
+<programlisting>
+infix 5 |- 
+infix 9 :=
+
+data Equal = Char := Int
+
+0 |- x:=y = 1 |- x:=y      -- XXX fails here
+</programlisting>
+      </listitem>
+
+      <listitem>
+	<para>GHC doesn't do fixity resolution in expressions during
+	parsing.  For example, according to the Haskell report, the
+	following expression is legal Haskell:
+<programlisting>
+    let x = 42 in x == 42 == True
+</programlisting>
+	and parses as:
+<programlisting>
+    (let x = 42 in x == 42) == True
+</programlisting>
+	because according to the report, the <literal>let</literal>
+	expression <quote>extends as far to the right as
+	possible</quote>.  Since it can't extend past the second
+	equals sign without causing a parse error
+	(<literal>==</literal> is non-fix), the
+	<literal>let</literal>-expression must terminate there.  GHC
+	simply gobbles up the whole expression, parsing like this:
+<programlisting>
+    (let x = 42 in x == 42 == True)
+</programlisting>
+        The Haskell report is arguably wrong here, but nevertheless
+        it's a difference between GHC & Haskell 98.</para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+
 <Sect2 id="infelicities-exprs-pats">
 <Title>Expressions and patterns
 </Title>
@@ -140,16 +209,28 @@ main = print (array (1,1) [(1,2), (1,3)])
 <Para>
 <VariableList>
 
+	<varlistentry>
+	  <term>The <literal>Char</literal> type</term>
+	  <indexterm><primary><literal>Char</literal></primary><secondary>size
+	  of</secondary></indexterm>
+	  <listitem>
+	    <para>The Haskell report says that the
+	    <literal>Char</literal> type holds 16 bits.  GHC follows
+	    the ISO-10646 standard a little more closely:
+	    <literal>maxBound :: Char</literal> in GHC is
+	    <literal>0x10FFFF</literal>.</para>
+	  </listitem>
+	</varlistentry>
+
 <VarListEntry>
 <Term>Arbitrary-sized tuples:</Term>
 <ListItem>
 <Para>
-Plain old tuples of arbitrary size <Emphasis>do</Emphasis> work.
-</Para>
-
-<Para>
-HOWEVER: standard instances for tuples (<Literal>Eq</Literal>, <Literal>Ord</Literal>, <Literal>Bounded</Literal>, <Literal>Ix</Literal>
-<Literal>Read</Literal>, and <Literal>Show</Literal>) are available <Emphasis>only</Emphasis> up to 5-tuples.
+Tuples are currently limited to size 61.  HOWEVER: standard instances
+for tuples (<Literal>Eq</Literal>, <Literal>Ord</Literal>,
+<Literal>Bounded</Literal>, <Literal>Ix</Literal>
+<Literal>Read</Literal>, and <Literal>Show</Literal>) are available
+<Emphasis>only</Emphasis> up to 5-tuples.
 </Para>
 
 <Para>
