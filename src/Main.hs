@@ -340,8 +340,8 @@ mkInterface no_implicit_prelude mod_map filename
 		   buildImportEnv mod_map mdl exported_visible_names 
 			implicit_imps
 
-  -- trace (show (fmToList orig_env)) $ do
-  -- trace (show (fmToList import_env)) $ do
+--   trace (show (fmToList orig_env)) $ do
+--  trace (show (fmToList import_env)) $ do
   let
      final_decls = orig_decls
 
@@ -743,26 +743,20 @@ getReExports mdl mod_map (Just exps)
 -- ----------------------------------------------------------------------------
 -- Building name environments
 
+-- The orig env maps names in the current source file to
+-- fully-qualified "original" names.
+
 buildOrigEnv :: ModuleMap -> [HsImportDecl] -> FiniteMap HsQName HsQName
 buildOrigEnv mod_map imp_decls
   = foldr plusFM emptyFM (map build imp_decls)
   where
-  build (HsImportDecl _ mdl qual maybe_as spec)
+  build imp_decl@(HsImportDecl _ mdl qual maybe_as _)
     = case lookupFM mod_map mdl of
        Nothing -> 
 	  trace ("Warning: module not found: " ++ show mdl) $ emptyFM
        Just iface -> 
-	  case spec of
-		-- no import specs
-	    Nothing -> import_everything
-		-- hiding
-	    Just (True, specs) -> 
-		import_everything `minusFM` 
-			listToFM (concat (map names_from_spec specs))
-		-- not hiding
-	    Just (False, specs) -> listToFM (concat (map names_from_spec specs))
+	  listToFM (concat (map orig_map (processImportDecl mod_map imp_decl)))
         where
-        import_everything = listToFM (concat (map orig_map (fmToList env)))
 
 	-- bring both qualified and unqualified names into scope, unless
 	-- the import was 'qualified'.
@@ -774,46 +768,26 @@ buildOrigEnv mod_map imp_decls
 	  | Just m <- maybe_as = m
 	  | otherwise          = mdl
 
-	env = iface_env iface
 
-	names_from_spec :: HsImportSpec -> [(HsQName,HsQName)]
-	names_from_spec (HsIVar nm) = one_name nm
-	names_from_spec (HsIAbs nm) = one_name nm
-	names_from_spec (HsIThingAll nm) = one_name nm ++ get_sub_names nm
-	names_from_spec (HsIThingWith nm nms) =
-	  one_name nm ++ concat (map one_name (
-				filter (`elem` nms) (sub_names nm)))
-
-	sub_names :: HsName -> [HsName]
-	sub_names nm =
-	  case lookupFM env nm of
-	    Just qnm -> filter (`elemFM` env) (all_subs_of_qname mod_map qnm)
-	    _ -> []
-
-	get_sub_names = concat . map one_name . sub_names
-
-	one_name :: HsName -> [(HsQName,HsQName)]
-	one_name nm = 
-	   case lookupFM env nm of
-		Nothing ->  trace ("Warning: " ++ show mdl
-				    ++ " does not export " ++ show nm) []
-		Just qnm -> orig_map (nm,qnm)
-
+-- The import env maps each "original" name referred to in the current
+-- module to the qualified name that we want to link to in the
+-- documentation.
 
 buildImportEnv :: ModuleMap -> Module -> [HsQName] -> [HsImportDecl]
 	-> FiniteMap HsQName HsQName
 buildImportEnv mod_map this_mod exported_names imp_decls
   = foldr plusFM emptyFM (map build imp_decls)
   where
-  build (HsImportDecl _ mdl _ _ _)
-    = case lookupFM mod_map mdl of
-       Nothing    -> emptyFM
-       Just iface -> listToFM (map import_map (fmToList (iface_env iface)))
-        where
-	 reexport_env = iface_reexported iface
+	build imp_decl@(HsImportDecl _ mdl _ _ _) = 
+	  case lookupFM mod_map mdl of
+       	    Nothing    -> emptyFM
+            Just iface -> listToFM (map import_map imported_names)
+	     where
+	      imported_names = processImportDecl mod_map imp_decl
+	      reexport_env = iface_reexported iface
 
-	 import_map (nm,qnm) = (qnm, maps_to)
- 	  where 
+	      import_map (nm,qnm) = (qnm, maps_to)
+ 	       where 
 		maps_to
 		 -- we re-export it: just link to this module
 		 | qnm `elem` exported_names = Qual this_mod nm
@@ -822,6 +796,45 @@ buildImportEnv mod_map this_mod exported_names imp_decls
 		 | Just new_qnm <- lookupFM reexport_env nm = new_qnm
 		 -- otherwise, it's documented in the other module
 		 | otherwise = Qual mdl nm
+
+
+processImportDecl :: ModuleMap -> HsImportDecl -> [(HsName,HsQName)]
+processImportDecl mod_map (HsImportDecl _ mdl is_qualified maybe_as imp_specs)
+    = case lookupFM mod_map mdl of
+       Nothing    -> []
+       Just iface -> imported_names
+        where
+	 env = iface_env iface
+	 sub = iface_sub iface
+
+ 	 all_names = fmToList env
+
+	 imported_names :: [(HsName,HsQName)]
+	 imported_names
+	   = case imp_specs of
+		Nothing          -> all_names
+	        Just (False,specs) -> [ (n,qnm) | (n,qnm) <- all_names,
+						n `elem` names specs False ]
+	        Just (True, specs) -> [ (n,qnm) | (n,qnm) <- all_names,
+						n `notElem` names specs True ]
+	      where
+		names specs is_hiding 
+		  = concat (map (spec_names is_hiding) specs)
+
+	-- when hiding, a conid refers to both the constructor and
+	-- the type/class constructor.
+	 spec_names _hid (HsIVar v)		= [v]
+	 spec_names True  (HsIAbs (HsTyClsName i))
+		 = [HsTyClsName i, HsVarName i]
+	 spec_names False (HsIAbs v)		= [v]
+	 spec_names _hid (HsIThingAll v)	= v : sub_names v
+	 spec_names _hid (HsIThingWith v xs) 	= v : xs
+
+	 sub_names :: HsName -> [HsName]
+	 sub_names nm =
+	  case lookupFM env nm of
+	    Just qnm -> filter (`elemFM` env) (all_subs_of_qname mod_map qnm)
+	    _ -> []
 
 -- -----------------------------------------------------------------------------
 -- Expand multiple type signatures
