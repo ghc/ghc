@@ -187,7 +187,7 @@ sub readHiFile {
 	} elsif ( /^_([a-z_]+)_$/ ) {
 	    $now_in = $1;
 
-	} elsif ( $now_in eq 'usages' && /^(\S+)\s+(\d+)\s+:: (.*)/ ) {
+	} elsif ( $now_in eq 'usages' && /^(\S+)\s+(!\s+)?(\d+)\s+:: (.*)/ ) {
 	    $Stuff{"$mod:usages"} .= $_; # save the whole thing
 
 
