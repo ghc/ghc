@@ -9,7 +9,7 @@ module TcInstDcls ( tcInstDecls1, tcInstDecls2, tcAddDeclCtxt ) where
 #include "HsVersions.h"
 
 
-import CmdLineOpts	( DynFlag(..), dopt )
+import CmdLineOpts	( DynFlag(..) )
 
 import HsSyn		( HsDecl(..), InstDecl(..), TyClDecl(..), HsType(..),
 			  MonoBinds(..), HsExpr(..),  HsLit(..), Sig(..), HsTyVarBndr(..),
@@ -23,10 +23,10 @@ import TcHsSyn		( TcMonoBinds, mkHsConApp )
 import TcBinds		( tcSpecSigs )
 import TcClassDcl	( tcMethodBind, badMethodErr )
 import TcMonad       
-import TcMType		( tcInstTyVars, checkValidTheta, UserTypeCtxt(..), SourceTyCtxt(..) )
-import TcType		( tcSplitDFunTy, tcIsTyVarTy, tcSplitTyConApp_maybe,
-			  tyVarsOfTypes, mkClassPred, mkTyVarTy,
-			  tcSplitSigmaTy, tcSplitPredTy_maybe, getClassPredTys_maybe
+import TcMType		( tcInstTyVars, checkValidTheta, checkValidInstHead, instTypeErr,
+			  UserTypeCtxt(..), SourceTyCtxt(..) )
+import TcType		( tcSplitDFunTy, mkClassPred, mkTyVarTy,
+			  tcSplitSigmaTy, tcSplitPredTy_maybe, getClassPredTys
 			)
 import Inst		( InstOrigin(..),
 			  newDicts, instToId,
@@ -40,6 +40,7 @@ import TcEnv		( TcEnv, tcExtendGlobalValEnv,
 			  isLocalThing,
 			)
 import InstEnv		( InstEnv, extendInstEnv )
+import PprType		( pprClassPred )
 import TcMonoType	( tcHsTyVars, kcHsSigType, tcHsType, tcHsSigType, checkSigTyVars )
 import TcSimplify	( tcSimplifyCheck )
 import HscTypes		( HomeSymbolTable, DFunId,
@@ -51,7 +52,6 @@ import DataCon		( classDataCon )
 import Class		( Class, DefMeth(..), classBigSig )
 import Var		( idName, idType )
 import VarSet		( emptyVarSet )
-import Maybes 		( maybeToBool )
 import MkId		( mkDictFunId )
 import FunDeps		( checkInstFDs )
 import Generics		( validGenericInstanceType )
@@ -59,16 +59,11 @@ import Module		( Module, foldModuleEnv )
 import Name		( getSrcLoc )
 import NameSet		( unitNameSet, nameSetToList )
 import PrelInfo		( eRROR_ID )
-import PprType		( pprClassPred )
-import TyCon		( TyCon, isSynTyCon )
+import TyCon		( TyCon )
 import Subst		( mkTopTyVarSubst, substTheta )
-import VarSet		( varSetElems )
-import TysWiredIn	( genericTyCons, isFFIArgumentTy, isFFIImportResultTy )
-import ForeignCall	( Safety(..) )
-import PrelNames	( cCallableClassKey, cReturnableClassKey, hasKey )
+import TysWiredIn	( genericTyCons )
 import Name             ( Name )
 import SrcLoc           ( SrcLoc )
-import VarSet           ( varSetElems )
 import Unique		( Uniquable(..) )
 import BasicTypes	( NewOrData(..), Fixity )
 import ErrUtils		( dumpIfSet_dyn )
@@ -253,34 +248,31 @@ tcInstDecl1 decl@(InstDecl poly_ty binds uprags maybe_dfun_name src_loc)
     tcHsType poly_ty			`thenTc` \ poly_ty' ->
     let
 	(tyvars, theta, tau) = tcSplitSigmaTy poly_ty'
-	maybe_cls_tys	      = case tcSplitPredTy_maybe tau of 
-				   Just pred -> getClassPredTys_maybe pred
-				   Nothing   -> Nothing 
-	Just (clas, inst_tys) = maybe_cls_tys
+	(clas,inst_tys)      = case tcSplitPredTy_maybe tau of { Just st -> getClassPredTys st }
+		-- The checkValidInstHead makes sure these splits succeed
     in
-    checkTc (maybeToBool maybe_cls_tys) (instHeadErr tau)	`thenTc_`    
-
     (case maybe_dfun_name of
 	Nothing ->	-- A source-file instance declaration
-
 		-- Check for respectable instance type, and context
 		-- but only do this for non-imported instance decls.
 		-- Imported ones should have been checked already, and may indeed
 		-- contain something illegal in normal Haskell, notably
 		--	instance CCallable [Char] 
-	    getDOptsTc						`thenTc` \ dflags -> 
-	    checkValidTheta InstDeclCtxt theta			`thenTc_`
-    	    checkValidInstHead dflags theta clas inst_tys	`thenTc_`
+	    checkValidTheta InstThetaCtxt theta		`thenTc_`
+    	    checkValidInstHead tau			`thenTc_`
+	    checkTc (checkInstFDs theta clas inst_tys)
+		    (instTypeErr (pprClassPred clas inst_tys) msg)	`thenTc_`
 	    newDFunName clas inst_tys src_loc
 
 	Just dfun_name -> 	-- An interface-file instance declaration
 			    returnNF_Tc dfun_name
-    )						`thenNF_Tc` \ dfun_name ->
-
+    )								`thenNF_Tc` \ dfun_name ->
     let
 	dfun_id = mkDictFunId dfun_name clas tyvars inst_tys theta
     in
     returnTc [InstInfo { iDFunId = dfun_id, iBinds = binds, iPrags = uprags }]
+  where
+    msg  = parens (ptext SLIT("the instance types do not agree with the functional dependencies of the class"))
 \end{code}
 
 
@@ -754,89 +746,6 @@ simplified: only zeze2 is extracted and its body is simplified.
 
 %************************************************************************
 %*									*
-\subsection{Checking for a decent instance type}
-%*									*
-%************************************************************************
-
-@checkValidInstHead@ checks the type {\em and} its syntactic constraints:
-it must normally look like: @instance Foo (Tycon a b c ...) ...@
-
-The exceptions to this syntactic checking: (1)~if the @GlasgowExts@
-flag is on, or (2)~the instance is imported (they must have been
-compiled elsewhere). In these cases, we let them go through anyway.
-
-We can also have instances for functions: @instance Foo (a -> b) ...@.
-
-\begin{code}
-checkValidInstHead dflags theta clas inst_tys
-  | null errs = returnTc ()
-  | otherwise = addErrsTc errs `thenNF_Tc_` failTc
-  where
-    errs = check_inst_head dflags theta clas inst_tys
-
-check_inst_head dflags theta clas inst_taus
-  |	-- CCALL CHECK
-	-- A user declaration of a CCallable/CReturnable instance
-	-- must be for a "boxed primitive" type.
-        (clas `hasKey` cCallableClassKey   
-            && not (ccallable_type dflags first_inst_tau)) 
-        ||
-        (clas `hasKey` cReturnableClassKey 
-            && not (creturnable_type first_inst_tau))
-  = [nonBoxedPrimCCallErr clas first_inst_tau]
-
-	-- If GlasgowExts then check at least one isn't a type variable
-  | dopt Opt_GlasgowExts dflags
-  = 	-- GlasgowExts case
-    check_tyvars dflags clas inst_taus ++ check_fundeps dflags theta clas inst_taus
-
-	-- WITH HASKELL 1.4, MUST HAVE C (T a b c)
-  | not (length inst_taus == 1 &&
-         maybeToBool maybe_tycon_app &&		-- Yes, there's a type constuctor
-         not (isSynTyCon tycon) &&		-- ...but not a synonym
-         all tcIsTyVarTy arg_tys && 		-- Applied to type variables
-	 length (varSetElems (tyVarsOfTypes arg_tys)) == length arg_tys
-          -- This last condition checks that all the type variables are distinct
-        )
-  = [instTypeErr clas inst_taus
-		 (text "the instance type must be of form (T a b c)" $$
-		  text "where T is not a synonym, and a,b,c are distinct type variables")]
-
-  | otherwise
-  = []
-
-  where
-    (first_inst_tau : _)       = inst_taus
-
-	-- Stuff for algebraic or -> type
-    maybe_tycon_app	  = tcSplitTyConApp_maybe first_inst_tau
-    Just (tycon, arg_tys) = maybe_tycon_app
-
-    ccallable_type   dflags ty = isFFIArgumentTy dflags PlayRisky ty
-    creturnable_type        ty = isFFIImportResultTy dflags ty
-	
-check_tyvars dflags clas inst_taus
-   	-- Check that at least one isn't a type variable
-	-- unless -fallow-undecideable-instances
-  | dopt Opt_AllowUndecidableInstances dflags = []
-  | not (all tcIsTyVarTy inst_taus)	      = []
-  | otherwise 				      = [the_err]
-  where
-    the_err = instTypeErr clas inst_taus msg
-    msg     =  ptext SLIT("There must be at least one non-type-variable in the instance head")
-	    $$ ptext SLIT("Use -fallow-undecidable-instances to lift this restriction")
-
-check_fundeps dflags theta clas inst_taus
-  | checkInstFDs theta clas inst_taus = []
-  | otherwise			      = [the_err]
-  where
-    the_err = instTypeErr clas inst_taus msg
-    msg  = ptext SLIT("the instance types do not agree with the functional dependencies of the class")
-\end{code}
-
-
-%************************************************************************
-%*									*
 \subsection{Error messages}
 %*									*
 %************************************************************************
@@ -872,8 +781,6 @@ badGenericInstanceType binds
 missingGenericInstances missing
   = ptext SLIT("Missing type patterns for") <+> pprQuotedList missing
 	  
-
-
 dupGenericInsts tc_inst_infos
   = vcat [ptext SLIT("More than one type pattern for a single generic type constructor:"),
 	  nest 4 (vcat (map ppr_inst_ty tc_inst_infos)),
@@ -881,20 +788,6 @@ dupGenericInsts tc_inst_infos
     ]
   where 
     ppr_inst_ty (tc,inst) = ppr (simpleInstInfoTy inst)
-
-instHeadErr ty
-  = vcat [ptext SLIT("Illegal instance head:") <+> ppr ty,
-	  ptext SLIT("Instance head must be of form <context> => <class> <types>")]
-
-instTypeErr clas tys msg
-  = sep [ptext SLIT("Illegal instance declaration for") <+> 
-		quotes (pprClassPred clas tys),
-	 nest 4 (parens msg)
-    ]
-
-nonBoxedPrimCCallErr clas inst_ty
-  = hang (ptext SLIT("Unacceptable instance type for ccall-ish class"))
-	 4 (pprClassPred clas [inst_ty])
 
 methodCtxt     = ptext SLIT("When checking the methods of an instance declaration")
 superClassCtxt = ptext SLIT("When checking the super-classes of an instance declaration")

@@ -25,7 +25,8 @@ module TcMType (
   --------------------------------
   -- Checking type validity
   Rank, UserTypeCtxt(..), checkValidType, pprUserTypeCtxt,
-  SourceTyCtxt(..), checkValidTheta,
+  SourceTyCtxt(..), checkValidTheta, 
+  checkValidInstHead, instTypeErr,
 
   --------------------------------
   -- Unification
@@ -55,7 +56,7 @@ import TcType		( tcEqType, tcCmpPred,
 			  tcGetTyVar, tcIsTyVarTy, tcSplitSigmaTy, isUnLiftedType, isIPPred,
 
 			  mkAppTy, mkTyVarTy, mkTyVarTys, mkFunTy, mkTyConApp,
-			  tyVarsOfPred,
+			  tyVarsOfPred, getClassPredTys_maybe,
 
 			  liftedTypeKind, unliftedTypeKind, openTypeKind, defaultKind, superKind,
 			  superBoxity, liftedBoxity, hasMoreBoxityInfo, typeKind,
@@ -72,9 +73,12 @@ import Var		( TyVar, varName, tyVarKind, tyVarName, isTyVar, mkTyVar,
 
 -- others:
 import TcMonad          -- TcType, amongst others
-import TysWiredIn	( voidTy, listTyCon, mkListTy, mkTupleTy )
+import TysWiredIn	( voidTy, listTyCon, mkListTy, mkTupleTy,
+			  isFFIArgumentTy, isFFIImportResultTy )
+import PrelNames	( cCallableClassKey, cReturnableClassKey, hasKey )
+import ForeignCall	( Safety(..) )
 import FunDeps		( grow )
-import PprType		( pprPred, pprSourceType, pprTheta )
+import PprType		( pprPred, pprSourceType, pprTheta, pprClassPred )
 import Name		( Name, NamedThing(..), setNameUnique, mkSysLocalName,
 			  mkLocalName, mkDerivedTyConOcc, isSystemName
 			)
@@ -548,6 +552,17 @@ data UserTypeCtxt
   | ForSigCtxt Name	-- Foreign inport or export signature
   | RuleSigCtxt Name 	-- Signature on a forall'd variable in a RULE
 
+-- Notes re TySynCtxt
+-- We allow type synonyms that aren't types; e.g.  type List = []
+--
+-- If the RHS mentions tyvars that aren't in scope, we'll 
+-- quantify over them:
+--	e.g. 	type T = a->a
+-- will become	type T = forall a. a->a
+--
+-- With gla-exts that's right, but for H98 we should complain. 
+
+
 pprUserTypeCtxt (FunSigCtxt n) 	= ptext SLIT("the type signature for") <+> quotes (ppr n)
 pprUserTypeCtxt ExprSigCtxt    	= ptext SLIT("an expression type signature")
 pprUserTypeCtxt (ConArgCtxt c) 	= ptext SLIT("the type of constructor") <+> quotes (ppr c)
@@ -597,18 +612,27 @@ checkValidType ctxt ty
 	-- Check the internal validity of the type itself
     check_poly_type rank ty
 
--- Notes re TySynCtxt
--- We allow type synonyms that aren't types; e.g.  type List = []
---
--- If the RHS mentions tyvars that aren't in scope, we'll 
--- quantify over them:
---	e.g. 	type T = a->a
--- will become	type T = forall a. a->a
---
--- With gla-exts that's right, but for H98 we should complain. 
+
+checkTypeCtxt ctxt ty
+  = vcat [ptext SLIT("In the type:") <+> ppr_ty ty,
+	  ptext SLIT("While checking") <+> pprUserTypeCtxt ctxt ]
+
+	-- Hack alert.  If there are no tyvars, (ppr sigma_ty) will print
+	-- something strange like {Eq k} -> k -> k, because there is no
+	-- ForAll at the top of the type.  Since this is going to the user
+	-- we want it to look like a proper Haskell type even then; hence the hack
+	-- 
+	-- This shows up in the complaint about
+	--	case C a where
+	--	  op :: Eq a => a -> a
+ppr_ty ty | null forall_tvs && not (null theta) = pprTheta theta <+> ptext SLIT("=>") <+> ppr tau
+          | otherwise	 		     = ppr ty
+          where
+	    (forall_tvs, theta, tau) = tcSplitSigmaTy ty
+\end{code}
 
 
-----------------------------------------
+\begin{code}
 type Rank = Int
 check_poly_type :: Rank -> Type -> TcM ()
 check_poly_type rank ty 
@@ -653,8 +677,8 @@ check_tau_type :: Rank -> Bool -> Type -> TcM ()
 -- No foralls otherwise
 -- Bool is True iff unboxed tuple are allowed here
 
-check_tau_type rank ubx_tup_ok ty@(UsageTy _ _)  = addErrTc (usageTyErr ty)
-check_tau_type rank ubx_tup_ok ty@(ForAllTy _ _) = addErrTc (forAllTyErr ty)
+check_tau_type rank ubx_tup_ok ty@(UsageTy _ _)  = failWithTc (usageTyErr ty)
+check_tau_type rank ubx_tup_ok ty@(ForAllTy _ _) = failWithTc (forAllTyErr ty)
 check_tau_type rank ubx_tup_ok (SourceTy sty)    = getDOptsTc		`thenNF_Tc` \ dflags ->
 						   check_source_ty dflags TypeCtxt sty
 check_tau_type rank ubx_tup_ok (TyVarTy _)       = returnTc ()
@@ -696,69 +720,6 @@ check_tau_type rank ubx_tup_ok ty@(TyConApp tc tys)
 ----------------------------------------
 check_note (FTVNote _)  = returnTc ()
 check_note (SynNote ty) = check_tau_type 0 False ty
-\end{code}
-
-
-\begin{code}
-data SourceTyCtxt
-  = ClassSCCtxt Name	-- Superclasses of clas
-  | SigmaCtxt		-- Context of a normal for-all type
-  | DataTyCtxt Name	-- Context of a data decl
-  | TypeCtxt 		-- Source type in an ordinary type
-  | InstDeclCtxt	-- Context of an instance decl
-		
-pprSourceTyCtxt (ClassSCCtxt c) = ptext SLIT("the super-classes of class") <+> quotes (ppr c)
-pprSourceTyCtxt SigmaCtxt       = ptext SLIT("the context of a polymorphic type")
-pprSourceTyCtxt (DataTyCtxt tc) = ptext SLIT("the context of the data type declaration for") <+> quotes (ppr tc)
-pprSourceTyCtxt InstDeclCtxt    = ptext SLIT("the context of an instance declaration")
-pprSourceTyCtxt TypeCtxt        = ptext SLIT("the context of a type")
-\end{code}
-
-\begin{code}
-checkValidTheta :: SourceTyCtxt -> ThetaType -> TcM ()
-checkValidTheta ctxt theta 
-  = tcAddErrCtxt (checkThetaCtxt ctxt theta) (check_valid_theta ctxt theta)
-
--------------------------
-check_valid_theta ctxt []
-  = returnTc ()
-check_valid_theta ctxt theta
-  = getDOptsTc					`thenNF_Tc` \ dflags ->
-    warnTc (not (null dups)) (dupPredWarn dups)	`thenNF_Tc_`
-    mapTc_ (check_source_ty dflags ctxt) theta
-  where
-    (_,dups) = removeDups tcCmpPred theta
-
--------------------------
-check_source_ty dflags ctxt pred@(ClassP cls tys)
-  = 	-- Class predicates are valid in all contexts
-    mapTc_ check_arg_type tys			`thenTc_`
-    checkTc (arity == n_tys) arity_err		`thenTc_`
-    checkTc (all tyvar_head tys || arby_preds_ok) (predTyVarErr pred)
-
-  where
-    class_name = className cls
-    arity      = classArity cls
-    n_tys      = length tys
-    arity_err  = arityErr "Class" class_name arity n_tys
-
-    arby_preds_ok = case ctxt of
-			InstDeclCtxt -> dopt Opt_AllowUndecidableInstances dflags
-			other	     -> dopt Opt_GlasgowExts               dflags
-
-check_source_ty dflags SigmaCtxt (IParam name ty) = check_arg_type ty
-check_source_ty dflags TypeCtxt  (NType tc tys)   = mapTc_ check_arg_type tys
-
--- Catch-all
-check_source_ty dflags ctxt sty = failWithTc (badSourceTyErr sty)
-
--------------------------
-tyvar_head ty			-- Haskell 98 allows predicates of form 
-  | tcIsTyVarTy ty = True	-- 	C (a ty1 .. tyn)
-  | otherwise			-- where a is a type variable
-  = case tcSplitAppTy_maybe ty of
-	Just (ty, _) -> tyvar_head ty
-	Nothing	     -> False
 \end{code}
 
 Check for ambiguity
@@ -818,12 +779,12 @@ checkAmbiguity forall_tyvars theta tau
 	    	any_ambig = any is_ambig ct_vars
 \end{code}
 
-
 \begin{code}
 ambigErr pred
   = sep [ptext SLIT("Ambiguous constraint") <+> quotes (pprPred pred),
 	 nest 4 (ptext SLIT("At least one of the forall'd type variables mentioned by the constraint") $$
 		 ptext SLIT("must be reachable from the type after the =>"))]
+
 
 freeErr pred
   = sep [ptext SLIT("All of the type variables in the constraint") <+> quotes (pprPred pred) <+>
@@ -835,31 +796,178 @@ forAllTyErr     ty = ptext SLIT("Illegal polymorphic type:") <+> ppr_ty ty
 usageTyErr      ty = ptext SLIT("Illegal usage type:") <+> ppr_ty ty
 unliftedArgErr  ty = ptext SLIT("Illegal unlifted type argument:") <+> ppr_ty ty
 ubxArgTyErr     ty = ptext SLIT("Illegal unboxed tuple type as function argument:") <+> ppr_ty ty
+kindErr kind       = ptext SLIT("Expecting an ordinary type, but found a type of kind") <+> ppr kind
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Checking a theta or source type}
+%*									*
+%************************************************************************
+
+\begin{code}
+data SourceTyCtxt
+  = ClassSCCtxt Name	-- Superclasses of clas
+  | SigmaCtxt		-- Context of a normal for-all type
+  | DataTyCtxt Name	-- Context of a data decl
+  | TypeCtxt 		-- Source type in an ordinary type
+  | InstThetaCtxt	-- Context of an instance decl
+  | InstHeadCtxt	-- Head of an instance decl
+		
+pprSourceTyCtxt (ClassSCCtxt c) = ptext SLIT("the super-classes of class") <+> quotes (ppr c)
+pprSourceTyCtxt SigmaCtxt       = ptext SLIT("the context of a polymorphic type")
+pprSourceTyCtxt (DataTyCtxt tc) = ptext SLIT("the context of the data type declaration for") <+> quotes (ppr tc)
+pprSourceTyCtxt InstThetaCtxt   = ptext SLIT("the context of an instance declaration")
+pprSourceTyCtxt InstHeadCtxt    = ptext SLIT("the head of an instance declaration")
+pprSourceTyCtxt TypeCtxt        = ptext SLIT("the context of a type")
+\end{code}
+
+\begin{code}
+checkValidTheta :: SourceTyCtxt -> ThetaType -> TcM ()
+checkValidTheta ctxt theta 
+  = tcAddErrCtxt (checkThetaCtxt ctxt theta) (check_valid_theta ctxt theta)
+
+-------------------------
+check_valid_theta ctxt []
+  = returnTc ()
+check_valid_theta ctxt theta
+  = getDOptsTc					`thenNF_Tc` \ dflags ->
+    warnTc (not (null dups)) (dupPredWarn dups)	`thenNF_Tc_`
+    mapTc_ (check_source_ty dflags ctxt) theta
+  where
+    (_,dups) = removeDups tcCmpPred theta
+
+-------------------------
+check_source_ty dflags ctxt pred@(ClassP cls tys)
+  = 	-- Class predicates are valid in all contexts
+    mapTc_ check_arg_type tys			`thenTc_`
+    checkTc (arity == n_tys) arity_err		`thenTc_`
+    checkTc (all tyvar_head tys || arby_preds_ok) (predTyVarErr pred)
+
+  where
+    class_name = className cls
+    arity      = classArity cls
+    n_tys      = length tys
+    arity_err  = arityErr "Class" class_name arity n_tys
+
+    arby_preds_ok = case ctxt of
+			InstHeadCtxt  -> True	-- We check for instance-head formation
+						-- in checkValidInstHead
+			InstThetaCtxt -> dopt Opt_AllowUndecidableInstances dflags
+			other	      -> dopt Opt_GlasgowExts               dflags
+
+check_source_ty dflags SigmaCtxt (IParam name ty) = check_arg_type ty
+check_source_ty dflags TypeCtxt  (NType tc tys)   = mapTc_ check_arg_type tys
+
+-- Catch-all
+check_source_ty dflags ctxt sty = failWithTc (badSourceTyErr sty)
+
+-------------------------
+tyvar_head ty			-- Haskell 98 allows predicates of form 
+  | tcIsTyVarTy ty = True	-- 	C (a ty1 .. tyn)
+  | otherwise			-- where a is a type variable
+  = case tcSplitAppTy_maybe ty of
+	Just (ty, _) -> tyvar_head ty
+	Nothing	     -> False
+\end{code}
+
+\begin{code}
 badSourceTyErr sty = ptext SLIT("Illegal constraint") <+> pprSourceType sty
 predTyVarErr pred  = ptext SLIT("Non-type variables in constraint:") <+> pprPred pred
-kindErr kind       = ptext SLIT("Expecting an ordinary type, but found a type of kind") <+> ppr kind
 dupPredWarn dups   = ptext SLIT("Duplicate constraint(s):") <+> pprWithCommas pprPred (map head dups)
-
-checkTypeCtxt ctxt ty
-  = vcat [ptext SLIT("In the type:") <+> ppr_ty ty,
-	  ptext SLIT("While checking") <+> pprUserTypeCtxt ctxt ]
-
-	-- Hack alert.  If there are no tyvars, (ppr sigma_ty) will print
-	-- something strange like {Eq k} -> k -> k, because there is no
-	-- ForAll at the top of the type.  Since this is going to the user
-	-- we want it to look like a proper Haskell type even then; hence the hack
-	-- 
-	-- This shows up in the complaint about
-	--	case C a where
-	--	  op :: Eq a => a -> a
-ppr_ty ty | null forall_tvs && not (null theta) = pprTheta theta <+> ptext SLIT("=>") <+> ppr tau
-          | otherwise	 		     = ppr ty
-          where
-	    (forall_tvs, theta, tau) = tcSplitSigmaTy ty
 
 checkThetaCtxt ctxt theta
   = vcat [ptext SLIT("In the context:") <+> pprTheta theta,
 	  ptext SLIT("While checking") <+> pprSourceTyCtxt ctxt ]
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Checking for a decent instance head type}
+%*									*
+%************************************************************************
+
+@checkValidInstHead@ checks the type {\em and} its syntactic constraints:
+it must normally look like: @instance Foo (Tycon a b c ...) ...@
+
+The exceptions to this syntactic checking: (1)~if the @GlasgowExts@
+flag is on, or (2)~the instance is imported (they must have been
+compiled elsewhere). In these cases, we let them go through anyway.
+
+We can also have instances for functions: @instance Foo (a -> b) ...@.
+
+\begin{code}
+checkValidInstHead :: Type -> TcM ()
+
+checkValidInstHead ty	-- Should be a source type
+  = case tcSplitPredTy_maybe ty of {
+	Nothing -> failWithTc (instTypeErr (ppr ty) empty) ;
+	Just pred -> 
+
+    case getClassPredTys_maybe pred of {
+	Nothing -> failWithTc (instTypeErr (pprPred pred) empty) ;
+        Just (clas,tys) ->
+
+    getDOptsTc					`thenNF_Tc` \ dflags ->
+    mapTc_ check_arg_type tys			`thenTc_`
+    check_inst_head dflags clas tys
+    }}
+
+check_inst_head dflags clas tys
+  |	-- CCALL CHECK
+	-- A user declaration of a CCallable/CReturnable instance
+	-- must be for a "boxed primitive" type.
+        (clas `hasKey` cCallableClassKey   
+            && not (ccallable_type first_ty)) 
+  ||    (clas `hasKey` cReturnableClassKey 
+            && not (creturnable_type first_ty))
+  = failWithTc (nonBoxedPrimCCallErr clas first_ty)
+
+	-- If GlasgowExts then check at least one isn't a type variable
+  | dopt Opt_GlasgowExts dflags
+  = check_tyvars dflags clas tys
+
+	-- WITH HASKELL 1.4, MUST HAVE C (T a b c)
+  | length tys == 1,
+    Just (tycon, arg_tys) <- tcSplitTyConApp_maybe first_ty,
+    not (isSynTyCon tycon), 		-- ...but not a synonym
+    all tcIsTyVarTy arg_tys,  		-- Applied to type variables
+    length (varSetElems (tyVarsOfTypes arg_tys)) == length arg_tys
+          -- This last condition checks that all the type variables are distinct
+  = returnTc ()
+
+  | otherwise
+  = failWithTc (instTypeErr (pprClassPred clas tys) head_shape_msg)
+
+  where
+    (first_ty : _)       = tys
+
+    ccallable_type   ty = isFFIArgumentTy dflags PlayRisky ty
+    creturnable_type ty = isFFIImportResultTy dflags ty
+	
+    head_shape_msg = parens (text "The instance type must be of form (T a b c)" $$
+			     text "where T is not a synonym, and a,b,c are distinct type variables")
+
+check_tyvars dflags clas tys
+   	-- Check that at least one isn't a type variable
+	-- unless -fallow-undecideable-instances
+  | dopt Opt_AllowUndecidableInstances dflags = returnTc ()
+  | not (all tcIsTyVarTy tys)	  	      = returnTc ()
+  | otherwise 				      = failWithTc (instTypeErr (pprClassPred clas tys) msg)
+  where
+    msg =  parens (ptext SLIT("There must be at least one non-type-variable in the instance head")
+	        $$ ptext SLIT("Use -fallow-undecidable-instances to lift this restriction"))
+\end{code}
+
+\begin{code}
+instTypeErr pp_ty msg
+  = sep [ptext SLIT("Illegal instance declaration for") <+> quotes pp_ty, 
+	 nest 4 msg]
+
+nonBoxedPrimCCallErr clas inst_ty
+  = hang (ptext SLIT("Unacceptable instance type for ccall-ish class"))
+	 4 (pprClassPred clas [inst_ty])
 \end{code}
 
 
