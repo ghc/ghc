@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.18 2002/03/05 14:30:51 simonmar Exp $
+-- $Id: DriverMkDepend.hs,v 1.19 2002/03/20 20:20:26 sof Exp $
 --
 -- GHC Driver
 --
@@ -11,16 +11,15 @@ module DriverMkDepend where
 
 #include "HsVersions.h"
 
-import DriverState
-import DriverUtil
+import DriverState      
+import DriverUtil       ( add, softGetDirectoryContents )
 import DriverFlags
 import SysTools		( newTempName )
 import qualified SysTools
-import Module
-import Module		( isHomeModule )
+import Module		( ModuleName, moduleNameUserString, isHomeModule )
 import Finder		( findModuleDep )
 import HscTypes		( ModuleLocation(..) )
-import Util
+import Util             ( global )
 import Panic
 
 import IOExts
@@ -28,8 +27,8 @@ import Exception
 
 import Directory
 import IO
-import Monad
-import Maybe
+import Monad            ( when )
+import Maybe            ( isJust )
 
 -------------------------------------------------------------------------------
 -- mkdependHS
@@ -173,7 +172,8 @@ findDependency is_source src imp = do
 	   Just (mod,loc)
 		| isHomeModule mod || include_prelude
 		-> return (Just (ml_hi_file loc, not is_source))
-		| otherwise 
+		| otherwise
 		-> return Nothing
 	   Nothing -> throwDyn (ProgramError 
-		(src ++ ": " ++ "can't locate import `" ++ imp_mod ++ "'"))
+		(src ++ ": " ++ "can't locate import `" ++ imp_mod ++ "'" ++
+		 if is_source then " (SOURCE import)" else ""))
