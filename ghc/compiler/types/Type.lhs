@@ -51,7 +51,7 @@ module Type (
 
 	-- Predicates and the like
 	PredType(..), getClassPredTys_maybe, getClassPredTys, 
-	isClassPred, isTyVarClassPred,
+	isPredTy, isClassPred, isTyVarClassPred,
 	mkDictTy, mkPredTy, mkPredTys, splitPredTy_maybe, predTyUnique,
 	splitDictTy, splitDictTy_maybe, isDictTy, predRepTy, splitDFunTy,
 	mkClassPred, predMentionsIPs, inheritablePred, isIPPred, mkPredName,
