@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgStackery.lhs,v 1.23 2002/12/11 15:36:27 simonmar Exp $
+% $Id: CgStackery.lhs,v 1.24 2003/11/17 14:42:47 simonmar Exp $
 %
 \section[CgStackery]{Stack management functions}
 
@@ -10,11 +10,11 @@ Stack-twiddling operations, which are pretty low-down and grimy.
 
 \begin{code}
 module CgStackery (
-	allocStack, allocPrimStack, allocStackTop, deAllocStackTop,
+	allocPrimStack, allocStackTop, deAllocStackTop,
 	adjustStackHW, getFinalStackHW, 
 	setStackFrame, getStackFrame,
 	mkVirtStkOffsets, mkStkAmodes,
-	freeStackSlots, dataStackSlots, addFreeSlots,
+	freeStackSlots, dataStackSlots,
 	updateFrameSize,
 	constructSlowCall, slowArgs,
     ) where
@@ -169,9 +169,6 @@ traceSlowCall amodes and_then
 Allocate a virtual offset for something.
 
 \begin{code}
-allocStack :: FCode VirtualSpOffset
-allocStack = allocPrimStack 1
-
 allocPrimStack :: Int -> FCode VirtualSpOffset
 allocPrimStack size = do
 	((virt_sp, frame, free_stk, real_sp, hw_sp),h_usage) <- getUsage

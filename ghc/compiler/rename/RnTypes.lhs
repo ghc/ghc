@@ -5,8 +5,8 @@
 
 \begin{code}
 module RnTypes ( rnHsType, rnContext, 
-		 rnHsSigType, rnHsTypeFVs, rnHsSigTypeFVs, 
-		 rnPat, rnPats, rnPatsAndThen,	-- Here because it's not part 
+		 rnHsSigType, rnHsTypeFVs,
+		 rnPat, rnPatsAndThen,	-- Here because it's not part 
 		 rnOverLit, litFVs,		-- of any mutual recursion	
 		 precParseErr, sectionPrecErr, dupFieldErr, patSigErr, checkTupSize
   ) where
@@ -55,11 +55,6 @@ to break several loop.
 rnHsTypeFVs :: SDoc -> RdrNameHsType -> RnM (RenamedHsType, FreeVars)
 rnHsTypeFVs doc_str ty 
   = rnHsType doc_str ty		`thenM` \ ty' ->
-    returnM (ty', extractHsTyNames ty')
-
-rnHsSigTypeFVs :: SDoc -> RdrNameHsType -> RnM (RenamedHsType, FreeVars)
-rnHsSigTypeFVs doc_str ty
-  = rnHsSigType doc_str ty	`thenM` \ ty' ->
     returnM (ty', extractHsTyNames ty')
 
 rnHsSigType :: SDoc -> RdrNameHsType -> RnM RenamedHsType
