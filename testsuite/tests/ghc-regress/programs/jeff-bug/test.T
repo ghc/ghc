@@ -5,5 +5,8 @@ include ($confdir ++ "/../multimod-test.T")
 --                  extra run flags
 --                  expected process return value, if not zero
 
-test "jeff-bug" { mtr("-package lang -fglasgow-exts -cpp", "", "") }
-
+-- Lack sensible input file to test it with.
+test "jeff-bug" {
+	$expect = "fail"
+	mtr("-package lang -fglasgow-exts -cpp", "-count /dev/null", "") 
+   }
