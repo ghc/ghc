@@ -101,7 +101,8 @@
 
     <itemizedlist>
       <listitem>
-	<para>FFI.</para>
+	<para>The FFI has been revised and expanded; see <xref
+	linkend="sec-Foreign"> and <xref linkend="sec-CTypes">.</para>
       </listitem>
 
       <listitem>
