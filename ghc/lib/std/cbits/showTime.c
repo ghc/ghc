@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: showTime.c,v 1.5 1999/09/30 14:25:47 sof Exp $
+ * $Id: showTime.c,v 1.6 1999/09/30 16:20:14 sof Exp $
  *
  * ClockTime.showsPrec Runtime Support
  */
@@ -41,7 +41,7 @@ showTime(I_ size, StgByteArray d, I_ maxsize, StgByteArray buf)
 	    return (-1);
 	}
     tm = localtime(&t);
-    if (tm != NULL && strftime(buf, maxsize, "%a %b %d %T %Z %Y", tm) > 0) {
+    if (tm != NULL && strftime(buf, maxsize, "%a %b %d %H:%M:%S %z %Y", tm) > 0) {
        return 1;
     } else {
        return (-1);
