@@ -5,7 +5,7 @@
 #	This file defines Make variables for the
 #	option flags for each utility program
 #
-# 	$Id: opts.mk,v 1.22 2001/05/16 09:46:43 rrt Exp $
+# 	$Id: opts.mk,v 1.23 2001/05/18 09:14:20 simonmar Exp $
 #
 #################################################################################
 
@@ -97,6 +97,7 @@ FLEX_OPTS          = $(SRC_FLEX_OPTS) $(WAY$(_way)_FLEX_OPTS) $(EXTRA_FLEX_OPTS)
 HAPPY_OPTS         = $(SRC_HAPPY_OPTS) $(WAY$(_way)_HAPPY_OPTS) $($*_HAPPY_OPTS) $(EXTRA_HAPPY_OPTS)
 GC_OPTS            = $(SRC_GC_OPTS) $(WAY$(_way)_GC_OPTS) $($*_GC_OPTS) $(EXTRA_GC_OPTS)
 HSTAGS_OPTS        = $(SRC_HSTAGS_OPTS) $(WAY$(_way)_HSTAGS_OPTS) $(EXTRA_HSTAGS_OPTS)
+HSC2HS_OPTS        = $(SRC_HSC2HS_OPTS) $(WAY$(_way)_HSC2HS_OPTS) $(EXTRA_HSC2HS_OPTS)
 INSTALL_OPTS       = $(SRC_INSTALL_OPTS) $(WAY$(_way)_INSTALL_OPTS) $(EXTRA_INSTALL_OPTS)
 INSTALL_BIN_OPTS   = $(INSTALL_OPTS) $(SRC_INSTALL_BIN_OPTS)
 LD_OPTS            = $(SRC_LD_OPTS) $(WAY$(_way)_LD_OPTS) $(EXTRA_LD_OPTS)
