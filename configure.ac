@@ -1083,7 +1083,7 @@ AC_CHECK_FUNCS(setenv unsetenv)
 
 
 dnl ** check for specific library functions that we are interested in
-AC_CHECK_FUNCS(access ftime getclock getpagesize getrusage gettimeofday mktime mprotect readlink setitimer stat lstat symlink sysconf timelocal times vadvise localtime_r gmtime_r readdir_r getgrgid_r getgrnam_r getpwuid_r getpwnam_r)
+AC_CHECK_FUNCS(access ftime getclock getpagesize getrusage gettimeofday mktime mprotect readlink setitimer stat lstat siginterrupt symlink sysconf timelocal times vadvise localtime_r gmtime_r readdir_r getgrgid_r getgrnam_r getpwuid_r getpwnam_r)
 
 dnl ** Solaris2 needs additionl flag for getpw*_r()
 case "$TargetPlatform" in
