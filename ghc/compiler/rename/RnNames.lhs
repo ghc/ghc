@@ -192,9 +192,7 @@ importsFromImportDecl rec_unqual_fn (ImportDecl mod qual_only as_source as_mod i
 
     if null avails then
 	-- If there's an error in getInterfaceExports, (e.g. interface
-	-- file not found) then avail might be NotAvailable, so availName
-	-- in home_modules fails.  Hence the guard here.  Also we get lots
-	-- of spurious errors from 'filterImports' if we don't find the interface file
+	-- file not found) we get lots of spurious errors from 'filterImports'
 	returnRn (emptyRdrEnv, mkEmptyExportAvails mod)
     else
 
@@ -207,12 +205,20 @@ importsFromImportDecl rec_unqual_fn (ImportDecl mod qual_only as_source as_mod i
 	home_modules = [name | avail <- filtered_avails,
 				-- Doesn't take account of hiding, but that doesn't matter
 		
+				-- Drop NotAvailables.  
+				-- Happens if filterAvail finds something missing
+			       case avail of
+				  NotAvailable -> False
+				  other        -> True,
+			
 			       let name = availName avail,
-			       nameModule name /= mod]
-				-- This predicate is a bit of a hack.
+			       nameModule (availName avail) /= mod
+				-- This nameModule predicate is a bit of a hack.
 				-- PrelBase imports error from PrelErr.hi-boot; but error is
 				-- wired in, so its provenance doesn't say it's from an hi-boot
 				-- file. Result: disaster when PrelErr.hi doesn't exist.
+				--	[Jan 99: I now can't see how the predicate achieves the goal!]
+			]
 				
 	same_module n1 n2 = nameModule n1 == nameModule n2
 	load n		  = loadHomeInterface (doc_str n) n

@@ -464,11 +464,12 @@ tcMonoExpr (RecordCon con_name rbinds) res_ty
     let
 	bad_fields = badFields rbinds data_con
     in
-    mapNF_Tc (addErrTc . badFieldCon con_name) bad_fields	`thenNF_Tc_`
+    if not (null bad_fields) then
+	mapNF_Tc (addErrTc . badFieldCon con_name) bad_fields	`thenNF_Tc_`
+	failTc	-- Fail now, because tcRecordBinds will crash on a bad field
+    else
 
 	-- Typecheck the record bindings
-	-- (Do this after checkRecordFields in case there's a field that
-	--  doesn't match the constructor.)
     tcRecordBinds record_ty rbinds		`thenTc` \ (rbinds', rbinds_lie) ->
 
     returnTc (RecordConOut data_con con_expr rbinds', con_lie `plusLIE` rbinds_lie)

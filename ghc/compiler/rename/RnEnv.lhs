@@ -586,7 +586,7 @@ availNames (AvailTC n ns) = ns
 filterAvail :: RdrNameIE	-- Wanted
 	    -> AvailInfo	-- Available
 	    -> AvailInfo	-- Resulting available; 
-				-- NotAvailable if wanted stuff isn't there
+				-- NotAvailable if (any of the) wanted stuff isn't there
 
 filterAvail ie@(IEThingWith want wants) avail@(AvailTC n ns)
   | sub_names_ok = AvailTC n (filter is_wanted ns)
@@ -603,8 +603,7 @@ filterAvail ie@(IEThingWith want wants) avail@(AvailTC n ns)
 
 filterAvail (IEThingAbs _) (AvailTC n ns)       = ASSERT( n `elem` ns ) 
 						  AvailTC n [n]
-
-filterAvail (IEThingAbs _) avail@(Avail n)      = avail		-- Type synonyms
+filterAvail (IEThingAll _) avail@(AvailTC _ _)  = avail
 
 filterAvail (IEVar _)      avail@(Avail n)      = avail
 filterAvail (IEVar v)      avail@(AvailTC n ns) = AvailTC n (filter wanted ns)
@@ -615,9 +614,10 @@ filterAvail (IEVar v)      avail@(AvailTC n ns) = AvailTC n (filter wanted ns)
 	-- 	import A( op ) 
 	-- where op is a class operation
 
-filterAvail (IEThingAll _) avail@(AvailTC _ _)  = avail
 
-filterAvail ie avail = NotAvailable 
+#ifdef DEBUG
+filterAvail ie avail = pprPanic "filterAvail" (ppr ie $$ pprAvail avail)
+#endif
 
 
 -- In interfaces, pprAvail gets given the OccName of the "host" thing

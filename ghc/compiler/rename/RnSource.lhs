@@ -153,7 +153,7 @@ rnDecl (TyClD (TyData new_or_data context tycon tyvars condecls derivings pragma
     returnRn (TyClD (TyData new_or_data context' tycon' tyvars' condecls' derivings' noDataPragmas src_loc),
 	      cxt_fvs `plusFV` plusFVs con_fvs_s `plusFV` deriv_fvs)
   where
-    data_doc = text "the data typecodeGen/ declaration for" <+> ppr tycon
+    data_doc = text "the data type declaration for" <+> ppr tycon
     con_names = map conDeclName condecls
 
 rnDecl (TyClD (TySynonym name tyvars ty src_loc))
