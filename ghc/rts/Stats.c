@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.16 1999/11/02 17:19:16 simonmar Exp $
+ * $Id: Stats.c,v 1.17 1999/11/09 15:46:57 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -63,9 +63,11 @@ static double TicksPerSecond   = 0.0;
 
 static double InitUserTime = 0.0;
 static double InitElapsedTime = 0.0;
+static double InitElapsedStamp = 0.0;
 
 static double MutUserTime = 0.0;
 static double MutElapsedTime = 0.0;
+static double MutElapsedStamp = 0.0;
 
 static double ExitUserTime = 0.0;
 static double ExitElapsedTime = 0.0;
@@ -117,7 +119,7 @@ elapsedtime(void)
 
     FT2longlong(kT,kernelTime);
     FT2longlong(uT,userTime);
-    return (((StgDouble)(uT + kT))/TicksPerSecond - ElapsedTimeStart);
+    return (((StgDouble)(uT + kT))/TicksPerSecond);
 }
 
 #else 
@@ -125,6 +127,7 @@ elapsedtime(void)
 double
 elapsedtime(void)
 {
+
 # if ! (defined(HAVE_TIMES) || defined(HAVE_FTIME))
     /* We will #ifdef around the fprintf for machines
        we *know* are unsupported. (WDP 94/05)
@@ -142,13 +145,13 @@ elapsedtime(void)
     struct tms t;
     clock_t r = times(&t);
 
-    return (((double)r)/TicksPerSecond - ElapsedTimeStart);
+    return (((double)r)/TicksPerSecond);
 
 #  else /* HAVE_FTIME */
     struct timeb t;
 
     ftime(&t);
-    return (fabs(t.time + 1e-3*t.millitm - ElapsedTimeStart));
+    return (fabs(t.time + 1e-3*t.millitm));
 
 #  endif /* HAVE_FTIME */
 # endif /* not stumped */
@@ -294,16 +297,24 @@ void
 end_init(void)
 {
   InitUserTime = usertime();
-  InitElapsedTime = elapsedtime();
+  InitElapsedStamp = elapsedtime(); 
+  InitElapsedTime = InitElapsedStamp - ElapsedTimeStart;
   if (InitElapsedTime < 0.0) {
     InitElapsedTime = 0.0;
   }
 }
 
+/* -----------------------------------------------------------------------------
+   stat_startExit and stat_endExit
+   
+   These two measure the time taken in shutdownHaskell().
+   -------------------------------------------------------------------------- */
+
 void
 stat_startExit(void)
 {
-  MutElapsedTime = elapsedtime() - GCe_tot_time - InitElapsedTime;
+  MutElapsedStamp = elapsedtime(); 
+  MutElapsedTime = MutElapsedStamp - GCe_tot_time - InitElapsedStamp;
   if (MutElapsedTime < 0) { MutElapsedTime = 0; }	/* sometimes -0.00 */
 
   /* for SMP, we don't know the mutator time yet, we have to inspect
@@ -327,7 +338,7 @@ stat_endExit(void)
 #else
   ExitUserTime = usertime() - MutUserTime - GC_tot_time - InitUserTime;
 #endif
-  ExitElapsedTime = elapsedtime() - MutElapsedTime;
+  ExitElapsedTime = elapsedtime() - MutElapsedStamp;
   if (ExitUserTime < 0.0) {
     ExitUserTime = 0.0;
   }
@@ -404,8 +415,8 @@ stat_endGC(lnat alloc, lnat collect, lnat live, lnat copied, lnat gen)
 
 	GC_tot_copied += (ullong) copied;
 	GC_tot_alloc  += (ullong) alloc;
-	GC_tot_time   += time-GC_start_time;
-	GCe_tot_time  += etime-GCe_start_time;
+	GC_tot_time   += gc_time;
+	GCe_tot_time  += gc_etime;
 
 #ifdef SMP
 	{
@@ -437,6 +448,33 @@ stat_endGC(lnat alloc, lnat collect, lnat live, lnat copied, lnat gen)
 }
 
 /* -----------------------------------------------------------------------------
+   stat_workerStop
+
+   Called under SMP when a worker thread finishes.  We drop the timing
+   stats for this thread into the task_ids struct for that thread.
+   -------------------------------------------------------------------------- */
+
+#ifdef SMP
+void
+stat_workerStop(void)
+{
+  nat i;
+  pthread_t me = pthread_self();
+
+  for (i = 0; i < RtsFlags.ConcFlags.nNodes; i++) {
+    if (task_ids[i].id == me) {
+      task_ids[i].mut_time = usertime() - task_ids[i].gc_time;
+      task_ids[i].mut_etime = elapsedtime()
+	                         - GCe_tot_time
+	                         - task_ids[i].elapsedtimestart;
+      if (task_ids[i].mut_time < 0.0)  { task_ids[i].mut_time = 0.0;  }
+      if (task_ids[i].mut_etime < 0.0) { task_ids[i].mut_etime = 0.0; }
+    }
+  }
+}
+#endif
+
+/* -----------------------------------------------------------------------------
    Called at the end of execution
 
    NOTE: number of allocations is not entirely accurate: it doesn't
@@ -452,7 +490,7 @@ stat_exit(int alloc)
     if (sf != NULL){
 	char temp[BIG_STRING_LEN];
 	double time = usertime();
-	double etime = elapsedtime();
+	double etime = elapsedtime() - ElapsedTimeStart;
 
 	/* avoid divide by zero if time is measured as 0.00 seconds -- SDM */
 	if (time  == 0.0)  time = 0.0001;
@@ -498,13 +536,15 @@ stat_exit(int alloc)
 	  MutUserTime = 0.0;
 	  for (i = 0; i < RtsFlags.ConcFlags.nNodes; i++) {
 	    MutUserTime += task_ids[i].mut_time;
-	    fprintf(sf, "  Task %2d:  MUT time: %6.2fs,  GC time: %6.2fs\n", 
-		    i, task_ids[i].mut_time, task_ids[i].gc_time);
+	    fprintf(sf, "  Task %2d:  MUT time: %6.2fs  (%6.2fs elapsed)\n"
+		        "            GC  time: %6.2fs  (%6.2fs elapsed)\n\n", 
+		    i, 
+		    task_ids[i].mut_time, task_ids[i].mut_etime,
+		    task_ids[i].gc_time, task_ids[i].gc_etime);
 	  }
 	}
 	time = MutUserTime + GC_tot_time + InitUserTime + ExitUserTime;
 	if (MutUserTime < 0) { MutUserTime = 0; }
-	fprintf(sf,"\n");
 #endif
 
 	fprintf(sf, "  INIT  time  %6.2fs  (%6.2fs elapsed)\n",

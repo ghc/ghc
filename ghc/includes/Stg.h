@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.19 1999/11/05 12:28:05 simonmar Exp $
+ * $Id: Stg.h,v 1.20 1999/11/09 15:47:08 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -21,12 +21,12 @@
  * with that.  If "Stg.h" is included via "Rts.h", we're assumed to
  * be in vanilla C.
  */
-#ifdef NOT_IN_STG_CODE
+#if ! IN_STG_CODE
 # ifndef NO_REGS
 #  define NO_REGS			/* don't define fixed registers */
 # endif
 #else
-# define IN_STG_CODE
+# define IN_STG_CODE 1
 #endif
 
 /* Configuration */
@@ -113,13 +113,13 @@ void _stgAssert (char *, unsigned int);
 #include "ClosureTypes.h"
 #include "InfoTables.h"
 #include "TSO.h"
-#include "Block.h"
 
 /* STG/Optimised-C related stuff */
 #include "SMP.h"
 #include "MachRegs.h"
 #include "Regs.h"
 #include "TailCalls.h"
+#include "Block.h"
 
 /* RTS public interface */
 #include "RtsAPI.h"

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.9 1999/11/02 15:06:02 simonmar Exp $
+ * $Id: Schedule.h,v 1.10 1999/11/09 15:46:55 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -97,7 +97,9 @@ extern pthread_cond_t  gc_pending_cond;
 #ifdef SMP
 typedef struct {
   pthread_t id;
+  double    elapsedtimestart;
   double    mut_time;
+  double    mut_etime;
   double    gc_time;
   double    gc_etime;
 } task_info;

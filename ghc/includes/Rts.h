@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Rts.h,v 1.8 1999/11/02 15:05:52 simonmar Exp $
+ * $Id: Rts.h,v 1.9 1999/11/09 15:47:08 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -11,7 +11,7 @@
 #define RTS_H
 
 #ifndef IN_STG_CODE
-#define NOT_IN_STG_CODE
+#define IN_STG_CODE 0
 #endif
 #include "Stg.h"
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.20 1999/11/02 15:06:04 simonmar Exp $
+ * $Id: Storage.c,v 1.21 1999/11/09 15:46:59 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -236,13 +236,20 @@ allocNurseries( void )
 #ifdef SMP
   {
     Capability *cap;
-    
+    bdescr *bd;
+
     g0s0->blocks = NULL;
     g0s0->n_blocks = 0;
     for (cap = free_capabilities; cap != NULL; cap = cap->link) {
       cap->rNursery = allocNursery(NULL, RtsFlags.GcFlags.minAllocAreaSize);
       cap->rCurrentNursery = cap->rNursery;
+      for (bd = cap->rNursery; bd != NULL; bd = bd->link) {
+	bd->back = (bdescr *)cap;
+      }
     }
+    /* Set the back links to be equal to the Capability,
+     * so we can do slightly better informed locking.
+     */
   }
 #else /* SMP */
   nursery_blocks  = RtsFlags.GcFlags.minAllocAreaSize;
@@ -480,8 +487,11 @@ calcAllocated( void )
 #ifdef SMP
   Capability *cap;
 
-  /* All tasks must be stopped */
-  ASSERT(n_free_capabilities == RtsFlags.ConcFlags.nNodes);
+  /* All tasks must be stopped.  Can't assert that all the
+     capabilities are owned by the scheduler, though: one or more
+     tasks might have been stopped while they were running (non-main)
+     threads. */
+  /*  ASSERT(n_free_capabilities == RtsFlags.ConcFlags.nNodes); */
 
   allocated = 
     n_free_capabilities * RtsFlags.GcFlags.minAllocAreaSize * BLOCK_SIZE_W

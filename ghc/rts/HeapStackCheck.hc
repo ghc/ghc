@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.hc,v 1.9 1999/08/25 16:11:48 simonmar Exp $
+ * $Id: HeapStackCheck.hc,v 1.10 1999/11/09 15:46:51 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -156,6 +156,18 @@ EXTFUN(stg_gc_enter_1)
   Sp -= 1;
   Sp[0] = R1.w;
   GC_ENTER
+  FE_
+}
+
+EXTFUN(stg_gc_enter_1_hponly)
+{
+  FB_
+  Sp -= 1;
+  Sp[0] = R1.w;
+  R1.i = HeapOverflow;
+  SaveThreadState();
+  CurrentTSO->whatNext = ThreadEnterGHC;
+  JMP_(StgReturn);
   FE_
 }
 

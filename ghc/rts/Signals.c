@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.9 1999/11/02 15:06:02 simonmar Exp $
+ * $Id: Signals.c,v 1.10 1999/11/09 15:46:57 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -257,7 +257,7 @@ pthread_t startup_guy;
 #endif
 
 static void
-shutdown_handler(int sig)
+shutdown_handler(int sig STG_UNUSED)
 {
 #ifdef SMP
   /* if I'm a worker thread, send this signal to the guy who

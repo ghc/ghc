@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.14 1999/11/02 15:05:53 simonmar Exp $
+ * $Id: Updates.h,v 1.15 1999/11/09 15:47:09 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -36,30 +36,55 @@
    if you *really* need an IND use UPD_REAL_IND
  */
 #ifdef SMP
-#define UPD_REAL_IND(updclosure, heapptr)		\
-   {							\
-	const StgInfoTable *info;			\
-	info = LOCK_CLOSURE(updclosure);		\
-							\
-     	if (info == &BLACKHOLE_BQ_info) {				\
-	   STGCALL1(awakenBlockedQueue, 				\
-		    ((StgBlockingQueue *)updclosure)->blocking_queue); 	\
-	}						\
-	updateWithIndirection((StgClosure *)updclosure,         \
-			      (StgClosure *)heapptr);		\
+#define UPD_REAL_IND(updclosure, heapptr)				\
+   {									\
+	const StgInfoTable *info;					\
+	if (Bdescr((P_)updclosure)->back != (bdescr *)BaseReg) {	\
+		info = LOCK_CLOSURE(updclosure);			\
+	} else {							\
+		info = updclosure->header.info;				\
+	}								\
+        AWAKEN_BQ(info,updclosure);					\
+	updateWithIndirection(info,					\
+			      (StgClosure *)updclosure,			\
+			      (StgClosure *)heapptr);			\
    }
 #else
 #define UPD_REAL_IND(updclosure, heapptr)		\
-        AWAKEN_BQ(updclosure);				\
-	updateWithIndirection((StgClosure *)updclosure,	\
-			      (StgClosure *)heapptr);
+   {							\
+	const StgInfoTable *info;			\
+	info = ((StgClosure *)updclosure)->header.info;	\
+        AWAKEN_BQ(info,updclosure);			\
+	updateWithIndirection(info,			\
+			      (StgClosure *)updclosure,	\
+			      (StgClosure *)heapptr);	\
+   }
 #endif
 
 #if defined(PROFILING) || defined(TICKY_TICKY)
-#define UPD_PERM_IND(updclosure, heapptr)                       \
-        AWAKEN_BQ(updclosure);                                  \
-	updateWithPermIndirection((StgClosure *)updclosure,     \
-			          (StgClosure *)heapptr);
+#define UPD_PERM_IND(updclosure, heapptr)			\
+   {								\
+	const StgInfoTable *info;				\
+	info = ((StgClosure *)updclosure)->header.info;		\
+        AWAKEN_BQ(info,updclosure);				\
+	updateWithPermIndirection(info,				\
+				  (StgClosure *)updclosure,	\
+				  (StgClosure *)heapptr);	\
+   }
+#endif
+
+#ifdef SMP
+#define UPD_IND_NOLOCK(updclosure, heapptr)				\
+   {									\
+	const StgInfoTable *info;					\
+	info = updclosure->header.info;					\
+        AWAKEN_BQ(info,updclosure);					\
+	updateWithIndirection(info,					\
+			      (StgClosure *)updclosure,			\
+			      (StgClosure *)heapptr);			\
+   }
+#else
+#define UPD_IND_NOLOCK(updclosure,heapptr) UPD_IND(updclosure,heapptr)
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -68,10 +93,10 @@
 
 extern void awakenBlockedQueue(StgTSO *q);
 
-#define AWAKEN_BQ(closure)						 \
-     	if (closure->header.info == &BLACKHOLE_BQ_info) {		 \
-		STGCALL1(awakenBlockedQueue, 				 \
-			 ((StgBlockingQueue *)closure)->blocking_queue); \
+#define AWAKEN_BQ(info,closure)						\
+     	if (info == &BLACKHOLE_BQ_info) {				\
+	     STGCALL1(awakenBlockedQueue,				\
+		      ((StgBlockingQueue *)closure)->blocking_queue);	\
 	}
 
 

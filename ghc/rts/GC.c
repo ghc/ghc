@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.65 1999/11/02 15:05:56 simonmar Exp $
+ * $Id: GC.c,v 1.66 1999/11/09 15:46:49 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -2204,9 +2204,30 @@ scavenge_mutable_list(generation *gen)
 	continue;
       }
 
+      /* Happens if a BLACKHOLE_BQ in the old generation is updated: 
+       */
+    case IND_OLDGEN:
+    case IND_OLDGEN_PERM:
+      /* Try to pull the indirectee into this generation, so we can
+       * remove the indirection from the mutable list.  
+       */
+      evac_gen = gen->no;
+      ((StgIndOldGen *)p)->indirectee = 
+        evacuate(((StgIndOldGen *)p)->indirectee);
+      evac_gen = 0;
+
+      if (failed_to_evac) {
+	failed_to_evac = rtsFalse;
+	p->mut_link = gen->mut_once_list;
+	gen->mut_once_list = p;
+      } else {
+	p->mut_link = NULL;
+      }
+      continue;
+
     default:
       /* shouldn't have anything else on the mutables list */
-      barf("scavenge_mut_list: strange object? %d", (int)(info->type));
+      barf("scavenge_mutable_list: strange object? %d", (int)(info->type));
     }
   }
 }
@@ -2894,7 +2915,7 @@ threadSqueezeStack(StgTSO *tso)
        * sorted out?  oh yes: we aren't counting each enter properly
        * in this case.  See the log somewhere.  KSW 1999-04-21
        */
-      UPD_IND(updatee_bypass, updatee_keep); /* this wakes the threads up */
+      UPD_IND_NOLOCK(updatee_bypass, updatee_keep); /* this wakes the threads up */
       
       sp = (P_)frame - 1;	/* sp = stuff to slide */
       displacement += sizeofW(StgUpdateFrame);

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.30 1999/11/08 15:30:39 sewardj Exp $
+ * $Id: Schedule.c,v 1.31 1999/11/09 15:46:54 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -86,10 +86,6 @@ StgTSO *blocked_queue_hd, *blocked_queue_tl;
  * Locks required: sched_mutex.
  */
 static StgTSO *suspended_ccalling_threads;
-
-#ifndef SMP
-static rtsBool in_ccall_gc;
-#endif
 
 static void GetRoots(void);
 static StgTSO *threadStackOverflow(StgTSO *tso);
@@ -192,18 +188,54 @@ schedule( void )
 
   while (1) {
 
-    /* Check whether any waiting threads need to be woken up.
-     * If the run queue is empty, we can wait indefinitely for
-     * something to happen.
+    /* Check whether any waiting threads need to be woken up.  If the
+     * run queue is empty, and there are no other tasks running, we
+     * can wait indefinitely for something to happen.
+     * ToDo: what if another client comes along & requests another
+     * main thread?
      */
     if (blocked_queue_hd != END_TSO_QUEUE) {
-      awaitEvent(run_queue_hd == END_TSO_QUEUE);
+      awaitEvent(
+	   (run_queue_hd == END_TSO_QUEUE)
+#ifdef SMP
+	&& (n_free_capabilities == RtsFlags.ConcFlags.nNodes)
+#endif
+	);
     }
     
     /* check for signals each time around the scheduler */
 #ifndef __MINGW32__
     if (signals_pending()) {
       start_signal_handlers();
+    }
+#endif
+
+    /* Detect deadlock: when we have no threads to run, there are
+     * no threads waiting on I/O or sleeping, and all the other
+     * tasks are waiting for work, we must have a deadlock.  Inform
+     * all the main threads.
+     */
+#ifdef SMP
+    if (blocked_queue_hd == END_TSO_QUEUE
+	&& run_queue_hd == END_TSO_QUEUE
+	&& (n_free_capabilities == RtsFlags.ConcFlags.nNodes)
+	) {
+      StgMainThread *m;
+      for (m = main_threads; m != NULL; m = m->link) {
+	  m->ret = NULL;
+	  m->stat = Deadlock;
+	  pthread_cond_broadcast(&m->wakeup);
+      }
+      main_threads = NULL;
+    }
+#else /* ! SMP */
+    if (blocked_queue_hd == END_TSO_QUEUE
+	&& run_queue_hd == END_TSO_QUEUE) {
+      StgMainThread *m = main_threads;
+      m->ret = NULL;
+      m->stat = Deadlock;
+      main_threads = m->link;
+      return;
     }
 #endif
 
@@ -249,11 +281,11 @@ schedule( void )
     
     /* set the context_switch flag
      */
-    if (run_queue_hd == END_TSO_QUEUE) 
+    if (run_queue_hd == END_TSO_QUEUE)
       context_switch = 0;
     else
       context_switch = 1;
-    
+
     RELEASE_LOCK(&sched_mutex);
     
 #ifdef SMP
@@ -711,17 +743,7 @@ taskStart( void *arg STG_UNUSED )
 static void
 term_handler(int sig STG_UNUSED)
 {
-  nat i;
-  pthread_t me = pthread_self();
-
-  for (i = 0; i < RtsFlags.ConcFlags.nNodes; i++) {
-    if (task_ids[i].id == me) {
-      task_ids[i].mut_time = usertime() - task_ids[i].gc_time;
-      if (task_ids[i].mut_time < 0.0) {
-	task_ids[i].mut_time = 0.0;
-      }
-    }
-  }
+  stat_workerStop();
   ACQUIRE_LOCK(&term_mutex);
   await_death--;
   RELEASE_LOCK(&term_mutex);
@@ -798,6 +820,11 @@ startTasks( void )
       barf("startTasks: Can't create new Posix thread");
     }
     task_ids[i].id = tid;
+    task_ids[i].mut_time = 0.0;
+    task_ids[i].mut_etime = 0.0;
+    task_ids[i].gc_time = 0.0;
+    task_ids[i].gc_etime = 0.0;
+    task_ids[i].elapsedtimestart = elapsedtime();
     IF_DEBUG(scheduler,fprintf(stderr,"schedule: Started task: %ld\n",tid););
   }
 }
@@ -884,14 +911,19 @@ waitThread(StgTSO *tso, /*out*/StgClosure **ret)
   m->link = main_threads;
   main_threads = m;
 
+  IF_DEBUG(scheduler, fprintf(stderr, "schedule: new main thread (%d)\n", 
+			      m->tso->id));
+
 #ifdef SMP
-  pthread_cond_wait(&m->wakeup, &sched_mutex);
+  do {
+    pthread_cond_wait(&m->wakeup, &sched_mutex);
+  } while (m->stat == NoStatus);
 #else
   schedule();
+  ASSERT(m->stat != NoStatus);
 #endif
 
   stat = m->stat;
-  ASSERT(stat != NoStatus);
 
 #ifdef SMP
   pthread_cond_destroy(&m->wakeup);
@@ -902,253 +934,6 @@ waitThread(StgTSO *tso, /*out*/StgClosure **ret)
   return stat;
 }
   
-
-#if 0
-SchedulerStatus schedule(StgTSO *main, StgClosure **ret_val)
-{
-  StgTSO *t;
-  StgThreadReturnCode ret;
-  StgTSO **MainTSO;
-  rtsBool in_ccall_gc;
-
-  /* Return value is NULL by default, it is only filled in if the
-   * main thread completes successfully.
-   */
-  if (ret_val) { *ret_val = NULL; }
-
-  /* Save away a pointer to the main thread so that we can keep track
-   * of it should a garbage collection happen.  We keep a stack of
-   * main threads in order to support scheduler re-entry.  We can't
-   * use the normal TSO linkage for this stack, because the main TSO
-   * may need to be linked onto other queues.
-   */
-  main_threads[next_main_thread] = main;
-  MainTSO = &main_threads[next_main_thread];
-  next_main_thread++;
-  IF_DEBUG(scheduler,
-	   fprintf(stderr, "Scheduler entered: nesting = %d\n", 
-		   next_main_thread););
-
-  /* Are we being re-entered? 
-   */
-  if (CurrentTSO != NULL) {
-    /* This happens when a _ccall_gc from Haskell ends up re-entering
-     * the scheduler.
-     *
-     * Block the current thread (put it on the ccalling_queue) and
-     * continue executing.  The calling thread better have stashed
-     * away its state properly and left its stack with a proper stack
-     * frame on the top.
-     */
-    threadPaused(CurrentTSO);
-    CurrentTSO->link = ccalling_threads;
-    ccalling_threads = CurrentTSO;
-    in_ccall_gc = rtsTrue;
-    IF_DEBUG(scheduler,
-	     fprintf(stderr, "Re-entry, thread %d did a _ccall_gc\n", 
-		     CurrentTSO->id););
-  } else {
-    in_ccall_gc = rtsFalse;
-  }
-
-  /* Take a thread from the run queue.
-   */
-  t = POP_RUN_QUEUE();
-
-  while (t != END_TSO_QUEUE) {
-    CurrentTSO = t;
-
-    /* If we have more threads on the run queue, set up a context
-     * switch at some point in the future.
-     */
-    if (run_queue_hd != END_TSO_QUEUE || blocked_queue_hd != END_TSO_QUEUE) {
-      context_switch = 1;
-    } else {
-      context_switch = 0;
-    }
-    IF_DEBUG(scheduler, belch("Running thread %ld...\n", t->id));
-
-    /* Be friendly to the storage manager: we're about to *run* this
-     * thread, so we better make sure the TSO is mutable.
-     */
-    if (t->mut_link == NULL) {
-      recordMutable((StgMutClosure *)t);
-    }
-
-    /* Run the current thread */
-    switch (t->whatNext) {
-    case ThreadKilled:
-    case ThreadComplete:
-      /* thread already killed.  Drop it and carry on. */
-      goto next_thread;
-    case ThreadEnterGHC:
-      ret = StgRun((StgFunPtr) stg_enterStackTop);
-      break;
-    case ThreadRunGHC:
-      ret = StgRun((StgFunPtr) stg_returnToStackTop);
-      break;
-    case ThreadEnterHugs:
-#ifdef INTERPRETER
-      {  
-	  IF_DEBUG(scheduler,belch("entering Hugs"));	  
-	  LoadThreadState();
-	  /* CHECK_SENSIBLE_REGS(); */
-	  {
-	      StgClosure* c = (StgClosure *)Sp[0];
-	      Sp += 1;
-	      ret = enter(c);
-	  }	
-	  SaveThreadState();
-	  break;
-      }
-#else
-      barf("Panic: entered a BCO but no bytecode interpreter in this build");
-#endif
-    default:
-      barf("schedule: invalid whatNext field");
-    }
-
-    /* We may have garbage collected while running the thread
-     * (eg. something nefarious like _ccall_GC_ performGC), and hence
-     * CurrentTSO may have moved.  Update t to reflect this.
-     */
-    t = CurrentTSO;
-    CurrentTSO = NULL;
-
-    /* Costs for the scheduler are assigned to CCS_SYSTEM */
-#ifdef PROFILING
-    CCCS = CCS_SYSTEM;
-#endif
-
-    switch (ret) {
-
-    case HeapOverflow:
-      IF_DEBUG(scheduler,belch("Thread %ld stopped: HeapOverflow\n", t->id));
-      threadPaused(t);
-      PUSH_ON_RUN_QUEUE(t);
-      GarbageCollect(GetRoots);
-      break;
-
-    case StackOverflow:
-      IF_DEBUG(scheduler,belch("Thread %ld stopped, StackOverflow\n", t->id));
-      { 
-	nat i;
-	/* enlarge the stack */
-	StgTSO *new_t = threadStackOverflow(t);
-	
-	/* This TSO has moved, so update any pointers to it from the
-	 * main thread stack.  It better not be on any other queues...
-	 * (it shouldn't be)
-	 */
-	for (i = 0; i < next_main_thread; i++) {
-	  if (main_threads[i] == t) {
-	    main_threads[i] = new_t;
-	  }
-	}
-	t = new_t;
-      }
-      PUSH_ON_RUN_QUEUE(t);
-      break;
-
-    case ThreadYielding:
-      IF_DEBUG(scheduler,
-               if (t->whatNext == ThreadEnterHugs) {
-		   /* ToDo: or maybe a timer expired when we were in Hugs?
-		    * or maybe someone hit ctrl-C
-                    */
-                   belch("Thread %ld stopped to switch to Hugs\n", t->id);
-               } else {
-                   belch("Thread %ld stopped, timer expired\n", t->id);
-               }
-               );
-      threadPaused(t);
-      if (interrupted) {
-          IF_DEBUG(scheduler,belch("Scheduler interrupted - returning"));
-	  deleteThread(t);
-	  while (run_queue_hd != END_TSO_QUEUE) {
-	      run_queue_hd = t->link;
-	      deleteThread(t);
-	  }
-	  run_queue_tl = END_TSO_QUEUE;
-	  /* ToDo: should I do the same with blocked queues? */
-          return Interrupted;
-      }
-
-      /* Put the thread back on the run queue, at the end.
-       * t->link is already set to END_TSO_QUEUE.
-       */
-      APPEND_TO_RUN_QUEUE(t);
-      break;
-
-    case ThreadBlocked:
-      IF_DEBUG(scheduler,
-	       fprintf(stderr, "Thread %d stopped, ", t->id);
-	       printThreadBlockage(t);
-	       fprintf(stderr, "\n"));
-      threadPaused(t);
-      /* assume the thread has put itself on some blocked queue
-       * somewhere.
-       */
-      break;
-
-    case ThreadFinished:
-      IF_DEBUG(scheduler,fprintf(stderr,"thread %ld finished\n", t->id));
-      t->whatNext = ThreadComplete;
-      break;
-
-    default:
-      barf("schedule: invalid thread return code");
-    }
-
-    /* check for signals each time around the scheduler */
-#ifndef __MINGW32__
-    if (signals_pending()) {
-      start_signal_handlers();
-    }
-#endif
-    /* If our main thread has finished or been killed, return.
-     * If we were re-entered as a result of a _ccall_gc, then
-     * pop the blocked thread off the ccalling_threads stack back
-     * into CurrentTSO.
-     */
-    if ((*MainTSO)->whatNext == ThreadComplete
-	|| (*MainTSO)->whatNext == ThreadKilled) {
-      next_main_thread--;
-      if (in_ccall_gc) {
-	CurrentTSO = ccalling_threads;
-	ccalling_threads = ccalling_threads->link;
-	/* remember to stub the link field of CurrentTSO */
-	CurrentTSO->link = END_TSO_QUEUE;
-      }
-      if ((*MainTSO)->whatNext == ThreadComplete) {
-	/* we finished successfully, fill in the return value */
-	if (ret_val) { *ret_val = (StgClosure *)(*MainTSO)->sp[0]; };
-	return Success;
-      } else {
-	return Killed;
-      }
-    }
-
-  next_thread:
-    /* Checked whether any waiting threads need to be woken up.
-     * If the run queue is empty, we can wait indefinitely for
-     * something to happen.
-     */
-    if (blocked_queue_hd != END_TSO_QUEUE) {
-      awaitEvent(run_queue_hd == END_TSO_QUEUE);
-    }
-
-    t = POP_RUN_QUEUE();
-  }
-
-  /* If we got to here, then we ran out of threads to run, but the
-   * main thread hasn't finished yet.  It must be blocked on an MVar
-   * or a black hole somewhere, so we return deadlock.
-   */
-  return Deadlock;
-}
-#endif
-
 /* -----------------------------------------------------------------------------
    Debugging: why is a thread blocked
    -------------------------------------------------------------------------- */
@@ -1605,7 +1390,7 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
 	 * this will also wake up any threads currently
 	 * waiting on the result.
 	 */
-	UPD_IND(su->updatee,ap);  /* revert the black hole */
+	UPD_IND_NOLOCK(su->updatee,ap);  /* revert the black hole */
 	su = su->link;
 	sp += sizeofW(StgUpdateFrame) -1;
 	sp[0] = (W_)ap; /* push onto stack */

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: BlockAlloc.h,v 1.7 1999/11/02 17:08:28 simonmar Exp $
+ * $Id: BlockAlloc.h,v 1.8 1999/11/09 15:46:49 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -23,16 +23,6 @@ extern bdescr *allocBlock(void);
 
 extern void freeGroup(bdescr *p);
 extern void freeChain(bdescr *p);
-
-/* Finding the block descriptor for a given block -------------------------- */
-
-static inline bdescr *Bdescr(StgPtr p)
-{
-  return (bdescr *)
-    ((((W_)p &  MBLOCK_MASK & ~BLOCK_MASK) >> (BLOCK_SHIFT-BDESCR_SHIFT)) 
-     | ((W_)p & ~MBLOCK_MASK)
-     );
-}
 
 /* Round a value to megablocks --------------------------------------------- */
 

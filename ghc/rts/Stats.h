@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.h,v 1.7 1999/11/02 17:19:17 simonmar Exp $
+ * $Id: Stats.h,v 1.8 1999/11/09 15:46:58 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -12,6 +12,7 @@ extern void      start_time(void);
 extern StgDouble usertime(void);
 extern void      end_init(void);
 extern void      stat_exit(int alloc);
+extern void      stat_workerStop(void);
 
 extern void      stat_startGC(void);
 extern void      stat_endGC(lnat alloc, lnat collect, lnat live, 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.20 1999/11/02 15:06:05 simonmar Exp $
+ * $Id: Updates.hc,v 1.21 1999/11/09 15:47:00 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -58,10 +58,17 @@
 	  /* Tick - it must be a con, all the paps are handled		\
 	   * in stg_upd_PAP and PAP_entry below				\
 	   */								\
-	  TICK_UPD_CON_IN_NEW(sizeW_fromITBL(get_itbl(Su)));	\
+	  TICK_UPD_CON_IN_NEW(sizeW_fromITBL(get_itbl(Su)));		\
 									\
-	  /* update the updatee with an indirection to the return value */\
-	  UPD_IND(Su,R1.p);					\
+	  if (Bdescr(updatee)->back != BaseReg) {			\
+		LOCK_CLOSURE(Su);					\
+	  }								\
+									\
+ 	  UPD_IND_NOLOCK(Su,R1.p);					\
+									\
+	  /* update the updatee with an indirection 			\
+	   * to the return value 					\
+	   */								\
 									\
 	  /* reset Su to the next update frame */			\
 	  Su = ((StgUpdateFrame *)Sp)->link;				\
@@ -88,8 +95,7 @@
 	   */								\
 	  TICK_UPD_CON_IN_NEW(sizeW_fromITBL(get_itbl(updatee)));	\
 									\
-	  /* update the updatee with an indirection to the return value */\
-	  UPD_IND(updatee,R1.p);					\
+	  UPD_IND(updatee, R1.cl);					\
 									\
 	  /* reset Su to the next update frame */			\
 	  Su = ((StgUpdateFrame *)Sp)->link;				\

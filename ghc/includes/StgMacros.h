@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.16 1999/11/05 12:28:05 simonmar Exp $
+ * $Id: StgMacros.h,v 1.17 1999/11/09 15:47:09 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -418,13 +418,33 @@ EDI_(stg_gen_chk_info);
 
 #ifdef EAGER_BLACKHOLING
 #  ifdef SMP
-#    define UPD_BH_UPDATABLE(info)		\
-        TICK_UPD_BH_UPDATABLE();		\
-        LOCK_THUNK(info);			\
+#    define UPD_BH_UPDATABLE(info)				\
+        TICK_UPD_BH_UPDATABLE();				\
+        { 							\
+	  bdescr *bd = Bdescr(R1.p);				\
+          if (bd->back != (bdescr *)BaseReg) {			\
+             if (bd->gen->no >= 1 || bd->step->no >= 1) {	\
+        	 LOCK_THUNK(info);				\
+             } else {						\
+	         EXTFUN_RTS(stg_gc_enter_1_hponly);		\
+        	 JMP_(stg_gc_enter_1_hponly);			\
+             }							\
+          }							\
+	}							\
         SET_INFO(R1.cl,&BLACKHOLE_info)
-#    define UPD_BH_SINGLE_ENTRY(info)		\
-        TICK_UPD_BH_SINGLE_ENTRY();		\
-        LOCK_THUNK(info);			\
+#    define UPD_BH_SINGLE_ENTRY(info)				\
+        TICK_UPD_BH_SINGLE_ENTRY();				\
+        {							\
+	  bdescr *bd = Bdescr(R1.p);				\
+          if (bd->back != (bdescr *)BaseReg) {			\
+             if (bd->gen->no >= 1 || bd->step->no >= 1) {	\
+        	 LOCK_THUNK(info);				\
+             } else {						\
+	         EXTFUN_RTS(stg_gc_enter_1_hponly);		\
+        	 JMP_(stg_gc_enter_1_hponly);			\
+             }							\
+          }							\
+	}							\
         SET_INFO(R1.cl,&BLACKHOLE_info)
 #  else
 #    define UPD_BH_UPDATABLE(info)		\

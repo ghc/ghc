@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStdThunks.hc,v 1.9 1999/11/02 15:06:04 simonmar Exp $
+ * $Id: StgStdThunks.hc,v 1.10 1999/11/09 15:46:58 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -7,7 +7,9 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#include "Stg.h"
+#include "Rts.h"
+#include "StoragePriv.h"
+#include "HeapStackCheck.h"
 
 /* -----------------------------------------------------------------------------
    The code for a thunk that simply extracts a field from a

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.33 1999/11/02 15:05:58 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.34 1999/11/09 15:46:53 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -1028,13 +1028,15 @@ FN_(delayzh_fast)
     ASSERT(CurrentTSO->why_blocked == NotBlocked);
     CurrentTSO->why_blocked = BlockedOnDelay;
 
+    ACQUIRE_LOCK(&sched_mutex);
+
     /* Add on ticks_since_select, since these will be subtracted at
      * the next awaitEvent call.
      */
     CurrentTSO->block_info.delay = R1.i + ticks_since_select;
 
-    ACQUIRE_LOCK(&sched_mutex);
     APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
+
     RELEASE_LOCK(&sched_mutex);
     JMP_(stg_block_noregs);
   FE_

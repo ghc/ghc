@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Regs.h,v 1.5 1999/11/02 15:05:51 simonmar Exp $
+ * $Id: Regs.h,v 1.6 1999/11/09 15:47:08 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -49,8 +49,8 @@ typedef struct StgRegTable_ {
   StgPtr 	  rHp;
   StgPtr 	  rHpLim;
   StgTSO         *rCurrentTSO;
-  bdescr         *rNursery;
-  bdescr         *rCurrentNursery;
+  struct _bdescr *rNursery;
+  struct _bdescr *rCurrentNursery;
 #ifdef SMP
   struct StgRegTable_ *link;
 #endif

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ClosureFlags.c,v 1.3 1999/11/02 15:05:56 simonmar Exp $
+ * $Id: ClosureFlags.c,v 1.4 1999/11/09 15:46:49 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -54,7 +54,7 @@ StgWord16 closure_flags[] = {
 /* IND_STATIC	   	*/ (              _STA                   ),
 /* CAF_UNENTERED        */ ( 0                                   ),
 /* CAF_ENTERED          */ ( 0                                   ),
-/* BLACKHOLE_BQ	   	*/ ( 	 _BTM|_NS|         _MUT|_UPT     ),
+/* CAF_BLACKHOLE   	*/ ( 	 _BTM|_NS|         _MUT|_UPT     ),
 /* RET_BCO		*/ (     _BTM                            ),
 /* RET_SMALL		*/ (     _BTM|                       _SRT),
 /* RET_VEC_SMALL	*/ (     _BTM|                       _SRT),
@@ -65,7 +65,7 @@ StgWord16 closure_flags[] = {
 /* CATCH_FRAME	   	*/ (     _BTM                            ),
 /* STOP_FRAME	   	*/ (     _BTM                            ),
 /* SEQ_FRAME 	   	*/ (     _BTM                            ),
-/* BLACKHOLE		*/ ( 	      _NS|              _UPT     ),
+/* BLACKHOLE		*/ ( 	      _NS|         _MUT|_UPT     ),
 /* BLACKHOLE_BQ	   	*/ ( 	      _NS|         _MUT|_UPT     ),
 /* SE_BLACKHOLE		*/ ( 	      _NS|              _UPT     ),
 /* SE_CAF_BLACKHOLE	*/ ( 	      _NS|              _UPT     ),

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.10 1999/11/02 15:06:05 simonmar Exp $
+ * $Id: Storage.h,v 1.11 1999/11/09 15:46:59 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -128,27 +128,29 @@ recordOldToNewPtrs(StgMutClosure *p)
   }
 }
 
-#define updateWithIndirection(p1, p2)				\
-  {								\
-    bdescr *bd;							\
-								\
-    bd = Bdescr((P_)p1);					\
-    if (bd->gen->no == 0) {					\
-      ((StgInd *)p1)->indirectee = p2;				\
-      SET_INFO(p1,&IND_info);					\
-      TICK_UPD_NEW_IND();					\
-    } else {							\
-      ((StgIndOldGen *)p1)->indirectee = p2;			\
-      ((StgIndOldGen *)p1)->mut_link = bd->gen->mut_once_list;	\
-      bd->gen->mut_once_list = (StgMutClosure *)p1;		\
-      SET_INFO(p1,&IND_OLDGEN_info);				\
-      TICK_UPD_OLD_IND();					\
-    }								\
+#define updateWithIndirection(info, p1, p2)				\
+  {									\
+    bdescr *bd;								\
+									\
+    bd = Bdescr((P_)p1);						\
+    if (bd->gen->no == 0) {						\
+      ((StgInd *)p1)->indirectee = p2;					\
+      SET_INFO(p1,&IND_info);						\
+      TICK_UPD_NEW_IND();						\
+    } else {								\
+      ((StgIndOldGen *)p1)->indirectee = p2;				\
+      if (info != &BLACKHOLE_BQ_info) {					\
+        ((StgIndOldGen *)p1)->mut_link = bd->gen->mut_once_list;	\
+        bd->gen->mut_once_list = (StgMutClosure *)p1;			\
+      }									\
+      SET_INFO(p1,&IND_OLDGEN_info);					\
+      TICK_UPD_OLD_IND();						\
+    }									\
   }
 
 #if defined(TICKY_TICKY) || defined(PROFILING)
 static inline void
-updateWithPermIndirection(StgClosure *p1, StgClosure *p2) 
+updateWithPermIndirection(info, StgClosure *p1, StgClosure *p2) 
 {
   bdescr *bd;
 
@@ -159,8 +161,10 @@ updateWithPermIndirection(StgClosure *p1, StgClosure *p2)
     TICK_UPD_NEW_PERM_IND(p1);
   } else {
     ((StgIndOldGen *)p1)->indirectee = p2;
-    ((StgIndOldGen *)p1)->mut_link = bd->gen->mut_once_list;
-    bd->gen->mut_once_list = (StgMutClosure *)p1;
+    if (info != &BLACKHOLE_BQ_info) {
+      ((StgIndOldGen *)p1)->mut_link = bd->gen->mut_once_list;
+      bd->gen->mut_once_list = (StgMutClosure *)p1;
+    }
     SET_INFO(p1,&IND_OLDGEN_PERM_info);
     TICK_UPD_OLD_PERM_IND();
   }
