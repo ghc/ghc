@@ -1015,6 +1015,10 @@ endif	# if way
 # these flags, and set the -e flag appropriately.  NOTE: watch out for
 # the --no-print-directory flag which is passed to recursive
 # invocations of make.
+#
+# NOTE: Truly weird use of exit below to stop the for loop dead in
+# its tracks should any of the sub-makes fail. By my reckoning, 
+#  "cmd || exit $?" should be equivalent to "cmd"
 
 ifeq "$(way)" ""
 ifneq "$(SUBDIRS)" ""
@@ -1024,13 +1028,15 @@ all docs runtests boot TAGS clean veryclean maintainer-clean install info ::
 	@echo "===fptools== Recursively making \`$@' in $(SUBDIRS) ..."
 	@echo "PWD = $(shell pwd)"
 	@echo "------------------------------------------------------------------------"
-	@case '${MFLAGS}' in *-[ik]*) set +e;; *-r*[ik]*) set +e;; *) set -e;; esac; \
-	for i in $(SUBDIRS) ; do \
+# Don't rely on -e working, instead we check exit return codes from sub-makes.
+	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
+	for i in $(SUBDIRS); do \
 	  echo "------------------------------------------------------------------------"; \
 	  echo "==fptools== $(MAKE) $@ $(MFLAGS);"; \
 	  echo " in $(shell pwd)/$$i"; \
 	  echo "------------------------------------------------------------------------"; \
 	  $(MAKE) --no-print-directory -C $$i $(MFLAGS) $@; \
+	  if [ $$? -eq 0 ] ;  then true; else exit $$x_on_err; fi; \
 	done
 	@echo "------------------------------------------------------------------------"
 	@echo "===fptools== Finished making \`$@' in $(SUBDIRS) ..."
@@ -1038,10 +1044,12 @@ all docs runtests boot TAGS clean veryclean maintainer-clean install info ::
 	@echo "------------------------------------------------------------------------"
 
 dist ::
-	@case '${MFLAGS}' in *-[ik]*) set +e;; *-r*[ik]*) set +e;; *) set -e;; esac; \
+# Don't rely on -e working, instead we check exit return codes from sub-makes.
+	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
 	for i in $(SUBDIRS) ; do \
 	  $(MKDIRHIER_PREFIX)mkdirhier $(SRC_DIST_DIR)/$$i; \
 	  $(MAKE) -C $$i $(MFLAGS) $@ SRC_DIST_DIR=$(SRC_DIST_DIR)/$$i; \
+	  if [ $$? -eq 0 ] ;  then true; else exit $$x_on_err; fi; \
 	done
 endif
 endif
@@ -1066,13 +1074,15 @@ all docs TAGS clean veryclean maintainer-clean install ::
 	@echo "===fptools== Recursively making \`$@' for ways: $(WAYS) ..."
 	@echo "PWD = $(shell pwd)"
 	@echo "------------------------------------------------------------------------"
-	@case '${MFLAGS}' in *-[ik]*) set +e;; *-r*[ik]*) set +e;; *) set -e;; esac; \
+# Don't rely on -e working, instead we check exit return codes from sub-makes.
+	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
 	for i in $(WAYS) ; do \
 	  echo "------------------------------------------------------------------------"; \
 	  echo "==fptools== $(MAKE) way=$$i $@;"; \
 	  echo "PWD = $(shell pwd)"; \
 	  echo "------------------------------------------------------------------------"; \
 	  $(MAKE) way=$$i --no-print-directory $(MFLAGS) $@ ; \
+	  if [ $$? -eq 0 ] ; then true; else exit $$x_on_err; fi; \
 	done
 	@echo "------------------------------------------------------------------------"
 	@echo "===fptools== Finished recursively making \`$@' for ways: $(WAYS) ..."
