@@ -42,22 +42,22 @@ type Word = Word32
 {- $notes
 
 * All arithmetic is performed modulo 2^n, where n is the number of
-  bits in the type.  One non-obvious consequence of this is that 'negate'
+  bits in the type.  One non-obvious consequence of this is that 'Prelude.negate'
   should /not/ raise an error on negative arguments.
 
 * For coercing between any two integer types, use
-  'fromIntegral', which is specialized for all the
+  'Prelude.fromIntegral', which is specialized for all the
   common cases so should be fast enough.  Coercing word types to and
   from integer types preserves representation, not sign.
 
-* It would be very natural to add a type 'Natural' providing an unbounded 
-  size unsigned integer, just as 'Integer' provides unbounded
+* It would be very natural to add a type @Natural@ providing an unbounded 
+  size unsigned integer, just as 'Prelude.Integer' provides unbounded
   size signed integers.  We do not do that yet since there is no demand
   for it.
 
-* The rules that hold for 'Enum' instances over a bounded type
-  such as 'Int' (see the section of the Haskell report dealing
-  with arithmetic sequences) also hold for the 'Enum' instances
+* The rules that hold for 'Prelude.Enum' instances over a bounded type
+  such as 'Prelude.Int' (see the section of the Haskell report dealing
+  with arithmetic sequences) also hold for the 'Prelude.Enum' instances
   over the various 'Word' types defined here.
 
 * Right and left shifts by amounts greater than or equal to the width
