@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.23 2001/02/12 12:22:01 simonmar Exp $
+ * $Id: Linker.c,v 1.24 2001/02/12 12:46:23 sewardj Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -295,6 +295,21 @@ lookupSymbol( char *lbl )
     }
 }
 
+static 
+void *
+lookupLocalSymbol( ObjectCode* oc, char *lbl )
+{
+    SymbolVal *val;
+    val = lookupStrHashTable(oc->lochash, lbl);
+
+    if (val == NULL) {
+        return NULL;
+    } else {
+	return val->addr;
+    }
+}
+
+
 /* -----------------------------------------------------------------------------
  * Load an obj (populate the global symbol table, but don't resolve yet)
  *
@@ -308,14 +323,14 @@ loadObj( char *path )
    int r, n;
    FILE *f;
 
-#ifdef DEBUG
+#  ifdef DEBUG
    /* assert that we haven't already loaded this object */
    { 
        ObjectCode *o;
        for (o = objects; o; o = o->next)
 	   ASSERT(strcmp(o->fileName, path));
    }
-#endif /* DEBUG */   
+#  endif /* DEBUG */   
 
    oc = stgMallocBytes(sizeof(ObjectCode), "loadObj(oc)");
 
@@ -331,7 +346,7 @@ loadObj( char *path )
    r = stat(path, &st);
    if (r == -1) { return 0; }
 
-   /* sigh, stdup() isn't a POSIX function, so do it the long way */
+   /* sigh, strdup() isn't a POSIX function, so do it the long way */
    oc->fileName = stgMallocBytes( strlen(path)+1, "loadObj" );
    strcpy(oc->fileName, path);
 
@@ -339,6 +354,7 @@ loadObj( char *path )
    oc->image             = stgMallocBytes( st.st_size, "loadObj(image)" );
    oc->symbols           = NULL;
    oc->sections          = NULL;
+   oc->lochash           = allocStrHashTable();
 
    /* chain it onto the list of objects */
    oc->next              = objects;
@@ -394,13 +410,13 @@ resolveObjs( void )
 
     for (oc = objects; oc; oc = oc->next) {
 	if (oc->status != OBJECT_RESOLVED) {
-#  if defined(OBJFORMAT_ELF)
+#           if defined(OBJFORMAT_ELF)
 	    r = ocResolve_ELF ( oc );
-#  elif defined(OBJFORMAT_PEi386)
+#           elif defined(OBJFORMAT_PEi386)
 	    r = ocResolve_PEi386 ( oc );
-#  else
+#           else
 	    barf("link: not implemented on this platform");
-#  endif
+#           endif
 	    if (!r) { return r; }
 	    oc->status = OBJECT_RESOLVED;
 	}
@@ -447,6 +463,7 @@ unloadObj( char *path )
 	    free(oc->fileName);
 	    free(oc->symbols);
 	    free(oc->sections);
+            freeHashTable(oc->lochash, NULL);
 	    free(oc);
 	    return 1;
 	}
@@ -1332,27 +1349,34 @@ ocGetNames_ELF ( ObjectCode* oc )
       oc->n_symbols = nent;
       for (j = 0; j < nent; j++) {
          if ( ( ELF32_ST_BIND(stab[j].st_info)==STB_GLOBAL
-	        /* || ELF32_ST_BIND(stab[j].st_info)==STB_LOCAL */
+                || ELF32_ST_BIND(stab[j].st_info)==STB_LOCAL
               )
-	      /* and not an undefined symbol */
-	      && stab[j].st_shndx != SHN_UNDEF
-	      &&
+              /* and not an undefined symbol */
+              && stab[j].st_shndx != SHN_UNDEF
+              &&
 	      /* and it's a not a section or string table or anything silly */
               ( ELF32_ST_TYPE(stab[j].st_info)==STT_FUNC ||
                 ELF32_ST_TYPE(stab[j].st_info)==STT_OBJECT ||
-	        ELF32_ST_TYPE(stab[j].st_info)==STT_NOTYPE )
-		) { 
+                ELF32_ST_TYPE(stab[j].st_info)==STT_NOTYPE 
+              )
+            ) { 
             char* nm = strtab + stab[j].st_name;
             char* ad = ehdrC 
                        + shdr[ stab[j].st_shndx ].sh_offset
                        + stab[j].st_value;
             ASSERT(nm != NULL);
             ASSERT(ad != NULL);
-	    IF_DEBUG(linker,belch( "addOTabName: %10p  %s %s",
-                       ad, oc->fileName, nm ));
 	    oc->symbols[j].lbl  = nm;
 	    oc->symbols[j].addr = ad;
-	    insertStrHashTable(symhash, nm, &(oc->symbols[j]));
+            if (ELF32_ST_BIND(stab[j].st_info)==STB_LOCAL) {
+               IF_DEBUG(linker,belch( "addOTabName(LOCL): %10p  %s %s",
+                                      ad, oc->fileName, nm ));
+               insertStrHashTable(oc->lochash, nm, &(oc->symbols[j]));
+            } else {
+               IF_DEBUG(linker,belch( "addOTabName(GLOB): %10p  %s %s",
+                                      ad, oc->fileName, nm ));
+               insertStrHashTable(symhash, nm, &(oc->symbols[j]));
+            }
          }
 	 else {
 	     IF_DEBUG(linker,belch( "skipping `%s'", 
@@ -1415,9 +1439,12 @@ static int do_Elf32_Rel_relocations ( ObjectCode* oc, char* ehdrC,
                 (ehdrC + shdr[stab[ELF32_R_SYM(info)].st_shndx ].sh_offset
                        + stab[ELF32_R_SYM(info)].st_value);
          } else {
-            /* No?  Should be in the symbol table then. */
+            /* No?  Should be in a symbol table then; first try the
+               local one. */
             symbol = strtab+stab[ ELF32_R_SYM(info)].st_name;
-            (void *)S = lookupSymbol( symbol );
+            (void*)S = lookupLocalSymbol( oc, symbol );
+            if ((void*)S == NULL)
+               (void*)S = lookupSymbol( symbol );
          }
          if (!S) {
             barf("do_Elf32_Rel_relocations:  %s: unknown symbol `%s'", 
@@ -1487,9 +1514,12 @@ static int do_Elf32_Rela_relocations ( ObjectCode* oc, char* ehdrC,
                 (ehdrC + shdr[stab[ELF32_R_SYM(info)].st_shndx ].sh_offset
                        + stab[ELF32_R_SYM(info)].st_value);
          } else {
-            /* No?  Should be in the symbol table then. */
+            /* No?  Should be in a symbol table then; first try the
+               local one. */
             symbol = strtab+stab[ ELF32_R_SYM(info)].st_name;
-            (void *)S = lookupSymbol( symbol );
+            (void*)S = lookupLocalSymbol( oc, symbol );
+            if ((void*)S == NULL)
+               (void*)S = lookupSymbol( symbol );
          }
          if (!S) {
 	   barf("ocResolve_ELF: %s: unknown symbol `%s'", 
@@ -1530,9 +1560,6 @@ static int do_Elf32_Rela_relocations ( ObjectCode* oc, char* ehdrC,
             w2 = (Elf32_Word)(S + A);
             *pP = w2;
             break;
-         case R_SPARC_NONE: belch("R_SPARC_NONE");
-            break;
-
 #        endif
          default: 
             fprintf(stderr, "unhandled ELF relocation(RelA) type %d\n",

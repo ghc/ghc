@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: LinkerInternals.h,v 1.1 2001/02/11 17:51:07 simonmar Exp $
+ * $Id: LinkerInternals.h,v 1.2 2001/02/12 12:46:23 sewardj Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -36,20 +36,23 @@ typedef struct { void* start; void* end; SectionKind kind; }
  * for each object file in use.
  */
 typedef struct _ObjectCode {
-    OStatus   status;
-    char*     fileName;
-    int       fileSize;
-    char*     formatName;            /* eg "ELF32", "DLL", "COFF", etc. */
+    OStatus    status;
+    char*      fileName;
+    int        fileSize;
+    char*      formatName;            /* eg "ELF32", "DLL", "COFF", etc. */
 
-    SymbolVal *symbols;
-    int       n_symbols;
+    SymbolVal  *symbols;
+    int        n_symbols;
 
     /* ptr to malloc'd lump of memory holding the obj file */
-    void*     image;
+    void*      image;
 
     /* The section-kind entries for this object module.  Dynamically expands. */
-    Section*  sections;
-    int       n_sections;
+    Section*   sections;
+    int        n_sections;
+
+    /* A private hash table for local symbols. */
+    HashTable* lochash;
     
     /* Allow a chain of these things */
     struct _ObjectCode * next;
