@@ -27,7 +27,7 @@ data Ptr a = Ptr Addr# deriving (Eq, Ord)
 -- of type @a@.
 --
 --  The type @a@ will normally be an instance of class
--- 'Storable' which provides the marshalling operations.
+-- 'Foreign.Storable.Storable' which provides the marshalling operations.
 
 
 -- |The constant 'nullPtr' contains a distinguished value of 'Ptr'

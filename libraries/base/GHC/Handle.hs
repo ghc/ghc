@@ -635,8 +635,8 @@ addFilePathToIOError fun fp (IOError h iot _ str _)
 -- Some operating systems delete empty files, so there is no guarantee
 -- that the file will exist following an 'openFile' with @mode@
 -- 'WriteMode' unless it is subsequently written to successfully.
--- The handle is positioned at the end of the file if `mode' is
--- `AppendMode', and otherwise at the beginning (in which case its
+-- The handle is positioned at the end of the file if @mode@ is
+-- 'AppendMode', and otherwise at the beginning (in which case its
 -- internal position is 0).
 -- The initial buffer mode is implementation-dependent.
 --
@@ -936,7 +936,7 @@ isEOF = hIsEOF stdin
 -- ---------------------------------------------------------------------------
 -- Looking ahead
 
--- | Computation 'hLookahead' returns the next character from the handle
+-- | Computation 'hLookAhead' returns the next character from the handle
 -- without removing it from the input buffer, blocking until a character
 -- is available.
 --
@@ -970,7 +970,7 @@ hLookAhead handle = do
 -- further explanation of what the type represent.
 
 -- | Computation 'hSetBuffering' @hdl mode@ sets the mode of buffering for
--- handle hdl on subsequent reads and writes.
+-- handle @hdl@ on subsequent reads and writes.
 --
 -- If the buffer mode is changed from 'BlockBuffering' or
 -- 'LineBuffering' to 'NoBuffering', then
@@ -1037,7 +1037,7 @@ hSetBuffering handle mode =
 -- hFlush
 
 -- | The action 'hFlush' @hdl@ causes any items buffered for output
--- in handle `hdl' to be sent immediately to the operating system.
+-- in handle @hdl@ to be sent immediately to the operating system.
 --
 -- This operation may fail with:
 --

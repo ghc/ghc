@@ -368,8 +368,8 @@ nmergeIO lss
       One final note: the
       @aaaa@ @bbbb@ example may not
       work too well on GHC (see Scheduling, above), due
-      to the locking on a 'Handle'.  Only one thread
-      may hold the lock on a 'Handle' at any one
+      to the locking on a 'System.IO.Handle'.  Only one thread
+      may hold the lock on a 'System.IO.Handle' at any one
       time, so if a reschedule happens while a thread is holding the
       lock, the other thread won't be able to run.  The upshot is that
       the switch from @aaaa@ to

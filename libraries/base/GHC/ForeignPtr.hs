@@ -183,7 +183,7 @@ newForeignPtr_ (Ptr obj) =  do
 touchForeignPtr :: ForeignPtr a -> IO ()
 -- ^This function ensures that the foreign object in
 -- question is alive at the given place in the sequence of IO
--- actions. In particular 'withForeignPtr'
+-- actions. In particular 'Foreign.ForeignPtr.withForeignPtr'
 -- does a 'touchForeignPtr' after it
 -- executes the user action.
 -- 
@@ -215,7 +215,7 @@ unsafeForeignPtrToPtr :: ForeignPtr a -> Ptr a
 -- has another usage occurrence.
 --
 -- To avoid subtle coding errors, hand written marshalling code
--- should preferably use 'withForeignPtr' rather
+-- should preferably use 'Foreign.ForeignPtr.withForeignPtr' rather
 -- than combinations of 'unsafeForeignPtrToPtr' and
 -- 'touchForeignPtr'.  However, the later routines
 -- are occasionally preferred in tool generated marshalling code.

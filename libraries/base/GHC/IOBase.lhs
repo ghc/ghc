@@ -408,8 +408,8 @@ type FilePath = String
 --    the next block of data is read into the buffer.
 --
 --  * /no-buffering/: the next input item is read and returned.
---    The 'hLookAhead' operation implies that even a no-buffered handle
---    may require a one-character buffer.
+--    The 'System.IO.hLookAhead' operation implies that even a no-buffered
+--    handle may require a one-character buffer.
 --
 -- The default buffering mode when a handle is opened is
 -- implementation-dependent and may depend on the file system object
@@ -518,7 +518,8 @@ showHandle file = showString "{handle: " . showString file . showString "}"
 -- |The type of exceptions.  Every kind of system-generated exception
 -- has a constructor in the 'Exception' type, and values of other
 -- types may be injected into 'Exception' by coercing them to
--- 'Dynamic' (see the section on Dynamic Exceptions: "Control.Exception\#DynamicExceptions").
+-- 'Data.Dynamic.Dynamic' (see the section on Dynamic Exceptions:
+-- "Control.Exception\#DynamicExceptions").
 data Exception
   = ArithException  	ArithException
 	-- ^Exceptions raised by arithmetic
@@ -537,8 +538,8 @@ data Exception
 	-- ^Asynchronous exceptions (see section on Asynchronous Exceptions: "Control.Exception\#AsynchronousExceptions").
   | BlockedOnDeadMVar
 	-- ^The current thread was executing a call to
-	-- 'takeMVar' that could never return, because there are no other
-	-- references to this 'MVar'.
+	-- 'Control.Concurrent.MVar.takeMVar' that could never return,
+	-- because there are no other references to this 'MVar'.
   | Deadlock
 	-- ^There are no runnable threads, so the program is
 	-- deadlocked.  The 'Deadlock' exception is
