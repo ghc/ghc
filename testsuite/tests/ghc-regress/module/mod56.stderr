@@ -1,5 +1,7 @@
 
 mod56.hs:4:
     Can't make a derived instance of `Ix T'
-    (one constructor data type or type with all nullary constructors expected)
+    (`T' has non-nullary constructors
+       and
+     `T' has more than one constructor)
     When deriving instances for type `T'
