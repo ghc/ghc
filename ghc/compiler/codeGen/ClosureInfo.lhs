@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: ClosureInfo.lhs,v 1.55 2002/12/11 16:55:04 simonpj Exp $
+% $Id: ClosureInfo.lhs,v 1.56 2002/12/12 11:53:11 simonmar Exp $
 %
 \section[ClosureInfo]{Data structures which describe closures}
 
@@ -1187,7 +1187,7 @@ mkInfoTable cl_info
     layout_info = (fromIntegral ptrs) .|. (fromIntegral nptrs `shiftL` HALF_WORD)
 #endif	     
 
-    layout_amode = CLit (MachWord (fromIntegral layout_info))
+    layout_amode = mkWordCLit layout_info
 
     extra_bits
 	| is_fun    = fun_extra_bits
@@ -1209,16 +1209,18 @@ mkInfoTable cl_info
 		   CLbl slow_lbl CodePtrRep, 
 		   livenessToAddrMode liveness,
 		   srt_label,
-		   mkIntCLit fun_desc
+		   fun_amode
 		  ]
-	| needs_srt = [srt_label, mkIntCLit fun_desc]
-	| otherwise = [mkIntCLit fun_desc]
+	| needs_srt = [srt_label, fun_amode]
+	| otherwise = [fun_amode]
 
 #ifdef WORDS_BIGENDIAN
     fun_desc = (fromIntegral fun_type `shiftL` HALF_WORD) .|. fromIntegral arity
 #else 
     fun_desc = (fromIntegral fun_type) .|. (fromIntegral arity `shiftL` HALF_WORD)
 #endif	     
+
+    fun_amode = mkWordCLit fun_desc
 
     fun_type = case arg_descr of
 		ArgSpec n -> n
@@ -1319,13 +1321,16 @@ livenessToAddrMode (Liveness lbl size bits)
 	| size <= mAX_SMALL_BITMAP_SIZE = small
 	| otherwise = CLbl lbl DataPtrRep
 	where
-	  small = mkIntCLit (fromIntegral size .|. (small_bits `shiftL` bITMAP_BITS_SHIFT))
+	  small = mkWordCLit (fromIntegral size .|. (small_bits `shiftL` bITMAP_BITS_SHIFT))
 	  small_bits = case bits of 
 			[]  -> 0
-			[b] -> intBS b
+			[b] -> fromIntegral (intBS b)
 			_   -> panic "livenessToAddrMode"
 
 mAX_SMALL_BITMAP_SIZE = (wORD_SIZE * 8) - bITMAP_BITS_SHIFT
+
+mkWordCLit :: StgWord -> CAddrMode
+mkWordCLit wd = CLit (MachWord (fromIntegral wd)) 
 
 zero_amode = mkIntCLit 0
 \end{code}
