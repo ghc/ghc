@@ -401,7 +401,7 @@ package_details installing
 	 extra_libraries   = [ "user32",  "gdi32", "winmm" ],
          include_dirs   = [],
          c_includes     = [],           -- ???
-         package_deps   = [ "lang", "greencard" ],
+         package_deps   = [ "lang" ], -- greencard now built in
          extra_ghc_opts = [],
          extra_cc_opts  = [],
          extra_ld_opts  = []
