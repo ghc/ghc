@@ -89,6 +89,48 @@ Core Language.Haskell.THSyntax.Type</pre>
       using the function <code>lookupOcc</code> on the name.
     </p>
     
+    <h3>Representing Binding Forms</h3>
+    <p>
+      Care needs to be taken when constructing TH representations of Haskell
+      terms that include binding forms, such as lambda abstractions or let
+      bindings.  To avoid name clashes, fresh names need to be generated for
+      all defined identifiers.  This is achieved via the routine
+      <code>DsMeta.mkGenSym</code>, which, given a <code>Name</code>, produces
+      a <code>Name</code> / <code>Id</code> pair (of type
+      <code>GenSymBind</code>) that associates the given <code>Name</code>
+      with a Core identifier that at runtime will be bound to a string that
+      contains the fresh name.  Notice the two-level nature of this
+      arrangement.  It is necessary, as the Core code that constructs the
+      Haskell term representation may be executed multiple types at runtime
+      and it must be ensured that different names are generated in each run.
+    </p>
+    <p>
+      Such fresh bindings need to be entered into the meta environment (of
+      type <a
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/deSugar/DsMonad.lhs"><code>DsMonad</code></a><code>.DsMetaEnv</code>),
+      which is part of the state (of type <code>DsMonad.DsEnv</code>)
+      maintained in the desugarer monad (of type <code>DsMonad.DsM</code>).
+      This is done using the function <code>DsMeta.addBinds</code>, which
+      extends the current environment by a list of <code>GenSymBind</code>s
+      and executes a subcomputation in this extended environment.  Names can
+      be looked up in the meta environment by way of the functions
+      <code>DsMeta.lookupOcc</code> and <code>DsMeta.lookupBinder</code>; more
+      details about the difference between these two functions can be found in
+      the next subsection.
+    </p>
+    <p>
+      NB: <code>DsMeta</code> uses <code>mkGenSym</code> only when
+      representing terms that may be embedded into a context where names can
+      be shadowed.  For example, a lambda abstraction embedded into an
+      expression can potentially shadow names defined in the context it is
+      being embedded into.  In contrast, this can never be the case for
+      top-level declarations, such as data type declarations; hence, the type
+      variables that a parametric data type declaration abstracts over are not
+      being gensym'ed.  As a result, variables in defining positions are
+      handled differently depending on the syntactic construct in which they
+      appear. 
+    </p>
+
     <h3>Binders Versus Occurences</h3>
     <p>
       Name lookups in the meta environment of the desugarer use two functions
@@ -121,13 +163,14 @@ in repTyClD and repC.</pre>
     <p>
       This implies that <code>lookupOcc</code>, when it does not find the name
       in the meta environment, uses the function <code>DsMeta.globalVar</code>
-      to construct the <em>original name</em> of the entity.  This name
-      uniquely identifies the entity in the whole program and is in scope
+      to construct the <em>original name</em> of the entity (cf. the TH paper
+      for more details regarding original names).  This name uniquely
+      identifies the entity in the whole program and is in scope
       <em>independent</em> of whether the user name of the same entity is in
       scope or not (i.e., it may be defined in a different module without
-      being explicitly imported).  <strong>NB:</strong> Incidentally, the
-      current implementation of this mechanisms facilitates breaking any
-      abstraction barrier.
+      being explicitly imported) and has the form &lt;module&gt;:&lt;name&gt;.
+      <strong>NB:</strong> Incidentally, the current implementation of this
+      mechanisms facilitates breaking any abstraction barrier.
     </p>
     
     <h3>Known-key Names for Template Haskell</h3>
@@ -141,12 +184,13 @@ in repTyClD and repC.</pre>
       href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/prelude/PrelNames.lhs"><code>PrelNames</code></a>
       triggers a significant amount of recompilation.  Hence, the names needed
       for TH are defined in <code>DsMeta</code> instead (at the end of the
-      module).
+      module).  All library functions needed by TH are contained in the name
+      set <code>DsMeta.templateHaskellNames</code>.
     </p>
     
     <p><small>
 <!-- hhmts start -->
-Last modified: Sat Nov  9 20:27:46 EST 2002
+Last modified: Wed Nov 13 18:01:48 EST 2002
 <!-- hhmts end -->
     </small>
   </body>
