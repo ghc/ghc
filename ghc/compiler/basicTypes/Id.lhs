@@ -25,7 +25,8 @@ module Id (
 	omitIfaceSigForId,
 	exportWithOrigOccName,
 	externallyVisibleId,
-	idFreeTyVars, 
+	idFreeTyVars,
+	isIP,
 
 	-- Inline pragma stuff
 	getInlinePragma, setInlinePragma, modifyInlinePragma, 
@@ -84,7 +85,8 @@ import IdInfo
 import Demand		( Demand, isStrict, wwLazy )
 import Name	 	( Name, OccName,
 			  mkSysLocalName, mkLocalName,
-			  isWiredInName, isUserExportedName
+			  isWiredInName, isUserExportedName,
+			  getOccName, isIPOcc
 			) 
 import OccName		( UserFS )
 import Const		( Con(..) )
@@ -273,6 +275,8 @@ omitIfaceSigForId id
 -- or an explicit user export.
 exportWithOrigOccName :: Id -> Bool
 exportWithOrigOccName id = omitIfaceSigForId id || isUserExportedId id
+
+isIP id = isIPOcc (getOccName id)
 \end{code}
 
 

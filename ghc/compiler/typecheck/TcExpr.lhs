@@ -9,7 +9,7 @@ module TcExpr ( tcApp, tcExpr, tcPolyExpr, tcId ) where
 #include "HsVersions.h"
 
 import HsSyn		( HsExpr(..), HsLit(..), ArithSeqInfo(..), 
-			  HsBinds(..), Stmt(..), StmtCtxt(..),
+			  HsBinds(..), MonoBinds(..), Stmt(..), StmtCtxt(..),
 			  mkMonoBind, nullMonoBinds
 			)
 import RnHsSyn		( RenamedHsExpr, RenamedRecordBinds )
@@ -733,10 +733,13 @@ tcMonoExpr (HsWith expr binds) res_ty
     tcIPBinds binds			`thenTc` \ (binds', types, lie2) ->
     partitionLIEbyMeth isBound lie	`thenTc` \ (ips, lie') ->
     zonkLIE ips				`thenTc` \ ips' ->
-    tcSimplify (text "With!") (tyVarsOfLIE ips') ips' `thenTc` \ res@(_, dict_binds, _) ->
+    tcSimplify (text "tcMonoExpr With") (tyVarsOfLIE ips') ips'
+					`thenTc` \ res@(_, dict_binds, _) ->
     let expr'' = if nullMonoBinds dict_binds
 		 then expr'
-		 else HsLet (MonoBind dict_binds [] NonRecursive) expr' in
+		 else HsLet (mkMonoBind (revBinds dict_binds) [] NonRecursive)
+			    expr'
+    in
     tcCheckIPBinds binds' types ips'	`thenTc_`
     returnTc (HsWith expr'' binds', lie' `plusLIE` lie2)
   where isBound p
@@ -744,6 +747,13 @@ tcMonoExpr (HsWith expr binds) res_ty
 	    Just n -> n `elem` names
 	    Nothing -> False
 	names = map fst binds
+	-- revBinds is used because tcSimplify outputs the bindings
+	-- out-of-order.  it's not a problem elsewhere because these
+	-- bindings are normally used in a recursive let
+	-- ZZ probably need to find a better solution
+	revBinds (b1 `AndMonoBinds` b2) =
+	    (revBinds b2) `AndMonoBinds` (revBinds b1)
+	revBinds b = b
 
 tcIPBinds ((name, expr) : binds)
   = newTyVarTy_OpenKind		`thenTc` \ ty ->

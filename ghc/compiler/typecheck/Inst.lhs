@@ -39,7 +39,7 @@ module Inst (
 import HsSyn	( HsLit(..), HsExpr(..) )
 import RnHsSyn	( RenamedArithSeqInfo, RenamedHsExpr, RenamedPat )
 import TcHsSyn	( TcExpr, TcId, 
-		  mkHsTyApp, mkHsDictApp, zonkId
+		  mkHsTyApp, mkHsDictApp, mkHsDictLam, zonkId
 		)
 import TcMonad
 import TcEnv	( TcIdSet, tcLookupValueByKey, tcLookupTyConByKey )
@@ -276,18 +276,24 @@ partitionLIEbyMeth pred lie
   = foldlTc (partMethod pred) (emptyLIE, emptyLIE) insts
   where insts = lieToList lie
 
-partMethod pred (ips, lie) m@(Method u id tys theta tau loc)
-  = if null ips_ then
+partMethod pred (ips, lie) d@(Dict _ p _)
+  = if pred p then
+	returnTc (consLIE d ips, lie)
+    else
+	returnTc (ips, consLIE d lie)
+
+partMethod pred (ips, lie) m@(Method u id tys theta tau loc@(_,sloc,_))
+  = let (ips_, theta_) = partition pred theta in
+    if null ips_ then
 	returnTc (ips, consLIE m lie)
     else if null theta_ then
 	returnTc (consLIE m ips, lie)
     else
-	newMethodWith id tys theta_ tau loc	    `thenTc` \ new_m2 ->
-	let id_m1 = instToIdBndr new_m2
-	    new_m1 = Method u id_m1 {- tys -} [] ips_ tau loc in
-	-- newMethodWith id_m1 tys ips_ tau loc	    `thenTc` \ new_m1 ->
-	returnTc (consLIE new_m1 ips, consLIE new_m2 lie)
-  where (ips_, theta_) = partition pred theta
+	zonkPreds theta_ `thenTc` \ theta_' ->
+	newDictsAtLoc loc theta_'	    `thenTc` \ (new_dicts, _) ->
+	returnTc (consLIE m ips,
+		  plusLIE (listToLIE new_dicts) lie)
+
 partMethod pred (ips, lie) inst@(LitInst u lit ty loc)
   = returnTc (ips, consLIE inst lie)
 
@@ -547,6 +553,7 @@ zonkInst (FunDep clas fds loc)
   = zonkFunDeps fds			`thenNF_Tc` \ fds' ->
     returnNF_Tc (FunDep clas fds' loc)
 
+zonkPreds preds = mapNF_Tc zonkPred preds
 zonkInsts insts = mapNF_Tc zonkInst insts
 
 zonkFunDeps fds = mapNF_Tc zonkFd fds
@@ -584,10 +591,12 @@ pprInst (LitInst u lit ty loc)
 
 pprInst (Dict u pred loc) = pprPred pred <+> show_uniq u
 
-pprInst (Method u id tys _ _ loc)
+pprInst m@(Method u id tys theta tau loc)
   = hsep [ppr id, ptext SLIT("at"), 
 	  brackets (interppSP tys),
-	  show_uniq u]
+	  ppr theta, ppr tau,
+	  show_uniq u,
+	  ppr (instToId m)]
 
 pprInst (FunDep clas fds loc)
   = hsep [ppr clas, ppr fds]

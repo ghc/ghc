@@ -40,7 +40,7 @@ module TcHsSyn (
 import HsSyn	-- oodles of it
 
 -- others:
-import Id	( idName, idType, setIdType, omitIfaceSigForId, Id )
+import Id	( idName, idType, setIdType, omitIfaceSigForId, isIP, Id )
 import DataCon	( DataCon, splitProductType_maybe )	
 import TcEnv	( tcLookupValueMaybe, tcExtendGlobalValEnv, tcGetValueEnv,
 		  ValueEnv, TcId, tcInstId
@@ -184,7 +184,7 @@ zonkIdBndr id
 
 zonkIdOcc :: TcId -> NF_TcM s Id
 zonkIdOcc id 
-  | not (isLocallyDefined id) || omitIfaceSigForId id
+  | not (isLocallyDefined id) || omitIfaceSigForId id || isIP id
 	-- The omitIfaceSigForId thing may look wierd but it's quite
 	-- sensible really.  We're avoiding looking up superclass selectors
 	-- and constructors; zonking them is a no-op anyway, and the
