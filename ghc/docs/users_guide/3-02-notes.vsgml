@@ -12,4 +12,6 @@ slightly).
 <item> Pattern binding desugaring improved to eliminate intermediate
 tuples in some cases.
 
+<item> Fixed parsing problem: declaring a record with an infix constructor.
+
 </itemize>
