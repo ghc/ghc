@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.c,v 1.6 1999/08/04 10:04:31 simonmar Exp $
+ * $Id: Stable.c,v 1.7 1999/08/04 15:25:33 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -231,7 +231,11 @@ enlargeStablePtrTable(void)
     stable_ptr_table = stgMallocWords(SPT_size * sizeof(snEntry), 
 				      "initStablePtrTable");
     
-    initFreeList(stable_ptr_table,INIT_SPT_SIZE,NULL);
+    /* we don't use index 0 in the stable name table, because that
+     * would conflict with the hash table lookup operations which
+     * return NULL if an entry isn't found in the hash table.
+     */
+    initFreeList(stable_ptr_table+1,INIT_SPT_SIZE-1,NULL);
     addrToStableHash = allocHashTable();
   }
   else {
