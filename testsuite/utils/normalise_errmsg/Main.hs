@@ -42,7 +42,7 @@ main
 clean str
    = let 
          -- convert all non-\n whitespace to space
-         toSpace c = if isSpace c && c /= '\n' then ' ' else c
+         toSpace c = if isSpace c then ' ' else c
          spaced = map toSpace str
 
          -- collapse sequences of spaces into one
