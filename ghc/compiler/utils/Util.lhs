@@ -67,6 +67,7 @@ module Util (
 	replaceFilenameSuffix, directoryOf, filenameOf,
 	replaceFilenameDirectory,
 	escapeSpaces, isPathSeparator,
+	normalisePath, platformPath, pgmPath,
     ) where
 
 #include "HsVersions.h"
@@ -922,5 +923,40 @@ isPathSeparator ch =
   ch == '/' || ch == '\\'
 #else
   ch == '/'
+#endif
+
+-----------------------------------------------------------------------------
+-- Convert filepath into platform / MSDOS form.
+
+-- We maintain path names in Unix form ('/'-separated) right until 
+-- the last moment.  On Windows we dos-ify them just before passing them
+-- to the Windows command.
+-- 
+-- The alternative, of using '/' consistently on Unix and '\' on Windows,
+-- proved quite awkward.  There were a lot more calls to platformPath,
+-- and even on Windows we might invoke a unix-like utility (eg 'sh'), which
+-- interpreted a command line 'foo\baz' as 'foobaz'.
+
+normalisePath :: String -> String
+-- Just changes '\' to '/'
+
+pgmPath :: String		-- Directory string in Unix format
+	-> String		-- Program name with no directory separators
+				--	(e.g. copy /y)
+	-> String		-- Program invocation string in native format
+
+#if defined(mingw32_HOST_OS)
+--------------------- Windows version ------------------
+normalisePath xs = subst '\\' '/' xs
+pgmPath dir pgm  = platformPath dir ++ '\\' : pgm
+platformPath p   = subst '/' '\\' p
+
+subst a b ls = map (\ x -> if x == a then b else x) ls
+#else
+--------------------- Non-Windows version --------------
+normalisePath xs   = xs
+pgmPath dir pgm    = dir ++ '/' : pgm
+platformPath stuff = stuff
+--------------------------------------------------------
 #endif
 \end{code}

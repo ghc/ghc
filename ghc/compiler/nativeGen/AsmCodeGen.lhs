@@ -37,7 +37,7 @@ import List		( groupBy, sortBy )
 import CLabel           ( pprCLabel )
 import ErrUtils		( dumpIfSet_dyn )
 import DynFlags		( DynFlags, DynFlag(..), dopt )
-import StaticFlags	( opt_Static, opt_SplitObjs, opt_PIC )
+import StaticFlags	( opt_Static, opt_PIC )
 
 import Digraph
 import qualified Pretty
@@ -133,8 +133,8 @@ nativeCodeGen dflags cmms us
   where
 
     add_split (Cmm tops)
-	| opt_SplitObjs = split_marker : tops
-	| otherwise	= tops
+	| dopt Opt_SplitObjs dflags = split_marker : tops
+	| otherwise		    = tops
 
     split_marker = CmmProc [] mkSplitMarkerLabel [] []
 

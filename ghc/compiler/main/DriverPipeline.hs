@@ -410,7 +410,7 @@ genOutputFilenameFunc dflags stop_phase keep_final_output
 		| is_last_phase, Just f <- maybe_output_filename = return f
 		| is_last_phase && keep_final_output = persistent_fn
 		| keep_this_output 		     = persistent_fn
-     		| otherwise        		     = newTempName suffix
+     		| otherwise        		     = newTempName dflags suffix
 
 	   where
 		is_last_phase = next_phase `eqPhase` stop_phase
@@ -802,7 +802,7 @@ runPhase Mangle stop dflags _basename _suff input_fn get_output_fn maybe_loc
 runPhase SplitMangle stop dflags _basename _suff input_fn get_output_fn maybe_loc
   = do  -- tmp_pfx is the prefix used for the split .s files
 	-- We also use it as the file to contain the no. of split .s files (sigh)
-	split_s_prefix <- SysTools.newTempName "split"
+	split_s_prefix <- SysTools.newTempName dflags "split"
 	let n_files_fn = split_s_prefix
 
 	SysTools.runSplit dflags

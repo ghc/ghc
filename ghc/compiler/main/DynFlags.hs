@@ -37,6 +37,7 @@ module DynFlags (
 	getOpts,			-- (DynFlags -> [a]) -> IO [a]
 	getVerbFlag,
 	updOptLevel,
+	setTmpDir,
 	
 	-- parsing DynFlags
 	parseDynamicFlags,
@@ -54,7 +55,7 @@ import DriverPhases	( Phase(..), phaseInputExt )
 import Config
 import CmdLineParser
 import Panic		( panic, GhcException(..) )
-import Util		( notNull, splitLongestPrefix, split )
+import Util		( notNull, splitLongestPrefix, split, normalisePath )
 
 import DATA_IOREF	( readIORef )
 import EXCEPTION	( throwDyn )
@@ -213,7 +214,7 @@ data DynFlags = DynFlags {
   libraryPaths		:: [String],
   frameworkPaths	:: [String],  	-- used on darwin only
   cmdlineFrameworks	:: [String],	-- ditto
-  tmpDir		:: String,
+  tmpDir		:: String,	-- no trailing '/'
   
   -- options for particular phases
   opt_L			:: [String],
@@ -342,7 +343,7 @@ defaultDynFlags =
 	libraryPaths		= [],
 	frameworkPaths		= [],
 	cmdlineFrameworks	= [],
-	tmpDir			= [],
+	tmpDir			= cDEFAULT_TMPDIR,
 	
 	opt_L			= [],
 	opt_P			= [],
@@ -431,7 +432,6 @@ setObjectSuf  f d = d{ objectSuf  = f}
 setHcSuf      f d = d{ hcSuf      = f}
 setHiSuf      f d = d{ hiSuf      = f}
 setHiDir      f d = d{ hiDir      = f}
-setTmpDir     f d = d{ tmpDir     = f}
 
 -- XXX HACK: Prelude> words "'does not' work" ===> ["'does","not'","work"]
 -- Config.hs should really use Option.
@@ -768,6 +768,10 @@ dynamic_flags = [
   ,  ( "optl"		, HasArg (upd . addOptl) )  
   ,  ( "optdll"		, HasArg (upd . addOptdll) )  
   ,  ( "optdep"		, HasArg (upd . addOptdep) )
+
+  ,  ( "split-objs"	, NoArg (if can_split
+				    then setDynFlag Opt_SplitObjs
+				    else return ()) )
 
 	-------- Linking ----------------------------------------------------
   ,  ( "c"		, NoArg (upd $ \d -> d{ ghcLink=NoLink } ))
@@ -1118,6 +1122,40 @@ splitPathList s = filter notNull (splitUp s)
     dir_markers = ['/', '\\']
 #endif
 
+-- -----------------------------------------------------------------------------
+-- tmpDir, where we store temporary files.
+
+setTmpDir :: FilePath -> DynFlags -> DynFlags
+setTmpDir dir dflags = dflags{ tmpDir = canonicalise dir }
+  where
+#if !defined(mingw32_HOST_OS)
+     canonicalise p = normalisePath p
+#else
+	-- Canonicalisation of temp path under win32 is a bit more
+	-- involved: (a) strip trailing slash, 
+	-- 	     (b) normalise slashes
+	--	     (c) just in case, if there is a prefix /cygdrive/x/, change to x:
+	-- 
+     canonicalise path = normalisePath (xltCygdrive (removeTrailingSlash path))
+
+        -- if we're operating under cygwin, and TMP/TEMP is of
+	-- the form "/cygdrive/drive/path", translate this to
+	-- "drive:/path" (as GHC isn't a cygwin app and doesn't
+	-- understand /cygdrive paths.)
+     xltCygdrive path
+      | "/cygdrive/" `isPrefixOf` path = 
+	  case drop (length "/cygdrive/") path of
+	    drive:xs@('/':_) -> drive:':':xs
+	    _ -> path
+      | otherwise = path
+
+        -- strip the trailing backslash (awful, but we only do this once).
+     removeTrailingSlash path = 
+       case last path of
+         '/'  -> init path
+         '\\' -> init path
+         _    -> path
+#endif
 
 -----------------------------------------------------------------------------
 -- Via-C compilation stuff
@@ -1228,3 +1266,22 @@ picCCOpts dflags
     | otherwise
         = []
 #endif
+
+-- -----------------------------------------------------------------------------
+-- Splitting
+
+can_split :: Bool
+can_split =  
+#if    defined(i386_TARGET_ARCH)     \
+    || defined(alpha_TARGET_ARCH)    \
+    || defined(hppa_TARGET_ARCH)     \
+    || defined(m68k_TARGET_ARCH)     \
+    || defined(mips_TARGET_ARCH)     \
+    || defined(powerpc_TARGET_ARCH)  \
+    || defined(rs6000_TARGET_ARCH)   \
+    || defined(sparc_TARGET_ARCH) 
+   True
+#else
+   False
+#endif
+

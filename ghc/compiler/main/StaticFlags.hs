@@ -58,7 +58,6 @@ module StaticFlags (
 	opt_IgnoreDotGhci,
 	opt_ErrorSpans,
 	opt_EmitCExternDecls,
-	opt_SplitObjs,
 	opt_GranMacros,
 	opt_HiVersion,
 	opt_HistorySize,
@@ -152,12 +151,6 @@ static_flags = [
 
 	------- Miscellaneous -----------------------------------------------
   ,  ( "no-link-chk"    , NoArg (return ()) ) -- ignored for backwards compat
-
-  ,  ( "split-objs"	, NoArg (if can_split
-				    then addOpt "-split-objs"
-				    else hPutStrLn stderr
-					    "warning: don't know how to split object files on this architecture"
-				) )
 
 	----- Linker --------------------------------------------------------
   ,  ( "static" 	, PassFlag addOpt )
@@ -278,7 +271,6 @@ opt_LiberateCaseThreshold	= lookup_def_int "-fliberate-case-threshold" (10::Int)
 opt_MaxWorkerArgs		= lookup_def_int "-fmax-worker-args" (10::Int)
 
 opt_EmitCExternDecls	        = lookUp  FSLIT("-femit-extern-decls")
-opt_SplitObjs			= lookUp  FSLIT("-split-objs")
 opt_GranMacros			= lookUp  FSLIT("-fgransim")
 opt_HiVersion			= read (cProjectVersionInt ++ cProjectPatchLevel) :: Int
 opt_HistorySize			= lookup_def_int "-fhistory-size" 20
@@ -397,24 +389,6 @@ foreign import ccall unsafe "enableTimingStats" enableTimingStats :: IO ()
 #else
 foreign import "setHeapSize"       unsafe setHeapSize       :: Int -> IO ()
 foreign import "enableTimingStats" unsafe enableTimingStats :: IO ()
-#endif
-
--- -----------------------------------------------------------------------------
--- Splitting
-
-can_split :: Bool
-can_split =  
-#if    defined(i386_TARGET_ARCH)     \
-    || defined(alpha_TARGET_ARCH)    \
-    || defined(hppa_TARGET_ARCH)     \
-    || defined(m68k_TARGET_ARCH)     \
-    || defined(mips_TARGET_ARCH)     \
-    || defined(powerpc_TARGET_ARCH)  \
-    || defined(rs6000_TARGET_ARCH)   \
-    || defined(sparc_TARGET_ARCH) 
-   True
-#else
-   False
 #endif
 
 -----------------------------------------------------------------------------

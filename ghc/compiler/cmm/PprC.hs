@@ -30,6 +30,7 @@ import MachOp
 import ForeignCall
 
 -- Utils
+import DynFlags		( DynFlags, DynFlag(..), dopt )
 import Unique           ( getUnique )
 import UniqSet
 import FiniteMap
@@ -37,7 +38,6 @@ import UniqFM		( eltsUFM )
 import FastString
 import Outputable
 import Constants
-import StaticFlags	( opt_SplitObjs )
 
 -- The rest
 import Data.List        ( intersperse, groupBy )
@@ -59,16 +59,18 @@ import MONAD_ST
 -- --------------------------------------------------------------------------
 -- Top level
 
-pprCs :: [Cmm] -> SDoc
-pprCs cmms = pprCode CStyle (vcat $ map (\c -> split_marker $$ pprC c) cmms)
+pprCs :: DynFlags -> [Cmm] -> SDoc
+pprCs dflags cmms
+ = pprCode CStyle (vcat $ map (\c -> split_marker $$ pprC c) cmms)
+ where
+   split_marker
+     | dopt Opt_SplitObjs dflags = ptext SLIT("__STG_SPLIT_MARKER")
+     | otherwise     	         = empty
 
-writeCs :: Handle -> [Cmm] -> IO ()
-writeCs handle cmms = printForUser handle alwaysQualify (pprCs cmms)
- 			-- ToDo: should be printForC
-
-split_marker
-  | opt_SplitObjs = ptext SLIT("__STG_SPLIT_MARKER")
-  | otherwise     = empty
+writeCs :: DynFlags -> Handle -> [Cmm] -> IO ()
+writeCs dflags handle cmms 
+  = printForUser handle alwaysQualify (pprCs dflags cmms)
+ 	-- ToDo: should be printForC
 
 -- --------------------------------------------------------------------------
 -- Now do some real work

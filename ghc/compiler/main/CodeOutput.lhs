@@ -152,7 +152,7 @@ outputC dflags filenm flat_absC
 	  hPutStr h cc_injects
 	  when stub_h_exists $ 
 	     hPutStrLn h ("#include \"" ++ (filenameOf (hscStubHOutName dflags)) ++ "\"")
-	  writeCs h flat_absC
+	  writeCs dflags h flat_absC
 \end{code}
 
 

@@ -39,8 +39,8 @@ import MachOp		( wordRep, MachHint(..) )
 
 import StgSyn
 import PrelNames	( gHC_PRIM, rOOT_MAIN, mAIN, pREL_TOP_HANDLER )
-import DynFlags		( DynFlags(..), DynFlag(..) )
-import StaticFlags	( opt_SplitObjs, opt_SccProfilingOn )
+import DynFlags		( DynFlags(..), DynFlag(..), dopt )
+import StaticFlags	( opt_SccProfilingOn )
 
 import HscTypes		( ForeignStubs(..), TypeEnv, typeEnvTyCons )
 import CostCentre       ( CollectedCCs )
@@ -281,7 +281,7 @@ variable.
 \begin{code}
 cgTopBinding :: DynFlags -> (StgBinding,[(Id,[Id])]) -> Code
 cgTopBinding dflags (StgNonRec id rhs, srts)
-  = do	{ id' <- maybeExternaliseId id
+  = do	{ id' <- maybeExternaliseId dflags id
 	; mapM_ (mkSRT dflags [id']) srts
 	; (id,info) <- cgTopRhs id' rhs
 	; addBindC id info 	-- Add the *un-externalised* Id to the envt,
@@ -290,7 +290,7 @@ cgTopBinding dflags (StgNonRec id rhs, srts)
 
 cgTopBinding dflags (StgRec pairs, srts)
   = do	{ let (bndrs, rhss) = unzip pairs
-	; bndrs' <- mapFCs maybeExternaliseId bndrs
+	; bndrs' <- mapFCs (maybeExternaliseId dflags) bndrs
 	; let pairs' = zip bndrs' rhss
 	; mapM_ (mkSRT dflags bndrs')  srts
 	; _new_binds <- fixC (\ new_binds -> do 
@@ -342,9 +342,9 @@ If we're splitting the object, we need to externalise all the top-level names
 which refers to this name).
 
 \begin{code}
-maybeExternaliseId :: Id -> FCode Id
-maybeExternaliseId id
-  | opt_SplitObjs, 	-- Externalise the name for -split-objs
+maybeExternaliseId :: DynFlags -> Id -> FCode Id
+maybeExternaliseId dflags id
+  | dopt Opt_SplitObjs dflags, 	-- Externalise the name for -split-objs
     isInternalName name = do { mod <- moduleName
 			     ; returnFC (setIdName id (externalise mod)) }
   | otherwise		= returnFC id

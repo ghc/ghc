@@ -48,8 +48,10 @@ import DriverPhases     ( isHaskellUserSrcFilename )
 import Config
 import Outputable
 import Panic		( GhcException(..) )
-import Util		( Suffix, global, notNull, consIORef )
-import DynFlags		( DynFlags(..), DynFlag(..), dopt, Option(..) )
+import Util		( Suffix, global, notNull, consIORef,
+			  normalisePath, pgmPath, platformPath )
+import DynFlags		( DynFlags(..), DynFlag(..), dopt, Option(..),
+			  setTmpDir, defaultDynFlags )
 
 import EXCEPTION	( throwDyn )
 import DATA_IOREF	( IORef, readIORef, writeIORef )
@@ -237,32 +239,32 @@ initSysTools minusB_args dflags
 		| am_installed = installed_bin cGHC_MANGLER_PGM
 		| otherwise    = inplace cGHC_MANGLER_DIR_REL cGHC_MANGLER_PGM
 
+	; let dflags0 = defaultDynFlags
 #ifndef mingw32_HOST_OS
 	-- check whether TMPDIR is set in the environment
-	; IO.try (do dir <- getEnv "TMPDIR" -- fails if not set
-	      	     setTmpDir dir
-	      	     return ()
-                 )
+	; e_tmpdir <- IO.try (getEnv "TMPDIR") -- fails if not set
 #else
 	  -- On Win32, consult GetTempPath() for a temp dir.
 	  --  => it first tries TMP, TEMP, then finally the
 	  --   Windows directory(!). The directory is in short-path
 	  --   form.
-	; IO.try (do
+	; e_tmpdir <- 
+            IO.try (do
 	        let len = (2048::Int)
 		buf  <- mallocArray len
 		ret  <- getTempPath len buf
-		tdir <-
-		  if ret == 0 then do
+		if ret == 0 then do
 		      -- failed, consult TMPDIR.
  	             free buf
 		     getEnv "TMPDIR"
-		   else do
+		  else do
 		     s <- peekCString buf
 		     free buf
-		     return s
-		setTmpDir tdir)
+		     return s)
 #endif
+        ; let dflags1 = case e_tmpdir of
+			  Left _  -> dflags0
+			  Right d -> setTmpDir d dflags0
 
 	-- Check that the package config exists
 	; config_exists <- doesFileExist pkgconfig_path
@@ -364,7 +366,7 @@ initSysTools minusB_args dflags
 	; writeIORef v_Pgm_T   	 	   touch_path
 	; writeIORef v_Pgm_CP  	 	   cp_path
 
-	; return dflags{
+	; return dflags1{
 			pgm_L	= unlit_path,
 			pgm_P	= cpp_path,
 			pgm_F	= "",
@@ -518,42 +520,9 @@ getUsageMsgPaths = readIORef v_Path_usages
 
 \begin{code}
 GLOBAL_VAR(v_FilesToClean, [],               [String] )
-GLOBAL_VAR(v_TmpDir,       cDEFAULT_TMPDIR,  String   )
-	-- v_TmpDir has no closing '/'
 \end{code}
 
 \begin{code}
-setTmpDir dir = writeIORef v_TmpDir (canonicalise dir)
-    where
-#if !defined(mingw32_HOST_OS)
-     canonicalise p = normalisePath p
-#else
-	-- Canonicalisation of temp path under win32 is a bit more
-	-- involved: (a) strip trailing slash, 
-	-- 	     (b) normalise slashes
-	--	     (c) just in case, if there is a prefix /cygdrive/x/, change to x:
-	-- 
-     canonicalise path = normalisePath (xltCygdrive (removeTrailingSlash path))
-
-        -- if we're operating under cygwin, and TMP/TEMP is of
-	-- the form "/cygdrive/drive/path", translate this to
-	-- "drive:/path" (as GHC isn't a cygwin app and doesn't
-	-- understand /cygdrive paths.)
-     xltCygdrive path
-      | "/cygdrive/" `isPrefixOf` path = 
-	  case drop (length "/cygdrive/") path of
-	    drive:xs@('/':_) -> drive:':':xs
-	    _ -> path
-      | otherwise = path
-
-        -- strip the trailing backslash (awful, but we only do this once).
-     removeTrailingSlash path = 
-       case last path of
-         '/'  -> init path
-         '\\' -> init path
-         _    -> path
-#endif
-
 cleanTempFiles :: DynFlags -> IO ()
 cleanTempFiles dflags
    = do fs <- readIORef v_FilesToClean
@@ -569,10 +538,9 @@ cleanTempFilesExcept dflags dont_delete
 
 
 -- find a temporary name that doesn't already exist.
-newTempName :: Suffix -> IO FilePath
-newTempName extn
+newTempName :: DynFlags -> Suffix -> IO FilePath
+newTempName DynFlags{tmpDir=tmp_dir} extn
   = do x <- getProcessID
-       tmp_dir <- readIORef v_TmpDir
        findTempName tmp_dir x
   where 
     findTempName tmp_dir x
@@ -668,54 +636,6 @@ traceCmd dflags phase_name cmd_line action
 			     ; when (verb >= 3) (hPutStrLn stderr ("Failed: " ++ cmd_line ++ (show exn)))
 	          	     ; throwDyn (PhaseFailed phase_name (ExitFailure 1)) }
 \end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Path names}
-%*									*
-%************************************************************************
-
-We maintain path names in Unix form ('/'-separated) right until 
-the last moment.  On Windows we dos-ify them just before passing them
-to the Windows command.
-
-The alternative, of using '/' consistently on Unix and '\' on Windows,
-proved quite awkward.  There were a lot more calls to platformPath,
-and even on Windows we might invoke a unix-like utility (eg 'sh'), which
-interpreted a command line 'foo\baz' as 'foobaz'.
-
-\begin{code}
------------------------------------------------------------------------------
--- Convert filepath into platform / MSDOS form.
-
-normalisePath :: String -> String
--- Just changes '\' to '/'
-
-pgmPath :: String		-- Directory string in Unix format
-	-> String		-- Program name with no directory separators
-				--	(e.g. copy /y)
-	-> String		-- Program invocation string in native format
-
-
-
-#if defined(mingw32_HOST_OS)
---------------------- Windows version ------------------
-normalisePath xs = subst '\\' '/' xs
-platformPath p   = subst '/' '\\' p
-pgmPath dir pgm  = platformPath dir ++ '\\' : pgm
-
-subst a b ls = map (\ x -> if x == a then b else x) ls
-#else
---------------------- Non-Windows version --------------
-normalisePath xs   = xs
-pgmPath dir pgm    = dir ++ '/' : pgm
-platformPath stuff = stuff
---------------------------------------------------------
-#endif
-
-\end{code}
-
 
 -----------------------------------------------------------------------------
    Path name construction
