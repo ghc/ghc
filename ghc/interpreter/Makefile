@@ -1,6 +1,6 @@
 
 # ----------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.13 1999/10/29 13:41:23 sewardj Exp $                        #
+# $Id: Makefile,v 1.14 1999/10/29 14:33:57 sewardj Exp $                        #
 # ----------------------------------------------------------------------------- #
 
 TOP = ../..
@@ -15,10 +15,10 @@ RTS_DIR = $(TOP)/ghc/rts
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-cygwin32"
 DYN_EXT=.dll
-MNO_CYGWIN=
+LIB_DL=
 else
 DYN_EXT=.so
-MNO_CYGWIN=
+LIB_DL=-ldl
 endif
 
 YACC = bison -y
@@ -35,7 +35,7 @@ C_SRCS = link.c type.c static.c storage.c derive.c input.c compiler.c subst.c \
      translate.c codegen.c lift.c free.c stgSubst.c optimise.c output.c   \
      hugs.c dynamic.c stg.c sainteger.c interface.c
 
-SRC_CC_OPTS = $(MNO_CYGWIN) -g -O -I$(GHC_DIR)/interpreter -I$(GHC_DIR)/includes -I$(GHC_DIR)/rts -D__HUGS__ -DCOMPILING_RTS -Wall -Wstrict-prototypes -Wno-unused -DDEBUG -DDEBUG_EXTRA -Winline
+SRC_CC_OPTS = -g -O -I$(GHC_DIR)/interpreter -I$(GHC_DIR)/includes -I$(GHC_DIR)/rts -D__HUGS__ -DCOMPILING_RTS -Wall -Wstrict-prototypes -Wno-unused -DDEBUG -DDEBUG_EXTRA -Winline
 
 GHC_LIBS_NEEDED = $(TOP)/ghc/rts/libHSrts.a
 
@@ -45,7 +45,7 @@ all :: parser.c $(GHC_LIBS_NEEDED) nHandle.$(DYN_EXT) hugs
 hugs: $(C_OBJS) ../rts/Sanity.o ../rts/Assembler.o ../rts/Disassembler.o \
       ../rts/Evaluator.o ../rts/ForeignCall.o ../rts/GC.o ../rts/Printer.o \
       ../rts/StgCRun.o
-	$(CC) -o $@ $(CC_OPTS) $^ $(GHC_LIBS_NEEDED) -lbfd -liberty -lm
+	$(CC) -o $@ $(CC_OPTS) $^ $(GHC_LIBS_NEEDED) -lbfd -liberty $(LIB_DL) -lm
 
 
 nHandle.$(DYN_EXT): nHandle.c
