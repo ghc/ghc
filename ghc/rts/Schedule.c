@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.62 2000/04/03 15:52:53 simonmar Exp $
+ * $Id: Schedule.c,v 1.63 2000/04/04 15:02:02 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -914,10 +914,8 @@ schedule( void )
        * maybe set context_switch and wait till they all pile in,
        * then have them wait on a GC condition variable.
        */
-#if defined(GRAN) || defined(PAR)    
-      IF_DEBUG(scheduler,belch("--<< TSO %ld (%p; %s) stopped: HeapOverflow", 
+      IF_DEBUG(scheduler,belch("--<< thread %ld (%p; %s) stopped: HeapOverflow", 
 			       t->id, t, whatNext_strs[t->what_next]));
-#endif
       threadPaused(t);
 #if defined(GRAN)
       ASSERT(!is_on_queue(t,CurrentProc));
@@ -930,10 +928,8 @@ schedule( void )
       break;
       
     case StackOverflow:
-#if defined(GRAN) || defined(PAR)    
-      IF_DEBUG(scheduler,belch("--<< TSO %ld (%p; %s) stopped, StackOverflow", 
+      IF_DEBUG(scheduler,belch("--<< thread %ld (%p; %s) stopped, StackOverflow", 
 			       t->id, t, whatNext_strs[t->what_next]));
-#endif
       /* just adjust the stack for this thread, then pop it back
        * on the run queue.
        */
@@ -971,31 +967,18 @@ schedule( void )
        * up the GC thread.  getThread will block during a GC until the
        * GC is finished.
        */
-#if defined(GRAN) || defined(PAR)    
       IF_DEBUG(scheduler,
                if (t->what_next == ThreadEnterHugs) {
 		   /* ToDo: or maybe a timer expired when we were in Hugs?
 		    * or maybe someone hit ctrl-C
                     */
-                   belch("--<< TSO %ld (%p; %s) stopped to switch to Hugs", 
+                   belch("--<< thread %ld (%p; %s) stopped to switch to Hugs", 
 			 t->id, t, whatNext_strs[t->what_next]);
                } else {
-                   belch("--<< TSO %ld (%p; %s) stopped, yielding", 
+                   belch("--<< thread %ld (%p; %s) stopped, yielding", 
 			 t->id, t, whatNext_strs[t->what_next]);
                }
                );
-#else
-      IF_DEBUG(scheduler,
-	       if (t->what_next == ThreadEnterHugs) {
-		 /* ToDo: or maybe a timer expired when we were in Hugs?
-		  * or maybe someone hit ctrl-C
-		  */
-		 belch("thread %ld stopped to switch to Hugs", t->id);
-	       } else {
-		 belch("thread %ld stopped, yielding", t->id);
-	       }
-	       );
-#endif
       threadPaused(t);
       IF_DEBUG(sanity,
 	       //belch("&& Doing sanity check on yielding TSO %ld.", t->id);
@@ -1024,7 +1007,7 @@ schedule( void )
     case ThreadBlocked:
 #if defined(GRAN)
       IF_DEBUG(scheduler,
-	       belch("--<< TSO %ld (%p; %s) stopped, blocking on node %p [PE %d] with BQ: ", 
+	       belch("--<< thread %ld (%p; %s) stopped, blocking on node %p [PE %d] with BQ: ", 
 			       t->id, t, whatNext_strs[t->what_next], t->block_info.closure, (t->block_info.closure==(StgClosure*)NULL ? 99 : where_is(t->block_info.closure)));
 	       if (t->block_info.closure!=(StgClosure*)NULL) print_bq(t->block_info.closure));
 
@@ -1050,7 +1033,7 @@ schedule( void )
       blockThread(t);
 
       IF_DEBUG(scheduler,
-	       belch("--<< TSO %ld (%p; %s) stopped, blocking on node %p with BQ: ", 
+	       belch("--<< thread %ld (%p; %s) stopped, blocking on node %p with BQ: ", 
 			       t->id, t, whatNext_strs[t->what_next], t->block_info.closure);
 	       if (t->block_info.closure!=(StgClosure*)NULL) print_bq(t->block_info.closure));
 
@@ -1061,7 +1044,7 @@ schedule( void )
        * case it'll be on the relevant queue already.
        */
       IF_DEBUG(scheduler,
-	       fprintf(stderr, "--<< TSO %d (%p) stopped ", t->id, t);
+	       fprintf(stderr, "--<< thread %d (%p) stopped ", t->id, t);
 	       printThreadBlockage(t);
 	       fprintf(stderr, "\n"));
 
@@ -1079,7 +1062,7 @@ schedule( void )
        * more main threads, we probably need to stop all the tasks until
        * we get a new one.
        */
-      IF_DEBUG(scheduler,belch("--++ TSO %d (%p) finished", t->id, t));
+      IF_DEBUG(scheduler,belch("--++ thread %d (%p) finished", t->id, t));
       t->what_next = ThreadComplete;
 #if defined(GRAN)
       endThread(t, CurrentProc); // clean-up the thread
