@@ -171,14 +171,13 @@ loadInterface doc_str mod_name from
 		-> returnM (Right iface) ;	-- Already loaded
 			-- The (src_imp == mi_boot iface) test checks that the already-loaded
 			-- interface isn't a boot iface.  This can conceivably happen,
-			-- if an earlier import had a 
-			-- before we got to real imports.   I think.
+			-- if an earlier import had a before we got to real imports.   I think.
 	    other -> do
 
 	{ if_gbl_env <- getGblEnv
 	; let { hi_boot_file = case from of
 				ImportByUser usr_boot -> usr_boot
-				ImportBySystem  -> sys_boot
+				ImportBySystem        -> sys_boot
 
 	      ; mb_dep   = lookupModuleEnvByName (if_is_boot if_gbl_env) mod_name
 	      ; sys_boot = case mb_dep of
@@ -209,7 +208,7 @@ loadInterface doc_str mod_name from
 	WARN(   case from of { ImportBySystem -> True; other -> False } &&
 		not (isJust mb_dep) && 
 	 	isHomeModule mod,
-		ppr mod )
+		ppr mod $$ ppr mb_dep)
 
 	initIfaceLcl (moduleName mod) $ do
 	-- 	Load the new ModIface into the External Package State

@@ -71,8 +71,7 @@ core2core :: HscEnv
 
 core2core hsc_env 
 	  mod_impl@(ModGuts { mg_exports = exports, 
-			      mg_binds = binds_in, 
-			      mg_rules = rules_in })
+			      mg_binds = binds_in })
   = do
         let dflags 	  = hsc_dflags hsc_env
 	    ghci_mode	  = hsc_mode hsc_env
@@ -85,7 +84,7 @@ core2core hsc_env
 
 		-- COMPUTE THE RULE BASE TO USE
 	(rule_base, local_rule_ids, orphan_rules)
-		<- prepareRules hsc_env ru_us binds_in rules_in
+		<- prepareRules hsc_env mod_impl ru_us
 
 		-- PREPARE THE BINDINGS
 	let binds1 = updateBinders ghci_mode local_rule_ids 
@@ -216,16 +215,17 @@ noStats dfs thing = do { binds <- thing; return (zeroSimplCount dfs, binds) }
 
 \begin{code}
 prepareRules :: HscEnv 
+	     -> ModGuts
 	     -> UniqSupply
-	     -> [CoreBind]
-	     -> [IdCoreRule]		-- Local rules
 	     -> IO (RuleBase, 		-- Full rule base
 		    IdSet,		-- Local rule Ids
 		    [IdCoreRule])	-- Orphan rules defined in this module
 
 prepareRules hsc_env@(HscEnv { hsc_dflags = dflags, hsc_HPT = hpt })
-	     us binds local_rules
-  = do	{ pkg_rule_base <- loadImportedRules hsc_env
+	     (ModGuts { mg_binds = binds, mg_rules = local_rules,
+			mg_deps = deps })
+	     us 
+  = do	{ pkg_rule_base <- loadImportedRules hsc_env deps
 
 	; let env	       = emptySimplEnv SimplGently [] local_ids 
 	      (better_rules,_) = initSmpl dflags us (mapSmpl (simplRule env) local_rules)

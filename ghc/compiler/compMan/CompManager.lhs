@@ -181,13 +181,15 @@ cmSetContext
 cmSetContext cmstate toplevs exports = do 
   let old_ic = cm_ic cmstate
 
-  export_env <- mkExportEnv (cm_hsc cmstate) 
-			    (map mkModuleName exports)
+  mb_export_env <- mkExportEnv (cm_hsc cmstate) 
+			       (map mkModuleName exports)
 
-  putStrLn (showSDoc (text "export env" $$ ppr export_env))
-  return cmstate{ cm_ic = old_ic { ic_toplev_scope = toplevs,
-		     		   ic_exports = exports,
-			       	   ic_rn_gbl_env = export_env } }
+  case mb_export_env of
+    Nothing -> return cmstate	-- Error already reported; do a no-op
+    Just export_env -> 
+	  return cmstate{ cm_ic = old_ic { ic_toplev_scope = toplevs,
+			     		   ic_exports = exports,
+				       	   ic_rn_gbl_env = export_env } }
 
 cmGetContext :: CmState -> IO ([String],[String])
 cmGetContext CmState{cm_ic=ic} = 
@@ -219,8 +221,12 @@ cmInfoThing cmstate id
 
 cmBrowseModule :: CmState -> String -> Bool -> IO [IfaceDecl]
 cmBrowseModule cmstate str exports_only
-  = getModuleContents (cm_hsc cmstate) (cm_ic cmstate) 
-		      (mkModuleName str) exports_only
+  = do { mb_decls <- getModuleContents (cm_hsc cmstate) (cm_ic cmstate) 
+		     		       (mkModuleName str) exports_only
+       ; case mb_decls of
+	   Nothing -> return []		-- An error of some kind
+	   Just ds -> return ds
+   }
 
 
 -----------------------------------------------------------------------------

@@ -91,7 +91,7 @@ import TyCon		( DataConDetails(..) )
 import Inst		( tcStdSyntaxName )
 import RnExpr		( rnStmts, rnExpr )
 import RnNames		( exportsToAvails )
-import LoadIface	( loadSysInterface )
+import LoadIface	( loadSrcInterface )
 import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..), IfaceExtName(..),
 			  tyThingToIfaceDecl )
 import IfaceEnv		( tcIfaceGlobal )
@@ -213,7 +213,7 @@ tcRnIface :: HscEnv
 	  -> ModIface 	-- Get the decls from here
 	  -> IO ModDetails
 tcRnIface hsc_env iface
-  = initIfaceIO hsc_env (typecheckIface iface)
+  = initIfaceIO hsc_env (mi_deps iface) (typecheckIface iface)
 \end{code}
 
 
@@ -573,7 +573,7 @@ mkFakeGroup decls -- Rather clumsy; lots of unused fields
   = HsGroup {	hs_tyclds = decls, 	-- This is the one we want
 		hs_valds = EmptyBinds, hs_fords = [],
 		hs_instds = [], hs_fixds = [], hs_depds = [],
-		hs_ruleds = [] }
+		hs_ruleds = [], hs_defds = [] }
 \end{code}
 
 
@@ -804,15 +804,15 @@ tcTopSrcDecls
 \begin{code}
 #ifdef GHCI
 mkExportEnv :: HscEnv -> [ModuleName]	-- Expose these modules' exports only
- 	    -> IO GlobalRdrEnv
+ 	    -> IO (Maybe GlobalRdrEnv)
 
 mkExportEnv hsc_env exports
-  = initIfaceIO hsc_env $ do {
+  = initTc hsc_env iNTERACTIVE $ do {
     export_envs <- mappM getModuleExports exports ;
     returnM (foldr plusGlobalRdrEnv emptyGlobalRdrEnv export_envs)
     }
 
-getModuleExports :: ModuleName -> IfG GlobalRdrEnv
+getModuleExports :: ModuleName -> TcM GlobalRdrEnv
 getModuleExports mod 
   = do	{ iface <- load_iface mod
 	; avails <- exportsToAvails (mi_exports iface)
@@ -833,10 +833,10 @@ getModuleContents
   -> InteractiveContext
   -> ModuleName			-- Module to inspect
   -> Bool			-- Grab just the exports, or the whole toplev
-  -> IO [IfaceDecl]
+  -> IO (Maybe [IfaceDecl])
 
 getModuleContents hsc_env ictxt mod exports_only
- = initIfaceIO hsc_env (get_mod_contents exports_only)
+ = initTc hsc_env iNTERACTIVE (get_mod_contents exports_only)
  where
    get_mod_contents exports_only
       | not exports_only	-- We want the whole top-level type env
@@ -858,7 +858,7 @@ getModuleContents hsc_env ictxt mod exports_only
     	}
 
    get_decl avail 
-	= do { thing <- tcIfaceGlobal (availName avail)
+	= do { thing <- tcLookupGlobal (availName avail)
 	     ; return (filter_decl (availOccs avail) (toIfaceDecl ictxt thing)) }
 
 ---------------------
@@ -879,7 +879,9 @@ wantToSee (ADataCon _) = False	-- They'll come via their TyCon
 wantToSee _ 	       = True
 
 ---------------------
-load_iface mod = loadSysInterface (text "context for compiling statements") mod
+load_iface mod = loadSrcInterface doc mod False {- Not boot iface -}
+	       where
+		 doc = ptext SLIT("context for compiling statements")
 
 ---------------------
 noRdrEnvErr mod = ptext SLIT("No top-level environment available for module") 

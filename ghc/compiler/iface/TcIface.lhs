@@ -27,7 +27,7 @@ import TypeRep		( Type(..), PredType(..) )
 import TyCon		( TyCon, tyConName )
 import HscTypes		( ExternalPackageState(..), PackageInstEnv, PackageRuleBase,
 			  HscEnv, TyThing(..), implicitTyThings, typeEnvIds,
-			  ModIface(..), ModDetails(..), InstPool, 
+			  ModIface(..), ModDetails(..), InstPool, Dependencies(..),
 			  TypeEnv, mkTypeEnv, extendTypeEnvList, lookupTypeEnv,
 			  DeclPool, RulePool, Pool(..), Gated, addRuleToPool )
 import InstEnv		( extendInstEnv )
@@ -492,9 +492,9 @@ are in the type environment.  However, remember that typechecking a Rule may
 (as a side effect) augment the type envt, and so we may need to iterate the process.
 
 \begin{code}
-loadImportedRules :: HscEnv -> IO PackageRuleBase
-loadImportedRules hsc_env
-  = initIfaceIO hsc_env $ do 
+loadImportedRules :: HscEnv -> Dependencies -> IO PackageRuleBase
+loadImportedRules hsc_env deps
+  = initIfaceIO hsc_env deps $ do 
 	{ -- Get new rules
 	  if_rules <- updateEps (\ eps ->
 		let { (new_pool, if_rules) = selectRules (eps_rules eps) (eps_PTE eps) }
@@ -510,7 +510,13 @@ loadImportedRules hsc_env
 	; updateEps (\ eps -> 
 	    let { new_rule_base = extendRuleBaseList (eps_rule_base eps) core_rules }
 	    in (eps { eps_rule_base = new_rule_base }, new_rule_base)
-	  ) }
+	  ) 
+
+	-- Strictly speaking, at this point we should go round again, since
+	-- typechecking one set of rules may bring in new things which enable
+	-- some more rules to come in.  But we call loadImportedRules several
+	-- times anyway, so I'm going to be lazy and ignore this.
+    }
 
 
 selectRules :: RulePool -> TypeEnv -> (RulePool, [(ModuleName, IfaceRule)])

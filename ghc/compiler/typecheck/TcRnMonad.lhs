@@ -12,7 +12,7 @@ import IOEnv		-- Re-export all
 
 import HsSyn		( MonoBinds(..) )
 import HscTypes		( HscEnv(..), 
-			  TyThing,
+			  TyThing, Dependencies(..),
 			  ExternalPackageState(..), HomePackageTable,
 			  ModDetails(..), HomeModInfo(..), 
 			  Deprecs(..), FixityEnv, FixItem,
@@ -744,10 +744,14 @@ initIfaceExtCore thing_inside
 	  }
 	; setEnvs (if_env, if_lenv) thing_inside }
 
-initIfaceIO :: HscEnv -> IfG a -> IO a
-initIfaceIO hsc_env do_this
+initIfaceIO :: HscEnv -> Dependencies -> IfG a -> IO a
+initIfaceIO hsc_env deps do_this
  = do	{ let {
-	     gbl_env = IfGblEnv { if_is_boot   = emptyModuleEnv,	-- Bogus?
+	     is_boot = mkModDeps (dep_mods deps)
+			-- Urgh!  But we do somehow need to get the info
+			-- on whether (for this particular compilation) we should
+			-- import a hi-boot file or not.
+	   ; gbl_env = IfGblEnv { if_is_boot   = is_boot,
 				  if_rec_types = Nothing } ;
 	   }
 
