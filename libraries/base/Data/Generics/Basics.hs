@@ -52,6 +52,7 @@ module Data.Generics.Basics (
         gmapQ, 
         gmapQl,
         gmapQr,
+        gmapQi,
         gmapM,
         gmapMp,
         gmapMo,
@@ -209,9 +210,18 @@ unit.
     where
       k (Qr c) x = Qr (\r -> c (f x `o` r))
 
+
   -- | A generic query that processes the immediate subterms and returns a list
   gmapQ :: (forall a. Data a => a -> u) -> a -> [u]
   gmapQ f = gmapQr (:) [] f
+
+
+  -- | A generic query that processes one child by index (zero-based)
+  gmapQi :: Int -> (forall a. Data a => a -> u) -> a -> u
+  gmapQi i f x = case gfoldl k z x of { COUNT _ (Just q) -> q } 
+    where
+      k (COUNT i' q) a = COUNT (i'+1) (if i==i' then Just (f a) else q) 
+      z f              = COUNT 0 Nothing
 
 
   -- | A generic monadic transformation that maps over the immediate subterms
@@ -280,6 +290,10 @@ newtype ID x = ID { unID :: x }
 
 -- | The constant type constructor needed for the definition of gmapQl
 newtype CONST c a = CONST { unCONST :: c }
+
+
+-- | Type constructor for adding counters to queries
+data COUNT q a = COUNT Int (Maybe q)
 
 
 -- | The type constructor used in definition of gmapQr
@@ -491,7 +505,20 @@ instance Data Rational where
   dataTypeOf _ = StringType
 
 --
--- Bool as the most trivial algebraic datatype;
+-- () as the most trivial algebraic datatype;
+-- define top-level definitions for representations.
+--
+
+emptyTupleConstr = mkConstr 1 "()" Prefix
+unitDataType     = mkDataType [emptyTupleConstr]
+
+instance Data () where
+  toConstr _ = emptyTupleConstr
+  fromConstr c | conIndex c == 1 = ()  
+  dataTypeOf _ = unitDataType
+
+--
+-- Bool as another trivial algebraic datatype;
 -- define top-level definitions for representations.
 --
 

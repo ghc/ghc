@@ -23,7 +23,8 @@ module Data.Generics (
   module Data.Generics.Schemes,	-- traversal schemes (everywhere etc.)
   module Data.Generics.Text,	-- generic read and show
   module Data.Generics.Twins,	-- twin traversal, e.g., generic eq
-  module Data.Generics.Reify	-- experimental reification theme
+  module Data.Generics.Reify,	-- experimental reification theme
+  module Data.Generics.List	-- mapping over polymorphic lists
 
 #ifndef __HADDOCK__
 	,
@@ -52,3 +53,4 @@ import Data.Generics.Schemes
 import Data.Generics.Text
 import Data.Generics.Twins
 import Data.Generics.Reify
+import Data.Generics.List

@@ -29,6 +29,9 @@ module Data.Generics.Aliases (
 	GenericR,
         Generic,
         Generic'(..),
+        GenericT'(..),
+        GenericQ'(..),
+        GenericM'(..),
 
 	-- * Inredients of generic functions
 	orElse,
@@ -245,6 +248,11 @@ type Generic c = forall a. Data a => a -> c a
 --
 data Generic' c = Generic' { unGeneric' :: Generic c }
 
+
+-- | Other first-class polymorphic wrappers
+newtype GenericT'   = GenericT' { unGenericT' :: Data a => a -> a }
+newtype GenericQ' r = GenericQ' { unGenericQ' :: GenericQ r }
+newtype GenericM' m = GenericM' { unGenericM' :: Data a => a -> m a }
 
 
 -- | Left-biased choice on maybies

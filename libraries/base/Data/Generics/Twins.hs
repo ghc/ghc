@@ -17,15 +17,23 @@
 
 module Data.Generics.Twins ( 
 
-	-- * The idiom of multi-parameter traversal
-	tfoldl,
+	-- * The idiom for multi-parameter traversal
+        gzipWith,
 
-	-- * Twin mapping combinators
+	-- * Mapping combinators with an additional list
+	gzipWithT,
+	gzipWithM,
+	gzipWithQ,
+	gzipWithQl,
+	gzipWithQr,
+
+	-- * Mapping combinators for twin traversal
 	tmapT,
-	tmapQl,
-	tmapM,
+  	tmapM,
+  	tmapQ,
 
-	-- * Prime examples of twin traversal
+
+	-- * Typical twin traversals
 	geq,
 	gzip
 
@@ -45,99 +53,174 @@ import Data.Generics.Aliases
 
 ------------------------------------------------------------------------------
 --
---	The idiom of multi-parameter traversal
+--	The idiom for multi-parameter traversal
 --
 ------------------------------------------------------------------------------
 
 {-
 
-The fact that we traverse two terms semi-simultaneously is reflected
-by the nested generic function type that occurs as the result type of
-tfoldl. By "semi-simultaneously", we mean that we first fold over the
-first term and compute a LIST of generic functions to be folded over
-the second term. So the outermost generic function type is GenericQ
-because we compute a list of generic functions which is a kind of
-query.  The inner generic function type is parameterised in a type
-constructor c so that we can instantiate twin traversal for
-transformations (T), queries (Q), and monadic transformations (M).
-The combinator tfoldl is also parameterised by a nested generic
-function which serves as the function to be mapped over the first term
-to get the functions to be mapped over the second term. The combinator
-tfoldl is further parameterised by gfoldl-like parameters k and z
-which however need to be lifted to k' and z' such that plain term
-traversal is combined with list traversal (of the list of generic
-functions).  That is, the essence of multi-parameter term traversal is
-a single term traversal interleaved with a list fold. As the
-definition of k' and z' details, the list fold can be arranged by the
-ingredients of the term fold. To this end, we use a designated TWIN
-datatype constructor which pairs a given type constructor c with a
-list of generic functions.
+gfoldl and friends so far facilitated traversal of a single term. We
+will now consider an idiom gfoldlWith to traverse two terms
+semi-simultaneously. By cascasding this idiom, we can also traverse
+more than two terms. The gfoldlWith primitive completes gfoldl in a
+way that is similar to the well-known couple map and
+zipWith. Basically, gfoldlWith takes an additional argument, namely a
+list, and this list is traversed simultaneously with the immediate
+subterms of a given term.
 
 -}
 
-tfoldl :: (forall a b. Data a => c (a -> b) -> c a -> c b)
-       -> (forall g. g -> c g)
-       -> GenericQ (Generic c)
-       -> GenericQ (Generic c)
 
-tfoldl k z t xs ys = case gfoldl k' z' ys of { TWIN _ c -> c }
+-- | gfoldl with an additional list
+gzipWith :: Data a
+         => (forall a b. Data a => d -> c (a -> b) -> a -> c b)
+         -> (forall g. g -> c g)
+         -> [d]
+         -> a
+         -> c a
+
+gzipWith k z l x = case gfoldl k' z' x of { WITH _ c -> c }
  where
-   l = gmapQ (\x -> Generic' (t x)) xs
-   k' (TWIN (r:rs) c) y = TWIN rs (k c (unGeneric' r y))
-   z' f                 = TWIN l (z f)
+   k' (WITH (h:t) c) y = WITH t (k h c y)
+   k' (WITH []    _) _ = error "gzipWith"
+   z' f                = WITH l (z f)
 
 
--- Pairing ID, CONST, m or others with lists of generic functions
-data TWIN c a   = TWIN [Generic' c] (c a) 
+-- | A type constructor for folding over the extra list
+data WITH q c a   = WITH [q] (c a) 
 
 
 
 ------------------------------------------------------------------------------
 --
---	Twin mapping combinators
+--	Mapping combinators with an additional list
 --
 ------------------------------------------------------------------------------
 
-tmapT :: GenericQ (GenericT) -> GenericQ (GenericT)
-tmapT f x y = unID $ tfoldl k z f' x y
- where
-  f' x y = ID $ f x y
-  k (ID c) (ID x) = ID (c x)
-  z = ID
+
+-- | gmapT with an additional list
+gzipWithT :: Data a 
+          => (forall a. Data a => b -> a -> a)
+          -> [b]
+          -> a
+          -> a
+
+gzipWithT f l = unID . gzipWith k ID l
+  where
+    k b (ID c) x = ID $ c $ f b x
 
 
-tmapQl :: (r -> r -> r) 
-       -> r
-       -> GenericQ (GenericQ r)
-       -> GenericQ (GenericQ r)
-tmapQl o r f x y = unCONST $ tfoldl k z f' x y
- where
-  f' x y = CONST $ f x y
-  k (CONST c) (CONST x) = CONST (c `o` x)  
-  z _ = CONST r
+-- | gmapM with an additional list
+gzipWithM :: (Data a, Monad m) 
+          => (forall a. Data a => b -> a -> m a)
+          -> [b]
+          -> a
+          -> m a
+
+gzipWithM f = gzipWith k return 
+  where
+    k b c x = do c' <- c
+                 x' <- f b x
+                 return (c' x')
 
 
-tmapM :: Monad m => GenericQ (GenericM m) -> GenericQ (GenericM m)
-tmapM f x y = tfoldl k z f x y
- where
-  k c x = do c' <- c
-             x' <- x
-             return $ c' x'
-  z = return
+-- | gmapQl with an additional list
+gzipWithQl :: Data a
+           => (r -> r -> r) 
+           -> r
+           -> (forall a. Data a => b -> a -> r)
+           -> [b]
+           -> a 
+           -> r
+
+gzipWithQl o r f l = unCONST . gzipWith k z l
+  where
+    k b (CONST c) x = CONST (c `o` f b x)
+    z _ = CONST r
 
 
--- The identity type constructor needed for the definition of tmapT
+-- | gmapQr with an additional list
+gzipWithQr :: Data a
+           => (r' -> r -> r) 
+           -> r
+           -> (forall a. Data a => b -> a -> r')
+           -> [b]
+           -> a 
+           -> r
+
+gzipWithQr o r f l x = unQr (gzipWith k z l x) r
+    where
+      k b (Qr c) x = Qr (\r -> c (f b x `o` r))
+      z _ = Qr id
+
+
+-- | gmapQ with an additional list
+gzipWithQ :: Data a
+      => (forall a. Data a => b -> a -> u)
+      -> [b]  
+      -> a 
+      -> [u]
+
+gzipWithQ f = gzipWithQr (:) [] f
+
+
+
+------------------------------------------------------------------------------
+--
+--	Helper type constructors
+--
+------------------------------------------------------------------------------
+
+
+
+-- | The identity type constructor needed for the definition of gzipWithT
 newtype ID x = ID { unID :: x }
 
 
--- The constant type constructor needed for the definition of tmapQl
+-- | The constant type constructor needed for the definition of gzipWithQl
 newtype CONST c a = CONST { unCONST :: c }
+
+
+-- | The type constructor needed for the definition of gzipWithQr
+newtype Qr r a = Qr { unQr  :: r -> r }
 
 
 
 ------------------------------------------------------------------------------
 --
---	Prime examples of twin traversal
+--	Mapping combinators for twin traversal
+--
+------------------------------------------------------------------------------
+
+
+-- | Twin map for transformation 
+tmapT :: GenericQ (GenericT) -> GenericQ (GenericT)
+tmapT f x y =
+  gzipWithT unGenericT'
+            (gmapQ (\x -> GenericT' (f x)) x)
+            y
+
+
+-- | Twin map for monadic transformation 
+tmapM :: Monad m => GenericQ (GenericM m) -> GenericQ (GenericM m)
+tmapM f x y =
+  gzipWithM unGenericM'
+            (gmapQ (\x -> GenericM' (f x)) x)
+            y
+
+
+-- | Twin map for monadic transformation 
+tmapQ :: GenericQ (GenericQ r) -> GenericQ (GenericQ [r])
+tmapQ f x y =
+  gzipWithQ unGenericQ'
+            (gmapQ (\x -> GenericQ' (f x)) x)
+            y
+
+
+
+------------------------------------------------------------------------------
+--
+--	Typical twin traversals
 --
 ------------------------------------------------------------------------------
 
@@ -160,11 +243,11 @@ couples of immediate subterms from the two given input terms.)
 -}
 
 geq x y = geq' x y
- where
-  geq' :: forall a b. (Data a, Data b) => a -> b -> Bool
-  geq' x y = and [ (toConstr x == toConstr y)
-                 , tmapQl (\b1 b2 -> and [b1,b2]) True geq' x y
-                 ]
+  where
+    geq' :: forall a b. (Data a, Data b) => a -> b -> Bool
+    geq' x y = and ( (toConstr x == toConstr y)
+                   : tmapQ geq' x y
+                   )
 
 
 -- | Generic zip controlled by a function with type-specific branches
@@ -177,5 +260,5 @@ gzip f x y =
   f x y
   `orElse`
   if toConstr x == toConstr y
-   then tmapM (gzip f) x y
-   else Nothing
+    then tmapM (gzip f) x y
+    else Nothing
