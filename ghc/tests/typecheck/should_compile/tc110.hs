@@ -13,6 +13,12 @@ primDup = undefined
 
 dup () = call primDup
 
+-- 	call :: Call c h => c -> h
+--
+--	call primDup :: h  with  {Call (Int -> IO Int) h}
+--	Hence h must be fixed by the environment
+--	Reduce at top level to {Call (IO Int) h'}
+
 class Call    c h | c -> h where
     call  :: c -> h
 
