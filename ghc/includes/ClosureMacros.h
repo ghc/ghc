@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.16 1999/05/13 17:31:06 simonm Exp $
+ * $Id: ClosureMacros.h,v 1.17 1999/06/25 09:13:37 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -60,16 +60,7 @@
 #define SET_INFO(c,i) ((c)->header.info = (i))
 #define GET_INFO(c)   ((c)->header.info)
 
-#if USE_MINIINTERPRETER
-#define INIT_ENTRY(e)    entry : (F_)(e)
-#define GET_ENTRY(c)     ((c)->header.info->entry)
-#define ENTRY_CODE(info) (((StgInfoTable *)info)->entry)
-#define INFO_PTR_TO_STRUCT(info) ((StgInfoTable *)info)
-#define get_itbl(c)      ((c)->header.info)
-static __inline__ StgFunPtr get_entry(const StgInfoTable *itbl) {
-    return itbl->entry;
-}
-#else
+#ifdef TABLES_NEXT_TO_CODE
 #define INIT_ENTRY(e)    code : {}
 #define GET_ENTRY(c)     ((StgFunPtr)((c)->header.info))
 #define ENTRY_CODE(info) (info)
@@ -77,6 +68,15 @@ static __inline__ StgFunPtr get_entry(const StgInfoTable *itbl) {
 #define get_itbl(c)      (((c)->header.info) - 1)
 static __inline__ StgFunPtr get_entry(const StgInfoTable *itbl) {
     return (StgFunPtr)(itbl+1);
+}
+#else
+#define INIT_ENTRY(e)    entry : (F_)(e)
+#define GET_ENTRY(c)     ((c)->header.info->entry)
+#define ENTRY_CODE(info) (((StgInfoTable *)info)->entry)
+#define INFO_PTR_TO_STRUCT(info) ((StgInfoTable *)info)
+#define get_itbl(c)      ((c)->header.info)
+static __inline__ StgFunPtr get_entry(const StgInfoTable *itbl) {
+    return itbl->entry;
 }
 #endif
 
@@ -164,16 +164,10 @@ extern int is_heap_alloced(const void* x);
 #define IS_HUGS_CONSTR_INFO(info) 0 /* ToDo: more than mildly bogus */
 #endif
 
-#ifdef USE_MINIINTERPRETER
-/* in the mininterpreter, we put infotables on closures */
-#define LOOKS_LIKE_GHC_INFO(info) IS_CODE_PTR(info)
+#ifdef HAVE_WIN32_DLL_SUPPORT
+# define LOOKS_LIKE_GHC_INFO(info) (!HEAP_ALLOCED(info) && !LOOKS_LIKE_STATIC_CLOSURE(info))
 #else
-/* otherwise we have entry pointers on closures */
-# ifdef HAVE_WIN32_DLL_SUPPORT
-#  define LOOKS_LIKE_GHC_INFO(info) (!HEAP_ALLOCED(info) && !LOOKS_LIKE_STATIC_CLOSURE(info))
-# else
-#  define LOOKS_LIKE_GHC_INFO(info) IS_CODE_PTR(info)
-# endif
+# define LOOKS_LIKE_GHC_INFO(info) IS_CODE_PTR(info)
 #endif
 
 /* -----------------------------------------------------------------------------

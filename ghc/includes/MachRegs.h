@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MachRegs.h,v 1.4 1999/02/05 16:02:23 simonm Exp $
+ * $Id: MachRegs.h,v 1.5 1999/06/25 09:13:38 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -180,7 +180,7 @@
 #endif /* hppa */
 
 /* -----------------------------------------------------------------------------
-   The Intel iX86 register mapping
+   The x86 register mapping
 
    Ok, we've only got 6 general purpose registers, a frame pointer and a
    stack pointer.  \tr{%eax} and \tr{%edx} are return values from C functions,
@@ -202,7 +202,9 @@
 
 #define REG(x) __asm__("%" #x)
 
+#ifndef not_doing_dynamic_linking
 #define REG_Base    ebx
+#endif
 #define REG_Sp	    ebp
 
 #if STOLEN_X86_REGS >= 3

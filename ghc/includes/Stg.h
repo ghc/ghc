@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.12 1999/05/11 16:46:20 keithw Exp $
+ * $Id: Stg.h,v 1.13 1999/06/25 09:13:38 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -45,6 +45,10 @@
 /* ToDo: Set this flag properly: COMPILER and INTERPRETER should not be mutually exclusive. */
 #ifndef INTERPRETER
 #define COMPILER 1
+#endif
+
+#ifndef USE_MINIINTERPRETER
+#define TABLES_NEXT_TO_CODE
 #endif
 
 /* bit macros

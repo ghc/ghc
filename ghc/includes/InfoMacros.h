@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoMacros.h,v 1.6 1999/05/13 17:31:06 simonm Exp $
+ * $Id: InfoMacros.h,v 1.7 1999/06/25 09:13:37 simonmar Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -110,7 +110,7 @@ INFO_TABLE_CONSTR(info, entry, ptrs, nptrs, tag_,type_,info_class,	\
  * layout field, so we only need one macro for these.
  */
 
-#ifndef USE_MINIINTERPRETER
+#ifdef TABLES_NEXT_TO_CODE
 
 typedef struct {
   StgFunPtr vec[2];
@@ -373,7 +373,7 @@ typedef struct {
 			alt_5, alt_6, alt_7, alt_8 }		\
 	}
 
-#endif /* MINI_INTERPRETER */
+#endif /* TABLES_NEXT_TO_CODE */
 
 /* For polymorphic activation records, we need both a direct return
  * address and a return vector:
@@ -381,7 +381,7 @@ typedef struct {
 
 typedef vec_info_8 StgPolyInfoTable;
 
-#ifdef USE_MINIINTERPRETER
+#ifndef TABLES_NEXT_TO_CODE
 
 #define VEC_POLY_INFO_TABLE(nm, bitmap_, 			\
 			   srt_, srt_off_, srt_len_,		\

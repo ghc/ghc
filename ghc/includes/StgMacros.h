@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.11 1999/05/13 17:31:07 simonm Exp $
+ * $Id: StgMacros.h,v 1.12 1999/06/25 09:13:38 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -404,10 +404,10 @@ EDI_(stg_gen_chk_info);
    The extra subtraction of one word is because tags start at zero.
    -------------------------------------------------------------------------- */
 
-#ifdef USE_MINIINTERPRETER
-#define RET_VEC(p,t) (((StgInfoTable *)p)->vector[t])
-#else
+#ifdef TABLES_NEXT_TO_CODE
 #define RET_VEC(p,t) (*((P_)(p) - sizeofW(StgInfoTable) - t - 1))
+#else
+#define RET_VEC(p,t) (((StgInfoTable *)p)->vector[t])
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -428,6 +428,9 @@ EDI_(stg_gen_chk_info);
 #  define UPD_BH_UPDATABLE(thunk)    /* nothing */
 #  define UPD_BH_SINGLE_ENTRY(thunk) /* nothing */
 #endif /* EAGER_BLACKHOLING */
+
+#define UPD_FRAME_UPDATEE(p)  (((StgUpdateFrame *)(p))->updatee)
+#define UPDATE_SU_FROM_UPD_FRAME(p) (Su=((StgUpdateFrame *)(p))->link)
 
 /* -----------------------------------------------------------------------------
    Moving Floats and Doubles

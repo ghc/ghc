@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoTables.h,v 1.15 1999/05/13 17:31:07 simonm Exp $
+ * $Id: InfoTables.h,v 1.16 1999/06/25 09:13:37 simonmar Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -173,11 +173,11 @@ typedef struct _StgInfoTable {
     StgWord         type : 16;	/* } These 2 elements fit into 32 bits */
     StgWord         srt_len : 16; /* }                                   */
 #endif
-#if USE_MINIINTERPRETER
+#ifdef TABLES_NEXT_TO_CODE
+    StgCode         code[0];
+#else
     StgFunPtr       entry;
     StgFunPtr       vector[0];
-#else
-    StgCode         code[0];
 #endif
 } StgInfoTable;
 
