@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.20 2000/11/28 14:41:54 sewardj Exp $
+-- $Id: InteractiveUI.hs,v 1.21 2000/12/12 10:02:57 sewardj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -22,7 +22,9 @@ import Outputable
 import Util
 
 import Exception
+#ifndef NO_READLINE
 import Readline
+#endif
 import IOExts
 
 import Numeric
@@ -32,6 +34,7 @@ import CPUTime
 import Directory
 import IO
 import Char
+
 
 -----------------------------------------------------------------------------
 
@@ -122,7 +125,8 @@ uiLoop = do
 #ifndef NO_READLINE
   l <- io (readline (moduleNameUserString (current_module st) ++ "> "))
 #else
-  l <- io (hGetLine stdin)
+  l_ok <- io (hGetLine stdin)
+  let l = Just l_ok
 #endif
   case l of
     Nothing -> exitGHCi
