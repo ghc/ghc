@@ -13,7 +13,12 @@
 --
 -----------------------------------------------------------------------------
 
-module Data.Tuple where
+module Data.Tuple (
+	  fst		-- :: (a,b) -> a
+	, snd		-- :: (a,b) -> a
+	, curry		-- :: ((a, b) -> c) -> a -> b -> c
+	, uncurry	-- :: (a -> b -> c) -> ((a, b) -> c)
+  ) where
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
