@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.2 2001/03/16 10:04:31 simonmar Exp $
+-- $Id: Main.hs,v 1.3 2001/03/20 15:57:30 simonmar Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -18,7 +18,9 @@ import Directory
 import System
 import IO
 
-default_pkgconf = clibdir ++ "/package.conf"
+-- string gap games to confuse CPP.
+default_pkgconf = "\ 
+   \ clibdir" ++ "/package.conf"
 
 main = do
   args <- getArgs
