@@ -27,7 +27,7 @@
 $ ghci
    ___         ___ _
   / _ \ /\  /\/ __(_)
- / /_\// /_/ / /  | |      GHC Interactive, version 4.11, For Haskell 98.
+ / /_\// /_/ / /  | |      GHC Interactive, version 5.00, For Haskell 98.
 / /_\\/ __  / /___| |      http://www.haskell.org/ghc/
 \____/\/ /_/\____/|_|      Type :? for help.
 
@@ -73,7 +73,7 @@ Prelude>
 <screen>
 Prelude> 1+2
 3
-PrePrelude> let x = 42 in x / 9
+Prelude> let x = 42 in x / 9
 4.666666666666667
 Prelude> 
 </screen>
@@ -557,7 +557,7 @@ $ ghci Main.hs
 $ ghci -package text
    ___         ___ _
   / _ \ /\  /\/ __(_)
- / /_\// /_/ / /  | |      GHC Interactive, version 4.11, For Haskell 98.
+ / /_\// /_/ / /  | |      GHC Interactive, version 5.00, For Haskell 98.
 / /_\\/ __  / /___| |      http://www.haskell.org/ghc/
 \____/\/ /_/\____/|_|      Type :? for help.
 
@@ -716,7 +716,7 @@ Prelude> :def make (\_ -> return ":! ghc --make Main")
       </varlistentry>
 
       <varlistentry>
-	<term><literal>:quit</literal> <replaceable>module</replaceable></term>
+	<term><literal>:quit</literal></term>
 	<indexterm><primary><literal>:quit</literal></primary></indexterm>
 	<listitem>
 	  <para>Quits GHCi.  You can also quit by typing a control-D
