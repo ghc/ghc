@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.20 2001/08/01 20:37:00 qrczak Exp $
+# $Id: Makefile,v 1.21 2001/08/08 13:21:04 qrczak Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -11,8 +11,6 @@ INSTALLING=1
 
 HS_PROG           = hsc2hs-bin
 SRC_HC_OPTS      += -package util
-# TODO: remove -H80M when the strictness analyser is working again.
-Main_HC_OPTS      = -H80M
 
 INSTALLED_SCRIPT_PROG  = hsc2hs
 INPLACE_SCRIPT_PROG    = hsc2hs-inplace

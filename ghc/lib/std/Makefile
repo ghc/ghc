@@ -54,15 +54,8 @@ PrelHandle_HC_OPTS   += -fno-ignore-asserts
 PrelIO_HC_OPTS       += -fno-ignore-asserts
 
 # Special options
-# TODO: remove -H80M when the strictness analyser is working again.
-PrelStorable_HC_OPTS = -monly-3-regs -H80M
+PrelStorable_HC_OPTS = -monly-3-regs
 PrelCError_HC_OPTS   = +RTS -K4m -RTS
-PrelInt_HC_OPTS      = -H80M # -monly-3-regs
-PrelWord_HC_OPTS     = -H80M # -monly-3-regs
-PrelFloat_HC_OPTS    = -H80M
-PrelRead_HC_OPTS     = -H80M
-PrelHandle_HC_OPTS   = -H80M
-Time_HC_OPTS         = -H80M
 
 #-----------------------------------------------------------------------------
 # 	Dependency generation
@@ -223,5 +216,3 @@ include $(TOP)/mk/target.mk
 
 # PrelIO.hsc includes PrelHandle_hsc.h
 PrelIO.hsc : PrelHandle_hsc.h
-
-

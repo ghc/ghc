@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.182 2001/08/07 08:16:48 rrt Exp $
+# $Id: Makefile,v 1.183 2001/08/08 13:21:04 qrczak Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -231,11 +231,7 @@ endif
 
 SRC_CC_OPTS += -Iparser -I. -I$(TOP)/includes -O
 SRC_HC_OPTS += -recomp $(GhcHcOpts)
-# TODO: change back to 16M when the strictness analyser is working again.
-SRC_HC_OPTS += -H80M
-# TODO: remove when the strictness analyser is working again.
-rename/ParseIface_HC_OPTS += -H120M
-parser/Parser_HC_OPTS     += -H100M
+SRC_HC_OPTS += -H16M
 
 # 	Special flags for particular modules
 #	The standard suffix rule for compiling a Haskell file
