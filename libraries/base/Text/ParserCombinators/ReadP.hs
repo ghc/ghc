@@ -275,7 +275,7 @@ readP_to_S :: ReadP a -> ReadS a
 -- ^ Converts a parser into a Haskell ReadS-style function.
 --   This is the main way in which you can \"run\" a 'ReadP' parser:
 --   the expanded type is
--- @ readP_to_S :: ReadP a -> String -> [(String,String)] @
+-- @ readP_to_S :: ReadP a -> String -> [(a,String)] @
 readP_to_S (R f) = run (f return)
 
 readS_to_P :: ReadS a -> ReadP a
