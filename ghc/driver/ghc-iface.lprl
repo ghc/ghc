@@ -194,6 +194,8 @@ sub readHiFile {
 	} elsif ( $now_in =~ /^(exports|instance_modules|instances|fixities)$/ ) {
 	    $Stuff{"$mod:$1"} .= $_; # just save it up
 
+	} elsif ( /^--.*/ ) { # silently ignore comment lines.
+	    ;
 	} elsif ( $now_in eq 'declarations' ) { # relatively special treatment needed...
 	# We're in a declaration
 
@@ -235,8 +237,6 @@ sub readHiFile {
 		$Decl{"$mod:$current_name"} .= $_
 	    }
 
-	} elsif ( /^--.*/ ) { # silently ignore comment lines.
-	    ;
 	} else {
 	    print STDERR "$Pgm:junk old iface line?:section:$now_in:$_";
 	}
@@ -290,19 +290,22 @@ sub mv_change {
 sub printNewItemVersion {
     local($hifile, $item, $mod_version, $show_hi_diffs) = @_;
     local($idecl) = $Decl{"new:$item"};
+    
 
     if (! defined($Decl{"old:$item"})) {	# Old decl doesn't exist
 	if ($show_hi_diffs) {print STDERR "new: $item\n";}
 	print $hifile  "$mod_version ";		# Use module version
 
-    } elsif ($idecl ne $Decl{"old:$item"})  {	# Old decl differs from new decl
-	local($odecl) = $Decl{"old:$item"};
-	if ($show_hi_diffs) {print STDERR "changed: $item\nOld: $odeclNew: $idecl";}
-	print $hifile  "$mod_version ";		# Use module version
-
     } elsif (! defined($OldVersion{"$item"}) ) {
 	if ($show_hi_diffs) {print STDERR "$item: no old version?!\n";}
 	print $hifile  "$mod_version ";			# Use module version
+
+    } elsif ($idecl ne $Decl{"old:$item"})  {	# Old decl differs from new decl
+	local($odecl) = $Decl{"old:$item"};
+	if ($show_hi_diffs) {print STDERR "changed: $item\nOld: $odeclNew: $idecl";}
+	print $hifile  "--old: ", $OldVersion{"$item"}, " $odecl" 
+			if $Keep_HiDiffs;         # show old in interface file
+	print $hifile  "$mod_version ";		  # Use module version
 
     } else {					# Identical decls, so use old version number
 	if ($show_hi_diffs) {print STDERR "$item: unchanged\n";}
