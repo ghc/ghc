@@ -529,9 +529,10 @@ mkDataTypeEqn tycon clas
 	-- 	  data T a b = ... deriving( Typeable )
 	-- gives
 	--	  instance Typeable2 T where ...
+	-- Notice that:
 	-- 1. There are no constraints in the instance
 	-- 2. There are no type variables either
-	-- 2. The actual class we want to generate isn't necessarily
+	-- 3. The actual class we want to generate isn't necessarily
 	--	Typeable; it depends on the arity of the type
     do	{ real_clas <- tcLookupClass (typeableClassNames !! tyConArity tycon)
 	; dfun_name <- new_dfun_name real_clas tycon
