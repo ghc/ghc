@@ -194,8 +194,14 @@ mkModule = Module
 mkVanillaModule :: ModuleName -> Module
 mkVanillaModule name = Module name UserMod dell
  where
-  dell | opt_Static || opt_CompilingPrelude = NotDll
-       | otherwise		 	    = Dll
+  main_mod = mkSrcModuleFS SLIT("Main")
+
+   -- Main can never be in a DLL - need this
+   -- special case in order to correctly
+   -- compile PrelMain
+  dell | opt_Static || opt_CompilingPrelude || 
+         name == main_mod = NotDll
+       | otherwise	  = Dll
 
 
 mkThisModule :: ModuleName -> Module	-- The module being comiled
