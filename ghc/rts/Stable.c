@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.c,v 1.28 2004/08/13 13:10:45 simonmar Exp $
+ * $Id: Stable.c,v 1.29 2004/08/22 15:50:42 panne Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -164,6 +164,7 @@ StgWord
 lookupStableName(StgPtr p)
 {
   StgWord sn;
+  void* sn_tmp;
 
   if (stable_ptr_free == NULL) {
     enlargeStablePtrTable();
@@ -174,7 +175,8 @@ lookupStableName(StgPtr p)
    */
   p = (StgPtr)removeIndirections((StgClosure*)p);
 
-  (void *)sn = lookupHashTable(addrToStableHash,(W_)p);
+  sn_tmp = lookupHashTable(addrToStableHash,(W_)p);
+  sn = (StgWord)sn_tmp;
   
   if (sn != 0) {
     ASSERT(stable_ptr_table[sn].addr == p);
@@ -182,7 +184,7 @@ lookupStableName(StgPtr p)
     return sn;
   } else {
     sn = stable_ptr_free - stable_ptr_table;
-    (P_)stable_ptr_free  = stable_ptr_free->addr;
+    stable_ptr_free  = (snEntry*)(stable_ptr_free->addr);
     stable_ptr_table[sn].ref = 0;
     stable_ptr_table[sn].addr = p;
     stable_ptr_table[sn].sn_obj = NULL;
@@ -377,7 +379,7 @@ gcStablePtrTable( void )
 		    continue;
 		    
 		} else {
-		    (StgClosure *)p->addr = isAlive((StgClosure *)p->addr);
+		  p->addr = (StgPtr)isAlive((StgClosure *)p->addr);
 		    IF_DEBUG(stable, fprintf(stderr,"Stable name %d still alive at %p, ref %d\n", p - stable_ptr_table, p->addr, p->ref));
 		}
 	    }

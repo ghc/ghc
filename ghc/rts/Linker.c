@@ -2682,6 +2682,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
       Elf_Word* pP = (Elf_Word*)P;
       Elf_Addr  A  = *pP;
       Elf_Addr  S;
+      void*     S_tmp;
       Elf_Addr  value;
 
       IF_DEBUG(linker,belch( "Rel entry %3d is raw(%6p %6p)",
@@ -2703,7 +2704,8 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
 	 } else {
             /* No, so look up the name in our global table. */
             symbol = strtab + sym.st_name;
-            (void*)S = lookupSymbol( symbol );
+            S_tmp = lookupSymbol( symbol );
+            S = (Elf_Addr)S_tmp;
 	 }
          if (!S) {
             belch("%s: unknown symbol `%s'", oc->fileName, symbol);
@@ -2762,6 +2764,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
       Elf_Addr  info   = rtab[j].r_info;
       Elf_Addr  A      = rtab[j].r_addend;
       Elf_Addr  S;
+      void*     S_tmp;
       Elf_Addr  value;
 #     if defined(sparc_TARGET_ARCH)
       Elf_Word* pP = (Elf_Word*)P;
@@ -2797,7 +2800,8 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 	 } else {
             /* No, so look up the name in our global table. */
             symbol = strtab + sym.st_name;
-            (void*)S = lookupSymbol( symbol );
+            S_tmp = lookupSymbol( symbol );
+            S = (Elf_Addr)S_tmp;
 
 #ifdef ELF_FUNCTION_DESC
 	    /* If a function, already a function descriptor - we would
