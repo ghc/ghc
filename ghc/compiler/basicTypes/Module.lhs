@@ -205,7 +205,7 @@ mkVanillaModule name = Module name (pprTrace "mkVanillaModule" (ppr name) ThisPa
 	-- file, but before we've opened Foo.hi.
 	-- (Until we've opened Foo.hi we don't know what the PackageInfo is.)
 
-mkThisModule :: ModuleName -> Module	-- The module being comiled
+mkThisModule :: ModuleName -> Module	-- The module being compiled
 mkThisModule name = Module name ThisPackage
 
 mkPrelModule :: ModuleName -> Module
