@@ -11,8 +11,8 @@
  * included in the distribution.
  *
  * $RCSfile: compiler.c,v $
- * $Revision: 1.13 $
- * $Date: 1999/11/18 12:10:18 $
+ * $Revision: 1.14 $
+ * $Date: 1999/11/22 14:39:43 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1509,7 +1509,7 @@ Void evalExp() {                    /* compile and run input expression    */
         switch (status) {
         case Deadlock:
         case AllBlocked: /* I don't understand the distinction - ADR */
-                printf("{Deadlock}");
+                printf("{Deadlock -- might be circular data dependencies}");
                 if (doRevertCAFs) RevertCAFs();
                 break;
         case Interrupted:
