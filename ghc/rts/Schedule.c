@@ -168,6 +168,11 @@ int context_switch = 0;
 /* if this flag is set as well, give up execution */
 rtsBool interrupted = rtsFalse;
 
+/* If this flag is set, we are running Haskell code.  Used to detect
+ * uses of 'foreign import unsafe' that should be 'safe'.
+ */
+rtsBool in_haskell = rtsFalse;
+
 /* Next thread ID to allocate.
  * Locks required: thread_id_mutex
  */
@@ -352,6 +357,15 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
   // Pre-condition: sched_mutex is held.
   // We might have a capability, passed in as initialCapability.
   cap = initialCapability;
+
+  // Check whether we have re-entered the RTS from Haskell without
+  // going via suspendThread()/resumeThread (i.e. a 'safe' foreign
+  // call).
+  if (in_haskell) {
+      errorBelch("schedule: re-entered unsafely.\n"
+		 "   Perhaps a 'foreign import unsafe' should be 'safe'?");
+      stg_exit(1);
+  }
 
 #if defined(RTS_SUPPORTS_THREADS)
   //
@@ -902,6 +916,7 @@ run_thread:
     prev_what_next = t->what_next;
 
     errno = t->saved_errno;
+    in_haskell = rtsTrue;
 
     switch (prev_what_next) {
 
@@ -922,6 +937,8 @@ run_thread:
     default:
       barf("schedule: invalid what_next field");
     }
+
+    in_haskell = rtsFalse;
 
     // The TSO might have moved, so find the new location:
     t = cap->r.rCurrentTSO;
@@ -1587,6 +1604,7 @@ suspendThread( StgRegTable *reg )
   RELEASE_LOCK(&sched_mutex);
   
   errno = saved_errno;
+  in_haskell = rtsFalse;
   return tok; 
 }
 
@@ -1633,6 +1651,7 @@ resumeThread( StgInt tok )
   cap->r.rCurrentTSO = tso;
   RELEASE_LOCK(&sched_mutex);
   errno = saved_errno;
+  in_haskell = rtsTrue;
   return &cap->r;
 }
 
