@@ -1,5 +1,0 @@
-__interface PprType 1 0 where
-__export PprType pprType pprPred ;
-1 pprType :: TypeRep.Type -> Outputable.SDoc ;
-1 pprPred :: Type.PredType -> Outputable.SDoc ;
-

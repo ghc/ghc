@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: ClosureInfo.lhs,v 1.59 2003/10/09 11:58:46 simonpj Exp $
+% $Id: ClosureInfo.lhs,v 1.60 2003/10/30 16:01:52 simonpj Exp $
 %
 \section[ClosureInfo]{Data structures which describe closures}
 
@@ -72,14 +72,14 @@ import Id		( Id, idType, idArity, idName, idPrimRep )
 import DataCon		( DataCon, dataConTag, fIRST_TAG, dataConTyCon,
 			  isNullaryDataCon, dataConName
 			)
-import Name		( Name, nameUnique, getOccName, getName )
+import Name		( Name, nameUnique, getOccName, getName, getOccString )
 import OccName		( occNameUserString )
-import PprType		( getTyDescription )
 import PrimRep
 import SMRep		-- all of it
 import Type		( isUnLiftedType, Type, repType, splitTyConApp_maybe )
+import TcType		( tcSplitSigmaTy )
 import TyCon		( isFunTyCon )
-import BasicTypes	( TopLevelFlag(..), isNotTopLevel, isTopLevel )
+import BasicTypes	( TopLevelFlag(..), isNotTopLevel, isTopLevel, ipNameName )
 import Util		( mapAccumL, listLengthCmp, lengthIs )
 import FastString
 import Outputable
@@ -1056,6 +1056,27 @@ closureTypeDescr (ClosureInfo { closureType = ty })
   = getTyDescription ty
 closureTypeDescr (ConInfo { closureCon = data_con })
   = occNameUserString (getOccName (dataConTyCon data_con))
+
+getTyDescription :: Type -> String
+getTyDescription ty
+  = case (tcSplitSigmaTy ty) of { (_, _, tau_ty) ->
+    case tau_ty of
+      TyVarTy _	       	     -> "*"
+      AppTy fun _      	     -> getTyDescription fun
+      FunTy _ res      	     -> '-' : '>' : fun_result res
+      NewTcApp tycon _ 	     -> getOccString tycon
+      TyConApp tycon _ 	     -> getOccString tycon
+      NoteTy (FTVNote _) ty  -> getTyDescription ty
+      NoteTy (SynNote ty1) _ -> getTyDescription ty1
+      PredTy sty	     -> getPredTyDescription sty
+      ForAllTy _ ty          -> getTyDescription ty
+    }
+  where
+    fun_result (FunTy _ res) = '>' : fun_result res
+    fun_result other	     = getTyDescription other
+
+getPredTyDescription (ClassP cl tys) = getOccString cl
+getPredTyDescription (IParam ip ty)  = getOccString (ipNameName ip)
 \end{code}
 
 %************************************************************************

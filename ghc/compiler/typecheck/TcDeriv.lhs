@@ -232,11 +232,7 @@ tcDeriving tycl_decls
   where
     ddump_deriving :: [InstInfo] -> RenamedHsBinds -> SDoc
     ddump_deriving inst_infos extra_binds
-      = vcat (map ppr_info inst_infos) $$ ppr extra_binds
-
-    ppr_info inst_info = pprInstInfo inst_info $$ 
-			 nest 4 (pprInstInfoDetails inst_info)
-	-- pprInstInfo doesn't print much: only the type
+      = vcat (map pprInstInfoDetails inst_infos) $$ ppr extra_binds
 
 -----------------------------------------
 deriveOrdinaryStuff []	-- Short cut

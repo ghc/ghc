@@ -25,7 +25,7 @@ import RnHsSyn		( extractHsTyNames )
 import Type		( predTypeRep )
 import BuildTyCl	( newTyConRhs )
 import HscTypes		( TyThing(..) )
-import TyCon            ( TyCon, ArgVrcs, tyConArity, tyConDataCons_maybe, tyConDataCons, tyConTyVars,
+import TyCon            ( TyCon, ArgVrcs, tyConArity, tyConDataCons, tyConTyVars,
                           getSynTyConDefn, isSynTyCon, isAlgTyCon, isHiBootTyCon,
 			  tyConName, isNewTyCon, isProductTyCon, tyConArgVrcs )
 import Class		( classTyCon )
@@ -36,7 +36,6 @@ import Name		( Name, isTyVarName )
 import NameEnv
 import NameSet
 import Digraph 		( SCC(..), stronglyConnComp, stronglyConnCompR )
-import Maybe		( isNothing )
 import BasicTypes	( RecFlag(..) )
 import Outputable
 \end{code}

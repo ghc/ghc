@@ -63,7 +63,8 @@ import TcType	( Type, TcType, TcThetaType, TcTyVarSet,
 		  isClassPred, isTyVarClassPred, isLinearPred, 
 		  getClassPredTys, getClassPredTys_maybe, mkPredName,
 		  isInheritablePred, isIPPred, matchTys,
-		  tidyType, tidyTypes, tidyFreeTyVars, tcSplitSigmaTy
+		  tidyType, tidyTypes, tidyFreeTyVars, tcSplitSigmaTy, 
+		  pprPred, pprParendType, pprThetaArrow, pprClassPred
 		)
 import HscTypes	( ExternalPackageState(..) )
 import CoreFVs	( idFreeTyVars )
@@ -72,7 +73,6 @@ import Id	( Id, idName, idType, mkUserLocal, mkSysLocal, mkLocalId, setIdUnique 
 import PrelInfo	( isStandardClass, isNoDictClass )
 import Name	( Name, mkMethodOcc, getOccName, getSrcLoc, isHomePackageName, isInternalName )
 import NameSet	( addOneToNameSet )
-import PprType	( pprPred, pprParendType, pprThetaArrow, pprClassPred )	
 import Subst	( substTy, substTyWith, substTheta, mkTyVarSubst )
 import Literal	( inIntRange )
 import Var	( TyVar )

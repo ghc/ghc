@@ -65,8 +65,12 @@ module Type (
 	eqType, eqKind, 
 
 	-- Seq
-	seqType, seqTypes
+	seqType, seqTypes,
 
+	-- Pretty-printing
+	pprKind, pprParendKind,
+	pprType, pprParendType,
+	pprPred, pprTheta, pprThetaArrow, pprClassPred
     ) where
 
 #include "HsVersions.h"
@@ -265,7 +269,7 @@ splitFunTy (FunTy arg res)   = (arg, res)
 splitFunTy (NoteTy _ ty)     = splitFunTy ty
 splitFunTy (PredTy p)        = splitFunTy (predTypeRep p)
 splitFunTy (NewTcApp tc tys) = splitFunTy (newTypeRep tc tys)
-splitFunTy other	     = pprPanic "splitFunTy" (crudePprType other)
+splitFunTy other	     = pprPanic "splitFunTy" (ppr other)
 
 splitFunTy_maybe :: Type -> Maybe (Type, Type)
 splitFunTy_maybe (FunTy arg res)   = Just (arg, res)
@@ -291,21 +295,21 @@ zipFunTys orig_xs orig_ty = split [] orig_xs orig_ty orig_ty
     split acc xs     nty (NoteTy _ ty)     = split acc           xs nty ty
     split acc xs     nty (PredTy p)        = split acc           xs nty (predTypeRep p)
     split acc xs     nty (NewTcApp tc tys) = split acc           xs nty (newTypeRep tc tys)
-    split acc (x:xs) nty ty                = pprPanic "zipFunTys" (ppr orig_xs <+> crudePprType orig_ty)
+    split acc (x:xs) nty ty                = pprPanic "zipFunTys" (ppr orig_xs <+> ppr orig_ty)
     
 funResultTy :: Type -> Type
 funResultTy (FunTy arg res)   = res
 funResultTy (NoteTy _ ty)     = funResultTy ty
 funResultTy (PredTy p)        = funResultTy (predTypeRep p)
 funResultTy (NewTcApp tc tys) = funResultTy (newTypeRep tc tys)
-funResultTy ty		      = pprPanic "funResultTy" (crudePprType ty)
+funResultTy ty		      = pprPanic "funResultTy" (ppr ty)
 
 funArgTy :: Type -> Type
 funArgTy (FunTy arg res)   = arg
 funArgTy (NoteTy _ ty)     = funArgTy ty
 funArgTy (PredTy p)        = funArgTy (predTypeRep p)
 funArgTy (NewTcApp tc tys) = funArgTy (newTypeRep tc tys)
-funArgTy ty		   = pprPanic "funArgTy" (crudePprType ty)
+funArgTy ty		   = pprPanic "funArgTy" (ppr ty)
 \end{code}
 
 
@@ -350,7 +354,7 @@ tyConAppArgs ty = snd (splitTyConApp ty)
 splitTyConApp :: Type -> (TyCon, [Type])
 splitTyConApp ty = case splitTyConApp_maybe ty of
 			Just stuff -> stuff
-			Nothing	   -> pprPanic "splitTyConApp" (crudePprType ty)
+			Nothing	   -> pprPanic "splitTyConApp" (ppr ty)
 
 splitTyConApp_maybe :: Type -> Maybe (TyCon, [Type])
 splitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
@@ -434,7 +438,7 @@ typePrimRep ty = case repType ty of
 		   FunTy _ _	 -> PtrRep
 		   AppTy _ _	 -> PtrRep	-- ??
 		   TyVarTy _	 -> PtrRep
-		   other	 -> pprPanic "typePrimRep" (crudePprType ty)
+		   other	 -> pprPanic "typePrimRep" (ppr ty)
 \end{code}
 
 
@@ -516,7 +520,7 @@ applyTys orig_fun_ty arg_tys
   = substTyWith (take n_args tvs) arg_tys 
 		(mkForAllTys (drop n_args tvs) rho_ty)
   | otherwise		-- Too many type args
-  = ASSERT2( n_tvs > 0, crudePprType orig_fun_ty )	-- Zero case gives infnite loop!
+  = ASSERT2( n_tvs > 0, ppr orig_fun_ty )	-- Zero case gives infnite loop!
     applyTys (substTyWith tvs (take n_tvs arg_tys) rho_ty)
 	     (drop n_tvs arg_tys)
   where

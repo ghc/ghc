@@ -102,14 +102,15 @@ module TcType (
   tidyTyVarBndr, tidyOpenTyVar, tidyOpenTyVars,
   typeKind, eqKind,
 
-  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta
+  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta,
+
+  pprKind, pprParendKind,
+  pprType, pprParendType,
+  pprPred, pprTheta, pprThetaArrow, pprClassPred
+
   ) where
 
 #include "HsVersions.h"
-
-
-import {-# SOURCE #-} PprType( pprType )
--- PprType imports TcType so that it can print intelligently
 
 -- friends:
 import TypeRep		( Type(..), TyNote(..), funTyCon )  -- friend
@@ -133,7 +134,10 @@ import Type		(	-- Re-exports
 			  tidyTyVarBndr, tidyOpenTyVar,
 			  tidyOpenTyVars, eqKind, 
 			  hasMoreBoxityInfo, liftedBoxity,
-			  superBoxity, typeKind, superKind, repType
+			  superBoxity, typeKind, superKind, repType,
+			  pprKind, pprParendKind,
+			  pprType, pprParendType,
+			  pprPred, pprTheta, pprThetaArrow, pprClassPred
 			)
 import TyCon		( TyCon, isUnLiftedTyCon, tyConUnique )
 import Class		( Class )

@@ -311,13 +311,13 @@ pprName name@(Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
 pprExternal sty name uniq mod occ mb_p is_wired
   | codeStyle sty        = ppr (moduleName mod) <> char '_' <> pprOccName occ
   | debugStyle sty       = sep [ppr (moduleName mod) <> dot <> pprOccName occ,
-				hsep [text "{-", 
-				      if is_wired then ptext SLIT("(w)") else empty,
-				      pprUnique uniq,
-				      case mb_p of
-					Nothing -> empty
-					Just n  -> brackets (ppr n),
-				      text "-}"]]
+				hsep [text "{-" 
+				     , if is_wired then ptext SLIT("(w)") else empty
+				     , pprUnique uniq
+-- (overkill)			     , case mb_p of
+--				 	 Nothing -> empty
+--					 Just n  -> brackets (ppr n)
+				     , text "-}"]]
   | unqualStyle sty name = pprOccName occ
   | otherwise		 = ppr (moduleName mod) <> dot <> pprOccName occ
 

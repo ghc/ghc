@@ -21,7 +21,6 @@ import TcType		( Type, ThetaType, PredType(..),
 			  predTyUnique, mkClassPred, tyVarsOfTypes, tyVarsOfPred,
 			  unifyTyListsX, unifyExtendTysX, tcEqType
 			)
-import PprType		(  )
 import VarSet
 import VarEnv
 import Outputable

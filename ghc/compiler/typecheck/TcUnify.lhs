@@ -43,8 +43,7 @@ import TcType		( TcKind, TcType, TcSigmaType, TcRhoType, TcTyVar, TcTauType,
 			  isSkolemTyVar, isUserTyVar, 
 			  tidyOpenType, tidyOpenTypes, tidyOpenTyVar, tidyOpenTyVars,
 			  eqKind, openTypeKind, liftedTypeKind, isTypeKind, mkArrowKind,
-			  hasMoreBoxityInfo, allDistinctTyVars
-			)
+			  hasMoreBoxityInfo, allDistinctTyVars, pprType )
 import Inst		( newDicts, instToId, tcInstCall )
 import TcMType		( getTcTyVar, putTcTyVar, tcInstType, newKindVar,
 			  newTyVarTy, newTyVarTys, newOpenTypeKind,
@@ -53,7 +52,6 @@ import TcSimplify	( tcSimplifyCheck )
 import TysWiredIn	( listTyCon, parrTyCon, tupleTyCon )
 import TcEnv		( tcGetGlobalTyVars, findGlobals )
 import TyCon		( TyCon, tyConArity, isTupleTyCon, tupleTyConBoxity )
-import PprType		( pprType )
 import Id		( Id, mkSysLocal )
 import Var		( Var, varName, tyVarKind )
 import VarSet		( emptyVarSet, unitVarSet, unionVarSet, elemVarSet, varSetElems )

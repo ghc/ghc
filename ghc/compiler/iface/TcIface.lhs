@@ -22,7 +22,7 @@ import BuildTyCl	( buildSynTyCon, buildAlgTyCon, buildDataCon, buildClass )
 import TcRnMonad
 import Type		( Kind, openTypeKind, liftedTypeKind, 
 			  unliftedTypeKind, mkArrowKind, splitTyConApp, 
-			  mkTyVarTys, mkGenTyConApp, mkTyVarTys, ThetaType )
+			  mkTyVarTys, mkGenTyConApp, mkTyVarTys, ThetaType, pprClassPred )
 import TypeRep		( Type(..), PredType(..) )
 import TyCon		( TyCon, tyConName )
 import HscTypes		( ExternalPackageState(..), PackageInstEnv, PackageRuleBase,
@@ -32,7 +32,6 @@ import HscTypes		( ExternalPackageState(..), PackageInstEnv, PackageRuleBase,
 			  DeclPool, RulePool, Pool(..), Gated, addRuleToPool )
 import InstEnv		( extendInstEnv )
 import CoreSyn
-import PprType		( pprClassPred )
 import PprCore		( pprIdRules )
 import Rules		( extendRuleBaseList )
 import CoreUtils	( exprType )

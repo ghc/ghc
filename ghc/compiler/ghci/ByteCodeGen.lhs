@@ -34,7 +34,7 @@ import DataCon		( DataCon, dataConTag, fIRST_TAG, dataConTyCon,
 import TyCon		( tyConFamilySize, isDataTyCon, tyConDataCons,
 			  isUnboxedTupleTyCon )
 import Class		( Class, classTyCon )
-import Type		( Type, repType, splitFunTys, dropForAlls )
+import Type		( Type, repType, splitFunTys, dropForAlls, pprType )
 import Util
 import DataCon		( dataConRepArity )
 import Var		( isTyVar )
@@ -48,7 +48,6 @@ import ErrUtils		( showPass, dumpIfSet_dyn )
 import Unique		( mkPseudoUnique3 )
 import FastString	( FastString(..), unpackFS )
 import Panic		( GhcException(..) )
-import PprType		( pprType )
 import SMRep		( arrWordsHdrSize, arrPtrsHdrSize, StgWord )
 import Bitmap		( intsToReverseBitmap, mkBitmap )
 import OrdList

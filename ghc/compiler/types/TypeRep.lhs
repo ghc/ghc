@@ -17,31 +17,37 @@ module TypeRep (
 	openKindCon, 					-- :: KX
 	typeCon,					-- :: BX -> KX
 	liftedTypeKind, unliftedTypeKind, openTypeKind,	-- :: KX
+	isLiftedTypeKind, isUnliftedTypeKind, isOpenTypeKind,
 	mkArrowKind, mkArrowKinds,			-- :: KX -> KX -> KX
 
 	funTyCon,
 
-	crudePprType		-- Prints type representations for debugging
+	-- Pretty-printing
+	pprKind, pprParendKind,
+	pprType, pprParendType,
+	pprPred, pprTheta, pprThetaArrow, pprClassPred
     ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} DataCon( DataCon )
+import {-# SOURCE #-} DataCon( DataCon, dataConName )
 
 -- friends:
 import Var	  ( Id, TyVar, tyVarKind )
 import VarEnv     ( TyVarEnv )
 import VarSet     ( TyVarSet )
-import Name	  ( Name, mkWiredInName, mkInternalName )
+import Name	  ( Name, NamedThing(..), mkWiredInName, mkInternalName )
 import OccName	  ( mkOccFS, mkKindOccFS, tcName )
-import BasicTypes ( IPName )
-import TyCon	  ( TyCon, KindCon, mkFunTyCon, mkKindCon, mkSuperKindCon, isNewTyCon )
+import BasicTypes ( IPName, tupleParens )
+import TyCon	  ( TyCon, KindCon, mkFunTyCon, mkKindCon, mkSuperKindCon, isNewTyCon,
+		    tyConArity, tupleTyConBoxity, isTupleTyCon, tyConName )
 import Class	  ( Class )
 
 -- others
 import PrelNames	( gHC_PRIM, kindConKey, boxityConKey, liftedConKey, 
 			  unliftedConKey, typeConKey, anyBoxConKey, 
-			  funTyConKey
+			  funTyConKey, listTyConKey, parrTyConKey,
+			  hasKey
 			)
 import SrcLoc		( noSrcLoc )
 import Outputable
@@ -342,6 +348,17 @@ openKindCon     = mkKindCon openKindConName superKind
 openTypeKind    = TyConApp openKindCon []
 \end{code}
 
+\begin{code}
+isLiftedTypeKind, isUnliftedTypeKind, isOpenTypeKind :: Kind -> Bool
+isLiftedTypeKind (TyConApp tc [TyConApp bc []])   = tyConName tc == typeConName && 
+						    tyConName bc == liftedConName
+isUnliftedTypeKind (TyConApp tc [TyConApp bc []]) = tyConName tc == typeConName && 
+						    tyConName bc == unliftedConName
+isOpenTypeKind (TyConApp tc []) = tyConName tc == openKindConName
+
+isSuperKind (TyConApp tc []) = tyConName tc == superKindName
+\end{code}
+
 ------------------------------------------
 Define arrow kinds
 
@@ -369,6 +386,18 @@ data TyThing = AnId     Id
 	     | ADataCon DataCon
 	     | ATyCon   TyCon
 	     | AClass   Class
+
+instance Outputable TyThing where
+  ppr (AnId   id)   = ptext SLIT("AnId")     <+> ppr id
+  ppr (ATyCon tc)   = ptext SLIT("ATyCon")   <+> ppr tc
+  ppr (AClass cl)   = ptext SLIT("AClass")   <+> ppr cl
+  ppr (ADataCon dc) = ptext SLIT("ADataCon") <+> ppr (dataConName dc)
+
+instance NamedThing TyThing where	-- Can't put this with the type
+  getName (AnId id)     = getName id	-- decl, because the DataCon instance
+  getName (ATyCon tc)   = getName tc	-- isn't visible there
+  getName (AClass cl)   = getName cl
+  getName (ADataCon dc) = dataConName dc
 \end{code}
 
 
@@ -398,34 +427,130 @@ funTyConName = mkWiredInName gHC_PRIM
 \end{code}
 
 
+%************************************************************************
+%*									*
+\subsection{The external interface}
+%*									*
+%************************************************************************
 
-%************************************************************************
-%*									*
-		Crude printing
-	For debug purposes, we may want to print a type directly
-%*									*
-%************************************************************************
+@pprType@ is the standard @Type@ printer; the overloaded @ppr@ function is
+defined to use this.  @pprParendType@ is the same, except it puts
+parens around the type, except for the atomic cases.  @pprParendType@
+works just by setting the initial context precedence very high.
 
 \begin{code}
-crudePprType :: Type -> SDoc
-crudePprType (TyVarTy tv)      = ppr tv
-crudePprType (AppTy t1 t2)     = crudePprType t1 <+> (parens (crudePprType t2))
-crudePprType (FunTy t1 t2)     = crudePprType t1 <+> (parens (crudePprType t2))
-crudePprType (TyConApp tc tys) = ppr_tc_app (ppr tc <> pp_nt tc) tys
-crudePprType (NewTcApp tc tys) = ptext SLIT("<nt>") <+> ppr_tc_app (ppr tc <> pp_nt tc) tys
-crudePprType (ForAllTy tv ty)  = sep [ptext SLIT("forall") <+> 
-				        parens (ppr tv <+> crudePprType (tyVarKind tv)) <> dot,
-				      crudePprType ty]
-crudePprType (PredTy st)  	        = braces (crudePprPredTy st)
-crudePprType (NoteTy (SynNote ty1) ty2) = crudePprType ty1
-crudePprType (NoteTy other ty)          = crudePprType ty
+data Prec = TopPrec 	-- No parens
+	  | FunPrec 	-- Function args; no parens for tycon apps
+	  | TyConPrec 	-- Tycon args; no parens for atomic
+	  deriving( Eq, Ord )
 
-crudePprPredTy (ClassP cls tys) = ppr_tc_app (ppr cls) tys
-crudePprPredTy (IParam ip ty)   = ppr ip <> dcolon <> crudePprType ty
+maybeParen :: Prec -> Prec -> SDoc -> SDoc
+maybeParen ctxt_prec inner_prec pretty
+  | ctxt_prec < inner_prec = pretty
+  | otherwise		   = parens pretty
 
-ppr_tc_app :: SDoc -> [Type] -> SDoc
-ppr_tc_app tc tys = tc <+> sep (map (parens . crudePprType) tys)
+------------------
+pprType, pprParendType :: Type -> SDoc
+pprType       ty = ppr_type TopPrec   ty
+pprParendType ty = ppr_type TyConPrec ty
 
-pp_nt tc | isNewTyCon tc = ptext SLIT("(nt)")
-	 | otherwise     = empty
+------------------
+pprKind, pprParendKind :: Kind -> SDoc
+pprKind       k = ppr_kind TopPrec k
+pprParendKind k = ppr_kind TyConPrec k
+
+------------------
+pprPred :: PredType -> SDoc
+pprPred (ClassP cls tys) = pprClassPred cls tys
+pprPred (IParam ip ty)   = ppr ip <> dcolon <> pprType ty
+
+pprClassPred :: Class -> [Type] -> SDoc
+pprClassPred clas tys = ppr clas <+> sep (map pprParendType tys)
+
+pprTheta :: ThetaType -> SDoc
+pprTheta theta = parens (sep (punctuate comma (map pprPred theta)))
+
+pprThetaArrow :: ThetaType -> SDoc
+pprThetaArrow theta 
+  | null theta = empty
+  | otherwise  = parens (sep (punctuate comma (map pprPred theta))) <+> ptext SLIT("=>")
+
+------------------
+instance Outputable Type where
+    ppr ty = pprType ty
+
+instance Outputable PredType where
+    ppr = pprPred
+
+instance Outputable name => OutputableBndr (IPName name) where
+    pprBndr _ n = ppr n	-- Simple for now
+
+------------------
+	-- OK, here's the main printer
+
+ppr_type :: Prec -> Type -> SDoc
+ppr_type p (TyVarTy tv)      	      = ppr tv
+ppr_type p (PredTy pred)     	      = braces (ppr pred)
+ppr_type p (NoteTy (SynNote ty1) ty2) = ppr_type p ty1
+ppr_type p (NoteTy other         ty2) = ppr_type p ty2
+
+ppr_type p (TyConApp tc tys) = ppr_tc_app p tc tys
+ppr_type p (NewTcApp tc tys) = ifPprDebug (ptext SLIT("<nt>")) <> 
+			       ppr_tc_app p tc tys
+
+ppr_type p (AppTy t1 t2) = maybeParen p TyConPrec $
+			   pprType t1 <+> ppr_type TyConPrec t2
+
+ppr_type p (FunTy ty1 ty2)
+  = -- We don't want to lose synonyms, so we mustn't use splitFunTys here.
+    maybeParen p FunPrec $
+    sep (ppr_type FunPrec ty1 : ppr_fun_tail ty2)
+  where
+    ppr_fun_tail (FunTy ty1 ty2) = (arrow <+> ppr_type FunPrec ty1) : ppr_fun_tail ty2
+    ppr_fun_tail other_ty        = [arrow <+> pprType other_ty]
+
+ppr_type p ty@(ForAllTy _ _)  
+  = maybeParen p FunPrec $
+    sep [pprForAll tvs, pprThetaArrow ctxt, pprType tau]
+  where
+    (tvs,  rho) = split1 [] ty
+    (ctxt, tau) = split2 [] rho
+
+    split1 tvs (ForAllTy tv ty) = split1 (tv:tvs) ty
+    split1 tvs ty		= (reverse tvs, ty)
+ 
+    split2 ps (PredTy p `FunTy` ty) = split2 (p:ps) ty
+    split2 ps ty		    = (reverse ps, ty)
+
+ppr_tc_app :: Prec -> TyCon -> [Type] -> SDoc
+ppr_tc_app p tc [ty] 
+  | tc `hasKey` listTyConKey = brackets (pprType ty)
+  | tc `hasKey` parrTyConKey = ptext SLIT("[:") <> pprType ty <> ptext SLIT(":]")
+ppr_tc_app p tc tys
+  | isTupleTyCon tc && tyConArity tc == length tys
+  = tupleParens (tupleTyConBoxity tc) (sep (punctuate comma (map pprType tys)))
+  | otherwise
+  = maybeParen p TyConPrec $
+    ppr tc <+> sep (map (ppr_type TyConPrec) tys)
+
+-------------------
+pprForAll tvs = ptext SLIT("forall") <+> sep (map pprTvBndr tvs) <> dot
+
+pprTvBndr tv | isLiftedTypeKind kind = ppr tv
+	     | otherwise	     = parens (ppr tv <+> dcolon <+> pprKind kind)
+	     where
+	       kind = tyVarKind tv
+
+
+-------------------
+ppr_kind :: Prec -> Kind -> SDoc
+ppr_kind p k
+  | isOpenTypeKind k     = ptext SLIT("?")
+  | isLiftedTypeKind k   = ptext SLIT("*")
+  | isUnliftedTypeKind k = ptext SLIT("#")
+ppr_kind p (TyVarTy tv)  = ppr tv
+ppr_kind p (FunTy k1 k2) = maybeParen p FunPrec $
+			 	  sep [ ppr_kind FunPrec k1, arrow <+> pprKind k2]
+ppr_kind p other = ptext SLIT("STRANGE KIND:") <+> ppr_type p other
 \end{code}
+

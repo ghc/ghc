@@ -61,9 +61,8 @@ import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  liftedTypeKind, defaultKind, superKind,
 			  superBoxity, liftedBoxity, typeKind,
 			  tyVarsOfType, tyVarsOfTypes, 
-			  eqKind, isTypeKind, 
-			)
-import PprType		( pprThetaArrow )
+			  eqKind, isTypeKind, pprThetaArrow, 
+			  pprPred, pprTheta, pprClassPred )
 import Subst		( Subst, mkTopTyVarSubst, substTy )
 import Class		( Class, classArity, className )
 import TyCon		( TyCon, isSynTyCon, isUnboxedTupleTyCon, 
@@ -74,7 +73,6 @@ import Var		( TyVar, tyVarKind, tyVarName, isTyVar,
 -- others:
 import TcRnMonad          -- TcType, amongst others
 import FunDeps		( grow )
-import PprType		( pprPred, pprTheta, pprClassPred )
 import Name		( Name, setNameUnique, mkSystemTvNameEncoded )
 import VarSet
 import CmdLineOpts	( dopt, DynFlag(..) )

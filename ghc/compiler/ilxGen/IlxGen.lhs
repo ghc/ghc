@@ -16,7 +16,7 @@ import TyCon	( TyCon,  tyConPrimRep, isUnboxedTupleTyCon, tyConDataCons,
 		  tyConTyVars, isDataTyCon, isAlgTyCon, tyConArity
 		)
 import Type	( liftedTypeKind, openTypeKind, unliftedTypeKind,
-		  isUnLiftedType, isTyVarTy, mkTyVarTy, predTypeRep,
+		  isUnLiftedType, isTyVarTy, mkTyVarTy, predTypeRep, pprType,
 		  splitForAllTys, splitFunTys, applyTy, applyTys, eqKind, tyVarsOfTypes
 		)
 import TypeRep	( Type(..) )
@@ -43,7 +43,6 @@ import Outputable
 import Char		( ord )
 import List		( partition, elem, insertBy,any  )
 import UniqSet
-import PprType		( pprType )	-- Only called in debug messages
 
 import TysPrim  ( foreignObjPrimTyCon, weakPrimTyCon, byteArrayPrimTyCon, mutableByteArrayPrimTyCon )
 

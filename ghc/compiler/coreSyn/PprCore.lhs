@@ -27,7 +27,7 @@ import Id		( Id, idType, isDataConWorkId_maybe, idLBVarInfo, idArity,
 			  globalIdDetails, isGlobalId, isExportedId, 
 			  isSpecPragmaId, idNewDemandInfo
 			)
-import Var		( isTyVar )
+import Var		( TyVar, isTyVar, tyVarKind )
 import IdInfo		( IdInfo, megaSeqIdInfo, 
 			  arityInfo, ppArityInfo, 
 			  specInfo, pprNewStrictness,
@@ -40,7 +40,7 @@ import IdInfo		( IdInfo, megaSeqIdInfo,
 			)
 import DataCon		( dataConTyCon )
 import TyCon		( tupleTyConBoxity, isTupleTyCon )
-import PprType		( pprParendType, pprType, pprTyVarBndr )
+import Type		( pprParendType, pprType, pprParendKind )
 import BasicTypes	( tupleParens )
 import Util             ( lengthIs )
 import Outputable
@@ -293,6 +293,17 @@ pprTypedBinder binder
 	-- It's important that the type is parenthesised too, at least when
 	-- printing interfaces, because we get \ x::(a->b) y::(c->d) -> ...
 	--	[Jun 2002: interfaces are now binary, so this doesn't matter]
+
+pprTyVarBndr :: TyVar -> SDoc
+pprTyVarBndr tyvar
+  = getPprStyle $ \ sty ->
+    if debugStyle sty then
+        hsep [ppr tyvar, dcolon, pprParendKind kind]
+		-- See comments with ppDcolon in PprCore.lhs
+    else
+        ppr tyvar
+  where
+    kind = tyVarKind tyvar
 
 -- pprIdBndr does *not* print the type
 -- When printing any Id binder in debug mode, we print its inline pragma and one-shot-ness

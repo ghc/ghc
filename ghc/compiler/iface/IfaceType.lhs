@@ -27,7 +27,7 @@ module IfaceType (
 #include "HsVersions.h"
 
 import Type		( openTypeKind, liftedTypeKind, unliftedTypeKind,
-			  splitFunTy_maybe, eqKind )
+			  splitFunTy_maybe, eqKind, pprType )
 import TypeRep		( Type(..), TyNote(..), PredType(..), Kind, ThetaType )
 import TyCon		( TyCon, isTupleTyCon, tyConArity, tupleTyConBoxity )
 import Var		( isId, tyVarKind, idType )
@@ -38,10 +38,6 @@ import Module		( ModuleName )
 import BasicTypes	( IPName(..), Arity, Version, mapIPName, tupleParens, Boxity )
 import Outputable
 import FastString
-
-#ifdef DEBUG
-import TypeRep( crudePprType )
-#endif
 \end{code}
 
 	
@@ -342,7 +338,7 @@ toIfaceKind k
   | Just (arg,res) <- splitFunTy_maybe k 
   = IfaceFunKind (toIfaceKind arg) (toIfaceKind res)
 #ifdef DEBUG
-  | otherwise = pprTrace "toIfaceKind" (crudePprType k) IfaceOpenTypeKind
+  | otherwise = pprTrace "toIfaceKind" (pprType k) IfaceOpenTypeKind
 #endif
 
 ---------------------

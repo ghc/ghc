@@ -637,6 +637,8 @@ tc_rn_src_decls ds
 	-- Rename the splice expression, and get its supporting decls
 	(rn_splice_expr, splice_fvs) <- addSrcLoc splice_loc $
 				 	rnExpr splice_expr ;
+	failIfErrsM ;	-- Don't typecheck if renaming failed
+
 	-- Execute the splice
 	spliced_decls <- tcSpliceDecls rn_splice_expr ;
 

@@ -26,10 +26,9 @@ module HsTypes (
 #include "HsVersions.h"
 
 import TcType		( Type, Kind, liftedTypeKind, eqKind )
-import TypeRep		( Type )
+import Type		( {- instance Outputable Kind -}, pprParendKind, pprKind )
 import Name		( Name, mkInternalName )
 import OccName		( mkVarOcc )
-import PprType		( {- instance Outputable Kind -}, pprParendKind, pprKind )
 import BasicTypes	( IPName, Boxity, tupleParens )
 import PrelNames	( unboundKey )
 import SrcLoc		( noSrcLoc )

@@ -14,7 +14,6 @@ module TcClassDcl ( tcClassSigs, tcClassDecl2,
 
 import HsSyn		( TyClDecl(..), Sig(..), MonoBinds(..), HsType(..), 
 			  HsExpr(..), HsLit(..), Pat(WildPat), HsTyVarBndr(..),
-			  HsExplicitForAll(..),
 			  mkSimpleMatch, andMonoBinds, andMonoBindList, 
 			  isPragSig, placeHolderType, mkExplicitHsForAllTy
 			)
@@ -29,7 +28,8 @@ import TcHsSyn		( TcMonoBinds )
 
 import Inst		( Inst, InstOrigin(..), instToId, newDicts, newMethod )
 import TcEnv		( tcLookupClass, tcExtendLocalValEnv2, tcExtendTyVarEnv2,
-			  InstInfo(..), pprInstInfo, simpleInstInfoTyCon, simpleInstInfoTy,
+			  InstInfo(..), pprInstInfoDetails,
+			  simpleInstInfoTyCon, simpleInstInfoTy,
 			  InstBindings(..), newDFunName
 			)
 import TcBinds		( tcMonoBinds, tcSpecSigs )
@@ -535,28 +535,27 @@ mkDefMethRhs origin clas inst_tys sel_id loc NoDefMeth
     wild_pats	 = [WildPat placeHolderType | ty <- arg_tys]
 
 mkDefMethRhs origin clas inst_tys sel_id loc GenDefMeth 
-  =  	-- A generic default method
-	-- If the method is defined generically, we can only do the job if the
+  = 	-- A generic default method
+    	-- If the method is defined generically, we can only do the job if the
 	-- instance declaration is for a single-parameter type class with
 	-- a type constructor applied to type arguments in the instance decl
 	-- 	(checkTc, so False provokes the error)
-     ASSERT( isInstDecl origin )	-- We never get here from a class decl
+    ASSERT( isInstDecl origin )	-- We never get here from a class decl
+    do	{ checkTc (isJust maybe_tycon)
+	 	  (badGenericInstance sel_id (notSimple inst_tys))
+	; checkTc (tyConHasGenerics tycon)
+	   	  (badGenericInstance sel_id (notGeneric tycon))
 
-     checkTc (isJust maybe_tycon)
-	     (badGenericInstance sel_id (notSimple inst_tys))		`thenM_`
-     checkTc (tyConHasGenerics tycon)
-	     (badGenericInstance sel_id (notGeneric tycon))		`thenM_`
+	; dflags <- getDOpts
+	; ioToTcRn (dumpIfSet_dyn dflags Opt_D_dump_deriv "Filling in method body" 
+		   (vcat [ppr clas <+> ppr inst_tys,
+			  nest 2 (ppr sel_id <+> equals <+> ppr rhs)]))
 
-     ioToTcRn (dumpIfSet opt_PprStyle_Debug "Generic RHS" stuff)	`thenM_`
-
-	-- Rename it before returning it
-     rnExpr rhs			`thenM` \ (rn_rhs, _) ->
-     returnM rn_rhs
+		-- Rename it before returning it
+	; (rn_rhs, _) <- rnExpr rhs
+	; returnM rn_rhs }
   where
     rhs = mkGenericRhs sel_id clas_tyvar tycon
-
-    stuff = vcat [ppr clas <+> ppr inst_tys,
-		  nest 4 (ppr sel_id <+> equals <+> ppr rhs)]
 
 	  -- The tycon is only used in the generic case, and in that
 	  -- case we require that the instance decl is for a single-parameter
@@ -629,7 +628,7 @@ getGenericInstances class_decls
 	-- Otherwise print it out
 	{ dflags <- getDOpts
 	; ioToTcRn (dumpIfSet_dyn dflags Opt_D_dump_deriv "Generic instances" 
-	 	   (vcat (map pprInstInfo gen_inst_info)))	
+	 	   (vcat (map pprInstInfoDetails gen_inst_info)))	
 	; returnM gen_inst_info }}
 
 get_generics decl@(ClassDecl {tcdName = class_name, tcdMeths = def_methods, tcdLoc = loc})
@@ -670,7 +669,6 @@ get_generics decl@(ClassDecl {tcdName = class_name, tcdMeths = def_methods, tcdL
     checkTc (null missing) (missingGenericInstances missing)	`thenM_`
 
     returnM inst_infos
-
   where
     generic_binds :: [(HsType Name, RenamedMonoBinds)]
     generic_binds = getGenericBinds def_methods

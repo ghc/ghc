@@ -17,8 +17,7 @@ import HsTypes		( HsType, PostTcType, SyntaxName, placeHolderType )
 import HsImpExp		( isOperator, pprHsVar )
 
 -- others:
-import PprType		( pprParendType )
-import Type		( Type )
+import Type		( Type, pprParendType )
 import Var		( TyVar, Id )
 import Name		( Name )
 import DataCon		( DataCon )

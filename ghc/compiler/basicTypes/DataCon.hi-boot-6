@@ -1,4 +1,5 @@
 module DataCon where
 
 data DataCon
+dataConName :: DataCon -> Name.Name
 isExistentialDataCon :: DataCon -> GHC.Base.Bool

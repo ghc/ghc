@@ -32,8 +32,7 @@ import TcUnify		( unifyKind )
 import TcType		( TcKind, ThetaType, TcType,
 			  mkArrowKind, liftedTypeKind, 
 			  tcSplitSigmaTy, tcEqType )
-import Type		( splitTyConApp_maybe )
-import PprType		( pprThetaArrow, pprParendType )
+import Type		( splitTyConApp_maybe, pprThetaArrow, pprParendType )
 import FieldLabel	( fieldLabelName, fieldLabelType )
 import Generics		( validGenericMethodType, canDoGenerics )
 import Class		( Class, className, classTyCon, DefMeth(..), classBigSig )

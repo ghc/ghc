@@ -25,12 +25,11 @@ module DataCon (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} Subst( substTyWith )
-import {-# SOURCE #-} PprType( pprType )
 
 import Type		( Type, ThetaType, 
 			  mkForAllTys, mkFunTys, mkTyConApp,
 			  mkTyVarTys, splitTyConApp_maybe, 
-			  mkPredTys, isStrictPred
+			  mkPredTys, isStrictPred, pprType
 			)
 import TyCon		( TyCon, tyConDataCons, tyConDataCons, isProductTyCon,
 			  isTupleTyCon, isUnboxedTupleTyCon )

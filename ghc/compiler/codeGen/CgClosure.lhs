@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.60 2003/05/14 09:13:53 simonmar Exp $
+% $Id: CgClosure.lhs,v 1.61 2003/10/30 16:01:52 simonpj Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -39,7 +39,6 @@ import Name		( Name, isInternalName )
 import Module		( Module, pprModule )
 import ListSetOps	( minusList )
 import PrimRep		( PrimRep(..), getPrimRepSize )
-import PprType          ( showTypeCategory )
 import Util		( isIn, splitAtList )
 import CmdLineOpts	( opt_SccProfilingOn )
 import Outputable
@@ -47,6 +46,12 @@ import FastString
 
 import Name             ( nameOccName )
 import OccName          ( occNameFS )
+
+-- Turgid imports for showTypeCategory
+import PrelNames
+import TcType		( Type, isDictTy, tcSplitTyConApp_maybe, tcSplitFunTy_maybe )
+import TyCon		( isPrimTyCon, isTupleTyCon, isEnumerationTyCon, maybeTyConSingleCon )
+import Maybe
 \end{code}
 
 %********************************************************
@@ -673,4 +678,56 @@ chooseDynCostCentres ccs args fvs body
 	    -- This looks like a HACK to me --SDM
     in
     (use_cc, blame_cc)
+\end{code}
+
+
+\begin{code}
+showTypeCategory :: Type -> Char
+  {-
+	{C,I,F,D}   char, int, float, double
+	T	    tuple
+	S	    other single-constructor type
+	{c,i,f,d}   unboxed ditto
+	t	    *unpacked* tuple
+	s	    *unpacked" single-cons...
+
+	v	    void#
+	a	    primitive array
+
+	E	    enumeration type
+	+	    dictionary, unless it's a ...
+	L	    List
+	>	    function
+	M	    other (multi-constructor) data-con type
+	.	    other type
+	-	    reserved for others to mark as "uninteresting"
+    -}
+showTypeCategory ty
+  = if isDictTy ty
+    then '+'
+    else
+      case tcSplitTyConApp_maybe ty of
+	Nothing -> if isJust (tcSplitFunTy_maybe ty)
+		   then '>'
+		   else '.'
+
+	Just (tycon, _) ->
+          let utc = getUnique tycon in
+	  if	  utc == charDataConKey    then 'C'
+	  else if utc == intDataConKey     then 'I'
+	  else if utc == floatDataConKey   then 'F'
+	  else if utc == doubleDataConKey  then 'D'
+	  else if utc == smallIntegerDataConKey ||
+		  utc == largeIntegerDataConKey   then 'J'
+	  else if utc == charPrimTyConKey  then 'c'
+	  else if (utc == intPrimTyConKey || utc == wordPrimTyConKey
+		|| utc == addrPrimTyConKey)		   then 'i'
+	  else if utc  == floatPrimTyConKey		   then 'f'
+	  else if utc  == doublePrimTyConKey		   then 'd'
+	  else if isPrimTyCon tycon {- array, we hope -}   then 'A'	-- Bogus
+	  else if isEnumerationTyCon tycon		   then 'E'
+	  else if isTupleTyCon tycon			   then 'T'
+	  else if isJust (maybeTyConSingleCon tycon)       then 'S'
+	  else if utc == listTyConKey			   then 'L'
+	  else 'M' -- oh, well...
 \end{code}

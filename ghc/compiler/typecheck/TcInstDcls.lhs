@@ -23,8 +23,7 @@ import TcMType		( tcInstType, checkValidTheta, checkValidInstHead, instTypeErr,
 			  checkAmbiguity, SourceTyCtxt(..) )
 import TcType		( mkClassPred, tcSplitForAllTys, tyVarsOfType,
 			  tcSplitSigmaTy, getClassPredTys, tcSplitPredTy_maybe, mkTyVarTys,
-			  TyVarDetails(..), tcSplitDFunTy
-			)
+			  TyVarDetails(..), tcSplitDFunTy, pprClassPred )
 import Inst		( InstOrigin(..), tcInstClassOp, newDicts, instToId, 
 			  showLIE, tcExtendLocalInstEnv )
 import TcDeriv		( tcDeriving )
@@ -32,7 +31,6 @@ import TcEnv		( tcExtendGlobalValEnv, tcExtendTyVarEnv2,
  			  InstInfo(..), InstBindings(..), 
 			  newDFunName, tcExtendLocalValEnv
 			)
-import PprType		( pprClassPred )
 import TcHsType		( kcHsSigType, tcHsKindedType )
 import TcUnify		( checkSigTyVars )
 import TcSimplify	( tcSimplifyCheck, tcSimplifyTop )

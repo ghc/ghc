@@ -1,5 +1,0 @@
-module PprType where
-
-pprType :: TypeRep.Type -> Outputable.SDoc
-pprPred :: Type.PredType -> Outputable.SDoc
-
