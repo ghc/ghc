@@ -1300,6 +1300,7 @@ pprUnionTag StablePtrRep	= char 'p'
 pprUnionTag StableNameRep	= char 'p'
 pprUnionTag WeakPtrRep		= char 'p'
 pprUnionTag ForeignObjRep	= char 'p'
+pprUnionTag PrimPtrRep		= char 'p'
 
 pprUnionTag ThreadIdRep		= char 't'
 

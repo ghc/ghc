@@ -165,7 +165,7 @@ system, to parameterise State#.
 
 \begin{code}
 realWorldTy	     = mkTyConTy realWorldTyCon
-realWorldTyCon	     = pcPrimTyCon realWorldTyConKey SLIT("RealWorld") 0 [] PtrRep
+realWorldTyCon	     = pcPrimTyCon realWorldTyConKey SLIT("RealWorld") 0 [] PrimPtrRep
 realWorldStatePrimTy = mkStatePrimTy realWorldTy	-- State# RealWorld
 \end{code}
 
@@ -204,7 +204,7 @@ mkMutableByteArrayPrimTy s  = mkTyConApp mutableByteArrayPrimTyCon [s]
 
 \begin{code}
 mutVarPrimTyCon = pcPrimTyCon mutVarPrimTyConKey SLIT("MutVar#")
-                              2 vrcsZP PtrRep
+                              2 vrcsZP PrimPtrRep
 
 mkMutVarPrimTy s elt 	    = mkTyConApp mutVarPrimTyCon [s, elt]
 \end{code}
@@ -217,7 +217,7 @@ mkMutVarPrimTy s elt 	    = mkTyConApp mutVarPrimTyCon [s, elt]
 
 \begin{code}
 mVarPrimTyCon = pcPrimTyCon mVarPrimTyConKey SLIT("MVar#")
-                            2 vrcsZP PtrRep
+                            2 vrcsZP PrimPtrRep
 
 mkMVarPrimTy s elt 	    = mkTyConApp mVarPrimTyCon [s, elt]
 \end{code}

@@ -283,6 +283,7 @@ primRepToSize FloatRep	    = IF_ARCH_alpha( TF, IF_ARCH_i386( F, IF_ARCH_sparc( 
 primRepToSize DoubleRep	    = IF_ARCH_alpha( TF, IF_ARCH_i386( DF,IF_ARCH_sparc( DF,)))
 primRepToSize ArrayRep	    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
 primRepToSize ByteArrayRep  = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
+primRepToSize PrimPtrRep    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
 primRepToSize WeakPtrRep    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
 primRepToSize ForeignObjRep = IF_ARCH_alpha( Q,  IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
 primRepToSize BCORep        = IF_ARCH_alpha( Q,  IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))

@@ -78,6 +78,11 @@ data PrimRep
   | ArrayRep		-- Primitive array of Haskell pointers
   | ByteArrayRep	-- Primitive array of bytes (no Haskell pointers)
 
+  | PrimPtrRep		-- Used for MutVars and MVars; 
+			-- a pointer to a primitive object
+			-- ToDo: subsumes WeakPtrRep, ThreadIdRep, 
+			-- StableNameRep, ForeignObjRep, and BCORep ?
+
   | VoidRep		-- Occupies no space at all!
 			-- (Primitive states are mapped onto this)
   deriving (Eq, Ord)
@@ -117,6 +122,7 @@ isFollowableRep ByteArrayRep  = True	-- 	''
 isFollowableRep WeakPtrRep    = True	-- 	''
 isFollowableRep ForeignObjRep = True	-- 	''
 isFollowableRep StableNameRep = True    --      ''
+isFollowableRep PrimPtrRep    = True    --      ''
 isFollowableRep ThreadIdRep   = True	-- pointer to a TSO
 
 isFollowableRep other	      = False
@@ -227,6 +233,7 @@ showPrimRep AddrRep	   = "StgAddr"
 showPrimRep FloatRep	   = "StgFloat"
 showPrimRep DoubleRep	   = "StgDouble"
 showPrimRep ArrayRep	   = "P_" -- see comment below
+showPrimRep PrimPtrRep	   = "P_"
 showPrimRep ByteArrayRep   = "StgByteArray"
 showPrimRep StablePtrRep   = "StgStablePtr"
 showPrimRep StableNameRep  = "P_"

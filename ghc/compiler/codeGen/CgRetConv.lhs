@@ -1,7 +1,7 @@
 %
 % (c) The GRASP Project, Glasgow University, 1992-1998
 %
-% $Id: CgRetConv.lhs,v 1.24 2000/08/07 23:37:20 qrczak Exp $
+% $Id: CgRetConv.lhs,v 1.25 2000/09/06 10:23:52 simonmar Exp $
 %
 \section[CgRetConv]{Return conventions for the code generator}
 
@@ -89,6 +89,7 @@ dataReturnConvPrim VoidRep	= VoidReg
 -- Return a primitive-array pointer in the usual register:
 dataReturnConvPrim ArrayRep     = VanillaReg ArrayRep ILIT(1)
 dataReturnConvPrim ByteArrayRep = VanillaReg ByteArrayRep ILIT(1)
+dataReturnConvPrim PrimPtrRep   = VanillaReg PrimPtrRep ILIT(1)
 
 dataReturnConvPrim StablePtrRep = VanillaReg StablePtrRep ILIT(1)
 dataReturnConvPrim ForeignObjRep = VanillaReg ForeignObjRep ILIT(1)
