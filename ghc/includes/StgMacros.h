@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.51 2003/04/22 16:25:08 simonmar Exp $
+ * $Id: StgMacros.h,v 1.52 2003/04/28 09:57:12 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -246,10 +246,14 @@ typedef StgWord StgWordArray[];
    we assume that the size of a double is always 2 pointers (wasting a
    word when it is only one pointer, but avoiding lots of #ifdefs).
 
+   NOTE: if you change the layout of RET_DYN stack frames, then you
+   might also need to adjust the value of RESERVED_STACK_WORDS in
+   Constants.h.
    -------------------------------------------------------------------------- */
 
 // VERY MAGIC CONSTANTS! 
-// must agree with code in HeapStackCheck.c, stg_gen_chk
+// must agree with code in HeapStackCheck.c, stg_gen_chk, and
+// RESERVED_STACK_WORDS in Constants.h.
 //
 #define RET_DYN_BITMAP_SIZE 8
 #define RET_DYN_NONPTR_REGS_SIZE 10
