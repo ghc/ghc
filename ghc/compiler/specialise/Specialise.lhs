@@ -1083,16 +1083,6 @@ specUDs tv_env_list dict_env_list (dbs, calls)
 %************************************************************************
 
 \begin{code}
-tyVarTemplates :: [TyVar]
-tyVarTemplates = map mk [1..]
-  where
-    mk i = mkTyVar (mkSysLocalName uniq occ noSrcLoc) mkBoxedTypeKind
-	 where
-	   uniq = mkAlphaTyVarUnique i
-	   occ  = _PK_ ("$t" ++ show i)
-\end{code}
-
-\begin{code}
 lookupId:: IdEnv Id -> Id -> Id
 lookupId env id = case lookupIdEnv env id of
 			Nothing  -> id
