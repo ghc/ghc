@@ -397,6 +397,21 @@ mention of it in the export list.
 
 This option is on by default.
 
+<tag><tt>-fwarn-type-defaults</tt>:</tag>
+<nidx>-fwarn-type-defaults option</nidx>
+<nidx>defaulting mechanism, warning</nidx>
+
+Have the compiler warn/inform you where in your source the Haskell
+defaulting mechanism for numeric types kicks in. This is useful
+information when converting code from a context that assumed one
+default into one with another, e.g., the 'default default' for Haskell
+1.4 caused the otherwise unconstrained value <tt>1</tt> to be given
+the type <tt>Int</tt>, whereas Haskell 98 defaults it to
+<tt>Integer</tt>.  This may lead to differences in performance and
+behaviour, hence the usefulness of being non-silent about this.
+
+This warning is off by default.
+
 <tag>@-fwarn-missing-signatures@:</tag>
 <nidx>-fwarn-missing-signatures option</nidx>
 <nidx>type signatures, missing</nidx>
