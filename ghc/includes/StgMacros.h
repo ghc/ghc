@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.7 1999/03/02 19:44:18 sof Exp $
+ * $Id: StgMacros.h,v 1.8 1999/04/27 12:31:40 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -58,6 +58,9 @@
 #define EC_		extern StgClosure
 #define EDC_		extern DLLIMPORT StgClosure
 #define IC_		extern StgClosure
+#define ECP_(x)		extern const StgClosure *(x)[]
+#define EDCP_(x)	extern DLLIMPORT StgClosure *(x)[]
+#define ICP_(x)		extern const StgClosure *(x)[]
 
 /* -----------------------------------------------------------------------------
    Stack Tagging.
