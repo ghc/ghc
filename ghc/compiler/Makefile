@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.124 2000/12/20 10:46:12 simonmar Exp $
+# $Id: Makefile,v 1.125 2000/12/20 13:33:00 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -120,7 +120,8 @@ endif
 
 HS_OBJS  = \
   $(patsubst %.hc, %.o, $(HCS)) \
-  parser/hschooks.o
+  parser/hschooks.o \
+  parser/hs_ctype.o
 
 DESTDIR       = $(INSTALL_LIBRARY_DIR_GHC)
 
@@ -159,7 +160,7 @@ empty:=
 space:= $(empty) $(empty)
 
 SRC_HC_OPTS += \
-  -cpp -fglasgow-exts \
+  -cpp -fglasgow-exts -Rghc-timing \
   -I. -IcodeGen -InativeGen -Iparser \
   -i$(subst $(space),:,$(DIRS)) 
 
