@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.51 2001/01/30 12:13:34 simonmar Exp $
+$Id: Parser.y,v 1.52 2001/02/11 09:36:00 qrczak Exp $
 
 Haskell grammar.
 
@@ -535,7 +535,7 @@ inst_type :: { RdrNameHsType }
 	: ctype				{% checkInstType $1 }
 
 types0  :: { [RdrNameHsType] }
-	: types				{ $1 }
+	: types				{ reverse $1 }
 	| {- empty -}			{ [] }
 
 types	:: { [RdrNameHsType] }
