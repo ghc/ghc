@@ -313,7 +313,7 @@ SRC_HC_OPTS += -package concurrent -package util
 endif
 endif
 
-SRC_CC_OPTS += -Iparser -I. -I$(TOP)/includes -O
+SRC_CC_OPTS += -Iparser -I. -O
 SRC_HC_OPTS += -recomp $(GhcHcOpts)
 SRC_HC_OPTS += -H16M
 
@@ -464,7 +464,7 @@ $(odir)/ghc-inplace : $(HS_PROG)
 	chmod 755 $@
 
 ghc-inplace : stage1/ghc-inplace
-	$(LN_S) $< $@
+	$(LN_S) -f $< $@
 
 CLEAN_FILES += $(odir)/ghc-inplace ghc-inplace
 
