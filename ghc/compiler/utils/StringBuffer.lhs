@@ -265,7 +265,9 @@ trySlurp handle sz_i chunk =
 	-- and add 1 to allow room for the final sentinel \NUL at
 	-- the end of the file.
   (chunk', rc) <- slurpFile 0# 0# chunk chunk_sz (chunk_sz -# (tAB_SIZE +# 1#))
+#if __GLASGOW_HASKELL__ < 404
   writeHandle handle handle_
+#endif
   if rc < (0::Int)
 	then constructErrorAndFail "slurpFile"
 	else return (chunk', rc+1 {-room for sentinel-})
