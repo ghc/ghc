@@ -3132,6 +3132,10 @@ genCCall fn cconv kind args
     * SysV insists on either passing I64 arguments on the stack, or in two GPRs,
       starting with an odd-numbered GPR. It may skip a GPR to achieve this.
       Darwin just treats an I64 like two separate I32s (high word first).
+    * I64 and F64 arguments are 8-byte aligned on the stack for SysV, but only
+      4-byte aligned like everything else on Darwin.
+    * The SysV spec claims that F32 is represented as F64 on the stack. GCC on
+      PowerPC Linux does not agree, so neither do we.
       
     According to both conventions, The parameter area should be part of the
     caller's stack frame, allocated in the caller's prologue code (large enough
@@ -3175,17 +3179,17 @@ genCCall target dest_regs argsAndHints vols
 #if darwin_TARGET_OS
         initialStackOffset = 24
 	    -- size of linkage area + size of arguments, in bytes	
-	stackDelta _finalStack = roundTo16 $ (24 +) $ max 32 $ sum $
+	stackDelta _finalStack = roundTo 16 $ (24 +) $ max 32 $ sum $
 	                               map machRepByteWidth argReps
 #elif linux_TARGET_OS
         initialStackOffset = 8
-        stackDelta finalStack = roundTo16 finalStack
+        stackDelta finalStack = roundTo 16 finalStack
 #endif
 	args = map fst argsAndHints
 	argReps = map cmmExprRep args
 
-	roundTo16 x | x `mod` 16 == 0 = x
-		    | otherwise = x + 16 - (x `mod` 16)
+	roundTo a x | x `mod` a == 0 = x
+		    | otherwise = x + a - (x `mod` a)
 
         move_sp_down finalStack
                | delta > 64 =
@@ -3222,9 +3226,10 @@ genCCall target dest_regs argsAndHints vols
                 storeWord vr [] offset = ST I32 vr (AddrRegImm sp (ImmInt offset))
                 
 #elif linux_TARGET_OS
-                let stackCode = accumCode `appOL` code
-                        `snocOL` ST I32 vr_hi (AddrRegImm sp (ImmInt stackOffset))
-                        `snocOL` ST I32 vr_lo (AddrRegImm sp (ImmInt (stackOffset+4)))
+                let stackOffset' = roundTo 8 stackOffset
+                    stackCode = accumCode `appOL` code
+                        `snocOL` ST I32 vr_hi (AddrRegImm sp (ImmInt stackOffset'))
+                        `snocOL` ST I32 vr_lo (AddrRegImm sp (ImmInt (stackOffset'+4)))
                     regCode hireg loreg =
                         accumCode `appOL` code
                             `snocOL` MR hireg vr_hi
@@ -3238,7 +3243,7 @@ genCCall target dest_regs argsAndHints vols
                         passArguments args regs fprs stackOffset
                                       (regCode hireg loreg) (hireg : loreg : accumUsed)
                     _ -> -- only one or no regs left
-                        passArguments args [] fprs (stackOffset+8)
+                        passArguments args [] fprs (stackOffset'+8)
                                       stackCode accumUsed
 #endif
         
@@ -3265,11 +3270,20 @@ genCCall target dest_regs argsAndHints vols
                 passArguments args
                               (drop nGprs gprs)
                               (drop nFprs fprs)
-                              (stackOffset + stackBytes)
+                              (stackOffset' + stackBytes)
                               (accumCode `appOL` code `snocOL` ST rep vr stackSlot)
                               accumUsed
             where
-                stackSlot = AddrRegImm sp (ImmInt stackOffset)
+#if darwin_TARGET_OS
+        -- stackOffset is at least 4-byte aligned
+        -- The Darwin ABI is happy with that.
+                stackOffset' = stackOffset
+#else
+        -- ... the SysV ABI requires 8-byte alignment for doubles.
+                stackOffset' | rep == F64 = roundTo 8 stackOffset
+                             | otherwise  =           stackOffset
+#endif
+                stackSlot = AddrRegImm sp (ImmInt stackOffset')
                 (nGprs, nFprs, stackBytes, regs) = case rep of
                     I32 -> (1, 0, 4, gprs)
 #if darwin_TARGET_OS
