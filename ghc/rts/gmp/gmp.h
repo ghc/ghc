@@ -30,7 +30,7 @@ MA 02111-1307, USA. */
 
 #ifndef STG_H
 /* Get DLL_IMPORT */
-#include "../../includes/config.h"
+#include "../../includes/ghcconfig.h"
 #include "../../includes/StgDLL.h"
 #endif
 
