@@ -1409,7 +1409,7 @@ closure kind          & HNF & UPD & NS & STA & THU & MUT & UPT & BH & IND & Sect
 @BCO_CAF@	      &   & 1 &   &   & 1 &   &   &   &   & \ref{sect:BCO}       \\
 
 @HUGS_AP@	      &   & 1 &   &   & 1 &   &   &   &   & \ref{sect:HUGS-AP}   \\
-@HUGS_PAP@	      &   &   & 1 &   &   &   &   &   &   & \ref{sect:HUGS-AP}   \\
+@HUGS_PAP@	      & 1 &   & 1 &   &   &   &   &   &   & \ref{sect:HUGS-AP}   \\
 
 @PAP@                 & 1 &   & 1 &   &   &   &   &   &   & \ref{sect:PAP}       \\
 
@@ -1865,7 +1865,7 @@ check failure.  A PAP has the following shape:
 {\em Fixed header}  & {\em No of arg words} & {\em Function closure} & {\em Arg stack} \\ \hline
 \end{tabular}
 \end{center}
-The ``arg stack'' is a copy of of the chunk of stack above the update
+The ``arg stack'' is a copy of the chunk of stack above the update
 frame; ``no of arg words'' tells how many words it consists of.  The
 function closure is (a pointer to) the closure for the function whose
 argument-satisfaction check failed.
