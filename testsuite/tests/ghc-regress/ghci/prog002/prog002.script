@@ -1,0 +1,40 @@
+:unset +s
+:unset +t
+-- first, clean up:
+:! rm -f *.hi *.o *~
+:! cp A1.hs A.hs
+
+:load D
+
+-- compile A & reload
+:! $HC $HC_OPTS -no-recomp -c A.hs
+:reload
+
+B.g 42
+B.g 42
+B.g 42
+
+-- swap A2 for A, compile & reload
+:! cp A2.hs A.hs
+:! $HC $HC_OPTS -no-recomp -c A.hs
+:reload
+-- the system should ignore the compiled version and compile its own.
+
+B.g 42
+B.g 42
+B.g 42
+
+-- pick up newly compiled A
+:load D
+
+B.g 42
+B.g 42
+B.g 42
+
+-- remove A.o: system should recompile A
+:! rm A.o
+:reload
+
+B.g 42
+B.g 42
+B.g 42

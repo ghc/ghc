@@ -1,0 +1,36 @@
+:unset +s
+-- first, tidy up:
+:! rm -f *.hi *.o *~
+:! cp D1.hs D.hs
+
+-- load the program (all interpreted)
+:load A
+
+-- reloading should do nothing
+:reload
+
+-- make sure `main' works
+main
+
+-- touch a module + recompile
+:! sleep 1
+:! touch C.hs
+:reload
+
+-- make sure `main' still works
+main
+
+-- compile D & reload
+:! $HC $HC_OPTS -no-recomp -c D.hs
+:reload
+main
+
+-- change D, recompile & reload
+:! cp D2.hs D.hs
+:! $HC $HC_OPTS -no-recomp -c D.hs
+:reload
+:load A
+
+-- make sure we're picking up the new D, via B
+:module B
+g 42

@@ -1,0 +1,76 @@
+:unset +s
+:unset +t
+-- A small multi-module program, with 4 modules, Main, B, C, D.  B & C
+-- depend on D, and A depends on B & C.
+-- 
+-- This test will try various combinations of compiled and interpreted
+-- versions of each module, and make sure each combination behaves
+-- sensibly.
+
+-- clean up
+:! rm *.o *.hi
+:! cp D1.hs D.hs
+
+:load A
+:type a
+a 42
+
+-- sigh; sleep 1, because the filesystem only stores times in seconds
+:! sleep 1; cp D2.hs D.hs
+:reload
+:type (Main.a,B.b,C.c,D.d)
+a 42
+
+-- compile D, check that :reload doesn't pick it up
+:! $HC $HC_OPTS -c D.hs
+:reload
+:type (Main.a,B.b,C.c,D.d)
+a 42
+
+-- pick up the compiled D now, with :load
+:load A
+:type (Main.a,B.b,C.c,D.d)
+a 42
+
+-- D,C compiled
+:! $HC $HC_OPTS -c C.hs
+:load A
+:type (Main.a,B.b,C.c,D.d)
+a 42
+
+-- D,C,B compiled
+:! $HC $HC_OPTS -c B.hs
+:load A
+:type (Main.a,B.b,C.c,D.d)
+a 42
+
+-- D,C,B,A compiled
+:! $HC $HC_OPTS -c A.hs
+:load A
+:type (Main.a,B.b,C.c,D.d)
+a 42
+
+-- D,C,A compiled  (better not use A.o)
+:! rm B.o
+:load A
+:type (Main.a,B.b,C.c,D.d)
+a 42
+
+-- D,A compiled  (better not use A.o)
+:! rm C.o
+:load A
+:type (Main.a,B.b,C.c,D.d)
+a 42
+
+-- A compiled  (better not use A.o)
+:! rm D.o
+:load A
+:type (Main.a,B.b,C.c,D.d)
+a 42
+
+-- A,B,C compiled (better not use A.o, B.o, C.o)
+:! $HC $HC_OPTS --make -v0 A
+:! rm D.o
+:load A
+:type (Main.a,B.b,C.c,D.d)
+a 42

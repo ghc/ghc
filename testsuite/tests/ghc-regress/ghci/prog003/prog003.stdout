@@ -1,0 +1,52 @@
+a :: Int -> Int
+168
+(Main.a,B.b,C.c,D.d) :: (Float -> Float,
+			 Float -> Float,
+			 Float -> Float,
+			 Float -> Float)
+28.0
+(Main.a,B.b,C.c,D.d) :: (Float -> Float,
+			 Float -> Float,
+			 Float -> Float,
+			 Float -> Float)
+28.0
+(Main.a,B.b,C.c,D.d) :: (Float -> Float,
+			 Float -> Float,
+			 Float -> Float,
+			 Float -> Float)
+28.0
+(Main.a,B.b,C.c,D.d) :: (Float -> Float,
+			 Float -> Float,
+			 Float -> Float,
+			 Float -> Float)
+28.0
+(Main.a,B.b,C.c,D.d) :: (Float -> Float,
+			 Float -> Float,
+			 Float -> Float,
+			 Float -> Float)
+28.0
+(Main.a,B.b,C.c,D.d) :: (Float -> Float,
+			 Float -> Float,
+			 Float -> Float,
+			 Float -> Float)
+28.0
+(Main.a,B.b,C.c,D.d) :: (Float -> Float,
+			 Float -> Float,
+			 Float -> Float,
+			 Float -> Float)
+28.0
+(Main.a,B.b,C.c,D.d) :: (Float -> Float,
+			 Float -> Float,
+			 Float -> Float,
+			 Float -> Float)
+28.0
+(Main.a,B.b,C.c,D.d) :: (Float -> Float,
+			 Float -> Float,
+			 Float -> Float,
+			 Float -> Float)
+28.0
+(Main.a,B.b,C.c,D.d) :: (Float -> Float,
+			 Float -> Float,
+			 Float -> Float,
+			 Float -> Float)
+28.0
