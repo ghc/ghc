@@ -7,4 +7,3 @@ _declarations_
 1 type Id = Var ;
 1 data Var ;
 1 setIdName _:_ Id -> Name.Name -> Id ;;
-

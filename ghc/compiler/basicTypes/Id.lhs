@@ -34,6 +34,9 @@ module Id (
 	isConstantId, isBottomingId, idAppIsBottom,
 	isExportedId, isUserExportedId,
 
+	-- One shot lambda stuff
+	isOneShotLambda, setOneShotLambda,
+
 	-- IdInfo stuff
 	setIdUnfolding,
 	setIdArity,
@@ -359,4 +362,17 @@ idMustNotBeINLINEd id = case getInlinePragma id of
 idMustBeINLINEd id =  case getInlinePragma id of
 			IMustBeINLINEd -> True
 			other	       -> False
+\end{code}
+
+
+	---------------------------------
+	-- ONE-SHOT LAMBDAS
+\begin{code}
+isOneShotLambda :: Id -> Bool
+isOneShotLambda id = case lbvarInfo (idInfo id) of
+			IsOneShotLambda -> True
+			NoLBVarInfo	-> False
+
+setOneShotLambda :: Id -> Id
+setOneShotLambda id = modifyIdInfo (`setLBVarInfo` IsOneShotLambda) id
 \end{code}

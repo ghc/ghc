@@ -27,7 +27,8 @@ import Id		( Id, idType, idInfo, idUnique,
 			  getIdDemandInfo, setIdDemandInfo,
 			  getIdArity, setIdArity, 
 			  getIdStrictness, 
-			  setInlinePragma, getInlinePragma, idMustBeINLINEd
+			  setInlinePragma, getInlinePragma, idMustBeINLINEd,
+			  setOneShotLambda
 			)
 import IdInfo		( InlinePragInfo(..), OccInfo(..), StrictnessInfo(..), 
 		 	  ArityInfo(..), atLeastArity, arityLowerBound, unknownArity,
@@ -45,7 +46,7 @@ import CoreFVs		( exprFreeVars )
 import CoreUnfold	( Unfolding(..), mkUnfolding, callSiteInline, 
 			  isEvaldUnfolding, blackListed )
 import CoreUtils	( cheapEqExpr, exprIsDupable, exprIsWHNF, exprIsTrivial,
-			  coreExprType, coreAltsType, exprArity,
+			  coreExprType, coreAltsType, exprArity, exprIsValue,
 			  exprOkForSpeculation
 			)
 import Rules		( lookupRule )
@@ -370,12 +371,12 @@ mkLamBndrZapper :: CoreExpr 	-- Function
 		-> Int		-- Number of args
 		-> Id -> Id	-- Use this to zap the binders
 mkLamBndrZapper fun n_args
-  | saturated fun n_args = \b -> b
-  | otherwise		 = \b -> maybeModifyIdInfo zapLamIdInfo b
+  | n_args >= n_params fun = \b -> b		-- Enough args
+  | otherwise		   = \b -> maybeModifyIdInfo zapLamIdInfo b
   where
-    saturated (Lam b e) 0 = False
-    saturated (Lam b e) n = saturated e (n-1)
-    saturated e		n = True
+    n_params (Lam b e) | isId b    = 1 + n_params e
+		       | otherwise = n_params e
+    n_params other		   = 0::Int
 \end{code}
 
 
@@ -849,10 +850,10 @@ completeApp fun args cont
 
 	-- Value argument
     go (Lam bndr fun) (arg:args)
-	  | preInlineUnconditionally bndr && not opt_SimplNoPreInlining
+	  | preInlineUnconditionally zapped_bndr && not opt_SimplNoPreInlining
 	  = tick (BetaReduction bndr) 			`thenSmpl_`
 	    tick (PreInlineUnconditionally bndr)	`thenSmpl_`
-	    extendSubst bndr (DoneEx arg)
+	    extendSubst zapped_bndr (DoneEx arg)
 	    (go fun args)
 	  | otherwise
 	  = tick (BetaReduction bndr) 			`thenSmpl_`
@@ -916,9 +917,8 @@ preInlineUnconditionally :: InId -> Bool
 	-- for the trivial bindings introduced by SimplUtils.mkRhsTyLam
 preInlineUnconditionally bndr
   = case getInlinePragma bndr of
-	IMustBeINLINEd			    -> True
-	ICanSafelyBeINLINEd InsideLam  _    -> False
-	ICanSafelyBeINLINEd not_in_lam True -> True	-- Not inside a lambda,
+	IMustBeINLINEd			      -> True
+	ICanSafelyBeINLINEd NotInsideLam True -> True	-- Not inside a lambda,
 							-- one occurrence ==> safe!
 	other -> False
 
@@ -955,23 +955,6 @@ postInlineUnconditionally bndr rhs
 		-- NB: Even IMustBeINLINEd is ignored here: if the rhs is trivial
 		-- it's best to inline it anyway.  We often get a=E; b=a
 		-- from desugaring, with both a and b marked NOINLINE.
-\end{code}
-
-\begin{code}
-inlineCase bndr scrut
-    =  exprIsTrivial scrut			-- Duplication is free
-   && (  isUnLiftedType (idType bndr) 
-      || scrut_is_evald_var			-- So dropping the case won't change termination
-      || isStrict (getIdDemandInfo bndr)	-- It's going to get evaluated later, so again
-	   					-- termination doesn't change
-      || not opt_SimplPedanticBottoms)		-- Or we don't care!
-  where
-	-- Check whether or not scrut is known to be evaluted
-	-- It's not going to be a visible value (else the previous
-	-- blob would apply) so we just check the variable case
-    scrut_is_evald_var = case scrut of
-				Var v -> isEvaldUnfolding (getIdUnfolding v)
-				other -> False
 \end{code}
 
 
@@ -1016,39 +999,51 @@ rebuild expr@(Con con args) (Select _ bndr alts se cont)
   | conOkForAlt con	-- Knocks out PrimOps and NoRepLits
   = knownCon expr con args bndr alts se cont
 
---	Case of other value (e.g. a partial application or lambda)
---	Turn it back into a let
-rebuild scrut (Select _ bndr ((DEFAULT, bs, rhs):alts) se cont)
-  |  isUnLiftedType (idType bndr) && exprOkForSpeculation scrut
-  || exprIsWHNF scrut
-  = ASSERT( null bs && null alts )
-    setSubstEnv se			$			
-    simplBinder bndr			$ \ bndr' ->
-    completeBinding bndr bndr' scrut 	$
-    simplExprF rhs cont
-
 
 ---------------------------------------------------------
 -- 	The other Select cases
 
 rebuild scrut (Select _ bndr alts se cont)
-  | all (cheapEqExpr rhs1) other_rhss
-    && inlineCase bndr scrut
-    && all binders_unused alts
+  | 	-- Check that the RHSs are all the same, and
+	-- don't use the binders in the alternatives
+	-- This test succeeds rapidly in the common case of
+	-- a single DEFAULT alternative
+    all (cheapEqExpr rhs1) other_rhss && all binders_unused alts
+
+	-- Check that the scrutinee can be let-bound instead of case-bound
+    && (   (isUnLiftedType (idType bndr) && 	-- It's unlifted and floatable
+	    exprOkForSpeculation scrut)		-- NB: scrut = an unboxed variable satisfies 
+	|| is_a_value scrut			-- It's a value
+
+--      || not opt_SimplPedanticBottoms)	-- Or we don't care!
+--	We used to allow improving termination by discarding cases, unless -fpedantic-bottoms was on,
+-- 	but that breaks badly for the dataToTag# primop, which relies on a case to evaluate
+-- 	its argument:  case x of { y -> dataToTag# y }
+--	Here we must *not* discard the case, because dataToTag# just fetches the tag from
+--	the info pointer.  So we'll be pedantic all the time, and see if that gives any
+-- 	other problems
+       )
+
     && opt_SimplDoCaseElim
   =   	-- Get rid of the case altogether
 	-- See the extensive notes on case-elimination below
 	-- Remember to bind the binder though!
-	    tick (CaseElim bndr)		`thenSmpl_`
-	    setSubstEnv se			(
-	    extendSubst bndr (DoneEx scrut)	$
-	    simplExprF rhs1 cont
-	    )
+    tick (CaseElim bndr)		`thenSmpl_` (
+    setSubstEnv se			$			
+    simplBinder bndr			$ \ bndr' ->
+    completeBinding bndr bndr' scrut 	$
+    simplExprF rhs1 cont)
+
   | otherwise
   = rebuild_case scrut bndr alts se cont
   where
     (rhs1:other_rhss)		 = [rhs | (_,_,rhs) <- alts]
     binders_unused (_, bndrs, _) = all isDeadBinder bndrs
+
+	-- Check whether or not scrut is known to be evaluted
+    is_a_value (Var v) =    isEvaldUnfolding (getIdUnfolding v)	-- It's been evaluated
+			 || isStrict (getIdDemandInfo bndr)	-- It's going to be evaluated later
+    is_a_value scrut   = exprIsValue scrut
 \end{code}
 
 Case elimination [see the code above]
@@ -1470,7 +1465,12 @@ mkDupableAlt case_bndr case_bndr' cont alt@(con, bndrs, rhs)
 	--
 	-- Now CPR should not w/w j because it's a thunk, so
 	-- that means that the enclosing function can't w/w either,
-	-- which is a BIG LOSE.  This actually happens in practice
+	-- which is a lose.  Here's the example that happened in practice:
+	--	kgmod :: Int -> Int -> Int
+	--	kgmod x y = if x > 0 && y < 0 || x < 0 && y > 0
+	--	            then 78
+	--		    else 5
+
 	then newId realWorldStatePrimTy  $ \ rw_id ->
 	     returnSmpl ([rw_id], [Var realWorldPrimId])
 	else 
@@ -1479,6 +1479,11 @@ mkDupableAlt case_bndr case_bndr' cont alt@(con, bndrs, rhs)
 	`thenSmpl` \ (final_bndrs', final_args) ->
 
     newId (foldr (mkFunTy . idType) rhs_ty' final_bndrs')	$ \ join_bndr ->
-    returnSmpl ([NonRec join_bndr (mkLams final_bndrs' rhs')],
+
+	-- Notice that we make the lambdas into one-shot-lambdas.  The
+	-- join point is sure to be applied at most once, and doing so
+	-- prevents the body of the join point being floated out by
+	-- the full laziness pass
+    returnSmpl ([NonRec join_bndr (mkLams (map setOneShotLambda final_bndrs') rhs')],
 		(con, bndrs, mkApps (Var join_bndr) final_args))
 \end{code}

@@ -16,7 +16,7 @@ module UniqSet (
 	unionUniqSets, unionManyUniqSets, minusUniqSet,
 	elementOfUniqSet, mapUniqSet, intersectUniqSets,
 	isEmptyUniqSet, filterUniqSet, sizeUniqSet, foldUniqSet,
-	elemUniqSet_Directly, lookupUniqSet
+	elemUniqSet_Directly, lookupUniqSet, hashUniqSet
     ) where
 
 #include "HsVersions.h"
@@ -102,6 +102,9 @@ elemUniqSet_Directly x (MkUniqSet set) = maybeToBool (lookupUFM_Directly set x)
 
 sizeUniqSet :: UniqSet a -> Int
 sizeUniqSet (MkUniqSet set) = sizeUFM set
+
+hashUniqSet :: UniqSet a -> Int
+hashUniqSet (MkUniqSet set) = hashUFM set
 
 isEmptyUniqSet :: UniqSet a -> Bool
 isEmptyUniqSet (MkUniqSet set) = isNullUFM set {-SLOW: sizeUFM set == 0-}

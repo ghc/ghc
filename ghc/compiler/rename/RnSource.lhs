@@ -45,7 +45,7 @@ import PrelInfo		( derivingOccurrences, numClass_RDR,
 			  bindIO_NAME
 			)
 import Bag		( bagToList )
-import List		( partition )
+import List		( partition, nub )
 import Outputable
 import SrcLoc		( SrcLoc )
 import CmdLineOpts	( opt_WarnUnusedMatches )	-- Warn of unused for-all'd tyvars
@@ -559,6 +559,8 @@ checkConstraints explicit_forall doc forall_tyvars ctxt ty
 			     False
 			     tys
 
+freeRdrTyVars	 :: RdrNameHsType -> [RdrName]
+freeRdrTyVars ty =  filter isRdrTyVar (extractHsTyRdrNames ty)
 
 rnHsType :: SDoc -> RdrNameHsType -> RnMS (RenamedHsType, FreeVars)
 
@@ -568,31 +570,37 @@ rnHsType doc (HsForAllTy Nothing ctxt ty)
 	-- over FV(T) \ {in-scope-tyvars} 
   = getLocalNameEnv		`thenRn` \ name_env ->
     let
-	mentioned_tyvars = filter isRdrTyVar (extractHsTyRdrNames ty)
-	forall_tyvars    = filter (not . (`elemFM` name_env)) mentioned_tyvars
+	mentioned_in_tau = freeRdrTyVars ty
+	forall_tyvars    = filter (not . (`elemFM` name_env)) mentioned_in_tau
     in
     checkConstraints False doc forall_tyvars ctxt ty	`thenRn` \ ctxt' ->
     rnForAll doc (map UserTyVar forall_tyvars) ctxt' ty
 
-rnHsType doc (HsForAllTy (Just forall_tyvars) ctxt ty)
+rnHsType doc (HsForAllTy (Just forall_tyvars) ctxt tau)
 	-- Explicit quantification.
 	-- Check that the forall'd tyvars are a subset of the
 	-- free tyvars in the tau-type part
 	-- That's only a warning... unless the tyvar is constrained by a 
 	-- context in which case it's an error
   = let
-	mentioned_tyvars      = filter isRdrTyVar (extractHsTyRdrNames ty)
-	constrained_tyvars    = [tv | (_,tys) <- ctxt,
+	mentioned_in_tau  = freeRdrTyVars tau
+	mentioned_in_ctxt = nub [tv | (_,tys) <- ctxt,
 				      ty <- tys,
-				      tv <- mentioned_tyvars]
-	dubious_guys	      = filter (`notElem` mentioned_tyvars) forall_tyvar_names
-	(bad_guys, warn_guys) = partition (`elem` constrained_tyvars) dubious_guys
+				      tv <- freeRdrTyVars ty]
+
+	dubious_guys	      = filter (`notElem` mentioned_in_tau) forall_tyvar_names
+		-- dubious = explicitly quantified but not mentioned in tau type
+
+	(bad_guys, warn_guys) = partition (`elem` mentioned_in_ctxt) dubious_guys
+		-- bad  = explicitly quantified and constrained, but not mentioned in tau
+		-- warn = explicitly quantified but not mentioned in ctxt or tau
+ 
 	forall_tyvar_names    = map getTyVarName forall_tyvars
     in
-    mapRn_ (forAllErr doc ty) bad_guys 				`thenRn_`
-    mapRn_ (forAllWarn doc ty) warn_guys			`thenRn_`
-    checkConstraints True doc forall_tyvar_names ctxt ty	`thenRn` \ ctxt' ->
-    rnForAll doc forall_tyvars ctxt' ty
+    mapRn_ (forAllErr doc tau) bad_guys 			`thenRn_`
+    mapRn_ (forAllWarn doc tau) warn_guys			`thenRn_`
+    checkConstraints True doc forall_tyvar_names ctxt tau	`thenRn` \ ctxt' ->
+    rnForAll doc forall_tyvars ctxt' tau
 
 rnHsType doc (MonoTyVar tyvar)
   = lookupOccRn tyvar 		`thenRn` \ tyvar' ->
@@ -878,12 +886,12 @@ forAllErr doc ty tyvar
       (ptext SLIT("In") <+> doc))
 
 ctxtErr explicit_forall doc tyvars constraint ty
-  = sep [ptext SLIT("The constraint") <+> quotes (pprClassAssertion constraint) <+>
+  = sep [ptext SLIT("None of the type variable(s) in the constraint") <+> quotes (pprClassAssertion constraint) <+>
 		   ptext SLIT("does not mention any of"),
 	 if explicit_forall then
- 	   nest 4 (ptext SLIT("the universally quantified type variables") <+> braces (interpp'SP tyvars))
+ 	   nest 4 (ptext SLIT("is universally quantified (i.e. bound by the forall)"))
 	 else
-	   nest 4 (ptext SLIT("the type variables in the type") <+> quotes (ppr ty))
+	   nest 4 (ptext SLIT("appears in the type") <+> quotes (ppr ty))
     ]
     $$
     (ptext SLIT("In") <+> doc)

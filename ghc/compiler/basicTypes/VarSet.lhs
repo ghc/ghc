@@ -22,7 +22,7 @@ module VarSet (
 
 import CmdLineOpts	( opt_PprStyle_Debug )
 import Var		( Var, Id, TyVar, IdOrTyVar, setVarUnique )
-import Unique		( Unique, Uniquable(..), incrUnique )
+import Unique		( Unique, Uniquable(..), incrUnique, deriveUnique )
 import UniqSet
 import UniqFM		( delFromUFM_Directly )
 import Outputable
@@ -91,7 +91,7 @@ uniqAway set var
   | not (var `elemVarSet` set) = var	-- Nothing to do
 
   | otherwise
-  = try 1 (incrUnique (getUnique var))
+  = try 1 (deriveUnique (getUnique var) (hashUniqSet set))
   where
     try n uniq | uniq `elemUniqSet_Directly` set = try ((n+1)::Int) (incrUnique uniq)
 #ifdef DEBUG

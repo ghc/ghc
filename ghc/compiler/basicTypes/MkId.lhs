@@ -41,7 +41,7 @@ import TysWiredIn	( boolTy, charTy, mkListTy )
 import PrelMods		( pREL_ERR, pREL_GHC )
 import Type		( Type, ThetaType,
 			  mkDictTy, mkTyConApp, mkTyVarTys, mkFunTys, mkFunTy, mkSigmaTy,
-			  isUnLiftedType, mkForAllTys, mkTyVarTy, 
+			  isUnLiftedType, mkForAllTys, mkTyVarTy, tyVarsOfTypes,
 			  splitSigmaTy, splitFunTy_maybe, splitAlgTyConApp,
 			  splitFunTys, splitForAllTys, unUsgTy,
 			  mkUsgTy, UsageAnn(..)
@@ -52,7 +52,7 @@ import Subst		( mkTopTyVarSubst, substTheta )
 import TyCon		( TyCon, isNewTyCon, tyConDataCons, isDataTyCon )
 import Class		( Class, classBigSig, classTyCon )
 import Var		( Id, TyVar )
-import VarEnv		( zipVarEnv )
+import VarSet		( isEmptyVarSet )
 import Const		( Con(..) )
 import Name		( mkDerivedName, mkWiredInIdName, mkLocalName, 
 			  mkWorkerOcc, mkSuperDictSelOcc,
@@ -458,7 +458,7 @@ mkDictFunId dfun_name clas inst_tyvars inst_tys inst_decl_theta
 				-- want to have any dict arguments, so that we can
 				-- expose the constant methods.
 
-		   other -> nub (inst_decl_theta ++ sc_theta')
+		   other -> nub (inst_decl_theta ++ filter not_const sc_theta')
 				-- Otherwise we pass the superclass dictionaries to
 				-- the dictionary function; the Mark Jones optimisation.
 				--
@@ -467,8 +467,15 @@ mkDictFunId dfun_name clas inst_tyvars inst_tys inst_decl_theta
 				--   instance Monad m => MonadT (EnvT env) m where ...
 				-- Here, the inst_decl_theta has (Monad m); but so
 				-- does the sc_theta'!
+				--
+				-- NOTE the "not_const".  I got caught by this one too:
+				--   class Foo a => Baz a b where ...
+				--   instance Wob b => Baz T b where..
+				-- Now sc_theta' has Foo T
 
     dfun_ty = mkSigmaTy inst_tyvars dfun_theta (mkDictTy clas inst_tys)
+
+    not_const (clas, tys) = not (isEmptyVarSet (tyVarsOfTypes tys))
 \end{code}
 
 

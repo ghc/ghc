@@ -26,6 +26,7 @@ module Unique (
 	getKey,				-- Used in Var only!
 
 	incrUnique,			-- Used for renumbering
+	deriveUnique,			-- Ditto
 	initTyVarUnique,
 	initTidyUniques,
 
@@ -233,6 +234,7 @@ mkUniqueGrimily :: Int# -> Unique		-- A trap-door for UniqSupply
 getKey		:: Unique -> Int#		-- for Var
 
 incrUnique	:: Unique -> Unique
+deriveUnique	:: Unique -> Int -> Unique
 \end{code}
 
 
@@ -242,9 +244,11 @@ mkUniqueGrimily x = MkUnique x
 {-# INLINE getKey #-}
 getKey (MkUnique x) = x
 
-incrUnique (MkUnique i) = MkUnique (i +# 100#)
--- Bump the unique by a lot, to get it out of the neighbourhood
--- of its friends
+incrUnique (MkUnique i) = MkUnique (i +# 1#)
+
+-- deriveUnique uses an 'X' tag so that it won't clash with
+-- any of the uniques produced any other way
+deriveUnique (MkUnique i) delta = mkUnique 'X' (I# i + delta)
 
 -- pop the Char in the top 8 bits of the Unique(Supply)
 
@@ -255,12 +259,15 @@ i2w x = int2Word# x
 i2w_s x = (x::Int#)
 
 mkUnique (C# c) (I# i)
-  = MkUnique (w2i (((i2w (ord# c)) `shiftL#` (i2w_s 24#)) `or#` (i2w i)))
+  = MkUnique (w2i (tag `or#` bits))
+  where
+    tag  = i2w (ord# c) `shiftL#` i2w_s 24#
+    bits = i2w i `and#` (i2w 16777215#){-``0x00ffffff''-}
 
 unpkUnique (MkUnique u)
   = let
 	tag = C# (chr# (w2i ((i2w u) `shiftr` (i2w_s 24#))))
-	i   = I#  (w2i ((i2w u) `and#` (i2w 16777215#){-``0x00ffffff''-}))
+	i   = I# (w2i ((i2w u) `and#` (i2w 16777215#){-``0x00ffffff''-}))
     in
     (tag, i)
   where
@@ -406,6 +413,7 @@ Allocation of unique supply characters:
 	other a-z: lower case chars for unique supplies (see Main.lhs)
 	B:   builtin
 	C-E: pseudo uniques	(used in native-code generator)
+	X:   uniques derived by deriveUnique
 	_:   unifiable tyvars   (above)
 	0-9: prelude things below
 

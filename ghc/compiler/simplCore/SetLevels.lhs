@@ -34,7 +34,7 @@ import CoreSyn
 
 import CoreUtils	( coreExprType, exprIsTrivial, exprIsBottom )
 import CoreFVs		-- all of it
-import Id		( Id, idType, mkSysLocal )
+import Id		( Id, idType, mkSysLocal, isOneShotLambda )
 import Var		( IdOrTyVar, Var, setVarUnique )
 import VarEnv
 import VarSet
@@ -301,8 +301,11 @@ lvlExpr ctxt_lvl env (_, AnnLam bndr rhs)
     bndr_is_tyvar = isTyVar bndr
     (bndrs, body) = go rhs
 
-    incd_lvl   | bndr_is_id = incMajorLvl ctxt_lvl
-	       | otherwise  = incMinorLvl ctxt_lvl
+    incd_lvl   | bndr_is_id && not (all isOneShotLambda bndrs) = incMajorLvl ctxt_lvl
+	       | otherwise				       = incMinorLvl ctxt_lvl
+	-- Only bump the major level number if the binders include
+	-- at least one more-than-one-shot lambda
+
     lvld_bndrs = [(b,incd_lvl) | b <- (bndr:bndrs)]
     new_env    = extendLvlEnv env lvld_bndrs
 

@@ -4,4 +4,3 @@ HsExpr HsExpr pprExpr;
 _declarations_
 1 data HsExpr i p;
 1 pprExpr _:_ _forall_ [i p] {Outputable.Outputable i, Outputable.Outputable p} => HsExpr.HsExpr i p -> Outputable.SDoc ;;
-

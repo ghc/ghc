@@ -21,7 +21,8 @@ import CoreSyn
 import CoreLint		( beginPass, endPass )
 import Const		( isDataCon )
 import CoreFVs		( CoreExprWithFVs, freeVars, freeVarsOf )
-import Var		( Id, idType )
+import Id		( isOneShotLambda )
+import Var		( Id, idType, isTyVar )
 import Type		( isUnLiftedType )
 import VarSet
 import Util		( zipEqual )
@@ -158,12 +159,13 @@ fiExpr to_drop (_,AnnApp fun arg)
     [drop_here, fun_drop, arg_drop] = sepBindsByDropPoint [freeVarsOf fun, freeVarsOf arg] to_drop
 \end{code}
 
-We are careful about lambdas:
+We are careful about lambdas: 
 
-* We never float inside a value lambda.  That risks losing laziness.
+* We must be careful about floating inside inside a value lambda.  
+  That risks losing laziness.
   The float-out pass might rescue us, but then again it might not.
 
-* We don't float inside type lambdas either.  At one time we did, and
+* We must be careful about type lambdas too.  At one time we did, and
   there is no risk of duplicating work thereby, but we do need to be
   careful.  In particular, here is a bad case (it happened in the
   cichelli benchmark:
@@ -174,13 +176,24 @@ We are careful about lambdas:
   This is bad as now f is an updatable closure (update PAP)
   and has arity 0.
 
-So the simple thing is never to float inside big lambda either.
-Maybe we'll find cases when that loses something important; if
-so we can modify the decision.
+So we treat lambda in groups, using the following rule:
+
+	Float inside a group of lambdas only if
+	they are all either type lambdas or one-shot lambdas.
+
+	Otherwise drop all the bindings outside the group.
 
 \begin{code}
 fiExpr to_drop (_, AnnLam b body)
-  = mkCoLets' to_drop (Lam b (fiExpr [] body))
+  = case collect [b] body of
+      (bndrs, real_body)
+	| all is_ok bndrs -> mkLams bndrs (fiExpr to_drop real_body)
+	| otherwise	  -> mkCoLets' to_drop (mkLams bndrs (fiExpr [] real_body))
+  where
+    collect bs (_, AnnLam b body) = collect (b:bs) body
+    collect bs body		  = (reverse bs, body)
+
+    is_ok bndr = isTyVar bndr || isOneShotLambda bndr
 \end{code}
 
 We don't float lets inwards past an SCC.

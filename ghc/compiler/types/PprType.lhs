@@ -163,15 +163,25 @@ ppr_ty env ctxt_prec ty@(ForAllTy _ _)
   = getPprStyle $ \ sty -> 
     maybeParen ctxt_prec fUN_PREC $
     if ifaceStyle sty then
-       sep [ ptext SLIT("__forall") <+> brackets pp_tyvars <+> ptext SLIT("=>"), pp_body ]
+       sep [ ptext SLIT("__forall") <+> brackets pp_tyvars <+> ptext SLIT("=>"), 
+	     ppr_ty env tOP_PREC rho
+	   ]
     else
-       sep [ ptext SLIT("forall") <+> pp_tyvars <> ptext SLIT("."), pp_body ]
+	-- The type checker occasionally prints a type in an error message,
+	-- and it had better come out looking like a user type
+       sep [ ptext SLIT("forall") <+> pp_tyvars <> ptext SLIT("."), 
+	     ppr_theta theta <+> ptext SLIT("=>"),
+	     ppr_ty env tOP_PREC tau
+	   ]
   where		
-    (tyvars, body_ty) = splitForAllTys ty  -- don't treat theta specially any more (KSW 1999-04)
+    (tyvars, rho) = splitForAllTys ty  -- don't treat theta specially any more (KSW 1999-04)
+    (theta, tau)  = splitRhoTy rho
     
     pp_tyvars = hsep (map (pBndr env LambdaBind) tyvars)
-    pp_body   = ppr_ty env tOP_PREC body_ty
     
+    ppr_theta theta     = parens (hsep (punctuate comma (map ppr_dict theta)))
+    ppr_dict (clas,tys) = ppr clas <+> hsep (map (ppr_ty env tYCON_PREC) tys)
+
 
 ppr_ty env ctxt_prec (FunTy ty1 ty2)
   = maybeParen ctxt_prec fUN_PREC (sep (ppr_ty env fUN_PREC ty1 : pp_rest ty2))

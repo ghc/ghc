@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.16 1999/05/13 17:30:56 simonm Exp $
+% $Id: CgHeapery.lhs,v 1.17 1999/05/26 14:12:13 simonmar Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
@@ -310,6 +310,9 @@ altHeapCheck is_fun regs [] AbsCNop Nothing code
 	       CCheck HP_CHK_NOREGS [mkIntCLit words_required] AbsCNop
 
 	    -- The SEQ case (polymophic/function typed case branch)
+	    -- We need this case because the closure in Node won't return
+	    -- directly when we enter it (it could be a function), so the
+	    -- heap check code needs to push a seq frame on top of the stack.
 	    [VanillaReg rep ILIT(1)]
 		|  rep == PtrRep
  		&& is_fun ->

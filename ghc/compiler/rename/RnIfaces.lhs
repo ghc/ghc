@@ -241,7 +241,7 @@ loadDecl mod decls_map (version, decl)
     let
 	main_name     = availName avail
 	new_decls_map = foldl add_decl decls_map
-				       [ (name, (version, avail, name==main_name, (mod, decl))) 
+				       [ (name, (version, avail, name==main_name, (mod, decl'))) 
 				       | name <- sys_bndrs ++ availNames avail]
 	add_decl decls_map (name, stuff)
 	  = WARN( name `elemNameEnv` decls_map, ppr name )

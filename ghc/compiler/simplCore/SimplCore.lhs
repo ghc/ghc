@@ -324,22 +324,6 @@ Several tasks are performed by the post-simplification pass
     way of the above scheme.  And anyway, IO is the only guaranteed
     way to enforce ordering  --SDM.
 
-3.  Mangle cases involving seq# in the discriminant.  Up to this
-    point, seq# will appear like this:
-
-	  case seq# e of
-		0# -> seqError#
-		_  -> ...
-
-    where the 0# branch is purely to bamboozle the strictness analyser
-    (see case 4 above).  This code comes from an unfolding for 'seq'
-    in Prelude.hs.  We translate this into
-
-	  case e of
-		_ -> ...
-
-    Now that the evaluation order is safe.
-
 4. Do eta reduction for lambda abstractions appearing in:
 	- the RHS of case alternatives
 	- the body of a let
@@ -473,21 +457,6 @@ postSimplExpr (Let bind body)
 postSimplExpr (Note note body)
   = postSimplExprEta body	`thenPM` \ body' ->
     returnPM (Note note body')
-
--- seq#: see notes above.
--- NB: seq# :: forall a. a -> Int#
-postSimplExpr (Case scrut@(Con (PrimOp SeqOp) [Type ty, e]) bndr alts)
-  = postSimplExpr e			`thenPM` \ e' ->
-    let 
-	-- The old binder can't have been used, so we
-	-- can gaily re-use it (yuk!)
-	new_bndr = setIdType bndr ty
-    in
-    postSimplExprEta default_rhs	`thenPM` \ rhs' ->
-    returnPM (Case e' new_bndr [(DEFAULT,[],rhs')])
-  where
-    (other_alts, maybe_default)  = findDefault alts
-    Just default_rhs		 = maybe_default
 
 -- par#: see notes above.
 postSimplExpr (Case scrut@(Con (PrimOp op) args) bndr alts)

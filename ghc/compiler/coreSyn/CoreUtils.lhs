@@ -7,7 +7,7 @@
 module CoreUtils (
 	coreExprType, coreAltsType,
 
-	exprIsBottom, exprIsDupable, exprIsTrivial, exprIsWHNF, exprIsCheap,
+	exprIsBottom, exprIsDupable, exprIsTrivial, exprIsWHNF, exprIsCheap, exprIsValue,
 	exprOkForSpeculation,
 	FormSummary(..), mkFormSummary, whnfOrBottom, exprArity,
 	cheapEqExpr, eqExpr, applyTypeToArgs
@@ -133,6 +133,8 @@ whnfOrBottom OtherForm  = False
 
 \begin{code}
 mkFormSummary :: CoreExpr -> FormSummary
+	-- Used exclusively by CoreUnfold.mkUnfolding
+	-- Returns ValueForm for cheap things, not just values
 mkFormSummary expr
   = go (0::Int) expr	-- The "n" is the number of *value* arguments so far
   where
@@ -143,7 +145,7 @@ mkFormSummary expr
 
     go n (Let (NonRec b r) e) | exprIsCheap r = go n e	-- let f = f' alpha in (f,g) 
 							-- should be treated as a value
-    go n (Let _ e)    = OtherForm
+    go n (Let _            e) 		      = OtherForm
 
 	-- We want selectors to look like values
 	-- e.g.  case x of { (a,b) -> a }
@@ -228,6 +230,9 @@ which aren't WHNF but are ``cheap'' are:
   *	op x1 ... xn
 
 	where op is a cheap primitive operator
+
+Notice that a variable is considered 'cheap': we can push it inside a lambda,
+because sharing will make sure it is only evaluated once.
 
 \begin{code}
 exprIsCheap :: CoreExpr -> Bool
@@ -318,13 +323,35 @@ exprIsBottom e = go 0 e
 		 go n (Lam _ _)	   = False
 \end{code}
 
+@exprIsValue@ returns true for expressions that are evaluated.
+It does not treat variables as evaluated.
+
+\begin{code}
+exprIsValue :: CoreExpr -> Bool		-- True => Value-lambda, constructor, PAP
+exprIsValue (Type ty)	  = True	-- Types are honorary Values; we don't mind
+					-- copying them
+exprIsValue (Var v)    	  = False
+exprIsValue (Lam b e)  	  = isId b || exprIsValue e
+exprIsValue (Note _ e) 	  = exprIsValue e
+exprIsValue (Let _ e)     = False
+exprIsValue (Case _ _ _)  = False
+exprIsValue (Con con _)   = isWHNFCon con 
+exprIsValue e@(App _ _)   = case collectArgs e of  
+				  (Var v, args) -> fun_arity > valArgCount args
+						where
+						   fun_arity  = arityLowerBound (getIdArity v)
+				  _	        -> False
+\end{code}
+
 exprIsWHNF reports True for head normal forms.  Note that does not necessarily
 mean *normal* forms; constructors might have non-trivial argument expressions, for
 example.  We use a let binding for WHNFs, rather than a case binding, even if it's
 used strictly.  We try to expose WHNFs by floating lets out of the RHS of lets.
 
-We treat applications of buildId and augmentId as honorary WHNFs, because we
-want them to get exposed
+	We treat applications of buildId and augmentId as honorary WHNFs, 
+	because we want them to get exposed.
+	[May 99: I've disabled this because it looks jolly dangerous:
+	 we'll substitute inside lambda with potential big loss of sharing.]
 
 \begin{code}
 exprIsWHNF :: CoreExpr -> Bool	-- True => Variable, value-lambda, constructor, PAP
@@ -337,10 +364,10 @@ exprIsWHNF (Let _ e)          = False
 exprIsWHNF (Case _ _ _)       = False
 exprIsWHNF (Con con _)        = isWHNFCon con 
 exprIsWHNF e@(App _ _)        = case collectArgs e of  
-				  (Var v, args) -> n_val_args == 0 || 
-						   fun_arity > n_val_args ||
-						   v_uniq == buildIdKey ||
-						   v_uniq == augmentIdKey
+				  (Var v, args) -> n_val_args == 0
+						|| fun_arity > n_val_args
+--  [May 99: disabled. See note above]		|| v_uniq == buildIdKey
+--						|| v_uniq == augmentIdKey
 						where
 						   n_val_args = valArgCount args
 						   fun_arity  = arityLowerBound (getIdArity v)

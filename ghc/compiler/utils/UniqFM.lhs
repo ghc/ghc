@@ -36,6 +36,7 @@ module UniqFM (
 	elemUFM,
 	filterUFM,
 	sizeUFM,
+	hashUFM,
 	isNullUFM,
 	lookupUFM, lookupUFM_Directly,
 	lookupWithDefaultUFM, lookupWithDefaultUFM_Directly,
@@ -109,6 +110,7 @@ mapUFM		:: (elt1 -> elt2) -> UniqFM elt1 -> UniqFM elt2
 filterUFM	:: (elt -> Bool) -> UniqFM elt -> UniqFM elt
 
 sizeUFM		:: UniqFM elt -> Int
+hashUFM		:: UniqFM elt -> Int
 elemUFM		:: Uniquable key => key -> UniqFM elt -> Bool
 
 lookupUFM	:: Uniquable key => UniqFM elt -> key -> Maybe elt
@@ -529,6 +531,12 @@ sizeUFM (LeafUFM _ _)	    = 1
 
 isNullUFM EmptyUFM = True
 isNullUFM _	   = False
+
+-- hashing is used in VarSet.uniqAway, and should be fast
+-- We use a cheap and cheerful method for now
+hashUFM EmptyUFM          = 0
+hashUFM (NodeUFM n _ _ _) = IBOX(n)
+hashUFM (LeafUFM n _)     = IBOX(n)
 \end{code}
 
 looking up in a hurry is the {\em whole point} of this binary tree lark.

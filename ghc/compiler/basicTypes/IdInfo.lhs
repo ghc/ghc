@@ -550,9 +550,11 @@ zapLamIdInfo info@(IdInfo {inlinePragInfo = inline_prag, demandInfo = demand})
   = Just (info {inlinePragInfo = safe_inline_prag,
 		demandInfo = wwLazy})
   where
+	-- The "unsafe" prags are the ones that say I'm not in a lambda
+	-- because that might not be true for an unsaturated lambda
     is_safe_inline_prag = case inline_prag of
-			 	ICanSafelyBeINLINEd dup_danger nalts -> notInsideLambda dup_danger
-				other				     -> True
+			 	ICanSafelyBeINLINEd NotInsideLam nalts -> False
+				other				       -> True
 
     safe_inline_prag    = case inline_prag of
 			 	ICanSafelyBeINLINEd _ nalts
@@ -644,15 +646,14 @@ work.
 data LBVarInfo
   = NoLBVarInfo
 
-  | IsOneShotLambda			-- the lambda that binds this Id is applied
-					--   at most once
+  | IsOneShotLambda		-- The lambda that binds this Id is applied
+				--   at most once
 				-- HACK ALERT! placing this info here is a short-term hack,
 				--   but it minimises changes to the rest of the compiler.
 				--   Hack agreed by SLPJ/KSW 1999-04.
 \end{code}
 
 \begin{code}
-
 noLBVarInfo = NoLBVarInfo
 
 -- not safe to print or parse LBVarInfo because it is not really a

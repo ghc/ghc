@@ -21,7 +21,7 @@ import CoreUtils	( coreExprType )
 import SimplUtils	( findDefault )
 import CostCentre	( noCCS )
 import Id		( Id, mkSysLocal, idType, getIdStrictness, idUnique, isExportedId,
-			  externallyVisibleId, setIdUnique, idName, getIdDemandInfo
+			  externallyVisibleId, setIdUnique, idName, getIdDemandInfo, setIdType
 			)
 import Var		( Var, varType, modifyIdInfo )
 import IdInfo		( setDemandInfo, StrictnessInfo(..) )
@@ -403,7 +403,7 @@ coreExprToStgFloat env (Let bind body) dem
     returnUs (new_bind:floats, stg_body)
 \end{code}
 
-Covert core @scc@ expression directly to STG @scc@ expression.
+Convert core @scc@ expression directly to STG @scc@ expression.
 
 \begin{code}
 coreExprToStgFloat env (Note (SCC cc) expr) dem
@@ -581,6 +581,37 @@ coreExprToStgFloat env expr@(Con con args) dem
 \subsubsection[coreToStg-cases]{Case expressions}
 %*									*
 %************************************************************************
+
+Mangle cases involving seq# in the discriminant.  Up to this
+point, seq# will appear like this:
+
+	  case seq# e of
+		0# -> seqError#
+		_  -> ...
+
+where the 0# branch is purely to bamboozle the strictness analyser
+This code comes from an unfolding for 'seq' in Prelude.hs.  We
+translate this into
+
+	  case e of
+		_ -> ...
+
+Now that the evaluation order is safe.
+
+This used to be done in the post-simplification phase, but we need
+unfoldings involving seq# to appear unmangled in the interface file,
+hence we do this mangling here.
+
+\begin{code}
+coreExprToStgFloat env 
+	(Case scrut@(Con (PrimOp SeqOp) [Type ty, e]) bndr alts) dem
+  = coreExprToStgFloat env (Case e new_bndr [(DEFAULT,[],default_rhs)]) dem
+  where new_bndr = setIdType bndr ty
+    	(other_alts, maybe_default)  = findDefault alts
+    	Just default_rhs	     = maybe_default
+\end{code}
+
+Now for normal case expressions...
 
 \begin{code}
 coreExprToStgFloat env (Case scrut bndr alts) dem
