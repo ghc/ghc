@@ -6,11 +6,21 @@
 This module attempts to provide a better line based editing facility
 for Haskell programmers by providing access to the GNU Readline
 library.  Related to this are bindings for the GNU History library
-which can be found in History.
+which can be found in History (at some point in the future :-).
 
+Original version by Darren Moffat
+Heavily modified in 1999 by Sven Panne <Sven.Panne@informatik.uni-muenchen.de>
+
+Notes:
+
+   * This binding is still *very* incomplete...  Volunteers?
+
+   * The GHC User's Guide section on Readline is not up-to-date anymore,
+     the flags you need are: -syslib misc -syslib posix -lreadline -ltermcap
+     (or -lncurses on some Linux systems)
 
 \begin{code}
-{-# OPTIONS -#include "cbits/ghcReadline.h" #-}
+{-# OPTIONS -#include <readline/readline.h> -#include <readline/history.h> #-}
 
 module Readline (
     rlInitialize,
@@ -26,22 +36,33 @@ module Readline (
     rlSetDone,
     rlPendingInput,
 
-    rlPrompt, rlTerminalName, rlSetReadlineName, rlGetReadlineName
+    rlPrompt, rlTerminalName,
+    rlGetReadlineName, rlSetReadlineName,
 
+    rlInStream, rlOutStream
     ) where
-import GlaExts
 
-import CString	( unpackCStringIO )
-import Foreign
+import Addr(Addr)
+import ByteArray(ByteArray)
+import Char(ord, chr)
+import CString(packString, unpackCStringIO)
+import IO(Handle)
+import IOExts(IORef, newIORef, readIORef, writeIORef, unsafePerformIO)
+import Maybe(fromMaybe)
+import Monad(when)
+import Posix(intToFd, fdToHandle)
+import System(getProgName)
 
-import System
+-- SUP: Haskell has closures and I've got no clue about the return value,
+--      so a better type for the callbacks is probably
+--      Int {- Numeric Arg -} -> IO ()
 
-type KeyCode = Int
+type KeyCode = Char
 
 type RlCallbackFunction = 
     (Int ->			-- Numeric Argument
      KeyCode ->			-- KeyCode of pressed Key
-     IO Int)
+     IO Int)                    -- What's this?
 \end{code}
 
 %***************************************************************************
@@ -51,141 +72,69 @@ type RlCallbackFunction =
 %***************************************************************************
 \begin{code}
 
-readline :: String			-- Prompt String
-	 -> IO String			-- Returned line
+rlInitialize :: IO ()
+rlInitialize = rlSetReadlineName =<< getProgName
+
+foreign import ccall "free"     free        :: Addr -> IO ()
+foreign import ccall "readline" readlineAux :: ByteArray Int -> IO Addr
+
+readline :: String		-- Prompt String
+	 -> IO (Maybe String)	-- Just returned line or Nothing if EOF
 readline prompt =  do
---ToDo: Get the "Live register in _casm_GC_ " bug fixed
---      this stops us passing the prompt string to readline directly :-(
---    litstr <- _casm_GC_ ``%r = readline(%0);'' prompt
-    _casm_ ``rl_prompt_hack = (char*)realloc(rl_prompt_hack, %1);
-	     strcpy (rl_prompt_hack,%0);'' 
-		prompt	(length prompt)
-    litstr <- _casm_GC_ ``%r = readline (rl_prompt_hack);''
-    if (litstr == ``NULL'') 
-     then ioError (userError "Readline has read EOF")
-     else do
-	str <- unpackCStringIO litstr
-	_ccall_ free litstr
-	return str
+   cstr <- readlineAux (packString prompt)
+   if cstr == ``NULL''
+      then return Nothing
+      else do str <- unpackCStringIO cstr
+              free cstr
+              return (Just str)
+
+foreign import ccall "add_history" add_history :: ByteArray Int -> IO ()
 
 addHistory :: String		-- String to enter in history
            -> IO ()
-addHistory str = _ccall_ add_history str
+addHistory = add_history . packString
 
+
+foreign export ccall dynamic mkRlCallback :: (Int -> Int -> IO Int) -> IO Addr
+foreign import ccall "rl_bind_key" rl_bind_key :: Int -> Addr -> IO Int
 
 rlBindKey :: KeyCode		    -- Key to Bind to
 	  -> RlCallbackFunction	    -- Function to exec on execution
 	  -> IO ()
-rlBindKey key cback =
-    if (0 > key) || (key > 255) then
-	ioError (userError "Invalid ASCII Key Code, must be in range 0.255")
-    else  do
-	addCbackEntry (key,cback)
-	_casm_ `` rl_bind_key((KeyCode)%0,&genericRlCback); '' key
+rlBindKey key cback = do
+   cbAddr <- mkRlCallback (\n k -> cback n (chr k))
+   ok     <- rl_bind_key (ord key) cbAddr
+   if ok /= 0 then wrongKeyCode else addCbackEntry key cbAddr
 
-\end{code}
+foreign import ccall "rl_add_defun" rl_add_defun :: ByteArray Int -> Addr -> Int -> IO Int
 
-i.e. add the (KeyCode,RlCallbackFunction) key to the assoc. list and register
-the generic callback for this KeyCode.
-
-The entry point that $genericRlCback$ calls would then read the
-global variables $current\_i$ and $current\_kc$ and do a lookup:
-
-\begin{code}
 rlAddDefun :: String ->			-- Function Name
 	      RlCallbackFunction ->	-- Function to call
-	      KeyCode ->		-- Key to bind to, or -1 for no bind
+	      Maybe KeyCode ->		-- Key to bind to
 	      IO ()
-rlAddDefun name cback key =
-    if (0 > key) || (key > 255) then
-	ioError (userError "Invalid ASCII Key Code, must be in range 0..255")
-    else do
-	addCbackEntry (key, cback)
-	_casm_ ``rl_add_defun (%0, &genericRlCback, (KeyCode)%1);'' name key
+rlAddDefun name cback mbKey = do
+   cbAddr <- mkRlCallback (\n k -> cback n (chr k))
+   ok     <- rl_add_defun (packString name) cbAddr (maybe (-1) ord mbKey)
+   when (ok /= 0) wrongKeyCode
 
-\end{code}
+-- Don't know how this should ever happen with KeyCode = Char
+wrongKeyCode :: IO ()
+wrongKeyCode = ioError (userError "Invalid ASCII Key Code, must be in range 0..255")
 
+-- Global hacking for freeing callbacks
 
-The C function $genericRlCallback$ puts the callback arguments into
-global variables and enters the Haskell world through the
-$haskellRlEntry$ function. Before exiting, the Haskell function will
-deposit its result in the global varariable $rl\_return$.
+theCbackTable :: IORef [(KeyCode,Addr)]
+theCbackTable = unsafePerformIO (newIORef [])
 
-In the Haskell action that is invoked via $enterStablePtr$, a match
-between the Keycode in $current\_kc$ and the Haskell callback needs to
-be made. To essentially keep the same assoc. list of (KeyCode,cback
-function) as Readline does, we make use of yet another global variable
-$cbackList$:
+foreign import ccall "freeHaskellFunctionPtr" freeHaskellFunctionPtr :: Addr -> IO ()
 
-\begin{code}
+addCbackEntry :: KeyCode -> Addr -> IO ()
+addCbackEntry key cbAddr = do
+   cbackTable <- readIORef theCbackTable
+   maybe (return ()) freeHaskellFunctionPtr (lookup key cbackTable)
+   writeIORef theCbackTable
+              ((key,cbAddr) : [ entry | entry@(k,_) <- cbackTable, k /= key ])
 
-createCbackList :: [(KeyCode,RlCallbackFunction)] -> PrimIO ()
-createCbackList ls = 
-#ifndef __PARALLEL_HASKELL__
-    makeStablePtr ls  >>= \ stable_ls ->
-    _casm_ `` cbackList=(StgStablePtr)%0; '' stable_ls
-#else
-    error "createCbackList: not available for Parallel Haskell"
-#endif
-
-getCbackList :: PrimIO [(KeyCode,RlCallbackFunction)]
-getCbackList = 
-#ifndef __PARALLEL_HASKELL__
-    _casm_ `` %r=(StgStablePtr)cbackList; '' >>= \ stable_ls ->
-    deRefStablePtr stable_ls
-#else
-    error "getCbackList: not available for Parallel Haskell"
-#endif
-
-setCbackList :: [(KeyCode,RlCallbackFunction)] -> PrimIO ()
-setCbackList ls =
-#ifndef __PARALLEL_HASKELL__
-    _casm_ `` %r=(StgStablePtr)cbackList; '' >>= \ old_stable_ls ->   
-    freeStablePtr old_stable_ls              >>
-    createCbackList ls
-#else
-    error "setCbackList: not available for Parallel Haskell"
-#endif
-
-addCbackEntry :: (KeyCode,RlCallbackFunction) -> IO ()
-addCbackEntry entry = do
-    ls <- getCbackList
-    setCbackList (entry:ls)
-\end{code}
-
-The above functions allows us to query and augment the assoc. list in
-Haskell.
-
-\begin{code}
-
-invokeRlCback :: IO ()
-invokeRlCback = do
-    kc    <- _casm_ `` %r=(KeyCode)current_kc; ''
-    narg  <- _casm_ `` %r=(int)current_narg; ''
-    ls    <- getCbackList
-    ret_val <- 
-      (case (dropWhile (\ (key,_) -> kc/=key) ls) of
-	 [] -> return (-1)
-	 ((_,cback):_) -> cback narg kc
-      )
-    _casm_ `` rl_return=(int)%0; '' ret_val
-
-\end{code}
- 
-Finally, we need to initialise this whole, ugly machinery:
-
-\begin{code}
-initRlCbacks :: PrimIO ()
-
-initRlCbacks =
-#ifndef __PARALLEL_HASKELL__
-    createCbackList []             >>
-    makeStablePtr (invokeRlCback)  >>= \ stable_f ->
-    _casm_ `` haskellRlEntry=(StgStablePtr)%0; '' stable_f >>= \ () ->
-    return ()
-#else
-    error "initRlCbacks: not available for Parallel Haskell"
-#endif
 \end{code}
 
 
@@ -202,14 +151,11 @@ they be in the IO Monad, should they be Mutable Variables?
 \begin{code}
 
 rlGetLineBuffer :: IO String
-rlGetLineBuffer = do
-    litstr <- _casm_ ``%r = rl_line_buffer;''
-    unpackCStringIO litstr
+rlGetLineBuffer = unpackCStringIO =<< _casm_ ``%r = rl_line_buffer;''
 				
 rlSetLineBuffer :: String -> IO ()
 rlSetLineBuffer str = _casm_ ``rl_line_buffer = %0;'' str
 		
-
 rlGetPoint :: IO Int
 rlGetPoint = _casm_ ``%r = rl_point;''
 
@@ -229,75 +175,39 @@ rlSetMark :: Int -> IO ()
 rlSetMark mark = _casm_ ``rl_mark = %0;'' mark
 
 rlSetDone :: Bool -> IO ()
-rlSetDone True  = _casm_ ``rl_done = %0;'' (1::Int)
 rlSetDone False = _casm_ ``rl_done = %0;'' (0::Int)
+rlSetDone True  = _casm_ ``rl_done = %0;'' (1::Int)
 
 rlPendingInput :: KeyCode -> IO ()
-rlPendingInput key = primIOToIO (_casm_ ``rl_pending_input = %0;'' key)
+rlPendingInput key = _casm_ ``rl_pending_input = %0;'' key
 
 rlPrompt :: IO String
-rlPrompt = do
-    litstr <- _casm_ ``%r = rl_readline_name;''
-    unpackCStringIO litstr
+rlPrompt = unpackCStringIO =<<  _casm_ ``%r = rl_readline_name;''
 
 rlTerminalName :: IO String
-rlTerminalName = do
-    litstr <- _casm_ ``%r = rl_terminal_name;''
-    unpackCStringIO litstr
-
+rlTerminalName = unpackCStringIO =<< _casm_ ``%r = rl_terminal_name;''
 
 rlGetReadlineName :: IO String
-rlGetReadlineName = do
-    litstr <- _casm_ ``%r = rl_readline_name;''
-    unpackCStringIO litstr
+rlGetReadlineName = unpackCStringIO =<< _casm_ ``%r = rl_readline_name;''
 
 rlSetReadlineName :: String -> IO ()
 rlSetReadlineName str = _casm_ ``rl_readline_name = %0;'' str
-\end{code}
 
-\begin{verbatim}
---
--- The following two were taken from PreludeStdIO stdin/stdout
---
 rlInStream :: Handle
-rlInStream = unsafePerformPrimIO (
-    newMVar						>>= \ handle ->
-    _ccall_ getLock (``rl_instream''::Addr) 0		>>= \ rc ->
-    (case rc of
-       0 -> putMVar handle ClosedHandle
-       1 -> putMVar handle (ReadHandle ``rl_instream'' Nothing False)
-       _ -> constructError				>>= \ ioError -> 
-            putMVar handle (ErrorHandle ioError)
-    )							>>
-    returnPrimIO handle
-  )
-
+rlInStream  = unsafePerformIO (fdToHandle (intToFd ``fileno(rl_instream)''))
 
 rlOutStream :: Handle
-rlOutStream = unsafePerformPrimIO (
-    newMVar						>>= \ handle ->
-    _ccall_ getLock (``rl_outstream''::Addr) 1		>>= \ rc ->
-    (case rc of
-       0 -> putMVar handle ClosedHandle
-       1 -> putMVar handle (WriteHandle ``rl_outstream'' Nothing False)
-       _ -> constructError				>>= \ ioError -> 
-            putMVar handle (ErrorHandle ioError)
-    )							>>
-    returnPrimIO handle
-  )
-
-\end{verbatim}
-   
-
-\begin{code}
-
--- rlStartupHook :: RlCallBackFunction -> IO ()	     
-
-rlInitialize :: IO ()
-rlInitialize = do
-    pname <- getProgName
-    rlSetReadlineName pname
-    _casm_ ``rl_prompt_hack = (char*)malloc(1);''
-    initRlCbacks
+rlOutStream = unsafePerformIO (fdToHandle (intToFd ``fileno(rl_outstream)''))
 
 \end{code}
+
+A simple test:
+
+main :: IO ()
+main = do rlInitialize
+          rlBindKey '\^X' (\nargc kc -> do print (nargc,kc); return 0)
+          loop
+   where loop = maybe (putStrLn "Qapla'!")
+                      (\reply -> do unless (null reply) (addHistory reply)
+                                    putStrLn (reply ++ "...   pItlh!")
+                                    loop) =<< readline "nuqneH, ghunwI'? "
