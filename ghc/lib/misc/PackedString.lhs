@@ -374,7 +374,7 @@ unpackNBytesPS ps len@(I# l#)
       CPS a len# -> unpackPS (CPS a (min# len# l#))
  where
   min# x# y# 
-    | x# ># y#  = x#
+    | x# <# y#  = x#
     | otherwise = y#
 
 unpackPSIO :: PackedString -> IO String
