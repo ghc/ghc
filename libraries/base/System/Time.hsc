@@ -199,6 +199,7 @@ noTimeDiff = TimeDiff 0 0 0 0 0 0 0
 -- -----------------------------------------------------------------------------
 -- getClockTime returns the current time in its internal representation.
 
+getClockTime :: IO ClockTime
 #if HAVE_GETTIMEOFDAY
 getClockTime = do
   allocaBytes (#const sizeof(struct timeval)) $ \ p_timeval -> do
