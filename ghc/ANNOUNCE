@@ -102,9 +102,8 @@ for tar, please)!
 + System requirements
 ======================
 
-To compile the sources, you need a machine with 32+MB memory, GNU C
-(`gcc'), `perl' plus a version of GHC installed (3.02 at least).  This
-release is known to work on the following platforms:
+To compile programs with GHC, you need a machine with 32+MB memory, GNU C
+and perl. This release is known to work on the following platforms:
 
   * i386-unknown-{linux,freebsd,netbsd,cygwin32,mingw32}
   * sparc-sun-solaris2
@@ -122,4 +121,3 @@ The builder's guide included in distribution gives a complete
 run-down of what ports work; an on-line version can be found at
 
    http://www.haskell.org/ghc/docs/4.08/building/building-guide.html
-
