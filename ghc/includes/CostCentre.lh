@@ -662,12 +662,12 @@ rtsBool cc_to_ignore PROTO((CostCentre));
 
 I_ heap_profile_init PROTO((char *argv[]));
 
-extern void heap_profile_finish(STG_NO_ARGS);
+void heap_profile_finish(STG_NO_ARGS);
 
-extern void heap_profile_setup(STG_NO_ARGS);      /* called at start of heap profile */
-extern void heap_profile_done(STG_NO_ARGS);	  /* called at end of heap profile */
+void heap_profile_setup(STG_NO_ARGS);      /* called at start of heap profile */
+void heap_profile_done(STG_NO_ARGS);	  /* called at end of heap profile */
 
-extern void (* heap_profile_fn) PROTO((P_ closure,I_ size));
+void (* heap_profile_fn) PROTO((P_ closure,I_ size));
 
 extern I_ earlier_ticks;	        /* no. of earlier ticks grouped */
 extern hash_t time_intervals;		/* no. of time intervals reported -- 18 */

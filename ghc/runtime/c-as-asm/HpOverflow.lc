@@ -690,7 +690,7 @@ switching or other nonsense... just set up StorageMgrInfo and perform
 a garbage collection.
 
 \begin{code}
-extern void handleTimerExpiry PROTO((rtsBool));
+void handleTimerExpiry PROTO((rtsBool));
 
 void 
 ReallyPerformThreadGC(reqsize, do_full_collection)

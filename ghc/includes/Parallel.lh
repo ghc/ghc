@@ -91,7 +91,6 @@ extern void myexit PROTO((I_));
 # else
 #  define EXIT exit
 # endif
-
 \end{code}
 
 %************************************************************************

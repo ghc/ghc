@@ -808,7 +808,7 @@ printStandardShapeClosure(
 #endif
   P_ Hp    = SAVE_Hp;
 
-  extern void printClosure PROTO( (P_, int, int) );
+  void printClosure PROTO( (P_, int, int) );
   int numValues = size - vhs;
   P_ HpBot = HP_BOT;
 

@@ -106,7 +106,7 @@ IF_RTS(rtsBool initThreadPools (STG_NO_ARGS);)
 IF_RTS(void init_gr_profiling PROTO((int, char **, int, char **));)
 #endif
 
-I_ collectHeap	    PROTO((W_ reqsize, smInfo *sm, rtsBool do_full_collection));
+I_ collectHeap PROTO((W_ reqsize, smInfo *sm, rtsBool do_full_collection));
 
 IF_RTS(void unmapMiddleStackPage PROTO((char *, int));) /* char * == caddr_t ? */
 
@@ -124,9 +124,8 @@ void	  end_init(STG_NO_ARGS);
 
 #ifdef PAR
 void EvacuateLocalGAs PROTO((rtsBool full));
-void RebuildGAtables PROTO((rtsBool full));
+void RebuildGAtables  PROTO((rtsBool full));
 #endif
-
 \end{code}
 
 @initSM@ finalizes any runtime parameters of the storage manager.

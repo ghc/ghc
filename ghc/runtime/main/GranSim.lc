@@ -616,7 +616,7 @@ W_ ariths,branches,loads,stores,floats;
 */
 
 /* This function in Threads.lc is only needed for SimplifiedFetch */
-extern FetchNode PROTO((P_ node,PROC CurrentProc));
+FetchNode PROTO((P_ node,PROC CurrentProc));
 
 I_ 
 GranSimFetch(node /* , liveness_mask */ )

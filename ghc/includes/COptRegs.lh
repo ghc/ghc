@@ -346,7 +346,7 @@ GLOBAL_REG_DECL(P_,HeapLim,REG_HeapLim)
 
 #if defined(__STG_GCC_REGS__)
 /* Keep -Wmissing-prototypes from complaining */
-void SAVE_REGS PROTO((RegisterTable *dump));
+void SAVE_REGS    PROTO((RegisterTable *dump));
 void RESTORE_REGS PROTO((RegisterTable *dump));
 
 extern STG_INLINE 
@@ -492,7 +492,7 @@ GLOBAL_REG_DECL(P_,LinkLim,REG_LinkLim)
 
 #if defined(__STG_GCC_REGS__)
 /* Keep -Wmissing-prototypes from complaining */
-void SAVE_REGS PROTO((RegisterTable *dump));
+void SAVE_REGS    PROTO((RegisterTable *dump));
 void RESTORE_REGS PROTO((RegisterTable *dump));
 
 extern STG_INLINE 
@@ -655,7 +655,7 @@ GLOBAL_REG_DECL(P_,OldHp,REG_OldHp)
 
 #if defined(__STG_GCC_REGS__)
 /* Keep -Wmissing-prototypes from complaining */
-void SAVE_REGS PROTO((RegisterTable *dump));
+void SAVE_REGS    PROTO((RegisterTable *dump));
 void RESTORE_REGS PROTO((RegisterTable *dump));
 
 extern STG_INLINE 

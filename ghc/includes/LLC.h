@@ -67,12 +67,12 @@
 #define GetArgN(n,a)		pvm_upklong(&(a),1,1)
 #define GetArgs(b,n)		pvm_upklong(b,n,1)
 
-extern void SendOp PROTO((OPCODE,GLOBAL_TASK_ID)),
-            SendOp1 PROTO((OPCODE,GLOBAL_TASK_ID,StgWord)),
-            SendOp2 PROTO((OPCODE,GLOBAL_TASK_ID,StgWord,StgWord)),
-	    SendOpV PROTO((OPCODE,GLOBAL_TASK_ID,int,...)), 
-            SendOpN PROTO((OPCODE,GLOBAL_TASK_ID,int,StgWord *)),
-            SendOpNV PROTO((OPCODE,GLOBAL_TASK_ID,int,StgWord*,int,...));
+void SendOp   PROTO((OPCODE,GLOBAL_TASK_ID)),
+     SendOp1  PROTO((OPCODE,GLOBAL_TASK_ID,StgWord)),
+     SendOp2  PROTO((OPCODE,GLOBAL_TASK_ID,StgWord,StgWord)),
+     SendOpV  PROTO((OPCODE,GLOBAL_TASK_ID,int,...)), 
+     SendOpN  PROTO((OPCODE,GLOBAL_TASK_ID,int,StgWord *)),
+     SendOpNV PROTO((OPCODE,GLOBAL_TASK_ID,int,StgWord*,int,...));
 
 char *GetOpName PROTO((unsigned op));
 void NullException(STG_NO_ARGS);
@@ -84,7 +84,7 @@ void get_opcode_and_sender PROTO((PACKET p, OPCODE *popcode, GLOBAL_TASK_ID *pse
 GLOBAL_TASK_ID *PEStartUp PROTO((unsigned nPEs));
 void PEShutDown(STG_NO_ARGS);
 
-extern void (*ExceptionHandler)();
+void (*ExceptionHandler)(STG_NO_ARGS);
 
 #endif /*PAR */
 #endif /*defined __LLC_H */

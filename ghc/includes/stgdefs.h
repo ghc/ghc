@@ -62,28 +62,26 @@ void _stgAssert PROTO((char *, unsigned int));
     GCC is schizophrenic about whether it adds these into its
     own headers for you; so we have no choice but to throw them in.
 */
-extern int fclose PROTO((FILE *));
-extern int fflush PROTO((FILE *));
-extern int fgetc PROTO((FILE *));
-/* extern int fgetpos PROTO((FILE *, fpos_t *)); */
-extern int fprintf PROTO((FILE *, const char *, ...));
-extern int fputc PROTO((int, FILE *));
-extern int fputs PROTO((const char *, FILE *));
-extern size_t fread PROTO((void *, size_t, size_t, FILE *));
-extern int fscanf PROTO((FILE *, const char *, ...));
-extern int fseek PROTO((FILE *, long int, int));
-/* extern int fsetpos PROTO((FILE *, const fpos_t *)); */
-extern size_t fwrite PROTO((const void *, size_t, size_t, FILE *));
-extern void perror PROTO((const char *));
-extern int printf PROTO((const char *, ...));
-extern int puts PROTO((const char *));
-extern int remove PROTO((const char *));
-extern int rename PROTO((const char *, const char *));
-extern void rewind PROTO((FILE *));
-extern int scanf PROTO((const char *, ...));
-extern void setbuf PROTO((FILE *, char *));
-extern int setvbuf PROTO((FILE *, char *, int, size_t));
-extern int sscanf PROTO((const char *, const char *, ...));
+int 	fclose PROTO((FILE *));
+int 	fflush PROTO((FILE *));
+int 	fgetc PROTO((FILE *));
+int 	fprintf PROTO((FILE *, const char *, ...));
+int 	fputc PROTO((int, FILE *));
+int 	fputs PROTO((const char *, FILE *));
+size_t	fread PROTO((void *, size_t, size_t, FILE *));
+int 	fscanf PROTO((FILE *, const char *, ...));
+int 	fseek PROTO((FILE *, long int, int));
+size_t	fwrite PROTO((const void *, size_t, size_t, FILE *));
+void	perror PROTO((const char *));
+int 	printf PROTO((const char *, ...));
+int 	puts PROTO((const char *));
+int 	remove PROTO((const char *));
+int 	rename PROTO((const char *, const char *));
+void	rewind PROTO((FILE *));
+int	scanf PROTO((const char *, ...));
+void	setbuf PROTO((FILE *, char *));
+int	setvbuf PROTO((FILE *, char *, int, size_t));
+int	sscanf PROTO((const char *, const char *, ...));
 /* end of hack */
 #endif /* STDC_HEADERS */
 
@@ -195,13 +193,13 @@ char * time_str(STG_NO_ARGS);
 #endif
 
 /* declarations for runtime-system entry points */
-extern void miniInterpret PROTO((StgFunPtr));
-extern void miniInterpret_debug PROTO(( StgFunPtr, void(*)(STG_NO_ARGS) ));
-extern void miniInterpretEnd(STG_NO_ARGS);
+void miniInterpret PROTO((StgFunPtr));
+void miniInterpret_debug PROTO(( StgFunPtr, void(*)(STG_NO_ARGS) ));
+void miniInterpretEnd(STG_NO_ARGS);
 
-extern StgFunPtr evaluateMain(STG_NO_ARGS);
-extern StgFunPtr returnMain(STG_NO_ARGS);
-extern StgFunPtr impossible_jump_after_switch(STG_NO_ARGS);
+StgFunPtr evaluateMain(STG_NO_ARGS);
+StgFunPtr returnMain(STG_NO_ARGS);
+StgFunPtr impossible_jump_after_switch(STG_NO_ARGS);
 
 /* hooks: user might write some of their own */
 void ErrorHdrHook	PROTO((FILE *));

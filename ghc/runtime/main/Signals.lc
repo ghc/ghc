@@ -396,8 +396,8 @@ sig_install(sig, spi, mask)
 
 # include <setjmp.h>
 
-extern StgPtr deRefStablePointer PROTO((StgStablePtr));
-extern void freeStablePointer PROTO((I_));
+StgPtr deRefStablePointer PROTO((StgStablePtr));
+void freeStablePointer PROTO((I_));
 extern jmp_buf restart_main;
 
 static I_ *handlers = NULL; /* Dynamically grown array of signal handlers */

@@ -107,7 +107,7 @@ save and restore the whole of @jmp_environment@.
 \begin{code}
 static jmp_buf jmp_environment;
 
-extern void bcopy PROTO((char *, char *, int)); /*ToDo: properly?*/
+void bcopy PROTO((char *, char *, int)); /*ToDo: properly?*/
 
 void
 miniInterpret(start_cont)

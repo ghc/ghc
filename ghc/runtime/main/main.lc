@@ -66,16 +66,16 @@ extern I_ 	OkToGC, buckets;
 extern rtsBool	TraceSparks, DelaySparks,
     	    	DeferGlobalUpdates;
 
-extern void RunParallelSystem PROTO((P_));
-extern void initParallelSystem(STG_NO_ARGS);
-extern void SynchroniseSystem(STG_NO_ARGS);
+void RunParallelSystem PROTO((P_));
+void initParallelSystem(STG_NO_ARGS);
+void SynchroniseSystem(STG_NO_ARGS);
 
-extern void SetTrace PROTO((W_ address, I_ level/*?*/));
+void SetTrace PROTO((W_ address, I_ level/*?*/));
 #endif
 
-extern void *stgAllocForGMP   PROTO((size_t));
-extern void *stgReallocForGMP PROTO ((void *, size_t, size_t));
-extern void  stgDeallocForGMP PROTO ((void *, size_t));
+void *stgAllocForGMP   PROTO((size_t));
+void *stgReallocForGMP PROTO ((void *, size_t, size_t));
+void  stgDeallocForGMP PROTO ((void *, size_t));
 
 /* NeXTs can't just reach out and touch "end", to use in
    distinguishing things in static vs dynamic (malloc'd) memory.

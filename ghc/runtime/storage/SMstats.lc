@@ -44,11 +44,6 @@ stat_exit
 #include <sys/resource.h>
 #endif
 
-/* Needed for Solaris2 */
-#if /* defined(HAVE_SYS_RUSAGE_H) && */ defined(solaris2_TARGET_OS)
-#include <sys/rusage.h>
-#endif
-
 #ifdef HAVE_SYS_TIMEB_H
 #include <sys/timeb.h>
 #endif

@@ -187,7 +187,7 @@ words of A stack and @b@ words of B stack.  If not, it calls
 
 NB: args @a@ and @b@ are pre-direction-ified!
 \begin{code}
-extern I_ SqueezeUpdateFrames PROTO((P_, P_, P_));
+I_ SqueezeUpdateFrames PROTO((P_, P_, P_));
 int sanityChk_StkO (P_ stko); /* ToDo: move to a sane place */
 
 #if ! defined(CONCURRENT)
@@ -208,7 +208,7 @@ extern void StackOverflow(STG_NO_ARGS) STG_NORETURN;
 
 #else /* threaded */
 
-extern I_ StackOverflow PROTO((W_, W_));
+I_ StackOverflow PROTO((W_, W_));
 
 /*
  * On a uniprocessor, we do *NOT* context switch on a stack overflow 
@@ -240,37 +240,6 @@ do {								\
 
 %************************************************************************
 %*									*
-\subsubsection[StgMacros-arity-chks]{Arity checks (for debugging)}
-%*									*
-%************************************************************************
-
-This is a debugging feature.  Each call to fast-entry-point code sets
-@ExpectedArity@ to some value, and the callee then checks that the
-value is as expected.
-
-\begin{code}
-#if defined(__DO_ARITY_CHKS__)
-
-extern I_			 ExpectedArity;
-extern void ArityError PROTO((I_)) STG_NORETURN;
-
-#define SET_ARITY(n) do { ExpectedArity = (n); } while(0)
-#define CHK_ARITY(n)			\
-	do {				\
-	if (ExpectedArity != (n)) {	\
-	    ULTRASAFESTGCALL1(void,(void *, I_),ArityError,n);	\
-	}}while(0)
-
-#else /* ! __DO_ARITY_CHKS__: normal case */
-
-#define SET_ARITY(n) /* nothing */
-#define CHK_ARITY(n) /* nothing */
-
-#endif /* ! __DO_ARITY_CHKS__ */
-\end{code}
-
-%************************************************************************
-%*									*
 \subsubsection[StgMacros-heap-chks]{Heap-overflow checks}
 %*									*
 %************************************************************************
@@ -279,7 +248,7 @@ Please see the general discussion/commentary about ``what really
 happens in a GC,'' in \tr{SMinterface.lh}.
 
 \begin{code}
-extern void PerformGC PROTO((W_));
+void PerformGC PROTO((W_));
 void RealPerformGC PROTO((W_ liveness, W_ reqsize, W_  always_reenter_node, rtsBool do_full_collection));
 void checkInCCallGC(STG_NO_ARGS);
 
@@ -303,7 +272,7 @@ void StgPerformGarbageCollection(STG_NO_ARGS);
 
 #else /* CONCURRENT */
 
-extern void ReallyPerformThreadGC PROTO((W_, rtsBool));
+void ReallyPerformThreadGC PROTO((W_, rtsBool));
 
 #define HEAP_OVERFLOW(liveness,n,reenter) 	\
     do {					\
@@ -878,12 +847,12 @@ Encoding and decoding float-ish things is pretty Integer-ish.  We use
 these pretty magical support functions, essentially stolen from Lennart:
 \begin{code}
 StgFloat  __encodeFloat	 PROTO((MP_INT *, I_));
-void  __decodeFloat  PROTO((MP_INT * /*result1*/,
+void      __decodeFloat  PROTO((MP_INT * /*result1*/,
 				I_ * /*result2*/,
 				StgFloat));
 
 StgDouble __encodeDouble PROTO((MP_INT *, I_));
-void  __decodeDouble PROTO((MP_INT * /*result1*/,
+void      __decodeDouble PROTO((MP_INT * /*result1*/,
 				I_ * /*result2*/,
 				StgDouble));
 \end{code}
@@ -1136,20 +1105,6 @@ extern I_ genSymZh(STG_NO_ARGS);
 extern I_ resetGenSymZh(STG_NO_ARGS);
 extern I_ incSeqWorldZh(STG_NO_ARGS);
 
-/* sigh again: without these some (notably "float") willnae work */
-extern I_ long2bytes__	 PROTO((long,	unsigned char *));
-extern I_ int2bytes__	 PROTO((int,	unsigned char *));
-extern I_ short2bytes__	 PROTO((short,	unsigned char *));
-extern I_ float2bytes__	 PROTO((float,	unsigned char *));
-extern I_ double2bytes__ PROTO((double, unsigned char *));
-
-/* these may not be necessary; and they create warnings (WDP) */
-extern I_ bytes2long__	 PROTO((P_, I_ *));
-extern I_ bytes2int__	 PROTO((P_, I_ *));
-extern I_ bytes2short__	 PROTO((P_, I_ *));
-extern I_ bytes2float__	 PROTO((P_, StgFloat *));
-extern I_ bytes2double__ PROTO((P_, StgDouble *));
-
 extern I_ byteArrayHasNUL__ PROTO((const char *, I_));
 \end{code}
 
@@ -1320,7 +1275,7 @@ ED_(Prelude_Z91Z93_closure);
 \begin{code}
 #ifdef CONCURRENT
 
-extern void Yield PROTO((W_));
+void Yield PROTO((W_));
 
 #define takeMVarZh(r, liveness, node)    		\
 {							\
@@ -1719,12 +1674,12 @@ extern I_ sig_install PROTO((I_, I_));
 
 StgInt getErrorHandler(STG_NO_ARGS);
 #ifndef PAR
-void raiseError PROTO((StgStablePtr handler));
+void   raiseError PROTO((StgStablePtr handler));
 StgInt catchError PROTO((StgStablePtr newErrorHandler));
 #endif
 void decrementErrorCount(STG_NO_ARGS);
 
-#define stg_catchError(sp)      SAFESTGCALL1(I_,(void *, StgStablePtr),catchError,sp)
+#define stg_catchError(sp)        SAFESTGCALL1(I_,(void *, StgStablePtr),catchError,sp)
 #define stg_decrementErrorCount() SAFESTGCALL0(void,(void *),decrementErrorCount)
 \end{code}
 
@@ -1764,7 +1719,6 @@ extern StgPtr _deRefStablePointer PROTO((StgInt, StgPtr));
 
 #define deRefStablePtrZh(ri,sp) \
    ri = SAFESTGCALL2(I_,(void *, I_, P_),_deRefStablePointer,sp,StorageMgrInfo.StablePointerTable);
-
 \end{code}
 
 Declarations for other stable pointer operations.
@@ -1821,7 +1775,7 @@ consider context switching...)
    any strictly increasing expression will do here */
 #define CalcNewNoSPtrs( i ) ((i)*2 + 100)
 
-extern void enlargeSPTable PROTO((P_, P_));
+void enlargeSPTable PROTO((P_, P_));
 
 #define makeStablePtrZh(stablePtr,liveness,unstablePtr)		    \
 do {								    \

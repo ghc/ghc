@@ -294,8 +294,8 @@ us how to do it.
  
 void
 freeHashTable(table, freeDataFun)
-HashTable *table;
-void (*freeDataFun) PROTO((void *));
+  HashTable *table;
+  void (*freeDataFun) PROTO((void *));
 {
     long segment;
     long index;

@@ -45,8 +45,8 @@ Is @mprotect@ POSIX now?
 # endif
 
 #if defined(sunos4_TARGET_OS)
-extern int getpagesize PROTO((void));
-extern int mprotect PROTO((caddr_t, size_t, int));
+int getpagesize PROTO((void));
+int mprotect PROTO((caddr_t, size_t, int));
 #endif
 
 /* Needed for FreeBSD (SDM, 96/03) */

@@ -700,7 +700,7 @@ do {                                 \
 EXTDATA_RO(StablePointerTable_info);
 EXTDATA_RO(EmptyStablePointerTable_info);
 EXTDATA(EmptySPTable_closure);
-extern int ValidateSPTable PROTO(( P_ SPTable ));
+int ValidateSPTable PROTO(( P_ SPTable ));
 
 #  define CHECK_SPT_InfoTable( closure ) \
   ASSERT( (*((PP_) (closure)) == EmptyStablePointerTable_info && (closure == EmptySPTable_closure) ) || \

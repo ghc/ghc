@@ -15,8 +15,8 @@ void EvacuateSparks(STG_NO_ARGS);
 #endif
 
 #ifdef GCdu
-extern void EvacuateCAFs PROTO(( P_ CAFlist ));
+void EvacuateCAFs PROTO(( P_ CAFlist ));
 #else /* !GCdu */
-extern void EvacAndScavengeCAFs PROTO(( P_ CAFlist, I_ *extra_words, I_ *roots ));
+void EvacAndScavengeCAFs PROTO(( P_ CAFlist, I_ *extra_words, I_ *roots ));
 #endif /* !GCdu */
 \end{code}
