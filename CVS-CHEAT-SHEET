@@ -51,15 +51,15 @@ Using CVS for the First Time
   tree you'll be working on.  The directory structure looks like this:
 
 	fptools/ghc		GHC
-	fptools/hslibs		Haskell Libraries
 	fptools/happy		Happy
 	fptools/haggis		Haggis
 	fptools/green-card	Green Card
 	fptools/nofib		Nofib test suite
+	fptools/hdirect		IDL-to-Haskell compiler
 	fptools/common-rts	GHC/Hugs combined run-time system
 
   For each directory, there's a mailing list: fp-cvs-ghc,
-  fp-cvs-hslibs etc.  Everyone on the mailing list is sent a message
+  fp-cvs-nofib etc.  Everyone on the mailing list is sent a message
   automatically by CVS whenever someone checks in a change, this helps
   to keep track of what's going on when several people are working on
   related stuff.  Ask the CVS meister to put you on the relevant
@@ -100,11 +100,11 @@ Checking Out a Source Tree
   You can call the fptools directory whatever you like, CVS won't mind.
 
 	$ cd <directory>
-	$ cvs checkout ghc hslibs happy
+	$ cvs checkout ghc happy
 
   The second command here checks out the relevant modules you want to
-  work on.  For a GHC build, for instance, you need at least ghc and
-  hslibs.
+  work on.  For a GHC build, for instance, you need at least the ghc
+  module (in fact you can get away with just that).
 
 
 Committing Your Changes
@@ -195,7 +195,7 @@ General Hints
 
 * To check out extra bits into an already-checked-out tree, use the
   following procedure.  Suppose you have a checked-out fptools tree containing
-  just ghc and hslibs, and you want to add nofib to it:
+  just ghc, and you want to add nofib to it:
 
 	cd fptools
 	cvs checkout nofib
