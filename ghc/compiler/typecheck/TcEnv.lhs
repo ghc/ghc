@@ -59,7 +59,7 @@ import TcType		( Type, ThetaType, TcKind, TcTyVar, TcTyVarSet,
 			)
 import qualified Type	( getTyVar_maybe )
 import Rules		( extendRuleBase )
-import Id		( idName, isDataConWrapId_maybe )
+import Id		( idName, isLocalId, isDataConWrapId_maybe )
 import Var		( TyVar, Id, idType )
 import VarSet
 import VarEnv
@@ -339,8 +339,21 @@ tcLookupIdLvl name
   = tcLookup name	`thenM` \ thing -> 
     case thing of
 	ATcId tc_id lvl	  -> returnM (tc_id, lvl)
-	AGlobal (AnId id) -> returnM (id, impLevel)
+	AGlobal (AnId id) 	-- See [Note: Levels]
+	  | isLocalId id  -> returnM (id, topLevel)
+	  | otherwise     -> returnM (id, impLevel)
 	other		  -> pprPanic "tcLookupIdLvl" (ppr name)
+
+-- 		[Note: Levels]
+-- Globals may either be imported, or may be from an earlier "chunk" 
+-- (separated by declaration splices) of this module.  The former
+-- *can* be used inside a top-level splice, but the latter cannot.
+-- Hence we give the former impLevel, but the latter topLevel
+-- E.g. this is bad:
+--	x = [| foo |]
+--	$( f x )
+-- By the time we are prcessing the $(f x), the binding for "x" 
+-- will be in the global env, not the local one.
 
 tcLookupLocalIds :: [Name] -> TcM [TcId]
 -- We expect the variables to all be bound, and all at
