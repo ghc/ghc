@@ -42,7 +42,7 @@ module SetLevels (
 
 import CoreSyn
 
-import CoreUtils	( exprType, exprIsTrivial, exprIsBottom )
+import CoreUtils	( exprType, exprIsTrivial, exprIsBottom, mkPiType )
 import CoreFVs		-- all of it
 import Subst
 import Id		( Id, idType, idFreeTyVars, mkSysLocal, isOneShotLambda, modifyIdInfo, 
@@ -54,7 +54,7 @@ import VarSet
 import VarEnv
 import Name		( getOccName )
 import OccName		( occNameUserString )
-import Type		( isUnLiftedType, mkPiType, Type )
+import Type		( isUnLiftedType, Type )
 import BasicTypes	( TopLevelFlag(..) )
 import Demand		( isStrict, wwLazy )
 import UniqSupply
