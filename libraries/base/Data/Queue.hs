@@ -24,9 +24,13 @@ module Data.Queue(
     ) where
 
 import Prelude -- necessary to get dependencies right
+import Data.Typeable
 
 -- | The type of FIFO queues.
 data Queue a = Q [a] [a] [a]
+
+#include "Typeable.h"
+INSTANCE_TYPEABLE1(Queue,queueTc,"Queue")
 
 -- Invariants for Q xs ys xs':
 --	length xs = length ys + length xs'
