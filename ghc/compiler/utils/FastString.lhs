@@ -55,7 +55,7 @@ import GHC.IOBase	( IO(..) )
 import PrimPacked
 import GLAEXTS
 import UNSAFE_IO	( unsafePerformIO )
-import ST		( stToIO )
+import MONAD_ST		( stToIO )
 import DATA_IOREF	( IORef, newIORef, readIORef, writeIORef )
 
 #if __GLASGOW_HASKELL__ < 503

@@ -66,7 +66,7 @@ import Data.Array.ST
 #endif
 
 import GLAEXTS
-import ST
+import MONAD_ST
 
 infixr 9 `thenTE`
 \end{code}

@@ -33,7 +33,7 @@ module PrimPacked (
 import GLAEXTS
 import UNSAFE_IO	( unsafePerformIO )
 
-import ST
+import MONAD_ST
 import Foreign
 
 #if __GLASGOW_HASKELL__ < 503

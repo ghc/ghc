@@ -23,6 +23,8 @@ you will screw up the layout where they are used in case expressions!
 #define TRACE       Debug.Trace
 #define DATA_IOREF  Data.IORef
 #define FIX_IO      System.IO
+#define MONAD_ST    Control.Monad.ST
+#define ST_ARRAY    Data.Array.ST
 
 #else
 
@@ -37,6 +39,8 @@ you will screw up the layout where they are used in case expressions!
 #define TRACE       IOExts
 #define DATA_IOREF  IOExts
 #define FIX_IO      IOExts
+#define MONAD_ST    ST
+#define ST_ARRAY    ST
 
 #endif
 

@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.220 2002/08/29 15:44:12 simonmar Exp $
+# $Id: Makefile,v 1.221 2002/09/06 14:35:43 simonmar Exp $
 
 TOP = ..
 
@@ -134,7 +134,10 @@ endif
 # Only include GHCi if we're bootstrapping with at least version 411
 ifeq "$(GhcWithInterpreter)" "YES"
 ifeq "$(bootstrapped)" "YES"
-SRC_HC_OPTS += -DGHCI
+SRC_HC_OPTS += -DGHCI -package readline
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+SRC_HC_OPTS += -package unix
+endif
 ALL_DIRS += ghci
 endif
 endif
@@ -184,10 +187,14 @@ SRC_HC_OPTS += \
 # which needs it).
 SRC_MKDEPENDHS_OPTS += -I$(GHC_INCLUDE_DIR)
 
+# When bootstrapped, we don't make use of *any* packages
+# (except possibly readline if GHCi is enabled, see above)
+ifneq "$(bootstrapped)" "YES"
 ifneq "$(mingw32_HOST_OS)" "1"
 SRC_HC_OPTS += -package concurrent -package posix -package util
 else
 SRC_HC_OPTS += -package concurrent -package util
+endif
 endif
 
 SRC_CC_OPTS += -Iparser -I. -I$(TOP)/includes -O

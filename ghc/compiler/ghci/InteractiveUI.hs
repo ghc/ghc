@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.132 2002/08/29 15:44:14 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.133 2002/09/06 14:35:44 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -49,11 +49,11 @@ import Panic		( GhcException(..), showGhcException )
 import Config
 
 #ifndef mingw32_TARGET_OS
-import Posix
+import System.Posix
 #endif
 
 #if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
-import Readline 
+import System.Console.Readline as Readline
 #endif
 
 --import SystemExts

@@ -1,6 +1,8 @@
 {
 module ParsePkgConf( loadPackageConfig ) where
 
+#include "HsVersions.h"
+
 import Packages  ( PackageConfig(..), defaultPackageConfig )
 import Lex
 import FastString
@@ -8,9 +10,7 @@ import StringBuffer
 import SrcLoc
 import Outputable
 import Panic     ( GhcException(..) )
-import Exception ( throwDyn )
-
-#include "HsVersions.h"
+import EXCEPTION ( throwDyn )
 
 }
 

@@ -32,7 +32,7 @@ import Data.Word	( Word8 )
 import MutableArray
 #endif
 
-import ST
+import MONAD_ST
 
 import Char		( chr, ord )
 import Maybe		( isJust )

@@ -220,11 +220,6 @@ boxResult :: [Id] -> Type -> DsM (Type, CoreExpr -> CoreExpr)
 -- the result type will be 
 --	State# RealWorld -> (# State# RealWorld #)
 
--- Here is where we arrange that ForeignPtrs which are passed to a 'safe'
--- foreign import don't get finalized until the call returns.  For each
--- argument of type ForeignObj# we arrange to touch# the argument after
--- the call.  The arg_ids passed in are the Ids passed to the actual ccall.
-
 boxResult arg_ids result_ty
   = case tcSplitTyConApp_maybe result_ty of
 	-- This split absolutely has to be a tcSplit, because we must
@@ -267,13 +262,11 @@ boxResult arg_ids result_ty
   where
     mk_alt return_result (Nothing, wrap_result)
 	= 	-- The ccall returns ()
-	  let
-		rhs_fun state_id = return_result (Var state_id) 
-					(wrap_result (panic "boxResult"))
-	  in
 	  newSysLocalDs realWorldStatePrimTy	`thenDs` \ state_id ->
-	  mkTouches arg_ids state_id rhs_fun	`thenDs` \ the_rhs ->
 	  let
+		the_rhs = return_result (Var state_id) 
+					(wrap_result (panic "boxResult"))
+
 		ccall_res_ty = mkTyConApp unboxedSingletonTyCon [realWorldStatePrimTy]
 		the_alt      = (DataAlt unboxedSingletonDataCon, [state_id], the_rhs)
 	  in
@@ -282,28 +275,16 @@ boxResult arg_ids result_ty
     mk_alt return_result (Just prim_res_ty, wrap_result)
 	=	-- The ccall returns a non-() value
 	  newSysLocalDs prim_res_ty 		`thenDs` \ result_id ->
-	  let
-		rhs_fun state_id = return_result (Var state_id) 
-					(wrap_result (Var result_id))
-	  in
 	  newSysLocalDs realWorldStatePrimTy	`thenDs` \ state_id ->
-	  mkTouches arg_ids state_id rhs_fun	`thenDs` \ the_rhs ->
 	  let
+		the_rhs = return_result (Var state_id) 
+					(wrap_result (Var result_id))
+
 		ccall_res_ty = mkTyConApp unboxedPairTyCon [realWorldStatePrimTy, prim_res_ty]
 		the_alt	     = (DataAlt unboxedPairDataCon, [state_id, result_id], the_rhs)
 	  in
 	  returnDs (ccall_res_ty, the_alt)
 
-touchzh = mkPrimOpId TouchOp
-
-mkTouches []     s cont = returnDs (cont s)
-mkTouches (v:vs) s cont
-  | not (idType v `eqType` foreignObjPrimTy) = mkTouches vs s cont
-  | otherwise = newSysLocalDs realWorldStatePrimTy `thenDs` \s' -> 
-		mkTouches vs s' cont `thenDs` \ rest ->
-	        returnDs (Case (mkApps (Var touchzh) [Type foreignObjPrimTy, 
-						      Var v, Var s]) s' 
-				[(DEFAULT, [], rest)])
 
 resultWrapper :: Type
    	      -> (Maybe Type,		-- Type of the expected result, if any

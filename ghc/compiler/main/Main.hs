@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.109 2002/08/29 15:44:15 simonmar Exp $
+-- $Id: Main.hs,v 1.110 2002/09/06 14:35:44 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -69,7 +69,12 @@ import EXCEPTION        ( raiseInThread )
 import EXCEPTION	( throwTo )
 # endif
 
+#if __GLASGOW_HASKELL__ > 504
+import System.Posix.Signals
+#else
 import Posix		( Handler(Catch), installHandler, sigINT, sigQUIT )
+#endif
+
 import DYNAMIC		( toDyn )
 #endif
 

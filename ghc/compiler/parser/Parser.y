@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.100 2002/06/07 07:16:05 chak Exp $
+$Id: Parser.y,v 1.101 2002/09/06 14:35:44 simonmar Exp $
 
 Haskell grammar.
 
@@ -10,6 +10,8 @@ Author(s): Simon Marlow, Sven Panne 1997, 1998, 1999
 
 {
 module Parser ( parseModule, parseStmt, parseIdentifier, parseIface ) where
+
+#include "HsVersions.h"
 
 import HsSyn
 import HsTypes		( mkHsTupCon )
@@ -35,13 +37,12 @@ import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), IPName(..),
 			  NewOrData(..), StrictnessMark(..), Activation(..) )
 import Panic
 
-import GlaExts
+import GLAEXTS
 import CStrings		( CLabelString )
 import FastString
 import Maybes		( orElse )
 import Outputable
 
-#include "HsVersions.h"
 }
 
 {-
