@@ -1,464 +1,1969 @@
-Desugared:
-Test.a :: for all d, e, f, g. ([d], [e], [f]) -> [g]
-Test.a = /\ t118 t119 t120 t121 -> \ ds.314 -> Nil! t121
-Test.b :: for all d, e. [d] -> [e]
-Test.b =
-    /\ t134 t135 -> \ ds.323 ->
-	let
-	  x.328 =
-	      case ds.323 of {
-		(:) x.324 ds.325 ->
-		    case ds.325 of {
-		      (:) xs.326 ys.327 -> x.324
-		      _ -> 
-			  (error Char)
-			      "``impossible'' pattern-matching error!\n"S
-		    }
-		_ ->  (error Char) "``impossible'' pattern-matching error!\n"S
-	      } in
-	let
-	  xs.333 =
-	      case ds.323 of {
-		(:) x.329 ds.330 ->
-		    case ds.330 of {
-		      (:) xs.331 ys.332 -> xs.331
-		      _ -> 
-			  (error Char)
-			      "``impossible'' pattern-matching error!\n"S
-		    }
-		_ ->  (error Char) "``impossible'' pattern-matching error!\n"S
-	      } in
-	let
-	  ys.338 =
-	      case ds.323 of {
-		(:) x.334 ds.335 ->
-		    case ds.335 of {
-		      (:) xs.336 ys.337 -> ys.337
-		      _ -> 
-			  (error Char)
-			      "``impossible'' pattern-matching error!\n"S
-		    }
-		_ ->  (error Char) "``impossible'' pattern-matching error!\n"S
-	      }
-	in  Nil! t135
-Test.c :: for all d, e, f, g. <Fractional f> -> <Num e> -> g -> d -> e -> f -> g
-Test.c =
-    /\ o139 t140 t143 o138 -> \ dict.144 dict.141 ->
-	let
-	  dict.145 = (sdsel.Num.Eq t143) ((sdsel.Fractional.Num t143) dict.144) in
-	let dict.142 = (sdsel.Num.Eq t140) dict.141 in
-	let c.137 = \ x.87 ds.339 ds.340 ds.341 -> let x.87 = x.87 in  x.87
-	in  c.137
-Test.d :: for all d, e. <Num e> -> <Ord d> -> <Num d> -> d -> e
-Test.d =
-    /\ t171 t174 -> \ dict.175 dict.173 dict.172 ->
-	let dict.169 = dict.175 in
-	let dict.163 = dict.169 in
-	let dict.157 = dict.163 in
-	let dict.152 = dict.157 in
-	let dict.166 = dict.172 in
-	let dict.160 = dict.166 in
-	let dict.154 = dict.160 in
-	let dict.149 = dict.154 in
-	let dict.167 = dict.173 in
-	let dict.161 = dict.167 in
-	let dict.155 = (sdsel.Ord.Eq t171) dict.161 in
-	let dict.150 = dict.155 in
-	let
-	  d.147 =
-	      \ ds.344 ->
-		  let
-		    fail.345 =
-			(error t174)
-			    "\"ds020.hs\", line 17: pattern-matching failure [function binding]\n"S in
-		  let
-		    fail.349 =
-			let
-			  n.88 =
-			      let
-				n.346 =
-				    (fromInteger t171) dict.160 (MkInteger! 4##)
-			      in 
-				case
-				    ((>= t171)
-					 dict.161
-					 ds.344
-					 ((fromInteger t171)
-					      dict.160 (MkInteger! 4##)))
-				of {
-				  True ->
-				      let
-					n.88 =
-					    (- t171)
-						dict.160
-						ds.344
-						((fromInteger t171)
-						     dict.160 (MkInteger! 4##))
-				      in  n.88
-				  False ->
-				      (error Char)
-					  "``impossible'' pattern-matching error!\n"S
-				}
-			in  (fromInteger t174) dict.163 (MkInteger! 2##)
-		  in 
-		    case
-			((== t171)
-			     dict.150
-			     ((fromInteger t171) dict.149 (MkInteger! 11##))
-			     ds.344)
-		    of {
-		      True -> (fromInteger t174) dict.152 (MkInteger! 4##)
-		      False ->
-			  case
-			      ((== t171)
-				   dict.155
-				   ((fromInteger t171)
-					dict.154 (MkInteger! 12##))
-				   ds.344)
-			  of {
-			    True -> (fromInteger t174) dict.157 (MkInteger! 3##)
-			    False -> fail.349
-			  }
-		    }
-	in  d.147
-Test.f :: for all d, e. [d] -> [e]
-Test.f =
-    /\ t182 t183 -> \ x.352 ->
-	let
-	  x.353 =
-	      case x.352 of {
-		Nil -> x.352
-		_ ->  (error Char) "``impossible'' pattern-matching error!\n"S
-	      }
-	in  Nil! t183
-Test.g :: for all d, e. [d] -> [e]
-Test.g = /\ t186 t187 -> \ ds.356 -> Nil! t187
-ds.357 :: ([t191], [t192], [t193])
-ds.357 = MkTuple3! [t191] [t192] [t193] (Nil! t191) (Nil! t192) (Nil! t193)
-ds.358 :: ([t197], [t198], [t199])
-ds.358 = MkTuple3! [t197] [t198] [t199] (Nil! t197) (Nil! t198) (Nil! t199)
-ds.359 :: [t208]
-ds.359 = /\ t208 -> Nil! t208
-Test.x1 :: for all d. d
-Test.x1 =
-    /\ t208 ->
-	case ds.359 of {
-	  (:) x1.363 ds.364 ->
-	      case ds.364 of {
-		(:) xs1.365 ys1.366 -> x1.363
-		_ ->  (error Char) "``impossible'' pattern-matching error!\n"S
-	      }
-	  _ ->  (error Char) "``impossible'' pattern-matching error!\n"S
-	}
-Test.xs1 :: for all d. d
-Test.xs1 =
-    /\ t208 ->
-	case ds.359 of {
-	  (:) x1.367 ds.368 ->
-	      case ds.368 of {
-		(:) xs1.369 ys1.370 -> xs1.369
-		_ ->  (error Char) "``impossible'' pattern-matching error!\n"S
-	      }
-	  _ ->  (error Char) "``impossible'' pattern-matching error!\n"S
-	}
-Test.ys1 :: for all d. [d]
-Test.ys1 =
-    /\ t208 ->
-	case ds.359 of {
-	  (:) x1.371 ds.372 ->
-	      case ds.372 of {
-		(:) xs1.373 ys1.374 -> ys1.374
-		_ ->  (error Char) "``impossible'' pattern-matching error!\n"S
-	      }
-	  _ ->  (error Char) "``impossible'' pattern-matching error!\n"S
-	}
-ds.375 :: [t217]
-ds.375 = /\ t217 -> Nil! t217
-Test.x :: for all d. d
-Test.x =
-    /\ t217 ->
-	case ds.375 of {
-	  (:) x.379 ds.380 ->
-	      case ds.380 of {
-		(:) xs.381 ys.382 ->
-		    let ys.383 = ys.382 in
-		    let xs.384 = xs.381 in let x.385 = x.379 in  x.385
-		_ ->  (error Char) "``impossible'' pattern-matching error!\n"S
-	      }
-	  _ ->  (error Char) "``impossible'' pattern-matching error!\n"S
-	}
-Test.xs :: for all d. d
-Test.xs =
-    /\ t217 ->
-	case ds.375 of {
-	  (:) x.386 ds.387 ->
-	      case ds.387 of {
-		(:) xs.388 ys.389 ->
-		    let ys.390 = ys.389 in
-		    let xs.391 = xs.388 in let x.392 = x.386 in  xs.391
-		_ ->  (error Char) "``impossible'' pattern-matching error!\n"S
-	      }
-	  _ ->  (error Char) "``impossible'' pattern-matching error!\n"S
-	}
-Test.ys :: for all d. [d]
-Test.ys =
-    /\ t217 ->
-	case ds.375 of {
-	  (:) x.393 ds.394 ->
-	      case ds.394 of {
-		(:) xs.395 ys.396 ->
-		    let ys.397 = ys.396 in
-		    let xs.398 = xs.395 in let x.399 = x.393 in  ys.397
-		_ ->  (error Char) "``impossible'' pattern-matching error!\n"S
-	      }
-	  _ ->  (error Char) "``impossible'' pattern-matching error!\n"S
-	}
-{- plain CoRec -}
-ds.406 :: [t254]
-ds.406 =
-    /\ t254 ->
-	let dict.410 = dfun.Eq.Int in
-	let
-	  eq2.413 =
-	      eqInt
-		  (let dict.411 = dfun.Num.Int in  MkInt! 2#)
-		  (let dict.412 = dfun.Num.Int in  MkInt! 4#) in
-	let dict.414 = dfun.Eq.Int in
-	let
-	  eq3.417 =
-	      eqInt
-		  (let dict.415 = dfun.Num.Int in  MkInt! 3#)
-		  (let dict.416 = dfun.Num.Int in  MkInt! 3#) in
-	let dict.418 = dfun.Eq.Int in
-	let
-	  eq4.421 =
-	      eqInt
-		  (let dict.419 = dfun.Num.Int in  MkInt! 4#)
-		  (let dict.420 = dfun.Num.Int in  MkInt! 2#)
-	in 
-	  case eq2.413 of {
-	    True -> Nil! t254
-	    False ->
-		case eq3.417 of {
-		  True -> :! t254 (Test.x2 t254) (Nil! t254)
-		  False ->
-		      case eq4.421 of {
-			True -> :! t254 (Test.x2 t254) (Nil! t254)
-			False -> Nil! t254
-		      }
-		}
-	  }
-Test.x2 :: for all d. d
-Test.x2 =
-    /\ t254 ->
-	case ds.406 of {
-	  (:) x2.422 ds.423 ->
-	      case ds.423 of {
-		(:) xs2.424 ys2.425 -> x2.422
-		_ ->  (error Char) "``impossible'' pattern-matching error!\n"S
-	      }
-	  _ ->  (error Char) "``impossible'' pattern-matching error!\n"S
-	}
-Test.xs2 :: for all d. d
-Test.xs2 =
-    /\ t254 ->
-	case ds.406 of {
-	  (:) x2.426 ds.427 ->
-	      case ds.427 of {
-		(:) xs2.428 ys2.429 -> xs2.428
-		_ ->  (error Char) "``impossible'' pattern-matching error!\n"S
-	      }
-	  _ ->  (error Char) "``impossible'' pattern-matching error!\n"S
-	}
-Test.ys2 :: for all d. [d]
-Test.ys2 =
-    /\ t254 ->
-	case ds.406 of {
-	  (:) x2.430 ds.431 ->
-	      case ds.431 of {
-		(:) xs2.432 ys2.433 -> ys2.433
-		_ ->  (error Char) "``impossible'' pattern-matching error!\n"S
-	      }
-	  _ ->  (error Char) "``impossible'' pattern-matching error!\n"S
-	}
-{- end plain CoRec -}
-ds.435 :: for all d, e. <Num e> -> <Ord d> -> <Num d> -> (d, e)
-ds.435 =
-    /\ t273 t275 -> \ dict.276 dict.269 dict.274 ->
-	let dict.267 = dict.276 in
-	let dict.271 = dict.274 in
-	let dict.265 = dict.271 in
-	let dict.262 = dict.265 in
-	let dict.260 = dict.269
-	in 
-	  let
-	    {- CoRec -}
-	    ds.434 =
-		case
-		    ((> t273)
-			 dict.260
-			 x3.257
-			 ((fromInteger t273) dict.262 (MkInteger! 3##)))
-		of {
-		  True ->
-		      MkTuple2!
-			  t273
-			  t275
-			  ((fromInteger t273) dict.265 (MkInteger! 4##))
-			  ((fromInteger t275) dict.267 (MkInteger! 5##))
-		  False ->
-		      case
-			  ((<= t273)
-			       dict.269
-			       x3.257
-			       ((fromInteger t273) dict.271 (MkInteger! 3##)))
-		      of {
-			True ->
-			    MkTuple2!
-				t273
-				t275
-				((fromInteger t273) dict.274 (MkInteger! 2##))
-				((fromInteger t275) dict.276 (MkInteger! 3##))
-			False ->
-			    (error (t273, t275))
-				"\"ds020.hs\", line 42: pattern-matching failure [pat binding]\n"S
-		      }
-		}
-	    x3.257 =
-		case ds.434 of {
-		  MkTuple2 x3.257 y3.258 -> x3.257
-		}
-	    y3.258 =
-		case ds.434 of {
-		  MkTuple2 x3.257 y3.258 -> y3.258
-		}
-	    {- end CoRec -}
-	  in  MkTuple2! t273 t275 x3.257 y3.258
-Test.x3 :: for all d, e. <Num e> -> <Ord d> -> <Num d> -> d
-Test.x3 =
-    /\ t273 t275 -> \ dict.276 dict.269 dict.274 ->
-	case (((ds.435 t273) t275) dict.276 dict.269 dict.274) of {
-	  MkTuple2 x3.257 y3.258 -> x3.257
-	}
-Test.y3 :: for all d, e. <Num e> -> <Ord d> -> <Num d> -> e
-Test.y3 =
-    /\ t273 t275 -> \ dict.276 dict.269 dict.274 ->
-	case (((ds.435 t273) t275) dict.276 dict.269 dict.274) of {
-	  MkTuple2 x3.257 y3.258 -> y3.258
-	}
-ds.442 :: (Char, (Char, (Char, Char)))
-ds.442 =
-    let dict.451 = dfun.Eq.Int in
-    let
-      eq2.454 =
-	  eqInt
-	      (let dict.452 = dfun.Num.Int in  MkInt! 2#)
-	      (let dict.453 = dfun.Num.Int in  MkInt! 4#) in
-    let dict.455 = dfun.Eq.Int in
-    let
-      eq3.458 =
-	  eqInt
-	      (let dict.456 = dfun.Num.Int in  MkInt! 3#)
-	      (let dict.457 = dfun.Num.Int in  MkInt! 3#) in
-    let dict.459 = dfun.Eq.Int in
-    let
-      eq4.462 =
-	  eqInt
-	      (let dict.460 = dfun.Num.Int in  MkInt! 4#)
-	      (let dict.461 = dfun.Num.Int in  MkInt! 2#)
-    in 
-      case eq2.454 of {
-	True ->
-	    MkTuple2!
-		Char
-		(Char, (Char, Char))
-		(MkChar! 'a'#)
-		(MkTuple2!
-		     Char
-		     (Char, Char)
-		     (MkChar! 'a'#)
-		     (MkTuple2! Char Char (MkChar! 'a'#) (MkChar! 'a'#)))
-	False ->
-	    case eq3.458 of {
-	      True ->
-		  MkTuple2!
-		      Char
-		      (Char, (Char, Char))
-		      (MkChar! 'b'#)
-		      (MkTuple2!
-			   Char
-			   (Char, Char)
-			   (MkChar! 'b'#)
-			   (MkTuple2! Char Char (MkChar! 'b'#) (MkChar! 'b'#)))
-	      False ->
-		  case eq4.462 of {
-		    True ->
-			MkTuple2!
-			    Char
-			    (Char, (Char, Char))
-			    (MkChar! 'c'#)
-			    (MkTuple2!
-				 Char
-				 (Char, Char)
-				 (MkChar! 'c'#)
-				 (MkTuple2!
-				      Char Char (MkChar! 'c'#) (MkChar! 'c'#)))
-		    False ->
-			MkTuple2!
-			    Char
-			    (Char, (Char, Char))
-			    (MkChar! 'd'#)
-			    (MkTuple2!
-				 Char
-				 (Char, Char)
-				 (MkChar! 'd'#)
-				 (MkTuple2!
-				      Char Char (MkChar! 'd'#) (MkChar! 'd'#)))
-		  }
-	    }
-      }
-Test.x4 :: Char
-Test.x4 =
-    case ds.442 of {
-      MkTuple2 x4.463 ds.464 ->
-	  case ds.464 of {
-	    MkTuple2 y4.465 ds.466 ->
-		case ds.466 of {
-		  MkTuple2 z4.467 a4.468 -> x4.463
-		}
-	  }
-    }
-Test.y4 :: Char
-Test.y4 =
-    case ds.442 of {
-      MkTuple2 x4.469 ds.470 ->
-	  case ds.470 of {
-	    MkTuple2 y4.471 ds.472 ->
-		case ds.472 of {
-		  MkTuple2 z4.473 a4.474 -> y4.471
-		}
-	  }
-    }
-Test.z4 :: Char
-Test.z4 =
-    case ds.442 of {
-      MkTuple2 x4.475 ds.476 ->
-	  case ds.476 of {
-	    MkTuple2 y4.477 ds.478 ->
-		case ds.478 of {
-		  MkTuple2 z4.479 a4.480 -> z4.479
-		}
-	  }
-    }
-Test.a4 :: Char
-Test.a4 =
-    case ds.442 of {
-      MkTuple2 x4.481 ds.482 ->
-	  case ds.482 of {
-	    MkTuple2 y4.483 ds.484 ->
-		case ds.484 of {
-		  MkTuple2 z4.485 a4.486 -> a4.486
-		}
-	  }
-    }
+ds020.hs:20: 
+    Warning: Pattern match(es) completely overlapped
+	in the definition of function `f'
+ds020.hs:16: 
+    Warning: Pattern match(es) completely overlapped
+	in the definition of function `d'
+ds020.hs:17: 
+    Warning: Pattern match(es) completely overlapped
+	in the definition of function `d'
+ds020.hs:9: 
+    Warning: Pattern match(es) completely overlapped
+	in the definition of function `b'
+ds020.hs:6: 
+    Warning: Pattern match(es) completely overlapped
+	in the definition of function `a'
 
+
+================================================================================
+Desugared:
+Rec {
+d.Eq_a1aR  :: 
+    {PrelBase.Eq{-23,p-} PrelBase.Int{-3g,p-}}
+{-# L #-}
+d.Eq_a1aR =
+    PrelBase.$d7{-rqT,p-}
+==_a1h7  :: 
+    PrelBase.Int{-3g,p-}
+    -> PrelBase.Int{-3g,p-}
+    -> PrelBase.Bool{-34,p-}
+{-# L #-}
+==_a1h7 =
+    PrelBase.=={-8Y,p-}
+	_@_ PrelBase.Int{-3g,p-} d.Eq_a1aR
+d.Num_a1aV  :: 
+    {PrelBase.Num{-2c,p-} PrelBase.Int{-3g,p-}}
+{-# L #-}
+d.Num_a1aV =
+    PrelBase.$d3{-rqn,p-}
+fromInt_a1h6  :: 
+    PrelBase.Int{-3g,p-} -> PrelBase.Int{-3g,p-}
+{-# L #-}
+fromInt_a1h6 =
+    PrelBase.fromInt{-8R,p-}
+	_@_ PrelBase.Int{-3g,p-} d.Num_a1aV
+lit_a1h5  :: 
+    PrelBase.Int{-3g,p-}
+{-# L #-}
+lit_a1h5 =
+    let {
+      ds_d1SI  :: 
+	  PrelBase.Int{-3g,p-}
+      {-# L #-}
+      ds_d1SI =
+	  PrelBase.I#{-5b,p-}{i}
+	      2
+    } in 
+      fromInt_a1h6
+	  ds_d1SI
+fromInt_a1h4  :: 
+    PrelBase.Int{-3g,p-} -> PrelBase.Int{-3g,p-}
+{-# L #-}
+fromInt_a1h4 =
+    fromInt_a1h6
+lit_a1h3  :: 
+    PrelBase.Int{-3g,p-}
+{-# L #-}
+lit_a1h3 =
+    let {
+      ds_d1SX  :: 
+	  PrelBase.Int{-3g,p-}
+      {-# L #-}
+      ds_d1SX =
+	  PrelBase.I#{-5b,p-}{i}
+	      4
+    } in 
+      fromInt_a1h4
+	  ds_d1SX
+fromInt_a1h2  :: 
+    PrelBase.Int{-3g,p-} -> PrelBase.Int{-3g,p-}
+{-# L #-}
+fromInt_a1h2 =
+    fromInt_a1h6
+lit_a1h1  :: 
+    PrelBase.Int{-3g,p-}
+{-# L #-}
+lit_a1h1 =
+    let {
+      ds_d1Tc  :: 
+	  PrelBase.Int{-3g,p-}
+      {-# L #-}
+      ds_d1Tc =
+	  PrelBase.I#{-5b,p-}{i}
+	      3
+    } in 
+      fromInt_a1h2
+	  ds_d1Tc
+d.Ord_a1b0  :: 
+    {PrelBase.Ord{-2d,p-} PrelBase.Int{-3g,p-}}
+{-# L #-}
+d.Ord_a1b0 =
+    PrelBase.$d6{-rqS,p-}
+>_a1h0  :: 
+    PrelBase.Int{-3g,p-}
+    -> PrelBase.Int{-3g,p-}
+    -> PrelBase.Bool{-34,p-}
+{-# L #-}
+>_a1h0 =
+    PrelBase.>{-rs3,p-}
+	_@_ PrelBase.Int{-3g,p-} d.Ord_a1b0
+lit_a1gZ  :: 
+    PrelBase.Int{-3g,p-}
+{-# L #-}
+lit_a1gZ =
+    lit_a1h1
+lit_a1gY  :: 
+    PrelBase.Int{-3g,p-}
+{-# L #-}
+lit_a1gY =
+    lit_a1h3
+fromInt_a1gX  :: 
+    PrelBase.Int{-3g,p-} -> PrelBase.Int{-3g,p-}
+{-# L #-}
+fromInt_a1gX =
+    fromInt_a1h6
+lit_a1gW  :: 
+    PrelBase.Int{-3g,p-}
+{-# L #-}
+lit_a1gW =
+    let {
+      ds_d1TC  :: 
+	  PrelBase.Int{-3g,p-}
+      {-# L #-}
+      ds_d1TC =
+	  PrelBase.I#{-5b,p-}{i}
+	      5
+    } in 
+      fromInt_a1gX
+	  ds_d1TC
+d.Ord_a1b4  :: 
+    {PrelBase.Ord{-2d,p-} PrelBase.Int{-3g,p-}}
+{-# L #-}
+d.Ord_a1b4 =
+    d.Ord_a1b0
+<=_a1gV  :: 
+    PrelBase.Int{-3g,p-}
+    -> PrelBase.Int{-3g,p-}
+    -> PrelBase.Bool{-34,p-}
+{-# L #-}
+<=_a1gV =
+    PrelBase.<={-rs2,p-}
+	_@_ PrelBase.Int{-3g,p-} d.Ord_a1b4
+lit_a1gU  :: 
+    PrelBase.Int{-3g,p-}
+{-# L #-}
+lit_a1gU =
+    lit_a1h5
+lit_a1gT  :: 
+    PrelBase.Int{-3g,p-}
+{-# L #-}
+lit_a1gT =
+    lit_a1h1
+==_a1gS  :: 
+    PrelBase.Int{-3g,p-}
+    -> PrelBase.Int{-3g,p-}
+    -> PrelBase.Bool{-34,p-}
+{-# L #-}
+==_a1gS =
+    ==_a1h7
+lit_a1gR  :: 
+    PrelBase.Int{-3g,p-}
+{-# L #-}
+lit_a1gR =
+    lit_a1h5
+lit_a1gQ  :: 
+    PrelBase.Int{-3g,p-}
+{-# L #-}
+lit_a1gQ =
+    lit_a1h3
+lit_a1gP  :: 
+    PrelBase.Int{-3g,p-}
+{-# L #-}
+lit_a1gP =
+    lit_a1h1
+==_a1hb  :: 
+    PrelBase.Int{-3g,p-}
+    -> PrelBase.Int{-3g,p-}
+    -> PrelBase.Bool{-34,p-}
+{-# L #-}
+==_a1hb =
+    ==_a1gS
+==_a1ha  :: 
+    PrelBase.Int{-3g,p-}
+    -> PrelBase.Int{-3g,p-}
+    -> PrelBase.Bool{-34,p-}
+{-# L #-}
+==_a1ha =
+    ==_a1gS
+lit_a1h9  :: 
+    PrelBase.Int{-3g,p-}
+{-# L #-}
+lit_a1h9 =
+    lit_a1gQ
+lit_a1h8  :: 
+    PrelBase.Int{-3g,p-}
+{-# L #-}
+lit_a1h8 =
+    lit_a1gR
+ds_d1Q9  :: 
+    (PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-})
+{-# L #-}
+ds_d1Q9 =
+    let { ds_d1Zt  :: 
+	      (PrelBase.Char{-38,p-}, (PrelBase.Char{-38,p-}, (PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-})))
+	  {-# L #-}
+	  ds_d1Zt =
+      let {
+	eq4_a12Q  :: 
+	    PrelBase.Bool{-34,p-}
+	{-# L #-}
+	eq4_a12Q =
+	    ==_a1ha
+		lit_a1h9 lit_a1h8 } in
+      let {
+	eq4_r4b  :: 
+	    PrelBase.Bool{-34,p-}
+	{-# L #-}
+	eq4_r4b =
+	    eq4_a12Q } in
+      let {
+	lit_a1Uy  :: 
+	    PrelBase.Int{-3g,p-}
+	{-# L #-}
+	lit_a1Uy =
+	    lit_a1gP } in
+      let {
+	eq3_a13e  :: 
+	    PrelBase.Bool{-34,p-}
+	{-# L #-}
+	eq3_a13e =
+	    ==_a1hb
+		lit_a1gP lit_a1Uy } in
+      let {
+	eq3_r4a  :: 
+	    PrelBase.Bool{-34,p-}
+	{-# L #-}
+	eq3_r4a =
+	    eq3_a13e } in
+      let {
+	eq2_a13A  :: 
+	    PrelBase.Bool{-34,p-}
+	{-# L #-}
+	eq2_a13A =
+	    ==_a1gS
+		lit_a1gR lit_a1gQ } in
+      let {
+	eq2_r49  :: 
+	    PrelBase.Bool{-34,p-}
+	{-# L #-}
+	eq2_r49 =
+	    eq2_a13A
+      } in 
+	case eq2_r49 of {
+	  PrelBase.True{-5E,p-}{i} ->
+	      let {
+		ds_d1Va  :: 
+		    PrelBase.Char{-38,p-}
+		{-# L #-}
+		ds_d1Va =
+		    PrelBase.C#{-54,p-}{i}
+			{'a'} } in
+	      let { ds_d1Ve  :: 
+			(PrelBase.Char{-38,p-}, (PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}))
+		    {-# L #-}
+		    ds_d1Ve =
+		let {
+		  ds_d1Vu  :: 
+		      PrelBase.Char{-38,p-}
+		  {-# L #-}
+		  ds_d1Vu =
+		      PrelBase.C#{-54,p-}{i}
+			  {'a'} } in
+		let { ds_d1Vy  :: 
+			  (PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-})
+		      {-# L #-}
+		      ds_d1Vy =
+		  let {
+		    ds_d1VO  :: 
+			PrelBase.Char{-38,p-}
+		    {-# L #-}
+		    ds_d1VO =
+			PrelBase.C#{-54,p-}{i}
+			    {'a'} } in
+		  let {
+		    ds_d1VS  :: 
+			PrelBase.Char{-38,p-}
+		    {-# L #-}
+		    ds_d1VS =
+			PrelBase.C#{-54,p-}{i}
+			    {'a'}
+		  } in 
+		    PrelTup.(,){-62,p-}{i}
+			{_@_ PrelBase.Char{-38,p-}
+			 _@_ PrelBase.Char{-38,p-}
+			 ds_d1VO
+			 ds_d1VS}
+		} in
+		PrelTup.(,){-62,p-}{i}
+		    {_@_ PrelBase.Char{-38,p-}
+		     _@_ (PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-})
+		     ds_d1Vu
+		     ds_d1Vy}
+	      } in
+	      PrelTup.(,){-62,p-}{i}
+		  {_@_ PrelBase.Char{-38,p-}
+		   _@_ (PrelBase.Char{-38,p-}, (PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}))
+		   ds_d1Va
+		   ds_d1Ve};
+	  PrelBase.False{-58,p-}{i} ->
+	      case eq3_r4a of {
+		PrelBase.True{-5E,p-}{i} ->
+		    let {
+		      ds_d1Wm  :: 
+			  PrelBase.Char{-38,p-}
+		      {-# L #-}
+		      ds_d1Wm =
+			  PrelBase.C#{-54,p-}{i}
+			      {'b'} } in
+		    let { ds_d1Wq  :: 
+			      (PrelBase.Char{-38,p-}, (PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}))
+			  {-# L #-}
+			  ds_d1Wq =
+		      let {
+			ds_d1WG  :: 
+			    PrelBase.Char{-38,p-}
+			{-# L #-}
+			ds_d1WG =
+			    PrelBase.C#{-54,p-}{i}
+				{'b'} } in
+		      let { ds_d1WK  :: 
+				(PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-})
+			    {-# L #-}
+			    ds_d1WK =
+			let {
+			  ds_d1X0  :: 
+			      PrelBase.Char{-38,p-}
+			  {-# L #-}
+			  ds_d1X0 =
+			      PrelBase.C#{-54,p-}{i}
+				  {'b'} } in
+			let {
+			  ds_d1X4  :: 
+			      PrelBase.Char{-38,p-}
+			  {-# L #-}
+			  ds_d1X4 =
+			      PrelBase.C#{-54,p-}{i}
+				  {'b'}
+			} in 
+			  PrelTup.(,){-62,p-}{i}
+			      {_@_ PrelBase.Char{-38,p-}
+			       _@_ PrelBase.Char{-38,p-}
+			       ds_d1X0
+			       ds_d1X4}
+		      } in
+		      PrelTup.(,){-62,p-}{i}
+			  {_@_ PrelBase.Char{-38,p-}
+			   _@_ (PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-})
+			   ds_d1WG
+			   ds_d1WK}
+		    } in
+		    PrelTup.(,){-62,p-}{i}
+			{_@_ PrelBase.Char{-38,p-}
+			 _@_ (PrelBase.Char{-38,p-}, (PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}))
+			 ds_d1Wm
+			 ds_d1Wq};
+		PrelBase.False{-58,p-}{i} ->
+		    case eq4_r4b of {
+		      PrelBase.True{-5E,p-}{i} ->
+			  let {
+			    ds_d1Xy  :: 
+				PrelBase.Char{-38,p-}
+			    {-# L #-}
+			    ds_d1Xy =
+				PrelBase.C#{-54,p-}{i}
+				    {'c'} } in
+			  let { ds_d1XC  :: 
+				    (PrelBase.Char{-38,p-}, (PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}))
+				{-# L #-}
+				ds_d1XC =
+			    let {
+			      ds_d1XS  :: 
+				  PrelBase.Char{-38,p-}
+			      {-# L #-}
+			      ds_d1XS =
+				  PrelBase.C#{-54,p-}{i}
+				      {'c'} } in
+			    let { ds_d1XW  :: 
+				      (PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-})
+				  {-# L #-}
+				  ds_d1XW =
+			      let {
+				ds_d1Yc  :: 
+				    PrelBase.Char{-38,p-}
+				{-# L #-}
+				ds_d1Yc =
+				    PrelBase.C#{-54,p-}{i}
+					{'c'} } in
+			      let {
+				ds_d1Yg  :: 
+				    PrelBase.Char{-38,p-}
+				{-# L #-}
+				ds_d1Yg =
+				    PrelBase.C#{-54,p-}{i}
+					{'c'}
+			      } in 
+				PrelTup.(,){-62,p-}{i}
+				    {_@_ PrelBase.Char{-38,p-}
+				     _@_ PrelBase.Char{-38,p-}
+				     ds_d1Yc
+				     ds_d1Yg}
+			    } in
+			    PrelTup.(,){-62,p-}{i}
+				{_@_ PrelBase.Char{-38,p-}
+				 _@_ (PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-})
+				 ds_d1XS
+				 ds_d1XW}
+			  } in
+			  PrelTup.(,){-62,p-}{i}
+			      {_@_ PrelBase.Char{-38,p-}
+			       _@_ (PrelBase.Char{-38,p-}, (PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}))
+			       ds_d1Xy
+			       ds_d1XC};
+		      PrelBase.False{-58,p-}{i} ->
+			  let {
+			    ds_d1YC  :: 
+				PrelBase.Char{-38,p-}
+			    {-# L #-}
+			    ds_d1YC =
+				PrelBase.C#{-54,p-}{i}
+				    {'d'} } in
+			  let { ds_d1YG  :: 
+				    (PrelBase.Char{-38,p-}, (PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}))
+				{-# L #-}
+				ds_d1YG =
+			    let {
+			      ds_d1YW  :: 
+				  PrelBase.Char{-38,p-}
+			      {-# L #-}
+			      ds_d1YW =
+				  PrelBase.C#{-54,p-}{i}
+				      {'d'} } in
+			    let { ds_d1Z0  :: 
+				      (PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-})
+				  {-# L #-}
+				  ds_d1Z0 =
+			      let {
+				ds_d1Zg  :: 
+				    PrelBase.Char{-38,p-}
+				{-# L #-}
+				ds_d1Zg =
+				    PrelBase.C#{-54,p-}{i}
+					{'d'} } in
+			      let {
+				ds_d1Zk  :: 
+				    PrelBase.Char{-38,p-}
+				{-# L #-}
+				ds_d1Zk =
+				    PrelBase.C#{-54,p-}{i}
+					{'d'}
+			      } in 
+				PrelTup.(,){-62,p-}{i}
+				    {_@_ PrelBase.Char{-38,p-}
+				     _@_ PrelBase.Char{-38,p-}
+				     ds_d1Zg
+				     ds_d1Zk}
+			    } in
+			    PrelTup.(,){-62,p-}{i}
+				{_@_ PrelBase.Char{-38,p-}
+				 _@_ (PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-})
+				 ds_d1YW
+				 ds_d1Z0}
+			  } in
+			  PrelTup.(,){-62,p-}{i}
+			      {_@_ PrelBase.Char{-38,p-}
+			       _@_ (PrelBase.Char{-38,p-}, (PrelBase.Char{-38,p-}, PrelBase.Char{-38,p-}))
+			       ds_d1YC
+			       ds_d1YG};
+		    };
+	      };
+	}
+    } in
+    case ds_d1Zt of { PrelTup.(,){-62,p-}{i} x4_a12r ds_d1ZC  ->
+    case ds_d1ZC of { PrelTup.(,){-62,p-}{i} y4_a12s ds_d1ZL  ->
+    case ds_d1ZL of { PrelTup.(,){-62,p-}{i} z4_a12t a4_a12u  ->
+    PrelTup.(,,,){-64,p-}{i}
+	{_@_ PrelBase.Char{-38,p-}
+	 _@_ PrelBase.Char{-38,p-}
+	 _@_ PrelBase.Char{-38,p-}
+	 _@_ PrelBase.Char{-38,p-}
+	 x4_a12r
+	 y4_a12s
+	 z4_a12t
+	 a4_a12u};};};}
+x4_a12r  :: 
+    PrelBase.Char{-38,p-}
+{-# L #-}
+x4_a12r =
+    case
+	ds_d1Q9
+    of {
+    PrelTup.(,,,){-64,p-}{i} x4_a12r y4_a12s z4_a12t a4_a12u  ->
+    x4_a12r;}
+y4_a12s  :: 
+    PrelBase.Char{-38,p-}
+{-# L #-}
+y4_a12s =
+    case
+	ds_d1Q9
+    of {
+    PrelTup.(,,,){-64,p-}{i} x4_a12r y4_a12s z4_a12t a4_a12u  ->
+    y4_a12s;}
+z4_a12t  :: 
+    PrelBase.Char{-38,p-}
+{-# L #-}
+z4_a12t =
+    case
+	ds_d1Q9
+    of {
+    PrelTup.(,,,){-64,p-}{i} x4_a12r y4_a12s z4_a12t a4_a12u  ->
+    z4_a12t;}
+a4_a12u  :: 
+    PrelBase.Char{-38,p-}
+{-# L #-}
+a4_a12u =
+    case
+	ds_d1Q9
+    of {
+    PrelTup.(,,,){-64,p-}{i} x4_a12r y4_a12s z4_a12t a4_a12u  ->
+    a4_a12u;}
+x4{-r4f,x-}  :: 
+    PrelBase.Char{-38,p-}
+{-# L #-}
+x4{-r4f,x-} =
+    x4_a12r
+y4{-r4e,x-}  :: 
+    PrelBase.Char{-38,p-}
+{-# L #-}
+y4{-r4e,x-} =
+    y4_a12s
+z4{-r4d,x-}  :: 
+    PrelBase.Char{-38,p-}
+{-# L #-}
+z4{-r4d,x-} =
+    z4_a12t
+a4{-r4c,x-}  :: 
+    PrelBase.Char{-38,p-}
+{-# L #-}
+a4{-r4c,x-} =
+    a4_a12u
+lit_a1QK  :: 
+    PrelBase.Int{-3g,p-}
+{-# L #-}
+lit_a1QK =
+    lit_a1gZ
+ds_d1QP  :: 
+    (PrelBase.Int{-3g,p-}, PrelBase.Int{-3g,p-})
+{-# L #-}
+ds_d1QP =
+    case
+	>_a1h0
+	    x3_a148 lit_a1gZ
+    of {
+      PrelBase.True{-5E,p-}{i} ->
+	  PrelTup.(,){-62,p-}{i}
+	      {_@_ PrelBase.Int{-3g,p-}
+	       _@_ PrelBase.Int{-3g,p-}
+	       lit_a1gY
+	       lit_a1gW};
+      PrelBase.False{-58,p-}{i} ->
+	  case
+	      <=_a1gV
+		  x3_a148 lit_a1QK
+	  of {
+	    PrelBase.True{-5E,p-}{i} ->
+		PrelTup.(,){-62,p-}{i}
+		    {_@_ PrelBase.Int{-3g,p-}
+		     _@_ PrelBase.Int{-3g,p-}
+		     lit_a1gU
+		     lit_a1gT};
+	    PrelBase.False{-58,p-}{i} ->
+		GHCerr.nonExhaustiveGuardsError{-8l,p-}
+		    _@_ (PrelBase.Int{-3g,p-}, PrelBase.Int{-3g,p-})
+		    _string_ "ds020.hs:42|";
+	  };
+    }
+x3_a148  :: 
+    PrelBase.Int{-3g,p-}
+{-# L #-}
+x3_a148 =
+    case ds_d1QP of { PrelTup.(,){-62,p-}{i} x3_a148 y3_a149  ->
+    x3_a148;}
+y3_a149  :: 
+    PrelBase.Int{-3g,p-}
+{-# L #-}
+y3_a149 =
+    case ds_d1QP of { PrelTup.(,){-62,p-}{i} x3_a148 y3_a149  ->
+    y3_a149;}
+x3{-r4h,x-}  :: 
+    PrelBase.Int{-3g,p-}
+{-# L #-}
+x3{-r4h,x-} =
+    x3_a148
+y3{-r4g,x-}  :: 
+    PrelBase.Int{-3g,p-}
+{-# L #-}
+y3{-r4g,x-} =
+    y3_a149
+ds_d1Ra  :: 
+    _forall_ [t{-a16h-}] => (t{-a16h-}, t{-a16h-}, [t{-a16h-}])
+{-# L #-}
+ds_d1Ra =
+    _/\_ t{-a16h-} ->
+	_letrec_ {
+	  ==_a1mv  :: 
+	      PrelBase.Int{-3g,p-}
+	      -> PrelBase.Int{-3g,p-}
+	      -> PrelBase.Bool{-34,p-}
+	  {-# L #-}
+	  ==_a1mv =
+	      ==_a1h7;
+	  ==_a1mu  :: 
+	      PrelBase.Int{-3g,p-}
+	      -> PrelBase.Int{-3g,p-}
+	      -> PrelBase.Bool{-34,p-}
+	  {-# L #-}
+	  ==_a1mu =
+	      ==_a1h7;
+	  lit_a1mt  :: 
+	      PrelBase.Int{-3g,p-}
+	  {-# L #-}
+	  lit_a1mt =
+	      lit_a1h3;
+	  lit_a1ms  :: 
+	      PrelBase.Int{-3g,p-}
+	  {-# L #-}
+	  lit_a1ms =
+	      lit_a1h5;
+	  ds_d22I  :: 
+	      (t{-a16h-}, t{-a16h-}, [t{-a16h-}])
+	  {-# L #-}
+	  ds_d22I =
+	      let { ds_d257  :: 
+			[t{-a16h-}]
+		    {-# L #-}
+		    ds_d257 =
+		let {
+		  eq4_a158  :: 
+		      PrelBase.Bool{-34,p-}
+		  {-# L #-}
+		  eq4_a158 =
+		      ==_a1mu
+			  lit_a1mt lit_a1ms } in
+		let {
+		  eq4_r41  :: 
+		      PrelBase.Bool{-34,p-}
+		  {-# L #-}
+		  eq4_r41 =
+		      eq4_a158 } in
+		let {
+		  lit_a23v  :: 
+		      PrelBase.Int{-3g,p-}
+		  {-# L #-}
+		  lit_a23v =
+		      lit_a1h1 } in
+		let {
+		  eq3_a15w  :: 
+		      PrelBase.Bool{-34,p-}
+		  {-# L #-}
+		  eq3_a15w =
+		      ==_a1mv
+			  lit_a1h1 lit_a23v } in
+		let {
+		  eq3_r40  :: 
+		      PrelBase.Bool{-34,p-}
+		  {-# L #-}
+		  eq3_r40 =
+		      eq3_a15w } in
+		let {
+		  eq2_a15S  :: 
+		      PrelBase.Bool{-34,p-}
+		  {-# L #-}
+		  eq2_a15S =
+		      ==_a1h7
+			  lit_a1h5 lit_a1h3 } in
+		let {
+		  eq2_r3Z  :: 
+		      PrelBase.Bool{-34,p-}
+		  {-# L #-}
+		  eq2_r3Z =
+		      eq2_a15S
+		} in 
+		  case eq2_r3Z of {
+		    PrelBase.True{-5E,p-}{i} ->
+			PrelBase.[]{-5i,p-}{i}
+			    _@_ t{-a16h-};
+		    PrelBase.False{-58,p-}{i} ->
+			case eq3_r40 of {
+			  PrelBase.True{-5E,p-}{i} ->
+			      let {
+				ds_d24m  :: 
+				    [t{-a16h-}]
+				{-# L #-}
+				ds_d24m =
+				    PrelBase.[]{-5i,p-}{i}
+					{_@_ t{-a16h-}}
+			      } in 
+				PrelBase.:{-55,p-}{i}
+				    {_@_ t{-a16h-} x2_a14U ds_d24m};
+			  PrelBase.False{-58,p-}{i} ->
+			      case eq4_r41 of {
+				PrelBase.True{-5E,p-}{i} ->
+				    let {
+				      ds_d24M  :: 
+					  [t{-a16h-}]
+				      {-# L #-}
+				      ds_d24M =
+					  PrelBase.[]{-5i,p-}{i}
+					      {_@_ t{-a16h-}}
+				    } in 
+				      PrelBase.:{-55,p-}{i}
+					  {_@_ t{-a16h-} x2_a14U ds_d24M};
+				PrelBase.False{-58,p-}{i} ->
+				    PrelBase.[]{-5i,p-}{i}
+					_@_ t{-a16h-};
+			      };
+			};
+		  }
+	      } in
+	      let {
+		fail_d258  :: 
+		    (t{-a16h-}, t{-a16h-}, [t{-a16h-}])
+		{-# L #-}
+		fail_d258 =
+		    GHCerr.irrefutPatError{-8g,p-}
+			_@_ (t{-a16h-}, t{-a16h-}, [t{-a16h-}])
+			_string_ "ds020.hs:39|(x2 PrelBase.: (xs2 PrelBase.: ys2))"
+	      } in 
+		case ds_d257 of {
+		  PrelBase.[]{-5i,p-}{i} ->
+		      fail_d258;
+		  PrelBase.:{-55,p-}{i} x2_a14U ds_d25l ->
+		      case ds_d25l of {
+			PrelBase.[]{-5i,p-}{i} ->
+			    fail_d258;
+			PrelBase.:{-55,p-}{i} xs2_a14V ys2_a14W ->
+			    PrelTup.(,,){-63,p-}{i}
+				{_@_ t{-a16h-}
+				 _@_ t{-a16h-}
+				 _@_ [t{-a16h-}]
+				 x2_a14U
+				 xs2_a14V
+				 ys2_a14W};
+		      };
+		};
+	  x2_a14U  :: 
+	      t{-a16h-}
+	  {-# L #-}
+	  x2_a14U =
+	      case
+		  ds_d22I
+	      of {
+	      PrelTup.(,,){-63,p-}{i} x2_a14U xs2_a14V ys2_a14W  ->
+	      x2_a14U;};
+	  xs2_a14V  :: 
+	      t{-a16h-}
+	  {-# L #-}
+	  xs2_a14V =
+	      case
+		  ds_d22I
+	      of {
+	      PrelTup.(,,){-63,p-}{i} x2_a14U xs2_a14V ys2_a14W  ->
+	      xs2_a14V;};
+	  ys2_a14W  :: 
+	      [t{-a16h-}]
+	  {-# L #-}
+	  ys2_a14W =
+	      case
+		  ds_d22I
+	      of {
+	      PrelTup.(,,){-63,p-}{i} x2_a14U xs2_a14V ys2_a14W  ->
+	      ys2_a14W;};
+	} in 
+	  PrelTup.(,,){-63,p-}{i}
+	      {_@_ t{-a16h-}
+	       _@_ t{-a16h-}
+	       _@_ [t{-a16h-}]
+	       x2_a14U
+	       xs2_a14V
+	       ys2_a14W}
+x2{-r4k,x-}  :: 
+    _forall_ [t{-a16h-}] => t{-a16h-}
+{-# L #-}
+x2{-r4k,x-} =
+    _/\_ t{-a16h-} ->
+	case
+	    ds_d1Ra
+		_@_ t{-a16h-}
+	of {
+	PrelTup.(,,){-63,p-}{i} ds_d26G ds_d26I ds_d26H  ->
+	ds_d26G;}
+xs2{-r4j,x-}  :: 
+    _forall_ [t{-a16h-}] => t{-a16h-}
+{-# L #-}
+xs2{-r4j,x-} =
+    _/\_ t{-a16h-} ->
+	case
+	    ds_d1Ra
+		_@_ t{-a16h-}
+	of {
+	PrelTup.(,,){-63,p-}{i} ds_d26Z ds_d26X ds_d26Y  ->
+	ds_d26X;}
+ys2{-r4i,x-}  :: 
+    _forall_ [t{-a16h-}] => [t{-a16h-}]
+{-# L #-}
+ys2{-r4i,x-} =
+    _/\_ t{-a16h-} ->
+	case
+	    ds_d1Ra
+		_@_ t{-a16h-}
+	of {
+	PrelTup.(,,){-63,p-}{i} ds_d27g ds_d27f ds_d27e  ->
+	ds_d27e;}
+ds_d1Rr  :: 
+    _forall_ [t{-a16I-}] => (t{-a16I-}, t{-a16I-}, [t{-a16I-}])
+{-# L #-}
+ds_d1Rr =
+    _/\_ t{-a16I-} ->
+	let { ds_d28P  :: 
+		  (t{-a16I-}, t{-a16I-}, [t{-a16I-}])
+	      {-# L #-}
+	      ds_d28P =
+	  let {
+	    ds_d27Z  :: 
+		[t{-a16I-}]
+	    {-# L #-}
+	    ds_d27Z =
+		PrelBase.[]{-5i,p-}{i}
+		    _@_ t{-a16I-} } in
+	  let {
+	    fail_d280  :: 
+		(t{-a16I-}, t{-a16I-}, [t{-a16I-}])
+	    {-# L #-}
+	    fail_d280 =
+		GHCerr.irrefutPatError{-8g,p-}
+		    _@_ (t{-a16I-}, t{-a16I-}, [t{-a16I-}])
+		    _string_ "ds020.hs:30|(~x PrelBase.: (~xs PrelBase.: ~ys))"
+	  } in 
+	    case ds_d27Z of {
+	      PrelBase.[]{-5i,p-}{i} ->
+		  fail_d280;
+	      PrelBase.:{-55,p-}{i} x_a16u ds_d28d ->
+		  case ds_d28d of {
+		    PrelBase.[]{-5i,p-}{i} ->
+			fail_d280;
+		    PrelBase.:{-55,p-}{i} xs_a16v ys_a16w ->
+			let {
+			  ys_a16w  :: 
+			      [t{-a16I-}]
+			  {-# L #-}
+			  ys_a16w =
+			      ys_a16w } in
+			let {
+			  xs_a16v  :: 
+			      t{-a16I-}
+			  {-# L #-}
+			  xs_a16v =
+			      xs_a16v } in
+			let {
+			  x_a16u  :: 
+			      t{-a16I-}
+			  {-# L #-}
+			  x_a16u =
+			      x_a16u
+			} in 
+			  PrelTup.(,,){-63,p-}{i}
+			      {_@_ t{-a16I-}
+			       _@_ t{-a16I-}
+			       _@_ [t{-a16I-}]
+			       x_a16u
+			       xs_a16v
+			       ys_a16w};
+		  };
+	    }
+	} in
+	let {
+	  x_a16u  :: 
+	      t{-a16I-}
+	  {-# L #-}
+	  x_a16u =
+	      case
+		  ds_d28P
+	      of {
+	      PrelTup.(,,){-63,p-}{i} x_a16u xs_a16v ys_a16w  ->
+	      x_a16u;} } in
+	let {
+	  xs_a16v  :: 
+	      t{-a16I-}
+	  {-# L #-}
+	  xs_a16v =
+	      case
+		  ds_d28P
+	      of {
+	      PrelTup.(,,){-63,p-}{i} x_a16u xs_a16v ys_a16w  ->
+	      xs_a16v;} } in
+	let {
+	  ys_a16w  :: 
+	      [t{-a16I-}]
+	  {-# L #-}
+	  ys_a16w =
+	      case
+		  ds_d28P
+	      of {
+	      PrelTup.(,,){-63,p-}{i} x_a16u xs_a16v ys_a16w  ->
+	      ys_a16w;}
+	} in 
+	  PrelTup.(,,){-63,p-}{i}
+	      {_@_ t{-a16I-}
+	       _@_ t{-a16I-}
+	       _@_ [t{-a16I-}]
+	       x_a16u
+	       xs_a16v
+	       ys_a16w}
+x{-r4n,x-}  :: 
+    _forall_ [t{-a16I-}] => t{-a16I-}
+{-# L #-}
+x{-r4n,x-} =
+    _/\_ t{-a16I-} ->
+	case
+	    ds_d1Rr
+		_@_ t{-a16I-}
+	of {
+	PrelTup.(,,){-63,p-}{i} ds_d29s ds_d29u ds_d29t  ->
+	ds_d29s;}
+xs{-r4m,x-}  :: 
+    _forall_ [t{-a16I-}] => t{-a16I-}
+{-# L #-}
+xs{-r4m,x-} =
+    _/\_ t{-a16I-} ->
+	case
+	    ds_d1Rr
+		_@_ t{-a16I-}
+	of {
+	PrelTup.(,,){-63,p-}{i} ds_d29L ds_d29J ds_d29K  ->
+	ds_d29J;}
+ys{-r4l,x-}  :: 
+    _forall_ [t{-a16I-}] => [t{-a16I-}]
+{-# L #-}
+ys{-r4l,x-} =
+    _/\_ t{-a16I-} ->
+	case
+	    ds_d1Rr
+		_@_ t{-a16I-}
+	of {
+	PrelTup.(,,){-63,p-}{i} ds_d2a2 ds_d2a1 ds_d2a0  ->
+	ds_d2a0;}
+ds_d1RI  :: 
+    _forall_ [t{-a16Y-}] => (t{-a16Y-}, t{-a16Y-}, [t{-a16Y-}])
+{-# L #-}
+ds_d1RI =
+    _/\_ t{-a16Y-} ->
+	let { ds_d2bs  :: 
+		  (t{-a16Y-}, t{-a16Y-}, [t{-a16Y-}])
+	      {-# L #-}
+	      ds_d2bs =
+	  let {
+	    ds_d2aL  :: 
+		[t{-a16Y-}]
+	    {-# L #-}
+	    ds_d2aL =
+		PrelBase.[]{-5i,p-}{i}
+		    _@_ t{-a16Y-} } in
+	  let {
+	    fail_d2aM  :: 
+		(t{-a16Y-}, t{-a16Y-}, [t{-a16Y-}])
+	    {-# L #-}
+	    fail_d2aM =
+		GHCerr.irrefutPatError{-8g,p-}
+		    _@_ (t{-a16Y-}, t{-a16Y-}, [t{-a16Y-}])
+		    _string_ "ds020.hs:29|(x1 PrelBase.: (xs1 PrelBase.: ys1))"
+	  } in 
+	    case ds_d2aL of {
+	      PrelBase.[]{-5i,p-}{i} ->
+		  fail_d2aM;
+	      PrelBase.:{-55,p-}{i} x1_a16K ds_d2aZ ->
+		  case ds_d2aZ of {
+		    PrelBase.[]{-5i,p-}{i} ->
+			fail_d2aM;
+		    PrelBase.:{-55,p-}{i} xs1_a16L ys1_a16M ->
+			PrelTup.(,,){-63,p-}{i}
+			    {_@_ t{-a16Y-}
+			     _@_ t{-a16Y-}
+			     _@_ [t{-a16Y-}]
+			     x1_a16K
+			     xs1_a16L
+			     ys1_a16M};
+		  };
+	    }
+	} in
+	let {
+	  x1_a16K  :: 
+	      t{-a16Y-}
+	  {-# L #-}
+	  x1_a16K =
+	      case
+		  ds_d2bs
+	      of {
+	      PrelTup.(,,){-63,p-}{i} x1_a16K xs1_a16L ys1_a16M  ->
+	      x1_a16K;} } in
+	let {
+	  xs1_a16L  :: 
+	      t{-a16Y-}
+	  {-# L #-}
+	  xs1_a16L =
+	      case
+		  ds_d2bs
+	      of {
+	      PrelTup.(,,){-63,p-}{i} x1_a16K xs1_a16L ys1_a16M  ->
+	      xs1_a16L;} } in
+	let {
+	  ys1_a16M  :: 
+	      [t{-a16Y-}]
+	  {-# L #-}
+	  ys1_a16M =
+	      case
+		  ds_d2bs
+	      of {
+	      PrelTup.(,,){-63,p-}{i} x1_a16K xs1_a16L ys1_a16M  ->
+	      ys1_a16M;}
+	} in 
+	  PrelTup.(,,){-63,p-}{i}
+	      {_@_ t{-a16Y-}
+	       _@_ t{-a16Y-}
+	       _@_ [t{-a16Y-}]
+	       x1_a16K
+	       xs1_a16L
+	       ys1_a16M}
+x1{-r4q,x-}  :: 
+    _forall_ [t{-a16Y-}] => t{-a16Y-}
+{-# L #-}
+x1{-r4q,x-} =
+    _/\_ t{-a16Y-} ->
+	case
+	    ds_d1RI
+		_@_ t{-a16Y-}
+	of {
+	PrelTup.(,,){-63,p-}{i} ds_d2c5 ds_d2c7 ds_d2c6  ->
+	ds_d2c5;}
+xs1{-r4p,x-}  :: 
+    _forall_ [t{-a16Y-}] => t{-a16Y-}
+{-# L #-}
+xs1{-r4p,x-} =
+    _/\_ t{-a16Y-} ->
+	case
+	    ds_d1RI
+		_@_ t{-a16Y-}
+	of {
+	PrelTup.(,,){-63,p-}{i} ds_d2co ds_d2cm ds_d2cn  ->
+	ds_d2cm;}
+ys1{-r4o,x-}  :: 
+    _forall_ [t{-a16Y-}] => [t{-a16Y-}]
+{-# L #-}
+ys1{-r4o,x-} =
+    _/\_ t{-a16Y-} ->
+	case
+	    ds_d1RI
+		_@_ t{-a16Y-}
+	of {
+	PrelTup.(,,){-63,p-}{i} ds_d2cF ds_d2cE ds_d2cD  ->
+	ds_d2cD;}
+ds_d1RZ  :: 
+    PrelBase.(){-40,p-}
+{-# L #-}
+ds_d1RZ =
+    let { ds_d2dp  :: 
+	      ([GHC.Void{-3T,p-}], [GHC.Void{-3T,p-}], [GHC.Void{-3T,p-}])
+	  {-# L #-}
+	  ds_d2dp =
+      let {
+	ds_d2cZ  :: 
+	    [GHC.Void{-3T,p-}]
+	{-# L #-}
+	ds_d2cZ =
+	    PrelBase.[]{-5i,p-}{i}
+		_@_ GHC.Void{-3T,p-} } in
+      let {
+	ds_d2d3  :: 
+	    [GHC.Void{-3T,p-}]
+	{-# L #-}
+	ds_d2d3 =
+	    PrelBase.[]{-5i,p-}{i}
+		_@_ GHC.Void{-3T,p-} } in
+      let {
+	ds_d2d7  :: 
+	    [GHC.Void{-3T,p-}]
+	{-# L #-}
+	ds_d2d7 =
+	    PrelBase.[]{-5i,p-}{i}
+		_@_ GHC.Void{-3T,p-}
+      } in 
+	PrelTup.(,,){-63,p-}{i}
+	    {_@_ [GHC.Void{-3T,p-}]
+	     _@_ [GHC.Void{-3T,p-}]
+	     _@_ [GHC.Void{-3T,p-}]
+	     ds_d2cZ
+	     ds_d2d3
+	     ds_d2d7}
+    } in
+    case
+	ds_d2dp
+    of {
+    PrelTup.(,,){-63,p-}{i} ds_d2dQ ds_d2dP ds_d2dO  ->
+    let { ds_d2eg  :: 
+	      PrelBase.(){-40,p-}
+	  {-# L #-}
+	  ds_d2eg =
+      let {
+	fail_d2dR  :: 
+	    PrelBase.(){-40,p-}
+	{-# L #-}
+	fail_d2dR =
+	    GHCerr.irrefutPatError{-8g,p-}
+		_@_ PrelBase.(){-40,p-} _string_ "ds020.hs:27|PrelBase.[]"
+      } in 
+	case ds_d2dO of {
+	  PrelBase.:{-55,p-}{i} ds_d2dZ ds_d2dY ->
+	      fail_d2dR;
+	  PrelBase.[]{-5i,p-}{i} ->
+	      PrelBase.(){-60,p-}{i}
+		  {};
+	}
+    } in
+    let { ds_d2eG  :: 
+	      PrelBase.(){-40,p-}
+	  {-# L #-}
+	  ds_d2eG =
+      let {
+	fail_d2eh  :: 
+	    PrelBase.(){-40,p-}
+	{-# L #-}
+	fail_d2eh =
+	    GHCerr.irrefutPatError{-8g,p-}
+		_@_ PrelBase.(){-40,p-} _string_ "ds020.hs:27|PrelBase.[]"
+      } in 
+	case ds_d2dP of {
+	  PrelBase.:{-55,p-}{i} ds_d2ep ds_d2eo ->
+	      fail_d2eh;
+	  PrelBase.[]{-5i,p-}{i} ->
+	      PrelBase.(){-60,p-}{i}
+		  {};
+	}
+    } in
+    let { ds_d2uC  :: 
+	      PrelBase.(){-40,p-}
+	  {-# L #-}
+	  ds_d2uC =
+      let {
+	fail_d2eH  :: 
+	    PrelBase.(){-40,p-}
+	{-# L #-}
+	fail_d2eH =
+	    GHCerr.irrefutPatError{-8g,p-}
+		_@_ PrelBase.(){-40,p-} _string_ "ds020.hs:27|PrelBase.[]"
+      } in 
+	case ds_d2dQ of {
+	  PrelBase.:{-55,p-}{i} ds_d2eP ds_d2eO ->
+	      fail_d2eH;
+	  PrelBase.[]{-5i,p-}{i} ->
+	      PrelBase.(){-60,p-}{i}
+		  {};
+	}
+    } in
+    PrelBase.(){-60,p-}{i}
+	{};}
+ds_d1S4  :: 
+    PrelBase.(){-40,p-}
+{-# L #-}
+ds_d1S4 =
+    let { ds_d2fM  :: 
+	      ([GHC.Void{-3T,p-}], [GHC.Void{-3T,p-}], [GHC.Void{-3T,p-}])
+	  {-# L #-}
+	  ds_d2fM =
+      let {
+	ds_d2ff  :: 
+	    [GHC.Void{-3T,p-}]
+	{-# L #-}
+	ds_d2ff =
+	    PrelBase.[]{-5i,p-}{i}
+		_@_ GHC.Void{-3T,p-} } in
+      let {
+	ds_d2fj  :: 
+	    [GHC.Void{-3T,p-}]
+	{-# L #-}
+	ds_d2fj =
+	    PrelBase.[]{-5i,p-}{i}
+		_@_ GHC.Void{-3T,p-} } in
+      let {
+	ds_d2fn  :: 
+	    [GHC.Void{-3T,p-}]
+	{-# L #-}
+	ds_d2fn =
+	    PrelBase.[]{-5i,p-}{i}
+		_@_ GHC.Void{-3T,p-}
+      } in 
+	PrelTup.(,,){-63,p-}{i}
+	    {_@_ [GHC.Void{-3T,p-}]
+	     _@_ [GHC.Void{-3T,p-}]
+	     _@_ [GHC.Void{-3T,p-}]
+	     ds_d2ff
+	     ds_d2fj
+	     ds_d2fn}
+    } in
+    let {
+      fail_d2fN  :: 
+	  PrelBase.(){-40,p-}
+      {-# L #-}
+      fail_d2fN =
+	  GHCerr.irrefutPatError{-8g,p-}
+	      _@_ PrelBase.(){-40,p-}
+	      _string_ "ds020.hs:26|(PrelBase.[], PrelBase.[], PrelBase.[])"
+    } in 
+      case
+	  ds_d2fM
+      of {
+      PrelTup.(,,){-63,p-}{i} ds_d2fW ds_d2fY ds_d2fX  ->
+      case ds_d2fW of {
+	PrelBase.:{-55,p-}{i} ds_d2g6 ds_d2g5 ->
+	    fail_d2fN;
+	PrelBase.[]{-5i,p-}{i} ->
+	    case ds_d2fY of {
+	      PrelBase.:{-55,p-}{i} ds_d2gk ds_d2gj ->
+		  fail_d2fN;
+	      PrelBase.[]{-5i,p-}{i} ->
+		  case ds_d2fX of {
+		    PrelBase.:{-55,p-}{i} ds_d2gy ds_d2gx ->
+			fail_d2fN;
+		    PrelBase.[]{-5i,p-}{i} ->
+			PrelBase.(){-60,p-}{i}
+			    {};
+		  };
+	    };
+      };}
+g{-r4r,x-}  :: 
+    _forall_ [t{-a17G-} t{-a17I-}] => [t{-a17G-}] -> [t{-a17I-}]
+{-# L #-}
+g{-r4r,x-} =
+    _/\_ t{-a17G-} t{-a17I-} -> \ ds_d2ha  :: 
+				      [t{-a17G-}]
+				  {-# L #-}
+				  ds_d2ha ->
+	let { ds_d2uD  :: 
+		  PrelBase.(){-40,p-}
+	      {-# L #-}
+	      ds_d2uD =
+	  let { ds_d2uE  :: 
+		    PrelBase.(){-40,p-}
+		{-# L #-}
+		ds_d2uE =
+	    let { ds_d2uF  :: 
+		      PrelBase.(){-40,p-}
+		  {-# L #-}
+		  ds_d2uF =
+	      let { ds_d2uG  :: 
+			PrelBase.(){-40,p-}
+		    {-# L #-}
+		    ds_d2uG =
+		let {
+		  fail_d2hb  :: 
+		      PrelBase.(){-40,p-}
+		  {-# L #-}
+		  fail_d2hb =
+		      GHCerr.irrefutPatError{-8g,p-}
+			  _@_ PrelBase.(){-40,p-} _string_ "ds020.hs:22|PrelBase.[]"
+		} in 
+		  case ds_d2ha of {
+		    PrelBase.:{-55,p-}{i} ds_d2hj ds_d2hi ->
+			fail_d2hb;
+		    PrelBase.[]{-5i,p-}{i} ->
+			PrelBase.(){-60,p-}{i}
+			    {};
+		  }
+	      } in
+	      PrelBase.(){-60,p-}{i}
+		  {}
+	    } in
+	    PrelBase.(){-60,p-}{i}
+		{}
+	  } in
+	  PrelBase.(){-60,p-}{i}
+	      {}
+	} in
+	PrelBase.[]{-5i,p-}{i}
+	    _@_ t{-a17I-}
+f{-r4s,x-}  :: 
+    _forall_ [t{-a17W-} t{-a17Y-}] => [t{-a17W-}] -> [t{-a17Y-}]
+{-# L #-}
+f{-r4s,x-} =
+    _/\_ t{-a17W-} t{-a17Y-} -> \ x_r3U  :: 
+				      [t{-a17W-}]
+				  {-# L #-}
+				  x_r3U ->
+	let { x_r3U  :: 
+		  [t{-a17W-}]
+	      {-# L #-}
+	      x_r3U =
+	  let {
+	    fail_d2hN  :: 
+		[t{-a17W-}]
+	    {-# L #-}
+	    fail_d2hN =
+		GHCerr.irrefutPatError{-8g,p-}
+		    _@_ [t{-a17W-}] _string_ "ds020.hs:19|(x@PrelBase.[])"
+	  } in 
+	    case x_r3U of {
+	      PrelBase.:{-55,p-}{i} ds_d2hV ds_d2hU ->
+		  fail_d2hN;
+	      PrelBase.[]{-5i,p-}{i} ->
+		  x_r3U;
+	    }
+	} in
+	PrelBase.[]{-5i,p-}{i}
+	    _@_ t{-a17Y-}
+d{-r4t,x-}  :: 
+    _forall_
+    [t{-a18b-} t{-a18D-}]
+    =>
+    {PrelBase.Num{-2c,p-} t{-a18b-}}
+    -> {PrelBase.Num{-2c,p-} t{-a18D-}}
+    -> {PrelBase.Ord{-2d,p-} t{-a18b-}}
+    -> t{-a18b-}
+    -> t{-a18D-}
+{-# L #-}
+d{-r4t,x-} =
+    _/\_ t{-a18b-} t{-a18D-} -> \ d.Num_a18H  :: 
+				      {PrelBase.Num{-2c,p-} t{-a18b-}}
+				  {-# L #-}
+				  d.Num_a18H d.Num_a18M  :: 
+						 {PrelBase.Num{-2c,p-} t{-a18D-}}
+					     {-# L #-}
+					     d.Num_a18M d.Ord_a18R  :: 
+							    {PrelBase.Ord{-2d,p-} t{-a18b-}}
+							{-# L #-}
+							d.Ord_a18R ->
+	let {
+	  d.Eq_a18J  :: 
+	      {PrelBase.Eq{-23,p-} t{-a18b-}}
+	  {-# L #-}
+	  d.Eq_a18J =
+	      PrelBase.scsel_OrdPrelBaseEq{-a2jI,p-}
+		  _@_ t{-a18b-} d.Ord_a18R } in
+	let {
+	  fromInt_a2jy  :: 
+	      PrelBase.Int{-3g,p-} -> t{-a18b-}
+	  {-# L #-}
+	  fromInt_a2jy =
+	      PrelBase.fromInt{-8R,p-}
+		  _@_ t{-a18b-} d.Num_a18H } in
+	let { lit_a2jx  :: 
+		  t{-a18b-}
+	      {-# L #-}
+	      lit_a2jx =
+	  let {
+	    ds_d2jX  :: 
+		PrelBase.Int{-3g,p-}
+	    {-# L #-}
+	    ds_d2jX =
+		PrelBase.I#{-5b,p-}{i}
+		    11
+	  } in 
+	    fromInt_a2jy
+		ds_d2jX
+	} in
+	let {
+	  ==_a2jw  :: 
+	      t{-a18b-} -> t{-a18b-} -> PrelBase.Bool{-34,p-}
+	  {-# L #-}
+	  ==_a2jw =
+	      PrelBase.=={-8Y,p-}
+		  _@_ t{-a18b-} d.Eq_a18J } in
+	let {
+	  fromInt_a2jv  :: 
+	      PrelBase.Int{-3g,p-} -> t{-a18D-}
+	  {-# L #-}
+	  fromInt_a2jv =
+	      PrelBase.fromInt{-8R,p-}
+		  _@_ t{-a18D-} d.Num_a18M } in
+	let { lit_a2ju  :: 
+		  t{-a18D-}
+	      {-# L #-}
+	      lit_a2ju =
+	  let {
+	    ds_d2kr  :: 
+		PrelBase.Int{-3g,p-}
+	    {-# L #-}
+	    ds_d2kr =
+		PrelBase.I#{-5b,p-}{i}
+		    4
+	  } in 
+	    fromInt_a2jv
+		ds_d2kr
+	} in
+	let {
+	  fromInt_a2jt  :: 
+	      PrelBase.Int{-3g,p-} -> t{-a18b-}
+	  {-# L #-}
+	  fromInt_a2jt =
+	      fromInt_a2jy } in
+	let { lit_a2js  :: 
+		  t{-a18b-}
+	      {-# L #-}
+	      lit_a2js =
+	  let {
+	    ds_d2kG  :: 
+		PrelBase.Int{-3g,p-}
+	    {-# L #-}
+	    ds_d2kG =
+		PrelBase.I#{-5b,p-}{i}
+		    12
+	  } in 
+	    fromInt_a2jt
+		ds_d2kG
+	} in
+	let {
+	  ==_a2jr  :: 
+	      t{-a18b-} -> t{-a18b-} -> PrelBase.Bool{-34,p-}
+	  {-# L #-}
+	  ==_a2jr =
+	      ==_a2jw } in
+	let {
+	  fromInt_a2jq  :: 
+	      PrelBase.Int{-3g,p-} -> t{-a18D-}
+	  {-# L #-}
+	  fromInt_a2jq =
+	      fromInt_a2jv } in
+	let { lit_a2jp  :: 
+		  t{-a18D-}
+	      {-# L #-}
+	      lit_a2jp =
+	  let {
+	    ds_d2kW  :: 
+		PrelBase.Int{-3g,p-}
+	    {-# L #-}
+	    ds_d2kW =
+		PrelBase.I#{-5b,p-}{i}
+		    3
+	  } in 
+	    fromInt_a2jq
+		ds_d2kW
+	} in
+	let {
+	  fromInt_a2jo  :: 
+	      PrelBase.Int{-3g,p-} -> t{-a18b-}
+	  {-# L #-}
+	  fromInt_a2jo =
+	      fromInt_a2jy } in
+	let { lit_a2jn  :: 
+		  t{-a18b-}
+	      {-# L #-}
+	      lit_a2jn =
+	  let {
+	    ds_d2lb  :: 
+		PrelBase.Int{-3g,p-}
+	    {-# L #-}
+	    ds_d2lb =
+		PrelBase.I#{-5b,p-}{i}
+		    4
+	  } in 
+	    fromInt_a2jo
+		ds_d2lb
+	} in
+	let {
+	  >=_a2jm  :: 
+	      t{-a18b-} -> t{-a18b-} -> PrelBase.Bool{-34,p-}
+	  {-# L #-}
+	  >=_a2jm =
+	      PrelBase.>={-8Z,p-}
+		  _@_ t{-a18b-} d.Ord_a18R } in
+	let {
+	  d.Num_a18T  :: 
+	      {PrelBase.Num{-2c,p-} t{-a18b-}}
+	  {-# L #-}
+	  d.Num_a18T =
+	      d.Num_a18H } in
+	let {
+	  -_a2jl  :: 
+	      t{-a18b-} -> t{-a18b-} -> t{-a18b-}
+	  {-# L #-}
+	  -_a2jl =
+	      PrelBase.-{-817,p-}
+		  _@_ t{-a18b-} d.Num_a18T } in
+	let {
+	  fromInt_a2jk  :: 
+	      PrelBase.Int{-3g,p-} -> t{-a18D-}
+	  {-# L #-}
+	  fromInt_a2jk =
+	      fromInt_a2jv } in
+	let { lit_a2jj  :: 
+		  t{-a18D-}
+	      {-# L #-}
+	      lit_a2jj =
+	  let {
+	    ds_d2lH  :: 
+		PrelBase.Int{-3g,p-}
+	    {-# L #-}
+	    ds_d2lH =
+		PrelBase.I#{-5b,p-}{i}
+		    2
+	  } in 
+	    fromInt_a2jk
+		ds_d2lH
+	} in
+	let {
+	  fromInt_a2ji  :: 
+	      PrelBase.Int{-3g,p-} -> t{-a18b-}
+	  {-# L #-}
+	  fromInt_a2ji =
+	      fromInt_a2jy } in
+	let { lit_a2jh  :: 
+		  t{-a18b-}
+	      {-# L #-}
+	      lit_a2jh =
+	  let {
+	    ds_d2lW  :: 
+		PrelBase.Int{-3g,p-}
+	    {-# L #-}
+	    ds_d2lW =
+		PrelBase.I#{-5b,p-}{i}
+		    43
+	  } in 
+	    fromInt_a2ji
+		ds_d2lW
+	} in
+	let {
+	  >=_a2jg  :: 
+	      t{-a18b-} -> t{-a18b-} -> PrelBase.Bool{-34,p-}
+	  {-# L #-}
+	  >=_a2jg =
+	      >=_a2jm } in
+	let {
+	  -_a2jf  :: 
+	      t{-a18b-} -> t{-a18b-} -> t{-a18b-}
+	  {-# L #-}
+	  -_a2jf =
+	      -_a2jl } in
+	let {
+	  fromInt_a2je  :: 
+	      PrelBase.Int{-3g,p-} -> t{-a18D-}
+	  {-# L #-}
+	  fromInt_a2je =
+	      fromInt_a2jv } in
+	let { lit_a2jd  :: 
+		  t{-a18D-}
+	      {-# L #-}
+	      lit_a2jd =
+	  let {
+	    ds_d2md  :: 
+		PrelBase.Int{-3g,p-}
+	    {-# L #-}
+	    ds_d2md =
+		PrelBase.I#{-5b,p-}{i}
+		    1
+	  } in 
+	    fromInt_a2je
+		ds_d2md
+	} in
+	let {
+	  fromInt_a2jc  :: 
+	      PrelBase.Int{-3g,p-} -> t{-a18b-}
+	  {-# L #-}
+	  fromInt_a2jc =
+	      fromInt_a2jy } in
+	let { lit_a2jb  :: 
+		  t{-a18b-}
+	      {-# L #-}
+	      lit_a2jb =
+	  let {
+	    ds_d2ms  :: 
+		PrelBase.Int{-3g,p-}
+	    {-# L #-}
+	    ds_d2ms =
+		PrelBase.I#{-5b,p-}{i}
+		    999
+	  } in 
+	    fromInt_a2jc
+		ds_d2ms
+	} in
+	let {
+	  >=_a2ja  :: 
+	      t{-a18b-} -> t{-a18b-} -> PrelBase.Bool{-34,p-}
+	  {-# L #-}
+	  >=_a2ja =
+	      >=_a2jm } in
+	let {
+	  -_a2j9  :: 
+	      t{-a18b-} -> t{-a18b-} -> t{-a18b-}
+	  {-# L #-}
+	  -_a2j9 =
+	      -_a2jl } in
+	let {
+	  fromInt_a2j8  :: 
+	      PrelBase.Int{-3g,p-} -> t{-a18D-}
+	  {-# L #-}
+	  fromInt_a2j8 =
+	      fromInt_a2jv } in
+	let { lit_a2j7  :: 
+		  t{-a18D-}
+	      {-# L #-}
+	      lit_a2j7 =
+	  let {
+	    ds_d2mJ  :: 
+		PrelBase.Int{-3g,p-}
+	    {-# L #-}
+	    ds_d2mJ =
+		PrelBase.I#{-5b,p-}{i}
+		    0
+	  } in 
+	    fromInt_a2j8
+		ds_d2mJ
+	} in
+	\ ds_d2ng  :: 
+	      t{-a18b-}
+	  {-# L #-}
+	  ds_d2ng ->
+	    let { fail_d2o7  :: 
+		      t{-a18D-}
+		  {-# L #-}
+		  fail_d2o7 =
+	      let { ds_d2n0  :: 
+			PrelBase.(){-40,p-}
+		    {-# L #-}
+		    ds_d2n0 =
+		let {
+		  fail_d2nt  :: 
+		      PrelBase.(){-40,p-}
+		  {-# L #-}
+		  fail_d2nt =
+		      GHCerr.irrefutPatError{-8g,p-}
+			  _@_ PrelBase.(){-40,p-} _string_ "ds020.hs:13|(n+4)"
+		} in 
+		  case
+		      (\ ds_d2nn  :: 
+			     t{-a18b-}
+			 {-# L #-}
+			 ds_d2nn ->
+			   >=_a2jm
+			       ds_d2nn lit_a2jn)
+			  ds_d2ng
+		  of {
+		    PrelBase.True{-5E,p-}{i} ->
+			let {
+			  n_r3O  :: 
+			      t{-a18b-}
+			  {-# L #-}
+			  n_r3O =
+			      (\ ds_d2nM  :: 
+				     t{-a18b-}
+				 {-# L #-}
+				 ds_d2nM ->
+				   -_a2jl
+				       ds_d2nM lit_a2jn)
+				  ds_d2ng
+			} in 
+			  PrelBase.(){-60,p-}{i}
+			      {};
+		    PrelBase.False{-58,p-}{i} ->
+			fail_d2nt;
+		  }
+	      } in
+	      lit_a2jj
+	    } in
+	    let {
+	      fail_d2or  :: 
+		  t{-a18D-}
+	      {-# L #-}
+	      fail_d2or =
+		  case
+		      ==_a2jr
+			  lit_a2js ds_d2ng
+		  of {
+		    PrelBase.True{-5E,p-}{i} ->
+			lit_a2jp;
+		    PrelBase.False{-58,p-}{i} ->
+			fail_d2o7;
+		  }
+	    } in 
+	      case
+		  ==_a2jw
+		      lit_a2jx ds_d2ng
+	      of {
+		PrelBase.True{-5E,p-}{i} ->
+		    lit_a2ju;
+		PrelBase.False{-58,p-}{i} ->
+		    fail_d2or;
+	      }
+c{-r4u,x-}  :: 
+    _forall_
+    [t{-a19h-} t{-a19j-} t{-a199-} t{-a19d-}]
+    =>
+    {PrelNum.Fractional{-26,p-} t{-a19d-}}
+    -> {PrelBase.Num{-2c,p-} t{-a199-}}
+    -> t{-a19h-}
+    -> t{-a19j-}
+    -> t{-a199-}
+    -> t{-a19d-}
+    -> t{-a19h-}
+{-# L #-}
+c{-r4u,x-} =
+    _/\_ t{-a19h-} t{-a19j-} t{-a199-} t{-a19d-} -> \ d.Fractional_a19r  :: 
+							  {PrelNum.Fractional{-26,p-} t{-a19d-}}
+						      {-# L #-}
+						      d.Fractional_a19r d.Num_a19m  :: 
+									    {PrelBase.Num{-2c,p-} t{-a199-}}
+									{-# L #-}
+									d.Num_a19m ->
+	let {
+	  d.Eq_a19o  :: 
+	      {PrelBase.Eq{-23,p-} t{-a199-}}
+	  {-# L #-}
+	  d.Eq_a19o =
+	      PrelBase.scsel_NumPrelBaseEq{-a2pi,p-}
+		  _@_ t{-a199-} d.Num_a19m } in
+	let {
+	  d.Num_a1b5  :: 
+	      {PrelBase.Num{-2c,p-} t{-a19d-}}
+	  {-# L #-}
+	  d.Num_a1b5 =
+	      PrelNum.scsel_FractionalPrelBaseNum{-a2pr,p-}
+		  _@_ t{-a19d-} d.Fractional_a19r } in
+	let {
+	  d.Eq_a19t  :: 
+	      {PrelBase.Eq{-23,p-} t{-a19d-}}
+	  {-# L #-}
+	  d.Eq_a19t =
+	      PrelBase.scsel_NumPrelBaseEq{-a2pi,p-}
+		  _@_ t{-a19d-} d.Num_a1b5 } in
+	let {
+	  fromInt_a2p8  :: 
+	      PrelBase.Int{-3g,p-} -> t{-a199-}
+	  {-# L #-}
+	  fromInt_a2p8 =
+	      PrelBase.fromInt{-8R,p-}
+		  _@_ t{-a199-} d.Num_a19m } in
+	let { lit_a2p7  :: 
+		  t{-a199-}
+	      {-# L #-}
+	      lit_a2p7 =
+	  let {
+	    ds_d2pO  :: 
+		PrelBase.Int{-3g,p-}
+	    {-# L #-}
+	    ds_d2pO =
+		PrelBase.I#{-5b,p-}{i}
+		    11111
+	  } in 
+	    fromInt_a2p8
+		ds_d2pO
+	} in
+	let {
+	  ==_a2p6  :: 
+	      t{-a199-} -> t{-a199-} -> PrelBase.Bool{-34,p-}
+	  {-# L #-}
+	  ==_a2p6 =
+	      PrelBase.=={-8Y,p-}
+		  _@_ t{-a199-} d.Eq_a19o } in
+	let {
+	  fromRational_a2p5  :: 
+	      PrelNum.Rational{-3r,p-} -> t{-a19d-}
+	  {-# L #-}
+	  fromRational_a2p5 =
+	      PrelNum.fromRational{-8T,p-}
+		  _@_ t{-a19d-} d.Fractional_a19r } in
+	let {
+	  lit_a2p4  :: 
+	      t{-a19d-}
+	  {-# L #-}
+	  lit_a2p4 =
+	      fromRational_a2p5
+		  _rational_  62831853 20000000 } in
+	let {
+	  ==_a2p3  :: 
+	      t{-a19d-} -> t{-a19d-} -> PrelBase.Bool{-34,p-}
+	  {-# L #-}
+	  ==_a2p3 =
+	      PrelBase.=={-8Y,p-}
+		  _@_ t{-a19d-} d.Eq_a19t
+	} in 
+	  \ x_r3H  :: 
+		t{-a19h-}
+	    {-# L #-}
+	    x_r3H ds_d2qY  :: 
+		      t{-a19j-}
+		  {-# L #-}
+		  ds_d2qY ds_d2qZ  :: 
+			      t{-a199-}
+			  {-# L #-}
+			  ds_d2qZ ds_d2qV  :: 
+				      t{-a19d-}
+				  {-# L #-}
+				  ds_d2qV ->
+	      let { ds_d2rv  :: 
+			PrelBase.(){-40,p-}
+		    {-# L #-}
+		    ds_d2rv =
+		let {
+		  fail_d2r0  :: 
+		      PrelBase.(){-40,p-}
+		  {-# L #-}
+		  fail_d2r0 =
+		      GHCerr.irrefutPatError{-8g,p-}
+			  _@_ PrelBase.(){-40,p-} _string_ "ds020.hs:11|3.1415926500000002"
+		} in 
+		  case
+		      ==_a2p3
+			  lit_a2p4 ds_d2qV
+		  of {
+		    PrelBase.True{-5E,p-}{i} ->
+			PrelBase.(){-60,p-}{i}
+			    {};
+		    PrelBase.False{-58,p-}{i} ->
+			fail_d2r0;
+		  }
+	      } in
+	      let { ds_d2rI  :: 
+			PrelBase.(){-40,p-}
+		    {-# L #-}
+		    ds_d2rI =
+		let {
+		  fail_d2rw  :: 
+		      PrelBase.(){-40,p-}
+		  {-# L #-}
+		  fail_d2rw =
+		      GHCerr.irrefutPatError{-8g,p-}
+			  _@_ PrelBase.(){-40,p-} _string_ "ds020.hs:11|11111"
+		} in 
+		  case
+		      ==_a2p6
+			  lit_a2p7 ds_d2qZ
+		  of {
+		    PrelBase.True{-5E,p-}{i} ->
+			PrelBase.(){-60,p-}{i}
+			    {};
+		    PrelBase.False{-58,p-}{i} ->
+			fail_d2rw;
+		  }
+	      } in
+	      let {
+		ds_d2qC  :: 
+		    PrelBase.(){-40,p-}
+		{-# L #-}
+		ds_d2qC =
+		    PrelBase.(){-60,p-}{i}
+			{}
+	      } in 
+		x_r3H
+b{-r4v,x-}  :: 
+    _forall_ [t{-a19Q-} t{-a19X-}] => [t{-a19Q-}] -> [t{-a19X-}]
+{-# L #-}
+b{-r4v,x-} =
+    _/\_ t{-a19Q-} t{-a19X-} -> \ ds_d2sd  :: 
+				      [t{-a19Q-}]
+				  {-# L #-}
+				  ds_d2sd ->
+	let { ds_d2sU  :: 
+		  (t{-a19Q-}, t{-a19Q-}, [t{-a19Q-}])
+	      {-# L #-}
+	      ds_d2sU =
+	  let {
+	    fail_d2se  :: 
+		(t{-a19Q-}, t{-a19Q-}, [t{-a19Q-}])
+	    {-# L #-}
+	    fail_d2se =
+		GHCerr.irrefutPatError{-8g,p-}
+		    _@_ (t{-a19Q-}, t{-a19Q-}, [t{-a19Q-}])
+		    _string_ "ds020.hs:8|(x PrelBase.: (xs PrelBase.: ys))"
+	  } in 
+	    case ds_d2sd of {
+	      PrelBase.[]{-5i,p-}{i} ->
+		  fail_d2se;
+	      PrelBase.:{-55,p-}{i} x_r3z ds_d2sr ->
+		  case ds_d2sr of {
+		    PrelBase.[]{-5i,p-}{i} ->
+			fail_d2se;
+		    PrelBase.:{-55,p-}{i} xs_r3A ys_r3B ->
+			PrelTup.(,,){-63,p-}{i}
+			    {_@_ t{-a19Q-} _@_ t{-a19Q-} _@_ [t{-a19Q-}] x_r3z xs_r3A ys_r3B};
+		  };
+	    }
+	} in
+	let {
+	  x_r3z  :: 
+	      t{-a19Q-}
+	  {-# L #-}
+	  x_r3z =
+	      case ds_d2sU of { PrelTup.(,,){-63,p-}{i} x_r3z xs_r3A ys_r3B  ->
+	      x_r3z;} } in
+	let {
+	  xs_r3A  :: 
+	      t{-a19Q-}
+	  {-# L #-}
+	  xs_r3A =
+	      case ds_d2sU of { PrelTup.(,,){-63,p-}{i} x_r3z xs_r3A ys_r3B  ->
+	      xs_r3A;} } in
+	let {
+	  ys_r3B  :: 
+	      [t{-a19Q-}]
+	  {-# L #-}
+	  ys_r3B =
+	      case ds_d2sU of { PrelTup.(,,){-63,p-}{i} x_r3z xs_r3A ys_r3B  ->
+	      ys_r3B;}
+	} in 
+	  PrelBase.[]{-5i,p-}{i}
+	      _@_ t{-a19X-}
+a{-r4w,x-}  :: 
+    _forall_
+    [t{-a1al-} t{-a1ao-} t{-a1ar-} t{-a1at-}]
+    =>
+    ([t{-a1al-}], [t{-a1ao-}], [t{-a1ar-}]) -> [t{-a1at-}]
+{-# L #-}
+a{-r4w,x-} =
+    _/\_ t{-a1al-} t{-a1ao-} t{-a1ar-} t{-a1at-} -> \ ds_d2tK  :: 
+							  ([t{-a1al-}], [t{-a1ao-}], [t{-a1ar-}])
+						      {-# L #-}
+						      ds_d2tK ->
+	let { ds_d2uH  :: 
+		  PrelBase.(){-40,p-}
+	      {-# L #-}
+	      ds_d2uH =
+	  let {
+	    fail_d2tL  :: 
+		PrelBase.(){-40,p-}
+	    {-# L #-}
+	    fail_d2tL =
+		GHCerr.irrefutPatError{-8g,p-}
+		    _@_ PrelBase.(){-40,p-}
+		    _string_ "ds020.hs:5|(PrelBase.[], PrelBase.[], PrelBase.[])"
+	  } in 
+	    case
+		ds_d2tK
+	    of {
+	    PrelTup.(,,){-63,p-}{i} ds_d2tU ds_d2tW ds_d2tV  ->
+	    case ds_d2tU of {
+	      PrelBase.:{-55,p-}{i} ds_d2u4 ds_d2u3 ->
+		  fail_d2tL;
+	      PrelBase.[]{-5i,p-}{i} ->
+		  case ds_d2tW of {
+		    PrelBase.:{-55,p-}{i} ds_d2ui ds_d2uh ->
+			fail_d2tL;
+		    PrelBase.[]{-5i,p-}{i} ->
+			case ds_d2tV of {
+			  PrelBase.:{-55,p-}{i} ds_d2uw ds_d2uv ->
+			      fail_d2tL;
+			  PrelBase.[]{-5i,p-}{i} ->
+			      PrelBase.(){-60,p-}{i}
+				  {};
+			};
+		  };
+	    };}
+	} in
+	PrelBase.[]{-5i,p-}{i}
+	    _@_ t{-a1at-}
+end Rec }

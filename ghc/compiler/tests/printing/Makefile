@@ -1,10 +1,19 @@
-TOP = ../../../..
-GhcRunTestRules = YES
-include $(TOP)/ghc/mk/ghc.mk
+TOP = ../../..
+include $(TOP)/mk/boilerplate.mk
 
-runtests :: $(patsubst %.hs, %.runtest, $(wildcard *.hs))
+HS_SRCS = $(wildcard *.hs)
 
-print001_flags = -noC -hi
-print002_flags = -noC -fno-implicit-prelude -dppr-user -ddump-rif2hs -ddump-tc -hi
-print003_flags = -noC -hi
-print004_flags = -noC -hi
+SRC_RUNTEST_OPTS += -accept-output -o1 $*.stdout -o2 $*.stderr -x 0
+HC_OPTS += -noC -ddump-tc -dcore-lint -hi
+
+%.o : %.hs
+
+%.o : %.hs
+	$(RUNTEST) $(HC) $(RUNTEST_OPTS) $(HC_OPTS) -c $< -o $@ -osuf $(subst .,,$(suffix $@)) 
+
+all :: $(HS_OBJS)
+
+print002_HC_OPTS = -fno-implicit-prelude -dppr-user -ddump-rdr -ddump-tc
+
+include $(TOP)/mk/target.mk
+

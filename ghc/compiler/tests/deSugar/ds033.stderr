@@ -1,22 +1,162 @@
-Desugared:
-Test.g1 :: for all d. d -> d
-Test.g1 = /\ o91 -> \ y.119 -> y.119
-Test.f1 :: for all d. d -> d
-Test.f1 = /\ t95 -> \ x.120 -> (Test.g1 t95) x.120
-Test.g2 :: for all d. d -> d
-Test.g2 = /\ o98 -> \ y.121 -> y.121
-Test.f2 :: for all d. d -> d
-Test.f2 = /\ t102 -> \ x.122 -> (Test.g2 t102) x.122
-{- plain CoRec -}
-Test.f3 :: for all d, e. d -> e
-Test.f3 = /\ o109 o110 -> \ x.123 -> ((Test.g3 o109) o110) x.123
-Test.g3 :: for all d, e. d -> e
-Test.g3 = /\ o109 o110 -> \ y.124 -> ((Test.f3 o109) o110) y.124
-{- end plain CoRec -}
-{- plain CoRec -}
-Test.g4 :: for all d, e. d -> e
-Test.g4 = /\ o117 o118 -> \ y.125 -> ((Test.f4 o117) o118) y.125
-Test.f4 :: for all d, e. d -> e
-Test.f4 = /\ o117 o118 -> \ x.126 -> ((Test.g4 o117) o118) x.126
-{- end plain CoRec -}
 
+
+================================================================================
+Desugared:
+Rec {
+ds_dsc  :: 
+    _forall_
+    [t{-anl-} t{-ann-}]
+    =>
+    (t{-anl-} -> t{-ann-}, t{-anl-} -> t{-ann-})
+{-# L #-}
+ds_dsc =
+    _/\_ t{-anl-} t{-ann-} ->
+	_letrec_ {
+	  g4_an6  :: 
+	      t{-anl-} -> t{-ann-}
+	  {-# L #-}
+	  g4_an6 =
+	      \ y_r3w  :: 
+		    t{-anl-}
+		{-# L #-}
+		y_r3w ->
+		  f4_an7
+		      y_r3w;
+	  f4_an7  :: 
+	      t{-anl-} -> t{-ann-}
+	  {-# L #-}
+	  f4_an7 =
+	      \ x_r3y  :: 
+		    t{-anl-}
+		{-# L #-}
+		x_r3y ->
+		  g4_an6
+		      x_r3y;
+	} in 
+	  PrelTup.(,){-62,p-}{i}
+	      {_@_ (t{-anl-} -> t{-ann-})
+	       _@_ (t{-anl-} -> t{-ann-})
+	       g4_an6
+	       f4_an7}
+g4{-r3A,x-}  :: 
+    _forall_ [t{-anl-} t{-ann-}] => t{-anl-} -> t{-ann-}
+{-# L #-}
+g4{-r3A,x-} =
+    _/\_ t{-anl-} t{-ann-} ->
+	case
+	    ds_dsc
+		_@_ t{-anl-} _@_ t{-ann-}
+	of {
+	PrelTup.(,){-62,p-}{i} ds_dth ds_dti  ->
+	ds_dth;}
+f4{-r3z,x-}  :: 
+    _forall_ [t{-anl-} t{-ann-}] => t{-anl-} -> t{-ann-}
+{-# L #-}
+f4{-r3z,x-} =
+    _/\_ t{-anl-} t{-ann-} ->
+	case
+	    ds_dsc
+		_@_ t{-anl-} _@_ t{-ann-}
+	of {
+	PrelTup.(,){-62,p-}{i} ds_dtB ds_dtA  ->
+	ds_dtA;}
+end Rec }
+Rec {
+ds_dtM  :: 
+    _forall_
+    [t{-anE-} t{-anG-}]
+    =>
+    (t{-anE-} -> t{-anG-}, t{-anE-} -> t{-anG-})
+{-# L #-}
+ds_dtM =
+    _/\_ t{-anE-} t{-anG-} ->
+	_letrec_ {
+	  f3_anp  :: 
+	      t{-anE-} -> t{-anG-}
+	  {-# L #-}
+	  f3_anp =
+	      \ x_r3s  :: 
+		    t{-anE-}
+		{-# L #-}
+		x_r3s ->
+		  g3_anq
+		      x_r3s;
+	  g3_anq  :: 
+	      t{-anE-} -> t{-anG-}
+	  {-# L #-}
+	  g3_anq =
+	      \ y_r3u  :: 
+		    t{-anE-}
+		{-# L #-}
+		y_r3u ->
+		  f3_anp
+		      y_r3u;
+	} in 
+	  PrelTup.(,){-62,p-}{i}
+	      {_@_ (t{-anE-} -> t{-anG-})
+	       _@_ (t{-anE-} -> t{-anG-})
+	       f3_anp
+	       g3_anq}
+f3{-r3C,x-}  :: 
+    _forall_ [t{-anE-} t{-anG-}] => t{-anE-} -> t{-anG-}
+{-# L #-}
+f3{-r3C,x-} =
+    _/\_ t{-anE-} t{-anG-} ->
+	case
+	    ds_dtM
+		_@_ t{-anE-} _@_ t{-anG-}
+	of {
+	PrelTup.(,){-62,p-}{i} ds_duR ds_duS  ->
+	ds_duR;}
+g3{-r3B,x-}  :: 
+    _forall_ [t{-anE-} t{-anG-}] => t{-anE-} -> t{-anG-}
+{-# L #-}
+g3{-r3B,x-} =
+    _/\_ t{-anE-} t{-anG-} ->
+	case
+	    ds_dtM
+		_@_ t{-anE-} _@_ t{-anG-}
+	of {
+	PrelTup.(,){-62,p-}{i} ds_dvb ds_dva  ->
+	ds_dva;}
+end Rec }
+g2{-r3E,x-}  :: 
+    _forall_ [t{-anO-}] => t{-anO-} -> t{-anO-}
+{-# L #-}
+g2{-r3E,x-} =
+    _/\_ t{-anO-} -> \ y_r3o  :: 
+			   t{-anO-}
+		       {-# L #-}
+		       y_r3o ->
+	y_r3o
+f2{-r3D,x-}  :: 
+    _forall_ [t{-anU-}] => t{-anU-} -> t{-anU-}
+{-# L #-}
+f2{-r3D,x-} =
+    _/\_ t{-anU-} -> \ x_r3q  :: 
+			   t{-anU-}
+		       {-# L #-}
+		       x_r3q ->
+	g2{-r3E,x-}
+	    _@_ t{-anU-} x_r3q
+g1{-r3F,x-}  :: 
+    _forall_ [t{-ao4-}] => t{-ao4-} -> t{-ao4-}
+{-# L #-}
+g1{-r3F,x-} =
+    _/\_ t{-ao4-} -> \ y_r3m  :: 
+			   t{-ao4-}
+		       {-# L #-}
+		       y_r3m ->
+	y_r3m
+f1{-r3G,x-}  :: 
+    _forall_ [t{-aoa-}] => t{-aoa-} -> t{-aoa-}
+{-# L #-}
+f1{-r3G,x-} =
+    _/\_ t{-aoa-} -> \ x_r3k  :: 
+			   t{-aoa-}
+		       {-# L #-}
+		       x_r3k ->
+	g1{-r3F,x-}
+	    _@_ t{-aoa-} x_r3k
+
+NOTE: Simplifier still going after 4 iterations; bailing out.

@@ -1,37 +1,36 @@
 --!!! string gaps
 --!!!
+module Main(main) where
 
 -----------
 
-main = appendChan stdout "\
+main = putStr "\
 
 \Some girls give me money\n\
 
 \Some girls buy me clothes\n\
 
 \..."
-	  exit done
 
 -----------
 
-main2 = appendChan stdout "\
+main2 = putStr "\
 \ \
-..." exit done
+..."
 
 -----------
 
-main3 = appendChan stdout "\
+main3 = putStr "\
 
 \Some girls give me money\n\
 -- and here is a comment
 \Some girls buy me clothes\n\
 
 \..."
-	  exit done
 
 -----------
 
-main3 = appendChan stdout "\
+main3 = putStr "\
 {-
     and here is a nested {- comment -}
 -}
@@ -40,4 +39,3 @@ main3 = appendChan stdout "\
 \Some girls buy me clothes\n\
 
 \..."
-	  exit done

@@ -1,12 +1,131 @@
-Desugared:
-{- plain CoRec -}
-Tests.f :: for all d, e. <Num e> -> <Eq d> -> d -> e
-Tests.f =
-    /\ t83 t90 -> \ dict.91 dict.84 x.93 ->
-	((Tests.g t83) t90) dict.91 dict.84 ((== t83) dict.84 x.93 x.93) x.93
-Tests.g :: for all d, e. <Num e> -> <Eq d> -> Bool -> d -> e
-Tests.g =
-    /\ t83 t90 -> \ dict.91 dict.84 b.94 x.95 ->
-	(abs t90) dict.91 (((Tests.f t83) t90) dict.91 dict.84 x.95)
-{- end plain CoRec -}
 
+
+================================================================================
+Desugared:
+Rec {
+ds_dK5  :: 
+    _forall_
+    [rlg{-aHq-} riC{-aHC-}]
+    =>
+    {PrelBase.Num{-2c,p-} riC{-aHC-}}
+    -> {PrelBase.Eq{-23,p-} rlg{-aHq-}}
+    -> (rlg{-aHq-} -> riC{-aHC-}, PrelBase.Bool{-34,p-}
+				  -> rlg{-aHq-}
+				  -> riC{-aHC-})
+{-# L #-}
+ds_dK5 =
+    _/\_ rlg{-aHq-} riC{-aHC-} -> \ d.Num_aHI  :: 
+					{PrelBase.Num{-2c,p-} riC{-aHC-}}
+				    {-# L #-}
+				    d.Num_aHI d.Eq_aHG  :: 
+						  {PrelBase.Eq{-23,p-} rlg{-aHq-}}
+					      {-# L #-}
+					      d.Eq_aHG ->
+	_letrec_ {
+	  ==_aKk  :: 
+	      rlg{-aHq-} -> rlg{-aHq-} -> PrelBase.Bool{-34,p-}
+	  {-# L #-}
+	  ==_aKk =
+	      PrelBase.=={-8Y,p-}
+		  _@_ rlg{-aHq-} d.Eq_aHG;
+	  abs_aKr  :: 
+	      riC{-aHC-} -> riC{-aHC-}
+	  {-# L #-}
+	  abs_aKr =
+	      PrelBase.abs{-r3j,p-}
+		  _@_ riC{-aHC-} d.Num_aHI;
+	  f_aHi  :: 
+	      rlg{-aHq-} -> riC{-aHC-}
+	  {-# L #-}
+	  f_aHi =
+	      \ x_r3e  :: 
+		    rlg{-aHq-}
+		{-# L #-}
+		x_r3e ->
+		  let {
+		    ds_dL3  :: 
+			PrelBase.Bool{-34,p-}
+		    {-# L #-}
+		    ds_dL3 =
+			==_aKk
+			    x_r3e x_r3e
+		  } in 
+		    g_aHj
+			ds_dL3 x_r3e;
+	  g_aHj  :: 
+	      PrelBase.Bool{-34,p-} -> rlg{-aHq-} -> riC{-aHC-}
+	  {-# L #-}
+	  g_aHj =
+	      \ b_r3g  :: 
+		    PrelBase.Bool{-34,p-}
+		{-# L #-}
+		b_r3g x_r3i  :: 
+			  rlg{-aHq-}
+		      {-# L #-}
+		      x_r3i ->
+		  let {
+		    ds_dLq  :: 
+			riC{-aHC-}
+		    {-# L #-}
+		    ds_dLq =
+			f_aHi
+			    x_r3i
+		  } in 
+		    abs_aKr
+			ds_dLq;
+	} in 
+	  PrelTup.(,){-62,p-}{i}
+	      {_@_ (rlg{-aHq-} -> riC{-aHC-})
+	       _@_ (PrelBase.Bool{-34,p-} -> rlg{-aHq-} -> riC{-aHC-})
+	       f_aHi
+	       g_aHj}
+f{-r3l,x-}  :: 
+    _forall_
+    [rlg{-aHq-} riC{-aHC-}]
+    =>
+    {PrelBase.Num{-2c,p-} riC{-aHC-}}
+    -> {PrelBase.Eq{-23,p-} rlg{-aHq-}}
+    -> rlg{-aHq-}
+    -> riC{-aHC-}
+{-# L #-}
+f{-r3l,x-} =
+    _/\_ rlg{-aHq-} riC{-aHC-} -> \ d.Num_aHI  :: 
+					{PrelBase.Num{-2c,p-} riC{-aHC-}}
+				    {-# L #-}
+				    d.Num_aHI d.Eq_aHG  :: 
+						  {PrelBase.Eq{-23,p-} rlg{-aHq-}}
+					      {-# L #-}
+					      d.Eq_aHG ->
+	case
+	    ds_dK5
+		_@_ rlg{-aHq-} _@_ riC{-aHC-} d.Num_aHI d.Eq_aHG
+	of {
+	PrelTup.(,){-62,p-}{i} ds_dM9 ds_dMa  ->
+	ds_dM9;}
+g{-r3k,x-}  :: 
+    _forall_
+    [rlg{-aHq-} riC{-aHC-}]
+    =>
+    {PrelBase.Num{-2c,p-} riC{-aHC-}}
+    -> {PrelBase.Eq{-23,p-} rlg{-aHq-}}
+    -> PrelBase.Bool{-34,p-}
+    -> rlg{-aHq-}
+    -> riC{-aHC-}
+{-# L #-}
+g{-r3k,x-} =
+    _/\_ rlg{-aHq-} riC{-aHC-} -> \ d.Num_aHI  :: 
+					{PrelBase.Num{-2c,p-} riC{-aHC-}}
+				    {-# L #-}
+				    d.Num_aHI d.Eq_aHG  :: 
+						  {PrelBase.Eq{-23,p-} rlg{-aHq-}}
+					      {-# L #-}
+					      d.Eq_aHG ->
+	case
+	    ds_dK5
+		_@_ rlg{-aHq-} _@_ riC{-aHC-} d.Num_aHI d.Eq_aHG
+	of {
+	PrelTup.(,){-62,p-}{i} ds_dMB ds_dMA  ->
+	ds_dMA;}
+end Rec }
+
+NOTE: Simplifier still going after 4 iterations; bailing out.

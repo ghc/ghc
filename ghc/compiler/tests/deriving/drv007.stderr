@@ -1,0 +1,13 @@
+ 
+drv007.hs:2: No instance for class
+	     `PrelBase.Eq'
+	     at type
+	     `PrelBase.Int -> PrelBase.Int'
+ 
+drv007.hs:4: No instance for:
+		 `PrelBase.Eq (PrelBase.Int -> PrelBase.Int)'
+    drv007.hs:4:
+	at a use of an overloaded identifier: `PrelBase.=='
+
+
+Compilation had errors

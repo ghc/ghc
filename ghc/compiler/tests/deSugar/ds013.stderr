@@ -1,89 +1,375 @@
-Desugared:
-Tests.f :: for all d. <Fractional d> -> d
-Tests.f =
-    /\ t78 -> \ dict.97 ->
-	let dict.95 = dict.97 in
-	let dict.90 = dict.95 in
-	let dict.87 = dict.90 in
-	let dict.85 = dict.87 in
-	let dict.93 = (sdsel.Fractional.Num t78) dict.85 in
-	let dict.83 = dict.93 in
-	let dict.81 = dict.83 in
-	let dict.79 = dict.81 in
-	let
-	  f.77 =
-	      (+ t78)
-		  dict.79
-		  ((- t78)
-		       dict.81
-		       ((+ t78)
-			    dict.83
-			    ((fromRational t78)
-				 dict.85 (MkDouble! 1.5000000000000000##))
-			    ((fromRational t78)
-				 dict.87 (MkDouble! 2.0000000000000000##)))
-		       ((fromRational t78)
-			    dict.90 (MkDouble! 3.1415926500000002##)))
-		  ((* t78)
-		       dict.93
-		       ((fromRational t78)
-			    dict.95 (MkDouble! 4.2000000000000002##))
-		       ((fromRational t78)
-			    dict.97 (MkDouble! 5.1111111111111107##)))
-	in  f.77
-dict.103 :: <Num Float>
-dict.103 = dfun.Num.Float
-dict.105 :: <Num Float>
-dict.105 = dfun.Num.Float
-dict.107 :: <Num Float>
-dict.107 = dfun.Num.Float
-dict.109 :: <Fractional Float>
-dict.109 = dfun.Fractional.Float
-dict.111 :: <Fractional Float>
-dict.111 = dfun.Fractional.Float
-dict.114 :: <Fractional Float>
-dict.114 = dfun.Fractional.Float
-dict.117 :: <Num Float>
-dict.117 = dfun.Num.Float
-dict.119 :: <Fractional Float>
-dict.119 = dfun.Fractional.Float
-dict.121 :: <Fractional Float>
-dict.121 = dfun.Fractional.Float
-Tests.g :: Float
-Tests.g =
-    plusFloat
-	(minusFloat
-	     (plusFloat
-		  (MkFloat! 1.5000000000000000#) (MkFloat! 2.0000000000000000#))
-	     (MkFloat! 3.1415926500000002#))
-	(timesFloat
-	     (MkFloat! 4.2000000000000002#) (MkFloat! 5.1111111111111107#))
-dict.127 :: <Num Double>
-dict.127 = dfun.Num.Double
-dict.129 :: <Num Double>
-dict.129 = dfun.Num.Double
-dict.131 :: <Num Double>
-dict.131 = dfun.Num.Double
-dict.133 :: <Fractional Double>
-dict.133 = dfun.Fractional.Double
-dict.135 :: <Fractional Double>
-dict.135 = dfun.Fractional.Double
-dict.138 :: <Fractional Double>
-dict.138 = dfun.Fractional.Double
-dict.141 :: <Num Double>
-dict.141 = dfun.Num.Double
-dict.143 :: <Fractional Double>
-dict.143 = dfun.Fractional.Double
-dict.145 :: <Fractional Double>
-dict.145 = dfun.Fractional.Double
-Tests.h :: Double
-Tests.h =
-    plusDouble
-	(minusDouble
-	     (plusDouble
-		  (MkDouble! 1.5000000000000000##)
-		  (MkDouble! 2.0000000000000000##))
-	     (MkDouble! 3.1415926500000002##))
-	(timesDouble
-	     (MkDouble! 4.2000000000000002##) (MkDouble! 5.1111111111111107##))
 
+
+================================================================================
+Desugared:
+Rec {
+d.Num_a12Q  :: 
+    {PrelBase.Num{-2c,p-} PrelBase.Double{-3a,p-}}
+{-# L #-}
+d.Num_a12Q =
+    PrelNum.$d16{-rrq,p-}
++_a19S  :: 
+    PrelBase.Double{-3a,p-}
+    -> PrelBase.Double{-3a,p-}
+    -> PrelBase.Double{-3a,p-}
+{-# L #-}
++_a19S =
+    PrelBase.+{-rcF,p-}
+	_@_ PrelBase.Double{-3a,p-} d.Num_a12Q
+d.Num_a12T  :: 
+    {PrelBase.Num{-2c,p-} PrelBase.Double{-3a,p-}}
+{-# L #-}
+d.Num_a12T =
+    d.Num_a12Q
+-_a19R  :: 
+    PrelBase.Double{-3a,p-}
+    -> PrelBase.Double{-3a,p-}
+    -> PrelBase.Double{-3a,p-}
+{-# L #-}
+-_a19R =
+    PrelBase.-{-817,p-}
+	_@_ PrelBase.Double{-3a,p-} d.Num_a12T
+d.Fractional_a12W  :: 
+    {PrelNum.Fractional{-26,p-} PrelBase.Double{-3a,p-}}
+{-# L #-}
+d.Fractional_a12W =
+    PrelNum.$d14{-rro,p-}
+fromRational_a19Q  :: 
+    PrelNum.Rational{-3r,p-} -> PrelBase.Double{-3a,p-}
+{-# L #-}
+fromRational_a19Q =
+    PrelNum.fromRational{-8T,p-}
+	_@_ PrelBase.Double{-3a,p-} d.Fractional_a12W
+lit_a19P  :: 
+    PrelBase.Double{-3a,p-}
+{-# L #-}
+lit_a19P =
+    fromRational_a19Q
+	_rational_  3 2
+fromRational_a19O  :: 
+    PrelNum.Rational{-3r,p-} -> PrelBase.Double{-3a,p-}
+{-# L #-}
+fromRational_a19O =
+    fromRational_a19Q
+lit_a19N  :: 
+    PrelBase.Double{-3a,p-}
+{-# L #-}
+lit_a19N =
+    fromRational_a19O
+	_rational_  2 1
+fromRational_a19M  :: 
+    PrelNum.Rational{-3r,p-} -> PrelBase.Double{-3a,p-}
+{-# L #-}
+fromRational_a19M =
+    fromRational_a19Q
+lit_a19L  :: 
+    PrelBase.Double{-3a,p-}
+{-# L #-}
+lit_a19L =
+    fromRational_a19M
+	_rational_  62831853 20000000
+d.Num_a131  :: 
+    {PrelBase.Num{-2c,p-} PrelBase.Double{-3a,p-}}
+{-# L #-}
+d.Num_a131 =
+    d.Num_a12Q
+*_a19K  :: 
+    PrelBase.Double{-3a,p-}
+    -> PrelBase.Double{-3a,p-}
+    -> PrelBase.Double{-3a,p-}
+{-# L #-}
+*_a19K =
+    PrelBase.*{-rU,p-}
+	_@_ PrelBase.Double{-3a,p-} d.Num_a131
+fromRational_a19J  :: 
+    PrelNum.Rational{-3r,p-} -> PrelBase.Double{-3a,p-}
+{-# L #-}
+fromRational_a19J =
+    fromRational_a19Q
+lit_a19I  :: 
+    PrelBase.Double{-3a,p-}
+{-# L #-}
+lit_a19I =
+    fromRational_a19J
+	_rational_  21 5
+fromRational_a19H  :: 
+    PrelNum.Rational{-3r,p-} -> PrelBase.Double{-3a,p-}
+{-# L #-}
+fromRational_a19H =
+    fromRational_a19Q
+lit_a19G  :: 
+    PrelBase.Double{-3a,p-}
+{-# L #-}
+lit_a19G =
+    fromRational_a19H
+	_rational_  5111111111111111111111111111 1000000000000000000000000000
+d.Num_a135  :: 
+    {PrelBase.Num{-2c,p-} PrelBase.Float{-3c,p-}}
+{-# L #-}
+d.Num_a135 =
+    PrelNum.$d25{-rrA,p-}
++_a19F  :: 
+    PrelBase.Float{-3c,p-}
+    -> PrelBase.Float{-3c,p-}
+    -> PrelBase.Float{-3c,p-}
+{-# L #-}
++_a19F =
+    PrelBase.+{-rcF,p-}
+	_@_ PrelBase.Float{-3c,p-} d.Num_a135
+d.Num_a138  :: 
+    {PrelBase.Num{-2c,p-} PrelBase.Float{-3c,p-}}
+{-# L #-}
+d.Num_a138 =
+    d.Num_a135
+-_a19E  :: 
+    PrelBase.Float{-3c,p-}
+    -> PrelBase.Float{-3c,p-}
+    -> PrelBase.Float{-3c,p-}
+{-# L #-}
+-_a19E =
+    PrelBase.-{-817,p-}
+	_@_ PrelBase.Float{-3c,p-} d.Num_a138
+d.Fractional_a13b  :: 
+    {PrelNum.Fractional{-26,p-} PrelBase.Float{-3c,p-}}
+{-# L #-}
+d.Fractional_a13b =
+    PrelNum.$d23{-rry,p-}
+fromRational_a19D  :: 
+    PrelNum.Rational{-3r,p-} -> PrelBase.Float{-3c,p-}
+{-# L #-}
+fromRational_a19D =
+    PrelNum.fromRational{-8T,p-}
+	_@_ PrelBase.Float{-3c,p-} d.Fractional_a13b
+lit_a19C  :: 
+    PrelBase.Float{-3c,p-}
+{-# L #-}
+lit_a19C =
+    fromRational_a19D
+	_rational_  3 2
+fromRational_a19B  :: 
+    PrelNum.Rational{-3r,p-} -> PrelBase.Float{-3c,p-}
+{-# L #-}
+fromRational_a19B =
+    fromRational_a19D
+lit_a19A  :: 
+    PrelBase.Float{-3c,p-}
+{-# L #-}
+lit_a19A =
+    fromRational_a19B
+	_rational_  2 1
+fromRational_a19z  :: 
+    PrelNum.Rational{-3r,p-} -> PrelBase.Float{-3c,p-}
+{-# L #-}
+fromRational_a19z =
+    fromRational_a19D
+lit_a19y  :: 
+    PrelBase.Float{-3c,p-}
+{-# L #-}
+lit_a19y =
+    fromRational_a19z
+	_rational_  62831853 20000000
+d.Num_a13g  :: 
+    {PrelBase.Num{-2c,p-} PrelBase.Float{-3c,p-}}
+{-# L #-}
+d.Num_a13g =
+    d.Num_a135
+*_a19x  :: 
+    PrelBase.Float{-3c,p-}
+    -> PrelBase.Float{-3c,p-}
+    -> PrelBase.Float{-3c,p-}
+{-# L #-}
+*_a19x =
+    PrelBase.*{-rU,p-}
+	_@_ PrelBase.Float{-3c,p-} d.Num_a13g
+fromRational_a19w  :: 
+    PrelNum.Rational{-3r,p-} -> PrelBase.Float{-3c,p-}
+{-# L #-}
+fromRational_a19w =
+    fromRational_a19D
+lit_a19v  :: 
+    PrelBase.Float{-3c,p-}
+{-# L #-}
+lit_a19v =
+    fromRational_a19w
+	_rational_  21 5
+fromRational_a19u  :: 
+    PrelNum.Rational{-3r,p-} -> PrelBase.Float{-3c,p-}
+{-# L #-}
+fromRational_a19u =
+    fromRational_a19D
+lit_a19r  :: 
+    PrelBase.Float{-3c,p-}
+{-# L #-}
+lit_a19r =
+    fromRational_a19u
+	_rational_  5111111111111111111111111111 1000000000000000000000000000
++_a19q  :: 
+    PrelBase.Double{-3a,p-}
+    -> PrelBase.Double{-3a,p-}
+    -> PrelBase.Double{-3a,p-}
+{-# L #-}
++_a19q =
+    +_a19S
+-_a19p  :: 
+    PrelBase.Double{-3a,p-}
+    -> PrelBase.Double{-3a,p-}
+    -> PrelBase.Double{-3a,p-}
+{-# L #-}
+-_a19p =
+    -_a19R
+lit_a19o  :: 
+    PrelBase.Double{-3a,p-}
+{-# L #-}
+lit_a19o =
+    lit_a19P
+lit_a19n  :: 
+    PrelBase.Double{-3a,p-}
+{-# L #-}
+lit_a19n =
+    lit_a19N
+lit_a19m  :: 
+    PrelBase.Double{-3a,p-}
+{-# L #-}
+lit_a19m =
+    lit_a19L
+*_a19l  :: 
+    PrelBase.Double{-3a,p-}
+    -> PrelBase.Double{-3a,p-}
+    -> PrelBase.Double{-3a,p-}
+{-# L #-}
+*_a19l =
+    *_a19K
+lit_a19k  :: 
+    PrelBase.Double{-3a,p-}
+{-# L #-}
+lit_a19k =
+    lit_a19I
+lit_a19j  :: 
+    PrelBase.Double{-3a,p-}
+{-# L #-}
+lit_a19j =
+    lit_a19G
++_a19i  :: 
+    PrelBase.Double{-3a,p-}
+    -> PrelBase.Double{-3a,p-}
+    -> PrelBase.Double{-3a,p-}
+{-# L #-}
++_a19i =
+    +_a19q
+h_a106  :: 
+    PrelBase.Double{-3a,p-}
+{-# L #-}
+h_a106 =
+    let { ds_d1hq  :: 
+	      PrelBase.Double{-3a,p-}
+	  {-# L #-}
+	  ds_d1hq =
+      let {
+	ds_d1hC  :: 
+	    PrelBase.Double{-3a,p-}
+	{-# L #-}
+	ds_d1hC =
+	    +_a19i
+		lit_a19o lit_a19n
+      } in 
+	-_a19p
+	    ds_d1hC lit_a19m
+    } in
+    let {
+      ds_d1hu  :: 
+	  PrelBase.Double{-3a,p-}
+      {-# L #-}
+      ds_d1hu =
+	  *_a19l
+	      lit_a19k lit_a19j
+    } in 
+      +_a19q
+	  ds_d1hq ds_d1hu
+h{-r4,x-}  :: 
+    PrelBase.Double{-3a,p-}
+{-# L #-}
+h{-r4,x-} =
+    h_a106
++_a1aJ  :: 
+    PrelBase.Float{-3c,p-}
+    -> PrelBase.Float{-3c,p-}
+    -> PrelBase.Float{-3c,p-}
+{-# L #-}
++_a1aJ =
+    +_a19F
+g_a10L  :: 
+    PrelBase.Float{-3c,p-}
+{-# L #-}
+g_a10L =
+    let { ds_d1ib  :: 
+	      PrelBase.Float{-3c,p-}
+	  {-# L #-}
+	  ds_d1ib =
+      let {
+	ds_d1in  :: 
+	    PrelBase.Float{-3c,p-}
+	{-# L #-}
+	ds_d1in =
+	    +_a1aJ
+		lit_a19C lit_a19A
+      } in 
+	-_a19E
+	    ds_d1in lit_a19y
+    } in
+    let {
+      ds_d1if  :: 
+	  PrelBase.Float{-3c,p-}
+      {-# L #-}
+      ds_d1if =
+	  *_a19x
+	      lit_a19v lit_a19r
+    } in 
+      +_a19F
+	  ds_d1ib ds_d1if
+g{-r2,x-}  :: 
+    PrelBase.Float{-3c,p-}
+{-# L #-}
+g{-r2,x-} =
+    g_a10L
++_a1bs  :: 
+    PrelBase.Double{-3a,p-}
+    -> PrelBase.Double{-3a,p-}
+    -> PrelBase.Double{-3a,p-}
+{-# L #-}
++_a1bs =
+    +_a19S
+f_a11q  :: 
+    PrelBase.Double{-3a,p-}
+{-# L #-}
+f_a11q =
+    let { ds_d1iW  :: 
+	      PrelBase.Double{-3a,p-}
+	  {-# L #-}
+	  ds_d1iW =
+      let {
+	ds_d1j8  :: 
+	    PrelBase.Double{-3a,p-}
+	{-# L #-}
+	ds_d1j8 =
+	    +_a1bs
+		lit_a19P lit_a19N
+      } in 
+	-_a19R
+	    ds_d1j8 lit_a19L
+    } in
+    let {
+      ds_d1j0  :: 
+	  PrelBase.Double{-3a,p-}
+      {-# L #-}
+      ds_d1j0 =
+	  *_a19K
+	      lit_a19I lit_a19G
+    } in 
+      +_a19S
+	  ds_d1iW ds_d1j0
+f{-r5,x-}  :: 
+    PrelBase.Double{-3a,p-}
+{-# L #-}
+f{-r5,x-} =
+    f_a11q
+end Rec }

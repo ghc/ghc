@@ -1,27 +1,110 @@
-Desugared:
-{- plain CoRec -}
-defm.Test.Foo.op1 :: for all a. <Test.Foo a> -> a -> a
-defm.Test.Foo.op1 = /\ a -> (error (a -> a)) "No default method for \"op1\"\n"S
-defm.Test.Foo.op2 :: for all a. <Test.Foo a> -> a -> a
-defm.Test.Foo.op2 = /\ a -> (error (a -> a)) "No default method for \"op2\"\n"S
-Test.Foo.op1 :: for all a. <Test.Foo a> -> a -> a
-Test.Foo.op1 =
-    /\ a -> \ ds.95 ->
-	case ds.95 of {
-	  MkTuple2 op1.77 op2.78 -> op1.77
-	}
-Test.Foo.op2 :: for all a. <Test.Foo a> -> a -> a
-Test.Foo.op2 =
-    /\ a -> \ ds.96 ->
-	case ds.96 of {
-	  MkTuple2 op1.80 op2.81 -> op2.81
-	}
-dfun.Test.Foo.Int :: <Test.Foo Int>
-dfun.Test.Foo.Int =
-    let dict.89 = dfun.Test.Foo.Int in
-    let op1.85 = \ x.97 -> (Test.Foo.op2 Int) dict.89 x.97 in
-    let dict.93 = dfun.Test.Foo.Int in
-    let op2.86 = \ y.98 -> (Test.Foo.op1 Int) dict.93 y.98
-    in  MkTuple2! (Int -> Int) (Int -> Int) op1.85 op2.86
-{- end plain CoRec -}
 
+
+================================================================================
+Desugared:
+Rec {
+op1{-r3r,x-}  :: 
+    _forall_
+    [a{-r3p-}]
+    =>
+    {Foo{-r3s,x-} a{-r3p-}} -> a{-r3p-} -> a{-r3p-}
+{-# L #-}
+op1{-r3r,x-} =
+    _/\_ a{-r3p-} -> \ tpl_B1  :: 
+			   {Foo{-r3s,x-} a{-r3p-}}
+		       {-# L #-}
+		       tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,p-}{i} tpl_B1 tpl_B2  -> tpl_B1;}
+op2{-r3q,x-}  :: 
+    _forall_
+    [a{-r3p-}]
+    =>
+    {Foo{-r3s,x-} a{-r3p-}} -> a{-r3p-} -> a{-r3p-}
+{-# L #-}
+op2{-r3q,x-} =
+    _/\_ a{-r3p-} -> \ tpl_B1  :: 
+			   {Foo{-r3s,x-} a{-r3p-}}
+		       {-# L #-}
+		       tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,p-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
+$mop1{-rn8,x-}  :: 
+    _forall_
+    [a{-r3p-}]
+    =>
+    {Foo{-r3s,x-} a{-r3p-}} -> a{-r3p-} -> a{-r3p-}
+{-# L #-}
+$mop1{-rn8,x-} =
+    _/\_ a{-anB-} -> \ d.Foo_anu  :: 
+			   {Foo{-r3s,x-} a{-anB-}}
+		       {-# L #-}
+		       d.Foo_anu ->
+	GHCerr.noDefaultMethodError{-8k,p-}
+	    _@_ (a{-anB-} -> a{-anB-}) _string_ "Class Foo Method op1"
+$mop2{-rn7,x-}  :: 
+    _forall_
+    [a{-r3p-}]
+    =>
+    {Foo{-r3s,x-} a{-r3p-}} -> a{-r3p-} -> a{-r3p-}
+{-# L #-}
+$mop2{-rn7,x-} =
+    _/\_ a{-anB-} -> \ d.Foo_anE  :: 
+			   {Foo{-r3s,x-} a{-anB-}}
+		       {-# L #-}
+		       d.Foo_anE ->
+	GHCerr.noDefaultMethodError{-8k,p-}
+	    _@_ (a{-anB-} -> a{-anB-}) _string_ "Class Foo Method op2"
+op2_aq8  :: 
+    PrelBase.Int{-3g,p-} -> PrelBase.Int{-3g,p-}
+{-# L #-}
+op2_aq8 =
+    op2_aqv
+op1_aqd  :: 
+    PrelBase.Int{-3g,p-} -> PrelBase.Int{-3g,p-}
+{-# L #-}
+op1_aqd =
+    op1_aqm
+op1_an6  :: 
+    PrelBase.Int{-3g,p-} -> PrelBase.Int{-3g,p-}
+{-# L #-}
+op1_an6 =
+    \ x_r3i  :: 
+	  PrelBase.Int{-3g,p-}
+      {-# L #-}
+      x_r3i ->
+	op2_aq8
+	    x_r3i
+op1_aqm  :: 
+    PrelBase.Int{-3g,p-} -> PrelBase.Int{-3g,p-}
+{-# L #-}
+op1_aqm =
+    op1_an6
+op2_anj  :: 
+    PrelBase.Int{-3g,p-} -> PrelBase.Int{-3g,p-}
+{-# L #-}
+op2_anj =
+    \ y_r3m  :: 
+	  PrelBase.Int{-3g,p-}
+      {-# L #-}
+      y_r3m ->
+	op1_aqd
+	    y_r3m
+op2_aqv  :: 
+    PrelBase.Int{-3g,p-} -> PrelBase.Int{-3g,p-}
+{-# L #-}
+op2_aqv =
+    op2_anj
+d.Foo_an3  :: 
+    {Foo{-r3s,x-} PrelBase.Int{-3g,p-}}
+{-# L #-}
+d.Foo_an3 =
+    PrelTup.(,){-62,p-}{i}
+	{_@_ (PrelBase.Int{-3g,p-} -> PrelBase.Int{-3g,p-})
+	 _@_ (PrelBase.Int{-3g,p-} -> PrelBase.Int{-3g,p-})
+	 op1_aqm
+	 op2_aqv}
+$d1{-rqE,x-}  :: 
+    {Foo{-r3s,x-} PrelBase.Int{-3g,p-}}
+{-# L #-}
+$d1{-rqE,x-} =
+    d.Foo_an3
+end Rec }

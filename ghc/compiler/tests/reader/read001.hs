@@ -1,4 +1,4 @@
--- this module supposedly includes one of each Haskell construct
+--!!! this module supposedly includes one of each Haskell construct
 
 -- HsImpExp stuff
 

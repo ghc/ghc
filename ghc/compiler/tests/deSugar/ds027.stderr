@@ -1,44 +1,118 @@
-Desugared:
-{- plain CoRec -}
-dfun.Eq.Test.Foo :: <Eq Test.Foo>
-dfun.Eq.Test.Foo =
-    let
-      ==.76 =
-	  \ ds.83 ds.84 ->
-	      let
-		fail.85 =
-		    (error Bool)
-			"\"ds027.hs\", line 8: pattern-matching failure [function binding]\n"S
-	      in 
-		case ds.83 of {
-		  Test.Bar ->
-		      case ds.84 of {
-			Test.Baz -> True
-			_ ->  fail.85
-		      }
-		  _ ->  fail.85
-		} in
-    let
-      /=.77 =
-	  \ ds.89 ds.90 ->
-	      let
-		fail.91 =
-		    (error Bool)
-			"\"ds027.hs\", line 9: pattern-matching failure [function binding]\n"S
-	      in 
-		case ds.89 of {
-		  Test.Bar ->
-		      case ds.90 of {
-			Test.Baz -> False
-			_ ->  fail.91
-		      }
-		  _ ->  fail.91
-		}
-    in 
-      MkTuple2!
-	  (Test.Foo -> Test.Foo -> Bool)
-	  (Test.Foo -> Test.Foo -> Bool)
-	  ==.76
-	  /=.77
-{- end plain CoRec -}
+ds027.hs:8: 
+    Warning: Possibly incomplete patterns
+	in the definition of function `=='
+ds027.hs:9: 
+    Warning: Possibly incomplete patterns
+	in the definition of function `/='
 
+
+================================================================================
+Desugared:
+Rec {
+d.Eval_aGg  :: 
+    {PrelBase.Eval{-24,p-} Foo{-r3n,x-}}
+{-# L #-}
+d.Eval_aGg =
+    PrelBase.void{-8G,p-}
+$d2{-rIX,x-}  :: 
+    {PrelBase.Eval{-24,p-} Foo{-r3n,x-}}
+{-# L #-}
+$d2{-rIX,x-} =
+    d.Eval_aGg
+==_aGo  :: 
+    Foo{-r3n,x-} -> Foo{-r3n,x-} -> PrelBase.Bool{-34,p-}
+{-# L #-}
+==_aGo =
+    \ ds_dJM  :: 
+	  Foo{-r3n,x-}
+      {-# L #-}
+      ds_dJM ds_dJN  :: 
+		 Foo{-r3n,x-}
+	     {-# L #-}
+	     ds_dJN ->
+	let {
+	  fail_dJO  :: 
+	      PrelBase.Bool{-34,p-}
+	  {-# L #-}
+	  fail_dJO =
+	      GHCerr.patError{-8r,p-}
+		  _@_ PrelBase.Bool{-34,p-} _string_ "ds027.hs:8|function `=='"
+	} in 
+	  case ds_dJM of {
+	    Baz{-r3,x-}{i} ->
+		fail_dJO;
+	    Bar{-r4,x-}{i} ->
+		case ds_dJN of {
+		  Bar{-r4,x-}{i} ->
+		      fail_dJO;
+		  Baz{-r3,x-}{i} ->
+		      PrelBase.True{-5E,p-}{i};
+		};
+	  }
+==_aJ7  :: 
+    Foo{-r3n,x-} -> Foo{-r3n,x-} -> PrelBase.Bool{-34,p-}
+{-# L #-}
+==_aJ7 =
+    ==_aGo
+/=_aGs  :: 
+    Foo{-r3n,x-} -> Foo{-r3n,x-} -> PrelBase.Bool{-34,p-}
+{-# L #-}
+/=_aGs =
+    \ ds_dKq  :: 
+	  Foo{-r3n,x-}
+      {-# L #-}
+      ds_dKq ds_dKr  :: 
+		 Foo{-r3n,x-}
+	     {-# L #-}
+	     ds_dKr ->
+	let {
+	  fail_dKs  :: 
+	      PrelBase.Bool{-34,p-}
+	  {-# L #-}
+	  fail_dKs =
+	      GHCerr.patError{-8r,p-}
+		  _@_ PrelBase.Bool{-34,p-} _string_ "ds027.hs:9|function `/='"
+	} in 
+	  case ds_dKq of {
+	    Baz{-r3,x-}{i} ->
+		fail_dKs;
+	    Bar{-r4,x-}{i} ->
+		case ds_dKr of {
+		  Bar{-r4,x-}{i} ->
+		      fail_dKs;
+		  Baz{-r3,x-}{i} ->
+		      PrelBase.False{-58,p-}{i};
+		};
+	  }
+/=_aJg  :: 
+    Foo{-r3n,x-} -> Foo{-r3n,x-} -> PrelBase.Bool{-34,p-}
+{-# L #-}
+/=_aJg =
+    /=_aGs
+d.Eq_aGl  :: 
+    {PrelBase.Eq{-23,p-} Foo{-r3n,x-}}
+{-# L #-}
+d.Eq_aGl =
+    PrelTup.(,){-62,p-}{i}
+	{_@_ (Foo{-r3n,x-} -> Foo{-r3n,x-} -> PrelBase.Bool{-34,p-})
+	 _@_ (Foo{-r3n,x-} -> Foo{-r3n,x-} -> PrelBase.Bool{-34,p-})
+	 ==_aJ7
+	 /=_aJg}
+$d1{-rJp,x-}  :: 
+    {PrelBase.Eq{-23,p-} Foo{-r3n,x-}}
+{-# L #-}
+$d1{-rJp,x-} =
+    d.Eq_aGl
+Bar{-r4,x-}{i}  :: 
+    Foo{-r3n,x-}
+_A_ 0 {-# L #-}
+Bar{-r4,x-}{i} =
+    Bar{-r4,x-}{i}
+	{}
+Baz{-r3,x-}{i}  :: 
+    Foo{-r3n,x-}
+_A_ 0 {-# L #-}
+Baz{-r3,x-}{i} =
+    Baz{-r3,x-}{i}
+	{}
+end Rec }

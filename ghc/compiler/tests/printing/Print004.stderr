@@ -1,0 +1,134 @@
+
+
+================================================================================
+Typechecked:
+{- nonrec -}
+{- nonrec -}
+Con{-r6v,l-}{i} =
+    _/\_ a{-r6C-} -> \ tpl_B1 ->
+	Con{-r6v,l-}{i}
+	    {_@_ a{-r6C-} tpl_B1}
+{- nonrec -}
+Junk11{-r4,l-}{i} =
+    _/\_ a{-r6A-} ->
+	Junk11{-r4,l-}{i}
+	    {_@_ a{-r6A-}}
+Junk2{-r3,l-}{i} =
+    _/\_ a{-r6A-} ->
+	Junk2{-r3,l-}{i}
+	    {_@_ a{-r6A-}}
+{- rec -}
+AbsBinds [a{-aLt-}] [] [([a{-aLt-}], $d2{-rLv,x-}, d.Eval_aJU)]
+    d.Eval_aJU =
+	({-dict-} [] [])
+{- rec -}
+AbsBinds [a{-aLu-}] [] [([a{-aLu-}], $d3{-rLD,x-}, d.Eval_aK0)]
+    d.Eval_aK0 =
+	({-dict-} [] [])
+{- rec -}
+AbsBinds
+[a{-aKf-}]
+[d.Ord_aKF]
+[([a{-aKf-}], $d4{-rLE,x-}, d.Show_aK6)]
+    d.Ord_aKR =
+	d.Ord_aKF
+    d.Show_aKP =
+	$d1{-rLJ,x-}
+	    a{-aKf-}
+	    d.Ord_aKR
+    showsPrec_aLI =
+	PrelBase.showsPrec{-r5t,p-}
+	    (FunnyInternalType{-r6u,l-} a{-aKf-})
+	    d.Show_aKP
+    showsPrec_aLH =
+	showsPrec_aLG
+    AbsBinds [] [] [([], showsPrec_aLG, showsPrec_aK9)]
+	lit_aLK =
+	    lit_aLA
+	showsPrec_aK9
+	    a_rJ8 (Con{-r6v,l-}{i} b1_rJa)
+		    =   PrelBase.showParen{-r61,p-}
+			    a_rJ8 >=_aLC lit_aLA
+			    PrelBase..{-r6d,p-}
+				[PrelBase.String{-r5q,p-}, PrelBase.String{-r5q,p-}, PrelBase.String{-r5q,p-}]
+				PrelBase.showString{-r60,p-}
+				    "Con "
+				showsPrec_aLI
+				    lit_aLK b1_rJa
+    AbsBinds [] [] [([], showList_aLF, showList_aKA)]
+	showList_aKA
+		    =   PrelBase.showList__{-r6F,p-}
+			    (OpaqueType{-r6,x-} a{-aKf-})
+			    showsPrec_aLH
+				lit_aLw
+    d.Show_aK6 =
+	({-dict-} [] [showsPrec_aLG, showList_aLF])
+{- rec -}
+AbsBinds
+[a{-aL6-}]
+[d.Ord_aLf]
+[([a{-aL6-}], $d1{-rLJ,x-}, d.Show_aKZ)]
+    d.Show_aLj =
+	d.Show_aKZ
+    $mshowsPrec_aLM =
+	PrelBase.$mshowsPrec{-rfh,p-}
+	    (FunnyInternalType{-r6u,l-} a{-aL6-})
+	    d.Show_aLj
+    d.Show_aLl =
+	d.Show_aKZ
+    $mshowList_aLL =
+	PrelBase.$mshowList{-rfg,p-}
+	    (FunnyInternalType{-r6u,l-} a{-aL6-})
+	    d.Show_aLl
+    AbsBinds [] [] [([], showsPrec_aL1, showsPrec_aL3)]
+	showsPrec_aL3
+	    =   $mshowsPrec_aLM
+    AbsBinds [] [] [([], showList_aLa, showList_aLc)]
+	showList_aLc
+	    =   $mshowList_aLL
+    d.Show_aKZ =
+	({-dict-} [] [showsPrec_aL1, showList_aLa])
+{- nonrec -}
+d.Ord_aLo =
+    PrelBase.$d6{-reK,p-}
+>=_aLC =
+    PrelBase.>={-8Z,p-}
+	PrelBase.Int{-3g,p-}
+	d.Ord_aLo
+d.Num_aLs =
+    PrelBase.$d3{-ref,p-}
+fromInt_aLB =
+    PrelBase.fromInt{-8R,p-}
+	PrelBase.Int{-3g,p-}
+	d.Num_aLs
+lit_aLA =
+    fromInt_aLB
+	PrelBase.I#{-5b,p-}{i}
+	    10#
+fromInt_aLz =
+    fromInt_aLB
+lit_aLw =
+    fromInt_aLz
+	PrelBase.I#{-5b,p-}{i}
+	    0#
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ExportOpaque 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d1 1 $d11 1 $d14 1 $d15 1 $d2 1 $d21 1 $d26 1 $d27 1 $d3 1 $d32 1 $d33 1 $d34 1 $d37 1 $d38 1 $d39 1 $d41 1 $d42 1 $d44 1 $d45 1 $d46 1 $d49 1 $d50 1 $d51 1 $d54 1 $d55 1 $d6 1 $d7 1 $d8 1 $m* 1 $m+ 1 $m- 1 $m/= 1 $m< 1 $m<= 1 $m== 1 $m> 1 $m>= 1 $mabs 1 $mcompare 1 $mfromInt 1 $mfromInteger 1 $mmax 1 $mmin 1 $mnegate 1 $mshowList 1 $mshowsPrec 1 $msignum 1 . 1 showList__ 1 showParen 1 showSpace 1 showString 1 Eq 1 Eval 1 Num 1 Ord 1 Ordering 1 Show 1 ShowS 1 String 1;
+PrelNum 1 :: $d10 1 $d16 1 $d17 1 $d18 1 $d29 1 $d33 1 $d34 1 $d35 1;
+_exports_
+ExportOpaque OpaqueType;
+_instances_
+instance _forall_ [a] {PrelBase.Ord a} => {PrelBase.Show (FunnyInternalType a)} = $d1;
+instance _forall_ [a] => {PrelBase.Eval (OpaqueType a)} = $d2;
+instance _forall_ [a] => {PrelBase.Eval (FunnyInternalType a)} = $d3;
+instance _forall_ [a] {PrelBase.Ord a} => {PrelBase.Show (OpaqueType a)} = $d4;
+_declarations_
+1 $d1 _:_ _forall_ [a] {PrelBase.Ord a} => {PrelBase.Show (FunnyInternalType a)} ;;
+1 $d2 _:_ _forall_ [a] => {PrelBase.Eval (OpaqueType a)} ;;
+1 $d3 _:_ _forall_ [a] => {PrelBase.Eval (FunnyInternalType a)} ;;
+1 $d4 _:_ _forall_ [a] {PrelBase.Ord a} => {PrelBase.Show (OpaqueType a)} ;;
+1 data FunnyInternalType r6A = Junk11 |  Junk2 ;
+1 data OpaqueType r6C = Con (FunnyInternalType r6C) ;

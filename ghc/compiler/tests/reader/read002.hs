@@ -1,4 +1,5 @@
 --!!! tests fixity reading and printing
+module Reader where
 
 infixl 1 `f`
 infixr 2 \\\

@@ -11,8 +11,8 @@
 
 module ExportOpaque( OpaqueType ) where
 
-data OpaqueType a = Con (FunnyInternalType a) deriving(Text)
+data OpaqueType a = Con (FunnyInternalType a) deriving(Show)
 
 data FunnyInternalType a = Junk11 | Junk2
 
-instance Ord a => Text (FunnyInternalType a)
+instance Ord a => Show (FunnyInternalType a)

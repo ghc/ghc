@@ -2,7 +2,7 @@
 
 module Test where
 
-import PreludeGlaST
+import GlaExts
 
 -- simple functions
 

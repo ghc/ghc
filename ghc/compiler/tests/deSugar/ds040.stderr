@@ -1,0 +1,9 @@
+ 
+ds040.hs:4:
+    Data constructor not in scope: `AppendChan'
+ 
+ds040.hs:4:
+    Value not in scope: `stdout'
+
+
+Compilation had errors

@@ -1,15 +1,16 @@
---!!! cc002 -- ccall with non-standard boxed arguments and results
+--!!! cc006 -- ccall with non-standard boxed arguments and results
 
 module Test where
 
-import PreludeGlaST
+import GlaExts
+import Foreign
 
 -- Test returning results
 
-a :: PrimIO ForeignObj
+a :: PrimIO Int
 a = _ccall_ a
 
-b :: PrimIO StablePtr
+b :: PrimIO (StablePtr Int)
 b = _ccall_ b
 
 -- Test taking arguments
@@ -17,5 +18,5 @@ b = _ccall_ b
 c :: ForeignObj -> PrimIO Int
 c x = _ccall_ c x
 
-d :: StablePtr -> PrimIO Int
+d :: StablePtr Int -> PrimIO Int
 d x = _ccall_ d x

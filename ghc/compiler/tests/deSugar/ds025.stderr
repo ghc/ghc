@@ -1,84 +1,18 @@
-Desugared:
-Util.ehead :: for all a. [a] -> [Char] -> a
-Util.ehead =
-    /\ a -> \ xs.152 loc.153 ->
-	let
-	  fail.154 =
-	      (error a)
-		  "\"ds025.hs\", line 8: pattern-matching failure [function binding]\n"S
-	in 
-	  case ((null a) xs.152) of {
-	    True -> (error a) ((++ Char) "4"S loc.153)
-	    False -> (head a) xs.152
-	  }
-Util.assoc :: for all a, a. <Eq a> -> <Text a> -> a -> [(a, a)] -> [Char] -> a
-Util.assoc =
-    /\ a a -> \ dict.120 dict.128 key.165 lst.166 loc.167 ->
-	let
-	  res.174 =
-	      let
-		{- CoRec -}
-		ds.168 =
-		    \ ds.169 ->
-			case ds.169 of {
-			  Nil -> Nil a
-			  (:) ds.170 ds.171 ->
-			      case ds.170 of {
-				MkTuple2 key'.172 val.173 ->
-				    case ((== a) dict.120 key.165 key'.172) of {
-				      True -> (: a) val.173 (ds.168 ds.171)
-				      False -> ds.168 ds.171
-				    }
-			      }
-			}
-		{- end CoRec -}
-	      in  ds.168 lst.166
-	in 
-	  case ((null a) res.174) of {
-	    True ->
-		(error a)
-		    ((++ Char)
-			 "1"S
-			 ((++ Char)
-			      loc.167
-			      ((++ Char) "2"S ((show a) dict.128 key.165))))
-	    False -> (Util.ehead a) res.174 "3"S
-	  }
-Util.assocMaybe :: for all a, b. <Eq a> -> a -> [(a, b)] -> Util.Maybe b
-Util.assocMaybe =
-    /\ a b -> \ dict.150 ->
-	let dict.142 = dict.150 in
-	let
-	  assocMaybe.134 =
-	      \ key.80 lst.81 ->
-		  let
-		    res.82 =
-			let
-			  {- CoRec -}
-			  ds.179 =
-			      \ ds.180 ->
-				  case ds.180 of {
-				    Nil -> Nil b
-				    (:) ds.181 ds.182 ->
-					case ds.181 of {
-					  MkTuple2 key'.183 val.184 ->
-					      case
-						  ((== a)
-						       dict.142 key.80 key'.183)
-					      of {
-						True ->
-						    (: b)
-							val.184 (ds.179 ds.182)
-						False -> ds.179 ds.182
-					      }
-					}
-				  }
-			  {- end CoRec -}
-			in  ds.179 lst.81
-		  in 
-		    case ((null b) res.82) of {
-		      True -> Util.Nothing b
-		      False -> (Util.Just b) ((head b) res.82)
-		    }
-	in  assocMaybe.134
+ 
+ds025.hs:3:
+    Conflicting definitions for: `Just'
+	Defined at ds025.hs:18
+	Imported from Prelude at ds025.hs:3
+ 
+ds025.hs:3:
+    Conflicting definitions for: `Nothing'
+	Defined at ds025.hs:18
+	Imported from Prelude at ds025.hs:3
+ 
+ds025.hs:3:
+    Conflicting definitions for: `Maybe'
+	Defined at ds025.hs:18
+	Imported from Prelude at ds025.hs:3
 
+
+Compilation had errors

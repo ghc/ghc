@@ -1,140 +1,671 @@
-Typechecked:
-AbsBinds [] [] [(a.t439, Test.a{-r79-})]
-    {- nonrec -}
-    a.t439 :: IoWorld -> (CHeapPtr, IoWorld)
-    a.t439
-	= ccall  a [CHeapPtr] 
-{- nonrec -}
-{- nonrec -}
-AbsBinds [] [] [(b.t440, Test.b{-r80-})]
-    {- nonrec -}
-    b.t440 :: IoWorld -> (StablePtr, IoWorld)
-    b.t440
-	= ccall  b [StablePtr] 
-{- nonrec -}
-{- nonrec -}
-AbsBinds [] [] [(c.t441, Test.c{-r81-})]
-    {- nonrec -}
-    c.t441 :: CHeapPtr -> IoWorld -> (Int, IoWorld)
-    c.t441
-	x.r211 = ccall  c [Int, CHeapPtr] x.r211
-{- nonrec -}
-{- nonrec -}
-AbsBinds [] [] [(d.t442, Test.d{-r82-})]
-    {- nonrec -}
-    d.t442 :: StablePtr -> IoWorld -> (Int, IoWorld)
-    d.t442
-	x.r212 = ccall  d [Int, StablePtr] x.r212
-{- nonrec -}
-{- nonrec -}
-Desugared:
-Test.a{-r79-} :: IoWorld -> (CHeapPtr, IoWorld)
-_NI_
-Test.a{-r79-} =
-    \ ds.d0 ->
-	case
-	    (case
-		 (case ds.d0 of {
-		    IoWorld ds.d1# -> ds.d1#
-		  })
-	     of {
-	       a.d6# -> ( _CCALL_ a [] CHeapPtr# )! a.d6#
-	     })
-	of {
-	  CHPPrimAndIoWorld ds.d2#  ds.d3# ->
-	      let {
-		a.d4 :: CHeapPtr
-		_NI_
-		a.d4 = CHP#! ds.d2# } in
-	      let {
-		a.d5 :: IoWorld
-		_NI_
-		a.d5 = IoWorld! ds.d3#
-	      } in  Tup2! CHeapPtr IoWorld a.d4 a.d5
+
+NOTE: Simplifier still going after 4 iterations; bailing out.
+
+
+================================================================================
+STG syntax:
+d{-r5y,x-} =
+     [] \r [x_s1vw]
+	let {
+	  stg_c1Fh =
+	      (False, True, False, False, True) [x_s1vw] \r [ds_s1vn]
+		  case
+		      ds_s1vn{-lvs:x_s1vw-} ::STBase.State{-3M,p-} GHC.RealWorld{-3s,p-}
+		  of {
+		      -- lvs: [ds_s1vn x_s1vw]; rhs lvs: [x_s1vw]; uniq: c1Fi
+		    STBase.S#{-5D,p-}{i} ds_s1vx ->
+			case
+			    x_s1vw{-lvs:ds_s1vx-} ::Foreign.StablePtr{-3w,p-} PrelBase.Int{-3g,p-}
+			of {
+			    -- lvs: [x_s1vw ds_s1vx]; rhs lvs: [ds_s1vx]; uniq: c1Fj
+			  Foreign.StablePtr{-5o,p-}{i} ds_s1vX ->
+			      case
+				  _ccall_ d [(STBase.StateAndInt#{-3D,p-} GHC.RealWorld{-3s,p-}) (GHC.State#{-3L,p-} GHC.RealWorld{-3s,p-}) (GHC.StablePtr#{-3v,p-} PrelBase.Int{-3g,p-})]# [ds_s1vx ds_s1vX] ::STBase.StateAndInt#{-3D,p-} GHC.RealWorld{-3s,p-}
+			      of {
+				  -- lvs: [ds_s1vx ds_s1vX]; rhs lvs: []; uniq: c1Fk
+				STBase.StateAndInt#{-5v,p-}{i} ds_s1w8 ds_s1vY ->
+				    let {
+				      ds_s1wC =
+					   PrelBase.I#{-5b,p-}{i}! [ds_s1vY]; } in
+				    let {
+				      ds_s1wB =
+					   STBase.S#{-5D,p-}{i}! [ds_s1w8];
+				    } in 
+				      PrelTup.(,){-62,p-}{i}! [ds_s1wC ds_s1wB];
+			      };
+			};
+		  };
+	} in 
+	  stg_c1Fh;
+c{-r5x,x-} =
+     [] \r [x_s1wL]
+	let {
+	  stg_c1EH =
+	      (False, True, False, False, True) [x_s1wL] \r [ds_s1wA]
+		  case
+		      ds_s1wA{-lvs:x_s1wL-} ::STBase.State{-3M,p-} GHC.RealWorld{-3s,p-}
+		  of {
+		      -- lvs: [ds_s1wA x_s1wL]; rhs lvs: [x_s1wL]; uniq: c1Fl
+		    STBase.S#{-5D,p-}{i} ds_s1wM ->
+			case x_s1wL{-lvs:ds_s1wM-} ::Foreign.ForeignObj{-3l,p-} of {
+			    -- lvs: [x_s1wL ds_s1wM]; rhs lvs: [ds_s1wM]; uniq: c1Fm
+			  Foreign.ForeignObj{-5f,p-}{i} ds_s1xc ->
+			      case
+				  _ccall_ c [(STBase.StateAndInt#{-3D,p-} GHC.RealWorld{-3s,p-}) (GHC.State#{-3L,p-} GHC.RealWorld{-3s,p-}) GHC.ForeignObj#{-3k,p-}]# [ds_s1wM ds_s1xc] ::STBase.StateAndInt#{-3D,p-} GHC.RealWorld{-3s,p-}
+			      of {
+				  -- lvs: [ds_s1wM ds_s1xc]; rhs lvs: []; uniq: c1Fn
+				STBase.StateAndInt#{-5v,p-}{i} ds_s1xn ds_s1xd ->
+				    let {
+				      ds_s1xL =
+					   PrelBase.I#{-5b,p-}{i}! [ds_s1xd]; } in
+				    let {
+				      ds_s1xK =
+					   STBase.S#{-5D,p-}{i}! [ds_s1xn];
+				    } in 
+				      PrelTup.(,){-62,p-}{i}! [ds_s1xL ds_s1xK];
+			      };
+			};
+		  };
+	} in 
+	  stg_c1EH;
+s_s1sE =
+     [] \r [ds_s1xJ]
+	case ds_s1xJ ::STBase.State{-3M,p-} GHC.RealWorld{-3s,p-} of {
+	    -- lvs: [ds_s1xJ]; rhs lvs: []; uniq: c1Fo
+	  STBase.S#{-5D,p-}{i} ds_s1yc ->
+	      case
+		  _ccall_ b [(Foreign.StateAndStablePtr#{-3J,p-} GHC.RealWorld{-3s,p-} PrelBase.Int{-3g,p-}) (GHC.State#{-3L,p-} GHC.RealWorld{-3s,p-})]# [ds_s1yc] ::Foreign.StateAndStablePtr#{-3J,p-} GHC.RealWorld{-3s,p-} PrelBase.Int{-3g,p-}
+	      of {
+		  -- lvs: [ds_s1yc]; rhs lvs: []; uniq: c1Fp
+		Foreign.StateAndStablePtr#{-5B,p-}{i} ds_s1ym ds_s1yb ->
+		    let {
+		      ds_s1yC =
+			   Foreign.StablePtr{-5o,p-}{i}! [ds_s1yb]; } in
+		    let {
+		      ds_s1yB =
+			   STBase.S#{-5D,p-}{i}! [ds_s1ym];
+		    } in 
+		      PrelTup.(,){-62,p-}{i}! [ds_s1yC ds_s1yB];
+	      };
+	};
+s_s1zw =
+    (False, True, False, False, True) [] \r [ds_s1yK]
+	case ds_s1yK ::STBase.State{-3M,p-} GHC.RealWorld{-3s,p-} of {
+	    -- lvs: [ds_s1yK]; rhs lvs: []; uniq: c1Fq
+	  STBase.S#{-5D,p-}{i} ds_s1zb ->
+	      case
+		  _ccall_ b [(Foreign.StateAndStablePtr#{-3J,p-} GHC.RealWorld{-3s,p-} PrelBase.Int{-3g,p-}) (GHC.State#{-3L,p-} GHC.RealWorld{-3s,p-})]# [ds_s1zb] ::Foreign.StateAndStablePtr#{-3J,p-} GHC.RealWorld{-3s,p-} PrelBase.Int{-3g,p-}
+	      of {
+		  -- lvs: [ds_s1zb]; rhs lvs: []; uniq: c1Fr
+		Foreign.StateAndStablePtr#{-5B,p-}{i} ds_s1zl ds_s1za ->
+		    let {
+		      ds_s1zL =
+			   Foreign.StablePtr{-5o,p-}{i}! [ds_s1za]; } in
+		    let {
+		      ds_s1zK =
+			   STBase.S#{-5D,p-}{i}! [ds_s1zl];
+		    } in 
+		      PrelTup.(,){-62,p-}{i}! [ds_s1zL ds_s1zK];
+	      };
+	};
+b{-r5w,x-} =
+     [] \u []
+	s_s1zw;
+s_s1uE =
+     [] \r [ds_s1zJ]
+	case ds_s1zJ ::STBase.State{-3M,p-} GHC.RealWorld{-3s,p-} of {
+	    -- lvs: [ds_s1zJ]; rhs lvs: []; uniq: c1Fs
+	  STBase.S#{-5D,p-}{i} ds_s1Ac ->
+	      case
+		  _ccall_ a [(STBase.StateAndInt#{-3D,p-} GHC.RealWorld{-3s,p-}) (GHC.State#{-3L,p-} GHC.RealWorld{-3s,p-})]# [ds_s1Ac] ::STBase.StateAndInt#{-3D,p-} GHC.RealWorld{-3s,p-}
+	      of {
+		  -- lvs: [ds_s1Ac]; rhs lvs: []; uniq: c1Ft
+		STBase.StateAndInt#{-5v,p-}{i} ds_s1Am ds_s1Ab ->
+		    let {
+		      ds_s1AC =
+			   PrelBase.I#{-5b,p-}{i}! [ds_s1Ab]; } in
+		    let {
+		      ds_s1AB =
+			   STBase.S#{-5D,p-}{i}! [ds_s1Am];
+		    } in 
+		      PrelTup.(,){-62,p-}{i}! [ds_s1AC ds_s1AB];
+	      };
+	};
+s_s1Bw =
+    (False, True, False, False, True) [] \r [ds_s1AK]
+	case ds_s1AK ::STBase.State{-3M,p-} GHC.RealWorld{-3s,p-} of {
+	    -- lvs: [ds_s1AK]; rhs lvs: []; uniq: c1Fu
+	  STBase.S#{-5D,p-}{i} ds_s1Bb ->
+	      case
+		  _ccall_ a [(STBase.StateAndInt#{-3D,p-} GHC.RealWorld{-3s,p-}) (GHC.State#{-3L,p-} GHC.RealWorld{-3s,p-})]# [ds_s1Bb] ::STBase.StateAndInt#{-3D,p-} GHC.RealWorld{-3s,p-}
+	      of {
+		  -- lvs: [ds_s1Bb]; rhs lvs: []; uniq: c1Fv
+		STBase.StateAndInt#{-5v,p-}{i} ds_s1Bl ds_s1Ba ->
+		    let {
+		      ds_s1BE =
+			   PrelBase.I#{-5b,p-}{i}! [ds_s1Ba]; } in
+		    let {
+		      ds_s1BF =
+			   STBase.S#{-5D,p-}{i}! [ds_s1Bl];
+		    } in 
+		      PrelTup.(,){-62,p-}{i}! [ds_s1BE ds_s1BF];
+	      };
+	};
+a{-r5v,x-} =
+     [] \u []
+	s_s1Bw;
+
+
+================================================================================
+Flat Abstract C:
+IFN_(ret_c1Fj) {
+ED_RO_(PrelBase_IZh_con_info);
+ED_(STBase_SZh_static_closure);
+ED_RO_(PrelTup_Z40Z44Z41_inregs_info);
+I_ s1vY;
+	FB_
+	HEAP_CHK(0,(_FHS+1),0);
+	{
+	I_ _ccall_result;
+	StgStablePtr _ccall_arg1=R3.i;
+	CALLER_SAVE_Base
+	CALLER_SAVE_SpA
+	CALLER_SAVE_SuA
+	CALLER_SAVE_SpB
+	CALLER_SAVE_SuB
+	CALLER_SAVE_Ret
+	CALLER_SAVE_Hp
+	CALLER_SAVE_HpLim
+	_ccall_result = (d((_ccall_arg1)));
+	CALLER_RESTORE_Base
+	CALLER_RESTORE_SpA
+	CALLER_RESTORE_SuA
+	CALLER_RESTORE_SpB
+	CALLER_RESTORE_SuB
+	CALLER_RESTORE_Ret
+	CALLER_RESTORE_Hp
+	CALLER_RESTORE_HpLim
+	CALLER_RESTORE_StdUpdRetVec
+	CALLER_RESTORE_StkStub
+	s1vY=_ccall_result;
 	}
-Test.b{-r80-} :: IoWorld -> (StablePtr, IoWorld)
-_NI_
-Test.b{-r80-} =
-    \ ds.d7 ->
-	case
-	    (case
-		 (case ds.d7 of {
-		    IoWorld ds.d8# -> ds.d8#
-		  })
-	     of {
-	       a.d13# -> ( _CCALL_ b [] StablePtr# )! a.d13#
-	     })
-	of {
-	  SPPrimAndIoWorld ds.d9#  ds.d10# ->
-	      let {
-		a.d11 :: StablePtr
-		_NI_
-		a.d11 = StablePtr#! ds.d9# } in
-	      let {
-		a.d12 :: IoWorld
-		_NI_
-		a.d12 = IoWorld! ds.d10#
-	      } in  Tup2! StablePtr IoWorld a.d11 a.d12
+	SET_SPEC_HDR(Hp-_FHS,PrelBase_IZh_con_info,0,1,0);
+	*Hp=(W_)(s1vY);
+	R4.p=STBase_SZh_static_closure;
+	R3.p=Hp-_FHS;
+	SpB=SpB-1;
+	R2.d=PrelTup_Z40Z44Z41_inregs_info;
+	GRAN_EXEC(10,2,22,22,0);
+	JMP_(DIRECT((StgRetAddr)(SpB[1])));
+	FE_
+}
+UNVECTBL(static,vtbl_c1Fj,ret_c1Fj)
+IFN_(ret_c1Fi) {
+	FB_
+	RetReg=(StgRetAddr)UNVEC(ret_c1Fj,vtbl_c1Fj);
+	R1.p=*SpA;
+	SpA=SpA+1;
+	ENT_VIA_NODE();
+	GRAN_EXEC(3,1,2,1,0);
+	JMP_((P_)(ENTRY_CODE((D_)(INFO_PTR(R1.p)))));
+	FE_
+}
+UNVECTBL(static,vtbl_c1Fi,ret_c1Fi)
+SPEC_N_ITBL(c1Fh_info,c1Fh_entry,StdErrorCode,1,-1,1,1,static const,IF_,0,0,0);
+IFN_(c1Fh_entry) {
+IF_(c1Fh_fast1);
+	FB_
+	ARGS_CHK_A(1);
+	R2.p=*SpA;
+	SpA=SpA+1;
+	GRAN_EXEC(5,2,1,0,0);
+	JMP_(c1Fh_fast1);
+	FE_
+}
+IFN_(c1Fh_fast1) {
+	FB_
+	STK_CHK(3,1,1,0,0,0,1);
+	SpB[1]=(W_)(RetReg);
+	RetReg=(StgRetAddr)UNVEC(ret_c1Fi,vtbl_c1Fi);
+	SpA[-1]=(P_)(R1.p[_FHS]);
+	R1=R2;
+	SpA=SpA-1;
+	SpB=SpB+1;
+	ENT_VIA_NODE();
+	GRAN_EXEC(5,1,2,2,0);
+	JMP_((P_)(ENTRY_CODE((D_)(INFO_PTR(R1.p)))));
+	FE_
+}
+STATIC_ITBL(Test_d_info,Test_d_entry,StdErrorCode,1,-1,STATIC_VHS,0,const,EF_,0,0,0);
+FN_(Test_d_entry) {
+ED_(Test_d_closure);
+EF_(Test_d_fast1);
+	FB_
+	ARGS_CHK_A_LOAD_NODE(1,Test_d_closure);
+	R1.p=*SpA;
+	SpA=SpA+1;
+	GRAN_EXEC(5,2,1,0,0);
+	JMP_(Test_d_fast1);
+	FE_
+}
+FN_(Test_d_fast1) {
+ID_RO_(c1Fh_info);
+IF_(c1Fh_entry);
+	FB_
+	HEAP_CHK(1,(_FHS+1),0);
+	SET_SPEC_HDR(Hp-_FHS,c1Fh_info,0,1,1);
+	*Hp=(W_)(R1.p);
+	R1.p=Hp-_FHS;
+	GRAN_EXEC(5,2,0,2,0);
+	JMP_(c1Fh_entry);
+	FE_
+}
+SET_STATIC_HDR(Test_d_closure,Test_d_info,0,,ED_RO_)
+};
+IFN_(ret_c1Fm) {
+ED_RO_(PrelBase_IZh_con_info);
+ED_(STBase_SZh_static_closure);
+ED_RO_(PrelTup_Z40Z44Z41_inregs_info);
+I_ s1xd;
+	FB_
+	HEAP_CHK(4,(_FHS+1),0);
+	{
+	I_ _ccall_result;
+	StgForeignObj _ccall_arg1=ForeignObj_CLOSURE_DATA(R3.p);
+	CALLER_SAVE_Base
+	CALLER_SAVE_SpA
+	CALLER_SAVE_SuA
+	CALLER_SAVE_SpB
+	CALLER_SAVE_SuB
+	CALLER_SAVE_Ret
+	CALLER_SAVE_Hp
+	CALLER_SAVE_HpLim
+	_ccall_result = (c((_ccall_arg1)));
+	CALLER_RESTORE_Base
+	CALLER_RESTORE_SpA
+	CALLER_RESTORE_SuA
+	CALLER_RESTORE_SpB
+	CALLER_RESTORE_SuB
+	CALLER_RESTORE_Ret
+	CALLER_RESTORE_Hp
+	CALLER_RESTORE_HpLim
+	CALLER_RESTORE_StdUpdRetVec
+	CALLER_RESTORE_StkStub
+	s1xd=_ccall_result;
 	}
-Test.c{-r81-} :: CHeapPtr -> IoWorld -> (Int, IoWorld)
-_NI_
-Test.c{-r81-} =
-    \ x.r211  ds.d14 ->
-	case
-	    (case
-		 (case ds.d14 of {
-		    IoWorld ds.d15# -> ds.d15#
-		  })
-	     of {
-	       a.d21# ->
-		   case
-		       (case x.r211 of {
-			  CHP# ds.d16# -> ds.d16#
-			})
-		   of {
-		     a.d22# -> ( _CCALL_ c [CHeapPtr#] Int# )! a.d21# a.d22#
-		   }
-	     })
-	of {
-	  IntPrimAndIoWorld ds.d17#  ds.d18# ->
-	      let {
-		a.d19 :: Int
-		_NI_
-		a.d19 = I#! ds.d17# } in
-	      let {
-		a.d20 :: IoWorld
-		_NI_
-		a.d20 = IoWorld! ds.d18#
-	      } in  Tup2! Int IoWorld a.d19 a.d20
+	SET_SPEC_HDR(Hp-_FHS,PrelBase_IZh_con_info,0,1,0);
+	*Hp=(W_)(s1xd);
+	R4.p=STBase_SZh_static_closure;
+	R3.p=Hp-_FHS;
+	SpB=SpB-1;
+	R2.d=PrelTup_Z40Z44Z41_inregs_info;
+	GRAN_EXEC(10,2,22,22,0);
+	JMP_(DIRECT((StgRetAddr)(SpB[1])));
+	FE_
+}
+UNVECTBL(static,vtbl_c1Fm,ret_c1Fm)
+IFN_(ret_c1Fl) {
+	FB_
+	RetReg=(StgRetAddr)UNVEC(ret_c1Fm,vtbl_c1Fm);
+	R1.p=*SpA;
+	SpA=SpA+1;
+	ENT_VIA_NODE();
+	GRAN_EXEC(3,1,2,1,0);
+	JMP_((P_)(ENTRY_CODE((D_)(INFO_PTR(R1.p)))));
+	FE_
+}
+UNVECTBL(static,vtbl_c1Fl,ret_c1Fl)
+SPEC_N_ITBL(c1EH_info,c1EH_entry,StdErrorCode,1,-1,1,1,static const,IF_,0,0,0);
+IFN_(c1EH_entry) {
+IF_(c1EH_fast1);
+	FB_
+	ARGS_CHK_A(1);
+	R2.p=*SpA;
+	SpA=SpA+1;
+	GRAN_EXEC(5,2,1,0,0);
+	JMP_(c1EH_fast1);
+	FE_
+}
+IFN_(c1EH_fast1) {
+	FB_
+	STK_CHK(3,1,1,0,0,0,1);
+	SpB[1]=(W_)(RetReg);
+	RetReg=(StgRetAddr)UNVEC(ret_c1Fl,vtbl_c1Fl);
+	SpA[-1]=(P_)(R1.p[_FHS]);
+	R1=R2;
+	SpA=SpA-1;
+	SpB=SpB+1;
+	ENT_VIA_NODE();
+	GRAN_EXEC(5,1,2,2,0);
+	JMP_((P_)(ENTRY_CODE((D_)(INFO_PTR(R1.p)))));
+	FE_
+}
+STATIC_ITBL(Test_c_info,Test_c_entry,StdErrorCode,1,-1,STATIC_VHS,0,const,EF_,0,0,0);
+FN_(Test_c_entry) {
+ED_(Test_c_closure);
+EF_(Test_c_fast1);
+	FB_
+	ARGS_CHK_A_LOAD_NODE(1,Test_c_closure);
+	R1.p=*SpA;
+	SpA=SpA+1;
+	GRAN_EXEC(5,2,1,0,0);
+	JMP_(Test_c_fast1);
+	FE_
+}
+FN_(Test_c_fast1) {
+ID_RO_(c1EH_info);
+IF_(c1EH_entry);
+	FB_
+	HEAP_CHK(1,(_FHS+1),0);
+	SET_SPEC_HDR(Hp-_FHS,c1EH_info,0,1,1);
+	*Hp=(W_)(R1.p);
+	R1.p=Hp-_FHS;
+	GRAN_EXEC(5,2,0,2,0);
+	JMP_(c1EH_entry);
+	FE_
+}
+SET_STATIC_HDR(Test_c_closure,Test_c_info,0,,ED_RO_)
+};
+IFN_(ret_c1Fo) {
+ED_RO_(Foreign_StablePtr_con_info);
+ED_(STBase_SZh_static_closure);
+ED_RO_(PrelTup_Z40Z44Z41_inregs_info);
+StgStablePtr s1yb;
+	FB_
+	HEAP_CHK(0,(_FHS+1),0);
+	{
+	StgStablePtr _ccall_result;
+	CALLER_SAVE_Base
+	CALLER_SAVE_SpA
+	CALLER_SAVE_SuA
+	CALLER_SAVE_SpB
+	CALLER_SAVE_SuB
+	CALLER_SAVE_Ret
+	CALLER_SAVE_Hp
+	CALLER_SAVE_HpLim
+	_ccall_result = (b());
+	CALLER_RESTORE_Base
+	CALLER_RESTORE_SpA
+	CALLER_RESTORE_SuA
+	CALLER_RESTORE_SpB
+	CALLER_RESTORE_SuB
+	CALLER_RESTORE_Ret
+	CALLER_RESTORE_Hp
+	CALLER_RESTORE_HpLim
+	CALLER_RESTORE_StdUpdRetVec
+	CALLER_RESTORE_StkStub
+	s1yb=_ccall_result;
 	}
-Test.d{-r82-} :: StablePtr -> IoWorld -> (Int, IoWorld)
-_NI_
-Test.d{-r82-} =
-    \ x.r212  ds.d23 ->
-	case
-	    (case
-		 (case ds.d23 of {
-		    IoWorld ds.d24# -> ds.d24#
-		  })
-	     of {
-	       a.d30# ->
-		   case
-		       (case x.r212 of {
-			  StablePtr# ds.d25# -> ds.d25#
-			})
-		   of {
-		     a.d31# -> ( _CCALL_ d [StablePtr#] Int# )! a.d30# a.d31#
-		   }
-	     })
-	of {
-	  IntPrimAndIoWorld ds.d26#  ds.d27# ->
-	      let {
-		a.d28 :: Int
-		_NI_
-		a.d28 = I#! ds.d26# } in
-	      let {
-		a.d29 :: IoWorld
-		_NI_
-		a.d29 = IoWorld! ds.d27#
-	      } in  Tup2! Int IoWorld a.d28 a.d29
+	SET_SPEC_HDR(Hp-_FHS,Foreign_StablePtr_con_info,0,1,0);
+	*Hp=(W_)(s1yb);
+	R4.p=STBase_SZh_static_closure;
+	R3.p=Hp-_FHS;
+	SpB=SpB-1;
+	R2.d=PrelTup_Z40Z44Z41_inregs_info;
+	GRAN_EXEC(10,2,21,22,0);
+	JMP_(DIRECT((StgRetAddr)(SpB[1])));
+	FE_
+}
+UNVECTBL(static,vtbl_c1Fo,ret_c1Fo)
+STATIC_ITBL(s1sE_info,s1sE_entry,StdErrorCode,1,-1,STATIC_VHS,0,static const,IF_,0,0,0);
+IFN_(s1sE_entry) {
+ID_(s1sE_closure);
+IF_(s1sE_fast1);
+	FB_
+	ARGS_CHK_A_LOAD_NODE(1,s1sE_closure);
+	R1.p=*SpA;
+	SpA=SpA+1;
+	GRAN_EXEC(5,2,1,0,0);
+	JMP_(s1sE_fast1);
+	FE_
+}
+IFN_(s1sE_fast1) {
+	FB_
+	STK_CHK(1,0,1,0,0,0,0);
+	SpB[1]=(W_)(RetReg);
+	RetReg=(StgRetAddr)UNVEC(ret_c1Fo,vtbl_c1Fo);
+	SpB=SpB+1;
+	ENT_VIA_NODE();
+	GRAN_EXEC(3,1,1,1,0);
+	JMP_((P_)(ENTRY_CODE((D_)(INFO_PTR(R1.p)))));
+	FE_
+}
+SET_STATIC_HDR(s1sE_closure,s1sE_info,0,static ,ID_RO_)
+};
+IFN_(ret_c1Fq) {
+ED_RO_(Foreign_StablePtr_con_info);
+ED_(STBase_SZh_static_closure);
+ED_RO_(PrelTup_Z40Z44Z41_inregs_info);
+StgStablePtr s1za;
+	FB_
+	HEAP_CHK(0,(_FHS+1),0);
+	{
+	StgStablePtr _ccall_result;
+	CALLER_SAVE_Base
+	CALLER_SAVE_SpA
+	CALLER_SAVE_SuA
+	CALLER_SAVE_SpB
+	CALLER_SAVE_SuB
+	CALLER_SAVE_Ret
+	CALLER_SAVE_Hp
+	CALLER_SAVE_HpLim
+	_ccall_result = (b());
+	CALLER_RESTORE_Base
+	CALLER_RESTORE_SpA
+	CALLER_RESTORE_SuA
+	CALLER_RESTORE_SpB
+	CALLER_RESTORE_SuB
+	CALLER_RESTORE_Ret
+	CALLER_RESTORE_Hp
+	CALLER_RESTORE_HpLim
+	CALLER_RESTORE_StdUpdRetVec
+	CALLER_RESTORE_StkStub
+	s1za=_ccall_result;
 	}
+	SET_SPEC_HDR(Hp-_FHS,Foreign_StablePtr_con_info,0,1,0);
+	*Hp=(W_)(s1za);
+	R4.p=STBase_SZh_static_closure;
+	R3.p=Hp-_FHS;
+	SpB=SpB-1;
+	R2.d=PrelTup_Z40Z44Z41_inregs_info;
+	GRAN_EXEC(10,2,21,22,0);
+	JMP_(DIRECT((StgRetAddr)(SpB[1])));
+	FE_
+}
+UNVECTBL(static,vtbl_c1Fq,ret_c1Fq)
+STATIC_ITBL(s1zw_info,s1zw_entry,StdErrorCode,1,-1,STATIC_VHS,0,static const,IF_,0,0,0);
+IFN_(s1zw_entry) {
+ID_(s1zw_closure);
+IF_(s1zw_fast1);
+	FB_
+	ARGS_CHK_A_LOAD_NODE(1,s1zw_closure);
+	R1.p=*SpA;
+	SpA=SpA+1;
+	GRAN_EXEC(5,2,1,0,0);
+	JMP_(s1zw_fast1);
+	FE_
+}
+IFN_(s1zw_fast1) {
+	FB_
+	STK_CHK(1,0,1,0,0,0,0);
+	SpB[1]=(W_)(RetReg);
+	RetReg=(StgRetAddr)UNVEC(ret_c1Fq,vtbl_c1Fq);
+	SpB=SpB+1;
+	ENT_VIA_NODE();
+	GRAN_EXEC(3,1,1,1,0);
+	JMP_((P_)(ENTRY_CODE((D_)(INFO_PTR(R1.p)))));
+	FE_
+}
+SET_STATIC_HDR(s1zw_closure,s1zw_info,0,static ,ID_RO_)
+};
+STATIC_ITBL(Test_b_info,Test_b_entry,StdErrorCode,1,-1,(STATIC_VHS+
+							2),0,const,EF_,0,0,0);
+FN_(Test_b_entry) {
+IF_(s1zw_entry);
+	FB_
+	STK_CHK(1,0,4,0,0,0,1);
+	HEAP_CHK(1,(BH_HS+2),1);
+	SET_BH_HDR(Hp-(BH_HS+1),BH_UPD_info,0,(BH_VHS+2),0);
+	UPD_CAF(R1.p,Hp-(BH_HS+1));
+	PUSH_STD_UPD_FRAME(Hp-(BH_HS+1),0,0);
+	RetReg=StdUpdRetVecReg;
+	SpB=SpB+4;
+	GRAN_EXEC(16,2,1,8,0);
+	JMP_(s1zw_entry);
+	FE_
+}
+SET_STATIC_HDR(Test_b_closure,Test_b_info,0,,ED_RO_)
+  , (W_)0, (W_)0
+};
+IFN_(ret_c1Fs) {
+ED_RO_(PrelBase_IZh_con_info);
+ED_(STBase_SZh_static_closure);
+ED_RO_(PrelTup_Z40Z44Z41_inregs_info);
+I_ s1Ab;
+	FB_
+	HEAP_CHK(0,(_FHS+1),0);
+	{
+	I_ _ccall_result;
+	CALLER_SAVE_Base
+	CALLER_SAVE_SpA
+	CALLER_SAVE_SuA
+	CALLER_SAVE_SpB
+	CALLER_SAVE_SuB
+	CALLER_SAVE_Ret
+	CALLER_SAVE_Hp
+	CALLER_SAVE_HpLim
+	_ccall_result = (a());
+	CALLER_RESTORE_Base
+	CALLER_RESTORE_SpA
+	CALLER_RESTORE_SuA
+	CALLER_RESTORE_SpB
+	CALLER_RESTORE_SuB
+	CALLER_RESTORE_Ret
+	CALLER_RESTORE_Hp
+	CALLER_RESTORE_HpLim
+	CALLER_RESTORE_StdUpdRetVec
+	CALLER_RESTORE_StkStub
+	s1Ab=_ccall_result;
+	}
+	SET_SPEC_HDR(Hp-_FHS,PrelBase_IZh_con_info,0,1,0);
+	*Hp=(W_)(s1Ab);
+	R4.p=STBase_SZh_static_closure;
+	R3.p=Hp-_FHS;
+	SpB=SpB-1;
+	R2.d=PrelTup_Z40Z44Z41_inregs_info;
+	GRAN_EXEC(10,2,21,22,0);
+	JMP_(DIRECT((StgRetAddr)(SpB[1])));
+	FE_
+}
+UNVECTBL(static,vtbl_c1Fs,ret_c1Fs)
+STATIC_ITBL(s1uE_info,s1uE_entry,StdErrorCode,1,-1,STATIC_VHS,0,static const,IF_,0,0,0);
+IFN_(s1uE_entry) {
+ID_(s1uE_closure);
+IF_(s1uE_fast1);
+	FB_
+	ARGS_CHK_A_LOAD_NODE(1,s1uE_closure);
+	R1.p=*SpA;
+	SpA=SpA+1;
+	GRAN_EXEC(5,2,1,0,0);
+	JMP_(s1uE_fast1);
+	FE_
+}
+IFN_(s1uE_fast1) {
+	FB_
+	STK_CHK(1,0,1,0,0,0,0);
+	SpB[1]=(W_)(RetReg);
+	RetReg=(StgRetAddr)UNVEC(ret_c1Fs,vtbl_c1Fs);
+	SpB=SpB+1;
+	ENT_VIA_NODE();
+	GRAN_EXEC(3,1,1,1,0);
+	JMP_((P_)(ENTRY_CODE((D_)(INFO_PTR(R1.p)))));
+	FE_
+}
+SET_STATIC_HDR(s1uE_closure,s1uE_info,0,static ,ID_RO_)
+};
+IFN_(ret_c1Fu) {
+ED_RO_(PrelBase_IZh_con_info);
+ED_(STBase_SZh_static_closure);
+ED_RO_(PrelTup_Z40Z44Z41_inregs_info);
+I_ s1Ba;
+	FB_
+	HEAP_CHK(0,(_FHS+1),0);
+	{
+	I_ _ccall_result;
+	CALLER_SAVE_Base
+	CALLER_SAVE_SpA
+	CALLER_SAVE_SuA
+	CALLER_SAVE_SpB
+	CALLER_SAVE_SuB
+	CALLER_SAVE_Ret
+	CALLER_SAVE_Hp
+	CALLER_SAVE_HpLim
+	_ccall_result = (a());
+	CALLER_RESTORE_Base
+	CALLER_RESTORE_SpA
+	CALLER_RESTORE_SuA
+	CALLER_RESTORE_SpB
+	CALLER_RESTORE_SuB
+	CALLER_RESTORE_Ret
+	CALLER_RESTORE_Hp
+	CALLER_RESTORE_HpLim
+	CALLER_RESTORE_StdUpdRetVec
+	CALLER_RESTORE_StkStub
+	s1Ba=_ccall_result;
+	}
+	SET_SPEC_HDR(Hp-_FHS,PrelBase_IZh_con_info,0,1,0);
+	*Hp=(W_)(s1Ba);
+	R4.p=STBase_SZh_static_closure;
+	R3.p=Hp-_FHS;
+	SpB=SpB-1;
+	R2.d=PrelTup_Z40Z44Z41_inregs_info;
+	GRAN_EXEC(10,2,21,22,0);
+	JMP_(DIRECT((StgRetAddr)(SpB[1])));
+	FE_
+}
+UNVECTBL(static,vtbl_c1Fu,ret_c1Fu)
+STATIC_ITBL(s1Bw_info,s1Bw_entry,StdErrorCode,1,-1,STATIC_VHS,0,static const,IF_,0,0,0);
+IFN_(s1Bw_entry) {
+ID_(s1Bw_closure);
+IF_(s1Bw_fast1);
+	FB_
+	ARGS_CHK_A_LOAD_NODE(1,s1Bw_closure);
+	R1.p=*SpA;
+	SpA=SpA+1;
+	GRAN_EXEC(5,2,1,0,0);
+	JMP_(s1Bw_fast1);
+	FE_
+}
+IFN_(s1Bw_fast1) {
+	FB_
+	STK_CHK(1,0,1,0,0,0,0);
+	SpB[1]=(W_)(RetReg);
+	RetReg=(StgRetAddr)UNVEC(ret_c1Fu,vtbl_c1Fu);
+	SpB=SpB+1;
+	ENT_VIA_NODE();
+	GRAN_EXEC(3,1,1,1,0);
+	JMP_((P_)(ENTRY_CODE((D_)(INFO_PTR(R1.p)))));
+	FE_
+}
+SET_STATIC_HDR(s1Bw_closure,s1Bw_info,0,static ,ID_RO_)
+};
+STATIC_ITBL(Test_a_info,Test_a_entry,StdErrorCode,1,-1,(STATIC_VHS+
+							2),0,const,EF_,0,0,0);
+FN_(Test_a_entry) {
+IF_(s1Bw_entry);
+	FB_
+	STK_CHK(1,0,4,0,0,0,1);
+	HEAP_CHK(1,(BH_HS+2),1);
+	SET_BH_HDR(Hp-(BH_HS+1),BH_UPD_info,0,(BH_VHS+2),0);
+	UPD_CAF(R1.p,Hp-(BH_HS+1));
+	PUSH_STD_UPD_FRAME(Hp-(BH_HS+1),0,0);
+	RetReg=StdUpdRetVecReg;
+	SpB=SpB+4;
+	GRAN_EXEC(16,2,1,8,0);
+	JMP_(s1Bw_entry);
+	FE_
+}
+SET_STATIC_HDR(Test_a_closure,Test_a_info,0,,ED_RO_)
+  , (W_)0, (W_)0
+};
+ghc: module version changed to 1; reason: no old .hi file

@@ -1,65 +1,205 @@
-Desugared:
-{- plain CoRec -}
-MapPairs.mappairs :: for all d, e, f. (d -> e -> f) -> [d] -> [e] -> [f]
-MapPairs.mappairs =
-    /\ t109 t112 t105 -> \ f.146 ds.147 ys.148 ->
-	let
-	  fail.149 =
-	      (error [t105])
-		  "\"ds005.hs\", line 10: pattern-matching failure [function binding]\n"S
-	in 
-	  case ds.147 of {
-	    Nil -> Nil! t105
-	    (:) x.150 xs.151 ->
-		case ys.148 of {
-		  Nil -> let f.152 = f.146 in  Nil! t105
-		  (:) y.153 ys.154 ->
-		      let xs.155 = xs.151 in
-		      let x.156 = x.150 in
-		      let f.157 = f.146
-		      in 
-			(: t105)
-			    (f.157 x.156 y.153)
-			    ((((MapPairs.mappairs t109) t112) t105)
-				 f.157 xs.155 ys.154)
-		}
-	  }
-{- end plain CoRec -}
-{- plain CoRec -}
-MapPairs.mappairs' :: for all d, e, f. (d -> e -> f) -> [d] -> [e] -> [f]
-MapPairs.mappairs' =
-    /\ t133 t136 t129 -> \ f.162 ds.163 ys.164 ->
-	let
-	  fail.165 =
-	      (error [t129])
-		  "\"ds005.hs\", line 15: pattern-matching failure [function binding]\n"S in
-	let
-	  fail.174 =
-	      let
-		fail.171 =
-		    case ds.163 of {
-		      (:) x.166 xs.167 ->
-			  case ys.164 of {
-			    (:) y.168 ys.169 ->
-				let f.170 = f.162
-				in 
-				  (: t129)
-				      (f.170 x.166 y.168)
-				      ((((MapPairs.mappairs' t133) t136) t129)
-					   f.170 xs.167 ys.169)
-			    _ ->  fail.165
-			  }
-		      _ ->  fail.165
-		    }
-	      in 
-		case ys.164 of {
-		  Nil -> let x.172 = ds.163 in let f.173 = f.162 in  Nil! t129
-		  _ ->  fail.171
-		}
-	in 
-	  case ds.163 of {
-	    Nil -> Nil! t129
-	    _ ->  fail.174
-	  }
-{- end plain CoRec -}
+ds005.hs:13: 
+    Warning: Possibly incomplete patterns
+	in the definition of function `mappairs''
 
+
+================================================================================
+Desugared:
+Rec {
+mappairs'{-r3O,x-}  :: 
+    _forall_
+    [t{-anl-} t{-anv-} t{-anx-}]
+    =>
+    (t{-anl-} -> t{-anv-} -> t{-anx-})
+    -> [t{-anl-}]
+    -> [t{-anv-}]
+    -> [t{-anx-}]
+{-# L #-}
+mappairs'{-r3O,x-} =
+    _/\_ t{-anl-} t{-anv-} t{-anx-} ->
+	_letrec_ {
+	  mappairs'_anf  :: 
+	      (t{-anl-} -> t{-anv-} -> t{-anx-})
+	      -> [t{-anl-}]
+	      -> [t{-anv-}]
+	      -> [t{-anx-}]
+	  {-# L #-}
+	  mappairs'_anf =
+	      \ f_r3x  :: 
+		    t{-anl-} -> t{-anv-} -> t{-anx-}
+		{-# L #-}
+		f_r3x ds_duS  :: 
+			  [t{-anl-}]
+		      {-# L #-}
+		      ds_duS ys_r3A  :: 
+				 [t{-anv-}]
+			     {-# L #-}
+			     ys_r3A ->
+		  let {
+		    fail_duT  :: 
+			[t{-anx-}]
+		    {-# L #-}
+		    fail_duT =
+			GHCerr.patError{-8r,p-}
+			    _@_ [t{-anx-}] _string_ "ds005.hs:13|function `mappairs''" } in
+		  let { fail_dwj  :: 
+			    [t{-anx-}]
+			{-# L #-}
+			fail_dwj =
+		    let {
+		      fail_dvV  :: 
+			  [t{-anx-}]
+		      {-# L #-}
+		      fail_dvV =
+			  case ds_duS of {
+			    PrelBase.[]{-5i,p-}{i} ->
+				fail_duT;
+			    PrelBase.:{-55,p-}{i} x_r3J xs_r3K ->
+				case ys_r3A of {
+				  PrelBase.[]{-5i,p-}{i} ->
+				      fail_duT;
+				  PrelBase.:{-55,p-}{i} y_r3M ys_r3N ->
+				      let {
+					f_r3H  :: 
+					    t{-anl-} -> t{-anv-} -> t{-anx-}
+					{-# L #-}
+					f_r3H =
+					    f_r3x } in
+				      let {
+					ds_dvr  :: 
+					    t{-anx-}
+					{-# L #-}
+					ds_dvr =
+					    f_r3H
+						x_r3J y_r3M } in
+				      let {
+					ds_dvv  :: 
+					    [t{-anx-}]
+					{-# L #-}
+					ds_dvv =
+					    mappairs'_anf
+						f_r3H xs_r3K ys_r3N
+				      } in 
+					PrelBase.:{-55,p-}{i}
+					    _@_ t{-anx-} ds_dvr ds_dvv;
+				};
+			  }
+		    } in 
+		      case ys_r3A of {
+			PrelBase.:{-55,p-}{i} ds_dw3 ds_dw2 ->
+			    fail_dvV;
+			PrelBase.[]{-5i,p-}{i} ->
+			    let {
+			      x_r3E  :: 
+				  [t{-anl-}]
+			      {-# L #-}
+			      x_r3E =
+				  ds_duS } in
+			    let {
+			      f_r3C  :: 
+				  t{-anl-} -> t{-anv-} -> t{-anx-}
+			      {-# L #-}
+			      f_r3C =
+				  f_r3x
+			    } in 
+			      PrelBase.[]{-5i,p-}{i}
+				  _@_ t{-anx-};
+		      }
+		  } in
+		  case ds_duS of {
+		    PrelBase.:{-55,p-}{i} ds_dwr ds_dwq ->
+			fail_dwj;
+		    PrelBase.[]{-5i,p-}{i} ->
+			PrelBase.[]{-5i,p-}{i}
+			    _@_ t{-anx-};
+		  };
+	} in 
+	  mappairs'_anf
+end Rec }
+Rec {
+mappairs{-r3P,x-}  :: 
+    _forall_
+    [t{-aoc-} t{-aoh-} t{-aoj-}]
+    =>
+    (t{-aoc-} -> t{-aoh-} -> t{-aoj-})
+    -> [t{-aoc-}]
+    -> [t{-aoh-}]
+    -> [t{-aoj-}]
+{-# L #-}
+mappairs{-r3P,x-} =
+    _/\_ t{-aoc-} t{-aoh-} t{-aoj-} ->
+	_letrec_ {
+	  mappairs_anX  :: 
+	      (t{-aoc-} -> t{-aoh-} -> t{-aoj-})
+	      -> [t{-aoc-}]
+	      -> [t{-aoh-}]
+	      -> [t{-aoj-}]
+	  {-# L #-}
+	  mappairs_anX =
+	      \ f_r3e  :: 
+		    t{-aoc-} -> t{-aoh-} -> t{-aoj-}
+		{-# L #-}
+		f_r3e ds_dx4  :: 
+			  [t{-aoc-}]
+		      {-# L #-}
+		      ds_dx4 ys_r3h  :: 
+				 [t{-aoh-}]
+			     {-# L #-}
+			     ys_r3h ->
+		  case ds_dx4 of {
+		    PrelBase.[]{-5i,p-}{i} ->
+			PrelBase.[]{-5i,p-}{i}
+			    _@_ t{-aoj-};
+		    PrelBase.:{-55,p-}{i} x_r3l xs_r3m ->
+			case ys_r3h of {
+			  PrelBase.[]{-5i,p-}{i} ->
+			      let {
+				f_r3j  :: 
+				    t{-aoc-} -> t{-aoh-} -> t{-aoj-}
+				{-# L #-}
+				f_r3j =
+				    f_r3e
+			      } in 
+				PrelBase.[]{-5i,p-}{i}
+				    _@_ t{-aoj-};
+			  PrelBase.:{-55,p-}{i} y_r3u ys_r3v ->
+			      let {
+				xs_r3s  :: 
+				    [t{-aoc-}]
+				{-# L #-}
+				xs_r3s =
+				    xs_r3m } in
+			      let {
+				x_r3r  :: 
+				    t{-aoc-}
+				{-# L #-}
+				x_r3r =
+				    x_r3l } in
+			      let {
+				f_r3p  :: 
+				    t{-aoc-} -> t{-aoh-} -> t{-aoj-}
+				{-# L #-}
+				f_r3p =
+				    f_r3e } in
+			      let {
+				ds_dxR  :: 
+				    t{-aoj-}
+				{-# L #-}
+				ds_dxR =
+				    f_r3p
+					x_r3r y_r3u } in
+			      let {
+				ds_dxV  :: 
+				    [t{-aoj-}]
+				{-# L #-}
+				ds_dxV =
+				    mappairs_anX
+					f_r3p xs_r3s ys_r3v
+			      } in 
+				PrelBase.:{-55,p-}{i}
+				    _@_ t{-aoj-} ds_dxR ds_dxV;
+			};
+		  };
+	} in 
+	  mappairs_anX
+end Rec }

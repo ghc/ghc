@@ -1,7 +1,20 @@
-TOP = ../../../..
-GhcRunTestRules = YES
-# These options apply to all tests
-RUNSTDTEST_OPTS = -noC -ddump-tc -dcore-lint -hi
-include $(TOP)/ghc/mk/ghc.mk
+TOP = ../../..
+include $(TOP)/mk/boilerplate.mk
 
-runtests :: $(patsubst %.hs, %.runtest, $(wildcard *.hs))
+HS_SRCS = $(wildcard *.hs)
+
+SRC_RUNTEST_OPTS += -o1 $*.stdout -o2 $*.stderr -x 0
+HC_OPTS += -noC -ddump-tc -dcore-lint -hi
+
+drv004_RUNTEST_OPTS = -x 1
+drv007_RUNTEST_OPTS = -x 1
+
+%.o : %.hs
+
+%.o : %.hs
+	$(RUNTEST) $(HC) $(RUNTEST_OPTS) $(HC_OPTS) -c $< -o $@ -osuf $(subst .,,$(suffix $@)) 
+
+all :: $(HS_OBJS)
+
+include $(TOP)/mk/target.mk
+

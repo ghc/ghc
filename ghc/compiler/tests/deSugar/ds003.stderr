@@ -1,61 +1,64 @@
-Desugared:
-Test.f :: for all d, e, f, g. [d] -> (e, f) -> Bool -> [g]
-Test.f =
-    /\ t106 o107 o108 t113 -> \ ds.122 y.123 ds.124 ->
-	let
-	  fail.125 =
-	      (error [t113])
-		  "\"ds003.hs\", line 8: pattern-matching failure [function binding]\n"S in
-	let
-	  fail.149 =
-	      let
-		fail.142 =
-		    let
-		      fail.128 =
-			  case ds.124 of {
-			    True ->
-				let y.126 = y.123 in
-				let x.127 = ds.122 in  Nil! t113
-			    _ ->  fail.125
-			  }
-		    in 
-		      case ds.122 of {
-			(:) x.129 ds.130 ->
-			    case ds.130 of {
-			      (:) x1.131 ds.132 ->
-				  case ds.132 of {
-				    (:) x2.133 x3.134 ->
-					let z.135 = ds.124 in
-					let
-					  y.138 =
-					      case y.123 of {
-						MkTuple2 y.136 ys.137 -> y.136
-					      } in
-					let
-					  ys.141 =
-					      case y.123 of {
-						MkTuple2 y.139 ys.140 -> ys.140
-					      }
-					in  Nil! t113
-				    _ ->  fail.128
-				  }
-			      _ ->  fail.128
-			    }
-			_ ->  fail.128
-		      }
-	      in 
-		case y.123 of {
-		  MkTuple2 y.143 ys.144 ->
-		      let z.146 = let z.145 = ds.124 in  z.145 in
-		      let a.147 = y.123 in let x.148 = ds.122 in  Nil! t113
-		}
-	in 
-	  case ds.122 of {
-	    Nil ->
-		case ds.124 of {
-		  True -> Nil! t113
-		  _ ->  fail.149
-		}
-	    _ ->  fail.149
-	  }
 
+
+================================================================================
+Desugared:
+f{-r3C,x-}  :: 
+    _forall_
+    [t{-aBt-} t{-aBF-} t{-aBI-} t{-aBS-}]
+    =>
+    [t{-aBt-}]
+    -> (t{-aBF-}, t{-aBI-})
+    -> PrelBase.Bool{-34,p-}
+    -> [t{-aBS-}]
+{-# L #-}
+f{-r3C,x-} =
+    _/\_ t{-aBt-} t{-aBF-} t{-aBI-} t{-aBS-} -> \ ds_dGi  :: 
+						      [t{-aBt-}]
+						  {-# L #-}
+						  ds_dGi y_r3e  :: 
+							     (t{-aBF-}, t{-aBI-})
+							 {-# L #-}
+							 y_r3e ds_dGj  :: 
+								   PrelBase.Bool{-34,p-}
+							       {-# L #-}
+							       ds_dGj ->
+	let {
+	  fail_dGE  :: 
+	      [t{-aBS-}]
+	  {-# L #-}
+	  fail_dGE =
+	      case y_r3e of { PrelTup.(,){-62,p-}{i} y_r3k ys_r3l  ->
+	      let {
+		z_r3n  :: 
+		    PrelBase.Bool{-34,p-}
+		{-# L #-}
+		z_r3n =
+		    ds_dGj } in
+	      let {
+		a_r3j  :: 
+		    (t{-aBF-}, t{-aBI-})
+		{-# L #-}
+		a_r3j =
+		    y_r3e } in
+	      let {
+		x_r3h  :: 
+		    [t{-aBt-}]
+		{-# L #-}
+		x_r3h =
+		    ds_dGi
+	      } in 
+		PrelBase.[]{-5i,p-}{i}
+		    _@_ t{-aBS-};}
+	} in 
+	  case ds_dGi of {
+	    PrelBase.:{-55,p-}{i} ds_dGM ds_dGL ->
+		fail_dGE;
+	    PrelBase.[]{-5i,p-}{i} ->
+		case ds_dGj of {
+		  PrelBase.False{-58,p-}{i} ->
+		      fail_dGE;
+		  PrelBase.True{-5E,p-}{i} ->
+		      PrelBase.[]{-5i,p-}{i}
+			  _@_ t{-aBS-};
+		};
+	  }

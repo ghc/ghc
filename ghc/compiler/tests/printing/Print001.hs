@@ -2,6 +2,8 @@
 
 module Print001 where
 
+import Ix
+
 data Foo d e f = MkFoo [((d->Int)->d)->e] (d->e, e->e) ()
 data Bar a = BarNil
 	   | BarCon (Foo a a a) (Bar a)

@@ -1,10 +1,82 @@
-Desugared:
-Tests.f :: for all d, e, f. f -> ((d, d) -> e) -> d -> (e, [f])
-Tests.f =
-    /\ o86 o96 t94 -> \ x.104 y.105 z.106 ->
-	let a.107 = (: t94) x.104 (Nil! t94) in
-	let b.108 = (: t94) x.104 a.107 in
-	let
-	  c.110 = y.105 (let d.109 = MkTuple2! o86 o86 z.106 z.106 in  d.109) in
-	let result.111 = MkTuple2! o96 [t94] c.110 b.108 in  result.111
 
+
+================================================================================
+Desugared:
+f{-r3p,x-}  :: 
+    _forall_
+    [t{-aBq-} t{-aBs-} t{-aBd-}]
+    =>
+    t{-aBd-}
+    -> ((t{-aBq-}, t{-aBq-}) -> t{-aBs-})
+    -> t{-aBq-}
+    -> (t{-aBs-}, [t{-aBd-}])
+{-# L #-}
+f{-r3p,x-} =
+    _/\_ t{-aBq-} t{-aBs-} t{-aBd-} -> \ x_r3d  :: 
+					     t{-aBd-}
+					 {-# L #-}
+					 x_r3d y_r3f  :: 
+						   (t{-aBq-}, t{-aBq-}) -> t{-aBs-}
+					       {-# L #-}
+					       y_r3f z_r3h  :: 
+							 t{-aBq-}
+						     {-# L #-}
+						     z_r3h ->
+	let { c_aAS  :: 
+		  t{-aBs-}
+	      {-# L #-}
+	      c_aAS =
+	  let {
+	    ds_dEz  :: 
+		(t{-aBq-}, t{-aBq-})
+	    {-# L #-}
+	    ds_dEz =
+		PrelTup.(,){-62,p-}{i}
+		    {_@_ t{-aBq-} _@_ t{-aBq-} z_r3h z_r3h}
+	  } in 
+	    y_r3f
+		ds_dEz
+	} in
+	let {
+	  c_r3l  :: 
+	      t{-aBs-}
+	  {-# L #-}
+	  c_r3l =
+	      c_aAS } in
+	let { a_aB8  :: 
+		  [t{-aBd-}]
+	      {-# L #-}
+	      a_aB8 =
+	  let {
+	    ds_dF5  :: 
+		[t{-aBd-}]
+	    {-# L #-}
+	    ds_dF5 =
+		PrelBase.[]{-5i,p-}{i}
+		    _@_ t{-aBd-}
+	  } in 
+	    PrelBase.:{-55,p-}{i}
+		_@_ t{-aBd-} x_r3d ds_dF5
+	} in
+	let {
+	  a_r3j  :: 
+	      [t{-aBd-}]
+	  {-# L #-}
+	  a_r3j =
+	      a_aB8 } in
+	let {
+	  b_aBg  :: 
+	      [t{-aBd-}]
+	  {-# L #-}
+	  b_aBg =
+	      PrelBase.:{-55,p-}{i}
+		  _@_ t{-aBd-} x_r3d a_r3j } in
+	let {
+	  b_r3k  :: 
+	      [t{-aBd-}]
+	  {-# L #-}
+	  b_r3k =
+	      b_aBg
+	} in 
+	  PrelTup.(,){-62,p-}{i}
+	      {_@_ t{-aBs-} _@_ [t{-aBd-}] c_r3l b_r3k}

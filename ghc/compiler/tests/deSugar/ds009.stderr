@@ -1,150 +1,481 @@
-Desugared:
-SimpleListComp.f :: for all d. [d] -> [d]
-SimpleListComp.f =
-    /\ t104 -> \ xs.145 ->
-	let
-	  {- CoRec -}
-	  ds.146 =
-	      \ ds.147 ->
-		  case ds.147 of {
-		    Nil -> Nil t104
-		    (:) ds.148 ds.149 ->
-			let x.150 = ds.148 in  (: t104) x.150 (ds.146 ds.149)
-		  }
-	  {- end CoRec -}
-	in  ds.146 xs.145
-SimpleListComp.g :: for all d, e, f. [d] -> [e] -> [f] -> [(d, e, f)]
-SimpleListComp.g =
-    /\ t110 t111 t112 -> \ xs.163 ys.164 zs.165 ->
-	let
-	  {- CoRec -}
-	  ds.166 =
-	      \ ds.167 ->
-		  case ds.167 of {
-		    Nil -> Nil (t110, t111, t112)
-		    (:) ds.168 ds.169 ->
-			let x.170 = ds.168
-			in 
-			  let
-			    {- CoRec -}
-			    ds.171 =
-				\ ds.172 ->
-				    case ds.172 of {
-				      Nil -> ds.166 ds.169
-				      (:) ds.173 ds.174 ->
-					  let y.175 = ds.173
-					  in 
-					    let
-					      {- CoRec -}
-					      ds.176 =
-						  \ ds.177 ->
-						      case ds.177 of {
-							Nil -> ds.171 ds.174
-							(:) ds.178 ds.179 ->
-							    let z.180 = ds.178
-							    in 
-							      (: (t110,
-								  t111,
-								  t112))
-								  (MkTuple3!
-								       t110
-								       t111
-								       t112
-								       x.170
-								       y.175
-								       z.180)
-								  (ds.176 ds.179)
-						      }
-					      {- end CoRec -}
-					    in  ds.176 zs.165
-				    }
-			    {- end CoRec -}
-			  in  ds.171 ys.164
-		  }
-	  {- end CoRec -}
-	in  ds.166 xs.163
-SimpleListComp.h :: for all d. [d] -> [d] -> [[d]]
-SimpleListComp.h =
-    /\ t118 -> \ xs.189 ys.190 ->
-	let
-	  {- CoRec -}
-	  ds.191 =
-	      \ ds.192 ->
-		  case ds.192 of {
-		    Nil -> Nil [t118]
-		    (:) ds.193 ds.194 ->
-			let x.195 = ds.193
-			in 
-			  let
-			    {- CoRec -}
-			    ds.196 =
-				\ ds.197 ->
-				    case ds.197 of {
-				      Nil -> ds.191 ds.194
-				      (:) ds.198 ds.199 ->
-					  let y.200 = ds.198 in  ds.196 ds.199
-				    }
-			    {- end CoRec -}
-			  in  ds.196 ys.190
-		  }
-	  {- end CoRec -}
-	in  ds.191 xs.189
-SimpleListComp.i :: for all d, e. <Eq d> -> <Eq e> -> [([e], [d])] -> [[e]]
-SimpleListComp.i =
-    /\ t128 t127 -> \ dict.133 dict.132 ->
-	let dict.130 = (dfun.Eq.List t127) dict.132 in
-	let dict.131 = (dfun.Eq.List t128) dict.133 in
-	let dict.126 = ((dfun.Eq.Tuple2 [t127]) [t128]) dict.130 dict.131 in
-	let
-	  i.120 =
-	      \ xs.78 ->
-		  let
-		    {- CoRec -}
-		    ds.201 =
-			\ ds.202 ->
-			    case ds.202 of {
-			      Nil -> Nil [t127]
-			      (:) ds.203 ds.204 ->
-				  case ds.203 of {
-				    MkTuple2 x.80 y.81 ->
-					let all.79 = ds.203
-					in 
-					  case
-					      ((== ([t127], [t128]))
-						   dict.126
-						   all.79
-						   (MkTuple2!
-							[t127]
-							[t128]
-							(Nil! t127)
-							(Nil! t128)))
-					  of {
-					    True ->
-						(: [t127]) x.80 (ds.201 ds.204)
-					    False -> ds.201 ds.204
-					  }
-				  }
-			    }
-		    {- end CoRec -}
-		  in  ds.201 xs.78
-	in  i.120
-SimpleListComp.j :: for all d, e, f, g. [(f, g, d, e)] -> [(f, g)]
-SimpleListComp.j =
-    /\ t139 t140 t137 t138 -> \ xs.210 ->
-	let
-	  {- CoRec -}
-	  ds.211 =
-	      \ ds.212 ->
-		  case ds.212 of {
-		    Nil -> Nil (t137, t138)
-		    (:) ds.213 ds.214 ->
-			case ds.213 of {
-			  MkTuple4 a.215 b.216 c.217 d.218 ->
-			      (: (t137, t138))
-				  (MkTuple2! t137 t138 a.215 b.216)
-				  (ds.211 ds.214)
-			}
-		  }
-	  {- end CoRec -}
-	in  ds.211 xs.210
 
+
+================================================================================
+Desugared:
+j{-r3R,x-}  :: 
+    _forall_
+    [t{-aXD-} t{-aXG-} t{-aXJ-} t{-aXM-} a{-aXO-}]
+    =>
+    {PrelBase.Monad{-28,p-} a{-aXO-}}
+    -> a{-aXO-} (t{-aXD-}, t{-aXG-}, t{-aXJ-}, t{-aXM-})
+    -> a{-aXO-} (t{-aXD-}, t{-aXG-})
+{-# L #-}
+j{-r3R,x-} =
+    _/\_ t{-aXD-} t{-aXG-} t{-aXJ-} t{-aXM-} a{-aXO-} -> \ d.Monad_aXY  :: 
+							       {PrelBase.Monad{-28,p-} a{-aXO-}}
+							   {-# L #-}
+							   d.Monad_aXY ->
+	let {
+	  >>=_a1c0  :: 
+	      _forall_
+	      [rjI{-a107-} rjJ{-a106-}]
+	      =>
+	      a{-aXO-} rjI{-a107-}
+	      -> (rjI{-a107-} -> a{-aXO-} rjJ{-a106-})
+	      -> a{-aXO-} rjJ{-a106-}
+	  {-# L #-}
+	  >>=_a1c0 =
+	      PrelBase.>>={-811,p-}
+		  _@_ a{-aXO-} d.Monad_aXY } in
+	let {
+	  d.Monad_aY0  :: 
+	      {PrelBase.Monad{-28,p-} a{-aXO-}}
+	  {-# L #-}
+	  d.Monad_aY0 =
+	      d.Monad_aXY } in
+	let {
+	  return_a1bZ  :: 
+	      _forall_ [rjQ{-a108-}] => rjQ{-a108-} -> a{-aXO-} rjQ{-a108-}
+	  {-# L #-}
+	  return_a1bZ =
+	      PrelBase.return{-816,p-}
+		  _@_ a{-aXO-} d.Monad_aY0
+	} in 
+	  \ xs_r3L  :: 
+		a{-aXO-} (t{-aXD-}, t{-aXG-}, t{-aXJ-}, t{-aXM-})
+	    {-# L #-}
+	    xs_r3L ->
+	      let {
+		ds_d1cw  :: 
+		    (t{-aXD-}, t{-aXG-}, t{-aXJ-}, t{-aXM-})
+		    -> a{-aXO-} (t{-aXD-}, t{-aXG-})
+		{-# L #-}
+		ds_d1cw =
+		    \ ds_d1cC  :: 
+			  (t{-aXD-}, t{-aXG-}, t{-aXJ-}, t{-aXM-})
+		      {-# L #-}
+		      ds_d1cC ->
+			case
+			    ds_d1cC
+			of {
+			PrelTup.(,,,){-64,p-}{i} a_r3N b_r3O c_r3P d_r3Q  ->
+			let {
+			  ds_d1cQ  :: 
+			      (t{-aXD-}, t{-aXG-})
+			  {-# L #-}
+			  ds_d1cQ =
+			      PrelTup.(,){-62,p-}{i}
+				  {_@_ t{-aXD-} _@_ t{-aXG-} a_r3N b_r3O}
+			} in 
+			  return_a1bZ
+			      _@_ (t{-aXD-}, t{-aXG-}) ds_d1cQ;}
+	      } in 
+		>>=_a1c0
+		    _@_ (t{-aXD-}, t{-aXG-}, t{-aXJ-}, t{-aXM-})
+		    _@_ (t{-aXD-}, t{-aXG-})
+		    xs_r3L
+		    ds_d1cw
+i{-r3S,x-}  :: 
+    _forall_
+    [a{-aYh-} t{-aYm-} t{-aYo-}]
+    =>
+    {PrelBase.Eq{-23,p-} t{-aYm-}}
+    -> {PrelBase.Eq{-23,p-} t{-aYo-}}
+    -> {PrelBase.MonadZero{-29,p-} a{-aYh-}}
+    -> a{-aYh-} ([t{-aYm-}], [t{-aYo-}])
+    -> a{-aYh-} [t{-aYm-}]
+{-# L #-}
+i{-r3S,x-} =
+    _/\_ a{-aYh-} t{-aYm-} t{-aYo-} -> \ d.Eq_aYC  :: 
+					     {PrelBase.Eq{-23,p-} t{-aYm-}}
+					 {-# L #-}
+					 d.Eq_aYC d.Eq_aYF  :: 
+						      {PrelBase.Eq{-23,p-} t{-aYo-}}
+						  {-# L #-}
+						  d.Eq_aYF d.MonadZero_aYL  :: 
+							       {PrelBase.MonadZero{-29,p-} a{-aYh-}}
+							   {-# L #-}
+							   d.MonadZero_aYL ->
+	let {
+	  d.Monad_aYH  :: 
+	      {PrelBase.Monad{-28,p-} a{-aYh-}}
+	  {-# L #-}
+	  d.Monad_aYH =
+	      PrelBase.scsel_MonadZeroPrelBaseMonad{-a1dR,p-}
+		  _@_ a{-aYh-} d.MonadZero_aYL } in
+	let {
+	  d.Eq_aYA  :: 
+	      {PrelBase.Eq{-23,p-} [t{-aYm-}]}
+	  {-# L #-}
+	  d.Eq_aYA =
+	      PrelBase.$d27{-rqA,p-}
+		  _@_ t{-aYm-} d.Eq_aYC } in
+	let {
+	  d.Eq_aYD  :: 
+	      {PrelBase.Eq{-23,p-} [t{-aYo-}]}
+	  {-# L #-}
+	  d.Eq_aYD =
+	      PrelBase.$d27{-rqA,p-}
+		  _@_ t{-aYo-} d.Eq_aYF } in
+	let {
+	  d.Eq_aYy  :: 
+	      {PrelBase.Eq{-23,p-} ([t{-aYm-}], [t{-aYo-}])}
+	  {-# L #-}
+	  d.Eq_aYy =
+	      PrelTup.$d9{-rq7,p-}
+		  _@_ [t{-aYm-}] _@_ [t{-aYo-}] d.Eq_aYA d.Eq_aYD } in
+	let {
+	  ==_a1dH  :: 
+	      ([t{-aYm-}], [t{-aYo-}])
+	      -> ([t{-aYm-}], [t{-aYo-}])
+	      -> PrelBase.Bool{-34,p-}
+	  {-# L #-}
+	  ==_a1dH =
+	      PrelBase.=={-8Y,p-}
+		  _@_ ([t{-aYm-}], [t{-aYo-}]) d.Eq_aYy } in
+	let {
+	  >>=_a1dG  :: 
+	      _forall_
+	      [rjI{-a10a-} rjJ{-a109-}]
+	      =>
+	      a{-aYh-} rjI{-a10a-}
+	      -> (rjI{-a10a-} -> a{-aYh-} rjJ{-a109-})
+	      -> a{-aYh-} rjJ{-a109-}
+	  {-# L #-}
+	  >>=_a1dG =
+	      PrelBase.>>={-811,p-}
+		  _@_ a{-aYh-} d.Monad_aYH } in
+	let {
+	  d.Monad_aYJ  :: 
+	      {PrelBase.Monad{-28,p-} a{-aYh-}}
+	  {-# L #-}
+	  d.Monad_aYJ =
+	      d.Monad_aYH } in
+	let {
+	  return_a1dF  :: 
+	      _forall_ [rjQ{-a10b-}] => rjQ{-a10b-} -> a{-aYh-} rjQ{-a10b-}
+	  {-# L #-}
+	  return_a1dF =
+	      PrelBase.return{-816,p-}
+		  _@_ a{-aYh-} d.Monad_aYJ } in
+	let {
+	  zero_a1dE  :: 
+	      _forall_ [rjD{-a10c-}] => a{-aYh-} rjD{-a10c-}
+	  {-# L #-}
+	  zero_a1dE =
+	      PrelBase.zero{-810,p-}
+		  _@_ a{-aYh-} d.MonadZero_aYL
+	} in 
+	  \ xs_r3F  :: 
+		a{-aYh-} ([t{-aYm-}], [t{-aYo-}])
+	    {-# L #-}
+	    xs_r3F ->
+	      let {
+		ds_d1f5  :: 
+		    ([t{-aYm-}], [t{-aYo-}]) -> a{-aYh-} [t{-aYm-}]
+		{-# L #-}
+		ds_d1f5 =
+		    \ all_r3H  :: 
+			  ([t{-aYm-}], [t{-aYo-}])
+		      {-# L #-}
+		      all_r3H ->
+			case all_r3H of { PrelTup.(,){-62,p-}{i} x_r3I y_r3J  ->
+			case
+			    let { ds_d1fr  :: 
+				      ([t{-aYm-}], [t{-aYo-}])
+				  {-# L #-}
+				  ds_d1fr =
+			      let {
+				ds_d1fE  :: 
+				    [t{-aYm-}]
+				{-# L #-}
+				ds_d1fE =
+				    PrelBase.[]{-5i,p-}{i}
+					_@_ t{-aYm-} } in
+			      let {
+				ds_d1fI  :: 
+				    [t{-aYo-}]
+				{-# L #-}
+				ds_d1fI =
+				    PrelBase.[]{-5i,p-}{i}
+					_@_ t{-aYo-}
+			      } in 
+				PrelTup.(,){-62,p-}{i}
+				    {_@_ [t{-aYm-}] _@_ [t{-aYo-}] ds_d1fE ds_d1fI}
+			    } in
+			    ==_a1dH
+				all_r3H ds_d1fr
+			of {
+			  PrelBase.True{-5E,p-}{i} ->
+			      return_a1dF
+				  _@_ [t{-aYm-}] x_r3I;
+			  PrelBase.False{-58,p-}{i} ->
+			      zero_a1dE
+				  _@_ [t{-aYm-}];
+			};}
+	      } in 
+		>>=_a1dG
+		    _@_ ([t{-aYm-}], [t{-aYo-}]) _@_ [t{-aYm-}] xs_r3F ds_d1f5
+h{-r3T,x-}  :: 
+    _forall_
+    [a{-aYU-} t{-aYZ-}]
+    =>
+    {PrelBase.MonadZero{-29,p-} a{-aYU-}}
+    -> a{-aYU-} t{-aYZ-}
+    -> a{-aYU-} t{-aYZ-}
+    -> a{-aYU-} [t{-aYZ-}]
+{-# L #-}
+h{-r3T,x-} =
+    _/\_ a{-aYU-} t{-aYZ-} -> \ d.MonadZero_aZd  :: 
+				    {PrelBase.MonadZero{-29,p-} a{-aYU-}}
+				{-# L #-}
+				d.MonadZero_aZd ->
+	let {
+	  d.Monad_aZ9  :: 
+	      {PrelBase.Monad{-28,p-} a{-aYU-}}
+	  {-# L #-}
+	  d.Monad_aZ9 =
+	      PrelBase.scsel_MonadZeroPrelBaseMonad{-a1dR,p-}
+		  _@_ a{-aYU-} d.MonadZero_aZd } in
+	let {
+	  >>=_a1gH  :: 
+	      _forall_
+	      [rjI{-a10e-} rjJ{-a10d-}]
+	      =>
+	      a{-aYU-} rjI{-a10e-}
+	      -> (rjI{-a10e-} -> a{-aYU-} rjJ{-a10d-})
+	      -> a{-aYU-} rjJ{-a10d-}
+	  {-# L #-}
+	  >>=_a1gH =
+	      PrelBase.>>={-811,p-}
+		  _@_ a{-aYU-} d.Monad_aZ9 } in
+	let {
+	  d.Monad_aZb  :: 
+	      {PrelBase.Monad{-28,p-} a{-aYU-}}
+	  {-# L #-}
+	  d.Monad_aZb =
+	      d.Monad_aZ9 } in
+	let {
+	  return_a1gG  :: 
+	      _forall_ [rjQ{-a10f-}] => rjQ{-a10f-} -> a{-aYU-} rjQ{-a10f-}
+	  {-# L #-}
+	  return_a1gG =
+	      PrelBase.return{-816,p-}
+		  _@_ a{-aYU-} d.Monad_aZb } in
+	let {
+	  zero_a1gF  :: 
+	      _forall_ [rjD{-a10g-}] => a{-aYU-} rjD{-a10g-}
+	  {-# L #-}
+	  zero_a1gF =
+	      PrelBase.zero{-810,p-}
+		  _@_ a{-aYU-} d.MonadZero_aZd
+	} in 
+	  \ xs_r3x  :: 
+		a{-aYU-} t{-aYZ-}
+	    {-# L #-}
+	    xs_r3x ys_r3z  :: 
+		       a{-aYU-} t{-aYZ-}
+		   {-# L #-}
+		   ys_r3z ->
+	      let {
+		ds_d1hu  :: 
+		    t{-aYZ-} -> a{-aYU-} [t{-aYZ-}]
+		{-# L #-}
+		ds_d1hu =
+		    \ x_r3B  :: 
+			  t{-aYZ-}
+		      {-# L #-}
+		      x_r3B ->
+			let {
+			  ds_d1hK  :: 
+			      t{-aYZ-} -> a{-aYU-} [t{-aYZ-}]
+			  {-# L #-}
+			  ds_d1hK =
+			      \ y_r3D  :: 
+				    t{-aYZ-}
+				{-# L #-}
+				y_r3D ->
+				  zero_a1gF
+				      _@_ [t{-aYZ-}]
+			} in 
+			  >>=_a1gH
+			      _@_ t{-aYZ-} _@_ [t{-aYZ-}] ys_r3z ds_d1hK
+	      } in 
+		>>=_a1gH
+		    _@_ t{-aYZ-} _@_ [t{-aYZ-}] xs_r3x ds_d1hu
+g{-r3U,x-}  :: 
+    _forall_
+    [a{-aZn-} t{-aZp-} t{-aZs-} t{-aZv-}]
+    =>
+    {PrelBase.MonadZero{-29,p-} a{-aZn-}}
+    -> a{-aZn-} t{-aZp-}
+    -> a{-aZn-} t{-aZs-}
+    -> a{-aZn-} t{-aZv-}
+    -> a{-aZn-} (t{-aZp-}, t{-aZs-}, t{-aZv-})
+{-# L #-}
+g{-r3U,x-} =
+    _/\_ a{-aZn-} t{-aZp-} t{-aZs-} t{-aZv-} -> \ d.MonadZero_aZJ  :: 
+						      {PrelBase.MonadZero{-29,p-} a{-aZn-}}
+						  {-# L #-}
+						  d.MonadZero_aZJ ->
+	let {
+	  d.Monad_aZF  :: 
+	      {PrelBase.Monad{-28,p-} a{-aZn-}}
+	  {-# L #-}
+	  d.Monad_aZF =
+	      PrelBase.scsel_MonadZeroPrelBaseMonad{-a1dR,p-}
+		  _@_ a{-aZn-} d.MonadZero_aZJ } in
+	let {
+	  >>=_a1im  :: 
+	      _forall_
+	      [rjI{-a10i-} rjJ{-a10h-}]
+	      =>
+	      a{-aZn-} rjI{-a10i-}
+	      -> (rjI{-a10i-} -> a{-aZn-} rjJ{-a10h-})
+	      -> a{-aZn-} rjJ{-a10h-}
+	  {-# L #-}
+	  >>=_a1im =
+	      PrelBase.>>={-811,p-}
+		  _@_ a{-aZn-} d.Monad_aZF } in
+	let {
+	  d.Monad_aZH  :: 
+	      {PrelBase.Monad{-28,p-} a{-aZn-}}
+	  {-# L #-}
+	  d.Monad_aZH =
+	      d.Monad_aZF } in
+	let {
+	  return_a1il  :: 
+	      _forall_ [rjQ{-a10j-}] => rjQ{-a10j-} -> a{-aZn-} rjQ{-a10j-}
+	  {-# L #-}
+	  return_a1il =
+	      PrelBase.return{-816,p-}
+		  _@_ a{-aZn-} d.Monad_aZH } in
+	let {
+	  zero_a1ik  :: 
+	      _forall_ [rjD{-a10k-}] => a{-aZn-} rjD{-a10k-}
+	  {-# L #-}
+	  zero_a1ik =
+	      PrelBase.zero{-810,p-}
+		  _@_ a{-aZn-} d.MonadZero_aZJ
+	} in 
+	  \ xs_r3l  :: 
+		a{-aZn-} t{-aZp-}
+	    {-# L #-}
+	    xs_r3l ys_r3n  :: 
+		       a{-aZn-} t{-aZs-}
+		   {-# L #-}
+		   ys_r3n zs_r3p  :: 
+			      a{-aZn-} t{-aZv-}
+			  {-# L #-}
+			  zs_r3p ->
+	      let {
+		ds_d1ja  :: 
+		    t{-aZp-} -> a{-aZn-} (t{-aZp-}, t{-aZs-}, t{-aZv-})
+		{-# L #-}
+		ds_d1ja =
+		    \ x_r3r  :: 
+			  t{-aZp-}
+		      {-# L #-}
+		      x_r3r ->
+			let {
+			  ds_d1jq  :: 
+			      t{-aZs-} -> a{-aZn-} (t{-aZp-}, t{-aZs-}, t{-aZv-})
+			  {-# L #-}
+			  ds_d1jq =
+			      \ y_r3t  :: 
+				    t{-aZs-}
+				{-# L #-}
+				y_r3t ->
+				  let {
+				    ds_d1jG  :: 
+					t{-aZv-} -> a{-aZn-} (t{-aZp-}, t{-aZs-}, t{-aZv-})
+				    {-# L #-}
+				    ds_d1jG =
+					\ z_r3v  :: 
+					      t{-aZv-}
+					  {-# L #-}
+					  z_r3v ->
+					    let {
+					      ds_d1jR  :: 
+						  (t{-aZp-}, t{-aZs-}, t{-aZv-})
+					      {-# L #-}
+					      ds_d1jR =
+						  PrelTup.(,,){-63,p-}{i}
+						      {_@_ t{-aZp-}
+						       _@_ t{-aZs-}
+						       _@_ t{-aZv-}
+						       x_r3r
+						       y_r3t
+						       z_r3v}
+					    } in 
+					      return_a1il
+						  _@_ (t{-aZp-}, t{-aZs-}, t{-aZv-}) ds_d1jR
+				  } in 
+				    >>=_a1im
+					_@_ t{-aZv-}
+					_@_ (t{-aZp-}, t{-aZs-}, t{-aZv-})
+					zs_r3p
+					ds_d1jG
+			} in 
+			  >>=_a1im
+			      _@_ t{-aZs-} _@_ (t{-aZp-}, t{-aZs-}, t{-aZv-}) ys_r3n ds_d1jq
+	      } in 
+		>>=_a1im
+		    _@_ t{-aZp-} _@_ (t{-aZp-}, t{-aZs-}, t{-aZv-}) xs_r3l ds_d1ja
+f{-r3V,x-}  :: 
+    _forall_
+    [a{-aZR-} t{-aZT-}]
+    =>
+    {PrelBase.Monad{-28,p-} a{-aZR-}}
+    -> a{-aZR-} t{-aZT-}
+    -> a{-aZR-} t{-aZT-}
+{-# L #-}
+f{-r3V,x-} =
+    _/\_ a{-aZR-} t{-aZT-} -> \ d.Monad_a103  :: 
+				    {PrelBase.Monad{-28,p-} a{-aZR-}}
+				{-# L #-}
+				d.Monad_a103 ->
+	let {
+	  >>=_a1ky  :: 
+	      _forall_
+	      [rjI{-a10m-} rjJ{-a10l-}]
+	      =>
+	      a{-aZR-} rjI{-a10m-}
+	      -> (rjI{-a10m-} -> a{-aZR-} rjJ{-a10l-})
+	      -> a{-aZR-} rjJ{-a10l-}
+	  {-# L #-}
+	  >>=_a1ky =
+	      PrelBase.>>={-811,p-}
+		  _@_ a{-aZR-} d.Monad_a103 } in
+	let {
+	  d.Monad_a105  :: 
+	      {PrelBase.Monad{-28,p-} a{-aZR-}}
+	  {-# L #-}
+	  d.Monad_a105 =
+	      d.Monad_a103 } in
+	let {
+	  return_a1kx  :: 
+	      _forall_ [rjQ{-a10n-}] => rjQ{-a10n-} -> a{-aZR-} rjQ{-a10n-}
+	  {-# L #-}
+	  return_a1kx =
+	      PrelBase.return{-816,p-}
+		  _@_ a{-aZR-} d.Monad_a105
+	} in 
+	  \ xs_r3h  :: 
+		a{-aZR-} t{-aZT-}
+	    {-# L #-}
+	    xs_r3h ->
+	      let {
+		ds_d1l4  :: 
+		    t{-aZT-} -> a{-aZR-} t{-aZT-}
+		{-# L #-}
+		ds_d1l4 =
+		    \ x_r3j  :: 
+			  t{-aZT-}
+		      {-# L #-}
+		      x_r3j ->
+			return_a1kx
+			    _@_ t{-aZT-} x_r3j
+	      } in 
+		>>=_a1ky
+		    _@_ t{-aZT-} _@_ t{-aZT-} xs_r3h ds_d1l4

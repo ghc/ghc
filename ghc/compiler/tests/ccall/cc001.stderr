@@ -1,188 +1,333 @@
+
+
+================================================================================
 Typechecked:
-lit.t444 = D# 2.0000000000000000##
-lit.t443 = F# 1.0000000000000000#
-AbsBinds [] [] [(a.t439, Test.a{-r79-})]
-    {- nonrec -}
-    a.t439 :: IoWorld -> (Int, IoWorld)
-    a.t439
-	= ccall  a [Int] 
 {- nonrec -}
 {- nonrec -}
-AbsBinds [] [] [(b.t440, Test.b{-r80-})]
-    {- nonrec -}
-    b.t440 :: Int -> IoWorld -> (Int, IoWorld)
-    b.t440
-	x.r212 = ccall  b [Int, Int] x.r212
+{- nonrec -}
+d.Fractional_a16j =
+    PrelNum.$d23{-rtW,p-}
+fromRational_a16o =
+    PrelNum.fromRational{-8T,p-}
+	PrelBase.Float{-3c,p-}
+	d.Fractional_a16j
+lit_a16r =
+    fromRational_a16o
+	1.0000000000000000
+d.Fractional_a16n =
+    PrelNum.$d14{-rtM,p-}
+fromRational_a16q =
+    PrelNum.fromRational{-8T,p-}
+	PrelBase.Double{-3a,p-}
+	d.Fractional_a16n
+lit_a16p =
+    fromRational_a16q
+	2.0000000000000000
+{- nonrec -}
+AbsBinds [] [] [([], c{-r5,x-}, c_a15h)]
+    c_a15h
+	x1_r4l x2_r4n x3_r4p x4_r4r
+		=   STBase.ST{-5G,p-}{i}
+			[GHC.RealWorld{-3s,p-}, PrelBase.Float{-3c,p-}]
+			_ccall_ c
+			    x1_r4l x2_r4n x3_r4p x4_r4r
 {- nonrec -}
 {- nonrec -}
-AbsBinds [] [] [(c.t441, Test.c{-r81-})]
-    {- nonrec -}
-    c.t441 :: Int -> Char -> Float -> Double -> IoWorld -> (Float, IoWorld)
-    c.t441
-	x1.r213 x2.r214 x3.r215 x4.r216
-		= ccall  c [Float, Int, Char, Float, Double]
-		      x1.r213 x2.r214 x3.r215 x4.r216
+AbsBinds [] [] [([], b{-r3,x-}, b_a15F)]
+    b_a15F
+	x_r4j   =   STBase.ST{-5G,p-}{i}
+			[GHC.RealWorld{-3s,p-}, PrelBase.Int{-3g,p-}]
+			_ccall_ b
+			    x_r4j
 {- nonrec -}
 {- nonrec -}
-AbsBinds [] [] [(d.t442, Test.d{-r82-})]
-    {- nonrec -}
-    d.t442 :: IoWorld -> (Float, IoWorld)
-    d.t442
-	= (thenIO{-r102-} [Int, Float])
-	      Test.a{-r79-}
-	      (\ x.r217 -> (thenIO{-r102-} [Int, Float])
-			       (Test.b{-r80-} x.r217)
-			       (\ y.r218 -> Test.c{-r81-}
-						y.r218 'f' lit.t443 lit.t444))
+AbsBinds [] [] [([], a{-r1,x-}, a_a15R)]
+    a_a15R
+	=   STBase.ST{-5G,p-}{i}
+		[GHC.RealWorld{-3s,p-}, PrelBase.Int{-3g,p-}]
+		_ccall_ a
 {- nonrec -}
 {- nonrec -}
+AbsBinds [] [] [([], d{-r7,x-}, d_a15Y)]
+    d_a15Y
+	=   STBase.thenPrimIO{-r4w,p-}
+		[PrelBase.Int{-3g,p-}, PrelBase.Float{-3c,p-}]
+		a{-r1,x-}
+		(\ x_r4t   ->  STBase.thenPrimIO{-r4w,p-}
+				   [PrelBase.Int{-3g,p-}, PrelBase.Float{-3c,p-}]
+				   (b{-r3,x-}
+					x_r4t)
+				   (\ y_r4v   ->  c{-r5,x-}
+						      y_r4v 'f' lit_a16r lit_a16p))
+{- nonrec -}
+
+
+================================================================================
 Desugared:
-{- plain CoRec -}
-lit.t444 :: Double
-_NI_
-lit.t444 = (\ tpl.d0# -> D#! tpl.d0#) 2.0000000000000000##
-lit.t443 :: Float
-_NI_
-lit.t443 = (\ tpl.d1# -> F#! tpl.d1#) 1.0000000000000000#
-Test.a{-r79-} :: IoWorld -> (Int, IoWorld)
-_NI_
-Test.a{-r79-} =
-    \ ds.d2 ->
-	case
-	    (case
-		 (case ds.d2 of {
-		    IoWorld ds.d3# -> ds.d3#
-		  })
-	     of {
-	       a.d8# -> ( _CCALL_ a [] Int# )! a.d8#
-	     })
-	of {
-	  IntPrimAndIoWorld ds.d4#  ds.d5# ->
-	      let {
-		a.d6 :: Int
-		_NI_
-		a.d6 = I#! ds.d4# } in
-	      let {
-		a.d7 :: IoWorld
-		_NI_
-		a.d7 = IoWorld! ds.d5#
-	      } in  Tup2! Int IoWorld a.d6 a.d7
-	}
-Test.b{-r80-} :: Int -> IoWorld -> (Int, IoWorld)
-_NI_
-Test.b{-r80-} =
-    \ x.r212  ds.d9 ->
-	case
-	    (case
-		 (case ds.d9 of {
-		    IoWorld ds.d10# -> ds.d10#
-		  })
-	     of {
-	       a.d16# ->
-		   case
-		       (case x.r212 of {
-			  I# ds.d11# -> ds.d11#
-			})
-		   of {
-		     a.d17# -> ( _CCALL_ b [Int#] Int# )! a.d16# a.d17#
-		   }
-	     })
-	of {
-	  IntPrimAndIoWorld ds.d12#  ds.d13# ->
-	      let {
-		a.d14 :: Int
-		_NI_
-		a.d14 = I#! ds.d12# } in
-	      let {
-		a.d15 :: IoWorld
-		_NI_
-		a.d15 = IoWorld! ds.d13#
-	      } in  Tup2! Int IoWorld a.d14 a.d15
-	}
-Test.c{-r81-} :: Int -> Char -> Float -> Double -> IoWorld -> (Float, IoWorld)
-_NI_
-Test.c{-r81-} =
-    \ x1.r213  x2.r214  x3.r215  x4.r216  ds.d18 ->
-	case
-	    (case
-		 (case ds.d18 of {
-		    IoWorld ds.d19# -> ds.d19#
-		  })
-	     of {
-	       a.d28# ->
-		   case
-		       (case x1.r213 of {
-			  I# ds.d20# -> ds.d20#
-			})
-		   of {
-		     a.d29# ->
-			 case
-			     (case x2.r214 of {
-				C# ds.d21# -> ds.d21#
-			      })
-			 of {
-			   a.d30# ->
-			       case
-				   (case x3.r215 of {
-				      F# ds.d22# -> ds.d22#
-				    })
-			       of {
-				 a.d31# ->
-				     case
-					 (case x4.r216 of {
-					    D# ds.d23# -> ds.d23#
-					  })
-				     of {
-				       a.d32# ->
-					   ( _CCALL_ c [Int#,
-							Char#,
-							Float#,
-							Double#] Float# )!
-					       a.d28#
-					       a.d29#
-					       a.d30#
-					       a.d31#
-					       a.d32#
-				     }
-			       }
-			 }
-		   }
-	     })
-	of {
-	  FloatPrimAndIoWorld ds.d24#  ds.d25# ->
-	      let {
-		a.d26 :: Float
-		_NI_
-		a.d26 = F#! ds.d24# } in
-	      let {
-		a.d27 :: IoWorld
-		_NI_
-		a.d27 = IoWorld! ds.d25#
-	      } in  Tup2! Float IoWorld a.d26 a.d27
-	}
-Test.d{-r82-} :: IoWorld -> (Float, IoWorld)
-_NI_
-Test.d{-r82-} =
+Rec {
+d.Fractional_a16j  :: 
+    {PrelNum.Fractional{-26,p-} PrelBase.Float{-3c,p-}}
+{-# L #-}
+d.Fractional_a16j =
+    PrelNum.$d23{-rtW,p-}
+fromRational_a16o  :: 
+    PrelNum.Rational{-3r,p-} -> PrelBase.Float{-3c,p-}
+{-# L #-}
+fromRational_a16o =
+    PrelNum.fromRational{-8T,p-}
+	_@_ PrelBase.Float{-3c,p-} d.Fractional_a16j
+lit_a16r  :: 
+    PrelBase.Float{-3c,p-}
+{-# L #-}
+lit_a16r =
+    fromRational_a16o
+	_rational_  1 1
+d.Fractional_a16n  :: 
+    {PrelNum.Fractional{-26,p-} PrelBase.Double{-3a,p-}}
+{-# L #-}
+d.Fractional_a16n =
+    PrelNum.$d14{-rtM,p-}
+fromRational_a16q  :: 
+    PrelNum.Rational{-3r,p-} -> PrelBase.Double{-3a,p-}
+{-# L #-}
+fromRational_a16q =
+    PrelNum.fromRational{-8T,p-}
+	_@_ PrelBase.Double{-3a,p-} d.Fractional_a16n
+lit_a16p  :: 
+    PrelBase.Double{-3a,p-}
+{-# L #-}
+lit_a16p =
+    fromRational_a16q
+	_rational_  2 1
+c_a15h  :: 
+    PrelBase.Int{-3g,p-}
+    -> PrelBase.Char{-38,p-}
+    -> PrelBase.Float{-3c,p-}
+    -> PrelBase.Double{-3a,p-}
+    -> STBase.PrimIO{-3P,p-} PrelBase.Float{-3c,p-}
+{-# L #-}
+c_a15h =
+    \ x1_r4l  :: 
+	  PrelBase.Int{-3g,p-}
+      {-# L #-}
+      x1_r4l x2_r4n  :: 
+		 PrelBase.Char{-38,p-}
+	     {-# L #-}
+	     x2_r4n x3_r4p  :: 
+			PrelBase.Float{-3c,p-}
+		    {-# L #-}
+		    x3_r4p x4_r4r  :: 
+			       PrelBase.Double{-3a,p-}
+			   {-# L #-}
+			   x4_r4r ->
+	let {
+	  ds_d1et  :: 
+	      STBase.State{-3M,p-} GHC.RealWorld{-3s,p-}
+	      -> (PrelBase.Float{-3c,p-}, STBase.State{-3M,p-} GHC.RealWorld{-3s,p-})
+	  {-# L #-}
+	  ds_d1et =
+	      \ ds_d1ez  :: 
+		    STBase.State{-3M,p-} GHC.RealWorld{-3s,p-}
+		{-# L #-}
+		ds_d1ez ->
+		  case ds_d1ez of { STBase.S#{-5D,p-}{i} ds_d1eI  ->
+		  case x1_r4l of { PrelBase.I#{-5b,p-}{i} ds_d1eR  ->
+		  case x2_r4n of { PrelBase.C#{-54,p-}{i} ds_d1f0  ->
+		  case x3_r4p of { PrelBase.F#{-59,p-}{i} ds_d1f9  ->
+		  case x4_r4r of { PrelBase.D#{-56,p-}{i} ds_d1fw  ->
+		  case
+		      _ccall_ c [(STBase.StateAndFloat#{-3C,p-} GHC.RealWorld{-3s,p-}) (GHC.State#{-3L,p-} GHC.RealWorld{-3s,p-}) GHC.Int#{-3f,p-} GHC.Char#{-37,p-} GHC.Float#{-3b,p-} GHC.Double#{-39,p-}]!
+			  ds_d1eI ds_d1eR ds_d1f0 ds_d1f9 ds_d1fw
+		  of {
+		  STBase.StateAndFloat#{-5u,p-}{i} ds_d1fZ ds_d1fX  ->
+		  let {
+		    ds_d1fO  :: 
+			PrelBase.Float{-3c,p-}
+		    {-# L #-}
+		    ds_d1fO =
+			PrelBase.F#{-59,p-}{i}
+			    {ds_d1fX} } in
+		  let {
+		    ds_d1fS  :: 
+			STBase.State{-3M,p-} GHC.RealWorld{-3s,p-}
+		    {-# L #-}
+		    ds_d1fS =
+			STBase.S#{-5D,p-}{i}
+			    {_@_ GHC.RealWorld{-3s,p-} ds_d1fZ}
+		  } in 
+		    PrelTup.(,){-62,p-}{i}
+			{_@_ PrelBase.Float{-3c,p-}
+			 _@_ (STBase.State{-3M,p-} GHC.RealWorld{-3s,p-})
+			 ds_d1fO
+			 ds_d1fS};};};};};};}
+	} in 
+	  STBase.ST{-5G,p-}{i}
+	      _@_ GHC.RealWorld{-3s,p-} _@_ PrelBase.Float{-3c,p-} ds_d1et
+c{-r5,x-}  :: 
+    PrelBase.Int{-3g,p-}
+    -> PrelBase.Char{-38,p-}
+    -> PrelBase.Float{-3c,p-}
+    -> PrelBase.Double{-3a,p-}
+    -> STBase.PrimIO{-3P,p-} PrelBase.Float{-3c,p-}
+{-# L #-}
+c{-r5,x-} =
+    c_a15h
+b_a15F  :: 
+    PrelBase.Int{-3g,p-} -> STBase.PrimIO{-3P,p-} PrelBase.Int{-3g,p-}
+{-# L #-}
+b_a15F =
+    \ x_r4j  :: 
+	  PrelBase.Int{-3g,p-}
+      {-# L #-}
+      x_r4j ->
+	let {
+	  ds_d1gj  :: 
+	      STBase.State{-3M,p-} GHC.RealWorld{-3s,p-}
+	      -> (PrelBase.Int{-3g,p-}, STBase.State{-3M,p-} GHC.RealWorld{-3s,p-})
+	  {-# L #-}
+	  ds_d1gj =
+	      \ ds_d1gp  :: 
+		    STBase.State{-3M,p-} GHC.RealWorld{-3s,p-}
+		{-# L #-}
+		ds_d1gp ->
+		  case ds_d1gp of { STBase.S#{-5D,p-}{i} ds_d1gy  ->
+		  case x_r4j of { PrelBase.I#{-5b,p-}{i} ds_d1gM  ->
+		  case
+		      _ccall_ b [(STBase.StateAndInt#{-3D,p-} GHC.RealWorld{-3s,p-}) (GHC.State#{-3L,p-} GHC.RealWorld{-3s,p-}) GHC.Int#{-3f,p-}]!
+			  ds_d1gy ds_d1gM
+		  of {
+		  STBase.StateAndInt#{-5v,p-}{i} ds_d1hf ds_d1hd  ->
+		  let {
+		    ds_d1h4  :: 
+			PrelBase.Int{-3g,p-}
+		    {-# L #-}
+		    ds_d1h4 =
+			PrelBase.I#{-5b,p-}{i}
+			    {ds_d1hd} } in
+		  let {
+		    ds_d1h8  :: 
+			STBase.State{-3M,p-} GHC.RealWorld{-3s,p-}
+		    {-# L #-}
+		    ds_d1h8 =
+			STBase.S#{-5D,p-}{i}
+			    {_@_ GHC.RealWorld{-3s,p-} ds_d1hf}
+		  } in 
+		    PrelTup.(,){-62,p-}{i}
+			{_@_ PrelBase.Int{-3g,p-}
+			 _@_ (STBase.State{-3M,p-} GHC.RealWorld{-3s,p-})
+			 ds_d1h4
+			 ds_d1h8};};};}
+	} in 
+	  STBase.ST{-5G,p-}{i}
+	      _@_ GHC.RealWorld{-3s,p-} _@_ PrelBase.Int{-3g,p-} ds_d1gj
+b{-r3,x-}  :: 
+    PrelBase.Int{-3g,p-} -> STBase.PrimIO{-3P,p-} PrelBase.Int{-3g,p-}
+{-# L #-}
+b{-r3,x-} =
+    b_a15F
+a_a15R  :: 
+    STBase.PrimIO{-3P,p-} PrelBase.Int{-3g,p-}
+{-# L #-}
+a_a15R =
     let {
-      a.d36 :: Int -> IoWorld -> (Float, IoWorld)
-      _NI_
-      a.d36 =
-	  \ x.r217 ->
+      ds_d1hy  :: 
+	  STBase.State{-3M,p-} GHC.RealWorld{-3s,p-}
+	  -> (PrelBase.Int{-3g,p-}, STBase.State{-3M,p-} GHC.RealWorld{-3s,p-})
+      {-# L #-}
+      ds_d1hy =
+	  \ ds_d1hE  :: 
+		STBase.State{-3M,p-} GHC.RealWorld{-3s,p-}
+	    {-# L #-}
+	    ds_d1hE ->
+	      case ds_d1hE of { STBase.S#{-5D,p-}{i} ds_d1hP  ->
+	      case
+		  _ccall_ a [(STBase.StateAndInt#{-3D,p-} GHC.RealWorld{-3s,p-}) (GHC.State#{-3L,p-} GHC.RealWorld{-3s,p-})]!
+		      ds_d1hP
+	      of {
+	      STBase.StateAndInt#{-5v,p-}{i} ds_d1ii ds_d1ig  ->
 	      let {
-		a.d35 :: Int -> IoWorld -> (Float, IoWorld)
-		_NI_
-		a.d35 =
-		    \ y.r218 ->
-			(let {
-			   a.d33 :: Char
-			   _NI_
-			   a.d33 = C#! 'f'#
-			 } in  Test.c{-r81-} y.r218 a.d33) lit.t443 lit.t444
+		ds_d1i7  :: 
+		    PrelBase.Int{-3g,p-}
+		{-# L #-}
+		ds_d1i7 =
+		    PrelBase.I#{-5b,p-}{i}
+			{ds_d1ig} } in
+	      let {
+		ds_d1ib  :: 
+		    STBase.State{-3M,p-} GHC.RealWorld{-3s,p-}
+		{-# L #-}
+		ds_d1ib =
+		    STBase.S#{-5D,p-}{i}
+			{_@_ GHC.RealWorld{-3s,p-} ds_d1ii}
 	      } in 
-		(let {
-		   a.d34 :: IoWorld -> (Int, IoWorld)
-		   _NI_
-		   a.d34 = Test.b{-r80-} x.r217
-		 } in  ((thenIO{-r102-} Int) Float) a.d34) a.d35
-    } in  ((thenIO{-r102-} Int) Float) Test.a{-r79-} a.d36
-{- end plain CoRec -}
+		PrelTup.(,){-62,p-}{i}
+		    {_@_ PrelBase.Int{-3g,p-}
+		     _@_ (STBase.State{-3M,p-} GHC.RealWorld{-3s,p-})
+		     ds_d1i7
+		     ds_d1ib};};}
+    } in 
+      STBase.ST{-5G,p-}{i}
+	  _@_ GHC.RealWorld{-3s,p-} _@_ PrelBase.Int{-3g,p-} ds_d1hy
+a{-r1,x-}  :: 
+    STBase.PrimIO{-3P,p-} PrelBase.Int{-3g,p-}
+{-# L #-}
+a{-r1,x-} =
+    a_a15R
+d_a15Y  :: 
+    STBase.PrimIO{-3P,p-} PrelBase.Float{-3c,p-}
+{-# L #-}
+d_a15Y =
+    let {
+      ds_d1iE  :: 
+	  PrelBase.Int{-3g,p-}
+	  -> STBase.PrimIO{-3P,p-} PrelBase.Float{-3c,p-}
+      {-# L #-}
+      ds_d1iE =
+	  \ x_r4t  :: 
+		PrelBase.Int{-3g,p-}
+	    {-# L #-}
+	    x_r4t ->
+	      let {
+		ds_d1iT  :: 
+		    STBase.PrimIO{-3P,p-} PrelBase.Int{-3g,p-}
+		{-# L #-}
+		ds_d1iT =
+		    b{-r3,x-}
+			x_r4t } in
+	      let {
+		ds_d1iX  :: 
+		    PrelBase.Int{-3g,p-}
+		    -> STBase.PrimIO{-3P,p-} PrelBase.Float{-3c,p-}
+		{-# L #-}
+		ds_d1iX =
+		    \ y_r4v  :: 
+			  PrelBase.Int{-3g,p-}
+		      {-# L #-}
+		      y_r4v ->
+			let {
+			  ds_d1jf  :: 
+			      PrelBase.Char{-38,p-}
+			  {-# L #-}
+			  ds_d1jf =
+			      PrelBase.C#{-54,p-}{i}
+				  {'f'}
+			} in 
+			  c{-r5,x-}
+			      y_r4v ds_d1jf lit_a16r lit_a16p
+	      } in 
+		STBase.thenPrimIO{-r4w,p-}
+		    _@_ PrelBase.Int{-3g,p-} _@_ PrelBase.Float{-3c,p-} ds_d1iT ds_d1iX
+    } in 
+      STBase.thenPrimIO{-r4w,p-}
+	  _@_ PrelBase.Int{-3g,p-}
+	  _@_ PrelBase.Float{-3c,p-}
+	  a{-r1,x-}
+	  ds_d1iE
+d{-r7,x-}  :: 
+    STBase.PrimIO{-3P,p-} PrelBase.Float{-3c,p-}
+{-# L #-}
+d{-r7,x-} =
+    d_a15Y
+end Rec }
+
+NOTE: Simplifier still going after 4 iterations; bailing out.

@@ -1,51 +1,137 @@
-Desugared:
-{- plain CoRec -}
-Main.foldPair ::
-    for all a, b. (a -> a -> a, b -> b -> b) -> (a, b) -> [(a, b)] -> (a, b)
-Main.foldPair =
-    /\ a b -> \ fg.122 ab.123 ds.124 ->
-	let
-	  fail.125 =
-	      (error (a, b))
-		  "\"ds031.hs\", line 4: pattern-matching failure [function binding]\n"S in
-	let
-	  fail.141 =
-	      case fg.122 of {
-		MkTuple2 f.126 g.127 ->
-		    case ds.124 of {
-		      (:) ds.128 abs.129 ->
-			  case ds.128 of {
-			    MkTuple2 a.130 b.131 ->
-				let ab.132 = ab.123 in
-				let fg.133 = fg.122 in
-				let
-				  ds.134 =
-				      ((Main.foldPair a) b)
-					  fg.133 ab.132 abs.129 in
-				let
-				  u.137 =
-				      case ds.134 of {
-					MkTuple2 u.135 v.136 -> u.135
-				      } in
-				let
-				  v.140 =
-				      case ds.134 of {
-					MkTuple2 u.138 v.139 -> v.139
-				      }
-				in 
-				  MkTuple2!
-				      a
-				      b
-				      (f.126 a.130 u.137)
-				      (g.127 b.131 v.140)
-			  }
-		      _ ->  fail.125
-		    }
-	      }
-	in 
-	  case ds.124 of {
-	    Nil -> ab.123
-	    _ ->  fail.141
-	  }
-{- end plain CoRec -}
+ds031.hs:4: 
+    Warning: Possibly incomplete patterns
+	in the definition of function `foldPair'
 
+
+================================================================================
+Desugared:
+Rec {
+foldPair{-r3f,x-}  :: 
+    _forall_
+    [a{-aB1-} b{-aB2-}]
+    =>
+    (a{-aB1-} -> a{-aB1-} -> a{-aB1-}, b{-aB2-}
+				       -> b{-aB2-}
+				       -> b{-aB2-})
+    -> (a{-aB1-}, b{-aB2-})
+    -> [(a{-aB1-}, b{-aB2-})]
+    -> (a{-aB1-}, b{-aB2-})
+{-# L #-}
+foldPair{-r3f,x-} =
+    _/\_ a{-aB1-} b{-aB2-} ->
+	_letrec_ {
+	  foldPair_aAY  :: 
+	      (a{-aB1-} -> a{-aB1-} -> a{-aB1-}, b{-aB2-}
+						 -> b{-aB2-}
+						 -> b{-aB2-})
+	      -> (a{-aB1-}, b{-aB2-})
+	      -> [(a{-aB1-}, b{-aB2-})]
+	      -> (a{-aB1-}, b{-aB2-})
+	  {-# L #-}
+	  foldPair_aAY =
+	      \ fg_r3h  :: 
+		    (a{-aB1-} -> a{-aB1-} -> a{-aB1-}, b{-aB2-}
+						       -> b{-aB2-}
+						       -> b{-aB2-})
+		{-# L #-}
+		fg_r3h ab_r3j  :: 
+			   (a{-aB1-}, b{-aB2-})
+		       {-# L #-}
+		       ab_r3j ds_dFz  :: 
+				  [(a{-aB1-}, b{-aB2-})]
+			      {-# L #-}
+			      ds_dFz ->
+		  let {
+		    fail_dFA  :: 
+			(a{-aB1-}, b{-aB2-})
+		    {-# L #-}
+		    fail_dFA =
+			GHCerr.patError{-8r,p-}
+			    _@_ (a{-aB1-}, b{-aB2-})
+			    _string_ "ds031.hs:4|function `foldPair'" } in
+		  let {
+		    fail_dHs  :: 
+			(a{-aB1-}, b{-aB2-})
+		    {-# L #-}
+		    fail_dHs =
+			case fg_r3h of { PrelTup.(,){-62,p-}{i} f_r3n g_r3o  ->
+			case ds_dFz of {
+			  PrelBase.[]{-5i,p-}{i} ->
+			      fail_dFA;
+			  PrelBase.:{-55,p-}{i} ds_dFV abs_r3u ->
+			      case ds_dFV of { PrelTup.(,){-62,p-}{i} a_r3s b_r3t  ->
+			      let {
+				ab_r3q  :: 
+				    (a{-aB1-}, b{-aB2-})
+				{-# L #-}
+				ab_r3q =
+				    ab_r3j } in
+			      let {
+				fg_r3m  :: 
+				    (a{-aB1-} -> a{-aB1-} -> a{-aB1-}, b{-aB2-}
+								       -> b{-aB2-}
+								       -> b{-aB2-})
+				{-# L #-}
+				fg_r3m =
+				    fg_r3h } in
+			      let {
+				ds_dGR  :: 
+				    (a{-aB1-}, b{-aB2-})
+				{-# L #-}
+				ds_dGR =
+				    foldPair{-r3f,x-}
+					_@_ a{-aB1-} _@_ b{-aB2-} fg_r3m ab_r3q abs_r3u } in
+			      let {
+				u_aBw  :: 
+				    a{-aB1-}
+				{-# L #-}
+				u_aBw =
+				    case ds_dGR of { PrelTup.(,){-62,p-}{i} u_aBw v_aBx  ->
+				    u_aBw;} } in
+			      let {
+				v_aBx  :: 
+				    b{-aB2-}
+				{-# L #-}
+				v_aBx =
+				    case ds_dGR of { PrelTup.(,){-62,p-}{i} u_aBw v_aBx  ->
+				    v_aBx;} } in
+			      let {
+				u_r3w  :: 
+				    a{-aB1-}
+				{-# L #-}
+				u_r3w =
+				    u_aBw } in
+			      let {
+				v_r3x  :: 
+				    b{-aB2-}
+				{-# L #-}
+				v_r3x =
+				    v_aBx } in
+			      let {
+				ds_dGq  :: 
+				    a{-aB1-}
+				{-# L #-}
+				ds_dGq =
+				    f_r3n
+					a_r3s u_r3w } in
+			      let {
+				ds_dGu  :: 
+				    b{-aB2-}
+				{-# L #-}
+				ds_dGu =
+				    g_r3o
+					b_r3t v_r3x
+			      } in 
+				PrelTup.(,){-62,p-}{i}
+				    {_@_ a{-aB1-} _@_ b{-aB2-} ds_dGq ds_dGu};};
+			};}
+		  } in 
+		    case ds_dFz of {
+		      PrelBase.:{-55,p-}{i} ds_dHA ds_dHz ->
+			  fail_dHs;
+		      PrelBase.[]{-5i,p-}{i} ->
+			  ab_r3j;
+		    };
+	} in 
+	  foldPair_aAY
+end Rec }

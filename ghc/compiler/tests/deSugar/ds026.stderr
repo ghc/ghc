@@ -1,49 +1,192 @@
-Desugared:
-defm.Main.Boo.op1 :: for all a. <Main.Boo a> -> a -> a
-defm.Main.Boo.op1 = /\ a -> (error (a -> a)) "No default method for \"op1\"\n"S
-Main.Boo.op1 :: for all a. <Main.Boo a> -> a -> a
-Main.Boo.op1 =
-    /\ a -> \ ds.113 ->
-	case ds.113 of {
-	  MkTuple2 dict.84 op1.83 -> op1.83
-	}
-sdsel.Main.Boo.Main.Foo :: for all a. <Main.Boo a> -> <Main.Foo a>
-sdsel.Main.Boo.Main.Foo =
-    /\ a -> \ ds.114 ->
-	case ds.114 of {
-	  MkTuple2 dict.87 op1.86 -> dict.87
-	}
-defm.Main.Foo.op :: for all a. <Main.Foo a> -> a -> a
-defm.Main.Foo.op = /\ a -> (error (a -> a)) "No default method for \"op\"\n"S
-Main.Foo.op :: for all a. <Main.Foo a> -> a -> a
-Main.Foo.op = /\ a -> \ op.90 -> op.90
-defm.Main.Noo.op2 :: for all a, b. <Main.Noo a> -> <Eq b> -> a -> b -> a
-defm.Main.Noo.op2 =
-    /\ a b -> \ dict.102 ->
-	(error (a -> b -> a)) "No default method for \"op2\"\n"S
-Main.Noo.op2 :: for all a, b. <Main.Noo a> -> <Eq b> -> a -> b -> a
-Main.Noo.op2 =
-    /\ a b -> \ ds.115 ->
-	case ds.115 of {
-	  MkTuple2 dict.94 op2.93 -> op2.93 b
-	}
-sdsel.Main.Noo.Main.Boo :: for all a. <Main.Noo a> -> <Main.Boo a>
-sdsel.Main.Noo.Main.Boo =
-    /\ a -> \ ds.116 ->
-	case ds.116 of {
-	  MkTuple2 dict.98 op2.97 -> dict.98
-	}
-Main.f :: for all b, a. <Eq b> -> <Main.Noo a> -> a -> b -> a
-Main.f =
-    /\ b a -> \ dict.112 dict.111 ->
-	let
-	  dict.108 =
-	      (sdsel.Main.Boo.Main.Foo a) ((sdsel.Main.Noo.Main.Boo a) dict.111) in
-	let
-	  f.104 =
-	      \ x.68 y.69 ->
-		  (Main.Foo.op a)
-		      dict.108
-		      (((Main.Noo.op2 a) b) dict.111 dict.112 x.68 y.69)
-	in  f.104
 
+
+================================================================================
+Desugared:
+Rec {
+scsel_NooShouldSucceedBoo{-aKl,x-}  :: 
+    _forall_
+    [a{-r3n-}]
+    =>
+    {Noo{-r3B,x-} a{-r3n-}} -> {Boo{-r3o,x-} a{-r3n-}}
+{-# L #-}
+scsel_NooShouldSucceedBoo{-aKl,x-} =
+    _/\_ a{-r3n-} -> \ tpl_B1  :: 
+			   {Noo{-r3B,x-} a{-r3n-}}
+		       {-# L #-}
+		       tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,p-}{i} tpl_B1 tpl_B2  -> tpl_B1;}
+op2{-r3A,x-}  :: 
+    _forall_
+    [a{-r3n-}]
+    =>
+    {Noo{-r3B,x-} a{-r3n-}}
+    -> (_forall_
+	[b{-r3q-}]
+	=>
+	{PrelBase.Eq{-23,p-} b{-r3q-}} -> a{-r3n-} -> b{-r3q-} -> a{-r3n-})
+{-# L #-}
+op2{-r3A,x-} =
+    _/\_ a{-r3n-} -> \ tpl_B1  :: 
+			   {Noo{-r3B,x-} a{-r3n-}}
+		       {-# L #-}
+		       tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,p-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
+$mop2{-rGB,x-}  :: 
+    _forall_
+    [a{-r3n-}]
+    =>
+    {Noo{-r3B,x-} a{-r3n-}}
+    -> (_forall_
+	[b{-r3q-}]
+	=>
+	{PrelBase.Eq{-23,p-} b{-r3q-}} -> a{-r3n-} -> b{-r3q-} -> a{-r3n-})
+{-# L #-}
+$mop2{-rGB,x-} =
+    _/\_ a{-aHc-} -> \ d.Noo_aH5  :: 
+			   {Noo{-r3B,x-} a{-aHc-}}
+		       {-# L #-}
+		       d.Noo_aH5 ->
+	_/\_ b{-aHg-} -> \ d.Eq_aHi  :: 
+			       {PrelBase.Eq{-23,p-} b{-aHg-}}
+			   {-# L #-}
+			   d.Eq_aHi ->
+	    GHCerr.noDefaultMethodError{-8k,p-}
+		_@_ (a{-aHc-} -> b{-aHg-} -> a{-aHc-})
+		_string_ "Class Noo Method op2"
+scsel_BooShouldSucceedFoo{-aKD,x-}  :: 
+    _forall_
+    [a{-r3t-}]
+    =>
+    {Boo{-r3o,x-} a{-r3t-}} -> {Foo{-r3u,x-} a{-r3t-}}
+{-# L #-}
+scsel_BooShouldSucceedFoo{-aKD,x-} =
+    _/\_ a{-r3t-} -> \ tpl_B1  :: 
+			   {Boo{-r3o,x-} a{-r3t-}}
+		       {-# L #-}
+		       tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,p-}{i} tpl_B1 tpl_B2  -> tpl_B1;}
+op1{-r3C,x-}  :: 
+    _forall_
+    [a{-r3t-}]
+    =>
+    {Boo{-r3o,x-} a{-r3t-}} -> a{-r3t-} -> a{-r3t-}
+{-# L #-}
+op1{-r3C,x-} =
+    _/\_ a{-r3t-} -> \ tpl_B1  :: 
+			   {Boo{-r3o,x-} a{-r3t-}}
+		       {-# L #-}
+		       tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,p-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
+$mop1{-rGD,x-}  :: 
+    _forall_
+    [a{-r3t-}]
+    =>
+    {Boo{-r3o,x-} a{-r3t-}} -> a{-r3t-} -> a{-r3t-}
+{-# L #-}
+$mop1{-rGD,x-} =
+    _/\_ a{-aHs-} -> \ d.Boo_aHl  :: 
+			   {Boo{-r3o,x-} a{-aHs-}}
+		       {-# L #-}
+		       d.Boo_aHl ->
+	GHCerr.noDefaultMethodError{-8k,p-}
+	    _@_ (a{-aHs-} -> a{-aHs-}) _string_ "Class Boo Method op1"
+op{-r3D,x-}  :: 
+    _forall_
+    [a{-r3y-}]
+    =>
+    {Foo{-r3u,x-} a{-r3y-}} -> a{-r3y-} -> a{-r3y-}
+{-# L #-}
+op{-r3D,x-} =
+    _/\_ a{-r3y-} -> \ tpl_B1  :: 
+			   {Foo{-r3u,x-} a{-r3y-}}
+		       {-# L #-}
+		       tpl_B1 ->
+	tpl_B1
+$mop{-rGC,x-}  :: 
+    _forall_
+    [a{-r3y-}]
+    =>
+    {Foo{-r3u,x-} a{-r3y-}} -> a{-r3y-} -> a{-r3y-}
+{-# L #-}
+$mop{-rGC,x-} =
+    _/\_ a{-aHD-} -> \ d.Foo_aHw  :: 
+			   {Foo{-r3u,x-} a{-aHD-}}
+		       {-# L #-}
+		       d.Foo_aHw ->
+	GHCerr.noDefaultMethodError{-8k,p-}
+	    _@_ (a{-aHD-} -> a{-aHD-}) _string_ "Class Foo Method op"
+f{-r3z,x-}  :: 
+    _forall_
+    [a{-aGK-} b{-aGQ-}]
+    =>
+    {Noo{-r3B,x-} a{-aGK-}}
+    -> {PrelBase.Eq{-23,p-} b{-aGQ-}}
+    -> a{-aGK-}
+    -> b{-aGQ-}
+    -> a{-aGK-}
+{-# L #-}
+f{-r3z,x-} =
+    _/\_ a{-aGK-} b{-aGQ-} -> \ d.Noo_aGY  :: 
+				    {Noo{-r3B,x-} a{-aGK-}}
+				{-# L #-}
+				d.Noo_aGY d.Eq_aH0  :: 
+					      {PrelBase.Eq{-23,p-} b{-aGQ-}}
+					  {-# L #-}
+					  d.Eq_aH0 ->
+	let {
+	  d.Boo_aH2  :: 
+	      {Boo{-r3o,x-} a{-aGK-}}
+	  {-# L #-}
+	  d.Boo_aH2 =
+	      scsel_NooShouldSucceedBoo{-aKl,x-}
+		  _@_ a{-aGK-} d.Noo_aGY } in
+	let {
+	  d.Foo_aGW  :: 
+	      {Foo{-r3u,x-} a{-aGK-}}
+	  {-# L #-}
+	  d.Foo_aGW =
+	      scsel_BooShouldSucceedFoo{-aKD,x-}
+		  _@_ a{-aGK-} d.Boo_aH2 } in
+	let {
+	  op_aMI  :: 
+	      a{-aGK-} -> a{-aGK-}
+	  {-# L #-}
+	  op_aMI =
+	      op{-r3D,x-}
+		  _@_ a{-aGK-} d.Foo_aGW } in
+	let {
+	  op2_aMH  :: 
+	      _forall_
+	      [b{-aGM-}]
+	      =>
+	      {PrelBase.Eq{-23,p-} b{-aGM-}} -> a{-aGK-} -> b{-aGM-} -> a{-aGK-}
+	  {-# L #-}
+	  op2_aMH =
+	      op2{-r3A,x-}
+		  _@_ a{-aGK-} d.Noo_aGY } in
+	let {
+	  op2_aMG  :: 
+	      a{-aGK-} -> b{-aGQ-} -> a{-aGK-}
+	  {-# L #-}
+	  op2_aMG =
+	      op2_aMH
+		  _@_ b{-aGQ-} d.Eq_aH0
+	} in 
+	  \ x_r3j  :: 
+		a{-aGK-}
+	    {-# L #-}
+	    x_r3j y_r3l  :: 
+		      b{-aGQ-}
+		  {-# L #-}
+		  y_r3l ->
+	      let {
+		ds_dNv  :: 
+		    a{-aGK-}
+		{-# L #-}
+		ds_dNv =
+		    op2_aMG
+			x_r3j y_r3l
+	      } in 
+		op_aMI
+		    ds_dNv
+end Rec }
