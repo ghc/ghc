@@ -1,7 +1,7 @@
 %
 % (c) The GRASP Project, Glasgow University, 1992-1998
 %
-% $Id: CgRetConv.lhs,v 1.30 2001/08/17 17:18:52 apt Exp $
+% $Id: CgRetConv.lhs,v 1.31 2002/01/28 16:52:37 simonpj Exp $
 %
 \section[CgRetConv]{Return conventions for the code generator}
 
@@ -58,12 +58,16 @@ ctrlReturnConvAlg :: TyCon -> CtrlReturnConvention
 
 ctrlReturnConvAlg tycon
   = case (tyConFamilySize tycon) of
-      0 -> pprPanic "ctrlRetConvAlg" (ppr tycon)
       size -> -- we're supposed to know...
 	if (size > (1::Int) && size <= mAX_FAMILY_SIZE_FOR_VEC_RETURNS) then
 	    VectoredReturn size
 	else
-	    UnvectoredReturn size
+	    UnvectoredReturn size	
+  -- NB: unvectored returns Include size 0 (no constructors), so that
+  --     the following perverse code compiles (it crashed GHC in 5.02)
+  -- 	    data T1
+  --	    data T2 = T2 !T1 Int
+  --     The only value of type T1 is bottom, which never returns anyway.
 \end{code}
 
 %************************************************************************
