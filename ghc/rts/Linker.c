@@ -3267,20 +3267,42 @@ static int ocAllocateJumpIslands_MachO(ObjectCode* oc)
     unsigned i;
 
     for( i = 0; i < header->ncmds; i++ )
-    {
-        if( lc->cmd == LC_DYSYMTAB )
+    {   
+        if( lc->cmd == LC_SYMTAB )
         {
-            struct dysymtab_command *dsymLC = (struct dysymtab_command *) lc;
+                // Find out the first and last undefined external
+                // symbol, so we don't have to allocate too many
+                // jump islands.
+            struct symtab_command *symLC = (struct symtab_command *) lc;
+            int min = symLC->nsyms, max = 0;
+            struct nlist *nlist =
+                symLC ? (struct nlist*) ((char*) oc->image + symLC->symoff)
+                      : NULL;
+            for(i=0;i<symLC->nsyms;i++)
+            {
+                if(nlist[i].n_type & N_STAB)
+                    ;
+                else if(nlist[i].n_type & N_EXT)
+                {
+                    if((nlist[i].n_type & N_TYPE) == N_UNDF
+                        && (nlist[i].n_value == 0))
+                    {
+                        if(i < min)
+                            min = i;
+                        if(i > max)
+                            max = i;
+                    }
+                }
+            }
+            if(max >= min)
+                return ocAllocateJumpIslands(oc, max - min + 1, min);
 
-            if( !ocAllocateJumpIslands( oc, dsymLC->nundefsym,
-                                            dsymLC->iundefsym ) )
-              return 0;
-
-            break;  // there can be only one LC_DSYMTAB
+            break;
         }
+        
         lc = (struct load_command *) ( ((char *)lc) + lc->cmdsize );
     }
-    return 1;
+    return ocAllocateJumpIslands(oc,0,0);
 }
 
 static int ocVerifyImage_MachO(ObjectCode* oc)
@@ -3578,9 +3600,11 @@ static int relocateSection(
                         // The branch offset is too large.
                         // Therefore, we try to use a jump island.
                         if(jumpIsland == 0)
+                        {
                             barf("unconditional relative branch out of range: "
                                  "no jump island available");
-
+                        }
+                        
                         word = offsetToJumpIsland;
                         if((long)word > (long)0x01FFFFFF || (long)word < (long)0xFFE00000)
                             barf("unconditional relative branch out of range: "
@@ -3606,7 +3630,6 @@ static int ocGetNames_MachO(ObjectCode* oc)
     struct segment_command *segLC = NULL;
     struct section *sections;
     struct symtab_command *symLC = NULL;
-    struct dysymtab_command *dsymLC = NULL;
     struct nlist *nlist;
     unsigned long commonSize = 0;
     char    *commonStorage = NULL;
@@ -3618,13 +3641,12 @@ static int ocGetNames_MachO(ObjectCode* oc)
 	    segLC = (struct segment_command*) lc;
 	else if(lc->cmd == LC_SYMTAB)
 	    symLC = (struct symtab_command*) lc;
-	else if(lc->cmd == LC_DYSYMTAB)
-	    dsymLC = (struct dysymtab_command*) lc;
 	lc = (struct load_command *) ( ((char*)lc) + lc->cmdsize );
     }
 
     sections = (struct section*) (segLC+1);
-    nlist = (struct nlist*) (image + symLC->symoff);
+    nlist = symLC ? (struct nlist*) (image + symLC->symoff)
+                  : NULL;
 
     for(i=0;i<segLC->nsects;i++)
     {
@@ -3662,61 +3684,56 @@ static int ocGetNames_MachO(ObjectCode* oc)
 
 	// count external symbols defined here
     oc->n_symbols = 0;
-    if(dsymLC)
-    {
-        for(i = dsymLC->iextdefsym;
-            i < dsymLC->iextdefsym + dsymLC->nextdefsym;
-            i++)
-        {
-            if((nlist[i].n_type & N_TYPE) == N_SECT)
-                oc->n_symbols++;
-        }
-    }
     if(symLC)
     {
         for(i=0;i<symLC->nsyms;i++)
         {
-	    if((nlist[i].n_type & N_TYPE) == N_UNDF
-		&& (nlist[i].n_type & N_EXT) && (nlist[i].n_value != 0))
-	    {
-	        commonSize += nlist[i].n_value;
-	        oc->n_symbols++;
-	    }
+            if(nlist[i].n_type & N_STAB)
+                ;
+            else if(nlist[i].n_type & N_EXT)
+            {
+                if((nlist[i].n_type & N_TYPE) == N_UNDF
+                    && (nlist[i].n_value != 0))
+                {
+                    commonSize += nlist[i].n_value;
+                    oc->n_symbols++;
+                }
+                else if((nlist[i].n_type & N_TYPE) == N_SECT)
+                    oc->n_symbols++;
+            }
         }
     }
     oc->symbols = stgMallocBytes(oc->n_symbols * sizeof(char*),
 				   "ocGetNames_MachO(oc->symbols)");
 
-    if(dsymLC)
+    if(symLC)
     {
-        // insert symbols into hash table
-        for(i = dsymLC->iextdefsym, curSymbol = 0;
-            i < dsymLC->iextdefsym + dsymLC->nextdefsym;
-            i++)
+        curSymbol = 0;
+        for(i=0;i<symLC->nsyms;i++)
         {
-            if((nlist[i].n_type & N_TYPE) == N_SECT)
+            if(nlist[i].n_type & N_STAB)
+                ;
+            else if((nlist[i].n_type & N_TYPE) == N_SECT)
             {
-                char *nm = image + symLC->stroff + nlist[i].n_un.n_strx;
-                ghciInsertStrHashTable(oc->fileName, symhash, nm,
-                                        image
-                                        + sections[nlist[i].n_sect-1].offset
-                                        - sections[nlist[i].n_sect-1].addr
-                                        + nlist[i].n_value);
-                oc->symbols[curSymbol++] = nm;
-            }
-        }
-    
-        // insert local symbols into lochash
-        for(i=dsymLC->ilocalsym;i<dsymLC->ilocalsym+dsymLC->nlocalsym;i++)
-        {
-            if((nlist[i].n_type & N_TYPE) == N_SECT)
-            {
-                char *nm = image + symLC->stroff + nlist[i].n_un.n_strx;
-                ghciInsertStrHashTable(oc->fileName, oc->lochash, nm,
-                                        image
-                                        + sections[nlist[i].n_sect-1].offset
-                                        - sections[nlist[i].n_sect-1].addr
-                                        + nlist[i].n_value);
+                if(nlist[i].n_type & N_EXT)
+                {
+                    char *nm = image + symLC->stroff + nlist[i].n_un.n_strx;
+                    ghciInsertStrHashTable(oc->fileName, symhash, nm,
+                                            image
+                                            + sections[nlist[i].n_sect-1].offset
+                                            - sections[nlist[i].n_sect-1].addr
+                                            + nlist[i].n_value);
+                    oc->symbols[curSymbol++] = nm;
+                }
+                else
+                {
+                    char *nm = image + symLC->stroff + nlist[i].n_un.n_strx;
+                    ghciInsertStrHashTable(oc->fileName, oc->lochash, nm,
+                                            image
+                                            + sections[nlist[i].n_sect-1].offset
+                                            - sections[nlist[i].n_sect-1].addr
+                                            + nlist[i].n_value);
+                }
             }
         }
     }
