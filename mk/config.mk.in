@@ -288,8 +288,8 @@ endif
 #   thr_p       : threaded profiled
 #   debug       : debugging (compile with -g for the C compiler, and -DDEBUG)
 #   debug_p     : debugging profiled
-#   debug_thr   : debugging threaded
-#   debug_thr_p : debugging threaded profiled
+#   thr_debug   : debugging threaded
+#   thr_debug_p : debugging threaded profiled
 #
 ifeq "$(BootingFromHc)" "YES"
 GhcRTSWays=
@@ -1061,6 +1061,14 @@ WAY_debug_HC_OPTS=-optc-DDEBUG
 # Way 'debug_p':
 WAY_debug_p_NAME=debug profiled
 WAY_debug_p_HC_OPTS=-optc-DDEBUG -prof
+
+# Way 'thr_debug':
+WAY_thr_debug_NAME=threaded
+WAY_thr_debug_HC_OPTS=-optc-DTHREADED_RTS -optc-DDEBUG
+
+# Way 'thr_debug_p':
+WAY_thr_debug_p_NAME=threaded
+WAY_thr_debug_p_HC_OPTS=-optc-DTHREADED_RTS -optc-DDEBUG -prof
 
 #
 # Add user-way configurations here:
