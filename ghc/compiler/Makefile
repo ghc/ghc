@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.210 2002/02/12 15:17:13 simonmar Exp $
+# $Id: Makefile,v 1.211 2002/02/13 20:14:42 sof Exp $
 
 TOP = ..
 
@@ -156,12 +156,12 @@ HS_OBJS	 += $(C_OBJS)
 #	into main/ (where it'll be compiled and linked with the compiler)
 #       (the Haskell-side code is ifdefed into main/SysTools.lhs)
 
-ifneq "$(bootstrapped)" "YES"
+ifeq "$(bootstrapped)/$(ghc_502_at_least)" "NO/NO"
 SRC_CC_OPTS += -I$(GHC_LIB_DIR)/std/cbits
 SRC_MKDEPENDC_OPTS += -I$(GHC_LIB_DIR)/std/cbits
 ALL_SRCS += main/rawSystem.c
 main/rawSystem.c : $(FPTOOLS_TOP)/hslibs/lang/cbits/rawSystem.c
-	$(CP) $< main
+	$(CP) $< main/
 else
 EXCLUDED_SRCS = main/rawSystem.c
 endif

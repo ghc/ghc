@@ -89,14 +89,14 @@ import MarshalArray
 -- use the line below when we can be sure of compiling with GHC >=
 -- 5.02, and remove the implementation of rawSystem at the end of this
 -- file
-#if __GLASGOW_HASKELL__ >= 503
+# if __GLASGOW_HASKELL__ >= 503
 import GHC.IOBase
-#else
+# else
 import PrelIOBase -- this can be removed when SystemExts is used
-#endif
-import CError     ( throwErrnoIfMinus1 ) -- as can this
--- import SystemExts       ( rawSystem )
+# endif
+import SystemExts       ( rawSystem )
 #else
+import CError           ( throwErrnoIfMinus1 ) -- as can this
 import System		( system )
 #endif
 
@@ -410,7 +410,7 @@ initSysTools minusB_args
 	}
 
 #if defined(mingw32_TARGET_OS)
-foreign import stdcall "GetTempPathA" getTempPath :: Int -> CString -> IO Int32
+foreign import stdcall "GetTempPathA" unsafe getTempPath :: Int -> CString -> IO Int32
 #endif
 \end{code}
 
@@ -848,20 +848,20 @@ getExecDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
 				    return (Just (reverse (dropList "/bin/ghc.exe" (reverse (unDosifyPath s)))))
 
 
-foreign import stdcall "GetModuleFileNameA" getModuleFileName :: Addr -> CString -> Int -> IO Int32
+foreign import stdcall "GetModuleFileNameA" unsafe getModuleFileName :: Addr -> CString -> Int -> IO Int32
 #else
 getExecDir :: IO (Maybe String) = do return Nothing
 #endif
 
 #ifdef mingw32_TARGET_OS
-foreign import "_getpid" getProcessID :: IO Int -- relies on Int == Int32 on Windows
+foreign import "_getpid" unsafe getProcessID :: IO Int -- relies on Int == Int32 on Windows
 #else
 getProcessID :: IO Int
 getProcessID = Posix.getProcessID
 #endif
 
+#if defined(mingw32_TARGET_OS) && (__GLASGOW_HASKELL__ <= 408)
 rawSystem :: String -> IO ExitCode
-#if __GLASGOW_HASKELL__ > 408
 rawSystem "" = ioException (IOError Nothing InvalidArgument "rawSystem" "null command" Nothing)
 rawSystem cmd =
   withCString cmd $ \s -> do
@@ -871,8 +871,6 @@ rawSystem cmd =
         n  -> return (ExitFailure n)
 
 foreign import ccall "rawSystemCmd" unsafe primRawSystem :: CString -> IO Int
-#else
-rawSystem = System.system
 #endif
 
 
