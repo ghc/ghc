@@ -19,10 +19,9 @@ module TypeRep (
 	liftedTypeKind, unliftedTypeKind, openTypeKind,	-- :: KX
 	mkArrowKind, mkArrowKinds,			-- :: KX -> KX -> KX
 
-	funTyCon
-#ifdef DEBUG
-	, crudePprType
-#endif
+	funTyCon,
+
+	crudePprType		-- Prints type representations for debugging
     ) where
 
 #include "HsVersions.h"
@@ -408,7 +407,6 @@ funTyConName = mkWiredInName gHC_PRIM
 %************************************************************************
 
 \begin{code}
-#ifdef DEBUG
 crudePprType :: Type -> SDoc
 crudePprType (TyVarTy tv)      = ppr tv
 crudePprType (AppTy t1 t2)     = crudePprType t1 <+> (parens (crudePprType t2))
@@ -430,5 +428,4 @@ ppr_tc_app tc tys = tc <+> sep (map (parens . crudePprType) tys)
 
 pp_nt tc | isNewTyCon tc = ptext SLIT("(nt)")
 	 | otherwise     = empty
-#endif
 \end{code}
