@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.25 $
- * $Date: 2000/01/05 19:10:21 $
+ * $Revision: 1.26 $
+ * $Date: 2000/01/06 16:33:10 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -508,10 +508,10 @@ break;
                nameMkI = addWiredInBoxingTycon("PrelBase","Int",   "I#",1,0,INT_REP   );
                nameMkW = addWiredInBoxingTycon("PrelAddr","Word",  "W#",1,0,WORD_REP  );
                nameMkA = addWiredInBoxingTycon("PrelAddr","Addr",  "A#",1,0,ADDR_REP  );
-               nameMkF = addWiredInBoxingTycon("PrelBase","Float", "F#",1,0,FLOAT_REP );
-               nameMkD = addWiredInBoxingTycon("PrelBase","Double","D#",1,0,DOUBLE_REP);
+               nameMkF = addWiredInBoxingTycon("PrelFloat","Float", "F#",1,0,FLOAT_REP );
+               nameMkD = addWiredInBoxingTycon("PrelFloat","Double","D#",1,0,DOUBLE_REP);
                nameMkInteger            
-                       = addWiredInBoxingTycon("PrelBase","Integer","Integer#",1,0,0);
+                       = addWiredInBoxingTycon("PrelNum","Integer","Integer#",1,0,0);
                nameMkPrimByteArray      
                        = addWiredInBoxingTycon("PrelGHC","ByteArray","PrimByteArray#",1,0,0);
 

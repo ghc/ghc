@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.19 $
- * $Date: 2000/01/06 14:17:16 $
+ * $Revision: 1.20 $
+ * $Date: 2000/01/06 16:33:10 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -2226,6 +2226,7 @@ Type type; {
       Sym(stg_gc_noregs)             \
       Sym(stg_gc_seq_1)              \
       Sym(stg_gc_d1)                 \
+      Sym(stg_gc_f1)                 \
       Sym(stg_chk_0)                 \
       Sym(stg_chk_1)                 \
       Sym(stg_gen_chk)               \
@@ -2269,6 +2270,7 @@ Type type; {
       Sym(waitReadzh_fast)           \
       Sym(waitWritezh_fast)          \
       Sym(CHARLIKE_closure)          \
+      Sym(INTLIKE_closure)           \
       Sym(suspendThread)             \
       Sym(resumeThread)              \
       Sym(stackOverflow)             \
@@ -2292,6 +2294,7 @@ Type type; {
       Sym(__int_encodeDouble)        \
       Sym(mpz_cmp_si)                \
       Sym(mpz_cmp)                   \
+      Sym(__mpn_gcd_1)               \
       Sym(newArrayzh_fast)           \
       Sym(unsafeThawArrayzh_fast)    \
       Sym(newDoubleArrayzh_fast)     \
@@ -2302,6 +2305,9 @@ Type type; {
       Sym(newCharArrayzh_fast)       \
       Sym(newMutVarzh_fast)          \
       Sym(quotRemIntegerzh_fast)     \
+      Sym(quotIntegerzh_fast)        \
+      Sym(remIntegerzh_fast)         \
+      Sym(divExactIntegerzh_fast)    \
       Sym(divModIntegerzh_fast)      \
       Sym(timesIntegerzh_fast)       \
       Sym(minusIntegerzh_fast)       \
@@ -2361,8 +2367,10 @@ Type type; {
 
 
 /* AJG Hack */
+#if 0
 #undef EXTERN_SYMS
 #define EXTERN_SYMS
+#endif
 
 /* entirely bogus claims about types of these symbols */
 #define Sym(vvv)  extern int vvv;

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.30 $
- * $Date: 2000/01/05 15:57:41 $
+ * $Revision: 1.31 $
+ * $Date: 2000/01/06 16:33:10 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -812,7 +812,7 @@ Tycon addTupleTycon ( Int n )
       if (tycon(i).tuple == n) return i;
 
    if (combined)
-      m = findFakeModule(findText(n==0 ? "PrelBase" : "PrelTup")); else
+      m = findFakeModule(findText(n<=1 ? "PrelBase" : "PrelTup")); else
       m = findModule(findText("Prelude"));
 
    setCurrModule(m);
