@@ -166,12 +166,12 @@ library-dirs:	"$libdir/libraries/base",
 #if !defined(mingw32_TARGET_OS) && !defined(cygwin32_TARGET_OS)
 hs-libraries:   "HSbase"
 #else
---
--- This splitting is the subject of a totally 
--- horrible hack, which glues HSbase{1,2,3}
--- back into HSbaase for the purposes of static linking.
--- See DriverState.getPackageLibraries for details.
---
+/*
+ This splitting is the subject of a totally 
+ horrible hack, which glues HSbase{1,2,3}
+ back into HSbaase for the purposes of static linking.
+ See DriverState.getPackageLibraries for details.
+*/
 hs-libraries:	"HSbase1", "HSbase2", "HSbase3"
 #endif
 
