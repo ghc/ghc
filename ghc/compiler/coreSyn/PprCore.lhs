@@ -197,7 +197,7 @@ ppr_expr pe expr@(Lam _ _)
   where
     pp_vars lam pp [] = empty
     pp_vars lam pp vs
-      = hsep [ptext lam, hsep (map pp vs), ptext SLIT("->")]
+      = hsep [ptext lam, vcat (map pp vs), ptext SLIT("->")]
 
 ppr_expr pe expr@(App fun arg)
   = let
@@ -276,7 +276,7 @@ ppr_expr pe (Note (SCC cc) expr)
 	 ppr_parend_expr pe expr ]
 
 ppr_expr pe (Note (Coerce to_ty from_ty) expr)
-  = sep [hsep [ptext SLIT("_coerce_"), pTy pe to_ty, pTy pe from_ty],
+  = sep [hsep [ptext SLIT("_coerce_"), pTy pe to_ty],
 	 ppr_parend_expr pe expr]
 
 ppr_expr pe (Note InlineCall expr)

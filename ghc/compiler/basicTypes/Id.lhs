@@ -112,7 +112,7 @@ import CmdLineOpts      ( opt_PprStyle_All )
 import Bag
 import IdInfo
 import Name	 	( nameUnique, isLocalName, mkSysLocalName,
-			  isWiredInName, setNameVisibility,
+			  isWiredInName, setNameVisibility, changeUnique,
 			  ExportFlag(..), Provenance,
 			  OccName(..), Name, Module,
 			  NamedThing(..)

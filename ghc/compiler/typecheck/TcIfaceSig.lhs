@@ -225,6 +225,11 @@ tcCoreExpr (UfPrim prim args)
     mapTc tcCoreArg args	`thenTc` \ args' ->
     returnTc (Prim primop args')
 
+tcCoreExpr (UfLam bndr body)
+  = tcCoreLamBndr bndr 		$ \ bndr' ->
+    tcCoreExpr body		`thenTc` \ body' ->
+    returnTc (Lam bndr' body')
+
 tcCoreExpr (UfApp fun arg)
   = tcCoreExpr fun		`thenTc` \ fun' ->
     tcCoreArg arg		`thenTc` \ arg' ->
@@ -234,6 +239,20 @@ tcCoreExpr (UfCase scrut alts)
   = tcCoreExpr scrut				`thenTc` \ scrut' ->
     tcCoreAlts (coreExprType scrut') alts	`thenTc` \ alts' ->
     returnTc (Case scrut' alts')
+
+tcCoreExpr (UfLet (UfNonRec bndr rhs) body)
+  = tcCoreExpr rhs		`thenTc` \ rhs' ->
+    tcCoreValBndr bndr 		$ \ bndr' ->
+    tcCoreExpr body		`thenTc` \ body' ->
+    returnTc (Let (NonRec bndr' rhs') body')
+
+tcCoreExpr (UfLet (UfRec pairs) body)
+  = tcCoreValBndrs bndrs	$ \ bndrs' ->
+    mapTc tcCoreExpr rhss	`thenTc` \ rhss' ->
+    tcCoreExpr body		`thenTc` \ body' ->
+    returnTc (Let (Rec (bndrs' `zip` rhss')) body')
+  where
+    (bndrs, rhss) = unzip pairs
 
 tcCoreExpr (UfNote note expr) 
   = tcCoreExpr expr		`thenTc` \ expr' ->
