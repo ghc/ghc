@@ -245,6 +245,9 @@ getWorkerIdAndCons wrap_id wrapper_fn
     go (Lam _ body)		      	  = go body
     go (Case _ (AlgAlts [(con,_,rhs)] _)) = let (wrap_id, cons) = go rhs
 					    in  (wrap_id, cons `addOneToIdSet` con)
+    go (Let (NonRec _ (Coerce (CoerceOut con) _ _)) body) 
+					  = let (wrap_id, cons) = go body
+					    in  (wrap_id, cons `addOneToIdSet` con)
     go other	 		      	  = (get_work_id other, emptyIdSet)
 
     get_work_id (App fn _)    = get_work_id fn
