@@ -7,7 +7,7 @@
 %*									*
 %************************************************************************
 
-Is @mprotect@ POSIX now?
+Is @mprotect@ POSIX now? [Yup, POSIX.4 -- sof]
 
 \begin{code}
 #if STACK_CHECK_BY_PAGE_FAULT
@@ -59,6 +59,11 @@ int mprotect PROTO((caddr_t, size_t, int));
 #define PROT_NONE 0
 #endif
 
+/* For VirtualProtect() and its flags */
+#if defined(cygwin32_TARGET_OS)
+#include <windows.h>
+#endif
+
 void 
 unmapMiddleStackPage(addr_, size)
 char * /*caddr_t*/ addr_;
@@ -67,6 +72,9 @@ int size;
     int pagesize = GETPAGESIZE();
     caddr_t addr = addr_;
     caddr_t middle = (caddr_t) (((W_) (addr + size / 2)) / pagesize * pagesize);
+#if defined(cygwin32_TARGET_OS)
+    unsigned int old_prot;
+#endif
 
 # ifdef STK_CHK_DEBUG
     fprintf(stderr, "pagesize: %x\nstack start: %08lx\nstack size: %08lx\nstack middle: %08lx\n",
@@ -77,7 +85,14 @@ int size;
 	fprintf(stderr, "Stack too small; stack overflow trap disabled.\n");
 	return;
     }
+/* mprotect() is broken in beta18, so we use the native Win32
+   call instead
+*/
+#if defined(cygwin32_TARGET_OS)
+    if (VirtualProtect(middle, pagesize, PAGE_NOACCESS, &old_prot) == 0) {
+#else
     if (mprotect(middle, pagesize, PROT_NONE) == -1) {
+#endif
 	perror("mprotect");
 	EXIT(EXIT_FAILURE);
     }
