@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.103 2002/10/11 16:45:17 simonpj Exp $
+-- $Id: DriverFlags.hs,v 1.104 2002/10/13 10:55:06 wolfgang Exp $
 --
 -- Driver flags
 --
@@ -598,7 +598,15 @@ machdepCCOpts
 	-- disable all warnings altogether using the -w flag. Oh well.
 
    | prefixMatch "powerpc-apple-darwin" cTARGETPLATFORM
-       = return ( ["-no-cpp-precomp"], [""] )
+      -- -no-cpp-precomp:
+      --     Disable Apple's precompiling preprocessor. It's a great thing
+      --     for "normal" programs, but it doesn't support register variable
+      --     declarations.
+      -- -mdynamic-no-pic:
+      --     As we don't support haskell code in shared libraries anyway,
+      --     we might as well turn of PIC code generation and save space and time.
+      --     This is completely optional.
+       = return ( ["-no-cpp-precomp","-mdynamic-no-pic"], [] )
 
    | prefixMatch "powerpc" cTARGETPLATFORM || prefixMatch "rs6000" cTARGETPLATFORM
 	= return ( ["-static"], ["-finhibit-size-directive"] )
