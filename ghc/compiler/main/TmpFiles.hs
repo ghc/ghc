@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: TmpFiles.hs,v 1.9 2000/12/04 16:42:14 rrt Exp $
+-- $Id: TmpFiles.hs,v 1.10 2000/12/05 12:09:43 sewardj Exp $
 --
 -- Temporary file management
 --
@@ -42,7 +42,7 @@ initTempFileStorage = do
 #ifndef mingw32_TARGET_OS
 	      writeIORef v_TmpDir dir
 #endif
-   )
+          )
 
 cleanTempFiles :: Bool -> IO ()
 cleanTempFiles verbose = do

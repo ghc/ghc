@@ -40,7 +40,7 @@ module Util (
 	mapAccumL, mapAccumR, mapAccumB, foldl2, count,
 
 	-- comparisons
-	thenCmp, cmpList, prefixMatch, postfixMatch,
+	thenCmp, cmpList, prefixMatch, suffixMatch,
 
 	-- strictness
 	seqList, ($!),
@@ -657,8 +657,8 @@ prefixMatch _pat [] = False
 prefixMatch (p:ps) (s:ss) | p == s    = prefixMatch ps ss
 			  | otherwise = False
 
-postfixMatch :: Eq a => [a] -> [a] -> Bool
-postfixMatch pat str = prefixMatch (reverse pat) (reverse str)
+suffixMatch :: Eq a => [a] -> [a] -> Bool
+suffixMatch pat str = prefixMatch (reverse pat) (reverse str)
 \end{code}
 
 %************************************************************************

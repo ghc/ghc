@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.17 2000/12/04 16:42:14 rrt Exp $
+-- $Id: DriverState.hs,v 1.18 2000/12/05 12:09:43 sewardj Exp $
 --
 -- Settings for the driver
 --
@@ -553,8 +553,9 @@ data WayName
 
 GLOBAL_VAR(v_Ways, [] ,[WayName])
 
-allowed_combinations way = ways `elem` combs
-  where  -- the sub-lists must be ordered according to WayName, because findBuildTag sorts them
+allowed_combination way = way `elem` combs
+  where  -- the sub-lists must be ordered according to WayName, 
+         -- because findBuildTag sorts them
     combs                = [ [WayProf,WayUnreg], [WayProf,WaySMP] ]
 
 findBuildTag :: IO [String]  -- new options
@@ -568,7 +569,7 @@ findBuildTag = do
 	       writeIORef v_Build_tag (wayTag details)
 	       return (wayOpts details)
 
-     ws  -> if not allowed_combination ws
+     ws  -> if not (allowed_combination ws)
 		then throwDyn (OtherError $
 				"combination not supported: "  ++
    				foldr1 (\a b -> a ++ '/':b) 
