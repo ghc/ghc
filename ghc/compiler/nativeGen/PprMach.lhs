@@ -394,17 +394,18 @@ pprAddr (AddrRegImm r1 imm)
 \begin{code}
 pprInstr :: Instr -> SDoc
 
---pprInstr (COMMENT s) = (<>) (ptext SLIT("# "))   (ptext s)
-pprInstr (COMMENT s) = empty -- nuke 'em
---alpha:  = (<>) (ptext SLIT("\t# ")) (ptext s)
---i386 :  = (<>) (ptext SLIT("# "))   (ptext s)
---sparc:  = (<>) (ptext SLIT("! "))   (ptext s)
+--pprInstr (COMMENT s) = empty -- nuke 'em
+pprInstr (COMMENT s)
+   =  IF_ARCH_alpha( ((<>) (ptext SLIT("\t# ")) (ptext s))
+     ,IF_ARCH_sparc( ((<>) (ptext SLIT("! "))   (ptext s))
+     ,IF_ARCH_i386( ((<>) (ptext SLIT("# "))   (ptext s))
+     ,)))
 
 pprInstr (SEGMENT TextSegment)
     = ptext
 	 IF_ARCH_alpha(SLIT("\t.text\n\t.align 3") {-word boundary-}
 	,IF_ARCH_sparc(SLIT("\t.text\n\t.align 4") {-word boundary-}
-	,IF_ARCH_i386((_PK_ ".text\n\t.align 4") {-needs per-OS variation!-}
+	,IF_ARCH_i386(SLIT(".text\n\t.align 4") {-needs per-OS variation!-}
 	,)))
 
 pprInstr (SEGMENT DataSegment)
@@ -983,6 +984,8 @@ pprInstr (CMP size src dst) = pprSizeOpOp SLIT("cmp")  size src dst
 pprInstr (TEST size src dst) = pprSizeOpOp SLIT("test")  size src dst
 pprInstr (PUSH size op) = pprSizeOp SLIT("push") size op
 pprInstr (POP size op) = pprSizeOp SLIT("pop") size op
+pprInstr PUSHA = ptext SLIT("\tpushal")
+pprInstr POPA = ptext SLIT("\tpopal")
 
 pprInstr (NOP) = ptext SLIT("\tnop")
 pprInstr (CLTD) = ptext SLIT("\tcltd")

@@ -20,7 +20,7 @@ import MachRegs
 import AbsCSyn		( MagicId )
 import AbsCUtils	( magicIdPrimRep )
 import CallConv		( CallConv )
-import CLabel		( isAsmTemp, CLabel )
+import CLabel		( isAsmTemp, CLabel, pprCLabel_asm )
 import Maybes		( maybeToBool, expectJust )
 import OrdList		-- quite a bit of it
 import PrimRep		( isFloatingRep, PrimRep(..) )
@@ -43,7 +43,29 @@ stmt2Instrs :: StixTree {- a stix statement -} -> UniqSM InstrBlock
 stmt2Instrs stmt = case stmt of
     StComment s    -> returnInstr (COMMENT s)
     StSegment seg  -> returnInstr (SEGMENT seg)
+
+#if 1
+    -- StFunBegin, normal non-debugging code for all architectures
     StFunBegin lab -> returnInstr (IF_ARCH_alpha(FUNBEGIN lab,LABEL lab))
+#else
+    -- StFunBegin, special tracing code for x86-Linux only
+    StFunBegin lab -> getUniqLabelNCG `thenUs` \ str_lbl ->
+                      returnUs (mkSeqInstrs [
+                         LABEL lab,
+                         COMMENT SLIT("begin trace sequence"),
+                         SEGMENT DataSegment,
+                         LABEL str_lbl,
+                         ASCII True (showSDoc (pprCLabel_asm lab)),
+                         SEGMENT TextSegment,
+                         PUSHA,
+                         PUSH L (OpImm (ImmCLbl str_lbl)),
+                         CALL (ImmLit (text "native_trace")),
+		         ADD L (OpImm (ImmInt 4)) (OpReg esp),
+                         POPA,
+                         COMMENT SLIT("end trace sequence")
+                      ])
+#endif
+
     StFunEnd lab   -> IF_ARCH_alpha(returnInstr (FUNEND lab),returnUs id)
     StLabel lab	   -> returnInstr (LABEL lab)
 

@@ -529,6 +529,8 @@ data RI
 
 	      | PUSH          Size Operand
 	      | POP           Size Operand
+	      | PUSHA
+	      | POPA
 
 -- Jumping around.
 
