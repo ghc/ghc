@@ -808,8 +808,7 @@ getModuleExports :: ModuleName -> TcM GlobalRdrEnv
 getModuleExports mod 
   = do	{ iface <- load_iface mod
 	; avails <- exportsToAvails (mi_exports iface)
-	; let { gres = [ GRE  { gre_name = name, gre_prov = vanillaProv mod,
-				gre_deprec = mi_dep_fn iface name }
+	; let { gres =  [ GRE  { gre_name = name, gre_prov = vanillaProv mod }
 			| avail <- avails, name <- availNames avail ] }
 	; returnM (mkGlobalRdrEnv gres) }
 

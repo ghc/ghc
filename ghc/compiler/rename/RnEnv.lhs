@@ -314,10 +314,7 @@ lookupGreRn_help rdr_name lookup
   = do	{ env <- getGlobalRdrEnv
 	; case lookup env of
 	    []	  -> returnM Nothing
-	    [gre] -> case gre_deprec gre of
-			Nothing -> returnM (Just gre)
-			Just _  -> do { warnDeprec gre
-				      ; returnM (Just gre) }
+	    [gre] -> returnM (Just gre)
 	    gres  -> do { addNameClashErrRn rdr_name gres
 			; returnM (Just (head gres)) } }
 
@@ -724,7 +721,7 @@ shadowedNameWarn doc shadow
     $$ doc
 
 unknownNameErr name
-  = sep [text flavour <+> ptext SLIT("not in scope:"), quotes (ppr name)]
+  = sep [ptext SLIT("Not in scope:"), text flavour <+> quotes (ppr name)]
   where
     flavour = occNameFlavour (rdrNameOcc name)
 
@@ -740,10 +737,4 @@ dupNamesErr descriptor (L loc name : dup_things)
     addErr ((ptext SLIT("Conflicting definitions for") <+> quotes (ppr name))
 	      $$ 
 	      descriptor)
-warnDeprec :: GlobalRdrElt -> RnM ()
-warnDeprec (GRE {gre_name = name, gre_deprec = Just txt})
-  = ifOptM Opt_WarnDeprecations	$
-    addWarn (sep [ text (occNameFlavour (nameOccName name)) <+> 
-		     quotes (ppr name) <+> text "is deprecated:", 
-		     nest 4 (ppr txt) ])
 \end{code}

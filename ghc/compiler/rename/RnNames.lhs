@@ -29,15 +29,16 @@ import Module		( Module, ModuleName, moduleName, mkPackageModule,
 			  unitModuleEnvByName, unitModuleEnv, 
 			  lookupModuleEnvByName, moduleEnvElts )
 import Name		( Name, nameSrcLoc, nameOccName, nameModuleName,
-			  nameParent, nameParent_maybe, isExternalName )
+			  nameParent, nameParent_maybe, isExternalName, nameModule )
 import NameSet
 import NameEnv
-import OccName		( srcDataName, isTcOcc, OccEnv, 
+import OccName		( srcDataName, isTcOcc, occNameFlavour, OccEnv, 
 			  mkOccEnv, lookupOccEnv, emptyOccEnv, extendOccEnv )
 import HscTypes		( GenAvailInfo(..), AvailInfo, Avails, GhciMode(..),
-			  IfaceExport, 
+			  IfaceExport, HomePackageTable, PackageIfaceTable, 
 			  availName, availNames, availsToNameSet, unQualInScope, 
-			  Deprecs(..), ModIface(..), Dependencies(..)
+			  Deprecs(..), ModIface(..), Dependencies(..), lookupIface,
+			  ExternalPackageState(..)
 			)
 import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace, 
 		  	  GlobalRdrEnv, mkGlobalRdrEnv, GlobalRdrElt(..), 
@@ -46,9 +47,10 @@ import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace,
 			  Provenance(..), ImportSpec(..), 
 			  isLocalGRE, pprNameProvenance )
 import Outputable
-import Maybes		( isJust, isNothing, catMaybes, mapCatMaybes )
+import Maybes		( isJust, isNothing, catMaybes, mapCatMaybes, seqMaybe )
 import SrcLoc		( noSrcLoc, Located(..), mkGeneralSrcSpan,
 			  unLoc, noLoc )
+import BasicTypes	( DeprecTxt )
 import ListSetOps	( removeDups )
 import Util		( sortLt, notNull, isSingleton )
 import List		( partition, insert )
@@ -180,7 +182,6 @@ importsFromImportDecl this_mod
 			  Just another_name -> another_name
 	imp_spec  = ImportSpec { is_mod = imp_mod_name, is_qual = qual_only,  
 		  		 is_loc = loc, is_as = qual_mod_name }
-	mk_deprec = mi_dep_fn iface
     in
 
 	-- Get the total imports, and filter them according to the import list
@@ -308,15 +309,8 @@ importsFromLocalDecls group
 	mod_name = moduleName this_mod
 	prov     = LocalDef mod_name
 	gbl_env  = mkGlobalRdrEnv gres
-	gres     = [ GRE { gre_name = name, gre_prov = prov, gre_deprec = Nothing}
+	gres     = [ GRE { gre_name = name, gre_prov = prov}
 		   | name <- all_names]
-	    -- gre_deprecs = Nothing: don't deprecate locally defined names
-	    -- For a start, we may be exporting a deprecated thing
-	    -- Also we may use a deprecated thing in the defn of another
-	    -- deprecated things.  We may even use a deprecated thing in
-	    -- the defn of a non-deprecated thing, when changing a module's 
-	    -- interface
-
 
 	    -- Optimisation: filter out names for built-in syntax
 	    -- They just clutter up the environment (esp tuples), and the parser
@@ -413,13 +407,12 @@ filterImports :: ModIface
 
 	-- Complains if import spec mentions things that the module doesn't export
         -- Warns/informs if import spec contains duplicates.
-mkGenericRdrEnv iface imp_spec avails
-  = mkGlobalRdrEnv [ GRE { gre_name = name, gre_prov = Imported [imp_spec] False,
-			   gre_deprec = mi_dep_fn iface name }
+mkGenericRdrEnv imp_spec avails
+  = mkGlobalRdrEnv [ GRE { gre_name = name, gre_prov = Imported [imp_spec] False }
 		   | avail <- avails, name <- availNames avail ]
 			
 filterImports iface imp_spec Nothing total_avails
-  = returnM (mkAvailEnv total_avails, mkGenericRdrEnv iface imp_spec total_avails)
+  = returnM (mkAvailEnv total_avails, mkGenericRdrEnv imp_spec total_avails)
 
 filterImports iface imp_spec (Just (want_hiding, import_items)) total_avails
   = mapAndUnzipM (addLocM get_item) import_items 	`thenM` \ (avails, gres) ->
@@ -435,7 +428,7 @@ filterImports iface imp_spec (Just (want_hiding, import_items)) total_avails
 	   keep n = not (n `elemNameSet` hidden)
 	   pruned_avails = pruneAvails keep total_avails
     in
-    returnM (mkAvailEnv pruned_avails, mkGenericRdrEnv iface imp_spec pruned_avails)
+    returnM (mkAvailEnv pruned_avails, mkGenericRdrEnv imp_spec pruned_avails)
   where
     import_fm :: OccEnv AvailInfo
     import_fm = mkOccEnv [ (nameOccName name, avail) 
@@ -448,8 +441,6 @@ filterImports iface imp_spec (Just (want_hiding, import_items)) total_avails
     bale_out item = addErr (badImportItemErr iface imp_spec item)	`thenM_`
 		    returnM (emptyAvailEnv, emptyGlobalRdrEnv)
 
-    mk_deprec = mi_dep_fn iface
-
     succeed_with :: Bool -> AvailInfo -> RnM (AvailEnv, GlobalRdrEnv)
     succeed_with all_explicit avail
       = do { loc <- getSrcSpanM
@@ -457,8 +448,7 @@ filterImports iface imp_spec (Just (want_hiding, import_items)) total_avails
 		      mkGlobalRdrEnv (map (mk_gre loc) (availNames avail))) }
       where
 	mk_gre loc name = GRE { gre_name = name, 
-				gre_prov = Imported [this_imp_spec loc] (explicit name), 
-				gre_deprec = mk_deprec name }
+				gre_prov = Imported [this_imp_spec loc] (explicit name) }
 	this_imp_spec loc = imp_spec { is_loc = loc }
 	explicit name = all_explicit || name == main_name
 	main_name = availName avail
@@ -747,11 +737,12 @@ check_occs ie occs avail
 \begin{code}
 reportUnusedNames :: TcGblEnv -> RnM ()
 reportUnusedNames gbl_env 
-  = warnUnusedModules unused_imp_mods	`thenM_`
-    warnUnusedTopBinds bad_locals	`thenM_`
-    warnUnusedImports bad_imports	`thenM_`
-    warnDuplicateImports dup_imps	`thenM_`
-    printMinimalImports minimal_imports
+  = do	{ warnDeprecations     defined_and_used
+	; warnUnusedTopBinds   unused_locals
+	; warnUnusedModules    unused_imp_mods
+	; warnUnusedImports    unused_imports	
+	; warnDuplicateImports dup_imps
+	; printMinimalImports  minimal_imports }
   where
     used_names, all_used_names :: NameSet
     used_names = findUses (tcg_dus gbl_env) emptyNameSet
@@ -764,28 +755,34 @@ reportUnusedNames gbl_env
     defined_names :: [GlobalRdrElt]
     defined_names = globalRdrEnvElts (tcg_rdr_env gbl_env)
 
+	-- Note that defined_and_used, defined_but_not_used
+	-- are both [GRE]; that's why we need defined_and_used
+	-- rather than just all_used_names
     defined_and_used, defined_but_not_used :: [GlobalRdrElt]
     (defined_and_used, defined_but_not_used) = partition is_used defined_names
-
-    dup_imps = filter isDupImport defined_and_used
     is_used gre = gre_name gre `elemNameSet` all_used_names
     
-    -- Filter out the ones that are 
-    --  (a) defined in this module, and
-    --	(b) not defined by a 'deriving' clause 
-    -- The latter have an Internal Name, so we can filter them out easily
-    bad_locals :: [GlobalRdrElt]
-    bad_locals = filter is_bad defined_but_not_used
-    is_bad :: GlobalRdrElt -> Bool
-    is_bad gre = isLocalGRE gre && isExternalName (gre_name gre)
+	-- Find the duplicate imports
+    dup_imps = filter is_dup defined_and_used
+    is_dup (GRE {gre_prov = Imported imp_spec True}) = not (isSingleton imp_spec)
+    is_dup other				     = False
+
+	-- Filter out the ones that are 
+	--  (a) defined in this module, and
+	--  (b) not defined by a 'deriving' clause 
+	-- The latter have an Internal Name, so we can filter them out easily
+    unused_locals :: [GlobalRdrElt]
+    unused_locals = filter is_unused_local defined_but_not_used
+    is_unused_local :: GlobalRdrElt -> Bool
+    is_unused_local gre = isLocalGRE gre && isExternalName (gre_name gre)
     
-    bad_imports :: [GlobalRdrElt]
-    bad_imports = filter bad_imp defined_but_not_used
-    bad_imp (GRE {gre_prov = Imported imp_specs True}) 
+    unused_imports :: [GlobalRdrElt]
+    unused_imports = filter unused_imp defined_but_not_used
+    unused_imp (GRE {gre_prov = Imported imp_specs True}) 
 	= not (all (module_unused . is_mod) imp_specs)
 		-- Don't complain about unused imports if we've already said the
 		-- entire import is unused
-    bad_imp other = False
+    unused_imp other = False
     
     -- To figure out the minimal set of imports, start with the things
     -- that are in scope (i.e. in gbl_env).  Then just combine them
@@ -809,7 +806,6 @@ reportUnusedNames gbl_env
     	-- There's really no good way to detect this, so the error message 
     	-- in RnEnv.warnUnusedModules is weakened instead
     
-
 	-- We've carefully preserved the provenance so that we can
 	-- construct minimal imports that import the name by (one of)
 	-- the same route(s) as the programmer originally did.
@@ -858,10 +854,48 @@ reportUnusedNames gbl_env
     module_unused :: ModuleName -> Bool
     module_unused mod = mod `elem` unused_imp_mods
 
-
-isDupImport (GRE {gre_prov = Imported imp_spec True}) = not (isSingleton imp_spec)
-isDupImport other				      = False
 		      
+---------------------
+warnDeprecations :: [GlobalRdrElt] -> RnM ()
+warnDeprecations used_gres
+  = ifOptM Opt_WarnDeprecations	$
+    do	{ hpt <- getHpt
+	; eps <- getEps
+	; mapM_ (check hpt (eps_PIT eps)) used_gres }
+  where
+    check hpt pit (GRE {gre_name = name, gre_prov = Imported (imp_spec:_) _})
+      | Just deprec_txt <- lookupDeprec hpt pit name
+      = addSrcSpan (is_loc imp_spec) $
+	addWarn (sep [ptext SLIT("Deprecated use of") <+> 
+			text (occNameFlavour (nameOccName name)) <+> 
+		 	quotes (ppr name),
+		      (parens imp_msg),
+		      (ppr deprec_txt) ])
+	where
+	  name_mod = nameModuleName name
+	  imp_mod  = is_mod imp_spec
+	  imp_msg  = ptext SLIT("imported from") <+> ppr imp_mod <> extra
+	  extra | imp_mod == name_mod = empty
+		| otherwise = ptext SLIT(", but defined in") <+> ppr name_mod
+
+    check hpt pit ok_gre = returnM ()	-- Local, or not deprectated
+	    -- The Imported pattern-match: don't deprecate locally defined names
+	    -- For a start, we may be exporting a deprecated thing
+	    -- Also we may use a deprecated thing in the defn of another
+	    -- deprecated things.  We may even use a deprecated thing in
+	    -- the defn of a non-deprecated thing, when changing a module's 
+	    -- interface
+
+lookupDeprec :: HomePackageTable -> PackageIfaceTable 
+	     -> Name -> Maybe DeprecTxt
+lookupDeprec hpt pit n 
+  = case lookupIface hpt pit (nameModule n) of
+	Just iface -> mi_dep_fn iface n `seqMaybe` 	-- Bleat if the thing, *or
+		      mi_dep_fn iface (nameParent n)	-- its parent*, is deprec'd
+	Nothing    -> pprPanic "lookupDeprec" (ppr n)	
+		-- By now all the interfaces should have been loaded
+
+---------------------
 warnDuplicateImports :: [GlobalRdrElt] -> RnM ()
 warnDuplicateImports gres
   = ifOptM Opt_WarnUnusedImports (mapM_ warn gres)
