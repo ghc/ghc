@@ -40,6 +40,11 @@
 	monadic parser combinators.
       </DD>
       <DT>
+	<A HREF="QuickCheck/index.html"><TT>QuickCheck</TT></a>
+      </DT><DD>
+	automatic specification-based testing.
+      </DD>
+      <DT>
 	<A HREF="readline/index.html"><TT>readline</TT></a>
       </DT><DD>
 	a library for interactively reading input from the console.
@@ -95,12 +100,18 @@
 	and all the modules in the
 	<A HREF="haskell98/index.html"><TT>haskell98</TT></a>,
 	<A HREF="haskell-src/index.html"><TT>haskell-src</TT></a>,
-	<A HREF="network/index.html"><TT>network</TT></a> and
-	<A HREF="parsec/index.html"><TT>parsec</TT></a> packages.
+	<A HREF="network/index.html"><TT>network</TT></a>,
+	<A HREF="parsec/index.html"><TT>parsec</TT></a> and.
+	<A HREF="QuickCheck/index.html"><TT>QuickCheck</TT></a> packages.
 @unixHTMLStart@
 	Most of the modules in the <A HREF="unix/index.html"><TT>unix</TT></a>
-	package are supported too.
+	package are supported, too.
 @unixHTMLEnd@
+@HOpenGLHTMLStart@
+ 	If the target platform supports OpenGL, the
+	<A HREF="OpenGL/index.html"><TT>OpenGL</TT></a> and
+	<A HREF="GLUT/index.html"><TT>GLUT</TT></a> packages are supported too.
+@HOpenGLHTMLEnd@
 	All those modules are always available, as a single hierarchy;
 	Hugs does not use the package subdivision.
       </DD>
