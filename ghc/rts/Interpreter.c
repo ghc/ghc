@@ -5,8 +5,8 @@
  * Copyright (c) 1994-2000.
  *
  * $RCSfile: Interpreter.c,v $
- * $Revision: 1.21 $
- * $Date: 2001/03/21 10:56:04 $
+ * $Revision: 1.22 $
+ * $Date: 2001/05/21 16:34:22 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -691,6 +691,30 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                     bciPtr = failto;
                  goto nextInsn;
               }
+              case bci_TESTLT_F: {
+                 /* The top thing on the stack should be a tagged float. */
+                 int discr   = BCO_NEXT;
+                 int failto  = BCO_NEXT;
+                 StgFloat stackFlt, discrFlt;
+                 ASSERT(sizeofW(StgFloat) == StackWord(0));
+                 stackFlt = PK_FLT( & StackWord(1) );
+                 discrFlt = PK_FLT( & BCO_LIT(discr) );
+                 if (stackFlt >= discrFlt)
+                    bciPtr = failto;
+                 goto nextInsn;
+              }
+              case bci_TESTEQ_F: {
+                 /* The top thing on the stack should be a tagged float. */
+                 int discr   = BCO_NEXT;
+                 int failto  = BCO_NEXT;
+                 StgFloat stackFlt, discrFlt;
+                 ASSERT(sizeofW(StgFloat) == StackWord(0));
+                 stackFlt = PK_FLT( & StackWord(1) );
+                 discrFlt = PK_FLT( & BCO_LIT(discr) );
+                 if (stackFlt != discrFlt)
+                    bciPtr = failto;
+                 goto nextInsn;
+              }
 
               /* Control-flow ish things */
               case bci_ENTER: {
@@ -746,10 +770,6 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
               }
               case bci_CASEFAIL:
                  barf("interpretBCO: hit a CASEFAIL");
-
-              /* As yet unimplemented */
-              case bci_TESTLT_F:
-              case bci_TESTEQ_F:
 
               /* Errors */
               default: 
