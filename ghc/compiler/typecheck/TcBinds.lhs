@@ -24,7 +24,7 @@ import RnHsSyn		( SYN_IE(RenamedHsBinds), RenamedSig(..),
 			  SYN_IE(RenamedMonoBinds)
 			)
 import TcHsSyn		( SYN_IE(TcHsBinds), SYN_IE(TcMonoBinds),
-			  TcIdOcc(..), SYN_IE(TcIdBndr), SYN_IE(TcExpr), 
+			  SYN_IE(TcExpr), 
 			  tcIdType
 			)
 
@@ -41,7 +41,8 @@ import TcSimplify	( tcSimplify, tcSimplifyAndCheck )
 import TcMonoType	( tcHsType )
 import TcPat		( tcPat )
 import TcSimplify	( bindInstsOfLocalFuns )
-import TcType		( SYN_IE(TcType), SYN_IE(TcThetaType), SYN_IE(TcTauType), 
+import TcType		( TcIdOcc(..), SYN_IE(TcIdBndr), 
+			  SYN_IE(TcType), SYN_IE(TcThetaType), SYN_IE(TcTauType), 
 			  SYN_IE(TcTyVarSet), SYN_IE(TcTyVar),
 			  newTyVarTy, zonkTcType, zonkTcTyVar, zonkTcTyVars,
 			  newTcTyVar, tcInstSigType, newTyVarTys
@@ -58,7 +59,7 @@ import Pretty
 import Type		( mkTyVarTy, mkTyVarTys, isTyVarTy, tyVarsOfTypes, eqSimpleTheta, 
 			  mkSigmaTy, splitSigmaTy, mkForAllTys, mkFunTys, getTyVar, mkDictTy,
 			  splitRhoTy, mkForAllTy, splitForAllTy )
-import TyVar		( GenTyVar, SYN_IE(TyVar), tyVarKind, minusTyVarSet, emptyTyVarSet,
+import TyVar		( GenTyVar, SYN_IE(TyVar), tyVarKind, mkTyVarSet, minusTyVarSet, emptyTyVarSet,
 			  elementOfTyVarSet, unionTyVarSets, tyVarSetToList )
 import Bag		( bagToList, foldrBag, isEmptyBag )
 import Util		( isIn, zipEqual, zipWithEqual, zipWith3Equal, hasNoDups, assoc,
@@ -232,7 +233,6 @@ tcBindWithSigs binder_names mbind tc_ty_sigs is_rec prag_info_fn
     tcGetUniques no_of_binders			`thenNF_Tc` \ uniqs ->
     mapNF_Tc mk_mono_id_ty binder_names 	`thenNF_Tc` \ mono_id_tys ->
     let
-	mono_id_tyvars	   = tyVarsOfTypes mono_id_tys
 	mono_ids           = zipWith3Equal "tcBindAndSigs" mk_id binder_names uniqs mono_id_tys
 	mk_id name uniq ty = mkUserLocal (getOccName name) uniq ty (getSrcLoc name)
     in
@@ -248,21 +248,27 @@ tcBindWithSigs binder_names mbind tc_ty_sigs is_rec prag_info_fn
 	-- The tyvars_not_to_gen are free in the environment, and hence
 	-- candidates for generalisation, but sometimes the monomorphism
 	-- restriction means we can't generalise them nevertheless
-    getTyVarsToGen is_unrestricted mono_id_tyvars lie	`thenTc` \ (tyvars_not_to_gen, tyvars_to_gen) ->
+    getTyVarsToGen is_unrestricted mono_id_tys lie	`thenTc` \ (tyvars_not_to_gen, tyvars_to_gen) ->
 
 	-- DEAL WITH TYPE VARIABLE KINDS
-    mapTc defaultUncommittedTyVar (tyVarSetToList tyvars_to_gen)	`thenTc` \ tyvars_to_gen_list ->
-		-- It's important that the final list (tyvars_to_gen_list) is fully
+    mapTc defaultUncommittedTyVar (tyVarSetToList tyvars_to_gen)	`thenTc` \ real_tyvars_to_gen_list ->
+    let
+	real_tyvars_to_gen = mkTyVarSet real_tyvars_to_gen_list
+		-- It's important that the final list (real_tyvars_to_gen and real_tyvars_to_gen_list) is fully
 		-- zonked, *including boxity*, because they'll be included in the forall types of
 		-- the polymorphic Ids, and instances of these Ids will be generated from them.
+		-- 
+		-- Also NB that tcSimplify takes zonked tyvars as its arg, hence we pass
+		-- real_tyvars_to_gen
 		--
-		-- This step can do unification => keep other zonking after this
+		-- **** This step can do unification => keep other zonking after this ****
+    in
 
 	-- SIMPLIFY THE LIE
     tcExtendGlobalTyVars tyvars_not_to_gen (
 	if null tc_ty_sigs then
 		-- No signatures, so just simplify the lie
-	    tcSimplify tyvars_to_gen lie		`thenTc` \ (lie_free, dict_binds, lie_bound) ->
+	    tcSimplify real_tyvars_to_gen lie		`thenTc` \ (lie_free, dict_binds, lie_bound) ->
 	    returnTc (lie_free, dict_binds, map instToId (bagToList lie_bound))
 
 	else
@@ -276,12 +282,12 @@ tcBindWithSigs binder_names mbind tc_ty_sigs is_rec prag_info_fn
 		-- Check that the needed dicts can be expressed in
 		-- terms of the signature ones
 	    tcAddErrCtxt (sigsCtxt tysig_names) $
-	    tcSimplifyAndCheck tyvars_to_gen dicts_sig lie	`thenTc` \ (lie_free, dict_binds) ->
+	    tcSimplifyAndCheck real_tyvars_to_gen dicts_sig lie	`thenTc` \ (lie_free, dict_binds) ->
 	    returnTc (lie_free, dict_binds, dict_ids)
 
     )						`thenTc` \ (lie_free, dict_binds, dicts_bound) ->
 
-    ASSERT( not (any (isUnboxedTypeKind . tyVarKind) tyvars_to_gen_list) )
+    ASSERT( not (any (isUnboxedTypeKind . tyVarKind) real_tyvars_to_gen_list) )
 		-- The instCantBeGeneralised stuff in tcSimplify should have
 		-- already raised an error if we're trying to generalise an unboxed tyvar
 		-- (NB: unboxed tyvars are always introduced along with a class constraint)
@@ -295,13 +301,13 @@ tcBindWithSigs binder_names mbind tc_ty_sigs is_rec prag_info_fn
 	dict_tys = map tcIdType dicts_bound
 
 	mk_export binder_name mono_id zonked_mono_id_ty
-	  | maybeToBool maybe_sig = (sig_tyvars,         TcId sig_poly_id, TcId mono_id)
-	  | otherwise		  = (tyvars_to_gen_list, TcId poly_id,     TcId mono_id)
+	  | maybeToBool maybe_sig = (sig_tyvars,              TcId sig_poly_id, TcId mono_id)
+	  | otherwise		  = (real_tyvars_to_gen_list, TcId poly_id,     TcId mono_id)
 	  where
 	    maybe_sig = maybeSig tc_ty_sigs binder_name
 	    Just (TySigInfo _ sig_poly_id sig_tyvars _ _ _) = maybe_sig
 	    poly_id = mkUserId binder_name poly_ty (prag_info_fn binder_name)
-	    poly_ty = mkForAllTys tyvars_to_gen_list $ mkFunTys dict_tys $ zonked_mono_id_ty
+	    poly_ty = mkForAllTys real_tyvars_to_gen_list $ mkFunTys dict_tys $ zonked_mono_id_ty
 				-- It's important to build a fully-zonked poly_ty, because
 				-- we'll slurp out its free type variables when extending the
 				-- local environment (tcExtendLocalValEnv); if it's not zonked
@@ -310,7 +316,7 @@ tcBindWithSigs binder_names mbind tc_ty_sigs is_rec prag_info_fn
 
 	 -- BUILD RESULTS
     returnTc (
-	 AbsBinds tyvars_to_gen_list
+	 AbsBinds real_tyvars_to_gen_list
 		  dicts_bound
 		  exports
 		  (dict_binds `AndMonoBinds` mbind'),
@@ -374,11 +380,11 @@ constrained tyvars. We don't use any of the results, except to
 find which tyvars are constrained.
 
 \begin{code}
-getTyVarsToGen is_unrestricted mono_tyvars lie
+getTyVarsToGen is_unrestricted mono_id_tys lie
   = tcGetGlobalTyVars 				`thenNF_Tc` \ free_tyvars ->
-    zonkTcTyVars mono_tyvars			`thenNF_Tc` \ mentioned_tyvars ->
+    mapNF_Tc zonkTcType mono_id_tys		`thenNF_Tc` \ zonked_mono_id_tys ->
     let
-	tyvars_to_gen    = mentioned_tyvars `minusTyVarSet` free_tyvars
+	tyvars_to_gen = tyVarsOfTypes zonked_mono_id_tys `minusTyVarSet` free_tyvars
     in
     if is_unrestricted
     then
@@ -468,11 +474,13 @@ tcMonoBinds mbind binder_names mono_ids tc_ty_sigs
 
     tc_mono_binds bind@(PatMonoBind pat grhss_and_binds locn)
       = tcAddSrcLoc locn		 	$
-	tcPat pat	     			`thenTc` \ (pat2, lie_pat, pat_ty) ->
-	tcExtendLocalValEnv sig_names sig_ids	$
-	tcGRHSsAndBinds grhss_and_binds		`thenTc` \ (grhss_and_binds2, lie, grhss_ty) ->
 	tcAddErrCtxt (patMonoBindsCtxt bind)	$
-	unifyTauTy pat_ty grhss_ty		`thenTc_`
+	tcPat pat	     			`thenTc` \ (pat2, lie_pat, pat_ty) ->
+
+		-- Before checking the RHS, but after the pattern, extend the envt with
+		-- bindings for the *polymorphic* Ids from any type signatures
+	tcExtendLocalValEnv sig_names sig_ids	$
+	tcGRHSsAndBinds pat_ty grhss_and_binds	`thenTc` \ (grhss_and_binds2, lie) ->
 	returnTc (PatMonoBind pat2 grhss_and_binds2 locn,
 		  plusLIE lie_pat lie)
 \end{code}
