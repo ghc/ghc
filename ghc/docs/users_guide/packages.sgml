@@ -106,7 +106,7 @@
 
 	<listitem>
 	  <para>The Haskell code in a package may be built into one or
-	  more Unix libraries (e.g. <filename>libHSfoo.a</filename>),
+	  more archive libraries (e.g. <filename>libHSfoo.a</filename>),
 	  or a single DLL on Windows
 	  (e.g. <filename>HSfoo.dll</filename>).  The restriction to a
 	  single DLL on Windows is that the package system is used to
@@ -120,15 +120,14 @@
 	  <para>Versions of the Haskell libraries for use with GHCi
 	  may also be included: GHCi cannot load <literal>.a</literal>
 	  files directly, instead it will look for an object file
-	  called <filename>HSfoo.o</filename> (the object suffix
-	  varies between platforms, as usual) and load that.  An
-	  object file can be built from a <literal>.a</literal>
-	  archive as follows (using GNU <command>ld</command> on
-	  Unix):</para>
+	  called <filename>HSfoo.o</filename> and load that.  The
+	  <literal>ghc-pkg</literal> tool can automatically build the
+	  GHCi version of each library, see <xref
+	  linkend="package-management">.  To build these libraries by
+	  hand from the <literal>.a</literal> archive, it is possible
+	  to use GNU <command>ld</command> as follows:</para>
 
-<screen>
-ld -r --whole-archive -o HSfoo.o libHSfoo.a
-</screen>
+<screen>ld -r --whole-archive -o HSfoo.o libHSfoo.a</screen>
 	</listitem>
 
 	<listitem>
@@ -197,6 +196,28 @@ ld -r --whole-archive -o HSfoo.o libHSfoo.a
 	    and adds it to the database of installed packages.  The
 	    package specification must be a package that isn't already
 	    installed.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>--auto-ghci-libs</option></term>
+	  <term><option>-g</option></term>
+	  <indexterm><primary><option>--auto-ghci-libs</option></primary>
+	      </indexterm>
+	  <listitem>
+	    <para>Automatically generate the GHCi
+	    <filename>.o</filename> version of each
+	    <filename>.a</filename> Haskell library, using GNU ld (if
+	    that is available).  Without this option,
+	    <literal>ghc-pkg</literal> will warn if GHCi versions of
+	    any Haskell libraries in the package don't exist.</para>
+	    
+	    <para>GHCi <literal>.o</literal> libraries don't
+	    necessarily have to live in the same directory as the
+	    corresponding <literal>.a</literal> library.  However,
+	    this option will cause the GHCi library to be created in
+	    the same directory as the <literal>.a</literal>
+	    library.</para>
 	  </listitem>
 	</varlistentry>
 
