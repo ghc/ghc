@@ -175,7 +175,7 @@ cmLoadModule cmstate1 rootname
         -- Throw away the old home dir cache
         emptyHomeDirCache
 
-        hPutStr stderr "cmLoadModule: downsweep begins\n"
+        hPutStrLn stderr ("ghc: chasing modules, starting from: " ++ rootname)
         mg2unsorted <- downsweep [rootname]
 
         let modnames1   = map name_of_summary mg1
@@ -195,8 +195,8 @@ cmLoadModule cmstate1 rootname
         let reachable_from :: ModuleName -> [ModuleName]
             reachable_from = downwards_closure_of_module mg2unsorted
 
-        hPutStrLn stderr "after tsort:\n"
-        hPutStrLn stderr (showSDoc (vcat (map ppr mg2)))
+        --hPutStrLn stderr "after tsort:\n"
+        --hPutStrLn stderr (showSDoc (vcat (map ppr mg2)))
 
         -- Because we don't take into account source imports when doing
         -- the topological sort, there shouldn't be any cycles in mg2.
@@ -387,7 +387,9 @@ upsweep_mod :: GhciMode
             -> IO (CmThreaded, Maybe Linkable)
 
 upsweep_mod ghci_mode oldUI threaded1 summary1 reachable_from_here
-   = do let mod_name = name_of_summary summary1
+   = do hPutStr stderr ("ghc: module " 
+                        ++ moduleNameUserString (name_of_summary summary1) ++ ": ")
+        let mod_name = name_of_summary summary1
         let (CmThreaded pcs1 hst1 hit1) = threaded1
         let old_iface = lookupUFM hit1 (name_of_summary summary1)
 
@@ -496,10 +498,10 @@ downwards_closure_of_module summaries root
              = (name_of_summary summ, ms_srcimps summ ++ ms_imps summ)
          res = simple_transitive_closure (map toEdge summaries) [root]             
      in
-         trace (showSDoc (text "DC of mod" <+> ppr root
-                          <+> text "=" <+> ppr res)) (
+         --trace (showSDoc (text "DC of mod" <+> ppr root
+         --                 <+> text "=" <+> ppr res)) (
          res
-         )
+         --)
 
 -- Calculate transitive closures from a set of roots given an adjacency list
 simple_transitive_closure :: Eq a => [(a,[a])] -> [a] -> [a]
@@ -559,7 +561,7 @@ downsweep rootNm
 
         getSummary :: ModuleName -> IO ModSummary
         getSummary nm
-           | trace ("getSummary: "++ showSDoc (ppr nm)) True
+           -- | trace ("getSummary: "++ showSDoc (ppr nm)) True
            = do found <- findModule nm
 		case found of
                    -- Be sure not to use the mod and location passed in to 

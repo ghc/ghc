@@ -136,7 +136,7 @@ hscNoRecomp ghci_mode dflags location (Just old_iface) hst hit pcs_ch
    in  return (HscNoRecomp pcs_ch bomb bomb)
  | otherwise
  = do {
-      hPutStrLn stderr "COMPILATION NOT REQUIRED";
+      hPutStrLn stderr "compilation not required";
       ;
       -- CLOSURE
       (pcs_cl, closure_errs, cl_hs_decls) 
@@ -165,7 +165,7 @@ hscNoRecomp ghci_mode dflags location (Just old_iface) hst hit pcs_ch
 
 hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
  = do	{
-      	; hPutStrLn stderr "COMPILATION IS REQUIRED";
+      	; hPutStrLn stderr "compilation IS required";
 
       	  -- what target are we shooting for?
       	; let toInterp = dopt_HscLang dflags == HscInterpreted
