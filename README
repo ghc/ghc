@@ -8,10 +8,12 @@ the following directories:
 
     ghc		  The Glasgow Haskell Compiler
     hslibs	  A Collection of Haskell libraries
+    haddock	  A Haskell documentation tool
     haggis	  The Haggis GUI toolkit
     happy	  The Happy Haskell parser generator
     hdirect       Haskell interop tool
     green-card	  A foreign function interface pre-processor for Haskell.
+    libraries	  Haskell libraries (reqd. by ghc)
     nofib	  The NoFib Haskell benchmarking suite
 
 Additional documentation for each project can be found in its
