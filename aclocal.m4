@@ -269,7 +269,7 @@ AC_DEFUN(AC_PROG_GNUCPP,
 [if test "$HaveGcc" = "YES"; then
 	echo > conftest.c
 	gcc -v -E conftest.c >/dev/null 2>conftest.out
-	echo '/(\S+(\/|\\\\)cpp)/ && print "[$]1";' > conftest.pl
+	echo '/(\S+(\/|\\)cpp)/ && print "[$]1";' > conftest.pl
 	ac_cv_gnu_cpp="`eval $PerlCmd -n conftest.pl conftest.out | tr '\\\' / `"
 	rm -fr conftest*
  else
