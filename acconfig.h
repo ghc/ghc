@@ -75,6 +75,12 @@
 /* Define if you need -ldl to get dlopen() */
 #undef HAVE_LIBDL
 
+/* Define if struct msghdr contains msg_accrights field */
+#undef HAVE_MSGHDR_MSG_ACCRIGHTS
+
+/* Define if struct msghdr contains msg_control field */
+#undef HAVE_MSGHDR_MSG_CONTROL
+
 /* Define if we can see RTLD_NEXT in dlfcn.h */
 #undef HAVE_RTLDNEXT
 

@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.102 2002/05/22 09:02:40 simonmar Exp $
+dnl $Id: aclocal.m4,v 1.103 2002/05/31 21:12:28 sof Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -1254,3 +1254,32 @@ else
   $2="";
 fi;
 ])
+
+dnl
+dnl Check to see whether 'struct msghdr' contains msg_control
+dnl 
+AC_DEFUN(FPTOOLS_MSGHDR_MSG_CONTROL,
+[AC_CACHE_CHECK([for msg_control in struct msghdr], fptools_cv_struct_msghdr_msg_control,
+[AC_TRY_COMPILE([#include <sys/uio.h>
+#include <sys/socket.h>], [struct msghdr m; m.msg_control;],
+fptools_cv_struct_msghdr_msg_control=yes, fptools_cv_struct_msghdr_msg_control=no)])
+if test $fptools_cv_struct_msghdr_msg_control = yes; then
+  AC_DEFINE(HAVE_MSGHDR_MSG_CONTROL)
+fi
+AC_SUBST(HAVE_MSGHDR_MSG_CONTROL)dnl
+])
+
+dnl
+dnl Check to see whether 'struct msghdr' contains msg_accrights
+dnl 
+AC_DEFUN(FPTOOLS_MSGHDR_MSG_ACCRIGHTS,
+[AC_CACHE_CHECK([for msg_accrights in struct msghdr], fptools_cv_struct_msghdr_msg_accrights,
+[AC_TRY_COMPILE([#include <sys/uio.h>
+#include <sys/socket.h>], [struct msghdr m; m.msg_accrights;],
+fptools_cv_struct_msghdr_msg_accrights=yes, fptools_cv_struct_msghdr_msg_accrights=no)])
+if test $fptools_cv_struct_msghdr_msg_accrights = yes; then
+  AC_DEFINE(HAVE_MSGHDR_MSG_ACCRIGHTS)
+fi
+AC_SUBST(HAVE_MSGHDR_MSG_ACCRIGHTS)dnl
+])
+

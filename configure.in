@@ -734,6 +734,10 @@ AC_STRUCT_ST_BLKSIZE
 dnl ** do we have long longs?
 FPTOOLS_C_LONG_LONG
 
+dnl ** check what fields struct msghdr contains
+FPTOOLS_MSGHDR_MSG_ACCRIGHTS
+FPTOOLS_MSGHDR_MSG_CONTROL
+
 dnl ** what are the sizes of various types
 dnl    (these must come before GHC_CHECK_ALIGNMENT)
 AC_CHECK_SIZEOF(char,               1)

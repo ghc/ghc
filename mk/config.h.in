@@ -418,6 +418,12 @@
 /* Define if you have the `mprotect' function. */
 #undef HAVE_MPROTECT
 
+/* Define if struct msghdr contains msg_accrights field */
+#undef HAVE_MSGHDR_MSG_ACCRIGHTS
+
+/* Define if struct msghdr contains msg_control field */
+#undef HAVE_MSGHDR_MSG_CONTROL
+
 /* Define if you have the <netdb.h> header file. */
 #undef HAVE_NETDB_H
 
