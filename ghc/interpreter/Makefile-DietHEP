@@ -1,0 +1,126 @@
+
+# --------------------------------------------------------------------------- #
+# $Id: Makefile-DietHEP,v 1.1 2000/05/12 15:59:37 sewardj Exp $                      #
+# --------------------------------------------------------------------------- #
+
+TOP = ..
+include $(TOP)/mk/boilerplate.mk
+SUBDIRS = lib
+
+# --------------------------------------------------------------------- #
+# interpreter and relevant .a/.so files                                 #
+# --------------------------------------------------------------------- #
+
+ifeq "$(TARGETPLATFORM)" "i386-unknown-cygwin32"
+DYN_EXT=.dll
+LIB_DL=
+else
+DYN_EXT=.so
+LIB_DL=-ldl
+endif
+
+ifeq "$(HaveLibGmp)$" "YES"
+LIB_GMP=-lgmp
+else
+LIB_GMP=../rts/gmp/libgmp.a
+endif
+
+YACC = bison -y
+%.c: %.y
+	-$(YACC) $<
+	mv y.tab.c $@
+	rm -f input.o
+
+HS_SRCS =
+
+Y_SRCS = parser.y
+C_SRCS = link.c type.c static.c storage.c derive.c input.c compiler.c subst.c \
+     translate.c codegen.c lift.c free.c stgSubst.c output.c   \
+     hugs.c dynamic.c stg.c sainteger.c object.c interface.c
+
+SRC_CC_OPTS = -I$(GHC_INTERPRETER_DIR) -I$(GHC_INCLUDE_DIR) -I$(GHC_RUNTIME_DIR) -D__HUGS__ -DCOMPILING_RTS -DNO_REGS -Wall -Wstrict-prototypes -Wno-unused -DDEBUG -Winline -g -DDIET_HEP
+
+GHC_LIBS_NEEDED = $(GHC_RUNTIME_DIR)/libHSrts.a \
+                  $(GHC_RUNTIME_DIR)/gmp/libgmp.a
+
+all :: parser.c $(GHC_LIBS_NEEDED) nHandle$(DYN_EXT) dh_demo.exe
+
+dh_demo.exe: DietHEP.dll
+	gcc -Wall -g -o dh_demo.exe dh_demo.c DietHEP_dll.a
+
+### EXTREMELY hacky
+DietHEP.a: $(C_OBJS)
+	rm -f DietHEP.o
+	ld -r -o DietHEP.o $^ $(GHC_LIBS_NEEDED)
+	rm -f DietHEP.a
+	ar clq DietHEP.a DietHEP.o
+	rm -f DietHEP.o
+
+foobar:
+	rm -f ../rts/libHSrts.a  ../rts/libHSrts_u.a
+	rm -f ../rts/StgCRun.o ../rts/StgCRun.u_o
+	make all
+
+nHandle$(DYN_EXT): nHandle.c
+ifeq "$(TARGETPLATFORM)" "i386-unknown-cygwin32"
+	gcc -mno-cygwin -O -Wall -o nHandle.o -c nHandle.c
+	dllwrap -mno-cygwin --target=i386-mingw32 -o nHandle.dll \
+                -def nHandle.def nHandle.o
+else
+	gcc -O -Wall -shared -fPIC -o nHandle.so nHandle.c
+endif
+
+$(GHC_RUNTIME_DIR)/libHSrts.a:
+	(cd $(GHC_RUNTIME_DIR) ; make clean ; make EXTRA_CC_OPTS=-I$(GHC_INTERPRETER_DIR))
+
+cleanish:
+	/bin/rm *.o
+rtsclean:
+	(cd $(GHC_RUNTIME_DIR) ; make clean)
+
+binaries:
+	tar cvzf stghugs.tar.gz hugs$(exeext) nHandle$(DYN_EXT) lib/*lhs lib/Prelude.hs
+
+snapshot:
+	/bin/rm -f snapshot.tar
+	tar cvf snapshot.tar Makefile *.[chy] \
+             ../rts/Assembler.c ../rts/Evaluator.c ../rts/Disassembler.c \
+             ../rts/ForeignCall.c ../rts/Printer.c ../rts/QueueTemplate.h \
+             ../includes/options.h ../includes/Assembler.h nHandle.c \
+             ../includes/Assembler.h ../rts/Bytecodes.h ../includes/ClosureMacros.h \
+             lib/*.hs runnofib runallnofib
+
+
+# --------------------------------------------------------------------- #
+# Testing                                                               #
+# --------------------------------------------------------------------- #
+
+check :: all
+	./test/runtests test/static/*.hs
+	./test/runtests test/typechecker/*.hs
+	./test/runtests test/runtime/*.hs
+	./test/runtests test/std/*.hs
+	./test/runtests test/exts/*.hs
+
+checkrun: all
+	./test/runtests test/runtime/*.hs
+	./test/runtests test/std/*.hs
+	./test/runtests test/exts/*.hs
+
+# --------------------------------------------------------------------- #
+# Cleanery & misc                                                       #
+# --------------------------------------------------------------------- #
+
+CLEAN_FILES += hugs nHandle.dll
+CLEAN_FILES += $(TOP)/ghc/rts/libHSrts.a $(TOP)/ghc/rts/*.o
+CLEAN_FILES += parser.c
+
+INSTALL_LIBEXECS = hugs
+
+depend :: parser.c $(LOOPS) $(SRCS_UGNHS)
+
+
+include $(TOP)/mk/target.mk
+
+
+include Makefile.DLLs
