@@ -869,146 +869,167 @@ int64ToInt (I64# i#) = I# (int64ToInt# i#)
 -- Word64# primop wrappers:
 
 ltInt64# :: Int64# -> Int64# -> Bool
-ltInt64# x# y# =  unsafePerformIO $ do
-	v <- _ccall_ stg_ltInt64 x# y# 
-	case (v::Int) of
-	  0 -> return False
-	  _ -> return True
+ltInt64# x# y# =  
+	case stg_ltInt64 x# y# of
+	  0 -> False
+	  _ -> True
       
 leInt64# :: Int64# -> Int64# -> Bool
-leInt64# x# y# =  unsafePerformIO $ do
-	v <- _ccall_ stg_leInt64 x# y# 
-	case (v::Int) of
-	  0 -> return False
-	  _ -> return True
-      
+leInt64# x# y# =  
+	case stg_leInt64 x# y# of
+	  0 -> False
+	  _ -> True
+
 eqInt64# :: Int64# -> Int64# -> Bool
-eqInt64# x# y# =  unsafePerformIO $ do
-	v <- _ccall_ stg_eqInt64 x# y# 
-	case (v::Int) of
-	  0 -> return False
-	  _ -> return True
-      
+eqInt64# x# y# =  
+	case stg_eqInt64 x# y# of
+	  0 -> False
+	  _ -> True
+
 neInt64# :: Int64# -> Int64# -> Bool
-neInt64# x# y# =  unsafePerformIO $ do
-	v <- _ccall_ stg_neInt64 x# y# 
-	case (v::Int) of
-	  0 -> return False
-	  _ -> return True
-      
+neInt64# x# y# =  
+	case stg_neInt64 x# y# of
+	  0 -> False
+	  _ -> True
+
 geInt64# :: Int64# -> Int64# -> Bool
-geInt64# x# y# =  unsafePerformIO $ do
-	v <- _ccall_ stg_geInt64 x# y# 
-	case (v::Int) of
-	  0 -> return False
-	  _ -> return True
-      
+geInt64# x# y# =  
+	case stg_geInt64 x# y# of
+	  0 -> False
+	  _ -> True
+
 gtInt64# :: Int64# -> Int64# -> Bool
-gtInt64# x# y# =  unsafePerformIO $ do
-	v <- _ccall_ stg_gtInt64 x# y# 
-	case (v::Int) of
-	  0 -> return False
-	  _ -> return True
+gtInt64# x# y# =  
+	case stg_gtInt64 x# y# of
+	  0 -> False
+	  _ -> True
 
 plusInt64# :: Int64# -> Int64# -> Int64#
 plusInt64# a# b# = 
-  case (unsafePerformIO (_ccall_ stg_plusInt64 a# b#)) of
+  case stg_plusInt64 a# b# of
     I64# i# -> i#
 
 minusInt64# :: Int64# -> Int64# -> Int64#
 minusInt64# a# b# =
-  case (unsafePerformIO (_ccall_ stg_minusInt64 a# b#)) of
+  case stg_minusInt64 a# b# of
     I64# i# -> i#
 
 timesInt64# :: Int64# -> Int64# -> Int64#
 timesInt64# a# b# =
-  case (unsafePerformIO (_ccall_ stg_timesInt64 a# b#)) of
+  case stg_timesInt64 a# b# of
     I64# i# -> i#
 
 quotInt64# :: Int64# -> Int64# -> Int64#
 quotInt64# a# b# =
-  case (unsafePerformIO (_ccall_ stg_quotInt64 a# b#)) of
+  case stg_quotInt64 a# b# of
     I64# i# -> i#
 
 remInt64# :: Int64# -> Int64# -> Int64#
 remInt64# a# b# =
-  case (unsafePerformIO (_ccall_ stg_remInt64 a# b#)) of
+  case stg_remInt64 a# b# of
     I64# i# -> i#
 
 negateInt64# :: Int64# -> Int64#
 negateInt64# a# =
-  case (unsafePerformIO (_ccall_ stg_negateInt64 a#)) of
+  case stg_negateInt64 a# of
     I64# i# -> i#
 
 and64# :: Word64# -> Word64# -> Word64#
 and64# a# b# =
-  case (unsafePerformIO (_ccall_ stg_and64 a# b#)) of
+  case stg_and64 a# b# of
     W64# w# -> w#
 
 or64# :: Word64# -> Word64# -> Word64#
 or64# a# b# =
-  case (unsafePerformIO (_ccall_ stg_or64 a# b#)) of
+  case stg_or64 a# b# of
     W64# w# -> w#
 
 xor64# :: Word64# -> Word64# -> Word64#
 xor64# a# b# = 
-  case (unsafePerformIO (_ccall_ stg_xor64 a# b#)) of
+  case stg_xor64 a# b# of
     W64# w# -> w#
 
 not64# :: Word64# -> Word64#
 not64# a# = 
-  case (unsafePerformIO (_ccall_ stg_not64 a#)) of
+  case stg_not64 a# of
     W64# w# -> w#
 
 shiftL64# :: Word64# -> Int# -> Word64#
 shiftL64# a# b# =
-  case (unsafePerformIO (_ccall_ stg_shiftL64 a# b#)) of
+  case stg_shiftL64 a# b# of
     W64# w# -> w#
 
 iShiftL64# :: Int64# -> Int# -> Int64#
 iShiftL64# a# b# =
-  case (unsafePerformIO (_ccall_ stg_iShiftL64 a# b#)) of
+  case stg_iShiftL64 a# b# of
     I64# i# -> i#
 
 iShiftRL64# :: Int64# -> Int# -> Int64#
 iShiftRL64# a# b# =
-  case (unsafePerformIO (_ccall_ stg_iShiftRL64 a# b#)) of
+  case stg_iShiftRL64 a# b# of
     I64# i# -> i#
 
 iShiftRA64# :: Int64# -> Int# -> Int64#
 iShiftRA64# a# b# =
-  case (unsafePerformIO (_ccall_ stg_iShiftRA64 a# b#)) of
+  case stg_iShiftRA64 a# b# of
     I64# i# -> i#
 
 shiftRL64# :: Word64# -> Int# -> Word64#
 shiftRL64# a# b# =
-  case (unsafePerformIO (_ccall_ stg_shifRtL64 a# b#)) of
+  case stg_shiftRL64 a# b# of
     W64# w# -> w#
 
 int64ToInt# :: Int64# -> Int#
 int64ToInt# i64# =
-  case (unsafePerformIO (_ccall_ stg_int64ToInt i64#)) of
+  case stg_int64ToInt i64# of
     I# i# -> i#
 
 wordToWord64# :: Word# -> Word64#
 wordToWord64# w# =
-  case (unsafePerformIO (_ccall_ stg_wordToWord64 w#)) of
+  case stg_wordToWord64 w# of
     W64# w64# -> w64#
 
 word64ToInt64# :: Word64# -> Int64#
 word64ToInt64# w# =
-  case (unsafePerformIO (_ccall_ stg_word64ToInt64 w#)) of
+  case stg_word64ToInt64 w# of
     I64# i# -> i#
 
 int64ToWord64# :: Int64# -> Word64#
 int64ToWord64# i# =
-  case (unsafePerformIO (_ccall_ stg_int64ToWord64 i#)) of
+  case stg_int64ToWord64 i# of
     W64# w# -> w#
 
 intToInt64# :: Int# -> Int64#
 intToInt64# i# =
-  case (unsafePerformIO (_ccall_ stg_intToInt64 i#)) of
+  case stg_intToInt64 i# of
     I64# i64# -> i64#
+
+foreign import "stg_intToInt64" stg_intToInt64 :: Int# -> Int64
+foreign import "stg_int64ToWord64" stg_int64ToWord64 :: Int64# -> Word64
+foreign import "stg_word64ToInt64" stg_word64ToInt64 :: Word64# -> Int64
+foreign import "stg_wordToWord64" stg_wordToWord64 :: Word# -> Word64
+foreign import "stg_int64ToInt" stg_int64ToInt :: Int64# -> Int
+foreign import "stg_shiftRL64" stg_shiftRL64 :: Word64# -> Int# -> Word64
+foreign import "stg_iShiftRA64" stg_iShiftRA64 :: Int64# -> Int# -> Int64
+foreign import "stg_iShiftRL64" stg_iShiftRL64 :: Int64# -> Int# -> Int64
+foreign import "stg_iShiftL64" stg_iShiftL64 :: Int64# -> Int# -> Int64
+foreign import "stg_shiftL64" stg_shiftL64 :: Word64# -> Int# -> Word64
+foreign import "stg_not64" stg_not64 :: Word64# -> Word64
+foreign import "stg_xor64" stg_xor64 :: Word64# -> Word64# -> Word64
+foreign import "stg_or64" stg_or64 :: Word64# -> Word64# -> Word64
+foreign import "stg_and64" stg_and64 :: Word64# -> Word64# -> Word64
+foreign import "stg_negateInt64" stg_negateInt64 :: Int64# -> Int64
+foreign import "stg_remInt64" stg_remInt64 :: Int64# -> Int64# -> Int64
+foreign import "stg_quotInt64" stg_quotInt64 :: Int64# -> Int64# -> Int64
+foreign import "stg_timesInt64" stg_timesInt64 :: Int64# -> Int64# -> Int64
+foreign import "stg_minusInt64" stg_minusInt64 :: Int64# -> Int64# -> Int64
+foreign import "stg_plusInt64" stg_plusInt64 :: Int64# -> Int64# -> Int64
+foreign import "stg_gtInt64" stg_gtInt64 :: Int64# -> Int64# -> Int
+foreign import "stg_geInt64" stg_geInt64 :: Int64# -> Int64# -> Int
+foreign import "stg_neInt64" stg_neInt64 :: Int64# -> Int64# -> Int
+foreign import "stg_eqInt64" stg_eqInt64 :: Int64# -> Int64# -> Int
+foreign import "stg_leInt64" stg_leInt64 :: Int64# -> Int64# -> Int
+foreign import "stg_ltInt64" stg_ltInt64 :: Int64# -> Int64# -> Int
 
 #endif
 

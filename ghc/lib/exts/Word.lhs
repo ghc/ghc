@@ -1004,132 +1004,150 @@ compareWord64# i# j#
 -- Word64# primop wrappers:
 
 ltWord64# :: Word64# -> Word64# -> Bool
-ltWord64# x# y# =  unsafePerformIO $ do
-	v <- _ccall_ stg_ltWord64 x# y# 
-	case (v::Int) of
-	  0 -> return False
-	  _ -> return True
-      
+ltWord64# x# y# =  
+	case stg_ltWord64 x# y# of
+	  0 -> False
+	  _ -> True
+
 leWord64# :: Word64# -> Word64# -> Bool
-leWord64# x# y# =  unsafePerformIO $ do
-	v <- _ccall_ stg_leWord64 x# y# 
-	case (v::Int) of
-	  0 -> return False
-	  _ -> return True
-      
+leWord64# x# y# =  
+	case stg_leWord64 x# y# of
+	  0 -> False
+	  _ -> True
+
 eqWord64# :: Word64# -> Word64# -> Bool
-eqWord64# x# y# =  unsafePerformIO $ do
-	v <- _ccall_ stg_eqWord64 x# y# 
-	case (v::Int) of
-	  0 -> return False
-	  _ -> return True
+eqWord64# x# y# = 
+	case stg_eqWord64 x# y# of
+	  0 -> False
+	  _ -> True
       
 neWord64# :: Word64# -> Word64# -> Bool
-neWord64# x# y# =  unsafePerformIO $ do
-	v <- _ccall_ stg_neWord64 x# y# 
-	case (v::Int) of
-	  0 -> return False
-	  _ -> return True
+neWord64# x# y# = 
+	case stg_neWord64 x# y# of
+	  0 -> False
+	  _ -> True
       
 geWord64# :: Word64# -> Word64# -> Bool
-geWord64# x# y# =  unsafePerformIO $ do
-	v <- _ccall_ stg_geWord64 x# y# 
-	case (v::Int) of
-	  0 -> return False
-	  _ -> return True
+geWord64# x# y# =  
+	case stg_geWord64 x# y# of
+	  0 -> False
+	  _ -> True
       
 gtWord64# :: Word64# -> Word64# -> Bool
-gtWord64# x# y# =  unsafePerformIO $ do
-	v <- _ccall_ stg_gtWord64 x# y# 
-	case (v::Int) of
-	  0 -> return False
-	  _ -> return True
+gtWord64# x# y# = 
+	case stg_gtWord64 x# y#  of
+	  0 -> False
+	  _ -> True
 
 plusInt64# :: Int64# -> Int64# -> Int64#
 plusInt64# a# b# = 
-  case (unsafePerformIO (_ccall_ stg_plusInt64 a# b#)) of
+  case stg_plusInt64 a# b# of
     I64# i# -> i#
 
 minusInt64# :: Int64# -> Int64# -> Int64#
 minusInt64# a# b# =
-  case (unsafePerformIO (_ccall_ stg_minusInt64 a# b#)) of
+  case stg_minusInt64 a# b# of
     I64# i# -> i#
 
 timesInt64# :: Int64# -> Int64# -> Int64#
 timesInt64# a# b# =
-  case (unsafePerformIO (_ccall_ stg_timesInt64 a# b#)) of
+  case stg_timesInt64 a# b# of
     I64# i# -> i#
 
 quotWord64# :: Word64# -> Word64# -> Word64#
 quotWord64# a# b# =
-  case (unsafePerformIO (_ccall_ stg_quotWord64 a# b#)) of
+  case stg_quotWord64 a# b# of
     W64# w# -> w#
 
 remWord64# :: Word64# -> Word64# -> Word64#
 remWord64# a# b# =
-  case (unsafePerformIO (_ccall_ stg_remWord64 a# b#)) of
+  case stg_remWord64 a# b# of
     W64# w# -> w#
 
 negateInt64# :: Int64# -> Int64#
 negateInt64# a# =
-  case (unsafePerformIO (_ccall_ stg_negateInt64 a#)) of
+  case stg_negateInt64 a# of
     I64# i# -> i#
 
 and64# :: Word64# -> Word64# -> Word64#
 and64# a# b# =
-  case (unsafePerformIO (_ccall_ stg_and64 a# b#)) of
+  case stg_and64 a# b# of
     W64# w# -> w#
 
 or64# :: Word64# -> Word64# -> Word64#
 or64# a# b# =
-  case (unsafePerformIO (_ccall_ stg_or64 a# b#)) of
+  case stg_or64 a# b# of
     W64# w# -> w#
 
 xor64# :: Word64# -> Word64# -> Word64#
 xor64# a# b# = 
-  case (unsafePerformIO (_ccall_ stg_xor64 a# b#)) of
+  case stg_xor64 a# b# of
     W64# w# -> w#
 
 not64# :: Word64# -> Word64#
 not64# a# = 
-  case (unsafePerformIO (_ccall_ stg_not64 a#)) of
+  case stg_not64 a# of
     W64# w# -> w#
 
 shiftL64# :: Word64# -> Int# -> Word64#
 shiftL64# a# b# =
-  case (unsafePerformIO (_ccall_ stg_shiftL64 a# b#)) of
+  case stg_shiftL64 a# b# of
     W64# w# -> w#
 
 shiftRL64# :: Word64# -> Int# -> Word64#
 shiftRL64# a# b# =
-  case (unsafePerformIO (_ccall_ stg_shiftRL64 a# b#)) of
+  case stg_shiftRL64 a# b# of
     W64# w# -> w#
 
 word64ToWord# :: Word64# -> Word#
 word64ToWord# w64# =
-  case (unsafePerformIO (_ccall_ stg_word64ToWord w64#)) of
+  case stg_word64ToWord w64# of
     W# w# -> w#
       
 wordToWord64# :: Word# -> Word64#
 wordToWord64# w# =
-  case (unsafePerformIO (_ccall_ stg_wordToWord64 w#)) of
+  case stg_wordToWord64 w# of
     W64# w64# -> w64#
 
 word64ToInt64# :: Word64# -> Int64#
 word64ToInt64# w64# =
-  case (unsafePerformIO (_ccall_ stg_word64ToInt64 w64#)) of
+  case stg_word64ToInt64 w64# of
     I64# i# -> i#
 
 int64ToWord64# :: Int64# -> Word64#
 int64ToWord64# i64# =
-  case (unsafePerformIO (_ccall_ stg_int64ToWord64 i64#)) of
+  case stg_int64ToWord64 i64# of
     W64# w# -> w#
 
 intToInt64# :: Int# -> Int64#
 intToInt64# i# =
-  case (unsafePerformIO (_ccall_ stg_intToInt64 i#)) of
+  case stg_intToInt64 i# of
     I64# i64# -> i64#
       
+foreign import "stg_intToInt64" stg_intToInt64 :: Int# -> Int64
+foreign import "stg_int64ToWord64" stg_int64ToWord64 :: Int64# -> Word64
+foreign import "stg_word64ToInt64" stg_word64ToInt64 :: Word64# -> Int64
+foreign import "stg_wordToWord64" stg_wordToWord64 :: Word# -> Word64
+foreign import "stg_word64ToWord" stg_word64ToWord :: Word64# -> Word
+foreign import "stg_shiftRL64" stg_shiftRL64 :: Word64# -> Int# -> Word64
+foreign import "stg_shiftL64" stg_shiftL64 :: Word64# -> Int# -> Word64
+foreign import "stg_not64" stg_not64 :: Word64# -> Word64
+foreign import "stg_xor64" stg_xor64 :: Word64# -> Word64# -> Word64
+foreign import "stg_or64" stg_or64 :: Word64# -> Word64# -> Word64
+foreign import "stg_and64" stg_and64 :: Word64# -> Word64# -> Word64
+foreign import "stg_negateInt64" stg_negateInt64 :: Int64# -> Int64
+foreign import "stg_remWord64" stg_remWord64 :: Word64# -> Word64# -> Word64
+foreign import "stg_quotWord64" stg_quotWord64 :: Word64# -> Word64# -> Word64
+foreign import "stg_timesInt64" stg_timesInt64 :: Int64# -> Int64# -> Int64
+foreign import "stg_minusInt64" stg_minusInt64 :: Int64# -> Int64# -> Int64
+foreign import "stg_plusInt64" stg_plusInt64 :: Int64# -> Int64# -> Int64
+foreign import "stg_gtWord64" stg_gtWord64 :: Word64# -> Word64# -> Int
+foreign import "stg_geWord64" stg_geWord64 :: Word64# -> Word64# -> Int
+foreign import "stg_neWord64" stg_neWord64 :: Word64# -> Word64# -> Int
+foreign import "stg_eqWord64" stg_eqWord64 :: Word64# -> Word64# -> Int
+foreign import "stg_leWord64" stg_leWord64 :: Word64# -> Word64# -> Int
+foreign import "stg_ltWord64" stg_ltWord64 :: Word64# -> Word64# -> Int
+
 #endif
 
 instance Enum Word64 where
