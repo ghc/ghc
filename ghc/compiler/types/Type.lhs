@@ -11,9 +11,10 @@ module Type (
 	getFunTy_maybe, getFunTyExpandingDicts_maybe,
 	mkTyConTy, getTyCon_maybe, applyTyCon,
 	mkSynTy,
-	mkForAllTy, mkForAllTys, getForAllTy_maybe, getForAllTyExpandingDicts_maybe, splitForAllTy, splitForAllTyExpandingDicts,
+	mkForAllTy, mkForAllTys, getForAllTy_maybe, getForAllTyExpandingDicts_maybe, 
+	splitForAllTy, splitForAllTyExpandingDicts,
 	mkForAllUsageTy, getForAllUsageTy,
-	applyTy,
+	applyTy, specialiseTy,
 #ifdef DEBUG
 	expandTy, -- only let out for debugging (ToDo: rm?)
 #endif
@@ -53,7 +54,7 @@ import {-# SOURCE #-} TysWiredIn ( tupleTyCon )
 #endif
 
 -- friends:
-import Class	( classSig, classOpLocalType, GenClass{-instances-}, SYN_IE(Class) )
+import Class	( classDictArgTys, GenClass{-instances-}, SYN_IE(Class) )
 import Kind	( mkBoxedTypeKind, resultKind, notArrowKind, Kind )
 import TyCon	( mkFunTyCon, isFunTyCon, isEnumerationTyCon, isTupleTyCon, maybeTyConSingleCon,
 		  isPrimTyCon, isAlgTyCon, isDataTyCon, isSynTyCon, maybeNewTyCon, isNewTyCon,
@@ -188,12 +189,7 @@ expandTy (DictTy clas ty u)
 		--       CCallable, CReturnable (and anything else
 		--       *really weird* that the user writes).
   where
-    (tyvar, super_classes, ops) = classSig clas
-    super_dict_tys = map mk_super_ty super_classes
-    class_op_tys   = map mk_op_ty ops
-    all_arg_tys    = super_dict_tys ++ class_op_tys
-    mk_super_ty sc = DictTy sc ty usageOmega
-    mk_op_ty	op = instantiateTy [(tyvar,ty)] (classOpLocalType op)
+    all_arg_tys  = classDictArgTys clas ty
 
 expandTy ty = ty
 \end{code}
@@ -338,16 +334,31 @@ applyTyCon tycon tys
     foldl AppTy (TyConTy tycon usageOmega) tys
 
 getTyCon_maybe		     :: GenType t u -> Maybe TyCon
---getTyConExpandingDicts_maybe :: Type        -> Maybe TyCon
 
 getTyCon_maybe (TyConTy tycon _) = Just tycon
 getTyCon_maybe (SynTy _ _ t)     = getTyCon_maybe t
 getTyCon_maybe other_ty		 = Nothing
+\end{code}
 
---getTyConExpandingDicts_maybe (TyConTy tycon _) = Just tycon
---getTyConExpandingDicts_maybe (SynTy _ _ t)     = getTyConExpandingDicts_maybe t
---getTyConExpandingDicts_maybe ty@(DictTy _ _ _) = getTyConExpandingDicts_maybe (expandTy ty)
---getTyConExpandingDicts_maybe other_ty	       = Nothing
+\begin{code}
+specialiseTy :: Type		-- The type of the Id of which the SpecId 
+				-- is a specialised version
+	     -> [Maybe Type]	-- The types at which it is specialised
+	     -> Int		-- Number of leading dictionary args to ignore
+	     -> Type
+
+specialiseTy main_ty maybe_tys dicts_to_ignore
+  = --false:ASSERT(isTauTy tau) TauType??
+    mkSigmaTy remaining_tyvars 
+	      (instantiateThetaTy inst_env remaining_theta)
+	      (instantiateTauTy   inst_env tau)
+  where
+    (tyvars, theta, tau) = splitSigmaTy main_ty	-- A prefix of, but usually all, 
+						-- the theta is discarded!
+    remaining_theta      = drop dicts_to_ignore theta
+    tyvars_and_maybe_tys = tyvars `zip` maybe_tys
+    remaining_tyvars     = [tyvar      | (tyvar, Nothing) <- tyvars_and_maybe_tys]
+    inst_env             = [(tyvar,ty) | (tyvar, Just ty) <- tyvars_and_maybe_tys]
 \end{code}
 
 \begin{code}
@@ -697,6 +708,8 @@ instantiateTauTy tenv ty
     bound_forall_tv_BAD = panic "instantiateTauTy:bound_forall_tv"
     deflt_forall_tv tv  = panic "instantiateTauTy:deflt_forall_tv"
 
+instantiateThetaTy tenv theta
+ = [(clas,instantiateTauTy tenv ty) | (clas,ty) <- theta]
 
 -- applyTypeEnv applies a type environment to a type.
 -- It can handle shadowing; for example:
