@@ -78,7 +78,6 @@ BIN_DIST_TOP= distrib/Makefile-bin.in \
 	      distrib/INSTALL \
 	      $(BIN_DIST_MAIN_DIR)/ANNOUNCE \
 	      $(BIN_DIST_MAIN_DIR)/VERSION \
-	      $(BIN_DIST_MAIN_DIR)/RELEASE \
 	      $(BIN_DIST_MAIN_DIR)/LICENSE \
 	      $(BIN_DIST_MAIN_DIR)/README \
 	      glafp-utils/mkdirhier/mkdirhier \
