@@ -812,34 +812,67 @@ identical to @HUGS_AP@s except that they are non-updatable.
 \label{sect:hugs-calling-conventions}
 
 The calling convention for any byte-code function is straightforward:
-
 \begin{itemize}
 \item Push any arguments on the stack.
 \item Push a pointer to the BCO.
 \item Begin interpreting the byte code.
 \end{itemize}
 
-The @ENTER@ byte-code instruction decides how to enter its argument.
-The object being entered must be either
+But it isn't enough for the bytecode interpreter to handle just
+byte-code functions specially.  At a minimum, it must also be able to
+enter constructors too because of the way that GHC returns to
+Hugs-compiled return addresses (Section~\ref{sect:ghc-to-hugs-return}).
 
-\begin{itemize}
-\item A BCO,
-\item A @HUGS_AP@,
-\item A @HUGS_PAP@,
-\item A constructor,
-\item A GHC-built closure, or
-\item An indirection.
-\end{itemize}
+In principle, all other closure types could be handled by switching to
+the compiled world (as described in
+Section~\ref{sect:hugs-to-ghc-closure}) and entering the closure
+there.  This would work but it would obviously be very inefficient if
+we entered a @HUGS_AP@ by switching worlds, entering the @HUGS_AP@,
+pushing the arguments and function onto the stack, and entering the
+function which, likely as not, will be a byte-code object which we
+will enter by \emph{returning} to the byte-code interpreter.  To avoid
+such gratuitious world switching, we choose to recognise certain
+closure types as being ``standard'' --- and duplicate the entry code
+for the ``standard closures'' in the bytecode interpreter.
 
-If @ENTER@ is applied to a BCO, we just begin interpreting the
-byte-code contained therein.  If the object is an @HUGS_AP@, we push an
-update frame, push the values from the @HUGS_AP@ on the stack, and enter
-its associated object.  If the object is a @HUGS_PAP@, we push its
-values on the stack and enter the first one.  If the object is a
-constructor, we simply return (see Section
-\ref{sect:hugs-return-convention}).  The fourth case is convered in
-Section \ref{sect:hugs-to-ghc-closure}.  If the object is an
-indirection, we simply enter the object it points to.
+A closure is said to be ``standard'' if its entry code is entirely
+determined by its info table.  \emph{Standard Closures} have the
+desirable property that the byte-code interpreter can enter
+the closure by simply ``interpreting'' the info table instead of
+switching to the compiled world.  The standard closures include:
+
+\begin{description}
+\item[@HUGS_AP@] 
+To enter a @HUGS_AP@ we push an update frame, push the values from the
+@HUGS_AP@ on the stack, and enter its associated object.
+
+\item[@HUGS_PAP@]
+To enter a @HUGS_PAP@, we push its values on the stack and enter the
+first one.
+
+\item[@PAP@]
+Same as @HUGS_PAP@.
+
+\item[Constructor]
+To enter a constructor, we simply return (see Section
+\ref{sect:hugs-return-convention}).
+
+\item[Indirection]
+To enter an indirection, we simply enter the object it points to
+after possibly adjusting the current cost centre.
+
+\item[Selector] 
+To enter a selector, we test whether the selectee is a value.  If so,
+we simply select the appropriate component; if not, it's simplest to
+treat it as a GHC-built closure --- though we could interpret it if we
+wanted.
+
+\end{description}
+
+The most obvious omissions from the above list are @BCO@s (which we
+dealt with above) and GHC-built closures (which are covered in Section
+\ref{sect:hugs-to-ghc-closure}).
+
 
 \subsection{Return convention}
 \label{sect:hugs-return-convention}
@@ -2911,7 +2944,7 @@ some of these update targets are garbage they will be collected right away.
 
 \fi
 
-\subsection{Space leaks and selectors}
+\subsection{Space leaks and selectors}\label{sect:space-leaks-and-selectors}
 
 \iffalse
 
@@ -2971,6 +3004,8 @@ If done carefully, the entire chain could be eliminated in a single
 garbage collection.   We have not (yet) implemented this idea.
 A very similar idea, dubbed ``stingy evaluation'', is described 
 by <.stingy.>.
+
+\ToDo{Simple generalisation: handle all the ``standard closures'' this way.}
 
 <.sparud lazy pattern matching.> describes another solution to the
 lazy-pattern-matching
