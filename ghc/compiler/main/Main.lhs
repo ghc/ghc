@@ -252,10 +252,10 @@ doIt (core_cmds, stg_cmds) =
     doOutput opt_ProduceC c_output_w 			>>
 
     dumpIfSet opt_D_dump_foreign "Foreign export header file" stub_h_output_d >>
-    outputStub opt_ProduceExportHStubs stub_h_output_w	>>
+    outputHStub opt_ProduceExportHStubs stub_h_output_w	>>
 
     dumpIfSet opt_D_dump_foreign "Foreign export stubs" stub_c_output_d >>
-    outputStub opt_ProduceExportCStubs stub_c_output_w	>>
+    outputCStub mod_name opt_ProduceExportCStubs stub_c_output_w	>>
 
     reportCompile (_UNPK_ mod_name) (showSDoc (ppSourceStats True rdr_module)) >>
 
@@ -281,8 +281,16 @@ doIt (core_cmds, stg_cmds) =
     -- don't use doOutput for dumping the f. export stubs
     -- since it is more than likely that the stubs file will
     -- turn out to be empty, in which case no file should be created.
-    outputStub switch "" = return ()
-    outputStub switch doc_str
+    outputCStub mod_name switch "" = return ()
+    outputCStub mod_name switch doc_str
+      = case switch of
+	  Nothing    -> return ()
+	  Just fname -> writeFile fname ("#include \"rtsdefs.h\"\n"++rest)
+	    where
+	     rest = "#include "++show ((_UNPK_ mod_name) ++ "_stub.h") ++ '\n':doc_str
+	      
+    outputHStub switch "" = return ()
+    outputHStub switch doc_str
       = case switch of
 	  Nothing    -> return ()
 	  Just fname -> writeFile fname ("#include \"rtsdefs.h\"\n"++doc_str)
