@@ -762,3 +762,13 @@ seqList (x:xs) b = x `seq` seqList xs b
 f $! x  = x `seq` f x
 #endif
 \end{code}
+
+\begin{code}
+#if __GLASGOW_HASKELL__ < 402
+bracket :: IO a -> (a -> IO b) -> (a -> IO c) -> IO c
+bracket before after thing = do
+  a <- before 
+  (thing a) `catch` (\err -> after a >>= fail err)
+  after a
+#endif
+\end{code}

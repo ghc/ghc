@@ -342,6 +342,10 @@ pprLit lit
 					     text "out of range",
 				             brackets (ppr range_min <+> text ".." 
 							<+> ppr range_max)])
+			-- in interface files, parenthesize raw negative ints.
+			-- this avoids problems like {-1} being interpreted
+			-- as a comment starter.
+		       | ifaceStyle sty && i < 0 -> parens (integer i)
 		       | otherwise -> integer i
 
 		       where
@@ -352,7 +356,8 @@ pprLit lit
       MachFloat f | code_style -> ptext SLIT("(StgFloat)") <> rational f
                   | otherwise  -> ptext SLIT("__float") <+> rational f
 
-      MachDouble d -> rational d
+      MachDouble d | ifaceStyle sty && d < 0 -> parens (rational d)
+		   | otherwise -> rational d
 
       MachAddr p | code_style -> ptext SLIT("(void*)") <> integer p
 	         | otherwise  -> ptext SLIT("__addr") <+> integer p

@@ -6,7 +6,7 @@
 Buffers for scanning string input stored in external arrays.
 
 \begin{code}
-{-# OPTIONS -fno-prune-tydecls #-}
+{-# OPTIONS -fno-prune-tydecls -#include "../lib/std/cbits/stgio.h" #-}
 module StringBuffer
        (
         StringBuffer,
@@ -23,6 +23,10 @@ module StringBuffer
 	lookAhead,        -- :: StringBuffer -> Int  -> Char
 	lookAhead#,       -- :: StringBuffer -> Int# -> Char#
         
+	-- offsets
+	currentIndex#,    -- :: StringBuffer -> Int#
+	lexemeIndex,	  -- :: StringBuffer -> Int#
+
 	 -- moving the end point of the current lexeme.
         setCurrentPos#,   -- :: StringBuffer -> Int# -> StringBuffer
 	incLexeme,	  -- :: StringBuffer -> StringBuffer
@@ -35,6 +39,8 @@ module StringBuffer
         stepOnUntil,      -- :: (Char -> Bool) -> StringBuffer -> StringBuffer
         stepOverLexeme,   -- :: StringBuffer   -> StringBuffer
 	scanNumLit,       -- :: Int -> StringBuffer -> (Int, StringBuffer)
+	squeezeLexeme,	  -- :: StringBuffer -> Int# -> StringBuffer
+	mergeLexemes,	  -- :: StringBuffer -> StringBuffer -> StringBuffer
         expandWhile,      -- :: (Char  -> Bool) -> StringBuffer -> StringBuffer
         expandWhile#,     -- :: (Char# -> Bool) -> StringBuffer -> StringBuffer
         expandUntilMatch, -- :: StrinBuffer -> String -> StringBuffer
@@ -45,7 +51,6 @@ module StringBuffer
 	 -- matching
         prefixMatch,       -- :: StringBuffer -> String -> Bool
 	untilEndOfString#, -- :: StringBuffer -> Int#
-	untilEndOfChar#,   -- :: StringBuffer -> Int#
 	untilChar#,        -- :: StringBuffer -> Char# -> Int#
 
          -- conversion
@@ -64,9 +69,15 @@ import GlaExts
 import Addr 		( Addr(..) )
 import Foreign
 import ST
+import Char		( chr )
 
 #if __GLASGOW_HASKELL__ >= 303
-import IO		( slurpFile )
+import IO		( openFile, slurpFile )
+import PrelIOBase
+import PrelHandle
+import Addr
+#include "../lib/std/cbits/error.h"
+-- urk!
 #else
 import IO		( openFile, hFileSize, hClose, IOMode(..) )
 #endif
@@ -81,6 +92,12 @@ import PrelIOBase	( IOError(..), IOErrorType(..) )
 import PrelHandle	( readHandle, writeHandle, filePtr )
 # endif
 import PrelPack		( unpackCStringBA )
+#endif
+
+#if __GLASGOW_HASKELL__ < 402
+import Util 		( bracket )
+#else
+import Exception	( bracket )
 #endif
 
 import PrimPacked
@@ -103,10 +120,13 @@ instance Text StringBuffer where
 \end{code}
 
 \begin{code}
-hGetStringBuffer :: FilePath -> IO StringBuffer
-hGetStringBuffer fname =
+hGetStringBuffer :: Bool -> FilePath -> IO StringBuffer
+hGetStringBuffer expand_tabs fname =
 #if __GLASGOW_HASKELL__ >= 303
-    slurpFile fname  >>= \ (a , read) ->
+    (if expand_tabs
+	then slurpFileExpandTabs fname
+    	else slurpFile fname)
+	  >>= \ (a , read) ->
     let (A# a#) = a
         (I# read#) = read
     in
@@ -149,6 +169,100 @@ unsafeWriteBuffer s@(StringBuffer a _ _ _) i# ch# =
  )
 \end{code}
 
+-----------------------------------------------------------------------------
+This very disturbing bit of code is used for expanding the tabs in a
+file before we start parsing it.  Expanding the tabs early makes the
+lexer a lot simpler: we only have to record the beginning of the line
+in order to be able to calculate the column offset of the current
+token.
+
+We guess the size of the buffer required as 20% extra for
+expanded tabs, and enlarge it if necessary.
+
+\begin{code}
+slurpFileExpandTabs :: FilePath -> IO (Addr, Int)
+slurpFileExpandTabs fname = do
+  bracket (openFile fname ReadMode) (hClose) 
+   (\ handle ->
+     do sz <- hFileSize handle
+        if sz > toInteger (maxBound::Int) 
+	  then ioError (userError "slurpFile: file too big")
+          else do
+      	    let sz_i = fromInteger sz
+      	        sz_i' = (sz_i * 12) `div` 10		-- add 20% for tabs
+      	    chunk <- allocMem sz_i'
+      	    trySlurp handle sz_i' chunk
+   )
+
+trySlurp :: Handle -> Int -> Addr -> IO (Addr, Int)
+trySlurp handle sz_i chunk =
+  wantReadableHandle "hGetChar" handle $ \ handle_ ->
+  let 
+	fo = haFO__ handle_
+
+	(I# chunk_sz) = sz_i
+
+	tAB_SIZE = 8#
+
+	slurpFile :: Int# -> Int# -> Addr -> Int# -> Int# -> IO Int
+	slurpFile c off chunk chunk_sz max_off = slurp c off
+	 where
+
+	  slurp :: Int# -> Int# -> IO Int
+	  slurp c off | off >=# max_off = do
+		let new_sz = chunk_sz *# 2#
+	     	chunk' <- reAllocMem chunk (I# new_sz)
+	     	slurpFile c off chunk' new_sz (new_sz -# tAB_SIZE)
+    	  slurp c off = do
+    		intc <- mayBlock fo (_ccall_ fileGetc fo)
+    		if intc == ((-1)::Int)
+     		  then do errtype <- _ccall_ getErrType__
+			  if errtype == (ERR_EOF :: Int)
+			    then return (I# off)
+			    else constructErrorAndFail "slurpFile"
+     		  else case chr intc of
+			 '\t' -> tabIt c off
+			 ch   -> do  writeCharOffAddr chunk (I# off) ch
+				     let c' | ch == '\n' = 0#
+					    | otherwise  = c +# 1#
+				     slurp c' (off +# 1#)
+
+	  tabIt :: Int# -> Int# -> IO Int
+	  -- can't run out of buffer in here, because we reserved an
+	  -- extra tAB_SIZE bytes at the end earlier.
+	  tabIt c off = do
+		writeCharOffAddr chunk (I# off) ' '
+		let c' = c +# 1#
+		    off' = off +# 1#
+		if c' `remInt#` tAB_SIZE ==# 0#
+			then slurp c' off'
+		    	else tabIt c' off'
+  in do
+
+	-- allow space for a full tab at the end of the buffer
+	-- (that's what the max_off thing is for)
+  rc <- slurpFile 0# 0# chunk chunk_sz (chunk_sz -# tAB_SIZE)
+  writeHandle handle handle_
+  if rc < (0::Int)
+	then constructErrorAndFail "slurpFile"
+	else return (chunk, rc)
+
+
+reAllocMem :: Addr -> Int -> IO Addr
+reAllocMem ptr sz = do
+   chunk <- _ccall_ realloc ptr sz
+   if chunk == nullAddr 
+      then constructErrorAndFail "reAllocMem"
+      else return chunk
+
+allocMem :: Int -> IO Addr
+allocMem sz = do
+   chunk <- _ccall_ allocMemory__ sz
+   if chunk == nullAddr 
+      then constructErrorAndFail "allocMem"
+      else return chunk
+\end{code}
+
 Lookup
 
 \begin{code}
@@ -170,6 +284,11 @@ indexSBuffer# (StringBuffer fo# _ _ _) i# = indexCharOffAddr# fo# i#
  -- relative lookup, i.e, currentChar = lookAhead 0
 lookAhead# (StringBuffer fo# _ _ c#) i# = indexCharOffAddr# fo# (c# +# i#)
 
+currentIndex# :: StringBuffer -> Int#
+currentIndex# (StringBuffer fo# _ _ c#) = c#
+
+lexemeIndex :: StringBuffer -> Int#
+lexemeIndex (StringBuffer fo# _ c# _) = c#
 \end{code}
 
  moving the start point of the current lexeme.
@@ -205,6 +324,13 @@ stepOnBy# (StringBuffer fo# l# s# c#) i# =
 stepOnTo# :: StringBuffer -> Int# -> StringBuffer
 stepOnTo# (StringBuffer fo l _ _) s# = StringBuffer fo l s# s#
 
+squeezeLexeme :: StringBuffer -> Int# -> StringBuffer
+squeezeLexeme (StringBuffer fo l s# c#) i# = StringBuffer fo l (s# +# i#) c#
+
+mergeLexemes :: StringBuffer -> StringBuffer -> StringBuffer
+mergeLexemes (StringBuffer fo l s# _) (StringBuffer _ _ _ c#)
+   = StringBuffer fo l s# c#
+
 stepOnUntil :: (Char -> Bool) -> StringBuffer -> StringBuffer
 
 stepOnUntil pred (StringBuffer fo l# s# c#) =
@@ -239,15 +365,15 @@ expandWhile# pred (StringBuffer fo l# s# c#) =
 	 | ch# `eqChar#` '\NUL'# && c# >=# l# -> StringBuffer fo l# s# c# -- EOB, return immediately.
          | otherwise     -> StringBuffer fo l# s# c#
 
-scanNumLit :: Int -> StringBuffer -> (Int,StringBuffer)
-scanNumLit (I# acc#) (StringBuffer fo l# s# c#) =
- loop acc# c#
+scanNumLit :: Integer -> StringBuffer -> (Integer,StringBuffer)
+scanNumLit acc (StringBuffer fo l# s# c#) =
+ loop acc c#
   where
-   loop acc# c# = 
+   loop acc c# = 
     case indexCharOffAddr# fo c# of
-     ch# | isDigit (C# ch#) -> loop (acc# *# 10# +# (ord# ch# -# ord# '0'#)) (c# +# 1#)
-	 | ch# `eqChar#` '\NUL'# && c# >=# l# -> (I# acc#, StringBuffer fo l# s# c#) -- EOB, return immediately.
-         | otherwise        -> (I# acc#,StringBuffer fo l# s# c#)
+     ch# | isDigit (C# ch#) -> loop (acc*10 + (toInteger (I# (ord# ch# -# ord# '0'#)))) (c# +# 1#)
+	 | ch# `eqChar#` '\NUL'# && c# >=# l# -> (acc, StringBuffer fo l# s# c#) -- EOB, return immediately.
+         | otherwise        -> (acc,StringBuffer fo l# s# c#)
 
 
 expandUntilMatch :: StringBuffer -> String -> StringBuffer
@@ -317,35 +443,12 @@ untilEndOfString# (StringBuffer fo l# s# c#) =
     _ -> loop (c# +# 1#)
 
 
-untilEndOfChar# :: StringBuffer -> StringBuffer
-untilEndOfChar# (StringBuffer fo l# s# c#) = 
- loop c# 
- where
-  getch# i# = indexCharOffAddr# fo i#
-
-  loop c# =
-   case getch# c# of
-    '\''# ->
-       case getch# (c# -# 1#) of
-	'\\'# ->
-	   case getch# (c# -# 2#) of 	
-	     '\\'# -> -- end of char
-		   StringBuffer fo l# s# c#
-             _ -> loop (c# +# 1#) -- false alarm
-        _ -> StringBuffer fo l# s# c#
-    '\NUL'# ->
-	if c# >=# l# then -- hit sentinel, this doesn't look too good..
-	   StringBuffer fo l# l# l#
-	else
-	   loop (c# +# 1#)
-    _ -> loop (c# +# 1#)
-
 untilChar# :: StringBuffer -> Char# -> StringBuffer
 untilChar# (StringBuffer fo l# s# c#) x# = 
  loop c# 
  where
   loop c#
-   | indexCharOffAddr# fo c# `eqChar#` x#
+   | c# >=# l# || indexCharOffAddr# fo c# `eqChar#` x#
    = StringBuffer fo l# s# c#
    | otherwise
    = loop (c# +# 1#)

@@ -43,9 +43,9 @@ import Ratio ( (%) )
 }
 
 %name	    parseIface
-%tokentype  { IfaceToken }
-%monad	    { IfM }{ thenIf }{ returnIf }
-%lexer      { lexIface } { ITeof }
+%tokentype  { Token }
+%monad	    { P }{ thenP }{ returnP }
+%lexer      { lexer } { ITeof }
 
 %token
  'case' 	{ ITcase }  			-- Haskell keywords
@@ -73,10 +73,14 @@ import Ratio ( (%) )
  'qualified' 	{ ITqualified }
  'hiding' 	{ IThiding }
 
+ 'export'	{ ITexport }
+ 'label'	{ ITlabel } 
+ 'dynamic'	{ ITdynamic }
+ 'unsafe'	{ ITunsafe }
  '__interface'	{ ITinterface }			-- GHC-extension keywords
- '__export'	{ ITexport }
+ '__export'	{ IT__export }
+ '__forall'	{ IT__forall }
  '__depends'	{ ITdepends }
- '__forall'	{ ITforall }
  '__letrec'	{ ITletrec }
  '__coerce'	{ ITcoerce }
  '__inline_call'{ ITinlineCall }
@@ -303,19 +307,29 @@ decl    : src_loc var_name '::' type maybe_idinfo
 maybe_idinfo  :: { RdrName -> [HsIdInfo RdrName] }
 maybe_idinfo  : {- empty -} 	{ \_ -> [] }
 	      | src_loc PRAGMA	{ \x -> 
-				   case parseIface $2 $1 of
-				     Succeeded (PIdInfo id_info) -> id_info
-				     Failed err -> pprPanic "IdInfo parse failed" 
-				                            (vcat [ppr x, err])
+				   case parseIface $2
+				           PState{bol = 0#, atbol = 1#,
+						  context = [],
+						  glasgow_exts = 1#,
+						  loc = $1 } of
+				     POk _ (PIdInfo id_info) -> id_info
+				     PFailed err -> 
+				        pprPanic "IdInfo parse failed" 
+				            (vcat [ppr x, err])
 				}
 
 -----------------------------------------------------------------------------
 
 rules_part :: { [RdrNameRuleDecl] }
 rules_part : {- empty -}	{ [] }
-	   | src_loc PRAGMA	{ case parseIface $2 $1 of
-				     Succeeded (PRules rules) -> rules
-				     Failed err -> pprPanic "Rules parse failed" err
+	   | src_loc PRAGMA	{ case parseIface $2 
+				           PState{bol = 0#, atbol = 1#,
+						  context = [],
+						  glasgow_exts = 1#,
+						  loc = $1 }  of
+				     POk _ (PRules rules) -> rules
+				     PFailed err -> 
+					  pprPanic "Rules parse failed" err
 				}
 
 rules	   :: { [RdrNameRuleDecl] }
@@ -338,7 +352,7 @@ decl_context	:: { RdrNameContext }
 decl_context	:  					{ [] }
 		| '{' context_list1 '}' '=>'	{ $2 }
 
-----------------------------------------------------------------
+----------------------------------------------------------------------------
 
 constrs		:: { [RdrNameConDecl] {- empty for handwritten abstract -} }
 		: 			{ [] }
@@ -440,9 +454,14 @@ mod_name	:: { ModuleName }
 var_fs		:: { EncodedFS }
 		: VARID			{ $1 }
 		| VARSYM		{ $1 }
-		| '-' 			{ SLIT("-") }
 		| '!'	  		{ SLIT("!") }
-
+		| 'as'			{ SLIT("as") }
+		| 'qualified'		{ SLIT("qualified") }
+		| 'hiding'		{ SLIT("hiding") }
+		| 'export'		{ SLIT("export") }
+		| 'label'		{ SLIT("label") }
+		| 'dynamic'		{ SLIT("dynamic") }
+		| 'unsafe'		{ SLIT("unsafe") }
 
 qvar_fs		:: { (EncodedFS, EncodedFS) }
 		:  QVARID		{ $1 }
@@ -670,23 +689,31 @@ comma_var_names1 : var_name					{ [$1] }
 		 | var_name ',' comma_var_names1		{ $1 : $3 }
 
 core_lit	:: { Literal }
-core_lit	: INTEGER			{ mkMachInt_safe $1 }
+core_lit	: integer			{ mkMachInt_safe $1 }
 		| CHAR				{ MachChar $1 }
 		| STRING			{ MachStr $1 }
 		| '__string' STRING		{ NoRepStr $2 (panic "NoRepStr type") }
-		| RATIONAL			{ MachDouble $1 }
-		| '__float' RATIONAL		{ MachFloat $2 }
+		| rational			{ MachDouble $1 }
+		| '__float' rational		{ MachFloat $2 }
 
-		| '__integer' INTEGER		{ NoRepInteger  $2 (panic "NoRepInteger type") 
+		| '__integer' integer		{ NoRepInteger  $2 (panic "NoRepInteger type") 
 							-- The type checker will add the types
 						}
 
-		| '__rational' INTEGER INTEGER	{ NoRepRational ($2 % $3) 
+		| '__rational' integer integer	{ NoRepRational ($2 % $3) 
 				  		   (panic "NoRepRational type")
 							-- The type checker will add the type
 						}
 
-		| '__addr' INTEGER		{ MachAddr $2 }
+		| '__addr' integer		{ MachAddr $2 }
+
+integer		:: { Integer }
+		: INTEGER                       { $1 }
+		| '-' INTEGER		        { (-$2) }
+
+rational	:: { Rational }
+		: RATIONAL                      { $1 }
+		| '-' RATIONAL			{ (-$2) }
 
 core_bndr       :: { UfBinder RdrName }
 core_bndr       : core_val_bndr                                 { $1 }
@@ -730,7 +757,7 @@ cc_caf  :: { IsCafCC }
 -------------------------------------------------------------------
 
 src_loc :: { SrcLoc }
-src_loc : 				{% getSrcLocIf }
+src_loc : 				{% getSrcLocP }
 
 checkVersion :: { () }
 	   : {-empty-}			{% checkVersion Nothing }
@@ -740,6 +767,8 @@ checkVersion :: { () }
 
 --			Haskell code 
 {
+happyError :: P a
+happyError buf PState{ loc = loc } = PFailed (ifaceParseErr buf loc)
 
 data IfaceStuff = PIface 	EncodedFS{-.hi module name-} ParsedIface
 		| PIdInfo	[HsIdInfo RdrName]

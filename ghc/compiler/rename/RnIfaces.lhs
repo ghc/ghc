@@ -64,6 +64,7 @@ import Outputable
 import Unique		( Unique )
 import StringBuffer     ( StringBuffer, hGetStringBuffer )
 import FastString	( mkFastString )
+import Lex
 import Outputable
 
 import IO	( isDoesNotExistError )
@@ -868,12 +869,16 @@ readIface :: Module -> String -> RnM d (Maybe (Module, ParsedIface))
 	-- Nothing <=> file not found, or unreadable, or illegible
 	-- Just x  <=> successfully found and parsed 
 readIface the_mod file_path
-  = ioToRnM (hGetStringBuffer file_path)       `thenRn` \ read_result ->
+  = ioToRnM (hGetStringBuffer False file_path)       `thenRn` \ read_result ->
     case read_result of
 	Right contents	  -> 
-             case parseIface contents (mkSrcLoc (mkFastString file_path) 1) of
-	          Failed err                    -> failWithRn Nothing err 
-		  Succeeded (PIface mod_nm iface) ->
+             case parseIface contents
+			PState{ bol = 0#, atbol = 1#,
+				context = [],
+				glasgow_exts = 1#,
+				loc = mkSrcLoc (mkFastString file_path) 1 } of
+	          PFailed err                    -> failWithRn Nothing err 
+		  POk _  (PIface mod_nm iface) ->
 			    warnCheckRn (mod_nm == moduleName the_mod)
 					(hsep [ ptext SLIT("Something is amiss; requested module name")
 				                , pprModule the_mod

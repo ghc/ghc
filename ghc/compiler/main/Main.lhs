@@ -12,7 +12,13 @@ import IO		( hPutStr, stderr )
 import HsSyn
 import BasicTypes	( NewOrData(..) )
 
-import ReadPrefix	( rdModule )
+import RdrHsSyn		( RdrNameHsModule )
+import FastString	( mkFastCharString, unpackFS )
+import StringBuffer	( hGetStringBuffer )
+import Parser		( parse )
+import Lex		( PState(..), P, ParseResult(..) )
+import SrcLoc		( mkSrcLoc )
+
 import Rename		( renameModule )
 
 import MkIface		( startIface, ifaceDecls, endIface )
@@ -55,6 +61,26 @@ main =
 \end{code}
 
 \begin{code}
+parseModule :: IO (ModuleName, RdrNameHsModule)
+parseModule = do
+    buf <- hGetStringBuffer True{-expand tabs-} (unpackFS src_filename)
+    case parse buf PState{ bol = 0#, atbol = 1#,
+		           context = [], glasgow_exts = glaexts,
+		           loc = mkSrcLoc src_filename 1 } of
+
+	PFailed err -> do
+		printErrs err
+		ghcExit 1
+		return (error "parseModule") -- just to get the types right
+
+	POk _ m@(HsModule mod _ _ _ _ _) -> 
+		return (mod, m)
+  where
+	glaexts | opt_GlasgowExts = 1#
+		| otherwise       = 0#
+\end{code}
+
+\begin{code}
 doIt :: ([CoreToDo], [StgToDo]) -> IO ()
 
 doIt (core_cmds, stg_cmds)
@@ -66,7 +92,7 @@ doIt (core_cmds, stg_cmds)
 	--------------------------  Reader  ----------------
     show_pass "Reader"	>>
     _scc_     "Reader"
-    rdModule		>>= \ (mod_name, rdr_module) ->
+    parseModule		>>= \ (mod_name, rdr_module) ->
 
     dumpIfSet opt_D_source_stats "Source Statistics"
 	(ppSourceStats False rdr_module)	 	>>

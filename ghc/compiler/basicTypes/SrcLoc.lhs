@@ -21,9 +21,10 @@ module SrcLoc (
 
 	mkGeneratedSrcLoc,	-- Code generated within the compiler
 
-	incSrcLine,
+	incSrcLine, replaceSrcLine,
 	
-	srcLocFile		-- return the file name part.
+	srcLocFile,		-- return the file name part.
+	srcLocLine		-- return the line part.
     ) where
 
 #include "HsVersions.h"
@@ -78,9 +79,15 @@ isNoSrcLoc other    = False
 srcLocFile :: SrcLoc -> FAST_STRING
 srcLocFile (SrcLoc fname _) = fname
 
+srcLocLine :: SrcLoc -> FAST_INT
+srcLocLine (SrcLoc _ l) = l
+
 incSrcLine :: SrcLoc -> SrcLoc
 incSrcLine (SrcLoc s l) = SrcLoc s (l +# 1#)
 incSrcLine loc  	= loc
+
+replaceSrcLine :: SrcLoc -> FAST_INT -> SrcLoc
+replaceSrcLine (SrcLoc s _) l = SrcLoc s l
 \end{code}
 
 %************************************************************************

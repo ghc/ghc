@@ -34,7 +34,7 @@ import Panic	( panic )
 \end{code}
 
 \begin{code}
-pRELUDE_Name      = mkSrcModule  "Prelude"
+pRELUDE_Name      = mkSrcModule "Prelude"
 pREL_GHC_Name     = mkSrcModule "PrelGHC"	   -- Primitive types and values
 pREL_BASE_Name    = mkSrcModule "PrelBase"
 pREL_ENUM_Name    = mkSrcModule "PrelEnum"

@@ -14,6 +14,8 @@ module CmdLineOpts (
 	intSwitchSet,
 	switchIsOn,
 
+	src_filename,
+
 	-- debugging opts
 	opt_D_dump_absC,
 	opt_D_dump_asm,
@@ -155,6 +157,7 @@ import GlaExts
 import Argv
 import Constants	-- Default values for some flags
 
+import FastString	( headFS )
 import Maybes		( assocMaybe, firstJust, maybeToBool )
 import Panic		( panic, panic# )
 
@@ -280,6 +283,13 @@ unpacked_opts =
    expandAts ('@':fname) = words (unsafePerformIO (readFile fname))
    expandAts l = [l]
 -}
+\end{code}
+
+\begin{code}
+src_filename :: FAST_STRING
+src_filename = case argv of
+		  filename : rest | headFS filename /= '-' -> filename
+		  otherwise -> panic "no filename"
 \end{code}
 
 \begin{code}

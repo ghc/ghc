@@ -16,7 +16,7 @@ module RdrName (
 	dummyRdrVarName, dummyRdrTcName,
 
 	-- Destruction
-	rdrNameModule, rdrNameOcc, 
+	rdrNameModule, rdrNameOcc, setRdrNameOcc,
 	isRdrDataCon, isRdrTyVar, isQual, isUnqual
   ) where 
 
@@ -62,6 +62,9 @@ rdrNameModule (RdrName (Qual m) _) = m
 
 rdrNameOcc :: RdrName -> OccName
 rdrNameOcc (RdrName _ occ) = occ
+
+setRdrNameOcc :: RdrName -> OccName -> RdrName
+setRdrNameOcc (RdrName q _) occ = RdrName q occ
 \end{code}
 
 \begin{code}

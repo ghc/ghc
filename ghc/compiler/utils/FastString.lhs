@@ -155,7 +155,7 @@ nullFastString (FastString _ l# _) = l# ==# 0#
 nullFastString (CharStr _ l#) = l# ==# 0#
 
 unpackFS :: FastString -> String
-unpackFS (FastString _ l# ba#) = unpackCStringBA# ba# l#
+unpackFS (FastString _ l# ba#) = unpackNBytesBA# ba# l#
 unpackFS (CharStr addr len#) =
  unpack 0#
  where

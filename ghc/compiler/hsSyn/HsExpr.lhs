@@ -153,6 +153,17 @@ data HsExpr id pat
 		(HsExpr id pat) -- expr whose cost is to be measured
 \end{code}
 
+These constructors only appear temporarily in the parser.
+
+\begin{code}
+  | EWildPat			-- wildcard
+
+  | EAsPat	id		-- as pattern
+		(HsExpr id pat)
+
+  | ELazyPat	(HsExpr id pat) -- ~ pattern
+\end{code}
+
 Everything from here on appears only in typechecker output.
 
 \begin{code}

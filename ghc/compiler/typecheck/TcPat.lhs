@@ -128,9 +128,12 @@ tcPat tc_bndr WildPatIn pat_ty
 tcPat tc_bndr (NegPatIn pat) pat_ty
   = tcPat tc_bndr (negate_lit pat) pat_ty
   where
-    negate_lit (LitPatIn (HsInt  i)) = LitPatIn (HsInt  (-i))
-    negate_lit (LitPatIn (HsFrac f)) = LitPatIn (HsFrac (-f))
-    negate_lit _                     = panic "TcPat:negate_pat"
+    negate_lit (LitPatIn (HsInt  i))       = LitPatIn (HsInt  (-i))
+    negate_lit (LitPatIn (HsIntPrim i))    = LitPatIn (HsIntPrim (-i))
+    negate_lit (LitPatIn (HsFrac f))       = LitPatIn (HsFrac (-f))
+    negate_lit (LitPatIn (HsFloatPrim f))  = LitPatIn (HsFloatPrim (-f))
+    negate_lit (LitPatIn (HsDoublePrim f)) = LitPatIn (HsDoublePrim (-f))
+    negate_lit _                           = panic "TcPat:negate_pat"
 
 tcPat tc_bndr (ParPatIn parend_pat) pat_ty
   = tcPat tc_bndr parend_pat pat_ty

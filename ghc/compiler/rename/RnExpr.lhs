@@ -122,9 +122,12 @@ rnPat neg@(NegPatIn pat)
     rnPat pat		`thenRn` \ (pat', fvs) ->
     returnRn (NegPatIn pat', fvs)
   where
-    valid_neg_pat (LitPatIn (HsInt  _)) = True
-    valid_neg_pat (LitPatIn (HsFrac _)) = True
-    valid_neg_pat _                     = False
+    valid_neg_pat (LitPatIn (HsInt        _)) = True
+    valid_neg_pat (LitPatIn (HsIntPrim    _)) = True
+    valid_neg_pat (LitPatIn (HsFrac       _)) = True
+    valid_neg_pat (LitPatIn (HsFloatPrim  _)) = True
+    valid_neg_pat (LitPatIn (HsDoublePrim _)) = True
+    valid_neg_pat _                           = False
 
 rnPat (ParPatIn pat)
   = rnPat pat		`thenRn` \ (pat', fvs) ->
@@ -311,6 +314,12 @@ rnExpr (OpApp e1 op _ e2)
 
     returnRn (final_e,
 	      fv_e1 `plusFV` fv_op `plusFV` fv_e2)
+
+-- constant-fold some negate applications on unboxed literals.  Since
+-- negate is a polymorphic function, we have to do these here.
+rnExpr (NegApp (HsLit (HsIntPrim i))    _) = rnExpr (HsLit (HsIntPrim (-i)))
+rnExpr (NegApp (HsLit (HsFloatPrim i))  _) = rnExpr (HsLit (HsFloatPrim (-i)))
+rnExpr (NegApp (HsLit (HsDoublePrim i)) _) = rnExpr (HsLit (HsDoublePrim (-i)))
 
 rnExpr (NegApp e n)
   = rnExpr e				`thenRn` \ (e', fv_e) ->
