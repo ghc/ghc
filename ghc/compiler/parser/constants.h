@@ -29,9 +29,6 @@
 
 #define MAX_INFIX 		500		/* Maximum number of infix operators */
 
-#define MAX_ESC_CHAR 		255		/* Largest Recognised Character: \255 */
-#define MAX_ESC_DIGITS 		10		/* Maximum number of digits in an escape \dd */
-
 
 #ifdef TRUE
 #undef TRUE
