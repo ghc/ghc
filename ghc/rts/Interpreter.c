@@ -5,8 +5,8 @@
  * Copyright (c) 1994-2000.
  *
  * $RCSfile: Interpreter.c,v $
- * $Revision: 1.25 $
- * $Date: 2001/08/02 17:01:33 $
+ * $Revision: 1.26 $
+ * $Date: 2001/08/03 15:05:52 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -763,7 +763,7 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
               }
               case bci_CCALL: {
                  int o_itbl                = BCO_NEXT;
-                 void(*marshall_fn)(void*) = BCO_LIT(o_itbl);
+                 void(*marshall_fn)(void*) = (void (*)(void*))BCO_LIT(o_itbl);
                  marshall_fn ( (void*)(& StackWord(0) ) );
                  goto nextInsn;
               }
