@@ -468,18 +468,17 @@ spec_one :: ScEnv
   Example
   
      In-scope: a, x::a   
-     f = /\b \y::[(a,b)] -> ....f (b,c) ((:) (a,(b,c)) v (h v))...
-	  [c is presumably bound by the (...) part]
+     f = /\b \y::[(a,b)] -> ....f (b,c) ((:) (a,(b,c)) (x,v) (h w))...
+	  [c::*, v::(b,c) are presumably bound by the (...) part]
   ==>
-     f_spec = /\ b c \ v::(a,(b,c)) -> 
-		  (...entire RHS of f...) (b,c) ((:) (a,(b,c)) v (h v))
+     f_spec = /\ b c \ v::(b,c) hw::[(a,(b,c))] ->
+		  (...entire RHS of f...) (b,c) ((:) (a,(b,c)) (x,v) hw)
   
-     RULE:  forall b c,
-		   y::[(a,(b,c))], 
-		   v::(a,(b,c)), 
-		   h::(a,(b,c))->[(a,(b,c))] .
+     RULE:  forall b::* c::*,		-- Note, *not* forall a, x
+		   v::(b,c),
+		   hw::[(a,(b,c))] .
   
-	    f (b,c) ((:) (a,(b,c)) v (h v)) = f_spec b c v
+	    f (b,c) ((:) (a,(b,c)) (x,v) hw) = f_spec b c v hw
 -}
 
 spec_one env fn rhs (pats, n)
@@ -491,14 +490,15 @@ spec_one env fn rhs (pats, n)
 	pat_fvs	     = varSetElems (exprsFreeVars pats)
 	vars_to_bind = filter not_avail pat_fvs
 	not_avail v  = not (v `elemVarEnv` scope env)
-		-- Put the type variables first just for tidiness
+		-- Put the type variables first; the type of a term
+		-- variable may mention a type variable
 	(tvs, ids)   = partition isTyVar vars_to_bind
 	bndrs  	     = tvs ++ ids
 	
 	rule_name = _PK_ ("SC:" ++ showSDoc (ppr fn <> int n))
 	spec_rhs  = mkLams bndrs (mkApps rhs pats)
 	spec_id   = mkUserLocal spec_occ spec_uniq (exprType spec_rhs) fn_loc
-	rule      = Rule rule_name pat_fvs pats (mkVarApps (Var spec_id) bndrs)
+	rule      = Rule rule_name bndrs pats (mkVarApps (Var spec_id) bndrs)
     in
     returnUs (rule, (spec_id, spec_rhs))
 \end{code}
