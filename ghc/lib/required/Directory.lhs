@@ -501,9 +501,10 @@ modificationTime stat =
     cvtUnsigned i1                                         `thenIO_Prim` \ secs ->
     return (TOD secs 0)
   where
-    malloc1 = ST $ \ (S# s#) ->
+    malloc1 = ST $ \ s# ->
 	case newIntArray# 1# s# of 
-          StateAndMutableByteArray# s2# barr# -> (MutableByteArray bnds barr#, S# s2#)
+          StateAndMutableByteArray# s2# barr# -> 
+		STret s2# (MutableByteArray bnds barr#)
 
     bnds = (0,1)
     -- The C routine fills in an unsigned word.  We don't have `unsigned2Integer#,'
@@ -511,14 +512,15 @@ modificationTime stat =
     -- zero is still handled specially, although (J# 1# 1# (ptr to 0#)) is probably
     -- acceptable to gmp.
 
-    cvtUnsigned (MutableByteArray _ arr#) = ST $ \ (S# s#) ->
+    cvtUnsigned (MutableByteArray _ arr#) = ST $ \ s# ->
 	case readIntArray# arr# 0# s# of 
 	  StateAndInt# s2# r# ->
             if r# ==# 0# then
-                (0, S# s2#)
+                STret s2# 0
             else
                 case unsafeFreezeByteArray# arr# s2# of
-                  StateAndByteArray# s3# frozen# -> (J# 1# 1# frozen#, S# s3#)
+                  StateAndByteArray# s3# frozen# -> 
+			STret s3# (J# 1# 1# frozen#)
 
 isDirectory :: FileStatus -> Bool
 isDirectory stat = unsafePerformPrimIO $

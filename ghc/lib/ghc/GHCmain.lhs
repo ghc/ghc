@@ -13,12 +13,11 @@ import STBase
 
 \begin{code}
 mainPrimIO = ST $ \ s ->
-    case Main.main   of { IO (ST main_guts) ->
-    case main_guts s of { (result, s2@(S# _)) ->
-    case result   of
-      Right ()  -> ( (), s2 )
-      Left  err -> error ("I/O error: "++showsPrec 0 err "\n")
-    }}
+    case Main.main   of { IO main_guts ->
+    case main_guts s of
+	IOok   s2 ()  -> STret s2 ()
+      	IOfail s2 err -> error ("I/O error: "++showsPrec 0 err "\n")
+    }
 \end{code}
 
 OLD COMMENT:

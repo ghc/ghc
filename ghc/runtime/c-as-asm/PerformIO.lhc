@@ -80,7 +80,7 @@ const W_ vtbl_stopPerformIO[] = {
    has gotten hold of (hopefully via @MakeStablePtr#@).
 */
 P_ unstable_Closure;
-ED_RO_(WorldStateToken_closure);
+ED_RO_(realWorldZh_closure);
 
 STGFUN(startPerformIO)
 {
@@ -118,7 +118,7 @@ STGFUN(startPerformIO)
     /* Put a World State Token on the A stack */
     /* This is necessary because we've not unboxed it (to reveal a void) yet */
     SpA -= AREL(1);
-    *SpA = (P_) WorldStateToken_closure;
+    *SpA = (P_) realWorldZh_closure;
 
     /* Save away C stack pointer so that we can restore it when we leave
        the Haskell world.

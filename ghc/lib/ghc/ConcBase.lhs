@@ -21,8 +21,8 @@ module ConcBase(
     ) where
 
 import PrelBase
-import STBase	( PrimIO(..), ST(..), State(..), StateAndPtr#(..) )
-import IOBase	( IO(..), MVar(..) )
+import STBase	( PrimIO(..), ST(..), STret(..), StateAndPtr#(..) )
+import IOBase	( IO(..), IOResult(..), MVar(..) )
 import GHCerr	( parError )
 import PrelBase	( Int(..) )
 import GHC	( fork#, delay#, waitRead#, waitWrite#,
@@ -44,21 +44,15 @@ infixr 0 `par`, `fork`
 \begin{code}
 forkST :: ST s a -> ST s a
 
-forkST (ST action) = ST $ \ s ->
-   let
-    (r, new_s) = action s
-   in
-    new_s `fork` (r, s)
+forkST (ST action) = ST $ \ s -> 
+	let d@(STret _ r) = action s in
+	d `fork` STret s r
 
 forkPrimIO :: PrimIO a -> PrimIO a
 forkPrimIO = forkST
 
 forkIO :: IO () -> IO ()
-forkIO (IO (ST action)) = IO $ ST $ \ s ->
-    let
-	(_, new_s) = action s
-    in
-    new_s `fork` (Right (), s)
+forkIO (IO action) = IO $ \ s -> (action s) `fork` IOok s ()
 
 par, fork :: Eval a => a -> b -> b
 
@@ -98,21 +92,21 @@ writes.
 
 newEmptyMVar  :: IO (MVar a)
 
-newEmptyMVar = IO $ ST $ \ (S# s#) ->
+newEmptyMVar = IO $ \ s# ->
     case newSynchVar# s# of
-        StateAndSynchVar# s2# svar# -> (Right (MVar svar#), S# s2#)
+        StateAndSynchVar# s2# svar# -> IOok s2# (MVar svar#)
 
 takeMVar :: MVar a -> IO a
 
-takeMVar (MVar mvar#) = IO $ ST $ \ (S# s#) ->
+takeMVar (MVar mvar#) = IO $ \ s# ->
     case takeMVar# mvar# s# of
-        StateAndPtr# s2# r -> (Right r, S# s2#)
+        StateAndPtr# s2# r -> IOok s2# r
 
 putMVar  :: MVar a -> a -> IO ()
 
-putMVar (MVar mvar#) x = IO $ ST $ \ (S# s#) ->
+putMVar (MVar mvar#) x = IO $ \ s# ->
     case putMVar# mvar# x s# of
-        s2# -> (Right (), S# s2#)
+        s2# -> IOok s2# ()
 
 newMVar :: a -> IO (MVar a)
 
@@ -158,17 +152,17 @@ specified file descriptor is available for reading (just like select).
 \begin{code}
 threadDelay, threadWaitRead, threadWaitWrite :: Int -> IO ()
 
-threadDelay (I# x#) = IO $ ST $ \ (S# s#) ->
+threadDelay (I# x#) = IO $ \ s# ->
     case delay# x# s# of
-      s2# -> (Right (), S# s2#)
+      s2# -> IOok s2# ()
 
-threadWaitRead (I# x#) = IO $ ST $ \ (S# s#) -> 
+threadWaitRead (I# x#) = IO $ \ s# -> 
     case waitRead# x# s# of
-      s2# -> (Right (), S# s2#)
+      s2# -> IOok s2# ()
 
-threadWaitWrite (I# x#) = IO $ ST $ \ (S# s#) ->
+threadWaitWrite (I# x#) = IO $ \ s# ->
     case waitWrite# x# s# of
-      s2# -> (Right (), S# s2#)
+      s2# -> IOok s2# ()
 \end{code}
 
 %*********************************************************

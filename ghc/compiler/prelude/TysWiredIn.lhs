@@ -77,6 +77,9 @@ module TysWiredIn (
 	stateAndWordPrimTyCon,
 	stateDataCon,
 	stateTyCon,
+	stRetDataCon,
+	stRetTyCon,
+	mkSTretTy,
 	stringTy,
 	trueDataCon,
 	unitTy,
@@ -281,6 +284,18 @@ stateTyCon = pcDataTyCon stateTyConKey sT_BASE SLIT("State") alpha_tyvar [stateD
 stateDataCon
   = pcDataCon stateDataConKey sT_BASE SLIT("S#")
 	alpha_tyvar [] [mkStatePrimTy alphaTy] stateTyCon nullSpecEnv
+\end{code}
+
+\begin{code}
+mkSTretTy alpha beta = applyTyCon stRetTyCon [alpha,beta]
+
+stRetTyCon
+  = pcDataTyCon stRetTyConKey sT_BASE SLIT("STret") 
+	alpha_beta_tyvars [stRetDataCon]
+stRetDataCon
+  = pcDataCon stRetDataConKey sT_BASE SLIT("STret")
+	alpha_beta_tyvars [] [mkStatePrimTy alphaTy, betaTy] 
+		stRetTyCon nullSpecEnv
 \end{code}
 
 \begin{code}
@@ -529,7 +544,7 @@ stTyCon = pcNewTyCon stTyConKey sT_BASE SLIT("ST") alpha_beta_tyvars [stDataCon]
 stDataCon = pcDataCon stDataConKey sT_BASE SLIT("ST")
 			alpha_beta_tyvars [] [ty] stTyCon nullSpecEnv
   where
-    ty = mkFunTy (mkStateTy alphaTy) (mkTupleTy 2 [betaTy, mkStateTy alphaTy])
+    ty = mkFunTy (mkStatePrimTy alphaTy) (mkSTretTy alphaTy betaTy)
 \end{code}
 
 %************************************************************************

@@ -157,23 +157,25 @@ getClockTime =
     else
 	constructErrorAndFail "getClockTime"
   where
-    malloc1 = ST $ \ (S# s#) ->
+    malloc1 = ST $ \ s# ->
 	case newIntArray# 1# s# of 
-          StateAndMutableByteArray# s2# barr# -> (MutableByteArray bottom barr#, S# s2#)
+          StateAndMutableByteArray# s2# barr# -> 
+		STret s2# (MutableByteArray bottom barr#)
 
-    -- The C routine fills in an unsigned word.  We don't have `unsigned2Integer#,'
-    -- so we freeze the data bits and use them for an MP_INT structure.  Note that
-    -- zero is still handled specially, although (J# 1# 1# (ptr to 0#)) is probably
-    -- acceptable to gmp.
+    --  The C routine fills in an unsigned word.  We don't have 
+    --	`unsigned2Integer#,' so we freeze the data bits and use them 
+    --	for an MP_INT structure.  Note that zero is still handled specially,
+    --	although (J# 1# 1# (ptr to 0#)) is probably acceptable to gmp.
 
-    cvtUnsigned (MutableByteArray _ arr#) = ST $ \ (S# s#) ->
+    cvtUnsigned (MutableByteArray _ arr#) = ST $ \ s# ->
 	case readIntArray# arr# 0# s# of 
 	  StateAndInt# s2# r# ->
             if r# ==# 0# then
-                (0, S# s2#)
+                STret s2# 0
             else
                 case unsafeFreezeByteArray# arr# s2# of
-                  StateAndByteArray# s3# frozen# -> (J# 1# 1# frozen#, S# s3#)
+                  StateAndByteArray# s3# frozen# -> 
+			STret s3# (J# 1# 1# frozen#)
 
 \end{code}
 
@@ -300,18 +302,20 @@ bottom = error "Time.bottom"
 -- Allocate a mutable array of characters with no indices.
 
 allocChars :: Int -> ST s (MutableByteArray s ())
-allocChars (I# size#) = ST $ \ (S# s#) ->
+allocChars (I# size#) = ST $ \ s# ->
     case newCharArray# size# s# of 
-      StateAndMutableByteArray# s2# barr# -> (MutableByteArray bot barr#, S# s2#)
+      StateAndMutableByteArray# s2# barr# -> 
+	STret s2# (MutableByteArray bot barr#)
   where
     bot = error "Time.allocChars"
 
 -- Allocate a mutable array of words with no indices
 
 allocWords :: Int -> ST s (MutableByteArray s ())
-allocWords (I# size#) = ST $ \ (S# s#) ->
+allocWords (I# size#) = ST $ \ s# ->
     case newIntArray# size# s# of 
-      StateAndMutableByteArray# s2# barr# -> (MutableByteArray bot barr#, S# s2#)
+      StateAndMutableByteArray# s2# barr# -> 
+	STret s2# (MutableByteArray bot barr#)
   where
     bot = error "Time.allocWords"
 

@@ -33,8 +33,19 @@ infixr 1 `thenIO_Prim`, `seqIO_Prim`
 %*							*
 %*********************************************************
 
+IO is no longer built on top of PrimIO (which is a specialised version
+of the ST monad), instead it is now has its own type.  This is purely
+for efficiency purposes, since we get to remove several levels of
+lifting in the type of the monad.
+
 \begin{code}
-newtype IO a = IO (PrimIO (Either IOError a))
+newtype IO a = IO (State# RealWorld -> IOResult a)
+
+{-# INLINE unIO #-}
+unIO (IO a) = a
+
+data IOResult a = IOok   (State# RealWorld) a
+		| IOfail (State# RealWorld) IOError
 
 instance  Functor IO where
    map f x = x >>= (return . f)
@@ -44,40 +55,36 @@ instance  Monad IO  where
     {-# INLINE (>>)   #-}
     {-# INLINE (>>=)  #-}
     m >> k      =  m >>= \ _ -> k
-    return x	= IO $ ST $ \ s@(S# _) -> (Right x, s)
+    return x	= IO $ \ s -> IOok s x
 
-    (IO (ST m)) >>= k =
-        IO (ST ( \ s ->
-	let  (r, new_s) = m s  in
-	case r of
-	  Left err -> (Left err, new_s)
-	  Right  x -> case (k x) of { IO (ST k2) ->
-		        k2 new_s }))
+    (IO m) >>= k =
+        IO $ \s ->
+	case m s of
+	    IOfail new_s err -> IOfail new_s err
+	    IOok   new_s a   -> unIO (k a) new_s
 
 fixIO :: (a -> IO a) -> IO a
     -- not required but worth having around
 
-fixIO k = IO $ ST $ \ s ->
+fixIO k = IO $ \ s ->
     let
-	(IO (ST k_loop)) = k loop
-	result           = k_loop s
-	(Right loop, _)  = result
+	(IO k_loop) = k loop
+	result      = k_loop s
+	IOok _ loop = result
     in
     result
 
 fail            :: IOError -> IO a 
-fail err	=  IO $ ST $ \ s -> (Left err, s)
+fail err	=  IO $ \ s -> IOfail s err
 
 userError       :: String  -> IOError
 userError str	=  IOError Nothing UserError str
 
 catch           :: IO a    -> (IOError -> IO a) -> IO a 
-catch (IO (ST m)) k  = IO $ ST $ \ s ->
-  case (m s) of { (r, new_s) ->
-  case r of
-    Right  _ -> (r, new_s)
-    Left err -> case (k err) of { IO (ST k_err) ->
-		(k_err new_s) }}
+catch (IO m) k  = IO $ \ s ->
+  case m s of
+    IOok   new_s a -> IOok new_s a
+    IOfail new_s e -> unIO (k e) new_s
 
 instance  Show (IO a)  where
     showsPrec p f  = showString "<<IO action>>"
@@ -99,16 +106,12 @@ ioToPrimIO :: IO a -> PrimIO       a
 primIOToIO = stToIO -- for backwards compatibility
 ioToPrimIO = ioToST
 
-stToIO (ST m) = IO $ ST $ \ s ->
-    case (m s) of { (r, new_s) ->
-    (Right r, new_s) }
+stToIO (ST m) = IO $ \ s -> case (m s) of STret new_s r -> IOok new_s r
 
-ioToST (IO (ST io)) = ST $ \ s ->
-    case (io s) of { (r, new_s) ->
-    case r of
-      Right a -> (a, new_s)
-      Left  e -> error ("I/O Error (ioToST): " ++ showsPrec 0 e "\n")
-    }
+ioToST (IO io) = ST $ \ s ->
+    case (io s) of
+      IOok   new_s a -> STret new_s a
+      IOfail new_s e -> error ("I/O Error (ioToST): " ++ showsPrec 0 e "\n")
 \end{code}
 
 @thenIO_Prim@ is a useful little number for doing _ccall_s in IO-land:
@@ -119,10 +122,8 @@ seqIO_Prim  :: PrimIO a -> IO b -> IO b
 {-# INLINE thenIO_Prim   #-}
 {-# INLINE seqIO_Prim   #-}
 
-thenIO_Prim (ST m) k = IO $ ST $ \ s ->
-    case (m s)     of { (m_res, new_s)    ->
-    case (k m_res) of { (IO (ST k_m_res)) ->
-    k_m_res new_s }}
+thenIO_Prim (ST m) k = IO $ \ s ->
+    case (m s) of STret new_s m_res -> unIO (k m_res) new_s
 
 seqIO_Prim m k = thenIO_Prim m (\ _ -> k)
 \end{code}

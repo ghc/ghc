@@ -1382,7 +1382,6 @@ sub init_FUNNY_THINGS {
 	"${T_US}UnderflowVect7${T_POST_LBL}", 1,
 	"${T_US}UpdErr${T_POST_LBL}", 1,
 	"${T_US}UpdatePAP${T_POST_LBL}", 1,
-	"${T_US}WorldStateToken${T_POST_LBL}", 1,
 	"${T_US}_Enter_Internal${T_POST_LBL}", 1,
 	"${T_US}_PRMarking_MarkNextAStack${T_POST_LBL}", 1,
 	"${T_US}_PRMarking_MarkNextBStack${T_POST_LBL}", 1,

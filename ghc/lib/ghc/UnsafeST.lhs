@@ -28,16 +28,16 @@ import GHC
 unsafeInterleaveST :: ST s a -> ST s a
 unsafeInterleaveST (ST m) = ST ( \ s ->
     let
-	(r, new_s) = m s
+	STret _ r = m s
     in
-    (r, s))
+    STret s r)
 
 unsafePerformPrimIO	:: PrimIO a -> a
 	-- We give a fresh definition here.  There are no
 	-- magical universal types kicking around.
 unsafePerformPrimIO (ST m)
-  = case m (S# realWorld#) of
-      (r,_) -> r
+  = case m realWorld# of
+      STret _ r -> r
 
 unsafeInterleavePrimIO	:: PrimIO a -> PrimIO a
 unsafeInterleavePrimIO	= unsafeInterleaveST

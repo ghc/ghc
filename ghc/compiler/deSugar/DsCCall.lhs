@@ -29,8 +29,9 @@ import Type		( isPrimType, maybeAppDataTyConExpandingDicts, maybeAppTyCon,
 import TysPrim		( byteArrayPrimTy, realWorldTy,  realWorldStatePrimTy,
 			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon )
 import TysWiredIn	( getStatePairingConInfo,
-			  realWorldStateTy, stateDataCon, pairDataCon, unitDataCon,
-			  stringTy
+			  stRetDataCon, pairDataCon, unitDataCon,
+			  stringTy,
+			  realWorldStateTy, stateDataCon
 			)
 import Util		( pprPanic, pprError, panic )
 
@@ -80,11 +81,14 @@ dsCCall :: FAST_STRING	-- C routine to invoke
 	-> DsM CoreExpr
 
 dsCCall label args may_gc is_asm result_ty
-  = newSysLocalDs realWorldStateTy	`thenDs` \ old_s ->
+  = newSysLocalDs realWorldStatePrimTy	`thenDs` \ old_s ->
 
-    mapAndUnzipDs unboxArg (Var old_s : args)	`thenDs` \ (final_args, arg_wrappers) ->
+    mapAndUnzipDs unboxArg args	`thenDs` \ (unboxed_args, arg_wrappers) ->
+    let
+	 final_args = Var old_s : unboxed_args
+    in
 
-    boxResult result_ty				`thenDs` \ (final_result_ty, res_wrapper) ->
+    boxResult result_ty		`thenDs` \ (final_result_ty, res_wrapper) ->
 
     let
 	the_ccall_op = CCallOp label is_asm may_gc
@@ -188,20 +192,20 @@ boxResult result_ty
   -- oops! can't see the data constructors
   = can't_see_datacons_error "result" result_ty
 
-  -- Data types with a single constructor, which has a single, primitive-typed arg
-  | (maybeToBool maybe_data_type) &&				-- Data type
-    (null other_data_cons) &&					-- Just one constr
-    not (null data_con_arg_tys) && null other_args_tys	&& 	-- Just one arg
-    isPrimType the_prim_result_ty				-- of primitive type
+  -- Data types with a single constructor, 
+  -- which has a single, primitive-typed arg.
+  | (maybeToBool maybe_data_type) &&			   -- Data type
+    (null other_data_cons) &&				   -- Just one constr
+    not (null data_con_arg_tys) && null other_args_tys	&& -- Just one arg
+    isPrimType the_prim_result_ty			   -- of primitive type
   =
-    newSysLocalDs realWorldStatePrimTy			`thenDs` \ prim_state_id ->
-    newSysLocalDs the_prim_result_ty 			`thenDs` \ prim_result_id ->
+    newSysLocalDs realWorldStatePrimTy		`thenDs` \ prim_state_id ->
+    newSysLocalDs the_prim_result_ty 		`thenDs` \ prim_result_id ->
 
-    mkConDs stateDataCon [TyArg realWorldTy, VarArg (Var prim_state_id)]  `thenDs` \ new_state ->
     mkConDs the_data_con (map TyArg tycon_arg_tys ++ [VarArg (Var prim_result_id)]) `thenDs` \ the_result ->
 
-    mkConDs pairDataCon
-	    [TyArg result_ty, TyArg realWorldStateTy, VarArg the_result, VarArg new_state]
+    mkConDs stRetDataCon
+	    [TyArg realWorldTy, TyArg result_ty, VarArg (Var prim_state_id), VarArg the_result]
 							`thenDs` \ the_pair ->
     let
 	the_alt = (state_and_prim_datacon, [prim_state_id, prim_result_id], the_pair)
@@ -217,10 +221,8 @@ boxResult result_ty
   =
     newSysLocalDs realWorldStatePrimTy		`thenDs` \ prim_state_id ->
 
-    mkConDs stateDataCon [TyArg realWorldTy, VarArg (Var prim_state_id)]
-						`thenDs` \ new_state ->
-    mkConDs pairDataCon
-	    [TyArg result_ty, TyArg realWorldStateTy, VarArg (Var unitDataCon), VarArg new_state]
+    mkConDs stRetDataCon
+	    [TyArg realWorldTy, TyArg result_ty, VarArg (Var prim_state_id), VarArg (Var unitDataCon)]
 						`thenDs` \ the_pair ->
 
     let

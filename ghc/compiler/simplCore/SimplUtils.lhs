@@ -42,7 +42,6 @@ import Type		( tyVarsOfType, mkForAllTys, mkTyVarTys, isPrimType, getTyVar_maybe
 			  maybeAppDataTyConExpandingDicts, SYN_IE(Type)
 			)
 import TyCon		( isDataTyCon )
-import TysWiredIn	( realWorldStateTy )
 import TyVar		( elementOfTyVarSet,
 			  GenTyVar{-instance Eq-} )
 import Util		( isIn, panic, assertPanic )

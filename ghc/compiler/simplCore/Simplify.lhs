@@ -53,7 +53,7 @@ import SimplUtils
 import Type		( mkTyVarTy, mkTyVarTys, mkAppTy, applyTy, mkFunTys, maybeAppDataTyCon,
 			  splitFunTy, splitFunTyExpandingDicts, getFunTy_maybe, eqTy
 			)
-import TysWiredIn	( realWorldStateTy )
+import TysPrim		( realWorldStatePrimTy )
 import Outputable	( PprStyle(..), Outputable(..) )
 import Util		( SYN_IE(Eager), appEager, returnEager, runEager, mapEager,
 			  isSingleton, zipEqual, zipWithEqual, mapAndUnzip, panic, pprPanic, assertPanic, pprTrace )
@@ -720,8 +720,8 @@ simplValLam env expr min_no_of_args expr_ty
 				-- but usually doesn't
 			   `max`
 			   case potential_extra_binder_tys of
-				[ty] | ty `eqTy` realWorldStateTy -> 1
-				other				  -> 0
+				[ty] | ty `eqTy` realWorldStatePrimTy -> 1
+				other				      -> 0
 \end{code}
 
 

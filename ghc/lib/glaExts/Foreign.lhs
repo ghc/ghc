@@ -88,12 +88,12 @@ writeForeignObj :: ForeignObj  -> Addr       -> PrimIO ()
 {- derived op - attaching a free() finaliser to a malloc() allocated reference. -}
 makeMallocPtr   :: Addr        -> PrimIO ForeignObj
 
-makeForeignObj (A# obj) (A# finaliser) = ST ( \ (S# s#) ->
+makeForeignObj (A# obj) (A# finaliser) = ST ( \ s# ->
     case makeForeignObj# obj finaliser s# of
-      StateAndForeignObj# s1# fo# -> (ForeignObj fo#, S# s1#))
+      StateAndForeignObj# s1# fo# -> STret s1# (ForeignObj fo#))
 
-writeForeignObj (ForeignObj fo#) (A# datum#) = ST ( \ (S# s#) ->
-    case writeForeignObj# fo# datum# s# of { s1# -> ((), S# s1#) } )
+writeForeignObj (ForeignObj fo#) (A# datum#) = ST ( \ s# ->
+    case writeForeignObj# fo# datum# s# of { s1# -> STret s1# () } )
 
 makeMallocPtr a = makeForeignObj a (``&free''::Addr)
 
@@ -133,13 +133,13 @@ performGC      :: PrimIO ()
 {-# INLINE freeStablePtr #-}
 {-# INLINE performGC #-}
 
-makeStablePtr f = ST $ \ (S# rw1#) ->
+makeStablePtr f = ST $ \ rw1# ->
     case makeStablePtr# f rw1# of
-      StateAndStablePtr# rw2# sp# -> (StablePtr sp#, S# rw2#)
+      StateAndStablePtr# rw2# sp# -> STret rw2# (StablePtr sp#)
 
-deRefStablePtr (StablePtr sp#) = ST $ \ (S# rw1#) ->
+deRefStablePtr (StablePtr sp#) = ST $ \ rw1# ->
     case deRefStablePtr# sp# rw1# of
-      StateAndPtr# rw2# a -> (a, S# rw2#)
+      StateAndPtr# rw2# a -> STret rw2# a
 
 freeStablePtr sp = _ccall_ freeStablePointer sp
 

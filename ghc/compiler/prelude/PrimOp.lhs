@@ -1383,7 +1383,7 @@ primOpInfo ErrorIOPrimOp -- errorIO# :: PrimIO () -> State# RealWorld#
 	statePrimTyCon VoidRep [realWorldTy]
   where
     primio_ish_ty result
-      = mkFunTy (mkStateTy realWorldTy) (mkTupleTy 2 [result, mkStateTy realWorldTy])
+      = mkFunTy (mkStatePrimTy realWorldTy) (mkSTretTy realWorldTy result)
 \end{code}
 
 %************************************************************************

@@ -2216,7 +2216,7 @@ processor:
 \begin{code}
 EXTDATA_RO(StkO_info);
 EXTDATA_RO(TSO_info);
-EXTDATA_RO(WorldStateToken_closure);
+EXTDATA_RO(realWorldZh_closure);
 
 EXTFUN(EnterNodeCode);
 UNVEC(EXTFUN(stopThreadDirectReturn);,EXTDATA(vtbl_stopStgWorld);)
@@ -2565,7 +2565,7 @@ W_ type;
 
     if (type == T_MAIN) {
         STKO_SpA(stko) -= AREL(1);
-        *STKO_SpA(stko) = (P_) WorldStateToken_closure;
+        *STKO_SpA(stko) = (P_) realWorldZh_closure;
     }
 
     SAVE_Ret = (StgRetAddr) UNVEC(stopThreadDirectReturn,vtbl_stopStgWorld);

@@ -192,8 +192,10 @@ module Unique (
 	stateAndWordPrimDataConKey,
 	stateAndWordPrimTyConKey,
 	stateDataConKey,
+	stRetDataConKey,
 	statePrimTyConKey,
 	stateTyConKey,
+	stRetTyConKey,
 	synchVarPrimTyConKey,
 	thenMClassOpKey,
 	toEnumClassOpKey,
@@ -573,6 +575,7 @@ byteArrayTyConKey			= mkPreludeTyConUnique 52
 wordPrimTyConKey			= mkPreludeTyConUnique 53
 wordTyConKey				= mkPreludeTyConUnique 54
 voidTyConKey				= mkPreludeTyConUnique 55
+stRetTyConKey				= mkPreludeTyConUnique 56
 \end{code}
 
 %************************************************************************
@@ -619,6 +622,7 @@ stateDataConKey				= mkPreludeDataConUnique 39
 trueDataConKey				= mkPreludeDataConUnique 40
 wordDataConKey				= mkPreludeDataConUnique 41
 stDataConKey				= mkPreludeDataConUnique 42
+stRetDataConKey				= mkPreludeDataConUnique 43
 \end{code}
 
 %************************************************************************

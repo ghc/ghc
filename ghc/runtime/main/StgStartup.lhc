@@ -200,10 +200,6 @@ SET_STATIC_HDR(EmptySPTable_closure,EmptyStablePointerTable_info,CC_SUBSUMED,,ED
 P_ realWorldZh_closure = (P_) 0xbadbadbaL;
 P_ GHC_void_closure = (P_) 0xbadbadbaL;
 
-SET_STATIC_HDR(WorldStateToken_closure,STBase_SZh_static_info,CC_SUBSUMED/*harmless*/,,ED_RO_)
-, (W_) 0xbadbadbaL
-};
-
 #ifndef CONCURRENT
 
 STGFUN(startStgWorld)
@@ -226,8 +222,8 @@ STGFUN(startStgWorld)
     RetReg = (StgRetAddr) UNVEC(stopThreadDirectReturn,vtbl_stopStgWorld); 
 
     /* Put an IoWorld token on the A stack */
-    SpA -= AREL(1);
-    *SpA = (P_) WorldStateToken_closure;
+    SpB -= BREL(1);
+    *SpB = (P_) realWorldZh_closure;
 
     Node = (P_) TopClosure; /* Point to the closure for main/errorIO-arg */
     ENT_VIA_NODE();
@@ -361,7 +357,7 @@ STGFUN(ErrorIO_innards)
 
     SpA = SuA - AREL(1);
 
-    *SpA = (P_) WorldStateToken_closure;
+    *SpA = (P_) realWorldZh_closure;
 
     STKO_LINK(StkOReg) = PrelBase_Z91Z93_closure;
     STKO_RETURN(StkOReg) = NULL;

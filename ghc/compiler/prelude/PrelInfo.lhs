@@ -169,7 +169,7 @@ data_tycons
     , stateAndStablePtrPrimTyCon
     , stateAndSynchVarPrimTyCon
     , stateAndWordPrimTyCon
-    , stateTyCon
+    , stRetTyCon
     , voidTyCon
     , wordTyCon
     ]

@@ -533,9 +533,9 @@ hPutStr handle str =
      newCharArray (0,I# bufLen) >>= \ arr@(MutableByteArray _ arr#) ->
      let
       write_char :: MutableByteArray# RealWorld -> Int# -> Char# -> PrimIO ()
-      write_char arr# n x = ST $ \ (S# s#) ->
+      write_char arr# n x = ST $ \ s# ->
 	  case (writeCharArray# arr# n x s#) of { s1# ->
-	  ( (), S# s1# ) }
+	  STret s1# () }
 
       shoveString :: Int# -> [Char] -> PrimIO Bool
       shoveString n ls = 

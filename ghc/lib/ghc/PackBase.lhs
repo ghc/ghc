@@ -248,20 +248,20 @@ new_ps_array	:: Int# -> ST s (MutableByteArray s Int)
 write_ps_array	:: MutableByteArray s Int -> Int# -> Char# -> ST s () 
 freeze_ps_array :: MutableByteArray s Int -> Int# -> ST s (ByteArray Int)
 
-new_ps_array size = ST $ \ (S# s) ->
+new_ps_array size = ST $ \ s ->
     case (newCharArray# size s)	  of { StateAndMutableByteArray# s2# barr# ->
-    (MutableByteArray bot barr#, S# s2#)}
+    STret s2# (MutableByteArray bot barr#) }
   where
     bot = error "new_ps_array"
 
-write_ps_array (MutableByteArray _ barr#) n ch = ST $ \ (S# s#) ->
+write_ps_array (MutableByteArray _ barr#) n ch = ST $ \ s# ->
     case writeCharArray# barr# n ch s#	of { s2#   ->
-    ((), S# s2#)}
+    STret s2# () }
 
 -- same as unsafeFreezeByteArray
-freeze_ps_array (MutableByteArray _ arr#) len# = ST $ \ (S# s#) ->
+freeze_ps_array (MutableByteArray _ arr#) len# = ST $ \ s# ->
     case unsafeFreezeByteArray# arr# s# of { StateAndByteArray# s2# frozen# ->
-    (ByteArray (0,I# len#) frozen#, S# s2#) }
+    STret s2# (ByteArray (0,I# len#) frozen#) }
 \end{code}
 
 

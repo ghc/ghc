@@ -27,7 +27,7 @@ module Channel
        ) where
 
 import Prelude
-import IOBase	( IO(..) )		-- Suspicious!
+import IOBase	( IO(..), ioToST, stToIO )		-- Suspicious!
 import ConcBase
 import STBase
 import UnsafeST ( unsafeInterleavePrimIO )
@@ -114,30 +114,13 @@ Operators for interfacing with functional streams.
 
 getChanContents :: Chan a -> IO [a]
 getChanContents ch
-{- WAS:
-  = unsafeInterleavePrimIO (
-      getChan ch 				   `thenPrimIO` \ ~(Right x) ->
-      unsafeInterleavePrimIO (getChanContents ch)  `thenPrimIO` \ ~(Right xs) ->
-      returnPrimIO  (Right (x:xs)))
--}
-  = my_2_IO $ unsafeInterleavePrimIO (
-	getChan_prim ch 			         >>= \ ~(Right x) ->
-	unsafeInterleavePrimIO (getChanContents_prim ch) >>= \ ~(Right xs) ->
-	returnPrimIO  (Right (x:xs)))
+  = unsafeInterleaveIO (do
+	x <- getChan ch
+    	xs <- getChanContents ch
+    	return (x:xs)
+    )
 
-my_2_IO :: PrimIO (Either IOError a) -> IO a -- simple; primIOToIO does too much!
-my_2_IO m = IO m
-
-getChan_prim	     :: Chan a -> PrimIO (Either IOError  a)
-getChanContents_prim :: Chan a -> PrimIO (Either IOError [a])
-
-getChan_prim ch = ST $ \ s ->
-    case (getChan ch) of { IO (ST get) ->
-    get s }
-
-getChanContents_prim ch = ST $ \ s ->
-    case (getChanContents ch) of { IO (ST get) ->
-    get s }
+unsafeInterleaveIO = stToIO . unsafeInterleavePrimIO . ioToST
 
 -------------
 putList2Chan :: Chan a -> [a] -> IO ()

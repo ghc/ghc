@@ -1195,7 +1195,6 @@ sub setupLinkOpts {
           ,'-u', "${uscore}PrelBase_CZh_static_info"
           ,'-u', "${uscore}PrelBase_False_inregs_info"
           ,'-u', "${uscore}PrelBase_True_inregs_info"
-	  ,'-u', "${uscore}STBase_SZh_static_info"
           ,'-u', "${uscore}DEBUG_REGS"
 	));
   if ($TargetPlatform =~ /^powerpc-|^rs6000-/) {
