@@ -20,6 +20,7 @@ import TysPrim( wordPrimTyCon, intPrimTyCon, charPrimTyCon,
 import TyCon ( TyCon, tyConName )
 import FastString
 import Outputable
+import Char
 
 #include "../HsVersions.h"
 
@@ -84,32 +85,33 @@ tdefs	:: { [TyClDecl RdrName] }
 
 tdef	:: { TyClDecl RdrName }
 	: '%data' q_tc_name tv_bndrs '=' '{' cons1 '}'
-                { mkTyData DataType ([], ifaceExtRdrName $2, map toHsTvBndr $3) $6 Nothing noSrcLoc }
+                { mkTyData DataType (noLoc [], noLoc (ifaceExtRdrName $2), map toHsTvBndr $3) $6 Nothing }
 	| '%newtype' q_tc_name tv_bndrs trep 
 		{ let tc_rdr = ifaceExtRdrName $2 in
-                  mkTyData NewType ([], tc_rdr, map toHsTvBndr $3) ($4 (rdrNameOcc tc_rdr)) Nothing noSrcLoc }
+                  mkTyData NewType (noLoc [], noLoc tc_rdr, map toHsTvBndr $3) ($4 (rdrNameOcc tc_rdr)) Nothing }
 
 -- For a newtype we have to invent a fake data constructor name
 -- It doesn't matter what it is, because it won't be used
-trep    :: { OccName -> [ConDecl RdrName] }
+trep    :: { OccName -> [LConDecl RdrName] }
         : {- empty -}   { (\ tc_occ -> []) }
         | '=' ty        { (\ tc_occ -> let { dc_name  = mkRdrUnqual (setOccNameSpace dataName tc_occ) ;
 			                      con_info = PrefixCon [unbangedType (toHsType $2)] }
-			                in [ConDecl dc_name [] [] con_info noSrcLoc]) }
+			                in [noLoc $ ConDecl (noLoc dc_name) []
+					   (noLoc []) con_info]) }
 
-cons1	:: { [ConDecl RdrName] }
+cons1	:: { [LConDecl RdrName] }
 	: con		{ [$1] }
 	| con ';' cons1	{ $1:$3 }
 
-con	:: { ConDecl RdrName }
+con	:: { LConDecl RdrName }
 	: d_pat_occ attv_bndrs hs_atys 
-		{ ConDecl (mkRdrUnqual $1) $2 [] (PrefixCon (map unbangedType $3)) noSrcLoc}
+		{ noLoc $ ConDecl (noLoc (mkRdrUnqual $1)) $2 (noLoc []) (PrefixCon (map unbangedType $3))}
 
-attv_bndrs :: { [HsTyVarBndr RdrName] }
+attv_bndrs :: { [LHsTyVarBndr RdrName] }
 	: {- empty -} 	         { [] }
 	| '@' tv_bndr attv_bndrs {  toHsTvBndr $2 : $3 }
 
-hs_atys :: { [HsType RdrName] }
+hs_atys :: { [LHsType RdrName] }
          : atys               { map toHsType $1 }
 
 
@@ -248,7 +250,7 @@ alt	:: { IfaceAlt }
 lit	:: { Literal }
 	: '(' INTEGER '::' aty ')'	{ convIntLit $2 $4 }
 	| '(' RATIONAL '::' aty ')'	{ convRatLit $2 $4 }
-	| '(' CHAR '::' aty ')'		{ MachChar (fromEnum $2) }
+	| '(' CHAR '::' aty ')'		{ MachChar $2 }
 	| '(' STRING '::' aty ')'	{ MachStr (mkFastString $2) }
 
 tv_occ	:: { OccName }
@@ -281,7 +283,7 @@ convIntLit :: Integer -> IfaceType -> Literal
 convIntLit i (IfaceTyConApp tc [])
   | tc `eqTc` intPrimTyCon  = MachInt  i  
   | tc `eqTc` wordPrimTyCon = MachWord i
-  | tc `eqTc` charPrimTyCon = MachChar (fromInteger i)
+  | tc `eqTc` charPrimTyCon = MachChar (chr (fromInteger i))
   | tc `eqTc` addrPrimTyCon && i == 0 = MachNullAddr
 convIntLit i aty
   = pprPanic "Unknown integer literal type" (ppr aty)
@@ -304,22 +306,24 @@ eqTc (IfaceTc (ExtPkg mod occ)) tycon
 -- and convert to HsTypes here.  But the IfaceTypes we can see here
 -- are very limited (see the productions for 'ty', so the translation
 -- isn't hard
-toHsType :: IfaceType -> HsType RdrName
-toHsType (IfaceTyVar v)        		 = HsTyVar (mkRdrUnqual v)
-toHsType (IfaceAppTy t1 t2)    		 = HsAppTy (toHsType t1) (toHsType t2)
-toHsType (IfaceFunTy t1 t2)    		 = HsFunTy (toHsType t1) (toHsType t2)
-toHsType (IfaceTyConApp (IfaceTc tc) ts) = foldl HsAppTy (HsTyVar (ifaceExtRdrName tc)) (map toHsType ts) 
+toHsType :: IfaceType -> LHsType RdrName
+toHsType (IfaceTyVar v)        		 = noLoc $ HsTyVar (mkRdrUnqual v)
+toHsType (IfaceAppTy t1 t2)    		 = noLoc $ HsAppTy (toHsType t1) (toHsType t2)
+toHsType (IfaceFunTy t1 t2)    		 = noLoc $ HsFunTy (toHsType t1) (toHsType t2)
+toHsType (IfaceTyConApp (IfaceTc tc) ts) = foldl mkHsAppTy (noLoc $ HsTyVar (ifaceExtRdrName tc)) (map toHsType ts) 
 toHsType (IfaceForAllTy tv t)            = add_forall (toHsTvBndr tv) (toHsType t)
 
-toHsTvBndr :: IfaceTvBndr -> HsTyVarBndr RdrName
-toHsTvBndr (tv,k) = KindedTyVar (mkRdrUnqual tv) (tcIfaceKind k)
+toHsTvBndr :: IfaceTvBndr -> LHsTyVarBndr RdrName
+toHsTvBndr (tv,k) = noLoc $ KindedTyVar (mkRdrUnqual tv) (tcIfaceKind k)
 
 ifaceExtRdrName :: IfaceExtName -> RdrName
 ifaceExtRdrName (ExtPkg mod occ) = mkOrig mod occ
 ifaceExtRdrName other = pprPanic "ParserCore.ifaceExtRdrName" (ppr other)
 
-add_forall tv (HsForAllTy exp tvs cxt t) = HsForAllTy exp (tv:tvs) cxt t
-add_forall tv t                          = HsForAllTy Explicit [tv] [] t
+add_forall tv (L _ (HsForAllTy exp tvs cxt t))
+  = noLoc $ HsForAllTy exp (tv:tvs) cxt t
+add_forall tv t
+  = noLoc $ HsForAllTy Explicit [tv] (noLoc []) t
   
 happyError :: P a 
 happyError s l = failP (show l ++ ": Parse error\n") (take 100 s) l

@@ -43,6 +43,7 @@ import Data.Array.Base	( UArray(..) )
 import Data.Array.ST	( castSTUArray )
 import Foreign		( Word16, free )
 import Data.Int		( Int64 )
+import Data.Char	( ord )
 
 import GHC.Base		( ByteArray# )
 import GHC.IOBase	( IO(..) )
@@ -349,7 +350,7 @@ mkBits findLabel st proto_insns
        literal st (MachInt j)      = int st (fromIntegral j)
        literal st (MachFloat r)    = float st (fromRational r)
        literal st (MachDouble r)   = double st (fromRational r)
-       literal st (MachChar c)     = int st c
+       literal st (MachChar c)     = int st (ord c)
        literal st (MachInt64 ii)   = int64 st (fromIntegral ii)
        literal st (MachWord64 ii)  = int64 st (fromIntegral ii)
        literal st other            = pprPanic "ByteCodeLink.literal" (ppr other)

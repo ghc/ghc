@@ -61,7 +61,7 @@ import Control.Exception	( throwDyn )
 import GHC.Exts		( Int(..), ByteArray# )
 
 import Control.Monad	( when )
-import Data.Char	( ord )
+import Data.Char	( ord, chr )
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module 
@@ -714,7 +714,7 @@ doCase d s p (_,scrut)
            = case l of MachInt i     -> DiscrI (fromInteger i)
                        MachFloat r   -> DiscrF (fromRational r)
                        MachDouble r  -> DiscrD (fromRational r)
-                       MachChar i    -> DiscrI i
+                       MachChar i    -> DiscrI (ord i)
                        _ -> pprPanic "schemeE(AnnCase).my_discr" (ppr l)
 
         maybe_ncons 
@@ -950,7 +950,7 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
 mkDummyLiteral :: PrimRep -> Literal
 mkDummyLiteral pr
    = case pr of
-        CharRep   -> MachChar 0
+        CharRep   -> MachChar (chr 0)
         IntRep    -> MachInt 0
         WordRep   -> MachWord 0
         DoubleRep -> MachDouble 0

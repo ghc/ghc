@@ -6,15 +6,18 @@
 \begin{code}
 module RnEnv ( 
 	newTopSrcBinder, 
-	lookupBndrRn,lookupTopBndrRn, 
-	lookupOccRn, lookupGlobalOccRn,
+	lookupLocatedBndrRn, lookupBndrRn, 
+	lookupLocatedTopBndrRn, lookupTopBndrRn,
+	lookupLocatedOccRn, lookupOccRn, 
+	lookupLocatedGlobalOccRn, lookupGlobalOccRn,
 	lookupTopFixSigNames, lookupSrcOcc_maybe,
-	lookupFixityRn, lookupSigOccRn, lookupInstDeclBndr,
+	lookupFixityRn, lookupLocatedSigOccRn, 
+	lookupLocatedInstDeclBndr,
 	lookupSyntaxName, lookupSyntaxNames, lookupImportedName,
 
 	newLocalsRn, newIPNameRn,
 	bindLocalNames, bindLocalNamesFV,
-	bindLocalsRn, bindLocalsFV, bindLocatedLocalsRn,
+	bindLocatedLocalsFV, bindLocatedLocalsRn,
 	bindPatSigTyVars, bindPatSigTyVarsFV,
 	bindTyVarsRn, extendTyVarEnvFVRn,
 	bindLocalFixities,
@@ -22,7 +25,7 @@ module RnEnv (
 	checkDupNames, mapFvRn,
 	warnUnusedMatches, warnUnusedModules, warnUnusedImports, 
 	warnUnusedTopBinds, warnUnusedLocalBinds,
-	dataTcOccs, unknownNameErr
+	dataTcOccs, unknownNameErr,
     ) where
 
 #include "HsVersions.h"
@@ -30,7 +33,7 @@ module RnEnv (
 import LoadIface	( loadSrcInterface )
 import IfaceEnv		( lookupOrig, newGlobalBinder, newIPName )
 import HsSyn
-import RdrHsSyn		( RdrNameHsType, RdrNameFixitySig, extractHsTyRdrTyVars )
+import RdrHsSyn		( extractHsTyRdrTyVars )
 import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual, isOrig,
 			  mkRdrUnqual, setRdrNameSpace, rdrNameOcc,
 			  pprGlobalRdrEnv, lookupGRE_RdrName, 
@@ -50,10 +53,11 @@ import Module		( Module, ModuleName, moduleName, mkHomeModule )
 import PrelNames	( mkUnboundName, rOOT_MAIN_Name, iNTERACTIVE )
 import UniqSupply
 import BasicTypes	( IPName, mapIPName )
-import SrcLoc		( SrcLoc )
+import SrcLoc		( srcSpanStart, Located(..), eqLocated, unLoc,
+			  srcLocSpan )
 import Outputable
-import ListSetOps	( removeDups, equivClasses )
-import List		( nub )
+import ListSetOps	( removeDups )
+import List		( nubBy )
 import CmdLineOpts
 import FastString	( FastString )
 \end{code}
@@ -65,8 +69,8 @@ import FastString	( FastString )
 %*********************************************************
 
 \begin{code}
-newTopSrcBinder :: Module -> Maybe Name -> (RdrName, SrcLoc) -> RnM Name
-newTopSrcBinder mod mb_parent (rdr_name, loc)
+newTopSrcBinder :: Module -> Maybe Name -> Located RdrName -> RnM Name
+newTopSrcBinder mod mb_parent (L loc rdr_name)
   | Just name <- isExact_maybe rdr_name
   = returnM name
 
@@ -82,10 +86,11 @@ newTopSrcBinder mod mb_parent (rdr_name, loc)
 	-- not from the environment.  In principle, it'd be fine to have an
 	-- arbitrary mixture of external core definitions in a single module,
 	-- (apart from module-initialisation issues, perhaps).
-    newGlobalBinder (mkHomeModule rdr_mod) (rdrNameOcc rdr_name) mb_parent loc
+    newGlobalBinder (mkHomeModule rdr_mod) (rdrNameOcc rdr_name) mb_parent 
+	(srcSpanStart loc) --TODO, should pass the whole span
 
   | otherwise
-  = newGlobalBinder mod (rdrNameOcc rdr_name) mb_parent loc
+  = newGlobalBinder mod (rdrNameOcc rdr_name) mb_parent (srcSpanStart loc)
   where
     rdr_mod = rdrNameModule rdr_name
 \end{code}
@@ -99,11 +104,19 @@ newTopSrcBinder mod mb_parent (rdr_name, loc)
 Looking up a name in the RnEnv.
 
 \begin{code}
+lookupLocatedBndrRn :: Located RdrName -> RnM (Located Name)
+lookupLocatedBndrRn = wrapLocM lookupBndrRn
+
+lookupBndrRn :: RdrName -> RnM Name
+-- NOTE: assumes that the SrcSpan of the binder has already been addSrcSpan'd
 lookupBndrRn rdr_name
   = getLocalRdrEnv		`thenM` \ local_env ->
     case lookupLocalRdrEnv local_env rdr_name of 
 	  Just name -> returnM name
 	  Nothing   -> lookupTopBndrRn rdr_name
+
+lookupLocatedTopBndrRn :: Located RdrName -> RnM (Located Name)
+lookupLocatedTopBndrRn = wrapLocM lookupTopBndrRn
 
 lookupTopBndrRn :: RdrName -> RnM Name
 -- Look up a top-level source-code binder.   We may be looking up an unqualified 'f',
@@ -143,9 +156,10 @@ lookupTopBndrRn rdr_name
 	-- This deals with the case of derived bindings, where
 	-- we don't bother to call newTopSrcBinder first
 	-- We assume there is no "parent" name
-  = getSrcLocM				`thenM` \ loc ->
-    newGlobalBinder (mkHomeModule (rdrNameModule rdr_name)) 
-		    (rdrNameOcc rdr_name) Nothing loc
+  = do
+	loc <- getSrcSpanM
+	newGlobalBinder (mkHomeModule (rdrNameModule rdr_name)) 
+		    (rdrNameOcc rdr_name) Nothing (srcSpanStart loc)
 
   | otherwise
   = do	{ mb_gre <- lookupGreLocalRn rdr_name
@@ -153,7 +167,7 @@ lookupTopBndrRn rdr_name
 		Nothing  -> unboundName rdr_name
 		Just gre -> returnM (gre_name gre) }
 	      
--- lookupSigOccRn is used for type signatures and pragmas
+-- lookupLocatedSigOccRn is used for type signatures and pragmas
 -- Is this valid?
 --   module A
 --	import M( f )
@@ -163,12 +177,15 @@ lookupTopBndrRn rdr_name
 -- The Haskell98 report does not stipulate this, but it will!
 -- So we must treat the 'f' in the signature in the same way
 -- as the binding occurrence of 'f', using lookupBndrRn
-lookupSigOccRn :: RdrName -> RnM Name
-lookupSigOccRn = lookupBndrRn
+lookupLocatedSigOccRn :: Located RdrName -> RnM (Located Name)
+lookupLocatedSigOccRn = lookupLocatedBndrRn
 
 -- lookupInstDeclBndr is used for the binders in an 
 -- instance declaration.   Here we use the class name to
 -- disambiguate.  
+
+lookupLocatedInstDeclBndr :: Name -> Located RdrName -> RnM (Located Name)
+lookupLocatedInstDeclBndr cls = wrapLocM (lookupInstDeclBndr cls)
 
 lookupInstDeclBndr :: Name -> RdrName -> RnM Name
 lookupInstDeclBndr cls_name rdr_name
@@ -196,6 +213,9 @@ newIPNameRn ip_rdr = newIPName (mapIPName rdrNameOcc ip_rdr)
 --		Occurrences
 --------------------------------------------------
 
+lookupLocatedOccRn :: Located RdrName -> RnM (Located Name)
+lookupLocatedOccRn = wrapLocM lookupOccRn
+
 -- lookupOccRn looks up an occurrence of a RdrName
 lookupOccRn :: RdrName -> RnM Name
 lookupOccRn rdr_name
@@ -203,6 +223,9 @@ lookupOccRn rdr_name
     case lookupLocalRdrEnv local_env rdr_name of
 	  Just name -> returnM name
 	  Nothing   -> lookupGlobalOccRn rdr_name
+
+lookupLocatedGlobalOccRn :: Located RdrName -> RnM (Located Name)
+lookupLocatedGlobalOccRn = wrapLocM lookupGlobalOccRn
 
 lookupGlobalOccRn :: RdrName -> RnM Name
 -- lookupGlobalOccRn is like lookupOccRn, except that it looks in the global 
@@ -282,7 +305,7 @@ lookupGreLocalRn rdr_name
   where
     lookup_fn env = filter isLocalGRE (lookupGRE_RdrName rdr_name env)
 
-lookupGreRn_help :: RdrName				-- Only used in error message
+lookupGreRn_help :: RdrName			-- Only used in error message
 		 -> (GlobalRdrEnv -> [GlobalRdrElt])	-- Lookup function
 		 -> RnM (Maybe GlobalRdrElt)
 -- Checks for exactly one match; reports deprecations
@@ -343,7 +366,7 @@ lookupTopFixSigNames rdr_name
 	; return [gre_name gre | Just gre <- mb_gres] }
 
 --------------------------------
-bindLocalFixities :: [RdrNameFixitySig] -> RnM a -> RnM a
+bindLocalFixities :: [FixitySig RdrName] -> RnM a -> RnM a
 -- Used for nested fixity decls
 -- No need to worry about type constructors here,
 -- Should check for duplicates but we don't
@@ -352,10 +375,9 @@ bindLocalFixities fixes thing_inside
   | otherwise  = mappM rn_sig fixes	`thenM` \ new_bit ->
 		 extendFixityEnv new_bit thing_inside
   where
-    rn_sig (FixitySig v fix src_loc)
-	= addSrcLoc src_loc $
-	  lookupSigOccRn v		`thenM` \ new_v ->
-	  returnM (new_v, (FixItem (rdrNameOcc v) fix src_loc))
+    rn_sig (FixitySig lv@(L loc v) fix)
+	= addLocM lookupBndrRn lv	`thenM` \ new_v ->
+	  returnM (new_v, (FixItem (rdrNameOcc v) fix loc))
 \end{code}
 
 --------------------------------
@@ -479,9 +501,9 @@ lookupSyntaxNames std_names
     	-- Get the similarly named thing from the local environment
     mappM (lookupOccRn . mkRdrUnqual . nameOccName) std_names 	`thenM` \ usr_names ->
 
-    returnM (std_names `zip` map HsVar usr_names, mkFVs usr_names)
+    returnM (std_names `zip` map nlHsVar usr_names, mkFVs usr_names)
   where
-    normal_case = returnM (std_names `zip` map HsVar std_names, emptyFVs)
+    normal_case = returnM (std_names `zip` map nlHsVar std_names, emptyFVs)
 \end{code}
 
 
@@ -492,21 +514,21 @@ lookupSyntaxNames std_names
 %*********************************************************
 
 \begin{code}
-newLocalsRn :: [(RdrName,SrcLoc)] -> RnM [Name]
+newLocalsRn :: [Located RdrName] -> RnM [Name]
 newLocalsRn rdr_names_w_loc
   = newUniqueSupply 		`thenM` \ us ->
     returnM (zipWith mk rdr_names_w_loc (uniqsFromSupply us))
   where
-    mk (rdr_name, loc) uniq
+    mk (L loc rdr_name) uniq
 	| Just name <- isExact_maybe rdr_name = name
 		-- This happens in code generated by Template Haskell 
 	| otherwise = ASSERT2( isUnqual rdr_name, ppr rdr_name )
 			-- We only bind unqualified names here
 			-- lookupRdrEnv doesn't even attempt to look up a qualified RdrName
-		      mkInternalName uniq (rdrNameOcc rdr_name) loc
+		      mkInternalName uniq (rdrNameOcc rdr_name) (srcSpanStart loc)
 
 bindLocatedLocalsRn :: SDoc	-- Documentation string for error message
-	   	    -> [(RdrName,SrcLoc)]
+	   	    -> [Located RdrName]
 	    	    -> ([Name] -> RnM a)
 	    	    -> RnM a
 bindLocatedLocalsRn doc_str rdr_names_w_loc enclosed_scope
@@ -536,16 +558,12 @@ bindLocalNamesFV names enclosed_scope
 
 
 -------------------------------------
-bindLocalsRn doc rdr_names enclosed_scope
-  = getSrcLocM		`thenM` \ loc ->
-    bindLocatedLocalsRn doc
-			(rdr_names `zip` repeat loc)
-		 	enclosed_scope
-
 	-- binLocalsFVRn is the same as bindLocalsRn
 	-- except that it deals with free vars
-bindLocalsFV doc rdr_names enclosed_scope
-  = bindLocalsRn doc rdr_names		$ \ names ->
+bindLocatedLocalsFV :: SDoc -> [Located RdrName] -> ([Name] -> RnM (a,FreeVars))
+  -> RnM (a, FreeVars)
+bindLocatedLocalsFV doc rdr_names enclosed_scope
+  = bindLocatedLocalsRn doc rdr_names	$ \ names ->
     enclosed_scope names		`thenM` \ (thing, fvs) ->
     returnM (thing, delListFromNameSet fvs names)
 
@@ -556,39 +574,37 @@ extendTyVarEnvFVRn tyvars enclosed_scope
   = bindLocalNames tyvars enclosed_scope 	`thenM` \ (thing, fvs) -> 
     returnM (thing, delListFromNameSet fvs tyvars)
 
-bindTyVarsRn :: SDoc -> [HsTyVarBndr RdrName]
-	      -> ([HsTyVarBndr Name] -> RnM a)
+bindTyVarsRn :: SDoc -> [LHsTyVarBndr RdrName]
+	      -> ([LHsTyVarBndr Name] -> RnM a)
 	      -> RnM a
 bindTyVarsRn doc_str tyvar_names enclosed_scope
-  = getSrcLocM					`thenM` \ loc ->
-    let
-	located_tyvars = [(hsTyVarName tv, loc) | tv <- tyvar_names] 
+  = let
+	located_tyvars = [L loc (hsTyVarName tv) | L loc tv <- tyvar_names] 
     in
     bindLocatedLocalsRn doc_str located_tyvars	$ \ names ->
-    enclosed_scope (zipWith replaceTyVarName tyvar_names names)
+    enclosed_scope (zipWith replace tyvar_names names)
+    where 
+	replace (L loc n1) n2 = L loc (replaceTyVarName n1 n2)
 
-bindPatSigTyVars :: [RdrNameHsType] -> ([Name] -> RnM a) -> RnM a
+bindPatSigTyVars :: [LHsType RdrName] -> ([Name] -> RnM a) -> RnM a
   -- Find the type variables in the pattern type 
   -- signatures that must be brought into scope
-
 bindPatSigTyVars tys thing_inside
   = getLocalRdrEnv		`thenM` \ name_env ->
-    getSrcLocM			`thenM` \ loc ->
     let
-	forall_tyvars  = nub [ tv | ty <- tys,
-				    tv <- extractHsTyRdrTyVars ty, 
-				    not (tv `elemLocalRdrEnv` name_env)
+	located_tyvars  = nubBy eqLocated [ tv | ty <- tys,
+				    tv <- extractHsTyRdrTyVars ty,
+				    not (unLoc tv `elemLocalRdrEnv` name_env)
 			 ]
 		-- The 'nub' is important.  For example:
 		--	f (x :: t) (y :: t) = ....
 		-- We don't want to complain about binding t twice!
 
-	located_tyvars = [(tv, loc) | tv <- forall_tyvars] 
 	doc_sig        = text "In a pattern type-signature"
     in
     bindLocatedLocalsRn doc_sig located_tyvars thing_inside
 
-bindPatSigTyVarsFV :: [RdrNameHsType]
+bindPatSigTyVarsFV :: [LHsType RdrName]
 		   -> RnM (a, FreeVars)
 	  	   -> RnM (a, FreeVars)
 bindPatSigTyVarsFV tys thing_inside
@@ -598,26 +614,26 @@ bindPatSigTyVarsFV tys thing_inside
 
 -------------------------------------
 checkDupNames :: SDoc
-	      -> [(RdrName, SrcLoc)]
+	      -> [Located RdrName]
 	      -> RnM ()
 checkDupNames doc_str rdr_names_w_loc
   = 	-- Check for duplicated names in a binding group
     mappM_ (dupNamesErr doc_str) dups
   where
-    (_, dups) = removeDups (\(n1,l1) (n2,l2) -> n1 `compare` n2) rdr_names_w_loc
+    (_, dups) = removeDups (\n1 n2 -> unLoc n1 `compare` unLoc n2) rdr_names_w_loc
 
 -------------------------------------
-checkShadowing doc_str rdr_names_w_loc
+checkShadowing doc_str loc_rdr_names
   = getLocalRdrEnv		`thenM` \ local_env ->
     getGlobalRdrEnv		`thenM` \ global_env ->
     let
-      check_shadow (rdr_name,loc)
+      check_shadow (L loc rdr_name)
 	|  rdr_name `elemLocalRdrEnv` local_env 
  	|| not (null (lookupGRE_RdrName rdr_name global_env ))
-	= addSrcLoc loc $ addWarn (shadowedNameWarn doc_str rdr_name)
+	= addSrcSpan loc $ addWarn (shadowedNameWarn doc_str rdr_name)
         | otherwise = returnM ()
     in
-    mappM_ check_shadow rdr_names_w_loc
+    mappM_ check_shadow loc_rdr_names
 \end{code}
 
 
@@ -663,35 +679,30 @@ warnUnusedMatches    names = ifOptM Opt_WarnUnusedMatches (warnUnusedLocals name
 
 -------------------------
 --	Helpers
-warnUnusedGREs   gres  = warnUnusedBinds [(n,Just p) | GRE {gre_name = n, gre_prov = p} <- gres]
-warnUnusedLocals names = warnUnusedBinds [(n,Nothing) | n<-names]
+warnUnusedGREs gres 
+ = warnUnusedBinds [(n,Just p) | GRE {gre_name = n, gre_prov = p} <- gres]
+
+warnUnusedLocals names
+ = warnUnusedBinds [(n,Nothing) | n<-names]
 
 warnUnusedBinds :: [(Name,Maybe Provenance)] -> RnM ()
-warnUnusedBinds names
-  = mappM_ warnUnusedGroup groups
-  where
-	-- Group by provenance
-   groups = equivClasses cmp (filter reportable names)
-   (_,prov1) `cmp` (_,prov2) = prov1 `compare` prov2
- 
-   reportable (name,_) = reportIfUnused (nameOccName name)
-
+warnUnusedBinds names  = mappM_ warnUnusedName (filter reportable names)
+ where reportable (name,_) = reportIfUnused (nameOccName name)
 
 -------------------------
 
-warnUnusedGroup :: [(Name,Maybe Provenance)] -> RnM ()
-warnUnusedGroup names
-  = addSrcLoc def_loc	$
-    addWarn		$
-    sep [msg <> colon, nest 4 (fsep (punctuate comma (map (ppr.fst) names)))]
+warnUnusedName :: (Name, Maybe Provenance) -> RnM ()
+warnUnusedName (name, prov)
+  = addWarnAt loc (sep [msg <> colon, nest 4 (ppr name)])
+	-- TODO should be a proper span
   where
-    (name1, prov1) = head names
-    loc1  	   = nameSrcLoc name1
-    (def_loc, msg) = case prov1 of
-			Just (Imported is _) -> (is_loc imp_spec, imp_from (is_mod imp_spec))
-				      where
-					 imp_spec = head is
-			other -> (loc1, unused_msg)
+    (loc,msg) = case prov of
+		  Just (Imported is _) -> 
+		     ( is_loc (head is), imp_from (is_mod imp_spec) )
+		     where
+			 imp_spec = head is
+		  other -> 
+		     ( srcLocSpan (nameSrcLoc name), unused_msg )
 
     unused_msg   = text "Defined but not used"
     imp_from mod = text "Imported from" <+> quotes (ppr mod) <+> text "but not used"
@@ -724,8 +735,8 @@ badOrigBinding name
   = ptext SLIT("Illegal binding of built-in syntax:") <+> ppr (rdrNameOcc name)
 	-- The rdrNameOcc is because we don't want to print Prelude.(,)
 
-dupNamesErr descriptor ((name,loc) : dup_things)
-  = addSrcLoc loc $
+dupNamesErr descriptor (L loc name : dup_things)
+  = addSrcSpan loc $
     addErr ((ptext SLIT("Conflicting definitions for") <+> quotes (ppr name))
 	      $$ 
 	      descriptor)

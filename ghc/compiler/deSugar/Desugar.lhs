@@ -12,9 +12,8 @@ import CmdLineOpts	( DynFlag(..), dopt, opt_SccProfilingOn )
 import HscTypes		( ModGuts(..), ModGuts, HscEnv(..), GhciMode(..),
 			  Dependencies(..), TypeEnv, 
 	  		  unQualInScope, availsToNameSet )
-import HsSyn		( MonoBinds, RuleDecl(..), RuleBndr(..), 
-			  HsExpr(..), HsBinds(..), MonoBinds(..) )
-import TcHsSyn		( TypecheckedRuleDecl, TypecheckedHsExpr )
+import HsSyn		( RuleDecl(..), RuleBndr(..), HsExpr(..), LHsExpr,
+			  HsBindGroup(..), LRuleDecl, HsBind(..) )
 import TcRnTypes	( TcGblEnv(..), ImportAvails(..) )
 import MkIface		( mkUsageInfo )
 import Id		( Id, setIdLocalExported, idName )
@@ -23,8 +22,8 @@ import CoreSyn
 import PprCore		( pprIdRules, pprCoreExpr )
 import Subst		( substExpr, mkSubst, mkInScopeSet )
 import DsMonad
-import DsExpr		( dsExpr )
-import DsBinds		( dsMonoBinds, AutoScc(..) )
+import DsExpr		( dsLExpr )
+import DsBinds		( dsHsBinds, AutoScc(..) )
 import DsForeign	( dsForeigns )
 import DsExpr		()	-- Forces DsExpr to be compiled; DsBinds only
 				-- depends on DsExpr.hi-boot.
@@ -34,15 +33,15 @@ import RdrName	 	( GlobalRdrEnv )
 import NameSet
 import VarEnv
 import VarSet
-import Bag		( isEmptyBag, mapBag, emptyBag )
+import Bag		( isEmptyBag, mapBag, emptyBag, bagToList )
 import CoreLint		( showPass, endPass )
 import CoreFVs		( ruleRhsFreeVars )
 import ErrUtils		( doIfSet, dumpIfSet_dyn, pprBagOfWarnings, 
-			  addShortWarnLocLine, errorsFound )
+			  mkWarnMsg, errorsFound, WarnMsg )
 import Outputable
 import qualified Pretty
 import UniqSupply	( mkSplitUniqSupply )
-import SrcLoc		( SrcLoc )
+import SrcLoc		( Located(..), SrcSpan, unLoc )
 import DATA_IOREF	( readIORef )
 import FastString
 \end{code}
@@ -127,13 +126,13 @@ deSugar hsc_env
 
 	-- Desugarer warnings are SDocs; here we
 	-- add the info about whether or not to print unqualified
-    mk_warn :: (SrcLoc,SDoc) -> (SrcLoc, Pretty.Doc)
-    mk_warn (loc, sdoc) = addShortWarnLocLine loc print_unqual sdoc
+    mk_warn :: (SrcSpan,SDoc) -> WarnMsg
+    mk_warn (loc, sdoc) = mkWarnMsg loc print_unqual sdoc
 
 
 deSugarExpr :: HscEnv
 	    -> Module -> GlobalRdrEnv -> TypeEnv 
- 	    -> TypecheckedHsExpr
+ 	    -> LHsExpr Id
 	    -> IO CoreExpr
 deSugarExpr hsc_env this_mod rdr_env type_env tc_expr
   = do	{ showPass dflags "Desugar"
@@ -143,7 +142,7 @@ deSugarExpr hsc_env this_mod rdr_env type_env tc_expr
 	; let { is_boot = emptyModuleEnv }	-- Assume no hi-boot files when
 						-- doing stuff from the command line
 	; (core_expr, ds_warns) <- initDs hsc_env this_mod type_env is_boot $
-				   dsExpr tc_expr
+				   dsLExpr tc_expr
 
 	-- Display any warnings 
 	-- Note: if -Werror is used, we don't signal an error here.
@@ -159,8 +158,8 @@ deSugarExpr hsc_env this_mod rdr_env type_env tc_expr
     dflags       = hsc_dflags hsc_env
     print_unqual = unQualInScope rdr_env
 
-    mk_warn :: (SrcLoc,SDoc) -> (SrcLoc, Pretty.Doc)
-    mk_warn (loc,sdoc) = addShortWarnLocLine loc print_unqual sdoc
+    mk_warn :: (SrcSpan,SDoc) -> WarnMsg
+    mk_warn (loc,sdoc) = mkWarnMsg loc print_unqual sdoc
 
 
 dsProgram ghci_mode (TcGblEnv { tcg_exports = exports,
@@ -168,7 +167,7 @@ dsProgram ghci_mode (TcGblEnv { tcg_exports = exports,
 		      		tcg_binds   = binds,
 		      		tcg_fords   = fords,
 		      		tcg_rules   = rules })
-  = dsMonoBinds auto_scc binds []	`thenDs` \ core_prs ->
+  = dsHsBinds auto_scc binds []	`thenDs` \ core_prs ->
     dsForeigns fords			`thenDs` \ (ds_fords, foreign_prs) ->
     let
 	all_prs = foreign_prs ++ core_prs
@@ -254,24 +253,25 @@ ppr_ds_rules rules
 %************************************************************************
 
 \begin{code}
-dsRule :: IdSet -> TypecheckedRuleDecl -> DsM (Id, CoreRule)
-dsRule in_scope (HsRule name act vars lhs rhs loc)
-  = putSrcLocDs loc		$
+dsRule :: IdSet -> LRuleDecl Id -> DsM (Id, CoreRule)
+dsRule in_scope (L loc (HsRule name act vars lhs rhs))
+  = putSrcSpanDs loc $ 
     ds_lhs all_vars lhs		`thenDs` \ (fn, args) ->
-    dsExpr rhs			`thenDs` \ core_rhs ->
+    dsLExpr rhs			`thenDs` \ core_rhs ->
     returnDs (fn, Rule name act tpl_vars args core_rhs)
   where
-    tpl_vars = [var | RuleBndr var <- vars]
+    tpl_vars = [var | RuleBndr (L _ var) <- vars]
     all_vars = mkInScopeSet (in_scope `unionVarSet` mkVarSet tpl_vars)
 
 ds_lhs all_vars lhs
   = let
-	(dict_binds, body) = case lhs of
-		(HsLet (MonoBind dict_binds _ _) body) -> (dict_binds, body)
-		other			 	       -> (EmptyMonoBinds, lhs)
+	(dict_binds, body) = 
+	   case unLoc lhs of
+		(HsLet [HsBindGroup dict_binds _ _] body) -> (dict_binds, body)
+		other			 	       -> (emptyBag, lhs)
     in
-    ds_dict_binds dict_binds 	`thenDs` \ dict_binds' ->
-    dsExpr body			`thenDs` \ body' ->
+    mappM ds_dict_bind (bagToList dict_binds) 	`thenDs` \ dict_binds' ->
+    dsLExpr body			`thenDs` \ body' ->
 
 	-- Substitute the dict bindings eagerly,
 	-- and take the body apart into a (f args) form
@@ -293,10 +293,7 @@ ds_lhs all_vars lhs
     in
     returnDs pair
 
-ds_dict_binds EmptyMonoBinds 	   = returnDs []
-ds_dict_binds (AndMonoBinds b1 b2) = ds_dict_binds b1 	`thenDs` \ env1 ->
-				     ds_dict_binds b2 	`thenDs` \ env2 ->
-				     returnDs (env1 ++ env2)
-ds_dict_binds (VarMonoBind id rhs) = dsExpr rhs		`thenDs` \ rhs' ->
-				     returnDs [(id,rhs')]
+ds_dict_bind (L _ (VarBind id rhs)) =
+  dsLExpr rhs `thenDs` \ rhs' ->
+  returnDs (id,rhs')
 \end{code}

@@ -11,7 +11,7 @@ module HsImpExp where
 import Module		( ModuleName )
 import Outputable
 import FastString
-import SrcLoc		( SrcLoc )
+import SrcLoc		( Located(..) )
 import Char		( isAlpha )
 \end{code}
 
@@ -23,18 +23,19 @@ import Char		( isAlpha )
 
 One per \tr{import} declaration in a module.
 \begin{code}
+type LImportDecl name = Located (ImportDecl name)
+
 data ImportDecl name
-  = ImportDecl	  ModuleName			-- module name
+  = ImportDecl	  (Located ModuleName)		-- module name
 		  Bool				-- True <=> {-# SOURCE #-} import
 		  Bool				-- True => qualified
 		  (Maybe ModuleName)		-- as Module
-		  (Maybe (Bool, [IE name]))	-- (True => hiding, names)
-		  SrcLoc
+		  (Maybe (Bool, [LIE name]))	-- (True => hiding, names)
 \end{code}
 
 \begin{code}
 instance (Outputable name) => Outputable (ImportDecl name) where
-    ppr (ImportDecl mod from qual as spec _)
+    ppr (ImportDecl mod from qual as spec)
       = hang (hsep [ptext SLIT("import"), ppr_imp from, 
                     pp_qual qual, ppr mod, pp_as as])
 	     4 (pp_spec spec)
@@ -54,7 +55,7 @@ instance (Outputable name) => Outputable (ImportDecl name) where
 	pp_spec (Just (True, spec))
 			= ptext SLIT("hiding") <+> parens (interpp'SP spec)
 
-ideclName (ImportDecl mod_nm _ _ _ _ _) = mod_nm
+ideclName (ImportDecl mod_nm _ _ _ _) = mod_nm
 \end{code}
 
 %************************************************************************
@@ -64,6 +65,8 @@ ideclName (ImportDecl mod_nm _ _ _ _ _) = mod_nm
 %************************************************************************
 
 \begin{code}
+type LIE name = Located (IE name)
+
 data IE name
   = IEVar		name
   | IEThingAbs          name		-- Class/Type (can't tell)

@@ -10,33 +10,21 @@ module DsArrows ( dsProcExpr ) where
 
 import Match		( matchSimply )
 import DsUtils		( mkErrorAppDs,
-			  mkCoreTupTy, mkCoreTup, selectMatchVar,
+			  mkCoreTupTy, mkCoreTup, selectMatchVarL,
 			  mkTupleCase, mkBigCoreTup, mkTupleType,
 			  mkTupleExpr, mkTupleSelector,
 			  dsReboundNames, lookupReboundName )
 import DsMonad
 
-import HsSyn		( HsExpr(..), 
-			  Stmt(..), HsMatchContext(..), HsStmtContext(..), 
-			  Match(..), GRHSs(..), GRHS(..),
-			  HsCmdTop(..), HsArrAppType(..),
-			  ReboundNames,
-			  collectHsBinders,
-			  collectStmtBinders, collectStmtsBinders,
-			  matchContextErrString
-			)
-import TcHsSyn		( TypecheckedHsCmd, TypecheckedHsCmdTop,
-			  TypecheckedHsExpr, TypecheckedPat,
-			  TypecheckedMatch, TypecheckedGRHS,
-			  TypecheckedStmt, hsPatType,
-			  TypecheckedMatchContext )
+import HsSyn
+import TcHsSyn		( hsPatType )
 
 -- NB: The desugarer, which straddles the source and Core worlds, sometimes
 --     needs to see source types (newtypes etc), and sometimes not
 --     So WATCH OUT; check each use of split*Ty functions.
 -- Sigh.  This is a pain.
 
-import {-# SOURCE #-} DsExpr ( dsExpr, dsLet )
+import {-# SOURCE #-} DsExpr ( dsExpr, dsLExpr, dsLet )
 
 import TcType		( Type, tcSplitAppTy )
 import Type		( mkTyConApp )
@@ -45,6 +33,7 @@ import CoreFVs		( exprFreeVars )
 import CoreUtils	( mkIfThenElse, bindNonRec, exprType )
 
 import Id		( Id, idType )
+import Name		( Name )
 import PrelInfo		( pAT_ERROR_ID )
 import DataCon		( dataConWrapId )
 import TysWiredIn	( tupleCon )
@@ -59,7 +48,7 @@ import HsPat		( collectPatBinders, collectPatsBinders )
 import VarSet		( IdSet, mkVarSet, varSetElems,
 			  intersectVarSet, minusVarSet, 
 			  unionVarSet, unionVarSets, elemVarSet )
-import SrcLoc		( SrcLoc )
+import SrcLoc		( Located(..), unLoc, noLoc, getLoc )
 \end{code}
 
 \begin{code}
@@ -122,7 +111,7 @@ do_map_arrow :: DsCmdEnv -> Type -> Type -> Type ->
 do_map_arrow ids b_ty c_ty d_ty f c
   = do_compose ids b_ty c_ty d_ty (do_arr ids b_ty c_ty f) c
 
-mkFailExpr :: TypecheckedMatchContext -> Type -> DsM CoreExpr
+mkFailExpr :: HsMatchContext Id -> Type -> DsM CoreExpr
 mkFailExpr ctxt ty
   = mkErrorAppDs pAT_ERROR_ID ty (matchContextErrString ctxt)
 
@@ -232,14 +221,14 @@ matchVarStack env_id (stack_id:stack_ids) body
 \end{code}
 
 \begin{code}
-mkHsTupleExpr :: [TypecheckedHsExpr] -> TypecheckedHsExpr
+mkHsTupleExpr :: [HsExpr Id] -> HsExpr Id
 mkHsTupleExpr [e] = e
-mkHsTupleExpr es = ExplicitTuple es Boxed
+mkHsTupleExpr es = ExplicitTuple (map noLoc es) Boxed
 
-mkHsPairExpr :: TypecheckedHsExpr -> TypecheckedHsExpr -> TypecheckedHsExpr
+mkHsPairExpr :: HsExpr Id -> HsExpr Id -> HsExpr Id
 mkHsPairExpr e1 e2 = mkHsTupleExpr [e1, e2]
 
-mkHsEnvStackExpr :: [Id] -> [Id] -> TypecheckedHsExpr
+mkHsEnvStackExpr :: [Id] -> [Id] -> HsExpr Id
 mkHsEnvStackExpr env_ids stack_ids
   = foldl mkHsPairExpr (mkHsTupleExpr (map HsVar env_ids)) (map HsVar stack_ids)
 \end{code}
@@ -255,13 +244,11 @@ Translation of arrow abstraction
 --		where (xs) is the tuple of variables bound by p
 
 dsProcExpr
-	:: TypecheckedPat
-	-> TypecheckedHsCmdTop
-	-> SrcLoc
+	:: LPat Id
+	-> LHsCmdTop Id
 	-> DsM CoreExpr
-dsProcExpr pat (HsCmdTop cmd [] cmd_ty ids) locn
-  = putSrcLocDs locn $
-    mkCmdEnv ids			`thenDs` \ meth_ids ->
+dsProcExpr pat (L _ (HsCmdTop cmd [] cmd_ty ids))
+  = mkCmdEnv ids			`thenDs` \ meth_ids ->
     let
 	locals = mkVarSet (collectPatBinders pat)
     in
@@ -271,7 +258,7 @@ dsProcExpr pat (HsCmdTop cmd [] cmd_ty ids) locn
 	env_ty = mkTupleType env_ids
     in
     mkFailExpr ProcExpr env_ty		`thenDs` \ fail_expr ->
-    selectMatchVar pat			`thenDs` \ var ->
+    selectMatchVarL pat			`thenDs` \ var ->
     matchSimply (Var var) ProcExpr pat (mkTupleExpr env_ids) fail_expr
 					`thenDs` \ match_code ->
     let
@@ -281,7 +268,6 @@ dsProcExpr pat (HsCmdTop cmd [] cmd_ty ids) locn
 		core_cmd
     in
     returnDs (bindCmdEnv meth_ids proc_code)
-
 \end{code}
 
 Translation of command judgements of the form
@@ -289,15 +275,17 @@ Translation of command judgements of the form
 	A | xs |- c :: [ts] t
 
 \begin{code}
+dsLCmd ids local_vars env_ids stack res_ty cmd
+  = dsCmd ids local_vars env_ids stack res_ty (unLoc cmd)
 
-dsCmd :: DsCmdEnv		-- arrow combinators
+dsCmd   :: DsCmdEnv		-- arrow combinators
 	-> IdSet		-- set of local vars available to this command
 	-> [Id]			-- list of vars in the input to this command
 				-- This is typically fed back,
 				-- so don't pull on it too early
 	-> [Type]		-- type of the stack
 	-> Type			-- return type of the command
-	-> TypecheckedHsCmd	-- command to desugar
+	-> HsCmd Id		-- command to desugar
 	-> DsM (CoreExpr,	-- desugared expression
 		IdSet)		-- set of local vars that occur free
 
@@ -307,14 +295,14 @@ dsCmd :: DsCmdEnv		-- arrow combinators
 --	A | xs |- f -< arg :: [] t'	---> arr (\ (xs) -> arg) >>> f
 
 dsCmd ids local_vars env_ids [] res_ty
-	(HsArrApp arrow arg arrow_ty HsFirstOrderApp _ _)
+	(HsArrApp arrow arg arrow_ty HsFirstOrderApp _)
   = let
 	(a_arg_ty, _res_ty') = tcSplitAppTy arrow_ty
         (_a_ty, arg_ty) = tcSplitAppTy a_arg_ty
 	env_ty = mkTupleType env_ids
     in
-    dsExpr arrow			`thenDs` \ core_arrow ->
-    dsExpr arg				`thenDs` \ core_arg ->
+    dsLExpr arrow			`thenDs` \ core_arrow ->
+    dsLExpr arg				`thenDs` \ core_arg ->
     matchEnvStack env_ids [] core_arg	`thenDs` \ core_make_arg ->
     returnDs (do_map_arrow ids env_ty arg_ty res_ty
 		core_make_arg
@@ -327,14 +315,14 @@ dsCmd ids local_vars env_ids [] res_ty
 --	A | xs |- f -<< arg :: [] t'	---> arr (\ (xs) -> (f,arg)) >>> app
 
 dsCmd ids local_vars env_ids [] res_ty
-	(HsArrApp arrow arg arrow_ty HsHigherOrderApp _ _)
+	(HsArrApp arrow arg arrow_ty HsHigherOrderApp _)
   = let
 	(a_arg_ty, _res_ty') = tcSplitAppTy arrow_ty
         (_a_ty, arg_ty) = tcSplitAppTy a_arg_ty
 	env_ty = mkTupleType env_ids
     in
-    dsExpr arrow			`thenDs` \ core_arrow ->
-    dsExpr arg				`thenDs` \ core_arg ->
+    dsLExpr arrow			`thenDs` \ core_arrow ->
+    dsLExpr arg				`thenDs` \ core_arg ->
     matchEnvStack env_ids [] (mkCorePairExpr core_arrow core_arg)
 					`thenDs` \ core_make_pair ->
     returnDs (do_map_arrow ids env_ty (mkCorePairTy arrow_ty arg_ty) res_ty
@@ -351,7 +339,7 @@ dsCmd ids local_vars env_ids [] res_ty
 --		---> arr (\ ((xs)*ts) -> let z = e in (((ys),z)*ts)) >>> c
 
 dsCmd ids local_vars env_ids stack res_ty (HsApp cmd arg)
-  = dsExpr arg			`thenDs` \ core_arg ->
+  = dsLExpr arg			`thenDs` \ core_arg ->
     let
 	arg_ty = exprType core_arg
 	stack' = arg_ty:stack
@@ -384,7 +372,7 @@ dsCmd ids local_vars env_ids stack res_ty (HsApp cmd arg)
 --		---> arr (\ ((((xs), p1), ... pk)*ts) -> ((ys)*ts)) >>> c
 
 dsCmd ids local_vars env_ids stack res_ty
-    (HsLam (Match pats _ (GRHSs [GRHS [ResultStmt body _] _loc] _ _cmd_ty)))
+    (HsLam (L _ (Match pats _ (GRHSs [L _ (GRHS [L _ (ResultStmt body)])] _ _cmd_ty))))
   = let
 	pat_vars = mkVarSet (collectPatsBinders pats)
 	local_vars' = local_vars `unionVarSet` pat_vars
@@ -415,7 +403,7 @@ dsCmd ids local_vars env_ids stack res_ty
 	     free_vars `minusVarSet` pat_vars)
 
 dsCmd ids local_vars env_ids stack res_ty (HsPar cmd)
-  = dsCmd ids local_vars env_ids stack res_ty cmd
+  = dsLCmd ids local_vars env_ids stack res_ty cmd
 
 --	A, xs |- e :: Bool
 --	A | xs1 |- c1 :: [ts] t
@@ -427,8 +415,8 @@ dsCmd ids local_vars env_ids stack res_ty (HsPar cmd)
 --			if e then Left ((xs1)*ts) else Right ((xs2)*ts)) >>>
 --		     c1 ||| c2
 
-dsCmd ids local_vars env_ids stack res_ty (HsIf cond then_cmd else_cmd _loc)
-  = dsExpr cond			`thenDs` \ core_cond ->
+dsCmd ids local_vars env_ids stack res_ty (HsIf cond then_cmd else_cmd)
+  = dsLExpr cond			`thenDs` \ core_cond ->
     dsfixCmd ids local_vars stack res_ty then_cmd
 				`thenDs` \ (core_then, fvs_then, then_ids) ->
     dsfixCmd ids local_vars stack res_ty else_cmd
@@ -485,8 +473,8 @@ case bodies, containing the following fields:
    bodies with |||.
 
 \begin{code}
-dsCmd ids local_vars env_ids stack res_ty (HsCase exp matches src_loc)
-  = dsExpr exp				`thenDs` \ core_exp ->
+dsCmd ids local_vars env_ids stack res_ty (HsCase exp matches)
+  = dsLExpr exp				`thenDs` \ core_exp ->
     mappM newSysLocalDs stack		`thenDs` \ stack_ids ->
 
     -- Extract and desugar the leaf commands in the case, building tuple
@@ -496,9 +484,9 @@ dsCmd ids local_vars env_ids stack res_ty (HsCase exp matches src_loc)
         leaves = concatMap leavesMatch matches
 	make_branch (leaf, bound_vars)
 	  = dsfixCmd ids (local_vars `unionVarSet` bound_vars) stack res_ty leaf
-					`thenDs` \ (core_leaf, fvs, leaf_ids) ->
+			   `thenDs` \ (core_leaf, fvs, leaf_ids) ->
 	    returnDs (fvs `minusVarSet` bound_vars,
-		      [mkHsEnvStackExpr leaf_ids stack_ids],
+		      [noLoc $ mkHsEnvStackExpr leaf_ids stack_ids],
 		      envStackType leaf_ids stack,
 		      core_leaf)
     in
@@ -507,10 +495,10 @@ dsCmd ids local_vars env_ids stack res_ty (HsCase exp matches src_loc)
     dsLookupDataCon leftDataConName	`thenDs` \ left_con ->
     dsLookupDataCon rightDataConName	`thenDs` \ right_con ->
     let
-	left_id = HsVar (dataConWrapId left_con)
-	right_id = HsVar (dataConWrapId right_con)
-	left_expr ty1 ty2 e = HsApp (TyApp left_id [ty1, ty2]) e
-	right_expr ty1 ty2 e = HsApp (TyApp right_id [ty1, ty2]) e
+	left_id = nlHsVar (dataConWrapId left_con)
+	right_id = nlHsVar (dataConWrapId right_con)
+	left_expr ty1 ty2 e = noLoc $ HsApp (noLoc $ TyApp left_id [ty1, ty2]) e
+	right_expr ty1 ty2 e = noLoc $ HsApp (noLoc $ TyApp right_id [ty1, ty2]) e
 
 	-- Prefix each tuple with a distinct series of Left's and Right's,
 	-- in a balanced way, keeping track of the types.
@@ -526,13 +514,13 @@ dsCmd ids local_vars env_ids stack res_ty (HsCase exp matches src_loc)
 	  = foldb merge_branches branches
 
 	-- Replace the commands in the case with these tagged tuples,
-	-- yielding a TypecheckedHsExpr we can feed to dsExpr.
+	-- yielding a HsExpr Id we can feed to dsExpr.
 
 	(_, matches') = mapAccumL (replaceLeavesMatch res_ty) leaves' matches
 	in_ty = envStackType env_ids stack
 	fvs_exp = exprFreeVars core_exp `intersectVarSet` local_vars
     in
-    dsExpr (HsCase exp matches' src_loc) `thenDs` \ core_body ->
+    dsExpr (HsCase exp matches') `thenDs` \ core_body ->
     matchEnvStack env_ids stack_ids core_body
 					`thenDs` \ core_matches ->
     returnDs(do_map_arrow ids in_ty sum_ty res_ty core_matches core_choices,
@@ -546,7 +534,7 @@ dsCmd ids local_vars env_ids stack res_ty (HsCase exp matches src_loc)
 
 dsCmd ids local_vars env_ids stack res_ty (HsLet binds body)
   = let
-	defined_vars = mkVarSet (collectHsBinders binds)
+	defined_vars = mkVarSet (map unLoc (collectGroupBinders binds))
 	local_vars' = local_vars `unionVarSet` defined_vars
     in
     dsfixCmd ids local_vars' stack res_ty body
@@ -566,7 +554,7 @@ dsCmd ids local_vars env_ids stack res_ty (HsLet binds body)
 			core_body,
 	exprFreeVars core_binds `intersectVarSet` local_vars)
 
-dsCmd ids local_vars env_ids [] res_ty (HsDo _ctxt stmts _ _ _loc)
+dsCmd ids local_vars env_ids [] res_ty (HsDo _ctxt stmts _ _)
   = dsCmdDo ids local_vars env_ids res_ty stmts
 
 --	A |- e :: forall e. a1 (e*ts1) t1 -> ... an (e*tsn) tn -> a (e*ts) t
@@ -574,11 +562,11 @@ dsCmd ids local_vars env_ids [] res_ty (HsDo _ctxt stmts _ _ _loc)
 --	-----------------------------------
 --	A | xs |- (|e c1 ... cn|) :: [ts] t	---> e [t_xs] c1 ... cn
 
-dsCmd _ids local_vars env_ids _stack _res_ty (HsArrForm op _ args _)
+dsCmd _ids local_vars env_ids _stack _res_ty (HsArrForm op _ args)
   = let
 	env_ty = mkTupleType env_ids
     in
-    dsExpr op				`thenDs` \ core_op ->
+    dsLExpr op				`thenDs` \ core_op ->
     mapAndUnzipDs (dsTrimCmdArg local_vars env_ids) args
 					`thenDs` \ (core_args, fv_sets) ->
     returnDs (mkApps (App core_op (Type env_ty)) core_args,
@@ -591,10 +579,10 @@ dsCmd _ids local_vars env_ids _stack _res_ty (HsArrForm op _ args _)
 dsTrimCmdArg
 	:: IdSet		-- set of local vars available to this command
 	-> [Id]			-- list of vars in the input to this command
-	-> TypecheckedHsCmdTop	-- command argument to desugar
+	-> LHsCmdTop Id	-- command argument to desugar
 	-> DsM (CoreExpr,	-- desugared expression
 		IdSet)		-- set of local vars that occur free
-dsTrimCmdArg local_vars env_ids (HsCmdTop cmd stack cmd_ty ids)
+dsTrimCmdArg local_vars env_ids (L _ (HsCmdTop cmd stack cmd_ty ids))
   = mkCmdEnv ids			`thenDs` \ meth_ids ->
     dsfixCmd meth_ids local_vars stack cmd_ty cmd
 				`thenDs` \ (core_cmd, free_vars, env_ids') ->
@@ -617,13 +605,13 @@ dsfixCmd
 	-> IdSet		-- set of local vars available to this command
 	-> [Type]		-- type of the stack
 	-> Type			-- return type of the command
-	-> TypecheckedHsCmd	-- command to desugar
+	-> LHsCmd Id		-- command to desugar
 	-> DsM (CoreExpr,	-- desugared expression
 		IdSet,		-- set of local vars that occur free
 		[Id])		-- set as a list, fed back
 dsfixCmd ids local_vars stack cmd_ty cmd
   = fixDs (\ ~(_,_,env_ids') ->
-	dsCmd ids local_vars env_ids' stack cmd_ty cmd
+	dsLCmd ids local_vars env_ids' stack cmd_ty cmd
 					`thenDs` \ (core_cmd, free_vars) ->
 	returnDs (core_cmd, free_vars, varSetElems free_vars))
 
@@ -641,7 +629,7 @@ dsCmdDo :: DsCmdEnv		-- arrow combinators
 				-- This is typically fed back,
 				-- so don't pull on it too early
 	-> Type			-- return type of the statement
-	-> [TypecheckedStmt]	-- statements to desugar
+	-> [LStmt Id]	-- statements to desugar
 	-> DsM (CoreExpr,	-- desugared expression
 		IdSet)		-- set of local vars that occur free
 
@@ -649,12 +637,12 @@ dsCmdDo :: DsCmdEnv		-- arrow combinators
 --	--------------------------
 --	A | xs |- do { c } :: [] t
 
-dsCmdDo ids local_vars env_ids res_ty [ResultStmt cmd _locn]
-  = dsCmd ids local_vars env_ids [] res_ty cmd
+dsCmdDo ids local_vars env_ids res_ty [L _ (ResultStmt cmd)]
+  = dsLCmd ids local_vars env_ids [] res_ty cmd
 
 dsCmdDo ids local_vars env_ids res_ty (stmt:stmts)
   = let
-	bound_vars = mkVarSet (collectStmtBinders stmt)
+	bound_vars = mkVarSet (map unLoc (collectLStmtBinders stmt))
 	local_vars' = local_vars `unionVarSet` bound_vars
     in
     fixDs (\ ~(_,_,env_ids') ->
@@ -662,7 +650,7 @@ dsCmdDo ids local_vars env_ids res_ty (stmt:stmts)
 					`thenDs` \ (core_stmts, fv_stmts) ->
 	returnDs (core_stmts, fv_stmts, varSetElems fv_stmts))
 				`thenDs` \ (core_stmts, fv_stmts, env_ids') ->
-    dsCmdStmt ids local_vars env_ids env_ids' stmt
+    dsCmdLStmt ids local_vars env_ids env_ids' stmt
 				`thenDs` \ (core_stmt, fv_stmt) ->
     returnDs (do_compose ids
 		(mkTupleType env_ids)
@@ -677,6 +665,8 @@ A statement maps one local environment to another, and is represented
 as an arrow from one tuple type to another.  A statement sequence is
 translated to a composition of such arrows.
 \begin{code}
+dsCmdLStmt ids local_vars env_ids out_ids cmd
+  = dsCmdStmt ids local_vars env_ids out_ids (unLoc cmd)
 
 dsCmdStmt
 	:: DsCmdEnv		-- arrow combinators
@@ -685,7 +675,7 @@ dsCmdStmt
 				-- This is typically fed back,
 				-- so don't pull on it too early
 	-> [Id]			-- list of vars in the output of this statement
-	-> TypecheckedStmt	-- statement to desugar
+	-> Stmt Id	-- statement to desugar
 	-> DsM (CoreExpr,	-- desugared expression
 		IdSet)		-- set of local vars that occur free
 
@@ -697,7 +687,7 @@ dsCmdStmt
 --		---> arr (\ (xs) -> ((xs1),(xs'))) >>> first c >>>
 --			arr snd >>> ss
 
-dsCmdStmt ids local_vars env_ids out_ids (ExprStmt cmd c_ty _loc)
+dsCmdStmt ids local_vars env_ids out_ids (ExprStmt cmd c_ty)
   = dsfixCmd ids local_vars [] c_ty cmd
 				`thenDs` \ (core_cmd, fv_cmd, env_ids1) ->
     matchEnvStack env_ids []
@@ -729,7 +719,7 @@ dsCmdStmt ids local_vars env_ids out_ids (ExprStmt cmd c_ty _loc)
 -- It would be simpler and more consistent to do this using second,
 -- but that's likely to be defined in terms of first.
 
-dsCmdStmt ids local_vars env_ids out_ids (BindStmt pat cmd _loc)
+dsCmdStmt ids local_vars env_ids out_ids (BindStmt pat cmd)
   = dsfixCmd ids local_vars [] (hsPatType pat) cmd
 				`thenDs` \ (core_cmd, fv_cmd, env_ids1) ->
     let
@@ -749,7 +739,7 @@ dsCmdStmt ids local_vars env_ids out_ids (BindStmt pat cmd _loc)
     -- projection function
     --		\ (p, (xs2)) -> (zs)
 
-    selectMatchVar pat			`thenDs` \ pat_id ->
+    selectMatchVarL pat			`thenDs` \ pat_id ->
     newSysLocalDs env_ty2		`thenDs` \ env_id ->
     newUniqueSupply			`thenDs` \ uniqs ->
     let
@@ -874,7 +864,7 @@ dsRecCmd ids local_vars stmts later_ids rec_ids rhss
 
     -- mk_pair_fn = \ (out_ids) -> ((later_ids),(rhss))
 
-    mappM dsExpr rhss		`thenDs` \ core_rhss ->
+    mappM dsLExpr rhss		`thenDs` \ core_rhss ->
     let
 	later_tuple = mkTupleExpr later_ids
 	later_ty = mkTupleType later_ids
@@ -931,7 +921,7 @@ dsfixCmdStmts
 	:: DsCmdEnv		-- arrow combinators
 	-> IdSet		-- set of local vars available to this statement
 	-> [Id]			-- output vars of these statements
-	-> [TypecheckedStmt]	-- statements to desugar
+	-> [LStmt Id]	-- statements to desugar
 	-> DsM (CoreExpr,	-- desugared expression
 		IdSet,		-- set of local vars that occur free
 		[Id])		-- input vars
@@ -947,21 +937,21 @@ dsCmdStmts
 	-> IdSet		-- set of local vars available to this statement
 	-> [Id]			-- list of vars in the input to these statements
 	-> [Id]			-- output vars of these statements
-	-> [TypecheckedStmt]	-- statements to desugar
+	-> [LStmt Id]	-- statements to desugar
 	-> DsM (CoreExpr,	-- desugared expression
 		IdSet)		-- set of local vars that occur free
 
 dsCmdStmts ids local_vars env_ids out_ids [stmt]
-  = dsCmdStmt ids local_vars env_ids out_ids stmt
+  = dsCmdLStmt ids local_vars env_ids out_ids stmt
 
 dsCmdStmts ids local_vars env_ids out_ids (stmt:stmts)
   = let
-	bound_vars = mkVarSet (collectStmtBinders stmt)
+	bound_vars = mkVarSet (map unLoc (collectLStmtBinders stmt))
 	local_vars' = local_vars `unionVarSet` bound_vars
     in
     dsfixCmdStmts ids local_vars' out_ids stmts
 				`thenDs` \ (core_stmts, fv_stmts, env_ids') ->
-    dsCmdStmt ids local_vars env_ids env_ids' stmt
+    dsCmdLStmt ids local_vars env_ids env_ids' stmt
 				`thenDs` \ (core_stmt, fv_stmt) ->
     returnDs (do_compose ids
 		(mkTupleType env_ids)
@@ -976,11 +966,11 @@ dsCmdStmts ids local_vars env_ids out_ids (stmt:stmts)
 Match a list of expressions against a list of patterns, left-to-right.
 
 \begin{code}
-matchSimplys :: [CoreExpr]               -- Scrutinees
-	     -> TypecheckedMatchContext  -- Match kind
-	     -> [TypecheckedPat]         -- Patterns they should match
-	     -> CoreExpr                 -- Return this if they all match
-	     -> CoreExpr                 -- Return this if they don't
+matchSimplys :: [CoreExpr]              -- Scrutinees
+	     -> HsMatchContext Name	-- Match kind
+	     -> [LPat Id]         	-- Patterns they should match
+	     -> CoreExpr                -- Return this if they all match
+	     -> CoreExpr                -- Return this if they don't
 	     -> DsM CoreExpr
 matchSimplys [] _ctxt [] result_expr _fail_expr = returnDs result_expr
 matchSimplys (exp:exps) ctxt (pat:pats) result_expr fail_expr
@@ -992,15 +982,18 @@ matchSimplys (exp:exps) ctxt (pat:pats) result_expr fail_expr
 List of leaf expressions, with set of variables bound in each
 
 \begin{code}
-leavesMatch :: TypecheckedMatch -> [(TypecheckedHsExpr, IdSet)]
-leavesMatch (Match pats _ (GRHSs grhss binds _ty))
+leavesMatch :: LMatch Id -> [(LHsExpr Id, IdSet)]
+leavesMatch (L _ (Match pats _ (GRHSs grhss binds _ty)))
   = let
-	defined_vars = mkVarSet (collectPatsBinders pats) `unionVarSet`
-		       mkVarSet (collectHsBinders binds)
+	defined_vars = mkVarSet (collectPatsBinders pats)
+			`unionVarSet`
+		       mkVarSet (map unLoc (collectGroupBinders binds))
     in
-    [(expr, mkVarSet (collectStmtsBinders stmts) `unionVarSet` defined_vars) |
-	GRHS stmts _locn <- grhss,
-	let ResultStmt expr _ = last stmts]
+    [(expr, 
+      mkVarSet (map unLoc (collectStmtsBinders stmts)) 
+	`unionVarSet` defined_vars) 
+    | L _ (GRHS stmts) <- grhss,
+      let L _ (ResultStmt expr) = last stmts]
 \end{code}
 
 Replace the leaf commands in a match
@@ -1008,23 +1001,23 @@ Replace the leaf commands in a match
 \begin{code}
 replaceLeavesMatch
 	:: Type			-- new result type
-	-> [TypecheckedHsExpr]	-- replacement leaf expressions of that type
-	-> TypecheckedMatch	-- the matches of a case command
-	-> ([TypecheckedHsExpr],-- remaining leaf expressions
-	    TypecheckedMatch)	-- updated match
-replaceLeavesMatch res_ty leaves (Match pat mt (GRHSs grhss binds _ty))
+	-> [LHsExpr Id]	-- replacement leaf expressions of that type
+	-> LMatch Id	-- the matches of a case command
+	-> ([LHsExpr Id],-- remaining leaf expressions
+	    LMatch Id)	-- updated match
+replaceLeavesMatch res_ty leaves (L loc (Match pat mt (GRHSs grhss binds _ty)))
   = let
 	(leaves', grhss') = mapAccumL replaceLeavesGRHS leaves grhss
     in
-    (leaves', Match pat mt (GRHSs grhss' binds res_ty))
+    (leaves', L loc (Match pat mt (GRHSs grhss' binds res_ty)))
 
 replaceLeavesGRHS
-	:: [TypecheckedHsExpr]	-- replacement leaf expressions of that type
-	-> TypecheckedGRHS	-- rhss of a case command
-	-> ([TypecheckedHsExpr],-- remaining leaf expressions
-	    TypecheckedGRHS)	-- updated GRHS
-replaceLeavesGRHS (leaf:leaves) (GRHS stmts srcloc)
-  = (leaves, GRHS (init stmts ++ [ResultStmt leaf srcloc]) srcloc)
+	:: [LHsExpr Id]	-- replacement leaf expressions of that type
+	-> LGRHS Id	-- rhss of a case command
+	-> ([LHsExpr Id],-- remaining leaf expressions
+	    LGRHS Id)	-- updated GRHS
+replaceLeavesGRHS (leaf:leaves) (L loc (GRHS stmts))
+  = (leaves, L loc (GRHS (init stmts ++ [L (getLoc leaf) (ResultStmt leaf)])))
 \end{code}
 
 Balanced fold of a non-empty list.

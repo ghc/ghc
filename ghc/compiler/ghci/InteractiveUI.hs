@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.161 2003/10/09 11:58:53 simonpj Exp $
+-- $Id: InteractiveUI.hs,v 1.162 2003/12/10 14:15:21 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -18,20 +18,12 @@ module InteractiveUI (
 import CompManager
 import HscTypes		( TyThing(..), HomeModInfo(hm_linkable), HomePackageTable,
 			  isObjectLinkable, GhciMode(..) )
-import HsSyn		( TyClDecl(..), ConDecl(..), Sig(..) )
 import IfaceSyn		( IfaceDecl( ifName ) )
 import DriverFlags
 import DriverState
 import DriverUtil	( remove_spaces )
 import Linker		( showLinkerState, linkPackages )
 import Util
-import IdInfo		( GlobalIdDetails(..) )
-import Id		( isImplicitId, idName, globalIdDetails )
-import Class		( className )
-import TyCon		( tyConName, tyConClass_maybe, isPrimTyCon, DataConDetails(..) )
-import DataCon		( dataConName )
-import FieldLabel	( fieldLabelTyCon )
-import SrcLoc		( isGoodSrcLoc )
 import Module		( showModMsg, lookupModuleEnv )
 import Name		( Name, isHomePackageName, nameSrcLoc, nameOccName,
 			  NamedThing(..) )

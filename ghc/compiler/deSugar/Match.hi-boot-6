@@ -12,7 +12,7 @@ matchExport
 matchSimply
 	:: CoreSyn.CoreExpr
 	-> HsExpr.HsMatchContext Var.Id
-	-> TcHsSyn.TypecheckedPat
+	-> HsPat.LPat Var.Id
 	-> CoreSyn.CoreExpr
 	-> CoreSyn.CoreExpr
 	-> DsMonad.DsM CoreSyn.CoreExpr
@@ -20,6 +20,6 @@ matchSimply
 matchSinglePat
 	:: CoreSyn.CoreExpr
 	-> DsMonad.DsMatchContext
-	-> TcHsSyn.TypecheckedPat
+	-> HsPat.LPat Var.Id
 	-> DsUtils.MatchResult
 	-> DsMonad.DsM DsUtils.MatchResult

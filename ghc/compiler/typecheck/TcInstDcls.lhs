@@ -8,13 +8,8 @@ module TcInstDcls ( tcInstDecls1, tcInstDecls2 ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( InstDecl(..), HsType(..),
-			  MonoBinds(..), HsExpr(..),  HsLit(..), Sig(..), 
-			  andMonoBindList, collectMonoBinders, 
-			  isClassDecl 
-			)
-import RnHsSyn		( RenamedHsBinds, RenamedInstDecl, RenamedTyClDecl )
-import TcHsSyn		( TcMonoBinds, mkHsConApp )
+import HsSyn
+import TcHsSyn		( mkHsConApp )
 import TcBinds		( tcSpecSigs )
 import TcClassDcl	( tcMethodBind, mkMethodBind, badMethodErr, 
 			  tcClassDecl2, getGenericInstances )
@@ -37,16 +32,18 @@ import TcSimplify	( tcSimplifyCheck, tcSimplifyTop )
 import Subst		( mkTyVarSubst, substTheta, substTy )
 import DataCon		( classDataCon )
 import Class		( classBigSig )
-import Var		( idName, idType )
+import Var		( Id, idName, idType )
 import NameSet		
 import MkId		( mkDictFunId, rUNTIME_ERROR_ID )
 import FunDeps		( checkInstFDs )
-import Name		( getSrcLoc )
+import Name		( Name, getSrcLoc )
 import NameSet		( unitNameSet, emptyNameSet, nameSetToList )
 import UnicodeUtil	( stringToUtf8 )
 import Maybe		( catMaybes )
+import SrcLoc		( srcLocSpan, unLoc, noLoc, Located(..), srcSpanStart )
 import ListSetOps	( minusList )
 import Outputable
+import Bag
 import FastString
 \end{code}
 
@@ -134,12 +131,12 @@ Gather up the instance declarations from their various sources
 
 \begin{code}
 tcInstDecls1	-- Deal with both source-code and imported instance decls
-   :: [RenamedTyClDecl]		-- For deriving stuff
-   -> [RenamedInstDecl]		-- Source code instance decls
+   :: [LTyClDecl Name]		-- For deriving stuff
+   -> [LInstDecl Name]		-- Source code instance decls
    -> TcM (TcGblEnv,		-- The full inst env
 	   [InstInfo],		-- Source-code instance decls to process; 
 				-- contains all dfuns for this module
-	   RenamedHsBinds)	-- Supporting bindings for derived instances
+	   [HsBindGroup Name])	-- Supporting bindings for derived instances
 
 tcInstDecls1 tycl_decls inst_decls
   = checkNoErrs $
@@ -151,7 +148,7 @@ tcInstDecls1 tycl_decls inst_decls
 
     let
 	local_inst_info = catMaybes local_inst_infos
-	clas_decls	= filter isClassDecl tycl_decls
+	clas_decls	= filter (isClassDecl.unLoc) tycl_decls
     in
 	-- (2) Instances from generic class declarations
     getGenericInstances clas_decls		`thenM` \ generic_inst_info -> 
@@ -179,7 +176,7 @@ addInsts infos thing_inside
 \end{code} 
 
 \begin{code}
-tcLocalInstDecl1 :: RenamedInstDecl 
+tcLocalInstDecl1 :: LInstDecl Name 
 		 -> TcM (Maybe InstInfo)	-- Nothing if there was an error
 	-- A source-file instance declaration
 	-- Type-check all the stuff before the "where"
@@ -189,10 +186,10 @@ tcLocalInstDecl1 :: RenamedInstDecl
 	-- Imported ones should have been checked already, and may indeed
 	-- contain something illegal in normal Haskell, notably
 	--	instance CCallable [Char] 
-tcLocalInstDecl1 decl@(InstDecl poly_ty binds uprags src_loc)
+tcLocalInstDecl1 decl@(L loc (InstDecl poly_ty binds uprags))
   =	-- Prime error recovery, set source location
     recoverM (returnM Nothing)		$
-    addSrcLoc src_loc			$
+    addSrcSpan loc			$
     addErrCtxt (instDeclCtxt1 poly_ty)	$
 
 	-- Typecheck the instance type itself.  We can't use 
@@ -207,7 +204,7 @@ tcLocalInstDecl1 decl@(InstDecl poly_ty binds uprags src_loc)
     checkValidInstHead tau				`thenM` \ (clas,inst_tys) ->
     checkTc (checkInstFDs theta clas inst_tys)
 	    (instTypeErr (pprClassPred clas inst_tys) msg)	`thenM_`
-    newDFunName clas inst_tys src_loc				`thenM` \ dfun_name ->
+    newDFunName clas inst_tys (srcSpanStart loc)		`thenM` \ dfun_name ->
     returnM (Just (InstInfo { iDFunId = mkDictFunId dfun_name tyvars theta clas inst_tys,
 			      iBinds = VanillaInst binds uprags }))
   where
@@ -222,8 +219,8 @@ tcLocalInstDecl1 decl@(InstDecl poly_ty binds uprags src_loc)
 %************************************************************************
 
 \begin{code}
-tcInstDecls2 :: [RenamedTyClDecl] -> [InstInfo] 
-	     -> TcM (TcLclEnv, TcMonoBinds)
+tcInstDecls2 :: [LTyClDecl Name] -> [InstInfo] 
+	     -> TcM (TcLclEnv, LHsBinds Id)
 -- (a) From each class declaration, 
 --	generate any default-method bindings
 -- (b) From each instance decl
@@ -232,7 +229,7 @@ tcInstDecls2 :: [RenamedTyClDecl] -> [InstInfo]
 tcInstDecls2 tycl_decls inst_decls
   = do	{	-- (a) Default methods from class decls
 	  (dm_binds_s, dm_ids_s) <- mapAndUnzipM tcClassDecl2 $
-			            filter isClassDecl tycl_decls
+			            filter (isClassDecl.unLoc) tycl_decls
 	; tcExtendLocalValEnv (concat dm_ids_s) 	$ do 
     
 	 	-- (b) instance declarations
@@ -240,8 +237,8 @@ tcInstDecls2 tycl_decls inst_decls
 
 		-- Done
 	; tcl_env <- getLclEnv
-	; returnM (tcl_env, andMonoBindList dm_binds_s	`AndMonoBinds`
-			    andMonoBindList inst_binds_s) }
+	; returnM (tcl_env, unionManyBags dm_binds_s	`unionBags`
+			    unionManyBags inst_binds_s) }
 \end{code}
 
 ======= New documentation starts here (Sept 92)	 ==============
@@ -312,12 +309,12 @@ First comes the easy case of a non-local instance decl.
 
 
 \begin{code}
-tcInstDecl2 :: InstInfo -> TcM TcMonoBinds
+tcInstDecl2 :: InstInfo -> TcM (LHsBinds Id)
 
 tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = binds })
   =	 -- Prime error recovery
-    recoverM (returnM EmptyMonoBinds)		$
-    addSrcLoc (getSrcLoc dfun_id)		$
+    recoverM (returnM emptyBag)			$
+    addSrcSpan (srcLocSpan (getSrcLoc dfun_id))	$
     addErrCtxt (instDeclCtxt2 (idType dfun_id))	$
     let
 	inst_ty 	 = idType dfun_id
@@ -364,8 +361,8 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = binds })
 	uprags = case binds of
 		       VanillaInst _ uprags -> uprags
 		       other		    -> []
-	spec_prags = [ SpecSig (idName dfun_id) ty loc
-		     | SpecInstSig ty loc <- uprags ]
+	spec_prags = [ L loc (SpecSig (L loc (idName dfun_id)) ty)
+		     | L loc (SpecInstSig ty) <- uprags ]
 	xtve = inst_tyvars `zip` inst_tyvars'
     in
     tcExtendGlobalValEnv [dfun_id] (
@@ -399,8 +396,9 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = binds })
 		-- emit an error message.  This in turn means that we don't
 		-- mention the constructor, which doesn't exist for CCallable, CReturnable
 		-- Hardly beautiful, but only three extra lines.
-	    HsApp (TyApp (HsVar rUNTIME_ERROR_ID) [idType this_dict_id])
-		  (HsLit (HsStringPrim (mkFastString (stringToUtf8 msg))))
+	    nlHsApp (noLoc $ TyApp (nlHsVar rUNTIME_ERROR_ID) 
+				   [idType this_dict_id])
+		  (nlHsLit (HsStringPrim (mkFastString (stringToUtf8 msg))))
 
 	  | otherwise	-- The common case
 	  = mkHsConApp dict_constr inst_tys' (map HsVar scs_and_meths)
@@ -414,17 +412,19 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = binds })
 	  where
 	    msg = "Compiler error: bad dictionary " ++ showSDoc (ppr clas)
 
-	dict_bind  = VarMonoBind this_dict_id dict_rhs
-	all_binds  = sc_binds_inner `AndMonoBinds` meth_binds `AndMonoBinds` dict_bind
+	dict_bind  = noLoc (VarBind this_dict_id dict_rhs)
+	all_binds  = dict_bind `consBag` (sc_binds_inner `unionBags` meth_binds)
 
-	main_bind = AbsBinds
+	main_bind = noLoc $ AbsBinds
 		 	 zonked_inst_tyvars
 		 	 (map instToId dfun_arg_dicts)
 		 	 [(inst_tyvars', dfun_id, this_dict_id)] 
 		 	 inlines all_binds
     in
     showLIE (text "instance") 		`thenM_`
-    returnM (main_bind `AndMonoBinds` prag_binds `AndMonoBinds` sc_binds_outer)
+    returnM (unitBag main_bind `unionBags` 
+	     prag_binds `unionBags`
+	     sc_binds_outer)
 
 
 tcMethods clas inst_tyvars inst_tyvars' dfun_theta' inst_tys' 
@@ -432,7 +432,7 @@ tcMethods clas inst_tyvars inst_tyvars' dfun_theta' inst_tys'
   = 	-- Check that all the method bindings come from this class
     let
 	sel_names = [idName sel_id | (sel_id, _) <- op_items]
-	bad_bndrs = collectMonoBinders monobinds `minusList` sel_names
+	bad_bndrs = collectHsBindBinders monobinds `minusList` sel_names
     in
     mappM (addErrTc . badMethodErr clas) bad_bndrs	`thenM_`
 
@@ -479,7 +479,7 @@ tcMethods clas inst_tyvars inst_tyvars' dfun_theta' inst_tys'
     mapM tc_method_bind meth_infos		`thenM` \ meth_binds_s ->
    
     returnM ([meth_id | (_,meth_id,_) <- meth_infos], 
-	     andMonoBindList meth_binds_s)
+	     unionManyBags meth_binds_s)
 
 
 -- Derived newtype instances
@@ -494,7 +494,7 @@ tcMethods clas inst_tyvars inst_tyvars' dfun_theta' inst_tys'
 
 	-- I don't think we have to do the checkSigTyVars thing
 
-    returnM (meth_ids, lie_binds `AndMonoBinds` andMonoBindList meth_binds)
+    returnM (meth_ids, lie_binds `unionBags` listToBag meth_binds)
 
   where
     do_one inst_loc (sel_id, _)
@@ -507,7 +507,7 @@ tcMethods clas inst_tyvars inst_tyvars' dfun_theta' inst_tys'
 	  let
 	     meth_id = instToId meth_inst
 	  in
-	  return (meth_id, VarMonoBind meth_id (HsVar (instToId rhs_inst)), rhs_inst)
+	  return (meth_id, noLoc (VarBind meth_id (nlHsVar (instToId rhs_inst))), rhs_inst)
 
 	-- Instantiate rep_tys with the relevant type variables
     rep_tys' = map (substTy subst) rep_tys
@@ -676,8 +676,8 @@ simplified: only zeze2 is extracted and its body is simplified.
 
 \begin{code}
 instDeclCtxt1 hs_inst_ty 
-  = inst_decl_ctxt (case hs_inst_ty of
-			HsForAllTy _ _ _ (HsPredTy pred) -> ppr pred
+  = inst_decl_ctxt (case unLoc hs_inst_ty of
+			HsForAllTy _ _ _ (L _ (HsPredTy pred)) -> ppr pred
 			HsPredTy pred	                 -> ppr pred
 			other			         -> ppr hs_inst_ty)	-- Don't expect this
 instDeclCtxt2 dfun_ty

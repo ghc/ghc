@@ -20,6 +20,7 @@ import Subst		( mkSubst, mkInScopeSet, bindSubst, substExpr )
 import CoreFVs		( exprFreeVars )
 import VarEnv		( emptySubstEnv )
 import ListSetOps	( equivClassesByUniq )
+import SrcLoc		( unLoc )
 import Unique		( Uniquable(..) )
 \end{code}
 
@@ -99,7 +100,7 @@ Wadler's chapter in SLPJ.
 match_con vars (eqn1@(EqnInfo _ _ (ConPatOut data_con (PrefixCon arg_pats) _ ex_tvs ex_dicts : _) _)
 		: other_eqns)
   = -- Make new vars for the con arguments; avoid new locals where possible
-    mappM selectMatchVar arg_pats	`thenDs` \ arg_vars ->
+    mappM selectMatchVarL arg_pats	`thenDs` \ arg_vars ->
 
     -- Now do the business to make the alt for _this_ ConPat ...
     match (arg_vars ++ vars) 
@@ -118,7 +119,7 @@ match_con vars (eqn1@(EqnInfo _ _ (ConPatOut data_con (PrefixCon arg_pats) _ ex_
   where
     shift_con_pat :: EquationInfo -> EquationInfo
     shift_con_pat (EqnInfo n ctx (ConPatOut _ (PrefixCon arg_pats) _ _ _ : pats) match_result)
-      = EqnInfo n ctx (arg_pats ++ pats) match_result
+      = EqnInfo n ctx (map unLoc arg_pats ++ pats) match_result
 
     other_pats = [p | EqnInfo _ _ (p:_) _ <- other_eqns]
 

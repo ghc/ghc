@@ -20,21 +20,14 @@ module TcForeign
 #include "config.h"
 #include "HsVersions.h"
 
-import HsSyn		( ForeignDecl(..), HsExpr(..),
-			  MonoBinds(..), ForeignImport(..), ForeignExport(..),
-			  CImportSpec(..)
-			)
-import RnHsSyn		( RenamedForeignDecl )
+import HsSyn
 
 import TcRnMonad
 import TcHsType		( tcHsSigType, UserTypeCtxt(..) )
-import TcHsSyn		( TcMonoBinds, TypecheckedForeignDecl, TcForeignDecl )
 import TcExpr		( tcCheckSigma )			
 
 import ErrUtils		( Message )
 import Id		( Id, mkLocalId, setIdLocalExported )
-import PrimRep		( getPrimRepSize, isFloatingRep )
-import Type		( typePrimRep )
 import OccName		( mkForeignExportOcc )
 import Name		( Name, NamedThing(..), mkExternalName )
 import TcType		( Type, tcSplitFunTys, tcSplitTyConApp_maybe,
@@ -51,19 +44,21 @@ import CStrings		( CLabelString, isCLabelString )
 import PrelNames	( hasKey, ioTyConKey )
 import CmdLineOpts	( dopt_HscLang, HscLang(..) )
 import Outputable
+import SrcLoc		( Located(..), srcSpanStart )
+import Bag		( emptyBag, consBag )
 
 \end{code}
 
 \begin{code}
 -- Defines a binding
-isForeignImport :: ForeignDecl name -> Bool
-isForeignImport (ForeignImport _ _ _ _ _) = True
-isForeignImport _			  = False
+isForeignImport :: LForeignDecl name -> Bool
+isForeignImport (L _ (ForeignImport _ _ _ _)) = True
+isForeignImport _			      = False
 
 -- Exports a binding
-isForeignExport :: ForeignDecl name -> Bool
-isForeignExport (ForeignExport _ _ _ _ _) = True
-isForeignExport _	  	          = False
+isForeignExport :: LForeignDecl name -> Bool
+isForeignExport (L _ (ForeignExport _ _ _ _)) = True
+isForeignExport _	  	              = False
 \end{code}
 
 %************************************************************************
@@ -73,14 +68,13 @@ isForeignExport _	  	          = False
 %************************************************************************
 
 \begin{code}
-tcForeignImports :: [ForeignDecl Name] -> TcM ([Id], [TypecheckedForeignDecl])
+tcForeignImports :: [LForeignDecl Name] -> TcM ([Id], [LForeignDecl Id])
 tcForeignImports decls
-  = mapAndUnzipM tcFImport (filter isForeignImport decls)
+  = mapAndUnzipM (wrapLocSndM tcFImport) (filter isForeignImport decls)
 
-tcFImport :: RenamedForeignDecl -> TcM (Id, TypecheckedForeignDecl)
-tcFImport fo@(ForeignImport nm hs_ty imp_decl isDeprec src_loc)
- = addSrcLoc src_loc			$
-   addErrCtxt (foreignDeclCtxt fo)	$
+tcFImport :: ForeignDecl Name -> TcM (Id, ForeignDecl Id)
+tcFImport fo@(ForeignImport (L loc nm) hs_ty imp_decl isDeprec)
+ = addErrCtxt (foreignDeclCtxt fo)	$
    tcHsSigType (ForSigCtxt nm) hs_ty	`thenM`	\ sig_ty ->
    let 
       -- drop the foralls before inspecting the structure
@@ -95,7 +89,7 @@ tcFImport fo@(ForeignImport nm hs_ty imp_decl isDeprec src_loc)
    tcCheckFIType sig_ty arg_tys res_ty imp_decl		`thenM` \ imp_decl' -> 
    -- can't use sig_ty here because it :: Type and we need HsType Id
    -- hence the undefined
-   returnM (id, ForeignImport id undefined imp_decl' isDeprec src_loc)
+   returnM (id, ForeignImport (L loc id) undefined imp_decl' isDeprec)
 \end{code}
 
 
@@ -198,22 +192,21 @@ checkFEDArgs arg_tys = returnM ()
 %************************************************************************
 
 \begin{code}
-tcForeignExports :: [ForeignDecl Name] 
-    		 -> TcM (TcMonoBinds, [TcForeignDecl])
+tcForeignExports :: [LForeignDecl Name] 
+    		 -> TcM (LHsBinds TcId, [LForeignDecl TcId])
 tcForeignExports decls
-  = foldlM combine (EmptyMonoBinds, []) (filter isForeignExport decls)
+  = foldlM combine (emptyBag, []) (filter isForeignExport decls)
   where
    combine (binds, fs) fe = 
-       tcFExport fe	`thenM ` \ (b, f) ->
-       returnM (b `AndMonoBinds` binds, f:fs)
+       wrapLocSndM tcFExport fe	`thenM` \ (b, f) ->
+       returnM (b `consBag` binds, f:fs)
 
-tcFExport :: RenamedForeignDecl -> TcM (TcMonoBinds, TcForeignDecl)
-tcFExport fo@(ForeignExport nm hs_ty spec isDeprec src_loc) =
-   addSrcLoc src_loc			$
+tcFExport :: ForeignDecl Name -> TcM (LHsBind Id, ForeignDecl Id)
+tcFExport fo@(ForeignExport (L loc nm) hs_ty spec isDeprec) =
    addErrCtxt (foreignDeclCtxt fo)	$
 
    tcHsSigType (ForSigCtxt nm) hs_ty	`thenM` \ sig_ty ->
-   tcCheckSigma (HsVar nm) sig_ty	`thenM` \ rhs ->
+   tcCheckSigma (nlHsVar nm) sig_ty	`thenM` \ rhs ->
 
    tcCheckFEType sig_ty spec		`thenM_`
 
@@ -226,11 +219,11 @@ tcFExport fo@(ForeignExport nm hs_ty spec isDeprec src_loc) =
    getModule			`thenM` \ mod ->
    let
         gnm  = mkExternalName uniq mod (mkForeignExportOcc (getOccName nm)) 
-			      Nothing src_loc
+			      Nothing (srcSpanStart loc)
 	id   = setIdLocalExported (mkLocalId gnm sig_ty)
-	bind = VarMonoBind id rhs
+	bind = L loc (VarBind id rhs)
    in
-   returnM (bind, ForeignExport id undefined spec isDeprec src_loc)
+   returnM (bind, ForeignExport (L loc id) undefined spec isDeprec)
 \end{code}
 
 ------------ Checking argument types for foreign export ----------------------

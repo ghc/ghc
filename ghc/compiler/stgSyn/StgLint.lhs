@@ -19,12 +19,13 @@ import PrimOp		( primOpType )
 import Literal		( literalType )
 import Maybes		( catMaybes )
 import Name		( getSrcLoc )
-import ErrUtils		( Message, addErrLocHdrLine )
+import ErrUtils		( Message, mkLocMessage )
 import Type		( mkFunTys, splitFunTys, splitTyConApp_maybe,
 			  isUnLiftedType, isTyVarTy, dropForAlls, Type
 			)
 import TyCon		( isAlgTyCon, isNewTyCon, tyConDataCons )
 import Util		( zipEqual, equalLength )
+import SrcLoc		( srcLocSpan )
 import Outputable
 
 infixr 9 `thenL`, `thenL_`, `thenMaybeL`
@@ -300,12 +301,12 @@ data LintLocInfo
   | BodyOfLetRec [Id]	-- One of the binders
 
 dumpLoc (RhsOf v) =
-  (getSrcLoc v, ptext SLIT(" [RHS of ") <> pp_binders [v] <> char ']' )
+  (srcLocSpan (getSrcLoc v), ptext SLIT(" [RHS of ") <> pp_binders [v] <> char ']' )
 dumpLoc (LambdaBodyOf bs) =
-  (getSrcLoc (head bs), ptext SLIT(" [in body of lambda with binders ") <> pp_binders bs <> char ']' )
+  (srcLocSpan (getSrcLoc (head bs)), ptext SLIT(" [in body of lambda with binders ") <> pp_binders bs <> char ']' )
 
 dumpLoc (BodyOfLetRec bs) =
-  (getSrcLoc (head bs), ptext SLIT(" [in body of letrec with binders ") <> pp_binders bs <> char ']' )
+  (srcLocSpan (getSrcLoc (head bs)), ptext SLIT(" [in body of letrec with binders ") <> pp_binders bs <> char ']' )
 
 
 pp_binders :: [Id] -> SDoc
@@ -375,7 +376,7 @@ addErr errs_so_far msg locs
   = errs_so_far `snocBag` mk_msg locs
   where
     mk_msg (loc:_) = let (l,hdr) = dumpLoc loc 
-		     in addErrLocHdrLine l hdr msg
+		     in  mkLocMessage l (hdr $$ msg)
     mk_msg []      = msg
 
 addLoc :: LintLocInfo -> LintM a -> LintM a

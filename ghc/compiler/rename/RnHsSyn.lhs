@@ -14,38 +14,7 @@ import TysWiredIn	( tupleTyCon, listTyCon, parrTyCon, charTyCon )
 import Name		( Name, getName, isTyVarName )
 import NameSet
 import BasicTypes	( Boxity )
-import Outputable
-\end{code}
-
-
-\begin{code}
-type RenamedHsDecl		= HsDecl		Name
-type RenamedArithSeqInfo	= ArithSeqInfo		Name
-type RenamedClassOpSig		= Sig			Name
-type RenamedConDecl		= ConDecl		Name
-type RenamedContext		= HsContext 		Name
-type RenamedRuleDecl		= RuleDecl		Name
-type RenamedTyClDecl		= TyClDecl		Name
-type RenamedDefaultDecl		= DefaultDecl		Name
-type RenamedForeignDecl		= ForeignDecl		Name
-type RenamedGRHS		= GRHS			Name
-type RenamedGRHSs		= GRHSs			Name
-type RenamedHsBinds		= HsBinds		Name
-type RenamedHsExpr		= HsExpr		Name
-type RenamedInstDecl		= InstDecl		Name
-type RenamedMatchContext	= HsMatchContext	Name
-type RenamedMatch		= Match			Name
-type RenamedMonoBinds		= MonoBinds		Name
-type RenamedPat			= InPat			Name
-type RenamedHsType		= HsType		Name
-type RenamedHsPred		= HsPred		Name
-type RenamedRecordBinds		= HsRecordBinds		Name
-type RenamedSig			= Sig			Name
-type RenamedStmt		= Stmt			Name
-type RenamedFixitySig		= FixitySig		Name
-type RenamedDeprecation		= DeprecDecl		Name
-type RenamedHsCmd		= HsCmd			Name
-type RenamedHsCmdTop		= HsCmdTop		Name
+import SrcLoc		( Located(..), unLoc )
 \end{code}
 
 %************************************************************************
@@ -65,37 +34,41 @@ parrTyCon_name    = getName parrTyCon
 tupleTyCon_name :: Boxity -> Int -> Name
 tupleTyCon_name boxity n = getName (tupleTyCon boxity n)
 
-extractHsTyVars :: RenamedHsType -> NameSet
+extractHsTyVars :: LHsType Name -> NameSet
 extractHsTyVars x = filterNameSet isTyVarName (extractHsTyNames x)
 
 extractFunDepNames :: FunDep Name -> NameSet
 extractFunDepNames (ns1, ns2) = mkNameSet ns1 `unionNameSets` mkNameSet ns2
 
-extractHsTyNames   :: RenamedHsType -> NameSet
+extractHsTyNames   :: LHsType Name -> NameSet
 extractHsTyNames ty
-  = get ty
+  = getl ty
   where
-    get (HsAppTy ty1 ty2)      = get ty1 `unionNameSets` get ty2
-    get (HsListTy ty)          = unitNameSet listTyCon_name `unionNameSets` get ty
-    get (HsPArrTy ty)          = unitNameSet parrTyCon_name `unionNameSets` get ty
+    getl (L _ ty) = get ty
+
+    get (HsAppTy ty1 ty2)      = getl ty1 `unionNameSets` getl ty2
+    get (HsListTy ty)          = unitNameSet listTyCon_name `unionNameSets` getl ty
+    get (HsPArrTy ty)          = unitNameSet parrTyCon_name `unionNameSets` getl ty
     get (HsTupleTy con tys)    = extractHsTyNames_s tys
-    get (HsFunTy ty1 ty2)      = get ty1 `unionNameSets` get ty2
-    get (HsPredTy p)	       = extractHsPredTyNames p
-    get (HsOpTy ty1 op ty2)    = get ty1 `unionNameSets` get ty2 `unionNameSets` unitNameSet op
-    get (HsParTy ty)           = get ty
+    get (HsFunTy ty1 ty2)      = getl ty1 `unionNameSets` getl ty2
+    get (HsPredTy p)	       = extractHsPredTyNames (unLoc p)
+    get (HsOpTy ty1 op ty2)    = getl ty1 `unionNameSets` getl ty2 `unionNameSets` unitNameSet (unLoc op)
+    get (HsParTy ty)           = getl ty
     get (HsNumTy n)            = emptyNameSet
     get (HsTyVar tv)	       = unitNameSet tv
-    get (HsKindSig ty k)       = get ty
+    get (HsKindSig ty k)       = getl ty
     get (HsForAllTy _ tvs 
-		    ctxt ty)   = (extractHsCtxtTyNames ctxt `unionNameSets` get ty)
+		    ctxt ty)   = (extractHsCtxtTyNames ctxt
+					 `unionNameSets` getl ty)
 					    `minusNameSet`
-				  mkNameSet (hsTyVarNames tvs)
+				  mkNameSet (hsLTyVarNames tvs)
 
-extractHsTyNames_s  :: [RenamedHsType] -> NameSet
+extractHsTyNames_s  :: [LHsType Name] -> NameSet
 extractHsTyNames_s tys = foldr (unionNameSets . extractHsTyNames) emptyNameSet tys
 
-extractHsCtxtTyNames :: RenamedContext -> NameSet
-extractHsCtxtTyNames ctxt = foldr (unionNameSets . extractHsPredTyNames) emptyNameSet ctxt
+extractHsCtxtTyNames :: LHsContext Name -> NameSet
+extractHsCtxtTyNames (L _ ctxt)
+  = foldr (unionNameSets . extractHsPredTyNames . unLoc) emptyNameSet ctxt
 
 -- You don't import or export implicit parameters,
 -- so don't mention the IP names
@@ -123,16 +96,17 @@ In all cases this is set up for interface-file declarations:
 
 \begin{code}
 ----------------
-hsSigsFVs sigs = plusFVs (map hsSigFVs sigs)
+hsSigsFVs :: [LSig Name] -> FreeVars
+hsSigsFVs sigs = plusFVs (map (hsSigFVs.unLoc) sigs)
 
-hsSigFVs (Sig v ty _) 	    = extractHsTyNames ty
-hsSigFVs (SpecInstSig ty _) = extractHsTyNames ty
-hsSigFVs (SpecSig v ty _)   = extractHsTyNames ty
+hsSigFVs (Sig v ty) 	    = extractHsTyNames ty
+hsSigFVs (SpecInstSig ty)   = extractHsTyNames ty
+hsSigFVs (SpecSig v ty)     = extractHsTyNames ty
 hsSigFVs other		    = emptyFVs
 
 ----------------
-conDeclFVs (ConDecl _ tyvars context details _)
-  = delFVs (map hsTyVarName tyvars) $
+conDeclFVs (L _ (ConDecl _ tyvars context details))
+  = delFVs (map hsLTyVarName tyvars) $
     extractHsCtxtTyNames context	  `plusFV`
     conDetailsFVs details
 
@@ -140,7 +114,7 @@ conDetailsFVs (PrefixCon btys)    = plusFVs (map bangTyFVs btys)
 conDetailsFVs (InfixCon bty1 bty2) = bangTyFVs bty1 `plusFV` bangTyFVs bty2
 conDetailsFVs (RecCon flds)	   = plusFVs [bangTyFVs bty | (_, bty) <- flds]
 
-bangTyFVs bty = extractHsTyNames (getBangType bty)
+bangTyFVs bty = extractHsTyNames (getBangType (unLoc bty))
 \end{code}
 
 
@@ -150,16 +124,16 @@ bangTyFVs bty = extractHsTyNames (getBangType bty)
 %*									*
 %************************************************************************
 
-These functions on generics are defined over RenamedMatches, which is
+These functions on generics are defined over Matches Name, which is
 why they are here and not in HsMatches.
 
 \begin{code}
-maybeGenericMatch :: RenamedMatch -> Maybe (RenamedHsType, RenamedMatch)
+maybeGenericMatch :: LMatch Name -> Maybe (HsType Name, LMatch Name)
   -- Tells whether a Match is for a generic definition
   -- and extract the type from a generic match and put it at the front
 
-maybeGenericMatch (Match (TypePat ty : pats) sig_ty grhss)
-  = Just (ty, Match pats sig_ty grhss)
+maybeGenericMatch (L loc (Match (L _ (TypePat (L _ ty)) : pats) sig_ty grhss))
+  = Just (ty, L loc (Match pats sig_ty grhss))
 
 maybeGenericMatch other_match = Nothing
 \end{code}

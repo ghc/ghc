@@ -1,14 +1,13 @@
 module TcSplice where
 
 tcSpliceExpr :: Name.Name
-	     -> RnHsSyn.RenamedHsExpr
+	     -> HsExpr.LHsExpr Name.Name
 	     -> TcUnify.Expected TcType.TcType
-	     -> TcRnTypes.TcM TcHsSyn.TcExpr
+	     -> TcRnTypes.TcM (HsExpr.HsExpr Var.Id)
 
 tcBracket :: HsExpr.HsBracket Name.Name 
 	  -> TcUnify.Expected TcType.TcType
-	  -> TcRnTypes.TcM TcHsSyn.TcExpr
+	  -> TcRnTypes.TcM (HsExpr.LHsExpr Var.Id)
 
-tcSpliceDecls :: RnHsSyn.RenamedHsExpr 
-	      -> TcRnTypes.TcM [RdrHsSyn.RdrNameHsDecl]
-
+tcSpliceDecls :: HsExpr.LHsExpr Name.Name
+	      -> TcRnTypes.TcM [HsDecls.LHsDecl RdrName.RdrName]

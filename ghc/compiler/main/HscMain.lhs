@@ -16,8 +16,7 @@ module HscMain (
 #include "HsVersions.h"
 
 #ifdef GHCI
-import HsSyn		( Stmt(..) )
-import TcHsSyn		( TypecheckedHsExpr )
+import HsSyn		( Stmt(..), LStmt, LHsExpr )
 import IfaceSyn		( IfaceDecl )
 import CodeOutput	( outputForeignStubs )
 import ByteCodeGen	( byteCodeGen, coreExprToBCOs )
@@ -26,12 +25,12 @@ import TidyPgm		( tidyCoreExpr )
 import CorePrep		( corePrepExpr )
 import Flattening	( flattenExpr )
 import TcRnDriver	( tcRnStmt, tcRnExpr, tcRnThing ) 
-import RdrHsSyn		( RdrNameStmt )
-import RdrName		( GlobalRdrEnv )
+import RdrName		( RdrName, GlobalRdrEnv )
 import Type		( Type )
 import PrelNames	( iNTERACTIVE )
 import StringBuffer	( stringToStringBuffer )
-import SrcLoc		( noSrcLoc )
+import SrcLoc		( noSrcLoc, Located(..) )
+import Var		( Id )
 import Name		( Name )
 import CoreLint		( lintUnfolding )
 import DsMeta		( templateHaskellNames )
@@ -40,7 +39,7 @@ import BasicTypes	( Fixity )
 
 import StringBuffer	( hGetStringBuffer )
 import Parser
-import Lexer		( P(..), ParseResult(..), mkPState, showPFailed )
+import Lexer		( P(..), ParseResult(..), mkPState )
 import SrcLoc		( mkSrcLoc )
 import TcRnDriver	( tcRnModule, tcRnExtCore )
 import TcIface		( typecheckIface )
@@ -62,7 +61,7 @@ import CodeOutput	( codeOutput )
 
 import CmdLineOpts
 import DriverPhases     ( isExtCoreFilename )
-import ErrUtils		( dumpIfSet, dumpIfSet_dyn, showPass )
+import ErrUtils		( dumpIfSet, dumpIfSet_dyn, showPass, printError )
 import UniqSupply	( mkSplitUniqSupply )
 
 import Outputable
@@ -425,8 +424,8 @@ myParseModule dflags src_filename
 
       case unP parseModule (mkPState buf loc dflags) of {
 
-	PFailed l1 l2 err -> do { hPutStrLn stderr (showSDoc (showPFailed l1 l2 err));
-                            	  return Nothing };
+	PFailed span err -> do { printError span err ;
+                            	 return Nothing };
 
 	POk _ rdr_module -> do {
 
@@ -524,7 +523,7 @@ hscTcExpr	-- Typecheck an expression (but don't run it)
 hscTcExpr hsc_env icontext expr
   = do	{ maybe_stmt <- hscParseStmt (hsc_dflags hsc_env) expr
 	; case maybe_stmt of {
-	     Just (ExprStmt expr _ _) 
+	     Just (L _ (ExprStmt expr _))
 			-> tcRnExpr hsc_env icontext expr ;
 	     Just other -> do { hPutStrLn stderr ("not an expression: `" ++ expr ++ "'") ;
 			        return Nothing } ;
@@ -532,7 +531,7 @@ hscTcExpr hsc_env icontext expr
 \end{code}
 
 \begin{code}
-hscParseStmt :: DynFlags -> String -> IO (Maybe RdrNameStmt)
+hscParseStmt :: DynFlags -> String -> IO (Maybe (LStmt RdrName))
 hscParseStmt dflags str
  = do showPass dflags "Parser"
       _scc_ "Parser"  do
@@ -543,8 +542,8 @@ hscParseStmt dflags str
 
       case unP parseStmt (mkPState buf loc dflags) of {
 
-	PFailed l1 l2 err -> do { hPutStrLn stderr (showSDoc (showPFailed l1 l2 err));	
-                                  return Nothing };
+	PFailed span err -> do { printError span err;
+                                 return Nothing };
 
 	-- no stmt: the line consisted of just space or comments
 	POk _ Nothing -> return Nothing;
@@ -577,7 +576,7 @@ hscThing hsc_env ic str
    = do maybe_rdr_name <- myParseIdentifier (hsc_dflags hsc_env) str
 	case maybe_rdr_name of {
 	  Nothing -> return [];
-	  Just rdr_name -> do
+	  Just (L _ rdr_name) -> do
 
 	maybe_tc_result <- tcRnThing hsc_env ic rdr_name
 
@@ -592,8 +591,8 @@ myParseIdentifier dflags str
        let loc  = mkSrcLoc FSLIT("<interactive>") 1 0
        case unP parseIdentifier (mkPState buf loc dflags) of
 
-	  PFailed l1 l2 err -> do { hPutStrLn stderr (showSDoc (showPFailed l1 l2 err));
-                                    return Nothing }
+	  PFailed span err -> do { printError span err;
+                                   return Nothing }
 
 	  POk _ rdr_name -> return (Just rdr_name)
 #endif
@@ -609,7 +608,7 @@ myParseIdentifier dflags str
 #ifdef GHCI
 compileExpr :: HscEnv 
 	    -> Module -> GlobalRdrEnv -> TypeEnv
-	    -> TypecheckedHsExpr
+	    -> LHsExpr Id
 	    -> IO HValue
 
 compileExpr hsc_env this_mod rdr_env type_env tc_expr

@@ -164,9 +164,7 @@ make_alt (DEFAULT,[],e) = C.Adefault (make_exp e)
 make_lit :: Literal -> C.Lit
 make_lit l = 
   case l of
-    MachChar i | i <= 0xff -> C.Lchar (chr i) t
-    MachChar i | otherwise -> C.Lint (toEnum i) t
-	-- For big characters, use an integer literal with a character type sig
+    MachChar i -> C.Lchar i t
     MachStr s -> C.Lstring (unpackFS s) t
     MachNullAddr -> C.Lint 0 t
     MachInt i -> C.Lint i t

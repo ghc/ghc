@@ -1,4 +1,5 @@
 module DsExpr where
 
-dsExpr :: TcHsSyn.TypecheckedHsExpr -> DsMonad.DsM CoreSyn.CoreExpr
-dsLet  :: TcHsSyn.TypecheckedHsBinds -> CoreSyn.CoreExpr -> DsMonad.DsM CoreSyn.CoreExpr
+dsExpr :: HsExpr.HsExpr Var.Id -> DsMonad.DsM CoreSyn.CoreExpr
+dsLExpr :: HsExpr.LHsExpr Var.Id -> DsMonad.DsM CoreSyn.CoreExpr
+dsLet  :: [HsBinds.HsBindGroup Var.Id] -> CoreSyn.CoreExpr -> DsMonad.DsM CoreSyn.CoreExpr

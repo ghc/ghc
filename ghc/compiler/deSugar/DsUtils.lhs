@@ -30,16 +30,16 @@ module DsUtils (
 	
 	dsReboundNames, lookupReboundName,
 
-	selectMatchVar
+	selectMatchVarL, selectMatchVar
     ) where
 
 #include "HsVersions.h"
 
 import {-# SOURCE #-}	Match ( matchSimply )
-import {-# SOURCE #-}	DsExpr( dsExpr )
+import {-# SOURCE #-}	DsExpr( dsLExpr )
 
 import HsSyn
-import TcHsSyn		( TypecheckedPat, hsPatType )
+import TcHsSyn		( hsPatType )
 import CoreSyn
 import Constants	( mAX_TUPLE_SIZE )
 import DsMonad
@@ -70,6 +70,7 @@ import PrelNames	( unpackCStringName, unpackCStringUtf8Name,
 			  lengthPName, indexPName )
 import Outputable
 import UnicodeUtil      ( intsToUtf8, stringToUtf8 )
+import SrcLoc		( Located(..), unLoc, noLoc )
 import Util             ( isSingleton, notNull, zipEqual )
 import ListSetOps	( assocDefault )
 import FastString
@@ -94,10 +95,11 @@ dsReboundNames rebound_ids
   where
 	-- The cheapo special case can happen when we 
 	-- make an intermediate HsDo when desugaring a RecStmt
-    mk_bind (std_name, HsVar id) = return ([], (std_name, id))
-    mk_bind (std_name, expr) 	 = dsExpr expr				`thenDs` \ rhs ->
-			     	   newSysLocalDs (exprType rhs)		`thenDs` \ id ->
-			     	   return ([NonRec id rhs], (std_name, id))
+    mk_bind (std_name, L _ (HsVar id)) = return ([], (std_name, id))
+    mk_bind (std_name, expr)
+ 	 = dsLExpr expr				`thenDs` \ rhs ->
+     	   newSysLocalDs (exprType rhs)		`thenDs` \ id ->
+     	   return ([NonRec id rhs], (std_name, id))
 
 lookupReboundName :: [(Name,Id)] -> Name -> CoreExpr
 lookupReboundName prs std_name
@@ -114,23 +116,23 @@ lookupReboundName prs std_name
 %************************************************************************
 
 \begin{code}
-tidyLitPat :: HsLit -> TypecheckedPat -> TypecheckedPat
+tidyLitPat :: HsLit -> LPat Id -> LPat Id
 tidyLitPat (HsChar c) pat = mkCharLitPat c
-tidyLitPat lit        pat = pat
+tidyLitPat lit	      pat = pat
 
-tidyNPat :: HsLit -> Type -> TypecheckedPat -> TypecheckedPat
+tidyNPat :: HsLit -> Type -> LPat Id -> LPat Id
 tidyNPat (HsString s) _ pat
   | lengthFS s <= 1	-- Short string literals only
   = foldr (\c pat -> mkPrefixConPat consDataCon [mkCharLitPat c,pat] stringTy)
-	  (mkNilPat stringTy) (unpackIntFS s)
+	  (mkNilPat stringTy) (unpackFS s)
 	-- The stringTy is the type of the whole pattern, not 
 	-- the type to instantiate (:) or [] with!
   where
 
 tidyNPat lit lit_ty default_pat
-  | isIntTy lit_ty     	= mkPrefixConPat intDataCon    [LitPat (mk_int lit)]    lit_ty 
-  | isFloatTy lit_ty  	= mkPrefixConPat floatDataCon  [LitPat (mk_float lit)]  lit_ty 
-  | isDoubleTy lit_ty 	= mkPrefixConPat doubleDataCon [LitPat (mk_double lit)] lit_ty 
+  | isIntTy lit_ty     	= mkPrefixConPat intDataCon    [noLoc $ LitPat (mk_int lit)]    lit_ty 
+  | isFloatTy lit_ty  	= mkPrefixConPat floatDataCon  [noLoc $ LitPat (mk_float lit)]  lit_ty 
+  | isDoubleTy lit_ty 	= mkPrefixConPat doubleDataCon [noLoc $ LitPat (mk_double lit)] lit_ty 
   | otherwise		= default_pat
 
   where
@@ -177,11 +179,14 @@ hand, which should indeed be bound to the pattern as a whole, then use it;
 otherwise, make one up.
 
 \begin{code}
-selectMatchVar :: TypecheckedPat -> DsM Id
+selectMatchVarL :: LPat Id -> DsM Id
+selectMatchVarL pat = selectMatchVar (unLoc pat)
+
 selectMatchVar (VarPat var)     = returnDs var
-selectMatchVar (AsPat var pat) 	= returnDs var
-selectMatchVar (LazyPat pat)   	= selectMatchVar pat
-selectMatchVar other_pat       	= newSysLocalDs (hsPatType other_pat) -- OK, better make up one...
+selectMatchVar (AsPat var pat)  = returnDs (unLoc var)
+selectMatchVar (LazyPat pat)    = selectMatchVarL pat
+selectMatchVar other_pat        = newSysLocalDs (hsPatType (noLoc other_pat))
+				 -- OK, better make up one...
 \end{code}
 
 
@@ -209,7 +214,7 @@ data EquationInfo
 			-- of the *first* thing matched in this group.
 			-- Should perhaps be a list of them all!
 
-	[TypecheckedPat]    -- The patterns for an eqn
+	[Pat Id]    	-- The patterns for an eqn
 
       	MatchResult	    -- Encapsulates the guards and bindings
 \end{code}
@@ -423,7 +428,7 @@ mkErrorAppDs :: Id 		-- The error function
 	     -> DsM CoreExpr
 
 mkErrorAppDs err_id ty msg
-  = getSrcLocDs			`thenDs` \ src_loc ->
+  = getSrcSpanDs		`thenDs` \ src_loc ->
     let
 	full_msg = showSDoc (hcat [ppr src_loc, text "|", text msg])
 	core_msg = Lit (MachStr (mkFastString (stringToUtf8 full_msg)))
@@ -439,7 +444,7 @@ mkErrorAppDs err_id ty msg
 %************************************************************************
 
 \begin{code}
-mkCharExpr    :: Int	    -> CoreExpr	     -- Returns	C# c :: Int
+mkCharExpr    :: Char	    -> CoreExpr	     -- Returns	C# c :: Int
 mkIntExpr     :: Integer    -> CoreExpr	     -- Returns	I# i :: Int
 mkIntegerExpr :: Integer    -> DsM CoreExpr  -- Result :: Integer
 mkStringLit   :: String     -> DsM CoreExpr  -- Result :: String
@@ -489,7 +494,7 @@ mkStringLitFS str
 
   | lengthFS str == 1
   = let
-	the_char = mkCharExpr (headIntFS str)
+	the_char = mkCharExpr (headFS str)
     in
     returnDs (mkConsExpr charTy the_char (mkNilExpr charTy))
 
@@ -530,15 +535,15 @@ even more helpful.  Something very similar happens for pattern-bound
 expressions.
 
 \begin{code}
-mkSelectorBinds :: TypecheckedPat	-- The pattern
-		-> CoreExpr    		-- Expression to which the pattern is bound
+mkSelectorBinds :: LPat Id	-- The pattern
+		-> CoreExpr	-- Expression to which the pattern is bound
 		-> DsM [(Id,CoreExpr)]
 
-mkSelectorBinds (VarPat v) val_expr
+mkSelectorBinds (L _ (VarPat v)) val_expr
   = returnDs [(v, val_expr)]
 
 mkSelectorBinds pat val_expr
-  | isSingleton binders || is_simple_pat pat
+  | isSingleton binders || is_simple_lpat pat
   = 	-- Given   p = e, where p binds x,y
 	-- we are going to make
 	--	v = p	(where v is fresh)
@@ -595,15 +600,19 @@ mkSelectorBinds pat val_expr
       where
         error_expr = mkCoerce (idType bndr_var) (Var err_var)
 
-    is_simple_pat (TuplePat ps Boxed)    = all is_triv_pat ps
-    is_simple_pat (ConPatOut _ ps _ _ _) = all is_triv_pat (hsConArgs ps)
+    is_simple_lpat p = is_simple_pat (unLoc p)
+
+    is_simple_pat (TuplePat ps Boxed)    = all is_triv_lpat ps
+    is_simple_pat (ConPatOut _ ps _ _ _) = all is_triv_lpat (hsConArgs ps)
     is_simple_pat (VarPat _)	       	 = True
-    is_simple_pat (ParPat p)		 = is_simple_pat p
+    is_simple_pat (ParPat p)		 = is_simple_lpat p
     is_simple_pat other		       	 = False
+
+    is_triv_lpat p = is_triv_pat (unLoc p)
 
     is_triv_pat (VarPat v)  = True
     is_triv_pat (WildPat _) = True
-    is_triv_pat (ParPat p)  = is_triv_pat p
+    is_triv_pat (ParPat p)  = is_triv_lpat p
     is_triv_pat other       = False
 \end{code}
 

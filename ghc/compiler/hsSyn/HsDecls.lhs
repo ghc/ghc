@@ -8,14 +8,17 @@ Definitions for: @TyDecl@ and @oCnDecl@, @ClassDecl@,
 
 \begin{code}
 module HsDecls (
-	HsDecl(..), TyClDecl(..), InstDecl(..), RuleDecl(..), RuleBndr(..),
-	DefaultDecl(..), HsGroup(..), SpliceDecl(..),
-	ForeignDecl(..), ForeignImport(..), ForeignExport(..),
+	HsDecl(..), LHsDecl, TyClDecl(..), LTyClDecl, 
+	InstDecl(..), LInstDecl,
+	RuleDecl(..), LRuleDecl, RuleBndr(..),
+	DefaultDecl(..), LDefaultDecl, HsGroup(..), SpliceDecl(..),
+	ForeignDecl(..), LForeignDecl, ForeignImport(..), ForeignExport(..),
 	CImportSpec(..), FoType(..),
-	ConDecl(..), 
-	BangType(..), HsBang(..), getBangType, getBangStrictness, unbangedType, 
-	DeprecDecl(..), 
-	tyClDeclName, tyClDeclNames, tyClDeclTyVars,
+	ConDecl(..), LConDecl,
+	LBangType, BangType(..), HsBang(..), 
+	getBangType, getBangStrictness, unbangedType, 
+	DeprecDecl(..),  LDeprecDecl,
+	tcdName, tyClDeclNames, tyClDeclTyVars,
 	isClassDecl, isSynDecl, isDataDecl, 
 	countTyClDecls,
 	conDetailsTys,
@@ -28,7 +31,8 @@ module HsDecls (
 import {-# SOURCE #-}	HsExpr( HsExpr, pprExpr )
 	-- Because Expr imports Decls via HsBracket
 
-import HsBinds		( HsBinds, MonoBinds, Sig(..), FixitySig )
+import HsBinds		( HsBindGroup, HsBind, LHsBinds, 
+			  Sig(..), LSig, LFixitySig )
 import HsPat		( HsConDetails(..), hsConArgs )
 import HsImpExp		( pprHsVar )
 import HsTypes
@@ -44,7 +48,7 @@ import Class		( FunDep )
 import CStrings		( CLabelString )
 import Outputable	
 import Util		( count )
-import SrcLoc		( SrcLoc )
+import SrcLoc		( Located(..), unLoc )
 import FastString
 \end{code}
 
@@ -56,10 +60,12 @@ import FastString
 %************************************************************************
 
 \begin{code}
+type LHsDecl id = Located (HsDecl id)
+
 data HsDecl id
   = TyClD	(TyClDecl id)
   | InstD	(InstDecl  id)
-  | ValD	(MonoBinds id)
+  | ValD	(HsBind id)
   | SigD	(Sig id)
   | DefD	(DefaultDecl id)
   | ForD        (ForeignDecl id)
@@ -84,23 +90,23 @@ data HsDecl id
 -- fed to the renamer.
 data HsGroup id
   = HsGroup {
-	hs_valds  :: HsBinds id,	
-		-- Before the renamer, this is a single big MonoBinds, 
+	hs_valds  :: [HsBindGroup id],
+		-- Before the renamer, this is a single big HsBindGroup,
 		-- with all the bindings, and all the signatures.
-		-- The renamer does dependency analysis, using ThenBinds
-		-- to give the structure
+		-- The renamer does dependency analysis, splitting it up
+		-- into several HsBindGroups.
 
-	hs_tyclds :: [TyClDecl id],
-	hs_instds :: [InstDecl id],
+	hs_tyclds :: [LTyClDecl id],
+	hs_instds :: [LInstDecl id],
 
-	hs_fixds  :: [FixitySig id],
+	hs_fixds  :: [LFixitySig id],
 		-- Snaffled out of both top-level fixity signatures,
 		-- and those in class declarations
 
-	hs_defds  :: [DefaultDecl id],
-	hs_fords  :: [ForeignDecl id],
-	hs_depds  :: [DeprecDecl id],
-	hs_ruleds :: [RuleDecl id]
+	hs_defds  :: [LDefaultDecl id],
+	hs_fords  :: [LForeignDecl id],
+	hs_depds  :: [LDeprecDecl id],
+	hs_ruleds :: [LRuleDecl id]
   }
 \end{code}
 
@@ -134,10 +140,10 @@ instance OutputableBndr name => Outputable (HsGroup name) where
 	  ppr_ds [] = empty
 	  ppr_ds ds = text "" $$ vcat (map ppr ds)
 
-data SpliceDecl id = SpliceDecl (HsExpr id) SrcLoc	-- Top level splice
+data SpliceDecl id = SpliceDecl (Located (HsExpr id))	-- Top level splice
 
 instance OutputableBndr name => Outputable (SpliceDecl name) where
-   ppr (SpliceDecl e _) = ptext SLIT("$") <> parens (pprExpr e)
+   ppr (SpliceDecl e) = ptext SLIT("$") <> parens (pprExpr (unLoc e))
 \end{code}
 
 
@@ -151,8 +157,8 @@ instance OutputableBndr name => Outputable (SpliceDecl name) where
 			THE NAMING STORY
 		--------------------------------
 
-Here is the story about the implicit names that go with type, class, and instance
-decls.  It's a bit tricky, so pay attention!
+Here is the story about the implicit names that go with type, class,
+and instance decls.  It's a bit tricky, so pay attention!
 
 "Implicit" (or "system") binders
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -165,7 +171,8 @@ decls.  It's a bit tricky, so pay attention!
 	the worker for that constructor
 	a selector for each superclass
 
-All have occurrence names that are derived uniquely from their parent declaration.
+All have occurrence names that are derived uniquely from their parent
+declaration.
 
 None of these get separate definitions in an interface file; they are
 fully defined by the data or class decl.  But they may *occur* in
@@ -285,35 +292,36 @@ Interface file code:
 -- for a module.  That's why (despite the misnomer) IfaceSig and ForeignType
 -- are both in TyClDecl
 
+type LTyClDecl name = Located (TyClDecl name)
+
 data TyClDecl name
-  = ForeignType { tcdName    :: name,
-		  tcdExtName :: Maybe FastString,
-		  tcdFoType  :: FoType,
-		  tcdLoc     :: SrcLoc }
+  = ForeignType { 
+		tcdLName    :: Located name,
+		tcdExtName  :: Maybe FastString,
+		tcdFoType   :: FoType
+  }
 
   | TyData {	tcdND     :: NewOrData,
-		tcdCtxt   :: HsContext name,	 -- Context
-		tcdName   :: name,		 -- Type constructor
-		tcdTyVars :: [HsTyVarBndr name], -- Type variables
-		tcdCons	  :: [ConDecl name],	 -- Data constructors
-		tcdDerivs :: Maybe (HsContext name),	-- Derivings; Nothing => not specified
-							-- Just [] => derive exactly what is asked
-		tcdLoc	   :: SrcLoc
+		tcdCtxt   :: LHsContext name,	 	-- Context
+		tcdLName  :: Located name,	 	-- Type constructor
+		tcdTyVars :: [LHsTyVarBndr name], 	-- Type variables
+		tcdCons	  :: [LConDecl name],	 	-- Data constructors
+		tcdDerivs :: Maybe (LHsContext name)	
+			-- Derivings; Nothing => not specified
+			-- 	      Just [] => derive exactly what is asked
     }
 
-  | TySynonym {	tcdName   :: name,		        -- type constructor
-		tcdTyVars :: [HsTyVarBndr name],	-- type variables
-		tcdSynRhs :: HsType name,	        -- synonym expansion
-		tcdLoc    :: SrcLoc
+  | TySynonym {	tcdLName  :: Located name,	        -- type constructor
+		tcdTyVars :: [LHsTyVarBndr name],	-- type variables
+		tcdSynRhs :: LHsType name	        -- synonym expansion
     }
 
-  | ClassDecl {	tcdCtxt    :: HsContext name, 	 	-- Context...
-		tcdName    :: name,		    	-- Name of the class
-		tcdTyVars  :: [HsTyVarBndr name],	-- The class type variables
-		tcdFDs     :: [FunDep name],		-- Functional dependencies
-		tcdSigs    :: [Sig name],		-- Methods' signatures
-		tcdMeths   :: MonoBinds name,		-- Default methods
-		tcdLoc     :: SrcLoc
+  | ClassDecl {	tcdCtxt    :: LHsContext name, 	 	-- Context...
+		tcdLName   :: Located name,	    	-- Name of the class
+		tcdTyVars  :: [LHsTyVarBndr name],	-- Class type variables
+		tcdFDs     :: [Located (FunDep name)],	-- Functional deps
+		tcdSigs    :: [LSig name],		-- Methods' signatures
+		tcdMeths   :: LHsBinds name		-- Default methods
     }
 \end{code}
 
@@ -335,25 +343,23 @@ isClassDecl other	   = False
 Dealing with names
 
 \begin{code}
---------------------------------
-tyClDeclName :: TyClDecl name -> name
-tyClDeclName tycl_decl = tcdName tycl_decl
+tcdName :: TyClDecl name -> name
+tcdName decl = unLoc (tcdLName decl)
 
---------------------------------
-tyClDeclNames :: Eq name => TyClDecl name -> [(name, SrcLoc)]
+tyClDeclNames :: Eq name => TyClDecl name -> [Located name]
 -- Returns all the *binding* names of the decl, along with their SrcLocs
 -- The first one is guaranteed to be the name of the decl
 -- For record fields, the first one counts as the SrcLoc
 -- We use the equality to filter out duplicate field names
 
-tyClDeclNames (TySynonym   {tcdName = name, tcdLoc = loc})  = [(name,loc)]
-tyClDeclNames (ForeignType {tcdName = name, tcdLoc = loc})  = [(name,loc)]
+tyClDeclNames (TySynonym   {tcdLName = name})  = [name]
+tyClDeclNames (ForeignType {tcdLName = name})  = [name]
 
-tyClDeclNames (ClassDecl {tcdName = cls_name, tcdSigs = sigs, tcdLoc = loc})
-  = (cls_name,loc) : [(n,loc) | Sig n _ loc <- sigs]
+tyClDeclNames (ClassDecl {tcdLName = cls_name, tcdSigs = sigs})
+  = cls_name : [n | L _ (Sig n _) <- sigs]
 
-tyClDeclNames (TyData {tcdName = tc_name, tcdCons = cons, tcdLoc = loc})
-  = (tc_name,loc) : conDeclsNames cons
+tyClDeclNames (TyData {tcdLName = tc_name, tcdCons = cons})
+  = tc_name : conDeclsNames (map unLoc cons)
 
 tyClDeclTyVars (TySynonym {tcdTyVars = tvs}) = tvs
 tyClDeclTyVars (TyData    {tcdTyVars = tvs}) = tvs
@@ -381,21 +387,21 @@ countTyClDecls decls
 instance OutputableBndr name
 	      => Outputable (TyClDecl name) where
 
-    ppr (ForeignType {tcdName = tycon})
-	= hsep [ptext SLIT("foreign import type dotnet"), ppr tycon]
+    ppr (ForeignType {tcdLName = ltycon})
+	= hsep [ptext SLIT("foreign import type dotnet"), ppr ltycon]
 
-    ppr (TySynonym {tcdName = tycon, tcdTyVars = tyvars, tcdSynRhs = mono_ty})
-      = hang (ptext SLIT("type") <+> pp_decl_head [] tycon tyvars <+> equals)
+    ppr (TySynonym {tcdLName = ltycon, tcdTyVars = tyvars, tcdSynRhs = mono_ty})
+      = hang (ptext SLIT("type") <+> pp_decl_head [] ltycon tyvars <+> equals)
 	     4 (ppr mono_ty)
 
-    ppr (TyData {tcdND = new_or_data, tcdCtxt = context, tcdName = tycon,
+    ppr (TyData {tcdND = new_or_data, tcdCtxt = context, tcdLName = ltycon,
 		 tcdTyVars = tyvars, tcdCons = condecls, 
 		 tcdDerivs = derivings})
-      = pp_tydecl (ppr new_or_data <+> pp_decl_head context tycon tyvars)
+      = pp_tydecl (ppr new_or_data <+> pp_decl_head (unLoc context) ltycon tyvars)
 		  (pp_condecls condecls)
 		  derivings
 
-    ppr (ClassDecl {tcdCtxt = context, tcdName = clas, tcdTyVars = tyvars, tcdFDs = fds,
+    ppr (ClassDecl {tcdCtxt = context, tcdLName = lclas, tcdTyVars = tyvars, tcdFDs = fds,
 		    tcdSigs = sigs, tcdMeths = methods})
       | null sigs	-- No "where" part
       = top_matter
@@ -404,11 +410,16 @@ instance OutputableBndr name
       = sep [hsep [top_matter, ptext SLIT("where {")],
 	     nest 4 (sep [sep (map ppr_sig sigs), ppr methods, char '}'])]
       where
-        top_matter  = ptext SLIT("class") <+> pp_decl_head context clas tyvars <+> pprFundeps fds
+        top_matter  = ptext SLIT("class") <+> pp_decl_head (unLoc context) lclas tyvars <+> pprFundeps (map unLoc fds)
 	ppr_sig sig = ppr sig <> semi
 
-pp_decl_head :: OutputableBndr name => HsContext name -> name -> [HsTyVarBndr name] -> SDoc
-pp_decl_head context thing tyvars = hsep [pprHsContext context, ppr thing, interppSP tyvars]
+pp_decl_head :: OutputableBndr name
+   => HsContext name
+   -> Located name
+   -> [LHsTyVarBndr name]
+   -> SDoc
+pp_decl_head context thing tyvars
+  = hsep [pprHsContext context, ppr thing, interppSP tyvars]
 
 pp_condecls cs = equals <+> sep (punctuate (ptext SLIT(" |")) (map ppr cs))
 
@@ -417,7 +428,8 @@ pp_tydecl pp_head pp_decl_rhs derivings
 	pp_decl_rhs,
 	case derivings of
 	  Nothing 	   -> empty
-	  Just ds	   -> hsep [ptext SLIT("deriving"), ppr_hs_context ds]
+	  Just ds	   -> hsep [ptext SLIT("deriving"), 
+					ppr_hs_context (unLoc ds)]
     ])
 \end{code}
 
@@ -429,39 +441,42 @@ pp_tydecl pp_head pp_decl_rhs derivings
 %************************************************************************
 
 \begin{code}
+type LConDecl name = Located (ConDecl name)
+
 data ConDecl name
-  = ConDecl 	name			-- Constructor name; this is used for the
+  = ConDecl 	(Located name)		-- Constructor name; this is used for the
 					-- DataCon itself, and for the user-callable wrapper Id
 
-		[HsTyVarBndr name]	-- Existentially quantified type variables
-		(HsContext name)	-- ...and context
+		[LHsTyVarBndr name]	-- Existentially quantified type variables
+		(LHsContext name)	-- ...and context
 					-- If both are empty then there are no existentials
 
-		(HsConDetails name (BangType name))
-		SrcLoc
+		(HsConDetails name (LBangType name))
 \end{code}
 
 \begin{code}
-conDeclsNames :: Eq name => [ConDecl name] -> [(name,SrcLoc)]
+conDeclsNames :: Eq name => [ConDecl name] -> [Located name]
   -- See tyClDeclNames for what this does
   -- The function is boringly complicated because of the records
   -- And since we only have equality, we have to be a little careful
 conDeclsNames cons
   = snd (foldl do_one ([], []) cons)
   where
-    do_one (flds_seen, acc) (ConDecl name _ _ (RecCon flds) loc)
-	= (new_flds ++ flds_seen, (name,loc) : [(f,loc) | f <- new_flds] ++ acc)
+    do_one (flds_seen, acc) (ConDecl lname _ _ (RecCon flds))
+	= (map unLoc new_flds ++ flds_seen, lname : [f | f <- new_flds] ++ acc)
 	where
-	  new_flds = [ f | (f,_) <- flds, not (f `elem` flds_seen) ]
+	  new_flds = [ f | (f,_) <- flds, not (unLoc f `elem` flds_seen) ]
 
-    do_one (flds_seen, acc) (ConDecl name _ _ _ loc)
-	= (flds_seen, (name,loc):acc)
+    do_one (flds_seen, acc) (ConDecl lname _ _ _)
+	= (flds_seen, lname:acc)
 
 conDetailsTys details = map getBangType (hsConArgs details)
 \end{code}
   
 \begin{code}
-data BangType name = BangType HsBang (HsType name)
+type LBangType name = Located (BangType name)
+
+data BangType name = BangType HsBang (LHsType name)
 
 data HsBang = HsNoBang
 	    | HsStrict	-- ! 
@@ -470,12 +485,13 @@ data HsBang = HsNoBang
 getBangType       (BangType _ ty) = ty
 getBangStrictness (BangType s _)  = s
 
-unbangedType ty = BangType HsNoBang ty
+unbangedType :: LHsType id -> LBangType id
+unbangedType ty@(L loc _) = L loc (BangType HsNoBang ty)
 \end{code}
 
 \begin{code}
 instance (OutputableBndr name) => Outputable (ConDecl name) where
-    ppr (ConDecl con tvs cxt con_details loc)
+    ppr (ConDecl con tvs cxt con_details)
       = sep [pprHsForAll Explicit tvs cxt, ppr_con_details con con_details]
 
 ppr_con_details con (InfixCon ty1 ty2)
@@ -495,7 +511,7 @@ ppr_con_details con (RecCon fields)
 
 instance OutputableBndr name => Outputable (BangType name) where
     ppr (BangType is_strict ty) 
-	= bang <> pprParendHsType ty
+	= bang <> pprParendHsType (unLoc ty)
 	where
 	  bang = case is_strict of
 			HsNoBang -> empty
@@ -511,17 +527,18 @@ instance OutputableBndr name => Outputable (BangType name) where
 %************************************************************************
 
 \begin{code}
+type LInstDecl name = Located (InstDecl name)
+
 data InstDecl name
-  = InstDecl	(HsType name)	-- Context => Class Instance-type
+  = InstDecl	(LHsType name)	-- Context => Class Instance-type
 				-- Using a polytype means that the renamer conveniently
 				-- figures out the quantified type variables for us.
-		(MonoBinds name)
-		[Sig name]		-- User-supplied pragmatic info
-		SrcLoc
+		(LHsBinds name)
+		[LSig name]		-- User-supplied pragmatic info
 
 instance (OutputableBndr name) => Outputable (InstDecl name) where
 
-    ppr (InstDecl inst_ty binds uprags src_loc)
+    ppr (InstDecl inst_ty binds uprags)
       = vcat [hsep [ptext SLIT("instance"), ppr inst_ty, ptext SLIT("where")],
 	      nest 4 (ppr uprags),
 	      nest 4 (ppr binds) ]
@@ -538,14 +555,15 @@ for the parser to check that; we pass them all through in the abstract
 syntax, and that restriction must be checked in the front end.
 
 \begin{code}
+type LDefaultDecl name = Located (DefaultDecl name)
+
 data DefaultDecl name
-  = DefaultDecl	[HsType name]
-		SrcLoc
+  = DefaultDecl	[LHsType name]
 
 instance (OutputableBndr name)
 	      => Outputable (DefaultDecl name) where
 
-    ppr (DefaultDecl tys src_loc)
+    ppr (DefaultDecl tys)
       = ptext SLIT("default") <+> parens (interpp'SP tys)
 \end{code}
 
@@ -563,9 +581,11 @@ instance (OutputableBndr name)
 -- * the Boolean value indicates whether the pre-standard deprecated syntax
 --   has been used
 --
+type LForeignDecl name = Located (ForeignDecl name)
+
 data ForeignDecl name
-  = ForeignImport name (HsType name) ForeignImport Bool SrcLoc  -- defines name
-  | ForeignExport name (HsType name) ForeignExport Bool SrcLoc  -- uses name
+  = ForeignImport (Located name) (LHsType name) ForeignImport Bool  -- defines name
+  | ForeignExport (Located name) (LHsType name) ForeignExport Bool  -- uses name
 
 -- specification of an imported external entity in dependence on the calling
 -- convention 
@@ -617,10 +637,10 @@ data FoType = DNType 		-- In due course we'll add subtype stuff
 --
 
 instance OutputableBndr name => Outputable (ForeignDecl name) where
-  ppr (ForeignImport n ty fimport _ _) =
+  ppr (ForeignImport n ty fimport _) =
     ptext SLIT("foreign import") <+> ppr fimport <+> 
     ppr n <+> dcolon <+> ppr ty
-  ppr (ForeignExport n ty fexport _ _) =
+  ppr (ForeignExport n ty fexport _) =
     ptext SLIT("foreign export") <+> ppr fexport <+> 
     ppr n <+> dcolon <+> ppr ty
 
@@ -662,27 +682,28 @@ instance Outputable FoType where
 %************************************************************************
 
 \begin{code}
+type LRuleDecl name = Located (RuleDecl name)
+
 data RuleDecl name
   = HsRule			-- Source rule
 	RuleName		-- Rule name
 	Activation
 	[RuleBndr name]		-- Forall'd vars; after typechecking this includes tyvars
-	(HsExpr name)	-- LHS
-	(HsExpr name)	-- RHS
-	SrcLoc		
+	(Located (HsExpr name))	-- LHS
+	(Located (HsExpr name))	-- RHS
 
 data RuleBndr name
-  = RuleBndr name
-  | RuleBndrSig name (HsType name)
+  = RuleBndr (Located name)
+  | RuleBndrSig (Located name) (LHsType name)
 
-collectRuleBndrSigTys :: [RuleBndr name] -> [HsType name]
+collectRuleBndrSigTys :: [RuleBndr name] -> [LHsType name]
 collectRuleBndrSigTys bndrs = [ty | RuleBndrSig _ ty <- bndrs]
 
 instance OutputableBndr name => Outputable (RuleDecl name) where
-  ppr (HsRule name act ns lhs rhs loc)
+  ppr (HsRule name act ns lhs rhs)
 	= sep [text "{-# RULES" <+> doubleQuotes (ftext name) <+> ppr act,
-	       nest 4 (pp_forall <+> pprExpr lhs), 
-	       nest 4 (equals <+> pprExpr rhs <+> text "#-}") ]
+	       nest 4 (pp_forall <+> pprExpr (unLoc lhs)), 
+	       nest 4 (equals <+> pprExpr (unLoc rhs) <+> text "#-}") ]
 	where
 	  pp_forall | null ns   = empty
 		    | otherwise	= text "forall" <+> fsep (map ppr ns) <> dot
@@ -702,9 +723,11 @@ instance OutputableBndr name => Outputable (RuleBndr name) where
 We use exported entities for things to deprecate.
 
 \begin{code}
-data DeprecDecl name = Deprecation name DeprecTxt SrcLoc
+type LDeprecDecl name = Located (DeprecDecl name)
+
+data DeprecDecl name = Deprecation name DeprecTxt
 
 instance OutputableBndr name => Outputable (DeprecDecl name) where
-    ppr (Deprecation thing txt _)
+    ppr (Deprecation thing txt)
       = hsep [text "{-# DEPRECATED", ppr thing, doubleQuotes (ppr txt), text "#-}"]
 \end{code}

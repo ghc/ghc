@@ -1,11 +1,10 @@
 module TcMatches where
 
-tcGRHSsPat    :: RnHsSyn.RenamedGRHSs
+tcGRHSsPat    :: HsExpr.GRHSs Name.Name
 	      -> TcUnify.Expected TcType.TcType
-	      -> TcRnTypes.TcM TcHsSyn.TcGRHSs
+	      -> TcRnTypes.TcM (HsExpr.GRHSs Var.Id)
 
 tcMatchesFun :: Name.Name
-	     -> [RnHsSyn.RenamedMatch]
+	     -> [HsExpr.LMatch Name.Name]
 	     -> TcUnify.Expected TcType.TcType
-	     -> TcRnTypes.TcM [TcHsSyn.TcMatch]
-
+	     -> TcRnTypes.TcM [HsExpr.LMatch Var.Id]

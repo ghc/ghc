@@ -8,9 +8,7 @@ module TcRules ( tcRules ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( RuleDecl(..), RuleBndr(..), collectRuleBndrSigTys )
-import RnHsSyn		( RenamedRuleDecl )
-import TcHsSyn		( TypecheckedRuleDecl, mkHsLet )
+import HsSyn		( RuleDecl(..), LRuleDecl, RuleBndr(..), collectRuleBndrSigTys, mkHsLet )
 import TcRnMonad
 import TcSimplify	( tcSimplifyToDicts, tcSimplifyInferCheck )
 import TcMType		( newTyVarTy )
@@ -20,17 +18,18 @@ import TcExpr		( tcCheckRho )
 import TcEnv		( tcExtendLocalValEnv )
 import Inst		( instToId )
 import Id		( idType, mkLocalId )
+import Name		( Name )
+import SrcLoc		( noLoc, unLoc )
 import Outputable
 \end{code}
 
 \begin{code}
-tcRules :: [RenamedRuleDecl] -> TcM [TypecheckedRuleDecl]
-tcRules decls = mappM tcRule decls
+tcRules :: [LRuleDecl Name] -> TcM [LRuleDecl TcId]
+tcRules decls = mappM (wrapLocM tcRule) decls
 
-tcRule :: RenamedRuleDecl -> TcM TypecheckedRuleDecl
-tcRule (HsRule name act vars lhs rhs src_loc)
-  = addSrcLoc src_loc 				$
-    addErrCtxt (ruleCtxt name)			$
+tcRule :: RuleDecl Name -> TcM (RuleDecl TcId)
+tcRule (HsRule name act vars lhs rhs)
+  = addErrCtxt (ruleCtxt name)			$
     traceTc (ptext SLIT("---- Rule ------")
 		 <+> ppr name)			`thenM_` 
     newTyVarTy openTypeKind			`thenM` \ rule_ty ->
@@ -88,15 +87,16 @@ tcRule (HsRule name act vars lhs rhs src_loc)
 			 lhs_dicts rhs_lie	`thenM` \ (forall_tvs1, rhs_binds) ->
 
     returnM (HsRule name act
-		    (map RuleBndr (forall_tvs1 ++ tpl_ids))	-- yuk
+		    (map (RuleBndr . noLoc) (forall_tvs1 ++ tpl_ids))	-- yuk
 		    (mkHsLet lhs_binds lhs')
-		    (mkHsLet rhs_binds rhs')
-		    src_loc)
+		    (mkHsLet rhs_binds rhs'))
   where
     new_id (RuleBndr var) 	   = newTyVarTy openTypeKind			`thenM` \ ty ->
-		          	     returnM (mkLocalId var ty)
-    new_id (RuleBndrSig var rn_ty) = tcHsSigType (RuleSigCtxt var) rn_ty	`thenM` \ ty ->
-				     returnM (mkLocalId var ty)
+		          	     returnM (mkLocalId (unLoc var) ty)
+    new_id (RuleBndrSig var rn_ty) = tcHsSigType (RuleSigCtxt nl_var) rn_ty	`thenM` \ ty ->
+				     returnM (mkLocalId nl_var ty)
+				   where
+				     nl_var = unLoc var
 
 ruleCtxt name = ptext SLIT("When checking the transformation rule") <+> 
 		doubleQuotes (ftext name)

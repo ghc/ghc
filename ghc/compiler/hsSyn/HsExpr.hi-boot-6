@@ -4,11 +4,14 @@ data HsExpr i
 data Match a
 data GRHSs a
 
+type LHsExpr a = SrcLoc.Located (HsExpr a)
+type LMatch a  = SrcLoc.Located (Match a)
+
 pprExpr :: (Outputable.OutputableBndr i) => 
 	HsExpr.HsExpr i -> Outputable.SDoc
 
 pprPatBind :: (Outputable.OutputableBndr i) => 
-	HsPat.Pat i -> HsExpr.GRHSs i -> Outputable.SDoc
+	HsPat.LPat i -> HsExpr.GRHSs i -> Outputable.SDoc
 
 pprFunBind :: (Outputable.OutputableBndr i) => 
-	i -> [HsExpr.Match i] -> Outputable.SDoc
+	i -> [HsExpr.LMatch i] -> Outputable.SDoc

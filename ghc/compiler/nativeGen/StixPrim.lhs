@@ -29,6 +29,7 @@ import Outputable
 import Util             ( notNull )
 import FastString
 import FastTypes
+import Char
 
 #include "NCG.h"
 \end{code}
@@ -160,7 +161,7 @@ amodeToStix (CLbl      lbl _) = StCLbl lbl
 amodeToStix (CCharLike (CLit (MachChar c)))
   = StIndex Word8Rep cHARLIKE_closure (StInt (toInteger off))
   where
-    off = charLikeSize * (c - mIN_CHARLIKE)
+    off = charLikeSize * (ord c - mIN_CHARLIKE)
 
 amodeToStix (CCharLike x)
   = panic "amodeToStix.CCharLike"
@@ -175,7 +176,7 @@ amodeToStix (CIntLike x)
 
 amodeToStix (CLit core)
   = case core of
-      MachChar c     -> StInt (toInteger c)
+      MachChar c     -> StInt (toInteger (ord c))
       MachStr s	     -> StString s
       MachNullAddr   -> StInt 0
       MachInt i      -> StInt i

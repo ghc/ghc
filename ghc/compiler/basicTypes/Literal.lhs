@@ -96,7 +96,7 @@ function applications, etc., etc., has not yet been done.
 data Literal
   =	------------------
 	-- First the primitive guys
-    MachChar	Int             -- Char#        At least 31 bits
+    MachChar	Char             -- Char#        At least 31 bits
   | MachStr	FastString
 
   | MachNullAddr                -- the NULL pointer, the only pointer value
@@ -211,8 +211,8 @@ inIntRange, inWordRange :: Integer -> Bool
 inIntRange  x = x >= tARGET_MIN_INT && x <= tARGET_MAX_INT
 inWordRange x = x >= 0		    && x <= tARGET_MAX_WORD
 
-inCharRange :: Int -> Bool
-inCharRange c =  c >= 0 && c <= tARGET_MAX_CHAR
+inCharRange :: Char -> Bool
+inCharRange c =  c >= '\0' && c <= chr tARGET_MAX_CHAR
 
 isZeroLit :: Literal -> Bool
 isZeroLit (MachInt    0) = True
@@ -250,8 +250,8 @@ narrow8WordLit   (MachWord w) = MachWord (toInteger (fromInteger w :: Word8))
 narrow16WordLit  (MachWord w) = MachWord (toInteger (fromInteger w :: Word16))
 narrow32WordLit  (MachWord w) = MachWord (toInteger (fromInteger w :: Word32))
 
-char2IntLit (MachChar c) = MachInt  (toInteger c)
-int2CharLit (MachInt  i) = MachChar (fromInteger i)
+char2IntLit (MachChar c) = MachInt  (toInteger (ord c))
+int2CharLit (MachInt  i) = MachChar (chr (fromInteger i))
 
 float2IntLit (MachFloat f) = MachInt   (truncate    f)
 int2FloatLit (MachInt   i) = MachFloat (fromInteger i)
@@ -366,7 +366,7 @@ pprLit lit
       code_style  = codeStyle  sty
     in
     case lit of
-      MachChar ch | code_style -> hcat [ptext SLIT("(C_)"), text (show ch)]
+      MachChar ch | code_style -> hcat [ptext SLIT("(C_)"), text (show (ord ch))]
 	          | otherwise  -> pprHsChar ch
 
       MachStr s | code_style -> pprFSInCStyle s
@@ -439,7 +439,7 @@ Hash values should be zero or a positive integer.  No negatives please.
 
 \begin{code}
 hashLiteral :: Literal -> Int
-hashLiteral (MachChar c)    	= c + 1000	-- Keep it out of range of common ints
+hashLiteral (MachChar c)    	= ord c + 1000	-- Keep it out of range of common ints
 hashLiteral (MachStr s)     	= hashFS s
 hashLiteral (MachNullAddr)    	= 0
 hashLiteral (MachInt i)   	= hashInteger i

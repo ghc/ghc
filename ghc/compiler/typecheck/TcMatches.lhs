@@ -15,18 +15,15 @@ module TcMatches ( tcMatchesFun, tcGRHSsPat, tcMatchesCase, tcMatchLambda,
 
 import {-# SOURCE #-}	TcExpr( tcCheckRho, tcMonoExpr )
 
-import HsSyn		( HsExpr(..), HsBinds(..), Match(..), GRHSs(..), GRHS(..),
-			  MonoBinds(..), Stmt(..), HsMatchContext(..), HsStmtContext(..),
-			  ReboundNames,
-			  pprMatch, getMatchLoc, isDoExpr,
+import HsSyn		( HsExpr(..), LHsExpr, HsBindGroup(..),
+			  Match(..), LMatch, GRHSs(..), GRHS(..), 
+			  Stmt(..), LStmt, HsMatchContext(..), HsStmtContext(..),
+			  ReboundNames, LPat,
+			  pprMatch, isDoExpr,
 			  pprMatchContext, pprStmtContext, pprStmtResultContext,
-			  mkMonoBind, collectSigTysFromPats, glueBindsOnGRHSs
+			  collectSigTysFromPats, glueBindsOnGRHSs
 			)
-import RnHsSyn		( RenamedMatch, RenamedGRHSs, RenamedStmt, RenamedHsExpr,
-			  RenamedPat, RenamedMatchContext )
-import TcHsSyn		( TcMatch, TcGRHSs, TcStmt, TcDictBinds, TcHsBinds, TcExpr,
-			  TcPat, TcStmt, ExprCoFn,
-			  isIdCoercion, (<$>), (<.>) )
+import TcHsSyn		( ExprCoFn, TcDictBinds, isIdCoercion, (<$>), (<.>) )
 
 import TcRnMonad
 import TcHsType		( tcAddScopedTyVars, tcHsSigType, UserTypeCtxt(..) )
@@ -52,6 +49,7 @@ import VarSet
 import Bag
 import Util		( isSingleton, notNull )
 import Outputable
+import SrcLoc		( Located(..), noLoc )
 
 import List		( nub )
 \end{code}
@@ -69,21 +67,19 @@ same number of arguments before using @tcMatches@ to do the work.
 
 \begin{code}
 tcMatchesFun :: Name
-	     -> [RenamedMatch]
+	     -> [LMatch Name]
 	     -> Expected TcRhoType 		-- Expected type
-	     -> TcM [TcMatch]
+	     -> TcM [LMatch TcId]
 
 tcMatchesFun fun_name matches@(first_match:_) expected_ty
   =	 -- Check that they all have the same no of arguments
-	 -- Set the location to that of the first equation, so that
+	 -- Location is in the monad, set the caller so that 
 	 -- any inter-equation error messages get some vaguely
 	 -- sensible location.	Note: we have to do this odd
 	 -- ann-grabbing, because we don't always have annotations in
 	 -- hand when we call tcMatchesFun...
-    addSrcLoc (getMatchLoc first_match)	 (
-	    checkTc (sameNoOfArgs matches)
-		    (varyingArgsErr fun_name matches)
-    )						 `thenM_`
+    checkTc (sameNoOfArgs matches)
+	    (varyingArgsErr fun_name matches)			 `thenM_`
 
 	-- ToDo: Don't use "expected" stuff if there ain't a type signature
 	-- because inconsistency between branches
@@ -101,10 +97,10 @@ parser guarantees that each equation has exactly one argument.
 
 \begin{code}
 tcMatchesCase :: TcMatchCtxt		-- Case context
-	      -> [RenamedMatch]		-- The case alternatives
+	      -> [LMatch Name]		-- The case alternatives
 	      -> Expected TcRhoType 	-- Type of whole case expressions
 	      -> TcM (TcRhoType,	-- Inferred type of the scrutinee
-		      [TcMatch]) 	-- Translated alternatives
+		      [LMatch TcId]) 	-- Translated alternatives
 
 tcMatchesCase ctxt matches (Check expr_ty)
   = 	-- This case is a bit yukky, because it prevents the
@@ -124,8 +120,8 @@ tcMatchesCase ctxt matches (Infer hole)
     returnM (scrut_ty, matches')
     
 
-tcMatchLambda :: RenamedMatch -> Expected TcRhoType -> TcM TcMatch
-tcMatchLambda match res_ty = tcMatch match_ctxt match res_ty
+tcMatchLambda :: LMatch Name -> Expected TcRhoType -> TcM (LMatch TcId)
+tcMatchLambda match res_ty = tcMatch match_ctxt res_ty match
   where
     match_ctxt = MC { mc_what = LambdaExpr,
 		      mc_body = tcMonoExpr }
@@ -134,9 +130,9 @@ tcMatchLambda match res_ty = tcMatch match_ctxt match res_ty
 @tcGRHSsPat@ typechecks @[GRHSs]@ that occur in a @PatMonoBind@.
 
 \begin{code}
-tcGRHSsPat :: RenamedGRHSs
+tcGRHSsPat :: GRHSs Name
 	   -> Expected TcRhoType
-	   -> TcM TcGRHSs
+	   -> TcM (GRHSs TcId)
 tcGRHSsPat grhss exp_ty = tcGRHSs match_ctxt grhss exp_ty
   where
     match_ctxt = MC { mc_what = PatBindRhs,
@@ -145,24 +141,22 @@ tcGRHSsPat grhss exp_ty = tcGRHSs match_ctxt grhss exp_ty
 
 \begin{code}
 data TcMatchCtxt 	-- c.f. TcStmtCtxt, also in this module
-  = MC { mc_what :: RenamedMatchContext,	-- What kind of thing this is
-    	 mc_body :: RenamedHsExpr 		-- Type checker for a body of an alternative
+  = MC { mc_what :: HsMatchContext Name,	-- What kind of thing this is
+    	 mc_body :: LHsExpr Name 		-- Type checker for a body of an alternative
 		    -> Expected TcRhoType 
-		    -> TcM TcExpr }	
+		    -> TcM (LHsExpr TcId) }	
 
 tcMatches :: TcMatchCtxt
-	  -> [RenamedMatch]
+	  -> [LMatch Name]
 	  -> Expected TcRhoType
-	  -> TcM [TcMatch]
+	  -> TcM [LMatch TcId]
 
 tcMatches ctxt matches exp_ty
   = 	-- If there is more than one branch, and exp_ty is a 'hole',
 	-- all branches must be types, not type schemes, otherwise the
 	-- order in which we check them would affect the result.
     zapExpectedBranches matches exp_ty 	`thenM` \ exp_ty' ->
-    mappM (tc_match exp_ty') matches
-  where
-    tc_match exp_ty match = tcMatch ctxt match exp_ty
+    mappM (tcMatch ctxt exp_ty') matches
 \end{code}
 
 
@@ -174,17 +168,18 @@ tcMatches ctxt matches exp_ty
 
 \begin{code}
 tcMatch :: TcMatchCtxt
-	-> RenamedMatch
 	-> Expected TcRhoType 	-- Expected result-type of the Match.
 			-- Early unification with this guy gives better error messages
 			-- We regard the Match as having type 
 			--	(ty1 -> ... -> tyn -> result_ty)
 			-- where there are n patterns.
-	-> TcM TcMatch
+	-> LMatch Name
+	-> TcM (LMatch TcId)
 
-tcMatch ctxt match@(Match pats maybe_rhs_sig grhss) expected_ty
-  = addSrcLoc (getMatchLoc match)		$	-- At one stage I removed this;
-    addErrCtxt (matchCtxt (mc_what ctxt) match)	$	-- I'm not sure why, so I put it back
+tcMatch ctxt exp_ty match = wrapLocM (tc_match ctxt exp_ty) match
+
+tc_match ctxt expected_ty match@(Match pats maybe_rhs_sig grhss)
+  = addErrCtxt (matchCtxt (mc_what ctxt) match)	$	-- I'm not sure why, so I put it back
     subFunTys pats expected_ty			$ \ pats_w_tys rhs_ty ->
 	-- This is the unique place we call subFunTys
 	-- The point is that if expected_y is a "hole", we want 
@@ -211,16 +206,16 @@ tcMatch ctxt match@(Match pats maybe_rhs_sig grhss) expected_ty
 			 returnM (lift_grhss co_fn rhs_ty' grhss')
 
 lift_grhss co_fn rhs_ty (GRHSs grhss binds ty)
-  = GRHSs (map lift_grhs grhss) binds rhs_ty	-- Change the type, since the coercion does
+  = GRHSs (map (fmap lift_grhs) grhss) binds rhs_ty	-- Change the type, since the coercion does
   where
-    lift_grhs (GRHS stmts loc) = GRHS (map lift_stmt stmts) loc
+    lift_grhs (GRHS stmts) = GRHS (map lift_stmt stmts)
 	      
-    lift_stmt (ResultStmt e l) = ResultStmt (co_fn <$> e) l
-    lift_stmt stmt	       = stmt
+    lift_stmt (L loc (ResultStmt e)) = L loc (ResultStmt (fmap (co_fn <$>) e))
+    lift_stmt stmt	  	     = stmt
 
-tcGRHSs :: TcMatchCtxt -> RenamedGRHSs
+tcGRHSs :: TcMatchCtxt -> GRHSs Name
 	-> Expected TcRhoType
-	-> TcM TcGRHSs
+	-> TcM (GRHSs TcId)
 
   -- Special case when there is just one equation with a degenerate 
   -- guard; then we pass in the full Expected type, so that we get
@@ -228,11 +223,11 @@ tcGRHSs :: TcMatchCtxt -> RenamedGRHSs
   --	f = \(x::forall a.a->a) -> <stuff>
   -- This is a consequence of the fact that tcStmts takes a TcType,
   -- not a Expected TcType, a decision we could revisit if necessary
-tcGRHSs ctxt (GRHSs [GRHS [ResultStmt rhs loc1] loc2] binds _) exp_ty
+tcGRHSs ctxt (GRHSs [L loc1 (GRHS [L loc2 (ResultStmt rhs)])] binds _) exp_ty
   = tcBindsAndThen glueBindsOnGRHSs binds 	$
     mc_body ctxt rhs exp_ty			`thenM` \ rhs' ->
     readExpectedType exp_ty			`thenM` \ exp_ty' ->
-    returnM (GRHSs [GRHS [ResultStmt rhs' loc1] loc2] EmptyBinds exp_ty')
+    returnM (GRHSs [L loc1 (GRHS [L loc2 (ResultStmt rhs')])] [] exp_ty')
 
 tcGRHSs ctxt (GRHSs grhss binds _) exp_ty
   = tcBindsAndThen glueBindsOnGRHSs binds 	$
@@ -247,13 +242,12 @@ tcGRHSs ctxt (GRHSs grhss binds _) exp_ty
 		       sc_ty   = exp_ty' }
       sc_body body = mc_body ctxt body (Check exp_ty')
 
-      tc_grhs (GRHS guarded locn)
-	= addSrcLoc locn		$
-	  tcStmts stmt_ctxt  guarded	`thenM` \ guarded' ->
-	  returnM (GRHS guarded' locn)
+      tc_grhs (GRHS guarded)
+	= tcStmts stmt_ctxt  guarded	`thenM` \ guarded' ->
+	  returnM (GRHS guarded')
     in
-    mappM tc_grhs grhss			`thenM` \ grhss' ->
-    returnM (GRHSs grhss' EmptyBinds exp_ty')
+    mappM (wrapLocM tc_grhs) grhss	`thenM` \ grhss' ->
+    returnM (GRHSs grhss' [] exp_ty')
 \end{code}
 
 
@@ -290,10 +284,10 @@ tcThingWithSig sig_ty thing_inside res_ty
 
 \begin{code}	  
 tcMatchPats
-	:: [(RenamedPat, Expected TcRhoType)]
+	:: [(LPat Name, Expected TcRhoType)]
 	-> Expected TcRhoType
 	-> TcM a
-	-> TcM ([TcPat], a, TcHsBinds)
+	-> TcM ([LPat TcId], a, HsBindGroup TcId)
 -- Typecheck the patterns, extend the environment to bind the variables,
 -- do the thing inside, use any existentially-bound dictionaries to 
 -- discharge parts of the returning LIE, and deal with pattern type
@@ -324,7 +318,7 @@ tcMatchPats pats_w_tys body_ty thing_inside
 	-- 	f (C g) x = g x
 	-- Here, result_ty will be simply Int, but expected_ty is (C -> a -> Int).
 
-    returnM (pats', result, mkMonoBind Recursive ex_binds)
+    returnM (pats', result, HsBindGroup ex_binds [] Recursive)
 
 tc_match_pats [] thing_inside
   = thing_inside 	`thenM` \ answer ->
@@ -367,7 +361,7 @@ tcCheckExistentialPat ex_tvs ex_ids ex_lie lie_req pats_w_tys body_ty
 	--  Here we must discharge op Methods
   = ASSERT( null ex_lie )
     extendLIEs lie_req		`thenM_` 
-    returnM EmptyMonoBinds
+    returnM emptyBag
 
   | otherwise
   =	-- Read the by-now-filled-in expected types
@@ -385,7 +379,7 @@ tcCheckExistentialPat ex_tvs ex_ids ex_lie lie_req pats_w_tys body_ty
 	-- Check for type variable escape
     checkSigTyVarsWrt (tyVarsOfTypes tys) tv_list		`thenM_` 
 
-    returnM (dict_binds `AndMonoBinds` inst_binds)
+    returnM (dict_binds `unionBags` inst_binds)
   where
     doc     = text ("existential context of a data constructor")
     tv_list = bagToList ex_tvs
@@ -401,9 +395,9 @@ tcCheckExistentialPat ex_tvs ex_ids ex_lie lie_req pats_w_tys body_ty
 
 \begin{code}
 tcDoStmts :: HsStmtContext Name 
-	  -> [RenamedStmt] -> ReboundNames Name
+	  -> [LStmt Name] -> ReboundNames Name
 	  -> TcRhoType		-- To keep it simple, we don't have an "expected" type here
-	  -> TcM ([TcStmt], ReboundNames TcId)
+	  -> TcM ([LStmt TcId], ReboundNames TcId)
 tcDoStmts PArrComp stmts method_names res_ty
   = unifyPArrTy res_ty					`thenM` \elt_ty ->
     tcComprehension PArrComp mkPArrTy elt_ty stmts	`thenM` \ stmts' ->
@@ -482,14 +476,14 @@ tcStmts ctxt stmts
 
 data TcStmtCtxt 
   = SC { sc_what :: HsStmtContext Name,				-- What kind of thing this is
-    	 sc_rhs  :: RenamedHsExpr -> TcType -> TcM TcExpr,	-- Type checker for RHS computations
-	 sc_body :: RenamedHsExpr -> TcM TcExpr,		-- Type checker for return computation
+    	 sc_rhs  :: LHsExpr Name -> TcType -> TcM (LHsExpr TcId),	-- Type checker for RHS computations
+	 sc_body :: LHsExpr Name -> TcM (LHsExpr TcId),		-- Type checker for return computation
 	 sc_ty   :: TcType }					-- Return type; used *only* to check
 								-- for escape in existential patterns
 tcStmtsAndThen
-	:: (TcStmt -> thing -> thing)	-- Combiner
+	:: (LStmt TcId -> thing -> thing)	-- Combiner
 	-> TcStmtCtxt
-        -> [RenamedStmt]
+        -> [LStmt Name]
 	-> TcM thing
         -> TcM thing
 
@@ -503,36 +497,36 @@ tcStmtsAndThen combine ctxt (stmt:stmts) thing_inside
     thing_inside
 
 	-- LetStmt
-tcStmtAndThen combine ctxt (LetStmt binds) thing_inside
+tcStmtAndThen combine ctxt (L _ (LetStmt binds)) thing_inside
   = tcBindsAndThen		-- No error context, but a binding group is
   	(glue_binds combine)	-- rather a large thing for an error context anyway
   	binds
   	thing_inside
 
 	-- BindStmt
-tcStmtAndThen combine ctxt stmt@(BindStmt pat exp src_loc) thing_inside
-  = addSrcLoc src_loc					$
+tcStmtAndThen combine ctxt (L src_loc stmt@(BindStmt pat exp)) thing_inside
+  = addSrcSpan src_loc					$
     addErrCtxt (stmtCtxt ctxt stmt)			$
     newTyVarTy liftedTypeKind				`thenM` \ pat_ty ->
     sc_rhs ctxt exp pat_ty				`thenM` \ exp' ->
     tcMatchPats [(pat, Check pat_ty)] (Check (sc_ty ctxt)) (
 	popErrCtxt thing_inside
     )							`thenM` \ ([pat'], thing, dict_binds) ->
-    returnM (combine (BindStmt pat' exp' src_loc)
+    returnM (combine (L src_loc (BindStmt pat' exp'))
 		     (glue_binds combine dict_binds thing))
 
 	-- ExprStmt
-tcStmtAndThen combine ctxt stmt@(ExprStmt exp _ src_loc) thing_inside
-  = addSrcLoc src_loc		(
+tcStmtAndThen combine ctxt (L src_loc stmt@(ExprStmt exp _)) thing_inside
+  = addSrcSpan src_loc		(
     	addErrCtxt (stmtCtxt ctxt stmt) $
 	if isDoExpr (sc_what ctxt)
 	then	-- do or mdo; the expression is a computation
 		newTyVarTy openTypeKind 	`thenM` \ any_ty ->
 		sc_rhs ctxt exp any_ty		`thenM` \ exp' ->
-		returnM (ExprStmt exp' any_ty src_loc)
+		returnM (L src_loc (ExprStmt exp' any_ty))
 	else	-- List comprehensions, pattern guards; expression is a boolean
 		tcCheckRho exp boolTy		`thenM` \ exp' ->
-		returnM (ExprStmt exp' boolTy src_loc)
+		returnM (L src_loc (ExprStmt exp' boolTy))
     )						`thenM` \ stmt' ->
 
     thing_inside 				`thenM` \ thing ->
@@ -540,9 +534,9 @@ tcStmtAndThen combine ctxt stmt@(ExprStmt exp _ src_loc) thing_inside
 
 
 	-- ParStmt
-tcStmtAndThen combine ctxt (ParStmt bndr_stmts_s) thing_inside
+tcStmtAndThen combine ctxt (L src_loc (ParStmt bndr_stmts_s)) thing_inside
   = loop bndr_stmts_s		`thenM` \ (pairs', thing) ->
-    returnM (combine (ParStmt pairs') thing)
+    returnM (combine (L src_loc (ParStmt pairs')) thing)
   where
     loop [] = thing_inside		`thenM` \ thing ->
 	      returnM ([], thing)
@@ -558,7 +552,7 @@ tcStmtAndThen combine ctxt (ParStmt bndr_stmts_s) thing_inside
     combine_par stmt ((stmts, bndrs) : pairs , thing) = ((stmt:stmts, bndrs) : pairs, thing)
 
 	-- RecStmt
-tcStmtAndThen combine ctxt (RecStmt stmts laterNames recNames _) thing_inside
+tcStmtAndThen combine ctxt (L src_loc (RecStmt stmts laterNames recNames _)) thing_inside
   = newTyVarTys (length recNames) liftedTypeKind		`thenM` \ recTys ->
     let
 	rec_ids = zipWith mkLocalId recNames recTys
@@ -575,7 +569,7 @@ tcStmtAndThen combine ctxt (RecStmt stmts laterNames recNames _) thing_inside
 	-- 	already scope over this part
     thing_inside				`thenM` \ thing ->
   
-    returnM (combine (RecStmt stmts' later_ids rec_ids rec_rets) thing)
+    returnM (combine (L src_loc (RecStmt stmts' later_ids rec_ids rec_rets)) thing)
   where 
     combine_rec stmt (stmts, thing) = (stmt:stmts, thing)
 
@@ -585,18 +579,18 @@ tcStmtAndThen combine ctxt (RecStmt stmts laterNames recNames _) thing_inside
 		-- poly_id may have a polymorphic type
 		-- but mono_ty is just a monomorphic type variable
 	  tcSubExp (Check mono_ty) (idType poly_id) 	`thenM` \ co_fn ->
-	  returnM (co_fn <$> HsVar poly_id) 
+	  returnM (L src_loc (co_fn <$> HsVar poly_id))
 
 	-- Result statements
-tcStmtAndThen combine ctxt stmt@(ResultStmt exp locn) thing_inside
+tcStmtAndThen combine ctxt (L src_loc stmt@(ResultStmt exp)) thing_inside
   = addErrCtxt (stmtCtxt ctxt stmt) (sc_body ctxt exp)	`thenM` \ exp' ->
     thing_inside 					`thenM` \ thing ->
-    returnM (combine (ResultStmt exp' locn) thing)
+    returnM (combine (L src_loc (ResultStmt exp')) thing)
 
 
 ------------------------------
-glue_binds combine EmptyBinds  thing = thing
-glue_binds combine other_binds thing = combine (LetStmt other_binds) thing
+glue_binds combine binds thing = combine (noLoc (LetStmt [binds])) thing
+	-- ToDo: fix the noLoc
 \end{code}
 
 
@@ -610,11 +604,11 @@ glue_binds combine other_binds thing = combine (LetStmt other_binds) thing
 number of args are used in each equation.
 
 \begin{code}
-sameNoOfArgs :: [RenamedMatch] -> Bool
+sameNoOfArgs :: [LMatch Name] -> Bool
 sameNoOfArgs matches = isSingleton (nub (map args_in_match matches))
   where
-    args_in_match :: RenamedMatch -> Int
-    args_in_match (Match pats _ _) = length pats
+    args_in_match :: LMatch Name -> Int
+    args_in_match (L _ (Match pats _ _)) = length pats
 \end{code}
 
 \begin{code}
@@ -627,8 +621,8 @@ matchCtxt ctxt  match  = hang (ptext SLIT("In") <+> pprMatchContext ctxt <> colo
 stmtCtxt ctxt stmt = hang (ptext SLIT("In") <+> pp_ctxt (sc_what ctxt) <> colon) 4 (ppr stmt)
 	where
 	  pp_ctxt  = case stmt of
-			ResultStmt _ _ -> pprStmtResultContext
-			other	       -> pprStmtContext
+			ResultStmt _ -> pprStmtResultContext
+			other	     -> pprStmtContext
 			
 sigPatCtxt bound_tvs bound_ids tys tidy_env 
   = 	-- tys is (body_ty : pat_tys)  

@@ -39,9 +39,9 @@ module Inst (
 
 import {-# SOURCE #-}	TcExpr( tcCheckSigma )
 
-import HsSyn	( HsLit(..), HsOverLit(..), HsExpr(..) )
-import TcHsSyn	( TcExpr, TcId, TcIdSet, 
-		  mkHsTyApp, mkHsDictApp, mkHsConApp, zonkId,
+import HsSyn	( HsLit(..), HsOverLit(..), HsExpr(..), LHsExpr, nlHsVar, mkHsApp )
+import TcHsSyn	( TcId, TcIdSet, 
+		  mkHsTyApp, mkHsDictApp, mkHsConApp, zonkId, 
 		  mkCoercion, ExprCoFn
 		)
 import TcRnMonad
@@ -80,6 +80,7 @@ import TysWiredIn ( floatDataCon, doubleDataCon )
 import PrelNames	( integerTyConName, fromIntegerName, fromRationalName, rationalTyConName )
 import BasicTypes( IPName(..), mapIPName, ipNameName )
 import UniqSupply( uniqsFromSupply )
+import SrcLoc	( mkSrcSpan, noLoc, unLoc, Located(..) )
 import CmdLineOpts( DynFlags, DynFlag( Opt_AllowUndecidableInstances ), dopt )
 import Maybes	( isJust )
 import Outputable
@@ -243,11 +244,12 @@ newDictsAtLoc inst_loc theta
 newIPDict :: InstOrigin -> IPName Name -> Type 
 	  -> TcM (IPName Id, Inst)
 newIPDict orig ip_name ty
-  = getInstLoc orig			`thenM` \ inst_loc@(InstLoc _ loc _) ->
+  = getInstLoc orig			`thenM` \ inst_loc ->
     newUnique				`thenM` \ uniq ->
     let
 	pred = IParam ip_name ty
-	id   = mkLocalId (mkPredName uniq loc pred) (mkPredTy pred)
+        name = mkPredName uniq (instLocSrcLoc inst_loc) pred 
+	id   = mkLocalId name (mkPredTy pred)
     in
     returnM (mapIPName (\n -> id) ip_name, Dict id pred inst_loc)
 \end{code}
@@ -268,7 +270,7 @@ tcInstCall orig fun_ty	-- fun_ty is usually a sigma-type
     newDicts orig theta		`thenM` \ dicts ->
     extendLIEs dicts		`thenM_`
     let
-	inst_fn e = mkHsDictApp (mkHsTyApp e (mkTyVarTys tyvars)) (map instToId dicts)
+	inst_fn e = DictApp (mkHsTyApp (noLoc e) (mkTyVarTys tyvars)) (map instToId dicts)
     in
     returnM (mkCoercion inst_fn, tau)
 
@@ -357,14 +359,15 @@ cases (the rest are caught in lookupInst).
 newOverloadedLit :: InstOrigin
 		 -> HsOverLit
 		 -> TcType
-		 -> TcM TcExpr
+		 -> TcM (LHsExpr TcId)
 newOverloadedLit orig lit@(HsIntegral i fi) expected_ty
-  | fi /= fromIntegerName	-- Do not generate a LitInst for rebindable
-				-- syntax.  Reason: tcSyntaxName does unification
+  | fi /= fromIntegerName	-- Do not generate a LitInst for rebindable syntax.  
+				-- Reason: tcSyntaxName does unification
 				-- which is very inconvenient in tcSimplify
-  = tcSyntaxName orig expected_ty (fromIntegerName, HsVar fi)	`thenM` \ (_,expr) ->
-    mkIntegerLit i						`thenM` \ integer_lit ->
-    returnM (HsApp expr integer_lit)
+				-- ToDo: noLoc sadness
+  = tcSyntaxName orig expected_ty (fromIntegerName, noLoc (HsVar fi))	`thenM` \ (_,expr) ->
+    mkIntegerLit i							`thenM` \ integer_lit ->
+    returnM (mkHsApp expr integer_lit)
 
   | Just expr <- shortCutIntLit i expected_ty 
   = returnM expr
@@ -374,9 +377,9 @@ newOverloadedLit orig lit@(HsIntegral i fi) expected_ty
 
 newOverloadedLit orig lit@(HsFractional r fr) expected_ty
   | fr /= fromRationalName	-- c.f. HsIntegral case
-  = tcSyntaxName orig expected_ty (fromRationalName, HsVar fr)	`thenM` \ (_,expr) ->
-    mkRatLit r							`thenM` \ rat_lit ->
-    returnM (HsApp expr rat_lit)
+  = tcSyntaxName orig expected_ty (fromRationalName, noLoc (HsVar fr))	`thenM` \ (_,expr) ->
+    mkRatLit r								`thenM` \ rat_lit ->
+    returnM (mkHsApp expr rat_lit)
 
   | Just expr <- shortCutFracLit r expected_ty 
   = returnM expr
@@ -384,6 +387,7 @@ newOverloadedLit orig lit@(HsFractional r fr) expected_ty
   | otherwise
   = newLitInst orig lit expected_ty
 
+newLitInst :: InstOrigin -> HsOverLit -> TcType -> TcM (LHsExpr TcId)
 newLitInst orig lit expected_ty
   = getInstLoc orig		`thenM` \ loc ->
     newUnique			`thenM` \ new_uniq ->
@@ -392,17 +396,17 @@ newLitInst orig lit expected_ty
 	lit_id   = mkSysLocal FSLIT("lit") new_uniq expected_ty
     in
     extendLIE lit_inst		`thenM_`
-    returnM (HsVar (instToId lit_inst))
+    returnM (L (instLocSrcSpan loc) (HsVar (instToId lit_inst)))
 
-shortCutIntLit :: Integer -> TcType -> Maybe TcExpr
+shortCutIntLit :: Integer -> TcType -> Maybe (LHsExpr TcId)	-- Returns noLoc'd result :-)
 shortCutIntLit i ty
   | isIntTy ty && inIntRange i 		-- Short cut for Int
-  = Just (HsLit (HsInt i))
+  = Just (noLoc (HsLit (HsInt i)))
   | isIntegerTy ty 			-- Short cut for Integer
-  = Just (HsLit (HsInteger i ty))
+  = Just (noLoc (HsLit (HsInteger i ty)))
   | otherwise = Nothing
 
-shortCutFracLit :: Rational -> TcType -> Maybe TcExpr
+shortCutFracLit :: Rational -> TcType -> Maybe (LHsExpr TcId)	-- Returns noLoc'd result :-)
 shortCutFracLit f ty
   | isFloatTy ty 
   = Just (mkHsConApp floatDataCon [] [HsLit (HsFloatPrim f)])
@@ -410,15 +414,17 @@ shortCutFracLit f ty
   = Just (mkHsConApp doubleDataCon [] [HsLit (HsDoublePrim f)])
   | otherwise = Nothing
 
-mkIntegerLit :: Integer -> TcM TcExpr
+mkIntegerLit :: Integer -> TcM (LHsExpr TcId)
 mkIntegerLit i
   = tcMetaTy integerTyConName 	`thenM` \ integer_ty ->
-    returnM (HsLit (HsInteger i integer_ty))
+    getSrcSpanM			`thenM` \ span -> 
+    returnM (L span $ HsLit (HsInteger i integer_ty))
 
-mkRatLit :: Rational -> TcM TcExpr
+mkRatLit :: Rational -> TcM (LHsExpr TcId)
 mkRatLit r
   = tcMetaTy rationalTyConName 	`thenM` \ rat_ty ->
-    returnM (HsLit (HsRat r rat_ty))
+    getSrcSpanM			`thenM` \ span -> 
+    returnM (L span $ HsLit (HsRat r rat_ty))
 \end{code}
 
 
@@ -579,13 +585,18 @@ traceDFuns dfuns
     pp dfun = ppr dfun <+> dcolon <+> ppr (idType dfun)
 
 funDepErr dfun dfuns
-  = addSrcLoc (getSrcLoc dfun) $
+  = addDictLoc dfun $
     addErr (hang (ptext SLIT("Functional dependencies conflict between instance declarations:"))
 	       2 (pprDFuns (dfun:dfuns)))
 dupInstErr dfun dup_dfun
-  = addSrcLoc (getSrcLoc dfun) $
+  = addDictLoc dfun $
     addErr (hang (ptext SLIT("Duplicate instance declarations:"))
 	       2 (pprDFuns [dfun, dup_dfun]))
+
+addDictLoc dfun thing_inside
+  = addSrcSpan (mkSrcSpan loc loc) thing_inside
+  where
+   loc = getSrcLoc dfun
 \end{code}
 
 %************************************************************************
@@ -597,8 +608,8 @@ dupInstErr dfun dup_dfun
 \begin{code}
 data LookupInstResult s
   = NoInstance
-  | SimpleInst TcExpr		-- Just a variable, type application, or literal
-  | GenInst    [Inst] TcExpr	-- The expression and its needed insts
+  | SimpleInst (LHsExpr TcId)		-- Just a variable, type application, or literal
+  | GenInst    [Inst] (LHsExpr TcId)	-- The expression and its needed insts
 
 lookupInst :: Inst -> TcM (LookupInstResult s)
 -- It's important that lookupInst does not put any new stuff into
@@ -610,7 +621,9 @@ lookupInst :: Inst -> TcM (LookupInstResult s)
 
 lookupInst inst@(Method _ id tys theta _ loc)
   = newDictsAtLoc loc theta		`thenM` \ dicts ->
-    returnM (GenInst dicts (mkHsDictApp (mkHsTyApp (HsVar id) tys) (map instToId dicts)))
+    returnM (GenInst dicts (mkHsDictApp (mkHsTyApp (L span (HsVar id)) tys) (map instToId dicts)))
+  where
+    span = instLocSrcSpan loc
 
 -- Literals
 
@@ -631,7 +644,8 @@ lookupInst inst@(LitInst u (HsIntegral i from_integer_name) ty loc)
     tcInstClassOp loc from_integer [ty]		`thenM` \ method_inst ->
     mkIntegerLit i				`thenM` \ integer_lit ->
     returnM (GenInst [method_inst]
-		     (HsApp (HsVar (instToId method_inst)) integer_lit))
+		     (mkHsApp (L (instLocSrcSpan loc)
+			   	 (HsVar (instToId method_inst))) integer_lit))
 
 lookupInst inst@(LitInst u (HsFractional f from_rat_name) ty loc)
   | Just expr <- shortCutFracLit f ty
@@ -642,7 +656,8 @@ lookupInst inst@(LitInst u (HsFractional f from_rat_name) ty loc)
     tcLookupId fromRationalName			`thenM` \ from_rational ->
     tcInstClassOp loc from_rational [ty]	`thenM` \ method_inst ->
     mkRatLit f					`thenM` \ rat_lit ->
-    returnM (GenInst [method_inst] (HsApp (HsVar (instToId method_inst)) rat_lit))
+    returnM (GenInst [method_inst] (mkHsApp (L (instLocSrcSpan loc) 
+					       (HsVar (instToId method_inst))) rat_lit))
 
 -- Dictionaries
 lookupInst dict@(Dict _ pred@(ClassP clas tys) loc)
@@ -699,7 +714,7 @@ instantiate_dfun tenv dfun_id pred loc
     let
     	dfun_rho   = substTy (mkTyVarSubst tyvars ty_args) rho
     	(theta, _) = tcSplitPhiTy dfun_rho
-    	ty_app     = mkHsTyApp (HsVar dfun_id) ty_args
+    	ty_app     = mkHsTyApp (L (instLocSrcSpan loc) (HsVar dfun_id)) ty_args
     in
     if null theta then
     	returnM (SimpleInst ty_app)
@@ -760,15 +775,15 @@ just use the expression inline.
 \begin{code}
 tcSyntaxName :: InstOrigin
 	     -> TcType			-- Type to instantiate it at
-	     -> (Name, HsExpr Name)	-- (Standard name, user name)
-	     -> TcM (Name, TcExpr)	-- (Standard name, suitable expression)
+	     -> (Name, LHsExpr Name)	-- (Standard name, user name)
+	     -> TcM (Name, LHsExpr TcId)	-- (Standard name, suitable expression)
 
 -- NB: tcSyntaxName calls tcExpr, and hence can do unification.
 -- So we do not call it from lookupInst, which is called from tcSimplify
 
-tcSyntaxName orig ty (std_nm, HsVar user_nm)
+tcSyntaxName orig ty (std_nm, L span (HsVar user_nm))
   | std_nm == user_nm
-  = tcStdSyntaxName orig ty std_nm
+  = addSrcSpan span (tcStdSyntaxName orig ty std_nm)
 
 tcSyntaxName orig ty (std_nm, user_nm_expr)
   = tcLookupId std_nm		`thenM` \ std_id ->
@@ -783,17 +798,18 @@ tcSyntaxName orig ty (std_nm, user_nm_expr)
 
 	-- Check that the user-supplied thing has the
 	-- same type as the standard one
-    tcCheckSigma user_nm_expr tau1			`thenM` \ expr ->
+    tcCheckSigma user_nm_expr tau1		`thenM` \ expr ->
     returnM (std_nm, expr)
 
 tcStdSyntaxName :: InstOrigin
-	        -> TcType		-- Type to instantiate it at
-	        -> Name			-- Standard name
-	        -> TcM (Name, TcExpr)	-- (Standard name, suitable expression)
+	        -> TcType			-- Type to instantiate it at
+	        -> Name				-- Standard name
+	        -> TcM (Name, LHsExpr TcId)	-- (Standard name, suitable expression)
 
 tcStdSyntaxName orig ty std_nm
   = newMethodFromName orig ty std_nm	`thenM` \ id ->
-    returnM (std_nm, HsVar id)
+    getSrcSpanM				`thenM` \ span -> 
+    returnM (std_nm, L span (HsVar id))
 
 syntaxNameCtxt name orig ty tidy_env
   = getInstLoc orig		`thenM` \ inst_loc ->

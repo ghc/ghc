@@ -8,12 +8,12 @@ in that the @Rec@/@NonRec@/etc structure is thrown away (whereas at
 lower levels it is preserved with @let@/@letrec@s).
 
 \begin{code}
-module DsBinds ( dsMonoBinds, AutoScc(..) ) where
+module DsBinds ( dsHsBinds, AutoScc(..) ) where
 
 #include "HsVersions.h"
 
 
-import {-# SOURCE #-}	DsExpr( dsExpr )
+import {-# SOURCE #-}	DsExpr( dsLExpr )
 import DsMonad
 import DsGRHSs		( dsGuarded )
 import DsUtils
@@ -21,7 +21,6 @@ import DsUtils
 import HsSyn		-- lots of things
 import CoreSyn		-- lots of things
 import CoreUtils	( exprType, mkInlineMe, mkSCC )
-import TcHsSyn		( TypecheckedMonoBinds )
 import Match		( matchWrapper )
 
 import CmdLineOpts	( opt_AutoSccsOnAllToplevs, opt_AutoSccsOnExportedToplevs )
@@ -33,7 +32,11 @@ import TcType		( mkTyVarTy )
 import Subst		( substTyWith )
 import TysWiredIn	( voidTy )
 import Outputable
+import SrcLoc		( Located(..) )
 import Maybe		( isJust )
+import Bag		( Bag, bagToList )
+
+import Monad		( foldM )
 \end{code}
 
 %************************************************************************
@@ -43,19 +46,28 @@ import Maybe		( isJust )
 %************************************************************************
 
 \begin{code}
-dsMonoBinds :: AutoScc			-- scc annotation policy (see below)
-	    -> TypecheckedMonoBinds
-	    -> [(Id,CoreExpr)]		-- Put this on the end (avoid quadratic append)
-	    -> DsM [(Id,CoreExpr)]	-- Result
+dsHsBinds :: AutoScc		 -- scc annotation policy (see below)
+	  -> Bag (LHsBind Id)
+	  -> [(Id,CoreExpr)]	 -- Put this on the end (avoid quadratic append)
+	  -> DsM [(Id,CoreExpr)] -- Result
 
-dsMonoBinds _ EmptyMonoBinds rest = returnDs rest
+dsHsBinds auto_scc binds rest = 
+  foldM (dsLHsBind auto_scc) rest (bagToList binds)
 
-dsMonoBinds auto_scc (AndMonoBinds  binds_1 binds_2) rest
-  = dsMonoBinds auto_scc binds_2 rest	`thenDs` \ rest' ->
-    dsMonoBinds auto_scc binds_1 rest'
+dsLHsBind :: AutoScc
+	 -> [(Id,CoreExpr)]	-- Put this on the end (avoid quadratic append)
+	 -> LHsBind Id
+	 -> DsM [(Id,CoreExpr)] -- Result
+dsLHsBind auto_scc rest (L loc bind)
+  = putSrcSpanDs loc $ dsHsBind auto_scc rest bind
 
-dsMonoBinds _ (VarMonoBind var expr) rest
-  = dsExpr expr			`thenDs` \ core_expr ->
+dsHsBind :: AutoScc
+	 -> [(Id,CoreExpr)]	-- Put this on the end (avoid quadratic append)
+	 -> HsBind Id
+	 -> DsM [(Id,CoreExpr)] -- Result
+
+dsHsBind auto_scc rest (VarBind var expr)
+  = dsLExpr expr		`thenDs` \ core_expr ->
 
 	-- Dictionary bindings are always VarMonoBinds, so
 	-- we only need do this here
@@ -73,15 +85,13 @@ dsMonoBinds _ (VarMonoBind var expr) rest
 
     returnDs ((var, core_expr'') : rest)
 
-dsMonoBinds auto_scc (FunMonoBind fun _ matches locn) rest
-  = putSrcLocDs locn	$
-    matchWrapper (FunRhs (idName fun)) matches		`thenDs` \ (args, body) ->
-    addAutoScc auto_scc (fun, mkLams args body)		`thenDs` \ pair ->
+dsHsBind auto_scc rest (FunBind (L _ fun) _ matches)
+  = matchWrapper (FunRhs (idName fun)) matches	`thenDs` \ (args, body) ->
+    addAutoScc auto_scc (fun, mkLams args body)	`thenDs` \ pair ->
     returnDs (pair : rest)
 
-dsMonoBinds auto_scc (PatMonoBind pat grhss locn) rest
-  = putSrcLocDs locn $
-    dsGuarded grhss				`thenDs` \ body_expr ->
+dsHsBind auto_scc rest (PatBind pat grhss)
+  = dsGuarded grhss				`thenDs` \ body_expr ->
     mkSelectorBinds pat body_expr		`thenDs` \ sel_binds ->
     mappM (addAutoScc auto_scc) sel_binds	`thenDs` \ sel_binds ->
     returnDs (sel_binds ++ rest)
@@ -90,9 +100,9 @@ dsMonoBinds auto_scc (PatMonoBind pat grhss locn) rest
 	-- For the (rare) case when there are some mixed-up
 	-- dictionary bindings (for which a Rec is convenient)
 	-- we reply on the enclosing dsBind to wrap a Rec around.
-dsMonoBinds auto_scc (AbsBinds [] [] exports inlines binds) rest
-  = dsMonoBinds (addSccs auto_scc exports) binds []`thenDs` \ core_prs ->
-    let 
+dsHsBind auto_scc rest (AbsBinds [] [] exports inlines binds)
+  = dsHsBinds (addSccs auto_scc exports) binds []`thenDs` \ core_prs ->
+    let
 	core_prs' = addLocalInlines exports inlines core_prs
 	exports'  = [(global, Var local) | (_, global, local) <- exports]
     in
@@ -100,10 +110,10 @@ dsMonoBinds auto_scc (AbsBinds [] [] exports inlines binds) rest
 
 	-- Another common case: one exported variable
 	-- Non-recursive bindings come through this way
-dsMonoBinds auto_scc
-     (AbsBinds all_tyvars dicts exps@[(tyvars, global, local)] inlines binds) rest
+dsHsBind auto_scc rest
+     (AbsBinds all_tyvars dicts exps@[(tyvars, global, local)] inlines binds)
   = ASSERT( all (`elem` tyvars) all_tyvars )
-    dsMonoBinds (addSccs auto_scc exps) binds []	`thenDs` \ core_prs ->
+    dsHsBinds (addSccs auto_scc exps) binds []	`thenDs` \ core_prs ->
     let 
 	-- Always treat the binds as recursive, because the typechecker
 	-- makes rather mixed-up dictionary bindings
@@ -117,8 +127,8 @@ dsMonoBinds auto_scc
     in
     returnDs (export' : rest)
 
-dsMonoBinds auto_scc (AbsBinds all_tyvars dicts exports inlines binds) rest
-  = dsMonoBinds (addSccs auto_scc exports) binds []`thenDs` \ core_prs ->
+dsHsBind auto_scc rest (AbsBinds all_tyvars dicts exports inlines binds)
+  = dsHsBinds (addSccs auto_scc exports) binds []`thenDs` \ core_prs ->
     let 
 	-- Rec because of mixed-up dictionary bindings
 	core_bind = Rec (addLocalInlines exports inlines core_prs)

@@ -10,7 +10,6 @@ module TcRnMonad(
 import TcRnTypes	-- Re-export all
 import IOEnv		-- Re-export all
 
-import HsSyn		( MonoBinds(..) )
 import HscTypes		( HscEnv(..), ModGuts(..), ModIface(..),
 			  TyThing, Dependencies(..), TypeEnv, emptyTypeEnv,
 			  ExternalPackageState(..), HomePackageTable,
@@ -28,8 +27,8 @@ import InstEnv		( InstEnv, emptyInstEnv, extendInstEnv )
 import VarSet		( emptyVarSet )
 import VarEnv		( TidyEnv, emptyTidyEnv )
 import ErrUtils		( Message, Messages, emptyMessages, errorsFound, 
-			  addShortErrLocLine, addShortWarnLocLine, printErrorsAndWarnings )
-import SrcLoc		( SrcLoc, mkGeneralSrcLoc )
+			  mkErrMsg, mkWarnMsg, printErrorsAndWarnings )
+import SrcLoc		( mkGeneralSrcSpan, SrcSpan, Located(..) )
 import NameEnv		( emptyNameEnv )
 import NameSet		( emptyDUs, emptyNameSet )
 import OccName		( emptyOccEnv )
@@ -88,7 +87,7 @@ initTc hsc_env mod do_this
 		tcg_exports  = [],
 		tcg_imports  = init_imports,
 		tcg_dus      = emptyDUs,
-		tcg_binds    = EmptyMonoBinds,
+		tcg_binds    = emptyBag,
 		tcg_deprecs  = NoDeprecs,
 		tcg_insts    = [],
 		tcg_rules    = [],
@@ -97,7 +96,7 @@ initTc hsc_env mod do_this
 	     } ;
 	     lcl_env = TcLclEnv {
 		tcl_errs       = errs_var,
-		tcl_loc	       = mkGeneralSrcLoc FSLIT("Top level of module"),
+		tcl_loc	       = mkGeneralSrcSpan FSLIT("Top level of module"),
 		tcl_ctxt       = [],
 		tcl_rdr	       = emptyLocalRdrEnv,
 		tcl_th_ctxt    = topStage,
@@ -353,12 +352,30 @@ getDefaultTys = do { env <- getGblEnv; return (tcg_default env) }
 %************************************************************************
 
 \begin{code}
-getSrcLocM :: TcRn SrcLoc
+getSrcSpanM :: TcRn SrcSpan
 	-- Avoid clash with Name.getSrcLoc
-getSrcLocM = do { env <- getLclEnv; return (tcl_loc env) }
+getSrcSpanM = do { env <- getLclEnv; return (tcl_loc env) }
 
-addSrcLoc :: SrcLoc -> TcRn a -> TcRn a
-addSrcLoc loc = updLclEnv (\env -> env { tcl_loc = loc })
+addSrcSpan :: SrcSpan -> TcRn a -> TcRn a
+addSrcSpan loc = updLclEnv (\env -> env { tcl_loc = loc })
+
+addLocM :: (a -> TcM b) -> Located a -> TcM b
+addLocM fn (L loc a) = addSrcSpan loc $ fn a
+
+wrapLocM :: (a -> TcM b) -> Located a -> TcM (Located b)
+wrapLocM fn (L loc a) = addSrcSpan loc $ do b <- fn a; return (L loc b)
+
+wrapLocFstM :: (a -> TcM (b,c)) -> Located a -> TcM (Located b, c)
+wrapLocFstM fn (L loc a) =
+  addSrcSpan loc $ do
+    (b,c) <- fn a
+    return (L loc b, c)
+
+wrapLocSndM :: (a -> TcM (b,c)) -> Located a -> TcM (b, Located c)
+wrapLocSndM fn (L loc a) =
+  addSrcSpan loc $ do
+    (b,c) <- fn a
+    return (b, L loc c)
 \end{code}
 
 
@@ -370,32 +387,43 @@ setErrsVar :: TcRef Messages -> TcRn a -> TcRn a
 setErrsVar v = updLclEnv (\ env -> env { tcl_errs =  v })
 
 addErr :: Message -> TcRn ()
-addErr msg = do { loc <- getSrcLocM ; addErrAt loc msg }
+addErr msg = do { loc <- getSrcSpanM ; addErrAt loc msg }
 
-addErrAt :: SrcLoc -> Message -> TcRn ()
+addLocErr :: Located e -> (e -> Message) -> TcRn ()
+addLocErr (L loc e) fn = addErrAt loc (fn e)
+
+addErrAt :: SrcSpan -> Message -> TcRn ()
 addErrAt loc msg
  = do {  errs_var <- getErrsVar ;
 	 rdr_env <- getGlobalRdrEnv ;
-	 let { err = addShortErrLocLine loc (unQualInScope rdr_env) msg } ;
+	 let { err = mkErrMsg loc (unQualInScope rdr_env) msg } ;
 	 (warns, errs) <- readMutVar errs_var ;
   	 writeMutVar errs_var (warns, errs `snocBag` err) }
 
-addErrs :: [(SrcLoc,Message)] -> TcRn ()
+addErrs :: [(SrcSpan,Message)] -> TcRn ()
 addErrs msgs = mappM_ add msgs
 	     where
 	       add (loc,msg) = addErrAt loc msg
 
 addReport :: Message -> TcRn ()
-addReport msg
+addReport msg = do loc <- getSrcSpanM; addReportAt loc msg
+
+addReportAt :: SrcSpan -> Message -> TcRn ()
+addReportAt loc msg
   = do { errs_var <- getErrsVar ;
-	 loc <- getSrcLocM ;
 	 rdr_env <- getGlobalRdrEnv ;
-	 let { warn = addShortWarnLocLine loc (unQualInScope rdr_env) msg } ;
+	 let { warn = mkWarnMsg loc (unQualInScope rdr_env) msg } ;
 	 (warns, errs) <- readMutVar errs_var ;
   	 writeMutVar errs_var (warns `snocBag` warn, errs) }
 
 addWarn :: Message -> TcRn ()
 addWarn msg = addReport (ptext SLIT("Warning:") <+> msg)
+
+addWarnAt :: SrcSpan -> Message -> TcRn ()
+addWarnAt loc msg = addReportAt loc (ptext SLIT("Warning:") <+> msg)
+
+addLocWarn :: Located e -> (e -> Message) -> TcRn ()
+addLocWarn (L loc e) fn = addReportAt loc (fn e)
 
 checkErr :: Bool -> Message -> TcRn ()
 -- Add the error if the bool is False
@@ -554,14 +582,14 @@ updCtxt upd = updLclEnv (\ env@(TcLclEnv { tcl_ctxt = ctxt }) ->
 
 getInstLoc :: InstOrigin -> TcM InstLoc
 getInstLoc origin
-  = do { loc <- getSrcLocM ; env <- getLclEnv ;
+  = do { loc <- getSrcSpanM ; env <- getLclEnv ;
 	 return (InstLoc origin loc (tcl_ctxt env)) }
 
 addInstCtxt :: InstLoc -> TcM a -> TcM a
--- Add the SrcLoc and context from the first Inst in the list
+-- Add the SrcSpan and context from the first Inst in the list
 -- 	(they all have similar locations)
 addInstCtxt (InstLoc _ src_loc ctxt) thing_inside
-  = addSrcLoc src_loc (updCtxt (\ old_ctxt -> ctxt) thing_inside)
+  = addSrcSpan src_loc (updCtxt (\ old_ctxt -> ctxt) thing_inside)
 \end{code}
 
     The addErrTc functions add an error message, but do not cause failure.
@@ -578,7 +606,7 @@ addErrsTc err_msgs = mappM_ addErrTc err_msgs
 addErrTcM :: (TidyEnv, Message) -> TcM ()
 addErrTcM (tidy_env, err_msg)
   = do { ctxt <- getErrCtxt ;
-	 loc  <- getSrcLocM ;
+	 loc  <- getSrcSpanM ;
 	 add_err_tcm tidy_env err_msg loc ctxt }
 \end{code}
 

@@ -51,6 +51,7 @@ import Util
 import Outputable
 
 import List		( partition )
+import Char		( ord )
 \end{code}
 
 %************************************************************************
@@ -172,7 +173,8 @@ buildDynCon binder cc con [arg_amode]
   | maybeCharLikeCon con && in_range_char_lit arg_amode
   = returnFC (stableAmodeIdInfo binder (CCharLike arg_amode) (mkConLFInfo con))
   where
-    in_range_char_lit (CLit (MachChar val)) = val <= mAX_CHARLIKE && val >= mIN_CHARLIKE
+    in_range_char_lit (CLit (MachChar val)) = 
+	ord val <= mAX_CHARLIKE && ord val >= mIN_CHARLIKE
     in_range_char_lit _other_amode	    = False
 \end{code}
 

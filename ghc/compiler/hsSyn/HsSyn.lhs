@@ -16,13 +16,14 @@ module HsSyn (
 	module HsLit,
 	module HsPat,
 	module HsTypes,
+ 	module HsUtils,
 	Fixity, NewOrData, 
 
 	HsModule(..), HsExtCore(..),
-	collectStmtsBinders, collectStmtBinders,
-	collectHsBinders,   collectLocatedHsBinders, 
-	collectMonoBinders, collectLocatedMonoBinders,
-	collectSigTysFromHsBinds, collectSigTysFromMonoBinds
+	collectStmtsBinders, collectStmtBinders, collectLStmtBinders,
+	collectGroupBinders, collectHsBindLocatedBinders,
+	collectHsBindBinders,
+	collectSigTysFromHsBind, collectSigTysFromHsBinds
      ) where
 
 #include "HsVersions.h"
@@ -37,30 +38,31 @@ import HsPat
 import HsTypes
 import HscTypes		( DeprecTxt )
 import BasicTypes	( Fixity, NewOrData )
+import HsUtils
 
 -- others:
 import IfaceSyn		( IfaceBinding )
 import Outputable
-import SrcLoc		( SrcLoc )
+import SrcLoc		( Located(..), unLoc, noLoc )
 import Module		( Module )
+import Bag		( Bag, foldrBag )
 \end{code}
 
 All we actually declare here is the top-level structure for a module.
 \begin{code}
 data HsModule name
   = HsModule
-	(Maybe Module)		-- Nothing => "module X where" is omitted
+	(Maybe (Located Module))-- Nothing => "module X where" is omitted
 				--	(in which case the next field is Nothing too)
-	(Maybe [IE name])	-- Export list; Nothing => export list omitted, so export everything
+	(Maybe [LIE name])	-- Export list; Nothing => export list omitted, so export everything
 				-- Just [] => export *nothing*
 				-- Just [...] => as you would expect...
-	[ImportDecl name]	-- We snaffle interesting stuff out of the
+	[LImportDecl name]	-- We snaffle interesting stuff out of the
 				-- imported interfaces early on, adding that
 				-- info to TyDecls/etc; so this list is
 				-- often empty, downstream.
-	[HsDecl name]	-- Type, class, value, and interface signature decls
+	[LHsDecl name]	-- Type, class, value, and interface signature decls
 	(Maybe DeprecTxt)	-- reason/explanation for deprecation of this module
-	SrcLoc
 
 data HsExtCore name	-- Read from Foo.hcr
   = HsExtCore
@@ -74,17 +76,17 @@ data HsExtCore name	-- Read from Foo.hcr
 instance (OutputableBndr name)
 	=> Outputable (HsModule name) where
 
-    ppr (HsModule Nothing _ imports decls _ src_loc)
+    ppr (HsModule Nothing _ imports decls _)
       = pp_nonnull imports $$ pp_nonnull decls
 
-    ppr (HsModule (Just name) exports imports decls deprec src_loc)
+    ppr (HsModule (Just name) exports imports decls deprec)
       = vcat [
 	    case exports of
 	      Nothing -> pp_header (ptext SLIT("where"))
 	      Just es -> vcat [
-			    pp_header lparen,
-			    nest 8 (fsep (punctuate comma (map ppr es))),
-			    nest 4 (ptext SLIT(") where"))
+			   pp_header lparen,
+			   nest 8 (fsep (punctuate comma (map ppr es))),
+			   nest 4 (ptext SLIT(") where"))
 			  ],
 	    pp_nonnull imports,
 	    pp_nonnull decls
@@ -121,41 +123,30 @@ where
 it should return @[x, y, f, a, b]@ (remember, order important).
 
 \begin{code}
-collectLocatedHsBinders :: HsBinds name -> [(name,SrcLoc)]
--- Used at top level only; so no need for an IPBinds case
-collectLocatedHsBinders EmptyBinds = []
-collectLocatedHsBinders (MonoBind b _ _) 
- = collectLocatedMonoBinders b
-collectLocatedHsBinders (ThenBinds b1 b2)
- = collectLocatedHsBinders b1 ++ collectLocatedHsBinders b2
+collectGroupBinders :: [HsBindGroup name] -> [Located name]
+collectGroupBinders groups = foldr collect_group [] groups
+	where
+	  collect_group (HsBindGroup bag sigs is_rec) acc
+	 	= foldrBag (collectAcc . unLoc) acc bag
+	  collect_group (HsIPBinds _) acc = acc
 
-collectHsBinders :: HsBinds name -> [name]
-collectHsBinders EmptyBinds 	   = []
-collectHsBinders (IPBinds _)	   = []		-- Implicit parameters don't create
-						-- ordinary bindings
-collectHsBinders (MonoBind b _ _)  = collectMonoBinders b
-collectHsBinders (ThenBinds b1 b2) = collectHsBinders b1 ++ collectHsBinders b2
 
-collectLocatedMonoBinders :: MonoBinds name -> [(name,SrcLoc)]
-collectLocatedMonoBinders binds
-  = go binds []
-  where
-    go EmptyMonoBinds	       acc = acc
-    go (PatMonoBind pat _ loc) acc = map (\v->(v,loc)) (collectPatBinders pat) ++ acc
-    go (FunMonoBind f _ _ loc) acc = (f,loc) : acc
-    go (AndMonoBinds bs1 bs2)  acc = go bs1 (go bs2 acc)
+collectAcc :: HsBind name -> [Located name] -> [Located name]
+collectAcc (PatBind pat _) acc = collectLocatedPatBinders pat ++ acc
+collectAcc (FunBind f _ _) acc = f : acc
+collectAcc (VarBind f _) acc  = noLoc f : acc
+collectAcc (AbsBinds _ _ dbinds _ binds) acc
+  = [noLoc dp | (_,dp,_) <- dbinds] ++ acc
+	-- ++ foldr collectAcc acc binds
+	-- I don't think we want the binders from the nested binds
+	-- The only time we collect binders from a typechecked 
+	-- binding (hence see AbsBinds) is in zonking in TcHsSyn
 
-collectMonoBinders :: MonoBinds name -> [name]
-collectMonoBinders binds
-  = go binds []
-  where
-    go EmptyMonoBinds	       acc = acc
-    go (PatMonoBind pat _ loc) acc = collectPatBinders pat ++ acc
-    go (FunMonoBind f _ _ loc) acc = f : acc
-    go (AndMonoBinds bs1 bs2)  acc = go bs1 (go bs2 acc)
-    go (VarMonoBind v _)       acc = v : acc
-    go (AbsBinds _ _ dbinds _ binds) acc
-      = [dp | (_,dp,_) <- dbinds] ++ go binds acc
+collectHsBindBinders :: Bag (LHsBind name) -> [name]
+collectHsBindBinders binds = map unLoc (collectHsBindLocatedBinders binds)
+
+collectHsBindLocatedBinders :: Bag (LHsBind name) -> [Located name]
+collectHsBindLocatedBinders binds = foldrBag (collectAcc . unLoc) [] binds
 \end{code}
 
 
@@ -168,42 +159,36 @@ collectMonoBinders binds
 Get all the pattern type signatures out of a bunch of bindings
 
 \begin{code}
-collectSigTysFromHsBinds :: HsBinds name -> [HsType name]
-collectSigTysFromHsBinds EmptyBinds        = [] 
-collectSigTysFromHsBinds (IPBinds _)       = [] 
-collectSigTysFromHsBinds (MonoBind b _ _)  = collectSigTysFromMonoBinds b
-collectSigTysFromHsBinds (ThenBinds b1 b2) = collectSigTysFromHsBinds b1 ++
-					     collectSigTysFromHsBinds b2
- 
+collectSigTysFromHsBinds :: [LHsBind name] -> [LHsType name]
+collectSigTysFromHsBinds binds = concat (map collectSigTysFromHsBind binds)
 
-collectSigTysFromMonoBinds :: MonoBinds name -> [HsType name]
-collectSigTysFromMonoBinds bind
-  = go bind []
+collectSigTysFromHsBind :: LHsBind name -> [LHsType name]
+collectSigTysFromHsBind bind
+  = go (unLoc bind)
   where
-    go EmptyMonoBinds           acc = acc
-    go (PatMonoBind pat _ loc)  acc = collectSigTysFromPat pat ++ acc
-    go (FunMonoBind f _ ms loc) acc = go_matches ms acc
-    go (AndMonoBinds bs1 bs2)   acc = go bs1 (go bs2 acc)
+    go (PatBind pat _)  = collectSigTysFromPat pat
+    go (FunBind f _ ms) = go_matches (map unLoc ms)
 
 	-- A binding like    x :: a = f y
 	-- is parsed as FunMonoBind, but for this purpose we 	
 	-- want to treat it as a pattern binding
-    go_matches []				 acc = acc
-    go_matches (Match [] (Just sig) _ : matches) acc = sig : go_matches matches acc
-    go_matches (match		      : matches) acc = go_matches matches acc
+    go_matches []				 = []
+    go_matches (Match [] (Just sig) _ : matches) = sig : go_matches matches
+    go_matches (match		      : matches) = go_matches matches
 \end{code}
 
 \begin{code}
-collectStmtsBinders :: [Stmt id] -> [id]
-collectStmtsBinders = concatMap collectStmtBinders
+collectStmtsBinders :: [LStmt id] -> [Located id]
+collectStmtsBinders = concatMap collectLStmtBinders
 
-collectStmtBinders :: Stmt id -> [id]
+collectLStmtBinders = collectStmtBinders . unLoc
+
+collectStmtBinders :: Stmt id -> [Located id]
   -- Id Binders for a Stmt... [but what about pattern-sig type vars]?
-collectStmtBinders (BindStmt pat _ _) = collectPatBinders pat
-collectStmtBinders (LetStmt binds)    = collectHsBinders binds
-collectStmtBinders (ExprStmt _ _ _)   = []
-collectStmtBinders (ResultStmt _ _)   = []
+collectStmtBinders (BindStmt pat _)   = collectLocatedPatBinders pat
+collectStmtBinders (LetStmt binds)    = collectGroupBinders binds
+collectStmtBinders (ExprStmt _ _)     = []
+collectStmtBinders (ResultStmt _)     = []
 collectStmtBinders (RecStmt ss _ _ _) = collectStmtsBinders ss
 collectStmtBinders other              = panic "collectStmtBinders"
 \end{code}
-

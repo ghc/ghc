@@ -10,7 +10,9 @@ module HscStats ( ppSourceStats ) where
 
 import HsSyn
 import Outputable
+import SrcLoc		( unLoc, Located(..) )
 import Char		( isSpace )
+import Bag		( bagToList )
 import Util             ( count )
 \end{code}
 
@@ -21,7 +23,7 @@ import Util             ( count )
 %************************************************************************
 
 \begin{code}
-ppSourceStats short (HsModule _ exports imports decls _ src_loc)
+ppSourceStats short (L _ (HsModule _ exports imports ldecls _))
  = (if short then hcat else vcat)
         (map pp_val
 	       [("ExportAll        ", export_all), -- 1 if no export list
@@ -56,6 +58,8 @@ ppSourceStats short (HsModule _ exports imports decls _ src_loc)
 	      	("SpecialisedBinds ", bind_specs)
 	       ])
   where
+    decls = map unLoc ldecls
+
     pp_val (str, 0) = empty
     pp_val (str, n) 
       | not short   = hcat [text str, int n]
@@ -78,13 +82,13 @@ ppSourceStats short (HsModule _ exports imports decls _ src_loc)
 
     real_exports = case exports of { Nothing -> []; Just es -> es }
     n_exports  	 = length real_exports
-    export_ms  	 = count (\ e -> case e of { IEModuleContents{} -> True;_ -> False})
+    export_ms  	 = count (\ e -> case unLoc e of { IEModuleContents{} -> True;_ -> False})
                          real_exports
     export_ds  	 = n_exports - export_ms
     export_all 	 = case exports of { Nothing -> 1; other -> 0 }
 
     (val_bind_ds, fn_bind_ds)
-	= foldr add2 (0,0) (map count_monobinds val_decls)
+	= foldr add2 (0,0) (map count_bind val_decls)
 
     (import_no, import_qual, import_as, import_all, import_partial, import_hiding)
 	= foldr add6 (0,0,0,0,0,0) (map import_info imports)
@@ -95,21 +99,19 @@ ppSourceStats short (HsModule _ exports imports decls _ src_loc)
     (inst_method_ds, method_specs, method_inlines)
 	= foldr add3 (0,0,0) (map inst_info inst_decls)
 
-    count_monobinds EmptyMonoBinds	  	 = (0,0)
-    count_monobinds (AndMonoBinds b1 b2)  	 = count_monobinds b1 `add2` count_monobinds b2
-    count_monobinds (PatMonoBind (VarPat n) r _) = (1,0)
-    count_monobinds (PatMonoBind p r _)          = (0,1)
-    count_monobinds (FunMonoBind f _ m _)        = (0,1)
+    count_bind (PatBind (L _ (VarPat n)) r) = (1,0)
+    count_bind (PatBind p r)               = (0,1)
+    count_bind (FunBind f _ m)             = (0,1)
 
     count_sigs sigs = foldr add4 (0,0,0,0) (map sig_info sigs)
 
-    sig_info (FixSig _)		    = (1,0,0,0)
-    sig_info (Sig _ _ _)            = (0,1,0,0)
-    sig_info (SpecSig _ _ _)        = (0,0,1,0)
-    sig_info (InlineSig _ _ _ _)    = (0,0,0,1)
-    sig_info _                      = (0,0,0,0)
+    sig_info (FixSig _)		  = (1,0,0,0)
+    sig_info (Sig _ _)            = (0,1,0,0)
+    sig_info (SpecSig _ _)        = (0,0,1,0)
+    sig_info (InlineSig _ _ _)    = (0,0,0,1)
+    sig_info _                    = (0,0,0,0)
 
-    import_info (ImportDecl _ _ qual as spec _)
+    import_info (L _ (ImportDecl _ _ qual as spec))
 	= add6 (1, qual_info qual, as_info as, 0,0,0) (spec_info spec)
     qual_info False  = 0
     qual_info True   = 1
@@ -120,19 +122,20 @@ ppSourceStats short (HsModule _ exports imports decls _ src_loc)
     spec_info (Just (True, _))  = (0,0,0,0,0,1)
 
     data_info (TyData {tcdCons = cs, tcdDerivs = derivs})
-	= (length cs, case derivs of {Nothing -> 0; Just ds -> length ds})
+	= (length cs, case derivs of Nothing -> 0
+				     Just ds -> length (unLoc ds))
     data_info other = (0,0)
 
     class_info decl@(ClassDecl {})
-	= case count_sigs (tcdSigs decl) of
+	= case count_sigs (map unLoc (tcdSigs decl)) of
 	    (_,classops,_,_) ->
-	       (classops, addpr (count_monobinds (tcdMeths decl)))
+	       (classops, addpr (foldr add2 (0,0) (map (count_bind.unLoc) (bagToList (tcdMeths decl)))))
     class_info other = (0,0)
 
-    inst_info (InstDecl _ inst_meths inst_sigs _)
-	= case count_sigs inst_sigs of
+    inst_info (InstDecl _ inst_meths inst_sigs)
+	= case count_sigs (map unLoc inst_sigs) of
 	    (_,_,ss,is) ->
-	       (addpr (count_monobinds inst_meths), ss, is)
+	       (addpr (foldr add2 (0,0) (map (count_bind.unLoc) (bagToList inst_meths))), ss, is)
 
     addpr :: (Int,Int) -> Int
     add2  :: (Int,Int) -> (Int,Int) -> (Int, Int)

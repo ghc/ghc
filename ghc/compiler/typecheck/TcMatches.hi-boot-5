@@ -1,11 +1,10 @@
 __interface TcMatches 1 0 where
 __export TcMatches tcGRHSsPat tcMatchesFun;
-1 tcGRHSsPat :: RnHsSyn.RenamedGRHSs
+1 tcGRHSsPat  :: HsExpr.GRHSs Name.Name
 	      -> TcUnify.Expected TcType.TcType
-	      -> TcRnTypes.TcM TcHsSyn.TcGRHSs ;
-1 tcMatchesFun :: 
-		Name.Name
-	     -> [RnHsSyn.RenamedMatch]
-	     -> TcUnify.Expected TcType.TcType
-	     -> TcRnTypes.TcM [TcHsSyn.TcMatch] ;
+	      -> TcRnTypes.TcM (HsExpr.GRHSs Var.Id) ;
 
+1 tcMatchesFun :: Name.Name
+	     -> [HsExpr.LMatch Name.Name]
+	     -> TcUnify.Expected TcType.TcType
+	     -> TcRnTypes.TcM [HsExpr.LMatch Var.Id] ;

@@ -4,9 +4,9 @@
 \section[RnSource]{Main pass of renamer}
 
 \begin{code}
-module RnTypes ( rnHsType, rnContext, 
+module RnTypes ( rnHsType, rnLHsType, rnContext,
 		 rnHsSigType, rnHsTypeFVs,
-		 rnPat, rnPatsAndThen,	-- Here because it's not part 
+		 rnLPat, rnPat, rnPatsAndThen,		-- Here because it's not part 
 		 rnOverLit, litFVs,		-- of any mutual recursion	
 		 precParseErr, sectionPrecErr, dupFieldErr, patSigErr, checkTupSize
   ) where
@@ -14,30 +14,34 @@ module RnTypes ( rnHsType, rnContext,
 import CmdLineOpts	( DynFlag(Opt_WarnUnusedMatches, Opt_GlasgowExts) )
 
 import HsSyn
-import RdrHsSyn	( RdrNameContext, RdrNameHsType, RdrNamePat,
-		  extractHsRhoRdrTyVars )
-import RnHsSyn	( RenamedContext, RenamedHsType, RenamedPat,
-		  extractHsTyNames, 
-		  parrTyCon_name, tupleTyCon_name, listTyCon_name, charTyCon_name )
-import RnEnv	( lookupOccRn, lookupBndrRn, lookupSyntaxName, lookupGlobalOccRn,
-		  bindTyVarsRn, lookupFixityRn, mapFvRn, newIPNameRn,
-		  bindPatSigTyVarsFV, bindLocalsFV, warnUnusedMatches )
+import RdrHsSyn		( extractHsRhoRdrTyVars )
+import RnHsSyn		( extractHsTyNames, parrTyCon_name, tupleTyCon_name, 
+			  listTyCon_name, charTyCon_name
+			)
+import RnEnv		( lookupOccRn, lookupBndrRn, lookupSyntaxName,
+			  lookupLocatedOccRn, lookupLocatedBndrRn,
+			  lookupLocatedGlobalOccRn, bindTyVarsRn, lookupFixityRn,
+			  mapFvRn, warnUnusedMatches,
+			  newIPNameRn, bindPatSigTyVarsFV, bindLocatedLocalsFV )
 import TcRnMonad
-import RdrName	( elemLocalRdrEnv )
-import PrelNames( eqStringName, eqClassName, integralClassName, 
-		  negateName, minusName, lengthPName, indexPName, plusIntegerName, fromIntegerName,
-		  timesIntegerName, ratioDataConName, fromRationalName )
+import RdrName		( RdrName, elemLocalRdrEnv )
+import PrelNames	( eqStringName, eqClassName, integralClassName, 
+		  	  negateName, minusName, lengthPName, indexPName,
+			  plusIntegerName, fromIntegerName, timesIntegerName,
+			  ratioDataConName, fromRationalName )
 import Constants	( mAX_TUPLE_SIZE )
 import TysWiredIn	( intTyCon )
 import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon, 
 			  floatPrimTyCon, doublePrimTyCon )
-import Name	( Name, NamedThing(..) )
+import Name		( Name, NamedThing(..) )
+import SrcLoc		( Located(..), unLoc )
 import NameSet
 
 import Literal		( inIntRange, inCharRange )
 import BasicTypes	( compareFixity )
 import ListSetOps	( removeDups )
 import Outputable
+import Monad		( when )
 
 #include "HsVersions.h"
 \end{code}
@@ -52,23 +56,26 @@ to break several loop.
 %*********************************************************
 
 \begin{code}
-rnHsTypeFVs :: SDoc -> RdrNameHsType -> RnM (RenamedHsType, FreeVars)
+rnHsTypeFVs :: SDoc -> LHsType RdrName -> RnM (LHsType Name, FreeVars)
 rnHsTypeFVs doc_str ty 
-  = rnHsType doc_str ty		`thenM` \ ty' ->
+  = rnLHsType doc_str ty	`thenM` \ ty' ->
     returnM (ty', extractHsTyNames ty')
 
-rnHsSigType :: SDoc -> RdrNameHsType -> RnM RenamedHsType
+rnHsSigType :: SDoc -> LHsType RdrName -> RnM (LHsType Name)
 	-- rnHsSigType is used for source-language type signatures,
 	-- which use *implicit* universal quantification.
 rnHsSigType doc_str ty
-  = rnHsType (text "In the type signature for" <+> doc_str) ty
+  = rnLHsType (text "In the type signature for" <+> doc_str) ty
 \end{code}
 
 rnHsType is here because we call it from loadInstDecl, and I didn't
 want a gratuitous knot.
 
 \begin{code}
-rnHsType :: SDoc -> RdrNameHsType -> RnM RenamedHsType
+rnLHsType  :: SDoc -> LHsType RdrName -> RnM (LHsType Name)
+rnLHsType doc = wrapLocM (rnHsType doc)
+
+rnHsType :: SDoc -> HsType RdrName -> RnM (HsType Name)
 
 rnHsType doc (HsForAllTy Implicit _ ctxt ty)
 	-- Implicit quantifiction in source code (no kinds on tyvars)
@@ -82,20 +89,21 @@ rnHsType doc (HsForAllTy Implicit _ ctxt ty)
 	-- when GlasgowExts is off, there usually won't be any, except for
 	-- class signatures:
 	--	class C a where { op :: a -> a }
-	forall_tyvars = filter (not . (`elemLocalRdrEnv` name_env)) mentioned
+	forall_tyvars = filter (not . (`elemLocalRdrEnv` name_env) . unLoc) mentioned
+	tyvar_bndrs = [ L loc (UserTyVar v) | (L loc v) <- forall_tyvars ]
     in
-    rnForAll doc Implicit (map UserTyVar forall_tyvars) ctxt ty
+    rnForAll doc Implicit tyvar_bndrs ctxt ty
 
 rnHsType doc (HsForAllTy Explicit forall_tyvars ctxt tau)
 	-- Explicit quantification.
 	-- Check that the forall'd tyvars are actually 
 	-- mentioned in the type, and produce a warning if not
   = let
-	mentioned	   = extractHsRhoRdrTyVars ctxt tau
-	forall_tyvar_names = hsTyVarNames forall_tyvars
+	mentioned	   = map unLoc (extractHsRhoRdrTyVars ctxt tau)
+	forall_tyvar_names = hsLTyVarLocNames forall_tyvars
 
 	-- Explicitly quantified but not mentioned in ctxt or tau
-	warn_guys = filter (`notElem` mentioned) forall_tyvar_names
+	warn_guys = filter ((`notElem` mentioned) . unLoc) forall_tyvar_names
     in
     mappM_ (forAllWarn doc tau) warn_guys	`thenM_`
     rnForAll doc Explicit forall_tyvars ctxt tau
@@ -104,15 +112,17 @@ rnHsType doc (HsTyVar tyvar)
   = lookupOccRn tyvar 		`thenM` \ tyvar' ->
     returnM (HsTyVar tyvar')
 
-rnHsType doc (HsOpTy ty1 op ty2)
-  = lookupOccRn op 		`thenM` \ op' ->
-    rnHsType doc ty1		`thenM` \ ty1' ->
-    rnHsType doc ty2		`thenM` \ ty2' -> 
-    lookupTyFixityRn op'	`thenM` \ fix ->
-    mkHsOpTyRn op' fix ty1' ty2'
+rnHsType doc (HsOpTy ty1 (L loc op) ty2)
+  = addSrcSpan loc (
+      lookupOccRn op			`thenM` \ op' ->
+      lookupTyFixityRn (L loc op')	`thenM` \ fix ->
+      rnLHsType doc ty1			`thenM` \ ty1' ->
+      rnLHsType doc ty2			`thenM` \ ty2' -> 
+      mkHsOpTyRn (L loc op') fix ty1' ty2'
+   )
 
 rnHsType doc (HsParTy ty)
-  = rnHsType doc ty 	        `thenM` \ ty' ->
+  = rnLHsType doc ty 	        `thenM` \ ty' ->
     returnM (HsParTy ty')
 
 rnHsType doc (HsNumTy i)
@@ -123,46 +133,49 @@ rnHsType doc (HsNumTy i)
 			   
 
 rnHsType doc (HsFunTy ty1 ty2)
-  = rnHsType doc ty1	`thenM` \ ty1' ->
+  = rnLHsType doc ty1	`thenM` \ ty1' ->
 	-- Might find a for-all as the arg of a function type
-    rnHsType doc ty2	`thenM` \ ty2' ->
+    rnLHsType doc ty2	`thenM` \ ty2' ->
 	-- Or as the result.  This happens when reading Prelude.hi
 	-- when we find return :: forall m. Monad m -> forall a. a -> m a
     returnM (HsFunTy ty1' ty2')
 
 rnHsType doc (HsListTy ty)
-  = rnHsType doc ty				`thenM` \ ty' ->
+  = rnLHsType doc ty				`thenM` \ ty' ->
     returnM (HsListTy ty')
 
 rnHsType doc (HsKindSig ty k)
-  = rnHsType doc ty				`thenM` \ ty' ->
+  = rnLHsType doc ty				`thenM` \ ty' ->
     returnM (HsKindSig ty' k)
 
 rnHsType doc (HsPArrTy ty)
-  = rnHsType doc ty				`thenM` \ ty' ->
+  = rnLHsType doc ty				`thenM` \ ty' ->
     returnM (HsPArrTy ty')
 
 -- Unboxed tuples are allowed to have poly-typed arguments.  These
 -- sometimes crop up as a result of CPR worker-wrappering dictionaries.
 rnHsType doc (HsTupleTy tup_con tys)
-  = mappM (rnHsType doc) tys	  	`thenM` \ tys' ->
+  = mappM (rnLHsType doc) tys	  	`thenM` \ tys' ->
     returnM (HsTupleTy tup_con tys')
 
 rnHsType doc (HsAppTy ty1 ty2)
-  = rnHsType doc ty1		`thenM` \ ty1' ->
-    rnHsType doc ty2		`thenM` \ ty2' ->
+  = rnLHsType doc ty1		`thenM` \ ty1' ->
+    rnLHsType doc ty2		`thenM` \ ty2' ->
     returnM (HsAppTy ty1' ty2')
 
 rnHsType doc (HsPredTy pred)
-  = rnPred doc pred	`thenM` \ pred' ->
+  = rnLPred doc pred	`thenM` \ pred' ->
     returnM (HsPredTy pred')
 
-rnHsTypes doc tys = mappM (rnHsType doc) tys
+rnLHsTypes doc tys = mappM (rnLHsType doc) tys
 \end{code}
 
 
 \begin{code}
-rnForAll doc exp [] [] ty = rnHsType doc ty
+rnForAll :: SDoc -> HsExplicitForAll -> [LHsTyVarBndr RdrName] -> LHsContext RdrName
+  -> LHsType RdrName -> RnM (HsType Name)
+
+rnForAll doc exp [] (L _ []) (L _ ty) = rnHsType doc ty
 	-- One reason for this case is that a type like Int#
 	-- starts of as (HsForAllTy Nothing [] Int), in case
 	-- there is some quantification.  Now that we have quantified
@@ -174,7 +187,7 @@ rnForAll doc exp [] [] ty = rnHsType doc ty
 rnForAll doc exp forall_tyvars ctxt ty
   = bindTyVarsRn doc forall_tyvars	$ \ new_tyvars ->
     rnContext doc ctxt			`thenM` \ new_ctxt ->
-    rnHsType doc ty			`thenM` \ new_ty ->
+    rnLHsType doc ty			`thenM` \ new_ty ->
     returnM (HsForAllTy exp new_tyvars new_ctxt new_ty)
 	-- Retain the same implicit/explicit flag as before
 	-- so that we can later print it correctly
@@ -197,18 +210,19 @@ have already been renamed and rearranged.  It's made rather tiresome
 by the presence of ->
 
 \begin{code}
-lookupTyFixityRn n 
+lookupTyFixityRn (L loc n)
   = doptM Opt_GlasgowExts 			`thenM` \ glaExts ->
-    warnIf (not glaExts) (infixTyConWarn n)	`thenM_`
+    when (not glaExts) 
+    	(addSrcSpan loc $ addWarn (infixTyConWarn n))	`thenM_`
     lookupFixityRn n
 
 -- Building (ty1 `op1` (ty21 `op2` ty22))
-mkHsOpTyRn :: Name -> Fixity 
-	   -> RenamedHsType -> RenamedHsType 
-	   -> RnM RenamedHsType
+mkHsOpTyRn :: Located Name -> Fixity 
+	   -> LHsType Name -> LHsType Name 
+	   -> RnM (HsType Name)
 
-mkHsOpTyRn op1 fix1 ty1 ty2@(HsOpTy ty21 op2 ty22)
-  = lookupTyFixityRn op2		`thenM` \ fix2 ->
+mkHsOpTyRn op1 fix1 ty1 ty2@(L loc (HsOpTy ty21 op2 ty22))
+  = lookupTyFixityRn op2	`thenM` \ fix2 ->
     let
 	(nofix_error, associate_right) = compareFixity fix1 fix2
     in
@@ -220,7 +234,7 @@ mkHsOpTyRn op1 fix1 ty1 ty2@(HsOpTy ty21 op2 ty22)
     if not associate_right then
 	-- Rearrange to ((ty1 `op1` ty21) `op2` ty22)
 	mkHsOpTyRn op1 fix1 ty1 ty21		`thenM` \ new_ty ->
-	returnM (HsOpTy new_ty op2 ty22)
+	returnM (HsOpTy (L loc new_ty) op2 ty22)  -- XXX loc is wrong
     else
     returnM (HsOpTy ty1 op1 ty2)
 
@@ -235,17 +249,23 @@ mkHsOpTyRn op fix ty1 ty2 			-- Default case, no rearrangment
 %*********************************************************
 
 \begin{code}
-rnContext :: SDoc -> RdrNameContext -> RnM RenamedContext
-rnContext doc ctxt = mappM (rnPred doc) ctxt
+rnContext :: SDoc -> LHsContext RdrName -> RnM (LHsContext Name)
+rnContext doc = wrapLocM (rnContext' doc)
+
+rnContext' :: SDoc -> HsContext RdrName -> RnM (HsContext Name)
+rnContext' doc ctxt = mappM (rnLPred doc) ctxt
+
+rnLPred :: SDoc -> LHsPred RdrName -> RnM (LHsPred Name)
+rnLPred doc  = wrapLocM (rnPred doc)
 
 rnPred doc (HsClassP clas tys)
   = lookupOccRn clas		`thenM` \ clas_name ->
-    rnHsTypes doc tys		`thenM` \ tys' ->
+    rnLHsTypes doc tys		`thenM` \ tys' ->
     returnM (HsClassP clas_name tys')
 
 rnPred doc (HsIParam n ty)
   = newIPNameRn n		`thenM` \ name ->
-    rnHsType doc ty		`thenM` \ ty' ->
+    rnLHsType doc ty		`thenM` \ ty' ->
     returnM (HsIParam name ty')
 \end{code}
 
@@ -259,8 +279,8 @@ rnPred doc (HsIParam n ty)
 \begin{code}
 rnPatsAndThen :: HsMatchContext Name
 	      -> Bool
-	      -> [RdrNamePat] 
-	      -> ([RenamedPat] -> RnM (a, FreeVars))
+	      -> [LPat RdrName] 
+	      -> ([LPat Name] -> RnM (a, FreeVars))
 	      -> RnM (a, FreeVars)
 -- Bring into scope all the binders and type variables
 -- bound by the patterns; then rename the patterns; then
@@ -272,8 +292,8 @@ rnPatsAndThen :: HsMatchContext Name
 
 rnPatsAndThen ctxt repUnused pats thing_inside
   = bindPatSigTyVarsFV pat_sig_tys 	$
-    bindLocalsFV doc_pat bndrs		$ \ new_bndrs ->
-    rnPats pats				`thenM` \ (pats', pat_fvs) ->
+    bindLocatedLocalsFV doc_pat bndrs	$ \ new_bndrs ->
+    rnLPats pats			`thenM` \ (pats', pat_fvs) ->
     thing_inside pats'			`thenM` \ (res, res_fvs) ->
 
     let
@@ -285,13 +305,19 @@ rnPatsAndThen ctxt repUnused pats thing_inside
     returnM (res, res_fvs `plusFV` pat_fvs)
   where
     pat_sig_tys = collectSigTysFromPats pats
-    bndrs 	= collectPatsBinders    pats
+    bndrs 	= collectLocatedPatsBinders pats
     doc_pat     = ptext SLIT("In") <+> pprMatchContext ctxt
 
-rnPats :: [RdrNamePat] -> RnM ([RenamedPat], FreeVars)
-rnPats ps = mapFvRn rnPat ps
+rnLPats :: [LPat RdrName] -> RnM ([LPat Name], FreeVars)
+rnLPats ps = mapFvRn rnLPat ps
 
-rnPat :: RdrNamePat -> RnM (RenamedPat, FreeVars)
+rnLPat :: LPat RdrName -> RnM (LPat Name, FreeVars)
+rnLPat = wrapLocFstM rnPat
+
+-- -----------------------------------------------------------------------------
+-- rnPat
+
+rnPat :: Pat RdrName -> RnM (Pat Name, FreeVars)
 
 rnPat (WildPat _) = returnM (WildPat placeHolderType, emptyFVs)
 
@@ -303,12 +329,12 @@ rnPat (SigPatIn pat ty)
   = doptM Opt_GlasgowExts `thenM` \ glaExts ->
     
     if glaExts
-    then rnPat pat		`thenM` \ (pat', fvs1) ->
+    then rnLPat pat		`thenM` \ (pat', fvs1) ->
          rnHsTypeFVs doc ty	`thenM` \ (ty',  fvs2) ->
          returnM (SigPatIn pat' ty', fvs1 `plusFV` fvs2)
 
     else addErr (patSigErr ty)	`thenM_`
-         rnPat pat
+         rnPat (unLoc pat) -- XXX shouldn't throw away the loc
   where
     doc = text "In a pattern type-signature"
     
@@ -332,34 +358,34 @@ rnPat (NPatIn lit mb_neg)
 
 rnPat (NPlusKPatIn name lit _)
   = rnOverLit lit			`thenM` \ (lit', fvs1) ->
-    lookupBndrRn name			`thenM` \ name' ->
+    lookupLocatedBndrRn name		`thenM` \ name' ->
     lookupSyntaxName minusName		`thenM` \ (minus, fvs2) ->
     returnM (NPlusKPatIn name' lit' minus, 
 	      fvs1 `plusFV` fvs2 `addOneFV` integralClassName)
 	-- The Report says that n+k patterns must be in Integral
 
 rnPat (LazyPat pat)
-  = rnPat pat		`thenM` \ (pat', fvs) ->
+  = rnLPat pat		`thenM` \ (pat', fvs) ->
     returnM (LazyPat pat', fvs)
 
 rnPat (AsPat name pat)
-  = rnPat pat		`thenM` \ (pat', fvs) ->
-    lookupBndrRn name	`thenM` \ vname ->
+  = rnLPat pat			`thenM` \ (pat', fvs) ->
+    lookupLocatedBndrRn name	`thenM` \ vname ->
     returnM (AsPat vname pat', fvs)
 
 rnPat (ConPatIn con stuff) = rnConPat con stuff
 
 
 rnPat (ParPat pat)
-  = rnPat pat		`thenM` \ (pat', fvs) ->
+  = rnLPat pat		`thenM` \ (pat', fvs) ->
     returnM (ParPat pat', fvs)
 
 rnPat (ListPat pats _)
-  = rnPats pats			`thenM` \ (patslist, fvs) ->
+  = rnLPats pats			`thenM` \ (patslist, fvs) ->
     returnM (ListPat patslist placeHolderType, fvs `addOneFV` listTyCon_name)
 
 rnPat (PArrPat pats _)
-  = rnPats pats			`thenM` \ (patslist, fvs) ->
+  = rnLPats pats			`thenM` \ (patslist, fvs) ->
     returnM (PArrPat patslist placeHolderType, 
 	      fvs `plusFV` implicit_fvs `addOneFV` parrTyCon_name)
   where
@@ -367,7 +393,7 @@ rnPat (PArrPat pats _)
 
 rnPat (TuplePat pats boxed)
   = checkTupSize tup_size	`thenM_`
-    rnPats pats			`thenM` \ (patslist, fvs) ->
+    rnLPats pats			`thenM` \ (patslist, fvs) ->
     returnM (TuplePat patslist boxed, fvs `addOneFV` tycon_name)
   where
     tup_size   = length pats
@@ -377,47 +403,54 @@ rnPat (TypePat name) =
     rnHsTypeFVs (text "In a type pattern") name	`thenM` \ (name', fvs) ->
     returnM (TypePat name', fvs)
 
-------------------------------
+-- -----------------------------------------------------------------------------
+-- rnConPat
+
 rnConPat con (PrefixCon pats)
-  = lookupOccRn con 	`thenM` \ con' ->
-    rnPats pats		`thenM` \ (pats', fvs) ->
-    returnM (ConPatIn con' (PrefixCon pats'), fvs `addOneFV` con')
+  = lookupLocatedOccRn con 	`thenM` \ con' ->
+    rnLPats pats		`thenM` \ (pats', fvs) ->
+    returnM (ConPatIn con' (PrefixCon pats'), fvs `addOneFV` unLoc con')
 
 rnConPat con (RecCon rpats)
-  = lookupOccRn con 	`thenM` \ con' ->
-    rnRpats rpats	`thenM` \ (rpats', fvs) ->
-    returnM (ConPatIn con' (RecCon rpats'), fvs `addOneFV` con')
+  = lookupLocatedOccRn con 	`thenM` \ con' ->
+    rnRpats rpats		`thenM` \ (rpats', fvs) ->
+    returnM (ConPatIn con' (RecCon rpats'), fvs `addOneFV` unLoc con')
 
 rnConPat con (InfixCon pat1 pat2)
-  = lookupOccRn con 				`thenM` \ con' ->
-    rnPat pat1					`thenM` \ (pat1', fvs1) ->
-    rnPat pat2					`thenM` \ (pat2', fvs2) ->
-    lookupFixityRn con'				`thenM` \ fixity ->
+  = lookupLocatedOccRn con			`thenM` \ con' ->
+    rnLPat pat1					`thenM` \ (pat1', fvs1) ->
+    rnLPat pat2					`thenM` \ (pat2', fvs2) ->
+    lookupFixityRn (unLoc con')			`thenM` \ fixity ->
     mkConOpPatRn con' fixity pat1' pat2'	`thenM` \ pat' ->
-    returnM (pat', fvs1 `plusFV` fvs2 `addOneFV` con')
+    returnM (pat', fvs1 `plusFV` fvs2 `addOneFV` unLoc con')
 
-------------------------
+-- -----------------------------------------------------------------------------
+-- rnRpats
+
+rnRpats :: [(Located RdrName, LPat RdrName)]
+        -> RnM ([(Located Name, LPat Name)], FreeVars)
 rnRpats rpats
   = mappM_ field_dup_err dup_fields 	`thenM_`
     mapFvRn rn_rpat rpats		`thenM` \ (rpats', fvs) ->
     returnM (rpats', fvs)
   where
-    (_, dup_fields) = removeDups compare [ f | (f,_) <- rpats ]
+    (_, dup_fields) = removeDups compare [ unLoc f | (f,_) <- rpats ]
 
     field_dup_err dups = addErr (dupFieldErr "pattern" dups)
 
     rn_rpat (field, pat)
-      = lookupGlobalOccRn field	`thenM` \ fieldname ->
-	rnPat pat		`thenM` \ (pat', fvs) ->
-	returnM ((fieldname, pat'), fvs `addOneFV` fieldname)
-\end{code}
+      = lookupLocatedGlobalOccRn field	`thenM` \ fieldname ->
+	rnLPat pat			`thenM` \ (pat', fvs) ->
+	returnM ((fieldname, pat'), fvs `addOneFV` unLoc fieldname)
 
-\begin{code}
-mkConOpPatRn :: Name -> Fixity -> RenamedPat -> RenamedPat
-	     -> RnM RenamedPat
+-- -----------------------------------------------------------------------------
+-- mkConOpPatRn
 
-mkConOpPatRn op2 fix2 p1@(ConPatIn op1 (InfixCon p11 p12)) p2
-  = lookupFixityRn op1		`thenM` \ fix1 ->
+mkConOpPatRn :: Located Name -> Fixity -> LPat Name -> LPat Name
+	     -> RnM (Pat Name)
+
+mkConOpPatRn op2 fix2 p1@(L loc (ConPatIn op1 (InfixCon p11 p12))) p2
+  = lookupFixityRn (unLoc op1)	`thenM` \ fix1 ->
     let
 	(nofix_error, associate_right) = compareFixity fix1 fix2
     in
@@ -427,12 +460,12 @@ mkConOpPatRn op2 fix2 p1@(ConPatIn op1 (InfixCon p11 p12)) p2
     else 
     if associate_right then
 	mkConOpPatRn op2 fix2 p12 p2		`thenM` \ new_p ->
-	returnM (ConPatIn op1 (InfixCon p11 new_p))
+	returnM (ConPatIn op1 (InfixCon p11 (L loc new_p)))  -- XXX loc right?
     else
     returnM (ConPatIn op2 (InfixCon p1 p2))
 
 mkConOpPatRn op fix p1 p2 			-- Default case, no rearrangment
-  = ASSERT( not_op_pat p2 )
+  = ASSERT( not_op_pat (unLoc p2) )
     returnM (ConPatIn op (InfixCon p1 p2))
 
 not_op_pat (ConPatIn _ (InfixCon _ _)) = False
@@ -462,10 +495,11 @@ litFVs (HsInt i)	      = returnM (unitFV (getName intTyCon))
 litFVs (HsIntPrim i)          = returnM (unitFV (getName intPrimTyCon))
 litFVs (HsFloatPrim f)        = returnM (unitFV (getName floatPrimTyCon))
 litFVs (HsDoublePrim d)       = returnM (unitFV (getName doublePrimTyCon))
-litFVs lit		      = pprPanic "RnExpr.litFVs" (ppr lit)	-- HsInteger and HsRat only appear 
-									-- in post-typechecker translations
+litFVs lit		      = pprPanic "RnExpr.litFVs" (ppr lit)
+					-- HsInteger and HsRat only appear 
+					-- in post-typechecker translations
 bogusCharError c
-  = ptext SLIT("character literal out of range: '\\") <> int c <> char '\''
+  = ptext SLIT("character literal out of range: '\\") <> char c <> char '\''
 
 rnOverLit (HsIntegral i _)
   = lookupSyntaxName fromIntegerName	`thenM` \ (from_integer_name, fvs) ->
@@ -514,8 +548,9 @@ checkTupSize tup_size
 		 nest 2 (parens (ptext SLIT("max size is") <+> int mAX_TUPLE_SIZE)),
 		 nest 2 (ptext SLIT("Workaround: use nested tuples or define a data type"))])
 
-forAllWarn doc ty tyvar
+forAllWarn doc ty (L loc tyvar)
   = ifOptM Opt_WarnUnusedMatches 	$
+    addSrcSpan loc $
     addWarn (sep [ptext SLIT("The universally quantified type variable") <+> quotes (ppr tyvar),
 		   nest 4 (ptext SLIT("does not appear in the type") <+> quotes (ppr ty))]
 		   $$
@@ -540,7 +575,7 @@ patSigErr ty
   =  (ptext SLIT("Illegal signature in pattern:") <+> ppr ty)
 	$$ nest 4 (ptext SLIT("Use -fglasgow-exts to permit it"))
 
-dupFieldErr str (dup:rest)
+dupFieldErr str dup
   = hsep [ptext SLIT("duplicate field name"), 
           quotes (ppr dup),
 	  ptext SLIT("in record"), text str]

@@ -16,9 +16,8 @@ import CoreSyn
 import DsCCall		( dsCCall, mkFCall, boxResult, unboxArg, resultWrapper )
 import DsMonad
 
-import HsSyn		( ForeignDecl(..), ForeignExport(..),
+import HsSyn		( ForeignDecl(..), ForeignExport(..), LForeignDecl,
 			  ForeignImport(..), CImportSpec(..) )
-import TcHsSyn		( TypecheckedForeignDecl )
 import CoreUtils	( exprType, mkInlineMe )
 import Id		( Id, idType, idName, mkSysLocal, setInlinePragma )
 import Literal		( Literal(..) )
@@ -46,6 +45,7 @@ import PrimRep          ( getPrimRepSizeInBytes )
 import PrelNames	( hasKey, ioTyConKey, stablePtrTyConName, newStablePtrName, bindIOName,
 			  checkDotnetResName )
 import BasicTypes	( Activation( NeverActive ) )
+import SrcLoc		( Located(..), unLoc )
 import Outputable
 import Maybe 		( fromJust )
 import FastString
@@ -68,7 +68,7 @@ so we reuse the desugaring code in @DsCCall@ to deal with these.
 type Binding = (Id, CoreExpr)	-- No rec/nonrec structure;
 				-- the occurrence analyser will sort it all out
 
-dsForeigns :: [TypecheckedForeignDecl] 
+dsForeigns :: [LForeignDecl Id] 
 	   -> DsM (ForeignStubs, [Binding])
 dsForeigns [] 
   = returnDs (NoStubs, [])
@@ -76,9 +76,9 @@ dsForeigns fos
   = foldlDs combine (ForeignStubs empty empty [] [], []) fos
  where
   combine (ForeignStubs acc_h acc_c acc_hdrs acc_feb, acc_f) 
-	  (ForeignImport id _ spec depr loc)
+	  (L loc (ForeignImport id _ spec depr))
     = traceIf (text "fi start" <+> ppr id)	`thenDs` \ _ ->
-      dsFImport id spec	           `thenDs` \ (bs, h, c, mbhd) -> 
+      dsFImport (unLoc id) spec	           `thenDs` \ (bs, h, c, mbhd) -> 
       warnDepr depr loc		   `thenDs` \ _                ->
       traceIf (text "fi end" <+> ppr id)	`thenDs` \ _ ->
       returnDs (ForeignStubs (h $$ acc_h)
@@ -88,7 +88,7 @@ dsForeigns fos
 		bs ++ acc_f)
 
   combine (ForeignStubs acc_h acc_c acc_hdrs acc_feb, acc_f) 
-	  (ForeignExport id _ (CExport (CExportStatic ext_nm cconv)) depr loc)
+	  (L loc (ForeignExport (L _ id) _ (CExport (CExportStatic ext_nm cconv)) depr))
     = dsFExport id (idType id) 
 		ext_nm cconv False                 `thenDs` \(h, c, _) ->
       warnDepr depr loc				   `thenDs` \_              ->

@@ -29,9 +29,9 @@ module TcGenDeriv (
 #include "HsVersions.h"
 
 import HsSyn
-import RdrName		( RdrName, mkVarUnqual, mkRdrUnqual, getRdrName, mkDerivedRdrName )
-import RdrHsSyn		( mkHsOpApp, RdrNameMonoBinds, RdrNameHsExpr, RdrNamePat, mkHsDo )
-import BasicTypes	( RecFlag(..), Fixity(..), maxPrecedence, Boxity(..) )
+import RdrName		( RdrName, mkVarUnqual, getRdrName, mkRdrUnqual,
+			   mkDerivedRdrName )
+import BasicTypes	( Fixity(..), maxPrecedence, Boxity(..) )
 import FieldLabel       ( fieldLabelName )
 import DataCon		( isNullaryDataCon, dataConTag,
 			  dataConOrigArgTys, dataConSourceArity, fIRST_TAG,
@@ -49,7 +49,7 @@ import PrelNames
 import TysWiredIn
 import MkId		( eRROR_ID )
 import PrimOp		( PrimOp(..) )
-import SrcLoc		( generatedSrcLoc, SrcLoc )
+import SrcLoc		( Located(..), noLoc, srcLocSpan )
 import TyCon		( TyCon, isNewTyCon, tyConDataCons, isEnumerationTyCon,
 			  maybeTyConSingleCon, tyConFamilySize, tyConTyVars, tyConName
 			)
@@ -65,6 +65,7 @@ import List		( partition, intersperse )
 import Outputable
 import FastString
 import OccName
+import Bag
 \end{code}
 
 %************************************************************************
@@ -148,11 +149,12 @@ instance ... Eq (Foo ...) where
 
 
 \begin{code}
-gen_Eq_binds :: TyCon -> RdrNameMonoBinds
+gen_Eq_binds :: TyCon -> LHsBinds RdrName
 
 gen_Eq_binds tycon
   = let
-	tycon_loc = getSrcLoc tycon
+	tycon_loc = getSrcSpan tycon
+
         (nullary_cons, nonnullary_cons)
            | isNewTyCon tycon = ([], tyConDataCons tycon)
            | otherwise	      = partition isNullaryDataCon (tyConDataCons tycon)
@@ -166,18 +168,19 @@ gen_Eq_binds tycon
 	    else -- calc. and compare the tags
 		 [([a_Pat, b_Pat],
 		    untag_Expr tycon [(a_RDR,ah_RDR), (b_RDR,bh_RDR)]
-		               (genOpApp (HsVar ah_RDR) eqInt_RDR (HsVar bh_RDR)))]
+		               (genOpApp (nlHsVar ah_RDR) eqInt_RDR (nlHsVar bh_RDR)))]
     in
-    mk_FunMonoBind tycon_loc eq_RDR ((map pats_etc nonnullary_cons) ++ rest)
-	    `AndMonoBinds`
-    mk_easy_FunMonoBind tycon_loc ne_RDR [a_Pat, b_Pat] [] (
-	HsApp (HsVar not_RDR) (HsPar (mkHsVarApps eq_RDR [a_RDR, b_RDR])))
+    listToBag [
+      mk_FunBind tycon_loc eq_RDR ((map pats_etc nonnullary_cons) ++ rest),
+      mk_easy_FunBind tycon_loc ne_RDR [a_Pat, b_Pat] emptyBag (
+	nlHsApp (nlHsVar not_RDR) (nlHsPar (nlHsVarApps eq_RDR [a_RDR, b_RDR])))
+    ]
   where
     ------------------------------------------------------------------
     pats_etc data_con
       = let
-	    con1_pat = mkConPat data_con_RDR as_needed
-	    con2_pat = mkConPat data_con_RDR bs_needed
+	    con1_pat = nlConVarPat data_con_RDR as_needed
+	    con2_pat = nlConVarPat data_con_RDR bs_needed
 
 	    data_con_RDR = getRdrName data_con
 	    con_arity   = length tys_needed
@@ -191,7 +194,7 @@ gen_Eq_binds tycon
 	nested_eq_expr tys as bs
 	  = foldl1 and_Expr (zipWith3Equal "nested_eq" nested_eq tys as bs)
 	  where
-	    nested_eq ty a b = HsPar (eq_Expr tycon ty (HsVar a) (HsVar b))
+	    nested_eq ty a b = nlHsPar (eq_Expr tycon ty (nlHsVar a) (nlHsVar b))
 \end{code}
 
 %************************************************************************
@@ -291,16 +294,17 @@ If there is only one constructor in the Data Type we don't need the WildCard Pat
 JJQC-30-Nov-1997
 
 \begin{code}
-gen_Ord_binds :: TyCon -> RdrNameMonoBinds
+gen_Ord_binds :: TyCon -> LHsBinds RdrName
 
 gen_Ord_binds tycon
-  = compare 	-- `AndMonoBinds` compare	
+  = unitBag compare 	-- `AndMonoBinds` compare	
 		-- The default declaration in PrelBase handles this
   where
-    tycon_loc = getSrcLoc tycon
+    tycon_loc = getSrcSpan tycon
     --------------------------------------------------------------------
-    compare = mk_easy_FunMonoBind tycon_loc compare_RDR
-				  [a_Pat, b_Pat] [cmp_eq] compare_rhs
+
+    compare = mk_easy_FunBind tycon_loc compare_RDR
+				  [a_Pat, b_Pat] (unitBag cmp_eq) compare_rhs
     compare_rhs
 	| single_con_type = cmp_eq_Expr a_Expr b_Expr
  	| otherwise
@@ -317,7 +321,7 @@ gen_Ord_binds tycon
        | isNewTyCon tycon = ([], tyConDataCons tycon)
        | otherwise	  = partition isNullaryDataCon tycon_data_cons
 
-    cmp_eq = mk_FunMonoBind tycon_loc cmp_eq_RDR cmp_eq_match
+    cmp_eq = mk_FunBind tycon_loc cmp_eq_RDR cmp_eq_match
     cmp_eq_match
       | isEnumerationTyCon tycon
 			   -- We know the tags are equal, so if it's an enumeration TyCon,
@@ -338,8 +342,8 @@ gen_Ord_binds tycon
 	  = ([con1_pat, con2_pat],
 	     nested_compare_expr tys_needed as_needed bs_needed)
 	  where
-	    con1_pat = mkConPat data_con_RDR as_needed
-	    con2_pat = mkConPat data_con_RDR bs_needed
+	    con1_pat = nlConVarPat data_con_RDR as_needed
+	    con2_pat = nlConVarPat data_con_RDR bs_needed
 
 	    data_con_RDR = getRdrName data_con
 	    con_arity   = length tys_needed
@@ -348,11 +352,11 @@ gen_Ord_binds tycon
 	    tys_needed  = dataConOrigArgTys data_con
 
 	    nested_compare_expr [ty] [a] [b]
-	      = careful_compare_Case tycon ty eqTag_Expr (HsVar a) (HsVar b)
+	      = careful_compare_Case tycon ty eqTag_Expr (nlHsVar a) (nlHsVar b)
 
 	    nested_compare_expr (ty:tys) (a:as) (b:bs)
 	      = let eq_expr = nested_compare_expr tys as bs
-		in  careful_compare_Case tycon ty eq_expr (HsVar a) (HsVar b)
+		in  careful_compare_Case tycon ty eq_expr (nlHsVar a) (nlHsVar b)
 
 	default_rhs | null nullary_cons = impossible_Expr	-- Keep desugarer from complaining about
 								-- inexhaustive patterns
@@ -402,76 +406,75 @@ instance ... Enum (Foo ...) where
 For @enumFromTo@ and @enumFromThenTo@, we use the default methods.
 
 \begin{code}
-gen_Enum_binds :: TyCon -> RdrNameMonoBinds
+gen_Enum_binds :: TyCon -> LHsBinds RdrName
 
 gen_Enum_binds tycon
-  = succ_enum		`AndMonoBinds`
-    pred_enum		`AndMonoBinds`
-    to_enum             `AndMonoBinds`
-    enum_from		`AndMonoBinds`
-    enum_from_then	`AndMonoBinds`
-    from_enum
+  = listToBag [
+	succ_enum,
+	pred_enum,
+	to_enum,
+	enum_from,
+	enum_from_then,
+	from_enum
+    ]
   where
-    tycon_loc = getSrcLoc tycon
+    tycon_loc = getSrcSpan tycon
     occ_nm    = getOccString tycon
 
     succ_enum
-      = mk_easy_FunMonoBind tycon_loc succ_RDR [a_Pat] [] $
+      = mk_easy_FunBind tycon_loc succ_RDR [a_Pat] emptyBag $
 	untag_Expr tycon [(a_RDR, ah_RDR)] $
-	HsIf (mkHsApps eq_RDR [HsVar (maxtag_RDR tycon),
-			       mkHsVarApps intDataCon_RDR [ah_RDR]])
+	nlHsIf (nlHsApps eq_RDR [nlHsVar (maxtag_RDR tycon),
+			       nlHsVarApps intDataCon_RDR [ah_RDR]])
 	     (illegal_Expr "succ" occ_nm "tried to take `succ' of last tag in enumeration")
-	     (HsApp (HsVar (tag2con_RDR tycon))
-		    (mkHsApps plus_RDR [mkHsVarApps intDataCon_RDR [ah_RDR],
-		 			mkHsIntLit 1]))
-	     tycon_loc
+	     (nlHsApp (nlHsVar (tag2con_RDR tycon))
+		    (nlHsApps plus_RDR [nlHsVarApps intDataCon_RDR [ah_RDR],
+		 			nlHsIntLit 1]))
 		    
     pred_enum
-      = mk_easy_FunMonoBind tycon_loc pred_RDR [a_Pat] [] $
+      = mk_easy_FunBind tycon_loc pred_RDR [a_Pat] emptyBag $
 	untag_Expr tycon [(a_RDR, ah_RDR)] $
-	HsIf (mkHsApps eq_RDR [mkHsIntLit 0,
-			       mkHsVarApps intDataCon_RDR [ah_RDR]])
+	nlHsIf (nlHsApps eq_RDR [nlHsIntLit 0,
+			       nlHsVarApps intDataCon_RDR [ah_RDR]])
 	     (illegal_Expr "pred" occ_nm "tried to take `pred' of first tag in enumeration")
-	     (HsApp (HsVar (tag2con_RDR tycon))
-			   (mkHsApps plus_RDR [mkHsVarApps intDataCon_RDR [ah_RDR],
-					       HsLit (HsInt (-1))]))
-	     tycon_loc
+	     (nlHsApp (nlHsVar (tag2con_RDR tycon))
+			   (nlHsApps plus_RDR [nlHsVarApps intDataCon_RDR [ah_RDR],
+					       nlHsLit (HsInt (-1))]))
 
     to_enum
-      = mk_easy_FunMonoBind tycon_loc toEnum_RDR [a_Pat] [] $
-	HsIf (mkHsApps and_RDR
-		[mkHsApps ge_RDR [HsVar a_RDR, mkHsIntLit 0],
-                 mkHsApps le_RDR [HsVar a_RDR, HsVar (maxtag_RDR tycon)]])
-             (mkHsVarApps (tag2con_RDR tycon) [a_RDR])
+      = mk_easy_FunBind tycon_loc toEnum_RDR [a_Pat] emptyBag $
+	nlHsIf (nlHsApps and_RDR
+		[nlHsApps ge_RDR [nlHsVar a_RDR, nlHsIntLit 0],
+                 nlHsApps le_RDR [nlHsVar a_RDR, nlHsVar (maxtag_RDR tycon)]])
+             (nlHsVarApps (tag2con_RDR tycon) [a_RDR])
 	     (illegal_toEnum_tag occ_nm (maxtag_RDR tycon))
-	     tycon_loc
 
     enum_from
-      = mk_easy_FunMonoBind tycon_loc enumFrom_RDR [a_Pat] [] $
+      = mk_easy_FunBind tycon_loc enumFrom_RDR [a_Pat] emptyBag $
 	  untag_Expr tycon [(a_RDR, ah_RDR)] $
-	  mkHsApps map_RDR 
-		[HsVar (tag2con_RDR tycon),
-		 HsPar (enum_from_to_Expr
-			    (mkHsVarApps intDataCon_RDR [ah_RDR])
-			    (HsVar (maxtag_RDR tycon)))]
+	  nlHsApps map_RDR 
+		[nlHsVar (tag2con_RDR tycon),
+		 nlHsPar (enum_from_to_Expr
+			    (nlHsVarApps intDataCon_RDR [ah_RDR])
+			    (nlHsVar (maxtag_RDR tycon)))]
 
     enum_from_then
-      = mk_easy_FunMonoBind tycon_loc enumFromThen_RDR [a_Pat, b_Pat] [] $
+      = mk_easy_FunBind tycon_loc enumFromThen_RDR [a_Pat, b_Pat] emptyBag $
 	  untag_Expr tycon [(a_RDR, ah_RDR), (b_RDR, bh_RDR)] $
-	  HsApp (mkHsVarApps map_RDR [tag2con_RDR tycon]) $
-	    HsPar (enum_from_then_to_Expr
-		    (mkHsVarApps intDataCon_RDR [ah_RDR])
-		    (mkHsVarApps intDataCon_RDR [bh_RDR])
-		    (HsIf  (mkHsApps gt_RDR [mkHsVarApps intDataCon_RDR [ah_RDR],
-					     mkHsVarApps intDataCon_RDR [bh_RDR]])
-			   (mkHsIntLit 0)
-			   (HsVar (maxtag_RDR tycon))
-			   tycon_loc))
+	  nlHsApp (nlHsVarApps map_RDR [tag2con_RDR tycon]) $
+	    nlHsPar (enum_from_then_to_Expr
+		    (nlHsVarApps intDataCon_RDR [ah_RDR])
+		    (nlHsVarApps intDataCon_RDR [bh_RDR])
+		    (nlHsIf  (nlHsApps gt_RDR [nlHsVarApps intDataCon_RDR [ah_RDR],
+					     nlHsVarApps intDataCon_RDR [bh_RDR]])
+			   (nlHsIntLit 0)
+			   (nlHsVar (maxtag_RDR tycon))
+			   ))
 
     from_enum
-      = mk_easy_FunMonoBind tycon_loc fromEnum_RDR [a_Pat] [] $
+      = mk_easy_FunBind tycon_loc fromEnum_RDR [a_Pat] emptyBag $
 	  untag_Expr tycon [(a_RDR, ah_RDR)] $
-	  (mkHsVarApps intDataCon_RDR [ah_RDR])
+	  (nlHsVarApps intDataCon_RDR [ah_RDR])
 \end{code}
 
 %************************************************************************
@@ -483,17 +486,17 @@ gen_Enum_binds tycon
 \begin{code}
 gen_Bounded_binds tycon
   = if isEnumerationTyCon tycon then
-	min_bound_enum `AndMonoBinds` max_bound_enum
+	listToBag [ min_bound_enum, max_bound_enum ]
     else
 	ASSERT(isSingleton data_cons)
-	min_bound_1con `AndMonoBinds` max_bound_1con
+	listToBag [ min_bound_1con, max_bound_1con ]
   where
     data_cons = tyConDataCons tycon
-    tycon_loc = getSrcLoc tycon
+    tycon_loc = getSrcSpan tycon
 
     ----- enum-flavored: ---------------------------
-    min_bound_enum = mkVarMonoBind tycon_loc minBound_RDR (HsVar data_con_1_RDR)
-    max_bound_enum = mkVarMonoBind tycon_loc maxBound_RDR (HsVar data_con_N_RDR)
+    min_bound_enum = mkVarBind tycon_loc minBound_RDR (nlHsVar data_con_1_RDR)
+    max_bound_enum = mkVarBind tycon_loc maxBound_RDR (nlHsVar data_con_N_RDR)
 
     data_con_1	  = head data_cons
     data_con_N	  = last data_cons
@@ -503,10 +506,10 @@ gen_Bounded_binds tycon
     ----- single-constructor-flavored: -------------
     arity	   = dataConSourceArity data_con_1
 
-    min_bound_1con = mkVarMonoBind tycon_loc minBound_RDR $
-		     mkHsVarApps data_con_1_RDR (nOfThem arity minBound_RDR)
-    max_bound_1con = mkVarMonoBind tycon_loc maxBound_RDR $
-		     mkHsVarApps data_con_1_RDR (nOfThem arity maxBound_RDR)
+    min_bound_1con = mkVarBind tycon_loc minBound_RDR $
+		     nlHsVarApps data_con_1_RDR (nOfThem arity minBound_RDR)
+    max_bound_1con = mkVarBind tycon_loc maxBound_RDR $
+		     nlHsVarApps data_con_1_RDR (nOfThem arity maxBound_RDR)
 \end{code}
 
 %************************************************************************
@@ -568,7 +571,7 @@ we follow the scheme given in Figure~19 of the Haskell~1.2 report
 (p.~147).
 
 \begin{code}
-gen_Ix_binds :: TyCon -> RdrNameMonoBinds
+gen_Ix_binds :: TyCon -> LHsBinds RdrName
 
 gen_Ix_binds tycon
   = if isEnumerationTyCon tycon
@@ -576,59 +579,55 @@ gen_Ix_binds tycon
     else single_con_ixes
   where
     tycon_str = getOccString tycon
-    tycon_loc = getSrcLoc tycon
+    tycon_loc = getSrcSpan tycon
 
     --------------------------------------------------------------
-    enum_ixes = enum_range `AndMonoBinds`
-    	    	enum_index `AndMonoBinds` enum_inRange
+    enum_ixes = listToBag [ enum_range, enum_index, enum_inRange ]
 
     enum_range
-      = mk_easy_FunMonoBind tycon_loc range_RDR 
-		[TuplePat [a_Pat, b_Pat] Boxed] [] $
+      = mk_easy_FunBind tycon_loc range_RDR 
+		[nlTuplePat [a_Pat, b_Pat] Boxed] emptyBag $
 	  untag_Expr tycon [(a_RDR, ah_RDR)] $
 	  untag_Expr tycon [(b_RDR, bh_RDR)] $
-	  HsApp (mkHsVarApps map_RDR [tag2con_RDR tycon]) $
-	      HsPar (enum_from_to_Expr
-			(mkHsVarApps intDataCon_RDR [ah_RDR])
-			(mkHsVarApps intDataCon_RDR [bh_RDR]))
+	  nlHsApp (nlHsVarApps map_RDR [tag2con_RDR tycon]) $
+	      nlHsPar (enum_from_to_Expr
+			(nlHsVarApps intDataCon_RDR [ah_RDR])
+			(nlHsVarApps intDataCon_RDR [bh_RDR]))
 
     enum_index
-      = mk_easy_FunMonoBind tycon_loc index_RDR 
-		[AsPat c_RDR (TuplePat [a_Pat, wildPat] Boxed), 
-				d_Pat] [] (
-	HsIf (HsPar (mkHsVarApps inRange_RDR [c_RDR, d_RDR])) (
+      = mk_easy_FunBind tycon_loc index_RDR 
+		[noLoc (AsPat (noLoc c_RDR) 
+			   (nlTuplePat [a_Pat, wildPat] Boxed)), 
+				d_Pat] emptyBag (
+	nlHsIf (nlHsPar (nlHsVarApps inRange_RDR [c_RDR, d_RDR])) (
 	   untag_Expr tycon [(a_RDR, ah_RDR)] (
 	   untag_Expr tycon [(d_RDR, dh_RDR)] (
 	   let
-		rhs = mkHsVarApps intDataCon_RDR [c_RDR]
+		rhs = nlHsVarApps intDataCon_RDR [c_RDR]
 	   in
-	   HsCase
-	     (genOpApp (HsVar dh_RDR) minusInt_RDR (HsVar ah_RDR))
-	     [mkSimpleHsAlt (VarPat c_RDR) rhs]
-	     tycon_loc
+	   nlHsCase
+	     (genOpApp (nlHsVar dh_RDR) minusInt_RDR (nlHsVar ah_RDR))
+	     [mkSimpleHsAlt (nlVarPat c_RDR) rhs]
 	   ))
 	) {-else-} (
-	   HsApp (HsVar error_RDR) (HsLit (HsString (mkFastString ("Ix."++tycon_str++".index: out of range\n"))))
-	)
-	tycon_loc)
+	   nlHsApp (nlHsVar error_RDR) (nlHsLit (HsString (mkFastString ("Ix."++tycon_str++".index: out of range\n"))))
+	))
 
     enum_inRange
-      = mk_easy_FunMonoBind tycon_loc inRange_RDR 
-	  [TuplePat [a_Pat, b_Pat] Boxed, c_Pat] [] (
+      = mk_easy_FunBind tycon_loc inRange_RDR 
+	  [nlTuplePat [a_Pat, b_Pat] Boxed, c_Pat] emptyBag (
 	  untag_Expr tycon [(a_RDR, ah_RDR)] (
 	  untag_Expr tycon [(b_RDR, bh_RDR)] (
 	  untag_Expr tycon [(c_RDR, ch_RDR)] (
-	  HsIf (genOpApp (HsVar ch_RDR) geInt_RDR (HsVar ah_RDR)) (
-	     (genOpApp (HsVar ch_RDR) leInt_RDR (HsVar bh_RDR))
+	  nlHsIf (genOpApp (nlHsVar ch_RDR) geInt_RDR (nlHsVar ah_RDR)) (
+	     (genOpApp (nlHsVar ch_RDR) leInt_RDR (nlHsVar bh_RDR))
 	  ) {-else-} (
 	     false_Expr
-	  ) tycon_loc))))
+	  )))))
 
     --------------------------------------------------------------
     single_con_ixes 
-      = single_con_range `AndMonoBinds`
-    	single_con_index `AndMonoBinds`
-	single_con_inRange
+      = listToBag [single_con_range, single_con_index, single_con_inRange]
 
     data_con
       =	case maybeTyConSingleCon tycon of -- just checking...
@@ -644,60 +643,59 @@ gen_Ix_binds tycon
     bs_needed = take con_arity bs_RDRs
     cs_needed = take con_arity cs_RDRs
 
-    con_pat  xs  = mkConPat data_con_RDR xs
-    con_expr     = mkHsVarApps data_con_RDR cs_needed
+    con_pat  xs  = nlConVarPat data_con_RDR xs
+    con_expr     = nlHsVarApps data_con_RDR cs_needed
 
     --------------------------------------------------------------
     single_con_range
-      = mk_easy_FunMonoBind tycon_loc range_RDR 
-	  [TuplePat [con_pat as_needed, con_pat bs_needed] Boxed] [] $
-	mkHsDo ListComp stmts tycon_loc
+      = mk_easy_FunBind tycon_loc range_RDR 
+	  [nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed] emptyBag $
+	nlHsDo ListComp stmts
       where
 	stmts = zipWith3Equal "single_con_range" mk_qual as_needed bs_needed cs_needed
 		++
-		[ResultStmt con_expr tycon_loc]
+		[nlResultStmt con_expr]
 
-	mk_qual a b c = BindStmt (VarPat c)
-				 (HsApp (HsVar range_RDR) 
-					(ExplicitTuple [HsVar a, HsVar b] Boxed))
-				 tycon_loc
+	mk_qual a b c = nlBindStmt (nlVarPat c)
+				 (nlHsApp (nlHsVar range_RDR) 
+					(nlTuple [nlHsVar a, nlHsVar b] Boxed))
 
     ----------------
     single_con_index
-      = mk_easy_FunMonoBind tycon_loc index_RDR 
-		[TuplePat [con_pat as_needed, con_pat bs_needed] Boxed, 
-		 con_pat cs_needed] [range_size] (
-	foldl mk_index (mkHsIntLit 0) (zip3 as_needed bs_needed cs_needed))
+      = mk_easy_FunBind tycon_loc index_RDR 
+		[nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed, 
+		 con_pat cs_needed] (unitBag range_size) (
+	foldl mk_index (nlHsIntLit 0) (zip3 as_needed bs_needed cs_needed))
       where
 	mk_index multiply_by (l, u, i)
 	  = genOpApp (
-	       (mkHsApps index_RDR [ExplicitTuple [HsVar l, HsVar u] Boxed,  
-				    HsVar i])
+	       (nlHsApps index_RDR [nlTuple [nlHsVar l, nlHsVar u] Boxed,  
+				    nlHsVar i])
 	   ) plus_RDR (
 		genOpApp (
-		    (HsApp (HsVar rangeSize_RDR) 
-			   (ExplicitTuple [HsVar l, HsVar u] Boxed))
+		    (nlHsApp (nlHsVar rangeSize_RDR) 
+			   (nlTuple [nlHsVar l, nlHsVar u] Boxed))
 		) times_RDR multiply_by
 	   )
 
 	range_size
-	  = mk_easy_FunMonoBind tycon_loc rangeSize_RDR 
-			[TuplePat [a_Pat, b_Pat] Boxed] [] (
+	  = mk_easy_FunBind tycon_loc rangeSize_RDR 
+			[nlTuplePat [a_Pat, b_Pat] Boxed] emptyBag (
 		genOpApp (
-		    (mkHsApps index_RDR [ExplicitTuple [a_Expr, b_Expr] Boxed,
+		    (nlHsApps index_RDR [nlTuple [a_Expr, b_Expr] Boxed,
 					 b_Expr])
-		) plus_RDR (mkHsIntLit 1))
+		) plus_RDR (nlHsIntLit 1))
 
     ------------------
     single_con_inRange
-      = mk_easy_FunMonoBind tycon_loc inRange_RDR 
-		[TuplePat [con_pat as_needed, con_pat bs_needed] Boxed, 
+      = mk_easy_FunBind tycon_loc inRange_RDR 
+		[nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed, 
 		 con_pat cs_needed]
-			   [] (
+			   emptyBag (
 	  foldl1 and_Expr (zipWith3Equal "single_con_inRange" in_range as_needed bs_needed cs_needed))
       where
-    	in_range a b c = mkHsApps inRange_RDR [ExplicitTuple [HsVar a, HsVar b] Boxed,
-					       HsVar c]
+    	in_range a b c = nlHsApps inRange_RDR [nlTuple [nlHsVar a, nlHsVar b] Boxed,
+					       nlHsVar c]
 \end{code}
 
 %************************************************************************
@@ -743,24 +741,25 @@ instance Read T where
 
 
 \begin{code}
-gen_Read_binds :: FixityEnv -> TyCon -> RdrNameMonoBinds
+gen_Read_binds :: FixityEnv -> TyCon -> LHsBinds RdrName
 
 gen_Read_binds get_fixity tycon
-  = read_prec `AndMonoBinds` default_binds
+  = listToBag [read_prec, default_readlist, default_readlistprec]
   where
     -----------------------------------------------------------------------
-    default_binds 
-	= mkVarMonoBind loc readList_RDR     (HsVar readListDefault_RDR)
-		`AndMonoBinds`
-	  mkVarMonoBind loc readListPrec_RDR (HsVar readListPrecDefault_RDR)
+    default_readlist 
+	= mkVarBind loc readList_RDR     (nlHsVar readListDefault_RDR)
+
+    default_readlistprec
+	= mkVarBind loc readListPrec_RDR (nlHsVar readListPrecDefault_RDR)
     -----------------------------------------------------------------------
 
-    loc       = getSrcLoc tycon
+    loc       = getSrcSpan tycon
     data_cons = tyConDataCons tycon
     (nullary_cons, non_nullary_cons) = partition isNullaryDataCon data_cons
     
-    read_prec = mkVarMonoBind loc readPrec_RDR
-	 		      (HsApp (HsVar parens_RDR) read_cons)
+    read_prec = mkVarBind loc readPrec_RDR
+	 		      (nlHsApp (nlHsVar parens_RDR) read_cons)
 
     read_cons 	          = foldr1 mk_alt (read_nullary_cons ++ read_non_nullary_cons)
     read_non_nullary_cons = map read_non_nullary_con non_nullary_cons
@@ -768,17 +767,17 @@ gen_Read_binds get_fixity tycon
     read_nullary_cons 
       = case nullary_cons of
     	    []    -> []
-    	    [con] -> [mkHsDo DoExpr [bindLex (ident_pat (data_con_str con)),
-		    		     result_stmt con []] loc]
-            _     -> [HsApp (HsVar choose_RDR) 
-    		   	    (ExplicitList placeHolderType (map mk_pair nullary_cons))]
+    	    [con] -> [nlHsDo DoExpr [bindLex (ident_pat (data_con_str con)),
+		    		     result_stmt con []]]
+            _     -> [nlHsApp (nlHsVar choose_RDR) 
+    		   	    (nlList (map mk_pair nullary_cons))]
     
-    mk_pair con = ExplicitTuple [HsLit (data_con_str con),
-    		   		 HsApp (HsVar returnM_RDR) (HsVar (getRdrName con))]
+    mk_pair con = nlTuple [nlHsLit (data_con_str con),
+    		   		 nlHsApp (nlHsVar returnM_RDR) (nlHsVar (getRdrName con))]
 				Boxed
     
     read_non_nullary_con data_con
-      = mkHsApps prec_RDR [mkHsIntLit prec, mkHsDo DoExpr stmts loc]
+      = nlHsApps prec_RDR [nlHsIntLit prec, nlHsDo DoExpr stmts]
       where
        	stmts | is_infix 	  = infix_stmts
      	      | length labels > 0 = lbl_stmts
@@ -817,24 +816,24 @@ gen_Read_binds get_fixity tycon
     --		Helpers
     ------------------------------------------------------------------------
     mk_alt e1 e2     = genOpApp e1 alt_RDR e2
-    bindLex pat	     = BindStmt pat (HsVar lexP_RDR) loc
-    result_stmt c as = ResultStmt (HsApp (HsVar returnM_RDR) (con_app c as)) loc
-    con_app c as     = mkHsVarApps (getRdrName c) as
+    bindLex pat	     = nlBindStmt pat (nlHsVar lexP_RDR)
+    result_stmt c as = nlResultStmt (nlHsApp (nlHsVar returnM_RDR) (con_app c as))
+    con_app c as     = nlHsVarApps (getRdrName c) as
     
-    punc_pat s   = ConPatIn punc_RDR  (PrefixCon [LitPat (mkHsString s)])	  -- Punc 'c'
-    ident_pat s  = ConPatIn ident_RDR (PrefixCon [LitPat s])			  -- Ident "foo"
-    symbol_pat s = ConPatIn symbol_RDR (PrefixCon [LitPat s])			  -- Symbol ">>"
+    punc_pat s   = nlConPat punc_RDR  [nlLitPat (mkHsString s)]	  -- Punc 'c'
+    ident_pat s  = nlConPat ident_RDR [nlLitPat s]		  -- Ident "foo"
+    symbol_pat s = nlConPat symbol_RDR [nlLitPat s]		  -- Symbol ">>"
     
     data_con_str con = mkHsString (occNameUserString (getOccName con))
     
     read_punc c = bindLex (punc_pat c)
     read_arg a ty 
 	| isUnLiftedType ty = pprPanic "Error in deriving:" (text "Can't read unlifted types yet:" <+> ppr ty)
-	| otherwise = BindStmt (VarPat a) (mkHsVarApps step_RDR [readPrec_RDR]) loc
+	| otherwise = nlBindStmt (nlVarPat a) (nlHsVarApps step_RDR [readPrec_RDR])
     
     read_field lbl a = read_lbl lbl ++
     		       [read_punc "=",
-    		        BindStmt (VarPat a) (mkHsVarApps reset_RDR [readPrec_RDR]) loc]
+    		        nlBindStmt (nlVarPat a) (nlHsVarApps reset_RDR [readPrec_RDR])]
 
 	-- When reading field labels we might encounter
 	-- 	a  = 3
@@ -884,17 +883,17 @@ Example
 		    -- the most tightly-binding operator
 
 \begin{code}
-gen_Show_binds :: FixityEnv -> TyCon -> RdrNameMonoBinds
+gen_Show_binds :: FixityEnv -> TyCon -> LHsBinds RdrName
 
 gen_Show_binds get_fixity tycon
-  = shows_prec `AndMonoBinds` show_list
+  = listToBag [shows_prec, show_list]
   where
-    tycon_loc = getSrcLoc tycon
+    tycon_loc = getSrcSpan tycon
     -----------------------------------------------------------------------
-    show_list = mkVarMonoBind tycon_loc showList_RDR
-		  (HsApp (HsVar showList___RDR) (HsPar (HsApp (HsVar showsPrec_RDR) (mkHsIntLit 0))))
+    show_list = mkVarBind tycon_loc showList_RDR
+		  (nlHsApp (nlHsVar showList___RDR) (nlHsPar (nlHsApp (nlHsVar showsPrec_RDR) (nlHsIntLit 0))))
     -----------------------------------------------------------------------
-    shows_prec = mk_FunMonoBind tycon_loc showsPrec_RDR (map pats_etc (tyConDataCons tycon))
+    shows_prec = mk_FunBind tycon_loc showsPrec_RDR (map pats_etc (tyConDataCons tycon))
       where
 	pats_etc data_con
 	  | nullary_con =  -- skip the showParen junk...
@@ -902,14 +901,14 @@ gen_Show_binds get_fixity tycon
 	     ([wildPat, con_pat], mk_showString_app con_str)
 	  | otherwise   =
 	     ([a_Pat, con_pat],
-		  showParen_Expr (HsPar (genOpApp a_Expr ge_RDR (HsLit (HsInt con_prec_plus_one))))
-				 (HsPar (nested_compose_Expr show_thingies)))
+		  showParen_Expr (nlHsPar (genOpApp a_Expr ge_RDR (nlHsLit (HsInt con_prec_plus_one))))
+				 (nlHsPar (nested_compose_Expr show_thingies)))
 	    where
 	     data_con_RDR  = getRdrName data_con
 	     con_arity     = dataConSourceArity data_con
 	     bs_needed     = take con_arity bs_RDRs
 	     arg_tys       = dataConOrigArgTys data_con		-- Correspond 1-1 with bs_needed
-	     con_pat       = mkConPat data_con_RDR bs_needed
+	     con_pat       = nlConVarPat data_con_RDR bs_needed
 	     nullary_con   = con_arity == 0
              labels        = dataConFieldLabels data_con
 	     lab_fields    = length labels
@@ -939,7 +938,7 @@ gen_Show_binds get_fixity tycon
 
              show_args 		     = zipWith show_arg bs_needed arg_tys
 	     (show_arg1:show_arg2:_) = show_args
-	     show_prefix_args	     = intersperse (HsVar showSpace_RDR) show_args
+	     show_prefix_args	     = intersperse (nlHsVar showSpace_RDR) show_args
 
 		--  Assumption for record syntax: no of fields == no of labelled fields 
 		--            (and in same order)
@@ -952,8 +951,8 @@ gen_Show_binds get_fixity tycon
 		-- Generates (showsPrec p x) for argument x, but it also boxes
 		-- the argument first if necessary.  Note that this prints unboxed
 		-- things without any '#' decorations; could change that if need be
-	     show_arg b arg_ty = mkHsApps showsPrec_RDR [HsLit (HsInt arg_prec), 
-							 box_if_necy "Show" tycon (HsVar b) arg_ty]
+	     show_arg b arg_ty = nlHsApps showsPrec_RDR [nlHsLit (HsInt arg_prec), 
+							 box_if_necy "Show" tycon (nlHsVar b) arg_ty]
 
 		-- Fixity stuff
 	     is_infix = isDataSymOcc dc_occ_nm
@@ -961,7 +960,7 @@ gen_Show_binds get_fixity tycon
 	     arg_prec | record_syntax = 0	-- Record fields don't need parens
 		      | otherwise     = con_prec_plus_one
 
-mk_showString_app str = HsApp (HsVar showString_RDR) (HsLit (mkHsString str))
+mk_showString_app str = nlHsApp (nlHsVar showString_RDR) (nlHsLit (mkHsString str))
 \end{code}
 
 \begin{code}
@@ -1002,18 +1001,19 @@ we generate
 Notice the use of lexically scoped type variables.
 
 \begin{code}
-gen_Typeable_binds :: TyCon -> RdrNameMonoBinds
+gen_Typeable_binds :: TyCon -> LHsBinds RdrName
 gen_Typeable_binds tycon
-  = mk_easy_FunMonoBind tycon_loc typeOf_RDR [wildPat] []
-	(mkHsApps mkTypeRep_RDR [tycon_rep, arg_reps])
+  = unitBag $
+	mk_easy_FunBind tycon_loc typeOf_RDR [wildPat] emptyBag
+		(nlHsApps mkTypeRep_RDR [tycon_rep, arg_reps])
   where
-    tycon_loc = getSrcLoc tycon
+    tycon_loc = getSrcSpan tycon
     tyvars    = tyConTyVars tycon
-    tycon_rep = HsVar mkTyConRep_RDR `HsApp` HsLit (mkHsString (showSDoc (ppr tycon)))
-    arg_reps  = ExplicitList placeHolderType (map mk tyvars)
-    mk tyvar  = HsApp (HsVar typeOf_RDR) 
-		      (ExprWithTySig (HsVar undefined_RDR)
-				     (HsTyVar (getRdrName tyvar)))
+    tycon_rep = nlHsVar mkTyConRep_RDR `nlHsApp` nlHsLit (mkHsString (showSDoc (ppr tycon)))
+    arg_reps  = nlList (map mk tyvars)
+    mk tyvar  = nlHsApp (nlHsVar typeOf_RDR) 
+		      (noLoc (ExprWithTySig (nlHsVar undefined_RDR)
+				     	    (nlHsTyVar (getRdrName tyvar))))
 \end{code}
 
 
@@ -1051,58 +1051,58 @@ we generate
 \begin{code}
 gen_Data_binds :: FixityEnv
 	       -> TyCon 
-	       -> (RdrNameMonoBinds,	-- The method bindings
-		   RdrNameMonoBinds)	-- Auxiliary bindings
+	       -> (LHsBinds RdrName,	-- The method bindings
+		   LHsBinds RdrName)	-- Auxiliary bindings
 gen_Data_binds fix_env tycon
-  = (andMonoBindList [gfoldl_bind, fromCon_bind, toCon_bind, dataTypeOf_bind],
+  = (listToBag [gfoldl_bind, fromCon_bind, toCon_bind, dataTypeOf_bind],
 		-- Auxiliary definitions: the data type and constructors
-     datatype_bind `AndMonoBinds` andMonoBindList (map mk_con_bind data_cons))
+     datatype_bind `consBag` listToBag (map mk_con_bind data_cons))
   where
-    tycon_loc = getSrcLoc tycon
+    tycon_loc = getSrcSpan tycon
     tycon_name = tyConName tycon
     data_cons = tyConDataCons tycon
 
 	------------ gfoldl
-    gfoldl_bind = mk_FunMonoBind tycon_loc gfoldl_RDR (map gfoldl_eqn data_cons)
-    gfoldl_eqn con = ([VarPat k_RDR, VarPat z_RDR, mkConPat con_name as_needed], 
-		       foldl mk_k_app (HsVar z_RDR `HsApp` HsVar con_name) as_needed)
+    gfoldl_bind = mk_FunBind tycon_loc gfoldl_RDR (map gfoldl_eqn data_cons)
+    gfoldl_eqn con = ([nlVarPat k_RDR, nlVarPat z_RDR, nlConVarPat con_name as_needed], 
+		       foldl mk_k_app (nlHsVar z_RDR `nlHsApp` nlHsVar con_name) as_needed)
 		   where
-		     con_name :: RdrName
+		     con_name ::  RdrName
 		     con_name = getRdrName con
 		     as_needed = take (dataConSourceArity con) as_RDRs
-		     mk_k_app e v = HsPar (mkHsOpApp e k_RDR (HsVar v))
+		     mk_k_app e v = nlHsPar (nlHsOpApp e k_RDR (nlHsVar v))
 
 	------------ fromConstr
-    fromCon_bind = mk_FunMonoBind tycon_loc fromConstr_RDR [([c_Pat], from_con_rhs)]
-    from_con_rhs = HsCase (HsVar conIndex_RDR `HsApp` c_Expr) 
-			  (map from_con_alt data_cons) tycon_loc
-    from_con_alt dc = mkSimpleHsAlt (ConPatIn intDataCon_RDR (PrefixCon [LitPat (HsIntPrim (toInteger (dataConTag dc)))]))
-				    (mkHsVarApps (getRdrName dc)
+    fromCon_bind = mk_FunBind tycon_loc fromConstr_RDR [([c_Pat], from_con_rhs)]
+    from_con_rhs = nlHsCase (nlHsVar conIndex_RDR `nlHsApp` c_Expr) 
+			  (map from_con_alt data_cons)
+    from_con_alt dc = mkSimpleHsAlt (nlConPat intDataCon_RDR [nlLitPat (HsIntPrim (toInteger (dataConTag dc)))])
+				    (nlHsVarApps (getRdrName dc)
 					         (replicate (dataConSourceArity dc) undefined_RDR))
 			  
 	------------ toConstr
-    toCon_bind = mk_FunMonoBind tycon_loc toConstr_RDR (map to_con_eqn data_cons)
-    to_con_eqn dc = ([mkWildConPat dc], HsVar (mk_constr_name dc))
+    toCon_bind = mk_FunBind tycon_loc toConstr_RDR (map to_con_eqn data_cons)
+    to_con_eqn dc = ([nlWildConPat dc], nlHsVar (mk_constr_name dc))
     
 	------------ dataTypeOf
-    dataTypeOf_bind = mk_easy_FunMonoBind tycon_loc dataTypeOf_RDR [wildPat] 
-					  [] (HsVar data_type_name)
+    dataTypeOf_bind = mk_easy_FunBind tycon_loc dataTypeOf_RDR [wildPat] 
+					  emptyBag (nlHsVar data_type_name)
 
 	------------ $dT
     data_type_name = mkDerivedRdrName tycon_name mkDataTOcc
-    datatype_bind  = mkVarMonoBind tycon_loc data_type_name
-				   (HsVar mkDataType_RDR `HsApp` 
-				    ExplicitList placeHolderType constrs)
-    constrs = [HsVar (mk_constr_name con) | con <- data_cons]
+    datatype_bind  = mkVarBind tycon_loc data_type_name
+				   (nlHsVar mkDataType_RDR `nlHsApp` 
+				    nlList constrs)
+    constrs = [nlHsVar (mk_constr_name con) | con <- data_cons]
 
 
 	------------ $cT1 etc
     mk_constr_name con = mkDerivedRdrName (dataConName con) mkDataCOcc
-    mk_con_bind dc = mkVarMonoBind tycon_loc (mk_constr_name dc) 
-					     (mkHsApps mkConstr_RDR (constr_args dc))
-    constr_args dc = [mkHsIntLit (toInteger (dataConTag dc)),		-- Tag
-		      HsLit (mkHsString (occNameUserString dc_occ)),	-- String name
-		      HsVar fixity]					-- Fixity
+    mk_con_bind dc = mkVarBind tycon_loc (mk_constr_name dc) 
+					     (nlHsApps mkConstr_RDR (constr_args dc))
+    constr_args dc = [nlHsIntLit (toInteger (dataConTag dc)),		-- Tag
+		      nlHsLit (mkHsString (occNameUserString dc_occ)),	-- String name
+		      nlHsVar fixity]					-- Fixity
 	where
 	  dc_occ   = getOccName dc
 	  is_infix = isDataSymOcc dc_occ
@@ -1142,53 +1142,53 @@ data TagThingWanted
   = GenCon2Tag | GenTag2Con | GenMaxTag
 
 gen_tag_n_con_monobind
-    :: (RdrName,	    -- (proto)Name for the thing in question
+    :: ( RdrName,	    -- (proto)Name for the thing in question
 	TyCon,		    -- tycon in question
 	TagThingWanted)
-    -> RdrNameMonoBinds
+    -> LHsBind RdrName
 
 gen_tag_n_con_monobind (rdr_name, tycon, GenCon2Tag)
   | lots_of_constructors
-  = mk_FunMonoBind loc rdr_name [([], get_tag_rhs)]
+  = mk_FunBind tycon_loc rdr_name [([], get_tag_rhs)]
 
   | otherwise
-  = mk_FunMonoBind loc rdr_name (map mk_stuff (tyConDataCons tycon))
+  = mk_FunBind tycon_loc rdr_name (map mk_stuff (tyConDataCons tycon))
 
   where
-    loc = getSrcLoc tycon
+    tycon_loc = getSrcSpan tycon
 
     tvs = map (mkRdrUnqual . getOccName) (tyConTyVars tycon)
-	-- We can't use gerRdrName because that makes an Exact RdrName
+	-- We can't use gerRdrName because that makes an Exact  RdrName
 	-- and we can't put them in the LocalRdrEnv
 
 	-- Give a signature to the bound variable, so 
 	-- that the case expression generated by getTag is
 	-- monomorphic.  In the push-enter model we get better code.
-    get_tag_rhs = ExprWithTySig 
-			(HsLam (mkSimpleHsAlt (VarPat a_RDR) 
-					      (HsApp (HsVar getTag_RDR) a_Expr)))
-			(mkExplicitHsForAllTy (map UserTyVar tvs) [] con2tag_ty)
+    get_tag_rhs = noLoc $ ExprWithTySig 
+			(nlHsLam (mkSimpleHsAlt (nlVarPat a_RDR) 
+					      (nlHsApp (nlHsVar getTag_RDR) a_Expr)))
+			(noLoc (mkExplicitHsForAllTy (map (noLoc.UserTyVar) tvs) (noLoc []) con2tag_ty))
 
-    con2tag_ty = foldl HsAppTy (HsTyVar (getRdrName tycon)) 
-		       (map HsTyVar tvs)
-		`HsFunTy` 
-		HsTyVar (getRdrName intPrimTyCon)
+    con2tag_ty = foldl nlHsAppTy (nlHsTyVar (getRdrName tycon)) 
+		       (map nlHsTyVar tvs)
+		`nlHsFunTy` 
+		nlHsTyVar (getRdrName intPrimTyCon)
 
     lots_of_constructors = tyConFamilySize tycon > mAX_FAMILY_SIZE_FOR_VEC_RETURNS
 
-    mk_stuff :: DataCon -> ([RdrNamePat], RdrNameHsExpr)
-    mk_stuff con = ([mkWildConPat con], 
-		    HsLit (HsIntPrim (toInteger ((dataConTag con) - fIRST_TAG))))
+    mk_stuff :: DataCon -> ([LPat RdrName], LHsExpr RdrName)
+    mk_stuff con = ([nlWildConPat con], 
+		    nlHsLit (HsIntPrim (toInteger ((dataConTag con) - fIRST_TAG))))
 
 gen_tag_n_con_monobind (rdr_name, tycon, GenTag2Con)
-  = mk_FunMonoBind (getSrcLoc tycon) rdr_name 
-	[([mkConPat intDataCon_RDR [a_RDR]], 
-	   ExprWithTySig (HsApp (HsVar tagToEnum_RDR) a_Expr) 
-			 (HsTyVar (getRdrName tycon)))]
+  = mk_FunBind (getSrcSpan tycon) rdr_name 
+	[([nlConVarPat intDataCon_RDR [a_RDR]], 
+	   noLoc (ExprWithTySig (nlHsApp (nlHsVar tagToEnum_RDR) a_Expr) 
+			 (nlHsTyVar (getRdrName tycon))))]
 
 gen_tag_n_con_monobind (rdr_name, tycon, GenMaxTag)
-  = mkVarMonoBind (getSrcLoc tycon) rdr_name 
-		  (HsApp (HsVar intDataCon_RDR) (HsLit (HsIntPrim max_tag)))
+  = mkVarBind (getSrcSpan tycon) rdr_name 
+		  (nlHsApp (nlHsVar intDataCon_RDR) (nlHsLit (HsIntPrim max_tag)))
   where
     max_tag =  case (tyConDataCons tycon) of
 		 data_cons -> toInteger ((length data_cons) - fIRST_TAG)
@@ -1201,95 +1201,39 @@ gen_tag_n_con_monobind (rdr_name, tycon, GenMaxTag)
 %*									*
 %************************************************************************
 
-@mk_easy_FunMonoBind fun pats binds expr@ generates:
-\begin{verbatim}
-    fun pat1 pat2 ... patN = expr where binds
-\end{verbatim}
-
-@mk_FunMonoBind fun [([p1a, p1b, ...], e1), ...]@ is for
-multi-clause definitions; it generates:
-\begin{verbatim}
-    fun p1a p1b ... p1N = e1
-    fun p2a p2b ... p2N = e2
-    ...
-    fun pMa pMb ... pMN = eM
-\end{verbatim}
-
-\begin{code}
-mkVarMonoBind :: SrcLoc -> RdrName -> RdrNameHsExpr -> RdrNameMonoBinds
-mkVarMonoBind loc var rhs = mk_easy_FunMonoBind loc var [] [] rhs
-
-mk_easy_FunMonoBind :: SrcLoc -> RdrName -> [RdrNamePat]
-		    -> [RdrNameMonoBinds] -> RdrNameHsExpr
-		    -> RdrNameMonoBinds
-
-mk_easy_FunMonoBind loc fun pats binds expr
-  = FunMonoBind fun False{-not infix-} [mk_easy_Match loc pats binds expr] loc
-
-mk_easy_Match loc pats binds expr
-  = mk_match loc pats expr (mkMonoBind Recursive (andMonoBindList binds))
-	-- The renamer expects everything in its input to be a
-	-- "recursive" MonoBinds, and it is its job to sort things out
-	-- from there.
-
-mk_FunMonoBind	:: SrcLoc -> RdrName
-		-> [([RdrNamePat], RdrNameHsExpr)]
-		-> RdrNameMonoBinds
-
-mk_FunMonoBind loc fun [] = panic "TcGenDeriv:mk_FunMonoBind"
-mk_FunMonoBind loc fun pats_and_exprs
-  = FunMonoBind fun False{-not infix-}
-		[ mk_match loc p e EmptyBinds | (p,e) <-pats_and_exprs ]
-		loc
-
-mk_match loc pats expr binds
-  = Match (map paren pats) Nothing 
-	  (GRHSs (unguardedRHS expr loc) binds placeHolderType)
-  where
-    paren p@(VarPat _) = p
-    paren other_p      = ParPat other_p
-
-mkWildConPat :: DataCon -> Pat RdrName
-mkWildConPat con = ConPatIn (getRdrName con) (PrefixCon (nOfThem (dataConSourceArity con) wildPat))
-
-wildPat :: Pat id
-wildPat  = WildPat placeHolderType	-- Pre-typechecking
-\end{code}
 
 ToDo: Better SrcLocs.
 
 \begin{code}
 compare_gen_Case ::
-	  RdrNameHsExpr	-- What to do for equality
-	  -> RdrNameHsExpr -> RdrNameHsExpr
-	  -> RdrNameHsExpr
+	  LHsExpr RdrName	-- What to do for equality
+	  -> LHsExpr RdrName -> LHsExpr RdrName
+	  -> LHsExpr RdrName
 careful_compare_Case :: -- checks for primitive types...
 	  TyCon			-- The tycon we are deriving for
 	  -> Type
-	  -> RdrNameHsExpr	-- What to do for equality
-	  -> RdrNameHsExpr -> RdrNameHsExpr
-	  -> RdrNameHsExpr
+	  -> LHsExpr RdrName	-- What to do for equality
+	  -> LHsExpr RdrName -> LHsExpr RdrName
+	  -> LHsExpr RdrName
 
-cmp_eq_Expr a b = HsApp (HsApp (HsVar cmp_eq_RDR) a) b
+cmp_eq_Expr a b = nlHsApp (nlHsApp (nlHsVar cmp_eq_RDR) a) b
 	-- Was: compare_gen_Case cmp_eq_RDR
 
-compare_gen_Case (HsVar eq_tag) a b | eq_tag == eqTag_RDR
-  = HsApp (HsApp (HsVar compare_RDR) a) b	-- Simple case 
+compare_gen_Case (L _ (HsVar eq_tag)) a b | eq_tag == eqTag_RDR
+  = nlHsApp (nlHsApp (nlHsVar compare_RDR) a) b	-- Simple case 
 compare_gen_Case eq a b				-- General case
-  = HsCase (HsPar (HsApp (HsApp (HsVar compare_RDR) a) b)) {-of-}
-      [mkSimpleHsAlt (mkNullaryConPat ltTag_RDR) ltTag_Expr,
-       mkSimpleHsAlt (mkNullaryConPat eqTag_RDR) eq,
-       mkSimpleHsAlt (mkNullaryConPat gtTag_RDR) gtTag_Expr]
-      generatedSrcLoc
+  = nlHsCase (nlHsPar (nlHsApp (nlHsApp (nlHsVar compare_RDR) a) b)) {-of-}
+      [mkSimpleHsAlt (nlNullaryConPat ltTag_RDR) ltTag_Expr,
+       mkSimpleHsAlt (nlNullaryConPat eqTag_RDR) eq,
+       mkSimpleHsAlt (nlNullaryConPat gtTag_RDR) gtTag_Expr]
 
 careful_compare_Case tycon ty eq a b
   | not (isUnLiftedType ty)
   = compare_gen_Case eq a b
   | otherwise      -- We have to do something special for primitive things...
-  = HsIf (genOpApp a relevant_eq_op b)
+  = nlHsIf (genOpApp a relevant_eq_op b)
 	 eq
-	 (HsIf (genOpApp a relevant_lt_op b) ltTag_Expr gtTag_Expr generatedSrcLoc)
-	 generatedSrcLoc
+	 (nlHsIf (genOpApp a relevant_lt_op b) ltTag_Expr gtTag_Expr)
   where
     relevant_eq_op = primOpRdrName (assoc_ty_id "Ord" tycon eq_op_tbl ty)
     relevant_lt_op = primOpRdrName (assoc_ty_id "Ord" tycon lt_op_tbl ty)
@@ -1297,11 +1241,11 @@ careful_compare_Case tycon ty eq a b
 
 box_if_necy :: String		-- The class involved
 	    -> TyCon		-- The tycon involved
-	    -> RdrNameHsExpr	-- The argument
+	    -> LHsExpr RdrName	-- The argument
 	    -> Type		-- The argument type
-	    -> RdrNameHsExpr	-- Boxed version of the arg
+	    -> LHsExpr RdrName	-- Boxed version of the arg
 box_if_necy cls_str tycon arg arg_ty
-  | isUnLiftedType arg_ty = HsApp (HsVar box_con) arg
+  | isUnLiftedType arg_ty = nlHsApp (nlHsVar box_con) arg
   | otherwise		  = arg
   where
     box_con = assoc_ty_id cls_str tycon box_con_tbl arg_ty
@@ -1349,12 +1293,12 @@ box_con_tbl =
 
 -----------------------------------------------------------------------
 
-and_Expr :: RdrNameHsExpr -> RdrNameHsExpr -> RdrNameHsExpr
+and_Expr :: LHsExpr RdrName -> LHsExpr RdrName -> LHsExpr RdrName
 and_Expr a b = genOpApp a and_RDR    b
 
 -----------------------------------------------------------------------
 
-eq_Expr :: TyCon -> Type -> RdrNameHsExpr -> RdrNameHsExpr -> RdrNameHsExpr
+eq_Expr :: TyCon -> Type -> LHsExpr RdrName -> LHsExpr RdrName -> LHsExpr RdrName
 eq_Expr tycon ty a b = genOpApp a eq_op b
  where
    eq_op
@@ -1365,78 +1309,81 @@ eq_Expr tycon ty a b = genOpApp a eq_op b
 \end{code}
 
 \begin{code}
-untag_Expr :: TyCon -> [(RdrName, RdrName)] -> RdrNameHsExpr -> RdrNameHsExpr
+untag_Expr :: TyCon -> [( RdrName,  RdrName)] -> LHsExpr RdrName -> LHsExpr RdrName
 untag_Expr tycon [] expr = expr
 untag_Expr tycon ((untag_this, put_tag_here) : more) expr
-  = HsCase (HsPar (mkHsVarApps (con2tag_RDR tycon) [untag_this])) {-of-}
-      [mkSimpleHsAlt (VarPat put_tag_here) (untag_Expr tycon more expr)]
-      generatedSrcLoc
+  = nlHsCase (nlHsPar (nlHsVarApps (con2tag_RDR tycon) [untag_this])) {-of-}
+      [mkSimpleHsAlt (nlVarPat put_tag_here) (untag_Expr tycon more expr)]
 
-cmp_tags_Expr :: RdrName 		-- Comparison op
-	     -> RdrName -> RdrName	-- Things to compare
-	     -> RdrNameHsExpr 		-- What to return if true
-	     -> RdrNameHsExpr		-- What to return if false
-	     -> RdrNameHsExpr
+cmp_tags_Expr ::  RdrName 		-- Comparison op
+	     ->  RdrName ->  RdrName	-- Things to compare
+	     -> LHsExpr RdrName 		-- What to return if true
+	     -> LHsExpr RdrName		-- What to return if false
+	     -> LHsExpr RdrName
 
 cmp_tags_Expr op a b true_case false_case
-  = HsIf (genOpApp (HsVar a) op (HsVar b)) true_case false_case generatedSrcLoc
+  = nlHsIf (genOpApp (nlHsVar a) op (nlHsVar b)) true_case false_case
 
 enum_from_to_Expr
-	:: RdrNameHsExpr -> RdrNameHsExpr
-	-> RdrNameHsExpr
+	:: LHsExpr RdrName -> LHsExpr RdrName
+	-> LHsExpr RdrName
 enum_from_then_to_Expr
-	:: RdrNameHsExpr -> RdrNameHsExpr -> RdrNameHsExpr
-	-> RdrNameHsExpr
+	:: LHsExpr RdrName -> LHsExpr RdrName -> LHsExpr RdrName
+	-> LHsExpr RdrName
 
-enum_from_to_Expr      f   t2 = HsApp (HsApp (HsVar enumFromTo_RDR) f) t2
-enum_from_then_to_Expr f t t2 = HsApp (HsApp (HsApp (HsVar enumFromThenTo_RDR) f) t) t2
+enum_from_to_Expr      f   t2 = nlHsApp (nlHsApp (nlHsVar enumFromTo_RDR) f) t2
+enum_from_then_to_Expr f t t2 = nlHsApp (nlHsApp (nlHsApp (nlHsVar enumFromThenTo_RDR) f) t) t2
 
 showParen_Expr
-	:: RdrNameHsExpr -> RdrNameHsExpr
-	-> RdrNameHsExpr
+	:: LHsExpr RdrName -> LHsExpr RdrName
+	-> LHsExpr RdrName
 
-showParen_Expr e1 e2 = HsApp (HsApp (HsVar showParen_RDR) e1) e2
+showParen_Expr e1 e2 = nlHsApp (nlHsApp (nlHsVar showParen_RDR) e1) e2
 
-nested_compose_Expr :: [RdrNameHsExpr] -> RdrNameHsExpr
+nested_compose_Expr :: [LHsExpr RdrName] -> LHsExpr RdrName
 
 nested_compose_Expr [e] = parenify e
 nested_compose_Expr (e:es)
-  = HsApp (HsApp (HsVar compose_RDR) (parenify e)) (nested_compose_Expr es)
+  = nlHsApp (nlHsApp (nlHsVar compose_RDR) (parenify e)) (nested_compose_Expr es)
 
 -- impossible_Expr is used in case RHSs that should never happen.
 -- We generate these to keep the desugarer from complaining that they *might* happen!
-impossible_Expr = HsApp (HsVar error_RDR) (HsLit (HsString (mkFastString "Urk! in TcGenDeriv")))
+impossible_Expr = nlHsApp (nlHsVar error_RDR) (nlHsLit (mkHsString "Urk! in TcGenDeriv"))
 
 -- illegal_Expr is used when signalling error conditions in the RHS of a derived
 -- method. It is currently only used by Enum.{succ,pred}
 illegal_Expr meth tp msg = 
-   HsApp (HsVar error_RDR) (HsLit (HsString (mkFastString (meth ++ '{':tp ++ "}: " ++ msg))))
+   nlHsApp (nlHsVar error_RDR) (nlHsLit (mkHsString (meth ++ '{':tp ++ "}: " ++ msg)))
 
 -- illegal_toEnum_tag is an extended version of illegal_Expr, which also allows you
 -- to include the value of a_RDR in the error string.
 illegal_toEnum_tag tp maxtag =
-   HsApp (HsVar error_RDR) 
-         (HsApp (HsApp (HsVar append_RDR)
-	               (HsLit (HsString (mkFastString ("toEnum{" ++ tp ++ "}: tag (")))))
-	               (HsApp (HsApp (HsApp 
-		           (HsVar showsPrec_RDR)
-			   (mkHsIntLit 0))
-   		           (HsVar a_RDR))
-			   (HsApp (HsApp 
-			       (HsVar append_RDR)
-			       (HsLit (HsString (mkFastString ") is outside of enumeration's range (0,"))))
-			       (HsApp (HsApp (HsApp 
-					(HsVar showsPrec_RDR)
-				        (mkHsIntLit 0))
-					(HsVar maxtag))
-					(HsLit (HsString (mkFastString ")")))))))
+   nlHsApp (nlHsVar error_RDR) 
+           (nlHsApp (nlHsApp (nlHsVar append_RDR)
+	               (nlHsLit (mkHsString ("toEnum{" ++ tp ++ "}: tag ("))))
+	            (nlHsApp (nlHsApp (nlHsApp 
+		           (nlHsVar showsPrec_RDR)
+			   (nlHsIntLit 0))
+   		           (nlHsVar a_RDR))
+			   (nlHsApp (nlHsApp 
+			       (nlHsVar append_RDR)
+			       (nlHsLit (mkHsString ") is outside of enumeration's range (0,")))
+			       (nlHsApp (nlHsApp (nlHsApp 
+					(nlHsVar showsPrec_RDR)
+				        (nlHsIntLit 0))
+					(nlHsVar maxtag))
+					(nlHsLit (mkHsString ")"))))))
 
-parenify e@(HsVar _) = e
-parenify e	     = HsPar e
+parenify e@(L _ (HsVar _)) = e
+parenify e	           = mkHsPar e
 
 -- genOpApp wraps brackets round the operator application, so that the
 -- renamer won't subsequently try to re-associate it. 
-genOpApp e1 op e2 = HsPar (mkHsOpApp e1 op e2)
+genOpApp e1 op e2 = nlHsPar (nlHsOpApp e1 op e2)
+\end{code}
+
+\begin{code}
+getSrcSpan = srcLocSpan . getSrcLoc
 \end{code}
 
 \begin{code}
@@ -1457,22 +1404,22 @@ as_RDRs		= [ mkVarUnqual (mkFastString ("a"++show i)) | i <- [(1::Int) .. ] ]
 bs_RDRs		= [ mkVarUnqual (mkFastString ("b"++show i)) | i <- [(1::Int) .. ] ]
 cs_RDRs		= [ mkVarUnqual (mkFastString ("c"++show i)) | i <- [(1::Int) .. ] ]
 
-a_Expr		= HsVar a_RDR
-b_Expr		= HsVar b_RDR
-c_Expr		= HsVar c_RDR
-ltTag_Expr	= HsVar ltTag_RDR
-eqTag_Expr	= HsVar eqTag_RDR
-gtTag_Expr	= HsVar gtTag_RDR
-false_Expr	= HsVar false_RDR
-true_Expr	= HsVar true_RDR
+a_Expr		= nlHsVar a_RDR
+b_Expr		= nlHsVar b_RDR
+c_Expr		= nlHsVar c_RDR
+ltTag_Expr	= nlHsVar ltTag_RDR
+eqTag_Expr	= nlHsVar eqTag_RDR
+gtTag_Expr	= nlHsVar gtTag_RDR
+false_Expr	= nlHsVar false_RDR
+true_Expr	= nlHsVar true_RDR
 
-a_Pat		= VarPat a_RDR
-b_Pat		= VarPat b_RDR
-c_Pat		= VarPat c_RDR
-d_Pat		= VarPat d_RDR
+a_Pat		= nlVarPat a_RDR
+b_Pat		= nlVarPat b_RDR
+c_Pat		= nlVarPat c_RDR
+d_Pat		= nlVarPat d_RDR
 
-con2tag_RDR, tag2con_RDR, maxtag_RDR :: TyCon -> RdrName
--- Generates Orig RdrNames, for the binding positions
+con2tag_RDR, tag2con_RDR, maxtag_RDR :: TyCon ->  RdrName
+-- Generates Orig s RdrName, for the binding positions
 con2tag_RDR tycon = mk_tc_deriv_name tycon "con2tag_"
 tag2con_RDR tycon = mk_tc_deriv_name tycon "tag2con_"
 maxtag_RDR  tycon = mk_tc_deriv_name tycon "maxtag_"
@@ -1486,7 +1433,7 @@ mk_tc_deriv_name tycon str
 		    new_str = str ++ occNameString tc_occ ++ "#"
 \end{code}
 
-RdrNames for PrimOps.  Can't be done in PrelNames, because PrimOp imports
+s RdrName for PrimOps.  Can't be done in PrelNames, because PrimOp imports
 PrelNames, so PrelNames can't import PrimOp.
 
 \begin{code}

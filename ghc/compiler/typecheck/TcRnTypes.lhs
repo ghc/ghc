@@ -30,7 +30,8 @@ module TcRnTypes(
 	ArrowCtxt(..), topArrowCtxt, ProcLevel, topProcLevel, 
 
 	-- Insts
-	Inst(..), InstOrigin(..), InstLoc(..), pprInstLoc, instLocSrcLoc,
+	Inst(..), InstOrigin(..), InstLoc(..), pprInstLoc, 
+	instLocSrcLoc, instLocSrcSpan,
 	LIE, emptyLIE, unitLIE, plusLIE, consLIE, 
 	plusLIEs, mkLIE, isEmptyLIE, lieToList, listToLIE,
 
@@ -40,8 +41,8 @@ module TcRnTypes(
 
 #include "HsVersions.h"
 
-import HsSyn		( PendingSplice, HsOverLit, MonoBinds, RuleDecl, ForeignDecl )
-import RnHsSyn		( RenamedPat, RenamedArithSeqInfo )
+import HsSyn		( PendingSplice, HsOverLit, LHsBind, LRuleDecl, LForeignDecl,
+			  Pat, ArithSeqInfo )
 import HscTypes		( FixityEnv,
 			  HscEnv, TypeEnv, TyThing, 
 			  Avails, GenAvailInfo(..), AvailInfo,
@@ -61,7 +62,7 @@ import Class		( Class )
 import Var		( Id, TyVar )
 import VarEnv		( TidyEnv )
 import Module
-import SrcLoc		( SrcLoc )
+import SrcLoc		( SrcSpan, SrcLoc, srcSpanStart )
 import VarSet		( IdSet )
 import ErrUtils		( Messages, Message )
 import UniqSupply	( UniqSupply )
@@ -179,11 +180,11 @@ data TcGblEnv
 		-- The next fields accumulate the payload of the module
 		-- The binds, rules and foreign-decl fiels are collected
 		-- initially in un-zonked form and are finally zonked in tcRnSrcDecls
-	tcg_binds   :: MonoBinds Id,		-- Value bindings in this module
+	tcg_binds   :: Bag (LHsBind Id),	-- Value bindings in this module
 	tcg_deprecs :: Deprecations,		-- ...Deprecations 
 	tcg_insts   :: [DFunId],		-- ...Instances
-	tcg_rules   :: [RuleDecl Id],		-- ...Rules
-	tcg_fords   :: [ForeignDecl Id]		-- ...Foreign import & exports
+	tcg_rules   :: [LRuleDecl Id],		-- ...Rules
+	tcg_fords   :: [LForeignDecl Id]	-- ...Foreign import & exports
     }
 \end{code}
 
@@ -253,7 +254,7 @@ Why?  Because they are now Ids not TcIds.  This final GlobalEnv is
 data TcLclEnv		-- Changes as we move inside an expression
 			-- Discarded after typecheck/rename; not passed on to desugarer
   = TcLclEnv {
-	tcl_loc  :: SrcLoc,		-- Source location
+	tcl_loc  :: SrcSpan,		-- Source span
 	tcl_ctxt :: ErrCtxt,		-- Error context
 	tcl_errs :: TcRef Messages,	-- Place to accumulate errors
 
@@ -714,16 +715,19 @@ It appears in TcMonad because there are a couple of error-message-generation
 functions that deal with it.
 
 \begin{code}
-data InstLoc = InstLoc InstOrigin SrcLoc ErrCtxt
+data InstLoc = InstLoc InstOrigin SrcSpan ErrCtxt
 
 instLocSrcLoc :: InstLoc -> SrcLoc
-instLocSrcLoc (InstLoc _ src_loc _) = src_loc
+instLocSrcLoc (InstLoc _ src_span _) = srcSpanStart src_span
+
+instLocSrcSpan :: InstLoc -> SrcSpan
+instLocSrcSpan (InstLoc _ src_span _) = src_span
 
 data InstOrigin
   = OccurrenceOf Name		-- Occurrence of an overloaded identifier
 
-  | IPOcc (IPName Name)		-- Occurrence of an implicit parameter
-  | IPBind (IPName Name)	-- Binding site of an implicit parameter
+  | IPOccOrigin  (IPName Name)	-- Occurrence of an implicit parameter
+  | IPBindOrigin (IPName Name)	-- Binding site of an implicit parameter
 
   | RecordUpdOrigin
 
@@ -733,10 +737,10 @@ data InstOrigin
 
   | LiteralOrigin HsOverLit	-- Occurrence of a literal
 
-  | PatOrigin RenamedPat
+  | PatOrigin (Pat Name)
 
-  | ArithSeqOrigin RenamedArithSeqInfo -- [x..], [x..y] etc
-  | PArrSeqOrigin  RenamedArithSeqInfo -- [:x..y:] and [:x,y..z:]
+  | ArithSeqOrigin (ArithSeqInfo Name) -- [x..], [x..y] etc
+  | PArrSeqOrigin  (ArithSeqInfo Name) -- [:x..y:] and [:x,y..z:]
 
   | SignatureOrigin		-- A dict created from a type signature
   | Rank2Origin			-- A dict created when typechecking the argument
@@ -772,9 +776,9 @@ pprInstLoc (InstLoc orig locn ctxt)
   where
     pp_orig (OccurrenceOf name)
       	= hsep [ptext SLIT("use of"), quotes (ppr name)]
-    pp_orig (IPOcc name)
+    pp_orig (IPOccOrigin name)
       	= hsep [ptext SLIT("use of implicit parameter"), quotes (ppr name)]
-    pp_orig (IPBind name)
+    pp_orig (IPBindOrigin name)
       	= hsep [ptext SLIT("binding for implicit parameter"), quotes (ppr name)]
     pp_orig RecordUpdOrigin
 	= ptext SLIT("a record update")

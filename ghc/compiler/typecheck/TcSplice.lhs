@@ -17,14 +17,12 @@ import qualified Language.Haskell.TH.THSyntax as TH
 -- THSyntax gives access to internal functions and data types
 
 import HscTypes		( HscEnv(..) )
-import HsSyn		( HsBracket(..), HsExpr(..) )
+import HsSyn		( HsBracket(..), HsExpr(..), LHsExpr, LHsDecl )
 import Convert		( convertToHsExpr, convertToHsDecls )
-import RnExpr		( rnExpr )
+import RnExpr		( rnLExpr )
 import RnEnv		( lookupFixityRn )
-import RdrHsSyn		( RdrNameHsExpr, RdrNameHsDecl )
-import RnHsSyn		( RenamedHsExpr )
 import TcExpr		( tcCheckRho, tcMonoExpr )
-import TcHsSyn		( TcExpr, TypecheckedHsExpr, mkHsLet, zonkTopExpr )
+import TcHsSyn		( mkHsLet, zonkTopLExpr )
 import TcSimplify	( tcSimplifyTop, tcSimplifyBracket )
 import TcUnify		( Expected, zapExpectedTo, zapExpectedType )
 import TcType		( TcType, openTypeKind, mkAppTy, tcSplitSigmaTy )
@@ -34,7 +32,8 @@ import TcHsType		( tcHsSigType )
 import TypeRep		( Type(..), PredType(..), TyThing(..) )	-- For reification
 import Name		( Name, NamedThing(..), nameOccName, nameModule, isExternalName )
 import OccName
-import Var		( TyVar, idType )
+import Var		( Id, TyVar, idType )
+import RdrName		( RdrName )
 import Module		( moduleUserString, mkModuleName )
 import TcRnMonad
 import IfaceEnv		( lookupOrig )
@@ -48,16 +47,18 @@ import IdInfo		( GlobalIdDetails(..) )
 import TysWiredIn	( mkListTy )
 import DsMeta		( expQTyConName, typeQTyConName, decTyConName, qTyConName, nameTyConName )
 import ErrUtils		( Message )
+import SrcLoc		( noLoc, unLoc )
 import Outputable
 import Unique		( Unique, Uniquable(..), getKey )
 import IOEnv		( IOEnv )
 import BasicTypes	( StrictnessMark(..), Fixity(..), FixityDirection(..) )
 import Module		( moduleUserString )
 import Panic		( showException )
-import GHC.Base		( unsafeCoerce#, Int(..) )	-- Should have a better home in the module hierarchy
-import Monad 		( liftM )
 import FastString	( LitString )
 import FastTypes	( iBox )
+
+import GHC.Base		( unsafeCoerce#, Int(..) )	-- Should have a better home in the module hierarchy
+import Monad 		( liftM )
 \end{code}
 
 
@@ -68,12 +69,12 @@ import FastTypes	( iBox )
 %************************************************************************
 
 \begin{code}
-tcSpliceDecls :: RenamedHsExpr -> TcM [RdrNameHsDecl]
+tcSpliceDecls :: LHsExpr Name -> TcM [LHsDecl RdrName]
 
 tcSpliceExpr :: Name 
-	     -> RenamedHsExpr
+	     -> LHsExpr Name
 	     -> Expected TcType
-	     -> TcM TcExpr
+	     -> TcM (HsExpr Id)
 
 #ifndef GHCI
 tcSpliceExpr n e ty = pprPanic "Cant do tcSpliceExpr without GHCi" (ppr e)
@@ -88,7 +89,7 @@ tcSpliceDecls e     = pprPanic "Cant do tcSpliceDecls without GHCi" (ppr e)
 %************************************************************************
 
 \begin{code}
-tcBracket :: HsBracket Name -> Expected TcType -> TcM TcExpr
+tcBracket :: HsBracket Name -> Expected TcType -> TcM (LHsExpr Id)
 tcBracket brack res_ty
   = getStage 				`thenM` \ level ->
     case bracketOK level of {
@@ -111,7 +112,7 @@ tcBracket brack res_ty
 
 	-- Return the original expression, not the type-decorated one
     readMutVar pending_splices		`thenM` \ pendings ->
-    returnM (HsBracketOut brack pendings)
+    returnM (noLoc (HsBracketOut brack pendings))
     }
 
 tc_bracket :: HsBracket Name -> TcM TcType
@@ -156,7 +157,8 @@ tcSpliceExpr name expr res_ty
 	Just next_level -> 
 
     case level of {
-	Comp 		       -> tcTopSplice expr res_ty ;
+	Comp 		       -> do { e <- tcTopSplice expr res_ty ;
+				       returnM (unLoc e) };
 	Brack _ ps_var lie_var ->  
 
 	-- A splice inside brackets
@@ -186,6 +188,7 @@ tcSpliceExpr name expr res_ty
 -- The recursive call to tcMonoExpr will simply expand the 
 -- inner escape before dealing with the outer one
 
+tcTopSplice :: LHsExpr Name -> Expected TcType -> TcM (LHsExpr Id)
 tcTopSplice expr res_ty
   = tcMetaTy expQTyConName		`thenM` \ meta_exp_ty ->
 
@@ -199,7 +202,7 @@ tcTopSplice expr res_ty
     let 
 	-- simple_expr :: TH.Exp
 
-	expr2 :: RdrNameHsExpr
+	expr2 :: LHsExpr RdrName
 	expr2 = convertToHsExpr simple_expr 
     in
     traceTc (text "Got result" <+> ppr expr2) 	`thenM_`
@@ -209,12 +212,12 @@ tcTopSplice expr res_ty
 
 	-- Rename it, but bale out if there are errors
 	-- otherwise the type checker just gives more spurious errors
-    checkNoErrs (rnExpr expr2)			`thenM` \ (exp3, fvs) ->
+    checkNoErrs (rnLExpr expr2)			`thenM` \ (exp3, fvs) ->
 
     tcMonoExpr exp3 res_ty
 
 
-tcTopSpliceExpr :: RenamedHsExpr -> TcType -> TcM TypecheckedHsExpr
+tcTopSpliceExpr :: LHsExpr Name -> TcType -> TcM (LHsExpr Id)
 -- Type check an expression that is the body of a top-level splice
 --   (the caller will compile and run it)
 tcTopSpliceExpr expr meta_ty
@@ -230,7 +233,7 @@ tcTopSpliceExpr expr meta_ty
     tcSimplifyTop lie			`thenM` \ const_binds ->
 	
 	-- And zonk it
-    zonkTopExpr (mkHsLet const_binds expr')
+    zonkTopLExpr (mkHsLet const_binds expr')
 \end{code}
 
 
@@ -276,15 +279,15 @@ tcSpliceDecls expr
 %************************************************************************
 
 \begin{code}
-runMetaE :: TypecheckedHsExpr 	-- Of type (Q Exp)
+runMetaE :: LHsExpr Id 	-- Of type (Q Exp)
 	 -> TcM TH.Exp	-- Of type Exp
 runMetaE e = runMeta e
 
-runMetaD :: TypecheckedHsExpr 	-- Of type Q [Dec]
+runMetaD :: LHsExpr Id 	-- Of type Q [Dec]
 	 -> TcM [TH.Dec]	-- Of type [Dec]
 runMetaD e = runMeta e
 
-runMeta :: TypecheckedHsExpr 	-- Of type X
+runMeta :: LHsExpr Id 	-- Of type X
 	-> TcM t		-- Of type t
 runMeta expr
   = do	{ hsc_env <- getTopEnv
@@ -336,9 +339,9 @@ instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
 %************************************************************************
 
 \begin{code}
-showSplice :: String -> TypecheckedHsExpr -> SDoc -> TcM ()
+showSplice :: String -> LHsExpr Id -> SDoc -> TcM ()
 showSplice what before after
-  = getSrcLocM		`thenM` \ loc ->
+  = getSrcSpanM		`thenM` \ loc ->
     traceSplice (vcat [ppr loc <> colon <+> text "Splicing" <+> text what, 
 		       nest 2 (sep [nest 2 (ppr before),
 				    text "======>",

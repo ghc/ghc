@@ -8,7 +8,7 @@ module TcDefaults ( tcDefaults ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( DefaultDecl(..) )
+import HsSyn		( DefaultDecl(..), LDefaultDecl )
 import Name		( Name )
 import TcRnMonad
 import TcEnv		( tcLookupClass )
@@ -16,11 +16,12 @@ import TcHsType		( tcHsSigType, UserTypeCtxt( DefaultDeclCtxt ) )
 import TcSimplify	( tcSimplifyDefault )
 import TcType           ( Type, mkClassPred, isTauTy )
 import PrelNames	( numClassName )
+import SrcLoc		( Located(..) )
 import Outputable
 \end{code}
 
 \begin{code}
-tcDefaults :: [DefaultDecl Name]
+tcDefaults :: [LDefaultDecl Name]
 	   -> TcM (Maybe [Type])    -- Defaulting types to heave
 				    -- into Tc monad for later use
 				    -- in Disambig.
@@ -37,11 +38,11 @@ tcDefaults []
 	-- one group, only for the next group to ignore them and install
 	-- defaultDefaultTys
 
-tcDefaults [DefaultDecl [] locn]
+tcDefaults [L locn (DefaultDecl [])]
   = returnM (Just [])		-- Default declaration specifying no types
 
-tcDefaults [DefaultDecl mono_tys locn]
-  = addSrcLoc locn 			$
+tcDefaults [L locn (DefaultDecl mono_tys)]
+  = addSrcSpan locn 			$
     addErrCtxt defaultDeclCtxt		$
     tcLookupClass numClassName		`thenM` \ num_class ->
     mappM tc_default_ty mono_tys	`thenM` \ tau_tys ->
@@ -52,8 +53,8 @@ tcDefaults [DefaultDecl mono_tys locn]
     
     returnM (Just tau_tys)
 
-tcDefaults decls@(DefaultDecl _ loc : _) =
-    addSrcLoc loc $
+tcDefaults decls@(L locn (DefaultDecl _) : _) =
+    addSrcSpan locn $
     failWithTc (dupDefaultDeclErr decls)
 
 
@@ -66,11 +67,11 @@ defaultDeclCtxt =  ptext SLIT("when checking that each type in a default declara
 		    $$ ptext SLIT("is an instance of class Num")
 
 
-dupDefaultDeclErr (DefaultDecl _ locn1 : dup_things)
+dupDefaultDeclErr (L _ (DefaultDecl _) : dup_things)
   = hang (ptext SLIT("Multiple default declarations"))
       4  (vcat (map pp dup_things))
   where
-    pp (DefaultDecl _ locn) = ptext SLIT("here was another default declaration") <+> ppr locn
+    pp (L locn (DefaultDecl _)) = ptext SLIT("here was another default declaration") <+> ppr locn
 
 polyDefErr ty 
   = hang (ptext SLIT("Illegal polymorphic type in default declaration") <> colon) 4 (ppr ty) 

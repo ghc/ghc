@@ -11,7 +11,7 @@ module DsMonad (
 	newTyVarsDs, 
 	duplicateLocalDs, newSysLocalDs, newSysLocalsDs, newUniqueId,
 	newFailLocalDs,
-	getSrcLocDs, putSrcLocDs,
+	getSrcSpanDs, putSrcSpanDs,
 	getModuleDs,
 	newUnique, 
 	UniqSupply, newUniqueSupply,
@@ -27,8 +27,8 @@ module DsMonad (
 
 #include "HsVersions.h"
 
-import TcHsSyn		( TypecheckedPat, TypecheckedMatchContext, TypecheckedHsExpr )
 import TcRnMonad
+import HsSyn		( HsExpr, HsMatchContext, Pat )
 import IfaceEnv		( tcIfaceGlobal )
 import HscTypes		( TyThing(..), TypeEnv, HscEnv, 
 			  IsBootInterface,
@@ -41,7 +41,7 @@ import Id		( mkSysLocal, setIdUnique, Id )
 import Module		( Module, ModuleName, ModuleEnv )
 import Var		( TyVar, setTyVarUnique )
 import Outputable
-import SrcLoc		( noSrcLoc, SrcLoc )
+import SrcLoc		( noSrcSpan, SrcSpan )
 import Type             ( Type )
 import UniqSupply	( UniqSupply, uniqsFromSupply )
 import Name		( Name, nameOccName )
@@ -69,7 +69,10 @@ foldlDs  = foldlM
 mapAndUnzipDs = mapAndUnzipM
 
 
-type DsWarning = (SrcLoc, SDoc)
+type DsWarning = (SrcSpan, SDoc)
+	-- Not quite the same as a WarnMsg, we have an SDoc here 
+	-- and we'll do the print_unqual stuff later on to turn it
+	-- into a Doc.
 
 data DsGblEnv = DsGblEnv {
 	ds_mod	   :: Module,       		-- For SCC profiling
@@ -80,7 +83,7 @@ data DsGblEnv = DsGblEnv {
 
 data DsLclEnv = DsLclEnv {
 	ds_meta	   :: DsMetaEnv,	-- Template Haskell bindings
-	ds_loc	   :: SrcLoc		-- to put in pattern-matching error msgs
+	ds_loc	   :: SrcSpan		-- to put in pattern-matching error msgs
      }
 
 -- Inside [| |] brackets, the desugarer looks 
@@ -92,8 +95,8 @@ data DsMetaVal
 			-- Will be dynamically alpha renamed.
 			-- The Id has type THSyntax.Var
 
-   | Splice TypecheckedHsExpr	-- These bindings are introduced by
-				-- the PendingSplices on a HsBracketOut
+   | Splice (HsExpr Id)	-- These bindings are introduced by
+			-- the PendingSplices on a HsBracketOut
 
 -- initDs returns the UniqSupply out the end (not just the result)
 
@@ -111,7 +114,7 @@ initDs hsc_env mod type_env is_boot thing_inside
 				     ds_if_env = if_env, 
 				     ds_warns = warn_var }
 	      ; lcl_env = DsLclEnv { ds_meta = emptyNameEnv, 
-				     ds_loc = noSrcLoc } }
+				     ds_loc = noSrcSpan } }
 
 	; res <- initTcRnIf 'd' hsc_env gbl_env lcl_env thing_inside
 
@@ -158,7 +161,7 @@ newTyVarsDs tyvar_tmpls
 \end{code}
 
 We can also reach out and either set/grab location information from
-the @SrcLoc@ being carried around.
+the @SrcSpan@ being carried around.
 
 \begin{code}
 getDOptsDs :: DsM DynFlags
@@ -167,11 +170,11 @@ getDOptsDs = getDOpts
 getModuleDs :: DsM Module
 getModuleDs = do { env <- getGblEnv; return (ds_mod env) }
 
-getSrcLocDs :: DsM SrcLoc
-getSrcLocDs = do { env <- getLclEnv; return (ds_loc env) }
+getSrcSpanDs :: DsM SrcSpan
+getSrcSpanDs = do { env <- getLclEnv; return (ds_loc env) }
 
-putSrcLocDs :: SrcLoc -> DsM a -> DsM a
-putSrcLocDs new_loc thing_inside = updLclEnv (\ env -> env {ds_loc = new_loc}) thing_inside
+putSrcSpanDs :: SrcSpan -> DsM a -> DsM a
+putSrcSpanDs new_loc thing_inside = updLclEnv (\ env -> env {ds_loc = new_loc}) thing_inside
 
 dsWarn :: DsWarning -> DsM ()
 dsWarn (loc,warn) = do { env <- getGblEnv; updMutVar (ds_warns env) (`snocBag` (loc,msg)) }
@@ -221,7 +224,7 @@ dsExtendMetaEnv menv thing_inside
 
 \begin{code}
 data DsMatchContext
-  = DsMatchContext TypecheckedMatchContext [TypecheckedPat] SrcLoc
+  = DsMatchContext (HsMatchContext Name) [Pat Id] SrcSpan
   | NoMatchContext
   deriving ()
 \end{code}

@@ -20,7 +20,7 @@ module TcTyDecls(
 #include "HsVersions.h"
 
 import TypeRep          ( Type(..), TyNote(..), PredType(..) )  -- friend
-import HsSyn		( TyClDecl(..), HsPred(..) )
+import HsSyn		( TyClDecl(..), HsPred(..), LTyClDecl )
 import RnHsSyn		( extractHsTyNames )
 import Type		( predTypeRep )
 import BuildTyCl	( newTyConRhs )
@@ -37,6 +37,7 @@ import NameEnv
 import NameSet
 import Digraph 		( SCC(..), stronglyConnComp, stronglyConnCompR )
 import BasicTypes	( RecFlag(..) )
+import SrcLoc		( Located(..) )
 import Outputable
 \end{code}
 
@@ -106,18 +107,25 @@ synTyConsOfType ty
 ---------------------------------------- END NOTE ]
 
 \begin{code}
-calcCycleErrs :: [TyClDecl Name] -> ([[Name]],	-- Recursive type synonym groups
+calcCycleErrs :: [LTyClDecl Name] -> ([[Name]],	-- Recursive type synonym groups
 			             [[Name]])	-- Ditto classes
 calcCycleErrs decls
   = (findCyclics syn_edges, findCyclics cls_edges)
   where
 	--------------- Type synonyms ----------------------
-    syn_edges 	     = [ (name, mk_syn_edges rhs) | TySynonym { tcdName = name, tcdSynRhs = rhs } <- decls ]
-    mk_syn_edges rhs = [ tc | tc <- nameSetToList (extractHsTyNames rhs), not (isTyVarName tc) ]
+    syn_edges 	     = [ (name, mk_syn_edges rhs) | 
+			  L _ (TySynonym { tcdLName  = L _ name, 
+					   tcdSynRhs = rhs }) <- decls ]
+
+    mk_syn_edges rhs = [ tc | tc <- nameSetToList (extractHsTyNames rhs), 
+			      not (isTyVarName tc) ]
 
 	--------------- Classes ----------------------
-    cls_edges = [ (name, mk_cls_edges ctxt) | ClassDecl { tcdName = name, tcdCtxt = ctxt } <- decls ]
-    mk_cls_edges ctxt = [ cls | HsClassP cls _ <- ctxt ]
+    cls_edges = [ (name, mk_cls_edges ctxt) | 
+		  L _ (ClassDecl { tcdLName = L _ name, 
+			           tcdCtxt  = L _ ctxt }) <- decls ]
+
+    mk_cls_edges ctxt = [ cls | L _ (HsClassP cls _) <- ctxt ]
 \end{code}
 
 

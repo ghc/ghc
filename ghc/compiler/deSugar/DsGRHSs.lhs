@@ -8,13 +8,14 @@ module DsGRHSs ( dsGuarded, dsGRHSs ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} DsExpr  ( dsExpr, dsLet )
+import {-# SOURCE #-} DsExpr  ( dsLExpr, dsLet )
 import {-# SOURCE #-} Match   ( matchSinglePat )
 
-import HsSyn		( Stmt(..), HsExpr(..), GRHSs(..), GRHS(..), HsMatchContext(..) )
-import TcHsSyn		( TypecheckedGRHSs, TypecheckedPat, TypecheckedStmt, TypecheckedMatchContext )
+import HsSyn		( Stmt(..), HsExpr(..), GRHSs(..), GRHS(..), 
+			  HsMatchContext(..), Pat(..), LStmt )
 import CoreSyn		( CoreExpr )
 import Type		( Type )
+import Var		( Id )
 
 import DsMonad
 import DsUtils
@@ -22,6 +23,8 @@ import Unique		( Uniquable(..) )
 import PrelInfo		( nON_EXHAUSTIVE_GUARDS_ERROR_ID )
 import TysWiredIn	( trueDataConId )
 import PrelNames	( otherwiseIdKey, hasKey )
+import Name		( Name )
+import SrcLoc		( unLoc, Located(..) )
 \end{code}
 
 @dsGuarded@ is used for both @case@ expressions and pattern bindings.
@@ -36,7 +39,7 @@ producing an expression with a runtime error in the corner if
 necessary.  The type argument gives the type of the @ei@.
 
 \begin{code}
-dsGuarded :: TypecheckedGRHSs -> DsM CoreExpr
+dsGuarded :: GRHSs Id -> DsM CoreExpr
 
 dsGuarded grhss
   = dsGRHSs PatBindRhs [] grhss 				`thenDs` \ (err_ty, match_result) ->
@@ -47,8 +50,8 @@ dsGuarded grhss
 In contrast, @dsGRHSs@ produces a @MatchResult@.
 
 \begin{code}
-dsGRHSs :: TypecheckedMatchContext -> [TypecheckedPat]	-- These are to build a MatchContext from
-	-> TypecheckedGRHSs				-- Guarded RHSs
+dsGRHSs :: HsMatchContext Name -> [Pat Id]	-- These are to build a MatchContext from
+	-> GRHSs Id				-- Guarded RHSs
 	-> DsM (Type, MatchResult)
 
 dsGRHSs kind pats (GRHSs grhss binds ty)
@@ -60,8 +63,8 @@ dsGRHSs kind pats (GRHSs grhss binds ty)
     in
     returnDs (ty, match_result2)
 
-dsGRHS kind pats (GRHS guard locn)
-  = matchGuard guard (DsMatchContext kind pats locn)
+dsGRHS kind pats (L loc (GRHS guard))
+  = matchGuard (map unLoc guard) (DsMatchContext kind pats loc)
 \end{code}
 
 
@@ -72,29 +75,29 @@ dsGRHS kind pats (GRHS guard locn)
 %************************************************************************
 
 \begin{code}
-matchGuard :: [TypecheckedStmt] 	-- Guard
+matchGuard :: [Stmt Id] 	-- Guard
            -> DsMatchContext            -- Context
 	   -> DsM MatchResult
 
 -- See comments with HsExpr.Stmt re what an ExprStmt means
 -- Here we must be in a guard context (not do-expression, nor list-comp)	
 
-matchGuard [ResultStmt expr locn] ctx 
-  = putSrcLocDs locn (dsExpr expr) 	`thenDs` \ core_expr ->
+matchGuard [ResultStmt expr] ctx 
+  = dsLExpr expr 	`thenDs` \ core_expr ->
     returnDs (cantFailMatchResult core_expr)
 
 	-- ExprStmts must be guards
 	-- Turn an "otherwise" guard is a no-op
-matchGuard (ExprStmt (HsVar v) _ _ : stmts) ctx
+matchGuard (ExprStmt (L _ (HsVar v)) _ : stmts) ctx
   |  v `hasKey` otherwiseIdKey
   || v `hasKey` getUnique trueDataConId	
 	-- trueDataConId doesn't have the same 
 	-- unique as trueDataCon
   = matchGuard stmts ctx
 
-matchGuard (ExprStmt expr _ locn : stmts) ctx
-  = matchGuard stmts ctx 		`thenDs` \ match_result ->
-    putSrcLocDs locn (dsExpr expr)	`thenDs` \ pred_expr ->
+matchGuard (ExprStmt expr _ : stmts) ctx
+  = matchGuard stmts ctx 	`thenDs` \ match_result ->
+    dsLExpr expr		`thenDs` \ pred_expr ->
     returnDs (mkGuardedMatchResult pred_expr match_result)
 
 matchGuard (LetStmt binds : stmts) ctx
@@ -102,9 +105,9 @@ matchGuard (LetStmt binds : stmts) ctx
     returnDs (adjustMatchResultDs (dsLet binds) match_result)
 	-- NB the dsLet occurs inside the match_result
 
-matchGuard (BindStmt pat rhs locn : stmts) ctx
+matchGuard (BindStmt pat rhs : stmts) ctx
   = matchGuard stmts ctx 		`thenDs` \ match_result ->
-    putSrcLocDs locn (dsExpr rhs)	`thenDs` \ core_rhs ->
+    dsLExpr rhs				`thenDs` \ core_rhs ->
     matchSinglePat core_rhs ctx pat match_result
 \end{code}
 

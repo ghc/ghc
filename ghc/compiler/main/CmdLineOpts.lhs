@@ -82,6 +82,7 @@ module CmdLineOpts (
 	opt_UF_DearOp,
 
 	-- misc opts
+	opt_ErrorSpans,
 	opt_InPackage,
 	opt_EmitCExternDecls,
 	opt_EnsureSplittableC,
@@ -801,6 +802,9 @@ opt_UF_DearOp   = ( 4 :: Int)
 opt_Static			= lookUp  FSLIT("-static")
 opt_Unregisterised		= lookUp  FSLIT("-funregisterised")
 opt_EmitExternalCore		= lookUp  FSLIT("-fext-core")
+
+-- Include full span info in error messages, instead of just the start position.
+opt_ErrorSpans			= lookUp FSLIT("-ferror-spans")
 \end{code}
 
 %************************************************************************
@@ -842,7 +846,8 @@ isStaticHscFlag f =
 	"fext-core",
 	"frule-check",
 	"frules-off",
-	"fcpr-off"
+	"fcpr-off",
+	"ferror-spans"
 	]
   || any (flip prefixMatch f) [
 	"fcontext-stack",

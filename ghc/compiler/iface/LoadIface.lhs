@@ -60,7 +60,7 @@ import SrcLoc		( mkSrcLoc, importedSrcLoc )
 import Maybes		( isJust, mapCatMaybes )
 import StringBuffer     ( hGetStringBuffer )
 import FastString	( mkFastString )
-import ErrUtils         ( Message )
+import ErrUtils         ( Message, mkLocMessage )
 import Finder		( findModule, findPackageModule, 
 			  hiBootExt, hiBootVerExt )
 import Lexer
@@ -556,7 +556,7 @@ read_iface dflags wanted_mod file_path is_hi_boot_file
 	  Left exn     -> return (Left (text (showException exn))) ;
 	  Right buffer -> 
         case unP parseIface (mkPState buffer loc dflags) of
-	  PFailed loc1 loc2 err -> return (Left (showPFailed loc1 loc2 err))
+	  PFailed span err -> return (Left (mkLocMessage span err))
 	  POk _ iface 
 	     | wanted_mod == actual_mod -> return (Right iface)
 	     | otherwise		-> return (Left err) 

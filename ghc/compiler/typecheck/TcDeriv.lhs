@@ -10,10 +10,7 @@ module TcDeriv ( tcDeriving ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( HsBinds(..), TyClDecl(..), MonoBinds(..),
-			  andMonoBindList )
-import RdrHsSyn		( RdrNameMonoBinds )
-import RnHsSyn		( RenamedHsBinds, RenamedTyClDecl, RenamedHsPred )
+import HsSyn
 import CmdLineOpts	( DynFlag(..) )
 
 import Generics		( mkTyConGenericBinds )
@@ -27,10 +24,10 @@ import InstEnv		( simpleDFunClassTyCon, extendInstEnv )
 import TcHsType		( tcHsPred )
 import TcSimplify	( tcSimplifyDeriv )
 
-import RnBinds		( rnMethodBinds, rnTopMonoBinds )
+import RnBinds		( rnMethodBinds, rnTopBinds )
 import RnEnv		( bindLocalNames )
 import TcRnMonad	( thenM, returnM, mapAndUnzipM )
-import HscTypes		( DFunId, FixityEnv, typeEnvTyCons )
+import HscTypes		( DFunId, FixityEnv )
 
 import BasicTypes	( NewOrData(..) )
 import Class		( className, classArity, classKey, classTyVars, classSCTheta, Class )
@@ -39,6 +36,7 @@ import ErrUtils		( dumpIfSet_dyn )
 import MkId		( mkDictFunId )
 import DataCon		( dataConOrigArgTys, isNullaryDataCon, isExistentialDataCon )
 import Maybes		( catMaybes )
+import RdrName		( RdrName )
 import Name		( Name, getSrcLoc )
 import NameSet		( NameSet, emptyNameSet, duDefs )
 import Unique		( Unique, getUnique )
@@ -54,9 +52,11 @@ import TcType		( TcType, ThetaType, mkTyVarTy, mkTyVarTys, mkTyConApp,
 import Var		( TyVar, tyVarKind, idType, varName )
 import VarSet		( mkVarSet, subVarSet )
 import PrelNames
+import SrcLoc		( srcLocSpan, Located(..) )
 import Util		( zipWithEqual, sortLt, notNull )
 import ListSetOps	( removeDups,  assoc )
 import Outputable
+import Bag
 \end{code}
 
 %************************************************************************
@@ -193,13 +193,13 @@ version.  So now all classes are "offending".
 %************************************************************************
 
 \begin{code}
-tcDeriving  :: [RenamedTyClDecl]	-- All type constructors
+tcDeriving  :: [LTyClDecl Name]	-- All type constructors
 	    -> TcM ([InstInfo],		-- The generated "instance decls"
-		    RenamedHsBinds,	-- Extra generated top-level bindings
+		    [HsBindGroup Name],	-- Extra generated top-level bindings
 		    NameSet)		-- Binders to keep alive
 
 tcDeriving tycl_decls
-  = recoverM (returnM ([], EmptyBinds, emptyNameSet)) $
+  = recoverM (returnM ([], [], emptyNameSet)) $
     do	{   	-- Fish the "deriving"-related information out of the TcEnv
 		-- and make the necessary "equations".
 	; (ordinary_eqns, newtype_inst_info) <- makeDerivEqns tycl_decls
@@ -219,9 +219,9 @@ tcDeriving tycl_decls
 	-- which is used in the generic binds
 	; (rn_binds, gen_bndrs) 
 		<- discardWarnings $ setOptM Opt_GlasgowExts $ do
-			{ (rn_deriv, _dus1) <- rnTopMonoBinds deriv_binds []
-			; (rn_gen, dus_gen) <- rnTopMonoBinds gen_binds   []
-			; return (rn_deriv `ThenBinds` rn_gen, duDefs dus_gen) }
+			{ (rn_deriv, _dus1) <- rnTopBinds deriv_binds []
+			; (rn_gen, dus_gen) <- rnTopBinds gen_binds   []
+			; return (rn_deriv ++ rn_gen, duDefs dus_gen) }
 
 
 	; dflags <- getDOpts
@@ -231,13 +231,13 @@ tcDeriving tycl_decls
 	; returnM (inst_info, rn_binds, gen_bndrs)
 	}
   where
-    ddump_deriving :: [InstInfo] -> RenamedHsBinds -> SDoc
+    ddump_deriving :: [InstInfo] -> [HsBindGroup Name] -> SDoc
     ddump_deriving inst_infos extra_binds
-      = vcat (map pprInstInfoDetails inst_infos) $$ ppr extra_binds
+      = vcat (map pprInstInfoDetails inst_infos) $$ vcat (map ppr extra_binds)
 
 -----------------------------------------
 deriveOrdinaryStuff []	-- Short cut
-  = returnM ([], EmptyMonoBinds)
+  = returnM ([], emptyBag)
 
 deriveOrdinaryStuff eqns
   = do	{	-- Take the equation list and solve it, to deliver a list of
@@ -254,13 +254,17 @@ deriveOrdinaryStuff eqns
 	; extra_binds <- genTaggeryBinds new_dfuns
 
 	-- Done
-	; returnM (inst_infos, andMonoBindList (extra_binds : aux_binds_s)) }
+	; returnM (inst_infos, unionManyBags (extra_binds : aux_binds_s))
+   }
 
 -----------------------------------------
 mkGenericBinds tycl_decls
-  = do	{ tcs <- mapM tcLookupTyCon [tc_name | TyData { tcdName = tc_name } <- tycl_decls]
+  = do	{ tcs <- mapM tcLookupTyCon 
+			[ tc_name | 
+			  L _ (TyData { tcdLName = L _ tc_name }) <- tycl_decls]
 		-- We are only interested in the data type declarations
-	; return (andMonoBindList [mkTyConGenericBinds tc | tc <- tcs, tyConHasGenerics tc]) }
+	; return (unionManyBags [ mkTyConGenericBinds tc | 
+				  tc <- tcs, tyConHasGenerics tc ]) }
 		-- And then only in the ones whose 'has-generics' flag is on
 \end{code}
 
@@ -287,7 +291,7 @@ or} has just one data constructor (e.g., tuples).
 all those.
 
 \begin{code}
-makeDerivEqns :: [RenamedTyClDecl] 
+makeDerivEqns :: [LTyClDecl Name] 
 	      -> TcM ([DerivEqn],	-- Ordinary derivings
 		      [InstInfo])	-- Special newtype derivings
 
@@ -296,21 +300,22 @@ makeDerivEqns tycl_decls
     returnM (catMaybes maybe_ordinaries, catMaybes maybe_newtypes)
   where
     ------------------------------------------------------------------
-    derive_these :: [(NewOrData, Name, RenamedHsPred)]
+    derive_these :: [(NewOrData, Name, LHsPred Name)]
 	-- Find the (nd, TyCon, Pred) pairs that must be `derived'
 	-- NB: only source-language decls have deriving, no imported ones do
     derive_these = [ (nd, tycon, pred) 
-		   | TyData {tcdND = nd, tcdName = tycon, tcdDerivs = Just preds} <- tycl_decls,
+		   | L _ (TyData { tcdND = nd, tcdLName = L _ tycon, 
+			          tcdDerivs = Just (L _ preds) }) <- tycl_decls,
 		     pred <- preds ]
 
     ------------------------------------------------------------------
-    mk_eqn :: (NewOrData, Name, RenamedHsPred) -> TcM (Maybe DerivEqn, Maybe InstInfo)
+    mk_eqn :: (NewOrData, Name, LHsPred Name) -> TcM (Maybe DerivEqn, Maybe InstInfo)
 	-- We swizzle the tyvars and datacons out of the tycon
 	-- to make the rest of the equation
 
     mk_eqn (new_or_data, tycon_name, pred)
       = tcLookupTyCon tycon_name		`thenM` \ tycon ->
-	addSrcLoc (getSrcLoc tycon)		$
+	addSrcSpan (srcLocSpan (getSrcLoc tycon))		$
         addErrCtxt (derivCtxt Nothing tycon)	$
 	tcExtendTyVarEnv (tyConTyVars tycon)	$	-- Deriving preds may (now) mention
 							-- the type variables for the type constructor
@@ -665,7 +670,7 @@ solveDerivEqns orig_eqns
     ------------------------------------------------------------------
 
     gen_soln (_, clas, tc,tyvars,deriv_rhs)
-      = addSrcLoc (getSrcLoc tc)		$
+      = addSrcSpan (srcLocSpan (getSrcLoc tc))		$
 	addErrCtxt (derivCtxt (Just clas) tc)	$
 	tcSimplifyDeriv tyvars deriv_rhs	`thenM` \ theta ->
 	returnM (sortLt (<) theta)	-- Canonicalise before returning the soluction
@@ -739,17 +744,17 @@ Much less often (really just for deriving @Ix@), we use a
 
 \item
 We use the renamer!!!  Reason: we're supposed to be
-producing @RenamedMonoBinds@ for the methods, but that means
+producing @LHsBinds Name@ for the methods, but that means
 producing correctly-uniquified code on the fly.  This is entirely
 possible (the @TcM@ monad has a @UniqueSupply@), but it is painful.
-So, instead, we produce @RdrNameMonoBinds@ then heave 'em through
+So, instead, we produce @MonoBinds RdrName@ then heave 'em through
 the renamer.  What a great hack!
 \end{itemize}
 
 \begin{code}
 -- Generate the InstInfo for the required instance,
 -- plus any auxiliary bindings required
-genInst :: DFunId -> TcM (InstInfo, RdrNameMonoBinds)
+genInst :: DFunId -> TcM (InstInfo, LHsBinds RdrName)
 genInst dfun
   = getFixityEnv		`thenM` \ fix_env -> 
     let
@@ -768,7 +773,7 @@ genInst dfun
     returnM (InstInfo { iDFunId = dfun, iBinds = VanillaInst rn_meth_binds [] }, 
 	     aux_binds)
 
-gen_list :: [(Unique, FixityEnv -> TyCon -> (RdrNameMonoBinds, RdrNameMonoBinds))]
+gen_list :: [(Unique, FixityEnv -> TyCon -> (LHsBinds RdrName, LHsBinds RdrName))]
 gen_list = [(eqClassKey,      no_aux_binds (ignore_fix_env gen_Eq_binds))
  	   ,(ordClassKey,     no_aux_binds (ignore_fix_env gen_Ord_binds))
  	   ,(enumClassKey,    no_aux_binds (ignore_fix_env gen_Enum_binds))
@@ -782,7 +787,7 @@ gen_list = [(eqClassKey,      no_aux_binds (ignore_fix_env gen_Eq_binds))
 
   -- no_aux_binds is used for generators that don't 
   -- need to produce any auxiliary bindings
-no_aux_binds f fix_env tc = (f fix_env tc, EmptyMonoBinds)
+no_aux_binds f fix_env tc = (f fix_env tc, emptyBag)
 ignore_fix_env f fix_env tc = f tc
 \end{code}
 
@@ -820,11 +825,11 @@ We're deriving @Enum@, or @Ix@ (enum type only???)
 If we have a @tag2con@ function, we also generate a @maxtag@ constant.
 
 \begin{code}
-genTaggeryBinds :: [DFunId] -> TcM RdrNameMonoBinds
+genTaggeryBinds :: [DFunId] -> TcM (LHsBinds RdrName)
 genTaggeryBinds dfuns
   = do	{ names_so_far <- foldlM do_con2tag []           tycons_of_interest
 	; nm_alist_etc <- foldlM do_tag2con names_so_far tycons_of_interest
-	; return (andMonoBindList (map gen_tag_n_con_monobind nm_alist_etc)) }
+	; return (listToBag (map gen_tag_n_con_monobind nm_alist_etc)) }
   where
     all_CTs = map simpleDFunClassTyCon dfuns
     all_tycons		    = map snd all_CTs

@@ -5,7 +5,7 @@
 
 \begin{code}
 module HsPat (
-	Pat(..), InPat, OutPat, 
+	Pat(..), InPat, OutPat, LPat,
 	
 	HsConDetails(..), hsConArgs,
 
@@ -15,6 +15,7 @@ module HsPat (
 	patsAreAllCons, isConPat, isSigPat,
 	patsAreAllLits,	isLitPat,
 	collectPatBinders, collectPatsBinders,
+	collectLocatedPatBinders, collectLocatedPatsBinders,
 	collectSigTysFromPat, collectSigTysFromPats
     ) where
 
@@ -25,7 +26,7 @@ import {-# SOURCE #-} HsExpr		( HsExpr )
 
 -- friends:
 import HsLit		( HsLit(HsCharPrim), HsOverLit )
-import HsTypes		( HsType, SyntaxName, PostTcType )
+import HsTypes		( LHsType, SyntaxName, PostTcType )
 import BasicTypes	( Boxity, tupleParens )
 -- others:
 import TysWiredIn	( nilDataCon, charDataCon, charTy )
@@ -33,37 +34,40 @@ import Var		( TyVar )
 import DataCon		( DataCon )
 import Outputable	
 import Type		( Type )
+import SrcLoc		( Located(..), unLoc, noLoc )
 \end{code}
 
 
 \begin{code}
-type InPat id = Pat id		-- No 'Out' constructors
-type OutPat id = Pat id		-- No 'In' constructors
+type InPat id  = LPat id	-- No 'Out' constructors
+type OutPat id = LPat id	-- No 'In' constructors
+
+type LPat id = Located (Pat id)
 
 data Pat id
   =	------------ Simple patterns ---------------
     WildPat	PostTcType		-- Wild card
   | VarPat	id			-- Variable
-  | LazyPat	(Pat id)		-- Lazy pattern
-  | AsPat	id (Pat id)		-- As pattern
-  | ParPat      (Pat id)		-- Parenthesised pattern
+  | LazyPat	(LPat id)		-- Lazy pattern
+  | AsPat	(Located id) (LPat id)  -- As pattern
+  | ParPat      (LPat id)		-- Parenthesised pattern
 
 	------------ Lists, tuples, arrays ---------------
-  | ListPat	[Pat id]		-- Syntactic list
+  | ListPat	[LPat id]		-- Syntactic list
 		PostTcType		-- The type of the elements
    	    	    
-  | TuplePat	[Pat id]		-- Tuple
+  | TuplePat	[LPat id]		-- Tuple
 		Boxity			-- UnitPat is TuplePat []
 
-  | PArrPat	[Pat id]		-- Syntactic parallel array
+  | PArrPat	[LPat id]		-- Syntactic parallel array
 		PostTcType		-- The type of the elements
 
 	------------ Constructor patterns ---------------
-  | ConPatIn	id 
-		(HsConDetails id (Pat id))
+  | ConPatIn	(Located id)
+		(HsConDetails id (LPat id))
 
   | ConPatOut	DataCon 
-		(HsConDetails id (Pat id))
+		(HsConDetails id (LPat id))
 		Type    		-- The type of the pattern
 		[TyVar]			-- Existentially bound type variables
 		[id]			-- Ditto dictionaries
@@ -86,27 +90,27 @@ data Pat id
 		    Type	 	-- Type of pattern, t
    	    	    (HsExpr id)		-- Of type t -> Bool; detects match
 
-  | NPlusKPatIn	    id			-- n+k pattern
+  | NPlusKPatIn	    (Located id)	-- n+k pattern
 		    HsOverLit		-- It'll always be an HsIntegral
 		    SyntaxName		-- Name of '-' (see RnEnv.lookupSyntaxName)
 
-  | NPlusKPatOut    id
+  | NPlusKPatOut    (Located id)
 		    Integer
    	    	    (HsExpr id)	 	-- Of type t -> Bool; detects match
    	    	    (HsExpr id) 	-- Of type t -> t; subtracts k
 
 
 	------------ Generics ---------------
-  | TypePat	    (HsType id)		-- Type pattern for generic definitions
+  | TypePat	    (LHsType id)	-- Type pattern for generic definitions
                                         -- e.g  f{| a+b |} = ...
                                         -- These show up only in class declarations,
                                         -- and should be a top-level pattern
 
 	------------ Pattern type signatures ---------------
-  | SigPatIn	    (Pat id)		-- Pattern with a type signature
-		    (HsType id)
+  | SigPatIn	    (LPat id)		-- Pattern with a type signature
+		    (LHsType id)
 
-  | SigPatOut	    (Pat id)		-- Pattern p
+  | SigPatOut	    (LPat id)		-- Pattern p
 		    Type		-- Type, t, of the whole pattern
 		    (HsExpr id)		-- Coercion function,
 					-- of type t -> typeof(p)
@@ -122,7 +126,7 @@ HsConDetails is use both for patterns and for data type declarations
 \begin{code}
 data HsConDetails id arg
   = PrefixCon [arg]			-- C p1 p2 p3
-  | RecCon    [(id, arg)]		-- C { x = p1, y = p2 }
+  | RecCon    [(Located id, arg)]	-- C { x = p1, y = p2 }
   | InfixCon  arg arg			-- p1 `C` p2
 
 hsConArgs :: HsConDetails id arg -> [arg]
@@ -155,7 +159,7 @@ pprPat (VarPat var)	  	-- Print with type info if -dppr-debug is on
 pprPat (WildPat _)	  = char '_'
 pprPat (LazyPat pat)      = char '~' <> ppr pat
 pprPat (AsPat name pat)   = parens (hcat [ppr name, char '@', ppr pat])
-pprPat (ParPat pat)	  = parens (pprPat pat)
+pprPat (ParPat pat)	  = parens (ppr pat)
 
 pprPat (ListPat pats _)   = brackets (interpp'SP pats)
 pprPat (PArrPat pats _)   = pabrackets (interpp'SP pats)
@@ -208,13 +212,13 @@ pabrackets p  = ptext SLIT("[:") <> p <> ptext SLIT(":]")
 \begin{code}
 mkPrefixConPat :: DataCon -> [OutPat id] -> Type -> OutPat id
 -- Make a vanilla Prefix constructor pattern
-mkPrefixConPat dc pats ty = ConPatOut dc (PrefixCon pats) ty [] []
+mkPrefixConPat dc pats ty = noLoc $ ConPatOut dc (PrefixCon pats) ty [] []
 
 mkNilPat :: Type -> OutPat id
 mkNilPat ty = mkPrefixConPat nilDataCon [] ty
 
-mkCharLitPat :: Int -> OutPat id
-mkCharLitPat c = mkPrefixConPat charDataCon [LitPat (HsCharPrim c)] charTy
+mkCharLitPat :: Char -> OutPat id
+mkCharLitPat c = mkPrefixConPat charDataCon [noLoc $ LitPat (HsCharPrim c)] charTy
 \end{code}
 
 
@@ -254,7 +258,7 @@ isWildPat other	      = False
 patsAreAllCons :: [Pat id] -> Bool
 patsAreAllCons pat_list = all isConPat pat_list
 
-isConPat (AsPat _ pat)		= isConPat pat
+isConPat (AsPat _ pat)		= isConPat (unLoc pat)
 isConPat (ConPatIn _ _)		= True
 isConPat (ConPatOut _ _ _ _ _)	= True
 isConPat (ListPat _ _)		= True
@@ -270,7 +274,7 @@ isSigPat other		   = False
 patsAreAllLits :: [Pat id] -> Bool
 patsAreAllLits pat_list = all isLitPat pat_list
 
-isLitPat (AsPat _ pat)	        = isLitPat pat
+isLitPat (AsPat _ pat)	        = isLitPat (unLoc pat)
 isLitPat (LitPat _)	        = True
 isLitPat (NPatIn _ _)	        = True
 isLitPat (NPatOut   _ _ _)      = True
@@ -293,24 +297,33 @@ It collects the bounds *value* variables in renamed patterns; type variables
 are *not* collected.
 
 \begin{code}
-collectPatBinders :: Pat a -> [a]
-collectPatBinders pat = collect pat []
+collectPatBinders :: LPat a -> [a]
+collectPatBinders pat = map unLoc (collectLocatedPatBinders pat)
 
-collectPatsBinders :: [Pat a] -> [a]
-collectPatsBinders pats = foldr collect [] pats
+collectLocatedPatBinders :: LPat a -> [Located a]
+collectLocatedPatBinders pat = collectl pat []
+
+collectPatsBinders :: [LPat a] -> [a]
+collectPatsBinders pats = map unLoc (collectLocatedPatsBinders pats)
+
+collectLocatedPatsBinders :: [LPat a] -> [Located a]
+collectLocatedPatsBinders pats = foldr collectl [] pats
+
+collectl (L l (VarPat var)) bndrs = L l var : bndrs
+collectl pat                bndrs = collect (unLoc pat) bndrs
 
 collect (WildPat _)	      	 bndrs = bndrs
-collect (VarPat var)      	 bndrs = var : bndrs
-collect (LazyPat pat)     	 bndrs = collect pat bndrs
-collect (AsPat a pat)     	 bndrs = a : collect pat bndrs
-collect (ParPat  pat)     	 bndrs = collect pat bndrs
+collect (LazyPat pat)     	 bndrs = collectl pat bndrs
+collect (AsPat a pat)     	 bndrs = a : collectl pat bndrs
+collect (ParPat  pat)     	 bndrs = collectl pat bndrs
 
-collect (ListPat pats _)    	 bndrs = foldr collect bndrs pats
-collect (PArrPat pats _)    	 bndrs = foldr collect bndrs pats
-collect (TuplePat pats _)  	 bndrs = foldr collect bndrs pats
+collect (ListPat pats _)    	 bndrs = foldr collectl bndrs pats
+collect (PArrPat pats _)    	 bndrs = foldr collectl bndrs pats
+collect (TuplePat pats _)  	 bndrs = foldr collectl bndrs pats
 
-collect (ConPatIn c ps)   	 bndrs = foldr collect bndrs (hsConArgs ps)
-collect (ConPatOut c ps _ _ ds)	 bndrs = ds ++ foldr collect bndrs (hsConArgs ps)
+collect (ConPatIn c ps)   	 bndrs = foldr collectl bndrs (hsConArgs ps)
+collect (ConPatOut c ps _ _ ds)	 bndrs = map noLoc ds
+					  ++ foldr collectl bndrs (hsConArgs ps)
 
 collect (LitPat _)	      	 bndrs = bndrs
 collect (NPatIn _ _)		 bndrs = bndrs
@@ -319,29 +332,31 @@ collect (NPatOut _ _ _)		 bndrs = bndrs
 collect (NPlusKPatIn n _ _)      bndrs = n : bndrs
 collect (NPlusKPatOut n _ _ _)   bndrs = n : bndrs
 
-collect (SigPatIn pat _)	 bndrs = collect pat bndrs
-collect (SigPatOut pat _ _)	 bndrs = collect pat bndrs
+collect (SigPatIn pat _)	 bndrs = collectl pat bndrs
+collect (SigPatOut pat _ _)	 bndrs = collectl pat bndrs
 collect (TypePat ty)             bndrs = bndrs
-collect (DictPat ids1 ids2)      bndrs = ids1 ++ ids2 ++ bndrs
+collect (DictPat ids1 ids2)      bndrs = map noLoc ids1 ++ map noLoc ids2
+					   ++ bndrs
 \end{code}
 
 \begin{code}
-collectSigTysFromPats :: [InPat name] -> [HsType name]
-collectSigTysFromPats pats = foldr collect_pat [] pats
+collectSigTysFromPats :: [InPat name] -> [LHsType name]
+collectSigTysFromPats pats = foldr collect_lpat [] pats
 
-collectSigTysFromPat :: InPat name -> [HsType name]
-collectSigTysFromPat pat = collect_pat pat []
+collectSigTysFromPat :: InPat name -> [LHsType name]
+collectSigTysFromPat pat = collect_lpat pat []
 
-collect_pat (SigPatIn pat ty)  acc = collect_pat pat (ty:acc)
+collect_lpat pat acc = collect_pat (unLoc pat) acc
+
+collect_pat (SigPatIn pat ty)  acc = collect_lpat pat (ty:acc)
 collect_pat (TypePat ty)       acc = ty:acc
 
-collect_pat (LazyPat pat)      acc = collect_pat pat acc
-collect_pat (AsPat a pat)      acc = collect_pat pat acc
-collect_pat (ParPat  pat)      acc = collect_pat pat acc
-collect_pat (ListPat pats _)   acc = foldr collect_pat acc pats
-collect_pat (PArrPat pats _)   acc = foldr collect_pat acc pats
-collect_pat (TuplePat pats _)  acc = foldr collect_pat acc pats
-collect_pat (ConPatIn c ps)    acc = foldr collect_pat acc (hsConArgs ps)
+collect_pat (LazyPat pat)      acc = collect_lpat pat acc
+collect_pat (AsPat a pat)      acc = collect_lpat pat acc
+collect_pat (ParPat  pat)      acc = collect_lpat pat acc
+collect_pat (ListPat pats _)   acc = foldr collect_lpat acc pats
+collect_pat (PArrPat pats _)   acc = foldr collect_lpat acc pats
+collect_pat (TuplePat pats _)  acc = foldr collect_lpat acc pats
+collect_pat (ConPatIn c ps)    acc = foldr collect_lpat acc (hsConArgs ps)
 collect_pat other	       acc = acc 	-- Literals, vars, wildcard
 \end{code}
-

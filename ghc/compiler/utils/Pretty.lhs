@@ -492,7 +492,7 @@ no occurrences of @Union@ or @NoDoc@ represents just one layout.
 data Doc
  = Empty                                -- empty
  | NilAbove Doc                         -- text "" $$ x
- | TextBeside TextDetails INT Doc       -- text s <> x  
+ | TextBeside !TextDetails INT Doc       -- text s <> x  
  | Nest INT Doc                         -- nest k x
  | Union Doc Doc                        -- ul `union` ur
  | NoDoc                                -- The empty set of documents
@@ -1016,6 +1016,8 @@ spaces n       = ' ' : spaces (n MINUS ILIT(1))
 pprCols = (120 :: Int) -- could make configurable
 
 printDoc :: Mode -> Handle -> Doc -> IO ()
+printDoc LeftMode hdl doc
+  = do { printLeftRender hdl doc; hFlush hdl }
 printDoc mode hdl doc
   = do { fullRender mode pprCols 1.5 put done doc ;
 	 hFlush hdl }
@@ -1026,6 +1028,22 @@ printDoc mode hdl doc
     put (LStr s l) next = hPutLitString hdl s l >> next 
 
     done = hPutChar hdl '\n'
+
+-- basically a specialised version of fullRender for LeftMode with IO output.
+printLeftRender :: Handle -> Doc -> IO ()
+printLeftRender hdl doc = lay (reduceDoc doc)
+  where
+    lay NoDoc               	= cant_fail
+    lay (Union p q) 		= lay (first p q)
+    lay (Nest k p)          	= lay p
+    lay Empty               	= hPutChar hdl '\n'
+    lay (NilAbove p)        	= hPutChar hdl '\n' >> lay p
+    lay (TextBeside s sl p) 	= put s >> lay p
+
+    put (Chr c)    = hPutChar hdl c
+    put (Str s)    = hPutStr  hdl s
+    put (PStr s)   = hPutFS   hdl s
+    put (LStr s l) = hPutLitString hdl s l
 
 #if __GLASGOW_HASKELL__ < 503
 hPutBuf = hPutBufFull

@@ -21,12 +21,8 @@ import {-# SOURCE #-} TcSplice ( tcSpliceDecls )
 
 import CmdLineOpts	( DynFlag(..), opt_PprStyle_Debug, dopt )
 import DriverState	( v_MainModIs, v_MainFunIs )
-import HsSyn		( HsModule(..), HsBinds(..), MonoBinds(..), HsExpr(..),
-			  HsGroup(..), SpliceDecl(..), HsExtCore(..),
-			  andMonoBinds
-			)
-import RdrHsSyn		( RdrNameHsModule, RdrNameHsDecl, 
-			  findSplice, main_RDR_Unqual )
+import HsSyn
+import RdrHsSyn		( findSplice, main_RDR_Unqual )
 
 import PrelNames	( runIOName, rootMainName, mAIN_Name )
 import RdrName		( RdrName, mkRdrUnqual, emptyGlobalRdrEnv, 
@@ -60,9 +56,9 @@ import OccName		( mkVarOcc )
 import Name		( Name, isExternalName, getSrcLoc, getOccName )
 import NameSet
 import TyCon		( tyConHasGenerics )
+import SrcLoc		( srcLocSpan, Located(..), noLoc, unLoc )
 import Outputable
-import HscTypes		( ModIface, ModDetails(..), ModGuts(..),
-			  HscEnv(..), ModIface(..), ModDetails(..), 
+import HscTypes		( ModGuts(..), HscEnv(..),
 			  GhciMode(..), noDependencies,
 			  Deprecs( NoDeprecs ), plusDeprecs,
 			  GenAvailInfo(Avail), availsToNameSet, availName,
@@ -72,15 +68,13 @@ import HscTypes		( ModIface, ModDetails(..), ModGuts(..),
 			)
 #ifdef GHCI
 import HsSyn		( HsStmtContext(..), 
-			  Stmt(..), Pat(VarPat), 
+			  Stmt(..), 
 			  collectStmtsBinders, mkSimpleMatch, placeHolderType )
-import RdrHsSyn		( RdrNameHsExpr, RdrNameStmt )
 import RdrName		( GlobalRdrEnv, mkGlobalRdrEnv, GlobalRdrElt(..),
 			  Provenance(..), ImportSpec(..),
 			  lookupLocalRdrEnv, extendLocalRdrEnv )
-import RnHsSyn		( RenamedStmt ) 
 import RnSource		( addTcgDUs )
-import TcHsSyn		( TypecheckedHsExpr, mkHsLet, zonkTopExpr, zonkTopBndrs )
+import TcHsSyn		( mkHsLet, zonkTopLExpr, zonkTopBndrs )
 import TcExpr		( tcCheckRho )
 import TcMType		( zonkTcType )
 import TcMatches	( tcStmtsAndThen, TcStmtCtxt(..) )
@@ -89,12 +83,11 @@ import TcType		( Type, mkForAllTys, mkFunTys, mkTyConApp, tyVarsOfType )
 import TcEnv		( tcLookupTyCon, tcLookupId )
 import TyCon		( DataConDetails(..) )
 import Inst		( tcStdSyntaxName )
-import RnExpr		( rnStmts, rnExpr )
+import RnExpr		( rnStmts, rnLExpr )
 import RnNames		( exportsToAvails )
 import LoadIface	( loadSrcInterface )
 import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..), IfaceExtName(..),
 			  tyThingToIfaceDecl )
-import IfaceEnv		( tcIfaceGlobal )
 import RnEnv		( lookupOccRn, dataTcOccs, lookupFixityRn )
 import Id		( Id, isImplicitId )
 import MkId		( unsafeCoerceId )
@@ -108,13 +101,17 @@ import PrelNames	( iNTERACTIVE, ioTyConName, printName, monadNames, itName, retu
 import Module		( ModuleName, lookupModuleEnvByName )
 import HscTypes		( InteractiveContext(..),
 			  HomeModInfo(..), typeEnvElts, 
-			  TyThing(..), availNames, icPrintUnqual )
+			  TyThing(..), availNames, icPrintUnqual,
+			  ModIface(..), ModDetails(..) )
 import BasicTypes	( RecFlag(..), Fixity )
 import Panic		( ghcError, GhcException(..) )
 #endif
 
 import FastString	( mkFastString )
 import Util		( sortLt )
+import Bag		( unionBags, snocBag, unitBag )
+
+import Maybe		( isJust )
 \end{code}
 
 
@@ -128,18 +125,21 @@ import Util		( sortLt )
 
 \begin{code}
 tcRnModule :: HscEnv 
-	   -> RdrNameHsModule 
+	   -> Located (HsModule RdrName)
 	   -> IO (Maybe TcGblEnv)
 
-tcRnModule hsc_env
-	   (HsModule maybe_mod exports import_decls local_decls mod_deprec loc)
+tcRnModule hsc_env (L loc (HsModule maybe_mod exports 
+				import_decls local_decls mod_deprec))
  = do { showPass (hsc_dflags hsc_env) "Renamer/typechecker" ;
 
    let { this_mod = case maybe_mod of
-			Nothing  -> mkHomeModule mAIN_Name	-- 'module M where' is omitted
-			Just mod -> mod } ;			-- The normal case
+			Nothing  -> mkHomeModule mAIN_Name	
+					-- 'module M where' is omitted
+			Just (L _ mod) -> mod } ;		
+					-- The normal case
 		
-   initTc hsc_env this_mod $ addSrcLoc loc $
+   initTc hsc_env this_mod $ 
+   addSrcSpan loc $
    do { 	-- Deal with imports; sets tcg_rdr_env, tcg_imports
 	(rdr_env, imports) <- rnImports import_decls ;
 	updGblEnv ( \ gbl -> gbl { tcg_rdr_env = rdr_env,
@@ -163,7 +163,7 @@ tcRnModule hsc_env
 	traceRn (text "rn3") ;
 
 		-- Process the export list
-	export_avails <- exportsFromAvail maybe_mod exports ;
+	export_avails <- exportsFromAvail (isJust maybe_mod) exports ;
 
 		-- Get any supporting decls for the exports that have not already
 		-- been sucked in for the declarations in the body of the module.
@@ -209,8 +209,8 @@ tcRnModule hsc_env
 #ifdef GHCI
 tcRnStmt :: HscEnv
 	 -> InteractiveContext
-	 -> RdrNameStmt
-	 -> IO (Maybe (InteractiveContext, [Name], TypecheckedHsExpr))
+	 -> LStmt RdrName
+	 -> IO (Maybe (InteractiveContext, [Name], LHsExpr Id))
 		-- The returned [Name] is the same as the input except for
 		-- ExprStmt, in which case the returned [Name] is [itName]
 		--
@@ -290,23 +290,24 @@ Here is the grand plan, implemented in tcUserStmt
 
 \begin{code}
 ---------------------------
-tcUserStmt :: RenamedStmt -> TcM ([Id], TypecheckedHsExpr)
-tcUserStmt (ExprStmt expr _ loc)
+tcUserStmt :: LStmt Name -> TcM ([Id], LHsExpr Id)
+tcUserStmt (L _ (ExprStmt expr _))
   = newUnique 		`thenM` \ uniq ->
     let 
 	fresh_it = itName uniq
-        the_bind = FunMonoBind fresh_it False 
-			[ mkSimpleMatch [] expr placeHolderType loc ] loc
+        the_bind = noLoc $ FunBind (noLoc fresh_it) False 
+			[ mkSimpleMatch [] expr placeHolderType ]
     in
     tryTcLIE_ (do { 	-- Try this if the other fails
 		traceTc (text "tcs 1b") ;
 		tc_stmts [
-		    LetStmt (MonoBind the_bind [] NonRecursive),
-		    ExprStmt (HsApp (HsVar printName) (HsVar fresh_it)) 
-			     placeHolderType loc] })
+		    nlLetStmt [HsBindGroup (unitBag the_bind) [] NonRecursive],
+		    nlExprStmt (nlHsApp (nlHsVar printName) 
+					      (nlHsVar fresh_it)) 
+		] })
 	  (do { 	-- Try this first 
 		traceTc (text "tcs 1a") ;
-		tc_stmts [BindStmt (VarPat fresh_it) expr loc] })
+		tc_stmts [nlBindStmt (nlVarPat fresh_it) expr] })
 
 tcUserStmt stmt = tc_stmts [stmt]
 
@@ -317,7 +318,7 @@ tc_stmts stmts
 	    ret_ty    = mkListTy unitTy ;
 	    io_ret_ty = mkTyConApp ioTyCon [ret_ty] ;
 
-	    names = collectStmtsBinders stmts ;
+	    names = map unLoc (collectStmtsBinders stmts) ;
 
 	    stmt_ctxt = SC { sc_what = DoExpr, 
 			     sc_rhs  = check_rhs,
@@ -338,10 +339,10 @@ tc_stmts stmts
 		-- then the type checker would instantiate x..z, and we wouldn't
 		-- get their *polymorphic* values.  (And we'd get ambiguity errs
 		-- if they were overloaded, since they aren't applied to anything.)
-	    mk_return ret_id ids = HsApp (TyApp (HsVar ret_id) [ret_ty]) 
-			      		 (ExplicitList unitTy (map mk_item ids)) ;
-	    mk_item id = HsApp (TyApp (HsVar unsafeCoerceId) [idType id, unitTy])
-		    	       (HsVar id) ;
+	    mk_return ret_id ids = nlHsApp (noLoc $ TyApp (nlHsVar ret_id) [ret_ty]) 
+			      		   (noLoc $ ExplicitList unitTy (map mk_item ids)) ;
+	    mk_item id = nlHsApp (noLoc $ TyApp (nlHsVar unsafeCoerceId) [idType id, unitTy])
+		    	       (nlHsVar id) ;
 
 	    io_ty = mkTyConApp ioTyCon []
 	 } ;
@@ -355,10 +356,10 @@ tc_stmts stmts
 			    -- where they will all be in scope
 			    ids <- mappM tcLookupId names ;
 			    ret_id <- tcLookupId returnIOName ;		-- return @ IO
-			    return (ids, [ResultStmt (mk_return ret_id ids) interactiveSrcLoc]) } ;
+			    return (ids, [nlResultStmt (mk_return ret_id ids)]) } ;
 
 	    io_ids <- mappM (tcStdSyntaxName DoOrigin io_ty) monadNames ;
-	    return (ids, HsDo DoExpr tc_stmts io_ids io_ret_ty interactiveSrcLoc) 
+	    return (ids, noLoc (HsDo DoExpr tc_stmts io_ids io_ret_ty))
 	} ;
 
 	-- Simplify the context right here, so that we fail
@@ -372,7 +373,7 @@ tc_stmts stmts
 
 	-- Build result expression and zonk it
 	let { expr = mkHsLet const_binds tc_expr } ;
-	zonked_expr <- zonkTopExpr expr ;
+	zonked_expr <- zonkTopLExpr expr ;
 	zonked_ids  <- zonkTopBndrs ids ;
 
 	return (zonked_ids, zonked_expr)
@@ -387,13 +388,13 @@ tcRnExpr just finds the type of an expression
 \begin{code}
 tcRnExpr :: HscEnv
 	 -> InteractiveContext
-	 -> RdrNameHsExpr
+	 -> LHsExpr RdrName
 	 -> IO (Maybe Type)
 tcRnExpr hsc_env ictxt rdr_expr
   = initTc hsc_env iNTERACTIVE $ 
     setInteractiveContext ictxt $ do {
 
-    (rn_expr, fvs) <- rnExpr rdr_expr ;
+    (rn_expr, fvs) <- rnLExpr rdr_expr ;
     failIfErrsM ;
 
 	-- Now typecheck the expression; 
@@ -497,15 +498,17 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 
    initTc hsc_env this_mod $ do {
 
+   let { ldecls  = map noLoc decls } ;
+
 	-- Deal with the type declarations; first bring their stuff
 	-- into scope, then rname them, then type check them
-   (rdr_env, imports) <- importsFromLocalDecls (mkFakeGroup decls) ;
+   (rdr_env, imports) <- importsFromLocalDecls (mkFakeGroup ldecls) ;
 
    updGblEnv (\gbl -> gbl { tcg_rdr_env = rdr_env `plusGlobalRdrEnv` tcg_rdr_env gbl,
 			    tcg_imports = imports `plusImportAvails` tcg_imports gbl }) 
 		  $ do {
 
-   rn_decls <- rnTyClDecls decls ;
+   rn_decls <- rnTyClDecls ldecls ;
    failIfErrsM ;
 
 	-- Dump trace of renaming part
@@ -553,7 +556,7 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 
 mkFakeGroup decls -- Rather clumsy; lots of unused fields
   = HsGroup {	hs_tyclds = decls, 	-- This is the one we want
-		hs_valds = EmptyBinds, hs_fords = [],
+		hs_valds = [], hs_fords = [],
 		hs_instds = [], hs_fixds = [], hs_depds = [],
 		hs_ruleds = [], hs_defds = [] }
 \end{code}
@@ -566,7 +569,7 @@ mkFakeGroup decls -- Rather clumsy; lots of unused fields
 %************************************************************************
 
 \begin{code}
-tcRnSrcDecls :: [RdrNameHsDecl] -> TcM TcGblEnv
+tcRnSrcDecls :: [LHsDecl RdrName] -> TcM TcGblEnv
 	-- Returns the variables free in the decls
 	-- Reason: solely to report unused imports and bindings
 tcRnSrcDecls decls
@@ -592,7 +595,7 @@ tcRnSrcDecls decls
 	      TcGblEnv { tcg_type_env = type_env, tcg_binds = binds, 
 		         tcg_rules = rules, tcg_fords = fords } = tcg_env } ;
 
-	(bind_ids, binds', fords', rules') <- zonkTopDecls (binds `andMonoBinds` inst_binds)
+	(bind_ids, binds', fords', rules') <- zonkTopDecls (binds `unionBags` inst_binds)
 							   rules fords ;
 
 	let { final_type_env = extendTypeEnvWithIds type_env bind_ids } ;
@@ -604,7 +607,7 @@ tcRnSrcDecls decls
 			  tcg_binds = binds', tcg_rules = rules', tcg_fords = fords' }) 
    }
 
-tc_rn_src_decls :: [RdrNameHsDecl] -> TcM (TcGblEnv, TcLclEnv)
+tc_rn_src_decls :: [LHsDecl RdrName] -> TcM (TcGblEnv, TcLclEnv)
 -- Loops around dealing with each top level inter-splice group 
 -- in turn, until it's dealt with the entire module
 tc_rn_src_decls ds
@@ -629,14 +632,13 @@ tc_rn_src_decls ds
 		      } ;
 
 	-- If there's a splice, we must carry on
-	   Just (SpliceDecl splice_expr splice_loc, rest_ds) -> do {
+	   Just (SpliceDecl splice_expr, rest_ds) -> do {
 #ifndef GHCI
 	failWithTc (text "Can't do a top-level splice; need a bootstrapped compiler")
 #else
 
 	-- Rename the splice expression, and get its supporting decls
-	(rn_splice_expr, splice_fvs) <- addSrcLoc splice_loc $
-				 	rnExpr splice_expr ;
+	(rn_splice_expr, splice_fvs) <- rnLExpr splice_expr ;
 	failIfErrsM ;	-- Don't typecheck if renaming failed
 
 	-- Execute the splice
@@ -744,7 +746,7 @@ tcTopSrcDecls
 		-- We also typecheck any extra binds that came out 
 		-- of the "deriving" process (deriv_binds)
         traceTc (text "Tc5") ;
-	(tc_val_binds, lcl_env) <- tcTopBinds (val_binds `ThenBinds` deriv_binds) ;
+	(tc_val_binds, lcl_env) <- tcTopBinds (val_binds ++ deriv_binds) ;
 	setLclTypeEnv lcl_env 	$ do {
 
 	     	-- Second pass over class and instance declarations, 
@@ -763,13 +765,13 @@ tcTopSrcDecls
 		-- Wrap up
         traceTc (text "Tc7a") ;
 	tcg_env <- getGblEnv ;
-	let { all_binds = tc_val_binds	 `AndMonoBinds`
-			  inst_binds	 `AndMonoBinds`
+	let { all_binds = tc_val_binds	 `unionBags`
+			  inst_binds	 `unionBags`
 			  foe_binds  ;
 
 		-- Extend the GblEnv with the (as yet un-zonked) 
 		-- bindings, rules, foreign decls
-	      tcg_env' = tcg_env {  tcg_binds = tcg_binds tcg_env `andMonoBinds` all_binds,
+	      tcg_env' = tcg_env {  tcg_binds = tcg_binds tcg_env `unionBags` all_binds,
 				    tcg_rules = tcg_rules tcg_env ++ rules,
 				    tcg_fords = tcg_fords tcg_env ++ foe_decls ++ fi_decls } } ;
   	return (tcg_env', lcl_env)
@@ -812,7 +814,8 @@ getModuleExports mod
 vanillaProv :: ModuleName -> Provenance
 -- We're building a GlobalRdrEnv as if the user imported
 -- all the specified modules into the global interactive module
-vanillaProv mod = Imported [ImportSpec mod mod False interactiveSrcLoc] False
+vanillaProv mod = Imported [ImportSpec mod mod False 
+			     (srcLocSpan interactiveSrcLoc)] False
 \end{code}
 
 \begin{code}
@@ -922,17 +925,17 @@ check_main ghci_mode tcg_env main_mod main_fn
 	     Nothing -> do { complain_no_main	
 			   ; return tcg_env } ;
 	     Just main_name -> do
-	{ let { rhs = HsApp (HsVar runIOName) (HsVar main_name) }
+	{ let { rhs = nlHsApp (nlHsVar runIOName) (nlHsVar main_name) }
 		   	-- :Main.main :: IO () = runIO main 
 
-	; (main_expr, ty) <- addSrcLoc (getSrcLoc main_name)	$
+	; (main_expr, ty) <- addSrcSpan (srcLocSpan (getSrcLoc main_name)) $
 			     tcInferRho rhs
 
 	; let { root_main_id = setIdLocalExported (mkLocalId rootMainName ty) ;
-	        main_bind    = VarMonoBind root_main_id main_expr }
+	        main_bind    = noLoc (VarBind root_main_id main_expr) }
 
 	; return (tcg_env { tcg_binds = tcg_binds tcg_env 
-					`andMonoBinds` main_bind,
+					`snocBag` main_bind,
 			    tcg_dus   = tcg_dus tcg_env
 				        `plusDU` usesOnly (unitFV main_name)
 		 }) 

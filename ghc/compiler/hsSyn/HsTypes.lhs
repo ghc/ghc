@@ -5,22 +5,25 @@
 
 \begin{code}
 module HsTypes (
-	  HsType(..), HsTyVarBndr(..), HsExplicitForAll(..),
-	, HsContext, HsPred(..)
-
-	, mkExplicitHsForAllTy, mkImplicitHsForAllTy, 
-	, mkHsDictTy, mkHsIParamTy
-	, hsTyVarName, hsTyVarNames, replaceTyVarName
-	, splitHsInstDeclTy
+	HsType(..), LHsType, 
+	HsTyVarBndr(..), LHsTyVarBndr,
+	HsExplicitForAll(..),
+	HsContext, LHsContext,
+	HsPred(..), LHsPred,
+	
+	mkExplicitHsForAllTy, mkImplicitHsForAllTy, 
+	hsTyVarName, hsTyVarNames, replaceTyVarName,
+	hsLTyVarName, hsLTyVarNames, hsLTyVarLocName, hsLTyVarLocNames,
+	splitHsInstDeclTy,
 	
 	-- Type place holder
-	, PostTcType, placeHolderType,
+	PostTcType, placeHolderType,
 
 	-- Name place holder
-	, SyntaxName, placeHolderName,
+	SyntaxName, placeHolderName,
 
 	-- Printing
-	, pprParendHsType, pprHsForAll, pprHsContext, ppr_hs_context, pprHsTyVarBndr
+	pprParendHsType, pprHsForAll, pprHsContext, ppr_hs_context, pprHsTyVarBndr
     ) where
 
 #include "HsVersions.h"
@@ -31,7 +34,7 @@ import Name		( Name, mkInternalName )
 import OccName		( mkVarOcc )
 import BasicTypes	( IPName, Boxity, tupleParens )
 import PrelNames	( unboundKey )
-import SrcLoc		( noSrcLoc )
+import SrcLoc		( noSrcLoc, Located(..), unLoc, noSrcSpan )
 import CmdLineOpts	( opt_PprStyle_Debug )
 import Outputable
 \end{code}
@@ -75,38 +78,44 @@ placeHolderName = mkInternalName unboundKey
 This is the syntax for types as seen in type signatures.
 
 \begin{code}
-type HsContext name = [HsPred name]
+type LHsContext name = Located (HsContext name)
 
-data HsPred name = HsClassP name [HsType name]
-		 | HsIParam (IPName name) (HsType name)
+type HsContext name = [LHsPred name]
+
+type LHsPred name = Located (HsPred name)
+
+data HsPred name = HsClassP name [LHsType name]
+		 | HsIParam (IPName name) (LHsType name)
+
+type LHsType name = Located (HsType name)
 
 data HsType name
   = HsForAllTy	HsExplicitForAll	-- Renamer leaves this flag unchanged, to record the way
 					-- the user wrote it originally, so that the printer can
 					-- print it as the user wrote it
-		[HsTyVarBndr name]	-- With ImplicitForAll, this is the empty list
+		[LHsTyVarBndr name]	-- With ImplicitForAll, this is the empty list
 					-- until the renamer fills in the variables
-		(HsContext name)
-		(HsType name)
+		(LHsContext name)
+		(LHsType name)
 
   | HsTyVar		name		-- Type variable or type constructor
 
-  | HsAppTy		(HsType name)
-			(HsType name)
+  | HsAppTy		(LHsType name)
+			(LHsType name)
 
-  | HsFunTy		(HsType name)   -- function type
-			(HsType name)
+  | HsFunTy		(LHsType name)   -- function type
+			(LHsType name)
 
-  | HsListTy		(HsType name)	-- Element type
+  | HsListTy		(LHsType name)	-- Element type
 
-  | HsPArrTy		(HsType name)	-- Elem. type of parallel array: [:t:]
+  | HsPArrTy		(LHsType name)	-- Elem. type of parallel array: [:t:]
 
   | HsTupleTy		Boxity
-			[HsType name]	-- Element types (length gives arity)
+			[LHsType name]	-- Element types (length gives arity)
 
-  | HsOpTy		(HsType name) name (HsType name)
+  | HsOpTy		(LHsType name) (Located name) (LHsType name)
 
-  | HsParTy		(HsType name)   
+  | HsParTy		(LHsType name)   
 	-- Parenthesis preserved for the precedence re-arrangement in RnTypes
 	-- It's important that a * (b + c) doesn't get rearranged to (a*b) + c!
 	-- 
@@ -116,10 +125,12 @@ data HsType name
 
   | HsNumTy             Integer		-- Generics only
 
-  -- these next two are only used in interfaces
-  | HsPredTy		(HsPred name)
+  | HsPredTy		(LHsPred name)  -- Only used in the type of an instance
+					-- declaration, eg.  Eq [a] -> Eq a
+					--			       ^^^^
+					--                            HsPredTy
 
-  | HsKindSig		(HsType name)	-- (ty :: kind)
+  | HsKindSig		(LHsType name)	-- (ty :: kind)
 			Kind		-- A type with a kind signature
 
 data HsExplicitForAll = Explicit | Implicit
@@ -137,22 +148,21 @@ data HsExplicitForAll = Explicit | Implicit
 mkImplicitHsForAllTy     ctxt ty = mkHsForAllTy Implicit [] ctxt ty
 mkExplicitHsForAllTy tvs ctxt ty = mkHsForAllTy Explicit tvs ctxt ty
 
-mkHsForAllTy :: HsExplicitForAll -> [HsTyVarBndr name] -> HsContext name -> HsType name -> HsType name
+mkHsForAllTy :: HsExplicitForAll -> [LHsTyVarBndr name] -> LHsContext name -> LHsType name -> HsType name
 -- Smart constructor for HsForAllTy
-mkHsForAllTy exp tvs []   ty = mk_forall_ty exp tvs ty
+mkHsForAllTy exp tvs (L _ []) ty = mk_forall_ty exp tvs ty
 mkHsForAllTy exp tvs ctxt ty = HsForAllTy exp tvs ctxt ty
 
 -- mk_forall_ty makes a pure for-all type (no context)
-mk_forall_ty Explicit [] ty 			      = ty	-- Explicit for-all with no tyvars
-mk_forall_ty exp  tvs  (HsParTy ty)		      = mk_forall_ty exp tvs ty
-mk_forall_ty exp1 tvs1 (HsForAllTy exp2 tvs2 ctxt ty) = mkHsForAllTy (exp1 `plus` exp2) (tvs1 ++ tvs2) ctxt ty
-mk_forall_ty exp  tvs  ty			      = HsForAllTy exp tvs [] ty
+mk_forall_ty Explicit [] ty 			      = unLoc ty	-- Explicit for-all with no tyvars
+mk_forall_ty exp  tvs  (L _ (HsParTy ty))		      = mk_forall_ty exp tvs ty
+mk_forall_ty exp1 tvs1 (L _ (HsForAllTy exp2 tvs2 ctxt ty)) = mkHsForAllTy (exp1 `plus` exp2) (tvs1 ++ tvs2) ctxt ty
+mk_forall_ty exp  tvs  ty			      = HsForAllTy exp tvs (L noSrcSpan []) ty
 
 Implicit `plus` Implicit = Implicit
 exp1     `plus` exp2     = Explicit
 
-mkHsDictTy cls tys = HsPredTy (HsClassP cls tys)
-mkHsIParamTy v ty  = HsPredTy (HsIParam v ty)
+type LHsTyVarBndr name = Located (HsTyVarBndr name)
 
 data HsTyVarBndr name
   = UserTyVar name
@@ -161,10 +171,24 @@ data HsTyVarBndr name
 	-- for-alls in it, (mostly to do with dictionaries).  These
 	-- must be explicitly Kinded.
 
+hsTyVarName :: HsTyVarBndr name -> name
 hsTyVarName (UserTyVar n)     = n
 hsTyVarName (KindedTyVar n _) = n
 
+hsLTyVarName :: LHsTyVarBndr name -> name
+hsLTyVarName = hsTyVarName . unLoc
+
+hsTyVarNames :: [HsTyVarBndr name] -> [name]
 hsTyVarNames tvs = map hsTyVarName tvs
+
+hsLTyVarNames :: [LHsTyVarBndr name] -> [name]
+hsLTyVarNames = map hsLTyVarName
+
+hsLTyVarLocName :: LHsTyVarBndr name -> Located name
+hsLTyVarLocName = fmap hsTyVarName
+
+hsLTyVarLocNames :: [LHsTyVarBndr name] -> [Located name]
+hsLTyVarLocNames = map hsLTyVarLocName
 
 replaceTyVarName :: HsTyVarBndr name1 -> name2 -> HsTyVarBndr name2
 replaceTyVarName (UserTyVar n)     n' = UserTyVar n'
@@ -176,7 +200,7 @@ replaceTyVarName (KindedTyVar n k) n' = KindedTyVar n' k
 splitHsInstDeclTy 
     :: Outputable name
     => HsType name 
-    -> ([HsTyVarBndr name], HsContext name, name, [HsType name])
+    -> ([LHsTyVarBndr name], HsContext name, name, [LHsType name])
 	-- Split up an instance decl type, returning the pieces
 
 -- In interface files, the instance declaration head is created
@@ -195,19 +219,19 @@ splitHsInstDeclTy inst_ty
   = case inst_ty of
 	HsForAllTy _ tvs cxt1 tau 	-- The type vars should have been
 					-- computed by now, even if they were implicit
-	      -> (tvs, cxt1++cxt2, cls, tys)
+	      -> (tvs, unLoc cxt1 ++ cxt2, cls, tys)
 	      where
-		 (cxt2, cls, tys) = split_tau tau
+		 (cxt2, cls, tys) = split_tau (unLoc tau)
 
 	other -> ([],  cxt2,  cls, tys)
 	      where
 		 (cxt2, cls, tys) = split_tau inst_ty
 
   where
-    split_tau (HsFunTy (HsPredTy p) ty)	= (p:ps, cls, tys)
+    split_tau (HsFunTy (L _ (HsPredTy p)) ty) = (p:ps, cls, tys)
 					where
-					  (ps, cls, tys) = split_tau ty
-    split_tau (HsPredTy (HsClassP cls tys)) = ([], cls,tys)
+					  (ps, cls, tys) = split_tau (unLoc ty)
+    split_tau (HsPredTy (L _ (HsClassP cls tys))) = ([], cls, tys)
     split_tau other = pprPanic "splitHsInstDeclTy" (ppr inst_ty)
 \end{code}
 
@@ -230,7 +254,7 @@ instance (Outputable name) => Outputable (HsTyVarBndr name) where
     ppr (KindedTyVar name kind) = pprHsTyVarBndr name kind
 
 instance Outputable name => Outputable (HsPred name) where
-    ppr (HsClassP clas tys) = ppr clas <+> hsep (map pprParendHsType tys)
+    ppr (HsClassP clas tys) = ppr clas <+> hsep (map (pprParendHsType.unLoc) tys)
     ppr (HsIParam n ty)    = hsep [ppr n, dcolon, ppr ty]
 
 pprHsTyVarBndr :: Outputable name => name -> Kind -> SDoc
@@ -238,8 +262,8 @@ pprHsTyVarBndr name kind | kind `eqKind` liftedTypeKind = ppr name
 			 | otherwise 	  	        = hsep [ppr name, dcolon, pprParendKind kind]
 
 pprHsForAll exp tvs cxt 
-  | show_forall = forall_part <+> pprHsContext cxt
-  | otherwise   = pprHsContext cxt
+  | show_forall = forall_part <+> pprHsContext (unLoc cxt)
+  | otherwise   = pprHsContext (unLoc cxt)
   where
     show_forall =  opt_PprStyle_Debug
 		|| (not (null tvs) && is_explicit)
@@ -280,40 +304,42 @@ pprParendHsType ty = ppr_mono_ty pREC_CON ty
 -- (a) Remove outermost HsParTy parens
 -- (b) Drop top-level for-all type variables in user style
 --     since they are implicit in Haskell
-prepare sty (HsParTy ty)	  = prepare sty ty
+prepare sty (HsParTy ty)	  = prepare sty (unLoc ty)
 prepare sty ty			  = ty
+
+ppr_mono_lty ctxt_prec ty = ppr_mono_ty ctxt_prec (unLoc ty)
 
 ppr_mono_ty ctxt_prec (HsForAllTy exp tvs ctxt ty)
   = maybeParen ctxt_prec pREC_FUN $
-    sep [pprHsForAll exp tvs ctxt, ppr_mono_ty pREC_TOP ty]
+    sep [pprHsForAll exp tvs ctxt, ppr_mono_lty pREC_TOP ty]
 
 ppr_mono_ty ctxt_prec (HsTyVar name)      = ppr name
 ppr_mono_ty ctxt_prec (HsFunTy ty1 ty2)   = ppr_fun_ty ctxt_prec ty1 ty2
 ppr_mono_ty ctxt_prec (HsTupleTy con tys) = tupleParens con (interpp'SP tys)
-ppr_mono_ty ctxt_prec (HsKindSig ty kind) = parens (ppr_mono_ty pREC_TOP ty <+> dcolon <+> pprKind kind)
-ppr_mono_ty ctxt_prec (HsListTy ty)	  = brackets (ppr_mono_ty pREC_TOP ty)
-ppr_mono_ty ctxt_prec (HsPArrTy ty)	  = pabrackets (ppr_mono_ty pREC_TOP ty)
+ppr_mono_ty ctxt_prec (HsKindSig ty kind) = parens (ppr_mono_lty pREC_TOP ty <+> dcolon <+> pprKind kind)
+ppr_mono_ty ctxt_prec (HsListTy ty)	  = brackets (ppr_mono_lty pREC_TOP ty)
+ppr_mono_ty ctxt_prec (HsPArrTy ty)	  = pabrackets (ppr_mono_lty pREC_TOP ty)
 ppr_mono_ty ctxt_prec (HsPredTy pred)     = braces (ppr pred)
 ppr_mono_ty ctxt_prec (HsNumTy n)         = integer n  -- generics only
 
 ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty)
   = maybeParen ctxt_prec pREC_CON $
-    hsep [ppr_mono_ty pREC_FUN fun_ty, ppr_mono_ty pREC_CON arg_ty]
+    hsep [ppr_mono_lty pREC_FUN fun_ty, ppr_mono_lty pREC_CON arg_ty]
 
 ppr_mono_ty ctxt_prec (HsOpTy ty1 op ty2)  
   = maybeParen ctxt_prec pREC_OP $
-    ppr_mono_ty pREC_OP ty1 <+> ppr op <+> ppr_mono_ty pREC_OP ty2
+    ppr_mono_lty pREC_OP ty1 <+> ppr op <+> ppr_mono_lty pREC_OP ty2
 
 ppr_mono_ty ctxt_prec (HsParTy ty)
-  = parens (ppr_mono_ty pREC_TOP ty)
+  = parens (ppr_mono_lty pREC_TOP ty)
   -- Put the parens in where the user did
   -- But we still use the precedence stuff to add parens because
   --	toHsType doesn't put in any HsParTys, so we may still need them
 
 --------------------------
 ppr_fun_ty ctxt_prec ty1 ty2
-  = let p1 = ppr_mono_ty pREC_FUN ty1
-	p2 = ppr_mono_ty pREC_TOP ty2
+  = let p1 = ppr_mono_lty pREC_FUN ty1
+	p2 = ppr_mono_lty pREC_TOP ty2
     in
     maybeParen ctxt_prec pREC_FUN $
     sep [p1, ptext SLIT("->") <+> p2]

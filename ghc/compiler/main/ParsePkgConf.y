@@ -8,6 +8,7 @@ import Lexer
 import CmdLineOpts
 import FastString
 import StringBuffer
+import ErrUtils  ( mkLocMessage )
 import SrcLoc
 import Outputable
 import Panic     ( GhcException(..) )
@@ -16,20 +17,20 @@ import EXCEPTION ( throwDyn )
 }
 
 %token
- '{'		{ T _ _ ITocurly }
- '}'		{ T _ _ ITccurly }
- '['		{ T _ _ ITobrack }
- ']'		{ T _ _ ITcbrack }
- ','		{ T _ _ ITcomma }
- '='		{ T _ _ ITequal }
- VARID   	{ T _ _ (ITvarid    $$) }
- CONID   	{ T _ _ (ITconid    $$) }
- STRING		{ T _ _ (ITstring   $$) }
+ '{'		{ L _ ITocurly }
+ '}'		{ L _ ITccurly }
+ '['		{ L _ ITobrack }
+ ']'		{ L _ ITcbrack }
+ ','		{ L _ ITcomma }
+ '='		{ L _ ITequal }
+ VARID   	{ L _ (ITvarid    $$) }
+ CONID   	{ L _ (ITconid    $$) }
+ STRING		{ L _ (ITstring   $$) }
 
 %monad { P } { >>= } { return }
-%lexer { lexer } { T _ _ ITeof }
+%lexer { lexer } { L _ ITeof }
 %name parse
-%tokentype { Token }
+%tokentype { Located Token }
 %%
 
 pkgconf :: { [ PackageConfig ] }
@@ -98,8 +99,8 @@ loadPackageConfig conf_filename = do
    buf <- hGetStringBuffer conf_filename
    let loc  = mkSrcLoc (mkFastString conf_filename) 1 0
    case unP parse (mkPState buf loc defaultDynFlags) of
-	PFailed l1 l2 err -> 
-	  throwDyn (InstallationError (showSDoc (showPFailed l1 l2 err)))
+	PFailed span err -> 
+           throwDyn (InstallationError (showSDoc (mkLocMessage span err)))
 
 	POk _ pkg_details -> do
 	    return pkg_details

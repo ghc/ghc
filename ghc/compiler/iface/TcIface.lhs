@@ -29,7 +29,7 @@ import HscTypes		( ExternalPackageState(..), PackageInstEnv, PackageRuleBase,
 			  HscEnv, TyThing(..), implicitTyThings, typeEnvIds,
 			  ModIface(..), ModDetails(..), InstPool, ModGuts,
 			  TypeEnv, mkTypeEnv, extendTypeEnvList, lookupTypeEnv,
-			  DeclPool, RulePool, Pool(..), Gated, addRuleToPool )
+			  RulePool, Pool(..) )
 import InstEnv		( extendInstEnv )
 import CoreSyn
 import PprCore		( pprIdRules )

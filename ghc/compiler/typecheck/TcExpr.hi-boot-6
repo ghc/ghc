@@ -1,16 +1,16 @@
 module TcExpr where
 
 tcCheckSigma :: 
-	  RnHsSyn.RenamedHsExpr
+	  HsExpr.LHsExpr Name.Name
        -> TcType.TcType
-       -> TcRnTypes.TcM TcHsSyn.TcExpr
+       -> TcRnTypes.TcM (HsExpr.LHsExpr Var.Id)
 
 tcCheckRho :: 
-	  RnHsSyn.RenamedHsExpr
+  	  HsExpr.LHsExpr Name.Name
        -> TcType.TcType
-       -> TcRnTypes.TcM TcHsSyn.TcExpr
+       -> TcRnTypes.TcM (HsExpr.LHsExpr Var.Id)
 
 tcMonoExpr :: 
-	  RnHsSyn.RenamedHsExpr
+  	  HsExpr.LHsExpr Name.Name
        -> TcUnify.Expected TcType.TcType
-       -> TcRnTypes.TcM TcHsSyn.TcExpr
+       -> TcRnTypes.TcM (HsExpr.LHsExpr Var.Id)

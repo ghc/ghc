@@ -14,8 +14,7 @@ import {-# SOURCE #-} DsExpr ( dsExpr )
 import DsMonad
 import DsUtils
 
-import HsSyn		( HsLit(..), Pat(..), HsExpr(..) )
-import TcHsSyn		( TypecheckedPat )
+import HsSyn
 import Id		( Id )
 import CoreSyn
 import TyCon		( tyConDataCons )
@@ -24,6 +23,7 @@ import PrelNames	( ratioTyConKey )
 import Unique		( hasKey )
 import Literal		( mkMachInt, Literal(..) )
 import Maybes		( catMaybes )
+import SrcLoc		( noLoc, Located(..), unLoc )
 import Panic		( panic, assertPanic )
 import Ratio 		( numerator, denominator )
 import Outputable
@@ -135,7 +135,7 @@ matchLiterals all_vars@(var:vars)
 	(shifted_eqns_for_this_lit, eqns_not_for_this_lit)
 	  = partitionEqnsByLit pat eqns_info
     in
-    dsExpr (HsApp eq_chk (HsVar var))		`thenDs` \ pred_expr ->
+    dsExpr (HsApp (noLoc eq_chk) (nlHsVar var))	`thenDs` \ pred_expr ->
     match vars shifted_eqns_for_this_lit        `thenDs` \ inner_match_result ->
     let
 	match_result1 = mkGuardedMatchResult pred_expr inner_match_result
@@ -167,12 +167,12 @@ matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo n ctx (pat@(NPlusKPatOut ma
     in
     match vars shifted_eqns_for_this_lit	`thenDs` \ inner_match_result ->
 
-    dsExpr (HsApp ge (HsVar var))		`thenDs` \ ge_expr ->
-    dsExpr (HsApp sub (HsVar var))		`thenDs` \ nminusk_expr ->
+    dsExpr (HsApp (noLoc ge) (nlHsVar var))	`thenDs` \ ge_expr ->
+    dsExpr (HsApp (noLoc sub) (nlHsVar var))	`thenDs` \ nminusk_expr ->
 
     let
 	match_result1 = mkGuardedMatchResult ge_expr $
-			mkCoLetsMatchResult [NonRec master_n nminusk_expr] $
+			mkCoLetsMatchResult [NonRec (unLoc master_n) nminusk_expr] $
 			inner_match_result
     in
     if (null eqns_not_for_this_lit)
@@ -188,7 +188,7 @@ that are ``same''/different as one we are looking at.  We need to know
 whether we're looking at a @LitPat@/@NPat@, and what literal we're after.
 
 \begin{code}
-partitionEqnsByLit :: TypecheckedPat
+partitionEqnsByLit :: Pat Id
 		   -> [EquationInfo]
 		   -> ([EquationInfo], 	-- These ones are for this lit, AND
 					-- they've been "shifted" by stripping
@@ -201,7 +201,7 @@ partitionEqnsByLit master_pat eqns
   = ( \ (xs,ys) -> (catMaybes xs, catMaybes ys))
 	(unzip (map (partition_eqn master_pat) eqns))
   where
-    partition_eqn :: TypecheckedPat -> EquationInfo -> (Maybe EquationInfo, Maybe EquationInfo)
+    partition_eqn :: Pat Id -> EquationInfo -> (Maybe EquationInfo, Maybe EquationInfo)
 
     partition_eqn (LitPat k1) (EqnInfo n ctx (LitPat k2 : remaining_pats) match_result)
       | k1 == k2 = (Just (EqnInfo n ctx remaining_pats match_result), Nothing)
@@ -211,8 +211,8 @@ partitionEqnsByLit master_pat eqns
       | k1 == k2 = (Just (EqnInfo n ctx remaining_pats match_result), Nothing)
 			  -- NB the pattern is stripped off the EquationInfo
 
-    partition_eqn (NPlusKPatOut master_n k1 _ _)
- 	          (EqnInfo n ctx (NPlusKPatOut n' k2 _ _ : remaining_pats) match_result)
+    partition_eqn (NPlusKPatOut (L _ master_n) k1 _ _)
+ 	          (EqnInfo n ctx (NPlusKPatOut (L _ n') k2 _ _ : remaining_pats) match_result)
       | k1 == k2 = (Just (EqnInfo n ctx remaining_pats new_match_result), Nothing)
 			  -- NB the pattern is stripped off the EquationInfo
       where

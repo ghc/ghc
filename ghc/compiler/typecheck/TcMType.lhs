@@ -43,7 +43,7 @@ module TcMType (
 
 
 -- friends:
-import HsSyn		( HsType )
+import HsSyn		( LHsType )
 import TypeRep		( Type(..), PredType(..), TyNote(..),	 -- Friend; can see representation
 			  Kind, ThetaType
 			) 
@@ -61,7 +61,7 @@ import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  liftedTypeKind, defaultKind, superKind,
 			  superBoxity, liftedBoxity, typeKind,
 			  tyVarsOfType, tyVarsOfTypes, 
-			  eqKind, isTypeKind, pprThetaArrow, 
+			  eqKind, isTypeKind, 
 			  pprPred, pprTheta, pprClassPred )
 import Subst		( Subst, mkTopTyVarSubst, substTy )
 import Class		( Class, classArity, className )
@@ -78,6 +78,7 @@ import VarSet
 import CmdLineOpts	( dopt, DynFlag(..) )
 import Util		( nOfThem, isSingleton, equalLength, notNull )
 import ListSetOps	( removeDups )
+import SrcLoc		( unLoc )
 import Outputable
 \end{code}
 
@@ -530,8 +531,8 @@ data UserTypeCtxt
 -- With gla-exts that's right, but for H98 we should complain. 
 
 
-pprHsSigCtxt :: UserTypeCtxt -> HsType Name -> SDoc
-pprHsSigCtxt ctxt hs_ty = pprUserTypeCtxt hs_ty ctxt
+pprHsSigCtxt :: UserTypeCtxt -> LHsType Name -> SDoc
+pprHsSigCtxt ctxt hs_ty = pprUserTypeCtxt (unLoc hs_ty) ctxt
 
 pprUserTypeCtxt ty (FunSigCtxt n)  = sep [ptext SLIT("In the type signature:"), pp_sig n ty]
 pprUserTypeCtxt ty ExprSigCtxt     = sep [ptext SLIT("In an expression type signature:"), nest 2 (ppr ty)]

@@ -10,8 +10,10 @@ module TcEnv(
 	-- Global environment
 	tcExtendGlobalEnv, 
 	tcExtendGlobalValEnv,
-	tcLookupGlobal, 
+	tcLookupLocatedGlobal,	tcLookupGlobal, 
 	tcLookupGlobalId, tcLookupTyCon, tcLookupClass, tcLookupDataCon,
+	tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
+	tcLookupLocatedClass, tcLookupLocatedDataCon,
 	
 	getInGlobalScope,
 
@@ -19,7 +21,7 @@ module TcEnv(
 	tcExtendTyVarKindEnv,
 	tcExtendTyVarEnv,    tcExtendTyVarEnv2, 
 	tcExtendLocalValEnv, tcExtendLocalValEnv2, 
-	tcLookup, tcLookupLocalIds,
+	tcLookup, tcLookupLocated, tcLookupLocalIds,
 	tcLookupId, tcLookupTyVar,
 	lclEnvElts, getInLocalScope, findGlobals, 
 
@@ -44,8 +46,8 @@ module TcEnv(
 
 #include "HsVersions.h"
 
-import RnHsSyn		( RenamedMonoBinds, RenamedSig )
-import HsSyn		( RuleDecl(..), , HsTyVarBndr(..) )
+import HsSyn		( LRuleDecl, , HsTyVarBndr(..), LHsTyVarBndr, LHsBinds,
+			  LSig )
 import TcIface		( tcImportDecl )
 import TcRnMonad
 import TcMType		( zonkTcType, zonkTcTyVar, zonkTcTyVarsAndFV )
@@ -63,16 +65,14 @@ import RdrName		( extendLocalRdrEnv )
 import DataCon		( DataCon )
 import TyCon		( TyCon )
 import Class		( Class )
-import Name		( Name, NamedThing(..), 
-			  getSrcLoc, mkInternalName, nameIsLocalOrFrom
-			)
+import Name		( Name, NamedThing(..), getSrcLoc, mkInternalName, nameIsLocalOrFrom )
 import NameEnv
 import OccName		( mkDFunOcc, occNameString )
 import HscTypes		( DFunId, extendTypeEnvList, lookupType,
 			  TyThing(..), tyThingId, tyThingTyCon, tyThingClass, tyThingDataCon,
 			  ExternalPackageState(..) )
 
-import SrcLoc		( SrcLoc )
+import SrcLoc		( SrcLoc, Located(..) )
 import Outputable
 import Maybe		( isJust )
 \end{code}
@@ -84,9 +84,17 @@ import Maybe		( isJust )
 %*									*
 %************************************************************************
 
+Using the Located versions (eg. tcLookupLocatedGlobal) is preferred,
+unless you know that the SrcSpan in the monad is already set to the
+span of the Name.
+
 \begin{code}
-tcLookupGlobal :: Name -> TcM TyThing
+tcLookupLocatedGlobal :: Located Name -> TcM TyThing
 -- c.f. IfaceEnvEnv.tcIfaceGlobal
+tcLookupLocatedGlobal name
+  = addLocM tcLookupGlobal name
+
+tcLookupGlobal :: Name -> TcM TyThing
 tcLookupGlobal name
   = do	{ env <- getGblEnv
 	; if nameIsLocalOrFrom (tcg_mod env) name
@@ -120,13 +128,25 @@ tcLookupDataCon con_name
 
 tcLookupClass :: Name -> TcM Class
 tcLookupClass name
-  = tcLookupGlobal name	`thenM` \ thing ->
+  = tcLookupGlobal name		`thenM` \ thing ->
     return (tyThingClass thing)
 	
 tcLookupTyCon :: Name -> TcM TyCon
 tcLookupTyCon name
-  = tcLookupGlobal name	`thenM` \ thing ->
+  = tcLookupGlobal name		`thenM` \ thing ->
     return (tyThingTyCon thing)
+
+tcLookupLocatedGlobalId :: Located Name -> TcM Id
+tcLookupLocatedGlobalId = addLocM tcLookupId
+
+tcLookupLocatedDataCon :: Located Name -> TcM DataCon
+tcLookupLocatedDataCon = addLocM tcLookupDataCon
+
+tcLookupLocatedClass :: Located Name -> TcM Class
+tcLookupLocatedClass = addLocM tcLookupClass
+
+tcLookupLocatedTyCon :: Located Name -> TcM TyCon
+tcLookupLocatedTyCon = addLocM tcLookupTyCon
 \end{code}
 
 %************************************************************************
@@ -188,6 +208,9 @@ tcExtendRecEnv gbl_stuff lcl_stuff thing_inside
 %************************************************************************
 
 \begin{code}
+tcLookupLocated :: Located Name -> TcM TcTyThing
+tcLookupLocated = addLocM tcLookup
+
 tcLookup :: Name -> TcM TcTyThing
 tcLookup name
   = getLclEnv 		`thenM` \ local_env ->
@@ -238,14 +261,14 @@ getInLocalScope = getLclEnv	`thenM` \ env ->
 \end{code}
 
 \begin{code}
-tcExtendTyVarKindEnv :: [HsTyVarBndr Name] -> TcM r -> TcM r
+tcExtendTyVarKindEnv :: [LHsTyVarBndr Name] -> TcM r -> TcM r
 -- The tyvars are all kinded
 tcExtendTyVarKindEnv tvs thing_inside
   = updLclEnv upd thing_inside
   where
     upd lcl_env = lcl_env { tcl_env = extend (tcl_env lcl_env) }
     extend env  = extendNameEnvList env [(n, ATyVar (mkTyVar n k)) 
-					| KindedTyVar n k <- tvs]
+					| L _ (KindedTyVar n k) <- tvs]
 	-- No need to extend global tyvars for kind checking
 
 tcExtendTyVarEnv :: [TyVar] -> TcM r -> TcM r
@@ -400,7 +423,7 @@ tcGetGlobalTyVars
 %************************************************************************
 
 \begin{code}
-tcExtendRules :: [RuleDecl Id] -> TcM a -> TcM a
+tcExtendRules :: [LRuleDecl Id] -> TcM a -> TcM a
 	-- Just pop the new rules into the EPS and envt resp
 	-- All the rules come from an interface file, not soruce
 	-- Nevertheless, some may be for this module, if we read
@@ -566,8 +589,8 @@ data InstInfo
 
 data InstBindings
   = VanillaInst 		-- The normal case
-	RenamedMonoBinds	-- Bindings
-      	[RenamedSig]		-- User pragmas recorded for generating 
+	(LHsBinds Name)		-- Bindings
+	[LSig Name]		-- User pragmas recorded for generating 
 				-- specialised instances
 
   | NewTypeDerived 		-- Used for deriving instances of newtypes, where the

@@ -51,7 +51,7 @@ import Module   ( ModuleName, mkSysModuleNameFS, mkModuleNameFS	)
 import Name	( Name, NamedThing(getName), nameModuleName, nameParent_maybe,
 		  nameOccName, isExternalName, nameSrcLoc )
 import Maybes	( seqMaybe )
-import SrcLoc	( SrcLoc, isGoodSrcLoc )
+import SrcLoc	( SrcLoc, isGoodSrcLoc, SrcSpan )
 import BasicTypes( DeprecTxt )
 import Outputable
 import Util	( thenCmp )
@@ -433,7 +433,7 @@ data ImportSpec		-- Describes a particular import declaration
 					-- the defining module for this thing!
 	is_as   :: ModuleName,		-- 'as M' (or 'Muggle' if there is no 'as' clause)
 	is_qual :: Bool,		-- True <=> qualified (only)
-	is_loc  :: SrcLoc }		-- Location of import statment
+	is_loc  :: SrcSpan }		-- Location of import statment
 
 -- Comparison of provenance is just used for grouping 
 -- error messages (in RnEnv.warnUnusedBinds)

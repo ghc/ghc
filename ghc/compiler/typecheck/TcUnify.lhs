@@ -28,7 +28,7 @@ module TcUnify (
 
 
 import HsSyn		( HsExpr(..) )
-import TcHsSyn		( mkHsLet,
+import TcHsSyn		( mkHsLet, mkHsDictLam,
 			  ExprCoFn, idCoercion, isIdCoercion, mkCoercion, (<.>), (<$>) )
 import TypeRep		( Type(..), PredType(..), TyNote(..), openKindCon, isSuperKind )
 
@@ -58,6 +58,7 @@ import VarSet		( emptyVarSet, unitVarSet, unionVarSet, elemVarSet, varSetElems )
 import VarEnv
 import Name		( isSystemName )
 import ErrUtils		( Message )
+import SrcLoc		( noLoc )
 import BasicTypes	( Boxity, Arity, isBoxed )
 import Util		( equalLength, lengthExceeds, notNull )
 import Outputable
@@ -441,7 +442,7 @@ tcSub_fun exp_arg exp_res act_arg act_res
 	         | otherwise	          = mkCoercion co_fn
 
 	co_fn e = DictLam [arg_id] 
-		     (co_fn_res <$> (HsApp e (co_fn_arg <$> (HsVar arg_id))))
+		     (noLoc (co_fn_res <$> (HsApp (noLoc e) (noLoc (co_fn_arg <$> HsVar arg_id)))))
 		-- Slight hack; using a "DictLam" to get an ordinary simple lambda
 		-- 	HsVar arg_id :: HsExpr exp_arg
 		--	co_fn_arg $it :: HsExpr act_arg
@@ -521,7 +522,7 @@ tcGen expected_ty extra_tvs thing_inside	-- We expect expected_ty to be a forall
 	    -- It's a bit out of place here, but using AbsBind involves inventing
 	    -- a couple of new names which seems worse.
 	dict_ids = map instToId dicts
-	co_fn e  = TyLam zonked_tvs (DictLam dict_ids (mkHsLet inst_binds e))
+	co_fn e  = TyLam zonked_tvs (mkHsDictLam dict_ids (mkHsLet inst_binds (noLoc e)))
     in
     returnM (mkCoercion co_fn, result)
   where

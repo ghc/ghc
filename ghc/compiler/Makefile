@@ -354,19 +354,21 @@ prelude/PrelRules_HC_OPTS	= -fvia-C
 main/ParsePkgConf_HC_OPTS	+= -fno-warn-incomplete-patterns
 # Use -fvia-C since the NCG can't handle the narrow16Int# (and intToInt16#?)
 # primops on all platforms.
-parser/Parser_HC_OPTS 		+= -Onot -fno-warn-incomplete-patterns -fvia-C
+parser/Parser_HC_OPTS 		+= -fno-warn-incomplete-patterns -fvia-C
 
-# The latest GHC version doesn't have a -K option yet, and it doesn't
-# seem to be necessary anymore for the modules below.
-ifeq "$(compiling_with_4xx)" "YES"
-parser/Parser_HC_OPTS 		+= -K2m
-endif
+# Careful optimisation of the parser: we don't want to throw everything
+# at it, because that takes too long and doesn't buy much, but we do want
+# to inline certain key external functions, so we instruct GHC not to
+# throw away inlinings as it would normally do in -Onot mode:
+parser/Parser_HC_OPTS		+= -Onot -fno-ignore-interface-pragmas
 
 ifeq "$(HOSTPLATFORM)" "hppa1.1-hp-hpux9"
 rename/RnMonad_HC_OPTS 		=  -O2 -O2-for-C
 endif
 
 utils/Digraph_HC_OPTS		= -fglasgow-exts 
+
+basicTypes/SrcLoc_HC_OPTS	= -funbox-strict-fields
 
 ifeq "$(bootstrapped)" "YES"
 utils/Binary_HC_OPTS		= -funbox-strict-fields
@@ -568,6 +570,9 @@ MAINTAINER_CLEAN_FILES += parser/Parser.info main/ParsePkgConf.info
 # Don't use the default MKDEPENDHS stuff... we'll do our own, below
 MKDEPENDHS_SRCS =
 MKDEPENDC_SRCS =
+
+# Make doesn't work this out for itself, it seems
+parser/Parser.y : parser/Parser.y.pp
 
 include $(TOP)/mk/target.mk
 

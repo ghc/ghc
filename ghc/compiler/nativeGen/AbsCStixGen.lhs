@@ -38,6 +38,8 @@ import Name             ( NamedThing(..) )
 import CmdLineOpts	( opt_EnsureSplittableC )
 import Outputable	( assertPanic )
 
+import Char		( ord )
+
 -- DEBUGGING ONLY
 --import TRACE		( trace )
 --import Outputable	( showSDoc )
@@ -448,7 +450,7 @@ be tuned.)
 \begin{code}
 
  intTag :: Literal -> Integer
- intTag (MachChar c)  = toInteger c
+ intTag (MachChar c)  = toInteger (ord c)
  intTag (MachInt i)   = i
  intTag (MachWord w)  = intTag (word2IntLit (MachWord w))
  intTag _             = panic "intTag"

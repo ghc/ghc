@@ -93,7 +93,7 @@ import CoreSyn		( IdCoreRule )
 import PrelNames	( isBuiltInSyntaxName )
 import Maybes		( orElse )
 import Outputable
-import SrcLoc		( SrcLoc )
+import SrcLoc		( SrcSpan )
 import UniqSupply	( UniqSupply )
 import Maybe		( fromJust )
 import FastString	( FastString )
@@ -629,7 +629,7 @@ emptyIfaceFixCache n = defaultFixity
 type FixityEnv = NameEnv FixItem
 
 -- We keep the OccName in the range so that we can generate an interface from it
-data FixItem = FixItem OccName Fixity SrcLoc
+data FixItem = FixItem OccName Fixity SrcSpan
 
 instance Outputable FixItem where
   ppr (FixItem occ fix loc) = ppr fix <+> ppr occ <+> parens (ppr loc)

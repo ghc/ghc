@@ -9,12 +9,13 @@ import HsSyn
 import Type             ( Type, isUnLiftedType, tyVarsOfType, tyVarsOfTypes,
 			  isTyVarTy, getTyVar_maybe, funTyCon
 			)
+import TcHsSyn		( mkSimpleHsAlt )
 import TcType		( tcSplitTyConApp_maybe, tcSplitSigmaTy, tcSplitSigmaTy, isTauTy )
 import DataCon          ( DataCon, dataConOrigArgTys, isExistentialDataCon,
 			  dataConSourceArity )
 
 import TyCon            ( TyCon, tyConName, tyConDataCons, 
-			  tyConHasGenerics, isBoxedTupleTyCon
+			  isBoxedTupleTyCon
 			)
 import Name		( nameModuleName, nameOccName, getSrcLoc )
 import OccName		( mkGenOcc1, mkGenOcc2 )
@@ -25,8 +26,9 @@ import VarSet		( varSetElems )
 import Id               ( Id, idType )
 import PrelNames
 	
-import SrcLoc		( generatedSrcLoc )
+import SrcLoc		( srcLocSpan, noLoc, Located(..) )
 import Util             ( takeList )
+import Bag
 import Outputable 
 import FastString
 
@@ -246,18 +248,18 @@ canDoGenerics data_cons
 
 \begin{code}
 type US = Int	-- Local unique supply, just a plain Int
-type FromAlt = (Pat RdrName, HsExpr RdrName)
+type FromAlt = (LPat RdrName, LHsExpr RdrName)
 
-mkTyConGenericBinds :: TyCon -> MonoBinds RdrName
+mkTyConGenericBinds :: TyCon -> LHsBinds RdrName
 mkTyConGenericBinds tycon
-  = FunMonoBind from_RDR False {- Not infix -}
-		[mkSimpleHsAlt pat rhs | (pat,rhs) <- from_alts]
-		loc
-	`AndMonoBinds`
-    FunMonoBind to_RDR False 
-		[mkSimpleHsAlt to_pat to_body] loc
+  = unitBag (L loc (FunBind (L loc from_RDR) False {- Not infix -}
+		 	    [mkSimpleHsAlt pat rhs | (pat,rhs) <- from_alts]))
+
+	`unionBags`
+    unitBag (L loc (FunBind (L loc to_RDR) False 
+			    [mkSimpleHsAlt to_pat to_body]))
   where
-    loc	     = getSrcLoc tycon
+    loc	     = srcLocSpan (getSrcLoc tycon)
     datacons = tyConDataCons tycon
     (from_RDR, to_RDR) = mkGenericNames tycon
 
@@ -272,8 +274,8 @@ mkTyConGenericBinds tycon
 
 mk_sum_stuff :: US 			-- Base for generating unique names
 	     -> [DataCon]	 	-- The data constructors
-	     -> ([FromAlt],			-- Alternatives for the T->Trep "from" function
-		 InPat RdrName, HsExpr RdrName)	-- Arg and body of the Trep->T "to" function
+	     -> ([FromAlt],				-- Alternatives for the T->Trep "from" function
+		 InPat RdrName, LHsExpr RdrName)	-- Arg and body of the Trep->T "to" function
 
 -- For example, given
 --	data T = C | D Int Int Int
@@ -294,18 +296,17 @@ mk_sum_stuff us [datacon]
      us'          = us + n_args
 
      datacon_rdr  = getRdrName datacon
-     app_exp      = mkHsVarApps datacon_rdr datacon_vars
-     from_alt     = (mkConPat datacon_rdr datacon_vars, from_alt_rhs)
+     app_exp      = nlHsVarApps datacon_rdr datacon_vars
+     from_alt     = (nlConVarPat datacon_rdr datacon_vars, from_alt_rhs)
 
      (_, from_alt_rhs, to_pat, to_body_fn) = mk_prod_stuff us' datacon_vars
 
 mk_sum_stuff us datacons
   = (wrap inlDataCon_RDR l_from_alts ++ wrap inrDataCon_RDR r_from_alts,
-     VarPat to_arg,
-     HsCase (HsVar to_arg) 
-	    [mkSimpleHsAlt (ConPatIn inlDataCon_RDR (PrefixCon [l_to_pat])) l_to_body,
-	     mkSimpleHsAlt (ConPatIn inrDataCon_RDR (PrefixCon [r_to_pat])) r_to_body]
-	    generatedSrcLoc)
+     nlVarPat to_arg,
+     noLoc (HsCase (nlHsVar to_arg) 
+	    [mkSimpleHsAlt (nlConPat inlDataCon_RDR [l_to_pat]) l_to_body,
+	     mkSimpleHsAlt (nlConPat inrDataCon_RDR [r_to_pat]) r_to_body]))
   where
     (l_datacons, r_datacons)		= splitInHalf datacons
     (l_from_alts, l_to_pat, l_to_body)	= mk_sum_stuff us' l_datacons
@@ -316,7 +317,7 @@ mk_sum_stuff us datacons
 
     wrap :: RdrName -> [FromAlt] -> [FromAlt]
 	-- Wrap an application of the Inl or Inr constructor round each alternative
-    wrap dc alts = [(pat, HsApp (HsVar dc) rhs) | (pat,rhs) <- alts]
+    wrap dc alts = [(pat, noLoc (HsApp (nlHsVar dc) rhs)) | (pat,rhs) <- alts]
 
 
 ----------------------------------------------------
@@ -327,9 +328,9 @@ mk_prod_stuff :: US			-- Base for unique names
 					-- 	They are bound enclosing from_rhs
 					-- 	Please bind these in the to_body_fn 
 	      -> (US,			-- Depleted unique-name supply
-		  HsExpr RdrName, 			-- from-rhs: puts together the representation from the arg_ids
+		  LHsExpr RdrName, 			-- from-rhs: puts together the representation from the arg_ids
 		  InPat RdrName,			-- to_pat: 
-		  HsExpr RdrName -> HsExpr RdrName)	-- to_body_fn: takes apart the representation
+		  LHsExpr RdrName -> LHsExpr RdrName)	-- to_body_fn: takes apart the representation
 
 -- For example:
 -- mk_prod_stuff abc [a,b,c] = ( a :*: (b :*: c),
@@ -344,9 +345,9 @@ mk_prod_stuff :: US			-- Base for unique names
 
 mk_prod_stuff us []		-- Unit case
   = (us+1,
-     HsVar genUnitDataCon_RDR,
-     SigPatIn (VarPat (mkGenericLocal us)) 
-	      (HsTyVar (getRdrName genUnitTyConName)),
+     nlHsVar genUnitDataCon_RDR,
+     noLoc (SigPatIn (nlVarPat (mkGenericLocal us)) 
+	    	     (noLoc (HsTyVar (getRdrName genUnitTyConName)))),
 	-- Give a signature to the pattern so we get 
 	--	data S a = Nil | S a
 	--	toS = \x -> case x of { Inl (g :: Unit) -> Nil
@@ -357,21 +358,20 @@ mk_prod_stuff us []		-- Unit case
      \x -> x)
 
 mk_prod_stuff us [arg_var]	-- Singleton case
-  = (us, HsVar arg_var, VarPat arg_var, \x -> x)
+  = (us, nlHsVar arg_var, nlVarPat arg_var, \x -> x)
 
 mk_prod_stuff us arg_vars	-- Two or more
   = (us'', 
-     HsVar crossDataCon_RDR `HsApp` l_alt_rhs `HsApp` r_alt_rhs,
-     VarPat to_arg, 
-     \x -> HsCase (HsVar to_arg)
-		  [mkSimpleHsAlt (ConPatIn crossDataCon_RDR (PrefixCon [l_to_pat, r_to_pat]))
-				 (l_to_body_fn (r_to_body_fn x))] generatedSrcLoc)
+     nlHsApps crossDataCon_RDR [l_alt_rhs, r_alt_rhs],
+     nlVarPat to_arg, 
+     \x -> noLoc (HsCase (nlHsVar to_arg)
+		  [mkSimpleHsAlt pat (l_to_body_fn (r_to_body_fn x))]))
   where
     to_arg = mkGenericLocal us
     (l_arg_vars, r_arg_vars) 		      = splitInHalf arg_vars
     (us',  l_alt_rhs, l_to_pat, l_to_body_fn) = mk_prod_stuff (us+1)  l_arg_vars
     (us'', r_alt_rhs, r_to_pat, r_to_body_fn) = mk_prod_stuff us' r_arg_vars
-
+    pat = nlConPat crossDataCon_RDR [l_to_pat, r_to_pat]
 
 splitInHalf :: [a] -> ([a],[a])
 splitInHalf list = (left, right)
@@ -448,9 +448,9 @@ By the time the type checker has done its stuff we'll get
 	   op = \b. \dict::Ord b. toOp b (op Trep b dict)
 
 \begin{code}
-mkGenericRhs :: Id -> TyVar -> TyCon -> HsExpr RdrName
+mkGenericRhs :: Id -> TyVar -> TyCon -> LHsExpr RdrName
 mkGenericRhs sel_id tyvar tycon
-  = HsApp (toEP bimap) (HsVar (getRdrName sel_id))
+  = mkHsApp (toEP bimap) (nlHsVar (getRdrName sel_id))
   where 
 	-- Initialising the "Environment" with the from/to functions
 	-- on the datatype (actually tycon) in question
@@ -466,18 +466,18 @@ mkGenericRhs sel_id tyvar tycon
 
 	-- Now we probably have a tycon in front
         -- of us, quite probably a FunTyCon.
-        ep    = EP (HsVar from_RDR) (HsVar to_RDR) 
+        ep    = EP (nlHsVar from_RDR) (nlHsVar to_RDR) 
         bimap = generate_bimap (tyvar, ep, local_tvs) final_ty
 
 type EPEnv = (TyVar,			-- The class type variable
-	      EP (HsExpr RdrName),	-- The EP it maps to
+	      EP (LHsExpr RdrName),	-- The EP it maps to
 	      [TyVar]			-- Other in-scope tyvars; they have an identity EP
 	     )
 
 -------------------
 generate_bimap :: EPEnv
 	       -> Type
-	       -> EP (HsExpr RdrName)
+	       -> EP (LHsExpr RdrName)
 -- Top level case - splitting the TyCon.
 generate_bimap env@(tv,ep,local_tvs) ty 
   = case getTyVar_maybe ty of
@@ -487,7 +487,7 @@ generate_bimap env@(tv,ep,local_tvs) ty
 	Nothing	 -> bimapApp env (tcSplitTyConApp_maybe ty)
 
 -------------------
-bimapApp :: EPEnv -> Maybe (TyCon, [Type]) -> EP (HsExpr RdrName)
+bimapApp :: EPEnv -> Maybe (TyCon, [Type]) -> EP (LHsExpr RdrName)
 bimapApp env Nothing		    = panic "TcClassDecl: Type Application!"
 bimapApp env (Just (tycon, ty_args)) 
   | tycon == funTyCon       = bimapArrow arg_eps
@@ -503,32 +503,30 @@ bimapApp env (Just (tycon, ty_args))
 -------------------
 -- bimapArrow :: [EP a a', EP b b'] -> EP (a->b) (a'->b')
 bimapArrow [ep1, ep2]
-  = EP { fromEP = mk_hs_lam [VarPat a_RDR, VarPat b_RDR] from_body, 
-	 toEP   = mk_hs_lam [VarPat a_RDR, VarPat b_RDR] to_body }
+  = EP { fromEP = mkHsLam [nlVarPat a_RDR, nlVarPat b_RDR] from_body, 
+	 toEP   = mkHsLam [nlVarPat a_RDR, nlVarPat b_RDR] to_body }
   where
-    from_body = fromEP ep2 `HsApp` (HsPar $ HsVar a_RDR `HsApp` (HsPar $ toEP   ep1 `HsApp` HsVar b_RDR))
-    to_body   = toEP   ep2 `HsApp` (HsPar $ HsVar a_RDR `HsApp` (HsPar $ fromEP ep1 `HsApp` HsVar b_RDR))
+    from_body = fromEP ep2 `mkHsApp` (mkHsPar $ nlHsVar a_RDR `mkHsApp` (mkHsPar $ toEP   ep1 `mkHsApp` nlHsVar b_RDR))
+    to_body   = toEP   ep2 `mkHsApp` (mkHsPar $ nlHsVar a_RDR `mkHsApp` (mkHsPar $ fromEP ep1 `mkHsApp` nlHsVar b_RDR))
 
 -------------------
 bimapTuple eps 
-  = EP { fromEP = mk_hs_lam [tuple_pat] from_body,
-	 toEP   = mk_hs_lam [tuple_pat] to_body }
+  = EP { fromEP = mkHsLam [noLoc tuple_pat] (noLoc from_body),
+	 toEP   = mkHsLam [noLoc tuple_pat] (noLoc to_body) }
   where
     names	= takeList eps gs_RDR
-    tuple_pat	= TuplePat (map VarPat names) Boxed
+    tuple_pat	= TuplePat (map nlVarPat names) Boxed
     eps_w_names = eps `zip` names
-    to_body     = ExplicitTuple [toEP   ep `HsApp` HsVar g | (ep,g) <- eps_w_names] Boxed
-    from_body   = ExplicitTuple [fromEP ep `HsApp` HsVar g | (ep,g) <- eps_w_names] Boxed
+    to_body     = ExplicitTuple [toEP   ep `mkHsApp` nlHsVar g | (ep,g) <- eps_w_names] Boxed
+    from_body   = ExplicitTuple [fromEP ep `mkHsApp` nlHsVar g | (ep,g) <- eps_w_names] Boxed
 
 -------------------
 a_RDR	= mkVarUnqual FSLIT("a")
 b_RDR	= mkVarUnqual FSLIT("b")
 gs_RDR	= [ mkVarUnqual (mkFastString ("g"++show i)) | i <- [(1::Int) .. ] ]
 
-mk_hs_lam pats body = HsPar (HsLam (mkSimpleMatch pats body placeHolderType generatedSrcLoc))
-
-idEP :: EP (HsExpr RdrName)
+idEP :: EP (LHsExpr RdrName)
 idEP = EP idexpr idexpr
      where
-       idexpr = mk_hs_lam [VarPat a_RDR] (HsVar a_RDR)
+       idexpr = mkHsLam [nlVarPat a_RDR] (nlHsVar a_RDR)
 \end{code}

@@ -8,14 +8,11 @@ module DsListComp ( dsListComp, dsPArrComp ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} DsExpr ( dsExpr, dsLet )
+import {-# SOURCE #-} DsExpr ( dsExpr, dsLExpr, dsLet )
 
 import BasicTypes	( Boxity(..) )
-import HsSyn		( Pat(..), HsExpr(..), Stmt(..),
-			  HsMatchContext(..), HsStmtContext(..),
-			  collectHsBinders )
-import TcHsSyn		( TypecheckedStmt, TypecheckedPat, TypecheckedHsExpr,
-			  hsPatType )
+import HsSyn
+import TcHsSyn		( hsPatType )
 import CoreSyn
 
 import DsMonad		-- the monadery used in the desugarer
@@ -34,7 +31,7 @@ import Match		( matchSimply )
 import PrelNames	( foldrName, buildName, replicatePName, mapPName, 
 			  filterPName, zipPName, crossPName ) 
 import PrelInfo		( pAT_ERROR_ID )
-import SrcLoc		( noSrcLoc )
+import SrcLoc		( noLoc, Located(..), unLoc )
 import Panic		( panic )
 \end{code}
 
@@ -45,12 +42,14 @@ turned on'' (if you read Gill {\em et al.}'s paper on the subject).
 There will be at least one ``qualifier'' in the input.
 
 \begin{code}
-dsListComp :: [TypecheckedStmt] 
+dsListComp :: [LStmt Id] 
 	   -> Type		-- Type of list elements
 	   -> DsM CoreExpr
-
-dsListComp quals elt_ty
+dsListComp lquals elt_ty
   = getDOptsDs  `thenDs` \dflags ->
+    let
+	quals = map unLoc lquals
+    in
     if opt_RulesOff || dopt Opt_IgnoreInterfacePragmas dflags
 	-- Either rules are switched off, or we are ignoring what there are;
 	-- Either way foldr/build won't happen, so use the more efficient
@@ -142,8 +141,7 @@ The introduced tuples are Boxed, but only because I couldn't get it to work
 with the Unboxed variety.
 
 \begin{code}
-
-deListComp :: [TypecheckedStmt] -> CoreExpr -> DsM CoreExpr
+deListComp :: [Stmt Id] -> CoreExpr -> DsM CoreExpr
 
 deListComp (ParStmt stmtss_w_bndrs : quals) list
   = mappM do_list_comp stmtss_w_bndrs	`thenDs` \ exps ->
@@ -157,26 +155,26 @@ deListComp (ParStmt stmtss_w_bndrs : quals) list
 	bndrs_s = map snd stmtss_w_bndrs
 
 	-- pat is the pattern ((x1,..,xn), (y1,..,ym)) in the example above
-	pat	 = TuplePat pats Boxed
+	pat	 = noLoc (TuplePat pats Boxed)
 	pats	 = map mk_hs_tuple_pat bndrs_s
 
 	-- Types of (x1,..,xn), (y1,..,yn) etc
 	qual_tys = map mk_bndrs_tys bndrs_s
 
 	do_list_comp (stmts, bndrs)
-	  = dsListComp (stmts ++ [ResultStmt (mk_hs_tuple_expr bndrs) noSrcLoc])
+	  = dsListComp (stmts ++ [noLoc $ ResultStmt (mk_hs_tuple_expr bndrs)])
 		       (mk_bndrs_tys bndrs)
 
 	mk_bndrs_tys bndrs = mkCoreTupTy (map idType bndrs)
 
 	-- Last: the one to return
-deListComp [ResultStmt expr locn] list	-- Figure 7.4, SLPJ, p 135, rule C above
-  = dsExpr expr			`thenDs` \ core_expr ->
+deListComp [ResultStmt expr] list	-- Figure 7.4, SLPJ, p 135, rule C above
+  = dsLExpr expr		`thenDs` \ core_expr ->
     returnDs (mkConsExpr (exprType core_expr) core_expr list)
 
 	-- Non-last: must be a guard
-deListComp (ExprStmt guard ty locn : quals) list	-- rule B above
-  = dsExpr guard       		`thenDs` \ core_guard ->
+deListComp (ExprStmt guard ty : quals) list	-- rule B above
+  = dsLExpr guard      		`thenDs` \ core_guard ->
     deListComp quals list	`thenDs` \ core_rest ->
     returnDs (mkIfThenElse core_guard core_rest list)
 
@@ -185,8 +183,8 @@ deListComp (LetStmt binds : quals) list
   = deListComp quals list	`thenDs` \ core_rest ->
     dsLet binds core_rest
 
-deListComp (BindStmt pat list1 locn : quals) core_list2 -- rule A' above
-  = dsExpr list1		    `thenDs` \ core_list1 ->
+deListComp (BindStmt pat list1 : quals) core_list2 -- rule A' above
+  = dsLExpr list1		    `thenDs` \ core_list1 ->
     deBindComp pat core_list1 quals core_list2
 \end{code}
 
@@ -253,14 +251,14 @@ mkZipBind elt_tys
 			      (DataAlt consDataCon, [a', as'], rest)]
 
 -- Helper functions that makes an HsTuple only for non-1-sized tuples
-mk_hs_tuple_expr :: [Id] -> TypecheckedHsExpr
-mk_hs_tuple_expr []   = HsVar unitDataConId
-mk_hs_tuple_expr [id] = HsVar id
-mk_hs_tuple_expr ids  = ExplicitTuple [ HsVar i | i <- ids ] Boxed
+mk_hs_tuple_expr :: [Id] -> LHsExpr Id
+mk_hs_tuple_expr []   = nlHsVar unitDataConId
+mk_hs_tuple_expr [id] = nlHsVar id
+mk_hs_tuple_expr ids  = noLoc $ ExplicitTuple [ nlHsVar i | i <- ids ] Boxed
 
-mk_hs_tuple_pat :: [Id] -> TypecheckedPat
-mk_hs_tuple_pat [b] = VarPat b
-mk_hs_tuple_pat bs  = TuplePat (map VarPat bs) Boxed
+mk_hs_tuple_pat :: [Id] -> LPat Id
+mk_hs_tuple_pat [b] = nlVarPat b
+mk_hs_tuple_pat bs  = noLoc $ TuplePat (map nlVarPat bs) Boxed
 \end{code}
 
 
@@ -285,17 +283,17 @@ TE[ e | p <- l , q ] c n = let
 
 \begin{code}
 dfListComp :: Id -> Id			-- 'c' and 'n'
-	   -> [TypecheckedStmt] 	-- the rest of the qual's
+	   -> [Stmt Id] 	-- the rest of the qual's
 	   -> DsM CoreExpr
 
 	-- Last: the one to return
-dfListComp c_id n_id [ResultStmt expr locn]
-  = dsExpr expr			`thenDs` \ core_expr ->
+dfListComp c_id n_id [ResultStmt expr]
+  = dsLExpr expr			`thenDs` \ core_expr ->
     returnDs (mkApps (Var c_id) [core_expr, Var n_id])
 
 	-- Non-last: must be a guard
-dfListComp c_id n_id (ExprStmt guard ty locn  : quals)
-  = dsExpr guard               			`thenDs` \ core_guard ->
+dfListComp c_id n_id (ExprStmt guard ty  : quals)
+  = dsLExpr guard              			`thenDs` \ core_guard ->
     dfListComp c_id n_id quals	`thenDs` \ core_rest ->
     returnDs (mkIfThenElse core_guard core_rest (Var n_id))
 
@@ -304,9 +302,9 @@ dfListComp c_id n_id (LetStmt binds : quals)
   = dfListComp c_id n_id quals	`thenDs` \ core_rest ->
     dsLet binds core_rest
 
-dfListComp c_id n_id (BindStmt pat list1 locn : quals)
+dfListComp c_id n_id (BindStmt pat list1 : quals)
     -- evaluate the two lists
-  = dsExpr list1				`thenDs` \ core_list1 ->
+  = dsLExpr list1			`thenDs` \ core_list1 ->
 
     -- find the required type
     let x_ty   = hsPatType pat
@@ -346,7 +344,7 @@ dfListComp c_id n_id (BindStmt pat list1 locn : quals)
 --
 --   [:e | qss:] = <<[:e | qss:]>> () [:():]
 --
-dsPArrComp      :: [TypecheckedStmt] 
+dsPArrComp      :: [Stmt Id] 
 	        -> Type		    -- Don't use; called with `undefined' below
 	        -> DsM CoreExpr
 dsPArrComp qs _  =
@@ -355,18 +353,18 @@ dsPArrComp qs _  =
 				     mkIntExpr 1, 
 				     mkCoreTup []]
   in
-  dePArrComp qs (TuplePat [] Boxed) unitArray
+  dePArrComp qs (noLoc (TuplePat [] Boxed)) unitArray
 
 -- the work horse
 --
-dePArrComp :: [TypecheckedStmt] 
-	   -> TypecheckedPat		-- the current generator pattern
-	   -> CoreExpr			-- the current generator expression
+dePArrComp :: [Stmt Id] 
+	   -> LPat Id		-- the current generator pattern
+	   -> CoreExpr		-- the current generator expression
 	   -> DsM CoreExpr
 --
 --  <<[:e' | :]>> pa ea = mapP (\pa -> e') ea
 --
-dePArrComp [ResultStmt e' _] pa cea =
+dePArrComp [ResultStmt e'] pa cea =
   dsLookupGlobalId mapPName				  `thenDs` \mapP    ->
   let ty = parrElemType cea
   in
@@ -376,7 +374,7 @@ dePArrComp [ResultStmt e' _] pa cea =
 --
 --  <<[:e' | b, qs:]>> pa ea = <<[:e' | qs:]>> pa (filterP (\pa -> b) ea)
 --
-dePArrComp (ExprStmt b _ _ : qs) pa cea =
+dePArrComp (ExprStmt b _ : qs) pa cea =
   dsLookupGlobalId filterPName			  `thenDs` \filterP  ->
   let ty = parrElemType cea
   in
@@ -388,10 +386,10 @@ dePArrComp (ExprStmt b _ _ : qs) pa cea =
 --    in
 --    <<[:e' | qs:]>> (pa, p) (crossP ea ef)
 --
-dePArrComp (BindStmt p e _ : qs) pa cea =
+dePArrComp (BindStmt p e : qs) pa cea =
   dsLookupGlobalId filterPName			  `thenDs` \filterP ->
   dsLookupGlobalId crossPName			  `thenDs` \crossP  ->
-  dsExpr e					  `thenDs` \ce      ->
+  dsLExpr e					  `thenDs` \ce      ->
   let ty'cea = parrElemType cea
       ty'ce  = parrElemType ce
       false  = Var falseDataConId
@@ -401,7 +399,7 @@ dePArrComp (BindStmt p e _ : qs) pa cea =
   matchSimply (Var v) (StmtCtxt PArrComp) p true false      `thenDs` \pred    ->
   let cef    = mkApps (Var filterP) [Type ty'ce, mkLams [v] pred, ce]
       ty'cef = ty'ce				-- filterP preserves the type
-      pa'    = TuplePat [pa, p] Boxed
+      pa'    = noLoc (TuplePat [pa, p] Boxed)
   in
   dePArrComp qs pa' (mkApps (Var crossP) [Type ty'cea, Type ty'cef, cea, cef])
 --
@@ -413,7 +411,7 @@ dePArrComp (BindStmt p e _ : qs) pa cea =
 --
 dePArrComp (LetStmt ds : qs) pa cea =
   dsLookupGlobalId mapPName				  `thenDs` \mapP    ->
-  let xs     = collectHsBinders ds
+  let xs     = map unLoc (collectGroupBinders ds)
       ty'cea = parrElemType cea
   in
   newSysLocalDs ty'cea					  `thenDs` \v       ->
@@ -426,7 +424,7 @@ dePArrComp (LetStmt ds : qs) pa cea =
   in
   mkErrorAppDs pAT_ERROR_ID errTy errMsg                  `thenDs` \cerr    ->
   matchSimply (Var v) (StmtCtxt PArrComp) pa projBody cerr  `thenDs` \ccase   ->
-  let pa'    = TuplePat [pa, TuplePat (map VarPat xs) Boxed] Boxed
+  let pa'    = noLoc $ TuplePat [pa, noLoc (TuplePat (map nlVarPat xs) Boxed)] Boxed
       proj   = mkLams [v] ccase
   in
   dePArrComp qs pa' (mkApps (Var mapP) [Type ty'cea, proj, cea])
@@ -440,11 +438,11 @@ dePArrComp (LetStmt ds : qs) pa cea =
 dePArrComp (ParStmt []             : qss2) pa cea = dePArrComp qss2 pa cea
 dePArrComp (ParStmt ((qs, xs):qss) : qss2) pa cea =
   dsLookupGlobalId zipPName				  `thenDs` \zipP    ->
-  let pa'     = TuplePat [pa, TuplePat (map VarPat xs) Boxed] Boxed
+  let pa'     = noLoc $ TuplePat [pa, noLoc (TuplePat (map nlVarPat xs) Boxed)] Boxed
       ty'cea  = parrElemType cea
-      resStmt = ResultStmt (ExplicitTuple (map HsVar xs) Boxed) noSrcLoc
+      resStmt = ResultStmt (noLoc $ ExplicitTuple (map nlHsVar xs) Boxed)
   in
-  dsPArrComp (qs ++ [resStmt]) undefined		  `thenDs` \cqs     ->
+  dsPArrComp (map unLoc qs ++ [resStmt]) undefined	  `thenDs` \cqs     ->
   let ty'cqs = parrElemType cqs
       cea'   = mkApps (Var zipP) [Type ty'cea, Type ty'cqs, cea, cqs]
   in
@@ -453,12 +451,12 @@ dePArrComp (ParStmt ((qs, xs):qss) : qss2) pa cea =
 -- generate Core corresponding to `\p -> e'
 --
 deLambda        :: Type			-- type of the argument
-		-> TypecheckedPat	-- argument pattern
-		-> TypecheckedHsExpr	-- body
+		-> LPat Id		-- argument pattern
+		-> LHsExpr Id		-- body
 		-> DsM (CoreExpr, Type)
 deLambda ty p e  =
   newSysLocalDs ty					  `thenDs` \v       ->
-  dsExpr e						  `thenDs` \ce      ->
+  dsLExpr e						  `thenDs` \ce      ->
   let errTy    = exprType ce
       errMsg   = "DsListComp.deLambda: internal error!"
   in

@@ -25,8 +25,8 @@ import Subst		( substTyWith )
 import Name		( getSrcLoc )
 import PprCore
 import ErrUtils		( dumpIfSet_core, ghcExit, Message, showPass,
-			  addErrLocHdrLine )
-import SrcLoc		( SrcLoc, noSrcLoc )
+			  mkLocMessage )
+import SrcLoc		( SrcLoc, noSrcLoc, mkSrcSpan )
 import Type		( Type, tyVarsOfType, eqType,
 			  splitFunTy_maybe, mkTyVarTy,
 			  splitForAllTy_maybe, splitTyConApp_maybe, splitTyConApp,
@@ -521,7 +521,7 @@ addErr errs_so_far msg locs
    context     | opt_PprStyle_Debug = vcat (reverse cxts) $$ cxt1
 	       | otherwise	    = cxt1
  
-   mk_msg msg = addErrLocHdrLine loc context msg
+   mk_msg msg = mkLocMessage (mkSrcSpan loc loc) (context $$ msg)
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
 addLoc extra_loc m loc scope errs

@@ -21,10 +21,8 @@ module TcSimplify (
 
 import {-# SOURCE #-} TcUnify( unifyTauTy )
 import TcEnv		-- temp
-import HsSyn		( MonoBinds(..), HsExpr(..), andMonoBinds, andMonoBindList )
-import TcHsSyn		( TcExpr, TcId,
-			  TcMonoBinds, TcDictBinds
-			)
+import HsSyn		( HsBind(..), LHsBinds, HsExpr(..), LHsExpr )
+import TcHsSyn		( TcId, TcDictBinds, mkHsApp, mkHsTyApp, mkHsDictApp )
 
 import TcRnMonad
 import Inst		( lookupInst, LookupInstResult(..),
@@ -62,10 +60,12 @@ import ErrUtils		( Message )
 import VarSet
 import VarEnv		( TidyEnv )
 import FiniteMap
+import Bag
 import Outputable
 import ListSetOps	( equivClasses )
 import Util		( zipEqual, isSingleton )
 import List		( partition )
+import SrcLoc		( Located(..) )
 import CmdLineOpts
 \end{code}
 
@@ -591,7 +591,7 @@ inferLoop doc tau_tvs wanteds
 	-- the final qtvs might be empty.  See [NO TYVARS] below.
 				
 	inferLoop doc tau_tvs (irreds ++ frees)	`thenM` \ (qtvs1, frees1, binds1, irreds1) ->
-	returnM (qtvs1, frees1, binds `AndMonoBinds` binds1, irreds1)
+	returnM (qtvs1, frees1, binds `unionBags` binds1, irreds1)
 \end{code}
 
 Example [LOOP]
@@ -761,7 +761,7 @@ tcSimplCheck doc get_qtvs givens wanted_lie
  	    returnM (varSetElems qtvs', frees, binds, irreds)
     	else
  	    check_loop givens' (irreds ++ frees) 	`thenM` \ (qtvs', frees1, binds1, irreds1) ->
- 	    returnM (qtvs', frees1, binds `AndMonoBinds` binds1, irreds1)
+ 	    returnM (qtvs', frees1, binds `unionBags` binds1, irreds1)
 \end{code}
 
 
@@ -844,7 +844,7 @@ restrict_loop doc qtvs wanteds
 	returnM (varSetElems qtvs', binds)
     else
 	restrict_loop doc qtvs' (irreds ++ frees)	`thenM` \ (qtvs1, binds1) ->
-	returnM (qtvs1, binds `AndMonoBinds` binds1)
+	returnM (qtvs1, binds `unionBags` binds1)
 \end{code}
 
 
@@ -977,7 +977,7 @@ tcSimplifyIPs given_ips wanteds
 	    returnM (frees, binds)
 	else
 	    simpl_loop givens' (irreds ++ frees)	`thenM` \ (frees1, binds1) ->
-	    returnM (frees1, binds `AndMonoBinds` binds1)
+	    returnM (frees1, binds `unionBags` binds1)
 \end{code}
 
 
@@ -1007,13 +1007,13 @@ For each method @Inst@ in the @init_lie@ that mentions one of the
 @LIE@), as well as the @HsBinds@ generated.
 
 \begin{code}
-bindInstsOfLocalFuns ::	[Inst] -> [TcId] -> TcM TcMonoBinds
+bindInstsOfLocalFuns ::	[Inst] -> [TcId] -> TcM (LHsBinds TcId)
 
 bindInstsOfLocalFuns wanteds local_ids
   | null overloaded_ids
 	-- Common case
   = extendLIEs wanteds		`thenM_`
-    returnM EmptyMonoBinds
+    returnM emptyBag
 
   | otherwise
   = simpleReduceLoop doc try_me wanteds		`thenM` \ (frees, binds, irreds) ->
@@ -1084,7 +1084,7 @@ data Avail
 			-- ToDo: remove?
 
   | Rhs 		-- Used when there is a RHS
-	TcExpr	 	-- The RHS
+	(LHsExpr TcId) 	-- The RHS
 	[Inst]		-- Insts free in the RHS; we need these too
 
   | Linear 		-- Splittable Insts only.
@@ -1096,7 +1096,7 @@ data Avail
   | LinRhss		-- Splittable Insts only; this is used only internally
 			-- 	by extractResults, where a Linear 
 			--	is turned into an LinRhss
-	[TcExpr]	-- A supply of suitable RHSs
+	[LHsExpr TcId]	-- A supply of suitable RHSs
 
 pprAvails avails = vcat [sep [ppr inst, nest 2 (equals <+> pprAvail avail)]
 			| (inst,avail) <- fmToList avails ]
@@ -1124,11 +1124,11 @@ The loop startes
 extractResults :: Avails
 	       -> [Inst]		-- Wanted
 	       -> TcM (TcDictBinds, 	-- Bindings
-			  [Inst],	-- Irreducible ones
-			  [Inst])	-- Free ones
+			[Inst],		-- Irreducible ones
+			[Inst])		-- Free ones
 
 extractResults avails wanteds
-  = go avails EmptyMonoBinds [] [] wanteds
+  = go avails emptyBag [] [] wanteds
   where
     go avails binds irreds frees [] 
       = returnM (binds, irreds, frees)
@@ -1145,7 +1145,7 @@ extractResults avails wanteds
 	  Just (Given id _) -> go avails new_binds irreds frees ws
 			    where
 			       new_binds | id == instToId w = binds
-					 | otherwise        = addBind binds w (HsVar id)
+					 | otherwise        = addBind binds w (L (instSpan w) (HsVar id))
 		-- The sought Id can be one of the givens, via a superclass chain
 		-- and then we definitely don't want to generate an x=x binding!
 
@@ -1157,7 +1157,7 @@ extractResults avails wanteds
 	    -> get_root irreds frees avail w		`thenM` \ (irreds', frees', root_id) ->
 	       split n (instToId split_inst) root_id w	`thenM` \ (binds', rhss) ->
 	       go (addToFM avails w (LinRhss rhss))
-		  (binds `AndMonoBinds` binds')
+		  (binds `unionBags` binds')
 		  irreds' frees' (split_inst : w : ws)
 
 	  Just (LinRhss (rhs:rhss))		-- Consume one of the Rhss
@@ -1199,7 +1199,7 @@ extractResults avails wanteds
 
 
 split :: Int -> TcId -> TcId -> Inst 
-      -> TcM (TcDictBinds, [TcExpr])
+      -> TcM (TcDictBinds, [LHsExpr TcId])
 -- (split n split_id root_id wanted) returns
 --	* a list of 'n' expressions, all of which witness 'avail'
 --	* a bunch of auxiliary bindings to support these expressions
@@ -1216,12 +1216,13 @@ split n split_id root_id wanted
     id      = instToId wanted
     occ     = getOccName id
     loc     = getSrcLoc id
+    span    = instSpan wanted
 
-    go 1 = returnM (EmptyMonoBinds, [HsVar root_id])
+    go 1 = returnM (emptyBag, [L span $ HsVar root_id])
 
     go n = go ((n+1) `div` 2)		`thenM` \ (binds1, rhss) ->
 	   expand n rhss		`thenM` \ (binds2, rhss') ->
-	   returnM (binds1 `AndMonoBinds` binds2, rhss')
+	   returnM (binds1 `unionBags` binds2, rhss')
 
 	-- (expand n rhss) 
 	-- Given ((n+1)/2) rhss, make n rhss, using auxiliary bindings
@@ -1234,7 +1235,7 @@ split n split_id root_id wanted
 			   returnM (binds', head rhss : rhss')
 	where
 	  go rhss = mapAndUnzipM do_one rhss	`thenM` \ (binds', rhss') ->
-		    returnM (andMonoBindList binds', concat rhss')
+		    returnM (listToBag binds', concat rhss')
 
 	  do_one rhs = newUnique 			`thenM` \ uniq -> 
 		       tcLookupId fstName		`thenM` \ fst_id ->
@@ -1242,14 +1243,16 @@ split n split_id root_id wanted
 		       let 
 			  x = mkUserLocal occ uniq pair_ty loc
 		       in
-		       returnM (VarMonoBind x (mk_app split_id rhs),
-				    [mk_fs_app fst_id ty x, mk_fs_app snd_id ty x])
+		       returnM (L span (VarBind x (mk_app span split_id rhs)),
+				[mk_fs_app span fst_id ty x, mk_fs_app span snd_id ty x])
 
-mk_fs_app id ty var = HsVar id `TyApp` [ty,ty] `HsApp` HsVar var
+mk_fs_app span id ty var = L span (HsVar id) `mkHsTyApp` [ty,ty] `mkHsApp` (L span (HsVar var))
 
-mk_app id rhs = HsApp (HsVar id) rhs
+mk_app span id rhs = L span (HsApp (L span (HsVar id)) rhs)
 
-addBind binds inst rhs = binds `AndMonoBinds` VarMonoBind (instToId inst) rhs
+addBind binds inst rhs = binds `unionBags` unitBag (L (instLocSrcSpan (instLoc inst)) 
+						      (VarBind (instToId inst) rhs))
+instSpan wanted = instLocSrcSpan (instLoc wanted)
 \end{code}
 
 
@@ -1280,7 +1283,7 @@ simpleReduceLoop doc try_me wanteds
 	returnM (frees, binds, irreds)
     else
 	simpleReduceLoop doc try_me (irreds ++ frees)	`thenM` \ (frees1, binds1, irreds1) ->
-	returnM (frees1, binds `AndMonoBinds` binds1, irreds1)
+	returnM (frees1, binds `unionBags` binds1, irreds1)
 \end{code}
 
 
@@ -1507,7 +1510,7 @@ addFree :: Avails -> Inst -> TcM Avails
 	--
 addFree avails free = returnM (addToFM avails free IsFree)
 
-addWanted :: Avails -> Inst -> TcExpr -> [Inst] -> TcM Avails
+addWanted :: Avails -> Inst -> LHsExpr TcId -> [Inst] -> TcM Avails
 addWanted avails wanted rhs_expr wanteds
   = ASSERT2( not (wanted `elemFM` avails), ppr wanted $$ ppr avails )
     addAvailAndSCs avails wanted avail
@@ -1571,7 +1574,7 @@ addSCs is_loop avails dict
 	  Just other 	   -> returnM avails'	-- SCs already added
 	  Nothing 	   -> addSCs is_loop avails' sc_dict
       where
-	sc_sel_rhs = DictApp (TyApp (HsVar sc_sel) tys) [instToId dict]
+	sc_sel_rhs = mkHsDictApp (mkHsTyApp (L (instSpan dict) (HsVar sc_sel)) tys) [instToId dict]
 	avail      = Rhs sc_sel_rhs [dict]
 	avails'    = addToFM avails sc_dict avail
 \end{code}
@@ -1735,7 +1738,7 @@ tc_simplify_top is_interactive wanteds
         mappM (disambigGroup is_interactive) std_oks
     )					`thenM` \ binds_ambig ->
 
-    returnM (binds `andMonoBinds` andMonoBindList binds_ambig)
+    returnM (binds `unionBags` unionManyBags binds_ambig)
 
 ----------------------------------
 d1 `cmp_by_tyvar` d2 = get_tv d1 `compare` get_tv d2
@@ -1836,7 +1839,7 @@ disambigGroup is_interactive dicts
 	returnM binds
 
     bomb_out = addTopAmbigErrs dicts	`thenM_`
-	       returnM EmptyMonoBinds
+	       returnM emptyBag
 
 get_default_tys
   = do 	{ mb_defaults <- getDefaultTys
@@ -2113,8 +2116,10 @@ addTopAmbigErrs dicts
     cmp (_,tvs1) (_,tvs2) = tvs1 `compare` tvs2
     
     report :: [(Inst,[TcTyVar])] -> TcM ()
-    report pairs@((_,tvs) : _)	-- The pairs share a common set of ambiguous tyvars
+    report pairs@((inst,tvs) : _)	-- The pairs share a common set of ambiguous tyvars
 	= mkMonomorphismMsg tidy_env dicts	`thenM` \ (tidy_env, mono_msg) ->
+	  addSrcSpan (instLocSrcSpan (instLoc inst)) $
+		-- the location of the first one will do for the err message
 	  addErrTcM (tidy_env, msg $$ mono_msg)
 	where
 	  dicts = map fst pairs

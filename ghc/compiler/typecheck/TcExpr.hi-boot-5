@@ -1,14 +1,16 @@
 __interface TcExpr 1 0 where
 __export TcExpr tcCheckSigma tcCheckRho tcMonoExpr ;
 1 tcCheckSigma :: 
-	  RnHsSyn.RenamedHsExpr
+	  HsExpr.LHsExpr Name.Name
        -> TcType.TcType
-       -> TcRnTypes.TcM TcHsSyn.TcExpr ;
+       -> TcRnTypes.TcM (HsExpr.LHsExpr Var.Id) ;
+
 1 tcCheckRho :: 
-	  RnHsSyn.RenamedHsExpr
+  	  HsExpr.LHsExpr Name.Name
        -> TcType.TcType
-       -> TcRnTypes.TcM TcHsSyn.TcExpr ;
+       -> TcRnTypes.TcM (HsExpr.LHsExpr Var.Id) ;
+
 1 tcMonoExpr :: 
-	  RnHsSyn.RenamedHsExpr
+  	  HsExpr.LHsExpr Name.Name
        -> TcUnify.Expected TcType.TcType
-       -> TcRnTypes.TcM TcHsSyn.TcExpr ;
+       -> TcRnTypes.TcM (HsExpr.LHsExpr Var.Id) ;

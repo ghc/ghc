@@ -12,11 +12,11 @@ module RnNames (
 #include "HsVersions.h"
 
 import CmdLineOpts	( DynFlag(..) )
-import HsSyn		( IE(..), ieName, ImportDecl(..),
+import HsSyn		( IE(..), ieName, ImportDecl(..), LImportDecl,
 			  ForeignDecl(..), HsGroup(..),
-			  collectLocatedHsBinders, tyClDeclNames 
+			  collectGroupBinders, tyClDeclNames 
 			)
-import RdrHsSyn		( RdrNameIE, RdrNameImportDecl, main_RDR_Unqual )
+import RdrHsSyn		( main_RDR_Unqual )
 import RnEnv
 import IfaceEnv		( lookupOrig, newGlobalBinder )
 import LoadIface	( loadSrcInterface )
@@ -46,7 +46,8 @@ import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace,
 			  isLocalGRE, pprNameProvenance )
 import Outputable
 import Maybes		( isJust, isNothing, catMaybes, mapCatMaybes )
-import SrcLoc		( noSrcLoc )
+import SrcLoc		( noSrcLoc, Located(..), mkGeneralSrcSpan, srcSpanStart,
+			  unLoc, noLoc )
 import ListSetOps	( removeDups )
 import Util		( sortLt, notNull )
 import List		( partition, insert )
@@ -62,7 +63,7 @@ import IO		( openFile, IOMode(..) )
 %************************************************************************
 
 \begin{code}
-rnImports :: [RdrNameImportDecl]
+rnImports :: [LImportDecl RdrName]
 	  -> RnM (GlobalRdrEnv, ImportAvails)
 
 rnImports imports
@@ -70,12 +71,11 @@ rnImports imports
 		-- Do the non {- SOURCE -} ones first, so that we get a helpful
 		-- warning for {- SOURCE -} ones that are unnecessary
 	getModule				`thenM` \ this_mod ->
- 	getSrcLocM				`thenM` \ loc ->
 	doptM Opt_NoImplicitPrelude		`thenM` \ opt_no_prelude -> 
 	let
-	  all_imports	     = mk_prel_imports this_mod loc opt_no_prelude ++ imports
+	  all_imports	     = mk_prel_imports this_mod opt_no_prelude ++ imports
 	  (source, ordinary) = partition is_source_import all_imports
-	  is_source_import (ImportDecl _ is_boot _ _ _ _) = is_boot
+	  is_source_import (L _ (ImportDecl _ is_boot _ _ _)) = is_boot
 
 	  get_imports = importsFromImportDecl this_mod
 	in
@@ -97,39 +97,43 @@ rnImports imports
 	-- NB: opt_NoImplicitPrelude is slightly different to import Prelude ();
 	-- because the former doesn't even look at Prelude.hi for instance 
 	-- declarations, whereas the latter does.
-    mk_prel_imports this_mod loc no_prelude
+    mk_prel_imports this_mod no_prelude
 	|  moduleName this_mod == pRELUDE_Name
 	|| explicit_prelude_import
 	|| no_prelude
 	= []
 
-	| otherwise = [preludeImportDecl loc]
+	| otherwise = [preludeImportDecl]
 
     explicit_prelude_import
-      = notNull [ () | (ImportDecl mod _ _ _ _ _) <- imports, 
-		       mod == pRELUDE_Name ]
+      = notNull [ () | L _ (ImportDecl mod _ _ _ _) <- imports, 
+		       unLoc mod == pRELUDE_Name ]
 
-preludeImportDecl loc
-  = ImportDecl pRELUDE_Name
+preludeImportDecl
+  = L loc $
+	ImportDecl (L loc pRELUDE_Name)
 	       False {- Not a boot interface -}
 	       False	{- Not qualified -}
 	       Nothing	{- No "as" -}
 	       Nothing	{- No import list -}
-	       loc
+  where
+    loc = mkGeneralSrcSpan FSLIT("Implicit import declaration")
 \end{code}
 	
 \begin{code}
 importsFromImportDecl :: Module
-		      -> RdrNameImportDecl
+		      -> LImportDecl RdrName
 		      -> RnM (GlobalRdrEnv, ImportAvails)
 
 importsFromImportDecl this_mod
-	(ImportDecl imp_mod_name want_boot qual_only as_mod imp_details iloc)
-  = addSrcLoc iloc $
+	(L loc (ImportDecl loc_imp_mod_name want_boot qual_only as_mod imp_details))
+  = 
+    addSrcSpan loc $
 
 	-- If there's an error in loadInterface, (e.g. interface
 	-- file not found) we get lots of spurious errors from 'filterImports'
     let
+	imp_mod_name = unLoc loc_imp_mod_name
 	this_mod_name = moduleName this_mod
 	doc = ppr imp_mod_name <+> ptext SLIT("is directly imported")
     in
@@ -213,7 +217,7 @@ importsFromImportDecl this_mod
 	--	module M ( module P ) where ...
 	-- Then we must export whatever came from P unqualified.
 	imp_spec  = ImportSpec { is_mod = imp_mod_name, is_qual = qual_only,  
-		  		 is_loc = iloc , is_as = qual_mod_name }
+		  		 is_loc = loc, is_as = qual_mod_name }
 	mk_deprec = mi_dep_fn iface
 	gres	  = [ GRE { gre_name = name, 
 		  	    gre_prov = Imported [imp_spec] (name `elemNameSet` explicits),
@@ -361,9 +365,8 @@ importsFromLocalDecls group
 %*							*
 %*********************************************************
 
-@getLocalDeclBinders@ returns the names for a @RdrNameHsDecl@.  It's
-used for both source code (from @importsFromLocalDecls@) and interface
-files (@loadDecl@ calls @getTyClDeclBinders@).
+@getLocalDeclBinders@ returns the names for an @HsDecl@.  It's
+used for source code.
 
 	*** See "THE NAMING STORY" in HsDecls ****
 
@@ -384,15 +387,15 @@ getLocalDeclBinders mod (HsGroup {hs_valds = val_decls,
     new_simple rdr_name = newTopSrcBinder mod Nothing rdr_name `thenM` \ name ->
 			  returnM (Avail name)
 
-    val_hs_bndrs = collectLocatedHsBinders val_decls
-    for_hs_bndrs = [(nm,loc) | ForeignImport nm _ _ _ loc <- foreign_decls]
+    val_hs_bndrs = collectGroupBinders val_decls
+    for_hs_bndrs = [nm | L _ (ForeignImport nm _ _ _) <- foreign_decls]
 
     new_tc tc_decl 
 	= newTopSrcBinder mod Nothing main_rdr			`thenM` \ main_name ->
 	  mappM (newTopSrcBinder mod (Just main_name)) sub_rdrs	`thenM` \ sub_names ->
 	  returnM (AvailTC main_name (main_name : sub_names))
 	where
-	  (main_rdr : sub_rdrs) = tyClDeclNames tc_decl
+	  (main_rdr : sub_rdrs) = tyClDeclNames (unLoc tc_decl)
 \end{code}
 
 
@@ -408,7 +411,7 @@ available, and filters it through the import spec (if any).
 \begin{code}
 filterImports :: Module				-- The module being imported
 	      -> IsBootInterface		-- Tells whether it's a {-# SOURCE #-} import
-	      -> Maybe (Bool, [RdrNameIE])	-- Import spec; True => hiding
+	      -> Maybe (Bool, [Located (IE RdrName)])	-- Import spec; True => hiding
 	      -> [AvailInfo]			-- What's available
 	      -> RnM ([AvailInfo],		-- What's imported
 		       NameSet)			-- What was imported explicitly
@@ -419,7 +422,7 @@ filterImports mod from Nothing imports
   = returnM (imports, emptyNameSet)
 
 filterImports mod from (Just (want_hiding, import_items)) total_avails
-  = mappM get_item import_items		`thenM` \ avails_w_explicits_s ->
+  = mappM (addLocM get_item) import_items 	`thenM` \ avails_w_explicits_s ->
     let
 	(item_avails, explicits_s) = unzip (concat avails_w_explicits_s)
 	explicits		   = foldl addListToNameSet emptyNameSet explicits_s
@@ -445,7 +448,7 @@ filterImports mod from (Just (want_hiding, import_items)) total_avails
     bale_out item = addErr (badImportItemErr mod from item)	`thenM_`
 		    returnM []
 
-    get_item :: RdrNameIE -> RnM [(AvailInfo, [Name])]
+    get_item :: IE RdrName -> RnM [(AvailInfo, [Name])]
 	-- Empty list for a bad item.
 	-- Singleton is typical case.
 	-- Can have two when we are hiding, and mention C which might be
@@ -453,13 +456,13 @@ filterImports mod from (Just (want_hiding, import_items)) total_avails
 	-- The [Name] is the list of explicitly-mentioned names
     get_item item@(IEModuleContents _) = bale_out item
 
-    get_item item@(IEThingAll _)
+    get_item item@(IEThingAll tc)
       = case check_item item of
 	  Nothing    		     -> bale_out item
 	  Just avail@(AvailTC _ [n]) -> 	-- This occurs when you import T(..), but
 						-- only export T abstractly.  The single [n]
 						-- in the AvailTC is the type or class itself
-					ifOptM Opt_WarnMisc (addWarn (dodgyImportWarn mod item))	`thenM_`
+					ifOptM Opt_WarnMisc (addWarn (dodgyImportWarn mod tc))	`thenM_`
 		     	 		returnM [(avail, [availName avail])]
 	  Just avail 		     -> returnM [(avail, [availName avail])]
 
@@ -496,7 +499,7 @@ filterImports mod from (Just (want_hiding, import_items)) total_avails
 \end{code}
 
 \begin{code}
-filterAvail :: RdrNameIE	-- Wanted
+filterAvail :: IE RdrName	-- Wanted
 	    -> AvailInfo	-- Available
 	    -> Maybe AvailInfo	-- Resulting available; 
 				-- Nothing if (any of the) wanted stuff isn't there
@@ -560,21 +563,21 @@ type ExportAccum	-- The type of the accumulating parameter of
 				--   so we can common-up related AvailInfos
 emptyExportAccum = ([], emptyFM, emptyAvailEnv) 
 
-type ExportOccMap = FiniteMap OccName (Name, RdrNameIE)
+type ExportOccMap = FiniteMap OccName (Name, IE RdrName)
 	-- Tracks what a particular exported OccName
 	--   in an export list refers to, and which item
 	--   it came from.  It's illegal to export two distinct things
 	--   that have the same occurrence name
 
 
-exportsFromAvail :: Maybe Module 	-- Nothing => no 'module M(..) where' header at all
-		 -> Maybe [RdrNameIE] 	-- Nothing => no explicit export list
+exportsFromAvail :: Bool  -- False => no 'module M(..) where' header at all
+		 -> Maybe [Located (IE RdrName)] -- Nothing => no explicit export list
 		 -> RnM Avails
 	-- Complains if two distinct exports have same OccName
         -- Warns about identical exports.
 	-- Complains about exports items not in scope
 
-exportsFromAvail maybe_mod exports
+exportsFromAvail explicit_mod exports
  = do { TcGblEnv { tcg_rdr_env = rdr_env, 
 		   tcg_imports = imports } <- getGblEnv ;
 
@@ -586,12 +589,11 @@ exportsFromAvail maybe_mod exports
 	--	   in interactive mode
 	ghci_mode <- getGhciMode ;
 	let { real_exports 
-	        = case maybe_mod of
-		    Just mod -> exports
-		    Nothing | ghci_mode == Interactive -> Nothing
-			    | otherwise		       -> Just [IEVar main_RDR_Unqual] } ;
-
+		| explicit_mod   	   = exports
+		| ghci_mode == Interactive = Nothing
+		| otherwise 		   = Just [noLoc (IEVar main_RDR_Unqual)] } ;
 	exports_from_avail real_exports rdr_env imports }
+
 
 exports_from_avail Nothing rdr_env
 		   imports@(ImportAvails { imp_env = entity_avail_env })
@@ -610,13 +612,15 @@ exports_from_avail Nothing rdr_env
 exports_from_avail (Just export_items) rdr_env
 		   (ImportAvails { imp_qual = mod_avail_env, 
 				   imp_env  = entity_avail_env }) 
-  = foldlM exports_from_item emptyExportAccum
+  = foldlM (exports_from_litem) emptyExportAccum
 	    export_items			`thenM` \ (_, _, export_avail_map) ->
     returnM (nameEnvElts export_avail_map)
 
   where
-    exports_from_item :: ExportAccum -> RdrNameIE -> RnM ExportAccum
+    exports_from_litem :: ExportAccum -> Located (IE RdrName) -> RnM ExportAccum
+    exports_from_litem acc = addLocM (exports_from_item acc)
 
+    exports_from_item :: ExportAccum -> IE RdrName -> RnM ExportAccum
     exports_from_item acc@(mods, occs, avails) ie@(IEModuleContents mod)
 	| mod `elem` mods 	-- Duplicate export of M
 	= do { warn_dup_exports <- doptM Opt_WarnDuplicateExports ;
@@ -665,7 +669,7 @@ exports_from_avail (Just export_items) rdr_env
 	    Just export_avail -> 	
 
 		-- Phew!  It's OK!  Now to check the occurrence stuff!
-	  warnIf (not (ok_item ie avail)) (dodgyExportWarn ie)	`thenM_`
+	  checkForDodgyExport ie avail				`thenM_`
           check_occs ie occs export_avail			`thenM` \ occs' ->
 	  returnM (mods, occs', addAvail avails export_avail)
 	  }
@@ -688,16 +692,16 @@ in_scope :: GlobalRdrEnv -> Name -> Bool
 -- regardless of whether it's ambiguous or not
 in_scope env n = any unQualOK (lookupGRE_Name env n)
 
-
 -------------------------------
-ok_item (IEThingAll _) (AvailTC _ [n]) = False
+checkForDodgyExport :: IE RdrName -> AvailInfo -> RnM ()
+checkForDodgyExport (IEThingAll tc) (AvailTC _ [n]) = addWarn (dodgyExportWarn tc)
   -- This occurs when you import T(..), but
   -- only export T abstractly.  The single [n]
   -- in the AvailTC is the type or class itself
-ok_item _ _ = True
+checkForDodgyExport _ _ = return ()
 
 -------------------------------
-check_occs :: RdrNameIE -> ExportOccMap -> AvailInfo -> RnM ExportOccMap
+check_occs :: IE RdrName -> ExportOccMap -> AvailInfo -> RnM ExportOccMap
 check_occs ie occs avail 
   = foldlM check occs (availNames avail)
   where
@@ -907,8 +911,8 @@ badImportItemErr mod from ie
 dodgyImportWarn mod item = dodgyMsg (ptext SLIT("import")) item
 dodgyExportWarn     item = dodgyMsg (ptext SLIT("export")) item
 
-dodgyMsg kind item@(IEThingAll tc)
-  = sep [ ptext SLIT("The") <+> kind <+> ptext SLIT("item") <+> quotes (ppr item),
+dodgyMsg kind tc
+  = sep [ ptext SLIT("The") <+> kind <+> ptext SLIT("item") <+> quotes (ppr (IEThingAll tc)),
 	  ptext SLIT("suggests that") <+> quotes (ppr tc) <+> ptext SLIT("has constructor or class methods"),
 	  ptext SLIT("but it has none; it is a type synonym or abstract type or class") ]
 	  

@@ -12,14 +12,14 @@ module TcExpr ( tcCheckSigma, tcCheckRho, tcInferRho, tcMonoExpr ) where
 import {-# SOURCE #-}	TcSplice( tcSpliceExpr, tcBracket )
 import Id		( Id )
 import TcType		( isTauTy )
-import TcEnv		( tcMetaTy, checkWellStaged )
+import TcEnv		( checkWellStaged )
 import qualified DsMeta
 #endif
 
-import HsSyn		( HsExpr(..), HsLit(..), ArithSeqInfo(..), recBindFields,
-			  HsMatchContext(..) )
-import RnHsSyn		( RenamedHsExpr, RenamedRecordBinds )
-import TcHsSyn		( TcExpr, TcRecordBinds, hsLitType, mkHsDictApp, mkHsTyApp, (<$>) )
+import HsSyn		( HsExpr(..), LHsExpr, HsLit(..), ArithSeqInfo(..), recBindFields,
+			  HsMatchContext(..), HsRecordBinds, mkHsApp, nlHsVar,
+			  nlHsApp )
+import TcHsSyn		( hsLitType, mkHsDictApp, mkHsTyApp, (<$>) )
 import TcRnMonad
 import TcUnify		( Expected(..), newHole, zapExpectedType, zapExpectedTo, tcSubExp, tcGen,
 			  unifyFunTy, zapToListTy, zapToPArrTy, zapToTupleTy )
@@ -30,8 +30,8 @@ import Inst		( InstOrigin(..),
 			  instToId, tcInstCall, tcInstDataCon
 			)
 import TcBinds		( tcBindsAndThen )
-import TcEnv		( tcLookup, tcLookupGlobalId, 
-			  tcLookupDataCon, tcLookupId, checkProcLevel
+import TcEnv		( tcLookup, tcLookupId, checkProcLevel,
+			  tcLookupDataCon, tcLookupGlobalId
 			)
 import TcArrows		( tcProc )
 import TcMatches	( tcMatchesCase, tcMatchLambda, tcDoStmts, tcThingWithSig, TcMatchCtxt(..) )
@@ -49,7 +49,7 @@ import FieldLabel	( FieldLabel, fieldLabelName, fieldLabelType, fieldLabelTyCon 
 import Id		( idType, recordSelectorFieldLabel, isRecordSelector )
 import DataCon		( DataCon, dataConFieldLabels, dataConStrictMarks, dataConWrapId )
 import Name		( Name )
-import TyCon		( TyCon, tyConTyVars, tyConTheta, isAlgTyCon, tyConDataCons )
+import TyCon		( TyCon, tyConTyVars, tyConTheta, tyConDataCons )
 import Subst		( mkTopTyVarSubst, substTheta, substTy )
 import VarSet		( emptyVarSet, elemVarSet )
 import TysWiredIn	( boolTy )
@@ -60,10 +60,14 @@ import PrelNames	( enumFromName, enumFromThenName,
 import ListSetOps	( minusList )
 import CmdLineOpts
 import HscTypes		( TyThing(..) )
-
+import SrcLoc		( Located(..), unLoc, getLoc )
 import Util
 import Outputable
 import FastString
+
+#ifdef DEBUG
+import TyCon		( isAlgTyCon )
+#endif
 \end{code}
 
 %************************************************************************
@@ -74,9 +78,9 @@ import FastString
 
 \begin{code}
 -- tcCheckSigma does type *checking*; it's passed the expected type of the result
-tcCheckSigma :: RenamedHsExpr		-- Expession to type check
+tcCheckSigma :: LHsExpr Name		-- Expession to type check
        	     -> TcSigmaType		-- Expected type (could be a polytpye)
-       	     -> TcM TcExpr		-- Generalised expr with expected type
+       	     -> TcM (LHsExpr TcId)	-- Generalised expr with expected type
 
 tcCheckSigma expr expected_ty 
   = traceTc (text "tcExpr" <+> (ppr expected_ty $$ ppr expr)) `thenM_`
@@ -87,7 +91,7 @@ tc_expr' expr sigma_ty
   = tcGen sigma_ty emptyVarSet (
 	\ rho_ty -> tcCheckRho expr rho_ty
     )				`thenM` \ (gen_fn, expr') ->
-    returnM (gen_fn <$> expr')
+    returnM (L (getLoc expr') (gen_fn <$> unLoc expr'))
 
 tc_expr' expr rho_ty	-- Monomorphic case
   = tcCheckRho expr rho_ty
@@ -99,44 +103,50 @@ The expression can return a higher-ranked type, such as
 so we must create a hole to pass in as the expected tyvar.
 
 \begin{code}
-tcCheckRho :: RenamedHsExpr -> TcRhoType -> TcM TcExpr
+tcCheckRho :: LHsExpr Name -> TcRhoType -> TcM (LHsExpr TcId)
 tcCheckRho expr rho_ty = tcMonoExpr expr (Check rho_ty)
 
-tcInferRho :: RenamedHsExpr -> TcM (TcExpr, TcRhoType)
-tcInferRho (HsVar name) = tcId name
-tcInferRho expr         = newHole			`thenM` \ hole ->
-			  tcMonoExpr expr (Infer hole)	`thenM` \ expr' ->
-			  readMutVar hole		`thenM` \ rho_ty ->
-		          returnM (expr', rho_ty) 
+tcInferRho :: LHsExpr Name -> TcM (LHsExpr TcId, TcRhoType)
+tcInferRho (L loc (HsVar name)) = addSrcSpan loc $ 
+				  do { (e,ty) <- tcId name; return (L loc e, ty)}
+tcInferRho expr		        = newHole			`thenM` \ hole ->
+			  	  tcMonoExpr expr (Infer hole)	`thenM` \ expr' ->
+			  	  readMutVar hole		`thenM` \ rho_ty ->
+		          	  returnM (expr', rho_ty) 
 \end{code}
 
 
 
 %************************************************************************
 %*									*
-\subsection{The TAUT rules for variables}
+\subsection{The TAUT rules for variables}TcExpr
 %*									*
 %************************************************************************
 
 \begin{code}
-tcMonoExpr :: RenamedHsExpr		-- Expession to type check
+tcMonoExpr :: LHsExpr Name		-- Expession to type check
 	   -> Expected TcRhoType 	-- Expected type (could be a type variable)
 					-- Definitely no foralls at the top
 					-- Can be a 'hole'.
-	   -> TcM TcExpr
+	   -> TcM (LHsExpr TcId)
 
-tcMonoExpr (HsVar name) res_ty
+tcMonoExpr (L loc expr) res_ty
+  = addSrcSpan loc (do { expr' <- tc_expr expr res_ty
+		       ; return (L loc expr') })
+
+tc_expr :: HsExpr Name -> Expected TcRhoType -> TcM (HsExpr TcId)
+tc_expr (HsVar name) res_ty
   = tcId name			`thenM` \ (expr', id_ty) ->
     tcSubExp res_ty id_ty 	`thenM` \ co_fn ->
     returnM (co_fn <$> expr')
 
-tcMonoExpr (HsIPVar ip) res_ty
+tc_expr (HsIPVar ip) res_ty
   = 	-- Implicit parameters must have a *tau-type* not a 
 	-- type scheme.  We enforce this by creating a fresh
 	-- type variable as its type.  (Because res_ty may not
 	-- be a tau-type.)
     newTyVarTy openTypeKind		`thenM` \ ip_ty ->
-    newIPDict (IPOcc ip) ip ip_ty 	`thenM` \ (ip', inst) ->
+    newIPDict (IPOccOrigin ip) ip ip_ty `thenM` \ (ip', inst) ->
     extendLIE inst			`thenM_`
     tcSubExp res_ty ip_ty		`thenM` \ co_fn ->
     returnM (co_fn <$> HsIPVar ip')
@@ -150,13 +160,14 @@ tcMonoExpr (HsIPVar ip) res_ty
 %************************************************************************
 
 \begin{code}
-tcMonoExpr in_expr@(ExprWithTySig expr poly_ty) res_ty
+tc_expr in_expr@(ExprWithTySig expr poly_ty) res_ty
  = addErrCtxt (exprSigCtxt in_expr)			$
    tcHsSigType ExprSigCtxt poly_ty			`thenM` \ sig_tc_ty ->
    tcThingWithSig sig_tc_ty (tcCheckRho expr) res_ty	`thenM` \ (co_fn, expr') ->
-   returnM (co_fn <$> expr')
+   returnM (co_fn <$> unLoc expr')
+	-- ToDo: nasty unLoc
 
-tcMonoExpr (HsType ty) res_ty
+tc_expr (HsType ty) res_ty
   = failWithTc (text "Can't handle type argument:" <+> ppr ty)
 	-- This is the syntax for type applications that I was planning
 	-- but there are difficulties (e.g. what order for type args)
@@ -173,25 +184,29 @@ tcMonoExpr (HsType ty) res_ty
 %************************************************************************
 
 \begin{code}
-tcMonoExpr (HsLit lit)     res_ty  = tcLit lit res_ty
-tcMonoExpr (HsOverLit lit) res_ty  = zapExpectedType res_ty	`thenM` \ res_ty' ->
-				     newOverloadedLit (LiteralOrigin lit) lit res_ty'
-tcMonoExpr (HsPar expr)    res_ty  = tcMonoExpr expr res_ty	`thenM` \ expr' -> 
-				     returnM (HsPar expr')
-tcMonoExpr (HsSCC lbl expr) res_ty = tcMonoExpr expr res_ty	`thenM` \ expr' ->
-				     returnM (HsSCC lbl expr')
-
-tcMonoExpr (HsCoreAnn lbl expr) res_ty = tcMonoExpr expr res_ty `thenM` \ expr' ->  -- hdaume: core annotation
+tc_expr (HsPar expr)    res_ty  = tcMonoExpr expr res_ty	`thenM` \ expr' -> 
+				  returnM (HsPar expr')
+tc_expr (HsSCC lbl expr) res_ty = tcMonoExpr expr res_ty	`thenM` \ expr' ->
+				  returnM (HsSCC lbl expr')
+tc_expr (HsCoreAnn lbl expr) res_ty = tcMonoExpr expr res_ty `thenM` \ expr' ->  -- hdaume: core annotation
                                          returnM (HsCoreAnn lbl expr')
-tcMonoExpr (NegApp expr neg_name) res_ty
-  = tcMonoExpr (HsApp (HsVar neg_name) expr) res_ty
+
+tc_expr (HsLit lit) res_ty  = tcLit lit res_ty
+
+tc_expr (HsOverLit lit) res_ty  
+  = zapExpectedType res_ty	`thenM` \ res_ty' ->
+    newOverloadedLit (LiteralOrigin lit) lit res_ty'	`thenM` \ lit_expr ->
+    returnM (unLoc lit_expr) 	-- ToDo: nasty unLoc
+
+tc_expr (NegApp expr neg_name) res_ty
+  = tc_expr (HsApp (nlHsVar neg_name) expr) res_ty
 	-- ToDo: use tcSyntaxName
 
-tcMonoExpr (HsLam match) res_ty
+tc_expr (HsLam match) res_ty
   = tcMatchLambda match res_ty 		`thenM` \ match' ->
     returnM (HsLam match')
 
-tcMonoExpr (HsApp e1 e2) res_ty 
+tc_expr (HsApp e1 e2) res_ty 
   = tcApp e1 [e2] res_ty
 \end{code}
 
@@ -206,7 +221,7 @@ a type error will occur if they aren't.
 -- or just
 -- 	op e
 
-tcMonoExpr in_expr@(SectionL arg1 op) res_ty
+tc_expr in_expr@(SectionL arg1 op) res_ty
   = tcInferRho op				`thenM` \ (op', op_ty) ->
     split_fun_ty op_ty 2 {- two args -}		`thenM` \ ([arg1_ty, arg2_ty], op_res_ty) ->
     tcArg op (arg1, arg1_ty, 1)			`thenM` \ arg1' ->
@@ -217,7 +232,7 @@ tcMonoExpr in_expr@(SectionL arg1 op) res_ty
 -- Right sections, equivalent to \ x -> x op expr, or
 --	\ x -> op x expr
 
-tcMonoExpr in_expr@(SectionR op arg2) res_ty
+tc_expr in_expr@(SectionR op arg2) res_ty
   = tcInferRho op				`thenM` \ (op', op_ty) ->
     split_fun_ty op_ty 2 {- two args -}		`thenM` \ ([arg1_ty, arg2_ty], op_res_ty) ->
     tcArg op (arg2, arg2_ty, 2)			`thenM` \ arg2' ->
@@ -227,7 +242,7 @@ tcMonoExpr in_expr@(SectionR op arg2) res_ty
 
 -- equivalent to (op e1) e2:
 
-tcMonoExpr in_expr@(OpApp arg1 op fix arg2) res_ty
+tc_expr in_expr@(OpApp arg1 op fix arg2) res_ty
   = tcInferRho op				`thenM` \ (op', op_ty) ->
     split_fun_ty op_ty 2 {- two args -}		`thenM` \ ([arg1_ty, arg2_ty], op_res_ty) ->
     tcArg op (arg1, arg1_ty, 1)			`thenM` \ arg1' ->
@@ -238,15 +253,16 @@ tcMonoExpr in_expr@(OpApp arg1 op fix arg2) res_ty
 \end{code}
 
 \begin{code}
-tcMonoExpr (HsLet binds expr) res_ty
+tc_expr (HsLet binds (L loc expr)) res_ty
   = tcBindsAndThen
-	HsLet
+	glue
 	binds 			-- Bindings to check
-	(tcMonoExpr expr res_ty)
+	(tc_expr expr res_ty)
+  where
+    glue bind expr = HsLet [bind] (L loc expr)
 
-tcMonoExpr in_expr@(HsCase scrut matches src_loc) res_ty
-  = addSrcLoc src_loc			$
-    addErrCtxt (caseCtxt in_expr)	$
+tc_expr in_expr@(HsCase scrut matches) res_ty
+  = addErrCtxt (caseCtxt in_expr)	$
 
 	-- Typecheck the case alternatives first.
 	-- The case patterns tend to give good type info to use
@@ -261,14 +277,13 @@ tcMonoExpr in_expr@(HsCase scrut matches src_loc) res_ty
       tcCheckRho scrut scrut_ty
     )					`thenM`    \ scrut' ->
 
-    returnM (HsCase scrut' matches' src_loc)
+    returnM (HsCase scrut' matches')
   where
     match_ctxt = MC { mc_what = CaseAlt,
 		      mc_body = tcMonoExpr }
 
-tcMonoExpr (HsIf pred b1 b2 src_loc) res_ty
-  = addSrcLoc src_loc	$
-    addErrCtxt (predCtxt pred) (
+tc_expr (HsIf pred b1 b2) res_ty
+  = addErrCtxt (predCtxt pred) (
     tcCheckRho pred boolTy	)	`thenM`    \ pred' ->
 
     zapExpectedType res_ty		`thenM`    \ res_ty' ->
@@ -276,16 +291,15 @@ tcMonoExpr (HsIf pred b1 b2 src_loc) res_ty
 
     tcCheckRho b1 res_ty'		`thenM`    \ b1' ->
     tcCheckRho b2 res_ty'		`thenM`    \ b2' ->
-    returnM (HsIf pred' b1' b2' src_loc)
+    returnM (HsIf pred' b1' b2')
 
-tcMonoExpr (HsDo do_or_lc stmts method_names _ src_loc) res_ty
-  = addSrcLoc src_loc					$
-    zapExpectedType res_ty				`thenM` \ res_ty' ->
+tc_expr (HsDo do_or_lc stmts method_names _) res_ty
+  = zapExpectedType res_ty				`thenM` \ res_ty' ->
 	-- All comprehensions yield a monotype
     tcDoStmts do_or_lc stmts method_names res_ty'	`thenM` \ (stmts', methods') ->
-    returnM (HsDo do_or_lc stmts' methods' res_ty' src_loc)
+    returnM (HsDo do_or_lc stmts' methods' res_ty')
 
-tcMonoExpr in_expr@(ExplicitList _ exprs) res_ty	-- Non-empty list
+tc_expr in_expr@(ExplicitList _ exprs) res_ty	-- Non-empty list
   = zapToListTy res_ty                `thenM` \ elt_ty ->  
     mappM (tc_elt elt_ty) exprs	      `thenM` \ exprs' ->
     returnM (ExplicitList elt_ty exprs')
@@ -294,7 +308,7 @@ tcMonoExpr in_expr@(ExplicitList _ exprs) res_ty	-- Non-empty list
       = addErrCtxt (listCtxt expr) $
 	tcCheckRho expr elt_ty
 
-tcMonoExpr in_expr@(ExplicitPArr _ exprs) res_ty	-- maybe empty
+tc_expr in_expr@(ExplicitPArr _ exprs) res_ty	-- maybe empty
   = zapToPArrTy res_ty                `thenM` \ elt_ty ->  
     mappM (tc_elt elt_ty) exprs	      `thenM` \ exprs' ->
     returnM (ExplicitPArr elt_ty exprs')
@@ -303,15 +317,14 @@ tcMonoExpr in_expr@(ExplicitPArr _ exprs) res_ty	-- maybe empty
       = addErrCtxt (parrCtxt expr) $
 	tcCheckRho expr elt_ty
 
-tcMonoExpr (ExplicitTuple exprs boxity) res_ty
+tc_expr (ExplicitTuple exprs boxity) res_ty
   = zapToTupleTy boxity (length exprs) res_ty	`thenM` \ arg_tys ->
     tcCheckRhos exprs arg_tys 			`thenM` \ exprs' ->
     returnM (ExplicitTuple exprs' boxity)
 
-tcMonoExpr (HsProc pat cmd loc) res_ty
-  = addSrcLoc loc $
-    tcProc pat cmd res_ty			`thenM` \ (pat', cmd') ->
-    returnM (HsProc pat' cmd' loc)
+tc_expr (HsProc pat cmd) res_ty
+  = tcProc pat cmd res_ty			`thenM` \ (pat', cmd') ->
+    returnM (HsProc pat' cmd')
 \end{code}
 
 %************************************************************************
@@ -321,9 +334,9 @@ tcMonoExpr (HsProc pat cmd loc) res_ty
 %************************************************************************
 
 \begin{code}
-tcMonoExpr expr@(RecordCon con_name rbinds) res_ty
+tc_expr expr@(RecordCon con@(L _ con_name) rbinds) res_ty
   = addErrCtxt (recordConCtxt expr)		$
-    tcId con_name			`thenM` \ (con_expr, con_tau) ->
+    addLocM tcId con			`thenM` \ (con_expr, con_tau) ->
     let
 	(_, record_ty)   = tcSplitFunTys con_tau
 	(tycon, ty_args) = tcSplitTyConApp record_ty
@@ -348,7 +361,8 @@ tcMonoExpr expr@(RecordCon con_name rbinds) res_ty
  	-- Check for missing fields
     checkMissingFields data_con rbinds		`thenM_` 
 
-    returnM (RecordConOut data_con con_expr rbinds')
+    getSrcSpanM					`thenM` \ loc ->
+    returnM (RecordConOut data_con (L loc con_expr) rbinds')
 
 -- The main complication with RecordUpd is that we need to explicitly
 -- handle the *non-updated* fields.  Consider:
@@ -376,21 +390,21 @@ tcMonoExpr expr@(RecordCon con_name rbinds) res_ty
 --
 -- All this is done in STEP 4 below.
 
-tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
+tc_expr expr@(RecordUpd record_expr rbinds) res_ty
   = addErrCtxt (recordUpdCtxt	expr)		$
 
 	-- STEP 0
 	-- Check that the field names are really field names
     ASSERT( notNull rbinds )
     let 
-	field_names = recBindFields rbinds
+	field_names = map fst rbinds
     in
-    mappM tcLookupGlobalId field_names		`thenM` \ sel_ids ->
+    mappM (tcLookupGlobalId.unLoc) field_names	`thenM` \ sel_ids ->
 	-- The renamer has already checked that they
 	-- are all in scope
     let
-	bad_guys = [ addErrTc (notSelector field_name) 
-		   | (field_name, sel_id) <- field_names `zip` sel_ids,
+	bad_guys = [ addSrcSpan loc $ addErrTc (notSelector field_name) 
+		   | (L loc field_name, sel_id) <- field_names `zip` sel_ids,
 		     not (isRecordSelector sel_id) 	-- Excludes class ops
 		   ]
     in
@@ -482,16 +496,16 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
 %************************************************************************
 
 \begin{code}
-tcMonoExpr (ArithSeqIn seq@(From expr)) res_ty
+tc_expr (ArithSeqIn seq@(From expr)) res_ty
   = zapToListTy res_ty 				`thenM` \ elt_ty ->  
     tcCheckRho expr elt_ty		 	`thenM` \ expr' ->
 
     newMethodFromName (ArithSeqOrigin seq) 
 		      elt_ty enumFromName	`thenM` \ enum_from ->
 
-    returnM (ArithSeqOut (HsVar enum_from) (From expr'))
+    returnM (ArithSeqOut (nlHsVar enum_from) (From expr'))
 
-tcMonoExpr in_expr@(ArithSeqIn seq@(FromThen expr1 expr2)) res_ty
+tc_expr in_expr@(ArithSeqIn seq@(FromThen expr1 expr2)) res_ty
   = addErrCtxt (arithSeqCtxt in_expr) $ 
     zapToListTy  res_ty         			`thenM`    \ elt_ty ->  
     tcCheckRho expr1 elt_ty				`thenM`    \ expr1' ->
@@ -499,10 +513,10 @@ tcMonoExpr in_expr@(ArithSeqIn seq@(FromThen expr1 expr2)) res_ty
     newMethodFromName (ArithSeqOrigin seq) 
 		      elt_ty enumFromThenName		`thenM` \ enum_from_then ->
 
-    returnM (ArithSeqOut (HsVar enum_from_then) (FromThen expr1' expr2'))
+    returnM (ArithSeqOut (nlHsVar enum_from_then) (FromThen expr1' expr2'))
 
 
-tcMonoExpr in_expr@(ArithSeqIn seq@(FromTo expr1 expr2)) res_ty
+tc_expr in_expr@(ArithSeqIn seq@(FromTo expr1 expr2)) res_ty
   = addErrCtxt (arithSeqCtxt in_expr) $
     zapToListTy  res_ty         			`thenM`    \ elt_ty ->  
     tcCheckRho expr1 elt_ty				`thenM`    \ expr1' ->
@@ -510,9 +524,9 @@ tcMonoExpr in_expr@(ArithSeqIn seq@(FromTo expr1 expr2)) res_ty
     newMethodFromName (ArithSeqOrigin seq) 
 	  	      elt_ty enumFromToName		`thenM` \ enum_from_to ->
 
-    returnM (ArithSeqOut (HsVar enum_from_to) (FromTo expr1' expr2'))
+    returnM (ArithSeqOut (nlHsVar enum_from_to) (FromTo expr1' expr2'))
 
-tcMonoExpr in_expr@(ArithSeqIn seq@(FromThenTo expr1 expr2 expr3)) res_ty
+tc_expr in_expr@(ArithSeqIn seq@(FromThenTo expr1 expr2 expr3)) res_ty
   = addErrCtxt  (arithSeqCtxt in_expr) $
     zapToListTy  res_ty         			`thenM`    \ elt_ty ->  
     tcCheckRho expr1 elt_ty				`thenM`    \ expr1' ->
@@ -521,9 +535,9 @@ tcMonoExpr in_expr@(ArithSeqIn seq@(FromThenTo expr1 expr2 expr3)) res_ty
     newMethodFromName (ArithSeqOrigin seq) 
 		      elt_ty enumFromThenToName		`thenM` \ eft ->
 
-    returnM (ArithSeqOut (HsVar eft) (FromThenTo expr1' expr2' expr3'))
+    returnM (ArithSeqOut (nlHsVar eft) (FromThenTo expr1' expr2' expr3'))
 
-tcMonoExpr in_expr@(PArrSeqIn seq@(FromTo expr1 expr2)) res_ty
+tc_expr in_expr@(PArrSeqIn seq@(FromTo expr1 expr2)) res_ty
   = addErrCtxt (parrSeqCtxt in_expr) $
     zapToPArrTy  res_ty         			`thenM`    \ elt_ty ->  
     tcCheckRho expr1 elt_ty				`thenM`    \ expr1' ->
@@ -531,9 +545,9 @@ tcMonoExpr in_expr@(PArrSeqIn seq@(FromTo expr1 expr2)) res_ty
     newMethodFromName (PArrSeqOrigin seq) 
 		      elt_ty enumFromToPName 		`thenM` \ enum_from_to ->
 
-    returnM (PArrSeqOut (HsVar enum_from_to) (FromTo expr1' expr2'))
+    returnM (PArrSeqOut (nlHsVar enum_from_to) (FromTo expr1' expr2'))
 
-tcMonoExpr in_expr@(PArrSeqIn seq@(FromThenTo expr1 expr2 expr3)) res_ty
+tc_expr in_expr@(PArrSeqIn seq@(FromThenTo expr1 expr2 expr3)) res_ty
   = addErrCtxt  (parrSeqCtxt in_expr) $
     zapToPArrTy  res_ty         			`thenM`    \ elt_ty ->  
     tcCheckRho expr1 elt_ty				`thenM`    \ expr1' ->
@@ -542,9 +556,9 @@ tcMonoExpr in_expr@(PArrSeqIn seq@(FromThenTo expr1 expr2 expr3)) res_ty
     newMethodFromName (PArrSeqOrigin seq)
 		      elt_ty enumFromThenToPName	`thenM` \ eft ->
 
-    returnM (PArrSeqOut (HsVar eft) (FromThenTo expr1' expr2' expr3'))
+    returnM (PArrSeqOut (nlHsVar eft) (FromThenTo expr1' expr2' expr3'))
 
-tcMonoExpr (PArrSeqIn _) _ 
+tc_expr (PArrSeqIn _) _ 
   = panic "TcExpr.tcMonoExpr: Infinite parallel array!"
     -- the parser shouldn't have generated it and the renamer shouldn't have
     -- let it through
@@ -561,8 +575,10 @@ tcMonoExpr (PArrSeqIn _) _
 #ifdef GHCI	/* Only if bootstrapped */
 	-- Rename excludes these cases otherwise
 
-tcMonoExpr (HsSplice n expr loc) res_ty = addSrcLoc loc (tcSpliceExpr n expr res_ty)
-tcMonoExpr (HsBracket brack loc) res_ty = addSrcLoc loc (tcBracket brack res_ty)
+tc_expr (HsSplice n expr) res_ty = tcSpliceExpr n expr res_ty
+tc_expr (HsBracket brack) res_ty = do
+  e <- tcBracket brack res_ty
+  return (unLoc e)
 #endif /* GHCI */
 \end{code}
 
@@ -574,7 +590,7 @@ tcMonoExpr (HsBracket brack loc) res_ty = addSrcLoc loc (tcBracket brack res_ty)
 %************************************************************************
 
 \begin{code}
-tcMonoExpr other _ = pprPanic "tcMonoExpr" (ppr other)
+tc_expr other _ = pprPanic "tcMonoExpr" (ppr other)
 \end{code}
 
 
@@ -586,11 +602,11 @@ tcMonoExpr other _ = pprPanic "tcMonoExpr" (ppr other)
 
 \begin{code}
 
-tcApp :: RenamedHsExpr -> [RenamedHsExpr]   	-- Function and args
+tcApp :: LHsExpr Name -> [LHsExpr Name]   	-- Function and args
       -> Expected TcRhoType	    		-- Expected result type of application
-      -> TcM TcExpr			    	-- Translated fun and args
+      -> TcM (HsExpr TcId)			    	-- Translated fun and args
 
-tcApp (HsApp e1 e2) args res_ty 
+tcApp (L _ (HsApp e1 e2)) args res_ty 
   = tcApp e1 (e2:args) res_ty		-- Accumulate the arguments
 
 tcApp fun args res_ty
@@ -630,7 +646,7 @@ tcApp fun args res_ty
     mappM (tcArg fun)
 	  (zip3 args expected_arg_tys [1..])	`thenM` \ args' ->
 
-    returnM (co_fn <$> foldl HsApp fun' args') 
+    returnM (co_fn <$> unLoc (foldl mkHsApp fun' args'))
 
 
 -- If an error happens we try to figure out whether the
@@ -673,9 +689,9 @@ split_fun_ty fun_ty n
 \end{code}
 
 \begin{code}
-tcArg :: RenamedHsExpr				-- The function (for error messages)
-      -> (RenamedHsExpr, TcSigmaType, Int)	-- Actual argument and expected arg type
-      -> TcM TcExpr				-- Resulting argument and LIE
+tcArg :: LHsExpr Name				-- The function (for error messages)
+      -> (LHsExpr Name, TcSigmaType, Int)	-- Actual argument and expected arg type
+      -> TcM (LHsExpr TcId)			-- Resulting argument
 
 tcArg the_fun (arg, expected_arg_ty, arg_no)
   = addErrCtxt (funAppCtxt the_fun arg arg_no) $
@@ -712,7 +728,7 @@ This gets a bit less sharing, but
 	b) perhaps fewer separated lambdas
 
 \begin{code}
-tcId :: Name -> TcM (TcExpr, TcRhoType)
+tcId :: Name -> TcM (HsExpr TcId, TcRhoType)
 tcId name	-- Look up the Id and instantiate its type
   = 	-- First check whether it's a DataCon
 	-- Reason: we must not forget to chuck in the
@@ -768,7 +784,7 @@ tcId name	-- Look up the Id and instantiate its type
 	
 		-- Update the pending splices
 	        readMutVar ps_var			`thenM` \ ps ->
-	        writeMutVar ps_var ((name, HsApp (HsVar lift) (HsVar id)) : ps)	`thenM_`
+	        writeMutVar ps_var ((name, nlHsApp (nlHsVar lift) (nlHsVar id)) : ps)	`thenM_`
 	
 		returnM (HsVar id, id_ty))
 
@@ -814,9 +830,11 @@ tcId name	-- Look up the Id and instantiate its type
     inst_data_con data_con
       = tcInstDataCon orig data_con	`thenM` \ (ty_args, ex_dicts, arg_tys, result_ty, _) ->
 	extendLIEs ex_dicts		`thenM_`
-	returnM (mkHsDictApp (mkHsTyApp (HsVar (dataConWrapId data_con)) ty_args) 
-			     (map instToId ex_dicts), 
+	getSrcSpanM			`thenM` \ loc ->
+	returnM (unLoc (mkHsDictApp (mkHsTyApp (L loc (HsVar (dataConWrapId data_con))) ty_args) 
+			     (map instToId ex_dicts)), 
 		 mkFunTys arg_tys result_ty)
+	-- ToDo: nasty loc/unloc stuff here
 
     orig = OccurrenceOf name
 \end{code}
@@ -848,17 +866,17 @@ This extends OK when the field types are universally quantified.
 tcRecordBinds
 	:: TyCon		-- Type constructor for the record
 	-> [TcType]		-- Args of this type constructor
-	-> RenamedRecordBinds
-	-> TcM TcRecordBinds
+	-> HsRecordBinds Name
+	-> TcM (HsRecordBinds TcId)
 
 tcRecordBinds tycon ty_args rbinds
   = mappM do_bind rbinds
   where
     tenv = mkTopTyVarSubst (tyConTyVars tycon) ty_args
 
-    do_bind (field_lbl_name, rhs)
+    do_bind (L loc field_lbl_name, rhs)
       = addErrCtxt (fieldCtxt field_lbl_name)	$
-           tcLookupId field_lbl_name		`thenM` \ sel_id ->
+        tcLookupId field_lbl_name		`thenM` \ sel_id ->
 	let
 	    field_lbl = recordSelectorFieldLabel sel_id
 	    field_ty  = substTy tenv (fieldLabelType field_lbl)
@@ -873,14 +891,14 @@ tcRecordBinds tycon ty_args rbinds
 
 	tcCheckSigma rhs field_ty 		`thenM` \ rhs' ->
 
-	returnM (sel_id, rhs')
+	returnM (L loc sel_id, rhs')
 
 badFields rbinds data_con
   = filter (not . (`elem` field_names)) (recBindFields rbinds)
   where
     field_names = map fieldLabelName (dataConFieldLabels data_con)
 
-checkMissingFields :: DataCon -> RenamedRecordBinds -> TcM ()
+checkMissingFields :: DataCon -> HsRecordBinds Name -> TcM ()
 checkMissingFields data_con rbinds
   | null field_labels 	-- Not declared as a record;
 			-- But C{} is still valid if no strict fields
@@ -927,7 +945,7 @@ checkMissingFields data_con rbinds
 %************************************************************************
 
 \begin{code}
-tcCheckRhos :: [RenamedHsExpr] -> [TcType] -> TcM [TcExpr]
+tcCheckRhos :: [LHsExpr Name] -> [TcType] -> TcM [LHsExpr TcId]
 
 tcCheckRhos [] [] = returnM []
 tcCheckRhos (expr:exprs) (ty:tys)
@@ -946,7 +964,7 @@ tcCheckRhos (expr:exprs) (ty:tys)
 Overloaded literals.
 
 \begin{code}
-tcLit :: HsLit -> Expected TcRhoType -> TcM TcExpr
+tcLit :: HsLit -> Expected TcRhoType -> TcM (HsExpr TcId)
 tcLit lit res_ty 
   = zapExpectedTo res_ty (hsLitType lit)		`thenM_`
     returnM (HsLit lit)
@@ -1000,7 +1018,7 @@ predCtxt expr
 appCtxt fun args
   = ptext SLIT("In the application") <+> quotes (ppr the_app)
   where
-    the_app = foldl HsApp fun args	-- Used in error messages
+    the_app = foldl mkHsApp fun args	-- Used in error messages
 
 badFieldsUpd rbinds
   = hang (ptext SLIT("No constructor has all these fields:"))
@@ -1034,7 +1052,7 @@ wrongArgsCtxt too_many_or_few fun args
 		    <+> ptext SLIT("arguments in the call"))
 	 4 (parens (ppr the_app))
   where
-    the_app = foldl HsApp fun args	-- Used in error messages
+    the_app = foldl mkHsApp fun args	-- Used in error messages
 
 #ifdef GHCI
 polySpliceErr :: Id -> SDoc

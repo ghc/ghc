@@ -25,8 +25,8 @@ import Ratio	( Rational )
 
 \begin{code}
 data HsLit
-  = HsChar	    Int			-- Character
-  | HsCharPrim	    Int			-- Unboxed character
+  = HsChar	    Char		-- Character
+  | HsCharPrim	    Char		-- Unboxed character
   | HsString	    FastString		-- String
   | HsStringPrim    FastString		-- Packed string
   | HsInt	    Integer		-- Genuinely an Int; arises from TcGenDeriv, 

@@ -62,10 +62,7 @@ import Panic
 import DATA_WORD	( Word32 )
 
 import IO		( Handle, stderr, stdout, hFlush )
-import Char             ( chr )
-#if __GLASGOW_HASKELL__ < 410
-import Char		( ord, isDigit )
-#endif
+import Char             ( chr, ord )
 \end{code}
 
 
@@ -391,44 +388,15 @@ class Outputable a => OutputableBndr a where
 %************************************************************************
 
 \begin{code}
-#if __GLASGOW_HASKELL__ < 410
--- Assume we have only 8-bit Chars.
-
-pprHsChar :: Int -> SDoc
-pprHsChar c = char '\'' <> text (showCharLit c "") <> char '\''
-
-pprHsString :: FastString -> SDoc
-pprHsString fs = doubleQuotes (text (foldr showCharLit "" (unpackIntFS fs)))
-
-showCharLit :: Int -> String -> String
-showCharLit c rest
-    | c == ord '\"' = "\\\"" ++ rest
-    | c == ord '\'' = "\\\'" ++ rest
-    | c == ord '\\' = "\\\\" ++ rest
-    | c >= 0x20 && c <= 0x7E = chr c : rest
-    | c == ord '\a' = "\\a" ++ rest
-    | c == ord '\b' = "\\b" ++ rest
-    | c == ord '\f' = "\\f" ++ rest
-    | c == ord '\n' = "\\n" ++ rest
-    | c == ord '\r' = "\\r" ++ rest
-    | c == ord '\t' = "\\t" ++ rest
-    | c == ord '\v' = "\\v" ++ rest
-    | otherwise     = ('\\':) $ shows (fromIntegral c :: Word32) $ case rest of
-        d:_ | isDigit d -> "\\&" ++ rest
-        _               -> rest
-
-#else
 -- We have 31-bit Chars and will simply use Show instances
 -- of Char and String.
 
-pprHsChar :: Int -> SDoc
-pprHsChar c | c > 0x10ffff = char '\\' <> text (show (fromIntegral c :: Word32))
-            | otherwise    = text (show (chr c))
+pprHsChar :: Char -> SDoc
+pprHsChar c | c > '\x10ffff' = char '\\' <> text (show (fromIntegral (ord c) :: Word32))
+            | otherwise      = text (show c)
 
 pprHsString :: FastString -> SDoc
 pprHsString fs = text (show (unpackFS fs))
-
-#endif
 
 instance Show FastString  where
     showsPrec p fs = showsPrecSDoc p (ppr fs)
