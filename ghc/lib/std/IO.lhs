@@ -84,7 +84,7 @@ hWaitForInput         :: Handle -> Int -> IO Bool
 --IOHandle:hSetBuffering         :: Handle -> BufferMode -> IO ()
 --IOHandle:hSetPosn              :: HandlePosn -> IO () 
 -- ioeGetFileName        :: IOError -> Maybe FilePath
--- ioeGetErrorString     :: IOError -> Maybe String
+-- ioeGetErrorString     :: IOError -> String
 -- ioeGetHandle          :: IOError -> Maybe Handle
 -- isAlreadyExistsError  :: IOError -> Bool
 -- isAlreadyInUseError   :: IOError -> Bool
