@@ -549,7 +549,7 @@ setMainIs arg
 
 machdepCCOpts 
    | prefixMatch "alpha"   cTARGETPLATFORM  
-	= return ( ["-static", "-w", "-mieee"
+	= return ( ["-w", "-mieee"
 #ifdef HAVE_THREADED_RTS_SUPPORT
 		    , "-D_REENTRANT"
 #endif
@@ -561,7 +561,7 @@ machdepCCOpts
    | prefixMatch "hppa"    cTARGETPLATFORM  
         -- ___HPUX_SOURCE, not _HPUX_SOURCE, is #defined if -ansi!
         -- (very nice, but too bad the HP /usr/include files don't agree.)
-	= return ( ["-static", "-D_HPUX_SOURCE"], [] )
+	= return ( ["-D_HPUX_SOURCE"], [] )
 
    | prefixMatch "m68k"    cTARGETPLATFORM
       -- -fno-defer-pop : for the .hc files, we want all the pushing/
