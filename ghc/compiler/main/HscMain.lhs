@@ -16,7 +16,7 @@ module HscMain ( HscResult(..), hscMain,
 import RdrHsSyn		( RdrNameStmt )
 import Rename		( renameStmt )
 import ByteCodeGen	( byteCodeGen )
-import Id		( Id, idName )
+import Id		( Id, idName, setGlobalIdDetails )
 import IdInfo		( GlobalIdDetails(VanillaGlobal) )
 import HscTypes		( InteractiveContext(..), TyThing(..) )
 #endif
@@ -506,7 +506,7 @@ hscStmt dflags hst hit pcs0 icontext stmt just_expr
 		-- using these ids later, the byte code generator will consider
 		-- the occurrences to be free rather than global.
 	     global_bound_ids = map globaliseId bound_ids;
-	     globaliseId id   = setIdGlobalDetails id VanillaGlobal
+	     globaliseId id   = setGlobalIdDetails id VanillaGlobal
 
 	; return (pcs2, Just (global_bound_ids, ty, bcos))
 
