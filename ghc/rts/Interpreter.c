@@ -5,8 +5,8 @@
  * Copyright (c) 1994-2000.
  *
  * $RCSfile: Interpreter.c,v $
- * $Revision: 1.5 $
- * $Date: 2000/12/20 14:47:22 $
+ * $Revision: 1.6 $
+ * $Date: 2001/01/03 15:30:48 $
  * ---------------------------------------------------------------------------*/
 
 #ifdef GHCI
@@ -120,7 +120,7 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                  /* Handle arg check failure.  Copy the spare args
                     into a PAP frame. */
                  pap = (StgPAP*)allocate(PAP_sizeW(arg_words_avail));
-                 SET_HDR(pap,&stg_PAP_info,CC_pap);
+                 SET_HDR(pap,&stg_PAP_info,CCS_SYSTEM/*ToDo*/);
                  pap->n_args = arg_words_avail;
                  for (i = 0; i < arg_words_avail; i++)
                     pap->payload[i] = (StgClosure*)StackWord(i);
@@ -250,7 +250,7 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                  /* A bit of a kludge since n_words = n_p + n_np */
                  int request        = CONSTR_sizeW( n_words, 0 );
                  StgClosure* con = (StgClosure*)allocate(request);
-                 SET_HDR(con, itbl, ??);
+                 SET_HDR(con, itbl, CCS_SYSTEM/*ToDo*/);
                  for (i = 0; i < n_words; i++)
                     con->payload[i] = (StgClosure*)StackWord(i);
                  iSp += n_words;
