@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.152 2003/03/26 15:56:25 simonmar Exp $
+ * $Id: GC.c,v 1.153 2003/04/01 15:05:13 sof Exp $
  *
  * (c) The GHC Team 1998-2003
  *
@@ -310,7 +310,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 		     Now, Now));
 #endif
 
-#ifndef mingw32_TARGET_OS
+#if defined(RTS_USER_SIGNALS)
   // block signals
   blockUserSignals();
 #endif
@@ -1087,7 +1087,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   // ok, GC over: tell the stats department what happened. 
   stat_endGC(allocated, collected, live, copied, N);
 
-#ifndef mingw32_TARGET_OS
+#if defined(RTS_USER_SIGNALS)
   // unblock signals again
   unblockUserSignals();
 #endif

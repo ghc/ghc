@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.h,v 1.10 2003/03/29 00:00:43 sof Exp $
+ * $Id: Signals.h,v 1.11 2003/04/01 15:05:22 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -7,7 +7,8 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef PAR
+#if !defined(PAR) && !defined(mingw32_TARGET_OS)
+#define RTS_USER_SIGNALS 1
 
 extern StgPtr pending_handler_buf[];
 extern StgPtr *next_pending_handler;
@@ -27,14 +28,11 @@ extern void startSignalHandlers(void);
 extern void markSignalHandlers (evac_fn evac);
 extern void initDefaultHandlers(void);
 
-#if !defined(mingw32_TARGET_OS)
 extern void handleSignalsInThisThread(void);
-#else
-#define handleSignalsInThisThread() /* nothing */
-#endif
 
 #else
 
 #define signals_pending() (rtsFalse)
+#define handleSignalsInThisThread() /* nothing */
 
-#endif /* PAR */
+#endif /* !PAR && !mingw32_TARGET_OS */

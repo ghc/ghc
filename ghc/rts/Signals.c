@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.36 2003/03/29 00:00:41 sof Exp $
+ * $Id: Signals.c,v 1.37 2003/04/01 15:05:22 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -32,7 +32,14 @@
 
 #include <stdlib.h>
 
-#ifndef PAR
+/* This curious flag is provided for the benefit of the Haskell binding
+ * to POSIX.1 to control whether or not to include SA_NOCLDSTOP when
+ * installing a SIGCHLD handler. 
+ * 
+ */
+StgInt nocldstop = 0;
+
+#if defined(RTS_USER_SIGNALS)
 
 /* SUP: The type of handlers is a little bit, well, doubtful... */
 static StgInt *handlers = NULL; /* Dynamically grown array of signal handlers */
@@ -44,9 +51,6 @@ static nat n_haskell_handlers = 0;
 
 StgPtr pending_handler_buf[N_PENDING_HANDLERS];
 StgPtr *next_pending_handler = pending_handler_buf;
-
-StgInt nocldstop = 0;
-
 
 #ifdef RTS_SUPPORTS_THREADS
 pthread_t signalHandlingThread;
@@ -338,20 +342,20 @@ markSignalHandlers (evac_fn evac)
     }
 }
 
-#else // PAR
+#else /* !RTS_USER_SIGNALS */
 StgInt 
-stg_sig_install(StgInt sig, StgInt spi, StgStablePtr handler, sigset_t *mask)
+stg_sig_install(StgInt sig STG_UNUSED,
+		StgInt spi STG_UNUSED,
+		StgStablePtr* handler STG_UNUSED,
+		void* mask STG_UNUSED)
 {
-    // don't fflush(stdout); WORKAROUND bug in Linux glibc
-    barf("no signal handling support in a parallel implementation");
+  //barf("User signals not supported");
+  return STG_SIG_DFL;
 }
 
-void
-startSignalHandlers(void)
-{
-}
 #endif
 
+#if defined(RTS_USER_SIGNALS)
 /* -----------------------------------------------------------------------------
  * SIGINT handler.
  *
@@ -421,7 +425,7 @@ initDefaultHandlers()
     startup_guy = pthread_self();
 #endif
 #ifdef RTS_SUPPORTS_THREADS
-	handleSignalsInThisThread();
+    handleSignalsInThisThread();
 #endif
 
     // install the SIGINT handler
@@ -467,3 +471,5 @@ initDefaultHandlers()
     ieee_set_fp_control(0);
 #endif
 }
+
+#endif /* RTS_USER_SIGNALS */

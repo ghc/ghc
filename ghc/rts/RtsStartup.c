@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.72 2003/02/22 04:51:53 sof Exp $
+ * $Id: RtsStartup.c,v 1.73 2003/04/01 15:05:15 sof Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -150,7 +150,7 @@ hs_init(int *argc, char **argv[])
     /* Initialise the stats department */
     initStats();
 
-#if !defined(mingw32_TARGET_OS) && !defined(PAR)
+#if defined(RTS_USER_SIGNALS)
     /* Initialise the user signal handler set */
     initUserSignals();
     /* Set up handler to run on SIGINT, etc. */

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Select.c,v 1.27 2003/03/29 00:00:41 sof Exp $
+ * $Id: Select.c,v 1.28 2003/04/01 15:05:22 sof Exp $
  *
  * (c) The GHC Team 1995-2002
  *
@@ -232,12 +232,14 @@ awaitEvent(rtsBool wait)
 	   * we could block for a long time before the signal is
 	   * serviced.
 	   */
+#if defined(RTS_USER_SIGNALS)
 	  if (signals_pending()) {
 	      RELEASE_LOCK(&sched_mutex); /* ToDo: kill */
 	      startSignalHandlers();
 	      ACQUIRE_LOCK(&sched_mutex);
 	      return; /* still hold the lock */
 	  }
+#endif
 
 	  /* we were interrupted, return to the scheduler immediately.
 	   */

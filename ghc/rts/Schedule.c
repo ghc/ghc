@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.165 2003/03/25 17:58:50 sof Exp $
+ * $Id: Schedule.c,v 1.166 2003/04/01 15:05:15 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -589,7 +589,7 @@ schedule( void )
 #endif // SMP
 
     /* check for signals each time around the scheduler */
-#ifndef mingw32_TARGET_OS
+#if defined(RTS_USER_SIGNALS)
     if (signals_pending()) {
       RELEASE_LOCK(&sched_mutex); /* ToDo: kill */
       startSignalHandlers();
@@ -656,7 +656,7 @@ schedule( void )
 
 	if ( !EMPTY_RUN_QUEUE() ) { goto not_deadlocked; }
 
-#ifndef mingw32_TARGET_OS
+#if defined(RTS_USER_SIGNALS)
 	/* If we have user-installed signal handlers, then wait
 	 * for signals to arrive rather then bombing out with a
 	 * deadlock.
@@ -2534,7 +2534,7 @@ GetRoots(evac_fn evac)
   markSparkQueue(evac);
 #endif
 
-#ifndef mingw32_TARGET_OS
+#if defined(RTS_USER_SIGNALS)
   // mark the signal handlers (signals should be already blocked)
   markSignalHandlers(evac);
 #endif
