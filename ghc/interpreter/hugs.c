@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.66 $
- * $Date: 2000/04/10 15:39:09 $
+ * $Revision: 1.67 $
+ * $Date: 2000/04/17 11:39:23 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -121,6 +121,9 @@ static Bool   disableOutput = FALSE;    /* TRUE => quiet                   */
        String hugsPath   = 0;           /* String for file search path     */
 
        List  ifaces_outstanding = NIL;
+
+static ConId currentModule_failed = NIL; /* Remember failed module from :r */
+
 
 
 /* --------------------------------------------------------------------------
@@ -1528,26 +1531,56 @@ static Bool loadThePrelude ( void )
 }
 
 
+/* Refresh the current target modules, and attempt to set the
+   current module to what it was before (ie currentModule):
+     if currentModule_failed is different from currentModule,
+        use that instead
+     if nextCurrMod is non null, try to set it to that instead
+     if the one we're after insn't available, select a target
+       from the end of the module group list.
+*/
 static void refreshActions ( ConId nextCurrMod, Bool cleanAfter )
 {
    List t;
-   ConId tryFor = mkCon(module(currentModule).text);
+   ConId tryFor; 
+
+   /* Remember what the old current module was. */
+   tryFor = mkCon(module(currentModule).text);
+
+   /* Do the Real Work. */
    achieveTargetModules(FALSE);
+
+   /* Remember if the current module was invalidated by this
+      refresh, so later refreshes can attempt to reload it. */
+   if (!elemMG(tryFor))
+      currentModule_failed = tryFor;
+
+   /* If a previous refresh failed to get an old current module, 
+      try for that instead. */
+   if (nonNull(currentModule_failed) 
+       && textOf(currentModule_failed) != textOf(tryFor)
+       && elemMG(currentModule_failed))
+      tryFor = currentModule_failed;
+   /* If our caller specified a new current module, that overrides
+      all historical settings. */
    if (nonNull(nextCurrMod))
       tryFor = nextCurrMod;
+   /* Finally, if we can't actually get hold of whatever it was we
+      were after, select something which is possible. */
    if (!elemMG(tryFor))
       tryFor = selectLatestMG();
+
    /* combined mode kludge, to get Prelude rather than PrelHugs */
    if (combined && textOf(tryFor)==findText("PrelHugs"))
       tryFor = mkCon(findText("Prelude"));
 
    if (cleanAfter) {
-   /* delete any targetModules which didn't actually get loaded  */
-   t = targetModules;
-   targetModules = NIL;
-   for (; nonNull(t); t=tl(t))
-      if (elemMG(hd(t)))
-         targetModules = cons(hd(t),targetModules);
+      /* delete any targetModules which didn't actually get loaded  */
+      t = targetModules;
+      targetModules = NIL;
+      for (; nonNull(t); t=tl(t))
+         if (elemMG(hd(t)))
+            targetModules = cons(hd(t),targetModules);
    }
 
    setCurrModule ( findModule(textOf(tryFor)) );
@@ -2758,10 +2791,13 @@ Int what; {                     /* system to respond as appropriate ...    */
     compiler(what);   
     codegen(what);
 
-    mark(moduleGraph);
-    mark(prelModules);
-    mark(targetModules);
-    mark(daSccs);
+    if (what == MARK) {
+       mark(moduleGraph);
+       mark(prelModules);
+       mark(targetModules);
+       mark(daSccs);
+       mark(currentModule_failed);
+    }
 }
 
 /*-------------------------------------------------------------------------*/
