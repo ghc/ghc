@@ -1,11 +1,11 @@
 (1,'a')
-"head []
+head []
 ([2,3,4],"")
-"tail []
+tail []
 ([1,2,3],"")
-"init []
+init []
 (4,'a')
-"last []
+last []
 [True,False]
 10
 56
