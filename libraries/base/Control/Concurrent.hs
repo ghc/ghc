@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Concurrent.hs,v 1.3 2001/12/21 15:07:21 simonmar Exp $
+-- $Id: Concurrent.hs,v 1.4 2002/04/10 15:57:16 simonmar Exp $
 --
 -- A common interface to a collection of useful concurrency
 -- abstractions.
@@ -75,7 +75,7 @@ import Control.Concurrent.SampleVar
 -- cmp_thread in the RTS.
 
 #ifdef __GLASGOW_HASKELL__
-foreign import ccall "cmp_thread" unsafe cmp_thread :: Addr# -> Addr# -> Int
+foreign import ccall unsafe "cmp_thread" cmp_thread :: Addr# -> Addr# -> Int
 -- Returns -1, 0, 1
 
 cmpThread :: ThreadId -> ThreadId -> Ordering
