@@ -694,7 +694,7 @@ getExecDir = do let len = 2048 -- plenty, PATH_MAX is 512 under Win32.
 		if ret == 0 then return Nothing
 		            else do s <- peekCString buf
 				    destructArray (fromIntegral len) buf
-				    return (Just (reverse (drop (length "/bin/ghc.exe") (reverse (unDosifyPath n)))))
+				    return (Just (reverse (drop (length "/bin/ghc.exe") (reverse (unDosifyPath s)))))
 
 
 foreign import stdcall "GetModuleFileNameA" getModuleFileName :: Addr -> CString -> Int32 -> IO Int32
