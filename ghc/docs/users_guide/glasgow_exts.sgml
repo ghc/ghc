@@ -1531,12 +1531,12 @@ in GHC, you can give the foralls if you want.  See <xref LinkEnd="universal-quan
  <emphasis>Each universally quantified type variable
 <literal>tvi</literal> must be reachable from <literal>type</literal></emphasis>.
 
-A type variable is "reachable" if it it is functionally dependent
-(see <xref linkend="functional-dependencies">)
-on the type variables free in <literal>type</literal>.
-The reason for this is that a value with a type that does not obey
-this restriction could not be used without introducing
-ambiguity. 
+A type variable <literal>a</literal> is "reachable" if it it appears
+in the same constraint as either a type variable free in in
+<literal>type</literal>, or another reachable type variable.  
+A value with a type that does not obey 
+this reachability restriction cannot be used without introducing
+ambiguity; that is why the type is rejected.
 Here, for example, is an illegal type:
 
 
@@ -1551,7 +1551,23 @@ would be introduced where <literal>tv</literal> is a fresh type variable, and
 applied to a dictionary for <literal>Eq tv</literal>.  The difficulty is that we
 can never know which instance of <literal>Eq</literal> to use because we never
 get any more information about <literal>tv</literal>.
-
+</para>
+<para>
+Note
+that the reachability condition is weaker than saying that <literal>a</literal> is
+functionally dependendent on a type variable free in
+<literal>type</literal> (see <xref
+linkend="functional-dependencies">).  The reason for this is there
+might be a "hidden" dependency, in a superclass perhaps.  So
+"reachable" is a conservative approximation to "functionally dependent".
+For example, consider:
+<programlisting>
+  class C a b | a -> b where ...
+  class C a b => D a b where ...
+  f :: forall a b. D a b => a -> a
+</programlisting>
+This is fine, because in fact <literal>a</literal> does functionally determine <literal>b</literal>
+but that is not immediately apparent from <literal>f</literal>'s type.
 </para>
 </listitem>
 <listitem>
