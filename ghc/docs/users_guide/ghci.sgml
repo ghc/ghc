@@ -12,7 +12,7 @@
   you're famililar with Hugs<indexterm><primary>Hugs</primary>
   </indexterm>, then you'll be right at home with GHCi.  However, GHCi
   also has support for interactively loading compiled code, as well as
-  supporting all<footnote><para>except the FFI, at the moment</para>
+  supporting all<footnote><para>except <literal>foreign export</literal>, at the moment</para>
   </footnote>the language extensions that GHC provides.</para>
   <indexterm><primary>FFI</primary><secondary>GHCi support</secondary></indexterm>
   <indexterm><primary>Foreign Function Interface</primary><secondary>GHCi support</secondary></indexterm>
@@ -734,6 +734,24 @@ Prelude> :def make (\_ -> return ":! ghc --make Main")
       </varlistentry>
 
       <varlistentry>
+	<term><literal>:info</literal> <replaceable>name</replaceable>
+	...</term>
+	<indexterm><primary><literal>:info</literal></primary>
+	</indexterm>
+	<listitem>
+	  <para>Displays information about the given name(s).  For
+	  example, if <replaceable>name</replaceable> is a class, then
+	  the class methods and their types will be printed;  if
+	  <replaceable>name</replaceable> is a type constructor, then
+	  its definition will be printed;  if
+	  <replaceable>name</replaceable> is a function, then its type
+	  will be printed.  If <replaceable>name</replaceable> has
+	  been loaded from a source file, then GHCi will also display
+	  the location of its definition in the source.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term><literal>:load</literal>
 	<replaceable>module</replaceable> ...</term>
 	<indexterm><primary><literal>:load</literal></primary></indexterm>
@@ -1038,15 +1056,6 @@ Prelude> :set -fno-glasgow-exts
       </varlistentry>
 
       <varlistentry>
-	<term><literal>System.exit</literal> causes GHCi to exit!</term>
-	<indexterm><primary><literal>System.exit</literal></primary><secondary>in
-	GHCi</secondary></indexterm>
-	<listitem>
-	  <para>Yes, it does.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
 	<term><literal>System.getArgs</literal> returns GHCi's command
 	line arguments!</term>
 	<listitem>
@@ -1055,7 +1064,7 @@ Prelude> :set -fno-glasgow-exts
       </varlistentry>
 
       <varlistentry>
-	<term>The interpreter can't load modules with FFI
+	<term>The interpreter can't load modules with foreign export
 	declarations!</term>
 	<listitem>
 	  <para>Unfortunately not.  We haven't implemented it yet.
