@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.19 2000/03/21 15:57:47 simonmar Exp $
+# $Id: Makefile,v 1.20 2000/05/16 11:36:57 rrt Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
@@ -30,12 +30,12 @@ addr001_HC_OPTS = -fglasgow-exts
 ioexts001_HC_OPTS 	= -fglasgow-exts -O
 ioexts001_RUNTEST_OPTS  = +RTS -K8m
 
-memo001_HC_OPTS		= -syslib lang
+memo001_HC_OPTS		= -syslib lang -syslib util
 # stress the garbage collector a bit, to make sure weak pointers are being
 # finalized properly, and stable names are GC'd etc.
 memo001_RUNTEST_OPTS    = +RTS -A10k -G1
 
-memo002_HC_OPTS		= -syslib lang
+memo002_HC_OPTS		= -syslib lang -syslib util
 memo002_RUNTEST_OPTS	= 20
 
 weak001_HC_OPTS		= -fglasgow-exts
