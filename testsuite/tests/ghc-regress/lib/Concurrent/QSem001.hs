@@ -5,26 +5,22 @@ import Control.Concurrent
 import Control.Monad
 
 
-data Action = NewQSem Int | SignalQSem | WaitQSem | GetQuantityQSem 
-	    | ReturnInt Int
-  deriving (Eq,Show)
-
-
 main = do 
   t <- myThreadId
   forkIO (threadDelay 1000000 >> killThread t)
 	-- just in case we deadlock
   testQSem
 
+data Action = NewQSem Int | SignalQSem | WaitQSem
+  deriving (Eq,Show)
+
+
 testQSem :: IO ()
 testQSem = do
-  quickCheck prop_NewGet_NewRet
-  quickCheck prop_SignalWait
-  quickCheck prop_WaitSignal
+  quietCheck prop_SignalWait
+  quietCheck prop_WaitSignal
 
-
-prop_NewGet_NewRet n = 
-  [NewQSem n,GetQuantityQSem] =^ [NewQSem n,ReturnInt n]
+quietCheck = check defaultConfig{configEvery = \n args -> ""}
 
 prop_SignalWait n = 
   n>=0 ==> [NewQSem n,SignalQSem,WaitQSem] =^ [NewQSem n]
@@ -33,25 +29,22 @@ prop_WaitSignal n =
   n>=1 ==> [NewQSem n,WaitQSem,SignalQSem] =^ [NewQSem n]
 
 
-perform :: [Action] -> IO [Int]
-perform [] = return []
+perform :: [Action] -> IO ()
+perform [] = return ()
 
 perform (a:as) =
   case a of
-    ReturnInt v  -> liftM (v:) (perform as)
     NewQSem n    -> newQSem n >>= \qs -> perform' qs as
     _		 -> error $ "Please use NewQSem as first action" ++ show a
 
 
-perform' :: QSem -> [Action] -> IO [Int]
-perform' _ [] = return []
+perform' :: QSem -> [Action] -> IO ()
+perform' _ [] = return ()
 
 perform' qs (a:as) =
   case a of
-    ReturnInt v	     -> liftM (v:) (perform' qs as)
     SignalQSem       -> signalQSem qs >> perform' qs as
     WaitQSem         -> waitQSem qs >> perform' qs as
-    GetQuantityQSem  -> liftM2 (:) (getQuantityQSem qs) (perform' qs as)
     _		     -> error $ "If you want to use " ++ show a 
 			        ++ " please use the =^ operator"
    
@@ -65,7 +58,6 @@ actions = do
 actions' :: Int -> Gen [Action]
 actions' quantity =
   oneof ([return [],
-	  liftM (GetQuantityQSem:) (actions' quantity),
 	  liftM (SignalQSem:) (actions' (quantity+1))] ++
 	  if quantity<=0
 	     then []
@@ -91,8 +83,6 @@ c ^=^ c' =
 delta :: Int -> [Action] -> Int
 delta i [] = i
 
-delta i (ReturnInt _:as) = delta i as
-
 delta _ (NewQSem i:as) = delta i as
 
 delta i (SignalQSem:as) = delta (i+1) as
@@ -100,6 +90,4 @@ delta i (SignalQSem:as) = delta (i+1) as
 delta i (WaitQSem:as) = delta (if i<=0
 				  then error "wait on 'empty' QSem"
 				  else i-1) as
-
-delta i (GetQuantityQSem:as) = delta i as
 

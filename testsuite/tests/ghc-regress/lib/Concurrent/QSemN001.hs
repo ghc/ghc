@@ -5,25 +5,23 @@ import Control.Concurrent
 import Control.Monad
 
 
-data Action = NewQSemN Int | SignalQSemN Int | WaitQSemN Int | GetQuantityQSemN
-	    | ReturnInt Int
-  deriving (Eq,Show)
-
 main = do 
   t <- myThreadId
   forkIO (threadDelay 1000000 >> killThread t)
 	-- just in case we deadlock
   testQSemN
 
+data Action = NewQSemN Int | SignalQSemN Int | WaitQSemN Int
+  deriving (Eq,Show)
+
+
 testQSemN :: IO ()
 testQSemN = do
-  quickCheck prop_NewGet_NewRet
-  quickCheck prop_SignalWait
-  quickCheck prop_WaitSignal
+  quietCheck prop_SignalWait
+  quietCheck prop_WaitSignal
 
+quietCheck = check defaultConfig{configEvery = \n args -> ""}
 
-prop_NewGet_NewRet n = 
-  [NewQSemN n,GetQuantityQSemN] =^ [NewQSemN n,ReturnInt n]
 
 prop_SignalWait l m n = l+m>=n ==> 
   [NewQSemN l,SignalQSemN m,WaitQSemN n] =^ [NewQSemN (l+m-n)]
@@ -37,7 +35,6 @@ perform [] = return []
 
 perform (a:as) =
   case a of
-    ReturnInt v  -> liftM (v:) (perform as)
     NewQSemN n   -> newQSemN n >>= \qs -> perform' qs as
     _		 -> error $ "Please use NewQSemN as first action" ++ show a
 
@@ -47,10 +44,8 @@ perform' _ [] = return []
 
 perform' qs (a:as) =
   case a of
-    ReturnInt v	     -> liftM (v:) (perform' qs as)
     SignalQSemN n    -> signalQSemN qs n >> perform' qs as
     WaitQSemN n      -> waitQSemN qs n >> perform' qs as
-    GetQuantityQSemN -> liftM2 (:) (getQuantityQSemN qs) (perform' qs as)
     _		     -> error $ "If you want to use " ++ show a 
 			        ++ " please use the =^ operator"
    
@@ -64,7 +59,6 @@ actions = do
 actions' :: Int -> Gen [Action]
 actions' quantity =
   oneof ([return [],
-	  liftM (GetQuantityQSemN:) (actions' quantity),
 	  do i<- choose (0,maxBound)
 	     liftM (SignalQSemN i:) (actions' (quantity+i))] ++
 	  if quantity<=0
@@ -92,8 +86,6 @@ c ^=^ c' =
 delta :: Int -> [Action] -> Int
 delta i [] = i
 
-delta i (ReturnInt _:as) = delta i as
-
 delta _ (NewQSemN i:as) = delta i as
 
 delta i (SignalQSemN n:as) = delta (i+n) as
@@ -101,6 +93,4 @@ delta i (SignalQSemN n:as) = delta (i+n) as
 delta i (WaitQSemN n:as) = delta (if i<n
 				  then error "wait on 'empty' QSemN"
 				  else i-n) as
-
-delta i (GetQuantityQSemN:as) = delta i as
 
