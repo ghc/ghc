@@ -8,7 +8,7 @@ override WAYS=
 # Hack!
 SRC_CC_OPTS += -I$(GHC_INCLUDE_DIR)
 
-CC=$(HC)
+CC=$(GHC)
 C_SRCS=$(wildcard *.c)
 LIBRARY=libHSposix_cbits.a
 LIBOBJS=$(C_OBJS)
