@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.125 2003/06/10 17:54:56 sof Exp $
+-- $Id: Main.hs,v 1.126 2003/06/17 23:26:30 sof Exp $
 --
 -- GHC Driver program
 --
@@ -219,12 +219,11 @@ main =
 			  || looksLikeModuleName m
 			  || '.' `notElem` m
 
-    (raw_srcs, objs) = partition looks_like_an_input fileish_args
-
-     -- To simplify the handling of filepaths, we normalise all source file
-     -- paths right away - e.g., for win32 platforms, backslashes are converted
+     -- To simplify the handling of filepaths, we normalise all filepaths right 
+     -- away - e.g., for win32 platforms, backslashes are converted
      -- into forward slashes.
-    srcs             = map normalisePath raw_srcs
+    normal_fileish_paths = map normalisePath fileish_args
+    (srcs, objs)         = partition looks_like_an_input normal_fileish_paths
 
    mapM_ (add v_Ld_inputs) objs
 
