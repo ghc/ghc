@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.60 2000/09/14 09:58:00 simonmar Exp $
+-- $Id: Main.hs,v 1.61 2000/09/25 12:30:44 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -1400,14 +1400,14 @@ run_pipeline ((phase, keep, o_suffix):phases)
 	input_fn do_linking use_ofile orig_basename orig_suffix
   = do
 
-     output_fn <- outputFileName (null phases) o_suffix
+     output_fn <- outputFileName (null phases) keep o_suffix
 
      carry_on <- run_phase phase orig_basename orig_suffix input_fn output_fn
 	-- sometimes we bail out early, eg. when the compiler's recompilation
 	-- checker has determined that recompilation isn't necessary.
      if not carry_on 
-	then do let (_,_,final_suffix) = last phases
-	        ofile <- outputFileName True final_suffix
+	then do let (_,keep,final_suffix) = last phases
+	        ofile <- outputFileName True keep final_suffix
 		return ofile
 	else do -- carry on ...
 
@@ -1420,20 +1420,18 @@ run_pipeline ((phase, keep, o_suffix):phases)
      run_pipeline phases output_fn do_linking use_ofile orig_basename orig_suffix
 
   where
-     outputFileName last_phase suffix
-  	= if last_phase && not do_linking && use_ofile
-	    then do o_file <- readIORef output_file
-		    case o_file of 
-		        Just s  -> return s
-			Nothing -> do
-			    f <- odir_ify (orig_basename ++ '.':suffix)
-			    osuf_ify f
-
-	    else if keep == Persistent
-			then odir_ify (orig_basename ++ '.':suffix)
-			else do filename <- newTempName o_suffix
-				add files_to_clean filename
-				return filename
+     outputFileName last_phase keep suffix
+  	= do o_file <- readIORef output_file
+   	     if last_phase && not do_linking && use_ofile && isJust o_file
+   	       then case o_file of 
+   		       Just s  -> return s
+   		       Nothing -> error "outputFileName"
+   	       else if keep == Persistent
+   			   then do f <- odir_ify (orig_basename ++ '.':suffix)
+   				   osuf_ify f
+   			   else do filename <- newTempName suffix
+   				   add files_to_clean filename
+   				   return filename
 
 -- find a temporary name that doesn't already exist.
 newTempName :: String -> IO String
