@@ -205,6 +205,10 @@ run flags files = do
 
   writeIORef saved_flags flags
 
+  when ((Flag_GenIndex `elem` flags || Flag_GenContents `elem` flags)
+	&& Flag_Html `elem` flags) $
+	die ("-h cannot be used with --gen-index or --gen-contents")
+
   when (Flag_GenContents `elem` flags) $ do
 	ppHtmlContents odir title maybe_index_url visible_read_ifaces prologue
         copyHtmlBits odir libdir css_file
