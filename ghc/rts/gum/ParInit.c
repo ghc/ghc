@@ -37,13 +37,15 @@ jmp_buf		exit_parallel_system;	/* How to abort from the RTS	*/
 
 /* Flag handling. */
 
-/*rtsBool TraceSparks =    rtsFalse;		/* Enable the spark trace mode 		*/
-/*rtsBool SparkLocally =   rtsFalse;		/* Use local threads if possible 	*/
-/*rtsBool DelaySparks =    rtsFalse;		/* Use delayed sparking 		*/
-/*rtsBool LocalSparkStrategy =   rtsFalse;	/* Either delayed threads or local threads*/
-/*rtsBool GlobalSparkStrategy =   rtsFalse;	/* Export all threads	    	     	*/
-/*
-/*rtsBool DeferGlobalUpdates =	 rtsFalse;	/* Defer updating of global nodes	*/
+#if 0
+rtsBool TraceSparks =    rtsFalse;		/* Enable the spark trace mode 		*/
+rtsBool SparkLocally =   rtsFalse;		/* Use local threads if possible 	*/
+rtsBool DelaySparks =    rtsFalse;		/* Use delayed sparking 		*/
+rtsBool LocalSparkStrategy =   rtsFalse;	/* Either delayed threads or local threads*/
+rtsBool GlobalSparkStrategy =   rtsFalse;	/* Export all threads	    	     	*/
+
+rtsBool DeferGlobalUpdates =	 rtsFalse;	/* Defer updating of global nodes	*/
+#endif
 
 rtsBool fishing = rtsFalse;                     /* We have no fish out in the stream    */
 

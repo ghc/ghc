@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  * 
- * $Id: HLComms.c,v 1.2 1998/12/02 13:29:05 simonm Exp $
+ * $Id: HLComms.c,v 1.3 1999/02/15 14:30:56 simonm Exp $
  *
  * High Level Communications Routines (HLComms.lc)
  *
@@ -113,50 +113,50 @@ static void
 blockFetch(StgPtr bf, StgPtr bh)
 {}
 
-/* 
- * Empty until Blocked fetches etc defined 
- *    switch (INFO_TYPE(INFO_PTR(bh))) {
- *    case INFO_BH_TYPE:
- *	BF_LINK(bf) = PrelBase_Z91Z93_closure;
- *	SET_INFO_PTR(bh, BQ_info);
- *	BQ_ENTRIES(bh) = (W_) bf;
- *
- *#ifdef GC_MUT_REQUIRED
- *	/*
- *	 * If we modify a black hole in the old generation, we have to
- *	 * make sure it goes on the mutables list
- *	 *
- *
- *	if (bh <= StorageMgrInfo.OldLim) {
- *	    MUT_LINK(bh) = (W_) StorageMgrInfo.OldMutables;
- *	    StorageMgrInfo.OldMutables = bh;
- *	} else
- *	    MUT_LINK(bh) = MUT_NOT_LINKED;
- *#endif
- *	break;
- *    case INFO_BQ_TYPE:
- *	BF_LINK(bf) = (P_) BQ_ENTRIES(bh);
- *	BQ_ENTRIES(bh) = (W_) bf;
- *	break;
- *    case INFO_FMBQ_TYPE:
- *	BF_LINK(bf) = (P_) FMBQ_ENTRIES(bh);
- *	FMBQ_ENTRIES(bh) = (W_) bf;
- *	break;
- *    case INFO_SPEC_RBH_TYPE:
- *	BF_LINK(bf) = (P_) SPEC_RBH_BQ(bh);
- *	SPEC_RBH_BQ(bh) = (W_) bf;
- *	break;
- *    case INFO_GEN_RBH_TYPE:
- *	BF_LINK(bf) = (P_) GEN_RBH_BQ(bh);
- *	GEN_RBH_BQ(bh) = (W_) bf;
- *	break;
- *    default:
- *	fprintf(stderr, "Panic: thought %#lx was a black hole (IP %#lx)\n",
- *	  (W_) bh, INFO_PTR(bh));
- *	EXIT(EXIT_FAILURE);
- *    }
- *}
- */
+#if 0 
+ Empty until Blocked fetches etc defined 
+    switch (INFO_TYPE(INFO_PTR(bh))) {
+    case INFO_BH_TYPE:
+	BF_LINK(bf) = PrelBase_Z91Z93_closure;
+	SET_INFO_PTR(bh, BQ_info);
+	BQ_ENTRIES(bh) = (W_) bf;
+
+#ifdef GC_MUT_REQUIRED
+	/*
+	 * If we modify a black hole in the old generation, we have to
+	 * make sure it goes on the mutables list
+	 */
+
+	if (bh <= StorageMgrInfo.OldLim) {
+	    MUT_LINK(bh) = (W_) StorageMgrInfo.OldMutables;
+	    StorageMgrInfo.OldMutables = bh;
+	} else
+	    MUT_LINK(bh) = MUT_NOT_LINKED;
+#endif
+	break;
+    case INFO_BQ_TYPE:
+	BF_LINK(bf) = (P_) BQ_ENTRIES(bh);
+	BQ_ENTRIES(bh) = (W_) bf;
+	break;
+    case INFO_FMBQ_TYPE:
+	BF_LINK(bf) = (P_) FMBQ_ENTRIES(bh);
+	FMBQ_ENTRIES(bh) = (W_) bf;
+	break;
+    case INFO_SPEC_RBH_TYPE:
+	BF_LINK(bf) = (P_) SPEC_RBH_BQ(bh);
+	SPEC_RBH_BQ(bh) = (W_) bf;
+	break;
+    case INFO_GEN_RBH_TYPE:
+	BF_LINK(bf) = (P_) GEN_RBH_BQ(bh);
+	GEN_RBH_BQ(bh) = (W_) bf;
+	break;
+    default:
+	fprintf(stderr, "Panic: thought %#lx was a black hole (IP %#lx)\n",
+	  (W_) bh, INFO_PTR(bh));
+	EXIT(EXIT_FAILURE);
+    }
+}
+#endif
 
 /*
  * processFetches constructs and sends resume messages for every
@@ -167,63 +167,64 @@ extern P_ PendingFetches;
 void
 processFetches()
 {}
-/* 
- * Empty till closure defined 
- *    P_ bf;
- *    P_ next;
- *    P_ closure;
- *    P_ ip;
- *    globalAddr rga;
- *    
- *    for (bf = PendingFetches; bf != PrelBase_Z91Z93_closure; bf = next) {
- *	next = BF_LINK(bf);
- *
- *	/*
- *	 * Find the target at the end of the indirection chain, and
- *	 * process it in much the same fashion as the original target
- *	 * of the fetch.  Though we hope to find graph here, we could
- *	 * find a black hole (of any flavor) or even a FetchMe.
- *	 *
- *	closure = BF_NODE(bf);
- *	while (IS_INDIRECTION(INFO_PTR(closure)))
- *	    closure = (P_) IND_CLOSURE_PTR(closure);
- *        ip = (P_) INFO_PTR(closure);
- *
- *	if (INFO_TYPE(ip) == INFO_FETCHME_TYPE) {
- *	    /* Forward the Fetch to someone else *
- *	    rga.loc.gc.gtid = (GLOBAL_TASK_ID) BF_GTID(bf);
- *	    rga.loc.gc.slot = (int) BF_SLOT(bf);
- *	    rga.weight = (unsigned) BF_WEIGHT(bf);
- *
- *	    sendFetch(FETCHME_GA(closure), &rga, 0 /* load *);
- *	} else if (IS_BLACK_HOLE(ip)) {
- *	    BF_NODE(bf) = closure;
- *	    blockFetch(bf, closure);
- *	} else {
- *	    /* We now have some local graph to send back *
- *	    W_ size;
- *	    P_ graph;
- *
- *	    if ((graph = PackNearbyGraph(closure, &size)) == NULL) {
- *		PendingFetches = bf;
- *		ReallyPerformThreadGC(PACK_HEAP_REQUIRED, rtsFalse);
- *		SAVE_Hp -= PACK_HEAP_REQUIRED;
- *		bf = PendingFetches;
- *		next = BF_LINK(bf);
- *		closure = BF_NODE(bf);
- *		graph = PackNearbyGraph(closure, &size);
- *		ASSERT(graph != NULL);
- *	    }
- *	    rga.loc.gc.gtid = (GLOBAL_TASK_ID) BF_GTID(bf);
- *	    rga.loc.gc.slot = (int) BF_SLOT(bf);
- *	    rga.weight = (unsigned) BF_WEIGHT(bf);
- *
- *	    sendResume(&rga, size, graph);
- *	}
- *    }
- *    PendingFetches = PrelBase_Z91Z93_closure;
- *}
- */
+ 
+#if 0
+ Empty till closure defined 
+    P_ bf;
+    P_ next;
+    P_ closure;
+    P_ ip;
+    globalAddr rga;
+    
+    for (bf = PendingFetches; bf != PrelBase_Z91Z93_closure; bf = next) {
+	next = BF_LINK(bf);
+
+	/*
+	 * Find the target at the end of the indirection chain, and
+	 * process it in much the same fashion as the original target
+	 * of the fetch.  Though we hope to find graph here, we could
+	 * find a black hole (of any flavor) or even a FetchMe.
+	 */
+	closure = BF_NODE(bf);
+	while (IS_INDIRECTION(INFO_PTR(closure)))
+	    closure = (P_) IND_CLOSURE_PTR(closure);
+        ip = (P_) INFO_PTR(closure);
+
+	if (INFO_TYPE(ip) == INFO_FETCHME_TYPE) {
+            /* Forward the Fetch to someone else */
+	    rga.loc.gc.gtid = (GLOBAL_TASK_ID) BF_GTID(bf);
+	    rga.loc.gc.slot = (int) BF_SLOT(bf);
+	    rga.weight = (unsigned) BF_WEIGHT(bf);
+
+	    sendFetch(FETCHME_GA(closure), &rga, 0 /* load */);
+	} else if (IS_BLACK_HOLE(ip)) {
+	    BF_NODE(bf) = closure;
+	    blockFetch(bf, closure);
+	} else {
+	    /* We now have some local graph to send back */
+	    W_ size;
+	    P_ graph;
+
+	    if ((graph = PackNearbyGraph(closure, &size)) == NULL) {
+		PendingFetches = bf;
+		ReallyPerformThreadGC(PACK_HEAP_REQUIRED, rtsFalse);
+		SAVE_Hp -= PACK_HEAP_REQUIRED;
+		bf = PendingFetches;
+		next = BF_LINK(bf);
+		closure = BF_NODE(bf);
+		graph = PackNearbyGraph(closure, &size);
+		ASSERT(graph != NULL);
+	    }
+	    rga.loc.gc.gtid = (GLOBAL_TASK_ID) BF_GTID(bf);
+	    rga.loc.gc.slot = (int) BF_SLOT(bf);
+	    rga.weight = (unsigned) BF_WEIGHT(bf);
+
+	    sendResume(&rga, size, graph);
+	}
+    }
+    PendingFetches = PrelBase_Z91Z93_closure;
+}
+#endif
 
 /*
  * unpackResume unpacks a Resume message into two Global addresses and
