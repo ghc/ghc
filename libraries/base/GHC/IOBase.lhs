@@ -107,10 +107,45 @@ ioToST (IO m) = (ST m)
 -- ---------------------------------------------------------------------------
 -- Unsafe IO operations
 
+{-|
+This is the "back door" into the 'IO' monad, allowing
+'IO' computation to be performed at any time.  For
+this to be safe, the 'IO' computation should be
+free of side effects and independent of its environment.
+
+If the I\/O computation wrapped in 'unsafePerformIO'
+performs side effects, then the relative order in which those side
+effects take place (relative to the main I\/O trunk, or other calls to
+'unsafePerformIO') is indeterminate.  
+
+However, it is less well known that
+'unsafePerformIO' is not type safe.  For example:
+
+>     test :: IORef [a]
+>     test = unsafePerformIO $ newIORef []
+>     
+>     main = do
+>     	      writeIORef test [42]
+>     	      bang \<- readIORef test
+>     	      print (bang :: [Char])
+
+This program will core dump.  This problem with polymorphic references
+is well known in the ML community, and does not arise with normal
+monadic use of references.  There is no easy way to make it impossible
+once you use 'unsafePerformIO'.  Indeed, it is
+possible to write @coerce :: a -> b@ with the
+help of 'unsafePerformIO'.  So be careful!
+-}
 {-# NOINLINE unsafePerformIO #-}
 unsafePerformIO	:: IO a -> a
 unsafePerformIO (IO m) = case m realWorld# of (# _, r #)   -> r
 
+{-|
+'unsafeInterleaveIO' allows 'IO' computation to be deferred lazily.
+When passed a value of type @IO a@, the 'IO' will only be performed
+when the value of the @a@ is demanded.  This is used to implement lazy
+file reading, see 'IO.hGetContents'.
+-}
 {-# NOINLINE unsafeInterleaveIO #-}
 unsafeInterleaveIO :: IO a -> IO a
 unsafeInterleaveIO (IO m)

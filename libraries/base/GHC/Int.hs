@@ -38,6 +38,7 @@ import GHC.Show
 -- and must ensure that it holds only values from its logical range.
 
 data Int8 = I8# Int# deriving (Eq, Ord)
+-- ^ 8-bit signed integer type
 
 instance CCallable Int8
 instance CReturnable Int8
@@ -146,6 +147,7 @@ instance Bits Int8 where
 -- and must ensure that it holds only values from its logical range.
 
 data Int16 = I16# Int# deriving (Eq, Ord)
+-- ^ 16-bit signed integer type
 
 instance CCallable Int16
 instance CReturnable Int16
@@ -255,6 +257,7 @@ instance Bits Int16 where
 #if WORD_SIZE_IN_BITS < 32
 
 data Int32 = I32# Int32#
+-- ^ 32-bit signed integer type
 
 instance Eq Int32 where
     (I32# x#) == (I32# y#) = x# `eqInt32#` y#
@@ -406,6 +409,7 @@ foreign import "stg_shiftRL32"     unsafe shiftRL32#     :: Word32# -> Int# -> W
 #endif
 
 data Int32 = I32# Int# deriving (Eq, Ord)
+-- ^ 32-bit signed integer type
 
 instance Show Int32 where
     showsPrec p x = showsPrec p (fromIntegral x :: Int)
@@ -523,6 +527,7 @@ instance Ix Int32 where
 #if WORD_SIZE_IN_BITS < 64
 
 data Int64 = I64# Int64#
+-- ^ 64-bit signed integer type
 
 instance Eq Int64 where
     (I64# x#) == (I64# y#) = x# `eqInt64#` y#
@@ -692,6 +697,7 @@ foreign import ccall unsafe "stg_integerToInt64"  integerToInt64#  :: Int# -> By
 -- from its logical range.
 
 data Int64 = I64# Int# deriving (Eq, Ord)
+-- ^ 64-bit signed integer type
 
 instance Show Int64 where
     showsPrec p x = showsPrec p (fromIntegral x :: Int)

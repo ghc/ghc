@@ -8,11 +8,12 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- The trace function.
+-- The 'trace' function.
 --
 -----------------------------------------------------------------------------
 
 module Debug.Trace (
+	-- * Tracing
 	trace -- :: String -> a -> a
   ) where
 
@@ -27,6 +28,14 @@ import GHC.Handle
 
 #ifdef __GLASGOW_HASKELL__
 {-# NOINLINE trace #-}
+{-|
+When called, 'trace' prints the string in its first argument to
+standard error, before returning the second argument as its result.
+The 'trace' function is not referentially transparent, and should only
+be used for debugging, or for monitoring execution. Some
+implementations of 'trace' may decorate the string that\'s output to
+indicate that you\'re tracing.
+-}
 trace :: String -> a -> a
 trace string expr = unsafePerformIO $ do
     hPutStr stderr string

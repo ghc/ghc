@@ -70,8 +70,7 @@ predError inst_ty =
 -- type Word
 ------------------------------------------------------------------------
 
--- A Word is an unsigned integral type, with the same size as Int.
-
+-- |A 'Word' is an unsigned integral type, with the same size as 'Int'.
 data Word = W# Word# deriving (Eq, Ord)
 
 instance CCallable Word
@@ -188,6 +187,7 @@ instance Bits Word where
 -- and must ensure that it holds only values from its logical range.
 
 data Word8 = W8# Word# deriving (Eq, Ord)
+-- ^ 8-bit unsigned integer type
 
 instance CCallable Word8
 instance CReturnable Word8
@@ -290,6 +290,7 @@ instance Bits Word8 where
 -- and must ensure that it holds only values from its logical range.
 
 data Word16 = W16# Word# deriving (Eq, Ord)
+-- ^ 16-bit unsigned integer type
 
 instance CCallable Word16
 instance CReturnable Word16
@@ -392,6 +393,7 @@ instance Bits Word16 where
 #if WORD_SIZE_IN_BITS < 32
 
 data Word32 = W32# Word32#
+-- ^ 32-bit unsigned integer type
 
 instance Eq Word32 where
     (W32# x#) == (W32# y#) = x# `eqWord32#` y#
@@ -514,6 +516,7 @@ foreign import unsafe "stg_shiftRL32"     shiftRL32#     :: Word32# -> Int# -> W
 #endif
 
 data Word32 = W32# Word# deriving (Eq, Ord)
+-- ^ 32-bit unsigned integer type
 
 instance Num Word32 where
     (W32# x#) + (W32# y#)  = W32# (narrow32Word# (x# `plusWord#` y#))
@@ -650,6 +653,7 @@ instance Read Word32 where
 #if WORD_SIZE_IN_BITS < 64
 
 data Word64 = W64# Word64#
+-- ^ 64-bit unsigned integer type
 
 instance Eq Word64 where
     (W64# x#) == (W64# y#) = x# `eqWord64#` y#
@@ -787,6 +791,7 @@ foreign import ccall unsafe "stg_integerToWord64" integerToWord64# :: Int# -> By
 -- from its logical range.
 
 data Word64 = W64# Word# deriving (Eq, Ord)
+-- ^ 64-bit unsigned integer type
 
 instance Num Word64 where
     (W64# x#) + (W64# y#)  = W64# (x# `plusWord#` y#)

@@ -509,6 +509,10 @@ eqString cs1      cs2	   = False
 
 \begin{code}
 data Int = I# Int#
+-- ^A fixed-precision integer type with at least the range @[-2^29
+-- .. 2^29-1]@.  The exact range for a given implementation can be
+-- determined by using 'minBound' and 'maxBound' from the 'Bounded'
+-- class.
 
 zeroInt, oneInt, twoInt, maxInt, minInt :: Int
 zeroInt = I# 0#
