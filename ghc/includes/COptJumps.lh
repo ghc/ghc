@@ -37,7 +37,7 @@ variant, too, for that matter).
 GCC will have assumed that pushing/popping of C-stack frames is going
 on when it generated its code, and used stack space accordingly.
 However, we actually {\em post-process away} all such stack-framery
-(see \tr{ghc/driver/ghc-asm-*.lprl}).
+(see \tr{ghc/driver/ghc-asm.lprl}).
 Thing will be OK however, if we initially make sure there are
 @RESERVED_C_STACK_BYTES@ on the C-stack to begin with, for local
 variables.
@@ -162,6 +162,22 @@ register void *_procedure __asm__("$27");
 /* The stack grows up!  Local variables are allocated just above the
    frame pointer, and extra arguments are stashed just below the stack
    pointer, so the safe space is again in the middle (cf. sparc).
+
+   Sven Panne <Sven.Panne@informatik.uni-muenchen.de> writes:
+   
+   But now for the reallly bad news: Some nasty guy in the threaded world
+   modifies R3 (the frame pointer)!! This should not happen (as far as I
+   know R3 should be a callee-saves register). Sadly, I can't reproduce
+   this behaviour consistently, Perhaps it is some strange point of our
+   boxes here? (uname -svrm gives HP-UX A.09.05 A 9000/715)
+   
+   ...
+  
+   So here is my next try: Don't calculate the register buffer by _adding_
+   to FP[r3], but by _subtracting_ from SP! The patch below should result in the
+   same addresses (+/- some bytes :-) By the way, is the SP[r30] after returning
+   from the threaded world the same as the one before entering it? 
+   I really hope so, otherwise %#*&!!
  */
 
 #define JMP_(cont)				\
@@ -173,7 +189,8 @@ register void *_procedure __asm__("$27");
 
 #define MINI_INTERPRETER_SETUP	    	    	\
     StgChar space[RESERVED_C_STACK_BYTES+16*sizeof(long)+10*sizeof(double)];	\
-    __asm__ volatile ("ldo %0(%%r3),%%r19\n"		\
+    /* __asm__ volatile ("ldo %0(%%r3),%%r19\n"	 */	\
+    __asm__ volatile ("ldo %0(%%r30),%%r19\n"		\
 		      "\tstw %%r3, 0(0,%%r19)\n"	\
                       "\tstw %%r4, 4(0,%%r19)\n"	\
                       "\tstw %%r5, 8(0,%%r19)\n"	\
@@ -203,14 +220,16 @@ register void *_procedure __asm__("$27");
 		      "\tldo 32(%%r19),%%r19\n"		\
 		      "\tfstds %%fr20,-16(0,%%r19)\n"   \
 		      "\tfstds %%fr21, -8(0,%%r19)\n" : :   \
-                      "n" (RESERVED_C_STACK_BYTES - (116 * sizeof(long) + 10 * sizeof(double))) : "%r19" );
+                      /* "n" (RESERVED_C_STACK_BYTES - (116 * sizeof(long) + 10 * sizeof(double))) : "%r19" ); */ \
+                      "n" (-(116 * sizeof(long) + 10 * sizeof(double))) : "%r19" );
 
 #define MINI_INTERPRETER_END	    	    	\
     __asm__ volatile (".align 4\n"		\
                	      "\t.EXPORT miniInterpretEnd,CODE\n" \
 		      "\t.EXPORT miniInterpretEnd,ENTRY,PRIV_LEV=3\n" \
                       "miniInterpretEnd\n"		\
-                      "\tldo %0(%%r3),%%r19\n"		\
+                      /* "\tldo %0(%%r3),%%r19\n" */	\
+                      "\tldo %0(%%r30),%%r19\n"		\
 		      "\tldw  0(0,%%r19),%%r3\n"	\
                       "\tldw  4(0,%%r19),%%r4\n"	\
                       "\tldw  8(0,%%r19),%%r5\n"	\
@@ -240,7 +259,8 @@ register void *_procedure __asm__("$27");
 		      "\tldo 32(%%r19),%%r19\n"		\
 		      "\tfldds -16(0,%%r19),%%fr20\n"   \
 		      "\tfldds  -8(0,%%r19),%%fr21\n" : :   \
-                      "n" (RESERVED_C_STACK_BYTES - (116 * sizeof(long) + 10 * sizeof(double))) : "%r19");
+                      /* "n" (RESERVED_C_STACK_BYTES - (116 * sizeof(long) + 10 * sizeof(double))) : "%r19"); */ \
+                      "n" (-(116 * sizeof(long) + 10 * sizeof(double))) : "%r19");
 
 #endif /* hppa1.1-hp-hpux* */
 \end{code}
@@ -466,48 +486,17 @@ extern void __DISCARD__(STG_NO_ARGS);
 */
 
 #define MINI_INTERPRETER_SETUP	    	    	\
-    StgChar space[RESERVED_C_STACK_BYTES+6*sizeof(double)+9*sizeof(long)]; \
-    __asm__ volatile ("addu $2,$sp,%0\n"	\
-                      "\ts.d $f20,0($2)\n"	\
-                      "\ts.d $f22,8($2)\n"	\
-                      "\ts.d $f24,16($2)\n"	\
-                      "\ts.d $f26,24($2)\n"	\
-                      "\ts.d $f28,32($2)\n"	\
-                      "\ts.d $f30,40($2)\n"	\
-		      "\tsw  $16,48($2)\n"    	\
-                      "\tsw  $17,52($2)\n"    	\
-                      "\tsw  $18,56($2)\n"	\
-                      "\tsw  $19,60($2)\n"	\
-                      "\tsw  $20,64($2)\n"	\
-                      "\tsw  $21,68($2)\n"	\
-                      "\tsw  $22,72($2)\n"	\
-                      "\tsw  $23,76($2)\n"	\
-                      "\tsw  $fp,80($2)\n" 	\
-                      : : "I" (RESERVED_C_STACK_BYTES+16) : "$2" );
+    StgChar space[RESERVED_C_STACK_BYTES+6*sizeof(double)+19*sizeof(long)]; \
+    __asm__ volatile ("stm  13,-176(1)\n"    	\
+                      : : "I" (RESERVED_C_STACK_BYTES+16) : "1" );
 
     /* the 16 bytes is for the argument-register save-area above $sp */
 
 #define MINI_INTERPRETER_END	    	    	\
-    __asm__ volatile (".align 2\n"		\
-               	      ".globl miniInterpretEnd\n" \
+    __asm__ volatile (".globl miniInterpretEnd\n" \
                       "miniInterpretEnd:\n"    	\
-		      "\taddu $2,$sp,%0\n"	\
-                      "\tl.d $f20,0($2)\n"	\
-                      "\tl.d $f22,8($2)\n"	\
-                      "\tl.d $f24,16($2)\n"	\
-                      "\tl.d $f26,24($2)\n"	\
-                      "\tl.d $f28,32($2)\n"	\
-                      "\tl.d $f30,40($2)\n"	\
-		      "\tlw  $16,48($2)\n"    	\
-                      "\tlw  $17,52($2)\n"    	\
-                      "\tlw  $18,56($2)\n"	\
-                      "\tlw  $19,60($2)\n"	\
-                      "\tlw  $20,64($2)\n"	\
-                      "\tlw  $21,68($2)\n"	\
-                      "\tlw  $22,72($2)\n"	\
-                      "\tlw  $23,76($2)\n"	\
-                      "\tlw  $fp,80($2)\n" 	\
-                      : : "I" (RESERVED_C_STACK_BYTES+16) : "$2" );
+		      "\tlm 13,-176(1)\n"    	\
+                      : : "I" (RESERVED_C_STACK_BYTES+16) : "1" );
 
 #endif /* powerpc */
 \end{code}
