@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: setBuffering.c,v 1.9 2001/01/16 14:06:14 simonmar Exp $
+ * $Id: setBuffering.c,v 1.10 2001/02/19 16:10:23 rrt Exp $
  *
  * hSetBuffering Runtime Support
  */
@@ -35,7 +35,9 @@ setBuffering(StgForeignPtr ptr, StgInt size)
     IOFileObject* fo = (IOFileObject*)ptr;
     int flags, rc=0;
     int input, isaterm;
+#ifndef mingw32_TARGET_OS
     struct termios tio;
+#endif
     struct stat sb;
 
     /* First off, flush old buffer.. */
