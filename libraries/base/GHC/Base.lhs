@@ -402,8 +402,9 @@ mapFB c f x ys = c (f x) ys
 
 \begin{code}
 -- |The 'Bool' type is an enumeration.  It is defined with 'False'
--- first so that the corresponding 'Enum' instance will give @'fromEnum'
--- False@ the value zero, and @'fromEnum' True@ the value 1.
+-- first so that the corresponding 'Prelude.Enum' instance will give
+-- 'Prelude.fromEnum' 'False' the value zero, and
+-- 'Prelude.fromEnum' 'True' the value 1.
 data  Bool  =  False | True  deriving (Eq, Ord)
 	-- Read in GHC.Read, Show in GHC.Show
 
@@ -495,11 +496,15 @@ data Ordering = LT | EQ | GT deriving (Eq, Ord)
 type String = [Char]
 
 {-| The character type 'Char' is an enumeration whose values represent
-Unicode characters.  A character literal in Haskell has type 'Char'.
+Unicode (or equivalently ISO 10646) characters.
+This set extends the ISO 8859-1 (Latin-1) character set
+(the first 256 charachers), which is itself an extension of the ASCII
+character set (the first 128 characters).
+A character literal in Haskell has type 'Char'.
 
-To convert a 'Char' to or from an 'Int', use 'Prelude.toEnum' and
-'Prelude.fromEnum' from the 'Enum' class respectively (equivalently
-'ord' and 'chr' also do the trick).
+To convert a 'Char' to or from the corresponding 'Int' value defined
+by Unicode, use 'Prelude.toEnum' and 'Prelude.fromEnum' from the
+'Prelude.Enum' class respectively (or equivalently 'ord' and 'chr').
 -}
 data Char = C# Char#
 
@@ -526,6 +531,7 @@ instance Ord Char where
 "x# `ltChar#` x#" forall x#. x# `ltChar#` x# = False
   #-}
 
+-- | The 'Prelude.toEnum' method restricted to the type 'Data.Char.Char'.
 chr :: Int -> Char
 chr (I# i#) | int2Word# i# `leWord#` int2Word# 0x10FFFF# = C# (chr# i#)
             | otherwise                                  = error "Prelude.chr: bad argument"
@@ -533,6 +539,7 @@ chr (I# i#) | int2Word# i# `leWord#` int2Word# 0x10FFFF# = C# (chr# i#)
 unsafeChr :: Int -> Char
 unsafeChr (I# i#) = C# (chr# i#)
 
+-- | The 'Prelude.fromEnum' method restricted to the type 'Data.Char.Char'.
 ord :: Char -> Int
 ord (C# c#) = I# (ord# c#)
 \end{code}

@@ -17,23 +17,33 @@ module Data.Char
     (
       Char
 
-    , isAscii, isLatin1, isControl
-    , isPrint, isSpace,  isUpper
-    , isLower, isAlpha,  isDigit
-    , isOctDigit, isHexDigit, isAlphaNum  -- :: Char -> Bool
+    , String
 
+    -- * Character classification
+    -- | Unicode characters are divided into letters, numbers, marks,
+    -- punctuation, symbols, separators (including spaces) and others
+    -- (including control characters).
+    -- The full set of Unicode character attributes is not accessible
+    -- in this library.
+    , isAscii, isLatin1, isControl, isSpace
+    , isLower, isUpper,  isAlpha,   isAlphaNum, isPrint
+    , isDigit, isOctDigit, isHexDigit  -- :: Char -> Bool
+
+    -- * Case conversion
     , toUpper, toLower  -- :: Char -> Char
 
+    -- * Single digit characters
     , digitToInt        -- :: Char -> Int
     , intToDigit        -- :: Int  -> Char
 
+    -- * Numeric representations
     , ord               -- :: Char -> Int
     , chr               -- :: Int  -> Char
-    , readLitChar       -- :: ReadS Char 
+
+    -- * String representations
     , showLitChar       -- :: Char -> ShowS
     , lexLitChar	-- :: ReadS String
-
-    , String
+    , readLitChar       -- :: ReadS Char 
 
      -- Implementation checked wrt. Haskell 98 lib report, 1/99.
     ) where
@@ -56,7 +66,10 @@ import Prelude(Char,String)
 import Char
 #endif
 
-
+-- | Convert a single digit 'Char' to the corresponding 'Int'.  
+-- This function fails unless its argument satisfies 'isHexDigit',
+-- but recognises both upper and lower-case hexadecimal digits
+-- (i.e. @\'0\'@..@\'9\'@, @\'a\'@..@\'f\'@, @\'A\'@..@\'F\'@).
 digitToInt :: Char -> Int
 digitToInt c
  | isDigit c		=  ord c - ord '0'

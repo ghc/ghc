@@ -155,12 +155,23 @@ read s = either error id (readEither s)
 lex :: ReadS String		-- As defined by H98
 lex s  = readP_to_S L.hsLex s
 
+-- | Read a string representation of a character, using Haskell
+-- source-language escape conventions.  For example:
+--
+-- > lexLitChar  "\\nHello"  =  [("\\n", "Hello")]
+--
 lexLitChar :: ReadS String	-- As defined by H98
 lexLitChar = readP_to_S (do { (s, _) <- P.gather L.lexChar ;
 			      return s })
 	-- There was a skipSpaces before the P.gather L.lexChar,
 	-- but that seems inconsistent with readLitChar
 
+-- | Read a string representation of a character, using Haskell
+-- source-language escape conventions, and convert it to the character
+-- that it encodes.  For example:
+--
+-- > readLitChar "\\nHello"  =  [('\n', "Hello")]
+--
 readLitChar :: ReadS Char	-- As defined by H98
 readLitChar = readP_to_S L.lexChar
 

@@ -32,19 +32,72 @@ import GHC.Num	 (fromInteger)
 
 #include "config.h"
 
-isAscii, isLatin1, isAsciiUpper, isAsciiLower :: Char -> Bool
+-- | Selects the first 128 characters of the Unicode character set,
+-- corresponding to the ASCII character set.
+isAscii                 :: Char -> Bool
 isAscii c	 	=  c <  '\x80'
+
+-- | Selects the first 256 characters of the Unicode character set,
+-- corresponding to the ISO 8859-1 (Latin-1) character set.
+isLatin1                :: Char -> Bool
 isLatin1 c              =  c <= '\xff'
+
+isAsciiUpper, isAsciiLower :: Char -> Bool
 isAsciiLower c          =  c >= 'a' && c <= 'z'
 isAsciiUpper c          =  c >= 'A' && c <= 'Z'
 
-isControl, isPrint, isSpace, isUpper,
- isLower, isAlpha, isDigit, isOctDigit, isHexDigit, isAlphaNum
- :: Char -> Bool
+-- | Selects control characters, which are the non-printing characters of
+-- the Latin-1 subset of Unicode.
+isControl               :: Char -> Bool
 
+-- | Selects printable Unicode characters
+-- (letters, numbers, marks, punctuation, symbols and spaces).
+isPrint                 :: Char -> Bool
+
+-- | Selects white-space characters in the Latin-1 range.
+-- (In Unicode terms, this includes spaces and some control characters.)
+isSpace                 :: Char -> Bool
+
+-- | Selects alphabetic Unicode characters (letters) that are not lower-case.
+-- (In Unicode terms, this includes letters in upper and title cases,
+-- as well as modifier letters and other letters.)
+isUpper                 :: Char -> Bool
+
+-- | Selects lower-case alphabetic Unicode characters (letters).
+isLower                 :: Char -> Bool
+
+-- | Selects alphabetic Unicode characters (letters).
+isAlpha                 :: Char -> Bool
+
+-- | Selects alphabetic or numeric digit Unicode characters.
+--
+-- Note that numeric digits outside the ASCII range are selected by this
+-- function but not by 'isDigit'.  Such digits may be part of identifiers
+-- but are not used by the printer and reader to represent numbers.
+isAlphaNum              :: Char -> Bool
+
+-- | Selects ASCII digits, i.e. @\'0\'@..@\'9\'@.
+isDigit                 :: Char -> Bool
+
+-- | Selects ASCII octal digits, i.e. @\'0\'@..@\'7\'@.
+isOctDigit              :: Char -> Bool
 isOctDigit c		=  c >= '0' && c <= '7'
+
+-- | Selects ASCII hexadecimal digits,
+-- i.e. @\'0\'@..@\'9\'@, @\'a\'@..@\'f\'@, @\'A\'@..@\'F\'@.
+isHexDigit              :: Char -> Bool
 isHexDigit c		=  isDigit c || c >= 'A' && c <= 'F' ||
                                         c >= 'a' && c <= 'f'
+
+-- | Convert a letter to the corresponding upper-case letter, leaving any
+-- other character unchanged.  Any Unicode letter which has an upper-case
+-- equivalent is transformed.
+toUpper                 :: Char -> Char
+
+-- | Convert a letter to the corresponding lower-case letter, leaving any
+-- other character unchanged.  Any Unicode letter which has a lower-case
+-- equivalent is transformed.
+toLower                 :: Char -> Char
 
 -- -----------------------------------------------------------------------------
 -- Win32 implementation

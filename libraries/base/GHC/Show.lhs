@@ -200,6 +200,11 @@ showSpace = {-showChar ' '-} \ xs -> ' ' : xs
 Code specific for characters
 
 \begin{code}
+-- | Convert a character to a string using only printable characters,
+-- using Haskell source-language escape conventions.  For example:
+--
+-- > showLitChar '\n' s  =  "\\n" ++ s
+--
 showLitChar 		   :: Char -> ShowS
 showLitChar c s | c > '\DEL' =  showChar '\\' (protectEsc isDec (shows (ord c)) s)
 showLitChar '\DEL'	   s =  showString "\\DEL" s
@@ -237,6 +242,9 @@ asciiTab = -- Using an array drags in the array module.  listArray ('\NUL', ' ')
 Code specific for Ints.
 
 \begin{code}
+-- | Convert an 'Int' in the range @0@..@15@ to the corresponding single
+-- digit 'Char'.  This function fails on other inputs, and generates
+-- lower-case hexadecimal digits.
 intToDigit :: Int -> Char
 intToDigit (I# i)
     | i >=# 0#  && i <=#  9# =  unsafeChr (ord '0' `plusInt` I# i)
