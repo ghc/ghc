@@ -385,7 +385,7 @@ rnMethodBinds gen_tyvars (FunMonoBind name inf matches locn)
     returnRn (FunMonoBind sel_name inf new_matches locn, fvs `addOneFV` sel_name)
   where
 	-- Gruesome; bring into scope the correct members of the generic type variables
-	-- See comments in RnSource.rnDecl(ClassDecl)
+	-- See comments in RnSource.rnSourceDecl(ClassDecl)
     rn_match match@(Match _ (TypePatIn ty : _) _ _)
 	= extendTyVarEnvFVRn gen_tvs (rnMatch match)
 	where

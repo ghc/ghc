@@ -261,7 +261,7 @@ tyClDeclSysNames :: TyClDecl name pat -> [(name, SrcLoc)]
 -- Similar to tyClDeclNames, but returns the "implicit" 
 -- or "system" names of the declaration
 
-tyClDeclSysNames (ClassDecl {tcdSysNames = names, tcdLoc = loc, tcdSigs = sigs})
+tyClDeclSysNames (ClassDecl {tcdSysNames = names, tcdLoc = loc})
   = [(n,loc) | n <- names]
 tyClDeclSysNames (TyData {tcdCons = cons, tcdSysNames = names, tcdLoc = loc})
   = [(n,loc) | n <- names] ++ 

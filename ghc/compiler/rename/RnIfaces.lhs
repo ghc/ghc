@@ -595,6 +595,7 @@ data ImportDeclResult
 importDecl name
   = 	-- STEP 1: Check if we've slurped it in while compiling this module
     getIfacesRn				`thenRn` \ ifaces ->
+    traceRn (text "Wanting:" <+> ppr name)	`thenRn_`
     if name `elemNameSet` iSlurp ifaces then	
 	returnRn AlreadySlurped	
     else
@@ -625,7 +626,8 @@ importDecl name
     in
     case lookupNameEnv decls_map name of
       Just (avail,_,decl)
-	-> setIfacesRn (recordSlurp ifaces avail)	`thenRn_`
+	-> traceRn (text "Record slurp" <+> ppr avail)	`thenRn_`
+    	   setIfacesRn (recordSlurp ifaces avail)	`thenRn_`
 	   returnRn (HereItIs decl)
 
       Nothing 

@@ -113,7 +113,7 @@ extractHsPredTyNames (HsPIParam n ty)
 
 Return the Names that must be in scope if we are to use this declaration.
 In all cases this is set up for interface-file declarations:
-	- for class decls we ignroe the bindings
+	- for class decls we ignore the bindings
 	- for instance decls likewise, plus the pragmas
 	- for rule decls, we ignore HsRules
 

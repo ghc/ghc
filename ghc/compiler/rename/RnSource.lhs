@@ -4,7 +4,7 @@
 \section[RnSource]{Main pass of renamer}
 
 \begin{code}
-module RnSource ( rnDecl, rnTyClDecl, rnIfaceRuleDecl, rnInstDecl, rnSourceDecls, 
+module RnSource ( rnTyClDecl, rnIfaceRuleDecl, rnInstDecl, rnSourceDecls, 
 		  rnHsType, rnHsSigType, rnHsTypeFVs, rnHsSigTypeFVs
 	) where
 
@@ -53,7 +53,7 @@ import CStrings		( isCLabelString )
 import ListSetOps	( removeDupsEq )
 \end{code}
 
-@rnDecl@ `renames' declarations.
+@rnSourceDecl@ `renames' declarations.
 It simultaneously performs dependency analysis and precedence parsing.
 It also does the following error checks:
 \begin{enumerate}
@@ -88,7 +88,7 @@ rnSourceDecls gbl_env local_fixity_env decls
     go fvs ds' []             = returnRn (ds', fvs)
     go fvs ds' (FixD _:ds)    = go fvs ds' ds
     go fvs ds' (DeprecD _:ds) = go fvs ds' ds
-    go fvs ds' (d:ds)         = rnDecl d	`thenRn` \(d', fvs') ->
+    go fvs ds' (d:ds)         = rnSourceDecl d	`thenRn` \(d', fvs') ->
 			        go (fvs `plusFV` fvs') (d':ds') ds
 \end{code}
 
@@ -100,38 +100,36 @@ rnSourceDecls gbl_env local_fixity_env decls
 %*********************************************************
 
 \begin{code}
--- rnDecl does all the work
-rnDecl :: RdrNameHsDecl -> RnMS (RenamedHsDecl, FreeVars)
+-- rnSourceDecl does all the work
+rnSourceDecl :: RdrNameHsDecl -> RnMS (RenamedHsDecl, FreeVars)
 
-rnDecl (ValD binds) = rnTopBinds binds	`thenRn` \ (new_binds, fvs) ->
-		      returnRn (ValD new_binds, fvs)
+rnSourceDecl (ValD binds) = rnTopBinds binds	`thenRn` \ (new_binds, fvs) ->
+			    returnRn (ValD new_binds, fvs)
 
-rnDecl (TyClD tycl_decl)
+rnSourceDecl (TyClD tycl_decl)
   = rnTyClDecl tycl_decl		`thenRn` \ new_decl ->
     rnClassBinds tycl_decl new_decl	`thenRn` \ (new_decl', fvs) ->
+    traceRn (text "rnClassDecl:" <+> (ppr (nameSetToList (tyClDeclFVs new_decl')) $$
+				      ppr (nameSetToList fvs))) 	`thenRn_`
     returnRn (TyClD new_decl', fvs `plusFV` tyClDeclFVs new_decl')
 
-rnDecl (InstD inst)
+rnSourceDecl (InstD inst)
   = rnInstDecl inst		`thenRn` \ new_inst ->
     rnInstBinds inst new_inst	`thenRn` \ (new_inst', fvs) ->
     returnRn (InstD new_inst', fvs `plusFV` instDeclFVs new_inst')
 
-rnDecl (RuleD rule)
-  | isIfaceRuleDecl rule
-  = rnIfaceRuleDecl rule	`thenRn` \ new_rule ->
-    returnRn (RuleD new_rule, ruleDeclFVs new_rule)
-  | otherwise
+rnSourceDecl (RuleD rule)
   = rnHsRuleDecl rule		`thenRn` \ (new_rule, fvs) ->
     returnRn (RuleD new_rule, fvs)
 
-rnDecl (DefD (DefaultDecl tys src_loc))
+rnSourceDecl (DefD (DefaultDecl tys src_loc))
   = pushSrcLocRn src_loc $
     mapFvRn (rnHsTypeFVs doc_str) tys		`thenRn` \ (tys', fvs) ->
     returnRn (DefD (DefaultDecl tys' src_loc), fvs)
   where
     doc_str = text "a `default' declaration"
 
-rnDecl (ForD (ForeignDecl name imp_exp ty ext_nm cconv src_loc))
+rnSourceDecl (ForD (ForeignDecl name imp_exp ty ext_nm cconv src_loc))
   = pushSrcLocRn src_loc $
     lookupOccRn name		        `thenRn` \ name' ->
     let 

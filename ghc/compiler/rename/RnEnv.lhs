@@ -410,7 +410,7 @@ bindLocalsFVRn doc rdr_names enclosed_scope
 
 -------------------------------------
 extendTyVarEnvFVRn :: [Name] -> RnMS (a, FreeVars) -> RnMS (a, FreeVars)
-	-- This tiresome function is used only in rnDecl on InstDecl
+	-- This tiresome function is used only in rnSourceDecl on InstDecl
 extendTyVarEnvFVRn tyvars enclosed_scope
   = bindLocalNames tyvars enclosed_scope 	`thenRn` \ (thing, fvs) -> 
     returnRn (thing, delListFromNameSet fvs tyvars)
