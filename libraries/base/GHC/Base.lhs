@@ -149,6 +149,14 @@ unpackCStringUtf8# a = error "urk"
 %*********************************************************
 
 \begin{code}
+
+-- | The 'Eq' class defines equality ('==') and inequality ('/=').
+-- All the basic datatypes exported by the "Prelude" are instances of 'Eq',
+-- and 'Eq' may be derived for any datatype whose constituents are also
+-- instances of 'Eq'.
+--
+-- Minimal complete definition: either '==' or '/='.
+--
 class  Eq a  where
     (==), (/=)		 :: a -> a -> Bool
 
@@ -415,6 +423,8 @@ need ().  (We could arrange suck in () only if -fglasgow-exts, but putting
 it here seems more direct.)
 
 \begin{code}
+-- | The unit datatype @()@ has one non-undefined member, the nullary
+-- constructor @()@.
 data () = ()
 
 instance Eq () where
@@ -439,6 +449,9 @@ instance Ord () where
 %*********************************************************
 
 \begin{code}
+-- | Represents an ordering relationship between two values: less
+-- than, equal to, or greater than.  An 'Ordering' is returned by
+-- 'compare'.
 data Ordering = LT | EQ | GT deriving (Eq, Ord)
 	-- Read in GHC.Read, Show in GHC.Show
 \end{code}
@@ -451,8 +464,18 @@ data Ordering = LT | EQ | GT deriving (Eq, Ord)
 %*********************************************************
 
 \begin{code}
+-- | A 'String' is a list of characters.  String constants in Haskell are values
+-- of type 'String'.
+--
 type String = [Char]
 
+{-| The character type 'Char' is an enumeration whose values represent
+Unicode characters.  A character literal in Haskell has type 'Char'.
+
+To convert a 'Char' to or from an 'Int', use 'Prelude.toEnum' and
+'Prelude.fromEnum' from the 'Enum' class respectively (equivalently
+'ord' and 'chr' also do the trick).
+-}
 data Char = C# Char#
 
 -- We don't use deriving for Eq and Ord, because for Ord the derived

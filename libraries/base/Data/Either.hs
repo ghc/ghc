@@ -22,6 +22,16 @@ module Data.Either (
 import GHC.Base
 #endif
 
+{-|
+
+The 'Either' type represents values with two possibilities: a value of
+type @'Either' a b@ is either @'Left' a@ or @'Right' b@.
+
+The 'Either' type is sometimes used to represent a value which is
+either correct or an error; by convention, the 'Left' constructor is
+used to hold an error value and the 'Right' constructor is used to
+hold a correct value (mnemonic: \"right\" also means \"correct\").
+-}
 data  Either a b  =  Left a | Right b	deriving (Eq, Ord )
 
 either                  :: (a -> c) -> (b -> c) -> Either a b -> c

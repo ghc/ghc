@@ -98,7 +98,10 @@ class  (RealFrac a, Floating a) => RealFloat a  where
 %*********************************************************
 
 \begin{code}
+-- | Single-precision floating point numbers.
 data Float	= F# Float#
+
+-- | Double-precision floating point numbers.
 data Double	= D# Double#
 
 instance CCallable   Float

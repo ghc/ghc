@@ -17,38 +17,7 @@
 
 module Prelude (
 
-	-- List things
-    [] (..),
-
-    map, (++), filter, concat,
-    head, last, tail, init, null, length, (!!), 
-    foldl, foldl1, scanl, scanl1, foldr, foldr1, scanr, scanr1,
-    iterate, repeat, replicate, cycle,
-    take, drop, splitAt, takeWhile, dropWhile, span, break,
-    reverse, and, or,
-    any, all, elem, notElem, lookup,
-    maximum, minimum, concatMap,
-    zip, zip3, zipWith, zipWith3, unzip, unzip3,
-
-    lines, words, unlines, unwords,
-    sum, product,
-
-        -- Everything from Text.Read and Text.Show
-    ReadS, ShowS,
-    Read(readsPrec, readList),
-    Show(showsPrec, showList, show),
-    reads, shows, read, lex, 
-    showChar, showString, readParen, showParen,
-    
-        -- Everything corresponding to the Report's PreludeIO
-    ioError, userError, catch,
-    FilePath, IOError,
-    putChar,
-    putStr, putStrLn, print,
-    getChar,
-    getLine, getContents, interact,
-    readFile, writeFile, appendFile, readIO, readLn,
-
+    -- * Basic data types
     Bool(..),
     Maybe(..),
     Either(..),
@@ -62,6 +31,7 @@ module Prelude (
     ()(..),		-- The unit type
     (->),		-- functions
     
+    -- * Basic type classes
     Eq(..),
     Ord(..), 
     Enum(..),
@@ -74,11 +44,42 @@ module Prelude (
     RealFrac(..),
     RealFloat(..),
 
-	-- Monad stuff, from GHC.Base, and defined here
+    -- * List operations
+    map, (++), filter, concat,
+    head, last, tail, init, null, length, (!!), 
+    foldl, foldl1, scanl, scanl1, foldr, foldr1, scanr, scanr1,
+    iterate, repeat, replicate, cycle,
+    take, drop, splitAt, takeWhile, dropWhile, span, break,
+    reverse, and, or,
+    any, all, elem, notElem, lookup,
+    maximum, minimum, concatMap,
+    zip, zip3, zipWith, zipWith3, unzip, unzip3,
+
+    lines, words, unlines, unwords,
+    sum, product,
+
+    -- * Converting to and from @String@
+    ReadS, ShowS,
+    Read(readsPrec, readList),
+    Show(showsPrec, showList, show),
+    reads, shows, read, lex, 
+    showChar, showString, readParen, showParen,
+    
+    -- * Simple I\/O operations
+    ioError, userError, catch,
+    FilePath, IOError,
+    putChar,
+    putStr, putStrLn, print,
+    getChar,
+    getLine, getContents, interact,
+    readFile, writeFile, appendFile, readIO, readLn,
+
+    -- * Monads
     Monad(..),
     Functor(..), 
     mapM, mapM_, sequence, sequence_, (=<<),
 
+    -- * Miscellaneous functions
     maybe, either,
     (&&), (||), not, otherwise,
     subtract, even, odd, gcd, lcm, (^), (^^), 

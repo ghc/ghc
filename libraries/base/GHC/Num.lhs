@@ -103,6 +103,7 @@ divModInt x@(I# _) y@(I# _) = (x `divInt` y, x `modInt` y)
 %*********************************************************
 
 \begin{code}
+-- | Arbitrary-precision integers.
 data Integer	
    = S# Int#				-- small integers
 #ifndef ILX

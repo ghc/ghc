@@ -40,6 +40,10 @@ default ()		-- Double isn't available yet,
 
 \begin{code}
 data  (Integral a)	=> Ratio a = !a :% !a  deriving (Eq)
+
+-- | Arbitrary-precision rational numbers, represented as a ratio of
+-- two 'Integer' values.  A rational number may be constructed using
+-- the '%' operator.
 type  Rational		=  Ratio Integer
 
 infinity, notANumber :: Rational
