@@ -54,6 +54,12 @@ module Module
 	-- Where to find a .hi file
     , WhereFrom(..)
 
+    , ModuleEnv,
+    , elemModuleEnv, extendModuleEnv, extendModuleEnvList, plusModuleEnv_C
+    , delModuleEnvList, delModuleEnv, plusModuleEnv, lookupModuleEnv
+    , lookupWithDefaultModuleEnv, mapModuleEnv, mkModuleEnv, emptyModuleEnv
+    , rngModuleEnv, unitModuleEnv, isEmptyModuleEnv, foldModuleEnv
+
     ) where
 
 #include "HsVersions.h"
@@ -62,6 +68,7 @@ import Outputable
 import CmdLineOpts	( opt_InPackage )
 import FastString	( FastString, uniqueOfFS )
 import Unique		( Uniquable(..), mkUniqueGrimily )
+import UniqFM
 \end{code}
 
 
@@ -259,4 +266,50 @@ moduleUserString (Module mod _) = moduleNameUserString mod
 --isLocalModule :: Module -> Bool
 --isLocalModule (Module _ ThisPackage) = True
 --isLocalModule _		      	     = False
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+\subsection{@ModuleEnv@s}
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+type ModuleEnv elt = UniqFM elt
+
+emptyModuleEnv       :: ModuleEnv a
+mkModuleEnv          :: [(Module, a)] -> ModuleEnv a
+unitModuleEnv        :: Module -> a -> ModuleEnv a
+extendModuleEnv      :: ModuleEnv a -> Module -> a -> ModuleEnv a
+plusModuleEnv        :: ModuleEnv a -> ModuleEnv a -> ModuleEnv a
+extendModuleEnvList  :: ModuleEnv a -> [(Module, a)] -> ModuleEnv a
+                  
+delModuleEnvList     :: ModuleEnv a -> [Module] -> ModuleEnv a
+delModuleEnv         :: ModuleEnv a -> Module -> ModuleEnv a
+plusModuleEnv_C      :: (a -> a -> a) -> ModuleEnv a -> ModuleEnv a -> ModuleEnv a
+mapModuleEnv         :: (a -> b) -> ModuleEnv a -> ModuleEnv b
+rngModuleEnv         :: ModuleEnv a -> [a]
+                  
+isEmptyModuleEnv     :: ModuleEnv a -> Bool
+lookupModuleEnv      :: ModuleEnv a -> Module -> Maybe a
+lookupWithDefaultModuleEnv :: ModuleEnv a -> a -> Module -> a
+elemModuleEnv        :: Module -> ModuleEnv a -> Bool
+foldModuleEnv        :: (a -> b -> b) -> b -> ModuleEnv a -> b
+
+elemModuleEnv       = elemUFM
+extendModuleEnv     = addToUFM
+extendModuleEnvList = addListToUFM
+plusModuleEnv_C     = plusUFM_C
+delModuleEnvList    = delListFromUFM
+delModuleEnv        = delFromUFM
+plusModuleEnv       = plusUFM
+lookupModuleEnv     = lookupUFM
+lookupWithDefaultModuleEnv = lookupWithDefaultUFM
+mapModuleEnv        = mapUFM
+mkModuleEnv         = listToUFM
+emptyModuleEnv      = emptyUFM
+rngModuleEnv        = eltsUFM
+unitModuleEnv       = unitUFM
+isEmptyModuleEnv    = isNullUFM
+foldModuleEnv       = foldUFM
 \end{code}
