@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.6 1997/03/24 04:39:38 sof Exp $
+# $Id: Makefile,v 1.7 1997/03/24 08:39:19 sof Exp $
 #
 
 TOP=.
@@ -24,6 +24,11 @@ ifeq "$(GhcWithHscBuiltViaC)" "NO"
 SUBDIRS = utils driver includes runtime docs compiler lib
 else
 SUBDIRS = utils driver includes runtime docs lib compiler
+endif
+
+# Easier to copy
+ifeq "$(BIN_DIST)" "1"
+SUBDIRS := $(filter-out docs,$(SUBDIRS))
 endif
 
 include $(TOP)/mk/target.mk

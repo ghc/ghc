@@ -68,43 +68,43 @@ binary-dist::
 	@$(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/info/ghc-2.02
 	@echo "Making html documentation.."
 	@echo "For fptools.."
-	$(MAKE) -C docs --no-print-directory $(MFLAGS) html
-	cp -f docs/html/* docs/*.html $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/html/ghc-2.02
-	@echo "Done."
-	@for i in $(BIN_DIST_DIRS); do \
-	   echo "For $$i.."; \
-	   echo cp -f $$i/docs/users_guide/html/* $$i/docs/users_guide/*.html $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/html/ghc-2.02; \
-	   cp -f $$i/docs/users_guide/html/* $$i/docs/users_guide/*.html $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/html/ghc-2.02; \
-	   echo cp -f $$i/docs/html/* $$i/docs/*.html $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/html/ghc-2.02; \
-	   cp -f $$i/docs/html/* $$i/docs/*.html $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/html/ghc-2.02; \
-	   echo "Done."; \
-	done
-	@echo "Making dvi files.."
-	@echo "For fptools.."
-	-$(MAKE) -C docs --no-print-directory $(MFLAGS) dvi
-	-cp -f docs/*.dvi  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/dvi/ghc-2.02
-	@echo "Done."
-	@for i in $(BIN_DIST_DIRS); do \
-	   echo "For $$i.."; \
-	   echo cp -f $$i/docs/users_guide/*.dvi $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/dvi/ghc-2.02; \
-	   cp -f $$i/docs/users_guide/*.dvi $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/dvi/ghc-2.02; \
-	   echo cp -f $$i/docs/*.dvi $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/dvi/ghc-2.02; \
-	   cp -f $$i/docs/*.dvi $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/dvi/ghc-2.02; \
-	   echo "Done."; \
-	done
-	@echo "Making info files.."
-	@echo "For fptools.."
-	-$(MAKE) -C docs --no-print-directory $(MFLAGS) info
-	-cp -f docs/*.info $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/info/ghc-2.02/
-	@echo "Done."
-	@for i in $(BIN_DIST_DIRS); do \
-	   echo "For $$i docs.."; \
-	   echo cp -f $$i/docs/users_guide/*.info  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/info/ghc-2.02; \
-	   cp -f $$i/docs/users_guide/*.info $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/info/ghc-2.02; \
-	   echo cp -f $$i/docs/*.info $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/info/ghc-2.02; \
-	   cp -f $$i/docs/*.info $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/info/ghc-2.02; \
-	   echo "Done."; \
-	done
+	#$(MAKE) -C docs --no-print-directory $(MFLAGS) html
+	#cp -f docs/html/* docs/*.html $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/html/ghc-2.02
+	#@echo "Done."
+	#@for i in $(BIN_DIST_DIRS); do \
+	#   echo "For $$i.."; \
+	#   echo cp -f $$i/docs/users_guide/html/* $$i/docs/users_guide/*.html $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/html/ghc-2.02; \
+	#   cp -f $$i/docs/users_guide/html/* $$i/docs/users_guide/*.html $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/html/ghc-2.02; \
+	#   echo cp -f $$i/docs/html/* $$i/docs/*.html $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/html/ghc-2.02; \
+	#   cp -f $$i/docs/html/* $$i/docs/*.html $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/html/ghc-2.02; \
+	#   echo "Done."; \
+	#done
+	##@echo "Making dvi files.."
+	#@echo "For fptools.."
+	#-$(MAKE) -C docs --no-print-directory $(MFLAGS) dvi
+	#-cp -f docs/*.dvi  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/dvi/ghc-2.02
+	#@echo "Done."
+	#@for i in $(BIN_DIST_DIRS); do \
+	#   echo "For $$i.."; \
+	#   echo cp -f $$i/docs/users_guide/*.dvi $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/dvi/ghc-2.02; \
+	#   cp -f $$i/docs/users_guide/*.dvi $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/dvi/ghc-2.02; \
+	#   echo cp -f $$i/docs/*.dvi $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/dvi/ghc-2.02; \
+	#   cp -f $$i/docs/*.dvi $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/dvi/ghc-2.02; \
+	#   echo "Done."; \
+	#done
+	#@echo "Making info files.."
+	#@echo "For fptools.."
+	#-$(MAKE) -C docs --no-print-directory $(MFLAGS) info
+	#-cp -f docs/*.info $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/info/ghc-2.02/
+	#@echo "Done."
+	#@for i in $(BIN_DIST_DIRS); do \
+	#   echo "For $$i docs.."; \
+	#   echo cp -f $$i/docs/users_guide/*.info  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/info/ghc-2.02; \
+	#   cp -f $$i/docs/users_guide/*.info $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/info/ghc-2.02; \
+	#   echo cp -f $$i/docs/*.info $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/info/ghc-2.02; \
+	#   cp -f $$i/docs/*.info $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/info/ghc-2.02; \
+	#   echo "Done."; \
+	#done
 
 #
 # binary dist'ing hslibs/, hackily.
