@@ -4084,7 +4084,7 @@ guide) before continuing to read these notes.
 </para>
 
 
-<sect2><Title>Cygwin and MinGW</Title>
+<sect2 id="cygwin-and-mingw"><Title>Cygwin and MinGW</Title>
 
 <para> The Windows situation for building GHC is rather confusing.  This section
 tries to clarify, and to establish terminology.</para>
@@ -4335,7 +4335,8 @@ Happy is a parser generator used to compile the Haskell grammar.  Add it in your
 
 <listitem>
 <para>GHC uses the <emphasis>mingw</emphasis> C compiler to
-generate code, so you have to install that. Just pick up a mingw bundle at
+generate code, so you have to install that (see <xref linkend="cygwin-and-mingw">). 
+Just pick up a mingw bundle at
 <ulink url="http://www.mingw.org/">http://www.mingw.org/</ulink>.
 We install it in <filename>c:/mingw</filename>.
 </para>
@@ -4343,6 +4344,18 @@ We install it in <filename>c:/mingw</filename>.
 They are only going to get used by explicit access (via the --with-gcc flag you
 give to <Command>configure</Command> later).  If you do add them to your path
 you are likely to get into a mess because their names overlap with Cygwin binaries.
+</para>
+</listitem>
+
+
+<listitem>
+<para>We use <command>emacs</command> a lot, so we install that too.
+When you are in <filename>fptools/ghc/compiler</filename>, you can use
+"<literal>make tags</literal>" to make a TAGS file for emacs.  That uses the utility
+<filename>fptools/ghc/utils/hasktags/hasktags</filename>, so you need to make that first.
+The most convenient way to do this is by going <literal>make boot</literal> in <filename>fptools/ghc</filename>.
+The <literal>make tags</literal> command also uses <command>etags</command>, which comes with <command>emacs</command>,
+so you will need to add <filename>emacs/bin</filename> to your <literal>PATH</literal>.
 </para>
 </listitem>
 
