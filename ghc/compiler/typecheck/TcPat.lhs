@@ -283,8 +283,12 @@ tcPat tc_bndr (LitPatIn lit@(HsStringPrim _)) pat_ty = tcSimpleLitPat lit addrPr
 tcPat tc_bndr (LitPatIn lit@(HsFloatPrim _))  pat_ty = tcSimpleLitPat lit floatPrimTy  pat_ty
 tcPat tc_bndr (LitPatIn lit@(HsDoublePrim _)) pat_ty = tcSimpleLitPat lit doublePrimTy pat_ty
 
-tcPat tc_bndr (LitPatIn lit@(HsLitLit s))     pat_ty = tcSimpleLitPat lit intTy pat_ty
-	-- This one looks weird!
+tcPat tc_bndr (LitPatIn lit@(HsLitLit s))     pat_ty 
+	-- cf tcExpr on LitLits
+  = tcLookupClassByKey cCallableClassKey		`thenNF_Tc` \ cCallableClass ->
+    newDicts (LitLitOrigin (_UNPK_ s))
+	     [(cCallableClass, [pat_ty])]		`thenNF_Tc` \ (dicts, _) ->
+    returnTc (LitPat lit pat_ty, dicts, emptyBag, emptyBag, emptyLIE)
 \end{code}
 
 %************************************************************************

@@ -525,56 +525,11 @@ tidy1 v (DictPat dicts methods) match_result
 -- LitPats: the desugarer only sees these at well-known types
 
 tidy1 v pat@(LitPat lit lit_ty) match_result
-  | isUnLiftedType lit_ty
-  = returnDs (pat, match_result)
-
-  | lit_ty == charTy
-  = returnDs (ConPat charDataCon charTy [] [] [LitPat (mk_char lit) charPrimTy],
-	      match_result)
-
-  | otherwise = pprPanic "tidy1:LitPat:" (ppr pat)
-  where
-    mk_char (HsChar c)    = HsCharPrim c
+  = returnDs (tidyLitPat lit lit_ty pat, match_result)
 
 -- NPats: we *might* be able to replace these w/ a simpler form
-
-
 tidy1 v pat@(NPat lit lit_ty _) match_result
-  = returnDs (better_pat, match_result)
-  where
-    better_pat
-      | lit_ty == charTy   = ConPat charDataCon   lit_ty [] [] [LitPat (mk_char lit)   charPrimTy]
-      | lit_ty == intTy    = ConPat intDataCon    lit_ty [] [] [LitPat (mk_int lit)    intPrimTy]
-      | lit_ty == wordTy   = ConPat wordDataCon   lit_ty [] [] [LitPat (mk_word lit)   wordPrimTy]
-      | lit_ty == addrTy   = ConPat addrDataCon   lit_ty [] [] [LitPat (mk_addr lit)   addrPrimTy]
-      | lit_ty == floatTy  = ConPat floatDataCon  lit_ty [] [] [LitPat (mk_float lit)  floatPrimTy]
-      | lit_ty == doubleTy = ConPat doubleDataCon lit_ty [] [] [LitPat (mk_double lit) doublePrimTy]
-
-		-- Convert the literal pattern "" to the constructor pattern [].
-      | null_str_lit lit       = ConPat nilDataCon lit_ty [] [] [] 
-
-      | otherwise	   = pat
-
-    mk_int    (HsInt i)      = HsIntPrim i
-    mk_int    l@(HsLitLit s) = l
-
-    mk_char   (HsChar c)     = HsCharPrim c
-    mk_char   l@(HsLitLit s) = l
-
-    mk_word   l@(HsLitLit s) = l
-
-    mk_addr   l@(HsLitLit s) = l
-
-    mk_float  (HsInt i)      = HsFloatPrim (fromInteger i)
-    mk_float  (HsFrac f)     = HsFloatPrim f
-    mk_float  l@(HsLitLit s) = l
-
-    mk_double (HsInt i)      = HsDoublePrim (fromInteger i)
-    mk_double (HsFrac f)     = HsDoublePrim f
-    mk_double l@(HsLitLit s) = l
-
-    null_str_lit (HsString s) = _NULL_ s
-    null_str_lit other_lit    = False
+  = returnDs (tidyLitPat lit lit_ty pat, match_result)
 
 -- and everything else goes through unchanged...
 

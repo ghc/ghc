@@ -18,7 +18,8 @@ import CoreSyn
 import DsUtils		( EquationInfo(..),
 			  MatchResult(..),
 			  EqnSet,
-			  CanItFail(..)
+			  CanItFail(..),
+			  tidyLitPat
  			)
 import Id		( idType )
 import DataCon		( DataCon, isTupleCon, isUnboxedTupleCon, dataConArgTys,
@@ -645,64 +646,8 @@ simplify_pat (RecPat dc ty ex_tvs dicts idps)
       | nm == n    = (nm,p):xs
       | otherwise  = x : insertNm nm p xs
 
-simplify_pat pat@(LitPat lit lit_ty) 
-  | isUnboxedType lit_ty = pat
-
-  | lit_ty == charTy = ConPat charDataCon charTy [] [] [LitPat (mk_char lit) charPrimTy]
-
-  | otherwise = pprPanic "Check.simplify_pat: LitPat:" (ppr pat)
-  where
-    mk_char (HsChar c)    = HsCharPrim c
-
-simplify_pat (NPat lit lit_ty hsexpr) = better_pat
-  where
-    better_pat
-      | lit_ty == charTy   = ConPat charDataCon   lit_ty [] [] [LitPat (mk_char lit)   charPrimTy]
-      | lit_ty == intTy    = ConPat intDataCon    lit_ty [] [] [LitPat (mk_int lit)    intPrimTy]
-      | lit_ty == wordTy   = ConPat wordDataCon   lit_ty [] [] [LitPat (mk_word lit)   wordPrimTy]
-      | lit_ty == addrTy   = ConPat addrDataCon   lit_ty [] [] [LitPat (mk_addr lit)   addrPrimTy]
-      | lit_ty == floatTy  = ConPat floatDataCon  lit_ty [] [] [LitPat (mk_float lit)  floatPrimTy]
-      | lit_ty == doubleTy = ConPat doubleDataCon lit_ty [] [] [LitPat (mk_double lit) doublePrimTy]
-
-		-- Convert the literal pattern "" to the constructor pattern [].
-      | null_str_lit lit      = ConPat nilDataCon  lit_ty [] [] []
-      | lit_ty == stringTy = 
-            foldr (\ x -> \y -> ConPat consDataCon list_ty [] [] [x, y])
-	                        (ConPat nilDataCon  list_ty [] [] [])
-	                        (mk_string lit)
-      | otherwise	       = NPat lit lit_ty hsexpr
-
-    list_ty = mkListTy lit_ty
-
-    mk_int    (HsInt i)      = HsIntPrim i
-    mk_int    l@(HsLitLit s) = l
-
-    mk_head_char (HsString s) = HsCharPrim (_HEAD_ s)
-    mk_string    (HsString s) = 
-       map (\ c -> ConPat charDataCon charTy [] []
-		         [LitPat (HsCharPrim c) charPrimTy]) 
-           (_UNPK_ s)
-
-    mk_char   (HsChar c)     = HsCharPrim c
-    mk_char   l@(HsLitLit s) = l
-
-    mk_word   l@(HsLitLit s) = l
-
-    mk_addr   l@(HsLitLit s) = l
-
-    mk_float  (HsInt i)      = HsFloatPrim (fromInteger i)
-    mk_float  (HsFrac f)     = HsFloatPrim f
-    mk_float  l@(HsLitLit s) = l
-
-    mk_double (HsInt i)      = HsDoublePrim (fromInteger i)
-    mk_double (HsFrac f)     = HsDoublePrim f
-    mk_double l@(HsLitLit s) = l
-
-    null_str_lit (HsString s) = _NULL_ s
-    null_str_lit other_lit    = False
-
-    one_str_lit (HsString s) = _LENGTH_ s == (1::Int)
-    one_str_lit other_lit    = False
+simplify_pat pat@(LitPat lit lit_ty)        = tidyLitPat lit lit_ty pat
+simplify_pat pat@(NPat   lit lit_ty hsexpr) = tidyLitPat lit lit_ty pat
 
 simplify_pat (NPlusKPat	id hslit ty hsexpr1 hsexpr2) = 
      WildPat ty
