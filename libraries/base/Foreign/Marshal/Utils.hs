@@ -87,7 +87,7 @@ new val  =
 
 -- |@'with' val f@ executes the computation @f@, passing as argument
 -- a pointer to a temporarily allocated block of memory into which
--- 'val' has been marshalled (the combination of 'alloca' and 'poke').
+-- @val@ has been marshalled (the combination of 'alloca' and 'poke').
 --
 -- The memory is freed when @f@ terminates (either normally or via an
 -- exception), so the pointer passed to @f@ must /not/ be used after this.
