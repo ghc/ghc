@@ -61,8 +61,6 @@ Other commonly-used options are:
     -M              Output Makefile rules recording the
 		    dependencies of a list of Haskell files.
 
-The User's Guide has more information about GHC's *many* options.
-
 Given the above, here are some TYPICAL invocations of $$:
 
     # compile a Haskell module to a .o file, optimising:
@@ -73,4 +71,10 @@ Given the above, here are some TYPICAL invocations of $$:
     % $$ -C -H16m Foo.hs
     # compile Haskell-produced C (.hc) to assembly language:
     % $$ -S Foo.hc
+
+The User's Guide has more information about GHC's *many* options.  An
+online copy can be found here:
+
+   http://www.haskell.org/ghc/documentation.html
+
 ------------------------------------------------------------------------

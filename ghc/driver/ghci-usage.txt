@@ -1,0 +1,26 @@
+Usage:
+
+    ghci [command-line-options-and-input-files]
+
+The kinds of input files that can be given on the command-line
+include:
+
+  - Haskell source files (.hs or .lhs suffix)
+  - Object files (.o suffix, or .obj on Windows)
+  - Dynamic libraries (.so suffix, or .dll on Windows)
+
+In addition, ghci accepts most of the command-line options that plain
+GHC does.  Some of the options that are commonly used are:
+
+    -fglasgow-exts  Allow Glasgow extensions (unboxed types, etc.)
+
+    -i<dir>         Search for imported modules in the directory <dir>.
+
+    -H32m	    Increase GHC's default heap size to 32m
+
+    -cpp            Enable CPP processing of source files
+
+Full details can be found in the User's Guide, an online copy of which
+can be found here:
+
+    http://www.haskell.org/ghc/documentation.html

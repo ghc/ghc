@@ -1,9 +1,8 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.127 2003/10/09 11:58:56 simonpj Exp $
 --
 -- Driver flags
 --
--- (c) Simon Marlow 2000
+-- (c) The University of Glasgow 2000-2003
 --
 -----------------------------------------------------------------------------
 
@@ -651,7 +650,24 @@ setVerbosity n
 
 addCmdlineHCInclude a = updDynFlags (\s -> s{cmdlineHcIncludes =  a : cmdlineHcIncludes s})
 
+-- -----------------------------------------------------------------------------
+-- Version and usage messages
+
 showVersion :: IO ()
 showVersion = do
   putStrLn (cProjectName ++ ", version " ++ cProjectVersion)
   exitWith ExitSuccess
+
+showGhcUsage = do 
+  (ghc_usage_path,ghci_usage_path) <- getUsageMsgPaths
+  mode <- readIORef v_GhcMode
+  let usage_path 
+	| mode == DoInteractive  = ghci_usage_path
+	| otherwise		 = ghc_usage_path
+  usage <- readFile usage_path
+  dump usage
+  exitWith ExitSuccess
+  where
+     dump ""	      = return ()
+     dump ('$':'$':s) = hPutStr stderr progName >> dump s
+     dump (c:s)	      = hPutChar stderr c >> dump s

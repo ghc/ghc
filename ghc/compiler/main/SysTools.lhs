@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- (c) The University of Glasgow 2001
+-- (c) The University of Glasgow 2001-2003
 --
 -- Access to system tools: gcc, cp, rm etc
 --
@@ -28,6 +28,7 @@ module SysTools (
 
 	getTopDir,		-- IO String	-- The value of $libdir
 	getPackageConfigPath,	-- IO String	-- Where package.conf is
+        getUsageMsgPaths,       -- IO (String,String)
 
 	-- Interface to system tools
 	runUnlit, runCpp, runCc, -- [Option] -> IO ()
@@ -55,7 +56,6 @@ module SysTools (
 	system, 		-- String -> IO ExitCode
 
 	-- Misc
-	showGhcUsage,		-- IO ()	Shows usage message and exits
 	getSysMan,		-- IO String	Parallel system only
 	
 	Option(..)
@@ -68,7 +68,7 @@ import DriverUtil
 import DriverPhases     ( isHaskellUserSrcFilename )
 import Config
 import Outputable
-import Panic		( progName, GhcException(..) )
+import Panic		( GhcException(..) )
 import Util		( global, notNull )
 import CmdLineOpts	( dynFlag, verbosity )
 
@@ -77,9 +77,9 @@ import DATA_IOREF	( IORef, readIORef, writeIORef )
 import DATA_INT
     
 import Monad		( when, unless )
-import System		( ExitCode(..), exitWith, getEnv, system )
+import System		( ExitCode(..), getEnv, system )
 import IO		( try, catch,
-			  openFile, hPutChar, hPutStrLn, hPutStr, hClose, hFlush, IOMode(..),
+			  openFile, hPutStrLn, hPutStr, hClose, hFlush, IOMode(..),
 			  stderr )
 import Directory	( doesFileExist, removeFile )
 import List             ( intersperse, partition )
@@ -204,7 +204,7 @@ GLOBAL_VAR(v_Pgm_T,    error "pgm_T",    String)	-- touch
 GLOBAL_VAR(v_Pgm_CP,   error "pgm_CP", 	 String)	-- cp
 
 GLOBAL_VAR(v_Path_package_config, error "path_package_config", String)
-GLOBAL_VAR(v_Path_usage,  	  error "ghc_usage.txt",       String)
+GLOBAL_VAR(v_Path_usages,  	  error "ghc_usage.txt",       (String,String))
 
 GLOBAL_VAR(v_TopDir,	error "TopDir",	String)		-- -B<dir>
 
@@ -253,6 +253,10 @@ initSysTools minusB_args
 	      ghc_usage_msg_path
 		| am_installed = installed "ghc-usage.txt"
 		| otherwise    = inplace cGHC_DRIVER_DIR_REL "ghc-usage.txt"
+
+	      ghci_usage_msg_path
+		| am_installed = installed "ghci-usage.txt"
+		| otherwise    = inplace cGHC_DRIVER_DIR_REL "ghci-usage.txt"
 
 		-- For all systems, unlit, split, mangle are GHC utilities
 		-- architecture-specific stuff is done when building Config.hs
@@ -382,7 +386,8 @@ initSysTools minusB_args
 				       
 	-- Initialise the global vars
 	; writeIORef v_Path_package_config pkgconfig_path
-	; writeIORef v_Path_usage 	   ghc_usage_msg_path
+	; writeIORef v_Path_usages 	   (ghc_usage_msg_path,
+					    ghci_usage_msg_path)
 
 	; writeIORef v_Pgm_sysman	   (top_dir ++ "/ghc/rts/parallel/SysMan")
 		-- Hans: this isn't right in general, but you can 
@@ -586,23 +591,10 @@ getSysMan :: IO String	-- How to invoke the system manager
 getSysMan = readIORef v_Pgm_sysman
 \end{code}
 
-%************************************************************************
-%*									*
-\subsection{GHC Usage message}
-%*									*
-%************************************************************************
-
-Show the usage message and exit
-
 \begin{code}
-showGhcUsage = do { usage_path <- readIORef v_Path_usage
-		  ; usage      <- readFile usage_path
-		  ; dump usage
-		  ; exitWith ExitSuccess }
-  where
-     dump ""	      = return ()
-     dump ('$':'$':s) = hPutStr stderr progName >> dump s
-     dump (c:s)	      = hPutChar stderr c >> dump s
+getUsageMsgPaths :: IO (FilePath,FilePath)
+	  -- the filenames of the usage messages (ghc, ghci)
+getUsageMsgPaths = readIORef v_Path_usages
 \end{code}
 
 
@@ -868,13 +860,6 @@ platformPath stuff = stuff
 
 \begin{code}
 slash		 :: String -> String -> String
-absPath, relPath :: [String] -> String
-
-relPath [] = ""
-relPath xs = foldr1 slash xs
-
-absPath xs = "" `slash` relPath xs
-
 slash s1 s2 = s1 ++ ('/' : s2)
 \end{code}
 
