@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.21 2001/02/27 12:43:45 rrt Exp $
+ * $Id: Itimer.c,v 1.22 2001/03/02 10:52:15 simonmar Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -80,10 +80,12 @@ handle_tick(int unused STG_UNUSED)
    */
   ticks_since_timestamp++;
 
-  ticks_to_ctxt_switch--;
-  if (ticks_to_ctxt_switch <= 0) {
-      ticks_to_ctxt_switch = RtsFlags.ConcFlags.ctxtSwitchTicks;
-      context_switch = 1;	/* schedule a context switch */
+  if (RtsFlags.ConcFlags.ctxtSwitchTicks > 0) {
+      ticks_to_ctxt_switch--;
+      if (ticks_to_ctxt_switch <= 0) {
+	  ticks_to_ctxt_switch = RtsFlags.ConcFlags.ctxtSwitchTicks;
+	  context_switch = 1;	/* schedule a context switch */
+      }
   }
 }
 
