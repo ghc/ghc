@@ -1606,12 +1606,12 @@ construction of interface files, is (allegedly) in the works.
         import_dirs    =  ["/usr/local/lib/imports/mypkg"],
 	library_dirs   =  ["/usr/local/lib"],
 	libraries      =  ["HSmypkg", "HSmypkg_cbits"],
-	include_dir    =  "",
-	c_include      =  "HsMyPkg.h",
+	include_dirs   =  [],
+	c_includes     =  ["HsMyPkg.h"],
 	package_deps   =  ["text", "data"],
-	extra_ghc_opts =  "",
-	extra_cc_opts  =  "",
-	extra_ld_opts  =  "-lmy_clib"
+	extra_ghc_opts =  [],
+	extra_cc_opts  =  [],
+	extra_ld_opts  =  ["-lmy_clib"]
        }
  )
 </screen>
@@ -1659,25 +1659,26 @@ construction of interface files, is (allegedly) in the works.
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>include_dir</literal></term>
-	  <indexterm><primary><literal>include_dir</literal></primary>
+	  <term><literal>include_dirs</literal></term>
+	  <indexterm><primary><literal>include_dirs</literal></primary>
 	    <secondary>package specification</secondary></indexterm>
 	  <listitem>
-	    <para>A directory containing C includes for this package
-	    (may be the empty string).</para>
+	    <para>A list of directories containing C includes for this
+	    package (maybe the empty list).</para>
 	  </listitem>
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>c_include</literal></term>
-	  <indexterm><primary><literal>c_include</literal></primary>
+	  <term><literal>c_includes</literal></term>
+	  <indexterm><primary><literal>c_includes</literal></primary>
 	    <secondary>package specification</secondary></indexterm>
 	  <listitem>
-	    <para>A file to include for via-C compilations using this
-	    package.  Typically this include file will contain
-	    function prototypes for any C functions used in the
-	    package, in case they end up being called as a result of
-	    Haskell functions from the package being inlined.</para>
+	    <para>A list of files to include for via-C compilations
+	    using this package.  Typically this include file will
+	    contain function prototypes for any C functions used in
+	    the package, in case they end up being called as a result
+	    of Haskell functions from the package being
+	    inlined.</para>
 	  </listitem>
 	</varlistentry>
 
