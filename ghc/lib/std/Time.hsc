@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: Time.hsc,v 1.1 2001/01/12 16:16:36 simonmar Exp $
+-- $Id: Time.hsc,v 1.2 2001/01/12 16:40:07 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1995-2001
 --
@@ -343,44 +343,50 @@ gmtoff x    = (#peek struct tm,tm_gmtoff) x :: IO CLong
 #   define tzname _tzname
 #  endif
 #  ifndef mingw32_TARGET_OS
-extern char *tzname[2];
+foreign label tzname :: Ptr (Ptr CChar)
 #  endif
-#  define ZONE(x)	 (((struct tm *)x)->tm_isdst ? tzname[1] : tzname[0])
+zone x = do 
+  dst <- (#peek struct tm,tm_isdst) x
+  if dst then peekArray tzname 1 else peekArray tzname 0
 # else /* ! HAVE_TZNAME */
-/* We're in trouble. If you should end up here, please report this as a bug. */
+-- We're in trouble. If you should end up here, please report this as a bug.
 #  error Dont know how to get at timezone name on your OS.
 # endif /* ! HAVE_TZNAME */
-/* Get the offset in secs from UTC, if (struct tm) doesn't supply it. */
 
+-- Get the offset in secs from UTC, if (struct tm) doesn't supply it. */
 #if defined(mingw32_TARGET_OS) || defined(cygwin32_TARGET_OS)
 #define timezone _timezone
 #endif
 
-#if !defined(HAVE_TIMEZONE) && !defined(mingw32_TARGET_OS)
-extern TYPE_TIMEZONE timezone;
-#endif
-
 # if HAVE_ALTZONE
-extern time_t altzone;
+foreign label altzone  :: Ptr CTime
+foreign label timezone :: Ptr CTime
+gmtoff x = do 
+  dst <- (#peek struct tm,tm_isdst) x
+  tz <- if dst then peek altzone else peek timezone
+  return (fromIntegral tz)
 #  define GMTOFF(x)   	 (((struct tm *)x)->tm_isdst ? altzone : timezone )
 # else /* ! HAVE_ALTZONE */
-/* Assume that DST offset is 1 hour ... */
-#  define GMTOFF(x) (((struct tm *)x)->tm_isdst ? (timezone - 3600) : timezone )
+-- Assume that DST offset is 1 hour ...
+gmtoff x = do 
+  dst <- (#peek struct tm,tm_isdst) x
+  tz  <- peek timezone
+  if dst then return (fromIngtegral tz - 3600) else return tz
 # endif /* ! HAVE_ALTZONE */
 #endif  /* ! HAVE_TM_ZONE */
 
 
 toCalendarTime :: ClockTime -> IO CalendarTime
-toCalendarTime =  clockToCalendarTime localtime
+toCalendarTime =  clockToCalendarTime localtime False
 
 toUTCTime      :: ClockTime -> CalendarTime
-toUTCTime      =  unsafePerformIO . clockToCalendarTime gmtime
+toUTCTime      =  unsafePerformIO . clockToCalendarTime gmtime True
 
 -- ToDo: should be made thread safe, because localtime uses static storage,
 -- or use the localtime_r version.
-clockToCalendarTime :: (Ptr CTime -> IO (Ptr CTm)) -> ClockTime
+clockToCalendarTime :: (Ptr CTime -> IO (Ptr CTm)) -> Bool -> ClockTime
 	 -> IO CalendarTime
-clockToCalendarTime fun (TOD secs psec) = do
+clockToCalendarTime fun is_utc (TOD secs psec) = do
   withObject (fromIntegral secs :: CTime)  $ \ p_timer -> do
     p_tm <- fun p_timer 	-- can't fail, according to POSIX
     sec   <-  (#peek struct tm,tm_sec  ) p_tm :: IO CInt
@@ -410,9 +416,9 @@ clockToCalendarTime fun (TOD secs psec) = do
 		psec
             	(toEnum (fromIntegral wday))
 		(fromIntegral yday)
-		tzname 
-		(fromIntegral tz)
-		(isdst /= 0))
+		(if is_utc then "UTC" else tzname)
+		(if is_utc then 0     else fromIntegral tz)
+		(if is_utc then False else isdst /= 0))
 
 
 toClockTime :: CalendarTime -> ClockTime
