@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.80 2000/04/14 16:47:43 panne Exp $
+ * $Id: GC.c,v 1.81 2000/04/27 16:31:46 sewardj Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -142,9 +142,6 @@ lnat g0s0_pcnt_kept = 30;	/* percentage of g0s0 live at last minor GC */
 static StgClosure * evacuate                ( StgClosure *q );
 static void         zero_static_object_list ( StgClosure* first_static );
 static void         zero_mutable_list       ( StgMutClosure *first );
-#if 0
-static void         revert_dead_CAFs        ( void );
-#endif
 
 static rtsBool      traverse_weak_ptr_list  ( void );
 static void         cleanup_weak_ptr_list   ( StgWeak **list );
@@ -485,11 +482,6 @@ void GarbageCollect ( void (*get_roots)(void), rtsBool force_major_gc )
   /* Now see which stable names are still alive.
    */
   gcStablePtrTable(major_gc);
-
-#if 0
-  /* revert dead CAFs and update enteredCAFs list */
-  revert_dead_CAFs();
-#endif
 
 #if defined(PAR)
   /* Reconstruct the Global Address tables used in GUM */
@@ -3113,31 +3105,6 @@ void RevertCAFs(void)
 #endif
 }
 
-#if 0
-//@cindex revert_dead_CAFs
-
-void revert_dead_CAFs(void)
-{
-    StgCAF* caf = enteredCAFs;
-    enteredCAFs = END_CAF_LIST;
-    while (caf != END_CAF_LIST) {
-        StgCAF *next, *new;
-        next = caf->link;
-        new = (StgCAF*)isAlive((StgClosure*)caf);
-        if (new) {
-           new->link = enteredCAFs;
-           enteredCAFs = new;
-        } else {
-           /* ASSERT(0); */
-           SET_INFO(caf,&CAF_UNENTERED_info);
-           caf->value = (StgClosure*)0xdeadbeef;
-           caf->link  = (StgCAF*)0xdeadbeef;
-        } 
-        caf = next;
-    }
-}
-#endif
-
 //@node Sanity code for CAF garbage collection, Lazy black holing, Reverting CAFs
 //@subsection Sanity code for CAF garbage collection
 
@@ -3594,7 +3561,6 @@ maybeLarge(StgClosure *closure)
 //* printMutOnceList::  @cindex\s-+printMutOnceList
 //* printMutableList::  @cindex\s-+printMutableList
 //* relocate_TSO::  @cindex\s-+relocate_TSO
-//* revert_dead_CAFs::  @cindex\s-+revert_dead_CAFs
 //* scavenge::  @cindex\s-+scavenge
 //* scavenge_large::  @cindex\s-+scavenge_large
 //* scavenge_mut_once_list::  @cindex\s-+scavenge_mut_once_list
