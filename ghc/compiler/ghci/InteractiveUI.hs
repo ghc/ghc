@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.146 2003/02/19 15:54:07 simonpj Exp $
+-- $Id: InteractiveUI.hs,v 1.147 2003/02/20 13:12:40 simonpj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -27,7 +27,7 @@ import Linker		( initLinker, showLinkerState, linkLibraries,
 			  linkPackages )
 import Util
 import IdInfo		( GlobalIdDetails(..) )
-import Id		( isImplicitId, idName )
+import Id		( isImplicitId, idName, globalIdDetails )
 import Class		( className )
 import TyCon		( tyConName, tyConClass_maybe, isPrimTyCon, DataConDetails(..) )
 import DataCon		( dataConName )
