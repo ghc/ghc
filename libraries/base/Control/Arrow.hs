@@ -16,9 +16,22 @@
 --	Firenze, Italy, pp229-240.
 -- See these papers for the equations these combinators are expected to
 -- satisfy.  These papers and more information on arrows can be found at
--- <http://www.soi.city.ac.uk/~ross/arrows/>.
+-- <http://www.haskell.org/arrows/>.
 
-module Control.Arrow where
+module Control.Arrow (
+		-- * Arrows
+		Arrow(..), Kleisli(..),
+		-- ** Derived combinators
+		returnA, (<<<),
+		-- * Monoid operations
+		ArrowZero(..), ArrowPlus(..),
+		-- * Conditionals
+		ArrowChoice(..),
+		-- * Arrow application
+		ArrowApply(..), ArrowMonad(..), leftApp,
+		-- * Feedback
+		ArrowLoop(..)
+	) where
 
 import Prelude
 
@@ -32,9 +45,6 @@ infixr 2 +++
 infixr 2 |||
 infixr 1 >>>
 infixr 1 <<<
-
------------------------------------------------------------------------------
--- * Arrows
 
 -- | The basic arrow class.
 --   Any instance must define either 'arr' or 'pure' (which are synonyms),
@@ -102,9 +112,6 @@ instance Monad m => Arrow (Kleisli m) where
 	first (Kleisli f) = Kleisli (\ ~(b,d) -> f b >>= \c -> return (c,d))
 	second (Kleisli f) = Kleisli (\ ~(d,b) -> f b >>= \c -> return (d,c))
 
------------------------------------------------------------------------------
--- ** Derived combinators
-
 -- | The identity arrow, which plays the role of 'return' in arrow notation.
 
 returnA :: Arrow a => a b b
@@ -114,9 +121,6 @@ returnA = arr id
 
 (<<<) :: Arrow a => a c d -> a b c -> a b d
 f <<< g = g >>> f
-
------------------------------------------------------------------------------
--- * Monoid operations
 
 class Arrow a => ArrowZero a where
 	zeroArrow :: a b c
@@ -130,11 +134,8 @@ class ArrowZero a => ArrowPlus a where
 instance MonadPlus m => ArrowPlus (Kleisli m) where
 	Kleisli f <+> Kleisli g = Kleisli (\x -> f x `mplus` g x)
 
------------------------------------------------------------------------------
--- * Conditionals
-
 -- | Choice, for arrows that support it.  This class underlies the
---   [if] and [case] constructs in arrow notation.
+--   @if@ and @case@ constructs in arrow notation.
 --   Any instance must define 'left'.  The other combinators have sensible
 --   default definitions, which may be overridden for efficiency.
 
@@ -184,9 +185,6 @@ instance Monad m => ArrowChoice (Kleisli m) where
 	f +++ g = (f >>> arr Left) ||| (g >>> arr Right)
 	Kleisli f ||| Kleisli g = Kleisli (either f g)
 
------------------------------------------------------------------------------
--- * Arrow application
-
 -- | Some arrows allow application of arrow inputs to other inputs.
 
 class Arrow a => ArrowApply a where
@@ -216,12 +214,9 @@ leftApp :: ArrowApply a => a b c -> a (Either b d) (Either c d)
 leftApp f = arr ((\b -> (arr (\() -> b) >>> f >>> arr Left, ())) |||
 		 (\d -> (arr (\() -> d) >>> arr Right, ()))) >>> app
 
------------------------------------------------------------------------------
--- * Feedback
-
 -- | The 'loop' operator expresses computations in which an output value is
 --   fed back as input, even though the computation occurs only once.
---   It underlies the [rec] value recursion construct in arrow notation.
+--   It underlies the @rec@ value recursion construct in arrow notation.
 
 class Arrow a => ArrowLoop a where
 	loop :: a (b,d) (c,d) -> a b c
