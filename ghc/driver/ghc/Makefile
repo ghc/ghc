@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.5 2001/06/27 15:26:56 chak Exp $
+# $Id: Makefile,v 1.6 2001/10/23 16:32:30 rrt Exp $
 #
 
 TOP=../..
@@ -16,12 +16,14 @@ GHCBIN=$(libexecdir)/ghc-$(ProjectVersion)
 GHCLIB=$(libdir)
 endif # BIN_DIST
 
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 SCRIPT_PROG  	  = ghc-$(ProjectVersion)
+LINK 		  = ghc
+endif
 SCRIPT_OBJS	  = ghc.sh
 INTERP		  = $(SHELL)
 TOPDIROPT	  = -B$(GHCLIB)
 SCRIPT_SUBST_VARS = GHCBIN TOPDIROPT
-LINK 		  = ghc
 INSTALL_SCRIPTS  += $(SCRIPT_PROG)
 
 # -----------------------------------------------------------------------------
