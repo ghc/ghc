@@ -200,7 +200,7 @@ lintSingleBinding rec_flag (binder,rhs)
 lintCoreExpr :: CoreExpr -> LintM Type
 -- The returned type has the substitution from the monad 
 -- already applied to it:
---	lintCoreExpr e subst = exprTpye (subst e)
+--	lintCoreExpr e subst = exprType (subst e)
 
 lintCoreExpr (Var var)
   = do	{ checkIdInScope var 
@@ -413,7 +413,8 @@ checkAltExpr expr ty
        ; ty' <- applySubst ty
        ; checkTys actual_ty ty' (mkCaseAltMsg expr actual_ty ty') }
 
-lintCoreAlt :: Type  			-- Type of scrutinee
+lintCoreAlt :: Type  			-- Type of scrutinee; a fixed point of 
+					--		      the substitution
             -> Type                     -- Type of the alternative
 	    -> CoreAlt
 	    -> LintM ()
