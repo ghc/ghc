@@ -93,7 +93,8 @@ import TysPrim
 
 -- others:
 import Constants	( mAX_TUPLE_SIZE )
-import Name		( Module, mkWiredInTyConName, mkWiredInIdName, mkSrcOccFS, dataName )
+import Module		( Module )
+import Name		( mkWiredInTyConName, mkWiredInIdName, mkSrcOccFS, dataName )
 import DataCon		( DataCon, mkDataCon )
 import Var		( TyVar, tyVarKind )
 import TyCon		( TyCon, mkAlgTyCon, mkSynTyCon, mkTupleTyCon )

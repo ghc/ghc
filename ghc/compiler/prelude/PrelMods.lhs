@@ -24,7 +24,7 @@ module PrelMods
 
 #include "HsVersions.h"
 
-import OccName	( Module, mkSrcModule )
+import Module	( Module, mkPrelModule, mkSrcModule )
 import Util	( nOfThem )
 import Panic	( panic )
 \end{code}
@@ -35,28 +35,28 @@ pREL_BASE, pREL_NUM, pREL_LIST, pREL_TUP, pREL_ADDR, pREL_READ      :: Module
 pREL_PACK, pREL_CONC, pREL_IO_BASE, pREL_ST, pREL_ARR	  	    :: Module	
 pREL_FOREIGN, pREL_STABLE					    :: Module
 
-pRELUDE	     = mkSrcModule "Prelude"
-pREL_GHC     = mkSrcModule "PrelGHC"	   -- Primitive types and values
-pREL_BASE    = mkSrcModule "PrelBase"
-pREL_READ    = mkSrcModule "PrelRead"
-pREL_NUM     = mkSrcModule "PrelNum"
-pREL_LIST    = mkSrcModule "PrelList"
-pREL_TUP     = mkSrcModule "PrelTup"
-pREL_PACK    = mkSrcModule "PrelPack"
-pREL_CONC    = mkSrcModule "PrelConc"
-pREL_IO_BASE = mkSrcModule "PrelIOBase"
-pREL_ST	     = mkSrcModule "PrelST"
-pREL_ARR     = mkSrcModule "PrelArr"
-pREL_FOREIGN = mkSrcModule "PrelForeign"
-pREL_STABLE  = mkSrcModule "PrelStable"
-pREL_ADDR    = mkSrcModule "PrelAddr"
-pREL_ERR     = mkSrcModule "PrelErr"
+pRELUDE	     = mkPrelModule "Prelude"
+pREL_GHC     = mkPrelModule "PrelGHC"	   -- Primitive types and values
+pREL_BASE    = mkPrelModule "PrelBase"
+pREL_READ    = mkPrelModule "PrelRead"
+pREL_NUM     = mkPrelModule "PrelNum"
+pREL_LIST    = mkPrelModule "PrelList"
+pREL_TUP     = mkPrelModule "PrelTup"
+pREL_PACK    = mkPrelModule "PrelPack"
+pREL_CONC    = mkPrelModule "PrelConc"
+pREL_IO_BASE = mkPrelModule "PrelIOBase"
+pREL_ST	     = mkPrelModule "PrelST"
+pREL_ARR     = mkPrelModule "PrelArr"
+pREL_FOREIGN = mkPrelModule "PrelForeign"
+pREL_STABLE  = mkPrelModule "PrelStable"
+pREL_ADDR    = mkPrelModule "PrelAddr"
+pREL_ERR     = mkPrelModule "PrelErr"
 
-mONAD	     = mkSrcModule "Monad"
-rATIO	     = mkSrcModule "Ratio"
-iX	     = mkSrcModule "Ix"
+mONAD	     = mkPrelModule "Monad"
+rATIO	     = mkPrelModule "Ratio"
+iX	     = mkPrelModule "Ix"
 
-pREL_MAIN    = mkSrcModule "PrelMain"
+pREL_MAIN    = mkPrelModule "PrelMain"
 mAIN	     = mkSrcModule "Main"
 
 iNT, wORD   :: Module

@@ -20,7 +20,8 @@ import TysWiredIn
 -- others:
 import CoreSyn		-- quite a bit
 import IdInfo		-- quite a bit
-import Name		( mkWiredInIdName, mkSrcVarOcc, Module )
+import Module		( Module )
+import Name		( mkWiredInIdName, mkSrcVarOcc )
 import Type		
 import Var		( TyVar )
 import Demand		( wwStrict )
