@@ -528,8 +528,6 @@ FPTOOLS_TOP_ABS_PLATFORM = @hardtop_plat@
 # but since the configure script has them on offer while
 # passing through, we might as well set them.
 
-ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-
 prefix			= @prefix@
 exec_prefix		= @exec_prefix@
 bindir			= @bindir@
@@ -538,53 +536,32 @@ libdir0			= @libdir@
 includedir		= @includedir@
 oldincludedir		= @oldincludedir@
 mandir			= @mandir@
+
+ifeq "$(Windows)" "YES"
 
 ifeq "$(strip $(prefix))" ""
 prefix		= c:/ghc
 endif
 
-ifacedir   = $(libdir)
-
-ifeq "$(strip $(exec_prefix))" ""
-exec_prefix		= $(prefix)
-endif
-ifeq "$(strip $(bindir))" ""
-bindir			= $(exec_prefix)/bin
-endif
-
-libexecdir		= $(libdir)
-
-ifeq "$(strip $(datadir))" ""
-datadir		= $(prefix)/imports
-endif
-ifeq "$(strip $(libdir))" ""
+# Hack: our directory layouts tend to be different on Windows, so
+# hack around configure's bogus assumptions here.
+datadir 	= $(prefix)
 libdir		= $(prefix)
-endif
-ifeq "$(strip $(includedir))" ""
-includedir	= $(prefix)/include
-endif
 
 else
 
-prefix			= @prefix@
-exec_prefix		= @exec_prefix@
-bindir			= @bindir@
-datadir0		= @datadir@
-libdir0			= @libdir@
-includedir		= @includedir@
-oldincludedir		= @oldincludedir@
-mandir			= @mandir@
-
 #
-# override libdir and datadir to put project-specific stuff in
+# Unix: override libdir and datadir to put project-specific stuff in
 # a subdirectory with the version number included.
 #
 libdir     = $(if $(ProjectNameShort),$(libdir0)/$(ProjectNameShort)-$(ProjectVersion),$(libdir0))
 datadir    = $(if $(ProjectNameShort),$(datadir0)/$(ProjectNameShort)-$(ProjectVersion),$(datadir0))
 
+endif # Windows
+
 # Default place for putting interface files is $(libdir)
 # (overriden for packages in package.mk)
-ifacedir   = $(libdir)
+ifacedir		= $(libdir)
 
 # 
 # Default values for most of the above are only set if
@@ -622,8 +599,6 @@ endif
 ifeq "$(strip $(mandir))" ""
 mandir		= $(prefix)/man
 endif
-
-endif  # i386-unknown-mingw32
 
 
 ################################################################################
