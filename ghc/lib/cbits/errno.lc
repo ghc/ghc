@@ -338,10 +338,19 @@ void cvtErrno(STG_NO_ARGS)
 	ghc_errno = GHC_ENOTDIR;
 	break;
 #endif
+#ifndef aix_TARGET_OS
+/* AIX returns EEXIST where 4.3BSD used ENOTEMPTY.
+ * there is an ENOTEMPTY defined as the same as EEXIST, and
+ * therefore it won't work properly on a case statement.
+ * another option is to define _ALL_SOURCE for aix, which
+ * gives a different number for ENOTEMPTY.
+ * I haven't tried that. -- andre.
+ */
 #ifdef ENOTEMPTY
     case ENOTEMPTY:
 	ghc_errno = GHC_ENOTEMPTY;
 	break;
+#endif
 #endif
 #ifdef ENOTSOCK
     case ENOTSOCK:

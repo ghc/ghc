@@ -6,7 +6,10 @@
 \begin{code}
 
 /* select and supporting types is not */
+#ifndef _AIX
 #define NON_POSIX_SOURCE  
+#endif
+
 #include "rtsdefs.h"
 #include "stgio.h"
 

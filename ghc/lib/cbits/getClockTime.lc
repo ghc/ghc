@@ -5,7 +5,9 @@
 
 \begin{code}
 
+#ifndef _AIX
 #define NON_POSIX_SOURCE    /* gettimeofday */
+#endif
 
 #include "rtsdefs.h"
 #include "stgio.h"

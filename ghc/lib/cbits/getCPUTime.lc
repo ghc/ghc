@@ -5,7 +5,9 @@
 
 \begin{code}
 
+#ifndef _AIX
 #define NON_POSIX_SOURCE /*needed for solaris2 only?*/
+#endif
 
 /* how is this to work given we have not read platform.h yet? */
 #ifdef hpux_TARGET_OS
