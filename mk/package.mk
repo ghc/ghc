@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.30 2003/06/04 12:37:09 reid Exp $
+# $Id: package.mk,v 1.31 2003/11/11 11:50:55 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -207,7 +207,7 @@ ifneq "$(NO_HADDOCK_DOCS)" "YES"
 HS_PPS = $(addsuffix .raw-hs, $(basename $(filter-out $(EXCLUDED_HADDOCK_SRCS), $(HS_SRCS))))
 
 HTML_DIR = html
-HTML_DOC = $(HTML_DIR)/index.html
+HTML_DOC = $(HTML_DIR)/haddock.css
 
 ifneq "$(HS_PPS)" ""
 
@@ -228,7 +228,9 @@ extraclean ::
 $(HTML_DOC) : $(HS_PPS)
 	@$(INSTALL_DIR) $(HTML_DIR)
 	$(HADDOCK) $(HADDOCK_OPTS) -h -o $(HTML_DIR) $(HS_PPS) \
+		--package=$(PACKAGE) \
 		--dump-interface=$(PACKAGE).haddock \
+		--use-index=../doc-index.html --use-contents=../index.html \
 		$(foreach pkg, $(PACKAGE_DEPS), \
 		   --read-interface=../$(pkg),../$(pkg)/$(pkg).haddock)
 
@@ -241,12 +243,12 @@ CLEAN_FILES += $(PACKAGE).haddock
 	$(GHC) $(HC_OPTS) -D__HADDOCK__ -E -cpp $< -o $<.tmp && sed -e 's/^#.*//' <$<.tmp >$@
 
 install-docs :: $(HTML_DOC)
-	@$(INSTALL_DIR) $(datadir)/html/$(PACKAGE)
+	@$(INSTALL_DIR) $(datadir)/html/libraries/$(PACKAGE)
 	@for i in $(HTML_DIR)/*; do \
-	   echo $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(datadir)/html/$(PACKAGE); \
-	   $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(datadir)/html/$(PACKAGE); \
+	   echo $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(datadir)/html/libraries/$(PACKAGE); \
+	   $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(datadir)/html/libraries/$(PACKAGE); \
 	done
-	$(INSTALL_DATA) $(INSTALL_OPTS) $(PACKAGE).haddock $(datadir)/html/$(PACKAGE)
+	$(INSTALL_DATA) $(INSTALL_OPTS) $(PACKAGE).haddock $(datadir)/html/libraries/$(PACKAGE)
 
 endif # HS_PPS
 endif # NO_HADDOCK_DOCS
