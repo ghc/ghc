@@ -60,10 +60,12 @@ IMP_Ubiq()
 import HsSyn
 import Lex
 import PrelMods		( pRELUDE )
-import Name	{-	( ExportFlag(..), Module(..), pprModule,
-			  OccName(..), pprOccName, prefixOccName ) -}
+import BasicTypes	( Module(..), NewOrData )
+import Name		( ExportFlag(..), pprModule,
+			  OccName(..), pprOccName, 
+			  prefixOccName, SYN_IE(NamedThing) )
 import Pretty		
-import PprStyle		( PprStyle(..) )
+import Outputable	( PprStyle(..) )
 import Util		--( cmpPString, panic, thenCmp )
 import Outputable
 #if __GLASGOW_HASKELL__ >= 202
