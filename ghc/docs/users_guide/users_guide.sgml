@@ -1,4 +1,4 @@
-<!DOCTYPE BOOK PUBLIC "-//OASIS//DTD DocBook V3.1//EN" [
+<!DOCTYPE BOOK PUBLIC "-//OASIS//DTD DocBook V4.1//EN" [
 <!ENTITY % ug-ent SYSTEM "ug-ent.sgml">
 %ug-ent;
 <!ENTITY ug-book SYSTEM "ug-book.sgml">
