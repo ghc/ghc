@@ -529,11 +529,9 @@ MKDEPENDHS	= $(HC)
 
 # Sometimes we want to invoke ghc from the build tree in different
 # projects (eg. it's handy to have a nofib & a ghc build in the same
-# tree).  We can refer to "this ghc" as $(GHC_INPLACE).
-# The addition to PATH makes the inplace GHC pick up the right
-# DLLs under Windows; it won't have any effect on other platforms.
+# tree).  We can refer to "this ghc" as $(GHC_INPLACE):
 
-GHC_INPLACE 	= PATH=$(FPTOOLS_TOP)/dll:$$PATH $(FPTOOLS_TOP)/ghc/driver/ghc-inplace
+GHC_INPLACE 	= $(FPTOOLS_TOP)/ghc/driver/ghc-inplace
 
 #-----------------------------------------------------------------------------
 # C compiler
