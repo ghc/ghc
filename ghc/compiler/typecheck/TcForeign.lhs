@@ -124,7 +124,7 @@ tcCheckFIType sig_ty arg_tys res_ty (CImport (CCallSpec target _ safety))
 
   | otherwise 		-- Normal foreign import
   = checkCg (if isCasmTarget target
-	     then checkC else checkCOrAsmOrDotNet)			`thenNF_Tc_`
+	     then checkC else checkCOrAsmOrDotNet)		`thenNF_Tc_`
     checkCTarget target						`thenNF_Tc_`
     getDOptsTc							`thenNF_Tc` \ dflags ->
     checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys	`thenNF_Tc_`
