@@ -49,8 +49,8 @@ import System	( getArgs, getProgName,
 		  system, exitWith,
 		  ExitCode(..)
 		)
-import IO
-import List ( isPrefixOf, isSuffixOf )
+import System.IO
+import Data.List ( isPrefixOf, isSuffixOf, intersperse )
 
 #include "../../includes/ghcconfig.h"
 
@@ -286,7 +286,7 @@ readParseDatabase filename = do
   let packages = read str
   evaluate packages
     `Exception.catch` \_ -> 
-	die (filename ++ ": parse error in package config file\n")
+	die (filename ++ ": parse error in package config file")
   return (filename,packages)
 
 emptyPackageConfig :: String
@@ -335,7 +335,7 @@ parsePackageInfo
 parsePackageInfo str defines force =
   case parseInstalledPackageInfo str of
     Right ok -> return ok
-    Left err -> die (showError err ++ "\n")
+    Left err -> die (showError err)
 
 -- Used for converting versionless package names to new
 -- PackageIdentifiers.  "Version [] []" is special: it means "no
@@ -350,12 +350,11 @@ unregisterPackage :: PackageDBStack -> PackageIdentifier -> IO ()
 unregisterPackage [] _ = error "unregisterPackage"
 unregisterPackage ((db_name, pkgs) : _) pkgid = do  
   checkConfigAccess db_name
-  when (pkgid `notElem` map package pkgs)
-       (die (db_name ++ ": package '" ++ showPackageId pkgid
-		 ++ "' not found\n"))
+  p <- findPackage [(db_name,pkgs)] pkgid
+  let pid = package p
   savePackageConfig db_name
   maybeRestoreOldConfig db_name $
-    writeNewConfig db_name (filter ((/= pkgid) . package) pkgs)
+    writeNewConfig db_name (filter ((/= pid) . package) pkgs)
 
 -- -----------------------------------------------------------------------------
 -- Exposing
@@ -393,11 +392,20 @@ describePackage db_stack pkgid = do
 
 findPackage :: PackageDBStack -> PackageIdentifier -> IO InstalledPackageInfo
 findPackage db_stack pkgid
-  = case [ p | p <- all_pkgs, pkgid == package p ] of
-	[] -> die ("cannot find package " ++ showPackageId pkgid)
-	(p:ps) -> return p
+  = case [ p | p <- all_pkgs, pkgid `matches` p ] of
+	[]  -> die ("cannot find package " ++ showPackageId pkgid)
+	[p] -> return p
+	ps  -> die ("package " ++ showPackageId pkgid ++ 
+			" matches multiple packages: " ++ 
+			concat (intersperse ", " (
+				 map (showPackageId.package) ps)))
   where
 	all_pkgs = concat (map snd db_stack)
+
+matches :: PackageIdentifier -> InstalledPackageInfo -> Bool
+pid `matches` p = 
+ pid == package p || 
+ not (realVersion pid) && pkgName pid == pkgName (package p)
 
 -- -----------------------------------------------------------------------------
 -- Field
@@ -436,7 +444,7 @@ checkConfigAccess :: FilePath -> IO ()
 checkConfigAccess filename = do
   access <- getPermissions filename
   when (not (writable access))
-      (die (filename ++ ": you don't have permission to modify this file\n"))
+      (die (filename ++ ": you don't have permission to modify this file"))
 
 maybeRestoreOldConfig :: FilePath -> IO () -> IO ()
 maybeRestoreOldConfig filename io
@@ -513,7 +521,7 @@ checkDuplicates db_stack pkg update = do
   -- Check whether this package id already exists in this DB
   --
   when (not update && (package pkg `elem` map package pkgs)) $
-       die ("package " ++ showPackageId pkgid ++ " is already installed\n")
+       die ("package " ++ showPackageId pkgid ++ " is already installed")
   --
   -- if we are exposing this new package, then check that
   -- there are no other exposed packages with the same name.
@@ -532,14 +540,14 @@ checkDir force d
  | otherwise = do
    there <- doesDirectoryExist d
    when (not there)
-       (dieOrForce force (d ++ " doesn't exist or isn't a directory\n"))
+       (dieOrForce force (d ++ " doesn't exist or isn't a directory"))
 
 checkDep :: PackageDBStack -> Bool -> PackageIdentifier -> IO ()
 checkDep db_stack force pkgid
   | real_version && pkgid `elem` pkgids = return ()
   | not real_version && pkgName pkgid `elem` pkg_names = return ()
   | otherwise = dieOrForce force ("dependency " ++ showPackageId pkgid
-					++ " doesn't exist\n")
+					++ " doesn't exist")
   where
 	-- for backwards compat, we treat 0.0 as a special version,
 	-- and don't check that it actually exists.
@@ -873,13 +881,13 @@ die :: String -> IO a
 die s = do 
   hFlush stdout
   prog <- getProgramName
-  hPutStr stderr (prog ++ ": " ++ s)
+  hPutStrLn stderr (prog ++ ": " ++ s)
   exitWith (ExitFailure 1)
 
 dieOrForce :: Bool -> String -> IO ()
 dieOrForce force s 
   | force     = do hFlush stdout; hPutStrLn stderr (s ++ " (ignoring)")
-  | otherwise = die (s ++ "\n")
+  | otherwise = die s
 
 
 -----------------------------------------------------------------------------
