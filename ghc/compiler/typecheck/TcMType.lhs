@@ -730,18 +730,36 @@ check_tau_type rank ubx_tup ty@(FunTy arg_ty res_ty)
 check_tau_type rank ubx_tup (AppTy ty1 ty2)
   = check_arg_type ty1 `thenTc_` check_arg_type ty2
 
-check_tau_type rank ubx_tup (NoteTy note ty)
-  = check_tau_type rank ubx_tup ty
+check_tau_type rank ubx_tup (NoteTy (SynNote syn) ty)
 	-- Synonym notes are built only when the synonym is 
 	-- saturated (see Type.mkSynTy)
-	-- Not checking the 'note' part allows us to instantiate a synonym
-	-- defn with a for-all type, or with a partially-applied type synonym,
-	-- but that seems OK too
+  = doptsTc Opt_GlasgowExts			`thenNF_Tc` \ gla_exts ->
+    (if gla_exts then
+	-- If -fglasgow-exts then don't check the 'note' part.
+	-- This  allows us to instantiate a synonym defn with a 
+	-- for-all type, or with a partially-applied type synonym.
+	-- 	e.g.   type T a b = a
+	--	       type S m   = m ()
+	--	       f :: S (T Int)
+	-- Here, T is partially applied, so it's illegal in H98.
+	-- But if you expand S first, then T we get just 
+	--	       f :: Int
+	-- which is fine.
+	returnTc ()
+    else
+	-- For H98, do check the un-expanded part
+	check_tau_type rank ubx_tup syn		
+    )						`thenTc_`
+
+    check_tau_type rank ubx_tup ty
+
+check_tau_type rank ubx_tup (NoteTy other_note ty)
+  = check_tau_type rank ubx_tup ty
 
 check_tau_type rank ubx_tup ty@(TyConApp tc tys)
   | isSynTyCon tc	
   = 	-- NB: Type.mkSynTy builds a TyConApp (not a NoteTy) for an unsaturated
-	-- synonym application, leaving it to checkValidType (i.e. right here
+	-- synonym application, leaving it to checkValidType (i.e. right here)
 	-- to find the error
     checkTc syn_arity_ok arity_msg	`thenTc_`
     mapTc_ check_arg_type tys
