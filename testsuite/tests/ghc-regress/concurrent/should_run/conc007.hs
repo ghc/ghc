@@ -13,7 +13,7 @@ choose a b = do
    b_id <- myForkIO (b `seq` takeMVar ready >> putMVar answer b)
    it <- takeMVar answer
    killThread a_id
---   killThread b_id
+   killThread b_id
    return it
 
 -- We need to catch the exception raised by killThread and ignore it.
