@@ -245,10 +245,14 @@ GhcLibWays=p
 #
 # ToDo: track down the source of this.
 #
-ifneq "$(strip $(way))" "p"
-GhcLibHcOpts= -O -split-objs -odir $*
-else
+ifeq "$(strip $(way))" "p"
 GhcLibHcOpts= -O
+else 
+ifeq "$(strip $(way))" "mr"
+GhcLibHcOpts= -O
+else
+GhcLibHcOpts= -O -split-objs -odir $*
+endif
 endif
 
 # what to include in a binary distribution
