@@ -1294,7 +1294,7 @@ instance (Eq k,Eq a) => Eq (Map k a) where
 --------------------------------------------------------------------}
 
 instance (Ord k, Ord v) => Ord (Map k v) where
-    compare m1 m2 = compare (toList m1) (toList m2)
+    compare m1 m2 = compare (toAscList m1) (toAscList m2)
 
 {--------------------------------------------------------------------
   Functor
