@@ -727,7 +727,7 @@ terms of the signature.
 
 \begin{code}
 reduceErr insts sty
-  = hang (ptext (SLIT("Context required by inferred type, but missing on a type signature")))
+  = hang (text "Context required by inferred type, but missing on a type signature")
        4 (vcat (map (pprInst sty) (bagToList insts)))
 \end{code}
 
