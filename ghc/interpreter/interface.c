@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.30 $
- * $Date: 2000/02/09 14:50:20 $
+ * $Revision: 1.31 $
+ * $Date: 2000/02/14 11:13:11 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -21,7 +21,7 @@
 #include "object.h"
 
 
-#define DEBUG_IFACE
+/*#define DEBUG_IFACE*/
 #define VERBOSE FALSE
 
 extern void print ( Cell, Int );
@@ -1093,7 +1093,7 @@ static ObjectCode* startGHCModule_partial_load ( String objNm, Int objSz )
        ERRMSG(0) "Validation of object file \"%s\" failed", objNm
        EEND;
     }
-    if (!ocGetNames(oc,0||VERBOSE)) {
+    if (!ocGetNames(oc,VERBOSE)) {
        ERRMSG(0) "Reading of symbol names in object file \"%s\" failed", objNm
        EEND;
     }
@@ -1319,11 +1319,11 @@ static Void finishGHCModule ( Cell root )
 #endif
 
    /* Last, but by no means least ... */
-   if (!ocResolve(module(mod).object,0||VERBOSE))
+   if (!ocResolve(module(mod).object,VERBOSE))
       internal("finishGHCModule: object resolution failed");
 
    for (oc=module(mod).objectExtras; oc; oc=oc->next) {
-      if (!ocResolve(oc, 0||VERBOSE))
+      if (!ocResolve(oc, VERBOSE))
          internal("finishGHCModule: extra object resolution failed");
    }
 }
