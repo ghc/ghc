@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: dynamic.c,v $
- * $Revision: 1.8 $
- * $Date: 1999/10/20 02:15:59 $
+ * $Revision: 1.9 $
+ * $Date: 1999/10/22 10:00:19 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -84,7 +84,7 @@ String symbol; {
 	ERRMSG(0) "Error while importing DLL \"%s\":\n%s\n", dll, dlerror()
         EEND;
     }
-    if (sym = dlsym(instance,symbol))
+    if ((sym = dlsym(instance,symbol)))
         return sym;
 
     ERRMSG(0) "Error loading sym:\n%s\n", dlerror()
