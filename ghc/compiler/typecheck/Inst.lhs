@@ -314,7 +314,8 @@ newDictsAtLoc inst_loc@(_,loc,_) theta
 
 newIPDict orig name ty
   = tcGetInstLoc orig			`thenNF_Tc` \ inst_loc ->
-    returnNF_Tc (Dict (mkLocalId name ty) (IParam name ty) inst_loc)
+    returnNF_Tc (Dict (mkLocalId name (mkPredTy pred)) pred inst_loc)
+  where pred = IParam name ty
 \end{code}
 
 
