@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.5 2001/08/31 15:28:49 apt Exp $
+-- $Id: primops.txt.pp,v 1.6 2001/09/11 09:02:43 simonpj Exp $
 --
 -- Primitive Operations
 --
@@ -1262,14 +1262,14 @@ primop  BlockAsyncExceptionsOp "blockAsyncExceptions#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
-   strictness  = { \ arity -> StrictnessInfo [wwLazy] False }
+   strictness  = { \ arity -> StrictnessInfo [wwLazy, wwPrim] False }
    out_of_line = True
 
 primop  UnblockAsyncExceptionsOp "unblockAsyncExceptions#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
-   strictness  = { \ arity -> StrictnessInfo [wwLazy] False }
+   strictness  = { \ arity -> StrictnessInfo [wwLazy, wwPrim] False }
    out_of_line = True
 
 ------------------------------------------------------------------------
