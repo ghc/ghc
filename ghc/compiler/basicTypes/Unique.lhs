@@ -27,6 +27,7 @@ module Unique (
 
 	incrUnique,			-- Used for renumbering
 	deriveUnique,			-- Ditto
+	newTagUnique,			-- Used in CgCase
 	initTyVarUnique,
 	initTidyUniques,
 
@@ -237,6 +238,7 @@ getKey		:: Unique -> Int#		-- for Var
 
 incrUnique	:: Unique -> Unique
 deriveUnique	:: Unique -> Int -> Unique
+newTagUnique	:: Unique -> Char -> Unique
 
 isTupleKey	:: Unique -> Bool
 \end{code}
@@ -253,6 +255,9 @@ incrUnique (MkUnique i) = MkUnique (i +# 1#)
 -- deriveUnique uses an 'X' tag so that it won't clash with
 -- any of the uniques produced any other way
 deriveUnique (MkUnique i) delta = mkUnique 'X' (I# i + delta)
+
+-- newTagUnique changes the "domain" of a unique to a different char
+newTagUnique u c = mkUnique c i where (_,i) = unpkUnique u
 
 -- pop the Char in the top 8 bits of the Unique(Supply)
 
