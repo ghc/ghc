@@ -155,8 +155,9 @@ filterModuleLinkables p (li:lis)
 -- Linker for interactive mode
 
 #ifndef GHCI
-linkObjs = panic "CmLink.linkObjs: no interpreter"
-unload = panic "CmLink.unload: no interpreter"
+linkObjs      = panic "CmLink.linkObjs: no interpreter"
+unload        = panic "CmLink.unload: no interpreter"
+lookupClosure = panic "CmLink.lookupClosure: no interpreter"
 #else
 linkObjs [] pls = linkFinish pls [] []
 linkObjs (l@(LM _ uls) : ls) pls

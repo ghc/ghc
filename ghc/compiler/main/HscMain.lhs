@@ -168,7 +168,8 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
  	    -------------------
  	    -- PARSE
  	    -------------------
-	; maybe_parsed <- myParseModule dflags (unJust (ml_hspp_file location) "hscRecomp:hspp")
+	; maybe_parsed <- myParseModule dflags (unJust (ml_hspp_file location) 
+                                                       "hscRecomp:hspp")
 	; case maybe_parsed of {
       	     Nothing -> return (HscFail pcs_ch);
       	     Just rdr_module -> do {

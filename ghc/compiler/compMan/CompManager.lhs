@@ -27,7 +27,7 @@ import Interpreter	( HValue )
 import Module		( ModuleName, moduleName, packageOfModule, 
 			  isModuleInThisPackage, PackageName, moduleEnvElts,
 			  moduleNameUserString )
-import CmStaticInfo	( Package(..), PackageConfigInfo, GhciMode )
+import CmStaticInfo	( Package(..), PackageConfigInfo, GhciMode(..) )
 import DriverPipeline
 import GetImports
 import HscTypes		( HomeSymbolTable, HomeIfaceTable, 
@@ -45,7 +45,7 @@ import Panic		( panic )
 import Exception	( throwDyn )
 import IO
 import Time             ( ClockTime )
-import Directory        ( getModificationTime )
+import Directory        ( getModificationTime, doesFileExist )
 
 \end{code}
 
@@ -377,8 +377,28 @@ upsweep_mod ghci_mode oldUI threaded1 summary1 source_might_have_changed
    = do let mod_name = name_of_summary summary1
         let (CmThreaded pcs1 hst1 hit1) = threaded1
         let old_iface = lookupUFM hit1 (name_of_summary summary1)
-        compresult <- compile ghci_mode summary1 (not source_might_have_changed) 
+
+        -- We *have* to compile it if we're in batch mode and we can't see
+        -- a previous linkable for it on disk.
+        compilation_mandatory 
+           <- if ghci_mode /= Batch then return False 
+              else case ml_obj_file (ms_location summary1) of
+                      Nothing     -> do --putStrLn "cmcm: object?!"
+                                        return True
+                      Just obj_fn -> do --putStrLn ("cmcm: old obj " ++ obj_fn)
+                                        b <- doesFileExist obj_fn
+                                        return (not b)
+
+        let compilation_might_be_needed 
+               = source_might_have_changed || compilation_mandatory
+            source_unchanged
+               = not compilation_might_be_needed
+
+        compresult <- compile ghci_mode summary1 source_unchanged
                               old_iface hst1 hit1 pcs1
+
+        putStrLn ( "UPSWEEP_MOD: smhc = " ++ show source_might_have_changed 
+                   ++ ",  cman = " ++ show compilation_mandatory)
 
         case compresult of
 
@@ -389,7 +409,13 @@ upsweep_mod ghci_mode oldUI threaded1 summary1 source_might_have_changed
               -> let hst2         = addToUFM hst1 mod_name details
                      hit2         = hit1
                      threaded2    = CmThreaded pcs2 hst2 hit2
-                     old_linkable = findModuleLinkable oldUI mod_name
+                     old_linkable 
+                        | ghci_mode == Interactive 
+                        = findModuleLinkable oldUI mod_name
+                        | otherwise
+                        = LM mod_name
+                             [DotO (unJust (ml_obj_file (ms_location summary1)) 
+                                    "upsweep_mod")]
                  in  return (threaded2, Just old_linkable)
 
            -- Compilation really did happen, and succeeded.  A new
