@@ -50,15 +50,18 @@ tcIfaceRules pkg_rule_base mod decls
 
 tcIfaceRule :: RenamedRuleDecl -> TcM TypecheckedRuleDecl
   -- No zonking necessary!
-tcIfaceRule (IfaceRule name vars fun args rhs src_loc)
+tcIfaceRule rule@(IfaceRule name vars fun args rhs src_loc)
   = tcAddSrcLoc src_loc 		$
     tcAddErrCtxt (ruleCtxt name)	$
     tcVar fun				`thenTc` \ fun' ->
     tcCoreLamBndrs vars			$ \ vars' ->
     mapTc tcCoreExpr args		`thenTc` \ args' ->
     tcCoreExpr rhs			`thenTc` \ rhs' ->
-    returnTc (IfaceRuleOut fun' (Rule name vars' args' rhs'))
-
+    let
+	new_rule :: TypecheckedRuleDecl
+	new_rule = IfaceRuleOut fun' (Rule name vars' args' rhs')
+    in
+    returnTc new_rule
 
 tcSourceRules :: [RenamedRuleDecl] -> TcM (LIE, [TypecheckedRuleDecl])
 tcSourceRules decls

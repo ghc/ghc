@@ -167,7 +167,9 @@ zonkIdOcc id
     let
 	new_id = case maybe_id' of
 		    Just (AnId id') -> id'
-		    other  	    -> WARN( isLocalId id, ppr id ) id
+		    other  	    -> id -- WARN( isLocalId id, ppr id ) id
+					-- Oops: the warning can give a black hole
+					-- because it looks at the idinfo
     in
     returnNF_Tc new_id
 \end{code}

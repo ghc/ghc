@@ -69,6 +69,8 @@ import HscTypes		( PersistentCompilerState(..), HomeSymbolTable,
 		          TyThing(..), implicitTyThingIds, 
 			  mkTypeEnv
 			)
+import Rules ( ruleBaseIds )
+import VarSet
 \end{code}
 
 
@@ -463,7 +465,7 @@ tcImports unf_env pcs hst get_fixity this_mod decls
     --   any type errors are found (ie there's an inconsistency)
     --   we silently discard the pragma
     traceTc (text "Tc3")			`thenNF_Tc_`
-    tcInterfaceSigs unf_env tycl_decls		`thenTc` \ sig_ids ->
+    tcInterfaceSigs unf_env this_mod tycl_decls	`thenTc` \ sig_ids ->
     tcExtendGlobalValEnv sig_ids		$
     
     

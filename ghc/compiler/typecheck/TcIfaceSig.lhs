@@ -25,14 +25,15 @@ import CoreUnfold
 import CoreLint		( lintUnfolding )
 import WorkWrap		( mkWrapper )
 
-import Id		( Id, mkId, mkVanillaId, isLocalId, isDataConWrapId_maybe )
+import Id		( Id, mkId, mkVanillaId, idName, isDataConWrapId_maybe )
+import Module		( Module )
 import MkId		( mkCCallOpId )
 import IdInfo
 import DataCon		( DataCon, dataConId, dataConSig, dataConArgTys )
 import Type		( mkTyVarTys, splitAlgTyConApp_maybe )
 import TysWiredIn	( tupleCon )
 import Var		( mkTyVar, tyVarKind )
-import Name		( Name )
+import Name		( Name, nameIsLocalOrFrom )
 import Demand		( wwLazy )
 import ErrUtils		( pprBagOfErrors )
 import Outputable	
@@ -49,15 +50,19 @@ signatures.
 
 \begin{code}
 tcInterfaceSigs :: RecTcEnv		-- Envt to use when checking unfoldings
+		-> Module		-- This module
 		-> [RenamedTyClDecl]	-- Ignore non-sig-decls in these decls
 		-> TcM [Id]
 		
 
-tcInterfaceSigs unf_env decls
+tcInterfaceSigs unf_env mod decls
   = listTc [ do_one name ty id_infos src_loc
 	   | IfaceSig {tcdName = name, tcdType = ty, tcdIdInfo = id_infos, tcdLoc =src_loc} <- decls]
   where
-    in_scope_vars = filter isLocalId (tcEnvIds unf_env)
+    in_scope_vars = filter (nameIsLocalOrFrom mod . idName) (tcEnvIds unf_env)
+		-- Oops: using isLocalId instead can give a black hole
+		-- because it looks at the idinfo
+
 	-- When we have hi-boot files, an unfolding might refer to
 	-- something defined in this module, so we must build a
 	-- suitable in-scope set.  This thunk will only be poked
@@ -171,7 +176,7 @@ tcVar :: Name -> TcM Id
 tcVar name
   = tcLookupGlobal_maybe name	`thenNF_Tc` \ maybe_id ->
     case maybe_id of {
-	Just (AnId id)	-> returnTc id;
+	Just (AnId id)	-> returnTc id ;
 	Nothing		-> failWithTc (noDecl name)
     }
 

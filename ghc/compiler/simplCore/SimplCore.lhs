@@ -217,7 +217,6 @@ prepareRules dflags pkg_rule_base hst us binds rules
 	      rule_base			  = extendRuleBaseList imp_rule_base orphan_rules
 	      final_rule_base		  = addRuleBaseFVs rule_base (ruleBaseFVs local_rule_base)
 		-- The last step black-lists the free vars of local rules too
-
 	; return (final_rule_base, local_rule_ids, orphan_rules, rule_rhs_fvs)
     }
   where
