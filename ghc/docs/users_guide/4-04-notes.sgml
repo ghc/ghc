@@ -204,7 +204,7 @@ Assertion failures now raise an <Constant>AssertionFailed</Constant> exception.
 
 <ListItem>
 <Para>
-Added simple high-level interface to the Regex library, see <XRef LinkEnd="RegexString">.
+Added simple high-level interface to the Regex library, see the libraries manual.
 </Para>
 </ListItem>
 

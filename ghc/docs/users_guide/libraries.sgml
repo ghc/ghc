@@ -91,17 +91,6 @@ flag).
 
 </Sect1>
 
-<Sect1>
-<Title>GHC/Hugs Extension Libraries</Title>
-
-<Para>
-The extension libraries provided by both GHC and Hugs are described in
-the
-<ULink
-URL="libs.html">GHC/Hugs Extension Library Document</ULink>
-</Para>
-
-</Sect1>
 
 <Sect1>
 <Title>GHC-only Extension Libraries</Title>
@@ -120,72 +109,10 @@ Haskell report says (modulo a few minor issues, see <XRef LinkEnd="vs-Haskell-de
 </Para>
 
 <Para>
-If you turn on <Option>-fglasgow-exts</Option>, a new world opesn up to you and the compiler
+If you turn on <Option>-fglasgow-exts</Option>, a new world opens up to you and the compiler
 will recognise and parse unboxed values properly, and provide access to the
 various interfaces libraries described here (and piles of other goodies.)
 </Para>
-
-&mutablearray
-&bytearray
-
-<Sect2>
-<Title>The <Literal>CCall</Literal> module</Title>
-
-<Para>
-The <Literal>CCall</Literal> module defines the classes <Literal>CCallable</Literal> and <Literal>CReturnable</Literal>,
-along with instances for the primitive types (<Literal>Int</Literal>, <Literal>Int&num;</Literal>, <Literal>Float</Literal>,
-<Literal>Float&num;</Literal> etc.)  GHC knows to import this module if you use <Function>&lowbar;ccall&lowbar;</Function>,
-but if you need to define your own instances of these classes, you
-will need to import <Literal>CCall</Literal> explicitly.
-</Para>
-
-<Para>
-More information on how to use <Function>&lowbar;ccall&lowbar;</Function> can be found in <XRef LinkEnd="glasgow-ccalls">.
-</Para>
-
-</Sect2>
-
-<Sect2>
-<Title>The <Literal>GlaExts</Literal> interface</Title>
-
-<Para>
-<IndexTerm><Primary>GlaExts interface (GHC extensions)</Primary></IndexTerm>
-</Para>
-
-<Para>
-The <Literal>GlaExts</Literal> interface provides access to extensions that only GHC
-implements.  These currently are: unboxed types, including the
-representations of the primitive types (Int, Float, etc.), and the
-GHC primitive operations (<Function>+&num;</Function>, <Function>==&num;</Function>, etc.).
-</Para>
-
-<Para>
-This module used to provide access to all the Glasgow extensions, but
-these have since been moved into separate libraries for compatibility
-with Hugs (version 2.09: in fact, you can still get at this stuff via
-<Literal>GlaExts</Literal> for compatibility, but this facility will likely be removed
-in the future).
-</Para>
-
-<Para>
-
-<ProgramListing>
--- the representation of some basic types:
-data Char    = C# Char#
-data Int     = I# Int#
-data Addr    = A# Addr#
-data Word    = W# Word#
-data Float   = F# Float#
-data Double  = D# Double#
-data Integer = S# Int#              -- small integers
-             | J# Int# ByteArray#   -- large integers
-
-module GHC  -- all primops and primitive types.
-</ProgramListing>
-
-</Para>
-
-</Sect2>
 
 </Sect1>
 
@@ -337,9 +264,6 @@ allocation during sequences of operations.
 <IndexTerm><Primary>numeric types, primitive</Primary></IndexTerm>
 <IndexTerm><Primary>integer types, primitive</Primary></IndexTerm>
 <IndexTerm><Primary>floating point types, primitive</Primary></IndexTerm>
-</Para>
-
-<Para>
 There are the following obvious primitive types:
 </Para>
 
@@ -989,16 +913,12 @@ realWorld# :: State# RealWorld
 
 </Sect2>
 
-<Sect2>
+<Sect2 id="sect-mutable">
 <Title>Mutable arrays</Title>
 
 <Para>
-<Anchor id="sect-mutable">
 <IndexTerm><Primary>mutable arrays</Primary></IndexTerm>
 <IndexTerm><Primary>arrays, mutable</Primary></IndexTerm>
-</Para>
-
-<Para>
 Corresponding to <Literal>Array&num;</Literal> and <Literal>ByteArray&num;</Literal>, we have the types of
 mutable versions of each.  In each case, the representation is a
 pointer to a suitable block of (mutable) heap-allocated storage.
@@ -1153,119 +1073,6 @@ unsafeFreezeByteArray# :: MutableByteArray# s -&#62; State# s -&#62; (# State# s
 </Sect2>
 
 <Sect2>
-<Title>Stable pointers</Title>
-
-<Para>
-<IndexTerm><Primary>stable pointers</Primary></IndexTerm>
-<IndexTerm><Primary>pointers, stable</Primary></IndexTerm>
-</Para>
-
-<Para>
-A stable pointer is a name for a Haskell object which can be passed to
-the external world.  It is ``stable'' in the sense that the name does
-not change when the Haskell garbage collector runs&mdash;in contrast to
-the address of the object which may well change.
-</Para>
-
-<Para>
-The stable pointer type is parameterised by the type of the thing
-which is named.
-</Para>
-
-<Para>
-
-<ProgramListing>
-type StablePtr# a
-</ProgramListing>
-
-<IndexTerm><Primary><literal>StablePtr&num;</literal></Primary></IndexTerm>
-</Para>
-
-<Para>
-A stable pointer is represented by an index into the (static)
-<Literal>StablePointerTable</Literal>.  The Haskell garbage collector treats the
-<Literal>StablePointerTable</Literal> as a source of roots for GC.
-</Para>
-
-<Para>
-The <Function>makeStablePointer</Function> function converts a value into a stable
-pointer.  It is part of the <Literal>IO</Literal> monad, because we want to be sure
-we don't allocate one twice by accident, and then only free one of the
-copies.
-</Para>
-
-<Para>
-
-<ProgramListing>
-makeStablePointer#  :: a -&#62; State# RealWorld -&#62; (# State# RealWord, StablePtr# a #)
-freeStablePointer#  :: StablePtr# a -&#62; State# RealWorld -&#62; State# RealWorld
-deRefStablePointer# :: StablePtr# a -&#62; State# RealWorld -&#62; (# State# RealWorld, a #)
-</ProgramListing>
-
-<IndexTerm><Primary><literal>makeStablePointer&num;</literal></Primary></IndexTerm>
-<IndexTerm><Primary><literal>freeStablePointer&num;</literal></Primary></IndexTerm>
-<IndexTerm><Primary><literal>deRefStablePointer&num;</literal></Primary></IndexTerm>
-</Para>
-
-<Para>
-There is also a C procedure <Function>FreeStablePtr</Function> which frees a stable pointer.
-</Para>
-
-</Sect2>
-
-<Sect2>
-<Title>Foreign objects</Title>
-
-<Para>
-<IndexTerm><Primary>Foreign objects</Primary></IndexTerm>
-</Para>
-
-<Para>
-A <Literal>ForeignObj&num;</Literal> is a reference to an object outside the Haskell world
-(i.e., from the C world, or a reference to an object on another
-machine completely.), where the Haskell world has been told ``Let me
-know when you're finished with this&hellip;''.
-</Para>
-
-<Para>
-
-<ProgramListing>
-type ForeignObj#
-</ProgramListing>
-
-<IndexTerm><Primary><literal>ForeignObj&num;</literal></Primary></IndexTerm>
-</Para>
-
-<Para>
-GHC provides two primitives on <Literal>ForeignObj&num;</Literal>:
-</Para>
-
-<Para>
-
-<ProgramListing>
-makeForeignObj#
-        :: Addr# -- foreign reference
-        -&#62; Addr# -- pointer to finalisation routine
-        -&#62; (# State# RealWorld, ForeignObj# )
-writeForeignObj
-        :: ForeignObj#        -- foreign object
-        -&#62; Addr#              -- datum
-        -&#62; State# RealWorld
-        -&#62; State# RealWorld
-</ProgramListing>
-
-<IndexTerm><Primary><literal>makeForeignObj&num;</literal></Primary></IndexTerm>
-<IndexTerm><Primary><literal>writeForeignObj&num;</literal></Primary></IndexTerm>
-</Para>
-
-<Para>
-The module <Literal>Foreign</Literal> (see library documentation) provides a more
-programmer-friendly interface to foreign objects.
-</Para>
-
-</Sect2>
-
-<Sect2>
 <Title>Synchronizing variables (M-vars)</Title>
 
 <Para>
@@ -1298,8 +1105,5 @@ putMVar#    :: SynchVar# s elt -&#62; State# s -&#62; State# s
 </Sect2>
 
 </Sect1>
-
-&posix
-&libmisc
 
 </Chapter>

@@ -11,13 +11,9 @@
         <!ENTITY glaexts        SYSTEM "glasgow_exts.sgml" >
         <!ENTITY parallel       SYSTEM "parallel.sgml" >
         <!ENTITY vs-hs          SYSTEM "vs_haskell.sgml" >
-        <!ENTITY libs           SYSTEM "libraries.sgml" >
-        <!ENTITY posix          SYSTEM "posix.sgml" >
-        <!ENTITY libmisc        SYSTEM "libmisc.sgml" >
         <!ENTITY wrong          SYSTEM "gone_wrong.sgml" >
+        <!ENTITY libraries      SYSTEM "libraries.sgml" >
         <!ENTITY utils          SYSTEM "utils.sgml" >
-        <!ENTITY mutablearray   SYSTEM "MutableArray.sgml">
-        <!ENTITY bytearray      SYSTEM "ByteArray.sgml">
         <!ENTITY win32-dll      SYSTEM "win32-dlls.sgml">
 ]>
 <Book>
@@ -36,8 +32,8 @@
 &prof
 &sooner
 &lang
-&libs
 &wrong
+&libraries
 &utils
 &win32-dll
 
