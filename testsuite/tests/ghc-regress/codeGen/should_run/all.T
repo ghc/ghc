@@ -29,11 +29,9 @@ test "cg021" { vtr("", "", "") }
 test "cg022" { vtr("", "", "") }
 test "cg024" { vtr("", "", "") }
 test "cg025" { vtr("", "cg025.hs", "1") }
-test "cg026" { vtr("-fglasgow-exts -fvia-C", "", "") }
+test "cg026" { vtr("-fglasgow-exts -package lang -fvia-C", "", "") }
 test "cg027" { vtr("", "", "") }
 test "cg028" { vtr("", "", "") }
-test "cg029" { vtr("-fglasgow-exts", "", "") }
-test "cg030" { vtr("-fglasgow-exts", "", "") }
 test "cg031" { vtr("-fglasgow-exts", "", "") }
 test "cg032" { vtr("-fglasgow-exts", "", "") }
 test "cg033" { vtr("-fglasgow-exts", "", "") }
@@ -44,9 +42,9 @@ test "cg037" { vtr("", "", "") }
 test "cg038" { vtr("", "", "") }
 test "cg039" { vtr("", "", "") }
 test "cg040" { vtr("", "", "") }
-test "cg042" { vtr("-fglasgow-exts", "", "") }
+test "cg042" { vtr("-fglasgow-exts -package lang", "", "") }
 test "cg043" { vtr("", "", "") }
-test "cg044" { vtr("-cpp", "", "" ) }
+test "cg044" { vtr("-cpp -package lang", "", "" ) }
 
 -- -O is temporary, until we fix the problems with seq#...
 test "cg045" { vtr( "-O", "", "1") }

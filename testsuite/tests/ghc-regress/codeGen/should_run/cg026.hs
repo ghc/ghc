@@ -2,7 +2,9 @@
 --
 module Main ( main ) where
 
-import PrelBase
+import GHC.Exts
+import Char 	( chr )
+
 import Addr
 import ST
 import ST

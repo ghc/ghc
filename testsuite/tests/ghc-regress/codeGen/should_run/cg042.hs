@@ -2,8 +2,7 @@
 --
 module Main ( main ) where
 
-import PrelBase --ghc1.3
-import IOExts
+import GHC.Exts
 import ByteArray
 import MutableArray
 import ST

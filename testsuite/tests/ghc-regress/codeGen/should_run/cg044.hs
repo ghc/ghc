@@ -2,20 +2,15 @@
 module Main(main) where
 
 import Char
-import GHC.ST
+import ST
 import MutableArray
 
+#include "config.h"
+
 reverse_if_bigendian :: [a] -> [a]
-#ifdef sparc_sun_solaris2
+#ifdef WORDS_BIGENDIAN
 reverse_if_bigendian = reverse
-#endif
-#ifdef i386_unknown_linux
-reverse_if_bigendian = id
-#endif
-#ifdef i386_unknown_mingw32
-reverse_if_bigendian = id
-#endif
-#ifdef alpha_dec_osf3
+#else
 reverse_if_bigendian = id
 #endif
 
