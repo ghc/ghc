@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.36 $
- * $Date: 2000/04/04 17:35:04 $
+ * $Revision: 1.37 $
+ * $Date: 2000/04/06 00:01:26 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -18,7 +18,7 @@
  * Texts, Names, Instances, Classes, Types, Kinds and Modules
  * ------------------------------------------------------------------------*/
 
-extern Text  textPrimPrel;
+extern Text  textPrelPrim;
 extern Text  textPrelude;
 extern Text  textNum;                   /* used to process default decls   */
 extern Text  textCcall;                 /* used to process foreign import  */
@@ -221,7 +221,7 @@ extern Type typeST;
 extern Type typeIO;
 extern Type typeException;
 
-extern Module modulePrimPrel;
+extern Module modulePrelPrim;
 extern Module modulePrelude;
 
 extern Kind   starToStar;                /* Type -> Type                    */

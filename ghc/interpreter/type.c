@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: type.c,v $
- * $Revision: 1.32 $
- * $Date: 2000/04/04 01:07:49 $
+ * $Revision: 1.33 $
+ * $Date: 2000/04/06 00:01:27 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -2853,7 +2853,7 @@ Int what; {
            } else {
                dummyVar     = inventVar();
 
-               setCurrModule(modulePrimPrel);
+               setCurrModule(modulePrelPrim);
 
                starToStar   = simpleKind(1);
 

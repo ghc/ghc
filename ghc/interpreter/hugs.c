@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.60 $
- * $Date: 2000/04/05 16:57:18 $
+ * $Revision: 1.61 $
+ * $Date: 2000/04/06 00:01:26 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -948,9 +948,8 @@ static void mgFromList ( List /* of CONID */ modgList )
          usesT = cons(textOf(hd(u)),usesT);
 
       /* artificially give all modules a dependency on Prelude */
-      if (mT != textPrelude && mT != textPrimPrel)
+      if (mT != textPrelude && mT != textPrelPrim)
          usesT = cons(textPrelude,usesT);
-
       adjList = cons(pair(mT,usesT),adjList);
    }
 
@@ -1173,7 +1172,6 @@ static Module parseModuleOrInterface ( ConId mc, Cell modeRequest )
       default:
          internal("parseModuleOrInterface");
    }
-
 
    /* Actually do the parsing. */
    if (useSource) {

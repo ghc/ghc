@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.63 $
- * $Date: 2000/04/05 16:57:18 $
+ * $Revision: 1.64 $
+ * $Date: 2000/04/06 00:01:27 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -1049,7 +1049,7 @@ Tycon addTupleTycon ( Int n )
 
    if (combined)
       m = findFakeModule(findText(n==0 ? "PrelBase" : "PrelTup")); else
-      m = findModule(findText("PrimPrel"));
+      m = findModule(findText("PrelPrim"));
 
    setCurrModule(m);
    k = STAR;

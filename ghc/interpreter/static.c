@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.37 $
- * $Date: 2000/04/05 14:14:51 $
+ * $Revision: 1.38 $
+ * $Date: 2000/04/06 00:01:27 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -5031,7 +5031,7 @@ Void checkDefns ( Module thisModule ) { /* Top level static analysis       */
     mapProc(checkQualImport,  module(thisModule).qualImports);
     mapProc(checkUnqualImport,unqualImports);
     /* Add "import Prelude" if there`s no explicit import */
-    if (modName == textPrimPrel || modName == textPrelude) {
+    if (modName == textPrelPrim || modName == textPrelude) {
       /* Nothing. */
     } else if (isNull(cellAssoc(modulePrelude,unqualImports))
 	       && isNull(cellRevAssoc(modulePrelude,module(thisModule).qualImports))) {

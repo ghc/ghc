@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.56 $
- * $Date: 2000/04/04 15:41:56 $
+ * $Revision: 1.57 $
+ * $Date: 2000/04/06 00:01:26 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -188,7 +188,7 @@ Name namePlus;
 Name nameMult;
 Name nameMFail;
 Type typeOrdering;
-Module modulePrimPrel;
+Module modulePrelPrim;
 Module modulePrelude;
 Name nameMap;
 Name nameMinus;
@@ -299,7 +299,7 @@ Void linkPreludeTC(void) {              /* Hook to tycons and classes in   */
 	if (combined) {
 	  setCurrModule(modulePrelude);
 	} else {
-	  setCurrModule(modulePrimPrel);
+	  setCurrModule(modulePrelPrim);
 	}
 
         typeChar                 = linkTycon("Char");
@@ -412,7 +412,7 @@ Void linkPreludeCM(void) {              /* Hook to cfuns and mfuns in      */
 	if (combined) {
 	  setCurrModule(modulePrelude);
 	} else {
-	  setCurrModule(modulePrimPrel);
+	  setCurrModule(modulePrelPrim);
 	}
 
         /* constructors */
@@ -459,7 +459,7 @@ Void linkPrimNames ( void ) {        /* Hook to names defined in Prelude */
 	if (combined) {
 	  setCurrModule(modulePrelude);
 	} else {
-	  setCurrModule(modulePrimPrel);
+	  setCurrModule(modulePrelPrim);
 	}
 
         /* primops */
@@ -703,14 +703,14 @@ assert(nonNull(namePMFail));
            } else {
                fixupRTStoPreludeRefs(NULL);
 
-               modulePrimPrel = findFakeModule(textPrimPrel);
+               modulePrelPrim = findFakeModule(textPrelPrim);
                modulePrelude = findFakeModule(textPrelude);
-               setCurrModule(modulePrimPrel);
+               setCurrModule(modulePrelPrim);
         
                for (i=0; i<NUM_TUPLES; ++i) {
                    if (i != 1) addTupleTycon(i);
                }
-               setCurrModule(modulePrimPrel);
+               setCurrModule(modulePrelPrim);
 
                typeArrow = addPrimTycon(findText("(->)"),
                                         pair(STAR,pair(STAR,STAR)),

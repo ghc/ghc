@@ -88,5 +88,5 @@ module Prelude (
 	-- Now we have the extra (non standard) thing.
   ) where
 
-import PrimPrel
+import PrelPrim
 
