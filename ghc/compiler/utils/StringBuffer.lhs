@@ -233,7 +233,7 @@ trySlurp handle sz_i chunk =
 	  slurp c off | off >=# max_off = do
 		let new_sz = chunk_sz *# 2#
 	     	chunk' <- reAllocMem chunk (I# new_sz)
-	     	slurpFile c off chunk' new_sz (new_sz -# tAB_SIZE)
+	     	slurpFile c off chunk' new_sz (new_sz -# (tAB_SIZE +# 1#))
     	  slurp c off = do
     		intc <- mayBlock fo (_ccall_ fileGetc fo)
     		if intc == ((-1)::Int)
@@ -261,12 +261,14 @@ trySlurp handle sz_i chunk =
   in do
 
 	-- allow space for a full tab at the end of the buffer
-	-- (that's what the max_off thing is for)
-  (chunk', rc) <- slurpFile 0# 0# chunk chunk_sz (chunk_sz -# tAB_SIZE)
+	-- (that's what the max_off thing is for),
+	-- and add 1 to allow room for the final sentinel \NUL at
+	-- the end of the file.
+  (chunk', rc) <- slurpFile 0# 0# chunk chunk_sz (chunk_sz -# (tAB_SIZE +# 1#))
   writeHandle handle handle_
   if rc < (0::Int)
 	then constructErrorAndFail "slurpFile"
-	else return (chunk', rc)
+	else return (chunk', rc+1 {-room for sentinel-})
 
 
 reAllocMem :: Addr -> Int -> IO Addr
