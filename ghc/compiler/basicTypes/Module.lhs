@@ -21,7 +21,7 @@ in a different DLL, by setting the DLL flag.
 \begin{code}
 module Module 
     (
-      Module, moduleName, mod_kind
+      Module, moduleName, moduleKind
 			    -- abstract, instance of Eq, Ord, Outputable
     , ModuleName
     , ModuleKind(..)
@@ -255,9 +255,6 @@ mkPrelModule name = Module name preludePackage
 
 moduleString :: Module -> EncodedString
 moduleString (Module (ModuleName fs) _) = _UNPK_ fs
-
-moduleName :: Module -> ModuleName
-moduleName (Module mod _) = mod
 
 moduleUserString :: Module -> UserString
 moduleUserString (Module mod _) = moduleNameUserString mod
