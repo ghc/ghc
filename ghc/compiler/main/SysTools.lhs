@@ -79,6 +79,7 @@ import qualified Posix
 #else
 import List		( isPrefixOf )
 import MarshalArray
+import Foreign
 #endif
 
 #if __GLASGOW_HASKELL__ > 408
@@ -279,11 +280,11 @@ initSysTools minusB_args
 		tdir <-
 		  if ret == 0 then do
 		      -- failed, consult TEMP.
- 	             destructArray len buf
+ 	             free buf
 		     getEnv "TMP"
 		   else do
 		     s <- peekCString buf
-		     destructArray len buf
+		     free buf
 		     return s
 		let
 	  	  -- strip the trailing backslash (awful, but 
@@ -835,9 +836,9 @@ getExecDir :: IO (Maybe String)
 getExecDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
 		buf <- mallocArray len
 		ret <- getModuleFileName nullAddr buf len
-		if ret == 0 then destructArray len buf >> return Nothing
+		if ret == 0 then free buf >> return Nothing
 		            else do s <- peekCString buf
-				    destructArray len buf
+				    free buf
 				    return (Just (reverse (dropList "/bin/ghc.exe" (reverse (unDosifyPath s)))))
 
 
