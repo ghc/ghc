@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.20 2001/02/09 17:23:57 sewardj Exp $
+ * $Id: Linker.c,v 1.21 2001/02/11 13:13:37 simonmar Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -1143,7 +1143,7 @@ ocResolve_PEi386 ( ObjectCode* oc, int verb )
 #define FALSE 0
 #define TRUE  1
 
-#if defined(solaris2_TARGET_OS)
+#if defined(sparc_TARGET_ARCH)
 #  define ELF_TARGET_SPARC  /* Used inside <elf.h> */
 #endif
 
@@ -1449,7 +1449,7 @@ static int do_Elf32_Rel_relocations ( ObjectCode* oc, char* ehdrC,
       Elf32_Addr  A  = *pP;
       Elf32_Addr  S;
 
-      IF_DEBUG(linker,belch( "Rel entry %3d is raw(%6p %6p)   ", 
+      IF_DEBUG(linker,belch( "Rel entry %3d is raw(%6p %6p)", 
                              j, (void*)offset, (void*)info ));
       if (!info) {
          IF_DEBUG(linker,belch( " ZERO" ));
@@ -1467,22 +1467,20 @@ static int do_Elf32_Rel_relocations ( ObjectCode* oc, char* ehdrC,
             (void *)S = lookupSymbol( symbol );
          }
          if (!S) {
-            barf("ocResolve_ELF: %s: unknown symbol `%s'", 
+            barf("do_Elf32_Rel_relocations:  %s: unknown symbol `%s'", 
                  oc->fileName, symbol);
          }
          IF_DEBUG(linker,belch( "`%s' resolves to %p", symbol, (void*)S ));
       }
-      IF_DEBUG(linker,fprintf ( stderr, "Reloc: P = %p   S = %p   A = %p\n",
-                                        (void*)P, (void*)S, (void*)A )); 
+      IF_DEBUG(linker,belch( "Reloc: P = %p   S = %p   A = %p",
+			     (void*)P, (void*)S, (void*)A )); 
       switch (ELF32_R_TYPE(info)) {
-#        if defined(linux_TARGET_OS)
+#ifdef i386_TARGET_ARCH
          case R_386_32:   *pP = S + A;     break;
          case R_386_PC32: *pP = S + A - P; break;
-#        endif
+#endif
          default: 
-            fprintf(stderr, "unhandled ELF relocation(Rel) type %d\n",
-                            ELF32_R_TYPE(info));
-            barf("do_Elf32_Rel_relocations: unhandled ELF relocation type");
+            barf("do_Elf32_Rel_relocations: unhandled ELF relocation(Rel) type %d\n", ELF32_R_TYPE(info));
             return 0;
       }
 
@@ -1516,7 +1514,7 @@ static int do_Elf32_Rela_relocations ( ObjectCode* oc, char* ehdrC,
       Elf32_Addr  P  = ((Elf32_Addr)targ) + offset;
       Elf32_Addr  A  = addend;
       Elf32_Addr  S;
-#     if defined(solaris2_TARGET_OS)
+#     if defined(sparc_TARGET_ARCH)
       /* This #ifdef only serves to avoid unused-var warnings. */
       Elf32_Word* pP = (Elf32_Word*)P;
       Elf32_Word  w1, w2;
@@ -1553,7 +1551,7 @@ static int do_Elf32_Rela_relocations ( ObjectCode* oc, char* ehdrC,
       IF_DEBUG(linker,fprintf ( stderr, "Reloc: P = %p   S = %p   A = %p\n",
                                         (void*)P, (void*)S, (void*)A )); 
       switch (ELF32_R_TYPE(info)) {
-#        if defined(solaris2_TARGET_OS)
+#        if defined(sparc_TARGET_ARCH)
          case R_SPARC_WDISP30: 
             w1 = *pP & 0xC0000000;
             w2 = (Elf32_Word)((S + A - P) >> 2);
