@@ -25,8 +25,12 @@ module PprType(
  ) where
 
 IMP_Ubiq()
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(IdLoop)
---IMPORT_DELOOPER(TyLoop) 	-- for paranoia checking
+#else
+import {-# SOURCE #-} Id
+#endif
+
 
 -- friends:
 -- (PprType can see all the representations it's trying to print)
