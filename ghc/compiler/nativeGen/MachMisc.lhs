@@ -8,7 +8,7 @@
 
 module MachMisc (
 
-	sizeOf, primRepToSize,
+	primRepToSize,
 
 	eXTRA_STK_ARGS_HERE,
 
@@ -89,18 +89,6 @@ where do we start putting the rest of them?
 eXTRA_STK_ARGS_HERE :: Int
 eXTRA_STK_ARGS_HERE
   = IF_ARCH_alpha(0, IF_ARCH_i386(23{-6x4bytes-}, IF_ARCH_sparc(23,???)))
-\end{code}
-
-% - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-Size of a @PrimRep@, in bytes.
-
-\begin{code}
-sizeOf :: PrimRep -> Int{-in bytes-}
-sizeOf pr = case primRepToSize pr of
-  IF_ARCH_alpha({B->1; Bu->1; {-W->2; Wu->2;-} L->4; {-SF->4;-} Q->8; TF->8},)
-  IF_ARCH_i386 ({B->1; Bu->1; W->2; Wu->2; L->4; Lu->4; F->4; DF->8; F80->10},)
-  IF_ARCH_sparc({B->1; Bu->1; W->4; F->4; DF->8},)
 \end{code}
 
 % - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

@@ -683,7 +683,7 @@ patchRegs instr env = case instr of
     JXX _ _		-> instr
     CALL _		-> instr
     CLTD		-> instr
-    _			-> pprPanic "patchInstr(x86)" empty
+    _			-> pprPanic "patchRegs(x86)" empty
 
   where
     patch1 insn op      = insn (patchOp op)
@@ -753,9 +753,8 @@ patchRegs instr env = case instr of
 Spill to memory, and load it back...
 
 JRS, 000122: on x86, don't spill directly above the stack pointer,
-since some insn sequences (int <-> conversions, and eventually
-StixInteger) use this as a temp location.  Leave 8 words (ie, 64 bytes
-for a 64-bit arch) of slop.
+since some insn sequences (int <-> conversions) use this as a temp
+location.  Leave 8 words (ie, 64 bytes for a 64-bit arch) of slop.
 
 \begin{code}
 spillSlotSize :: Int
@@ -775,18 +774,18 @@ spillSlotToOffset slot
    = pprPanic "spillSlotToOffset:" 
               (text "invalid spill location: " <> int slot)
 
-vregToSpillSlot :: FiniteMap Unique Int -> Unique -> Int
+vregToSpillSlot :: FiniteMap VRegUnique Int -> VRegUnique -> Int
 vregToSpillSlot vreg_to_slot_map u
    = case lookupFM vreg_to_slot_map u of
         Just xx -> xx
-        Nothing -> pprPanic "vregToSpillSlot: unmapped vreg" (ppr u)
+        Nothing -> pprPanic "vregToSpillSlot: unmapped vreg" (pprVRegUnique u)
 
 
-spillReg, loadReg :: FiniteMap Unique Int -> Int -> Reg -> Reg -> Instr
+spillReg, loadReg :: FiniteMap VRegUnique Int -> Int -> Reg -> Reg -> Instr
 
 spillReg vreg_to_slot_map delta dyn vreg
   | isVirtualReg vreg
-  = let	slot_no = vregToSpillSlot vreg_to_slot_map (getUnique vreg)
+  = let	slot_no = vregToSpillSlot vreg_to_slot_map (getVRegUnique vreg)
         off     = spillSlotToOffset slot_no
     in
 	{-Alpha: spill below the stack pointer (?)-}
@@ -811,7 +810,7 @@ spillReg vreg_to_slot_map delta dyn vreg
    
 loadReg vreg_to_slot_map delta vreg dyn
   | isVirtualReg vreg
-  = let	slot_no = vregToSpillSlot vreg_to_slot_map (getUnique vreg)
+  = let	slot_no = vregToSpillSlot vreg_to_slot_map (getVRegUnique vreg)
         off     = spillSlotToOffset slot_no
     in
 	 IF_ARCH_alpha( LD  sz dyn (spRel (- (off `div` 8)))

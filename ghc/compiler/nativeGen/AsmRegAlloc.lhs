@@ -271,7 +271,7 @@ spill slot numbers for the uniques.
 insertSpillCode :: [Instr] -> [Instr]
 insertSpillCode insns
    = let uniques_in_insns
-            = map getUnique 
+            = map getVRegUnique 
                   (regSetToList 
                      (foldl unionRegSets emptyRegSet 
                             (map vregs_in_insn insns)))
@@ -279,7 +279,7 @@ insertSpillCode insns
             = case regUsage i of
                  RU rds wrs -> filterRegSet isVirtualReg 
                                              (rds `unionRegSets` wrs)
-         vreg_to_slot_map :: FiniteMap Unique Int
+         vreg_to_slot_map :: FiniteMap VRegUnique Int
          vreg_to_slot_map
             = listToFM (zip uniques_in_insns [0..])
 
@@ -297,7 +297,7 @@ insertSpillCode insns
 -- to the stack pointer, as opposed to the frame pointer.  The other is a 
 -- counter, used to manufacture new temporary register names.
 
-patchInstr :: FiniteMap Unique Int -> (Int,Int) -> Instr -> ((Int,Int), [Instr])
+patchInstr :: FiniteMap VRegUnique Int -> (Int,Int) -> Instr -> ((Int,Int), [Instr])
 patchInstr vreg_to_slot_map (delta,ctr) instr
 
  | null memSrcs && null memDsts 
@@ -330,12 +330,14 @@ patchInstr vreg_to_slot_map (delta,ctr) instr
            | isVirtualReg vreg
            = case [vi | (vreg', vi) <- vreg_env, vreg' == vreg] of
                 [i] -> case regClass vreg of
-                          RcInteger -> VirtualRegI (mkPseudoUnique3 i)
-                          RcFloat   -> VirtualRegF (mkPseudoUnique3 i)
-                          RcDouble  -> VirtualRegD (mkPseudoUnique3 i)
+                          RcInteger -> VirtualRegI (pseudoVReg i)
+                          RcFloat   -> VirtualRegF (pseudoVReg i)
+                          RcDouble  -> VirtualRegD (pseudoVReg i)
                 _   -> pprPanic "patchInstr: unmapped VReg" (ppr vreg)
            | otherwise
            = vreg
+
+        pseudoVReg i = VRegUniqueLo (mkPseudoUnique3 i)
 
 	memSrcs   = filter isVirtualReg (regSetToList srcs)
 	memDsts   = filter isVirtualReg (regSetToList dsts)

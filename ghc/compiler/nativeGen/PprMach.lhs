@@ -51,8 +51,8 @@ pprReg :: IF_ARCH_i386(Size ->,) Reg -> Doc
 pprReg IF_ARCH_i386(s,) r
   = case r of
       RealReg i      -> ppr_reg_no IF_ARCH_i386(s,) i
-      VirtualRegI u  -> text "%vI_" <> asmSDoc (pprUnique u)
-      VirtualRegF u  -> text "%vF_" <> asmSDoc (pprUnique u)
+      VirtualRegI u  -> text "%vI_" <> asmSDoc (pprVRegUnique u)
+      VirtualRegF u  -> text "%vF_" <> asmSDoc (pprVRegUnique u)
   where
 #if alpha_TARGET_ARCH
     ppr_reg_no :: Int -> Doc

@@ -33,7 +33,8 @@ import Literal		( Literal(..), word2IntLit )
 import Maybes	    	( Maybe012(..), maybeToBool )
 import StgSyn		( StgOp(..) )
 import MachOp		( MachOp(..), resultRepsOfMachOp )
-import PrimRep	    	( isFloatingRep, PrimRep(..) )
+import PrimRep	    	( isFloatingRep, is64BitRep, 
+			  PrimRep(..), getPrimRepArrayElemSize )
 import StixInfo	    	( genCodeInfoTable, genBitmapInfoTable,
 			  livenessIsSmall, bitmapToIntegers )
 import StixMacro	( macroCode, checkCode )
@@ -237,8 +238,8 @@ Here we handle top-level things, like @CCodeBlock@s and
 
     -- We need to promote any item smaller than a word to a word
     promote_to_word pk 
-       | sizeOf pk >= sizeOf IntRep  = pk
-       | otherwise                   = IntRep
+       | getPrimRepArrayElemSize pk >= getPrimRepArrayElemSize IntRep  = pk
+       | otherwise                                                     = IntRep
 
     upd_reqd = closureUpdReqd cl_info
 
@@ -346,14 +347,23 @@ of the source?  Be careful about floats/doubles.
 \begin{code}
 
  gencode (CAssign lhs rhs)
-  | getAmodeRep lhs == VoidRep = returnUs id
+  | lhs_rep == VoidRep 
+  = returnUs id
   | otherwise
-  = let pk = getAmodeRep lhs
-    	pk' = if mixedTypeLocn lhs && not (isFloatingRep pk) then IntRep else pk
+  = let -- This is a Hack.  Should be cleaned up.
+        -- JRS, 10 Dec 01
+        pk' | ncg_target_is_32bit && is64BitRep lhs_rep
+            = lhs_rep
+            | otherwise
+            = if   mixedTypeLocn lhs && not (isFloatingRep lhs_rep) 
+              then IntRep 
+              else lhs_rep
     	lhs' = a2stix lhs
     	rhs' = a2stix' rhs
     in
 	returnUs (\xs -> mkStAssign pk' lhs' rhs' : xs)
+    where 
+       lhs_rep = getAmodeRep lhs
 
 \end{code}
 

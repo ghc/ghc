@@ -203,6 +203,8 @@ getPrimRepSizeInBytes other         = pprPanic "getPrimRepSizeInBytes" (ppr othe
 -- getPrimRepSizeInBytes, the rationale behind which is
 -- unclear to me.
 getPrimRepArrayElemSize :: PrimRep -> Int
+getPrimRepArrayElemSize CharRep       = 4
+getPrimRepArrayElemSize DataPtrRep    = wORD_SIZE
 getPrimRepArrayElemSize PtrRep        = wORD_SIZE
 getPrimRepArrayElemSize IntRep        = wORD_SIZE
 getPrimRepArrayElemSize WordRep       = wORD_SIZE

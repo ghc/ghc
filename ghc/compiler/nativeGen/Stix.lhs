@@ -8,7 +8,7 @@ module Stix (
         StixStmt(..), mkStAssign, StixStmtList,
 	pprStixStmts, pprStixStmt, pprStixExpr, pprStixReg,
         stixStmt_CountTempUses, stixStmt_Subst,
-        liftStrings,
+        liftStrings, repOfStixExpr,
 	DestInfo(..), hasDestInfo,
 
 	stgBaseReg, stgNode, stgSp, stgSu, stgSpLim, 
@@ -24,7 +24,10 @@ module Stix (
         uniqOfNatM_State, deltaOfNatM_State,
 
 	getUniqLabelNCG, getNatLabelNCG,
-        ncgPrimopMoan
+        ncgPrimopMoan,
+
+	-- Information about the target arch
+        ncg_target_is_32bit
     ) where
 
 #include "HsVersions.h"
@@ -34,15 +37,17 @@ import IOExts		( unsafePerformIO )
 import IO		( hPutStrLn, stderr )
 
 import AbsCSyn		( node, tagreg, MagicId(..) )
+import AbsCUtils	( magicIdPrimRep )
 import ForeignCall	( CCallConv )
 import CLabel		( mkAsmTempLabel, CLabel, pprCLabel )
 import PrimRep          ( PrimRep(..) )
-import MachOp		( MachOp(..), pprMachOp )
+import MachOp		( MachOp(..), pprMachOp, resultRepsOfMachOp )
 import Unique           ( Unique )
 import SMRep		( fixedHdrSize, arrWordsHdrSize, arrPtrsHdrSize )
 import UniqSupply	( UniqSupply, splitUniqSupply, uniqFromSupply,
                           UniqSM, thenUs, returnUs, getUniqueUs )
 import Maybes		( Maybe012(..), maybe012ToList )
+import Constants	( wORD_SIZE )
 import Outputable
 import FastTypes
 \end{code}
@@ -153,6 +158,23 @@ data StixExpr
   | StCall FAST_STRING CCallConv PrimRep [StixExpr]
 
 
+-- What's the PrimRep of the value denoted by this StixExpr?
+repOfStixExpr :: StixExpr -> PrimRep
+repOfStixExpr (StInt _)       = IntRep
+repOfStixExpr (StFloat _)     = FloatRep
+repOfStixExpr (StDouble _)    = DoubleRep
+repOfStixExpr (StString _)    = PtrRep
+repOfStixExpr (StCLbl _)      = PtrRep
+repOfStixExpr (StReg reg)     = repOfStixReg reg
+repOfStixExpr (StIndex _ _ _) = PtrRep
+repOfStixExpr (StInd rep _)   = rep
+repOfStixExpr (StCall target conv retrep args) = retrep
+repOfStixExpr (StMachOp mop args) 
+   = case resultRepsOfMachOp mop of
+        Just1 rep -> rep
+        other     -> pprPanic "repOfStixExpr:StMachOp" (pprMachOp mop)
+
+
 -- used by insnFuture in RegAllocInfo.lhs
 data DestInfo
    = NoDestInfo             -- no supplied dests; infer from context
@@ -239,10 +261,13 @@ data StixReg
 pprStixReg (StixMagicId mid)  = ppMId mid
 pprStixReg (StixTemp temp)    = pprStixVReg temp
 
+repOfStixReg (StixTemp (StixVReg u pr)) = pr
+repOfStixReg (StixMagicId mid)          = magicIdPrimRep mid
+
 data StixVReg
    = StixVReg Unique PrimRep
 
-pprStixVReg (StixVReg u pr) = hcat [text "VReg(", ppr u, ppr pr, char ')']
+pprStixVReg (StixVReg u pr) = hcat [text "VReg(", ppr u, colon, ppr pr, char ')']
 
 
 
@@ -611,4 +636,14 @@ ncgPrimopMoan msg pp_rep
      )
      `seq`
      pprPanic msg pp_rep
+\end{code}
+
+Information about the target.
+
+\begin{code}
+
+ncg_target_is_32bit :: Bool
+ncg_target_is_32bit | wORD_SIZE == 4 = True
+                    | wORD_SIZE == 8 = False
+
 \end{code}

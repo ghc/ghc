@@ -17,7 +17,7 @@ import AbsCUtils	( getAmodeRep, mixedTypeLocn )
 import SMRep		( fixedHdrSize )
 import Literal		( Literal(..), word2IntLit )
 import MachOp		( MachOp(..) )
-import PrimRep		( PrimRep(..), getPrimRepSizeInBytes )
+import PrimRep		( PrimRep(..), getPrimRepArrayElemSize )
 import UniqSupply	( returnUs, thenUs, getUniqueUs, UniqSM )
 import Constants	( wORD_SIZE,
 			  mIN_INTLIKE, mIN_CHARLIKE, uF_UPDATEE, bLOCK_SIZE,
@@ -104,6 +104,8 @@ foreignCallCode lhs (CCall (CCallSpec (StaticTarget fn) cconv safety)) rhs
 	       pk   = case getAmodeRep lhs of
                         FloatRep  -> FloatRep
                         DoubleRep -> DoubleRep
+                        Int64Rep  -> Int64Rep
+                        Word64Rep -> Word64Rep
                         other     -> IntRep
 
 foreignCallCode lhs call rhs
@@ -233,8 +235,8 @@ cHARLIKE_closure = StCLbl mkCharlikeClosureLabel
 mutArrPtrsFrozen_info = StCLbl mkMAP_FROZEN_infoLabel
 
 -- these are the sizes of charLike and intLike closures, in _bytes_.
-charLikeSize = (fixedHdrSize + 1) * (sizeOf PtrRep)
-intLikeSize  = (fixedHdrSize + 1) * (sizeOf PtrRep)
+charLikeSize = (fixedHdrSize + 1) * (getPrimRepArrayElemSize PtrRep)
+intLikeSize  = (fixedHdrSize + 1) * (getPrimRepArrayElemSize PtrRep)
 \end{code}
 
 

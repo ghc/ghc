@@ -14,6 +14,7 @@ module MachCode ( stmtsToInstrs, InstrBlock ) where
 #include "HsVersions.h"
 #include "nativeGen/NCG.h"
 
+import Unique		( Unique )
 import MachMisc		-- may differ per-platform
 import MachRegs
 import OrdList		( OrdList, nilOL, isNilOL, unitOL, appOL, toOL,
@@ -27,25 +28,27 @@ import CLabel		( CLabel, labelDynamic )
 import CLabel 		( isAsmTemp )
 #endif
 import Maybes		( maybeToBool, Maybe012(..) )
-import PrimRep		( isFloatingRep, PrimRep(..) )
+import PrimRep		( isFloatingRep, is64BitRep, PrimRep(..),
+                          getPrimRepArrayElemSize )
 import Stix		( getNatLabelNCG, StixStmt(..), StixExpr(..),
-			  StixReg(..), StixVReg(..), CodeSegment(..), 
+			  StixReg(..), pprStixReg, StixVReg(..), CodeSegment(..), 
                           DestInfo, hasDestInfo,
-                          pprStixExpr, 
+                          pprStixExpr, repOfStixExpr,
                           liftStrings,
                           NatM, thenNat, returnNat, mapNat, 
                           mapAndUnzipNat, mapAccumLNat,
-                          getDeltaNat, setDeltaNat,
-                          ncgPrimopMoan
+                          getDeltaNat, setDeltaNat, getUniqueNat,
+                          ncgPrimopMoan,
+			  ncg_target_is_32bit
 			)
 import Pretty
 import Outputable	( panic, pprPanic, showSDoc )
 import qualified Outputable
 import CmdLineOpts	( opt_Static )
+import Stix		( pprStixStmt )
 
 -- DEBUGGING ONLY
 import IOExts		( trace )
-import Stix		( pprStixStmt )
 
 infixr 3 `bind`
 \end{code}
@@ -92,9 +95,13 @@ stmtToInstrs stmt = case stmt of
 
     StAssignMem pk addr src
       | isFloatingRep pk -> assignMem_FltCode pk (derefDLL addr) (derefDLL src)
+      | ncg_target_is_32bit
+        && is64BitRep pk -> assignMem_I64Code    (derefDLL addr) (derefDLL src)
       | otherwise	 -> assignMem_IntCode pk (derefDLL addr) (derefDLL src)
     StAssignReg pk reg src
       | isFloatingRep pk -> assignReg_FltCode pk reg (derefDLL src)
+      | ncg_target_is_32bit
+        && is64BitRep pk -> assignReg_I64Code    reg (derefDLL src)
       | otherwise	 -> assignReg_IntCode pk reg (derefDLL src)
     StAssignMachOp lhss mop rhss
       -> assignMachOp lhss mop rhss
@@ -119,7 +126,7 @@ stmtToInstrs stmt = case stmt of
 	-- the linker can handle simple arithmetic...
 	getData (StIndex rep (StCLbl lbl) (StInt off)) =
 		returnNat (nilOL,
-                           ImmIndex lbl (fromInteger off * sizeOf rep))
+                           ImmIndex lbl (fromInteger off * getPrimRepArrayElemSize rep))
 
     -- Top-level lifted-out string.  The segment will already have been set
     -- (see Stix.liftStrings).
@@ -172,7 +179,7 @@ mangleIndexTree :: StixExpr -> StixExpr
 mangleIndexTree (StIndex pk base (StInt i))
   = StMachOp MO_Nat_Add [base, off]
   where
-    off = StInt (i * toInteger (sizeOf pk))
+    off = StInt (i * toInteger (getPrimRepArrayElemSize pk))
 
 mangleIndexTree (StIndex pk base off)
   = StMachOp MO_Nat_Add [
@@ -182,7 +189,7 @@ mangleIndexTree (StIndex pk base off)
     ]
   where
     shift :: PrimRep -> Int
-    shift rep = case sizeOf rep of
+    shift rep = case getPrimRepArrayElemSize rep of
                    1 -> 0
                    2 -> 1
                    4 -> 2
@@ -197,7 +204,7 @@ maybeImm :: StixExpr -> Maybe Imm
 maybeImm (StCLbl l)       
    = Just (ImmCLbl l)
 maybeImm (StIndex rep (StCLbl l) (StInt off)) 
-   = Just (ImmIndex l (fromInteger off * sizeOf rep))
+   = Just (ImmIndex l (fromInteger off * getPrimRepArrayElemSize rep))
 maybeImm (StInt i)
   | i >= toInteger (minBound::Int) && i <= toInteger (maxBound::Int)
   = Just (ImmInt (fromInteger i))
@@ -205,6 +212,132 @@ maybeImm (StInt i)
   = Just (ImmInteger i)
 
 maybeImm _ = Nothing
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{The @Register64@ type}
+%*									*
+%************************************************************************
+
+Simple support for generating 64-bit code (ie, 64 bit values and 64
+bit assignments) on 32-bit platforms.  Unlike the main code generator
+we merely shoot for generating working code as simply as possible, and
+pay little attention to code quality.  Specifically, there is no
+attempt to deal cleverly with the fixed-vs-floating register
+distinction; all values are generated into (pairs of) floating
+registers, even if this would mean some redundant reg-reg moves as a
+result.  Only one of the VRegUniques is returned, since it will be
+of the VRegUniqueLo form, and the upper-half VReg can be determined
+by applying getHiVRegFromLo to it.
+
+\begin{code}
+
+data ChildCode64 	-- a.k.a "Register64"
+   = ChildCode64 
+        InstrBlock 	-- code
+        VRegUnique 	-- unique for the lower 32-bit temporary
+	-- which contains the result; use getHiVRegFromLo to find
+	-- the other VRegUnique.
+	-- Rules of this simplified insn selection game are
+	-- therefore that the returned VRegUniques may be modified
+
+assignMem_I64Code :: StixExpr -> StixExpr -> NatM InstrBlock
+assignReg_I64Code :: StixReg  -> StixExpr -> NatM InstrBlock
+iselExpr64        :: StixExpr -> NatM ChildCode64
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+#if i386_TARGET_ARCH
+
+assignMem_I64Code addrTree valueTree
+   = iselExpr64 valueTree		`thenNat` \ (ChildCode64 vcode vrlo) ->
+     getRegister addrTree		`thenNat` \ register_addr ->
+     getNewRegNCG IntRep		`thenNat` \ t_addr ->
+     let rlo = VirtualRegI vrlo
+         rhi = getHiVRegFromLo rlo
+         code_addr = registerCode register_addr t_addr
+         reg_addr  = registerName register_addr t_addr
+         -- Little-endian store
+         mov_lo = MOV L (OpReg rlo)
+                        (OpAddr (AddrBaseIndex (Just reg_addr) Nothing (ImmInt 0)))
+         mov_hi = MOV L (OpReg rhi)
+                        (OpAddr (AddrBaseIndex (Just reg_addr) Nothing (ImmInt 4)))
+     in
+         returnNat (vcode `appOL` code_addr `snocOL` mov_lo `snocOL` mov_hi)
+
+assignReg_I64Code (StixTemp (StixVReg u_dst pk)) valueTree
+   = iselExpr64 valueTree		`thenNat` \ (ChildCode64 vcode vr_src_lo) ->
+     let 
+         r_dst_lo = mkVReg u_dst IntRep
+         r_src_lo = VirtualRegI vr_src_lo
+         r_dst_hi = getHiVRegFromLo r_dst_lo
+         r_src_hi = getHiVRegFromLo r_src_lo
+         mov_lo = MOV L (OpReg r_src_lo) (OpReg r_dst_lo)
+         mov_hi = MOV L (OpReg r_src_hi) (OpReg r_dst_hi)
+     in
+         returnNat (
+            vcode `snocOL` mov_lo `snocOL` mov_hi
+         )
+
+assignReg_I64Code lvalue valueTree
+   = pprPanic "assignReg_I64Code(i386): invalid lvalue"
+              (pprStixReg lvalue)
+
+
+
+iselExpr64 (StInd pk addrTree)
+   | is64BitRep pk
+   = getRegister addrTree		`thenNat` \ register_addr ->
+     getNewRegNCG IntRep		`thenNat` \ t_addr ->
+     getNewRegNCG IntRep		`thenNat` \ rlo ->
+     let rhi = getHiVRegFromLo rlo
+         code_addr = registerCode register_addr t_addr
+         reg_addr  = registerName register_addr t_addr
+         mov_lo = MOV L (OpAddr (AddrBaseIndex (Just reg_addr) Nothing (ImmInt 0)))
+                        (OpReg rlo)
+         mov_hi = MOV L (OpAddr (AddrBaseIndex (Just reg_addr) Nothing (ImmInt 4)))
+                        (OpReg rhi)
+     in
+         returnNat (
+            ChildCode64 (code_addr `snocOL` mov_lo `snocOL` mov_hi) 
+                        (getVRegUnique rlo)
+         )
+
+iselExpr64 (StReg (StixTemp (StixVReg vu pk)))
+   | is64BitRep pk
+   = getNewRegNCG IntRep 		`thenNat` \ r_dst_lo ->
+     let r_dst_hi = getHiVRegFromLo r_dst_lo
+         r_src_lo = mkVReg vu IntRep
+         r_src_hi = getHiVRegFromLo r_src_lo
+         mov_lo = MOV L (OpReg r_src_lo) (OpReg r_dst_lo)
+         mov_hi = MOV L (OpReg r_src_hi) (OpReg r_dst_hi)
+     in
+         returnNat (
+            ChildCode64 (toOL [mov_lo, mov_hi]) (getVRegUnique r_dst_lo)
+         )
+         
+iselExpr64 (StCall fn cconv kind args)
+  | is64BitRep kind
+  = genCCall fn cconv kind args			`thenNat` \ call ->
+    getNewRegNCG IntRep				`thenNat` \ r_dst_lo ->
+    let r_dst_hi = getHiVRegFromLo r_dst_lo
+        mov_lo = MOV L (OpReg eax) (OpReg r_dst_lo)
+        mov_hi = MOV L (OpReg edx) (OpReg r_dst_hi)
+    in
+    returnNat (
+       ChildCode64 (call `snocOL` mov_lo `snocOL` mov_hi) 
+                   (getVRegUnique r_dst_lo)
+    )
+
+iselExpr64 expr
+   = pprPanic "iselExpr64(i386)" (pprStixExpr expr)
+
+#endif {- i386_TARGET_ARCH -}
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
 \end{code}
 
 %************************************************************************
@@ -292,6 +425,7 @@ getRegister tree@(StIndex _ _ _)
   = getRegister (mangleIndexTree tree)
 
 getRegister (StCall fn cconv kind args)
+  | not (ncg_target_is_32bit && is64BitRep kind)
   = genCCall fn cconv kind args   	    `thenNat` \ call ->
     returnNat (Fixed kind reg call)
   where
@@ -895,6 +1029,7 @@ getRegister (StMachOp mop [x, y]) -- dyadic MachOps
     sub_code sz x y = trivialCode (SUB sz) Nothing x y
 
 getRegister (StInd pk mem)
+  | not (is64BitRep pk)
   = getAmode mem    	    	    `thenNat` \ amode ->
     let
     	code = amodeCode amode
@@ -1476,6 +1611,8 @@ getCondCode (StMachOp mop [x, y])
       MO_Dbl_Le -> condFltCode LE  x y
 
       other -> pprPanic "getCondCode(x86,sparc)" (pprMachOp mop)
+
+getCondCode other =  pprPanic "getCondCode(2)(x86,sparc)" (pprStixExpr other)
 
 #endif {- i386_TARGET_ARCH || sparc_TARGET_ARCH -}
 \end{code}
@@ -2407,7 +2544,7 @@ genCCall fn cconv kind args
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if i386_TARGET_ARCH
 
-genCCall fn cconv kind [StInt i]
+genCCall fn cconv ret_rep [StInt i]
   | fn == SLIT ("PerformGC_wrapper")
   = let call = toOL [
                   MOV L (OpImm (ImmInt (fromInteger i))) (OpReg eax),
@@ -2419,8 +2556,8 @@ genCCall fn cconv kind [StInt i]
     returnNat call
 
 
-genCCall fn cconv kind args
-  = mapNat get_call_arg
+genCCall fn cconv ret_rep args
+  = mapNat push_arg
            (reverse args)  `thenNat` \ sizes_n_codes ->
     getDeltaNat            `thenNat` \ delta ->
     let (sizes, codes) = unzip sizes_n_codes
@@ -2462,14 +2599,25 @@ genCCall fn cconv kind args
     arg_size _  = 4
 
     ------------
-    get_call_arg :: StixExpr{-current argument-}
+    push_arg :: StixExpr{-current argument-}
                     -> NatM (Int, InstrBlock)  -- argsz, code
 
-    get_call_arg arg
-      = get_op arg		  `thenNat` \ (code, reg, sz) ->
-        getDeltaNat               `thenNat` \ delta ->
-        arg_size sz               `bind`    \ size ->
-        setDeltaNat (delta-size)  `thenNat` \ _ ->
+    push_arg arg
+      | is64BitRep arg_rep
+      = iselExpr64 arg			`thenNat` \ (ChildCode64 code vr_lo) ->
+        getDeltaNat			`thenNat` \ delta ->
+        setDeltaNat (delta - 8)		`thenNat` \ _ ->
+        let r_lo = VirtualRegI vr_lo
+            r_hi = getHiVRegFromLo r_lo
+        in  returnNat (8,
+                       toOL [PUSH L (OpReg r_hi), DELTA (delta - 4),
+                             PUSH L (OpReg r_lo), DELTA (delta - 8)]
+            )
+      | otherwise
+      = get_op arg			`thenNat` \ (code, reg, sz) ->
+        getDeltaNat			`thenNat` \ delta ->
+        arg_size sz			`bind`    \ size ->
+        setDeltaNat (delta-size)  	`thenNat` \ _ ->
         if   (case sz of DF -> True; F -> True; _ -> False)
         then returnNat (size,
                         code `appOL`
@@ -2484,6 +2632,9 @@ genCCall fn cconv kind args
                         PUSH L (OpReg reg) `snocOL`
                         DELTA (delta-size)
                        )
+      where
+         arg_rep = repOfStixExpr arg
+
     ------------
     get_op
 	:: StixExpr

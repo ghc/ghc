@@ -15,7 +15,8 @@ modules --- the pleasure has been foregone.)
 module MachRegs (
 
         RegClass(..), regClass,
-	Reg(..), isRealReg, isVirtualReg,
+	VRegUnique(..), pprVRegUnique, getHiVRegFromLo, 
+	Reg(..), isRealReg, isVirtualReg, getVRegUnique,
         allocatableRegs, argRegs, allArgRegs, callClobberedRegs,
 
 	Imm(..),
@@ -248,6 +249,26 @@ Virtual regs can be of either class, so that info is attached.
 
 \begin{code}
 
+data VRegUnique
+   = VRegUniqueLo Unique		-- lower part of a split quantity
+   | VRegUniqueHi Unique		-- upper part thereof
+     deriving (Eq, Ord)
+
+instance Show VRegUnique where
+   show (VRegUniqueLo u) = show u
+   show (VRegUniqueHi u) = "_hi_" ++ show u
+
+pprVRegUnique :: VRegUnique -> Outputable.SDoc
+pprVRegUnique 
+   = Outputable.text . show
+
+-- Determine the upper-half vreg for a 64-bit quantity on a 32-bit platform
+-- when supplied with the vreg for the lower-half of the quantity.
+getHiVRegFromLo (VirtualRegI (VRegUniqueLo u)) 
+   = VirtualRegI (VRegUniqueHi u)
+getHiVRegFromLo other 
+   = pprPanic "getHiVRegFromLo" (ppr other)
+
 data RegClass 
    = RcInteger 
    | RcFloat
@@ -256,22 +277,29 @@ data RegClass
 
 data Reg
    = RealReg     Int
-   | VirtualRegI Unique
-   | VirtualRegF Unique
-   | VirtualRegD Unique
+   | VirtualRegI VRegUnique
+   | VirtualRegF VRegUnique
+   | VirtualRegD VRegUnique
 
 unRealReg (RealReg i) = i
 unRealReg vreg        = pprPanic "unRealReg on VirtualReg" (ppr vreg)
+
+getVRegUnique :: Reg -> VRegUnique
+getVRegUnique (VirtualRegI vu) = vu
+getVRegUnique (VirtualRegF vu) = vu
+getVRegUnique (VirtualRegD vu) = vu
+getVRegUnique rreg             = pprPanic "getVRegUnique on RealReg" (ppr rreg)
 
 mkVReg :: Unique -> PrimRep -> Reg
 mkVReg u pk
 #if sparc_TARGET_ARCH
    = case pk of
-        FloatRep  -> VirtualRegF u
-        DoubleRep -> VirtualRegD u
-        other     -> VirtualRegI u
+        FloatRep  -> VirtualRegF (VRegUniqueLo u)
+        DoubleRep -> VirtualRegD (VRegUniqueLo u)
+        other     -> VirtualRegI (VRegUniqueLo u)
 #else
-   = if isFloatingRep pk then VirtualRegD u else VirtualRegI u
+   = if isFloatingRep pk then VirtualRegD (VRegUniqueLo u) 
+                         else VirtualRegI (VRegUniqueLo u)
 #endif
 
 isVirtualReg (RealReg _)     = False
@@ -314,19 +342,13 @@ instance Ord Reg where
 
 
 instance Show Reg where
-    showsPrec _ (RealReg i)     = showString (showReg i)
-    showsPrec _ (VirtualRegI u) = showString "%vI_"  . shows u
-    showsPrec _ (VirtualRegF u) = showString "%vF_"  . shows u
-    showsPrec _ (VirtualRegD u) = showString "%vD_"  . shows u
+    show (RealReg i)     = showReg i
+    show (VirtualRegI u) = "%vI_" ++ show u
+    show (VirtualRegF u) = "%vF_" ++ show u
+    show (VirtualRegD u) = "%vD_" ++ show u
 
 instance Outputable Reg where
     ppr r = Outputable.text (show r)
-
-instance Uniquable Reg where
-    getUnique (RealReg i)     = mkPseudoUnique2 i
-    getUnique (VirtualRegI u) = u
-    getUnique (VirtualRegF u) = u
-    getUnique (VirtualRegD u) = u
 \end{code}
 
 ** Machine-specific Reg stuff: **

@@ -36,6 +36,8 @@ import MachMisc		( IF_ARCH_i386(i386_insert_ffrees,) )
 import qualified Pretty
 import Outputable
 
+-- DEBUGGING ONLY
+--import OrdList
 \end{code}
 
 The 96/03 native-code generator has machine-independent and
@@ -241,12 +243,18 @@ stixStmt_ConFold stmt
         StJump dsts addr
            -> StJump dsts (stixExpr_ConFold addr)
         StCondJump addr test
-           -> StCondJump addr (stixExpr_ConFold test)
+           -> let test_opt = stixExpr_ConFold test
+              in 
+              if  manifestlyZero test_opt
+              then StComment (_PK_ ("deleted: " ++ showSDoc (pprStixStmt stmt)))
+              else StCondJump addr (stixExpr_ConFold test)
         StData pk datas
            -> StData pk (map stixExpr_ConFold datas)
         other
            -> other
-
+     where
+        manifestlyZero (StInt 0) = True
+        manifestlyZero other     = False
 
 stixExpr_ConFold expr
    = case expr of

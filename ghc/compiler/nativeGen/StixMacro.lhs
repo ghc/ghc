@@ -316,6 +316,11 @@ checkCode macro args assts
 		in  (\xs -> assign_hp words : cjmp_hp : 
 			    assts (hp_alloc words : gc_d1 : join : xs))
 
+	HP_CHK_L1      -> 
+		let [words] = args_stix
+		in  (\xs -> assign_hp words : cjmp_hp : 
+			    assts (hp_alloc words : gc_l1 : join : xs))
+
 	HP_CHK_UT_ALT  -> 
                 let [words,ptrs,nonptrs,r,ret] = args_stix
                 in (\xs -> assign_hp words : cjmp_hp :
@@ -360,6 +365,7 @@ gc_unpt_r1         = mkStJump_to_GCentry_name "stg_gc_unpt_r1"
 gc_unbx_r1         = mkStJump_to_GCentry_name "stg_gc_unbx_r1"
 gc_f1              = mkStJump_to_GCentry_name "stg_gc_f1"
 gc_d1              = mkStJump_to_GCentry_name "stg_gc_d1"
+gc_l1              = mkStJump_to_GCentry_name "stg_gc_l1"
 gc_gen             = mkStJump_to_GCentry_name "stg_gen_chk"
 gc_ut (StInt p) (StInt np)
                    = mkStJump_to_GCentry_name ("stg_gc_ut_" ++ show p ++ "_" ++ show np)
