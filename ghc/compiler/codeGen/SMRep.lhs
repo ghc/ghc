@@ -41,7 +41,7 @@ module SMRep (
 import Id		( Id, idType )
 import Type		( Type, typePrimRep, PrimRep(..) )
 import TyCon		( TyCon, tyConPrimRep )
-import MachOp		( MachRep(..), MachHint(..), wordRep )
+import MachOp--		( MachRep(..), MachHint(..), wordRep )
 import CmdLineOpts	( opt_SccProfilingOn, opt_GranMacros, opt_Unregisterised )
 import Constants
 import Outputable

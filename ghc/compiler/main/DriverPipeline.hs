@@ -1167,11 +1167,16 @@ doCpp raw include_cc_opts input_fn output_fn = do
     let cpp_prog args | raw       = SysTools.runCpp args
 	              | otherwise = SysTools.runCc (SysTools.Option "-E" : args)
 
+    let target_defs = 
+	  [ "-D" ++ cTARGETOS   ++ "_TARGET_OS=1",
+	    "-D" ++ cTARGETARCH ++ "_TARGET_ARCH=1" ]
+
     cpp_prog       ([SysTools.Option verb]
 		    ++ map SysTools.Option include_paths
 		    ++ map SysTools.Option hsSourceCppOpts
 		    ++ map SysTools.Option hscpp_opts
 		    ++ map SysTools.Option cc_opts
+		    ++ map SysTools.Option target_defs
 		    ++ [ SysTools.Option     "-x"
 		       , SysTools.Option     "c"
 		       , SysTools.Option     input_fn

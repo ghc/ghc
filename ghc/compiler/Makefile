@@ -192,6 +192,8 @@ $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "cHscIfaceFileVersion  = \"$(HscIfaceFileVersion)\"" >> $(CONFIG_HS)
 	@echo "cHOSTPLATFORM         = \"$(HOSTPLATFORM)\"" >> $(CONFIG_HS)
 	@echo "cTARGETPLATFORM       = \"$(TARGETPLATFORM)\"" >> $(CONFIG_HS)
+	@echo "cTARGETOS             = \"$(TargetOS_CPP)\"" >> $(CONFIG_HS)
+	@echo "cTARGETARCH           = \"$(TargetArch_CPP)\"" >> $(CONFIG_HS)
 	@echo "cGhcWithNativeCodeGen = \"$(GhcWithNativeCodeGen)\"" >> $(CONFIG_HS)
 	@echo "cGhcUnregisterised    = \"$(GhcUnregisterised)\"" >> $(CONFIG_HS)
 	@echo "cLeadingUnderscore    = \"$(LeadingUnderscore)\"" >> $(CONFIG_HS)
