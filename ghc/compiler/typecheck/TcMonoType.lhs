@@ -821,15 +821,17 @@ checkSigTyVars sig_tyvars free_tyvars
 		-- acc maps a zonked type variable back to a signature type variable
 	  = case getTyVar_maybe ty of {
 	      Nothing ->			-- Error (a)!
-			returnNF_Tc (tidy_env, acc, unify_msg sig_tyvar (ppr ty) : msgs) ;
+			returnNF_Tc (tidy_env, acc, unify_msg sig_tyvar (quotes (ppr ty)) : msgs) ;
 
 	      Just tv ->
 
 	    case lookupVarEnv acc tv of {
 		Just sig_tyvar' -> 	-- Error (b) or (d)!
-			returnNF_Tc (tidy_env, acc, unify_msg sig_tyvar (ppr sig_tyvar') : msgs) ;
+			returnNF_Tc (tidy_env, acc, unify_msg sig_tyvar thing : msgs)
+		    where
+			thing = ptext SLIT("another quantified type variable") <+> quotes (ppr sig_tyvar')
 
-		Nothing ->
+	      ; Nothing ->
 
 	    if tv `elemVarSet` globals	-- Error (c)! Type variable escapes
 					-- The least comprehensible, so put it last
@@ -913,7 +915,7 @@ escape_msg sig_tv tv globs frees
     vcat_first 0 (x:xs) = text "...others omitted..."
     vcat_first n (x:xs) = x $$ vcat_first (n-1) xs
 
-unify_msg tv thing = mk_msg tv <+> ptext SLIT("is unified with") <+> quotes thing
+unify_msg tv thing = mk_msg tv <+> ptext SLIT("is unified with") <+> thing
 mk_msg tv          = ptext SLIT("Quantified type variable") <+> quotes (ppr tv)
 \end{code}
 
