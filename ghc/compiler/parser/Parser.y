@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.108 2002/10/10 15:14:37 sof Exp $
+$Id: Parser.y,v 1.109 2002/10/11 08:48:13 simonpj Exp $
 
 Haskell grammar.
 
@@ -413,7 +413,7 @@ topdecl :: { RdrBinding }
 		  in RdrHsDecl (InstD (InstDecl $3 binds sigs Nothing $1)) }
 	| srcloc 'default' '(' comma_types0 ')'		{ RdrHsDecl (DefD (DefaultDecl $4 $1)) }
 	| 'foreign' fdecl				{ RdrHsDecl $2 }
-	| '{-# DEPRECATED' deprecations '#-}'	 	{ RdrBindings $2 }
+	| '{-# DEPRECATED' deprecations '#-}'	 	{ RdrBindings (reverse $2) }
 	| '{-# RULES' rules '#-}'		 	{ RdrBindings (reverse $2) }
 	| srcloc '$(' exp ')'				{ RdrHsDecl (SpliceD (SpliceDecl $3 $1)) }
       	| decl						{ $1 }
@@ -487,7 +487,7 @@ letbinds :: { RdrNameHsExpr -> RdrNameHsExpr }
 -----------------------------------------------------------------------------
 -- Transformation Rules
 
-rules	:: { [RdrBinding] }
+rules	:: { [RdrBinding] }	-- Reversed
 	:  rules ';' rule			{ $3 : $1 }
         |  rules ';'				{ $1 }
         |  rule					{ [$1] }
@@ -522,10 +522,11 @@ rule_var :: { RdrNameRuleBndr }
        	| '(' varid '::' ctype ')'             	{ RuleBndrSig $2 $4 }
 
 -----------------------------------------------------------------------------
--- Deprecations
+-- Deprecations (c.f. rules)
 
-deprecations :: { [RdrBinding] }
-	: deprecation ';' deprecations		{ $1 : $3 }
+deprecations :: { [RdrBinding] }	-- Reversed
+	: deprecations ';' deprecation		{ $3 : $1 }
+	| deprecations ';' 			{ $1 }
 	| deprecation				{ [$1] }
 	| {- empty -}				{ [] }
 
