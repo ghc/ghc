@@ -30,7 +30,7 @@ import Name		( mkGlobalName, nameModule, nameOccName, getOccString,
 			  mkForeignExportOcc, isLocalName,
 			  NamedThing(..), Provenance(..), ExportFlag(..)
 			)
-import Type		( unUsgTy,
+import Type		( unUsgTy, repType,
 			  splitTyConApp_maybe, splitFunTys, splitForAllTys,
 			  Type, mkFunTys, mkForAllTys, mkTyConApp,
 			  mkTyVarTy, mkFunTy, splitAppTy, applyTy, funResultTy
@@ -493,7 +493,7 @@ showStgType t = text "Stg" <> text (showFFIType t)
 showFFIType :: Type -> String
 showFFIType t = getOccString (getName tc)
  where
-  tc = case splitTyConApp_maybe t of
+  tc = case splitTyConApp_maybe (repType t) of
 	    Just (tc,_) -> tc
 	    Nothing	-> pprPanic "showFFIType" (ppr t)
 \end{code}
