@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: HsLexer.lhs,v 1.6 2002/05/08 13:39:56 simonmar Exp $
+-- $Id: HsLexer.lhs,v 1.7 2002/05/09 10:34:44 simonmar Exp $
 --
 -- (c) The GHC Team, 1997-2000
 --
@@ -352,7 +352,7 @@ lexToken cont s loc y x =
 	do_doc ('#':s) f = f DocOptions      cont s loc y x
 	do_doc ('*':s) f = section 1 s
 	  where section n ('*':s) = section (n+1) s
-		section n _ = f (DocSection n) cont s loc y x
+		section n s = f (DocSection n) cont s loc y x
 	do_doc _ _ = error "Internal error: HsLexer.do_doc"
 
 
