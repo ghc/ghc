@@ -186,6 +186,11 @@ these steps:
 				(more about multi-module programs
 				below).
 
+		multimod_compile_fail
+				Compile a multi-module program,
+				and expect the compilation to fail
+				with error messages in T.stderr
+
 		multimod_compile_and_run
 				Compile and run a multi-module
 				program.
@@ -324,6 +329,7 @@ The following <test-fn>s are provided at the moment:
 	   compile_fail
 	   compile_and_run
 	   multimod_compile
+	   multimod_compile_fail
 	   multimod_compile_and_run
 
 and obviously others can be defined.  The function should return
