@@ -26,6 +26,7 @@ module Text.ParserCombinators.Parsec.Error
                   where
 
 
+import Prelude
 import Data.List (nub,sortBy)
 import Text.ParserCombinators.Parsec.Pos 
                           
@@ -43,15 +44,18 @@ messageToEnum msg
                   Expect _      -> 2
                   Message _     -> 3                                  
                                       
+messageCompare :: Message -> Message -> Ordering
 messageCompare msg1 msg2
     = compare (messageToEnum msg1) (messageToEnum msg2)
   
+messageString :: Message -> String
 messageString msg
     = case msg of SysUnExpect s -> s
                   UnExpect s    -> s
                   Expect s      -> s
                   Message s     -> s                                  
 
+messageEq :: Message -> Message -> Bool
 messageEq msg1 msg2
     = (messageCompare msg1 msg2 == EQ)
     
@@ -77,18 +81,23 @@ errorIsUnknown (ParseError pos msgs)
 -----------------------------------------------------------
 -- Create parse errors
 -----------------------------------------------------------                         
+newErrorUnknown :: SourcePos -> ParseError
 newErrorUnknown pos
     = ParseError pos []
     
+newErrorMessage :: Message -> SourcePos -> ParseError
 newErrorMessage msg pos  
     = ParseError pos [msg]
 
+addErrorMessage :: Message -> ParseError -> ParseError
 addErrorMessage msg (ParseError pos msgs)
     = ParseError pos (msg:msgs)
     
+setErrorPos :: SourcePos -> ParseError -> ParseError
 setErrorPos pos (ParseError _ msgs)
     = ParseError pos msgs
     
+setErrorMessage :: Message -> ParseError -> ParseError
 setErrorMessage msg (ParseError pos msgs)
     = ParseError pos (msg:filter (not . messageEq msg) msgs)
  

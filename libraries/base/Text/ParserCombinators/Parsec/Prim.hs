@@ -39,6 +39,7 @@ module Text.ParserCombinators.Parsec.Prim
                    , getParserState, setParserState 
                  ) where
 
+import Prelude
 import Text.ParserCombinators.Parsec.Pos
 import Text.ParserCombinators.Parsec.Error
 import Control.Monad
@@ -105,7 +106,10 @@ setInput input      = do{ updateParserState (\(State _ pos user) -> State input 
                         ; return ()
                         }
 
-getParserState      = updateParserState id    
+getParserState	    :: GenParser tok st (State tok st)
+getParserState      =  updateParserState id    
+
+setParserState	    :: State tok st -> GenParser tok st (State tok st)
 setParserState st   = updateParserState (const st)
 
 
@@ -152,6 +156,7 @@ parseTest p input
         Right x  -> print x
 
 
+parse :: GenParser tok () a -> SourceName -> [tok] -> Either ParseError a
 parse p name input
     = runParser p () name input
 
@@ -313,6 +318,7 @@ label :: GenParser tok st a -> String -> GenParser tok st a
 label p msg
   = labels p [msg]
 
+labels :: GenParser tok st a -> [String] -> GenParser tok st a
 labels (Parser p) msgs
     = Parser (\state -> 
         case (p state) of

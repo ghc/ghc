@@ -23,6 +23,7 @@ module Text.ParserCombinators.Parsec.Char
                   , satisfy
                   ) where
 
+import Prelude
 import Data.Char
 import Text.ParserCombinators.Parsec.Pos( updatePosChar, updatePosString )
 import Text.ParserCombinators.Parsec.Prim
