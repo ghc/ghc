@@ -113,7 +113,7 @@ tcCheckFIType sig_ty arg_tys res_ty (CDynImport _)
 
 tcCheckFIType sig_ty arg_tys res_ty (CImport (CCallSpec target _ safety))
   | isDynamicTarget target	-- Foreign import dynamic
-  = checkCg checkCOrAsm		`thenNF_Tc_`
+  = checkCg checkCOrAsmOrInterp		`thenNF_Tc_`
     case arg_tys of		-- The first arg must be Addr
       []     		-> check False (illegalForeignTyErr empty sig_ty)
       (arg1_ty:arg_tys) -> getDOptsTc							`thenNF_Tc` \ dflags ->
@@ -237,12 +237,20 @@ checkC other = Just (text "requires C code generation (-fvia-C)")
 			   
 checkCOrAsm HscC   = Nothing
 checkCOrAsm HscAsm = Nothing
-checkCOrAsm other  = Just (text "via-C or native code generation (-fvia-C)")
+checkCOrAsm other  
+   = Just (text "requires via-C or native code generation (-fvia-C)")
+
+checkCOrAsmOrInterp HscC           = Nothing
+checkCOrAsmOrInterp HscAsm         = Nothing
+checkCOrAsmOrInterp HscInterpreted = Nothing
+checkCOrAsmOrInterp other  
+   = Just (text "requires interpreted, C or native code generation")
 
 checkCOrAsmOrDotNet HscC   = Nothing
 checkCOrAsmOrDotNet HscAsm = Nothing
 checkCOrAsmOrDotNet HscILX = Nothing
-checkCOrAsmOrDotNet other  = Just (text "requires C, native or .NET ILX code generation")
+checkCOrAsmOrDotNet other  
+   = Just (text "requires C, native or .NET ILX code generation")
 
 checkCOrAsmOrDotNetOrInterp HscC           = Nothing
 checkCOrAsmOrDotNetOrInterp HscAsm         = Nothing
@@ -266,7 +274,8 @@ check True _	   = returnTc ()
 check _    the_err = addErrTc the_err
 
 illegalForeignTyErr arg_or_res ty
-  = hang (hsep [ptext SLIT("Unacceptable"), arg_or_res, ptext SLIT("type in foreign declaration:")])
+  = hang (hsep [ptext SLIT("Unacceptable"), arg_or_res, 
+                ptext SLIT("type in foreign declaration:")])
 	 4 (hsep [ppr ty])
 
 -- Used for 'arg_or_res' argument to illegalForeignTyErr
@@ -274,9 +283,10 @@ argument = text "argument"
 result   = text "result"
 
 badCName :: CLabelString -> Message
-badCName target = sep [quotes (ppr target) <+> ptext SLIT("is not a valid C identifier")]
+badCName target 
+   = sep [quotes (ppr target) <+> ptext SLIT("is not a valid C identifier")]
 
 foreignDeclCtxt fo
   = hang (ptext SLIT("When checking declaration:"))
-     4   (ppr fo)
+         4 (ppr fo)
 \end{code}

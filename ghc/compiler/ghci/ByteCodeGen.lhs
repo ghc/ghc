@@ -24,7 +24,8 @@ import CoreSyn
 import PprCore		( pprCoreExpr )
 import Literal		( Literal(..), literalPrimRep )
 import PrimRep		( PrimRep(..) )
-import PrimOp		( PrimOp(..)  )
+import PrimOp		( PrimOp(..) )
+import CStrings		( CLabelString )
 import CoreFVs		( freeVars )
 import Type		( typePrimRep, splitTyConApp_maybe, isTyVarTy, splitForAllTys )
 import DataCon		( dataConTag, fIRST_TAG, dataConTyCon, 
@@ -365,12 +366,22 @@ schemeE d s p (fvs_case, AnnCase (fvs_scrut, scrut) bndr
       as
    case .... of a -> ...
    Use  a  as the name of the binder too.
+
+   Also    case .... of (# a #) -> ...
+      to
+   case .... of a -> ...
 -}
 schemeE d s p (fvs, AnnCase scrut bndr [(DataAlt dc, [bind1, bind2], rhs)])
    | isUnboxedTupleCon dc && VoidRep == typePrimRep (idType bind1)
-   = trace "automagic mashing of case alts (# VoidRep, a #)" (
+   = --trace "automagic mashing of case alts (# VoidRep, a #)" (
      schemeE d s p (fvs, AnnCase scrut bind2 [(DEFAULT, [bind2], rhs)])
-     )
+     --)
+
+schemeE d s p (fvs, AnnCase scrut bndr [(DataAlt dc, [bind1], rhs)])
+   | isUnboxedTupleCon dc
+   = --trace "automagic mashing of case alts (# a #)" (
+     schemeE d s p (fvs, AnnCase scrut bind1 [(DEFAULT, [bind1], rhs)])
+     --)
 
 schemeE d s p (fvs, AnnCase scrut bndr alts)
    = let
@@ -467,7 +478,8 @@ schemeE d s p other
 --
 -- 2.  (Another nasty hack).  Spot (# a::VoidRep, b #) and treat
 --     it simply as  b  -- since the representations are identical
---     (the VoidRep takes up zero stack space).
+--     (the VoidRep takes up zero stack space).  Also, spot
+--     (# b #) and treat it as  b.
 --
 -- 3.  Application of a non-nullary constructor, by defn saturated.
 --     Split the args into ptrs and non-ptrs, and push the nonptrs, 
@@ -508,11 +520,14 @@ schemeT d s p app
    | let isVoidRepAtom (_, AnnVar v)    = VoidRep == typePrimRep (idType v)
          isVoidRepAtom (_, AnnNote n e) = isVoidRepAtom e
      in  is_con_call && isUnboxedTupleCon con 
-         && length args_r_to_l == 2 
-         && isVoidRepAtom (last (args_r_to_l))
-   = trace ("schemeT: unboxed pair with Void first component") (
+         && ( (length args_r_to_l == 2 && isVoidRepAtom (last (args_r_to_l)))
+              || (length args_r_to_l == 1)
+            )
+   = --trace (if length args_r_to_l == 1
+     --       then "schemeT: unboxed singleton"
+     --       else "schemeT: unboxed pair with Void first component") (
      schemeT d s p (head args_r_to_l)
-     )
+     --)
 
    -- Cases 3 and 4
    | otherwise
@@ -575,91 +590,8 @@ schemeT d s p app
       do_pushery d []
 
          -- CCALL !
-         | Just (CCall (CCallSpec (StaticTarget target) 
-                                  cconv safety)) <- isFCallId_maybe fn
-         = let -- Get the arg and result reps.
-               (a_reps, r_rep) = getCCallPrimReps (idType fn)               
-               tys_str = showSDoc (ppr (a_reps, r_rep))
-               {-
-               Because the Haskell stack grows down, the a_reps refer to 
-               lowest to highest addresses in that order.  The args for the call
-               are on the stack.  Now push an unboxed, tagged Addr# indicating
-               the C function to call.  Then push a dummy placeholder for the 
-               result.  Finally, emit a CCALL insn with an offset pointing to the 
-               Addr# just pushed, and a literal field holding the mallocville
-               address of the piece of marshalling code we generate.
-               So, just prior to the CCALL insn, the stack looks like this 
-               (growing down, as usual):
-                 
-                  <arg_n>
-                  ...
-                  <arg_1>
-                  Addr# address_of_C_fn
-                  <placeholder-for-result#> (must be an unboxed type)
-
-               The interpreter then calls the marshall code mentioned
-               in the CCALL insn, passing it (& <placeholder-for-result#>), 
-               that is, the addr of the topmost word in the stack.
-               When this returns, the placeholder will have been
-               filled in.  The placeholder is slid down to the sequel
-               depth, and we RETURN.
-
-               This arrangement makes it simple to do f-i-dynamic since the Addr#
-               value is the first arg anyway.  It also has the virtue that the
-               stack is GC-understandable at all times.
-
-               The marshalling code is generated specifically for this
-               call site, and so knows exactly the (Haskell) stack
-               offsets of the args, fn address and placeholder.  It
-               copies the args to the C stack, calls the stacked addr,
-               and parks the result back in the placeholder.  The interpreter
-               calls it as a normal C call, assuming it has a signature
-                  void marshall_code ( StgWord* ptr_to_top_of_stack )
-               -}
-
-               -- resolve static address
-               target_addr 
-                  = let unpacked = _UNPK_ target
-                    in  case unsafePerformIO (lookupSymbol unpacked) of
-                           Just aa -> case aa of Ptr a# -> A# a#
-                           Nothing -> panic ("interpreted ccall: can't resolve: " 
-                                             ++ unpacked)
-
-               -- push the Addr#
-               addr_usizeW  = untaggedSizeW AddrRep
-               addr_tsizeW  = taggedSizeW AddrRep
-               push_Addr    = toOL [PUSH_UBX (Right target_addr) addr_usizeW,
-                                    PUSH_TAG addr_usizeW]
-               d_after_Addr = d + addr_tsizeW
-               -- push the return placeholder
-               r_lit        = mkDummyLiteral r_rep
-               r_usizeW     = untaggedSizeW r_rep
-               r_tsizeW     = 1{-tag-} + r_usizeW
-               push_r       = toOL [PUSH_UBX (Left r_lit) r_usizeW,
-                                    PUSH_TAG r_usizeW]
-               d_after_r    = d_after_Addr + r_tsizeW
-               -- do the call
-               do_call      = unitOL (CCALL addr_of_marshaller)
-               -- slide and return
-               wrapup       = mkSLIDE r_tsizeW
-                                      (d_after_r - r_tsizeW - s)
-                              `snocOL` RETURN r_rep
-
-               -- generate the marshalling code we're going to call
-               r_offW       = 0 
-               addr_offW    = r_tsizeW
-               arg1_offW    = r_tsizeW + addr_tsizeW
-               args_offW    = map (arg1_offW +) 
-                                  (init (scanl (+) 0 (map taggedSizeW a_reps)))
-               addr_of_marshaller
-                            = mkMarshalCode (r_offW, r_rep) addr_offW
-                                            (zip args_offW a_reps)               
-           in
-               --trace (show (arg1_offW, args_offW  ,  (map taggedSizeW a_reps) )) (
-               target_addr 
-               `seq`
-               (push_Addr `appOL` push_r `appOL` do_call `appOL` wrapup)
-               --)
+         | Just (CCall ccall_spec) <- isFCallId_maybe fn
+         = generateCCall d s fn ccall_spec
 
          | otherwise
          = case maybe_dcon of
@@ -672,12 +604,130 @@ schemeT d s p app
                                         (d - s - narg_words)
                         `snocOL` ENTER
 
-mkSLIDE n d 
-   = if d == 0 then nilOL else unitOL (SLIDE n d)
-bind x f 
-   = f x
 
 
+{- Given that the args for a CCall have been pushed onto the Haskell
+   stack, generate the marshalling (machine) code for the ccall, and
+   create bytecodes to call that and then return in the right way.  
+-}
+generateCCall :: Int -> Sequel 		-- stack and sequel depths
+              -> Id 			-- of target, for type info
+              -> CCallSpec		-- where to call
+              -> BCInstrList
+
+generateCCall d s fn ccall_spec@(CCallSpec target cconv safety)
+   = let -- Get the arg and result reps.
+         (a_reps_RAW, maybe_r_rep) = getCCallPrimReps (idType fn)               
+         (returns_void, r_rep)
+            = case maybe_r_rep of
+                 Nothing -> (True,  VoidRep)
+                 Just rr -> (False, rr) 
+         {-
+         Because the Haskell stack grows down, the a_reps refer to 
+         lowest to highest addresses in that order.  The args for the call
+         are on the stack.  Now push an unboxed, tagged Addr# indicating
+         the C function to call.  Then push a dummy placeholder for the 
+         result.  Finally, emit a CCALL insn with an offset pointing to the 
+         Addr# just pushed, and a literal field holding the mallocville
+         address of the piece of marshalling code we generate.
+         So, just prior to the CCALL insn, the stack looks like this 
+         (growing down, as usual):
+                 
+            <arg_n>
+            ...
+            <arg_1>
+            Addr# address_of_C_fn
+            <placeholder-for-result#> (must be an unboxed type)
+
+         The interpreter then calls the marshall code mentioned
+         in the CCALL insn, passing it (& <placeholder-for-result#>), 
+         that is, the addr of the topmost word in the stack.
+         When this returns, the placeholder will have been
+         filled in.  The placeholder is slid down to the sequel
+         depth, and we RETURN.
+
+         This arrangement makes it simple to do f-i-dynamic since the Addr#
+         value is the first arg anyway.  It also has the virtue that the
+         stack is GC-understandable at all times.
+
+         The marshalling code is generated specifically for this
+         call site, and so knows exactly the (Haskell) stack
+         offsets of the args, fn address and placeholder.  It
+         copies the args to the C stack, calls the stacked addr,
+         and parks the result back in the placeholder.  The interpreter
+         calls it as a normal C call, assuming it has a signature
+            void marshall_code ( StgWord* ptr_to_top_of_stack )
+         -}
+         -- resolve static address
+         (is_static, static_target_addr)
+            = case target of
+                 DynamicTarget
+                    -> (False, panic "ByteCodeGen.generateCCall(dyn)")
+                 StaticTarget target
+                    -> let unpacked = _UNPK_ target
+                       in  case unsafePerformIO (lookupSymbol unpacked) of
+                              Just aa -> case aa of Ptr a# -> (True, A# a#)
+                              Nothing -> invalid
+                 CasmTarget _
+                    -> invalid
+                 where
+                    invalid = pprPanic ("ByteCodeGen.generateCCall: unfindable " 
+                                        ++ "symbol or otherwise invalid target")
+                                       (ppr ccall_spec)
+
+         -- Get the arg reps, zapping the leading Addr# in the dynamic case
+         a_reps | is_static = a_reps_RAW
+                | otherwise = if null a_reps_RAW 
+                              then panic "ByteCodeGen.generateCCall: dyn with no args"
+                              else tail a_reps_RAW
+
+         -- push the Addr#
+         addr_usizeW = untaggedSizeW AddrRep
+         addr_tsizeW = taggedSizeW AddrRep
+         (push_Addr, d_after_Addr)
+            | is_static
+            = (toOL [PUSH_UBX (Right static_target_addr) addr_usizeW,
+                     PUSH_TAG addr_usizeW],
+               d + addr_tsizeW)
+            | otherwise	-- is already on the stack
+            = (nilOL, d)
+
+         -- Push the return placeholder.  For a call returning nothing,
+         -- this is a VoidRep (tag).
+         r_usizeW  = untaggedSizeW r_rep
+         r_tsizeW  = taggedSizeW r_rep
+         d_after_r = d_after_Addr + r_tsizeW
+         r_lit     = mkDummyLiteral r_rep
+         push_r    = (if   returns_void 
+                      then nilOL 
+                      else unitOL (PUSH_UBX (Left r_lit) r_usizeW))
+                      `appOL` 
+                      unitOL (PUSH_TAG r_usizeW)
+
+         -- do the call
+         do_call      = unitOL (CCALL addr_of_marshaller)
+         -- slide and return
+         wrapup       = mkSLIDE r_tsizeW (d_after_r - r_tsizeW - s)
+                        `snocOL` RETURN r_rep
+
+         -- generate the marshalling code we're going to call
+         r_offW       = 0 
+         addr_offW    = r_tsizeW
+         arg1_offW    = r_tsizeW + addr_tsizeW
+         args_offW    = map (arg1_offW +) 
+                            (init (scanl (+) 0 (map taggedSizeW a_reps)))
+         addr_of_marshaller
+                      = mkMarshalCode cconv
+                                      (r_offW, r_rep) addr_offW
+                                      (zip args_offW a_reps)
+     in
+         --trace (show (arg1_offW, args_offW  ,  (map taggedSizeW a_reps) )) (
+         push_Addr `appOL` push_r `appOL` do_call `appOL` wrapup
+         --)
+
+
+-- Make a dummy literal, to be used as a placeholder for FFI return
+-- values on the stack.
 mkDummyLiteral :: PrimRep -> Literal
 mkDummyLiteral pr
    = case pr of
@@ -692,31 +742,44 @@ mkDummyLiteral pr
 --       PrelGHC.Int# -> PrelGHC.State# PrelGHC.RealWorld
 --                    -> (# PrelGHC.State# PrelGHC.RealWorld, PrelGHC.Int# #)
 --
--- to [IntRep] -> IntRep
+-- to [IntRep] -> Just IntRep
 -- and check that the last arg is VoidRep'd and that an unboxed pair is
 -- returned wherein the first arg is VoidRep'd.
+--
+-- Alternatively, for call-targets returning nothing, convert
+--
+--       PrelGHC.Int# -> PrelGHC.State# PrelGHC.RealWorld
+--                    -> (# PrelGHC.State# PrelGHC.RealWorld, PrelGHC.Int# #)
+--
+-- to [IntRep] -> Nothing
 
-getCCallPrimReps :: Type -> ([PrimRep], PrimRep)
+getCCallPrimReps :: Type -> ([PrimRep], Maybe PrimRep)
 getCCallPrimReps fn_ty
    = let (a_tys, r_ty) = splitRepFunTys fn_ty
          a_reps        = map typePrimRep a_tys
+         a_reps_to_go  = init a_reps
+         maybe_r_rep_to_go  
+            = if length r_reps == 1 then Nothing else Just (r_reps !! 1)
          (r_tycon, r_reps) 
             = case splitTyConApp_maybe (repType r_ty) of
                       (Just (tyc, tys)) -> (tyc, map typePrimRep tys)
                       Nothing -> blargh
+
          ok = length a_reps >= 1 && VoidRep == last a_reps
-               && length r_reps == 2 && VoidRep == head r_reps
+               && ( (length r_reps == 2 && VoidRep == head r_reps)
+                    || r_reps == [VoidRep] )
                && isUnboxedTupleTyCon r_tycon
-               && PtrRep /= r_rep_to_go	-- if it was, it would be impossible 
-                                        -- to create a valid return value 
-                                        -- placeholder on the stack
-         a_reps_to_go = init a_reps
-         r_rep_to_go  = r_reps !! 1
+               && case maybe_r_rep_to_go of
+                     Nothing    -> True
+                     Just r_rep -> r_rep /= PtrRep
+                                   -- if it was, it would be impossible 
+                                   -- to create a valid return value 
+                                   -- placeholder on the stack
          blargh       = pprPanic "getCCallPrimReps: can't handle:" 
                                  (pprType fn_ty)
      in 
      --trace (showSDoc (ppr (a_reps, r_reps))) (
-     if ok then (a_reps_to_go, r_rep_to_go) else blargh
+     if ok then (a_reps_to_go, maybe_r_rep_to_go) else blargh
      --)
 
 atomRep (AnnVar v)    = typePrimRep (idType v)
@@ -1104,6 +1167,10 @@ unboxedTupleException
            ("Bytecode generator can't handle unboxed tuples.  Possibly due\n" ++
             "\tto foreign import/export decls in source.  Workaround:\n" ++
             "\tcompile this module to a .o file, then restart session."))
+
+
+mkSLIDE n d = if d == 0 then nilOL else unitOL (SLIDE n d)
+bind x f    = f x
 
 \end{code}
 

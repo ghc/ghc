@@ -10,6 +10,7 @@ module ByteCodeFFI ( taggedSizeW, untaggedSizeW, mkMarshalCode ) where
 
 import Outputable
 import PrimRep		( PrimRep(..), getPrimRepSize, isFollowableRep )
+import ForeignCall	( CCallConv(..) )
 import Bits		( Bits(..), shiftR )
 import Word		( Word8, Word32 )
 import Addr		( Addr(..), writeWord8OffAddr )
@@ -62,6 +63,9 @@ sendBytesToMallocville bytes
 
 \begin{code}
 
+-- For sparc_TARGET_ARCH, i386_TARGET_ARCH, etc.
+#include "nativeGen/NCG.h"
+
 {-
 Make a piece of code which expects to see the Haskell stack
 looking like this.  It is given a pointer to the lowest word in
@@ -72,18 +76,29 @@ the stack -- presumably the tag of the placeholder.
                   <arg_1>
                   Addr# address_of_C_fn
                   <placeholder-for-result#> (must be an unboxed type)
+
+We cope with both ccall and stdcall for the C fn.  However, this code
+itself expects only to be called using the ccall convention -- that is,
+we don't clear our own (single) arg off the C stack.
 -}
-mkMarshalCode :: (Int, PrimRep) -> Int -> [(Int, PrimRep)] 
+mkMarshalCode :: CCallConv
+              -> (Int, PrimRep) -> Int -> [(Int, PrimRep)] 
               -> Addr
-mkMarshalCode (r_offW, r_rep) addr_offW arg_offs_n_reps
-   = let bytes = mkMarshalCode_wrk (r_offW, r_rep) 
+mkMarshalCode cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
+   = let bytes = mkMarshalCode_wrk cconv (r_offW, r_rep) 
                                    addr_offW arg_offs_n_reps
      in  unsafePerformIO (sendBytesToMallocville bytes)
 
 
-mkMarshalCode_wrk :: (Int, PrimRep) -> Int -> [(Int, PrimRep)] 
+
+
+mkMarshalCode_wrk :: CCallConv 
+                  -> (Int, PrimRep) -> Int -> [(Int, PrimRep)] 
                   -> [Word8]
-mkMarshalCode_wrk (r_offW, r_rep) addr_offW arg_offs_n_reps
+
+#if i386_TARGET_ARCH
+
+mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
 
    = let -- Don't change this without first consulting Intel Corp :-)
          bytes_per_word = 4
@@ -218,7 +233,9 @@ mkMarshalCode_wrk (r_offW, r_rep) addr_offW arg_offs_n_reps
            addl        $4*number_of_args_pushed, %esp (ccall only)
            movl        28+4(%esp), %esi
      -}
-     ++ add_lit_esp (bytes_per_word * length offsets_to_pushW)
+     ++ (if   cconv /= StdCallConv
+         then add_lit_esp (bytes_per_word * length offsets_to_pushW)
+         else [])
      ++ movl_offespmem_esi 32
 
      {- Depending on what the return type is, get the result 
@@ -239,6 +256,7 @@ mkMarshalCode_wrk (r_offW, r_rep) addr_offW arg_offs_n_reps
            AddrRep   -> movl_eax_offesimem 4
            DoubleRep -> fstl_offesimem 4
            FloatRep  -> fsts_offesimem 4
+           VoidRep   -> []
            other     -> pprPanic "ByteCodeFFI.mkMarshalCode_wrk(x86)" (ppr r_rep)
 
      {- Restore all the pushed regs and go home.
@@ -256,5 +274,8 @@ mkMarshalCode_wrk (r_offW, r_rep) addr_offW arg_offs_n_reps
      ++ restore_regs
      ++ ret
      )
+
+#endif /* i386_TARGET_ARCH */
+
 \end{code}
 
