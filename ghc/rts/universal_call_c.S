@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1999.
  *
  * $RCSfile: universal_call_c.S,v $
- * $Revision: 1.6 $
- * $Date: 1999/10/27 11:55:51 $
+ * $Revision: 1.7 $
+ * $Date: 1999/10/27 15:29:37 $
  * ------------------------------------------------------------------------*/
 	
 #include "config.h"
@@ -67,8 +67,10 @@
 	
 #if i386_TARGET_ARCH
 
-# Tricky!  Calls the specified function using ccall convention,
-# *and* assumes that I myself was called using ccall.
+/*
+ * Tricky!  Calls the specified function using ccall convention,
+ * *and* assumes that I myself was called using ccall.
+ */
 
 .globl universal_call_c_x86_ccall
 universal_call_c_x86_ccall:
@@ -206,13 +208,13 @@ universal_call_c_x86_stdcall:
 	fstpl 0(%esi)
 	jmp .Lsbye	
 .Lsbye:
-	## don_t clear the args -- the callee does it
-	## leal -12(%ebp),%esp
+	/* don_t clear the args -- the callee does it */
+	/* leal -12(%ebp),%esp */
 	popl %ebx
 	popl %esi
 	popl %edi
 	leave
-	## ret $16       # but we have to clear our own! (no! we were ccall_d)
+	/* ret $16     # but we have to clear our own! (no! we were ccall_d) */
 	ret
 
 #endif /* i386_TARGET_ARCH */
