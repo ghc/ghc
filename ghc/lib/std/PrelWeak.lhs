@@ -10,7 +10,6 @@
 module PrelWeak where
 
 import PrelGHC
-import PrelMaybe
 import PrelBase
 import PrelIOBase
 import PrelForeign
@@ -26,23 +25,8 @@ mkWeak key val finaliser = IO $ \s ->
    case mkWeak# key val finaliser s of { (# s1, w #) ->
    (# s1, Weak w #) }
 
-mkWeakNoFinaliser key val = IO $ \s ->
-   -- zero is a valid finaliser argument to mkWeak#, and means "no finaliser"
-   case mkWeak# key val (unsafeCoerce# 0#) s of { (# s1, w #) ->
-   (# s1, Weak w #) }
-
-deRefWeak :: Weak v -> IO (Maybe v)
-deRefWeak (Weak w) = IO $ \s ->
-   case deRefWeak# w s of
-	(# s1, flag, p #) -> case flag of
-				0# -> (# s1, Nothing #)
-				_  -> (# s1, Just p #)
-
 mkWeakPtr :: k -> IO () -> IO (Weak k)
 mkWeakPtr key finaliser = mkWeak key key finaliser
-
-mkWeakPair :: k -> v -> IO () -> IO (Weak (k,v))
-mkWeakPair key val finaliser = mkWeak key (key,val) finaliser
 
 addFinaliser :: key -> IO () -> IO ()
 addFinaliser key finaliser = do
@@ -53,9 +37,6 @@ addForeignFinaliser :: ForeignObj -> IO () -> IO ()
 addForeignFinaliser (ForeignObj fo) finaliser = addFinaliser fo finaliser
 
 {-
-finalise :: Weak v -> IO ()
-finalise (Weak w) = finaliseWeak# w
-
 instance Eq (Weak v) where
   (Weak w1) == (Weak w2) = w1 `sameWeak#` w2
 -}
