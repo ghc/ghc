@@ -3781,7 +3781,7 @@ a new <literal>form</literal> keyword.
 Although only GHC implements arrow notation directly,
 there is also a preprocessor
 (available from the 
-<ulink url="http://www.haskell.org/arrows/">arrows web page></ulink>)
+<ulink url="http://www.haskell.org/arrows/">arrows web page</ulink>)
 that translates arrow notation into Haskell 98
 for use with other Haskell systems.
 You would still want to check arrow programs with GHC;
