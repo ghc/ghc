@@ -204,7 +204,7 @@ StgWord64 stg_integerToWord64 (StgInt sa, StgByteArray /* Really: mp_limb_t* */ 
 #endif
 
 INLINE int __hscore_get_errno(void) { return errno; }
-INLINE int __hscore_set_errno(int e) { errno = e; }
+INLINE void __hscore_set_errno(int e) { errno = e; }
 
 #if !defined(_MSC_VER)
 INLINE int __hscore_s_isreg(m)  { return S_ISREG(m);  }
