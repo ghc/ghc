@@ -280,7 +280,7 @@ checkClsFD qtvs fd clas_tvs tys1 tys2
 -- to make the types match.  For example, given
 --	class C a b | a->b where ...
 --	instance C (Maybe x) (Tree x) where ..
--- and an Inst of form (C (Maybe t1 t2), 
+-- and an Inst of form (C (Maybe t1) t2), 
 -- then we will call checkClsFD with
 --
 --	qtvs = {x}, tys1 = [Maybe x,  Tree x]
