@@ -19,7 +19,7 @@ import Maybes		( catMaybes )
 import Name		( isLocallyDefined, getSrcLoc )
 import ErrUtils		( ErrMsg, Message, addErrLocHdrLine, pprBagOfErrors, dontAddErrLoc )
 import Type		( mkFunTys, splitFunTys, splitAlgTyConApp_maybe, 
-			  isUnLiftedType, isTyVarTy, Type
+			  isUnLiftedType, isTyVarTy, splitForAllTys, Type
 			)
 import TyCon		( TyCon, isDataTyCon )
 import Util		( zipEqual )
@@ -114,6 +114,9 @@ lint_binds_help (binder, rhs)
 \begin{code}
 lintStgRhs :: StgRhs -> LintM (Maybe Type)
 
+lintStgRhs (StgRhsClosure _ _ _ _ _ [] expr)
+  = lintStgExpr expr
+
 lintStgRhs (StgRhsClosure _ _ _ _ _ binders expr)
   = addLoc (LambdaBodyOf binders) (
     addInScopeVars binders (
@@ -172,12 +175,15 @@ lintStgExpr e@(StgCase scrut _ _ bndr _ alts)
   = lintStgExpr scrut		`thenMaybeL` \ _ ->
     checkTys (idType bndr) scrut_ty (mkDefltMsg bndr) `thenL_`
 
-	-- Check that it is a data type
-    case (splitAlgTyConApp_maybe scrut_ty) of
-      Just (tycon, _, _) | isDataTyCon tycon
-	      -> addInScopeVars [bndr] (lintStgAlts alts scrut_ty tycon)
-      other   -> addErrL (mkCaseDataConMsg e)	`thenL_`
-		 returnL Nothing
+    (trace (showSDoc (ppr e)) $ 
+	-- we only allow case of tail-call or primop.
+    (case scrut of
+	StgApp _ _ -> returnL ()
+	StgCon _ _ _ -> returnL ()
+	other -> addErrL (mkCaseOfCaseMsg e))   `thenL_`
+
+    addInScopeVars [bndr] (lintStgAlts alts scrut_ty)
+  )
   where
     scrut_ty = get_ty alts
 
@@ -188,10 +194,9 @@ lintStgExpr e@(StgCase scrut _ _ bndr _ alts)
 \begin{code}
 lintStgAlts :: StgCaseAlts
 	     -> Type 		-- Type of scrutinee
-	     -> TyCon			-- TyCon pinned on the case
 	     -> LintM (Maybe Type)	-- Type of alternatives
 
-lintStgAlts alts scrut_ty case_tycon
+lintStgAlts alts scrut_ty
   = (case alts of
 	 StgAlgAlts _ alg_alts deflt ->
 	   mapL (lintAlgAlt scrut_ty) alg_alts 	`thenL` \ maybe_alt_tys ->
@@ -371,6 +376,12 @@ addInScopeVars ids m loc scope errs
     m loc (scope `unionVarSet` new_set) errs
 \end{code}
 
+Checking function applications: we only check that the type has the
+right *number* of arrows, we don't actually compare the types.  This
+is because we can't expect the types to be equal - the type
+applications and type lambdas that we use to calculate accurate types
+have long since disappeared.
+
 \begin{code}
 checkFunApp :: Type 		    -- The function type
 	    -> [Type]		    -- The arg type(s)
@@ -380,7 +391,8 @@ checkFunApp :: Type 		    -- The function type
 checkFunApp fun_ty arg_tys msg loc scope errs
   = cfa res_ty expected_arg_tys arg_tys
   where
-    (expected_arg_tys, res_ty) = splitFunTys fun_ty
+    (_, de_forall_ty)   = splitForAllTys fun_ty
+    (expected_arg_tys, res_ty) = splitFunTys de_forall_ty
 
     cfa res_ty expected []	-- Args have run out; that's fine
       = (Just (mkFunTys expected res_ty), errs)
@@ -397,9 +409,7 @@ checkFunApp fun_ty arg_tys msg loc scope errs
 	  (new_expected, new_res) -> cfa new_res new_expected arg_tys
 
     cfa res_ty (expected_arg_ty:expected_arg_tys) (arg_ty:arg_tys)
-      = if (expected_arg_ty == arg_ty)
-	then cfa res_ty expected_arg_tys arg_tys
-	else (Nothing, addErr errs msg loc) -- Arg mis-match
+      = cfa res_ty expected_arg_tys arg_tys
 \end{code}
 
 \begin{code}
@@ -412,22 +422,16 @@ checkInScope id loc scope errs
 
 checkTys :: Type -> Type -> Message -> LintM ()
 checkTys ty1 ty2 msg loc scope errs
-  = if (ty1 == ty2)
-    then ((), errs)
-    else ((), addErr errs msg loc)
+  = -- if (ty1 == ty2) then
+    ((), errs)
+    -- else ((), addErr errs msg loc)
 \end{code}
 
 \begin{code}
 mkCaseAltMsg :: StgCaseAlts -> Message
 mkCaseAltMsg alts
   = ($$) (text "In some case alternatives, type of alternatives not all same:")
-	    -- LATER: (ppr alts)
-	    (panic "mkCaseAltMsg")
-
-mkCaseDataConMsg :: StgExpr -> Message
-mkCaseDataConMsg expr
-  = ($$) (ptext SLIT("A case scrutinee not a type-constructor type:"))
-	    (ppr expr)
+	    (empty) -- LATER: ppr alts
 
 mkCaseAbstractMsg :: TyCon -> Message
 mkCaseAbstractMsg tycon
@@ -491,6 +495,10 @@ mkPrimAltMsg :: (Literal, StgExpr) -> Message
 mkPrimAltMsg alt
   = text "In a primitive case alternative, type of literal doesn't match type of scrutinee:"
     $$ ppr alt
+
+mkCaseOfCaseMsg :: StgExpr -> Message
+mkCaseOfCaseMsg e
+  = text "Case of non-tail-call:" $$ ppr e
 
 mkRhsMsg :: Id -> Type -> Message
 mkRhsMsg binder ty
