@@ -517,9 +517,22 @@ normalize r = if r < 1 then
 		    tn = 10^n
 		in  if x >= tn then norm ee (x/tn) (e+n) else norm (ee-1) x e
 
-drop0 :: String -> String
-drop0 "" = ""
-drop0 (c:cs) = c : fromMaybe [] (dropTrailing0s cs) --WAS (yuck): reverse (dropWhile (=='0') (reverse cs))
+prR :: Int -> Rational -> Int -> String
+prR n r e  | r <  1  = prR n (r*10) (e-1)		-- final adjustment
+prR n r e  | r >= 10 = prR n (r/10) (e+1)
+prR n r e0
+  | e > 0 && e < 8   = takeN e s ('.' : drop0 (drop e s) [])
+  | e <= 0 && e > -3 = '0': '.' : takeN (-e) (repeat '0') (drop0 s [])
+  | otherwise	     =  h : '.' : drop0 t ('e':show e0)
+   where
+	s@(h:t) = show ((round (r * 10^n))::Integer)
+	e       = e0+1
+	
+	takeN (I# n#) ls rs = takeUInt n# ls rs
+
+drop0 :: String -> String -> String
+drop0     [] rs = rs
+drop0 (c:cs) rs = c : fromMaybe rs (dropTrailing0s cs) --WAS (yuck): reverse (dropWhile (=='0') (reverse cs))
   where
    dropTrailing0s []       = Nothing
    dropTrailing0s ('0':xs) = 
@@ -531,18 +544,6 @@ drop0 (c:cs) = c : fromMaybe [] (dropTrailing0s cs) --WAS (yuck): reverse (dropW
       Nothing -> Just [x]
       Just ls -> Just (x:ls)
 
-prR :: Int -> Rational -> Int -> String
-prR n r e | r <  1  = prR n (r*10) (e-1)		-- final adjustment
-prR n r e | r >= 10 = prR n (r/10) (e+1)
-prR n r e0 =
-	let s = show ((round (r * 10^n))::Integer)
-	    e = e0+1
-	in  if e > 0 && e < 8 then
-		take e s ++ "." ++ drop0 (drop e s)
-	    else if e <= 0 && e > -3 then
-	        "0." ++ take (-e) (repeat '0') ++ drop0 s
-	    else
-	        head s : "."++ drop0 (tail s) ++ "e" ++ show e0
 \end{code}
 
 [In response to a request for documentation of how fromRational works,
@@ -712,7 +713,7 @@ formatRealFloat fmt decs x
        Just dec ->
         let dec' = max dec 1 in
         case is of
-         [0] -> '0':'.':take dec' (repeat '0') ++ "e0"
+         [0] -> '0' :'.' : take dec' (repeat '0') ++ "e0"
          _ ->
           let
 	   (ei,is') = roundTo base (dec'+1) is

@@ -339,7 +339,7 @@ their greatest common divisor.
 
 \begin{code}
 reduce ::  (Integral a) => a -> a -> Ratio a
-reduce _ 0		=  error "{Ratio.%}: zero denominator"
+reduce _ 0		=  error "Ratio.%: zero denominator"
 reduce x y		=  (x `quot` d) :% (y `quot` d)
 			   where d = gcd x y
 \end{code}

@@ -20,7 +20,12 @@ module PrelList (
    lines, words, unlines, unwords, reverse, and, or,
    any, all, elem, notElem, lookup,
    sum, product, maximum, minimum, concatMap,
-   zip, zip3, zipWith, zipWith3, unzip, unzip3
+   zip, zip3, zipWith, zipWith3, unzip, unzip3,
+
+   -- non-standard, but hidden when creating the Prelude
+   -- export list.
+   takeUInt
+
  ) where
 
 import {-# SOURCE #-} PrelErr ( error )
@@ -200,23 +205,23 @@ splitAt _     _           =  errorNegativeIdx "splitAt"
 
 #else /* hack away */
 take	:: Int -> [b] -> [b]
-take (I# n#) xs = takeUInt n# xs
+take (I# n#) xs = takeUInt n# xs []
 
 -- The general code for take, below, checks n <= maxInt
 -- No need to check for maxInt overflow when specialised
 -- at type Int or Int# since the Int must be <= maxInt
 
-takeUInt :: Int# -> [b] -> [b]
-takeUInt n xs
-  | n >=# 0#  =  take_unsafe_UInt n xs
+takeUInt :: Int# -> [b] -> [b] -> [b]
+takeUInt n xs rs
+  | n >=# 0#  =  take_unsafe_UInt n xs rs
   | otherwise =  errorNegativeIdx "take"
 
-take_unsafe_UInt :: Int# -> [b] -> [b]
-take_unsafe_UInt 0# _     = []
-take_unsafe_UInt m  ls    =
+take_unsafe_UInt :: Int# -> [b] -> [b] -> [b]
+take_unsafe_UInt 0#  _ rs  = rs
+take_unsafe_UInt m  ls rs  =
   case ls of
-    []     -> ls
-    (x:xs) -> x : take_unsafe_UInt (m -# 1#) xs
+    []     -> rs
+    (x:xs) -> x : take_unsafe_UInt (m -# 1#) xs rs
 
 drop		:: Int -> [b] -> [b]
 drop (I# n#) ls
