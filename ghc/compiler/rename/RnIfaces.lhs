@@ -618,6 +618,10 @@ getNonWiredDataDecl needed_name
 		    ty_decl@(TyData new_or_data context tycon tyvars condecls derivings pragmas src_loc)
   |  needed_name == tycon_name
   && opt_PruneTyDecls
+        -- don't prune newtypes, as the code generator may
+	-- want to peer inside a newtype type constructor
+	-- (ClosureInfo.fun_result_ty is the culprit.)
+  && not (new_or_data == NewType)
   && not (nameUnique needed_name `elem` cCallishTyKeys)		
 	-- Hack!  Don't prune these tycons whose constructors
 	-- the desugarer must be able to see when desugaring
