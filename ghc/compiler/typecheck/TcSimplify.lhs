@@ -741,7 +741,7 @@ tcSimplCheck doc get_qtvs givens wanted_lie
       =		-- Step 1
     	mappM zonkInst givens	`thenM` \ givens' ->
     	mappM zonkInst wanteds	`thenM` \ wanteds' ->
-    	get_qtvs 			`thenM` \ qtvs' ->
+    	get_qtvs 		`thenM` \ qtvs' ->
 
  		    -- Step 2
     	let
@@ -785,14 +785,13 @@ tcSimplifyRestricted doc tau_tvs wanteds
 	--	foo = f (3::Int)
 	-- We want to infer the polymorphic type
 	--	foo :: forall b. b -> b
-    let
-	try_me inst = ReduceMe		-- Reduce as far as we can.  Don't stop at
-					-- dicts; the idea is to get rid of as many type
-					-- variables as possible, and we don't want to stop
-					-- at (say) Monad (ST s), because that reduces
-					-- immediately, with no constraint on s.
-    in
-    simpleReduceLoop doc try_me wanteds		`thenM` \ (_, _, constrained_dicts) ->
+
+	-- 'reduceMe': Reduce as far as we can.  Don't stop at
+	-- dicts; the idea is to get rid of as many type
+	-- variables as possible, and we don't want to stop
+	-- at (say) Monad (ST s), because that reduces
+	-- immediately, with no constraint on s.
+    simpleReduceLoop doc reduceMe wanteds	`thenM` \ (foo_frees, foo_binds, constrained_dicts) ->
 
 	-- Next, figure out the tyvars we will quantify over
     zonkTcTyVarsAndFV (varSetElems tau_tvs)	`thenM` \ tau_tvs' ->
@@ -802,6 +801,10 @@ tcSimplifyRestricted doc tau_tvs wanteds
 	qtvs = (tau_tvs' `minusVarSet` oclose (fdPredsOfInsts constrained_dicts) gbl_tvs)
 			 `minusVarSet` constrained_tvs
     in
+    traceTc (text "tcSimplifyRestricted" <+> vcat [
+		pprInsts wanteds, pprInsts foo_frees, pprInsts constrained_dicts,
+		ppr foo_binds,
+		ppr constrained_tvs, ppr tau_tvs', ppr qtvs ])	`thenM_`
 
 	-- The first step may have squashed more methods than
 	-- necessary, so try again, this time knowing the exact
@@ -816,19 +819,28 @@ tcSimplifyRestricted doc tau_tvs wanteds
 	-- Remember that we may need to do *some* simplification, to
 	-- (for example) squash {Monad (ST s)} into {}.  It's not enough
 	-- just to float all constraints
-    mappM zonkInst wanteds			`thenM` \ wanteds' ->
+    restrict_loop doc qtvs wanteds
+	-- We still need a loop because improvement can take place
+	-- E.g. if we have (C (T a)) and the instance decl
+	--	instance D Int b => C (T a) where ...
+	-- and there's a functional dependency for D.   Then we may improve
+	-- the tyep variable 'b'.
+
+restrict_loop doc qtvs wanteds
+  = mappM zonkInst wanteds			`thenM` \ wanteds' ->
+    zonkTcTyVarsAndFV (varSetElems qtvs)	`thenM` \ qtvs' ->
     let
-        try_me inst | isFreeWrtTyVars qtvs inst = Free
-	            | otherwise                 = ReduceMe
+        try_me inst | isFreeWrtTyVars qtvs' inst = Free
+	            | otherwise                  = ReduceMe
     in
     reduceContext doc try_me [] wanteds'	`thenM` \ (no_improvement, frees, binds, irreds) ->
-    ASSERT( no_improvement )
-    ASSERT( null irreds )
-	-- No need to loop because simpleReduceLoop will have
-	-- already done any improvement necessary
-
-    extendLIEs frees				`thenM_`
-    returnM (varSetElems qtvs, binds)
+    if no_improvement then
+	ASSERT( null irreds )
+	extendLIEs frees			`thenM_`
+	returnM (varSetElems qtvs', binds)
+    else
+	restrict_loop doc qtvs' (irreds ++ frees)	`thenM` \ (qtvs1, binds1) ->
+	returnM (qtvs1, binds `AndMonoBinds` binds1)
 \end{code}
 
 
@@ -907,12 +919,10 @@ this bracket again at its usage site.
 \begin{code}
 tcSimplifyBracket :: [Inst] -> TcM ()
 tcSimplifyBracket wanteds
-  = simpleReduceLoop doc try_me wanteds		`thenM_`
+  = simpleReduceLoop doc reduceMe wanteds	`thenM_`
     returnM ()
-
   where
-    doc     = text "tcSimplifyBracket"
-    try_me inst	= ReduceMe
+    doc = text "tcSimplifyBracket"
 \end{code}
 
 
