@@ -37,7 +37,8 @@ import DataCon		( dataConTag, dataConTyCon, dataConId, fIRST_TAG )
 import CoreUtils	( exprIsValue, cheapEqExpr, exprIsConApp_maybe )
 import Type		( tyConAppTyCon, eqType )
 import OccName		( occNameUserString)
-import PrelNames	( unpackCStringFoldrName, unpackCStringFoldrIdKey, hasKey )
+import PrelNames	( unpackCStringFoldrName, unpackCStringFoldrIdKey, hasKey,
+			  eqStringName, unpackCStringListIdKey )
 import Name		( Name )
 import Bits		( Bits(..) )
 #if __GLASGOW_HASKELL__ >= 500
@@ -462,21 +463,22 @@ dataToTagRule other = Nothing
 builtinRules :: [(Name, CoreRule)]
 -- Rules for non-primops that can't be expressed using a RULE pragma
 builtinRules
-  = [ (unpackCStringFoldrName, BuiltinRule SLIT("AppendLitString") match_append_lit_str)
+  = [ (unpackCStringFoldrName, BuiltinRule SLIT("AppendLitString") match_append_lit),
+      (eqStringName,	       BuiltinRule SLIT("EqString") match_eq_string)
     ]
 
 
 -- The rule is this:
 -- 	unpackFoldrCString# "foo" c (unpackFoldrCString# "baz" c n)  =  unpackFoldrCString# "foobaz" c n
 
-match_append_lit_str [Type ty1,
-		      Lit (MachStr s1),
-		      c1,
-		      Var unpk `App` Type ty2 
-			       `App` Lit (MachStr s2)
-			       `App` c2
-			       `App` n
-		     ]
+match_append_lit [Type ty1,
+		   Lit (MachStr s1),
+		   c1,
+		   Var unpk `App` Type ty2 
+		  	    `App` Lit (MachStr s2)
+		  	    `App` c2
+		  	    `App` n
+		  ]
   | unpk `hasKey` unpackCStringFoldrIdKey && 
     c1 `cheapEqExpr` c2
   = ASSERT( ty1 `eqType` ty2 )
@@ -485,5 +487,16 @@ match_append_lit_str [Type ty1,
 		   `App` c1
 		   `App` n)
 
-match_append_lit_str other = Nothing
+match_append_lit other = Nothing
+
+-- The rule is this:
+-- 	eqString (unpackCStringList# (Lit s1)) (unpackCStringList# (Lit s2) = s1==s2
+
+match_eq_string [Var unpk1 `App` Lit (MachStr s1),
+		 Var unpk2 `App` Lit (MachStr s2)]
+  | unpk1 `hasKey` unpackCStringListIdKey,
+    unpk2 `hasKey` unpackCStringListIdKey
+  = Just (if s1 == s2 then trueVal else falseVal)
+
+match_eq_string other = Nothing
 \end{code}		

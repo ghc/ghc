@@ -159,6 +159,7 @@ knownKeyNames
 	mapName,
 	appendName,
 	unpackCStringName,
+	unpackCStringListName,
 	unpackCStringAppendName,
 	unpackCStringFoldrName,
 	unpackCStringUtf8Name,
@@ -378,6 +379,7 @@ eqStringName	  = varQual pREL_BASE_Name SLIT("eqString") eqStringIdKey
 
 -- Strings
 unpackCStringName       = varQual pREL_BASE_Name SLIT("unpackCString#") unpackCStringIdKey
+unpackCStringListName   = varQual pREL_BASE_Name SLIT("unpackCStringList#") unpackCStringListIdKey
 unpackCStringAppendName = varQual pREL_BASE_Name SLIT("unpackAppendCString#") unpackCStringAppendIdKey
 unpackCStringFoldrName  = varQual pREL_BASE_Name SLIT("unpackFoldrCString#") unpackCStringFoldrIdKey
 unpackCStringUtf8Name   = varQual pREL_BASE_Name SLIT("unpackCStringUtf8#") unpackCStringUtf8IdKey
@@ -843,6 +845,7 @@ plusIntegerIdKey	      = mkPreludeMiscIdUnique 41
 timesIntegerIdKey	      = mkPreludeMiscIdUnique 42
 printIdKey		      = mkPreludeMiscIdUnique 43
 failIOIdKey		      = mkPreludeMiscIdUnique 44
+unpackCStringListIdKey	      = mkPreludeMiscIdUnique 45
 \end{code}
 
 Certain class operations from Prelude classes.  They get their own
