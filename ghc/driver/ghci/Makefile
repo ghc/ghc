@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.7 2001/07/30 10:40:36 rrt Exp $
+# $Id: Makefile,v 1.8 2001/08/03 17:03:48 sof Exp $
 #
 
 TOP=../..
@@ -29,6 +29,8 @@ INPLACE_SCRIPT_PROG    = ghci-inplace
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 C_PROG = ghci
+else
+C_SRCS=
 endif
 
 SCRIPT_OBJS	  = ghci.sh
