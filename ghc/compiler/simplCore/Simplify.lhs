@@ -43,7 +43,7 @@ import Name		( isLocallyDefined )
 import CoreSyn
 import CoreFVs		( exprFreeVars )
 import CoreUnfold	( Unfolding, mkOtherCon, mkUnfolding, otherCons,
-			  callSiteInline, blackListed, hasSomeUnfolding
+			  callSiteInline, hasSomeUnfolding
 			)
 import CoreUtils	( cheapEqExpr, exprIsDupable, exprIsCheap, exprIsTrivial,
 			  coreExprType, coreAltsType, exprArity, exprIsValue,
@@ -451,7 +451,7 @@ simplBeta bndr rhs rhs_se cont_ty thing_inside
     extendSubst bndr (ContEx rhs_se rhs) thing_inside
 
   | otherwise
-  = 	-- Simplify the RHS
+  =  	-- Simplify the RHS
     simplBinder bndr					$ \ bndr' ->
     simplArg (idType bndr') (getIdDemandInfo bndr)
 	     rhs rhs_se cont_ty				$ \ rhs' ->
@@ -469,7 +469,7 @@ completeBeta bndr bndr' rhs' thing_inside
     returnSmpl ([], (in_scope, Case rhs' bndr' [(DEFAULT, [], mkLets floats body)]))
 
   | otherwise
-  = completeBinding bndr bndr' rhs' thing_inside
+  = completeBinding bndr bndr' False rhs' thing_inside
 \end{code}
 
 
@@ -512,18 +512,19 @@ It does *not* attempt to do let-to-case.  Why?  Because they are used for
 \begin{code}
 completeBinding :: InId 		-- Binder
 		-> OutId		-- New binder
+		-> Bool			-- True <=> black-listed; don't inline
 	        -> OutExpr		-- Simplified RHS
 		-> SimplM (OutStuff a)	-- Thing inside
 	   	-> SimplM (OutStuff a)
 
-completeBinding old_bndr new_bndr new_rhs thing_inside
+completeBinding old_bndr new_bndr black_listed new_rhs thing_inside
   |  isDeadBinder old_bndr	-- This happens; for example, the case_bndr during case of
 				-- known constructor:  case (a,b) of x { (p,q) -> ... }
 				-- Here x isn't mentioned in the RHS, so we don't want to
 				-- create the (dead) let-binding  let x = (a,b) in ...
   =  thing_inside
 
-  |  postInlineUnconditionally old_bndr new_rhs
+  |  not black_listed && postInlineUnconditionally old_bndr new_rhs
 	-- Maybe we don't need a let-binding!  Maybe we can just
 	-- inline it right away.  Unlike the preInlineUnconditionally case
 	-- we are allowed to look at the RHS.
@@ -587,21 +588,29 @@ simplLazyBind :: TopLevelFlag
 -- Also the binder has already been simplified, and hence is in scope
 
 simplLazyBind top_lvl bndr bndr' rhs thing_inside
-  | preInlineUnconditionally bndr && not opt_SimplNoPreInlining
-  = tick (PreInlineUnconditionally bndr)		`thenSmpl_`
-    getSubstEnv 					`thenSmpl` \ rhs_se ->
-    (extendSubst bndr (ContEx rhs_se rhs) thing_inside)
+  = getBlackList		`thenSmpl` \ black_list_fn ->
+    let 
+	black_listed = isTopLevel top_lvl && black_list_fn bndr
+	-- Only top level things can be black listed, so the
+	-- first test gets us 'False' without having to call
+	-- the function, in the common case.
+    in
+    if not black_listed && 
+       preInlineUnconditionally bndr && 
+       not opt_SimplNoPreInlining
+    then
+	tick (PreInlineUnconditionally bndr)		`thenSmpl_`
+	getSubstEnv 					`thenSmpl` \ rhs_se ->
+	(extendSubst bndr (ContEx rhs_se rhs) thing_inside)
 
-  | otherwise
-  = 	-- Simplify the RHS
-    getSubstEnv 					`thenSmpl` \ rhs_se ->
-
-    simplRhs top_lvl False {- Not ok to float unboxed -}
-	     (idType bndr')
-	     rhs rhs_se  				$ \ rhs' ->
+    else 	-- Simplify the RHS
+	getSubstEnv 					`thenSmpl` \ rhs_se ->
+	simplRhs top_lvl False {- Not ok to float unboxed -}
+	         (idType bndr')
+	         rhs rhs_se  				$ \ rhs' ->
 
 	-- Now compete the binding and simplify the body
-    completeBinding bndr bndr' rhs' thing_inside
+	completeBinding bndr bndr' black_listed rhs' thing_inside
 \end{code}
 
 
@@ -1034,10 +1043,10 @@ rebuild scrut (Select _ bndr alts se cont)
    	-- Get rid of the case altogether
 	-- See the extensive notes on case-elimination below
 	-- Remember to bind the binder though!
-  = tick (CaseElim bndr)		`thenSmpl_` (
-    setSubstEnv se			$			
-    simplBinder bndr			$ \ bndr' ->
-    completeBinding bndr bndr' scrut 	$
+  = tick (CaseElim bndr)			`thenSmpl_` (
+    setSubstEnv se				$			
+    simplBinder bndr				$ \ bndr' ->
+    completeBinding bndr bndr' False scrut 	$
     simplExprF rhs1 cont)
 
   | otherwise
@@ -1179,7 +1188,7 @@ knownCon expr con args bndr alts se cont
     simplBinder bndr		$ \ bndr' ->
     case findAlt con alts of
 	(DEFAULT, bs, rhs)     -> ASSERT( null bs )
-				  completeBinding bndr bndr' expr $
+				  completeBinding bndr bndr' False expr $
 					-- Don't use completeBeta here.  The expr might be
 					-- an unboxed literal, like 3, or a variable
 					-- whose unfolding is an unboxed literal... and
@@ -1196,7 +1205,7 @@ knownCon expr con args bndr alts se cont
 				  simplExprF rhs cont
 
 	(DataCon dc, bs, rhs)  -> ASSERT( length bs == length real_args )
-				  completeBinding bndr bndr' expr	$
+				  completeBinding bndr bndr' False expr	$
 					-- See note above
 				  extendSubstList bs (map mk real_args) $
 			          simplExprF rhs cont
