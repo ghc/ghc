@@ -3,28 +3,76 @@
 </Title>
 
 <Para>
-The motivation behind this foreign function interface(FFI)
-specification is to make it possible to describe in Haskell <Emphasis>source
-code</Emphasis> the interface to foreign functionality in a Haskell system
-independent manner. It builds on experiences made with the previous
-foreign function interfaces provided by GHC and Hugs.
+The motivation behind this foreign function interface (FFI) specification is
+to make it possible to describe in Haskell <Emphasis>source code</Emphasis>
+the interface to foreign functionality in a Haskell system independent
+manner. It builds on experiences made with the previous foreign function
+interfaces provided by GHC and Hugs.  However, the FFI specified in this
+document is not in the market of trying to completely bridge the gap between
+the actual type of an external function, and what is a
+<Emphasis>convenient</Emphasis> type for that function to the Haskell
+programmer. That is the domain of tools like HaskellDirect or Green Card, both
+of which are capable of generating Haskell code that uses this FFI.
 </Para>
 
 <Para>
-The FFI specified in this document is not in the market of trying to
-completely bridge the gap between the actual type of an external
-function, and what is a <Emphasis>convenient</Emphasis> type for that function to the
-Haskell programmer. That is the domain of tools like HaskellDirect or
-Green Card, both of which are capable of generating Haskell code that
-uses this FFI.
+Generally, the FFI consists of three parts:
+<OrderedList>
+
+<ListItem>
+<Para>
+extensions to the base language Haskell 98 (most notably <Literal>foreign
+import</Literal> and <Literal>foreign export</Literal> declarations), which
+are specified in the present document,
+</Para>
+</ListItem>
+
+<ListItem>
+<Para>
+a low-level marshalling library, which is part of the
+<Emphasis>Language</Emphasis> part of the <Emphasis>Haskell Extension
+Library</Emphasis> (see <xref linkend="sec-???">), and a
+</Para>
+</ListItem>
+
+<ListItem>
+<Para>
+a high-level marshalling library, which is still under development.
+</Para>
+</ListItem>
+
+</OrderedList>
+Before diving into the details of the language extension coming with the FFI,
+let us briefly outline the two other components of the interface.
 </Para>
 
 <Para>
-The FFI can be split up into two complementary halves; one half that
-provides Haskell constructs for importing foreign functionality into
-Haskell, the other which lets you expose Haskell functions to the
-outside world. We start with the former, how to import external
-functionality into Haskell.
+The low-level marshalling library consists of a portion that is independent of
+the targeted foreign language and dedicated support for Haskell bindings to C
+libraries (special support for other languages may be added in the future).
+The language independent part is given by the module
+<literal>Foreign</literal> module (see <xref linkend="sec-Foreign">).  It
+provides support for handling references to foreign structures, for passing
+references to Haskell structures out to foreign routines, and for storing
+primitive data types in raw memory blocks in a portable manner.  The support
+for C libraries essentially provides Haskell representations for all basic
+types of C (see <xref linkend="sec-CTypes"> and <xref
+linkend="sec-CTypesISO">).
+</Para>
+
+<Para>
+The high-level library, of which the interface definition is not yet
+finalised, provides routines for marshalling complex Haskell structures as
+well as handling out and in-out parameters in a convenient, yet protable way.
+</Para>
+
+<Para>
+In the following, we will discuss the language extensions of the FFI (ie, the
+first point above).  They can be split up into two complementary halves; one
+half that provides Haskell constructs for importing foreign functionality into
+Haskell, the other which lets you expose Haskell functions to the outside
+world. We start with the former, how to import external functionality into
+Haskell.
 </Para>
 
 </Sect1>
