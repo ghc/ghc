@@ -64,7 +64,7 @@ stmt2Instrs stmt = case stmt of
     StData kind args
       -> mapAndUnzipUs getData args	`thenUs` \ (codes, imms) ->
 	 returnUs (\xs -> mkSeqList (asmInstr (DATA (primRepToSize kind) imms))
-				    (foldr1 (.) codes xs))
+				    (foldr (.) id codes xs))
       where
 	getData :: StixTree -> UniqSM (InstrBlock, Imm)
 
