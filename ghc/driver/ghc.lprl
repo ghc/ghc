@@ -1697,10 +1697,15 @@ Finally, decide what to queue up for linker input.
 
 #ToDo:    local($or_isuf) = ($Isuffix eq '') ? '' : "|$Isuffix";
 
-    if ( $ifile !~ /\.(lhs|hs|hc|c|s)$/ && $ifile !~ /_hc$/ ) {
-	print STDERR "$Pgm: don't recognise suffix on `$ifile'; passing it through to linker\n"
-	    if $ifile !~ /\.a$/;
 
+    if ( $ifile !~ /\.(lhs|hs|hc|c|s|a)$/ && $ifile !~ /_hc$/ ) {
+        # There's sometimes confusion regarding .hi files; users
+	# supplying them on the command line.
+        if ( $ifile =~ /\.hi$/ ) {
+	    print STDERR "$Pgm: warning: found `$ifile' on command line; interface files should not be supplied here - ignoring it.\n";
+        } else {
+	   print STDERR "$Pgm: don't recognise suffix on `$ifile'; passing it through to linker\n";
+        }
 	# oops; we tentatively pushed the wrong thing; fix & do the right thing
 	pop(@Link_file); push(@Link_file, $ifile);
     }
