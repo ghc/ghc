@@ -21,7 +21,7 @@ import TcMonad
 import Inst		( Inst, LIE, plusLIE )
 import TcEnv		( TcIdOcc(..), newMonoIds )
 import TcPat		( tcPat )
-import TcType		( TcType, TcMaybe, zonkTcType )
+import TcType		( TcType, TcMaybe, zonkTcType, newTyVarTy )
 import TcSimplify	( bindInstsOfLocalFuns )
 import Unify		( unifyTauTy, unifyTauTyList, unifyFunTy )
 import Name		( Name {- instance Outputable -} )
@@ -78,8 +78,16 @@ tcMatchesFun fun_name expected_ty matches@(first_match:_)
 parser guarantees that each equation has exactly one argument.
 
 \begin{code}
-tcMatchesCase :: TcType s -> [RenamedMatch] -> TcM s ([TcMatch s], LIE s)
-tcMatchesCase expected_ty matches = tcMatchesExpected expected_ty MCase matches
+tcMatchesCase :: TcType s 		-- Type of whole case expressions
+	      -> [RenamedMatch]		-- The case alternatives
+	      -> TcM s (TcType s,	-- Inferred type of the scrutinee
+			[TcMatch s], 	-- Translated alternatives
+			LIE s)
+
+tcMatchesCase expr_ty matches
+  = newTyVarTy mkTypeKind 					`thenNF_Tc` \ scrut_ty ->
+    tcMatchesExpected (mkFunTy scrut_ty expr_ty) MCase matches	`thenTc` \ (matches', lie) ->
+    returnTc (scrut_ty, matches', lie)
 \end{code}
 
 

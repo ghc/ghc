@@ -99,7 +99,7 @@ tcExpr :: RenamedHsExpr			-- Expession to type check
 \begin{code}
 tcExpr (HsVar name) res_ty
   = tcId name			`thenNF_Tc` \ (expr', lie, id_ty) ->
-    unifyTauTy id_ty res_ty	`thenTc_`
+    unifyTauTy res_ty id_ty 	`thenTc_`
 
     -- Check that the result type doesn't have any nested for-alls.
     -- For example, a "build" on its own is no good; it must be
@@ -306,16 +306,24 @@ tcExpr (HsLet binds expr) res_ty
 	      returnTc (expr', lie)
     combiner is_rec bind expr = HsLet (MonoBind bind [] is_rec) expr
 
-tcExpr in_expr@(HsCase expr matches src_loc) res_ty
-  = tcAddSrcLoc src_loc	$
-    newTyVarTy mkTypeKind 	`thenNF_Tc` \ expr_ty ->
-    tcExpr expr expr_ty		`thenTc`    \ (expr',lie1) ->
+tcExpr in_expr@(HsCase scrut matches src_loc) res_ty
+  = tcAddSrcLoc src_loc			$
+    tcAddErrCtxt (caseCtxt in_expr)	$
 
-    tcAddErrCtxt (caseCtxt in_expr) $
-    tcMatchesCase (mkFunTy expr_ty res_ty) matches	
-				`thenTc`    \ (matches',lie2) ->
+	-- Typecheck the case alternatives first.
+	-- The case patterns tend to give good type info to use
+	-- when typechecking the scrutinee.  For example
+	--	case (map f) of
+	--	  (x:xs) -> ...
+	-- will report that map is applied to too few arguments
 
-    returnTc (HsCase expr' matches' src_loc, plusLIE lie1 lie2)
+    tcMatchesCase res_ty matches	`thenTc`    \ (scrut_ty, matches', lie2) ->
+
+    tcAddErrCtxt (caseScrutCtxt scrut)	(
+      tcExpr scrut scrut_ty
+    )					`thenTc`    \ (scrut',lie1) ->
+
+    returnTc (HsCase scrut' matches' src_loc, plusLIE lie1 lie2)
 
 tcExpr (HsIf pred b1 b2 src_loc) res_ty
   = tcAddSrcLoc src_loc	$
@@ -357,7 +365,7 @@ tcExpr (RecordCon con_name _ rbinds) res_ty
     in
 	-- Con is syntactically constrained to be a data constructor
     ASSERT( maybeToBool (splitAlgTyConApp_maybe record_ty ) )
-    unifyTauTy record_ty res_ty         `thenTc_`
+    unifyTauTy res_ty record_ty          `thenTc_`
 
 	-- Check that the record bindings match the constructor
     let
@@ -432,7 +440,7 @@ tcExpr (RecordUpd record_expr rbinds) res_ty
     let
 	result_record_ty = mkTyConApp tycon result_inst_tys
     in
-    unifyTauTy result_record_ty res_ty          `thenTc_`
+    unifyTauTy res_ty result_record_ty          `thenTc_`
     tcRecordBinds result_record_ty rbinds	`thenTc` \ (rbinds', rbinds_lie) ->
 
 	-- STEP 4
@@ -1033,6 +1041,9 @@ arithSeqCtxt expr
 
 caseCtxt expr
   = hang (ptext SLIT("In the case expression:")) 4 (ppr expr)
+
+caseScrutCtxt expr
+  = hang (ptext SLIT("In the scrutinee of a case expression:")) 4 (ppr expr)
 
 exprSigCtxt expr
   = hang (ptext SLIT("In an expression with a type signature:"))

@@ -311,7 +311,7 @@ unifyFunTy ty
 unify_fun_ty_help ty	-- Special cases failed, so revert to ordinary unification
   = newTyVarTy mkTypeKind		`thenNF_Tc` \ arg ->
     newTyVarTy mkTypeKind		`thenNF_Tc` \ res ->
-    unifyTauTy (mkFunTy arg res) ty	`thenTc_`
+    unifyTauTy ty (mkFunTy arg res)	`thenTc_`
     returnTc (arg,res)
 \end{code}
 
@@ -332,7 +332,7 @@ unifyListTy ty
 
 unify_list_ty_help ty	-- Revert to ordinary unification
   = newTyVarTy mkBoxedTypeKind		`thenNF_Tc` \ elt_ty ->
-    unifyTauTy (mkListTy elt_ty) ty	`thenTc_`
+    unifyTauTy ty (mkListTy elt_ty)	`thenTc_`
     returnTc elt_ty
 \end{code}
 
@@ -353,7 +353,7 @@ unifyTupleTy arity ty
 
 unify_tuple_ty_help arity ty
   = mapNF_Tc (\ _ -> newTyVarTy mkBoxedTypeKind) [1..arity]	`thenNF_Tc` \ arg_tys ->
-    unifyTauTy (mkTupleTy arity arg_tys) ty			`thenTc_`
+    unifyTauTy ty (mkTupleTy arity arg_tys)			`thenTc_`
     returnTc arg_tys
 \end{code}
 

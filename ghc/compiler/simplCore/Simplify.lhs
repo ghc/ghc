@@ -947,7 +947,8 @@ simplNonRec env binder@(id,occ_info) rhs body_c body_ty
     -- Try let-from-let
     simpl_bind env (Let bind rhs) | let_floating_ok
       = tick LetFloatFromLet                    `thenSmpl_`
-	simplBind env (fix_up_demandedness will_be_demanded bind)
+	simplBind env (if will_be_demanded then bind 
+					   else un_demandify_bind bind)
 		      (\env -> simpl_bind env rhs) body_ty
 
     -- Try case-from-let; this deals with a strict let of error too
@@ -1276,7 +1277,8 @@ floatBind env top_level bind
     returnSmpl binds'
 
   where
-    (binds', _, n_extras) = fltBind bind	
+    binds'   = fltBind bind
+    n_extras = sum (map no_of_binds binds') - no_of_binds bind 
 
     float_lets		      = switchIsSet env SimplFloatLetsExposingWHNF
     always_float_let_from_let = switchIsSet env SimplAlwaysFloatLetsFromLets
@@ -1284,27 +1286,22 @@ floatBind env top_level bind
 	-- fltBind guarantees not to return leaky floats
 	-- and all the binders of the floats have had their demand-info zapped
     fltBind (NonRec bndr rhs)
-      = (binds ++ [NonRec (un_demandify bndr) rhs'], 
-	 leakFree bndr rhs', 
-	 length binds)
+      = binds ++ [NonRec bndr rhs'] 
       where
         (binds, rhs') = fltRhs rhs
     
     fltBind (Rec pairs)
-      = ([Rec (extras
-      	       ++
-	       binders `zip` rhss')],
-         and (zipWith leakFree binders rhss'),
-	 length extras
-        )
-    
+      = [Rec pairs']
       where
-        (binders, rhss)  = unzip pairs
-        (binds_s, rhss') = mapAndUnzip fltRhs rhss
-	extras		 = concat (map get_pairs (concat binds_s))
+        pairs' = concat [ let
+				(binds, rhs') = fltRhs rhs
+		          in
+			  foldr get_pairs [(bndr, rhs')] binds
+			| (bndr, rhs) <- pairs
+			]
 
-        get_pairs (NonRec bndr rhs) = [(bndr,rhs)]
-        get_pairs (Rec pairs)       = pairs
+        get_pairs (NonRec bndr rhs) rest = (bndr,rhs) :  rest
+        get_pairs (Rec pairs)       rest = pairs      ++ rest
     
 	-- fltRhs has same invariant as fltBind
     fltRhs rhs
@@ -1322,12 +1319,19 @@ floatBind env top_level bind
             -- fltExpr guarantees not to return leaky floats
       = (binds' ++ body_binds, body')
       where
-        (body_binds, body')	     = fltExpr body
-        (binds', binds_wont_leak, _) = fltBind bind
+        binds_wont_leak     = all leakFreeBind binds'
+        (body_binds, body') = fltExpr body
+        binds'		    = fltBind (un_demandify_bind bind)
     
     fltExpr expr = ([], expr)
 
 -- Crude but effective
+no_of_binds (NonRec _ _) = 1
+no_of_binds (Rec pairs)  = length pairs
+
+leakFreeBind (NonRec bndr rhs) = leakFree bndr rhs
+leakFreeBind (Rec pairs)       = and [leakFree bndr rhs | (bndr, rhs) <- pairs]
+
 leakFree (id,_) rhs = case getIdArity id of
 			ArityAtLeast n | n > 0 -> True
 			ArityExactly n | n > 0 -> True
@@ -1358,16 +1362,14 @@ simplArg env (VarArg id)  = lookupId env id
 
 
 \begin{code}
--- fix_up_demandedness switches off the willBeDemanded Info field
+-- un_demandify_bind switches off the willBeDemanded Info field
 -- for bindings floated out of a non-demanded let
-fix_up_demandedness True {- Will be demanded -} bind
-   = bind	-- Simple; no change to demand info needed
-fix_up_demandedness False {- May not be demanded -} (NonRec binder rhs)
-   = NonRec (un_demandify binder) rhs
-fix_up_demandedness False {- May not be demanded -} (Rec pairs)
-   = Rec [(un_demandify binder, rhs) | (binder,rhs) <- pairs]
+un_demandify_bind (NonRec binder rhs)
+   = NonRec (un_demandify_bndr binder) rhs
+un_demandify_bind (Rec pairs)
+   = Rec [(un_demandify_bndr binder, rhs) | (binder,rhs) <- pairs]
 
-un_demandify (id, occ_info) = (id `addIdDemandInfo` noDemandInfo, occ_info)
+un_demandify_bndr (id, occ_info) = (id `addIdDemandInfo` noDemandInfo, occ_info)
 
 is_cheap_prim_app (Prim op _) = primOpOkForSpeculation op
 is_cheap_prim_app other	      = False
