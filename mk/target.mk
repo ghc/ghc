@@ -869,6 +869,30 @@ else
 	cp $(TEXI2HTML_PREFIX)invisible.xbm html/
 	@touch $@
 endif
+
+#--------------------------------------------------------------------------
+# SGML Documentation
+#
+# This will eventually replace the literate stuff for documentation
+
+SGML_SRCS = $(wildcard    *.sgml *.vsgml)
+SGML_DVI  = $(addsuffix  .dvi, $(basename $(SGML_SRCS)))
+SGML_PS   = $(addsuffix   .ps, $(basename $(SGML_SRCS)))
+SGML_TEXI = $(addsuffix .texi, $(basename $(SGML_SRCS)))
+SGML_INFO = $(addsuffix .info, $(basename $(SGML_SRCS)))
+SGML_HTML = $(addsuffix .html, $(basename $(SGML_SRCS)))
+SGML_TEXT = $(addsuffix  .txt, $(basename $(SGML_SRCS)))
+
+dvi  :: $(SGML_DVI)
+info :: $(SGML_INFO)
+html :: $(SGML_HTML)
+txt  :: $(SGML_TXT)
+ps   :: $(SGML_PS)
+
+CLEAN_FILES += $(SGML_TEXT) $(SGML_HTML) $(SGML_TEXI) $(SGML_PS) $(SGML_DVI)
+
+# suffix rules should handle the rest (for single-file docs at least).
+
 ###########################################
 #
 #	Targets: clean
