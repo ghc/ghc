@@ -1,5 +1,5 @@
 
 tcfail086.hs:6:
     Can't make a derived instance of `Eq Ex'
-    (it has existentially-quantified constructor(s))
+    (`Ex' has existentially-quantified constructor(s))
     When deriving instances for type `Ex'

@@ -4,6 +4,7 @@ tcfail008.hs:3:
       arising from the literal `2' at tcfail008.hs:3
     Possible cause: the monomorphism restriction applied to the following:
       o :: [a] (bound at tcfail008.hs:3)
+    Probable fix: give these definitions an explicit type signature
     In the second argument of `(:)', namely `2'
     In a right-hand side of function `o': 1 : 2
     In the definition of `o': o = 1 : 2
