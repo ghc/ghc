@@ -861,6 +861,7 @@ htmlMarkup = Markup {
 -- If the doc is a single paragraph, don't surround it with <P> (this causes
 -- ugly extra whitespace with some browsers).
 docToHtml (DocParagraph p) = docToHtml p
+docToHtml (DocCodeBlock p) = docToHtml (DocMonospaced p)
 docToHtml doc = markup htmlMarkup doc
 
 -- -----------------------------------------------------------------------------
