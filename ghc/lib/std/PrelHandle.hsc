@@ -4,7 +4,7 @@
 #undef DEBUG
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelHandle.hsc,v 1.6 2001/05/30 16:39:22 sewardj Exp $
+-- $Id: PrelHandle.hsc,v 1.7 2001/05/31 10:03:35 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1994-2001
 --
@@ -265,6 +265,12 @@ ioe_notWritable = ioException
 ioe_notSeekable = ioException 
    (IOError Nothing IllegalOperation ""
 	"handle is not seekable" Nothing)
+
+ioe_bufsiz :: Int -> IO a
+ioe_bufsiz n = ioException 
+   (IOError Nothing InvalidArgument "hSetBuffering"
+	("illegal buffer size " ++ showsPrec 9 n []) Nothing)
+				-- 9 => should be parens'ified.
 
 -- -----------------------------------------------------------------------------
 -- Handle Finalizers
@@ -864,21 +870,15 @@ hSetBuffering handle mode =
 	  -- for input terminals we need to put the terminal into
 	  -- cooked or raw mode depending on the type of buffering.
 	  is_tty <- fdIsTTY (haFD handle_)
-	  when is_tty $
+	  when (is_tty && isReadableHandleType (haType handle_)) $
 		case mode of
 		  NoBuffering -> setCooked (haFD handle_) False
 		  _           -> setCooked (haFD handle_) True
-		
+
  	  -- throw away spare buffers, they might be the wrong size
 	  writeIORef (haBuffers handle_) BufferListNil
 
 	  return (handle_{ haBufferMode = mode })
-
-ioe_bufsiz n
-  = ioException (IOError Nothing InvalidArgument "hSetBuffering"
-			("illegal buffer size " ++ showsPrec 9 n [])
-				-- 9 => should be parens'ified.
-			Nothing)
 
 -- -----------------------------------------------------------------------------
 -- hFlush
@@ -1049,12 +1049,7 @@ hIsReadable handle =
     case haType handle_ of 
       ClosedHandle 	   -> ioe_closedHandle
       SemiClosedHandle 	   -> ioe_closedHandle
-      htype 		   -> return (isReadable htype)
-  where
-    isReadable ReadHandle         = True
-    isReadable (ReadSideHandle _) = True
-    isReadable ReadWriteHandle    = True
-    isReadable _	          = False
+      htype 		   -> return (isReadableHandleType htype)
 
 hIsWritable :: Handle -> IO Bool
 hIsWritable (DuplexHandle _ _) = return False
@@ -1063,12 +1058,7 @@ hIsWritable handle =
     case haType handle_ of 
       ClosedHandle 	   -> ioe_closedHandle
       SemiClosedHandle 	   -> ioe_closedHandle
-      htype 		   -> return (isWritable htype)
-  where
-    isWritable AppendHandle    = True
-    isWritable WriteHandle     = True
-    isWritable ReadWriteHandle = True
-    isWritable _	       = False
+      htype 		   -> return (isWritableHandleType htype)
 
 -- Querying how a handle buffers its data:
 

@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.40 2001/05/22 19:25:49 qrczak Exp $
+% $Id: PrelIOBase.lhs,v 1.41 2001/05/31 10:03:35 simonmar Exp $
 % 
 % (c) The University of Glasgow, 1994-2001
 %
@@ -235,6 +235,16 @@ data HandleType
  | AppendHandle
  | ReadWriteHandle
  | ReadSideHandle  !(MVar Handle__)	-- read side of a duplex handle
+
+isReadableHandleType ReadHandle         = True
+isReadableHandleType ReadWriteHandle    = True
+isReadableHandleType (ReadSideHandle _) = True
+isReadableHandleType _	       	        = False
+
+isWritableHandleType AppendHandle    = True
+isWritableHandleType WriteHandle     = True
+isWritableHandleType ReadWriteHandle = True
+isWritableHandleType _	       	     = False
 
 -- File names are specified using @FilePath@, a OS-dependent
 -- string that (hopefully, I guess) maps to an accessible file/object.
