@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------------
- * $Id: matrix.c,v 1.1 2000/04/05 10:06:36 simonmar Exp $
+ * $Id: matrix.c,v 1.2 2001/07/24 06:01:21 ken Exp $
  *									
  *	Copyright (C) 1995-2000 University of Oxford
  *									
@@ -23,6 +23,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include "matrix.h"
 
 Matrix newMat(int rows,int cols, int elsize, void *zero) {
