@@ -43,10 +43,7 @@ getChar         :: IO Char
 getChar         =  hGetChar stdin
 
 getLine         :: IO String
-getLine         =  do c <- getChar
-                      if c == '\n' then return "" else 
-                         do s <- getLine
-                            return (c:s)
+getLine         =  hGetLine stdin
             
 getContents     :: IO String
 getContents     =  hGetContents stdin
