@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: config.mk,v 1.10 2000/09/05 09:40:08 simonmar Exp $
+# $Id: config.mk,v 1.11 2001/02/16 11:39:37 sewardj Exp $
 #
 # GHC project configuration
 #
@@ -12,7 +12,7 @@ GhcMainDir = ghc
 GhcBinDistDirs = ghc hslibs
 GhcBinDistDocs = ghc/docs/set
 GhcBinDistPrlScripts = ghc-$(ProjectVersion)
-GhcBinDistLibPrlScripts = ghc-asm ghc-split ghc-stats
+GhcBinDistLibPrlScripts = ghc-asm ghc-split
 GhcBinDistBins = hp2ps
 
 include $(GhcMainDir)/mk/version.mk
