@@ -30,7 +30,12 @@ module Data.Version (
 	showVersion, parseVersion,
   ) where
 
-#if __GLASGOW_HASKELL__ < 603
+-- These #ifdefs are necessary because this code might be compiled as
+-- part of ghc/lib/compat, and hence might be compiled by an older version
+-- of GHC.  In which case, we might need to pick up ReadP from 
+-- Distribution.Compat.ReadP, because the version in 
+-- Text.ParserCombinators.ReadP doesn't have all the combinators we need.
+#if __GLASGOW_HASKELL__ <= 602
 import Distribution.Compat.ReadP
 #else
 import Text.ParserCombinators.ReadP
@@ -125,7 +130,7 @@ showVersion (Version branch tags)
 
 -- | A parser for versions in the format produced by 'showVersion'.
 --
-#if __GLASGOW_HASKELL__ < 602
+#if __GLASGOW_HASKELL__ <= 602
 parseVersion :: ReadP r Version
 #else
 parseVersion :: ReadP Version
