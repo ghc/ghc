@@ -44,36 +44,36 @@ Prelude>
 <screen>
  Commands available from the prompt:
 
-   %lt;stmt&gt;                     evaluate/run %lt;stmt&gt;
-   :add %lt;filename&gt; ...        add module(s) to the current target set
-   :browse [*]%lt;module&gt;        display the names defined by %lt;module&gt;
-   :cd %lt;dir&gt;                  change directory to %lt;dir&gt;
-   :def %lt;cmd&gt; %lt;expr&gt;          define a command :%lt;cmd&gt;
+   &lt;stmt&gt;                     evaluate/run &lt;stmt&gt;
+   :add &lt;filename&gt; ...        add module(s) to the current target set
+   :browse [*]&lt;module&gt;        display the names defined by &lt;module&gt;
+   :cd &lt;dir&gt;                  change directory to &lt;dir&gt;
+   :def &lt;cmd&gt; &lt;expr&gt;          define a command :&lt;cmd&gt;
    :help, :?                  display this list of commands
-   :info [%lt;name&gt; ...]         display information about the given names
-   :load %lt;filename&gt; ...       load module(s) and their dependents
-   :module [+/-] [*]%lt;mod&gt; ... set the context for expression evaluation
+   :info [&lt;name&gt; ...]         display information about the given names
+   :load &lt;filename&gt; ...       load module(s) and their dependents
+   :module [+/-] [*]&lt;mod&gt; ... set the context for expression evaluation
    :reload                    reload the current module set
 
-   :set %lt;option&gt; ...          set options
-   :set args %lt;arg&gt; ...        set the arguments returned by System.getArgs
-   :set prog %lt;progname&gt;       set the value returned by System.getProgName
+   :set &lt;option&gt; ...          set options
+   :set args &lt;arg&gt; ...        set the arguments returned by System.getArgs
+   :set prog &lt;progname&gt;       set the value returned by System.getProgName
 
    :show modules              show the currently loaded modules
    :show bindings             show the current bindings made at the prompt
 
-   :type %lt;expr&gt;               show the type of %lt;expr&gt;
-   :undef %lt;cmd&gt;               undefine user-defined command :%lt;cmd&gt;
-   :unset %lt;option&gt; ...        unset options
+   :type &lt;expr&gt;               show the type of &lt;expr&gt;
+   :undef &lt;cmd&gt;               undefine user-defined command :&lt;cmd&gt;
+   :unset &lt;option&gt; ...        unset options
    :quit                      exit GHCi
-   :!%lt;command&gt;                run the shell command %lt;command&gt;
+   :!&lt;command&gt;                run the shell command &lt;command&gt;
 
  Options for `:set' and `:unset':
 
     +r                 revert top-level expressions after each evaluation
     +s                 print timing/memory stats after each evaluation
     +t                 print type after evaluation
-    -%lt;flags&gt;           most GHC command line flags can also be set here
+    -&lt;flags&gt;           most GHC command line flags can also be set here
                          (eg. -v2, -fglasgow-exts, etc.)
 </screen>
 
