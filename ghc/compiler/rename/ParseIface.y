@@ -15,7 +15,7 @@ import BasicTypes	( Fixity(..), FixityDirection(..),
 import CostCentre       ( CostCentre(..), IsCafCC(..), IsDupdCC(..) )
 import HsPragmas	( noDataPragmas, noClassPragmas )
 import Type		( Kind, mkArrowKind, boxedTypeKind, openTypeKind )
-import IdInfo           ( ArityInfo, exactArity )
+import IdInfo           ( ArityInfo, exactArity, CprInfo(..) )
 import Lex		
 
 import RnMonad		( ImportVersion, LocalVersion, ParsedIface(..), WhatsImported(..),
@@ -98,6 +98,7 @@ import Ratio ( (%) )
  '__C'		{ ITnocaf }
  '__U'		{ ITunfold $$ }
  '__S'		{ ITstrict $$ }
+ '__M'		{ ITcprinfo $$ }
 
  '..'		{ ITdotdot }  			-- reserved symbols
  '::'		{ ITdcolon }
@@ -531,6 +532,7 @@ id_info		: 	 			{ [] }
 id_info_item	:: { HsIdInfo RdrName }
 id_info_item	: '__A' arity_info		{ HsArity $2 }
 		| strict_info			{ HsStrictness $1 }
+                | '__M' 		        { HsCprInfo $1 }
 		| '__U' core_expr		{ HsUnfold $1 (Just $2) }
                 | '__U' 		 	{ HsUnfold $1 Nothing }
                 | '__P' spec_tvs

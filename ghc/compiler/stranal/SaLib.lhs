@@ -115,7 +115,7 @@ lookupAbsValEnv (AbsValEnv idenv) y
 absValFromStrictness :: AnalysisKind -> StrictnessInfo -> AbsVal
 
 absValFromStrictness anal NoStrictnessInfo = AbsTop
-absValFromStrictness anal (StrictnessInfo args_info bot_result _)
+absValFromStrictness anal (StrictnessInfo args_info bot_result)
   = case args_info of	-- Check the invariant that the arg list on 
 	[] -> res	-- AbsApproxFun is non-empty
 	_  -> AbsApproxFun args_info res

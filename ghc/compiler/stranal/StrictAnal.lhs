@@ -7,7 +7,7 @@ The original version(s) of all strictness-analyser code (except the
 Semantique analyser) was written by Andy Gill.
 
 \begin{code}
-module StrictAnal ( saWwTopBinds ) where
+module StrictAnal ( saBinds ) where
 
 #include "HsVersions.h"
 
@@ -23,7 +23,6 @@ import ErrUtils		( dumpIfSet )
 import SaAbsInt
 import SaLib
 import Demand		( isStrict )
-import WorkWrap		-- "back-end" of strictness analyser
 import UniqSupply       ( UniqSupply )
 import Util		( zipWith4Equal )
 import Outputable
@@ -75,12 +74,15 @@ Alas and alack.
 %*									*
 %************************************************************************
 
-\begin{code}
-saWwTopBinds :: UniqSupply
-	     -> [CoreBind]
-	     -> IO [CoreBind]
+@saBinds@ decorates bindings with strictness info.  A later 
+worker-wrapper pass can use this info to create wrappers and
+strict workers.
 
-saWwTopBinds us binds
+\begin{code}
+saBinds ::[CoreBind]
+	   -> IO [CoreBind]
+
+saBinds binds
   = do {
 	beginPass "Strictness analysis";
 
@@ -93,11 +95,7 @@ saWwTopBinds us binds
 	let { binds_w_strictness = saTopBindsBinds binds };
 #endif
 
-	-- Create worker/wrappers, and mark binders with their
-	-- "strictness info" [which encodes their worker/wrapper-ness]
-	let { binds' = workersAndWrappers us binds_w_strictness };
-
-	endPass "Strictness analysis" (opt_D_dump_stranal || opt_D_verbose_core2core) binds'
+	endPass "Strictness analysis" (opt_D_dump_stranal || opt_D_verbose_core2core) binds_w_strictness
     }
 \end{code}
 
@@ -328,7 +326,7 @@ addStrictnessInfoToId
 addStrictnessInfoToId str_val abs_val binder body
   = case (collectTyAndValBinders body) of
 	(_, lambda_bounds, rhs) -> binder `setIdStrictness` 
-				   mkStrictnessInfo strictness False
+				   mkStrictnessInfo strictness
 		where
 		    tys        = map idType lambda_bounds
 		    strictness = findStrictness tys str_val abs_val

@@ -1038,7 +1038,7 @@ rebuild expr cont
     case expr of
 	Var v -> case getIdStrictness v of
 		    NoStrictnessInfo		        -> do_rebuild expr cont
-		    StrictnessInfo demands result_bot _ -> ASSERT( not (null demands) || result_bot )
+		    StrictnessInfo demands result_bot   -> ASSERT( not (null demands) || result_bot )
 								-- If this happened we'd get an infinite loop
 							   rebuild_strict demands result_bot expr (idType v) cont
 	other  -> do_rebuild expr cont

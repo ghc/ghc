@@ -640,6 +640,7 @@ rnIdInfo (HsUnfold inline Nothing)	= returnRn (HsUnfold inline Nothing)
 rnIdInfo (HsArity arity)	= returnRn (HsArity arity)
 rnIdInfo (HsUpdate update)	= returnRn (HsUpdate update)
 rnIdInfo (HsNoCafRefs)		= returnRn (HsNoCafRefs)
+rnIdInfo (HsCprInfo cpr_info)	= returnRn (HsCprInfo cpr_info)
 rnIdInfo (HsSpecialise tyvars tys expr)
   = bindTyVarsRn doc tyvars	$ \ tyvars' ->
     rnCoreExpr expr		`thenRn` \ expr' ->

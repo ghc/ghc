@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.53 1999/03/02 18:54:47 sof Exp $
+# $Id: Makefile,v 1.54 1999/04/13 08:55:52 kglynn Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -49,7 +49,7 @@ $(HS_PROG) :: $(HS_SRCS)
 DIRS = \
   utils basicTypes types hsSyn prelude rename typecheck deSugar coreSyn \
   specialise simplCore stranal stgSyn simplStg codeGen absCSyn main \
-  reader profiling parser
+  reader profiling parser cprAnalysis
 
 
 ifeq ($(GhcWithNativeCodeGen),YES)

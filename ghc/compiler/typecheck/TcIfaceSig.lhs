@@ -88,6 +88,7 @@ tcIdInfo unf_env name ty info info_ins
     tcPrag info (HsArity arity) = returnTc (arity `setArityInfo` info)
     tcPrag info (HsUpdate upd)  = returnTc (upd   `setUpdateInfo` info)
     tcPrag info (HsNoCafRefs)   = returnTc (NoCafRefs `setCafInfo` info)
+    tcPrag info (HsCprInfo cpr_info)     = returnTc (cpr_info `setCprInfo` info)
 
     tcPrag info (HsUnfold inline_prag maybe_expr)
 	= (case maybe_expr of
@@ -135,18 +136,22 @@ tcIdInfo unf_env name ty info info_ins
 \begin{code}
 tcStrictness unf_env ty info (HsStrictnessInfo (demands, bot_result) maybe_worker)
   = tcWorker unf_env maybe_worker		`thenNF_Tc` \ maybe_worker_id ->
-    uniqSMToTcM (mkWrapper ty demands)		`thenNF_Tc` \ wrap_fn ->
+    -- We are relying here on cpr info always appearing before strictness info
+    -- fingers crossed ....
+    uniqSMToTcM (mkWrapper ty demands (cprInfo info))
+      		                                `thenNF_Tc` \ wrap_fn ->
     let
 	-- Watch out! We can't pull on maybe_worker_id too eagerly!
 	info' = case maybe_worker_id of
 			Just worker_id -> setUnfoldingInfo (mkUnfolding (wrap_fn worker_id)) $
+                                          setWorkerInfo (Just worker_id) $
 					  setInlinePragInfo IWantToBeINLINEd info
 
 			Nothing        -> info
 
 	has_worker = maybeToBool maybe_worker_id
     in
-    returnTc (StrictnessInfo demands bot_result has_worker  `setStrictnessInfo` info')
+    returnTc (StrictnessInfo demands bot_result `setStrictnessInfo` info')
 \end{code}
 
 \begin{code}

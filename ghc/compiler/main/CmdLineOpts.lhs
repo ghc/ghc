@@ -38,6 +38,8 @@ module CmdLineOpts (
 	opt_D_dump_spec,
 	opt_D_dump_stg,
 	opt_D_dump_stranal,
+	opt_D_dump_cpranal,
+	opt_D_dump_worker_wrapper,
 	opt_D_dump_tc,
 	opt_D_show_passes,
 	opt_D_show_rn_trace,
@@ -174,9 +176,11 @@ data CoreToDo		-- These are diff core-to-core passes,
   | CoreDoPrintCore
   | CoreDoStaticArgs
   | CoreDoStrictness
+  | CoreDoWorkerWrapper
   | CoreDoSpecialising
   | CoreDoFoldrBuildWorkerWrapper
   | CoreDoFoldrBuildWWAnal
+  | CoreDoCPResult 
 \end{code}
 
 \begin{code}
@@ -308,6 +312,8 @@ opt_D_dump_simpl_iterations	= lookUp  SLIT("-ddump-simpl-iterations")
 opt_D_dump_spec			= lookUp  SLIT("-ddump-spec")
 opt_D_dump_stg			= lookUp  SLIT("-ddump-stg")
 opt_D_dump_stranal		= lookUp  SLIT("-ddump-stranal")
+opt_D_dump_worker_wrapper	= lookUp  SLIT("-ddump-workwrap")
+opt_D_dump_cpranal	        = lookUp  SLIT("-ddump-cpranalyse")
 opt_D_dump_tc			= lookUp  SLIT("-ddump-tc")
 opt_D_show_passes		= lookUp  SLIT("-dshow-passes")
 opt_D_show_rn_trace		= lookUp  SLIT("-dshow-rn-trace")
@@ -416,9 +422,11 @@ classifyOpts = sep argv [] [] -- accumulators...
 	  "-fprint-core"     -> CORE_TD(CoreDoPrintCore)
 	  "-fstatic-args"    -> CORE_TD(CoreDoStaticArgs)
 	  "-fstrictness"     -> CORE_TD(CoreDoStrictness)
+	  "-fworker-wrapper" -> CORE_TD(CoreDoWorkerWrapper)
 	  "-fspecialise"     -> CORE_TD(CoreDoSpecialising)
 	  "-ffoldr-build-worker-wrapper"  -> CORE_TD(CoreDoFoldrBuildWorkerWrapper)
-	  "-ffoldr-build-ww-anal"  -> CORE_TD(CoreDoFoldrBuildWWAnal)
+	  "-ffoldr-build-ww-anal"         -> CORE_TD(CoreDoFoldrBuildWWAnal)
+	  "-fcpr-analyse"    -> CORE_TD(CoreDoCPResult)
 
 	  "-fstg-static-args" -> STG_TD(StgDoStaticArgs)
 	  "-fupdate-analysis" -> STG_TD(StgDoUpdateAnalysis)

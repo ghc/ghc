@@ -24,7 +24,7 @@ import HsPragmas	( DataPragmas, ClassPragmas )
 import HsTypes
 import HsCore		( UfExpr )
 import BasicTypes	( Fixity, NewOrData(..) )
-import IdInfo		( ArityInfo, UpdateInfo, InlinePragInfo )
+import IdInfo		( ArityInfo, UpdateInfo, InlinePragInfo, CprInfo )
 import Demand		( Demand )
 import CallConv		( CallConv, pprCallConv )
 
@@ -453,6 +453,7 @@ data HsIdInfo name
   | HsUpdate		UpdateInfo
   | HsSpecialise	[HsTyVar name] [HsType name] (UfExpr name)
   | HsNoCafRefs
+  | HsCprInfo           CprInfo
 
 
 data HsStrictnessInfo name

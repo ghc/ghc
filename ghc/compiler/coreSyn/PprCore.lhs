@@ -22,7 +22,8 @@ import Var		( isTyVar )
 import IdInfo		( IdInfo,
 			  arityInfo, ppArityInfo,
 			  demandInfo, updateInfo, ppUpdateInfo, specInfo, 
-			  strictnessInfo, ppStrictnessInfo, cafInfo, ppCafInfo
+			  strictnessInfo, ppStrictnessInfo, cafInfo, ppCafInfo,
+			  cprInfo, ppCprInfo
 			)
 import Const		( Con(..), DataCon )
 import DataCon		( isTupleCon, isUnboxedTupleCon )
@@ -330,6 +331,7 @@ ppIdInfo info
 	    ppStrictnessInfo s,
 	    ppr d,
 	    ppCafInfo c,
+            ppCprInfo m,
 	    ppSpecInfo p
 	-- Inline pragma printed out with all binders; see PprCore.pprIdBndr
 	]
@@ -339,6 +341,7 @@ ppIdInfo info
     s = strictnessInfo info
     u = updateInfo info
     c = cafInfo info
+    m = cprInfo info
     p = specInfo info
 \end{code}
 

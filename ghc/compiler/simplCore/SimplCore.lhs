@@ -57,7 +57,10 @@ import LiberateCase	( liberateCase )
 import SAT		( doStaticArgs )
 import Specialise	( specProgram)
 import SpecEnv		( specEnvToList, specEnvFromList )
-import StrictAnal	( saWwTopBinds )
+import StrictAnal	( saBinds )
+import WorkWrap	        ( wwTopBinds )
+import CprAnalyse       ( cprAnalyse )
+
 import Var		( TyVar, mkId )
 import Unique		( Unique, Uniquable(..),
 			  ratioTyConKey, mkUnique, incrUnique, initTidyUniques
@@ -112,8 +115,10 @@ doCorePass us binds CoreLiberateCase	     = _scc_ "LiberateCase"   liberateCase 
 doCorePass us binds CoreDoFloatInwards	     = _scc_ "FloatInwards"   floatInwards binds
 doCorePass us binds CoreDoFullLaziness       = _scc_ "CoreFloating"   floatOutwards us binds
 doCorePass us binds CoreDoStaticArgs	     = _scc_ "CoreStaticArgs" doStaticArgs us binds
-doCorePass us binds CoreDoStrictness	     = _scc_ "CoreStranal"    saWwTopBinds us binds
+doCorePass us binds CoreDoStrictness	     = _scc_ "CoreStranal"    saBinds binds
+doCorePass us binds CoreDoWorkerWrapper	     = _scc_ "CoreWorkWrap"   wwTopBinds us binds
 doCorePass us binds CoreDoSpecialising	     = _scc_ "Specialise"     specProgram us binds
+doCorePass us binds CoreDoCPResult	     = _scc_ "CPResult"       cprAnalyse binds
 doCorePass us binds CoreDoPrintCore	     = _scc_ "PrintCore"      do
                                                                        putStr (showSDoc $ pprCoreBindings binds)
 								       return binds

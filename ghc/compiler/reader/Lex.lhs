@@ -35,7 +35,7 @@ module Lex (
 import Char 		( ord, isSpace )
 import List             ( isSuffixOf )
 
-import IdInfo		( InlinePragInfo(..) )
+import IdInfo		( InlinePragInfo(..), CprInfo(..) )
 import Name		( isLowerISO, isUpperISO )
 import Module		( IfaceFlavour, hiFile, hiBootFile )
 import PrelMods		( mkTupNameStr, mkUbxTupNameStr )
@@ -140,6 +140,7 @@ data IfaceToken
   | ITnocaf
   | ITunfold InlinePragInfo
   | ITstrict ([Demand], Bool)
+  | ITcprinfo (CprInfo)
   | ITscc
   | ITsccAllCafs
 
@@ -268,13 +269,16 @@ lexIface cont buf =
 	       buf' -> case reads ('\'':lexemeToString (incLexeme buf')) of
 			[  (ch, rest)] -> cont (ITchar ch) (stepOverLexeme (incLexeme buf'))
 
-    -- strictness pragma and __scc treated specially.
+    -- strictness and cpr pragmas and __scc treated specially.
     '_'# ->
 	 case lookAhead# buf 1# of
 	   '_'# -> case lookAhead# buf 2# of
 	   	    'S'# -> 
 			lex_demand cont (stepOnUntil (not . isSpace) 
 		                        (stepOnBy# buf 3#)) -- past __S
+	   	    'M'# -> 
+			lex_cpr cont (stepOnUntil (not . isSpace) 
+		                     (stepOnBy# buf 3#)) -- past __M
 	   	    's'# -> 
 			case prefixMatch (stepOnBy# buf 3#) "cc" of
 		               Just buf' -> lex_scc cont (stepOverLexeme buf')
@@ -349,6 +353,24 @@ lex_demand cont buf =
   do_unpack new_or_data wrapper_unpacks acc buf
    = case read_em [] buf of
       (stuff, rest) -> read_em (WwUnpack new_or_data wrapper_unpacks stuff : acc) rest
+
+lex_cpr cont buf = 
+ case read_em [] buf of { (cpr_inf,buf') -> 
+   ASSERT ( null (tail cpr_inf) )
+   cont (ITcprinfo $ head cpr_inf) (stepOverLexeme buf')
+ }
+ where
+   -- code snatched from lex_demand above
+  read_em acc buf = 
+   case currentChar# buf of
+    '-'# -> read_em (NoCPRInfo : acc) (stepOn buf)
+    '('# -> do_unpack acc (stepOn buf)
+    ')'# -> (reverse acc, stepOn buf)
+    _    -> (reverse acc, buf)
+
+  do_unpack acc buf
+   = case read_em [] buf of
+      (stuff, rest) -> read_em ((CPRInfo stuff)  : acc) rest
 
 ------------------
 lex_scc cont buf =

@@ -98,7 +98,7 @@ templates, but we don't ever expect to generate code for it.
 pc_bottoming_Id key mod name ty
  = pcMiscPrelId key mod name ty bottoming_info
  where
-    bottoming_info = mkStrictnessInfo ([wwStrict], True) False `setStrictnessInfo` noCafIdInfo
+    bottoming_info = mkStrictnessInfo ([wwStrict], True) `setStrictnessInfo` noCafIdInfo
 	-- these "bottom" out, no matter what their arguments
 
 eRROR_ID

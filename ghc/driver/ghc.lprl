@@ -873,6 +873,7 @@ sub setupOptimiseFlags {
 	  ']',
 
 	'-fstrictness',
+	'-fworker-wrapper',
 
 	'-fsimplify',
 	  '[', 

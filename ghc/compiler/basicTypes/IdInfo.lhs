@@ -19,10 +19,15 @@ module IdInfo (
 
 	-- Strictness
 	StrictnessInfo(..),				-- Non-abstract
-	workerExists, mkStrictnessInfo,
+	mkStrictnessInfo,
 	noStrictnessInfo, strictnessInfo,
 	ppStrictnessInfo, setStrictnessInfo, 
 	isBottomingStrictness, appIsBottom,
+
+        -- Worker
+        WorkerInfo, workerExists, 
+        mkWorkerInfo, noWorkerInfo, workerInfo, setWorkerInfo,
+        ppWorkerInfo,
 
 	-- Unfolding
 	unfoldingInfo, setUnfoldingInfo, 
@@ -43,6 +48,9 @@ module IdInfo (
 
 	-- CAF info
 	CafInfo(..), cafInfo, setCafInfo, ppCafInfo,
+
+        -- Constructed Product Result Info
+        CprInfo(..), cprInfo, setCprInfo, ppCprInfo, noCprInfo
     ) where
 
 #include "HsVersions.h"
@@ -51,9 +59,13 @@ module IdInfo (
 import {-# SOURCE #-} CoreUnfold ( Unfolding, noUnfolding )
 import {-# SOURCE #-} CoreSyn	 ( CoreExpr )
 
+import Id               ( Id )
 import SpecEnv	        ( SpecEnv, emptySpecEnv )
 import Demand		( Demand,  isLazy, wwLazy, pprDemands )
 import Outputable	
+
+import Maybe            ( isJust )
+
 \end{code}
 
 An @IdInfo@ gives {\em optional} information about an @Id@.  If
@@ -75,9 +87,11 @@ data IdInfo
 	demandInfo :: Demand,			-- Whether or not it is definitely demanded
 	specInfo :: IdSpecEnv,			-- Specialisations of this function which exist
 	strictnessInfo :: StrictnessInfo,	-- Strictness properties
+        workerInfo :: WorkerInfo,               -- Pointer to Worker Function
 	unfoldingInfo :: Unfolding,		-- Its unfolding
 	updateInfo :: UpdateInfo,		-- Which args should be updated
 	cafInfo :: CafInfo,
+	cprInfo :: CprInfo,                     -- Function always constructs a product result
 	inlinePragInfo :: !InlinePragInfo	-- Inline pragmas
     }
 \end{code}
@@ -88,11 +102,13 @@ Setters
 setUpdateInfo	  ud info = info { updateInfo = ud }
 setDemandInfo	  dd info = info { demandInfo = dd }
 setStrictnessInfo st info = info { strictnessInfo = st }
+setWorkerInfo     wk info = info { workerInfo = wk }
 setSpecInfo 	  sp info = info { specInfo = sp }
 setArityInfo	  ar info = info { arityInfo = ar  }
 setInlinePragInfo pr info = info { inlinePragInfo = pr }
 setUnfoldingInfo  uf info = info { unfoldingInfo = uf }
 setCafInfo        cf info = info { cafInfo = cf }
+setCprInfo        cp info = info { cprInfo = cp }
 \end{code}
 
 
@@ -102,9 +118,11 @@ noIdInfo = IdInfo {
 		demandInfo	= wwLazy,
 		specInfo	= emptySpecEnv,
 		strictnessInfo	= NoStrictnessInfo,
+		workerInfo	= noWorkerInfo,
 		unfoldingInfo	= noUnfolding,
 		updateInfo	= NoUpdateInfo,
 		cafInfo		= MayHaveCafRefs,
+		cprInfo		= NoCPRInfo,
 		inlinePragInfo  = NoInlinePragInfo
 	   }
 \end{code}
@@ -273,10 +291,12 @@ each of the ``wrapper's'' arguments (see the description about
 worker/wrapper-style transformations in the PJ/Launchbury paper on
 unboxed types).
 
-The list of @Demands@ specifies: (a)~the strictness properties
-of a function's arguments; (b)~the {\em existence} of a ``worker''
-version of the function; and (c)~the type signature of that worker (if
-it exists); i.e. its calling convention.
+The list of @Demands@ specifies: (a)~the strictness properties of a
+function's arguments; and (b)~the type signature of that worker (if it
+exists); i.e. its calling convention.
+
+Note that the existence of a worker function is now denoted by the Id's
+workerInfo field.
 
 \begin{code}
 data StrictnessInfo
@@ -288,40 +308,58 @@ data StrictnessInfo
 				-- BUT NB: f = \x y. error "urk"
 				-- 	   will have info  SI [SS] True
 				-- but still (f) and (f 2) are not bot; only (f 3 2) is bot
-
-		   Bool		-- True <=> there is a worker. There might not be, even for a
-				-- strict function, because:
-				-- 	(a) the function might be small enough to inline, 
-				--	    so no need for w/w split
-				-- 	(b) the strictness info might be "SSS" or something, so no w/w split.
 \end{code}
 
 \begin{code}
-mkStrictnessInfo :: ([Demand], Bool) -> Bool -> StrictnessInfo
+mkStrictnessInfo :: ([Demand], Bool) -> StrictnessInfo
 
-mkStrictnessInfo (xs, is_bot) has_wrkr
+mkStrictnessInfo (xs, is_bot)
   | all isLazy xs && not is_bot	= NoStrictnessInfo		-- Uninteresting
-  | otherwise		        = StrictnessInfo xs is_bot has_wrkr
+  | otherwise		        = StrictnessInfo xs is_bot
 
 noStrictnessInfo       = NoStrictnessInfo
 
-isBottomingStrictness (StrictnessInfo _ bot _) = bot
-isBottomingStrictness NoStrictnessInfo         = False
+isBottomingStrictness (StrictnessInfo _ bot) = bot
+isBottomingStrictness NoStrictnessInfo       = False
 
 -- appIsBottom returns true if an application to n args would diverge
-appIsBottom (StrictnessInfo ds bot _) n = bot && (n >= length ds)
+appIsBottom (StrictnessInfo ds bot)   n = bot && (n >= length ds)
 appIsBottom  NoStrictnessInfo	      n	= False
 
 ppStrictnessInfo NoStrictnessInfo = empty
-ppStrictnessInfo (StrictnessInfo wrapper_args bot wrkr_maybe)
+ppStrictnessInfo (StrictnessInfo wrapper_args bot)
   = hsep [ptext SLIT("__S"), pprDemands wrapper_args bot]
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection[worker-IdInfo]{Worker info about an @Id@}
+%*									*
+%************************************************************************
+
+If this Id has a worker then we store a reference to it. Worker
+functions are generated by the worker/wrapper pass.  This uses
+information from the strictness and CPR analyses.
+
+There might not be a worker, even for a strict function, because:
+(a) the function might be small enough to inline, so no need 
+    for w/w split
+(b) the strictness info might be "SSS" or something, so no w/w split.
 
 \begin{code}
-workerExists :: StrictnessInfo -> Bool
-workerExists (StrictnessInfo _ _ worker_exists) = worker_exists
-workerExists other			        = False
+
+type WorkerInfo = Maybe Id
+
+mkWorkerInfo :: Id -> WorkerInfo
+mkWorkerInfo wk_id = Just wk_id
+
+noWorkerInfo = Nothing
+
+ppWorkerInfo Nothing      = empty
+ppWorkerInfo (Just wk_id) = ppr wk_id
+
+workerExists :: Maybe Id -> Bool
+workerExists = isJust
 \end{code}
 
 
@@ -384,3 +422,69 @@ data CafInfo
 ppCafInfo NoCafRefs = ptext SLIT("__C")
 ppCafInfo MayHaveCafRefs = empty
 \end{code}
+
+%************************************************************************
+%*									*
+\subsection[cpr-IdInfo]{Constructed Product Result info about an @Id@}
+%*									*
+%************************************************************************
+
+If the @Id@ is a function then it may have CPR info. A CPR analysis
+phase detects whether:
+
+\begin{enumerate}
+\item
+The function's return value has a product type, i.e. an algebraic  type 
+with a single constructor. Examples of such types are tuples and boxed
+primitive values.
+\item
+The function always 'constructs' the value that it is returning.  It
+must do this on every path through,  and it's OK if it calls another
+function which constructs the result.
+\end{enumerate}
+
+If this is the case then we store a template which tells us the
+function has the CPR property and which components of the result are
+also CPRs.   
+
+\begin{code}
+data CprInfo
+  = NoCPRInfo
+
+  | CPRInfo [CprInfo] 
+
+-- e.g. const 5 == CPRInfo [NoCPRInfo]
+--              == __M(-)
+--      \x -> (5,
+--              (x,
+--               5,
+--               x)
+--            ) 
+--            CPRInfo [CPRInfo [NoCPRInfo], 
+--                     CPRInfo [NoCprInfo,
+--                              CPRInfo [NoCPRInfo],
+--                              NoCPRInfo]
+--                    ]
+--            __M((-)(-(-)-)-)
+\end{code}
+
+\begin{code}
+
+noCprInfo       = NoCPRInfo
+
+ppCprInfo NoCPRInfo = empty
+ppCprInfo c@(CPRInfo _)
+  = hsep [ptext SLIT("__M"), ppCprInfo' c]
+    where
+    ppCprInfo' NoCPRInfo      = char '-'
+    ppCprInfo' (CPRInfo args) = parens (hcat (map ppCprInfo' args))
+
+instance Outputable CprInfo where
+    ppr = ppCprInfo
+
+instance Show CprInfo where
+    showsPrec p c = showsPrecSDoc p (ppr c)
+\end{code}
+
+
+

@@ -40,17 +40,21 @@ module Id (
 	setIdArity,
 	setIdDemandInfo,
 	setIdStrictness,
+	setIdWorkerInfo,
 	setIdSpecialisation,
 	setIdUpdateInfo,
 	setIdCafInfo,
+	setIdCprInfo,
 
 	getIdArity,
 	getIdDemandInfo,
 	getIdStrictness,
+	getIdWorkerInfo,
 	getIdUnfolding,
 	getIdSpecialisation,
 	getIdUpdateInfo,
-	getIdCafInfo
+	getIdCafInfo,
+	getIdCprInfo
 
     ) where
 
@@ -84,9 +88,13 @@ infixl 	1 `setIdUnfolding`,
 	  `setIdArity`,
 	  `setIdDemandInfo`,
 	  `setIdStrictness`,
+	  `setIdWorkerInfo`,
 	  `setIdSpecialisation`,
 	  `setIdUpdateInfo`,
-	  `setInlinePragma`
+	  `setInlinePragma`,
+	  `getIdCafInfo`,
+	  `getIdCprInfo`
+
 	-- infixl so you can say (id `set` a `set` b)
 \end{code}
 
@@ -237,6 +245,14 @@ idAppIsBottom :: Id -> Int -> Bool
 idAppIsBottom id n = appIsBottom (strictnessInfo (idInfo id)) n
 
 	---------------------------------
+	-- WORKER ID
+getIdWorkerInfo :: Id -> WorkerInfo
+getIdWorkerInfo id = workerInfo (idInfo id)
+
+setIdWorkerInfo :: Id -> WorkerInfo -> Id
+setIdWorkerInfo id work_info = modifyIdInfo id (work_info `setWorkerInfo`)
+
+	---------------------------------
 	-- UNFOLDING
 getIdUnfolding :: Id -> Unfolding
 getIdUnfolding id = unfoldingInfo (idInfo id)
@@ -275,6 +291,15 @@ getIdCafInfo id = cafInfo (idInfo id)
 
 setIdCafInfo :: Id -> CafInfo -> Id
 setIdCafInfo id caf_info = modifyIdInfo id (caf_info `setCafInfo`)
+
+	---------------------------------
+	-- CPR INFO
+getIdCprInfo :: Id -> CprInfo
+getIdCprInfo id = cprInfo (idInfo id)
+
+setIdCprInfo :: Id -> CprInfo -> Id
+setIdCprInfo id cpr_info = modifyIdInfo id (cpr_info `setCprInfo`)
+
 \end{code}
 
 

@@ -36,7 +36,8 @@ import IdInfo		( IdInfo, StrictnessInfo, ArityInfo, InlinePragInfo(..), inlinePr
 			  arityInfo, ppArityInfo, 
 			  strictnessInfo, ppStrictnessInfo, 
 			  cafInfo, ppCafInfo,
-			  workerExists, isBottomingStrictness
+			  cprInfo, ppCprInfo,
+			  workerExists, workerInfo, isBottomingStrictness
 			)
 import CoreSyn		( CoreExpr, CoreBind, Bind(..) )
 import CoreUtils	( exprSomeFreeVars )
@@ -277,6 +278,7 @@ ifaceId get_idinfo needed_ids is_rec id rhs
      | otherwise		= hsep [ptext SLIT("{-##"),
 					arity_pretty, 
 					caf_pretty,
+					cpr_pretty,
 					strict_pretty, 
 					unfold_pretty, 
 					spec_pretty,
@@ -288,9 +290,13 @@ ifaceId get_idinfo needed_ids is_rec id rhs
     ------------ Caf Info --------------
     caf_pretty = ppCafInfo (cafInfo idinfo)
 
-    ------------  Strictness  --------------
+    ------------ CPR Info --------------
+    cpr_pretty = ppCprInfo (cprInfo idinfo)
+
+    ------------  Strictness and Worker  --------------
     strict_info   = strictnessInfo idinfo
-    has_worker    = workerExists strict_info
+    work_info     = workerInfo idinfo
+    has_worker    = workerExists work_info
     bottoming_fn  = isBottomingStrictness strict_info
     strict_pretty = ppStrictnessInfo strict_info <+> wrkr_pretty
 
@@ -299,8 +305,9 @@ ifaceId get_idinfo needed_ids is_rec id rhs
 		| otherwise      = ppr work_id <+> 
 				   braces (hsep (map ppr con_list))
 
-    (work_id, wrapper_cons) = getWorkerIdAndCons id rhs
-    con_list 		    = uniqSetToList wrapper_cons
+    (Just work_id) = work_info
+    wrapper_cons   = snd $ getWorkerIdAndCons id rhs
+    con_list       = uniqSetToList wrapper_cons
 
     ------------  Unfolding  --------------
     unfold_pretty | show_unfold = unfold_herald <+> pprIfaceUnfolding rhs
