@@ -17,15 +17,16 @@ import Time		( ClockTime )
 import Directory	( doesFileExist, getModificationTime )
 import Outputable
 
-import Module		( Module, ModuleName, PackageName )
-import CmStaticInfo	( PCI(..), Package(..) )
+import Module		( Module, ModuleName, PackageName, 
+			  moduleNameUserString )
+import CmStaticInfo	( Package(..), PackageConfigInfo(..) )
 \end{code}
 
 \begin{code}
 -- make a product type, with Maybe return --> Module,lhs
 data ModLocation 
-   = SourceOnly ModuleName Path        -- .hs
-   | ObjectCode ModuleName Path Path   -- .o, .hi
+   = SourceOnly ModuleName FilePath            -- .hs
+   | ObjectCode ModuleName FilePath FilePath   -- .o, .hi
    | InPackage  ModuleName PackageName
    | NotFound
 
@@ -52,8 +53,8 @@ isPackageLoc _               = False
 mkFinder :: [(ModuleName,PackageName,FilePath)] -> [FilePath] -> Finder
 mkFinder pkg_ifaces home_dirs modnm
    = do found <- mkFinderX pkg_ifaces home_dirs modnm
-        putStrLn ("FINDER: request  = " ++ modnm ++ "\n" ++
-                  "FINDER: response = " ++ showSDoc (ppr found))
+        --putStrLn ("FINDER: request  = " ++ modnm ++ "\n" ++
+        --          "FINDER: response = " ++ showSDoc (ppr found))
         return found
 
 
@@ -71,8 +72,8 @@ mkFinderX pkg_ifaces home_dirs modnm
            ((pkgname,path):_, [])
               -> return (InPackage modnm pkgname)
            (packages, locs_n_times)
-              -> do hPutStr stderr ( "GHCI: warning: module `" ++ modnm ++
-                                     "' appears as both a home and package module\n")
+              -> do --hPutStr stderr ( "GHCI: warning: module `" ++ modnm ++
+                    --                 "' appears as both a home and package module\n")
                     return (homeMod locs_n_times)
      where
         in_package 
@@ -103,7 +104,7 @@ homeModuleExists modname path
      where
         object thi to = Just (ObjectCode modname nm_o nm_hi, max thi to)
         source ths    = Just (SourceOnly modname nm_hs, ths)
-        nm = path ++ "/" ++ modname
+        nm = path ++ "/" ++ moduleNameUserString modname
         nm_hs = nm ++ ".hs"
         nm_hi = nm ++ ".hi"
         nm_o  = nm ++ ".o"
@@ -122,8 +123,8 @@ homeModuleExists modname path
 
 
 newFinder :: FilePath{-temp debugging hack-}
-          -> PCI -> IO Finder
+          -> PackageConfigInfo -> IO Finder
 newFinder path pci
-   = return (mkFinder (module_table pci) [path])
+   = return (mkFinder (pci_modtable pci) [path])
 
 \end{code}

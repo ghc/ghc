@@ -4,7 +4,7 @@
 \section[CmStaticInfo]{Session-static info for the Compilation Manager}
 
 \begin{code}
-module CmStaticInfo ( Package(..), PCI(..), mkPCI )
+module CmStaticInfo ( Package(..), PackageConfigInfo(..), mkPCI )
 where
 
 #include "HsVersions.h"
@@ -41,11 +41,11 @@ data Package
      }
   deriving Read
 
-mkPCI :: [Package] -> IO PCI
+mkPCI :: [Package] -> IO PackageConfigInfo
 mkPCI raw_package_info
    = do mtab <- mk_module_table raw_package_info
-        return (PCI { pci_rawinfo  = raw_package_info,
-                      pci_modtable = mtab })
+        return (PackageConfigInfo { pci_rawinfo  = raw_package_info,
+                                    pci_modtable = mtab })
 
 mk_module_table :: [Package] -> IO [(ModuleName,PackageName,FilePath)]
 mk_module_table raw_info
@@ -63,7 +63,7 @@ mk_module_table raw_info
         return iface_table
      where
         fsifyStrings (mod_str, pkg_str, path_str)
-           = (mkFastString mod_str, mkFastString pkg_str, path_str)
+           = (_PK_ mod_str, _PK_ pkg_str, path_str)
         -- nm_and_paths :: Package -> [(PkgName,Path)]
         nm_and_paths package 
            = [(name package, path) | path <- nub (import_dirs package)]
