@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.c,v 1.10 1999/02/11 17:40:28 simonm Exp $
+ * $Id: Sanity.c,v 1.11 1999/03/03 19:07:39 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -23,8 +23,7 @@
 #include "BlockAlloc.h"
 #include "Sanity.h"
 
-#define LOOKS_LIKE_PTR(r) \
-  (IS_DATA_PTR(r) || ((IS_USER_PTR(r) && Bdescr((P_)r)->free != (void *)-1)))
+#define LOOKS_LIKE_PTR(r) (IS_DATA_PTR(r) || ((HEAP_ALLOCED(r) && Bdescr((P_)r)->free != (void *)-1)))
 
 /* -----------------------------------------------------------------------------
    Check stack sanity
@@ -36,7 +35,7 @@ StgOffset checkStackObject( StgPtr sp );
 
 void      checkStackChunk( StgPtr sp, StgPtr stack_end );
 
-static StgOffset checkSmallBitmap(  StgPtr payload, StgNat32 bitmap );
+static StgOffset checkSmallBitmap(  StgPtr payload, StgWord32 bitmap );
 
 static StgOffset checkLargeBitmap( StgPtr payload, 
 				   StgLargeBitmap* large_bitmap );
@@ -44,7 +43,7 @@ static StgOffset checkLargeBitmap( StgPtr payload,
 void checkClosureShallow( StgClosure* p );
 
 static StgOffset 
-checkSmallBitmap( StgPtr payload, StgNat32 bitmap )
+checkSmallBitmap( StgPtr payload, StgWord32 bitmap )
 {
     StgOffset i;
 
@@ -61,12 +60,12 @@ checkSmallBitmap( StgPtr payload, StgNat32 bitmap )
 static StgOffset 
 checkLargeBitmap( StgPtr payload, StgLargeBitmap* large_bitmap )
 {
-    StgNat32 bmp;
+    StgWord32 bmp;
     StgOffset i;
 
     i = 0;
     for (bmp=0; bmp<large_bitmap->size; bmp++) {
-	StgNat32 bitmap = large_bitmap->bitmap[bmp];
+	StgWord32 bitmap = large_bitmap->bitmap[bmp];
 	for(; bitmap != 0; ++i, bitmap >>= 1 ) {
 	    if ((bitmap & 1) == 0) {
 		checkClosure(stgCast(StgClosure*,payload[i]));
@@ -368,7 +367,7 @@ checkHeap(bdescr *bd, StgPtr start)
 
 	/* skip over slop */
 	while (p < bd->free &&
-	       (*p == 0 || !LOOKS_LIKE_GHC_INFO(*p))) { p++; } 
+	       (*p == 0 || !LOOKS_LIKE_GHC_INFO((void*)*p))) { p++; } 
       }
       bd = bd->link;
       if (bd != NULL) {
