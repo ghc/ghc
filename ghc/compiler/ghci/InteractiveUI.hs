@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.150 2003/04/12 16:27:24 panne Exp $
+-- $Id: InteractiveUI.hs,v 1.151 2003/04/23 10:42:36 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -539,6 +539,7 @@ addModule files = do
   state <- getGHCiState
   dflags <- io (getDynFlags)
   io (revertCAFs)			-- always revert CAFs on load/add.
+  files <- mapM expandPath files
   let new_targets = files ++ targets state 
   graph <- io (cmDepAnal (cmstate state) dflags new_targets)
   (cmstate1, ok, mods) <- io (cmLoadModules (cmstate state) dflags graph)
@@ -547,10 +548,9 @@ addModule files = do
   modulesLoadedMsg ok mods dflags
 
 changeDirectory :: String -> GHCi ()
-changeDirectory ('~':d) = do
-   tilde <- io (getEnv "HOME")	-- will fail if HOME not defined
-   io (setCurrentDirectory (tilde ++ '/':d))
-changeDirectory d = io (setCurrentDirectory d)
+changeDirectory dir = do
+  dir <- expandPath dir
+  io (setCurrentDirectory dir)
 
 defineMacro :: String -> GHCi ()
 defineMacro s = do
@@ -604,6 +604,9 @@ loadModule' :: [FilePath] -> GHCi ()
 loadModule' files = do
   state <- getGHCiState
   dflags <- io getDynFlags
+
+  -- expand tildes
+  files <- mapM expandPath files
 
   -- do the dependency anal first, so that if it fails we don't throw
   -- away the current set of modules.
@@ -1070,3 +1073,15 @@ revertCAFs = do
 
 foreign import ccall "revertCAFs" rts_revertCAFs  :: IO ()  
 	-- Make it "safe", just in case
+
+-- -----------------------------------------------------------------------------
+-- Utils
+
+expandPath :: String -> GHCi String
+expandPath path = 
+  case dropWhile isSpace path of
+   ('~':d) -> do
+	tilde <- io (getEnv "HOME")	-- will fail if HOME not defined
+	return (tilde ++ '/':d)
+   other -> 
+	return other
