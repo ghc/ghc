@@ -51,8 +51,8 @@ import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  tcEqType, tcCmpPred, isClassPred,
 			  tcSplitPhiTy, tcSplitPredTy_maybe, tcSplitAppTy_maybe, 
 			  tcSplitTyConApp_maybe, tcSplitForAllTys,
-			  tcIsTyVarTy, tcSplitSigmaTy, 
-			  isUnLiftedType, isIPPred, isTyVarTy,
+			  tcIsTyVarTy, tcSplitSigmaTy, tcIsTyVarTy,
+			  isUnLiftedType, isIPPred, 
 
 			  mkAppTy, mkTyVarTy, mkTyVarTys, 
 			  tyVarsOfPred, getClassPredTys_maybe,
@@ -816,7 +816,7 @@ check_class_pred_tys dflags ctxt tys
   = case ctxt of
 	InstHeadCtxt  -> True	-- We check for instance-head 
 				-- formation in checkValidInstHead
-	InstThetaCtxt -> undecidable_ok || all isTyVarTy tys
+	InstThetaCtxt -> undecidable_ok || all tcIsTyVarTy tys
 	other	      -> gla_exts       || all tyvar_head tys
   where
     undecidable_ok = dopt Opt_AllowUndecidableInstances dflags 
