@@ -3,8 +3,8 @@
 --
 import IO
 import System
-import IOExts (trace)
-import RegexString
+import Debug.Trace (trace)
+import Text.Regex
 import Maybe
 
 main = do
