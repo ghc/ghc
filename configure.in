@@ -16,6 +16,12 @@ dnl
 # First off, a distrib sanity check..
 AC_INIT(mk/config.mk.in)
 
+dnl * Declare subdirectories that have a private configure script
+dnl
+dnl After the toplevel configuration is complete, the script will recurse into
+dnl these subdirectories (the use of cache values makes repeated checks cheap)
+AC_CONFIG_SUBDIRS(ghc)
+
 # -------------------------------------------------------------------------
 # Prepare to generate the following header files
 #

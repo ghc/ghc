@@ -1,0 +1,24 @@
+dnl GHC-only part of fptools configuration
+dnl 
+dnl Copyright (c) 1999 Manuel M. T. Chakravarty <chak@acm.org>
+dnl 
+dnl This file is subject to the same free software license as GHC.
+
+dnl ######################################################################
+dnl Process this file with autoconf to produce a configure script.
+dnl ######################################################################
+
+
+dnl * Initialise and check sanity.
+AC_INIT(ghc.spec.in)
+
+dnl * Compute the version number.
+version=`sed -e 's/.*\([[0-9]]\)\.\([[0-9]]*\).*/\1.\2/' VERSION`
+patchlevel=1
+
+dnl These are needed by the .spec file.
+AC_SUBST(version)
+AC_SUBST(patchlevel)
+
+dnl * Write the results...
+AC_OUTPUT(ghc.spec)
