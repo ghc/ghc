@@ -220,6 +220,15 @@ main = print (array (1,1) [(1,2), (1,3)])</programlisting>
 	  arithmetic).  This behaviour was chosen so that for example
 	  writing <literal>0xffffffff :: Int</literal> preserves the
 	  bit-pattern in the resulting <literal>Int</literal>.</para>
+
+	  <para>The <literal>fromIntegral</literal> function also
+	  preserves bit-patterns when converting between the sized
+	  integral types (<literal>Int8</literal>,
+	  <literal>Int16</literal>, <literal>Int32</literal>,
+	  <literal>Int64</literal> and the unsigned
+	  <literal>Word</literal> variants), see <xref
+	  linkend="sec-Int"> and <xref linkend="sec-Word">.</para>
+
 	</listitem>
       </varlistentry>
 
