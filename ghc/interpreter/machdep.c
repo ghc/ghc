@@ -13,8 +13,8 @@
  * included in the distribution.
  *
  * $RCSfile: machdep.c,v $
- * $Revision: 1.22 $
- * $Date: 2000/03/22 18:14:22 $
+ * $Revision: 1.23 $
+ * $Date: 2000/03/24 14:32:03 $
  * ------------------------------------------------------------------------*/
 
 #ifdef HAVE_SIGNAL_H
@@ -1166,63 +1166,7 @@ Int readTerminalChar() {                /* read character from terminal    */
  * Interrupt handling:
  * ------------------------------------------------------------------------*/
 
-Bool    broken         = FALSE;
-static  Bool breakReqd = FALSE;
-static  sigProto(ignoreBreak);
-static  Void local installHandlers ( Void );
-
-Bool breakOn(reqd)                      /* set break trapping on if reqd,  */
-Bool reqd; {                            /* or off otherwise, returning old */
-    Bool old  = breakReqd;
-
-    breakReqd = reqd;
-    if (reqd) {
-        if (broken) {                   /* repond to break signal received */
-            broken = FALSE;             /* whilst break trap disabled      */
-            sigRaise(breakHandler);
-            /* not reached */
-        }
-#if HANDLERS_CANT_LONGJMP
-        ctrlbrk(ignoreBreak);
-#else
-        ctrlbrk(breakHandler);
-#endif
-    } else {
-        ctrlbrk(ignoreBreak);
-    }
-    return old;
-}
-
-static sigHandler(ignoreBreak) {        /* record but don't respond to break*/
-    ctrlbrk(ignoreBreak);         /* reinstall signal handler               */
-                                  /* redundant on BSD systems but essential */
-                                  /* on POSIX and other systems             */
-    broken = TRUE;
-    interruptStgRts();
-    sigResume;
-}
-
-#if !DONT_PANIC
-static sigProto(panic);
-static sigHandler(panic) {              /* exit in a panic, on receipt of  */
-    everybody(EXIT);                    /* an unexpected signal            */
-    fprintf(stderr,"\nUnexpected signal\n");
-    exit(1);
-    sigResume;/*NOTREACHED*/
-}
-#endif /* !DONT_PANIC */
-
-#if IS_WIN32
-BOOL WINAPI consoleHandler(DWORD dwCtrlType) {
-    switch (dwCtrlType) {		/* Allows Hugs to be terminated    */
-	case CTRL_CLOSE_EVENT :		/* from the window's close menu.   */
-	    ExitProcess(0);
-    }
-    return FALSE;
-}
-#endif
- 
-static Void local installHandlers() { /* Install handlers for all fatal    */ 
+static Void installHandlers ( void ) { /* Install handlers for all fatal   */ 
                                       /* signals except SIGINT and SIGBREAK*/
 #if IS_WIN32
     SetConsoleCtrlHandler(consoleHandler,TRUE);

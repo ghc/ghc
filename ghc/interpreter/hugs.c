@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.48 $
- * $Date: 2000/03/24 12:36:43 $
+ * $Revision: 1.49 $
+ * $Date: 2000/03/24 14:32:03 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -733,13 +733,56 @@ static Void local changeDir() {         /* change directory                */
 
 
 /* --------------------------------------------------------------------------
+ * Interrupt handling
+ * ------------------------------------------------------------------------*/
+
+static jmp_buf catch_error;             /* jump buffer for error trapping  */
+
+HugsBreakAction currentBreakAction = HugsIgnoreBreak;
+
+static void handler_IgnoreBreak ( int sig )
+{
+   setHandler ( handler_IgnoreBreak );
+}
+
+static void handler_LongjmpOnBreak ( int sig )
+{
+   setHandler ( handler_LongjmpOnBreak );
+   Printf("{Interrupted!}\n");
+   longjmp(catch_error,1);
+}
+
+static void handler_RtsInterrupt ( int sig )
+{
+   setHandler ( handler_RtsInterrupt );
+   interruptStgRts();
+}
+
+HugsBreakAction setBreakAction ( HugsBreakAction newAction )
+{
+   HugsBreakAction tmp = currentBreakAction;
+   currentBreakAction = newAction;
+   switch (newAction) {
+      case HugsIgnoreBreak:
+         setHandler ( handler_IgnoreBreak ); break;
+      case HugsLongjmpOnBreak:
+         setHandler ( handler_LongjmpOnBreak ); break;
+      case HugsRtsInterrupt:
+         setHandler ( handler_RtsInterrupt ); break;
+      default:
+         internal("setBreakAction");
+   }
+   return tmp;
+}
+
+
+/* --------------------------------------------------------------------------
  * The new module chaser, loader, etc
  * ------------------------------------------------------------------------*/
 
 List    moduleGraph   = NIL;
 List    prelModules   = NIL;
 List    targetModules = NIL;
-static jmp_buf catch_error;             /* jump buffer for error trapping  */
 
 static void setCurrentFile ( Module mod )
 {
@@ -1204,6 +1247,8 @@ static void achieveTargetModules ( void )
    volatile Cell grp;
    volatile List badMods;
 
+   setBreakAction ( HugsIgnoreBreak );
+
    /* First, examine timestamps to find out which modules are
       out of date with respect to the source/interface/object files.
    */
@@ -1338,6 +1383,7 @@ static void achieveTargetModules ( void )
       if (!varIsMember(textOf(mc),modgList)
           && !varIsMember(textOf(mc),parsedButNotLoaded)) {
 
+         setBreakAction ( HugsLongjmpOnBreak );
          if (setjmp(catch_error)==0) {
             /* try this; it may throw an exception */
             mod = parseModuleOrInterface ( 
@@ -1345,6 +1391,7 @@ static void achieveTargetModules ( void )
          } else {
             /* here's the exception handler, if parsing fails */
             /* A parse error (or similar).  Clean up and abort. */
+            setBreakAction ( HugsIgnoreBreak );
             mod = findModule(textOf(mc));
             if (nonNull(mod)) nukeModule(mod);
             for (t = parsedButNotLoaded; nonNull(t); t=tl(t)) {
@@ -1355,6 +1402,7 @@ static void achieveTargetModules ( void )
             return;
             /* end of the exception handler */
          }
+         setBreakAction ( HugsIgnoreBreak );
 
          parsedButNotLoaded = cons(mc, parsedButNotLoaded);
          toChase = dupOnto(module(mod).uses,toChase);
@@ -1417,6 +1465,7 @@ static void achieveTargetModules ( void )
       if (!varIsMember(textOf(selectArbitrarilyFromGroup(grp)),
                        parsedButNotLoaded)) continue;
 
+      setBreakAction ( HugsLongjmpOnBreak );
       if (setjmp(catch_error)==0) {
          /* try this; it may throw an exception */
          tryLoadGroup(grp);
@@ -1424,6 +1473,7 @@ static void achieveTargetModules ( void )
          /* here's the exception handler, if static/typecheck etc fails */
          /* nuke the entire rest (ie, the unloaded part)
             of the module graph */
+         setBreakAction ( HugsIgnoreBreak );
          badMods = listFromSpecifiedMG ( mg );
          for (t = badMods; nonNull(t); t=tl(t)) {
             mod = findModule(textOf(hd(t)));
@@ -1442,12 +1492,13 @@ static void achieveTargetModules ( void )
          return;
          /* end of the exception handler */
       }
-
+      setBreakAction ( HugsIgnoreBreak );
    }
 
    /* Err .. I think that's it.  If we get here, we've successfully
       achieved the target set.  Phew!
    */
+   setBreakAction ( HugsIgnoreBreak );
 }
 
 
@@ -1643,6 +1694,7 @@ static Void local evaluator() {        /* evaluate expr and print value    */
 
     defaultDefns = combined ? stdDefaults : evalDefaults;
 
+    setBreakAction ( HugsLongjmpOnBreak );
     if (setjmp(catch_error)==0) {
        /* try this */
        parseExp();
@@ -1650,9 +1702,11 @@ static Void local evaluator() {        /* evaluate expr and print value    */
        type = typeCheckExp(TRUE);
     } else {
        /* if an exception happens, we arrive here */
+       setBreakAction ( HugsIgnoreBreak );
        goto cleanup_and_return;
     }
 
+    setBreakAction ( HugsIgnoreBreak );
     if (isPolyType(type)) {
         ks = polySigOf(type);
         bd = monotypeOf(type);
@@ -1707,6 +1761,7 @@ static Void local evaluator() {        /* evaluate expr and print value    */
 #endif
 
   cleanup_and_return:
+   setBreakAction ( HugsIgnoreBreak );
    nukeModule(evalMod);
    setCurrModule(currMod);
    setCurrentFile(currMod);
@@ -2258,8 +2313,9 @@ String argv[]; {
     Bool   prelOK;
     String s;
 
-    breakOn(TRUE);                      /* enable break trapping           */
+    setBreakAction ( HugsIgnoreBreak );
     modConIds = initialize(argc,argv);  /* the initial modules to load     */
+    setBreakAction ( HugsIgnoreBreak );
     prelOK    = loadThePrelude();
     if (combined) everybody(POSTPREL);
 
@@ -2285,7 +2341,7 @@ String argv[]; {
     modConIds = NIL;
 
     /* initialize calls startupHaskell, which trashes our signal handlers */
-    breakOn(TRUE);
+    setBreakAction ( HugsIgnoreBreak );
     forHelp();
 
     for (;;) {
@@ -2364,7 +2420,6 @@ String argv[]; {
 
         if (autoMain) break;
     }
-    breakOn(FALSE);
 }
 
 /* --------------------------------------------------------------------------
@@ -2537,20 +2592,6 @@ String msg; {
     exit(1);
 }
 
-sigHandler(breakHandler) {              /* respond to break interrupt      */
-    Hilite();
-    Printf("{Interrupted!}\n");
-    Lolite();
-    breakOn(TRUE);  /* reinstall signal handler - redundant on BSD systems */
-                    /* but essential on POSIX (and other?) systems         */
-    everybody(BREAK);
-    failed();
-    stopAnyPrinting();
-    FlushStdout();
-    clearerr(stdin);
-    longjmp(catch_error,1);
-    sigResume;/*NOTREACHED*/
-}
 
 /* --------------------------------------------------------------------------
  * Read value from environment variable or registry:

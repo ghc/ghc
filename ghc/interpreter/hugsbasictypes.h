@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugsbasictypes.h,v $
- * $Revision: 1.1 $
- * $Date: 2000/03/23 14:54:21 $
+ * $Revision: 1.2 $
+ * $Date: 2000/03/24 14:32:03 $
  * ------------------------------------------------------------------------*/
 
 #define NON_POSIX_SOURCE
@@ -162,22 +162,6 @@ extern  int     stricmp    Args((const char *, const char*));
 #ifndef alloca
 #define alloca _alloca
 #endif
-#endif
-
-/*---------------------------------------------------------------------------
- * Interrupting execution (signals, allowBreak):
- *-------------------------------------------------------------------------*/
-
-#if !DOS && VOID_INT_SIGNALS
-# define sigProto(nm)   void nm ( int )
-# define sigRaise(nm)   nm(1)
-# define sigHandler(nm) void nm ( sig_arg ) int sig_arg;
-# define sigResume      return
-#else
-# define sigProto(nm)   int nm ( Void )
-# define sigRaise(nm)   nm()
-# define sigHandler(nm) int nm ( Void )
-# define sigResume      return 1
 #endif
 
 /*---------------------------------------------------------------------------

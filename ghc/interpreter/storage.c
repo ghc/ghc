@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.54 $
- * $Date: 2000/03/24 12:36:43 $
+ * $Revision: 1.55 $
+ * $Date: 2000/03/24 14:32:03 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -1993,12 +1993,14 @@ Cell n; {                               /* it was a cell ref, but don't    */
 }
 
 Void garbageCollect()     {             /* Run garbage collector ...       */
-    Bool breakStat = breakOn(FALSE);    /* disable break checking          */
+                                        /* disable break checking          */
     Int i,j;
     register Int mask;
     register Int place;
     Int      recovered;
     jmp_buf  regs;                      /* save registers on stack         */
+    HugsBreakAction oldBrk
+       = setBreakAction ( HugsIgnoreBreak );
 fprintf ( stderr, "wa-hey!  garbage collection!  too difficult!  bye!\n" );
 exit(0);
     setjmp(regs);
@@ -2032,7 +2034,7 @@ exit(0);
     }
 
     gcRecovered(recovered);
-    breakOn(breakStat);                 /* restore break trapping if nec.  */
+    setBreakAction ( oldBrk );
 
     everybody(GCDONE);
 

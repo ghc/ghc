@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.32 $
- * $Date: 2000/03/22 18:14:22 $
+ * $Revision: 1.33 $
+ * $Date: 2000/03/24 14:32:03 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -312,7 +312,6 @@ extern Int    whnfInt;                  /* integer value of term in whnf   */
 extern Float  whnfFloat;                /* float value of term in whnf     */
 extern Long   numCells;                 /* number of cells allocated       */
 extern Int    numGcs;                   /* number of garbage collections   */
-extern Bool   broken;                   /* indicates interrupt received    */
 extern Bool   preludeLoaded;            /* TRUE => prelude has been loaded */
 extern Bool   flagAssert;               /* TRUE => assert False <e> causes
                                                    an assertion failure    */
@@ -557,38 +556,31 @@ extern Bool      stdcallAllowed ( void );
  * Interrupting execution (signals, allowBreak):
  *-------------------------------------------------------------------------*/
 
-extern Bool breakOn             ( Bool );
-extern Bool broken;                     /* indicates interrupt received    */
+typedef
+   enum { HugsIgnoreBreak, HugsLongjmpOnBreak, HugsRtsInterrupt }
+   HugsBreakAction;
+
+extern HugsBreakAction currentBreakAction;
+extern HugsBreakAction setBreakAction ( HugsBreakAction );
+
 
 #ifndef SIGBREAK /* Sigh, not defined in cygwin32 beta release 16 */
 # define SIGBREAK 21
 #endif
 
-/* allowBreak: call to allow user to interrupt computation
- * ctrlbrk:    set control break handler
- */
-
-#if HAVE_SIGPROCMASK
+/* ctrlbrk: set the interrupt handler.
+   Hugs relies on being able to do sigprocmask, since some of
+   the signal handlers do longjmps, and this zaps the previous
+   signal mask.  So setHandler needs to do sigprocmask in order
+   to get the signal mask to a sane state each time.
+*/
 #include <signal.h>
-#define ctrlbrk(bh)	{ sigset_t mask; \
-			  signal(SIGINT,bh); \
-			  sigemptyset(&mask); \
-			  sigaddset(&mask, SIGINT); \
-			  sigprocmask(SIG_UNBLOCK, &mask, NULL); \
-			}
-#else
-#  define ctrlbrk(bh)	signal(SIGINT,bh)
-#endif
-
-#if SYMANTEC_C
-extern int time_release;
-extern int allow_break_count;
-# define allowBreak()	if (time_release !=0 && \
-			    (++allow_break_count % time_release) == 0) \
-			    ProcessEvent();
-#else
-# define allowBreak()  if (broken) { broken=FALSE; sigRaise(breakHandler); }
-#endif
+#define setHandler(bh) 	 { sigset_t mask; \
+			   signal(SIGINT,bh); \
+			   sigemptyset(&mask); \
+			   sigaddset(&mask, SIGINT); \
+			   sigprocmask(SIG_UNBLOCK, &mask, NULL); \
+			 }
 
 
 /*---------------------------------------------------------------------------

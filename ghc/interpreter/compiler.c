@@ -11,8 +11,8 @@
  * included in the distribution.
  *
  * $RCSfile: compiler.c,v $
- * $Revision: 1.24 $
- * $Date: 2000/03/23 14:54:20 $
+ * $Revision: 1.25 $
+ * $Date: 2000/03/24 14:32:03 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -1462,15 +1462,6 @@ static List addGlobals( List binds )
     return binds;
 }
 
-typedef void (*sighandler_t)(int);
-void eval_ctrlbrk ( int dunnowhat )
-{
-   interruptStgRts();
-   /* reinstall the signal handler so that further interrupts which
-      happen before the thread can return to the scheduler, lead back
-      here rather than invoking the previous break handler. */
-   signal(SIGINT, eval_ctrlbrk);
-}
 
 Void evalExp ( void ) {             /* compile and run input expression    */
     /* ToDo: this name (and other names generated during pattern match?)
@@ -1494,19 +1485,17 @@ Void evalExp ( void ) {             /* compile and run input expression    */
        unless doRevertCAFs below is permanently TRUE.
      */
     /* initScheduler(); */
-#ifdef CRUDE_PROFILING
+#   ifdef CRUDE_PROFILING
     cp_init();
-#endif
+#   endif
 
     {
         HaskellObj      result; /* ignored */
-        sighandler_t    old_ctrlbrk;
         SchedulerStatus status;
         Bool            doRevertCAFs = TRUE;  /* do not change -- comment above */
-        old_ctrlbrk         = signal(SIGINT, eval_ctrlbrk);
-        ASSERT(old_ctrlbrk != SIG_ERR);
+        HugsBreakAction brkOld = setBreakAction ( HugsRtsInterrupt ); 
         status              = rts_eval_(closureOfVar(v),10000,&result);
-        signal(SIGINT,old_ctrlbrk);
+        setBreakAction ( brkOld );
         fflush (stderr); 
         fflush (stdout);
         switch (status) {

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: input.c,v $
- * $Revision: 1.23 $
- * $Date: 2000/03/23 14:54:21 $
+ * $Revision: 1.24 $
+ * $Date: 2000/03/24 14:32:03 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -562,7 +562,7 @@ static Void local skip() {              /* move forward one char in input  */
             closeAnyInput();
         }
         else if (reading==KEYBOARD) {
-            allowBreak();
+            /* allowBreak(); */
             if (c0=='\n')
                 c1 = EOF;
             else {
@@ -574,7 +574,7 @@ static Void local skip() {              /* move forward one char in input  */
   		 * fail - returning "-1" to indicate an error.
   		 * This is one of the rare cases where "-1" does not mean EOF.
   		 */
- 		if (EOF == c1 && (!feof(stdin) || broken==TRUE)) {
+ 		if (EOF == c1 && (!feof(stdin) /* || broken==TRUE */)) {
                     c1 = ' ';
                 }
             }
