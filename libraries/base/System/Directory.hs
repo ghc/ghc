@@ -519,7 +519,7 @@ copyFile fromFPath toFPath =
 -- canonicalized path, with the intent that two paths referring
 -- to the same file\/directory will map to the same canonicalized
 -- path. Note that it is impossible to guarantee that the
--- implication (same file\/dir <=> same canonicalizedPath) holds
+-- implication (same file\/dir \<=\> same canonicalizedPath) holds
 -- in either direction: this function can make only a best-effort
 -- attempt.
 canonicalizePath :: FilePath -> IO FilePath

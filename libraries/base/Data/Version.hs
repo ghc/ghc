@@ -66,7 +66,7 @@ ordering on the 'versionBranch' fields (i.e. 2.1 > 2.0, 1.2.3 > 1.2.2,
 etc.).  This is expected to be sufficient for many uses, but note that
 you may need to use a more specific ordering for your versioning
 scheme.  For example, some versioning schemes may include pre-releases
-which have tags @"pre1"@, @"pre2"@, and so on, and these would need to
+which have tags @\"pre1\"@, @\"pre2\"@, and so on, and these would need to
 be taken into account when determining ordering.  In some cases, date
 ordering may be more appropriate, so the application would have to
 look for @date@ tags in the 'versionTags' field and compare those.
@@ -131,7 +131,7 @@ instance Ord Version where
 
 -- | Provides one possible concrete representation for 'Version'.  For
 -- a version with 'versionBranch' @= [1,2,3]@ and 'versionTags' 
--- @= ["tag1","tag2"]@, the output will be @1.2.3-tag1-tag2@.
+-- @= [\"tag1\",\"tag2\"]@, the output will be @1.2.3-tag1-tag2@.
 --
 showVersion :: Version -> String
 showVersion (Version branch tags)

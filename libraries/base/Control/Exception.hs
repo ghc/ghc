@@ -467,23 +467,6 @@ Similar arguments apply for other interruptible operations like
 'System.IO.openFile'.
 -}
 
--- -----------------------------------------------------------------------------
--- Assert
-
-#ifdef __HADDOCK__
--- | If the first argument evaluates to 'True', then the result is the
--- second argument.  Otherwise an 'AssertionFailed' exception is raised,
--- containing a 'String' with the source file and line number of the
--- call to assert.
---
--- Assertions can normally be turned on or off with a compiler flag
--- (for GHC, assertions are normally on unless the @-fignore-asserts@
--- option is give).  When assertions are turned off, the first
--- argument to 'assert' is ignored, and the second argument is
--- returned as the result.
-assert :: Bool -> a -> a
-#endif
-
 #ifndef __GLASGOW_HASKELL__
 assert :: Bool -> a -> a
 assert True x = x
