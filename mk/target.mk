@@ -437,7 +437,7 @@ all :: $(LIBRARY)
 
 define BUILD_LIB
 $(RM) $@
-$(AR) $(AR_OPTS) $@ $(LIBOBJS)
+$(AR) $(AR_OPTS) $@ $(STUBOBJS) $(LIBOBJS)
 $(RANLIB) $@
 endef
 
@@ -455,7 +455,7 @@ SRC_HC_OPTS += -split-objs
 
 define BUILD_LIB
 $(RM) $@
-TMPDIR=$(TMPDIR); export TMPDIR; $(FIND) $(patsubst %.$(way_)o,%,$(LIBOBJS)) -name '*.$(way_)o' -print | xargs ar q $@
+TMPDIR=$(TMPDIR); export TMPDIR; ( echo $(STUBOBJS) ; $(FIND) $(patsubst %.$(way_)o,%,$(LIBOBJS)) -name '*.$(way_)o' -print ) | xargs ar q $@
 $(RANLIB) $@
 endef
 
@@ -499,7 +499,7 @@ SRC_HC_POST_OPTS += \
 endif
 endif
 
-$(LIBRARY) :: $(LIBOBJS)
+$(LIBRARY) :: $(STUBOBJS) $(LIBOBJS)
 	$(BUILD_LIB)
 endif
 

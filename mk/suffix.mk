@@ -142,6 +142,10 @@ endif
 	@$(RM) $@
 	$(FLEX) -t $(FLEX_OPTS) $< > $@ || ( $(RM) $@ && exit 1 )
 
+# stubs are automatically generated and compiled by GHC
+%_stub.$(way_)o: %.o
+	@:
+
 #-----------------------------------------------------------------------------
 # Yacc stuff
 
