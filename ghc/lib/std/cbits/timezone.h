@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: timezone.h,v 1.6 1999/02/09 09:43:08 simonm Exp $
+ * $Id: timezone.h,v 1.7 1999/03/02 20:14:02 sof Exp $
  *
  * Time-zone support header
  */
@@ -60,10 +60,13 @@
 #define GMTOFF(x)        (((struct tm *)x)->tm_gmtoff)
 #else /* ! HAVE_TM_ZONE */
 # if HAVE_TZNAME || cygwin32_TARGET_OS
-#if cygwin32_TARGET_OS
-#define tzname _tzname
-#endif
+#  if cygwin32_TARGET_OS
+#   define tzname _tzname
+#  endif
+#  ifndef mingw32_TARGET_OS
 extern char *tzname[2];
+#  endif
+
 #  define ZONE(x)	 (((struct tm *)x)->tm_isdst ? tzname[1] : tzname[0])
 #  define SETZONE(x,z)
 # else /* ! HAVE_TZNAME */
@@ -72,16 +75,24 @@ extern char *tzname[2];
 # endif /* ! HAVE_TZNAME */
 /* Get the offset in secs from UTC, if (struct tm) doesn't supply it. */
 
+#ifdef mingw32_TARGET_OS
+#define timezone _timezone
+#else
+# ifdef cygwin32_TARGET_OS
+#  define timezone _timezone
+# endif
+#endif
+
 #ifndef HAVE_TIMEZONE
 extern TYPE_TIMEZONE timezone;
 #endif
 
 # if HAVE_ALTZONE
 extern time_t altzone;
-#  define GMTOFF(x)   	 (((struct tm *)x)->tm_isdst ? altzone : timezone)
+#  define GMTOFF(x)   	 (((struct tm *)x)->tm_isdst ? altzone : timezone )
 # else /* ! HAVE_ALTZONE */
 /* Assume that DST offset is 1 hour ... */
-#  define GMTOFF(x) (((struct tm *)x)->tm_isdst ? (timezone - 3600) : timezone)
+#  define GMTOFF(x) (((struct tm *)x)->tm_isdst ? (timezone - 3600) : timezone )
 # endif /* ! HAVE_ALTZONE */
 #endif  /* ! HAVE_TM_ZONE */
 
