@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Select.c,v 1.4 1999/11/03 15:04:25 simonmar Exp $
+ * $Id: Select.c,v 1.5 1999/11/24 16:39:33 simonmar Exp $
  *
  * (c) The GHC Team 1995-1999
  *
@@ -49,7 +49,8 @@ awaitEvent(rtsBool wait)
     StgTSO *tso, *prev, *next;
     rtsBool ready;
     fd_set rfd,wfd;
-    int min, numFound, delta;
+    int numFound;
+    nat min, delta;
     int maxfd = -1;
    
     struct timeval tv;
@@ -200,8 +201,13 @@ awaitEvent(rtsBool wait)
 	break;
 	
       case BlockedOnDelay:
-	tso->block_info.delay -= delta;
-	ready = (tso->block_info.delay <= 0);
+	if (tso->block_info.delay > delta) {
+	  tso->block_info.delay -= delta;
+	  ready = 0;
+	} else {
+	  tso->block_info.delay = 0;
+	  ready = 1;
+	}
 	break;
 	
       default:
