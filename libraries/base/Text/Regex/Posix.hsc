@@ -106,7 +106,7 @@ matched_parts string p_match = do
   start <- (#peek regmatch_t, rm_so) p_match :: IO CInt
   end   <- (#peek regmatch_t, rm_eo) p_match :: IO CInt
   let s = fromIntegral start; e = fromIntegral end
-  return ( take (s-1) string, 
+  return ( take s string, 
 	   take (e-s) (drop s string),
 	   drop e string )  
 
