@@ -1,0 +1,32 @@
+{-# OPTIONS -fno-implicit-prelude #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Foreign.Concurrent
+-- Copyright   :  (c) The University of Glasgow 2003
+-- License     :  BSD-style (see the file libraries/base/LICENSE)
+-- 
+-- Maintainer  :  ffi@haskell.org
+-- Stability   :  provisional
+-- Portability :  non-portable (requires concurrency)
+--
+-- FFI datatypes and operations that use or require concurrency.
+--
+-----------------------------------------------------------------------------
+
+module Foreign.Concurrent
+  (
+	-- * Concurrency-based @ForeignPtr@ operations
+#ifdef __GLASGOW_HASKELL__
+	newForeignPtr,
+	addForeignPtrFinalizer,
+#endif
+  ) where
+
+#ifdef __GLASGOW_HASKELL__
+import qualified GHC.ForeignPtr
+#endif
+
+#ifdef __GLASGOW_HASKELL__
+newForeignPtr          = GHC.ForeignPtr.newConcForeignPtr
+addForeignPtrFinalizer = GHC.ForeignPtr.addForeignPtrConcFinalizer
+#endif

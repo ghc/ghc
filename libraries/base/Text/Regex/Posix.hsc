@@ -56,28 +56,14 @@ regcomp
   -> Int    	-- ^ Flags (summed together)
   -> IO Regex  	-- ^ Returns: the compiled regular expression
 regcomp pattern flags = do
-#ifdef __HUGS__
   regex_fptr <- mallocForeignPtrBytes (#const sizeof(regex_t))
-#else
-  regex_ptr <- mallocBytes (#const sizeof(regex_t))
-  regex_fptr <- newForeignPtr regex_ptr (regfree regex_ptr)
-#endif /* __HUGS__ */
   r <- withCString pattern $ \cstr ->
     	 withForeignPtr regex_fptr $ \p ->
            c_regcomp p cstr (fromIntegral flags)
-#ifdef __HUGS__
   addForeignPtrFinalizer regex_fptr ptr_regfree
-#endif
   if (r == 0)
      then return (Regex regex_fptr)
      else error "Text.Regex.Posix.regcomp: error in pattern" -- ToDo
-
-#ifndef __HUGS__
-regfree :: Ptr CRegex -> IO ()
-regfree p_regex = do
-  c_regfree p_regex
-  free p_regex
-#endif /* __HUGS__ */
 
 -- -----------------------------------------------------------------------------
 -- regexec
@@ -174,13 +160,8 @@ type CRegMatch = ()
 foreign import ccall unsafe "regcomp"
   c_regcomp :: Ptr CRegex -> CString -> CInt -> IO CInt
 
-#ifdef __HUGS__
 foreign import ccall  unsafe "&regfree"
   ptr_regfree :: FunPtr (Ptr CRegex -> IO ())
-#else
-foreign import ccall  unsafe "regfree"
-  c_regfree :: Ptr CRegex -> IO ()
-#endif /* __HUGS__ */
 
 foreign import ccall unsafe "regexec"
   c_regexec :: Ptr CRegex -> CString -> CSize
