@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.186 2004/02/26 11:41:22 simonmar Exp $
+ * $Id: Schedule.c,v 1.187 2004/02/26 16:13:46 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2003
  *
@@ -2080,8 +2080,6 @@ initScheduler(void)
   initMutex(&sched_mutex);
   initMutex(&term_mutex);
   initMutex(&thread_id_mutex);
-
-  initCondition(&thread_ready_cond);
 #endif
   
 #if defined(RTS_SUPPORTS_THREADS)
