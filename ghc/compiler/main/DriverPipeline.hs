@@ -1254,7 +1254,7 @@ doMkDLL o_files = do
 	-- opts from -optdll-<blah>
     extra_ld_opts <- getStaticOpts v_Opt_dll
 
-    [rts_pkg] <- getPackageDetails [rtsPackage]
+    [rts_pkg, std_pkg] <- getPackageDetails [rtsPackage, preludePackage]
 
     let extra_os = if static || no_hs_main
                    then []
