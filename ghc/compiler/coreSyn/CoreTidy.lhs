@@ -169,6 +169,7 @@ tidyIdBndr env@(tidy_env, var_env) id
 	-- 
 	-- All nested Ids now have the same IdInfo, namely none,
 	-- which should save some space.
+	-- But note that tidyLetBndr puts some of it back.
         ty'          	  = tidyType env (idType id)
 	id'          	  = mkUserLocal occ' (idUnique id) ty' noSrcLoc
 	var_env'	  = extendVarEnv var_env id id'
