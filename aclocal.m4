@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.29 1998/10/05 14:15:32 simonm Exp $
+dnl $Id: aclocal.m4,v 1.30 1998/10/07 12:41:42 simonm Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -460,12 +460,12 @@ not_done=1
 for i in etext _etext __etext; do
   FPTOOLS_IN_SCOPE($i,$i,fptools_cv_end_of_text)
   if test "$fptools_cv_end_of_text" = yes; then
-   AC_DEFINE(TEXT_SECTION_END_MARKER, $i)
+   AC_DEFINE_UNQUOTED(TEXT_SECTION_END_MARKER, $i)
    not_done=0
    break
   fi
 done
-if test "$not_done"; then
+if test "$not_done" = 1; then
 FPTOOLS_IN_SCOPE(etext asm("etext"),etext,fptools_cv_end_of_text);
 if test "$fptools_cv_end_of_text" = yes; then
   AC_DEFINE(TEXT_SECTION_END_MARKER, etext asm("etext"))
@@ -484,12 +484,12 @@ not_done=1
 for i in end _end __end; do
   FPTOOLS_IN_SCOPE($i,$i,fptools_cv_end_of_data)
   if test "$fptools_cv_end_of_data" = yes; then
-   AC_DEFINE(DATA_SECTION_END_MARKER, $i)
+   AC_DEFINE_UNQUOTED(DATA_SECTION_END_MARKER, $i)
    not_done=0
    break
   fi
 done
-if test "$not_done"; then
+if test "$not_done" = 1; then
 FPTOOLS_IN_SCOPE(end asm("end"),end,fptools_cv_end_of_data);
 if test "$fptools_cv_end_of_data" = yes; then
   AC_DEFINE(DATA_SECTION_END_MARKER, end asm("end"))
