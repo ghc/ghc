@@ -72,7 +72,7 @@ HsInt prel_PrelHandle_write(HsInt fd, HsAddr ptr, HsInt off, HsInt sz)
 
 HsInt prel_PrelHandle_read(HsInt fd, HsAddr ptr, HsInt off, HsInt sz)
 {
-  return write(fd,ptr + off, sz);
+  return read(fd,ptr + off, sz);
 }
 
 void *prel_PrelIO_memcpy(char *dst, HsInt dst_off, const char *src, size_t sz)
