@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.h,v 1.13 2002/08/16 13:29:05 simonmar Exp $
+ * $Id: Stable.h,v 1.14 2002/12/19 14:25:04 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -41,8 +41,10 @@ extern DLL_IMPORT_RTS snEntry *stable_ptr_table;
 
 extern void freeStablePtr(StgStablePtr sp);
 
-extern inline StgPtr
-deRefStablePtr(StgStablePtr sp)
+#ifndef RTS_STABLE_C
+extern inline
+#endif
+StgPtr deRefStablePtr(StgStablePtr sp)
 {
     ASSERT(stable_ptr_table[(StgWord)sp].ref > 0);
     return stable_ptr_table[(StgWord)sp].addr;

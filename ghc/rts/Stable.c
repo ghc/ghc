@@ -1,11 +1,14 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.c,v 1.22 2002/08/16 13:29:07 simonmar Exp $
+ * $Id: Stable.c,v 1.23 2002/12/19 14:25:05 simonmar Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2002
  *
  * Stable names and stable pointers.
  *
  * ---------------------------------------------------------------------------*/
+
+// Make static versions of inline functions in Stable.h:
+#define RTS_STABLE_C
 
 #include "PosixSource.h"
 #include "Rts.h"
