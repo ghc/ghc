@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.35 2002/07/25 18:37:00 sof Exp $
+ * $Id: Schedule.h,v 1.36 2002/10/22 11:01:20 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -196,6 +196,8 @@ void print_bq (StgClosure *node);
 #if defined(PAR)
 void print_bqe (StgBlockingQueueElement *bqe);
 #endif
+
+void labelThread(StgPtr tso, char *label);
 
 /* -----------------------------------------------------------------------------
  * Some convenient macros...

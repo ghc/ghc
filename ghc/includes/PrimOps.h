@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.98 2002/10/18 09:51:04 simonmar Exp $
+ * $Id: PrimOps.h,v 1.99 2002/10/22 11:01:18 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -276,10 +276,8 @@ EXTFUN_RTS(unblockAsyncExceptionszh_fast);
 EXTFUN_RTS(myThreadIdzh_fast);
 EXTFUN_RTS(labelThreadzh_fast);
 
-extern int cmp_thread(const StgTSO *tso1, const StgTSO *tso2);
-extern int rts_getThreadId(const StgTSO *tso);
-extern void labelThread(StgTSO *tso, char *label);
-
+extern int cmp_thread(StgPtr tso1, StgPtr tso2);
+extern int rts_getThreadId(StgPtr tso);
 
 /* -----------------------------------------------------------------------------
    Weak Pointer PrimOps.

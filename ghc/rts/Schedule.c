@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.156 2002/09/25 14:46:31 simonmar Exp $
+ * $Id: Schedule.c,v 1.157 2002/10/22 11:01:19 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1657,10 +1657,11 @@ static void unblockThread(StgTSO *tso);
  * instances of Eq/Ord for ThreadIds.
  * ------------------------------------------------------------------------ */
 
-int cmp_thread(const StgTSO *tso1, const StgTSO *tso2) 
+int
+cmp_thread(StgPtr tso1, StgPtr tso2) 
 { 
-  StgThreadID id1 = tso1->id; 
-  StgThreadID id2 = tso2->id;
+  StgThreadID id1 = ((StgTSO *)tso1)->id; 
+  StgThreadID id2 = ((StgTSO *)tso2)->id;
  
   if (id1 < id2) return (-1);
   if (id1 > id2) return 1;
@@ -1672,13 +1673,15 @@ int cmp_thread(const StgTSO *tso1, const StgTSO *tso2)
  *
  * This is used in the implementation of Show for ThreadIds.
  * ------------------------------------------------------------------------ */
-int rts_getThreadId(const StgTSO *tso) 
+int
+rts_getThreadId(StgPtr tso) 
 {
-  return tso->id;
+  return ((StgTSO *)tso)->id;
 }
 
 #ifdef DEBUG
-void labelThread(StgTSO *tso, char *label)
+void
+labelThread(StgPtr tso, char *label)
 {
   int len;
   void *buf;
