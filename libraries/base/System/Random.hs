@@ -45,6 +45,7 @@ module System.Random
 import Prelude
 
 import System.CPUTime	( getCPUTime )
+import System.Time	( getClockTime, ClockTime(..) )
 import Data.Char	( isSpace, chr, ord )
 import System.IO.Unsafe ( unsafePerformIO )
 import Data.IORef
@@ -52,7 +53,6 @@ import Numeric		( readDec )
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.IOBase	( stToIO )
-import System.Time	( getClockTime, ClockTime(..) )
 #endif
 
 {- $intro
@@ -271,20 +271,11 @@ instance Random Float where
   random g        = randomIvalDouble (0::Double,1) realToFrac g
   randomR (a,b) g = randomIvalDouble (realToFrac a, realToFrac b) realToFrac g
 
-#ifdef __GLASGOW_HASKELL__
 mkStdRNG :: Integer -> IO StdGen
 mkStdRNG o = do
     ct          <- getCPUTime
     (TOD sec _) <- getClockTime
     return (createStdGen (sec * 12345 + ct + o))
-#endif
-
-#ifdef __HUGS__
-mkStdRNG :: Integer -> IO StdGen
-mkStdRNG o = do
-    ct          <- getCPUTime
-    return (createStdGen (ct + o))
-#endif
 
 randomIvalInteger :: (RandomGen g, Num a) => (Integer, Integer) -> g -> (a, g)
 randomIvalInteger (l,h) rng
