@@ -1,11 +1,11 @@
 
-tcfail071.hs:8:
+tcfail071.hs:5:
     Mismatched contexts
     When matching the contexts of the signatures for
-      g :: forall e. e -> e
       f :: forall d. (Ord d) => d -> d
+      g :: forall e. e -> e
     The signature contexts in a mutually recursive group should all be identical
-    When generalising the type(s) for g, f
+    When generalising the type(s) for f, g
 
 tcfail071.hs:10:
     Cannot unify the type-signature variable `e'

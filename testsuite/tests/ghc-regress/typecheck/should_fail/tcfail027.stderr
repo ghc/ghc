@@ -1,5 +1,5 @@
 
-tcfail027.hs:4:
+tcfail027.hs:7:
     Cycle in class declarations:
-	`A' at tcfail027.hs:4
 	`B' at tcfail027.hs:7
+	`A' at tcfail027.hs:4

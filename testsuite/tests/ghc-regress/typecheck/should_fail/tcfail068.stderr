@@ -28,10 +28,10 @@ tcfail068.hs:23:
     Inferred type is less polymorphic than expected
 	Quantified type variable `s' escapes
 	It is mentioned in the environment:
-	  itrap' :: Int -> Int -> ST s (IndTree s a)
-	    (bound at tcfail068.hs:25)
 	  itrapsnd :: Int -> Int -> ST s (IndTree s a)
 	    (bound at tcfail068.hs:28)
+	  itrap' :: Int -> Int -> ST s (IndTree s a)
+	    (bound at tcfail068.hs:25)
 	  arr :: IndTree s a (bound at tcfail068.hs:23)
     In the first argument of `runST', namely `(itrap' i k)'
     In a right-hand side of function `itrap': runST (itrap' i k)
@@ -54,10 +54,10 @@ tcfail068.hs:35:
     Inferred type is less polymorphic than expected
 	Quantified type variable `s' escapes
 	It is mentioned in the environment:
-	  itrapstate' :: Int -> Int -> c -> ST s (c, IndTree s b)
-	    (bound at tcfail068.hs:37)
 	  itrapstatesnd :: Int -> Int -> c -> ST s (c, IndTree s b)
 	    (bound at tcfail068.hs:40)
+	  itrapstate' :: Int -> Int -> c -> ST s (c, IndTree s b)
+	    (bound at tcfail068.hs:37)
 	  arr :: IndTree s b (bound at tcfail068.hs:35)
     In the first argument of `runST', namely `(itrapstate' i k s)'
     In a right-hand side of function `itrapstate':
