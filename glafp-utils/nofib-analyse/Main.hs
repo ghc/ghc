@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.2 2000/03/01 18:38:45 keithw Exp $
+-- $Id: Main.hs,v 1.3 2000/03/02 11:39:45 keithw Exp $
 
 -- (c) Simon Marlow 1997-1999
 -----------------------------------------------------------------------------
@@ -158,10 +158,10 @@ htmlShowResults
 htmlShowResults (r:rs) ss f stat result_ok
   =   tabHeader ss
   +/+ foldr1 (+/+) (zipWith tableRow [1..] results_per_prog)
-  +/+ foldr1 (+/+) (tableRow (-1) ("Average", gms)
-                    : if nodevs then []
-                                else [tableRow (-1) ("-1 s.d.", lows),
-                                      tableRow (-1) ("+1 s.d.", highs)])
+  +/+ foldr1 (+/+) ((if nodevs then []
+                               else [tableRow (-1) ("-1 s.d.", lows),
+                                     tableRow (-1) ("+1 s.d.", highs)])
+                    ++ [tableRow (-1) ("Average", gms)])
  where
 	-- results_per_prog :: [ (String,[BoxValue a]) ]
 	results_per_prog = map (calc_result rs f stat result_ok) (fmToList r)
@@ -180,13 +180,14 @@ htmlShowMultiResults
 htmlShowMultiResults (r:rs) ss f result_ok =
 	multiTabHeader ss 
 	 +/+ foldr1 (+/+) (map show_results_for_prog results_per_prog_mod_run)
-         +/+ foldr1 (+/+) ((cellHtml [] (bold [] (htmlStr "Average"))
-                            +-+ tableRow (-1) ("", gms))
-                           : if nodevs then []
-                                       else [(cellHtml [] (bold [] (htmlStr "-1 s.d.")))
-                                             +-+ tableRow (-1) ("", lows),
-                                             (cellHtml [] (bold [] (htmlStr "+1 s.d.")))
-                                             +-+ tableRow (-1) ("", highs)])
+         +/+ foldr1 (+/+) ((if nodevs then []
+                                      else [(cellHtml [] (bold [] (htmlStr "-1 s.d.")))
+                                            +-+ tableRow (-1) ("", lows),
+                                            (cellHtml [] (bold [] (htmlStr "+1 s.d.")))
+                                            +-+ tableRow (-1) ("", highs)])
+                           ++ [cellHtml [] (bold [] (htmlStr "Average"))
+                               +-+ tableRow (-1) ("", gms)])
+
   where
 	base_results = fmToList r :: [(String,Results)]
 
@@ -312,13 +313,13 @@ ascii_show_results
 ascii_show_results (r:rs) ss f stat result_ok
 	= ascii_header ss
 	. interleave "\n" (map show_per_prog_results results_per_prog)
-	. str "\n"
-	. show_per_prog_results ("Average",gms)
         . if nodevs then id
                     else   str "\n"
 	                 . show_per_prog_results ("-1 s.d.",lows)
 	                 . str "\n"
 	                 . show_per_prog_results ("+1 s.d.",highs)
+	. str "\n"
+	. show_per_prog_results ("Average",gms)
  where
 	-- results_per_prog :: [ (String,[BoxValue a]) ]
 	results_per_prog = map (calc_result rs f stat result_ok) (fmToList r)
@@ -338,13 +339,13 @@ ascii_show_multi_results (r:rs) ss f result_ok
 	= ascii_header ss 
 	. interleave "\n" (map show_results_for_prog results_per_prog_mod_run)
 	. str "\n"
-	. str "\n"
-	. show_per_prog_results ("Average",gms)
         . if nodevs then id
                     else   str "\n"
 	                 . show_per_prog_results ("-1 s.d.",lows)
 	                 . str "\n"
 	                 . show_per_prog_results ("+1 s.d.",highs)
+	. str "\n"
+	. show_per_prog_results ("Average",gms)
   where
 	base_results = fmToList r :: [(String,Results)]
 
