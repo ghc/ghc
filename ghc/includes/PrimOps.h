@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.29 1999/05/10 09:26:41 sof Exp $
+ * $Id: PrimOps.h,v 1.30 1999/05/10 09:50:49 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -307,19 +307,16 @@ typedef union {
  * integer2Int# is now modular.
  */
 
-#define integer2Intzh(r, sa,da)					\
-{ MP_INT arg;							\
-  								\
-  arg._mp_size	= (sa);						\
-  arg._mp_alloc	= ((StgArrWords *)da)->words;			\
-  arg._mp_d	= (unsigned long int *) (BYTE_ARR_CTS(da));	\
-								\
-  (r) =                                                         \
-    ( arg._mp_size == 0 ) ?                                     \
-       0 :                                                      \
-       (( arg._mp_size < 0 && arg._mp_d[0] != 0x80000000 ) ?    \
-          -(I_)arg._mp_d[0] :                                   \
-	   (I_)arg._mp_d[0]);                                   \
+#define integer2Intzh(r, sa,da)				\
+{ StgWord word0 = ((StgWord *)BYTE_ARR_CTS(da))[0];	\
+  int size = sa;					\
+							\
+  (r) =							\
+    ( size == 0 ) ?					\
+       0 :						\
+       ( size < 0 && word0 != 0x8000000 ) ?		\
+         -(I_)word0 :					\
+	  (I_)word0;					\
 }
 
 #define integer2Wordzh(r, sa,da)				\
