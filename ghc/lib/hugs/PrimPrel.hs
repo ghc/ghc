@@ -1136,26 +1136,21 @@ null (_:_)        = False
 (x:xs) ++ ys      = x : (xs ++ ys)
 
 map              :: (a -> b) -> [a] -> [b]
---map f xs          = [ f x | x <- xs ]
 map f []     = []
 map f (x:xs) = f x : map f xs
 
 
 filter           :: (a -> Bool) -> [a] -> [a]
---filter p xs       = [ x | x <- xs, p x ]
-filter p [] = []
+filter p []     = []
 filter p (x:xs) = if p x then x : filter p xs else filter p xs
 
 
 concat           :: [[a]] -> [a]
---concat            = foldr (++) []
 concat []       = []
 concat (xs:xss) = xs ++ concat xss
 
 length           :: [a] -> Int
---length            = foldl' (\n _ -> n + 1) 0
-length []     = 0
-length (x:xs) = let n = length xs in primSeq n (1+n)
+length            = foldl' (\n _ -> n + 1) 0
 
 (!!)             :: [b] -> Int -> b
 (x:_)  !! 0       = x
@@ -1793,7 +1788,7 @@ instance Show AsyncException where
 instance Show Exception where
   showsPrec _ (IOException err)	         = shows err
   showsPrec _ (ArithException err)       = shows err
-  showsPrec _ (ErrorCall err)	         = showString err
+  showsPrec _ (ErrorCall err)	         = showString ("error: " ++ err)
   showsPrec _ (NoMethodError err)        = showString err
   showsPrec _ (PatternMatchFail err)     = showString err
   showsPrec _ (NonExhaustiveGuards err)  = showString err
