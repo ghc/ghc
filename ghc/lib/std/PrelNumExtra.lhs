@@ -751,10 +751,11 @@ formatRealFloat fmt decs x
      FFExponent ->
       case decs of
        Nothing ->
-        let e' = if e==0 then 0 else e-1 in
-	(case ds of
-          [d]     -> d : ".0e"
-	  (d:ds') -> d : '.' : ds' ++ "e") ++ show e'
+        let show_e' = show (e-1) in
+	case ds of
+          "0"     -> "0.0e0"
+          [d]     -> d : ".0e" ++ show_e'
+	  (d:ds') -> d : '.' : ds' ++ "e" ++ show_e'
        Just dec ->
         let dec' = max dec 1 in
         case is of
