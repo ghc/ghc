@@ -15,6 +15,7 @@
 module GHC.ConsoleHandler
 #ifndef mingw32_TARGET_OS
 	where
+import Prelude -- necessary to get dependencies right
 #else /* whole file */
 	( Handler(..)
 	, installHandler
@@ -24,6 +25,8 @@ module GHC.ConsoleHandler
 {-
 #include "Signals.h"
 -}
+
+import Prelude -- necessary to get dependencies right
 
 import Foreign
 import Foreign.C
