@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.14 2000/06/20 15:12:14 simonmar Exp $
+ * $Id: Itimer.c,v 1.15 2000/07/17 15:09:35 rrt Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -96,22 +96,6 @@ handle_tick(int unused STG_UNUSED)
 
 #if defined(mingw32_TARGET_OS) || (defined(cygwin32_TARGET_OS) && !defined(HAVE_SETITIMER))
 
-/* 
- * Sigh - to avoid requiring anyone that wants to build ghc to have
- * to augment the Win32 header files that comes with cygwinb20.1,
- * include the missing MM API decls here inline.
- *
- * ToDo: check and remove these once the next version of cygwin is
- * released.
- */
-#define TIMERR_NOERROR   0
-#define TIMERR_NOCANDO   97
-#define TIME_PERIODIC    1
-
-typedef UINT MMRESULT;
-typedef void CALLBACK (*TIMECALLBACK) (UINT, UINT, DWORD, DWORD, DWORD);
-typedef TIMECALLBACK *LPTIMECALLBACK;
-MMRESULT STDCALL  timeSetEvent(UINT, UINT, LPTIMECALLBACK, DWORD, UINT);
 /*
   vtalrm_handler is assigned and set up in Signals.c
 
