@@ -295,7 +295,18 @@ machine in order to compile (most of) the sources, however.
 	      </listitem>
 	    </itemizedlist>
 
-	    <para>[Windows users. To protect your
+
+       <para>
+       [Windows users.] The programs <command>ssh-keygen1</command>, <command>ssh1</command>, and <command>cvs</command>,
+       seem to lock up <command>bash</command> entirely if they try to get user input (e.g. if
+       they ask for a password).  To solve this, start up <filename>cmd.exe</filename> 
+       and run it as follows:
+       <Screen>
+       c:\tmp> set CYGWIN32=tty
+       c:\tmp> c:/user/local/bin/ssh-keygen1
+       </Screen> </para>
+
+	    <para>[Windows users.] To protect your
             <literal>.ssh</literal> from access by anyone else,
             right-click your <literal>.ssh</literal> directory, and
             select <literal>Properties</literal>.  If you are not on
@@ -303,7 +314,7 @@ machine in order to compile (most of) the sources, however.
             full permissions (the second panel).  Remove everyone else
             from the access control list.  Don't leave them there but
             deny them access, because 'they' may be a list that
-            includes you!]</para>
+            includes you!</para>
 	  </listitem>
 
 	  <listitem>
@@ -324,39 +335,88 @@ machine in order to compile (most of) the sources, however.
 
 	  <listitem>
 	    <para>Set the following environment variables:</para>
-	    <itemizedlist>
-	      <listitem>
-		<para><literal>$CVS_RSH</literal> to
-		<literal>ssh</literal></para>
-	      </listitem>
-	      <listitem>
-		<para><literal>$CVSROOT</literal> to
-		<literal>:ext:</literal><replaceable>your-username</replaceable><literal>@cvs.haskell.org:/home/cvs/root</literal></para>
-	      </listitem>
-	    </itemizedlist>
-	  </listitem>
+	   <ItemizedList>
+	   <listitem>
+	   <para>
+	   <constant>$HOME</constant>: points to your home directory.  This is where CVS
+	   will look for its <filename>.cvsrc</filename> file.
+	   </para>
+	   </listitem>
 
-	</orderedlist>
-
-	<para>The <literal>CVSROOT</literal> environment variable will
-        be recorded in the checked-out tree, so you don't need to set
-        this every time either. Ignore the instructions for setting
-        <literal>CVSROOT</literal> below. </para>
-
-	<para>Caveats:</para>
-
-	<itemizedlist>
-	  <listitem>
-	    <para>Setting your <literal>CVS_RSH</literal> to
+	   <listitem>
+	   <para>
+	   <constant>$CVS_RSH</constant> to <filename>ssh</filename>
+	   </para>
+  	   <para>[Windows users.] Setting your <literal>CVS_RSH</literal> to
             <literal>ssh</literal> assumes that your CVS client
             understands how to execute shell script
             (&quot;#!&quot;s,really), which is what
             <literal>ssh</literal> is. This may not be the case on
-            some platforms (read: Win32), so in that case set
-            <literal>CVS_RSH</literal> to
+            Win32 platforms, so in that case set <literal>CVS_RSH</literal> to
             <literal>ssh1</literal>.</para>
+	   </listitem>
+
+             <listitem>
+		<para><literal>$CVSROOT</literal> to
+		<literal>:ext:</literal><replaceable>your-username</replaceable>
+                <literal>@cvs.haskell.org:/home/cvs/root</literal>
+		where <replaceable>your-username</replaceable> is your user name on
+		<literal>cvs.haskell.org</literal>.
+		</para>
+	<para>The <literal>CVSROOT</literal> environment variable will
+        be recorded in the checked-out tree, so you don't need to set
+        this every time. </para>
+
+	     </listitem>
+
+	<listitem>
+	<para>
+	<constant>$CVSEDITOR</constant>: <filename>bin/gnuclient.exe</filename> 
+	if you want to use an Emacs buffer for typing in those long commit messages.
+	</para>
+	</listitem>
+
+	<listitem>
+	<para>
+	<constant>$SHELL</constant>: To use bash as the shell in Emacs, you need to
+	set this to point to <Filename>bash.exe</Filename>.
+	</para>
+	</listitem>
+
+       </ItemizedList>
+
+
 	  </listitem>
-	</itemizedlist>
+
+	  <listitem>
+	  <para>
+	  Put the following in <filename>$HOME/.cvsrc</filename>:
+	  </para>
+	  
+	  <ProgramListing>
+	  checkout -P
+	  release -d
+	  update -P
+	  diff -u
+	  </ProgramListing>
+	  
+	  <para>
+	  These are the default options for the specified CVS commands,
+	  and represent better defaults than the usual ones.  (Feel
+	  free to change them.)
+	  </para>
+	  
+	  <para>
+	  [Windows users.]  Filenames starting with <filename>.</filename> were illegal in 
+	  the 8.3 DOS filesystem, but that restriction should have
+	  been lifted by now (i.e., you're using VFAT or later filesystems.) If
+	  you're still having problems creating it, don't worry; <filename>.cvsrc</filename> is entirely
+	  optional.
+	  </para>
+	  </listitem>
+
+	</orderedlist>
+
 
 	<para>[Experts.]  Once your account is set up, you can get
         access from other machines without bothering Jeff, thus:</para>
@@ -386,6 +446,8 @@ machine in order to compile (most of) the sources, however.
       </sect3>
     </sect2>
 
+
+
     <sect2 id="cvs-first">
       <title>Checking Out a Source Tree</title>
 
@@ -405,13 +467,21 @@ machine in order to compile (most of) the sources, however.
           for the fptools suite, including the configuration files and
           some other junk. </para>
 
+<para>[Windows users.]  The following messages appear to be harmless:
+<Screen>
+setsockopt IPTOS_LOWDELAY: Invalid argument
+setsockopt IPTOS_THROUGHPUT: Invalid argument
+</Screen>
+</para>
+
+
+	  <para>You can call the fptools directory whatever you like,
+          CVS won't mind: </para>
+	  
 <screen>
     $ mv fptools <replaceable>directory</replaceable>
 </screen>
 
-	  <para>You can call the fptools directory whatever you like,
-          CVS won't mind. </para>
-	  
 	  <para> NB: after you've read the CVS manual you might be
           tempted to try</para>
 <screen>
@@ -3469,6 +3539,38 @@ You should read the GHC installation guide sections on Windows (in the user
 guide) before continuing to read these notes.
 </para>
 
+
+<Sect2><Title>Before you start</Title>
+
+<itemizedlist>
+<listitem>
+<para>
+Make sure that the user environment variable
+<constant>MAKE_MODE</constant> is set to <Literal>UNIX</Literal>. If you
+don't do this you get very weird messages when you type
+<Command>make</Command>, such as:
+<Screen>
+/c: /c: No such file or directory
+</Screen>
+</para>
+</listitem>
+
+<listitem>
+<para>GHC uses the <emphasis>mingwin</emphasis> C compiler to
+generate code, so you have to install that. Just pick up a mingwin bundle at
+<ulink url="http://www.mingw.org/">http://www.mingw.org/</ulink>.
+We install it in <filename>c:/mingw</filename>.
+</para>
+</listitem>
+
+<listitem>
+<para>
+Install a version of GHC, and put it in your <constant>PATH</constant>. 
+The InstallShield tells you the path when you install it.
+</para>
+</listitem>
+
+<listitem>
 <para>
 Because of various hard-wired infelicities, you need to copy
 <Filename>bash.exe</Filename> (from GHC's <Filename>extra-bin</Filename>
@@ -3477,232 +3579,30 @@ directory), and <Filename>perl.exe</Filename> and
 to <Filename>/bin</Filename> (discover where your Cygwin root directory is
 by typign <Command>mount</Command>).
 </para>
-
-<para>
-Before you start, you need to make sure that the user environment variable
-<constant>MAKE_MODE</constant> is set to <Literal>UNIX</Literal>. If you
-don't do this you get very weird messages when you type
-<Command>make</Command>, such as:
-</para>
-<Screen>
-/c: /c: No such file or directory</Screen>
-
-<Sect2><Title>Configuring ssh</Title>
-
-<ItemizedList>
-
-<listitem>
-<para>
-Generate a key, by running <filename>c:/user/local/bin/ssh-keygen1</filename>.
-  This generates a public key in <filename>.ssh/identity.pub</filename>, and a
-  private key in <filename>.ssh/identity</filename>
-</para>
-
-<para>
-  In response to the 'Enter passphrase' question, just hit
-  return (i.e. use an empty passphrase).  The passphrase is
-  a password that protects your private key.  But it's a pain
-  to type this passphrase everytime you use <Command>ssh</Command>, so the best
-  thing to do is simply to protect your <filename>.ssh</filename> directory, and
-  <filename>.ssh/identity</filename> from access by anyone else.  To do this 
-  right-click your <filename>.ssh</filename> directory, and select Properties.
-  If you are not on the access control list, add yourself, and
-  give yourself full permissions (the second panel).  
-  Remove everyone else from the access control list.  (Don't
-  leave them there but deny them access, because 'they' may be
-  a list that includes you!)
-</para>
-
-<para>
-  If you have problems running <Command>ssh-keygen1</Command>
-  from within <Command>bash</Command>, start up <filename>cmd.exe</filename> and run it as follows:
-</para>
-
-<Screen>
-c:\tmp> set CYGWIN32=tty
-c:\tmp> c:/user/local/bin/ssh-keygen1
-</Screen>
 </listitem>
 
 <listitem>
-<para>
-If you don't have an account on <Literal>cvs.haskell.org</Literal>, send 
-  your <filename>.ssh/identity.pub</filename> to the CVS repository administrator
-  (currently Jeff Lewis <Email>jlewis@galconn.com</Email>).  He will set up
-  your account.
-</para>
-
-<para>
-  If you do have an account on <Literal>cvs.haskell.org</Literal>, use TeraTerm
-  to logon to it. Once in, copy the
-  key that <Command>ssh-keygen1</Command> deposited in <filename>/.ssh/identity.pub</filename> into
-  your <filename>~/.ssh/authorized_keys</filename>. Make sure that the new version
-  of <filename>authorized_keys</filename> still has 600 file permission.
-</para>
-</listitem>
-
-</ItemizedList>
-
-</Sect2>
-
-
-<Sect2><Title>Configuring CVS</Title>
-
-<ItemizedList>
-
-<listitem>
-<para>
-From the System control panel,
-set the following <Emphasis>user</Emphasis> environment variables (see the GHC user guide)
-</para>
-
-<ItemizedList>
-<listitem>
-<para>
-<constant>HOME</constant>: points to your home directory.  This is where CVS
-will look for its <filename>.cvsrc</filename> file.
-</para>
+<para> You should not need to install <command>ssh</command> 
+and <command>cvs</command>: they come with Cygwin.</para>
 </listitem>
 
 <listitem>
-<para>
-<constant>CVS_RSH</constant>: <filename>c:/path_to_ghc/extra-bin/ssh</filename>
+<para> Check out a copy of GHC sources from
+the CVS repository, following the instructions above (<xref linkend="cvs-access">).
 </para>
 </listitem>
+</itemizedlist>
+</sect2>
 
-<listitem>
-<para>
-<constant>CVSROOT</constant>: <Literal>:ext:username@cvs.haskell.org:/home/cvs/root</Literal>,
-where <Literal>username</Literal> is your userid
-</para>
-</listitem>
-
-<listitem>
-<para>
-<constant>CVSEDITOR</constant>: <filename>bin/gnuclient.exe</filename> if you want to use an Emacs buffer for typing in those long commit messages.
-</para>
-</listitem>
-
-<listitem>
-<para>
-<constant>SHELL</constant>: To use bash as the shell in Emacs, you need to
-set this to point to <Filename>bash.exe</Filename>.
-</para>
-</listitem>
-
-</ItemizedList>
-</listitem>
-
-<listitem>
-<para>
-Put the following in <filename>$HOME/.cvsrc</filename>:
-</para>
-
-<ProgramListing>
-checkout -P
-release -d
-update -P
-diff -u
-</ProgramListing>
-
-<para>
-These are the default options for the specified CVS commands,
-and represent better defaults than the usual ones.  (Feel
-free to change them.)
-</para>
-
-<para>
-Filenames starting with <filename>.</filename> were illegal in 
-the 8.3 DOS filesystem, but that restriction should have
-been lifted by now (i.e., you're using VFAT or later filesystems.) If
-you're still having problems creating it, don't worry; <filename>.cvsrc</filename> is entirely
-optional.
-</para>
-</listitem>
-
-<listitem>
-<para>
-Try doing <Command>cvs co fpconfig</Command>. All being well, bytes should
-start to trickle through, leaving a directory <filename>fptools</filename>
-in your current directory.  (You can <Command>rm</Command> it if you don't
-want to keep it.) The following messages appear to be harmless:
-</para>
-
-<Screen>
-setsockopt IPTOS_LOWDELAY: Invalid argument
-setsockopt IPTOS_THROUGHPUT: Invalid argument
-</Screen>
-
-<para>
-At this point I found that CVS tried to invoke a little dialogue with
-me (along the lines of `do you want to talk to this host?'), but
-for some reason bombed out.  This was from a bash shell running in Emacs.
-I solved this by invoking a Cygnus shell, and running CVS from there.
-Once things are dialogue free, it seems to work OK from within Emacs.
-</para>
-</listitem>
-
-<listitem>
-<para>
-If you want to check out part of large tree, proceed as follows:
-</para>
-
-<ProgramListing>
-cvs -f checkout -l papers
-cd papers
-cvs update cpr
-</ProgramListing>
-
-<para>
-This sequence checks out the <Literal>papers</Literal> module, but none
-of its sub-directories.
-The "<Option>-l</Option>" flag says not to check out sub-directories.
-The "<Option>-f</Option>" flag says not to read the <filename>.cvsrc</filename> file
-whose <Option>-P</Option> default (don't check out empty directories) is
-in this case bogus.
-</para>
-
-<para>
-The <Command>cvs update</Command> command sucks in a named sub-directory.
-</para>
-</listitem>
-
-</ItemizedList>
-
-<para>
-There is a very nice graphical front-end to CVS for Win32 platforms,
-with a UI that people will be familiar with, at 
-<ULink URL="http://www.wincvs.org/">wincvs.org</ULink>.
-I have not tried it yet.
-</para>
-
-</Sect2>
-
-
-    <Sect2><Title>Building GHC</Title>
+<Sect2><Title>Building GHC</Title>
       
-      <ItemizedList>
-
-	<listitem>
-	  <para>
-	    You should give the option
-	    <option>--host=i386-unknown-mingw32</option> to
-	    <command>autoconf</command>, so that it doesn't try to
-	    build for Cygwin (unless that's what you really
-	    want). Since it's possible to get into trouble using the
-	    wrong C compiler, it's wise either to avoid installing
-	    Cygwin gcc, or to explicitly specify
-	    <option>--with-gcc=/mingw/bin/gcc</option>.
-	  </para>
-	</listitem>
+<ItemizedList>
 
 <listitem>
 <para>
-You have to run <Command>autoconf</Command> both in <filename>fptools</filename>
+Run <Command>autoconf</Command> both in <filename>fptools</filename>
 and in <filename>fptools/ghc</filename>.  If you omit the latter step you'll
 get an error when you run <filename>./configure</filename>:
-</para>
-
 <Screen>
 ...lots of stuff...
 creating mk/config.h
@@ -3712,15 +3612,23 @@ running /bin/sh ./configure  --cache-file=.././config.cache --srcdir=.
 ./configure: ./configure: No such file or directory
 configure: error: ./configure failed for ghc
 </Screen>
-</listitem>
-
-<listitem>
-<para>
-You need <filename>ghc</filename> to be in your <constant>PATH</constant> before you run
-<Command>configure</Command>. The InstallShield tells you the path
-when you install it.
 </para>
 </listitem>
+
+	<listitem>
+	  <para> 
+	    After <command>autoconf</command> run <command>./configure</command> in
+	    <filename>fptools/</filename> thus:
+<Screen>
+  ./configure --host=i386-unknown-mingw32 --with-gcc=/mingw/bin/gcc
+</Screen>
+      Both these options are important!
+      It's possible to get into trouble using the
+      wrong C compiler!
+      </para>
+      </listitem>
+
+
 
 </ItemizedList>
 
