@@ -54,7 +54,10 @@ data InPat name
 		    Fixity		-- c.f. OpApp in HsExpr
 		    (InPat name)
 
-  | NPatIn	    HsOverLit
+  | NPatIn	    HsOverLit 		-- Always positive
+		    (Maybe Name)	-- Just (Name of 'negate') for negative
+					-- patterns, Nothing otherwise
+					--  (see RnEnv.lookupSyntaxName)
 
   | NPlusKPatIn	    name		-- n+k pattern
 		    HsOverLit		-- It'll always be an HsIntegral
@@ -166,7 +169,7 @@ pprInPat (ListPatIn pats)     = brackets (interpp'SP pats)
 pprInPat (PArrPatIn pats)     = pabrackets (interpp'SP pats)
 pprInPat (TuplePatIn pats bx) = tupleParens bx (interpp'SP pats)
 pprInPat (NPlusKPatIn n k _)  = parens (hcat [ppr n, char '+', ppr k])
-pprInPat (NPatIn l)	      = ppr l
+pprInPat (NPatIn l _)	      = ppr l
 
 pprInPat (ConPatIn c pats)
   | null pats = ppr c
@@ -345,7 +348,7 @@ collect (SigPatIn pat _)	 bndrs = collect pat bndrs
 collect (LazyPatIn pat)     	 bndrs = collect pat bndrs
 collect (AsPatIn a pat)     	 bndrs = a : collect pat bndrs
 collect (NPlusKPatIn n _ _)      bndrs = n : bndrs
-collect (NPatIn _)		 bndrs = bndrs
+collect (NPatIn _ _)		 bndrs = bndrs
 collect (ConPatIn c pats)   	 bndrs = foldr collect bndrs pats
 collect (ConOpPatIn p1 c f p2)   bndrs = collect p1 (collect p2 bndrs)
 collect (ParPatIn  pat)     	 bndrs = collect pat bndrs
@@ -390,7 +393,7 @@ collect_pat (VarPatIn var)         acc = acc
 collect_pat (LitPatIn _)	   acc = acc
 collect_pat (LazyPatIn pat)        acc = collect_pat pat acc
 collect_pat (AsPatIn a pat)        acc = collect_pat pat acc
-collect_pat (NPatIn _)		   acc = acc
+collect_pat (NPatIn _ _)	   acc = acc
 collect_pat (NPlusKPatIn n _ _)    acc = acc
 collect_pat (ConPatIn c pats)      acc = foldr collect_pat acc pats
 collect_pat (ConOpPatIn p1 c f p2) acc = collect_pat p1 (collect_pat p2 acc)

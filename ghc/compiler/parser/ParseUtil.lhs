@@ -200,7 +200,7 @@ checkPat e [] = case e of
 	EWildPat	   -> returnP WildPatIn
 	HsVar x		   -> returnP (VarPatIn x)
 	HsLit l 	   -> returnP (LitPatIn l)
-	HsOverLit l	   -> returnP (NPatIn l)
+	HsOverLit l	   -> returnP (NPatIn l Nothing)
 	ELazyPat e	   -> checkPat e [] `thenP` (returnP . LazyPatIn)
 	EAsPat n e	   -> checkPat e [] `thenP` (returnP . AsPatIn n)
         ExprWithTySig e t  -> checkPat e [] `thenP` \e ->
@@ -213,13 +213,12 @@ checkPat e [] = case e of
 			      in
 			      returnP (SigPatIn e t')
 
-	-- translate out NegApps of literals in patterns.
-	-- NB. negative primitive literals are already handled by
-	-- RdrHsSyn.mkHsNegApp
-	NegApp (HsOverLit (HsIntegral i n)) _
-		-> returnP (NPatIn (HsIntegral (-i) n))
-	NegApp (HsOverLit (HsFractional f n)) _
-		-> returnP (NPatIn (HsFractional (-f) n))
+	-- Translate out NegApps of literals in patterns. We negate
+	-- the Integer here, and add back the call to 'negate' when
+	-- we typecheck the pattern.
+	-- NB. Negative *primitive* literals are already handled by
+	--     RdrHsSyn.mkHsNegApp
+	NegApp (HsOverLit lit) neg -> returnP (NPatIn lit (Just neg))
 
 	OpApp (HsVar n) (HsVar plus) _ (HsOverLit lit@(HsIntegral _ _)) 
 		  	   | plus == plus_RDR

@@ -306,12 +306,20 @@ tcPat tc_bndr (LitPatIn simple_lit) pat_ty
   = unifyTauTy pat_ty (simpleHsLitTy simple_lit)		`thenTc_` 
     returnTc (LitPat simple_lit pat_ty, emptyLIE, emptyBag, emptyBag, emptyLIE)
 
-tcPat tc_bndr pat@(NPatIn over_lit) pat_ty
-  = newOverloadedLit origin over_lit pat_ty		`thenNF_Tc` \ (over_lit_expr, lie1) ->
+tcPat tc_bndr pat@(NPatIn over_lit mb_neg) pat_ty
+  = newOverloadedLit origin over_lit pat_ty		`thenNF_Tc` \ (pos_lit_expr, lie1) ->
     newMethodFromName origin pat_ty eqName		`thenNF_Tc` \ eq ->
+    (case mb_neg of
+	Nothing  -> returnNF_Tc (pos_lit_expr, emptyLIE)	-- Positive literal
+	Just neg -> 	-- Negative literal
+			-- The 'negate' is re-mappable syntax
+		    tcLookupId neg				`thenNF_Tc` \ neg_sel_id ->
+ 		    newMethod origin neg_sel_id [pat_ty]	`thenNF_Tc` \ neg ->
+		    returnNF_Tc (HsApp (HsVar (instToId neg)) pos_lit_expr, unitLIE neg)
+    )								`thenNF_Tc` \ (lit_expr, lie2) ->
 
-    returnTc (NPat lit' pat_ty (HsApp (HsVar (instToId eq)) over_lit_expr),
-	      lie1 `plusLIE` unitLIE eq,
+    returnTc (NPat lit' pat_ty (HsApp (HsVar (instToId eq)) lit_expr),
+	      lie1 `plusLIE` lie2 `plusLIE` unitLIE eq,
 	      emptyBag, emptyBag, emptyLIE)
   where
     origin = PatOrigin pat

@@ -90,15 +90,23 @@ rnPat (LitPatIn lit)
   = litFVs lit		`thenRn` \ fvs ->
     returnRn (LitPatIn lit, fvs) 
 
-rnPat (NPatIn lit) 
+rnPat (NPatIn lit mb_neg) 
   = rnOverLit lit			`thenRn` \ (lit', fvs1) ->
-    returnRn (NPatIn lit', fvs1 `addOneFV` eqClassName)	-- Needed to find equality on pattern
+    (case mb_neg of
+	Nothing  -> returnRn (Nothing, emptyFVs)
+	Just neg -> lookupSyntaxName neg	`thenRn` \ neg' ->
+		    returnRn (Just neg', unitFV neg')
+    )					`thenRn` \ (mb_neg', fvs2) ->
+    returnRn (NPatIn lit' mb_neg', 
+	      fvs1 `plusFV` fvs2 `addOneFV` eqClassName)	
+	-- Needed to find equality on pattern
 
 rnPat (NPlusKPatIn name lit minus)
   = rnOverLit lit			`thenRn` \ (lit', fvs) ->
     lookupBndrRn name			`thenRn` \ name' ->
     lookupSyntaxName minus		`thenRn` \ minus' ->
-    returnRn (NPlusKPatIn name' lit' minus', fvs `addOneFV` ordClassName `addOneFV` minus')
+    returnRn (NPlusKPatIn name' lit' minus', 
+	      fvs `addOneFV` ordClassName `addOneFV` minus')
 
 rnPat (LazyPatIn pat)
   = rnPat pat		`thenRn` \ (pat', fvs) ->
