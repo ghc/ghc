@@ -57,7 +57,7 @@ where
 #include "HsVersions.h"
 
 import DriverPipeline	( CompResult(..), preprocess, compile, link )
-import DriverState	( v_Output_file )
+import DriverState	( v_Output_file, v_NoHsMain )
 import DriverPhases
 import DriverUtil
 import Finder
@@ -638,15 +638,22 @@ cmLoadModules cmstate1 dflags mg2unsorted
 	      -- clean up after ourselves
 	      cleanTempFilesExcept verb (ppFilesFromSummaries modsDone)
 
-	      -- issue a warning for the confusing case where the user said '-o foo'
-	      -- but we're not going to do any linking.
 	      ofile <- readIORef v_Output_file
-	      when (ghci_mode == Batch && isJust ofile && not a_root_is_Main
+	      no_hs_main <- readIORef v_NoHsMain
+
+	      -- Issue a warning for the confusing case where the user
+	      -- said '-o foo' but we're not going to do any linking.
+	      -- We attempt linking if either (a) one of the modules is
+	      -- called Main, or (b) the user said -no-hs-main, indicating
+	      -- that main() is going to come from somewhere else.
+	      --
+	      let do_linking = a_root_is_Main || no_hs_main
+	      when (ghci_mode == Batch && isJust ofile && not do_linking
 		     && verb > 0) $
 	         hPutStrLn stderr "Warning: output was redirected with -o, but no output will be generated\nbecause there is no Main module."
 
 	      -- link everything together
-              linkresult <- link ghci_mode dflags a_root_is_Main hpt3 
+              linkresult <- link ghci_mode dflags do_linking hpt3 
 
 	      cmLoadFinish Succeeded linkresult 
 			   hpt3 modsDone ghci_mode pcs3
