@@ -1,5 +1,5 @@
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude -monly-3-regs #-}
+{-# OPTIONS -fno-implicit-prelude #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Storable
