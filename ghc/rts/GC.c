@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.38 1999/02/23 15:45:06 simonm Exp $
+ * $Id: GC.c,v 1.39 1999/02/24 16:25:40 simonm Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -561,6 +561,8 @@ void GarbageCollect(void (*get_roots)(void))
   }
   small_alloc_list = NULL;
   alloc_blocks = 0;
+  alloc_Hp = NULL;
+  alloc_HpLim = NULL;
   alloc_blocks_lim = RtsFlags.GcFlags.minAllocAreaSize;
 
   /* Two-space collector:
@@ -676,6 +678,7 @@ void GarbageCollect(void (*get_roots)(void))
     bd->free = bd->start;
     ASSERT(bd->gen == g0);
     ASSERT(bd->step == g0s0);
+    IF_DEBUG(sanity,memset(bd->start, 0xaa, BLOCK_SIZE));
   }
   current_nursery = g0s0->blocks;
 
