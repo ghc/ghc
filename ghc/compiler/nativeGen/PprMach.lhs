@@ -17,14 +17,21 @@ module PprMach ( pprInstr, pprSize, pprUserReg ) where
 import MachRegs		-- may differ per-platform
 import MachMisc
 
-import CLabel		( pprCLabel_asm, externallyVisibleCLabel, labelDynamic )
+import CLabel		( pprCLabel, externallyVisibleCLabel, labelDynamic )
 import Stix		( CodeSegment(..) )
-import Outputable
+import Unique		( pprUnique )
+import Panic		( panic )
+import Pretty
+import qualified Outputable
 
 import ST
 import MutableArray
 import Char		( chr, ord )
 import Maybe		( isJust )
+
+asmSDoc d = Outputable.withPprStyleDoc (
+	      Outputable.mkCodeStyle Outputable.AsmStyle) d
+pprCLabel_asm l = asmSDoc (pprCLabel l)
 \end{code}
 
 %************************************************************************
@@ -36,20 +43,19 @@ import Maybe		( isJust )
 For x86, the way we print a register name depends
 on which bit of it we care about.  Yurgh.
 \begin{code}
-pprUserReg :: Reg -> SDoc
+pprUserReg :: Reg -> Doc
 pprUserReg = pprReg IF_ARCH_i386(L,)
 
-
-pprReg :: IF_ARCH_i386(Size ->,) Reg -> SDoc
+pprReg :: IF_ARCH_i386(Size ->,) Reg -> Doc
 
 pprReg IF_ARCH_i386(s,) r
   = case r of
       RealReg i      -> ppr_reg_no IF_ARCH_i386(s,) i
-      VirtualRegI u  -> text "%vI_" <> ppr u
-      VirtualRegF u  -> text "%vF_" <> ppr u      
+      VirtualRegI u  -> text "%vI_" <> asmSDoc (pprUnique u)
+      VirtualRegF u  -> text "%vF_" <> asmSDoc (pprUnique u)
   where
 #if alpha_TARGET_ARCH
-    ppr_reg_no :: Int -> SDoc
+    ppr_reg_no :: Int -> Doc
     ppr_reg_no i = ptext
       (case i of {
 	 0 -> SLIT("$0");    1 -> SLIT("$1");
@@ -88,7 +94,7 @@ pprReg IF_ARCH_i386(s,) r
       })
 #endif
 #if i386_TARGET_ARCH
-    ppr_reg_no :: Size -> Int -> SDoc
+    ppr_reg_no :: Size -> Int -> Doc
     ppr_reg_no B  = ppr_reg_byte
     ppr_reg_no Bu = ppr_reg_byte
     ppr_reg_no W  = ppr_reg_word
@@ -124,7 +130,7 @@ pprReg IF_ARCH_i386(s,) r
       })
 #endif
 #if sparc_TARGET_ARCH
-    ppr_reg_no :: Int -> SDoc
+    ppr_reg_no :: Int -> Doc
     ppr_reg_no i = ptext
       (case i of {
 	 0 -> SLIT("%g0");   1 -> SLIT("%g1");
@@ -171,7 +177,7 @@ pprReg IF_ARCH_i386(s,) r
 %************************************************************************
 
 \begin{code}
-pprSize :: Size -> SDoc
+pprSize :: Size -> Doc
 
 pprSize x = ptext (case x of
 #if alpha_TARGET_ARCH
@@ -205,7 +211,7 @@ pprSize x = ptext (case x of
 	F   -> SLIT("")
 	DF  -> SLIT("d")
     )
-pprStSize :: Size -> SDoc
+pprStSize :: Size -> Doc
 pprStSize x = ptext (case x of
 	B   -> SLIT("b")
 	Bu  -> SLIT("b")
@@ -223,7 +229,7 @@ pprStSize x = ptext (case x of
 %************************************************************************
 
 \begin{code}
-pprCond :: Cond -> SDoc
+pprCond :: Cond -> Doc
 
 pprCond c = ptext (case c of {
 #if alpha_TARGET_ARCH
@@ -265,7 +271,7 @@ pprCond c = ptext (case c of {
 %************************************************************************
 
 \begin{code}
-pprImm :: Imm -> SDoc
+pprImm :: Imm -> Doc
 
 pprImm (ImmInt i)     = int i
 pprImm (ImmInteger i) = integer i
@@ -299,7 +305,7 @@ pprImm (HI i)
 %************************************************************************
 
 \begin{code}
-pprAddr :: MachRegsAddr -> SDoc
+pprAddr :: MachRegsAddr -> Doc
 
 #if alpha_TARGET_ARCH
 pprAddr (AddrReg r) = parens (pprReg r)
@@ -372,7 +378,7 @@ pprAddr (AddrRegImm r1 imm)
 %************************************************************************
 
 \begin{code}
-pprInstr :: Instr -> SDoc
+pprInstr :: Instr -> Doc
 
 --pprInstr (COMMENT s) = empty -- nuke 'em
 pprInstr (COMMENT s)
@@ -428,10 +434,10 @@ pprInstr (ASCII False{-no backslash conversion-} str)
 pprInstr (ASCII True str)
   = vcat (map do1 (str ++ [chr 0]))
     where
-       do1 :: Char -> SDoc
+       do1 :: Char -> Doc
        do1 c = ptext SLIT("\t.byte\t0x") <> hshow (ord c)
 
-       hshow :: Int -> SDoc
+       hshow :: Int -> Doc
        hshow n | n >= 0 && n <= 255
                = char (tab !! (n `div` 16)) <> char (tab !! (n `mod` 16))
        tab = "0123456789ABCDEF"
@@ -852,12 +858,12 @@ pprInstr (FUNEND clab)
 
 Continue with Alpha-only printing bits and bobs:
 \begin{code}
-pprRI :: RI -> SDoc
+pprRI :: RI -> Doc
 
 pprRI (RIReg r) = pprReg r
 pprRI (RIImm r) = pprImm r
 
-pprRegRIReg :: FAST_STRING -> Reg -> RI -> Reg -> SDoc
+pprRegRIReg :: FAST_STRING -> Reg -> RI -> Reg -> Doc
 
 pprRegRIReg name reg1 ri reg2
   = hcat [
@@ -871,7 +877,7 @@ pprRegRIReg name reg1 ri reg2
 	pprReg reg2
     ]
 
-pprSizeRegRegReg :: FAST_STRING -> Size -> Reg -> Reg -> Reg -> SDoc
+pprSizeRegRegReg :: FAST_STRING -> Size -> Reg -> Reg -> Reg -> Doc
 
 pprSizeRegRegReg name size reg1 reg2 reg3
   = hcat [
@@ -1140,7 +1146,7 @@ gregno (RealReg i) = i
 gregno other       = --pprPanic "gregno" (ppr other)
                      999   -- bogus; only needed for debug printing
 
-pprG :: Instr -> SDoc -> SDoc
+pprG :: Instr -> Doc -> Doc
 pprG fake actual
    = (char '#' <> pprGInstr fake) $$ actual
 
@@ -1176,16 +1182,16 @@ pprGInstr (GDIV sz src1 src2 dst) = pprSizeRegRegReg SLIT("gdiv") sz src1 src2 d
 
 Continue with I386-only printing bits and bobs:
 \begin{code}
-pprDollImm :: Imm -> SDoc
+pprDollImm :: Imm -> Doc
 
 pprDollImm i =  ptext SLIT("$") <> pprImm i
 
-pprOperand :: Size -> Operand -> SDoc
+pprOperand :: Size -> Operand -> Doc
 pprOperand s (OpReg r)   = pprReg s r
 pprOperand s (OpImm i)   = pprDollImm i
 pprOperand s (OpAddr ea) = pprAddr ea
 
-pprSizeImmOp :: FAST_STRING -> Size -> Imm -> Operand -> SDoc
+pprSizeImmOp :: FAST_STRING -> Size -> Imm -> Operand -> Doc
 pprSizeImmOp name size imm op1
   = hcat [
         char '\t',
@@ -1198,7 +1204,7 @@ pprSizeImmOp name size imm op1
 	pprOperand size op1
     ]
 	
-pprSizeOp :: FAST_STRING -> Size -> Operand -> SDoc
+pprSizeOp :: FAST_STRING -> Size -> Operand -> Doc
 pprSizeOp name size op1
   = hcat [
     	char '\t',
@@ -1208,7 +1214,7 @@ pprSizeOp name size op1
 	pprOperand size op1
     ]
 
-pprSizeOpOp :: FAST_STRING -> Size -> Operand -> Operand -> SDoc
+pprSizeOpOp :: FAST_STRING -> Size -> Operand -> Operand -> Doc
 pprSizeOpOp name size op1 op2
   = hcat [
     	char '\t',
@@ -1220,7 +1226,7 @@ pprSizeOpOp name size op1 op2
 	pprOperand size op2
     ]
 
-pprSizeByteOpOp :: FAST_STRING -> Size -> Operand -> Operand -> SDoc
+pprSizeByteOpOp :: FAST_STRING -> Size -> Operand -> Operand -> Doc
 pprSizeByteOpOp name size op1 op2
   = hcat [
     	char '\t',
@@ -1232,7 +1238,7 @@ pprSizeByteOpOp name size op1 op2
 	pprOperand size op2
     ]
 
-pprSizeOpReg :: FAST_STRING -> Size -> Operand -> Reg -> SDoc
+pprSizeOpReg :: FAST_STRING -> Size -> Operand -> Reg -> Doc
 pprSizeOpReg name size op1 reg
   = hcat [
     	char '\t',
@@ -1244,7 +1250,7 @@ pprSizeOpReg name size op1 reg
 	pprReg size reg
     ]
 
-pprSizeReg :: FAST_STRING -> Size -> Reg -> SDoc
+pprSizeReg :: FAST_STRING -> Size -> Reg -> Doc
 pprSizeReg name size reg1
   = hcat [
     	char '\t',
@@ -1254,7 +1260,7 @@ pprSizeReg name size reg1
 	pprReg size reg1
     ]
 
-pprSizeRegReg :: FAST_STRING -> Size -> Reg -> Reg -> SDoc
+pprSizeRegReg :: FAST_STRING -> Size -> Reg -> Reg -> Doc
 pprSizeRegReg name size reg1 reg2
   = hcat [
     	char '\t',
@@ -1266,7 +1272,7 @@ pprSizeRegReg name size reg1 reg2
         pprReg size reg2
     ]
 
-pprSizeSizeRegReg :: FAST_STRING -> Size -> Size -> Reg -> Reg -> SDoc
+pprSizeSizeRegReg :: FAST_STRING -> Size -> Size -> Reg -> Reg -> Doc
 pprSizeSizeRegReg name size1 size2 reg1 reg2
   = hcat [
     	char '\t',
@@ -1279,7 +1285,7 @@ pprSizeSizeRegReg name size1 size2 reg1 reg2
         pprReg size2 reg2
     ]
 
-pprSizeRegRegReg :: FAST_STRING -> Size -> Reg -> Reg -> Reg -> SDoc
+pprSizeRegRegReg :: FAST_STRING -> Size -> Reg -> Reg -> Reg -> Doc
 pprSizeRegRegReg name size reg1 reg2 reg3
   = hcat [
     	char '\t',
@@ -1293,7 +1299,7 @@ pprSizeRegRegReg name size reg1 reg2 reg3
         pprReg size reg3
     ]
 
-pprSizeAddr :: FAST_STRING -> Size -> MachRegsAddr -> SDoc
+pprSizeAddr :: FAST_STRING -> Size -> MachRegsAddr -> Doc
 pprSizeAddr name size op
   = hcat [
     	char '\t',
@@ -1303,7 +1309,7 @@ pprSizeAddr name size op
 	pprAddr op
     ]
 
-pprSizeAddrReg :: FAST_STRING -> Size -> MachRegsAddr -> Reg -> SDoc
+pprSizeAddrReg :: FAST_STRING -> Size -> MachRegsAddr -> Reg -> Doc
 pprSizeAddrReg name size op dst
   = hcat [
     	char '\t',
@@ -1315,7 +1321,7 @@ pprSizeAddrReg name size op dst
 	pprReg size dst
     ]
 
-pprSizeRegAddr :: FAST_STRING -> Size -> Reg -> MachRegsAddr -> SDoc
+pprSizeRegAddr :: FAST_STRING -> Size -> Reg -> MachRegsAddr -> Doc
 pprSizeRegAddr name size src op
   = hcat [
     	char '\t',
@@ -1327,7 +1333,7 @@ pprSizeRegAddr name size src op
 	pprAddr op
     ]
 
-pprOpOp :: FAST_STRING -> Size -> Operand -> Operand -> SDoc
+pprOpOp :: FAST_STRING -> Size -> Operand -> Operand -> Doc
 pprOpOp name size op1 op2
   = hcat [
     	char '\t',
@@ -1337,7 +1343,7 @@ pprOpOp name size op1 op2
 	pprOperand size op2
     ]
 
-pprSizeOpOpCoerce :: FAST_STRING -> Size -> Size -> Operand -> Operand -> SDoc
+pprSizeOpOpCoerce :: FAST_STRING -> Size -> Size -> Operand -> Operand -> Doc
 pprSizeOpOpCoerce name size1 size2 op1 op2
   = hcat [ char '\t', ptext name, pprSize size1, pprSize size2, space,
 	pprOperand size1 op1,
@@ -1345,7 +1351,7 @@ pprSizeOpOpCoerce name size1 size2 op1 op2
 	pprOperand size2 op2
     ]
 
-pprCondInstr :: FAST_STRING -> Cond -> SDoc -> SDoc
+pprCondInstr :: FAST_STRING -> Cond -> Doc -> Doc
 pprCondInstr name cond arg
   = hcat [ char '\t', ptext name, pprCond cond, space, arg]
 
@@ -1566,11 +1572,11 @@ pprInstr (CALL imm n _)
 
 Continue with SPARC-only printing bits and bobs:
 \begin{code}
-pprRI :: RI -> SDoc
+pprRI :: RI -> Doc
 pprRI (RIReg r) = pprReg r
 pprRI (RIImm r) = pprImm r
 
-pprSizeRegReg :: FAST_STRING -> Size -> Reg -> Reg -> SDoc
+pprSizeRegReg :: FAST_STRING -> Size -> Reg -> Reg -> Doc
 pprSizeRegReg name size reg1 reg2
   = hcat [
     	char '\t',
@@ -1583,7 +1589,7 @@ pprSizeRegReg name size reg1 reg2
 	pprReg reg2
     ]
 
-pprSizeRegRegReg :: FAST_STRING -> Size -> Reg -> Reg -> Reg -> SDoc
+pprSizeRegRegReg :: FAST_STRING -> Size -> Reg -> Reg -> Reg -> Doc
 pprSizeRegRegReg name size reg1 reg2 reg3
   = hcat [
     	char '\t',
@@ -1598,7 +1604,7 @@ pprSizeRegRegReg name size reg1 reg2 reg3
 	pprReg reg3
     ]
 
-pprRegRIReg :: FAST_STRING -> Bool -> Reg -> RI -> Reg -> SDoc
+pprRegRIReg :: FAST_STRING -> Bool -> Reg -> RI -> Reg -> Doc
 pprRegRIReg name b reg1 ri reg2
   = hcat [
 	char '\t',
@@ -1611,7 +1617,7 @@ pprRegRIReg name b reg1 ri reg2
 	pprReg reg2
     ]
 
-pprRIReg :: FAST_STRING -> Bool -> RI -> Reg -> SDoc
+pprRIReg :: FAST_STRING -> Bool -> RI -> Reg -> Doc
 pprRIReg name b ri reg1
   = hcat [
 	char '\t',

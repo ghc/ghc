@@ -71,7 +71,7 @@ runRegAllocate regs find_reserve_regs instrs
               $$
               (text "code = ")
               $$
-              (vcat (map pprInstr flatInstrs))
+              (vcat (map (docToSDoc.pprInstr) flatInstrs))
             )
     tryGeneral (resv:resvs)
        = case generalAlloc resv of

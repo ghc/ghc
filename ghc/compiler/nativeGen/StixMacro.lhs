@@ -207,13 +207,13 @@ ind_static_info	= StCLbl mkIndStaticInfoLabel
 ind_info  	= StCLbl mkIndInfoLabel
 upd_frame_info	= StCLbl mkUpdInfoLabel
 seq_frame_info	= StCLbl mkSeqInfoLabel
-stg_update_PAP  = StCLbl mkStgUpdatePAPLabel
+
+stg_update_PAP  = regTableEntry CodePtrRep OFFSET_stgUpdatePAP
+
 -- Some common call trees
 
-updatePAP, stackOverflow :: StixTree
-
-updatePAP     = StJump NoDestInfo stg_update_PAP
-stackOverflow = StCall SLIT("StackOverflow") CCallConv VoidRep []
+updatePAP :: StixTree
+updatePAP = StJump NoDestInfo stg_update_PAP
 \end{code}
 
 -----------------------------------------------------------------------------
@@ -228,6 +228,7 @@ checkCode macro args assts
     let args_stix = map amodeToStix args
 	newHp wds = StIndex PtrRep stgHp wds
 	assign_hp wds = StAssign PtrRep stgHp (newHp wds)
+	hp_alloc wds = StAssign IntRep stgHpAlloc wds
 	test_hp = StPrim AddrLeOp [stgHp, stgHpLim]
 	cjmp_hp = StCondJump ulbl_pass test_hp
 
@@ -258,12 +259,12 @@ checkCode macro args assts
 	HP_CHK_NP      -> 
 		let [words,ptrs] = args_stix
 		in  (\xs -> assign_hp words : cjmp_hp : 
-			    assts (gc_enter ptrs : join : xs))
+			    assts (hp_alloc words : gc_enter ptrs : join : xs))
 
 	HP_CHK_SEQ_NP  -> 
 		let [words,ptrs] = args_stix
 		in  (\xs -> assign_hp words : cjmp_hp : 
-			    assts (gc_seq ptrs : join : xs))
+			    assts (hp_alloc words : gc_seq ptrs : join : xs))
 
 	STK_CHK_NP     -> 
 		let [words,ptrs] = args_stix
@@ -275,12 +276,14 @@ checkCode macro args assts
 		in  (\xs -> cjmp_sp_fail sp_words : 
 			    assign_hp hp_words : cjmp_hp :
 			    fail :
-			    assts (gc_enter ptrs : join : xs))
+			    assts (hp_alloc hp_words : gc_enter ptrs
+				   : join : xs))
 
 	HP_CHK	       -> 
 		let [words,ret,r,ptrs] = args_stix
 		in  (\xs -> assign_hp words : cjmp_hp :
-			    assts (assign_ret r ret : gc_chk ptrs : join : xs))
+			    assts (hp_alloc words : assign_ret r ret
+				   : gc_chk ptrs : join : xs))
 
 	STK_CHK	       -> 
 		let [words,ret,r,ptrs] = args_stix
@@ -292,47 +295,49 @@ checkCode macro args assts
 		in  (\xs -> cjmp_sp_fail sp_words :
 			    assign_hp hp_words : cjmp_hp :
 			    fail :
-			    assts (assign_ret r ret : gc_chk ptrs : join : xs))
+			    assts (hp_alloc hp_words : assign_ret r ret
+				  : gc_chk ptrs : join : xs))
 
 	HP_CHK_NOREGS  -> 
 		let [words] = args_stix
 		in  (\xs -> assign_hp words : cjmp_hp : 
-			    assts (gc_noregs : join : xs))
+			    assts (hp_alloc words : gc_noregs : join : xs))
 
 	HP_CHK_UNPT_R1 -> 
 		let [words] = args_stix
 		in  (\xs -> assign_hp words : cjmp_hp : 
-			    assts (gc_unpt_r1 : join : xs))
+			    assts (hp_alloc words : gc_unpt_r1 : join : xs))
 
 	HP_CHK_UNBX_R1 -> 
 		let [words] = args_stix
 		in  (\xs -> assign_hp words : cjmp_hp : 
-			    assts (gc_unbx_r1 : join : xs))
+			    assts (hp_alloc words : gc_unbx_r1 : join : xs))
 
 	HP_CHK_F1      -> 
 		let [words] = args_stix
 		in  (\xs -> assign_hp words : cjmp_hp : 
-			    assts (gc_f1 : join : xs))
+			    assts (hp_alloc words : gc_f1 : join : xs))
 
 	HP_CHK_D1      -> 
 		let [words] = args_stix
 		in  (\xs -> assign_hp words : cjmp_hp : 
-			    assts (gc_d1 : join : xs))
+			    assts (hp_alloc words : gc_d1 : join : xs))
 
 	HP_CHK_UT_ALT  -> 
                 let [words,ptrs,nonptrs,r,ret] = args_stix
                 in (\xs -> assign_hp words : cjmp_hp :
-                           assts (assign_ret r ret : gc_ut ptrs nonptrs 
+                           assts (hp_alloc words : assign_ret r ret
+				  : gc_ut ptrs nonptrs 
                                   : join : xs))
 
 	HP_CHK_GEN     -> 
                 let [words,liveness,reentry] = args_stix
                 in (\xs -> assign_hp words : cjmp_hp :
-                           assts (assign_liveness liveness :
+                           assts (hp_alloc words : assign_liveness liveness :
                                   assign_reentry reentry :
                                   gc_gen : join : xs))
     )
-	
+
 -- Various canned heap-check routines
 
 mkStJump_to_GCentry :: String -> StixTree
@@ -342,8 +347,13 @@ mkStJump_to_GCentry gcname
 --   | otherwise -- it's in a different DLL
 --   = StJump (StInd PtrRep (StLitLbl True sdoc))
 
+gc_chk (StInt 0)   = StJump NoDestInfo (regTableEntry CodePtrRep OFFSET_stgChk0)
+gc_chk (StInt 1)   = StJump NoDestInfo (regTableEntry CodePtrRep OFFSET_stgChk1)
 gc_chk (StInt n)   = mkStJump_to_GCentry ("stg_chk_" ++ show n)
+
+gc_enter (StInt 1) = StJump NoDestInfo (regTableEntry CodePtrRep OFFSET_stgGCEnter1)
 gc_enter (StInt n) = mkStJump_to_GCentry ("stg_gc_enter_" ++ show n)
+
 gc_seq (StInt n)   = mkStJump_to_GCentry ("stg_gc_seq_" ++ show n)
 gc_noregs          = mkStJump_to_GCentry "stg_gc_noregs"
 gc_unpt_r1         = mkStJump_to_GCentry "stg_gc_unpt_r1"

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.47 2001/09/04 18:29:20 ken Exp $
+% $Id: CLabel.lhs,v 1.48 2001/11/08 12:56:01 simonmar Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -70,9 +70,6 @@ module CLabel (
 	CLabelType(..), labelType, labelDynamic,
 
 	pprCLabel
-#if ! OMIT_NATIVE_CODEGEN
-	, pprCLabel_asm
-#endif
     ) where
 
 
@@ -431,11 +428,6 @@ internal names. <type> is one of the following:
 	 ccs			Cost centre stack
 
 \begin{code}
--- specialised for PprAsm: saves lots of arg passing in NCG
-#if ! OMIT_NATIVE_CODEGEN
-pprCLabel_asm = pprCLabel
-#endif
-
 pprCLabel :: CLabel -> SDoc
 
 #if ! OMIT_NATIVE_CODEGEN

@@ -172,7 +172,7 @@ module Pretty (
         hang, punctuate,
         
 --      renderStyle,            -- Haskell 1.3 only
-        render, fullRender
+        render, fullRender, printDoc
   ) where
 
 #include "HsVersions.h"
@@ -180,6 +180,7 @@ module Pretty (
 import FastString
 import GlaExts
 import Numeric (fromRat)
+import IO
 
 -- Don't import Util( assertPanic ) because it makes a loop in the module structure
 
@@ -967,4 +968,18 @@ multi_ch n       ch = ch : multi_ch (n MINUS ILIT(1)) ch
 
 spaces ILIT(0) = ""
 spaces n       = ' ' : spaces (n MINUS ILIT(1))
+\end{code}
+
+\begin{code}
+pprCols = (100 :: Int) -- could make configurable
+
+printDoc :: Mode -> Handle -> Doc -> IO ()
+printDoc mode hdl doc
+  = fullRender mode pprCols 1.5 put done doc
+  where
+    put (Chr c)  next = hPutChar hdl c >> next 
+    put (Str s)  next = hPutStr  hdl s >> next 
+    put (PStr s) next = hPutFS   hdl s >> next 
+
+    done = hPutChar hdl '\n'
 \end{code}

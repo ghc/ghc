@@ -12,7 +12,7 @@ module Outputable (
 	Outputable(..),			-- Class
 
 	PprStyle, CodeStyle(..), PrintUnqualified, alwaysQualify,
-	getPprStyle, withPprStyle, pprDeeper,
+	getPprStyle, withPprStyle, withPprStyleDoc, pprDeeper,
 	codeStyle, ifaceStyle, userStyle, debugStyle, asmStyle,
 	ifPprDebug, unqualStyle,
 
@@ -34,7 +34,7 @@ module Outputable (
 
 	printSDoc, printErrs, printDump,
 	printForC, printForAsm, printForIface, printForUser,
-	pprCode, pprCols,
+	pprCode, mkCodeStyle,
 	showSDoc, showSDocForUser, showSDocDebug, showSDocIface, 
 	showSDocUnqual, showsPrecSDoc,
 	pprHsChar, pprHsString,
@@ -125,6 +125,9 @@ type SDoc = PprStyle -> Doc
 withPprStyle :: PprStyle -> SDoc -> SDoc
 withPprStyle sty d sty' = d sty
 
+withPprStyleDoc :: PprStyle -> SDoc -> Doc
+withPprStyleDoc sty d = d sty
+
 pprDeeper :: SDoc -> SDoc
 pprDeeper d (PprUser unqual (PartWay 0)) = Pretty.text "..."
 pprDeeper d (PprUser unqual (PartWay n)) = d (PprUser unqual (PartWay (n-1)))
@@ -167,17 +170,17 @@ ifPprDebug d sty	  = Pretty.empty
 
 \begin{code}
 printSDoc :: SDoc -> PprStyle -> IO ()
-printSDoc d sty = printDoc PageMode stdout (d sty)
+printSDoc d sty = Pretty.printDoc PageMode stdout (d sty)
 
--- I'm not sure whether the direct-IO approach of printDoc
+-- I'm not sure whether the direct-IO approach of Pretty.printDoc
 -- above is better or worse than the put-big-string approach here
 printErrs :: PrintUnqualified -> SDoc -> IO ()
-printErrs unqual doc = printDoc PageMode stderr (doc style)
+printErrs unqual doc = Pretty.printDoc PageMode stderr (doc style)
 		     where
 		       style = mkUserStyle unqual (PartWay opt_PprUserLength)
 
 printDump :: SDoc -> IO ()
-printDump doc = printDoc PageMode stdout (better_doc defaultUserStyle)
+printDump doc = Pretty.printDoc PageMode stdout (better_doc defaultUserStyle)
   	      where
 		better_doc = doc $$ text ""
 	-- We used to always print in debug style, but I want
@@ -186,23 +189,26 @@ printDump doc = printDoc PageMode stdout (better_doc defaultUserStyle)
 
 printForUser :: Handle -> PrintUnqualified -> SDoc -> IO ()
 printForUser handle unqual doc 
-  = printDoc PageMode handle (doc (mkUserStyle unqual AllTheWay))
+  = Pretty.printDoc PageMode handle (doc (mkUserStyle unqual AllTheWay))
 
 -- printForIface prints all on one line for interface files.
 -- It's called repeatedly for successive lines
 printForIface :: Handle -> PrintUnqualified -> SDoc -> IO ()
 printForIface handle unqual doc 
-  = printDoc LeftMode handle (doc (PprInterface unqual))
+  = Pretty.printDoc LeftMode handle (doc (PprInterface unqual))
 
 -- printForC, printForAsm do what they sound like
 printForC :: Handle -> SDoc -> IO ()
-printForC handle doc = printDoc LeftMode handle (doc (PprCode CStyle))
+printForC handle doc = Pretty.printDoc LeftMode handle (doc (PprCode CStyle))
 
 printForAsm :: Handle -> SDoc -> IO ()
-printForAsm handle doc = printDoc LeftMode handle (doc (PprCode AsmStyle))
+printForAsm handle doc = Pretty.printDoc LeftMode handle (doc (PprCode AsmStyle))
 
 pprCode :: CodeStyle -> SDoc -> SDoc
 pprCode cs d = withPprStyle (PprCode cs) d
+
+mkCodeStyle :: CodeStyle -> PprStyle
+mkCodeStyle = PprCode
 
 -- Can't make SDoc an instance of Show because SDoc is just a function type
 -- However, Doc *is* an instance of Show
@@ -398,18 +404,6 @@ instance Show FastString  where
 %************************************************************************
 
 \begin{code}
-pprCols = (100 :: Int) -- could make configurable
-
-printDoc :: Mode -> Handle -> Doc -> IO ()
-printDoc mode hdl doc
-  = fullRender mode pprCols 1.5 put done doc
-  where
-    put (Chr c)  next = hPutChar hdl c >> next 
-    put (Str s)  next = hPutStr  hdl s >> next 
-    put (PStr s) next = hPutFS   hdl s >> next 
-
-    done = hPutChar hdl '\n'
-
 showDocWith :: Mode -> Doc -> String
 showDocWith mode doc
   = fullRender mode 100 1.5 put "" doc

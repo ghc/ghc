@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.38 2001/09/26 15:11:50 simonpj Exp $
+% $Id: AbsCSyn.lhs,v 1.39 2001/11/08 12:56:01 simonmar Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -494,6 +494,7 @@ data MagicId
 
   | CurrentTSO		-- pointer to current thread's TSO
   | CurrentNursery	-- pointer to allocation area
+  | HpAlloc		-- allocation count for heap check failure
 
 
 node 	= VanillaReg PtrRep     (_ILIT 1) -- A convenient alias for Node

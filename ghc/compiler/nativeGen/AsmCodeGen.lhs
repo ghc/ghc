@@ -32,7 +32,7 @@ import UniqSupply	( returnUs, thenUs, initUs,
 			  lazyMapUs )
 import MachMisc		( IF_ARCH_i386(i386_insert_ffrees,) )
 
-import OrdList		( concatOL )
+import qualified Pretty
 import Outputable
 
 \end{code}
@@ -85,7 +85,7 @@ The machine-dependent bits break down as follows:
 So, here we go:
 
 \begin{code}
-nativeCodeGen :: AbstractC -> UniqSupply -> (SDoc, SDoc)
+nativeCodeGen :: AbstractC -> UniqSupply -> (SDoc, Pretty.Doc)
 nativeCodeGen absC us
    = let absCstmts         = mkAbsCStmtList absC
          (sdoc_pairs, us1) = initUs us (lazyMapUs absCtoNat absCstmts)
@@ -102,22 +102,22 @@ nativeCodeGen absC us
                                           $$ char ' ') 
                                           sds)
 #        else
-         my_vcat sds = vcat sds
+         my_vcat sds = Pretty.vcat sds
          my_trace m x = x
 #        endif
-     in  
-         my_trace "nativeGen: begin" 
+     in
+         my_trace "nativeGen: begin"
                   (stix_sdoc, insn_sdoc)
 
 
-absCtoNat :: AbstractC -> UniqSM (SDoc, SDoc)
+absCtoNat :: AbstractC -> UniqSM (SDoc, Pretty.Doc)
 absCtoNat absC
    = _scc_ "genCodeAbstractC" genCodeAbstractC absC        `thenUs` \ stixRaw ->
      _scc_ "genericOpt"       genericOpt stixRaw           `bind`   \ stixOpt ->
      _scc_ "genMachCode"      genMachCode stixOpt          `thenUs` \ pre_regalloc ->
      _scc_ "regAlloc"         regAlloc pre_regalloc        `bind`   \ almost_final ->
      _scc_ "x86fp_kludge"     x86fp_kludge almost_final    `bind`   \ final_mach_code ->
-     _scc_ "vcat"     vcat (map pprInstr final_mach_code)  `bind`   \ final_sdoc ->
+     _scc_ "vcat"     Pretty.vcat (map pprInstr final_mach_code)  `bind`   \ final_sdoc ->
      _scc_ "pprStixTrees"    pprStixTrees stixOpt          `bind`   \ stix_sdoc ->
      returnUs (stix_sdoc, final_sdoc)
      where

@@ -32,6 +32,7 @@ module MachRegs (
 	saveLoc,
 	spRel,
 	stgReg,
+	regTableEntry,
 	strImmLit
 
 #if alpha_TARGET_ARCH
@@ -62,7 +63,9 @@ import PrimRep		( PrimRep(..), isFloatingRep )
 import Stix		( StixTree(..), StixReg(..),
                           getUniqueNat, returnNat, thenNat, NatM )
 import Unique		( mkPseudoUnique2, Uniquable(..), Unique )
-import Outputable
+import Pretty
+import Outputable	( Outputable(..), pprPanic, panic )
+import qualified Outputable
 import FastTypes
 \end{code}
 
@@ -73,9 +76,9 @@ data Imm
   = ImmInt	Int
   | ImmInteger	Integer	    -- Sigh.
   | ImmCLbl	CLabel	    -- AbstractC Label (with baggage)
-  | ImmLab	Bool SDoc    -- Simple string label (underscore-able)
+  | ImmLab	Bool Doc    -- Simple string label (underscore-able)
                              -- Bool==True ==> in a different DLL
-  | ImmLit	SDoc    -- Simple string
+  | ImmLit	Doc    -- Simple string
   | ImmIndex    CLabel Int
   | ImmFloat	Rational
   | ImmDouble	Rational
@@ -180,30 +183,30 @@ data RegLoc = Save StixTree | Always StixTree
 Trees for register save locations:
 \begin{code}
 saveLoc :: MagicId -> StixTree
-
 saveLoc reg = case (stgReg reg) of {Always loc -> loc; Save loc -> loc}
 \end{code}
 
 \begin{code}
 stgReg :: MagicId -> RegLoc
-
+stgReg BaseReg
+ = case magicIdRegMaybe BaseReg of
+	Nothing -> Always (StCLbl mkMainRegTableLabel)
+	Just _  -> Save   (StCLbl mkMainRegTableLabel)
 stgReg x
-  = case (magicIdRegMaybe x) of
-	Just _  -> Save   nonReg
-	Nothing -> Always nonReg
+  = case magicIdRegMaybe x of
+	Just _  -> Save   stix
+	Nothing -> Always stix
   where
-    offset = baseRegOffset x
+    stix   = regTableEntry (magicIdPrimRep x) (baseRegOffset x)
 
+regTableEntry :: PrimRep -> Int -> StixTree
+regTableEntry rep offset 
+  = StInd rep (StPrim IntAddOp 
+		   [baseLoc, StInt (toInteger (offset*BYTES_PER_WORD))])
+  where
     baseLoc = case (magicIdRegMaybe BaseReg) of
       Just _  -> StReg (StixMagicId BaseReg)
       Nothing -> StCLbl mkMainRegTableLabel
-
-    nonReg = case x of
-      BaseReg -> StCLbl mkMainRegTableLabel
-
-      _ -> StInd (magicIdPrimRep x)
-		 (StPrim IntAddOp [baseLoc,
-			StInt (toInteger (offset*BYTES_PER_WORD))])
 \end{code}
 
 % - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -328,7 +331,7 @@ instance Show Reg where
     showsPrec _ (VirtualRegD u) = showString "%vD_"  . shows u
 
 instance Outputable Reg where
-    ppr r = text (show r)
+    ppr r = Outputable.text (show r)
 
 instance Uniquable Reg where
     getUnique (RealReg i)     = mkPseudoUnique2 i
@@ -630,6 +633,7 @@ baseRegOffset Hp		     = OFFSET_Hp
 baseRegOffset HpLim		     = OFFSET_HpLim
 baseRegOffset CurrentTSO	     = OFFSET_CurrentTSO
 baseRegOffset CurrentNursery	     = OFFSET_CurrentNursery
+baseRegOffset HpAlloc		     = OFFSET_HpAlloc
 #ifdef NCG_DEBUG
 baseRegOffset BaseReg		     = panic "baseRegOffset:BaseReg"
 baseRegOffset CurCostCentre	     = panic "baseRegOffset:CurCostCentre"

@@ -34,6 +34,7 @@ import Module		( Module )
 import CmdLineOpts
 import ErrUtils		( dumpIfSet_dyn, showPass )
 import Outputable
+import Pretty		( Mode(..), printDoc )
 import CmdLineOpts	( DynFlags, HscLang(..), dopt_OutName )
 
 import IOExts
@@ -134,8 +135,9 @@ outputAsm dflags filenm flat_absC
        let (stix_final, ncg_output_d) = _scc_ "NativeCodeGen" 
 				        nativeCodeGen flat_absC ncg_uniqs
        dumpIfSet_dyn dflags Opt_D_dump_stix "Final stix code" stix_final
-       dumpIfSet_dyn dflags Opt_D_dump_asm "Asm code" ncg_output_d
-       _scc_ "OutputAsm" doOutput filenm ( \f -> printForAsm f ncg_output_d)
+       dumpIfSet_dyn dflags Opt_D_dump_asm "Asm code" (docToSDoc ncg_output_d)
+       _scc_ "OutputAsm" doOutput filenm $
+	   \f -> printDoc LeftMode f ncg_output_d
   where
 
 #else /* OMIT_NATIVE_CODEGEN */
