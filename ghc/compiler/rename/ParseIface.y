@@ -4,8 +4,6 @@ module ParseIface ( parseIface ) where
 
 IMP_Ubiq(){-uitous-}
 
-import CmdLineOpts	( opt_IgnoreIfacePragmas )
-
 import HsSyn		-- quite a bit of stuff
 import RdrHsSyn		-- oodles of synonyms
 import HsDecls		( HsIdInfo(..) )
@@ -13,11 +11,9 @@ import HsTypes		( mkHsForAllTy )
 import HsCore
 import Literal
 import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..), Version(..) )
-import HsPragmas	( noGenPragmas, noDataPragmas, noClassPragmas, noClassOpPragmas, noInstancePragmas )
-import IdInfo		( exactArity, mkStrictnessInfo, mkBottomStrictnessInfo,
-			  ArgUsageInfo, FBTypeInfo, ArityInfo, StrictnessInfo
-			)
-import Kind		( Kind, mkArrowKind, mkTypeKind )
+import HsPragmas	( noDataPragmas, noClassPragmas )
+import Kind		( Kind, mkArrowKind, mkBoxedTypeKind )
+import IdInfo           ( ArgUsageInfo, FBTypeInfo )
 import Lex		
 
 import RnMonad		( SYN_IE(ImportVersion), SYN_IE(LocalVersion), ParsedIface(..),
@@ -27,7 +23,7 @@ import Bag		( emptyBag, unitBag, snocBag )
 import FiniteMap	( emptyFM, unitFM, addToFM, plusFM, bagToFM, FiniteMap )
 import Name		( OccName(..), isTCOcc, Provenance, SYN_IE(Module) )
 import SrcLoc		( mkIfaceSrcLoc )
-import Util		( panic{-, pprPanic ToDo:rm-} )
+--import Util		( panic{-, pprPanic ToDo:rm-} )
 import ParseType        ( parseType )
 import ParseUnfolding   ( parseUnfolding )
 import Maybes
@@ -426,7 +422,7 @@ kind		:: { Kind }
 		| akind RARROW kind	{ mkArrowKind $1 $3 }
 
 akind		:: { Kind }
-		: VARSYM		{ mkTypeKind {- ToDo: check that it's "*" -} }
+		: VARSYM		{ mkBoxedTypeKind {- ToDo: check that it's "*" -} }
 		| OPAREN kind CPAREN	{ $2
 --------------------------------------------------------------------------
 					}

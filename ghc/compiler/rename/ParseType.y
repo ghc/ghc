@@ -14,7 +14,7 @@ import HsPragmas	( noGenPragmas, noDataPragmas, noClassPragmas, noClassOpPragmas
 import IdInfo		( exactArity, mkStrictnessInfo, mkBottomStrictnessInfo,
 			  ArgUsageInfo, FBTypeInfo
 			)
-import Kind		( Kind, mkArrowKind, mkTypeKind )
+import Kind		( Kind, mkArrowKind, mkBoxedTypeKind )
 import Lex		
 
 import RnMonad		( SYN_IE(ImportVersion), SYN_IE(LocalVersion), ParsedIface(..),
@@ -123,7 +123,7 @@ kind		:: { Kind }
 		| akind RARROW kind	{ mkArrowKind $1 $3 }
 
 akind		:: { Kind }
-		: VARSYM		{ mkTypeKind {- ToDo: check that it's "*" -} }
+		: VARSYM		{ mkBoxedTypeKind {- ToDo: check that it's "*" -} }
 		| OPAREN kind CPAREN	{ $2 }
 
 tv_name		:: { RdrName }

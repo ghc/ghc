@@ -15,7 +15,7 @@ import HsPragmas	( noGenPragmas, noDataPragmas, noClassPragmas, noClassOpPragmas
 import IdInfo		( exactArity, mkStrictnessInfo, mkBottomStrictnessInfo,
 			  ArgUsageInfo, FBTypeInfo, ArityInfo, StrictnessInfo
 			)
-import Kind		( Kind, mkArrowKind, mkTypeKind )
+import Kind		( Kind, mkArrowKind, mkBoxedTypeKind )
 import Lex		
 
 import RnMonad		( SYN_IE(ImportVersion), SYN_IE(LocalVersion), ParsedIface(..),
@@ -232,7 +232,7 @@ core_val_bndrs	: 						{ [] }
 
 core_tv_bndr	:: { UfBinder RdrName }
 core_tv_bndr	:  tv_name DCOLON akind				{ UfTyBinder $1 $3 }
-		|  tv_name					{ UfTyBinder $1 mkTypeKind }
+		|  tv_name					{ UfTyBinder $1 mkBoxedTypeKind }
 
 core_tv_bndrs	:: { [UfBinder RdrName] }
 core_tv_bndrs	: 						{ [] }
@@ -334,7 +334,7 @@ kind		:: { Kind }
 		| akind RARROW kind	{ mkArrowKind $1 $3 }
 
 akind		:: { Kind }
-		: VARSYM		{ mkTypeKind {- ToDo: check that it's "*" -} }
+		: VARSYM		{ mkBoxedTypeKind {- ToDo: check that it's "*" -} }
 		| OPAREN kind CPAREN	{ $2 }
 
 tv_name		:: { RdrName }
