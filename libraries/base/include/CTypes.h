@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: CTypes.h,v 1.3 2002/08/03 19:32:17 reid Exp $
+ * $Id: CTypes.h,v 1.4 2002/08/20 10:03:05 simonmar Exp $
  *
  * Dirty CPP hackery for CTypes/CTypesISO
  *
@@ -171,17 +171,20 @@ instance RealFloat T where { \
 #define NUMERIC_TYPE(T,C,S,B) \
 newtype T = T B deriving (NUMERIC_CLASSES); \
 INSTANCE_READ(T,B); \
-INSTANCE_SHOW(T,B)
+INSTANCE_SHOW(T,B); \
+INSTANCE_TYPEABLE0(T,C,S) ;
 
 #define INTEGRAL_TYPE(T,C,S,B) \
 newtype T = T B deriving (NUMERIC_CLASSES, INTEGRAL_CLASSES); \
 INSTANCE_READ(T,B); \
-INSTANCE_SHOW(T,B)
+INSTANCE_SHOW(T,B); \
+INSTANCE_TYPEABLE0(T,C,S) ;
 
 #define FLOATING_TYPE(T,C,S,B) \
 newtype T = T B deriving (NUMERIC_CLASSES, FLOATING_CLASSES); \
 INSTANCE_READ(T,B); \
-INSTANCE_SHOW(T,B)
+INSTANCE_SHOW(T,B); \
+INSTANCE_TYPEABLE0(T,C,S) ;
 
 #define INSTANCE_READ(T,B) \
 instance Read T where { \
