@@ -13,6 +13,8 @@
 --
 -----------------------------------------------------------------------------
 
+#include "config.h"
+
 module System.Posix.Types (
   CDev(..), CIno(..), CMode(..), COff(..), CPid(..), CSsize(..),
 
@@ -23,15 +25,18 @@ module System.Posix.Types (
 
   Fd(..),
 
+#ifndef mingw32_TARGET_OS
+  LinkCount,
+  UserID,
+  GroupID,
+#endif
+
   ByteCount,
   ClockTick,
   EpochTime,
   FileOffset,
-  GroupID,
-  LinkCount,
   ProcessID,
   ProcessGroupID,
-  UserID,
   DeviceID,
   FileID,
   FileMode
@@ -54,7 +59,6 @@ import GHC.Show
 
 #include "Dynamic.h"
 #include "CTypes.h"
-#include "config.h"
 
 NUMERIC_TYPE(CDev,tyConCDev,"CDev",HTYPE_DEV_T)
 INTEGRAL_TYPE(CIno,tyConCIno,"CIno",HTYPE_INO_T)
@@ -82,15 +86,18 @@ INTEGRAL_TYPE(CBlkCnt,tyConBlkCnd,"CBlkCnt",HTYPE_BLKCNT_T)
 INTEGRAL_TYPE(Fd,tyConFd,"Fd",CInt)
 
 -- nicer names, and backwards compatibility with POSIX library:
+#ifndef mingw32_TARGET_OS
+type LinkCount      = CNlink
+type UserID         = CUid
+type GroupID        = CGid
+#endif
+
 type ByteCount      = CSize
 type ClockTick      = CClock
 type EpochTime      = CTime
-type LinkCount      = CNlink
 type DeviceID       = CDev
 type FileID         = CIno
 type FileMode       = CMode
 type ProcessID      = CPid
-type UserID         = CUid
-type GroupID        = CGid
 type FileOffset     = COff
 type ProcessGroupID = CPid
