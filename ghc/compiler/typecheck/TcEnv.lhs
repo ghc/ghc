@@ -59,6 +59,7 @@ import Id		( idName, isLocalId )
 import Var		( TyVar, Id, mkTyVar, idType )
 import VarSet
 import VarEnv
+import RdrName		( extendLocalRdrEnv )
 import DataCon		( DataCon )
 import TyCon		( TyCon )
 import Class		( Class )
@@ -258,9 +259,12 @@ tcExtendTyVarEnv2 tv_pairs thing_inside
 		     thing_inside
 
 tc_extend_tv_env binds tyvars thing_inside
-  = getLclEnv	   `thenM` \ env@(TcLclEnv {tcl_env = le, tcl_tyvars = gtvs}) ->
+  = getLclEnv	   `thenM` \ env@(TcLclEnv {tcl_env = le, 
+					    tcl_tyvars = gtvs, 
+					    tcl_rdr = rdr_env}) ->
     let
  	le'        = extendNameEnvList le binds
+	rdr_env'   = extendLocalRdrEnv rdr_env (map fst binds)
 	new_tv_set = mkVarSet tyvars
     in
 	-- It's important to add the in-scope tyvars to the global tyvar set
@@ -270,7 +274,7 @@ tc_extend_tv_env binds tyvars thing_inside
 	-- class and instance decls, when we mustn't generalise the class tyvars
 	-- when typechecking the methods.
     tc_extend_gtvs gtvs new_tv_set		`thenM` \ gtvs' ->
-    setLclEnv (env {tcl_env = le', tcl_tyvars = gtvs'}) thing_inside
+    setLclEnv (env {tcl_env = le', tcl_tyvars = gtvs', tcl_rdr = rdr_env'}) thing_inside
 \end{code}
 
 
@@ -284,9 +288,10 @@ tcExtendLocalValEnv ids thing_inside
 	proc_lvl	    = proc_level (tcl_arrow_ctxt env)
 	extra_env	    = [(idName id, ATcId id th_lvl proc_lvl) | id <- ids]
 	le'		    = extendNameEnvList (tcl_env env) extra_env
+	rdr_env'	    = extendLocalRdrEnv (tcl_rdr env) (map idName ids)
     in
     tc_extend_gtvs (tcl_tyvars env) extra_global_tyvars	`thenM` \ gtvs' ->
-    setLclEnv (env {tcl_env = le', tcl_tyvars = gtvs'}) thing_inside
+    setLclEnv (env {tcl_env = le', tcl_tyvars = gtvs', tcl_rdr = rdr_env'}) thing_inside
 
 tcExtendLocalValEnv2 :: [(Name,TcId)] -> TcM a -> TcM a
 tcExtendLocalValEnv2 names_w_ids thing_inside
@@ -297,9 +302,10 @@ tcExtendLocalValEnv2 names_w_ids thing_inside
 	proc_lvl	    = proc_level (tcl_arrow_ctxt env)
 	extra_env	    = [(name, ATcId id th_lvl proc_lvl) | (name,id) <- names_w_ids]
 	le'		    = extendNameEnvList (tcl_env env) extra_env
+	rdr_env'	    = extendLocalRdrEnv (tcl_rdr env) (map fst names_w_ids)
     in
     tc_extend_gtvs (tcl_tyvars env) extra_global_tyvars	`thenM` \ gtvs' ->
-    setLclEnv (env {tcl_env = le', tcl_tyvars = gtvs'}) thing_inside
+    setLclEnv (env {tcl_env = le', tcl_tyvars = gtvs', tcl_rdr = rdr_env'}) thing_inside
 \end{code}
 
 

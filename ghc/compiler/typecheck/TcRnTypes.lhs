@@ -261,6 +261,10 @@ data TcLclEnv		-- Changes as we move inside an expression
 	tcl_arrow_ctxt :: ArrowCtxt,	-- Arrow-notation context
 
 	tcl_rdr :: LocalRdrEnv,		-- Local name envt
+		-- Maintained during renaming, of course, but also during
+		-- type checking, solely so that when renaming a Template-Haskell
+		-- splice we have the right environment for the renamer.
+		-- 
 		--   Does *not* include global name envt; may shadow it
 		--   Includes both ordinary variables and type variables;
 		--   they are kept distinct because tyvar have a different
