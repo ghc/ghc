@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.115 2003/10/22 15:01:00 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.116 2004/01/08 15:26:44 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -1656,7 +1656,7 @@ FN_(delayzh_fast)
     CurrentTSO->why_blocked = BlockedOnDoProc;
     APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
 #else
-    target = (R1.i / (TICK_MILLISECS*1000)) + getourtimeofday();
+    target = ((R1.i + TICK_MILLISECS*1000-1) / (TICK_MILLISECS*1000)) + getourtimeofday();
     CurrentTSO->block_info.target = target;
 
     /* Insert the new thread in the sleeping queue. */
