@@ -30,7 +30,7 @@ module Foreign.Marshal.Alloc (
 
 import Data.Maybe
 import Foreign.Ptr	 	( Ptr, nullPtr, FunPtr )
-import Foreign.C.Types	 	( CSize, CInt(..) )
+import Foreign.C.Types	 	( CSize )
 import Foreign.Storable  	( Storable(sizeOf) )
 
 #ifdef __GLASGOW_HASKELL__
