@@ -540,40 +540,40 @@ tcExtendLocalInstEnv :: [DFunId] -> TcM a -> TcM a
   -- Add new locally-defined instances
 tcExtendLocalInstEnv dfuns thing_inside
  = do { traceDFuns dfuns
-      ; eps <- getEps
       ; env <- getGblEnv
       ; dflags  <- getDOpts
-      ; inst_env' <- foldlM (extend dflags (eps_inst_env eps)) 
-			    (tcg_inst_env env) 
-			    dfuns
+      ; inst_env' <- foldlM (addInst dflags) (tcg_inst_env env) dfuns
       ; let env' = env { tcg_insts = dfuns ++ tcg_insts env,
 			 tcg_inst_env = inst_env' }
       ; setGblEnv env' thing_inside }
- where
-  extend dflags pkg_ie home_ie dfun
-   = do	{ checkNewInst dflags (home_ie, pkg_ie) dfun
-	; return (extendInstEnv home_ie dfun) }
 
-checkNewInst :: DynFlags -> (InstEnv, InstEnv) -> DFunId -> TcM ()
--- Check that the proposed new instance is OK
-checkNewInst dflags ies dfun
-  = do	{ 	-- Check functional dependencies
-	  case checkFunDeps ies dfun of
+addInst :: DynFlags -> InstEnv -> DFunId -> TcM InstEnv
+-- Check that the proposed new instance is OK, 
+-- and then add it to the home inst env
+addInst dflags home_ie dfun
+  = do	{ 	-- Load imported instances, so that we report
+		-- duplicates correctly
+	  pkg_ie  <- loadImportedInsts cls tys
+
+		-- Check functional dependencies
+	; case checkFunDeps (pkg_ie, home_ie) dfun of
 		Just dfuns -> funDepErr dfun dfuns
 		Nothing    -> return ()
 
 		-- Check for duplicate instance decls
+	; let { (matches, _) = lookupInstEnv dflags (pkg_ie, home_ie) cls tys
+	      ;	dup_dfuns = [dup_dfun | (_, (_, dup_tys, dup_dfun)) <- matches,
+			  		isJust (matchTys (mkVarSet tvs) tys dup_tys)] }
+		-- Find memebers of the match list which 
+		-- dfun itself matches. If the match is 2-way, it's a duplicate
 	; case dup_dfuns of
 	    dup_dfun : _ -> dupInstErr dfun dup_dfun
 	    []           -> return ()
-	}
+
+		-- OK, now extend the envt
+	; return (extendInstEnv home_ie dfun) }
   where
     (tvs, _, cls, tys) = tcSplitDFunTy (idType dfun)
-    (matches, _) = lookupInstEnv dflags ies cls tys
-    dup_dfuns = [dup_dfun | (_, (_, dup_tys, dup_dfun)) <- matches,
-			    isJust (matchTys (mkVarSet tvs) tys dup_tys)]
-	-- Find memebers of the match list which 
-	-- dfun itself matches. If the match is 2-way, it's a duplicate
 
 traceDFuns dfuns
   = traceTc (text "Adding instances:" <+> vcat (map pp dfuns))

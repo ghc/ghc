@@ -250,8 +250,8 @@ thing we are looking up can have an arbitrary "flexi" part.
 
 \begin{code}
 lookupInstEnv :: DynFlags
-	      -> (InstEnv, 	-- Home-package inst-env
-		  InstEnv) 	-- External package inst-env
+	      -> (InstEnv 	-- External package inst-env
+		 ,InstEnv) 	-- Home-package inst-env
 	      -> Class -> [Type]			-- What we are looking for
 	      -> ([(TyVarSubstEnv, InstEnvElt)], 	-- Successful matches
 		  [Id])					-- These don't match but do unify
@@ -265,7 +265,7 @@ lookupInstEnv :: DynFlags
 	-- but Foo [Int] is a unifier.  This gives the caller a better chance of
 	-- giving a suitable error messagen
 
-lookupInstEnv dflags (home_ie, pkg_ie) cls tys
+lookupInstEnv dflags (pkg_ie, home_ie) cls tys
   | not (null all_unifs) = (all_matches, all_unifs)	-- This is always an error situation,
 							-- so don't attempt to pune the matches
   | otherwise		 = (pruned_matches, [])
@@ -362,7 +362,7 @@ checkFunDeps :: (InstEnv, InstEnv) -> DFunId
 	     -> Maybe [DFunId]	-- Nothing  <=> ok
 				-- Just dfs <=> conflict with dfs
 -- Check wheher adding DFunId would break functional-dependency constraints
-checkFunDeps (home_ie, pkg_ie) dfun
+checkFunDeps (pkg_ie, home_ie) dfun
   | null bad_fundeps = Nothing
   | otherwise	     = Just bad_fundeps
   where
