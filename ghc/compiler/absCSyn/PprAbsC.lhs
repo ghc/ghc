@@ -151,7 +151,7 @@ pprAbsC (CReturn am return_info)  c
    mk_vector x = hcat [ptext SLIT("RET_VEC"), char '(', pprAmode am, comma,
 		       x, rparen ]
 
-pprAbsC (CSplitMarker) _ = ptext SLIT("/* SPLIT */")
+pprAbsC (CSplitMarker) _ = ptext SLIT("__STG_SPLIT_MARKER")
 
 -- we optimise various degenerate cases of CSwitches.
 
