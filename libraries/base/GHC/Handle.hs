@@ -24,7 +24,7 @@ module GHC.Handle (
   newEmptyBuffer, allocateBuffer, readCharFromBuffer, writeCharIntoBuffer,
   flushWriteBufferOnly, flushWriteBuffer, flushReadBuffer, fillReadBuffer,
   read_off,  read_off_ba,
-  write_off, write_off_ba,
+  write_off, write_off_ba, unlockFile,
 
   ioe_closedHandle, ioe_EOF, ioe_notReadable, ioe_notWritable,
 
@@ -306,16 +306,23 @@ stdHandleFinalizer m = do
 handleFinalizer :: MVar Handle__ -> IO ()
 handleFinalizer m = do
   h_ <- takeMVar m
-  flushWriteBufferOnly h_
-  let fd = fromIntegral (haFD h_)
-  unlockFile fd
-  when (fd /= -1) 
+  let
+    -- hClose puts both the fd and the handle's type
+    -- into a closed state, so it's a bit excessive
+    -- to test for both here, but caution sometimes
+    -- pays off..
+   alreadyClosed = 
+     case haType h_ of { ClosedHandle{} -> True; _ -> False }
+   fd = fromIntegral (haFD h_)
+
+  when (not alreadyClosed && fd /= -1) $ do
+       flushWriteBufferOnly h_
+       unlockFile fd
 #ifdef mingw32_TARGET_OS
        (closeFd (haIsStream h_) fd >> return ())
 #else
        (c_close fd >> return ())
 #endif
-  return ()
 
 -- ---------------------------------------------------------------------------
 -- Grimy buffer operations
