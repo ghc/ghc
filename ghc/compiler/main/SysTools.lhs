@@ -55,12 +55,7 @@ import IO		( hPutStr, hPutChar, hPutStrLn, hFlush, stderr )
 import Directory	( doesFileExist, removeFile )
 import IOExts		( IORef, readIORef, writeIORef )
 import Monad		( when, unless )
-#if defined(mingw32_TARGET_OS) && __GLASGOW_HASKELL__ < 501
-import qualified System
-#else
-import System           ( system )
-#endif
-import System		( ExitCode(..), exitWith )
+import System           ( system, ExitCode(..), exitWith )
 
 #include "../includes/config.h"
 
@@ -652,37 +647,5 @@ getExecDir = do len <- getCurrentDirectory 0 nullAddr
 getProcessID :: IO Int
 getProcessID = Posix.getProcessID
 getExecDir :: IO (Maybe String) = do return Nothing
-#endif
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{System}
-%*									*
-%************************************************************************
-
-In GHC prior to 5.01 (or so), on Windows, the implementation
-of "system" in the library System.system does not work for very 
-long command lines.  But GHC may need to make a system call with
-a very long command line, notably when it links itself during
-bootstrapping.  
-
-Solution: import the new definition (which involves compiling up
-lib/std/cbits/system.c)
-
-ToDo: remove when compiling with GHC < 5 is not relevant any more
-
-\begin{code}
-#if defined(mingw32_TARGET_OS) && __GLASGOW_HASKELL__ > 500
--- copied from lib/std/System.lhs
-system cmd =
-  withUnsafeCString cmd $ \s -> do
-    status <- throwErrnoIfMinus1 "system" (primSystem s)
-    case status of
-        0  -> return ExitSuccess
-        n  -> return (ExitFailure n)
-system "" = ioException (IOError Nothing InvalidArgument "system" "null command" Nothing)
-
-foreign import ccall "systemCmd" unsafe primSystem :: UnsafeCString -> IO Int
 #endif
 \end{code}
