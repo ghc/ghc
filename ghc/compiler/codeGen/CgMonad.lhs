@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgMonad.lhs,v 1.31 2001/10/15 16:03:04 simonpj Exp $
+% $Id: CgMonad.lhs,v 1.32 2001/11/23 11:46:31 simonmar Exp $
 %
 \section[CgMonad]{The code generation monad}
 
@@ -28,7 +28,7 @@ module CgMonad (
 
 	StackUsage, Slot(..), HeapUsage,
 
-	profCtrC, profCtrAbsC,
+	profCtrC, profCtrAbsC, ldvEnter,
 
 	costCentresC, moduleName,
 
@@ -550,29 +550,22 @@ nothing.
 
 \begin{code}
 costCentresC :: FAST_STRING -> [CAddrMode] -> Code
-
-costCentresC macro args = 
-	if opt_SccProfilingOn then do
-		(MkCgState absC binds usage) <- getState
-		setState $ MkCgState (mkAbsCStmts absC (CCallProfCCMacro macro args)) binds usage
-	else
-		nopC
+costCentresC macro args
+ | opt_SccProfilingOn  = absC (CCallProfCCMacro macro args)
+ | otherwise           = nopC
 
 profCtrC :: FAST_STRING -> [CAddrMode] -> Code
-
-profCtrC macro args = 
-	if not opt_DoTickyProfiling
-    then nopC
-	else do
-		(MkCgState absC binds usage) <- getState
-		setState $ MkCgState (mkAbsCStmts absC (CCallProfCtrMacro macro args)) binds usage
+profCtrC macro args
+ | opt_DoTickyProfiling = absC (CCallProfCtrMacro macro args)
+ | otherwise            = nopC
 
 profCtrAbsC :: FAST_STRING -> [CAddrMode] -> AbstractC
-
 profCtrAbsC macro args
-  = if not opt_DoTickyProfiling
-    then AbsCNop
-    else CCallProfCtrMacro macro args
+ | opt_DoTickyProfiling = CCallProfCtrMacro macro args
+ | otherwise            = AbsCNop
+
+ldvEnter :: Code
+ldvEnter = costCentresC SLIT("LDV_ENTER") [CReg node]
 
 {- Try to avoid adding too many special compilation strategies here.
    It's better to modify the header files as necessary for particular
