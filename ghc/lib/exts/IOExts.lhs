@@ -25,6 +25,9 @@ module IOExts
 	, readIOArray
 	, writeIOArray
 	, freezeIOArray
+	
+	, openFileEx
+	, IOModeEx(..)
 
         , trace
         , performGC
@@ -36,6 +39,7 @@ module IOExts
 \begin{code}
 import PrelBase
 import PrelIOBase
+import PrelHandle ( openFileEx, IOModeEx(..) )
 import PrelST
 import PrelUnsafe
 import PrelArr
@@ -84,3 +88,4 @@ writeIOArray (IOArray arr) ix elt = stToIO (writeArray arr ix elt)
 
 freezeIOArray (IOArray arr) = stToIO (freezeArray arr)
 \end{code}
+

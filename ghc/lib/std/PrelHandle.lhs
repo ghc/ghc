@@ -186,9 +186,17 @@ stderr = unsafePerformIO (do
 data IOMode      =  ReadMode | WriteMode | AppendMode | ReadWriteMode
                     deriving (Eq, Ord, Ix, Enum, Read, Show)
 
-openFile :: FilePath -> IOMode -> IO Handle
+data IOModeEx 
+ = BinaryMode IOMode
+ | TextMode   IOMode
+   deriving (Eq, Read, Show)
 
-openFile f m = do
+openFile :: FilePath -> IOMode -> IO Handle
+openFile fp im = openFileEx fp (TextMode im)
+
+openFileEx :: FilePath -> IOModeEx -> IO Handle
+
+openFileEx f m = do
     ptr <- _ccall_ openFile f m'
     if ptr /= ``NULL'' then do
 #ifndef __PARALLEL_HASKELL__
@@ -208,13 +216,22 @@ openFile f m = do
 		  _		   -> ioError
         fail improved_error
   where
+    imo = case m of
+           BinaryMode imo -> imo
+	   TextMode imo   -> imo
+
     m' = case m of 
+           BinaryMode _   -> imo' ++ "b"
+	   TextMode imo   -> imo'
+
+    imo' =
+      case imo of
            ReadMode      -> "r"
            WriteMode     -> "w"
            AppendMode    -> "a"
            ReadWriteMode -> "r+"
 
-    htype = case m of 
+    htype = case imo of 
               ReadMode      -> ReadHandle
               WriteMode     -> WriteHandle
               AppendMode    -> AppendHandle

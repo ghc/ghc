@@ -184,6 +184,10 @@ References (aka mutable variables) and mutable arrays (but no form of
 mutable byte arrays)
 
 <item>
+<tt/openFileEx/ extends the standard <tr/openFile/ action with support
+for opening binary files.
+
+<item>
 <tt/performGC/ triggers an immediate garbage collection
 
 <item>
@@ -247,6 +251,12 @@ readIOArray         :: Ix ix => IOArray ix elt -> ix -> IO elt
 writeIOArray        :: Ix ix => IOArray ix elt -> ix -> elt -> IO ()
 freezeIOArray       :: Ix ix => IOArray ix elt -> IO (Array ix elt)
 instance Eq (IOArray ix elt)
+
+openFileEx          :: FilePath -> IOModeEx -> IO Handle
+data IOModeEx = BinaryMode IO.IOMode | TextMode IO.IOMode
+instance Eq IOModeEx
+instance Read IOModeEx
+instance Show IOModeEx
 
 performGC           :: IO ()
 trace               :: String -> a -> a
