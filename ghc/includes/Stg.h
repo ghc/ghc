@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.60 2003/12/28 13:09:43 panne Exp $
+ * $Id: Stg.h,v 1.61 2004/03/08 10:27:22 stolz Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -105,7 +105,7 @@
 /*
  * 'Portable' 
  */
-#if defined(__GNUC__)
+#if defined(__GNUC__) || defined( __INTEL_COMPILER)
 # define INLINE_HEADER static inline
 # define INLINE_ME inline
 # define STATIC_INLINE INLINE_HEADER
