@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: config.mk,v 1.17 2002/02/27 11:18:30 simonmar Exp $
+# $Id: config.mk,v 1.18 2002/07/02 13:56:22 simonmar Exp $
 #
 # GHC project configuration
 #
@@ -10,7 +10,6 @@
 # what to include in a binary distribution
 GhcMainDir = ghc
 GhcBinDistDirs = ghc libraries hslibs
-GhcBinDistDocs = ghc/docs/set
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 GhcBinDistShScripts = ghc-$(ProjectVersion) ghci-$(ProjectVersion) ghc-pkg-$(ProjectVersion)
 else
