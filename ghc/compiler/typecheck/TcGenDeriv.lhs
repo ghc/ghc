@@ -35,7 +35,7 @@ import BasicTypes	( Fixity(..), maxPrecedence, Boxity(..) )
 import FieldLabel       ( fieldLabelName )
 import DataCon		( isNullaryDataCon, dataConTag,
 			  dataConOrigArgTys, dataConSourceArity, fIRST_TAG,
-			  DataCon, dataConName,
+			  DataCon, dataConName, dataConIsInfix,
 			  dataConFieldLabels )
 import Name		( getOccString, getSrcLoc, Name, NamedThing(..)	)
 
@@ -780,7 +780,7 @@ gen_Read_binds get_fixity tycon
      	      | otherwise	  = prefix_stmts
      
        	prefix_stmts		-- T a b c
-       	  = [bindLex (ident_pat (data_con_str data_con))]
+       	  = [bindLex (ident_pat (data_con_str_w_parens data_con))]
        	    ++ read_args
        	    ++ [result_stmt data_con as_needed]
      	 
@@ -791,7 +791,7 @@ gen_Read_binds get_fixity tycon
      	     result_stmt data_con [a1,a2]]
      
        	lbl_stmts		-- T { f1 = a, f2 = b }
-       	  = [bindLex (ident_pat (data_con_str data_con)),
+       	  = [bindLex (ident_pat (data_con_str_w_parens data_con)),
        	     read_punc "{"]
        	    ++ concat (intersperse [read_punc ","] field_stmts)
        	    ++ [read_punc "}", result_stmt data_con as_needed]
@@ -801,7 +801,7 @@ gen_Read_binds get_fixity tycon
        	con_arity    = dataConSourceArity data_con
        	labels       = dataConFieldLabels data_con
        	dc_nm	     = getName data_con
-       	is_infix     = isDataSymOcc (getOccName dc_nm)
+       	is_infix     = dataConIsInfix data_con
        	as_needed    = take con_arity as_RDRs
 	read_args    = zipWithEqual "gen_Read_binds" read_arg as_needed (dataConOrigArgTys data_con)
        	(read_a1:read_a2:_) = read_args
@@ -820,7 +820,8 @@ gen_Read_binds get_fixity tycon
     ident_pat s  = nlConPat ident_RDR [nlLitPat s]		  -- Ident "foo"
     symbol_pat s = nlConPat symbol_RDR [nlLitPat s]		  -- Symbol ">>"
     
-    data_con_str con = mkHsString (occNameUserString (getOccName con))
+    data_con_str          con = mkHsString (occNameUserString (getOccName con))
+    data_con_str_w_parens con = mkHsString (occNameUserString_with_parens (getOccName con))
     
     read_punc c = bindLex (punc_pat c)
     read_arg a ty 
@@ -913,24 +914,22 @@ gen_Show_binds get_fixity tycon
 	     dc_nm	    = getName data_con
 	     dc_occ_nm	    = getOccName data_con
              con_str        = occNameUserString dc_occ_nm
+	     op_con_str     = occNameUserString_with_parens dc_occ_nm
 
 	     show_thingies 
 		| is_infix     	= [show_arg1, mk_showString_app (" " ++ con_str ++ " "), show_arg2]
-		| record_syntax = mk_showString_app (con_str ++ " {") : 
+		| record_syntax = mk_showString_app (op_con_str ++ " {") : 
 				  show_record_args ++ [mk_showString_app "}"]
-		| otherwise	= mk_showString_app (con_str ++ " ") : show_prefix_args
+		| otherwise	= mk_showString_app (op_con_str ++ " ") : show_prefix_args
                 
-	     show_label l = mk_showString_app (the_name ++ " = ")
+	     show_label l = mk_showString_app (nm ++ " = ")
 			-- Note the spaces around the "=" sign.  If we don't have them
 			-- then we get Foo { x=-1 } and the "=-" parses as a single
 			-- lexeme.  Only the space after the '=' is necessary, but
 			-- it seems tidier to have them both sides.
 		 where
 		   occ_nm   = getOccName (fieldLabelName l)
-		   nm       = occNameUserString occ_nm
-		   is_op    = isSymOcc occ_nm	    -- Legal, but rare.
-		   the_name | is_op     = '(':nm ++ ")"
-			    | otherwise = nm
+		   nm       = occNameUserString_with_parens occ_nm
 
              show_args 		     = zipWith show_arg bs_needed arg_tys
 	     (show_arg1:show_arg2:_) = show_args
@@ -951,10 +950,17 @@ gen_Show_binds get_fixity tycon
 							 box_if_necy "Show" tycon (nlHsVar b) arg_ty]
 
 		-- Fixity stuff
-	     is_infix = isDataSymOcc dc_occ_nm
+	     is_infix = dataConIsInfix data_con
              con_prec_plus_one = 1 + getPrec is_infix get_fixity dc_nm
 	     arg_prec | record_syntax = 0	-- Record fields don't need parens
 		      | otherwise     = con_prec_plus_one
+
+occNameUserString_with_parens :: OccName -> String
+occNameUserString_with_parens occ
+  | isSymOcc occ = '(':nm ++ ")"
+  | otherwise    = nm
+  where
+   nm = occNameUserString occ
 
 mk_showString_app str = nlHsApp (nlHsVar showString_RDR) (nlHsLit (mkHsString str))
 \end{code}

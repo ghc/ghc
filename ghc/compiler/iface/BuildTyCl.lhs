@@ -82,7 +82,7 @@ mkNewTyConRhs con
 				
 
 ------------------------------------------------------
-buildDataCon :: Name
+buildDataCon :: Name -> Bool
 	    -> [StrictnessMark] 
 	    -> [Name]			-- Field labels
 	    -> [TyVar] -> ThetaType
@@ -93,30 +93,32 @@ buildDataCon :: Name
 --   a) makes the worker Id
 --   b) makes the wrapper Id if necessary, including
 --	allocating its unique (hence monadic)
-buildDataCon src_name arg_stricts field_lbl_names 
+buildDataCon src_name declared_infix arg_stricts field_lbl_names 
 	     tyvars ctxt ex_tyvars ex_ctxt 
 	     arg_tys tycon
-  = newImplicitBinder src_name mkDataConWrapperOcc	`thenM` \ wrap_name ->
-    newImplicitBinder src_name mkDataConWorkerOcc 	`thenM` \ work_name -> 
+  = do	{ wrap_name <- newImplicitBinder src_name mkDataConWrapperOcc
+	; work_name <- newImplicitBinder src_name mkDataConWorkerOcc
 	-- This last one takes the name of the data constructor in the source
 	-- code, which (for Haskell source anyway) will be in the SrcDataName name
 	-- space, and makes it into a "real data constructor name"
-    let
+
+	; let
 		-- Make the FieldLabels
 		-- The zipLazy avoids forcing the arg_tys too early
-	final_lbls = [ mkFieldLabel name tycon ty tag 
-		     | ((name, tag), ty) <- (field_lbl_names `zip` allFieldLabelTags)
-					    `zipLazy` arg_tys
-		     ]
+		final_lbls = [ mkFieldLabel name tycon ty tag 
+			     | ((name, tag), ty) <- (field_lbl_names `zip` allFieldLabelTags)
+						    `zipLazy` arg_tys
+			     ]
 
-	ctxt' = thinContext arg_tys ctxt
-	data_con = mkDataCon src_name arg_stricts final_lbls
-			     tyvars ctxt'
-			     ex_tyvars ex_ctxt
-			     arg_tys tycon dc_ids
-	dc_ids = mkDataConIds wrap_name work_name data_con
-    in
-    returnM data_con
+		ctxt' = thinContext arg_tys ctxt
+		data_con = mkDataCon src_name declared_infix 
+				     arg_stricts final_lbls
+				     tyvars ctxt'
+				     ex_tyvars ex_ctxt
+				     arg_tys tycon dc_ids
+		dc_ids = mkDataConIds wrap_name work_name data_con
+
+	; returnM data_con }
 
 -- The context for a data constructor should be limited to
 -- the type variables mentioned in the arg_tys
@@ -175,7 +177,7 @@ buildClass class_name tvs sc_theta fds sig_stuff tc_isrec tc_vrcs
 			   | (op_name, dm_info, _) <- sig_stuff ] }
 	  		-- Build the selector id and default method id
 
-	; dict_con <- buildDataCon datacon_name
+	; dict_con <- buildDataCon datacon_name False {- Not declared infix -}
 				   (map (const NotMarkedStrict) dict_component_tys)
 				   [{- No labelled fields -}]
 				   tvs [{-No context-}]

@@ -907,8 +907,8 @@ filter_decl occs decl@(IfaceData {ifCons = IfNewTyCon con})
 filter_decl occs decl
   = decl
 
-keep_sig occs (IfaceClassOp occ _ _)	   = occ `elem` occs
-keep_con occs (IfaceConDecl occ _ _ _ _ _) = occ `elem` occs
+keep_sig occs (IfaceClassOp occ _ _)	     = occ `elem` occs
+keep_con occs (IfaceConDecl occ _ _ _ _ _ _) = occ `elem` occs
 
 availOccs avail = map nameOccName (availNames avail)
 

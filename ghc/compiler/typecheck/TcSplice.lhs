@@ -43,7 +43,7 @@ import IfaceEnv		( lookupOrig )
 import Class		( Class, classBigSig )
 import TyCon		( TyCon, tyConTheta, tyConTyVars, getSynTyConDefn, isSynTyCon, isNewTyCon, tyConDataCons )
 import DataCon		( DataCon, dataConTyCon, dataConOrigArgTys, dataConStrictMarks, 
-			  dataConName, dataConFieldLabels, dataConWrapId )
+			  dataConName, dataConFieldLabels, dataConWrapId, dataConIsInfix )
 import Id		( idName, globalIdDetails )
 import IdInfo		( GlobalIdDetails(..) )
 import TysWiredIn	( mkListTy )
@@ -549,11 +549,18 @@ reifyDataCon dc
   = do 	{ arg_tys <- reifyTypes (dataConOrigArgTys dc)
 	; let stricts = map reifyStrict (dataConStrictMarks dc)
 	      fields  = dataConFieldLabels dc
-	; if null fields then
-	     return (TH.NormalC (reifyName dc) (stricts `zip` arg_tys))
+	      name    = reifyName dc
+	      [a1,a2] = arg_tys
+	      [s1,s2] = stricts
+	; ASSERT( length arg_tys == length stricts )
+          if not (null fields) then
+	     return (TH.RecC name (zip3 (map reifyName fields) stricts arg_tys))
 	  else
-	     return (TH.RecC (reifyName dc) (zip3 (map reifyName fields) stricts arg_tys)) }
-	-- NB: we don't remember whether the constructor was declared in an infix way
+	  if dataConIsInfix dc then
+	     ASSERT( length arg_tys == 2 )
+	     return (TH.InfixC (s1,a1) name (s1,a2))
+	  else
+	     return (TH.NormalC name (stricts `zip` arg_tys)) }
 
 ------------------------------
 reifyClass :: Class -> TcM TH.Dec

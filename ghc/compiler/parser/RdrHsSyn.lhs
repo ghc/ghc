@@ -273,17 +273,17 @@ hsIfaceCons NewType [con]	-- newtype
 
 hsIfaceCon :: ConDecl RdrName -> IfaceConDecl
 hsIfaceCon (ConDecl lname ex_tvs ex_ctxt details)
-  = IfaceConDecl (get_occ lname)
+  = IfaceConDecl (get_occ lname) is_infix
 		 (hsIfaceTvs ex_tvs)
 		 (hsIfaceCtxt (unLoc ex_ctxt))
 		 (map (hsIfaceLType . getBangType       . unLoc) args)
 		 (map (hsStrictMark . getBangStrictness . unLoc) args)
 		 flds
   where
-    (args, flds) = case details of
-			PrefixCon args -> (args, [])
-			InfixCon a1 a2 -> ([a1,a2], [])
-			RecCon fs      -> (map snd fs, map (get_occ . fst) fs)
+    (is_infix, args, flds) = case details of
+				PrefixCon args -> (False, args, [])
+				InfixCon a1 a2 -> (True, [a1,a2], [])
+				RecCon fs      -> (False, map snd fs, map (get_occ . fst) fs)
     get_occ lname = rdrNameOcc (unLoc lname)
 
 hsStrictMark :: HsBang -> StrictnessMark

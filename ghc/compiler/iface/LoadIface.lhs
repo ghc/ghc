@@ -306,7 +306,7 @@ ifaceDeclSubBndrs (IfaceData {ifCons = cons}) = foldr ((++) . conDeclBndrs) []
 						      (visibleIfConDecls cons)
 ifaceDeclSubBndrs other 		      = []
 
-conDeclBndrs (IfaceConDecl con_occ _ _ _ _ fields)
+conDeclBndrs (IfaceConDecl con_occ _ _ _ _ _ fields)
   = fields ++ 
     [con_occ, mkDataConWrapperOcc con_occ, mkDataConWorkerOcc con_occ]
 

@@ -16,7 +16,7 @@ import HsSyn		( TyClDecl(..),  HsConDetails(..), HsTyVarBndr(..),
 			  LTyClDecl, tcdName, LHsTyVarBndr
 			)
 import BasicTypes	( RecFlag(..), StrictnessMark(..) )
-import HscTypes		( implicitTyThings )
+import HscTypes		( implicitTyThings, lookupFixity )
 import BuildTyCl	( buildClass, buildAlgTyCon, buildSynTyCon, buildDataCon,
 			  mkDataTyConRhs, mkNewTyConRhs )
 import TcRnMonad
@@ -414,20 +414,20 @@ tcConDecl new_or_data tycon tyvars ctxt
     { ex_ctxt' <- tcHsKindedContext ex_ctxt
     ; unbox_strict <- doptM Opt_UnboxStrictFields
     ; let 
-	tc_datacon field_lbls btys
+	tc_datacon is_infix field_lbls btys
 	  = do { let { ubtys = map unLoc btys }
 	       ; arg_tys <- mappM (tcHsKindedType . getBangType) ubtys
-    	       ; buildDataCon (unLoc name)
+    	       ; buildDataCon (unLoc name) is_infix
     		    (argStrictness unbox_strict tycon ubtys arg_tys)
     		    (map unLoc field_lbls)
     		    tyvars ctxt ex_tvs' ex_ctxt'
     		    arg_tys tycon }
     ; case details of
-	PrefixCon btys     -> tc_datacon [] btys
-	InfixCon bty1 bty2 -> tc_datacon [] [bty1,bty2]
+	PrefixCon btys     -> tc_datacon False [] btys
+	InfixCon bty1 bty2 -> tc_datacon True [] [bty1,bty2]
 	RecCon fields      -> do { checkTc (null ex_tvs') (exRecConErr name)
 				 ; let { (field_names, btys) = unzip fields }
-				 ; tc_datacon field_names btys } }
+				 ; tc_datacon False field_names btys } }
 
 argStrictness :: Bool		-- True <=> -funbox-strict_fields
 	      -> TyCon -> [BangType Name] 

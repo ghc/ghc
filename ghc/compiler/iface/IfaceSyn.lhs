@@ -55,7 +55,7 @@ import TyCon		( TyCon, ArgVrcs, AlgTyConRhs(..), isRecursiveTyCon, isForeignTyCo
 			  tyConHasGenerics, tyConArgVrcs, tyConTheta, getSynTyConDefn,
 			  tyConArity, tyConTyVars, algTyConRhs, tyConExtName  )
 import DataCon		( dataConName, dataConSig, dataConFieldLabels, dataConStrictMarks,
-			  dataConTyCon )
+			  dataConTyCon, dataConIsInfix )
 import Class		( FunDep, DefMeth, classExtraBigSig, classTyCon )
 import OccName		( OccName, OccEnv, lookupOccEnv, emptyOccEnv, 
 			  lookupOccEnv, extendOccEnv, emptyOccEnv,
@@ -138,6 +138,7 @@ visibleIfConDecls (IfNewTyCon c)   = [c]
 
 data IfaceConDecl 
   = IfaceConDecl OccName		-- Constructor name
+		 Bool			-- True <=> declared infix
 		 [IfaceTvBndr]		-- Existental tyvars
 		 IfaceContext		-- Existential context
 		 [IfaceType]		-- Arg types
@@ -286,9 +287,10 @@ pp_condecls (IfDataTyCon cs) = equals <+> sep (punctuate (ptext SLIT(" |")) (map
 pp_condecls (IfNewTyCon c)   = equals <+> ppr c
 
 instance Outputable IfaceConDecl where
-  ppr (IfaceConDecl name ex_tvs ex_ctxt arg_tys strs fields)
+  ppr (IfaceConDecl name is_infix ex_tvs ex_ctxt arg_tys strs fields)
     = pprIfaceForAllPart ex_tvs ex_ctxt $
       sep [ppr name <+> sep (map pprParendIfaceType arg_tys),
+	   if is_infix then ptext SLIT("Infix") else empty,
 	   if null strs then empty 
 	      else nest 4 (ptext SLIT("Stricts:") <+> hsep (map ppr strs)),
 	   if null fields then empty
@@ -492,6 +494,7 @@ tyThingToIfaceDecl _ abstract_tcs ext (ATyCon tycon)
 
     ifaceConDecl data_con 
 	= IfaceConDecl (getOccName (dataConName data_con))
+		       (dataConIsInfix data_con)
 		       (toIfaceTvBndrs ex_tyvars)
 		       (toIfaceContext ext ex_theta)
 		       (map (toIfaceType ext) arg_tys)
@@ -781,9 +784,9 @@ eq_hsCD env (IfNewTyCon c1)  (IfNewTyCon c2)  = eq_ConDecl env c1 c2
 eq_hsCD env IfAbstractTyCon  IfAbstractTyCon  = Equal
 eq_hsCD env d1		     d2		      = NotEqual
 
-eq_ConDecl env (IfaceConDecl n1 tvs1 cxt1 args1 ss1 lbls1)
-	       (IfaceConDecl n2 tvs2 cxt2 args2 ss2 lbls2)	
-  = bool (n1 == n2 && ss1 == ss2 && lbls1 == lbls2) &&&
+eq_ConDecl env (IfaceConDecl n1 inf1 tvs1 cxt1 args1 ss1 lbls1)
+	       (IfaceConDecl n2 inf2 tvs2 cxt2 args2 ss2 lbls2)	
+  = bool (n1 == n2 && inf1 == inf2 && ss1 == ss2 && lbls1 == lbls2) &&&
     eq_ifTvBndrs env tvs1 tvs2 (\ env ->
 	eq_ifContext env cxt1 cxt2 &&&
 	eq_ifTypes env args1 args2)

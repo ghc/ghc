@@ -956,13 +956,14 @@ instance Binary IfaceConDecls where
 		      return (IfNewTyCon aa)
 
 instance Binary IfaceConDecl where
-    put_ bh (IfaceConDecl a1 a2 a3 a4 a5 a6) = do
+    put_ bh (IfaceConDecl a1 a2 a3 a4 a5 a6 a7) = do
 	    put_ bh a1
 	    put_ bh a2
 	    put_ bh a3
 	    put_ bh a4
 	    put_ bh a5
 	    put_ bh a6
+	    put_ bh a7
     get bh = do
 	    a1 <- get bh
 	    a2 <- get bh
@@ -970,7 +971,8 @@ instance Binary IfaceConDecl where
 	    a4 <- get bh
 	    a5 <- get bh
 	    a6 <- get bh
-	    return (IfaceConDecl a1 a2 a3 a4 a5 a6)
+	    a7 <- get bh
+	    return (IfaceConDecl a1 a2 a3 a4 a5 a6 a7)
 
 instance Binary IfaceClassOp where
    put_ bh (IfaceClassOp n def ty) = do	

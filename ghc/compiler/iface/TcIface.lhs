@@ -423,7 +423,7 @@ tcIfaceDataCons tycon tyvars ctxt if_cons
 	IfNewTyCon con   -> do 	{ data_con <- tc_con_decl con
 				; return (mkNewTyConRhs data_con) }
   where
-    tc_con_decl (IfaceConDecl occ ex_tvs ex_ctxt args stricts field_lbls)
+    tc_con_decl (IfaceConDecl occ is_infix ex_tvs ex_ctxt args stricts field_lbls)
       = bindIfaceTyVars ex_tvs	$ \ ex_tyvars -> do
 	{ name <- lookupIfaceTop occ
 	; ex_theta <- tcIfaceCtxt ex_ctxt	-- Laziness seems not worth the bother here
@@ -434,7 +434,7 @@ tcIfaceDataCons tycon tyvars ctxt if_cons
 
 	; lbl_names <- mappM lookupIfaceTop field_lbls
 
-	; buildDataCon name stricts lbl_names
+	; buildDataCon name is_infix stricts lbl_names
 		       tyvars ctxt ex_tyvars ex_theta 
 		       arg_tys tycon
 	}

@@ -13,7 +13,7 @@ module DataCon (
 	dataConRepArgTys, dataConTheta, 
 	dataConFieldLabels, dataConStrictMarks, dataConExStricts,
 	dataConSourceArity, dataConRepArity,
-	dataConNumInstArgs, 
+	dataConNumInstArgs, dataConIsInfix,
 	dataConWorkId, dataConWrapId, dataConWrapId_maybe, dataConImplicitIds,
 	dataConRepStrictness,
 	isNullaryDataCon, isTupleCon, isUnboxedTupleCon,
@@ -252,7 +252,11 @@ data DataCon
 	--
 	-- An entirely separate wrapper function is built in TcTyDecls
 
-	dcIds :: DataConIds
+	dcIds :: DataConIds,
+
+	dcInfix :: Bool		-- True <=> declared infix
+				-- Used for Template Haskell and 'deriving' only
+				-- The actual fixity is stored elsewhere
   }
 
 data DataConIds
@@ -342,6 +346,7 @@ instance Show DataCon where
 
 \begin{code}
 mkDataCon :: Name 
+	  -> Bool	-- Declared infix
 	  -> [StrictnessMark] -> [FieldLabel]
 	  -> [TyVar] -> ThetaType
 	  -> [TyVar] -> ThetaType
@@ -350,7 +355,7 @@ mkDataCon :: Name
 	  -> DataCon
   -- Can get the tag from the TyCon
 
-mkDataCon name 
+mkDataCon name declared_infix
 	  arg_stricts	-- Must match orig_arg_tys 1-1
 	  fields
 	  tyvars theta ex_tyvars ex_theta orig_arg_tys tycon
@@ -365,7 +370,7 @@ mkDataCon name
 	     	  dcExTyVars = ex_tyvars, dcExTheta = ex_theta,
 		  dcStrictMarks = arg_stricts, dcRepStrictness = rep_arg_stricts,
 		  dcFields = fields, dcTag = tag, dcTyCon = tycon, dcRepType = ty,
-		  dcIds = ids}
+		  dcIds = ids, dcInfix = declared_infix}
 
 	-- Strictness marks for source-args
 	--	*after unboxing choices*, 
@@ -404,6 +409,9 @@ dataConTyCon = dcTyCon
 
 dataConRepType :: DataCon -> Type
 dataConRepType = dcRepType
+
+dataConIsInfix :: DataCon -> Bool
+dataConIsInfix = dcInfix
 
 dataConWorkId :: DataCon -> Id
 dataConWorkId dc = case dcIds dc of

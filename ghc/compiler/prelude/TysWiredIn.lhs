@@ -69,7 +69,8 @@ import TyCon		( TyCon, AlgTyConRhs(DataTyCon), tyConDataCons,
 			  mkTupleTyCon, mkAlgTyCon, tyConName
 			)
 
-import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed, StrictnessMark(..) )
+import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed, StrictnessMark(..),
+			  Fixity(..), FixityDirection(..), defaultFixity )
 
 import Type		( Type, mkTyConTy, mkTyConApp, mkTyVarTy, mkTyVarTys, 
 			  ThetaType, TyThing(..) )
@@ -181,7 +182,10 @@ pcTyCon is_enum is_rec name tyvars argvrcs cons
                 is_rec
 		True		-- All the wired-in tycons have generics
 
-pcDataCon :: Name -> [TyVar] -> ThetaType -> [Type] -> TyCon -> DataCon
+pcDataCon :: Name -> [TyVar] -> [Type] -> TyCon -> DataCon
+pcDataCon = pcDataConWithFixity False
+
+pcDataConWithFixity :: Bool -> Name -> [TyVar] -> [Type] -> TyCon -> DataCon
 -- The Name should be in the DataName name space; it's the name
 -- of the DataCon itself.
 --
@@ -189,13 +193,13 @@ pcDataCon :: Name -> [TyVar] -> ThetaType -> [Type] -> TyCon -> DataCon
 -- the first is used for the datacon itself,
 -- the second is used for the "worker name"
 
-pcDataCon dc_name tyvars context arg_tys tycon
+pcDataConWithFixity declared_infix dc_name tyvars arg_tys tycon
   = data_con
   where
-    data_con = mkDataCon dc_name	
+    data_con = mkDataCon dc_name declared_infix
                 (map (const NotMarkedStrict) arg_tys)
                 [{- No labelled fields -}]
-                tyvars context [] [] arg_tys tycon 
+                tyvars [] [] [] arg_tys tycon 
 		(mkDataConIds bogus_wrap_name wrk_name data_con)
 
     mod      = nameModule dc_name
@@ -244,7 +248,7 @@ mk_tuple boxity arity = (tycon, tuple_con)
 	tyvars   | isBoxed boxity = take arity alphaTyVars
 		 | otherwise	  = take arity openAlphaTyVars
 
-	tuple_con = pcDataCon dc_name tyvars [] tyvar_tys tycon
+	tuple_con = pcDataCon dc_name tyvars tyvar_tys tycon
 	tyvar_tys = mkTyVarTys tyvars
 	dc_name   = mkWiredInName mod (mkTupleOcc dataName boxity arity) dc_uniq
 				  (Just tc_name) (ADataCon tuple_con)
@@ -292,7 +296,7 @@ voidTy = unitTy
 charTy = mkTyConTy charTyCon
 
 charTyCon   = pcNonRecDataTyCon charTyConName [] [] [charDataCon]
-charDataCon = pcDataCon charDataConName [] [] [charPrimTy] charTyCon
+charDataCon = pcDataCon charDataConName [] [charPrimTy] charTyCon
 
 stringTy = mkListTy charTy -- convenience only
 \end{code}
@@ -301,21 +305,21 @@ stringTy = mkListTy charTy -- convenience only
 intTy = mkTyConTy intTyCon 
 
 intTyCon = pcNonRecDataTyCon intTyConName [] [] [intDataCon]
-intDataCon = pcDataCon intDataConName [] [] [intPrimTy] intTyCon
+intDataCon = pcDataCon intDataConName [] [intPrimTy] intTyCon
 \end{code}
 
 \begin{code}
 floatTy	= mkTyConTy floatTyCon
 
 floatTyCon   = pcNonRecDataTyCon floatTyConName   [] [] [floatDataCon]
-floatDataCon = pcDataCon         floatDataConName [] [] [floatPrimTy] floatTyCon
+floatDataCon = pcDataCon         floatDataConName [] [floatPrimTy] floatTyCon
 \end{code}
 
 \begin{code}
 doubleTy = mkTyConTy doubleTyCon
 
 doubleTyCon   = pcNonRecDataTyCon doubleTyConName   [] [] [doubleDataCon]
-doubleDataCon = pcDataCon	  doubleDataConName [] [] [doublePrimTy] doubleTyCon
+doubleDataCon = pcDataCon	  doubleDataConName [] [doublePrimTy] doubleTyCon
 \end{code}
 
 
@@ -373,8 +377,8 @@ boolTy = mkTyConTy boolTyCon
 boolTyCon = pcTyCon True NonRecursive boolTyConName
 		    [] [] [falseDataCon, trueDataCon]
 
-falseDataCon = pcDataCon falseDataConName [] [] [] boolTyCon
-trueDataCon  = pcDataCon trueDataConName  [] [] [] boolTyCon
+falseDataCon = pcDataCon falseDataConName [] [] boolTyCon
+trueDataCon  = pcDataCon trueDataConName  [] [] boolTyCon
 
 falseDataConId = dataConWorkId falseDataCon
 trueDataConId  = dataConWorkId trueDataCon
@@ -402,9 +406,10 @@ mkListTy ty = mkTyConApp listTyCon [ty]
 listTyCon = pcRecDataTyCon listTyConName
 			alpha_tyvar [(True,False)] [nilDataCon, consDataCon]
 
-nilDataCon  = pcDataCon nilDataConName alpha_tyvar [] [] listTyCon
-consDataCon = pcDataCon consDataConName
- 	       alpha_tyvar [] [alphaTy, mkTyConApp listTyCon alpha_ty] listTyCon
+nilDataCon  = pcDataCon nilDataConName alpha_tyvar [] listTyCon
+consDataCon = pcDataConWithFixity True {- Declared infix -}
+	       consDataConName
+ 	       alpha_tyvar [alphaTy, mkTyConApp listTyCon alpha_ty] listTyCon
 -- Interesting: polymorphic recursion would help here.
 -- We can't use (mkListTy alphaTy) in the defn of consDataCon, else mkListTy
 -- gets the over-specific type (Type -> Type)
@@ -493,7 +498,6 @@ parrDataCon :: DataCon
 parrDataCon  = pcDataCon 
 	         parrDataConName 
 		 alpha_tyvar		-- forall'ed type variables
-		 []			-- context
 		 [intPrimTy,		-- 1st argument: Int#
 		  mkTyConApp		-- 2nd argument: Array# a
 		    arrayPrimTyCon 
@@ -527,7 +531,7 @@ parrFakeConArr  = array (0, mAX_TUPLE_SIZE) [(i, mkPArrFakeCon i)
 mkPArrFakeCon       :: Int -> DataCon
 mkPArrFakeCon arity  = data_con
   where
-	data_con  = pcDataCon name [tyvar] [] tyvarTys parrTyCon
+	data_con  = pcDataCon name [tyvar] tyvarTys parrTyCon
 	tyvar     = head alphaTyVars
 	tyvarTys  = replicate arity $ mkTyVarTy tyvar
         nameStr   = mkFastString ("MkPArr" ++ show arity)
