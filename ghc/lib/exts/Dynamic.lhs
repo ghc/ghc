@@ -15,6 +15,8 @@ with operations for converting dynamic values into a concrete
 The Dynamic implementation provided is closely based on code
 contained in Hugs library of the same name.
 
+NOTE: test code at the end, but commented out.
+
 \begin{code}
 module Dynamic
     (
@@ -116,9 +118,14 @@ instance Show TypeRep where
     case tys of
       [] -> showsPrec p tycon
       [x] | tycon == listTc    -> showChar '[' . shows x . showChar ']'
-      xs  | isTupleTyCon tycon -> showTuple tycon xs
-      xs -> showParen (p > 9) $
-   	    showsPrec p tycon . showChar ' ' . showArgs tys
+      xs  
+        | isTupleTyCon tycon -> showTuple tycon xs
+	| otherwise	     ->
+	    showParen (p > 9) $
+   	    showsPrec p tycon . 
+	    showChar ' '      . 
+	    showArgs tys
+
   showsPrec p (Fun f a) =
      showParen (p > 8) $
      showsPrec 9 f . showString " -> " . showsPrec 8 a
@@ -144,7 +151,7 @@ isTupleTyCon (TyCon _ (',':_)) = True
 isTupleTyCon _		       = False
 
 instance Show TyCon where
-  showsPrec d (TyCon _ s) = showString s
+  showsPrec _ (TyCon _ s) = showString s
 
 -- 
 -- If we enforce the restriction that TyCons are
@@ -164,6 +171,7 @@ uni = unsafePerformIO ( newIORef 0 )
 Some (Show.TypeRep) helpers:
 
 \begin{code}
+showArgs :: Show a => [a] -> ShowS
 showArgs [] = id
 showArgs [a] = showsPrec 10 a
 showArgs (a:as) = showsPrec 10 a . showString " " . showArgs as 
@@ -357,16 +365,23 @@ instance ( Typeable a
 
 \begin{code}
 -- prelude types:
+intTc, charTc, boolTc :: TyCon
 intTc      = mkTyCon "Int"
 charTc     = mkTyCon "Char"
 boolTc     = mkTyCon "Bool"
+
+floatTc, doubleTc, integerTc :: TyCon
 floatTc    = mkTyCon "Float"
 doubleTc   = mkTyCon "Double"
 integerTc  = mkTyCon "Integer"
+
+ioTc, maybeTc, eitherTc, listTc :: TyCon
 ioTc       = mkTyCon "IO"
 maybeTc    = mkTyCon "Maybe"
 eitherTc   = mkTyCon "Either"
 listTc     = mkTyCon "[]"
+
+unitTc, orderingTc, arrayTc, complexTc, handleTc :: TyCon
 unitTc     = mkTyCon "()"
 orderingTc = mkTyCon "Ordering"
 arrayTc    = mkTyCon "Array"
@@ -374,25 +389,35 @@ complexTc  = mkTyCon "Complex"
 handleTc   = mkTyCon "Handle"
 
 -- Hugs/GHC extension lib types:
+addrTc, stablePtrTc, mvarTc :: TyCon
 addrTc       = mkTyCon "Addr"
 stablePtrTc  = mkTyCon "StablePtr"
 mvarTc       = mkTyCon "MVar"
+
+foreignObjTc, stTc :: TyCon
 foreignObjTc = mkTyCon "ForeignObj"
 stTc         = mkTyCon "ST"
+
+int8Tc, int16Tc, int32Tc, int64Tc :: TyCon
 int8Tc       = mkTyCon "Int8"
 int16Tc      = mkTyCon "Int16"
 int32Tc      = mkTyCon "Int32"
 int64Tc	     = mkTyCon "Int64"
+
+word8Tc, word16Tc, word32Tc, word64Tc :: TyCon
 word8Tc      = mkTyCon "Word8"
 word16Tc     = mkTyCon "Word16"
 word32Tc     = mkTyCon "Word32"
 word64Tc     = mkTyCon "Word64"
+
+tyConTc, typeRepTc, dynamicTc :: TyCon
 tyConTc      = mkTyCon "TyCon"
 typeRepTc    = mkTyCon "Type"
 dynamicTc    = mkTyCon "Dynamic"
 
 -- GHC specific:
 {- BEGIN_FOR_GHC
+byteArrayTc, mutablebyteArrayTc, wordTc :: TyCon
 byteArrayTc  = mkTyCon "ByteArray"
 mutablebyteArrayTc = mkTyCon "MutableByteArray"
 wordTc       = mkTyCon "Word"
@@ -400,7 +425,9 @@ wordTc       = mkTyCon "Word"
 
 \end{code}
 
-\begin{code}
+begin{code}
+test1,test2, test3, test4 :: Dynamic
+
 test1 = toDyn (1::Int)
 test2 = toDyn ((+) :: Int -> Int -> Int)
 test3 = dynApp test2 test1
@@ -411,7 +438,9 @@ test5 = fromDyn test4 0
 test6 = fromDyn test1 0
 test7 = fromDyn test2 0
 
+test8 :: Dynamic
 test8 = toDyn (mkAppTy listTc)
+
 test9 :: Float
 test9 = fromDyn test8 0
 
@@ -429,4 +458,4 @@ printf str args = putStr (decode str args)
 
 test10 :: IO ()
 test10 = printf "%n = %c, that much is %b\n" [toDyn (3::Int),toDyn 'a', toDyn False]
-\end{code}
+end{code}

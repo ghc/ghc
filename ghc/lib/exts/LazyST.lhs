@@ -40,7 +40,7 @@ import PrelGHC
 newtype ST s a = ST (PrelST.State s -> (a,PrelST.State s))
 
 instance Functor (ST s) where
-    map f m = ST $ \ s ->
+    fmap f m = ST $ \ s ->
       let 
        ST m_a = m
        (r,new_s) = m_a s
@@ -51,6 +51,7 @@ instance Monad (ST s) where
 
         return a = ST $ \ s -> (a,s)
         m >> k   =  m >>= \ _ -> k
+	fail s   = error s
 
         (ST m) >>= k
          = ST $ \ s ->
@@ -62,7 +63,7 @@ instance Monad (ST s) where
 
 {-# NOINLINE runST #-}
 runST :: (forall s. ST s a) -> a
-runST st = case st of ST st -> let (r,_) = st (PrelST.S# realWorld#) in r
+runST st = case st of ST the_st -> let (r,_) = the_st (PrelST.S# realWorld#) in r
 \end{code}
 
 %*********************************************************
@@ -106,8 +107,9 @@ readSTArray (STArray arr) ix = strictToLazyST (readArray arr ix)
 writeSTArray (STArray arr) ix v = strictToLazyST (writeArray arr ix v)
 boundsSTArray (STArray arr) = boundsOfArray arr
 thawSTArray arr	= 
-	    strictToLazyST (thawArray arr) >>= \arr -> 
-	    return (STArray arr)
+	    strictToLazyST (thawArray arr) >>= \ marr -> 
+	    return (STArray marr)
+
 freezeSTArray (STArray arr) = strictToLazyST (freezeArray arr)
 unsafeFreezeSTArray (STArray arr) = strictToLazyST (unsafeFreezeArray arr)
 
@@ -115,8 +117,8 @@ strictToLazyST :: PrelST.ST s a -> ST s a
 strictToLazyST m = ST $ \s ->
         let 
   	   pr = case s of { PrelST.S# s# -> PrelST.liftST m s# }
-	   r  = case pr of { PrelST.STret s2# r -> r }
-	   s' = case pr of { PrelST.STret s2# r -> PrelST.S# s2# }
+	   r  = case pr of { PrelST.STret _ v -> v }
+	   s' = case pr of { PrelST.STret s2# _ -> PrelST.S# s2# }
 	in
 	(r, s')
 

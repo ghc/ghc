@@ -49,6 +49,7 @@ module IOExts
 	
 	, unsafePtrEq
 	, unsafeIOToST
+	, stToIO
 
         ) where
 

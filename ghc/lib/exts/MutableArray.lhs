@@ -140,9 +140,9 @@ freezeStablePtrArray (MutableByteArray ixs arr#) = ST $ \ s# ->
 	    -> State# s			-- the Universe and everything
 	    -> (# State# s, ByteArray# #)
 
-    freeze arr# n# s#
-      = case (newStablePtrArray# n# s#)    of { (# s2# , newarr1# #) ->
-	case copy 0# n# arr# newarr1# s2#  of { (# s3# , newarr2# #) ->
+    freeze arr1# n# s#
+      = case (newStablePtrArray# n# s#)     of { (# s2# , newarr1# #) ->
+	case copy 0# n# arr1# newarr1# s2#  of { (# s3# , newarr2# #) ->
 	unsafeFreezeByteArray# newarr2# s3#
 	}}
       where
@@ -151,11 +151,11 @@ freezeStablePtrArray (MutableByteArray ixs arr#) = ST $ \ s# ->
 	     -> State# s
 	     -> (# State# s , MutableByteArray# s #)
 
-	copy cur# end# from# to# s#
+	copy cur# end# from# to# st#
 	  | cur# ==# end#
-	    = (# s# , to# #)
+	    = (# st# , to# #)
 	  | otherwise
-	    = case (readStablePtrArray#  from# cur#       s#) of { (# s1# , ele #) ->
+	    = case (readStablePtrArray#  from# cur#      st#) of { (# s1# , ele #) ->
 	      case (writeStablePtrArray# to#   cur# ele  s1#) of { s2# ->
 	      copy (cur# +# 1#) end# from# to# s2#
 	      }}

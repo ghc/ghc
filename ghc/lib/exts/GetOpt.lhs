@@ -55,12 +55,12 @@ usageInfo header optDescr = unlines (header:table)
          flushLeft n xs = [ take n (x ++ repeat ' ') | x <- xs ]
 
 fmtOpt :: OptDescr a -> (String,String,String)
-fmtOpt (Option sos los ad descr) = (sepBy ", " (map (fmtShort ad) sos),
-                                    sepBy ", " (map (fmtLong  ad) los),
+fmtOpt (Option sos los ad descr) = (sepBy ',' (map (fmtShort ad) sos),
+                                    sepBy ',' (map (fmtLong  ad) los),
                                     descr)
-   where sepBy sep []     = ""
-         sepBy sep [x]    = x
-         sepBy sep (x:xs) = x ++ sep ++ sepBy sep xs
+   where sepBy _  []     = ""
+         sepBy _  [x]    = x
+         sepBy ch (x:xs) = x ++ ch:' ':sepBy ch xs
 
 fmtShort :: ArgDescr a -> Char -> String
 fmtShort (NoArg  _   ) so = "-" ++ [so]
@@ -99,16 +99,16 @@ getNext a            rest _        = (NonOpt a,rest)
 
 -- handle long option
 longOpt :: String -> [String] -> [OptDescr a] -> (OptKind a,[String])
-longOpt xs rest optDescr = long ads arg rest
-   where (opt,arg) = break (=='=') xs
+longOpt ls rs optDescr = long ads arg rs
+   where (opt,arg) = break (=='=') ls
          options   = [ o  | o@(Option _ ls _ _) <- optDescr, l <- ls, opt `isPrefixOf` l ]
          ads       = [ ad | Option _ _ ad _ <- options ]
          optStr    = ("--"++opt)
 
          long (_:_:_)      _        rest     = (errAmbig options optStr,rest)
          long [NoArg  a  ] []       rest     = (Opt a,rest)
-         long [NoArg  a  ] ('=':xs) rest     = (errNoArg optStr,rest)
-         long [ReqArg f d] []       []       = (errReq d optStr,[])
+         long [NoArg  _  ] ('=':_)  rest     = (errNoArg optStr,rest)
+         long [ReqArg _ d] []       []       = (errReq d optStr,[])
          long [ReqArg f _] []       (r:rest) = (Opt (f r),rest)
          long [ReqArg f _] ('=':xs) rest     = (Opt (f xs),rest)
          long [OptArg f _] []       rest     = (Opt (f Nothing),rest)

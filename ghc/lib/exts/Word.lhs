@@ -102,6 +102,7 @@ import PrelAddr
 #endif
 import Ix
 import Bits
+import Ratio
 import Numeric (readDec, showInt)
 
 -----------------------------------------------------------------------------
@@ -123,8 +124,11 @@ intToWord8  = word32ToWord8  . intToWord32
 word16ToInt = word32ToInt    . word16ToWord32
 intToWord16 = word32ToWord16 . intToWord32
 
+intToWord32 :: Int -> Word32
 intToWord32 (I# x)   = W32# ((int2Word# x) `and#` (case (maxBound::Word32) of W32# x# -> x#))
 --intToWord32 (I# x)   = W32# (int2Word# x)
+
+word32ToInt :: Word32 -> Int
 word32ToInt (W32# x) = I#   (word2Int# x)
 
 wordToInt :: Word -> Int
@@ -218,15 +222,19 @@ instance Integral Word8 where
 
 instance Ix Word8 where
     range (m,n)          = [m..n]
-    index b@(m,n) i
+    index b@(m,_) i
 	   | inRange b i = word8ToInt (i-m)
-	   | otherwise   = error (showString "Ix{Word8}.index: Index " .
-				  showParen True (showsPrec 0 i) .
-                                  showString " out of range " $
-				  showParen True (showsPrec 0 b) "")
+	   | otherwise   = indexError i b "Word8"
     inRange (m,n) i      = m <= i && i <= n
 
 instance Enum Word8 where
+    succ w	    
+      | w == maxBound = error ("Enum{Word8}.succ: tried to take `succ' of " ++ show w)
+      | otherwise     = w+1
+    pred w	    
+      | w == minBound = error ("Enum{Word8}.pred: tried to take `pred' of " ++ show w)
+      | otherwise     = w+1
+
     toEnum    (I# i)  = W8# (intToWord8# i)
     fromEnum  (W8# w) = I# (word2Int# w)
     enumFrom c       = map toEnum [fromEnum c .. fromEnum (maxBound::Word8)]
@@ -234,10 +242,10 @@ instance Enum Word8 where
 		       where last = if d < c then minBound else maxBound
 
 instance Read Word8 where
-    readsPrec p = readDec
+    readsPrec _ = readDec
 
 instance Show Word8 where
-    showsPrec p = showInt
+    showsPrec _ = showInt
 
 --
 -- Word8s are represented by an (unboxed) 32-bit Word.
@@ -280,6 +288,7 @@ instance Bits Word8 where
 pow2# :: Int# -> Int#
 pow2# x# = word2Int# (shiftL# (int2Word# 1#) x#)
 
+word2Integer :: Word# -> Integer
 word2Integer w = case word2Integer# w of
 			(# a, s, d #) -> J# a s d
 
@@ -368,15 +377,18 @@ instance Integral Word16 where
 
 instance Ix Word16 where
   range (m,n)          = [m..n]
-  index b@(m,n) i
+  index b@(m,_) i
          | inRange b i = word16ToInt (i - m)
-         | otherwise   = error (showString "Ix{Word16}.index: Index " .
-				showParen True (showsPrec 0 i) .
-                                showString " out of range " $
-				showParen True (showsPrec 0 b) "")
+         | otherwise   = indexError i b "Word16"
   inRange (m,n) i      = m <= i && i <= n
 
 instance Enum Word16 where
+  succ w	    
+      | w == maxBound = error ("Enum{Word16}.succ: tried to take `succ' of " ++ show w)
+      | otherwise     = w+1
+  pred w
+      | w == minBound = error ("Enum{Word16}.pred: tried to take `pred' of " ++ show w)
+      | otherwise     = w+1
   toEnum    (I# i)   = W16# (intToWord16# i)
   fromEnum  (W16# w) = I# (word2Int# w)
   enumFrom c       = map toEnum [fromEnum c .. fromEnum (maxBound::Word16)]
@@ -384,10 +396,10 @@ instance Enum Word16 where
 		       where last = if d < c then minBound else maxBound
 
 instance Read Word16 where
-  readsPrec p = readDec
+  readsPrec _ = readDec
 
 instance Show Word16 where
-  showsPrec p = showInt
+  showsPrec _ = showInt
 
 instance Bits Word16 where
   (W16# x)  .&.  (W16# y)  = W16# (x `and#` y)
@@ -517,20 +529,24 @@ instance Integral Word32 where
 
 {-# INLINE quotWord32 #-}
 {-# INLINE remWord32  #-}
+remWord32, quotWord32 :: Word32 -> Word32 -> Word32
 (W32# x) `quotWord32` (W32# y) = W32# (x `quotWord#` y)
 (W32# x) `remWord32`  (W32# y) = W32# (x `remWord#`  y)
 
 instance Ix Word32 where
     range (m,n)          = [m..n]
-    index b@(m,n) i
+    index b@(m,_) i
 	   | inRange b i = word32ToInt (i - m)
-	   | otherwise   = error (showString "Ix{Word32}.index: Index " .
-				  showParen True (showsPrec 0 i) .
-                                  showString " out of range " $
-				  showParen True (showsPrec 0 b) "")
+	   | otherwise   = indexError i b "Word32"
     inRange (m,n) i      = m <= i && i <= n
 
 instance Enum Word32 where
+    succ w	    
+      | w == maxBound = error ("Enum{Word32}.succ: tried to take `succ' of " ++ show w)
+      | otherwise     = w+1
+    pred w	    
+      | w == minBound = error ("Enum{Word32}.pred: tried to take `pred' of " ++ show w)
+      | otherwise     = w+1
     toEnum                  = intToWord32
     fromEnum                = word32ToInt   -- lossy, don't use.
     enumFrom w              = [w .. maxBound]
@@ -562,7 +578,7 @@ instance Enum Word32 where
 	  | otherwise  = x - diff2
 
 eftt32 :: Word32 -> (Word32 -> Maybe Word32) -> [Word32]
-eftt32 now stepper = go now
+eftt32 init stepper = go init
   where
     go now =
      case stepper now of
@@ -577,10 +593,10 @@ eft32 now last = go now
     | otherwise = x:go (x+1)
 
 instance Read Word32 where
-    readsPrec p = readDec
+    readsPrec _ = readDec
 
 instance Show Word32 where
-    showsPrec p = showInt
+    showsPrec _ = showInt
 
 instance Bits Word32 where
   (W32# x)  .&.  (W32# y)  = W32# (x `and#` y)
@@ -692,15 +708,18 @@ instance Integral Word64 where
 
 instance Ix Word64 where
     range (m,n)          = [m..n]
-    index b@(m,n) i
+    index b@(m,_) i
 	   | inRange b i = word64ToInt (i-m)
-	   | otherwise   = error (showString "Ix{Word64}.index: Index " .
-				  showParen True (showsPrec 0 i) .
-                                  showString " out of range " $
-				  showParen True (showsPrec 0 b) "")
+	   | otherwise   = indexError i b "Word64"
     inRange (m,n) i      = m <= i && i <= n
 
 instance Enum Word64 where
+    succ w	    
+      | w == maxBound = error ("Enum{Word64}.succ: tried to take `succ' of " ++ show w)
+      | otherwise     = w+1
+    pred w	    
+      | w == minBound = error ("Enum{Word64}.pred: tried to take `pred' of " ++ show w)
+      | otherwise     = w+1
     toEnum    (I# i)        = W64# (intToWord# i)
     fromEnum  (W64# w)      = I# (word2Int# w)    -- lossy, don't use.
     enumFrom w              = eft64 w 1
@@ -712,10 +731,10 @@ instance Enum Word64 where
 	  | otherwise = minBound
 
 instance Read Word64 where
-    readsPrec p = readDec
+    readsPrec _ = readDec
 
 instance Show Word64 where
-    showsPrec p = showInt
+    showsPrec _ = showInt
 
 
 instance Bits Word64 where
@@ -772,7 +791,7 @@ word64ToInteger (W64# w#) =
 word64ToInt :: Word64 -> Int
 word64ToInt w = 
    case w `quotRem` 0x100000000 of 
-     (h,l) -> toInt (word64ToWord32 l)
+     (_,l) -> toInt (word64ToWord32 l)
 
 intToWord64# :: Int# -> Word64#
 intToWord64# i# = wordToWord64# (int2Word# i#)
@@ -787,7 +806,7 @@ instance Show Word64 where
   showsPrec p x = showsPrec p (word64ToInteger x)
 
 instance Read Word64 where
-  readsPrec p s = [ (integerToWord64 x,r) | (x,r) <- readDec s ]
+  readsPrec _ s = [ (integerToWord64 x,r) | (x,r) <- readDec s ]
 
 instance Eq  Word64     where 
   (W64# x) == (W64# y) = x `eqWord64#` y
@@ -842,15 +861,18 @@ instance Integral Word64 where
 
 instance Ix Word64 where
     range (m,n)          = [m..n]
-    index b@(m,n) i
+    index b@(m,_) i
 	   | inRange b i = word64ToInt (i-m)
-	   | otherwise   = error (showString "Ix{Word64}.index: Index " .
-				  showParen True (showsPrec 0 i) .
-                                  showString " out of range " $
-				  showParen True (showsPrec 0 b) "")
+	   | otherwise   = indexError i b "Word64"
     inRange (m,n) i      = m <= i && i <= n
 
 instance Enum Word64 where
+    succ w	    
+      | w == maxBound = error ("Enum{Word64}.succ: tried to take `succ' of " ++ show w)
+      | otherwise     = w+1
+    pred w	    
+      | w == minBound = error ("Enum{Word64}.pred: tried to take `pred' of " ++ show w)
+      | otherwise     = w+1
     toEnum    (I# i)        = W64# (intToWord64# i)
     fromEnum  (W64# w)      = I# (word2Int# (word64ToWord# w))  -- lossy, don't use.
     enumFrom w              = eft64 w 1
@@ -898,6 +920,7 @@ instance Bits Word64 where
   bitSize  _    = 64
   isSigned _    = False
 
+compareWord64# :: Word64# -> Word64# -> Ordering
 compareWord64# i# j# 
  | i# `ltWord64#` j# = LT
  | i# `eqWord64#` j# = EQ
@@ -1008,29 +1031,29 @@ shiftRL64# a# b# =
     W64# w# -> w#
 
 word64ToWord# :: Word64# -> Word#
-word64ToWord# w# =
-  case (unsafePerformIO (_ccall_ stg_word64ToWord w#)) of
+word64ToWord# w64# =
+  case (unsafePerformIO (_ccall_ stg_word64ToWord w64#)) of
     W# w# -> w#
       
 wordToWord64# :: Word# -> Word64#
 wordToWord64# w# =
   case (unsafePerformIO (_ccall_ stg_wordToWord64 w#)) of
-    W64# w# -> w#
+    W64# w64# -> w64#
 
 word64ToInt64# :: Word64# -> Int64#
-word64ToInt64# w# =
-  case (unsafePerformIO (_ccall_ stg_word64ToInt64 w#)) of
+word64ToInt64# w64# =
+  case (unsafePerformIO (_ccall_ stg_word64ToInt64 w64#)) of
     I64# i# -> i#
 
 int64ToWord64# :: Int64# -> Word64#
-int64ToWord64# w# =
-  case (unsafePerformIO (_ccall_ stg_int64ToWord64 w#)) of
+int64ToWord64# i64# =
+  case (unsafePerformIO (_ccall_ stg_int64ToWord64 i64#)) of
     W64# w# -> w#
 
 intToInt64# :: Int# -> Int64#
 intToInt64# i# =
   case (unsafePerformIO (_ccall_ stg_intToInt64 i#)) of
-    I64# i# -> i#
+    I64# i64# -> i64#
       
 #endif
 
@@ -1040,7 +1063,7 @@ sizeofWord64 = 8
 -- Enum Word64 helper funs:
 
 eftt64 :: Word64 -> Word64 -> (Word64->Bool) -> [Word64]
-eftt64 now step done = go now
+eftt64 init step done = go init
   where
    go now
      | done now  = []
@@ -1091,6 +1114,7 @@ The remainder of this file consists of definitions which are only
 used in the implementation.
 
 \begin{code}
+signumReal :: (Ord a, Num a) => a -> a
 signumReal x | x == 0    =  0
 	     | x > 0     =  1
 	     | otherwise = -1
@@ -1225,7 +1249,7 @@ writeWord16OffAddr :: Addr -> Int -> Word16 -> IO ()
 writeWord16OffAddr a i e = _casm_ `` (((StgNat16*)%0)[(StgInt)%1])=(StgNat16)%2; '' a i e
 
 writeWord32OffAddr :: Addr -> Int -> Word32 -> IO ()
-writeWord32OffAddr (A# a#) i@(I# i#) (W32# w#) = IO $ \ s# ->
+writeWord32OffAddr (A# a#) i (W32# w#) = IO $ \ s# ->
       case (writeWordOffAddr#  a# i'# w# s#) of s2# -> (# s2#, () #)
  where
    -- adjust index to be in Word units, not Word32 ones.
@@ -1272,5 +1296,19 @@ writeWord64OffForeignObj fo i e = _casm_ `` (((StgNat64*)%0)[(StgInt)%1])=(StgNa
 # endif
 
 #endif
+
+\end{code}
+
+C&P'ed from Ix.lhs
+
+\begin{code}
+{-# NOINLINE indexError #-}
+indexError :: Show a => a -> (a,a) -> String -> b
+indexError i rng tp
+  = error (showString "Ix{" . showString tp . showString "}.index: Index " .
+           showParen True (showsPrec 0 i) .
+	   showString " out of range " $
+	   showParen True (showsPrec 0 rng) "")
+
 
 \end{code}

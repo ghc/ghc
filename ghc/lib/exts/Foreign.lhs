@@ -21,7 +21,8 @@ module Foreign
        , freeStablePtr   -- :: StablePtr a -> IO ()
        ) where
 
-import PrelForeign
+import PrelForeign --hiding ( makeForeignObj )
+--import qualified PrelForeign as PF ( makeForeignObj )
 import PrelBase    ( Int(..), Double(..), Float(..), Char(..) )
 import PrelGHC     ( indexCharOffForeignObj#, indexIntOffForeignObj#, 
 		     indexAddrOffForeignObj#, indexFloatOffForeignObj#, 
@@ -67,6 +68,17 @@ import PrelIOBase ( IO(..) )
 foreignObjToAddr :: ForeignObj -> IO Addr
 foreignObjToAddr fo = _casm_ `` %r=(StgAddr)%0; '' fo
 \end{code}
+
+begin{code}
+makeForeignObj :: Addr -> Addr -> IO ForeignObj
+makeForeignObj obj finaliser = do
+   fobj <- PF.makeForeignObj obj
+   addForeignFinaliser fobj (app0 finaliser)
+   return fobj
+
+foreign import dynamic unsafe app0 :: Addr -> IO ()
+end{code}
+
 
 
 \begin{code}

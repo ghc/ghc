@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Exception.lhs,v 1.3 1999/01/07 16:39:07 simonm Exp $
+% $Id: Exception.lhs,v 1.4 1999/01/14 18:15:29 sof Exp $
 %
 % (c) The GRAP/AQUA Project, Glasgow University, 1998
 %
@@ -105,14 +105,14 @@ tryAll a = catch# (a `seq` return (Right a)) (\e -> return (Left e))
 #endif
 
 tryAllIO :: IO a -> IO (Either Exception a)
-tryAllIO a = catchAllIO (a >>= \a -> return (Right a))
+tryAllIO a = catchAllIO (a >>= \ v -> return (Right v))
 			(\e -> return (Left e))
 
 try :: (Exception -> Maybe b) -> a -> IO (Either b a)
 try p a = do
   r <- tryAll a
   case r of
-	Right a -> return (Right a)
+	Right v -> return (Right v)
 	Left  e -> case p e of
 			Nothing -> throw e
 			Just b  -> return (Left b)
@@ -121,7 +121,7 @@ tryIO :: (Exception -> Maybe b) -> IO a -> IO (Either b a)
 tryIO p a = do
   r <- tryAllIO a
   case r of
-	Right a -> return (Right a)
+	Right v -> return (Right v)
 	Left  e -> case p e of
 			Nothing -> throw e
 			Just b  -> return (Left b)
@@ -150,7 +150,7 @@ catchDyn m k = catchException m handle
 		  	  	case fromDynamic dyn of
 				    Just exception  -> k exception
 				    Nothing -> throw ex
-			   other -> throw ex
+			   _ -> throw ex
 \end{code}
 
 -----------------------------------------------------------------------------

@@ -87,6 +87,7 @@ import PrelAddr ( Int64(..), Word64(..) )
 #endif
 import Ix
 import Bits
+import Ratio   ( (%) )
 import Numeric ( readDec )
 import Word    ( Word32 )
 
@@ -130,6 +131,8 @@ instance CCallable Int8
 instance CReturnable Int8
 
 int8ToInt (I8# x) = I# (int8ToInt# x)
+
+int8ToInt# :: Int# -> Int#
 int8ToInt# x = if x' <=# 0x7f# then x' else x' -# 0x100#
    where x' = word2Int# (int2Word# x `and#` int2Word# 0xff#)
 
@@ -139,6 +142,8 @@ int8ToInt# x = if x' <=# 0x7f# then x' else x' -# 0x100#
 -- i.e., show (intToInt8 511) => "-1"
 --
 intToInt8 (I# x) = I8# (intToInt8# x)
+
+intToInt8# :: Int# -> Int#
 intToInt8# i# = word2Int# ((int2Word# i#) `and#` int2Word# 0xff#)
 
 instance Eq  Int8     where 
@@ -177,40 +182,45 @@ instance Real Int8 where
     toRational x = toInteger x % 1
 
 instance Integral Int8 where
-    div x@(I8# x#) y@(I8# y#) = 
-       if x > 0 && y < 0	then quotInt8 (x-y-1) y
-       else if x < 0 && y > 0	then quotInt8 (x-y+1) y
-       else quotInt8 x y
+    div x y
+       | x > 0 && y < 0 = quotInt8 (x-y-1) y
+       | x < 0 && y > 0	= quotInt8 (x-y+1) y
+       | otherwise      = quotInt8 x y
+
     quot x@(I8# _) y@(I8# y#)
        | y# /=# 0# = x `quotInt8` y
        | otherwise = error "Integral.Int8.quot: divide by 0\n"
     rem x@(I8# _) y@(I8# y#)
        | y# /=# 0#  = x `remInt8` y
        | otherwise  = error "Integral.Int8.rem: divide by 0\n"
-    mod x@(I8# x#) y@(I8# y#) =
-       if x > 0 && y < 0 || x < 0 && y > 0 then
-	  if r/=0 then r+y else 0
-       else
-	  r
+    mod x y
+       | x > 0 && y < 0 || x < 0 && y > 0 = if r/=0 then r+y else 0
+       | otherwise = r
 	where r = remInt8 x y
+
     a@(I8# _) `quotRem` b@(I8# _) = (a `quotInt8` b, a `remInt8` b)
     toInteger i8  = toInteger (int8ToInt i8)
     toInt     i8  = int8ToInt i8
 
+remInt8, quotInt8 :: Int8 -> Int8 -> Int8
 remInt8  (I8# x) (I8# y) = I8# (intToInt8# ((int8ToInt# x) `remInt#` (int8ToInt# y)))
 quotInt8 (I8# x) (I8# y) = I8# (intToInt8# ((int8ToInt# x) `quotInt#` (int8ToInt# y)))
 
 instance Ix Int8 where
     range (m,n)          = [m..n]
-    index b@(m,n) i
+    index b@(m,_) i
 	      | inRange b i = int8ToInt (i - m)
-	      | otherwise   = error (showString "Ix{Int8}.index: Index " .
-				     showParen True (showsPrec 0 i) .
-                                     showString " out of range " $
-				     showParen True (showsPrec 0 b) "")
+	      | otherwise   = indexError i b "Int8"
     inRange (m,n) i      = m <= i && i <= n
 
 instance Enum Int8 where
+    succ i
+      | i == maxBound = error ("Enum{Int8}.succ: tried to take `succ' of " ++ show i)
+      | otherwise     = i+1
+    pred i
+      | i == minBound = error ("Enum{Int8}.pred: tried to take `pred' of " ++ show i)
+      | otherwise     = i+1
+
     toEnum         = intToInt8
     fromEnum       = int8ToInt
     enumFrom c       = map toEnum [fromEnum c .. fromEnum (maxBound::Int8)]
@@ -275,10 +285,13 @@ instance CReturnable Int16
 
 int16ToInt (I16# x) = I# (int16ToInt# x)
 
+int16ToInt# :: Int# -> Int#
 int16ToInt# x = if x' <=# 0x7fff# then x' else x' -# 0x10000#
    where x' = word2Int# (int2Word# x `and#` int2Word# 0xffff#)
 
 intToInt16 (I# x) = I16# (intToInt16# x)
+
+intToInt16# :: Int# -> Int#
 intToInt16# i# = word2Int# ((int2Word# i#) `and#` int2Word# 0xffff#)
 
 instance Eq  Int16     where
@@ -310,40 +323,45 @@ instance Real Int16 where
     toRational x = toInteger x % 1
 
 instance Integral Int16 where
-    div x@(I16# x#) y@(I16# y#) = 
-       if x > 0 && y < 0	then quotInt16 (x-y-1) y
-       else if x < 0 && y > 0	then quotInt16 (x-y+1) y
-       else quotInt16 x y
+    div x y
+       | x > 0 && y < 0	= quotInt16 (x-y-1) y
+       | x < 0 && y > 0	= quotInt16 (x-y+1) y
+       | otherwise	= quotInt16 x y
+
     quot x@(I16# _) y@(I16# y#)
        | y# /=# 0#      = x `quotInt16` y
        | otherwise      = error "Integral.Int16.quot: divide by 0\n"
     rem x@(I16# _) y@(I16# y#)
        | y# /=# 0#      = x `remInt16` y
        | otherwise      = error "Integral.Int16.rem: divide by 0\n"
-    mod x@(I16# x#) y@(I16# y#) =
-       if x > 0 && y < 0 || x < 0 && y > 0 then
-	  if r/=0 then r+y else 0
-       else
-	  r
+    mod x y
+       | x > 0 && y < 0 || x < 0 && y > 0 = if r/=0 then r+y else 0
+       | otherwise			  = r
 	where r = remInt16 x y
+
     a@(I16# _) `quotRem` b@(I16# _) = (a `quotInt16` b, a `remInt16` b)
     toInteger i16  = toInteger (int16ToInt i16)
     toInt     i16  = int16ToInt i16
 
+remInt16, quotInt16 :: Int16 -> Int16 -> Int16
 remInt16  (I16# x) (I16# y) = I16# (intToInt16# ((int16ToInt# x) `remInt#` (int16ToInt# y)))
 quotInt16 (I16# x) (I16# y) = I16# (intToInt16# ((int16ToInt# x) `quotInt#` (int16ToInt# y)))
 
 instance Ix Int16 where
     range (m,n)          = [m..n]
-    index b@(m,n) i
+    index b@(m,_) i
 	      | inRange b i = int16ToInt (i - m)
-	      | otherwise   = error (showString "Ix{Int16}.index: Index " .
-				     showParen True (showsPrec 0 i) .
-                                     showString " out of range " $
-				     showParen True (showsPrec 0 b) "")
+	      | otherwise   = indexError i b "Int16"
     inRange (m,n) i      = m <= i && i <= n
 
 instance Enum Int16 where
+    succ i
+      | i == maxBound = error ("Enum{Int16}.succ: tried to take `succ' of " ++ show i)
+      | otherwise     = i+1
+    pred i
+      | i == minBound = error ("Enum{Int16}.pred: tried to take `pred' of " ++ show i)
+      | otherwise     = i+1
+
     toEnum           = intToInt16
     fromEnum         = int16ToInt
     enumFrom c       = map toEnum [fromEnum c .. fromEnum (maxBound::Int16)]
@@ -456,40 +474,44 @@ instance Real Int32 where
     toRational x = toInteger x % 1
 
 instance Integral Int32 where
-    div x@(I32# x#) y@(I32# y#) = 
-       if x > 0 && y < 0	then quotInt32 (x-y-1) y
-       else if x < 0 && y > 0	then quotInt32 (x-y+1) y
-       else quotInt32 x y
+    div x y
+       | x > 0 && y < 0	= quotInt32 (x-y-1) y
+       | x < 0 && y > 0	= quotInt32 (x-y+1) y
+       | otherwise      = quotInt32 x y
     quot x@(I32# _) y@(I32# y#)
        | y# /=# 0#  = x `quotInt32` y
        | otherwise  = error "Integral.Int32.quot: divide by 0\n"
     rem x@(I32# _) y@(I32# y#)
        | y# /=# 0#  = x `remInt32` y
        | otherwise  = error "Integral.Int32.rem: divide by 0\n"
-    mod x@(I32# x#) y@(I32# y#) =
-       if x > 0 && y < 0 || x < 0 && y > 0 then
-	  if r/=0 then r+y else 0
-       else
-	  r
+    mod x y
+       | x > 0 && y < 0 || x < 0 && y > 0 = if r/=0 then r+y else 0
+       | otherwise			  = r
 	where r = remInt32 x y
+
     a@(I32# _) `quotRem` b@(I32# _) = (a `quotInt32` b, a `remInt32` b)
     toInteger i32  = toInteger (int32ToInt i32)
     toInt     i32  = int32ToInt i32
 
+remInt32, quotInt32 :: Int32 -> Int32 -> Int32
 remInt32  (I32# x) (I32# y) = I32# (intToInt32# ((int32ToInt# x) `remInt#` (int32ToInt# y)))
 quotInt32 (I32# x) (I32# y) = I32# (intToInt32# ((int32ToInt# x) `quotInt#` (int32ToInt# y)))
 
 instance Ix Int32 where
     range (m,n)          = [m..n]
-    index b@(m,n) i
+    index b@(m,_) i
 	      | inRange b i = int32ToInt (i - m)
-	      | otherwise   = error (showString "Ix{Int32}.index: Index " .
-				     showParen True (showsPrec 0 i) .
-                                     showString " out of range " $
-				     showParen True (showsPrec 0 b) "")
+	      | otherwise   = indexError i b "Int32"
     inRange (m,n) i      = m <= i && i <= n
 
 instance Enum Int32 where
+    succ i
+      | i == maxBound = error ("Enum{Int32}.succ: tried to take `succ' of " ++ show i)
+      | otherwise     = i+1
+    pred i
+      | i == minBound = error ("Enum{Int32}.pred: tried to take `pred' of " ++ show i)
+      | otherwise     = i+1
+
     toEnum         = intToInt32
     fromEnum       = int32ToInt
     enumFrom c       = map toEnum [fromEnum c .. fromEnum (maxBound::Int32)]
@@ -584,7 +606,7 @@ instance Real Int64 where
   toRational x = toInteger x % 1
 
 instance Integral Int64 where
-    div x@(I64# x#) y@(I64# y#)
+    div x y
       | x > 0 && y < 0	= quotInt64 (x-y-1) y
       | x < 0 && y > 0	= quotInt64 (x-y+1) y
       | otherwise       = quotInt64 x y
@@ -597,7 +619,7 @@ instance Integral Int64 where
        | y# /=# 0# = x `remInt64` y
        | otherwise = error "Integral.Int32.rem: divide by 0\n"
 
-    mod x@(I64# x#) y@(I64# y#)
+    mod x y
        | x > 0 && y < 0 || x < 0 && y > 0 = if r/=0 then r+y else 0
        | otherwise = r
 	where r = remInt64 x y
@@ -607,6 +629,13 @@ instance Integral Int64 where
     toInt     (I64# i#) = I# i#
 
 instance Enum Int64 where
+    succ i
+      | i == maxBound = error ("Enum{Int64}.succ: tried to take `succ' of " ++ show i)
+      | otherwise     = i+1
+    pred i
+      | i == minBound = error ("Enum{Int64}.pred: tried to take `pred' of " ++ show i)
+      | otherwise     = i+1
+
     toEnum    (I# i)   = I64# i#
     fromEnum  (I64# i) = I64# i#
     enumFrom c         = map toEnum [fromEnum c .. fromEnum (maxBound::Int64)] -- a long list!
@@ -692,7 +721,7 @@ instance Show Int64 where
   showsPrec p x = showsPrec p (int64ToInteger x)
 
 instance Read Int64 where
-  readsPrec p s = [ (integerToInt64 x,r) | (x,r) <- readDec s ]
+  readsPrec _ s = [ (integerToInt64 x,r) | (x,r) <- readDec s ]
 
 instance Eq  Int64     where 
   (I64# x) == (I64# y) = x `eqInt64#` y
@@ -719,6 +748,7 @@ instance Num Int64 where
   fromInteger i       = integerToInt64 i
   fromInt     i       = intToInt64 i
 
+compareInt64# :: Int64# -> Int64# -> Ordering
 compareInt64# i# j# 
  | i# `ltInt64#` j# = LT
  | i# `eqInt64#` j# = EQ
@@ -732,7 +762,7 @@ instance Real Int64 where
   toRational x = toInteger x % 1
 
 instance Integral Int64 where
-    div x@(I64# x#) y@(I64# y#)
+    div x y
       | x > 0 && y < 0	= quotInt64 (x-y-1) y
       | x < 0 && y > 0	= quotInt64 (x-y+1) y
       | otherwise       = quotInt64 x y
@@ -745,7 +775,7 @@ instance Integral Int64 where
        | y# `neInt64#` (intToInt64# 0#) = x `remInt64` y
        | otherwise = error "Integral.Int32.rem: divide by 0\n"
 
-    mod x@(I64# x#) y@(I64# y#)
+    mod x y
        | x > 0 && y < 0 || x < 0 && y > 0 = if r/=0 then r+y else 0
        | otherwise = r
 	where r = remInt64 x y
@@ -755,6 +785,13 @@ instance Integral Int64 where
     toInt     i         = int64ToInt i
 
 instance Enum Int64 where
+    succ i
+      | i == maxBound = error ("Enum{Int64}.succ: tried to take `succ' of " ++ show i)
+      | otherwise     = i+1
+    pred i
+      | i == minBound = error ("Enum{Int64}.pred: tried to take `pred' of " ++ show i)
+      | otherwise     = i+1
+
     toEnum    (I# i)   = I64# (intToInt64# i)
     fromEnum  (I64# w) = I# (int64ToInt# w)
     enumFrom i              = eft64 i 1
@@ -796,6 +833,7 @@ instance Bits Int64 where
   bitSize  _    = 64
   isSigned _    = True
 
+remInt64, quotInt64 :: Int64 -> Int64 -> Int64
 remInt64  (I64# x) (I64# y) = I64# (x `remInt64#` y)
 quotInt64 (I64# x) (I64# y) = I64# (x `quotInt64#` y)
 
@@ -808,7 +846,7 @@ int64ToInt (I64# i#) = I# (int64ToInt# i#)
 -- Enum Int64 helper funs:
 
 eftt64 :: Int64 -> Int64 -> (Int64->Bool) -> [Int64]
-eftt64 now step done = go now
+eftt64 init step done = go init
   where
    go now
      | done now  = []
@@ -942,14 +980,14 @@ shiftRL64# a# b# =
     W64# w# -> w#
 
 int64ToInt# :: Int64# -> Int#
-int64ToInt# i# =
-  case (unsafePerformIO (_ccall_ stg_int64ToInt i#)) of
+int64ToInt# i64# =
+  case (unsafePerformIO (_ccall_ stg_int64ToInt i64#)) of
     I# i# -> i#
 
 wordToWord64# :: Word# -> Word64#
 wordToWord64# w# =
   case (unsafePerformIO (_ccall_ stg_wordToWord64 w#)) of
-    W64# w# -> w#
+    W64# w64# -> w64#
 
 word64ToInt64# :: Word64# -> Int64#
 word64ToInt64# w# =
@@ -957,17 +995,24 @@ word64ToInt64# w# =
     I64# i# -> i#
 
 int64ToWord64# :: Int64# -> Word64#
-int64ToWord64# w# =
-  case (unsafePerformIO (_ccall_ stg_int64ToWord64 w#)) of
+int64ToWord64# i# =
+  case (unsafePerformIO (_ccall_ stg_int64ToWord64 i#)) of
     W64# w# -> w#
 
 intToInt64# :: Int# -> Int64#
 intToInt64# i# =
   case (unsafePerformIO (_ccall_ stg_intToInt64 i#)) of
-    I64# i# -> i#
-      
+    I64# i64# -> i64#
 
 #endif
+
+instance Ix Int64 where
+    range (m,n)          = [m..n]
+    index b@(m,_) i
+	   | inRange b i = int64ToInt (i-m)
+	   | otherwise   = indexError i b "Int64"
+    inRange (m,n) i      = m <= i && i <= n
+
 
 sizeofInt64 :: Word32
 sizeofInt64 = 8
@@ -982,9 +1027,11 @@ sizeofInt64 = 8
 Code copied from the Prelude
 
 \begin{code}
+absReal :: (Ord a, Num a) => a -> a
 absReal x    | x >= 0    = x
 	     | otherwise = -x
 
+signumReal :: (Ord a, Num a) => a -> a
 signumReal x | x == 0    =  0
 	     | x > 0     =  1
 	     | otherwise = -1
@@ -1143,3 +1190,17 @@ writeInt64OffForeignObj fo i e = _casm_ `` (((StgInt64*)%0)[(StgInt)%1])=(StgInt
 
 \end{code}
 
+
+C&P'ed from Ix.lhs
+
+\begin{code}
+{-# NOINLINE indexError #-}
+indexError :: Show a => a -> (a,a) -> String -> b
+indexError i rng tp
+  = error (showString "Ix{" . showString tp . showString "}.index: Index " .
+           showParen True (showsPrec 0 i) .
+	   showString " out of range " $
+	   showParen True (showsPrec 0 rng) "")
+
+
+\end{code}

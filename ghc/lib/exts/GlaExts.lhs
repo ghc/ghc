@@ -52,7 +52,6 @@ module GlaExts
 
         -- misc bits
 	trace,
-	Lift(..),
 
         -- and finally, all the unboxed primops of PrelGHC!
         module PrelGHC
@@ -70,9 +69,16 @@ import MutableArray
 import Monad
 
 type PrimIO a = IO a
+
+primIOToIO :: PrimIO a -> IO a
 primIOToIO io = io
+
+ioToPrimIO :: IO a -> PrimIO a
 ioToPrimIO io = io
+
+unsafePerformPrimIO :: PrimIO a -> a
 unsafePerformPrimIO = unsafePerformIO
+
 thenPrimIO :: PrimIO a -> (a -> PrimIO b) -> PrimIO b
 thenPrimIO = (>>=)
 
