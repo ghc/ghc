@@ -13,21 +13,9 @@
 #include "stgio.h"
 
 StgInt
-getSocketOption__ (fd, opt)
-StgInt fd;
-StgInt opt;
+getSocketOption__ (StgInt fd, StgInt opt, StgInt level)
 {
-  int level,optval, sz_optval,rc;
-
-  if ( 
-#ifndef _WIN32
-       opt == TCP_MAXSEG ||
-#endif
-       opt == TCP_NODELAY ) {
-     level = IPPROTO_TCP;
-  } else {
-     level = SOL_SOCKET;
-  }
+  int optval, sz_optval, rc;
 
   sz_optval = sizeof(int);
 
@@ -42,23 +30,10 @@ StgInt opt;
 }
 
 StgInt
-setSocketOption__ (fd, opt, val)
-StgInt fd;
-StgInt opt;
-StgInt val;
+setSocketOption__ (StgInt fd, StgInt opt, StgInt level, StgInt val)
 {
-  int level, optval,rc;
+  int optval, rc;
 
-  if ( 
-#ifndef _WIN32
-       opt == TCP_MAXSEG || 
-#endif
-       opt == TCP_NODELAY ) {
-     level = IPPROTO_TCP;
-  } else {
-     level = SOL_SOCKET;
-  }
-  
   optval = val;
 
   while ( (rc = setsockopt((int)fd, level, opt, &optval, sizeof(optval))) < 0 ) {

@@ -87,7 +87,7 @@ import Ix
 import Weak	    ( addForeignFinalizer )
 import PrelIOBase  -- IOError, Handle representation
 import PrelHandle
-import PrelConc	    ( threadWaitRead )
+import PrelConc	    ( threadWaitRead, threadWaitWrite )
 import Foreign
 import Addr	    ( nullAddr )
 
@@ -321,6 +321,8 @@ connect (MkSocket s _family _stype _protocol socketStatus) addr = do
    status <- _ccall_ connectSocket s addr' sz (isDomainSocket::Int)
    case (status::Int) of
      -1 -> constructErrorAndFail "connect"
+     -6 -> do threadWaitWrite s >> writeIORef socketStatus Connected
+	   -- ToDo: check for error with getsockopt
      _  -> writeIORef socketStatus Connected
 \end{code}
        
@@ -585,6 +587,15 @@ data SocketOption
     | UseLoopBack   {- SO_USELOOPBACK -}  -- not used, I believe.
 #endif
 
+socketOptLevel :: SocketOption -> Int
+socketOptLevel so = 
+  case so of
+#ifndef _WIN32
+    MaxSegment   -> ``IPPROTO_TCP''
+#endif
+    NoDelay      -> ``IPPROTO_TCP''
+    _            -> ``SOL_SOCKET''
+
 packSocketOption :: SocketOption -> Int
 packSocketOption so =
   case so of
@@ -616,7 +627,10 @@ setSocketOption :: Socket
 		-> Int		 -- Option Value
 		-> IO ()
 setSocketOption (MkSocket s _ _ _ _) so v = do
-   rc <- _ccall_ setSocketOption__ s (packSocketOption so) v
+   rc <- _ccall_ setSocketOption__ s 
+		(packSocketOption so) 
+		(socketOptLevel so) 
+		v 
    if rc /= (0::Int)
     then constructErrorAndFail "setSocketOption"
     else return ()
@@ -625,7 +639,9 @@ getSocketOption :: Socket
 		-> SocketOption  -- Option Name
 		-> IO Int	  -- Option Value
 getSocketOption (MkSocket s _ _ _ _) so = do
-   rc <- _ccall_ getSocketOption__ s (packSocketOption so)
+   rc <- _ccall_ getSocketOption__ s 
+		(packSocketOption so)
+		(socketOptLevel so)
    if rc == -1 -- let's just hope that value isn't taken..
     then constructErrorAndFail "getSocketOption"
     else return rc

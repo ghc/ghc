@@ -87,8 +87,8 @@ StgInt	recvFrom__ (StgInt, StgAddr, StgInt, StgAddr);
 StgInt	sendTo__ (StgInt, StgAddr, StgInt, StgAddr, StgInt);
 
 /* socketOpt.c */
-StgInt	getSocketOption__ (StgInt, StgInt);
-StgInt	setSocketOption__ (StgInt, StgInt, StgInt);
+StgInt	getSocketOption__ (StgInt, StgInt, StgInt);
+StgInt	setSocketOption__ (StgInt, StgInt, StgInt, StgInt);
 
 /* writeDescriptor.lc */
 StgInt	writeDescriptor (StgInt, StgAddr, StgInt);

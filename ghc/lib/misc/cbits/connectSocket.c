@@ -18,7 +18,11 @@ connectSocket(I_ sockfd, A_ servaddr, I_ addrlen, I_ isUnixDomain)
     int rc;
     
     while ((rc = connect((int)sockfd, (struct sockaddr *)servaddr, (int)addrlen)) < 0) {
-      if (errno != EINTR) {
+      if (errno == EINPROGRESS) {
+	errno = 0;
+	return FILEOBJ_BLOCKED_WRITE;
+	
+      } else if (errno != EINTR) {
 	  cvtErrno();
 	  switch (ghc_errno) {
 	  default:
@@ -44,7 +48,6 @@ connectSocket(I_ sockfd, A_ servaddr, I_ addrlen, I_ isUnixDomain)
 	      ghc_errtype = ERR_INVALIDARGUMENT;
 	      ghc_errstr  = "Address cannot be used with socket";
 	      break;
-	  case GHC_EINPROGRESS:
 	  case GHC_EALREADY:
 	      ghc_errtype = ERR_RESOURCEBUSY;
 	      ghc_errstr  = "Non-blocking socket, previous connection attempt not completed";
@@ -64,7 +67,6 @@ connectSocket(I_ sockfd, A_ servaddr, I_ addrlen, I_ isUnixDomain)
 	  case GHC_EINVAL:
 	      ghc_errtype = ERR_SYSTEMERROR;
 	      ghc_errstr  = "Specified size of structure not equal valid address for family";
-	      break;
 	      break;
 	  case GHC_ENETUNREACH:
 	      ghc_errtype = ERR_PERMISSIONDENIED;
