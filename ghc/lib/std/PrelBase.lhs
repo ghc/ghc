@@ -30,7 +30,7 @@ infixr 0  $
 
 %*********************************************************
 %*							*
-\subsection{Standard classes @Eq@, @Ord@, @Bounded@
+\subsection{Standard classes @Eq@, @Ord@}
 %*							*
 %*********************************************************
 
@@ -50,7 +50,9 @@ class  (Eq a) => Ord a  where
 -- Using compare can be more efficient for complex types.
     compare x y
 	    | x == y    = EQ
-	    | x <  y    = LT
+	    | x <= y    = LT	-- NB: must be '<=' not '<' to validate the
+				-- above claim about the minimal things that can
+				-- be defined for an instance of Ord
 	    | otherwise = GT
 
     x <= y  = case compare x y of { GT -> False; other -> True }
@@ -241,7 +243,7 @@ some programs may get away without consulting PrelTup).  Furthermore,
 the renamer currently *always* asks for () to be in scope, so that
 ccalls can use () as their default type; so when compiling PrelBase we
 need ().  (We could arrange suck in () only if -fglasgow-exts, but putting
-it here seems more direct.
+it here seems more direct.)
 
 \begin{code}
 data  ()  =  ()
