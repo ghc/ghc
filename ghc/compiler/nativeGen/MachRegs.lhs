@@ -87,12 +87,12 @@ data Imm
   | ImmFloat	Rational
   | ImmDouble	Rational
   IF_ARCH_sparc(
-  | LO Imm		    -- Possible restrictions...
+  | LO Imm		    {- Possible restrictions... -}
   | HI Imm
   ,IF_ARCH_powerpc(
   | LO Imm
   | HI Imm
-  | HA Imm	-- high halfword adjusted
+  | HA Imm	{- high halfword adjusted -}
   ,))
 strImmLit s = ImmLit (text s)
 \end{code}
