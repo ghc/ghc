@@ -194,7 +194,7 @@ pprKind UnliftedTypeKind = ptext SLIT("#")
 pprKind OpenTypeKind     = ptext SLIT("?")
 pprKind ArgTypeKind      = ptext SLIT("??")
 pprKind UbxTupleKind     = ptext SLIT("(#)")
-pprKind (FunKind k1 k2)  = sep [ pprKind k1, arrow <+> pprParendKind k2]
+pprKind (FunKind k1 k2)  = sep [ pprParendKind k1, arrow <+> pprKind k2]
 \end{code}
 
 
