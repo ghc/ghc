@@ -99,6 +99,11 @@ mallocBytesRWX(int len)
   return addr;
 }
 
+#ifdef LEADING_UNDERSCORE
+#define UNDERSCORE "_"
+#else 
+#define UNDERSCORE ""
+#endif
 #if defined(i386_HOST_ARCH)
 /* 
   Now here's something obscure for you:
@@ -118,8 +123,8 @@ mallocBytesRWX(int len)
   to return to it before tail jumping from the adjustor thunk.
 */
 __asm__ (
-   ".globl obscure_ccall_ret_code\n"
-   "obscure_ccall_ret_code:\n\t"
+   ".globl " UNDERSCORE "obscure_ccall_ret_code\n"
+   UNDERSCORE "obscure_ccall_ret_code:\n\t"
    "addl $0x4, %esp\n\t"
    "ret"
   );
@@ -128,8 +133,8 @@ extern void obscure_ccall_ret_code(void);
 
 #if defined(x86_64_TARGET_ARCH)
 __asm__ (
-   ".globl obscure_ccall_ret_code\n"
-   "obscure_ccall_ret_code:\n\t"
+   ".globl " UNDERSCORE "obscure_ccall_ret_code\n"
+   UNDERSCORE "obscure_ccall_ret_code:\n\t"
    "addq $0x8, %rsp\n\t"
    "ret"
   );
