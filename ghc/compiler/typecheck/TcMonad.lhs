@@ -17,7 +17,7 @@ module TcMonad(
 	listNF_Tc, mapAndUnzipNF_Tc, mapBagNF_Tc,
 
 	checkTc, checkTcM, checkMaybeTc, checkMaybeTcM, 
-	failTc, warnTc, recoverTc, recoverNF_Tc,
+	failTc, warnTc, recoverTc, recoverNF_Tc, discardErrsTc,
 
 	tcGetEnv, tcSetEnv,
 	tcGetDefaultTys, tcSetDefaultTys,
@@ -49,7 +49,7 @@ IMP_Ubiq(){-uitous-}
 IMPORT_DELOOPER(TcMLoop) ( TcEnv, initEnv, TcMaybe )  -- We need the type TcEnv and an initial Env
 #else
 import {-# SOURCE #-} TcEnv  ( TcEnv, initEnv )
-import {-# SOURCE #-} TcType ( TcMaybe )
+import {-# SOURCE #-} TcType ( TcMaybe, TcTyVarSet )
 #endif
 
 import Type		( SYN_IE(Type), GenType )
@@ -295,12 +295,18 @@ warnTc :: Bool -> Message -> NF_TcM s ()
 warnTc warn_if_true warn down env
   = if warn_if_true then
 	readMutVarSST errs_var					`thenSST` \ (warns,errs) ->
-	writeMutVarSST errs_var (warns `snocBag` warn, errs) 	`thenSST_`
+	listNF_Tc ctxt down env	`thenSST` \ ctxt_msgs ->
+	let
+	    full_warn = mkTcErr loc ctxt_msgs warn
+	in
+	writeMutVarSST errs_var (warns `snocBag` full_warn, errs) 	`thenSST_`
     	returnSST ()
     else
 	returnSST ()
   where
     errs_var = getTcErrs down
+    ctxt     = getErrCtxt down
+    loc      = getLoc down
 
 recoverTc :: TcM s r -> TcM s r -> TcM s r
 recoverTc recover m down env
@@ -318,7 +324,6 @@ tryTc recover m down env
   = recoverFSST (\ _ -> recover down env) $
 
     newMutVarSST (emptyBag,emptyBag)	`thenSST` \ new_errs_var ->
-
     m (setTcErrs down new_errs_var) env	`thenFSST` \ result ->
 
 	-- Check that m has no errors; if it has internal recovery
@@ -330,6 +335,12 @@ tryTc recover m down env
 	returnFSST result
     else
 	recover down env
+
+-- Run the thing inside, but throw away all its error messages.
+discardErrsTc :: TcM s r -> TcM s r
+discardErrsTc m down env
+  = newMutVarSST (emptyBag,emptyBag)	`thenSST` \ new_errs_var ->
+    m (setTcErrs down new_errs_var) env
 
 checkTc :: Bool -> Message -> TcM s ()		-- Check that the boolean is true
 checkTc True  err = returnTc ()
@@ -368,7 +379,12 @@ Environment
 tcGetEnv :: NF_TcM s (TcEnv s)
 tcGetEnv down env = returnSST env
 
-tcSetEnv :: TcEnv s -> TcM s a -> TcM s a
+tcSetEnv :: TcEnv s
+	  -> (TcDown s -> TcEnv s -> State# s -> b)
+	  -> TcDown s -> TcEnv s -> State# s -> b
+-- tcSetEnv :: TcEnv s -> TcM s a -> TcM s a
+-- tcSetEnv :: TcEnv s -> NF_TcM s a -> NF_TcM s a
+
 tcSetEnv new_env m down old_env = m down new_env
 \end{code}
 
