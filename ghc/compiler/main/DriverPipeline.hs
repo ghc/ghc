@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.16 2000/11/08 15:25:25 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.17 2000/11/08 16:24:34 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -532,6 +532,10 @@ run_phase cc_phase _basename _suff input_fn output_fn
 
 	pkg_extra_cc_opts <- getPackageExtraCcOpts
 
+	split_objs <- readIORef v_Split_object_files
+	let split_opt | hcc && split_objs = [ "-DUSE_SPLIT_MARKERS" ]
+		      | otherwise         = [ ]
+
 	excessPrecision <- readIORef v_Excess_precision
 
 	run_something "C Compiler"
@@ -543,6 +547,7 @@ run_phase cc_phase _basename _suff input_fn output_fn
 		   ++ [ verb, "-S", "-Wimplicit", opt_flag ]
 		   ++ [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt ]
 		   ++ cc_opts
+		   ++ split_opt
 #ifdef mingw32_TARGET_OS
                    ++ [" -mno-cygwin"]
 #endif

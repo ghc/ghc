@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.15 2000/11/08 15:25:25 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.16 2000/11/08 16:24:34 simonmar Exp $
 --
 -- Driver flags
 --
@@ -215,7 +215,6 @@ static_flags =
   ,  ( "split-objs"	, NoArg (if can_split
 				    then do writeIORef v_Split_object_files True
 					    add v_Opt_C "-fglobalise-toplev-names"
--- TODO!!!!!				    add opt_c "-DUSE_SPLIT_MARKERS"
 				    else hPutStrLn stderr
 					    "warning: don't know how to  split \
 					    \object files on this architecture"
