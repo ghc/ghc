@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.79 2001/07/19 09:03:24 simonmar Exp $
+dnl $Id: aclocal.m4,v 1.80 2001/07/19 20:27:23 sof Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -675,7 +675,7 @@ AC_DEFUN([FPTOOLS_END_TEXT_SECTION],
 		     fptools_cv_end_of_text="etext asm("etext")"
 		   fi
 		 fi])
-		 if test -n $fptools_cv_end_of_text; then
+		 if test -n "$fptools_cv_end_of_text"; then
 		   AC_DEFINE_UNQUOTED([TEXT_SECTION_END_MARKER], $fptools_cv_end_of_text)
 		 else
 		   AC_DEFINE_UNQUOTED([TEXT_SECTION_END_MARKER], dunno_end_of_text)
@@ -698,7 +698,7 @@ AC_DEFUN([FPTOOLS_END_TEXT_SECTION],
 		     fptools_cv_end_of_text_decl=etext
 		   fi
 		 fi])
-		 if test -n $fptools_cv_end_of_text_decl; then
+		 if test -n "$fptools_cv_end_of_text_decl"; then
 		   AC_DEFINE_UNQUOTED([TEXT_SECTION_END_MARKER_DECL], $fptools_cv_end_of_text_decl)
 		 else
 		   AC_DEFINE_UNQUOTED([TEXT_SECTION_END_MARKER_DECL], dunno_end_of_text_decl)
@@ -726,7 +726,7 @@ AC_DEFUN([FPTOOLS_END_DATA_SECTION],
 		     fptools_cv_end_of_data=end
 		   fi
 		 fi])
-		 if test -n $fptools_cv_end_of_data; then
+		 if test -n "$fptools_cv_end_of_data"; then
 		   AC_DEFINE_UNQUOTED([DATA_SECTION_END_MARKER], $fptools_cv_end_of_data)
 		 else
 		   AC_DEFINE_UNQUOTED([DATA_SECTION_END_MARKER], dunno_end_of_data)
@@ -749,7 +749,7 @@ AC_DEFUN([FPTOOLS_END_DATA_SECTION],
 		     fptools_cv_end_of_data_decl=end
 		   fi
 		 fi])
-		 if test -n $fptools_cv_end_of_data_decl; then
+		 if test -n "$fptools_cv_end_of_data_decl"; then
 		   AC_DEFINE_UNQUOTED([DATA_SECTION_END_MARKER_DECL], $fptools_cv_end_of_data_decl)
 		 else
 		   AC_DEFINE_UNQUOTED([DATA_SECTION_END_MARKER_DECL], dunno_end_of_data_decl)
