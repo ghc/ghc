@@ -1,7 +1,7 @@
 /* 
  * (c) The University of Glasgow 2002
  *
- * $Id: system.c,v 1.5 2002/02/07 11:13:30 simonmar Exp $
+ * $Id: system.c,v 1.6 2002/03/26 21:02:19 sof Exp $
  *
  * system Runtime Support
  */
@@ -20,7 +20,7 @@ HsInt
 systemCmd(HsAddr cmd)
 {
   /* -------------------- WINDOWS VERSION --------------------- */
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_TARGET_OS) || defined(cygwin32_TARGET_OS)
     return system(cmd);
 #else
   /* -------------------- UNIX VERSION --------------------- */
