@@ -881,7 +881,7 @@ AC_CHECK_HEADER(malloc.h,[AC_CHECK_FUNCS(valloc)])
 
 dnl ** check for POSIX regex
 HavePosixRegex=NO
-AC_CHECK_HEADER(regex.h,[AC_CHECK_FUNC(regcomp, [HavePosixRegex=YES])])
+AC_CHECK_HEADERS(regex.h,[AC_CHECK_FUNC(regcomp, [HavePosixRegex=YES])])
 AC_SUBST(HavePosixRegex)
 
 dnl ** how do we get a timezone name, and UTC offset ?
