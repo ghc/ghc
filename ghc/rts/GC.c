@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.6 1999/01/13 17:25:39 simonm Exp $
+ * $Id: GC.c,v 1.7 1999/01/14 10:49:01 simonm Exp $
  *
  * Two-space garbage collector
  *
@@ -386,6 +386,11 @@ void GarbageCollect(void (*get_roots)(void))
   /* run through all the generations/steps and tidy up 
    */
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+
+    if (g <= N) {
+      generations[g].collections++; /* for stats */
+    }
+
     for (s = 0; s < generations[g].n_steps; s++) {
       bdescr *next;
       step = &generations[g].steps[s];
@@ -399,7 +404,6 @@ void GarbageCollect(void (*get_roots)(void))
       /* for generations we collected... */
       if (g <= N) {
 
-	generations[g].collections++; /* for stats */
 	collected += step->n_blocks * BLOCK_SIZE_W; /* for stats */
 
 	/* free old memory and shift to-space into from-space for all
@@ -951,8 +955,14 @@ loop:
 	   * with the evacuation, just update the source address with
 	   * a pointer to the (evacuated) constructor field.
 	   */
-	  if (IS_USER_PTR(q) && Bdescr((P_)q)->evacuated) {
-	    return q;
+	  if (IS_USER_PTR(q)) {
+	    bdescr *bd = Bdescr((P_)q);
+	    if (bd->evacuated) {
+	      if (bd->gen->no < evac_gen) {
+		failed_to_evac = rtsTrue;
+	      }
+	      return q;
+	    }
 	  }
 
 	  /* otherwise, carry on and evacuate this constructor field,
