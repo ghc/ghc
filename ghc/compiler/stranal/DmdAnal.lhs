@@ -919,6 +919,19 @@ lub (Seq k1 ds1) (Seq k2 ds2)
 
 lub d1@(Seq _ _) d2 = d2 `lub` d1
 
+
+defer :: Demand -> Demand
+-- Computes (Abs `lub` d)
+-- For the Bot case consider
+--	f x y = if ... then x else error x
+--   Then for y we get Abs `lub` Bot, and we really
+--   want Abs overall
+defer Bot	    = Abs
+defer Abs	    = Abs
+defer (Seq Keep ds) = Lazy
+defer (Seq _    ds) = Seq Defer ds
+defer d	   	    = Lazy
+
 ---------------
 both :: Demand -> Demand -> Demand
 
