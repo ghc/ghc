@@ -368,7 +368,7 @@ accept sock@(MkSocket s family stype protocol status) = do
 	 show currentStatus))
    else do
      (ptr, sz) <- allocSockAddr family
-     int_star <- stToIO (newIntArray (0,1))
+     int_star <- stToIO (newIntArray ((0::Int),1))
      stToIO (writeIntArray int_star 0 sz)
      new_sock <- _ccall_ acceptSocket s ptr int_star
      case (new_sock::Int) of
@@ -511,7 +511,7 @@ getPeerName   :: Socket -> IO SockAddr
 
 getPeerName (MkSocket s family _ _ _) = do
  (ptr, a_sz) <- allocSockAddr family
- int_star <- stToIO (newIntArray (0,1))
+ int_star <- stToIO (newIntArray ((0::Int),1))
  stToIO (writeIntArray int_star 0 a_sz)
  status <- _ccall_ getPeerName s ptr int_star
  case (status::Int) of
@@ -524,7 +524,7 @@ getSocketName :: Socket -> IO SockAddr
 
 getSocketName (MkSocket s family _ _ _) = do
  (ptr, a_sz) <- allocSockAddr family
- int_star <- stToIO (newIntArray (0,1))
+ int_star <- stToIO (newIntArray ((0::Int),1))
  stToIO (writeIntArray int_star 0 a_sz)
  rc <- _ccall_ getSockName s ptr int_star
  case (rc::Int) of

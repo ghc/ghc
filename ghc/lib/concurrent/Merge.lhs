@@ -18,6 +18,7 @@ import Semaphore
 import PrelConc
 import PrelIOBase
 
+max_buff_size :: Int
 max_buff_size = 1
 
 mergeIO :: [a] -> [a] -> IO [a]

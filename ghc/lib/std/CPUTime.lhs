@@ -72,7 +72,7 @@ getCPUTime = do
 
 getCPUTime :: IO Integer
 getCPUTime = 
-    stToIO (newIntArray (0,3))		>>= \ marr ->
+    stToIO (newIntArray ((0::Int),3))	>>= \ marr ->
     stToIO (unsafeFreezeByteArray marr)	>>= \ barr@(ByteArray _ frozen#) ->
     _ccall_ getCPUTime barr		>>= \ ptr ->
     if (ptr::Addr) /= ``NULL'' then
