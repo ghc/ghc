@@ -49,10 +49,10 @@ errno.
 
 \begin{code}
 syserr :: String -> IO a
-syserr str = fail (IOError Nothing     -- ToDo: better
-			   SystemError
-			   str
-			   "")
+syserr str = ioError (IOError Nothing     -- ToDo: better
+			      SystemError
+			      str
+			      "")
 
 -- common templates for system calls
 

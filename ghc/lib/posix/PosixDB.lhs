@@ -48,7 +48,7 @@ getGroupEntryForID :: GroupID -> IO GroupEntry
 getGroupEntryForID gid = do
     ptr <- _ccall_ getgrgid gid
     if ptr == nullAddr then
-	fail (IOError Nothing NoSuchThing
+	ioError (IOError Nothing NoSuchThing
 	     "getGroupEntryForID" "no such group entry")
      else
 	unpackGroupEntry ptr
@@ -58,7 +58,7 @@ getGroupEntryForName name = do
     gname <- packStringIO name
     ptr <- _ccall_ getgrnam gname
     if ptr == nullAddr then
-	fail (IOError Nothing NoSuchThing
+	ioError (IOError Nothing NoSuchThing
 	     "getGroupEntryForName" "no such group entry")
      else
 	unpackGroupEntry ptr
@@ -67,7 +67,7 @@ getUserEntryForID :: UserID -> IO UserEntry
 getUserEntryForID uid = do
     ptr <- _ccall_ getpwuid uid
     if ptr == nullAddr then
-	fail (IOError Nothing NoSuchThing
+	ioError (IOError Nothing NoSuchThing
 	     "getUserEntryForID" "no such user entry")
      else
 	unpackUserEntry ptr
@@ -77,7 +77,7 @@ getUserEntryForName name = do
     uname <- packStringIO name
     ptr   <- _ccall_ getpwnam uname
     if ptr == nullAddr then
-	fail (IOError Nothing NoSuchThing
+	ioError (IOError Nothing NoSuchThing
 	     "getUserEntryForName" "no such user entry")
      else
 	unpackUserEntry ptr

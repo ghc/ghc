@@ -130,7 +130,7 @@ readDirStream dirp = do
        else do
 	     errno <- getErrorCode
 	     if errno == noError
-		then fail (IOError Nothing EOF "readDirStream" "EOF")
+		then ioError (IOError Nothing EOF "readDirStream" "EOF")
 		else syserr "readDirStream"
 
 rewindDirStream :: DirStream -> IO ()
@@ -141,7 +141,7 @@ rewindDirStream dirp = do
 closeDirStream :: DirStream -> IO ()
 closeDirStream dirp = do
     rc <- _ccall_ closedir dirp
-    if rc == 0
+    if rc == (0::Int)
        then return ()
        else syserr "closeDirStream"
 
@@ -275,7 +275,7 @@ openFd :: FilePath
 openFd name how maybe_mode (OpenFileFlags append exclusive noctty nonBlock truncate) =
     packStringIO name >>= \file ->
     _ccall_ open file flags mode_w >>= \fd@(I# fd#) ->
-    if fd /= -1
+    if fd /= ((-1)::Int)
        then return (FD# fd#)
        else syserr "openFd"
   where
@@ -310,7 +310,7 @@ createFile :: FilePath -> FileMode -> IO Fd
 createFile name mode =
     packStringIO name >>= \file ->
     _ccall_ creat file mode >>= \fd@(I# fd#) ->
-    if fd /= -1
+    if fd /= ((-1)::Int)
        then return (FD# fd#)
        else syserr "createFile"
 
@@ -322,7 +322,7 @@ createLink name1 name2 = do
     path1 <- packStringIO name1
     path2 <- packStringIO name2
     rc <- _ccall_ link path1 path2
-    if rc == 0
+    if rc == (0::Int)
        then return ()
        else syserr "createLink"
 
@@ -330,7 +330,7 @@ createDirectory :: FilePath -> FileMode -> IO ()
 createDirectory name mode = do -- NB: diff signature from LibDirectory one!
     dir <- packStringIO name
     rc  <- _ccall_ mkdir dir mode
-    if rc == 0
+    if rc == (0::Int)
        then return ()
        else syserr "createDirectory"
 
@@ -338,7 +338,7 @@ createNamedPipe :: FilePath -> FileMode -> IO ()
 createNamedPipe name mode = do
     pipe <- packStringIO name
     rc   <-_ccall_ mkfifo pipe mode
-    if rc == 0
+    if rc == (0::Int)
        then return ()
        else syserr "createNamedPipe"
 
@@ -346,7 +346,7 @@ removeLink :: FilePath -> IO ()
 removeLink name = do
     path <- packStringIO name
     rc   <-_ccall_ unlink path
-    if rc == 0
+    if rc == (0::Int)
        then return ()
        else syserr "removeLink"
 
@@ -355,7 +355,7 @@ rename name1 name2 = do
     path1 <- packStringIO name1
     path2 <- packStringIO name2
     rc    <- _ccall_ rename path1 path2
-    if rc == 0
+    if rc == (0::Int)
        then return ()
        else syserr "rename"
 
@@ -406,34 +406,34 @@ statusChangeTime stat = unsafePerformIO $
 isDirectory :: FileStatus -> Bool
 isDirectory stat = unsafePerformIO $
     _casm_ ``%r = S_ISDIR(((struct stat *)%0)->st_mode);'' stat >>= \ rc ->
-    return (rc /= 0)
+    return (rc /= (0::Int))
 
 isCharacterDevice :: FileStatus -> Bool
 isCharacterDevice stat = unsafePerformIO $
     _casm_ ``%r = S_ISCHR(((struct stat *)%0)->st_mode);'' stat >>= \ rc ->
-    return (rc /= 0)
+    return (rc /= (0::Int))
 
 isBlockDevice :: FileStatus -> Bool
 isBlockDevice stat = unsafePerformIO $
     _casm_ ``%r = S_ISBLK(((struct stat *)%0)->st_mode);'' stat >>= \ rc ->
-    return (rc /= 0)
+    return (rc /= (0::Int))
 
 isRegularFile :: FileStatus -> Bool
 isRegularFile stat = unsafePerformIO $
     _casm_ ``%r = S_ISREG(((struct stat *)%0)->st_mode);'' stat >>= \ rc ->
-    return (rc /= 0)
+    return (rc /= (0::Int))
 
 isNamedPipe :: FileStatus -> Bool
 isNamedPipe stat = unsafePerformIO $
     _casm_ ``%r = S_ISFIFO(((struct stat *)%0)->st_mode);'' stat >>= \ rc ->
-    return (rc /= 0)
+    return (rc /= (0::Int))
 
 getFileStatus :: FilePath -> IO FileStatus
 getFileStatus name = do
     path  <- packStringIO name
     bytes <- allocChars ``sizeof(struct stat)''
     rc    <- _casm_ ``%r = stat(%0,(struct stat *)%1);'' path bytes
-    if rc == 0
+    if rc == (0::Int)
        then do
 	    stat <- freeze bytes
 	    return stat
@@ -443,7 +443,7 @@ getFdStatus :: Fd -> IO FileStatus
 getFdStatus fd = do
     bytes <- allocChars ``sizeof(struct stat)''
     rc    <- _casm_ ``%r = fstat(%0,(struct stat *)%1);'' fd bytes
-    if rc == 0
+    if rc == (0::Int)
        then do
 	    stat <- freeze bytes
 	    return stat
@@ -453,7 +453,7 @@ fileAccess :: FilePath -> Bool -> Bool -> Bool -> IO Bool
 fileAccess name read write exec = do
     path <- packStringIO name
     rc   <- _ccall_ access path flags
-    return (rc == 0)
+    return (rc == (0::Int))
   where
     flags  = I# (word2Int# (read# `or#` write# `or#` exec#))
     read#  = case (if read  then ``R_OK'' else ``0'') of { W# x -> x }
@@ -464,13 +464,13 @@ fileExist :: FilePath -> IO Bool
 fileExist name = do
     path <- packStringIO name
     rc   <- _ccall_ access path (``F_OK''::Int)
-    return (rc == 0)
+    return (rc == (0::Int))
 
 setFileMode :: FilePath -> FileMode -> IO ()
 setFileMode name mode = do
     path <- packStringIO name
     rc   <- _ccall_ chmod path mode
-    if rc == 0
+    if rc == (0::Int)
        then return ()
        else syserr "setFileMode"
 
@@ -478,7 +478,7 @@ setOwnerAndGroup :: FilePath -> UserID -> GroupID -> IO ()
 setOwnerAndGroup name uid gid = do
     path <- packStringIO name
     rc   <- _ccall_ chown path uid gid
-    if rc == 0
+    if rc == (0::Int)
        then return ()
        else syserr "setOwnerAndGroup"
 
@@ -488,7 +488,7 @@ setFileTimes name atime mtime = do
     rc   <- _casm_ ``do {struct utimbuf ub; ub.actime = (time_t) %0;
 		         ub.modtime = (time_t) %1;
 		         %r = utime(%2, &ub);} while(0);'' atime mtime path
-    if rc == 0
+    if rc == (0::Int)
        then return ()
        else syserr "setFileTimes"
 
@@ -497,7 +497,7 @@ touchFile :: FilePath -> IO ()
 touchFile name = do
     path <- packStringIO name
     rc   <- _ccall_ utime path nullAddr
-    if rc == 0
+    if rc == (0::Int)
        then return ()
        else syserr "touchFile"
 
@@ -526,12 +526,12 @@ pathconf :: Int -> FilePath -> IO Limit
 pathconf n name = do
   path <- packStringIO name
   rc   <- _ccall_ pathconf path n
-  if rc /= -1
+  if rc /= ((-1)::Int)
      then return rc
      else do
 	  errno <-  getErrorCode
 	  if errno == invalidArgument
-	     then fail (IOError Nothing NoSuchThing "getPathVar" "no such path limit or option")
+	     then ioError (IOError Nothing NoSuchThing "getPathVar" "no such path limit or option")
 	     else syserr "PosixFiles.getPathVar"
 
 
@@ -550,12 +550,12 @@ getFileVar v fd =
 fpathconf :: Int -> Fd -> IO Limit
 fpathconf n fd = do
  rc <- _ccall_ fpathconf fd n
- if rc /= -1
+ if rc /= ((-1)::Int)
     then return rc
     else do
 	 errno <-  getErrorCode
 	 if errno == invalidArgument
-	    then fail (IOError Nothing NoSuchThing "getFileVar" "no such path limit or option")
+	    then ioError (IOError Nothing NoSuchThing "getFileVar" "no such path limit or option")
 	    else syserr "getFileVar"
 
 \end{code}

@@ -223,7 +223,7 @@ controlChar :: TerminalAttributes -> ControlCharacter -> Maybe Char
 controlChar termios cc = unsafePerformIO $ do
     val <- _casm_ ``%r = ((struct termios *)%0)->c_cc[%1];''
 		  termios (cc2Word cc)
-    if val == ``_POSIX_VDISABLE''
+    if val == (``_POSIX_VDISABLE''::Int)
        then return Nothing
        else return (Just (toEnum val))
 
@@ -314,7 +314,7 @@ getTerminalAttributes :: Fd -> IO TerminalAttributes
 getTerminalAttributes (FD# fd) = do
     bytes <- allocChars ``sizeof(struct termios)''
     rc <- _casm_ ``%r = tcgetattr(%0,(struct termios *)%1);'' fd bytes
-    if rc /= -1
+    if rc /= ((-1)::Int)
        then freeze bytes
        else syserr "getTerminalAttributes"
 
@@ -329,7 +329,7 @@ setTerminalAttributes :: Fd
 setTerminalAttributes (FD# fd) termios state = do
     rc <- _casm_ ``%r = tcsetattr(%0,%1,(struct termios *)%2);''
 		 fd (state2Int state) termios
-    if rc /= -1
+    if rc /= ((-1)::Int)
        then return ()
        else syserr "setTerminalAttributes"
   where
@@ -377,7 +377,7 @@ controlFlow (FD# fd) action =
 getTerminalProcessGroupID :: Fd -> IO ProcessGroupID
 getTerminalProcessGroupID (FD# fd) = do
     pgid <- _ccall_ tcgetpgrp fd
-    if pgid /= -1
+    if pgid /= ((-1)::Int)
        then return pgid
        else syserr "getTerminalProcessGroupID"
 

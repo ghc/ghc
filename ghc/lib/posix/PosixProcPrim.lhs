@@ -114,7 +114,7 @@ import PosixProcEnv (getProcessID)
 forkProcess :: IO (Maybe ProcessID)
 forkProcess = do
     pid <-_ccall_ fork
-    case pid of
+    case (pid::Int) of
       -1 -> syserr "forkProcess"
       0  -> return Nothing
       _  -> return (Just pid)
@@ -155,7 +155,7 @@ getProcessStatus block stopped pid = do
     wstat <- allocWords 1
     pid   <-_casm_ ``%r = waitpid(%0, (int *)%1, %2);'' pid wstat
 		(waitOptions block stopped)
-    case pid of
+    case (pid::Int) of
       -1 -> syserr "getProcessStatus"
       0  -> return Nothing
       _  -> do ps <- decipherWaitStatus wstat
@@ -169,7 +169,7 @@ getGroupProcessStatus block stopped pgid = do
     wstat <- allocWords 1
     pid   <-_casm_ ``%r = waitpid(%0, (int *)%1, %2);'' (-pgid) wstat
 		   (waitOptions block stopped)
-    case pid of
+    case (pid::Int) of
       -1 -> syserr "getGroupProcessStatus"
       0  -> return Nothing
       _  -> do ps <- decipherWaitStatus wstat
@@ -215,8 +215,7 @@ getEnvVar name = do
     str <- packStringIO name
     str <- _ccall_ getenv str
     if str == nullAddr
-       then fail (IOError Nothing NoSuchThing
-		 "getEnvVar" "no such environment variable")
+       then ioError (IOError Nothing NoSuchThing "getEnvVar" "no such environment variable")
        else strcpy str
 
 setEnvVar :: String -> String -> IO ()
@@ -324,15 +323,15 @@ signalProcessGroup int pgid = signalProcess int (-pgid)
 
 setStoppedChildFlag :: Bool -> IO Bool
 setStoppedChildFlag b = do
-    rc <- _casm_ ``%r = nocldstop; nocldstop = %0;'' x
-    return (rc == 0)
+    rc <- _casm_ ``%r = nocldstop; nocldstop = %0;'' (x::Int)
+    return (rc == (0::Int))
   where
     x = case b of {True -> 0; False -> 1}
 
 queryStoppedChildFlag :: IO Bool
 queryStoppedChildFlag = do
     rc <- _casm_ ``%r = nocldstop;''
-    return (rc == 0)
+    return (rc == (0::Int))
 
 data Handler = Default
              | Ignore
@@ -364,7 +363,7 @@ addSignal int oldset = unsafePerformPrimIO $ do
 inSignalSet :: Signal -> SignalSet -> Bool
 inSignalSet int sigset = unsafePerformPrimIO $ do
     rc <- _casm_ ``%r = sigismember((sigset_t *)%0, %1);'' sigset int
-    return (rc == 1)
+    return (rc == (1::Int))
 
 deleteSignal :: Signal -> SignalSet -> SignalSet
 deleteSignal int oldset = unsafePerformPrimIO $ do
@@ -378,7 +377,7 @@ installHandler :: Signal
                -> IO Handler		-- old handler
 
 #ifdef __PARALLEL_HASKELL__
-installHandler = fail (userError "installHandler: not available for Parallel Haskell")
+installHandler = ioError (userError "installHandler: not available for Parallel Haskell")
 #else
 installHandler int handler maybe_mask = (
     case handler of
@@ -389,7 +388,7 @@ installHandler int handler maybe_mask = (
 	_ccall_ stg_sig_catch int sptr mask
     ) >>= \rc ->
 
-    if rc >= 0 then do
+    if rc >= (0::Int) then do
         osptr <- _casm_ ``%r = (StgStablePtr) (%0);'' rc
         m     <- deRefStablePtr osptr
 	return (Catch m)
@@ -410,7 +409,7 @@ getSignalMask :: IO SignalSet
 getSignalMask = do
     bytes <- allocChars sigSetSize
     rc    <- _casm_ ``%r = sigprocmask(0, NULL, (sigset_t *)%0);'' bytes
-    if rc == 0
+    if rc == (0::Int)
        then freeze bytes
        else syserr "getSignalMask"
 
@@ -419,7 +418,7 @@ sigProcMask name how sigset = do
     bytes <- allocChars sigSetSize
     rc <- _casm_ ``%r = sigprocmask(%0, (sigset_t *)%1, (sigset_t *)%2);''
 		 how sigset bytes
-    if rc == 0
+    if rc == (0::Int)
        then freeze bytes
        else syserr name
 
@@ -436,7 +435,7 @@ getPendingSignals :: IO SignalSet
 getPendingSignals = do
     bytes <- allocChars sigSetSize
     rc <- _casm_ ``%r = sigpending((sigset_t *)%0);'' bytes
-    if rc == 0
+    if rc == (0::Int)
        then freeze bytes
        else syserr "getPendingSignals"
 
@@ -494,15 +493,15 @@ waitOptions True  True  = ``WUNTRACED''
 decipherWaitStatus :: MutableByteArray s x -> IO ProcessStatus
 decipherWaitStatus wstat = do
     exited <- _casm_ ``%r = WIFEXITED(*(int *)%0);'' wstat
-    if exited /= 0
+    if exited /= (0::Int)
       then do
         exitstatus <- _casm_ ``%r = WEXITSTATUS(*(int *)%0);'' wstat
-        if exitstatus == 0
+        if exitstatus == (0::Int)
 	   then return (Exited ExitSuccess)
 	   else return (Exited (ExitFailure exitstatus))
       else do
         signalled <- _casm_ ``%r = WIFSIGNALED(*(int *)%0);'' wstat
-        if signalled /= 0
+        if signalled /= (0::Int)
 	   then do
 		termsig <- _casm_ ``%r = WTERMSIG(*(int *)%0);'' wstat
 		return (Terminated termsig)

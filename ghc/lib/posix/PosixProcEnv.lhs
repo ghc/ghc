@@ -99,10 +99,10 @@ setGroupID gid = nonzero_error (_ccall_ setgid gid) "setGroupID"
 #if !defined(cygwin32_TARGET_OS)
 getGroups :: IO [GroupID]
 getGroups = do
-    ngroups <- _ccall_ getgroups 0 nullAddr
+    ngroups <- _ccall_ getgroups (0::Int) nullAddr
     words   <- allocWords ngroups
     ngroups <- _casm_ ``%r = getgroups(%0,(gid_t *)%1);'' ngroups words
-    if ngroups /= -1
+    if ngroups /= ((-1)::Int)
        then do
 	 arr <- freeze words
          return (map (extract arr) [0..(ngroups-1)])
@@ -134,14 +134,14 @@ getProcessGroupID = _ccall_ getpgrp
 
 createProcessGroup :: ProcessID -> IO ProcessGroupID
 createProcessGroup pid = do
-    pgid <- _ccall_ setpgid pid 0
-    if pgid == 0
+    pgid <- _ccall_ setpgid pid (0::Int)
+    if pgid == (0::Int)
        then return pgid
        else syserr "createProcessGroup"
 
 joinProcessGroup :: ProcessGroupID -> IO ()
 joinProcessGroup pgid =
-    nonzero_error (_ccall_ setpgid 0 pgid) "joinProcessGroupID"
+    nonzero_error (_ccall_ setpgid (0::Int) pgid) "joinProcessGroupID"
 
 setProcessGroupID :: ProcessID -> ProcessGroupID -> IO ()
 setProcessGroupID pid pgid =
@@ -150,7 +150,7 @@ setProcessGroupID pid pgid =
 createSession :: IO ProcessGroupID
 createSession = do
     pgid <- _ccall_ setsid
-    if pgid /= -1
+    if pgid /= ((-1)::Int)
        then return pgid
        else syserr "createSession"
 
@@ -185,14 +185,14 @@ getSystemID :: IO SystemID
 getSystemID = do
     bytes <- allocChars (``sizeof(struct utsname)''::Int)
     rc    <- _casm_ ``%r = uname((struct utsname *)%0);'' bytes
-    if rc /= -1
+    if rc /= ((-1)::Int)
        then freeze bytes
        else syserr "getSystemID"
 
 epochTime :: IO EpochTime
 epochTime = do
     secs <- _ccall_ time nullAddr
-    if secs /= -1
+    if secs /= ((-1)::Int)
        then return secs
        else syserr "epochTime"
 
@@ -223,7 +223,7 @@ getProcessTimes :: IO ProcessTimes
 getProcessTimes = do
     bytes <- allocChars (``sizeof(struct tms)''::Int)
     elapsed <- _casm_ ``%r = times((struct tms *)%0);'' bytes
-    if elapsed /= -1
+    if elapsed /= ((-1)::Int)
        then do
 	    times <- freeze bytes
 	    return (elapsed, times)
@@ -235,7 +235,7 @@ getControllingTerminalName :: IO FilePath
 getControllingTerminalName = do
     str <- _ccall_ ctermid nullAddr
     if str == nullAddr
-       then fail (IOError Nothing NoSuchThing "getControllingTerminalName" "no controlling terminal")
+       then ioError (IOError Nothing NoSuchThing "getControllingTerminalName" "no controlling terminal")
        else strcpy str
 #endif
 
@@ -246,17 +246,17 @@ getTerminalName fd = do
        then do
         err <- try (queryTerminal fd)
         either (\err -> syserr "getTerminalName")
-               (\succ -> if succ then fail (IOError Nothing NoSuchThing
-					    "getTerminalName" "no name")
-                         else fail (IOError Nothing InappropriateType
-					    "getTerminalName" "not a terminal"))
+               (\succ -> if succ then ioError (IOError Nothing NoSuchThing
+						"getTerminalName" "no name")
+                         else ioError (IOError Nothing InappropriateType
+						"getTerminalName" "not a terminal"))
            err
        else strcpy str
 
 queryTerminal :: Fd -> IO Bool
 queryTerminal (FD# fd) = do
     rc <- _ccall_ isatty fd
-    case rc of
+    case (rc::Int) of
       -1 -> syserr "queryTerminal"
       0  -> return False
       1  -> return True
@@ -286,10 +286,10 @@ getSysVar v =
 sysconf :: Int -> IO Limit
 sysconf n = do
  rc <- _ccall_ sysconf n
- if rc /= -1
+ if rc /= (-1::Int)
     then return rc
-    else fail (IOError Nothing NoSuchThing
-		       "getSysVar" 
-		       "no such system limit or option")
+    else ioError (IOError Nothing NoSuchThing
+		          "getSysVar" 
+		          "no such system limit or option")
 
 \end{code}

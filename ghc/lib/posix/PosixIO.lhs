@@ -47,7 +47,7 @@ createPipe :: IO (Fd, Fd)
 createPipe = do
     bytes <- allocChars ``(2*sizeof(int))''
     rc    <- _casm_ ``%r = pipe((int *)%0);'' bytes
-    if rc /= -1
+    if rc /= ((-1)::Int)
        then do
 	rd <- _casm_ ``%r = ((int *)%0)[0];'' bytes
 	wd <- _casm_ ``%r = ((int *)%0)[1];'' bytes
@@ -79,8 +79,8 @@ handleToFd h = do
 fdToHandle :: Fd -> IO Handle
 fdToHandle fd@(FD# fd#) = do
      -- first find out what kind of file desc. this is..
-    flags <- _ccall_ fcntl fd (``F_GETFL''::Int) 0
-    if flags /= -1 
+    flags <- _ccall_ fcntl fd (``F_GETFL''::Int) (0::Int)
+    if flags /= ((-1)::Int)
      then do
       let
        (I# flags#) = flags
@@ -98,7 +98,7 @@ fdToHandle fd@(FD# fd#) = do
 	 | rwH       = (ReadWriteHandle, 1)
 	 | otherwise = (ReadHandle, 0)
 	  
-      fo <- _ccall_ openFd fd flags flush_on_close
+      fo <- _ccall_ openFd fd flags (flush_on_close::Int)
       if fo /= nullAddr then do
 	 {-
 	   A distinction is made here between std{Input,Output,Error} Fds
@@ -134,7 +134,7 @@ fdRead fd nbytes = do
     rc    <-  _ccall_ read fd bytes nbytes
     case rc of
       -1 -> syserr "fdRead"
-      0  -> fail (IOError Nothing EOF "fdRead" "EOF")
+      0  -> ioError (IOError Nothing EOF "fdRead" "EOF")
       n | n == nbytes -> do
 	    buf <- freeze bytes
 	    s   <- unpackNBytesBAIO buf n
@@ -153,7 +153,7 @@ fdWrite :: Fd -> String -> IO ByteCount
 fdWrite fd str = do
     buf <- packStringIO str
     rc  <- _ccall_ write fd buf (length str)
-    if rc /= -1
+    if rc /= ((-1)::Int)
        then return rc
        else syserr "fdWrite"
 
@@ -163,7 +163,7 @@ data FdOption = AppendOnWrite
 
 queryFdOption :: Fd -> FdOption -> IO Bool
 queryFdOption fd CloseOnExec =
-    _ccall_ fcntl fd (``F_GETFD''::Int) 0	    >>= \ (I# flags#) ->
+    _ccall_ fcntl fd (``F_GETFD''::Int) (0::Int)    >>= \ (I# flags#) ->
     if flags# /=# -1# then
 	return ((int2Word# flags# `and#` fd_cloexec#) `neWord#` int2Word# 0#)
     else
@@ -171,7 +171,7 @@ queryFdOption fd CloseOnExec =
   where
     fd_cloexec# = case (``FD_CLOEXEC'') of { W# x -> x }
 queryFdOption fd other =
-    _ccall_ fcntl fd (``F_GETFL''::Int) 0	    >>= \ (I# flags#) ->
+    _ccall_ fcntl fd (``F_GETFL''::Int) (0::Int)    >>= \ (I# flags#) ->
     if flags# >=# 0# then
 	return ((int2Word# flags# `and#` opt#) `neWord#` int2Word# 0#)
     else
@@ -184,13 +184,13 @@ queryFdOption fd other =
 
 setFdOption :: Fd -> FdOption -> Bool -> IO ()
 setFdOption fd CloseOnExec val = do
-    flags <- _ccall_ fcntl fd (``F_GETFD''::Int) 0
-    if flags /= -1 then do
+    flags <- _ccall_ fcntl fd (``F_GETFD''::Int) (0::Int)
+    if flags /= ((-1)::Int) then do
 	rc <- (if val then
 		 _casm_ ``%r = fcntl(%0, F_SETFD, %1 | FD_CLOEXEC);'' fd flags
 	       else do
 		 _casm_ ``%r = fcntl(%0, F_SETFD, %1 & ~FD_CLOEXEC);'' fd flags)
-	if rc /= -1
+	if rc /= ((-1)::Int)
 	   then return ()
 	   else fail
      else fail
@@ -198,13 +198,13 @@ setFdOption fd CloseOnExec val = do
     fail = syserr "setFdOption"
 
 setFdOption fd other val = do
-    flags <- _ccall_ fcntl fd (``F_GETFL''::Int) 0
-    if flags >= 0 then do
+    flags <- _ccall_ fcntl fd (``F_GETFL''::Int) (0::Int)
+    if flags >= (0::Int) then do
 	rc <- (if val then
 	         _casm_ ``%r = fcntl(%0, F_SETFL, %1 | %2);'' fd flags opt
 	       else do
 	         _casm_ ``%r = fcntl(%0, F_SETFL, %1 & ~(%2));'' fd flags opt)
-	if rc /= -1
+	if rc /= ((-1)::Int)
 	   then return ()
 	   else fail
      else fail
@@ -225,7 +225,7 @@ getLock :: Fd -> FileLock -> IO (Maybe (ProcessID, FileLock))
 getLock fd lock = do
     flock <- lock2Bytes lock
     rc    <- _ccall_ fcntl fd (``F_GETLK''::Int) flock
-    if rc /= -1
+    if rc /= ((-1)::Int)
        then do
 	    result <- bytes2ProcessIDAndLock flock
 	    return (maybeResult result)
@@ -247,7 +247,7 @@ waitToSetLock fd lock = do
 fdSeek :: Fd -> SeekMode -> FileOffset -> IO FileOffset
 fdSeek fd mode offset = do
     rc <- _ccall_ lseek fd offset (mode2Int mode)
-    if rc /= -1
+    if rc /= ((-1)::Int)
        then return rc
        else syserr "fdSeek"
 
