@@ -55,6 +55,7 @@ import Panic		( panic )
 import Char		( isDigit )
 import GlaExts		( word2Int#, int2Word#, shiftRL#, and#, (/=#) )
 import Outputable	( text )
+import IOExts		( trace )
 \end{code}
 
 \begin{code}
@@ -330,8 +331,12 @@ primRepToSize DoubleRep	    = IF_ARCH_alpha( TF, IF_ARCH_i386( DF,IF_ARCH_sparc(
 primRepToSize ArrayRep	    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
 primRepToSize ByteArrayRep  = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
 primRepToSize WeakPtrRep    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
-primRepToSize ForeignObjRep  = IF_ARCH_alpha( Q, IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
+primRepToSize ForeignObjRep = IF_ARCH_alpha( Q,  IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
 primRepToSize StablePtrRep  = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
+primRepToSize ThreadIdRep   = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
+-- SUP: Wrong!!! Only for testing the rest of the NCG
+primRepToSize Word64Rep     = trace "primRepToSize: Word64Rep not handled" B
+primRepToSize Int64Rep      = trace "primRepToSize: Int64Rep not handled"  B
 \end{code}
 
 %************************************************************************
