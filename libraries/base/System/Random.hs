@@ -48,10 +48,10 @@ import System.CPUTime	( getCPUTime )
 import Data.Char	( isSpace, chr, ord )
 import System.IO.Unsafe ( unsafePerformIO )
 import Data.IORef
+import Numeric		( readDec )
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Show		( showSignedInt, showSpace )
-import Numeric		( readDec )
 import GHC.IOBase	( unsafePerformIO, stToIO )
 import System.Time	( getClockTime, ClockTime(..) )
 #endif
