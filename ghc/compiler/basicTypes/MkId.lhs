@@ -769,6 +769,7 @@ they can unify with both unlifted and lifted types.  Hence we provide
 another gun with which to shoot yourself in the foot.
 
 \begin{code}
+-- unsafeCoerce# :: forall a b. a -> b
 unsafeCoerceId
   = pcMiscPrelId unsafeCoerceIdKey pREL_GHC SLIT("unsafeCoerce#") ty info
   where
