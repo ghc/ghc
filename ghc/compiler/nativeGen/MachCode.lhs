@@ -27,7 +27,7 @@ import PrimRep		( isFloatingRep, PrimRep(..) )
 import PrimOp		( PrimOp(..) )
 import CallConv		( cCallConv )
 import Stix		( getUniqLabelNCG, StixTree(..),
-			  StixReg(..), CodeSegment(..)
+			  StixReg(..), CodeSegment(..), pprStixTrees
 			)
 import UniqSupply	( returnUs, thenUs, mapUs, mapAndUnzipUs,
 			  mapAccumLUs, UniqSM
@@ -235,7 +235,7 @@ getRegister :: StixTree -> UniqSM Register
 getRegister (StReg (StixMagicId stgreg))
   = case (magicIdRegMaybe stgreg) of
       Just reg -> returnUs (Fixed (magicIdPrimRep stgreg) reg id)
-      -- cannae be Nothing
+                  -- cannae be Nothing
 
 getRegister (StReg (StixTemp u pk))
   = returnUs (Fixed pk (UnmappedReg u pk) id)
@@ -889,6 +889,9 @@ getRegister leaf
     	code dst = mkSeqInstr (MOV L (OpImm imm__2) (OpReg dst))
     in
     	returnUs (Any PtrRep code)
+  | otherwise
+  = pprPanic "getRegister(x86)" (pprStixTrees [leaf])
+
   where
     imm = maybeImm leaf
     imm__2 = case imm of Just x -> x
