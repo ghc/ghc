@@ -20,6 +20,7 @@ module CmdLineOpts (
 	opt_AutoSccsOnAllToplevs,
 	opt_AutoSccsOnExportedToplevs,
 	opt_AutoSccsOnIndividualCafs,
+	opt_CompilingPrelude,
 	opt_D_dump_absC,
 	opt_D_dump_asm,
 	opt_D_dump_deriv,
@@ -279,6 +280,14 @@ opt_AllowUndecidableInstances 	= lookUp  SLIT("-fallow-undecidable-instances")
 opt_AutoSccsOnAllToplevs	= lookUp  SLIT("-fauto-sccs-on-all-toplevs")
 opt_AutoSccsOnExportedToplevs	= lookUp  SLIT("-fauto-sccs-on-exported-toplevs")
 opt_AutoSccsOnIndividualCafs	= lookUp  SLIT("-fauto-sccs-on-individual-cafs")
+  {-
+   It's a bit unfortunate to have to re-introduce this chap, but on Win32
+   platforms we do need a way of distinguishing between the case when we're
+   compiling a static version of the Prelude and one that's going to be
+   put into a DLL. Why? Because the compiler's wired in modules need to
+   be attributed as either coming from a DLL or not.
+  -}
+opt_CompilingPrelude		= lookUp  SLIT("-fcompiling-prelude")
 opt_D_dump_absC			= lookUp  SLIT("-ddump-absC")
 opt_D_dump_asm			= lookUp  SLIT("-ddump-asm")
 opt_D_dump_deriv		= lookUp  SLIT("-ddump-deriv")
