@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.12 2000/06/12 17:01:57 panne Exp $
+# $Id: Makefile,v 1.13 2000/08/15 11:41:19 rrt Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
@@ -16,7 +16,7 @@ cg012_HC_OPTS = -fglasgow-exts
 cg015_HC_OPTS = -fglasgow-exts
 cg018_HC_OPTS = -fglasgow-exts
 cg025_HC_OPTS = -fglasgow-exts
-cg026_HC_OPTS = -fglasgow-exts
+cg026_HC_OPTS = -fglasgow-exts -fvia-C
 cg029_HC_OPTS = -fglasgow-exts
 cg030_HC_OPTS = -fglasgow-exts
 cg031_HC_OPTS = -fglasgow-exts
