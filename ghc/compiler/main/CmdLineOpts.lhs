@@ -222,6 +222,7 @@ data CoreToDo		-- These are diff core-to-core passes,
   | CoreDoSpecialising
   | CoreDoUSPInf
   | CoreDoCPResult 
+  | CoreDoGlomBinds
   | CoreCSE
 \end{code}
 
@@ -506,6 +507,7 @@ classifyOpts = sep argv [] [] -- accumulators...
 	  "-ffloat-outwards-full" -> CORE_TD(CoreDoFloatOutwards True)
 	  "-fliberate-case"  -> CORE_TD(CoreLiberateCase)
 	  "-fcse"  	     -> CORE_TD(CoreCSE)
+	  "-fglom-binds"     -> CORE_TD(CoreDoGlomBinds)
 	  "-fprint-core"     -> CORE_TD(CoreDoPrintCore)
 	  "-fstatic-args"    -> CORE_TD(CoreDoStaticArgs)
 	  "-fstrictness"     -> CORE_TD(CoreDoStrictness)

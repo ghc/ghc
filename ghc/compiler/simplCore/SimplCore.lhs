@@ -125,15 +125,8 @@ doCorePass us binds lrb rb CoreDoWorkerWrapper      = _scc_ "WorkWrap"      noSt
 doCorePass us binds lrb rb CoreDoSpecialising       = _scc_ "Specialise"    noStats (specProgram us binds)
 doCorePass us binds lrb rb CoreDoCPResult	    = _scc_ "CPResult"      noStats (cprAnalyse binds)
 doCorePass us binds lrb rb CoreDoPrintCore	    = _scc_ "PrintCore"     noStats (printCore binds)
-doCorePass us binds lrb rb CoreDoUSPInf
-  = _scc_ "CoreUsageSPInf" 
-    if opt_UsageSPOn then
-      do
-         (binds1, rules1) <- doUsageSPInf us binds lrb
-         return (zeroSimplCount, binds1, rules1)
-    else
-      trace "WARNING: ignoring requested -fusagesp pass; requires -fusagesp-on" $
-      return (zeroSimplCount, binds, Nothing)
+doCorePass us binds lrb rb CoreDoGlomBinds	    = noStats (glomBinds binds)
+doCorePass us binds lrb rb CoreDoUSPInf		    = _scc_ "CoreUsageSPInf" noStats (doUsageSPInf us binds lrb)
 
 printCore binds = do dumpIfSet True "Print Core"
 			       (pprCoreBindings binds)
@@ -142,6 +135,7 @@ printCore binds = do dumpIfSet True "Print Core"
 -- most passes return no stats and don't change rules
 noStats thing = do { binds <- thing; return (zeroSimplCount, binds, Nothing) }
 \end{code}
+
 
 
 %************************************************************************
@@ -202,6 +196,41 @@ simpl_arg e
     returnSmpl (etaReduceExpr e')
 \end{code}
 
+\begin{code}
+glomBinds :: [CoreBind] -> IO [CoreBind]
+-- Glom all binds together in one Rec, in case any
+-- transformations have introduced any new dependencies
+--
+-- NB: the global invariant is this:
+--	*** the top level bindings are never cloned, and are always unique ***
+--
+-- We sort them into dependency order, but applying transformation rules may
+-- make something at the top refer to something at the bottom:
+--	f = \x -> p (q x)
+--	h = \y -> 3
+--	
+--	RULE:  p (q x) = h x
+--
+-- Applying this rule makes f refer to h, 
+-- although it doesn't appear to in the source program.  
+-- This pass lets us control where it happens.
+--
+-- NOTICE that this cannot happen for rules whose head is a locally-defined
+-- function.  It only happens for rules whose head is an imported function
+-- (p in the example above).  So, for example, the rule had been
+--	RULE: f (p x) = h x
+-- then the rule for f would be attached to f itself (in its IdInfo) 
+-- by prepareLocalRuleBase and h would be regarded by the occurrency 
+-- analyser as free in f.
+
+glomBinds binds
+  = do { beginPass "GlomBinds" ;
+	 let { recd_binds = [Rec (flattenBinds binds)] } ;
+	 return recd_binds }
+	-- Not much point in printing the result... 
+	-- just consumes output bandwidth
+\end{code}
+
 %************************************************************************
 %*									*
 \subsection{The driver for the simplifier}
@@ -220,26 +249,7 @@ simplifyPgm (imported_rule_ids, rule_lhs_fvs)
   = do {
 	beginPass "Simplify";
 
-	-- Glom all binds together in one Rec, in case any
-	-- transformations have introduced any new dependencies
-	--
-	-- NB: the global invariant is this:
-	--	*** the top level bindings are never cloned, and are always unique ***
-	--
-	-- We sort them into dependency order, but applying transformation rules may
-	-- make something at the top refer to something at the bottom:
-	--	f = \x -> p (q x)
-	--	h = \y -> 3
-	--	
-	--	RULE:  p (q x) = h x
-	--
-	-- Applying this rule makes f refer to h, although it doesn't appear to in the
-	-- source program.  Our solution is to do this occasional glom-together step,
-	-- just once per overall simplfication step.
-
-	let { recd_binds = [Rec (flattenBinds binds)] };
-
-	(termination_msg, it_count, counts_out, binds') <- iteration us 1 zeroSimplCount recd_binds;
+	(termination_msg, it_count, counts_out, binds') <- iteration us 1 zeroSimplCount binds;
 
 	dumpIfSet (opt_D_verbose_core2core && opt_D_dump_simpl_stats)
 		  "Simplifier statistics"

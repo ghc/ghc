@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.56 2000/09/05 10:18:28 simonmar Exp $
+-- $Id: Main.hs,v 1.57 2000/09/07 16:31:45 simonpj Exp $
 --
 -- GHC Driver program
 --
@@ -517,6 +517,7 @@ hsc_minusO_flags = do
 	"-fstrictness",
 	"-fcpr-analyse",
 	"-fworker-wrapper",
+	"-fglom-binds",
 
 	"-fsimplify",
 	  "[", 
