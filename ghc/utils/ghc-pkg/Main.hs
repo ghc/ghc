@@ -23,9 +23,10 @@ import Distribution.Package
 import Distribution.License
 import Distribution.Version
 import Compat.Directory 	( getAppUserDataDirectory )
-import Control.Exception	( catch, throw, evaluate )
+import Control.Exception	( evaluate )
+import qualified Control.Exception as Exception
 
-import Prelude hiding ( catch )
+import Prelude
 
 import Package -- the old package config type
 
@@ -50,7 +51,7 @@ import System	( getEnv, getArgs, getProgName,
 		  system, exitWith,
 		  ExitCode(..)
 		)
-import IO hiding ( catch )
+import IO
 import List ( isPrefixOf, isSuffixOf )
 
 import ParsePkgConfLite
@@ -288,7 +289,8 @@ readParseDatabase filename = do
   str <- readFile filename
   let packages = read str
   evaluate packages
-    `catch` \_ -> die (filename ++ ": parse error in package config file\n")
+    `Exception.catch` \_ -> 
+	die (filename ++ ": parse error in package config file\n")
   return (filename,packages)
 
 emptyPackageConfig :: String
@@ -339,7 +341,7 @@ parsePackageInfo str defines force =
     Right ok -> return ok
     Left err -> do
 	old_pkg <- evaluate (parseOnePackageConfig str)
-		 	    `catch` \_ -> parse_failed
+		 	    `Exception.catch` \_ -> parse_failed
 	putStr "Expanding embedded variables... "
 	new_old_pkg <- expandEnvVars old_pkg defines force
 	return (convertOldPackage old_pkg)
@@ -505,7 +507,7 @@ maybeRestoreOldConfig filename io
         	          "restore the old configuration... ")
 	renameFile (filename ++ ".old")  filename
         hPutStrLn stdout "done."
-	throw e
+	ioError e
 
 writeNewConfig :: FilePath -> [InstalledPackageInfo] -> IO ()
 writeNewConfig filename packages = do
