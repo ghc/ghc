@@ -3,7 +3,7 @@
 %
 
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# OPTIONS -fno-implicit-prelude -fcompiling-prelude #-}
 
 module PrelHugs (
    hugsprimPmInt,
