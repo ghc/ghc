@@ -400,11 +400,11 @@ sub process_stats_file {
 		$TotMem = $1;
 	    }
 
-	    if ( /^\s*INIT\s+time\s*(\d+\.\d\d)s\s*\(\s*(\d+\.\d\d)s elapsed\)/ ) {
+	    if ( /^\s*INIT\s+time\s*(-*\d+\.\d\d)s\s*\(\s*(-*\d+\.\d\d)s elapsed\)/ ) {
 		$InitTime = $1; $InitElapsed = $2;
-	    } elsif ( /^\s*MUT\s+time\s*(\d+\.\d\d)s\s*\(\s*(\d+\.\d\d)s elapsed\)/ ) {
+	    } elsif ( /^\s*MUT\s+time\s*(-*\d+\.\d\d)s\s*\(\s*(-*\d+\.\d\d)s elapsed\)/ ) {
 		$MutTime = $1; $MutElapsed = $2;
-	    } elsif ( /^\s*GC\s+time\s*(\d+\.\d\d)s\s*\(\s*(\d+\.\d\d)s elapsed\)/ ) {
+	    } elsif ( /^\s*GC\s+time\s*(-*\d+\.\d\d)s\s*\(\s*(-*\d+\.\d\d)s elapsed\)/ ) {
 		$GcTime = $1; $GcElapsed = $2;
 	    }
 	}
@@ -467,6 +467,15 @@ sub process_stats_file {
     $MutElapsed =~ s/,//g;
     $GcTime =~ s/,//g;
     $GcElapsed =~ s/,//g;
+
+    # if timings are negative (I've seen -0.00s) then set to 0
+    $InitTime           = 0 unless $InitTime >= 0;
+    $InitElapsed        = 0 unless $InitElapsed >= 0; 
+    $MutTime            = 0 unless $MutTime >= 0;
+    $MutElapsed         = 0 unless $MutElapsed >= 0;
+    $GcTime             = 0 unless $GcTime >= 0;
+    $GcElapsed          = 0 unless $GcElapsed >= 0;
+    
 }
 
 sub process_spixstats_files { # 2 of them; one for mutator, one for GC
