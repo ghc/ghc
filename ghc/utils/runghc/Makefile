@@ -36,6 +36,8 @@ all :: runhaskell
 runhaskell : $(HS_PROG)
 	$(CP) $< runhaskell$(exeext)
 
+CLEAN_FILES += runhaskell
+
 # Only install runhaskell if there isn't already one installed
 ifneq "$(findstring install, $(MAKECMDGOALS))" ""
 ifeq "$(wildcard $(bindir)/runhaskell)" ""
