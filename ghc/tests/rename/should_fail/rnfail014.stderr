@@ -1,0 +1,17 @@
+ 
+rnfail014.hs:12:
+    Context constrains type variable(s) `a'
+	that do not appear in `Int -> Int'
+	in the type signature for `f'
+ 
+rnfail014.hs:17:
+    Context constrains in-scope type variable(s) `a'
+	in the type signature for `op'
+ 
+rnfail014.hs:9:
+    Context constrains type variable(s) `a'
+	that do not appear in `Eq Bool'
+	in the type signature for an instance decl
+
+
+Compilation had errors

@@ -1,0 +1,7 @@
+ 
+rnfail004.hs:6: Conflicting definitions for `a' in binding group
+ 
+rnfail004.hs:7: Conflicting definitions for `b' in binding group
+
+
+Compilation had errors

@@ -1,0 +1,8 @@
+ 
+rnfail013.hs:3:
+    Conflicting definitions for: `MkT'
+	Defined at rnfail013.hs:9
+	Defined at rnfail013.hs:7
+
+
+Compilation had errors

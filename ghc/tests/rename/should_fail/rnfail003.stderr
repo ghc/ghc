@@ -1,0 +1,8 @@
+ 
+rnfail003.hs:2:
+    Conflicting definitions for: `f'
+	Defined at rnfail003.hs:4
+	Defined at rnfail003.hs:2
+
+
+Compilation had errors

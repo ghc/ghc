@@ -1,0 +1,6 @@
+rn022.hs:9: 
+    Warning: Possibly incomplete patterns
+	in the definition of function `f'
+rn022.hs:11: 
+    Warning: Possibly incomplete patterns
+	in the definition of function `g'
