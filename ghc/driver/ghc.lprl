@@ -1731,7 +1731,7 @@ sub runHsc {
 	# emit nofibbish time/bytes-alloc stats to stderr;
 	# see later .stat file post-processing
 	print STDERR "warning: both -Rgc-stats and -Rghc-timing used, -Rghc-timing wins." if $CollectingGCstats;
-	push(@HsC_rts_flags, "-s$Tmp_prefix.stat");
+	push(@HsC_rts_flags, "-S$Tmp_prefix.stat");
 	push(@Files_to_tidy, "$Tmp_prefix.stat");
     }
 
