@@ -45,18 +45,7 @@ module Foreign.C.Types
 	, CFile,        CFpos,     CJmpBuf
 	) where
 
-#ifdef __NHC__
-import NHC.FFI
-  ( CChar(..),    CSChar(..),  CUChar(..)
-  , CShort(..),   CUShort(..), CInt(..),   CUInt(..)
-  , CLong(..),    CULong(..),  CLLong(..), CULLong(..)
-  , CPtrdiff(..), CSize(..),   CWchar(..), CSigAtomic(..)
-  , CClock(..),   CTime(..)
-  , CFloat(..),   CDouble(..), CLDouble(..)
-  , CFile,        CFpos,       CJmpBuf
-  , Storable(..)
-  )
-#else
+#ifndef __NHC__
 
 import Foreign.Storable
 import Data.Bits	( Bits(..) )
@@ -164,5 +153,52 @@ data CJmpBuf = CJmpBuf
 
 -- C99 types which are still missing include:
 -- intptr_t, uintptr_t, intmax_t, uintmax_t, wint_t, wctrans_t, wctype_t
+
+#else	/* __NHC__ */
+
+import NHC.FFI
+  ( CChar(..),    CSChar(..),  CUChar(..)
+  , CShort(..),   CUShort(..), CInt(..),   CUInt(..)
+  , CLong(..),    CULong(..),  CLLong(..), CULLong(..)
+  , CPtrdiff(..), CSize(..),   CWchar(..), CSigAtomic(..)
+  , CClock(..),   CTime(..)
+  , CFloat(..),   CDouble(..), CLDouble(..)
+  , CFile,        CFpos,       CJmpBuf
+  , Storable(..)
+  )
+import Data.Bits
+import NHC.SizedTypes
+
+#define INSTANCE_BITS(T) \
+instance Bits T where { \
+  (T x) .&.     (T y)   = T (x .&.   y) ; \
+  (T x) .|.     (T y)   = T (x .|.   y) ; \
+  (T x) `xor`   (T y)   = T (x `xor` y) ; \
+  complement    (T x)   = T (complement x) ; \
+  shift         (T x) n = T (shift x n) ; \
+  rotate        (T x) n = T (rotate x n) ; \
+  bit                 n = T (bit n) ; \
+  setBit        (T x) n = T (setBit x n) ; \
+  clearBit      (T x) n = T (clearBit x n) ; \
+  complementBit (T x) n = T (complementBit x n) ; \
+  testBit       (T x) n = testBit x n ; \
+  bitSize       (T x)   = bitSize x ; \
+  isSigned      (T x)   = isSigned x }
+
+INSTANCE_BITS(CChar)
+INSTANCE_BITS(CSChar)
+INSTANCE_BITS(CUChar)
+INSTANCE_BITS(CShort)
+INSTANCE_BITS(CUShort)
+INSTANCE_BITS(CInt)
+INSTANCE_BITS(CUInt)
+INSTANCE_BITS(CLong)
+INSTANCE_BITS(CULong)
+INSTANCE_BITS(CLLong)
+INSTANCE_BITS(CULLong)
+INSTANCE_BITS(CPtrdiff)
+INSTANCE_BITS(CWchar)
+INSTANCE_BITS(CSigAtomic)
+INSTANCE_BITS(CSize)
 
 #endif
