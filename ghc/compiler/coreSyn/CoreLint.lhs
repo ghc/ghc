@@ -41,6 +41,7 @@ import TyCon		( isPrimTyCon )
 import BasicTypes	( RecFlag(..), isNonRec )
 import CmdLineOpts
 import Maybe
+import Util		( notNull )
 import Outputable
 
 infixr 9 `thenL`, `seqL`
