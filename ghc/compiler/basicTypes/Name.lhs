@@ -42,7 +42,7 @@ module Name (
 
 import OccName		-- All of it
 import Module		( Module, moduleName, pprModule, mkVanillaModule, 
-			  isLocalModule )
+			  isModuleInThisPackage )
 import RdrName		( RdrName, mkRdrQual, mkRdrUnqual, rdrNameOcc, 
 			  rdrNameModule )
 import CmdLineOpts	( opt_Static, opt_PprStyle_NoPrags, 
@@ -342,7 +342,7 @@ isDllName :: Name -> Bool
 	-- Does this name refer to something in a different DLL?
 isDllName nm = not opt_Static &&
 	       not (isLocallyDefinedName nm) &&		-- isLocallyDefinedName test needed 'cos
-	       not (isLocalModule (nameModule nm))	-- nameModule won't work on local names
+	       not (isModuleInThisPackage (nameModule nm))	-- nameModule won't work on local names
 
 
 
