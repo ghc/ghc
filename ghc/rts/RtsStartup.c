@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.73 2003/04/01 15:05:15 sof Exp $
+ * $Id: RtsStartup.c,v 1.74 2003/08/19 16:32:23 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -55,6 +55,10 @@
 #endif
 
 #include <stdlib.h>
+
+#ifdef HAVE_LOCALE_H
+#include <locale.h>
+#endif
 
 // Flag Structure
 struct RTS_FLAGS RtsFlags;
@@ -165,6 +169,10 @@ hs_init(int *argc, char **argv[])
     if (RtsFlags.GcFlags.frontpanel) {
 	initFrontPanel();
     }
+#endif
+
+#ifdef HAVE_LOCALE_H
+    setlocale(LC_ALL,"");
 #endif
 
     /* Record initialization times */
