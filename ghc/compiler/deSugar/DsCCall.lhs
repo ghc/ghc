@@ -34,11 +34,16 @@ import Type		( isUnLiftedType, splitAlgTyConApp_maybe, mkFunTys,
 			  splitTyConApp_maybe, tyVarsOfType, mkForAllTys, Type
 			)
 import TysPrim		( byteArrayPrimTy, realWorldStatePrimTy,
-			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon )
-import TysWiredIn	( unitDataConId, stringTy,
+			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon,
+			  intPrimTy
+			)
+import TysWiredIn	( unitDataConId, stringTy, boolTy,
+			  falseDataCon, falseDataConId,
+			  trueDataCon, trueDataConId,
 			  unboxedPairDataCon,
 			  mkUnboxedTupleTy, unboxedTupleCon
 			)
+import Literal		( mkMachInt )
 import CStrings		( CLabelString )
 import Unique		( Unique )
 import VarSet		( varSetElems )
@@ -174,6 +179,16 @@ unboxArg arg
 	      \ body -> Case arg case_bndr [(DataAlt box_data_con,[prim_arg],body)]
     )
 
+  -- Booleans; Hacking alert: the 0/1 literals should match the HsFalse/HsTrue constants
+  | arg_ty == boolTy
+  = newSysLocalDs intPrimTy		`thenDs` \ prim_arg ->
+    returnDs (Var prim_arg,
+	      \ body -> Case (Case arg (mkWildId arg_ty) [
+                                (DataAlt falseDataCon,[],mkIntLit 0),
+                                (DataAlt trueDataCon, [],mkIntLit 1)])
+                             prim_arg [(DEFAULT,[],body)]
+    )
+
   | otherwise
   = getSrcLocDs `thenDs` \ l ->
     pprPanic "unboxArg: " (ppr l <+> ppr arg_ty)
@@ -247,6 +262,13 @@ boxResult result_ty
     in
     returnDs (ccall_res_type, \prim_app -> Case prim_app case_bndr [the_alt]
     )
+
+  -- Booleans
+  | result_ty == boolTy
+  = returnDs (mkUnboxedTupleTy 2 [realWorldStatePrimTy, intPrimTy],
+              \ prim_app -> Case prim_app (mkWildId intPrimTy) [
+                               (LitAlt (mkMachInt 0),[],Var falseDataConId),
+                               (DEFAULT             ,[],Var trueDataConId )])
 
   | otherwise
   = pprPanic "boxResult: " (ppr result_ty)

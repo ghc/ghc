@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.13 2000/03/31 03:09:36 hwloidl Exp $
+ * $Id: RtsAPI.c,v 1.14 2000/04/04 13:40:27 panne Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -176,7 +176,7 @@ rts_mkAddr (void *a)
 
 #ifdef COMPILER /* GHC has em, Hugs doesn't */
 HaskellObj
-rts_mkBool (int b)
+rts_mkBool (StgBool b)
 {
   if (b) {
     return (StgClosure *)True_closure;
@@ -316,9 +316,9 @@ int
 rts_getBool (HaskellObj p)
 {
   if (p == True_closure) {
-    return 1;
+    return 1; /* NOTE: This should better be HsTrue */
   } else if (p == False_closure) {
-    return 0;
+    return 0; /* ... and this HsFalse */
   } else {
     barf("getBool: not a Bool");
   }

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgTypes.h,v 1.7 2000/01/25 14:36:53 panne Exp $
+ * $Id: StgTypes.h,v 1.8 2000/04/04 13:40:27 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -90,7 +90,7 @@ typedef void*              StgAddr;
  */
 
 typedef StgWord8           StgChar;
-
+typedef int                StgBool;
 /*
  * If a double fits in an StgWord, don't bother using floats.
  */
