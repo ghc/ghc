@@ -1,4 +1,4 @@
 
-mdofail002.hs:10:8:
+mdofail002.hs:11:8:
     Conflicting definitions for `x'
     In a mdo-expression
