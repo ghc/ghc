@@ -160,7 +160,7 @@ maybePackageModule mod_name = do
   found <- findOnPackagePath pkgs hi
   case found of
 	Nothing -> return Nothing
-	Just (pkg_name,path) -> 
+	Just (pkg_name,path) ->
 	    return (Just (mkModule mod_name pkg_name,
 			  ModuleLocation{ 
                                 ml_hspp_file = Nothing,
@@ -178,8 +178,8 @@ findOnPackagePath pkgs file = loop pkgs
   loop (p:ps) = do
     found <- findOnPath (import_dirs p) file
     case found of
-	Nothing -> loop ps
-	Just f  -> return (Just (mkFastString (name p), f))
+	Nothing   -> loop ps
+	Just path -> return (Just (mkFastString (name p), path ++ '/':file))
 
 findOnPath :: [String] -> String -> IO (Maybe FilePath)
 findOnPath path s = loop path
