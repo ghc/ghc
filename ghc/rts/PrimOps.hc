@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.48 2000/03/20 15:49:56 panne Exp $
+ * $Id: PrimOps.hc,v 1.49 2000/03/21 11:33:12 rrt Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1017,7 +1017,7 @@ FN_(delayzh_fast)
     /* Add on ticks_since_select, since these will be subtracted at
      * the next awaitEvent call.
      */
-#if defined(HAVE_SETITIMER)
+#if defined(HAVE_SETITIMER) || defined(mingw32_TARGET_OS)
     CurrentTSO->block_info.delay = R1.i + ticks_since_select;
 #else
     CurrentTSO->block_info.target = R1.i + getourtimeofday();

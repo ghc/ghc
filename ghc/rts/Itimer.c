@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.11 2000/03/20 09:42:49 andy Exp $
+ * $Id: Itimer.c,v 1.12 2000/03/21 11:33:12 rrt Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -239,6 +239,7 @@ unblock_vtalrm_signal(void)
 }
 #endif
 
+#if !defined(HAVE_SETITIMER) && !defined(mingw32_TARGET_OS)
 unsigned int 
 getourtimeofday(void)
 {
@@ -246,3 +247,4 @@ getourtimeofday(void)
   gettimeofday(&tv, (struct timezone *) NULL);
   return (tv.tv_sec * 1000000 + tv.tv_usec);
 }
+#endif
