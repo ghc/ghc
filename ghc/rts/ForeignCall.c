@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: ForeignCall.c,v 1.18 2000/08/07 23:37:23 qrczak Exp $
+ * $Id: ForeignCall.c,v 1.19 2000/10/09 10:28:33 daan Exp $
  *
  * (c) The GHC Team 1994-1999.
  *
@@ -317,7 +317,6 @@ int ccall ( CFunDescriptor*  d,
    PushPtr((StgPtr)(*bco));
    cap->rCurrentTSO->sp    = MainRegTable.rSp;
    cap->rCurrentTSO->su    = MainRegTable.rSu;
-   cap->rCurrentTSO->splim = MainRegTable.rSpLim;
    token = suspendThread(cap);
 
 #if i386_TARGET_ARCH
@@ -336,7 +335,6 @@ int ccall ( CFunDescriptor*  d,
    cap = resumeThread(token);
    MainRegTable.rSp    = cap->rCurrentTSO->sp;
    MainRegTable.rSu    = cap->rCurrentTSO->su;
-   MainRegTable.rSpLim = cap->rCurrentTSO->splim;
    *bco=(StgBCO*)PopPtr();
 
    /* INT, WORD, ADDR, STABLE don't need to do a word-size check

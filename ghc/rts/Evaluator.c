@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.56 $
- * $Date: 2000/06/23 12:09:00 $
+ * $Revision: 1.57 $
+ * $Date: 2000/10/09 10:28:33 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -181,7 +181,6 @@ void      SloppifyIntegerEnd ( StgPtr );
 	   SSS;							\
            cap->rCurrentTSO->sp    = gSp;			\
            cap->rCurrentTSO->su    = gSu;			\
-           cap->rCurrentTSO->splim = gSpLim;			\
            return retVal;					\
         }
 
@@ -315,7 +314,7 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
 
     gSp    = cap->rCurrentTSO->sp;
     gSu    = cap->rCurrentTSO->su;
-    gSpLim = cap->rCurrentTSO->splim;
+    gSpLim = cap->rCurrentTSO->stack + RESERVED_STACK_WORDS;
 
 #ifdef DEBUG
     /* use the t values to check that Su/Sp/SpLim do not change unexpectedly */
@@ -374,7 +373,7 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
 	   cap->rCurrentTSO->why_blocked = BlockedOnDelay;
 	   ACQUIRE_LOCK(&sched_mutex);
 	   
-#if defined(HAVE_SETITIMER) || defined(mingw32_TARGET_OS)
+#if defined(HAVE_SETITIMER) /* || defined(mingw32_TARGET_OS) */
 	   cap->rCurrentTSO->block_info.delay
 	     = hugsBlock.delay + ticks_since_select;
 #else
@@ -1357,7 +1356,7 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
             Case(i_VAR_WORD_big):
             Case(i_RETADDR_big):
             Case(i_ALLOC_PAP):
-
+#ifndef XMLAMBDA
             Case(i_UNPACK_INJ):
             Case(i_UNPACK_ROW):
             Case(i_TEST_INJ_CONST):
@@ -1370,7 +1369,7 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
             Case(i_PACK_ROW):
             Case(i_ALLOC_ROW_big):
             Case(i_ALLOC_ROW):
-
+#endif
                     bciPtr--;
                     printf ( "\n\n" );
                     disInstr ( bco, PC );
