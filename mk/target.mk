@@ -1168,7 +1168,7 @@ endif
 # the --no-print-directory flag which is passed to recursive
 # invocations of make.
 #
-#ifeq "$(way)" ""
+ifeq "$(way)" ""
 ifneq "$(SUBDIRS)" ""
 
 # we override the 'boot', 'all' and 'install' targets in the top
@@ -1215,7 +1215,7 @@ $(ALL_TARGET) docs runtests $(BOOT_TARGET) TAGS clean distclean mostlyclean main
 	@echo "------------------------------------------------------------------------"
 
 endif
-#endif
+endif
 
 #
 # Selectively building subdirectories.
