@@ -92,8 +92,6 @@ import PrelPack		( unpackCStringBA )
 
 #if __GLASGOW_HASKELL__ >= 501
 import PrelIO		( hGetcBuffered )
-import PrelCError	( throwErrnoIfMinus1RetryMayBlock )
-import PrelConc		( threadWaitRead )
 #endif
 
 import Exception	( bracket )
