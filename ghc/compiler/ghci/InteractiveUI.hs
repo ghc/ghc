@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.92 2001/10/15 15:05:17 simonpj Exp $
+-- $Id: InteractiveUI.hs,v 1.93 2001/10/16 13:25:00 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -17,7 +17,7 @@ module InteractiveUI ( interactiveUI, ghciWelcomeMsg ) where
 import Packages
 import CompManager
 import HscTypes		( GhciMode(..), TyThing(..) )
-import MkIface          ( ifaceTyCls )
+import MkIface
 import ByteCodeLink
 import DriverFlags
 import DriverState
@@ -148,6 +148,12 @@ interactiveUI cmstate paths cmdline_libs = do
    dflags <- getDynFlags
 
    (cmstate, maybe_hval) 
+	<- cmCompileExpr cmstate dflags "IO.hSetBuffering IO.stdout IO.NoBuffering >> IO.hSetBuffering IO.stderr IO.NoBuffering"
+   case maybe_hval of
+	Just hval -> unsafeCoerce# hval :: IO ()
+	_ -> panic "interactiveUI:buffering"
+
+   (cmstate, maybe_hval)
 	<- cmCompileExpr cmstate dflags "IO.hFlush PrelHandle.stderr"
    case maybe_hval of
 	Just hval -> writeIORef flush_stderr (unsafeCoerce# hval :: IO ())
@@ -671,7 +677,7 @@ newPackages new_pkgs = do
     flushPackageCache pkgs
    
     new_pkg_info <- getPackageDetails new_pkgs
-    mapM_ (linkPackage False) (reverse new_pkg_info)
+    mapM_ linkPackage (reverse new_pkg_info)
 
 -----------------------------------------------------------------------------
 -- GHCi monad
@@ -758,7 +764,7 @@ showLS (Right nm) = "(dynamic) " ++ nm
 
 linkPackages :: [LibrarySpec] -> [PackageConfig] -> IO ()
 linkPackages cmdline_lib_specs pkgs
-   = do sequence_ [ linkPackage (name p `elem` loaded) p | p <- reverse pkgs ]
+   = do mapM_ linkPackage (reverse pkgs)
         lib_paths <- readIORef v_Library_paths
         mapM_ (preloadLib lib_paths) cmdline_lib_specs
 	if (null cmdline_lib_specs)
@@ -768,16 +774,6 @@ linkPackages cmdline_lib_specs pkgs
 		   if ok then putStrLn "done."
 	      		 else throwDyn (InstallationError "linking extra libraries/objects failed")
      where
-	-- Packages that are already linked into GHCi.  For mingw32, we only
-	-- skip gmp and rts, since std and after need to load the msvcrt.dll
-	-- library which std depends on.
-	loaded 
-#          ifndef mingw32_TARGET_OS
-           = [ "gmp", "rts", "std", "concurrent", "posix", "text", "util" ]
-#          else
-           = [ "gmp", "rts" ]
-#          endif
-
         preloadLib :: [String] -> LibrarySpec -> IO ()
         preloadLib lib_paths lib_spec
            = do putStr ("Loading object " ++ showLS lib_spec ++ " ... ")
@@ -818,13 +814,18 @@ linkPackages cmdline_lib_specs pkgs
            = (throwDyn . CmdLineError)
                 "user specified .o/.so/.DLL could not be loaded."
 
+-- Packages that are already linked into GHCi.  For mingw32, we only
+-- skip gmp and rts, since std and after need to load the msvcrt.dll
+-- library which std depends on.
+loaded_in_ghci
+#          ifndef mingw32_TARGET_OS
+           = [ "gmp", "rts", "std", "concurrent", "posix", "text", "util" ]
+#          else
+           = [ "gmp", "rts" ]
+#          endif
 
-linkPackage :: Bool -> PackageConfig -> IO ()
--- ignore rts and gmp for now (ToDo; better?)
-linkPackage loaded_in_ghci pkg
-   | name pkg `elem` ["rts", "gmp"] 
-   = return ()
-   | otherwise
+linkPackage :: PackageConfig -> IO ()
+linkPackage pkg
    = do putStr ("Loading package " ++ name pkg ++ " ... ")
         -- For each obj, try obj.o and if that fails, obj.so.
         -- Complication: all the .so's must be loaded before any of the .o's.  
@@ -835,8 +836,8 @@ linkPackage loaded_in_ghci pkg
 	-- Don't load the .so libs if this is a package GHCi is already
 	-- linked against, because we'll already have the .so linked in.
 	let (so_libs, obj_libs) = partition isRight classifieds
-        let sos_first | loaded_in_ghci = obj_libs
-		      | otherwise      = so_libs ++ obj_libs
+        let sos_first | name pkg `elem` loaded_in_ghci = obj_libs
+		      | otherwise      		       = so_libs ++ obj_libs
 
         mapM loadClassified sos_first
         putStr "linking ... "
