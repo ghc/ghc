@@ -35,7 +35,7 @@ initStacks(smInfo *sm)
         STKO_SIZE(MainStkO) = RTSflags.GcFlags.stksSize + STKO_VHS;
         STKO_SpB(MainStkO) = STKO_SuB(MainStkO) = STKO_BSTK_BOT(MainStkO) + BREL(1);
         STKO_SpA(MainStkO) = STKO_SuA(MainStkO) = STKO_ASTK_BOT(MainStkO) + AREL(1);
-        STKO_LINK(MainStkO) = Prelude_Z91Z93_closure;
+        STKO_LINK(MainStkO) = PrelBase_Z91Z93_closure;
     	STKO_RETURN(MainStkO) = NULL;
 
 	ASSERT(sanityChk_StkO(MainStkO));
