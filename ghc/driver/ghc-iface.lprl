@@ -163,6 +163,7 @@ sub constructNewHiFile {
 	print NEWHI $Decl{"new:$v"};		# Print the new decl itself
     }
     print NEWHI $Stuff{'new:rules'} unless $Stuff{'new:rules'} eq '';
+    print NEWHI $Stuff{'new:deprecations'} unless $Stuff{'new:deprecations'} eq '';
 
     close(NEWHI) || &tidy_up_and_die(1,"Failed writing to $new_hi\n");
 }
@@ -198,6 +199,7 @@ sub readHiFile {
     $Stuff{"$mod:instances"}	    = '';
     $Stuff{"$mod:declarations"}	    = '';
     $Stuff{"$mod:rules"}	    = '';
+    $Stuff{"$mod:deprecations"}	    = '';
 
     if (! -f $hifile) { # no pre-existing .hi file
 	$HiExists{$mod} = 0;
@@ -231,6 +233,9 @@ sub readHiFile {
 
 	} elsif ( /^{-## __R / ) {
 	    $Stuff{"$mod:rules"} .= $_;
+	
+	} elsif ( /^{-## __D / ) {
+	    $Stuff{"$mod:deprecations"} .= $_;
 	
 	} elsif ( /^-[-]+ .*/ ) { # silently ignore comment lines.
 	    ;
@@ -314,7 +319,7 @@ sub calcNewModuleVersion {
 	return(&mv_change($changed_version, "orphan-hood changed"));
     }
 
-    foreach $t ( 'usages' , 'exports', 'instances', 'fixities', 'rules' ) {
+    foreach $t ( 'usages' , 'exports', 'instances', 'fixities', 'rules', 'deprecations' ) {
 	return(&mv_change($changed_version,"$t changed")) if $Stuff{"old:$t"} ne $Stuff{"new:$t"};
     }
 
