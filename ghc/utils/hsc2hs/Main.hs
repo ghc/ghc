@@ -1,5 +1,5 @@
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.31 2001/07/23 23:08:04 ken Exp $
+-- $Id: Main.hs,v 1.32 2001/07/24 05:49:32 ken Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -57,7 +57,7 @@ options = [
     Option "o" ["output"]     (ReqArg Output     "FILE") "name of main output file",
     Option ""  ["help"]       (NoArg  Help)              "display this help and exit",
     Option ""  ["version"]    (NoArg  Version)           "output version information and exit",
-    Option ""  ["no-compile"] (NoArg  NoCompile)         "stop after writing *_hsc_make.c",
+    Option ""  ["no-compile"] (NoArg  NoCompile)         "stop after writing *_hsc_make.c"]
 
 main :: IO ()
 main = do
