@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.107 2002/10/09 16:53:11 simonpj Exp $
+$Id: Parser.y,v 1.108 2002/10/10 15:14:37 sof Exp $
 
 Haskell grammar.
 
@@ -414,7 +414,7 @@ topdecl :: { RdrBinding }
 	| srcloc 'default' '(' comma_types0 ')'		{ RdrHsDecl (DefD (DefaultDecl $4 $1)) }
 	| 'foreign' fdecl				{ RdrHsDecl $2 }
 	| '{-# DEPRECATED' deprecations '#-}'	 	{ RdrBindings $2 }
-	| '{-# RULES' rules '#-}'		 	{ RdrBindings $2 }
+	| '{-# RULES' rules '#-}'		 	{ RdrBindings (reverse $2) }
 	| srcloc '$(' exp ')'				{ RdrHsDecl (SpliceD (SpliceDecl $3 $1)) }
       	| decl						{ $1 }
 
@@ -488,7 +488,8 @@ letbinds :: { RdrNameHsExpr -> RdrNameHsExpr }
 -- Transformation Rules
 
 rules	:: { [RdrBinding] }
-	:  rule ';' rules			{ $1 : $3 }
+	:  rules ';' rule			{ $3 : $1 }
+        |  rules ';'				{ $1 }
         |  rule					{ [$1] }
 	|  {- empty -}				{ [] }
 
