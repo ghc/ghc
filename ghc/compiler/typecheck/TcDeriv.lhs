@@ -46,17 +46,14 @@ import Maybes		( maybeToBool )
 import Name		( isLocallyDefined, getSrcLoc, ExportFlag(..), Provenance, 
 			  Name{--O only-}, SYN_IE(Module)
 			)
-import Outputable	( Outputable(..){-instances e.g., (,)-} )
+import Outputable	( PprStyle(..), Outputable(..){-instances e.g., (,)-} )
 import PprType		( GenType, GenTyVar, GenClass, TyCon )
-import PprStyle		( PprStyle(..) )
 import Pretty		( ($$), vcat, hsep, hcat, 
 		          ptext, text, char, hang, Doc )
---import Pretty--ToDo:rm
---import FiniteMap--ToDo:rm
 import SrcLoc		( mkGeneratedSrcLoc, SrcLoc )
 import TyCon		( tyConTyVars, tyConDataCons, tyConDerivings,
 			  tyConTheta, maybeTyConSingleCon,
-			  isEnumerationTyCon, isDataTyCon, TyCon
+			  isEnumerationTyCon, isAlgTyCon, TyCon
 			)
 import Type		( GenType(..), SYN_IE(TauType), mkTyVarTys, applyTyCon,
 			  mkSigmaTy, mkDictTy, isPrimType, instantiateTy,
@@ -298,9 +295,8 @@ makeDerivEqns :: TcM s [DerivEqn]
 makeDerivEqns
   = tcGetEnv			    `thenNF_Tc` \ env ->
     let
-	local_data_tycons = filter (\tc -> isLocallyDefined tc && isDataTyCon tc)
+	local_data_tycons = filter (\tc -> isLocallyDefined tc && isAlgTyCon tc)
 				   (getEnv_TyCons env)
-	-- ToDo: what about newtypes???
     in
     if null local_data_tycons then
 	-- Bale out now; evalClass may not be loaded if there aren't any
