@@ -581,17 +581,29 @@ install-dirs ::
 #install:: install-dirs
 
 ifneq "$(INSTALL_PROGS)" ""
+
+#
+# Here's an interesting one - when using the win32 version
+# of install (provided via the cygwin toolkit), we have to
+# supply the .exe suffix, *if* there's no other suffix.
+#
+# The rule below does this by ferreting out the suffix of each
+# entry in the INSTALL_PROGS list. If there's no suffix, use
+# $(exeext).
+# 
+# This is bit of a pain to express since GNU make doesn't have
+# something like $(if ...), but possible using $(subst ..)
+# [Aside: I added support for $(if ..) to my local copy of GNU
+# make at one stage, perhaps I should propagate the patch to
+# the GNU make maintainers..] 
+#
+INSTALL_PROGS := $(foreach p, $(INSTALL_PROGS), $(addsuffix $(subst _,,$(subst __,$(exeext),_$(suffix $(p))_)), $(basename $(p))))
+
 install:: $(INSTALL_PROGS)
 	@$(INSTALL_DIR) $(bindir)
 	@for i in $(INSTALL_PROGS); do \
-		case $$i in \
-		  *.dll) \
-		    echo $(INSTALL_DATA) $(INSTALL_BIN_OPTS) $$i $(bindir); \
-		    $(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(bindir) ;; \
-		  *) \
-		    echo $(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i$(exeext) $(bindir); \
-		    $(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i$(exeext) $(bindir) ;;  \
-		esac; \
+		    echo $(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(bindir); \
+		    $(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(bindir) ;;  \
 	done
 endif
 
@@ -640,10 +652,16 @@ install:: $(INSTALL_LIBS)
 endif
 
 ifneq "$(INSTALL_LIBEXECS)" ""
+#
+# See above comment next to defn of INSTALL_PROGS for what
+# the purpose of this one-liner is.
+# 
+INSTALL_LIBEXECS := $(foreach p, $(INSTALL_LIBEXECS), $(addsuffix $(subst _,,$(subst __,$(exeext),_$(suffix $(p))_)), $(basename $(p))))
+
 install:: $(INSTALL_LIBEXECS)
 	@$(INSTALL_DIR) $(libexecdir)
 	-for i in $(INSTALL_LIBEXECS); do \
-		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i$(exeext) $(libexecdir); \
+		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(libexecdir); \
 	done
 endif
 
