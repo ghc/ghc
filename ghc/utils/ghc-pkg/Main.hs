@@ -131,13 +131,14 @@ ourCopyright = "GHC package manager version " ++ version ++ "\n"
 usageHeader :: String -> String
 usageHeader prog = substProg prog $
   "Usage:\n" ++
-  "  $p {--help | -?}\n" ++
-  "    Produce this usage message.\n" ++
-  "\n" ++
-  "  $p register {filename | -} [--user | --global]\n" ++
+  "  $p register {filename | -}\n" ++
   "    Register the package using the specified installed package\n" ++
   "    description. The syntax for the latter is given in the $p\n" ++
   "    documentation.\n" ++
+  "\n" ++
+  "  $p update {filename | -}\n" ++
+  "    Register the package, overwriting any other package with the\n" ++
+  "    same name.\n" ++
   "\n" ++
   "  $p unregister {pkg-id}\n" ++
   "    Unregister the specified package.\n" ++
@@ -148,7 +149,7 @@ usageHeader prog = substProg prog $
   "  $p hide {pkg-id}\n" ++
   "    Hide the specified package.\n" ++
   "\n" ++
-  "  $p list [--global | --user]\n" ++
+  "  $p list\n" ++
   "    List all registered packages, both global and user (unless either\n" ++
   "    --global or --user is specified), and both hidden and exposed.\n" ++
   "\n" ++
@@ -159,7 +160,9 @@ usageHeader prog = substProg prog $
   "\n" ++
   "  $p field {pkg-id} {field}\n" ++
   "    Extract the specified field of the package description for the\n" ++
-  "    specified package.\n"
+  "    specified package.\n" ++
+  "\n" ++
+  " The following optional flags are also accepted:\n"
 
 substProg :: String -> String -> String
 substProg _ [] = []
