@@ -45,6 +45,15 @@ i[[3456]]86-*-solaris2*)
 i[[3456]]86-*-cygwin32*)
 	exeext='.exe'
 	TargetPlatform=i386-unknown-cygwin32;;
+i[[3456]]86-*-mingw32*)
+	exeext='.exe'
+	# We assume you're using mingw32 via the gcc that comes
+	# with cygwin, and not the native port, so let's augment
+	# the gcc command-line used here with -mno-cygwin to
+	# arrange for good things to happen.
+	CFLAGS="-mno-cygwin $CFLAGS"
+	TargetPlatform=i386-unknown-mingw32
+	;;
 m68k-next-nextstep2)
 	TargetPlatform=m68k-next-nextstep2;;
 m68k-next-nextstep3)
