@@ -1,4 +1,5 @@
 __interface TcIface 1 0 where
-
+__export TcIface tcImportDecl ;
 1 tcImportDecl :: Name.Name -> TcRnTypes.IfG TypeRep.TyThing ;
+
 
