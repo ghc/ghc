@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.106 2001/07/24 06:31:36 ken Exp $
+ * $Id: GC.c,v 1.107 2001/07/24 16:36:43 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -212,6 +212,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   bdescr *bd;
   step *stp;
   lnat live, allocated, collected = 0, copied = 0;
+  lnat oldgen_saved_blocks = 0;
   nat g, s;
 
 #ifdef PROFILING
@@ -248,7 +249,9 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   } else {
     N = 0;
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-      if (generations[g].steps[0].n_blocks >= generations[g].max_blocks) {
+      if (generations[g].steps[0].n_blocks +
+	  generations[g].steps[0].n_large_blocks
+	  >= generations[g].max_blocks) {
         N = g;
       }
     }
@@ -325,6 +328,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
       stp->scan_bd     = bd;
       stp->new_large_objects = NULL;
       stp->scavenged_large_objects = NULL;
+      stp->n_scavenged_large_blocks = 0;
       new_blocks++;
       // mark the large objects as not evacuated yet 
       for (bd = stp->large_objects; bd; bd = bd->link) {
@@ -390,6 +394,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
       stp->n_to_blocks = 0;
       stp->new_large_objects = NULL;
       stp->scavenged_large_objects = NULL;
+      stp->n_scavenged_large_blocks = 0;
     }
   }
 
@@ -588,6 +593,8 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   // NO MORE EVACUATION AFTER THIS POINT!
   // Finally: compaction of the oldest generation.
   if (major_gc && RtsFlags.GcFlags.compact) { 
+      // save number of blocks for stats
+      oldgen_saved_blocks = oldest_gen->steps[0].n_blocks;
       compact(get_roots);
   }
 
@@ -617,7 +624,12 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
       // for generations we collected... 
       if (g <= N) {
 
-	collected += stp->n_blocks * BLOCK_SIZE_W; // for stats 
+	  // rough calculation of garbage collected, for stats output
+	  if (stp->is_compacted) {
+	      collected += (oldgen_saved_blocks - stp->n_blocks) * BLOCK_SIZE_W;
+	  } else {
+	      collected += stp->n_blocks * BLOCK_SIZE_W;
+	  }
 
 	/* free old memory and shift to-space into from-space for all
 	 * the collected steps (except the allocation area).  These
@@ -665,10 +677,13 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 	  freeGroup(bd);
 	  bd = next;
 	}
+
+	// update the count of blocks used by large objects
 	for (bd = stp->scavenged_large_objects; bd != NULL; bd = bd->link) {
 	  bd->flags &= ~BF_EVACUATED;
 	}
-	stp->large_objects = stp->scavenged_large_objects;
+	stp->large_objects  = stp->scavenged_large_objects;
+	stp->n_large_blocks = stp->n_scavenged_large_blocks;
 
 	/* Set the maximum blocks for this generation, interpolating
 	 * between the maximum size of the oldest and youngest
@@ -701,10 +716,11 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 
 	// add the new blocks we promoted during this GC 
 	stp->n_blocks += stp->n_to_blocks;
+	stp->n_large_blocks += stp->n_scavenged_large_blocks;
       }
     }
   }
-  
+
   /* Set the maximum blocks for the oldest generation, based on twice
    * the amount of live data now, adjusted to fit the maximum heap
    * size if necessary.  
@@ -823,7 +839,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
       nat needed = calcNeeded(); 	// approx blocks needed at next GC 
 
       /* Guess how much will be live in generation 0 step 0 next time.
-       * A good approximation is the obtained by finding the
+       * A good approximation is obtained by finding the
        * percentage of g0s0 that was live at the last minor GC.
        */
       if (N == 0) {
@@ -1135,8 +1151,12 @@ isAlive(StgClosure *p)
 	return p;
     }
     // large objects have an evacuated flag
-    if ((bd->flags & BF_LARGE) && (bd->flags & BF_EVACUATED)) {
-	return p;
+    if (bd->flags & BF_LARGE) {
+	if (bd->flags & BF_EVACUATED) {
+	    return p;
+	} else {
+	    return NULL;
+	}
     }
     // check the mark bit for compacted steps
     if (bd->step->is_compacted && is_marked((P_)p,bd)) {
@@ -2348,6 +2368,7 @@ scavenge_mark_stack(void)
 	case CONSTR_2_0:
 	    ((StgClosure *)p)->payload[1] = evacuate(((StgClosure *)p)->payload[1]);
 	    ((StgClosure *)p)->payload[0] = evacuate(((StgClosure *)p)->payload[0]);
+	    mark(p+1,Bdescr(p));
 	    break;
 	
 	case FUN_1_0:
@@ -2358,6 +2379,7 @@ scavenge_mark_stack(void)
 	case CONSTR_1_0:
 	case CONSTR_1_1:
 	    ((StgClosure *)p)->payload[0] = evacuate(((StgClosure *)p)->payload[0]);
+	    mark(p+1,Bdescr(p));
 	    break;
 	
 	case FUN_0_1:
@@ -2367,6 +2389,7 @@ scavenge_mark_stack(void)
 	    scavenge_srt(info);
 	case CONSTR_0_1:
 	case CONSTR_0_2:
+	    mark(p+1,Bdescr(p));
 	    break;
 	
 	case FUN:
@@ -2403,6 +2426,7 @@ scavenge_mark_stack(void)
 		recordOldToNewPtrs((StgMutClosure *)p);
 	    }
 	    failed_to_evac = rtsFalse;
+	    mark(p+1,Bdescr(p));
 	    break;
 
 	case MUT_VAR:
@@ -2410,6 +2434,7 @@ scavenge_mark_stack(void)
 	    ((StgMutVar *)p)->var = evacuate(((StgMutVar *)p)->var);
 	    evac_gen = saved_evac_gen;
 	    failed_to_evac = rtsFalse;
+	    mark(p+1,Bdescr(p));
 	    break;
 
 	case MUT_CONS:
@@ -2828,12 +2853,31 @@ scavenge_mutable_list(generation *gen)
 	continue;
       }
       
+      // Happens if a MUT_ARR_PTRS in the old generation is frozen
+    case MUT_ARR_PTRS_FROZEN:
+      {
+	StgPtr end, q;
+	
+	evac_gen = gen->no;
+	end = (P_)p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
+	for (q = (P_)((StgMutArrPtrs *)p)->payload; q < end; q++) {
+	  (StgClosure *)*q = evacuate((StgClosure *)*q);
+	}
+	evac_gen = 0;
+	p->mut_link = NULL;
+	if (failed_to_evac) {
+	    failed_to_evac = rtsFalse;
+	    mkMutCons((StgClosure *)p, gen);
+	}
+	continue;
+      }
+	
     case MUT_VAR:
 	((StgMutVar *)p)->var = evacuate(((StgMutVar *)p)->var);
 	p->mut_link = gen->mut_list;
 	gen->mut_list = p;
 	continue;
-      
+
     case MVAR:
       {
 	StgMVar *mvar = (StgMVar *)p;
@@ -3265,6 +3309,9 @@ scavenge_large(step *stp)
      */
     stp->new_large_objects = bd->link;
     dbl_link_onto(bd, &stp->scavenged_large_objects);
+
+    // update the block count in this step.
+    stp->n_scavenged_large_blocks += bd->blocks;
 
     p = bd->start;
     info  = get_itbl((StgClosure *)p);

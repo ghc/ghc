@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStorage.h,v 1.9 2001/07/23 17:23:19 simonmar Exp $
+ * $Id: StgStorage.h,v 1.10 2001/07/24 16:36:44 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -48,38 +48,40 @@
  */
 
 typedef struct _step {
-  unsigned int no;		/* step number */
-  bdescr *blocks;		/* blocks in this step */
-  unsigned int n_blocks;	/* number of blocks */
-  struct _step *to;		/* where collected objects from this step go */
-  struct _generation *gen;	/* generation this step belongs to */
-  unsigned int gen_no;          /* generation number (cached) */
-  bdescr *large_objects;	/* large objects (doubly linked) */
-  int is_compacted;             /* compact this step */
+  unsigned int         no;		/* step number */
+  bdescr *             blocks;		/* blocks in this step */
+  unsigned int         n_blocks;	/* number of blocks */
+  struct _step *       to;		/* destination step for live objects */
+  struct _generation * gen;		/* generation this step belongs to */
+  unsigned int         gen_no;          /* generation number (cached) */
+  bdescr *             large_objects;	/* large objects (doubly linked) */
+  unsigned int         n_large_blocks;  /* no. of blocks used by large objs */
+  int                  is_compacted;	/* compact this step? (old gen only) */
 
   /* temporary use during GC: */
-  StgPtr  hp;			/* next free locn in to-space */
-  StgPtr  hpLim;		/* end of current to-space block */
-  bdescr *hp_bd;		/* bdescr of current to-space block */
-  bdescr *to_blocks;		/* bdescr of first to-space block */
-  unsigned int n_to_blocks;	/* number of blocks in to-space */
-  bdescr *scan_bd;		/* block currently being scanned */
-  StgPtr  scan;			/* scan pointer in current block */
-  bdescr *new_large_objects;    /* large objects collected so far */
-  bdescr *scavenged_large_objects; /* live large objects after GC (dbl link) */
-  bdescr *bitmap;               /* bitmap for compacting collection */
+  StgPtr       hp;			/* next free locn in to-space */
+  StgPtr       hpLim;			/* end of current to-space block */
+  bdescr *     hp_bd;			/* bdescr of current to-space block */
+  bdescr *     to_blocks;		/* bdescr of first to-space block */
+  unsigned int n_to_blocks;		/* number of blocks in to-space */
+  bdescr *     scan_bd;			/* block currently being scanned */
+  StgPtr       scan;			/* scan pointer in current block */
+  bdescr *     new_large_objects;    	/* large objects collected so far */
+  bdescr *     scavenged_large_objects; /* live large objs after GC (d-link) */
+  unsigned int n_scavenged_large_blocks;/* size of above */
+  bdescr *     bitmap;  		/* bitmap for compacting collection */
 } step;
 
 typedef struct _generation {
-  unsigned int no;		/* generation number */
-  step *steps;			/* steps */
-  unsigned int n_steps;		/* number of steps */
-  unsigned int max_blocks;	/* max blocks in step 0 */
-  StgMutClosure *mut_list;      /* mutable objects in this generation (not G0)*/
-  StgMutClosure *mut_once_list; /* objects that point to younger generations */
+  unsigned int   no;			/* generation number */
+  step *         steps;			/* steps */
+  unsigned int   n_steps;		/* number of steps */
+  unsigned int   max_blocks;		/* max blocks in step 0 */
+  StgMutClosure *mut_list;      	/* mut objects in this gen (not G0)*/
+  StgMutClosure *mut_once_list; 	/* objects that point to younger gens */
 
   /* temporary use during GC: */
-  StgMutClosure *saved_mut_list;
+  StgMutClosure * saved_mut_list;
 
   /* stats information */
   unsigned int collections;

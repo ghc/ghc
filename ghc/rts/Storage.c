@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.41 2001/07/23 17:23:20 simonmar Exp $
+ * $Id: Storage.c,v 1.42 2001/07/24 16:36:43 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -605,7 +605,7 @@ calcLive(void)
 	  continue; 
       }
       stp = &generations[g].steps[s];
-      live += (stp->n_blocks - 1) * BLOCK_SIZE_W;
+      live += (stp->n_large_blocks + stp->n_blocks - 1) * BLOCK_SIZE_W;
       if (stp->hp_bd != NULL) {
 	  live += ((lnat)stp->hp_bd->free - (lnat)stp->hp_bd->start) 
 	      / sizeof(W_);
@@ -633,7 +633,9 @@ calcNeeded(void)
     for (s = 0; s < generations[g].n_steps; s++) {
       if (g == 0 && s == 0) { continue; }
       stp = &generations[g].steps[s];
-      if (generations[g].steps[0].n_blocks > generations[g].max_blocks
+      if (generations[g].steps[0].n_blocks +
+	  generations[g].steps[0].n_large_blocks 
+	  > generations[g].max_blocks
 	  && stp->is_compacted == 0) {
 	needed += 2 * stp->n_blocks;
       } else {
@@ -712,7 +714,7 @@ countBlocks(bdescr *bd)
 {
     nat n;
     for (n=0; bd != NULL; bd=bd->link) {
-	n++;
+	n += bd->blocks;
     }
     return n;
 }
@@ -732,9 +734,11 @@ checkSanity( void )
 	    for (s = 0; s < generations[g].n_steps; s++) {
 		if (g == 0 && s == 0) { continue; }
 		checkHeap(generations[g].steps[s].blocks);
+		checkChain(generations[g].steps[s].large_objects);
 		ASSERT(countBlocks(generations[g].steps[s].blocks)
 		       == generations[g].steps[s].n_blocks);
-		checkChain(generations[g].steps[s].large_objects);
+		ASSERT(countBlocks(generations[g].steps[s].large_objects)
+		       == generations[g].steps[s].n_large_blocks);
 		if (g > 0) {
 		    checkMutableList(generations[g].mut_list, g);
 		    checkMutOnceList(generations[g].mut_once_list, g);
