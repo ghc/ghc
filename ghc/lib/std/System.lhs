@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: System.lhs,v 1.36 2001/10/13 16:02:47 sof Exp $
+-- $Id: System.lhs,v 1.37 2001/11/08 16:36:39 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1994-2000
 --
@@ -44,7 +44,8 @@ getArgs =
    peekArray (p - 1) (advancePtr argv 1) >>= mapM peekCString
    
    
-foreign import "getProgArgv" getProgArgv :: Ptr CInt -> Ptr (Ptr CString) -> IO ()
+foreign import "getProgArgv" unsafe 
+  getProgArgv :: Ptr CInt -> Ptr (Ptr CString) -> IO ()
 
 -- Computation `getProgName' returns the name of the program
 -- as it was invoked.
