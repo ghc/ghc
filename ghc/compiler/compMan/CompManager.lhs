@@ -39,6 +39,7 @@ import DriverUtil
 import Outputable
 import Panic
 import CmdLineOpts	( DynFlags(..) )
+import IOExts
 
 #ifdef GHCI
 import Interpreter	( HValue )
@@ -56,7 +57,7 @@ import Directory        ( getModificationTime, doesFileExist )
 import IO
 import Monad
 import List		( nub )
-import Maybe		( catMaybes, fromMaybe, maybeToList )
+import Maybe		( catMaybes, fromMaybe, maybeToList, isJust )
 \end{code}
 
 
@@ -158,7 +159,7 @@ cmUnload state
    where
      CmState{ pcms=pcms } = state
      PersistentCMState{ hst=hst, hit=hit } = pcms
-     (new_hst, new_hit,[]) = retainInTopLevelEnvs [] (hst,hit,[])
+     (new_hst, new_hit) = retainInTopLevelEnvs [] (hst,hit)
 \end{code}
 
 The real business of the compilation manager: given a system state and
@@ -214,6 +215,20 @@ cmLoadModule cmstate1 rootname
         -- not in strict downwards closure, during calls to compile.
         let mg2_with_srcimps = topological_sort True mg2unsorted
 
+	-- Sort out which linkables we wish to keep in the unlinked image.
+	-- For each module, we take:
+	--
+	--	- the old in-core linkable, if available
+	--	- an on-disk linkable, if available
+	--
+	-- and we take the youngest of these, provided it is younger than the
+	-- source file.
+	--
+	-- If a module has a valid linkable, then it may be STABLE (see below),
+	-- and it is classified as SOURCE UNCHANGED for the purposes of calling
+	-- compile.
+	valid_linkables <- getValidLinkables ui1 mg2unsorted
+
         -- Figure out a stable set of modules which can be retained
         -- the top level envs, to avoid upsweeping them.  Goes to a
         -- bit of trouble to avoid upsweeping module cycles.
@@ -222,28 +237,21 @@ cmLoadModule cmstate1 rootname
         -- Travel upwards, over the sccified graph.  For each scc
         -- of modules ms, add ms to S only if:
         -- 1.  All home imports of ms are either in ms or S
-        -- 2.  All m <- ms satisfy P, where
-        --      P | interactive = have old summary for m and it indicates
-        --                        that the source is unchanged
-        --        | batch = linkable exists on disk, and is younger 
-        --                  than source.
+        -- 2.  A valid linkable exists for each module in ms
 
-        (stable_mods, linkables_for_stable_mods)
-           <- preUpsweep ghci_mode ui1 mg1 mg2unsorted_names [] [] mg2_with_srcimps
-        let stable_old_summaries
-               = concatMap (findInSummaries mg1) stable_mods
+        stable_mods
+           <- preUpsweep valid_linkables mg2unsorted_names [] mg2_with_srcimps
+
+        let stable_summaries
+               = concatMap (findInSummaries mg2unsorted) stable_mods
 
         when (verb >= 2) $
            putStrLn (showSDoc (text "STABLE MODULES:" 
                                <+> sep (map (text.moduleNameUserString) stable_mods)))
 
+        let (hst2, hit2) = retainInTopLevelEnvs stable_mods (hst1, hit1)
 
-        let (hst2, hit2, [])
-               = retainInTopLevelEnvs stable_mods (hst1, hit1, [])
-            ui2 
-               = linkables_for_stable_mods
-
-	-- Now hst2, hit2, ui2 now hold the 'reduced system', just the set of
+	-- Now hst2 and hit2 now hold the 'reduced system', just the set of
 	-- modules which are stable.
 
         -- We could at this point detect cycles which aren't broken by
@@ -269,10 +277,10 @@ cmLoadModule cmstate1 rootname
         let threaded2 = CmThreaded pcs1 hst2 hit2
 
         (upsweep_complete_success, threaded3, modsUpswept, newLis)
-           <- upsweep_mods ghci_mode dflags ui2 reachable_from 
+           <- upsweep_mods ghci_mode dflags valid_linkables reachable_from 
                            threaded2 upsweep_these
 
-        let ui3 = add_to_ui ui2 newLis
+        let ui3 = add_to_ui valid_linkables newLis
         let (CmThreaded pcs3 hst3 hit3) = threaded3
 
         -- At this point, modsUpswept and newLis should have the same
@@ -285,7 +293,7 @@ cmLoadModule cmstate1 rootname
 	--  with some object on disk ???)
         -- Get in in a roughly top .. bottom order (hence reverse).
 
-        let modsDone = reverse modsUpswept ++ stable_old_summaries
+        let modsDone = reverse modsUpswept ++ stable_summaries
 
         -- Try and do linking in some form, depending on whether the
         -- upsweep was completely or only partially successful.
@@ -347,27 +355,90 @@ cmLoadModule cmstate1 rootname
                                   map ms_mod mods_to_keep)
 
 
+-----------------------------------------------------------------------------
+-- getValidLinkables
 
+getValidLinkables
+	:: [Linkable]			-- old linkables
+	-> [ModSummary]			-- all modules in the program
+	-> IO [Linkable]		-- still-valid linkables 
+
+getValidLinkables old_linkables summaries
+  = do lis <- mapM (getValidLinkable old_linkables) summaries
+       return (concat lis)
+
+getValidLinkable old_linkables summary
+  = do let mod_name = moduleName (ms_mod summary)
+       maybe_disk_linkable
+           <- case ml_obj_file (ms_location summary) of
+                 Nothing -> return Nothing
+                 Just obj_fn -> maybe_getFileLinkable mod_name obj_fn
+
+	-- find an old in-core linkable if we have one. (forget about
+	-- on-disk linkables for now, we'll check again whether there's
+	-- one here below, just in case a new one has popped up recently).
+       let old_linkable = findModuleLinkable_maybe old_linkables mod_name
+           maybe_old_linkable =
+	 	case old_linkable of
+	    	    Just (LM _ _ ls) | all isInterpretable ls -> old_linkable
+	    	    _ -> Nothing      
+
+       -- The most recent of the old UI linkable or whatever we could
+       -- find on disk.  Is returned as the linkable if compile
+       -- doesn't think we need to recompile.        
+       let linkable_list
+               = case (maybe_old_linkable, maybe_disk_linkable) of
+                    (Nothing, Nothing) -> []
+                    (Nothing, Just di) -> [di]
+                    (Just ui, Nothing) -> [ui]
+                    (Just ui, Just di)
+                       | linkableTime ui >= linkableTime di -> [ui]
+                       | otherwise                          -> [di]
+
+       -- only linkables newer than the source code are valid
+       let maybe_src_date = ms_hs_date summary
+
+	   valid_linkable_list
+	      = case maybe_src_date of
+		  Nothing -> panic "valid_linkable_list"
+		  Just src_date	
+		      -> filter (\li -> linkableTime li > src_date) linkable_list
+
+       return valid_linkable_list
+
+
+
+maybe_getFileLinkable :: ModuleName -> FilePath -> IO (Maybe Linkable)
+maybe_getFileLinkable mod_name obj_fn
+   = do obj_exist <- doesFileExist obj_fn
+        if not obj_exist 
+         then return Nothing 
+         else 
+         do let stub_fn = case splitFilename3 obj_fn of
+                             (dir, base, ext) -> dir ++ "/" ++ base ++ ".stub_o"
+            stub_exist <- doesFileExist stub_fn
+            obj_time <- getModificationTime obj_fn
+            if stub_exist
+             then return (Just (LM obj_time mod_name [DotO obj_fn, DotO stub_fn]))
+             else return (Just (LM obj_time mod_name [DotO obj_fn]))
+
+
+-----------------------------------------------------------------------------
 -- Do a pre-upsweep without use of "compile", to establish a 
 -- (downward-closed) set of stable modules which can be retained
 -- in the top-level environments.  Also return linkables for those 
 -- modules determined to be stable, since (in Batch mode, at least)
 -- there's no other way for them to get into UI.
-preUpsweep :: GhciMode
-           -> [Linkable]	-- linkables from previous cmLoadModule pass
-				-- should be [] in batch mode
-           -> [ModSummary]      -- summaries from previous cmLoadModule pass
-				-- should be [] in batch mode
+
+preUpsweep :: [Linkable]	-- valid linkables
            -> [ModuleName]      -- names of all mods encountered in downsweep
            -> [ModuleName]      -- accumulating stable modules
-           -> [Linkable]        -- their linkables, in batch mode
            -> [SCC ModSummary]  -- scc-ified mod graph, including src imps
-           -> IO ([ModuleName], [Linkable])
-				-- stable modules and their linkables
+           -> IO [ModuleName]	-- stable modules
 
-preUpsweep ghci_mode old_lis old_summaries all_home_mods stable lis [] 
-   = return (stable, lis)
-preUpsweep ghci_mode old_lis old_summaries all_home_mods stable lis (scc0:sccs)
+preUpsweep valid_lis all_home_mods stable [] 
+   = return stable
+preUpsweep valid_lis all_home_mods stable (scc0:sccs)
    = do let scc = flattenSCC scc0
             scc_allhomeimps :: [ModuleName]
             scc_allhomeimps 
@@ -380,19 +451,18 @@ preUpsweep ghci_mode old_lis old_summaries all_home_mods stable lis (scc0:sccs)
                = --trace (showSDoc (text "ISOS" <+> ppr m <+> ppr scc_names <+> ppr stable)) (
                  m `elem` scc_names || m `elem` stable
                  --)
-        (all_scc_stable, more_lis)
+        all_scc_stable
            <- if   not all_imports_in_scc_or_stable
                then do --putStrLn ("PART1 fail " ++ showSDoc (ppr scc_allhomeimps <+> ppr (filter (not.in_stable_or_scc) scc_allhomeimps)))
-                       return (False, [])
-               else do bools_n_lis 
-                          <- mapM (is_stable ghci_mode old_lis old_summaries) scc
-                       let (bools, liss) = unzip bools_n_lis
-                       --when (not (and bools)) (putStrLn ("PART2 fail: " ++ showSDoc (ppr scc_names)))
-                       return (and bools, concat liss)
+                       return False
+               else do --when (not (and bools)) (putStrLn ("PART2 fail: " ++ showSDoc (ppr scc_names)))
+                       return (all is_stable scc)
         if not all_scc_stable
-         then preUpsweep ghci_mode old_lis old_summaries all_home_mods stable lis sccs
-         else preUpsweep ghci_mode old_lis old_summaries all_home_mods 
-                         (scc_names++stable) (more_lis++lis) sccs
+         then preUpsweep valid_lis all_home_mods stable sccs
+         else preUpsweep valid_lis all_home_mods (scc_names++stable) sccs
+
+   where is_stable new_summary
+   	    = isJust (findModuleLinkable_maybe valid_lis (name_of_summary new_summary))
 
 
 -- Helper for preUpsweep.  Assuming that new_summary's imports are all
@@ -401,43 +471,6 @@ preUpsweep ghci_mode old_lis old_summaries all_home_mods stable lis (scc0:sccs)
 findInSummaries :: [ModSummary] -> ModuleName -> [ModSummary]
 findInSummaries old_summaries mod_name
    = [s | s <- old_summaries, name_of_summary s == mod_name]
-
-is_stable :: GhciMode 
-          -> [Linkable] -> [ModSummary] -- OLD lis and summs, in Interactive mode
-          -> ModSummary			-- this module
-          -> IO (Bool, [Linkable])
-
-is_stable Interactive old_lis old_summaries new_summary
-   -- Only true if the old summary exists and
-   -- the new source date matches the old one.
-   = case found_old_summarys of
-        [] -> return (False, old_linkable)
-        (old_summary:_)
-           -> case (ms_hs_date new_summary, ms_hs_date old_summary) of
-                 (Just d1, Just d2) -> return (d1 == d2, old_linkable)
-                 (_,       _      ) -> return (False, old_linkable)
-     where
-        old_linkable
-           = maybeToList
-                (findModuleLinkable_maybe old_lis (name_of_summary new_summary))
-        found_old_summarys
-           = findInSummaries old_summaries (name_of_summary new_summary)
-
-is_stable Batch [] [] new_summary
-   -- Only true if we can find a linkable, and it is younger than
-   -- the source time.
-   = case ms_hs_date new_summary of
-        Nothing -> return (False, [])  -- no source date (?!)
-        Just hs_time 
-         -> case ml_obj_file (ms_location new_summary) of
-               Nothing -> return (False, [])  -- no obj filename
-               Just fn 
-                -> do maybe_li <- maybe_getFileLinkable
-                                     (moduleName (ms_mod new_summary)) fn
-                      case maybe_li of
-                         Nothing -> return (False, []) -- no object file on disk
-                         Just li -> return (linkableTime li >= hs_time, [li])
-
 
 
 -- Return (names of) all those in modsDone who are part of a cycle
@@ -492,7 +525,7 @@ data CmThreaded  -- stuff threaded through individual module compilations
 -- There better had not be any cyclic groups here -- we check for them.
 upsweep_mods :: GhciMode
 	     -> DynFlags
-             -> UnlinkedImage         -- old linkables
+             -> UnlinkedImage         -- valid linkables
              -> (ModuleName -> [ModuleName])  -- to construct downward closures
              -> CmThreaded            -- PCS & HST & HIT
              -> [SCC ModSummary]      -- mods to do (the worklist)
@@ -534,21 +567,6 @@ upsweep_mods ghci_mode dflags oldUI reachable_from threaded
 
 -- Compile a single module.  Always produce a Linkable for it if 
 -- successful.  If no compilation happened, return the old Linkable.
-maybe_getFileLinkable :: ModuleName -> FilePath -> IO (Maybe Linkable)
-maybe_getFileLinkable mod_name obj_fn
-   = do obj_exist <- doesFileExist obj_fn
-        if not obj_exist 
-         then return Nothing 
-         else 
-         do let stub_fn = case splitFilename3 obj_fn of
-                             (dir, base, ext) -> dir ++ "/" ++ base ++ ".stub_o"
-            stub_exist <- doesFileExist stub_fn
-            obj_time <- getModificationTime obj_fn
-            if stub_exist
-             then return (Just (LM obj_time mod_name [DotO obj_fn, DotO stub_fn]))
-             else return (Just (LM obj_time mod_name [DotO obj_fn]))
-
-
 upsweep_mod :: GhciMode 
 	    -> DynFlags
             -> UnlinkedImage
@@ -574,37 +592,14 @@ upsweep_mod ghci_mode dflags oldUI threaded1 summary1 reachable_from_here
         let (CmThreaded pcs1 hst1 hit1) = threaded1
         let old_iface = lookupUFM hit1 mod_name
 
-        let maybe_oldUI_linkable = findModuleLinkable_maybe oldUI mod_name
-        maybe_oldDisk_linkable
-           <- case ml_obj_file (ms_location summary1) of
-                 Nothing -> return Nothing
-                 Just obj_fn -> maybe_getFileLinkable mod_name obj_fn
+        let maybe_old_linkable = findModuleLinkable_maybe oldUI mod_name
 
-        -- The most recent of the old UI linkable or whatever we could
-        -- find on disk.  Is returned as the linkable if compile
-        -- doesn't think we need to recompile.        
-        let maybe_old_linkable
-               = case (maybe_oldUI_linkable, maybe_oldDisk_linkable) of
-                    (Nothing, Nothing) -> Nothing
-                    (Nothing, Just di) -> Just di
-                    (Just ui, Nothing) -> Just ui
-                    (Just ui, Just di)
-                       | linkableTime ui >= linkableTime di -> Just ui
-                       | otherwise                          -> Just di
+            source_unchanged = isJust maybe_old_linkable
 
-        let compilation_mandatory
-               = case maybe_old_linkable of
-                    Nothing -> True
-                    Just li -> case ms_hs_date summary1 of
-                                  Nothing -> panic "compilation_mandatory:no src date"
-                                  Just src_date -> src_date >= linkableTime li
-            source_unchanged
-               = not compilation_mandatory
-
-            (hst1_strictDC, hit1_strictDC, [])
+            (hst1_strictDC, hit1_strictDC)
                = retainInTopLevelEnvs 
                     (filter (/= (name_of_summary summary1)) reachable_from_here)
-                    (hst1,hit1,[])
+                    (hst1,hit1)
 
             old_linkable 
                = unJust "upsweep_mod:old_linkable" maybe_old_linkable
@@ -666,12 +661,11 @@ removeFromTopLevelEnvs zap_these (hst, hit, ui)
      )
 
 retainInTopLevelEnvs :: [ModuleName]
-                        -> (HomeSymbolTable, HomeIfaceTable, UnlinkedImage)
-                        -> (HomeSymbolTable, HomeIfaceTable, UnlinkedImage)
-retainInTopLevelEnvs keep_these (hst, hit, ui)
+                        -> (HomeSymbolTable, HomeIfaceTable)
+                        -> (HomeSymbolTable, HomeIfaceTable)
+retainInTopLevelEnvs keep_these (hst, hit)
    = (retainInUFM hst keep_these,
-      retainInUFM hit keep_these,
-      filterModuleLinkables (`elem` keep_these) ui
+      retainInUFM hit keep_these
      )
      where
         retainInUFM :: Uniquable key => UniqFM elt -> [key] -> UniqFM elt
