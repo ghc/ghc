@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.35 2002/06/19 20:45:14 sof Exp $
+ * $Id: RtsAPI.c,v 1.36 2002/08/16 14:30:21 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -232,12 +232,13 @@ rts_mkString (char *s)
 HaskellObj
 rts_apply (HaskellObj f, HaskellObj arg)
 {
-  StgAP_UPD *ap = (StgAP_UPD *)alloc(AP_sizeW(1));
-  SET_HDR(ap, &stg_AP_UPD_info, CCS_SYSTEM);
-  ap->n_args = 1;
-  ap->fun    = f;
-  ap->payload[0] = arg;
-  return (StgClosure *)ap;
+    StgClosure *ap;
+
+    ap = (StgClosure *)alloc(sizeofW(StgClosure) + 2);
+    SET_HDR(ap, (StgInfoTable *)&stg_ap_2_upd_info, CCS_SYSTEM);
+    ap->payload[0] = f;
+    ap->payload[1] = arg;
+    return (StgClosure *)ap;
 }
 
 /* ----------------------------------------------------------------------------
