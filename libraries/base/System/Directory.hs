@@ -67,6 +67,7 @@ import Control.Exception       ( bracket )
 import System.Posix.Types
 import System.Time             ( ClockTime(..) )
 import System.IO
+import System.IO.Error
 import Foreign
 import Foreign.C
 
@@ -237,6 +238,7 @@ The operand refers to an existing non-directory object.
 
 removeDirectory :: FilePath -> IO ()
 removeDirectory path = do
+  modifyIOError (`ioeSetFileName` path) $
     withCString path $ \s ->
        throwErrnoIfMinus1Retry_ "removeDirectory" (c_rmdir s)
 
@@ -276,6 +278,7 @@ The operand refers to an existing directory.
 
 removeFile :: FilePath -> IO ()
 removeFile path = do
+  modifyIOError (`ioeSetFileName` path) $
     withCString path $ \s ->
       throwErrnoIfMinus1Retry_ "removeFile" (c_unlink s)
 
@@ -428,6 +431,7 @@ The path refers to an existing non-directory object.
 
 getDirectoryContents :: FilePath -> IO [FilePath]
 getDirectoryContents path = do
+  modifyIOError (`ioeSetFileName` path) $
    alloca $ \ ptr_dEnt ->
      bracket
 	(withCString path $ \s -> 
@@ -537,6 +541,7 @@ The path refers to an existing non-directory object.
 
 setCurrentDirectory :: FilePath -> IO ()
 setCurrentDirectory path = do
+  modifyIOError (`ioeSetFileName` path) $
     withCString path $ \s -> 
        throwErrnoIfMinus1Retry_ "setCurrentDirectory" (c_chdir s)
 	-- ToDo: add path to error
@@ -566,6 +571,7 @@ getModificationTime name =
 
 withFileStatus :: FilePath -> (Ptr CStat -> IO a) -> IO a
 withFileStatus name f = do
+  modifyIOError (`ioeSetFileName` name) $
     allocaBytes sizeof_stat $ \p ->
       withCString (fileNameEndClean name) $ \s -> do
         throwErrnoIfMinus1Retry_ "withFileStatus" (c_stat s p)
@@ -573,6 +579,7 @@ withFileStatus name f = do
 
 withFileOrSymlinkStatus :: FilePath -> (Ptr CStat -> IO a) -> IO a
 withFileOrSymlinkStatus name f = do
+  modifyIOError (`ioeSetFileName` name) $
     allocaBytes sizeof_stat $ \p ->
       withCString name $ \s -> do
         throwErrnoIfMinus1Retry_ "withFileOrSymlinkStatus" (lstat s p)
