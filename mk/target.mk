@@ -308,6 +308,10 @@ endif
 ifneq "$(C_PROG)" ""
 all :: $(C_PROG)
 
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+CC_OPTS += -mno-cygwin
+endif
+
 $(C_PROG) :: $(C_OBJS)
 	$(CC) -o $@ $(CC_OPTS) $(LD_OPTS) $(C_OBJS) $(LIBS)
 endif
