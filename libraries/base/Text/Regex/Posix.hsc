@@ -48,6 +48,8 @@ module Text.Regex.Posix (
 #include "regex.h"
 #else
 #include "regex/regex.h"
+
+-- CFILES stuff is Hugs only
 {-# CFILES cbits/regex/reallocf.c #-}
 {-# CFILES cbits/regex/regcomp.c #-}
 {-# CFILES cbits/regex/regerror.c #-}
@@ -174,6 +176,26 @@ unpack string p_match = do
 
 type CRegMatch = ()
 
+#ifdef __GLASGOW_HASKELL__
+foreign import ccall unsafe "regcomp"
+  c_regcomp :: Ptr CRegex -> CString -> CInt -> IO CInt
+
+foreign import ccall  unsafe "&regfree"
+  ptr_regfree :: FunPtr (Ptr CRegex -> IO ())
+
+foreign import ccall unsafe "regexec"
+  c_regexec :: Ptr CRegex -> CString -> CSize
+	    -> Ptr CRegMatch -> CInt -> IO CInt
+#else
+-- For NHC and (we think) Hugs, we have to hackily put
+-- the regex.h include in the name of the C function to
+-- import.  (GHC does this by interpreting the
+-- "-#include regex.h" OPTIONS pragma that hsc2hs generates.
+-- The trouble with the hacky solution is that sometimes
+-- we want regex.h and sometimes regex/regex.h.  I'm not
+-- sure if the hack will work for NHC and Hugs on all 
+-- platforms
+
 foreign import ccall unsafe "regex.h regcomp"
   c_regcomp :: Ptr CRegex -> CString -> CInt -> IO CInt
 
@@ -183,3 +205,4 @@ foreign import ccall  unsafe "regex.h &regfree"
 foreign import ccall unsafe "regex.h regexec"
   c_regexec :: Ptr CRegex -> CString -> CSize
 	    -> Ptr CRegMatch -> CInt -> IO CInt
+#endif
