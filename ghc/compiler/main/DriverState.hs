@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.9 2000/10/27 14:56:00 sewardj Exp $
+-- $Id: DriverState.hs,v 1.10 2000/10/27 15:40:01 simonpj Exp $
 --
 -- Settings for the driver
 --
@@ -16,9 +16,12 @@ import CmdLineOpts
 import DriverUtil
 import Util
 import Config
-
 import Exception
 import IOExts
+#ifdef mingw32_TARGET_OS
+import TmpFiles	( newTempName )
+import Directory ( removeFile )
+#endif
 
 import System
 import IO
