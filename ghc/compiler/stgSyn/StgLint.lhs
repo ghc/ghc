@@ -22,7 +22,7 @@ import ErrUtils		( ErrMsg, Message, addErrLocHdrLine, pprBagOfErrors, dontAddErr
 import Type		( mkFunTys, splitFunTys, splitTyConApp_maybe,
 			  isUnLiftedType, isTyVarTy, splitForAllTys, Type
 			)
-import TyCon		( TyCon, isDataTyCon, tyConDataCons )
+import TyCon		( TyCon, isAlgTyCon, isNewTyCon, tyConDataCons )
 import Util		( zipEqual, equalLength )
 import Outputable
 
@@ -254,7 +254,8 @@ lintStgAlts alts scrut_ty
 
 lintAlgAlt scrut_ty (con, args, _, rhs)
   = (case splitTyConApp_maybe scrut_ty of
-      Just (tycon, tys_applied) | isDataTyCon tycon ->
+      Just (tycon, tys_applied) | isAlgTyCon tycon && 
+				  not (isNewTyCon tycon) ->
 	 let
 	   cons    = tyConDataCons tycon
 	   arg_tys = dataConArgTys con tys_applied
