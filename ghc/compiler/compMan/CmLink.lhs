@@ -188,7 +188,7 @@ unload Interactive dflags linkables pls
 	   | linkableInSet l linkables
 		= return True
 	   | otherwise
-		= do mapM unloadObj [ f | DotO f <- objs ]
+		= do mapM_ unloadObj [ f | DotO f <- objs ]
 		     return False
 #else
 unload Interactive dflags linkables pls = panic "CmLink.unload: no interpreter"

@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.123 2002/05/01 15:48:48 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.124 2002/05/01 17:56:54 sof Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -797,7 +797,7 @@ setProg _ = do
 setOptions wds =
    do -- first, deal with the GHCi opts (+s, +t, etc.)
       let (plus_opts, minus_opts)  = partition isPlus wds
-      mapM setOpt plus_opts
+      mapM_ setOpt plus_opts
 
       -- now, the GHC flags
       pkgs_before <- io (readIORef v_Packages)
@@ -831,7 +831,7 @@ unsetOptions str
 	  then io (putStrLn ("unknown option: `" ++ head rest2 ++ "'"))
 	  else do
 
-       mapM unsetOpt plus_opts
+       mapM_ unsetOpt plus_opts
  
        -- can't do GHC flags for now
        if (not (null minus_opts))
@@ -907,7 +907,7 @@ showBindings = do
 	unqual = cmGetPrintUnqual cms
 	showBinding b = putStrLn (showSDocForUser unqual (ppr (ifaceTyThing b)))
 
-  io (mapM showBinding (cmGetBindings cms))
+  io (mapM_ showBinding (cmGetBindings cms))
   return ()
 
 -----------------------------------------------------------------------------
@@ -1090,7 +1090,7 @@ linkPackage dflags pkg
 	    loadDynamics dirs dlls
 	
 	-- After loading all the DLLs, we can load the static objects.
-	mapM loadObj objs
+	mapM_ loadObj objs
 
         maybePutStr dflags "linking ... "
         ok <- resolveObjs

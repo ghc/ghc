@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.105 2002/05/01 09:30:05 simonmar Exp $
+-- $Id: Main.hs,v 1.106 2002/05/01 17:56:57 sof Exp $
 --
 -- GHC Driver program
 --
@@ -308,7 +308,7 @@ main =
 beginMake :: [String] -> IO ()
 beginMake fileish_args
   = do let (objs, mods) = partition objish_file fileish_args
-       mapM (add v_Ld_inputs) objs
+       mapM_ (add v_Ld_inputs) objs
 
        case mods of
 	 []    -> throwDyn (UsageError "no input files")

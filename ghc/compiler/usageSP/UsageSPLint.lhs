@@ -128,7 +128,7 @@ lintTyUSPAnnotsN fom fex = lintN
                                           do { let thelint = if isFunTyCon tc
                                                              then lintTyUSPAnnots fom fex
                                                              else lintN
-                                             ; mapM thelint tys
+                                             ; mapM_ thelint tys
                                              ; return ()
                                              }
     lintN     (FunTy ty1 ty2)           = do { lintTyUSPAnnots fom fex ty1
@@ -210,9 +210,7 @@ lintTyUSPConst (TyVarTy _)                         = do { return () }
 lintTyUSPConst (AppTy ty1 ty2)                     = do { lintTyUSPConst ty1
                                                         ; lintTyUSPConst ty2
                                                         }
-lintTyUSPConst (TyConApp tc tys)                   = do { mapM lintTyUSPConst tys
-                                                        ; return ()
-                                                        }
+lintTyUSPConst (TyConApp tc tys)                   = mapM_ lintTyUSPConst tys
 lintTyUSPConst (FunTy ty1 ty2)                     = do { lintTyUSPConst ty1
                                                         ; lintTyUSPConst ty2
                                                         }
