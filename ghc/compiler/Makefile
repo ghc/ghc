@@ -57,8 +57,11 @@ endif
 
 HS_SRCS = $(SRCS_UGNHS) \
           $(foreach dir,$(DIRS),$(wildcard $(dir)/*.lhs)) \
-	  rename/ParseIface.hs rename/ParseType.hs rename/ParseUnfolding.hs \
-	  main/LoopHack.hc 
+	  rename/ParseIface.hs rename/ParseType.hs rename/ParseUnfolding.hs
+
+ifneq "$(Ghc2_0)" "YES"
+HS_SRCS += main/LoopHack.hc 
+endif
 
 # NB: it's no good to include *.hs in the top-line wildcard, because the .hs files
 #     in parser/ may not have been created at that point.
