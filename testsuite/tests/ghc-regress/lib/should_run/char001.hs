@@ -1,4 +1,8 @@
 -- !!! Testing the behaviour of Char.lexLitChar a little..
+
+-- [March 2003]  We now allow \X and \O as escapes although the 
+-- spec only permits \x and \o.  Seems more consistent. 
+
 module Main where
 
 import Char
