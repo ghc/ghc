@@ -72,7 +72,7 @@ modifyIORef ref f = writeIORef ref . f =<< readIORef ref
 --
 -- Extending the atomicity to multiple 'IORef's is problematic, so it
 -- is recommended that if you need to do anything more complicated
--- then using 'MVar' instead is a good idea.
+-- then using 'Control.Concurrent.MVar.MVar' instead is a good idea.
 --
 atomicModifyIORef :: IORef a -> (a -> (a,b)) -> IO b
 #if defined(__GLASGOW_HASKELL__)

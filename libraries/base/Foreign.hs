@@ -24,8 +24,8 @@ module Foreign
         , module Foreign.Storable
         , module Foreign.Marshal
 
-        -- For compatibility with the FFI addendum only.  The recommended
-        -- place to get this from is System.IO.Unsafe.
+        -- | For compatibility with the FFI addendum only.  The recommended
+        -- place to get this from is "System.IO.Unsafe".
         , unsafePerformIO
         ) where
 
