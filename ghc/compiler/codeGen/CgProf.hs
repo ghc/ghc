@@ -316,12 +316,12 @@ emitCostCentreStackDecl ccs
 	      mkCCostCentre cc,
 	      zero,   -- struct _CostCentreStack *prevStack;
 	      zero,   -- struct _IndexTable *indexTable;
-	      zero,   -- StgWord    selected;       
 	      zero64, -- StgWord64  scc_count;      
+	      zero,   -- StgWord    selected;       
 	      zero,   -- StgWord    time_ticks;     
 	      zero64, -- StgWord64  mem_alloc;      
-	      zero,   -- StgWord    inherited_ticks;
 	      zero64, -- StgWord64  inherited_alloc;
+	      zero,   -- StgWord    inherited_ticks;
 	      zero    -- CostCentre *root;
 	   ]
   ; emitDataLits (mkCCSLabel ccs) lits

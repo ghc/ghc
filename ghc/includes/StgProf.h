@@ -12,6 +12,12 @@
 /* -----------------------------------------------------------------------------
  * Data Structures 
  * ---------------------------------------------------------------------------*/  
+// NB. be careful to avoid unwanted padding between fields, by
+// putting the 8-byte fields on an 8-byte boundary.  Padding can
+// vary between C compilers, and we don't take into account any
+// possible padding when generating CCS and CC decls in the code
+// generator (compiler/codeGen/CgProf.hs).
+
 typedef struct _CostCentre {
   StgInt ccID;
 
@@ -20,13 +26,12 @@ typedef struct _CostCentre {
  
   /* used for accumulating costs at the end of the run... */
   StgWord   time_ticks;
-  StgWord64 mem_alloc;
+  StgWord64 mem_alloc;      // align 8 (see above)
 
   StgInt    is_caf;
 
   struct _CostCentre *link;
 } CostCentre;
-
 
 typedef struct _CostCentreStack {
   StgInt ccsID;
@@ -35,12 +40,12 @@ typedef struct _CostCentreStack {
   struct _CostCentreStack *prevStack;
   struct _IndexTable *indexTable;
 
+  StgWord64  scc_count;       // align 8 (see above)
   StgWord    selected;
-  StgWord64  scc_count;
   StgWord    time_ticks;
-  StgWord64  mem_alloc;
+  StgWord64  mem_alloc;       // align 8 (see above)
+  StgWord64  inherited_alloc; // align 8 (see above)
   StgWord    inherited_ticks;
-  StgWord64  inherited_alloc;
 
   CostCentre *root;
 } CostCentreStack;
