@@ -8,9 +8,14 @@
 
 module RnSource ( rnDecl, rnHsType, rnHsSigType ) where
 
-IMP_Ubiq()
-IMPORT_DELOOPER(RnLoop)		-- *check* the RnPass/RnExpr/RnBinds loop-breaking
 IMPORT_1_3(List(partition))
+IMP_Ubiq()
+
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
+IMPORT_DELOOPER(RnLoop)		-- *check* the RnPass/RnExpr/RnBinds loop-breaking
+#else
+import {-# SOURCE #-} RnExpr
+#endif
 
 import HsSyn
 import HsDecls		( HsIdInfo(..) )
@@ -87,17 +92,11 @@ rnDecl (SigD (IfaceSig name ty id_infos loc))
   = pushSrcLocRn loc $
     lookupBndrRn name		`thenRn` \ name' ->
     rnHsType ty			`thenRn` \ ty' ->
-
-	-- Get the pragma info, unless we should ignore it
-    (if opt_IgnoreIfacePragmas then
-	returnRn []
-     else
-	setModeRn (InterfaceMode Optional) $
-		-- In all the rest of the signature we read in optional mode,
-		-- so that (a) we don't die
-	mapRn rnIdInfo id_infos
-    )				`thenRn` \ id_infos' -> 
-
+	-- Get the pragma info (if any).
+    setModeRn (InterfaceMode Optional) $
+	-- In all the rest of the signature we read in optional mode,
+	-- so that (a) we don't die
+    mapRn rnIdInfo id_infos	`thenRn` \ id_infos' -> 
     returnRn (SigD (IfaceSig name' ty' id_infos' loc))
 \end{code}
 
@@ -157,14 +156,15 @@ original names, reporting any unknown names.
 \begin{code}
 rnDecl (ClD (ClassDecl context cname tyvar sigs mbinds pragmas src_loc))
   = pushSrcLocRn src_loc $
-    bindTyVarsRn cls_doc [tyvar]			$ \ [tyvar'] ->
-    rnContext context	    				`thenRn` \ context' ->
-    lookupBndrRn cname					`thenRn` \ cname' ->
+    bindTyVarsRn cls_doc [tyvar]			( \ [tyvar'] ->
+	rnContext context	    				`thenRn` \ context' ->
+	lookupBndrRn cname					`thenRn` \ cname' ->
 
-	-- Check the signatures
-    checkDupOrQualNames sig_doc sig_names		`thenRn_` 
-    mapRn (rn_op cname' (getTyVarName tyvar')) sigs	`thenRn` \ sigs' ->
-
+	     -- Check the signatures
+	checkDupOrQualNames sig_doc sig_names		`thenRn_` 
+	mapRn (rn_op cname' (getTyVarName tyvar')) sigs	`thenRn` \ sigs' ->
+	returnRn (tyvar', context', cname', sigs')
+    )							`thenRn` \ (tyvar', context', cname', sigs') ->
 
 	-- Check the methods
     checkDupOrQualNames meth_doc meth_names		`thenRn_`
