@@ -707,9 +707,12 @@ every orphan module below the module being compiled.  This is usually
 wasted work, but there is no avoiding it.  You should therefore do
 your best to have as few orphan modules as possible.
 
-</para><para>
-You can identify an orphan module by looking in its interface file, M.hi.  If there is a ``!'' on
-the first line, GHC considers it an orphan module. 
+</para>
+
+<para> You can identify an orphan module by looking in its interface
+file, <filename>M.hi</filename>, using the
+<option>--show-iface</option>.  If there is a ``!'' on the first line,
+GHC considers it an orphan module.
 </para>
 </sect2>
 
