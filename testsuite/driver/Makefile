@@ -1,5 +1,5 @@
-
-# Yes, it's a hack.  Complaints to /dev/null.
+TOP = ..
+include $(TOP)/mk/boilerplate.mk
 
 RUNTESTS_SRCS= \
 	TopSort.hs CmdLexer.hs CmdParser.hs CmdSemantics.hs CmdSyntax.hs Main.hs \
@@ -16,19 +16,11 @@ RUNTESTS_SRCS= \
 	basicRxLib/ParsePolyRegexp.hs basicRxLib/ParsePolyRegexpBasic.hs \
 	basicRxLib/ParseStringRegexp.hs basicRxLib/Parsers.hs basicRxLib/Regexp.hs
 
-
-all: runtests
-
-boot:
-	@echo "Make boot is not needed here"
+all :: runtests
 
 runtests: $(RUNTESTS_SRCS)
-	ghc -W -fno-warn-unused-matches --make Main -o runtests -ibasicRxLib -package lang -package util -cpp
+	$(GHC) $(HC_OPTS) -W -fno-warn-unused-matches --make Main -o runtests -ibasicRxLib -package lang -package util -cpp
 
-clean:
-	/bin/rm -f runtests *.o *.hi basicRxLib/*.o basicRxLib/*.hi
+CLEAN_FILES += basicRxLib/*.o basicRxLib/*.hi
 
-HAPPY_OPTS = -gac
-
-%.hs : %.y
-	happy $(HAPPY_OPTS) -o $@ $<
+include $(TOP)/mk/target.mk
