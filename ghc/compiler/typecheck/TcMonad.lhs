@@ -217,6 +217,12 @@ mapBagTc f bag
 fixTc    :: (a -> TcM a)    -> TcM a
 fixNF_Tc :: (a -> NF_TcM a) -> NF_TcM a
 fixTc m env down = fixIO (\ loop -> m loop env down)
+{-# NOINLINE fixTc #-}
+-- aargh!  Not inlining fixTc alleviates a space leak problem.
+-- Normally fixTc is used with a lazy tuple match: if the optimiser is
+-- shown the definition of fixTc, it occasionally transforms the code
+-- in such a way that the code generator doesn't spot the selector
+-- thunks.  Sigh.
 
 recoverTc    :: TcM r -> TcM r -> TcM r
 recoverNF_Tc :: NF_TcM r -> TcM r -> NF_TcM r
