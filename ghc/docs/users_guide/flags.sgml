@@ -1657,12 +1657,6 @@
 	  </thead>
 	  <tbody>
 	    <row>
-	      <entry><option>-funfold-casms-in-hi-file</option></entry>
-	      <entry>Allow casms in unfoldings</entry>
-	      <entry>static</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
 	      <entry><option>-femit-extern-decls</option></entry>
 	      <entry>???</entry>
 	      <entry>static</entry>
