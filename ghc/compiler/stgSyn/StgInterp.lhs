@@ -26,7 +26,6 @@ import Class		( Class, classTyCon )
 #ifdef GHCI
 -- giga-hack
 import {-# SOURCE #-} MCI_make_constr
-#endif
 
 import PrelGHC		--( unsafeCoerce#, dataToTag#,
 			--  indexPtrOffClosure#, indexWordOffClosure# )
@@ -37,6 +36,7 @@ import Storable
 import Addr		-- again ...
 import Word
 import Bits
+#endif
 
 
 runStgI :: [TyCon] -> [Class] -> [StgBinding] -> IO Int
