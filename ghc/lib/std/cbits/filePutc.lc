@@ -49,7 +49,7 @@ StgChar c;
 
     fo->flags = (fo->flags & ~FILEOBJ_RW_READ) | FILEOBJ_RW_WRITE;
 	      
-    /* check whether we can just add it to the buffer.. */
+   /* check whether we can just add it to the buffer.. */
     if ( FILEOBJ_UNBUFFERED(fo) ) {
         ; 
     } else {

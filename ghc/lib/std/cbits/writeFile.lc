@@ -76,6 +76,7 @@ StgInt  len;
     if (len == 0 )
 	return 0;
 
+
     /* First of all, check if we do need to flush the buffer .. */
     /* Note - in the case of line buffering, we do not currently check
        whether we need to flush buffer due to line terminators in the

@@ -150,7 +150,12 @@ stderr = unsafePerformIO (do
 #ifndef __PARALLEL_HASKELL__
             fo <- makeForeignObj fo (``&freeStdFileObject''::Addr)
 #endif
-            newHandle (Handle__ fo WriteHandle NoBuffering "stderr")
+            hdl <- newHandle (Handle__ fo WriteHandle NoBuffering "stderr")
+	     -- when stderr and stdout are both connected to a terminal, ensure
+	     -- that anything buffered on stdout is flushed prior to writing on stderr.
+	     -- 
+	    hConnectTo stdout hdl
+	    return hdl
        _ -> do ioError <- constructError "stderr"
                newHandle (mkErrorHandle__ ioError)
   )
@@ -774,12 +779,20 @@ hConnectTo hW hR = hConnectHdl_ hW hR 0{-connect regardless-}
 
 hConnectHdl_ :: Handle -> Handle -> Int -> IO ()
 hConnectHdl_ hW hR is_tty = do
-  hW_ <- wantWriteableHandle "hConnectTo" hW
-  hR_ <- wantReadableHandle  "hConnectTo" hR
+  hW_ <- wantRWHandle "hConnectTo" hW
+  hR_ <- wantRWHandle "hConnectTo" hR
   _ccall_ setConnectedTo (haFO__ hR_) (haFO__ hW_) is_tty  -- ConcHask: SAFE, won't block
   writeHandle hR hR_
   writeHandle hW hW_
 
+#ifndef __PARALLEL_HASKELL__
+#define FILE_OBJECT	    ForeignObj
+#else
+#define FILE_OBJECT	    Addr
+#endif
+
+flushConnectedHandle :: FILE_OBJECT -> IO ()
+flushConnectedHandle fo = _ccall_ flushConnectedHandle fo
 \end{code}
 
 As an extension, we also allow characters to be pushed back.
@@ -984,6 +997,26 @@ wantWriteableHandle fun handle = do
    not_writeable_error = 
 	   IOError (Just handle) IllegalOperation fun
 		   ("handle is not open for writing")
+
+-- either R or W.
+wantRWHandle :: String -> Handle -> IO Handle__
+wantRWHandle fun handle = do
+    handle_ <- readHandle handle
+    case haType__ handle_ of 
+      ErrorHandle ioError -> do
+	  writeHandle handle handle_
+          fail ioError
+      ClosedHandle -> do
+	  writeHandle handle handle_
+	  ioe_closedHandle fun handle
+      SemiClosedHandle -> do
+	  writeHandle handle handle_
+	  ioe_closedHandle fun handle
+      other -> return handle_
+  where
+   not_readable_error = 
+	   IOError (Just handle) IllegalOperation fun	
+		   ("handle is not open for reading or writing")
 
 wantSeekableHandle :: String -> Handle -> IO Handle__
 wantSeekableHandle fun handle = do

@@ -80,8 +80,21 @@ StgForeignObj ptr;
     return 0;
 }
 
+void
+flushConnectedHandle(ptr)
+StgForeignObj ptr;
+{
+    StgInt rc;
+    IOFileObject* fo = (IOFileObject*)ptr;
+
+
+    /* if the stream is connected to an output stream, flush it first */
+    if ( fo->connectedTo != NULL   && fo->connectedTo->fd != -1 &&
+         (fo->connectedTo->flags & FILEOBJ_WRITE)  ) {
+        rc = flushBuffer((StgForeignObj)fo->connectedTo);
+    }
+    /* Willfully ignore return code for now */
+    return;  
+}
 
 \end{code}
-
-
-

@@ -90,6 +90,7 @@ StgInt	fileSize    PROTO((StgForeignObj, StgByteArray));
 StgInt	flushFile   PROTO((StgForeignObj));
 StgInt	flushBuffer PROTO((StgForeignObj));
 StgInt	flushReadBuffer PROTO((StgForeignObj));
+void	flushConnectedHandle PROTO((StgForeignObj));
 
 /* freeFile.lc */
 void freeStdFile PROTO((StgForeignObj));

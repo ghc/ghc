@@ -329,6 +329,7 @@ hPutChar :: Handle -> Char -> IO ()
 hPutChar handle c = do
     handle_  <- wantWriteableHandle "hPutChar" handle
     let fo = haFO__ handle_
+    flushConnectedHandle fo    
     rc       <- mayBlock fo (_ccall_ filePutc fo c)   -- ConcHask: UNSAFE, may block.
     writeHandle handle handle_
     if rc == 0
@@ -345,6 +346,7 @@ hPutStr :: Handle -> String -> IO ()
 hPutStr handle str = do
     handle_ <- wantWriteableHandle "hPutStr" handle
     let fo = haFO__ handle_
+    flushConnectedHandle fo
     case haBufferMode__ handle_ of
        LineBuffering -> do
 	    buf <- _ccall_ getWriteableBuf fo
