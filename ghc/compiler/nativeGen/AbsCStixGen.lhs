@@ -24,7 +24,8 @@ import SMRep		( fixedItblSize,
 import Constants   	( mIN_UPD_SIZE )
 import CLabel           ( CLabel, mkReturnInfoLabel, mkReturnPtLabel,
                           mkClosureTblLabel, mkClosureLabel,
-			  moduleRegdLabel, labelDynamic )
+			  moduleRegdLabel, labelDynamic,
+			  mkSplitMarkerLabel )
 import ClosureInfo	( infoTableLabelFromCI, entryLabelFromCI,
 			  fastLabelFromCI, closureUpdReqd,
 			  staticClosureNeedsLink
@@ -257,11 +258,12 @@ Now the individual AbstractC statements.
 
 \end{code}
 
-Split markers are a NOP in this land.
+Split markers just insert a __stg_split_marker, which is caught by the
+split-mangler later on and used to split the assembly into chunks.
 
 \begin{code}
 
- gencode CSplitMarker = returnUs id
+ gencode CSplitMarker = returnUs (\xs -> StLabel mkSplitMarkerLabel : xs)
 
 \end{code}
 

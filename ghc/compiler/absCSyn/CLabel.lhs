@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.36 2000/05/22 17:05:57 simonmar Exp $
+% $Id: CLabel.lhs,v 1.37 2000/07/03 14:59:25 simonmar Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -38,6 +38,7 @@ module CLabel (
 	mkErrorStdEntryLabel,
 
 	mkStgUpdatePAPLabel,
+	mkSplitMarkerLabel,
 	mkUpdInfoLabel,
 	mkSeqInfoLabel,
 	mkIndInfoLabel,
@@ -46,8 +47,6 @@ module CLabel (
         mkMainRegTableLabel,
 	mkCharlikeClosureLabel,
 	mkIntlikeClosureLabel,
-	mkTopClosureLabel,
-	mkErrorIO_innardsLabel,
 	mkMAP_FROZEN_infoLabel,
 
 	mkTopTickyCtrLabel,
@@ -184,7 +183,7 @@ data RtsLabelInfo
   | RtsMainRegTable             -- MainRegTable (??? Capabilities wurble ???)
   | Rts_Closure String		-- misc rts closures, eg CHARLIKE_closure
   | Rts_Info String		-- misc rts itbls, eg MUT_ARR_PTRS_FROZEN_info
-  | Rts_Code String		-- misc rts code, eg ErrorIO_innards
+  | Rts_Code String		-- misc rts code
 
   | RtsSelectorInfoTbl Bool{-updatable-} Int{-offset-}	-- Selector thunks
   | RtsSelectorEntry   Bool{-updatable-} Int{-offset-}
@@ -245,6 +244,7 @@ mkModuleInitLabel		= ModuleInitLabel
 mkErrorStdEntryLabel		= RtsLabel RtsShouldNeverHappenCode
 
 mkStgUpdatePAPLabel		= RtsLabel (Rts_Code "stg_update_PAP")
+mkSplitMarkerLabel		= RtsLabel (Rts_Code "__stg_split_marker")
 mkUpdInfoLabel			= RtsLabel RtsUpdInfo
 mkSeqInfoLabel			= RtsLabel RtsSeqInfo
 mkIndInfoLabel			= RtsLabel (Rts_Info "IND_info")
@@ -253,8 +253,6 @@ mkRtsGCEntryLabel str		= RtsLabel (RtsGCEntryLabel str)
 mkMainRegTableLabel		= RtsLabel RtsMainRegTable
 mkCharlikeClosureLabel		= RtsLabel (Rts_Closure "CHARLIKE_closure")
 mkIntlikeClosureLabel		= RtsLabel (Rts_Closure "INTLIKE_closure")
-mkTopClosureLabel		= RtsLabel (Rts_Closure "TopClosure")
-mkErrorIO_innardsLabel		= RtsLabel (Rts_Code "ErrorIO_innards")
 mkMAP_FROZEN_infoLabel		= RtsLabel (Rts_Info "MUT_ARR_PTRS_FROZEN_info")
 
 mkTopTickyCtrLabel		= RtsLabel RtsTopTickyCtr
