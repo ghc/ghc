@@ -1,25 +1,18 @@
-data [] a = [] | a : [a]
--- <wired into compiler>
-instance Eq [a] 	-- Imported from `GHC.Base'
-instance Monad [] 	-- Imported from `GHC.Base'
-instance Functor [] 	-- Imported from `GHC.Base'
-instance Ord [a] 	-- Imported from `GHC.Base'
-data () = ()
--- <wired into compiler>
-instance Bounded () 	-- Imported from `GHC.Enum'
-instance Enum () 	-- Imported from `GHC.Enum'
-instance Eq () 	-- Imported from `GHC.Base'
-instance Ord () 	-- Imported from `GHC.Base'
-instance Read () 	-- Imported from `GHC.Read'
-instance Show () 	-- Imported from `GHC.Show'
-instance Ix () 	-- Imported from `GHC.Arr'
-instance Typeable () 	-- Imported from `Data.Typeable'
-data (,) a b = (,) a b
--- <wired into compiler>
-instance Bounded (a, b) 	-- Imported from `GHC.Enum'
-instance Eq (a, b) 	-- Imported from `Data.Tuple'
-instance Ord (a, b) 	-- Imported from `Data.Tuple'
-instance Read (a, b) 	-- Imported from `GHC.Read'
-instance Show (a, b) 	-- Imported from `GHC.Show'
-instance Ix (a, b) 	-- Imported from `GHC.Arr'
-instance Typeable2 (,) 	-- Imported from `Data.Typeable'
+data [] a = [] | a : [a] 	-- <wired into compiler>
+instance Eq [a] 	-- Imported from GHC.Base
+instance Monad [] 	-- Imported from GHC.Base
+instance Functor [] 	-- Imported from GHC.Base
+instance Ord [a] 	-- Imported from GHC.Base
+data () = () 	-- <wired into compiler>
+instance Bounded () 	-- Imported from GHC.Enum
+instance Enum () 	-- Imported from GHC.Enum
+instance Eq () 	-- Imported from GHC.Base
+instance Ord () 	-- Imported from GHC.Base
+instance Read () 	-- Imported from GHC.Read
+instance Show () 	-- Imported from GHC.Show
+data (,) a b = (,) a b 	-- <wired into compiler>
+instance Bounded (a, b) 	-- Imported from GHC.Enum
+instance Eq (a, b) 	-- Imported from Data.Tuple
+instance Ord (a, b) 	-- Imported from Data.Tuple
+instance Read (a, b) 	-- Imported from GHC.Read
+instance Show (a, b) 	-- Imported from GHC.Show

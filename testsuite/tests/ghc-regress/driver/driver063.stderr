@@ -1,3 +1,3 @@
-D.hs:
-    Could not find interface file for `A'
-    (use -v to see a list of the files searched for)
+Could not find module `A':
+  use -v to see a list of the files searched for
+  (imported from D.hs)

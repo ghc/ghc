@@ -1,19 +1,19 @@
 class (Eq a, Show a) => Num a where
   (+) :: a -> a -> a
   ...
+  	-- Imported from GHC.Num
 infixl 6 +
--- Imported from `GHC.Num'
 class (Eq a, Show a) => Num a where
   (+) :: a -> a -> a
   ...
+  	-- Imported from GHC.Num
 infixl 6 +
--- Imported from `GHC.Num'
 data (RealFloat a) => Complex a = !a :+ !a
+  	-- Imported from Data.Complex
 infix 6 :+
--- Imported from `Data.Complex'
 data (RealFloat a) => Complex a = !a :+ !a
+  	-- Imported from Data.Complex
 infix 6 :+
--- Imported from `Data.Complex'
 class (RealFrac a, Floating a) => RealFloat a where
   floatRadix :: a -> Integer
   floatDigits :: a -> Int
@@ -29,11 +29,8 @@ class (RealFrac a, Floating a) => RealFloat a where
   isNegativeZero :: a -> Bool
   isIEEE :: a -> Bool
   atan2 :: a -> a -> a
--- <no location info>
-instance RealFloat CLDouble 	-- Imported from `Foreign.C.Types'
-instance RealFloat CFloat 	-- Imported from `Foreign.C.Types'
-instance RealFloat CDouble 	-- Imported from `Foreign.C.Types'
-instance RealFloat Float 	-- Imported from `GHC.Float'
-instance RealFloat Double 	-- Imported from `GHC.Float'
+  	-- <no location info>
+instance RealFloat Float 	-- Imported from GHC.Float
+instance RealFloat Double 	-- Imported from GHC.Float
 isPrefixOf :: (Eq a) => [a] -> [a] -> Bool
--- Imported from `Data.List'
+  	-- Imported from Data.List
