@@ -364,7 +364,8 @@ instance Binary Kind where
 We define a few wired-in type constructors here to avoid module knots
 
 \begin{code}
-funTyCon = mkFunTyCon funTyConName (mkArrowKinds [liftedTypeKind, liftedTypeKind] liftedTypeKind)
+funTyCon = mkFunTyCon funTyConName (mkArrowKinds [openTypeKind, openTypeKind] liftedTypeKind)
+	-- Functions can take and return either lifted or unlifted types
 \end{code}
 
 ------------------------------------------
