@@ -38,8 +38,8 @@ Haskell side.
 */
 #include "PosixSource.h"
 #include "Rts.h"
+#include "RtsExternal.h"
 #include "RtsUtils.h"
-#include "RtsFlags.h"
 #include <stdlib.h>
 
 #if defined(_WIN32)
@@ -48,16 +48,21 @@ Haskell side.
 
 /* Heavily arch-specific, I'm afraid.. */
 
+typedef enum { 
+    pageExecuteRead, 
+    pageExecuteReadWrite 
+} pageMode;
+
 /*
  * Function: execPage()
  *
- * Set the executable bit on page containing addr. CURRENTLY DISABLED.
+ * Set the executable bit on page containing addr.
  *
  * TODO: Can the code span more than one page? If yes, we need to make two
  * pages executable!
  */
 static rtsBool
-execPage (void* addr, int writable)
+execPage (void* addr, pageMode mode)
 {
 #if defined(i386_TARGET_ARCH) && defined(_WIN32) && 0
     SYSTEM_INFO sInfo;
@@ -68,17 +73,17 @@ execPage (void* addr, int writable)
     
     if ( VirtualProtect ( (void*)((unsigned long)addr & (sInfo.dwPageSize - 1)),
 			  sInfo.dwPageSize,
-			  ( writable ? PAGE_EXECUTE_READWRITE : PAGE_EXECUTE_READ),
+			  ( mode == pageExecuteReadWrite ? PAGE_EXECUTE_READWRITE : PAGE_EXECUTE_READ),
 			  &dwOldProtect) == 0 ) {
 # if 1
 	DWORD rc = GetLastError();
-	fprintf(stderr, "execPage: failed to protect 0x%p; error=%lu; old protection: %lu\n", addr, rc, dwOldProtect);
+	prog_belch("execPage: failed to protect 0x%p; error=%lu; old protection: %lu\n", addr, rc, dwOldProtect);
 # endif
 	return rtsFalse;
     }
     return rtsTrue;
 #else
-    (void)addr;   (void)writable;   /* keep gcc -Wall happy */
+    (void)addr;   (void)mode;   /* keep gcc -Wall happy */
     return rtsTrue;
 #endif
 }
@@ -189,7 +194,7 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
 	adj_code[0x0c] = (unsigned char)0xff; /* jmp %eax */
 	adj_code[0x0d] = (unsigned char)0xe0;
 	
-	execPage(adjustor,rtsTrue);
+	execPage(adjustor, pageExecuteReadWrite);
     }
 #endif
     break;
@@ -235,7 +240,7 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
 	adj_code[0x0f] = (unsigned char)0xff; /* jmp *%eax */
 	adj_code[0x10] = (unsigned char)0xe0; 
 
-	execPage(adjustor,rtsTrue);
+	execPage(adjustor, pageExecuteReadWrite);
     }
 #elif defined(sparc_TARGET_ARCH)
   /* Magic constant computed by inspecting the code length of the following
@@ -522,7 +527,7 @@ freeHaskellFunctionPtr(void* ptr)
 #if defined(i386_TARGET_ARCH)
  if ( *(unsigned char*)ptr != 0x68 &&
       *(unsigned char*)ptr != 0x58 ) {
-   fprintf(stderr, "freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
+   prog_belch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
    return;
  }
 
@@ -534,7 +539,7 @@ freeHaskellFunctionPtr(void* ptr)
  }    
 #elif defined(sparc_TARGET_ARCH)
  if ( *(unsigned long*)ptr != 0x9C23A008UL ) {
-   fprintf(stderr, "freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
+   prog_belch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
    return;
  }
 
@@ -542,7 +547,7 @@ freeHaskellFunctionPtr(void* ptr)
  freeStablePtr(*((StgStablePtr*)((unsigned long*)ptr + 11)));
 #elif defined(alpha_TARGET_ARCH)
  if ( *(StgWord64*)ptr != 0xa77b0018a61b0010L ) {
-   fprintf(stderr, "freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
+   prog_belch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
    return;
  }
 
@@ -550,7 +555,7 @@ freeHaskellFunctionPtr(void* ptr)
  freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 0x10)));
 #elif defined(powerpc_TARGET_ARCH)
  if ( *(StgWord*)ptr != 0x7d0a4378 ) {
-   fprintf(stderr, "freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
+   prog_belch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
    return;
  }
  freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 4*12)));
@@ -559,7 +564,7 @@ freeHaskellFunctionPtr(void* ptr)
  StgWord64 *code = (StgWord64 *)(fdesc+1);
 
  if (fdesc->ip != (StgWord64)code) {
-   fprintf(stderr, "freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
+   prog_belch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
    return;
  }
  freeStablePtr((StgStablePtr)code[16]);
@@ -578,11 +583,9 @@ freeHaskellFunctionPtr(void* ptr)
  * Function: initAdjustor()
  *
  * Perform initialisation of adjustor thunk layer (if needed.)
- *
- * TODO: Call this at RTS initialisation time.
  */
 rtsBool
 initAdjustor(void)
 {
-    return execPage(__obscure_ccall_ret_code, rtsFalse);
+    return execPage(__obscure_ccall_ret_code, pageExecuteRead);
 }
