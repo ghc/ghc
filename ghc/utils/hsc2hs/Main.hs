@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.15 2001/02/05 18:01:39 rrt Exp $
+-- $Id: Main.hs,v 1.16 2001/02/05 22:02:18 qrczak Exp $
 --
 -- (originally "GlueHsc.hs" by Marcin 'Qrczak' Kowalczyk)
 --
@@ -23,9 +23,6 @@ import Monad       (liftM, liftM2, when)
 import Char        (ord, intToDigit, isSpace, isAlpha, isAlphaNum, toUpper)
 import List        (intersperse)
 import Exception   (catchAllIO)
-#ifndef mingw32_TARGET_OS
-import Posix
-#endif
 
 version :: String
 version = "hsc2hs-0.64"
@@ -487,7 +484,4 @@ kludgedSystem cmd
 
 #ifdef mingw32_TARGET_OS
 foreign import "_getpid" myGetProcessID :: IO Int 
-#else
-myGetProcessID :: IO Int
-myGetProcessID = Posix.getProcessID
 #endif
