@@ -371,8 +371,8 @@ showCharLit c rest
 -- of Char and String.
 
 pprHsChar :: Int -> SDoc
-pprHsChar c | not (inCharRange c) = char '\\' <> show (fromIntegral c :: Word32)
-            | otherwise = text (show (chr c))
+pprHsChar c | c > 0x10ffff = char '\\' <> show (fromIntegral c :: Word32)
+            | otherwise    = text (show (chr c))
 
 pprHsString :: FastString -> SDoc
 pprHsString fs = text (show (unpackFS fs))
