@@ -9,7 +9,8 @@
 module TcSimplify (
 	tcSimplifyInfer, tcSimplifyInferCheck,
 	tcSimplifyCheck, tcSimplifyRestricted,
-	tcSimplifyToDicts, tcSimplifyIPs, tcSimplifyTop,
+	tcSimplifyToDicts, tcSimplifyIPs, 
+	tcSimplifyTop, tcSimplifyInteractive,
 	tcSimplifyBracket,
 
 	tcSimplifyDeriv, tcSimplifyDefault,
@@ -1620,10 +1621,14 @@ It's OK: the final zonking stage should zap y to (), which is fine.
 
 
 \begin{code}
-tcSimplifyTop :: [Inst] -> TcM TcDictBinds
+tcSimplifyTop, tcSimplifyInteractive :: [Inst] -> TcM TcDictBinds
+tcSimplifyTop         wanteds = tc_simplify_top False {- Not interactive loop -} wanteds
+tcSimplifyInteractive wanteds = tc_simplify_top True  {- Interactive loop -}     wanteds
+
+
 -- The TcLclEnv should be valid here, solely to improve
 -- error message generation for the monomorphism restriction
-tcSimplifyTop wanteds
+tc_simplify_top is_interactive wanteds
   = getLclEnv							`thenM` \ lcl_env ->
     traceTc (text "tcSimplifyTop" <+> ppr (lclEnvElts lcl_env))	`thenM_`
     simpleReduceLoop (text "tcSimplTop") reduceMe wanteds	`thenM` \ (frees, binds, irreds) ->
@@ -1674,8 +1679,7 @@ tcSimplifyTop wanteds
 	addTopAmbigErrs (tidy_env, ambigs)	`thenM_`
 
 	-- Disambiguate the ones that look feasible
-	getGhciMode				`thenM` \ mode ->
-        mappM (disambigGroup mode) std_oks
+        mappM (disambigGroup is_interactive) std_oks
     )					`thenM` \ binds_ambig ->
 
     returnM (binds `andMonoBinds` andMonoBindList binds_ambig)
@@ -1722,11 +1726,11 @@ Since we're not using the result of @foo@, the result if (presumably)
 @void@.
 
 \begin{code}
-disambigGroup :: GhciMode 
+disambigGroup :: Bool	-- True <=> simplifying at top-level interactive loop
 	      -> [Inst]	-- All standard classes of form (C a)
 	      -> TcM TcDictBinds
 
-disambigGroup ghci_mode dicts
+disambigGroup is_interactive dicts
   |   any std_default_class classes 	-- Guaranteed all standard classes
 	  -- See comment at the end of function for reasons as to
 	  -- why the defaulting mechanism doesn't apply to groups that
@@ -1770,7 +1774,7 @@ disambigGroup ghci_mode dicts
 
     std_default_class cls
       =  isNumericClass cls
-      || (ghci_mode == Interactive && 
+      || (is_interactive && 
 	  classKey cls `elem` [showClassKey, eqClassKey, ordClassKey])
 	 	-- In interactive mode, we default Show a to Show ()
 		-- to avoid graututious errors on "show []"
