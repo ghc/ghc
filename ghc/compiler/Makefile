@@ -582,6 +582,16 @@ MKDEPENDC_SRCS =
 parser/Parser.y : parser/Parser.y.pp
 EXTRA_SRCS += parser/Parser.y
 
+
+#-----------------------------------------------------------------------------
+# 		Source files for tags file generation
+#
+# We want to excluded derived sources, because they won't be in the source
+# tree, which is where we are going to move the TAGS file to.a
+
+TAGS_HS_SRCS = parser/Parser.y.pp $(filter-out $(DERIVED_SRCS) main/Config.hs parser/Parser.y, $(sort $(SRCS)))
+
+
 include $(TOP)/mk/target.mk
 
 # -----------------------------------------------------------------------------
