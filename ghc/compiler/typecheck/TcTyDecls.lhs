@@ -12,7 +12,7 @@ files for imported data types.
 
 \begin{code}
 module TcTyDecls(
-        calcTyConArgVrcs, tyVarVrc,
+        calcTyConArgVrcs,
 	calcRecFlags, calcCycleErrs,
 	newTyConRhs
     ) where
@@ -425,18 +425,6 @@ vrcInTy fao v (NewTcApp tc tys)         = let pms1 = map (vrcInTy fao v) tys
 
 vrcInTy fao v (PredTy st) = vrcInTy fao v (predTypeRep st)
 \end{code}
-
-
-External entry point: assumes tyconargvrcs already computed.
-
-\begin{code}
-tyVarVrc :: TyVar               -- tyvar to check Vrc of
-         -> Type                -- type to check for occ in
-         -> (Bool,Bool)         -- (occurs positively, occurs negatively)
-
-tyVarVrc = vrcInTy tyConArgVrcs
-\end{code}
-
 
 Variance algebra
 ~~~~~~~~~~~~~~~~
