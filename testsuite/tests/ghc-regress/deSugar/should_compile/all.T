@@ -61,3 +61,5 @@ test "ds048" { vtc("") }
 test "ds049" { vtc("-fvia-C -package lang") }
 test "ds050" { vtc("-fglasgow-exts") }
 test "ds051" { vtc("") }
+test "ds052" { $expect = "fail" vtc("") }
+test "ds053" { $expect = "fail" vtc("") }
