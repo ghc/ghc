@@ -31,7 +31,8 @@ import ByteCodeItbls	( ItblEnv )
 import ByteCodeAsm	( CompiledByteCode(..), bcoFreeNames, UnlinkedBCO(..))
 
 import Packages
-import DriverState	( v_Library_paths, v_Opt_l, getStaticOpts )
+import DriverState	( v_Library_paths, v_Opt_l,
+			  v_Cmdline_frameworks, v_Framework_paths, getStaticOpts )
 import Finder		( findModule, findLinkable )
 import HscTypes
 import Name		( Name,  nameModule, isExternalName )
@@ -386,22 +387,36 @@ linkLibraries dflags objs
    = do	{ lib_paths <- readIORef v_Library_paths
 	; opt_l  <- getStaticOpts v_Opt_l
 	; let minus_ls = [ lib | '-':'l':lib <- opt_l ]
+#ifdef darwin_TARGET_OS
+	; framework_paths <- readIORef v_Framework_paths
+	; frameworks <- readIORef v_Cmdline_frameworks
+#endif
         ; let cmdline_lib_specs = map Object objs ++ map DLL minus_ls
-	
+#ifdef darwin_TARGET_OS
+		++ map Framework frameworks
+#endif
 	; if (null cmdline_lib_specs) then return () 
  	  else do {
 
 		-- Now link them
+#ifdef darwin_TARGET_OS
+ 	; mapM_ (preloadLib dflags lib_paths framework_paths) cmdline_lib_specs
+#else
  	; mapM_ (preloadLib dflags lib_paths) cmdline_lib_specs
-
+#endif
 	; maybePutStr dflags "final link ... "
 	; ok <- resolveObjs
 	; if succeeded ok then maybePutStrLn dflags "done."
 	  else throwDyn (InstallationError "linking extra libraries/objects failed")
 	}}
      where
+#ifdef darwin_TARGET_OS
+        preloadLib :: DynFlags -> [String] -> [String] -> LibrarySpec -> IO ()
+        preloadLib dflags lib_paths framework_paths lib_spec
+#else
         preloadLib :: DynFlags -> [String] -> LibrarySpec -> IO ()
         preloadLib dflags lib_paths lib_spec
+#endif
            = do maybePutStr dflags ("Loading object " ++ showLS lib_spec ++ " ... ")
                 case lib_spec of
                    Object static_ish
@@ -414,7 +429,14 @@ linkLibraries dflags objs
                                Nothing -> return ()
                                Just mm -> preloadFailed mm lib_paths lib_spec
                             maybePutStrLn dflags "done"
-
+#ifdef darwin_TARGET_OS
+                   Framework framework
+                      -> do maybe_errstr <- loadFramework framework_paths framework
+                            case maybe_errstr of
+                               Nothing -> return ()
+                               Just mm -> preloadFailed mm framework_paths lib_spec
+                            maybePutStrLn dflags "done"
+#endif
         preloadFailed :: String -> [String] -> LibrarySpec -> IO ()
         preloadFailed sys_errmsg paths spec
            = do maybePutStr dflags
@@ -613,11 +635,11 @@ data LibrarySpec
 -- of DLL handles that rts/Linker.c maintains, and that in turn is 
 -- used by lookupSymbol.  So we must call addDLL for each library 
 -- just to get the DLL handle into the list.
-partOfGHCi 
-#          ifndef mingw32_TARGET_OS
-           = [ "base", "haskell98", "haskell-src", "readline" ]
+partOfGHCi
+#          if defined(mingw32_TARGET_OS) || defined(darwin_TARGET_OS)
+           = [ ]
 #          else
-	   = [ ]
+           = [ "base", "haskell98", "haskell-src", "readline" ]
 #          endif
 
 showLS (Object nm)  = "(static) " ++ nm
