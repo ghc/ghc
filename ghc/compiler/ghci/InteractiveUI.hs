@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.90 2001/08/16 10:54:22 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.91 2001/08/20 16:17:17 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -28,10 +28,12 @@ import Util
 import Id		( isRecordSelector, recordSelectorFieldLabel, 
 			  isDataConWrapId, idName )
 import Class		( className )
-import TyCon		( tyConName, tyConClass_maybe )
+import TyCon		( tyConName, tyConClass_maybe, isPrimTyCon )
 import FieldLabel	( fieldLabelTyCon )
 import SrcLoc		( isGoodSrcLoc )
-import Name		( Name, isHomePackageName, nameSrcLoc, NamedThing(..) )
+import Name		( Name, isHomePackageName, nameSrcLoc, nameOccName,
+			  NamedThing(..) )
+import OccName		( isSymOcc )
 import BasicTypes	( defaultFixity )
 import Outputable
 import CmdLineOpts	( DynFlag(..), getDynFlags, saveDynFlags, restoreDynFlags, dopt_unset )
@@ -401,11 +403,17 @@ info s = do
 
     showFixity fix name
 	| fix == defaultFixity = empty
-	| otherwise            = ppr fix <+> ppr name
+	| otherwise            = ppr fix <+> 
+				 (if isSymOcc (nameOccName name)
+					then ppr name
+					else char '`' <> ppr name <> char '`')
 
-    showTyThing (AClass cl) 
+    showTyThing (AClass cl)
        = hcat [ppr cl, text " is a class", showSrcLoc (className cl)]
     showTyThing (ATyCon ty)
+       | isPrimTyCon ty
+       = hcat [ppr ty, text " is a primitive type constructor"]
+       | otherwise
        = hcat [ppr ty, text " is a type constructor", showSrcLoc (tyConName ty)]
     showTyThing (AnId   id)
        = hcat [ppr id, text " is a ", idDescr id, showSrcLoc (idName id)]
