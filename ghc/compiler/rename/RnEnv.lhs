@@ -61,7 +61,7 @@ newLocalTopBinder :: Module -> OccName
 	       -> (Name -> ExportFlag) -> SrcLoc
 	       -> RnM d Name
 newLocalTopBinder mod occ rec_exp_fn loc
-  = newTopBinder mod occ (\name -> LocalDef loc (rec_exp_fn name))
+  = newTopBinder mod occ (\name -> setNameProvenance name (LocalDef loc (rec_exp_fn name)))
 	-- We must set the provenance of the thing in the cache
 	-- correctly, particularly whether or not it is locally defined.
 	--
@@ -72,12 +72,13 @@ newLocalTopBinder mod occ rec_exp_fn loc
 newImportedBinder :: Module -> RdrName -> RnM d Name
 newImportedBinder mod rdr_name
   = ASSERT2( isUnqual rdr_name, ppr rdr_name )
-    newTopBinder mod (rdrNameOcc rdr_name) (\name -> implicitImportProvenance)
+    newTopBinder mod (rdrNameOcc rdr_name) (\name -> name)
+	-- Provenance is already implicitImportProvenance
 
 implicitImportProvenance = NonLocalDef ImplicitImport False
 
-newTopBinder :: Module -> OccName -> (Name -> Provenance) -> RnM d Name
-newTopBinder mod occ mk_prov
+newTopBinder :: Module -> OccName -> (Name -> Name) -> RnM d Name
+newTopBinder mod occ set_prov
   = 	-- First check the cache
     getNameSupplyRn		`thenRn` \ (us, inst_ns, cache, ipcache) ->
     let 
@@ -85,10 +86,9 @@ newTopBinder mod occ mk_prov
     in
     case lookupFM cache key of
 
-	-- A hit in the cache!  Re-use the unique (which may be widely known)
-	-- But otherwise build a new name, thereby
-	-- overwriting whatever module details and provenance is in the cache already; 
-	-- This updates WiredIn things and known-key things, which are there from the start.
+	-- A hit in the cache! 
+	-- Set the Module of the thing, and set its provenance (hack pending 
+	-- 	spj update)
 	--
 	-- It also means that if there are two defns for the same thing
 	-- in a module, then each gets a separate SrcLoc
@@ -99,8 +99,7 @@ newTopBinder mod occ mk_prov
 	-- So for them we just set the provenance
 
 	Just name -> let 
-			new_name  | isWiredInName name = setNameProvenance name (mk_prov name)
-				  | otherwise	       = mkGlobalName (nameUnique name) mod occ (mk_prov name)
+			new_name  = set_prov (setNameModule name mod)
 			new_cache = addToFM cache key new_name
 		     in
 		     setNameSupplyRn (us, inst_ns, new_cache, ipcache)	`thenRn_`
@@ -111,7 +110,7 @@ newTopBinder mod occ mk_prov
 	Nothing -> let
 			(us', us1) = splitUniqSupply us
 			uniq   	   = uniqFromSupply us1
-			new_name   = mkGlobalName uniq mod occ (mk_prov new_name)
+			new_name   = set_prov (mkGlobalName uniq mod occ implicitImportProvenance)
 			new_cache  = addToFM cache key new_name
 		   in
 		   setNameSupplyRn (us', inst_ns, new_cache, ipcache)	`thenRn_`
