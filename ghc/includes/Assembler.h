@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Assembler.h,v 1.16 2000/06/27 09:18:04 sewardj Exp $
+ * $Id: Assembler.h,v 1.17 2000/08/29 13:34:21 qrczak Exp $
  *
  * (c) The GHC Team 1994-1998.
  *
@@ -29,7 +29,7 @@ extern void DEBUG_LoadSymbols( char *name );
 typedef unsigned char   AsmNat8;
 typedef unsigned int    AsmNat;
 typedef signed   int    AsmInt;
-typedef int64           AsmInt64;  
+typedef HsInt64_        AsmInt64;
 typedef unsigned int    AsmWord;
 typedef void*           AsmAddr;
 typedef unsigned char   AsmChar;

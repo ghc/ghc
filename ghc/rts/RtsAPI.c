@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.19 2000/08/15 11:48:06 simonmar Exp $
+ * $Id: RtsAPI.c,v 1.20 2000/08/29 13:34:21 qrczak Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -75,7 +75,7 @@ rts_mkInt32 (int i)
 }
 
 HaskellObj
-rts_mkInt64 (long long int i)
+rts_mkInt64 (HsInt64_ i)
 {
   long long *tmp;
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,2));
@@ -126,7 +126,7 @@ rts_mkWord32 (unsigned int w)
 }
 
 HaskellObj
-rts_mkWord64 (unsigned long long w)
+rts_mkWord64 (HsWord64_ w)
 {
   unsigned long long *tmp;
 

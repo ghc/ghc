@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.h,v 1.16 2000/08/07 23:37:23 qrczak Exp $
+ * $Id: RtsAPI.h,v 1.17 2000/08/29 13:34:21 qrczak Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -25,15 +25,17 @@ typedef StgClosure *HaskellObj;
 
 
 /* Make this compilable with Visual C++.  We can't just use StgInt64 here,
-   because this file should be compilable without reference to the rest
-   of the RTS machinery.
-*/
+ * because this file should be compilable without reference to the rest
+ * of the RTS machinery.  These are absolutely non-standard types, but
+ * I don't know what alternatives are safe if we don't #include anything
+ * here.
+ */
 #if defined(__MSVC__)
-typedef __int64            int64;
-typedef unsigned __int64   nat64;
+typedef __int64            HsInt64_;
+typedef unsigned __int64   HsWord64_;
 #else
-typedef long long          int64;
-typedef unsigned long long nat64;
+typedef long long          HsInt64_;
+typedef unsigned long long HsWord64_;
 #endif
 
 /* ----------------------------------------------------------------------------
@@ -57,8 +59,8 @@ HaskellObj   rts_mkWord       ( unsigned int w );
 HaskellObj   rts_mkWord8      ( unsigned int w );
 HaskellObj   rts_mkWord16     ( unsigned int w );
 HaskellObj   rts_mkWord32     ( unsigned int w );
-HaskellObj   rts_mkInt64      ( int64 i );
-HaskellObj   rts_mkWord64     ( nat64 w );
+HaskellObj   rts_mkInt64      ( HsInt64_ i );
+HaskellObj   rts_mkWord64     ( HsWord64_ w );
 HaskellObj   rts_mkFloat      ( float f );
 HaskellObj   rts_mkDouble     ( double f );
 HaskellObj   rts_mkStablePtr  ( StgStablePtr s );

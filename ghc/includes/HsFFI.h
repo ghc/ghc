@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsFFI.h,v 1.5 2000/08/18 18:08:48 qrczak Exp $
+ * $Id: HsFFI.h,v 1.6 2000/08/29 13:34:21 qrczak Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -19,7 +19,10 @@
 
 /* get limits for integral types */
 #ifdef HAVE_STDINT_H
-/* ISO C 99 requires this */
+/* ISO C 99 says:
+ * "C++ implementations should define these macros only when
+ * __STDC_LIMIT_MACROS is defined before <stdint.h> is included."
+ */
 #define __STDC_LIMIT_MACROS
 #include <stdint.h>
 #else
@@ -41,6 +44,16 @@
 #define UINT16_MAX		(65535U)
 #define UINT32_MAX		(4294967295U)
 #define UINT64_MAX		(18446744073709551615ULL)
+/* Define these types too. Some C 99 code may assume that if INT8_MIN
+   is defined then int8_t is also present. */
+typedef StgInt8			int8_t;
+typedef StgInt16		int16_t;
+typedef StgInt32		int32_t;
+typedef StgInt64		int64_t;
+typedef StgWord8		uint8_t;
+typedef StgWord16		uint16_t;
+typedef StgWord32		uint32_t;
+typedef StgWord64		uint64_t;
 #endif
 
 /* get limits for floating point types */
