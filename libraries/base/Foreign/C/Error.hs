@@ -97,6 +97,8 @@ import GHC.IOBase (Exception(..), IOException(..), IOErrorType(..))
 -- regular imports
 -- ---------------
 
+import System.IO.Unsafe( unsafePerformIO )
+import Foreign.Storable
 import Foreign.Ptr
 import Foreign.C.Types
 import Foreign.C.String
@@ -119,7 +121,7 @@ import System.IO		( IOError, Handle, ioError )
 -- This function exists because errno is a variable on some systems, but on
 -- Windows it is a macro for a function...
 -- [yes, global variables and thread safety don't really go hand-in-hand. -- sof]
-foreign import ccall unsafe "ghcErrno" _errno :: Ptr CInt
+foreign import ccall unsafe "HsBase.h ghcErrno" _errno :: Ptr CInt
 
 -- Haskell representation for "errno" values
 --
@@ -511,7 +513,7 @@ errnoToIOError loc errno maybeHdl maybeName = unsafePerformIO $ do
     return (userError (loc ++ ": " ++ str ++ maybe "" (": "++) maybeName))
 #endif
 
-foreign import ccall unsafe strerror :: Errno -> IO (Ptr CChar)
+foreign import ccall unsafe "string.h" strerror :: Errno -> IO (Ptr CChar)
 
 
 -- Dreadfully tedious callouts to wrappers which define  the
