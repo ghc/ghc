@@ -768,7 +768,8 @@ f $! x  = x `seq` f x
 bracket :: IO a -> (a -> IO b) -> (a -> IO c) -> IO c
 bracket before after thing = do
   a <- before 
-  (thing a) `catch` (\err -> after a >>= fail err)
+  r <- (thing a) `catch` (\err -> after a >> fail err)
   after a
+  return r
 #endif
 \end{code}
