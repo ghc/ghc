@@ -795,7 +795,8 @@ hscModuleContents
 
 hscModuleContents dflags hst hit pcs0 mod exports_only = do {
 
-  -- slurp the interface if necessary
+  -- Slurp the interface if necessary (a home module will certainly
+  -- alraedy be loaded, but a package module might not be)
   (pcs1, print_unqual, maybe_rn_stuff) 
 	<- slurpIface dflags hit hst pcs0 mod;
 
@@ -813,7 +814,8 @@ hscModuleContents dflags hst hit pcs0 mod exports_only = do {
 
   let { all_names 
 	   | exports_only = names
-	   | otherwise =
+	   | otherwise =	-- Invariant; we only have (not exports_only) 
+				-- for a home module so it must already be in the HIT
 	     let { iface = fromJust (lookupModuleEnv hit mod);
 		   env   = fromJust (mi_globals iface);
 	           range = rdrEnvElts env;
