@@ -19,8 +19,8 @@ import HsSyn		( HsModule(..), HsDecl(..), IE(..), ieName, ImportDecl(..),
 import RdrHsSyn		( RdrNameIE, RdrNameImportDecl,
 			  RdrNameHsModule, RdrNameHsDecl
 			)
-import RnIfaces		( getInterfaceExports, recordLocalSlurps )
-import RnHiFiles	( getTyClDeclBinders )
+import RnIfaces		( recordLocalSlurps )
+import RnHiFiles	( getTyClDeclBinders, loadInterface )
 import RnEnv
 import RnMonad
 
@@ -32,7 +32,9 @@ import Module		( ModuleName, moduleName, WhereFrom(..) )
 import NameSet
 import Name		( Name, nameSrcLoc, nameOccName,  nameEnvElts )
 import HscTypes		( Provenance(..), ImportReason(..), GlobalRdrEnv,
-			  GenAvailInfo(..), AvailInfo, Avails, AvailEnv )
+			  GenAvailInfo(..), AvailInfo, Avails, AvailEnv, 
+			  Deprecations(..), ModIface(..)
+			)
 import RdrName		( RdrName, rdrNameOcc, setRdrNameOcc )
 import OccName		( setOccNameSpace, dataName )
 import NameSet		( elemNameSet, emptyNameSet )
@@ -124,15 +126,14 @@ importsFromImportDecl :: ModuleName
 
 importsFromImportDecl this_mod_name (ImportDecl imp_mod_name from qual_only as_mod import_spec iloc)
   = pushSrcLocRn iloc $
-    getInterfaceExports imp_mod_name from	`thenRn` \ (imp_mod, avails_by_module) ->
 
-    if null avails_by_module then
-	-- If there's an error in getInterfaceExports, (e.g. interface
-	-- file not found) we get lots of spurious errors from 'filterImports'
-	returnRn (emptyRdrEnv, mkEmptyExportAvails imp_mod_name)
-    else
-
+    loadInterface (ppr imp_mod_name <+> ptext SLIT("is directly imported"))
+		  imp_mod_name from			`thenRn` \ iface ->
     let
+	imp_mod		 = mi_module iface
+	avails_by_module = mi_exports iface
+	deprecs		 = mi_deprecs iface
+
 	avails :: Avails
 	avails = [ avail | (mod_name, avails) <- avails_by_module,
 			   mod_name /= this_mod_name,
@@ -155,6 +156,19 @@ importsFromImportDecl this_mod_name (ImportDecl imp_mod_name from qual_only as_m
 	-- then you'll get a 'B does not export AType' message.  Oh well.
 
     in
+    if null avails_by_module then
+	-- If there's an error in loadInterface, (e.g. interface
+	-- file not found) we get lots of spurious errors from 'filterImports'
+	returnRn (emptyRdrEnv, mkEmptyExportAvails imp_mod_name)
+    else
+
+	-- Complain if we import a deprecated module
+    (case deprecs of	
+	DeprecAll txt -> addWarnRn (moduleDeprec imp_mod_name txt)
+	other	      -> returnRn ()
+    )							`thenRn_`
+
+	-- Filter the imports according to the import list
     filterImports imp_mod_name from import_spec avails	`thenRn` \ (filtered_avails, hides, explicits) ->
 
     let
@@ -164,7 +178,7 @@ importsFromImportDecl this_mod_name (ImportDecl imp_mod_name from qual_only as_m
 			Just another_name -> another_name
 
 	mk_prov name = NonLocalDef (UserImport imp_mod iloc (name `elemNameSet` explicits)) 
-	gbl_env      = mkGlobalRdrEnv qual_mod unqual_imp True hides mk_prov filtered_avails
+	gbl_env      = mkGlobalRdrEnv qual_mod unqual_imp True hides mk_prov filtered_avails deprecs
 	exports      = mkExportAvails qual_mod unqual_imp gbl_env            filtered_avails
     in
     returnRn (gbl_env, exports)
@@ -195,7 +209,15 @@ importsFromLocalDecls this_mod decls
 	unqual_imp = True	-- Want unqualified names
 	mk_prov n  = LocalDef	-- Provenance is local
 	hides	   = []		-- Hide nothing
-	gbl_env    = mkGlobalRdrEnv mod_name unqual_imp True hides mk_prov avails
+
+	gbl_env    = mkGlobalRdrEnv mod_name unqual_imp True hides mk_prov avails NoDeprecs
+	    -- NoDeprecs: don't complain about locally defined names
+	    -- For a start, we may be exporting a deprecated thing
+	    -- Also we may use a deprecated thing in the defn of another
+	    -- deprecated things.  We may even use a deprecated thing in
+	    -- the defn of a non-deprecated thing, when changing a module's 
+	    -- interface
+
 	exports    = mkExportAvails mod_name unqual_imp gbl_env            avails
     in
     returnRn (gbl_env, exports)
@@ -568,4 +590,8 @@ dupModuleExport mod
   = hsep [ptext SLIT("Duplicate"),
 	  quotes (ptext SLIT("Module") <+> ppr mod), 
           ptext SLIT("in export list")]
+
+moduleDeprec mod txt
+  = sep [ ptext SLIT("Module") <+> quotes (ppr mod) <+> ptext SLIT("is deprecated:"), 
+	  nest 4 (ppr txt) ]	  
 \end{code}
