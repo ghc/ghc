@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.63 2001/09/04 16:33:04 sewardj Exp $
+ * $Id: Linker.c,v 1.64 2001/09/04 16:49:12 sewardj Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -1699,11 +1699,7 @@ ocGetNames_ELF ( ObjectCode* oc )
    }
 
    k = 0;
-   oc->n_sections = ehdr->e_shnum;
-   oc->sections = stgMallocBytes( oc->n_sections * sizeof(Section), 
-                                  "ocGetNames_ELF(oc->sections)" );
-
-   for (i = 0; i < oc->n_sections; i++) {
+   for (i = 0; i < ehdr->e_shnum; i++) {
 
       /* make a section entry for relevant sections */
       SectionKind kind = SECTIONKIND_OTHER;
@@ -1723,10 +1719,6 @@ ocGetNames_ELF ( ObjectCode* oc )
          char* zspace = stgCallocBytes(1, shdr[i].sh_size, 
                                        "ocGetNames_ELF(anonymous bss)");
          shdr[i].sh_offset = ((char*)zspace) - ((char*)ehdrC);
-         /* We don't prod BSS sections, hence the following isn't
-            necessary:
-               addProddableBlock(oc, zspace, shdr[i].sh_size);
-         */
          /*
          fprintf(stderr, "BSS section at 0x%x, size %d\n", 
                          zspace, shdr[i].sh_size);
@@ -1734,9 +1726,8 @@ ocGetNames_ELF ( ObjectCode* oc )
       }
 
       /* fill in the section info */
-      oc->sections[i].start = ehdrC + shdr[i].sh_offset;
-      oc->sections[i].end   = ehdrC + shdr[i].sh_offset + shdr[i].sh_size - 1;
-      oc->sections[i].kind  = kind;
+      addSection(oc, kind, ehdrC + shdr[i].sh_offset, 
+                     ehdrC + shdr[i].sh_offset + shdr[i].sh_size - 1);
       if (kind != SECTIONKIND_OTHER && shdr[i].sh_size > 0)
          addProddableBlock(oc, ehdrC + shdr[i].sh_offset, shdr[i].sh_size);
 
@@ -1905,13 +1896,12 @@ do_Elf32_Rela_relocations ( ObjectCode* oc, char* ehdrC,
    for (j = 0; j < nent; j++) {
       Elf32_Addr  offset = rtab[j].r_offset;
       Elf32_Word  info   = rtab[j].r_info;
-      Elf32_Sword addend = rtab[j].r_addend;
-
       Elf32_Addr  P  = ((Elf32_Addr)targ) + offset;
-      Elf32_Addr  A  = addend;
       Elf32_Addr  S;
 #     if defined(sparc_TARGET_ARCH)
       /* This #ifdef only serves to avoid unused-var warnings. */
+      Elf32_Sword addend = rtab[j].r_addend;
+      Elf32_Addr  A  = addend;
       Elf32_Word* pP = (Elf32_Word*)P;
       Elf32_Word  w1, w2;
 #     endif
@@ -1949,7 +1939,7 @@ do_Elf32_Rela_relocations ( ObjectCode* oc, char* ehdrC,
       }
       IF_DEBUG(linker,fprintf ( stderr, "Reloc: P = %p   S = %p   A = %p\n",
                                         (void*)P, (void*)S, (void*)A )); 
-      checkProddableBlock ( oc, P );
+      checkProddableBlock ( oc, (void*)P );
       switch (ELF32_R_TYPE(info)) {
 #        if defined(sparc_TARGET_ARCH)
          case R_SPARC_WDISP30: 
