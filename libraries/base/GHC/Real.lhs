@@ -41,6 +41,13 @@ default ()		-- Double isn't available yet,
 \begin{code}
 data  (Integral a)	=> Ratio a = !a :% !a  deriving (Eq)
 type  Rational		=  Ratio Integer
+
+infinity, notANumber :: Rational
+infinity   = 1 :% 0
+notANumber = 0 :% 0
+
+-- Use :%, not % for Inf/NaN; the latter would 
+-- immediately lead to a runtime error, because it normalises. 
 \end{code}
 
 

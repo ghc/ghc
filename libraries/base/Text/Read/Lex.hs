@@ -36,7 +36,7 @@ import GHC.Show( Show(.. ), showChar, showString,
 		 isSpace, isAlpha, isAlphaNum,
 		 isOctDigit, isHexDigit, toUpper )
 import GHC.Real( Ratio(..), Integral, Rational, (%), fromIntegral, fromRational, 
-		 toInteger, (^), (^^) )
+		 toInteger, (^), (^^), infinity, notANumber )
 import GHC.Float( Float, Double )
 import GHC.List
 import GHC.Show( ShowS, shows )
@@ -283,21 +283,6 @@ lexString =
 
 -- ---------------------------------------------------------------------------
 --  Lexing numbers
-
-infinity, notANumber :: Rational
-infinity   = 1 :% 0
-notANumber = 0 :% 0
-
--- Use :%, not % for Inf/NaN, the latter would 
--- immediately lead to a runtime error. 
---
--- Note that
---     isInfinite (read "Infinity" :: Float)
---  or
---     isInfinite (fromRational (1 :% 0))
--- still don't work, because fromRational is not OK for those cases.
--- 
--- The whole Infinity/NaN story is a bit murky to me
 
 type Base   = Int
 type Digits = [Int]

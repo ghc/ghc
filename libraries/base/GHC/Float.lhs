@@ -675,14 +675,18 @@ fromRat x = x'
 Now, here's Lennart's code (which works)
 
 \begin{code}
-{-# SPECIALISE fromRat :: 
-	Rational -> Double,
-	Rational -> Float #-}
+{-# SPECIALISE fromRat :: Rational -> Double,
+			  Rational -> Float #-}
 fromRat :: (RealFloat a) => Rational -> a
-fromRat x 
-  | x == 0    =  encodeFloat 0 0 		-- Handle exceptional cases
-  | x <  0    =  - fromRat' (-x)		-- first.
-  | otherwise =  fromRat' x
+
+-- Deal with special cases first, delegating the real work to fromRat'
+fromRat (n :% 0) | n > 0  =  1/0	-- +Infinity
+		 | n == 0 =  0/0	-- NaN
+		 | n < 0  = -1/0	-- -Infinity
+
+fromRat (n :% d) | n > 0  = fromRat' (n :% d)
+		 | n == 0 = encodeFloat 0 0 		-- Zero
+		 | n < 0  = - fromRat' ((-n) :% d)
 
 -- Conversion process:
 -- Scale the rational number by the RealFloat base until
@@ -693,6 +697,7 @@ fromRat x
 -- a first guess of the exponent.
 
 fromRat' :: (RealFloat a) => Rational -> a
+-- Invariant: argument is strictly positive
 fromRat' x = r
   where b = floatRadix r
         p = floatDigits r
