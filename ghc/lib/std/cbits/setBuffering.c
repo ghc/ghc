@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: setBuffering.c,v 1.8 2000/04/14 16:19:43 rrt Exp $
+ * $Id: setBuffering.c,v 1.9 2001/01/16 14:06:14 simonmar Exp $
  *
  * hSetBuffering Runtime Support
  */
@@ -37,7 +37,6 @@ setBuffering(StgForeignPtr ptr, StgInt size)
     int input, isaterm;
     struct termios tio;
     struct stat sb;
-   
 
     /* First off, flush old buffer.. */
     if ( (fo->flags & FILEOBJ_WRITE) ) {
@@ -83,7 +82,7 @@ setBuffering(StgForeignPtr ptr, StgInt size)
 	    tio.c_lflag &=  ~ICANON;
 	    tio.c_cc[VMIN] = 1;
 	    tio.c_cc[VTIME] = 0;
-	    if (tcsetattr(fo->fd, TCSANOW, &tio) < 0) {
+	    if (tcSetAttr(fo->fd, TCSANOW, &tio) < 0) {
 		cvtErrno();
 		stdErrno();
 		return -1;
@@ -138,7 +137,7 @@ setBuffering(StgForeignPtr ptr, StgInt size)
 	    return -1;
 	}
 	tio.c_lflag |= ICANON;
-	if (tcsetattr(fo->fd, TCSANOW, &tio) < 0) {
+	if (tcSetAttr(fo->fd, TCSANOW, &tio) < 0) {
 	    cvtErrno();
 	    stdErrno();
 	    return -1;

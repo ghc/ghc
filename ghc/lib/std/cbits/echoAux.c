@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: echoAux.c,v 1.3 1999/03/01 09:02:04 sof Exp $
+ * $Id: echoAux.c,v 1.4 2001/01/16 14:06:14 simonmar Exp $
  *
  * Support functions for changing echoing
  */
@@ -26,9 +26,7 @@
 #endif
 
 StgInt
-setTerminalEcho(ptr, on)
-StgForeignPtr ptr;
-StgInt on;
+setTerminalEcho(StgForeignPtr ptr, StgInt on)
 {
    IOFileObject* fo = (IOFileObject*)ptr;
    struct termios tios;
@@ -51,7 +49,7 @@ StgInt on;
      tios.c_lflag &= ~ECHO;
    }
 
-   while ( (rc = tcsetattr(fd,TCSANOW,&tios)) == -1) {
+   while ( (rc = tcSetAttr(fd,TCSANOW,&tios)) == -1) {
 	if (errno != EINTR) {
 	    cvtErrno();
 	    stdErrno();

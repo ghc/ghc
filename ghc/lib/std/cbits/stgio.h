@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: stgio.h,v 1.24 2000/11/07 10:42:57 simonmar Exp $
+ * $Id: stgio.h,v 1.25 2001/01/16 14:06:14 simonmar Exp $
  *
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1999
  *
@@ -23,28 +23,6 @@ StgAddr allocMemory__ (StgInt);
 
 /* closeFile.c */
 StgInt closeFile (StgForeignPtr,StgInt);
-
-/* createDirectory.c */
-StgInt createDirectory (StgByteArray);
-
-/* directoryAux.c */
-StgAddr openDir__         (StgByteArray);
-StgAddr readDir__         (StgAddr);
-StgAddr get_dirent_d_name (StgAddr);
-StgWord get_stat_st_mode  (StgAddr);
-StgInt64 get_stat_st_mtime(StgAddr);
-void     set_stat_st_mtime(StgByteArray, StgByteArray);
-StgInt  sizeof_stat       (void);
-StgInt  prim_stat         (StgAddr,StgAddr);
-StgWord const_S_IRUSR 	  (void);
-StgWord const_S_IWUSR 	  (void);
-StgWord const_S_IXUSR 	  (void);
-StgWord const_R_OK 	  (void);
-StgWord const_W_OK 	  (void);
-StgWord const_X_OK 	  (void);
-StgWord const_F_OK 	  (void);
-StgInt  prim_S_ISDIR  	  (StgWord);
-StgInt  prim_S_ISREG  	  (StgWord);
 
 /* echoAux.c */
 StgInt setTerminalEcho (StgForeignPtr, StgInt);
@@ -132,19 +110,9 @@ StgAddr ref_freeFileObject    (void);
 /* getBufferMode.c */
 StgInt	getBufferMode (StgForeignPtr);
 
-/* getClockTime.c */
-StgInt	getClockTime (StgByteArray, StgByteArray);
-StgInt  prim_getClockTime(StgByteArray, StgByteArray);
-
 /* getCPUTime.c */
 StgInt getCPUTime (StgByteArray);
 StgInt clockTicks(void);
-
-/* getCurrentDirectory.c */
-StgAddr getCurrentDirectory(void);
-
-/* getDirectoryContents.c */
-StgAddr getDirectoryContents (StgByteArray);
 
 /* getLock.c */
 int     lockFile    (int, int, int);
@@ -169,18 +137,6 @@ StgInt	readChunk (StgForeignPtr,StgAddr,StgInt,StgInt);
 StgInt	readLine  (StgForeignPtr);
 StgInt	readChar  (StgForeignPtr);
 
-/* removeDirectory.c */
-StgInt removeDirectory (StgByteArray);
-
-/* removeFile.c */
-StgInt removeFile (StgByteArray);
-
-/* renameDirectory.c */
-StgInt renameDirectory (StgByteArray, StgByteArray);
-
-/* renameFile.c */
-StgInt renameFile (StgByteArray, StgByteArray);
-
 /* seekFile.c */
 StgInt	seekFile  (StgForeignPtr, StgInt, StgInt, StgByteArray);
 StgInt	seekFile_int64 (StgForeignPtr, StgInt, StgInt64);
@@ -202,35 +158,6 @@ StgInt showTime (StgInt, StgByteArray, StgInt, StgByteArray);
 /* system.c */
 StgInt	systemCmd (StgByteArray);
 
-/* timezone.c */
-StgInt  get_tm_sec       ( StgAddr );
-StgInt  get_tm_min       ( StgAddr );
-StgInt  get_tm_hour      ( StgAddr );
-StgInt  get_tm_mday      ( StgAddr );
-StgInt  get_tm_mon       ( StgAddr );
-StgInt  get_tm_year      ( StgAddr );
-StgInt  get_tm_wday      ( StgAddr );
-StgInt  get_tm_yday      ( StgAddr );
-StgInt  get_tm_isdst     ( StgAddr );
-StgAddr prim_ZONE        ( StgAddr );
-StgInt  prim_GMTOFF      ( StgAddr );
-void    prim_SETZONE     ( StgAddr, StgAddr );
-StgInt  sizeof_word      ( void ); 
-StgInt  sizeof_struct_tm ( void );
-StgInt  sizeof_time_t    ( void );
-char*   get_ZONE         ( StgAddr );
-
-/* toLocalTime.c */
-StgInt toLocalTime (StgInt, StgByteArray, StgByteArray);
-StgInt prim_toLocalTime ( StgInt64,StgByteArray );
-
-/* toUTCTime.c */
-StgInt toUTCTime (StgInt, StgByteArray, StgByteArray);
-StgInt prim_toUTCTime ( StgInt64,StgByteArray );
-
-/* toClockSec.c */
-StgInt toClockSec (StgInt, StgInt, StgInt, StgInt, StgInt, StgInt, StgInt, StgInt, StgByteArray);
-
 /* writeError.c */
 StgAddr addrOf_ErrorHdrHook(void);
 void    writeErrString__ (StgAddr, StgByteArray, StgInt);
@@ -241,6 +168,12 @@ StgInt	writeBufBA  (StgForeignPtr, StgByteArray, StgInt, StgInt);
 StgInt	writeFileObject (StgForeignPtr, StgInt);
 StgInt	writeBuffer (StgForeignPtr, StgInt);
 StgInt  write_ (StgForeignPtr ptr, StgAddr buf, StgInt len);
+
+/* tcSetAttr.c */
+#ifdef HAVE_TERMIOS_H
+#include <termios.h>
+#endif
+int tcSetAttr (int fd, int options, const struct termios *tp);
 
 #endif /* ! STGIO_H */
 
