@@ -278,7 +278,7 @@ bindSocket (MkSocket s _family _stype _protocol socketStatus) addr = do
 	 show currentStatus))
   else do
    addr' <- packSockAddr addr
-   let (_,sz) = boundsOfByteArray addr'
+   let (_,sz) = boundsOfMutableByteArray addr'
    status <- _ccall_ bindSocket s addr' sz (isDomainSocket::Int)
    case (status::Int) of
      -1 -> constructErrorAndFail "bindSocket"
@@ -313,7 +313,7 @@ connect (MkSocket s _family _stype _protocol socketStatus) addr = do
          show currentStatus))
   else do
    addr' <- packSockAddr addr
-   let (_,sz) = boundsOfByteArray addr'
+   let (_,sz) = boundsOfMutableByteArray addr'
    status <- _ccall_ connectSocket s addr' sz (isDomainSocket::Int)
    case (status::Int) of
      -1 -> constructErrorAndFail "connect"
@@ -425,7 +425,7 @@ sendTo (MkSocket s _family _stype _protocol status) xs addr = do
           show currentStatus))
    else do
     addr' <- packSockAddr addr
-    let (_,sz) = boundsOfByteArray addr'
+    let (_,sz) = boundsOfMutableByteArray addr'
     nbytes <- _ccall_ sendTo__ s xs (length xs) addr' sz
     case (nbytes::Int) of
       -1 -> constructErrorAndFail "sendTo"
@@ -1130,13 +1130,13 @@ allocSockAddr :: Family -> IO (MutableByteArray RealWorld Int, Int)
 #ifndef cygwin32_TARGET_OS
 allocSockAddr AF_UNIX = do
     ptr <- allocChars ``sizeof(struct sockaddr_un)''
-    let (_,sz) = boundsOfByteArray ptr
+    let (_,sz) = boundsOfMutableByteArray ptr
     return (ptr, sz)
 #endif
 
 allocSockAddr AF_INET = do
     ptr <- allocChars ``sizeof(struct sockaddr_in)''
-    let (_,sz) = boundsOfByteArray ptr
+    let (_,sz) = boundsOfMutableByteArray ptr
     return (ptr, sz)
 
 -------------------------------------------------------------------------------
