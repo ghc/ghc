@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.36 $
- * $Date: 2000/02/29 12:54:51 $
+ * $Revision: 1.37 $
+ * $Date: 2000/03/13 10:30:25 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -24,6 +24,7 @@
 #include "ForeignCall.h"
 #include "PrimOps.h"   /* for __{encode,decode}{Float,Double} */
 #include "Evaluator.h"
+#include "sainteger.h"
 
 #ifdef DEBUG
 #include "Printer.h"
@@ -39,11 +40,7 @@
 #include <ieee754.h> /* These are for primops */
 #endif
 
-#ifdef STANDALONE_INTEGER
-#include "sainteger.h"
-#else
-#error Non-standalone integer not yet supported
-#endif
+
 
 /* An incredibly useful abbreviation.
  * Interestingly, there are some uses of END_TSO_QUEUE_closure that
@@ -298,7 +295,6 @@ static        StgClosure* raiseAnError   ( StgClosure* exception );
 
 static int  enterCountI = 0;
 
-#ifdef STANDALONE_INTEGER
 StgDouble B__encodeDouble (B* s, I_ e);
 void      B__decodeDouble (B* man, I_* exp, StgDouble dbl);
 #if ! FLOATS_AS_DOUBLES
@@ -307,7 +303,6 @@ void      B__decodeFloat (B* man, I_* exp, StgFloat flt);
 StgPtr    CreateByteArrayToHoldInteger ( int );
 B*        IntegerInsideByteArray ( StgPtr );
 void      SloppifyIntegerEnd ( StgPtr );
-#endif
 #endif
 
 
@@ -2125,7 +2120,6 @@ static StgClosure* makeErrorCall ( const char* msg )
 }
 
 
-#ifdef STANDALONE_INTEGER
 StgPtr CreateByteArrayToHoldInteger ( int nbytes )
 {
    StgInt  words     = (nbytes+sizeof(W_)-1)/sizeof(W_);
@@ -2194,7 +2188,6 @@ void SloppifyIntegerEnd ( StgPtr arr0 )
    SloppifyIntegerEnd(p);                            \
    PushPtr(p);                                       \
 }
-#endif
 
 
 
@@ -2231,21 +2224,22 @@ void myStackCheck ( Capability* cap )
       assert(0);
    }
    while (1) {
-      if (!(gSu >= cap->rCurrentTSO->stack 
-            && gSu <= cap->rCurrentTSO->stack 
-               + cap->rCurrentTSO->stack_size)) {
+      if (!( (P_)gSu >= (P_)cap->rCurrentTSO->stack 
+              && 
+              (P_)gSu <= (P_)(cap->rCurrentTSO->stack 
+                              + cap->rCurrentTSO->stack_size))) {
          fprintf ( stderr, "myStackCheck: gSu out of stack\n" );
          assert(0);
       }
       switch (get_itbl(stgCast(StgClosure*,gSu))->type) {
       case CATCH_FRAME:
-         gSu = (StgPtr) ((StgCatchFrame*)(gSu))->link;
+         gSu = (StgUpdateFrame*) ((StgCatchFrame*)(gSu))->link;
          break;
       case UPDATE_FRAME:
-         gSu = (StgPtr) ((StgUpdateFrame*)(gSu))->link;
+         gSu = (StgUpdateFrame*) ((StgUpdateFrame*)(gSu))->link;
          break;
       case SEQ_FRAME:
-         gSu = (StgPtr) ((StgSeqFrame*)(gSu))->link;
+         gSu = (StgUpdateFrame*) ((StgSeqFrame*)(gSu))->link;
          break;
       case STOP_FRAME:
          goto postloop;
@@ -2438,7 +2432,6 @@ static void* enterBCO_primop1 ( int primop1code )
         case i_readStableOffAddr:  OP_AI_s(indexStablePtrOffAddrzh(r,x,y)); break;
         case i_writeStableOffAddr: OP_AIs_(writeStablePtrOffAddrzh(x,y,z)); break;
 
-#ifdef STANDALONE_INTEGER
         case i_compareInteger:     
             {
                 B* x = IntegerInsideByteArray(PopPtr());
@@ -2503,9 +2496,6 @@ static void* enterBCO_primop1 ( int primop1code )
                                       IntegerInsideByteArray(PopPtr())
                                    ));
                                    break; 
-#else
-#error Non-standalone integer not yet implemented
-#endif /* STANDALONE_INTEGER */
 
         case i_gtFloat:         OP_FF_B(x>y);        break;
         case i_geFloat:         OP_FF_B(x>=y);       break;
@@ -2546,7 +2536,6 @@ static void* enterBCO_primop1 ( int primop1code )
         case i_tanhFloat:       OP_F_F(tanh(x));     break;
         case i_powerFloat:      OP_FF_F(pow(x,y));   break;
 
-#ifdef STANDALONE_INTEGER
         case i_encodeFloatZ:
             {
                 StgPtr sig = PopPtr();
@@ -2566,9 +2555,7 @@ static void* enterBCO_primop1 ( int primop1code )
                 PushPtr(sig);
             }
             break;
-#else
-#error encode/decodeFloatZ not yet implemented for GHC ints
-#endif
+
         case i_isNaNFloat:      OP_F_B(isFloatNaN(x));      break;
         case i_isInfiniteFloat: OP_F_B(isFloatInfinite(x)); break;
         case i_isNegativeZeroFloat: OP_F_B(isFloatNegativeZero(x)); break;
@@ -2614,7 +2601,6 @@ static void* enterBCO_primop1 ( int primop1code )
         case i_tanhDouble:      OP_D_D(tanh(x));     break;
         case i_powerDouble:     OP_DD_D(pow(x,y));   break;
 
-#ifdef STANDALONE_INTEGER
         case i_encodeDoubleZ:
             {
                 StgPtr sig = PopPtr();
@@ -2634,9 +2620,7 @@ static void* enterBCO_primop1 ( int primop1code )
                 PushPtr(sig);
             }
             break;
-#else
-#error encode/decodeDoubleZ not yet implemented for GHC ints
-#endif
+
         case i_isNaNDouble:      OP_D_B(isDoubleNaN(x));      break;
         case i_isInfiniteDouble: OP_D_B(isDoubleInfinite(x)); break;
         case i_isNegativeZeroDouble: OP_D_B(isDoubleNegativeZero(x)); break;
@@ -3071,14 +3055,6 @@ static void* enterBCO_primop2 ( int primop2code,
                 break;
             }
 
-#if 1
-#if 0
-ToDo: another way out of the problem might be to add an explicit
-continuation to primTakeMVar: takeMVar v = primTakeMVar v takeMVar.
-The problem with this plan is that now I dont know how much to chop
-off the stack.
-#endif
-#endif
         case i_delay:
         case i_waitRead:
         case i_waitWrite:
@@ -3134,7 +3110,7 @@ nat marshall(char arg_ty, void* arg)
     case INT_REP:
             PushTaggedInt(*((int*)arg));
             return ARG_SIZE(INT_TAG);
-#ifdef TODO_STANDALONE_INTEGER
+#if 0
     case INTEGER_REP:
             PushTaggedInteger(*((mpz_ptr*)arg));
             return ARG_SIZE(INTEGER_TAG);
@@ -3186,7 +3162,7 @@ nat unmarshall(char res_ty, void* res)
     case INT_REP:
             *((int*)res) = PopTaggedInt();
             return ARG_SIZE(INT_TAG);
-#ifdef TODO_STANDALONE_INTEGER
+#if 0
     case INTEGER_REP:
             *((mpz_ptr*)res) = PopTaggedInteger();
             return ARG_SIZE(INTEGER_TAG);
@@ -3237,7 +3213,7 @@ nat argSize( const char* ks )
         case INT_REP:
                 sz += sizeof(StgWord) * ARG_SIZE(INT_TAG);
                 break;
-#ifdef TODO_STANDALONE_INTEGER
+#if 0
         case INTEGER_REP:
                 sz += sizeof(StgWord) * ARG_SIZE(INTEGER_TAG);
                 break;
@@ -3281,8 +3257,6 @@ nat argSize( const char* ks )
  * Code based on the HBC code (lib/fltcode.c) and more recently GHC
  * (ghc/rts/StgPrimFloat.c)
  * ---------------------------------------------------------------------------*/
-
-#ifdef STANDALONE_INTEGER
 
 #if IEEE_FLOATING_POINT
 #define MY_DMINEXP  ((DBL_MIN_EXP) - (DBL_MANT_DIG) - 1)
@@ -3454,7 +3428,5 @@ void B__decodeFloat (B* man, I_* exp, StgFloat flt)
 }
 
 #endif	/* FLOATS_AS_DOUBLES */
-
-#endif /* STANDALONE_INTEGER */
 
 #endif /* INTERPRETER */
