@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GCCompact.c,v 1.14 2003/03/24 14:46:54 simonmar Exp $
+ * $Id: GCCompact.c,v 1.15 2003/03/24 16:18:26 simonmar Exp $
  *
  * (c) The GHC Team 2001
  *
@@ -340,7 +340,8 @@ thread_stack(StgPtr p, StgPtr stack_end)
 	    StgRetFun *ret_fun = (StgRetFun *)p;
 	    StgFunInfoTable *fun_info;
 	    
-	    fun_info = itbl_to_fun_itbl(get_threaded_info(ret_fun->fun));
+	    fun_info = itbl_to_fun_itbl(
+		get_threaded_info((StgPtr)ret_fun->fun));
 	         // *before* threading it!
 	    thread((StgPtr)&ret_fun->fun);
 	    p = thread_arg_block(fun_info, ret_fun->payload);
@@ -361,7 +362,7 @@ thread_PAP (StgPAP *pap)
     StgWord bitmap, size;
     StgFunInfoTable *fun_info;
     
-    fun_info = itbl_to_fun_itbl(get_threaded_info(pap->fun));
+    fun_info = itbl_to_fun_itbl(get_threaded_info((StgPtr)pap->fun));
     ASSERT(fun_info->i.type != PAP);
 
     p = (StgPtr)pap->payload;
