@@ -27,7 +27,7 @@ module SysTools (
 				-- Command-line override
 	setDryRun,
 
-	getTopDir,		-- IO String	-- The value of $libdir
+	getTopDir,		-- IO String	-- The value of $topdir
 	getPackageConfigPath,	-- IO String	-- Where package.conf is
         getUsageMsgPaths,       -- IO (String,String)
 
@@ -166,7 +166,7 @@ Package
     {name = "tools",    import_dirs = [],  source_dirs = [],
      library_dirs = [], hs_libraries = [], extra_libraries = [],
      include_dirs = [], c_includes = [],   package_deps = [],
-     extra_ghc_opts = ["-pgmc/usr/bin/gcc","-pgml${libdir}/bin/unlit", ... etc.],
+     extra_ghc_opts = ["-pgmc/usr/bin/gcc","-pgml${topdir}/bin/unlit", ... etc.],
      extra_cc_opts = [], extra_ld_opts = []}
 
 Which would have the advantage that we get to collect together in one

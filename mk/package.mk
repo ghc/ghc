@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.43 2005/01/14 08:01:27 wolfgang Exp $
+# $Id: package.mk,v 1.44 2005/01/20 14:22:31 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -12,7 +12,57 @@ endif
 endif
 
 # -----------------------------------------------------------------------------
+# Directory layouts, installation etc.
+
+# Here Windows & Unix differ.  On Windows, the value of $(prefix) is known
+# to the compiler, and spliced into package.conf in place of $topdir at
+# runtime.
+#
+# On Unix, we only use absolute paths in package.conf, except that when
+# building a binary distribution we use $libdir and $datadir in package.conf
+# which are then replaced by the correct values at install time.
+#
+
+ifeq "$(Windows)" "YES"
+
+PKG_LIBDIR  = $$topdir
+PKG_DATADIR = $$topdir
+
+else
+
+ifeq "$(BIN_DIST)" ""
+PKG_LIBDIR  = $(libdir)
+PKG_DATADIR = $(datadir)
+else
+PKG_LIBDIR  = $$libdir
+PKG_DATADIR = $$datadir
+endif
+
+endif # Unix
+
+IMPORT_DIR_INSTALLED = $(PKG_LIBDIR)/imports
+IMPORT_DIR_INPLACE   = $(FPTOOLS_TOP_ABS)/libraries/$(PACKAGE)
+
+INCLODE_DIR_INSTALLED =
+INCLUDE_DIR_INPLACE   = $(FPTOOLS_TOP_ABS)/libraries/$(PACKAGE)/include
+
+LIB_DIR_INSTALLED    = $(PKG_LIBDIR)
+LIB_DIR_INPLACE	     = $(FPTOOLS_TOP_ABS)/libraries/$(PACKAGE)
+
+DATA_DIR_INSTALLED   = $(PKG_DATADIR)
+DATA_DIR_INPLACE     = $(FPTOOLS_TOP_ABS)/libraries/$(PACKAGE)
+
+HTML_DIR_INPLACE     = $(FPTOOLS_TOP_ABS)/libraries/$(PACKAGE)/html
+HTML_DIR_INSTALLED   = $(PKG_DATADIR)/html/libraries/$(PACKAGE)
+
+HADDOCK_IFACE_INPLACE   = $(HTML_DIR_INPLACE)/$(PACKAGE).haddock
+HADDOCK_IFACE_INSTALLED = $(HTML_DIR_INSTALLED)/$(PACKAGE).haddock
+
+# -----------------------------------------------------------------------------
 # Build the package configuration file and tell the compiler about it.
+
+# We want to build two versions of the package configuration: one for use
+# in the 
 
 ifeq "$(way)" ""
 
@@ -25,16 +75,18 @@ endif
 PACKAGE_CPP_OPTS += -DPACKAGE=${PACKAGE}
 PACKAGE_CPP_OPTS += -DVERSION=${VERSION}
 
-IMPORT_DIR_INSTALLED = $$libdir/imports
-IMPORT_DIR_INPLACE   = $$libdir/libraries/$(PACKAGE)
-
-LIB_DIR_INSTALLED    = $$libdir
-LIB_DIR_INPLACE	     = $$libdir/libraries/$(PACKAGE)
+PACKAGE_CPP_OPTS += -DPKG_LIBDIR='"$(PKG_LIBDIR)"'
+PACKAGE_CPP_OPTS += -DPKG_DATADIR='"$(PKG_DATADIR)"'
 
 package.conf.inplace   : package.conf.in
 	$(CPP) $(RAWCPP_FLAGS) -P \
 		-DIMPORT_DIR='"$(IMPORT_DIR_INPLACE)"' \
 		-DLIB_DIR='"$(LIB_DIR_INPLACE)"' \
+		-DINCLUDE_DIR='"$(INCLUDE_DIR_INPLACE)"' \
+		-DDATA_DIR='"$(DATA_DIR_INPLACE)"' \
+		-DHTML_DIR='"$(HTML_DIR_INPLACE)"' \
+		-DHADDOCK_IFACE='"$(HADDOCK_IFACE_INPLACE)"' \
+		-DFPTOOLS_TOP_ABS=\"${FPTOOLS_TOP_ABS}\" \
 		-x c $(PACKAGE_CPP_OPTS) $< | \
 	grep -v '^#pragma GCC' | \
 	sed -e 's/""//g' -e 's/:[ 	]*,/: /g' >$@
@@ -43,6 +95,10 @@ package.conf.installed : package.conf.in
 	$(CPP) $(RAWCPP_FLAGS) -P -DINSTALLING \
 		-DIMPORT_DIR='"$(IMPORT_DIR_INSTALLED)"' \
 		-DLIB_DIR='"$(LIB_DIR_INSTALLED)"' \
+		-DINCLUDE_DIR='"$(INCLUDE_DIR_INSTALLED)"' \
+		-DDATA_DIR='"$(DATA_DIR_INSTALLED)"' \
+		-DHTML_DIR='"$(HTML_DIR_INSTALLED)"' \
+		-DHADDOCK_IFACE='"$(HADDOCK_IFACE_INSTALLED)"' \
 		 -x c $(PACKAGE_CPP_OPTS) $< | \
 	grep -v '^#pragma GCC' | \
 	sed -e 's/""//g' -e 's/:[ 	]*,/: /g' >$@
@@ -68,8 +124,8 @@ boot all :: $(STAMP_PKG_CONF)
 endif
 
 $(STAMP_PKG_CONF) : package.conf.inplace package.conf.installed
-	$(GHC_PKG_INPLACE) --update-package <package.conf.inplace
-	$(GHC_PKG_INPLACE)  -f $(GHC_DRIVER_DIR)/package.conf --update-package <package.conf.installed
+	$(GHC_PKG_INPLACE) --force --update-package <package.conf.inplace
+	$(GHC_PKG_INPLACE)  -f $(GHC_DRIVER_DIR)/package.conf --force --update-package <package.conf.installed
 	@touch $(STAMP_PKG_CONF)
 
 CLEAN_FILES += package.conf.installed package.conf.inplace 
@@ -79,7 +135,6 @@ else # $(STANDALONE_PACKAGE) == "YES"
 PACKAGE_CPP_OPTS += -DPACKAGE_DEPS='$(subst " ","$(comma) ",$(patsubst %,"%",$(PACKAGE_DEPS)))'
 PACKAGE_CPP_OPTS += -DLIBRARY=\"HS$(PACKAGE)\"
 PACKAGE_CPP_OPTS += -DLIBDIR=\"$(libdir)\"
-PACKAGE_CPP_OPTS += -DFPTOOLS_TOP_ABS=\"${FPTOOLS_TOP_ABS}\"
 
 # Let the package configuration file refer to $(libdir) as
 # ${pkglibdir}.  Note we can't use ${libdir} because ghc-pkg already
@@ -308,13 +363,16 @@ CLEAN_FILES += $(PACKAGE).haddock
 %.raw-hs : %.hs
 	$(HC) $(HC_OPTS) -D__HADDOCK__ -E -optP-P $< -o $@
 
+HTML_INSTALL_DIR = $(datadir)/html/libraries/$(PACKAGE)
+#  NOT the same as HTML_DIR_INSTALLED when BIN_DIST is on
+
 install-docs :: $(HTML_DOC)
-	@$(INSTALL_DIR) $(datadir)/html/libraries/$(PACKAGE)
+	@$(INSTALL_DIR) $(HTML_INSTALL_DIR)
 	@for i in $(HTML_DIR)/*; do \
-	   echo $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(datadir)/html/libraries/$(PACKAGE); \
-	   $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(datadir)/html/libraries/$(PACKAGE); \
+	   echo $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(HTML_INSTALL_DIR); \
+	   $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(HTML_INSTALL_DIR); \
 	done
-	$(INSTALL_DATA) $(INSTALL_OPTS) $(PACKAGE).haddock $(datadir)/html/libraries/$(PACKAGE)
+	$(INSTALL_DATA) $(INSTALL_OPTS) $(PACKAGE).haddock $(HTML_INSTALL_DIR)
 
 endif # HS_PPS
 endif # NO_HADDOCK_DOCS

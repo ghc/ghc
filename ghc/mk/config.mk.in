@@ -21,6 +21,7 @@ GhcBinDistPrlScripts =
 GhcBinDistLibPrlScripts = ghc-asm ghc-split
 GhcBinDistBins = hp2ps ghcprof
 GhcBinDistLinks = ghc ghci ghc-pkg
+GhcBinDistLibSplicedFiles = package.conf
 
 # -----------------------------------------------------------------------------
 # GHC-specific configuration settings

@@ -543,8 +543,8 @@ checkDuplicates db_stack pkg update = do
 
 checkDir :: Bool -> String -> IO ()
 checkDir force d
- | "$libdir" `isPrefixOf` d = return ()
-	-- can't check this, because we don't know what $libdir is
+ | "$topdir" `isPrefixOf` d = return ()
+	-- can't check this, because we don't know what $topdir is
  | otherwise = do
    there <- doesDirectoryExist d
    when (not there)
@@ -579,7 +579,7 @@ checkHSLib dirs auto_ghci_libs force lib = do
 
 doesLibExistIn :: String -> String -> IO Bool
 doesLibExistIn lib d
- | "$libdir" `isPrefixOf` d = return True
+ | "$topdir" `isPrefixOf` d = return True
  | otherwise                = doesFileExist (d ++ '/':lib)
 
 checkGHCiLib :: [String] -> String -> String -> String -> Bool -> IO ()
