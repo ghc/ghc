@@ -75,7 +75,10 @@ module System.Posix.Signals (
   scheduleAlarm,
 
   -- * Waiting for signals
-  getPendingSignals, awaitSignal,
+  getPendingSignals,
+#ifndef cygwin32_TARGET_OS
+  awaitSignal,
+#endif
 
 #ifdef __GLASGOW_HASKELL__
   -- * The @NOCLDSTOP@ flag
@@ -190,10 +193,8 @@ busError = sigBUS
 processStatusChanged :: Signal
 processStatusChanged = sigCHLD
 
-#ifndef cygwin32_TARGET_OS
 continueProcess :: Signal
 continueProcess = sigCONT
-#endif
 
 floatingPointException :: Signal
 floatingPointException = sigFPE
