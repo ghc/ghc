@@ -44,6 +44,9 @@ module Util (
 	unzipWith,
 
 	global,
+
+	-- module names
+	looksLikeModuleName,
     ) where
 
 #include "../includes/config.h"
@@ -63,6 +66,8 @@ import qualified List	( elem, notElem )
 #ifndef DEBUG
 import List		( zipWith4 )
 #endif
+
+import Char		( isUpper, isAlphaNum )
 
 infixr 9 `thenCmp`
 \end{code}
@@ -781,4 +786,13 @@ Global variables:
 \begin{code}
 global :: a -> IORef a
 global a = unsafePerformIO (newIORef a)
+\end{code}
+
+Module names:
+
+\begin{code}
+looksLikeModuleName [] = False
+looksLikeModuleName (c:cs) = isUpper c && all isAlphaNumEx cs
+
+isAlphaNumEx c = isAlphaNum c || c == '_' || c == '.'
 \end{code}
