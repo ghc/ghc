@@ -557,6 +557,7 @@ instance Data a => Data (Maybe a) where
                    2 -> Just undefined
   dataTypeOf _ = maybeDataType
 
+
 --
 -- Yet another polymorphic datatype constructor.
 -- No surprises.
@@ -572,11 +573,37 @@ instance (Data a, Data b) => Data (a,b) where
                    1 -> (undefined,undefined)
   dataTypeOf _ = productDataType
 
+
 --
 -- Yet another polymorphic datatype constructor.
 -- No surprises.
 --
+ 
+tripleConstr = mkConstr 1 "(,,)" Infix
+tripleDataType = mkDataType [tripleConstr]
 
+instance (Data a, Data b, Data c) => Data (a,b,c) where
+  gfoldl f z (a,b,c) = z (,,) `f` a `f` b `f` c
+  toConstr _ = tripleConstr
+  fromConstr c = case conIndex c of
+                   1 -> (undefined,undefined,undefined)
+  dataTypeOf _ = tripleDataType
+ 
+quadrupleConstr = mkConstr 1 "(,,,)" Infix
+quadrupleDataType = mkDataType [quadrupleConstr]
+ 
+instance (Data a, Data b, Data c, Data d) => Data (a,b,c,d) where
+  gfoldl f z (a,b,c,d) = z (,,,) `f` a `f` b `f` c `f` d
+  toConstr _ = quadrupleConstr
+  fromConstr c = case conIndex c of
+                   1 -> (undefined,undefined,undefined,undefined)
+  dataTypeOf _ = quadrupleDataType
+
+
+--
+-- Yet another polymorphic datatype constructor.
+-- No surprises.
+--
 
 leftConstr     = mkConstr 1 "Left"  Prefix
 rightConstr    = mkConstr 2 "Right" Prefix
