@@ -15,13 +15,14 @@ import IO	( hPutStr, stderr )
 
 import CmdLineOpts      ( opt_D_show_passes, opt_DoCoreLinting )
 import CoreSyn
+import CoreUtils	( idSpecVars )
 
 import Bag
 import Kind		( hasMoreBoxityInfo, Kind{-instance-} )
 import Literal		( literalType, Literal{-instance-} )
 import Id		( idType, isBottomingId, dataConRepType, isDataCon, isAlgCon,
 			  dataConArgTys, GenId{-instances-},
-			  emptyIdSet, mkIdSet,
+			  emptyIdSet, mkIdSet, 
 			  unionIdSets, elementOfIdSet, IdSet,
 			  Id
 			)
@@ -33,7 +34,6 @@ import PprCore
 import ErrUtils		( doIfSet, ghcExit )
 import PrimOp		( primOpType )
 import PrimRep		( PrimRep(..) )
-import Specialise       ( idSpecVars )
 import SrcLoc		( SrcLoc )
 import Type		( mkFunTy, splitFunTy_maybe, mkForAllTy,
 			  splitForAllTy_maybe,
