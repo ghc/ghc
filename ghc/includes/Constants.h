@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Constants.h,v 1.24 2003/03/25 16:19:55 sof Exp $
+ * $Id: Constants.h,v 1.25 2003/04/28 09:55:20 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -130,10 +130,16 @@
    
    This must be large enough to accomodate the largest stack frame
    pushed in one of the heap check fragments in HeapStackCheck.hc
-   (ie. currently the generic heap checks - 19 words).
+   (ie. currently the generic heap checks - 3 words for StgRetDyn,
+   18 words for the saved registers, see StgMacros.h).  
+
+   In the event of an unboxed tuple or let-no-escape stack/heap check
+   failure, there will be other words on the stack which are covered
+   by the RET_DYN frame.  These will have been accounted for by stack
+   checks however, so we don't need to allow for them here.
    -------------------------------------------------------------------------- */
 
-#define RESERVED_STACK_WORDS 19
+#define RESERVED_STACK_WORDS 21
 
 /* -----------------------------------------------------------------------------
    Storage manager constants
