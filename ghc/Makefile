@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.18 2001/07/13 13:55:19 rrt Exp $
+# $Id: Makefile,v 1.19 2001/10/24 10:07:57 rrt Exp $
 #
 
 TOP=.
@@ -43,5 +43,12 @@ endif
 SRC_DIST_FILES += configure
 
 DIST_CLEAN_FILES += ghc.spec config.status
+
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+# These files need to be in the InstallShield
+# INSTALL_DATAS rather than INSTALL_DOCS is used so these files go
+# in the top-level directory of the distribution
+INSTALL_DATAS += ANNOUNCE LICENSE README VERSION
+endif
 
 include $(TOP)/mk/target.mk
