@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: config.mk,v 1.19 2003/03/05 10:22:22 simonmar Exp $
+# $Id: config.mk,v 1.20 2003/05/19 13:01:23 simonmar Exp $
 #
 # GHC project configuration
 #
@@ -19,7 +19,7 @@ endif
 
 GhcBinDistPrlScripts = 
 GhcBinDistLibPrlScripts = ghc-asm ghc-split
-GhcBinDistBins = hp2ps ghcprof DrIFT DtdToHaskell Xtract
+GhcBinDistBins = hp2ps ghcprof
 GhcBinDistLinks = ghc ghci ghc-pkg
 
 include $(GhcMainDir)/mk/version.mk
