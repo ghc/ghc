@@ -203,6 +203,15 @@ i[[3456]]86-*-mingw32*)
         HostOS_CPP='mingw32'
 	exeext='.exe'
         ;;
+ia64-*-linux*)
+        HostPlatform=ia64-unknown-linux # hack again
+        TargetPlatform=ia64-unknown-linux
+        BuildPlatform=ia64-unknown-linux
+        HostPlatform_CPP='ia64_unknown_linux'
+        HostArch_CPP='ia64'
+        HostVendor_CPP='unknown'
+        HostOS_CPP='linux'
+        ;;
 m68k-next-nextstep2)
         HostPlatform_CPP='m68k_next_nextstep2'
         HostArch_CPP='m68k'
@@ -899,9 +908,15 @@ AC_CHECK_FUNCS(access ftime getclock getpagesize getrusage gettimeofday mktime m
 dnl ** check whether this machine has gmp3 installed
 AC_CHECK_LIB(gmp,  __gmpz_fdiv_qr, HaveLibGmp=YES; LibGmp=gmp,
   AC_CHECK_LIB(gmp3, __gmpz_fdiv_qr,  HaveLibGmp=YES; LibGmp=gmp3,
-    HaveLibGmp=No; LibGmp=not-installed))
+    HaveLibGmp=NO; LibGmp=not-installed))
 AC_SUBST(HaveLibGmp)
 AC_SUBST(LibGmp)
+
+if test "$HaveLibGmp" = "NO"; then
+if test "$HostArch_CPP" = "ia64"; then
+AC_MSG_ERROR([You need to install libgmp (the in-tree version does not work on IA64).])
+fi;
+fi;
 
 dnl ** check whether this machine has GNU regex in libc.
 FPTOOLS_REGEX_IN_LIBC
