@@ -1,0 +1,13 @@
+\begin{picture}(0,0)%
+\epsfig{file=hugs_ret.pstex}%
+\end{picture}%
+\setlength{\unitlength}{0.00066700in}%
+%
+\begingroup\makeatletter\ifx\SetFigFont\undefined%
+\gdef\SetFigFont#1#2#3#4#5{%
+  \reset@font\fontsize{#1}{#2pt}%
+  \fontfamily{#3}\fontseries{#4}\fontshape{#5}%
+  \selectfont}%
+\fi\endgroup%
+\begin{picture}(3624,4449)(889,-4798)
+\end{picture}
