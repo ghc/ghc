@@ -116,7 +116,7 @@ and hence the default mechanism would resolve the "a".
 
 \begin{code}
 module TcSimplify (
-	tcSimplify, tcSimplifyAndCheck, tcSimplifyRuleLhs, 
+	tcSimplify, tcSimplifyAndCheck, tcSimplifyToDicts, 
 	tcSimplifyTop, tcSimplifyThetas, tcSimplifyCheckThetas,
 	bindInstsOfLocalFuns
     ) where
@@ -293,10 +293,27 @@ On the LHS of transformation rules we only simplify methods and constants,
 getting dictionaries.  We want to keep all of them unsimplified, to serve
 as the available stuff for the RHS of the rule.
 
+The same thing is used for specialise pragmas. Consider
+	
+	f :: Num a => a -> a
+	{-# SPECIALISE f :: Int -> Int #-}
+	f = ...
+
+The type checker generates a binding like:
+
+	f_spec = (f :: Int -> Int)
+
+and we want to end up with
+
+	f_spec = _inline_me_ (f Int dNumInt)
+
+But that means that we must simplify the Method for f to (f Int dNumInt)! 
+So tcSimplifyToDicts squeezes out all Methods.
+
 \begin{code}
-tcSimplifyRuleLhs :: LIE -> TcM s (LIE, TcDictBinds)
-tcSimplifyRuleLhs wanted_lie
-  = reduceContext (text "tcSimplRuleLhs") try_me [] wanteds	`thenTc` \ (binds, frees, irreds) ->
+tcSimplifyToDicts :: LIE -> TcM s (LIE, TcDictBinds)
+tcSimplifyToDicts wanted_lie
+  = reduceContext (text "tcSimplifyToDicts") try_me [] wanteds	`thenTc` \ (binds, frees, irreds) ->
     ASSERT( null frees )
     returnTc (mkLIE irreds, binds)
   where
@@ -306,6 +323,7 @@ tcSimplifyRuleLhs wanted_lie
     try_me inst	| isDict inst = DontReduce
 		| otherwise   = ReduceMe AddToIrreds
 \end{code}
+
 
 
 %************************************************************************

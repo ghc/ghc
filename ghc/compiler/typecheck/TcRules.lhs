@@ -13,7 +13,7 @@ import HsCore		( UfRuleBody(..) )
 import RnHsSyn		( RenamedHsDecl )
 import TcHsSyn		( TypecheckedRuleDecl, mkHsLet )
 import TcMonad
-import TcSimplify	( tcSimplifyRuleLhs, tcSimplifyAndCheck )
+import TcSimplify	( tcSimplifyToDicts, tcSimplifyAndCheck )
 import TcType		( zonkTcTypes, newTyVarTy_OpenKind )
 import TcIfaceSig	( tcCoreExpr, tcCoreLamBndrs, tcVar )
 import TcMonoType	( tcHsType, tcHsTyVar, checkSigTyVars )
@@ -66,7 +66,7 @@ tcRule (RuleDecl name sig_tvs vars lhs rhs src_loc)
     )						`thenTc` \ (ids, lhs', rhs', lhs_lie, rhs_lie) ->
 
 		-- Check that LHS has no overloading at all
-    tcSimplifyRuleLhs lhs_lie				`thenTc` \ (lhs_dicts, lhs_binds) ->
+    tcSimplifyToDicts lhs_lie				`thenTc` \ (lhs_dicts, lhs_binds) ->
     checkSigTyVars sig_tyvars				`thenTc_`
 
 	-- Gather the template variables and tyvars
