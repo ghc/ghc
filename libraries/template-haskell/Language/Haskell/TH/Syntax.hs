@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# OPTIONS_GHC -fglasgow-exts #-}
 	-- Need GlaExts for the nested forall in defn of Q
 -----------------------------------------------------------------------------
 -- |
