@@ -869,9 +869,10 @@ getRegister (CmmMachOp (MO_S_Conv I32 I64) [CmmLoad addr _]) = do
 
 #if x86_64_TARGET_ARCH
 getRegister (CmmMachOp (MO_S_Neg F32) [x]) = do
+  x_code <- getAnyReg x
   lbl <- getNewLabelNat
   let
-    code dst = toOL [
+    code dst = x_code dst `appOL` toOL [
 	-- This is how gcc does it, so it can't be that bad:
 	LDATA ReadOnlyData16 [
 		CmmAlign 16,
@@ -889,10 +890,11 @@ getRegister (CmmMachOp (MO_S_Neg F32) [x]) = do
   return (Any F32 code)
 
 getRegister (CmmMachOp (MO_S_Neg F64) [x]) = do
+  x_code <- getAnyReg x
   lbl <- getNewLabelNat
   let
 	-- This is how gcc does it, so it can't be that bad:
-    code dst = toOL [
+    code dst = x_code dst `appOL` toOL [
 	LDATA ReadOnlyData16 [
 		CmmAlign 16,
 		CmmDataLabel lbl,
