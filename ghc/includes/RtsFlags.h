@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.42 2002/07/17 09:21:49 simonmar Exp $
+ * $Id: RtsFlags.h,v 1.43 2002/08/05 10:11:03 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -44,36 +44,22 @@ struct GC_FLAGS {
     rtsBool frontpanel;
 };
 
-/* Hack: this struct uses bitfields so that we can use a binary arg
- * with the -D flag.
- * Remember to update the corresponding bit of RtsFlags.c if you
- * change/extend this struct.
- */
 struct DEBUG_FLAGS {  
-  /* flags to control debugging output in various subsystems */
-  rtsBool scheduler   : 1; /*  1 */
-  rtsBool evaluator   : 1; /*  2 */
-  rtsBool codegen     : 1; /*  4 */
-  rtsBool weak        : 1; /*  8 */
-  rtsBool gccafs      : 1; /* 16 */
-  rtsBool gc          : 1; /* 32 */
-  rtsBool block_alloc : 1; /* 64 */
-
-  /* flags to control consistency checking (often very expensive!) */
-  rtsBool sanity      : 1; /* 128 */
-
-  rtsBool stable      : 1; /* 256 */
-  rtsBool prof        : 1; /* 512 */
-  rtsBool gran        : 1; /* 1024 */
-  rtsBool par         : 1; /* 2048 */
-
-  /* The object linker */
-  rtsBool linker      : 1; /* 4096 */
+    // flags to control debugging output & extra checking in various subsystems
+    rtsBool scheduler;      // 's'
+    rtsBool evaluator;	    // 'e'
+    rtsBool codegen;        // 'c'
+    rtsBool weak;           // 'w'
+    rtsBool gccafs;         // 'G'
+    rtsBool gc;             // 'g'
+    rtsBool block_alloc;    // 'b'
+    rtsBool sanity;         // 'S'   warning: might be expensive!
+    rtsBool stable;         // 't'
+    rtsBool prof;           // 'p'
+    rtsBool gran;           // 'r'
+    rtsBool par;            // 'P'
+    rtsBool linker;         // 'l'   the object linker
 };
-
-#define MAX_DEBUG_OPTION     13
-#define DEBUG_MASK(n)        ((nat)(ldexp(1,n)))
-#define MAX_DEBUG_MASK       ((nat)(ldexp(1,(MAX_DEBUG_OPTION+1))-1))
 
 struct COST_CENTRE_FLAGS {
     unsigned int	    doCostCentres;
@@ -312,9 +298,11 @@ struct TICKY_FLAGS {
 
 struct RTS_FLAGS {
     struct GC_FLAGS	GcFlags;
-    struct DEBUG_FLAGS	DebugFlags;
     struct CONCURRENT_FLAGS ConcFlags;
 
+#ifdef DEBUG
+    struct DEBUG_FLAGS	DebugFlags;
+#endif
 #if defined(PROFILING) || defined(PAR)
     struct COST_CENTRE_FLAGS CcFlags;
 #endif

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.58 2002/07/18 09:13:10 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.59 2002/08/05 10:11:04 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -58,22 +58,6 @@ char   *rts_argv[MAX_RTS_ARGS];
  */
 #define RTS 1
 #define PGM 0
-
-char *debug_opts_strs[] = {
-  "DEBUG (-D1): scheduler\n",
-  "DEBUG (-D2): evaluator\n",
-  "DEBUG (-D4): codegen\n",
-  "DEBUG (-D8): weak\n",
-  "DEBUG (-D16): gccafs\n",
-  "DEBUG (-D32): gc\n",
-  "DEBUG (-D64): block\n",
-  "DEBUG (-D128): sanity\n",
-  "DEBUG (-D256): stable\n",
-  "DEBUG (-D512): prof\n",
-  "DEBUG (-D1024): gran\n",
-  "DEBUG (-D2048): par\n",
-  "DEBUG (-D4096): linker\n"
-};
 
 char *debug_opts_prefix[] = {
   "_-", /* scheduler */
@@ -205,10 +189,6 @@ static void process_par_option(int arg, int *rts_argc, char *rts_argv[], rtsBool
 static void set_par_debug_options(nat n);
 static void help_par_debug_options(nat n);
 #endif
-#if defined(DEBUG)
-static void set_debug_options(nat n);
-static void help_debug_options(nat n);
-#endif
 
 //@node Command-line option parsing routines, GranSim specific options, Static function decls
 //@subsection Command-line option parsing routines
@@ -245,6 +225,22 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.compactThreshold   = 30.0;
 #ifdef RTS_GTK_FRONTPANEL
     RtsFlags.GcFlags.frontpanel         = rtsFalse;
+#endif
+
+#ifdef DEBUG
+    RtsFlags.DebugFlags.scheduler	= rtsFalse;
+    RtsFlags.DebugFlags.evaluator	= rtsFalse;
+    RtsFlags.DebugFlags.codegen		= rtsFalse;
+    RtsFlags.DebugFlags.weak		= rtsFalse;
+    RtsFlags.DebugFlags.gccafs		= rtsFalse;
+    RtsFlags.DebugFlags.gc		= rtsFalse;
+    RtsFlags.DebugFlags.block_alloc	= rtsFalse;
+    RtsFlags.DebugFlags.sanity		= rtsFalse;
+    RtsFlags.DebugFlags.stable		= rtsFalse;
+    RtsFlags.DebugFlags.prof		= rtsFalse;
+    RtsFlags.DebugFlags.gran		= rtsFalse;
+    RtsFlags.DebugFlags.par		= rtsFalse;
+    RtsFlags.DebugFlags.linker		= rtsFalse;
 #endif
 
 #if defined(PROFILING) || defined(PAR)
@@ -464,6 +460,23 @@ usage_text[] = {
 "  -C<secs>  Context-switch interval in seconds",
 "                (0 or no argument means switch as often as possible)",
 "                the default is .02 sec; resolution is .02 sec",
+"",
+#if defined(DEBUG)
+"  -Ds  DEBUG: scheduler",
+"  -De  DEBUG: evaluator",
+"  -Dc  DEBUG: codegen",
+"  -Dw  DEBUG: weak",
+"  -DG  DEBUG: gccafs",
+"  -Dg  DEBUG: gc",
+"  -Db  DEBUG: block",
+"  -DS  DEBUG: sanity",
+"  -Dt  DEBUG: stable",
+"  -Dp  DEBUG: prof",
+"  -Dr  DEBUG: gran",
+"  -DP  DEBUG: par",
+"  -Dl  DEBUG: linker",
+"",
+#endif // DEBUG
 #if defined(SMP)
 "  -N<n>     Use <n> OS threads (default: 1)",
 #endif
@@ -712,12 +725,56 @@ error = rtsTrue;
 	      
 #ifdef DEBUG
 	      case 'D':
-		if (isdigit(rts_argv[arg][2])) {/* Set all debugging options in one */
-	    	/* hack warning: interpret the flags as a binary number */
-		  nat n = decode(rts_argv[arg]+2);
-		  set_debug_options(n);
-		}
-		break;
+	      { 
+		  char *c;
+
+		  for (c  = rts_argv[arg] + 2; *c != '\0'; c++) {
+		      switch (*c) {
+		      case 's':
+			  RtsFlags.DebugFlags.scheduler = rtsTrue;
+			  break;
+		      case 'e':
+			  RtsFlags.DebugFlags.evaluator = rtsTrue;
+			  break;
+		      case 'c':
+			  RtsFlags.DebugFlags.codegen = rtsTrue;
+			  break;
+		      case 'w':
+			  RtsFlags.DebugFlags.weak = rtsTrue;
+			  break;
+		      case 'G':
+			  RtsFlags.DebugFlags.gccafs = rtsTrue;
+			  break;
+		      case 'g':
+			  RtsFlags.DebugFlags.gc = rtsTrue;
+			  break;
+		      case 'b':
+			  RtsFlags.DebugFlags.block_alloc = rtsTrue;
+			  break;
+		      case 'S':
+			  RtsFlags.DebugFlags.sanity = rtsTrue;
+			  break;
+		      case 't':
+			  RtsFlags.DebugFlags.stable = rtsTrue;
+			  break;
+		      case 'p':
+			  RtsFlags.DebugFlags.prof = rtsTrue;
+			  break;
+		      case 'r':
+			  RtsFlags.DebugFlags.gran = rtsTrue;
+			  break;
+		      case 'P':
+			  RtsFlags.DebugFlags.par = rtsTrue;
+			  break;
+		      case 'l':
+			  RtsFlags.DebugFlags.linker = rtsTrue;
+			  break;
+		      default:
+			  bad_option( rts_argv[arg] );
+		      }
+		  }
+		  break;
+	      }
 #endif
 
 	      case 'K':
@@ -2067,44 +2124,6 @@ help_par_debug_options(nat n) {
 }
 
 #endif /* PAR */
-
-#ifdef DEBUG
-static void
-set_debug_options(nat n) {
-  nat i;
-
-  for (i=0; i<=MAX_DEBUG_OPTION; i++) 
-    if ((n>>i)&1) {
-      fprintf(stderr, debug_opts_strs[i]);
-      switch (i) {
-        case 0: RtsFlags.DebugFlags.scheduler   = rtsTrue; break;
-        case 1: RtsFlags.DebugFlags.evaluator   = rtsTrue; break;
-        case 2: RtsFlags.DebugFlags.codegen     = rtsTrue; break;
-        case 3: RtsFlags.DebugFlags.weak        = rtsTrue; break;
-        case 4: RtsFlags.DebugFlags.gccafs      = rtsTrue; break;
-        case 5: RtsFlags.DebugFlags.gc          = rtsTrue; break;
-        case 6: RtsFlags.DebugFlags.block_alloc = rtsTrue; break;
-        case 7: RtsFlags.DebugFlags.sanity      = rtsTrue; break;
-        case 8: RtsFlags.DebugFlags.stable      = rtsTrue; break;
-        case 9: RtsFlags.DebugFlags.prof        = rtsTrue; break;
-        case 10:  RtsFlags.DebugFlags.gran       = rtsTrue; break;
-        case 11:  RtsFlags.DebugFlags.par        = rtsTrue; break;
-        case 12:  RtsFlags.DebugFlags.linker     = rtsTrue; break;
-        default: barf("set_debug_options: only %d debug options expected",
-		      MAX_DEBUG_OPTION);
-      } /* switch */
-    } /* if */
-}
-
-static void
-help_debug_options(nat n) {
-  nat i;
-
-  for (i=0; i<=MAX_DEBUG_OPTION; i++) 
-    if ((n>>i)&1) 
-      fprintf(stderr, debug_opts_strs[i]);
-}
-#endif /* DEBUG */
 
 //@node Aux fcts,  , GranSim specific options
 //@subsection Aux fcts
