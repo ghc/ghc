@@ -333,7 +333,7 @@ and it's convenient to write them all down in one place.
 dollarMainName = varQual mAIN_Name FSLIT("$main") dollarMainKey
 runMainName    = varQual pREL_TOP_HANDLER_Name FSLIT("runMain") runMainKey
 
--- Stuff from PrelGHC
+-- Stuff from GHC.Prim
 usOnceTyConName  = kindQual FSLIT(".") usOnceTyConKey
 usManyTyConName  = kindQual FSLIT("!") usManyTyConKey
 superKindName    = kindQual FSLIT("KX") kindConKey
