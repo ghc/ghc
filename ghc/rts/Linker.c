@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.91 2002/06/09 13:37:41 matthewc Exp $
+ * $Id: Linker.c,v 1.92 2002/06/09 19:27:16 panne Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -845,10 +845,6 @@ loadObj( char *path )
    /* chain it onto the list of objects */
    oc->next              = objects;
    objects               = oc;
-
-   fd = open(path, O_RDONLY);
-   if (fd == -1)
-      barf("loadObj: can't open `%s'", path);
 
 #ifdef USE_MMAP
 #define ROUND_UP(x,size) ((x + size - 1) & ~(size - 1))
@@ -2055,6 +2051,7 @@ findElfSection ( void* objImage, Elf_Word sh_type )
    return ptr;
 }
 
+#if defined(ia64_TARGET_ARCH)
 static Elf_Addr
 findElfSegment ( void* objImage, Elf_Addr vaddr )
 {
@@ -2071,6 +2068,7 @@ findElfSegment ( void* objImage, Elf_Addr vaddr )
    }
    return segaddr;
 }
+#endif
 
 static int
 ocVerifyImage_ELF ( ObjectCode* oc )
@@ -2513,18 +2511,19 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
                           target_shndx, symtab_shndx ));
 
    for (j = 0; j < nent; j++) {
+#if defined(DEBUG) || defined(sparc_TARGET_ARCH) || defined(ia64_TARGET_ARCH)
       Elf_Addr  offset = rtab[j].r_offset;
+#endif
       Elf_Addr  info   = rtab[j].r_info;
       Elf_Addr  A      = rtab[j].r_addend;
-      Elf_Addr  P      = (Elf_Addr)targ + offset;
       Elf_Addr  S;
       Elf_Addr  value;
 #     if defined(sparc_TARGET_ARCH)
       /* This #ifdef only serves to avoid unused-var warnings. */
-      Elf_Word* pP = (Elf_Word*)P;
+      Elf_Word* pP = (Elf_Word*)((Elf_Addr)targ + offset);
       Elf_Word  w1, w2;
 #     elif defined(ia64_TARGET_ARCH)
-      Elf64_Xword *pP = (Elf64_Xword *)P;
+      Elf64_Xword *pP = (Elf64_Xword *)((Elf_Addr)targ + offset);
       Elf_Addr addr;
 #     endif
 
