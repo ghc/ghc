@@ -183,14 +183,18 @@ ifeq "$(ILXized)" "YES"
 SRC_HC_OPTS += -optI--assembly-name -optIstd.$(way_)o -optI--module -DILX -keep-il-file
 
 HS_ILX+=PrelGHC.$(way_)o
-PrelGHC.il: PrelGHC.ilx.real
+
+PrelGHC.ilx: PrelGHC.ilx.pp
+	$(CP) $< $@
+
+PrelGHC.il: PrelGHC.ilx
 #	sed -e "s/'PrelBase.dll'/'PrelBase.$(way_)o'/g" $< > $@.tmp
 	$(ILX2IL) --module --assembly-name std.dll -o $@ $<
 	$(ILASM) /QUIET /DLL /OUT=$@ $@.il
 #	mv $@.tmp $@
 
 std.$(way_)mvl: $(HS_IL)
-	((ILVALID_HOME=c:\\devel\\fcom\\src\\ ILVALID_MSCORLIB=mscorlib.vlb $(ILVALID) c:\\devel\\fcom\\src\\bin\\msilxlib$(ilx2il_suffix).vlb $(HS_IL)) 2>&1) | tee $@
+	((ILSDK_HOME=c:\\devel\\fcom $(ILVALID) c:\\devel\\fcom\\bin\\msilxlib$(ilx2il_suffix).ilo $(HS_IL)) 2>&1) | tee $@
 
 std.$(way_)vlb: std.dll
 	mkvlb.exe -V -o $@.tmp std
@@ -199,11 +203,11 @@ std.$(way_)vlb: std.dll
 
 MINI_IL=PrelBase.ilx-Onot.mono.il Prelude.ilx-Onot.mono.il PrelGHC.ilx-Onot.mono.il PrelPrimopWrappers.ilx-Onot.mono.il PrelErr.ilx-Onot.mono.il PrelIOBase.ilx-Onot.mono.il PrelTup.ilx-Onot.mono.il PrelShow.ilx-Onot.mono.il PrelList.ilx-Onot.mono.il PrelPtr.ilx-Onot.mono.il PrelMaybe.ilx-Onot.mono.il PrelPack.ilx-Onot.mono.il PrelST.ilx-Onot.mono.il PrelByteArr.ilx-Onot.mono.il PrelArr.ilx-Onot.mono.il PrelNum.ilx-Onot.mono.il PrelEnum.ilx-Onot.mono.il PrelFloat.ilx-Onot.mono.il PrelReal.ilx-Onot.mono.il PrelConc.ilx-Onot.mono.il
 mini.mvl: $(MINI_IL)
-	((ILVALID_HOME=c:\\devel\\fcom\\src\\ ILVALID_MSCORLIB=mscorlib.vlb $(ILVALID) c:\\devel\\fcom\\src\\bin\\msilxlib$(ilx2il_suffix).vlb  $(MINI_IL)) 2>&1) | tee $@
+	((ILSDK_HOME=c:\\devel\\fcom $(ILVALID) c:\\devel\\fcom\\bin\\msilxlib$(ilx2il_suffix).ilo $(MINI_IL)) 2>&1) | tee $@
 
 
 std.$(ilx_way).mvlx: $(HS_ILX)
-	ILVALID_HOME=c:\\devel\\fcom\\src\\ ILVALID_MSCORLIB=mscorlib.vlb $(ILVALID) c:\\devel\\fcom\\src\\bin\\msilxlib.vlbx  $(HS_ILX) | tee $@
+	ILSDK_HOME=c:\\devel\\fcom $(ILVALID) c:\\devel\\fcom\\bin\\msilxlib.ilo $(HS_ILX) | tee $@
 
 endif # ILXized
 
