@@ -280,22 +280,22 @@ ppHtmlIndex odir doctitle ifaces = do
   index :: (HsName -> Bool) -> [(HsName, [(Module,Bool)])]
   index f = sortBy cmp (fmToList (full_index f))
     where cmp (n1,_) (n2,_) = n1 `compare` n2
-    
+
   iface_indices f = map (getIfaceIndex f) ifaces
   full_index f = foldr (plusFM_C (++)) emptyFM (iface_indices f)
 
   getIfaceIndex f (mdl,iface) = listToFM
-    [ (nm, [(mdl, mdl == mdl')]) 
+    [ (nm, [(mdl, not (nm `elemFM` iface_reexported iface))]) 
     | (nm, Qual mdl' _) <- fmToList (iface_env iface), f nm ]
 
   indexElt :: (HsName, [(Module,Bool)]) -> HtmlTable
   indexElt (nm, entries) = 
      td << ppHsName nm
-     <-> td << (hsep [ if defining then
-			 bold << linkId (Module mdl) (Just nm) << toHtml mdl
-		       else
+     <-> td << (hsep [ if visible then
 			 linkId (Module mdl) (Just nm) << toHtml mdl
-	             | (Module mdl, defining) <- entries ])
+		       else
+			 toHtml mdl
+	             | (Module mdl, visible) <- entries ])
 
   initialChars = [ 'A'..'Z' ] ++ ":!#$%&*+./<=>?@\\^|-~"
 
