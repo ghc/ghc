@@ -8,6 +8,8 @@ test('read001',		normal, compile_and_run, [''])
 test('show001',		normal, compile_and_run, [''])
 test('text001',		normal, compile_and_run, [''])
 
+test('tup001',		normal, compile_and_run, [''])
+
 test('addr001',		normal, compile_and_run, [''])
 test('dynamic001', 	normal, compile_and_run, [''])
 test('dynamic002', 	normal, compile_and_run, [''])
