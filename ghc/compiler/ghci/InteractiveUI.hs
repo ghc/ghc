@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.44 2001/02/12 16:08:48 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.45 2001/02/13 13:09:36 sewardj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -42,9 +42,12 @@ import CPUTime
 import Directory
 import IO
 import Char
-import Monad ( when )
+import Monad 		( when )
 
 import PrelGHC 		( unsafeCoerce# )
+import PrelPack 	( packString )
+import PrelByteArr
+import Foreign		( Ptr, nullPtr )
 
 -----------------------------------------------------------------------------
 
@@ -666,25 +669,50 @@ linkPackages pkgs = mapM_ linkPackage pkgs
 
 linkPackage :: Package -> IO ()
 -- ignore rts and gmp for now (ToDo; better?)
-linkPackage pkg | name pkg `elem` ["rts", "gmp"] = return ()
-linkPackage pkg = do
-  putStr ("Loading package " ++ name pkg ++ " ... ")
-  let dirs = library_dirs pkg
-  let objs = map (++".o") (hs_libraries pkg ++ extra_libraries pkg)
-  mapM (linkOneObj dirs) objs
-  putStr "resolving ... "
-  resolveObjs
-  putStrLn "done."
+linkPackage pkg 
+   | name pkg `elem` ["rts", "gmp"] 
+   = return ()
+   | otherwise
+   = do putStr ("Loading package " ++ name pkg ++ " ... ")
+        -- For each obj, try obj.o and if that fails, obj.so.
+        -- Complication: all the .so's must be loaded before any of the .o's.  
+        let dirs      =  library_dirs pkg
+        let objs      =  hs_libraries pkg ++ extra_libraries pkg
+        classifieds   <- mapM (locateOneObj dirs) objs
+        let sos_first = filter isRight classifieds 
+                        ++ filter (not.isRight) classifieds
+        mapM loadClassified sos_first
+        putStr "linking ... "
+        resolveObjs
+        putStrLn "done."
+     where
+        isRight (Right _) = True
+        isRight (Left _)  = False
 
-linkOneObj dirs obj = do
-  filename <- findFile dirs obj
-  loadObj filename
 
-findFile [] obj = throwDyn (OtherError ("can't find " ++ obj))
-findFile (d:ds) obj = do
-  let path = d ++ '/':obj
-  b <- doesFileExist path
-  if b then return path else findFile ds obj
+loadClassified :: Either FilePath String -> IO ()
+loadClassified (Left obj_absolute_filename)
+   = do --putStr ("Left  " ++ obj_absolute_filename ++ "\n")
+        loadObj obj_absolute_filename
+loadClassified (Right dll_unadorned)
+   = do --putStr ("Right " ++ dll_unadorned ++ "\n")
+        dll_ok <- ocAddDLL (packString dll_unadorned)
+        if    dll_ok /= 1
+         then throwDyn (OtherError ("can't find .o or .so/.DLL for: " 
+                                    ++ dll_unadorned))
+         else return ()
+
+locateOneObj :: [FilePath] -> String -> IO (Either FilePath String)
+locateOneObj []     obj 
+   = return (Right obj) -- we assume
+locateOneObj (d:ds) obj 
+   = do let path = d ++ '/':obj ++ ".o"
+        b <- doesFileExist path
+        if b then return (Left path) else locateOneObj ds obj
+
+
+type PackedString = ByteArray Int
+foreign import "ocAddDLL" unsafe ocAddDLL :: PackedString -> IO Int
 
 -----------------------------------------------------------------------------
 -- timing & statistics
