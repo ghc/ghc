@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.22 $
- * $Date: 2000/02/03 15:56:13 $
+ * $Revision: 1.23 $
+ * $Date: 2000/02/04 13:41:00 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -58,7 +58,7 @@ static Void   local checkMems           Args((Class,List,Cell));
 static Void   local checkMems2           Args((Class,Cell));
 static Void   local addMembers          Args((Class));
 static Name   local newMember           Args((Int,Int,Cell,Type,Class));
-static Name   local newDSel             Args((Class,Int));
+       Name         newDSel             Args((Class,Int));
 static Text   local generateText        Args((String,Class));
        Int          visitClass          Args((Class));
 
@@ -1633,7 +1633,7 @@ Class parent; {
     return m;
 }
 
-static Name local newDSel(c,no)         /* Make definition for dict selectr*/
+Name newDSel(c,no)                      /* Make definition for dict selectr*/
 Class c;
 Int   no; {
     Name s;

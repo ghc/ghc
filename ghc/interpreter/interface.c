@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.26 $
- * $Date: 2000/02/03 15:56:13 $
+ * $Revision: 1.27 $
+ * $Date: 2000/02/04 13:41:00 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1694,6 +1694,8 @@ List  mems0; {    /* [((VarId, Type))]     */
     List mems;    /* [((VarId, Type))]     */
     List tvsInT;  /* [VarId] and then [((VarId,Kind))] */
     List tvs;     /* [((VarId,Kind))]      */
+    List ns;      /* [Name]                */
+    Int  mno;
 
     ZPair kinded_tv = hd(kinded_tvs);
     Text ct         = textOf(tc_name);
@@ -1785,10 +1787,14 @@ List  mems0; {    /* [((VarId, Type))]     */
 
         /* (ADR) ToDo: 
          * cclass(nw).dsels    = ?;
-         * cclass(nw).dbuild   = ?;
-         * cclass(nm).dcon     = ?;
          * cclass(nm).defaults = ?;
          */
+
+        ns = NIL;
+        for (mno=0; mno<cclass(nw).numSupers; mno++) {
+           ns = cons(newDSel(nw,mno),ns);
+        }
+        cclass(nw).dsels = rev(ns);
     }
 }
 
