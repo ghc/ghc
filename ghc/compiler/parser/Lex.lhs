@@ -140,6 +140,7 @@ data Token
   | ITint64_lit
   | ITrational_lit
   | ITaddr_lit
+  | ITlabel_lit
   | ITlit_lit
   | ITstring_lit
   | ITtypeapp
@@ -309,6 +310,7 @@ ghcExtensionKeywordsFM = listToUFM $
 	("__word64",		ITword64_lit),
 	("__rational",		ITrational_lit),
 	("__addr",		ITaddr_lit),
+	("__label",		ITlabel_lit),
 	("__litlit",		ITlit_lit),
 	("__string",		ITstring_lit),
 	("__a",			ITtypeapp),

@@ -26,7 +26,7 @@ import AbsCUtils	( getAmodeRep, nonemptyAbsC,
 			)
 
 import Constants	( mIN_UPD_SIZE )
-import CallConv		( CallConv, callConvAttribute )
+import CallConv		( callConvAttribute )
 import CLabel		( externallyVisibleCLabel, mkErrorStdEntryLabel,
 			  needsCDecl, pprCLabel,
 			  mkReturnInfoLabel, mkReturnPtLabel, mkClosureTblLabel,
@@ -34,7 +34,7 @@ import CLabel		( externallyVisibleCLabel, mkErrorStdEntryLabel,
 			  CLabel, CLabelType(..), labelType, labelDynamic
 			)
 
-import CmdLineOpts	( opt_SccProfilingOn, opt_EmitCExternDecls, opt_GranMacros )
+import CmdLineOpts	( opt_SccProfilingOn, opt_GranMacros )
 import CostCentre	( pprCostCentreDecl, pprCostCentreStackDecl )
 
 import Costs		( costs, addrModeCosts, CostRes(..), Side(..) )
@@ -57,7 +57,6 @@ import StgSyn		( SRT(..) )
 import BitSet		( intBS )
 import Outputable
 import Util		( nOfThem )
-import Addr		( Addr )
 
 import ST
 import MutableArray
@@ -1145,8 +1144,6 @@ ppr_amode (CIntLike int)
 
 ppr_amode (CLit lit) = pprBasicLit lit
 
-ppr_amode (CLitLit str _) = ptext str
-
 ppr_amode (CJoinPoint _)
   = panic "ppr_amode: CJoinPoint"
 
@@ -1161,6 +1158,7 @@ cExprMacroText ENTRY_CODE 		= SLIT("ENTRY_CODE")
 cExprMacroText ARG_TAG    		= SLIT("ARG_TAG")
 cExprMacroText GET_TAG    		= SLIT("GET_TAG")
 cExprMacroText UPD_FRAME_UPDATEE 	= SLIT("UPD_FRAME_UPDATEE")
+cExprMacroText CCS_HDR		 	= SLIT("CCS_HDR")
 
 cStmtMacroText ARGS_CHK			= SLIT("ARGS_CHK")
 cStmtMacroText ARGS_CHK_LOAD_NODE	= SLIT("ARGS_CHK_LOAD_NODE")
@@ -1540,7 +1538,6 @@ ppr_decls_Amode (CVal _ _)	= returnTE (Nothing, Nothing)
 ppr_decls_Amode (CAddr _)	= returnTE (Nothing, Nothing)
 ppr_decls_Amode (CReg _)	= returnTE (Nothing, Nothing)
 ppr_decls_Amode (CLit _)	= returnTE (Nothing, Nothing)
-ppr_decls_Amode (CLitLit _ _) 	= returnTE (Nothing, Nothing)
 
 -- CIntLike must be a literal -- no decls
 ppr_decls_Amode (CIntLike int)	= returnTE (Nothing, Nothing)

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.30 2000/05/15 15:03:36 simonmar Exp $
+% $Id: AbsCSyn.lhs,v 1.31 2000/07/06 14:08:31 simonmar Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -321,10 +321,6 @@ data CAddrMode
 
   | CLit    Literal
 
-  | CLitLit FAST_STRING	-- completely literal literal: just spit this String
-			-- into the C output
-	    PrimRep
-
   | CJoinPoint		-- This is used as the amode of a let-no-escape-bound
 			-- variable.
 	VirtualSpOffset	  -- Sp value after any volatile free vars
@@ -348,6 +344,7 @@ data CExprMacro
   | ARG_TAG				-- stack argument tagging
   | GET_TAG				-- get current constructor tag
   | UPD_FRAME_UPDATEE
+  | CCS_HDR
 
 \end{code}
 

@@ -24,12 +24,9 @@ module Literal
 import TysPrim		( charPrimTy, addrPrimTy, floatPrimTy, doublePrimTy,
 			  intPrimTy, wordPrimTy, int64PrimTy, word64PrimTy
 			)
-import Name		( hashName )
 import PrimRep		( PrimRep(..) )
-import TyCon		( isNewTyCon )
 import Type		( Type, typePrimRep )
 import PprType		( pprParendType )
-import Demand		( Demand )
 import CStrings		( charToC, charToEasyHaskell, pprFSInCStyle )
 
 import Outputable
@@ -101,7 +98,15 @@ data Literal
   | MachFloat	Rational
   | MachDouble	Rational
 
-  | MachLitLit  FAST_STRING Type	-- Type might be Add# or Int# etc
+	-- string argument is the name of a symbol.  This literal
+	-- refers to the *address* of the label.
+  | MachLabel   FAST_STRING		-- always an Addr#
+
+	-- lit-lits only work for via-C compilation, hence they
+	-- are deprecated.  The string is emitted verbatim into
+	-- the C file, and can therefore be any C expression,
+	-- macro call, #defined constant etc.
+  | MachLitLit  FAST_STRING Type	-- Type might be Addr# or Int# etc
 \end{code}
 
 \begin{code}
@@ -193,6 +198,7 @@ literalType (MachInt64  _)	  = int64PrimTy
 literalType (MachWord64  _)	  = word64PrimTy
 literalType (MachFloat _)	  = floatPrimTy
 literalType (MachDouble _)	  = doublePrimTy
+literalType (MachLabel _)	  = addrPrimTy
 literalType (MachLitLit _ ty)	  = ty
 \end{code}
 
@@ -208,6 +214,7 @@ literalPrimRep (MachInt64 _)	  = Int64Rep
 literalPrimRep (MachWord64 _)	  = Word64Rep
 literalPrimRep (MachFloat _)	  = FloatRep
 literalPrimRep (MachDouble _)	  = DoubleRep
+literalPrimRep (MachLabel _)	  = AddrRep
 literalPrimRep (MachLitLit _ ty)  = typePrimRep ty
 \end{code}
 
@@ -224,6 +231,7 @@ cmpLit (MachInt64     a)   (MachInt64	   b)   = a `compare` b
 cmpLit (MachWord64    a)   (MachWord64	   b)   = a `compare` b
 cmpLit (MachFloat     a)   (MachFloat	   b)   = a `compare` b
 cmpLit (MachDouble    a)   (MachDouble	   b)   = a `compare` b
+cmpLit (MachLabel     a)   (MachLabel      b)   = a `compare` b
 cmpLit (MachLitLit    a b) (MachLitLit    c d)  = (a `compare` c) `thenCmp` (b `compare` d)
 cmpLit lit1		   lit2		        | litTag lit1 _LT_ litTag lit2 = LT
 					        | otherwise  		       = GT
@@ -237,7 +245,8 @@ litTag (MachInt64     _)   = ILIT(6)
 litTag (MachWord64    _)   = ILIT(7)
 litTag (MachFloat     _)   = ILIT(8)
 litTag (MachDouble    _)   = ILIT(9)
-litTag (MachLitLit    _ _) = ILIT(10)
+litTag (MachLabel     _)   = ILIT(10)
+litTag (MachLitLit    _ _) = ILIT(11)
 \end{code}
 
 	Printing
@@ -283,6 +292,9 @@ pprLit lit
 
       MachAddr p | code_style -> ptext SLIT("(void*)") <> integer p
 	         | otherwise  -> ptext SLIT("__addr") <+> integer p
+
+      MachLabel l | code_style -> ptext SLIT("(&") <> ptext l <> char ')'
+		  | otherwise  -> ptext SLIT("__label") <+> pprFSAsString l
 
       MachLitLit s ty | code_style  -> ptext s
 		      | otherwise   -> parens (hsep [ptext SLIT("__litlit"), 

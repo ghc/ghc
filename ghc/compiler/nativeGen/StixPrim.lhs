@@ -8,7 +8,6 @@ module StixPrim ( primCode, amodeToStix, amodeToStix' ) where
 #include "HsVersions.h"
 
 import MachMisc
-import MachRegs
 import Stix
 import StixInteger
 
@@ -16,7 +15,6 @@ import AbsCSyn 		hiding ( spRel )
 import AbsCUtils	( getAmodeRep, mixedTypeLocn )
 import SMRep		( fixedHdrSize )
 import Literal		( Literal(..), word2IntLit )
-import CallConv		( cCallConv )
 import PrimOp		( PrimOp(..), CCall(..), CCallTarget(..) )
 import PrimRep		( PrimRep(..), isFloatingRep )
 import UniqSupply	( returnUs, thenUs, getUniqueUs, UniqSM )
@@ -432,18 +430,11 @@ amodeToStix (CLit core)
       MachAddr a     -> StInt a
       MachInt i      -> StInt i
       MachWord w     -> case word2IntLit core of MachInt iw -> StInt iw
-      MachLitLit s _ -> trace ("\nnativeGen WARNING: Reference to C entity `" 
-                                ++ (_UNPK_ s) ++ "' cannot be reliably compiled."
-                                ++ "\n\t\t   It may well crash your program."
-                                ++ "\n\t\t   Workaround: compile via C (use -fvia-C).\n"
-                              )
-                              (litLitToStix (_UNPK_ s))
+      MachLitLit s _ -> litLitErr
+      MachLabel l    -> StCLbl (mkForeignLabel l False{-ToDo: dynamic-})
       MachFloat d    -> StDouble d
       MachDouble d   -> StDouble d
       _ -> panic "amodeToStix:core literal"
-
-amodeToStix (CLitLit s _)
-   = litLitToStix (_UNPK_ s)
 
 amodeToStix (CMacroExpr _ macro [arg])
   = case macro of
@@ -464,12 +455,9 @@ amodeToStix (CMacroExpr _ macro [arg])
       UPD_FRAME_UPDATEE
          -> StInd PtrRep (StIndex PtrRep (amodeToStix arg) 
                                          (StInt (toInteger uF_UPDATEE)))
-litLitToStix nm
-  | all is_id nm = StCLbl (mkForeignLabel (_PK_ nm) False{-ToDo: dynamic-})
-  | otherwise    = error ("\nlitLitToStix: can't handle `" ++ nm ++ "'\n" 
-                           ++ "suggested workaround: use flag -fvia-C\n")
 
-  where is_id c = isAlpha c || isDigit c || c == '_'
+litLitErr = 
+  panic "native code generator can't compile lit-lits, use -fvia-C"
 \end{code}
 
 Sizes of the CharLike and IntLike closures that are arranged as arrays

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: Costs.lhs,v 1.23 2000/05/25 12:49:34 panne Exp $
+% $Id: Costs.lhs,v 1.24 2000/07/06 14:08:31 simonmar Exp $
 %
 % Only needed in a GranSim setup -- HWL
 % ---------------------------------------------------------------------------
@@ -288,10 +288,6 @@ addrModeCosts addr_mode side =
 
     CLit    _	   -> if lhs then nullCosts	       -- should never occur
 			     else Cost (1, 0, 0, 0, 0) -- typ.: mov lit,%reg
-
-    CLitLit _  _   -> if lhs then nullCosts
-			     else Cost (1, 0, 0, 0, 0)
-		      -- same es CLit
 
     CJoinPoint _	  -> if lhs then Cost (0, 0, 0, 1, 0)
 				    else Cost (0, 0, 1, 0, 0)

@@ -134,6 +134,7 @@ import Ratio ( (%) )
  '__word64'	{ ITword64_lit }
  '__rational'	{ ITrational_lit }
  '__addr'	{ ITaddr_lit }
+ '__label'	{ ITlabel_lit }
  '__litlit'	{ ITlit_lit }
  '__string'	{ ITstring_lit }
  '__ccall'	{ ITccall $$ }
@@ -856,6 +857,7 @@ core_lit	: integer			{ mkMachInt $1 }
 		| '__int64' integer		{ mkMachInt64 $2 }
 		| '__float' rational		{ MachFloat $2 }
 		| '__addr' integer		{ MachAddr $2 }
+		| '__label' STRING		{ MachLabel $2 }
 
 integer		:: { Integer }
 		: INTEGER                       { $1 }

@@ -158,7 +158,6 @@ getAmodeRep (CLbl _ kind)	    	    = kind
 getAmodeRep (CCharLike _)	    	    = PtrRep
 getAmodeRep (CIntLike _)	    	    = PtrRep
 getAmodeRep (CLit lit)		    	    = literalPrimRep lit
-getAmodeRep (CLitLit _ kind)	    	    = kind
 getAmodeRep (CMacroExpr kind _ _)    	    = kind
 getAmodeRep (CJoinPoint _)	    	    = panic "getAmodeRep:CJoinPoint"
 \end{code}

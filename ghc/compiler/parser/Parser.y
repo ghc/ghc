@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.32 2000/06/01 08:51:46 simonmar Exp $
+$Id: Parser.y,v 1.33 2000/07/06 14:08:31 simonmar Exp $
 
 Haskell grammar.
 
@@ -127,6 +127,7 @@ Conflicts: 14 shift/reduce
  '__float'	{ ITfloat_lit }
  '__rational'	{ ITrational_lit }
  '__addr'	{ ITaddr_lit }
+ '__label'	{ ITlabel_lit }
  '__litlit'	{ ITlit_lit }
  '__string'	{ ITstring_lit }
  '__ccall'	{ ITccall $$ }

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.39 2000/01/13 14:33:58 hwloidl Exp $
+% $Id: CgClosure.lhs,v 1.40 2000/07/06 14:08:31 simonmar Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -40,8 +40,7 @@ import CgUsages		( adjustSpAndHp, setRealAndVirtualSp, getVirtSp,
 			  getSpRelOffset, getHpRelOffset
 			)
 import CLabel		( CLabel, mkClosureLabel, mkFastEntryLabel,
-			  mkRednCountsLabel, mkInfoTableLabel,
-                          pprCLabel
+			  mkRednCountsLabel, mkInfoTableLabel
 			)
 import ClosureInfo	-- lots and lots of stuff
 import CmdLineOpts	( opt_GranMacros, opt_SccProfilingOn, opt_DoTickyProfiling )
@@ -682,9 +681,8 @@ setupUpdate closure_info code
        -- updated with the new value when available.
 
              -- Alloc black hole specifying CC_HDR(Node) as the cost centre
-             --   Hack Warning: Using a CLitLit to get CAddrMode !
        let
-           use_cc   = CLitLit SLIT("CCS_HDR(R1.p)") PtrRep
+           use_cc   = CMacroExpr PtrRep CCS_HDR [nodeReg]
            blame_cc = use_cc
        in
        allocDynClosure (bhCI closure_info) use_cc blame_cc []  `thenFC` \ heap_offset ->
