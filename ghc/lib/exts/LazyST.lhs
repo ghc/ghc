@@ -60,7 +60,7 @@ instance Monad (ST s) where
            in
            k_a new_s
 
--- ToDo: un-inline this, it could cause problems...
+{-# NOINLINE runST #-}
 runST :: (All s => ST s a) -> a
 runST st = case st of ST st -> let (r,_) = st (PrelST.S# realWorld#) in r
 \end{code}
