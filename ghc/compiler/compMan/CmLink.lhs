@@ -107,8 +107,9 @@ unload :: GhciMode
        -> PersistentLinkerState
        -> IO PersistentLinkerState 
 
+unload Batch dflags linkables pls = return pls
+
 #ifdef GHCI
-unload Batch       dflags linkables pls = return pls
 unload Interactive dflags linkables pls
   = do new_loaded <- filterM maybeUnload (objects_loaded pls)
        let mods_retained = map linkableModName new_loaded
@@ -133,7 +134,7 @@ unload Interactive dflags linkables pls
 	  where
 	     unloadObjs = mapM unloadObj [ f | DotO f <- objs ]
 #else
-unload = panic "CmLink.unload: no interpreter"
+unload Interactive dflags linkables pls = panic "CmLink.unload: no interpreter"
 #endif
 -----------------------------------------------------------------------------
 -- Linking
