@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.19 1998/12/18 17:40:32 simonpj Exp $
+% $Id: AbsCSyn.lhs,v 1.20 1999/03/03 17:41:13 simonm Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -77,8 +77,8 @@ stored in a mixed type location.)
 
 \begin{code}
   | CAssign
-	CAddrMode 	-- target
-	CAddrMode	-- source
+	!CAddrMode 	-- target
+	!CAddrMode	-- source
 
   | CJump
 	CAddrMode	-- Put this in the program counter
@@ -95,7 +95,7 @@ stored in a mixed type location.)
     	CAddrMode   	-- Any base address mode
     	ReturnInfo  	-- How to get the return address from the base address
 
-  | CSwitch CAddrMode
+  | CSwitch !CAddrMode
 	[(Literal, AbstractC)]	-- alternatives
 	AbstractC		-- default; if there is no real Abstract C in here
 				-- (e.g., all comments; see function "nonemptyAbsC"),
@@ -146,7 +146,7 @@ stored in a mixed type location.)
 	AbstractC
 
   | CRetDirect			-- Direct return
-        Unique			-- for making labels
+        !Unique			-- for making labels
 	AbstractC   		-- return code
 	(CLabel,SRT)		-- SRT info
 	Liveness		-- stack liveness at the return point
@@ -302,7 +302,7 @@ data CAddrMode
     	        CAddrMode   -- Offset
     	    	PrimRep    -- For casting
 
-  | CTemp Unique PrimRep	-- Temporary locations
+  | CTemp !Unique !PrimRep	-- Temporary locations
 	-- ``Temporaries'' correspond to local variables in C, and registers in
 	-- native code.
 
