@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.41 1998/05/22 09:09:56 simonm Exp $
+# $Id: Makefile,v 1.42 1998/06/04 11:36:51 sof Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -29,7 +29,7 @@ LIBRARY=libhsp.a
 # be to do ` env PATH=$(PATH) make hsc 'to minimise the environment. (or the
 # equivalent of `env' if it doesn't exist locally).
 #
-HS_PROG=hsc
+HS_PROG=hsc$(_way)
 
 
 # -----------------------------------------------------------------------------
