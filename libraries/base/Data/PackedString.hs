@@ -100,9 +100,12 @@ INSTANCE_TYPEABLE0(PackedString,packedStringTc,"PackedString")
 -- -----------------------------------------------------------------------------
 -- Constructor functions
 
+-- | The 'nilPS' value is the empty string.
 nilPS :: PackedString
 nilPS = PS (array (0,-1) [])
 
+-- | The 'consPS' function prepends the given character to the
+-- given string.
 consPS :: Char -> PackedString -> PackedString
 consPS c cs = packString (c : (unpackPS cs)) -- ToDo:better
 
@@ -110,6 +113,8 @@ consPS c cs = packString (c : (unpackPS cs)) -- ToDo:better
 packString :: String -> PackedString
 packString str = packNChars (length str) str
 
+-- | The 'packNChars' function creates a 'PackedString' out of the
+-- first @len@ elements of the given 'String'.
 packNChars :: Int -> [Char] -> PackedString
 packNChars len str = PS (array (0,len-1) (zip [0..] str))
 
@@ -123,17 +128,23 @@ unpackPS (PS ps) = elems ps
 -- -----------------------------------------------------------------------------
 -- List-mimicking functions for PackedStrings
 
+-- | The 'lengthPS' function returns the length of the input list.  Analogous to 'length'.
 lengthPS :: PackedString -> Int
 lengthPS (PS ps) = rangeSize (bounds ps)
 
+-- | The 'indexPS' function returns the character in the string at the given position.
 indexPS :: PackedString -> Int -> Char
 indexPS (PS ps) i = ps ! i
 
+-- | The 'headPS' function returns the first element of a 'PackedString' or throws an
+-- error if the string is empty.
 headPS :: PackedString -> Char
 headPS ps
   | nullPS ps = error "Data.PackedString.headPS: head []"
   | otherwise  = indexPS ps 0
 
+-- | The 'tailPS' function returns the tail of a 'PackedString' or throws an error
+-- if the string is empty.
 tailPS :: PackedString -> PackedString
 tailPS ps
   | len <= 0 = error "Data.PackedString.tailPS: tail []"
@@ -142,71 +153,97 @@ tailPS ps
   where
     len = lengthPS ps
 
+-- | The 'nullPS' function returns True iff the argument is null.
 nullPS :: PackedString -> Bool
 nullPS (PS ps) = rangeSize (bounds ps) == 0
 
+-- | The 'appendPS' function appends the second string onto the first.
 appendPS :: PackedString -> PackedString -> PackedString
 appendPS xs ys
   | nullPS xs = ys
   | nullPS ys = xs
   | otherwise  = concatPS [xs,ys]
 
+-- | The 'mapPS' function applies a function to each character in the string.
 mapPS :: (Char -> Char) -> PackedString -> PackedString
 mapPS f (PS ps) = PS (amap f ps)
 
+-- | The 'filterPS' function filters out the appropriate substring.
 filterPS :: (Char -> Bool) -> PackedString -> PackedString {-or String?-}
 filterPS pred ps = packString (filter pred (unpackPS ps))
 
+-- | The 'foldlPS' function behaves like 'foldl' on 'PackedString's.
 foldlPS :: (a -> Char -> a) -> a -> PackedString -> a
 foldlPS f b ps = foldl f b (unpackPS ps)
 
+-- | The 'foldrPS' function behaves like 'foldr' on 'PackedString's.
 foldrPS :: (Char -> a -> a) -> a -> PackedString -> a
 foldrPS f v ps = foldr f v (unpackPS ps)
 
+-- | The 'takePS' function takes the first @n@ characters of a 'PackedString'.
 takePS :: Int -> PackedString -> PackedString
 takePS n ps = substrPS ps 0 (n-1)
 
+-- | The 'dropPS' function drops the first @n@ characters of a 'PackedString'.
 dropPS	:: Int -> PackedString -> PackedString
 dropPS n ps = substrPS ps n (lengthPS ps - 1)
 
+-- | The 'splitWithPS' function splits a 'PackedString' at a given index.
 splitAtPS :: Int -> PackedString -> (PackedString, PackedString)
 splitAtPS  n ps  = (takePS n ps, dropPS n ps)
 
+-- | The 'takeWhilePS' function is analogous to the 'takeWhile' function.
 takeWhilePS :: (Char -> Bool) -> PackedString -> PackedString
 takeWhilePS pred ps = packString (takeWhile pred (unpackPS ps))
 
+-- | The 'dropWhilePS' function is analogous to the 'dropWhile' function.
 dropWhilePS :: (Char -> Bool) -> PackedString -> PackedString
 dropWhilePS pred ps = packString (dropWhile pred (unpackPS ps))
 
+-- | The 'elemPS' function returns True iff the given element is in the string.
 elemPS :: Char -> PackedString -> Bool
 elemPS c ps = c `elem` unpackPS ps
 
+-- | The 'spanPS' function returns a pair containing the result of
+-- running both 'takeWhilePS' and 'dropWhilePS'.
 spanPS :: (Char -> Bool) -> PackedString -> (PackedString, PackedString)
 spanPS  p ps = (takeWhilePS p ps, dropWhilePS p ps)
 
+-- | The 'breakPS' function breaks a string at the first position which
+-- satisfies the predicate.
 breakPS :: (Char -> Bool) -> PackedString -> (PackedString, PackedString)
 breakPS p ps = spanPS (not . p) ps
 
+-- | The 'linesPS' function splits the input on line-breaks.
 linesPS :: PackedString -> [PackedString]
 linesPS ps = splitPS '\n' ps
 
+-- | The 'unlinesPS' function concatenates the input list after
+-- interspersing newlines.
 unlinesPS :: [PackedString] -> PackedString
 unlinesPS = joinPS (packString "\n")
 
+-- | The 'wordsPS' function is analogous to the 'words' function.
 wordsPS :: PackedString -> [PackedString]
 wordsPS ps = filter (not.nullPS) (splitWithPS isSpace ps)
 
+-- | The 'unwordsPS' function is analogous to the 'unwords' function.
 unwordsPS :: [PackedString] -> PackedString
 unwordsPS = joinPS (packString " ")
 
+-- | The 'reversePS' function reverses the string.
 reversePS :: PackedString -> PackedString
 reversePS ps = packString (reverse (unpackPS ps))
 
+-- | The 'concatPS' function concatenates a list of 'PackedString's.
 concatPS :: [PackedString] -> PackedString
 concatPS pss = packString (concat (map unpackPS pss))
 
 ------------------------------------------------------------
 
+-- | The 'joinPS' function takes a 'PackedString' and a list of 'PackedString's
+-- and concatenates the list after interspersing the first argument between
+-- each element of the list.
 joinPS :: PackedString -> [PackedString] -> PackedString
 joinPS filler pss = concatPS (splice pss)
  where
@@ -224,9 +261,12 @@ joinPS filler pss = concatPS (splice pss)
   * joinPS (packString [x]) (splitPS x ls) = ls
 -}
 
+-- | The 'splitPS' function splits the input string on each occurance of the given 'Char'.
 splitPS :: Char -> PackedString -> [PackedString]
 splitPS c = splitWithPS (== c)
 
+-- | The 'splitWithPS' function takes a character predicate and splits the input string
+-- at each character which satisfies the predicate.
 splitWithPS :: (Char -> Bool) -> PackedString -> [PackedString]
 splitWithPS pred (PS ps) =
  splitify 0
@@ -257,6 +297,9 @@ first_pos_that_satisfies pred ps len n =
 -- The definition of @_substrPS@ is essentially:
 -- @take (end - begin + 1) (drop begin str)@.
 
+-- | The 'substrPS' function takes a 'PackedString' and two indices
+-- and returns the substring of the input string between (and including)
+-- these indices.
 substrPS :: PackedString -> Int -> Int -> PackedString
 substrPS (PS ps) begin end = packString [ ps ! i | i <- [begin..end] ]
 
