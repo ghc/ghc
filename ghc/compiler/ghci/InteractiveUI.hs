@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.37 2001/02/09 15:33:51 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.38 2001/02/09 15:39:39 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -25,6 +25,7 @@ import Outputable
 import Util
 import PprType		{- instance Outputable Type; do not delete -}
 import Panic		( GhcException(..) )
+import Config
 
 import Exception
 import Dynamic
@@ -47,7 +48,7 @@ import Monad ( when )
 
 ghciWelcomeMsg = "\ 
 \   ___         ___ _ 							     \n\ 
-\  / _ \\ /\\  /\\/ __(_)      GHC Interactive, version 5.00, For Haskell 98.   \n\ 
+\  / _ \\ /\\  /\\/ __(_)      GHC Interactive, version " ++ cProjectVersion ++ ", For Haskell 98.   \n\ 
 \ / /_\\// /_/ / /  | |      http://www.haskell.org/ghc                       \n\ 
 \/ /_\\\\/ __  / /___| |      Bug reports to: glasgow-haskell-bugs@haskell.org \n\ 
 \\\____/\\/ /_/\\____/|_|      Type :? for help.\n"
