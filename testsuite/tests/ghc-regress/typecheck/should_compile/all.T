@@ -183,3 +183,4 @@ test('tc173', normal, run_command_ignore_output, ['make tc173'])
 
 test('tc174', normal, compile, [''])
 test('tc175', normal, compile, [''])
+test('tc176', normal, compile, [''])
