@@ -56,14 +56,13 @@ import IOExts		( IORef, readIORef, writeIORef )
 import Monad		( when, unless )
 import System		( system, ExitCode(..), exitWith )
 import CString
+import CTypes
 import Int
-
-#if __GLASGOW_HASKELL__ < 500
-import Storable
-#else
+import Ptr
+import MarshalAlloc
 import MarshalArray
-#endif
-
+import Storable
+    
 #include "../includes/config.h"
 
 #if !defined(mingw32_TARGET_OS)
@@ -687,37 +686,35 @@ slash s1 s2 = s1 ++ ('/' : s2)
 
 \begin{code}
 -----------------------------------------------------------------------------
--- Define	myGetProcessId :: IO Int
---		getExecDir     :: IO (Maybe String)
+-- Define	getExecDir     :: IO (Maybe String)
+
+#if defined(mingw32_TARGET_OS) && __GLASGOW_HASKELL__ >= 500
+foreign import stdcall "RegQueryValueExA" regQueryValue :: Addr -> CString -> Addr -> Addr -> Ptr CChar -> Ptr Int32 -> IO Int32
+foreign import stdcall "RegQueryValueExA" regQueryValueLen :: Addr -> CString -> Addr -> Addr -> Addr -> Ptr Int32 -> IO Int32
+foreign import stdcall "RegOpenKeyExA" regOpenKey :: Int32 -> CString -> Int32 -> Int32 -> Ptr Addr -> IO Int32
+getExecDir :: IO (Maybe String)
+getExecDir = do alloca $ \ p_len -> do
+		alloca $ \ p_hKey -> do
+		withCString "SOFTWARE\\University of Glasgow\\Glasgow Haskell Compiler\\ghc-5.01" $ \ name ->
+                    regOpenKey 0x80000002 {-HKEY_LOCAL_MACHINE-} name 0 1 {-KEY_QUERY_VALUE-} p_hKey
+                hKey <- peek p_hKey
+		withCString "InstallDir" $ \ key -> do
+		    regQueryValueLen hKey key nullAddr nullAddr nullAddr p_len
+		    len <- peek p_len
+		    buf <- mallocArray (fromIntegral len)
+		    ret <- regQueryValue hKey key nullAddr nullAddr buf p_len
+		    if ret /= 0 then return Nothing
+		       else do s <- peekCString buf
+			       destructArray (fromIntegral len) buf
+			       return (Just s)
+#else
+getExecDir :: IO (Maybe String) = do return Nothing
+#endif
 
 #ifdef mingw32_TARGET_OS
 foreign import "_getpid" getProcessID :: IO Int -- relies on Int == Int32 on Windows
-
-#if __GLASGOW_HASKELL__ >= 500
-foreign import stdcall "GetCurrentDirectoryA" getCurrentDirectory :: Int32 -> CString -> IO Int32
-foreign import stdcall "GetCurrentDirectoryA" getCurrentDirectoryLen :: Int32 -> Addr -> IO Int32
-getExecDir :: IO (Maybe String)
-getExecDir = do len <- getCurrentDirectoryLen 0 nullAddr
-		buf <- mallocArray (fromIntegral len)
-		ret <- getCurrentDirectory len buf
-		if ret == 0 then return Nothing
-		            else do s <- peekCString buf
-				    destructArray (fromIntegral len) buf
-				    return (Just s)
-#else
-foreign import stdcall "GetCurrentDirectoryA" getCurrentDirectory :: Int32 -> Addr -> IO Int32
-getExecDir :: IO (Maybe String)
-getExecDir = do len <- getCurrentDirectory 0 nullAddr
-		buf <- malloc (fromIntegral len)
-		ret <- getCurrentDirectory len buf
-		if ret == 0 then return Nothing
-		            else do s <- unpackCStringIO buf
-				    free buf
-				    return (Just s)
-#endif
 #else
 getProcessID :: IO Int
 getProcessID = Posix.getProcessID
-getExecDir :: IO (Maybe String) = do return Nothing
 #endif
 \end{code}
