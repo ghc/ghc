@@ -1115,16 +1115,6 @@ dnl ** check for math library
 AC_CHECK_LIB([m], [atan], [LIBS="-lm $LIBS"; LIBM="-lm"], [LIBM=])
 AC_SUBST([LIBM])
 
-dnl ** check for X Window System
-AC_PATH_XTRA()
-
-if test "$no_x" = yes; then
-  GhcLibsWithX11=NO
-else
-  GhcLibsWithX11=YES
-fi
-AC_SUBST([GhcLibsWithX11])
-
 dnl ################################################################
 dnl Check for libraries
 dnl ################################################################

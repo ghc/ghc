@@ -397,27 +397,6 @@ LIBM=@LIBM@
 #
 GhcLibsWithObjectIO=@GhcLibsWithObjectIO@
 
-# Build the Haskell OpenGL binding?
-#
-GhcLibsWithOpenGL=@GhcLibsWithOpenGL@
-GLU_CFLAGS=@GLU_CFLAGS@
-GLU_LIBS=@GLU_LIBS@
-
-# Build the Haskell OpenAL binding?
-#
-GhcLibsWithOpenAL=@GhcLibsWithOpenAL@
-
-# Build the Haskell GLUT binding?
-#
-GhcLibsWithGLUT=@GhcLibsWithGLUT@
-GLUT_LIBS=@GLUT_LIBS@
-
-# X11 stuff
-#
-GhcLibsWithX11=@GhcLibsWithX11@
-X_CFLAGS=@X_CFLAGS@
-X_LIBS=@X_LIBS@
-
 # .NET interop support?
 #
 DotnetSupport=@DotnetSupport@

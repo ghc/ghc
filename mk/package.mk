@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.40 2004/11/03 12:31:42 ross Exp $
+# $Id: package.mk,v 1.41 2004/11/23 12:35:12 ross Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -17,9 +17,9 @@ endif
 ifeq "$(way)" ""
 
 ifeq "$(STANDALONE_PACKAGE)" "NO"
-PKGCONF_CPP_EXTRA_OPTS = -I$(GHC_INCLUDE_DIR)
+PKGCONF_CPP_EXTRA_OPTS = -I$(GHC_INCLUDE_DIR) -Iinclude
 else
-PKGCONF_CPP_EXTRA_OPTS =
+PKGCONF_CPP_EXTRA_OPTS = -Iinclude
 endif
 
 package.conf.inplace   : package.conf.in
