@@ -266,7 +266,7 @@ runPipeline pipeline (input_fn,suffix) do_linking use_ofile
   where (basename, _) = splitFilename input_fn
 
 pipeLoop [] input_fn _ _ _ _ = return input_fn
-pipeLoop ((phase, keep, o_suffix):phases) 
+pipeLoop (all_phases@((phase, keep, o_suffix):phases))
 	(input_fn,real_suff) do_linking use_ofile orig_basename orig_suffix
   = do
 
@@ -277,7 +277,7 @@ pipeLoop ((phase, keep, o_suffix):phases)
 	-- checker has determined that recompilation isn't necessary.
      case mbCarryOn of
        Nothing -> do
-	      let (_,keep,final_suffix) = last phases
+	      let (_,keep,final_suffix) = last all_phases
 	      ofile <- outputFileName True keep final_suffix
 	      return (ofile, final_suffix)
           -- carry on ...
