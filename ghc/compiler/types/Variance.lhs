@@ -102,13 +102,7 @@ abstractVrcs tc =
 #ifdef DEBUG
                   pprTrace "Vrc: abstract tycon:" (ppr tc) $
 #endif
-                  warn_abstract_vrcs `seq` replicate (tyConArity tc) (True,True)
-
-warn_abstract_vrcs
--- we pull the message out as a CAF so the warning only appears *once*
-  = trace ("WARNING: tyConArgVrc info inaccurate due to unavailable constructors.\n"
-        ++ "         Use -fno-prune-tydecls to fix.") $
-                ()
+                  replicate (tyConArity tc) (True,True)
 \end{code}
 
 

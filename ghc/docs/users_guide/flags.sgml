@@ -1687,12 +1687,6 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
-	      <entry><option>-fno-prune-tydecls</option></entry>
-	      <entry>Renamer: don't prune type declarations</entry>
-	      <entry>static</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
 	      <entry><option>-fhistory-size</option></entry>
 	      <entry>Set simplification history size</entry>
 	      <entry>static</entry>
