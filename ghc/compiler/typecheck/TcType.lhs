@@ -752,6 +752,14 @@ uTysX ty1 (TyVarTy tyvar2) k subst@(tmpls,_)
   | tyvar2 `elemVarSet` tmpls
   = uVarX tyvar2 ty1 k subst
 
+	-- Predicates
+uTysX (SourceTy (IParam n1 t1)) (SourceTy (IParam n2 t2)) k subst
+  | n1 == n2 = uTysX t1 t2 k subst
+uTysX (SourceTy (ClassP c1 tys1)) (SourceTy (ClassP c2 tys2)) k subst
+  | c1 == c2 = uTyListsX tys1 tys2 k subst
+uTysX (SourceTy (NType tc1 tys1)) (SourceTy (NType tc2 tys2)) k subst
+  | tc1 == tc2 = uTyListsX tys1 tys2 k subst
+
 	-- Functions; just check the two parts
 uTysX (FunTy fun1 arg1) (FunTy fun2 arg2) k subst
   = uTysX fun1 fun2 (uTysX arg1 arg2 k) subst
@@ -891,6 +899,15 @@ match (TyVarTy v) ty tmpls k senv
     -- variable may not match the pattern (TyVarTy v') as one would
     -- expect, due to an intervening Note.  KSW 2000-06.
 
+	-- Predicates
+match (SourceTy (IParam n1 t1)) (SourceTy (IParam n2 t2)) tmpls k senv
+  | n1 == n2 = match t1 t2 tmpls k senv
+match (SourceTy (ClassP c1 tys1)) (SourceTy (ClassP c2 tys2)) tmpls k senv
+  | c1 == c2 = match_list_exactly tys1 tys2 tmpls k senv
+match (SourceTy (NType tc1 tys1)) (SourceTy (NType tc2 tys2)) tmpls k senv
+  | tc1 == tc2 = match_list_exactly tys1 tys2 tmpls k senv
+
+	-- Functions; just check the two parts
 match (FunTy arg1 res1) (FunTy arg2 res2) tmpls k senv
   = match arg1 arg2 tmpls (match res1 res2 tmpls k) senv
 
@@ -900,11 +917,11 @@ match (AppTy fun1 arg1) ty2 tmpls k senv
 	Nothing 	 -> Nothing	-- Fail
 
 match (TyConApp tc1 tys1) (TyConApp tc2 tys2) tmpls k senv
-  | tc1 == tc2 = match_tc_app tys1 tys2 tmpls k senv
+  | tc1 == tc2 = match_list_exactly tys1 tys2 tmpls k senv
 
 -- Newtypes are opaque; other source types should not happen
 match (SourceTy (NType tc1 tys1)) (SourceTy (NType tc2 tys2)) tmpls k senv
-  | tc1 == tc2 = match_tc_app tys1 tys2 tmpls k senv
+  | tc1 == tc2 = match_list_exactly tys1 tys2 tmpls k senv
 
 match (UsageTy _ ty1) ty2 tmpls k senv = match ty1 ty2 tmpls k senv
 match ty1 (UsageTy _ ty2) tmpls k senv = match ty1 ty2 tmpls k senv
@@ -919,7 +936,7 @@ match ty1      (NoteTy n2 ty2) tmpls k senv = match ty1 ty2 tmpls k senv
 -- Catch-all fails
 match _ _ _ _ _ = Nothing
 
-match_tc_app tys1 tys2 tmpls k senv
+match_list_exactly tys1 tys2 tmpls k senv
   = match_list tys1 tys2 tmpls k' senv
   where
     k' (senv', tys2') | null tys2' = k senv'	-- Succeed

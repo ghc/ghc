@@ -264,20 +264,35 @@ mkEqnMsg (pred1,from1) (pred2,from2)
 	  nest 2 (sep [ppr pred2 <> comma, nest 2 from2])]
  
 ----------
-checkClsFD :: TyVarSet 			-- The quantified type variables, which
-					-- can be instantiated to make the types match
+checkClsFD :: TyVarSet 			-- Quantified type variables; see note below
 	   -> FunDep TyVar -> [TyVar] 	-- One functional dependency from the class
 	   -> [Type] -> [Type]
 	   -> [Equation]
 
 checkClsFD qtvs fd clas_tvs tys1 tys2
+-- 'qtvs' are the quantified type variables, the ones which an be instantiated 
+-- to make the types match.  For example, given
+--	class C a b | a->b where ...
+--	instance C (Maybe x) (Tree x) where ..
+-- and an Inst of form (C (Maybe t1 t2), 
+-- then we will call checkClsFD with
+--
+--	qtvs = {x}, tys1 = [Maybe x,  Tree x]
+--		    tys2 = [Maybe t1, t2]
+--
+-- We can instantiate x to t1, and then we want to force
+-- 	Tree x [t1/x]  :=:   t2
+
 -- We use 'unify' even though we are often only matching
 -- unifyTyListsX will only bind variables in qtvs, so it's OK!
   = case unifyTyListsX qtvs ls1 ls2 of
 	Nothing   -> []
 	Just unif -> [ (qtvs', substTy full_unif r1, substTy full_unif r2)
 		     | (r1,r2) <- rs1 `zip` rs2,
-		       not (maybeToBool (unifyExtendTysX qtvs unif r1 r2))]
+		       not (maybeToBool (unifyExtendTysX qtvs' unif r1 r2))]
+			-- Don't include any equations that already hold
+			-- taking account of the fact that any qtvs that aren't 
+			-- already instantiated can be instantiated to anything at all
 		  where
 		    full_unif = mkSubst emptyInScopeSet unif
 			-- No for-alls in sight; hmm

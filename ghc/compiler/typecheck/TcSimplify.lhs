@@ -1141,8 +1141,8 @@ tcImprove avails
 	   unifyTauTy (substTy tenv t1) (substTy tenv t2)
     ppr_eqn ((qtvs, t1, t2), doc)
 	= vcat [ptext SLIT("forall") <+> braces (pprWithCommas ppr (varSetElems qtvs))
-				     <+> ppr t1 <+> equals <+> ppr t2,
-		doc]
+				     <+> ppr t1 <+> ptext SLIT(":=:") <+> ppr t2,
+		nest 2 doc]
 \end{code}
 
 The main context-reduction function is @reduce@.  Here's its game plan.
