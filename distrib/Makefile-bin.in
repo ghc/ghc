@@ -143,6 +143,8 @@ config-pkgs ::
 	   echo $$"libdir='$(real_libdir)';"                   >> bin/$(platform)/$(package)-$(version)/$$i ; \
 	   echo $$"libexecdir='$(real_libdir)';"               >> bin/$(platform)/$(package)-$(version)/$$i ; \
 	   echo $$"datadir='$(real_datadir)';"                 >> bin/$(platform)/$(package)-$(version)/$$i ; \
+	   echo $$"SED='$(SED)';"		>> bin/$(platform)/$(package)-$(version)/$$i ; \
+	   echo $$"RAWCPP='$(RAWCPP)';"		>> bin/$(platform)/$(package)-$(version)/$$i ; \
 	   cat bin/$(platform)/$(package)-$(version)/$$i.prl   >> bin/$(platform)/$(package)-$(version)/$$i ; \
 	   $(CHMOD) $(BIN_PERMS) bin/$(platform)/$(package)-$(version)/$$i; \
 	   echo "Done."; \
@@ -167,10 +169,12 @@ config-pkgs ::
 	   $(RM) bin/$(platform)/$(package)-$(version)/$$i.bak; \
 	   test -f bin/$(platform)/$(package)-$(version)/$$i && $(MV) bin/$(platform)/$(package)-$(version)/$$i bin/$(platform)/$(package)-$(version)/$$i.bak; \
 	   echo "#! $(SH)"                      > bin/$(platform)/$(package)-$(version)/$$i ; \
-	   echo "bindir='$(bindir)';"          >> bin/$(platform)/$(package)-$(version)/$$i ; \
-	   echo "libdir='$(real_libdir)';"     >> bin/$(platform)/$(package)-$(version)/$$i ; \
-	   echo "libexecdir='$(real_libdir)';" >> bin/$(platform)/$(package)-$(version)/$$i ; \
-	   echo "datadir='$(real_datadir)';"   >> bin/$(platform)/$(package)-$(version)/$$i ; \
+	   echo "bindir='$(bindir)'"          >> bin/$(platform)/$(package)-$(version)/$$i ; \
+	   echo "libdir='$(real_libdir)'"     >> bin/$(platform)/$(package)-$(version)/$$i ; \
+	   echo "libexecdir='$(real_libdir)'" >> bin/$(platform)/$(package)-$(version)/$$i ; \
+	   echo "datadir='$(real_datadir)'"   >> bin/$(platform)/$(package)-$(version)/$$i ; \
+	   echo "SED='$(SED)'"			 >> bin/$(platform)/$(package)-$(version)/$$i ; \
+	   echo "RAWCPP='$(RAWCPP)'"		 >> bin/$(platform)/$(package)-$(version)/$$i ; \
 	   cat bin/$(platform)/$(package)-$(version)/$$i.sh >> bin/$(platform)/$(package)-$(version)/$$i; \
 	   $(CHMOD) $(BIN_PERMS) bin/$(platform)/$(package)-$(version)/$$i; \
 	   echo "Done."; \
