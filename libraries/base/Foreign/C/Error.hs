@@ -124,7 +124,7 @@ import System.IO.Unsafe		( unsafePerformIO )
 #endif
 
 #ifdef __HUGS__
-{-# CBITS PrelIOUtils.c #-}
+{-# CFILES cbits/PrelIOUtils.c #-}
 #endif
 
 

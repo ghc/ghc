@@ -33,7 +33,7 @@ import Foreign.C.Types ( CInt )
 import Foreign.Ptr ( Ptr )
 
 #ifdef __HUGS__
-{-# CBITS execvpe.c  #-}
+{-# CFILES cbits/execvpe.c  #-}
 #endif
 
 -- ----------------------------------------------------------------------------

@@ -43,11 +43,11 @@ module Text.Regex.Posix (
 #include "regex.h"
 #else
 #include "regex/regex.h"
-{-# CBITS regex/reallocf.c #-}
-{-# CBITS regex/regcomp.c #-}
-{-# CBITS regex/regerror.c #-}
-{-# CBITS regex/regexec.c #-}
-{-# CBITS regex/regfree.c #-}
+{-# CFILES cbits/regex/reallocf.c #-}
+{-# CFILES cbits/regex/regcomp.c #-}
+{-# CFILES cbits/regex/regerror.c #-}
+{-# CFILES cbits/regex/regexec.c #-}
+{-# CFILES cbits/regex/regfree.c #-}
 #endif
 
 import Prelude

@@ -45,7 +45,7 @@ import System.IO
 #ifdef __HUGS__
 import Hugs.Prelude (IOException(..), IOErrorType(..))
 
-{-# CBITS PrelIOUtils.c dirUtils.c consUtils.c #-}
+{-# CFILES cbits/PrelIOUtils.c cbits/dirUtils.c cbits/consUtils.c #-}
 ioException = ioError
 #endif
 
