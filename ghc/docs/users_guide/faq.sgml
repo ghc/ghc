@@ -340,6 +340,38 @@ details.</para>
         lose Ctrl-D.  C'est la vie.</para>
       </listitem>
     </varlistentry>
+
+    <varlistentry>
+      <term>If I print out a string using <literal>putStr</literal>,
+      and then attempt to read some input using
+      <literal>hGetLine</literal>, I don't see the output from the
+      <literal>putStr</literal>.</term>
+
+      <listitem>
+	<para>The <literal>stdout</literal> handle is line-buffered by
+	default, which means that output sent to the handle is only
+	flushed when a newline (<literal>/n</literal>) is output, the
+	buffer is full, or <literal>hFlush</literal> is called on the
+	Handle.  The right way to make the text appear without sending
+	a newline is to use <literal>hFlush</literal>:</para>
+
+<programlisting>
+  import System.IO
+  main = do
+    putStr "how are you today? "
+    hFlush stdout
+    input <- hGetLine
+    ...</programlisting>
+
+	<para>You'll probably find that the behaviour differs when
+	using GHCi: the <literal>hFlush</literal> isn't necessary to
+	make the text appear.  This is because in GHCi we turn off the
+	buffering on <literal>stdout</literal>, because this is
+	normally what you want in an interpreter: output appears as it
+	is generated.</para>
+      </listitem>
+    </varlistentry>
+
   </variablelist>
 </chapter>
 
