@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.86 2001/07/03 16:46:21 rrt Exp $
+-- $Id: DriverPipeline.hs,v 1.87 2001/07/11 01:27:04 sof Exp $
 --
 -- GHC Driver
 --
@@ -272,17 +272,16 @@ pipeLoop ((phase, keep, o_suffix):phases)
 
      output_fn <- outputFileName (null phases) keep o_suffix
 
-     carry_on <- run_phase phase orig_basename orig_suffix input_fn output_fn
+     mbCarryOn <- run_phase phase orig_basename orig_suffix input_fn output_fn 
 	-- sometimes we bail out early, eg. when the compiler's recompilation
 	-- checker has determined that recompilation isn't necessary.
-     if not carry_on 
-	then do let (_,keep,final_suffix) = last phases
-	        ofile <- outputFileName True keep final_suffix
-		return ofile
-	else do -- carry on ...
-
-     pipeLoop phases output_fn do_linking use_ofile orig_basename orig_suffix
-
+     case mbCarryOn of
+       Nothing -> do
+	      let (_,keep,final_suffix) = last phases
+	      ofile <- outputFileName True keep final_suffix
+	      return ofile
+          -- carry on ...
+       Just fn -> pipeLoop phases fn do_linking use_ofile orig_basename orig_suffix
   where
      outputFileName last_phase keep suffix
   	= do o_file <- readIORef v_Output_file
@@ -300,7 +299,7 @@ pipeLoop ((phase, keep, o_suffix):phases)
 run_phase Unlit _basename _suff input_fn output_fn
   = do unlit_flags <- getOpts opt_L
        SysTools.runUnlit (unlit_flags ++ ["-h", input_fn, input_fn, output_fn])
-       return True
+       return (Just output_fn)
 
 -------------------------------------------------------------------------------
 -- Cpp phase 
@@ -311,8 +310,11 @@ run_phase Cpp basename suff input_fn output_fn
        checkProcessArgsResult unhandled_flags basename suff
 
        do_cpp <- dynFlag cppFlag
-       if do_cpp
-          then do
+       if not do_cpp then
+           -- no need to preprocess CPP, just pass input file along
+	   -- to the next phase of the pipeline.
+          return (Just input_fn)
+	else do
 	    hscpp_opts	    <- getOpts opt_P
        	    hs_src_cpp_opts <- readIORef v_Hs_source_cpp_opts
 
@@ -330,30 +332,12 @@ run_phase Cpp basename suff input_fn output_fn
 			    ++ hscpp_opts
 			    ++ md_c_flags
 			    ++ [ "-x", "c", input_fn, "-o", output_fn ])
-
-	-- ToDo: switch away from using 'echo' altogether (but need
-	-- a faster alternative than what's done below).
-#if defined(mingw32_TARGET_OS)
-	  else do
-	    h <- openFile output_fn WriteMode
-	    hPutStrLn h ("{-# LINE 1 \"" ++ input_fn ++ "\" #-}")
-	    ls <- readFile input_fn -- inefficient, but it'll do for now.
-	    			    -- ToDo: speed up via slurping.
-	    hPutStrLn h ls
-	    hClose h
-#else
-	  else do
-	    SysTools.runSomething "Ineffective C pre-processor"
-	           ("echo '{-# LINE 1 \""  ++ input_fn ++ "\" #-}' > " 
-		    ++ output_fn ++ " && cat " ++ input_fn
-		    ++ " >> " ++ output_fn) []
-#endif
-       return True
+	    return (Just output_fn)
 
 -----------------------------------------------------------------------------
 -- MkDependHS phase
 
-run_phase MkDependHS basename suff input_fn _output_fn = do 
+run_phase MkDependHS basename suff input_fn output_fn = do 
    src <- readFile input_fn
    let (import_sources, import_normals, _) = getImports src
 
@@ -391,7 +375,7 @@ run_phase MkDependHS basename suff input_fn _output_fn = do
 
    mapM genDep [ d | Just d <- deps ]
 
-   return True
+   return (Just output_fn)
 
 -- add the lines to dep_makefile:
 	   -- always:
@@ -506,7 +490,7 @@ run_phase Hsc basename suff input_fn output_fn
 	    HscFail pcs -> throwDyn (PhaseFailed "hsc" (ExitFailure 1));
 
             HscNoRecomp pcs details iface -> do { SysTools.touch "Touching object file" o_file
-						; return False } ;
+						; return Nothing } ;
 
 	    HscRecomp pcs details iface stub_h_exists stub_c_exists
 		      _maybe_interpreted_code -> do
@@ -517,7 +501,7 @@ run_phase Hsc basename suff input_fn output_fn
 		Nothing -> return ()
 		Just stub_o -> add v_Ld_inputs stub_o
 
-	return True
+	return (Just output_fn)
     }
 
 -----------------------------------------------------------------------------
@@ -569,7 +553,7 @@ run_phase cc_phase basename suff input_fn output_fn
 		       ++ include_paths
 		       ++ pkg_extra_cc_opts
 		       )
-	return True
+	return (Just output_fn)
 
 	-- ToDo: postprocess the output from gcc
 
@@ -586,12 +570,12 @@ run_phase Mangle _basename _suff input_fn output_fn
        SysTools.runMangle (mangler_opts
 		          ++ [ input_fn, output_fn ]
 		          ++ machdep_opts)
-       return True
+       return (Just output_fn)
 
 -----------------------------------------------------------------------------
 -- Splitting phase
 
-run_phase SplitMangle _basename _suff input_fn _output_fn
+run_phase SplitMangle _basename _suff input_fn output_fn
   = do  -- tmp_pfx is the prefix used for the split .s files
 	-- We also use it as the file to contain the no. of split .s files (sigh)
 	split_s_prefix <- SysTools.newTempName "split"
@@ -608,7 +592,7 @@ run_phase SplitMangle _basename _suff input_fn _output_fn
 	addFilesToClean [ split_s_prefix ++ "__" ++ show n ++ ".s"
 			| n <- [1..n_files]]
 
-	return True
+	return (Just output_fn)
 
 -----------------------------------------------------------------------------
 -- As phase
@@ -620,9 +604,9 @@ run_phase As _basename _suff input_fn output_fn
 	SysTools.runAs (as_opts
 		       ++ [ "-I" ++ p | p <- cmdline_include_paths ]
 		       ++ [ "-c", input_fn, "-o",  output_fn ])
-	return True
+	return (Just output_fn)
 
-run_phase SplitAs basename _suff _input_fn _output_fn
+run_phase SplitAs basename _suff _input_fn output_fn
   = do  as_opts <- getOpts opt_a
 
 	(split_s_prefix, n) <- readIORef v_Split_info
@@ -640,7 +624,7 @@ run_phase SplitAs basename _suff _input_fn _output_fn
 		    SysTools.runAs (as_opts ++ ["-c", "-o", real_o, input_s])
 	
 	mapM_ assemble_file [1..n]
-	return True
+	return (Just output_fn)
 
 -----------------------------------------------------------------------------
 -- MoveBinary sort-of-phase
