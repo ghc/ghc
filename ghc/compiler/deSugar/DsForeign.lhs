@@ -21,7 +21,7 @@ import TcHsSyn		( TypecheckedForeignDecl )
 import CoreUtils	( exprType, mkInlineMe )
 import Id		( Id, idType, idName, mkSysLocal, setInlinePragma )
 import Literal		( Literal(..) )
-import Module		( Module, moduleUserString )
+import Module		( Module, moduleString )
 import Name		( getOccString, NamedThing(..) )
 import OccName		( encodeFS )
 import Type		( repType, eqType )
@@ -269,7 +269,7 @@ dsFExport mod_name fn_id ty ext_name cconv isDyn
 					`thenDs` \ mod -> 
      let
       	(h_stub, c_stub) 
-           = mkFExportCBits (moduleUserString mod) ext_name 
+           = mkFExportCBits ext_name 
                             (if isDyn then Nothing else Just fn_id)
                             fe_arg_tys res_ty is_IO_res_ty cconv
      in
@@ -307,7 +307,7 @@ dsFExportDynamic mod_name id cconv
   =  newSysLocalDs ty					 `thenDs` \ fe_id ->
      let 
         -- hack: need to get at the name of the C stub we're about to generate.
-       fe_nm	   = mkFastString (moduleUserString mod_name ++ "_" ++ toCName fe_id)
+       fe_nm	   = mkFastString (moduleString mod_name ++ "_" ++ toCName fe_id)
      in
      dsFExport mod_name id export_ty fe_nm cconv True  	`thenDs` \ (h_code, c_code) ->
      newSysLocalDs arg_ty				`thenDs` \ cback ->
@@ -379,15 +379,14 @@ The C stub constructs the application of the exported Haskell function
 using the hugs/ghc rts invocation API.
 
 \begin{code}
-mkFExportCBits :: String
-	       -> FastString
+mkFExportCBits :: FastString
 	       -> Maybe Id 	-- Just==static, Nothing==dynamic
 	       -> [Type] 
 	       -> Type 
                -> Bool		-- True <=> returns an IO type
 	       -> CCallConv 
 	       -> (SDoc, SDoc)
-mkFExportCBits mod_nm c_nm maybe_target arg_htys res_hty is_IO_res_ty cc 
+mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc 
  = (header_bits, c_bits)
  where
   -- Create up types and names for the real args
