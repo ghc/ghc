@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.45 2001/02/28 00:01:01 qrczak Exp $
+% $Id: CLabel.lhs,v 1.46 2001/04/20 14:54:37 sewardj Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -48,6 +48,7 @@ module CLabel (
 	mkCharlikeClosureLabel,
 	mkIntlikeClosureLabel,
 	mkMAP_FROZEN_infoLabel,
+        mkEMPTY_MVAR_infoLabel,
 
 	mkTopTickyCtrLabel,
 	mkBlackHoleInfoTableLabel,
@@ -253,6 +254,7 @@ mkMainRegTableLabel		= RtsLabel RtsMainRegTable
 mkCharlikeClosureLabel		= RtsLabel (Rts_Closure "stg_CHARLIKE_closure")
 mkIntlikeClosureLabel		= RtsLabel (Rts_Closure "stg_INTLIKE_closure")
 mkMAP_FROZEN_infoLabel		= RtsLabel (Rts_Info "stg_MUT_ARR_PTRS_FROZEN_info")
+mkEMPTY_MVAR_infoLabel		= RtsLabel (Rts_Info "stg_EMPTY_MVAR_info")
 
 mkTopTickyCtrLabel		= RtsLabel RtsTopTickyCtr
 mkBlackHoleInfoTableLabel	= RtsLabel (RtsBlackHoleInfoTbl SLIT("stg_BLACKHOLE_info"))
