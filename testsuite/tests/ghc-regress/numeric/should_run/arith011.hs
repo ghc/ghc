@@ -4,6 +4,7 @@ import Int
 import Word
 import Bits
 import Ix -- added SOF
+import Control.Exception
 
 main :: IO ()
 main = test
@@ -80,9 +81,8 @@ testConversions zero = do
   putStr "Word64  : " >> print (map fromIntegral numbers :: [Word64])
   where numbers = [minBound, 0, maxBound] `asTypeOf` [zero]
 
-samples :: (Num a) => a -> ([a], [a])
-samples zero = (map fromInteger ([-3 .. -1]++[0 .. 3]),
-                map fromInteger ([-3 .. -1]++[1 .. 3]))
+samples :: (Num a) => a -> [a]
+samples zero = map fromInteger ([-3 .. -1]++[0 .. 3])
   
 table1 :: (Show a, Show b) => String -> (a -> b) -> [a] -> IO ()
 table1 nm f xs = do
@@ -98,15 +98,16 @@ table2 nm op xs ys = do
            ]
   putStrLn "#"
  where
-  op' x y = putStrLn (show x ++ " " ++ nm ++ " " ++ show y 
-                      ++ " = " ++ show (op x y))
+  op' x y = do s <- Control.Exception.catch (evaluate (show (op x y))) 
+					    (return . show)
+	       putStrLn (show x ++ " " ++ nm ++ " " ++ show y ++ " = " ++ s)
 
 testReadShow zero = do
   putStrLn "testReadShow"
   print xs
   print (map read_show xs)
  where
-  (xs,zs) = samples zero
+  xs = samples zero
   read_show x = (read (show x) `asTypeOf` zero)
 
 testEq zero = do
@@ -114,7 +115,7 @@ testEq zero = do
   table2 "==" (==) xs xs
   table2 "/=" (/=) xs xs
  where
-  (xs,ys) = samples zero
+  xs = samples zero
 
 testOrd zero = do
   putStrLn "testOrd"
@@ -124,7 +125,7 @@ testOrd zero = do
   table2 ">="  	    (>=)    xs xs
   table2 "`compare`" compare xs xs
  where
-  (xs,ys) = samples zero
+  xs = samples zero
 
 testNum zero = do
   putStrLn "testNum"
@@ -133,30 +134,30 @@ testNum zero = do
   table2 "*"  	  (*)    xs xs
   table1 "negate" negate xs
  where
-  (xs,ys) = samples zero
+  xs = samples zero
 
 testReal zero = do
   putStrLn "testReal"
   table1 "toRational" toRational xs
  where
-  (xs,ys) = samples zero
+  xs = samples zero
 
 testIntegral zero = do
   putStrLn "testIntegral"
-  table2 "`divMod` " divMod  xs ys
-  table2 "`div`    " div     xs ys
-  table2 "`mod`    " mod     xs ys
-  table2 "`quotRem`" quotRem xs ys
-  table2 "`quot`   " quot    xs ys
-  table2 "`rem`    " rem     xs ys
+  table2 "`divMod` " divMod  xs xs
+  table2 "`div`    " div     xs xs
+  table2 "`mod`    " mod     xs xs
+  table2 "`quotRem`" quotRem xs xs
+  table2 "`quot`   " quot    xs xs
+  table2 "`rem`    " rem     xs xs
  where
-  (xs,ys) = samples zero
+  xs = samples zero
 
 testBits zero do_bitsize = do
   putStrLn "testBits"
-  table2 ".&.  "            (.&.)         xs ys
-  table2 ".|.  "            (.|.)         xs ys
-  table2 "`xor`"            xor           xs ys
+  table2 ".&.  "            (.&.)         xs xs
+  table2 ".|.  "            (.|.)         xs xs
+  table2 "`xor`"            xor           xs xs
   table1 "complement"       complement    xs
   table2 "`shiftL`"         shiftL        xs ([0..3] ++ [32,64])
   table2 "`shiftR`"         shiftR        xs ([0..3] ++ [32,64]) 
@@ -169,4 +170,4 @@ testBits zero do_bitsize = do
   if do_bitsize then table1 "bitSize" bitSize xs else return ()
   table1 "isSigned"         isSigned      xs
  where
-  (xs,ys) = samples zero
+  xs = samples zero

@@ -18,7 +18,7 @@ test('arith008', expect_fail_for(['optasm']), compile_and_run, [''])
 
 test('arith009', normal, compile_and_run, [''])
 test('arith010', normal, compile_and_run, ['-package lang'])
-test('arith011', normal, compile_and_run, ['-package lang'])
+test('arith011', normal, compile_and_run, [''])
 
 test('arith012', expect_fail_for(['optasm']), compile_and_run, ['-package lang'])
 
