@@ -168,10 +168,13 @@ hGetLineBufferedLoop handle_ ref
 #endif
 
   xs <- unpack raw r off
+
+  -- if eol == True, then off is the offset of the '\n'
+  -- otherwise off == w and the buffer is now empty.
   if eol
-	then do if w == off + 1
-		   then writeIORef ref buf{ bufRPtr=0, bufWPtr=0 }
-		   else writeIORef ref buf{ bufRPtr = off + 1 }
+	then do if (w == off + 1)
+	    		then writeIORef ref buf{ bufRPtr=0, bufWPtr=0 }
+		   	else writeIORef ref buf{ bufRPtr = off + 1 }
 	        return (concat (reverse (xs:xss)))
 	else do
 	     maybe_buf <- maybeFillReadBuffer (haFD handle_) True (haIsStream handle_)
@@ -179,10 +182,12 @@ hGetLineBufferedLoop handle_ ref
 	     case maybe_buf of
 		-- Nothing indicates we caught an EOF, and we may have a
 		-- partial line to return.
-		Nothing -> let str = concat (reverse (xs:xss)) in
-		     	   if not (null str)
-			      then return str
-			      else ioe_EOF
+		Nothing -> do
+		     writeIORef ref buf{ bufRPtr=0, bufWPtr=0 }
+		     let str = concat (reverse (xs:xss))
+		     if not (null str)
+		        then return str
+		        else ioe_EOF
 		Just new_buf -> 
 		     hGetLineBufferedLoop handle_ ref new_buf (xs:xss)
 
