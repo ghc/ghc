@@ -829,8 +829,8 @@ nonStdGuardErr guard
     ) 4 (ppr guard)
 
 patSigErr ty
-  = hang (ptext SLIT("Illegal signature in pattern:") <+> ppr ty)
-	 4 (ptext SLIT("Use -fglasgow-exts to permit it"))
+  =  (ptext SLIT("Illegal signature in pattern:") <+> ppr ty)
+	$$ nest 4 (ptext SLIT("Use -fglasgow-exts to permit it"))
 
 pp_op (op, fix) = hcat [ppr op, space, parens (ppr fix)]
 \end{code}

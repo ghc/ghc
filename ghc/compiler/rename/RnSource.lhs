@@ -14,7 +14,7 @@ import HsPragmas
 import HsTypes		( getTyVarName, pprClassAssertion, cmpHsTypes )
 import RdrName		( RdrName, isRdrDataCon, rdrNameOcc, isRdrTyVar )
 import RdrHsSyn		( RdrNameContext, RdrNameHsType, RdrNameConDecl,
-			  extractHsTyRdrNames, extractRuleBndrsTyVars
+			  extractRuleBndrsTyVars, extractHsTyRdrTyVars
 			)
 import RnHsSyn
 import HsCore
@@ -565,12 +565,9 @@ checkConstraints explicit_forall doc forall_tyvars ctxt ty
 	| otherwise	   = addErrRn (ctxtErr explicit_forall doc forall_tyvars ct ty)
 			     `thenRn_` returnRn Nothing
         where
-	  forall_mentioned = foldr ((||) . any (`elem` forall_tyvars) . extractHsTyRdrNames)
+	  forall_mentioned = foldr ((||) . any (`elem` forall_tyvars) . extractHsTyRdrTyVars)
 			     False
 			     tys
-
-freeRdrTyVars	 :: RdrNameHsType -> [RdrName]
-freeRdrTyVars ty =  filter isRdrTyVar (extractHsTyRdrNames ty)
 
 rnHsType :: SDoc -> RdrNameHsType -> RnMS (RenamedHsType, FreeVars)
 
@@ -580,7 +577,7 @@ rnHsType doc (HsForAllTy Nothing ctxt ty)
 	-- over FV(T) \ {in-scope-tyvars} 
   = getLocalNameEnv		`thenRn` \ name_env ->
     let
-	mentioned_in_tau = freeRdrTyVars ty
+	mentioned_in_tau = extractHsTyRdrTyVars ty
 	forall_tyvars    = filter (not . (`elemFM` name_env)) mentioned_in_tau
     in
     checkConstraints False doc forall_tyvars ctxt ty	`thenRn` \ ctxt' ->
@@ -593,10 +590,10 @@ rnHsType doc (HsForAllTy (Just forall_tyvars) ctxt tau)
 	-- That's only a warning... unless the tyvar is constrained by a 
 	-- context in which case it's an error
   = let
-	mentioned_in_tau  = freeRdrTyVars tau
+	mentioned_in_tau  = extractHsTyRdrTyVars tau
 	mentioned_in_ctxt = nub [tv | (_,tys) <- ctxt,
 				      ty <- tys,
-				      tv <- freeRdrTyVars ty]
+				      tv <- extractHsTyRdrTyVars ty]
 
 	dubious_guys	      = filter (`notElem` mentioned_in_tau) forall_tyvar_names
 		-- dubious = explicitly quantified but not mentioned in tau type

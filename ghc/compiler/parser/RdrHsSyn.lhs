@@ -48,7 +48,9 @@ module RdrHsSyn (
 	RdrNameGenPragmas,
 	RdrNameInstancePragmas,
 	extractHsTyRdrNames, 
-	extractPatsTyVars, extractRuleBndrsTyVars,
+	extractHsTyRdrTyVars,
+	extractPatsTyVars, 
+	extractRuleBndrsTyVars,
  
 	mkOpApp, mkClassDecl, mkClassOpSig,
 
@@ -133,6 +135,9 @@ It's used when making the for-alls explicit.
 extractHsTyRdrNames :: HsType RdrName -> [RdrName]
 extractHsTyRdrNames ty = nub (extract_ty ty [])
 
+extractHsTyRdrTyVars	 :: RdrNameHsType -> [RdrName]
+extractHsTyRdrTyVars ty =  filter isRdrTyVar (extractHsTyRdrNames ty)
+
 extractRuleBndrsTyVars :: [RuleBndr RdrName] -> [RdrName]
 extractRuleBndrsTyVars bndrs = filter isRdrTyVar (nub (foldr go [] bndrs))
                            where
@@ -146,13 +151,14 @@ extract_ctxt ctxt acc = foldr extract_ass acc ctxt
                     where
                       extract_ass (cls, tys) acc = foldr extract_ty (cls : acc) tys
 
-extract_ty (MonoTyApp ty1 ty2)        acc = extract_ty ty1 (extract_ty ty2 acc)
-extract_ty (MonoListTy ty)    acc = extract_ty ty acc
-extract_ty (MonoTupleTy tys _)  acc = foldr extract_ty acc tys
-extract_ty (MonoFunTy ty1 ty2)        acc = extract_ty ty1 (extract_ty ty2 acc)
-extract_ty (MonoDictTy cls tys)       acc = foldr extract_ty (cls : acc) tys
-extract_ty (MonoUsgTy usg ty) acc = extract_ty ty acc
-extract_ty (MonoTyVar tv)       acc = tv : acc
+extract_ty (MonoTyApp ty1 ty2)          acc = extract_ty ty1 (extract_ty ty2 acc)
+extract_ty (MonoListTy ty)              acc = extract_ty ty acc
+extract_ty (MonoTupleTy tys _)          acc = foldr extract_ty acc tys
+extract_ty (MonoFunTy ty1 ty2)          acc = extract_ty ty1 (extract_ty ty2 acc)
+extract_ty (MonoDictTy cls tys)         acc = foldr extract_ty (cls : acc) tys
+extract_ty (MonoUsgTy usg ty)           acc = extract_ty ty acc
+extract_ty (MonoTyVar tv)               acc = tv : acc
+extract_ty (HsForAllTy Nothing ctxt ty) acc = extract_ctxt ctxt (extract_ty ty acc)
 extract_ty (HsForAllTy (Just tvs) ctxt ty) 
                                 acc = acc ++
                                       (filter (`notElem` locals) $
@@ -162,7 +168,7 @@ extract_ty (HsForAllTy (Just tvs) ctxt ty)
 
 
 extractPatsTyVars :: [RdrNamePat] -> [RdrName]
-extractPatsTyVars pats = nub (foldr extract_pat [] pats)
+extractPatsTyVars pats = filter isRdrTyVar (nub (foldr extract_pat [] pats))
 
 extract_pat (SigPatIn pat ty)	   acc = extract_ty ty acc
 extract_pat WildPatIn	      	   acc = acc

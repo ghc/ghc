@@ -182,7 +182,14 @@ checkPat e [] = case e of
 	ELazyPat e	   -> checkPat e [] `thenP` (returnP . LazyPatIn)
 	EAsPat n e	   -> checkPat e [] `thenP` (returnP . AsPatIn n)
         ExprWithTySig e t  -> checkPat e [] `thenP` \e ->
-			      returnP (SigPatIn e t)
+			      -- pattern signatures are parsed as sigtypes,
+			      -- but they aren't explicit forall points.  Hence
+			      -- we have to remove the implicit forall here.
+			      let t' = case t of 
+					  HsForAllTy Nothing [] ty -> ty
+					  other -> other
+			      in
+			      returnP (SigPatIn e t')
 
 	OpApp (HsVar n) (HsVar plus) _ (HsLit k@(HsInt _)) | plus == plus_RDR
 			   -> returnP (NPlusKPatIn n k)
