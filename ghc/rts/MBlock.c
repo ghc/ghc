@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.36 2002/11/05 09:31:37 simonmar Exp $
+ * $Id: MBlock.c,v 1.37 2002/11/05 22:31:53 wolfgang Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -120,8 +120,8 @@ my_mmap (void *addr, int size)
     if(!addr || err)	// try to allocate anywhere
 	err = vm_allocate(mach_task_self(),(vm_address_t*) &ret, size, TRUE);
 	
-    if(err)
-	ret = (void*) -1;
+    if(err) // don't know what the error codes mean exactly
+	barf("memory allocation failed (requested %d bytes)", size);
     else
 	vm_protect(mach_task_self(),ret,size,FALSE,VM_PROT_READ|VM_PROT_WRITE);
 #else
