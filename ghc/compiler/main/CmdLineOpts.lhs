@@ -388,9 +388,6 @@ defaultDynFlags = DynFlags {
   flags = [ 
 	    Opt_ImplicitPrelude,
 	    Opt_MonomorphismRestriction,
-	    Opt_Generics,
-			-- Generating the helper-functions for
-			-- generics is now on by default
 	    Opt_Strictness,
 			-- strictness is on by default, but this only
 			-- applies to -O.

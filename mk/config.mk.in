@@ -319,8 +319,13 @@ endif
 #
 # 	-O is pretty desirable, otherwise no inlining of prelude
 #		things (incl "+") happens when compiling with this compiler
+#
+#	-fgenerics switches on generation of support code for 
+#		derivable type classes.  This is now off by default,
+#		but we switch it on for the libraries so that we generate
+#		the code in case someone importing wants it
 
-GhcLibHcOpts=-O -Rghc-timing
+GhcLibHcOpts=-O -Rghc-timing -fgenerics
 
 # Win32 only: Enable the RTS and libraries to be built as DLLs
 DLLized=@EnableWin32DLLs@
