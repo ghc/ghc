@@ -406,7 +406,7 @@ Some Haskell-related discussion takes place in the Usenet newsgroup
 	  conditional code which tests for this value, however: since
 	  interfaces change on a day-to-day basis, and we don't have
 	  finer granularity in the values of
-	  <literal>__GLASGOW_HASKLL__</literal>, you should only
+	  <literal>__GLASGOW_HASKELL__</literal>, you should only
 	  conditionally compile using predicates which test whether
 	  <literal>__GLASGOW_HASKELL__</literal> is equal to, later
 	  than, or earlier than a given major release.</para>
