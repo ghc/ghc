@@ -96,7 +96,7 @@ bin2nat (One  : bs) = 2 * (bin2nat bs) + 1
 showBin :: Data t => t -> Bin
 
 showBin t
-  = if not (isPrimType myDataType) 
+  = if isAlgType myDataType
       then con2bin ++ concat (gmapQ showBin t)
       else showBin base
 
@@ -166,7 +166,7 @@ readBin = result
  where
 
   -- The worker, which we also use as type argument
-  result = if not (isPrimType myDataType)
+  result = if isAlgType myDataType
 
              then do bin <- readB (lengthNat (max - 1))
                      gunfoldR (bin2con bin) readBin

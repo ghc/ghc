@@ -18,13 +18,17 @@ data Data a =>
 
 -- Some terms and corresponding type representations
 myTerm     = undefined :: MyDataType Int
-myTypeRep  = typeOf myTerm
-myTyCon    = typerepTyCon myTypeRep
-myDataType = dataTypeOf myTerm
+myTypeRep  = typeOf myTerm		-- type representation in Typeable
+myTyCon    = typerepTyCon myTypeRep	-- type constructor via Typeable
+myDataType = dataTypeOf myTerm		-- datatype representation in Data
+myString1  = tyconString myTyCon	-- type constructor via Typeable
+myString2  = dataTypeCon myDataType	-- type constructor via Data
 
 -- Main function for testing
-main = print ( myTypeRep
-	     , myTyCon
-             , dataTyCon myDataType
-	     , dataTyMod myDataType
-             )
+main = print   ( myTypeRep
+	     , ( myDataType
+             , ( tyconModule myString1
+             , ( tyconUQname myString1
+             , ( tyconModule myString2
+             , ( tyconUQname myString2
+             ))))))

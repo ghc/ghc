@@ -47,13 +47,11 @@ instance (Data a, Data [a]) => Data (Nest a)
     fromConstr c = case conIndex c of
                      1 -> Box undefined
                      2 -> Wrap undefined
-    dataTypeOf x = nestDataType x
+    dataTypeOf _ = nestDataType
 
-boxConstr      = mkDataConstr 1 "Box"  Prefix
-wrapConstr     = mkDataConstr 2 "Wrap" Prefix
-
-nestDataType :: Typeable x => x -> DataType
-nestDataType x = mkDataType [boxConstr,wrapConstr] x
+boxConstr    = mkDataCon nestDataType "Box"  Prefix
+wrapConstr   = mkDataCon nestDataType "Wrap" Prefix
+nestDataType = mkDataType "Main.Nest" [boxConstr,wrapConstr]
 
 
 -- Test for compilation only

@@ -22,10 +22,6 @@ normal:
 ghci:
 	gmake TEST_HC=${stage2} WAY=ghci
 
-# Just do normal compilation for testing during development
-normal:
-	gmake WAY=normal
-
 # Should probably be reused from somewhere else
 clean:
 	find . -depth -name "core"       -exec rm -rf \{\} \;
