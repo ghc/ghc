@@ -375,11 +375,14 @@ Don't guess&mdash;look it up.
 
 <Para>
 Look for your function in the interface file, then for the third field
-in the pragma; it should say <Literal>&lowbar;S&lowbar; &lt;string&gt;</Literal>.  The <Literal>&lt;string&gt;</Literal>
-gives the strictness of the function's arguments.  <Function>L</Function> is lazy
-(bad), <Function>S</Function> and <Function>E</Function> are strict (good), <Function>P</Function> is &ldquo;primitive&rdquo; (good),
-<Function>U(...)</Function> is strict and
-&ldquo;unpackable&rdquo; (very good), and <Function>A</Function> is absent (very good).
+in the pragma; it should say <Literal>&lowbar;&lowbar;S
+&lt;string&gt;</Literal>.  The <Literal>&lt;string&gt;</Literal> gives
+the strictness of the function's arguments.  <Function>L</Function> is
+lazy (bad), <Function>S</Function> and <Function>E</Function> are
+strict (good), <Function>P</Function> is &ldquo;primitive&rdquo;
+(good), <Function>U(...)</Function> is strict and
+&ldquo;unpackable&rdquo; (very good), and <Function>A</Function> is
+absent (very good).
 </Para>
 
 <Para>
