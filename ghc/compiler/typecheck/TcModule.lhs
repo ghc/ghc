@@ -43,7 +43,7 @@ import TcTyClsDecls	( tcTyAndClassDecls )
 import CoreUnfold	( unfoldingTemplate, hasUnfolding )
 import Type		( funResultTy, splitForAllTys, openTypeKind )
 import Bag		( isEmptyBag )
-import ErrUtils		( printErrorsAndWarnings, dumpIfSet_dyn, showPass )
+import ErrUtils		( printErrorsAndWarnings, errorsFound, dumpIfSet_dyn, showPass )
 import Id		( idType, idUnfolding )
 import Module           ( Module )
 import Name		( Name, toRdrName )
@@ -51,7 +51,6 @@ import Name		( nameEnvElts, lookupNameEnv )
 import TyCon		( tyConGenInfo )
 import Util
 import BasicTypes       ( EP(..), Fixity )
-import Bag		( isEmptyBag )
 import Outputable
 import HscTypes		( PersistentCompilerState(..), HomeSymbolTable, 
 			  PackageTypeEnv, ModIface(..),
@@ -141,14 +140,14 @@ typecheck dflags pcs hst unqual thing_inside
  = do	{ showPass dflags "Typechecker";
 	; env <- initTcEnv hst (pcs_PTE pcs)
 
-	; (maybe_tc_result, (warns,errs)) <- initTc dflags env thing_inside
+	; (maybe_tc_result, errs) <- initTc dflags env thing_inside
 
-	; printErrorsAndWarnings unqual (errs,warns)
+	; printErrorsAndWarnings unqual errs
 
-	; if isEmptyBag errs then 
-             return maybe_tc_result
-           else 
+	; if errorsFound errs then 
              return Nothing 
+           else 
+             return maybe_tc_result
 	}
 \end{code}
 
