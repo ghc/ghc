@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Num.lhs,v 1.1 2001/06/28 14:15:03 simonmar Exp $
+% $Id: Num.lhs,v 1.2 2001/07/31 13:09:11 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -17,6 +17,15 @@ and the type
 
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
+
+#include "MachDeps.h"
+#if WORD_SIZE_IN_BYTES == 4
+#define LEFTMOST_BIT 2147483648
+#elif WORD_SIZE_IN_BYTES == 8
+#define LEFTMOST_BIT 9223372036854775808
+#else
+#error Please define LEFTMOST_BIT to be 2^(WORD_SIZE_IN_BYTES*8-1)
+#endif
 
 module GHC.Num where
 
@@ -130,7 +139,7 @@ toBig i@(J# _ _) = i
 
 \begin{code}
 quotRemInteger :: Integer -> Integer -> (Integer, Integer)
-quotRemInteger a@(S# (-2147483648#)) b = quotRemInteger (toBig a) b
+quotRemInteger a@(S# (-LEFTMOST_BIT#)) b = quotRemInteger (toBig a) b
 quotRemInteger (S# i) (S# j)
   = case quotRemInt (I# i) (I# j) of ( I# i, I# j ) -> ( S# i, S# j ) 
 quotRemInteger i1@(J# _ _) i2@(S# _) = quotRemInteger i1 (toBig i2)
@@ -140,7 +149,7 @@ quotRemInteger (J# s1 d1) (J# s2 d2)
 	  (# s3, d3, s4, d4 #)
 	    -> (J# s3 d3, J# s4 d4)
 
-divModInteger a@(S# (-2147483648#)) b = divModInteger (toBig a) b
+divModInteger a@(S# (-LEFTMOST_BIT#)) b = divModInteger (toBig a) b
 divModInteger (S# i) (S# j)
   = case divModInt (I# i) (I# j) of ( I# i, I# j ) -> ( S# i, S# j) 
 divModInteger i1@(J# _ _) i2@(S# _) = divModInteger i1 (toBig i2)
@@ -153,7 +162,7 @@ divModInteger (J# s1 d1) (J# s2 d2)
 remInteger :: Integer -> Integer -> Integer
 remInteger ia 0
   = error "Prelude.Integral.rem{Integer}: divide by 0"
-remInteger a@(S# (-2147483648#)) b = remInteger (toBig a) b
+remInteger a@(S# (-LEFTMOST_BIT#)) b = remInteger (toBig a) b
 remInteger (S# a) (S# b) = S# (remInt# a b)
 {- Special case doesn't work, because a 1-element J# has the range
    -(2^32-1) -- 2^32-1, whereas S# has the range -2^31 -- (2^31-1)
@@ -174,7 +183,7 @@ remInteger (J# sa a) (J# sb b)
 quotInteger :: Integer -> Integer -> Integer
 quotInteger ia 0
   = error "Prelude.Integral.quot{Integer}: divide by 0"
-quotInteger a@(S# (-2147483648#)) b = quotInteger (toBig a) b
+quotInteger a@(S# (-LEFTMOST_BIT#)) b = quotInteger (toBig a) b
 quotInteger (S# a) (S# b) = S# (quotInt# a b)
 {- Special case disabled, see remInteger above
 quotInteger (S# a) (J# sb b)
@@ -195,8 +204,8 @@ quotInteger (J# sa a) (J# sb b)
 \begin{code}
 gcdInteger :: Integer -> Integer -> Integer
 -- SUP: Do we really need the first two cases?
-gcdInteger a@(S# (-2147483648#)) b = gcdInteger (toBig a) b
-gcdInteger a b@(S# (-2147483648#)) = gcdInteger a (toBig b)
+gcdInteger a@(S# (-LEFTMOST_BIT#)) b = gcdInteger (toBig a) b
+gcdInteger a b@(S# (-LEFTMOST_BIT#)) = gcdInteger a (toBig b)
 gcdInteger (S# a) (S# b) = case gcdInt (I# a) (I# b) of { I# c -> S# c }
 gcdInteger ia@(S# 0#) ib@(J# 0# _) = error "GHC.Num.gcdInteger: gcd 0 0 is undefined"
 gcdInteger ia@(S# a)  ib@(J# sb b)
@@ -221,7 +230,7 @@ lcmInteger a b
         ab = abs b
 
 divExact :: Integer -> Integer -> Integer
-divExact a@(S# (-2147483648#)) b = divExact (toBig a) b
+divExact a@(S# (-LEFTMOST_BIT#)) b = divExact (toBig a) b
 divExact (S# a) (S# b) = S# (quotInt# a b)
 divExact (S# a) (J# sb b)
   = S# (quotInt# a (integer2Int# sb b))
@@ -310,7 +319,7 @@ instance  Num Integer  where
     fromInteger	x  =  x
 
     -- ORIG: abs n = if n >= 0 then n else -n
-    abs (S# (-2147483648#)) = 2147483648
+    abs (S# (-LEFTMOST_BIT#)) = LEFTMOST_BIT
     abs (S# i) = case abs (I# i) of I# j -> S# j
     abs n@(J# s d) = if (s >=# 0#) then n else J# (negateInt# s) d
 
@@ -344,7 +353,7 @@ timesInteger i1@(J# _ _) i2@(S# _) = i1 * toBig i2
 timesInteger i1@(S# _) i2@(J# _ _) = toBig i1 * i2
 timesInteger (J# s1 d1) (J# s2 d2) = case timesInteger# s1 d1 s2 d2 of (# s, d #) -> J# s d
 
-negateInteger (S# (-2147483648#)) = 2147483648
+negateInteger (S# (-LEFTMOST_BIT#)) = LEFTMOST_BIT
 negateInteger (S# i)		  = S# (negateInt# i)
 negateInteger (J# s d)		  = J# (negateInt# s) d
 \end{code}
