@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.66 2001/09/07 16:08:31 sewardj Exp $
+ * $Id: Linker.c,v 1.67 2001/09/12 14:53:39 sewardj Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -1717,12 +1717,12 @@ ocGetNames_ELF ( ObjectCode* oc )
             it, and set its .sh_offset field such that 
             ehdrC + .sh_offset == addr_of_zeroed_space.  */
          char* zspace = stgCallocBytes(1, shdr[i].sh_size, 
-                                       "ocGetNames_ELF(anonymous bss)");
+                                       "ocGetNames_ELF(BSS)");
          shdr[i].sh_offset = ((char*)zspace) - ((char*)ehdrC);
-         /*
+	 /*         
          fprintf(stderr, "BSS section at 0x%x, size %d\n", 
                          zspace, shdr[i].sh_size);
-         */
+	 */
       }
 
       /* fill in the section info */
@@ -1742,6 +1742,26 @@ ocGetNames_ELF ( ObjectCode* oc )
                                    "ocGetNames_ELF(oc->symbols)");
 
       for (j = 0; j < nent; j++) {
+
+         char  isLocal = FALSE; /* avoids uninit-var warning */
+         char* ad      = NULL;
+         char* nm      = strtab + stab[j].st_name;
+         int   secno   = stab[j].st_shndx;
+
+	 /* Figure out if we want to add it; if so, set ad to its
+            address.  Otherwise leave ad == NULL. */
+
+         if (secno == SHN_COMMON) {
+            isLocal = FALSE;
+            ad = stgCallocBytes(1, stab[j].st_size, "ocGetNames_ELF(COMMON)");
+	    /*
+            fprintf(stderr, "COMMON symbol, size %d name %s\n", 
+                            stab[j].st_size, nm);
+	    */
+	    /* Pointless to do addProddableBlock() for this area,
+               since the linker should never poke around in it. */
+	 }
+         else
          if ( ( ELF32_ST_BIND(stab[j].st_info)==STB_GLOBAL
                 || ELF32_ST_BIND(stab[j].st_info)==STB_LOCAL
               )
@@ -1756,33 +1776,39 @@ ocGetNames_ELF ( ObjectCode* oc )
                 ELF32_ST_TYPE(stab[j].st_info)==STT_NOTYPE 
               )
             ) {
-            char* nm;
-            char* ad; 
-	    int secno = stab[j].st_shndx;
 	    /* Section 0 is the undefined section, hence > and not >=. */
             ASSERT(secno > 0 && secno < ehdr->e_shnum);
-            nm = strtab + stab[j].st_name;
-            /*
+	    /*            
             if (shdr[secno].sh_type == SHT_NOBITS) {
-               fprintf(stderr, "bss symbol, size %d off %d name %s\n", 
-               stab[j].st_size, stab[j].st_value, nm);
+               fprintf(stderr, "   BSS symbol, size %d off %d name %s\n", 
+                               stab[j].st_size, stab[j].st_value, nm);
             }
             */
             ad = ehdrC + shdr[ secno ].sh_offset + stab[j].st_value;
-            ASSERT(nm != NULL);
-            ASSERT(ad != NULL);
-	    oc->symbols[j] = nm;
             if (ELF32_ST_BIND(stab[j].st_info)==STB_LOCAL) {
                IF_DEBUG(linker,belch( "addOTabName(LOCL): %10p  %s %s",
                                       ad, oc->fileName, nm ));
-               insertStrHashTable(oc->lochash, nm, ad);
+               isLocal = TRUE;
             } else {
                IF_DEBUG(linker,belch( "addOTabName(GLOB): %10p  %s %s",
                                       ad, oc->fileName, nm ));
-               insertStrHashTable(symhash, nm, ad);
+               isLocal = FALSE;
             }
          }
-         else {
+
+         /* And the decision is ... */
+
+         if (ad != NULL) {
+            ASSERT(nm != NULL);
+	    oc->symbols[j] = nm;
+            /* Acquire! */
+            if (isLocal) {
+               insertStrHashTable(oc->lochash, nm, ad);
+            } else {
+               insertStrHashTable(symhash, nm, ad);
+            }
+         } else {
+            /* Skip. */
             IF_DEBUG(linker,belch( "skipping `%s'", 
                                    strtab + stab[j].st_name ));
             /*
@@ -1796,6 +1822,7 @@ ocGetNames_ELF ( ObjectCode* oc )
             */
             oc->symbols[j] = NULL;
          }
+
       }
    }
 
