@@ -12,6 +12,10 @@ include $(TOP)/mk/boilerplate.mk
 
 # posix must be before misc.
 
+ifeq "$(GhcWithHscBuiltViaC)" "YES"
+SUBDIRS = std exts
+else
 SUBDIRS = std exts posix misc concurrent
+endif
 
 include $(TOP)/mk/target.mk
