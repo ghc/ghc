@@ -938,7 +938,7 @@ dnl    off_t, because it will affect the result of that test.
 AC_SYS_LARGEFILE
 
 dnl ** check for specific header (.h) files that we are interested in
-AC_CHECK_HEADERS([arpa/inet.h bfd.h ctype.h dirent.h dlfcn.h errno.h fcntl.h grp.h limits.h locale.h netdb.h netinet/in.h netinet/tcp.h nlist.h pthread.h pwd.h signal.h sys/mman.h sys/resource.h sys/socket.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/uio.h sys/un.h sys/utsname.h sys/wait.h termios.h time.h utime.h windows.h winsock.h])
+AC_CHECK_HEADERS([bfd.h ctype.h dirent.h dlfcn.h errno.h fcntl.h grp.h limits.h locale.h nlist.h pthread.h pwd.h signal.h sys/mman.h sys/resource.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/utsname.h sys/wait.h termios.h time.h utime.h windows.h winsock.h])
 
 AC_CHECK_HEADER([unistd.h], [AC_CHECK_FUNCS(lchown)])
 
@@ -1000,17 +1000,6 @@ AC_STRUCT_ST_BLKSIZE
 
 dnl ** do we have long longs?
 AC_CHECK_TYPES([long long])
-
-dnl ** check what fields struct msghdr contains
-AC_CHECK_MEMBERS([struct msghdr.msg_control, struct msghdr.msg_accrights], [], [], [#if HAVE_SYS_TYPES_H
-# include <sys/types.h>
-#endif
-#if HAVE_SYS_SOCKET_H
-# include <sys/socket.h>
-#endif
-#if HAVE_SYS_UIO_H
-# include <sys/uio.h>
-#endif])
 
 dnl ** what are the sizes of various types
 AC_CHECK_SIZEOF(char,               1)
@@ -1370,30 +1359,6 @@ case "$cv_func_usleep_return_type" in
 esac
 
 dnl --------------------------------------------------
-dnl * test for in_addr_t
-dnl --------------------------------------------------
-AC_MSG_CHECKING(for in_addr_t in netinet/in.h)
-AC_EGREP_HEADER(in_addr_t, netinet/in.h,
- [ AC_DEFINE([HAVE_IN_ADDR_T], [1], [Define to 1 if in_addr_t is available.]) AC_MSG_RESULT(yes) ],
- AC_MSG_RESULT(no))
-
-dnl --------------------------------------------------
-dnl * test for Linux sendfile(2)
-dnl --------------------------------------------------
-AC_MSG_CHECKING(for sendfile in sys/sendfile.h)
-AC_EGREP_HEADER(sendfile, sys/sendfile.h,
- [ AC_DEFINE([HAVE_LINUX_SENDFILE], [1], [Define to 1 if you have a Linux sendfile(2) implementation.]) AC_MSG_RESULT(yes) ],
- AC_MSG_RESULT(no))
-
-dnl --------------------------------------------------
-dnl * test for BSD sendfile(2)
-dnl --------------------------------------------------
-AC_MSG_CHECKING(for sendfile in sys/socket.h)
-AC_EGREP_HEADER(sendfile, sys/socket.h,
- [ AC_DEFINE([HAVE_BSD_SENDFILE], [1], [Define to 1 if you have a BSDish sendfile(2) implementation.]) AC_MSG_RESULT(yes) ],
- AC_MSG_RESULT(no))
-
-dnl --------------------------------------------------
 dnl * test for GTK+
 dnl --------------------------------------------------
 
@@ -1453,29 +1418,5 @@ we_have_sigpoll
 #endif
 ], AC_DEFINE([HAVE_SIGPOLL], [1], [Define to 1 if you have the sigpoll() function.]) haveSIGPOLL=yes, haveSIGPOLL=no)
 AC_MSG_RESULT([$haveSIGPOLL])
-
-AC_MSG_CHECKING([for _SC_GETGR_R_SIZE_MAX])
-AC_EGREP_CPP(we_have_that_sysconf_thing,
-[
-#include <unistd.h>
-#ifdef _SC_GETGR_R_SIZE_MAX
-we_have_that_sysconf_thing
-#endif
-],
-[AC_MSG_RESULT([yes])
-AC_DEFINE([HAVE_SC_GETGR_R_SIZE_MAX], [1], [Define to 1 if <unistd.h> defines _SC_GETGR_R_SIZE_MAX.])],
-[AC_MSG_RESULT([no])])
-
-AC_MSG_CHECKING([for _SC_GETPW_R_SIZE_MAX])
-AC_EGREP_CPP(we_have_that_sysconf_thing,
-[
-#include <unistd.h>
-#ifdef _SC_GETPW_R_SIZE_MAX
-we_have_that_sysconf_thing
-#endif
-],
-[AC_MSG_RESULT([yes])
-AC_DEFINE([HAVE_SC_GETPW_R_SIZE_MAX], [1], [Define to 1 if <unistd.h> defines _SC_GETPW_R_SIZE_MAX.])],
-[AC_MSG_RESULT([no])])
 
 AC_OUTPUT(mk/config.mk, echo timestamp > mk/stamp-h )
