@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.43 2003/05/30 09:19:39 simonpj Exp $
+# $Id: Makefile,v 1.44 2003/07/23 15:39:54 simonmar Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -57,9 +57,14 @@ SRC_HC_OPTS += -funbox-strict-fields
 # -----------------------------------------------------------------------------
 # PrimOpWrappers
 
+ifeq "$(BootingFromHc)" "YES"
+GHC/PrimopWrappers.hs:
+	touch GHC/PrimopWrappers.hs
+else
 GHC/PrimopWrappers.hs: $(GHC_COMPILER_DIR)/prelude/primops.txt
 	@$(RM) $@
 	$(GHC_GENPRIMOP) --make-haskell-wrappers < $< > $@
+endif
 
 boot :: GHC/PrimopWrappers.hs
 
