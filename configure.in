@@ -511,20 +511,6 @@ esac
 dnl ** does #! path/to/perl work? (sometimes it's too long...)
 FPTOOLS_SHEBANG_PERL
 
-dnl ** set up extra GCC options on Win32
-case $HostOS_CPP in
-cygwin32|mingw32)
-   STD_CC_OPTS="-mno-cygwin $CC_MWIN32_FLAG"
-   CFLAGS="$STD_CC_OPTS $CFLAGS"
-   CPPFLAGS="$STD_CC_OPTS $CPPFLAGS"
-   ;;
-*)
-   STD_CC_OPTS=""
-   ;;
-esac
-SRC_CC_OPTS="-O $STD_CC_OPTS"
-AC_SUBST(SRC_CC_OPTS)
-
 dnl ** look for GCC and find out which version
 dnl     Figure out which C compiler to use.  Gcc is preferred.
 dnl     If gcc, make sure it's at least 2.1
@@ -532,17 +518,17 @@ dnl
 AC_PROG_CC
 FPTOOLS_HAVE_GCC
 
-dnl ** does the C compiler support option -mwin32 ?
-FPTOOLS_CC_MWIN32
-
 dnl ** figure out how to invoke cpp directly (gcc -E is no good)
 AC_PROG_CPP
 
-dnl ** set up extra GCC options on Win32
-case $HostOS_CPP in
-cygwin32|mingw32)
-   CPP="$CPP $STD_CC_OPTS"
-esac
+dnl ** does the C compiler support the following options?
+FPTOOLS_CC_FLAG(-mwin32,CC_SUPPORTS_MWIN32)
+FPTOOLS_CC_FLAG(-mno-cygwin,CC_SUPPORTS_MNO_CYGWIN)
+
+EXTRA_CC_OPTS="$CC_SUPPORTS_MNO_CYGWIN $CC_SUPPORTS_MWIN32"
+SRC_CC_OPTS="-O $EXTRA_CC_OPTS"
+CPPFLAGS="$EXTRA_CC_OPTS $CPPFLAGS"
+AC_SUBST(SRC_CC_OPTS)
 
 dnl ** figure out how to do context diffs
 FPTOOLS_PROG_DIFF

@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.76 2001/06/28 11:47:03 simonmar Exp $
+dnl $Id: aclocal.m4,v 1.77 2001/06/30 00:00:49 sof Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -1066,19 +1066,20 @@ fi
 ])
 
 dnl
-dnl Check to see whether CC (gcc) supports the -mwin32 option.
+dnl Check to see whether CC (gcc) supports a particular option.
 dnl 
-AC_DEFUN(FPTOOLS_CC_MWIN32,
-[AC_CACHE_CHECK([whether $CC accepts -mwin32], ac_cv_cc_supports_mwin32,
+AC_DEFUN(FPTOOLS_CC_FLAG,
 [save_CFLAGS="$CFLAGS"
- CFLAGS="$CFLAGS -mwin32"
+AC_CACHE_CHECK([whether $CC accepts $1], [ac_cv_cc_$2],
+[CFLAGS="$CFLAGS $1"
  AC_LANG_C
- AC_TRY_COMPILE(,[int main(){return(0);}], ac_cv_cc_supports_mwin32=yes, ac_cv_cc_supports_mwin32=no)
- CFLAGS="$CFLAGS_save"])
-if test "$ac_cv_cc_supports_mwin32" = yes; then
-  CC_MWIN32_FLAG="-mwin32";
+ AC_TRY_COMPILE(,[int main(){return(0);}],
+                 [ac_cv_cc_$2=yes],
+		 [ac_cv_cc_$2=no])
+])
+if test "$ac_cv_cc_$2"x = "yesx"; then
+  $2=$extra_flag;
 else
-  CC_MWIN32_FLAG="";
+  $2=$extra_flag;
 fi;
-AC_SUBST(CC_MWIN32_FLAG)
 ])
