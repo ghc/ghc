@@ -33,6 +33,7 @@ import Foreign
 import Foreign.C
 import Control.Monad
 import GHC.IOBase
+#include "config.h"
 #endif
 
 #ifdef __HUGS__
