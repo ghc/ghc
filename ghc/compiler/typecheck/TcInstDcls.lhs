@@ -593,7 +593,7 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = binds })
 		 	 [(inst_tyvars', dfun_id, this_dict_id)] 
 		 	 inlines all_binds
     in
-    showLIE "instance" 		`thenM_`
+    showLIE (text "instance") 		`thenM_`
     returnM (main_bind `AndMonoBinds` prag_binds `AndMonoBinds` sc_binds_outer)
 
 
