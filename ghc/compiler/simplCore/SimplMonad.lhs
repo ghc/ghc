@@ -37,7 +37,7 @@ module SimplMonad (
 	-- Environments
 	SimplEnv, emptySimplEnv, getSubst, setSubst,
 	getSubstEnv, extendSubst, extendSubstList,
-	getInScope, setInScope, modifyInScope, addNewInScopeIds,
+	getInScope, setInScope, setInScopeSet, modifyInScope, addNewInScopeIds,
 	setSubstEnv, zapSubstEnv,
 
 	-- Floats
@@ -62,7 +62,7 @@ import VarEnv
 import VarSet
 import OrdList
 import qualified Subst
-import Subst		( Subst, mkSubst, substEnv, 
+import Subst		( Subst, emptySubst, substEnv, 
 			  InScopeSet, mkInScopeSet, substInScope,
 			  isInScope 
 			)
@@ -597,10 +597,10 @@ data SimplEnv
 	-- have a correctly-substituted type.  So we use a lookup in this
 	-- set to replace occurrences
 
-emptySimplEnv :: SimplifierMode -> [SimplifierSwitch] -> VarSet -> SimplEnv
-emptySimplEnv mode switches in_scope
-  = SimplEnv { seChkr = isAmongSimpl switches, seCC = subsumedCCS, seMode = mode,
-	       seSubst = mkSubst (mkInScopeSet in_scope) emptySubstEnv }
+emptySimplEnv :: SimplifierMode -> [SimplifierSwitch] -> SimplEnv
+emptySimplEnv mode switches
+  = SimplEnv { seChkr = isAmongSimpl switches, seCC = subsumedCCS, 
+	       seMode = mode, seSubst = emptySubst }
 	-- The top level "enclosing CC" is "SUBSUMED".
 
 ---------------------

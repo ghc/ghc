@@ -111,12 +111,12 @@ type FloatBinds    = [FloatBind]
 %************************************************************************
 
 \begin{code}
-floatOutwards :: DynFlags
-	      -> FloatOutSwitches
+floatOutwards :: FloatOutSwitches
+	      -> DynFlags
 	      -> UniqSupply 
 	      -> [CoreBind] -> IO [CoreBind]
 
-floatOutwards dflags float_sws us pgm
+floatOutwards float_sws dflags us pgm
   = do {
 	showPass dflags float_msg ;
 

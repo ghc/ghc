@@ -7,8 +7,7 @@
 module Rules (
 	RuleBase, emptyRuleBase, 
 	extendRuleBaseList, 
-	ruleBaseIds, getLocalRules,
-	pprRuleBase, ruleCheckProgram,
+	ruleBaseIds, pprRuleBase, ruleCheckProgram,
 
         lookupRule, addRule, addIdSpecialisations
     ) where
@@ -25,21 +24,20 @@ import Subst		( Subst, InScopeSet, mkInScopeSet, lookupSubst, extendSubst,
 			  substEnv, setSubstEnv, emptySubst, isInScope, emptyInScopeSet,
 			  bindSubstList, unBindSubstList, substInScope, uniqAway
 			)
-import Id		( Id, idIsFrom, idUnfolding, idSpecialisation, setIdSpecialisation ) 
+import Id		( Id, idUnfolding, idSpecialisation, setIdSpecialisation ) 
 import Var		( isId )
 import VarSet
 import VarEnv
 import TcType		( mkTyVarTy )
 import qualified TcType ( match )
 import BasicTypes	( Activation, CompilerPhase, isActive )
-import Module		( Module )
 
 import Outputable
 import FastString
 import Maybe		( isJust, isNothing, fromMaybe )
 import Util		( sortLt )
 import Bag
-import List		( isPrefixOf, partition )
+import List		( isPrefixOf )
 \end{code}
 
 
@@ -607,24 +605,6 @@ extendRuleBase (RuleBase rule_ids) (id, rule)
 	-- if not, use the Id from the incoming rule.  If may be a PrimOpId,
 	-- in which case it may have rules in its belly already.  Seems
 	-- dreadfully hackoid.
-
-getLocalRules :: Module -> RuleBase -> (IdSet,		-- Ids with local rules
-					RuleBase)	-- Non-local rules
--- Get the rules for locally-defined Ids out of the RuleBase
--- If we miss any rules for Ids defined here, then we end up
--- giving the local decl a new Unique (because the in-scope-set is (hackily) the
--- same as the non-local-rule-id set, so the Id looks as if it's in scope
--- and hence should be cloned), and now the binding for the class method 
--- doesn't have the same Unique as the one in the Class and the tc-env
---	Example:	class Foo a where
---			  op :: a -> a
---			{-# RULES "op" op x = x #-}
--- 
--- NB we can't use isLocalId, because isLocalId isn't true of class methods.
-getLocalRules this_mod (RuleBase ids)
-  = (mkVarSet local_ids, RuleBase (mkVarSet imp_ids))
-  where
-    (local_ids, imp_ids) = partition (idIsFrom this_mod) (varSetElems ids)
 
 pprRuleBase :: RuleBase -> SDoc
 pprRuleBase (RuleBase rules) = vcat [ pprTidyIdRules id | id <- varSetElems rules ]

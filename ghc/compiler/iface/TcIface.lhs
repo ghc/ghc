@@ -25,7 +25,7 @@ import Type		( liftedTypeKind, splitTyConApp,
 			  mkTyVarTys, mkGenTyConApp, mkTyVarTys, ThetaType, pprClassPred )
 import TypeRep		( Type(..), PredType(..) )
 import TyCon		( TyCon, tyConName )
-import HscTypes		( ExternalPackageState(..), PackageInstEnv, PackageRuleBase,
+import HscTypes		( ExternalPackageState(..), PackageInstEnv, 
 			  HscEnv, TyThing(..), implicitTyThings, typeEnvIds,
 			  ModIface(..), ModDetails(..), InstPool, ModGuts,
 			  TypeEnv, mkTypeEnv, extendTypeEnvList, lookupTypeEnv,
@@ -46,7 +46,7 @@ import IdInfo		( IdInfo, CafInfo(..), WorkerInfo(..),
 			  setArityInfo, setInlinePragInfo, setCafInfo, 
 			  vanillaIdInfo, newStrictnessInfo )
 import Class		( Class )
-import TyCon		( AlgTyConRhs(..), tyConDataCons, tyConTyVars, isTupleTyCon, mkForeignTyCon )
+import TyCon		( tyConDataCons, tyConTyVars, isTupleTyCon, mkForeignTyCon )
 import DataCon		( dataConWorkId, dataConExistentialTyVars, dataConArgTys )
 import TysWiredIn	( tupleCon )
 import Var		( TyVar, mkTyVar, tyVarKind )
@@ -60,7 +60,7 @@ import Outputable
 import SrcLoc		( noSrcLoc )
 import Util		( zipWithEqual, dropList, equalLength, zipLazy )
 import Maybes		( expectJust )
-import CmdLineOpts	( DynFlag(..), dopt )
+import CmdLineOpts	( DynFlag(..) )
 \end{code}
 
 This module takes
@@ -584,7 +584,8 @@ are in the type environment.  However, remember that typechecking a Rule may
 (as a side effect) augment the type envt, and so we may need to iterate the process.
 
 \begin{code}
-loadImportedRules :: HscEnv -> ModGuts -> IO PackageRuleBase
+loadImportedRules :: HscEnv -> ModGuts -> IO [IdCoreRule]
+-- Returns just the new rules added
 loadImportedRules hsc_env guts
   = initIfaceRules hsc_env guts $ do 
 	{ -- Get new rules
@@ -610,6 +611,7 @@ loadImportedRules hsc_env guts
 	-- typechecking one set of rules may bring in new things which enable
 	-- some more rules to come in.  But we call loadImportedRules several
 	-- times anyway, so I'm going to be lazy and ignore this.
+	; return core_rules
     }
 
 
