@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.35 2002/11/05 09:26:04 simonmar Exp $
+ * $Id: MBlock.c,v 1.36 2002/11/05 09:31:37 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -129,8 +129,16 @@ my_mmap (void *addr, int size)
 	       MAP_ANON | MAP_PRIVATE, -1, 0);
 #endif
 
+    if (ret == (void *)-1) {
+	if (errno == ENOMEM) {
+	    barf("out of memory (requested %d bytes)", size);
+	} else {
+	    barf("getMBlock: mmap failed");
+	}
+    }
+
     return ret;
-}    
+}
 
 // Implements the general case: allocate a chunk of memory of 'size'
 // mblocks.
@@ -145,9 +153,6 @@ gen_map_mblocks (int size)
     // it (unmap the rest).
     size += MBLOCK_SIZE;
     ret = my_mmap(0, size);
-    if (ret == (void *)-1) {
-	barf("gen_map_mblocks: mmap failed");
-    }
     
     // unmap the slop bits around the chunk we allocated
     slop = (W_)ret & MBLOCK_MASK;
@@ -159,6 +164,9 @@ gen_map_mblocks (int size)
 	barf("gen_map_mblocks: munmap failed");
     }
     
+    // ToDo: if we happened to get an aligned block, then don't
+    // unmap the excess, just use it.
+
     // next time, try after the block we just got.
     ret += MBLOCK_SIZE - slop;
     return ret;
@@ -181,14 +189,6 @@ getMBlocks(nat n)
       ret = gen_map_mblocks(size);
   } else {
       ret = my_mmap(next_request, size);
-  
-      if (ret == (void *)-1) {
-	  if (errno == ENOMEM) {
-	      barf("out of memory (requested %d bytes)", n * MBLOCK_SIZE);
-	  } else {
-	      barf("getMBlock: mmap failed");
-	  }
-      }
 
       if (((W_)ret & MBLOCK_MASK) != 0) {
 	  // misaligned block!
@@ -206,6 +206,7 @@ getMBlocks(nat n)
   }
 
   // Next time, we'll try to allocate right after the block we just got.
+  // ToDo: check that we haven't already grabbed the memory at next_request
   next_request = ret + size;
 
   IF_DEBUG(gc,fprintf(stderr,"Allocated %d megablock(s) at %p\n",n,ret));
