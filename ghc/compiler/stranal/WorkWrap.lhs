@@ -15,9 +15,9 @@ import CoreUnfold	( Unfolding, certainlySmallEnoughToInline, calcUnfoldingGuidan
 import CmdLineOpts	( opt_UnfoldingCreationThreshold )
 
 import CoreUtils	( coreExprType )
-import Id		( idWantsToBeINLINEd, getIdStrictness, mkWorkerId,
-			  addIdStrictness, addInlinePragma,
-			  GenId
+import Id		( getInlinePragma, getIdStrictness, mkWorkerId,
+			  addIdStrictness, addInlinePragma, 
+			  GenId, SYN_IE(Id)
 			)
 import IdInfo		( noIdInfo, addUnfoldInfo,  
 			  mkStrictnessInfo, addStrictnessInfo, StrictnessInfo(..)
@@ -185,9 +185,10 @@ tryWW	:: Id				-- The fn binder
 					-- wrapper.
 tryWW fn_id rhs
   | (certainlySmallEnoughToInline $
-     calcUnfoldingGuidance (idWantsToBeINLINEd fn_id) 
+     calcUnfoldingGuidance (getInlinePragma fn_id) 
 			  opt_UnfoldingCreationThreshold
-			  rhs)
+			  rhs
+    )
 	    -- No point in worker/wrappering something that is going to be
 	    -- INLINEd wholesale anyway.  If the strictness analyser is run
 	    -- twice, this test also prevents wrappers (which are INLINEd)
