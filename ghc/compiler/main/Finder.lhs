@@ -67,27 +67,27 @@ maybeHomeModule mod_name is_source = do
 
    let mod_str  = moduleNameUserString mod_name 
        basename = map (\c -> if c == '.' then '/' else c) mod_str
-          -- last chance: .hi-boot-<ver> and .hi-boot
-       hi_boot_ver = "hi-boot-" ++ cHscIfaceFileVersion
        
        std_exts =
-        [ (hisuf,
-	   \ _ fName path -> mkHiOnlyModuleLocn mod_name fName)
-	, ("hs",      
-	   \ _ fName path -> mkHomeModuleLocn mod_name path fName)
-	, ("lhs",
-	   \ _ fName path -> mkHomeModuleLocn mod_name path fName)
+        [ ("hs",   \ _ fName path -> mkHomeModuleLocn mod_name path fName)
+	, ("lhs",  \ _ fName path -> mkHomeModuleLocn mod_name path fName)
+	, (hisuf,  \ _ fName path -> mkHiOnlyModuleLocn mod_name fName)
 	]
+	-- look for the .hi file last, because if there's a source file about
+	-- we want to find it.
+
+        -- last chance: .hi-boot-<ver> and .hi-boot
+       hi_boot_ver = "hi-boot-" ++ cHscIfaceFileVersion
 
        boot_exts = 
-       		[ (hi_boot_ver, \ _ fName path -> mkHiOnlyModuleLocn mod_name fName)
-		, ("hi-boot", \ _ fName path -> mkHiOnlyModuleLocn mod_name fName)
-		]
+       	[ (hi_boot_ver, \ _ fName path -> mkHiOnlyModuleLocn mod_name fName)
+	, ("hi-boot",   \ _ fName path -> mkHiOnlyModuleLocn mod_name fName)
+	]
 
    searchPathExts  
-   		(map ((,) undefined) home_path)
-		basename
-		(if is_source then (boot_exts++std_exts) else std_exts ++ boot_exts)
+   	(map ((,) undefined) home_path)
+	basename
+	(if is_source then (boot_exts++std_exts) else std_exts ++ boot_exts)
 			-- for SOURCE imports, check the hi-boot extensions
 			-- before the source/iface ones, to avoid
 			-- creating circ Makefile deps.
