@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.17 2002/07/23 11:23:55 simonmar Exp $
+# $Id: package.mk,v 1.18 2002/09/25 10:32:23 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -23,7 +23,11 @@ $(PACKAGE).conf.installed : $(PACKAGE).conf.in
 # configuration needs updating if it was updated already in the last
 # second.
 #
-STAMP_PKG_CONF = stamp-pkg-conf
+# The stamp file goes in $(GHC_DRIVER_DIR), so that if someone happens
+# to 'make clean' in ghc without cleaning in libraries too, the packages
+# will be correctly re-installed.
+#
+STAMP_PKG_CONF = $(GHC_DRIVER_DIR)/stamp-pkg-conf-$(PACKAGE)
 CLEAN_FILES += $(STAMP_PKG_CONF)
 
 boot all :: $(STAMP_PKG_CONF)
