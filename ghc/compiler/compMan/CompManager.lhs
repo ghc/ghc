@@ -59,7 +59,7 @@ import Type		( tidyType )
 import VarEnv		( emptyTidyEnv )
 import UniqFM
 import Unique		( Uniquable )
-import Digraph		( SCC(..), stronglyConnComp, flattenSCC )
+import Digraph		( SCC(..), stronglyConnComp, flattenSCC, flattenSCCs )
 import ErrUtils		( showPass )
 import SysTools		( cleanTempFilesExcept )
 import Util
@@ -482,9 +482,13 @@ cmLoadModule cmstate1 rootnames
 
         let threaded2 = CmThreaded pcs1 hst1 hit1
 
+	-- clean up between compilations
+	let cleanup = cleanTempFilesExcept verb 
+			  (ppFilesFromSummaries (flattenSCCs upsweep_these))
+
         (upsweep_complete_success, threaded3, modsUpswept, newLis)
            <- upsweep_mods ghci_mode dflags valid_linkables reachable_from 
-                           threaded2 upsweep_these
+                           threaded2 cleanup upsweep_these
 
         let ui3 = add_to_ui valid_linkables newLis
         let (CmThreaded pcs3 hst3 hit3) = threaded3
@@ -816,6 +820,7 @@ upsweep_mods :: GhciMode
              -> UnlinkedImage         -- valid linkables
              -> (ModuleName -> [ModuleName])  -- to construct downward closures
              -> CmThreaded            -- PCS & HST & HIT
+	     -> IO ()		      -- how to clean up unwanted tmp files
              -> [SCC ModSummary]      -- mods to do (the worklist)
                                       -- ...... RETURNING ......
              -> IO (Bool{-complete success?-},
@@ -823,17 +828,17 @@ upsweep_mods :: GhciMode
                     [ModSummary],     -- mods which succeeded
                     [Linkable])       -- new linkables
 
-upsweep_mods ghci_mode dflags oldUI reachable_from threaded 
+upsweep_mods ghci_mode dflags oldUI reachable_from threaded cleanup
      []
    = return (True, threaded, [], [])
 
-upsweep_mods ghci_mode dflags oldUI reachable_from threaded 
+upsweep_mods ghci_mode dflags oldUI reachable_from threaded cleanup
      ((CyclicSCC ms):_)
    = do hPutStrLn stderr ("Module imports form a cycle for modules:\n\t" ++
                           unwords (map (moduleNameUserString.name_of_summary) ms))
         return (False, threaded, [], [])
 
-upsweep_mods ghci_mode dflags oldUI reachable_from threaded 
+upsweep_mods ghci_mode dflags oldUI reachable_from threaded cleanup
      ((AcyclicSCC mod):mods)
    = do --case threaded of
         --   CmThreaded pcsz hstz hitz
@@ -842,12 +847,16 @@ upsweep_mods ghci_mode dflags oldUI reachable_from threaded
         (threaded1, maybe_linkable) 
            <- upsweep_mod ghci_mode dflags oldUI threaded mod 
                           (reachable_from (name_of_summary mod))
+
+	-- remove unwanted tmp files between compilations
+	cleanup
+
         case maybe_linkable of
            Just linkable 
               -> -- No errors; do the rest
                  do (restOK, threaded2, modOKs, linkables) 
                        <- upsweep_mods ghci_mode dflags oldUI reachable_from 
-                                       threaded1 mods
+                                       threaded1 cleanup mods
                     return (restOK, threaded2, mod:modOKs, linkable:linkables)
            Nothing -- we got a compilation error; give up now
               -> return (False, threaded1, [], [])
