@@ -17,7 +17,7 @@ import FiniteMap
 import List 	( sortBy )
 import Char	( toUpper, toLower )
 import Monad	( when )
-import IOExts
+--import IOExts
 
 import Html
 import qualified Html
@@ -521,7 +521,7 @@ ppHsDataDecl doc_map summary is_newty decl@(HsDataDecl loc ctx nm args cons drv)
 	   = isNothing (lookupFM doc_map nm) && all field_has_no_doc fields
 
  	field_has_no_doc (HsFieldDecl nms _ _)
-	   = trace (show nms ++ show (map (isNothing . lookupFM doc_map) nms)) $ all isNothing (map (lookupFM doc_map) nms)
+	   = all isNothing (map (lookupFM doc_map) nms)
 
 
 ppShortConstr :: Bool -> HsConDecl -> Html
