@@ -12,7 +12,7 @@ module Packages (
 
 	PackageName,		-- Instance of Outputable
 	mkPackageName, packageNameString,
-	preludePackage, rtsPackage, stdPackage, haskell98Package,	-- :: PackageName
+	preludePackage, rtsPackage, haskell98Package,	-- :: PackageName
 
 	PackageConfigMap, emptyPkgMap, extendPkgMap, lookupPkg
     )
