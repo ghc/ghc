@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoTables.h,v 1.19 2000/04/05 15:27:59 simonmar Exp $
+ * $Id: InfoTables.h,v 1.20 2001/03/02 16:12:18 simonmar Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -117,14 +117,15 @@ typedef struct {
 
 /* The type flags provide quick access to certain properties of a closure. */
 
-#define _HNF (1<<0)  /* head normal form?  */
+#define _HNF (1<<0)  /* head normal form?    */
 #define _BTM (1<<1)  /* bitmap-style layout? */
-#define _NS  (1<<2)  /* non-sparkable      */
-#define _STA (1<<3)  /* static?            */
-#define _THU (1<<4)  /* thunk?             */
-#define _MUT (1<<5)  /* mutable?           */
-#define _UPT (1<<6)  /* unpointed?         */
-#define _SRT (1<<7)  /* has an SRT?        */
+#define _NS  (1<<2)  /* non-sparkable        */
+#define _STA (1<<3)  /* static?              */
+#define _THU (1<<4)  /* thunk?               */
+#define _MUT (1<<5)  /* mutable?             */
+#define _UPT (1<<6)  /* unpointed?           */
+#define _SRT (1<<7)  /* has an SRT?          */
+#define _IND (1<<8)  /* is an indirection?   */
 
 #define isSTATIC(flags)    ((flags) &_STA)
 #define isMUTABLE(flags)   ((flags) &_MUT)
@@ -139,13 +140,13 @@ extern StgWord16 closure_flags[];
 
 #define closure_HNF(c)          (  closureFlags(c) & _HNF)
 #define closure_BITMAP(c)       (  closureFlags(c) & _BTM)
-#define closure_NON_SPARK(c)    ( (closureFlags(c) & _NS))
 #define closure_SHOULD_SPARK(c) (!(closureFlags(c) & _NS))
 #define closure_STATIC(c)       (  closureFlags(c) & _STA)
 #define closure_THUNK(c)        (  closureFlags(c) & _THU)
 #define closure_MUTABLE(c)      (  closureFlags(c) & _MUT)
 #define closure_UNPOINTED(c)    (  closureFlags(c) & _UPT)
 #define closure_SRT(c)          (  closureFlags(c) & _SRT)
+#define closure_IND(c)          (  closureFlags(c) & _IND)
 
 /* same as above but for info-ptr rather than closure */
 #define ipFlags(ip)             (closure_flags[ip->type])
@@ -158,6 +159,7 @@ extern StgWord16 closure_flags[];
 #define ip_MUTABLE(ip)      	 (  ipFlags(ip) & _MUT)
 #define ip_UNPOINTED(ip)    	 (  ipFlags(ip) & _UPT)
 #define ip_SRT(ip)          	 (  ipFlags(ip) & _SRT)
+#define ip_IND(ip)          	 (  ipFlags(ip) & _IND)
 
 /* -----------------------------------------------------------------------------
    Info Tables
