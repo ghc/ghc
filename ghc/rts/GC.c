@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.118 2001/08/08 14:14:08 simonmar Exp $
+ * $Id: GC.c,v 1.119 2001/08/10 10:52:12 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1338,9 +1338,10 @@ evacuate_large(StgPtr p)
   bdescr *bd = Bdescr(p);
   step *stp;
 
-  // should point to the beginning of the block 
-  ASSERT(((W_)p & BLOCK_MASK) == 0);
-  
+  // object must be at the beginning of the block (or be a ByteArray)
+  ASSERT(get_itbl((StgClosure *)p)->type == ARR_WORDS ||
+	 (((W_)p & BLOCK_MASK) == 0));
+
   // already evacuated? 
   if (bd->flags & BF_EVACUATED) { 
     /* Don't forget to set the failed_to_evac flag if we didn't get
