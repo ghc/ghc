@@ -254,11 +254,11 @@ mkGenericBinds tcs = andMonoBindList [ mkTyConGenBinds tc
 
 mkTyConGenBinds :: TyCon -> MonoBinds RdrName
 mkTyConGenBinds tycon
-  = FunMonoBind to_RDR False {- Not infix -}
+  = FunMonoBind from_RDR False {- Not infix -}
 		[mkSimpleHsAlt pat rhs | (pat,rhs) <- from_alts]
 		loc
 	`AndMonoBinds`
-    FunMonoBind from_RDR False 
+    FunMonoBind to_RDR False 
 		[mkSimpleHsAlt (VarPat to_arg) to_body] loc
   where
     loc	     = getSrcLoc tycon
