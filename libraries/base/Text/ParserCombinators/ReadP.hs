@@ -40,6 +40,7 @@ module Text.ParserCombinators.ReadP
   choice,     -- :: [ReadP a] -> ReadP a
   
   -- * Running a parser
+  ReadS,      -- :: *; = String -> [(a,String)]
   readP_to_S, -- :: ReadP a -> ReadS a
   readS_to_P, -- :: ReadS a -> ReadP a
   
@@ -59,8 +60,11 @@ import Data.Char( isSpace )
 infixr 5 +++, <++
 
 #ifdef __GLASGOW_HASKELL__
--- We define a local version of ReadS here,
--- because its "real" definition site is in GHC.Read
+------------------------------------------------------------------------
+-- ReadS
+
+-- | A parser for a type @a@, represented as a function that takes a
+-- 'String' and returns a list of possible parses @(a,'String')@ pairs.
 type ReadS a = String -> [(a,String)]
 #endif
 

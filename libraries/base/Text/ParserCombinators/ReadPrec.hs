@@ -47,6 +47,7 @@ module Text.ParserCombinators.ReadPrec
 
 import Text.ParserCombinators.ReadP
   ( ReadP
+  , ReadS
   , readP_to_S
   , readS_to_P
   )
@@ -135,12 +136,6 @@ choice ps = foldr (+++) pfail ps
 
 -- ---------------------------------------------------------------------------
 -- Converting between ReadPrec and Read
-
-#ifdef __GLASGOW_HASKELL__
--- We define a local version of ReadS here,
--- because its "real" definition site is in GHC.Read
-type ReadS a = String -> [(a,String)]
-#endif
 
 readPrec_to_P :: ReadPrec a -> (Int -> ReadP a)
 readPrec_to_P (P f) = f

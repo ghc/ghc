@@ -49,6 +49,7 @@ import qualified Text.ParserCombinators.ReadP as P
 
 import Text.ParserCombinators.ReadP
   ( ReadP
+  , ReadS
   , readP_to_S
   )
 
@@ -89,18 +90,11 @@ readParen b g   =  if b then mandatory else optional
 
 %*********************************************************
 %*							*
-\subsection{The @Read@ class and @ReadS@ type}
+\subsection{The @Read@ class}
 %*							*
 %*********************************************************
 
 \begin{code}
-------------------------------------------------------------------------
--- ReadS
-
--- | A parser for a type @a@, represented as a function that takes a
--- 'String' and returns a list of possible parses @(a,'String')@ pairs.
-type ReadS a = String -> [(a,String)]
-
 ------------------------------------------------------------------------
 -- class Read
 
