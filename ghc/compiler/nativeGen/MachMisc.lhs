@@ -31,7 +31,7 @@ module MachMisc (
 #if i386_TARGET_ARCH
 #endif
 #if sparc_TARGET_ARCH
-	RI(..), riZero
+	RI(..), riZero, fpRelEA, moveSp, fPair
 #endif
     ) where
 
@@ -45,6 +45,9 @@ import Literal		( mkMachInt, Literal(..) )
 import MachRegs		( stgReg, callerSaves, RegLoc(..),
 			  Imm(..), Reg(..), 
 			  MachRegsAddr(..)
+#                         if sparc_TARGET_ARCH
+                          ,fp, sp
+#                         endif
 			)
 import PrimRep		( PrimRep(..) )
 import SMRep		( SMRep(..) )
@@ -52,7 +55,7 @@ import Stix		( StixTree(..), StixReg(..), CodeSegment )
 import Panic		( panic )
 import Char		( isDigit )
 import GlaExts		( word2Int#, int2Word#, shiftRL#, and#, (/=#) )
-import Outputable	( text )
+import Outputable	( text, pprPanic, ppr )
 import IOExts		( trace )
 \end{code}
 
@@ -639,5 +642,21 @@ riZero (RIImm (ImmInteger 0))	    = True
 riZero (RIReg (RealReg 0))          = True
 riZero _			    = False
 
+-- Calculate the effective address which would be used by the
+-- corresponding fpRel sequence.  fpRel is in MachRegs.lhs,
+-- alas -- can't have fpRelEA here because of module dependencies.
+fpRelEA :: Int -> Reg -> Instr
+fpRelEA n dst
+   = ADD False False fp (RIImm (ImmInt (n * BYTES_PER_WORD))) dst
+
+-- Code to shift the stack pointer by n words.
+moveSp :: Int -> Instr
+moveSp n
+   = ADD False False sp (RIImm (ImmInt (n * BYTES_PER_WORD))) sp
+
+-- Produce the second-half-of-a-double register given the first half.
+fPair :: Reg -> Reg
+fPair (RealReg n) | n >= 32 && n `mod` 2 == 0  = RealReg (n+1)
+fPair other = pprPanic "fPair(sparc NCG)" (ppr other)
 #endif {- sparc_TARGET_ARCH -}
 \end{code}

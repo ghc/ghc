@@ -150,6 +150,7 @@ regUsage :: Instr -> RegUsage
 
 interesting (VirtualRegI _)  = True
 interesting (VirtualRegF _)  = True
+interesting (VirtualRegD _)  = True
 interesting (RealReg (I# i)) = _IS_TRUE_(freeReg i)
 
 #if alpha_TARGET_ARCH
@@ -313,9 +314,6 @@ regUsage instr = case instr of
     usageM (OpReg reg)    = mkRU [reg] [reg]
     usageM (OpAddr ea)    = mkRU (use_EA ea) []
 
-    -- caller-saves registers
-    callClobberedRegs = [eax,ecx,edx,fake0,fake1,fake2,fake3,fake4,fake5]
-
     -- Registers defd when an operand is written.
     def_W (OpReg reg)  = [reg]
     def_W (OpAddr ea)  = []
@@ -348,38 +346,36 @@ hasFixedEDX instr
 #if sparc_TARGET_ARCH
 
 regUsage instr = case instr of
-    LD sz addr reg  	-> usage (regAddr addr, [reg])
-    ST sz reg addr  	-> usage (reg : regAddr addr, [])
-    ADD x cc r1 ar r2 	-> usage (r1 : regRI ar, [r2])
-    SUB x cc r1 ar r2 	-> usage (r1 : regRI ar, [r2])
-    AND b r1 ar r2  	-> usage (r1 : regRI ar, [r2])
-    ANDN b r1 ar r2 	-> usage (r1 : regRI ar, [r2])
-    OR b r1 ar r2   	-> usage (r1 : regRI ar, [r2])
-    ORN b r1 ar r2  	-> usage (r1 : regRI ar, [r2])
-    XOR b r1 ar r2  	-> usage (r1 : regRI ar, [r2])
-    XNOR b r1 ar r2 	-> usage (r1 : regRI ar, [r2])
-    SLL r1 ar r2    	-> usage (r1 : regRI ar, [r2])
-    SRL r1 ar r2    	-> usage (r1 : regRI ar, [r2])
-    SRA r1 ar r2    	-> usage (r1 : regRI ar, [r2])
+    LD    sz addr reg  	-> usage (regAddr addr, [reg])
+    ST    sz reg addr  	-> usage (reg : regAddr addr, [])
+    ADD   x cc r1 ar r2	-> usage (r1 : regRI ar, [r2])
+    SUB   x cc r1 ar r2	-> usage (r1 : regRI ar, [r2])
+    AND   b r1 ar r2  	-> usage (r1 : regRI ar, [r2])
+    ANDN  b r1 ar r2 	-> usage (r1 : regRI ar, [r2])
+    OR    b r1 ar r2   	-> usage (r1 : regRI ar, [r2])
+    ORN   b r1 ar r2  	-> usage (r1 : regRI ar, [r2])
+    XOR   b r1 ar r2  	-> usage (r1 : regRI ar, [r2])
+    XNOR  b r1 ar r2 	-> usage (r1 : regRI ar, [r2])
+    SLL   r1 ar r2    	-> usage (r1 : regRI ar, [r2])
+    SRL   r1 ar r2    	-> usage (r1 : regRI ar, [r2])
+    SRA   r1 ar r2    	-> usage (r1 : regRI ar, [r2])
     SETHI imm reg   	-> usage ([], [reg])
-    FABS s r1 r2    	-> usage ([r1], [r2])
-    FADD s r1 r2 r3 	-> usage ([r1, r2], [r3])
-    FCMP e s r1 r2  	-> usage ([r1, r2], [])
-    FDIV s r1 r2 r3 	-> usage ([r1, r2], [r3])
-    FMOV s r1 r2    	-> usage ([r1], [r2])
-    FMUL s r1 r2 r3 	-> usage ([r1, r2], [r3])
-    FNEG s r1 r2    	-> usage ([r1], [r2])
+    FABS  s r1 r2    	-> usage ([r1], [r2])
+    FADD  s r1 r2 r3 	-> usage ([r1, r2], [r3])
+    FCMP  e s r1 r2  	-> usage ([r1, r2], [])
+    FDIV  s r1 r2 r3 	-> usage ([r1, r2], [r3])
+    FMOV  s r1 r2    	-> usage ([r1], [r2])
+    FMUL  s r1 r2 r3 	-> usage ([r1, r2], [r3])
+    FNEG  s r1 r2    	-> usage ([r1], [r2])
     FSQRT s r1 r2   	-> usage ([r1], [r2])
-    FSUB s r1 r2 r3 	-> usage ([r1, r2], [r3])
+    FSUB  s r1 r2 r3 	-> usage ([r1, r2], [r3])
     FxTOy s1 s2 r1 r2 	-> usage ([r1], [r2])
 
     -- We assume that all local jumps will be BI/BF.  JMP must be out-of-line.
-    JMP addr 	    	-> noUsage
+    JMP   addr 	    	-> usage (regAddr addr, [])
 
-    -- I don't understand this terminal vs non-terminal distinction for
-    -- CALLs is.  Fix.  JRS, 000616.
-    CALL _ n True   	-> error "nativeGen(sparc): unimp regUsage CALL"
-    CALL _ n False  	-> error "nativeGen(sparc): unimp regUsage CALL"
+    CALL  _ n True   	-> noUsage
+    CALL  _ n False  	-> usage (argRegs n, callClobberedRegs)
 
     _ 	    	    	-> noUsage
   where
@@ -439,10 +435,9 @@ findReservedRegs instrs
     error "findReservedRegs: alpha"
 #endif
 #if sparc_TARGET_ARCH
-  = --[[NCG_Reserved_I1, NCG_Reserved_I2,
-    --  NCG_Reserved_F1, NCG_Reserved_F2,
-    --  NCG_Reserved_D1, NCG_Reserved_D2]]
-    error "findReservedRegs: sparc"
+  = [[NCG_SpillTmp_I1, NCG_SpillTmp_I2, 
+      NCG_SpillTmp_D1, NCG_SpillTmp_D2,
+      NCG_SpillTmp_F1, NCG_SpillTmp_F2]]
 #endif
 #if i386_TARGET_ARCH
   -- We can use %fake4 and %fake5 safely for float temps.
@@ -535,9 +530,20 @@ insnFuture insn
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if sparc_TARGET_ARCH
 
-    -- We assume that all local jumps will be BI/BF.  JMP must be out-of-line.
+    -- We assume that all local jumps will be BI/BF.
+    BI ALWAYS _ (ImmCLbl clbl) -> Branch clbl
+    BI other  _ (ImmCLbl clbl) -> NextOrBranch clbl
+    BI other  _ _ -> panic "nativeGen(sparc):insnFuture(BI)"
 
-    boring -> error "nativeGen(sparc): unimp insnFuture"
+    BF ALWAYS _ (ImmCLbl clbl) -> Branch clbl
+    BF other  _ (ImmCLbl clbl) -> NextOrBranch clbl
+    BF other  _ _ -> panic "nativeGen(sparc):insnFuture(BF)"
+
+    -- JMP and CALL(terminal) must be out-of-line.
+    JMP _         -> NoFuture
+    CALL _ _ True -> NoFuture
+
+    boring -> Next
 
 #endif {- sparc_TARGET_ARCH -}
 \end{code}
@@ -752,8 +758,11 @@ StixInteger) use this as a temp location.  Leave 8 words (ie, 64 bytes
 for a 64-bit arch) of slop.
 
 \begin{code}
+spillSlotSize :: Int
+spillSlotSize = IF_ARCH_alpha( 8, IF_ARCH_sparc( 8, IF_ARCH_i386( 12, )))
+
 maxSpillSlots :: Int
-maxSpillSlots = (rESERVED_C_STACK_BYTES - 64) `div` 12
+maxSpillSlots = ((rESERVED_C_STACK_BYTES - 64) `div` spillSlotSize) - 1
 
 -- convert a spill slot number to a *byte* offset, with no sign:
 -- decide on a per arch basis whether you are spilling above or below
@@ -761,7 +770,7 @@ maxSpillSlots = (rESERVED_C_STACK_BYTES - 64) `div` 12
 spillSlotToOffset :: Int -> Int
 spillSlotToOffset slot
    | slot >= 0 && slot < maxSpillSlots
-   = 64 + 12 * slot
+   = 64 + spillSlotSize * slot
    | otherwise
    = pprPanic "spillSlotToOffset:" 
               (text "invalid spill location: " <> int slot)
@@ -791,8 +800,13 @@ spillReg vreg_to_slot_map delta dyn vreg
                         else MOV L (OpReg dyn) (OpAddr (spRel off_w))
 
 	{-SPARC: spill below frame pointer leaving 2 words/spill-}
-	,IF_ARCH_sparc( ST (error "get sz from regClass vreg") 
-                           dyn (fpRel (- (off `div` 4)))
+	,IF_ARCH_sparc( 
+                        let off_w = 1 + (off `div` 4)
+                            sz = case regClass vreg of
+                                    RcInteger -> W
+                                    RcFloat   -> F
+                                    RcDouble  -> DF
+                        in ST sz dyn (fpRel (- off_w))
         ,)))
 
    
@@ -802,12 +816,19 @@ loadReg vreg_to_slot_map delta vreg dyn
         off     = spillSlotToOffset slot_no
     in
 	 IF_ARCH_alpha( LD  sz dyn (spRel (- (off `div` 8)))
+
 	,IF_ARCH_i386 ( let off_w = (off-delta) `div` 4
                         in
                         if   regClass vreg == RcFloating
                         then GLD F80 (spRel off_w) dyn
                         else MOV L (OpAddr (spRel off_w)) (OpReg dyn)
-	,IF_ARCH_sparc( LD  (error "get sz from regClass vreg")
-                            (fpRel (- (off `div` 4))) dyn
-	,)))
+
+	,IF_ARCH_sparc( 
+                        let off_w = 1 + (off `div` 4)
+                            sz = case regClass vreg of
+                                   RcInteger -> W
+                                   RcFloat   -> F
+                                   RcDouble  -> DF
+                        in LD sz (fpRel (- off_w)) dyn
+        ,)))
 \end{code}

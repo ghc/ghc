@@ -16,7 +16,7 @@ module MachRegs (
 
         RegClass(..), regClass,
 	Reg(..), isRealReg, isVirtualReg,
-        allocatableRegs,
+        allocatableRegs, argRegs, allArgRegs, callClobberedRegs,
 
 	Imm(..),
 	MachRegsAddr(..),
@@ -47,7 +47,7 @@ module MachRegs (
 #if sparc_TARGET_ARCH
 	, fits13Bits
 	, fpRel, gReg, iReg, lReg, oReg, largeOffsetError
-	, fp, g0, o0, f0
+	, fp, sp, g0, g1, g2, o0, f0, f6, f8, f26, f27
 	
 #endif
     ) where
@@ -76,6 +76,7 @@ data Imm
                              -- Bool==True ==> in a different DLL
   | ImmLit	SDoc    -- Simple string
   | ImmIndex    CLabel Int
+  | ImmFloat	Rational
   | ImmDouble	Rational
   IF_ARCH_sparc(
   | LO Imm		    -- Possible restrictions...
@@ -150,13 +151,8 @@ fits8Bits i = i >= -256 && i < 256
 #endif
 
 #if sparc_TARGET_ARCH
-{-# SPECIALIZE
-    fits13Bits :: Int -> Bool
-  #-}
-{-# SPECIALIZE
-    fits13Bits :: Integer -> Bool
-  #-}
 
+{-# SPECIALIZE fits13Bits :: Int -> Bool, Integer -> Bool #-}
 fits13Bits :: Integral a => a -> Bool
 fits13Bits x = x >= -4096 && x < 4096
 
@@ -261,50 +257,74 @@ Virtual regs can be of either class, so that info is attached.
 
 data RegClass 
    = RcInteger 
-   | RcFloating
+   | RcFloat
+   | RcDouble
      deriving Eq
 
 data Reg
    = RealReg     Int
    | VirtualRegI Unique
    | VirtualRegF Unique
+   | VirtualRegD Unique
+
+unRealReg (RealReg i) = i
+unRealReg vreg        = pprPanic "unRealReg on VirtualReg" (ppr vreg)
 
 mkVReg :: Unique -> PrimRep -> Reg
 mkVReg u pk
-   = if isFloatingRep pk then VirtualRegF u else VirtualRegI u
+#if sparc_TARGET_ARCH
+   = case pk of
+        FloatRep  -> VirtualRegF u
+        DoubleRep -> VirtualRegD u
+        other     -> VirtualRegI u
+#else
+   = if isFloatingRep pk then VirtualRegD u else VirtualRegI u
+#endif
 
 isVirtualReg (RealReg _)     = False
 isVirtualReg (VirtualRegI _) = True
 isVirtualReg (VirtualRegF _) = True
+isVirtualReg (VirtualRegD _) = True
 isRealReg = not . isVirtualReg
 
 getNewRegNCG :: PrimRep -> NatM Reg
 getNewRegNCG pk
-   = if   isFloatingRep pk 
-     then getUniqueNat `thenNat` \ u -> returnNat (VirtualRegF u)
-     else getUniqueNat `thenNat` \ u -> returnNat (VirtualRegI u)
+   = getUniqueNat `thenNat` \ u -> returnNat (mkVReg u pk)
 
 instance Eq Reg where
    (==) (RealReg i1)     (RealReg i2)     = i1 == i2
    (==) (VirtualRegI u1) (VirtualRegI u2) = u1 == u2
    (==) (VirtualRegF u1) (VirtualRegF u2) = u1 == u2
+   (==) (VirtualRegD u1) (VirtualRegD u2) = u1 == u2
    (==) reg1             reg2             = False
 
 instance Ord Reg where
    compare (RealReg i1)     (RealReg i2)     = compare i1 i2
    compare (RealReg _)      (VirtualRegI _)  = LT
    compare (RealReg _)      (VirtualRegF _)  = LT
+   compare (RealReg _)      (VirtualRegD _)  = LT
+
    compare (VirtualRegI _)  (RealReg _)      = GT
    compare (VirtualRegI u1) (VirtualRegI u2) = compare u1 u2
    compare (VirtualRegI _)  (VirtualRegF _)  = LT
+   compare (VirtualRegI _)  (VirtualRegD _)  = LT
+
    compare (VirtualRegF _)  (RealReg _)      = GT
    compare (VirtualRegF _)  (VirtualRegI _)  = GT
    compare (VirtualRegF u1) (VirtualRegF u2) = compare u1 u2
+   compare (VirtualRegF _)  (VirtualRegD _)  = LT
+
+   compare (VirtualRegD _)  (RealReg _)      = GT
+   compare (VirtualRegD _)  (VirtualRegI _)  = GT
+   compare (VirtualRegD _)  (VirtualRegF _)  = GT
+   compare (VirtualRegD u1) (VirtualRegD u2) = compare u1 u2
+
 
 instance Show Reg where
     showsPrec _ (RealReg i)     = showString (showReg i)
     showsPrec _ (VirtualRegI u) = showString "%vI_"  . shows u
     showsPrec _ (VirtualRegF u) = showString "%vF_"  . shows u
+    showsPrec _ (VirtualRegD u) = showString "%vD_"  . shows u
 
 instance Outputable Reg where
     ppr r = text (show r)
@@ -313,6 +333,7 @@ instance Uniquable Reg where
     getUnique (RealReg i)     = mkPseudoUnique2 i
     getUnique (VirtualRegI u) = u
     getUnique (VirtualRegF u) = u
+    getUnique (VirtualRegD u) = u
 \end{code}
 
 ** Machine-specific Reg stuff: **
@@ -371,9 +392,10 @@ fake3 = RealReg 11
 fake4 = RealReg 12
 fake5 = RealReg 13
 
-regClass (RealReg i)     = if i < 8 then RcInteger else RcFloating
+regClass (RealReg i)     = if i < 8 then RcInteger else RcDouble
 regClass (VirtualRegI u) = RcInteger
-regClass (VirtualRegF u) = RcFloating
+regClass (VirtualRegF u) = RcFloat
+regClass (VirtualRegD u) = RcDouble
 
 regNames 
    = ["%eax", "%ebx", "%ecx", "%edx", "%esi", "%edi", "%ebp", "%esp", 
@@ -391,9 +413,11 @@ showReg n
 The SPARC has 64 registers of interest; 32 integer registers and 32
 floating point registers.  The mapping of STG registers to SPARC
 machine registers is defined in StgRegs.h.  We are, of course,
-prepared for any eventuality.  When (if?) the sparc nativegen is 
-ever revived, we should just treat it as if it has 16 floating
-regs, and use them in pairs.  
+prepared for any eventuality.
+
+The whole fp-register pairing thing on sparcs is a huge nuisance.  See
+fptools/ghc/includes/MachRegs.h for a description of what's going on
+here.
 
 \begin{code}
 #if sparc_TARGET_ARCH
@@ -405,24 +429,45 @@ lReg x = (16 + x)
 iReg x = (24 + x)
 fReg x = (32 + x)
 
--- CHECK THIS
-regClass (RealReg i)     = if i < 32 then RcInteger else RcFloating
-regClass (VirtualRegI u) = RcInteger
-regClass (VirtualRegF u) = RcFloating
+nCG_FirstFloatReg :: Int
+nCG_FirstFloatReg = unRealReg NCG_FirstFloatReg
 
--- FIX THIS
+regClass (VirtualRegI u) = RcInteger
+regClass (VirtualRegF u) = RcFloat
+regClass (VirtualRegD u) = RcDouble
+regClass (RealReg i) | i < 32                = RcInteger 
+                     | i < nCG_FirstFloatReg = RcDouble
+                     | otherwise             = RcFloat
+
 showReg :: Int -> String
 showReg n
-   = if   n >= 0 && n < 64
-     then "%sparc_real_reg_" ++ show n
-     else "%unknown_sparc_real_reg_" ++ show n
+   | n >= 0  && n < 8   = "%g" ++ show n
+   | n >= 8  && n < 16  = "%o" ++ show (n-8)
+   | n >= 16 && n < 24  = "%l" ++ show (n-16)
+   | n >= 24 && n < 32  = "%i" ++ show (n-24)
+   | n >= 32 && n < 64  = "%f" ++ show (n-32)
+   | otherwise          = "%unknown_sparc_real_reg_" ++ show n
 
-g0, fp, sp, o0, f0 :: Reg
-g0 = RealReg (gReg 0)
-fp = RealReg (iReg 6)
-sp = RealReg (oReg 6)
-o0 = RealReg (oReg 0)
-f0 = RealReg (fReg 0)
+g0, g1, g2, fp, sp, o0, f0, f1, f6, f8, f22, f26, f27 :: Reg
+
+f6  = RealReg (fReg 6)
+f8  = RealReg (fReg 8)
+f22 = RealReg (fReg 22)
+f26 = RealReg (fReg 26)
+f27 = RealReg (fReg 27)
+
+
+-- g0 is useful for codegen; is always zero, and writes to it vanish.
+g0  = RealReg (gReg 0)
+g1  = RealReg (gReg 1)
+g2  = RealReg (gReg 2)
+
+-- FP, SP, int and float return (from C) regs.
+fp  = RealReg (iReg 6)
+sp  = RealReg (oReg 6)
+o0  = RealReg (oReg 0)
+f0  = RealReg (fReg 0)
+f1  = RealReg (fReg 1)
 
 #endif
 \end{code}
@@ -513,16 +558,17 @@ names in the header files.  Gag me with a spoon, eh?
 #define i5 29
 #define i6 30
 #define i7 31
-#define f0 32
-#define f1 33
-#define f2 34
-#define f3 35
-#define f4 36
-#define f5 37
-#define f6 38
-#define f7 39
-#define f8 40
-#define f9 41
+
+#define f0  32
+#define f1  33
+#define f2  34
+#define f3  35
+#define f4  36
+#define f5  37
+#define f6  38
+#define f7  39
+#define f8  40
+#define f9  41
 #define f10 42
 #define f11 43
 #define f12 44
@@ -545,6 +591,7 @@ names in the header files.  Gag me with a spoon, eh?
 #define f29 61
 #define f30 62
 #define f31 63
+
 #endif
 \end{code}
 
@@ -748,19 +795,15 @@ magicIdRegMaybe _		   	= Nothing
 
 \begin{code}
 -------------------------------
-#if 0
-freeRegs :: [Reg]
-freeRegs
-  = freeMappedRegs IF_ARCH_alpha( [0..63],
-		   IF_ARCH_i386(  [0..13],
-		   IF_ARCH_sparc( [0..63],)))
-#endif
 -- allMachRegs is the complete set of machine regs.
 allMachRegNos :: [Int]
 allMachRegNos
    = IF_ARCH_alpha( [0..63],
      IF_ARCH_i386(  [0..13],
-     IF_ARCH_sparc( [0..63],)))
+     IF_ARCH_sparc( ([0..31]
+                     ++ [f0,f2 .. nCG_FirstFloatReg-1]
+                     ++ [nCG_FirstFloatReg .. f31]),
+                   )))
 -- allocatableRegs is allMachRegNos with the fixed-use regs removed.
 allocatableRegs :: [Reg]
 allocatableRegs
@@ -769,10 +812,9 @@ allocatableRegs
 
 
 -------------------------------
-#if 0
 callClobberedRegs :: [Reg]
 callClobberedRegs
-  = freeMappedRegs
+  =
 #if alpha_TARGET_ARCH
     [0, 1, 2, 3, 4, 5, 6, 7, 8,
      16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
@@ -781,58 +823,67 @@ callClobberedRegs
      fReg 24, fReg 25, fReg 26, fReg 27, fReg 28, fReg 29, fReg 30]
 #endif {- alpha_TARGET_ARCH -}
 #if i386_TARGET_ARCH
-    [{-none-}]
+    -- caller-saves registers
+    [eax,ecx,edx,fake0,fake1,fake2,fake3,fake4,fake5]
 #endif {- i386_TARGET_ARCH -}
 #if sparc_TARGET_ARCH
-    ( oReg 7 :
-      [oReg i | i <- [0..5]] ++
-      [gReg i | i <- [1..7]] ++
-      [fReg i | i <- [0..31]] )
+    map RealReg 
+        ( oReg 7 :
+          [oReg i | i <- [0..5]] ++
+          [gReg i | i <- [1..7]] ++
+          [fReg i | i <- [0..31]] )
 #endif {- sparc_TARGET_ARCH -}
-#endif
 
 -------------------------------
-#if 0
+-- argRegs is the set of regs which are read for an n-argument call to C.
+-- For archs which pass all args on the stack (x86), is empty.
+-- Sparc passes up to the first 6 args in regs.
+-- Dunno about Alpha.
 argRegs :: Int -> [Reg]
 
-argRegs 0 = []
 #if i386_TARGET_ARCH
-argRegs _ = panic "MachRegs.argRegs: doesn't work on I386"
-#else
+argRegs _ = panic "MachRegs.argRegs(x86): should not be used!"
+#endif
+
 #if alpha_TARGET_ARCH
+argRegs 0 = []
 argRegs 1 = freeMappedRegs [16, fReg 16]
 argRegs 2 = freeMappedRegs [16, 17, fReg 16, fReg 17]
 argRegs 3 = freeMappedRegs [16, 17, 18, fReg 16, fReg 17, fReg 18]
 argRegs 4 = freeMappedRegs [16, 17, 18, 19, fReg 16, fReg 17, fReg 18, fReg 19]
 argRegs 5 = freeMappedRegs [16, 17, 18, 19, 20, fReg 16, fReg 17, fReg 18, fReg 19, fReg 20]
 argRegs 6 = freeMappedRegs [16, 17, 18, 19, 20, 21, fReg 16, fReg 17, fReg 18, fReg 19, fReg 20, fReg 21]
+argRegs _ = panic "MachRegs.argRegs(alpha): don't know about >6 arguments!"
 #endif {- alpha_TARGET_ARCH -}
+
 #if sparc_TARGET_ARCH
-argRegs 1 = freeMappedRegs (map oReg [0])
-argRegs 2 = freeMappedRegs (map oReg [0,1])
-argRegs 3 = freeMappedRegs (map oReg [0,1,2])
-argRegs 4 = freeMappedRegs (map oReg [0,1,2,3])
-argRegs 5 = freeMappedRegs (map oReg [0,1,2,3,4])
-argRegs 6 = freeMappedRegs (map oReg [0,1,2,3,4,5])
+argRegs 0 = []
+argRegs 1 = map (RealReg . oReg) [0]
+argRegs 2 = map (RealReg . oReg) [0,1]
+argRegs 3 = map (RealReg . oReg) [0,1,2]
+argRegs 4 = map (RealReg . oReg) [0,1,2,3]
+argRegs 5 = map (RealReg . oReg) [0,1,2,3,4]
+argRegs 6 = map (RealReg . oReg) [0,1,2,3,4,5]
+argRegs _ = panic "MachRegs.argRegs(sparc): don't know about >6 arguments!"
 #endif {- sparc_TARGET_ARCH -}
-argRegs _ = panic "MachRegs.argRegs: don't know about >6 arguments!"
-#endif {- i386_TARGET_ARCH -}
-#endif
+
+
 
 -------------------------------
-
-#if 0
+-- all of the arg regs ??
 #if alpha_TARGET_ARCH
 allArgRegs :: [(Reg, Reg)]
-
 allArgRegs = [(realReg i, realReg (fReg i)) | i <- [16..21]]
 #endif {- alpha_TARGET_ARCH -}
 
 #if sparc_TARGET_ARCH
 allArgRegs :: [Reg]
-
-allArgRegs = map realReg [oReg i | i <- [0..5]]
+allArgRegs = map RealReg [oReg i | i <- [0..5]]
 #endif {- sparc_TARGET_ARCH -}
+
+#if linux_TARGET_ARCH
+allArgRegs :: [Reg]
+allArgRegs = panic "MachRegs.allArgRegs(x86): should not be used!"
 #endif
 \end{code}
 
@@ -859,6 +910,8 @@ freeReg ILIT(g6) = _FALSE_  --	%g6 is reserved (ABI).
 freeReg ILIT(g7) = _FALSE_  --	%g7 is reserved (ABI).
 freeReg ILIT(i6) = _FALSE_  --	%i6 is our frame pointer.
 freeReg ILIT(o6) = _FALSE_  --	%o6 is our stack pointer.
+freeReg ILIT(f0) = _FALSE_  --  %f0/%f1 are the C fp return registers.
+freeReg ILIT(f1) = _FALSE_
 #endif
 
 #ifdef REG_Base
@@ -921,15 +974,5 @@ freeReg ILIT(REG_Hp)   = _FALSE_
 #ifdef REG_HpLim
 freeReg ILIT(REG_HpLim) = _FALSE_
 #endif
-freeReg n
-  -- we hang onto two double regs for dedicated
-  -- use; this is not necessary on Alphas and
-  -- may not be on other non-SPARCs.
-#ifdef REG_D1
-  | n _EQ_ (ILIT(REG_D1) _ADD_ ILIT(1)) = _FALSE_
-#endif
-#ifdef REG_D2
-  | n _EQ_ (ILIT(REG_D2) _ADD_ ILIT(1)) = _FALSE_
-#endif
-  | otherwise = _TRUE_
+freeReg n               = _TRUE_
 \end{code}

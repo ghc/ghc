@@ -59,11 +59,13 @@ runRegAllocate
     -> [Instr]
 
 runRegAllocate regs find_reserve_regs instrs
-  = case simpleAlloc of
+  = --trace ("runRegAllocate: " ++ show regs) (
+    case simpleAlloc of
        Just simple -> --trace "SIMPLE" 
                       simple
        Nothing     -> --trace "GENERAL"
                       (tryGeneral reserves)
+    --)
   where
     tryGeneral [] 
        = error "nativeGen: spilling failed.  Workaround: compile with -fvia-C.\n"
@@ -137,7 +139,8 @@ doSimpleAlloc available_real_regs instrs
                                             (i2:ris_done) is
                        where
                           isFloatingOrReal reg
-                             = isRealReg reg || regClass reg == RcFloating
+                             = isRealReg reg || regClass reg == RcFloat
+                                             || regClass reg == RcDouble
 
                           rds_l = regSetToList rds
                           wrs_l = regSetToList wrs
@@ -222,7 +225,7 @@ doGeneralAlloc all_regs reserve_regs instrs
               ++ " using " 
               ++ showSDoc (hsep (map ppr reserve_regs))
 
-#        ifdef NCG_DEBUG
+#        if 1 /* ifdef DEBUG */
          maybetrace msg x = trace msg x
 #        else
          maybetrace msg x = x

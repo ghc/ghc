@@ -216,8 +216,15 @@ Here we handle top-level things, like @CCodeBlock@s and
   = returnUs (\xs -> table ++ xs)
   where
     table = StData PtrRep [StCLbl (infoTableLabelFromCI cl_info)] : 
-	    map (\amode -> StData (getAmodeRep amode) [a2stix amode]) amodes ++
+	    map do_one_amode amodes ++
 	    [StData PtrRep (padding_wds ++ static_link)]
+
+    do_one_amode amode 
+       = StData (promote_to_word (getAmodeRep amode)) [a2stix amode]
+
+    -- We need to promote any item smaller than a word to a word
+    promote_to_word CharRep = WordRep
+    promote_to_word other   = other
 
     -- always at least one padding word: this is the static link field
     -- for the garbage collector.

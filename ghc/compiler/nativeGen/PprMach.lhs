@@ -26,7 +26,7 @@ import Outputable
 
 import ST
 import MutableArray
-import Char		( ord )
+import Char		( chr, ord )
 \end{code}
 
 %************************************************************************
@@ -377,14 +377,14 @@ pprInstr (DELTA d)
 
 pprInstr (SEGMENT TextSegment)
     =  IF_ARCH_alpha(ptext SLIT("\t.text\n\t.align 3") {-word boundary-}
-      ,IF_ARCH_sparc(ptext SLIT("\t.text\n\t.align 4") {-word boundary-}
+      ,IF_ARCH_sparc(ptext SLIT(".text\n\t.align 4") {-word boundary-}
       ,IF_ARCH_i386((text ".text\n\t.align 4,0x90") {-needs per-OS variation!-}
       ,)))
 
 pprInstr (SEGMENT DataSegment)
     = ptext
 	 IF_ARCH_alpha(SLIT("\t.data\n\t.align 3")
-	,IF_ARCH_sparc(SLIT("\t.data\n\t.align 8") {-<8 will break double constants -}
+	,IF_ARCH_sparc(SLIT(".data\n\t.align 8") {-<8 will break double constants -}
 	,IF_ARCH_i386(SLIT(".data\n\t.align 4")
 	,)))
 
@@ -399,7 +399,7 @@ pprInstr (LABEL clab)
 	    hcat [ptext
 			 IF_ARCH_alpha(SLIT("\t.globl\t")
 		        ,IF_ARCH_i386(SLIT(".globl ")
-			,IF_ARCH_sparc(SLIT("\t.global\t")
+			,IF_ARCH_sparc(SLIT(".global\t")
 			,)))
 			, pp_lab, char '\n'],
 	pp_lab,
@@ -410,6 +410,9 @@ pprInstr (ASCII False{-no backslash conversion-} str)
   = hcat [ ptext SLIT("\t.asciz "), char '\"', text str, char '"' ]
 
 pprInstr (ASCII True str)
+#if 0
+  -- The Solaris assembler doesn't understand \x escapes in
+  -- strings.
   = asciify str
   where
     asciify :: String -> SDoc
@@ -423,47 +426,51 @@ pprInstr (ASCII True str)
          in  this $$ asciify rest
     asciify_char :: Char -> String
     asciify_char c = '\\' : 'x' : hshow (ord c)
+#endif
+  = vcat (map do1 (str ++ [chr 0]))
+    where
+       do1 :: Char -> SDoc
+       do1 c = text "\t.byte\t0x" <> text (hshow (ord c))
 
-    hshow :: Int -> String
-    hshow n | n >= 0 && n <= 255
-            = [ tab !! (n `div` 16), tab !! (n `mod` 16)]
-    tab = "0123456789abcdef"
-
+       hshow :: Int -> String
+       hshow n | n >= 0 && n <= 255
+               = [ tab !! (n `div` 16), tab !! (n `mod` 16)]
+       tab = "0123456789ABCDEF"
 
 
 pprInstr (DATA s xs)
   = vcat (concatMap (ppr_item s) xs)
     where
+
 #if alpha_TARGET_ARCH
             ppr_item = error "ppr_item on Alpha"
-#if 0
-            This needs to be fixed.
-	    B  -> SLIT("\t.byte\t")
-	    BU -> SLIT("\t.byte\t")
-	    Q  -> SLIT("\t.quad\t")
-	    TF -> SLIT("\t.t_floating\t")
-#endif
 #endif
 #if sparc_TARGET_ARCH
-            ppr_item = error "ppr_item on Sparc"
-#if 0
-            This needs to be fixed.
-	    B  -> SLIT("\t.byte\t")
-	    BU -> SLIT("\t.byte\t")
-	    W  -> SLIT("\t.word\t")
-    	    DF -> SLIT("\t.double\t")
-#endif
-#endif
-#if i386_TARGET_ARCH
+        -- copy n paste of x86 version
 	ppr_item B  x = [text "\t.byte\t" <> pprImm x]
-	ppr_item L  x = [text "\t.long\t" <> pprImm x]
-	ppr_item F  (ImmDouble r)
+	ppr_item W  x = [text "\t.long\t" <> pprImm x]
+	ppr_item F  (ImmFloat r)
            = let bs = floatToBytes (fromRational r)
              in  map (\b -> text "\t.byte\t" <> pprImm (ImmInt b)) bs
     	ppr_item DF (ImmDouble r)
            = let bs = doubleToBytes (fromRational r)
              in  map (\b -> text "\t.byte\t" <> pprImm (ImmInt b)) bs
+#endif
+#if i386_TARGET_ARCH
+	ppr_item B  x = [text "\t.byte\t" <> pprImm x]
+	ppr_item L  x = [text "\t.long\t" <> pprImm x]
+	ppr_item F  (ImmFloat r)
+           = let bs = floatToBytes (fromRational r)
+             in  map (\b -> text "\t.byte\t" <> pprImm (ImmInt b)) bs
+    	ppr_item DF (ImmDouble r)
+           = let bs = doubleToBytes (fromRational r)
+             in  map (\b -> text "\t.byte\t" <> pprImm (ImmInt b)) bs
+#endif
 
+        -- floatToBytes and doubleToBytes convert to the host's byte
+        -- order.  Providing that we're not cross-compiling for a 
+        -- target with the opposite endianness, this should work ok
+        -- on all targets.
         floatToBytes :: Float -> [Int]
         floatToBytes f
            = runST (do
@@ -491,8 +498,6 @@ pprInstr (DATA s xs)
                 i7 <- readCharArray arr 7
                 return (map ord [i0,i1,i2,i3,i4,i5,i6,i7])
              )
-
-#endif
 
 -- fall through to rest of (machine-specific) pprInstr...
 \end{code}
@@ -1345,61 +1350,69 @@ pprCondInstr name cond arg
 -- reads (bytearrays).
 --
 
+-- Translate to the following:
+--    add g1,g2,g1
+--    ld  [g1],%fn
+--    ld  [g1+4],%f(n+1)
+--    sub g1,g2,g1           -- to restore g1
 pprInstr (LD DF (AddrRegReg g1 g2) reg)
-  = hcat [
-	ptext SLIT("\tadd\t"), pprReg g1,comma,pprReg g2,comma,pprReg g1, char '\n',
-	pp_ld_lbracket, pprReg g1, pp_rbracket_comma, pprReg reg, char '\n',
-	pp_ld_lbracket, pprReg g1, ptext SLIT("+4]"), comma, pprReg (fPair reg)
+  = vcat [
+       hcat [ptext SLIT("\tadd\t"), pprReg g1,comma,pprReg g2,comma,pprReg g1],
+       hcat [pp_ld_lbracket, pprReg g1, pp_rbracket_comma, pprReg reg],
+       hcat [pp_ld_lbracket, pprReg g1, ptext SLIT("+4]"), comma, pprReg (fPair reg)],
+       hcat [ptext SLIT("\tsub\t"), pprReg g1,comma,pprReg g2,comma,pprReg g1]
     ]
 
+-- Translate to
+--    ld  [addr],%fn
+--    ld  [addr+4],%f(n+1)
 pprInstr (LD DF addr reg) | maybeToBool off_addr
-  = hcat [
-	pp_ld_lbracket,
-	pprAddr addr,
-	pp_rbracket_comma,
-	pprReg reg,
-
-	char '\n',
-	pp_ld_lbracket,
-	pprAddr addr2,
-	pp_rbracket_comma,
-	pprReg (fPair reg)
+  = vcat [
+       hcat [pp_ld_lbracket, pprAddr addr, pp_rbracket_comma, pprReg reg],
+       hcat [pp_ld_lbracket, pprAddr addr2, pp_rbracket_comma,pprReg (fPair reg)]
     ]
   where
     off_addr = addrOffset addr 4
     addr2 = case off_addr of Just x -> x
 
+
 pprInstr (LD size addr reg)
   = hcat [
-	ptext SLIT("\tld"),
-	pprSize size,
-	char '\t',
-	lbrack,
-	pprAddr addr,
-	pp_rbracket_comma,
-	pprReg reg
+       ptext SLIT("\tld"),
+       pprSize size,
+       char '\t',
+       lbrack,
+       pprAddr addr,
+       pp_rbracket_comma,
+       pprReg reg
     ]
 
 -- The same clumsy hack as above
 
+-- Translate to the following:
+--    add g1,g2,g1
+--    st  %fn,[g1]
+--    st  %f(n+1),[g1+4]
+--    sub g1,g2,g1           -- to restore g1
 pprInstr (ST DF reg (AddrRegReg g1 g2))
- = hcat [
-	ptext SLIT("\tadd\t"),
-		      pprReg g1,comma,pprReg g2,comma,pprReg g1, char '\n',
-	ptext SLIT("\tst\t"),    
-	      pprReg reg, pp_comma_lbracket, pprReg g1,
-	ptext SLIT("]\n\tst\t"), 
-	      pprReg (fPair reg), pp_comma_lbracket, pprReg g1, ptext SLIT("+4]")
+ = vcat [
+       hcat [ptext SLIT("\tadd\t"), pprReg g1,comma,pprReg g2,comma,pprReg g1],
+       hcat [ptext SLIT("\tst\t"), pprReg reg, pp_comma_lbracket, 
+             pprReg g1,	rbrack],
+       hcat [ptext SLIT("\tst\t"), pprReg (fPair reg), pp_comma_lbracket,
+             pprReg g1, ptext SLIT("+4]")],
+       hcat [ptext SLIT("\tsub\t"), pprReg g1,comma,pprReg g2,comma,pprReg g1]
     ]
 
+-- Translate to
+--    st  %fn,[addr]
+--    st  %f(n+1),[addr+4]
 pprInstr (ST DF reg addr) | maybeToBool off_addr 
- = hcat [
-	ptext SLIT("\tst\t"),
-	pprReg reg, pp_comma_lbracket,	pprAddr addr,
-
-	ptext SLIT("]\n\tst\t"),
-	pprReg (fPair reg), pp_comma_lbracket,
-	pprAddr addr2, rbrack
+ = vcat [
+      hcat [ptext SLIT("\tst\t"), pprReg reg, pp_comma_lbracket, 
+            pprAddr addr, rbrack],
+      hcat [ptext SLIT("\tst\t"), pprReg (fPair reg), pp_comma_lbracket,
+            pprAddr addr2, rbrack]
     ]
   where
     off_addr = addrOffset addr 4
@@ -1411,13 +1424,13 @@ pprInstr (ST DF reg addr) | maybeToBool off_addr
 
 pprInstr (ST size reg addr)
   = hcat [
-	ptext SLIT("\tst"),
-	pprStSize size,
-	char '\t',
-	pprReg reg,
-	pp_comma_lbracket,
-	pprAddr addr,
-	rbrack
+       ptext SLIT("\tst"),
+       pprStSize size,
+       char '\t',
+       pprReg reg,
+       pp_comma_lbracket,
+       pprAddr addr,
+       rbrack
     ]
 
 pprInstr (ADD x cc reg1 ri reg2)
@@ -1536,11 +1549,6 @@ pprInstr (CALL imm n _)
 
 Continue with SPARC-only printing bits and bobs:
 \begin{code}
--- Get rid of this fPair nonsense, don't reimplement it.  It's an
--- entirely unnecessary complication.  I just put this here so it will 
--- at least compile on Sparcs.  JRS, 000616.
-fPair = error "nativeGen(sparc): unimp fPair"
-
 pprRI :: RI -> SDoc
 pprRI (RIReg r) = pprReg r
 pprRI (RIImm r) = pprImm r

@@ -53,6 +53,7 @@ data StixTree
     -- We can tag the leaves with constants/immediates.
 
   | StInt	Integer	    -- ** add Kind at some point
+  | StFloat	Rational
   | StDouble	Rational
   | StString	FAST_STRING
   | StCLbl	CLabel	    -- labels that we might index into
@@ -136,6 +137,7 @@ pprStixTree t
    = case t of
        StSegment cseg   -> paren (ppCodeSegment cseg)
        StInt i          -> paren (integer i)
+       StFloat rat      -> paren (text "Float" <+> rational rat)
        StDouble	rat     -> paren (text "Double" <+> rational rat)
        StString str     -> paren (text "Str" <+> ptext str)
        StComment str    -> paren (text "Comment" <+> ptext str)
@@ -268,6 +270,7 @@ stixCountTempUses u t
 
         StSegment _      -> 0
         StInt _          -> 0
+        StFloat _        -> 0
         StDouble _       -> 0
         StString _       -> 0
         StCLbl _         -> 0
@@ -311,6 +314,7 @@ stixMapUniques f t
 
         StSegment _      -> t
         StInt _          -> t
+        StFloat _        -> t
         StDouble _       -> t
         StString _       -> t
         StCLbl _         -> t

@@ -95,6 +95,7 @@ stmt2Instrs stmt = case stmt of
 
 	getData (StInt i)        = returnNat (nilOL, ImmInteger i)
 	getData (StDouble d)     = returnNat (nilOL, ImmDouble d)
+	getData (StFloat d)      = returnNat (nilOL, ImmFloat d)
 	getData (StCLbl l)       = returnNat (nilOL, ImmCLbl l)
 	getData (StString s)     =
 	    getNatLabelNCG 	    	    `thenNat` \ lbl ->
@@ -128,6 +129,7 @@ derefDLL tree
                 StInd pk addr          -> StInd pk (qq addr)
                 StCall who cc pk args  -> StCall who cc pk (map qq args)
                 StInt    _             -> t
+                StFloat  _             -> t
                 StDouble _             -> t
                 StString _             -> t
                 StReg    _             -> t
@@ -898,6 +900,19 @@ getRegister leaf
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if sparc_TARGET_ARCH
 
+getRegister (StFloat d)
+  = getNatLabelNCG 	    	    `thenNat` \ lbl ->
+    getNewRegNCG PtrRep    	    `thenNat` \ tmp ->
+    let code dst = toOL [
+    	    SEGMENT DataSegment,
+	    LABEL lbl,
+	    DATA F [ImmFloat d],
+	    SEGMENT TextSegment,
+	    SETHI (HI (ImmCLbl lbl)) tmp,
+	    LD F (AddrRegImm tmp (LO (ImmCLbl lbl))) dst]
+    in
+    	returnNat (Any FloatRep code)
+
 getRegister (StDouble d)
   = getNatLabelNCG 	    	    `thenNat` \ lbl ->
     getNewRegNCG PtrRep    	    `thenNat` \ tmp ->
@@ -911,33 +926,42 @@ getRegister (StDouble d)
     in
     	returnNat (Any DoubleRep code)
 
+-- The 6-word scratch area is immediately below the frame pointer.
+-- Below that is the spill area.
+getRegister (StScratchWord i)
+   | i >= 0 && i < 6
+   = let j        = i+1
+         code dst = unitOL (fpRelEA j dst)
+     in 
+     returnNat (Any PtrRep code)
+
+
 getRegister (StPrim primop [x]) -- unary PrimOps
   = case primop of
-      IntNegOp -> trivialUCode (SUB False False g0) x
-      NotOp    -> trivialUCode (XNOR False g0) x
+      IntNegOp       -> trivialUCode (SUB False False g0) x
+      NotOp          -> trivialUCode (XNOR False g0) x
 
-      FloatNegOp  -> trivialUFCode FloatRep (FNEG F) x
-
-      DoubleNegOp -> trivialUFCode DoubleRep (FNEG DF) x
+      FloatNegOp     -> trivialUFCode FloatRep (FNEG F) x
+      DoubleNegOp    -> trivialUFCode DoubleRep (FNEG DF) x
 
       Double2FloatOp -> trivialUFCode FloatRep  (FxTOy DF F) x
       Float2DoubleOp -> trivialUFCode DoubleRep (FxTOy F DF) x
 
-      OrdOp -> coerceIntCode IntRep x
-      ChrOp -> chrCode x
+      OrdOp          -> coerceIntCode IntRep x
+      ChrOp          -> chrCode x
 
-      Float2IntOp  -> coerceFP2Int x
-      Int2FloatOp  -> coerceInt2FP FloatRep x
-      Double2IntOp -> coerceFP2Int x
-      Int2DoubleOp -> coerceInt2FP DoubleRep x
+      Float2IntOp    -> coerceFP2Int x
+      Int2FloatOp    -> coerceInt2FP FloatRep x
+      Double2IntOp   -> coerceFP2Int x
+      Int2DoubleOp   -> coerceInt2FP DoubleRep x
 
       other_op ->
         let
-	    fixed_x = if is_float_op  -- promote to double
-			  then StPrim Float2DoubleOp [x]
-			  else x
+           fixed_x = if   is_float_op  -- promote to double
+                     then StPrim Float2DoubleOp [x]
+                     else x
 	in
-	getRegister (StCall fn cCallConv DoubleRep [x])
+	getRegister (StCall fn cCallConv DoubleRep [fixed_x])
        where
 	(is_float_op, fn)
 	  = case primop of
@@ -959,7 +983,7 @@ getRegister (StPrim primop [x]) -- unary PrimOps
 
 	      DoubleExpOp   -> (False, SLIT("exp"))
 	      DoubleLogOp   -> (False, SLIT("log"))
-	      DoubleSqrtOp  -> (True,  SLIT("sqrt"))
+	      DoubleSqrtOp  -> (False, SLIT("sqrt"))
 
 	      DoubleSinOp   -> (False, SLIT("sin"))
 	      DoubleCosOp   -> (False, SLIT("cos"))
@@ -972,7 +996,10 @@ getRegister (StPrim primop [x]) -- unary PrimOps
 	      DoubleSinhOp  -> (False, SLIT("sinh"))
 	      DoubleCoshOp  -> (False, SLIT("cosh"))
 	      DoubleTanhOp  -> (False, SLIT("tanh"))
-	      _             -> panic ("Monadic PrimOp not handled: " ++ show primop)
+
+              other
+                 -> pprPanic "getRegister(sparc,monadicprimop)" 
+                             (pprStixTree (StPrim primop [x]))
 
 getRegister (StPrim primop [x, y]) -- dyadic PrimOps
   = case primop of
@@ -1046,10 +1073,16 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
       ISraOp -> trivialCode SRA x y  --was: panic "SparcGen:isra"
       ISrlOp -> trivialCode SRL x y  --was: panic "SparcGen:isrl"
 
-      FloatPowerOp  -> getRegister (StCall SLIT("pow") cCallConv DoubleRep [promote x, promote y])
+      FloatPowerOp  -> getRegister (StCall SLIT("pow") cCallConv DoubleRep 
+                                           [promote x, promote y])
 		       where promote x = StPrim Float2DoubleOp [x]
-      DoublePowerOp -> getRegister (StCall SLIT("pow") cCallConv DoubleRep [x, y])
---      _ -> panic "Prim op " ++ (showPrimOp primop) ++ " not handled!"
+      DoublePowerOp -> getRegister (StCall SLIT("pow") cCallConv DoubleRep 
+                                           [x, y])
+
+      other
+         -> pprPanic "getRegister(sparc,dyadic primop)" 
+                     (pprStixTree (StPrim primop [x, y]))
+
   where
     imul_div fn x y = getRegister (StCall fn cCallConv IntRep [x, y])
 
@@ -1079,6 +1112,8 @@ getRegister leaf
     	    OR False dst (RIImm (LO imm__2)) dst]
     in
     	returnNat (Any PtrRep code)
+  | otherwise
+  = pprPanic "getRegister(sparc)" (pprStixTree leaf)
   where
     imm = maybeImm leaf
     imm__2 = case imm of Just x -> x
@@ -2394,21 +2429,27 @@ genCCall fn cconv kind args
 #endif {- i386_TARGET_ARCH -}
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if sparc_TARGET_ARCH
-
--- Implement this!  It should be im MachRegs.lhs, not here.
-allArgRegs :: [Reg]
-allArgRegs = error "nativeGen(sparc): allArgRegs"
-
 genCCall fn cconv kind args
   = mapAccumLNat get_arg (allArgRegs, eXTRA_STK_ARGS_HERE) args
     	    	    	  `thenNat` \ ((unused,_), argCode) ->
     let
 
     	nRegs = length allArgRegs - length unused
-    	call = CALL fn__2 nRegs False
+    	call = unitOL (CALL fn__2 nRegs False)
     	code = concatOL argCode
+
+        -- 3 because in the worst case, %o0 .. %o5 will only use up 3 args
+        (move_sp_down, move_sp_up)
+           = let nn = length args - 3 
+             in  if   nn <= 0
+                 then (nilOL, nilOL)
+                 else (unitOL (moveSp (-(2*nn))), unitOL (moveSp (2*nn)))
     in
-    	returnNat (code `snocOL` call `snocOL` NOP)
+    	returnNat (move_sp_down `appOL` 
+                   code         `appOL` 
+                   call         `appOL` 
+                   unitOL NOP   `appOL`
+                   move_sp_up)
   where
     -- function names that begin with '.' are assumed to be special
     -- internally generated names like '.mul,' which don't get an
@@ -2429,6 +2470,9 @@ genCCall fn cconv kind args
 	offset to use for overflowing arguments.  This way,
 	@get_arg@ can be applied to all of a call's arguments using
 	@mapAccumL@.
+
+        If we have to put args on the stack, move %o6==%sp down by
+        8 x the number of args, to ensure there's enough space.
     -}
     get_arg
 	:: ([Reg],Int)	-- Argument registers and stack offset (accumulator)
@@ -2453,23 +2497,27 @@ genCCall fn cconv kind args
 		case dsts of
 		   [] -> ( ([], offset + 1), 
                             code `snocOL`
-			    -- conveniently put the second part in the right stack
-			    -- location, and load the first part into %o5
-			    ST DF src (spRel (offset - 1)) `snocOL`
-			    LD W (spRel (offset - 1)) dst
+			    -- put the second part in the right stack
+			    -- and load the first part into %o5
+                            FMOV DF src f0             `snocOL`
+			    ST   F  f0 (spRel offset)  `snocOL`
+                            LD   W  (spRel offset) dst `snocOL`
+                            ST   F  (fPair f0) (spRel offset)
                          )
 		   (dst__2:dsts__2) 
                        -> ( (dsts__2, offset), 
-                            code `snocOL`
-			    ST DF src (spRel (-2)) `snocOL`
-			    LD W (spRel (-2)) dst `snocOL`
-			    LD W (spRel (-1)) dst__2
+                            code                          `snocOL`
+                            FMOV DF src f0                `snocOL`
+                            ST   F  f0 (spRel 16)         `snocOL`
+                            LD   W  (spRel 16) dst        `snocOL`
+                            ST   F  (fPair f0) (spRel 16) `snocOL`
+                            LD   W  (spRel 16) dst__2
                           )
 	    FloatRep 
                -> ( (dsts, offset), 
                     code `snocOL`
-	            ST F src (spRel (-2)) `snocOL`
-	            LD W (spRel (-2)) dst
+	            ST F src (spRel 16) `snocOL`
+	            LD W (spRel 16) dst
                   )
 	    _  -> ( (dsts, offset), 
                     if   isFixed register 

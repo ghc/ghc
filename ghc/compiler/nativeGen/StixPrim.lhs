@@ -270,7 +270,10 @@ primCode lhs (CCallOp (CCall (StaticTarget fn) is_asm may_gc cconv)) rhs
       [] -> StCall fn cconv VoidRep args
       [lhs] ->
 	  let lhs' = amodeToStix lhs
-	      pk = if isFloatingRep (getAmodeRep lhs) then DoubleRep else IntRep
+	      pk   = case getAmodeRep lhs of
+                        FloatRep  -> FloatRep
+                        DoubleRep -> DoubleRep
+                        other     -> IntRep
 	  in
 	      StAssign pk lhs' (StCall fn cconv pk args)
 \end{code}
@@ -432,7 +435,7 @@ amodeToStix (CLit core)
       MachWord w     -> case word2IntLit core of MachInt iw -> StInt iw
       MachLitLit s _ -> litLitErr
       MachLabel l    -> StCLbl (mkForeignLabel l False{-ToDo: dynamic-})
-      MachFloat d    -> StDouble d
+      MachFloat d    -> StFloat d
       MachDouble d   -> StDouble d
       _ -> panic "amodeToStix:core literal"
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MachRegs.h,v 1.8 2000/04/14 15:10:20 sewardj Exp $
+ * $Id: MachRegs.h,v 1.9 2000/07/11 15:26:33 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -414,6 +414,37 @@
    Note: %g3 is *definitely* clobbered in the builtin divide code (and
    our save/restore machinery is NOT GOOD ENOUGH for that); discretion
    being the better part of valor, we also don't take %g4.
+
+   The paired nature of the floating point registers causes complications for
+   the native code genertor.  For convenience, we pretend that the first 22
+   fp regs %f0 .. %f21 are actually 11 double regs, and the remaining 10 are
+   float (single) regs.  The NCG acts accordingly.  That means that the 
+   following FP assignment is rather fragile, and should only be changed
+   with extreme care.  The current scheme is:
+
+      %f0 /%f1    FP return from C
+      %f2 /%f3    D1
+      %f4 /%f5    D2
+      %f6 /%f7    ncg double spill tmp #1
+      %f8 /%f9    ncg double spill tmp #2
+      %f10/%f11   allocatable
+      %f12/%f13   allocatable
+      %f14/%f15   allocatable
+      %f16/%f17   allocatable
+      %f18/%f19   allocatable
+      %f20/%f21   allocatable
+
+      %f22        F1
+      %f23        F2
+      %f24        F3
+      %f25        F4
+      %f26        ncg single spill tmp #1
+      %f27        ncg single spill tmp #2
+      %f28        allocatable
+      %f29        allocatable
+      %f30        allocatable
+      %f31        allocatable
+
    -------------------------------------------------------------------------- */
 
 #if sparc_TARGET_ARCH
@@ -438,12 +469,12 @@
 #define REG_R7    	l7
 #define REG_R8		i5
 
-#define REG_F1	    	f2
-#define REG_F2	    	f3
-#define REG_F3	    	f4
-#define REG_F4	    	f5
-#define REG_D1	    	f6
-#define REG_D2	    	f8
+#define REG_F1	    	f22
+#define REG_F2	    	f23
+#define REG_F3	    	f24
+#define REG_F4	    	f25
+#define REG_D1	    	f2
+#define REG_D2	    	f4
 
 #define REG_Sp    	i0
 #define REG_Su    	i1
@@ -452,12 +483,14 @@
 #define REG_Hp	    	i3
 #define REG_HpLim	i4
 
-#define NCG_Reserved_I1	g1
-#define NCG_Reserved_I2	g2
-#define NCG_Reserved_F1	f14
-#define NCG_Reserved_F2 f15
-#define NCG_Reserved_D1	f16
-#define NCG_Reserved_D2	f18
+#define NCG_SpillTmp_I1	g1
+#define NCG_SpillTmp_I2	g2
+#define NCG_SpillTmp_F1	f26
+#define NCG_SpillTmp_F2 f27
+#define NCG_SpillTmp_D1	f6
+#define NCG_SpillTmp_D2	f8
+
+#define NCG_FirstFloatReg f22
 
 #endif /* sparc */
 
