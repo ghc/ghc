@@ -15,7 +15,7 @@ import TcHsSyn		( TypecheckedRuleDecl, TcExpr, mkHsLet )
 import TcRnMonad
 import TcSimplify	( tcSimplifyToDicts, tcSimplifyInferCheck )
 import TcMType		( newTyVarTy )
-import TcType		( TcTyVarSet, tyVarsOfTypes, openTypeKind )
+import TcType		( TcTyVarSet, tyVarsOfTypes, tyVarsOfType, openTypeKind )
 import TcIfaceSig	( tcCoreExpr, tcCoreLamBndrs, tcVar )
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..), tcAddScopedTyVars )
 import TcExpr		( tcMonoExpr )
@@ -132,15 +132,29 @@ ruleLhsTvs :: TcExpr -> TcTyVarSet
 -- Fortunately the form of the LHS is pretty limited (see RnSource.validRuleLhs)
 -- so we don't need to deal with the whole of HsSyn.
 --
-ruleLhsTvs (OpApp e1 op _ e2)
-  = ruleLhsTvs e1 `unionVarSet` ruleLhsTvs op `unionVarSet` ruleLhsTvs e2
-ruleLhsTvs (HsApp e1 e2)
-  = ruleLhsTvs e1 `unionVarSet` ruleLhsTvs e2
-ruleLhsTvs (HsVar v) = emptyVarSet	-- I don't think we need the tyvars of the Id
-ruleLhsTvs (TyApp e1 tys)
-  = ruleLhsTvs e1 `unionVarSet` tyVarsOfTypes tys
+-- Uh oh!  validRuleLhs only checks the function part of rule LHSs!
+
+ruleLhsTvs (HsPar e)     = ruleLhsTvs e
+ruleLhsTvs (HsLit e)     = emptyVarSet
+ruleLhsTvs (HsOverLit e) = emptyVarSet
+ruleLhsTvs (HsVar v)     = emptyVarSet	-- I don't think we need the tyvars of the Id
+
+ruleLhsTvs (OpApp e1 op _ e2)   = ruleLhsTvs e1 `unionVarSet` ruleLhsTvs op 
+				  `unionVarSet` ruleLhsTvs e2
+ruleLhsTvs (HsApp e1 e2)   	= ruleLhsTvs e1 `unionVarSet` ruleLhsTvs e2
+ruleLhsTvs (TyApp e1 tys)  	= ruleLhsTvs e1 `unionVarSet` tyVarsOfTypes tys
+ruleLhsTvs (DictApp e ds)  	= ruleLhsTvs e
+ruleLhsTvs (NegApp e _)    	= ruleLhsTvs e
+ruleLhsTvs (ExplicitList ty es) = tyVarsOfType ty `unionVarSet` ruleLhsTvs_s es
+ruleLhsTvs (ExplicitTuple es _) = ruleLhsTvs_s es
+
+-- Type abstractions can occur in rules like 
+--	"foldr k z (build g) = g k z"
+ruleLhsTvs (TyLam tvs e)   = ruleLhsTvs e `delVarSetList` tvs
+ruleLhsTvs (DictLam ids e) = ruleLhsTvs e
 ruleLhsTvs e = pprPanic "ruleLhsTvs" (ppr e)
 
+ruleLhsTvs_s es = foldr (unionVarSet . ruleLhsTvs) emptyVarSet es
 
 ruleCtxt name = ptext SLIT("When checking the transformation rule") <+> 
 		doubleQuotes (ftext name)

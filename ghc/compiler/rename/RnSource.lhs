@@ -57,8 +57,8 @@ import Outputable
 import SrcLoc		( SrcLoc )
 import CmdLineOpts	( DynFlag(..) )
 				-- Warn of unused for-all'd tyvars
-import Maybes		( maybeToBool )
-import Maybe            ( maybe, catMaybes )
+import Maybes		( maybeToBool, seqMaybe )
+import Maybe            ( maybe, catMaybes, isNothing )
 \end{code}
 
 @rnSourceDecl@ `renames' declarations.
@@ -394,8 +394,11 @@ rnHsRuleDecl (HsRule rule_name act vars lhs rhs src_loc)
 
     rnExpr lhs					`thenM` \ (lhs', fv_lhs) ->
     rnExpr rhs					`thenM` \ (rhs', fv_rhs) ->
-    checkErr (validRuleLhs ids lhs')
-	    (badRuleLhsErr rule_name lhs')	`thenM_`
+    let
+	mb_bad = validRuleLhs ids lhs'
+    in
+    checkErr (isNothing mb_bad)
+	     (badRuleLhsErr rule_name lhs' mb_bad)	`thenM_`
     let
 	bad_vars = [var | var <- ids, not (var `elemNameSet` fv_lhs)]
     in
@@ -415,18 +418,37 @@ rnHsRuleDecl (HsRule rule_name act vars lhs rhs src_loc)
 
 Check the shape of a transformation rule LHS.  Currently
 we only allow LHSs of the form @(f e1 .. en)@, where @f@ is
-not one of the @forall@'d variables.
+not one of the @forall@'d variables.  We also restrict the form of the LHS so
+that it may be plausibly matched.  Basically you only get to write ordinary 
+applications.  (E.g. a case expression is not allowed: too elaborate.)
 
 NB: if you add new cases here, make sure you add new ones to TcRule.ruleLhsTvs
 
 \begin{code}
+validRuleLhs :: [Name] -> RenamedHsExpr -> Maybe RenamedHsExpr
+-- Nothing => OK
+-- Just e  => Not ok, and e is the offending expression
 validRuleLhs foralls lhs
   = check lhs
   where
-    check (OpApp _ op _ _)		  = check op
-    check (HsApp e1 e2) 		  = check e1
-    check (HsVar v) | v `notElem` foralls = True
-    check other				  = False
+    check (OpApp e1 op _ e2)		  = check op `seqMaybe` check_e e1 `seqMaybe` check_e e2
+    check (HsApp e1 e2) 		  = check e1 `seqMaybe` check_e e2
+    check (HsVar v) | v `notElem` foralls = Nothing
+    check other				  = Just other 	-- Failure
+
+    check_e (HsVar v)     = Nothing
+    check_e (HsPar e) 	  = check_e e
+    check_e (HsLit e) 	  = Nothing
+    check_e (HsOverLit e) = Nothing
+
+    check_e (OpApp e1 op _ e2) 	 = check_e e1 `seqMaybe` check_e op `seqMaybe` check_e e2
+    check_e (HsApp e1 e2)      	 = check_e e1 `seqMaybe` check_e e2
+    check_e (NegApp e _)       	 = check_e e
+    check_e (ExplicitList _ es)	 = check_es es
+    check_e (ExplicitTuple es _) = check_es es
+    check_e other		 = Just other	-- Fails
+
+    check_es es = foldr (seqMaybe . check_e) Nothing es
 \end{code}
 
 
@@ -912,9 +934,10 @@ getRnStats eps imported_decls
 badDataCon name
    = hsep [ptext SLIT("Illegal data constructor name"), quotes (ppr name)]
 
-badRuleLhsErr name lhs
+badRuleLhsErr name lhs (Just bad_e)
   = sep [ptext SLIT("Rule") <+> ftext name <> colon,
-	 nest 4 (ptext SLIT("Illegal left-hand side:") <+> ppr lhs)]
+	 nest 4 (vcat [ptext SLIT("Illegal expression:") <+> ppr bad_e, 
+		       ptext SLIT("in left-hand side:") <+> ppr lhs])]
     $$
     ptext SLIT("LHS must be of form (f e1 .. en) where f is not forall'd")
 
