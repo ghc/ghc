@@ -30,7 +30,7 @@ module StgSyn (
 	SYN_IE(StgBinding), SYN_IE(StgExpr), SYN_IE(StgRhs),
 	SYN_IE(StgCaseAlts), SYN_IE(StgCaseDefault),
 
-	pprPlainStgBinding,
+	pprStgBinding, pprStgBindings,
 	getArgPrimRep,
 	isLitLitArg,
 	stgArity,
@@ -498,18 +498,18 @@ Robin Popplestone asked for semi-colon separators on STG binds; here's
 hoping he likes terminators instead...  Ditto for case alternatives.
 
 \begin{code}
-pprStgBinding :: (Outputable bndr, Outputable bdee, Ord bdee) =>
+pprGenStgBinding :: (Outputable bndr, Outputable bdee, Ord bdee) =>
 		PprStyle -> GenStgBinding bndr bdee -> Doc
 
-pprStgBinding sty (StgNonRec bndr rhs)
+pprGenStgBinding sty (StgNonRec bndr rhs)
   = hang (hsep [ppr sty bndr, equals])
     	 4 ((<>) (ppr sty rhs) semi)
 
-pprStgBinding sty (StgCoerceBinding bndr occ)
+pprGenStgBinding sty (StgCoerceBinding bndr occ)
   = hang (hsep [ppr sty bndr, equals, ptext SLIT("{-Coerce-}")])
     	 4 ((<>) (ppr sty occ) semi)
 
-pprStgBinding sty (StgRec pairs)
+pprGenStgBinding sty (StgRec pairs)
   = vcat ((ifPprDebug sty (ptext SLIT("{- StgRec (begin) -}"))) :
 	      (map (ppr_bind sty) pairs) ++ [(ifPprDebug sty (ptext SLIT("{- StgRec (end) -}")))])
   where
@@ -517,8 +517,11 @@ pprStgBinding sty (StgRec pairs)
       = hang (hsep [ppr sty bndr, equals])
 	     4 ((<>) (ppr sty expr) semi)
 
-pprPlainStgBinding :: PprStyle -> StgBinding -> Doc
-pprPlainStgBinding sty b = pprStgBinding sty b
+pprStgBinding  :: PprStyle -> StgBinding   -> Doc
+pprStgBinding sty  bind  = pprGenStgBinding sty bind
+
+pprStgBindings :: PprStyle -> [StgBinding] -> Doc
+pprStgBindings sty binds = vcat (map (pprGenStgBinding sty) binds)
 \end{code}
 
 \begin{code}
@@ -527,7 +530,7 @@ instance (Outputable bdee) => Outputable (GenStgArg bdee) where
 
 instance (Outputable bndr, Outputable bdee, Ord bdee)
 		=> Outputable (GenStgBinding bndr bdee) where
-    ppr = pprStgBinding
+    ppr = pprGenStgBinding
 
 instance (Outputable bndr, Outputable bdee, Ord bdee)
 		=> Outputable (GenStgExpr bndr bdee) where
@@ -594,17 +597,17 @@ pprStgExpr sty (StgLet (StgNonRec bndr (StgRhsClosure cc bi free_vars upd_flag a
 
 pprStgExpr sty (StgLet bind expr@(StgLet _ _))
   = ($$)
-      (sep [hang (ptext SLIT("let {")) 2 (hsep [pprStgBinding sty bind, ptext SLIT("} in")])])
+      (sep [hang (ptext SLIT("let {")) 2 (hsep [pprGenStgBinding sty bind, ptext SLIT("} in")])])
       (ppr sty expr)
 
 -- general case
 pprStgExpr sty (StgLet bind expr)
-  = sep [hang (ptext SLIT("let {")) 2 (pprStgBinding sty bind),
+  = sep [hang (ptext SLIT("let {")) 2 (pprGenStgBinding sty bind),
 	   hang (ptext SLIT("} in ")) 2 (ppr sty expr)]
 
 pprStgExpr sty (StgLetNoEscape lvs_whole lvs_rhss bind expr)
   = sep [hang (ptext SLIT("let-no-escape {"))
-	    	2 (pprStgBinding sty bind),
+	    	2 (pprGenStgBinding sty bind),
 	   hang ((<>) (ptext SLIT("} in "))
 		   (ifPprDebug sty (
 		    nest 4 (

@@ -61,7 +61,7 @@ lintStgBindings sty whodunnit binds
 			ptext SLIT("*** Stg Lint Errors: in "),text whodunnit, ptext SLIT(" ***"),
 			msg sty,
 			ptext SLIT("*** Offending Program ***"),
-			vcat (map (pprPlainStgBinding sty) binds),
+			pprStgBindings sty binds,
 			ptext SLIT("*** End of Offense ***")])
   where
     lint_binds :: [StgBinding] -> LintM ()

@@ -34,7 +34,8 @@ import Id		( nullIdEnv, lookupIdEnv, addOneToIdEnv,
 			)
 import Maybes		( maybeToBool )
 import PprType		( GenType{-instance Outputable-} )
-import Outputable       ( PprStyle, Outputable(..) )
+import ErrUtils		( doIfSet )
+import Outputable       ( PprStyle, Outputable(..), printErrs, pprDumpStyle )
 import Pretty		( Doc, ($$), vcat, text, ptext )
 import UniqSupply	( splitUniqSupply, UniqSupply )
 import Util		( mapAccumL, panic, assertPanic )
@@ -43,7 +44,6 @@ import Util		( mapAccumL, panic, assertPanic )
 \begin{code}
 stg2stg :: [StgToDo]		-- spec of what stg-to-stg passes to do
 	-> FAST_STRING		-- module name (profiling only)
-	-> PprStyle		-- printing style (for debugging only)
 	-> UniqSupply		-- a name supply
 	-> [StgBinding]		-- input...
 	-> IO
@@ -51,16 +51,13 @@ stg2stg :: [StgToDo]		-- spec of what stg-to-stg passes to do
 	     ([CostCentre],	-- local cost-centres that need to be decl'd
 	      [CostCentre]))	-- "extern" cost-centres
 
-stg2stg stg_todos module_name ppr_style us binds
+stg2stg stg_todos module_name us binds
   = case (splitUniqSupply us)	of { (us4now, us4later) ->
 
-    (if do_verbose_stg2stg then
-	hPutStr stderr "VERBOSE STG-TO-STG:\n" >>
-	hPutStr stderr (show
-	(($$) (ptext SLIT("*** Core2Stg:"))
-		 (vcat (map (ppr ppr_style) (setStgVarInfo False binds)))
-	))
-     else return ()) >>
+    doIfSet do_verbose_stg2stg
+	(printErrs (text "VERBOSE STG-TO-STG:" $$
+		    text "*** Core2Stg:" $$
+		    vcat (map (ppr pprDumpStyle) (setStgVarInfo False binds)))) >>
 
 	-- Do the main business!
     foldl_mn do_stg_pass (binds, us4now, ([],[])) stg_todos
@@ -110,7 +107,7 @@ stg2stg stg_todos module_name ppr_style us binds
 
     -------------
     stg_linter = if False --LATER: opt_DoStgLinting (ToDo)
-		 then lintStgBindings ppr_style
+		 then lintStgBindings pprDumpStyle
 		 else ( \ whodunnit binds -> binds )
 
     -------------------------------------------
@@ -154,7 +151,7 @@ stg2stg stg_todos module_name ppr_style us binds
 	(if do_verbose_stg2stg then
 	    hPutStr stderr (show
 	    (($$) (text ("*** "++what++":"))
-		     (vcat (map (ppr ppr_style) binds2))
+		     (vcat (map (ppr pprDumpStyle) binds2))
 	    ))
 	 else return ()) >>
 	let
