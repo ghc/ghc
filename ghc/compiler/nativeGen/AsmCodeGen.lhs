@@ -8,7 +8,6 @@ module AsmCodeGen ( nativeCodeGen ) where
 #include "HsVersions.h"
 #include "nativeGen/NCG.h"
 
-import IO		( Handle )
 import List		( intersperse )
 
 import MachMisc
@@ -28,14 +27,13 @@ import Stix		( StixTree(..), StixReg(..),
                           NatM, initNat, mapNat,
                           NatM_State, mkNatM_State,
                           uniqOfNatM_State, deltaOfNatM_State )
-import PrimRep		( isFloatingRep, PrimRep(..) )
 import UniqSupply	( returnUs, thenUs, mapUs, initUs, 
                           initUs_, UniqSM, UniqSupply,
 			  lazyThenUs, lazyMapUs )
 import MachMisc		( IF_ARCH_i386(i386_insert_ffrees,) )
 
 import OrdList		( fromOL, concatOL )
-import Outputable	
+import Outputable
 
 \end{code}
 
@@ -97,12 +95,13 @@ nativeCodeGen absC us
          insn_sdoc         = my_vcat insn_sdocs
          stix_sdoc         = vcat stix_sdocs
 
-#        if DEBUG
+#        if NCG_DEBUG
          my_trace m x = trace m x
-         my_vcat sds = vcat (intersperse (char ' ' 
-                                          $$ ptext SLIT("# ___stg_split_marker")
-                                          $$ char ' ') 
-                                          sds)
+         my_vcat sds = vcat (intersperse 
+				(char ' ' 
+                                 $$ ptext SLIT("# __debug_NCG_split_marker")
+                                 $$ char ' ') 
+                                 sds)
 #        else
          my_vcat sds = vcat sds
          my_trace m x = x
@@ -201,7 +200,7 @@ stixPeep ( t1@(StAssign pka (StReg (StixTemp u pk)) rhs)
    | stixCountTempUses u t2 == 1
      && sum (map (stixCountTempUses u) ts) == 0
    = 
-#    ifdef DEBUG
+#    ifdef NCG_DEBUG
      trace ("nativeGen: inlining " ++ showSDoc (pprStixTree rhs))
 #    endif
            (stixPeep (stixSubst u rhs t2 : ts))
