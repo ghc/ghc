@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.29 2001/02/11 17:51:08 simonmar Exp $
+ * $Id: Storage.h,v 1.30 2001/03/02 14:36:16 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -169,6 +169,7 @@ recordOldToNewPtrs(StgMutClosure *p)
   {									\
     bdescr *bd;								\
 									\
+    ASSERT( p1 != p2 );							\
     bd = Bdescr((P_)p1);						\
     if (bd->gen->no == 0) {						\
       ((StgInd *)p1)->indirectee = p2;					\
@@ -176,14 +177,14 @@ recordOldToNewPtrs(StgMutClosure *p)
       TICK_UPD_NEW_IND();						\
     } else {								\
       if (info != &stg_BLACKHOLE_BQ_info) {				\
-	{ 								\
+	{								\
           StgInfoTable *inf = get_itbl(p1);				\
 	  nat np = inf->layout.payload.ptrs,				\
 	      nw = inf->layout.payload.nptrs, i;			\
-          if (inf->type != THUNK_SELECTOR) {                            \
+          if (inf->type != THUNK_SELECTOR) {				\
              for (i = np; i < np + nw; i++) {				\
 	        ((StgClosure *)p1)->payload[i] = 0;			\
-             }                                                          \
+             }								\
           }								\
         }								\
         ACQUIRE_LOCK(&sm_mutex);					\
@@ -202,6 +203,7 @@ recordOldToNewPtrs(StgMutClosure *p)
  */
 #define updateWithStaticIndirection(info, p1, p2)			\
   {									\
+    ASSERT( p1 != p2 );							\
     ASSERT( ((StgMutClosure*)p1)->mut_link == NULL );			\
 									\
     ACQUIRE_LOCK(&sm_mutex);						\
@@ -220,6 +222,7 @@ updateWithPermIndirection(const StgInfoTable *info, StgClosure *p1, StgClosure *
 {
   bdescr *bd;
 
+  ASSERT( p1 != p2 );							\
   bd = Bdescr((P_)p1);
   if (bd->gen->no == 0) {
     ((StgInd *)p1)->indirectee = p2;
