@@ -50,8 +50,14 @@ charPrimTyCon	= pcPrimTyCon charPrimTyConKey SLIT("Char#") 0 CharRep
 intPrimTy	= mkTyConTy intPrimTyCon
 intPrimTyCon	= pcPrimTyCon intPrimTyConKey SLIT("Int#") 0 IntRep
 
+int64PrimTy	= mkTyConTy int64PrimTyCon
+int64PrimTyCon	= pcPrimTyCon int64PrimTyConKey SLIT("Int64#") 0 Int64Rep
+
 wordPrimTy	= mkTyConTy wordPrimTyCon
 wordPrimTyCon	= pcPrimTyCon wordPrimTyConKey SLIT("Word#") 0 WordRep
+
+word64PrimTy	= mkTyConTy word64PrimTyCon
+word64PrimTyCon	= pcPrimTyCon word64PrimTyConKey SLIT("Word64#") 0 Word64Rep
 
 addrPrimTy	= mkTyConTy addrPrimTyCon
 addrPrimTyCon	= pcPrimTyCon addrPrimTyConKey SLIT("Addr#") 0 AddrRep
@@ -73,12 +79,14 @@ getPrimRepInfo ::
     PrimRep -> (String,		-- tag string
 		Type, TyCon)	-- prim type and tycon
 
-getPrimRepInfo CharRep   = ("Char",   charPrimTy,   charPrimTyCon)
-getPrimRepInfo IntRep    = ("Int",    intPrimTy,    intPrimTyCon)
-getPrimRepInfo WordRep   = ("Word",   wordPrimTy,   wordPrimTyCon)
-getPrimRepInfo AddrRep   = ("Addr",   addrPrimTy,   addrPrimTyCon)
-getPrimRepInfo FloatRep  = ("Float",  floatPrimTy,  floatPrimTyCon)
-getPrimRepInfo DoubleRep = ("Double", doublePrimTy, doublePrimTyCon)
+getPrimRepInfo CharRep       = ("Char",   charPrimTy,   charPrimTyCon)
+getPrimRepInfo IntRep        = ("Int",    intPrimTy,    intPrimTyCon)
+getPrimRepInfo WordRep       = ("Word",   wordPrimTy,   wordPrimTyCon)
+getPrimRepInfo AddrRep       = ("Addr",   addrPrimTy,   addrPrimTyCon)
+getPrimRepInfo FloatRep      = ("Float",  floatPrimTy,  floatPrimTyCon)
+getPrimRepInfo DoubleRep     = ("Double", doublePrimTy, doublePrimTyCon)
+getPrimRepInfo Int64Rep      = ("Int64",  int64PrimTy,  int64PrimTyCon)
+getPrimRepInfo Word64Rep     = ("Word64", word64PrimTy, word64PrimTyCon)
 \end{code}
 
 %************************************************************************
