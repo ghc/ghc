@@ -294,7 +294,7 @@ main (int argc, char **argv) {
 
   IF_PAR_DEBUG(verbose,
 	       fprintf(stderr,
-	               "==== RFP: GdH enabled SysMan reporting for duty ($Revision: 1.6 $)\n"));
+	               "==== RFP: GdH enabled SysMan reporting for duty\n"));
   
   if (argc > 1) {
     if (*argv[1] == '-') {
