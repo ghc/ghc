@@ -21,6 +21,9 @@ import OrdList		( OrdList, nilOL, isNilOL, unitOL, appOL, toOL,
 import AbsCUtils	( magicIdPrimRep )
 import ForeignCall	( CCallConv(..) )
 import CLabel		( CLabel, labelDynamic )
+#if sparc_TARGET_ARCH || alpha_TARGET_ARCH
+import CLabel 		( isAsmTemp )
+#endif
 import Maybes		( maybeToBool )
 import PrimRep		( isFloatingRep, PrimRep(..) )
 import PrimOp		( PrimOp(..) )
