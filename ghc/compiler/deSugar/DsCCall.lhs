@@ -17,7 +17,7 @@ import DsMonad
 import DsUtils
 
 import CoreUtils	( coreExprType )
-import Id		( dataConArgTys, dataConTyCon, idType )
+import Id		( Id(..), dataConArgTys, dataConTyCon, idType )
 import Maybes		( maybeToBool )
 import Outputable	( PprStyle(..), Outputable(..) )
 import PprType		( GenType{-instances-} )
