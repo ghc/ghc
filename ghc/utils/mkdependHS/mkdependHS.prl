@@ -73,7 +73,7 @@ if ( $OrigCpp !~ /(\S+)\s+(.*)/ ) {
 	if ( $GccV =~ /Reading specs from (.*)\/specs/ ) {
 	    $Cpp = "$1/cpp $rest";
 	} else {
-	    die "hscpp: don't know how to run cpp: $OrigCpp\n";
+	    die "mkdependHS: don't know how to run cpp: $OrigCpp\n";
 	}
     }
 }
