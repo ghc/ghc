@@ -1,0 +1,11 @@
+
+rnfail020.hs:12:
+    The constraint `Eq a' does not mention any of the universally quantified type variables
+	in the type `(Eq a) => Set a -> Set a -> Set a'
+    In a type signature for `unionSets'
+    In an equation for function `unionSetB':
+	unionSetB (s1 :: Set a) s2
+		    = unionSets s1 s2
+		    where
+			unionSets :: forall. (Eq a) => Set a -> Set a -> Set a
+			unionSets a b = a

@@ -1,0 +1,3 @@
+
+tests/ghc-regress/rename/should_fail/rnfail008.hs:18:
+    Variable not in scope: `op3'

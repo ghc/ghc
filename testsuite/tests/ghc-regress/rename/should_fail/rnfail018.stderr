@@ -1,0 +1,12 @@
+
+tests/ghc-regress/rename/should_fail/rnfail018.hs:12:
+    Type variable not in scope: `a'
+
+tests/ghc-regress/rename/should_fail/rnfail018.hs:12:
+    Type variable not in scope: `m'
+
+tests/ghc-regress/rename/should_fail/rnfail018.hs:12:
+    Type variable not in scope: `m'
+
+tests/ghc-regress/rename/should_fail/rnfail018.hs:12:
+    Type variable not in scope: `a'

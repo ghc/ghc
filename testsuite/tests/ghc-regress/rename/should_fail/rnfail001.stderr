@@ -1,0 +1,4 @@
+
+tests/ghc-regress/rename/should_fail/rnfail001.hs:3:
+    Conflicting definitions for `x'
+    In the definition of `f'

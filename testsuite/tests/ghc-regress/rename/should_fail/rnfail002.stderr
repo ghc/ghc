@@ -1,0 +1,5 @@
+
+rnfail002.hs:4:
+    Multiple declarations of `Main.y'
+	rnfail002.hs:5
+	rnfail002.hs:6

@@ -1,0 +1,5 @@
+
+rnfail011.hs:2:
+    Multiple declarations of `Main.A'
+	rnfail011.hs:2
+	rnfail011.hs:6

@@ -1,0 +1,6 @@
+
+tests/ghc-regress/rename/should_fail/rnfail024.hs:3:
+    Variable not in scope: `sig_without_a_defn'
+
+tests/ghc-regress/rename/should_fail/rnfail024.hs:6:
+    Variable not in scope: `sig_without_a_defn'

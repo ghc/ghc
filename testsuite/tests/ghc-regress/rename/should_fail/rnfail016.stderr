@@ -1,0 +1,9 @@
+
+tests/ghc-regress/rename/should_fail/rnfail016.hs:5:
+    Pattern syntax in expression context: x@x
+
+tests/ghc-regress/rename/should_fail/rnfail016.hs:6:
+    Pattern syntax in expression context: ~x
+
+tests/ghc-regress/rename/should_fail/rnfail016.hs:7:
+    Pattern syntax in expression context: _

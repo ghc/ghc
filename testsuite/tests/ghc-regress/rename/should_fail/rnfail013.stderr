@@ -1,0 +1,5 @@
+
+rnfail013.hs:3:
+    Multiple declarations of `Foo.MkT'
+	rnfail013.hs:5
+	rnfail013.hs:7

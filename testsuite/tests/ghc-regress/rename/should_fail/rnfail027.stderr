@@ -1,0 +1,3 @@
+
+tests/ghc-regress/rename/should_fail/rnfail027.hs:5:
+    Variable not in scope: `wibble'

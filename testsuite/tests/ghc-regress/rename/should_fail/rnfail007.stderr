@@ -1,0 +1,3 @@
+
+tests/ghc-regress/rename/should_fail/rnfail007.hs:3:
+    Variable not in scope: `main'

@@ -1,0 +1,5 @@
+
+rnfail003.hs:2:
+    Multiple declarations of `Main.f'
+	rnfail003.hs:2
+	rnfail003.hs:4

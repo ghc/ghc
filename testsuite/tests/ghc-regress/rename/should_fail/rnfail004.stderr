@@ -1,0 +1,8 @@
+
+rnfail004.hs:7:
+    Conflicting definitions for `a'
+    in a binding group
+
+rnfail004.hs:8:
+    Conflicting definitions for `b'
+    in a binding group

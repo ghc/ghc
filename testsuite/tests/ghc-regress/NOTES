@@ -11,3 +11,6 @@ typecheck/should_fail
    (are needed by tcfail082 but am not sure how to do multi-module
     tests yet)
 
+rename/should_compile
+   rn037 issues
+
