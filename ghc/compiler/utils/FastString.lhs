@@ -62,7 +62,7 @@ import PackBase
 #endif
 #if __GLASGOW_HASKELL__ >= 209
 import Addr
-import IORef
+import IOExts
 # define newVar   newIORef
 # define readVar  readIORef
 # define writeVar writeIORef
