@@ -175,7 +175,7 @@ zapSpecPragInfo   info = case flavourInfo info of
 
 copyIdInfo :: IdInfo	-- From
   	   -> IdInfo	-- To
-	   -> IdInfo	-- To updated with stuff from From; except flavour unchanged
+	   -> IdInfo	-- To, updated with stuff from From; except flavour unchanged
 -- copyIdInfo is used when shorting out a top-level binding
 --	f_local = BIG
 --	f = f_local
@@ -186,30 +186,20 @@ copyIdInfo :: IdInfo	-- From
 -- The fact that things can go wrong here is a bad sign, but I can't see
 -- how to make it 'patently right', so copyIdInfo is derived (pretty much) by trial and error
 --
--- Here 'from' is f_local, 'to' is f.
+-- Here 'from' is f_local, 'to' is f, and the result is attached to f
 
 copyIdInfo from to = from { flavourInfo = flavourInfo to,
-			    specInfo = specInfo to
+			    specInfo = specInfo to,
+			    inlinePragInfo = inlinePragInfo to
 			  }
-	-- It's important to propagate the inline pragmas from bndr
-	-- to exportd_id.  Ditto strictness etc.  This "bites" when we use an INLNE pragma:
-	--	{-# INLINE f #-}
-	--	f x = (x,x)
+	-- It's important to preserve the inline pragma on 'f'; e.g. consider
+	--	{-# NOINLINE f #-}
+	--	f = local
 	--
-	-- This becomes (where the "*" means INLINE prag)
+	-- similarly, transformation rules may be attached to f
+	-- and we want to preserve them.  
 	--
-	--	M.f = /\a -> let mf* = \x -> (x,x) in mf
-	--
-	-- Now the mf floats out and we end up with the trivial binding
-	--
-	--	mf* = /\a -> \x -> (x,x)
-	--	M.f = mf
-	--
-	-- Now, when we short out the M.f = mf binding we must preserve the inline
-	-- pragma on the mf binding.
-	--
-	-- On the other hand, transformation rules may be attached to the 
-	-- 'to' Id, and we want to preserve them.  
+	-- On the other hand, we want the strictness info from f_local.
 \end{code}
 
 
@@ -284,8 +274,15 @@ besides the code-generator need arity info!)
 \begin{code}
 data ArityInfo
   = UnknownArity	-- No idea
-  | ArityExactly Int	-- Arity is exactly this
-  | ArityAtLeast Int	-- Arity is this or greater
+
+  | ArityExactly Int	-- Arity is exactly this.  We use this when importing a
+			-- function; it's already been compiled and we know its
+			-- arity for sure.
+
+  | ArityAtLeast Int	-- Arity is this or greater.  We attach this arity to 
+			-- functions in the module being compiled.  Their arity
+			-- might increase later in the compilation process, if
+			-- an extra lambda floats up to the binding site.
 
 seqArity :: ArityInfo -> ()
 seqArity a = arityLowerBound a `seq` ()
