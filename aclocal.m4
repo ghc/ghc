@@ -448,7 +448,12 @@ fi
 rm -rf conftest*
 case $HostPlatform in
  *mingw32) 
- 	  ArCmd="`cygpath -w ${ArCmdRaw} | sed -e 's@\\\\@/@g' ` ${ArCmdArgs}"
+	  if test ${OSTYPE} == "msys"
+	   then
+	     ArCmd="${ArCmdRaw} ${ArCmdArgs}"
+	   else
+ 	     ArCmd="`cygpath -w ${ArCmdRaw} | sed -e 's@\\\\@/@g' ` ${ArCmdArgs}"
+	  fi
  	  ;;
  *) ArCmd="${ArCmdRaw} ${ArCmdArgs}"
     ;;

@@ -452,11 +452,16 @@ dnl Find 'hardtop_plat', the native format for 'hardtop' (i.e., right kind of \d
 dnl
 case $HostPlatform in
   i386-unknown-mingw32 | i386-unknown-cygwin32)
-  	# convert $hardtop to a path that mingw will understand too
-	cyghardtop=${hardtop}
-	hardtop=`cygpath -w ${cyghardtop} | sed -e 's@\\\\@/@g'`
-  	hardtop_plat=`cygpath -w ${cyghardtop} | sed -e 's@\\\\@\\\\\\\\@g'`
-	;;
+        if test ${OSTYPE} != "msys" 
+          then
+            # convert $hardtop to a path that mingw will understand too
+            cyghardtop=${hardtop}
+            hardtop=`cygpath -w ${cyghardtop} | sed -e 's@\\\\@/@g'`
+            hardtop_plat=`cygpath -w ${cyghardtop} | sed -e 's@\\\\@\\\\\\\\@g'`
+          else
+            hardtop_plat=${hardtop}
+        fi
+        ;;
   *)
   	hardtop_plat=${hardtop}
 	;;
@@ -515,9 +520,13 @@ AC_ARG_WITH(gcc,
 [AC_HELP_STRING([--with-gcc=ARG],
         [Use ARG as the path to GCC  [default=autodetect]])],
 [WhatGccIsCalled="$withval"
- if test "x$HostPlatform" = "xi386-unknown-mingw32"; then
-    # Canonicalise to <drive>:/path/to/gcc
-    withval=`cygpath -w ${withval} | sed -e 's@\\\\@/@g' `
+ if test "x$HostPlatform" = "xi386-unknown-mingw32"
+    then
+       if test ${OSTYPE} != "msys"
+         then
+         # Canonicalise to <drive>:/path/to/gcc
+         withval=`cygpath -w ${withval} | sed -e 's@\\\\@/@g' `
+       fi
  fi;
  CC="$withval"],
 [WhatGccIsCalled="gcc"]
@@ -774,7 +783,12 @@ case $Catalog in
    glafp*) 
 	case $HostOS_CPP in
 	   mingw32)
-	      Catalog=`cygpath -w $hardtop/$Catalog`
+	          if test ${OSTYPE} == "msys"
+	            then
+	              Catalog=$hardtop/$Catalog
+	            else
+	              Catalog=`cygpath -w $hardtop/$Catalog`
+	          fi
 	      ;;
 	   *) Catalog=$hardtop/$Catalog
 	      ;;
@@ -1386,7 +1400,13 @@ FPTOOLS_UNDERSCORE
 dnl ** check for ld, and whether ld has -x option
 AC_PATH_PROG(LdCmdRaw, ld)
 case $HostOS_CPP in
- mingw32) LdCmd=`cygpath -w ${LdCmdRaw} | sed -e 's@\\\\@/@g' `
+ mingw32) 
+        if test ${OSTYPE} == "msys"
+	   then
+             LdCmd=${LdCmdRaw}
+	   else
+             LdCmd=`cygpath -w ${LdCmdRaw} | sed -e 's@\\\\@/@g' `
+	fi
  	   ;;
  *) LdCmd=${LdCmdRaw}
     ;;
