@@ -17,8 +17,10 @@ import AsmCodeGen	( nativeCodeGen )
 import IlxGen		( ilxGen )
 #endif
 
+#ifdef JAVA
 import JavaGen		( javaGen )
 import qualified PrintJava
+#endif
 
 import DriverState	( v_HCHeader )
 import TyCon		( TyCon )
@@ -73,8 +75,13 @@ codeOutput dflags mod_name tycons core_binds stg_binds
           		       >> return stub_names
              HscC           -> outputC dflags filenm flat_abstractC stub_names
           		       >> return stub_names
-             HscJava        -> outputJava dflags filenm mod_name tycons core_binds
+             HscJava        -> 
+#ifdef JAVA
+			       outputJava dflags filenm mod_name tycons core_binds
           		       >> return stub_names
+#else
+                               panic "Java support not compiled into this ghc"
+#endif
 	     HscILX         -> 
 #ifdef ILX
 	                       outputIlx dflags filenm mod_name tycons stg_binds
@@ -147,6 +154,7 @@ outputAsm dflags filenm flat_absC
 %************************************************************************
 
 \begin{code}
+#ifdef JAVA
 outputJava dflags filenm mod tycons core_binds
   = doOutput filenm (\ f -> printForUser f alwaysQualify pp_java)
 	-- User style printing for now to keep indentation
@@ -155,6 +163,7 @@ outputJava dflags filenm mod tycons core_binds
 	-- Make sure we have up to date dead-var information
     java_code = javaGen mod [{- Should be imports-}] tycons occ_anal_binds
     pp_java   = PrintJava.compilationUnit java_code
+#endif
 \end{code}
 
 
