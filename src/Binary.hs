@@ -269,7 +269,7 @@ getWord8 (BinMem _ ix_r sz_r0 arr_r0) = do
     ix <- readFastMutInt ix_r
     sz <- readFastMutInt sz_r0
     when (ix >= sz)  $
-	throw (mkIOError eofErrorType "Data.Binary.getWord8" Nothing Nothing)
+	ioError (mkIOError eofErrorType "Data.Binary.getWord8" Nothing Nothing)
     arr <- readIORef arr_r0
     w <- unsafeRead arr ix
     writeFastMutInt ix_r (ix+1)
