@@ -153,23 +153,22 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
      <c>: 	ff e0             jmp    %eax        	   # and jump to it.
 		# the callee cleans up the stack
     */
-    if ((adjustor = stgMallocBytes(14, "createAdjustor")) != NULL) {
-	unsigned char *const adj_code = (unsigned char *)adjustor;
-	adj_code[0x00] = (unsigned char)0x58;  /* popl %eax  */
+    adjustor = stgMallocBytes(14, "createAdjustor");
+    unsigned char *const adj_code = (unsigned char *)adjustor;
+    adj_code[0x00] = (unsigned char)0x58;  /* popl %eax  */
 
-	adj_code[0x01] = (unsigned char)0x68;  /* pushl hptr (which is a dword immediate ) */
-	*((StgStablePtr*)(adj_code + 0x02)) = (StgStablePtr)hptr;
+    adj_code[0x01] = (unsigned char)0x68;  /* pushl hptr (which is a dword immediate ) */
+    *((StgStablePtr*)(adj_code + 0x02)) = (StgStablePtr)hptr;
 
-	adj_code[0x06] = (unsigned char)0x50; /* pushl %eax */
+    adj_code[0x06] = (unsigned char)0x50; /* pushl %eax */
 
-	adj_code[0x07] = (unsigned char)0xb8; /* movl  $wptr, %eax */
-	*((StgFunPtr*)(adj_code + 0x08)) = (StgFunPtr)wptr;
+    adj_code[0x07] = (unsigned char)0xb8; /* movl  $wptr, %eax */
+    *((StgFunPtr*)(adj_code + 0x08)) = (StgFunPtr)wptr;
 
-	adj_code[0x0c] = (unsigned char)0xff; /* jmp %eax */
-	adj_code[0x0d] = (unsigned char)0xe0;
+    adj_code[0x0c] = (unsigned char)0xff; /* jmp %eax */
+    adj_code[0x0d] = (unsigned char)0xe0;
 	
-	execPage(adjustor, pageExecuteReadWrite);
-    }
+    execPage(adjustor, pageExecuteReadWrite);
 #endif
     break;
 
@@ -199,23 +198,22 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
     That's (thankfully) the case here with the restricted set of 
     return types that we support.
   */
-    if ((adjustor = stgMallocBytes(17, "createAdjustor")) != NULL) {
-	unsigned char *const adj_code = (unsigned char *)adjustor;
+    adjustor = stgMallocBytes(17, "createAdjustor");
+    unsigned char *const adj_code = (unsigned char *)adjustor;
 
-	adj_code[0x00] = (unsigned char)0x68;  /* pushl hptr (which is a dword immediate ) */
-	*((StgStablePtr*)(adj_code+0x01)) = (StgStablePtr)hptr;
+    adj_code[0x00] = (unsigned char)0x68;  /* pushl hptr (which is a dword immediate ) */
+    *((StgStablePtr*)(adj_code+0x01)) = (StgStablePtr)hptr;
 
-	adj_code[0x05] = (unsigned char)0xb8;  /* movl  $wptr, %eax */
-	*((StgFunPtr*)(adj_code + 0x06)) = (StgFunPtr)wptr;
+    adj_code[0x05] = (unsigned char)0xb8;  /* movl  $wptr, %eax */
+    *((StgFunPtr*)(adj_code + 0x06)) = (StgFunPtr)wptr;
 
-	adj_code[0x0a] = (unsigned char)0x68;  /* pushl obscure_ccall_ret_code */
-	*((StgFunPtr*)(adj_code + 0x0b)) = (StgFunPtr)obscure_ccall_ret_code;
+    adj_code[0x0a] = (unsigned char)0x68;  /* pushl obscure_ccall_ret_code */
+    *((StgFunPtr*)(adj_code + 0x0b)) = (StgFunPtr)obscure_ccall_ret_code;
 
-	adj_code[0x0f] = (unsigned char)0xff; /* jmp *%eax */
-	adj_code[0x10] = (unsigned char)0xe0; 
+    adj_code[0x0f] = (unsigned char)0xff; /* jmp *%eax */
+    adj_code[0x10] = (unsigned char)0xe0; 
 
-	execPage(adjustor, pageExecuteReadWrite);
-    }
+    execPage(adjustor, pageExecuteReadWrite);
 #elif defined(sparc_TARGET_ARCH)
   /* Magic constant computed by inspecting the code length of the following
      assembly language snippet (offset and machine code prefixed):
@@ -246,40 +244,39 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
      similarly, and local variables should be accessed via %fp, not %sp. In a
      nutshell: This should work! (Famous last words! :-)
   */
-    if ((adjustor = stgMallocBytes(4*(11+1), "createAdjustor")) != NULL) {
-        unsigned long *const adj_code = (unsigned long *)adjustor;
+    adjustor = stgMallocBytes(4*(11+1), "createAdjustor");
+    unsigned long *const adj_code = (unsigned long *)adjustor;
 
-        adj_code[ 0]  = 0x9C23A008UL;   /* sub   %sp, 8, %sp         */
-        adj_code[ 1]  = 0xDA23A060UL;   /* st    %o5, [%sp + 96]     */
-        adj_code[ 2]  = 0xD823A05CUL;   /* st    %o4, [%sp + 92]     */
-        adj_code[ 3]  = 0x9A10000BUL;   /* mov   %o3, %o5            */
-        adj_code[ 4]  = 0x9810000AUL;   /* mov   %o2, %o4            */
-        adj_code[ 5]  = 0x96100009UL;   /* mov   %o1, %o3            */
-        adj_code[ 6]  = 0x94100008UL;   /* mov   %o0, %o2            */
-        adj_code[ 7]  = 0x13000000UL;   /* sethi %hi(wptr), %o1      */
-        adj_code[ 7] |= ((unsigned long)wptr) >> 10;
-        adj_code[ 8]  = 0x11000000UL;   /* sethi %hi(hptr), %o0      */
-        adj_code[ 8] |= ((unsigned long)hptr) >> 10;
-        adj_code[ 9]  = 0x81C26000UL;   /* jmp   %o1 + %lo(wptr)     */
-        adj_code[ 9] |= ((unsigned long)wptr) & 0x000003FFUL;
-        adj_code[10]  = 0x90122000UL;   /* or    %o0, %lo(hptr), %o0 */
-        adj_code[10] |= ((unsigned long)hptr) & 0x000003FFUL;
+    adj_code[ 0]  = 0x9C23A008UL;   /* sub   %sp, 8, %sp         */
+    adj_code[ 1]  = 0xDA23A060UL;   /* st    %o5, [%sp + 96]     */
+    adj_code[ 2]  = 0xD823A05CUL;   /* st    %o4, [%sp + 92]     */
+    adj_code[ 3]  = 0x9A10000BUL;   /* mov   %o3, %o5            */
+    adj_code[ 4]  = 0x9810000AUL;   /* mov   %o2, %o4            */
+    adj_code[ 5]  = 0x96100009UL;   /* mov   %o1, %o3            */
+    adj_code[ 6]  = 0x94100008UL;   /* mov   %o0, %o2            */
+    adj_code[ 7]  = 0x13000000UL;   /* sethi %hi(wptr), %o1      */
+    adj_code[ 7] |= ((unsigned long)wptr) >> 10;
+    adj_code[ 8]  = 0x11000000UL;   /* sethi %hi(hptr), %o0      */
+    adj_code[ 8] |= ((unsigned long)hptr) >> 10;
+    adj_code[ 9]  = 0x81C26000UL;   /* jmp   %o1 + %lo(wptr)     */
+    adj_code[ 9] |= ((unsigned long)wptr) & 0x000003FFUL;
+    adj_code[10]  = 0x90122000UL;   /* or    %o0, %lo(hptr), %o0 */
+    adj_code[10] |= ((unsigned long)hptr) & 0x000003FFUL;
 
-        adj_code[11]  = (unsigned long)hptr;
+    adj_code[11]  = (unsigned long)hptr;
 
-        /* flush cache */
-        asm("flush %0" : : "r" (adj_code     ));
-        asm("flush %0" : : "r" (adj_code +  2));
-        asm("flush %0" : : "r" (adj_code +  4));
-        asm("flush %0" : : "r" (adj_code +  6));
-        asm("flush %0" : : "r" (adj_code + 10));
+    /* flush cache */
+    asm("flush %0" : : "r" (adj_code     ));
+    asm("flush %0" : : "r" (adj_code +  2));
+    asm("flush %0" : : "r" (adj_code +  4));
+    asm("flush %0" : : "r" (adj_code +  6));
+    asm("flush %0" : : "r" (adj_code + 10));
 
-        /* max. 5 instructions latency, and we need at >= 1 for returning */
-        asm("nop");
-        asm("nop");
-        asm("nop");
-        asm("nop");
-    }
+    /* max. 5 instructions latency, and we need at >= 1 for returning */
+    asm("nop");
+    asm("nop");
+    asm("nop");
+    asm("nop");
 #elif defined(alpha_TARGET_ARCH)
   /* Magic constant computed by inspecting the code length of
      the following assembly language snippet
@@ -322,21 +319,20 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
       4 bytes (getting rid of the nop), hence saving memory. [ccshan]
   */
     ASSERT(((StgWord64)wptr & 3) == 0);
-    if ((adjustor = stgMallocBytes(48, "createAdjustor")) != NULL) {
-	StgWord64 *const code = (StgWord64 *)adjustor;
+    adjustor = stgMallocBytes(48, "createAdjustor");
+    StgWord64 *const code = (StgWord64 *)adjustor;
 
-	code[0] = 0x4610041246520414L;
-	code[1] = 0x46730415a61b0020L;
-	code[2] = 0x46310413a77b0028L;
-	code[3] = 0x000000006bfb0000L
-		| (((StgWord32*)(wptr) - (StgWord32*)(code) - 3) & 0x3fff);
+    code[0] = 0x4610041246520414L;
+    code[1] = 0x46730415a61b0020L;
+    code[2] = 0x46310413a77b0028L;
+    code[3] = 0x000000006bfb0000L
+      | (((StgWord32*)(wptr) - (StgWord32*)(code) - 3) & 0x3fff);
 
-	code[4] = (StgWord64)hptr;
-	code[5] = (StgWord64)wptr;
+    code[4] = (StgWord64)hptr;
+    code[5] = (StgWord64)wptr;
 
-	/* Ensure that instruction cache is consistent with our new code */
-	__asm__ volatile("call_pal %0" : : "i" (PAL_imb));
-    }
+    /* Ensure that instruction cache is consistent with our new code */
+    __asm__ volatile("call_pal %0" : : "i" (PAL_imb));
 #elif defined(powerpc_TARGET_ARCH)
 /*
 	For PowerPC, the following code is used:
@@ -359,48 +355,45 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
 	this code, it only works for up to 6 arguments (when floating point arguments
 	are involved, this may be more or less, depending on the exact situation).
 */
-	if ((adjustor = stgMallocBytes(4*13, "createAdjustor")) != NULL) {
-		unsigned long *const adj_code = (unsigned long *)adjustor;
+    adjustor = stgMallocBytes(4*13, "createAdjustor");
+    unsigned long *const adj_code = (unsigned long *)adjustor;
 
-		// make room for extra arguments
-		adj_code[0] = 0x7d0a4378;	//mr r10,r8
-		adj_code[1] = 0x7ce93b78;	//mr r9,r7
-		adj_code[2] = 0x7cc83378;	//mr r8,r6
-		adj_code[3] = 0x7ca72b78;	//mr r7,r5
-		adj_code[4] = 0x7c862378;	//mr r6,r4
-		adj_code[5] = 0x7c651b78;	//mr r5,r3
+    // make room for extra arguments
+    adj_code[0] = 0x7d0a4378;	//mr r10,r8
+    adj_code[1] = 0x7ce93b78;	//mr r9,r7
+    adj_code[2] = 0x7cc83378;	//mr r8,r6
+    adj_code[3] = 0x7ca72b78;	//mr r7,r5
+    adj_code[4] = 0x7c862378;	//mr r6,r4
+    adj_code[5] = 0x7c651b78;	//mr r5,r3
 		
-		adj_code[6] = 0x3c000000;	//lis r0,hi(wptr)
-		adj_code[6] |= ((unsigned long)wptr) >> 16;
+    adj_code[6] = 0x3c000000;	//lis r0,hi(wptr)
+    adj_code[6] |= ((unsigned long)wptr) >> 16;
 		
-		adj_code[7] = 0x3c600000;	//lis r3,hi(hptr)
-		adj_code[7] |= ((unsigned long)hptr) >> 16;
+    adj_code[7] = 0x3c600000;	//lis r3,hi(hptr)
+    adj_code[7] |= ((unsigned long)hptr) >> 16;
 		
-		adj_code[8] = 0x60000000;	//ori r0,r0,lo(wptr)
-		adj_code[8] |= ((unsigned long)wptr) & 0xFFFF; 
+    adj_code[8] = 0x60000000;	//ori r0,r0,lo(wptr)
+    adj_code[8] |= ((unsigned long)wptr) & 0xFFFF; 
 		
-		adj_code[9] = 0x60630000;	//ori r3,r3,lo(hptr)
-		adj_code[9] |= ((unsigned long)hptr) & 0xFFFF;
+    adj_code[9] = 0x60630000;	//ori r3,r3,lo(hptr)
+    adj_code[9] |= ((unsigned long)hptr) & 0xFFFF;
 		
-		adj_code[10] = 0x7c0903a6;	//mtctr r0
-		adj_code[11] = 0x4e800420;	//bctr
-		adj_code[12] = (unsigned long)hptr;
+    adj_code[10] = 0x7c0903a6;	//mtctr r0
+    adj_code[11] = 0x4e800420;	//bctr
+    adj_code[12] = (unsigned long)hptr;
 		
-		// Flush the Instruction cache:
-		//	MakeDataExecutable(adjustor,4*13);
-			/* This would require us to link with CoreServices.framework */
-		{		/* this should do the same: */
-			int n = 13;
-			unsigned long *p = adj_code;
-			while(n--)
-			{
-				__asm__ volatile ("dcbf 0,%0\n\tsync\n\ticbi 0,%0"
-						    : : "r" (p));
-				p++;
-			}
-			__asm__ volatile ("sync\n\tisync");
-		}
-	}
+    /* Flush the Instruction cache: */
+    /* MakeDataExecutable(adjustor,4*13); */
+    /* This would require us to link with CoreServices.framework */
+    { /* this should do the same: */
+      int n = 13;
+      unsigned long *p = adj_code;
+      while (n--) {
+	__asm__ volatile ("dcbf 0,%0\n\tsync\n\ticbi 0,%0" : : "r" (p));
+	p++;
+      }
+      __asm__ volatile ("sync\n\tisync");
+    }
 #elif defined(ia64_TARGET_ARCH)
 /*
     Up to 8 inputs are passed in registers.  We flush the last two inputs to
