@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.8 $
- * $Date: 1999/07/06 15:24:37 $
+ * $Revision: 1.9 $
+ * $Date: 1999/10/11 12:15:13 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -216,6 +216,12 @@ char *argv[]; {
 #endif
 
     CStackBase = &argc;                 /* Save stack base for use in gc   */
+
+    /* Try and figure out an absolute path to the executable, so
+       we can make a reasonable guess about where the default
+       libraries (Prelude etc) are.
+    */
+    setDefaultLibDir ( argv[0] );
 
     /* If first arg is +Q or -Q, be entirely silent, and automatically run
        main after loading scripts.  Useful for running the nofib suite.    */
@@ -813,9 +819,15 @@ static Void local makeStackEntry ( ScriptInfo* ent, String iname )
    if (!(sAvail || (oAvail && iAvail))) 
       internal("chase");
    /* Load objects in preference to sources if both are available */
+   /* 11 Oct 99: disable object loading in the interim.
+      Will probably only reinstate when HEP becomes available.
    fromObj = sAvail
                 ? (oAvail && iAvail && timeEarlier(sTime,oTime))
                 : TRUE;
+   */
+
+   fromObj = FALSE;
+
    /* ToDo: namesUpto overflow */
    ent->modName     = strCopy(iname);
    ent->details     = TRUE;
@@ -1162,7 +1174,7 @@ static Void local whatScripts() {       /* list scripts in current session */
     if (projectLoaded)
         Printf(" (project: %s)",currProject);
     for (i=0; i<numScripts; ++i)
-        Printf("\n%s",scriptInfo[i].modName);
+      Printf("\n%s%s",scriptInfo[i].path, scriptInfo[i].modName);
     Putchar('\n');
 }
 

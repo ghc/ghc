@@ -12,8 +12,8 @@
  * in the distribution for details.
  *
  * $RCSfile: machdep.c,v $
- * $Revision: 1.6 $
- * $Date: 1999/06/07 17:22:37 $
+ * $Revision: 1.7 $
+ * $Date: 1999/10/11 12:15:12 $
  * ------------------------------------------------------------------------*/
 
 #ifdef HAVE_SIGNAL_H
@@ -599,6 +599,33 @@ String path; {
  * New path handling stuff for the Combined System (tm)
  * ------------------------------------------------------------------------*/
 
+#define N_DEFAULT_LIBDIR 1000
+char defaultLibDir[N_DEFAULT_LIBDIR];
+
+/* Assumes that getcwd()++argv[0] is the absolute path to the
+   executable.  Basically wrong.
+*/
+void setDefaultLibDir ( String argv_0 )
+{
+   int i;
+   if (argv_0[0] != SLASH) {
+      if (!getcwd(defaultLibDir,N_DEFAULT_LIBDIR-strlen(argv_0)-10)) {
+         ERRMSG(0) "Can't get current working directory"
+         EEND;
+      }
+      i = strlen(defaultLibDir);
+      defaultLibDir[i++] = SLASH;
+   } else {
+      i = 0;
+   }
+   strcpy(&defaultLibDir[i],argv_0);
+   i += strlen(argv_0);
+   while (defaultLibDir[i] != SLASH) i--;
+   i++;
+   strcpy(&defaultLibDir[i], "lib");
+   /* fprintf ( stderr, "default lib dir = %s\n", defaultLibDir ); */
+}
+
 Bool findFilesForModule ( 
         String  modName,
         String* path,
@@ -621,18 +648,21 @@ Bool findFilesForModule (
    Int    nPath;
    Bool   literate;
    String peStart, peEnd;
-   String augdPath;       /* . and then hugsPath */
+   String augdPath;       /* .:defaultLibDir:hugsPath */
 
    *path = *sExt = NULL;
    *sAvail = *iAvail = *oAvail = FALSE;
    *sSize  = *iSize  = *oSize  = 0;
 
-   augdPath = malloc(3+strlen(hugsPath));
+   augdPath = malloc(4+strlen(defaultLibDir)+strlen(hugsPath));
    if (!augdPath)
       internal("moduleNameToFileNames: malloc failed(2)");
    augdPath[0] = '.';
    augdPath[1] = PATHSEP;
    augdPath[2] = 0;
+   strcat ( augdPath, defaultLibDir );
+   augdPath[2+strlen(defaultLibDir)] = PATHSEP;
+   augdPath[3+strlen(defaultLibDir)] = 0;
    strcat(augdPath,hugsPath);
 
    peEnd = augdPath-1;
