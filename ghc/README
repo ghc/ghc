@@ -44,6 +44,8 @@ Mailing Lists
 
     subscribe at http://www.haskell.org/mailman/listinfo/
 
+Contributors
+=============
 
 Current GHC team:
 
@@ -61,6 +63,7 @@ Additional Contributors (in alphabetical order):
     Marcin Kowalczyk	 <qrczak@knm.org.pl>
     Hans Wolfgang Lloidl <hwloidl@cee.hw.ac.uk>
     Sven Panne		 <Sven.Panne@BetaResearch.de>
+    Ken Shan		 <ken@digitas.harvard.edu>
     Keith Wansborough    <Keith.Wansbrough@cl.cam.ac.uk>
     Michael Weber	 <michael.weber@post.rwth-aachen.de>
 
