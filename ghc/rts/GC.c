@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.7 1999/01/14 10:49:01 simonm Exp $
+ * $Id: GC.c,v 1.8 1999/01/14 11:11:29 simonm Exp $
  *
  * Two-space garbage collector
  *
@@ -1745,6 +1745,18 @@ scavenge_static(void)
       {
 	StgInd *ind = (StgInd *)p;
 	ind->indirectee = evacuate(ind->indirectee);
+
+	/* might fail to evacuate it, in which case we have to pop it
+	 * back on the mutable list (and take it off the
+	 * scavenged_static list because the static link and mut link
+	 * pointers are one and the same).
+	 */
+	if (failed_to_evac) {
+	  failed_to_evac = rtsFalse;
+	  scavenged_static_objects = STATIC_LINK(info,p);
+	  ((StgMutClosure *)ind)->mut_link = oldest_gen->mut_list;
+	  oldest_gen->mut_list = (StgMutClosure *)ind;
+	}
 	break;
       }
       
@@ -1768,6 +1780,8 @@ scavenge_static(void)
     default:
       barf("scavenge_static");
     }
+
+    ASSERT(failed_to_evac == rtsFalse);
 
     /* get the next static object from the list.  Remeber, there might
      * be more stuff on this list now that we've done some evacuating!
