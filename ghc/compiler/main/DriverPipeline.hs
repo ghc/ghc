@@ -84,7 +84,7 @@ getGhcMode flags
 	([(flag,one)], rest) -> return (rest, one, flag)
 	(_    , _   ) -> 
 	  throwDyn (UsageError 
-		"only one of the flags -M, -E, -C, -S, -c, --make, --interactive, -mk-dll is allowed")
+		"only one of the flags -M, -E, -C, -S, -c, --make, --interactive, --mk-dll is allowed")
 
 -----------------------------------------------------------------------------
 -- genPipeline
@@ -195,6 +195,7 @@ genPipeline todo stop_flag persistent_output lang (filename,suffix)
 			StopBefore phase      -> phase
 			DoMkDependHS	      -> Ln
 			DoLink                -> Ln
+			DoMkDLL               -> Ln
    ----------- -----  ----   ---   --   --  -  -  -
 
 	-- this shouldn't happen.
