@@ -95,7 +95,7 @@ import MkId		( unsafeCoerceId )
 import TysWiredIn	( mkListTy, unitTy )
 import IdInfo		( GlobalIdDetails(..) )
 import SrcLoc		( interactiveSrcLoc, unLoc )
-import Var		( setGlobalIdDetails )
+import Var		( globaliseId )
 import Name		( nameOccName, nameModuleName )
 import NameEnv		( delListFromNameEnv )
 import PrelNames	( iNTERACTIVE, ioTyConName, printName, monadNames, itName, returnIOName )
@@ -244,8 +244,7 @@ tcRnStmt hsc_env ictxt rdr_stmt
 	    	-- important: otherwise when we come to compile an expression
 	    	-- using these ids later, the byte code generator will consider
 	    	-- the occurrences to be free rather than global.
-	global_ids     = map globaliseId bound_ids ;
-	globaliseId id = setGlobalIdDetails id VanillaGlobal ;
+	global_ids     = map (globaliseId VanillaGlobal) bound_ids ;
     
 		-- Update the interactive context
 	rn_env   = ic_rn_local_env ictxt ;

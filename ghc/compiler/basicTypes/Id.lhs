@@ -19,7 +19,7 @@ module Id (
 	recordSelectorFieldLabel,
 
 	-- Modifying an Id
-	setIdName, setIdUnique, Id.setIdType, setIdLocalExported, setGlobalIdDetails,
+	setIdName, setIdUnique, Id.setIdType, setIdLocalExported, 
 	setIdInfo, lazySetIdInfo, modifyIdInfo, maybeModifyIdInfo,
 	zapLamIdInfo, zapDemandIdInfo, 
 
@@ -86,7 +86,7 @@ import Var		( Id, DictId,
 			  setIdName, setIdType, setIdUnique, setIdLocalExported,
 			  setIdInfo, lazySetIdInfo, modifyIdInfo, 
 			  maybeModifyIdInfo,
-			  globalIdDetails, setGlobalIdDetails
+			  globalIdDetails
 			)
 import qualified Var	( mkLocalId, mkGlobalId, mkSpecPragmaId, mkExportedLocalId )
 import Type		( Type, typePrimRep, addFreeTyVars, seqType)

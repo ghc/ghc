@@ -21,7 +21,7 @@ module Var (
 	setIdName, setIdUnique, setIdType, setIdInfo, lazySetIdInfo, 
 	setIdLocalExported, zapSpecPragmaId,
 
-	globalIdDetails, setGlobalIdDetails, 
+	globalIdDetails, globaliseId, 
 
 	mkLocalId, mkExportedLocalId, mkSpecPragmaId,
 	mkGlobalId, 
@@ -221,9 +221,13 @@ setIdLocalExported :: Id -> Id
 -- It had better be a LocalId already
 setIdLocalExported id = id { lclDetails = Exported }
 
-setGlobalIdDetails :: Id -> GlobalIdDetails -> Id
--- It had better be a GlobalId already
-setGlobalIdDetails id details = id { gblDetails = details }
+globaliseId :: GlobalIdDetails -> Id -> Id
+-- If it's a local, make it global
+globaliseId details id = GlobalId { varName    = varName id,
+				    realUnique = realUnique id,
+			   	    idType     = idType id,
+				    idInfo     = idInfo id,
+				    gblDetails = details }
 
 zapSpecPragmaId :: Id -> Id
 zapSpecPragmaId id
