@@ -142,9 +142,17 @@ instance Outputable PackageInfo where
 data ModLocation
    = ModLocation {
         ml_hs_file   :: Maybe FilePath,
-        ml_hspp_file :: Maybe FilePath,  -- path of preprocessed source
-        ml_hi_file   :: FilePath,
-        ml_obj_file  :: Maybe FilePath
+
+        ml_hspp_file :: Maybe FilePath, -- Path of preprocessed source
+
+        ml_hi_file   :: FilePath,	-- Where the .hi file is, whether or not it exists
+					-- Always of form foo.hi, even if there is an hi-boot
+					-- file (we add the -boot suffix later)
+
+        ml_obj_file  :: FilePath	-- Where the .o file is, whether or not it exists
+					-- (might not exist either because the module
+					--  hasn't been compiled yet, or because
+					--  it is part of a package with a .a file)
      }
      deriving Show
 
@@ -158,7 +166,7 @@ showModMsg use_object mod location =
     mod_str ++ replicate (max 0 (16 - length mod_str)) ' '
     ++" ( " ++ expectJust "showModMsg" (ml_hs_file location) ++ ", "
     ++ (if use_object
-	  then expectJust "showModMsg" (ml_obj_file location)
+	  then ml_obj_file location
 	  else "interpreted")
     ++ " )"
  where mod_str = moduleUserString mod

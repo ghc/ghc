@@ -771,7 +771,7 @@ run_phase Hsc basename suff input_fn output_fn
 		   -- THIS COMPILATION, then use that to determine if the 
 		   -- source is unchanged.
 		| Just x <- expl_o_file, todo == StopBefore Ln  =  x
-		| otherwise = expectJust "source_unchanged" (ml_obj_file location)
+		| otherwise = ml_obj_file location
 
 	source_unchanged <- 
           if not (do_recomp && ( todo == DoLink || todo == StopBefore Ln ))

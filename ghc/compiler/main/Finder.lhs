@@ -209,26 +209,27 @@ searchPathExts path mod_name exts = search path
 -- Building ModLocations
 
 mkHiOnlyModLocation hisuf mod_name path basename extension = do
+  loc <- hiOnlyModLocation path basename hisuf
+  let result = (mkHomeModule mod_name, loc)
   addToFinderCache mod_name result
   return result
- where
-  result = ( mkHomeModule mod_name, hiOnlyModLocation path basename hisuf )
 
 mkPackageModLocation hisuf mod_name path basename _extension = do
+  loc <- hiOnlyModLocation path basename hisuf
+  let result = (mkPackageModule mod_name, loc)
   addToFinderCache mod_name result
   return result
- where
-  result = ( mkPackageModule mod_name, hiOnlyModLocation path basename hisuf )
 
-hiOnlyModLocation path basename hisuf =
-      ModLocation{ ml_hspp_file = Nothing,
- 	          ml_hs_file   = Nothing,
- 		    -- remove the .hi-boot suffix from hi_file, if it
- 		    -- had one.  We always want the name of the real
- 		    -- .hi file in the ml_hi_file field.
- 	          ml_hi_file   = path ++ '/':basename ++ '.':hisuf,
- 	          ml_obj_file  = Nothing
-                 }
+hiOnlyModLocation path basename hisuf 
+ = do { obj_fn <- mkObjPath path basename ;
+        return (ModLocation{ ml_hspp_file = Nothing,
+ 	        	     ml_hs_file   = Nothing,
+ 	        	     ml_hi_file   = path ++ '/':basename ++ '.':hisuf,
+		 		    -- Remove the .hi-boot suffix from hi_file, if it
+		 		    -- had one.  We always want the name of the real
+		 		    -- .hi file in the ml_hi_file field.
+	   	             ml_obj_file  = obj_fn
+                 })}
 
 -- -----------------------------------------------------------------------------
 -- Constructing a home module location
@@ -273,8 +274,8 @@ mkHomeModLocation mod_name is_root path basename extension = do
 
    hisuf  <- readIORef v_Hi_suf
    hidir  <- readIORef v_Hi_dir
-   odir   <- readIORef v_Output_dir
-   osuf   <- readIORef v_Object_suf
+
+   obj_fn <- mkObjPath path basename
 
    let  -- hi filename
        mod_str = moduleNameUserString mod_name
@@ -293,21 +294,29 @@ mkHomeModLocation mod_name is_root path basename extension = do
 	 | path == "."  = basename ++ '.':extension
 	 | otherwise    = path ++ '/':basename ++ '.':extension
 
-	-- the object filename
-       obj_path | Just d <- odir = d
-	 	| otherwise      = path
-       obj_fn = obj_path ++ '/':basename ++ '.':osuf
-
-  
        result = ( mkHomeModule mod_name,
            	  ModLocation{ ml_hspp_file = Nothing,
 	   		       ml_hs_file   = Just source_fn,
 			       ml_hi_file   = hi_fn,
-			       ml_obj_file  = Just obj_fn,
+			       ml_obj_file  = obj_fn,
 		       })
 
    addToFinderCache mod_name result
    return result
+
+mkObjPath :: String -> FilePath -> IO FilePath
+-- Construct the filename of a .o file from the path/basename
+-- derived either from a .hs file or a .hi file.
+--
+-- Does *not* check whether the .o file exists
+mkObjPath path basename
+  = do  odir   <- readIORef v_Output_dir
+	osuf   <- readIORef v_Object_suf
+	let obj_path | Just d <- odir = d
+	   	     | otherwise      = path
+        return (obj_path ++ '/':basename ++ '.':osuf)
+
+  
 
 -- -----------------------------------------------------------------------------
 -- findLinkable isn't related to the other stuff in here, 
@@ -315,8 +324,8 @@ mkHomeModLocation mod_name is_root path basename extension = do
 
 findLinkable :: ModuleName -> ModLocation -> IO (Maybe Linkable)
 findLinkable mod locn
-   | Just obj_fn <- ml_obj_file locn
-   = do obj_exist <- doesFileExist obj_fn
+   = do let obj_fn = ml_obj_file locn
+	obj_exist <- doesFileExist obj_fn
         if not obj_exist 
          then return Nothing 
          else 
@@ -327,6 +336,4 @@ findLinkable mod locn
             if stub_exist
              then return (Just (LM obj_time mod [DotO obj_fn, DotO stub_fn]))
              else return (Just (LM obj_time mod [DotO obj_fn]))
-   | otherwise
-   = return Nothing
 \end{code}
