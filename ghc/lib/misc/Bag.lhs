@@ -4,32 +4,19 @@
 \section[Bags]{@Bag@: an unordered collection with duplicates}
 
 \begin{code}
-#ifdef COMPILING_GHC
-#include "HsVersions.h"
-#endif
-
 module Bag (
 	Bag,	-- abstract type
 
 	emptyBag, unitBag, unionBags, unionManyBags,
 	mapBag,
-#ifndef COMPILING_GHC
 	elemBag,
-#endif
+
 	filterBag, partitionBag, concatBag, foldBag,
 	isEmptyBag, consBag, snocBag,
 	listToBag, bagToList
     ) where
 
-#ifdef COMPILING_GHC
-IMP_Ubiq(){-uitous-}
-IMPORT_1_3(List(partition))
-
-import Outputable	( interpp'SP )
-import Pretty
-#else
 import List(partition)
-#endif
 
 data Bag a
   = EmptyBag
@@ -42,7 +29,6 @@ data Bag a
 emptyBag = EmptyBag
 unitBag  = UnitBag
 
-#ifndef COMPILING_GHC
 elemBag :: Eq a => a -> Bag a -> Bool
 
 elemBag x EmptyBag        = False
@@ -50,7 +36,6 @@ elemBag x (UnitBag y)     = x==y
 elemBag x (TwoBags b1 b2) = x `elemBag` b1 || x `elemBag` b2
 elemBag x (ListBag ys)    = any (x ==) ys
 elemBag x (ListOfBags bs) = any (x `elemBag`) bs
-#endif
 
 unionManyBags [] = EmptyBag
 unionManyBags xs = ListOfBags xs
@@ -155,17 +140,4 @@ bagToList_append (UnitBag x)	 xs = x:xs
 bagToList_append (TwoBags b1 b2) xs = bagToList_append b1 (bagToList_append b2 xs)
 bagToList_append (ListBag xx)    xs = xx++xs
 bagToList_append (ListOfBags bs) xs = foldr bagToList_append xs bs
-\end{code}
-
-\begin{code}
-#ifdef COMPILING_GHC
-
-instance (Outputable a) => Outputable (Bag a) where
-    ppr sty EmptyBag	    = ppStr "emptyBag"
-    ppr sty (UnitBag a)     = ppr sty a
-    ppr sty (TwoBags b1 b2) = ppCat [ppr sty b1, pp'SP, ppr sty b2]
-    ppr sty (ListBag as)    = interpp'SP sty as
-    ppr sty (ListOfBags bs) = ppCat [ppLbrack, interpp'SP sty bs, ppRbrack]
-
-#endif {- COMPILING_GHC -}
 \end{code}
