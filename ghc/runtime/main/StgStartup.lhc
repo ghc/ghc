@@ -310,6 +310,8 @@ STGFUN(ErrorIO_innards)
     /* Assumes that "TopClosure" has been set already */
 {
     FB_
+    fflush(stdout);
+    fflush(stderr);
     if (ErrorIO_call_count >= 16 /* MAGIC CONSTANT */ ) {
         /* Don't wrap the calls; we're done with STG land */
         fflush(stdout);
@@ -395,6 +397,8 @@ ErrorIO_innards(STG_NO_ARGS)
     /* Assumes that "TopClosure" has been set already */
 {
     FB_
+    fflush(stdout);
+    fflush(stderr);
     if (ErrorIO_call_count >= 16 /* MAGIC CONSTANT */ ) {
         /* Don't wrap the calls; we're done with STG land */
         fflush(stdout);
