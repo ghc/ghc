@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.13 1999/02/05 16:02:45 simonm Exp $
+ * $Id: PrimOps.hc,v 1.14 1999/02/11 14:22:53 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -300,7 +300,7 @@ FN_(mkWeakzh_fast)
 {
   /* R1.p = key
      R2.p = value
-     R3.p = finaliser
+     R3.p = finalizer
   */
   StgWeak *w;
   FB_
@@ -316,9 +316,9 @@ FN_(mkWeakzh_fast)
   w->key        = R1.cl;
   w->value      = R2.cl;
   if (R3.cl) {
-     w->finaliser  = R3.cl;
+     w->finalizer  = R3.cl;
   } else {
-     w->finaliser  = &NO_FINALISER_closure;
+     w->finalizer  = &NO_FINALIZER_closure;
   }
 
   w->link       = weak_ptr_list;
@@ -330,7 +330,7 @@ FN_(mkWeakzh_fast)
   FE_
 }
 
-FN_(finaliseWeakzh_fast)
+FN_(finalizeWeakzh_fast)
 {
   /* R1.p = weak ptr
    */
@@ -339,16 +339,20 @@ FN_(finaliseWeakzh_fast)
   TICK_RET_UNBOXED_TUP(0);
   w = (StgWeak *)R1.p;
 
-  if (w->finaliser != &NO_FINALISER_closure) {
-#ifdef INTERPRETER
-      STGCALL2(createGenThread, RtsFlags.GcFlags.initialStkSize, w->finaliser);
-#else
-      STGCALL2(createIOThread, RtsFlags.GcFlags.initialStkSize, w->finaliser);
-#endif
+  /* already dead? */
+  if (w->header.info == &DEAD_WEAK_info) {
+      RET_NP(0,&NO_FINALIZER_closure);
   }
+
+  /* kill it */
   w->header.info = &DEAD_WEAK_info;
 
-  JMP_(ENTRY_CODE(Sp[0]));
+  /* return the finalizer */
+  if (w->finalizer == &NO_FINALIZER_closure) {
+      RET_NP(0,&NO_FINALIZER_closure);
+  } else {
+      RET_NP(1,w->finalizer);
+  }
   FE_
 }
 

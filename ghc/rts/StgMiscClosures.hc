@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.13 1999/02/05 16:02:58 simonm Exp $
+ * $Id: StgMiscClosures.hc,v 1.14 1999/02/11 14:22:54 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -240,16 +240,16 @@ INFO_TABLE_CONSTR(DEAD_WEAK_info,DEAD_WEAK_entry,0,1,0,CONSTR,const,EF_,0,0);
 NON_ENTERABLE_ENTRY_CODE(DEAD_WEAK);
 
 /* -----------------------------------------------------------------------------
-   NO_FINALISER
+   NO_FINALIZER
 
    This is a static nullary constructor (like []) that we use to mark an empty
-   finaliser in a weak pointer object.
+   finalizer in a weak pointer object.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE_CONSTR(NO_FINALISER_info,NO_FINALISER_entry,0,0,0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
-NON_ENTERABLE_ENTRY_CODE(NO_FINALISER);
+INFO_TABLE_CONSTR(NO_FINALIZER_info,NO_FINALIZER_entry,0,0,0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
+NON_ENTERABLE_ENTRY_CODE(NO_FINALIZER);
 
-SET_STATIC_HDR(NO_FINALISER_closure,NO_FINALISER_info,0/*CC*/,,EI_)
+SET_STATIC_HDR(NO_FINALIZER_closure,NO_FINALIZER_info,0/*CC*/,,EI_)
 };
 
 /* -----------------------------------------------------------------------------

@@ -172,7 +172,7 @@ data PrimOp
 
     | MkWeakOp
     | DeRefWeakOp
-    | FinaliseWeakOp
+    | FinalizeWeakOp
 
     | MakeStableNameOp
     | EqStableNameOp
@@ -501,7 +501,7 @@ tagOf_PrimOp MakeForeignObjOp		      = ILIT(201)
 tagOf_PrimOp WriteForeignObjOp		      = ILIT(202)
 tagOf_PrimOp MkWeakOp			      = ILIT(203)
 tagOf_PrimOp DeRefWeakOp		      = ILIT(204)
-tagOf_PrimOp FinaliseWeakOp		      = ILIT(205)
+tagOf_PrimOp FinalizeWeakOp		      = ILIT(205)
 tagOf_PrimOp MakeStableNameOp		      = ILIT(206)
 tagOf_PrimOp EqStableNameOp		      = ILIT(207)
 tagOf_PrimOp StableNameToIntOp		      = ILIT(208)
@@ -767,7 +767,7 @@ allThePrimOps
 	WriteForeignObjOp,
 	MkWeakOp,
 	DeRefWeakOp,
-	FinaliseWeakOp,
+	FinalizeWeakOp,
 	MakeStableNameOp,
 	EqStableNameOp,
 	StableNameToIntOp,
@@ -1542,7 +1542,7 @@ primOpInfo MkWeakOp
 \end{code}
 
 The following operation dereferences a weak pointer.  The weak pointer
-may have been finalised, so the operation returns a result code which
+may have been finalized, so the operation returns a result code which
 must be inspected before looking at the dereferenced value.
 
 	deRefWeak# :: Weak# v -> State# RealWorld ->
@@ -1561,15 +1561,26 @@ primOpInfo DeRefWeakOp
 	(unboxedTriple [realWorldStatePrimTy, intPrimTy, alphaTy])
 \end{code}
 
-Weak pointers can be finalised early by using the finalise# operation:
+Weak pointers can be finalized early by using the finalize# operation:
 	
-	finalise# :: Weak# v -> State# RealWorld -> State# RealWorld
+	finalizeWeak# :: Weak# v -> State# RealWorld -> 
+	   		   (# State# RealWorld, Int#, IO () #)
+
+The Int# returned is either
+
+	0 if the weak pointer has already been finalized, or it has no
+	  finalizer (the third component is then invalid).
+
+	1 if the weak pointer is still alive, with the finalizer returned
+	  as the third component.
 
 \begin{code}
-primOpInfo FinaliseWeakOp
- = mkGenPrimOp SLIT("finaliseWeak#") [alphaTyVar]
+primOpInfo FinalizeWeakOp
+ = mkGenPrimOp SLIT("finalizeWeak#") [alphaTyVar]
 	[mkWeakPrimTy alphaTy, realWorldStatePrimTy]
-	realWorldStatePrimTy
+	(unboxedTriple [realWorldStatePrimTy, intPrimTy,
+		        mkFunTy realWorldStatePrimTy 
+			  (unboxedPair [realWorldStatePrimTy,unitTy])])
 \end{code}
 
 %************************************************************************
@@ -1805,7 +1816,7 @@ primOpOutOfLine op
 	FloatDecodeOp		-> True
 	DoubleDecodeOp		-> True
 	MkWeakOp		-> True
-	FinaliseWeakOp		-> True
+	FinalizeWeakOp		-> True
 	MakeStableNameOp	-> True
 	MakeForeignObjOp	-> True
 	NewMutVarOp		-> True
@@ -1887,7 +1898,7 @@ primOpHasSideEffects MakeForeignObjOp  = True
 primOpHasSideEffects WriteForeignObjOp = True
 primOpHasSideEffects MkWeakOp  	       = True
 primOpHasSideEffects DeRefWeakOp       = True
-primOpHasSideEffects FinaliseWeakOp    = True
+primOpHasSideEffects FinalizeWeakOp    = True
 primOpHasSideEffects MakeStablePtrOp   = True
 primOpHasSideEffects MakeStableNameOp  = True
 primOpHasSideEffects EqStablePtrOp     = True  -- SOF

@@ -1,9 +1,9 @@
 /* -----------------------------------------------------------------------------
- * $Id: Weak.c,v 1.7 1999/02/05 16:03:03 simonm Exp $
+ * $Id: Weak.c,v 1.8 1999/02/11 14:22:55 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
- * Weak pointers / finalisers
+ * Weak pointers / finalizers
  *
  * ---------------------------------------------------------------------------*/
 
@@ -16,43 +16,43 @@
 StgWeak *weak_ptr_list;
 
 /*
- * finaliseWeakPointersNow() is called just before the system is shut
- * down.  It runs the finaliser for each weak pointer still in the
+ * finalizeWeakPointersNow() is called just before the system is shut
+ * down.  It runs the finalizer for each weak pointer still in the
  * system.
  */
 
 void
-finaliseWeakPointersNow(void)
+finalizeWeakPointersNow(void)
 {
   StgWeak *w;
 
   for (w = weak_ptr_list; w; w = w->link) {
     IF_DEBUG(weak,fprintf(stderr,"Finalising weak pointer at %p -> %p\n", w, w->key));
     w->header.info = &DEAD_WEAK_info;
-    if (w->finaliser != &NO_FINALISER_closure) {
-      rts_evalIO(w->finaliser,NULL);
+    if (w->finalizer != &NO_FINALIZER_closure) {
+      rts_evalIO(w->finalizer,NULL);
     }
   }
 } 
 
 /*
- * scheduleFinalisers() is called on the list of weak pointers found
+ * scheduleFinalizers() is called on the list of weak pointers found
  * to be dead after a garbage collection.  It overwrites each object
- * with DEAD_WEAK, and creates a new thread for the finaliser.
+ * with DEAD_WEAK, and creates a new thread for the finalizer.
  */
 
 void
-scheduleFinalisers(StgWeak *list)
+scheduleFinalizers(StgWeak *list)
 {
   StgWeak *w;
   
   for (w = list; w; w = w->link) {
     IF_DEBUG(weak,fprintf(stderr,"Finalising weak pointer at %p -> %p\n", w, w->key));
-    if (w->finaliser != &NO_FINALISER_closure) {
+    if (w->finalizer != &NO_FINALIZER_closure) {
 #ifdef INTERPRETER
-      createGenThread(RtsFlags.GcFlags.initialStkSize, w->finaliser);
+      createGenThread(RtsFlags.GcFlags.initialStkSize, w->finalizer);
 #else
-      createIOThread(RtsFlags.GcFlags.initialStkSize, w->finaliser);
+      createIOThread(RtsFlags.GcFlags.initialStkSize, w->finalizer);
 #endif
     }
     w->header.info = &DEAD_WEAK_info;

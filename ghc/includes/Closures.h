@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Closures.h,v 1.7 1999/02/05 16:02:21 simonm Exp $
+ * $Id: Closures.h,v 1.8 1999/02/11 14:22:56 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -260,7 +260,7 @@ typedef struct _StgWeak {	/* Weak v */
   StgHeader header;
   StgClosure *key;
   StgClosure *value;		/* v */
-  StgClosure *finaliser;
+  StgClosure *finalizer;
   struct _StgWeak *link;
 } StgWeak;
 
