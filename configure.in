@@ -355,15 +355,6 @@ if test "$GHC" = ""; then
   AC_PATH_PROG(GHC,ghc)
 fi
 
-AC_ARG_WITH(hc,
-[  --with-hc=<haskell compiler>
-        Use a command different from 'ghc' to compile generic Haskell code.
-],
-[WithHc="$withval"],
-[WithHc=$GHC]
-)
-AC_SUBST(WithHc)
-
 AC_ARG_WITH(ghc,
 [  --with-ghc=<haskell compiler>
         Use a command different from 'ghc' to compile GHC-specific Haskell code
@@ -373,6 +364,15 @@ AC_ARG_WITH(ghc,
 [WithGhc=$GHC]
 )
 AC_SUBST(WithGhc)
+
+AC_ARG_WITH(hc,
+[  --with-hc=<haskell compiler>
+        Use a command different from 'ghc' to compile generic Haskell code.
+],
+[WithHc="$withval"],
+[WithHc=$WithGhc]
+)
+AC_SUBST(WithHc)
 
 if test "$WithGhc" != ""; then
   FPTOOLS_GHC_VERSION([GhcVersion], [GhcMajVersion], [GhcMinVersion], [GhcPatchLevel])dnl
