@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.24 $
- * $Date: 1999/11/25 10:19:16 $
+ * $Revision: 1.25 $
+ * $Date: 1999/11/29 18:59:26 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -29,7 +29,7 @@
 #include "Rts.h"
 #include "RtsAPI.h"
 #include "Schedule.h"
-
+#include "Assembler.h"                                /* DEBUG_LoadSymbols */
 
 Bool haskell98 = TRUE;                  /* TRUE => Haskell 98 compatibility*/
 
@@ -108,12 +108,13 @@ static Void   local browse	      Args((Void));
 
 static Bool   printing     = FALSE;     /* TRUE => currently printing value*/
 static Bool   showStats    = FALSE;     /* TRUE => print stats after eval  */
-static Bool   listScripts  = TRUE;      /* TRUE => list scripts after loading*/
+static Bool   listScripts  = TRUE;    /* TRUE => list scripts after loading*/
 static Bool   addType      = FALSE;     /* TRUE => print type with value   */
 static Bool   useDots      = RISCOS;    /* TRUE => use dots in progress    */
 static Bool   quiet        = FALSE;     /* TRUE => don't show progress     */
 static Bool   lastWasObject = FALSE;
        Bool   preludeLoaded = FALSE;
+       Bool   debugSC       = FALSE;
 
 typedef 
    struct { 
@@ -768,9 +769,7 @@ struct options toggle[] = {             /* List of command line toggles    */
 #if DEBUG_CODE
     {'D', 1, "Debug: show generated G code",          &debugCode},
 #endif
-#if DEBUG_SHOWSC
     {'S', 1, "Debug: show generated SC code",         &debugSC},
-#endif
 #if 0
     {'f', 1, "Terminate evaluation on first error",   &failOnError},
     {'u', 1, "Use \"show\" to display results",       &useShow},
@@ -860,8 +859,8 @@ static Void local makeStackEntry ( ScriptInfo* ent, String iname )
         );
    if (!ok) {
       ERRMSG(0) 
-	/* "Can't file source or object+interface for module \"%s\"", */
-         "Can't file source for module \"%s\"",
+         "Can't find source or object+interface for module \"%s\"",
+         /* "Can't find source for module \"%s\"", */
          iname
       EEND;
    }
@@ -871,11 +870,10 @@ static Void local makeStackEntry ( ScriptInfo* ent, String iname )
    /* Load objects in preference to sources if both are available */
    /* 11 Oct 99: disable object loading in the interim.
       Will probably only reinstate when HEP becomes available.
+   */
    fromObj = sAvail
                 ? (oAvail && iAvail && timeEarlier(sTime,oTime))
                 : TRUE;
-   */
-   fromObj = FALSE;
 
    /* ToDo: namesUpto overflow */
    ent->modName     = strCopy(iname);

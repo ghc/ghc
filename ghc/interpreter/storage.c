@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.18 $
- * $Date: 1999/11/25 12:12:25 $
+ * $Revision: 1.19 $
+ * $Date: 1999/11/29 18:59:32 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -230,6 +230,166 @@ Text t; {                               /* at top of text table            */
 }
 
 
+static int fromHexDigit ( char c )
+{
+   switch (c) {
+      case '0': case '1': case '2': case '3': case '4':
+      case '5': case '6': case '7': case '8': case '9':
+         return c - '0';
+      case 'a': case 'A': return 10;
+      case 'b': case 'B': return 11;
+      case 'c': case 'C': return 12;
+      case 'd': case 'D': return 13;
+      case 'e': case 'E': return 14;
+      case 'f': case 'F': return 15;
+      default: return -1;
+   }
+}
+
+
+/* returns findText (unZencode s) */
+Text unZcodeThenFindText ( String s )
+{
+   unsigned char* p;
+   Int            n, nn, i;
+   Text           t;
+
+   assert(s);
+   nn = 100 + 10 * strlen(s);
+   p = malloc ( nn );
+   if (!p) internal ("unZcodeThenFindText: malloc failed");
+   n = 0;
+
+   while (1) {
+      if (!(*s)) break;
+      if (n > nn-90) internal ("unZcodeThenFindText: result is too big");
+      if (*s != 'z' && *s != 'Z') {
+         p[n] = *s; n++; s++; 
+         continue;
+      }
+      s++;
+      if (!(*s)) goto parse_error;
+      switch (*s++) {
+         case 'Z': p[n++] = 'Z'; break;
+         case 'C': p[n++] = ':'; break;
+         case 'L': p[n++] = '('; break;
+         case 'R': p[n++] = ')'; break;
+         case 'M': p[n++] = '['; break;
+         case 'N': p[n++] = ']'; break;
+         case 'z': p[n++] = 'z'; break;
+         case 'a': p[n++] = '&'; break;
+         case 'b': p[n++] = '|'; break;
+         case 'd': p[n++] = '$'; break;
+         case 'e': p[n++] = '='; break;
+         case 'g': p[n++] = '>'; break;
+         case 'h': p[n++] = '#'; break;
+         case 'i': p[n++] = '.'; break;
+         case 'l': p[n++] = '<'; break;
+         case 'm': p[n++] = '-'; break;
+         case 'n': p[n++] = '!'; break;
+         case 'p': p[n++] = '+'; break;
+         case 'q': p[n++] = '\\'; break;
+         case 'r': p[n++] = '\''; break;
+         case 's': p[n++] = '/'; break;
+         case 't': p[n++] = '*'; break;
+         case 'u': p[n++] = '^'; break;
+         case 'v': p[n++] = '%'; break;
+         case 'x':
+            if (!s[0] || !s[1]) goto parse_error;
+            if (fromHexDigit(s[0]) < 0 || fromHexDigit(s[1]) < 0) goto parse_error;
+            p[n++] = 16 * fromHexDigit(s[0]) + fromHexDigit(s[1]);
+            p += 2; s += 2;
+            break;
+         case '0': case '1': case '2': case '3': case '4':
+         case '5': case '6': case '7': case '8': case '9':
+            i = 0;
+            s--;
+            while (*s && isdigit((int)(*s))) {
+               i = 10 * i + (*s - '0');
+               s++;
+            }
+            if (*s != 'T') goto parse_error;
+            s++;
+            p[n++] = '(';
+            while (i > 0) { p[n++] = ','; i--; };
+            p[n++] = ')';
+            break;
+         default: 
+            goto parse_error;
+      }      
+   }
+   p[n] = 0;
+   t = findText(p);
+   free(p);
+   return t;
+
+  parse_error:
+   free(p);
+   fprintf ( stderr, "\nstring = `%s'\n", s );
+   internal ( "unZcodeThenFindText: parse error on above string");
+   return NIL; /*notreached*/
+}
+
+
+Text enZcodeThenFindText ( String s )
+{
+   unsigned char* p;
+   Int            n, nn;
+   Text           t;
+   char toHex[16] = "0123456789ABCDEF";
+
+   assert(s);
+   nn = 100 + 10 * strlen(s);
+   p = malloc ( nn );
+   if (!p) internal ("enZcodeThenFindText: malloc failed");
+   n = 0;
+   while (1) {
+      if (!(*s)) break;
+      if (n > nn-90) internal ("enZcodeThenFindText: result is too big");
+      if (*s != 'z' 
+          && *s != 'Z'
+          && (isalnum((int)(*s)) || *s == '_')) { 
+         p[n] = *s; n++; s++;
+         continue;
+      }
+      switch (*s++) {
+         case '(': p[n++] = 'Z'; p[n++] = 'L'; break;
+         case ')': p[n++] = 'Z'; p[n++] = 'R'; break;
+         case '[': p[n++] = 'Z'; p[n++] = 'M'; break;
+         case ']': p[n++] = 'Z'; p[n++] = 'N'; break;
+         case ':': p[n++] = 'Z'; p[n++] = 'C'; break;
+         case 'Z': p[n++] = 'Z'; p[n++] = 'Z'; break;
+         case 'z': p[n++] = 'z'; p[n++] = 'z'; break;
+         case '&': p[n++] = 'z'; p[n++] = 'a'; break;
+         case '|': p[n++] = 'z'; p[n++] = 'b'; break;
+         case '$': p[n++] = 'z'; p[n++] = 'd'; break;
+         case '=': p[n++] = 'z'; p[n++] = 'e'; break;
+         case '>': p[n++] = 'z'; p[n++] = 'g'; break;
+         case '#': p[n++] = 'z'; p[n++] = 'h'; break;
+         case '.': p[n++] = 'z'; p[n++] = 'i'; break;
+         case '<': p[n++] = 'z'; p[n++] = 'l'; break;
+         case '-': p[n++] = 'z'; p[n++] = 'm'; break;
+         case '!': p[n++] = 'z'; p[n++] = 'n'; break;
+         case '+': p[n++] = 'z'; p[n++] = 'p'; break;
+         case '\'': p[n++] = 'z'; p[n++] = 'q'; break;
+         case '\\': p[n++] = 'z'; p[n++] = 'r'; break;
+         case '/': p[n++] = 'z'; p[n++] = 's'; break;
+         case '*': p[n++] = 'z'; p[n++] = 't'; break;
+         case '^': p[n++] = 'z'; p[n++] = 'u'; break;
+         case '%': p[n++] = 'z'; p[n++] = 'v'; break;
+         default: s--; p[n++] = 'z'; p[n++] = 'x';
+                       p[n++] = toHex[(int)(*s)/16];
+                       p[n++] = toHex[(int)(*s)%16];
+                  s++; break;
+      }
+   }
+   p[n] = 0;
+   t = findText(p);
+   free(p);
+   return t;
+}
+
+
 /* --------------------------------------------------------------------------
  * Ext storage:
  *
@@ -319,7 +479,7 @@ Tycon tc; {
 
 static Void local hashTycon(tc)         /* Insert Tycon into hash table    */
 Tycon tc; {
-  assert(isTycon(tc));
+   assert(isTycon(tc));
    if (1) {
      Text  t = tycon(tc).text;
      Int   h = tHash(t);
@@ -397,6 +557,20 @@ List   ts; {                            /* Null pattern matches every tycon*/
             if (nonNull(tycon(tc).kind))
                 ts = insertTycon(tc,ts);
     return ts;
+}
+
+Text ghcTupleText(tup)
+Tycon tup; {
+    Int  i;
+    char buf[103];
+    assert(isTuple(tup));
+    tup = tupleOf(tup);
+    if (tup >= 100) internal("ghcTupleText");
+    buf[0] = '(';
+    for (i = 1; i <= tup; i++) buf[i] = ',';
+    buf[i] = ')';
+    buf[i+1] = 0;
+    return findText(buf);
 }
 
 /* --------------------------------------------------------------------------
@@ -1064,9 +1238,14 @@ void addDLSect ( Module m, void* start, void* end, DLSect sect )
 void* lookupOTabName ( Module m, char* nm )
 {
    int i;
-   for (i = 0; i < module(m).usedoTab; i++)
+   for (i = 0; i < module(m).usedoTab; i++) {
+      if (0)
+         fprintf ( stderr, 
+                   "lookupOTabName: request %s, table has %s\n",
+                   nm, module(m).oTab[i].nm );
       if (0==strcmp(nm,module(m).oTab[i].nm))
          return module(m).oTab[i].ad;
+   }
    return NULL;
 }
 

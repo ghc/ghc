@@ -8,8 +8,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.18 $
- * $Date: 1999/11/25 10:19:15 $
+ * $Revision: 1.19 $
+ * $Date: 1999/11/29 18:59:25 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -171,10 +171,7 @@ extern String preprocessor;             /* preprocessor command            */
 #if DEBUG_CODE
 extern Bool  debugCode;                 /* TRUE => print G-code to screen  */
 #endif
-#if DEBUG_SHOWSC
 extern Bool  debugSC;			/* TRUE => print SC to screen  */
-extern Void  printSc Args((FILE*, Text, Int, Cell));
-#endif
 extern Bool  kindExpert;                /* TRUE => display kind errors in  */
                                         /*         full detail             */
 extern Bool  allowOverlap;              /* TRUE => allow overlapping insts */
@@ -313,6 +310,9 @@ extern  Inst   findInstFor      Args((Cell,Int));
 #if MULTI_INST
 extern  List   findInstsFor     Args((Cell,Int));
 #endif
+
+extern Void ppScripts ( Void );
+extern Void ppModules ( Void );
 
 extern Type primType( Int /*AsmMonad*/ monad, String a_kinds, String r_kinds );
 #define aVar            mkOffset(0)     /* Simple skeleton for type var    */
@@ -541,6 +541,7 @@ extern Int  outColumn;                 /* current output column number     */
 
 extern Void unlexStrConst  Args((Text));
 extern Void unlexVar       Args((Text));
+extern Void unlexVarStr    Args((String));
 extern List offsetTyvarsIn          Args((Type,List));
 
 extern List cfunSfuns;                  /* List of (Cfun,[SelectorVar])    */

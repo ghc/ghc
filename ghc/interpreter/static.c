@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.17 $
- * $Date: 1999/11/17 16:57:44 $
+ * $Revision: 1.18 $
+ * $Date: 1999/11/29 18:59:30 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1389,10 +1389,8 @@ Class c; {
  * Self-improvement (of a C with a C, or a D with a D) is treated as a
  * special case of an inherited dependency.
  * ------------------------------------------------------------------------*/
-static List local inheritFundeps(c,pi,o)
-Class c;
-Cell pi;
-Int o; {
+static List local inheritFundeps ( Class c, Cell pi, Int o )
+{
     Int alpha = newKindedVars(cclass(c).kinds);
     List scs = cclass(c).supers;
     List xfds = NIL;
@@ -1422,8 +1420,8 @@ Int o; {
     return xfds;
 }
 
-static Void local extendFundeps(c)
-Class c; {
+static Void local extendFundeps ( Class c )
+{ 
     Int alpha;
     emptySubstitution();
     alpha = newKindedVars(cclass(c).kinds);
@@ -1593,8 +1591,13 @@ Class c; {                              /* and other parts of class struct.*/
 */
 
     mno                  = cclass(c).numSupers + cclass(c).numMembers;
-    cclass(c).dcon       = addPrimCfun(generateText("Make.%s",c),mno,0,NIL);
-    implementCfun(cclass(c).dcon,NIL); /* ADR addition */
+    /* cclass(c).dcon       = addPrimCfun(generateText("Make.%s",c),mno,0,NIL); */
+    cclass(c).dcon       = addPrimCfun(generateText(":D%s",c),mno,0,NIL);
+    /* implementCfun(cclass(c).dcon,NIL);
+       Don't manufacture a wrapper fn for dictionary constructors.
+       Applications of dictionary constructors are always saturated,
+       and translate.c:stgExpr() special-cases saturated constructor apps.
+    */
 
     if (mno==1) {                       /* Single entry dicts use newtype  */
         name(cclass(c).dcon).defn = nameId;
@@ -1634,7 +1637,8 @@ Int   no; {
     Name s;
     char buf[16];
 
-    sprintf(buf,"sc%d.%s",no,"%s");
+    /* sprintf(buf,"sc%d.%s",no,"%s"); */
+    sprintf(buf,"$p%d%s",no+1,"%s");
     s                = newName(generateText(buf,c),c);
     name(s).line     = cclass(c).line;
     name(s).arity    = 1;
@@ -3246,7 +3250,8 @@ static Void local checkDefaultDefns() { /* check that default types are    */
  * Foreign import declarations are Hugs' equivalent of GHC's ccall mechanism.
  * They are used to "import" C functions into a module.
  * They are usually not written by hand but, rather, generated automatically
- * by GreenCard, IDL compilers or whatever.
+ * by GreenCard, IDL compilers or whatever.  We support foreign import 
+ * (static) and foreign import dynamic.  In the latter case, extName==NIL.
  *
  * Foreign export declarations generate C wrappers for Hugs functions.
  * Hugs only provides "foreign export dynamic" because it's not obvious

@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.13 $
- * $Date: 1999/11/17 16:57:48 $
+ * $Revision: 1.14 $
+ * $Date: 1999/11/29 18:59:34 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -53,11 +53,13 @@ typedef Cell         Ext;                        /* extension label        */
  * names, string literals, character constants etc...
  * ------------------------------------------------------------------------*/
 
-extern  String       textToStr          Args((Text));
-extern  Text         findText           Args((String));
-extern  Text         inventText         Args((Void));
-extern  Text         inventDictText     Args((Void));
-extern  Bool         inventedText       Args((Text));
+extern  String       textToStr            Args((Text));
+extern  Text         findText             Args((String));
+extern  Text         inventText           Args((Void));
+extern  Text         inventDictText       Args((Void));
+extern  Bool         inventedText         Args((Text));
+extern  Text         enZcodeThenFindText  Args((String));
+extern  Text         unZcodeThenFindText  Args((String));
 
 /* Variants of textToStr and syntaxOf which work for idents, ops whether
  * qualified or unqualified.
@@ -380,6 +382,9 @@ extern  Ptr             cptrOf          Args((Cell));
 #endif
 #define mkTuple(n)   (TUPMIN+(n))
 #define tupleOf(n)   ((Int)((n)-TUPMIN))
+extern Text ghcTupleText Args((Tycon));
+
+
 
 #if TREX
 #define EXTMIN       (TUPMIN+NUM_TUPLES)
@@ -552,7 +557,7 @@ struct strName {
     Cell   defn;
     Cell   stgVar;        /* really StgVar   */
     Text   callconv;      /* for foreign import/export */
-    const void*  primop;  /* really StgPrim* */
+    void*  primop;        /* really StgPrim* */
     Name   nextNameHash;
 };
 

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: codegen.c,v $
- * $Revision: 1.11 $
- * $Date: 1999/11/22 18:11:00 $
+ * $Revision: 1.12 $
+ * $Date: 1999/11/29 18:59:25 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -63,7 +63,8 @@ static Cell cptrFromName ( Name n )
    Module m = name(n).mod;
    Text  mt = module(m).text;
    sprintf(buf,"%s_%s_closure", 
-               textToStr(mt), textToStr(name(n).text) );
+               textToStr(mt), 
+               textToStr( enZcodeThenFindText ( textToStr (name(n).text) ) ) );
    p = lookupOTabName ( m, buf );
    if (!p) {
       ERRMSG(0) "Can't find object symbol %s", buf
@@ -205,7 +206,7 @@ static AsmBCO cgAlts( AsmSp root, AsmSp sp, List alts )
        con = stgCaseAltCon(hd(alts));
 
        /* special case: dictionary constructors */
-       if (strncmp("Make.",textToStr(name(con).text),5)==0) {
+       if (strncmp(":D",textToStr(name(con).text),2)==0) {
           omit_test = TRUE;
           goto xyzzy;
        }
@@ -389,7 +390,8 @@ static Void cgExpr( AsmBCO bco, AsmSp root, StgExpr e )
             } else {
                 /* ToDo: implement this code...  */
                 assert(0);
-                /* asmPushRet(bco,delayPrimAlt( stgPrimCaseVars(e), stgPrimCaseBody(e))); */
+                /* asmPushRet(bco,delayPrimAlt( stgPrimCaseVars(e), 
+                                                stgPrimCaseBody(e))); */
                 /* cgExpr( bco,root,scrut ); */
             }
             break;

@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: output.c,v $
- * $Revision: 1.12 $
- * $Date: 1999/11/12 17:32:42 $
+ * $Revision: 1.13 $
+ * $Date: 1999/11/29 18:59:29 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -551,18 +551,24 @@ Cell e; {                               /* args not yet printed ...        */
     return ts;
 }
 
-Void unlexVar(t)                       /* print text as a variable name    */
-Text t; {                              /* operator symbols must be enclosed*/
-    String s = textToStr(t);           /* in parentheses... except [] ...  */
-
+Void unlexVarStr(s)
+String s; {
     if ((isascii((int)(s[0])) && isalpha((int)(s[0]))) 
-       || s[0]=='_' || s[0]=='[' || s[0]=='(')
+        || s[0]=='_' || s[0]=='[' || s[0]=='('
+        || s[0]=='$'
+        || (s[0]==':' && s[1]=='D')
+       )
         putStr(s);
     else {
         putChr('(');
         putStr(s);
         putChr(')');
     }
+}
+
+Void unlexVar(t)                       /* print text as a variable name    */
+Text t; {                              /* operator symbols must be enclosed*/
+    unlexVarStr(textToStr(t));         /* in parentheses... except [] ...  */
 }
 
 static Void local unlexOp(t)           /* print text as operator name      */

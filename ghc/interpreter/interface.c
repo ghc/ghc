@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.6 $
- * $Date: 1999/10/29 11:41:04 $
+ * $Revision: 1.7 $
+ * $Date: 1999/11/29 18:59:28 $
  * ------------------------------------------------------------------------*/
 
 /* ToDo:
@@ -35,6 +35,7 @@
 #include "dynamic.h"
 
 #define DEBUG_IFACE
+#define VERBOSITY TRUE
 
 extern void print ( Cell, Int );
 
@@ -109,7 +110,7 @@ static Type       local conidcellsToTycons Args((Int,Type));
 
 static Void       local resolveReferencesInObjectModule Args((Module,Bool));
 static Bool       local validateOImage Args((void*, Int, Bool));
-static Void       local readSyms Args((Module));
+static Void       local readSyms Args((Module,Bool));
 
 static void*      local lookupObjName ( char* );
 
@@ -403,7 +404,7 @@ printf ( "new module %s\n", textToStr(t) );
        ERRMSG(0) "Read of object file \"%s\" failed", nameObj
        EEND;
     }
-    if (!validateOImage(img,sizeObj,FALSE)) {
+    if (!validateOImage(img,sizeObj,VERBOSITY)) {
        ERRMSG(0) "Validation of object file \"%s\" failed", nameObj 
        EEND;
     }
@@ -411,7 +412,7 @@ printf ( "new module %s\n", textToStr(t) );
     assert(!module(m).oImage);
     module(m).oImage = img;
 
-    readSyms(m);
+    readSyms(m,VERBOSITY);
 
     if (!cellIsMember(m, ghcModules))
        ghcModules = cons(m, ghcModules);
@@ -1041,6 +1042,8 @@ List ktyvars; { /* [(VarId|Text,Kind)] */
       case QUAL:
          return pair(QUAL,pair(tvsToOffsets(line,fst(snd(type)),ktyvars),
                                tvsToOffsets(line,snd(snd(type)),ktyvars)));
+      case DICTAP: /* bogus ?? */
+         return ap(DICTAP, tvsToOffsets(line,snd(type),ktyvars));
       case VARIDCELL: /* Ha! some real work to do! */
        { Int i = 0;
          Text tv = textOf(type);
@@ -1072,6 +1075,12 @@ List ktyvars; { /* [(VarId|Text,Kind)] */
    Tycons or Classes have been loaded into the symbol tables and can be
    looked up.
 */
+static Text kludgeGHCPrelText ( Text m )
+{
+   if (strncmp(textToStr(m), "Prel", 4)==0)
+      return textPrelude; else return m;
+}
+
 static Type local conidcellsToTycons(line,type)
 Int  line;
 Type type; {
@@ -1084,7 +1093,7 @@ Type type; {
          return type;
       case QUALIDENT:
        { List t;
-         Text m     = qmodOf(type);
+         Text m     = kludgeGHCPrelText(qmodOf(type));
          Text v     = qtextOf(type);
          Module mod = findModule(m);
 	 //printf ( "lookup qualident " ); print(type,100); printf("\n");
@@ -1130,6 +1139,8 @@ Type type; {
       case QUAL:
          return pair(QUAL,pair(conidcellsToTycons(line,fst(snd(type))),
                                conidcellsToTycons(line,snd(snd(type)))));
+      case DICTAP: /* bogus?? */
+         return ap(DICTAP, conidcellsToTycons(line, snd(type)));
       default: 
          fprintf(stderr, "conidcellsToTycons: unknown stuff %d\n", 
                  whatIs(type));
@@ -1248,14 +1259,15 @@ static Void local resolveReferencesInObjectModule_elf ( Module m,
 {
    char symbol[1000]; // ToDo
    int i, j;
-   Elf32_Sym*  stab;
+   Elf32_Sym*  stab = NULL;
    char* strtab;
    char* ehdrC = (char*)(module(m).oImage);
    Elf32_Ehdr* ehdr = (Elf32_Ehdr*) ehdrC;
    Elf32_Shdr* shdr = (Elf32_Shdr*) (ehdrC + ehdr->e_shoff);
    Elf32_Word* targ;
    // first find "the" symbol table
-   //stab = findElfSection ( objImage, SHT_SYMTAB );
+   // why is this commented out???
+   stab = findElfSection ( ehdrC, SHT_SYMTAB );
 
    // also go find the string table
    strtab = findElfSection ( ehdrC, SHT_STRTAB );
@@ -1414,7 +1426,8 @@ static Bool local validateOImage_elf ( void*  imgV,
       if (shdr[i].sh_type == SHT_REL  && verb) fprintf ( stderr, "Rel  " ); else
       if (shdr[i].sh_type == SHT_RELA && verb) fprintf ( stderr, "RelA " ); else
       if (verb)                                fprintf ( stderr, "     " );
-      if (sh_strtab && verb) fprintf ( stderr, "sname=%s", sh_strtab + shdr[i].sh_name );
+      if (sh_strtab && verb) 
+         fprintf ( stderr, "sname=%s", sh_strtab + shdr[i].sh_name );
       if (verb) fprintf ( stderr, "\n" );
    }
 
@@ -1424,7 +1437,8 @@ static Bool local validateOImage_elf ( void*  imgV,
    for (i = 0; i < ehdr->e_shnum; i++) {
       if (shdr[i].sh_type == SHT_STRTAB &&
           i !=  ehdr->e_shstrndx) {
-         if (verb) fprintf ( stderr, "   section %d is a normal string table\n", i );
+         if (verb) 
+            fprintf ( stderr, "   section %d is a normal string table\n", i );
          strtab = ehdrC + shdr[i].sh_offset;
          nstrtab++;
       }
@@ -1490,7 +1504,7 @@ static Bool local validateOImage_elf ( void*  imgV,
 }
 
 
-static void readSyms_elf ( Module m )
+static void readSyms_elf ( Module m, Bool verb )
 {
    int i, j, k, nent;
    Elf32_Sym* stab;
@@ -1542,9 +1556,9 @@ static void readSyms_elf ( Module m )
                        + stab[j].st_value;
             assert(nm);
             assert(ad);
-            /* fprintf(stderr, "addOTabName: %s %s %p\n",
-               textToStr(module(m).text), nm, ad );
-            */
+            if (verb)
+               fprintf(stderr, "addOTabName: %10p  %s %s\n",
+                       ad, textToStr(module(m).text), nm );
             addOTabName ( m, nm, ad );
          }
       }
@@ -1580,10 +1594,10 @@ static Void local resolveReferencesInObjectModule ( Module m, Bool verb )
 }
 
 
-static Void local readSyms ( Module m )
+static Void local readSyms ( Module m, Bool verb )
 {
 #if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS)
-   readSyms_elf ( m );
+   readSyms_elf ( m, verb );
 #else
    internal("readSyms: not implemented on this platform");
 #endif
@@ -1638,7 +1652,7 @@ void* lookupObjName ( char* nm )
    pp = strchr(nm2, '_');
    if (!pp) goto not_found;
    *pp = 0;
-   t = findText(nm2);
+   t = unZcodeThenFindText(nm2);
    m = findModule(t);
    if (isNull(m)) goto not_found;
    a = lookupOTabName ( m, nm );

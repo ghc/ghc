@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.17 1999/11/22 16:44:33 sewardj Exp $
+ * $Id: Printer.c,v 1.18 1999/11/29 18:59:46 sewardj Exp $
  *
  * Copyright (c) 1994-1999.
  *
@@ -312,10 +312,12 @@ StgPtr printStackObj( StgPtr sp )
     if (IS_ARG_TAG(*sp)) {
         nat i;
         StgWord tag = *sp++;
-        fprintf(stderr,"Tag: %d words\n", tag);
+        fprintf(stderr,"Tagged{");
         for (i = 0; i < tag; i++) {
-            fprintf(stderr,"Word# %d\n", *sp++);
+            fprintf(stderr,"0x%x#", (unsigned)(*sp++));
+            if (i < tag-1) fprintf(stderr, ", ");
         }
+        fprintf(stderr, "}\n");
     } else {
         StgClosure* c = (StgClosure*)(*sp);
         printPtr((StgPtr)*sp);

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: stg.c,v $
- * $Revision: 1.8 $
- * $Date: 1999/11/12 17:32:45 $
+ * $Revision: 1.9 $
+ * $Date: 1999/11/29 18:59:32 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -449,7 +449,7 @@ Void putStgExpr( StgExpr e )                        /* pretty print expr */
     case STGPRIM: 
         {
             Cell op = stgPrimOp(e);
-            unlexVar(name(op).text);
+            unlexVarStr(asmGetPrimopName(name(op).primop));
             putStgAtoms(stgPrimArgs(e));
             break;
         }

@@ -13,6 +13,6 @@
 #if MAJOR_RELEASE
 #define HUGS_VERSION "November 1999 "
 #else
-#define HUGS_VERSION "STGHugs-991125"
+#define HUGS_VERSION "STGHugs-991129"
 #endif
 

@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Assembler.c,v $
- * $Revision: 1.18 $
- * $Date: 1999/11/19 15:42:12 $
+ * $Revision: 1.19 $
+ * $Date: 1999/11/29 18:59:40 $
  *
  * This module provides functions to construct BCOs and other closures
  * required by the bytecode compiler.
@@ -1105,10 +1105,15 @@ AsmSp asmBeginPrim( AsmBCO bco )
     return bco->sp;
 }
 
-void   asmEndPrim( AsmBCO bco, const AsmPrim* prim, AsmSp base )
+void asmEndPrim( AsmBCO bco, const AsmPrim* prim, AsmSp base )
 {
     emiti_8(bco,prim->prefix,prim->opcode);
     setSp(bco, base);
+}
+
+char* asmGetPrimopName ( AsmPrim* p )
+{
+   return p->name;
 }
 
 /* Hugs used to let you add arbitrary primops with arbitrary types
@@ -1116,7 +1121,7 @@ void   asmEndPrim( AsmBCO bco, const AsmPrim* prim, AsmSp base )
  * We deliberately avoided that approach because we wanted more
  * control over which primops are provided.
  */
-const AsmPrim asmPrimOps[] = {
+AsmPrim asmPrimOps[] = {
 
     /* Char# operations */
       { "primGtChar",                "CC", "B",  MONAD_Id, i_PRIMOP1, i_gtChar }
@@ -1425,17 +1430,17 @@ const AsmPrim asmPrimOps[] = {
     , { 0,0,0,0,0,0 }
 };
 
-const AsmPrim ccall_ccall_Id
+AsmPrim ccall_ccall_Id
    = { "ccall", 0, 0, MONAD_IO, i_PRIMOP2, i_ccall_ccall_Id };
-const AsmPrim ccall_ccall_IO
+AsmPrim ccall_ccall_IO
    = { "ccall", 0, 0, MONAD_IO, i_PRIMOP2, i_ccall_ccall_IO };
-const AsmPrim ccall_stdcall_Id 
+AsmPrim ccall_stdcall_Id 
    = { "ccall", 0, 0, MONAD_IO, i_PRIMOP2, i_ccall_stdcall_Id };
-const AsmPrim ccall_stdcall_IO 
+AsmPrim ccall_stdcall_IO 
    = { "ccall", 0, 0, MONAD_IO, i_PRIMOP2, i_ccall_stdcall_IO };
 
 
-const AsmPrim* asmFindPrim( char* s )
+AsmPrim* asmFindPrim( char* s )
 {
     int i;
     for (i=0; asmPrimOps[i].name; ++i) {
@@ -1446,7 +1451,7 @@ const AsmPrim* asmFindPrim( char* s )
     return 0;
 }
 
-const AsmPrim* asmFindPrimop( AsmInstr prefix, AsmInstr op )
+AsmPrim* asmFindPrimop( AsmInstr prefix, AsmInstr op )
 {
     nat i;
     for (i=0; asmPrimOps[i].name; ++i) {

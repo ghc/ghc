@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Assembler.h,v 1.11 1999/11/16 17:38:54 sewardj Exp $
+ * $Id: Assembler.h,v 1.12 1999/11/29 18:59:23 sewardj Exp $
  *
  * (c) The GHC Team 1994-1998.
  *
@@ -203,12 +203,14 @@ typedef struct {
     AsmNat8  opcode; /* should be Primop1 or Primop2 */
 } AsmPrim;
 
-extern const AsmPrim asmPrimOps[]; /* null terminated list */
+extern AsmPrim asmPrimOps[]; /* null terminated list */
 
-extern const AsmPrim* asmFindPrim    ( char* s );
-extern const AsmPrim* asmFindPrimop  ( AsmInstr prefix, AsmInstr op );
-extern AsmSp          asmBeginPrim   ( AsmBCO bco );
-extern void           asmEndPrim     ( AsmBCO bco, const AsmPrim* prim, AsmSp base );
+extern AsmPrim* asmFindPrim      ( char* s );
+extern AsmPrim* asmFindPrimop    ( AsmInstr prefix, AsmInstr op );
+extern AsmSp    asmBeginPrim     ( AsmBCO bco );
+extern void     asmEndPrim       ( AsmBCO bco, const AsmPrim* prim, 
+                                               AsmSp base );
+extern char*    asmGetPrimopName ( AsmPrim* p );
 
 extern AsmBCO asm_BCO_catch    ( void );
 extern AsmBCO asm_BCO_raise    ( void );
@@ -243,10 +245,10 @@ extern void   asmEndMkPAP      ( AsmBCO bco, AsmVar v, AsmSp start );
  * C-call and H-call
  * ------------------------------------------------------------------------*/
 
-extern const AsmPrim ccall_ccall_Id;
-extern const AsmPrim ccall_ccall_IO;
-extern const AsmPrim ccall_stdcall_Id;
-extern const AsmPrim ccall_stdcall_IO;
+extern AsmPrim ccall_ccall_Id;
+extern AsmPrim ccall_ccall_IO;
+extern AsmPrim ccall_stdcall_Id;
+extern AsmPrim ccall_stdcall_IO;
 
 typedef struct {
   unsigned int  num_args;

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: type.c,v $
- * $Revision: 1.16 $
- * $Date: 1999/11/23 15:12:06 $
+ * $Revision: 1.17 $
+ * $Date: 1999/11/29 18:59:34 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1755,9 +1755,11 @@ Class c; {				/* defaults for class c		   */
     }
 
     for (; nonNull(mems); mems=tl(mems)) {
-	static String deftext = "default_";
+        /* static String deftext = "default_"; */
+	static String deftext = "$dm";
 	String s	      = textToStr(name(hd(mems)).text);
 	Name   n;
+        i = j = 0;
 	for (; i<FILENAME_MAX && deftext[i]!='\0'; i++) {
 	    buf[i] = deftext[i];
 	}
@@ -1943,8 +1945,50 @@ Inst in; {                              /* member functions for instance in*/
     locs = cons(pair(d,singleton(pair(NIL,ap(l,dictDef)))),locs);
 
     name(inst(in).builder).defn			/* Register builder imp	   */
-	     = singleton(pair(args,ap(LETREC,pair(singleton(locs),
-						  ap(l,d)))));
+       = singleton(pair(args,ap(LETREC,pair(singleton(locs),
+	                                    ap(l,d)))));
+
+    /* Invent a GHC-compatible name for the instance decl */
+    {
+       char buf[FILENAME_MAX+1];
+       Int           i, j;
+       String        str;
+       Cell          qq      = inst(in).head;
+       Cell          pp      = NIL;
+       static String zdftext = "$f";
+
+       while (isAp(qq)) {
+          pp = cons(arg(qq),pp);
+          qq = fun(qq);
+       }
+       // pp is now the fwd list of args(?) to this pred
+
+       i = 0;
+       for (j = 0; i<FILENAME_MAX && zdftext[j]!='\0'; i++, j++) {
+          buf[i] = zdftext[j];
+       }
+       str = textToStr(cclass(inst(in).c).text);
+       for (j = 0; i<FILENAME_MAX && str[j]!='\0'; i++, j++) {
+          buf[i] = str[j];
+       }
+       for (; nonNull(pp); pp=tl(pp)) {
+          qq = hd(pp);
+          while (isAp(qq)) qq = fun(qq);
+          switch (whatIs(qq)) {
+             case TYCON: str = textToStr(tycon(qq).text); break;
+             case TUPLE: str = textToStr(ghcTupleText(qq)); break;
+             default: internal("typeInstDefn: making GHC name"); break;
+          }
+          for (j = 0; i<FILENAME_MAX && str[j]!='\0'; i++, j++) {
+             buf[i] = str[j];
+          }
+       }
+
+       buf[i++] = '\0';
+       name(inst(in).builder).text = findText(buf);
+       //fprintf ( stderr, "result = %s\n", buf );
+    }
+
     genDefns = cons(inst(in).builder,genDefns);
 }
 

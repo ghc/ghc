@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: input.c,v $
- * $Revision: 1.13 $
- * $Date: 1999/11/25 11:10:16 $
+ * $Revision: 1.14 $
+ * $Date: 1999/11/29 18:59:27 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -49,25 +49,26 @@
  * Global data:
  * ------------------------------------------------------------------------*/
 
-List tyconDefns      = NIL;             /* type constructor definitions    */
-List typeInDefns     = NIL;             /* type synonym restrictions       */
-List valDefns        = NIL;             /* value definitions in script     */
-List classDefns      = NIL;             /* class defns in script           */
-List instDefns       = NIL;             /* instance defns in script        */
-List selDefns        = NIL;             /* list of selector lists          */
-List genDefns        = NIL;             /* list of generated names         */
-List unqualImports   = NIL;             /* unqualified import list         */
-List foreignImports  = NIL;             /* foreign imports                 */
-List foreignExports  = NIL;             /* foreign exportsd                */
-List defaultDefns    = NIL;             /* default definitions (if any)    */
-Int  defaultLine     = 0;               /* line in which default defs occur*/
-List evalDefaults    = NIL;             /* defaults for evaluator          */
+List tyconDefns       = NIL;            /* type constructor definitions    */
+List typeInDefns      = NIL;            /* type synonym restrictions       */
+List valDefns         = NIL;            /* value definitions in script     */
+List classDefns       = NIL;            /* class defns in script           */
+List instDefns        = NIL;            /* instance defns in script        */
+List selDefns         = NIL;            /* list of selector lists          */
+List genDefns         = NIL;            /* list of generated names         */
+List unqualImports    = NIL;            /* unqualified import list         */
+List foreignImports   = NIL;            /* foreign imports                 */
+List foreignExports   = NIL;            /* foreign exportsd                */
+List defaultDefns     = NIL;            /* default definitions (if any)    */
+Int  defaultLine      = 0;              /* line in which default defs occur*/
+List evalDefaults     = NIL;            /* defaults for evaluator          */
 
-Cell inputExpr       = NIL;             /* input expression                */
-Cell inputContext    = NIL;             /* input context                   */
-Bool literateScripts = FALSE;           /* TRUE => default to lit scripts  */
-Bool literateErrors  = TRUE;            /* TRUE => report errs in lit scrs */
-Bool offsideON       = TRUE;            /* TRUE => implement offside rule  */
+Cell inputExpr        = NIL;            /* input expression                */
+Cell inputContext     = NIL;            /* input context                   */
+Bool literateScripts  = FALSE;          /* TRUE => default to lit scripts  */
+Bool literateErrors   = TRUE;           /* TRUE => report errs in lit scrs */
+Bool offsideON        = TRUE;           /* TRUE => implement offside rule  */
+Bool readingInterface = FALSE;
 
 String repeatStr     = 0;               /* Repeat last expr                */
 
@@ -727,7 +728,9 @@ static Text local readIdent() {        /* read identifier                  */
     } while (isISO(c0) && isIn(c0,IDAFTER));
     endToken();
     identType = isIn(tokenStr[0],LARGE) ? CONID : VARID;
-    return findText(tokenStr);
+    if (readingInterface)
+       return unZcodeThenFindText(tokenStr); else
+       return findText(tokenStr);
 }
 
 
@@ -1274,7 +1277,7 @@ static  Int        indentDepth = (-1); /* current indentation nesting      */
 
 static Void local goOffside(col)       /* insert offside marker            */
 Int col; {                             /* for specified column             */
-assert(offsideON);
+    assert(offsideON);
     if (indentDepth>=MAXINDENT) {
         ERRMSG(row) "Too many levels of program nesting"
         EEND;
@@ -1283,12 +1286,12 @@ assert(offsideON);
 }
 
 static Void local unOffside() {        /* leave layout rule area           */
-assert(offsideON);
+    assert(offsideON);
     indentDepth--;
 }
 
 static Bool local canUnOffside() {     /* Decide if unoffside permitted    */
-assert(offsideON);
+    assert(offsideON);
     return indentDepth>=0 && layout[indentDepth]!=HARD;
 }
 
@@ -1590,9 +1593,11 @@ static Void local parseInput(startWith)/* Parse input with given first tok,*/
 Int startWith; {                       /* determining whether to read a    */
     firstToken   = TRUE;               /* script or an expression          */
     firstTokenIs = startWith;
-    if (startWith==INTERFACE) 
-       offsideON = FALSE; else 
-       offsideON = TRUE;
+    if (startWith==INTERFACE) {
+       offsideON = FALSE; readingInterface = TRUE; 
+    } else {
+       offsideON = TRUE; readingInterface = FALSE;
+    }
 
     clearStack();
     if (yyparse()) {                   /* This can only be parser overflow */

@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.29 $
- * $Date: 1999/11/18 16:02:18 $
+ * $Revision: 1.30 $
+ * $Date: 1999/11/29 18:59:42 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -3059,9 +3059,12 @@ off the stack.
         case i_ccall_stdcall_IO:
             {
                 int r;
-                CFunDescriptor* descriptor = PopTaggedAddr();
-                void (*funPtr)(void)       = PopTaggedAddr();
-                char cc = (primop2code == i_ccall_stdcall_Id ||
+                CFunDescriptor* descriptor;
+                void (*funPtr)(void);
+                char cc;
+                descriptor = PopTaggedAddr();
+                funPtr     = PopTaggedAddr();
+                 cc = (primop2code == i_ccall_stdcall_Id ||
                            primop2code == i_ccall_stdcall_IO)
                           ? 's' : 'c';
                 r = ccall(descriptor,funPtr,bco,cc,cap);
