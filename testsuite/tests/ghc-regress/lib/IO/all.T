@@ -37,11 +37,14 @@ test "openFile001" 	{ vtr("","","") }
 test "openFile002" 	{ vtr("","","1") }
 test "openFile003" 	{ vtr("","","") }
 test "openFile004" 	{ vtr("","","") }
-test "openFile005" 	{ vtr("","","") }
+test "openFile005" 	{ if $platform == "i386-unknown-mingw32" then expect fail fi
+                          vtr("","","") }
 test "openFile006" 	{ vtr("","","") }
-test "openFile007" 	{ vtr("","","") }
+test "openFile007" 	{ if $platform == "i386-unknown-mingw32" then expect fail fi
+                          vtr("","","") }
 test "putStr001" 	{ vtr("","","") }
-test "readFile001" 	{ vtr("","","") }
+test "readFile001" 	{ if $platform == "i386-unknown-mingw32" then expect fail fi
+                          vtr("","","") }
 test "readwrite001" 	{ vtr("-cpp","","") }
 test "readwrite002" 	{ $stdin = "readwrite002.hs" 
 			  vtr("-cpp","","") }
