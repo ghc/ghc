@@ -86,7 +86,7 @@ mkSplitUniqSupply (C# c#)
 		return (MkSplitUniqSupply uniq s1 s2)
 	    )
 
-	mk_unique = _ccall_ genSymZh		>>= \ (W# u#) ->
+	mk_unique = _ccall_ genSymzh		>>= \ (W# u#) ->
 		    return (I# (w2i (mask# `or#` u#)))
     in
     mk_supply#
