@@ -56,6 +56,17 @@ void _stgAssert PROTO((char *, unsigned int));
 	 _POSIX2_VERSION
 	 _POSIX_4SOURCE
 */
+
+/* Bogus use of non-existent variable POSIX_C_SOURCE in the supplied header files
+   for gcc-2.7.1 on Solaris forces us to define it: (this strikes when using st_atime
+   and friends in <sys/stat.h> )
+*/
+
+#if (__GNUC__ == 2) && (__GNUC_MINOR__ == 7) 
+/* sigh, not possible to get at bugfix release number (fixed in 2.7.2) */
+#define POSIX_C_SOURCE _POSIX_C_SOURCE
+#endif
+
 #include <unistd.h>
 #include <signal.h>
 #endif
