@@ -132,6 +132,25 @@ HsSyn stuff
 </ul>
 
 
+
+<h2>Library stuff: base package</h2>
+
+<ul> 
+<li> GHC.Base
+<li> Data.Tuple (GHC.Base), GHC.Ptr (GHC.Base)
+<li> GHC.Enum (Data.Tuple)
+<li> GHC.Show (GHC.Enum)
+<li> GHC.Num (GHC.Show)
+<li> GHC.ST (GHC.Num), GHC.Real (GHC.Num)
+<li> GHC.Arr (GHC.ST) GHC.STRef (GHC.ST)
+<li> GHC.IOBase (GHC.Arr)
+<li> Data.Bits (GHC.Real)
+<li> Data.HashTable (Data.Bits, Control.Monad)
+<li> Data.Typeable (GHC.IOBase, Data.HashTable)
+<li> GHC.Weak (Data.Typeable, GHC.IOBase)
+</ul>
+
+
     <p><small>
 <!-- hhmts start -->
 Last modified: Wed Aug 22 16:46:33 GMT Daylight Time 2001
