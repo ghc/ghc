@@ -1,4 +1,4 @@
 
 tcfail040.hs:3:
-    Ambiguous type variable `a' in these top-level constraint
+    Ambiguous type variable `a' in the top-level constraint:
       `ORD a' arising from use of `<<' at tcfail040.hs:19
