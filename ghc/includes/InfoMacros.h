@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoMacros.h,v 1.19 2002/06/03 12:56:41 matthewc Exp $
+ * $Id: InfoMacros.h,v 1.20 2002/09/25 20:43:34 wolfgang Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -80,7 +80,7 @@ INFO_TABLE_SRT(info,				/* info-table label */	\
                 PROF_INFO(prof_type, prof_descr)			\
 		SRT_INFO(RBH,srt_,srt_off_,srt_len_),                  	\
                 INCLUDE_RBH_INFO(info),			                \
-                INIT_ENTRY(stg_RBH_##entry),                           	\
+                INIT_ENTRY(stg_RBH_##entry)                           	\
 	} ; 								\
         StgFunPtr stg_RBH_##entry (void) {                                  \
           FB_                                                           \
@@ -92,7 +92,7 @@ INFO_TABLE_SRT(info,				/* info-table label */	\
                 PROF_INFO(prof_type, prof_descr)			\
 		SRT_INFO(type,srt_,srt_off_,srt_len_),			\
                 INCLUDE_RBH_INFO(stg_RBH_##info),				\
-                INIT_ENTRY(entry),                                      \
+                INIT_ENTRY(entry)                                       \
 	}
 
 #else
@@ -110,7 +110,7 @@ INFO_TABLE_SRT(info,				/* info-table label */	\
 		layout : { payload : {ptrs,nptrs} },			\
                 PROF_INFO(prof_type, prof_descr)			\
 		SRT_INFO(type,srt_,srt_off_,srt_len_),			\
-                INIT_ENTRY(entry),                                      \
+                INIT_ENTRY(entry)                                       \
 	}
 
 #endif
@@ -131,7 +131,7 @@ INFO_TABLE_SRT_BITMAP(info, entry, bitmap_, srt_, srt_off_, srt_len_,	\
                 PROF_INFO(prof_type, prof_descr)			\
 		SRT_INFO(RBH,srt_,srt_off_,srt_len_),			\
                 INCLUDE_RBH_INFO(info),					\
-                INIT_ENTRY(stg_RBH_##entry),				\
+                INIT_ENTRY(stg_RBH_##entry)				\
 	};								\
         StgFunPtr stg_RBH_##entry (void) {                              \
           FB_                                                           \
@@ -143,7 +143,7 @@ INFO_TABLE_SRT_BITMAP(info, entry, bitmap_, srt_, srt_off_, srt_len_,	\
                 PROF_INFO(prof_type, prof_descr)			\
 		SRT_INFO(type,srt_,srt_off_,srt_len_),			\
                 INCLUDE_RBH_INFO(stg_RBH_##info),			\
-                INIT_ENTRY(entry),					\
+                INIT_ENTRY(entry)					\
 	}
 
 #else
@@ -157,7 +157,7 @@ INFO_TABLE_SRT_BITMAP(info, entry, bitmap_, srt_, srt_off_, srt_len_,	\
 		layout : { bitmap : (StgWord)bitmap_ },			\
                 PROF_INFO(prof_type, prof_descr)			\
 		SRT_INFO(type,srt_,srt_off_,srt_len_),			\
-                INIT_ENTRY(entry),					\
+                INIT_ENTRY(entry)					\
 	}
 #endif
 
@@ -176,7 +176,7 @@ INFO_TABLE(info, entry, ptrs, nptrs, type, info_class,		\
                 PROF_INFO(prof_type, prof_descr)		\
 		STD_INFO(RBH),					\
                 INCLUDE_RBH_INFO(info),			        \
-                INIT_ENTRY(stg_RBH_##entry),		        \
+                INIT_ENTRY(stg_RBH_##entry)		        \
 	} ;                                                     \
         StgFunPtr stg_RBH_##entry (void) {                          \
           FB_                                                   \
@@ -188,7 +188,7 @@ INFO_TABLE(info, entry, ptrs, nptrs, type, info_class,		\
                 PROF_INFO(prof_type, prof_descr)		\
 		STD_INFO(type),					\
                 INCLUDE_RBH_INFO(stg_RBH_##info),			\
-                INIT_ENTRY(entry),				\
+                INIT_ENTRY(entry)				\
 	}
 
 #else
@@ -201,7 +201,7 @@ INFO_TABLE(info, entry, ptrs, nptrs, type, info_class,	\
 		layout : { payload : {ptrs,nptrs} },	\
                 PROF_INFO(prof_type, prof_descr)	\
 		STD_INFO(type),				\
-                INIT_ENTRY(entry),			\
+                INIT_ENTRY(entry)			\
 	}
 
 #endif
@@ -221,7 +221,7 @@ INFO_TABLE_SELECTOR(info, entry, offset, info_class,		\
                 PROF_INFO(prof_type, prof_descr)		\
 		STD_INFO(RBH),					\
                 INCLUDE_RBH_INFO(info),				\
-                INIT_ENTRY(stg_RBH_##entry),			\
+                INIT_ENTRY(stg_RBH_##entry)			\
 	};							\
         StgFunPtr stg_RBH_##entry (void) {                          \
           FB_                                                   \
@@ -233,7 +233,7 @@ INFO_TABLE_SELECTOR(info, entry, offset, info_class,		\
                 PROF_INFO(prof_type, prof_descr)		\
 		STD_INFO(THUNK_SELECTOR),			\
                 INCLUDE_RBH_INFO(stg_RBH_##info),			\
-                INIT_ENTRY(entry),				\
+                INIT_ENTRY(entry)				\
 	}
 
 #else
@@ -246,7 +246,7 @@ INFO_TABLE_SELECTOR(info, entry, offset, info_class,	\
 		layout : { selector_offset : offset },	\
                 PROF_INFO(prof_type, prof_descr)	\
 		STD_INFO(THUNK_SELECTOR),		\
-                INIT_ENTRY(entry),			\
+                INIT_ENTRY(entry)			\
 	}
 
 #endif
@@ -261,7 +261,7 @@ INFO_TABLE_CONSTR(info, entry, ptrs, nptrs, tag_,type_,info_class,	\
 		layout : { payload : {ptrs,nptrs} },			\
                 PROF_INFO(prof_type, prof_descr)			\
                 CONSTR_INFO(type_,tag_),				\
-                INIT_ENTRY(entry),					\
+                INIT_ENTRY(entry)					\
 	}
 
 #define constrTag(con) (get_itbl(con)->srt_len)
@@ -453,7 +453,7 @@ typedef struct {
 	info_class INFO_TBL_CONST vec_info_2 info = {		\
 		i : { layout : { bitmap : (StgWord)bitmap_ },	\
 		      SRT_INFO(type,srt_,srt_off_,srt_len_),	\
-		      INIT_ENTRY(NULL),				\
+		      INIT_ENTRY(NULL)				\
 		},						\
 		vec : { alt_1, alt_2 }				\
 	}
@@ -465,7 +465,7 @@ typedef struct {
 	info_class INFO_TBL_CONST vec_info_3 info = {		\
 		i : { layout : { bitmap : (StgWord)bitmap_ },	\
 		      SRT_INFO(type,srt_,srt_off_,srt_len_),	\
-		      INIT_ENTRY(NULL),				\
+		      INIT_ENTRY(NULL)				\
 		},						\
                 vec : { alt_1, alt_2, alt_3 }			\
 	}
@@ -477,7 +477,7 @@ typedef struct {
 	info_class INFO_TBL_CONST vec_info_4 info = {		\
 		i : { layout : { bitmap : (StgWord)bitmap_ },	\
 		      SRT_INFO(type,srt_,srt_off_,srt_len_),	\
-		      INIT_ENTRY(NULL),				\
+		      INIT_ENTRY(NULL)				\
 		},						\
                 vec : { alt_1, alt_2, alt_3, alt_4 }		\
 	}
@@ -490,7 +490,7 @@ typedef struct {
 	info_class INFO_TBL_CONST vec_info_5 info = {		\
 		i : { layout : { bitmap : (StgWord)bitmap_ },	\
 		      SRT_INFO(type,srt_,srt_off_,srt_len_),	\
-		      INIT_ENTRY(NULL),				\
+		      INIT_ENTRY(NULL)				\
 		},						\
                 vec : { alt_1, alt_2, alt_3, alt_4,		\
 			alt_5 }					\
@@ -504,7 +504,7 @@ typedef struct {
 	info_class INFO_TBL_CONST vec_info_6 info = {		\
 		i : { layout : { bitmap : (StgWord)bitmap_ },	\
 		      SRT_INFO(type,srt_,srt_off_,srt_len_),	\
-		      INIT_ENTRY(NULL),				\
+		      INIT_ENTRY(NULL)				\
 		},						\
                 vec : { alt_1, alt_2, alt_3, alt_4,		\
 			alt_5, alt_6 }				\
@@ -518,7 +518,7 @@ typedef struct {
 	info_class INFO_TBL_CONST vec_info_7 info = {		\
 		i : { layout : { bitmap : (StgWord)bitmap_ },	\
 		      SRT_INFO(type,srt_,srt_off_,srt_len_),	\
-		      INIT_ENTRY(NULL),				\
+		      INIT_ENTRY(NULL)				\
 		},						\
                 vec : { alt_1, alt_2, alt_3, alt_4,		\
 			alt_5, alt_6, alt_7 }			\
@@ -532,7 +532,7 @@ typedef struct {
 	info_class INFO_TBL_CONST vec_info_8 info = {		\
 		i : { layout : { bitmap : (StgWord)bitmap_ },	\
 		      SRT_INFO(type,srt_,srt_off_,srt_len_),	\
-		      INIT_ENTRY(NULL),				\
+		      INIT_ENTRY(NULL)				\
 		},						\
                 vec : { alt_1, alt_2, alt_3, alt_4,		\
 			alt_5, alt_6, alt_7, alt_8 }		\
@@ -555,7 +555,7 @@ typedef vec_info_8 StgPolyInfoTable;
   info_class INFO_TBL_CONST vec_info_8 nm##_info = {		\
 		i : { layout : { bitmap : (StgWord)bitmap_ },	\
 		      SRT_INFO(type,srt_,srt_off_,srt_len_),	\
-                      INIT_ENTRY(nm##_entry),			\
+                      INIT_ENTRY(nm##_entry)			\
 		},						\
 		vec : {						\
 			(F_) nm##_0_entry,			\
