@@ -79,7 +79,8 @@ lookupInstTy tyvars ts u = ts !! i
 
 tyVarFunDep :: [FunDep Type] -> [FunDep TyVar]
 tyVarFunDep fdtys 
-  = [(varSetElems (tyVarsOfTypes xs), varSetElems (tyVarsOfTypes xs)) | (xs,ys) <- fdtys]
+  = [(getTyvars xs, getTyvars ys) | (xs, ys) <- fdtys]
+  where getTyvars = varSetElems . tyVarsOfTypes
 
 pprFundeps :: Outputable a => [FunDep a] -> SDoc
 pprFundeps [] = empty
