@@ -145,9 +145,23 @@ mkDUs pairs = [(Just defs, uses) | (defs,uses) <- pairs]
 plusDU :: DefUses -> DefUses -> DefUses
 plusDU = (++)
 
-allUses :: DefUses -> Uses -> Uses
--- Collect all uses, removing defs
-allUses dus uses
+duDefs :: DefUses -> Defs
+duDefs dus = foldr get emptyNameSet dus
+  where
+    get (Nothing, u1) d2 = d2
+    get (Just d1, u1) d2 = d1 `unionNameSets` d2
+
+duUses :: DefUses -> Uses
+-- Just like allUses, but defs are not eliminated
+duUses dus = foldr get emptyNameSet dus
+  where
+    get (d1, u1) u2 = u1 `unionNameSets` u2
+
+allUses :: DefUses -> Uses
+-- Collect all uses, regardless of
+-- whether the group is itself used,
+-- but remove defs on the way
+allUses dus
   = foldr get emptyNameSet dus
   where
     get (Nothing,   rhs_uses) uses = rhs_uses `unionNameSets` uses
@@ -159,7 +173,7 @@ findUses :: DefUses -> Uses -> Uses
 -- find all the uses, transitively. 
 -- The result is a superset of the input uses;
 -- and includes things defined in the input DefUses
--- (if they are used, of course)
+-- (but only if they are used)
 findUses dus uses 
   = foldr get uses dus
   where
@@ -170,16 +184,4 @@ findUses dus uses
 	= rhs_uses `unionNameSets` uses
 	| otherwise	-- No def is used
 	= uses
-
-duDefs :: DefUses -> Defs
-duDefs dus = foldr get emptyNameSet dus
-  where
-    get (Nothing, u1) d2 = d2
-    get (Just d1, u1) d2 = d1 `unionNameSets` d2
-
-duUses :: DefUses -> Uses
--- Defs are not eliminated
-duUses dus = foldr get emptyNameSet dus
-  where
-    get (d1, u1) u2 = u1 `unionNameSets` u2
 \end{code}

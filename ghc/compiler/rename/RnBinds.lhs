@@ -205,10 +205,10 @@ rnMonoBindsAndThen mbinds sigs thing_inside -- Non-empty monobinds
     warnUnusedLocalBinds unused_bndrs	`thenM_`
 
     returnM (result, all_uses `minusNameSet` bndrs)
-	-- It's important to return all the uses, not the 'real uses' used for
+	-- duUses: It's important to return all the uses, not the 'real uses' used for
 	-- warning about unused bindings.  Otherwise consider:
 	--	x = 3
-	--	y = let p = x in 'x'
+	--	y = let p = x in 'x'	-- NB: p not used
 	-- If we don't "see" the dependency of 'y' on 'x', we may put the
 	-- bindings in the wrong order, and the type checker will complain
 	-- that x isn't in scope

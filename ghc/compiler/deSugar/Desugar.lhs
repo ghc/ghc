@@ -96,7 +96,7 @@ deSugar hsc_env
 		  (printDump (ppr_ds_rules ds_rules))
 
 	; dfun_uses <- readIORef dfun_uses_var		-- What dfuns are used
-	; let used_names = allUses dus emptyNameSet `unionNameSets` dfun_uses
+	; let used_names = allUses dus `unionNameSets` dfun_uses
 	; usages <- mkUsageInfo hsc_env imports used_names
 	; let 
 	     deps = Deps { dep_mods = moduleEnvElts (imp_dep_mods imports), 
