@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.7 1999/02/11 17:40:27 simonm Exp $
+ * $Id: RtsStartup.c,v 1.8 1999/03/03 19:10:37 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -30,6 +30,19 @@
 #include "LLC.h"
 #endif
 
+#ifndef aix_TARGET_OS /* AIX gives link errors with this as a const (RO assembler section) */
+const 
+#endif 
+  StgClosure *PrelBase_Bool_closure_tbl[] = {
+#ifndef HAVE_WIN32_DLL_SUPPORT
+    &False_closure,
+    &True_closure
+#else
+    &dummy_ret_closure,
+    &dummy_ret_closure
+#endif
+};
+
 /*
  * Flag Structure
  */
@@ -37,6 +50,15 @@ struct RTS_FLAGS RtsFlags;
 
 extern void startupHaskell(int argc, char *argv[])
 {
+    static int rts_has_started_up = 0;
+    int i;
+
+    /* To avoid repeated initialisations of the RTS */
+   if (rts_has_started_up)
+     return;
+   else
+     rts_has_started_up=1;
+
 #if defined(PAR)
     int nPEs = 0;		    /* Number of PEs */
 #endif
@@ -106,7 +128,26 @@ extern void startupHaskell(int argc, char *argv[])
 #if 0
     initUserSignals();
 #endif
+ 
+    /* When the RTS and Prelude live in separate DLLs,
+       we need to patch up the char- and int-like tables
+       that the RTS keep after both DLLs have been loaded,
+       filling in the tables with references to where the
+       static info tables have been loaded inside the running
+       process.
+       
+       Ditto for Bool closure tbl.
+    */
+#ifdef HAVE_WIN32_DLL_SUPPORT
+    for(i=0;i<=255;i++)
+       (CHARLIKE_closure[i]).header.info = (const StgInfoTable*)&Czh_static_info;
 
+    for(i=0;i<=32;i++)
+       (INTLIKE_closure[i]).header.info = (const StgInfoTable*)&Izh_static_info;
+       
+    PrelBase_Bool_closure_tbl[0] = (const StgClosure*)&False_closure;
+    PrelBase_Bool_closure_tbl[1] = (const StgClosure*)&True_closure;
+#endif
     /* Record initialization times */
     end_init();
 }
