@@ -41,7 +41,8 @@ import Type		( mkSigmaTy, mkForAllTys, mkDictTy, mkTyVarTys,
 			  splitForAllTy, instantiateTy, matchTy, SYN_IE(ThetaType) )
 import TyVar		( GenTyVar )
 import Unique		( Unique )
-import Util		( equivClasses, zipWithEqual, panic )
+import Util		( equivClasses, zipWithEqual, panic{-, pprTrace-} )
+--import PprStyle
 
 import IdInfo		( noIdInfo )
 --import TcPragmas	( tcDictFunPragmas, tcGenPragmas )
@@ -118,6 +119,8 @@ mkInstanceRelatedIds from_here src_loc inst_mod inst_pragmas
 
 	returnTc (mkDictFunId dfun_uniq clas inst_ty dfun_ty from_here src_loc inst_mod dfun_id_info)
     ) `thenTc` \ dfun_id ->
+
+--  pprTrace "DFUN: " (ppr PprDebug dfun_id) $
 
 	-- MAKE THE CONSTANT-METHOD IDS
 	-- if there are no type variables involved

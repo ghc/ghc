@@ -37,7 +37,6 @@ import Pretty		( ppBesides, ppStr )
 import SimplEnv
 import SimplMonad
 import TyCon		( tyConFamilySize )
-import Type		( isPrimType, getAppDataTyConExpandingDicts, maybeAppDataTyConExpandingDicts )
 import Util		( pprTrace, assertPanic, panic )
 import Maybes		( maybeToBool )
 \end{code}

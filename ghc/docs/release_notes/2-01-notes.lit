@@ -1,0 +1,202 @@
+Release~2.01 is the first release of Glasgow Haskell for Haskell~1.3.
+It represents a major step forward in GHC development since GHC~0.26
+(July 1995).  Note that we are also releasing GHC~0.29, the current
+state-of-play with the Haskell~1.2 compiler---at the same time as
+2.01.
+
+The announcement for this release is distributed as \tr{ANNOUNCE-2.01}
+in the top-level directory.  It contains very important caveats about
+2.01, which we do not repeat here!
+
+Information about ``what's ported to which machine'' is in the
+Installation Guide.  Since 0.26, we've improved our support for iX86
+(Intel) boxes, notably those running Linux.
+
+%************************************************************************
+%*                                                                      *
+\subsection[2-01-config]{New configuration things in 2.01}
+%*                                                                      *
+%************************************************************************
+
+%************************************************************************
+%*                                                                      *
+\subsection[2-01-user-visible]{User-visible changes in 2.01, including incompatibilities}
+%*                                                                      *
+%************************************************************************
+
+GHC~2.01 is a compiler for Haskell~1.3 and, as such, introduces many
+user-visible changes.  The GHC user's guide has a section to help you
+upgrade your programs to Haskell~1.3; all user-visible changes
+are described there (and not repeated here).
+
+%************************************************************************
+%*                                                                      *
+\subsection[2-01-options]{New or changed GHC command-line options}
+%*                                                                      *
+%************************************************************************
+
+A new flag, \tr{-recomp} invokes the new ``recompilation checker.''
+We recommend that you use it whenever you use `make' to build your
+Haskell programs.  Please see the User's Guide for details.
+
+The flags \tr{-fomit-derived-read} and
+\tr{-fomit-reexported-instances} have died; there is no longer any
+need for them.
+
+%************************************************************************
+%*                                                                      *
+\subsection[2-01-new-in-compiler]{New in the compiler proper}
+%*                                                                      *
+%************************************************************************
+
+Substantially rewritten.  Notable points:
+\begin{itemize}
+\item
+The typechecker, besides doing all the new 1.3
+features (constructor classes, records, etc.), has been made
+ready to do linear types (e.g., there are now ``usage
+variables'' as well as ``type variables'').
+
+\item
+The Core language now has one constructor for lambdas
+(\tr{Lam}; rather than two, \tr{CoLam} and \tr{CoTyLam});
+also, one constructor for applications (\tr{App}, rather
+than two, \tr{CoApp} and \tr{CoTyApp}).
+
+Consequently, new more-general datatypes for binders and
+arguments now exist (\tr{CoreBinder} and \tr{CoreArg},
+respectively).
+
+Again, the Core language is now ``linear types''-ready
+(though the work hasn't been done yet).
+
+A new Core constructor, \tr{Coerce}, exists to support the
+1.3 \tr{newtype} construct.
+
+\item
+The ``renamer''---the part of the compiler that implements
+the Haskell module system---has been completely rewritten.
+
+In part, this is because the 1.3 module system is radically
+changed from 1.2, even if the user is unlikely to notice.
+
+We've implemented the new system with a ``go to the
+horse's mouth'' scheme; that is, to discover the facts about
+an entity \tr{Foo.bar}, we {\em always} go to the interface
+for module \tr{Foo}; hence, we can never get duff information
+about \tr{bar} from some intermediary.
+
+Interface files are no longer mandated by the language, so
+they are completely different in 2.01 compared to 0.2x.  They
+will very likely change again.  All processing of interface
+files is done in Haskell now (the most likely reason why GHC
+has slowed down :-().
+
+\item
+Much less special pleading for the Prelude.  If you wanted
+to write your own Prelude and drop it in, you would have
+a fighting chance now.
+
+\item
+No more `make' dependency loops!  (Hooray!) The whole compiler
+will build in one `make' run, no fuss or bother.
+\end{itemize}
+
+%************************************************************************
+%*                                                                      *
+\subsection[2-01-new-in-libraries]{In the ``required'' libraries (incl. Prelude)}
+%*                                                                      *
+%************************************************************************
+
+We support standard 1.3 monadic I/O, to the best of our knowledge.
+
+The proposal for \tr{LibPosix} didn't make it into Haskell 1.3 I/O.
+So it's now a system library, \tr{-syslib posix}.  (And, of course,
+the \tr{Lib} prefix is gone.)
+
+%************************************************************************
+%*                                                                      *
+\subsection[2-01-new-in-glaexts]{New in ``Glasgow extensions'' library things}
+%*                                                                      *
+%************************************************************************
+
+The @PreludeGlaMisc@ and @PreludePrimIO@ interfaces have died.
+Use @PreludeGlaST@ instead.
+
+We don't really know what our interfaces-to-nonstandard-things will
+eventually look like...
+
+MallocPtrs now called ForeignObjs
+
+The @_PackedString@ gunk (with leading underscores) is gone.  Just
+\tr{import PackedString} and use ``normal'' names.
+
+All of the following are {\em gone}:
+\begin{verbatim}
+data _FILE  -- corresponds to a "FILE *" in C
+
+fclose  :: _FILE -> PrimIO Int
+fdopen  :: Int -> String -> PrimIO _FILE
+fflush  :: _FILE -> PrimIO Int
+fopen   :: String -> String -> PrimIO _FILE
+fread   :: Int -> Int -> _FILE -> PrimIO (Int, _ByteArray Int)
+freopen :: String -> String -> _FILE -> PrimIO _FILE
+fwrite  :: _ByteArray Int -> Int -> Int -> _FILE -> PrimIO Int
+
+appendChanPrimIO :: String -> String -> PrimIO ()
+appendFilePrimIO :: String -> String -> PrimIO ()
+getArgsPrimIO	 :: PrimIO [String]
+readChanPrimIO	 :: String -> PrimIO String
+\end{verbatim}
+
+%************************************************************************
+%*                                                                      *
+\subsection[2-01-new-in-syslibs]{In the ``system'' libraries}
+%*                                                                      *
+%************************************************************************
+
+The ``system'' libraries are no longer part of GHC (they lived in
+\tr{ghc/lib/}); they have been lifted out into a subsystem in their
+own right (they live in \tr{hslibs}).
+
+Of course, a GHC distribution will ``happen'' to have these libraries
+included; however, we hope the libraries will evolve into a large,
+flourishing, independently-maintained, and independently-distributed
+body of code---preferably compiler-independent, too!
+
+Renamings in the GHC system library (\tr{hslibs/ghc/}): The function
+\tr{BitSet.singletonBS} is now called \tr{unitBS}.  Similarly,
+\tr{FiniteMap.singletonFM} is now \tr{unitFM}.  \tr{Set.singletonSet}
+lingers briefly; \tr{unitSet} is also available now.
+
+We are {\em not} up-to-date with the HBC-for-1.3's HBC library (the source
+hasn't been released yet).
+
+The \tr{Either}, \tr{Maybe}, and \tr{Option} modules in the HBC
+library (\tr{hslibs/hbc/}) have been deleted---they are too close to
+what Haskell~1.3 provides anyway (hence, confusing).
+
+The POSIX support code is in \tr{hslibs/posix}.
+
+We have added a ``contrib'' system library (\tr{hslibs/contrib/});
+made up of code that was contributed to the ``Haskell library'',
+mostly by Stephen Bevan.  Quite of bit of code for numerical methods
+in there...
+
+%************************************************************************
+%*                                                                      *
+\subsection[2-01-new-in-rts]{In the runtime system}
+%*                                                                      *
+%************************************************************************
+
+We have made a point {\em not} to beat on the runtime system very much.
+Some bugs have been fixed since 0.26, of course.
+
+The GranSim (parallel-machine simulator) stuff is substantially improved
+(but you're better off using the 0.29 version of it).
+
+%************************************************************************
+%*                                                                      *
+%\subsection[2-01-new-elsewhere]{Other new stuff}
+%*                                                                      *
+%************************************************************************

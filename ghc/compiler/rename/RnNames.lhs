@@ -389,7 +389,10 @@ doImportDecls iface_cache g_info us src_imps
 
     	    rec_imp_fn :: Name -> (ExportFlag, [SrcLoc])
 	    rec_imp_fn n = case lookupUFM rec_imp_fm n of
-		             Nothing            -> panic "RnNames:rec_imp_fn"
+		             Nothing            -> (NotExported,[mkBuiltinSrcLoc])
+						   -- panic "RnNames:rec_imp_fn"
+						   -- but the panic can show up
+						   -- in error messages
 		             Just (flag, locns) -> (flag, bagToList locns)
 
 	    i_info = (g_info, emptyFM, emptyFM, rec_imp_fn)

@@ -5,7 +5,7 @@
 #include "rtsdefs.h"
 
 void
-NoRunnableThreadsHook ()
+NoRunnableThreadsHook (void)
 {
     fprintf(stderr, "No runnable threads!\n");
 }

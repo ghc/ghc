@@ -13,7 +13,6 @@ module Maybes (
 	MaybeErr(..),
 
 	allMaybes,
-	catMaybes,
 	firstJust,
 	expectJust,
 	maybeToBool,
@@ -28,7 +27,9 @@ module Maybes (
 	returnMaybe,
 	thenMaB
 
-#if ! defined(COMPILING_GHC)
+#if defined(COMPILING_GHC)
+	, catMaybes
+#else
 	, findJust
 	, foldlMaybeErrs
 	, listMaybeErrs
@@ -41,6 +42,8 @@ CHK_Ubiq() -- debugging consistency check
 
 import Unique (Unique) -- only for specialising
 
+#else
+import Maybe -- renamer will tell us if there are any conflicts
 #endif
 \end{code}
 
@@ -63,10 +66,12 @@ a list of @Justs@ into a single @Just@, returning @Nothing@ if there
 are any @Nothings@.
 
 \begin{code}
+#ifdef COMPILING_GHC
 catMaybes :: [Maybe a] -> [a]
 catMaybes []		    = []
 catMaybes (Nothing : xs)   = catMaybes xs
 catMaybes (Just x : xs)	   = (x : catMaybes xs)
+#endif
 
 allMaybes :: [Maybe a] -> Maybe [a]
 allMaybes [] = Just []

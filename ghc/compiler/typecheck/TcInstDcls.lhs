@@ -61,7 +61,7 @@ import CmdLineOpts	( opt_GlasgowExts, opt_CompilingGhcInternals,
 import Class		( GenClass, GenClassOp, 
 			  isCcallishClass, classBigSig,
 			  classOps, classOpLocalType,
-			  classOpTagByString
+			  classOpTagByString_maybe
 			  )
 import Id		( GenId, idType, isDefaultMethodId_maybe )
 import ListSetOps	( minusList )
@@ -602,10 +602,13 @@ processInstBinds1 clas avail_insts method_ids mbind
 
     -- Make a method id for the method
     let
-	tag       = classOpTagByString clas occ
-	method_id = method_ids !! (tag-1)
-	method_ty = tcIdType method_id
+	maybe_tag  = classOpTagByString_maybe clas occ
+	(Just tag) = maybe_tag
+	method_id  = method_ids !! (tag-1)
+	method_ty  = tcIdType method_id
     in
+    -- check that the method mentioned is actually in the class:
+    checkMaybeTc maybe_tag (instMethodNotInClassErr occ clas) `thenTc_`
 
     tcInstTcType method_ty		`thenNF_Tc` \ (method_tyvars, method_rho) ->
     let
@@ -921,6 +924,10 @@ omitDefaultMethodWarn clas_op clas_name inst_ty sty
 	   ppr sty clas_op, ppStr "in instance",
 	   ppPStr clas_name, pprParendGenType sty inst_ty]
 
+instMethodNotInClassErr occ clas sty
+  = ppHang (ppStr "Instance mentions a method not in the class")
+	 4 (ppBesides [ppStr "class `", ppr sty clas, ppStr "' method `",
+    		       ppPStr occ, ppStr "'"])
 
 patMonoBindsCtxt pbind sty
   = ppHang (ppStr "In a pattern binding:")

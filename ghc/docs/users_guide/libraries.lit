@@ -9,12 +9,17 @@
 We intend to provide more and more ready-to-use Haskell code, so that
 every program doesn't have to invent everything from scratch.
 
-At the moment, we supply a part of the HBC library, as well as the
-beginnings of one of our own (``GHC library'').
-
 If you provide a \tr{-syslib <name>}\index{-syslib <name> option} option,
 then the interfaces for that library will come into scope (and may be
 \tr{import}ed), and the code will be added in at link time.
+
+We supply a part of the HBC library (\tr{-syslib hbc}); as well as one
+of our own (\tr{-syslib ghc}); one for an interface to POSIX routines
+(\tr{-syslib posix}); and one of contributed stuff off the net, mostly
+numerical (\tr{-syslib contrib}).
+
+If you have Haggis (our GUI X~toolkit for Haskell), it probably works
+with a \tr{-syslib haggis} flag.
 
 %************************************************************************
 %*                                                                      *
@@ -48,7 +53,17 @@ unitBag         :: elt -> Bag elt
 
 unionBags       :: Bag elt   -> Bag elt -> Bag elt
 unionManyBags   :: [Bag elt] -> Bag elt
+consBag		:: elt	     -> Bag elt -> Bag elt
 snocBag         :: Bag elt   -> elt     -> Bag elt
+
+concatBag	:: Bag (Bag a) -> Bag a
+mapBag		:: (a -> b) -> Bag a -> Bag b
+
+foldBag :: (r -> r -> r) -- Replace TwoBags with this; should be associative
+	-> (a -> r)	 -- Replace UnitBag with this
+	-> r		 -- Replace EmptyBag with this
+	-> Bag a
+	-> r
 
 elemBag         :: Eq elt => elt -> Bag elt -> Bool
 isEmptyBag      ::                  Bag elt -> Bool
@@ -78,7 +93,7 @@ to kill you.'' --JSM]
 mkBS        :: [Int]  -> BitSet
 listBS      :: BitSet -> [Int]
 emptyBS     :: BitSet 
-singletonBS :: Int    -> BitSet
+unitBS	    :: Int    -> BitSet
 
 unionBS     :: BitSet -> BitSet -> BitSet
 minusBS     :: BitSet -> BitSet -> BitSet
@@ -109,7 +124,7 @@ Guess what?  The implementation uses balanced trees.
 \begin{verbatim}
 --      BUILDING
 emptyFM         :: FiniteMap key elt
-singletonFM     :: key -> elt -> FiniteMap key elt
+unitFM		:: key -> elt -> FiniteMap key elt
 listToFM        :: Ord key => [(key,elt)] -> FiniteMap key elt
                         -- In the case of duplicates, the last is taken
 
@@ -197,19 +212,18 @@ intersectingLists   :: Eq a => [a] -> [a] -> Bool
 %*                                                                      *
 %************************************************************************
 
-Note: a \tr{Maybe} type is nearly inevitable in Haskell~1.3.
-You should use this module with \tr{-fhaskell-1.3}.
+The \tr{Maybe} type itself is in the Haskell~1.3 prelude.  Moreover,
+the required \tr{Maybe} library provides many useful functions on
+\tr{Maybe}s.  This (old) module provides more.
 
-Two non-abstract types:
+An \tr{Either}-like type called \tr{MaybeErr}:
 \begin{verbatim}
-data Maybe    a       = Nothing       | Just a -- Prelude; re-exported
 data MaybeErr val err = Succeeded val | Failed err
 \end{verbatim}
 
 Some operations to do with \tr{Maybe} (some commentary follows):
 \begin{verbatim}
 maybeToBool :: Maybe a -> Bool      -- Nothing => False; Just => True
-catMaybes   :: [Maybe a] -> [a]
 allMaybes   :: [Maybe a] -> Maybe [a]
 firstJust   :: [Maybe a] -> Maybe a
 findJust    :: (a -> Maybe b) -> [a] -> Maybe b
@@ -218,6 +232,10 @@ assocMaybe  :: Eq a => [(a,b)] -> a -> Maybe b
 mkLookupFun :: (key -> key -> Bool) -- Equality predicate
             -> [(key,val)]          -- The assoc list
             -> (key -> Maybe val)   -- A lookup fun to use
+mkLookupFunDef :: (key -> key -> Bool) -- Ditto, with a default
+            -> [(key,val)]
+	    -> val		    -- the default
+            -> (key -> val)	    -- NB: not a Maybe anymore
 
     -- a monad thing
 thenMaybe   :: Maybe a -> (a -> Maybe b) -> Maybe b
@@ -226,8 +244,7 @@ failMaybe   :: Maybe a
 mapMaybe    :: (a -> Maybe b) -> [a] -> Maybe [b]
 \end{verbatim}
 
-@catMaybes@ takes a list of @Maybe@s and returns a list of the
-contents of all the @Just@s in it.
+NB: @catMaybes@, which used to be here, is in the Haskell~1.3 libraries.
 
 @allMaybes@ collects a list of @Justs@ into a single @Just@, returning
 @Nothing@ if there are any @Nothings@.
@@ -262,72 +279,62 @@ accumulating any errors that occur.
 
 %************************************************************************
 %*                                                                      *
-\subsubsection[PackedString]{The @_PackedString@ type}
+\subsubsection[PackedString]{The @PackedString@ type}
 \index{PackedString module (GHC syslib)}
 %*                                                                      *
 %************************************************************************
 
-The type \tr{_PackedString} is built-in, i.e., no
-special action (other than a \tr{-fglasgow-exts} flag) is required to
-use it.
-
-The documentation here describes the {\em built-in} functions.
-
-You may also access this code as a system library and {\em not} use
-the \tr{-fglasgow-exts} flag.  Just do \tr{import PackedString},
-heave in your \tr{-syslib ghc}, and drop off the leading underscores
-which you see here.
-
-We still may change this interface (again).
+You need \tr{import PackedString}, and
+heave in your \tr{-syslib ghc}.
 
 The basic type and functions which are available are:
 \begin{verbatim}
-data _PackedString
+data PackedString
 
-_packString      :: [Char] -> _PackedString
-_packStringST    :: [Char] -> _ST s _PackedString
-_packCString     :: _Addr  -> _PackedString
-_packCBytes      :: Int -> _Addr -> _PackedString
-_packCBytesST    :: Int -> _Addr -> _ST s _PackedString
-_packBytesForC   :: [Char] -> _ByteArray Int
-_packBytesForCST :: [Char] -> _ST s (_ByteArray Int)
-_byteArrayToPS   :: _ByteArray Int -> _PackedString
-_psToByteArray   :: _PackedString -> _ByteArray Int
+packString      :: [Char] -> PackedString
+packStringST    :: [Char] -> ST s PackedString
+packCString     :: Addr  -> PackedString
+packCBytes      :: Int -> Addr -> PackedString
+packCBytesST    :: Int -> Addr -> ST s PackedString
+packBytesForC   :: [Char] -> ByteArray Int
+packBytesForCST :: [Char] -> ST s (ByteArray Int)
+byteArrayToPS   :: ByteArray Int -> PackedString
+psToByteArray   :: PackedString -> ByteArray Int
 
-_unpackPS        :: _PackedString -> [Char]
+unpackPS        :: PackedString -> [Char]
 \end{verbatim}
 
 We also provide a wad of list-manipulation-like functions:
 \begin{verbatim}
-_nilPS      :: _PackedString
-_consPS     :: Char -> _PackedString -> _PackedString
+nilPS      :: PackedString
+consPS     :: Char -> PackedString -> PackedString
 
-_headPS     :: _PackedString -> Char
-_tailPS     :: _PackedString -> _PackedString
-_nullPS     :: _PackedString -> Bool
-_appendPS   :: _PackedString -> _PackedString -> _PackedString
-_lengthPS   :: _PackedString -> Int
-_indexPS    :: _PackedString -> Int -> Char
-            -- 0-origin indexing into the string
-_mapPS      :: (Char -> Char) -> _PackedString -> _PackedString {-or String?-}
-_filterPS   :: (Char -> Bool) -> _PackedString -> _PackedString {-or String?-}
-_foldlPS    :: (a -> Char -> a) -> a -> _PackedString -> a
-_foldrPS    :: (Char -> a -> a) -> a -> _PackedString -> a
-_takePS     :: Int -> _PackedString -> _PackedString
-_dropPS     :: Int -> _PackedString -> _PackedString
-_splitAtPS  :: Int -> _PackedString -> (_PackedString, _PackedString)
-_takeWhilePS:: (Char -> Bool) -> _PackedString -> _PackedString
-_dropWhilePS:: (Char -> Bool) -> _PackedString -> _PackedString
-_spanPS     :: (Char -> Bool) -> _PackedString -> (_PackedString, _PackedString)
-_breakPS    :: (Char -> Bool) -> _PackedString -> (_PackedString, _PackedString)
-_linesPS    :: _PackedString -> [_PackedString]
-_wordsPS    :: _PackedString -> [_PackedString]
-_reversePS  :: _PackedString -> _PackedString
-_concatPS   :: [_PackedString] -> _PackedString
+headPS     :: PackedString -> Char
+tailPS     :: PackedString -> PackedString
+nullPS     :: PackedString -> Bool
+appendPS   :: PackedString -> PackedString -> PackedString
+lengthPS   :: PackedString -> Int
+indexPS    :: PackedString -> Int -> Char
+           -- 0-origin indexing into the string
+mapPS      :: (Char -> Char) -> PackedString -> PackedString {-or String?-}
+filterPS   :: (Char -> Bool) -> PackedString -> PackedString {-or String?-}
+foldlPS    :: (a -> Char -> a) -> a -> PackedString -> a
+foldrPS    :: (Char -> a -> a) -> a -> PackedString -> a
+takePS     :: Int -> PackedString -> PackedString
+dropPS     :: Int -> PackedString -> PackedString
+splitAtPS  :: Int -> PackedString -> (PackedString, PackedString)
+takeWhilePS:: (Char -> Bool) -> PackedString -> PackedString
+dropWhilePS:: (Char -> Bool) -> PackedString -> PackedString
+spanPS     :: (Char -> Bool) -> PackedString -> (PackedString, PackedString)
+breakPS    :: (Char -> Bool) -> PackedString -> (PackedString, PackedString)
+linesPS    :: PackedString -> [PackedString]
+wordsPS    :: PackedString -> [PackedString]
+reversePS  :: PackedString -> PackedString
+concatPS   :: [PackedString] -> PackedString
 
-_substrPS   :: _PackedString -> Int -> Int -> _PackedString
-            -- pluck out a piece of a _PS
-            -- start and end chars you want; both 0-origin-specified
+substrPS   :: PackedString -> Int -> Int -> PackedString
+           -- pluck out a piece of a PS
+           -- start and end chars you want; both 0-origin-specified
 \end{verbatim}
 
 %************************************************************************
@@ -373,6 +380,10 @@ ppInterleave    :: Pretty -> [Pretty] -> Pretty -- spacing between
 ppIntersperse   :: Pretty -> [Pretty] -> Pretty -- no spacing between
 ppNest          :: Int -> Pretty -> Pretty
 ppSep           :: [Pretty] -> Pretty
+
+ppBracket 	:: Pretty -> Pretty -- [ ... ] around something
+ppParens  	:: Pretty -> Pretty -- ( ... ) around something
+ppQuote   	:: Pretty -> Pretty -- ` ... ' around something
 \end{verbatim}
 
 %************************************************************************
@@ -413,27 +424,33 @@ too surprised if this stuff moves/gets-renamed/etc.
 
 \begin{verbatim}
 -- general list processing
-forall          :: (a -> Bool) -> [a] -> Bool
 exists          :: (a -> Bool) -> [a] -> Bool
-zipEqual        :: [a] -> [b] -> [(a,b)]
-nOfThem         :: Int -> a -> [a]
-lengthExceeds   :: [a] -> Int -> Bool
+forall          :: (a -> Bool) -> [a] -> Bool
 isSingleton     :: [a] -> Bool
+lengthExceeds   :: [a] -> Int -> Bool
+mapAndUnzip	:: (a -> (b, c)) -> [a] -> ([b], [c])
+mapAndUnzip3	:: (a -> (b, c, d)) -> [a] -> ([b], [c], [d])
+nOfThem         :: Int -> a -> [a]
+zipEqual        :: [a] -> [b] -> [(a,b)]
+zipWithEqual	:: String -> (a->b->c) -> [a]->[b]->[c]
+zipWith3Equal	:: String -> (a->b->c->d) -> [a]->[b]->[c]->[d]
+zipWith4Equal	:: String -> (a->b->c->d->e) -> [a]->[b]->[c]->[d]->[e]
+zipLazy		:: [a] -> [b] -> [(a,b)] -- lazy in 2nd arg
 
 -- association lists
 assoc       :: Eq a => String -> [(a, b)] -> a -> b
 
 -- duplicate handling
 hasNoDups    :: Eq a => [a] -> Bool
-equivClasses :: (a -> a -> _CMP_TAG) -> [a] -> [[a]]
+equivClasses :: (a -> a -> Ordering) -> [a] -> [[a]]
 runs         :: (a -> a -> Bool)     -> [a] -> [[a]]
-removeDups   :: (a -> a -> _CMP_TAG) -> [a] -> ([a], [[a]])
+removeDups   :: (a -> a -> Ordering) -> [a] -> ([a], [[a]])
 
 -- sorting (don't complain of no choice...)
 quicksort          :: (a -> a -> Bool)     -> [a] -> [a]
 sortLt             :: (a -> a -> Bool)     -> [a] -> [a]
 stableSortLt       :: (a -> a -> Bool)     -> [a] -> [a]
-mergesort          :: (a -> a -> _CMP_TAG) -> [a] -> [a]
+mergesort          :: (a -> a -> Ordering) -> [a] -> [a]
 mergeSort          :: Ord a => [a] -> [a]
 naturalMergeSort   :: Ord a => [a] -> [a]
 mergeSortLe        :: Ord a => [a] -> [a]
@@ -461,10 +478,7 @@ mapAccumB :: (accl -> accr -> x -> (accl, accr,y))
           -> (accl, accr, [y])
 
 -- comparisons
-cmpString :: String -> String -> _CMP_TAG
-
--- this type is built-in
-data _CMP_TAG = _LT | _EQ | _GT
+cmpString :: String -> String -> Ordering
 
 -- pairs
 applyToPair :: ((a -> c), (b -> d)) -> (a, b) -> (c, d)
@@ -500,7 +514,7 @@ Readline library.  As such, you will need to look at the GNU
 documentation (and have a \tr{libreadline.a} file around somewhere...)
 
 You'll need to link any Readlining program with \tr{-lreadline -ltermcap},
-besides the usual \tr{-syslib ghc} (and \tr{-fhaskell-1.3}).
+besides the usual \tr{-syslib ghc}.
 
 The main function you'll use is:
 \begin{verbatim}
@@ -535,7 +549,7 @@ will see in the GNU readline documentation.)
 
 The \tr{Regex} library provides quite direct interface to the GNU
 regular-expression library, for doing manipulation on
-\tr{_PackedString}s.  You probably need to see the GNU documentation
+\tr{PackedString}s.  You probably need to see the GNU documentation
 if you are operating at this level.
 
 The datatypes and functions that \tr{Regex} provides are:
@@ -553,18 +567,18 @@ data REmatch
 -- matched inside a string, e.g.
 --
 -- matching "reg(exp)" "a regexp" returns the pair (5,7) for the
--- (exp) group. (_PackedString indices start from 0)
+-- (exp) group. (PackedString indices start from 0)
 
 type GroupBounds = (Int, Int)
 
 re_compile_pattern
-	:: _PackedString	-- pattern to compile
+	:: PackedString	-- pattern to compile
 	-> Bool			-- True <=> assume single-line mode
 	-> Bool			-- True <=> case-insensitive
 	-> PrimIO PatBuffer
 
 re_match :: PatBuffer		-- compiled regexp
-	 -> _PackedString	-- string to match
+	 -> PackedString	-- string to match
 	 -> Int			-- start position
 	 -> Bool		-- True <=> record results in registers
 	 -> PrimIO (Maybe REmatch)
@@ -575,23 +589,23 @@ re_match :: PatBuffer		-- compiled regexp
 -- into one massive heap chunk, but load (smaller chunks) on demand.
 
 re_match2 :: PatBuffer		-- 2-string version
-	  -> _PackedString
-	  -> _PackedString
+	  -> PackedString
+	  -> PackedString
 	  -> Int
 	  -> Int
 	  -> Bool
 	  -> PrimIO (Maybe REmatch)
 
 re_search :: PatBuffer		-- compiled regexp
-	  -> _PackedString	-- string to search
+	  -> PackedString	-- string to search
 	  -> Int		-- start index
 	  -> Int		-- stop index
 	  -> Bool		-- True <=> record results in registers
 	  -> PrimIO (Maybe REmatch)
 
 re_search2 :: PatBuffer		-- Double buffer search
-	   -> _PackedString
-	   -> _PackedString
+	   -> PackedString
+	   -> PackedString
 	   -> Int		-- start index
 	   -> Int		-- range (?)
 	   -> Int		-- stop index
@@ -600,68 +614,68 @@ re_search2 :: PatBuffer		-- Double buffer search
 \end{verbatim}
 
 The \tr{MatchPS} module provides Perl-like ``higher-level'' facilities
-to operate on \tr{_PackedStrings}.  The regular expressions in
+to operate on \tr{PackedStrings}.  The regular expressions in
 question are in Perl syntax.  The ``flags'' on various functions can
 include: \tr{i} for case-insensitive, \tr{s} for single-line mode, and
 \tr{g} for global.  (It's probably worth your time to peruse the
 source code...)
 
 \begin{verbatim}
-matchPS :: _PackedString    -- regexp
-	-> _PackedString    -- string to match
+matchPS :: PackedString    -- regexp
+	-> PackedString    -- string to match
 	-> [Char]	    -- flags
 	-> Maybe REmatch    -- info about what matched and where
 
-searchPS :: _PackedString   -- regexp
-	 -> _PackedString   -- string to match
+searchPS :: PackedString   -- regexp
+	 -> PackedString   -- string to match
 	 -> [Char]	    -- flags
 	 -> Maybe REmatch
 
 -- Perl-like match-and-substitute:
-substPS :: _PackedString    -- regexp
-	-> _PackedString    -- replacement
+substPS :: PackedString    -- regexp
+	-> PackedString    -- replacement
 	-> [Char]	    -- flags
-	-> _PackedString    -- string
-	-> _PackedString
+	-> PackedString    -- string
+	-> PackedString
 
 -- same as substPS, but no prefix and suffix:
-replacePS :: _PackedString  -- regexp
-	  -> _PackedString  -- replacement
+replacePS :: PackedString  -- regexp
+	  -> PackedString  -- replacement
 	  -> [Char]	    -- flags
-	  -> _PackedString  -- string
-	  -> _PackedString
+	  -> PackedString  -- string
+	  -> PackedString
 
-match2PS :: _PackedString   -- regexp
-	 -> _PackedString   -- string1 to match
-	 -> _PackedString   -- string2 to match
+match2PS :: PackedString   -- regexp
+	 -> PackedString   -- string1 to match
+	 -> PackedString   -- string2 to match
 	 -> [Char]	    -- flags
 	 -> Maybe REmatch
 
-search2PS :: _PackedString  -- regexp
-	  -> _PackedString  -- string to match
-	  -> _PackedString  -- string to match
+search2PS :: PackedString  -- regexp
+	  -> PackedString  -- string to match
+	  -> PackedString  -- string to match
 	  -> [Char]	    -- flags
 	  -> Maybe REmatch
 
 -- functions to pull the matched pieces out of an REmatch:
 
 getMatchesNo    :: REmatch -> Int
-getMatchedGroup :: REmatch -> Int -> _PackedString -> _PackedString
-getWholeMatch   :: REmatch -> _PackedString -> _PackedString
-getLastMatch    :: REmatch -> _PackedString -> _PackedString
-getAfterMatch   :: REmatch -> _PackedString -> _PackedString
+getMatchedGroup :: REmatch -> Int -> PackedString -> PackedString
+getWholeMatch   :: REmatch -> PackedString -> PackedString
+getLastMatch    :: REmatch -> PackedString -> PackedString
+getAfterMatch   :: REmatch -> PackedString -> PackedString
 
 -- (reverse) brute-force string matching;
 -- Perl equivalent is index/rindex:
-findPS, rfindPS :: _PackedString -> _PackedString -> Maybe Int
+findPS, rfindPS :: PackedString -> PackedString -> Maybe Int
 
 -- Equivalent to Perl "chop" (off the last character, if any):
-chopPS :: _PackedString -> _PackedString
+chopPS :: PackedString -> PackedString
 
 -- matchPrefixPS: tries to match as much as possible of strA starting
 -- from the beginning of strB (handy when matching fancy literals in
 -- parsers):
-matchPrefixPS :: _PackedString -> _PackedString -> Int
+matchPrefixPS :: PackedString -> PackedString -> Int
 \end{verbatim}
 
 %************************************************************************
@@ -678,7 +692,7 @@ matchPrefixPS :: _PackedString -> _PackedString -> Int
 (Darren Moffat supplied the network-interface toolkit.)
 
 Your best bet for documentation is to look at the code---really!--- 
-normally in \tr{ghc/lib/ghc/{BSD,Socket,SocketPrim}.lhs}.
+normally in \tr{hslibs/ghc/src/{BSD,Socket,SocketPrim}.lhs}.
 
 The \tr{BSD} module provides functions to get at system-database info;
 pretty straightforward if you're into this sort of thing:
@@ -749,32 +763,6 @@ modules that GHC does not support (because they require HBC-specific
 extensions) are omitted.
 
 \begin{description}
-\item[\tr{Either}:]
-\index{Either module (HBC library)}%
-A binary sum data type:
-\begin{verbatim}
-data Either a b = Left a | Right b
-\end{verbatim}
-The constructor \tr{Left} is typically used for errors; it can be
-renamed to \tr{Wrong} on import.
-
-\item[\tr{Maybe}:]
-\index{Maybe module (HBC library)}%
-A type for failure or success:
-\begin{verbatim}
-data Maybe a = Nothing | Just a
-thenM :: Maybe a -> (a -> Maybe b) -> Maybe b
-    -- apply a function that may fail
-\end{verbatim}
-
-\item[\tr{Option}:]
-\index{Option module (HBC library)}%
-An alias for \tr{Maybe}:
-\begin{verbatim}
-data Option a = None | Some a
-thenO :: Option a -> (a -> Option b) -> Option b
-\end{verbatim}
-
 \item[\tr{ListUtil}:]
 \index{ListUtil module (HBC library)}%
 Various useful functions involving lists that are missing from the
@@ -810,7 +798,7 @@ groupEq :: (a->a->Bool) -> [a] -> [[a]]
         -- group list elements according to an equality predicate
 group :: (Eq a) => [a] -> [[a]]
         -- group according to} ==
-readListLazily :: (Text a) => String -> [a]
+readListLazily :: (Read a) => String -> [a]
         -- read a list in a lazy fashion
 \end{verbatim}
 
@@ -884,7 +872,7 @@ data Word                       -- 32 bit quantity
 instance Bits Byte, Bits Short, Bits Word
 instance Eq Byte, Eq Short, Eq Word
 instance Ord Byte, Ord Short, Ord Word
-instance Text Byte, Text Short, Text Word
+instance Show Byte, Show Short, Show Word
 instance Num Byte, Num Short, Num Word
 wordToShorts :: Word -> [Short]   -- convert a Word to two Short
 wordToBytes :: Word -> [Byte]     -- convert a Word to four Byte
@@ -974,7 +962,7 @@ sepBy1 :: Parser a b -> Parser a c -> Parser a [b]
         -- Non-empty sequence of items separated by something
 sepBy :: Parser a b -> Parser a c -> Parser a [b]
         -- Sequence of items separated by something
-lit :: (Eq a, Text a) => a -> Parser [a] a
+lit :: (Eq a, Show a) => a -> Parser [a] a
         -- Recognise a literal token from a list of tokens
 litp :: String -> (a->Bool) -> Parser [a] a
         -- Recognise a token with a predicate.
@@ -986,7 +974,7 @@ token :: (a -> Either String (b, a)) -> Parser a b
 parse :: Parser a b -> a -> Either ([String], a) [(b, a)]
         -- Do a parse.  Return either error (possible tokens and rest
         -- of tokens) or all possible parses.
-sParse :: (Text a) => (Parser [a] b) -> [a] -> Either String b
+sParse :: (Show a) => (Parser [a] b) -> [a] -> Either String b
         -- Simple parse.  Return error message or result.
 \end{verbatim}
 
@@ -1045,3 +1033,43 @@ instance ...                    -- All reasonable instances.
 isInteger :: Number -> Bool     -- Test if a Number is an integer.
 \end{verbatim}
 \end{description}
+
+%************************************************************************
+%*                                                                      *
+\subsection[contrib-library]{The `contrib' system library}
+\index{contrib system library}
+\index{system library, contrib}
+%*                                                                      *
+%************************************************************************
+
+Just for a bit of fun, we took all the old contributed ``Haskell
+library'' code---Stephen J.~Bevan the main hero, converted it to
+Haskell~1.3 and heaved it into a \tr{contrib} system library.  It is
+mostly code for numerical methods (@SetMap@ is an exception); we have
+{\em no idea} whether it is any good or not.
+
+The modules provided are:
+@Adams_Bashforth_Approx@,
+@Adams_Predictor_Corrector_Approx@,
+@Choleski_Factorization@,
+@Crout_Reduction@,
+@Cubic_Spline@,
+@Fixed_Point_Approx@,
+@Gauss_Seidel_Iteration@,
+@Hermite_Interpolation@,
+@Horner@,
+@Jacobi_Iteration@,
+@LLDecompMethod@,
+@Least_Squares_Fit@,
+@Matrix_Ops@,
+@Neville_Iterated_Interpolation@,
+@Newton_Cotes@,
+@Newton_Interpolatory_Divided_Difference@,
+@Newton_Raphson_Approx@,
+@Runge_Kutta_Approx@,
+@SOR_Iteration@,
+@Secant_Approx@,
+@SetMap@,
+@Steffensen_Approx@,
+@Taylor_Approx@, and
+@Vector_Ops@.

@@ -12,10 +12,12 @@
 #endif
 
 module Pretty (
-	SYN_IE(Pretty),
 
 #if defined(COMPILING_GHC)
+	SYN_IE(Pretty),
 	prettyToUn,
+#else
+	Pretty,
 #endif
 	ppNil, ppStr, ppPStr, ppChar, ppInt, ppInteger,
 	ppFloat, ppDouble,
@@ -46,6 +48,8 @@ IMPORT_1_3(Ratio)
 IMPORT_1_3(IO)
 
 import Unpretty		( SYN_IE(Unpretty) )
+#else
+import Ratio
 #endif
 
 import CharSeq

@@ -112,7 +112,7 @@ DoGlobalGC(STG_NO_ARGS)
 {}
 /*
 static void
-HandleException(STG_NO_ARGS)
+HandleException(PACKET p)
 {}
 */
 \end{code}

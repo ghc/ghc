@@ -14,7 +14,7 @@ module Class (
 	classSuperDictSelId, classOpId, classDefaultMethodId,
 	classSig, classBigSig, classInstEnv,
 	isSuperClassOf,
-	classOpTagByString,
+	classOpTagByString, classOpTagByString_maybe,
 
 	derivableClassKeys, needsDataDeclCtxtClassKeys,
 	cCallishClassKeys, isNoDictClass,
@@ -331,17 +331,23 @@ classOpLocalType (ClassOp _ _ ty) = ty
 
 Rather unsavoury ways of getting ClassOp tags:
 \begin{code}
-classOpTagByString :: Class -> FAST_STRING -> Int
+classOpTagByString_maybe :: Class -> FAST_STRING -> Maybe Int
+classOpTagByString       :: Class -> FAST_STRING -> Int
 
 classOpTagByString clas op
+  = case (classOpTagByString_maybe clas op) of
+      Just tag -> tag
+#ifdef DEBUG
+      Nothing  -> pprPanic "classOpTagByString:" (ppCat (ppPStr op : map (ppPStr . classOpString) (classOps clas)))
+#endif
+
+classOpTagByString_maybe clas op
   = go (map classOpString (classOps clas)) 1
   where
+    go []     _   = Nothing
     go (n:ns) tag = if n == op
-		    then tag
+		    then Just tag
 		    else go ns (tag+1)
-#ifdef DEBUG
-    go []     tag = pprPanic "classOpTagByString:" (ppCat (ppPStr op : map (ppPStr . classOpString) (classOps clas)))
-#endif
 \end{code}
 
 %************************************************************************

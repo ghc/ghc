@@ -1531,7 +1531,8 @@ specAlts (AlgAlts alts deflt) scrutinee_ty args
     -- We use ty_args of scrutinee type to identify specialisation of
     -- alternatives:
 
-    (_, ty_args, _) = getAppDataTyConExpandingDicts scrutinee_ty
+    (_, ty_args, _) = --trace "Specialise.specAlts:getAppData..." $
+		      getAppDataTyConExpandingDicts scrutinee_ty
 
     specAlgAlt ty_args (con,binders,rhs)
       = specLambdaOrCaseBody binders rhs args	`thenSM` \ (binders, rhs, rhs_uds) ->

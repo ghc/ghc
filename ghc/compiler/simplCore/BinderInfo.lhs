@@ -16,7 +16,7 @@ module BinderInfo (
 
 	inlineUnconditionally, okToInline,
 
-	addBinderInfo, orBinderInfo, 
+	addBinderInfo, orBinderInfo, andBinderInfo,
 
 	argOccurrence, funOccurrence, dangerousArgOcc, noBinderInfo,
 	markMany, markDangerousToDup, markInsideSCC,
@@ -117,20 +117,24 @@ okToInline BottomForm occ_info small_enough
 		-- This used to be checked for, but I can't
 		-- see why so I've left it out.
 
--- Non-WHNFs can be inlined if they occur once, or are small
-okToInline OtherForm (OneOcc _ _ _ n_alts _) small_enough | n_alts <= 1 = True
-okToInline OtherForm any_occ 		     small_enough 		= small_enough
-
--- A WHNF can be inlined if it doesn't occur inside a lambda,
+-- A WHNF can be inlined if it occurs once, or is small
+okToInline form occ_info small_enough
+ | is_whnf_form form
+ = small_enough || one_occ
+ where
+   one_occ = case occ_info of
+		OneOcc _ _ _ n_alts _ -> n_alts <= 1
+		other		      -> False
+   	
+   is_whnf_form VarForm   = True
+   is_whnf_form ValueForm = True
+   is_whnf_form other     = False
+    
+-- A non-WHNF can be inlined if it doesn't occur inside a lambda,
 -- and occurs exactly once or 
 --     occurs once in each branch of a case and is small
-okToInline form (OneOcc _ NoDupDanger _ n_alts _) small_enough 
-  = is_whnf_form form && 
-    (n_alts <= 1 || small_enough)
-  where
-    is_whnf_form VarForm   = True
-    is_whnf_form ValueForm = True
-    is_whnf_form other     = False
+okToInline OtherForm (OneOcc _ NoDupDanger _ n_alts _) small_enough 
+  = n_alts <= 1 || small_enough
 
 okToInline form any_occ small_enough = False
 \end{code}
@@ -194,49 +198,55 @@ addBinderInfo info1 DeadCode = info1
 addBinderInfo info1 info2
 	= ManyOcc (min (getBinderInfoArity info1) (getBinderInfoArity info2))
 
--- (orBinderInfo orig new) is used in two situations:
--- First, it combines occurrence info from branches of a case
---
--- Second, when a variable whose occurrence
---   info is currently "orig" is bound to a variable whose occurrence info is "new"
---	eg  (\new -> e) orig
---   What we want to do is to *worsen* orig's info to take account of new's
+-- (orBinderInfo orig new) is used when combining occurrence 
+-- info from branches of a case
 
 orBinderInfo DeadCode info2 = info2
 orBinderInfo info1 DeadCode = info1
 orBinderInfo (OneOcc posn1 dup1 scc1 n_alts1 ar_1)
-		      (OneOcc posn2 dup2 scc2 n_alts2 ar_2)
+	     (OneOcc posn2 dup2 scc2 n_alts2 ar_2)
   = OneOcc (combine_posns posn1 posn2)
 	   (combine_dups  dup1  dup2)
 	   (combine_sccs  scc1  scc2)
 	   (n_alts1 + n_alts2)
 	   (min ar_1 ar_2)
-  where
-    combine_dups DupDanger _ = DupDanger	-- Too paranoid?? ToDo
-    combine_dups _ DupDanger = DupDanger
-    combine_dups _ _	     = NoDupDanger
-
-    combine_sccs InsideSCC _ = InsideSCC	-- Too paranoid?? ToDo
-    combine_sccs _ InsideSCC = InsideSCC
-    combine_sccs _ _	     = NotInsideSCC
-
 orBinderInfo info1 info2
 	= ManyOcc (min (getBinderInfoArity info1) (getBinderInfoArity info2))
+
+-- (andBinderInfo orig new) is used in two situations:
+-- First, when a variable whose occurrence info
+--   is currently "orig" is bound to a variable whose occurrence info is "new"
+--	eg  (\new -> e) orig
+--   What we want to do is to *worsen* orig's info to take account of new's
+--
+-- second, when completing a let-binding
+--	let new = ...orig...
+-- we compute the way orig occurs in (...orig...), and then use orBinderInfo
+-- to worsen this info by the way new occurs in the let body; then we use
+-- that to worsen orig's currently recorded occurrence info.
+
+andBinderInfo DeadCode info2 = DeadCode
+andBinderInfo info1 DeadCode = DeadCode
+andBinderInfo (OneOcc posn1 dup1 scc1 n_alts1 ar_1)
+	      (OneOcc posn2 dup2 scc2 n_alts2 ar_2)
+  = OneOcc (combine_posns posn1 posn2)
+	   (combine_dups  dup1  dup2)
+	   (combine_sccs  scc1  scc2)
+	   (n_alts1 + n_alts2)
+	   ar_1					-- Min arity just from orig
+andBinderInfo info1 info2 = ManyOcc (getBinderInfoArity info1)
+
 
 combine_posns FunOcc FunOcc = FunOcc -- see comment at FunOrArg defn
 combine_posns _  	 _  = ArgOcc
 
-{-
-multiplyBinderInfo orig@(ManyOcc _) new
-  = ManyOcc (min (getBinderInfoArity orig) (getBinderInfoArity new))
+combine_dups DupDanger _ = DupDanger	-- Too paranoid?? ToDo
+combine_dups _ DupDanger = DupDanger
+combine_dups _ _	     = NoDupDanger
 
-multiplyBinderInfo orig new@(ManyOcc _)
-  = ManyOcc (min (getBinderInfoArity orig) (getBinderInfoArity new))
-
-multiplyBinderInfo (OneOcc posn1 dup1 scc1 n_alts1 ar_1)
-		   (OneOcc posn2 dup2 scc2 n_alts2 ar_2)  
-  = OneOcc (combine_posns posn1 posn2) ???
--}
+combine_sccs InsideSCC _ = InsideSCC	-- Too paranoid?? ToDo
+combine_sccs _ InsideSCC = InsideSCC
+combine_sccs _ _	     = NotInsideSCC
 
 setBinderInfoArityToZero :: BinderInfo -> BinderInfo
 setBinderInfoArityToZero DeadCode    = DeadCode

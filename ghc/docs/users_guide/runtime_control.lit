@@ -21,11 +21,11 @@ When your Haskell program starts up, its RTS extracts
 command-line arguments bracketed between \tr{+RTS}\index{+RTS option}
 and \tr{-RTS}\index{-RTS option} as its own.  For example:
 \begin{verbatim}
-% ./a.out -f +RTS -p -S -RTS -h foo bar
+% ./a.out -f +RTS -pT -S -RTS -h foo bar
 \end{verbatim}
-The RTS will snaffle \tr{-p -S} for itself,
+The RTS will snaffle \tr{-pT -S} for itself,
 and the remaining arguments \tr{-f -h foo bar} will be handed
-to your program when it does a @GetArgs@ I/O request.
+to your program if/when it calls @System.getArgs@.
 
 No \tr{-RTS} option is required if the runtime-system options extend
 to the end of the command line, as in this example:
@@ -83,11 +83,12 @@ specially, with the output really being sent to \tr{stderr}.
 
 %Note that the same program will typically allocate more space with a
 %generational collector than with a non-generational collector.
-The amount of heap allocation will typically increase as the total heap
-size is reduced.  The reason for this odd behaviour is that updates of
-promoted-to-old-generation objects may require the extra allocation of a new-generation
-object to ensure that there are never any pointers from the old
-generation to the new generation.
+
+The amount of heap allocation will typically increase as the total
+heap size is reduced.  The reason for this odd behaviour is that
+updates of promoted-to-old-generation objects may require the extra
+allocation of a new-generation object to ensure that there are never
+any pointers from the old generation to the new generation.
 
 For some garbage collectors (not including the default one, sadly),
 you can convert the \tr{-S} output into a residency graph (in
@@ -189,18 +190,18 @@ recommended for everyday use!
 Sound the bell at the start of each (major) garbage collection.
 
 Oddly enough, people really do use this option!  Our pal in Durham
-(England), PaulCallaghan, writes: ``Some people here use it for a
+(England), Paul Callaghan, writes: ``Some people here use it for a
 variety of purposes---honestly!---e.g., confirmation that the
 code/machine is doing something, infinite loop detection, gauging cost
 of recently added code. Certain people can even tell what stage [the
 program] is in by the beep pattern. But the major use is for annoying
 others in the same office...''
 
-\item[\tr{-I}:]
-Use the ``debugging mini-interpreter'' with sanity-checking; you have
-to have an appropriately-compiled version of the prelude, etc.
-Goes together nicely with GDB (GNU debugger)...
-(OLD, REALLY)
+% \item[\tr{-I}:]
+% Use the ``debugging mini-interpreter'' with sanity-checking; you have
+% to have an appropriately-compiled version of the prelude, etc.
+% Goes together nicely with GDB (GNU debugger)...
+% (OLD, REALLY)
 
 \item[\tr{-r<file>}:]
 \index{-r <file> RTS option}
@@ -239,7 +240,7 @@ GHC lets you exercise rudimentary control over the messages printed
 when the runtime system ``blows up,'' e.g., on stack overflow.
 
 Simply write some of the following procedures in C and then make sure
-they get linked in, in preference to those in the RTS library:
+they get linked in preference to those in the RTS library:
 \begin{description}
 \item[\tr{void ErrorHdrHook (FILE *)}:]
 \index{ErrorHdrHook}
@@ -278,16 +279,13 @@ For example, here is the ``hooks'' code used by GHC itself:
 #define I_ long int
 
 void
-ErrorHdrHook (where)
-  FILE *where;
+ErrorHdrHook (FILE *where)
 {
     fprintf(where, "\n"); /* no "Fail: " */
 }
 
 void
-OutOfHeapHook (request_size, heap_size)
-  W_ request_size; /* in bytes */
-  W_ heap_size;    /* in bytes */
+OutOfHeapHook (W_ request_size, W_ heap_size) /* both sizes in bytes */
 {
     fprintf(stderr, "GHC's heap exhausted;\nwhile trying to 
 	allocate %lu bytes in a %lu-byte heap;\nuse the `-H<size>'
@@ -297,8 +295,7 @@ OutOfHeapHook (request_size, heap_size)
 }
 
 void
-StackOverflowHook (stack_size)
-  I_ stack_size;    /* in bytes */
+StackOverflowHook (I_ stack_size)    /* in bytes */
 {
     fprintf(stderr, "GHC stack-space overflow: current size
 	%ld bytes.\nUse the `-K<size>' option to increase it.\n",
@@ -306,24 +303,21 @@ StackOverflowHook (stack_size)
 }
 
 void
-PatErrorHdrHook (where)
-  FILE *where;
+PatErrorHdrHook (FILE *where)
 {
     fprintf(where, "\n*** Pattern-matching error within GHC!\n\n
 	This is a compiler bug; please report it to
-	glasgow-haskell-bugs@dcs.glasgow.ac.uk.\n\nFail: ");
+	glasgow-haskell-bugs@dcs.gla.ac.uk.\n\nFail: ");
 }
 
 void
-PreTraceHook (where)
-  FILE *where;
+PreTraceHook (FILE *where)
 {
     fprintf(where, "\n"); /* not "Trace On" */
 }
 
 void
-PostTraceHook (where)
-  FILE *where;
+PostTraceHook (FILE *where)
 {
     fprintf(where, "\n"); /* not "Trace Off" */
 }

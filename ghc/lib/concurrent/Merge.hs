@@ -18,7 +18,8 @@ module Merge
 
 import Semaphore
 
-import PreludeGlaST
+import GHCbase
+import GHCio		( stThen )
 import Concurrent	( forkIO )
 
 max_buff_size = 1
@@ -65,10 +66,10 @@ suckIO branches_running buff@(tail_list,e) vs
 		waitQSem e 	   		 >>
 		takeMVar tail_list 		 >>= \ node ->
 	        newEmptyMVar 	   		 >>= \ next_node ->
-		unsafeInterleavePrimIO (
-			takeMVar next_node       `thenPrimIO` \ (Right x) ->
-			signalQSem e             `seqPrimIO`
-			returnPrimIO x)          `thenPrimIO` \ next_node_val ->
+		unsafeInterleavePrimIO ( ioToPrimIO $
+			takeMVar next_node  >>= \ x ->
+			signalQSem e	    >>
+			return x)	    `stThen` \ next_node_val ->
 		putMVar node (x:next_node_val)   >>
 		putMVar tail_list next_node 	 >>
 		suckIO branches_running buff xs

@@ -18,7 +18,7 @@ import CoreSyn
 import Bag
 import Kind		( hasMoreBoxityInfo, Kind{-instance-} )
 import Literal		( literalType, Literal{-instance-} )
-import Id		( idType, isBottomingId,
+import Id		( idType, isBottomingId, dataConRepType,
 			  dataConArgTys, GenId{-instances-},
 			  emptyIdSet, mkIdSet, intersectIdSets,
 			  unionIdSets, elementOfIdSet, SYN_IE(IdSet)
@@ -198,14 +198,8 @@ lintCoreExpr (Let binds body)
 	(addInScopeVars binders (lintCoreExpr body))
 
 lintCoreExpr e@(Con con args)
-  = lintCoreArgs {-False-} e unoverloaded_ty args
+  = lintCoreArgs {-False-} e (dataConRepType con) args
     -- Note: we don't check for primitive types in these arguments
-  where
-	-- Constructors are special in that they aren't passed their
-	-- dictionary arguments, so we swizzle them out of the
-	-- constructor type before handing over to lintCorArgs
-    unoverloaded_ty = mkForAllTys tyvars tau
-    (tyvars, theta, tau) = splitSigmaTy (idType con)
 
 lintCoreExpr e@(Prim op args)
   = lintCoreArgs {-True-} e (primOpType op) args

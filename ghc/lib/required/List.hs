@@ -18,11 +18,11 @@ delete                  =  deleteBy (==)
 
 deleteBy                :: (a -> a -> Bool) -> a -> [a] -> [a]
 deleteBy eq x []        = []
-deleteBy eq x (y:ys)    = if x `eq` y then ys else deleteBy eq x ys
+deleteBy eq x (y:ys)    = if x `eq` y then ys else y : deleteBy eq x ys
 
 -- list difference (non-associative).  In the result of xs \\ ys,
 -- the first occurrence of each element of ys in turn (if any)
--- has been removed from xs.  This (xs ++ ys) \\ xs == ys.
+-- has been removed from xs.  Thus, (xs ++ ys) \\ xs == ys.
 (\\)			:: (Eq a) => [a] -> [a] -> [a]
 (\\)		        =  foldl (flip delete)
 

@@ -22,13 +22,14 @@ import CoreUtils	( coreExprType, nonErrorRHSs, maybeErrorApp,
 			  unTagBinders, squashableDictishCcExpr
 			)
 import Id		( idType, idWantsToBeINLINEd,
+			  externallyVisibleId,
 			  getIdDemandInfo, addIdDemandInfo,
 			  GenId{-instance NamedThing-}
 			)
 import IdInfo		( willBeDemanded, DemandInfo )
 import Literal		( isNoRepLit )
 import Maybes		( maybeToBool )
-import Name		( isLocallyDefined )
+--import Name		( isExported )
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instance Outputable-} )
 import Pretty		( ppAbove )
@@ -193,8 +194,8 @@ simplTopBinds env [] = returnSmpl []
 simplTopBinds env (NonRec binder@(in_id,occ_info) rhs : binds)
   = 	-- No cloning necessary at top level
  	-- Process the binding
-    simplRhsExpr env binder rhs 	`thenSmpl` \ rhs' ->
-    completeNonRec True env binder rhs'	`thenSmpl` \ (new_env, binds1') ->
+    simplRhsExpr env binder rhs 		`thenSmpl` \ rhs' ->
+    completeNonRec env binder in_id rhs'	`thenSmpl` \ (new_env, binds1') ->
 
 	-- Process the other bindings
     simplTopBinds new_env binds	`thenSmpl` \ binds2' ->
@@ -774,7 +775,8 @@ simplBind env (NonRec binder@(id,occ_info) rhs) body_c body_ty
  
     complete_bind env rhs
       = simplRhsExpr env binder rhs 		`thenSmpl` \ rhs' ->
-	completeNonRec False env binder rhs'	`thenSmpl` \ (new_env, binds) ->
+	cloneId env binder			`thenSmpl` \ new_id ->
+	completeNonRec env binder new_id rhs'	`thenSmpl` \ (new_env, binds) ->
         body_c new_env				`thenSmpl` \ body' ->
         returnSmpl (mkCoLetsAny binds body')
 
@@ -1060,63 +1062,64 @@ x.  That's just what completeLetBinding does.
 
 
 \begin{code}
-	-- Sigh: rather disgusting case for coercions. We want to 
-	-- ensure that all let-bound Coerces have atomic bodies, so
-	-- they can freely be inlined.
-completeNonRec top_level env binder@(_,occ_info) (Coerce coercion ty rhs)
-  = (case rhs of
-	Var v -> returnSmpl (env, [], rhs)
-	Lit l -> returnSmpl (env, [], rhs)
-	other -> newId (coreExprType rhs)			`thenSmpl` \ inner_id ->
-		 completeNonRec top_level env 
-			(inner_id, dangerousArgOcc) rhs		`thenSmpl` \ (env1, extra_bind) ->
-		-- Dangerous occ because, like constructor args,
-		-- it can be duplicated easily
-		let
-		atomic_rhs = case lookupId env1 inner_id of
-			  	LitArg l -> Lit l
-				VarArg v -> Var v
-		in
-		returnSmpl (env1, extra_bind, atomic_rhs)
-     )				`thenSmpl` \ (env1, extra_bind, atomic_rhs) ->
-	-- Tiresome to do all this, but we must treat the lit/var cases specially
-	-- or we get a tick for atomic rhs when effectively it's a no-op.
-
-     cloneId env1 binder				  `thenSmpl` \ new_id ->
-     let 
-	new_rhs = Coerce coercion ty atomic_rhs
-	env2    = extendIdEnvWithClone env1 binder new_id
-	new_env = extendEnvGivenBinding env2 occ_info new_id new_rhs
-     in
-     returnSmpl (new_env, extra_bind ++ [NonRec new_id new_rhs])
-	
-completeNonRec top_level env binder@(id,_) new_rhs
-  -- See if RHS is an atom, or a reusable constructor
-  | maybeToBool maybe_atomic_rhs
-  = let
-	new_env = extendIdEnvWithAtom env binder rhs_atom
-	result_binds | top_level = [NonRec id new_rhs]	-- Don't discard top-level bindings
-							-- (they'll be dropped later if not
-							-- exported and dead)
-		     | otherwise = []
-    in
-    tick atom_tick_type			`thenSmpl_`
-    returnSmpl (new_env, result_binds)
-  where
-    maybe_atomic_rhs		    = exprToAtom env new_rhs
-    Just (rhs_atom, atom_tick_type) = maybe_atomic_rhs
-
-completeNonRec top_level env binder@(old_id,occ_info) new_rhs
-  = (if top_level then
-	returnSmpl old_id		-- Only clone local binders
-     else
-	cloneId env binder
-    )				`thenSmpl` \ new_id ->
+	-- We want to ensure that all let-bound Coerces have 
+	-- atomic bodies, so they can freely be inlined.
+completeNonRec env binder new_id (Coerce coercion ty rhs)
+  | not (is_atomic rhs)
+  = newId (coreExprType rhs)				`thenSmpl` \ inner_id ->
+    completeNonRec env 
+		   (inner_id, dangerousArgOcc) inner_id rhs `thenSmpl` \ (env1, binds1) ->
+	-- Dangerous occ because, like constructor args,
+	-- it can be duplicated easily
     let
-        env1    = extendIdEnvWithClone env binder new_id
-	new_env = extendEnvGivenBinding env1 occ_info new_id new_rhs
+	atomic_rhs = case lookupId env1 inner_id of
+		  	LitArg l -> Lit l
+			VarArg v -> Var v
     in
-    returnSmpl (new_env, [NonRec new_id new_rhs])
+    completeNonRec env1 binder new_id
+		   (Coerce coercion ty atomic_rhs)	`thenSmpl` \ (env2, binds2) ->
+
+    returnSmpl (env2, binds1 ++ binds2)
+  where
+    is_atomic (Var v) = True
+    is_atomic (Lit l) = not (isNoRepLit l)
+    is_atomic other   = False
+	
+	-- Atomic right-hand sides.
+	-- We used to have a "tick AtomicRhs" in here, but it causes more trouble
+	-- than it's worth.  For a top-level binding a = b, where a is exported,
+	-- we can't drop the binding, so we get repeated AtomicRhs ticks
+completeNonRec env binder new_id rhs@(Var v)
+  = returnSmpl (extendIdEnvWithAtom env binder (VarArg v), [NonRec new_id rhs])
+
+completeNonRec env binder new_id rhs@(Lit lit)
+  | not (isNoRepLit lit)
+  = returnSmpl (extendIdEnvWithAtom env binder (LitArg lit), [NonRec new_id rhs])
+
+	-- Right hand sides that are constructors
+	--	let v = C args
+	--	in
+	--- ...(let w = C same-args in ...)...
+	-- Then use v instead of w.	 This may save
+	-- re-constructing an existing constructor.
+completeNonRec env binder new_id rhs@(Con con con_args)
+  | switchIsSet env SimplReuseCon && 
+    maybeToBool maybe_existing_con &&
+    not (externallyVisibleId new_id)		-- Don't bother for exported things
+						-- because we won't be able to drop
+						-- its binding.
+  = tick ConReused		`thenSmpl_`
+    returnSmpl (extendIdEnvWithAtom env binder (VarArg it), [NonRec new_id rhs])
+  where
+    maybe_existing_con = lookForConstructor env con con_args
+    Just it 	       = maybe_existing_con
+
+	-- Default case
+completeNonRec env binder@(id,occ_info) new_id rhs
+ = returnSmpl (new_env, [NonRec new_id rhs])
+ where
+   env1    = extendIdEnvWithClone env binder new_id
+   new_env = extendEnvGivenBinding env1 occ_info new_id rhs
 \end{code}
 
 %************************************************************************
@@ -1131,31 +1134,6 @@ simplArg :: SimplEnv -> InArg -> OutArg
 simplArg env (LitArg lit) = LitArg lit
 simplArg env (TyArg  ty)  = TyArg  (simplTy env ty)
 simplArg env (VarArg id)  = lookupId env id
-\end{code}
-
-
-\begin{code}
-exprToAtom env (Var var) 
-  = Just (VarArg var, AtomicRhs)
-
-exprToAtom env (Lit lit) 
-  | not (isNoRepLit lit)
-  = Just (LitArg lit, AtomicRhs)
-
-exprToAtom env (Con con con_args)
-  | switchIsSet env SimplReuseCon
-  -- Look out for
-  --	let v = C args
-  --	in
-  --- ...(let w = C same-args in ...)...
-  -- Then use v instead of w.	 This may save
-  -- re-constructing an existing constructor.
-  = case (lookForConstructor env con con_args) of
-		  Nothing  -> Nothing
-		  Just var -> Just (VarArg var, ConReused)
-
-exprToAtom env other
-  = Nothing
 \end{code}
 
 %************************************************************************

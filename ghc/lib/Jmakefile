@@ -40,7 +40,7 @@ EtagsNeededHere(tags)
 ****************************************************************/
 
 /* The driver will give warnings if -split-objs, but that's cool... */
-GHC_OPTS=-short -cpp 		\
+GHC_OPTS=-recomp -cpp 		\
 	 -dcore-lint 		\
 	 -irequired		\
 	 -fusing-ghc-internals	\
@@ -67,6 +67,7 @@ HSTAGS_OPTS=-fglasgow-exts
 BASIC_HS =			\
 prelude/Prelude.hs		\
 prelude/GHCbase.hs		\
+prelude/GHCerr.hs		\
 prelude/GHCps.hs		\
 prelude/GHCio.hs		\
 prelude/GHCmain.hs		\
@@ -92,6 +93,8 @@ concurrent/SampleVar.hs		\
 concurrent/Semaphore.hs		\
 concurrent/Concurrent.hs
 
+BASIC_HIs = $(BASIC_HS:.hs=.hi)
+
 BASIC_OBJS_DIRS	= $(BASIC_HS:.hs=)
 
 /* easy way to make many many Make variables: */
@@ -103,46 +106,6 @@ WayThingVars(BASIC)
 *									*
 *************************************************************************/
 
-#ifndef SpecialGhcLibraryTarget
-#define SpecialGhcLibraryTarget(lib,tag,objs_DEP,objs_DIR,find_pat) @@\
-AllTarget(CAT3(lib,tag,.a))					@@\
-CAT3(lib,tag,.a):: objs_DEP					@@\
-	$(RM) $@						@@\
-	TMPDIR=$(TMPDIR); export TMPDIR;			\
-	find objs_DIR -name find_pat -print | xargs ar q $@	@@\
-	$(RANLIB) CAT3(lib,tag,.a)				@@\
-clean  ::							@@\
-	$(RM) CAT3(lib,tag,.a)
-#endif /* SpecialGhcLibraryTarget */
-
-#ifndef SpecialGhcLibInstallTarget
-#if DoInstallGHCSystem == YES
-#define SpecialGhcLibInstallTarget(lib,tag)			@@\
-install :: CAT3(lib,tag,.a)					@@\
-	$(INSTALL) $(INSTLIBFLAGS) CAT3(lib,tag,.a)		\
-		$(INSTLIBDIR_GHC)/CAT3(lib,tag,.a)		@@\
-	$(RANLIB) $(INSTLIBDIR_GHC)/CAT3(lib,tag,.a)
-#else  /* ! DoInstallGhc... */
-#define SpecialGhcLibInstallTarget(lib,tag) /*nothing*/
-#endif /* ! DoInstallGhc... */
-#endif /* SpecialGhcLibInstallTarget */
-
-/* build/install all the diff libs for a particular build */
-
-#define BigHisTarget(targeti,basei)				@@\
-targeti ::							@@\
-InstallTarget(targeti)						@@\
-InstallMultNonExecTargets(targeti,basei,$(INSTDATADIR_GHC)/imports)
-
-#define BigLibsTarget(tag,glob,base)				@@\
-SpecialGhcLibraryTarget(libHS,tag,base,$(BASIC_OBJS_DIRS),glob)	@@\
-SpecialGhcLibInstallTarget(libHS,tag)
-
-/* build *everything* -- monster macro from hell */
-#define BigBuildTarget(tag,glob,targeti,base,basei)		\
-BigLibsTarget(tag,glob,base)					@@\
-BigHisTarget(targeti,basei)
-
 /****************************************************************
 *								*
 * Creating and installing...					*
@@ -152,50 +115,12 @@ BigHisTarget(targeti,basei)
 
 /* make sure install's target dir is there */
 #if DoInstallGHCSystem == YES
-MakeDirectories(install, $(INSTLIBDIR_GHC) 		\
-			 $(INSTDATADIR_GHC)/imports)
+MakeDirectories(install, $(INSTLIBDIR_GHC) $(INSTDATADIR_GHC)/imports)
 
-basic_his :: /* nothing */
-InstallTarget(basic_his)
-InstallMultNonExecTargets(basic_his, $(BASIC_HIs),  $(INSTDATADIR_GHC)/imports)
+InstallDataTarget(MODULES,$(INSTDATADIR_GHC)/imports)
 #endif /* installing */
 
-IfBuild_normal(BigBuildTarget(,'*.o',basic_his, $(BASIC_DEP_norm),  $(BASIC_HIs)))
-IfBuild_p(BigBuildTarget(_p,'*.p_o',his_p, $(BASIC_DEP_p),  $(BASIC_HIs_p)))
-IfBuild_t(BigBuildTarget(_t,'*.t_o',his_t, $(BASIC_DEP_t),  $(BASIC_HIs_t)))
-IfBuild_u(BigBuildTarget(,'*.u_o',his_u, $(BASIC_DEP_u),  $(BASIC_HIs_u)))
-IfBuild_mc(BigBuildTarget(_mc,'*.mc_o',his_mc, $(BASIC_DEP_mc),  $(BASIC_HIs_mc)))
-IfBuild_mr(BigBuildTarget(_mr,'*.mr_o',his_mr, $(BASIC_DEP_mr),  $(BASIC_HIs_mr)))
-IfBuild_mt(BigBuildTarget(_mr,'*.mt_o',his_mt, $(BASIC_DEP_mt),  $(BASIC_HIs_mt)))
-IfBuild_mp(BigBuildTarget(_mp,'*.mp_o',his_mp, $(BASIC_DEP_mp),  $(BASIC_HIs_mp)))
-IfBuild_mg(BigBuildTarget(_mg,'*.mg_o',his_mg, $(BASIC_DEP_mg),  $(BASIC_HIs_mg)))
-
-/* these GC ones do not *really* need separate .hi files,
-   but it really makes life easier to do it this way
-*/
-IfBuild_2s(BigBuildTarget(_2s,'*.2s_o',his_2s, $(BASIC_DEP_2s),  $(BASIC_HIs_2s)))
-IfBuild_1s(BigBuildTarget(_1s,'*.1s_o',his_1s, $(BASIC_DEP_1s),  $(BASIC_HIs_1s)))
-IfBuild_du(BigBuildTarget(_du,'*.du_o',his_du, $(BASIC_DEP_du),  $(BASIC_HIs_du)))
-
-/* user ways -- yeeps! */
-
-IfBuild_a(BigBuildTarget(_a,'*.a_o',his_a, $(BASIC_DEP_a),  $(BASIC_HIs_a)))
-IfBuild_b(BigBuildTarget(_b,'*.b_o',his_b, $(BASIC_DEP_b),  $(BASIC_HIs_b)))
-IfBuild_c(BigBuildTarget(_c,'*.c_o',his_c, $(BASIC_DEP_c),  $(BASIC_HIs_c)))
-IfBuild_d(BigBuildTarget(_d,'*.d_o',his_d, $(BASIC_DEP_d),  $(BASIC_HIs_d)))
-IfBuild_e(BigBuildTarget(_e,'*.e_o',his_e, $(BASIC_DEP_e),  $(BASIC_HIs_e)))
-IfBuild_f(BigBuildTarget(_f,'*.f_o',his_f, $(BASIC_DEP_f),  $(BASIC_HIs_f)))
-IfBuild_g(BigBuildTarget(_g,'*.g_o',his_g, $(BASIC_DEP_g),  $(BASIC_HIs_g)))
-IfBuild_h(BigBuildTarget(_h,'*.h_o',his_h, $(BASIC_DEP_h),  $(BASIC_HIs_h)))
-IfBuild_i(BigBuildTarget(_i,'*.i_o',his_i, $(BASIC_DEP_i),  $(BASIC_HIs_i)))
-IfBuild_j(BigBuildTarget(_j,'*.j_o',his_j, $(BASIC_DEP_j),  $(BASIC_HIs_j)))
-IfBuild_k(BigBuildTarget(_k,'*.k_o',his_k, $(BASIC_DEP_k),  $(BASIC_HIs_k)))
-IfBuild_l(BigBuildTarget(_l,'*.l_o',his_l, $(BASIC_DEP_l),  $(BASIC_HIs_l)))
-IfBuild_m(BigBuildTarget(_m,'*.m_o',his_m, $(BASIC_DEP_m),  $(BASIC_HIs_m)))
-IfBuild_n(BigBuildTarget(_n,'*.n_o',his_n, $(BASIC_DEP_n),  $(BASIC_HIs_n)))
-IfBuild_o(BigBuildTarget(_o,'*.o_o',his_o, $(BASIC_DEP_o),  $(BASIC_HIs_o)))
-IfBuild_A(BigBuildTarget(_A,'*.A_o',his_A, $(BASIC_DEP_A),  $(BASIC_HIs_A)))
-IfBuild_B(BigBuildTarget(_B,'*.B_o',his_B, $(BASIC_DEP_B),  $(BASIC_HIs_B)))
+BasicEverything(libHS, $(INSTLIBDIR_GHC), $(INSTDATADIR_GHC))
 
 /****************************************************************
 *								*
@@ -220,29 +145,33 @@ clean  ::						@@\
 
 /* now use the macro: */
 
-CompileWayishly(GHC,prelude/Prelude,hs,-iprelude -fglasgow-exts -fcompiling-ghc-internals Prelude -fno-implicit-prelude)
-CompileWayishly(GHC,prelude/GHCbase,hs,-iprelude -fglasgow-exts -fcompiling-ghc-internals GHCbase)
-CompileWayishly(GHC,prelude/GHCps,hs,  -iprelude -fglasgow-exts)
-CompileWayishly(GHC,prelude/GHCio,hs,  -iprelude -fglasgow-exts)
+/* NB: the -Onots are only because -O would not go through on
+   a reasonably-sized machine (i.e., one I have)
+*/
+CompileWayishly(GHC,prelude/Prelude,hs,/*-split-objs Prelude*/ -iprelude -fglasgow-exts -fcompiling-ghc-internals Prelude -fno-implicit-prelude '-#include"cbits/stgio.h"' -H18m -Onot)
+CompileWayishly(GHC,prelude/GHCbase,hs,/*-split-objs GHCbase*/ -iprelude -fglasgow-exts -fcompiling-ghc-internals GHCbase '-#include"cbits/stgio.h"' -H12m -monly-2-regs -Onot)
+CompileWayishly(GHC,prelude/GHCerr,hs, /*-split-objs GHCerr*/ -iprelude -fglasgow-exts -fcompiling-ghc-internals GHCerr -H12m -Onot)
+CompileWayishly(GHC,prelude/GHCps,hs,  /*-split-objs GHCps*/ -iprelude -fglasgow-exts '-#include"cbits/stgio.h"' -monly-3-regs -Onot)
+CompileWayishly(GHC,prelude/GHCio,hs,  /*-split-objs GHCio*/ -iprelude -fglasgow-exts '-#include"cbits/stgio.h"' -Onot)
 CompileWayishly(GHC,prelude/GHCmain,hs,-iprelude -fglasgow-exts)
 CompileWayishly(GHC,prelude/PreludeGlaST,hs,-iprelude -fglasgow-exts)
 
-CompileWayishly(GHC,required/Array,hs,-fglasgow-exts -iprelude)
-CompileWayishly(GHC,required/Char,hs,)
-CompileWayishly(GHC,required/Complex,hs,)
-CompileWayishly(GHC,required/Directory,hs,-fglasgow-exts)
-CompileWayishly(GHC,required/IO,hs,-fglasgow-exts)
-CompileWayishly(GHC,required/Ix,hs,-fglasgow-exts)
-CompileWayishly(GHC,required/List,hs,)
-CompileWayishly(GHC,required/Maybe,hs,)
-CompileWayishly(GHC,required/Monad,hs,)
-CompileWayishly(GHC,required/Ratio,hs,)
-CompileWayishly(GHC,required/System,hs,-fglasgow-exts)
+CompileWayishly(GHC,required/Array,hs, /*-split-objs Array*/ -fglasgow-exts -iprelude -Onot)
+CompileWayishly(GHC,required/Char,hs,  /*-split-objs Char*/)
+CompileWayishly(GHC,required/Complex,hs,/*-split-objs Complex*/)
+CompileWayishly(GHC,required/Directory,hs,/*-split-objs Directory*/ -fglasgow-exts '-#include"cbits/stgio.h"' -monly-3-regs)
+CompileWayishly(GHC,required/IO,hs,/*-split-objs IO*/ -fglasgow-exts '-#include"cbits/stgio.h"')
+CompileWayishly(GHC,required/Ix,hs,    /*-split-objs Ix*/ -fglasgow-exts)
+CompileWayishly(GHC,required/List,hs,  /*-split-objs List*/)
+CompileWayishly(GHC,required/Maybe,hs, /*-split-objs Maybe*/)
+CompileWayishly(GHC,required/Monad,hs, /*-split-objs Monad*/)
+CompileWayishly(GHC,required/Ratio,hs, /*-split-objs Ratio*/)
+CompileWayishly(GHC,required/System,hs,/*-split-objs System*/ -fglasgow-exts '-#include"cbits/stgio.h"')
 
 CompileWayishly(GHC,concurrent/Channel,hs,)
 CompileWayishly(GHC,concurrent/ChannelVar,hs,)
 CompileWayishly(GHC,concurrent/Merge,hs,-iconcurrent)
-CompileWayishly(GHC,concurrent/Parallel,hs,)
+CompileWayishly(GHC,concurrent/Parallel,hs,-fglasgow-exts)
 CompileWayishly(GHC,concurrent/SampleVar,hs,)
 CompileWayishly(GHC,concurrent/Semaphore,hs,)
 CompileWayishly(GHC,concurrent/Concurrent,hs,-iconcurrent)

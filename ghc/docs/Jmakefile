@@ -7,15 +7,7 @@
 #define NoInstallTargetForSubdirs
 #define NoTagTargetForSubdirs
 
-SUBDIRS = add_to_compiler	\
-	  users_guide 		\
+SUBDIRS = users_guide 		\
 	  install_guide 	\
 	  release_notes		\
 	  state_interface
-
-XCOMM 	  developers_guide ?
-XCOMM 	  interfaces ?
-XCOMM 	  pragmas ?
-
-XCOMM grasp_overview ?
-XCOMM style_guide ?

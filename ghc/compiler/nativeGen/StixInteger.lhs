@@ -25,7 +25,7 @@ import PrimOp		( PrimOp(..) )
 import PrimRep		( PrimRep(..) )
 import SMRep		( SMRep(..), SMSpecRepKind, SMUpdateKind )
 import Stix		( getUniqLabelNCG, sStLitLbl, stgHp, stgHpLim,
-			  StixTree(..), StixTreeList(..),
+			  StixTree(..), SYN_IE(StixTreeList),
 			  CodeSegment, StixReg
 			)
 import StixMacro	( macroCode, heapCheck )

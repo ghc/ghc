@@ -246,12 +246,12 @@ PrintTickyInfo()
   I_ tot_returns_in_regs =
 	RET_NEW_IN_REGS_ctr + RET_OLD_IN_REGS_ctr + RET_SEMI_IN_REGS_ctr;
   I_ tot_returns_in_heap =
-	RET_NEW_IN_HEAP_ctr + RET_OLD_IN_HEAP_ctr + RET_SEMI_IN_HEAP_ctr + RET_SEMI_BY_DEFAULT_ctr/*???*/;
+	RET_NEW_IN_HEAP_ctr + RET_OLD_IN_HEAP_ctr + RET_SEMI_IN_HEAP_ctr + RET_SEMI_BY_DEFAULT_ctr/*?*/;
   I_ tot_returns_of_new =
 	RET_NEW_IN_REGS_ctr + RET_NEW_IN_HEAP_ctr;
-  I_ tot_returns_of_old = /* NB: NOT USED ???!  94/05 WDP */
+  I_ tot_returns_of_old = /* NB: NOT USED ?!  94/05 WDP */
 	RET_OLD_IN_REGS_ctr + RET_OLD_IN_HEAP_ctr +
-	RET_SEMI_BY_DEFAULT_ctr + RET_SEMI_IN_HEAP_ctr + RET_SEMI_IN_REGS_ctr /*???*/;
+	RET_SEMI_BY_DEFAULT_ctr + RET_SEMI_IN_HEAP_ctr + RET_SEMI_IN_REGS_ctr /*?*/;
 
   I_ tot_returns =
 	tot_returns_in_regs + tot_returns_in_heap;

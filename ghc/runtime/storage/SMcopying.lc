@@ -207,7 +207,7 @@ Note: no \tr{evacuate[AB]Stack} for ``parallel'' systems, because they
 don't have a single main stack.
 
 \begin{code}
-#if !defined(PAR) /* && !defined(GRAN) */  /* HWL */
+#if !defined(PAR)
 void
 EvacuateAStack(PP_ stackA, PP_ botA /* botA points to bottom-most word */)
 {
@@ -235,7 +235,7 @@ EVACUATED_INFOPTR)
 Otherwise closure is live update reference to to-space address
 
 \begin{code}
-#if !defined(PAR)  /* && !defined(GRAN) */  /* HWL */
+#if !defined(PAR)
 void
 EvacuateBStack( stackB, botB, roots )
   P_ stackB;

@@ -47,7 +47,7 @@ IMP_Ubiq(){-uitous-}
 
 IMPORT_DELOOPER(SmplLoop)		-- breaks the MagicUFs / SimplEnv loop
 
-import BinderInfo	( orBinderInfo, noBinderInfo,
+import BinderInfo	( orBinderInfo, andBinderInfo, noBinderInfo,
 			  BinderInfo(..){-instances, too-}, FunOrArg, DuplicationDanger, InsideSCC
 			)
 import CgCompInfo	( uNFOLDING_CREATION_THRESHOLD )
@@ -76,7 +76,7 @@ import PprCore		-- various instances
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType, GenTyVar )
 import Pretty
-import Type		( eqTy, getAppDataTyConExpandingDicts, applyTypeEnvToTy )
+import Type		( eqTy, applyTypeEnvToTy )
 import TyVar		( nullTyVarEnv, addOneToTyVarEnv, growTyVarEnvList,
 			  SYN_IE(TyVarEnv), GenTyVar{-instance Eq-}
 			)
@@ -424,9 +424,14 @@ extendEnvGivenBinding env@(SimplEnv chkr encl_cc ty_env in_id_env out_id_env con
 	-- If the out_id is already in the OutIdEnv, then just replace the
 	-- unfolding, leaving occurrence info alone (this must then
 	-- be a call via extendEnvGivenNewRhs).
-    out_id_env_with_unfolding = foldl modifyOccInfo env1 (ufmToList fv_occ_info)
+    out_id_env_with_unfolding = foldl modifyOccInfo env1 full_fv_occ_info
+		-- full_fv_occ_info combines the occurrence of the current binder
+		-- with the occurrences of its RHS's free variables.
+    full_fv_occ_info	      = [ (uniq, fv_occ `andBinderInfo` occ_info) 
+				| (uniq,fv_occ) <- ufmToList fv_occ_info
+				]
     env1 		      =	addToUFM_C modifyOutEnvItem out_id_env out_id 
-					   (out_id, occ_info, OutUnfolding unf_cc unfolding)
+					   (out_id, occ_info, rhs_info)
 
 	-- Occurrence-analyse the RHS
 	-- The "interesting" free variables we want occurrence info for are those
@@ -435,16 +440,10 @@ extendEnvGivenBinding env@(SimplEnv chkr encl_cc ty_env in_id_env out_id_env con
     interesting_fvs	    = mkIdSet [id | (id,OneOcc _ _ _ _ _,_) <- eltsUFM out_id_env]
 
 	-- Compute unfolding details
-    unfolding    = SimpleUnfolding form_summary guidance template
+    rhs_info     = OutUnfolding unf_cc (SimpleUnfolding form_summary guidance template)
     form_summary = mkFormSummary rhs
 
-    guidance | not (switchIsSet env IgnoreINLINEPragma) && idWantsToBeINLINEd out_id
-	     = UnfoldAlways
-
-             | otherwise
-	     = calcUnfoldingGuidance True{-sccs OK-} bOMB_OUT_SIZE rhs
-
-    bOMB_OUT_SIZE = getSimplIntSwitch chkr SimplUnfoldingCreationThreshold
+    guidance = mkSimplUnfoldingGuidance chkr out_id rhs
 
 	-- Compute cost centre for thing
     unf_cc  | noCostCentreAttached expr_cc = encl_cc
@@ -452,29 +451,63 @@ extendEnvGivenBinding env@(SimplEnv chkr encl_cc ty_env in_id_env out_id_env con
 	    where
 	      expr_cc =  coreExprCc rhs
 
+{-	We need to be pretty careful when extending 
+	the environment with RHS info in recursive groups.
+
+Here's a nasty example:
+
+	letrec	r = f x
+		t = r
+		x = ...t...
+	in
+	...t...
+
+Here, r occurs exactly once, so we may reasonably inline r in t's RHS.
+But the pre-simplified t's rhs is an atom, r, so we may also decide to
+inline t everywhere.  But if we do *both* these reasonable things we get
+
+	letrec	r = f x
+		t = f x
+		x = ...r...
+	in
+	...t...
+
+(The t in the body doesn't get inlined because by the time the recursive
+group is done we see that t's RHS isn't an atom.)
+
+Bad news!  (f x) is duplicated!  Our solution is to only be prepared to
+inline RHSs in their own RHSs if they are *values* (lambda or constructor).
+
+This means that silly x=y  bindings in recursive group will never go away. Sigh.  ToDo!
+-}
+
 extendEnvForRecBinding env@(SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps)
 		       (out_id, ((_,occ_info), old_rhs))
   = SimplEnv chkr encl_cc ty_env in_id_env new_out_id_env con_apps
   where
-    new_out_id_env = case guidance of
-			UnfoldNever -> out_id_env		-- No new stuff to put in
-		        other	    -> out_id_env_with_unfolding
+    new_out_id_env = case (form_summary, guidance) of
+			(ValueForm, UnfoldNever) -> out_id_env		-- No new stuff to put in
+			(ValueForm, _)		 -> out_id_env_with_unfolding
+		        other	    		 -> out_id_env		-- Not a value
 
 	-- If there is an unfolding, we add rhs-info for out_id,
 	-- No need to modify occ info because RHS is pre-simplification
     out_id_env_with_unfolding =	addOneToIdEnv out_id_env out_id 
-			        (out_id, occ_info, InUnfolding env unfolding)
+			        (out_id, occ_info, rhs_info)
 
 	-- Compute unfolding details
-    unfolding    = SimpleUnfolding form_summary guidance old_rhs
+    rhs_info     = InUnfolding env (SimpleUnfolding form_summary guidance old_rhs)
     form_summary = mkFormSummary old_rhs
+    guidance     = mkSimplUnfoldingGuidance chkr out_id (unTagBinders old_rhs)
 
-    guidance | not (switchIsSet env IgnoreINLINEPragma) && idWantsToBeINLINEd out_id
-	     = UnfoldAlways
 
-             | otherwise
-	     = calcUnfoldingGuidance True{-sccs OK-} bOMB_OUT_SIZE (unTagBinders old_rhs)
+mkSimplUnfoldingGuidance chkr out_id rhs
+  | not (switchIsOn chkr IgnoreINLINEPragma) && idWantsToBeINLINEd out_id
+  = UnfoldAlways
 
+  | otherwise
+  = calcUnfoldingGuidance True{-sccs OK-} bOMB_OUT_SIZE rhs
+  where
     bOMB_OUT_SIZE = getSimplIntSwitch chkr SimplUnfoldingCreationThreshold
 
 extendEnvGivenRhsInfo :: SimplEnv -> OutId -> BinderInfo -> RhsInfo -> SimplEnv

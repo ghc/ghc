@@ -819,8 +819,8 @@ NormalLibraryTarget(hsp,$(HSP_OBJS_O))
 /* BuildPgmFromCFiles(hsp,parser/printtree.o parser/main.o,,libhsp.a) */
 
 #if DoInstallGHCSystem == YES
-MakeDirectories(install, $(INSTLIBDIR_GHC))
-InstallBinaryTarget(hsp,$(INSTLIBDIR_GHC))
+/* MakeDirectories(install, $(INSTLIBDIR_GHC)) */
+/* InstallBinaryTarget(hsp,$(INSTLIBDIR_GHC)) */
 #endif /* DoInstall... */
 
 YaccRunWithExpectMsg(parser/hsparser,12,0)

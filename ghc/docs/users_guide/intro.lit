@@ -1,11 +1,11 @@
 %
-% $Header: /srv/cvs/cvs.haskell.org/fptools/ghc/docs/users_guide/Attic/intro.lit,v 1.1 1996/01/08 20:25:10 partain Exp $
+% $Header: /srv/cvs/cvs.haskell.org/fptools/ghc/docs/users_guide/Attic/intro.lit,v 1.2 1996/07/25 20:48:26 partain Exp $
 %
 \section[introduction-GHC]{Introduction to GHC}
 
 This is a guide to using the Glasgow Haskell compilation (GHC) system.
-It is a batch compiler for the Haskell~1.2 language, with support for
-various extensions, including the DRAFT 1.3 I/O proposal.
+It is a batch compiler for the Haskell~1.3 language, with support for
+various Glasgow-only extensions.
 
 Many people will use GHC very simply: compile some
 modules---\tr{ghc -c -O Foo.hs Bar.hs}; and link them---
@@ -30,8 +30,8 @@ material in \sectionref{compiler-tutorial} may help.
 
 On the World-Wide Web, there are several URLs of likely interest:
 \begin{display}
-GHC home page -- http://www.dcs.glasgow.ac.uk/fp/software/ghc.html
-Glasgow FP group page -- http://www.dcs.glasgow.ac.uk/fp/
+GHC home page -- http://www.dcs.gla.ac.uk/fp/software/ghc/
+Glasgow FP group page -- http://www.dcs.gla.ac.uk/fp/
 comp.lang.functional FAQ -- http://www.cs.nott.ac.uk/Department/Staff/mpj/faq.html
 programming language research page --
    http://www.cs.cmu.edu/afs/cs.cmu.edu/user/mleone/web/language-research.html
@@ -41,29 +41,53 @@ join, as you feel is appropriate.
 \begin{description}
 \item[glasgow-haskell-users:]
 This list is for GHC users to chat among themselves.  Subscribe by
-sending mail to \tr{glasgow-haskell-users-request@dcs.glasgow.ac.uk}.
-Messages for the list go to \tr{glasgow-haskell-users}.
+sending mail to \tr{majordomo@dcs.gla.ac.uk}, with
+a message body (not header) like this:
+\begin{verbatim}
+subscribe glasgow-haskell-users My Name <m.y.self@bigbucks.com>
+\end{verbatim}
+(The last bit is your all-important e-mail address, of course.)
+
+To communicate with your fellow users, send mail to \tr{glasgow-haskell-users}.
+
+To contact the list administrator, send mail to
+\tr{glasgow-haskell-users-request}.  An archive of the list is
+available on the Web at:
+\begin{verbatim}
+\tr{http://www.dcs.gla.ac.uk/mail-www/glasgow-haskell-users}.
+\end{verbatim}
 
 \item[glasgow-haskell-bugs:]
 Send bug reports for GHC to this address!  The sad and lonely people
 who subscribe to this list will muse upon what's wrong and what you
 might do about it.
 
-Subscribe via \tr{glasgow-haskell-bugs-request@dcs.glasgow.ac.uk}.
+Subscribe via \tr{majordomo@dcs.gla.ac.uk} with:
+\begin{verbatim}
+subscribe glasgow-haskell-bugs My Name <m.y.self@hackers.r.us>
+\end{verbatim}
+
+Again, you may contact the list administrator at
+\tr{glasgow-haskell-bugs-request}.
+And, yes,  an archive of the list is
+available on the Web at:
+\begin{verbatim}
+\tr{http://www.dcs.gla.ac.uk/mail-www/glasgow-haskell-bugs}.
+\end{verbatim}
 \end{description}
 
 There is also the general Haskell mailing list.  Subscribe by sending
-email to \tr{haskell-request@dcs.glasgow.ac.uk} or
-\tr{haskell-request@cs.yale.edu}, whichever is geographically closer
-to you.
+email to \tr{majordomo@dcs.gla.ac.uk}, with the usual message body:
+\begin{verbatim}
+subscribe haskell My Name <m.y.self@fp.rules.ok.org>
+\end{verbatim}
 
 Some Haskell-related discussion takes place in the Usenet newsgroup
-\tr{comp.lang.functional}.  (But note: news propagation to Glasgow can
-be terrible.  That's one reason Glaswegians aren't too active in
-c.f.l.)
+\tr{comp.lang.functional}.  (But note: news is basically dead at Glasgow.
+That's one reason Glaswegians aren't too active in c.f.l.)
 
 The main anonymous-FTP site for Glasgow Haskell is
-\tr{ftp.dcs.glasgow.ac.uk}, in \tr{pub/haskell/glasgow/}.
+\tr{ftp.dcs.gla.ac.uk}, in \tr{pub/haskell/glasgow/}.
 ``Important'' bits are mirrored at other Haskell archive sites (and we
 have their stuff, too).
 

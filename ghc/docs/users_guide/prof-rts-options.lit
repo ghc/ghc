@@ -9,7 +9,7 @@ what you want to profile (e.g., time and/or space), and how you wish
 the collected data to be reported.  You also may wish to set the
 sampling interval used in time profiling.
 
-Executive summary: \tr{./a.out +RTS -p} produces a time profile in
+Executive summary: \tr{./a.out +RTS -pT} produces a time profile in
 \tr{a.out.prof}; \tr{./a.out +RTS -hC} produces space-profiling
 info which can be mangled by \tr{hp2ps} and viewed with \tr{ghostview}
 (or equivalent).
@@ -23,13 +23,13 @@ Profiling runtime flags are passed to your program between the usual
 \index{-P<sort> RTS option (profiling)}
 \index{time profile}
 \index{serial time profile}
-The \tr{-p} option produces a standard {\em time profile} report.
+The \tr{-p?} option produces a standard {\em time profile} report.
 It is written into the file \pl{<program>}\tr{.prof}.
 
-The \tr{-P} option produces a more detailed report containing the
+The \tr{-P?} option produces a more detailed report containing the
 actual time and allocation data as well.  (Not used much.)
 
-The \tr{-P} option also produces {\em serial time-profiling}
+The \tr{-P?} option also produces {\em serial time-profiling}
 information, in the file \pl{<program>}\tr{.time}. This can be
 converted into a (somewhat unsatisfactory) PostScript graph using
 \tr{hp2ps} (see \Sectionref{hp2ps}).

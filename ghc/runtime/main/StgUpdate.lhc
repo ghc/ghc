@@ -391,7 +391,7 @@ STGFUN(Perm_Ind_entry)
 
     /* Don't add INDs to granularity cost */
 
-    /* Dont: ENT_IND(Node); for ticky-ticky; this ind is here only to help ticky */
+    /* Dont: ENT_IND(Node); for ticky-ticky; this ind is here only to help profiling */
 
     /* Enter PAP cost centre -- lexical scoping only */
     ENTER_CC_PAP_CL(Node);
@@ -479,7 +479,7 @@ STGFUN(UpdatePAP)
       /* set "CC_pap" to go in the updatee (see Sansom thesis, p 183) */
 
     CC_pap /*really cc_enter*/ = (CostCentre) CC_HDR(Node);
-    if (IS_SUBSUMED_CC(CC_pap) /*really cc_enter*/)
+    if (IS_CAF_OR_DICT_OR_SUB_CC(CC_pap) /*really cc_enter*/)
 	CC_pap = CCC;
 #endif
 
@@ -572,7 +572,7 @@ STGFUN(UpdatePAP)
      * Take the CC out of the update frame if a CAF/DICT.
      */
 
-    CCC = (IS_CAF_OR_DICT_CC(CC_pap)) ? GRAB_COST_CENTRE(SuB) : CC_pap;
+    CCC = (IS_CAF_OR_DICT_OR_SUB_CC(CC_pap)) ? GRAB_COST_CENTRE(SuB) : CC_pap;
 
 #endif /* PROFILING */
 
@@ -658,7 +658,7 @@ STGFUN(PAP_entry)
          */
 
         CC_pap = (CostCentre) CC_HDR(Node);
-        CCC = (IS_CAF_OR_DICT_CC(CC_pap)) ? GRAB_COST_CENTRE(SuB) : CC_pap;
+        CCC = (IS_CAF_OR_DICT_OR_SUB_CC(CC_pap)) ? GRAB_COST_CENTRE(SuB) : CC_pap;
 
 #endif /* PROFILING */
 

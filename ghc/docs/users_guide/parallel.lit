@@ -22,10 +22,9 @@ optional---the user wants something done!
 A Concurrent Haskell program implies multiple `threads' running within
 a single Unix process on a single processor.
 
-Simon Peyton Jones and Sigbjorn Finne have a paper available,
-``Concurrent Haskell: preliminary version.''
-(draft available via \tr{ftp}
-from \tr{ftp.dcs.gla.ac.uk/pub/glasgow-fp/drafts}).
+You will find at least one paper about Concurrent Haskell hanging off
+of Simon Peyton Jones's Web page;
+\tr{http://www.dcs.gla.ac.uk/~simonpj/}.
 
 Parallel Haskell is about {\em speed}---spawning threads onto multiple
 processors so that your program will run faster.  The `threads'
@@ -35,9 +34,11 @@ get the job done more quickly by sequential execution, then fine.
 A Parallel Haskell program implies multiple processes running on
 multiple processors, under a PVM (Parallel Virtual Machine) framework.
 
-Parallel Haskell is new with GHC 0.26; it is more about ``research
-fun'' than about ``speed.'' That will change.  There is no paper about
-Parallel Haskell.  That will change, too.
+Parallel Haskell is still relatively new; it is more about ``research
+fun'' than about ``speed.'' That will change.
+
+Again, check Simon's Web page for publications about Parallel Haskell
+(including ``GUM'', the key bits of the runtime system).
 
 Some details about Concurrent and Parallel Haskell follow.
 
@@ -67,8 +68,6 @@ collection of useful concurrency abstractions, including those
 mentioned in the ``concurrent paper''.
 
 Just put \tr{import Concurrent} into your modules, and away you go.
-NB: intended for use with the \tr{-fhaskell-1.3} flag.
-
 To create a ``required thread'':
 
 \begin{verbatim}
@@ -80,37 +79,33 @@ and ``M-Vars'', which are two flavours of {\em synchronising variables}.
 \index{synchronising variables (Glasgow extension)}
 \index{concurrency -- synchronising variables}
 
-\tr{_IVars}\index{_IVars (Glasgow extension)} are write-once
+\tr{IVars}\index{IVars (Glasgow extension)} are write-once
 variables.  They start out empty, and any threads that attempt to read
 them will block until they are filled.  Once they are written, any
 blocked threads are freed, and additional reads are permitted.
-Attempting to write a value to a full \tr{_IVar} results in a runtime
+Attempting to write a value to a full \tr{IVar} results in a runtime
 error.  Interface:
 \begin{verbatim}
-type IVar a = _IVar a -- more convenient name
-
-newIVar     :: IO (_IVar a)
-readIVar    :: _IVar a -> IO a
-writeIVar   :: _IVar a -> a -> IO ()
+newIVar     :: IO (IVar a)
+readIVar    :: IVar a -> IO a
+writeIVar   :: IVar a -> a -> IO ()
 \end{verbatim}
 
-\tr{_MVars}\index{_MVars (Glasgow extension)} are rendezvous points,
+\tr{MVars}\index{MVars (Glasgow extension)} are rendezvous points,
 mostly for concurrent threads.  They begin empty, and any attempt to
-read an empty \tr{_MVar} blocks.  When an \tr{_MVar} is written, a
-single blocked thread may be freed.  Reading an \tr{_MVar} toggles its
+read an empty \tr{MVar} blocks.  When an \tr{MVar} is written, a
+single blocked thread may be freed.  Reading an \tr{MVar} toggles its
 state from full back to empty.  Therefore, any value written to an
-\tr{_MVar} may only be read once.  Multiple reads and writes are
+\tr{MVar} may only be read once.  Multiple reads and writes are
 allowed, but there must be at least one read between any two
 writes. Interface:
 \begin{verbatim}
-type MVar a  = _MVar a -- more convenient name
-
-newEmptyMVar :: IO (_MVar a)
-newMVar      :: a -> IO (_MVar a)
-takeMVar     :: _MVar a -> IO a
-putMVar      :: _MVar a -> a -> IO ()
-readMVar     :: _MVar a -> IO a
-swapMVar     :: _MVar a -> a -> IO a
+newEmptyMVar :: IO (MVar a)
+newMVar      :: a -> IO (MVar a)
+takeMVar     :: MVar a -> IO a
+putMVar      :: MVar a -> a -> IO ()
+readMVar     :: MVar a -> IO a
+swapMVar     :: MVar a -> a -> IO a
 \end{verbatim}
 
 A {\em channel variable} (@CVar@) is a one-element channel, as
@@ -157,20 +152,20 @@ nmergeIO :: [[a]] -> IO [a]
 \end{verbatim}
 
 A {\em Sample variable} (@SampleVar@) is slightly different from a
-normal @_MVar@:
+normal @MVar@:
 \begin{itemize}
 \item Reading an empty @SampleVar@ causes the reader to block
-    (same as @takeMVar@ on empty @_MVar@).
+    (same as @takeMVar@ on empty @MVar@).
 \item Reading a filled @SampleVar@ empties it and returns value.
     (same as @takeMVar@)
 \item Writing to an empty @SampleVar@ fills it with a value, and
-potentially, wakes up a blocked reader  (same as for @putMVar@ on empty @_MVar@).
+potentially, wakes up a blocked reader  (same as for @putMVar@ on empty @MVar@).
 \item Writing to a filled @SampleVar@ overwrites the current value.
- (different from @putMVar@ on full @_MVar@.)
+ (different from @putMVar@ on full @MVar@.)
 \end{itemize}
 
 \begin{verbatim}
-type SampleVar a = _MVar (Int, _MVar a)
+type SampleVar a = MVar (Int, MVar a)
 
 emptySampleVar :: SampleVar a -> IO ()
 newSampleVar   :: IO (SampleVar a)
@@ -255,18 +250,12 @@ not generate code to evaluate the addends from left to right.
 %*                                                                      *
 %************************************************************************
 
-The functions \tr{par} and \tr{seq} are really just renamings:
-\begin{verbatim}
-par a b = _par_ a b
-seq a b = _seq_ a b
-\end{verbatim}
-
-The functions \tr{_par_} and \tr{_seq_} are built into GHC, and unfold
+The functions \tr{par} and \tr{seq} are wired into GHC, and unfold
 into uses of the \tr{par#} and \tr{seq#} primitives, respectively.  If
 you'd like to see this with your very own eyes, just run GHC with the
 \tr{-ddump-simpl} option.  (Anything for a good time...)
 
-You can use \tr{_par_} and \tr{_seq_} in Concurrent Haskell, though
+You can use \tr{par} and \tr{seq} in Concurrent Haskell, though
 I'm not sure why you would want to.
 
 %************************************************************************
@@ -390,11 +379,8 @@ PVM ``processors'' your program to run on.  (For more details of
 all relevant RTS options, please see \sectionref{parallel-rts-opts}.)
 
 In truth, running Parallel Haskell programs and getting information
-out of them (e.g., activity profiles) is a battle with the vagaries of
+out of them (e.g., parallelism profiles) is a battle with the vagaries of
 PVM, detailed in the following sections.
-
-For example: the stdout and stderr from your parallel program run will
-appear in a log file, called something like \tr{/tmp/pvml.NNN}.
 
 %************************************************************************
 %*                                                                      *
@@ -447,56 +433,54 @@ results---only with ``how parallel'' it was!  We want pretty pictures.
 
 Parallelism profiles (\`a la \tr{hbcpp}) can be generated with the
 \tr{-q}\index{-q RTS option (concurrent, parallel)} RTS option.  The
-per-processor profiling info is dumped into files {\em in your home
-directory} named \tr{<program>.gr}.  These are then munged into a
-PostScript picture, which you can then display.  For example,
-to run your program \tr{a.out} on 8 processors, then view the
-parallelism profile, do:
+per-processor profiling info is dumped into files named
+\tr{<full-path><program>.gr}.  These are then munged into a PostScript picture,
+which you can then display.  For example, to run your program
+\tr{a.out} on 8 processors, then view the parallelism profile, do:
 
 \begin{verbatim}
 % ./a.out +RTS -N8 -q
-% cd			# to home directory
-% grs2gr *.???.gr	# combine the 8 .gr files into one
-% gr2ps -O temp.gr	# cvt to .ps; output in temp.ps
+% grs2gr *.???.gr > temp.gr	# combine the 8 .gr files into one
+% gr2ps -O temp.gr		# cvt to .ps; output in temp.ps
 % ghostview -seascape temp.ps	# look at it!
 \end{verbatim}
 
 The scripts for processing the parallelism profiles are distributed
 in \tr{ghc/utils/parallel/}.
 
-%************************************************************************
-%*                                                                      *
-\subsubsection{Activity profiles}
-\index{activity profiles}
-\index{profiles, activity}
-\index{visualisation tools}
-%*                                                                      *
-%************************************************************************
-
-You can also use the standard GHC ``cost-centre'' profiling to see how
-much time each PVM ``processor'' spends
-
-No special compilation flags beyond \tr{-parallel} are required to get
-this basic four-activity profile.  Just use the \tr{-P} RTS option,
-thusly:
-\begin{verbatim}
-./a.out +RTS -N7 -P	# 7 processors
-\end{verbatim}
-
-The above will create files named \tr{<something>.prof} and/or
-\tr{<something>.time} {\em in your home directory}.  You can
-process the \tr{.time} files into PostScript using \tr{hp2ps},
-\index{hp2ps}
-as described elsewhere in this guide.
-
-Because of the weird file names, you probably need to use
-\tr{hp2ps} as a filter.  Also, you probably want to give \tr{hp2ps}
-a \tr{-t0} flag, so that no ``inconsequential'' data is ignored---in
-parallel-land it's all consequential.  So:
-\begin{verbatim}
-% hp2ps -t0 < fooo.001.time > temp.ps
-\end{verbatim}
-
+%$$************************************************************************
+%$$*                                                                      *
+%$$\subsubsection{Activity profiles}
+%$$\index{activity profiles}
+%$$\index{profiles, activity}
+%$$\index{visualisation tools}
+%$$%$$*                                                                      *
+%$$%$$************************************************************************
+%$$
+%$$You can also use the standard GHC ``cost-centre'' profiling to see how
+%$$much time each PVM ``processor'' spends
+%$$
+%$$No special compilation flags beyond \tr{-parallel} are required to get
+%$$this basic four-activity profile.  Just use the \tr{-P} RTS option,
+%$$thusly:
+%$$\begin{verbatim}
+%$$./a.out +RTS -N7 -P	# 7 processors
+%$$\end{verbatim}
+%$$
+%$$The above will create files named \tr{<something>.prof} and/or
+%$$\tr{<something>.time} {\em in your home directory}.  You can
+%$$process the \tr{.time} files into PostScript using \tr{hp2ps},
+%$$\index{hp2ps}
+%$$as described elsewhere in this guide.
+%$$
+%$$Because of the weird file names, you probably need to use
+%$$\tr{hp2ps} as a filter.  Also, you probably want to give \tr{hp2ps}
+%$$a \tr{-t0} flag, so that no ``inconsequential'' data is ignored---in
+%$$parallel-land it's all consequential.  So:
+%$$\begin{verbatim}
+%$$%$$ hp2ps -t0 < fooo.001.time > temp.ps
+%$$\end{verbatim}
+%$$
 %$$ The first line of the
 %$$ \tr{.qp} file contains the name of the program executed, along with
 %$$ any program arguments and thread-specific RTS options.  The second
@@ -546,11 +530,12 @@ parallel-land it's all consequential.  So:
 %*                                                                      *
 %************************************************************************
 
-The ``garbage-collection statistics'' RTS options can be useful
-for seeing what parallel programs are doing.  If you do either
-\tr{+RTS -Sstderr}\index{-Sstderr RTS option} or \tr{+RTS -sstderr},
-then you'll get mutator, garbage-collection, etc., times on standard
-error which, for PVM programs, appears in \tr{/tmp/pvml.nnn}.
+The ``garbage-collection statistics'' RTS options can be useful for
+seeing what parallel programs are doing.  If you do either
+\tr{+RTS -Sstderr}\index{-Sstderr RTS option} or \tr{+RTS -sstderr}, then
+you'll get mutator, garbage-collection, etc., times on standard
+error. The standard error of all PE's other than the `main thread'
+appears in \tr{/tmp/pvml.nnn}, courtesy of PVM.
 
 Whether doing \tr{+RTS -Sstderr} or not, a handy way to watch
 what's happening overall is: \tr{tail -f /tmp/pvml.nnn}.
@@ -618,13 +603,20 @@ in \tr{ghc/utils/pvm/}.
 (PARALLEL ONLY) Limit the number of pending sparks per processor to
 \tr{<num>}. The default is 100. A larger number may be appropriate if
 your program generates large amounts of parallelism initially.
+
+\item[\tr{-Q<num>}:]
+\index{-Q<num> RTS option (parallel)}
+(PARALLEL ONLY) Set the size of packets transmitted between processors
+to \tr{<num>}. The default is 1024 words. A larger number may be
+appropriate if your machine has a high communication cost relative to
+computation speed.
 \end{description}
 
 %************************************************************************
 %*                                                                      *
-\subsubsubsection[parallel-problems]{Potential problems with Parallel Haskell}
-\index{Parallel Haskell---problems}
-\index{problems, Parallel Haskell}
+\subsubsubsection[parallel-problems]{Potential problems with Parallel Haskell} 
+\index{Parallel Haskell---problems} 
+\index{problems, Parallel Haskell} 
 %*                                                                      *
 %************************************************************************
 

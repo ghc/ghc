@@ -31,12 +31,12 @@ possible phases of a compilation:
     - hscpp:	run code through the C pre-processor (if -cpp flag given)
     - hsc:	run the Haskell compiler proper
     - gcc:	run the C compiler (if compiling via C)
-    - as:	run the Unix assembler
-    - ld:	run the Unix linker
+    - as:	run the assembler
+    - ld:	run the linker
 
 For each input file, the phase to START with is determined by the
 file's suffix:
-    - .lhs	literate Haskell: lit2pgm
+    - .lhs	literate Haskell: unlit
     - .hs	illiterate Haskell: hsc
     - .hc	C from the Haskell compiler: gcc
     - .c	C not from the Haskell compiler: gcc
@@ -208,11 +208,11 @@ $Oopt_MonadEtaExpansion		= '';
 $Oopt_FinalStgProfilingMassage	= '';
 $Oopt_StgStats			= '';
 $Oopt_SpecialiseUnboxed		= '';
-$Oopt_DoSpecialise		= '-fspecialise';
-$Oopt_FoldrBuild		= 1; # On by default!
-$Oopt_FB_Support		= '-fdo-arity-expand';
+$Oopt_DoSpecialise		= ''; # ToDo:LATER: '-fspecialise';
+$Oopt_FoldrBuild		= 0; # *Off* by default!
+$Oopt_FB_Support		= ''; # was '-fdo-arity-expand';
 #$Oopt_FoldrBuildWW		= 0; # Off by default
-$Oopt_FoldrBuildInline		= '-fdo-inline-foldr-build';
+$Oopt_FoldrBuildInline		= ''; # was '-fdo-inline-foldr-build';
 \end{code}
 
 Things to do with C compilers/etc:
@@ -406,7 +406,8 @@ require special handling.
 @SysImport_dir	= ( $(INSTALLING) )
 		    ? ( "$InstDataDirGhc/imports" )
 		    : ( "$TopPwd/$(CURRENT_DIR)/$(GHC_LIBSRC)/prelude"
-		      , "$TopPwd/$(CURRENT_DIR)/$(GHC_LIBSRC)/required" );
+		      , "$TopPwd/$(CURRENT_DIR)/$(GHC_LIBSRC)/required"
+		      , "$TopPwd/$(CURRENT_DIR)/$(GHC_LIBSRC)/concurrent" );
 
 $GhcVersionInfo  = int ($(PROJECTVERSION) * 100);
 $Haskell1Version = 3; # i.e., Haskell 1.3
@@ -417,11 +418,13 @@ $Haskell1Version = 3; # i.e., Haskell 1.3
 
 @SysLibrary_dir = ( ( $(INSTALLING) )	#-syslib things supplied by the system
 		    ? $InstLibDirGhc
-		    : ("$TopPwd/$(CURRENT_DIR)/$(GHC_RUNTIMESRC)",
-		       "$TopPwd/$(CURRENT_DIR)/$(GHC_RUNTIMESRC)/gmp",
-		       "$TopPwd/$(CURRENT_DIR)/$(GHC_LIBSRC)")
+		    : ( "$TopPwd/$(CURRENT_DIR)/$(GHC_RUNTIMESRC)"
+		      , "$TopPwd/$(CURRENT_DIR)/$(GHC_RUNTIMESRC)/gmp"
+		      , "$TopPwd/$(CURRENT_DIR)/$(GHC_LIBSRC)"
+		      , "$TopPwd/$(CURRENT_DIR)/$(GHC_LIBSRC)/cbits"
+		      )
 		  );
-@SysLibrary = ( '-lHS' ); 	# basic I/O and prelude stuff
+@SysLibrary = (); # will be built up as we go along
 
 $TopClosureFile # defaults to 1.2 one; will be mangled later
 	= ( $(INSTALLING) ) ? "$InstLibDirGhc/TopClosureXXXX.o"
@@ -445,10 +448,10 @@ $PostprocessCcOutput = 0;
 $HaveNativeCodeGen = $(GHC_WITH_NATIVE_CODEGEN);
 $HscOut = '-C='; # '-C=' ==> .hc output; '-S=' ==> .s output; '-N=' ==> neither
 $HscOut = '-S='
-    if $HaveNativeCodeGen && $TargetPlatform =~ /^(alpha|sparc|i386)-/;
+    if $HaveNativeCodeGen && $TargetPlatform =~ /^(alpha|sparc)-/; #ToDo: add |i386 !
 $ProduceHi   = '-hifile=';
 $HiOnStdout  = 0;
-$HiDiff_flag = 0;
+$HiDiff_flag = '';
 
 $CollectingGCstats = 0;
 $CollectGhcTimings = 0;
@@ -469,6 +472,7 @@ $Specific_output_file = '';	# set by -o <file>; "-" for stdout
 $Specific_hi_file = '';		# set by -ohi <file>; "-" for stdout
 $Specific_dump_file = '';	# set by -odump <file>; "-" for stdout
 $Using_dump_file = 0;
+$Isuffix    = '';
 $Osuffix    = '';	# default: use the normal suffix for that kind of output
 $HiSuffix   = 'hi';
 $SysHiSuffix= 'hi';
@@ -568,7 +572,7 @@ arg: while($_ = $ARGV[0]) {
     /^-v$/	    && do { $Verbose = '-v'; $Time = 'time'; next arg; };
 
     #---------- what phases are to be run ----------------------------------
-    /^-short$/	    && do { $Do_recomp_chkr = 1; next arg; };
+    /^-recomp/	    && do { $Do_recomp_chkr = 1; next arg; };
 
     /^-cpp$/	    && do { $Cpp_flag_set = 1; next arg; };
     # change the global default:
@@ -589,8 +593,9 @@ arg: while($_ = $ARGV[0]) {
     /^-nohi$/	    && do { $ProduceHi = '-nohifile='; next arg; };
     # don't generate an interface (even if generating C)
 
-    /^-hi-diffs$/    && do { $HiDiff_flag = 1; next arg; };
-    /^-no-hi-diffs$/ && do { $HiDiff_flag = 0; next arg; };
+    /^-hi-diffs$/ &&		 do { $HiDiff_flag = 'normal'; next arg; };
+    /^-hi-diffs-with-usages$/ && do { $HiDiff_flag = 'usages'; next arg; };
+    /^-no-hi-diffs$/ &&		 do { $HiDiff_flag = '';       next arg; };
     # show/disable diffs if the interface file changes
 
     /^-E$/	    && do { push(@CcBoth_flags, '-E');
@@ -635,6 +640,14 @@ arg: while($_ = $ARGV[0]) {
 				    print STDERR "$Pgm: no such directory: $dir_part\n";
 				    $Status++;
 				}
+			    }
+			    next arg; };
+
+    # NB: -isuf not documented yet (because it doesn't work yet)
+    /^-isuf$/	    && do { $Isuffix  = &grab_arg_arg('-isuf', '');
+			    if ($Isuffix =~ /\./ ) {
+				print STDERR "$Pgm: -isuf suffix shouldn't contain a .\n";
+				$Status++;
 			    }
 			    next arg; };
 
@@ -807,7 +820,14 @@ arg: while($_ = $ARGV[0]) {
 				? "$InstSysLibDir/$syslib/imports"
 				: "$TopPwd/hslibs/$syslib/src");
 
-			    unshift(@SysLibrary, ('-lHS' . $syslib ));
+			    if (! $(INSTALLING)) {
+				push(@SysLibrary_dir,
+					("$TopPwd/hslibs/$syslib"
+					,"$TopPwd/hslibs/$syslib/cbits"));
+			    }
+
+			    push(@SysLibrary, ("-lHS$syslib"
+						 ,"-lHS${syslib}_cbits"));
 
 			    next arg; };
 
@@ -859,10 +879,12 @@ arg: while($_ = $ARGV[0]) {
     /^-fno-implicit-prelude$/      && do { $NoImplicitPrelude= 1; push(@HsC_flags, $_); next arg; };
 
     # ToDo: rename to -fcompiling-ghc-internals=<module>
+    # NB: not documented
     /^-fcompiling-ghc-internals(.*)/	&& do { local($m) = &grab_arg_arg('-fcompiling-ghc-internals',$1);
 					push(@HsC_flags, "-fcompiling-ghc-internals=$m");
 					next arg; };
 
+    # NB: not really put to use and not documented
     /^-fusing-ghc-internals$/ && do { $UsingGhcInternals = 1; next arg; };
 
     /^-user-prelude-force/	&& do { # ignore if not -user-prelude
@@ -887,21 +909,12 @@ arg: while($_ = $ARGV[0]) {
 			}
 			next arg; };
 
-    /^-f(hide-builtin-names|min-builtin-names)$/
-		&& do { push(@HsC_flags, $_);
-#			push(@HsC_flags, '-fno-implicit-prelude'); # don't read Prelude.hi
-#			push(@HsP_flags, '-N'); # allow foo# names
-			next arg; };
     /^-fglasgow-exts$/
 		&& do { push(@HsC_flags, $_);
 			push(@HsP_flags, '-N');
 
 #			push(@HsC_flags, '-fshow-import-specs');
 
-#			if ( ! $(INSTALLING) ) {
-#			    unshift(@SysImport_dir,
-#				"$TopPwd/$(CURRENT_DIR)/$(GHC_LIBSRC)/glaExts");
-#			}
 			next arg; };
 
     /^-fspeciali[sz]e-unboxed$/
@@ -939,10 +952,6 @@ arg: while($_ = $ARGV[0]) {
 		    && do { $Oopt_FoldrBuildInline .= ' -fdo-not-fold-back-append '; 
 			    #print "No Foldback of append\n";
 			    next arg; };
-
-#    /^-ffoldr-build-ww$/
-#		    && do { $Oopt_FoldrBuildWW = 1; next arg; };
-
 
     # ---------------
 
@@ -986,7 +995,8 @@ arg: while($_ = $ARGV[0]) {
 			    &squashHscFlag("-f$1");
 			    next arg; };
 
-    /^-f/	    && do { push(@HsC_flags, $_); next arg; };
+    /^-f(show-import-specs)/
+		    && do { push(@HsC_flags, $_); next arg; };
 
     # ---------------
 
@@ -1034,9 +1044,9 @@ arg: while($_ = $ARGV[0]) {
 	if ($heap_size <= 0) {
 	    print STDERR "$Pgm: resetting heap-size to zero!!!\n";
 	    $Specific_heap_size = 0;
-	}
+	
 	# if several heap sizes given, take the largest...
-	if ($heap_size >= $Specific_heap_size) {
+	} elsif ($heap_size >= $Specific_heap_size) {
 	    $Specific_heap_size = $heap_size;
 	} else {
 	    print STDERR "$Pgm: ignoring heap-size-setting option ($_)...not the largest seen\n";
@@ -1055,9 +1065,9 @@ arg: while($_ = $ARGV[0]) {
 	if ($stk_size <= 0) {
 	    print STDERR "$Pgm: resetting stack-size to zero!!!\n";
 	    $Specific_stk_size = 0;
-	}
+
 	# if several stack sizes given, take the largest...
-	if ($stk_size >= $Specific_stk_size) {
+	} elsif ($stk_size >= $Specific_stk_size) {
 	    $Specific_stk_size = $stk_size;
 	} else {
 	    print STDERR "$Pgm: ignoring stack-size-setting option (-Rmax-stksize $stk_size)...not the largest seen\n";
@@ -1300,7 +1310,6 @@ It really really wants to be the last STG-to-STG pass that is run.
 	  '\)',
 	$Oopt_AddAutoSccs,
 #	'-ffull-laziness',	# removed 95/04 WDP following Andr\'e's lead
-	'-fuse-get-mentioned-vars', # for the renamer
 	
 	$Oopt_FinalStgProfilingMassage
     );
@@ -1331,6 +1340,7 @@ It really really wants to be the last STG-to-STG pass that is run.
 	  '-ffloat-primops-ok',
 	  '-fcase-of-case',
 	  '-fdo-case-elim',
+	  '-fcase-merge',
 	  '-fdo-eta-reduction',
 	  '-fdo-lambda-eta-expansion',
 	  '-freuse-con',
@@ -1340,7 +1350,7 @@ It really really wants to be the last STG-to-STG pass that is run.
 	  $Oopt_MaxSimplifierIterations,
 	  '\)',
 
-	'-fcalc-inlinings1',
+#LATER:	'-fcalc-inlinings1', -- pointless for 2.01
 
 #	($Oopt_FoldrBuildWW) ? (
 #		'-ffoldr-build-ww-anal',
@@ -1352,6 +1362,7 @@ It really really wants to be the last STG-to-STG pass that is run.
 #		  '-ffloat-primops-ok',
 #		  '-fcase-of-case',
 #		  '-fdo-case-elim',
+#		  '-fcase-merge',
 #		  '-fdo-eta-reduction',
 #		  '-fdo-lambda-eta-expansion',
 #		  '-freuse-con',
@@ -1378,6 +1389,7 @@ It really really wants to be the last STG-to-STG pass that is run.
 	    '-ffloat-primops-ok',
 	    '-fcase-of-case',
 	    '-fdo-case-elim',
+	    '-fcase-merge',
 	    '-fdo-eta-reduction',
 	    '-fdo-lambda-eta-expansion',
 	    '-freuse-con',
@@ -1397,6 +1409,7 @@ It really really wants to be the last STG-to-STG pass that is run.
 	  '-ffloat-primops-ok',
 	  '-fcase-of-case',
 	  '-fdo-case-elim',
+	  '-fcase-merge',
 	  '-fdo-eta-reduction',
 	  '-fdo-lambda-eta-expansion',
 	  '-freuse-con',
@@ -1419,6 +1432,7 @@ It really really wants to be the last STG-to-STG pass that is run.
 	  '-ffloat-primops-ok',
 	  '-fcase-of-case',
 	  '-fdo-case-elim',
+	  '-fcase-merge',
 	  '-fdo-eta-reduction',
 	  '-fdo-lambda-eta-expansion',
 	  '-freuse-con',
@@ -1436,7 +1450,7 @@ It really really wants to be the last STG-to-STG pass that is run.
 
 #	( ($OptLevel != 2)
 #        ? ''
-#	: "-fliberate-case -fsimplify \\( $Oopt_FB_Support -ffloat-lets-exposing-whnf -ffloat-primops-ok -fcase-of-case -fdo-case-elim -fdo-eta-reduction -fdo-lambda-eta-expansion -freuse-con -flet-to-case $Oopt_PedanticBottoms $Oopt_MonadEtaExpansion $Oopt_UnfoldingUseThreshold $Oopt_MaxSimplifierIterations \\)" ),
+#	: "-fliberate-case -fsimplify \\( $Oopt_FB_Support -ffloat-lets-exposing-whnf -ffloat-primops-ok -fcase-of-case -fdo-case-elim -fcase-merge -fdo-eta-reduction -fdo-lambda-eta-expansion -freuse-con -flet-to-case $Oopt_PedanticBottoms $Oopt_MonadEtaExpansion $Oopt_UnfoldingUseThreshold $Oopt_MaxSimplifierIterations \\)" ),
 
 # Final clean-up simplification:
 
@@ -1447,6 +1461,7 @@ It really really wants to be the last STG-to-STG pass that is run.
 	  '-ffloat-primops-ok',
 	  '-fcase-of-case',
 	  '-fdo-case-elim',
+	  '-fcase-merge',
 	  '-fdo-eta-reduction',
 	  '-fdo-lambda-eta-expansion',
 	  '-freuse-con',
@@ -1463,10 +1478,10 @@ It really really wants to be the last STG-to-STG pass that is run.
 
       #	'-fstatic-args',
 
-	'-fcalc-inlinings2',
+#LATER:	'-fcalc-inlinings2', -- pointless for 2.01
 
       # stg2stg passes
-	'-fupdate-analysis',
+#LATER:	'-fupdate-analysis',
 	'-flambda-lift',
 	$Oopt_FinalStgProfilingMassage,
 	$Oopt_StgStats,
@@ -1653,6 +1668,8 @@ if ($TargetPlatform =~ /^alpha-/) {
     # we know how to *mangle* asm for PowerPC
     unshift(@CcRegd_flags, ('-D__STG_REV_TBLS__'));
     unshift(@CcRegd_flags, ('-DSTACK_CHECK_BY_PAGE_FAULT=1')) if $StkChkByPageFaultOK;
+    unshift(@CcBoth_flags,  ('-static')); # always easier to start with
+    unshift(@CcRegd_flags, ('-finhibit-size-directive')); # avoids traceback tables
 
 } elsif ($TargetPlatform =~ /^sparc-/) {
     # we know how to *mangle* asm for SPARC
@@ -1712,8 +1729,11 @@ if ( ! $(INSTALLING) ) {
 \end{code}
 
 \begin{code}
+push(@SysLibrary, ( '-lHS', '-lHS_cbits' )); # basic I/O and prelude stuff
+
 local($f);
 foreach $f (@SysLibrary) {
+    next if $f =~ /_cbits/;
     $f .= $BuildTag if $f =~ /^-lHS/;
 }
 
@@ -1915,9 +1935,11 @@ args: while ($a = shift(@ARGV)) {
     }
 }
 
-exec "$SysMan $debug $pvm_executable $nprocessors @nonPVM_args";
-print STDERR "Exec failed!!!: $SysMan $debug $nprocessors @nonPVM_args\n";
-exit(1); 
+local($return_val) = 0;
+system("$SysMan $debug $pvm_executable $nprocessors @nonPVM_args");
+$return_val = $?;
+system("mv $ENV{'HOME'}/$pvm_executable_base.???.gr .") if -f "$ENV{'HOME'}/$pvm_executable_base.001.gr";
+exit($return_val);
 EOSCRIPT2
 	close(EXEC) || die "Failed closing $executable\n";
 	chmod 0755, $executable;
@@ -2005,7 +2027,7 @@ Again, we'll do the post-recompilation-checker parts of this later.
     } elsif ($ifile =~ /\.hs$/) {
     	$do_lit2pgm = 0;
 	$lit2pgm_hscpp = $ifile;
-    } elsif ($ifile =~ /\.hc$/) {
+    } elsif ($ifile =~ /\.hc$/ || $ifile =~ /_hc$/ ) { # || $ifile =~ /\.$Isuffix$/o) # ToDo: better
     	$do_lit2pgm = 0; $do_hscpp = 0; $do_hsc = 0; $do_cc = 1;
 	$hsc_out = $ifile;    
     } elsif ($ifile =~ /\.c$/) {
@@ -2066,7 +2088,11 @@ Check if hsc needs to be run at all.
 	$more_processing_required
 	    = &runRecompChkr($ifile, $hscpp_hsc, $ifile_root, $ofile_target, $hifile_target);
 
-	print STDERR "$Pgm:recompile: NOT NEEDED!\n" if ! $more_processing_required;
+	if ( ! $more_processing_required ) {
+	    print STDERR "$Pgm:recompile: NOT NEEDED!\n"; # Yay!
+	    # propagate dependency:
+	    &run_something("touch $ofile_target", "Touch $ofile_target, to propagate dependencies");
+	}
     }
 
     $do_hsc = 0, $do_cc = 0, $do_as = 0 if ! $more_processing_required;
@@ -2117,7 +2143,9 @@ Finally, decide what to queue up for linker input.
     # tentatively assume we will eventually produce linker input:
     push(@Link_file, &odir_ify($ifile_root, 'o'));
 
-    if ($ifile !~ /\.(lhs|hs|hc|c|s)$/) {
+#ToDo:    local($or_isuf) = ($Isuffix eq '') ? '' : "|$Isuffix";
+
+    if ( $ifile !~ /\.(lhs|hs|hc|c|s)$/ && $ifile !~ /_hc$/ ) {
 	print STDERR "$Pgm: don't recognise suffix on `$ifile'; passing it through to linker\n"
 	    if $ifile !~ /\.a$/;
 
@@ -2311,8 +2339,8 @@ sub already_mapped_err {
 
     return if $m_ino == $p_ino; # same inode number
 
-    print STDERR "$Pgm: module $mod already mapped to $mapped_to (inode $m_ino)";
-    print STDERR ";\n\tignoring: $path (inode $p_ino)\n";
+    print STDERR "$Pgm: module $mod already mapped to $mapped_to";
+    print STDERR ";\n\tignoring: $path\n";
 }
 \end{code}
 
@@ -2419,23 +2447,23 @@ sub runMangler {
 	&mangle_asm($cc_as_o, $cc_as);
 
 #OLD: for sanity:
-	local($target) = 'oops';
-	$target = '-alpha'	if $TargetPlatform =~ /^alpha-/;
-	$target = '-hppa'	if $TargetPlatform =~ /^hppa/;
-	$target = ''	 	if $TargetPlatform =~ /^i386-/;
-	$target = '-m68k'	if $TargetPlatform =~ /^m68k-/;
-	$target = '-mips'	if $TargetPlatform =~ /^mips-/;
-	$target = ''		if $TargetPlatform =~ /^powerpc-/;
-	$target = '-solaris'	if $TargetPlatform =~ /^sparc-sun-solaris2/;
-	$target = '-sparc'	if $TargetPlatform =~ /^sparc-sun-sunos4/;
-
-	if ( $target ne '' ) {
-	    require("ghc-asm$target.prl")
-	    || &tidy_up_and_die(1,"$Pgm: panic: can't load ghc-asm$target.prl!\n");
-	    &mangle_asm($cc_as_o, "$cc_as-2"); # the OLD one!
-	    &run_something("$Cmp -s $cc_as-2 $cc_as || $Diff $cc_as-2 $cc_as 1>&2 || exit 0",
-		"Diff'ing old and new mangled .s files"); # NB: to stderr
-	}
+#OLD:	local($target) = 'oops';
+#OLD:	$target = '-alpha'	if $TargetPlatform =~ /^alpha-/;
+#OLD:	$target = '-hppa'	if $TargetPlatform =~ /^hppa/;
+#OLD:	$target = '-old-asm' 	if $TargetPlatform =~ /^i386-/;
+#OLD:	$target = '-m68k'	if $TargetPlatform =~ /^m68k-/;
+#OLD:	$target = '-mips'	if $TargetPlatform =~ /^mips-/;
+#OLD:	$target = ''		if $TargetPlatform =~ /^powerpc-/;
+#OLD:	$target = '-solaris'	if $TargetPlatform =~ /^sparc-sun-solaris2/;
+#OLD:	$target = '-sparc'	if $TargetPlatform =~ /^sparc-sun-sunos4/;
+#OLD:
+#OLD:	if ( $target ne '' ) {
+#OLD:	    require("ghc-asm$target.prl")
+#OLD:	    || &tidy_up_and_die(1,"$Pgm: panic: can't load ghc-asm$target.prl!\n");
+#OLD:	    &mangle_asm($cc_as_o, "$cc_as-2"); # the OLD one!
+#OLD:	    &run_something("$Cmp -s $cc_as-2 $cc_as || $Diff $cc_as-2 $cc_as 1>&2 || exit 0",
+#OLD:		"Diff'ing old and new mangled .s files"); # NB: to stderr
+#OLD:	}
 
     } elsif ($TargetPlatform =~ /^hppa/) {
 	# minor mangling of non-threaded files for hp-pa only
@@ -2659,7 +2687,7 @@ next argument (\tr{-Rmax-heapsize 8M}).  We allow both cases.
 
 Note: no error-checking; \tr{-Rmax-heapsize -Rgc-stats} will silently
 gobble the second argument (and probably set the heapsize to something
-nonsensical). (ToDo?)
+nonsensical).
 \begin{code}
 sub grab_arg_arg {
     local($option, $rest_of_arg) = @_;

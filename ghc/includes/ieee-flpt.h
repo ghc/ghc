@@ -5,31 +5,39 @@
 
    /* Radix of exponent representation */
 #ifndef FLT_RADIX
-#define FLT_RADIX 2
+# define FLT_RADIX 2
 #endif
 
    /* Number of base-FLT_RADIX digits in the significand of a float */
 #ifndef FLT_MANT_DIG
-#define FLT_MANT_DIG 24
+# define FLT_MANT_DIG 24
 #endif
    /* Minimum int x such that FLT_RADIX**(x-1) is a normalised float */
 #ifndef FLT_MIN_EXP
-#define FLT_MIN_EXP (-125)
+# ifdef __GLASGOW_HASKELL__
+#  define FLT_MIN_EXP (negate 125)
+# else
+#  define FLT_MIN_EXP (-125)
+# endif
 #endif
    /* Maximum int x such that FLT_RADIX**(x-1) is a representable float */
 #ifndef FLT_MAX_EXP
-#define FLT_MAX_EXP 128
+# define FLT_MAX_EXP 128
 #endif
 
    /* Number of base-FLT_RADIX digits in the significand of a double */
 #ifndef DBL_MANT_DIG
-#define DBL_MANT_DIG 53
+# define DBL_MANT_DIG 53
 #endif
    /* Minimum int x such that FLT_RADIX**(x-1) is a normalised double */
 #ifndef DBL_MIN_EXP
-#define DBL_MIN_EXP (-1021)
+# ifdef __GLASGOW_HASKELL__
+#  define DBL_MIN_EXP (negate 1021)
+# else
+#  define DBL_MIN_EXP (-1021)
+# endif
 #endif
    /* Maximum int x such that FLT_RADIX**(x-1) is a representable double */
 #ifndef DBL_MAX_EXP
-#define DBL_MAX_EXP 1024
+# define DBL_MAX_EXP 1024
 #endif

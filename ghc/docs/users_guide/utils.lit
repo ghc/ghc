@@ -22,7 +22,7 @@ GHC, assuming you name your source files the same as your modules.
 Thus:
 \begin{verbatim}
 HC      = ghc
-HCFLAGS = -fhaskell-1.3 -cpp -hi-diffs $(EXTRA_HC_OPTS)
+HCFLAGS = -recomp -cpp -hi-diffs $(EXTRA_HC_OPTS)
 
 SRCS = Main.lhs Foo.lhs Bar.lhs
 OBJS = Main.o   Foo.o   Bar.o
@@ -65,6 +65,11 @@ Now, before you start compiling, and any time you change the
 \tr{make cool_pgm}.  \tr{mkdependHS} will append the needed
 dependencies to your \tr{Makefile}.
 
+Please note the use of the recompilation checker (the \tr{-recomp}
+\index{-recomp option} flag).  Without it, your dependencies will be
+{\em inadequate} to cope with the Haskell~1.3 module system!  See
+\sectionref{recomp} for more details about the recompilation checker!
+
 A few caveats about this simple scheme: (a)~You may need to compile
 some modules explicitly to create their interfaces in the first place
 (e.g., \tr{make Bar.o} to create \tr{Bar.hi}).  (b)~You may have to
@@ -84,6 +89,8 @@ e.g., \tr{mkdependHS -help}.
 \index{TAGS for Haskell}
 %*                                                                      *
 %************************************************************************
+
+NB: \tr{hstags} is temporarily dead at version~2.01.  Sigh.
 
 `Tags' is a facility for indexing the definitions of
 programming-language things in a multi-file program, and then using
@@ -133,7 +140,7 @@ Andy Gill and Simon Marlow have written a parser-generator for
 Haskell, called \tr{happy}.\index{happy parser generator} \tr{Happy}
 is to Haskell what \tr{Yacc} is to C.
 
-You can get \tr{happy} by FTP from \tr{ftp.dcs.glasgow.ac.uk} in
+You can get \tr{happy} by FTP from \tr{ftp.dcs.gla.ac.uk} in
 \tr{pub/haskell/happy}, the file \tr{happy-0.8.tar.gz}.
 
 \tr{Happy} is at its shining best when compiled by GHC.

@@ -4,13 +4,18 @@
 \section[Bags]{@Bag@: an unordered collection with duplicates}
 
 \begin{code}
+#ifdef COMPILING_GHC
 #include "HsVersions.h"
+#endif
 
 module Bag (
 	Bag,	-- abstract type
 
 	emptyBag, unitBag, unionBags, unionManyBags,
-	mapBag, -- UNUSED: elemBag,
+	mapBag,
+#ifndef COMPILING_GHC
+	elemBag,
+#endif
 	filterBag, partitionBag, concatBag, foldBag,
 	isEmptyBag, consBag, snocBag,
 	listToBag, bagToList
@@ -22,6 +27,8 @@ IMPORT_1_3(List(partition))
 
 import Outputable	( interpp'SP )
 import Pretty
+#else
+import List(partition)
 #endif
 
 data Bag a
@@ -35,7 +42,7 @@ data Bag a
 emptyBag = EmptyBag
 unitBag  = UnitBag
 
-{- UNUSED:
+#ifndef COMPILING_GHC
 elemBag :: Eq a => a -> Bag a -> Bool
 
 elemBag x EmptyBag        = False
@@ -43,7 +50,7 @@ elemBag x (UnitBag y)     = x==y
 elemBag x (TwoBags b1 b2) = x `elemBag` b1 || x `elemBag` b2
 elemBag x (ListBag ys)    = any (x ==) ys
 elemBag x (ListOfBags bs) = any (x `elemBag`) bs
--}
+#endif
 
 unionManyBags [] = EmptyBag
 unionManyBags xs = ListOfBags xs
@@ -55,8 +62,9 @@ unionBags b EmptyBag = b
 unionBags b1 b2      = TwoBags b1 b2
 
 consBag :: a -> Bag a -> Bag a
-consBag elt bag = (unitBag elt) `unionBags` bag
 snocBag :: Bag a -> a -> Bag a
+
+consBag elt bag = (unitBag elt) `unionBags` bag
 snocBag bag elt = bag `unionBags` (unitBag elt)
 
 isEmptyBag EmptyBag	    = True

@@ -8,7 +8,7 @@ module PreludeGlaST (
 	MutableArray,
 	MutableByteArray,
 	PrimIO,
-	Addr, Word,
+	Addr(..), Word(..),
 	CCallable(..), CReturnable(..),
 
 	boundsOfArray,
@@ -57,6 +57,7 @@ module PreludeGlaST (
 	returnPrimIO,
 	returnST,
 	returnStrictlyST,
+	runST,
 	primIOToIO,
 	ioToPrimIO,
 	sameMutableArray,
@@ -82,6 +83,12 @@ module PreludeGlaST (
 	writeFloatArray,
 	writeIntArray,
 	writeVar
+#ifndef __PARALLEL_HASKELL__
+	, makeStablePtr
+	, deRefStablePtr
+	, freeStablePtr
+	, performGC
+#endif
     ) where
 
 import GHCbase

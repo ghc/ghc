@@ -64,7 +64,7 @@ import Maybes	( maybeToBool, assocMaybe )
 import PrimRep	( PrimRep(..) )
 import Unique	-- quite a few *Keys
 import Util	( thenCmp, zipEqual, assoc,
-		  panic, panic#, assertPanic,
+		  panic, panic#, assertPanic, pprPanic,
 		  Ord3(..){-instances-}
 		)
 -- ToDo:rm all these
@@ -78,6 +78,7 @@ import Util	( thenCmp, zipEqual, assoc,
 --	UniqFM (ufmToList )
 --import {-mumble-}
 --	Outputable
+--import PprEnv
 \end{code}
 
 Data types
@@ -472,7 +473,7 @@ get_app_data_tycon maybe ty
   = case maybe ty of
       Just stuff -> stuff
 #ifdef DEBUG
-      Nothing    -> panic "Type.getAppDataTyCon" -- (pprGenType PprShowAll ty)
+      Nothing    -> panic "Type.getAppDataTyCon"--  (pprGenType PprShowAll ty)
 #endif
 
 

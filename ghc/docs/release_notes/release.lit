@@ -2,13 +2,13 @@
 \documentstyle[11pt,literate]{article}
 \begin{document}
 \title{Release notes for Glasgow Haskell}
-\author{Will Partain (for the AQUA Team)\\
+\author{The GHC Team\\
 Department of Computing Science\\
 University of Glasgow\\
 Glasgow, Scotland\\
 G12 8QQ\\
 \\
-Email: glasgow-haskell-\{users,bugs\}-request\@dcs.glasgow.ac.uk}
+Email: glasgow-haskell-\{users,bugs\}-request\@dcs.gla.ac.uk}
 \maketitle
 \begin{rawlatex}
 \tableofcontents
@@ -26,66 +26,35 @@ Email: glasgow-haskell-\{users,bugs\}-request\@dcs.glasgow.ac.uk}
 % pointers to it.  Mentioning something in the release notes is not
 % the same as documenting it.
 
-\section[release-0-26]{Release notes for version~0.26---7/95}
-\input{0-26-notes.lit}
+\section[release-2-01]{Release notes for version~2.01---7/96}
+\input{2-01-notes.lit}
 
 %\section[release-RSN]{What we hope to do Real Soon Now}
 %\downsection
 %\input{real-soon-now.lit}
 %\upsection
 
-\section{Non-release notes for versions~0.24 and 0.25}
-Version~0.24 (March 1995) was a tidy-up release; it mostly
-fixed some ``threads'' problems (now ``Concurrent Haskell''),
-some I/O problems, and some porting problems.
+\section{Versions 0.26 through 0.29}
 
-Version~0.25 was a binary-only dump of a \tr{i386-*-linuxaout}
-build, just so people could try it.
+GHC~0.26 (7/95) was the last major release of GHC for Haskell~1.2.
 
-\section[release-0-23]{Release notes for version~0.23---12/94}
-\input{0-23-notes.lit}
+GHC~0.27 (12/95) was a `` binary-only from-working-sources
+no-guarantees snapshot ...  for i386-unknown-linuxaout and
+i386-unknown-solaris2 platforms...''
 
-\section[release-0-22]{Release notes for version~0.22---7/94}
-\input{0-22-notes.lit}
+GHC~0.28 (5/96) was the same thing, for the i386-unknown-linux (ELF)
+platform.
 
-\section[release-0-19]{Release notes for version~0.19---12/93}
-\input{0-19-notes.lit}
+GHC~0.29 (7/96), released at the same time as 2.01, is just ``0.26
+with bug fixes''; i.e., the current state-of-play on the Haskell~1.2
+compiler development.
 
-\section[release-0-16]{Release notes for version~0.16---07/93}
-\input{0-16-notes.lit}
+\section{Old release notes}
 
-\section[release-0-10]{Release notes for version~0.10---12/92}
-\input{0-10-notes.lit}
-
-\section[release-0-09]{Release~0.09---9/92}
-
-This was an unannounced pseudo-release to a few people.
-
-\section[release-0-08]{Release notes for version~0.08---7/92}
-\input{0-08-notes.lit}
-
-\section[release-0-07]{Release~0.07}
-
-This was an unannounced pseudo-release to a few people.
-
-\section[release-0-06]{Release notes for version~0.06---3/92}
-\input{0-06-notes.lit}
-
-\section[release-0-05]{Release notes for version~0.05---12/91}
-\input{0-05-notes.lit}
-
-\section[releases-0-03-04]{Releases between 0.02 and 0.05}
-
-There were a couple of private releases to highly zealous people,
-mainly our friends at York.  There are README files in the
-\tr{release_notes/} dir about those, if you are really interested.
-
-\section[release-0-02]{Release notes for version~0.02---8/91}
-\downsection
-Nothing about version 0.02, our very first release, is still
-interesting :-)
-%\input{0-02-notes.lit}
-\upsection
+We used to include the release notes back to the dawn of time in this
+document.  Made for a nice long document, but it wasn't that
+interesting.  If you would like to see old release notes, just ask;
+we've still got 'em.
 
 \begin{onlystandalone}
 % \printindex

@@ -86,6 +86,9 @@ arg: while ($_ = $ARGV[0]) {
 			        next arg; };
     /^-postscript(.*)/ && do { $PostScript = &grab_arg_arg('-postscript',$1);
 			        next arg; };
+    /^-script/ && do { print STDERR "$Pgm: -script argument is obsolete;\nUse -prescript and -postscript instead.\n";
+		    $Status++;
+		    next arg; };
     /^-(ghc|hbc)-timing$/ && do { $SysSpecificTiming = $1;
 				  next arg; };
     /^-spix-timing$/ && do { $SysSpecificTiming = 'ghcspix';
@@ -149,7 +152,7 @@ if ( $SpixTiming eq 'yes' ) {
 
     open(SPIXNM, "nm -n $ToRunOrig |") || die "nm -n $ToRunOrig open failed!\n";
     spix: while (<SPIXNM>) {
-	if ( / T +(_FreeMallocPtr|_([A-Za-z]+)Hook|_xmalloc|_mpz_get_si)$/ ) {
+	if ( / T +(_freeForeignObj|_([A-Za-z]+)Hook|_xmalloc|_mpz_get_si)$/ ) {
 	    $LastSpix = $1;
 	    last spix;
 	}

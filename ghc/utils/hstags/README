@@ -3,8 +3,8 @@ files for Glasgow-Haskell-compilable programs.  (It is "sophisticated"
 only in that it uses the GHC parser to find "interesting" things in
 the source files.)
 
+With GHC 2.01: doesn't work yet.
+
 A simpler alternative is Denis Howe's "fptags" script, which is
 distributed in the ghc/CONTRIB directory.
 
-Will Partain
-Sept 1994

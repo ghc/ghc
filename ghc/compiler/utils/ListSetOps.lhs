@@ -4,13 +4,15 @@
 \section[ListSetOps]{Set-like operations on lists}
 
 \begin{code}
+#ifdef COMPILING_GHC
 #include "HsVersions.h"
+#endif
 
 module ListSetOps (
 	unionLists,
 	intersectLists,
 	minusList
-#if ! defined(COMPILING_GHC)
+#ifndef COMPILING_GHC
 	, disjointLists, intersectingLists
 #endif
    ) where

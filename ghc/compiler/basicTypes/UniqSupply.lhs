@@ -103,7 +103,8 @@ mkSplitUniqSupply (C# c#)
 		    returnPrimIO (I# (w2i (mask# `or#` u#)))
     in
 #if __GLASGOW_HASKELL__ >= 200
-    primIOToIO mk_supply#
+    primIOToIO mk_supply#	>>= \ s ->
+    return s
 #else
     mk_supply#	`thenPrimIO` \ s ->
     return s

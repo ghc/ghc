@@ -547,13 +547,14 @@ P_      get_closure_info PROTO((P_ closure, W_ *size, W_ *ptrs, W_ *nonptrs, W_ 
 #  define PACK_HDR_SIZE	4	/* Words of header in a packet */
 
 #    define PACK_HEAP_REQUIRED  \
-      ((RTSflags.GranFlags.packBufferSize - PACK_HDR_SIZE) / (PACK_GA_SIZE + _FHS) * (SPEC_HS + 2))
+      ((RTSflags.GranFlags.packBufferSize - PACK_HDR_SIZE) / (PACK_GA_SIZE \
+      + _FHS) * (SPEC_HS + 2)) 
 
 #    define PACK_FLAG_LOCN           0  
 #    define PACK_TSO_LOCN            1
 #    define PACK_UNPACKED_SIZE_LOCN  2
 #    define PACK_SIZE_LOCN           3
-#    define MAGIC_PACK_FLAG 0xfabc
+#    define MAGIC_PACK_FLAG          0xfabc
 #endif  
 
 #endif /* Parallel_H */

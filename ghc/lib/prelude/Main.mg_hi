@@ -1,0 +1,5 @@
+interface Main 1
+__exports__
+Main main (..)
+__declarations__
+Main.main :: GHCbase.IO Prelude.();

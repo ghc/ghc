@@ -1,6 +1,4 @@
 #define IHaveSubdirs
 
 SUBDIRS = scripts \
-	  msub \
-	  etags \
-	  verbatim
+	  msub

@@ -7,7 +7,7 @@ include advertising or testimonials from happy users if they send them
 along...
 
 Will Partain
-partain@dcs.glasgow.ac.uk
+partain@dcs.gla.ac.uk
 95/12/05
 
 =======================================================================
@@ -20,7 +20,7 @@ partain@dcs.glasgow.ac.uk
   chalmers/thiemann -- Peter Thiemann added "indentation stuff"
 	and fontification -- version 0.2.
 
-  chalmers/sof -- Sigbjorn Finne's <sof@dcs.glasgow.ac.uk> hacked
+  chalmers/sof -- Sigbjorn Finne's <sof@dcs.gla.ac.uk> hacked
 	version of Thiemann's.
 
 .......................................................................
@@ -52,4 +52,4 @@ partain@dcs.glasgow.ac.uk
   yale/chak : "extended by Manuel M.T. Chakravarty with rudimentary
 	editing features (including better syntax table) and support
 	for the font-lock-mode."  Via Hans Wolfgang Loidl
-	<hwloidl@dcs.glasgow.ac.uk>
+	<hwloidl@dcs.gla.ac.uk>

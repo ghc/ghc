@@ -1,23 +1,25 @@
 #ifndef PLATFORM_H
 #define PLATFORM_H
 
-#define alpha_dec_osf1		 1
-#define hppa1_1_hp_hpux		 2
-#define i386_next_nextstep3	 3
-#define i386_unknown_freebsd	 4
-#define i386_unknown_linux	 5
-#define i386_unknown_netbsd	 6
-#define i386_unknown_solaris2	 7
-#define m68k_apple_macos7	 8
-#define m68k_next_nextstep	 9
-#define m68k_simonpj_grip	10
-#define m68k_sun_sunos4		11
-#define mips_dec_ultrix		12
-#define mips_sgi_irix		13
-#define rs6000_ibm_aix		14
-#define sparc_sun_solaris2	15
-#define sparc_sun_sunos4	16
-#define i386_unknown_linuxaout	17
+#define alpha_dec_osf1		10
+#define alpha_unknown_linux	11
+#define hppa1_1_hp_hpux		20
+#define i386_next_nextstep3	30
+#define i386_unknown_bsdi	31
+#define i386_unknown_freebsd	32
+#define i386_unknown_linux	33
+#define i386_unknown_linuxaout	34
+#define i386_unknown_netbsd	35
+#define i386_unknown_solaris2	36
+#define m68k_next_nextstep	50
+#define m68k_simonpj_grip	51
+#define m68k_sun_sunos4		52
+#define mips_dec_ultrix		60
+#define mips_sgi_irix		61
+#define powerpc_ibm_aix		70
+#define sparc_sun_solaris2	80
+#define sparc_sun_sunos4	81
+#define sparc_unknown_linux	82
 
 #define HostPlatform_TYPE   @HostPlatform_CPP@
 #define TargetPlatform_TYPE @HostPlatform_CPP@

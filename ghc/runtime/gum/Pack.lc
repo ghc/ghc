@@ -153,7 +153,7 @@ W_ *packbuffersize;
     ASSERT(packlocn <= RTSflags.ParFlags.packBufferSize);
     *packbuffersize = packlocn;
 #  else  /* GRAN */
-    ASSERT(packlocn <= PackBuffer[PACK_SIZE_LOCN]);
+    ASSERT(packlocn <= PackBuffer[PACK_SIZE_LOCN]+PACK_HDR_SIZE);
     /* ToDo: Print an earlier, more meaningful message */
     if (packlocn==PACK_HDR_SIZE) {  /* i.e. packet is empty */
       fprintf(stderr,"EMPTY PACKET! Can't transfer closure %#lx at all!!\n",

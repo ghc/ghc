@@ -2,15 +2,13 @@
 #include "rtsdefs.h"
 
 void
-PreTraceHook (where)
-  FILE *where;
+PreTraceHook (FILE *where)
 {
     fprintf(where, "Trace On:\n");
 }
 
 void
-PostTraceHook (where)
-  FILE *where;
+PostTraceHook (FILE *where)
 {
     fprintf(where, "\nTrace Off.\n");
 }

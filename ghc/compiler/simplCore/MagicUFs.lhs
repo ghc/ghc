@@ -16,6 +16,7 @@ module MagicUFs (
 IMP_Ubiq(){-uitous-}
 IMPORT_DELOOPER(IdLoop)		-- paranoia checking
 
+import Id		( addInlinePragma )
 import CoreSyn
 import SimplEnv		( SimplEnv )
 import SimplMonad	( SYN_IE(SmplM), SimplCount )
@@ -446,11 +447,11 @@ foldl_fun env (TypeArg ty1:TypeArg ty2:ValArg arg_k:ValArg arg_z:ValArg arg_list
 				      t] ->
 
         let
-	  c     = addIdUnfolding pre_c (iWantToBeINLINEd UnfoldAlways)
+	  c     = addInlinePragma pre_c
 	  c_rhs = Lam b (Lam g' (Lam a
 		  (Let (NonRec t (App (App (argToExpr arg_k) (VarArg a)) (VarArg b)))
 			 (App (Var g') (VarArg t)))))
-	  n     = addIdUnfolding pre_n (iWantToBeINLINEd UnfoldAlways)
+	  n     = addInlinePragma pre_n
 	  n_rhs = Lam a' (Var a')
         in
         returnSmpl (Let (NonRec c c_rhs) $
@@ -489,13 +490,13 @@ foldl_fun env (TypeArg ty1:TypeArg ty2:ValArg arg_k:ValArg arg_z:ValArg arg_list
 				      t] ->
 
         let
-	  c     = addIdUnfolding pre_c (iWantToBeINLINEd UnfoldAlways)
+	  c     = addInlinePragma pre_c
 	  c_rhs = Lam b (Lam g_ (Lam a
 		  (Let (NonRec t (App (App (argToExpr arg_k) (VarArg a)) (VarArg b)))
 			 (App (Var g_) (VarArg t)))))
-	  n     = addIdUnfolding pre_n (iWantToBeINLINEd UnfoldAlways)
+	  n     = addInlinePragma pre_n
 	  n_rhs = Lam a' (Var a')
-	  r     = addIdUnfolding pre_r (iWantToBeINLINEd UnfoldAlways)
+	  r     = addInlinePragma pre_r
 	  r_rhs = mkGenApp (Var foldrId)
 					[TypeArg ty2,TypeArg (mkFunTys [ty1] ty1),
 					 ValArg (VarArg c),

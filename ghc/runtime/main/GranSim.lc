@@ -2,7 +2,7 @@
 % (c) The GRASP/AQUA Project, Glasgow University, 1995 - 1996
 %     Hans Wolfgang Loidl
 %
-% Time-stamp: <Wed Jun 19 1996 16:38:25 Stardate: [-31]7683.25 hwloidl>
+% Time-stamp: <Thu Jul 25 1996 04:01:57 Stardate: [-31]7860.63 hwloidl>
 %
 %************************************************************************
 %*                                                                      *
@@ -77,6 +77,9 @@ char *proc_status_names[] = {
 unsigned CurrentProc = 0;
 rtsBool IgnoreEvents = rtsFalse; /* HACK only for testing */
 
+#if 0 && (defined(GCap) || defined(GCgn))
+closq ex_RBH_q = NULL;
+#endif
 #endif  /* GRAN */
 \end{code}
 
@@ -438,6 +441,50 @@ grab_event()             /* undo prepend_event i.e. get the event */
 
  EventHd = EVENT_NEXT(EventHd);
  return (event);
+}
+
+void 
+traverse_eventq_for_gc()
+{
+ eventq event = EventHd;
+ W_ bufsize;
+ P_ closure, tso, buffer, bufptr;
+ PROC proc, creator;
+
+ /* Traverse eventq and replace every FETCHREPLY by a FETCHNODE for the
+    orig closure (root of packed graph). This means that a graph, which is
+    between processors at the time of GC is fetched again at the time when
+    it would have arrived, had there been no GC. Slightly inaccurate but
+    safe for GC.
+    This is only needed for GUM style fetchng. */
+ if (!RTSflags.GranFlags.DoGUMMFetching)
+   return;
+
+ for(event = EventHd; event!=NULL; event=EVENT_NEXT(event)) {
+   if (EVENT_TYPE(event)==FETCHREPLY) {
+     buffer = EVENT_NODE(event);
+     ASSERT(buffer[PACK_FLAG_LOCN]==MAGIC_PACK_FLAG);  /* It's a pack buffer */
+     bufsize = buffer[PACK_SIZE_LOCN];
+     closure= (P_)buffer[PACK_HDR_SIZE];
+     tso = (P_)buffer[PACK_TSO_LOCN];
+     proc = EVENT_PROC(event);
+     creator = EVENT_CREATOR(event);                 /* similar to unpacking */
+     for (bufptr=buffer+PACK_HDR_SIZE; bufptr<(buffer+bufsize);
+	  bufptr++) {
+	 if ( (INFO_TYPE(INFO_PTR(*bufptr)) == INFO_SPEC_RBH_TYPE) ||
+	      (INFO_TYPE(INFO_PTR(*bufptr)) == INFO_GEN_RBH_TYPE) ) {
+	     convertFromRBH((P_)*bufptr);
+	 }
+     }
+     free(buffer);
+     EVENT_TYPE(event) = FETCHNODE;
+     EVENT_PROC(event) = creator;
+     EVENT_CREATOR(event) = proc;
+     EVENT_NODE(event) = closure;
+     EVENT_TSO(event) = tso;
+     EVENT_GC_INFO(event) =  0;
+   }
+ }
 }
 
 void
@@ -984,7 +1031,7 @@ I_ len;
         fprintf(gr_file,"PE %2u [%s]: %-9s\t%lx\t%s\t[SN %u]\n", 
 	/* using spark name as optional argument     ^^^^^^ */
 	        proc,time_string,gran_event_names[name],
-	        id,node_str,(len & NEW_SPARKNAME_MASK));
+	        id,node_str,len);
         break;
      case GR_FETCH:
      case GR_REPLY:
@@ -1035,8 +1082,8 @@ I_ len;
     return;
 
   id = tso == NULL ? -1 : TSO_ID(tso);
-  if (node==Nil_closure)
-      strcpy(node_str,"________");  /* "Nil_closure"); */
+  if (node==Prelude_Z91Z93_closure)
+      strcpy(node_str,"________");  /* "Z91Z93_closure"); */
   else
       sprintf(node_str,"0x%-6lx",node);
 
@@ -1068,7 +1115,7 @@ I_ len;
         fprintf(gr_file,"PE %2u [%s]: %-9s\t%lx\t%s\t[SN %u]\n", 
 	/* using spark name as optional argument     ^^^^^^ */
 	        proc,time_string,gran_event_names[name],
-	        id,node_str,(len & NEW_SPARKNAME_MASK));
+	        id,node_str,len);
         break;
      default:
         fprintf(stderr,"Error in DumpStartEventAt: event %s is not a START event\n",

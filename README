@@ -1,9 +1,10 @@
 This is the root directory for functional-programming tools
 distributed by the Computing Science Department at Glasgow University.
-Simon Peyton Jones <simonpj@dcs.glasgow.ac.uk> is the ringleader
-of this effort.  The tools are:
+Simon Peyton Jones <simonpj@dcs.gla.ac.uk> is the ringleader of this
+effort.  The tools are:
 
     ghc		the Glasgow Haskell compilation system
+    hslibs	collection of Haskell libraries
     haggis	the Haggis GUI toolkit
     happy	the Happy Haskell parser generator
     nofib	the NoFib Haskell benchmarking suite

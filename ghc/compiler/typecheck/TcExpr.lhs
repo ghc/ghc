@@ -377,7 +377,8 @@ tcExpr (RecordUpd record_expr rbinds)
 	-- Check that the field names are plausible
     zonkTcType record_ty		`thenNF_Tc` \ record_ty' ->
     let
-	(tycon, inst_tys, data_cons) = trace "TcExpr.getAppDataTyCon" $ getAppDataTyCon record_ty'
+	(tycon, inst_tys, data_cons) = --trace "TcExpr.getAppDataTyCon" $
+				       getAppDataTyCon record_ty'
 	-- The record binds are non-empty (syntax); so at least one field
 	-- label will have been unified with record_ty by tcRecordBinds;
 	-- field labels must be of data type; hencd the getAppDataTyCon must succeed.

@@ -203,7 +203,7 @@ StgFunPtr impossible_jump_after_switch(STG_NO_ARGS);
 
 /* hooks: user might write some of their own */
 void ErrorHdrHook	PROTO((FILE *));
-void OutOfHeapHook	PROTO((W_));
+void OutOfHeapHook	PROTO((W_, W_));
 void StackOverflowHook	PROTO((I_));
 #ifdef CONCURRENT
 void NoRunnableThreadsHook (STG_NO_ARGS);

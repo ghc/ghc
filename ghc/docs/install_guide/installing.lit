@@ -1,18 +1,18 @@
 %
-% $Header: /srv/cvs/cvs.haskell.org/fptools/ghc/docs/install_guide/Attic/installing.lit,v 1.3 1996/06/30 16:45:00 partain Exp $
+% $Header: /srv/cvs/cvs.haskell.org/fptools/ghc/docs/install_guide/Attic/installing.lit,v 1.4 1996/07/25 20:47:34 partain Exp $
 %
 \begin{onlystandalone}
 \documentstyle[11pt,literate]{article}
 \begin{document}
 \title{Installing the Glasgow Functional Programming Tools\\
-Version~0.26}
-\author{The AQUA Team (scribe: Will Partain)\\
+Version~2.01}
+\author{The GHC Team\\
 Department of Computing Science\\
 University of Glasgow\\
 Glasgow, Scotland\\
 G12 8QQ\\
 \\
-Email: glasgow-haskell-\{users,bugs\}-request\@dcs.glasgow.ac.uk}
+Email: glasgow-haskell-\{users,bugs\}-request\@dcs.gla.ac.uk}
 \maketitle
 \begin{rawlatex}
 \tableofcontents
@@ -30,11 +30,6 @@ For most people, it should be easy to install one or more of the
 Glasgow functional-programming tools (the `Glasgow tools'), most often
 just the Glasgow Haskell compiler (GHC).  This document will guide you
 through the installation process, and point out the known pitfalls.
-
-Note: As of version~0.26, this document describes how to build {\em
-all} of the Glasgow tools, not just the Haskell compiler.  The
-\tr{configure} script, etc., has changed to cope with this wider
-mandate; something to bear in mind...
 
 %************************************************************************
 %*									*
@@ -73,6 +68,10 @@ intermediate C (\tr{.hc}) files that we provide.
 Building GHC on an unsupported platform falls into this category.
 Please see \sectionref{booting-from-C}.
 
+NB: For GHC~2.01, bootstrapping from \tr{.hc} files means you will get
+an all-2.01 system---possibly unduly slow.  Building with GHC~0.29
+will get you a faster compiler...
+
 Once you have built GHC, you can build the other Glasgow tools with
 it.
 
@@ -82,7 +81,7 @@ recommended, but see \sectionref{building-with-HBC}.
 
 %************************************************************************
 %*									*
-\subsection[port-info]{What machines the Glasgow tools, version~0.26, run on}
+\subsection[port-info]{What machines the Glasgow tools, version~2.01, run on}
 \index{ports, GHC}
 \index{GHC ports}
 \index{supported platforms}
@@ -113,19 +112,16 @@ supports the underlying BSDisms.
 The GHC hierarchy of Porting Goodness: (a)~Best is a native-code
 generator; (b)~next best is a ``registerised''
 port; (c)~the bare minimum is an ``unregisterised'' port.
-``Unregisterised'' Haskell programs are much bigger and slower,
-but the port is much easier to get going.
+``Unregisterised'' is so terrible that we won't say more about it.
 
-With GHC~0.26, we add ``registerised'' support for some HP-PA, iX86,
-and MIPS platforms.
+We use Sun4s running SunOS~4.1.3 and Solaris 2.5, and DEC~Alphas
+running OSF/1~V2.0, so those are the ``fully-supported'' platforms,
+unsurprisingly.  Both have native-code generators, for quicker
+compilations.  The native-code generator for iX86 platforms (e.g.,
+Linux ELF) is {\em nearly} working; but is not turned on by default.
 
-We use Sun4s running SunOS~4.1.3 and DEC~Alphas running OSF/1~V2.0,
-so those are the ``fully-supported'' platforms, unsurprisingly.  Both
-have native-code generators, for quicker compilations.
-
-Here's everything that's known about GHC ports, as of 0.26. We
-identify platforms by their ``canonical GNU-style'' names.  We
-identify
+Here's everything that's known about GHC ports, as of 2.01. We
+identify platforms by their ``canonical GNU-style'' names.
 
 Note that some ports are fussy about which GCC version you use; or
 require GAS; or ...
@@ -153,33 +149,38 @@ libraries (see \sectionref{Pre-supposed} for details).
 %-------------------------------------------------------------------
 \item[HP-PA box running HP/UX 9.x:]
 \index{hppa1.1-hp-hpux: registerised port}
-GHC~0.26 works registerised.  No native-code generator.
+Works registerised.  No native-code generator.
 For GCC, you're best off with one of the Utah releases of
 GCC~2.6.3 (`u3' or later), from \tr{jaguar.cs.utah.edu}.
-We don't know if straight GCC 2.7.x works or not.
+We think a straight GCC 2.7.x works, too.
 
 Concurrent/Parallel Haskell probably don't work (yet).
 \index{hppa1.1-hp-hpux: concurrent---no}
 \index{hppa1.1-hp-hpux: parallel---no}
 
 %-------------------------------------------------------------------
-\item[\tr{i386-*-linuxaout} (PCs running Linux---\tr{a.out} format):]
-\index{i386-*-linuxaout: registerised port}
-GHC~0.26 works registerised (no native-code generator).
+\item[\tr{i386-*-linux} (PCs running Linux---ELF format):]
+\index{i386-*-linux: registerised port}
+GHC~2.01 works registerised.
 You {\em must} have GCC 2.7.x or later.
+The iX86 native-code generator is {\em nearly} there, but it
+isn't turned on by default.
 
-Concurrent/Parallel Haskell probably don't work (yet).
-\index{i386-*-linuxaout: concurrent---no}
-\index{i386-*-linuxaout: parallel---no}
-\index{i386-*-linuxaout: profiling---maybe}
-Profiling might work, but it is untested.
+Profiling works, and Concurrent Haskell works.
+\index{i386-*-linux: profiling---yes}
+\index{i386-*-linux: concurrent---yes}
+Parallel Haskell probably works.
+\index{i386-*-linux: parallel---maybe}
+
+On old Linux a.out systems: should be the same.
+\index{i386-*-linuxaout: registerised port}
 
 %-------------------------------------------------------------------
 \item[\tr{mips-sgi-irix5}:]
 \index{mips-sgi-irix5: registerised port}
-GHC~0.26 works registerised (no native-code generator).
+GHC~2.01 works registerised (no native-code generator).
 I suspect any GCC~2.6.x (or later) is OK.  The GCC that I used
-was built with \tr{--with-gnu-as}.
+was built with \tr{--with-gnu-as}; turns out that is important!
 
 Concurrent/Parallel Haskell probably don't work (yet).
 Profiling might work, but it is untested.
@@ -211,7 +212,8 @@ Concurrent/Parallel Haskell probably won't work (yet).
 %-------------------------------------------------------------------
 \item[\tr{m68k-sun-sunos4} (Sun3):]
 \index{m68k-sun-sunos4: registerised port}
-GHC~0.26 works registerised.  No native-code generator.
+GHC~2.01 hasn't been tried on a Sun3.  GHC~0.26 worked registerised.
+No native-code generator.
 
 Concurrent/Parallel Haskell probably don't work (yet).
 \index{m68k-sun-sunos4: concurrent---no}
@@ -254,6 +256,7 @@ All of the above are {\em estimates} of disk-space needs.
 Use an appropriate machine, compilers, and things.
 
 SPARC boxes and DEC Alphas running OSF/1 are fully supported.
+Linux, MIPS, and HP boxes are in pretty good shape.
 \Sectionref{port-info} gives the full run-down on ports or lack
 thereof.
 
@@ -266,11 +269,11 @@ probably need a reasonably up-to-date GCC (GNU C compiler),
 too---\sectionref{port-info} lists any specific requirements in this
 regard.
 
-If you are going to be making documents [unlikely], you'll need
-\tr{makeindex} as well, and maybe \tr{tgrind} [unlikely].  If you edit
-the one or two \tr{flex} files in GHC, you'll need \tr{flex}, too
-[unlikely].
-
+% If you are going to be making documents [unlikely], you'll need
+% \tr{makeindex} as well, and maybe \tr{tgrind} [unlikely].  If you edit
+% the one or two \tr{flex} files in GHC, you'll need \tr{flex}, too
+% [unlikely].
+% 
 If you end up yacc'ing the Haskell parser [unlikely], Sun's standard
 \tr{/bin/yacc} won't cut it.  Either the unbundled \tr{/usr/lang/yacc}
 or \tr{bison} will do fine.  Berkeley yacc (\tr{byacc}) won't do.
@@ -285,7 +288,7 @@ For GHC, please see the bug-reporting section of the User's guide
 (separate document), to maximise the usefulness of your report.
 
 If in doubt, please send a message to
-\tr{glasgow-haskell-bugs@dcs.glasgow.ac.uk}.
+\tr{glasgow-haskell-bugs@dcs.gla.ac.uk}.
 \end{enumerate}
 
 %************************************************************************
@@ -318,14 +321,14 @@ one bundle per \tr{.tar.gz} file.
 
 A basic GHC ``bundle'' gives you the compiler and the standard,
 sequential libraries.  The files are called
-\tr{ghc-0.26-<platform>.tar.gz}, where \tr{<platform>} is one of:
-alpha-dec-osf2, hppa1.1-hp-hpux9, i386-unknown-linuxaout,
-% i386-unknown-solaris2,
+\tr{ghc-2.01-<platform>.tar.gz}, where \tr{<platform>} is one of:
+alpha-dec-osf2, hppa1.1-hp-hpux9, i386-unknown-linux,
+i386-unknown-solaris2, i386-unknown-freebsd,
 m68k-sun-sunos4, mips-sgi-irix5,
 sparc-sun-sunos4, sparc-sun-solaris2.
 
 There are plenty of ``non-basic'' GHC bundles.  The files for them are
-called \tr{ghc-0.26-<bundle>-<platform>.tar.gz}, where the
+called \tr{ghc-2.01-<bundle>-<platform>.tar.gz}, where the
 \tr{<platform>} is as above, and \tr{<bundle>} is one of these:
 \begin{description}
 \item[\tr{prof}:]  Profiling with cost-centres.  You probably want this.
@@ -353,9 +356,9 @@ unpack them all together in the same place, thusly:
 
 \begin{verbatim}
 cd /put/them/in/here
-gunzip < ghc-0.26-sparc-sun-sunos4.tar.gz      | tar xf -
-gunzip < ghc-0.26-prof-sparc-sun-sunos4.tar.gz | tar xf -
-gunzip < ghc-0.26-conc-sparc-sun-sunos4.tar.gz | tar xf -
+gunzip < ghc-2.01-sparc-sun-sunos4.tar.gz      | tar xf -
+gunzip < ghc-2.01-prof-sparc-sun-sunos4.tar.gz | tar xf -
+gunzip < ghc-2.01-conc-sparc-sun-sunos4.tar.gz | tar xf -
 \end{verbatim}
 
 If you unpacked the files in a way that does {\em not} preserve
@@ -374,7 +377,7 @@ Here's what to do with the stuff in each directory, once unpacked.
 \begin{description}
 %---------------------------------------------------------------------
 \item[\tr{bin/<platform>} (sometimes just \tr{bin/}):]
-Copy these executables so that they will be in users' PATHs.
+Copy (or link to) these executables so that they will be in users' PATHs.
 
 %---------------------------------------------------------------------
 \item[\tr{lib}:]
@@ -394,7 +397,6 @@ Things you need to fiddle so the tools will spring to life:
 bin directory.
 
 \item
-CHOICE \#1 (BETTER):
 Edit your \tr{ghc}, \tr{mkdependHS}, and \tr{hstags} scripts:
 (a)~Create a correct \tr{#!...perl} first line in each one. (Ask a
 Unix-friendly person to help you, if you don't know what a
@@ -409,17 +411,22 @@ So, if your ``lib'' files are now in \tr{/home/myself/lib/ghc/...},
 then you should set \tr{GLASGOW_HASKELL_ROOT} to \tr{/home/myself}.
 
 \item
-CHOICE \#2:
-Set your \tr{GLASGOW_HASKELL_ROOT} environment variable, and
-don't edit the \tr{ghc}, \tr{mkdependHS}, and \tr{hstags} scripts
-at all.
+Actually setting the \tr{GLASGOW_HASKELL_ROOT} environment variable
+is a {\em bad} idea, mostly because it precludes having several
+GHC versions around at the same time.
 
-It's better to edit the scripts; that way, it's once for all.
+% \item
+% CHOICE \#2:
+% Set your \tr{GLASGOW_HASKELL_ROOT} environment variable, and
+% don't edit the \tr{ghc}, \tr{mkdependHS}, and \tr{hstags} scripts
+% at all.
+%
+% It's better to edit the scripts; that way, it's once for all.
 
 \item
 You {\em may} need to re-\tr{ranlib} your libraries (on Sun4s).
 \begin{verbatim}
-% cd <wherever-the-lib-files-are-now>/ghc/0.26/sparc-sun-sunos4
+% cd <wherever-the-lib-files-are-now>/ghc/2.01/sparc-sun-sunos4
 % foreach i ( `find . -name '*.a' -print` ) # or other-shell equiv...
 ?    ranlib $i
 ?    # or, on some machines: ar s $i
@@ -502,8 +509,7 @@ things you want to have anyway.  Please see \sectionref{Pre-supposed}.
 
 \item
 Be sure you have a suitable Haskell compiler, or else the intermediate
-C (\tr{.hc}) files.  In some cases, you might want an alternative set
-of interface (\tr{.hi}) files (quicker than generating a fresh set).
+C (\tr{.hc}) files..
 \Sectionref{install-strategy} lists the various strategies you might
 adopt.
 
@@ -524,7 +530,12 @@ find . -type f \! -name \*.hi \! -name \*.hc \! -name \*.jm -print \
 Run the \tr{configure} script.  It is a shell script that looks around
 to find out things about your system.  You can see the \tr{configure}
 options by passing it a \tr{--help} flag, or by reading
-\sectionref{Configuring}.
+\sectionref{Configuring}.  A typical invocation might be:
+\begin{verbatim}
+% cd <the-very-top-dir>
+% ./configure --prefix=/usr/local/fp \
+	      --with-hc=ghc-0.29 --with-mkdependHS=mkdependHS-0.29
+\end{verbatim}
 
 \item
 Once configured, build the basic support utilities and make your
@@ -606,21 +617,20 @@ Because the compiler heart of Glorious Glasgow Haskell is written in
 Haskell, you have to use some ``bootstrapping'' mechanism.
 
 Your best choice, if available, is to use a binary distribution for
-your platform; i.e., compile GHC~0.26 with a GHC~0.26 that we have
+your platform; e.g., compile GHC~2.01 with a GHC~0.29 that we have
 provided.  Please see \sectionref{installing-bin-distrib} for how to
 install a binary distribution.
 
-Your remaining choice is to use the intermediate C (\tr{.hc}) files that we
-supply.  This is the {\em only} choice for anyone trying to port to
-a new or weakly-supported system.
+Your remaining choice is to use the intermediate C (\tr{.hc}) files
+that we supply.  This is the {\em only} choice for anyone trying to
+port to a new or weakly-supported system.
 
 The main drawback of the supplied-\tr{.hc} approach is that you will
 have a lot of very bulky intermediate files on your disk for a while.
 
-One obscure note: if you're going to build GHC to have a native-code
-generator, you're well advised to get a suitable set of interface
-files (to save making them yourself).  Please see \sectionref{Compiler_reconfig}
-if you plan to end up with a native-code generator.
+(With GHC~2.01, another drawback is that the \tr{.hc} files will give
+you a 2.01-built-with-2.01---normally a good thing---but, in this case,
+probably slower than a 2.01-built-with-0.29.)
 
 % If you have to boot from C (\tr{.hc}) files, you should follow the
 % directions in \sectionref{booting-from-C}.
@@ -680,6 +690,8 @@ Do the main GHC build, just as \tr{STARTUP} suggests:
 \begin{verbatim}
 % cd ghc
 % make all >& make.log
+% cd ../hslibs
+% make all >& make.log
 \end{verbatim}
 If this fails or something seems suspicious, check the ``known
 pitfalls'' (\sectionref{build-pitfalls}).  If you can't figure out how
@@ -707,14 +719,14 @@ main = putStr "Hello, world!\n"
 First, give yourself a convenient way to execute the driver script
 \tr{ghc/driver/ghc}, perhaps something like...
 \begin{verbatim}
-% ln -s /local/src/ghc-0.26/ghc/driver/ghc ~/bin/sun4/ghc
+% ln -s /local/src/ghc-2.01/ghc/driver/ghc ~/bin/alpha/ghc
 % rehash
 \end{verbatim}
 
 Compile the program, using the \tr{-v} (verbose) flag to verify that
 libraries, etc., are being found properly:
 \begin{verbatim}
-% ghc -v -o hello -fhaskell-1.3 Main.hs
+% ghc -v -o hello Main.hs
 \end{verbatim}
 
 Now run it:
@@ -753,12 +765,16 @@ Assuming that everything's OK so far, all you need to do is:
 \begin{verbatim}
 % cd <very-top>/ghc
 % make install
+% cd <very-top>/hslibs
+% make install
 \end{verbatim}
 
 If you're a little dubious (as I usually am), you can always do a
 ``trial run'' first:
 \begin{verbatim}
 % cd <very-top>/ghc
+% make -n install >& temp-log-file-to-look-at
+% cd <very-top>/hslibs
 % make -n install >& temp-log-file-to-look-at
 \end{verbatim}
 
@@ -774,7 +790,7 @@ In both cases, if something breaks, it's a {\em bug}.
 %*									*
 %************************************************************************
 
-Because our documentation is in DVI/Info formats, and because there is
+Because our documentation is in DVI/Info/HTML formats, and because there is
 no standard practice about how such documents are ``installed,'' we
 haven't tried to automate this (at least not enough that we promise it
 works).
@@ -851,9 +867,12 @@ of GHC first.
 If you want to execute out of the source tree but would like to clear
 off lots and lots of stuff, you can do:
 \begin{verbatim}
-% cd ghc/lib	# scrub library C and object files
-% rm */*.hc
+% cd ghc/lib	# scrub library .hc and object files
+% rm */*.hc */*.*_hc
 % find . -name '*.o' -print | xargs /bin/rm
+
+% cd hslibs/	# ditto for syslibs
+% rm */src/*.hc */src/*.*_hc
 
 % cd ghc/compiler   # scrub compiler object files
 % rm */*.o
@@ -879,17 +898,17 @@ because no binaries have been provided, or because the machine
 is not ``fully supported.''
 
 To boot from C (\tr{.hc}) files, you need the regular source distribution
-(\tr{ghc-0.26-src.tar.gz}) and also some extra files in
-\tr{ghc-0.26-hc-files.tar.gz}.  DON'T FORGET any extra \tr{.hc}
+(\tr{ghc-2.01-src.tar.gz}) and also some extra files in
+\tr{ghc-2.01-hc-files.tar.gz}.  DON'T FORGET any extra \tr{.hc}
 files for profiling, concurrent, parallel, ...
 
 Whatever you want to build, just unpack all the files ``together'':
 \begin{verbatim}
 % cd <wherever>
-% gunzip -c ghc-0.26-src.tar.gz      | tar xf -
-% gunzip -c ghc-0.26-hc-files.tar.gz | tar xf -	     # basic...
-% gunzip -c ghc-0.26-prof-hc-files.tar.gz | tar xf - # profiling...
-% gunzip -c ghc-0.26-conc-hc-files.tar.gz | tar xf - # concurrent...
+% gunzip -c ghc-2.01-src.tar.gz      | tar xf -
+% gunzip -c ghc-2.01-hc-files.tar.gz | tar xf -	     # basic...
+% gunzip -c ghc-2.01-prof-hc-files.tar.gz | tar xf - # profiling...
+% gunzip -c ghc-2.01-conc-hc-files.tar.gz | tar xf - # concurrent...
 ... etc ...
 \end{verbatim}
 
@@ -1027,6 +1046,9 @@ It's now time to type \tr{cd ghc; make all}!  This ``should'' work,
 especially, on a known machine.  Also, it can take a VERY long time
 (esp. on oldish machines), so it's good to run overnight, on a quiet
 machine, nice'd, etc., etc.
+
+You will probably continue by building the system libraries:
+\tr{cd hslibs; make all}...
 
 When it's all built, test your alleged GHC system, as suggested in
 \sectionref{GHC_test}.
@@ -1435,30 +1457,19 @@ an initial boot are: (a)~to get a native-code generator, or (b)~if you
 are going to hack on GHC.
 
 The reason you must rebuild to get a native-code generator: The
-\tr{.hc} files will {\em not} turn into a native-code generator, and
-the distributed \tr{.hi} files ``match'' those \tr{.hc} files.
+\tr{.hc} files that we supply do {\em not} include a native-code generator.
+(They are supposed to work on and for any machine.)
 
 From here on, I presume you've installed your booted GHC as
-\tr{ghc-0.26}.
+\tr{ghc-2.01}.
 
-If you are going for a native-code generator, you can save yourself
-some re-compiling by getting a suitable set of interface (\tr{.hi})
-files, for GHC for your machine.  You should end up doing, for example:
-\begin{verbatim}
-cd ghc-0.26/ghc/compiler # note where you are!
-
-rm */*.o    # scrub the old compiler files
-
-gunzip -c ghc-0.26-hi-files-alpha.tar.gz | tar xfv -
-\end{verbatim}
-
-Now you can configure as before, but using \tr{--with-hc=ghc-0.26}
+You can configure as before, but using \tr{--with-hc=ghc-2.01}
 (\tr{config.status} records what you did before).
 
 Running \tr{sh < STARTUP} isn't strictly necessary; you only need to
 rebuild in \tr{ghc/compiler}:
 \begin{verbatim}
-cd ghc-0.26/ghc/compiler
+cd ghc-2.01/ghc/compiler
 make Makefile	# if you didn't STARTUP...
 
 make all EXTRA_HC_OPTS=-fvia-C	# -fvia-C important!
@@ -1477,14 +1488,22 @@ type \tr{make install} in \tr{ghc/compiler} to finish the job.
 %*									*
 %************************************************************************
 
-GHC~0.26 doesn't build with HBC.  (It could, but we haven't put in
-the effort to maintain it.)
+GHC~2.01 doesn't build with HBC.
 
-GHC~0.26 is best built with itself, GHC~0.26.  We heartily recommend
-it.  GHC~0.26 can certainly be built with GHC~0.23 or 0.24, and with
-some earlier versions, with some effort.
+GHC~2.01 can be built with:
+\begin{description}
+\item[GHC~0.26:]
+Provided you don't use \tr{-O} (i.e., configure with
+\tr{--disable-hsc-optimised})...
 
-GHC has never been built with compilers other than GHC and HBC.
+\item[GHC~0.29:]
+Works fine, and builds the fastest compiler; but be sure to configure
+with \tr{--with-mkdependHS=blah}, where \tr{blah} is a name to invoke
+the \tr{mkdependHS} that comes with GHC~0.29.
+
+\item[Itself:]
+It works, but the resulting compiler is slower.
+\end{description}
 
 %$$ If you are going to build the compiler with HBC,
 %$$ please get the appropriate set of \tr{.hi} interface
@@ -1513,8 +1532,9 @@ GHC has never been built with compilers other than GHC and HBC.
 %************************************************************************
 
 Here are the gory details about some utility programs you may need;
-\tr{perl} and \tr{gcc} are the only important ones. (PVM is important if you're going for Parallel Haskell.) The
-\tr{configure} script will tell you if you are missing something.
+\tr{perl} and \tr{gcc} are the only important ones. (PVM is important
+if you're going for Parallel Haskell.) The \tr{configure} script will
+tell you if you are missing something.
 
 \begin{description}
 \item[Perl:]
@@ -1524,24 +1544,17 @@ Here are the gory details about some utility programs you may need;
 for doing shell-scripty tasks that involve lots of text processing.
 It is pretty easy to install.
 
-(We still assume Perl version 4; experience suggests that Perl~5
-is fine, too.)
+(Perl~5 is the current version; GHC is still friendly to Perl~4 as well.)
 
 Perl should be put somewhere so that it can be invoked by the \tr{#!}
 script-invoking mechanism. (I believe \tr{/usr/bin/perl} is preferred;
 we use \tr{/usr/local/bin/perl} at Glasgow.)  The full pathname should
 be less than 32 characters long.
 
-Perl version 4.035 has a bug to do with recursion that will bite if
-you run the \tr{lit2texi} script, when making Info files from
-``literate'' files of various sorts.  Either use a more recent version
-(4.036, or 5.00n) or an older version
-(e.g., perl 4.019).
-
 \item[GNU C (\tr{gcc}):]
 \index{pre-supposed: GCC (GNU C compiler)}
 \index{GCC (GNU C compiler), pre-supposed}
-The current version is 2.7.0, and has no problems that we know of.
+The current version is 2.7.2, and has no problems that we know of.
 
 If your GCC dies with ``internal error'' on some GHC source file,
 please let us know, so we can report it and get things improved.
@@ -1555,7 +1568,7 @@ PVM is the Parallel Virtual Machine on which Parallel Haskell programs
 run.  Underneath PVM, you can have (for example) a network of
 workstations (slow) or a multiprocessor box (faster).
 
-The current version of PVM is 3.3.7.  It is readily available on
+The current version of PVM is 3.3.11; we use 3.3.7.  It is readily available on
 the net; I think I got it from \tr{research.att.com}, in \tr{netlib}.
 
 A PVM installation is slightly quirky, but easy to do.  Just follow
@@ -1655,7 +1668,7 @@ these are OK.
 
 %------------------------------------------------------------------------
 \item
-In 0.26, when compiling via C, you'll sometimes get ``warning:
+When compiling via C, you'll sometimes get ``warning:
 assignment from incompatible pointer type'' out of GCC.  Harmless.
 
 %------------------------------------------------------------------------
@@ -1937,6 +1950,25 @@ compiler, please compile from intermediate C files (produced by GHC
 somewhere else).''
 
 %--------------------------------------------------------------
+\item[\tr{--with-mkdependHS=}{\em mkdep}:]
+\index{--with-mkdependHS configure option}
+
+Use {\em mkdep} as your \tr{mkdependHS} program.  You should use the
+\tr{mkdependHS} that came with the GHC which you are probably
+specifying via \tr{--with-hc=...}.
+
+%--------------------------------------------------------------
+\item[\tr{--with-gcc=}{\em blah}:]
+\index{--with-gcc configure option}
+Use {\em blah} as my ``GNU C compiler.''  In case you have several,
+and want to chose a particular one.
+
+%--------------------------------------------------------------
+\item[\tr{--with-make=}{\em blub}:]
+\index{--with-make configure option}
+Ditto, for ``make''.
+
+%--------------------------------------------------------------
 \item[\tr{--with-tmpdir=}{\em directory}:]
 Set the directory where temporary files should be created.  This is
 \tr{/tmp} by default, which is Sometimes Uncool (because, e.g.,
@@ -1970,16 +2002,14 @@ Some common combinations would be:
 ./configure --prefix=/users/fp/partain --with-hc=c --disable-profiling
     # use .hc files; don't bother with profiling
 
-./configure --with-hc=ghc-0.26 --with-readline-library --with-sockets-library
-    # simple build with itself; for Sun4s & Alphas, you
-    # should grab & use ghc-0.26-hi-files-<blah>.tar.gz
-    # (because those machines have a native-code generator).
+./configure --with-hc=ghc-0.29 --with-readline-library --with-sockets-library
+    # simple build with 0.29
     # For the extra libraries, you've got to have the right
     # stuff to link to.
 
-./configure --with-hc=ghc-0.26 --disable-hsc-optimised --enable-hsc-debug
+./configure --with-hc=ghc-0.29 --disable-hsc-optimised --enable-hsc-debug
     # Don't use -O on GHC itself; turn on -DDEBUG.
-    # Slows things way down, but it's the right thing if
+    # Slows things down, but it's The Right Thing if
     # you're hacking on GHC and doing lots of recompilations.
 
 ./configure --with-hc=c --enable-concurrent --enable-parallel --with-tmpdir=/usr/tmp
@@ -1990,6 +2020,17 @@ Some common combinations would be:
 
 Remember, if you build \tr{--with-hc=c} on a Sun4 or Alpha, you
 do {\em not} have a native-code generator.
+
+%************************************************************************
+%*									*
+\subsection[Configuring-HsLibs]{Haskell-libraries-specific things in \tr{configure}}
+\index{Configuring the Haskell libraries}
+%*									*
+%************************************************************************
+
+The normal thing is: \tr{--enable-hslibs --with-hc-for-hslibs=in-place}.
+
+NOT DONE YET.
 
 %************************************************************************
 %*									*
@@ -2022,8 +2063,11 @@ MORE TO COME.
 %*									*
 %************************************************************************
 
-Use \tr{--enable-nofib}.  If you have NoFib and GHC in the same build
+Use \tr{--enable-nofib --with-setup=ghc}.
+If you have NoFib and GHC in the same build
 tree but only want to build the NoFib suite, use \tr{--disable-ghc}.
+
+(If you were testing HBC on NoFib, you'd do \tr{--with-setup=hbc}, of course.)
 
 You may want to enable or disable various sets of tests, as
 suggested by \tr{./configure --help}.  If you use \tr{--enable-all-tests},
@@ -2110,18 +2154,18 @@ ghc/compiler/	& The Haskell compiler proper, called \tr{hsc}; \\
 		& \\
 ghc/runtime/	& The runtime system, including the garbage-collector(s).\\
 		& \\
-ghc/lib/prelude/& Source for the linked-in code for the ``standard prelude''. \\
-ghc/lib/glaExts/ & Source for the linked-in code for our Glasgow extensions. \\
-ghc/lib/haskell-1.3/ & Source for the linked-in code for Haskell 1.3 I/O. \\
-ghc/lib/hbc/	& Source for the HBC `system library'. \\
-ghc/lib/ghc/	& Source for the GHC `system library'.\\
-		& \\
-ghc/includes/	& The ``public'' .hi files slurped by the parser, \\
-		& and .h files \tr{#include}d in generated .hc files come from.\\
+ghc/lib/	& Source for the linked-in code for the ``standard prelude''. \\
+ghc/includes/	& The .h files \tr{#include}d in generated .hc files.\\
 		& \\
 ghc/docs/	& documents; see the README file there. \\
 		& \\
 ghc/CONTRIB/	& reserved for contributed things \\
+		& \\
+hslibs/ghc/	& `ghc' system library (syslib) \\
+hslibs/hbc/	& `hbc' system library \\
+hslibs/posix/	& `posix' system library \\
+hslibs/contrib/ & `contrib' system library \\
+		& \\
 haggis/		& Haggis Haskell X11 GUI toolkit \\
 happy/		& Happy Haskell parser generator \\
 nofib/		& NoFib Haskell benchmark and test suite \\

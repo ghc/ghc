@@ -149,9 +149,7 @@ try_split_bind id expr =
 
 	worker_ty = mkForallTy (templ  ++ [alphaTyVar])
 			(foldr mkFunTy n_ty_templ (arg_tys++[c_ty_templ,n_ty_templ]))
-	wrapper_id  = id `replaceIdInfo`
-			      (getIdInfo id	`addInfo_UF`
-			       iWantToBeINLINEd UnfoldAlways)
+	wrapper_id  = addInlinePragma id
 	worker_id  = mkWorkerId worker_new_uq id worker_ty
 				noIdInfo
 		-- TODO : CHECK if mkWorkerId is thr

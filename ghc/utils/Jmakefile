@@ -2,12 +2,15 @@
 
 SUBDIRS = hp2ps		\
 	  hscpp		\
-	  hstags	\
 	  mkdependHS	\
 	  parallel	\
 	  stat2resid	\
 	  ugen		\
 	  unlit
+
+/*	  hstags
+    not ready to go for 2.01
+*/
 
 /* "heap-view" is not in the list because (a) it requires
    a Haskell compiler (which you may not have yet), and (b) you are

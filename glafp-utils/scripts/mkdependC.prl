@@ -21,6 +21,20 @@ $Col_width = 78; # ignored
 $Makefile = '';
 @Src_files = ();
 
+# the following is a hack, so we can use RAWCPP, but there you go;
+# put in just enough #defines that mkdependC will not barf.
+$HostPlatform = '$(HOSTPLATFORM)';
+
+if ( $HostPlatform =~ /^i386-/ ) {
+    push(@Defines, '-D__i386__');
+}
+if ( $HostPlatform =~ /^sparc-/ ) {
+    push(@Defines, '-D__sparc__');
+}
+if ( $HostPlatform =~ /-solaris2$/ ) {
+    push(@Defines, '-D__svr4__');
+}
+
 &mangle_command_line_args();
 
 if ( ! $Makefile && -f 'makefile' ) {
@@ -135,7 +149,7 @@ sub slurp_file { # follows an example in the `open' item in perl man page
 
     $fname = &tidy_dir_names($fname);
 
-    unless (open($fhandle, "$(GNUCPP) $Include_dirs @Defines $fname |")) {
+    unless (open($fhandle, "$(RAWCPP) $Include_dirs @Defines $fname |")) {
          die "$Pgm: Can't open $fname: $!\n";
     }
     line: while (<$fhandle>) {

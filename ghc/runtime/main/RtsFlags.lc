@@ -288,7 +288,7 @@ usage_text[] = {
 "  -O        Disable output for performance measurement",
 # endif /* PAR */
 # ifdef GRAN  /* ToDo: fill in decent Docu here */
-"  -b...     All GranSim options start with -b, and there are many of them",
+"  -b...     All GranSim options start with -b; see GranSim User's Guide for details",
 # endif
 #endif /* CONCURRENT */
 "",
@@ -548,8 +548,13 @@ error = rtsTrue;
 			RTSflags.CcFlags.sortBy = rts_argv[arg][2];
 		    break;
 		  default:
+		    PAR_BUILD_ONLY(
+		    break; /* we do not care about sortBy for parallel */
+		    )
+		    PROFILING_BUILD_ONLY(
 		    fprintf(stderr, "Invalid profiling sort option %s\n", rts_argv[arg]);
 		    error = rtsTrue;
+		    )
 		}
 		) break;
 
@@ -1243,6 +1248,17 @@ allowed\n",
 	  /* features in connection with exploiting granularity */
 	  /* information. I.e. if -bY is chosen these options */
 	  /* tell the RTS what to do with the supplied info --HWL */
+
+        case 'W':
+	  if (rts_argv[arg][3] != '\0') {
+	    RTSflags.GranFlags.packBufferSize_internal = decode(rts_argv[arg]+3);
+	  } else {
+	    RTSflags.GranFlags.packBufferSize_internal = GRANSIM_DEFAULT_PACK_BUFFER_SIZE;
+	  }
+	  fprintf(stderr,"Size of GranSim internal pack buffer: %u.\n",
+		  RTSflags.GranFlags.packBufferSize_internal);
+	  break;
+  		      
         case 'X':
 	  switch(rts_argv[arg][3]) {
 	    
@@ -1448,6 +1464,11 @@ allowed\n",
 	    case 'B':
 	      fprintf(stderr,"Debug busyness.\n");
 	      RTSflags.GranFlags.debug |= 0x4000; 
+	      break;
+
+	    case 'P':
+	      fprintf(stderr,"Debug pack buffer handling.\n");
+	      RTSflags.GranFlags.debug |= 0x8000; 
 	      break;
 
 	    case 's':

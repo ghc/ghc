@@ -24,11 +24,11 @@ all top-level, exported functions.
 {\em All} top-level functions, exported or not, will be automatically
 \tr{_scc_}'d.
 
-% secret!
-%\item[\tr{-caf-all}:]
-%\index{-caf-all option}
-%The costs of all CAFs in a module are usually attributed to one
-%``big'' CAF cost-centre. With this option, all CAFs get their own cost-centre.
+\item[\tr{-caf-all}:]
+\index{-caf-all option}
+The costs of all CAFs in a module are usually attributed to one
+``big'' CAF cost-centre. With this option, all CAFs get their own cost-centre.
+An ``if all else fails'' option...
 
 %\item[\tr{-dict-all}:]
 %\index{-dict-all option}

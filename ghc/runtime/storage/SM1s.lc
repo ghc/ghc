@@ -133,7 +133,7 @@ collectHeap(reqsize, sm, do_full_collection)
 #if defined(GRAN)
     LinkEvents();
 #endif
-#if defined(CONCURRENT) /* && !defined(GRAN) */
+#if defined(CONCURRENT)
     LinkSparks();
 #endif
 #ifdef PAR
@@ -148,10 +148,8 @@ collectHeap(reqsize, sm, do_full_collection)
     LINK_LOCATION_TO_CLOSURE(&sm->StablePointerTable);
 
     */
-# if /* !defined(GRAN) */  /* HWL */
     LinkAStack( MAIN_SpA, stackInfo.botA );
     LinkBStack( MAIN_SuB, stackInfo.botB );
-# endif
 #endif /* parallel */
 
     /* Do Inplace Compaction */

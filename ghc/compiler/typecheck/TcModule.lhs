@@ -128,7 +128,11 @@ tcModule rn_env
 	-- pragmas, which is done lazily [ie failure just drops the pragma
 	-- without having any global-failure effect].
 
+    -- trace "tc1" $
+
     fixTc (\ ~(_, _, _, _, _, _, sig_ids) ->
+
+	-- trace "tc2" $
 	tcExtendGlobalValEnv sig_ids (
 
 	-- The knot for instance information.  This isn't used at all
@@ -140,6 +144,7 @@ tcModule rn_env
 	    tcTyAndClassDecls1 rec_inst_mapper ty_decls_bag cls_decls_bag
 					`thenTc` \ env ->
 
+	    --trace "tc3" $
 		-- Typecheck the instance decls, includes deriving
 	    tcSetEnv env (
 	    --trace "tcInstDecls:"	$
@@ -147,11 +152,14 @@ tcModule rn_env
 			 mod_name rn_env fixities 
 	    )				`thenTc` \ (inst_info, deriv_binds, ddump_deriv) ->
 
+	    --trace "tc4" $
 	    buildInstanceEnvs inst_info	`thenTc` \ inst_mapper ->
 
 	    returnTc (inst_mapper, env, inst_info, deriv_binds, ddump_deriv)
 
 	) `thenTc` \ (_, env, inst_info, deriv_binds, ddump_deriv) ->
+
+	--trace "tc5" $
 	tcSetEnv env (
 
 	    -- Default declarations
@@ -181,11 +189,13 @@ tcModule rn_env
 	    --   we silently discard the pragma
 	tcInterfaceSigs sigs		`thenTc` \ sig_ids ->
 	tcGetEnv			`thenNF_Tc` \ env ->
+	--trace "tc6" $
 
 	returnTc (env, inst_info, data_binds, deriv_binds, ddump_deriv, defaulting_tys, sig_ids)
 
     )))) `thenTc` \ (env, inst_info, data_binds, deriv_binds, ddump_deriv, defaulting_tys, _) ->
 
+    --trace "tc7" $
     tcSetEnv env (				-- to the end...
     tcSetDefaultTys defaulting_tys (		-- ditto
 
@@ -197,6 +207,7 @@ tcModule rn_env
 	(val_decls `ThenBinds` deriv_binds)
 	(	-- Second pass over instance declarations,
 		-- to compile the bindings themselves.
+	    --trace "tc8" $
 	    tcInstDecls2  inst_info	`thenNF_Tc` \ (lie_instdecls, inst_binds) ->
 	    tcClassDecls2 cls_decls_bag	`thenNF_Tc` \ (lie_clasdecls, cls_binds) ->
 	    tcGetEnv			`thenNF_Tc` \ env ->
@@ -212,6 +223,7 @@ tcModule rn_env
 	-- restriction, and no subsequent decl instantiates its
 	-- type.  (Usually, ambiguous type variables are resolved
 	-- during the generalisation step.)
+    --trace "tc9" $
     tcSimplifyTop lie_alldecls			`thenTc` \ const_insts ->
 
 	-- Backsubstitution.  Monomorphic top-level decls may have

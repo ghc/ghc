@@ -2,13 +2,13 @@
 \documentstyle[11pt,literate]{article}
 \begin{document}
 \title{The Glorious Haskell Compilation System\\ Profiling Guide}
-\author{The AQUA Team (Patrick M. Sansom)\\
+\author{The GHC Team (Patrick M. Sansom)\\
 Department of Computing Science\\
 University of Glasgow\\
 Glasgow, Scotland\\
 G12 8QQ\\
 \\
-Email: glasgow-haskell-\{users,bugs\}-request\@dcs.glasgow.ac.uk}
+Email: glasgow-haskell-\{users,bugs\}-request\@dcs.gla.ac.uk}
 \maketitle
 \begin{rawlatex}
 \tableofcontents
@@ -25,7 +25,7 @@ execution behaviour, so you can improve it.
 
 %This profiling system is still under development.
 %Please e-mail reports of any bugs you discover to
-%\tr{glasgow-haskell-bugs@dcs.glasgow.ac.uk}.
+%\tr{glasgow-haskell-bugs@dcs.gla.ac.uk}.
 
 Any comments, suggestions and/or improvements you have to are welcome.
 Recommended ``profiling tricks'' would be especially cool!
@@ -238,7 +238,7 @@ system.  Just visit the Glasgow FP Web page...
 % 
 % It is in the GHC distribution in \tr{ghc/docs/papers/profiling.ps},
 % or it can be retrieved using ftp from
-% \tr{ftp.dcs.glasgow.ac.uk} (\tr{[130.209.240.50]})
+% \tr{ftp.dcs.gla.ac.uk} (\tr{[130.209.240.50]})
 % in the file
 % \tr{pub/glasgow-fp/papers/lazy-profiling.ps}.
 

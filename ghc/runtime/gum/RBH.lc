@@ -247,6 +247,17 @@ P_ closure;
     /* Put back old info pointer (only in GrAnSim) -- HWL */
     SET_INFO_PTR(closure, REVERT_INFOPTR(INFO_PTR(closure)));
 
+#  if (defined(GCap) || defined(GCgn))
+    /* If we convert from an RBH in the old generation,
+       we have to make sure it goes on the mutables list */
+
+    if(closure <= StorageMgrInfo.OldLim) {
+	if (IS_MUTABLE(INFO_PTR(closure)) && MUT_LINK(closure) == MUT_NOT_LINKED) {
+	    MUT_LINK(closure) = (W_) StorageMgrInfo.OldMutables;
+            StorageMgrInfo.OldMutables = closure;
+	}
+    }
+#  endif
 }
 
 /* Remove closure from the mutables list */
@@ -268,9 +279,24 @@ UnlinkFromMUT(P_ closure)
      MUT_LINK(prev) = MUT_LINK(curr);
    MUT_LINK(curr) = MUT_NOT_LINKED;
   }
+
+#if 0 && (defined(GCap) || defined(GCgn))
+  {
+    closq newclos;
+    extern closq ex_RBH_q;
+
+    newclos = (closq) stgMallocBytes(sizeof(struct clos), "UnlinkFromMUT");
+    CLOS_CLOSURE(newclos) = closure;
+    CLOS_PREV(newclos) = NULL;
+    CLOS_NEXT(newclos) = ex_RBH_q;
+    if (ex_RBH_q!=NULL)
+      CLOS_PREV(ex_RBH_q) = newclos;
+    ex_RBH_q = newclos;
+  }
+#endif
 }
 
 #endif /* PAR */
 
-#endif /* PAR -- whole file */
+#endif /* PAR || GRAN -- whole file */
 \end{code}

@@ -2,6 +2,9 @@
 extern int ghc_errno;
 extern int ghc_errtype;
 extern char *ghc_errstr;
+
+void cvtErrno (void);
+void stdErrno (void);
 #endif
 
 #define ERR_ALREADYEXISTS 1

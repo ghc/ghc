@@ -245,10 +245,10 @@ collect2s(W_ reqsize, smInfo *sm)
 #if defined(GRAN)
     EvacuateEvents();
 #endif
-#if defined(CONCURRENT)  /* && !defined(GRAN) */
+#if defined(CONCURRENT)
     EvacuateSparks();
 #endif
-#if !defined(PAR) /* && !defined(GRAN) */  /* HWL */
+#if !defined(PAR)
     EvacuateAStack( MAIN_SpA, stackInfo.botA );
     EvacuateBStack( MAIN_SuB, stackInfo.botB, &bstk_roots );
 #endif /* !PAR */
@@ -289,7 +289,7 @@ collect2s(W_ reqsize, smInfo *sm)
 
     if (RTSflags.GcFlags.giveStats) {
 	char comment_str[BIG_STRING_LEN];
-#if !defined(PAR) /* && !defined(CONCURRENT) */  /* HWL */
+#if !defined(PAR)
 	sprintf(comment_str, "%4lu %4ld %3ld %3ld %6lu %6lu %6lu  2s",
 		(W_) (SUBTRACT_A_STK(MAIN_SpA, stackInfo.botA) + 1),
 		bstk_roots, sm->rootno,
@@ -441,6 +441,31 @@ collectHeap(reqsize, sm, do_full_collection)
 	mutable++;
     }
 
+#if 0 && defined(GRAN)
+    {
+      extern ex_RBH_q;
+      closq prev_ptr, clos_ptr;
+
+      DEBUG_STRING("Evacuate reverted RBHs:");
+      clos_ptr = ex_RBH_q;
+      while ( clos_ptr ) {
+
+	/* Scavenge the OldMutable */
+	P_ info = (P_) INFO_PTR(CLOS_CLOSURE(clos_ptr));
+	StgScavPtr scav_code = SCAV_CODE(info);
+	Scav = CLOS_CLOSURE(clos_ptr);
+	(scav_code)();
+
+	/* No mutable closure are put on the ex_RBH_q */
+	/* ASSERT(IS_MUTABLE(info)); */
+        prev_ptr = clos_ptr;
+        clos_ptr = CLOS_NEXT(clos_ptr);
+        free(prev_ptr);
+      }
+      ex_RBH_q = NULL;
+    }
+#endif /* GRAN */
+
 #ifdef PAR
     EvacuateLocalGAs(rtsFalse);
 #else
@@ -468,10 +493,10 @@ collectHeap(reqsize, sm, do_full_collection)
 #if defined(GRAN)
     EvacuateEvents();
 #endif
-#if defined(CONCURRENT) /* && !defined(GRAN) */
+#if defined(CONCURRENT)
     EvacuateSparks();
 #endif
-#if !defined(PAR) /* && !defined(GRAN) */ /* HWL */
+#if !defined(PAR)
     EvacuateAStack( MAIN_SpA, stackInfo.botA );
     EvacuateBStack( MAIN_SuB, stackInfo.botB, &bstk_roots );
     /* ToDo: Optimisation which squeezes out garbage update frames */
@@ -506,7 +531,7 @@ collectHeap(reqsize, sm, do_full_collection)
 
     if (RTSflags.GcFlags.giveStats) {
 	char minor_str[BIG_STRING_LEN];
-#if !defined(PAR) /* && !defined(CONCURRENT) */ /* HWL */
+#if !defined(PAR)
 	sprintf(minor_str, "%4lu %4ld %3ld %3ld  %4ld        Minor",
 	      (W_) (SUBTRACT_A_STK(MAIN_SpA, stackInfo.botA) + 1),
 	      bstk_roots, sm->rootno, caf_roots, mutable); /* oldnew_roots, old_words */
@@ -617,7 +642,7 @@ collectHeap(reqsize, sm, do_full_collection)
 #if defined(GRAN)
     LinkEvents();
 #endif
-#if defined(CONCURRENT)  /* && !defined(GRAN) */
+#if defined(CONCURRENT)
     LinkSparks();
 #endif
 #ifdef PAR
@@ -627,10 +652,8 @@ collectHeap(reqsize, sm, do_full_collection)
     DEBUG_STRING("Linking Stable Pointer Table:");
     LINK_LOCATION_TO_CLOSURE(&sm->StablePointerTable);
 */
-#if 1 /* !defined(GRAN) */  /* HWL */
     LinkAStack( MAIN_SpA, stackInfo.botA );
     LinkBStack( MAIN_SuB, stackInfo.botB );
-#endif
 #endif
 
     /* Do Inplace Compaction */
@@ -679,7 +702,7 @@ collectHeap(reqsize, sm, do_full_collection)
 
     if (RTSflags.GcFlags.giveStats) {
 	char major_str[BIG_STRING_LEN];
-#if !defined(PAR) /* && !defined(CONCURRENT) */  /* HWL */
+#if !defined(PAR)
 	sprintf(major_str, "%4lu %4ld %3ld %3ld  %4d %4d  *Major* %4.1f%%",
 		(W_) (SUBTRACT_A_STK(MAIN_SpA, stackInfo.botA) + 1),
 		bstk_roots, sm->rootno, appelInfo.OldCAFno,
@@ -719,6 +742,8 @@ collectHeap(reqsize, sm, do_full_collection)
       return( GC_SOFT_LIMIT_EXCEEDED );	/* Heap nearly exhausted */
     } else {
       return( GC_SUCCESS );          /* Heap OK */
+    /* linked = IS_MUTABLE(INFO_PTR(closure)) && MUT_LINK(closure) !=
+       MUT_NOT_LINKED; */
     }
 }
 

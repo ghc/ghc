@@ -82,7 +82,7 @@ P_ CurrentTSO = NULL;
 /* Only needed for GranSim Light; costs of operations during rescheduling
    are associated to the virtual processor on which ActiveTSO is living */
 P_ ActiveTSO = NULL;
-rtsBool             __resched = rtsFalse;  /* debugging only !!*/
+rtsBool             resched = rtsFalse;  /* debugging only !!*/
 
 /* Pointers to the head and tail of the runnable queues for each PE */
 /* In GranSim Light only the thread/spark-queues of proc 0 are used */
@@ -236,10 +236,6 @@ P_ topClosure;
       }
 
     CurrentProc = MainProc;
-#if 0
-    Idlers = RTSflags.GranFlags.proc;
-    IdleProcs = ~0l;
-#endif
 #endif /* GRAN */
 
     if (DO_QP_PROF)
@@ -413,9 +409,9 @@ P_ topClosure;
       TSO_CLOCK(ActiveTSO) = CurrentTime[CurrentProc];
       ActiveTSO = NULL;
       CurrentTime[CurrentProc] = TSO_CLOCK(CurrentTSO);
-      if(RTSflags.GranFlags.DoFairSchedule &&  __resched )
+      if(RTSflags.GranFlags.DoFairSchedule &&  resched )
         {
-            __resched = rtsFalse;
+            resched = rtsFalse;
             if (RTSflags.GranFlags.granSimStats &&
                 RTSflags.GranFlags.debug & 0x20000)
               DumpGranEvent(GR_SCHEDULE,ThreadQueueHd);
@@ -542,14 +538,14 @@ int what_next;           /* Run the current thread again? */
       /* A bit of a hassle if the event queue is empty, but ... */
       CurrentTSO = ThreadQueueHd;
 
-      __resched = rtsFalse;
+      resched = rtsFalse;
       if (RTSflags.GranFlags.Light &&
           TSO_LINK(ThreadQueueHd)!=Prelude_Z91Z93_closure &&
           TSO_CLOCK(ThreadQueueHd)>TSO_CLOCK(TSO_LINK(ThreadQueueHd))) {
           if(RTSflags.GranFlags.granSimStats &&
              RTSflags.GranFlags.debug & 0x20000 )
             DumpGranEvent(GR_DESCHEDULE,ThreadQueueHd);
-          __resched = rtsTrue;
+          resched = rtsTrue;
           ThreadQueueHd =           TSO_LINK(CurrentTSO);
           if (ThreadQueueHd==Prelude_Z91Z93_closure)
             ThreadQueueTl=Prelude_Z91Z93_closure;
@@ -756,6 +752,23 @@ int what_next;           /* Run the current thread again? */
           continue;                    /* handle next event in event queue  */
 
         case FINDWORK:
+          { /* Make sure that we have enough heap for creating a new
+	       thread. This is a conservative estimate of the required heap.
+	       This eliminates special checks for GC around NewThread within
+               munch_spark.                                                 */
+
+            I_ req_heap = TSO_HS + TSO_CTS_SIZE + STKO_HS +
+	                  RTSflags.ConcFlags.stkChunkSize;
+
+	    if (SAVE_Hp + req_heap >= SAVE_HpLim ) {
+              ReallyPerformThreadGC(req_heap, rtsFalse);
+              SAVE_Hp -= req_heap;
+              if (IS_SPARKING(CurrentProc)) 
+                MAKE_IDLE(CurrentProc);
+              continue;
+            }
+          }
+
           if( RTSflags.GranFlags.DoAlwaysCreateThreads ||
 	      (ThreadQueueHd == Prelude_Z91Z93_closure && 
               (RTSflags.GranFlags.FetchStrategy >= 2 || 
@@ -774,10 +787,10 @@ int what_next;           /* Run the current thread again? */
               /* DaH chu' Qu' yIchen! Now create new work! */ 
               munch_spark (found, prev, spark);
 
-              /* ToDo: check */
+              /* ToDo: check ; not valid if GC occurs in munch_spark
               ASSERT(procStatus[CurrentProc]==Starting ||
 	             procStatus[CurrentProc]==Idle ||
-	             RTSflags.GranFlags.DoAlwaysCreateThreads);
+	             RTSflags.GranFlags.DoAlwaysCreateThreads); */
             }
           continue; /* to the next event */
 
@@ -913,10 +926,10 @@ do_the_fetchnode(eventq event)
      }
 #  endif 
      event = grab_event();
-     SAVE_Hp -= PACK_HEAP_REQUIRED-1; 
+     SAVE_Hp -= PACK_HEAP_REQUIRED; 
 
-     /* GC knows that events are special beats and follows the pointer i.e. */
-     /* events are valid even if they moved. Hopefully, an EXIT is triggered */
+     /* GC knows that events are special and follows the pointer i.e. */
+     /* events are valid even if they moved. An EXIT is triggered */
      /* if there is not enough heap after GC. */
     }
   } while (rc == 4);
@@ -1246,7 +1259,8 @@ munch_spark (rtsBool found, sparkq prev, sparkq spark)
 #  endif
          new_event(CurrentProc,CurrentProc,CurrentTime[CurrentProc]+1,
                   FINDWORK,Prelude_Z91Z93_closure,Prelude_Z91Z93_closure,NULL);
-         ReallyPerformThreadGC(TSO_HS+TSO_CTS_SIZE,rtsTrue);
+         ReallyPerformThreadGC(TSO_HS+TSO_CTS_SIZE,rtsFalse);
+	 SAVE_Hp -= TSO_HS+TSO_CTS_SIZE;
          spark = NULL;
          return; /* was: continue; */ /* to the next event, eventually */
        }
@@ -1258,7 +1272,7 @@ munch_spark (rtsBool found, sparkq prev, sparkq spark)
 	
      TSO_EXPORTED(tso) =  SPARK_EXPORTED(spark);
      TSO_LOCKED(tso) =    !SPARK_GLOBAL(spark);
-     TSO_SPARKNAME(tso) = (0x1 >> 16) | (NEW_SPARKNAME_MASK & SPARK_NAME(spark)) ;
+     TSO_SPARKNAME(tso) = SPARK_NAME(spark);
 	
      new_event(CurrentProc,CurrentProc,CurrentTime[CurrentProc],
               STARTTHREAD,tso,node,NULL);
@@ -1266,7 +1280,6 @@ munch_spark (rtsBool found, sparkq prev, sparkq spark)
      procStatus[CurrentProc] = Starting;
      
      ASSERT(spark != NULL);
-     /* ASSERT(SPARK_PREV(spark)==prev); */
 
      spark = delete_from_spark_queue (prev, spark);
     }
@@ -1519,7 +1532,7 @@ enum gran_event_types event_type;
   tot_tq_len += thread_queue_len(CurrentProc);
 #  endif 
 
-  ASSERT(TSO_LINK(CurrentTSO)==Prelude_Z91Z93_closure);  /* TMP-CHG HWL */
+  ASSERT(TSO_LINK(CurrentTSO)==Prelude_Z91Z93_closure);
 
   /* Idle proc; same for pri spark and basic version */
   if(ThreadQueueHd==Prelude_Z91Z93_closure)
@@ -1556,7 +1569,7 @@ enum gran_event_types event_type;
   if(RTSflags.GranFlags.Light)
     {
       ASSERT(ThreadQueueHd!=Prelude_Z91Z93_closure);
-      ASSERT(TSO_LINK(tso)==Prelude_Z91Z93_closure);   /* TMP-CHG HWL */
+      ASSERT(TSO_LINK(tso)==Prelude_Z91Z93_closure);
 
       /* If only one thread in queue so far we emit DESCHEDULE in debug mode */
       if(RTSflags.GranFlags.granSimStats &&
@@ -1564,7 +1577,7 @@ enum gran_event_types event_type;
          TSO_LINK(ThreadQueueHd)==Prelude_Z91Z93_closure) {
 	DumpRawGranEvent(CurrentProc,CurrentProc,GR_DESCHEDULE,
 			 ThreadQueueHd,Prelude_Z91Z93_closure,0);
-        __resched = rtsTrue;
+        resched = rtsTrue;
       }
 
       if ( InsertThread(tso) ) {                        /* new head of queue */
@@ -2101,7 +2114,8 @@ PROC proc;
 #  endif
 }
 
-TIME SparkStealTime()
+TIME
+SparkStealTime(void)
 {
   double fishdelay, sparkdelay, latencydelay;
   fishdelay =  (double)RTSflags.GranFlags.proc/2;
@@ -2109,10 +2123,6 @@ TIME SparkStealTime()
           ((fishdelay-1)/(double)(RTSflags.GranFlags.proc-1))*(double)idlers();
   latencydelay = sparkdelay*((double)RTSflags.GranFlags.gran_latency);
 
-/*
-  fprintf(stderr,"fish delay = %g, spark delay = %g, latency delay = %g, Idlers = %u\n",
-          fishdelay,sparkdelay,latencydelay,Idlers);
-*/
   return((TIME)latencydelay);
 }
 #endif                                                       /* GRAN ; HWL */
@@ -2207,16 +2217,11 @@ I_ name, gran_info, size_info, par_info, local;
 /* To make casm more convenient use this function to label strategies */
 int
 set_sparkname(P_ tso, int name) { 
-  if (TSO_SPARKNAME(tso) & OLD_SPARKNAME_MASK == 1) {
-    TSO_SPARKNAME(tso) &= NEW_SPARKNAME_MASK;
-    TSO_SPARKNAME(tso) = TSO_SPARKNAME(tso) >> 16;
-    TSO_SPARKNAME(tso) |= name;
-  } else {
-    TSO_SPARKNAME(tso) = (TSO_SPARKNAME(tso) & OLD_SPARKNAME_MASK) | name ; 
-  }
+  TSO_SPARKNAME(tso) = name ; 
+
   if(0 && RTSflags.GranFlags.granSimStats)
 	DumpRawGranEvent(CurrentProc,99,GR_START,
-			 tso,Nil_closure,
+			 tso,Prelude_Z91Z93_closure,
 	                 TSO_SPARKNAME(tso));
                          /* ^^^  SN (spark name) as optional info */
 			 /* spark_queue_len(CurrentProc,ADVISORY_POOL)); */
@@ -2226,7 +2231,7 @@ set_sparkname(P_ tso, int name) {
 
 int
 reset_sparkname(P_ tso) { 
-  TSO_SPARKNAME(tso) = (TSO_SPARKNAME(tso) & OLD_SPARKNAME_MASK) << 16;
+  TSO_SPARKNAME(tso) = 0;
   return (0);
 }
 
@@ -2420,11 +2425,11 @@ W_ type;
 #ifdef PAR
     TSO_CCC(tso) = (CostCentre)STATIC_CC_REF(CC_MAIN);
 #endif
-    TSO_NAME(tso) = (P_) INFO_PTR(topClosure);  /* A string would be nicer -- JSM */
+    TSO_NAME(tso) = (P_) INFO_PTR(topClosure); /* A string would be nicer -- JSM */
     TSO_ID(tso) = threadId++;
     TSO_TYPE(tso) = type;
     TSO_PC1(tso) = TSO_PC2(tso) = EnterNodeCode;
-    TSO_ARG1(tso) = /* TSO_ARG2(tso) = */ 0;  /* FIX THIS -- HWL */
+    TSO_ARG1(tso) = /* TSO_ARG2(tso) = */ 0;
     TSO_SWITCH(tso) = NULL;
 
 #ifdef TICKY_TICKY
@@ -2583,7 +2588,7 @@ EndThread(STG_NO_ARGS)
       if (RTSflags.GranFlags.labelling && RTSflags.GranFlags.granSimStats &&
           !RTSflags.GranFlags.granSimStats_suppressed)
 	DumpStartEventAt(TSO_STARTEDAT(CurrentTSO),where_is(CurrentTSO),0,GR_START,
-			 CurrentTSO,Nil_closure,
+			 CurrentTSO,Prelude_Z91Z93_closure,
 	                 TSO_SPARKNAME(CurrentTSO));
                          /* ^^^  SN (spark name) as optional info */
 			 /* spark_queue_len(CurrentProc,ADVISORY_POOL)); */

@@ -83,15 +83,15 @@ if (! $ENV{'GLASGOW_HASKELL_ROOT'}) { # good -- death to environment variables
 } else {
     $TopPwd = $ENV{'GLASGOW_HASKELL_ROOT'};
 
-    if ( '$(INSTLIBDIR_GHC)' =~ /\/local\/fp(\/.*)/ ) {
+    if ('$(INSTLIBDIR_GHC)' =~ /.*(\/lib\/ghc\/\d\.\d\d\/[^-]-[^-]-[^-]\/.*)/) {
 	$InstLibDirGhc	= $ENV{'GLASGOW_HASKELL_ROOT'} . $1;
     } else {
 	print STDERR "GLASGOW_HASKELL_ROOT environment variable is set;\nBut can't untangle $(INSTLIBDIR_GHC).\n(Installation error)\n";
 	exit(1);
     }
 
-    if ( '$(INSTDATADIR_GHC)' =~ /\/local\/fp(\/.*)/ ) {
-	$InstDataDirGhc	= $ENV{'GLASGOW_HASKELL_ROOT'} . $1;
+    if ('$(INSTDATADIR_GHC)' =~ /.*(\/lib\/ghc\/\d\.\d\d\/.*)/) {
+	$InstDataDirGhc	= $ENV{'GLASGOW_HASKELL_ROOT'} . $2;
     } else {
 	print STDERR "GLASGOW_HASKELL_ROOT environment variable is set;\nBut can't untangle $(INSTDATADIR_GHC).\n(Installation error)\n";
 	exit(1);
@@ -104,71 +104,26 @@ $Unlit = ( $(INSTALLING) ) ? "$InstLibDirGhc/unlit"
 $Begin_magic_str = "# DO NOT DELETE: Beginning of Haskell dependencies\n";
 $End_magic_str = "# DO NOT DELETE: End of Haskell dependencies\n";
 $Obj_suffix = '.o';
-$ghc_version_info = $(PROJECTVERSION) * 100;
+$ghc_version_info = int ( $(PROJECTVERSION) * 100 );
 
 $Import_dirs = '.';
 %Syslibs = ();
+%LibIfaces  = (); # known prelude/syslib ifaces; read from a file
 %IgnoreMe = ();
-%PreludeIfaces = ( 'Prelude',	    '1',
-		 , 'Array',	    '1'
-		 , 'Char',	    '1'
-		 , 'Complex',	    '1'
-		 , 'Directory',	    '1'
-		 , 'IO',   	    '1'
-		 , 'Ix',   	    '1'
-		 , 'List', 	    '1'
-		 , 'Maybe',	    '1'
-		 , 'Monad',	    '1'
-		 , 'Ratio',	    '1'
-		 , 'System',	    '1'
-		 , 'PreludeGlaST',  '1'
-		 , 'PreludeGlaMisc','1'
-		 , 'Concurrent',    '1'
-		 , 'Parallel',	    '1');
-%GhcLibIfaces = (  'Bag', '1',
-		   'BitSet', '1',
-		   # CharSeq not supposed to be used by user (I think. WDP)
-		   'FiniteMap', '1',
-		   'ListSetOps', '1',
-		   'Maybes', '1',
-		   'PackedString', '1',
-		   'Regex', '1',
-		   'MatchPS', '1',
-		   'Readline', '1',
-		   'Socket', '1',
-		   'SocketPrim', '1',
-		   'BSD', '1',
-		   'Pretty', '1',
-		   'Set', '1',
-		   'Util', '1' );
-%HbcLibIfaces = (  'Algebra', '1',
-		   'Hash', '1',
-		   'ListUtil', '1',
-		   'Miranda', '1',
-		   'NameSupply', '1',
-		   'Native', '1',
-		   'Number', '1',
-		   'Parse', '1',
-		   'Pretty', '1',
-		   'Printf', '1',
-		   'QSort', '1',
-		   'Random', '1',
-		   'SimpleLex', '1',
-		   'Time', '1',
-		   'Trace', '1',
-		   'Word', '1' );
-%IO13Ifaces = (    'LibSystem', '1',
-		   'LibCPUTime', '1',
-		   'LibDirectory', '1',
-		   'LibPosix', '1',
-		   'LibTime', '1' );
 
-$Haskell_1 = 2; # assume Haskell 1.2, still. Changed by -fhaskell-1.3
+$Haskell_1 = 3; # assume Haskell 1.3. Changed by -fhaskell-1.?
 $Include_dirs = '-I.';
 $Makefile = '';
 @Src_files = ();
 
 &mangle_command_line_args();
+
+# load up LibIfaces tables:
+&read_MODULES('prelude', 'prelude');
+foreach $lib ( @Syslibs ) {
+    &read_MODULES('syslib', $lib);
+}
+#print STDERR "libs provide:",(keys %LibIfaces),"\n";
 
 if ( $Status ) {
     print stderr $Usage;
@@ -206,7 +161,7 @@ foreach $sf (@Src_files) {
     # builds up @Depend_lines
     print STDERR "Here we go for source file: $sf\n" if $Verbose;
     ($bf = $sf) =~ s/\.l?hs$//;
-    push(@Depend_lines, "$bf$Obj_suffix : $sf\n");
+    push(@Depend_lines, "$bf$Obj_suffix $bf.hi : $sf\n");
     foreach $suff (@File_suffix) {
         push(@Depend_lines, "$bf$suff$Obj_suffix : $sf\n");
     }
@@ -297,6 +252,31 @@ sub mangle_command_line_args {
     @File_suffix = sort (@File_suffix);
 }
 
+sub read_MODULES {
+    local($flavor,$lib) = @_;
+
+    local($m_dir) = '';
+    if ($flavor eq 'prelude') {    
+	$m_dir = ( $(INSTALLING) ) ? "$InstDataDirGhc/imports" : "$TopPwd/$(CURRENT_DIR)/$(GHC_LIBSRC)";
+    } else {
+	$m_dir = ( $(INSTALLING) ) ? "$InstSysLibDir/$lib"     : "$TopPwd/hslibs/$lib";
+    }
+    local($m_file) = "$m_dir/MODULES";
+
+    open(MFILE, "< $m_file") || die "$Pgm: can't open $m_file to read\n";
+    while (<MFILE>) {
+	chop;
+	# strip comments and leading/trailing whitespace
+	s/#.*//;
+	s/^\s+//;
+	s/\s+$//;
+	next if /^$/; # nothing left!
+	
+	$LibIfaces{"$lib:$_"} = 1; # record that this library provides this iface
+    }
+    close(MFILE);
+}
+
 sub grab_arg_arg {
     local($option, $rest_of_arg) = @_;
     
@@ -351,9 +331,9 @@ sub slurp_file_for_imports {
 	|| die "$Pgm: Can't open $file_to_read: $!\n";
 
     while (<SRCFILE>) {
-	next unless (/^>?\s*(import)\s+([A-Z][A-Za-z0-9_']*)/ || /^!(include)\s+"(\S+)"/);
+	next unless (/^>?\s*(import)(\s+qualified)?\s+([A-Z][A-Za-z0-9_']*)/ || /^!(include)(\s+)"(\S+)"/);
 	$todo    = $1;
-	$modname = $2;
+	$modname = $3;
 
 	if ($todo eq 'import') {
 	    if ( $IgnoreMe{$modname} eq 'y' ) {
@@ -462,24 +442,14 @@ sub find_in_Import_dirs {
 	print STDERR "trying... $name_to_check\n" if $Verbose >= 2; # very verbose
 	return($name_to_check) if -f $name_to_check;
     }
+
     # OK, maybe it's referring to something in a system library
     foreach $lib ( @Syslibs ) {
-	if ( $lib eq 'ghc' ) {
-	    return('__ignore__') if $GhcLibIfaces{$modname};
-	} elsif ( $lib eq 'hbc' ) {
-	    return('__ignore__') if $HbcLibIfaces{$modname};
-	} else {
-	    die "Unrecognised syslib: $lib\n";
-	}
-    }
-
-    # Might be a Haskell 1.3 Module (but only if we've said -fhaskell-1.3)
-    if ( $Haskell_1 >= 3 ) {
-	return('__ignore__') if $IO13Ifaces{$modname};
+	return('__ignore__') if $LibIfaces{"$lib:$modname"};
     }
 
     # Last hope: referring to a Prelude interface
-    return('__ignore__') if $PreludeIfaces{$modname};
+    return('__ignore__') if $LibIfaces{"prelude:$modname"};
 
     die "No file `$modname.hi', `$modname.lhs' or `$modname.hs' (reqd from file `$orig_src_file')\namong import directories:\n\t$Import_dirs\n";
 }

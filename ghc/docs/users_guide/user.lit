@@ -1,14 +1,14 @@
 \begin{onlystandalone}
 \documentstyle[11pt,literate]{article}
 \begin{document}
-\title{The Glorious Glasgow Haskell Compilation System\\ Version~0.26\\ User's Guide}
-\author{The AQUA Team\\
+\title{The Glorious Glasgow Haskell Compilation System\\ Version~2.01\\ User's Guide}
+\author{The GHC Team\\
 Department of Computing Science\\
 University of Glasgow\\
 Glasgow, Scotland\\
 G12 8QQ\\
 \\
-Email: glasgow-haskell-\{bugs,users\}-request\@dcs.glasgow.ac.uk}
+Email: glasgow-haskell-\{bugs,users\}-request\@dcs.gla.ac.uk}
 \maketitle
 \begin{rawlatex}
 \tableofcontents
@@ -25,7 +25,9 @@ Email: glasgow-haskell-\{bugs,users\}-request\@dcs.glasgow.ac.uk}
 \input{libraries.lit}
 \input{parallel.lit}
 \input{gone_wrong.lit}
+\input{backwards.lit}
 \input{vs_haskell.lit}
+\input{recomp.lit}
 \input{utils.lit}
 \input{ticky.lit}
 \input{tutorial.lit}

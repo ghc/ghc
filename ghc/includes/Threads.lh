@@ -133,9 +133,6 @@ extern I_ threadId;
 void ScheduleThreads PROTO((P_ topClosure));
 
 #if defined(GRAN)
-#define OLD_SPARKNAME_MASK        0xffff0000
-#define NEW_SPARKNAME_MASK        0x0000ffff
-
 void ReSchedule PROTO((int what_next)) STG_NORETURN;
 void add_to_spark_queue PROTO((sparkq));
 int set_sparkname PROTO((P_, int));

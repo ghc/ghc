@@ -63,6 +63,11 @@ module Prelude (
     (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,)(..),
     (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,)(..),
     (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,)(..),
+    (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,)(..),
+    (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,)(..),
+    (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,)(..),
+    (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,)(..),
+    (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,)(..),
 --  Functions: (->)
     Eq((==), (/=)),
     Ord(compare, (<), (<=), (>=), (>), max, min),
@@ -72,7 +77,7 @@ module Prelude (
     Eval(..{-seq, strict-}), seq, strict, -- NB: glasgow hack
     Num((+), (-), (*), negate, abs, signum, fromInteger, fromInt{-partain-}),
     Real(toRational),
-    Integral(quot, rem, div, mod, quotRem, divMod, toInteger),
+    Integral(quot, rem, div, mod, quotRem, divMod, toInteger, toInt{-partain-}),
     Fractional((/), recip, fromRational),
     Floating(pi, exp, log, sqrt, (**), logBase, sin, cos, tan,
              asin, acos, atan, sinh, cosh, tanh, asinh, acosh, atanh),
@@ -189,12 +194,13 @@ class  (Real a, Enum a) => Integral a  where
     quot, rem, div, mod	:: a -> a -> a
     quotRem, divMod	:: a -> a -> (a,a)
     toInteger		:: a -> Integer
+    toInt		:: a -> Int -- partain: Glasgow extension
 
     n `quot` d		=  q  where (q,r) = quotRem n d
     n `rem` d		=  r  where (q,r) = quotRem n d
     n `div` d		=  q  where (q,r) = divMod n d
     n `mod` d		=  r  where (q,r) = divMod n d
-    divMod n d 		=  if signum r == - signum d then (q-1, r+d) else qr
+    divMod n d 		=  if signum r == negate (signum d) then (q-1, r+d) else qr
 			   where qr@(q,r) = quotRem n d
 
 class  (Num a) => Fractional a  where
@@ -254,7 +260,7 @@ class  (RealFrac a, Floating a) => RealFloat a  where
     exponent x		=  if m == 0 then 0 else n + floatDigits x
 			   where (m,n) = decodeFloat x
 
-    significand x	=  encodeFloat m (- floatDigits x)
+    significand x	=  encodeFloat m (negate (floatDigits x))
 			   where (m,_) = decodeFloat x
 
     scaleFloat k x	=  encodeFloat m (n+k)
@@ -293,7 +299,7 @@ x ^ n | n > 0	=  f x (n-1) x
 _ ^ _		= error "Prelude.^: negative exponent"
 
 (^^)		:: (Fractional a, Integral b) => a -> b -> a
-x ^^ n		=  if n >= 0 then x^n else recip (x^(-n))
+x ^^ n		=  if n >= 0 then x^n else recip (x^(negate n))
 
 fromIntegral	:: (Integral a, Num b) => a -> b
 fromIntegral	=  fromInteger . toInteger
@@ -306,7 +312,7 @@ atan2 y x	=  case (signum y, signum x) of
 			( 0, 1) ->  0
 			( 1, 0) ->  pi/2
 			( 0,-1) ->  pi
-			(-1, 0) -> -pi/2
+			(-1, 0) ->  (negate pi)/2
 			( _, 1) ->  atan (y/x)
 			( _,-1) ->  atan (y/x) + pi
 			( 0, 0) ->  error "Prelude.atan2: atan2 of origin"
@@ -553,8 +559,8 @@ instance CCallable   Int
 instance CReturnable Int
 
 instance  Bounded Int where
-    minBound =  -2147483647	-- **********************
-    maxBound =  2147483647	-- **********************
+    minBound =  negate 2147483647   -- **********************
+    maxBound =  2147483647	    -- **********************
 
 instance  Num Int  where
     (+)	   x y =  plusInt x y
@@ -603,7 +609,7 @@ instance  Integral Int	where
 --OLD:   odd x  = neInt (x `mod` 2) 0
 
     toInteger (I# n#) = int2Integer# n#  -- give back a full-blown Integer
---  toInt x	      = x
+    toInt x	      = x
 
 instance  Enum Int  where
     toEnum   x = x
@@ -614,9 +620,9 @@ instance  Enum Int  where
 #else
     {-# INLINE enumFrom #-}
     {-# INLINE enumFromTo #-}
-    enumFrom x           = _build (\ c _ -> 
+    enumFrom x           = build (\ c _ -> 
 	let g x = x `c` g (x `plusInt` 1) in g x)
-    enumFromTo x y	 = _build (\ c n ->
+    enumFromTo x y	 = build (\ c n ->
 	let g x = if x <= y then x `c` g (x `plusInt` 1) else n in g x)
 #endif
     enumFromThen m n     =  en' m (n `minusInt` m)
@@ -696,7 +702,7 @@ instance  Num Integer  where
 	in
 	if      cmp >#  0# then 1
 	else if cmp ==# 0# then 0
-	else			-1
+	else			(negate 1)
 	}
 
     fromInteger	x	=  x
@@ -720,7 +726,7 @@ instance  Integral Integer where
 	    -> (J# a3 s3 d3, J# a4 s4 d4)
 -}
     toInteger n	     = n
---  toInt (J# a s d) = case (integer2Int# a s d) of { n# -> I# n# }
+    toInt (J# a s d) = case (integer2Int# a s d) of { n# -> I# n# }
 
     -- the rest are identical to the report default methods;
     -- you get slightly better code if you let the compiler
@@ -731,7 +737,7 @@ instance  Integral Integer where
     n `mod` d	=  r  where (q,r) = divMod n d
 
     divMod n d 	=  case (quotRem n d) of { qr@(q,r) ->
-		   if signum r == - signum d then (q - 1, r+d) else qr }
+		   if signum r == negate (signum d) then (q - 1, r+d) else qr }
 		   -- Case-ified by WDP 94/10
 
 instance  Enum Integer  where
@@ -764,9 +770,9 @@ instance  Num Float  where
     (*)		x y 	=  timesFloat x y
     abs x | x >= 0.0	=  x
 	  | otherwise	=  negateFloat x
-    signum x | x == 0.0	 =  0
-	     | x > 0.0	 =  1
-	     | otherwise = -1
+    signum x | x == 0.0	 = 0
+	     | x > 0.0	 = 1
+	     | otherwise = negate 1
     fromInteger n	=  encodeFloat n 0
     fromInt i		=  int2Float i
 
@@ -821,7 +827,7 @@ instance  RealFrac Float  where
     	if n >= 0 then
 	    (fromInteger m * fromInteger b ^ n, 0.0)
     	else
-	    case (quotRem m (b^(-n))) of { (w,r) ->
+	    case (quotRem m (b^(negate n))) of { (w,r) ->
 	    (fromInteger w, encodeFloat r n)
 	    }
         }
@@ -862,7 +868,7 @@ instance  RealFloat Float  where
 			    (m,n) -> if m == 0 then 0 else n + floatDigits x
 
     significand x	= case decodeFloat x of
-			    (m,_) -> encodeFloat m (- (floatDigits x))
+			    (m,_) -> encodeFloat m (negate (floatDigits x))
 
     scaleFloat k x	= case decodeFloat x of
 			    (m,n) -> encodeFloat m (n+k)
@@ -889,9 +895,9 @@ instance  Num Double  where
     (*)		x y 	=  timesDouble x y
     abs x | x >= 0.0	=  x
 	  | otherwise	=  negateDouble x
-    signum x | x == 0.0	 =  0
-	     | x > 0.0	 =  1
-	     | otherwise = -1
+    signum x | x == 0.0	 = 0
+	     | x > 0.0	 = 1
+	     | otherwise = negate 1
     fromInteger n	=  encodeFloat n 0
     fromInt (I# n#)	=  case (int2Double# n#) of { d# -> D# d# }
 
@@ -954,7 +960,7 @@ instance  RealFrac Double  where
     	if n >= 0 then
 	    (fromInteger m * fromInteger b ^ n, 0.0)
     	else
-	    case (quotRem m (b^(-n))) of { (w,r) ->
+	    case (quotRem m (b^(negate n))) of { (w,r) ->
 	    (fromInteger w, encodeFloat r n)
 	    }
         }
@@ -995,7 +1001,7 @@ instance  RealFloat Double  where
 			    (m,n) -> if m == 0 then 0 else n + floatDigits x
 
     significand x	= case decodeFloat x of
-			    (m,_) -> encodeFloat m (- (floatDigits x))
+			    (m,_) -> encodeFloat m (negate (floatDigits x))
 
     scaleFloat k x	= case decodeFloat x of
 			    (m,n) -> encodeFloat m (n+k)
@@ -1138,6 +1144,18 @@ data (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o p q r s t u 
  = (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o p q r s t u v w x y z a_ b_ c_ d_ e_
 data (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o p q r s t u v w x y z a_ b_ c_ d_ e_ f_
  = (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o p q r s t u v w x y z a_ b_ c_ d_ e_ f_
+data (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o p q r s t u v w x y z a_ b_ c_ d_ e_ f_ g_
+ = (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o p q r s t u v w x y z a_ b_ c_ d_ e_ f_ g_
+data (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o p q r s t u v w x y z a_ b_ c_ d_ e_ f_ g_ h_
+ = (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o p q r s t u v w x y z a_ b_ c_ d_ e_ f_ g_ h_
+data (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o p q r s t u v w x y z a_ b_ c_ d_ e_ f_ g_ h_ i_
+ = (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o p q r s t u v w x y z a_ b_ c_ d_ e_ f_ g_ h_ i_
+data (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o p q r s t u v w x y z a_ b_ c_ d_ e_ f_ g_ h_ i_ j_
+ = (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o p q r s t u v w x y z a_ b_ c_ d_ e_ f_ g_ h_ i_ j_
+data (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o p q r s t u v w x y z a_ b_ c_ d_ e_ f_ g_ h_ i_ j_ k_
+ = (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o p q r s t u v w x y z a_ b_ c_ d_ e_ f_ g_ h_ i_ j_ k_
+ -- if you add more tuples, you need to change the compiler, too
+ -- (it has a wired-in number: 37)
 
 instance  (Read a, Read b) => Read (a,b)  where
     readsPrec p = readParen False

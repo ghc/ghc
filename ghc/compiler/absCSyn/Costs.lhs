@@ -368,6 +368,7 @@ stmtMacroCosts macro modes =
     GRAN_RESCHEDULE		->  nullCosts	  {- GrAnSim bookkeeping -}
     GRAN_FETCH_AND_RESCHEDULE	->  nullCosts	  {- GrAnSim bookkeeping -}
     THREAD_CONTEXT_SWITCH	->  nullCosts	  {- GrAnSim bookkeeping -}
+    _ -> trace "Costs.stmtMacroCosts" nullCosts
 
 -- ---------------------------------------------------------------------------
 

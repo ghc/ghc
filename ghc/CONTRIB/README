@@ -5,9 +5,11 @@ fptags		Denis Howe <dbh@doc.ic.ac.uk>
 		Bourne-shell script.
 		Create an emacs tags file for one or more functional programs.
 
-haskell.el	A Haskell mode from Simon Marlow <simonm@dcs.glasgow.ac.uk>.
+haskell-modes/	A collection of all known "Haskell modes" for GNU Emacs.	
 
 haskel.gif	Provided by Lennart Augustsson <augustss@cs.chalmers.se>
+
+haskell_poem	Speaks for itself.
 
 mira2hs		Denis Howe <dbh@doc.ic.ac.uk>
 		Bourne-shell script.

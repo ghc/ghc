@@ -122,39 +122,4 @@ StgAddr toClockSec PROTO((StgInt, StgInt, StgInt, StgInt, StgInt, StgInt, StgInt
 /* writeFile.lc */
 StgInt	writeFile PROTO((StgAddr, StgAddr, StgInt));
 
-/* SOCKET THINGS ALL TOGETHER: */
-
-#if 0
-LATER
-/* acceptSocket.lc */
-StgInt acceptSocket(I_ sockfd, A_ peer, A_ addrlen);
-
-/* bindSocket.lc */
-StgInt bindSocket(I_ sockfd, A_ myaddr, I_ addrlen, I_ isUnixDomain);
-
-/* connectSocket.lc */
-StgInt connectSocket(I_ sockfd, A_ servaddr, I_ addrlen, I_ isUnixDomain);
-
-/* createSocket.lc */
-StgInt createSocket(I_ family, I_ type, I_ protocol);
-
-/* getPeerName.lc */
-StgInt getPeerName(int sockfd, struct sockaddr *peer, int *namelen);
-
-/* getSockName.lc */
-StgInt getSockName(int sockfd, struct sockaddr *peer, int *namelen);
-
-/* listenSocket.lc */
-StgInt listenSocket(int sockfd, int backlog);
-
-/* readDescriptor.lc */
-StgInt readDescriptor(int fd, char *buf, int nbytes);
-
-/* shutdownSocket.lc */
-StgInt shutdownSocket(int sockfd, int how);
-
-/* writeDescriptor.lc */
-StgInt writeDescriptor(int fd, char *buf, int nbytes);
-#endif /* 0 */
-
 #endif /* ! STGIO_H */

@@ -453,6 +453,7 @@ getTyDescription ty
       TyConTy tycon _ -> _UNPK_ (getLocalName tycon)
       SynTy tycon _ _ -> _UNPK_ (getLocalName tycon)
       DictTy _ _ _    -> "dict"
+      ForAllTy _ ty   -> getTyDescription ty
       _		      -> pprPanic "getTyDescription: other" (pprType PprDebug tau_ty)
     }
   where

@@ -32,6 +32,7 @@ import CoreSyn
 import CostCentre	( isDictCC, CostCentre, noCostCentre )
 import Id		( idType, mkSysLocal, getIdArity, isBottomingId,
 			  toplevelishId, mkIdWithNewUniq, applyTypeEnvToId,
+			  dataConRepType,
 			  addOneToIdEnv, growIdEnvList, lookupIdEnv,
 			  isNullIdEnv, SYN_IE(IdEnv),
 			  GenId{-instances-}
@@ -50,7 +51,7 @@ import TyVar		( cloneTyVar,
 			  isNullTyVarEnv, addOneToTyVarEnv, SYN_IE(TyVarEnv)
 			)
 import Type		( mkFunTy, mkForAllTy, mkForAllUsageTy, mkTyVarTy,
-			  getFunTy_maybe, applyTy, isPrimType,
+			  getFunTyExpandingDicts_maybe, applyTy, isPrimType,
 			  splitSigmaTy, splitFunTy, eqTy, applyTypeEnvToTy
 			)
 import TysWiredIn	( trueDataCon, falseDataCon )
@@ -86,7 +87,7 @@ coreExprType (Coerce _ ty _)	= ty -- that's the whole point!
 -- a Con is a fully-saturated application of a data constructor
 -- a Prim is <ditto> of a PrimOp
 
-coreExprType (Con con args) = applyTypeToArgs (idType    con) args
+coreExprType (Con con args) = applyTypeToArgs (dataConRepType    con) args
 coreExprType (Prim op args) = applyTypeToArgs (primOpType op) args
 
 coreExprType (Lam (ValBinder binder) expr)
@@ -109,7 +110,7 @@ coreExprType (App expr val_arg)
     let
 	fun_ty = coreExprType expr
     in
-    case (getFunTy_maybe fun_ty) of
+    case (getFunTyExpandingDicts_maybe False{-no peeking-} fun_ty) of
 	  Just (_, result_ty) -> result_ty
 #ifdef DEBUG
 	  Nothing -> pprPanic "coreExprType:\n"
@@ -136,7 +137,7 @@ applyTypeToArgs op_ty args	    = foldl applyTypeToArg op_ty args
 
 applyTypeToArg op_ty (TyArg ty)     = applyTy op_ty ty
 applyTypeToArg op_ty (UsageArg _)   = panic "applyTypeToArg: UsageArg"
-applyTypeToArg op_ty val_or_lit_arg = case (getFunTy_maybe op_ty) of
+applyTypeToArg op_ty val_or_lit_arg = case (getFunTyExpandingDicts_maybe False{-no peeking-} op_ty) of
 					Just (_, res_ty) -> res_ty
 \end{code}
 

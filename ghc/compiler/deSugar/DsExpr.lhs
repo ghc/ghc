@@ -424,7 +424,7 @@ dsExpr (RecordUpdOut record_expr dicts rbinds)
     dsRbinds rbinds		$ \ rbinds' ->
     let
 	record_ty		= coreExprType record_expr'
-	(tycon, inst_tys, cons) = trace "DsExpr.getAppDataTyConExpandingDicts" $
+	(tycon, inst_tys, cons) = --trace "DsExpr.getAppDataTyConExpandingDicts" $
 				  getAppDataTyConExpandingDicts record_ty
 	cons_to_upd  	 	= filter has_all_fields cons
 

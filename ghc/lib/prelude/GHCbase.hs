@@ -14,6 +14,7 @@ import Ratio
 import qualified GHCps	( packString, packCBytes, comparePS, unpackPS )
 import qualified GHCio  ( IOError )
 import qualified Monad
+import GHCerr
 
 infixr 0 `seq`, `par`, `fork`
 
@@ -85,14 +86,29 @@ instance Show PackedString where
 
 ---------------------------------------------------------------
 data State a = S# (State# a)
+
 data ForeignObj = ForeignObj ForeignObj#
+instance CCallable   ForeignObj
+
 #ifndef __PARALLEL_HASKELL__
 data StablePtr a = StablePtr (StablePtr# a)
+instance CCallable   (StablePtr a)
+instance CReturnable (StablePtr a)
 #endif
 
-instance CCallable   (StablePtr a)
-instance CCallable   ForeignObj
-instance CReturnable (StablePtr a)
+eqForeignObj   :: ForeignObj -> ForeignObj -> Bool
+makeForeignObj :: Addr       -> Addr       -> PrimIO ForeignObj
+
+makeForeignObj (A# obj) (A# finaliser) = ST $ \ (S# s#) ->
+    case makeForeignObj# obj finaliser s# of
+      StateAndForeignObj# s1# fo# -> (ForeignObj fo#, S# s1#)
+
+eqForeignObj mp1 mp2
+  = unsafePerformPrimIO (_ccall_ eqForeignObj mp1 mp2) /= (0::Int)
+
+instance Eq ForeignObj where 
+    p == q = eqForeignObj p q
+    p /= q = not (eqForeignObj p q)
 
 #ifndef __PARALLEL_HASKELL__
 
@@ -104,8 +120,6 @@ makeStablePtr  :: a -> PrimIO (StablePtr a)
 deRefStablePtr :: StablePtr a -> PrimIO a
 freeStablePtr  :: StablePtr a -> PrimIO ()
 
-eqForeignObj   :: ForeignObj -> ForeignObj -> Bool
-makeForeignObj :: Addr       -> Addr       -> PrimIO ForeignObj
 performGC      :: PrimIO ()
 
 {-# INLINE deRefStablePtr #-}
@@ -121,17 +135,6 @@ deRefStablePtr (StablePtr sp#) = ST $ \ (S# rw1#) ->
       StateAndPtr# rw2# a -> (a, S# rw2#)
 
 freeStablePtr sp = _ccall_ freeStablePointer sp
-
-makeForeignObj (A# obj) (A# finaliser) = ST $ \ (S# s#) ->
-    case makeForeignObj# obj finaliser s# of
-      StateAndForeignObj# s1# fo# -> (ForeignObj fo#, S# s1#)
-
-eqForeignObj mp1 mp2
-  = unsafePerformPrimIO (_ccall_ eqForeignObj mp1 mp2) /= (0::Int)
-
-instance Eq ForeignObj where 
-    p == q = eqForeignObj p q
-    p /= q = not (eqForeignObj p q)
 
 performGC = _ccall_GC_ StgPerformGarbageCollection
 
@@ -185,7 +188,7 @@ instance Monad (ST s) where
     {-# INLINE return #-}
     {-# INLINE (>>)   #-}
     {-# INLINE (>>=)  #-}
-    return x = ST $ \ s -> (x, s)
+    return x = ST $ \ s@(S# _) -> (x, s)
     m >> k   =  m >>= \ _ -> k
 
     (ST m) >>= k
@@ -266,9 +269,9 @@ forkST (ST action) = ST $ \ s ->
    let
     (r, new_s) = action s
    in
-    new_s `_fork_` (r, s)
+    new_s `fork__` (r, s)
  where
-    _fork_ x y = case (fork# x) of { 0# -> parError#; _ -> y }
+    fork__ x y = case (fork# x) of { 0# -> parError; _ -> y }
 
 #endif {- concurrent -}
 
@@ -1093,22 +1096,16 @@ seq, par, fork :: Eval a => a -> b -> b
 {-# INLINE par  #-}
 {-# INLINE fork #-}
 
+#ifdef __CONCURRENT_HASKELL__
 seq  x y = case (seq#  x) of { 0# -> parError; _ -> y }
 par  x y = case (par#  x) of { 0# -> parError; _ -> y }
 fork x y = case (fork# x) of { 0# -> parError; _ -> y }
+#else
+seq  x y = y
+par  x y = y
+fork x y = y
+#endif
 
----------------------------------------------------------------
--- HACK: Magic unfoldings not implemented for unboxed lists
---	 Need to define a "build" to avoid undefined symbol
-
-build   = error "GHCbase.build"
-augment = error "GHCbase.augment"
---{-# GENERATE_SPECS build a #-}
---build 		:: ((a -> [a] -> [a]) -> [a] -> [a]) -> [a]
---build g 	= g (:) []
-
-
----------------------------------------------------------------
 -- string-support functions:
 ---------------------------------------------------------------
 
@@ -1210,32 +1207,6 @@ fputs stream [] = return True
 fputs stream (c : cs)
   = _ccall_ stg_putc c stream >> -- stg_putc expands to putc
     fputs stream cs		 -- (just does some casting stream)
-
----------------------------------------------------------------
--- Used for compiler-generated error message;
--- encoding saves bytes of string junk.
-
-absentErr, parError :: a
-irrefutPatError
- , noDefaultMethodError
- , noExplicitMethodError
- , nonExhaustiveGuardsError
- , patError
- , recConError
- , recUpdError :: String -> a
-
-absentErr = error "Oops! The program has entered an `absent' argument!\n"
-parError  = error "Oops! Entered GHCbase.parError (a GHC bug -- please report it!)\n"
-
-irrefutPatError          s = error ("irrefutPatError:"++s)
-noDefaultMethodError     s = error ("noDefaultMethodError:"++s)
-noExplicitMethodError    s = error ("noExplicitMethodError:"++s)
-nonExhaustiveGuardsError s = error ("nonExhaustiveGuardsError:"++s)
-
-patError msg
-  = error__ (\ x -> _ccall_ PatErrorHdrHook x) ("Pattern-matching failed in: "++msg++"\n")
-recConError s = error ("recConError:"++s)
-recUpdError s = error ("recUpdError:"++s)
 
 ---------------------------------------------------------------
 -- ******** defn of `_trace' using Glasgow IO *******

@@ -1,5 +1,0 @@
-BuildPgmFromOneCFile(etags)
-
-InstallBinaryTarget(etags,$(INSTBINDIR))
-
-CDependTarget( $(SRCS_C) )

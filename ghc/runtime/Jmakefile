@@ -72,7 +72,6 @@ RTS_LH =				\
 
 RTS_LC = 				\
 	c-as-asm/CallWrap_C.lc		\
-	c-as-asm/FreeMallocPtr.lc	\
 	c-as-asm/HpOverflow.lc		\
 	c-as-asm/StablePtr.lc		\
 	c-as-asm/StablePtrOps.lc	\
@@ -134,6 +133,7 @@ RTS_LHC = 				\
 
 CLIB_LC = 				\
 	hooks/ErrorHdr.lc		\
+	hooks/FreeForeignObj.lc		\
 	hooks/OutOfHeap.lc		\
 	hooks/OutOfStk.lc		\
 	hooks/OutOfVM.lc		\
@@ -203,11 +203,6 @@ CLIB_OBJS     = $(CLIB_LC:.lc=.o)
 *								*
 ****************************************************************/
 
-#define CompileClibishly(file,flags)				@@\
-CAT2(file,.o) : CAT2(file,.c)					@@\
-	$(RM) $@						@@\
-	$(GHC) -c -o CAT2(file,.o) $(GHCFLAGS) flags CAT2(file,.c)
-
 NormalLibraryTarget(HSclib,$(CLIB_OBJS))
 ExtraStuffToClean($(CLIB_OBJS))
 #if DoInstallGHCSystem == YES
@@ -215,17 +210,18 @@ InstallLibraryTarget(HSclib,$(INSTLIBDIR_GHC))
 #endif
 
 /* all .lc files, so far */
-CompileClibishly(hooks/ErrorHdr,)
-CompileClibishly(hooks/OutOfHeap,)
-CompileClibishly(hooks/OutOfStk,)
-CompileClibishly(hooks/OutOfVM,)
-CompileClibishly(hooks/NoRunnableThrds,)
-CompileClibishly(hooks/PatErrorHdr,)
-CompileClibishly(hooks/TraceHooks,)
-CompileClibishly(hooks/SizeHooks,)
-CompileClibishly(hooks/InitEachPE,)
-CompileClibishly(main/Mallocs,)
-CompileClibishly(main/TopClosure,)
+CompileCBitsly(GHC,hooks/ErrorHdr,)
+CompileCBitsly(GHC,hooks/FreeForeignObj,)
+CompileCBitsly(GHC,hooks/OutOfHeap,)
+CompileCBitsly(GHC,hooks/OutOfStk,)
+CompileCBitsly(GHC,hooks/OutOfVM,)
+CompileCBitsly(GHC,hooks/NoRunnableThrds,)
+CompileCBitsly(GHC,hooks/PatErrorHdr,)
+CompileCBitsly(GHC,hooks/TraceHooks,)
+CompileCBitsly(GHC,hooks/SizeHooks,)
+CompileCBitsly(GHC,hooks/InitEachPE,)
+CompileCBitsly(GHC,main/Mallocs,)
+CompileCBitsly(GHC,main/TopClosure,)
 
 ExtraStuffToClean(main/TopClosure.o)
 
@@ -242,10 +238,10 @@ install :: main/TopClosure.o
 # endif
 
 AllTarget(gum/SysMan)
-gum/SysMan : gum/SysMan_mp.o gum/LLComms_mp.o main/Mallocs.o hooks/OutOfVM.o
+gum/SysMan : gum/SysMan.mp_o gum/LLComms.mp_o main/Mallocs.o hooks/OutOfVM.o
 	$(RM) $@
-	$(CC) -o $@ gum/SysMan_mp.o gum/LLComms_mp.o main/Mallocs.o hooks/OutOfVM.o -L$$PVM_ROOT/lib/$$PVM_ARCH -lpvm3 -lgpvm3 __socket_libs
-ExtraStuffToClean(gum/SysMan_mp.o gum/SysMan)
+	$(CC) -o $@ gum/SysMan.mp_o gum/LLComms.mp_o main/Mallocs.o hooks/OutOfVM.o -L$$PVM_ROOT/lib/$$PVM_ARCH -lpvm3 -lgpvm3 __socket_libs
+ExtraStuffToClean(gum/SysMan.mp_o gum/SysMan)
 # if DoInstallGHCSystem == YES
 install :: gum/SysMan
 	$(INSTALL) -c $(INSTBINFLAGS) gum/SysMan $(INSTLIBDIR_GHC)/SysMan
@@ -261,29 +257,29 @@ install :: gum/SysMan
 /* to build and install the per-build rts stuff */
 
 #ifndef SpecialGhcRtsLibTarget
-#define SpecialGhcRtsLibTarget(tag,objs)					@@\
-AllTarget(CAT3(libHSrts,tag,.a))						@@\
-ExtraStuffToClean(objs CAT3(libHSrts,tag,.a))		 			@@\
-CAT3(libHSrts,tag,.a):: $(H_FILES) objs 					@@\
-	$(RM) $@								@@\
-	$(AR) $@ objs								@@\
+#define SpecialGhcRtsLibTarget(tag,objs)	@@\
+AllTarget(CAT3(libHSrts,tag,.a))		@@\
+ExtraStuffToClean(objs CAT3(libHSrts,tag,.a))	@@\
+CAT3(libHSrts,tag,.a):: $(H_FILES) objs 	@@\
+	$(RM) $@				@@\
+	$(AR) $@ objs				@@\
 	$(RANLIB) $@
 #endif /* SpecialGhcRtsLibTarget */
 
 #ifndef SpecialGhcRtsLibInstallTarget
 #if DoInstallGHCSystem == YES
-#define SpecialGhcRtsLibInstallTarget(tag)					@@\
-install :: CAT3(libHSrts,tag,.a)						@@\
-	$(INSTALL) $(INSTLIBFLAGS) \						@@\
-		CAT3(libHSrts,tag,.a) \						@@\
-		$(INSTLIBDIR_GHC)/CAT3(libHSrts,tag,.a)				@@\
+#define SpecialGhcRtsLibInstallTarget(tag)			@@\
+install :: CAT3(libHSrts,tag,.a)				@@\
+	$(INSTALL) $(INSTLIBFLAGS) \				@@\
+		CAT3(libHSrts,tag,.a) \				@@\
+		$(INSTLIBDIR_GHC)/CAT3(libHSrts,tag,.a)		@@\
 	$(RANLIB) $(INSTLIBDIR_GHC)/CAT3(libHSrts,tag,.a)
 #else /* ! DoInstallGHC... */
 #define SpecialGhcRtsLibInstallTarget(tag) /*nothing*/
 #endif /* ! DoInstallGHC... */
 #endif /* SpecialGhcRtsLibInstallTarget */
 
-#define BigBuildTarget(tag,objs)	\
+#define BigBuildRtsTarget(tag,objs)	\
 SpecialGhcRtsLibTarget(tag,objs)	@@\
 SpecialGhcRtsLibInstallTarget(tag)
 
@@ -297,35 +293,35 @@ SpecialGhcRtsLibInstallTarget(tag)
 MakeDirectories(install, $(INSTLIBDIR_GHC))
 #endif /* DoInstallGHCSystem */
 
-IfBuild_normal(BigBuildTarget(,$(RTS_OBJS_norm)))
-IfBuild_p(BigBuildTarget(_p,   $(RTS_OBJS_p)))
-IfBuild_t(BigBuildTarget(_t,   $(RTS_OBJS_t)))
-IfBuild_u(BigBuildTarget(_u,   $(RTS_OBJS_u)))
-IfBuild_mc(BigBuildTarget(_mc, $(RTS_OBJS_mc)))
-IfBuild_mr(BigBuildTarget(_mr, $(RTS_OBJS_mr)))
-IfBuild_mt(BigBuildTarget(_mt, $(RTS_OBJS_mt)))
-IfBuild_mp(BigBuildTarget(_mp, $(RTS_OBJS_mp)))
-IfBuild_mg(BigBuildTarget(_mg, $(RTS_OBJS_mg)))
-IfBuild_2s(BigBuildTarget(_2s, $(RTS_OBJS_2s)))
-IfBuild_1s(BigBuildTarget(_1s, $(RTS_OBJS_1s)))
-IfBuild_du(BigBuildTarget(_du, $(RTS_OBJS_du)))
-IfBuild_a(BigBuildTarget(_a,   $(RTS_OBJS_a)))
-IfBuild_b(BigBuildTarget(_b,   $(RTS_OBJS_b)))
-IfBuild_c(BigBuildTarget(_c,   $(RTS_OBJS_c)))
-IfBuild_d(BigBuildTarget(_d,   $(RTS_OBJS_d)))
-IfBuild_e(BigBuildTarget(_e,   $(RTS_OBJS_e)))
-IfBuild_f(BigBuildTarget(_f,   $(RTS_OBJS_f)))
-IfBuild_g(BigBuildTarget(_g,   $(RTS_OBJS_g)))
-IfBuild_h(BigBuildTarget(_h,   $(RTS_OBJS_h)))
-IfBuild_i(BigBuildTarget(_i,   $(RTS_OBJS_i)))
-IfBuild_j(BigBuildTarget(_j,   $(RTS_OBJS_j)))
-IfBuild_k(BigBuildTarget(_k,   $(RTS_OBJS_k)))
-IfBuild_l(BigBuildTarget(_l,   $(RTS_OBJS_l)))
-IfBuild_m(BigBuildTarget(_m,   $(RTS_OBJS_m)))
-IfBuild_n(BigBuildTarget(_n,   $(RTS_OBJS_n)))
-IfBuild_o(BigBuildTarget(_o,   $(RTS_OBJS_o)))
-IfBuild_A(BigBuildTarget(_A,   $(RTS_OBJS_A)))
-IfBuild_B(BigBuildTarget(_B,   $(RTS_OBJS_B)))
+IfBuild_normal(BigBuildRtsTarget(,$(RTS_OBJS_norm)))
+IfBuild_p(BigBuildRtsTarget(_p,   $(RTS_OBJS_p)))
+IfBuild_t(BigBuildRtsTarget(_t,   $(RTS_OBJS_t)))
+IfBuild_u(BigBuildRtsTarget(_u,   $(RTS_OBJS_u)))
+IfBuild_mc(BigBuildRtsTarget(_mc, $(RTS_OBJS_mc)))
+IfBuild_mr(BigBuildRtsTarget(_mr, $(RTS_OBJS_mr)))
+IfBuild_mt(BigBuildRtsTarget(_mt, $(RTS_OBJS_mt)))
+IfBuild_mp(BigBuildRtsTarget(_mp, $(RTS_OBJS_mp)))
+IfBuild_mg(BigBuildRtsTarget(_mg, $(RTS_OBJS_mg)))
+IfBuild_2s(BigBuildRtsTarget(_2s, $(RTS_OBJS_2s)))
+IfBuild_1s(BigBuildRtsTarget(_1s, $(RTS_OBJS_1s)))
+IfBuild_du(BigBuildRtsTarget(_du, $(RTS_OBJS_du)))
+IfBuild_a(BigBuildRtsTarget(_a,   $(RTS_OBJS_a)))
+IfBuild_b(BigBuildRtsTarget(_b,   $(RTS_OBJS_b)))
+IfBuild_c(BigBuildRtsTarget(_c,   $(RTS_OBJS_c)))
+IfBuild_d(BigBuildRtsTarget(_d,   $(RTS_OBJS_d)))
+IfBuild_e(BigBuildRtsTarget(_e,   $(RTS_OBJS_e)))
+IfBuild_f(BigBuildRtsTarget(_f,   $(RTS_OBJS_f)))
+IfBuild_g(BigBuildRtsTarget(_g,   $(RTS_OBJS_g)))
+IfBuild_h(BigBuildRtsTarget(_h,   $(RTS_OBJS_h)))
+IfBuild_i(BigBuildRtsTarget(_i,   $(RTS_OBJS_i)))
+IfBuild_j(BigBuildRtsTarget(_j,   $(RTS_OBJS_j)))
+IfBuild_k(BigBuildRtsTarget(_k,   $(RTS_OBJS_k)))
+IfBuild_l(BigBuildRtsTarget(_l,   $(RTS_OBJS_l)))
+IfBuild_m(BigBuildRtsTarget(_m,   $(RTS_OBJS_m)))
+IfBuild_n(BigBuildRtsTarget(_n,   $(RTS_OBJS_n)))
+IfBuild_o(BigBuildRtsTarget(_o,   $(RTS_OBJS_o)))
+IfBuild_A(BigBuildRtsTarget(_A,   $(RTS_OBJS_A)))
+IfBuild_B(BigBuildRtsTarget(_B,   $(RTS_OBJS_B)))
 
 
 /****************************************************************
@@ -334,46 +330,45 @@ IfBuild_B(BigBuildTarget(_B,   $(RTS_OBJS_B)))
 *								*
 ****************************************************************/
 
-#define DoRtsFile(file,isuf,way,flags)					 @@\
+#define DoRtsFile(file,isuf,way,vsuf,flags)				 @@\
 CAT3(file.,way,o) : CAT2(file,isuf)					 @@\
 	$(RM) $@							 @@\
-	$(GHC) -c -o CAT3(file.,way,o) $(GHCFLAGS) flags $(CAT4(GHC,_,way,OPTS)) CAT2(file,isuf)
+	$(GHC) -c -o CAT3(file.,way,o) $(GHCFLAGS) flags $(CAT3(GHC,_OPTS,vsuf)) CAT2(file,isuf)
 
-#define CompileRTSishly(file,isuf,flags)	@@\
-IfBuild_normal(DoRtsFile(file,isuf,,flags))	\
-IfBuild_p(DoRtsFile(file,isuf,p_,   flags))	\
-IfBuild_t(DoRtsFile(file,isuf,t_,   flags))	\
-IfBuild_u(DoRtsFile(file,isuf,u_,   flags))	\
-IfBuild_mc(DoRtsFile(file,isuf,mc_, flags))	\
-IfBuild_mr(DoRtsFile(file,isuf,mr_, flags))	\
-IfBuild_mt(DoRtsFile(file,isuf,mt_, flags))	\
-IfBuild_mp(DoRtsFile(file,isuf,mp_, flags))	\
-IfBuild_mg(DoRtsFile(file,isuf,mg_, flags))	\
-IfBuild_2s(DoRtsFile(file,isuf,2s_, flags))	\
-IfBuild_1s(DoRtsFile(file,isuf,1s_, flags))	\
-IfBuild_du(DoRtsFile(file,isuf,du_, flags))	\
-IfBuild_a(DoRtsFile(file,isuf,a_,   flags))	\
-IfBuild_b(DoRtsFile(file,isuf,b_,   flags))	\
-IfBuild_c(DoRtsFile(file,isuf,c_,   flags))	\
-IfBuild_d(DoRtsFile(file,isuf,d_,   flags))	\
-IfBuild_e(DoRtsFile(file,isuf,e_,   flags))	\
-IfBuild_f(DoRtsFile(file,isuf,f_,   flags))	\
-IfBuild_g(DoRtsFile(file,isuf,g_,   flags))	\
-IfBuild_h(DoRtsFile(file,isuf,h_,   flags))	\
-IfBuild_i(DoRtsFile(file,isuf,i_,   flags))	\
-IfBuild_j(DoRtsFile(file,isuf,j_,   flags))	\
-IfBuild_k(DoRtsFile(file,isuf,k_,   flags))	\
-IfBuild_l(DoRtsFile(file,isuf,l_,   flags))	\
-IfBuild_m(DoRtsFile(file,isuf,m_,   flags))	\
-IfBuild_n(DoRtsFile(file,isuf,n_,   flags))	\
-IfBuild_o(DoRtsFile(file,isuf,o_,   flags))	\
-IfBuild_A(DoRtsFile(file,isuf,A_,   flags))	\
-IfBuild_B(DoRtsFile(file,isuf,B_,   flags))
+#define CompileRTSishly(file,isuf,flags)		@@\
+IfBuild_normal(DoRtsFile(file,isuf,,_norm,flags))	\
+IfBuild_p(DoRtsFile(file,isuf,p_,_p,   	  flags))	\
+IfBuild_t(DoRtsFile(file,isuf,t_,_t,   	  flags))	\
+IfBuild_u(DoRtsFile(file,isuf,u_,_u,   	  flags))	\
+IfBuild_mc(DoRtsFile(file,isuf,mc_,_mc,   flags))	\
+IfBuild_mr(DoRtsFile(file,isuf,mr_,_mr,   flags))	\
+IfBuild_mt(DoRtsFile(file,isuf,mt_,_mt,   flags))	\
+IfBuild_mp(DoRtsFile(file,isuf,mp_,_mp,   flags))	\
+IfBuild_mg(DoRtsFile(file,isuf,mg_,_mg,   flags))	\
+IfBuild_2s(DoRtsFile(file,isuf,2s_,_2s,   flags))	\
+IfBuild_1s(DoRtsFile(file,isuf,1s_,_1s,   flags))	\
+IfBuild_du(DoRtsFile(file,isuf,du_,_du,   flags))	\
+IfBuild_a(DoRtsFile(file,isuf,a_,_a,   	  flags))	\
+IfBuild_b(DoRtsFile(file,isuf,b_,_b,   	  flags))	\
+IfBuild_c(DoRtsFile(file,isuf,c_,_c,   	  flags))	\
+IfBuild_d(DoRtsFile(file,isuf,d_,_d,   	  flags))	\
+IfBuild_e(DoRtsFile(file,isuf,e_,_e,   	  flags))	\
+IfBuild_f(DoRtsFile(file,isuf,f_,_f,   	  flags))	\
+IfBuild_g(DoRtsFile(file,isuf,g_,_g,   	  flags))	\
+IfBuild_h(DoRtsFile(file,isuf,h_,_h,   	  flags))	\
+IfBuild_i(DoRtsFile(file,isuf,i_,_i,   	  flags))	\
+IfBuild_j(DoRtsFile(file,isuf,j_,_j,   	  flags))	\
+IfBuild_k(DoRtsFile(file,isuf,k_,_k,   	  flags))	\
+IfBuild_l(DoRtsFile(file,isuf,l_,_l,   	  flags))	\
+IfBuild_m(DoRtsFile(file,isuf,m_,_m,   	  flags))	\
+IfBuild_n(DoRtsFile(file,isuf,n_,_n,   	  flags))	\
+IfBuild_o(DoRtsFile(file,isuf,o_,_o,   	  flags))	\
+IfBuild_A(DoRtsFile(file,isuf,A_,_A,   	  flags))	\
+IfBuild_B(DoRtsFile(file,isuf,B_,_B,   	  flags))
 
 /* here we go: */
 
 CompileRTSishly(c-as-asm/CallWrap_C,.c,)
-CompileRTSishly(c-as-asm/FreeMallocPtr,.c,)
 CompileRTSishly(c-as-asm/HpOverflow,.c,)
 CompileRTSishly(c-as-asm/PerformIO,.hc,-optc-DIN_GHC_RTS=1)
 CompileRTSishly(c-as-asm/StablePtr,.c,)

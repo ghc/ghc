@@ -14,7 +14,7 @@ IMP_Ubiq()
 IMPORT_1_3(List(partition))
 
 import HsSyn
-import RdrHsSyn		( RdrNameHsModule(..), RdrNameImportDecl(..) )
+import RdrHsSyn		( SYN_IE(RdrNameHsModule), SYN_IE(RdrNameImportDecl) )
 import RnHsSyn		( RnName(..){-.. is for Ix hack only-}, SYN_IE(RenamedHsModule), isRnTyConOrClass, isRnWired )
 
 --ToDo:rm: all for debugging only

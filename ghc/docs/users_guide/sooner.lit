@@ -62,28 +62,8 @@ remotely-mounted disks; then {\em link} on a slow machine that had
 your disks directly mounted.
 
 %----------------------------------------------------------------
-\item[Don't derive \tr{read} for \tr{Text} unnecessarily:]
-When doing \tr{deriving Text},
-use \tr{-fomit-derived-read}\index{-fomit-derived-read option}
-to derive only the \tr{showsPrec} method.  Quicker, smaller code.
-
-%----------------------------------------------------------------
-\item[Don't re-export instance declarations:]
-
-(Note: This recommendation totally violates the Haskell language
-standard.)
-
-The Haskell module system dictates that instance declarations are
-exported and re-exported into interface files with considerable gusto.
-In a large system, especially one with mutually-recursive modules,
-this tendency makes your interface files bigger (bad) and decreases
-the chances that changes will be propagated incorrectly (bad).
-
-If you wish, you may use a language-violating option,
-\tr{-fomit-reexported-instances},
-\index{-fomit-reexported-instances option}
-to get just the effect you might expect.  It can't help but
-speed things up.
+\item[Don't derive/use \tr{Read} unnecessarily:]
+It's ugly and slow.
 
 %----------------------------------------------------------------
 \item[GHC compiles some program constructs slowly:]
@@ -162,7 +142,9 @@ faster''...
 to make your program go faster.  Compilation time will be slower,
 especially with \tr{-O2}.
 
-At version~0.26, \tr{-O2} is nearly indistinguishable from \tr{-O}.
+At present, \tr{-O2} is nearly indistinguishable from \tr{-O}.
+
+At version 2.01, \tr{-O} is a dodgy proposition, no matter what.
 
 %----------------------------------------------------------------
 \item[Compile via C and crank up GCC:] Even with \tr{-O}, GHC tries to
@@ -262,11 +244,6 @@ type signatures; e.g.,:
 \begin{verbatim}
 % egrep '^[a-z].*::.*=>' *.hi
 \end{verbatim}
-
-Note: explicit export lists sometimes ``mask'' overloaded top-level
-functions; i.e., you won't see anything about them in the interface
-file.  I sometimes remove my export list temporarily, just to see what
-pops out.
 \end{description}
 
 %----------------------------------------------------------------
@@ -488,8 +465,7 @@ option for the extreme case. (``Only unfoldings with zero cost should proceed.''
 (Note: I have not been too successful at producing code smaller
 than that which comes out with \tr{-O}.  WDP 94/12)
 
-Use \tr{-fomit-derived-read} if you are using a lot of derived
-instances of \tr{Text} (and don't need the read methods).
+Avoid \tr{Read}.
 
 Use \tr{strip} on your executables.
 

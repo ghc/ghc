@@ -84,7 +84,7 @@ void get_opcode_and_sender PROTO((PACKET p, OPCODE *popcode, GLOBAL_TASK_ID *pse
 GLOBAL_TASK_ID *PEStartUp PROTO((unsigned nPEs));
 void PEShutDown(STG_NO_ARGS);
 
-void (*ExceptionHandler)(STG_NO_ARGS);
+void (*ExceptionHandler) PROTO((PACKET));
 
 #endif /*PAR */
 #endif /*defined __LLC_H */

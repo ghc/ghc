@@ -120,7 +120,8 @@ pprMatch sty is_case first_match
       = ([], pprGRHSsAndBinds sty is_case grhss_n_binds)
 
     ppr_match sty is_case (SimpleMatch expr)
-      = ([], ppr sty expr)
+      = ([], ppHang (ppStr (if is_case then "->" else "="))
+		 4 (ppr sty expr))
 
 ----------------------------------------------------------
 

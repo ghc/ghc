@@ -266,8 +266,8 @@ is used by most of the current garbage collectors.
 Mark (GC) register mapping:
 
 \begin{verbatim}
-	    	sparc  m68k  alpha  mipseX  hppa  iX86  rs6000
-        	-----  ----  -----  ------  ----  ----  ------
+	    	sparc  m68k  alpha  mipseX  hppa  iX86  powerpc
+        	-----  ----  -----  ------  ----  ----  -------
 MarkBase					  ebx
 		
 Mark	    	i0     a2    $9	    $16	    r4	  ebp
@@ -427,8 +427,8 @@ reside in global registers, because the scan code is not threaded.
 Scan (GC) register mapping:
 
 \begin{verbatim}
-	    	sparc  m68k  alpha  mipseX  hppa  iX86  rs6000
-        	-----  ----  -----  ------  ----  ----  ------
+	    	sparc  m68k  alpha  mipseX  hppa  iX86  powerpc
+        	-----  ----  -----  ------  ----  ----  -------
 ScanBase   	g4
 		
 Scan	    	       a2    $9	    $16	    r4    ebx
@@ -558,8 +558,8 @@ etc. or there'll be trouble. ADR
 Scavenge (GC) register mapping:
 
 \begin{verbatim}
-	    	sparc  m68k  alpha  mipseX  hppa  iX86  rs6000
-        	-----  ----  -----  ------  ----  ----  ------
+	    	sparc  m68k  alpha  mipseX  hppa  iX86  powerpc
+        	-----  ----  -----  ------  ----  ----  -------
 ScavBase   	g4
 		
 Scav	    	       a2    $9	    $16	    r4    ebx
@@ -734,8 +734,8 @@ IF YOU CHANGE THIS TABLE, YOU MAY NEED TO CHANGE CallWrapper.s
 documentation in the porter's part of the installation guide.
 
 \begin{verbatim}
-                sparc  m68k  alpha  mipseX  hppa   iX86  rs6000
-                -----  ----  -----  ------  ----   ----  ------
+                sparc  m68k  alpha  mipseX  hppa   iX86  powerpc
+                -----  ----  -----  ------  ----   ----  -------
 BaseReg#               a5                          ebx
 
 StkOReg								(CONCURRENT)       

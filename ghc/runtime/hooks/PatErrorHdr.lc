@@ -2,8 +2,7 @@
 #include "rtsdefs.h"
 
 void
-PatErrorHdrHook (where)
-  FILE *where;
+PatErrorHdrHook (FILE *where)
 {
     fprintf(where, "\nFail: ");
 }

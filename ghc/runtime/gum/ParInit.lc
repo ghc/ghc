@@ -156,7 +156,7 @@ SynchroniseSystem(STG_NO_ARGS)
     for (i = 0; i < nPEs; ++i)
 	registerTask(PEs[i]);
 
-/*  pvm_notify( PvmTaskExit, PP_FAIL, 1, &SysManTask);  /* Setup an error handler */
+/*  pvm_notify( PvmTaskExit, PP_FAIL, 1, &SysManTask);  /? Setup an error handler */
 
     /* Initialise the PE task array? */
 }

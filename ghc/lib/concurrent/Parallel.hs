@@ -12,6 +12,7 @@ module Parallel (par, seq -- re-exported
     ) where
 
 import GHCbase ( par, seq )
+import GHCerr  ( parError )
 
 #if defined(__GRANSIM__)
 

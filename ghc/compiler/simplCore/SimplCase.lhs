@@ -511,7 +511,8 @@ simplAlts env scrut (AlgAlts alts deflt) rhs_c
 	    new_env = case scrut of
 		       Var v -> extendEnvGivenNewRhs env1 v (Con con args)
 			     where
-				(_, ty_args, _) = getAppDataTyConExpandingDicts (idType v)
+				(_, ty_args, _) = --trace "SimplCase.getAppData..." $
+						  getAppDataTyConExpandingDicts (idType v)
 				args = map TyArg ty_args ++ map VarArg con_args'
 
 		       other -> env1
@@ -775,7 +776,8 @@ mkCoCase env scrut (AlgAlts outer_alts
 	 v | scrut_is_var = Var scrut_var
 	   | otherwise    = Con con (map TyArg arg_tys ++ map VarArg args)
 
-    arg_tys = case (getAppDataTyConExpandingDicts (idType deflt_var)) of
+    arg_tys = --trace "SimplCase:getAppData...:2" $
+	      case (getAppDataTyConExpandingDicts (idType deflt_var)) of
 		(_, arg_tys, _) -> arg_tys
 
 mkCoCase env scrut (PrimAlts

@@ -109,6 +109,9 @@ openAlphaTy = mkTyVarTy openAlphaTyVar
 
 errorTy  :: Type
 errorTy  = mkSigmaTy [openAlphaTyVar] [] (mkFunTys [mkListTy charTy] openAlphaTy)
+    -- Notice the openAlphaTyVar.  It says that "error" can be applied
+    -- to unboxed as well as boxed types.  This is OK because it never
+    -- returns, so the return type is irrelevant.
 \end{code}
 
 We want \tr{GHCbase.trace} to be wired in

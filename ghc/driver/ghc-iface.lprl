@@ -20,8 +20,21 @@ sub postprocessHiFile {
 
     # run diff if they asked for it
     if ($HiDiff_flag && ! $HiOnStdout && ! $going_interactive && -f $hifile_target) {
-	&run_something("$Cmp -s $hifile_target $new_hi || $Diff $hifile_target $new_hi 1>&2 || exit 0",
-	    "Diff'ing old and new .$HiSuffix files"); # NB: to stderr
+	if ( $HiDiff_flag eq 'usages' ) {
+	    # lots of near-useless info; but if you want it...
+	    &run_something("$Cmp -s $hifile_target $new_hi || $Diff $hifile_target $new_hi 1>&2 || exit 0",
+		"Diff'ing old and new .$HiSuffix files"); # NB: to stderr
+	} else {
+	    # strip out usages, *then* run diff
+	    local($hi_before) = "$Tmp_prefix.hi-before";
+	    local($hi_after)  = "$Tmp_prefix.hi-now";
+
+	    &deUsagifyHi($hifile_target, $hi_before);
+	    &deUsagifyHi($new_hi,	 $hi_after);
+
+	    &run_something("$Cmp -s $hi_before $hi_after || $Diff $hi_before $hi_after 1>&2 || exit 0",
+		"Diff'ing old and new .$HiSuffix files"); # NB: to stderr
+	}
     }
 
     # if we produced an interface file "no matter what",
@@ -32,6 +45,34 @@ sub postprocessHiFile {
 	&run_something("$Cmp -s $hifile_target $new_hi || ( $Rm $hifile_target && $Cp $new_hi $hifile_target )",
 	   "Replace .$HiSuffix file, if changed");
     }
+}
+
+sub deUsagifyHi {
+    local($ifile,$ofile) = @_;
+
+    open(OLDHIF, "< $ifile") || &tidy_up_and_die(1,"Can't open $ifile (read)\n");
+    open(NEWHIF, "> $ofile") || &tidy_up_and_die(1,"Can't open $ofile (write)\n");
+
+    # read up to __usages__ line
+    $_ = <OLDHIF>;
+    while ($_ ne '' && ! /^__usages__/) {
+	print NEWHIF $_ unless /^(interface |\{-# GHC_PRAGMA)/;
+	$_ = <OLDHIF>;
+    }
+    if ( $_ ne '' ) {
+	# skip to next __<anything> line
+	$_ = <OLDHIF>;
+	while ($_ ne '' && ! /^__/) { $_ = <OLDHIF>; }
+
+	# print the rest
+	while ($_ ne '') {
+	    print NEWHIF $_;
+	    $_ = <OLDHIF>;
+	}
+    }
+
+    close(OLDHIF) || &tidy_up_and_die(1,"Failed reading from $ifile\n");
+    close(NEWHIF) || &tidy_up_and_die(1,"Failed writing to $ofile\n");
 }
 \end{code}
 
@@ -135,6 +176,7 @@ sub readHiFile {
     local($now_in) = '';
     hi_line: while (<HIFILE>) {
 	next if /^ *$/; # blank line
+	next if /\{-# GHC_PRAGMA INTERFACE VERSION 20 #-\}/;
 
 	# avoid pre-1.3 interfaces
 #print STDERR "now_in:$now_in:$_";
@@ -237,7 +279,8 @@ sub printNewItemVersion {
     local($item, $mod_version) = @_;
 
     if (! defined($Decl{"new:$item"}) ) {
-	print STDERR "$item: no decl?! (nothing into __versions__)\n";
+# it's OK, because the thing is almost-certainly wired-in
+#	print STDERR "$item: no decl?! (nothing into __versions__)\n";
 	return;
     }
 

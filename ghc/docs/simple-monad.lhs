@@ -257,7 +257,7 @@ code you're likely to write or see will look like the stuff in here.
 Comments, suggestions, etc., to me, please.
 
 Will Partain
-partain@dcs.glasgow.ac.uk
+partain@dcs.gla.ac.uk
 
 % compile with:
 %   ghc -cpp <other-flags> Foo.lhs

@@ -48,7 +48,7 @@ import IdInfo		( arityMaybe, bottomIsGuaranteed )
 import Literal		( isNoRepLit, isLitLitLit )
 import Pretty
 import TyCon		( tyConFamilySize )
-import Type		( getAppDataTyConExpandingDicts )
+import Type		( maybeAppDataTyConExpandingDicts )
 import UniqSet		( emptyUniqSet, unitUniqSet, mkUniqSet,
 			  addOneToUniqSet, unionUniqSets
 			)
@@ -229,10 +229,16 @@ calcUnfoldingGuidance scc_s_OK bOMB_OUT_SIZE expr
 			(length val_binders)
 			(map discount_for val_binders)
 			size
-	       discount_for b | b `is_elem` cased_args = tyConFamilySize tycon
-			      | otherwise	       = 0
-			      where
-				(tycon, _, _) = getAppDataTyConExpandingDicts (idType b)
+
+	       discount_for b
+	         | is_data && b `is_elem` cased_args = tyConFamilySize tycon
+		 | otherwise = 0
+		 where
+		   (is_data, tycon)
+		     = --trace "CoreUnfold.getAppDataTyConExpandingDicts:1" $ 
+			case (maybeAppDataTyConExpandingDicts (idType b)) of
+			  Nothing       -> (False, panic "discount")
+			  Just (tc,_,_) -> (True,  tc)
 	   in
 	   -- pprTrace "calcUnfold:" (ppAbove (ppr PprDebug uf) (ppr PprDebug expr))
 	   uf
@@ -307,7 +313,7 @@ sizeExpr scc_s_OK bOMB_OUT_SIZE args expr
     ------------
     size_up_alts scrut_ty (AlgAlts alts deflt)
       = foldr (addSize . size_alg_alt) (size_up_deflt deflt) alts
-		`addSizeN` (tyConFamilySize tycon)
+		`addSizeN` (if is_data then tyConFamilySize tycon else 1{-??-})
 	-- NB: we charge N for an alg. "case", where N is
 	-- the number of constructors in the thing being eval'd.
 	-- (You'll eventually get a "discount" of N if you
@@ -316,8 +322,11 @@ sizeExpr scc_s_OK bOMB_OUT_SIZE args expr
 	size_alg_alt (con,args,rhs) = size_up rhs
 	    -- Don't charge for args, so that wrappers look cheap
 
-	(tycon, _, _) = --trace "CoreUnfold.getAppDataTyConExpandingDicts" $ 
-			getAppDataTyConExpandingDicts scrut_ty
+	(is_data,tycon)
+	  = --trace "CoreUnfold.getAppDataTyConExpandingDicts:2" $ 
+	    case (maybeAppDataTyConExpandingDicts scrut_ty) of
+	      Nothing       -> (False, panic "size_up_alts")
+	      Just (tc,_,_) -> (True, tc)
 
     size_up_alts _ (PrimAlts alts deflt)
       = foldr (addSize . size_prim_alt) (size_up_deflt deflt) alts
@@ -345,7 +354,6 @@ sizeExpr scc_s_OK bOMB_OUT_SIZE args expr
     sizeZero  = Just (0, [])
     sizeOne   = Just (1, [])
     sizeN n   = Just (n, [])
-    sizeVar v = Just (0, [v])
 
     addSizeN Nothing _ = Nothing
     addSizeN (Just (n, xs)) m

@@ -2,12 +2,12 @@
 # a simple wrapper to test a .s-file mangler
 # reads stdin, writes stdout
 
-$which = $ARGV[0]; shift; # nice error checking, Will
+$TargetPlatform = $ARGV[0]; shift; # nice error checking, Will
 
-require("ghc-asm-$which.prl") || die "require mangler failed!\n";
+require("ghc-asm.prl") || die "require mangler failed!\n";
 
 $SpX86Mangling = 1;
-$StolenX86Regs = 5;
+$StolenX86Regs = 4;
 
 open(INP, "> /tmp/mangle1.$$") || die "Can't open tmp file 1\n";
 while (<>) {

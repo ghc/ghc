@@ -88,10 +88,10 @@ typedef struct cc {
     char *group;           	/* name of group  in which _scc_ occurs */
 
     char is_subsumed;		/* 'B'  => *not* a CAF/dict/sub cc	*/
-				/* 'S'  => *is* a subsumed cc		*/
+				/* 's'  => *is* a subsumed cc		*/
 				/* 'c'  => *is* a CAF cc		*/
 				/* 'd'  => *is* a dictionary cc		*/
-				/* IS_CAF_OR_DICT tests for lowercase bit */
+				/* IS_CAF_OR_DICT_OR_SUB_CC tests for lowercase bit */
 
     /* Statistics Gathered */
 

@@ -108,6 +108,18 @@ typedef struct event {
   struct event *next;
   } *eventq;
 
+#if (defined(GCap) || defined(GCgn))
+typedef struct clos      /* a queue of ex-RBHs (needed for gen GC only) */
+{
+  struct clos *prev, *next;
+  P_ closure;
+} *closq;
+
+#define CLOS_CLOSURE(clos)  (clos->closure)
+#define CLOS_PREV(clos)     (clos->prev)
+#define CLOS_NEXT(clos)     (clos->next)
+#endif
+
 /* Macros for accessing components of the event structure */ 
 #define EVENT_PROC(evt)	(evt->proc)
 #define EVENT_CREATOR(evt)	(evt->creator)
@@ -121,10 +133,6 @@ typedef struct event {
 
 /* Maximum number of PEs that can be simulated */
 #define MAX_PROC (BITS_IN(W_))
-
-#if 0
-extern W_ IdleProcs, Idlers; 
-#endif
 
 /* Processor numbers to bitmasks and vice-versa */
 #define MainProc	     0           /* Id of main processor */
@@ -235,6 +243,8 @@ void newevent PROTO((PROC proc, PROC creator, TIME time, EVTTYPE
 			    evttype, P_	tso, P_ node, sparkq spark));
 void prepend_event PROTO((eventq event));
 eventq grab_event PROTO((STG_NO_ARGS));
+void traverse_eventq_for_gc PROTO((STG_NO_ARGS));
+
 void print_event PROTO((eventq event));
 void print_eventq PROTO((eventq hd));
 void print_spark PROTO((sparkq spark));
@@ -273,8 +283,8 @@ IF_RTS(void end_gr_simulation(STG_NO_ARGS);)
    simulated packet buffer size.
 */
 
-#define GRANSIM_DEFAULT_PACK_BUFFER_SIZE     200
-#define REALLOC_SZ                           50
+#define GRANSIM_DEFAULT_PACK_BUFFER_SIZE     400
+#define REALLOC_SZ                           200
 
 /* extern W_ gran_mpacktime, gran_mtidytime, gran_munpacktime; */
 

@@ -1,7 +1,6 @@
 /* stuff to have before we get going */
 MsubNeededHere(ghc)
 UnlitNeededHere(depend)
-InfoStuffNeededHere(docs)
 
 DYN_LOADABLE_BITS = \
 	ghc-asm.prl \

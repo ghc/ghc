@@ -1,0 +1,7 @@
+state-interface.dvi : state-interface.tex
+	$(RM) state-interface.dvi
+	latex state-interface.tex
+
+state-interface.tex : state-interface.verb
+	$(RM) state-interface.tex
+	expand state-interface.verb | verbatim > state-interface.tex

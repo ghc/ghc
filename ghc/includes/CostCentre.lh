@@ -47,7 +47,7 @@ source using the @CC_DECLARE@ macro where @label@, @module@ and
 \begin{code} 
 # define CC_IS_CAF      'c'
 # define CC_IS_DICT     'd'
-# define CC_IS_SUBSUMED 'S'
+# define CC_IS_SUBSUMED 's'
 # define CC_IS_BORING   'B'
 
 # define STATIC_CC_REF(cc_ident) &CAT2(cc_ident,_struct)
@@ -156,10 +156,8 @@ CC_EXTERN(CC_DONTZuCARE);  	/* placeholder only */
 CC_EXTERN(CC_CAFs);		/* prelude cost centre (CAFs  only) */
 CC_EXTERN(CC_DICTs);		/* prelude cost centre (DICTs only) */
 
-# define IS_CAF_OR_DICT_CC(cc) \
+# define IS_CAF_OR_DICT_OD_SUB_CC(cc) \
     ((cc)->is_subsumed & ' ') 	/* tests for lower case character */
-
-# define IS_SUBSUMED_CC(cc) ((cc)->is_subsumed == CC_IS_SUBSUMED)
 
 \end{code}
 
@@ -268,7 +266,7 @@ On entering a closure we only count the enter to thunks ...
 	do {						\
 	CostCentre cc = (CostCentre) (centre);		\
 	ASSERT_IS_REGISTERED(cc,1);			\
-	if ( ! IS_CAF_OR_DICT_CC(cc) ) {		\
+	if ( ! IS_CAF_OR_DICT_OR_SUB_CC(cc) ) {		\
 	    CCC = cc;					\
 	} else {					\
 	    CCC_DETAIL_COUNT(cc->caffun_subsumed); 	\
@@ -308,7 +306,7 @@ On entering a closure we only count the enter to thunks ...
 	do {						\
 	CostCentre cc = (CostCentre) (centre);		\
 	ASSERT_IS_REGISTERED(cc,1);			\
-	if ( ! IS_CAF_OR_DICT_CC(cc) ) {		\
+	if ( ! IS_CAF_OR_DICT_OR_SUB_CC(cc) ) {		\
 	    CCC = cc;					\
 	} else {					\
 	    CCC_DETAIL_COUNT(cc->caffun_subsumed); 	\

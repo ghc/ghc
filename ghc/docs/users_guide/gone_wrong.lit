@@ -49,40 +49,40 @@ how you get along.
 This is a bug just as surely as a ``panic.'' Please report it.
 
 %-------------------------------------------------------------------
-\item[``Some confusion about a value specialised to a type...''  Huh???]
-(A deeply obscure and unfriendly error message.)
-
-This message crops up when the typechecker sees a reference in an
-interface pragma to a specialisation of an overloaded value
-(function); for example, \tr{elem} specialised for type \tr{[Char]}
-(\tr{String}).  The problem is: it doesn't {\em know} that such a
-specialisation exists!
-
-The cause of this problem is (please report any other cases...): The
-compiler has imported pragmatic info for the value in question from
-more than one interface, and the multiple interfaces did not agree
-{\em exactly} about the value's pragmatic info.  Since the compiler
-doesn't know whom to believe, it believes none of them.
-
-The cure is to re-compile the modules that {\em re-export} the
-offending value (after possibly re-compiling its defining module).
-Now the pragmatic info should be exactly the same in every case, and
-things should be fine.
+% \item[``Some confusion about a value specialised to a type...''  Huh???]
+% (A deeply obscure and unfriendly error message.)
+% 
+% This message crops up when the typechecker sees a reference in an
+% interface pragma to a specialisation of an overloaded value
+% (function); for example, \tr{elem} specialised for type \tr{[Char]}
+% (\tr{String}).  The problem is: it doesn't {\em know} that such a
+% specialisation exists!
+% 
+% The cause of this problem is (please report any other cases...): The
+% compiler has imported pragmatic info for the value in question from
+% more than one interface, and the multiple interfaces did not agree
+% {\em exactly} about the value's pragmatic info.  Since the compiler
+% doesn't know whom to believe, it believes none of them.
+% 
+% The cure is to re-compile the modules that {\em re-export} the
+% offending value (after possibly re-compiling its defining module).
+% Now the pragmatic info should be exactly the same in every case, and
+% things should be fine.
 
 %-------------------------------------------------------------------
-\item[``Can't see the data constructors for a ccall/casm'' Huh?]
-GHC ``unboxes'' C-call arguments and ``reboxes'' C-call results for you.
-To do this, it {\\em has} to be able to see the types fully;
-abstract types won't do!
-
-Thus, if you say \tr{data Foo = Foo Int#}
-(a cool ``boxed primitive'' type), but then make it abstract
-(only \tr{data Foo} appears in the interface), then GHC can't figure
-out what to do with \tr{Foo} arguments/results to C-calls.
-
-Solutions: either make the type unabstract, or compile with \tr{-O}.
-With the latter, the constructor info will be passed along in
-the interface pragmas.
+% \item[``Can't see the data constructors for a ccall/casm'' Huh?]
+% GHC ``unboxes'' C-call arguments and ``reboxes'' C-call results for you.
+% To do this, it {\\em has} to be able to see the types fully;
+% abstract types won't do!
+% 
+% Thus, if you say \tr{data Foo = Foo Int#}
+% (a cool ``boxed primitive'' type), but then make it abstract
+% (only \tr{data Foo} appears in the interface), then GHC can't figure
+% out what to do with \tr{Foo} arguments/results to C-calls.
+% 
+% Solutions: either make the type unabstract, or compile with \tr{-O}.
+% With the latter, the constructor info will be passed along in
+% the interface pragmas.
 
 %-------------------------------------------------------------------
 \item[``This is a terrible error message.'']
@@ -222,7 +222,8 @@ extra checking) to your compilation options.
 So, before you report a bug because of a core dump, you should probably:
 \begin{verbatim}
 % rm *.o        # scrub your object files
-% make my_prog  # re-make your program; use -hi-diffs to highlight changes
+% make my_prog  # re-make your program; use -hi-diffs to highlight changes;
+		# as mentioned above, use -dcore-lint to be more paranoid
 % ./my_prog ... # retry...
 \end{verbatim}
 
@@ -259,7 +260,7 @@ arithmetic uncheckiness might cause an exception, too...
 
 Glasgow Haskell is a changing system so there are sure to be bugs in
 it.  Please report them to
-\tr{glasgow-haskell-bugs@dcs.glasgow.ac.uk}!  (However, please check
+\tr{glasgow-haskell-bugs@dcs.gla.ac.uk}!  (However, please check
 the earlier part of this section to be sure it's not a known
 not-really-a problem.)
 
@@ -268,7 +269,7 @@ Don't omit them because ``Oh, they won't be interested...''
 \begin{enumerate}
 \item
 What kind of machine are you running on, and exactly what version of the
-operating system are you using? (\tr{cat /etc/motd} often shows the desired
+operating system are you using? (\tr{uname -a} or \tr{cat /etc/motd} will show the desired
 information.)
 
 \item

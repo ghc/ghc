@@ -106,8 +106,7 @@ compilation system & ``start here''& ``stop after''& output file \\ \hline
 
 literate pre-processor & .lhs      & -      & - \\
 C pre-processor (opt.) & -         & -      & - \\
-Haskell parser      & .hs       & -      & -  \\
-Haskell compiler    & -    & -C, -S     & .hc, .s \\
+Haskell compiler    & .hs    & -C, -S     & .hc, .s \\
 C compiler (opt.)       & .hc or .c & -S            & .s  \\
 assembler              & .s        & -c     & .o  \\
 linker                 & other     & -      & a.out \\
@@ -183,7 +182,7 @@ The avoided ``dangerous'' optimisations are those that can make
 runtime or space {\em worse} if you're unlucky.  They are
 normally turned on or off individually.
 
-As of version~0.26, \tr{-O2} is {\em unlikely} to produce
+At the moment, \tr{-O2} is {\em unlikely} to produce
 better code than \tr{-O}.
 
 % \item[\tr{-O0}:]
@@ -266,16 +265,13 @@ So, for example, you can say
 strictness analyser.
 
 The options you are most likely to want to turn off are:
-\tr{-fno-update-analysis}\index{-fno-update-analysis option} [because
-it is sometimes slow],
 \tr{-fno-strictness}\index{-fno-strictness option} (strictness
 analyser [because it is sometimes slow]),
 \tr{-fno-specialise}\index{-fno-specialise option} (automatic
 specialisation of overloaded functions [because it makes your code
 bigger]) [US spelling also accepted],
 and
-\tr{-fno-foldr-build}\index{-fno-foldr-build option} [because no-one
-knows what Andy Gill made it do].
+\tr{-fno-foldr-build}\index{-fno-foldr-build option}.
 
 Should you wish to turn individual flags {\em on}, you are advised to
 use the \tr{-Ofile} option, described above.  Because the order in
@@ -286,11 +282,11 @@ Here are some ``dangerous'' optimisations you {\em might} want to try:
 \begin{description}
 %------------------------------------------------------------------
 \item[\tr{-funfolding-creation-threshold<n>}:]
-(Default: 30) By raising or lowering this number, you can raise or lower the
-amount of pragmatic junk that gets spewed into interface files.
-(An unfolding has a ``size'' that reflects the cost in terms of ``code
-bloat'' of expanding that unfolding in another module.  A bigger
-Core expression would be assigned a bigger cost.)
+(Default: 30) By raising or lowering this number, you can raise or
+lower the amount of pragmatic junk that gets spewed into interface
+files.  (An unfolding has a ``size'' that reflects the cost in terms
+of ``code bloat'' of expanding that unfolding in another module.  A
+bigger Core expression would be assigned a bigger cost.)
 
 \item[\tr{-funfolding-use-threshold<n>}:]
 (Default: 3) By raising or lowering this number, you can make the
@@ -316,13 +312,13 @@ with the bigger-but-better one?  Yes, if the bigger one's ``size'' is
 still under the ``override threshold.''  You can use this flag to
 adjust this threshold (why, I'm not sure).
 
-\item[\tr{-fliberated-case-threshold<n>}:]
-(Default: 12) [Vastly obscure: NOT IMPLEMENTED YET]
-``Case liberation'' lifts evaluation out of recursive functions; it
-does this by duplicating code.  Done without constraint, you can get
-serious code bloat; so we only do it if the ``size'' of the duplicated
-code is smaller than some ``threshold.''  This flag can fiddle that
-threshold.
+% \item[\tr{-fliberated-case-threshold<n>}:]
+% (Default: 12) [Vastly obscure: NOT IMPLEMENTED YET]
+% ``Case liberation'' lifts evaluation out of recursive functions; it
+% does this by duplicating code.  Done without constraint, you can get
+% serious code bloat; so we only do it if the ``size'' of the duplicated
+% code is smaller than some ``threshold.''  This flag can fiddle that
+% threshold.
 
 \item[\tr{-fsemi-tagging}:]
 This option (which {\em does not work} with the native-code generator)
@@ -331,7 +327,7 @@ values.  You win if you have lots of such values during a run of your
 program, you lose otherwise.  (And you pay in extra code space.)
 
 We have not played with \tr{-fsemi-tagging} enough to recommend it.
-(For all we know, it doesn't even work in 0.26.  Sigh.)
+(For all we know, it doesn't even work anymore...  Sigh.)
 \end{description}
 
 %----------------------------------------------------------------------
@@ -365,23 +361,29 @@ We have not played with \tr{-fsemi-tagging} enough to recommend it.
 Some flags only make sense for particular target platforms.
 
 \begin{description}
+\item[\tr{-mv8}:]
+(SPARC machines)\index{-mv8 option (SPARC only)}
+Means to pass the like-named option to GCC; it says to use the
+Version 8 SPARC instructions, notably integer multiply and divide.
+The similiar \tr{-m*} GCC options for SPARC also work, actually.
+
 \item[\tr{-mlong-calls}:]
 (HPPA machines)\index{-mlong-calls option (HPPA only)}
 Means to pass the like-named option to GCC.  Required for Very Big
 modules, maybe.  (Probably means you're in trouble...)
 
-\item[\tr{-monly-[432]-regs}:]
+\item[\tr{-monly-[32]-regs}:]
 (iX86 machines)\index{-monly-N-regs option (iX86 only)}
-GHC tries to ``steal'' five registers from GCC, for performance
+GHC tries to ``steal'' four registers from GCC, for performance
 reasons; it almost always works.  However, when GCC is compiling some
-modules with five stolen registers, it will crash, probably saying:
+modules with four stolen registers, it will crash, probably saying:
 \begin{verbatim}
 Foo.hc:533: fixed or forbidden register was spilled.
 This may be due to a compiler bug or to impossible asm
 statements or clauses.
 \end{verbatim}
-Just give some registers back with \tr{-monly-N-regs}.  Try `4' first,
-then `3', then `2'.  If `2' doesn't work, please report the bug to us.
+Just give some registers back with \tr{-monly-N-regs}.  Try `3' first,
+then `2'.  If `2' doesn't work, please report the bug to us.
 \end{description}
 
 %----------------------------------------------------------------------
@@ -389,7 +391,7 @@ then `3', then `2'.  If `2' doesn't work, please report the bug to us.
 \index{optimisation by GCC}
 \index{GCC optimisation}
 
-The C~compiler, normally GCC, is run with \tr{-O} turned on.  (It has
+The C~compiler (GCC) is run with \tr{-O} turned on.  (It has
 to be, actually.)
 
 If you want to run GCC with \tr{-O2}---which may be worth a few
@@ -440,7 +442,7 @@ One file is usually an {\em interface file}.  If compiling
 \tr{bar/Foo.hs}, the interface file would normally be \tr{bar/Foo.hi}.
 The interface output may be directed to another file
 \tr{bar2/Wurble.iface} with the option
-\tr{-ohi bar2/Wurble.iface}\index{-ohi <file> option}.
+\tr{-ohi bar2/Wurble.iface}\index{-ohi <file> option} (not recommended).
 
 To avoid generating an interface file at all, use a \tr{-nohi}
 option.\index{-nohi option}
@@ -450,6 +452,11 @@ the new one is byte-for-byte the same as the old one; this is friendly to
 \tr{make}.  When an interface does change, it is often enlightening to
 be informed.  The \tr{-hi-diffs}\index{-hi-diffs option} option will
 make \tr{ghc} run \tr{diff} on the old and new \tr{.hi} files.
+
+The \tr{.hi} files from GHC 2.xx contain ``usage'' information which
+changes often and uninterestingly.  If you really want to see these
+changes reported, you need to use the
+\tr{-hi-diffs-with-usages}\index{-hi-diffs-with-usages option} option.
 
 GHC's non-interface output normally goes into a \tr{.hc}, \tr{.o},
 etc., file, depending on the last-run compilation phase.  The option
@@ -495,7 +502,12 @@ that your read.
 The \tr{-hisuf}/\tr{-osuf} game is useful if you want to compile a
 program with both GHC and HBC (say) in the same directory.  Let HBC
 use the standard \tr{.hi}/\tr{.o} suffixes; add
-\tr{-hisuf _g.hi -osuf _g.o} to your \tr{make} rule for GHC compiling...
+\tr{-hisuf g_hi -osuf g_o} to your \tr{make} rule for GHC compiling...
+
+NB: {\em A change from 0.26 and before:} Before, you might have said
+\tr{-hisuf _g.hi -osuf _g.o}; now, the \tr{.} is assumed and you
+specify what comes {\em after} it.  (This is a more portable solution
+for the long term.)
 
 % THIS SHOULD HAPPEN AUTOMAGICALLY:
 % If you want to change the suffix looked for on system-supplied
@@ -547,11 +559,9 @@ colon-separated list of \tr{dirs} to the ``import directories'' list.
 
 A plain \tr{-i} resets the ``import directories'' list back to nothing.
 
-GHC normally imports \tr{PreludeCore.hi} and \tr{Prelude.hi} files for
-you.  If you'd rather it didn't, then give it a
-\tr{-fno-implicit-prelude} option\index{-fno-implicit-prelude option}.
-(Sadly, it still has to {\em find} a \tr{PreludeNull_.hi} file; it
-just won't feed it into the compiler proper.)  You are unlikely to get
+GHC normally imports \tr{Prelude.hi} files for you.  If you'd rather
+it didn't, then give it a \tr{-fno-implicit-prelude}
+option\index{-fno-implicit-prelude option}.  You are unlikely to get
 very far without a Prelude, but, hey, it's a free country.
 
 If you are using a system-supplied non-Prelude library (e.g., the HBC
@@ -610,7 +620,7 @@ Undefine macro \tr{<foo>} in the usual way.
 \item[\tr{-I<dir>}:]
 \index{-I<dir> option}
 Specify a directory in which to look for \tr{#include} files, in
-the usual UNIX/C way.
+the usual C way.
 \end{description}
 
 The \tr{ghc} driver pre-defines several macros:
@@ -619,18 +629,18 @@ The \tr{ghc} driver pre-defines several macros:
 \index{__HASKELL1__ macro}
 If defined to $n$, that means GHC supports the
 Haskell language defined in the Haskell report version $1.n$.
-Currently 2.
+Currently 3.
 
 NB: This macro is set both when pre-processing Haskell source and
 when pre-processing generated C (\tr{.hc}) files.
 
-If you give the \tr{-fhaskell-1.3} flag\index{-fhaskell-1.3 option},
-then \tr{__HASKELL1__} is set to 3.  Obviously.
+% If you give the \tr{-fhaskell-1.3} flag\index{-fhaskell-1.3 option},
+% then \tr{__HASKELL1__} is set to 3.  Obviously.
 
 \item[\tr{__GLASGOW_HASKELL__}:]
 \index{__GLASGOW_HASKELL__ macro}
 For version $n$ of the GHC system, this will be \tr{#define}d to
-$100 \times n$.  So, for version~0.26, it is 26.
+$100 \times n$.  So, for version~2.01, it is 201.
 
 This macro is {\em only} set when pre-processing Haskell source.
 ({\em Not} when pre-processing generated C.)
@@ -639,8 +649,7 @@ With any luck, \tr{__GLASGOW_HASKELL__} will be undefined in all other
 implementations that support C-style pre-processing.
 
 (For reference: the comparable symbols for other systems are:
-\tr{__YALE_HASKELL__} for Yale Haskell, \tr{__HBC__} for Chalmers
-HBC, and \tr{__GOFER__} for Gofer [I think].)
+\tr{__HUGS__} for Hugs and \tr{__HBC__} for Chalmers.)
 
 \item[\tr{__CONCURRENT_HASKELL__}:]
 \index{__CONCURRENT_HASKELL__ macro}
@@ -738,21 +747,23 @@ libraries automatically; these are:
 
 -lHSrts,-lHSclib & basic runtime libraries \\
 -lHS         & standard Prelude library \\
+-lHS\_cbits  & C support code for standard Prelude library \\
 -lgmp        & GNU multi-precision library (for Integers)\\
 \end{tabular}
 \index{-lHS library}
+\index{-lHS_cbits library}
 \index{-lHSrts library}
 \index{-lgmp library}
 
 \item[\tr{-syslib <name>}:]
 \index{-syslib <name> option}
 
-If you are using an optional GHC-supplied library (e.g., the HBC
+If you are using a Haskell ``system library'' (e.g., the HBC
 library), just use the \tr{-syslib hbc} option, and the correct code
 should be linked in.
 
-Please see \sectionref{syslibs} for information about optional
-GHC-supplied libraries.
+Please see \sectionref{syslibs} for information about
+``system libraries.''
 
 \item[\tr{-L<dir>}:]
 \index{-L<dir> option}
@@ -828,16 +839,16 @@ Report garbage-collection statistics.  It will create a
 
 Alternatively, if you'd rather the GC stats went straight to standard
 error, you can ``cheat'' by using, instead: \tr{-optCrts-Sstderr}.
-
-\item[\tr{-Rhbc}:]
-\index{-Rhbc option}
-Tell the compiler it has an HBC-style RTS; i.e., it was compiled with
-HBC.  Not used in Real Life.
-
-\item[\tr{-Rghc}:]
-\index{-Rghc option}
-Tell the compiler it has a GHC-style RTS; i.e., it was compiled with
-GHC.  Not used in Real Life.
+%
+%\item[\tr{-Rhbc}:]
+%\index{-Rhbc option}
+%Tell the compiler it has an HBC-style RTS; i.e., it was compiled with
+%HBC.  Not used in Real Life.
+%
+%\item[\tr{-Rghc}:]
+%\index{-Rghc option}
+%Tell the compiler it has a GHC-style RTS; i.e., it was compiled with
+%GHC.  Not used in Real Life.
 \end{description}
 
 For all \tr{<size>}s: If the last character of \tr{size} is a K,
@@ -873,31 +884,32 @@ programming, please see \Sectionref{concurrent-and-parallel}.
 
 %************************************************************************
 %*                                                                      *
-\subsection[options-experimental]{For experimental purposes}
-\index{experimental options}
+%\subsection[options-experimental]{For experimental purposes}
+%\index{experimental options}
 %*                                                                      *
 %************************************************************************
 
-From time to time, we provide GHC options for ``experimenting.''  Easy
-come, easy go.  In version~0.26, the ``experimental'' options are:
-\begin{description}
-\item[\tr{-firrefutable-tuples} option:]
-\index{-firrefutable-tuples option (experimental)}
-Pretend that every tuple pattern is irrefutable; i.e., has a
-``twiddle'' (\tr{~}) in front of it.
+%From time to time, we provide GHC options for ``experimenting.''  Easy
+%come, easy go.  In version~0.26, the ``experimental'' options are:
+%\begin{description}
+%\item[\tr{-firrefutable-tuples} option:]
+%\index{-firrefutable-tuples option (experimental)}
+%Pretend that every tuple pattern is irrefutable; i.e., has a
+%``twiddle'' (\tr{~}) in front of it.
+%
+%Some parts of the GHC system {\em depend} on strictness properties which
+%\tr{-firrefutable-tuples} may undo, notably the low-level state-transformer
+%stuff, which includes I/O (!).  You're on your own...
+%
+%\item[\tr{-fall-strict} option:]
+%\index{-fall-strict option (experimental)}
+% (DOESN'T REALLY WORK, I THINK) Changes the strictness analyser so
+%that, when it asks the question ``Is this function argument certain to
+%be evaluated?'', the answer is always ``yes''.
+%
+%Compilation is changed in no other way.
+%\end{description}
 
-Some parts of the GHC system {\em depend} on strictness properties which
-\tr{-firrefutable-tuples} may undo, notably the low-level state-transformer
-stuff, which includes I/O (!).  You're on your own...
-
-\item[\tr{-fall-strict} option:]
-\index{-fall-strict option (experimental)}
-(DOESN'T REALLY WORK, I THINK) Changes the strictness analyser so
-that, when it asks the question ``Is this function argument certain to
-be evaluated?'', the answer is always ``yes''.
-
-Compilation is changed in no other way.
-\end{description}
 % -firrefutable-everything
 % -fall-demanded
 
@@ -919,7 +931,7 @@ HACKER TERRITORY. HACKER TERRITORY.
 You may specify that a different program
 be used for one of the phases of the compilation system, in place of
 whatever the driver \tr{ghc} has wired into it.  For example, you
-might want to test a replacement parser.  The
+might want to try a different assembler.  The
 \tr{-pgm<phase-code><program-name>}\index{-pgm<phase><stuff> option} option to
 \tr{ghc} will cause it to use \pl{<program-name>} for phase
 \pl{<phase-code>}, where the codes to indicate the phases are:
@@ -928,16 +940,11 @@ might want to test a replacement parser.  The
 code & phase \\ \hline
 L    & literate pre-processor \\
 P    & C pre-processor (if -cpp only) \\
-p    & parser \\
 C    & Haskell compiler \\
-cO   & C compiler for `optimised' (normal) compiling \\
-c    & C compiler for `unregisterised' compiling \\
+c    & C compiler\\
 a    & assembler \\
 l    & linker \\
 \end{tabular}
-
-If you use the ambiguous \tr{-pgmcOle}, it will take it to mean
-``use program \tr{le} for optimised C compiling.''
 
 %----------------------------------------------------------------------
 \subsubsection[forcing-options-through]{Forcing options to a particular phase.}
@@ -962,8 +969,8 @@ So, for example: when I want to use my normal driver but with my
 profiled compiler binary, I use this script:
 \begin{verbatim}
 #! /bin/sh
-exec /local/grasp_tmp3/partain/ghc-BUILDS/working-alpha/ghc/driver/ghc \
-     -pgmC/local/grasp_tmp3/partain/ghc-BUILDS/working-hsc-prof/hsc \
+exec /local/grasp_tmp3/simonpj/ghc-BUILDS/working-alpha/ghc/driver/ghc \
+     -pgmC/local/grasp_tmp3/simonpj/ghc-BUILDS/working-hsc-prof/hsc \
      -optCrts-i0.5 \
      -optCrts-PT \
      "$@"
@@ -987,10 +994,11 @@ example: \tr{ghc -noC -ddump-simpl Foo.hs}
 conjunction with \tr{-noC}, which turns off interface generation;
 thus: \tr{-noC -hi}.
 
-\item[\tr{-ddump-parser}:]
-\index{-ddump-parser option}
-This debugging option shows the exact prefix-form Haskell that is fed
-into the Haskell compiler proper.
+\item[\tr{-dshow-passes}:]
+\index{-dshow-passes option}
+Prints a message to stderr as each pass starts.  Gives a warm but
+undoubtedly misleading feeling that GHC is telling you what's
+happening.
 
 \item[\tr{-ddump-<pass>}:]
 \index{-ddump-<pass> options}
@@ -998,17 +1006,14 @@ Make a debugging dump after pass \tr{<pass>} (may be common enough to
 need a short form...).  Some of the most useful ones are:
 
 \begin{tabular}{ll}
-\tr{-ddump-rif2hs} & reader output (earliest stuff in the compiler) \\
-\tr{-ddump-rn4} & renamer output \\
+\tr{-ddump-rdr} & reader output (earliest stuff in the compiler) \\
+\tr{-ddump-rn} & renamer output \\
 \tr{-ddump-tc} & typechecker output \\
 \tr{-ddump-deriv} & derived instances \\
 \tr{-ddump-ds} & desugarer output \\
 \tr{-ddump-simpl} & simplifer output (Core-to-Core passes) \\
-        & (and don't forget \tr{-O}, too!) \\
 \tr{-ddump-stranal} & strictness analyser output \\
-        & (only works in conjunction with -ddump-simpl)\\
 \tr{-ddump-occur-anal} & `occurrence analysis' output \\
-        & (only works in conjunction with -ddump-simpl)\\
 \tr{-ddump-spec} & dump specialisation info \\
 \tr{-ddump-stg} & output of STG-to-STG passes \\
 \tr{-ddump-absC} & {\em un}flattened Abstract~C \\
@@ -1016,8 +1021,8 @@ need a short form...).  Some of the most useful ones are:
 \tr{-ddump-realC} & same as what goes to the C compiler \\
 \tr{-ddump-asm} & assembly language from the native-code generator \\
 \end{tabular}
-\index{-ddump-rif2hs option}%
-\index{-ddump-rn4 option}%
+\index{-ddump-rdr option}%
+\index{-ddump-rn option}%
 \index{-ddump-tc option}%
 \index{-ddump-deriv option}%
 \index{-ddump-ds option}%
@@ -1060,10 +1065,10 @@ individual type variables) is displayed.
 \item[\tr{-ddump-raw-asm}:]
 \index{-ddump-raw-asm option}
 Dump out the assembly-language stuff, before the ``mangler'' gets it.
-
-\item[\tr{-dgc-debug}:]
-\index{-dgc-debug option}
-Enables some debugging code related to the garbage-collector.
+%
+%\item[\tr{-dgc-debug}:]
+%\index{-dgc-debug option}
+%Enables some debugging code related to the garbage-collector.
 \end{description}
 
 %ToDo: -ddump-asm-insn-counts
@@ -1168,38 +1173,38 @@ Main.skip2{-r1L6-} =
 trademark of Peyton Jones Enterprises, plc.)
 
 %----------------------------------------------------------------------
-\subsubsection[arity-checking]{Options to insert arity-checking code}
-\index{arity checking}
-
-The \tr{-darity-checks}\index{-darity-checks option} option inserts
-code to check for arity violations.  Unfortunately, it's not that
-simple: you have to link with a prelude that was also built with arity
-checks.  If you have one, then great; otherwise...
-
-The \tr{-darity-checks-C-only}\index{-darity-checks-C-only option}
-option inserts the self-same arity checking code into \tr{.hc} files,
-but doesn't compile it into the \tr{.o} files.  We use this flag with
-the \tr{-keep-hc-file-too}\index{-keep-hc-file-too option}, where we
-are keeping \tr{.hc} files around for debugging purposes.
+%\subsubsection[arity-checking]{Options to insert arity-checking code}
+%\index{arity checking}
+%
+%The \tr{-darity-checks}\index{-darity-checks option} option inserts
+%code to check for arity violations.  Unfortunately, it's not that
+%simple: you have to link with a prelude that was also built with arity
+%checks.  If you have one, then great; otherwise...
+%
+%The \tr{-darity-checks-C-only}\index{-darity-checks-C-only option}
+%option inserts the self-same arity checking code into \tr{.hc} files,
+%but doesn't compile it into the \tr{.o} files.  We use this flag with
+%the \tr{-keep-hc-file-too}\index{-keep-hc-file-too option}, where we
+%are keeping \tr{.hc} files around for debugging purposes.
 
 %----------------------------------------------------------------------
-\subsubsection[omit-checking]{Options to omit checking code}
-\index{omitting runtime checks}
-
-By default, the GHC system emits all possible not-too-expensive
-runtime checking code.  If you are brave or experimenting, you might
-want to turn off some of this (not recommended):
-
-\begin{tabular}{ll}
--dno-black-holing & won't buy you much (even if it works) \\
--dno-updates & you're crazy if you do this \\
--dno-stk-stubbing & omit stack stubbing (NOT DONE YET) \\
-\end{tabular}
-\index{-dno-black-holing option}%
-\index{-dno-updates option}%
-\index{-dno-stk-stubbing option}
-
-Warning: all very lightly tested, if at all...
+%\subsubsection[omit-checking]{Options to omit checking code}
+%\index{omitting runtime checks}
+%
+%By default, the GHC system emits all possible not-too-expensive
+%runtime checking code.  If you are brave or experimenting, you might
+%want to turn off some of this (not recommended):
+%
+%\begin{tabular}{ll}
+%-dno-black-holing & won't buy you much (even if it works) \\
+%-dno-updates & you're crazy if you do this \\
+%-dno-stk-stubbing & omit stack stubbing (NOT DONE YET) \\
+%\end{tabular}
+%\index{-dno-black-holing option}%
+%\index{-dno-updates option}%
+%\index{-dno-stk-stubbing option}
+%
+%Warning: all very lightly tested, if at all...
 
 %% %************************************************************************
 %% %*                                                                   *

@@ -648,7 +648,7 @@ AC_ARG_WITH(hc,
         c | C)  WithHc='C'
                 ;;
         in-place )
-                WithHc='IN-PLACE'
+		WithHc='IN-PLACE'
                 ;;
         *)      echo "I don't understand this option: --with-hc=$withval"
                 exit 1
@@ -686,6 +686,7 @@ case $WithHc in
     c | C)  WithHcType='HC_USE_HC_FILES'
             ;;
     IN-PLACE) WithHcType='HC_GLASGOW_GHC'
+	      WithHc='$(TOP_PWD)/ghc/driver/ghc'
 	    ;;
 esac
 AC_SUBST(WithHc)
@@ -699,16 +700,15 @@ AC_ARG_WITH(gcc,
    [HaveGcc=YES; WhatGccIsCalled="$withval"])
 AC_SUBST(WhatGccIsCalled)
 
-dnl ** Choose which make to use (default 'make -r')
-MakeCmd='make -r'
+dnl ** Choose which make to use (default 'make')
+MakeCmd='make'
 AC_ARG_WITH(make,
    [ 
 --with-make=<make command> 
 	Use an alternate command instead of 'make'.  This is useful
 	when GNU make is required (for instance when the default make
 	supplied by the system won't work, as is the case on FreeBSD
-	and NetBSD).  You probably want to include the '-r' flag with
-	make, to exclude implicit suffix rules.],
+	and NetBSD).],
    [MakeCmd="$withval"]) 
 AC_SUBST(MakeCmd)
 
@@ -741,16 +741,19 @@ AC_SUBST(HcMaxHeapWasSet)
 AC_SUBST(HcMaxHeap)
 
 dnl ** figure out about mkdependHS
-MkDependHSCmd=':'
+MkDependHSCmd='mkdependHS'
 if test -f ./ghc/utils/mkdependHS/mkdependHS \
      -o -f ./ghc/utils/mkdependHS/mkdependHS.prl ; then
     MkDependHSCmd='TopDirPwd/ghc/utils/mkdependHS/mkdependHS'
-else
-    AC_CHECK_PROG(have_mkdependHS,mkdependHS,YES,NO)
-    if test $have_mkdependHS = 'YES' ; then
-	MkDependHSCmd='mkdependHS'
-    fi
 fi
+AC_ARG_WITH(mkdependHS,
+   [--with-mkdependHS=<mkdependHS command>
+	Use a different command instead of 'mkdependHS'.],
+   [MkDependHSCmd="$withval"])
+dnl AC_CHECK_PROG(have_mkdependHS,$MkDependHSCmd,YES,NO)
+dnl if test $have_mkdependHS = 'NO' ; then
+dnl     MkDependHSCmd=':'
+dnl fi
 AC_SUBST(MkDependHSCmd)
 
 # -------------------------------------------------------------------------
@@ -764,7 +767,7 @@ if echo $CPP | egrep gcc >/dev/null 2>&1; then
     echo '/(\S+\/cpp)/ && print "$1";' > conftest.pl
     # GNUCPP: used in jmake.c (GnuCppCmd) and in mkdependC
     # (where we could do with the usual pre-#defines)
-    GNUCPP="gcc -E"
+    GNUCPP="`eval $PerlCmd -n conftest.pl conftest.out`"
     test -n "$verbose" && echo "        setting GNUCPP to $GNUCPP"
     # RAWCPP: we do not want *any* pre-#defines...
     # (e.g., hscpp, mkdependHS)
@@ -1558,7 +1561,7 @@ option, if used, overrides --with-hc=<...>:
                 WithHsLibsHc=$withval
                 ;;
         in-place )
-                WithHsLibsHc='IN-PLACE'
+		WithHsLibsHc='IN-PLACE'
                 ;;
         *)      echo "I don't understand this option: --with-hc-for-hslibs=$withval"
                 exit 1
@@ -1582,6 +1585,7 @@ case $WithHsLibsHc in
             fi
             ;;
     IN-PLACE) WithHsLibsHcType='HC_GLASGOW_GHC'
+	      WithHsLibsHc='$(TOP_PWD)/ghc/driver/ghc'
 	    ;;
 esac
 AC_SUBST(WithHsLibsHc)
@@ -1640,7 +1644,7 @@ The Haskell compiler to compile Happy; this option, if used, overrides
         nhc* )  WithHappyHc=$withval
                 ;;
         in-place )
-                WithHappyHc='IN-PLACE'
+		WithHappyHc='IN-PLACE'
                 ;;
         *)      echo "I don't understand this option: --with-hc-for-happy=$withval"
                 exit 1
@@ -1680,6 +1684,7 @@ case $WithHappyHc in
             fi
             ;;
     IN-PLACE) WithHappyHcType='HC_GLASGOW_GHC'
+                WithHappyHc='$(TOP_PWD)/ghc/driver/ghc'
 	    ;;
 esac
 AC_SUBST(WithHappyHc)
@@ -1715,7 +1720,7 @@ used, overrides --with-hc=<...>:
                 WithHaggisHc=$withval
                 ;;
         in-place )
-                WithHaggisHc='IN-PLACE'
+		WithHaggicHs='IN-PLACE'
                 ;;
         *)      echo "I don't understand this option: --with-hc-for-haggis=$withval"
                 exit 1
@@ -1739,6 +1744,7 @@ case $WithHaggisHc in
             fi
             ;;
     IN-PLACE) WithHaggisHcType='HC_GLASGOW_GHC'
+                WithHaggisHc='$(TOP_PWD)/ghc/driver/ghc'
 	    ;;
 esac
 AC_SUBST(WithHaggisHc)
@@ -1753,29 +1759,11 @@ fi
 dnl
 dnl * `Literate' CONFIGURATION STUFF
 
-if test "xxx$DoingLiterate" = 'xxxliterate' ; then
-# a very big "if"!
-
-BuildInfoUtils='NO'
-AC_ARG_ENABLE(info-utils,
-   [
-*******************************************************************
-** Literate programming system OPTIONS:
-
---enable-info-utils       build GNU info/makeinfo utilities],
-   [case "$enableval" in
-        yes) BuildInfoUtils='YES'
-             ;;
-        no)  BuildInfoUtils='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-info-utils=$enableval"
-             exit 1
-             ;;
-    esac])
-AC_SUBST(BuildInfoUtils)
-
-# here ends a very big if DoingLiterate = 'literate' ...
-fi
+dnl if test "xxx$DoingLiterate" = 'xxxliterate' ; then
+dnl # a very big "if"!
+dnl 
+dnl # here ends a very big if DoingLiterate = 'literate' ...
+dnl fi
 #
 # -------------------------------------------------------------------------
 dnl
@@ -1812,7 +1800,7 @@ used, overrides --with-hc=<...>:
         nhc* )  WithNoFibHc=$withval
                 ;;
         in-place )
-                WithNoFibHc='IN-PLACE'
+		WithNoFibHc='IN-PLACE'
                 ;;
         *)      echo "I don't understand this option: --with-hc-for-nofib=$withval"
                 exit 1
@@ -1852,6 +1840,7 @@ case $WithNoFibHc in
             fi
             ;;
     IN-PLACE) WithNoFibHcType='HC_GLASGOW_GHC'
+                WithNoFibHc='$(TOP_PWD)/ghc/driver/ghc'
 	    ;;
 esac
 AC_SUBST(WithNoFibHc)
@@ -2034,15 +2023,9 @@ for xx in Real Spectral Imaginary GHC_ONLY Specialise PRIVATE Parallel ; do
     echo "#endif"			      >> nofib/mkworld/buildinfo.jm
 done
 
-# Here, by HACK means, we dump all the Build_ info
+# Here, by HACK means, we add all the Build_ info
 # into a file.  See comment above.
-rm -f nofib/mkworld/buildinfo.jm
-echo creating nofib/mkworld/buildinfo.jm
-cat > nofib/mkworld/buildinfo.jm <<EOF
-XCOMM ** DO NOT EDIT! **
-XCOMM This file is obliterated every time 'configure' is run!
 
-EOF
 for xx in normal p t u mc mr mt mp mg 2s 1s du a b c d e f g h i j k l m n o A B ; do
     eval "yy=\$Build_$xx"
     echo "#ifndef Build_$xx"     >> nofib/mkworld/buildinfo.jm

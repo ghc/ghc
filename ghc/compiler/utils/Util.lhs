@@ -9,12 +9,16 @@
 # define IF_NOT_GHC(a) {--}
 #else
 # define panic error
-# define TAG_ _CMP_TAG
-# define LT_ _LT
-# define EQ_ _EQ
-# define GT_ _GT
+# define TAG_ Ordering
+# define LT_ LT
+# define EQ_ EQ
+# define GT_ GT
+# define _LT LT
+# define _EQ EQ
+# define _GT GT
 # define GT__ _
-# define tagCmp_ _tagCmp
+# define tagCmp_ compare
+# define _tagCmp compare
 # define FAST_STRING String
 # define ASSERT(x) {-nothing-}
 # define IF_NOT_GHC(a) a
@@ -41,8 +45,8 @@ module Util (
         zipLazy,
 	mapAndUnzip, mapAndUnzip3,
 	nOfThem, lengthExceeds, isSingleton,
-	startsWith, endsWith,
 #if defined(COMPILING_GHC)
+	startsWith, endsWith,
 	isIn, isn'tIn,
 #endif
 
@@ -65,9 +69,12 @@ module Util (
 	mapAccumL, mapAccumR, mapAccumB,
 
 	-- comparisons
+#if defined(COMPILING_GHC)
 	Ord3(..), thenCmp, cmpList,
-	IF_NOT_GHC(cmpString COMMA)
 	cmpPString,
+#else
+	cmpString,
+#endif
 
 	-- pairs
 	IF_NOT_GHC(cfst COMMA applyToPair COMMA applyToFst COMMA)
@@ -88,6 +95,8 @@ CHK_Ubiq() -- debugging consistency check
 IMPORT_1_3(List(zipWith4))
 
 import Pretty
+#else
+import List(zipWith4)
 #endif
 
 infixr 9 `thenCmp`
@@ -212,7 +221,7 @@ startsWith, endsWith :: String -> String -> Maybe String
 startsWith []     str = Just str
 startsWith (c:cs) (s:ss)
   = if c /= s then Nothing else startsWith cs ss
-startWith  _	  []  = Nothing
+startsWith  _	  []  = Nothing
 
 endsWith cs ss
   = case (startsWith (reverse cs) (reverse ss)) of
@@ -715,7 +724,11 @@ cmpString (x:xs) (y:ys) = if	  x == y then cmpString xs ys
 cmpString []     ys	= LT_
 cmpString xs     []	= GT_
 
+#ifdef COMPILING_GHC
 cmpString _ _ = panic# "cmpString"
+#else
+cmpString _ _ = error "cmpString"
+#endif
 \end{code}
 
 \begin{code}

@@ -102,7 +102,7 @@ RealPerformGC(liveness, reqsize, always_reenter_node, do_full_collection)
 	}
 # endif
 # if defined(GRAN)
-    	ReSchedule(SAME_THREAD); /* ToDo: Check HWL */
+    	ReSchedule(SAME_THREAD);
 # else
     	ReSchedule(1);
 # endif
@@ -180,7 +180,7 @@ RealPerformGC(liveness, reqsize, always_reenter_node, do_full_collection)
       GC_result = collectHeap(reqsize, &StorageMgrInfo, do_full_collection);
 
       if ( GC_result == GC_HARD_LIMIT_EXCEEDED ) {
-	OutOfHeapHook(reqsize * sizeof(W_)); /*msg*/
+	OutOfHeapHook(reqsize * sizeof(W_), RTSflags.GcFlags.heapSize * sizeof(W_)); /*msg*/
 	shutdownHaskell();
 	EXIT(EXIT_FAILURE);
 
@@ -736,24 +736,31 @@ rtsBool do_full_collection;
     PruneSparks();
 
 # if defined(GRAN)
+    traverse_eventq_for_gc();         /* tidy up eventq for GC */
+
     /* Store head and tail of runnable lists as roots for GC */
-    for(proc = 0; proc < RTSflags.GranFlags.proc; ++proc) {
+    if (RTSflags.GranFlags.Light) {
+	  StorageMgrInfo.roots[num_ptr_roots++] = RunnableThreadsHd[0];
+	  StorageMgrInfo.roots[num_ptr_roots++] = RunnableThreadsTl[0];
+    } else { 
+      for(proc = 0; proc < RTSflags.GranFlags.proc; ++proc) {
 #  if defined(GRAN_CHECK) && defined(GRAN)
-	if ( RTSflags.GcFlags.giveStats && (RTSflags.GranFlags.debug & 0x40) )
-	    fprintf(RTSflags.GcFlags.statsFile,"Saving RunnableThreadsHd %d (proc: %d) -- 0x%lx\n",
-		    num_ptr_roots,proc,RunnableThreadsHd[proc]);
+	  if ( RTSflags.GcFlags.giveStats && (RTSflags.GranFlags.debug & 0x40) )
+	      fprintf(RTSflags.GcFlags.statsFile,"Saving RunnableThreadsHd %d (proc: %d) -- 0x%lx\n",
+		      num_ptr_roots,proc,RunnableThreadsHd[proc]);
 #  endif       
-
-	StorageMgrInfo.roots[num_ptr_roots++] = RunnableThreadsHd[proc];
-
+  
+	  StorageMgrInfo.roots[num_ptr_roots++] = RunnableThreadsHd[proc];
+  
 #  if defined(GRAN_CHECK) && defined(GRAN)
-	if ( RTSflags.GcFlags.giveStats && (RTSflags.GranFlags.debug & 0x40) )
-	    fprintf(RTSflags.GcFlags.statsFile,"Saving RunnableThreadsTl %d (proc: %d) -- 0x%lx\n",
-		    num_ptr_roots,proc,RunnableThreadsTl[proc]);
+	  if ( RTSflags.GcFlags.giveStats && (RTSflags.GranFlags.debug & 0x40) )
+	      fprintf(RTSflags.GcFlags.statsFile,"Saving RunnableThreadsTl %d (proc: %d) -- 0x%lx\n",
+		      num_ptr_roots,proc,RunnableThreadsTl[proc]);
 #  endif       
-	StorageMgrInfo.roots[num_ptr_roots++] = RunnableThreadsTl[proc];
-
-    }  /* forall proc ... */
+	  StorageMgrInfo.roots[num_ptr_roots++] = RunnableThreadsTl[proc];
+  
+      }  /* forall proc ... */
+    }  /* RTSflags.GranFlags.Light */
 
     /* This is now done as part of collectHeap (see ../storage dir) */
     /* num_ptr_roots = SaveSparkRoots(num_ptr_roots); */
@@ -797,7 +804,7 @@ rtsBool do_full_collection;
     /* ====> The REAL THING happens here */    
     if (collectHeap(reqsize, &StorageMgrInfo, do_full_collection) != GC_SUCCESS) { 
 
-	OutOfHeapHook(reqsize * sizeof(W_)); /*msg*/
+	OutOfHeapHook(reqsize * sizeof(W_), RTSflags.GcFlags.heapSize * sizeof(W_)); /*msg*/
 
 # if defined(TICKY_TICKY)
 	if (RTSflags.TickyFlags.showTickyStats) PrintTickyInfo();
@@ -842,27 +849,30 @@ rtsBool do_full_collection;
 
     /* NB: PROC is unsigned datatype i.e. (PROC)-1 > 0 !  */
 
-    for(proc = RTSflags.GranFlags.proc - 1; 
-	(proc >= 0) && (proc < RTSflags.GranFlags.proc) ; 
-	--proc) {
+    if (RTSflags.GranFlags.Light) {
+	  RunnableThreadsTl[0] = StorageMgrInfo.roots[--num_ptr_roots] ;
+	  RunnableThreadsHd[0] = StorageMgrInfo.roots[--num_ptr_roots] ;
+    } else { 
+      for(proc = RTSflags.GranFlags.proc - 1; 
+	  (proc >= 0) && (proc < RTSflags.GranFlags.proc) ; 
+	  --proc) {
 #  if defined(GRAN_CHECK) && defined(GRAN)
-	if ( RTSflags.GcFlags.giveStats && (RTSflags.GranFlags.debug & 0x40) )
-	    fprintf(RTSflags.GcFlags.statsFile,
-		    "Restoring RunnableThreadsTl %d (proc: %d) -- new: 0x%lx\n",
-		    num_ptr_roots-1,proc,StorageMgrInfo.roots[num_ptr_roots-1]);
+	  if ( RTSflags.GcFlags.giveStats && (RTSflags.GranFlags.debug & 0x40) )
+	      fprintf(RTSflags.GcFlags.statsFile,
+		      "Restoring RunnableThreadsTl %d (proc: %d) -- new: 0x%lx\n",
+		      num_ptr_roots-1,proc,StorageMgrInfo.roots[num_ptr_roots-1]);
 #  endif
-
-	RunnableThreadsTl[proc] = StorageMgrInfo.roots[--num_ptr_roots];
-
+	  RunnableThreadsTl[proc] = StorageMgrInfo.roots[--num_ptr_roots];
+  
 #  if defined(GRAN_CHECK) && defined(GRAN)
-	if ( RTSflags.GcFlags.giveStats && (RTSflags.GranFlags.debug & 0x40) )
-	    fprintf(RTSflags.GcFlags.statsFile,
-		    "Restoring RunnableThreadsHd %d (proc: %d) -- new: 0x%lx\n",
-		    num_ptr_roots-1,proc,StorageMgrInfo.roots[num_ptr_roots-1]);
+	  if ( RTSflags.GcFlags.giveStats && (RTSflags.GranFlags.debug & 0x40) )
+	      fprintf(RTSflags.GcFlags.statsFile,
+		      "Restoring RunnableThreadsHd %d (proc: %d) -- new: 0x%lx\n",
+		      num_ptr_roots-1,proc,StorageMgrInfo.roots[num_ptr_roots-1]);
 #  endif
-
-	RunnableThreadsHd[proc] = StorageMgrInfo.roots[--num_ptr_roots];
-    }  /* forall proc ... */
+	  RunnableThreadsHd[proc] = StorageMgrInfo.roots[--num_ptr_roots];
+      }  /* forall proc ... */
+    }  /* RTSflags.GranFlags.Light */
 
 # endif /* GRAN */
 
@@ -908,13 +918,4 @@ BlackHoleUpdateStack(STG_NO_ARGS)
     }
 }
 #endif	/* !CONCURRENT */
-\end{code}
-
-
-\begin{code}
-#if 0 /* defined(CONCURRENT) && !defined(GRAN) */
-void
-PerformReschedule(W_ liveness, W_ always_reenter_node)
-{ }
-#endif
 \end{code}

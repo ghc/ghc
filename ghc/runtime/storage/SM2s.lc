@@ -144,10 +144,10 @@ collectHeap(reqsize, sm, do_full_collection)
 #if defined(GRAN)
     EvacuateEvents();
 #endif
-#if defined(CONCURRENT) /* && !defined(GRAN) */
+#if defined(CONCURRENT)
     EvacuateSparks();
 #endif
-#if !defined(PAR) && !defined(GRAN)
+#if !defined(PAR) /* && !defined(GRAN) */
     EvacuateAStack( MAIN_SpA, stackInfo.botA );
     EvacuateBStack( MAIN_SuB, stackInfo.botB, &bstk_roots );
 #endif /* !PAR */

@@ -428,6 +428,8 @@ more_handlers(I_ sig)
     nHandlers = sig + 1;
 }
 
+I_ nocldstop = 0;
+
 # ifdef _POSIX_SOURCE
 
 static void
@@ -469,8 +471,6 @@ unblockUserSignals(void)
     sigprocmask(SIG_SETMASK, &savedSignals, NULL);
 }
 
-
-I_ nocldstop = 0;
 
 I_ 
 sig_install(sig, spi, mask)

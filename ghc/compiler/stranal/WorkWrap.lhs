@@ -11,12 +11,13 @@ module WorkWrap ( workersAndWrappers ) where
 IMP_Ubiq(){-uitous-}
 
 import CoreSyn
-import CoreUnfold	( Unfolding(..), UnfoldingGuidance(..) )
-IMPORT_DELOOPER(IdLoop)	 -- ToDo:rm when iWantToBeINLINEd goes
+import CoreUnfold	( Unfolding(..), UnfoldingGuidance(..), SimpleUnfolding )
+import MagicUFs		( MagicUnfoldingFun )
 
 import CoreUtils	( coreExprType )
 import Id		( idWantsToBeINLINEd, getIdStrictness, mkWorkerId,
-			  getIdInfo, replaceIdInfo, GenId
+			  addIdStrictness, addInlinePragma,
+			  GenId
 			)
 import IdInfo		( noIdInfo, addInfo_UF, indicatesWorker,
 			  mkStrictnessInfo, StrictnessInfo(..)
@@ -24,9 +25,6 @@ import IdInfo		( noIdInfo, addInfo_UF, indicatesWorker,
 import SaLib
 import UniqSupply	( returnUs, thenUs, mapUs, getUnique, SYN_IE(UniqSM) )
 import WwLib
-
-iWantToBeINLINEd :: UnfoldingGuidance -> Unfolding
-iWantToBeINLINEd x = NoUnfolding --ToDo:panic "WorkWrap.iWantToBeINLINEd (ToDo)"
 \end{code}
 
 We take Core bindings whose binders have their strictness attached (by
@@ -240,12 +238,9 @@ tryWW fn_id rhs
 		    -- worker Id:
 		    mkStrictnessInfo args_info (Just worker_id)
 
-		wrapper_id  = fn_id `replaceIdInfo`
-			      (getIdInfo fn_id		`addInfo`
-			       revised_strictness_info	`addInfo_UF`
-			       iWantToBeINLINEd UnfoldAlways)
-		-- NB! the "iWantToBeINLINEd" part adds an INLINE pragma to
-		-- the wrapper, which is of course what we want.
+		wrapper_id  = addInlinePragma (fn_id `addIdStrictness`
+					       revised_strictness_info)
+		-- NB the "addInlinePragma" part; we want to inline wrappers everywhere
 	    in
 	    returnUs [ (worker_id,  worker_rhs),   -- worker comes first
 		       (wrapper_id, wrapper_rhs) ] -- because wrapper mentions it

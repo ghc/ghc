@@ -371,12 +371,12 @@ unsigned nPEs;
     } 
     addr = WaitForPEOp(PP_PETIDS, ANY_GLOBAL_TASK);
     GetArgs(buffer, nPEs);
-#if 0
     for (i = 0; i < nPEs; ++i) {
 	PEs[i] = (GLOBAL_TASK_ID) buffer[i];
+#if 0
 	fprintf(stderr,"PEs[%d] = %x \n", i, PEs[i]); 
-    }
 #endif
+    }
     free(buffer);
     return PEs;
 }

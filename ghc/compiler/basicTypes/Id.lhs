@@ -40,6 +40,7 @@ module Id (
 	idType,
 	idUnique,
 
+	dataConRepType,
 	dataConArgTys,
 	dataConArity,
 	dataConNumFields,
@@ -107,6 +108,7 @@ module Id (
 	getIdUpdateInfo,
 	getPragmaInfo,
 	replaceIdInfo,
+	addInlinePragma,
 
 	-- IdEnvs AND IdSets
 	SYN_IE(IdEnv), SYN_IE(GenIdSet), SYN_IE(IdSet),
@@ -169,7 +171,7 @@ import MatchEnv		( MatchEnv )
 import SrcLoc		( mkBuiltinSrcLoc )
 import TyCon		( TyCon, mkTupleTyCon, tyConDataCons )
 import Type		( mkSigmaTy, mkTyVarTys, mkFunTys, mkDictTy,
-			  applyTyCon, instantiateTy,
+			  applyTyCon, instantiateTy, mkForAllTys,
 			  tyVarsOfType, applyTypeEnvToTy, typePrimRep,
 			  GenType, SYN_IE(ThetaType), SYN_IE(TauType), SYN_IE(Type)
 			)
@@ -816,6 +818,10 @@ idWantsToBeINLINEd :: Id -> Bool
 
 idWantsToBeINLINEd (Id _ _ _ _ IWantToBeINLINEd _) = True
 idWantsToBeINLINEd _				   = False
+
+addInlinePragma :: Id -> Id
+addInlinePragma (Id u sn ty details _ info)
+  = Id u sn ty details IWantToBeINLINEd info
 \end{code}
 
 For @unlocaliseId@: See the brief commentary in
@@ -1391,6 +1397,25 @@ dataConSig (Id _ _ _ (TupleConId arity) _ _)
   where
     tyvars	= take arity alphaTyVars
     tyvar_tys	= mkTyVarTys tyvars
+
+
+-- dataConRepType returns the type of the representation of a contructor
+-- This may differ from the type of the contructor Id itself for two reasons:
+--	a) the constructor Id may be overloaded, but the dictionary isn't stored
+--	b) the constructor may store an unboxed version of a strict field.
+-- Here's an example illustrating both:
+--	data Ord a => T a = MkT Int! a
+-- Here
+--	T :: Ord a => Int -> a -> T a
+-- but the rep type is
+--	Trep :: Int# -> a -> T a
+-- Actually, the unboxed part isn't implemented yet!
+
+dataConRepType :: GenId (GenType tv u) -> GenType tv u
+dataConRepType con
+  = mkForAllTys tyvars tau
+  where
+    (tyvars, theta, tau) = splitSigmaTy (idType con)
 
 dataConFieldLabels :: DataCon -> [FieldLabel]
 dataConFieldLabels (Id _ _ _ (DataConId _ _ fields _ _ _ _) _ _) = fields

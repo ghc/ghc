@@ -1,0 +1,41 @@
+%************************************************************************
+%*                                                                      *
+\section[recomp]{The GHC recompilation checker (and using `make')}
+\index{recompilation checker}
+\index{make and recompilation}
+%*                                                                      *
+%************************************************************************
+
+The Haskell~1.3 module system (nicely improved, thank you very much)
+requires a substantially different implementation, which we have done
+for GHC~2.01.
+
+We have taken a fairly radical approach and implemented a ``go to the
+horse's mouth'' scheme; that is, when seeking out information about an
+entity \tr{Foo.bar}, GHC will always look in the interface for
+\tr{Foo}---no matter what interface {\em told us} about \tr{Foo.bar}
+(via re-exporting and whatnot).
+
+This ``horse's mouth'' scheme removes some of the most unsavoury
+aspects of GHC~0.2x's behaviour (because of picking up duff
+information about re-exported entities).  However, the keen-minded
+user will see that it makes it difficult to maintain
+\tr{make}-friendly dependencies between modules.
+
+Enter the ``recompilation checker'', which you invoke merely by adding
+a \tr{-recomp} option\index{-recomp option} to your GHC command line.
+(You should also create ordinary `make' dependencies; there's an
+example of how to do this in \sectionref{mkdependHS}.)
+
+GHC will now start ``compiling'' much more often than in the old days,
+but it will frequently bail out quickly, saying the recompile is
+\tr{NOT NEEDED}.  What a beautiful sight!
+
+The recompilation checker is not finished.  Its main faults are:
+(a)~it doesn't yet do the right things for instance declarations;
+(b)~it doesn't do anything about pragmas (happily, GHC~2.01 doesn't
+produce any); (c)~it has no good solution for mutually-recursive
+modules.
+
+Patrick Sansom has a workshop paper about how all these things should
+be done.  Ask him (email: \tr{sansom}) if you want a copy.

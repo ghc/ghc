@@ -1,0 +1,209 @@
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 1994
+%
+\subsection[openFile.lc]{openFile Runtime Support}
+
+\begin{code}
+
+#include "rtsdefs.h"
+#include "stgio.h"
+
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+
+#ifdef HAVE_SYS_STAT_H
+#include <sys/stat.h>
+#endif
+
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+
+#ifdef HAVE_FCNTL_H
+#include <fcntl.h>
+#endif
+
+StgAddr
+openFile(file, how)
+StgByteArray file;
+StgByteArray how;
+{
+    FILE *fp;
+    int fd;
+    int oflags;
+    int exclusive;
+    int created = 0;
+    struct stat sb;
+
+    /*
+     * Since we aren't supposed to succeed when we're opening for writing and
+     * there's another writer, we can't just do an fopen() for "w" mode.
+     */
+
+    switch (how[0]) {
+    case 'a':
+	oflags = O_WRONLY | O_NOCTTY | O_APPEND;
+	exclusive = 1;
+	break;
+    case 'w':
+	oflags = O_WRONLY | O_NOCTTY;
+	exclusive = 1;
+	break;
+    case 'r':
+	oflags = how[1] == '+' ? O_RDWR | O_NOCTTY : O_RDONLY | O_NOCTTY;
+	exclusive = 0;
+	break;
+    default:
+	fprintf(stderr, "openFile: unknown mode `%s'\n", how);
+	EXIT(EXIT_FAILURE);
+    }
+
+    /* First try to open without creating */
+    while ((fd = open(file, oflags, 0666)) < 0) {
+	if (errno == ENOENT) {
+	    if (how[0] == 'r' && how[1] == '\0') {
+		/* For ReadMode, just bail out now */
+		ghc_errtype = ERR_NOSUCHTHING;
+		ghc_errstr = "file does not exist";
+		return NULL;
+	    }
+	    /* Now try to create it */
+	    while ((fd = open(file, oflags | O_CREAT | O_EXCL, 0666)) < 0) {
+		if (errno == EEXIST) {
+		    /* Race detected; go back and open without creating it */
+		    break;
+		} else if (errno != EINTR) {
+		    cvtErrno();
+		    switch (ghc_errno) {
+		    default:
+			stdErrno();
+			break;
+		    case GHC_ENOENT:
+		    case GHC_ENOTDIR:
+			ghc_errtype = ERR_NOSUCHTHING;
+			ghc_errstr = "no path to file";
+			break;
+		    case GHC_EINVAL:
+			ghc_errtype = ERR_PERMISSIONDENIED;
+			ghc_errstr = "unsupported owner or group";
+			break;
+		    }
+		    return NULL;
+		}
+	    }
+	    if (fd >= 0) {
+		created = 1;
+		break;
+	    }
+	} else if (errno != EINTR) {
+	    cvtErrno();
+	    switch (ghc_errno) {
+	    default:
+		stdErrno();
+		break;
+	    case GHC_ENOTDIR:
+		ghc_errtype = ERR_NOSUCHTHING;
+		ghc_errstr = "no path to file";
+		break;
+	    case GHC_EINVAL:
+		ghc_errtype = ERR_PERMISSIONDENIED;
+		ghc_errstr = "unsupported owner or group";
+		break;
+	    }
+	    return NULL;
+	}
+    }
+
+    /* Make sure that we aren't looking at a directory */
+
+    while (fstat(fd, &sb) < 0) {
+	/* highly unlikely */
+	if (errno != EINTR) {
+	    cvtErrno();
+	    if (created)
+		(void) unlink(file);
+	    (void) close(fd);
+	    return NULL;
+	}
+    }
+    if (S_ISDIR(sb.st_mode)) {
+	ghc_errtype = ERR_INAPPROPRIATETYPE;
+	ghc_errstr = "file is a directory";
+	/* We can't have created it in this case. */
+	(void) close(fd);
+
+	return NULL;
+    }
+    /* Use our own personal locking */
+
+    if (lockFile(fd, exclusive) < 0) {
+	cvtErrno();
+	switch (ghc_errno) {
+	default:
+	    stdErrno();
+	    break;
+	case GHC_EACCES:
+	case GHC_EAGAIN:
+	    ghc_errtype = ERR_RESOURCEBUSY;
+	    ghc_errstr = "file is locked";
+	    break;
+	}
+	if (created)
+	    (void) unlink(file);
+	(void) close(fd);
+	return NULL;
+    }
+
+    /*
+     * Write mode is supposed to truncate the file.  Unfortunately, our pal
+     * ftruncate() is non-POSIX, so we truncate with a second open, which may fail.
+     */
+
+    if (how[0] == 'w') {
+	int fd2;
+
+	oflags |= O_TRUNC;
+	while ((fd2 = open(file, oflags, 0666)) < 0) {
+	    if (errno != EINTR) {
+		cvtErrno();
+		if (created)
+		    (void) unlink(file);
+		(void) close(fd);
+		switch (ghc_errno) {
+		default:
+		    stdErrno();
+		    break;
+		case GHC_EAGAIN:
+		    ghc_errtype = ERR_RESOURCEBUSY;
+		    ghc_errstr = "enforced lock prevents truncation";
+		    break;
+		case GHC_ENOTDIR:
+		    ghc_errtype = ERR_NOSUCHTHING;
+		    ghc_errstr = "no path to file";
+		    break;
+		case GHC_EINVAL:
+		    ghc_errtype = ERR_PERMISSIONDENIED;
+		    ghc_errstr = "unsupported owner or group";
+		    break;
+		}
+		return NULL;
+	    }
+	}
+	close(fd2);
+    }
+    errno = 0;			/* Just in case fdopen() is lame */
+    while ((fp = fdopen(fd, how)) == NULL) {
+	if (errno != EINTR) {
+	    cvtErrno();
+	    if (created)
+		(void) unlink(file);
+	    (void) close(fd);
+	    return NULL;
+	}
+    }
+
+    return (StgAddr) fp;
+}
+
+\end{code}

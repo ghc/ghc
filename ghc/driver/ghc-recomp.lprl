@@ -33,7 +33,7 @@ sub runRecompChkr {
      $hi_atime,$hi_mtime,$hi_ctime,$hi_blksize,$hi_blocks) = stat(_); # stat info from -f test
 
     if ($i_mtime > $o_mtime) {
-	print STDERR "$Pgm:recompile:Input file $ifile newer than $ofile_target ($i_mtime > $o_mtime)\n";
+	print STDERR "$Pgm:recompile:Input file $ifile newer than $ofile_target\n";
 	return(1);
     }
 
@@ -120,10 +120,6 @@ print STDERR "considering used entities...\n";
 	}
     }
     return 0 if ! $used_entities_have_changed;
-
-    print STDERR "ifile  $ifile:\t$i_mtime\n";
-    print STDERR "ofile  $ofile_target:\t$o_mtime\n";
-    print STDERR "hifile $hifile_target:\t$hi_mtime\n";
 
     return(1); # OK, *recompile*
 }

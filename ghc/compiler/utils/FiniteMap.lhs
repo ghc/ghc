@@ -25,6 +25,10 @@ near the end (only \tr{#ifdef COMPILING_GHC}).
 #define ASSERT(e) {--}
 #define IF_NOT_GHC(a) a
 #define COMMA ,
+#define _tagCmp compare
+#define _LT LT
+#define _GT GT
+#define _EQ EQ
 #endif
 
 #if defined(COMPILING_GHC) && defined(DEBUG_FINITEMAPS)/* NB NB NB */
