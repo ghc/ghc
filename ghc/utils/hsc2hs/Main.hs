@@ -1,7 +1,7 @@
 {-# OPTIONS -fglasgow-exts #-}
 
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.47 2003/05/20 11:07:54 stolz Exp $
+-- $Id: Main.hs,v 1.48 2003/08/27 14:11:17 panne Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -18,12 +18,12 @@ import GetOpt
 #endif
 
 import Config
-import System        (getProgName, getArgs, ExitCode(..), exitWith, exitFailure, system)
+import System        (getProgName, getArgs, ExitCode(..), exitWith, system)
 import Directory     (removeFile,doesFileExist)
 import Monad         (MonadPlus(..), liftM, liftM2, when, unless)
 import Char          (isAlpha, isAlphaNum, isSpace, isDigit, toUpper, intToDigit, ord)
-import List          (intersperse)
-import IO            (hPutStrLn,stderr)
+import List          (intersperse, isSuffixOf)
+import IO            (hPutStr, hPutStrLn, stderr)
 
 #include "../../includes/config.h"
 
@@ -40,7 +40,7 @@ import CString
 
 
 version :: String
-version = "hsc2hs-0.65"
+version = "hsc2hs version 0.65\n"
 
 data Flag
     = Help
@@ -71,26 +71,38 @@ define s = case break (== '=') s of
 
 options :: [OptDescr Flag]
 options = [
-    Option "t" ["template"]   (ReqArg Template   "FILE") "template file",
-    Option "c" ["cc"]         (ReqArg Compiler   "PROG") "C compiler to use",
-    Option "l" ["ld"]         (ReqArg Linker     "PROG") "linker to use",
-    Option "C" ["cflag"]      (ReqArg CompFlag   "FLAG") "flag to pass to the C compiler",
-    Option "I" []             (ReqArg (CompFlag . ("-I"++))
-                                                 "DIR")  "passed to the C compiler",
-    Option "L" ["lflag"]      (ReqArg LinkFlag   "FLAG") "flag to pass to the linker",
-    Option "i" ["include"]    (ReqArg include    "FILE") "as if placed in the source",
-    Option "D" ["define"]     (ReqArg define "NAME[=VALUE]") "as if placed in the source",
-    Option "o" ["output"]     (ReqArg Output     "FILE") "name of main output file",
-    Option ""  ["help"]       (NoArg  Help)              "display this help and exit",
-    Option "v" ["verbose"]    (NoArg  Verbose)           "dump commands to stderr",
-    Option ""  ["version"]    (NoArg  Version)           "output version information and exit",
-    Option ""  ["no-compile"] (NoArg  NoCompile)         "stop after writing *_hsc_make.c"]
+    Option ['o'] ["output"]     (ReqArg Output     "FILE")
+        "name of main output file",
+    Option ['t'] ["template"]   (ReqArg Template   "FILE")
+        "template file",
+    Option ['c'] ["cc"]         (ReqArg Compiler   "PROG")
+        "C compiler to use",
+    Option ['l'] ["ld"]         (ReqArg Linker     "PROG")
+        "linker to use",
+    Option ['C'] ["cflag"]      (ReqArg CompFlag   "FLAG")
+        "flag to pass to the C compiler",
+    Option ['I'] []             (ReqArg (CompFlag . ("-I"++)) "DIR")
+        "passed to the C compiler",
+    Option ['L'] ["lflag"]      (ReqArg LinkFlag   "FLAG")
+        "flag to pass to the linker",
+    Option ['i'] ["include"]    (ReqArg include    "FILE")
+        "as if placed in the source",
+    Option ['D'] ["define"]     (ReqArg define "NAME[=VALUE]")
+        "as if placed in the source",
+    Option []    ["no-compile"] (NoArg  NoCompile)
+        "stop after writing *_hsc_make.c",
+    Option ['v'] ["verbose"]    (NoArg  Verbose)
+        "dump commands to stderr",
+    Option ['?'] ["help"]       (NoArg  Help)
+        "display this help and exit",
+    Option ['V'] ["version"]    (NoArg  Version)
+        "output version information and exit" ]
     
 
 main :: IO ()
 main = do
-    prog <- getProgName
-    let header = "Usage: "++prog++" [OPTIONS] INPUT.hsc [...]"
+    prog <- getProgramName
+    let header = "Usage: "++prog++" [OPTIONS] INPUT.hsc [...]\n"
     args <- getArgs
     let (flags, files, errs) = getOpt Permute options args
 
@@ -114,16 +126,25 @@ main = do
 		           return (add_opt flags) 
     case (files, errs) of
         (_, _)
-            | any isHelp    flags_w_tpl -> putStrLn (usageInfo header options)
-            | any isVersion flags_w_tpl -> putStrLn version
+            | any isHelp    flags_w_tpl -> bye (usageInfo header options)
+            | any isVersion flags_w_tpl -> bye version
             where
             isHelp    Help    = True; isHelp    _ = False
             isVersion Version = True; isVersion _ = False
-        ([],    []) -> putStrLn (prog++": No input files")
-        (files, []) -> mapM_ (processFile flags_w_tpl) files
-        (_,   errs) -> do { mapM_ putStrLn errs ;
-			    putStrLn (usageInfo header options) ;
-		            exitFailure }
+        (files@(_:_), []) -> mapM_ (processFile flags_w_tpl) files
+        (_,   errs) -> die (concat errs ++ usageInfo header options)
+
+getProgramName :: IO String
+getProgramName = liftM (`withoutSuffix` "-bin") getProgName
+   where str `withoutSuffix` suff
+            | suff `isSuffixOf` str = take (length str - length suff) str
+            | otherwise             = str
+
+bye :: String -> IO a
+bye s = putStr s >> exitWith ExitSuccess
+
+die :: String -> IO a
+die s = hPutStr stderr s >> exitWith (ExitFailure 1)
 
 processFile :: [Flag] -> String -> IO ()
 processFile flags name 
@@ -132,9 +153,8 @@ processFile flags name
        case parser of
     	   Parser p -> case p (SourcePos file_name 1) s of
     	       Success _ _ _ toks -> output flags file_name toks
-    	       Failure (SourcePos name' line) msg -> do
-    		   putStrLn (name'++":"++show line++": "++msg)
-    		   exitFailure
+    	       Failure (SourcePos name' line) msg ->
+    		   die (name'++":"++show line++": "++msg++"\n")
 
 ------------------------------------------------------------------------
 -- A deterministic parser which remembers the text which has been parsed.
@@ -589,9 +609,7 @@ systemL flg s = do
   system s
 
 onlyOne :: String -> IO a
-onlyOne what = do
-    putStrLn ("Only one "++what++" may be specified")
-    exitFailure
+onlyOne what = die ("Only one "++what++" may be specified\n")
 
 outFlagHeaderCProg :: Flag -> String
 outFlagHeaderCProg (Template t)          = "#include \""++t++"\"\n"

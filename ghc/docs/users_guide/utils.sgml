@@ -184,6 +184,14 @@ tags:
 
       <variablelist>
 	<varlistentry>
+	  <term><literal>-o FILE</literal> or
+	  <literal>&ndash;&ndash;output=FILE</literal></term>
+	  <listitem>
+	    <para>Name of the Haskell file.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
 	  <term><literal>-t FILE</literal> or
 	  <literal>&ndash;&ndash;template=FILE</literal></term>
 	  <listitem>
@@ -251,33 +259,25 @@ tags:
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>-o FILE</literal> or
-	  <literal>&ndash;&ndash;output=FILE</literal></term>
-	  <listitem>
-	    <para>Name of the Haskell file.</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
-	  <term><literal>&ndash;&ndash;help</literal></term>
-	  <listitem>
-	    <para>Display a summary of the available flags.</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
-	  <term><literal>&ndash;&ndash;version</literal></term>
-	  <listitem>
-	    <para>Output version information.</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
 	  <term><literal>&ndash;&ndash;no-compile</literal></term>
 	  <listitem>
 	    <para>Stop after writing out the intermediate C program to disk.
 	    The file name for the intermediate C program is the input file name
 	    with <literal>.hsc</literal> replaced with <literal>_hsc_make.c</literal>.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>-?</literal> or <literal>&ndash;&ndash;help</literal></term>
+	  <listitem>
+	    <para>Display a summary of the available flags and exit successfully.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>-V</literal> or <literal>&ndash;&ndash;version</literal></term>
+	  <listitem>
+	    <para>Output version information and exit successfully.</para>
 	  </listitem>
 	</varlistentry>
       </variablelist>
