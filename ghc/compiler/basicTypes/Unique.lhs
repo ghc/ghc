@@ -287,9 +287,14 @@ Allocation of unique supply characters:
 mkAlphaTyVarUnique i            = mkUnique '1' i
 
 mkPreludeClassUnique i		= mkUnique '2' i
+
+-- Prelude type constructors occupy *three* slots.
+-- The first is for the tycon itself; the latter two
+-- are for the generic to/from Ids.  See TysWiredIn.mk_tc_gen_info.
+
 mkPreludeTyConUnique i		= mkUnique '3' (3*i)
-mkTupleTyConUnique Boxed   a	= mkUnique '4' a
-mkTupleTyConUnique Unboxed a	= mkUnique '5' a
+mkTupleTyConUnique Boxed   a	= mkUnique '4' (3*a)
+mkTupleTyConUnique Unboxed a	= mkUnique '5' (3*a)
 
 -- Data constructor keys occupy *two* slots.  The first is used for the
 -- data constructor itself and its wrapper function (the function that

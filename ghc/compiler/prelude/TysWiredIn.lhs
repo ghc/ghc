@@ -178,6 +178,20 @@ pcTyCon new_or_data is_rec name tyvars argvrcs cons
     kind     = mkArrowKinds (map tyVarKind tyvars) boxedTypeKind
     gen_info = mk_tc_gen_info mod (nameUnique name) name tycon
 
+-- We generate names for the generic to/from Ids by incrementing
+-- the TyCon unique.  So each Prelude tycon needs 3 slots, one
+-- for itself and two more for the generic Ids.
+mk_tc_gen_info mod tc_uniq tc_name tycon
+  = mkTyConGenInfo tycon name1 name2
+  where
+	tc_occ_name = nameOccName tc_name
+	occ_name1   = mkGenOcc1 tc_occ_name
+	occ_name2   = mkGenOcc2 tc_occ_name
+	fn1_key     = incrUnique tc_uniq
+	fn2_key     = incrUnique fn1_key
+	name1	    = mkWiredInName  mod occ_name1 fn1_key
+	name2	    = mkWiredInName  mod occ_name2 fn2_key
+
 pcDataCon :: Name -> [TyVar] -> ClassContext -> [TauType] -> TyCon -> DataCon
 -- The unique is the first of two free uniques;
 -- the first is used for the datacon itself and the worker;
@@ -245,18 +259,6 @@ mk_tuple boxity arity = (tycon, tuple_con)
 	dc_uniq   = mkTupleDataConUnique boxity arity
 	mod	  = mkPrelModule mod_name
 	gen_info  = mk_tc_gen_info mod tc_uniq tc_name tycon
-
-mk_tc_gen_info mod tc_uniq tc_name tycon
-  = gen_info
-  where
-	tc_occ_name = nameOccName tc_name
-	occ_name1   = mkGenOcc1 tc_occ_name
-	occ_name2   = mkGenOcc2 tc_occ_name
-	fn1_key     = incrUnique tc_uniq
-	fn2_key     = incrUnique fn1_key
-	name1	    = mkWiredInName  mod occ_name1 fn1_key
-	name2	    = mkWiredInName  mod occ_name2 fn2_key
-	gen_info    = mkTyConGenInfo tycon name1 name2
 
 unitTyCon     = tupleTyCon Boxed 0
 unitDataConId = dataConId (head (tyConDataCons unitTyCon))

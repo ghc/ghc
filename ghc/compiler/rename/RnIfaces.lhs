@@ -213,22 +213,20 @@ slurpImpDecls source_fvs
   = traceRn (text "slurpImp" <+> fsep (map ppr (nameSetToList source_fvs))) `thenRn_`
 
 	-- The current slurped-set records all local things
-    getSlurped					`thenRn` \ source_binders ->
-    slurpSourceRefs source_binders source_fvs	`thenRn` \ (decls, needed) ->
+    slurpSourceRefs source_fvs	`thenRn` \ (decls, needed) ->
 
 	-- Then get everything else
     closeDecls decls needed
 
 
 -------------------------------------------------------
-slurpSourceRefs :: NameSet			-- Variables defined in source
-		-> FreeVars			-- Variables referenced in source
+slurpSourceRefs :: FreeVars			-- Variables referenced in source
 		-> RnMG ([RenamedHsDecl],
 			 FreeVars)		-- Un-satisfied needs
 -- The declaration (and hence home module) of each gate has
 -- already been loaded
 
-slurpSourceRefs source_binders source_fvs
+slurpSourceRefs source_fvs
   = go_outer [] 			-- Accumulating decls
 	     emptyFVs 			-- Unsatisfied needs
 	     emptyFVs			-- Accumulating gates

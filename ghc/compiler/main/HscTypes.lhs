@@ -257,6 +257,11 @@ instance NamedThing TyThing where
   getName (ATyCon tc) = getName tc
   getName (AClass cl) = getName cl
 
+instance Outputable TyThing where
+  ppr (AnId   id) = ptext SLIT("AnId")   <+> ppr id
+  ppr (ATyCon tc) = ptext SLIT("ATyCon") <+> ppr tc
+  ppr (AClass cl) = ptext SLIT("AClass") <+> ppr cl
+
 typeEnvClasses env = [cl | AClass cl <- nameEnvElts env]
 typeEnvTyCons  env = [tc | ATyCon tc <- nameEnvElts env] 
 
