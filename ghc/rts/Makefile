@@ -287,6 +287,7 @@ endif
 
 # ToDo: should we really include Rts.h here?  Required for GNU_ATTRIBUTE().
 SRC_HC_OPTS += \
+  -I. \
   -\#include Prelude.h \
   -\#include Rts.h \
   -\#include RtsFlags.h \
