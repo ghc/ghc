@@ -44,7 +44,7 @@ import TcMType		( zonkTcTyVarsAndFV, tcInstTyVars, checkAmbiguity )
 import TcType		( TcTyVar, TcTyVarSet, ThetaType, 
 			  mkClassPred, isOverloadedTy, mkTyConApp,
 			  mkTyVarTy, tcGetTyVar, isTyVarClassPred, mkTyVarTys,
-			  tyVarsOfPred, isIPPred, inheritablePred, predHasFDs )
+			  tyVarsOfPred, isIPPred, isInheritablePred, predHasFDs )
 import Id		( idType, mkUserLocal )
 import Var		( TyVar )
 import Name		( getOccName, getSrcLoc )
@@ -635,7 +635,7 @@ The net effect of [NO TYVARS]
 isFreeWhenInferring :: TyVarSet -> Inst	-> Bool
 isFreeWhenInferring qtvs inst
   =  isFreeWrtTyVars qtvs inst			-- Constrains no quantified vars
-  && all inheritablePred (predsOfInst inst)	-- And no implicit parameter involved
+  && all isInheritablePred (predsOfInst inst)	-- And no implicit parameter involved
 						-- (see "Notes on implicit parameters")
 
 isFreeWhenChecking :: TyVarSet	-- Quantified tyvars

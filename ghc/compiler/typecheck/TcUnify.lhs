@@ -45,7 +45,7 @@ import TcType		( TcKind, TcType, TcSigmaType, TcPhiType, TcTyVar, TcTauType,
 			)
 import qualified Type	( getTyVar_maybe )
 import Inst		( LIE, emptyLIE, plusLIE, mkLIE, 
-			  newDicts, instToId
+			  newDicts, instToId, tcInstCall
 			)
 import TcMType		( getTcTyVar, putTcTyVar, tcInstType, 
 			  newTyVarTy, newTyVarTys, newBoxityVar, newHoleTyVarTy,
@@ -160,16 +160,9 @@ tc_sub exp_sty expected_ty act_sty actual_ty
 
 tc_sub exp_sty expected_ty act_sty actual_ty
   | isSigmaTy actual_ty
-  = tcInstType actual_ty	`thenNF_Tc` \ (tvs, theta, body_ty) ->
-    newDicts orig theta		`thenNF_Tc` \ dicts ->
-    let
-	inst_fn e = mkHsDictApp (mkHsTyApp e (mkTyVarTys tvs))
-				(map instToId dicts)
-    in
-    tc_sub exp_sty expected_ty body_ty body_ty	`thenTc` \ (co_fn, lie) ->
-    returnTc (co_fn <.> mkCoercion inst_fn, lie `plusLIE` mkLIE dicts)
-  where
-    orig = Rank2Origin
+  = tcInstCall Rank2Origin actual_ty		`thenNF_Tc` \ (inst_fn, lie1, body_ty) ->
+    tc_sub exp_sty expected_ty body_ty body_ty	`thenTc` \ (co_fn, lie2) ->
+    returnTc (co_fn <.> mkCoercion inst_fn, lie1 `plusLIE` lie2)
 
 -----------------------------------
 -- Function case

@@ -22,8 +22,8 @@ import BasicTypes	( RecFlag(..),  isMarkedStrict )
 import Inst		( InstOrigin(..), 
 			  LIE, mkLIE, emptyLIE, unitLIE, plusLIE, plusLIEs,
 			  newOverloadedLit, newMethod, newIPDict,
-			  newDicts, 
-			  instToId, tcInstId
+			  newDicts, newMethodWithGivenTy,
+			  instToId, tcInstCall
 			)
 import TcBinds		( tcBindsAndThen )
 import TcEnv		( tcLookupClass, tcLookupGlobalId, tcLookupGlobal_maybe,
@@ -33,12 +33,13 @@ import TcMatches	( tcMatchesCase, tcMatchLambda, tcStmts )
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..) )
 import TcPat		( badFieldCon )
 import TcSimplify	( tcSimplifyIPs )
-import TcMType		( tcInstTyVars, newTyVarTy, newTyVarTys, zonkTcType )
+import TcMType		( tcInstTyVars, tcInstType, newHoleTyVarTy,
+			  newTyVarTy, newTyVarTys, zonkTcType )
 import TcType		( TcType, TcSigmaType, TcPhiType,
-			  tcSplitFunTys, tcSplitTyConApp,
+			  tcSplitFunTys, tcSplitTyConApp, mkTyVarTys,
 			  isSigmaTy, mkFunTy, mkAppTy, mkTyConTy,
 			  mkTyConApp, mkClassPred, tcFunArgTy,
-			  tyVarsOfTypes, 
+			  tyVarsOfTypes, isLinearPred,
 			  liftedTypeKind, openTypeKind, mkArrowKind,
 			  tcSplitSigmaTy, tcTyConAppTyCon,
 			  tidyOpenType
@@ -130,8 +131,14 @@ tcMonoExpr in_expr@(ExprWithTySig expr poly_ty) res_ty
  = tcHsSigType ExprSigCtxt poly_ty	`thenTc` \ sig_tc_ty ->
    tcAddErrCtxt (exprSigCtxt in_expr)	$
    tcExpr expr sig_tc_ty		`thenTc` \ (expr', lie1) ->
-   tcSub res_ty sig_tc_ty		`thenTc` \ (co_fn, lie2) ->
-   returnTc (co_fn <$> expr', lie1 `plusLIE` lie2)
+
+	-- Must instantiate the outer for-alls of sig_tc_ty
+	-- else we risk instantiating a ? res_ty to a forall-type
+	-- which breaks the invariant that tcMonoExpr only returns phi-types
+   tcInstCall SignatureOrigin sig_tc_ty	`thenNF_Tc` \ (inst_fn, lie2, inst_sig_ty) ->
+   tcSub res_ty inst_sig_ty		`thenTc` \ (co_fn, lie3) ->
+
+   returnTc (co_fn <$> inst_fn expr', lie1 `plusLIE` lie2 `plusLIE` lie3)
 \end{code}
 
 
@@ -703,19 +710,74 @@ tcArg the_fun (arg, expected_arg_ty, arg_no)
 %*									*
 %************************************************************************
 
+tcId instantiates an occurrence of an Id.
+The instantiate_it loop runs round instantiating the Id.
+It has to be a loop because we are now prepared to entertain
+types like
+	f:: forall a. Eq a => forall b. Baz b => tau
+We want to instantiate this to
+	f2::tau		{f2 = f1 b (Baz b), f1 = f a (Eq a)}
+
+The -fno-method-sharing flag controls what happens so far as the LIE
+is concerned.  The default case is that for an overloaded function we 
+generate a "method" Id, and add the Method Inst to the LIE.  So you get
+something like
+	f :: Num a => a -> a
+	f = /\a (d:Num a) -> let m = (+) a d in \ (x:a) -> m x x
+If you specify -fno-method-sharing, the dictionary application 
+isn't shared, so we get
+	f :: Num a => a -> a
+	f = /\a (d:Num a) (x:a) -> (+) a d x x
+This gets a bit less sharing, but
+	a) it's better for RULEs involving overloaded functions
+	b) perhaps fewer separated lambdas
+
 \begin{code}
 tcId :: Name -> NF_TcM (TcExpr, LIE, TcType)
 tcId name	-- Look up the Id and instantiate its type
   = tcLookupId name			`thenNF_Tc` \ id ->
-    tcInstId id
+    loop (OccurrenceOf id) (HsVar id) emptyLIE (idType id)
+  where
+    loop orig (HsVar fun_id) lie fun_ty
+	| want_method_inst fun_ty
+	= tcInstType fun_ty			`thenNF_Tc` \ (tyvars, theta, tau) ->
+	  newMethodWithGivenTy orig fun_id 
+		(mkTyVarTys tyvars) theta tau	`thenNF_Tc` \ meth ->
+	  loop orig (HsVar (instToId meth)) 
+	       (unitLIE meth `plusLIE` lie) tau
+
+    loop orig fun lie fun_ty 
+	| isSigmaTy fun_ty
+	= tcInstCall orig fun_ty	`thenNF_Tc` \ (inst_fn, inst_lie, tau) ->
+	  loop orig (inst_fn fun) (inst_lie `plusLIE` lie) tau
+
+	| otherwise
+	= returnNF_Tc (fun, lie, fun_ty)
+
+    want_method_inst fun_ty 
+	| opt_NoMethodSharing = False	
+	| otherwise	      = case tcSplitSigmaTy fun_ty of
+				  (_,[],_)    -> False 	-- Not overloaded
+				  (_,theta,_) -> not (any isLinearPred theta)
+	-- This is a slight hack.
+	-- If 	f :: (%x :: T) => Int -> Int
+	-- Then if we have two separate calls, (f 3, f 4), we cannot
+	-- make a method constraint that then gets shared, thus:
+	--	let m = f %x in (m 3, m 4)
+	-- because that loses the linearity of the constraint.
+	-- The simplest thing to do is never to construct a method constraint
+	-- in the first place that has a linear implicit parameter in it.
 \end{code}
 
 Typecheck expression which in most cases will be an Id.
+The expression can return a higher-ranked type, such as
+	(forall a. a->a) -> Int
+so we must create a HoleTyVarTy to pass in as the expected tyvar.
 
 \begin{code}
 tcExpr_id :: RenamedHsExpr -> TcM (TcExpr, LIE, TcType)
 tcExpr_id (HsVar name) = tcId name
-tcExpr_id expr         = newTyVarTy openTypeKind	`thenNF_Tc` \ id_ty ->
+tcExpr_id expr         = newHoleTyVarTy			`thenNF_Tc` \ id_ty ->
 			 tcMonoExpr expr id_ty		`thenTc`    \ (expr', lie_id) ->
 		         returnTc (expr', lie_id, id_ty) 
 \end{code}

@@ -13,7 +13,7 @@ module Inst (
 
 	newDictsFromOld, newDicts, cloneDict,
 	newMethod, newMethodWithGivenTy, newMethodAtLoc,
-	newOverloadedLit, newIPDict, tcInstId,
+	newOverloadedLit, newIPDict, tcInstCall,
 
 	tyVarsOfInst, tyVarsOfInsts, tyVarsOfLIE, 
 	ipNamesOfInst, ipNamesOfInsts, predsOfInst, predsOfInsts,
@@ -21,7 +21,8 @@ module Inst (
 
 	lookupInst, lookupSimpleInst, LookupInstResult(..),
 
-	isDict, isClassDict, isMethod, isLinearInst, linearInstType,
+	isDict, isClassDict, isMethod, 
+	isLinearInst, linearInstType,
 	isTyVarDict, isStdClassTyVarDict, isMethodFor, 
 	instBindingRequired, instCanBeGeneralised,
 
@@ -35,7 +36,7 @@ module Inst (
 
 import CmdLineOpts ( opt_NoMethodSharing )
 import HsSyn	( HsLit(..), HsOverLit(..), HsExpr(..) )
-import TcHsSyn	( TcExpr, TcId, 
+import TcHsSyn	( TcExpr, TcId, TypecheckedHsExpr,
 		  mkHsTyApp, mkHsDictApp, mkHsConApp, zonkId
 		)
 import TcMonad
@@ -51,7 +52,7 @@ import TcType	( Type, TcType, TcThetaType, TcPredType, TcTauType, TcTyVarSet,
 		  isIntTy,isFloatTy, isIntegerTy, isDoubleTy,
 		  tcIsTyVarTy, mkPredTy, mkTyVarTy, mkTyVarTys,
 		  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tidyPred,
-		  isClassPred, isTyVarClassPred, 
+		  isClassPred, isTyVarClassPred, isLinearPred,
 		  getClassPredTys, getClassPredTys_maybe, mkPredName,
 		  tidyType, tidyTypes, tidyFreeTyVars,
 		  tcCmpType, tcCmpTypes, tcCmpPred
@@ -272,11 +273,7 @@ isLinearInst other	     = False
 	-- We never build Method Insts that have
 	-- linear implicit paramters in them.
 	-- Hence no need to look for Methods
-	-- See Inst.tcInstId 
-
-isLinearPred :: TcPredType -> Bool
-isLinearPred (IParam (Linear n) _) = True
-isLinearPred other		   = False
+	-- See TcExpr.tcId 
 
 linearInstType :: Inst -> TcType	-- %x::t  -->  t
 linearInstType (Dict _ (IParam _ ty) _) = ty
@@ -358,62 +355,16 @@ newIPDict orig ip_name ty
 %*									*
 %************************************************************************
 
-tcInstId instantiates an occurrence of an Id.
-The instantiate_it loop runs round instantiating the Id.
-It has to be a loop because we are now prepared to entertain
-types like
-	f:: forall a. Eq a => forall b. Baz b => tau
-We want to instantiate this to
-	f2::tau		{f2 = f1 b (Baz b), f1 = f a (Eq a)}
-
-The -fno-method-sharing flag controls what happens so far as the LIE
-is concerned.  The default case is that for an overloaded function we 
-generate a "method" Id, and add the Method Inst to the LIE.  So you get
-something like
-	f :: Num a => a -> a
-	f = /\a (d:Num a) -> let m = (+) a d in \ (x:a) -> m x x
-If you specify -fno-method-sharing, the dictionary application 
-isn't shared, so we get
-	f :: Num a => a -> a
-	f = /\a (d:Num a) (x:a) -> (+) a d x x
-This gets a bit less sharing, but
-	a) it's better for RULEs involving overloaded functions
-	b) perhaps fewer separated lambdas
-
 
 \begin{code}
-tcInstId :: Id -> NF_TcM (TcExpr, LIE, TcType)
-tcInstId fun
-  = loop (HsVar fun) emptyLIE (idType fun)
-  where
-    orig = OccurrenceOf fun
-    loop fun lie fun_ty = tcInstType fun_ty		`thenNF_Tc` \ (tyvars, theta, tau) ->
-			  loop_help fun lie (mkTyVarTys tyvars) theta tau
-
-    loop_help fun lie arg_tys [] tau	-- Not overloaded
-	= returnNF_Tc (mkHsTyApp fun arg_tys, lie, tau)
-
-    loop_help (HsVar fun_id) lie arg_tys theta tau
-	| can_share theta		-- Sharable method binding
-	= newMethodWithGivenTy orig fun_id arg_tys theta tau	`thenNF_Tc` \ meth ->
-	  loop (HsVar (instToId meth)) 
-	       (unitLIE meth `plusLIE` lie) tau
-
-    loop_help fun lie arg_tys theta tau	-- The general case
- 	= newDicts orig theta					`thenNF_Tc` \ dicts ->
-	  loop (mkHsDictApp (mkHsTyApp fun arg_tys) (map instToId dicts)) 
-	       (mkLIE dicts `plusLIE` lie) tau
-
-    can_share theta | opt_NoMethodSharing = False
-		    | otherwise		  = not (any isLinearPred theta)
-	-- This is a slight hack.
-	-- If 	f :: (%x :: T) => Int -> Int
-	-- Then if we have two separate calls, (f 3, f 4), we cannot
-	-- make a method constraint that then gets shared, thus:
-	--	let m = f %x in (m 3, m 4)
-	-- because that loses the linearity of the constraint.
-	-- The simplest thing to do is never to construct a method constraint
-	-- in the first place that has a linear implicit parameter in it.
+tcInstCall :: InstOrigin  -> TcType -> NF_TcM (TypecheckedHsExpr -> TypecheckedHsExpr, LIE, TcType)
+tcInstCall orig fun_ty	-- fun_ty is usually a sigma-type
+  = tcInstType fun_ty		`thenNF_Tc` \ (tyvars, theta, tau) ->
+    newDicts orig theta		`thenNF_Tc` \ dicts ->
+    let
+	inst_fn e = mkHsDictApp (mkHsTyApp e (mkTyVarTys tyvars)) (map instToId dicts)
+    in
+    returnNF_Tc (inst_fn, mkLIE dicts, tau)
 
 newMethod :: InstOrigin
 	  -> TcId

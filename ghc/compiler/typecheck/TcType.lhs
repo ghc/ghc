@@ -59,7 +59,7 @@ module TcType (
   isPredTy, isClassPred, isTyVarClassPred, predHasFDs,
   mkDictTy, tcSplitPredTy_maybe, predTyUnique,
   isDictTy, tcSplitDFunTy, predTyUnique, 
-  mkClassPred, inheritablePred, isIPPred, mkPredName, 
+  mkClassPred, isInheritablePred, isLinearPred, isIPPred, mkPredName, 
 
   ---------------------------------
   -- Foreign import and export
@@ -137,7 +137,7 @@ import OccName		( OccName, mkDictOcc )
 import NameSet
 import PrelNames	-- Lots (e.g. in isFFIArgumentTy)
 import TysWiredIn	( ptrTyCon, funPtrTyCon, addrTyCon, unitTyCon )
-import BasicTypes	( ipNameName )
+import BasicTypes	( IPName(..), ipNameName )
 import Unique		( Unique, Uniquable(..) )
 import SrcLoc		( SrcLoc )
 import Util		( cmpList, thenCmp, equalLength )
@@ -530,7 +530,7 @@ isIPPred :: SourceType -> Bool
 isIPPred (IParam _ _) = True
 isIPPred other	      = False
 
-inheritablePred :: PredType -> Bool
+isInheritablePred :: PredType -> Bool
 -- Can be inherited by a context.  For example, consider
 --	f x = let g y = (?v, y+x)
 --	      in (g 3 with ?v = 8, 
@@ -539,8 +539,12 @@ inheritablePred :: PredType -> Bool
 --	g :: (?v :: a) => a -> a
 -- but it doesn't need to be quantified over the Num a dictionary
 -- which can be free in g's rhs, and shared by both calls to g
-inheritablePred (ClassP _ _) = True
-inheritablePred other	     = False
+isInheritablePred (ClassP _ _) = True
+isInheritablePred other	     = False
+
+isLinearPred :: TcPredType -> Bool
+isLinearPred (IParam (Linear n) _) = True
+isLinearPred other		   = False
 \end{code}
 
 
