@@ -1229,17 +1229,19 @@ declarations.  So this is illegal:
 </programlisting>
 
 
-Reason: a value of type <literal>T</literal> must be represented as a pair
-of a dictionary for <literal>Ord t</literal> and a value of type <literal>t</literal>.
-That contradicts the idea that <literal>newtype</literal> should have no
-concrete representation.  You can get just the same efficiency and effect
-by using <literal>data</literal> instead of <literal>newtype</literal>.  If there is no
-overloading involved, then there is more of a case for allowing
-an existentially-quantified <literal>newtype</literal>, because the <literal>data</literal>
-because the <literal>data</literal> version does carry an implementation cost,
-but single-field existentially quantified constructors aren't much
-use.  So the simple restriction (no existential stuff on <literal>newtype</literal>)
-stands, unless there are convincing reasons to change it.
+Reason: a value of type <literal>T</literal> must be represented as a
+pair of a dictionary for <literal>Ord t</literal> and a value of type
+<literal>t</literal>.  That contradicts the idea that
+<literal>newtype</literal> should have no concrete representation.
+You can get just the same efficiency and effect by using
+<literal>data</literal> instead of <literal>newtype</literal>.  If
+there is no overloading involved, then there is more of a case for
+allowing an existentially-quantified <literal>newtype</literal>,
+because the <literal>data</literal> version does carry an
+implementation cost, but single-field existentially quantified
+constructors aren't much use.  So the simple restriction (no
+existential stuff on <literal>newtype</literal>) stands, unless there
+are convincing reasons to change it.
 
 
 </para>
