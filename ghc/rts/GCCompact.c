@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GCCompact.c,v 1.4 2001/07/25 11:55:57 simonmar Exp $
+ * $Id: GCCompact.c,v 1.5 2001/07/30 12:57:01 simonmar Exp $
  *
  * (c) The GHC Team 2001
  *
@@ -723,8 +723,15 @@ update_fwd_compact( bdescr *blocks )
 
 	    size = p - q;
 	    if (free + size > free_bd->start + BLOCK_SIZE_W) {
+		// unset the next bit in the bitmap to indicate that
+		// this object needs to be pushed into the next
+		// block.  This saves us having to run down the
+		// threaded info pointer list twice during the next pass.
+		unmark(q+1,bd);
 		free_bd = free_bd->link;
 		free = free_bd->start;
+	    } else {
+		ASSERT(is_marked(q+1,bd));
 	    }
 
 	    unthread(q,free);
@@ -784,15 +791,7 @@ update_bkwd_compact( step *stp )
 	    }
 #endif
 
-	    // must unthread before we look at the info ptr...
-	    info = get_threaded_info(p);
-
-	    ASSERT(p && (LOOKS_LIKE_GHC_INFO(info)
-			 || IS_HUGS_CONSTR_INFO(info)));
-
-	    size = obj_sizeW((StgClosure *)p,info);
-
-	    if (free + size > free_bd->start + BLOCK_SIZE_W) {
+	    if (!is_marked(p+1,bd)) {
 		// don't forget to update the free ptr in the block desc.
 		free_bd->free = free;
 		free_bd = free_bd->link;
@@ -801,6 +800,12 @@ update_bkwd_compact( step *stp )
 	    }
 
 	    unthread(p,free);
+	    info = get_itbl((StgClosure *)p);
+	    size = obj_sizeW((StgClosure *)p,info);
+
+	    ASSERT(p && (LOOKS_LIKE_GHC_INFO(info)
+			 || IS_HUGS_CONSTR_INFO(info)));
+
 	    if (free != p) {
 		move(free,p,size);
 	    }
