@@ -16,7 +16,8 @@ module PrelBase(
 import {-# SOURCE #-}	IOBase	( error )	
 import GHC
 
-infixr 9  ., !!
+infixr 9  .
+infixl 9  !!
 infixl 7  *
 infixl 6  +, -
 infixr 5  ++, :
