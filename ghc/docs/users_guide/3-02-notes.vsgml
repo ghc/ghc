@@ -1,8 +1,8 @@
-<sect1>Release notes for version~3-01---2/97
-<label id="release-3-01">
+<sect1>Release notes for version~3-02---4/97
+<label id="release-3-02">
 <p>
 
-Changes made since 3.00:
+Changes made since 3.01:
 
 <itemize>
 
@@ -13,5 +13,11 @@ slightly).
 tuples in some cases.
 
 <item> Fixed parsing problem: declaring a record with an infix constructor.
+
+<item> When computing the Makefile dependencies, using either
+<tt/ghc -M/ (preferred) or by invoking the <tt/mkdependHS/ script
+directly, <tt/CPP/ will now by default not be run over the input
+files. To have CPP wash your input files, use the command-line option
+<tt/-cpp/.
 
 </itemize>

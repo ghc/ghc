@@ -35,6 +35,7 @@ mkdependHS-specific options (not between --'s):
     -w          No warnings
     -f blah	Use "blah" as the makefile, rather than "makefile"
 		or "Makefile".
+    -cpp	Wash the input files through cpp(1).
     -o <osuf>	Use <osuf> as the "object file" suffix ( default: o)
     -s <suf>	Make extra dependencies for files with
 		suffix <suf><osuf>; thus, "-o hc -s _a" will
@@ -66,6 +67,7 @@ $Warnings   = 1; # 1 => warn about duplicate interface files
 $Dashdashes_seen = 0;
 
 $Cpp = ${RAWCPP};
+$Cpp_flag_set = 0; # 1 => run cpp over input files.
 
 if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
     $Tmp_prefix = $ENV{'TMPDIR'} . "/mkdependHS$$";
@@ -235,6 +237,8 @@ sub mangle_command_line_args {
 
 	} elsif ( /^-D(.*)/ ) { # recognized wherever they occur
 	    push(@Defines, $_);
+	} elsif ( /^-cpp$/ ) { # recognized wherever they occur
+	    $Cpp_flag_set =1; 
 	} elsif ( /^-i$/ ) {
 	    $Import_dirs = ''; # import path cleared!
 	} elsif ( /^-i(.*)/ ) {
@@ -367,10 +371,15 @@ sub slurp_file_for_imports {
     # we mangle #include's so they will also leave something
     # behind to indicate the dependency on _them_
     
-    print STDERR "${SED} -e '/^# *include/{p;s/^# *include/!include/;};s/'\\''//g;s/\"//g' $file_to_read | $Cpp $Include_dirs -I$last_seen_dir @Defines |\n" if $Verbose;
+    local ($open_cmd);
+    if ($Cpp_flag_set) {
+       $open_cmd = "${SED} -e '/^# *include/{p;s/^# *include/!include/;};s/'\\''//g;s/\"//g' $file_to_read | $Cpp $Include_dirs -I$last_seen_dir @Defines |";
+    } else {
+       $open_cmd = $file_to_read;
+    }
+    print STDERR "$open_cmd\n" if $Verbose;
 
-    open(SRCFILE, "${SED} -e '/^# *include/{p;s/^# *include/!include/;};s/'\\''//g;s/\"//g' $file_to_read | $Cpp $Include_dirs -I$last_seen_dir @Defines |")
-	|| die "$Pgm: Can't open $file_to_read: $!\n";
+    open(SRCFILE, $open_cmd) || die "$Pgm: Can't open $file_to_read: $!\n";
 
     while (<SRCFILE>) {
         #

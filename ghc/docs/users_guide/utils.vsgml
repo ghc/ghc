@@ -66,6 +66,8 @@ that it doesn't understand are simply ignored; this way you can feed your
 Makefile's standard GHC options to @mkdependHS@ un-filtered.
 <descrip>
 
+<tag>@-cpp@</tag>       Run the C pre-processor over the input files. The
+			default is not to.
 <tag>@-D<blah>@</tag>	A cpp @#define@; usual meaning.
 
 <tag>@-i<dirs>@</tag>	Add @<dirs>@ (colon-separated) to list of directories
