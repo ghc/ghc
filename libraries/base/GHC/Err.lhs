@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Err.lhs,v 1.2 2001/07/31 13:11:07 simonmar Exp $
+% $Id: Err.lhs,v 1.3 2001/07/31 13:11:40 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -52,7 +52,7 @@ error :: String -> a
 error s = throw (ErrorCall s)
 
 errorCString :: Addr# -> a
-errorCString s = error (unpackCString s)
+errorCString s = error (unpackCString# s)
 
 -- It is expected that compilers will recognize this and insert error
 -- messages which are more appropriate to the context in which undefined 
