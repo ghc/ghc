@@ -102,8 +102,7 @@ Prelude>
     <title>Loading source files</title>
 
     <para>Suppose we have the following Haskell source code, which we
-    place in a file <filename>Main.hs</filename> in the current
-    directory:</para>
+    place in a file <filename>Main.hs</filename>:</para>
 
 <programlisting>
 main = print (fac 20)
@@ -111,6 +110,24 @@ main = print (fac 20)
 fac 0 = 1
 fac n = n * fac (n-1)
 </programlisting>
+
+    <para>You can save <filename>Main.hs</filename> anywhere you like,
+    but if you save it somewhere other than the current
+    directory<footnote><para>If you started up GHCi from the command
+    line then GHCi's current directory is the same as the current
+    directory of the shell from which it was started.  If you started
+    GHCi from the &ldquo;Start&rdquo; menu in Windows, then the
+    current directory is probably something like
+    <filename>C:\Documents and Settings\<replaceable>user
+    name</replaceable></filename>.</para> </footnote> then we will
+    need to change to the right directory in GHCi:</para>
+
+<screen>
+Prelude> :cd <replaceable>dir</replaceable>
+</screen>
+
+    <para>where <replaceable>dir</replaceable> is the directory (or
+    folder) in which you saved <filename>Main.hs</filename>.</para>
 
     <para>To load a Haskell source file into GHCi, use the
     <literal>:load</literal> command:</para>
