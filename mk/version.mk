@@ -13,6 +13,6 @@
 #
 ProjectName       = Haddock
 ProjectNameShort  = haddock
-ProjectVersion    = 0.1
-ProjectVersionInt = 1
+ProjectVersion    = 0.2
+ProjectVersionInt = 2
 ProjectPatchLevel = 0
