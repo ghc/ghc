@@ -408,6 +408,7 @@ Edges in Type/Class decls
 
 \begin{code}
 tyClDeclFTVs :: RenamedTyClDecl -> [Name]
+	-- Find the free non-tyvar vars
 tyClDeclFTVs d = foldNameSet add [] (tyClDeclFVs d)
 	       where
 		 add n fvs | isTyVarName n = fvs

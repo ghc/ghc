@@ -56,7 +56,7 @@ import PprType		( pprConstraint, pprPred )
 import TyCon		( TyCon, isSynTyCon )
 import Type		( splitDFunTy, isTyVarTy,
 			  splitTyConApp_maybe, splitDictTy,
-			  splitAlgTyConApp_maybe, splitForAllTys,
+			  splitForAllTys,
 			  tyVarsOfTypes, mkClassPred, mkTyVarTy,
 			  getClassTys_maybe
 			)
@@ -725,11 +725,6 @@ scrutiniseInstanceHead clas inst_taus
     maybe_tycon_app	  = splitTyConApp_maybe first_inst_tau
     Just (tycon, arg_tys) = maybe_tycon_app
 
-	-- Stuff for an *algebraic* data type
-    alg_tycon_app_maybe	   = splitAlgTyConApp_maybe first_inst_tau
-				-- The "Alg" part looks through synonyms
-    Just (alg_tycon, _, _) = alg_tycon_app_maybe
- 
     ccallable_type   dflags ty = isFFIArgumentTy dflags False {- Not safe call -} ty
     creturnable_type        ty = isFFIResultTy ty
 \end{code}

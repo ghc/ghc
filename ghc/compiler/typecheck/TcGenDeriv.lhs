@@ -63,7 +63,7 @@ import Panic		( panic, assertPanic )
 import Maybes		( maybeToBool )
 import Constants
 import List		( partition, intersperse )
-import Outputable	( pprPanic, ppr )
+import Outputable	( pprPanic, ppr, pprTrace )
 
 #if __GLASGOW_HASKELL__ >= 404
 import GlaExts		( fromInt )
@@ -914,8 +914,8 @@ gen_Read_binds get_fixity tycon
 	      c.f. Figure 18 in Haskell 1.1 report.
 	    -}
 	   paren_prec_limit
-	     | not is_infix  = fromInt maxPrecedence
-	     | otherwise     = getFixity get_fixity dc_nm
+	     | not is_infix  = defaultPrecedence
+	     | otherwise     = getPrecedence get_fixity dc_nm
 
 	   read_paren_arg   -- parens depend on precedence...
 	    | nullary_con  = false_Expr -- it's optional.
@@ -1027,8 +1027,8 @@ gen_Show_binds get_fixity tycon
 	        c.f. Figure 16 and 17 in Haskell 1.1 report
 	      -}  
 	     paren_prec_limit
-		| not is_infix = fromInt maxPrecedence + 1
-		| otherwise    = getFixity get_fixity dc_nm + 1
+		| not is_infix = defaultPrecedence + 1
+		| otherwise    = getPrecedence get_fixity dc_nm + 1
 
 \end{code}
 
@@ -1041,24 +1041,26 @@ getLRPrecs is_infix get_fixity nm = [lp, rp]
 	cf. Figures 16-18 in Haskell 1.1 report.
      -}
      (con_left_assoc, con_right_assoc) = isLRAssoc get_fixity nm
-     paren_con_prec = getFixity get_fixity nm
-     maxPrec	    = fromInt maxPrecedence
+     paren_con_prec = getPrecedence get_fixity nm
 
      lp
-      | not is_infix   = maxPrec + 1
+      | not is_infix   = defaultPrecedence + 1
       | con_left_assoc = paren_con_prec
       | otherwise      = paren_con_prec + 1
 		  
      rp
-      | not is_infix    = maxPrec + 1
+      | not is_infix    = defaultPrecedence + 1
       | con_right_assoc = paren_con_prec
       | otherwise       = paren_con_prec + 1
 		  
-getFixity :: (Name -> Maybe Fixity) -> Name -> Integer
-getFixity get_fixity nm 
+defaultPrecedence :: Integer
+defaultPrecedence = fromInt maxPrecedence
+
+getPrecedence :: (Name -> Maybe Fixity) -> Name -> Integer
+getPrecedence get_fixity nm 
    = case get_fixity nm of
         Just (Fixity x _) -> fromInt x
-        other	          -> pprPanic "TcGenDeriv.getFixity" (ppr nm)
+        other	          -> pprTrace "TcGenDeriv.getPrecedence" (ppr nm) defaultPrecedence
 
 isLRAssoc :: (Name -> Maybe Fixity) -> Name -> (Bool, Bool)
 isLRAssoc get_fixity nm =

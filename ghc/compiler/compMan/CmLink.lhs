@@ -12,11 +12,11 @@ module CmLink ( Linkable(..),  Unlinked(..),
                 PersistentLinkerState{-abstractly!-}, emptyPLS )
 where
 
+
 import Interpreter
 import CmStaticInfo	( PackageConfigInfo )
 import Module		( ModuleName, PackageName )
 import Outputable	( SDoc )
-import FiniteMap	( emptyFM )
 import Digraph		( SCC(..), flattenSCC )
 import Outputable
 import Panic		( panic )
@@ -82,12 +82,8 @@ instance Outputable Linkable where
    ppr (LP package_nm)       = text "LinkableP" <+> ptext package_nm
 
 emptyPLS :: IO PersistentLinkerState
-#ifdef GHCI
-emptyPLS = return (PersistentLinkerState { closure_env = emptyFM, 
-                                           itbl_env    = emptyFM })
-#else
-emptyPLS = return (PersistentLinkerState {})
-#endif
+emptyPLS = return (PersistentLinkerState { closure_env = emptyClosureEnv, 
+                                           itbl_env    = emptyItblEnv })
 \end{code}
 
 \begin{code}

@@ -182,7 +182,7 @@ importsFromImportDecl this_mod_name is_unqual (ImportDecl imp_mod_name from qual
 	-- then you'll get a 'B does not export AType' message.  Oh well.
 
     in
-    filterImports imp_mod_name import_spec avails	`thenRn` \ (filtered_avails, hides, explicits) ->
+    filterImports imp_mod_name from import_spec avails	`thenRn` \ (filtered_avails, hides, explicits) ->
 
     let
 	mk_provenance name = NonLocalDef (UserImport imp_mod iloc (name `elemNameSet` explicits)) 
@@ -277,6 +277,7 @@ available, and filters it through the import spec (if any).
 
 \begin{code}
 filterImports :: ModuleName			-- The module being imported
+	      -> WhereFrom			-- Tells whether it's a {-# SOURCE #-} import
 	      -> Maybe (Bool, [RdrNameIE])	-- Import spec; True => hiding
 	      -> [AvailInfo]			-- What's available
 	      -> RnMG ([AvailInfo],		-- What's actually imported
@@ -289,10 +290,10 @@ filterImports :: ModuleName			-- The module being imported
 
 	-- Complains if import spec mentions things that the module doesn't export
         -- Warns/informs if import spec contains duplicates.
-filterImports mod Nothing imports
+filterImports mod from Nothing imports
   = returnRn (imports, [], emptyNameSet)
 
-filterImports mod (Just (want_hiding, import_items)) total_avails
+filterImports mod from (Just (want_hiding, import_items)) total_avails
   = flatMapRn get_item import_items		`thenRn` \ avails_w_explicits ->
     let
 	(item_avails, explicits_s) = unzip avails_w_explicits
@@ -314,7 +315,7 @@ filterImports mod (Just (want_hiding, import_items)) total_avails
 	-- they won't make any difference because naked entities like T
 	-- in an import list map to TcOccs, not VarOccs.
 
-    bale_out item = addErrRn (badImportItemErr mod item)	`thenRn_`
+    bale_out item = addErrRn (badImportItemErr mod from item)	`thenRn_`
 		    returnRn []
 
     get_item item@(IEModuleContents _) = bale_out item
@@ -604,9 +605,13 @@ mk_export_fn exported_names = \name ->  name `elemNameSet` exported_names
 %************************************************************************
 
 \begin{code}
-badImportItemErr mod ie
-  = sep [ptext SLIT("Module"), quotes (ppr mod), 
+badImportItemErr mod from ie
+  = sep [ptext SLIT("Module"), quotes (ppr mod), source_import,
 	 ptext SLIT("does not export"), quotes (ppr ie)]
+  where
+    source_import = case from of
+		      ImportByUserSource -> ptext SLIT("(hi-boot interface)")
+		      other		 -> empty
 
 dodgyImportWarn mod item = dodgyMsg (ptext SLIT("import")) item
 dodgyExportWarn     item = dodgyMsg (ptext SLIT("export")) item

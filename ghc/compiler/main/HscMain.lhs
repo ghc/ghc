@@ -22,7 +22,6 @@ import Rename		( renameModule, checkOldIface, closeIfaceDecls )
 import Rules		( emptyRuleBase )
 import PrelInfo		( wiredInThingEnv, wiredInThings )
 import PrelNames	( knownKeyNames )
-import PrelRules	( builtinRules )
 import MkIface		( completeIface, mkModDetailsFromIface, mkModDetails,
 			  writeIface )
 import TcModule		( TcResults(..), typecheckModule )
@@ -46,7 +45,7 @@ import UniqSupply	( mkSplitUniqSupply )
 
 import Bag		( emptyBag )
 import Outputable
-import Interpreter
+import Interpreter	( UnlinkedIBind, ItblEnv, stgToInterpSyn )
 import HscStats		( ppSourceStats )
 import HscTypes		( ModDetails, ModIface(..), PersistentCompilerState(..),
 			  PersistentRenamerState(..), ModuleLocation(..),
@@ -128,7 +127,7 @@ hscNoRecomp dflags location maybe_checked_iface hst hit pcs_ch
 
       -- TYPECHECK
       maybe_tc_result
-         <- typecheckModule dflags this_mod pcs_cl hst hit cl_hs_decls;
+         <- typecheckModule dflags this_mod pcs_cl hst old_iface cl_hs_decls;
       case maybe_tc_result of {
          Nothing -> return (HscFail pcs_cl);
          Just tc_result -> do {
@@ -176,7 +175,7 @@ hscRecomp dflags location maybe_checked_iface hst hit pcs_ch
       -- TYPECHECK
       show_pass dflags "Typechecker";
       maybe_tc_result
-         <- typecheckModule dflags this_mod pcs_rn hst hit rn_hs_decls;
+         <- typecheckModule dflags this_mod pcs_rn hst new_iface rn_hs_decls;
       case maybe_tc_result of {
          Nothing -> do { hPutStrLn stderr "Typechecked failed" 
 		       ; return (HscFail pcs_rn) } ;

@@ -25,9 +25,9 @@ import RnIfaces		( slurpImpDecls, mkImportInfo,
 			  getInterfaceExports, closeDecls,
 			  RecompileRequired, outOfDate, recompileRequired
 			)
-import RnHiFiles	( readIface, removeContext, 
+import RnHiFiles	( readIface, removeContext, loadInterface,
 			  loadExports, loadFixDecls, loadDeprecs )
-import RnEnv		( availsToNameSet,
+import RnEnv		( availsToNameSet, availName,
 			  emptyAvailEnv, unitAvailEnv, availEnvElts, plusAvailEnv, groupAvails,
 			  warnUnusedImports, warnUnusedLocalBinds, warnUnusedModules,
 			  lookupOrigNames, lookupSrcName, newGlobalName
@@ -37,11 +37,10 @@ import Module           ( Module, ModuleName, WhereFrom(..),
 			  mkModuleInThisPackage, mkModuleName, moduleEnvElts
 			)
 import Name		( Name, NamedThing(..), getSrcLoc,
-			  nameIsLocalOrFrom,
-			  nameOccName, nameModule,
+			  nameIsLocalOrFrom, nameOccName, nameModule,
 			)
 import Name		( mkNameEnv, nameEnvElts, extendNameEnv )
-import RdrName		( elemRdrEnv, foldRdrEnv, isQual )
+import RdrName		( rdrEnvToList, elemRdrEnv, foldRdrEnv, isQual )
 import OccName		( occNameFlavour )
 import NameSet
 import TysWiredIn	( unitTyCon, intTyCon, boolTyCon )
@@ -65,7 +64,7 @@ import HscTypes		( PersistentCompilerState, HomeIfaceTable, HomeSymbolTable,
 			  ModIface(..), WhatsImported(..), 
 			  VersionInfo(..), ImportVersion, 
 			  IfaceDecls, mkIfaceDecls, dcl_tycl, dcl_rules, dcl_insts,
-			  GlobalRdrEnv, AvailEnv, GenAvailInfo(..), AvailInfo, 
+			  GlobalRdrEnv, AvailEnv, GenAvailInfo(..), AvailInfo, Avails,
 			  Provenance(..), ImportReason(..), initialVersionInfo,
 			  Deprecations(..), lookupDeprec, lookupIface
 			 )
@@ -137,7 +136,7 @@ rename this_module contents@(HsModule _ _ _ imports local_decls mod_deprec loc)
 	-- SLURP IN ALL THE NEEDED DECLARATIONS
     implicitFVs mod_name rn_local_decls 	`thenRn` \ implicit_fvs -> 
     let
-	slurp_fvs	= implicit_fvs `plusFV` source_fvs
+	slurp_fvs = implicit_fvs `plusFV` source_fvs
 		-- It's important to do the "plus" this way round, so that
 		-- when compiling the prelude, locally-defined (), Bool, etc
 		-- override the implicit ones. 
@@ -181,19 +180,11 @@ rename this_module contents@(HsModule _ _ _ imports local_decls mod_deprec loc)
 				mi_deprecs  = my_deprecs,
 				mi_decls    = panic "mi_decls"
 		    }
-
-		-- The export_fvs make the exported names look just as if they
-		-- occurred in the source program.  
-		-- We only need the 'parent name' of the avail;
-		-- that's enough to suck in the declaration.
-	export_fvs = availsToNameSet export_avails
-	used_vars  = source_fvs `plusFV` export_fvs
-
     in
 
 	-- REPORT UNUSED NAMES, AND DEBUG DUMP 
     reportUnusedNames mod_iface imports global_avail_env
-		      used_vars rn_imp_decls 			`thenRn_`
+		      source_fvs export_avails rn_imp_decls 	`thenRn_`
 
     returnRn (Just (mod_iface, final_decls))
   where
@@ -404,9 +395,7 @@ loadOldIface :: ParsedIface -> RnMG ModIface
 
 loadOldIface parsed_iface
   = let iface = parsed_iface 
-    in	-- RENAME IT
-    let mod = pi_mod iface
-        doc_str = ptext SLIT("need usage info from") <+> ppr mod
+        mod = pi_mod iface
     in
     initIfaceRnMS mod (
 	loadHomeDecls (pi_decls iface)	`thenRn` \ decls ->
@@ -523,16 +512,18 @@ closeIfaceDecls dflags hit hst pcs
 \begin{code}
 reportUnusedNames :: ModIface -> [RdrNameImportDecl] 
 		  -> AvailEnv
-		  -> NameSet 
+		  -> NameSet 		-- Used in this module
+		  -> Avails		-- Exported by this module
 		  -> [RenamedHsDecl] 
 		  -> RnMG ()
 reportUnusedNames my_mod_iface imports avail_env 
-		  used_names imported_decls
+		  source_fvs export_avails imported_decls
   = warnUnusedModules unused_imp_mods				`thenRn_`
     warnUnusedLocalBinds bad_locals				`thenRn_`
     warnUnusedImports bad_imp_names				`thenRn_`
     printMinimalImports this_mod minimal_imports		`thenRn_`
-    warnDeprecations this_mod my_deprecs really_used_names	`thenRn_`
+    warnDeprecations this_mod export_avails my_deprecs 
+		     really_used_names				`thenRn_`
     traceRn (text "Used" <+> fsep (map ppr (nameSetToList used_names)))	`thenRn_`
     returnRn ()
 
@@ -541,6 +532,11 @@ reportUnusedNames my_mod_iface imports avail_env
     gbl_env    = mi_globals my_mod_iface
     my_deprecs = mi_deprecs my_mod_iface
     
+	-- The export_fvs make the exported names look just as if they
+	-- occurred in the source program.  
+    export_fvs = availsToNameSet export_avails
+    used_names = source_fvs `plusFV` export_fvs
+
     -- Now, a use of C implies a use of T,
     -- if C was brought into scope by T(..) or T(C)
     really_used_names = used_names `unionNameSets`
@@ -637,13 +633,17 @@ reportUnusedNames my_mod_iface imports avail_env
     module_unused :: Module -> Bool
     module_unused mod = moduleName mod `elem` unused_imp_mods
 
-
-warnDeprecations this_mod my_deprecs used_names
+warnDeprecations this_mod export_avails my_deprecs used_names
   = doptRn Opt_WarnDeprecations				`thenRn` \ warn_drs ->
     if not warn_drs then returnRn () else
 
-    getIfacesRn						`thenRn` \ ifaces ->
-    getHomeIfaceTableRn					`thenRn` \ hit ->
+	-- The home modules for things in the export list
+	-- may not have been loaded yet; do it now, so 
+	-- that we can see their deprecations, if any
+    mapRn_ load_home export_mods		`thenRn_`
+
+    getIfacesRn					`thenRn` \ ifaces ->
+    getHomeIfaceTableRn				`thenRn` \ hit ->
     let
 	pit     = iPIT ifaces
 	deprecs = [ (n,txt)
@@ -653,6 +653,13 @@ warnDeprecations this_mod my_deprecs used_names
     mapRn_ warnDeprec deprecs
 
   where
+    export_mods = nub [ moduleName (nameModule name) 
+		      | avail <- export_avails,
+			let name = availName avail,
+			not (nameIsLocalOrFrom this_mod name) ]
+  
+    load_home m = loadInterface (text "Check deprecations for" <+> ppr m) m ImportBySystem
+
     lookup_deprec hit pit n
 	| nameIsLocalOrFrom this_mod n
 	= lookupDeprec my_deprecs n 
@@ -752,7 +759,7 @@ getRnStats imported_decls ifaces
     
     stats = vcat 
     	[int n_mods <+> text "interfaces read",
-    	 hsep [ int n_decls_slurped, text "class decls imported, out of", 
+    	 hsep [ int n_decls_slurped, text "type/class/variable imported, out of", 
     	        int (n_decls_slurped + n_decls_left), text "read"],
     	 hsep [ int n_insts_slurped, text "instance decls imported, out of",  
     	        int (n_insts_slurped + n_insts_left), text "read"],

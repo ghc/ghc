@@ -74,6 +74,7 @@ import CTypes
 
 type ItblEnv    = FiniteMap RdrName (Ptr StgInfoTable)
 type ClosureEnv = FiniteMap RdrName HValue
+emptyClosureEnv = emptyFM
 
 -- ---------------------------------------------------------------------------
 -- Run our STG program through the interpreter

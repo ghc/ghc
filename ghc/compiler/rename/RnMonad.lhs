@@ -52,7 +52,7 @@ import RdrName		( RdrName, dummyRdrVarName, rdrNameModule, rdrNameOcc,
 			  RdrNameEnv, emptyRdrEnv, extendRdrEnv, 
 			  addListToRdrEnv, rdrEnvToList, rdrEnvElts
 			)
-import Name		( Name, OccName, NamedThing(..), getSrcLoc,
+import Name		( Name, OccName, NamedThing(..), 
 			  nameOccName,
 			  decode, mkLocalName, mkKnownKeyGlobal
 			)
@@ -450,7 +450,8 @@ mapRn    :: (a -> RnM d b) -> [a] -> RnM d [b]
 mapRn_   :: (a -> RnM d b) -> [a] -> RnM d ()
 mapMaybeRn :: (a -> RnM d (Maybe b)) -> [a] -> RnM d [b]
 flatMapRn  :: (a -> RnM d [b])       -> [a] -> RnM d [b]
-sequenceRn :: [RnM d a] -> RnM d [a]
+sequenceRn  :: [RnM d a] -> RnM d [a]
+sequenceRn_ :: [RnM d a] -> RnM d ()
 foldlRn :: (b  -> a -> RnM d b) -> b -> [a] -> RnM d b
 mapAndUnzipRn :: (a -> RnM d (b,c)) -> [a] -> RnM d ([b],[c])
 fixRn    :: (a -> RnM d a) -> RnM d a
@@ -466,8 +467,11 @@ andRn combiner m1 m2 gdown ldown
 
 sequenceRn []     = returnRn []
 sequenceRn (m:ms) =  m			`thenRn` \ r ->
-		     sequenceRn ms 	`thenRn` \ rs ->
+		     sequenceRn ms	`thenRn` \ rs ->
 		     returnRn (r:rs)
+
+sequenceRn_ []     = returnRn ()
+sequenceRn_ (m:ms) = m `thenRn_` sequenceRn_ ms
 
 mapRn f []     = returnRn []
 mapRn f (x:xs)

@@ -80,11 +80,12 @@ typecheckModule
 	:: DynFlags
 	-> Module
 	-> PersistentCompilerState
-	-> HomeSymbolTable -> HomeIfaceTable
+	-> HomeSymbolTable
+	-> ModIface		-- Iface for this module
 	-> [RenamedHsDecl]
 	-> IO (Maybe TcResults)
 
-typecheckModule dflags this_mod pcs hst hit decls
+typecheckModule dflags this_mod pcs hst mod_iface decls
   = do	env <- initTcEnv hst (pcs_PTE pcs)
 
         (maybe_result, (warns,errs)) <- initTc dflags env tc_module
@@ -105,11 +106,11 @@ typecheckModule dflags this_mod pcs hst hit decls
     tc_module :: TcM (RecTcEnv, TcResults)
     tc_module = fixTc (\ ~(unf_env ,_) -> tcModule pcs hst get_fixity this_mod decls unf_env)
 
-    pit = pcs_PIT pcs
+    pit        = pcs_PIT pcs
+    fixity_env = mi_fixities mod_iface
 
     get_fixity :: Name -> Maybe Fixity
-    get_fixity nm = lookupIface hit pit this_mod nm 	`thenMaybe` \ iface ->
-		    lookupNameEnv (mi_fixities iface) nm
+    get_fixity nm = lookupNameEnv fixity_env nm
 \end{code}
 
 The internal monster:
