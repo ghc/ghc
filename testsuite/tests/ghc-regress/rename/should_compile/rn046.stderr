@@ -1,5 +1,5 @@
 
-rn046.hs:
+rn046.hs:2:0:
     Warning: Module `List' is imported, but nothing from it is used
 	     (except perhaps instances visible in `List')
 
