@@ -302,8 +302,12 @@ maybeParen ctxt_prec op_prec p | ctxt_prec >= op_prec = parens p
 
 pprHsType, pprParendHsType :: (Outputable name) => HsType name -> SDoc
 
-pprHsType ty       = ppr_mono_ty pREC_TOP ty
+pprHsType ty       = ppr_mono_ty pREC_TOP (de_paren ty)
 pprParendHsType ty = ppr_mono_ty pREC_CON ty
+
+-- Remove outermost HsParTy parens before printing a type
+de_paren (HsParTy ty) = de_paren ty
+de_paren ty	      = ty
 
 ppr_mono_ty ctxt_prec (HsForAllTy maybe_tvs ctxt ty)
   = maybeParen ctxt_prec pREC_FUN $
