@@ -309,16 +309,30 @@ gen_Ord_binds tycon
 			-- So we need to do a less-than comparison on the tags
 		    (cmp_tags_Expr ltH_Int_RDR ah_RDR bh_RDR ltTag_Expr gtTag_Expr)))
 
+    tycon_data_cons = tyConDataCons tycon
     (nullary_cons, nonnullary_cons)
        | isNewTyCon tycon = ([], tyConDataCons tycon)
-       | otherwise	  = partition isNullaryDataCon (tyConDataCons tycon)
+       | otherwise	  = partition isNullaryDataCon tycon_data_cons
 
-    cmp_eq
-      = mk_FunMonoBind tycon_loc cmp_eq_RDR (map pats_etc nonnullary_cons ++
-          if ((length nonnullary_cons + length nullary_cons) == 1)
-            then []
-            else [([WildPatIn, WildPatIn], 
-          default_rhs)])
+    cmp_eq =
+       mk_FunMonoBind tycon_loc 
+                      cmp_eq_RDR 
+                      (if null nonnullary_cons && (length nullary_cons == 1) then
+			   -- catch this specially to avoid warnings
+			   -- about overlapping patterns from the desugarer.
+		          let 
+			   data_con     = head nullary_cons
+			   data_con_RDR = qual_orig_name data_con
+                           pat          = ConPatIn data_con_RDR []
+                          in
+		          [([pat,pat], eqTag_Expr)]
+		       else
+		          map pats_etc nonnullary_cons ++
+			  -- leave out wildcards to silence desugarer.
+		          (if length tycon_data_cons == 1 then
+			      []
+			   else
+                              [([WildPatIn, WildPatIn], default_rhs)]))
       where
 	pats_etc data_con
 	  = ([con1_pat, con2_pat],
