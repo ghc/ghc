@@ -253,10 +253,11 @@
          <para>Emission of external Core format.  The goal is for
          other tools to be able to grab the Core resulting from GHC's
          front end manglings and optimisations.  Core format is
-         formally defined by the document <replaceable>An External
-         Representation of the GHC Core Language</replaceable> in the
-         GHC repository.  We also have sample
-         tools for reading, writing and typechecking external Core.
+         formally defined by the document <ulink url="http://www.haskell.org/ghc/docs/papers/core.ps.gz"
+         <citetitle>An External Representation for the GHC Core Language</citetitle></ulink>.
+         We also have sample
+         tools for reading, writing and typechecking external Core,
+         available in the source distribution directory <literal>/fptools/ghc/utils/ext-core</literal>.
          Ultimately we plan that Core files can also be read by
          GHC.  The relevant flag is <option>-fext-core</option>.
          </para>

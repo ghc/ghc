@@ -1270,6 +1270,33 @@
       </informaltable>
     </sect2>
 
+         
+    <sect2>
+      <title>External core file options (<xref linkend="ext-core">)</title>
+
+      <informaltable>
+	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	  <thead>
+	    <row>
+	      <entry>Flag</entry>
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>-fext-core</option></entry>
+	      <entry>Generate <filename>.hcr</filename> external Core files</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+    </sect2>
+	
+
     <sect2>
       <title>Compiler debugging options (<xref linkend="options-debugging">)</title>
 
