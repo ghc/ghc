@@ -19,6 +19,9 @@ module Html (
 
 import qualified BlockTable as BT
 
+import Data.Char (isAscii, ord)
+import Numeric (showHex)
+
 infixr 2 +++  -- combining Html
 infixr 7 <<   -- nesting Html
 infixl 8 !    -- adding optional arguments
@@ -152,7 +155,9 @@ stringToHtmlString = concatMap fixChar
       fixChar '>' = "&gt;"
       fixChar '&' = "&amp;"
       fixChar '"' = "&quot;"
-      fixChar c   = [c]               
+      fixChar c
+	| isAscii c = [c]
+	| otherwise = "&#x" ++ showHex (ord c) ";"
 
 -- ---------------------------------------------------------------------------
 -- Classes
