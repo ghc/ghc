@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.h,v 1.18 2003/08/29 16:00:29 simonmar Exp $
+ * $Id: MBlock.h,v 1.19 2003/09/21 13:26:05 igloo Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -70,7 +70,7 @@ extern StgWord8 mblock_map[];
 # define MARK_HEAP_ALLOCED(p)	((MBLOCK_MAP_ENTRY(p) < MBLOCK_MAP_SIZE) \
 					&& (mblock_map[MBLOCK_MAP_ENTRY(p)] = 1))
 
-#elif defined(x86_64_TARGET_ARCH)
+#elif SIZEOF_VOID_P == 8
 /* XXX: This is a HACK, and will not work in general!  We just use the
  * lower 32 bits of the address, and do the same as for the 32-bit
  * version.  As long as the OS gives us memory in a roughly linear
