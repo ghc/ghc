@@ -213,9 +213,6 @@ GhcWithRegisterised=YES
 #   i386, alpha & sparc
 GhcWithNativeCodeGen=$(shell if (test x$(findstring $(HostArch_CPP),i386 alpha sparc) = x); then echo NO; else echo YES; fi)
 
-# Build the compiler with the deforester included?
-GhcWithDeforester=NO
-
 #
 # Building various ways?
 # (right now, empty if not).
