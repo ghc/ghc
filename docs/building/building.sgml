@@ -1101,13 +1101,13 @@ or higher)</term>
 	</varlistentry>
 
 	<varlistentry>
-	  <term>i386-unknown-cygwin32:</term>
-	  <indexterm><primary>i386-unknown-cygwin32</primary></indexterm>
+	  <term>i386-unknown-mingw32:</term>
+	  <indexterm><primary>i386-unknown-mingw32</primary></indexterm>
 	  <listitem>
-	    <para>Fully supported under Win9x/NT, including a native
-            code generator. Requires the <Literal>cygwin32</Literal>
-            compatibility library and a healthy collection of GNU
-            tools (i.e., gcc, GNU ld, bash etc.).</para>
+	    <para>Fully supported under Win9x, WinNT, Win2k, and
+            WinXP.  Includes a native code generator.  Building from
+            source requires a recent <Literal>cygwin32</Literal>
+            distribution to be installed.</para>
 	  </listitem>
 	</varlistentry>
 
