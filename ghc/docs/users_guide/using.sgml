@@ -826,7 +826,7 @@ ghc &ndash;&ndash;make Main.hs
     generated during compilation.  By default, you get a standard set
     of warnings which are generally likely to indicate bugs in your
     program.  These are:
-    <option>-fwarn-overlpapping-patterns</option>,
+    <option>-fwarn-overlapping-patterns</option>,
     <option>-fwarn-deprecations</option>,
     <option>-fwarn-duplicate-exports</option>,
     <option>-fwarn-missing-fields</option>, and
@@ -987,6 +987,18 @@ g [] = 2
           an instance declaration is missing one or more methods, and
           the corresponding class declaration has no default
           declaration for them.</para>
+	  <para>The warning is suppressed if the method name
+	  begins with an underscore.  Here's an example where this is useful:
+	    <programlisting>
+	      class C a where
+	        _simpleFn :: a -> String
+	        complexFn :: a -> a -> String
+	        complexFn x y = ... _simpleFn ...
+	      </programlisting>
+	    The idea is that: (a) users of the class will only call <literal>complexFn</literal>; 
+	    never <literal>_simpleFn</literal>; and (b)
+	    instance declarations can define either <literal>complexFn</literal> or <literal>_simpleFn</literal>.
+	    </para>
 	</listitem>
       </varlistentry>
 
@@ -1111,9 +1123,12 @@ f "2"    = 2
 	  <para>Report all unused variables which arise from pattern
           matches, including patterns consisting of a single variable.
           For instance <literal>f x y = []</literal> would report
-          <VarName>x</VarName> and <VarName>y</VarName> as unused.  To
-          eliminate the warning, all unused variables can be replaced
-          with wildcards.</para>
+          <VarName>x</VarName> and <VarName>y</VarName> as unused.  The
+          warning is suppressed if the variable name begins with an underscore, thus:
+	    <programlisting>
+	       f _x = True
+	    </programlisting>
+          </para>
 	</listitem>
       </varlistentry>
 
