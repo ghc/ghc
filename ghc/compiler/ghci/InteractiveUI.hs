@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.91 2001/08/20 16:17:17 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.92 2001/10/15 15:05:17 simonpj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -399,7 +399,7 @@ info s = do
     showThing (ty_thing, fixity) 
 	= vcat [ text "-- " <> showTyThing ty_thing, 
 		 showFixity fixity (getName ty_thing),
-	         ppr (ifaceTyCls ty_thing) ]
+	         ppr (ifaceTyThing ty_thing) ]
 
     showFixity fix name
 	| fix == defaultFixity = empty
