@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.31 2000/07/31 10:12:19 simonmar Exp $
+# $Id: Makefile,v 1.32 2000/08/07 16:06:38 rrt Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -145,7 +145,7 @@ all :: $(DLL_PEN)/gmp.dll
 
 $(DLL_PEN)/gmp.dll:
 	make -C gmp gmp.dll
-	mv gmp/gmp.dll $(DLL_PEN)
+	$(MV) gmp/gmp.dll $(DLL_PEN)
 endif
 
 install :: gmp/libgmp.a
