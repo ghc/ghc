@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: HsSyn.lhs,v 1.7 2002/05/08 14:48:41 simonmar Exp $
+% $Id: HsSyn.lhs,v 1.8 2002/05/09 10:35:00 simonmar Exp $
 %
 % (c) The GHC Team, 1997-2002
 %
@@ -35,7 +35,10 @@ data SrcLoc = SrcLoc Int Int -- (Line, Indentation)
   deriving (Eq,Ord,Show)
 
 newtype Module = Module String
-  deriving (Eq,Ord,Show)
+  deriving (Eq,Ord)
+
+instance Show Module where
+   showsPrec p (Module m) = showString m
 
 data HsQName
 	= Qual Module HsName
