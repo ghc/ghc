@@ -239,7 +239,7 @@ sub mangle_command_line_args {
 	} elsif ( /^-concurrent$/ ) {
 	    push(@Syslibs, 'concurrent');
 	} elsif (/^-#include(.*)/) {
-	    &grab_arg_arg(*Args,$_,'');
+	    &grab_arg_arg(*Args,'-#include',$1);
 	} elsif ($Dashdashes_seen != 1) { # not between -- ... --
 	    if ( /^-v$/ ) {
 		$Verbose++;
