@@ -261,6 +261,7 @@ BINDIST_DOC_WAYS = html ps
 # BINDIST_DOC_WAYS =
 
 binary-dist ::
+ifneq "$(DOCBOOK_CATALOG)" ""
 	@for i in $(BIN_DIST_DIRS); do 		 	 	\
 	  if test -d "$$i"; then 			 	\
 	    $(MAKE) -C $$i $(MFLAGS) $(BINDIST_DOC_WAYS); 	\
@@ -280,6 +281,7 @@ binary-dist ::
 		datadir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share; \
 	  fi \
 	done
+endif
 
 # Rename scripts to $i.prl and $i.sh where necessary.
 # ToDo: do this in a cleaner way...
