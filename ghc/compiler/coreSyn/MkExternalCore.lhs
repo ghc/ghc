@@ -15,12 +15,14 @@ import Module
 import CoreSyn
 import HscTypes	
 import TyCon
+import Class
 import TypeRep
 import Type
 import DataCon
 import CoreSyn
 import Var
 import IdInfo
+import Id( idUnfolding )
 import Literal
 import Name
 import CostCentre
@@ -28,6 +30,7 @@ import Outputable
 import ForeignCall
 import PprExternalCore	
 import CmdLineOpts
+import Maybes( orElse )
 import IO
 import FastString
 
@@ -49,9 +52,23 @@ mkExternalCore :: ModGuts -> C.Module
 mkExternalCore (ModGuts {mg_module=this_mod, mg_types = type_env, mg_binds = binds})
   = C.Module mname tdefs vdefs
   where
-    mname = make_mid this_mod
-    tdefs = foldr collect_tdefs [] (typeEnvTyCons type_env)
-    vdefs = map make_vdef binds
+    mname  = make_mid this_mod
+    tdefs  = foldr collect_tdefs [] tycons
+    vdefs  = map make_vdef (implicit_binds ++ binds)
+    tycons = map classTyCon (typeEnvClasses type_env) ++ typeEnvTyCons type_env
+
+	-- Don't forget to include the implicit bindings!
+    implicit_binds = map get_defn (concatMap implicit_ids (typeEnvElts type_env))
+
+implicit_ids :: TyThing -> [Id]
+-- C.f. HscTypes.mkImplicitBinds, but we do not include constructor workers
+implicit_ids (ATyCon tc) = map dataConWrapId (tyConDataCons_maybe tc `orElse` [])
+				 ++ tyConSelIds tc ++ tyConGenIds tc
+implicit_ids (AClass cl) = classSelIds cl
+implicit_ids other       = []
+
+get_defn :: Id -> CoreBind
+get_defn id = NonRec id (unfoldingTemplate (idUnfolding id))
 
 collect_tdefs :: TyCon -> [C.Tdef] -> [C.Tdef]
 collect_tdefs tcon tdefs 
