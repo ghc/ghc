@@ -17,13 +17,13 @@ main = do
    hSetBuffering cd NoBuffering
    hPutStr cd speakString
    hSeek cd AbsoluteSeek 0
-   speak cd  `catch` \ err -> if isEOFError err then putStrLn "\nCaught EOF" else fail err
+   speak cd  `catch` \ err -> if isEOFError err then putStrLn "\nCaught EOF" else ioError err
    hSeek cd AbsoluteSeek 0
    hSetBuffering cd LineBuffering
-   speak cd  `catch` \ err -> if isEOFError err then putStrLn "\nCaught EOF" else fail err
+   speak cd  `catch` \ err -> if isEOFError err then putStrLn "\nCaught EOF" else ioError err
    hSeek cd AbsoluteSeek 0
    hSetBuffering cd (BlockBuffering Nothing)
-   speak cd  `catch` \ err -> if isEOFError err then putStrLn "\nCaught EOF" else fail err
+   speak cd  `catch` \ err -> if isEOFError err then putStrLn "\nCaught EOF" else ioError err
 
 speakString = "Someone wants to speak with you\n"
 
