@@ -1,0 +1,202 @@
+# *** MSUB does some substitutions here ***
+# *** grep for $( ***
+#
+# tries to work like mkdependC
+#
+# ToDo: strip out all the .h junk
+#
+($Pgm = $0) =~ s/.*\/([^\/]+)$/\1/;
+$Usage  = "usage: $Pgm: not done yet\n";
+
+$Status  = 0; # just used for exit() status
+$Verbose = 0;
+$Dashdashes_seen = 0;
+
+$Begin_magic_str = "# DO NOT DELETE: Beginning of C dependencies\n";
+$End_magic_str = "# DO NOT DELETE: End of C dependencies\n";
+$Obj_suffix = '.o';
+@Defines = ();
+$Include_dirs = '';
+$Col_width = 78; # ignored
+$Makefile = '';
+@Src_files = ();
+
+# the following is a hack, so we can use RAWCPP, but there you go;
+# put in just enough #defines that mkdependC will not barf.
+$HostPlatform = '$(HOSTPLATFORM)';
+
+if ( $HostPlatform =~ /^i386-/ ) {
+    push(@Defines, '-D__i386__');
+}
+if ( $HostPlatform =~ /^sparc-/ ) {
+    push(@Defines, '-D__sparc__');
+}
+if ( $HostPlatform =~ /-solaris2$/ ) {
+    push(@Defines, '-D__svr4__');
+}
+
+&mangle_command_line_args();
+
+if ( ! $Makefile && -f 'makefile' ) {
+    $Makefile = 'makefile';
+} elsif ( ! $Makefile && -f 'Makefile') {
+    $Makefile = 'Makefile';
+} elsif ( ! $Makefile) {
+    die "$Pgm: no makefile or Makefile found\n";
+}
+
+@Depend_lines = ();
+%Depend_seen = ();
+
+print STDERR "CPP defines=@Defines\n" if $Verbose;
+print STDERR "Include_dirs=$Include_dirs\n" if $Verbose;
+
+foreach $sf (@Src_files) {
+    # just like lit-inputter
+    # except it puts each file through CPP and
+    # a de-commenter (not implemented);
+    # builds up @Depend_lines
+    print STDERR "Here we go for source file: $sf\n" if $Verbose;
+    ($of = $sf) =~ s/\.(c|hc)$/$Obj_suffix/;
+
+    &slurp_file($sf, 'fh00');
+}
+
+# OK, mangle the Makefile
+unlink("$Makefile.bak");
+rename($Makefile,"$Makefile.bak");
+# now copy Makefile.bak into Makefile, rm'ing old dependencies
+# and adding the new
+open(OMKF,"< $Makefile.bak") || die "$Pgm: can't open $Makefile.bak: $!\n";
+open(NMKF,"> $Makefile") || die "$Pgm: can't open $Makefile: $!\n";
+select(NMKF);
+$_ = <OMKF>;
+while ($_ && $_ ne $Begin_magic_str) { # copy through, 'til Begin_magic_str
+    print $_;
+    $_ = <OMKF>;
+}
+while ($_ && $_ ne $End_magic_str) { # delete 'til End_magic_str
+    $_ = <OMKF>;
+}
+# insert dependencies
+print $Begin_magic_str;
+print @Depend_lines;
+print $End_magic_str;
+while (<OMKF>) { # copy the rest through
+    print $_;
+}
+close(NMKF);
+close(OMKF);
+exit 0;
+
+sub mangle_command_line_args {
+    while($_ = $ARGV[0]) {
+	shift(@ARGV);
+
+	if ( /^--$/ ) {
+	    $Dashdashes_seen++;
+
+	} elsif ( /^-D(.*)/ ) { # recognized wherever they occur
+	    push(@Defines, $_);
+	} elsif ( /^-I/ ) {
+	    $Include_dirs .= " $_";
+
+	} elsif ($Dashdashes_seen != 1) { # not between -- ... --
+	    if ( /^-v$/ ) {
+		$Verbose++;
+	    } elsif ( /^-f/ ) {
+		$Makefile	= &grab_arg_arg($_);
+	    } elsif ( /^-o/ ) {
+		$Obj_suffix	= &grab_arg_arg($_);
+	    } elsif ( /^-bs/ ) {
+		$Begin_magic_str = &grab_arg_arg($_) . "\n";
+	    } elsif ( /^-es/ ) {
+		$End_magic_str = &grab_arg_arg($_) . "\n";
+	    } elsif ( /^-w/ ) {
+		$Width	= &grab_arg_arg($_);
+	    } elsif ( /^-/ ) {
+		print STDERR "$Pgm: unknown option ignored: $_\n";
+	    } else {
+		push(@Src_files, $_);
+	    }
+
+	} elsif ($Dashdashes_seen == 1) { # where we ignore unknown options
+	    push(@Src_files,$_) if ! /^-/;
+	}
+    }
+}
+
+sub grab_arg_arg {
+    local($option) = @_;
+    local($rest_of_arg);
+    
+    ($rest_of_arg = $option) =~ s/^-.//;
+
+    if ($rest_of_arg) {
+	return($rest_of_arg);
+    } elsif ($#ARGV >= 0) {
+	local($temp) = $ARGV[0]; shift(@ARGV); 
+	return($temp);
+    } else {
+	die "$Pgm: no argument following $option option\n";
+    }
+}
+
+sub slurp_file { # follows an example in the `open' item in perl man page
+    local($fname,$fhandle) = @_;
+    local($depend); # tmp
+    $fhandle++; # a string increment
+
+    $fname = &tidy_dir_names($fname);
+
+    unless (open($fhandle, "$(RAWCPP) $Include_dirs @Defines $fname |")) {
+         die "$Pgm: Can't open $fname: $!\n";
+    }
+    line: while (<$fhandle>) {
+	next line if ! /^#/;
+	next line if /^#(ident|pragma)/;
+	chop; # rm trailing newline
+
+	$_ = &tidy_dir_names($_);
+
+	# strip junk off the front and back
+	$_ =~ s/^#\s+\d+\s+//;
+	$_ =~ s/[ 0-9]*$//;
+	
+	# a little bit of ad-hoc fiddling now:
+	# don't bother w/ dependencies on /usr/include stuff
+	# don't bother if it looks like a GCC built-in hdr file
+	# don't bother with funny yacc-ish files
+    	# don't bother with "literate" .h files (.lh); we'll just
+	# depend on the de-litified versions (which have better info)
+	# don't let a file depend on itself
+	next line if /^\/usr\/include/;
+	next line if /\/gcc-lib\/[^\/\n]+\/[\.0-9]+\/include\//;
+	next line if /\/yaccpar/;
+    	next line if /\/bison\.(simple|hairy)/;
+	next line if /\.lh$/;
+	next line if $_ eq $fname;
+
+	print STDERR "$fname :: $_\n" if $Verbose;
+
+	# ToDo: some sanity checks that we still have something reasonable?
+
+	$depend = "$of : $_\n";
+	next line if $Depend_seen{$depend};  # already seen this one...
+
+	# OK, it's a new one.
+	push (@Depend_lines, $depend);
+	$Depend_seen{$depend} = 1;
+    }
+    close($fhandle);
+}
+
+sub tidy_dir_names { # rm various pernicious dir-name combinations...
+    local($str) = @_;
+
+    $str =~ s|/[^/.][^/]*/\.\.||g;	# nuke: /<dir>/..
+    $str =~ s|/\.[^.][^/]*/\.\.||g;	# nuke: /./.. (and others)
+    $str =~ s|"||g;
+    $str =~ s| \./| |;
+    $str;
+}

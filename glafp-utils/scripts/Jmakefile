@@ -1,0 +1,50 @@
+PROGRAMS = lndir \
+	   runstdtest \
+	   mkdependC \
+	   mkdirhier \
+	   fastmake \
+	   ltx
+
+all:: $(PROGRAMS)
+/* stuff to have before we get going */
+MsubNeededHere($(PROGRAMS))
+
+/* === BUILD STUFF (installation, etc., below) ========== */
+
+/* std X11 stuff: used in installing ghc/hslibs */
+MsubProgramScriptTarget(BourneShell,mkdirhier,mkdirhier.sh,,)
+
+BuildPgmFromOneCFile(lndir)
+
+MsubMakefileDependentProgramScriptTarget(PerlCmd,runstdtest,runstdtest.prl,,)
+MsubMakefileDependentProgramScriptTarget(PerlCmd,ltx,ltx.prl,,)
+MsubProgramScriptTarget(PerlCmd,fastmake,fastmake.prl,,)
+
+/*
+mkdependC has to go in "bin" directory, because there may be
+machine-dependent ideas of what CC to use, etc.
+
+ltx, runstdtest: ditto, but only because of TMPDIR
+*/
+MsubMakefileDependentProgramScriptTarget(PerlCmd,mkdependC,mkdependC.prl,/*noflags*/,/*Makefile*/)
+
+/* === INSTALLATION ======== */
+
+/* the rest of these vary from std/useful to hackish dans le extreme */
+
+MakeDirectories(install, $(INSTBINDIR) $(INSTSCRIPTDIR))
+InstallScriptTarget(fastmake,	  $(INSTSCRIPTDIR))
+InstallBinaryTarget(lndir,	  $(INSTBINDIR))
+InstallScriptTarget(ltx,	  $(INSTBINDIR))
+InstallScriptTarget(mkdependC,	  $(INSTBINDIR))
+InstallScriptTarget(runstdtest,  $(INSTBINDIR))
+
+InstallManPageTarget(lndir,$(INSTCOMMANDIR),$(COMMANSUFFIX))
+InstallManPageTarget(mkdirhier,$(INSTCOMMANDIR),$(COMMANSUFFIX))
+
+/* === OTHER STUFF ========= */
+
+ExtraStuffToClean($(PROGRAMS))
+
+ClearTagsFile()
+PerlTagsTarget( *.prl ) /* nothing for the Bourne shell scripts */
