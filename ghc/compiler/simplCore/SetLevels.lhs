@@ -80,7 +80,9 @@ import Outputable
 %************************************************************************
 
 \begin{code}
-data Level = Level Int	-- Level number of enclosing lambdas
+data Level = InlineCtxt	-- A level that's used only for
+			-- the context parameter ctxt_lvl
+	   | Level Int	-- Level number of enclosing lambdas
 	  	   Int	-- Number of big-lambda and/or case expressions between
 			-- here and the nearest enclosing lambda
 \end{code}
@@ -105,44 +107,68 @@ The main function @lvlExpr@ carries a ``context level'' (@ctxt_lvl@).
 That's meant to be the level number of the enclosing binder in the
 final (floated) program.  If the level number of a sub-expression is
 less than that of the context, then it might be worth let-binding the
-sub-expression so that it will indeed float. This context level starts
-at @Level 0 0@.
+sub-expression so that it will indeed float.  
+
+If you can float to level @Level 0 0@ worth doing so because then your
+allocation becomes static instead of dynamic.  We always start with
+context @Level 0 0@.  @InlineCtxt@ very similar to @Level 0 0@, but is
+used for one purpose: to say "don't float anything out of here".
+That's exactly what we want for the body of an INLINE, where we don't
+want to float anything out at all.  See notes with lvlMFE below.
+
 
 \begin{code}
 type LevelledExpr  = TaggedExpr Level
 type LevelledBind  = TaggedBind Level
 
-tOP_LEVEL = Level 0 0
+tOP_LEVEL   = Level 0 0
+iNLINE_CTXT = InlineCtxt
 
 incMajorLvl :: Level -> Level
+incMajorLvl InlineCtxt			= Level 1 0
 incMajorLvl (Level major minor) = Level (major+1) 0
 
 incMinorLvl :: Level -> Level
+incMinorLvl InlineCtxt			= Level 0 1
 incMinorLvl (Level major minor) = Level major (minor+1)
 
 maxLvl :: Level -> Level -> Level
+maxLvl InlineCtxt l2  = l2
+maxLvl l1  InlineCtxt = l1
 maxLvl l1@(Level maj1 min1) l2@(Level maj2 min2)
   | (maj1 > maj2) || (maj1 == maj2 && min1 > min2) = l1
   | otherwise					   = l2
 
 ltLvl :: Level -> Level -> Bool
+ltLvl any_lvl	 InlineCtxt  = False
+ltLvl InlineCtxt (Level _ _) = True
 ltLvl (Level maj1 min1) (Level maj2 min2)
   = (maj1 < maj2) || (maj1 == maj2 && min1 < min2)
 
 ltMajLvl :: Level -> Level -> Bool
     -- Tells if one level belongs to a difft *lambda* level to another
+ltMajLvl any_lvl	InlineCtxt     = False
+ltMajLvl InlineCtxt	(Level maj2 _) = 0 < maj2
 ltMajLvl (Level maj1 _) (Level maj2 _) = maj1 < maj2
 
 isTopLvl :: Level -> Bool
 isTopLvl (Level 0 0) = True
-isTopLvl other       = False
+isTopLvl other	     = False
+
+isInlineCtxt :: Level -> Bool
+isInlineCtxt InlineCtxt = True
+isInlineCtxt other	= False
 
 instance Outputable Level where
+  ppr InlineCtxt      = text "<INLINE>"
   ppr (Level maj min) = hcat [ char '<', int maj, char ',', int min, char '>' ]
 
 instance Eq Level where
+  InlineCtxt	    == InlineCtxt	 = True
   (Level maj1 min1) == (Level maj2 min2) = maj1==maj2 && min1==min2
+  l1		    == l2		 = False
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -224,8 +250,8 @@ lvlExpr ctxt_lvl env (_, AnnApp fun arg)
 	-- but we do if the function is big and hairy, like a case
 
 lvlExpr ctxt_lvl env (_, AnnNote InlineMe expr)
--- Don't float anything out of an InlineMe; hence the tOP_LEVEL
-  = lvlExpr tOP_LEVEL env expr 	`thenLvl` \ expr' ->
+-- Don't float anything out of an InlineMe; hence the iNLINE_CTXT
+  = lvlExpr iNLINE_CTXT env expr 	`thenLvl` \ expr' ->
     returnLvl (Note InlineMe expr')
 
 lvlExpr ctxt_lvl env (_, AnnNote note expr)
@@ -319,11 +345,18 @@ lvlMFE strict_ctxt ctxt_lvl env ann_expr@(fvs, _)
     dest_lvl = destLevel env fvs (isFunction ann_expr)
     abs_vars = abstractVars dest_lvl env fvs
 
-    good_destination =  dest_lvl `ltMajLvl` ctxt_lvl		-- Escapes a value lambda
-		     || (isTopLvl dest_lvl && not strict_ctxt)	-- Goes to the top
+    good_destination =  dest_lvl `ltMajLvl` ctxt_lvl	-- Escapes a value lambda
+		     || (isTopLvl dest_lvl		-- Goes to the top
+			 && not (isInlineCtxt ctxt_lvl)	-- Don't float out of an __inline__ context
+			 && not strict_ctxt)		--   or from a strict context	
 	-- A decision to float entails let-binding this thing, and we only do 
 	-- that if we'll escape a value lambda, or will go to the top level.
-	-- But beware
+	-- But beware (a):
+	--	x = __inline__ (f (g y))
+	-- Here we don't want to float the (g y); otherwise it'll get outside the
+	--  	__inline__ envelope, and may never get inlined
+	--
+	-- Also beware (b):
 	--	concat = /\ a -> foldr ..a.. (++) []
 	-- was getting turned into
 	--	concat = /\ a -> lvl a
