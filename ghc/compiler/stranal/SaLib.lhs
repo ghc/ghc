@@ -8,7 +8,7 @@ See also: the ``library'' for the ``back end'' (@SaBackLib@).
 \begin{code}
 #ifndef DEBUG
 -- If DEBUG is off, omit all exports 
-module SaAbsInt () where
+module SaLib () where
 
 #else
 module SaLib (
