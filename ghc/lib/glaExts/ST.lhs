@@ -42,7 +42,8 @@ import Ix
 %*********************************************************
 
 \begin{code}
-newtype STRef s a = STRef (MutableVar s a) deriving Eq
+newtype STRef s a = STRef (MutableVar s a) 
+    deriving Eq
 
 newSTRef :: a -> ST s (STRef s a)
 newSTRef v = newVar v >>= \ var -> return (STRef var)
@@ -61,7 +62,8 @@ writeSTRef (STRef var) v = writeVar var v
 %*********************************************************
 
 \begin{code}
-type STArray s ix elt = MutableArray s ix elt
+newtype STArray s ix elt = STArray (MutableArray s ix elt)
+    deriving Eq
 
 newSTArray 		:: Ix ix => (ix,ix) -> elt -> ST s (STArray s ix elt)
 writeSTArray	  	:: Ix ix => STArray s ix elt -> ix -> elt -> ST s () 
@@ -71,12 +73,20 @@ thawSTArray 		:: Ix ix => Array ix elt -> ST s (STArray s ix elt)
 freezeSTArray	  	:: Ix ix => STArray s ix elt -> ST s (Array ix elt)
 unsafeFreezeSTArray 	:: Ix ix => STArray s ix elt -> ST s (Array ix elt)
 
-newSTArray    		= newArray
-boundsSTArray 		= boundsOfArray
-readSTArray   		= readArray
-writeSTArray  		= writeArray
-thawSTArray   		= thawArray
-freezeSTArray 		= freezeArray
-unsafeFreezeSTArray 	= unsafeFreezeArray
+newSTArray ixs elt = 
+    newArray ixs elt >>= \arr -> 
+    return (STArray arr)
+
+boundsSTArray (STArray arr) = boundsOfArray arr
+
+readSTArray (STArray arr) ix = readArray arr ix
+
+writeSTArray (STArray arr) ix elt = writeArray arr ix elt
+
+thawSTArray arr = thawArray arr >>= \starr -> return (STArray starr)
+
+freezeSTArray (STArray arr) = freezeArray arr
+
+unsafeFreezeSTArray (STArray arr) = unsafeFreezeArray arr
 \end{code}
-	
+
