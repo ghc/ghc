@@ -45,7 +45,7 @@ import TcType		( Type, tcSplitFunTys, tcSplitTyConApp_maybe,
 			  isFFIExternalTy, isFFIDynArgumentTy,
 			  isFFIDynResultTy, isForeignPtrTy
 			)
-import ForeignCall	( CExportSpec(..), CCallTarget(..),
+import ForeignCall	( CExportSpec(..), CCallTarget(..), CCallConv(..),
 			  isDynamicTarget, isCasmTarget ) 
 import CStrings		( CLabelString, isCLabelString )
 import PrelNames	( hasKey, ioTyConKey )
@@ -106,13 +106,20 @@ tcCheckFIType sig_ty arg_tys res_ty (CImport _ _ _ _ (CLabel _))
   = checkCg checkCOrAsm		`thenNF_Tc_`
     check (isFFILabelTy sig_ty) (illegalForeignTyErr empty sig_ty)
 
-tcCheckFIType sig_ty arg_tys res_ty (CImport _ _ _ _ CWrapper)
+tcCheckFIType sig_ty arg_tys res_ty (CImport cconv _ _ _ CWrapper)
   = 	-- Foreign wrapper (former f.e.d.)
    	-- The type must be of the form ft -> IO (FunPtr ft), where ft is a
    	-- valid foreign type.  For legacy reasons ft -> IO (Ptr ft) as well
    	-- as ft -> IO Addr is accepted, too.  The use of the latter two forms
    	-- is DEPRECATED, though.
-    checkCg checkCOrAsmOrInterp		`thenNF_Tc_`
+    checkCg (if cconv == StdCallConv
+		then checkC
+		else checkCOrAsmOrInterp)		`thenNF_Tc_`
+	-- the native code gen can't handle foreign import stdcall "wrapper",
+	-- because it doesn't emit the '@n' suffix on the label of the
+	-- C stub function.  Infrastructure changes are required to make this
+	-- happen; MachLabel will need to carry around information about
+	-- the arity of the foreign call.
     case arg_tys of
 	[arg1_ty] -> checkForeignArgs isFFIExternalTy arg1_tys			`thenNF_Tc_`
 		     checkForeignRes nonIOok  isFFIExportResultTy res1_ty	`thenNF_Tc_`
@@ -269,7 +276,7 @@ checkForeignRes non_io_result_ok pred_res_ty ty
 		 (illegalForeignTyErr result ty)
 \end{code}
 
-\begin{code} 
+\begin{code}
 checkDotNet HscILX = Nothing
 checkDotNet other  = Just (text "requires .NET code generation (-filx)")
 
