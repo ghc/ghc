@@ -810,14 +810,21 @@ completeCall var occ_info cont
 	-- won't occur for things that have specialisations till a later phase, so
 	-- it's ok to try for inlining first.
 	--
-	-- Don't apply rules for a loop breaker: doing so might give rise
-	-- to an infinite loop, for the same reasons that inlining the ordinary
-	-- RHS of a loop breaker might.
+	-- You might think that we shouldn't apply rules for a loop breaker: 
+	-- doing so might give rise to an infinite loop, because a RULE is
+	-- rather like an extra equation for the function:
+	--	RULE:		f (g x) y = x+y
+	--	Eqn:		f a     y = a-y
+	--
+	-- But it's too drastic to disable rules for loop breakers.  
+	-- Even the foldr/build rule would be disabled, because foldr 
+	-- is recursive, and hence a loop breaker:
+	--	foldr k z (build g) = g k z
+	-- So it's up to the programmer: rules can cause divergence
 
     getSwitchChecker 	`thenSmpl` \ chkr ->
     let
-	maybe_rule |  switchIsOn chkr DontApplyRules 
-		   || isLoopBreaker occ_info	    = Nothing
+	maybe_rule | switchIsOn chkr DontApplyRules = Nothing
 		   | otherwise			    = lookupRule in_scope var args' 
     in
     case maybe_rule of {
