@@ -1,12 +1,10 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelEnum.lhs,v 1.15 2001/08/17 17:18:54 apt Exp $
+% $Id: PrelEnum.lhs,v 1.16 2001/08/29 09:34:05 simonmar Exp $
 %
-% (c) The University of Glasgow, 1992-2000
+% (c) The University of Glasgow, 1992-2001
 %
 
-\section[PrelBounded]{Module @PrelBounded@}
-
-Instances of Bounded for various datatypes.
+Instances of Bounded and Enum for various datatypes.
 
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}

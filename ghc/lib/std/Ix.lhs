@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Ix.lhs,v 1.18 2000/06/30 13:39:35 simonmar Exp $
+% $Id: Ix.lhs,v 1.19 2001/08/29 09:34:05 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -13,8 +13,8 @@ module Ix
 	  ( range	-- :: (Ix a) => (a,a) -> [a]
 	  , index       -- :: (Ix a) => (a,a) -> a   -> Int
 	  , inRange     -- :: (Ix a) => (a,a) -> a   -> Bool
+	  , rangeSize	-- :: (Ix a) => (a,a) -> Int
 	  )
-    ,	rangeSize       -- :: (Ix a) => (a,a) -> Int
     -- Ix instances:
     --
     --  Ix Char

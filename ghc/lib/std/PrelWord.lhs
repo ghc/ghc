@@ -140,11 +140,10 @@ instance Bounded Word where
 #endif
 
 instance Ix Word where
-    range (m,n)       = [m..n]
-    index b@(m,_) i
-        | inRange b i = fromIntegral (i - m)
-        | otherwise   = indexError b i "Word"
-    inRange (m,n) i   = m <= i && i <= n
+    range (m,n)              = [m..n]
+    unsafeIndex b@(m,_) i    = fromIntegral (i - m)
+    inRange (m,n) i          = m <= i && i <= n
+    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
 
 instance Read Word where
     readsPrec p s = [(fromInteger x, r) | (x, r) <- readsPrec p s]
@@ -240,11 +239,10 @@ instance Bounded Word8 where
     maxBound = 0xFF
 
 instance Ix Word8 where
-    range (m,n)       = [m..n]
-    index b@(m,_) i
-        | inRange b i = fromIntegral (i - m)
-        | otherwise   = indexError b i "Word8"
-    inRange (m,n) i   = m <= i && i <= n
+    range (m,n)              = [m..n]
+    unsafeIndex b@(m,_) i    = fromIntegral (i - m)
+    inRange (m,n) i          = m <= i && i <= n
+    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
 
 instance Read Word8 where
     readsPrec p s = [(fromIntegral (x::Int), r) | (x, r) <- readsPrec p s]
@@ -341,11 +339,10 @@ instance Bounded Word16 where
     maxBound = 0xFFFF
 
 instance Ix Word16 where
-    range (m,n)       = [m..n]
-    index b@(m,_) i
-        | inRange b i = fromIntegral (i - m)
-        | otherwise   = indexError b i "Word16"
-    inRange (m,n) i   = m <= i && i <= n
+    range (m,n)              = [m..n]
+    unsafeIndex b@(m,_) i    = fromIntegral (i - m)
+    inRange (m,n) i          = m <= i && i <= n
+    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
 
 instance Read Word16 where
     readsPrec p s = [(fromIntegral (x::Int), r) | (x, r) <- readsPrec p s]
@@ -615,11 +612,10 @@ instance Bounded Word32 where
     maxBound = 0xFFFFFFFF
 
 instance Ix Word32 where
-    range (m,n)       = [m..n]
-    index b@(m,_) i
-        | inRange b i = fromIntegral (i - m)
-        | otherwise   = indexError b i "Word32"
-    inRange (m,n) i   = m <= i && i <= n
+    range (m,n)              = [m..n]
+    unsafeIndex b@(m,_) i    = fromIntegral (i - m)
+    inRange (m,n) i          = m <= i && i <= n
+    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
 
 instance Read Word32 where  
 #if WORD_SIZE_IN_BITS < 33
@@ -845,11 +841,10 @@ instance Bounded Word64 where
     maxBound = 0xFFFFFFFFFFFFFFFF
 
 instance Ix Word64 where
-    range (m,n)       = [m..n]
-    index b@(m,_) i
-        | inRange b i = fromIntegral (i - m)
-        | otherwise   = indexError b i "Word64"
-    inRange (m,n) i   = m <= i && i <= n
+    range (m,n)              = [m..n]
+    unsafeIndex b@(m,_) i    = fromIntegral (i - m)
+    inRange (m,n) i          = m <= i && i <= n
+    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
 
 instance Read Word64 where
     readsPrec p s = [(fromInteger x, r) | (x, r) <- readsPrec p s]
