@@ -46,6 +46,7 @@ import StringBuffer	( hGetStringBuffer, freeStringBuffer )
 import Parser
 import Lex		( ParseResult(..), ExtFlags(..), mkPState )
 import SrcLoc		( mkSrcLoc )
+import Finder		( findModule )
 import Rename		( checkOldIface, renameModule, renameExtCore, 
 			  closeIfaceDecls, RnResult(..) )
 import Rules		( emptyRuleBase )
@@ -83,7 +84,6 @@ import OccName		( OccName )
 import Name		( Name, nameModule, nameOccName, getName )
 import NameEnv		( emptyNameEnv, mkNameEnv )
 import Module		( Module )
-import BasicTypes	( Version )
 import FastString
 import Maybes		( expectJust )
 import Util		( seqList )
@@ -98,6 +98,7 @@ import IO
 import MkExternalCore	( emitExternalCore )
 import ParserCore
 import ParserCoreUtils
+
 \end{code}
 
 
@@ -226,14 +227,12 @@ hscRecomp ghci_mode dflags have_object
 	    	   pcs_tc, ds_details, foreign_stuff) -> do {
 
 	  let {
-	    imported_module_names :: [ModuleName];
  	    imported_module_names = 
 		filter (/= gHC_PRIM_Name) $
 		map ideclName (hsModuleImports rdr_module);
 
-	    imported_modules :: [(Module,Version)];
             imported_modules =
-		map (getModuleAndVersion hit (pcs_PIT pcs_tc))
+		map (moduleNameToModule hit (pcs_PIT pcs_tc))
 			imported_module_names;
 	  }
 
@@ -387,18 +386,13 @@ hscRecomp ghci_mode dflags have_object
 		    final_iface <- _scc_ "MkFinalIface" 
 			  mkFinalIface ghci_mode dflags location 
                                    maybe_checked_iface new_iface tidy_details
-
-		    -- get this module's version
-		    version <- return $! vers_module (mi_version final_iface)
-
 		    if toNothing 
                       then do
 			  return (False, False, Nothing, final_iface)
 	              else do
 		          ------------------  Code generation ------------------
 			  abstractC <- _scc_ "CodeGen"
-				       codeGen dflags this_mod version
-					       imported_modules
+				       codeGen dflags this_mod imported_modules
 					       cost_centre_info fe_binders
 					       local_tycons stg_binds
 			  

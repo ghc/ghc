@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.53 2002/07/16 14:56:09 simonmar Exp $
+% $Id: CLabel.lhs,v 1.54 2002/07/18 09:16:12 simonmar Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -127,8 +127,12 @@ data CLabel
 
   | ModuleInitLabel 
 	Module			-- the module name
-	Version			-- its version (same as the interface file ver)
 	String			-- its "way"
+	-- at some point we might want some kind of version number in
+	-- the module init label, to guard against compiling modules in
+	-- the wrong order.  We can't use the interface file version however,
+	-- because we don't always recompile modules which depend on a module
+	-- whose version has changed.
 
   | PlainModuleInitLabel Module	 -- without the vesrion & way info
 
@@ -313,7 +317,7 @@ needsCDecl (IdLabel _ _)		= True
 needsCDecl (CaseLabel _ CaseReturnPt)	= True
 needsCDecl (DataConLabel _ _)		= True
 needsCDecl (TyConLabel _)		= True
-needsCDecl (ModuleInitLabel _ _ _)	= True
+needsCDecl (ModuleInitLabel _ _)	= True
 needsCDecl (PlainModuleInitLabel _)	= True
 
 needsCDecl (CaseLabel _ _)		= False
@@ -341,7 +345,7 @@ externallyVisibleCLabel (DataConLabel _ _) = True
 externallyVisibleCLabel (TyConLabel tc)    = True
 externallyVisibleCLabel (CaseLabel _ _)	   = False
 externallyVisibleCLabel (AsmTempLabel _)   = False
-externallyVisibleCLabel (ModuleInitLabel _ _ _)= True
+externallyVisibleCLabel (ModuleInitLabel _ _)= True
 externallyVisibleCLabel (PlainModuleInitLabel _)= True
 externallyVisibleCLabel (RtsLabel RtsModuleRegd) = False --hack
 externallyVisibleCLabel (RtsLabel _)	   = True
@@ -364,7 +368,7 @@ labelType (CaseLabel _ CaseReturnInfo)        = InfoTblType
 labelType (CaseLabel _ CaseReturnPt)	      = CodeType
 labelType (CaseLabel _ CaseVecTbl)            = VecTblType
 labelType (TyConLabel _)		      = ClosureTblType
-labelType (ModuleInitLabel _ _ _)             = CodeType
+labelType (ModuleInitLabel _ _)               = CodeType
 labelType (PlainModuleInitLabel _)            = CodeType
 
 labelType (IdLabel _ info) = 
@@ -399,7 +403,7 @@ labelDynamic lbl =
    DataConLabel n k  -> isDllName n
    TyConLabel tc     -> isDllName (getName tc)
    ForeignLabel _ d  -> d
-   ModuleInitLabel m _ _  -> (not opt_Static) && (not (isHomeModule m))
+   ModuleInitLabel m _  -> (not opt_Static) && (not (isHomeModule m))
    PlainModuleInitLabel m -> (not opt_Static) && (not (isHomeModule m))
    _ 		     -> False
 \end{code}
@@ -533,9 +537,9 @@ pprCLbl (DataConLabel con flavor) = ppr con <> ppConFlavor flavor
 pprCLbl (CC_Label cc) 		= ppr cc
 pprCLbl (CCS_Label ccs) 	= ppr ccs
 
-pprCLbl (ModuleInitLabel mod ver way)	
+pprCLbl (ModuleInitLabel mod way)	
    = ptext SLIT("__stginit_") <> ftext (moduleNameFS (moduleName mod))
-	<> char '_' <> int ver <> char '_' <> text way
+	<> char '_' <> text way
 
 pprCLbl (PlainModuleInitLabel mod)	
    = ptext SLIT("__stginit_") <> ftext (moduleNameFS (moduleName mod))

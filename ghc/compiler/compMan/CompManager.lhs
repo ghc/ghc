@@ -73,7 +73,7 @@ import HscMain		( initPersistentCompilerState, hscThing,
 #else
 import HscMain		( initPersistentCompilerState )
 #endif
-import HscTypes
+import HscTypes hiding ( moduleNameToModule )
 import Name		( Name, NamedThing(..), nameRdrName, nameModule,
 			  isHomePackageName, isExternalName )
 import NameEnv

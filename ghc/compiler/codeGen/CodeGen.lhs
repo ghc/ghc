@@ -63,15 +63,14 @@ import IOExts		( readIORef )
 \begin{code}
 codeGen :: DynFlags
 	-> Module		-- Module name
-	-> Version		-- Module version
-	-> [(Module,Version)]	-- Import names & versions
+	-> [Module]		-- Import names
 	-> CollectedCCs		-- (Local/global) cost-centres needing declaring/registering.
 	-> [Id]			-- foreign-exported binders
 	-> [TyCon] 		-- Local tycons, including ones from classes
 	-> [(StgBinding,[Id])]	-- Bindings to convert, with SRTs
 	-> IO AbstractC		-- Output
 
-codeGen dflags mod_name mod_ver imported_modules cost_centre_info fe_binders
+codeGen dflags mod_name imported_modules cost_centre_info fe_binders
 	tycons stg_binds
   = do	
 	showPass dflags "CodeGen"
@@ -84,7 +83,7 @@ codeGen dflags mod_name mod_ver imported_modules cost_centre_info fe_binders
 
 	    datatype_stuff = genStaticConBits cinfo data_tycons
 	    code_stuff     = initC cinfo (mapCs cgTopBinding stg_binds)
-	    init_stuff     = mkModuleInit fe_binders mod_name mod_ver way
+	    init_stuff     = mkModuleInit fe_binders mod_name way
 				imported_modules cost_centre_info
 
 	    abstractC = mkAbstractCs [ maybeSplitCode,
@@ -111,12 +110,11 @@ codeGen dflags mod_name mod_ver imported_modules cost_centre_info fe_binders
 mkModuleInit 
 	:: [Id]			-- foreign exported functions
 	-> Module		-- module name
-	-> Version		-- module version
 	-> String		-- the "way"
-	-> [(Module,Version)]	-- import names & versions
+	-> [Module]		-- import names
 	-> CollectedCCs         -- cost centre info
 	-> AbstractC
-mkModuleInit fe_binders mod ver way imps cost_centre_info
+mkModuleInit fe_binders mod way imps cost_centre_info
   = let
 	register_fes = 
 	   map (\f -> CMacroStmt REGISTER_FOREIGN_EXPORT [f]) fe_labels
@@ -127,10 +125,10 @@ mkModuleInit fe_binders mod ver way imps cost_centre_info
 	(cc_decls, cc_regs) = mkCostCentreStuff cost_centre_info
 
 	-- we don't want/need to init GHC.Prim, so filter it out
-	mk_import_register (imp,ver)
+	mk_import_register imp
 	    | imp == gHC_PRIM = AbsCNop
 	    | otherwise = CMacroStmt REGISTER_IMPORT [
-				CLbl (mkModuleInitLabel imp ver way) AddrRep
+				CLbl (mkModuleInitLabel imp way) AddrRep
 	    		  ]
 
 	register_imports = map mk_import_register imps
@@ -138,7 +136,7 @@ mkModuleInit fe_binders mod ver way imps cost_centre_info
     mkAbstractCs [
 	cc_decls,
         CModuleInitBlock (mkPlainModuleInitLabel mod)
-			 (mkModuleInitLabel mod ver way)
+			 (mkModuleInitLabel mod way)
 		         (mkAbstractCs (register_fes ++
 				        cc_regs :
 				        register_imports))
