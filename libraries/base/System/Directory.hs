@@ -35,7 +35,7 @@ module System.Directory
 	writable,		-- :: Permissions -> Bool
 	executable,		-- :: Permissions -> Bool
 	searchable		-- :: Permissions -> Bool
-     ),
+     )
 
     , createDirectory		-- :: FilePath -> IO ()
     , removeDirectory		-- :: FilePath -> IO ()

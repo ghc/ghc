@@ -38,7 +38,7 @@ module GHC.Read
   , parens     -- :: ReadPrec a -> ReadPrec a
   , list       -- :: ReadPrec a -> ReadPrec [a]
   , choose     -- :: [(String, ReadPrec a)] -> ReadPrec a
-  , readListDefault, readListPrecDefault,
+  , readListDefault, readListPrecDefault
 
   -- Temporary
   , readList__
