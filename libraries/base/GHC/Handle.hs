@@ -47,6 +47,8 @@ module GHC.Handle (
 
  ) where
 
+#include "config.h"
+
 import Control.Monad
 import Data.Bits
 import Data.Maybe
@@ -939,7 +941,11 @@ hSetBuffering handle mode =
 	  is_tty <- fdIsTTY (haFD handle_)
 	  when (is_tty && isReadableHandleType (haType handle_)) $
 		case mode of
+#ifndef mingw32_TARGET_OS
+	-- 'raw' mode under win32 is a bit too specialised (and troublesome
+	-- for most common uses), so simply disable its use here.
 		  NoBuffering -> setCooked (haFD handle_) False
+#endif
 		  _           -> setCooked (haFD handle_) True
 
  	  -- throw away spare buffers, they might be the wrong size

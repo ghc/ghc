@@ -218,7 +218,14 @@ tcSetAttr fd options p_tios = do
 
 #else
 
--- bogus defns for win32
+-- 'raw' mode for Win32 means turn off 'line input' (=> buffering and
+-- character translation for the console.) The Win32 API for doing
+-- this is GetConsoleMode(), which also requires echoing to be disabled
+-- when turning off 'line input' processing. Notice that turning off
+-- 'line input' implies enter/return is reported as '\r' (and it won't
+-- report that character until another character is input..odd.) This
+-- latter feature doesn't sit too well with IO actions like IO.hGetLine..
+-- consider yourself warned.
 setCooked :: Int -> Bool -> IO ()
 setCooked fd cooked = do
   x <- set_console_buffering (fromIntegral fd) (if cooked then 1 else 0)
@@ -229,6 +236,8 @@ setCooked fd cooked = do
 ioe_unk_error loc msg 
  = IOError Nothing OtherError loc msg Nothing
 
+-- Note: echoing goes hand in hand with enabling 'line input' / raw-ness
+-- for Win32 consoles, hence setEcho ends up being the inverse of setCooked.
 setEcho :: Int -> Bool -> IO ()
 setEcho fd on = do
   x <- set_console_echo (fromIntegral fd) (if on then 1 else 0)
