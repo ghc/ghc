@@ -348,7 +348,7 @@ EXPORTS
 	rts_checkSchedStatus @ 357 ; 
 	rts_eval @ 358 ; 
 	rts_evalIO @ 359 ; 
-	rts_evalIO_ @ 360 ; 
+	rts_evalLazyIO @ 360 ; 
 	rts_eval_ @ 361 ; 
 	rts_getAddr @ 362 ; 
 	rts_getBool @ 363 ; 
