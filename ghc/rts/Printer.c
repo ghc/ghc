@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.50 2001/12/06 14:33:02 simonmar Exp $
+ * $Id: Printer.c,v 1.51 2002/02/04 20:26:25 sof Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -314,7 +314,7 @@ printClosure( StgClosure *obj )
                 putchar(arrWordsGetChar(obj,i));
 		} */
 	    for (i=0; i<((StgArrWords *)obj)->words; i++)
-	      fprintf(stdout, "%ld", ((StgArrWords *)obj)->payload[i]);
+	      fprintf(stdout, "%u", ((StgArrWords *)obj)->payload[i]);
             fprintf(stdout,"\")\n");
             break;
         }
