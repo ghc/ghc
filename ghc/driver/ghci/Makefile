@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.6 2001/06/27 15:26:56 chak Exp $
+# $Id: Makefile,v 1.7 2001/07/30 10:40:36 rrt Exp $
 #
 
 TOP=../..
@@ -27,6 +27,10 @@ endif
 INSTALLED_SCRIPT_PROG  = ghci-$(ProjectVersion)
 INPLACE_SCRIPT_PROG    = ghci-inplace
 
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+C_PROG = ghci
+endif
+
 SCRIPT_OBJS	  = ghci.sh
 INTERP		  = $(SHELL)
 SCRIPT_SUBST_VARS = GHCBIN TOPDIROPT
@@ -35,7 +39,9 @@ TOPDIROPT 	  = -B$(GHCLIB)
 
 ifeq "$(INSTALLING)" "1"
 SCRIPT_PROG 	=  $(INSTALLED_SCRIPT_PROG)
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 LINK 		=  ghci
+endif
 else
 SCRIPT_PROG 	=  $(INPLACE_SCRIPT_PROG)
 endif
@@ -48,4 +54,3 @@ all clean distclean maintainer-clean ::
 endif
 
 include $(TOP)/mk/target.mk
-
