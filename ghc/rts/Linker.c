@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.19 2001/02/09 12:39:53 sewardj Exp $
+ * $Id: Linker.c,v 1.20 2001/02/09 17:23:57 sewardj Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -1514,10 +1514,13 @@ static int do_Elf32_Rela_relocations ( ObjectCode* oc, char* ehdrC,
       Elf32_Sword addend = rtab[j].r_addend;
 
       Elf32_Addr  P  = ((Elf32_Addr)targ) + offset;
-      Elf32_Word* pP = (Elf32_Word*)P;
       Elf32_Addr  A  = addend;
       Elf32_Addr  S;
+#     if defined(solaris2_TARGET_OS)
+      /* This #ifdef only serves to avoid unused-var warnings. */
+      Elf32_Word* pP = (Elf32_Word*)P;
       Elf32_Word  w1, w2;
+#     endif
 
       IF_DEBUG(linker,belch( "Rel entry %3d is raw(%6p %6p %6p)   ", 
                              j, (void*)offset, (void*)info, 
