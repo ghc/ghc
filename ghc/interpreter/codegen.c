@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: codegen.c,v $
- * $Revision: 1.14 $
- * $Date: 1999/12/10 15:59:41 $
+ * $Revision: 1.15 $
+ * $Date: 2000/01/12 16:32:41 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -126,10 +126,11 @@ static void cgBind( AsmBCO bco, StgVar v )
 static Void pushVar( AsmBCO bco, StgVar v )
 {
     Cell info;
-
-    if (!(isStgVar(v) || isCPtr(v))) {
+#if 0
+printf ( "pushVar:  %d  ", v ); fflush(stdout);
+print(v,10);printf("\n");
+#endif
     assert(isStgVar(v) || isCPtr(v));
-    }
 
     if (isCPtr(v)) {
        asmGHCClosure(bco, cptrOf(v));
@@ -147,14 +148,22 @@ static Void pushVar( AsmBCO bco, StgVar v )
 
 static Void pushAtom( AsmBCO bco, StgAtom e )
 {
+#if 0
+printf ( "pushAtom: %d  ", e ); fflush(stdout);
+print(e,10);printf("\n");
+#endif
     switch (whatIs(e)) {
     case STGVAR: 
             pushVar(bco,e);
             break;
     case NAME: 
-            if (nonNull(name(e).stgVar))
-               pushVar(bco,name(e).stgVar); else
-               pushVar(bco,cptrFromName(e));
+            if (nonNull(name(e).stgVar)) {
+	       pushVar(bco,name(e).stgVar);
+            } else {
+               Cell /*CPtr*/ addr = cptrFromName(e);
+               fprintf ( stderr, "nativeAtom: name %s\n", nameFromOPtr(cptrOf(addr)) );
+	       pushVar(bco,addr);
+            }
             break;
     case CHARCELL: 
             asmConstChar(bco,charOf(e));
@@ -317,7 +326,9 @@ static AsmBCO cgRhs( StgRhs rhs )
 
 static Void cgExpr( AsmBCO bco, AsmSp root, StgExpr e )
 {
-  //printf("cgExpr:");ppStgExpr(e);printf("\n");
+#if 0
+    printf("cgExpr:");ppStgExpr(e);printf("\n");
+#endif
     switch (whatIs(e)) {
     case LETREC:
         {
@@ -407,7 +418,8 @@ static Void cgExpr( AsmBCO bco, AsmSp root, StgExpr e )
     case NAME: /* Tail call (with no args) */
         {
             AsmSp env = asmBeginEnter(bco);
-            pushVar(bco,name(e).stgVar);
+            /* JRS 000112: next line used to be: pushVar(bco,name(e).stgVar); */
+            pushAtom(bco,e);
             asmEndEnter(bco,env,root);
             break;
         }
@@ -512,7 +524,7 @@ static Void build( AsmBCO bco, StgVar v )
 {
     StgRhs rhs = stgVarBody(v);
     assert(isStgVar(v));
-
+    //ppStg(v);
     switch (whatIs(rhs)) {
     case STGCON:
         {
@@ -542,8 +554,8 @@ static Void build( AsmBCO bco, StgVar v )
             if (isCPtr(fun)) {
                assert(isName(fun0));
                itsaPAP = name(fun0).arity > length(args);
-fprintf ( stderr, "nativeCall: name %s, arity %d, args %d\n",
-               nameFromOPtr(cptrOf(fun)), name(fun0).arity, length(args) );
+               fprintf ( stderr, "nativeCall: name %s, arity %d, args %d\n",
+                         nameFromOPtr(cptrOf(fun)), name(fun0).arity, length(args) );
             } else {
                itsaPAP = FALSE;
                if (nonNull(stgVarBody(fun))
