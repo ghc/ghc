@@ -101,6 +101,8 @@ HOSTPLATFORM TARGETPLATFORM
 
 ProjectName ProjectVersion ProjectVersionInt ProjectPatchLevel 
 
+HscMajorVersion HscMinorVersion CcMajorVersion CcMinorVersion
+
 TOP_PWD
 
 bindir libdir libexecdir datadir
@@ -377,7 +379,6 @@ require special handling.
 # We need to look in ghc/ and glaExts/ when searching for implicitly needed .hi files, but 
 # we should really *not* look there for explicitly imported modules.
 
-$GhcVersionInfo  = $ProjectVersionInt;
 $Haskell1Version = 4; # i.e., Haskell 1.4
 @Cpp_define	 = ();
 
@@ -543,10 +544,10 @@ $LinkChk = 1;	# set to 0 if the link check should *not* be done
 
 # major & minor version numbers; major numbers must always agree;
 # minor disagreements yield a warning.
-$HsC_major_version = 33;
-$HsC_minor_version = 0;
-$Cc_major_version  = 36;
-$Cc_minor_version  = 1;
+$HsC_major_version = $HscMajorVersion;
+$HsC_minor_version = $HscMinorVersion;
+$Cc_major_version  = $CcMajorVersion;
+$Cc_minor_version  = $CcMinorVersion;
 
 # options: these must always agree
 $HsC_consist_options = '';    # we record, in this order:
@@ -1518,6 +1519,8 @@ sub ProcessInputFile {
 			  # from input file (need to know for recomp
 			  # checking purposes)
     local($hifile_target);# ditto (but .hi file)
+    local($ofile_c_stub_target); 
+    local($ofile_h_stub_target); 
 \end{code}
 
 Handle the weirdity of input from stdin.
@@ -1532,6 +1535,8 @@ Handle the weirdity of input from stdin.
 			? $Specific_hi_file
 			: "$ifile_root.$HiSuffix"; # ToDo: odirify?
 			# NB: may change if $ifile_root isn't module name (??)
+	($ofile_c_stub_target = $ifile) =~s/\.[^\.\/]+$/_stub.c/;
+	($ofile_h_stub_target = $ifile) =~s/\.[^\.\/]+$/_stub.h/;
     } else {
 	$ifile = "$Tmp_prefix.hs"; # we know that's where we put the input
 	$ifile_root   = '_stdin';
@@ -1622,7 +1627,9 @@ Again, we'll do the post-recompilation-checker parts of this later.
 			  ? $Do_cc
 			  : ( ($HscOut eq '-C=') ? 1 : 0 );
     local($do_as)	= $Do_as;
-    local($hsc_out)	  = ( $HscOut eq '-C=' ) ? "$Tmp_prefix.hc" : "$Tmp_prefix.s" ;
+    local($hsc_out)	   = ( $HscOut eq '-C=' ) ? "$Tmp_prefix.hc" : "$Tmp_prefix.s" ;
+    local($hsc_out_c_stub) = ( $HscOut eq '-C=' ) ? "${Tmp_prefix}_stb.c" : "";
+    local($hsc_out_h_stub) = ( $HscOut eq '-C=' ) ? "${Tmp_prefix}_stb.h" : "";
 
     if ($Only_preprocess_hc) { # stop after having run $Cc -E
        $do_as=0;
@@ -1634,9 +1641,13 @@ Again, we'll do the post-recompilation-checker parts of this later.
     } elsif ($ifile =~ /\.hc$/ || $ifile =~ /_hc$/ ) { # || $ifile =~ /\.$Isuffix$/o) # ToDo: better
     	$do_hscpp = 0; $do_hsc = 0; $do_cc = 1;
 	$hsc_out = $ifile;
+	$hsc_out_c_stub = '';
+	$hsc_out_h_stub = '';
     } elsif ($ifile =~ /\.c$/) {
     	$do_hscpp = 0; $do_hsc = 0; $do_cc = 1;
 	$hsc_out = $ifile; $is_hc_file = 0;
+	$hsc_out_c_stub = '';
+	$hsc_out_h_stub = '';
     } elsif ($ifile =~ /\.s$/) {
     	$do_hscpp = 0; $do_hsc = 0; $do_cc = 0;
 	$cc_as = $ifile;    
@@ -1693,7 +1704,16 @@ Now the Haskell compiler, C compiler, and assembler
 \begin{code}
    if ($do_hsc) {
 	&runHscAndProcessInterfaces( $ifile, $hscpp_hsc, $ifile_root, 
-				     $ofile_target, $hifile_target);
+				     $ofile_target, $hifile_target,
+				     $going_interactive);
+    }
+
+    if (-f $hsc_out_c_stub) {
+	&run_something("cp $hsc_out_c_stub $ofile_c_stub_target", 'Copy foreign export C stubs');
+    }
+
+    if (-f $hsc_out_h_stub) {
+	&run_something("cp $hsc_out_h_stub $ofile_h_stub_target", 'Copy foreign export header file');
     }
 
     if ($do_cc) {
@@ -1774,7 +1794,7 @@ sub runHscpp {
 	&run_something($to_do, 'Ineffective C pre-processor');
     } else {
 	local($includes) = '-I' . join(' -I',@Include_dir);
-	$to_do .= "$HsCpp $Verbose @HsCpp_flags -D__HASKELL1__=$Haskell1Version -D__GLASGOW_HASKELL__=$GhcVersionInfo $includes $lit2pgm_hscpp >> $hscpp_hsc";
+	$to_do .= "$HsCpp $Verbose @HsCpp_flags -D__HASKELL1__=$Haskell1Version -D__GLASGOW_HASKELL__=$ProjectVersionInt $includes $lit2pgm_hscpp >> $hscpp_hsc";
 	push(@Files_to_tidy, $hscpp_hsc );
 	&run_something($to_do, 'Haskellised C pre-processor');
     }
@@ -1790,7 +1810,9 @@ sub runHscpp {
 
 \begin{code}
 sub runHscAndProcessInterfaces {
-    local($ifile, $hscpp_hsc, $ifile_root, $ofile_target, $hifile_target) = @_;
+    local($ifile, $hscpp_hsc, $ifile_root, 
+          $ofile_target, $hifile_target,
+	  $going_interactive) = @_;
 
 	# $ifile 		is the original input file
 	# $hscpp_hsc		post-unlit, post-cpp, etc., input file
@@ -1829,6 +1851,9 @@ sub runHscAndProcessInterfaces {
 	$source_unchanged = 0;
     }
 
+    # Tell the compiler which version we're using
+    push(@HsC_flags, "-fhi-version=${ProjectVersionInt}");
+
     # So if source_unchanged is still "1", we pass on the good news to the compiler
     # The -recomp flag can disable this, forcing recompilation
     if ($Do_recomp_chkr && $source_unchanged) {
@@ -1837,7 +1862,7 @@ sub runHscAndProcessInterfaces {
 
     # Run the compiler
 
-    &runHsc($ifile_root, $hsc_out, $hsc_hi, $going_interactive);
+    &runHsc($ifile_root, $hsc_out, $hsc_hi, $hsc_out_c_stub, $hsc_out_h_stub, $going_interactive);
 
    # See if it bailed out early, saying nothing needed doing.  
    # We work this out by seeing if it created an output .hi file
@@ -1910,13 +1935,12 @@ sub runHscAndProcessInterfaces {
 
 \begin{code}
 sub runHsc {
-    local($ifile_root, $hsc_out, $hsc_hi, $going_interactive) = @_;
+    local($ifile_root, $hsc_out, $hsc_hi, $hsc_out_c_stub, $hsc_out_h_stub, $going_interactive) = @_;
 
     # prepend comma to HsP flags (so hsc can tell them apart...)
     foreach $a ( @HsP_flags ) { $a = ",$a" unless $a =~ /^,/; }
 
     &makeHiMap() unless $HiMapDone;
-    #print STDERR "HiIncludes: $HiIncludeString\n";
     push(@HsC_flags, "-himap=$HiIncludeString");
 
     # here, we may produce .hc/.s and/or .hi files
@@ -1924,15 +1948,15 @@ sub runHsc {
     #@Files_to_tidy = ();
 
     if ( $going_interactive ) {
-	# don't need .hi unless going to show it on stdout:
+	# don't need .hi unless we're going to show it on stdout:
 	$ProduceHi = '-nohifile=' if ! $HiOnStdout;
 	$do_cc = 0; $do_as = 0; $Do_lnkr = 0; # and we won't go any further...
     }
 
     # set up for producing output/.hi; note that flag twiddling
     # may mean that nothing will actually be produced:
-    $output = "$ProduceHi$hsc_hi $HscOut$hsc_out";
-    push(@Files_to_tidy, $hsc_hi, $hsc_out );
+    $output = "$ProduceHi$hsc_hi $HscOut$hsc_out -F=$hsc_out_c_stub -FH=$hsc_out_h_stub";
+    push(@Files_to_tidy, $hsc_hi, $hsc_out, $hsc_out_c_stub, $hsc_out_h_stub );
 
     # if we're compiling foo.hs, we want the GC stats to end up in foo.stat
     if ( $CollectingGCstats ) {
@@ -1966,12 +1990,15 @@ sub runHsc {
     #  [ Note: support for `at-files' is not compiled in by default ]
     $cmd_line_opts_via_at_file=0;
     if ($cmd_line_opts_via_at_file) {
+
       local($to_do_opts) = "$Tmp_prefix.opts";
       open(OPTS, "> $Tmp_prefix.opts") || &tidy_up_and_die(1,"Can't open $Tmp_prefix.opts\n");
       print OPTS "$dump @HsC_flags $CoreLint $StgLint $Verbose";
       close(OPTS);
       $to_do = "$HsC @HsP_flags ,$hscpp_hsc \@$Tmp_prefix.opts $output +RTS @HsC_rts_flags";
+
     } else {
+
       $to_do = "$HsC @HsP_flags ,$hscpp_hsc $dump @HsC_flags $CoreLint $StgLint $Verbose $output +RTS @HsC_rts_flags";
     }
     &run_something($to_do, 'Haskell compiler');
@@ -2084,6 +2111,10 @@ sub runGcc {
 EOINCL
 	# user may have asked for #includes to be injected...
 	print TMP @CcInjects if $#CcInjects >= 0;
+    } else {
+	# Straight .c files may want to know that they're being used
+	# with a particular version of GHC, so we define __GLASGOW_HASKELL__ for their benefit.
+        print TMP "#define __GLASGOW_HASKELL__ ${ProjectVersionInt}\n";
     }
     # heave in the consistency info
     print TMP "static char ghc_cc_ID[] = \"\@(#)cc $ifile\t$Cc_major_version.$Cc_minor_version,$Cc_consist_options\";\n";
@@ -3049,6 +3080,10 @@ arg: while($_ = $Args[0]) {
 			    };
 			    push(@HsC_antiflags, @StandardWarnings);
 			    next arg; };
+
+    # --------------- fun stuff ----------------
+
+    /^-freport-compile$/ && do { push(@HsC_flags, $_); next arg; };
 
     # --------------- platform specific flags (for gcc mostly) ----------------
 

@@ -147,7 +147,7 @@ sub constructNewHiFile {
     }
 
     local($new_module_version) = &calcNewModuleVersion(@decl_names);
-    print NEWHI "_interface_ ", $ModuleName{'new'}, " $new_module_version $GhcVersionInfo\n";
+    print NEWHI "_interface_ ", $ModuleName{'new'}, " $new_module_version $ProjectVersionInt\n";
 
     if ( $Stuff{'new:instance_modules'} ) {
 	print NEWHI "_instance_modules_\n";

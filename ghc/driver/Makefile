@@ -4,6 +4,9 @@
 TOP=..
 CURRENT_DIR=ghc/driver
 include $(TOP)/mk/boilerplate.mk
+#
+# The driver needs to get at 
+include $(TOP)/mk/version.mk
 
 INSTALLING=0
 
@@ -13,7 +16,7 @@ DYN_LOADABLE_BITS = \
 	ghc-consist.prl \
 	ghc-split.prl
 
-SCRIPT_PROG = ghc-$(GhcProjectVersion)
+SCRIPT_PROG = ghc-$(ProjectVersion)
 SCRIPT_LINK = ghc
 SCRIPT_OBJS = ghc.prl
  
@@ -37,6 +40,7 @@ endif
 SCRIPT_SUBST_VARS := \
   INSTALLING \
   ProjectName ProjectVersion ProjectVersionInt ProjectPatchLevel \
+  HscMajorVersion HscMinorVersion CcMajorVersion CcMinorVersion \
   CURRENT_DIR HOSTPLATFORM TARGETPLATFORM \
   GHC_LIB_DIR GHC_RUNTIME_DIR GHC_UTILS_DIR GHC_INCLUDE_DIR \
   GHC_OPT_HILEV_ASM GhcWithNativeCodeGen LeadingUnderscore\
@@ -94,12 +98,14 @@ SRC_DEST_FILES=$(patsubst %.prl,%.lprl,$(DYN_LOADABLE_BITS)) ghc.lprl ordering-p
 
 include $(TOP)/mk/target.mk
 
+ghc.prl : $(TOP)/mk/version.mk
+
 # Hack to re-create the in-situ build tree driver script after 
 # having installed it.
 #
 install ::
 	@$(RM) $(SCRIPT_PROG)
-	@$(MAKE) $(MFLAGS) BIN_DIST=0 $(SCRIPT_PROG)
+	@$(MAKE) $(MFLAGS) BIN_DIST=0 INSTALLING=0 $(SCRIPT_PROG)
 
 #
 # Another hack (hmm..I can see a pattern developing here :-)
