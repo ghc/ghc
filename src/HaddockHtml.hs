@@ -207,7 +207,7 @@ ppHtmlContents odir doctitle maybe_index_url
 	    s15 </>
 	    footer
 	  )
-  writeFile (odir ++ pathSeparator:contentsHtmlFile) (renderHtml html)
+  writeFile (odir ++ pathSeparator:contentsHtmlFile) (prettyHtml html)
 
 ppPrologue :: String -> Maybe Doc -> HtmlTable
 ppPrologue title Nothing = Html.emptyTable
@@ -265,7 +265,7 @@ ppHtmlIndex odir doctitle maybe_contents_url ifaces = do
   when split_indices $
     mapM_ (do_sub_index index) initialChars
 
-  writeFile (odir ++ pathSeparator:indexHtmlFile) (renderHtml html)
+  writeFile (odir ++ pathSeparator:indexHtmlFile) (renderHtml html False)
 
  where
   split_indices = length index > 50
@@ -289,7 +289,7 @@ ppHtmlIndex odir doctitle maybe_contents_url ifaces = do
   do_sub_index this_ix c
     = unless (null index_part) $
         writeFile (odir ++ pathSeparator:subIndexHtmlFile c)
-                  (renderHtml html)
+                  (renderHtml html False)
     where 
       html = header (thetitle (toHtml (doctitle ++ " (Index)")) +++
 		thelink ! [href cssFile, 
@@ -378,7 +378,7 @@ ppHtmlModule odir doctitle source_url
 	    ifaceToHtml mdl iface </> s15 </>
 	    footer
          )
-  writeFile (moduleHtmlFile odir mdl) (renderHtml html)
+  writeFile (moduleHtmlFile odir mdl) (renderHtml html False)
 
 ifaceToHtml :: String -> Interface -> HtmlTable
 ifaceToHtml _ iface 

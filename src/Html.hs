@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Html.hs,v 1.4 2004/03/25 15:45:10 simonmar Exp $
+-- $Id: Html.hs,v 1.5 2004/03/25 16:00:37 simonmar Exp $
 --
 -- An Html combinator library
 --
@@ -962,10 +962,10 @@ gui act = form ! [action act,method "POST"]
 -- The output is quite messy, because space matters in
 -- HTML, so we must not generate needless spaces.
 
-renderHtml :: (HTML html) => html -> String
-renderHtml theHtml =
+renderHtml :: (HTML html) => html -> Bool -> String
+renderHtml theHtml pretty =
       renderMessage ++ 
-         foldr (.) id (map (renderHtml' 0)
+         foldr (.) id (map (if pretty then renderHtml' 0 else unprettyHtml)
                            (getHtmlElements (tag "HTML" << theHtml))) "\n"
 
 renderMessage :: String
@@ -976,15 +976,6 @@ renderMessage =
 -- Warning: spaces matters in HTML. You are better using renderHtml.
 -- This is intentually very inefficent to "encorage" this,
 -- but the neater version in easier when debugging.
-
--- Local Utilities
-prettyHtml :: (HTML html) => html -> String
-prettyHtml theHtml = 
-        unlines
-      $ concat
-      $ map prettyHtml'
-      $ getHtmlElements
-      $ toHtml theHtml
 
 renderHtml' :: Int -> HtmlElement -> ShowS
 renderHtml' _ (HtmlString str) = (++) str
@@ -997,6 +988,27 @@ renderHtml' n (HtmlTag
         else (renderTag True name0 markupAttrs0 n
              . foldr (.) id (map (renderHtml' (n+2)) (getHtmlElements html))
              . renderTag False name0 [] n)
+
+unprettyHtml :: HtmlElement -> ShowS
+unprettyHtml (HtmlString str) = (++) str
+unprettyHtml (HtmlTag
+              { markupTag = name0,
+                markupContent = html,
+                markupAttrs = markupAttrs0 })
+      = if isNoHtml html && elem name0 validHtmlITags
+        then renderTag True name0 markupAttrs0 0
+        else (renderTag True name0 markupAttrs0 0
+             . foldr (.) id (map unprettyHtml (getHtmlElements html))
+             . renderTag False name0 [] 0)
+
+-- Local Utilities
+prettyHtml :: (HTML html) => html -> String
+prettyHtml theHtml = 
+        unlines
+      $ concat
+      $ map prettyHtml'
+      $ getHtmlElements
+      $ toHtml theHtml
 
 prettyHtml' :: HtmlElement -> [String]
 prettyHtml' (HtmlString str) = [str]
