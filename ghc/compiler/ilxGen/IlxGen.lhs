@@ -1,5 +1,5 @@
 %
-\section{Generate COM+ extended assembler}
+\section{Generate .NET extended IL}
 
 \begin{code}
 module IlxGen( ilxGen ) where
@@ -966,7 +966,7 @@ ilxRhs env rec (bndr, StgRhsClosure _ _ fvs upd args rhs)
   where
     pushFv id = if elem id rec then text "ldnull" else pushId env id
     (free_ilx_tvs, free_non_ilx_tvs,free_vs) = categorizeVars fvs
-    clotext = pprIlxBoxedTyConApp env (ilxEnvQualifyByModule env (ppr bndr)) (map mkTyVarTy free_ilx_tvs)
+    clotext = pprIlxNamedTyConApp env (ilxEnvQualifyByModule env (ppr bndr)) (map mkTyVarTy free_ilx_tvs)
 
 ilxFixupRec env rec (bndr, _) | isVoidIlxRepId bndr = ilxComment (text "no recursive fixup for void-rep-id")
 
@@ -982,7 +982,7 @@ ilxFixupRec env rec (bndr, StgRhsClosure _ _ fvs upd args rhs)
                           text "stclofld" <+> clotext <> text "," <+> pprId recid] 
                 else text "//no fixup needed for" <+> pprId recid
     (free_ilx_tvs, free_non_ilx_tvs,free_vs) = categorizeVars fvs
-    clotext = pprIlxBoxedTyConApp env (ilxEnvQualifyByModule env (ppr bndr)) (map mkTyVarTy free_ilx_tvs)
+    clotext = pprIlxNamedTyConApp env (ilxEnvQualifyByModule env (ppr bndr)) (map mkTyVarTy free_ilx_tvs)
 
 
 
@@ -1044,7 +1044,7 @@ ilxTopBind mod env pairs       =
 ilxTopRhs mod env (bndr, StgRhsClosure _ _ fvs upd args rhs)
   = vcat [vcat (map (pushId env) free_vs),
          (if null free_non_ilx_tvs then empty else (ilxComment (text "ignored some higher order type arguments in application - code will be non verifiable...."))),
-	  text "newclo" <+> pprIlxBoxedTyConApp env (ilxEnvQualifyByModule env (ppr bndr)) (map mkTyVarTy free_ilx_tvs),
+	  text "newclo" <+> pprIlxNamedTyConApp env (ilxEnvQualifyByModule env (ppr bndr)) (map mkTyVarTy free_ilx_tvs),
 	  text "stsfld"  <+> pprFieldRef env (mod,bndTy,bndr)
     ]
   where
@@ -1227,17 +1227,28 @@ ilxTypeR env (NoteTy _ ty)
 
 pprIlxFunTy dom ran = parens (hsep [text "func",parens dom,text "-->", ran])
 
-ilxTyConApp env tc args =
-   case lookupUFM tyPrimConTable (getUnique tc) of
+ilxTyConApp env tcon args =
+   case lookupUFM tyPrimConTable (getUnique tcon) of
 	Just f  -> f args env
         Nothing -> 
-            (if isUnboxedTupleTyCon tc then pprIlxUnBoxedTyConApp else pprIlxBoxedTyConApp)
-              env ((nameReference env (getName tc)) <> (ppr tc)) args
+            (if isUnboxedTupleTyCon tcon then pprIlxUnboxedTupleTyConApp else pprIlxBoxedTyConApp)
+              env tcon args
 
-pprIlxUnBoxedTyConApp env tcdoc args = text "value class" <+> tcdoc <> pprTypeArgs ilxTypeL env args
-pprIlxBoxedTyConApp env tcdoc args = text "class" <+> tcdoc <> pprTypeArgs ilxTypeR env args
+pprIlxTyCon env tcon = nameReference env (getName tcon) <> ppr tcon
+pprIlxUnboxedTupleTyConApp env tcon args 
+  = text "/* unboxed */ value class" <+> pprIlxTyCon env tcon' <> pprTypeArgs ilxTypeL env non_void
+  where 
+   non_void = filter (not . isVoidIlxRepType) args
+   tcon' = dataConTyCon (tupleCon Unboxed (length non_void)) 
+pprIlxBoxedTyConApp env tcon args 
+  = pprIlxNamedTyConApp env (pprIlxTyCon env tcon) args
+pprIlxNamedTyConApp env tcon_text args 
+  = text "class" <+> tcon_text <> pprTypeArgs ilxTypeR env args
 
 -- Returns e.g: <Int32, Bool>
+-- Void-sized type arguments are _always_ eliminated, everywhere.
+-- If the type constructor is an unboxed tuple type then it should already have
+-- been adjusted to be the correct constructor.
 pprTypeArgs f env tys = pprTypeArgs_aux f env (filter (not . isVoidIlxRepType) tys)
 
 pprTypeArgs_aux f env []  = empty
@@ -1607,8 +1618,14 @@ splitTyArgs1 (StgTypeArg ty : args) = (ty:tys, args')
 splitTyArgs1 args		    = ([], args)
 
 ilxConRef env data_con
-    = pprId data_con <> pprValArgTys ilxTypeL env' (map deepIlxRepType (filter (not . isVoidIlxRepType) arg_tys))
+ | isUnboxedTupleCon data_con
+    = let data_con' = tupleCon Unboxed (length non_void_args)in 
+      pprId data_con' <> arg_text
+ | otherwise 
+    = pprId data_con <> arg_text
   where
+    arg_text = pprValArgTys ilxTypeL env' (map deepIlxRepType non_void_args)
+    non_void_args = filter (not . isVoidIlxRepType) arg_tys
     (tyvars, tau_ty) = splitForAllTys (dataConRepType data_con)
     (arg_tys, _)     = splitFunTys tau_ty
     env' 	     = formalIlxEnv env tyvars
@@ -1709,10 +1726,10 @@ repBCO = ilxTypeSeq [ilxType "class ",prelGHCReference,ilxType "PrelGHC_BCOzh"]
 ilxTyPair l r = ilxTyParams [l,r]
 ilxTyTriple l m r = ilxTyParams [l,m,r]
 ilxTyQuad l m1 m2 r = ilxTyParams [l,m1,m2,r]
-ilxUnboxedEmptyRep = ilxTypeSeq [ilxType "value class",prelGHCReference,ilxType "PrelGHC_Z0H"]
-ilxUnboxedPairRep l r = ilxTypeSeq [ilxType "value class",prelGHCReference,ilxType "PrelGHC_Z1H",ilxTyPair l r]
-ilxUnboxedTripleRep l m r = ilxTypeSeq [ilxType "value class",prelGHCReference,ilxType "PrelGHC_Z2H",ilxTyTriple l m r]
-ilxUnboxedQuadRep l m1 m2 r = ilxTypeSeq [ilxType "value class",prelGHCReference,ilxType "PrelGHC_Z3H",ilxTyQuad l m1 m2 r]
+ilxUnboxedEmptyRep = ilxTypeSeq [ilxType "value class",prelGHCReference,ilxType "PrelGHC_Z1H"]
+ilxUnboxedPairRep l r = ilxTypeSeq [ilxType "value class",prelGHCReference,ilxType "PrelGHC_Z2H",ilxTyPair l r]
+ilxUnboxedTripleRep l m r = ilxTypeSeq [ilxType "value class",prelGHCReference,ilxType "PrelGHC_Z3H",ilxTyTriple l m r]
+ilxUnboxedQuadRep l m1 m2 r = ilxTypeSeq [ilxType "value class",prelGHCReference,ilxType "PrelGHC_Z4H",ilxTyQuad l m1 m2 r]
 
 ilxTyIO b = ilxTypeSeq [ilxType "(func ( /* unit skipped */ ) --> ", b, ilxType ")"]
 
@@ -2225,7 +2242,12 @@ ilxPrimOpTable op
 	YieldOp -> simp_op (ilxOpSeq [ilxOp "call class [mscorlib]System.Threading.Thread class [mscorlib]System.Threading.Thread::get_CurrentThread() 
                                 call instance void class [mscorlib]System.Threading.Thread::Suspend()"])
 	MyThreadIdOp -> simp_op (ilxOpSeq [ilxOp "call default  class [mscorlib]System.Threading.Thread class [mscorlib]System.Threading.Thread::get_CurrentThread() "])
-	KillThreadOp -> ty1_op (\ty -> ilxOpSeq [ilxOp "box", ty, ilxOp "call instance void class [mscorlib]System.Threading.Thread::Abort(class [mscorlib]System.Object) "])
+	-- This pushes a THUNK across as the exception value.
+        -- This is the correct Haskell semantics...  TODO: we should probably
+        -- push across an HaskellThreadAbortException object that wraps this
+        -- thunk, but which is still actually an exception of
+        -- an appropriate type.
+        KillThreadOp -> ty1_op (\ty -> ilxOpSeq [ilxOp "call instance void class [mscorlib]System.Threading.Thread::Abort(class [mscorlib]System.Object) "])
               {-   ThreadId# -> a -> State# RealWorld -> State# RealWorld -}
 
 	ForkOp -> warn_op "ForkOp" (simp_op (ilxOp "/* ForkOp skipped... */ newobj void [mscorlib]System.Object::.ctor() throw"))
