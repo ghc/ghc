@@ -238,37 +238,34 @@ YES) AC_DEFINE([LEADING_UNDERSCORE], [1], [Define to 1 if C symbols have a leadi
 esac
 ])
 
-dnl
-dnl FPTOOLS_PROG_CHECK_VERSION(VERSIONSTR1, TEST, VERSIONSTR2,
-dnl                            ACTION-IF-TRUE [, ACTION-IF-FALSE])
-dnl
-dnl compare versions field-wise (separator is '.')
-dnl TEST is one of {-lt,-le,-eq,-ge,-gt}
-dnl
-dnl quite shell-independant and SUSv2 compliant code
-dnl
-dnl NOTE: the loop could be unrolled within autoconf, but the
-dnl       macro code would be a) longer and b) harder to debug... ;)
-dnl
-AC_DEFUN(FPTOOLS_PROG_CHECK_VERSION,
-[if ( IFS=".";
-      a="[$1]";  b="[$3]";
-      while test -n "$a$b"
-      do
-              set -- [$]a;  h1="[$]1";  shift 2>/dev/null;  a="[$]*"
-              set -- [$]b;  h2="[$]1";  shift 2>/dev/null;  b="[$]*"
-              test -n "[$]h1" || h1=0;  test -n "[$]h2" || h2=0
-              test [$]{h1} -eq [$]{h2} || break
-      done
-      test [$]{h1} [$2] [$]{h2}
-    )
-then ifelse([$4],,[:],[
-  $4])
-ifelse([$5],,,
-[else
-  $5])
-fi
-])])dnl
+
+# FP_COMPARE_VERSIONS(VERSION1, TEST, VERSION2, [ACTION-IF-TRUE], [ACTION-IF-FALSE])
+# ----------------------------------------------------------------------------------
+# Compare dotted version numbers VERSION1 and VERSION2 lexicographically according
+# to TEST (one of -eq, -ne, -lt, -le, -gt, or -ge).
+AC_DEFUN([FP_COMPARE_VERSIONS],
+[fp_version1=$1; fp_version2=$3
+fp_save_IFS=$IFS; IFS='.'
+while test x"$fp_version1" != x || test x"$fp_version2" != x
+do
+
+  set dummy $fp_version1; shift
+  fp_num1=""
+  test $[@%:@] = 0 || { fp_num1="[$]1"; shift; }
+  test x"$fp_num1" = x && fp_num1="0"
+  fp_version1="[$]*"
+
+  set dummy $fp_version2; shift
+  fp_num2=""
+  test $[@%:@] = 0 || { fp_num2="[$]1"; shift; }
+  test x"$fp_num2" = x && fp_num2="0"
+  fp_version2="[$]*"
+
+  test "$fp_num1" = "$fp_num2" || break;
+done
+IFS=$fp_save_IFS
+AS_IF([test "$fp_num1" $2 "$fp_num2"], [$4], [$5])[]dnl
+])# FP_COMPARE_VERSIONS
 
 
 dnl
@@ -287,8 +284,8 @@ else
 fi
 changequote([, ])dnl
 ])
-FPTOOLS_PROG_CHECK_VERSION([$fptools_cv_greencard_version],-lt,$1,
-  [AC_MSG_ERROR([greencard version $1 or later is required (found '$fptools_cv_greencard_version')])])dnl
+FP_COMPARE_VERSIONS([$fptools_cv_greencard_version],[-lt],[$1],
+  [AC_MSG_ERROR([greencard version $1 or later is required (found '$fptools_cv_greencard_version')])])[]dnl
 GreencardVersion=$fptools_cv_greencard_version
 AC_SUBST(GreencardVersion)
 ])
@@ -321,8 +318,8 @@ fi;
 changequote([, ])dnl
 ])
 if test -d $srcdir/ghc -a ! -f $srcdir/ghc/compiler/parser/Parser.hs; then
-  FPTOOLS_PROG_CHECK_VERSION([$fptools_cv_happy_version],-lt,[1.13],
-  [AC_MSG_ERROR([Happy version 1.13 or later is required to compile GHC.])])dnl
+  FP_COMPARE_VERSIONS([$fptools_cv_happy_version],[-lt],[1.13],
+  [AC_MSG_ERROR([Happy version 1.13 or later is required to compile GHC.])])[]dnl
 fi
 HappyVersion=$fptools_cv_happy_version;
 AC_SUBST(HappyVersion)
@@ -376,8 +373,8 @@ fi;
 changequote([, ])dnl
 ])
 dnl if test -d $srcdir/ghc -a ! -f $srcdir/ghc/compiler/parser/Lexer.hs; then
-dnl   FPTOOLS_PROG_CHECK_VERSION([$fptools_cv_alex_version],-lt,[2.0],
-dnl   [AC_MSG_ERROR([Alex version 2.0 or later is required to compile GHC.])])dnl
+dnl   FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-lt],[2.0],
+dnl   [AC_MSG_ERROR([Alex version 2.0 or later is required to compile GHC.])])[]dnl
 dnl fi
 AlexVersion=$fptools_cv_alex_version;
 AC_SUBST(AlexVersion)
@@ -509,15 +506,14 @@ changequote(, )dnl
     gcc_version_str="`$CC -v 2>&1 | grep 'version ' | sed -e 's/.*version [^0-9]*\([0-9][0-9]*\)\.\([0-9][0-9]*\).*/\1\.\2/g' `"
 changequote([, ])dnl
     fptools_cv_have_gcc='yes'
-    FPTOOLS_PROG_CHECK_VERSION($gcc_version_str, -lt, "2.0",
-        fptools_cv_have_gcc='no'
+    FP_COMPARE_VERSIONS([$gcc_version_str], [-lt], [2.0],
+        [fptools_cv_have_gcc='no'
         echo ""
 	echo "your gcc version appears to be ..."
         $CC --version
         echo "gcc prior to 2.0 and have never worked with ghc."
         echo "we recommend 2.95.3, although versions back to 2.7.2 should be ok."
-        AC_MSG_ERROR([gcc 1.X has never been supported])
-    )
+        AC_MSG_ERROR([gcc 1.X has never been supported])])
 fi
 ])
 HaveGcc=`echo $fptools_cv_have_gcc | sed 'y/yesno/YESNO/'`
@@ -530,17 +526,15 @@ dnl -momit-leaf-frame-pointer on by default.  If this is the case, we
 dnl need to turn it off for mangling to work.  The test is currently a bit
 dnl crude, using only the version number of gcc.
 dnl
-AC_DEFUN(FPTOOLS_GCC_NEEDS_NO_OMIT_LFPTR,
-[AC_CACHE_CHECK([whether gcc needs -mno-omit-leaf-frame-pointer], fptools_cv_gcc_needs_no_omit_lfptr,
-[
- fptools_cv_gcc_needs_no_omit_lfptr='no'
- FPTOOLS_PROG_CHECK_VERSION($gcc_version_str, -ge, "3.2",
-     fptools_cv_gcc_needs_no_omit_lfptr='yes')
-])
+AC_DEFUN([FPTOOLS_GCC_NEEDS_NO_OMIT_LFPTR],
+[AC_CACHE_CHECK([whether gcc needs -mno-omit-leaf-frame-pointer], [fptools_cv_gcc_needs_no_omit_lfptr],
+[FP_COMPARE_VERSIONS([$gcc_version_str], [-ge], [3.2],
+  [fptools_cv_gcc_needs_no_omit_lfptr=yes],
+  [fptools_cv_gcc_needs_no_omit_lfptr=no])])
 if test "$fptools_cv_gcc_needs_no_omit_lfptr" = "yes"; then
    AC_DEFINE([HAVE_GCC_MNO_OMIT_LFPTR], [1], [Define to 1 if gcc supports -mno-omit-leaf-frame-pointer.])
-fi
-])
+fi])# FPTOOLS_GCC_NEEDS_NO_OMIT_LFPTR
+
 
 dnl Small feature test for perl version. Assumes PerlCmd
 dnl contains path to perl binary
