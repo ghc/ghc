@@ -360,27 +360,25 @@ TargetOS_CPP=$HostOS_CPP
 BuildVendor_CPP=$HostVendor_CPP
 TargetVendor_CPP=$HostVendor_CPP
 
-dnl Cannot afford all these SUBSTs (because of braindead seds w/ 99 cmd limits)
-dnl AC_SUBST(BuildPlatform)
-
+AC_SUBST(BuildPlatform)
 AC_SUBST(HostPlatform)
 AC_SUBST(TargetPlatform)
 AC_SUBST(HostPlatform_CPP)
-dnl AC_SUBST(BuildPlatform_CPP)
-dnl AC_SUBST(TargetPlatform_CPP)
+AC_SUBST(BuildPlatform_CPP)
+AC_SUBST(TargetPlatform_CPP)
 
 AC_SUBST(HostArch_CPP)
-dnl AC_SUBST(BuildArch_CPP)
-dnl AC_SUBST(TargetArch_CPP)
+AC_SUBST(BuildArch_CPP)
+AC_SUBST(TargetArch_CPP)
 
 AC_SUBST(HostOS_CPP)
 AC_SUBST(HostOS_Full)
-dnl AC_SUBST(BuildOS_CPP)
-dnl AC_SUBST(TargetOS_CPP)
+AC_SUBST(BuildOS_CPP)
+AC_SUBST(TargetOS_CPP)
 
 AC_SUBST(HostVendor_CPP)
-dnl AC_SUBST(BuildVendor_CPP)
-dnl AC_SUBST(TargetVendor_CPP)
+AC_SUBST(BuildVendor_CPP)
+AC_SUBST(TargetVendor_CPP)
 
 AC_SUBST(exeext)
 
