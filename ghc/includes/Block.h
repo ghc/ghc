@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Block.h,v 1.6 1999/11/09 15:47:07 simonmar Exp $
+ * $Id: Block.h,v 1.7 2000/04/05 14:26:31 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -110,4 +110,4 @@ static inline bdescr *Bdescr(StgPtr p)
 #define BLOCKS_TO_MBLOCKS(n) \
    (1 + (W_)MBLOCK_ROUND_UP((n-BLOCKS_PER_MBLOCK) * BLOCK_SIZE) / MBLOCK_SIZE)
 
-#endif BLOCK_H
+#endif /* BLOCK_H */

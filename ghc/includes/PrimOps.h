@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.48 2000/03/31 03:09:35 hwloidl Exp $
+ * $Id: PrimOps.h,v 1.49 2000/04/05 14:26:31 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -900,4 +900,4 @@ extern StgInt sig_install (StgInt, StgInt, StgStablePtr, sigset_t *);
 #define stg_sig_ignore(sig,mask) sig_install(sig,STG_SIG_IGN,0,(sigset_t *)mask)
 #define stg_sig_catch(sig,ptr,mask) sig_install(sig,STG_SIG_HAN,ptr,(sigset_t *)mask)
 
-#endif PRIMOPS_H
+#endif /* PRIMOPS_H */

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgTypes.h,v 1.8 2000/04/04 13:40:27 panne Exp $
+ * $Id: StgTypes.h,v 1.9 2000/04/05 14:26:31 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -194,5 +194,4 @@ typedef StgClosurePtr   L_;
 
 #define stgCast(ty,e) ((ty)(e))
 
-#endif STGTYPES_H
-
+#endif /* STGTYPES_H */

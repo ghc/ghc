@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureTypes.h,v 1.12 2000/01/13 14:34:00 hwloidl Exp $
+ * $Id: ClosureTypes.h,v 1.13 2000/04/05 14:26:31 panne Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -83,4 +83,4 @@
 
 #define N_CLOSURE_TYPES         65
 
-#endif CLOSURETYPES_H
+#endif /* CLOSURETYPES_H */

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TailCalls.h,v 1.4 1999/03/01 17:40:55 simonm Exp $
+ * $Id: TailCalls.h,v 1.5 2000/04/05 14:26:31 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -50,7 +50,7 @@ extern void __DISCARD__(void);
       goto *target; 	    	    	\
     }
 
-#endif i386_TARGET_ARCH
+#endif /* i386_TARGET_ARCH */
 
 /* -----------------------------------------------------------------------------
    Tail calling on Sparc
@@ -68,7 +68,7 @@ extern void __DISCARD__(void);
 #define FB_
 #define FE_
 
-#endif sparc_TARGET_ARCH
+#endif /* sparc_TARGET_ARCH */
 
 /* -----------------------------------------------------------------------------
    Tail calling on Alpha
@@ -87,7 +87,7 @@ register void *_procedure __asm__("$27");
 #define FB_
 #define FE_
 
-#endif alpha_TARGET_ARCH
+#endif /* alpha_TARGET_ARCH */
 
 /* -----------------------------------------------------------------------------
    Tail calling on HP
@@ -120,5 +120,4 @@ register void *_procedure __asm__("$27");
 
 #endif /* !USE_MINIINTERPRETER */
 
-#endif TAILCALLS_H
-
+#endif /* TAILCALLS_H */

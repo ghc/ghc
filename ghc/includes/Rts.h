@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Rts.h,v 1.12 2000/01/13 14:34:01 hwloidl Exp $
+ * $Id: Rts.h,v 1.13 2000/04/05 14:26:31 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -101,4 +101,4 @@
 #define stg_min(a,b) ({typeof(a) _a = (a), _b = (b); _a <= _b ? _a : _b; })
 #define stg_max(a,b) ({typeof(a) _a = (a), _b = (b); _a <= _b ? _b : _a; })
 
-#endif RTS_H
+#endif /* RTS_H */
