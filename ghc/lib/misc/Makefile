@@ -21,7 +21,7 @@ HS_SRCS	= $(wildcard *.lhs)
 
 # Remove Readline.lhs if readline.h isn't available.
 ifneq "$(GhcLibsWithReadline)" "YES"
-  HS_SRCS := $(filter-out src/Readline.lhs,$(HS_SRCS))
+  HS_SRCS := $(filter-out Readline.lhs,$(HS_SRCS))
 else
   SRC_HC_OPTS += -I$(ReadlineIncludePath)
 endif
