@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelCString.lhs,v 1.5 2001/08/10 13:48:06 simonmar Exp $
+% $Id: PrelCString.lhs,v 1.6 2001/11/27 14:49:10 simonmar Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -17,8 +17,6 @@ import PrelPtr
 import PrelStorable
 import PrelCTypes
 import PrelWord
-import PrelByteArr
-import PrelPack
 import PrelList
 import PrelReal
 import PrelNum
