@@ -52,7 +52,7 @@ declBinders d =
    case d of
      HsTypeDecl _ n _ _          -> [n]
      HsDataDecl _ _ n _ cons _   -> n : concat (map conDeclBinders cons)
-     HsNewTypeDecl _ _ n _ _ _   -> [n]
+     HsNewTypeDecl _ _ n _ con _ -> n : conDeclBinders con
      HsClassDecl _ qt _ decls    -> exQtNm qt : collectNames decls
      HsTypeSig _ ns _            -> ns
      HsForeignImport _ _ _ _ n _ -> [n]
