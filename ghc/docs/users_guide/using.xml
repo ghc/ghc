@@ -51,35 +51,35 @@ ghc [argument...]
       <option>-fglasgow-exts</option> option.  Rather than maintaining
       the list of per-file options in a <filename>Makefile</filename>,
       it is possible to do this directly in the source file using the
-      <literal>OPTIONS</literal> pragma <indexterm><primary>OPTIONS
+      <literal>OPTIONS_GHC</literal> pragma <indexterm><primary>OPTIONS_GHC
       pragma</primary></indexterm>:</para>
 
 <programlisting>
-{-# OPTIONS -fglasgow-exts #-}
+{-# OPTIONS_GHC -fglasgow-exts #-}
 module X where
 ...
 </programlisting>
       
-      <para><literal>OPTIONS</literal> pragmas are only looked for at
+      <para><literal>OPTIONS_GHC</literal> pragmas are only looked for at
       the top of your source files, upto the first
       (non-literate,non-empty) line not containing
-      <literal>OPTIONS</literal>. Multiple <literal>OPTIONS</literal>
+      <literal>OPTIONS_GHC</literal>. Multiple <literal>OPTIONS_GHC</literal>
       pragmas are recognised. Note that your command shell does not
       get to the source file options, they are just included literally
       in the array of command-line arguments the compiler driver
       maintains internally, so you'll be desperately disappointed if
-      you try to glob etc. inside <literal>OPTIONS</literal>.</para>
+      you try to glob etc. inside <literal>OPTIONS_GHC</literal>.</para>
 
-      <para>NOTE: the contents of OPTIONS are prepended to the
+      <para>NOTE: the contents of OPTIONS_GHC are prepended to the
       command-line options, so you <emphasis>do</emphasis> have the
-      ability to override OPTIONS settings via the command
+      ability to override OPTIONS_GHC settings via the command
       line.</para>
 
       <para>It is not recommended to move all the contents of your
       Makefiles into your source files, but in some circumstances, the
-      <literal>OPTIONS</literal> pragma is the Right Thing. (If you
+      <literal>OPTIONS_GHC</literal> pragma is the Right Thing. (If you
       use <option>-keep-hc-file-too</option> and have OPTION flags in
-      your module, the OPTIONS will get put into the generated .hc
+      your module, the OPTIONS_GHC will get put into the generated .hc
       file).</para>
     </sect2>
 
@@ -102,7 +102,7 @@ module X where
     <para>Each of GHC's command line options is classified as either
     <firstterm>static</firstterm> or <firstterm>dynamic</firstterm>.
     A static flag may only be specified on the command line, whereas a
-    dynamic flag may also be given in an <literal>OPTIONS</literal>
+    dynamic flag may also be given in an <literal>OPTIONS_GHC</literal>
     pragma in a source file or set from the GHCi command-line with
     <literal>:set</literal>.</para>
 
@@ -354,7 +354,7 @@ ghc &ndash;&ndash;make Main.hs
       <option>&ndash;&ndash;make</option>, but note that any options
       you give on the command line will apply to all the source files
       compiled, so if you want any options to apply to a single source
-      file only, you'll need to use an <literal>OPTIONS</literal>
+      file only, you'll need to use an <literal>OPTIONS_GHC</literal>
       pragma (see <xref linkend="source-file-options"/>).</para>
 
       <para>If the program needs to be linked with additional objects

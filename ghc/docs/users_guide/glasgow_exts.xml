@@ -4373,16 +4373,19 @@ key_function :: Int -> String -> (Bool, Double)
     </sect2>
 
     <sect2 id="options-pragma">
-      <title>OPTIONS pragma</title>
-      <indexterm><primary>OPTIONS</primary>
+      <title>OPTIONS_GHC pragma</title>
+      <indexterm><primary>OPTIONS_GHC</primary>
       </indexterm>
-      <indexterm><primary>pragma</primary><secondary>OPTIONS</secondary>
+      <indexterm><primary>pragma</primary><secondary>OPTIONS_GHC</secondary>
       </indexterm>
 
-      <para>The <literal>OPTIONS</literal> pragma is used to specify
+      <para>The <literal>OPTIONS_GHC</literal> pragma is used to specify
       additional options that are given to the compiler when compiling
       this source file.  See <xref linkend="source-file-options"/> for
       details.</para>
+
+      <para>Previous versions of GHC accepted <literal>OPTIONS</literal> rather
+	than <literal>OPTIONS_GHC</literal>, but that is now deprecated.</para>
     </sect2>
 
     <sect2 id="rules">
