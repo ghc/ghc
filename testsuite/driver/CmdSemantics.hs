@@ -211,7 +211,7 @@ processParsedTFile :: Maybe [String]	-- which tests to run
                    -> FilePath
                    -> [(Var,String)]
                    -> [TopDef]
-                   -> IO [(TestID, Maybe (Result, Result))]
+                   -> IO [TestResult]
 
 processParsedTFile test_filter tfilepath initial_global_env topdefs
    = do { let raw_tests = filter isTTest topdefs
@@ -233,7 +233,7 @@ processParsedTFile test_filter tfilepath initial_global_env topdefs
         ; case ei_global_env of
              Left barfage
                 -> do officialMsg barfage
-                      return [(TestID tfilepath tname, Nothing)
+                      return [TestFFail (TestID tfilepath tname)
                               | TTest tname trhs <- tests]
              Right global_env
                 -> do all_done <- mapM (doOne global_env macro_env) tests
@@ -243,18 +243,18 @@ processParsedTFile test_filter tfilepath initial_global_env topdefs
         doOne global_env macro_env (TTest tname stmts)
            = do putStr "\n\n"
                 let test_id = TestID tfilepath tname
-                officialMsg ("=== " ++ show test_id ++ " ===")
+                officialMsg ("=== " ++ ppTestID test_id ++ " ===")
                 r <- doOneTest (("testname", tname):global_env)
                                 macro_env stmts
                 case r of
                    Left barfage 
                       -> do officialMsg barfage
-                            return (test_id, Nothing)
-                   Right res@(exp,act)
+                            return (TestFFail test_id)
+                   Right (exp,act)
                       -> do officialMsg ("=== outcome for " ++ tname 
                                          ++ ": exp:" ++ show exp
                                          ++ ", act:" ++ show act ++ " ===")
-                            return (test_id, Just res)
+                            return (TestRanOK test_id exp act)
 
 
 getApplicableTests :: Maybe [String] -> [TopDef] -> [TopDef]

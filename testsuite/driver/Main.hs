@@ -1,16 +1,15 @@
 
 module Main where
 
-import CmdSyntax	( Var, TestName, Result(..), 
-			  Expr(..), TestID(..),
-			  officialMsg, panic,
-			  isJust, isNothing, unJust,
-			  isLeft, isRight, unLeft, unRight )
+import CmdSyntax
 import CmdSemantics	( parseOneTFile, processParsedTFile )
 import Directory
 import System
 import List
 import Monad		( when )
+import Time		( ClockTime, getClockTime )
+import IO		( catch )
+
 
 --import IOExts(trace)
 
@@ -69,6 +68,8 @@ usage
      "runtests --tool=<compiler-to-test>\n" ++   		   -- "
      "         --config=<path_to_config_file>\n" ++ 		   -- "
      "         --rootdir=<path_to_root_of_tests_directory>\n" ++   -- "
+     "         --save-summary=<path_of_summary_file_to_create>\n" ++   -- "
+     "         --compare-summary=<path_of_summary_file_to_compare_against>\n" ++   -- "
      "         [--$var=literal-value]\n" ++			   -- "
      "         [names of tests to run, if you don't want all]\n" ++
      "\n" ++
@@ -86,10 +87,13 @@ test
             ++ "--rootdir=../tests/codeGen")
 
 main_really arg_ws0
-   = do { let (arg_ws1, maybe_tool) = fish arg_ws0 "--tool="
-        ; let (arg_ws2, maybe_conf) = fish arg_ws1 "--config="
-        ; let (arg_ws3, maybe_root) = fish arg_ws2 "--rootdir="
-        ; let (arg_ws4, cmd_binds)  = getBinds arg_ws3
+   = do { start_time <- getClockTime
+        ; let (arg_ws1, maybe_tool)    = fish arg_ws0 "--tool="
+        ; let (arg_ws2, maybe_conf)    = fish arg_ws1 "--config="
+        ; let (arg_ws3, maybe_root)    = fish arg_ws2 "--rootdir="
+        ; let (arg_ws4, maybe_save_su) = fish arg_ws3 "--save-summary="
+        ; let (arg_ws5, maybe_cmp_su)  = fish arg_ws4 "--compare-summary="
+        ; let (arg_ws6, cmd_binds)  = getBinds arg_ws5
         ; let invalid_binds
                  = filter (`elem` special_var_names) 
                           (map fst cmd_binds)
@@ -110,7 +114,7 @@ main_really arg_ws0
                            ("conffilename", conffile)]
 
               tests_to_run
-                 = if null arg_ws4 then Nothing{-all of them-}
+                 = if null arg_ws6 then Nothing{-all of them-}
                                    else Just arg_ws4{-just these-}
 
         ; conf_ok <- doesFileExist conf
@@ -149,93 +153,177 @@ main_really arg_ws0
         ; putStr "\n"
         ; officialMsg ("=== All done. ===")
         -- ; putStr ("\n" ++ ((unlines . map show) results))
-        ; putStr ("\n" ++ executive_summary results)
+        ; let summary = makeSummary start_time results
+        ; putStr ("\n" ++ snd (ppSummary summary))
         ; putStr "\n"
+        ; case maybe_cmp_su of
+             Nothing -> return ()
+             Just fn 
+                -> do { officialMsg ("=== Comparing against: " ++ fn ++ " ===")
+                      ; maybe_txt <- maybe_readFile fn
+                      ; case maybe_txt of {
+                           Nothing -> do 
+                              officialMsg ("=== Can't read abovementioned file ===")
+                              return ()
+                         ; Just txt -> 
+                   do { case ((reads txt) :: [(Summary, String)]) of
+                           ((old_summ, ""):_)
+                              -> do putStrLn ""
+                                    putStrLn (ppSummaryDiffs old_summ summary)
+                           other
+                              -> do officialMsg 
+                                       ("=== Parse error in: " ++ fn ++ " ===")
+                                    return ()
+                      }}}
+        ; case maybe_save_su of
+             Nothing -> return ()
+             Just fn -> do officialMsg ("=== Saving summary in: " ++ fn ++ " ===")
+                           wr_ok <- maybe_writeFile fn (show summary)
+                           when (not wr_ok)
+                              (officialMsg ("=== Can't write abovementioned file ==="))
+        ; putStrLn ""
         -- ; exitWith ExitSuccess
      }}}
+     where
+        addTVars some_genv tfpath
+           = case splitPathname tfpath of
+                (tfdir, tfname) -> ("testdir", tfdir) 
+                                   : ("testfilename", tfname) 
+                                   : some_genv
 
-addTVars some_genv tfpath
-   = case splitPathname tfpath of
-         (tfdir, tfname) -> ("testdir", tfdir) 
-                            : ("testfilename", tfname) 
-                            : some_genv
 
--- Summarise overall outcome
-executive_summary :: [(TestID, Maybe (Result, Result))] 
-                  -> String
-executive_summary outcomes
+data Summary 
+   = Summary {
+        start_time :: String,
+        n_cands :: Int,
+        frame_fails,	-- Tests which got a framework failure
+        skipped,	-- Tests which asked to be skipped
+        p_p,		-- Tests which: expect Pass, actual Pass 
+        p_f,		-- Tests which: expect Pass, actual Fail 
+        f_p, 		-- Tests which: expect Fail, actual Pass 
+        f_f, 		-- Tests which: expect Fail, actual Fail
+        exp_u,		-- Tests which: expect Unknown
+        act_u,		-- Tests which: actual Unknown
+        u_u,		-- Tests which: expect Unknown, Actual Unknown
+        u_notu,		-- Tests which: expect Unknown, Actual /= Unknown
+        unexp		-- All tests for which Expected /= Actual
+           :: [TestResult]
+     }
+        deriving (Show, Read)
+
+
+-- Cook up a summary from raw test results
+makeSummary :: ClockTime	-- when the test run started
+            -> [TestResult]
+            -> Summary
+
+makeSummary start_time outcomes
    = let n_cands     = length outcomes
-         meta_fails  = filter is_meta_fail outcomes
-         outcomes_ok = filter (not.is_meta_fail) outcomes
+         frame_fails = filter is_frame_fail outcomes
+         outcomes_ok = filter (not.is_frame_fail) outcomes
          skipped     = filter is_skip       outcomes_ok
 
-         p_p = filter (got ((== Pass), (== Pass))) outcomes_ok
-         p_f = filter (got ((== Pass), (== Fail))) outcomes_ok
-         f_p = filter (got ((== Fail), (== Pass))) outcomes_ok
-         f_f = filter (got ((== Fail), (== Fail))) outcomes_ok
+         p_p    = filter (got (== Pass) (== Pass)) outcomes_ok
+         p_f    = filter (got (== Pass) (== Fail)) outcomes_ok
+         f_p    = filter (got (== Fail) (== Pass)) outcomes_ok
+         f_f    = filter (got (== Fail) (== Fail)) outcomes_ok
 
-         exp_u = filter (got ((== Unknown), const True)) outcomes_ok
-         act_u = filter (got (const True, (== Unknown))) outcomes_ok
-         u_u   = filter (got ((== Unknown), (== Unknown))) outcomes_ok
+         exp_u  = filter (got (== Unknown) (const True)) outcomes_ok
+         act_u  = filter (got (const True) (== Unknown)) outcomes_ok
+         u_u    = filter (got (== Unknown) (== Unknown)) outcomes_ok
+         u_notu = filter (got (== Unknown) (/= Unknown)) outcomes_ok
 
-         unexpected_u
-            = filter (`notElem` u_u) (exp_u ++ act_u)
+         unexp  = nubBy (\a b -> testid_of_TestResult a == testid_of_TestResult b)
+                        (p_f ++ f_p ++ u_notu)
+     in 
+         Summary { start_time=show start_time,
+                   n_cands=n_cands, 
+                   frame_fails=frame_fails, skipped=skipped,
+                   p_p=p_p, p_f=p_f, f_p=f_p, f_f=f_f,
+                   exp_u=exp_u, act_u=act_u, u_u=u_u, u_notu=u_notu,
+                   unexp=unexp
+                 }
+     where
+        is_frame_fail (TestFFail _)   = True
+        is_frame_fail (TestRanOK _ _ _) = False
 
-         unexpected = nub (p_f ++ f_p ++ unexpected_u)
+        got f1 f2 (TestRanOK nm r1 r2) = f1 r1 && f2 r2
+        got f1 f2 (TestFFail nm)     = False
 
-         summary
-            = unlines [ "OVERALL SUMMARY:"
+        is_skip (TestRanOK nm Skipped Skipped) = True
+        is_skip (TestRanOK nm r1 r2)
+           | r1 == Skipped || r2 == Skipped 
+           = panic "is_skip"
+        is_skip other = False
+
+
+-- Produce both verbose and ultra-terse versions of a Summary
+ppSummary :: Summary -> (String, String)
+ppSummary s
+   = let summary_big
+            = unlines [ "OVERALL SUMMARY for run started at " 
+                           ++ start_time s
                       , ""
-                      , "   " ++ show n_cands 
+                      , "   " ++ show (n_cands s)
                               ++ " total test candidates, of which:"
-                      , "   " ++ show (length meta_fails) 
+                      , "   " ++ show (length (frame_fails s)) 
                               ++ " framework failures,"
-                      , "   " ++ show (length skipped) ++ " were skipped,"
+                      , "   " ++ show (length (skipped s)) ++ " were skipped,"
                       , ""
-                      , "   " ++ show (length p_p) ++ " expected passes,"
-                      , "   " ++ show (length f_f) ++ " expected failures,"
-                      , "   " ++ show (length f_p) ++ " unexpected passes,"
-                      , "   " ++ show (length p_f) ++ " unexpected failures,"
+                      , "   " ++ show (length (p_p s)) ++ " expected passes,"
+                      , "   " ++ show (length (f_f s)) ++ " expected failures,"
+                      , "   " ++ show (length (f_p s)) ++ " unexpected passes,"
+                      , "   " ++ show (length (p_f s)) ++ " unexpected failures,"
                       , ""
-                      , "   " ++ show (length exp_u) ++ " specified as unknown,"
-                      , "   " ++ show (length act_u) ++ " actual unknowns,"
-                      , "   " ++ show (length u_u) ++ " expected unknowns."
+                      , "   " ++ show (length (exp_u s)) ++ " specified as unknown,"
+                      , "   " ++ show (length (act_u s)) ++ " actual unknowns,"
+                      , "   " ++ show (length (u_u s)) ++ " expected unknowns."
                       ]
 
+         summary_short
+            = show (n_cands s) ++ " cands, " 
+              ++ show (length (frame_fails s)) ++ " framework-failed, " 
+              ++ show (length (skipped s)) ++ " skipped, "
+              ++ show (length (unexp s)) ++ " unexpected outcomes."
+
          unexpected_summary
-            | null unexpected 
+            | null (unexp s)
             = ""
             | otherwise
             = "\nThe following tests had unexpected outcomes:\n"
-              ++ unlines (map ppTest unexpected)
+              ++ unlines (map (("   "++). ppTestID . testid_of_TestResult) 
+                              (unexp s))
 
-         metafail_summary
-            | null meta_fails
+         framefail_summary
+            | null (frame_fails s)
             = ""
             | otherwise
             = "\nThe following tests had framework failures:\n"
-              ++ unlines (map (("   "++).show.fst) meta_fails)
-
-         ppTest (test, Just (exp,act))
-             = "   exp:" ++ show exp ++ ", act:" ++ show act 
-               ++ "    " ++ show test
-
-         is_meta_fail (_, Nothing) = True
-         is_meta_fail other       = False
-
-         got (f1,f2) (_, Just (r1,r2)) = f1 r1 && f2 r2
-         got (f1,f2) other             = False
-
-         is_skip (_, Just (Skipped, Skipped)) = True
-         is_skip (_, Just (r1, r2))
-            | r1 == Skipped || r2 == Skipped 
-            = panic "is_skip"
-         is_skip other = False
-
-         is_exp_unk (_, Just (Unknown, Unknown)) = True
-         is_exp_unk other                         = False
+              ++ unlines (map (("   "++).show) (frame_fails s))
      in
-         summary ++ unexpected_summary ++ metafail_summary
+         (summary_short,
+          summary_big ++ unexpected_summary ++ framefail_summary)
+
+
+-- Print differences between two summaries
+ppSummaryDiffs old new
+   = "DIFFERENCES from run of " ++ start_time old ++ "\n"
+     ++ "\n"
+     ++ "Prev: "
+     ++ fst (ppSummary old) 
+     ++ "\n Now: "
+     ++ fst (ppSummary new)
+     ++ if null diff_unexp then []
+        else "\nNew unexpected outcomes:\n" ++ unlines (map ppTestResult diff_unexp)
+
+     where
+        old_unexp = unexp old
+        now_unexp = unexp new
+        old_unexp_ids = map testid_of_TestResult old_unexp
+        diff_unexp = filter (\new_u -> testid_of_TestResult new_u 
+                                          `notElem` old_unexp_ids)
+                            now_unexp
+
 
 -- Helper for cmd line args
 fish :: [String] -> String -> ([String], Maybe String)
@@ -281,6 +369,18 @@ getBinds cmd_line_opts
 special_var_names
    = ["testfilename", "testdir", "conffilename", "confdir", 
       "tool", "testname"]
+
+
+-- File reader/writer with exception catching.
+maybe_readFile :: FilePath -> IO (Maybe String)
+maybe_readFile fname
+   = catch (readFile fname >>= (return . Just))
+           (const (return Nothing))
+
+maybe_writeFile :: FilePath -> String -> IO Bool
+maybe_writeFile fname cts
+   = catch (writeFile fname cts >> (return True))
+           (const (return False))
 
 
 -- (eg) "foo/bar/xyzzy.ext" --> ("foo/bar", "xyzzy", "ext")

@@ -1,7 +1,10 @@
 
 module CmdSyntax ( Var, MacroName, TestName, MacroDef(..),
                    TopDef(..), Stmt(..), Expr(..), freeVars,
-                   Op(..), Result(..), TestID(..),
+                   Op(..), Result(..), 
+                   TestID(..), ppTestID,
+                   TestResult(..), ppTestResult,
+                   testid_of_TestResult, results_of_TestResult,
                    panic, officialMsg, my_system,
                    isJust, isNothing, unJust,
                    isTInclude, isTTest, isTMacroDef, isTAssign,
@@ -52,10 +55,9 @@ data MacroDef  = MacroDef [Var] [Stmt]
 
 data TestID = TestID FilePath{-for the .T file-} 
                      TestName{-name within the .T file-}
-              deriving Eq
+              deriving (Eq, Show, Read)
 
-instance Show TestID where
-   show (TestID tfilepath tname) = tfilepath ++ " " ++ tname
+ppTestID (TestID tfilepath tname) = tfilepath ++ " " ++ tname
 
 ------------------
 
@@ -126,5 +128,22 @@ data Result
    | Fail 		-- test failed
    | Unknown		-- test might have run, but outcome undetermined
    | Skipped		-- skip-when clause indicated this test to be skipped
-     deriving (Eq, Show)
+     deriving (Eq, Show, Read)
 
+-- Overall result of a test
+data TestResult
+   = TestFFail TestID
+   | TestRanOK TestID Result Result
+     deriving (Show, Read)
+
+ppTestResult (TestFFail nm)
+   = "   framefail    " ++ ppTestID nm
+ppTestResult (TestRanOK nm exp act)
+   = "   exp:" ++ show exp ++ ", act:" ++ show act 
+     ++ "    " ++ ppTestID nm
+
+testid_of_TestResult (TestFFail nm1)     = nm1
+testid_of_TestResult (TestRanOK nm1 _ _) = nm1
+
+results_of_TestResult (TestFFail nm1)     = Nothing
+results_of_TestResult (TestRanOK nm1 e a) = Just (e,a)
