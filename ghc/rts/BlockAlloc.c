@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: BlockAlloc.c,v 1.11 2001/11/08 10:18:49 simonmar Exp $
+ * $Id: BlockAlloc.c,v 1.12 2001/11/08 12:41:07 simonmar Exp $
  *
  * (c) The GHC Team 1998-2000
  * 
@@ -205,6 +205,7 @@ coalesce(bdescr *p)
     p->link    = q->link;
     for (i = 0, bd = q; i < q->blocks; bd++, i++) {
 	bd->free = 0;
+	bd->blocks = 0;
 	bd->link = p;
     }
     return p;
