@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.15 2002/02/12 15:17:34 simonmar Exp $
+# $Id: Makefile,v 1.16 2002/02/13 11:51:40 simonmar Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -38,6 +38,10 @@ ALL_DIRS = \
 	Text/Show
 
 PACKAGE = base
+
+ifneq "$(HavePosixRegex)" "YES"
+EXCLUDED_SRCS += Text/Regex/Posix.hsc Text/Regex.hs
+endif
 
 SRC_HC_OPTS += -fglasgow-exts -cpp -Iinclude
 SRC_HSC2HS_OPTS += -Iinclude
