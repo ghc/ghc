@@ -1,0 +1,6 @@
+
+mdofail004.hs:17:
+    No instance for (MonadFix X)
+    arising from a do statement at mdofail004.hs:17
+    In a right-hand side of function `z': mdo return [1, 2, 3, 4]
+    In the definition of `z': z = mdo return [1, 2, 3, 4]

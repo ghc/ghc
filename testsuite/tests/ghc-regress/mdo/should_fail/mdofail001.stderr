@@ -1,0 +1,6 @@
+
+mdofail001.hs:10:
+    No instance for (Num Char)
+    arising from the literal `1' at mdofail001.hs:10
+    In the list element: 1
+    In the first argument of `l', namely `[1, 2, 3]'
