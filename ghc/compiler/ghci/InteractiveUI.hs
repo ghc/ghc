@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.103 2001/12/05 19:24:53 sof Exp $
+-- $Id: InteractiveUI.hs,v 1.104 2002/01/03 17:05:50 sewardj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -804,7 +804,8 @@ linkPackages cmdline_lib_specs pkgs
 	   else do putStr "final link ... "
 		   ok <- resolveObjs
 		   if ok then putStrLn "done."
-	      		 else throwDyn (InstallationError "linking extra libraries/objects failed")
+	      		 else throwDyn (InstallationError 
+                                          "linking extra libraries/objects failed")
      where
         preloadLib :: [String] -> LibrarySpec -> IO ()
         preloadLib lib_paths lib_spec
@@ -817,14 +818,18 @@ linkPackages cmdline_lib_specs pkgs
                       -> -- We add "" to the set of paths to try, so that
                          -- if none of the real paths match, we force addDLL
                          -- to look in the default dynamic-link search paths.
-                         do b <- preload_dynamic (lib_paths++[""]) dll_unadorned
-                            when (not b) (cantFind lib_paths lib_spec)
+                         do maybe_errstr <- preload_dynamic (lib_paths++[""]) 
+                                                            dll_unadorned
+                            case maybe_errstr of
+                               Nothing -> return ()
+                               Just mm -> preloadFailed mm lib_paths lib_spec
                             putStrLn "done"
 
-        cantFind :: [String] -> LibrarySpec -> IO ()
-        cantFind paths spec
-           = do putStr ("failed.\nCan't find " ++ showLS spec
-                        ++ " in directories:\n"
+        preloadFailed :: String -> [String] -> LibrarySpec -> IO ()
+        preloadFailed sys_errmsg paths spec
+           = do putStr ("failed.\nDynamic linker error message was:\n   " 
+                        ++ sys_errmsg  ++ "\nWhilst trying to load:  " 
+                        ++ showLS spec ++ "\nDirectories to search are:\n"
                         ++ unlines (map ("   "++) paths) )
                 give_up
 
@@ -834,13 +839,16 @@ linkPackages cmdline_lib_specs pkgs
                 if not b then return False
                          else loadObj name >> return True
 
+        -- return Nothing == success, else Just error message from addDLL
         preload_dynamic [] name
-           = return False
+           = return Nothing
         preload_dynamic (path:paths) rootname
-           = do maybe_errmsg <- addDLL path rootname
-                if    maybe_errmsg /= nullPtr
+           = do -- addDLL returns NULL on success
+                maybe_errmsg <- addDLL path rootname
+                if    maybe_errmsg == nullPtr
                  then preload_dynamic paths rootname
-                 else return True
+                 else do str <- peekCString maybe_errmsg
+                         return (Just str)
 
         give_up 
            = (throwDyn . CmdLineError)
