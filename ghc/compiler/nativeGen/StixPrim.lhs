@@ -273,6 +273,16 @@ primCode [lhs] (IndexOffAddrOp pk) [obj, ix]
     in
     returnUs (\xs -> assign : xs)
 
+primCode [lhs] (IndexOffForeignObjOp pk) [obj, ix]
+  = let
+	lhs' = amodeToStix lhs
+    	obj' = amodeToStix obj
+    	ix' = amodeToStix ix
+	obj'' = StIndex PtrRep obj' foHS
+    	assign = StAssign pk lhs' (StInd pk (StIndex pk obj'' ix'))
+    in
+    returnUs (\xs -> assign : xs)
+
 primCode [] (WriteByteArrayOp pk) [obj, ix, v]
   = let
 	obj' = amodeToStix obj
@@ -422,9 +432,10 @@ primCode lhs (CCallOp fn is_asm may_gc arg_tys result_ty) rhs
 	let base = amodeToStix' x
 	in
 	    case getAmodeRep x of
-	      ArrayRep -> StIndex PtrRep base mutHS
-	      ByteArrayRep -> StIndex IntRep base dataHS
-	      ForeignObjRep -> error "ERROR: native-code generator can't handle ForeignObjs (yet): use -fvia-C!"
+	      ArrayRep      -> StIndex PtrRep base mutHS
+	      ByteArrayRep  -> StIndex IntRep base dataHS
+	      ForeignObjRep -> StIndex PtrRep base foHS
+		 {-error "ERROR: native-code generator can't handle ForeignObjs (yet): use -fvia-C!"-}
 	      _ -> base
 \end{code}
 
