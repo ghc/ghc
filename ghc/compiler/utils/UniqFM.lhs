@@ -129,7 +129,9 @@ ufmToList	:: UniqFM elt -> [(Unique, elt)]
 %************************************************************************
 
 \begin{code}
-#ifdef __GLASGOW_HASKELL__
+-- Turn off for now, these need to be updated (SDM 4/98)
+
+{- #ifdef __GLASGOW_HASKELL__ -}
 -- I don't think HBC was too happy about this (WDP 94/10)
 
 {-# SPECIALIZE
@@ -149,7 +151,7 @@ ufmToList	:: UniqFM elt -> [(Unique, elt)]
 		 , UniqFM elt -> Unique -> Maybe elt
   #-}
 
-#endif {- __GLASGOW_HASKELL__ -}
+{- #endif {- __GLASGOW_HASKELL__ -} -}
 \end{code}
 
 %************************************************************************
