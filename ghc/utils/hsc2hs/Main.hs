@@ -1,7 +1,7 @@
 {-# OPTIONS -fglasgow-exts #-}
 
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.43 2002/10/29 10:50:54 simonpj Exp $
+-- $Id: Main.hs,v 1.44 2003/02/07 21:55:36 sof Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -19,10 +19,11 @@ import GetOpt
 
 import Config
 import System        (getProgName, getArgs, ExitCode(..), exitWith, exitFailure, system)
-import Directory     (removeFile)
+import Directory     (removeFile,doesFileExist)
 import Monad         (MonadPlus(..), liftM, liftM2, when, unless)
 import Char          (isAlpha, isAlphaNum, isSpace, isDigit, toUpper, intToDigit, ord)
 import List          (intersperse)
+import IO            (hPutStrLn,stderr)
 
 #include "../../includes/config.h"
 
@@ -53,6 +54,7 @@ data Flag
     | Include   String
     | Define    String (Maybe String)
     | Output    String
+    | Verbose
 
 template_flag (Template _) = True
 template_flag _		   = False
@@ -80,8 +82,10 @@ options = [
     Option "D" ["define"]     (ReqArg define "NAME[=VALUE]") "as if placed in the source",
     Option "o" ["output"]     (ReqArg Output     "FILE") "name of main output file",
     Option ""  ["help"]       (NoArg  Help)              "display this help and exit",
+    Option "v" ["verbose"]    (NoArg  Verbose)           "dump commands to stderr",
     Option ""  ["version"]    (NoArg  Version)           "output version information and exit",
     Option ""  ["no-compile"] (NoArg  NoCompile)         "stop after writing *_hsc_make.c"]
+    
 
 main :: IO ()
 main = do
@@ -101,7 +105,7 @@ main = do
 			     case mb_path of
 				Nothing   -> return flags
 
-				Just path -> return (Template path : flags) }
+				Just path -> return (Template (path ++ "/template-hsc.h") : flags) }
 
     case (files, errs) of
         (_, _)
@@ -473,6 +477,8 @@ output flags name toks = do
 	outHFile     = outBase++"_hsc.h"
         outHName     = outDir++outHFile
         outCName     = outDir++outBase++"_hsc.c"
+	
+	beVerbose    = any (\ x -> case x of { Verbose{} -> True; _ -> False}) flags
 
     let execProgName
             | null outDir = '.':pathSep:progName
@@ -487,17 +493,29 @@ output flags name toks = do
             where
             fixChar c | isAlphaNum c = toUpper c
                       | otherwise    = '_'
+
+          -- try locating GHC..on Win32, look in the vicinity of hsc2hs.
+        locateGhc def = do
+	    mb <- getExecDir "bin/hsc2hs.exe"
+	    case mb of
+	      Nothing -> return def
+	      Just x  -> do
+	         let ghc_path = dosifyPath (x ++ "bin/ghc.exe")
+	         flg <- doesFileExist ghc_path
+		 if flg 
+		  then return ghc_path
+		  else return def
     
     compiler <- case [c | Compiler c <- flags] of
-        []  -> return "ghc"
+        []  -> locateGhc "ghc"
         [c] -> return c
         _   -> onlyOne "compiler"
     
     linker <- case [l | Linker l <- flags] of
-        []  -> return cGCC
+        []  -> locateGhc "ghc"
         [l] -> return l
         _   -> onlyOne "linker"
-    
+
     writeFile cProgName $
         concatMap outFlagHeaderCProg flags++
         concatMap outHeaderCProg specials++
@@ -508,8 +526,10 @@ output flags name toks = do
         "    return 0;\n}\n"
     
     unless (null [() | NoCompile <- flags]) $ exitWith ExitSuccess
+
+
     
-    compilerStatus <- system $
+    compilerStatus <- systemL beVerbose $
         compiler++
         " -c"++
         concat [" "++f | CompFlag f <- flags]++
@@ -520,7 +540,7 @@ output flags name toks = do
         _                 -> return ()
     removeFile cProgName
     
-    linkerStatus <- system $
+    linkerStatus <- systemL beVerbose $
         linker++
         concat [" "++f | LinkFlag f <- flags]++
         " "++oProgName++
@@ -530,7 +550,7 @@ output flags name toks = do
         _                 -> return ()
     removeFile oProgName
     
-    progStatus <- system (execProgName++" >"++outName)
+    progStatus <- systemL beVerbose (execProgName++" >"++outName)
     removeFile progName
     case progStatus of
         e@(ExitFailure _) -> exitWith e
@@ -557,6 +577,11 @@ output flags name toks = do
         concatMap outTokenC specials
 	-- NB. outHFile not outHName; works better when processed
 	-- by gcc or mkdependC.
+
+systemL :: Bool -> String -> IO ExitCode
+systemL flg s = do
+  when flg (hPutStrLn stderr ("Executing: " ++ s))
+  system s
 
 onlyOne :: String -> IO a
 onlyOne what = do
@@ -781,7 +806,7 @@ getExecDir cmd
   where
     len = 2048::Int -- Plenty, PATH_MAX is 512 under Win32.
 
-foreign import stdcall "GetModuleFileNameA" unsafe 
+foreign import stdcall unsafe "GetModuleFileNameA"
   getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
 
 #else
