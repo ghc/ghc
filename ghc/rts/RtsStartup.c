@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.68 2003/01/28 16:30:06 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.69 2003/01/29 09:54:33 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -177,9 +177,9 @@ startupHaskell(int argc, char *argv[], void (*init_root)(void))
 
 
 /* -----------------------------------------------------------------------------
-   Getting the program's arguments.
+   Getting/Setting the program's arguments.
 
-   This is used by System.Environment.getArgs.
+   These are used by System.Environment.
    -------------------------------------------------------------------------- */
 
 void
@@ -187,6 +187,18 @@ getProgArgv(int *argc, char **argv[])
 {
     *argc = prog_argc;
     *argv = prog_argv;
+}
+
+void
+setProgArgv(int argc, char *argv[])
+{
+   /* Usually this is done by startupHaskell, so we don't need to call this. 
+      However, sometimes Hugs wants to change the arguments which Haskell
+      getArgs >>= ... will be fed.  So you can do that by calling here
+      _after_ calling startupHaskell.
+   */
+   prog_argc = argc;
+   prog_argv = argv;
 }
 
 /* -----------------------------------------------------------------------------

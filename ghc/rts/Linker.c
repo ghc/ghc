@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.111 2003/01/28 17:05:32 simonmar Exp $
+ * $Id: Linker.c,v 1.112 2003/01/29 09:54:32 simonmar Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -295,7 +295,6 @@ typedef struct _RtsSymbolVal {
       Maybe_ForeignObj				\
       Maybe_Stable_Names			\
       Sym(StgReturn)				\
-      Sym(init_stack)				\
       SymX(stg_enter_info)			\
       SymX(stg_enter_ret)			\
       SymX(stg_gc_void_info)			\
@@ -444,6 +443,7 @@ typedef struct _RtsSymbolVal {
       SymX(rts_mkWord64)			\
       SymX(rts_mkWord8)				\
       SymX(run_queue_hd)			\
+      SymX(setProgArgv)				\
       SymX(startupHaskell)			\
       SymX(shutdownHaskell)			\
       SymX(shutdownHaskellAndExit)		\
