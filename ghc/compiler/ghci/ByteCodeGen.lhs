@@ -1202,7 +1202,7 @@ pushAtom False d p (AnnLit lit)
                             in  ioToBc (mallocBytes (n+1)) `thenBc` \ (Ptr a#) ->
                                 recordMallocBc (A# a#)     `thenBc_`
                                 ioToBc (
-                                   do strncpy (Ptr a#) ba (fromIntegral n)
+                                   do memcpy (Ptr a#) ba (fromIntegral n)
                                       writeCharOffAddr (A# a#) n '\0'
                                       return (A# a#)
                                    )
@@ -1230,7 +1230,7 @@ pushAtom tagged d p other
    = pprPanic "ByteCodeGen.pushAtom" 
               (pprCoreExpr (deAnnotate (undefined, other)))
 
-foreign import "strncpy" strncpy :: Ptr a -> ByteArray# -> CInt -> IO ()
+foreign import "memcpy" memcpy :: Ptr a -> ByteArray# -> CInt -> IO ()
 
 
 -- Given a bunch of alts code and their discrs, do the donkey work
