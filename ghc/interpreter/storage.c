@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.74 $
- * $Date: 2000/05/09 09:11:40 $
+ * $Revision: 1.75 $
+ * $Date: 2000/05/09 17:38:19 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -20,7 +20,6 @@
 #include "object.h"
 #include <setjmp.h>
 #include "Stg.h"
-#include "Storage.h"
 
 /*#define DEBUG_SHOWUSE*/
 
