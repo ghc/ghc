@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.47 2001/08/21 10:00:22 simonpj Exp $
+% $Id: CgClosure.lhs,v 1.48 2001/09/10 10:07:21 rje Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -369,19 +369,19 @@ closureCodeBody binder_info closure_info cc all_args body
 	-- see argSatisfactionCheck for new version
 	-- fast_entry_code = forceHeapCheck [] True fast_entry_code'
 
-	fast_entry_code
-	  = moduleName		`thenFC` \ mod_name ->
-	    profCtrC SLIT("TICK_CTR") [ 
-		CLbl ticky_ctr_label DataPtrRep,
-		mkCString (_PK_ (ppr_for_ticky_name mod_name name)),
-		mkIntCLit stg_arity,	-- total # of args
-		mkIntCLit sp_stk_args,	-- # passed on stk
-		mkCString (_PK_ (map (showTypeCategory . idType) all_args))
-      	    ] `thenC`
-
-	    profCtrC SLIT("TICK_ENT_FUN_DIRECT") [
-		    CLbl ticky_ctr_label DataPtrRep
-	    ] `thenC`
+	fast_entry_code = do
+		mod_name <- moduleName
+		profCtrC SLIT("TICK_CTR") [ 
+			CLbl ticky_ctr_label DataPtrRep,
+			mkCString (_PK_ (ppr_for_ticky_name mod_name name)),
+			mkIntCLit stg_arity,	-- total # of args
+			mkIntCLit sp_stk_args,	-- # passed on stk
+			mkCString (_PK_ (map (showTypeCategory . idType) all_args))
+			] 
+		let prof = 
+			profCtrC SLIT("TICK_ENT_FUN_DIRECT") [
+				CLbl ticky_ctr_label DataPtrRep
+			] 
 
 -- Nuked for now; see comment at end of file
 --		    CString (_PK_ (show_wrapper_name wrapper_maybe)),
@@ -390,18 +390,19 @@ closureCodeBody binder_info closure_info cc all_args body
 
 		-- Bind args to regs/stack as appropriate, and
 		-- record expected position of sps.
-	    bindArgsToRegs reg_args arg_regs		    `thenC`
-	    mapCs bindNewToStack stk_offsets		    `thenC`
-	    setRealAndVirtualSp sp_stk_args		    `thenC`
+		bindArgsToRegs reg_args arg_regs		    
+		mapCs bindNewToStack stk_offsets		    
+		setRealAndVirtualSp sp_stk_args		    
 
 	    	-- free up the stack slots containing tags
-	    freeStackSlots (map fst stk_tags)		    `thenC`
+		freeStackSlots (map fst stk_tags)
 
 		-- Enter the closures cc, if required
-	    enterCostCentreCode closure_info cc IsFunction False `thenC`
+		enterCostCentreCode closure_info cc IsFunction False
 
 		-- Do the business
-	    funWrapper closure_info arg_regs stk_tags info_label (cgExpr body)
+		funWrapper closure_info arg_regs stk_tags info_label 
+			(prof >> cgExpr body)
     in
 
     setTickyCtrLabel ticky_ctr_label (
