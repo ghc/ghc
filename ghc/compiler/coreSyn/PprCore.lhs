@@ -31,13 +31,12 @@ import Id		( idType, getIdInfo, getIdStrictness, isTupleCon,
 			  nullIdEnv, SYN_IE(DataCon), GenId{-instances-},
 			  SYN_IE(Id)
 			) 
-import IdInfo		( ppIdInfo, StrictnessInfo(..) )
+import IdInfo		( ppIdInfo, ppStrictnessInfo )
 import Literal		( Literal{-instances-} )
 import Name		( OccName, parenInCode )
 import Outputable	-- quite a few things
 import PprEnv
 import PprType		( pprParendGenType, pprTyVarBndr, GenType{-instances-}, GenTyVar{-instance-} )
-import PprStyle		( PprStyle(..), ifaceStyle )
 import Pretty
 import PrimOp		( PrimOp{-instances-} )
 import TyVar		( GenTyVar{-instances-} )
@@ -434,13 +433,7 @@ pprBigCoreBinder sty binder
 pprBabyCoreBinder sty binder
   = hsep [ppr sty binder, pp_strictness]
   where
-    pp_strictness
-      = case (getIdStrictness binder) of
-	  NoStrictnessInfo    -> empty
-	  BottomGuaranteed    -> ptext SLIT("{- _!_ -}")
-	  StrictnessInfo xx _ ->
-		panic "PprCore:pp_strictness:StrictnessInfo:ToDo"
-		-- text ("{- " ++ (showList xx "") ++ " -}")
+    pp_strictness = ppStrictnessInfo sty (getIdStrictness binder)
 
 pprTypedCoreBinder sty binder
   = hcat [ppr sty binder, ppDcolon, pprParendGenType sty (idType binder)]
