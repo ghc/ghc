@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.23 2000/12/04 12:31:21 simonmar Exp $
+ * $Id: StgCRun.c,v 1.24 2001/07/24 06:02:21 ken Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -393,7 +393,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg)
                	      ".globl " STG_RETURN "\n"
                       STG_RETURN ":\n\t"
 		      "lda %0,($14)\n\t"  /* save R1 */
-               	      "lda $30,%0($30)\n\t"
+               	      "lda $30,%1($30)\n\t"
                	      "ldq $9,-8($30)\n\t"
                	      "ldq $10,-16($30)\n\t"
                	      "ldq $11,-24($30)\n\t"
