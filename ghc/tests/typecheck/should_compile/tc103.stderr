@@ -1,0 +1,5 @@
+ghc: module version changed to 1; reason: no old .hi file
+__export ShouldCompile C D{DD} D_;
+1 newtype D a = DD (D_  a) ;
+1 type C a = D   a -> a ;
+1 type D_ a = C   (PrelMaybe.Maybe a) ;
