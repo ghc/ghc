@@ -8,7 +8,7 @@ module TyVar (
         setTyVarFlexi,
 	cloneTyVar, nameTyVar,
 
-	openAlphaTyVar,
+	openAlphaTyVar, openAlphaTyVars,
 	alphaTyVars, alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar,
 
 	-- We also export "environments" keyed off of
@@ -96,6 +96,10 @@ Fixed collection of type variables
 	-- to a boxed or unboxed type variable.  It's used for the 
 	-- result type for "error", so that we can have (error Int# "Help")
 openAlphaTyVar = TyVar initTyVarUnique mkTypeKind Nothing unused
+
+openAlphaTyVars = 
+    [ TyVar u mkTypeKind Nothing unused
+    | u <- iterate incrUnique initTyVarUnique]
 
 alphaTyVars = [ TyVar u mkBoxedTypeKind Nothing unused
 	      | u <- iterate incrUnique initTyVarUnique]
