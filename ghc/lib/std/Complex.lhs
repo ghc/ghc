@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Complex.lhs,v 1.6 2001/09/19 14:05:01 simonmar Exp $
+% $Id: Complex.lhs,v 1.7 2001/09/19 14:06:03 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -55,8 +55,6 @@ data  (RealFloat a)     => Complex a = !a :+ !a  deriving (Eq, Read, Show)
 %*********************************************************
 
 \begin{code}
-{-# SPECIALISE realPart :: Complex Double -> Double #-}
-{-# SPECIALISE imagPart :: Complex Double -> Double #-}
 realPart, imagPart :: (RealFloat a) => Complex a -> a
 realPart (x :+ _) =  x
 imagPart (_ :+ y) =  y
