@@ -21,7 +21,7 @@ module Data.Array.IArray (
     -- * Class of array types with immutable bounds
     HasBounds,  -- :: (* -> * -> *) -> class
 
-    -- * Ordinary boxed/lazy arrays
+    -- * Ordinary boxed\/lazy arrays
     Array,    
 
     -- * The @Ix@ class and operations
