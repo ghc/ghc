@@ -23,7 +23,7 @@
 
 \begin{document}
 \title{Implementation of Lag/Drag/Void/Use Profiling}
-\author{Sungwoo Park}
+\author{Sungwoo Park \\ Simon Marlow}
 
 \makeatactive
 \maketitle
@@ -209,33 +209,30 @@ the current global time is stored in its last use time field.
 
 \section{Global Time \texttt{ldvTime} and Retainer Profiling}
 
-The global time, stored in @ldvTime@, is used primarily to record the number
-of times heap censuses have been performed for LDV profiling. 
-It is initialized to $1$ and incremented each time a heap census is completed 
-through an invocation of @LdvCensus()@ (i.e., at the end of @LdvCensus()@).
-Its implication is that 
-all closures created between two successive invocations of @LdvCensus()@
-have the same creation time.
-Another implication is that 
-if a closure is used at least once between two successive heap 
-censuses, we consider the closure to be in the use phase 
-during the corresponding time period 
-(because we just set its last use time field to the current value
-of @ldvTime@ whenever it is used).
-Notice that a closure with a creation time $t_c$ may be destroyed before
-the major garbage collection before the actual heap census for time $t_c$ and thus 
-may \emph{not} be observed during the heap census for time $t_c$.
-Such a closure does not affect the profiling statistics at all.
+The global time, stored in @ldvTime@, records the current time period.
+It is initialized to $1$ and incremented after each time a heap census
+is completed through an invocation of @LdvCensus()@.  Note that each
+value of @ldvTime@ represents a time \emph{period}, not a point in
+time.
 
-In addition, the global time @ldvTime@ indicates
-which of LDVU profiling and retainer profiling is currently active:
-during LDVU profiling, it is initialized to $1$ in @initLdvProfiling()@
-and then increments as LDVU profiling proceeds;
-during retainer profiling, however, it is always fixed to $0$.
+All closures created between two successive invocations of
+@LdvCensus()@ have the same creation time.  If a closure is used at
+least once between two successive heap censuses, we consider the
+closure to be in the use phase during the corresponding time period
+(because we just set its last use time field to the current value of
+@ldvTime@ whenever it is used).  Notice that a closure with a creation
+time $t_c$ may be destroyed before the actual heap census for time
+$t_c$ and thus may \emph{not} be observed during the heap census for
+time $t_c$.  Such a closure does not show up in the profile at all.
 
-Thus, wherever a piece of code shared by both retainer profiling and
-LDVU profiling comes to play, we usually need to first examine the value of @ldvTime@
-if necessary. For instance, consider the macro @LDV_recordUse()@:
+In addition, the value of @ldvTime@ indicates which of LDVU profiling
+and retainer profiling is currently active: during LDVU profiling, it
+is initialized to $1$ in @initLdvProfiling()@ and then increments as
+LDVU profiling proceeds; during retainer profiling, however, it is
+always fixed to $0$.  Thus, wherever a piece of code shared by both
+retainer profiling and LDVU profiling comes to play, we usually need
+to first examine the value of @ldvTime@ if necessary. For instance,
+consider the macro @LDV_recordUse()@:
 
 \begin{code}
 #define LDV_recordUse(c)                              \
@@ -243,12 +240,12 @@ if necessary. For instance, consider the macro @LDV_recordUse()@:
     LDVW((c)) = (LDVW((c)) & LDV_CREATE_MASK) | ldvTime | LDV_STATE_USE; 
 \end{code}
 
-If retainer profiling is being performed, @ldvTime@ is equal to $0$, and
-@LDV_recordUse()@ causes no side effect.\footnote{Due to this interference
-with LDVU profiling, retainer profiling slows down a bit; for instance, 
-checking @ldvTime@ against $0$ in the above example would always evaluate to
-@rtsFalse@ during retainer profiling.
-However, this is the price to be paid for our decision not to employ a 
+If retainer profiling is being performed, @ldvTime@ is equal to $0$,
+and @LDV_recordUse()@ causes no side effect.\footnote{Due to this
+interference with LDVU profiling, retainer profiling slows down a bit;
+for instance, checking @ldvTime@ against $0$ in the above example
+would always evaluate to @rtsFalse@ during retainer profiling.
+However, this is the price to be paid for our decision not to employ a
 separate field for LDVU profiling.}
 
 As another example, consider @LDV_recordCreate()@:
@@ -268,51 +265,39 @@ retainer set fields correctly.
 \label{sec-heap-censuses}
 
 The LDVU profiler performs heap censuses periodically by invoking the
-function @LdvCensus()@
-(a heap census can take place at any random moment during program execution).
-Since LDVU profiling deals only with live closures, however, we choose to have
-a heap census preceded by a major garbage collection so that only live
-closures reside in the heap 
-(see @schedule()@ in @Schedule.c@).\footnote{It turns out that this
-choice does not considerably simplify the implementation; we need to
-finish a complete linear scan of the entire live heap at any rate. 
-As a side note, in~\cite{RR}, a heap census is \emph{followed} by a garbage
-collection, which is the opposite of our strategy.}
-This design choice is necessary for the LDVU profiling result not to be 
-affected by the amount of heap memory available to programs.
-Without a a major garbage collection performed before a heap census,
-the size of closures in the drag or void phases would heavily depend on
-the amount of available heap memory. 
+function @LdvCensus()@.  Because we need to know exactly which
+closures in the heap are live at census time, we always precede the
+census with a major garbage collection.
 
-During a census, we examine each closure one by one and compute the following
-three quantities:
+During a census, we examine each closure one by one and compute the
+following three quantities:
 
 \begin{enumerate}
 \item the total size of all \emph{inherently used} closures.
-\item the total size of all closures which have never been used.
+\item the total size of all closures which have not been used (yet).
 \item the total size of all closures which have been used at least once. 
 \end{enumerate}
 
-An inherently used closure is, by definition, one which is deemed to
-be in use even at the point of its birth. A closure which cannot be
-entered (e.g., @ARR_WORDS@) belongs to this category (otherwise
-such a closure would stay in the void phase all the time).
-In the current implementation, the following types of closures are 
-considered to be inherently used:
-@TSO@, @MVAR@, @MUT_ARR_PTRS@, @MUT_ARR_PTRS_FROZEN@, @ARR_WORDS@,
-@WEAK@, @MUT_VAR@, @MUT_CONS@, @FOREIGN@, @BCO@, and @STABLE_NAME@.
+For most closures, a \emph{use} consists of entering the closure.  For
+unlifted objects which are never entered (eg. @ARR_WORDS@), it would
+be difficult to determine their points of use because such points are
+scattered around the implementation in various primitive operations.
+For this reason we consider all unlifted objects as ``inherently
+used''.  The following types of closures are considered to be
+inherently used: @TSO@, @MVAR@, @MUT_ARR_PTRS@, @MUT_ARR_PTRS_FROZEN@,
+@ARR_WORDS@, @WEAK@, @MUT_VAR@, @MUT_CONS@, @FOREIGN@, @BCO@, and
+@STABLE_NAME@.
 
 The three quantities are stored in an @LdvGenInfo@ array @gi[]@.
-@gi[]@ is indexed by time. 
-For instance, @gi[ldvTime]@ stores the three quantaties for the current
-global time.
-The structure @LdvGenInfo@ is defined as follows:
+@gi[]@ is indexed by time period.  For instance, @gi[ldvTime]@ stores
+the three quantaties for the current global time period.  The
+structure @LdvGenInfo@ is defined as follows:
 
 \begin{code}
 typedef struct {
   ...
   int inherentlyUsed;   // total size of 'inherently used' closures
-  int notUsed;          // total size of 'never used' closures
+  int notUsed;          // total size of 'not used yet' closures
   int used;             // total size of 'used at least once' closures
   ...
 } LdvGenInfo;
@@ -322,104 +307,41 @@ The above three quantities account for mutually exclusive sets of closures.
 In other words, if a closure is not inherently used, it belongs to 
 either the second or the third.
 
-\subsection{Linear Scan of the Heap during Heap Censuses}
+\subsection{Taking a Census of the Live Heap}
 
-During a heap census, we need to visit every live closure once, and a linear
-scan of the heap is sufficient to our goal. 
-Since we assume that a major garbage collection cleans up the heap before
-any heap census, we can take advantage of the following facts to implement
-a linear scan for heap censuses:
+During a heap census, we need to visit every live closure once, so we
+perform a linear scan of the live heap after a major GC.  We can take
+advantage of the following facts to implement a linear scan for heap
+censuses:
 
 \begin{itemize}
 \item The nursery is empty. The small object pool and the large object pool, 
       however, may \emph{not} be empty. This is because the garbage collector
       invokes @scheduleFinalizer()@ after removing dead closures, and
       @scheduleFinalizer()@ may create new closures through @allocate()@.
-\item @IND@, @IND_OLDGEN@, and @EVACUATED@ closures do not appear in the heap.
+\item @IND@, @IND_OLDGEN@, and @EVACUATED@ closures do not appear in
+the live heap.
 \end{itemize}
 
-The implementation of the linear scan strategy is complicated by the
-following two facts. 
-First, either the small object pool (accessible from @small_alloc_list@) 
-or the large object pool (accessible from @g0s0->large_objects@) 
-may contain an initial evaluation stack, which is allocated via @allocate()@ in 
-@initModules()@ (in @RtsStartup.c@).
-The initial evaluation stack is heterogenous from any closure; it may not
-consist of consecutively allocated closures, which makes it
-hard to discern the initial evaluation stack among ordinary closures (unless
-we keep track of its position and size). 
-Second, a closure may not necessarily be adjacent to the next closure in the heap
-because there may appear \emph{slop words} between two closures.
-This happens when a closure is replaced by another closure with different 
-(smaller) size.
-
-We solve the first problem simply by postponing heap censuses until the first
-garbage collection, whether it is a major garbage collection or not.
-This simple idea works because the initial evaluation stack is removed from
-the heap during a garbage collection. The boolean variable @hasBeenAnyGC@
-is set to @rtsTrue@ the first time a garbage collection is performed, and
-hence @LdvCensus()@ returns immediately unless @hasBeenAnyGC@ has a @rtsTrue@
-value. 
-In practice, however, this premature return seldom happens: minor garbage 
-collections occur frequently enough that the first invocation of @LdvCensus()@ is
-preceded by a minor garbage collection in most cases.
-
-We solve the second problem by filling all possible slop words with zeroes.
-Then we can find the next closure after any give closure by skipping zeroes
-if any. First of all, we notice that slop words surviving a major garbage
-collection can be generated only in the following two cases:
-
-\begin{enumerate}
-\item A closure is overwritten with a blackhole. 
-\item A closure is overwritten with an indirection closure.
-%\item A weak pointer is overwritten with a dead weak pointer.
-\end{enumerate}
-
-In either case, an existing closure is destroyed after being replaced with a 
-new closure. 
-If the two closures are of the same size, no slop words are introduce and 
-we only need to invoke 
-@LDV_recordDead()@ on the existing closure, which cannot be an inherently used
-closure.
-If not, that is, the new closure is smaller than the existing closure 
-(the opposite cannot happen), we need to fill one or more slop words with zeroes
-as well as invoke @LDV_recordDead()@ on the existing closure.
-The macro @LDV_recordDead_FILL_SLOP_DYNAMIC()@ accomplishes these two tasks:
-it determines the size of the existing closure, invokes @LDV_recordDead()@, and
-fills the slop words with zeroes.
-After excluding all cases in which the two closures are of the same size,
-we invoke @LDV_recordDead_FILL_SLOP_DYNAMIC()@ only from:
-
-\begin{enumerate}
-\item @UPD_BH_UPDATABLE()@ and @UPD_BH_SINGLE_ENTRY()@ in @includes/StgMacros.h@, 
-@threadLazyBlackHole()@ and @threadSqueezeStack()@ in @GC.c@.
-\item @updateWithIndirection()@ and @updateWithPermIndirection()@ 
-in @Storage.h@.\footnote{Actually slop words created in 
-@updateWithIndirection()@ cannot survive major garbage collections.
-Still we invoke @LDV\_recordDead\_FILL\_SLOP\_DYNAMIC()@ to support linear
-scan of the heap during a garbage collection, which is discussed in the next
-section.}
-\end{enumerate}
-
-Notice that weak pointers being overwritten with dead weak pointers can be handled 
-properly without recourse to @LDV_recordDead_FILL_SLOP_DYNAMIC()@. The reason is 
-that dead weak pointers are of the same size as normal weak 
-pointers.\footnote{This is not the case without profiling. It was not the case 
-in the previous version of
-GHC, either. See the comments on @stg\_DEAD\_WEAK\_info@ in @StgMiscClosures.hc@.}
+There is one small complication when traversing the live heap: the
+garbage collector may have replaced @WEAK@ objects with @DEAD_WEAK@
+objects, which have a smaller size and hence leave some space before
+the next object.  To avoid this problem we change the size of
+@DEAD_WEAK@ objects to match that of @WEAK@ objects when profiling is
+enabled (see @StgMiscClosures.hc@).
 
 \section{Destruction of Closures}
 
-In order to compute the total size of closures for each of the four phases,
-we must report the destruction of every closure (except inherently used closures)
-to the LDVU profiler by invoking @LDV_recordDead()@.
-@LDV_recordDead()@ must not be called on any inherently used closure
-because any invocation of @LDV_recordDead()@ affects the
-statistics regarding void and drag phases, which no inherently used
-closure can be in.
+In order to compute the total size of closures for each of the four
+phases, we must report the destruction of every closure (except
+inherently used closures) to the LDVU profiler by invoking
+@LDV_recordDead()@.  @LDV_recordDead()@ must not be called on any
+inherently used closure because any invocation of @LDV_recordDead()@
+affects the statistics regarding void and drag phases, which no
+inherently used closure can be in.
 
-@LDV_recordDead()@ updates two fields @voidNew@ and @dragNew@ in the @LdvGenInfo@ 
-array @gi[]@:
+@LDV_recordDead()@ updates two fields @voidNew@ and @dragNew@ in the
+@LdvGenInfo@ array @gi[]@:
 
 \begin{code}
 typedef struct {
@@ -430,24 +352,23 @@ typedef struct {
 } LdvGenInfo;
 \end{code} 
 
-@gi[ldvTime].voidNew@ accumulates the size of all closures satisfying the following
-two conditions: 1) observed during the heap census at time @ldvTime@;
-2) now known to have been in the void phase at time @ldvTime@.
-It is updated when a closure which has never been used is destroyed.
-Suppose that a closure @c@ which has never been used is about to be destroyed.
-If its creation time is $t_c$, we judge that @c@ has been in the
-void phase all its lifetime, namely, from time $t_c$ to @ldvTime@.
-Since @c@ will not be observed during the next heap census, which corresponds
-to time @ldvTime@, @c@ contributes to the void phase of times $t_c$ through
-@ldvTime@ - 1.
-Therefore, we increase the @voidNew@ field of @gi[@$t_c$@]@ through @gi[ldvTime - 1]@
-by the size of @c@.\footnote{In the actual implementation, we update @gi[$t_c$]@ 
-and @gi[ldvTime]@ (not @gi[ldvTime@$ - $1@]@) only: @gi[$t_c$]@ and @gi[ldvTime]@ 
-are increased and decreased by the size of @c@, respectively. 
-After finishing the program execution, we can correctly adjust all the fields
-as follows:
-@gi[$t_c$]@ is computed as $\sum_{i=0}^{t_c}$@gi[$i$]@.
-}
+@gi[ldvTime].voidNew@ accumulates the size of all closures satisfying
+the following two conditions: 1) observed during the heap census at
+time @ldvTime@; 2) now known to have been in the void phase at time
+@ldvTime@.  It is updated when a closure which has never been used is
+destroyed.  Suppose that a closure @c@ which has never been used is
+about to be destroyed.  If its creation time is $t_c$, we judge that
+@c@ has been in the void phase all its lifetime, namely, from time
+$t_c$ to @ldvTime@.  Since @c@ will not be observed during the next
+heap census, which corresponds to time @ldvTime@, @c@ contributes to
+the void phase of times $t_c$ through @ldvTime@ - 1.  Therefore, we
+increase the @voidNew@ field of @gi[@$t_c$@]@ through @gi[ldvTime - 1]@
+ by the size of @c@.\footnote{In the actual implementation, we
+update @gi[$t_c$]@ and @gi[ldvTime]@ (not @gi[ldvTime@$ - $1@]@) only:
+@gi[$t_c$]@ and @gi[ldvTime]@ are increased and decreased by the size
+of @c@, respectively.  After finishing the program execution, we can
+correctly adjust all the fields as follows: @gi[$t_c$]@ is computed as
+$\sum_{i=0}^{t_c}$@gi[$i$]@.  }
 
 @gi[ldvTime].dragNew@ accumulates the size of all closures satisfying the following
 two conditions: 1) observed during the heap census at time @ldvTime@;
@@ -484,16 +405,13 @@ There are four cases in which a closure is destroyed:
   with an @IND_OLDGEN_PERM@ closure during scavenging.
   We call either @LDV_recordDead()@ or @LDV_recordDead_FILL_SLOP_DYNAMIC()@.
   
-\item Closures are removed permanently from the graph during garbage collections.
-We locate and dispose of all dead closures by 
-linearly scanning the from-space right before tidying up.
-This is feasible because any closures which is about to be removed from the graph
-still remains in the from-space until tidying up is completed.
-The next subsection explains how to implement this idea.
+\item Closures are removed permanently from the graph during garbage
+collections.  We locate and dispose of all dead closures by linearly
+scanning the from-space right before tidying up.  This is feasible
+because any closures which is about to be removed from the graph still
+remains in the from-space until tidying up is completed.  The next
+subsection explains how to implement this idea.
 \end{enumerate}
-
-\textbf{To do:} if okay, replace the invocation of @SET_HDR()@ with that of 
-@SET_INFO()@ and remove @LDV_recordCreate()@ in some of the above cases. 
 
 \subsection{Linear scan of the from-space during garbage collections}
 
@@ -502,12 +420,6 @@ In order to implement linear scan of the from-space during a garbage collection
 we need to take into consideration the following facts:
 
 \begin{itemize}
-\item The from-space includes the nursery. 
-Furthermore, a closure in the nursery may not necessarily be adjacent to the next 
-closure because slop words may lie between the two closures;
-the Haskell mutator may allocate more space than actually needed in the
-nursery when creating a closure, potentially leaving slop words. 
-
 \item The pointer @free@ of a block in the nursery may incorrectly point to
 a byte past its actual boundary.
 This happens because 
@@ -521,43 +433,87 @@ only during the Haskell mutator time.
 
 \item The from-space may well contain a good number of @EVACUATED@ closures,
 and they must be skipped over.
+
+\item The from-space includes the nursery. 
+Furthermore, a closure in the nursery may not necessarily be adjacent to the next 
+closure because slop words may lie between the two closures;
+the Haskell mutator may allocate more space than actually needed in the
+nursery when creating a closure, potentially leaving slop words. 
 \end{itemize}
 
-The first problem could be solved by always monitoring @Hp@ during the Haskell
-mutator time: whenever @Hp@ is increased, we fill with zeroes 
-as many words as the change of @HP@. Then, we could skip any trailing 
-zero words when linearly scanning the nursery.
+The first problem is easily solved by limiting the scan up to the
+actual block boundary for each nursery block (see
+@processNurseryForDead()@).  In other words, for a nursery block
+descriptor @bd@, whichever of @bd->start@$ + $@BLOCK_SIZE_W@ and
+@bd->free@ is smaller is used as the actual boundary.
+
+We solve the second problem by exploiting LDV words of @EVACUATED@
+closures: we store the size of an evacuated closure, which now resides
+in the to-space, in the LDV word of the new @EVACUATED@ closure
+occupying its memory.  This is easily implemented by inserting a call
+to the macro @SET_EVACUAEE_FOR_LDV()@ in @copy()@ and @copyPart()@ (in
+@GC.c@).  Thus, when we encounter an @EVACUATED@ closure while
+linearly scanning the nursery, we can skip a correct number of words
+by referring to its LDV word.
+
+The third problem could be partially solved by always monitoring @Hp@
+during the Haskell mutator time: whenever @Hp@ is increased, we fill
+with zeroes as many words as the change of @HP@. Then, we could skip
+any trailing zero words when linearly scanning the nursery.
 Alternatively we could initialize the entire nursery with zeroes after
-each garbage collection and not worry about any change made to @Hp@ during the
-Haskell mutator time. 
-The number of zero words to be written to the nursery could be reduced
-in the first approach, for we do not have to fill the header for a new closure.
-Nevertheless we choose to employ the second approach because
-it simplifies the implementation code significantly 
-(see @resetNurseries()@ in @Storage.c@). 
-Moreover, the second approach compensates for its redundant initialization cost
-by providing faster execution (due to a single memory write loop in contrast
-to frequent memory write loops in the first approach).
-Also, we attribute the initialization cost to the runtime system and thus 
-the Haskell mutator behavior is little affected. 
+each garbage collection and not worry about any change made to @Hp@
+during the Haskell mutator time.  The number of zero words to be
+written to the nursery could be reduced in the first approach, for we
+do not have to fill the header for a new closure.  Nevertheless we
+choose to employ the second approach because it simplifies the
+implementation code significantly (see @resetNurseries()@ in
+@Storage.c@).  Moreover, the second approach compensates for its
+redundant initialization cost by providing faster execution (due to a
+single memory write loop in contrast to frequent memory write loops in
+the first approach).  Also, we attribute the initialization cost to
+the runtime system and thus the Haskell mutator behavior is little
+affected.
 
-The second problem is easily solved by limiting the scan up to the actual
-block boundary for each nursery block (see @processNurseryForDead()@).
-In other words, for a nursery block descriptor @bd@, 
-whichever of @bd->start@$ + $@BLOCK_SIZE_W@ and @bd->free@ is smaller
-is used as the actual boundary. 
+There is further complication though: occasionally a closure is
+overwritten with a closure of a smaller size, leaving some slop
+between itself and the next closure in the heap.  There are two cases:
 
-We solve the third problem by exploiting LDV words of @EVACUATED@ closures:
-we store the size of an evacuated closure, which now resides in the to-space,
-in the LDV word of the new @EVACUATED@ closure occupying its memory.
-This is easily implemented by inserting a call to the macro
-@SET_EVACUAEE_FOR_LDV()@ in @copy()@ and @copyPart()@ (in @GC.c@).
-Thus, when we encounter an @EVACUATED@ closure while linearly scanning the
-nursery, we can skip a correct number of words by referring to its LDV word.
+\begin{enumerate}
+\item A closure is overwritten with a blackhole. 
+\item A closure is overwritten with an indirection closure.
+\end{enumerate}
 
-The linear scan of the from-space is initiated by the garbage collector.
-From the function @LdvCensusForDead()@, every dead closure in the from-space is
-visited through an invocation of @processHeapClosureForDead()@.
+In either case, an existing closure is destroyed after being replaced
+with a new closure.  If the two closures are of the same size, no slop
+words are introduced and we only need to invoke @LDV_recordDead()@ on
+the existing closure, which cannot be an inherently used closure.  If
+not, that is, the new closure is smaller than the existing closure
+(the opposite cannot happen), we need to fill one or more slop words
+with zeroes as well as invoke @LDV_recordDead()@ on the existing
+closure.  The macro @LDV_recordDead_FILL_SLOP_DYNAMIC()@ accomplishes
+these two tasks: it determines the size of the existing closure,
+invokes @LDV_recordDead()@, and fills the slop words with zeroes.
+After excluding all cases in which the two closures are of the same
+size, we invoke @LDV_recordDead_FILL_SLOP_DYNAMIC()@ only from:
+
+\begin{enumerate}
+\item @threadLazyBlackHole()@ and @threadSqueezeStack()@ in @GC.c@
+(for lazy blackholing),
+\item @UPD_BH_UPDATABLE()@ and @UPD_BH_SINGLE_ENTRY()@ in
+@includes/StgMacros.h@ (for eager blackholing, which isn't the
+default),
+\item @updateWithIndirection()@ and @updateWithPermIndirection()@ 
+in @Storage.h@.\footnote{Actually slop words created in 
+@updateWithIndirection()@ cannot survive major garbage collections.
+Still we invoke @LDV\_recordDead\_FILL\_SLOP\_DYNAMIC()@ to support linear
+scan of the heap during a garbage collection, which is discussed in the next
+section.}
+\end{enumerate}
+
+The linear scan of the from-space is initiated by the garbage
+collector.  From the function @LdvCensusForDead()@, every dead closure
+in the from-space is visited through an invocation of
+@processHeapClosureForDead()@.
 
 \subsection{Final scan of the heap}
 
@@ -579,17 +535,16 @@ and no assumptions made upon LDVU profiling hold any longer.
 
 \section{Time of Use}
 
-In order to yield correct LDVU profiling results, we must make sure that
-@LDV_recordUse()@ be called on a closure whenever it is used; otherwise,
-most of closures would be reported to be in the void phase.
-@includes/StgLdvProf.h@ provides nine entry macros (e.g., @LDV_ENT_THK()@).
-Each of the entry macros corresponds to a type of closures which can be entered.
-For instance, @LDV_ENT_THK()@ is supposed to be invoked whenever a thunk
-is used. In the current implementation, all these macros expand to 
-@LDV_recordUse()@ with no additional work.
-
-\textbf{To do:} modify the compiler so that it inserts the above macros
-at appropriate places in the generated C code.
+In order to yield correct LDVU profiling results, we must make sure
+that @LDV_recordUse()@ be called on a closure whenever it is used;
+otherwise, most of closures would be reported to be in the void phase.
+@includes/StgLdvProf.h@ provides an entry macro @LDV_ENTER@ which
+expands to @LDV_recordUse()@.  The compiler arranges to invoke
+@LDV_ENTER@ in the entry code for every dynamic closure it generates
+code for (constructors, thunks and functions).  We also have to add
+@LDV_ENTER@ calls to the closures statically compiled into the RTS:
+@PAP@s, @AP_UPD@s, standard thunk forms (in @StgStdThunks.hc@, and
+several others in @StgMiscClosures.hc@.
 
 \section{Computing Final Statistics}
 
@@ -658,6 +613,18 @@ execution of retainer profiling.
 
 \textbf{To do:} Currently the LDVU profiling is not supported with @-G1@ option.
 
+\textbf{To do:} When we perform LDVU profiling, the Haskell mutator time seems to
+be affected by @-S@ or @-s@ runtime option. For instance, the following 
+two options should result in nearly same profiling outputs, but
+the second run (without @-Sstderr@ option) spends almost twice as
+long in the Haskell mutator as the first run:
+1) @+RTS -Sstderr -hL -RTS@; 2) @+RTS -hL -RTS@.
+This is quite a subtle bug because this wierd phenomenon is not 
+observed in retainer profiling, yet the implementation of 
+@mut_user_time_during_LDV()@ is completely analogous to that of 
+@mut_user_time_during_RP()@. The overall shapes of the resultant graphs 
+are almost the same, though.
+
 \section{Files}
 
 This section gives a summary of changes made to the GHC in 
@@ -689,8 +656,9 @@ with LDVU profiling.
 \item[Profiling.c] changes @initProfilingLogFile@ and @report_ccs_profiling()@.
 \item[Proftimer.c] declares @ticks_to_retainer_ldv_profiling@,
   @performRetainerLdvProfiling@, and @doContextSwitch@.
-\item[Proftimer.h] is the header for @Proftimer.c@.
-\item[RtsAPI.c] implements @setProfileHeader()@.
+\item[Proftimer.h] is the header for @Proftimer.c@. Defines @PROFILING_MIN_PERIOD@,
+  which specifies the minimum profiling period and the default profiling period.
+%\item[RtsAPI.c] implements @setProfileHeader()@.
 \item[RtsFlags.c]
   sets @RtsFlags.ProfFlags.doHeapProfile@,
   adds a string to @usage_text[]@ in @setupRtsFlags()@.
