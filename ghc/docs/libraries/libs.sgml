@@ -9,7 +9,7 @@
 
 <title>The Hugs-GHC Extension Libraries
 <author>Alastair Reid <tt/reid-alastair@cs.yale.edu/
-<date>v0.6, 17 November 1997
+<date>v0.7, 21 November 1997
 <abstract>
 Hugs and GHC provide a common set of libraries to aid portability.
 This document specifies the interfaces to these libraries and documents
@@ -141,6 +141,29 @@ monitoring execution.
   semantics of your program.  Consider this a warning!
   -->
 
+<item>
+<tt/unsafePtrEq/ compares two values for pointer equality without
+evaluating them.  The results are not referentially transparent and
+may vary significantly from one compiler to another or in the face of
+semantics-preserving program changes.  However, pointer equality is useful
+in creating a number of referentially transparent constructs such as this
+simplified memoisation function:
+
+<tscreen><verb>
+> cache :: (a -> b) -> (a -> b)
+> cache f = \x -> unsafePerformIO (check x)
+>  where
+>   ref = unsafePerformIO (newIORef (error "cache", error "cache"))
+>   check x = readIORef ref >>= \ (x',a) ->
+>	       if x `unsafePtrEq` x' then
+>		 return a
+>	       else
+>		 let a = f x in
+>		 writeIORef ref (x, a) >>
+>		 return a
+</verb></tscreen>
+
+
 </itemize>
 
 <tscreen><verb>
@@ -165,8 +188,9 @@ writeIOArray        :: Ix ix => IOArray ix elt -> ix -> elt -> IO ()
 freezeIOArray       :: Ix ix => IOArray ix elt -> IO (Array ix elt)
 instance Eq (IOArray ix elt)
 
-trace               :: String -> a -> a
 performGC           :: IO ()
+trace               :: String -> a -> a
+unsafePtrEq         :: a -> a -> Bool
 </verb></tscreen>
 
 <!--
