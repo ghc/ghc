@@ -996,16 +996,17 @@ reportError bombOut str = do
     else
      return ()
 
-foreign label "ErrorHdrHook" 
+foreign import ccall "addrOf_ErrorHdrHook" unsafe
         addrOf_ErrorHdrHook :: Addr
 
 foreign import ccall "writeErrString__" unsafe
 	writeErrString :: Addr -> ByteArray Int -> Int -> IO ()
 
-foreign import ccall "stackOverflow"
+-- SUP: Are the hooks allowed to re-enter Haskell land? If yes, remove the unsafe below.
+foreign import ccall "stackOverflow" unsafe
 	callStackOverflowHook :: IO ()
 
-foreign import ccall "stg_exit"
+foreign import ccall "stg_exit" unsafe
 	stg_exit :: Int -> IO ()
 \end{code}
 
@@ -1269,7 +1270,7 @@ foreign import "libHS_cbits" "openFile" unsafe
 foreign import "libHS_cbits" "const_BUFSIZ" unsafe
            const_BUFSIZ          :: Int
 
-foreign import "libHS_cbits" "setBinaryMode__" 
+foreign import "libHS_cbits" "setBinaryMode__" unsafe
 	   setBinaryMode :: FILE_OBJECT -> Int -> IO Int
 \end{code}
 

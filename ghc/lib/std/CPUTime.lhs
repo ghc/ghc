@@ -59,7 +59,7 @@ cpuTimePrecision = round ((1000000000000::Integer) %
                           fromInt (unsafePerformIO clockTicks))
 
 foreign import "libHS_cbits" "getCPUTime" unsafe primGetCPUTime :: ByteArray Int -> IO Int
-foreign import "libHS_cbits" "clockTicks" clockTicks :: IO Int
+foreign import "libHS_cbits" "clockTicks" unsafe clockTicks :: IO Int
 
 \end{code}
 

@@ -79,9 +79,9 @@ connectWorlds hrealworld
 --                          StgAddr      typestr,
 --                          StgChar      callconv )
 
-foreign import "createAdjThunk" hugsCreateAdjThunk 
+foreign import "createAdjThunk" unsafe hugsCreateAdjThunk 
         :: StablePtr (a -> b) -> Addr{-mallocville String-} -> Char -> IO Addr
-foreign import "malloc" malloc 
+foreign import "malloc" unsafe malloc 
         :: Int -> IO Addr
 hugsprimCreateAdjThunk :: (a -> b) -> String -> Char -> IO Addr
 hugsprimCreateAdjThunk fun typestr callconv

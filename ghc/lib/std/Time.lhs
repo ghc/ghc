@@ -589,10 +589,10 @@ foreign import "libHS_cbits" "get_tm_wday"  unsafe get_tm_wday  :: MBytes -> IO 
 foreign import "libHS_cbits" "get_tm_yday"  unsafe get_tm_yday  :: MBytes -> IO Int
 foreign import "libHS_cbits" "get_tm_isdst" unsafe get_tm_isdst :: MBytes -> IO Int
 	       		   
-foreign import "libHS_cbits" "prim_ZONE"    prim_ZONE    :: Bytes -> IO Addr
-foreign import "libHS_cbits" "prim_GMTOFF"  prim_GMTOFF  :: Bytes -> IO Int
+foreign import "libHS_cbits" "prim_ZONE"    unsafe prim_ZONE    :: Bytes -> IO Addr
+foreign import "libHS_cbits" "prim_GMTOFF"  unsafe prim_GMTOFF  :: Bytes -> IO Int
 	       		   
-foreign import "libHS_cbits" "sizeof_struct_tm" sizeof_struct_tm :: Int
+foreign import "libHS_cbits" "sizeof_struct_tm" unsafe sizeof_struct_tm :: Int
 
 #ifdef __HUGS__
 -- believed to be at least 1 bit (the sign bit!) bigger than sizeof_time_t
@@ -602,7 +602,7 @@ sizeof_int64 = 8
 
 type MBytes = MutableByteArray RealWorld Int
 
-foreign import "libHS_cbits" "sizeof_time_t"    sizeof_time_t    :: Int
+foreign import "libHS_cbits" "sizeof_time_t" unsafe sizeof_time_t    :: Int
 
 foreign import "libHS_cbits" "prim_SETZONE" unsafe prim_SETZONE :: MBytes -> MBytes -> IO ()
 #ifdef __HUGS__

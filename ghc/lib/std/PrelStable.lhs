@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelStable.lhs,v 1.5 2000/04/14 15:28:24 rrt Exp $
+% $Id: PrelStable.lhs,v 1.6 2000/05/01 14:53:47 panne Exp $
 %
 % (c) The GHC Team, 1992-1999
 %
@@ -27,7 +27,7 @@ instance CReturnable (StablePtr a)
 
 makeStablePtr  :: a -> IO (StablePtr a)
 deRefStablePtr :: StablePtr a -> IO a
-foreign import "freeStablePtr" freeStablePtr :: StablePtr a -> IO ()
+foreign import "freeStablePtr" unsafe freeStablePtr :: StablePtr a -> IO ()
 
 makeStablePtr a = IO $ \ s ->
     case makeStablePtr# a s of (# s', sp #) -> (# s', StablePtr sp #)
