@@ -443,7 +443,7 @@ data ImportAvails
 		-- combine stuff coming from different (unqualified) 
 		-- imports of the same module
 
-	imp_mods :: ModuleEnv (Module, Maybe Bool),
+	imp_mods :: ModuleEnv (Module, Maybe Bool, SrcSpan),
 		-- Domain is all directly-imported modules
 		-- Maybe value answers the question "is the import restricted?"
 		--   Nothing    => unrestricted import (e.g., "import Foo")

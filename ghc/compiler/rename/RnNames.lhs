@@ -50,7 +50,7 @@ import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace,
 import Outputable
 import Maybes		( isJust, isNothing, catMaybes, mapCatMaybes, seqMaybe )
 import SrcLoc		( noSrcLoc, Located(..), mkGeneralSrcSpan,
-			  unLoc, noLoc, srcLocSpan )
+			  unLoc, noLoc, srcLocSpan, SrcSpan )
 import BasicTypes	( DeprecTxt )
 import ListSetOps	( removeDups )
 import Util		( sortLt, notNull, isSingleton )
@@ -228,7 +228,7 @@ importsFromImportDecl this_mod
 	imports   = ImportAvails { 
 			imp_qual     = unitModuleEnvByName qual_mod_name avail_env,
 			imp_env      = avail_env,
-			imp_mods     = unitModuleEnv imp_mod (imp_mod, import_all),
+			imp_mods     = unitModuleEnv imp_mod (imp_mod, import_all, loc),
 			imp_orphs    = orphans,
 			imp_dep_mods = mkModDeps dependent_mods,
 			imp_dep_pkgs = dependent_pkgs }
@@ -852,8 +852,7 @@ reportUnusedNames gbl_env
 	-- We've carefully preserved the provenance so that we can
 	-- construct minimal imports that import the name by (one of)
 	-- the same route(s) as the programmer originally did.
-    add_name (GRE {gre_name = n, 
-		   gre_prov = Imported imp_specs _}) acc 
+    add_name (GRE {gre_name = n, gre_prov = Imported imp_specs _}) acc 
 	= addToFM_C plusAvailEnv acc (is_mod (head imp_specs))
 		    (unitAvailEnv (mk_avail n (nameParent_maybe n)))
     add_name other acc 
@@ -864,38 +863,35 @@ reportUnusedNames gbl_env
     mk_avail n Nothing | isTcOcc (nameOccName n) = AvailTC n [n]
 		       | otherwise		 = Avail n
     
-    add_inst_mod m acc 
-      | m `elemFM` acc = acc	-- We import something already
-      | otherwise      = addToFM acc m emptyAvailEnv
+    add_inst_mod (mod,_,_) acc 
+      | mod_name `elemFM` acc = acc	-- We import something already
+      | otherwise             = addToFM acc mod_name emptyAvailEnv
+      where
+	mod_name = moduleName mod
     	-- Add an empty collection of imports for a module
     	-- from which we have sucked only instance decls
    
     imports = tcg_imports gbl_env
 
-    direct_import_mods :: [ModuleName]
-    direct_import_mods = map (moduleName . fst) 
-			     (moduleEnvElts (imp_mods imports))
-
-    hasEmptyImpList :: ModuleName -> Bool
-    hasEmptyImpList m = 
-       case lookupModuleEnvByName (imp_mods imports) m of
-	 Just (_,Just x) -> not x
-	 _ -> False
+    direct_import_mods :: [(Module, Maybe Bool, SrcSpan)]
+	-- See the type of the imp_mods for this triple
+    direct_import_mods = moduleEnvElts (imp_mods imports)
 
     -- unused_imp_mods are the directly-imported modules 
     -- that are not mentioned in minimal_imports1
     -- [Note: not 'minimal_imports', because that includes directly-imported
     --	      modules even if we use nothing from them; see notes above]
-    unused_imp_mods = [m | m <- direct_import_mods,
-    		       isNothing (lookupFM minimal_imports1 m),
-    		       m /= pRELUDE_Name,
-		       not (hasEmptyImpList m)]
-	-- hasEmptyImpList arranges not to complain about
+    unused_imp_mods = [(mod_name,loc) | (mod,imp,loc) <- direct_import_mods,
+		       let mod_name = moduleName mod,
+    		       not (mod_name `elemFM` minimal_imports1),
+    		       mod_name /= pRELUDE_Name,
+		       imp /= Just False]
+	-- The Just False part is not to complain about
 	-- import M (), which is an idiom for importing
 	-- instance declarations
     
     module_unused :: ModuleName -> Bool
-    module_unused mod = mod `elem` unused_imp_mods
+    module_unused mod = any (((==) mod) . fst) unused_imp_mods
 
 ---------------------
 warnDuplicateImports :: [GlobalRdrElt] -> RnM ()

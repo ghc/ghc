@@ -112,7 +112,7 @@ deSugar hsc_env
 		mg_exports  = exports,
 		mg_deps	    = deps,
 		mg_usages   = usages,
-		mg_dir_imps = [m | (m,_) <- moduleEnvElts (imp_mods imports)],
+		mg_dir_imps = [m | (m,_,_) <- moduleEnvElts (imp_mods imports)],
 	        mg_rdr_env  = rdr_env,
 		mg_fix_env  = fix_env,
 		mg_deprecs  = deprecs,

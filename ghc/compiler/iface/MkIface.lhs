@@ -702,8 +702,8 @@ mk_usage_info pit hpt dir_imp_mods dep_mods proto_used_names
 	-- ToDo: do we need to sort into canonical order?
 
     import_all mod = case lookupModuleEnv dir_imp_mods mod of
-    			Just (_,imp_all) -> isNothing imp_all
-    			Nothing		 -> False
+    			Just (_,imp_all,_) -> isNothing imp_all
+    			Nothing		   -> False
     
     -- We want to create a Usage for a home module if 
     --	a) we used something from; has something in used_names

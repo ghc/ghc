@@ -54,7 +54,7 @@ import Module		( Module, ModuleName, moduleName, mkHomeModule )
 import PrelNames	( mkUnboundName, rOOT_MAIN_Name, iNTERACTIVE )
 import UniqSupply
 import BasicTypes	( IPName, mapIPName )
-import SrcLoc		( srcSpanStart, Located(..), eqLocated, unLoc,
+import SrcLoc		( SrcSpan, srcSpanStart, Located(..), eqLocated, unLoc,
 			  srcLocSpan )
 import Outputable
 import ListSetOps	( removeDups )
@@ -658,12 +658,13 @@ mapFvRn f xs = mappM f xs	`thenM` \ stuff ->
 %************************************************************************
 
 \begin{code}
-warnUnusedModules :: [ModuleName] -> RnM ()
+warnUnusedModules :: [(ModuleName,SrcSpan)] -> RnM ()
 warnUnusedModules mods
-  = ifOptM Opt_WarnUnusedImports (mappM_ (addWarn . unused_mod) mods)
+  = ifOptM Opt_WarnUnusedImports (mappM_ bleat mods)
   where
-    unused_mod m = vcat [ptext SLIT("Module") <+> quotes (ppr m) <+> 
-			   text "is imported, but nothing from it is used",
+    bleat (mod,loc) = addSrcSpan loc $ addWarn (mk_warn mod)
+    mk_warn m = vcat [ptext SLIT("Module") <+> quotes (ppr m) <+> 
+			 text "is imported, but nothing from it is used",
 			 parens (ptext SLIT("except perhaps instances visible in") <+>
 				   quotes (ppr m))]
 
