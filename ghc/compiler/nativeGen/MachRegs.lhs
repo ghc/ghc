@@ -62,7 +62,6 @@ module MachRegs (
 #if __GLASGOW_HASKELL__ >= 202
 import GlaExts hiding (Addr)
 import FastString
-import Ubiq
 #else
 IMP_Ubiq(){-uitous-}
 #endif

@@ -3,14 +3,14 @@ _exports_
 CostCentre CostCentre noCostCentre useCurrentCostCentre overheadCostCentre dontCareCostCentre subsumedCosts preludeCafsCostCentre mkAllCafsCC preludeDictsCostCentre mkAllDictsCC cafifyCC mkUserCC;
 _declarations_
 1 data CostCentre;
-1 noCostCentre _:_ CostCentre ;;
-1 useCurrentCostCentre _:_ CostCentre ;;
-1 overheadCostCentre _:_ CostCentre ;;
-1 dontCareCostCentre _:_ CostCentre ;;
-1 subsumedCosts _:_ CostCentre ;;
-1 preludeCafsCostCentre _:_ CostCentre ;;
-1 mkAllCafsCC _:_ FastString.FastString -> FastString.FastString -> CostCentre ;;;;
-1 preludeDictsCostCentre _:_ PrelBase.Bool -> CostCentre ;;
-1 mkAllDictsCC _:_ FastString.FastString -> FastString.FastString -> PrelBase.Bool -> CostCentre ;;
-1 cafifyCC _:_ CostCentre -> CostCentre ;;
-1 mkUserCC _:_ FastString.FastString -> FastString.FastString -> FastString.FastString -> CostCentre ;;
+1 noCostCentre _:_ CostCentre.CostCentre ;;
+1 useCurrentCostCentre _:_ CostCentre.CostCentre ;;
+1 overheadCostCentre _:_ CostCentre.CostCentre ;;
+1 dontCareCostCentre _:_ CostCentre.CostCentre ;;
+1 subsumedCosts _:_ CostCentre.CostCentre ;;
+1 preludeCafsCostCentre _:_ CostCentre.CostCentre ;;
+1 mkAllCafsCC _:_ FastString.FastString -> FastString.FastString -> CostCentre.CostCentre ;;
+1 preludeDictsCostCentre _:_ PrelBase.Bool -> CostCentre.CostCentre ;;
+1 mkAllDictsCC _:_ FastString.FastString -> FastString.FastString -> PrelBase.Bool -> CostCentre.CostCentre ;;
+1 cafifyCC _:_ CostCentre.CostCentre -> CostCentre.CostCentre ;;
+1 mkUserCC _:_ FastString.FastString -> FastString.FastString -> FastString.FastString -> CostCentre.CostCentre ;;

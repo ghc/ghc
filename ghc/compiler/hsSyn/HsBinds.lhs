@@ -17,9 +17,6 @@ IMP_Ubiq()
 IMPORT_DELOOPER(HsLoop)	( pprMatches, pprGRHSsAndBinds,
 			  Match, GRHSsAndBinds,
 			  pprExpr, HsExpr )
-#else
-import {-# SOURCE #-} HsMatches ( pprMatches, Match, pprGRHSsAndBinds, GRHSsAndBinds )
-import {-# SOURCE #-} HsExpr    ( pprExpr, HsExpr )
 #endif
 
 import HsPragmas	( GenPragmas, ClassOpPragmas )
@@ -39,6 +36,12 @@ import Bag
 import SrcLoc		( SrcLoc{-instances-} )
 import TyVar		( GenTyVar{-instances-} )
 import Unique		( Unique {- instance Eq -} )
+
+#if __GLASGOW_HASKELL__ >= 202
+import {-# SOURCE #-} HsExpr    ( pprExpr, HsExpr )
+import {-# SOURCE #-} HsMatches ( pprMatches, Match, pprGRHSsAndBinds, GRHSsAndBinds )
+#endif
+
 \end{code}
 
 %************************************************************************

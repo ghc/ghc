@@ -55,7 +55,6 @@ module RegAllocInfo (
 import qualified GlaExts (Addr(..))
 import GlaExts hiding (Addr(..))
 import FastString
-import Ubiq
 #else
 IMP_Ubiq(){-uitous-}
 import Pretty ( Doc )

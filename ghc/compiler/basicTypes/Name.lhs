@@ -75,7 +75,7 @@ import Usage            ( SYN_IE(UVar), SYN_IE(Usage) )
 import Unique		( pprUnique, showUnique, Unique )
 import UniqSet		( UniqSet(..), emptyUniqSet, unitUniqSet, unionUniqSets, uniqSetToList, isEmptyUniqSet,
 		 	  unionManyUniqSets, minusUniqSet, mkUniqSet, elementOfUniqSet, addListToUniqSet, addOneToUniqSet )
-import UniqFM		( UniqFM, SYN_IE(Uniquable) )
+import UniqFM		( UniqFM, Uniquable(..) )
 import Util		--( cmpPString, panic, assertPanic {-, pprTrace ToDo:rm-} )
 
 \end{code}

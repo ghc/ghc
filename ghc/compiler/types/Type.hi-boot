@@ -7,5 +7,5 @@ Type Type GenType splitFunTy splitSigmaTy;
 _declarations_
 1 type Type = Type.GenType TyVar.TyVar Usage.UVar ;
 1 data GenType a b;
-1 splitFunTy _:_ _forall_ [a b] => Type.GenType a b -> ([GenType a b], Type.GenType a b) ;;
+1 splitFunTy _:_ _forall_ [a b] => Type.GenType a b -> ([Type.GenType a b], Type.GenType a b) ;;
 1 splitSigmaTy _:_ _forall_ [a b] => Type.GenType a b -> ([a],[(Class.Class,Type.GenType a b)], Type.GenType a b) ;;

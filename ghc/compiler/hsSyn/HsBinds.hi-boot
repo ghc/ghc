@@ -5,4 +5,3 @@ _instances_
 _declarations_
 1 data HsBinds a b c d ;
 1 nullBinds _:_ _forall_ [a b c d] => HsBinds.HsBinds a b c d -> PrelBase.Bool ;;
-

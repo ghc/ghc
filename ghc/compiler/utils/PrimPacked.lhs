@@ -42,6 +42,9 @@ import GHC
 import ArrBase
 import ST
 import STBase
+#if __GLASGOW_HASKELL__ == 202
+import PrelBase ( Char(..) )
+#endif
 #endif
 
 \end{code} 

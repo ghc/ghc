@@ -44,6 +44,8 @@ module FastString
 #if __GLASGOW_HASKELL__ <= 201
 import PreludeGlaST
 import PreludeGlaMisc
+import HandleHack
+import Ubiq
 #else
 import GlaExts
 import Foreign
@@ -51,11 +53,14 @@ import IOBase
 import IOHandle
 import ST
 import STBase
+import {-# SOURCE #-} Unique  ( mkUniqueGrimily, Unique )
+import {-# SOURCE #-} UniqFM  ( Uniquable(..) )
+#if __GLASGOW_HASKELL__ == 202
+import PrelBase ( Char (..) )
 #endif
-import HandleHack
+#endif
 
 import PrimPacked
-import Ubiq
 
 #define hASH_TBL_SIZE 993
 

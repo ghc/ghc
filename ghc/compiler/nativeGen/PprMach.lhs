@@ -21,7 +21,6 @@ IMP_Ubiq(){-uitious-}
 import qualified GlaExts (Addr(..))
 import GlaExts hiding (Addr(..))
 import FastString
-import Ubiq
 #else
 IMP_Ubiq(){-uitious-}
 #endif

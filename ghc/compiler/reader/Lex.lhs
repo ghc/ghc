@@ -20,12 +20,15 @@ module Lex (
 
 
 IMPORT_1_3(Char(isDigit, isAlpha, isAlphanum, isUpper,isLower, isSpace, ord))
-IMPORT_DELOOPER(Ubiq)
 
 #if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
+IMPORT_DELOOPER(Ubiq)
 IMPORT_DELOOPER(IdLoop)    -- get the CostCentre type&constructors from here
 #else
 import {-# SOURCE #-} CostCentre
+# if __GLASGOW_HASKELL__ == 202
+import PrelBase ( Char(..) )
+# endif
 #endif
 
 import CmdLineOpts	( opt_IgnoreIfacePragmas )

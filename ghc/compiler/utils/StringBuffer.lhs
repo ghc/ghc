@@ -59,10 +59,11 @@ module StringBuffer
 	_ByteArray
        ) where
 
-import Ubiq
 #if __GLASGOW_HASKELL__ <= 200
 import PreludeGlaST
 import PreludeGlaMisc
+import HandleHack
+import Ubiq
 #else
 import GlaExts
 import Foreign
@@ -71,10 +72,12 @@ import IOHandle
 import ST
 import STBase
 import Char (isDigit)
+# if __GLASGOW_HASKELL__ == 202
+import PrelBase ( Char(..) )
+# endif
 #endif
 import PrimPacked
 import FastString
-import HandleHack
 
 \end{code} 
 

@@ -33,6 +33,9 @@ import PreludeGlaST
 #elif __GLASGOW_HASKELL__ >= 202
 import GlaExts
 import STBase
+# if __GLASGOW_HASKELL__ == 202
+import PrelBase ( Char(..) )
+# endif
 # define WHASH      GlaExts.W#
 #else
 import PreludeGlaST

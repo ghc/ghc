@@ -229,6 +229,9 @@ import PreludeGlaST
 #else
 import GlaExts
 import ST
+#if __GLASGOW_HASKELL__ == 202
+import PrelBase ( Char(..) )
+#endif
 #endif
 
 IMP_Ubiq(){-uitous-}
