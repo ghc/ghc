@@ -158,7 +158,7 @@ checkSimple t _ = parseError "Illegal left hand side in data/newtype declaration
 
 checkDo []	       = parseError "Empty 'do' construct"
 checkDo [ExprStmt e l] = returnP [ResultStmt e l]
-checkDo [s] 	       = parseError "The last statment in a 'do' construct must be an expression"
+checkDo [s] 	       = parseError "The last statement in a 'do' construct must be an expression"
 checkDo (s:ss)	       = checkDo ss	`thenP` \ ss' ->
 			 returnP (s:ss')
 
