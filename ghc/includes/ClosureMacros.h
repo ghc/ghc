@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.6 1999/03/03 18:16:15 sof Exp $
+ * $Id: ClosureMacros.h,v 1.7 1999/03/03 19:27:23 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -107,7 +107,9 @@ extern StgFun DATA_SECTION_END_MARKER_DECL;
 
 #ifdef HAVE_WIN32_DLL_SUPPORT
 extern int is_heap_alloced(const void* x);
-#define HEAP_ALLOCED(x)  (is_heap_alloced(x))
+# define HEAP_ALLOCED(x)  (is_heap_alloced(x))
+#else
+# define HEAP_ALLOCED(x)  IS_USER_PTR(x)
 #endif
 
 /* When working with Win32 DLLs, static closures are identified by
