@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.30 2003/09/25 15:14:44 panne Exp $
+ * $Id: HsBase.h,v 1.31 2003/10/13 03:19:48 sof Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -195,9 +195,14 @@ StgWord64 stg_integerToWord64 (StgInt sa, StgByteArray /* Really: mp_limb_t* */ 
    -------------------------------------------------------------------------- */
 
 #ifndef INLINE
-#define INLINE extern inline
+# if defined(_MSC_VER)
+#  define INLINE extern __inline
+# else
+#  define INLINE extern inline
+# endif
 #endif
 
+#if !defined(_MSC_VER) && !defined(__MINGW__)
 INLINE int __hscore_s_isreg(m)  { return S_ISREG(m);  }
 INLINE int __hscore_s_isdir(m)  { return S_ISDIR(m);  }
 INLINE int __hscore_s_isfifo(m) { return S_ISFIFO(m); }
@@ -206,8 +211,9 @@ INLINE int __hscore_s_ischr(m)  { return S_ISCHR(m);  }
 #ifdef S_ISSOCK
 INLINE int __hscore_s_issock(m) { return S_ISSOCK(m); }
 #endif
+#endif
 
-#ifndef mingw32_TARGET_OS
+#if !defined(mingw32_TARGET_OS) && !defined(_MSC_VER) && !defined(__MINGW__)
 INLINE int
 __hscore_sigemptyset( sigset_t *set )
 { return sigemptyset(set); }
@@ -262,7 +268,11 @@ __hscore_seek_cur()
 INLINE HsInt
 __hscore_o_binary()
 {
+#if defined(_MSC_VER)
+  return O_BINARY;
+#else
   return CONST_O_BINARY;
+#endif
 }
 
 INLINE int
@@ -440,14 +450,27 @@ INLINE HsInt __hscore_long_path_size() { return PATH_MAX; }
 INLINE HsInt __hscore_long_path_size() { return 4096; }
 #endif
 
+#ifdef R_OK
 INLINE mode_t __hscore_R_OK() { return R_OK; }
+#endif
+#ifdef W_OK
 INLINE mode_t __hscore_W_OK() { return W_OK; }
+#endif
+#ifdef X_OK
 INLINE mode_t __hscore_X_OK() { return X_OK; }
+#endif
 
+#ifdef S_IRUSR
 INLINE mode_t __hscore_S_IRUSR() { return S_IRUSR; }
+#endif
+#ifdef S_IWUSR
 INLINE mode_t __hscore_S_IWUSR() { return S_IWUSR; }
+#endif
+#ifdef S_IXUSR
 INLINE mode_t __hscore_S_IXUSR() { return S_IXUSR; }
+#endif
 
+#if !defined(_MSC_VER) && !defined(__MINGW__)
 INLINE HsAddr
 __hscore_d_name( struct dirent* d )
 { 
@@ -457,6 +480,7 @@ __hscore_d_name( struct dirent* d )
   return (HsAddr)(d->d_name);
 #endif
 }
+#endif
 
 INLINE HsInt
 __hscore_end_of_dir( void )
@@ -484,7 +508,9 @@ __hscore_sizeof_stat( void )
 
 INLINE time_t __hscore_st_mtime ( struct stat* st ) { return st->st_mtime; }
 INLINE off_t  __hscore_st_size  ( struct stat* st ) { return st->st_size; }
+#if !defined(_MSC_VER) && !defined(__MINGW__)
 INLINE mode_t __hscore_st_mode  ( struct stat* st ) { return st->st_mode; }
+#endif
 
 #if HAVE_TERMIOS_H
 INLINE tcflag_t __hscore_lflag( struct termios* ts ) { return ts->c_lflag; }
@@ -495,7 +521,6 @@ __hscore_poke_lflag( struct termios* ts, tcflag_t t ) { ts->c_lflag = t; }
 INLINE unsigned char*
 __hscore_ptr_c_cc( struct termios* ts ) 
 { return (unsigned char*) &ts->c_cc; }
-#endif
 
 INLINE HsInt
 __hscore_sizeof_termios( void )
@@ -506,7 +531,9 @@ __hscore_sizeof_termios( void )
   return 0;
 #endif
 }
+#endif
 
+#if !defined(_MSC_VER) && !defined(__MINGW__)
 INLINE HsInt
 __hscore_sizeof_sigset_t( void )
 {
@@ -516,6 +543,7 @@ __hscore_sizeof_sigset_t( void )
   return 0;
 #endif
 }
+#endif
 
 INLINE int
 __hscore_echo( void )
@@ -620,7 +648,7 @@ extern void __hscore_set_saved_termios(int fd, void* ts);
 
 INLINE int __hscore_hs_fileno (FILE *f) { return fileno (f); }
 
-#ifndef mingw32_TARGET_OS
+#if !defined(mingw32_TARGET_OS) && !defined(_MSC_VER) && !defined(__MINGW32__)
 INLINE int __hsposix_SIGABRT()   { return SIGABRT; }
 INLINE int __hsposix_SIGALRM()   { return SIGALRM; }
 INLINE int __hsposix_SIGBUS()    { return SIGBUS; }
