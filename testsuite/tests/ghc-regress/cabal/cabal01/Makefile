@@ -23,7 +23,7 @@ cabal01: setup
 
 	./setup configure --prefix=`pwd`/install --with-compiler=$(TEST_HC) --with-hc-pkg=$(GHC_PKG)
 	./setup build
-	./setup install --install-prefix=`pwd`/install-tmp
+	./setup copy --copy-prefix=`pwd`/install-tmp
 	ls install-tmp
 #	install w/ register!
 	./setup install --user
