@@ -238,7 +238,7 @@ GhcLibWays=p
 # 	-O is pretty desirable, otherwise no inlining of prelude
 #		things (incl "+") happens when compiling with this compiler
 
-GhcLibHcOpts= -O -split-objs -odir $(basename $*)
+GhcLibHcOpts= -O -split-objs -odir $*
 
 
 #################################################################################
