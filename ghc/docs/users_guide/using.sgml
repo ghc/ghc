@@ -1064,8 +1064,7 @@ It is worth noting that on Windows, because each package is built as a DLL, and 
 </Para>
 
 <Para>
-It is reasonably straightforward to set up a <Filename>Makefile</Filename> to use with
-GHC, assuming you name your source files the same as your modules.
+It is reasonably straightforward to set up a <Filename>Makefile</Filename> to use with GHC, assuming you name your source files the same as your modules.
 Thus:
 </Para>
 
@@ -1078,7 +1077,7 @@ HC_OPTS = -cpp $(EXTRA_HC_OPTS)
 SRCS = Main.lhs Foo.lhs Bar.lhs
 OBJS = Main.o   Foo.o   Bar.o
 
-.SUFFIXES : .o .hi .lhs .hc .s
+.SUFFIXES : .o .hs .hi .lhs .hc .s
 
 cool_pgm : $(OBJS)
         rm $@
