@@ -364,6 +364,14 @@ A.o : B.hi-boot
         <filename>makefile</filename>, then the old dependencies are
         deleted first.</para>
 
+	<para>Don't forget to use the same <option>-package</option>
+	options on the <literal>ghc -M</literal> command line as you
+	would when compiling; this enables the dependency generator to
+	locate any imported modules that come from packages.  The
+	package modules won't be included in the dependencies
+	generated, though (but see the
+	<option>--include-prelude</option> option below).</para>
+
 	<para>The dependency generation phase of GHC can take some
         additional options, which you may find useful.  For historical
         reasons, each option passed to the dependency generator from
@@ -474,13 +482,11 @@ ghc -M -optdep-f -optdep.depend ...
 	  <varlistentry>
 	    <term><option>--include-prelude</option></term>
 	    <listitem>
-	      <para>Regard prelude libraries as unstable, i.e.,
-              generate dependencies on the prelude modules used
-              (including <literal>Prelude</literal>).  This option is
-              normally only used by the various system libraries. If a
-              <option>-package</option> option is used, dependencies
-              will also be generated on the library's
-              interfaces.</para>
+	      <para>Regard modules imported from packages as unstable,
+              i.e., generate dependencies on the package modules used
+              (including <literal>Prelude</literal>, and all other
+              standard Haskell libraries).  This option is normally
+              only used by the various system libraries.</para>
 	    </listitem>
 	  </varlistentry>
 	</variablelist>
