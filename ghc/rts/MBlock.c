@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.25 2001/12/10 01:28:00 sebc Exp $
+ * $Id: MBlock.c,v 1.26 2002/01/08 16:38:27 sof Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -101,22 +101,25 @@ getMBlocks(nat n)
  On Win32 platforms we make use of the two-phased virtual memory API
  to allocate mega blocks. We proceed as follows:
 
- Reserve a large chunk of VM (128M at the time), but don't supply a 
- base address that's aligned on a MB boundary. Instead we round up to the
- nearest from the chunk of VM we're given back from the OS (at the
- moment we just leave the 'slop' at the beginning of the reserved
- chunk unused - ToDo: reuse it .)
+ Reserve a large chunk of VM (256M at the time, or what the user asked
+ for via the -M option), but don't supply a base address that's aligned on
+ a MB boundary. Instead we round up to the nearest mblock from the chunk of
+ VM we're handed back from the OS (at the moment we just leave the 'slop' at
+ the beginning of the reserved chunk unused - ToDo: reuse it .)
 
  Reserving memory doesn't allocate physical storage (not even in the
- page file), this is done by committing pages (or mega-blocks in
+ page file), this is done later on by committing pages (or mega-blocks in
  our case).
-
 */
 
 char* base_non_committed = (char*)0;
+char* end_non_committed = (char*)0;
 
-/* Reserve VM 256M at the time to try to minimise the slop cost. */
+/* Default is to reserve 256M of VM to minimise the slop cost. */
 #define SIZE_RESERVED_POOL  ( 256 * 1024 * 1024 )
+
+/* Number of bytes reserved */
+static unsigned long size_reserved_pool = SIZE_RESERVED_POOL;
 
 /* This predicate should be inlined, really. */
 /* TODO: this only works for a single chunk */
@@ -124,7 +127,7 @@ int
 is_heap_alloced(const void* x)
 {
   return (((char*)(x) >= base_non_committed) && 
-          ((char*)(x) <= (base_non_committed + SIZE_RESERVED_POOL)));
+          ((char*)(x) <= end_non_committed));
 }
 
 void *
@@ -135,13 +138,19 @@ getMBlocks(nat n)
   void* ret                       = (void*)0;
 
   lnat size = MBLOCK_SIZE * n;
-
-  if ( (base_non_committed == 0) || 
-       (next_request + size > base_non_committed + SIZE_RESERVED_POOL) ) {
-    if (base_non_committed)
-        barf("Windows programs can only use 256Mb of heap; sorry!");
+  
+  if ( (base_non_committed == 0) || (next_request + size > end_non_committed) ) {
+    if (base_non_committed) {
+      barf("RTS exhausted max heap size (%d bytes)\n", size_reserved_pool);
+    }
+    if (RtsFlags.GcFlags.maxHeapSize != 0) {
+      size_reserved_pool = BLOCK_SIZE * RtsFlags.GcFlags.maxHeapSize;
+      if (size_reserved_pool < MBLOCK_SIZE) {
+	size_reserved_pool = 2*MBLOCK_SIZE;
+      }
+    }
     base_non_committed = VirtualAlloc ( NULL
-                                      , SIZE_RESERVED_POOL
+                                      , size_reserved_pool
 				      , MEM_RESERVE
 				      , PAGE_READWRITE
 				      );
@@ -149,14 +158,15 @@ getMBlocks(nat n)
          fprintf(stderr, "getMBlocks: VirtualAlloc failed with: %ld\n", GetLastError());
          ret=(void*)-1;
     } else {
-    /* The returned pointer is not aligned on a mega-block boundary. Make it. */
-       base_mblocks = (char*)((unsigned long)base_non_committed & (unsigned long)0xfff00000) + MBLOCK_SIZE;
+      end_non_committed = (char*)base_non_committed + (unsigned long)size_reserved_pool;
+      /* The returned pointer is not aligned on a mega-block boundary. Make it. */
+      base_mblocks = (char*)((unsigned long)base_non_committed & (unsigned long)0xfff00000) + MBLOCK_SIZE;
 #      if 0
        fprintf(stderr, "getMBlocks: Dropping %d bytes off of 256M chunk\n", 
 	               (unsigned)base_mblocks - (unsigned)base_non_committed);
 #      endif
 
-       if ( ((char*)base_mblocks + size) > ((char*)base_non_committed + SIZE_RESERVED_POOL) ) {
+       if ( ((char*)base_mblocks + size) > end_non_committed ) {
           fprintf(stderr, "getMBlocks: oops, committed too small a region to start with.");
 	  ret=(void*)-1;
        } else {
