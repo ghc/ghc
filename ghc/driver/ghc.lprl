@@ -1105,6 +1105,7 @@ sub setupLinkOpts {
           ,'-u', "${uscore}PrelException_PutFullMVar_static_closure"
           ,'-u', "${uscore}PrelException_BlockedOnDeadMVar_static_closure"
           ,'-u', "${uscore}__init_Prelude"
+          ,'-u', "${uscore}__init_PrelMain"
 	));
   if (!$NoHaskellMain) {
    unshift (@Ld_flags,'-u', "${uscore}PrelMain_mainIO_closure");
