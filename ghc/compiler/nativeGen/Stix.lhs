@@ -140,7 +140,7 @@ hasDestInfo (DestInfo _) = True
 
 pprDests :: DestInfo -> SDoc
 pprDests NoDestInfo      = text "NoDestInfo"
-pprDests (DestInfo dsts) = brack (hsep (map pprCLabel dsts))
+pprDests (DestInfo dsts) = brackets (hsep (map pprCLabel dsts))
 
 
 pprStixTrees :: [StixTree] -> SDoc
@@ -151,41 +151,38 @@ pprStixTrees ts
        char ' '
     ]
 
-paren t = char '(' <> t <> char ')'
-brack t = char '[' <> t <> char ']'
-
 pprStixTree :: StixTree -> SDoc
 pprStixTree t 
    = case t of
-       StSegment cseg   -> paren (ppCodeSegment cseg)
-       StInt i          -> paren (integer i)
-       StFloat rat      -> paren (text "Float" <+> rational rat)
-       StDouble	rat     -> paren (text "Double" <+> rational rat)
-       StString str     -> paren (text "Str `" <> ptext str <> char '\'')
-       StComment str    -> paren (text "Comment" <+> ptext str)
+       StSegment cseg   -> parens (ppCodeSegment cseg)
+       StInt i          -> parens (integer i)
+       StFloat rat      -> parens (text "Float" <+> rational rat)
+       StDouble	rat     -> parens (text "Double" <+> rational rat)
+       StString str     -> parens (text "Str `" <> ptext str <> char '\'')
+       StComment str    -> parens (text "Comment" <+> ptext str)
        StCLbl lbl       -> pprCLabel lbl
        StReg reg        -> ppStixReg reg
-       StIndex k b o    -> paren (pprStixTree b <+> char '+' <> 
-                                  ppr k <+> pprStixTree o)
+       StIndex k b o    -> parens (pprStixTree b <+> char '+' <> 
+                                   ppr k <+> pprStixTree o)
        StInd k t        -> ppr k <> char '[' <> pprStixTree t <> char ']'
        StAssign k d s   -> pprStixTree d <> text "  :=" <> ppr k 
                                          <> text "  " <> pprStixTree s
        StLabel ll       -> pprCLabel ll <+> char ':'
-       StFunBegin ll    -> char ' ' $$ paren (text "FunBegin" <+> pprCLabel ll)
-       StFunEnd ll      -> paren (text "FunEnd" <+> pprCLabel ll)
-       StJump dsts t    -> paren (text "Jump" <+> pprDests dsts <+> pprStixTree t)
-       StFallThrough ll -> paren (text "FallThru" <+> pprCLabel ll)
-       StCondJump l t   -> paren (text "JumpC" <+> pprCLabel l 
-                                               <+> pprStixTree t)
-       StData k ds      -> paren (text "Data" <+> ppr k <+>
-                                  hsep (map pprStixTree ds))
-       StPrim op ts     -> paren (text "Prim" <+> ppr op <+> 
-                                  hsep (map pprStixTree ts))
+       StFunBegin ll    -> char ' ' $$ parens (text "FunBegin" <+> pprCLabel ll)
+       StFunEnd ll      -> parens (text "FunEnd" <+> pprCLabel ll)
+       StJump dsts t    -> parens (text "Jump" <+> pprDests dsts <+> pprStixTree t)
+       StFallThrough ll -> parens (text "FallThru" <+> pprCLabel ll)
+       StCondJump l t   -> parens (text "JumpC" <+> pprCLabel l 
+                                                <+> pprStixTree t)
+       StData k ds      -> parens (text "Data" <+> ppr k <+>
+                                   hsep (map pprStixTree ds))
+       StPrim op ts     -> parens (text "Prim" <+> ppr op <+> 
+                                   hsep (map pprStixTree ts))
        StCall nm cc k args
-                        -> paren (text "Call" <+> ptext nm <+>
-                                  ppr cc <+> ppr k <+> 
-                                  hsep (map pprStixTree args))
-       StScratchWord i  -> text "ScratchWord" <> paren (int i)
+                        -> parens (text "Call" <+> ptext nm <+>
+                                   ppr cc <+> ppr k <+> 
+                                   hsep (map pprStixTree args))
+       StScratchWord i  -> text "ScratchWord" <> parens (int i)
 \end{code}
 
 Stix registers can have two forms.  They {\em may} or {\em may not}
