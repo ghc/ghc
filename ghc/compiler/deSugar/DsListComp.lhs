@@ -19,10 +19,10 @@ import DsUtils
 
 import CmdLineOpts	( opt_FoldrBuildOn )
 import CoreUtils	( coreExprType, mkCoreIfThenElse )
-import PrelInfo		( nilDataCon, consDataCon, listTyCon,
-			  mkBuild, foldrId )
+import PrelVals		( mkBuild, foldrId )
 import Type		( mkTyVarTy, mkForAllTy, mkFunTys )
 import TysPrim		( alphaTy )
+import TysWiredIn	( nilDataCon, consDataCon, listTyCon )
 import TyVar		( alphaTyVar )
 import Match		( matchSimply )
 import Util		( panic )

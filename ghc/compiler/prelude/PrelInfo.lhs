@@ -8,88 +8,11 @@
 
 module PrelInfo (
 
-	pRELUDE, pRELUDE_BUILTIN, pRELUDE_CORE, pRELUDE_RATIO,
-	pRELUDE_LIST, pRELUDE_TEXT,
-	pRELUDE_PRIMIO, pRELUDE_IO, pRELUDE_PS,
-	gLASGOW_ST, gLASGOW_MISC,
-
 	-- finite maps for built-in things (for the renamer and typechecker):
 	builtinNameInfo, BuiltinNames(..),
 	BuiltinKeys(..), BuiltinIdInfos(..),
 
-	-- *odd* values that need to be reached out and grabbed:
-	eRROR_ID,
-	pAT_ERROR_ID,
-	rEC_CON_ERROR_ID,
-	rEC_UPD_ERROR_ID,
-	iRREFUT_PAT_ERROR_ID,
-	nON_EXHAUSTIVE_GUARDS_ERROR_ID,
-	aBSENT_ERROR_ID,
-	packStringForCId,
-	unpackCStringId, unpackCString2Id,
-	unpackCStringAppendId, unpackCStringFoldrId,
-	integerZeroId, integerPlusOneId,
-	integerPlusTwoId, integerMinusOneId,
-
-	-----------------------------------------------------
-	-- the rest of the export list is organised by *type*
-	-----------------------------------------------------
-
-	-- type: Bool
-	boolTyCon, boolTy, falseDataCon, trueDataCon,
-
-	-- types: Char#, Char, String (= [Char])
-	charPrimTy, charTy, stringTy,
-	charPrimTyCon, charTyCon, charDataCon,
-
-	-- type: Ordering (used in deriving)
-	orderingTy, ltDataCon, eqDataCon, gtDataCon,
-
-	-- types: Double#, Double
-	doublePrimTy, doubleTy,
-	doublePrimTyCon, doubleTyCon, doubleDataCon,
-
-	-- types: Float#, Float
-	floatPrimTy, floatTy,
-	floatPrimTyCon, floatTyCon, floatDataCon,
-
-	-- types: Glasgow *primitive* arrays, sequencing and I/O
-	mkPrimIoTy, -- to typecheck "mainPrimIO" & for _ccall_s
-	realWorldStatePrimTy, realWorldStateTy{-boxed-},
-	realWorldTy, realWorldTyCon, realWorldPrimId,
-	statePrimTyCon, stateDataCon, getStatePairingConInfo,
-
-	byteArrayPrimTy,
-
-	-- types: Void# (only used within the compiler)
-	voidPrimTy, voidPrimId,
-
-	-- types: Addr#, Int#, Word#, Int
-	intPrimTy, intTy, intPrimTyCon, intTyCon, intDataCon,
-	wordPrimTyCon, wordPrimTy, wordTy, wordTyCon, wordDataCon,
-	addrPrimTyCon, addrPrimTy, addrTy, addrTyCon, addrDataCon,
-	maybeIntLikeTyCon, maybeCharLikeTyCon,
-
-	-- types: Integer, Rational (= Ratio Integer)
-	integerTy, rationalTy,
-	integerTyCon, integerDataCon,
-	rationalTyCon, ratioDataCon,
-
-	-- type: Lift
-	liftTyCon, liftDataCon, mkLiftTy,
-
-	-- type: List
-	listTyCon, mkListTy, nilDataCon, consDataCon,
-
-	-- type: tuples
-	mkTupleTy, unitTy,
-
-	-- for compilation of List Comprehensions and foldr
-	foldlId, foldrId,
-	mkBuild, buildId, augmentId, appendId
-
-	-- and, finally, we must put in some (abstract) data types,
-	-- to make the interface self-sufficient
+	maybeCharLikeTyCon, maybeIntLikeTyCon
     ) where
 
 import Ubiq
@@ -231,7 +154,7 @@ prim_tycons
     , doublePrimTyCon
     , floatPrimTyCon
     , intPrimTyCon
-    , mallocPtrPrimTyCon
+    , foreignObjPrimTyCon
     , mutableArrayPrimTyCon
     , mutableByteArrayPrimTyCon
     , synchVarPrimTyCon
@@ -272,7 +195,7 @@ data_tycons
     , intTyCon
     , integerTyCon
     , liftTyCon
-    , mallocPtrTyCon
+    , foreignObjTyCon
     , ratioTyCon
     , return2GMPsTyCon
     , returnIntAndGMPTyCon
@@ -284,7 +207,7 @@ data_tycons
     , stateAndDoublePrimTyCon
     , stateAndFloatPrimTyCon
     , stateAndIntPrimTyCon
-    , stateAndMallocPtrPrimTyCon
+    , stateAndForeignObjPrimTyCon
     , stateAndMutableArrayPrimTyCon
     , stateAndMutableByteArrayPrimTyCon
     , stateAndSynchVarPrimTyCon
@@ -338,15 +261,14 @@ parallel_ids
     else
         [ parId
         , forkId
-#ifdef GRAN
-    	, parLocalId
+	, copyableId
+	, noFollowId
+	, parAtAbsId
+	, parAtForNowId
+	, parAtId
+	, parAtRelId
 	, parGlobalId
-	    -- Add later:
-	    -- ,parAtId
-	    -- ,parAtForNowId
-	    -- ,copyableId
-	    -- ,noFollowId
-#endif {-GRAN-}
+    	, parLocalId
 	]
 
 pcIdWiredInInfo :: Id -> (FAST_STRING, RnName)
@@ -405,6 +327,7 @@ tysyn_keys
 class_keys
   = [ (s, (k, RnImplicitClass)) | (s,k) <-
     [ (SLIT("Eq"),		eqClassKey)		-- mentioned, derivable
+    , (SLIT("Eval"),		evalClassKey)		-- mentioned
     , (SLIT("Ord"),		ordClassKey)		-- derivable
     , (SLIT("Num"),		numClassKey)		-- mentioned, numeric
     , (SLIT("Real"),		realClassKey)		-- numeric
@@ -414,6 +337,7 @@ class_keys
     , (SLIT("RealFrac"),	realFracClassKey)	-- numeric
     , (SLIT("RealFloat"),	realFloatClassKey)	-- numeric
 --  , (SLIT("Ix"),		ixClassKey)		-- derivable (but it isn't Prelude.Ix; hmmm)
+	-- see *hack* in Rename
     , (SLIT("Bounded"),		boundedClassKey)	-- derivable
     , (SLIT("Enum"),		enumClassKey)		-- derivable
     , (SLIT("Show"),		showClassKey)		-- derivable

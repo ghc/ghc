@@ -43,9 +43,7 @@ import PprCore		( GenCoreExpr{-instances-}, GenCoreArg{-instances-} )
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instances-} )
 import Pretty		( ppAboves )
-import PrelInfo		( trueDataCon, falseDataCon,
-			  augmentId, buildId
-			)
+import PrelVals		( augmentId, buildId )
 import PrimOp		( primOpType, fragilePrimOp, PrimOp(..) )
 import SrcLoc		( mkUnknownSrcLoc )
 import TyVar		( isNullTyVarEnv, TyVarEnv(..) )
@@ -53,6 +51,7 @@ import Type		( mkFunTys, mkForAllTy, mkForAllUsageTy, mkTyVarTy,
 			  getFunTy_maybe, applyTy, isPrimType,
 			  splitSigmaTy, splitFunTy, eqTy, applyTypeEnvToTy
 			)
+import TysWiredIn	( trueDataCon, falseDataCon )
 import UniqSupply	( initUs, returnUs, thenUs,
 			  mapUs, mapAndUnzipUs, getUnique,
 			  UniqSM(..), UniqSupply

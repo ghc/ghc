@@ -107,9 +107,9 @@ module Unique (
 	ltDataConKey,
 	mainIdKey,
 	mainPrimIOIdKey,
-	mallocPtrDataConKey,
-	mallocPtrPrimTyConKey,
-	mallocPtrTyConKey,
+	foreignObjDataConKey,
+	foreignObjPrimTyConKey,
+	foreignObjTyConKey,
 	monadClassKey,
 	monadZeroClassKey,
 	monadPlusClassKey,
@@ -165,8 +165,8 @@ module Unique (
 	stateAndFloatPrimTyConKey,
 	stateAndIntPrimDataConKey,
 	stateAndIntPrimTyConKey,
-	stateAndMallocPtrPrimDataConKey,
-	stateAndMallocPtrPrimTyConKey,
+	stateAndForeignObjPrimDataConKey,
+	stateAndForeignObjPrimTyConKey,
 	stateAndMutableArrayPrimDataConKey,
 	stateAndMutableArrayPrimTyConKey,
 	stateAndMutableByteArrayPrimDataConKey,
@@ -195,13 +195,14 @@ module Unique (
 	wordDataConKey,
 	wordPrimTyConKey,
 	wordTyConKey
-#ifdef GRAN
 	, copyableIdKey
 	, noFollowIdKey
+	, parAtAbsIdKey
+	, parAtForNowIdKey
+	, parAtIdKey
+	, parAtRelIdKey
 	, parGlobalIdKey
 	, parLocalIdKey
-#endif
-	-- to make interface self-sufficient
     ) where
 
 import PreludeGlaST
@@ -468,8 +469,8 @@ intTyConKey				= mkPreludeTyConUnique 16
 integerTyConKey				= mkPreludeTyConUnique 17
 liftTyConKey				= mkPreludeTyConUnique 18
 listTyConKey				= mkPreludeTyConUnique 19
-mallocPtrPrimTyConKey			= mkPreludeTyConUnique 20
-mallocPtrTyConKey			= mkPreludeTyConUnique 21
+foreignObjPrimTyConKey			= mkPreludeTyConUnique 20
+foreignObjTyConKey			= mkPreludeTyConUnique 21
 mutableArrayPrimTyConKey		= mkPreludeTyConUnique 22
 mutableByteArrayPrimTyConKey		= mkPreludeTyConUnique 23
 orderingTyConKey			= mkPreludeTyConUnique 24
@@ -488,7 +489,7 @@ stateAndCharPrimTyConKey		= mkPreludeTyConUnique 36
 stateAndDoublePrimTyConKey		= mkPreludeTyConUnique 37
 stateAndFloatPrimTyConKey		= mkPreludeTyConUnique 38
 stateAndIntPrimTyConKey			= mkPreludeTyConUnique 39
-stateAndMallocPtrPrimTyConKey		= mkPreludeTyConUnique 40
+stateAndForeignObjPrimTyConKey		= mkPreludeTyConUnique 40
 stateAndMutableArrayPrimTyConKey	= mkPreludeTyConUnique 41
 stateAndMutableByteArrayPrimTyConKey	= mkPreludeTyConUnique 42
 stateAndSynchVarPrimTyConKey	    	= mkPreludeTyConUnique 43
@@ -526,7 +527,7 @@ intDataConKey				= mkPreludeDataConUnique 11
 integerDataConKey			= mkPreludeDataConUnique 12
 liftDataConKey				= mkPreludeDataConUnique 13
 ltDataConKey				= mkPreludeDataConUnique 14
-mallocPtrDataConKey			= mkPreludeDataConUnique 15
+foreignObjDataConKey			= mkPreludeDataConUnique 15
 nilDataConKey				= mkPreludeDataConUnique 18
 ratioDataConKey				= mkPreludeDataConUnique 21
 return2GMPsDataConKey			= mkPreludeDataConUnique 22
@@ -539,7 +540,7 @@ stateAndCharPrimDataConKey		= mkPreludeDataConUnique 28
 stateAndDoublePrimDataConKey		= mkPreludeDataConUnique 29
 stateAndFloatPrimDataConKey		= mkPreludeDataConUnique 30
 stateAndIntPrimDataConKey		= mkPreludeDataConUnique 31
-stateAndMallocPtrPrimDataConKey		= mkPreludeDataConUnique 32
+stateAndForeignObjPrimDataConKey		= mkPreludeDataConUnique 32
 stateAndMutableArrayPrimDataConKey	= mkPreludeDataConUnique 33
 stateAndMutableByteArrayPrimDataConKey	= mkPreludeDataConUnique 34
 stateAndSynchVarPrimDataConKey	    	= mkPreludeDataConUnique 35
@@ -593,12 +594,14 @@ nonExhaustiveGuardsErrorIdKey = mkPreludeMiscIdUnique 32
 noDefaultMethodErrorIdKey     = mkPreludeMiscIdUnique 33
 nonExplicitMethodErrorIdKey   = mkPreludeMiscIdUnique 34
 
-#ifdef GRAN
-parLocalIdKey		= mkPreludeMiscIdUnique 35
-parGlobalIdKey		= mkPreludeMiscIdUnique 36
-noFollowIdKey		= mkPreludeMiscIdUnique 37
-copyableIdKey		= mkPreludeMiscIdUnique 38
-#endif
+copyableIdKey		= mkPreludeMiscIdUnique 35
+noFollowIdKey		= mkPreludeMiscIdUnique 36
+parAtAbsIdKey		= mkPreludeMiscIdUnique 37
+parAtForNowIdKey	= mkPreludeMiscIdUnique 38
+parAtIdKey		= mkPreludeMiscIdUnique 39
+parAtRelIdKey		= mkPreludeMiscIdUnique 40
+parGlobalIdKey		= mkPreludeMiscIdUnique 41
+parLocalIdKey		= mkPreludeMiscIdUnique 42
 \end{code}
 
 Certain class operations from Prelude classes.  They get

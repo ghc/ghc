@@ -246,6 +246,25 @@ genConInfo comp_info tycon data_con
     closure_label   = mkClosureLabel  data_con
 \end{code}
 
+The entry code for a constructor now loads the info ptr by indirecting
+node.  The alternative is to load the info ptr in the enter-via-node
+sequence.  There's is a trade-off here:
+
+	* If the architecture can perform an indirect jump through a
+	  register in one instruction, or if the info ptr is not a
+	  real register, then *not* loading the info ptr on an enter
+	  is a win.
+
+	* If the enter-via-node code is identical whether we load the
+	  info ptr or not, then doing it is a win (it means we don't
+	  have to do it here).
+
+However, the gratuitous load here is miniscule compared to the
+gratuitous loads of the info ptr on each enter, so we go for the first
+option.
+
+-- Simon M. (6/5/96)
+
 \begin{code}
 mkConCodeAndInfo :: Id 			-- Data constructor
 		 -> (ClosureInfo, Code)	-- The info table
@@ -261,7 +280,7 @@ mkConCodeAndInfo con
 	    body_code
 	      = profCtrC SLIT("RET_OLD_IN_REGS") [mkIntCLit (length regs_w_offsets)] `thenC`
 
-		performReturn (mkAbstractCs (map move_to_reg regs_w_offsets))
+		performReturn (mkAbstractCs (load_infoptr : map move_to_reg regs_w_offsets))
 			      (mkStaticAlgReturnCode con Nothing {- Info-ptr already loaded-})
 			      emptyIdSet{-no live vars-}
 	in
@@ -278,7 +297,7 @@ mkConCodeAndInfo con
 		= -- NB: We don't set CC when entering data (WDP 94/06)
 		  profCtrC SLIT("RET_OLD_IN_HEAP") [mkIntCLit (length arg_things)] `thenC`
 
-		  performReturn AbsCNop	-- Ptr to thing already in Node
+		  performReturn (mkAbstractCs [load_infoptr])	-- Ptr to thing already in Node
 				(mkStaticAlgReturnCode con Nothing {- Info-ptr already loaded-})
 				emptyIdSet{-no live vars-}
 	in
@@ -288,6 +307,9 @@ mkConCodeAndInfo con
     move_to_reg :: (MagicId, VirtualHeapOffset {-from Node-}) -> AbstractC
     move_to_reg (reg, offset)
       = CAssign (CReg reg) (CVal (NodeRel offset) (magicIdPrimRep reg))
+
+    load_infoptr 
+      = CAssign (CReg infoptr) (CMacroExpr DataPtrRep INFO_PTR [CReg node])
 \end{code}
 
 %************************************************************************

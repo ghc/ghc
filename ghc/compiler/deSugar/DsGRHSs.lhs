@@ -22,7 +22,7 @@ import DsMonad
 import DsUtils
 
 import CoreUtils	( mkCoreIfThenElse )
-import PrelInfo		( stringTy, nON_EXHAUSTIVE_GUARDS_ERROR_ID )
+import PrelVals		( nON_EXHAUSTIVE_GUARDS_ERROR_ID )
 import PprStyle		( PprStyle(..) )
 import Pretty		( ppShow )
 import SrcLoc		( SrcLoc{-instance-} )

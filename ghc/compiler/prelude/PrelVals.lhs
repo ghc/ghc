@@ -24,7 +24,7 @@ import IdInfo		-- quite a bit
 import Literal		( mkMachInt )
 import PrimOp		( PrimOp(..) )
 import SpecEnv		( SpecEnv(..), nullSpecEnv )
-import TyVar		( alphaTyVar, betaTyVar )
+import TyVar		( alphaTyVar, betaTyVar, gammaTyVar )
 import Unique		-- lots of *Keys
 import Util		( panic )
 \end{code}
@@ -164,13 +164,13 @@ OK, this is Will's idea: we should have magic values for Integers 0,
 +1, +2, and -1 (go ahead, fire me):
 \begin{code}
 integerZeroId
-  = pcMiscPrelId integerZeroIdKey     pRELUDE_CORE SLIT("__integer0")  integerTy noIdInfo
+  = pcMiscPrelId integerZeroIdKey     pRELUDE SLIT("__integer0")  integerTy noIdInfo
 integerPlusOneId
-  = pcMiscPrelId integerPlusOneIdKey  pRELUDE_CORE SLIT("__integer1")  integerTy noIdInfo
+  = pcMiscPrelId integerPlusOneIdKey  pRELUDE SLIT("__integer1")  integerTy noIdInfo
 integerPlusTwoId
-  = pcMiscPrelId integerPlusTwoIdKey  pRELUDE_CORE SLIT("__integer2")  integerTy noIdInfo
+  = pcMiscPrelId integerPlusTwoIdKey  pRELUDE SLIT("__integer2")  integerTy noIdInfo
 integerMinusOneId
-  = pcMiscPrelId integerMinusOneIdKey pRELUDE_CORE SLIT("__integerm1") integerTy noIdInfo
+  = pcMiscPrelId integerMinusOneIdKey pRELUDE SLIT("__integerm1") integerTy noIdInfo
 \end{code}
 
 %************************************************************************
@@ -274,50 +274,191 @@ forkId = pcMiscPrelId forkIdKey pRELUDE_BUILTIN SLIT("_fork_")
 
 \end{code}
 
+GranSim ones:
 \begin{code}
-#ifdef GRAN
-
 parLocalId = pcMiscPrelId parLocalIdKey pRELUDE_BUILTIN SLIT("_parLocal_")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
-		    (mkFunTys [intPrimTy, alphaTy, betaTy] betaTy))
+		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy, alphaTy, betaTy] betaTy))
 		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding parLocal_template))
   where
-    [w, x, y, z]
+    -- Annotations: w: name, g: gran. info, s: size info, p: par info  -- HWL
+    [w, g, s, p, x, y, z]
       = mkTemplateLocals [
 	{-w-} intPrimTy,
+	{-g-} intPrimTy,
+	{-s-} intPrimTy,
+	{-p-} intPrimTy,
     	{-x-} alphaTy,
     	{-y-} betaTy,
-	{-z-} betaTy
+	{-z-} intPrimTy
     	]
 
     parLocal_template
-      = mkLam [alphaTyVar, betaTyVar] [w, x, y] (
-		Case (Prim ParLocalOp [TyArg alphaTy, TyArg betaTy, VarArg x, VarArg w, VarArg y]) (
-		  AlgAlts
-		    [(liftDataCon, [z], Var z)]
-		    (NoDefault)))
+      = mkLam [alphaTyVar, betaTyVar] [w, g, s, p, x, y] (
+		Case (Prim ParLocalOp [TyArg alphaTy, TyArg betaTy, VarArg x, VarArg w, VarArg g, VarArg s, VarArg p, VarArg y]) (
+		  PrimAlts
+		    [(mkMachInt 0, mkTyApp (Var pAR_ERROR_ID) [betaTy])]
+		    (BindDefault z (Var y))))
 
 parGlobalId = pcMiscPrelId parGlobalIdKey pRELUDE_BUILTIN SLIT("_parGlobal_")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
-		    (mkFunTys [intPrimTy,alphaTy,betaTy] betaTy))
+		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy, alphaTy, betaTy] betaTy))
 		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding parGlobal_template))
   where
-    [w, x, y, z]
+    -- Annotations: w: name, g: gran. info, s: size info, p: par info  -- HWL
+    [w, g, s, p, x, y, z]
       = mkTemplateLocals [
     	{-w-} intPrimTy,
+	{-g-} intPrimTy,
+	{-s-} intPrimTy,
+	{-p-} intPrimTy,
     	{-x-} alphaTy,
     	{-y-} betaTy,
-	{-z-} betaTy
+	{-z-} intPrimTy
     	]
 
     parGlobal_template
-      = mkLam [alphaTyVar, betaTyVar] [w, x, y] (
-		Case (Prim ParGlobalOp [TyArg alphaTy, TyArg betaTy, VarArg x, VarArg w, VarArg y]) (
-		  AlgAlts
-		    [(liftDataCon, [z], Var z)]
-		    (NoDefault)))
+      = mkLam [alphaTyVar, betaTyVar] [w, g, s, p, x, y] (
+		Case (Prim ParGlobalOp [TyArg alphaTy, TyArg betaTy, VarArg x, VarArg w, VarArg g, VarArg s, VarArg p, VarArg y]) (
+		  PrimAlts
+		    [(mkMachInt 0, mkTyApp (Var pAR_ERROR_ID) [betaTy])]
+		    (BindDefault z (Var y))))
 
-#endif {-GRAN-}
+
+parAtId = pcMiscPrelId parAtIdKey pRELUDE_BUILTIN SLIT("_parAt_")
+		  (mkSigmaTy [alphaTyVar, betaTyVar] []
+		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy,
+		               alphaTy, betaTy, gammaTy] gammaTy))
+		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding parAt_template))
+  where
+    -- Annotations: w: name, g: gran. info, s: size info, p: par info  -- HWL
+    [w, g, s, p, v, x, y, z]
+      = mkTemplateLocals [
+    	{-w-} intPrimTy,
+    	{-g-} intPrimTy,
+	{-s-} intPrimTy,
+	{-p-} intPrimTy,
+    	{-v-} alphaTy,
+    	{-x-} betaTy,
+    	{-y-} gammaTy,
+	{-z-} intPrimTy
+    	]
+
+    parAt_template
+      = mkLam [alphaTyVar, betaTyVar, gammaTyVar] [w, g, s, p, v, x, y] (
+		Case (Prim ParAtOp [TyArg alphaTy, TyArg betaTy, TyArg gammaTy, VarArg x, VarArg v, VarArg w, VarArg g, VarArg s, VarArg p, VarArg y]) (
+		  PrimAlts
+		    [(mkMachInt 0, mkTyApp (Var pAR_ERROR_ID) [betaTy])]
+		    (BindDefault z (Var y))))
+
+parAtAbsId = pcMiscPrelId parAtAbsIdKey pRELUDE_BUILTIN SLIT("_parAtAbs_")
+		  (mkSigmaTy [alphaTyVar, betaTyVar] []
+		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy, intPrimTy, alphaTy, betaTy] betaTy))
+		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding parAtAbs_template))
+  where
+    -- Annotations: w: name, g: gran. info, s: size info, p: par info  -- HWL
+    [w, g, s, p, v, x, y, z]
+      = mkTemplateLocals [
+    	{-w-} intPrimTy,
+    	{-g-} intPrimTy,
+	{-s-} intPrimTy,
+	{-p-} intPrimTy,
+	{-v-} intPrimTy,
+    	{-x-} alphaTy,
+    	{-y-} betaTy,
+    	{-z-} intPrimTy
+    	]
+
+    parAtAbs_template
+      = mkLam [alphaTyVar, betaTyVar] [w, g, s, p, v, x, y] (
+		Case (Prim ParAtAbsOp [TyArg alphaTy, TyArg betaTy, VarArg x, VarArg v, VarArg w, VarArg g, VarArg s, VarArg p, VarArg y]) (
+		  PrimAlts
+		    [(mkMachInt 0, mkTyApp (Var pAR_ERROR_ID) [betaTy])]
+		    (BindDefault z (Var y))))
+
+parAtRelId = pcMiscPrelId parAtRelIdKey pRELUDE_BUILTIN SLIT("_parAtRel_")
+		  (mkSigmaTy [alphaTyVar, betaTyVar] []
+		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy, intPrimTy, alphaTy, betaTy] betaTy))
+		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding parAtRel_template))
+  where
+    -- Annotations: w: name, g: gran. info, s: size info, p: par info  -- HWL
+    [w, g, s, p, v, x, y, z]
+      = mkTemplateLocals [
+    	{-w-} intPrimTy,
+    	{-g-} intPrimTy,
+	{-s-} intPrimTy,
+	{-p-} intPrimTy,
+	{-v-} intPrimTy,
+    	{-x-} alphaTy,
+    	{-y-} betaTy,
+    	{-z-} intPrimTy
+    	]
+
+    parAtRel_template
+      = mkLam [alphaTyVar, betaTyVar] [w, g, s, p, v, x, y] (
+		Case (Prim ParAtRelOp [TyArg alphaTy, TyArg betaTy, VarArg x, VarArg v, VarArg w, VarArg g, VarArg s, VarArg p, VarArg y]) (
+		  PrimAlts
+		    [(mkMachInt 0, mkTyApp (Var pAR_ERROR_ID) [betaTy])]
+		    (BindDefault z (Var y))))
+
+parAtForNowId = pcMiscPrelId parAtForNowIdKey pRELUDE_BUILTIN SLIT("_parAtForNow_")
+		  (mkSigmaTy [alphaTyVar, betaTyVar] []
+		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy,
+				alphaTy, betaTy, gammaTy] gammaTy))
+		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding parAtForNow_template))
+  where
+    -- Annotations: w: name, g: gran. info, s: size info, p: par info  -- HWL
+    [w, g, s, p, v, x, y, z]
+      = mkTemplateLocals [
+    	{-w-} intPrimTy,
+    	{-g-} intPrimTy,
+	{-s-} intPrimTy,
+	{-p-} intPrimTy,
+    	{-v-} alphaTy,
+    	{-x-} betaTy,
+    	{-y-} gammaTy,
+	{-z-} intPrimTy
+    	]
+
+    parAtForNow_template
+      = mkLam [alphaTyVar, betaTyVar, gammaTyVar] [w, g, s, p, v, x, y] (
+		Case (Prim ParAtForNowOp [TyArg alphaTy, TyArg betaTy, TyArg gammaTy, VarArg x, VarArg v, VarArg w, VarArg g, VarArg s, VarArg p, VarArg y]) (
+		  PrimAlts
+		    [(mkMachInt 0, mkTyApp (Var pAR_ERROR_ID) [betaTy])]
+		    (BindDefault z (Var y))))
+
+-- copyable and noFollow are currently merely hooks: they are translated into
+-- calls to the macros COPYABLE and NOFOLLOW                            -- HWL 
+
+copyableId = pcMiscPrelId copyableIdKey pRELUDE_BUILTIN SLIT("_copyable_")
+		  (mkSigmaTy [alphaTyVar] []
+		    alphaTy)
+		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding copyable_template))
+  where
+    -- Annotations: x: closure that's tagged to by copyable
+    [x, z]
+      = mkTemplateLocals [
+    	{-x-} alphaTy,
+    	{-z-} alphaTy
+    	]
+
+    copyable_template
+      = mkLam [alphaTyVar] [x] ( Prim CopyableOp [TyArg alphaTy, VarArg x] )
+
+noFollowId = pcMiscPrelId noFollowIdKey pRELUDE_BUILTIN SLIT("_noFollow_")
+		  (mkSigmaTy [alphaTyVar] []
+		    alphaTy)
+		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding noFollow_template))
+  where
+    -- Annotations: x: closure that's tagged to not follow
+    [x, z]
+      = mkTemplateLocals [
+    	{-x-} alphaTy,
+    	{-z-} alphaTy
+    	]
+
+    noFollow_template
+      = mkLam [alphaTyVar] [x] ( Prim NoFollowOp [TyArg alphaTy, VarArg x] )
 \end{code}
 
 %************************************************************************
@@ -453,7 +594,7 @@ realWorldPrimId
 
 \begin{code}
 buildId
-  = pcMiscPrelId buildIdKey pRELUDE_CORE SLIT("_build") buildTy
+  = pcMiscPrelId buildIdKey pRELUDE_BUILTIN SLIT("_build") buildTy
 	((((noIdInfo
 		{-LATER:`addInfo_UF` mkMagicUnfolding buildIdKey-})
 		`addInfo` mkStrictnessInfo [WwStrict] Nothing)
@@ -498,7 +639,7 @@ mkBuild ty tv c n g expr
 
 \begin{code}
 augmentId
-  = pcMiscPrelId augmentIdKey pRELUDE_CORE SLIT("_augment") augmentTy
+  = pcMiscPrelId augmentIdKey pRELUDE_BUILTIN SLIT("_augment") augmentTy
 	(((noIdInfo
 		{-LATER:`addInfo_UF` mkMagicUnfolding augmentIdKey-})
 		`addInfo` mkStrictnessInfo [WwStrict,WwLazy False] Nothing)

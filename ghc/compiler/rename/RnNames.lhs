@@ -22,7 +22,7 @@ import RnHsSyn
 import RnMonad
 import RnIfaces		( IfaceCache(..), cachedIface, cachedDecl )
 import RnUtils		( RnEnv(..), emptyRnEnv, extendGlobalRnEnv,
-			  lubExportFlag, qualNameErr, dupNamesErr, negateNameWarn
+			  lubExportFlag, qualNameErr, dupNamesErr
 			)
 import ParseUtils	( ParsedIface(..), RdrIfaceDecl(..), RdrIfaceInst )
 
@@ -292,7 +292,6 @@ newGlobalName locn maybe_exp rdr
 
 	n = mkTopLevName uniq orig locn exp (occ_fn n) -- NB: two "n"s
     in
-    addWarnIfRn (rdr == Unqual SLIT("negate")) (negateNameWarn (rdr, locn)) `thenRn_`
     addErrIfRn (isQual rdr) (qualNameErr "name in definition" (rdr, locn)) `thenRn_`
     returnRn n    
 \end{code}
@@ -491,6 +490,7 @@ getBuiltins (((b_val_names,b_tc_names),_,_,_),_,_,_) mod maybe_spec
       Nothing           -> (all_vals, all_tcs, Nothing)
 
       Just (True, ies)  -> -- hiding does not work for builtin names
+			   trace "getBuiltins: import Prelude hiding ( ... )" $
 			   (all_vals, all_tcs, maybe_spec)
 
       Just (False, ies) -> let 
@@ -509,11 +509,16 @@ getBuiltins (((b_val_names,b_tc_names),_,_,_),_,_,_) mod maybe_spec
     do_builtin (ie:ies)
       = let str = unqual_str (ie_name ie)
 	in
-	case (lookupFM b_tc_names str) of -- NB: we favour the tycon/class FM...
+	case (lookupFM b_tc_names str) of 	-- NB: we favour the tycon/class FM...
 	  Just rn -> case (ie,rn) of
 	     (IEThingAbs _, WiredInTyCon tc)
 		-> (vals, (str, rn) `consBag` tcs, ies_left)
 	     (IEThingAll _, WiredInTyCon tc)
+		-> (listToBag (map (\ id -> (getLocalName id, WiredInId id)) 
+				   (tyConDataCons tc))
+		    `unionBags` vals,
+		    (str,rn) `consBag` tcs, ies_left)
+	     (IEThingWith _ _, WiredInTyCon tc)	-- No checking of With...
 		-> (listToBag (map (\ id -> (getLocalName id, WiredInId id)) 
 				   (tyConDataCons tc))
 		    `unionBags` vals,

@@ -26,9 +26,10 @@ import Id		( idType, mkSysLocal,
 			  GenId{-instances-}
 			)
 import Name		( isLocallyDefined, getSrcLoc )
-import PrelInfo		( liftDataCon, mkLiftTy, statePrimTyCon )
 import TyCon		( isBoxedTyCon, TyCon{-instance-} )
 import Type		( maybeAppDataTyConExpandingDicts, eqTy )
+import TysPrim		( statePrimTyCon )
+import TysWiredIn	( liftDataCon, mkLiftTy )
 import UniqSupply	( getUnique, getUniques, splitUniqSupply, UniqSupply )
 import Util		( zipEqual, zipWithEqual, assertPanic, panic )
 

@@ -148,5 +148,5 @@ instance Uniquable (GenTyVar a) where
 
 instance NamedThing (GenTyVar a) where
     getName (TyVar _ _ (Just n) _) = n
-    getName (TyVar u _ _        _) = mkLocalName u (showUnique u) mkUnknownSrcLoc
+    getName (TyVar u _ _        _) = mkLocalName u (showUnique u) True{-emph uniq-} mkUnknownSrcLoc
 \end{code}

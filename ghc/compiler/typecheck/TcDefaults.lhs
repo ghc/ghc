@@ -21,7 +21,7 @@ import TcEnv		( tcLookupClassByKey )
 import TcMonoType	( tcMonoType )
 import TcSimplify	( tcSimplifyCheckThetas )
 
-import PrelInfo		( intTy, doubleTy, unitTy )
+import TysWiredIn	( intTy, doubleTy, unitTy )
 import Unique		( numClassKey )
 import Util
 \end{code}

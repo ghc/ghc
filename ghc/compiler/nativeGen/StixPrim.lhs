@@ -52,7 +52,7 @@ First, the dreaded @ccall@.  We can't handle @casm@s.
 Usually, this compiles to an assignment, but when the left-hand side
 is empty, we just perform the call and ignore the result.
 
-ToDo ADR: modify this to handle Malloc Ptrs.
+ToDo ADR: modify this to handle ForeignObjs.
 
 btw Why not let programmer use casm to provide assembly code instead
 of C code?  ADR
@@ -414,7 +414,7 @@ primCode lhs (CCallOp fn is_asm may_gc arg_tys result_ty) rhs
 	    case getAmodeRep x of
 	      ArrayRep -> StIndex PtrRep base mutHS
 	      ByteArrayRep -> StIndex IntRep base dataHS
-	      MallocPtrRep -> error "ERROR: native-code generator can't handle Malloc Ptrs (yet): use -fvia-C!"
+	      ForeignObjRep -> error "ERROR: native-code generator can't handle ForeignObjs (yet): use -fvia-C!"
 	      _ -> base
 \end{code}
 

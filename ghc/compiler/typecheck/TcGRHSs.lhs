@@ -21,7 +21,7 @@ import TcExpr		( tcExpr )
 import TcType		( TcType(..) ) 
 import Unify		( unifyTauTy )
 
-import PrelInfo		( boolTy )
+import TysWiredIn	( boolTy )
 \end{code}
 
 \begin{code}

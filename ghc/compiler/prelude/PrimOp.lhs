@@ -20,6 +20,7 @@ module PrimOp (
 	primOpOkForSpeculation, primOpIsCheap,
 	fragilePrimOp,
 	HeapRequirement(..), primOpHeapReq,
+	StackRequirement(..), primOpStackRequired,	
 
        -- export for the Native Code Generator
 	primOpInfo, -- needed for primOpNameInfo
@@ -45,7 +46,7 @@ import TyCon		( TyCon{-instances-} )
 import Type		( getAppDataTyConExpandingDicts, maybeAppDataTyConExpandingDicts,
 			  mkForAllTys, mkFunTys, applyTyCon, typePrimRep
 			)
-import TyVar		( alphaTyVar, betaTyVar, GenTyVar{-instance Eq-} )
+import TyVar		( alphaTyVar, betaTyVar, gammaTyVar, GenTyVar{-instance Eq-} )
 import Unique		( Unique{-instance Eq-} )
 import Util		( panic#, assoc, panic{-ToDo:rm-} )
 \end{code}
@@ -144,8 +145,8 @@ data PrimOp
     | IndexOffAddrOp	PrimRep
 	-- PrimRep can be one of {Char,Int,Addr,Float,Double}Kind.
 	-- This is just a cheesy encoding of a bunch of ops.
-	-- Note that MallocPtrRep is not included -- the only way of
-	-- creating a MallocPtr is with a ccall or casm.
+	-- Note that ForeignObjRep is not included -- the only way of
+	-- creating a ForeignObj is with a ccall or casm.
 
     | UnsafeFreezeArrayOp | UnsafeFreezeByteArrayOp
 
@@ -153,6 +154,7 @@ data PrimOp
     | TakeMVarOp | PutMVarOp
     | ReadIVarOp | WriteIVarOp
 
+    | MakeForeignObjOp -- foreign objects (malloc pointers or any old URL)
     | MakeStablePtrOp | DeRefStablePtrOp
 \end{code}
 
@@ -239,18 +241,19 @@ about using it this way?? ADR)
     | ParOp
     | ForkOp
 
-    -- two for concurrency
+    -- three for concurrency
     | DelayOp
-    | WaitOp
+    | WaitReadOp
+    | WaitWriteOp
 
-#ifdef GRAN
     | ParGlobalOp	-- named global par
     | ParLocalOp	-- named local par
     | ParAtOp		-- specifies destination of local par
+    | ParAtAbsOp	-- specifies destination of local par (abs processor)
+    | ParAtRelOp	-- specifies destination of local par (rel processor)
     | ParAtForNowOp	-- specifies initial destination of global par
     | CopyableOp	-- marks copyable code
     | NoFollowOp	-- marks non-followup expression
-#endif {-GRAN-}
 \end{code}
 
 Deriving Ix is what we really want! ToDo
@@ -409,25 +412,27 @@ tagOf_PrimOp TakeMVarOp		    	    = ILIT(151)
 tagOf_PrimOp PutMVarOp		    	    = ILIT(152)
 tagOf_PrimOp ReadIVarOp		    	    = ILIT(153)
 tagOf_PrimOp WriteIVarOp		    = ILIT(154)
-tagOf_PrimOp MakeStablePtrOp		    = ILIT(155)
-tagOf_PrimOp DeRefStablePtrOp		    = ILIT(156)
-tagOf_PrimOp (CCallOp _ _ _ _ _)	    = ILIT(157)
-tagOf_PrimOp ErrorIOPrimOp		    = ILIT(158)
-tagOf_PrimOp ReallyUnsafePtrEqualityOp	    = ILIT(159)
-tagOf_PrimOp SeqOp			    = ILIT(160)
-tagOf_PrimOp ParOp			    = ILIT(161)
-tagOf_PrimOp ForkOp			    = ILIT(162)
-tagOf_PrimOp DelayOp			    = ILIT(163)
-tagOf_PrimOp WaitOp			    = ILIT(164)
+tagOf_PrimOp MakeForeignObjOp		    = ILIT(155)
+tagOf_PrimOp MakeStablePtrOp		    = ILIT(156)
+tagOf_PrimOp DeRefStablePtrOp		    = ILIT(157)
+tagOf_PrimOp (CCallOp _ _ _ _ _)	    = ILIT(158)
+tagOf_PrimOp ErrorIOPrimOp		    = ILIT(159)
+tagOf_PrimOp ReallyUnsafePtrEqualityOp	    = ILIT(160)
+tagOf_PrimOp SeqOp			    = ILIT(161)
+tagOf_PrimOp ParOp			    = ILIT(162)
+tagOf_PrimOp ForkOp			    = ILIT(163)
+tagOf_PrimOp DelayOp			    = ILIT(164)
+tagOf_PrimOp WaitReadOp			    = ILIT(165)
+tagOf_PrimOp WaitWriteOp		    = ILIT(166)
 
-#ifdef GRAN
-tagOf_PrimOp ParGlobalOp		    = ILIT(165)
-tagOf_PrimOp ParLocalOp			    = ILIT(166)
-tagOf_PrimOp ParAtOp			    = ILIT(167)
-tagOf_PrimOp ParAtForNowOp		    = ILIT(168)
-tagOf_PrimOp CopyableOp			    = ILIT(169)
-tagOf_PrimOp NoFollowOp			    = ILIT(170)
-#endif {-GRAN-}
+tagOf_PrimOp ParGlobalOp		    = ILIT(167)
+tagOf_PrimOp ParLocalOp			    = ILIT(168)
+tagOf_PrimOp ParAtOp			    = ILIT(169)
+tagOf_PrimOp ParAtAbsOp			    = ILIT(170)
+tagOf_PrimOp ParAtRelOp			    = ILIT(171)
+tagOf_PrimOp ParAtForNowOp		    = ILIT(172)
+tagOf_PrimOp CopyableOp			    = ILIT(173)
+tagOf_PrimOp NoFollowOp			    = ILIT(174)
 
 tagOf_PrimOp _ = panic# "tagOf_PrimOp: pattern-match"
 
@@ -591,19 +596,25 @@ allThePrimOps
 	PutMVarOp,
 	ReadIVarOp,
 	WriteIVarOp,
+	MakeForeignObjOp,
 	MakeStablePtrOp,
 	DeRefStablePtrOp,
 	ReallyUnsafePtrEqualityOp,
 	ErrorIOPrimOp,
-#ifdef GRAN
 	ParGlobalOp,
 	ParLocalOp,
-#endif {-GRAN-}
+	ParAtOp,
+	ParAtAbsOp,
+	ParAtRelOp,
+	ParAtForNowOp,
+	CopyableOp,
+	NoFollowOp,
 	SeqOp,
     	ParOp,
     	ForkOp,
 	DelayOp,
-	WaitOp
+	WaitReadOp,
+	WaitWriteOp
     ]
 \end{code}
 
@@ -1117,16 +1128,56 @@ primOpInfo DelayOp
 	[intPrimTy, mkStatePrimTy s]
 	statePrimTyCon VoidRep [s]
 
-primOpInfo WaitOp
+primOpInfo WaitReadOp
   = let {
 	s = alphaTy; s_tv = alphaTyVar
     } in
-    PrimResult SLIT("wait#") [s_tv]
+    PrimResult SLIT("waitRead#") [s_tv]
 	[intPrimTy, mkStatePrimTy s]
 	statePrimTyCon VoidRep [s]
 
+primOpInfo WaitWriteOp
+  = let {
+	s = alphaTy; s_tv = alphaTyVar
+    } in
+    PrimResult SLIT("waitWrite#") [s_tv]
+	[intPrimTy, mkStatePrimTy s]
+	statePrimTyCon VoidRep [s]
 \end{code}
 
+%************************************************************************
+%*									*
+\subsubsection[PrimOps-makeForeignObj]{PrimOpInfo for Foreign Objects}
+%*									*
+%************************************************************************
+
+Not everything should/can be in the Haskell heap. As an example, in an
+image processing application written in Haskell, you really would like
+to avoid heaving huge images between different space or generations of
+a garbage collector. Instead use @ForeignObj@ (formerly known as @MallocPtr@),
+which refer to some externally allocated structure/value. Using @ForeignObj@,
+just a reference to an image is present in the heap, the image could then
+be stored outside the Haskell heap, i.e., as a malloc'ed structure or in
+a completely separate address space alltogether. 
+
+When a @ForeignObj@ becomes garbage, a user-defined finalisation routine
+associated with the object is invoked (currently, each ForeignObj has a
+direct reference to its finaliser).  -- SOF
+
+The only function defined over @ForeignObj@s is:
+
+\begin{pseudocode}
+makeForeignObj# :: Addr#  -- foreign object
+                -> Addr#  -- ptr to its finaliser routine
+		-> StateAndForeignObj# _RealWorld# ForeignObj#
+\end{pseudocode}
+
+\begin{code}
+primOpInfo MakeForeignObjOp
+  = AlgResult SLIT("makeForeignObj#") [] 
+	[addrPrimTy, addrPrimTy, realWorldStatePrimTy] 
+	stateAndForeignObjPrimTyCon [realWorldTy]
+\end{code}
 
 %************************************************************************
 %*									*
@@ -1239,27 +1290,26 @@ primOpInfo ForkOp	-- fork# :: a -> Int#
 \end{code}
 
 \begin{code}
-#ifdef GRAN
+-- HWL: The first 4 Int# in all par... annotations denote:
+--   name, granularity info, size of result, degree of parallelism
 
-primOpInfo ParGlobalOp	-- parGlobal# :: Int -> a -> b -> b
-  = AlgResult SLIT("parGlobal#")	[alphaTyVar,betaTyVar] [intPrimTy,alphaTy,betaTy] liftTyCon [betaTy]
+primOpInfo ParGlobalOp	-- parGlobal# :: Int# -> Int# -> Int# -> Int# -> a -> b -> b
+  = AlgResult SLIT("parGlobal#")	[alphaTyVar,betaTyVar] [alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,betaTy] liftTyCon [betaTy]
 
-primOpInfo ParLocalOp	-- parLocal# :: Int -> a -> b -> b
-  = AlgResult SLIT("parLocal#")	[alphaTyVar,betaTyVar] [intPrimTy,alphaTy,betaTy] liftTyCon [betaTy]
+primOpInfo ParLocalOp	-- parLocal# :: Int# -> Int# -> Int# -> Int# -> a -> b -> b
+  = AlgResult SLIT("parLocal#")	[alphaTyVar,betaTyVar] [alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,betaTy] liftTyCon [betaTy]
 
-primOpInfo ParAtOp	-- parAt# :: Int -> a -> b -> c -> c
-  = AlgResult SLIT("parAt#")	[alphaTyVar,betaTyVar,gammaTyVar] [intPrimTy,alphaTy,betaTy,gammaTy] liftTyCon [gammaTy]
+primOpInfo ParAtOp	-- parAt# :: Int# -> Int# -> Int# -> Int# -> a -> b -> c -> c
+  = AlgResult SLIT("parAt#")	[alphaTyVar,betaTyVar,gammaTyVar] [alphaTy,betaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,gammaTy] liftTyCon [gammaTy]
 
-primOpInfo ParAtForNowOp	-- parAtForNow# :: Int -> a -> b -> c -> c
-  = AlgResult SLIT("parAtForNow#")	[alphaTyVar,betaTyVar,gammaTyVar] [intPrimTy,alphaTy,betaTy,gammaTy] liftTyCon [gammaTy]
+primOpInfo ParAtAbsOp	-- parAtAbs# :: Int# -> Int# -> Int# -> Int# -> Int# -> a -> b -> b
+  = AlgResult SLIT("parAtAbs#")	[alphaTyVar,betaTyVar] [alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,betaTy] liftTyCon [betaTy]
 
-primOpInfo CopyableOp	-- copyable# :: a -> a
-  = AlgResult SLIT("copyable#")	[alphaTyVar] [alphaTy] liftTyCon [alphaTy]
+primOpInfo ParAtRelOp	-- parAtRel# :: Int# -> Int# -> Int# -> Int# -> Int# -> a -> b -> b
+  = AlgResult SLIT("parAtRel#")	[alphaTyVar,betaTyVar] [alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,betaTy] liftTyCon [betaTy]
 
-primOpInfo NoFollowOp	-- noFollow# :: a -> a
-  = AlgResult SLIT("noFollow#")	[alphaTyVar] [alphaTy] liftTyCon [alphaTy]
-
-#endif {-GRAN-}
+primOpInfo ParAtForNowOp	-- parAtForNow# :: Int# -> Int# -> Int# -> Int# -> a -> b -> c -> c
+  = AlgResult SLIT("parAtForNow#")	[alphaTyVar,betaTyVar,gammaTyVar] [alphaTy,betaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,gammaTy] liftTyCon [gammaTy]
 \end{code}
 
 %************************************************************************
@@ -1337,18 +1387,12 @@ primOpHeapReq DoubleDecodeOp	= FixedHeapRequired
     	    	    	    	    	  (intOff mIN_MP_INT_SIZE)))
 
 -- ccall may allocate heap if it is explicitly allowed to (_ccall_gc_)
--- or if it returns a MallocPtr.
+-- or if it returns a ForeignObj.
 
-primOpHeapReq (CCallOp _ _ mayGC@True _ _) = VariableHeapRequired
-primOpHeapReq (CCallOp _ _ mayGC@False _ return_ty)
-   = if returnsMallocPtr
-     then VariableHeapRequired
-     else NoHeapRequired
-  where
-   returnsMallocPtr
-     = case (maybeAppDataTyConExpandingDicts return_ty) of
-	 Nothing            -> False
-	 Just (tycon, _, _) -> tycon == stateAndMallocPtrPrimTyCon
+primOpHeapReq (CCallOp _ _ mayGC@True  _ _) = VariableHeapRequired
+primOpHeapReq (CCallOp _ _ mayGC@False _ _) = NoHeapRequired
+
+primOpHeapReq MakeForeignObjOp	= VariableHeapRequired
 
 -- this occasionally has to expand the Stable Pointer table
 primOpHeapReq MakeStablePtrOp	= VariableHeapRequired
@@ -1375,24 +1419,31 @@ primOpHeapReq ForkOp	    	= VariableHeapRequired
 -- A SeqOp requires unknown space to evaluate its argument
 primOpHeapReq SeqOp	    	= VariableHeapRequired
 
-#ifdef GRAN
-
--- a ParGlobalOp creates a single 4-tuple in the heap.  ToDo: verify this!
-primOpHeapReq ParGlobalOp	= trace "primOpHeapReq:ParGlobalOp:verify!" (
-				  FixedHeapRequired
-    	    	    	    	  (addOff (totHdrSize (MuTupleRep 4)) (intOff 4))
-				  )
-
--- a ParLocalOp creates a single 4-tuple in the heap.  ToDo: verify this!
-primOpHeapReq ParLocalOp	= trace "primOpHeapReq:ParLocalOp:verify!" (
-				  FixedHeapRequired
-    	    	    	    	  (addOff (totHdrSize (MuTupleRep 4)) (intOff 4))
-				  )
-
--- ToDo: parAt, parAtForNow, copyable, noFollow !!  (HWL)
-#endif {-GRAN-}
+-- GranSim sparks are stgMalloced i.e. no heap required
+primOpHeapReq ParGlobalOp	= NoHeapRequired
+primOpHeapReq ParLocalOp	= NoHeapRequired
+primOpHeapReq ParAtOp	        = NoHeapRequired
+primOpHeapReq ParAtAbsOp	= NoHeapRequired
+primOpHeapReq ParAtRelOp	= NoHeapRequired
+primOpHeapReq ParAtForNowOp	= NoHeapRequired
+-- CopyableOp and NoFolowOp don't require heap; don't rely on default
+primOpHeapReq CopyableOp	= NoHeapRequired
+primOpHeapReq NoFollowOp	= NoHeapRequired
 
 primOpHeapReq other_op	    	= NoHeapRequired
+\end{code}
+
+The amount of stack required by primops.
+
+\begin{code}
+data StackRequirement
+  = NoStackRequired 
+  | FixedStackRequired Int {-AStack-} Int {-BStack-}
+  | VariableStackRequired
+     
+primOpStackRequired SeqOp = FixedStackRequired 0 {-AStack-} 2 {-BStack-}
+primOpStackRequired _     = VariableStackRequired 
+-- ToDo: be more specific for certain primops (currently only used for seq)
 \end{code}
 
 Primops which can trigger GC have to be called carefully.
@@ -1405,7 +1456,8 @@ primOpCanTriggerGC op
     	TakeMVarOp  -> True
     	ReadIVarOp  -> True
 	DelayOp     -> True
-	WaitOp      -> True
+	WaitReadOp  -> True
+	WaitWriteOp -> True
 	_           ->
 	    case primOpHeapReq op of
     	    	VariableHeapRequired -> True
@@ -1457,10 +1509,14 @@ primOpOkForSpeculation ParOp		= False	    	-- Could be expensive!
 primOpOkForSpeculation ForkOp	    	= False	    	-- Likewise
 primOpOkForSpeculation SeqOp	    	= False	    	-- Likewise
 
-#ifdef GRAN
 primOpOkForSpeculation ParGlobalOp	= False	    	-- Could be expensive!
 primOpOkForSpeculation ParLocalOp	= False	    	-- Could be expensive!
-#endif {-GRAN-}
+primOpOkForSpeculation ParAtOp		= False	    	-- Could be expensive!
+primOpOkForSpeculation ParAtAbsOp	= False	    	-- Could be expensive!
+primOpOkForSpeculation ParAtRelOp	= False	    	-- Could be expensive!
+primOpOkForSpeculation ParAtForNowOp	= False	    	-- Could be expensive!
+primOpOkForSpeculation CopyableOp	= False	    	-- only tags closure
+primOpOkForSpeculation NoFollowOp	= False	    	-- only tags closure
 
 -- The default is "yes it's ok for speculation"
 primOpOkForSpeculation other_op		= True
@@ -1483,15 +1539,18 @@ fragilePrimOp :: PrimOp -> Bool
 fragilePrimOp ParOp = True
 fragilePrimOp ForkOp = True
 fragilePrimOp SeqOp = True
-fragilePrimOp MakeStablePtrOp = True
+fragilePrimOp MakeForeignObjOp = True  -- SOF
+fragilePrimOp MakeStablePtrOp  = True
 fragilePrimOp DeRefStablePtrOp = True  -- ??? JSM & ADR
 
-#ifdef GRAN
 fragilePrimOp ParGlobalOp = True
 fragilePrimOp ParLocalOp = True
-fragilePrimOp CopyableOp = trace "fragilePrimOp:CopyableOp" True  -- Possibly not.  ASP
-fragilePrimOp NoFollowOp = trace "fragilePrimOp:NoFollowOp" True  -- Possibly not.  ASP
-#endif {-GRAN-}
+fragilePrimOp ParAtOp = True
+fragilePrimOp ParAtAbsOp = True
+fragilePrimOp ParAtRelOp = True
+fragilePrimOp ParAtForNowOp = True
+fragilePrimOp CopyableOp = True  -- Possibly not.  ASP 
+fragilePrimOp NoFollowOp = True  -- Possibly not.  ASP
 
 fragilePrimOp other = False
 \end{code}
@@ -1551,6 +1610,7 @@ primOpNeedsWrapper DoublePowerOp    	= True
 primOpNeedsWrapper DoubleEncodeOp   	= True
 primOpNeedsWrapper DoubleDecodeOp	= True
 
+primOpNeedsWrapper MakeForeignObjOp	= True
 primOpNeedsWrapper MakeStablePtrOp	= True
 primOpNeedsWrapper DeRefStablePtrOp	= True
 
@@ -1559,7 +1619,8 @@ primOpNeedsWrapper PutMVarOp		= True
 primOpNeedsWrapper ReadIVarOp	    	= True
 
 primOpNeedsWrapper DelayOp	    	= True
-primOpNeedsWrapper WaitOp		= True
+primOpNeedsWrapper WaitReadOp		= True
+primOpNeedsWrapper WaitWriteOp		= True
 
 primOpNeedsWrapper other_op 	    	= False
 \end{code}

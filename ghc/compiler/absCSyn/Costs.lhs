@@ -60,28 +60,9 @@ module Costs( costs,
 import Ubiq{-uitous-}
 
 import AbsCSyn
+import PrimOp		( primOpNeedsWrapper, PrimOp(..) )
 
 -- --------------------------------------------------------------------------
-#ifndef GRAN
--- a module of "stubs" that don't do anything
-data CostRes = Cost (Int, Int, Int, Int, Int)
-data Side = Lhs | Rhs
-
-nullCosts    = Cost (0, 0, 0, 0, 0) :: CostRes
-
-costs :: AbstractC -> CostRes
-addrModeCosts :: CAddrMode -> Side -> CostRes
-costs _ = nullCosts
-addrModeCosts _ _ = nullCosts
-
-instance Eq CostRes; instance Text CostRes
-
-instance Num CostRes where
-    x + y = nullCosts
-
-#else {-GRAN-}
--- the real thing
-
 data CostRes = Cost (Int, Int, Int, Int, Int)
 	       deriving (Text)
 
@@ -425,10 +406,7 @@ gmpOps	=
   ]
 
 
--- Haven't found the .umul .div .rem macros yet
--- If they are not Haskell cde, they are not costed, yet
-
-abs_costs = nullCosts  -- NB:  This is normal STG code with costs already
+abs_costs = nullCosts   -- NB:  This is normal STG code with costs already 
 			--	included; no need to add costs again.
 
 umul_costs = Cost (21,4,0,0,0)	   -- due to spy counts
@@ -439,8 +417,10 @@ primOpCosts :: PrimOp -> CostRes
 
 -- Special cases
 
-primOpCosts (CCallOp _ _ _ _ _) = SAVE_COSTS + CCALL_COSTS_GUESS +
-				  RESTORE_COSTS		-- GUESS; check it
+primOpCosts (CCallOp _ _ _ _ _) = SAVE_COSTS + RESTORE_COSTS  	
+	                          -- don't guess costs of ccall proper
+                                  -- for exact costing use a GRAN_EXEC
+                                  -- in the C code
 
 -- Usually 3 mov instructions are needed to get args and res in right place.
 
@@ -484,7 +464,7 @@ primOpCosts FloatPowerOp  = Cost (2, 1, 4, 4, 3)
 
 primOpCosts primOp
   | primOp `elem` floatOps = Cost (0, 0, 0, 0, 1)  :: CostRes
-  | primOp `elem` gmpOps   = Cost (50, 5, 10, 10, 0) :: CostRes	 -- GUESS; check it
+  | primOp `elem` gmpOps   = Cost (30, 5, 10, 10, 0) :: CostRes  -- GUESS; check it
   | otherwise		   = Cost (1, 0, 0, 0, 0)
 
 -- ---------------------------------------------------------------------------
@@ -502,8 +482,6 @@ costsByKind FloatRep	_ = nullCosts
 costsByKind DoubleRep	_ = nullCosts
 -}
 -- ---------------------------------------------------------------------------
-
-#endif {-GRAN-}
 \end{code}
 
 This is the data structure of {\tt PrimOp} copied from prelude/PrimOp.lhs.
@@ -601,8 +579,8 @@ data PrimOp
     | IndexOffAddrOp	PrimRep
 	-- PrimRep can be one of {Char,Int,Addr,Float,Double}Kind.
 	-- This is just a cheesy encoding of a bunch of ops.
-	-- Note that MallocPtrRep is not included -- the only way of
-	-- creating a MallocPtr is with a ccall or casm.
+	-- Note that ForeignObjRep is not included -- the only way of
+	-- creating a ForeignObj is with a ccall or casm.
 
     | UnsafeFreezeArrayOp | UnsafeFreezeByteArrayOp
 
@@ -610,7 +588,11 @@ data PrimOp
 \end{pseudocode}
 
 A special ``trap-door'' to use in making calls direct to C functions:
-Note: From GrAn point of view, CCall is probably very expensive -- HWL
+Note: From GrAn point of view, CCall is probably very expensive 
+      The programmer can specify the costs of the Ccall by inserting
+      a GRAN_EXEC(a,b,l,s,f) at the end of the C- code, specifing the
+      number or arithm., branch, load, store and floating point instructions
+      -- HWL
 
 \begin{pseudocode}
     | CCallOp	String	-- An "unboxed" ccall# to this named function

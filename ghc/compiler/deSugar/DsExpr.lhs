@@ -42,14 +42,14 @@ import MagicUFs		( MagicUnfoldingFun )
 import Name		( Name{--O only-} )
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType )
-import PrelInfo		( mkTupleTy, unitTy, nilDataCon, consDataCon,
-			  charDataCon, charTy, rEC_CON_ERROR_ID,
-			  rEC_UPD_ERROR_ID
-			)
+import PrelVals		( rEC_CON_ERROR_ID, rEC_UPD_ERROR_ID )
 import Pretty		( ppShow, ppBesides, ppPStr, ppStr )
 import TyCon		( isDataTyCon, isNewTyCon )
 import Type		( splitSigmaTy, splitFunTy, typePrimRep,
 			  getAppDataTyConExpandingDicts, getAppTyCon, applyTy
+			)
+import TysWiredIn	( mkTupleTy, unitTy, nilDataCon, consDataCon,
+			  charDataCon, charTy
 			)
 import TyVar		( nullTyVarEnv, addOneToTyVarEnv, GenTyVar{-instance Eq-} )
 import Usage		( UVar(..) )

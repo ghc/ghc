@@ -17,7 +17,7 @@ import Ubiq{-uitous-}
 import CoreSyn
 import Id		( idType, mkSysLocal, dataConArgTys )
 import IdInfo		( mkStrictnessInfo, nonAbsentArgs, Demand(..) )
-import PrelInfo		( aBSENT_ERROR_ID )
+import PrelVals		( aBSENT_ERROR_ID )
 import SrcLoc		( mkUnknownSrcLoc )
 import Type		( isPrimType, mkTyVarTys, mkForAllTys, mkFunTys,
 			  maybeAppDataTyConExpandingDicts

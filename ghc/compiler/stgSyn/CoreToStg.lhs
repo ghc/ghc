@@ -29,8 +29,7 @@ import Id		( mkSysLocal, idType, isBottomingId,
 			)
 import Literal		( mkMachInt, Literal(..) )
 import Name		( isExported )
-import PrelInfo		( unpackCStringId, unpackCString2Id, stringTy,
-			  integerTy, rationalTy, ratioDataCon,
+import PrelVals		( unpackCStringId, unpackCString2Id,
 			  integerZeroId, integerPlusOneId,
 			  integerPlusTwoId, integerMinusOneId
 			)
@@ -38,6 +37,7 @@ import PrimOp		( PrimOp(..) )
 import SpecUtils	( mkSpecialisedCon )
 import SrcLoc		( mkUnknownSrcLoc )
 import Type		( getAppDataTyConExpandingDicts )
+import TysWiredIn	( stringTy, integerTy, rationalTy, ratioDataCon )
 import UniqSupply	-- all of it, really
 import Util		( panic )
 
@@ -426,17 +426,21 @@ coreExprToStg env expr@(Lam _ _)
   = let
 	(_,_, binders, body) = collectBinders expr
     in
-    coreExprToStg env body		`thenUs` \ (stg_body, binds) ->
-    newStgVar (coreExprType expr)	`thenUs` \ var ->
-    returnUs
-      (StgLet (StgNonRec var (StgRhsClosure noCostCentre
-		 	      stgArgOcc
-			      bOGUS_FVs
-			      ReEntrant 	-- binders is non-empty
-			      binders
-			      stg_body))
-       (StgApp (StgVarArg var) [] bOGUS_LVs),
-       binds)
+    coreExprToStg env body		`thenUs` \ stuff@(stg_body, binds) ->
+
+    if null binders then -- it was all type/usage binders; tossed
+	returnUs stuff
+    else
+	newStgVar (coreExprType expr)	`thenUs` \ var ->
+	returnUs
+	  (StgLet (StgNonRec var (StgRhsClosure noCostCentre
+				  stgArgOcc
+				  bOGUS_FVs
+				  ReEntrant 	-- binders is non-empty
+				  binders
+				  stg_body))
+	   (StgApp (StgVarArg var) [] bOGUS_LVs),
+	   binds)
 \end{code}
 
 %************************************************************************

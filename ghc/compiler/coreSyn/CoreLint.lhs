@@ -38,7 +38,7 @@ import Type		( mkFunTy,getFunTy_maybe,mkForAllTy,mkForAllTys,getForAllTy_maybe,
 			  maybeAppDataTyConExpandingDicts, eqTy
 --			  ,expandTy -- ToDo:rm
 			)
-import TyCon		( isPrimTyCon, tyConFamilySize )
+import TyCon		( isPrimTyCon )
 import TyVar		( tyVarKind, GenTyVar{-instances-} )
 import UniqSet		( emptyUniqSet, mkUniqSet, intersectUniqSets,
 			  unionUniqSets, elementOfUniqSet, UniqSet(..)

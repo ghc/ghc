@@ -44,7 +44,7 @@ import PrimOp		( primOpCanTriggerGC, primOpHeapReq, HeapRequirement(..),
 			)
 import PrimRep		( getPrimRepSize, PrimRep(..) )
 import TyCon		( tyConDataCons )
-import Util		( panic, pprPanic )
+import Util		( panic, pprPanic, assertPanic )
 \end{code}
 
 This module provides the support code for @StgToAbstractC@ to deal
@@ -94,7 +94,8 @@ Here is where we insert real live machine instructions.
 
 \begin{code}
 cgExpr x@(StgPrim op args live_vars)
-  = getPrimOpArgAmodes op args	`thenFC` \ arg_amodes ->
+  = ASSERT(op /= SeqOp) -- can't handle SeqOp
+    getPrimOpArgAmodes op args	`thenFC` \ arg_amodes ->
     let
 	result_regs   = assignPrimOpResultRegs op
 	result_amodes = map CReg result_regs

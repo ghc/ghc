@@ -42,7 +42,7 @@ module TysWiredIn (
 	liftTyCon,
 	listTyCon,
 	ltDataCon,
-	mallocPtrTyCon,
+	foreignObjTyCon,
 	mkLiftTy,
 	mkListTy,
 	mkPrimIoTy,
@@ -68,7 +68,7 @@ module TysWiredIn (
 	stateAndDoublePrimTyCon,
 	stateAndFloatPrimTyCon,
 	stateAndIntPrimTyCon,
-	stateAndMallocPtrPrimTyCon,
+	stateAndForeignObjPrimTyCon,
 	stateAndMutableArrayPrimTyCon,
 	stateAndMutableByteArrayPrimTyCon,
 	stateAndPtrPrimTyCon,
@@ -219,17 +219,17 @@ stablePtrTyCon
   where
     stablePtrDataCon
       = pcDataCon stablePtrDataConKey gLASGOW_MISC SLIT("_StablePtr")
-	    [alphaTyVar] [] [applyTyCon stablePtrPrimTyCon [alphaTy]] stablePtrTyCon nullSpecEnv
+	    [alphaTyVar] [] [mkStablePtrPrimTy alphaTy] stablePtrTyCon nullSpecEnv
 \end{code}
 
 \begin{code}
-mallocPtrTyCon
-  = pcDataTyCon mallocPtrTyConKey gLASGOW_MISC SLIT("_MallocPtr")
-	[] [mallocPtrDataCon]
+foreignObjTyCon
+  = pcDataTyCon foreignObjTyConKey gLASGOW_MISC SLIT("_ForeignObj")
+	[] [foreignObjDataCon]
   where
-    mallocPtrDataCon
-      = pcDataCon mallocPtrDataConKey gLASGOW_MISC SLIT("_MallocPtr")
-	    [] [] [applyTyCon mallocPtrPrimTyCon []] mallocPtrTyCon nullSpecEnv
+    foreignObjDataCon
+      = pcDataCon foreignObjDataConKey gLASGOW_MISC SLIT("_ForeignObj")
+	    [] [] [foreignObjPrimTy] foreignObjTyCon nullSpecEnv
 \end{code}
 
 %************************************************************************
@@ -330,14 +330,14 @@ stateAndStablePtrPrimDataCon
 		[mkStatePrimTy alphaTy, applyTyCon stablePtrPrimTyCon [betaTy]]
 		stateAndStablePtrPrimTyCon nullSpecEnv
 
-stateAndMallocPtrPrimTyCon
-  = pcDataTyCon stateAndMallocPtrPrimTyConKey pRELUDE_BUILTIN SLIT("StateAndMallocPtr#")
-		[alphaTyVar] [stateAndMallocPtrPrimDataCon]
-stateAndMallocPtrPrimDataCon
-  = pcDataCon stateAndMallocPtrPrimDataConKey pRELUDE_BUILTIN SLIT("StateAndMallocPtr#")
+stateAndForeignObjPrimTyCon
+  = pcDataTyCon stateAndForeignObjPrimTyConKey pRELUDE_BUILTIN SLIT("StateAndForeignObj#")
+		[alphaTyVar] [stateAndForeignObjPrimDataCon]
+stateAndForeignObjPrimDataCon
+  = pcDataCon stateAndForeignObjPrimDataConKey pRELUDE_BUILTIN SLIT("StateAndForeignObj#")
 		[alphaTyVar] []
-		[mkStatePrimTy alphaTy, applyTyCon mallocPtrPrimTyCon []]
-		stateAndMallocPtrPrimTyCon nullSpecEnv
+		[mkStatePrimTy alphaTy, applyTyCon foreignObjPrimTyCon []]
+		stateAndForeignObjPrimTyCon nullSpecEnv
 
 stateAndFloatPrimTyCon
   = pcDataTyCon stateAndFloatPrimTyConKey pRELUDE_BUILTIN SLIT("StateAndFloat#")
@@ -424,7 +424,7 @@ getStatePairingConInfo prim_ty
 	(wordPrimTyCon, (stateAndWordPrimDataCon, stateAndWordPrimTyCon, 0)),
 	(addrPrimTyCon, (stateAndAddrPrimDataCon, stateAndAddrPrimTyCon, 0)),
 	(stablePtrPrimTyCon, (stateAndStablePtrPrimDataCon, stateAndStablePtrPrimTyCon, 0)),
-	(mallocPtrPrimTyCon, (stateAndMallocPtrPrimDataCon, stateAndMallocPtrPrimTyCon, 0)),
+	(foreignObjPrimTyCon, (stateAndForeignObjPrimDataCon, stateAndForeignObjPrimTyCon, 0)),
 	(floatPrimTyCon, (stateAndFloatPrimDataCon, stateAndFloatPrimTyCon, 0)),
 	(doublePrimTyCon, (stateAndDoublePrimDataCon, stateAndDoublePrimTyCon, 0)),
 	(arrayPrimTyCon, (stateAndArrayPrimDataCon, stateAndArrayPrimTyCon, 0)),
@@ -531,10 +531,10 @@ primitive counterpart.
 \begin{code}
 boolTy = mkTyConTy boolTyCon
 
-boolTyCon = pcDataTyCon boolTyConKey pRELUDE_CORE SLIT("Bool") [] [falseDataCon, trueDataCon]
+boolTyCon = pcDataTyCon boolTyConKey pRELUDE SLIT("Bool") [] [falseDataCon, trueDataCon]
 
-falseDataCon = pcDataCon falseDataConKey pRELUDE_CORE SLIT("False") [] [] [] boolTyCon nullSpecEnv
-trueDataCon  = pcDataCon trueDataConKey	 pRELUDE_CORE SLIT("True")  [] [] [] boolTyCon nullSpecEnv
+falseDataCon = pcDataCon falseDataConKey pRELUDE SLIT("False") [] [] [] boolTyCon nullSpecEnv
+trueDataCon  = pcDataCon trueDataConKey	 pRELUDE SLIT("True")  [] [] [] boolTyCon nullSpecEnv
 \end{code}
 
 %************************************************************************
@@ -660,15 +660,15 @@ rationalTy :: GenType t u
 mkRatioTy ty = applyTyCon ratioTyCon [ty]
 rationalTy   = mkRatioTy integerTy
 
-ratioTyCon = pcDataTyCon ratioTyConKey pRELUDE_RATIO SLIT("Ratio") [alphaTyVar] [ratioDataCon]
+ratioTyCon = pcDataTyCon ratioTyConKey rATIO SLIT("Ratio") [alphaTyVar] [ratioDataCon]
 
-ratioDataCon = pcDataCon ratioDataConKey pRELUDE_RATIO SLIT(":%")
+ratioDataCon = pcDataCon ratioDataConKey rATIO SLIT(":%")
 		[alphaTyVar] [{-(integralClass,alphaTy)-}] [alphaTy, alphaTy] ratioTyCon nullSpecEnv
 	-- context omitted to match lib/prelude/ defn of "data Ratio ..."
 
 rationalTyCon
   = mkSynTyCon
-      (mkBuiltinName rationalTyConKey pRELUDE_RATIO SLIT("Rational"))
+      (mkBuiltinName rationalTyConKey rATIO SLIT("Rational"))
       mkBoxedTypeKind
       0	[] rationalTy -- == mkRatioTy integerTy
 \end{code}
@@ -725,7 +725,7 @@ stringTy = mkListTy charTy
 
 stringTyCon
  = mkSynTyCon
-     (mkBuiltinName stringTyConKey pRELUDE_CORE SLIT("String"))
+     (mkBuiltinName stringTyConKey pRELUDE SLIT("String"))
      mkBoxedTypeKind
      0 [] stringTy
 \end{code}

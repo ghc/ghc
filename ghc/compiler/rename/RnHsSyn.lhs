@@ -92,12 +92,6 @@ isRnImplicit _			 = False
 isRnUnbound (RnUnbound _) = True
 isRnUnbound _		  = False
 
-isRnDecl (RnName _)	= True
-isRnDecl (RnSyn _)	= True
-isRnDecl (RnData _ _ _)	= True
-isRnDecl (RnClass _ _)	= True
-isRnDecl _		= False
-
 -- Very general NamedThing comparison, used when comparing
 -- Uniquable things with different types
 
@@ -128,8 +122,8 @@ instance NamedThing RnName where
     getName (RnImplicitClass n) = n
     getName (RnUnbound occ)     = pprTrace "getRnName:RnUnbound: " (ppr PprDebug occ)
 				  (case occ of
-				     Unqual n -> mkLocalName bottom n bottom2
-				     Qual m n -> mkLocalName bottom n bottom2)
+				     Unqual n -> mkLocalName bottom n False bottom2
+				     Qual m n -> mkLocalName bottom n False bottom2)
 			        where bottom = mkAlphaTyVarUnique 0 -- anything; just something that will print
 				      bottom2 = panic "getRnName: srcloc"
 

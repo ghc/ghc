@@ -663,7 +663,7 @@ extendUnfoldEnvGivenConstructor env var con args
 	(_, ty_args, _) = getAppDataTyConExpandingDicts scrut_ty
     in
     extendUnfoldEnvGivenFormDetails
-      env var (ConForm con (map VarArg args))
+      env var (ConForm con (map TyArg ty_args ++ map VarArg args))
 \end{code}
 
 

@@ -29,13 +29,13 @@ import Name		( Name, isLocallyDefined, isLexVarId, getLocalName, ExportFlag(..),
 			  nameImportFlag, RdrName, pprNonSym )
 import Outputable	-- ToDo:rm
 import PprStyle 	-- ToDo:rm 
-import PrelInfo		( consDataCon )
 import Pretty
 import SrcLoc		( SrcLoc )
 import Unique		( Unique )
-import UniqFM		( emptyUFM, addListToUFM_C, listToUFM, lookupUFM, eltsUFM )
+import UniqFM		( emptyUFM, addListToUFM_C, listToUFM, plusUFM, lookupUFM, eltsUFM )
 import UniqSet		( UniqSet(..) )
-import Util		( isIn, isn'tIn, sortLt, removeDups, cmpPString, assertPanic, pprTrace{-ToDo:rm-} )
+import Util		( isIn, isn'tIn, sortLt, removeDups, mapAndUnzip3, cmpPString,
+			  assertPanic, pprTrace{-ToDo:rm-} )
 \end{code}
 
 rnSource `renames' the source module and export list.
@@ -122,45 +122,67 @@ rnExports mods unqual_imps Nothing
 rnExports mods unqual_imps (Just exps)
   = mapAndUnzipRn (rnIE mods) exps `thenRn` \ (mod_maybes, exp_bags) ->
     let 
-        exp_names = bagToList (unionManyBags exp_bags)
+	(tc_bags, val_bags) = unzip exp_bags
+	tc_names  = bagToList (unionManyBags tc_bags)
+        val_names = bagToList (unionManyBags val_bags)
         exp_mods  = catMaybes mod_maybes
 
 	-- Warn for duplicate names and modules
-	(uniq_exp_names, dup_names) = removeDups cmp_fst exp_names
-	(uniq_exp_mods,  dup_mods)  = removeDups cmpPString exp_mods
+	(_, dup_tc_names)  = removeDups cmp_fst tc_names
+	(_, dup_val_names) = removeDups cmp_fst val_names
 	cmp_fst (x,_) (y,_) = x `cmp` y
 
+	(uniq_mods, dup_mods) = removeDups cmpPString exp_mods
+
+	-- Get names for exported modules
+
+	(mod_tcs, mod_vals, empty_mods)
+	  = case mapAndUnzip3 get_mod_names uniq_mods of
+	      (tcs, vals, emptys) -> (concat tcs, concat vals, catMaybes emptys)
+		
+	(unqual_tcs, unqual_vals) = partition (isRnTyConOrClass.snd) (bagToList unqual_imps)
+
+        get_mod_names mod
+	  = (tcs, vals, empty_mod)
+          where
+            tcs  = [(getName rn, nameImportFlag (getName rn))
+		   | (mod',rn) <- unqual_tcs, mod == mod']
+            vals = [(getName rn, nameImportFlag (getName rn))
+		   | (mod',rn) <- unqual_vals, mod == mod']
+	    empty_mod = if null tcs && null vals
+			then Just mod
+			else Nothing
+							    
 	-- Build finite map of exported names to export flag
-	exp_map0 = addListToUFM_C lub_expflag emptyUFM (map pair_fst uniq_exp_names)
-	(exp_map1, empty_mods) = foldl add_mod_names (exp_map0, []) uniq_exp_mods
-
-	mod_fm = addListToFM_C unionBags emptyFM
-		 [(mod, unitBag (getName rn, nameImportFlag (getName rn)))
-		  | (mod,rn) <- bagToList unqual_imps, isRnDecl rn]
-
-        add_mod_names (exp_map, empty) mod
-	  = case lookupFM mod_fm mod of
-	      Nothing        -> (exp_map, mod:empty)
-	      Just mod_names -> (addListToUFM_C lub_expflag exp_map (map pair_fst (bagToList mod_names)), empty)
+	tc_map0  = addListToUFM_C lub_expflag emptyUFM (map pair_fst tc_names)
+	tc_map   = addListToUFM_C lub_expflag tc_map0  (map pair_fst mod_tcs)
+	
+        val_map0 = addListToUFM_C lub_expflag emptyUFM (map pair_fst val_names)
+        val_map  = addListToUFM_C lub_expflag val_map0 (map pair_fst mod_vals)
 
 	pair_fst p@(f,_) = (f,p)
 	lub_expflag (n, flag1) (_, flag2) = (n, lubExportFlag flag1 flag2)
 
 	-- Check for exporting of duplicate local names
-	exp_locals = [(getLocalName n, n) | (n,_) <- eltsUFM exp_map1]
-	(_, dup_locals) = removeDups cmp_local exp_locals
+	tc_locals  = [(getLocalName n, n) | (n,_) <- eltsUFM tc_map]
+	val_locals = [(getLocalName n, n) | (n,_) <- eltsUFM val_map]
+	(_, dup_tc_locals)  = removeDups cmp_local tc_locals
+	(_, dup_val_locals) = removeDups cmp_local val_locals
 	cmp_local (x,_) (y,_) = x `cmpPString` y
 
 	-- Build export flag function
-	exp_fn n = case lookupUFM exp_map1 n of
+	final_exp_map = plusUFM tc_map val_map
+	exp_fn n = case lookupUFM final_exp_map n of
 		     Nothing       -> NotExported
 		     Just (_,flag) -> flag
     in
-    getSrcLocRn 						`thenRn` \ src_loc ->
-    mapRn (addWarnRn . dupNameExportWarn  src_loc) dup_names 	`thenRn_`
-    mapRn (addWarnRn . dupModExportWarn   src_loc) dup_mods 	`thenRn_`
-    mapRn (addWarnRn . emptyModExportWarn src_loc) empty_mods 	`thenRn_`
-    mapRn (addErrRn  . dupLocalsExportErr src_loc) dup_locals 	`thenRn_`
+    getSrcLocRn 							`thenRn` \ src_loc ->
+    mapRn (addWarnRn . dupNameExportWarn  src_loc) dup_tc_names 	`thenRn_`
+    mapRn (addWarnRn . dupNameExportWarn  src_loc) dup_val_names 	`thenRn_`
+    mapRn (addWarnRn . dupModExportWarn   src_loc) dup_mods 		`thenRn_`
+    mapRn (addWarnRn . emptyModExportWarn src_loc) empty_mods 		`thenRn_`
+    mapRn (addErrRn  . dupLocalsExportErr src_loc) dup_tc_locals	`thenRn_`
+    mapRn (addErrRn  . dupLocalsExportErr src_loc) dup_val_locals	`thenRn_`
     returnRn exp_fn
 
 
@@ -169,20 +191,20 @@ rnIE mods (IEVar name)
     checkIEVar rn	`thenRn` \ exps ->
     returnRn (Nothing, exps)
   where
-    checkIEVar (RnName n)         = returnRn (unitBag (n,ExportAll))
+    checkIEVar (RnName n)         = returnRn (emptyBag, unitBag (n,ExportAll))
     checkIEVar rn@(RnClassOp _ _) = getSrcLocRn `thenRn` \ src_loc ->
-			            failButContinueRn emptyBag (classOpExportErr rn src_loc)
-    checkIEVar rn		  = returnRn emptyBag
+			            failButContinueRn (emptyBag, emptyBag) (classOpExportErr rn src_loc)
+    checkIEVar rn		  = returnRn (emptyBag, emptyBag)
 
 rnIE mods (IEThingAbs name)
   = lookupTyConOrClass name	`thenRn` \ rn ->
     checkIEAbs rn		`thenRn` \ exps ->
     returnRn (Nothing, exps)
   where
-    checkIEAbs (RnSyn n)      = returnRn (unitBag (n,ExportAbs))
-    checkIEAbs (RnData n _ _) = returnRn (unitBag (n,ExportAbs))
-    checkIEAbs (RnClass n _)  = returnRn (unitBag (n,ExportAbs))
-    checkIEAbs rn             = returnRn emptyBag
+    checkIEAbs (RnSyn n)      = returnRn (unitBag (n,ExportAbs), emptyBag)
+    checkIEAbs (RnData n _ _) = returnRn (unitBag (n,ExportAbs), emptyBag)
+    checkIEAbs (RnClass n _)  = returnRn (unitBag (n,ExportAbs), emptyBag)
+    checkIEAbs rn             = returnRn (emptyBag, emptyBag)
 
 rnIE mods (IEThingAll name)
   = lookupTyConOrClass name	`thenRn` \ rn ->
@@ -190,13 +212,14 @@ rnIE mods (IEThingAll name)
     checkImportAll rn           `thenRn_`
     returnRn (Nothing, exps)
   where
-    checkIEAll (RnData n cons fields) = returnRn (exp_all n `consBag` listToBag (map exp_all cons)
-							  `unionBags` listToBag (map exp_all fields))
-    checkIEAll (RnClass n ops)        = returnRn (exp_all n `consBag` listToBag (map exp_all ops))
+    checkIEAll (RnData n cons fields) = returnRn (unitBag (exp_all n), listToBag (map exp_all cons)
+						    			 `unionBags`
+						  		       listToBag (map exp_all fields))
+    checkIEAll (RnClass n ops)        = returnRn (unitBag (exp_all n), listToBag (map exp_all ops))
     checkIEAll rn@(RnSyn n)           = getSrcLocRn `thenRn` \ src_loc ->
-			                warnAndContinueRn (unitBag (n, ExportAbs))
+			                warnAndContinueRn (unitBag (n, ExportAbs), emptyBag)
 					    (synAllExportErr False{-warning-} rn src_loc)
-    checkIEAll rn                     = returnRn emptyBag
+    checkIEAll rn                     = returnRn (emptyBag, emptyBag)
 
     exp_all n = (n, ExportAll)
 
@@ -209,19 +232,21 @@ rnIE mods (IEThingWith name names)
   where
     checkIEWith rn@(RnData n cons fields) rns
 	| same_names (cons++fields) rns
-	= returnRn (consBag (exp_all n) (listToBag (map exp_all cons)))
+	= returnRn (unitBag (exp_all n), listToBag (map exp_all cons)
+					   `unionBags`
+					 listToBag (map exp_all fields))
 	| otherwise
 	= rnWithErr "constructrs (and fields)" rn (cons++fields) rns 
     checkIEWith rn@(RnClass n ops) rns
 	| same_names ops rns
-	= returnRn (consBag (exp_all n) (listToBag (map exp_all ops)))
+	= returnRn (unitBag (exp_all n), listToBag (map exp_all ops))
 	| otherwise
 	= rnWithErr "class ops" rn ops rns
     checkIEWith rn@(RnSyn _) rns
 	= getSrcLocRn `thenRn` \ src_loc ->
-	  failButContinueRn emptyBag (synAllExportErr True{-error-} rn src_loc)
+	  failButContinueRn (emptyBag, emptyBag) (synAllExportErr True{-error-} rn src_loc)
     checkIEWith rn rns
-	= returnRn emptyBag
+	= returnRn (emptyBag, emptyBag)
 
     exp_all n = (n, ExportAll)
 
@@ -231,14 +256,14 @@ rnIE mods (IEThingWith name names)
 
     rnWithErr str rn has rns
       = getSrcLocRn `thenRn` \ src_loc ->
-	failButContinueRn emptyBag (withExportErr str rn has rns src_loc)
+	failButContinueRn (emptyBag, emptyBag) (withExportErr str rn has rns src_loc)
 
 rnIE mods (IEModuleContents mod)
   | isIn "rnIE:IEModule" mod mods
-  = returnRn (Just mod, emptyBag)
+  = returnRn (Just mod, (emptyBag, emptyBag))
   | otherwise
   = getSrcLocRn `thenRn` \ src_loc ->
-    failButContinueRn (Nothing,emptyBag) (badModExportErr mod src_loc)
+    failButContinueRn (Nothing, (emptyBag, emptyBag)) (badModExportErr mod src_loc)
 
 
 checkImportAll rn 
@@ -306,7 +331,7 @@ rn_derivs tycon2 locn (Just ds)
     rn_deriv tycon2 locn clas
       = lookupClass clas	    `thenRn` \ clas_name ->
 	addErrIfRn (uniqueOf clas_name `not_elem` derivableClassKeys)
-		   (derivingNonStdClassErr clas locn)
+		   (derivingNonStdClassErr clas_name locn)
 				    `thenRn_`
 	returnRn clas_name
       where

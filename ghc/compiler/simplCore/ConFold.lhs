@@ -19,10 +19,10 @@ import CoreUnfold	( UnfoldingDetails(..), FormSummary(..) )
 import Id		( idType )
 import Literal		( mkMachInt, mkMachWord, Literal(..) )
 import MagicUFs		( MagicUnfoldingFun )
-import PrelInfo		( trueDataCon, falseDataCon )
 import PrimOp		( PrimOp(..) )
 import SimplEnv
 import SimplMonad
+import TysWiredIn	( trueDataCon, falseDataCon )
 \end{code}
 
 \begin{code}

@@ -16,8 +16,8 @@ module TcPragmas (
 import TcMonad		hiding ( rnMtoTcM )
 import HsSyn		-- the stuff being typechecked
 
-import PrelInfo		( PrimOp(..)	-- to see CCallOp
-			)
+--import PrelInfo		( PrimOp(..)	-- to see CCallOp
+--			)
 import Type
 import CmdLineOpts
 import CostCentre

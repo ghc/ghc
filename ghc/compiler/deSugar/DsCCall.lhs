@@ -20,13 +20,15 @@ import Id		( dataConArgTys, mkTupleCon )
 import Maybes		( maybeToBool )
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instances-} )
-import PrelInfo		( byteArrayPrimTy, getStatePairingConInfo,
-		          packStringForCId, realWorldStatePrimTy,
-			  realWorldStateTy, realWorldTy, stateDataCon,
-			  stringTy )
 import Pretty
+import PrelVals		( packStringForCId )
 import PrimOp		( PrimOp(..) )
 import Type		( isPrimType, maybeAppDataTyConExpandingDicts, eqTy )
+import TysPrim		( byteArrayPrimTy, realWorldTy,  realWorldStatePrimTy )
+import TysWiredIn	( getStatePairingConInfo,
+			  realWorldStateTy, stateDataCon,
+			  stringTy
+			)
 import Util		( pprPanic, pprError, panic )
 
 maybeBoxedPrimType = panic "DsCCall.maybeBoxedPrimType"
@@ -147,38 +149,7 @@ unboxArg arg
 	      \ body -> Case arg (AlgAlts [(box_data_con,[prim_arg],body)]
 					      NoDefault)
     )
-  -- ... continued below ....
-\end{code}
 
-As an experiment, I'm going to unpack any "acceptably small"
-enumeration.  This code will never get used in the main version
-because enumerations would have triggered type errors but I've
-disabled type-checking in my version. ADR
-
-To Will: It might be worth leaving this in (but commented out) until
-we decide what's happening with enumerations. ADR
-
-\begin{code}
-#if 0
-  -- MAYBE LATER:
-  -- Data types with a nullary constructors (enumeration)
-  | isEnumerationType arg_ty  &&				-- enumeration
-    (length data_cons) <= 5					-- "acceptably short"
-  = newSysLocalDs the_prim_arg_ty		`thenDs` \ prim_arg ->
-
-    let
-      alts = [ (con, [], mkMachInt i) | (con,i) <- data_cons `zip` [0..] ]
-      arg_tag = Case arg (AlgAlts alts) NoDefault
-    in
-
-    returnDs (Var prim_arg,
-	      \ body -> Case arg_tag (PrimAlts [(prim_arg, body)] NoDefault)
-    )
-#endif
-\end{code}
-
-\begin{code}
-  -- ... continued from above ....
   | otherwise
   = pprPanic "unboxArg: " (ppr PprDebug arg_ty)
   where
@@ -255,34 +226,6 @@ boxResult result_ty
     returnDs (realWorldStateTy,
 	      \prim_app -> Case prim_app (AlgAlts [the_alt] NoDefault)
     )
-
-#if 0
-    -- MAYBE LATER???
-
-  -- Data types with several nullary constructors (Enumerated types)
-  | isEnumerationType result_ty &&				-- Enumeration
-    (length data_cons) <= 5					-- fairly short
-  =
-    newSysLocalDs realWorldStatePrimTy				`thenDs` \ prim_state_id ->
-    newSysLocalDs intPrimTy 					`thenDs` \ prim_result_id ->
-
-    mkConDs stateDataCon [realWorldTy] [Var prim_state_id]	`thenDs` \ new_state ->
-
-    let
-      alts = [ (mkMachInt i, con) | (i, con) <- [0..] `zip` data_cons ]
-      the_result = Case prim_result_id (PrimAlts alts) NoDefault
-    in
-
-    mkConDs (mkTupleCon 2)
-	      [result_ty, realWorldStateTy]
-	      [the_result, new_state]				`thenDs` \ the_pair ->
-    let
-	the_alt = (state_and_prim_datacon, [prim_state_id, prim_result_id], the_pair)
-    in
-    returnDs (state_and_prim_ty,
-	      \prim_app -> Case prim_app (AlgAlts [the_alt] NoDefault)
-    )
-#endif
 
   | otherwise
   = pprPanic "boxResult: " (ppr PprDebug result_ty)

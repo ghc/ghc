@@ -140,11 +140,11 @@ ifaceUsages (Just if_hdl) usages
     usages_list = fmToList usages
 
     upp_uses (m, (mv, versions))
-      = uppBesides [uppPStr m, uppSP, uppPStr SLIT(" :: "),
+      = uppBesides [uppPStr m, uppSP, uppInt mv, uppPStr SLIT(" :: "),
 	       upp_versions (fmToList versions), uppSemi]
 
     upp_versions nvs
-      = uppIntersperse upp'SP{-'-} [ uppCat [uppPStr n, uppInt v] | (n,v) <- nvs ]
+      = uppIntersperse upp'SP{-'-} [ uppCat [(if isLexSym n then uppParens else id) (uppPStr n), uppInt v] | (n,v) <- nvs ]
 \end{code}
 
 \begin{code}
@@ -160,7 +160,7 @@ ifaceVersions (Just if_hdl) version_info
     version_list = fmToList version_info
 
     upp_versions nvs
-      = uppAboves [ uppPStr n | (n,v) <- nvs ]
+      = uppAboves [ (if isLexSym n then uppParens else id) (uppPStr n) | (n,v) <- nvs ]
 \end{code}
 
 \begin{code}
@@ -257,13 +257,13 @@ ifaceDecls Nothing{-no iface handle-} _ = return ()
 
 ifaceDecls (Just if_hdl) (vals, tycons, classes, _)
   = let
---	exported_classes = filter isExported classes
---	exported_tycons  = filter isExported tycons
-	exported_vals	 = filter isExported vals
+	togo_classes = [ c | c <- classes, isLocallyDefined c ]
+	togo_tycons  = [ t | t <- tycons,  isLocallyDefined t ]
+	togo_vals    = [ v | v <- vals,    isLocallyDefined v ]
 
-	sorted_classes   = sortLt ltLexical classes
-	sorted_tycons	 = sortLt ltLexical tycons
-	sorted_vals	 = sortLt ltLexical exported_vals
+	sorted_classes   = sortLt ltLexical togo_classes
+	sorted_tycons	 = sortLt ltLexical togo_tycons
+	sorted_vals	 = sortLt ltLexical togo_vals
     in
     if (null sorted_classes && null sorted_tycons && null sorted_vals) then
 	--  You could have a module with just instances in it
@@ -281,17 +281,17 @@ ifaceInstances Nothing{-no iface handle-} _ = return ()
 
 ifaceInstances (Just if_hdl) (_, _, _, insts)
   = let
-	exported_insts	= filter is_exported_inst (bagToList insts)
+	togo_insts	= filter is_togo_inst (bagToList insts)
 
-	sorted_insts	= sortLt lt_inst exported_insts
+	sorted_insts	= sortLt lt_inst togo_insts
     in
-    if null exported_insts then
+    if null togo_insts then
 	return ()
     else
 	hPutStr if_hdl "\n__instances__\n" >>
 	hPutStr if_hdl (uppShow 0 (uppAboves (map pp_inst sorted_insts)))
   where
-    is_exported_inst (InstInfo clas _ ty _ _ _ _ _ from_here _ _ _)
+    is_togo_inst (InstInfo clas _ ty _ _ _ _ _ from_here _ _ _)
       = from_here -- && ...
 
     -------

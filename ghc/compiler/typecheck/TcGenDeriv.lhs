@@ -81,7 +81,7 @@ import Maybes		( maybeToBool )
 --import Name		( Name(..) )
 import Outputable
 import PrimOp
-import PrelInfo
+--import PrelInfo
 import Pretty
 import SrcLoc		( mkGeneratedSrcLoc )
 import TyCon		( TyCon, tyConDataCons, isEnumerationTyCon, maybeTyConSingleCon )
@@ -1047,11 +1047,11 @@ showString_PN	= prelude_val pRELUDE_TEXT SLIT("showString")
 showParen_PN	= prelude_val pRELUDE_TEXT SLIT("showParen")
 readParen_PN	= prelude_val pRELUDE_TEXT SLIT("readParen")
 lex_PN		= prelude_val pRELUDE_TEXT SLIT("lex")
-_showList_PN    = prelude_val pRELUDE_CORE SLIT("_showList")
-_readList_PN    = prelude_val pRELUDE_CORE SLIT("_readList")
+_showList_PN    = prelude_val pRELUDE SLIT("_showList")
+_readList_PN    = prelude_val pRELUDE SLIT("_readList")
 
 prelude_val    m s = Imp m s [m] s
-prelude_method c o = Imp pRELUDE_CORE o [pRELUDE_CORE] o -- class not used...
+prelude_method c o = Imp pRELUDE o [pRELUDE] o -- class not used...
 
 a_Expr		= HsVar a_PN
 b_Expr		= HsVar b_PN

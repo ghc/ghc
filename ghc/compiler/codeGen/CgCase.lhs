@@ -30,21 +30,21 @@ import CgBindery	( getVolatileRegs, getArgAmode, getArgAmodes,
 			  idInfoToAmode
 			)
 import CgCon		( buildDynCon, bindConArgs )
-import CgHeapery	( heapCheck )
+import CgHeapery	( heapCheck, yield )
 import CgRetConv	( dataReturnConvAlg, dataReturnConvPrim,
 			  ctrlReturnConvAlg,
 			  DataReturnConvention(..), CtrlReturnConvention(..),
 			  assignPrimOpResultRegs,
 			  makePrimOpArgsRobust
 			)
-import CgStackery	( allocAStack, allocBStack )
+import CgStackery	( allocAStack, allocBStack, allocAStackTop, allocBStackTop )
 import CgTailCall	( tailCallBusiness, performReturn )
 import CgUsages		( getSpARelOffset, getSpBRelOffset, freeBStkSlot )
 import CLabel		( mkVecTblLabel, mkReturnPtLabel, mkDefaultLabel,
 			  mkAltLabel, mkClosureLabel
 			)
 import ClosureInfo	( mkConLFInfo, mkLFArgument, layOutDynCon )
-import CmdLineOpts	( opt_SccProfilingOn )
+import CmdLineOpts	( opt_SccProfilingOn, opt_GranMacros )
 import CostCentre	( useCurrentCostCentre )
 import HeapOffs		( VirtualSpBOffset(..), VirtualHeapOffset(..) )
 import Id		( idPrimRep, toplevelishId,
@@ -55,7 +55,9 @@ import Id		( idPrimRep, toplevelishId,
 import Maybes		( catMaybes )
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instance Outputable-} )
-import PrimOp		( primOpCanTriggerGC, PrimOp(..) )
+import PrimOp		( primOpCanTriggerGC, PrimOp(..),
+			  primOpStackRequired, StackRequirement(..)
+			)
 import PrimRep		( getPrimRepSize, isFollowableRep, retPrimRepSize,
 			  PrimRep(..)
 			)
@@ -173,10 +175,6 @@ cgCase scrut@(StgPrim op args _) live_in_whole_case live_in_alts uniq
     	panic "cgCase: case on PrimOp with default *and* alts\n"
 	-- For now, die if alts are non-empty
     else
-#if 0
-	pprTrace "cgCase:prim app returning alg data type: bad code!" (ppr PprDebug scrut) $
-	-- See above TO DO TO DO
-#endif
 	cgExpr (StgLet (StgNonRec id scrut_rhs) deflt_rhs)
   where
     scrut_rhs       = StgRhsClosure useCurrentCostCentre stgArgOcc{-safe-} scrut_free_vars
@@ -198,6 +196,8 @@ cgCase (StgPrim op args _) live_in_whole_case live_in_alts uniq alts
     in
 	-- Perform the operation
     getVolatileRegs live_in_alts		        `thenFC` \ vol_regs ->
+
+    -- seq cannot happen here => no additional B Stack alloc
 
     absC (COpStmt result_amodes op
 		 arg_amodes -- note: no liveness arg
@@ -231,9 +231,29 @@ cgCase (StgPrim op args _) live_in_whole_case live_in_alts uniq alts
     nukeDeadBindings live_in_whole_case	`thenC`
     saveVolatileVars live_in_alts	`thenFC` \ volatile_var_save_assts ->
 
-    getEndOfBlockInfo                 	`thenFC` \ eob_info ->
-    forkEval eob_info nopC
-	     (getAbsC (cgInlineAlts GCMayHappen uniq alts) `thenFC` \ abs_c ->
+    -- Allocate stack words for the prim-op itself,
+    -- these are guaranteed to be ON TOP OF the stack.
+    -- Currently this is used *only* by the seq# primitive op.
+    let 
+      (a_req,b_req) = case (primOpStackRequired op) of
+    			   NoStackRequired        -> (0, 0)
+    			   FixedStackRequired a b -> (a, b)
+    			   VariableStackRequired  -> (0, 0) -- i.e. don't care
+    in
+    allocAStackTop a_req 		`thenFC` \ a_slot ->
+    allocBStackTop b_req 		`thenFC` \ b_slot ->
+
+    getEndOfBlockInfo                 	`thenFC` \ eob_info@(EndOfBlockInfo args_spa args_spb sequel) ->
+    -- a_req and b_req allocate stack space that is taken care of by the
+    -- macros generated for the primops; thus, we there is no need to adjust
+    -- this part of the stacks later on (=> +a_req in EndOfBlockInfo)
+    -- currently all this is only used for SeqOp
+    forkEval (if True {- a_req==0 && b_req==0 -}
+                then eob_info
+                else (EndOfBlockInfo (args_spa+a_req) 
+	                             (args_spb+b_req) sequel)) nopC 
+	     (
+	      getAbsC (cgInlineAlts GCMayHappen uniq alts) `thenFC` \ abs_c ->
 	      absC (CRetUnVector vtbl_label (CLabelledCode return_label abs_c))
     	    	    	    	    	`thenC`
 	      returnFC (CaseAlts (CUnVecLbl return_label vtbl_label)
@@ -461,7 +481,7 @@ cgEvalAlts cc_slot uniq (StgAlgAlts ty alts deflt)
 	    else
 		cgSemiTaggedAlts uniq alts deflt -- Just <something>
     in
-    cgAlgAlts GCMayHappen uniq cc_restore use_labelled_alts ty alts deflt
+    cgAlgAlts GCMayHappen uniq cc_restore use_labelled_alts ty alts deflt True
 					`thenFC` \ (tagged_alt_absCs, deflt_absC) ->
 
     mkReturnVector uniq ty tagged_alt_absCs deflt_absC `thenFC` \ return_vec ->
@@ -493,6 +513,12 @@ cgInlineAlts :: GCFlag -> Unique
     	     -> Code
 \end{code}
 
+HWL comment on {\em GrAnSim\/}  (adding GRAN_YIELDs for context switch): If
+we  do  an inlining of the  case  no separate  functions  for returning are
+created, so we don't have to generate a GRAN_YIELD in that case.  This info
+must be  propagated  to cgAlgAltRhs (where the  GRAN_YIELD  macro might  be
+emitted). Hence, the new Bool arg to cgAlgAltRhs.
+
 First case: algebraic case, exactly one alternative, no default.
 In this case the primitive op will not have set a temporary to the
 tag, so we shouldn't generate a switch statment.  Instead we just
@@ -500,7 +526,7 @@ do the right thing.
 
 \begin{code}
 cgInlineAlts gc_flag uniq (StgAlgAlts ty [alt@(con,args,use_mask,rhs)] StgNoDefault)
-  = cgAlgAltRhs gc_flag con args use_mask rhs
+  = cgAlgAltRhs gc_flag con args use_mask rhs False{-no yield macro if alt gets inlined-}
 \end{code}
 
 Second case: algebraic case, several alternatives.
@@ -509,7 +535,8 @@ Tag is held in a temporary.
 \begin{code}
 cgInlineAlts gc_flag uniq (StgAlgAlts ty alts deflt)
   = cgAlgAlts gc_flag uniq AbsCNop{-restore_cc-} False{-no semi-tagging-}
-		ty alts deflt	`thenFC` \ (tagged_alts, deflt_c) ->
+		ty alts deflt
+                False{-don't emit yield-}  `thenFC` \ (tagged_alts, deflt_c) ->
 
 	-- Do the switch
     absC (mkAlgAltsCSwitch tag_amode tagged_alts deflt_c)
@@ -536,6 +563,11 @@ cgInlineAlts gc_flag uniq (StgPrimAlts ty alts deflt)
 In @cgAlgAlts@, none of the binders in the alternatives are
 assumed to be yet bound.
 
+HWL comment on {\em GrAnSim\/} (adding GRAN_YIELDs for context switch): The
+last   arg of  cgAlgAlts  indicates  if we  want  a context   switch at the
+beginning of  each alternative. Normally we  want that. The  only exception
+are inlined alternatives.
+
 \begin{code}
 cgAlgAlts :: GCFlag
 	  -> Unique
@@ -544,6 +576,7 @@ cgAlgAlts :: GCFlag
 	  -> Type	    	    	    	-- From the case statement
 	  -> [(Id, [Id], [Bool], StgExpr)]	-- The alternatives
 	  -> StgCaseDefault		-- The default
+          -> Bool                               -- Context switch at alts?
 	  -> FCode ([(ConTag, AbstractC)],	-- The branches
 		    AbstractC			-- The default case
 	     )
@@ -571,15 +604,16 @@ It's all pretty turgid anyway.
 \begin{code}
 cgAlgAlts gc_flag uniq restore_cc semi_tagging
 	ty alts deflt@(StgBindDefault binder True{-used-} _)
+        emit_yield{-should a yield macro be emitted?-}
   = let
 	extra_branches :: [FCode (ConTag, AbstractC)]
 	extra_branches = catMaybes (map mk_extra_branch default_cons)
 
 	must_label_default = semi_tagging || not (null extra_branches)
     in
-    forkAlts (map (cgAlgAlt gc_flag uniq restore_cc semi_tagging) alts)
+    forkAlts (map (cgAlgAlt gc_flag uniq restore_cc semi_tagging emit_yield) alts)
 	     extra_branches
-	     (cgAlgDefault  gc_flag uniq restore_cc must_label_default deflt)
+	     (cgAlgDefault  gc_flag uniq restore_cc must_label_default deflt emit_yield)
   where
 
     default_join_lbl = mkDefaultLabel uniq
@@ -636,25 +670,36 @@ Now comes the general case
 \begin{code}
 cgAlgAlts gc_flag uniq restore_cc must_label_branches ty alts deflt
 	{- The deflt is either StgNoDefault or a BindDefault which doesn't use the binder -}
-  = forkAlts (map (cgAlgAlt gc_flag uniq restore_cc must_label_branches) alts)
+          emit_yield{-should a yield macro be emitted?-}
+
+  = forkAlts (map (cgAlgAlt gc_flag uniq restore_cc must_label_branches emit_yield) alts)
 	     [{- No "extra branches" -}]
-	     (cgAlgDefault gc_flag uniq restore_cc must_label_branches deflt)
+	     (cgAlgDefault gc_flag uniq restore_cc must_label_branches deflt emit_yield)
 \end{code}
 
 \begin{code}
 cgAlgDefault :: GCFlag
 	     -> Unique -> AbstractC -> Bool -- turgid state...
 	     -> StgCaseDefault	    -- input
-	     -> FCode AbstractC		    -- output
+	     -> Bool
+	     -> FCode AbstractC	    -- output
 
 cgAlgDefault gc_flag uniq restore_cc must_label_branch
-	     StgNoDefault
+	     StgNoDefault _
   = returnFC AbsCNop
 
 cgAlgDefault gc_flag uniq restore_cc must_label_branch
 	     (StgBindDefault _ False{-binder not used-} rhs)
+             emit_yield{-should a yield macro be emitted?-}
 
   = getAbsC (absC restore_cc `thenC`
+	     let
+		emit_gran_macros = opt_GranMacros
+	     in
+             (if emit_gran_macros && emit_yield 
+                then yield [] False 
+                else absC AbsCNop)                            `thenC`     
+    -- liveness same as in possibleHeapCheck below
 	     possibleHeapCheck gc_flag [] False (cgExpr rhs)) `thenFC` \ abs_c ->
     let
 	final_abs_c | must_label_branch = CJump (CLabelledCode lbl abs_c)
@@ -667,11 +712,19 @@ cgAlgDefault gc_flag uniq restore_cc must_label_branch
 
 cgAlgDefault gc_flag uniq restore_cc must_label_branch
 	     (StgBindDefault binder True{-binder used-} rhs)
+          emit_yield{-should a yield macro be emitted?-}
 
   = 	-- We have arranged that Node points to the thing, even
     	-- even if we return in registers
     bindNewToReg binder node mkLFArgument `thenC`
     getAbsC (absC restore_cc `thenC`
+	     let
+		emit_gran_macros = opt_GranMacros
+	     in
+             (if emit_gran_macros && emit_yield
+                then yield [node] False
+                else absC AbsCNop)                            `thenC`     
+		-- liveness same as in possibleHeapCheck below
 	     possibleHeapCheck gc_flag [node] False (cgExpr rhs)
 	-- Node is live, but doesn't need to point at the thing itself;
 	-- it's ok for Node to point to an indirection or FETCH_ME
@@ -686,15 +739,21 @@ cgAlgDefault gc_flag uniq restore_cc must_label_branch
   where
     lbl = mkDefaultLabel uniq
 
+-- HWL comment on GrAnSim: GRAN_YIELDs needed; emitted in cgAlgAltRhs
 
 cgAlgAlt :: GCFlag
 	 -> Unique -> AbstractC -> Bool		-- turgid state
+	 -> Bool                               -- Context switch at alts?
 	 -> (Id, [Id], [Bool], StgExpr)
 	 -> FCode (ConTag, AbstractC)
 
-cgAlgAlt gc_flag uniq restore_cc must_label_branch (con, args, use_mask, rhs)
+cgAlgAlt gc_flag uniq restore_cc must_label_branch 
+         emit_yield{-should a yield macro be emitted?-}
+         (con, args, use_mask, rhs)
   = getAbsC (absC restore_cc `thenC`
-	     cgAlgAltRhs gc_flag con args use_mask rhs) `thenFC` \ abs_c ->
+	     cgAlgAltRhs gc_flag con args use_mask rhs 
+             emit_yield
+            ) `thenFC` \ abs_c -> 
     let
 	final_abs_c | must_label_branch = CJump (CLabelledCode lbl abs_c)
 		    | otherwise	        = abs_c
@@ -704,9 +763,14 @@ cgAlgAlt gc_flag uniq restore_cc must_label_branch (con, args, use_mask, rhs)
     tag	= dataConTag con
     lbl = mkAltLabel uniq tag
 
-cgAlgAltRhs :: GCFlag -> Id -> [Id] -> [Bool] -> StgExpr -> Code
-
-cgAlgAltRhs gc_flag con args use_mask rhs
+cgAlgAltRhs :: GCFlag 
+	    -> Id 
+	    -> [Id] 
+	    -> [Bool] 
+	    -> StgExpr 
+	    -> Bool              -- context switch?
+	    -> Code
+cgAlgAltRhs gc_flag con args use_mask rhs emit_yield
   = let
       (live_regs, node_reqd)
 	= case (dataReturnConvAlg con) of
@@ -717,6 +781,13 @@ cgAlgAltRhs gc_flag con args use_mask rhs
 				-- enabled only the live registers will have valid
 				-- pointers in them.
     in
+     let
+	emit_gran_macros = opt_GranMacros
+     in
+    (if emit_gran_macros && emit_yield
+      then yield live_regs node_reqd 
+      else absC AbsCNop)                                    `thenC`     
+    -- liveness same as in possibleHeapCheck below
     possibleHeapCheck gc_flag live_regs node_reqd (
     (case gc_flag of
 	NoGC   	    -> mapFCs bindNewToTemp args `thenFC` \ _ ->

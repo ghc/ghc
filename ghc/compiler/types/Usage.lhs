@@ -14,11 +14,14 @@ module Usage (
 	eqUVar, eqUsage
 ) where
 
-import Ubiq
+import Ubiq{-uitous-}
+
 import Pretty	( Pretty(..), PrettyRep, ppPStr, ppBeside )
 import UniqFM	( emptyUFM, listToUFM, addToUFM, lookupUFM,
-		  plusUFM, sizeUFM, UniqFM )
+		  plusUFM, sizeUFM, UniqFM
+		)
 import Unique	( Unique{-instances-} )
+import Util	( panic )
 \end{code}
 
 \begin{code}
@@ -33,7 +36,7 @@ type Usage = GenUsage UVar
 usageOmega = UsageOmega
 
 duffUsage :: GenUsage uvar
-duffUsage = error "Usage of non-Type kind doesn't make sense"
+duffUsage = panic "Usage of non-Type kind doesn't make sense"
 \end{code}
 
 %************************************************************************

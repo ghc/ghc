@@ -47,10 +47,6 @@ import Id		( Id(..), GenId, idType, dataConFieldLabels, dataConSig )
 import Kind		( Kind, mkBoxedTypeKind, mkTypeKind, mkArrowKind )
 import GenSpecEtc	( checkSigTyVars, checkSigTyVarsGivenGlobals )
 import Name		( Name{-instance Eq-} )
-import PrelInfo		( intPrimTy, charPrimTy, doublePrimTy,
-			  floatPrimTy, addrPrimTy, addrTy,
-			  boolTy, charTy, stringTy, mkListTy,
-			  mkTupleTy, mkPrimIoTy )
 import Type		( mkFunTy, mkAppTy, mkTyVarTy, mkTyVarTys,
 			  getTyVar_maybe, getFunTy_maybe, instantiateTy,
 			  splitForAllTy, splitRhoTy, splitSigmaTy, splitFunTy,
@@ -58,12 +54,19 @@ import Type		( mkFunTy, mkAppTy, mkTyVarTy, mkTyVarTys,
 			  getAppDataTyCon, maybeAppDataTyCon
 			)
 import TyVar		( GenTyVar, TyVarSet(..), unionTyVarSets, mkTyVarSet )
+import TysPrim		( intPrimTy, charPrimTy, doublePrimTy,
+			  floatPrimTy, addrPrimTy
+			)
+import TysWiredIn	( addrTy,
+			  boolTy, charTy, stringTy, mkListTy,
+			  mkTupleTy, mkPrimIoTy
+			)
 import Unify		( unifyTauTy, unifyTauTyList, unifyTauTyLists, unifyFunTy )
 import Unique		( Unique, cCallableClassKey, cReturnableClassKey, 
 			  enumFromClassOpKey, enumFromThenClassOpKey,
 			  enumFromToClassOpKey, enumFromThenToClassOpKey,
-			  monadClassKey, monadZeroClassKey )
-
+			  monadClassKey, monadZeroClassKey
+			)
 --import Name		( Name )		-- Instance 
 import Outputable	( interpp'SP )
 import PprType		( GenType, GenTyVar )	-- Instances
@@ -781,10 +784,14 @@ tcDoStmts _ m (stmt@(ExprStmt exp src_loc) : stmts)
 	      stmts_ty)
 
 tcDoStmts _ m (stmt@(BindStmt pat exp src_loc) : stmts)
-  = tcAddSrcLoc src_loc			(
+  = newMonoIds (collectPatBinders pat) mkBoxedTypeKind $ \ _ ->
+    tcAddSrcLoc src_loc			(
     tcSetErrCtxt (stmtCtxt stmt)	(
 	tcPat pat			`thenTc`    \ (pat', pat_lie, pat_ty) ->  
+
     	tcExpr exp			`thenTc`    \ (exp', exp_lie, exp_ty) ->
+		-- See comments with tcListComp on GeneratorQual
+
 	newTyVarTy mkTypeKind		`thenNF_Tc` \ a ->
 	unifyTauTy a pat_ty		`thenTc_`
 	unifyTauTy (mkAppTy m a) exp_ty	`thenTc_`

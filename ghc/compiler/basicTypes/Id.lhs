@@ -1122,10 +1122,10 @@ no_free_tvs ty = isEmptyTyVarSet (tyVarsOfType ty)
 mkSysLocal, mkUserLocal :: FAST_STRING -> Unique -> MyTy a b -> SrcLoc -> MyId a b
 
 mkSysLocal str uniq ty loc
-  = Id uniq (mkLocalName uniq str loc) ty (SysLocalId (no_free_tvs ty)) NoPragmaInfo noIdInfo
+  = Id uniq (mkLocalName uniq str True{-emph uniq-} loc) ty (SysLocalId (no_free_tvs ty)) NoPragmaInfo noIdInfo
 
 mkUserLocal str uniq ty loc
-  = Id uniq (mkLocalName uniq str loc) ty (LocalId (no_free_tvs ty)) NoPragmaInfo noIdInfo
+  = Id uniq (mkLocalName uniq str False{-emph name-} loc) ty (LocalId (no_free_tvs ty)) NoPragmaInfo noIdInfo
 
 -- mkUserId builds a local or top-level Id, depending on the name given
 mkUserId :: Name -> MyTy a b -> PragmaInfo -> MyId a b

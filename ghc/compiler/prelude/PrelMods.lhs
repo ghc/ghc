@@ -9,11 +9,14 @@ defined here so as to avod
 #include "HsVersions.h"
 
 module PrelMods (
-	pRELUDE, pRELUDE_BUILTIN, pRELUDE_CORE, pRELUDE_RATIO,
+	pRELUDE, pRELUDE_BUILTIN,
 	pRELUDE_LIST, pRELUDE_TEXT,
 	pRELUDE_PRIMIO, pRELUDE_IO, pRELUDE_PS,
 	gLASGOW_ST, gLASGOW_MISC,
-	pRELUDE_FB, fromPrelude
+	pRELUDE_FB,
+	rATIO,
+	
+	fromPrelude
   ) where
 
 CHK_Ubiq() -- debugging consistency check
@@ -25,14 +28,14 @@ gLASGOW_MISC	= SLIT("PreludeGlaMisc")
 gLASGOW_ST	= SLIT("PreludeGlaST")
 pRELUDE		= SLIT("Prelude")
 pRELUDE_BUILTIN = SLIT("PreludeBuiltin")
-pRELUDE_CORE	= SLIT("PreludeCore")
 pRELUDE_FB	= SLIT("PreludeFoldrBuild")
 pRELUDE_IO	= SLIT("PreludeIO")
 pRELUDE_LIST	= SLIT("PreludeList")
 pRELUDE_PRIMIO	= SLIT("PreludePrimIO")
 pRELUDE_PS	= SLIT("PreludePS")
-pRELUDE_RATIO	= SLIT("PreludeRatio")
 pRELUDE_TEXT	= SLIT("PreludeText")
+
+rATIO = SLIT("Ratio")
 
 fromPrelude :: FAST_STRING -> Bool
 fromPrelude s = (_SUBSTR_ s 0 6 == SLIT("Prelude"))

@@ -50,7 +50,7 @@ data PrimRep
   | FloatRep		--	   floats
   | DoubleRep		--	   doubles
 
-  | MallocPtrRep	-- This has to be a special kind because ccall
+  | ForeignObjRep	-- This has to be a special kind because ccall
 			-- generates special code when passing/returning
 			-- one of these. [ADR]
 
@@ -86,7 +86,8 @@ isFollowableRep :: PrimRep -> Bool
 isFollowableRep PtrRep        = True
 isFollowableRep ArrayRep      = True
 isFollowableRep ByteArrayRep  = True
-isFollowableRep MallocPtrRep  = True
+-- why is a MallocPtr followable? 4/96 SOF
+-- isFollowableRep ForeignObjRep  = True
 
 isFollowableRep StablePtrRep  = False
 -- StablePtrs aren't followable because they are just indices into a
@@ -166,7 +167,7 @@ showPrimRep DoubleRep	  = "StgDouble"
 showPrimRep ArrayRep	  = "StgArray" -- see comment below
 showPrimRep ByteArrayRep  = "StgByteArray"
 showPrimRep StablePtrRep  = "StgStablePtr"
-showPrimRep MallocPtrRep  = "StgPtr" -- see comment below
+showPrimRep ForeignObjRep  = "StgPtr" -- see comment below
 showPrimRep VoidRep	  = "!!VOID_KIND!!"
 
 guessPrimRep "D_"	     = DataPtrRep
@@ -186,15 +187,17 @@ All local C variables of @ArrayRep@ are declared in C as type
 @StgArray@.  The coercion to a more precise C type is done just before
 indexing (by the relevant C primitive-op macro).
 
-Nota Bene. There are three types associated with Malloc Pointers:
+Nota Bene. There are three types associated with @ForeignObj@ (MallocPtr++): 
 \begin{itemize}
 \item
-@StgMallocClosure@ is the type of the thing the C world gives us.
+@StgForeignObjClosure@ is the type of the thing the prim. op @mkForeignObj@ returns.
+{- old comment for MallocPtr
 (This typename is hardwired into @ppr_casm_results@ in
 @PprAbsC.lhs@.)
+-}
 
 \item
-@StgMallocPtr@ is the type of the thing we give the C world.
+@StgForeignObj@ is the type of the thing we give the C world.
 
 \item
 @StgPtr@ is the type of the (pointer to the) heap object which we

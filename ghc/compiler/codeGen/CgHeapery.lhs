@@ -10,10 +10,8 @@ module CgHeapery (
 	heapCheck,
 	allocHeap, allocDynClosure
 
-#ifdef GRAN
-	-- new for GrAnSim    HWL
-	, heapCheckOnly, fetchAndReschedule
-#endif  {- GRAN -}
+        -- new functions, basically inserting macro calls into Code -- HWL
+        , heapCheckOnly, fetchAndReschedule, yield
     ) where
 
 import Ubiq{-uitous-}
@@ -41,56 +39,15 @@ import PrimRep		( PrimRep(..) )
 %*									*
 %************************************************************************
 
-This is std code we replaced by the bits below for GrAnSim. -- HWL
+The new code  for heapChecks. For GrAnSim the code for doing a heap check
+and doing a context switch has been separated. Especially, the HEAP_CHK
+macro only performs a heap check. THREAD_CONTEXT_SWITCH should be used for
+doing a context switch. GRAN_FETCH_AND_RESCHEDULE must be put at the
+beginning of every slow entry code in order to simulate the fetching of
+closures. If fetching is necessary (i.e. current closure is not local) then
+an automatic context switch is done.
 
 \begin{code}
-#ifndef GRAN
-
-heapCheck :: [MagicId] 		-- Live registers
-	  -> Bool 		-- Node reqd after GC?
-	  -> Code
-	  -> Code
-
-heapCheck regs node_reqd code
-  = initHeapUsage (\ hHw -> do_heap_chk hHw `thenC` code)
-  where
-
-    do_heap_chk :: HeapOffset -> Code
-    do_heap_chk words_required
-      = absC (if isZeroOff(words_required) then AbsCNop else checking_code) `thenC`
-	    -- The test is *inside* the absC, to avoid black holes!
-
-	-- Now we have set up the real heap pointer and checked there is
-	-- enough space. It remains only to reflect this in the environment
-
-	setRealHp words_required
-
-	    -- The "word_required" here is a fudge.
-	    -- *** IT DEPENDS ON THE DIRECTION ***, and on
-	    -- whether the Hp is moved the whole way all
-	    -- at once or not.
-      where
-	all_regs = if node_reqd then node:regs else regs
-	liveness_mask = mkLiveRegsMask all_regs
-
-	checking_code = CMacroStmt HEAP_CHK [
-			mkIntCLit liveness_mask,
-			COffset words_required,
-    	    	    	mkIntCLit (if node_reqd then 1 else 0)]
-#endif  {- GRAN -}
-\end{code}
-
-The GrAnSim code for heapChecks. The code for doing a heap check and
-doing a context switch has been separated. Especially, the HEAP_CHK
-macro only performs a heap check. THREAD_CONTEXT_SWITCH should be used
-for doing a context switch. GRAN_FETCH_AND_RESCHEDULE must be put at
-the beginning of every slow entry code in order to simulate the
-fetching of closures. If fetching is necessary (i.e. current closure
-is not local) then an automatic context switch is done.
-
-\begin{code}
-#ifdef GRAN
-
 heapCheck :: [MagicId]          -- Live registers
 	  -> Bool               -- Node reqd after GC?
 	  -> Code
@@ -169,10 +126,10 @@ heapCheck' do_context_switch regs node_reqd code
 -- Emit macro for simulating a fetch and then reschedule
 
 fetchAndReschedule ::   [MagicId]               -- Live registers
-			-> Bool                 -- Node reqd
+			-> Bool                 -- Node reqd?
 			-> Code
 
-fetchAndReschedule regs node_reqd =
+fetchAndReschedule regs node_reqd  =
       if (node `elem` regs || node_reqd)
 	then fetch_code `thenC` reschedule_code
 	else absC AbsCNop
@@ -187,8 +144,35 @@ fetchAndReschedule regs node_reqd =
 	 --HWL: generate GRAN_FETCH macro for GrAnSim
 	 --     currently GRAN_FETCH and GRAN_FETCH_AND_RESCHEDULE are miai
 	fetch_code = absC (CMacroStmt GRAN_FETCH [])
+\end{code}
 
-#endif  {- GRAN -}
+The @GRAN_YIELD@ macro is taken from JSM's  code for Concurrent Haskell. It
+allows to context-switch at  places where @node@ is  not alive (it uses the
+@Continue@ rather  than the @EnterNodeCode@  function in the  RTS). We emit
+this kind of macro at the beginning of the following kinds of basic bocks:
+\begin{itemize}
+ \item Slow entry code where node is not alive (see @CgClosure.lhs@). Normally 
+       we use @fetchAndReschedule@ at a slow entry code.
+ \item Fast entry code (see @CgClosure.lhs@).
+ \item Alternatives in case expressions (@CLabelledCode@ structures), provided
+       that they are not inlined (see @CgCases.lhs@). These alternatives will 
+       be turned into separate functions.
+\end{itemize}
+
+\begin{code}
+yield ::   [MagicId]               -- Live registers
+             -> Bool                 -- Node reqd?
+             -> Code 
+
+yield regs node_reqd =
+      -- NB: node is not alive; that's why we use DO_YIELD rather than 
+      --     GRAN_RESCHEDULE 
+      yield_code
+      where
+        all_regs = if node_reqd then node:regs else regs
+        liveness_mask = mkLiveRegsMask all_regs
+
+        yield_code = absC (CMacroStmt GRAN_YIELD [mkIntCLit liveness_mask])
 \end{code}
 
 %************************************************************************

@@ -54,12 +54,13 @@ import Name		( Name, RdrName(..), appendRdr, nameUnique,
 			  mkTupleTyConName, mkFunTyConName
 			)
 import Unique		( Unique, funTyConKey, mkTupleTyConUnique )
-import PrelInfo		( intDataCon, charDataCon )
 import Pretty		( Pretty(..), PrettyRep )
-import PprStyle		( PprStyle )
 import SrcLoc		( SrcLoc, mkBuiltinSrcLoc )
-import Unique		( intDataConKey, charDataConKey )
-import Util		( panic, panic#, nOfThem, isIn, Ord3(..) )
+import Util		( panic, panic#, pprPanic{-ToDo:rm-}, nOfThem, isIn, Ord3(..) )
+import {-hide me-}
+	PprType (pprTyCon)
+import {-hide me-}
+	PprStyle--ToDo:rm
 \end{code}
 
 \begin{code}
@@ -230,6 +231,9 @@ tyConDataCons other				  = []
 
 tyConFamilySize (DataTyCon _ _ _ _ _ data_cons _ _) = length data_cons
 tyConFamilySize (TupleTyCon _ _ _)		    = 1
+#ifdef DEBUG
+tyConFamilySize other = pprPanic "tyConFamilySize:" (pprTyCon PprDebug other)
+#endif
 \end{code}
 
 \begin{code}

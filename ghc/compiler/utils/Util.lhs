@@ -39,7 +39,7 @@ module Util (
 	IF_NOT_GHC(forall COMMA exists COMMA)
 	zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
         zipLazy,
-	mapAndUnzip,
+	mapAndUnzip, mapAndUnzip3,
 	nOfThem, lengthExceeds, isSingleton,
 	startsWith, endsWith,
 #if defined(COMPILING_GHC)
@@ -67,11 +67,8 @@ module Util (
 	-- comparisons
 	Ord3(..), thenCmp, cmpList,
 	IF_NOT_GHC(cmpString COMMA)
-#ifdef USE_FAST_STRINGS
 	cmpPString,
-#else
-	substr,
-#endif
+
 	-- pairs
 	IF_NOT_GHC(cfst COMMA applyToPair COMMA applyToFst COMMA)
 	IF_NOT_GHC(applyToSnd COMMA foldPair COMMA)
@@ -83,15 +80,6 @@ module Util (
 	, assertPanic
 #endif {- COMPILING_GHC -}
 
-	-- and to make the interface self-sufficient...
-#if __HASKELL1__ < 3
-# if defined(COMPILING_GHC)
-	, Maybe(..){-.. for pragmas...-}, PrettyRep, Pretty(..)
-# else
-	, Maybe
-# endif
-#endif
-
     ) where
 
 #if defined(COMPILING_GHC)
@@ -99,9 +87,6 @@ module Util (
 CHK_Ubiq() -- debugging consistency check
 
 import Pretty
-#endif
-#if __HASKELL1__ < 3
-import Maybes		( Maybe(..) )
 #endif
 
 infixr 9 `thenCmp`
@@ -195,6 +180,16 @@ mapAndUnzip f (x:xs)
 	(rs1, rs2) = mapAndUnzip f xs
     in
     (r1:rs1, r2:rs2)
+
+mapAndUnzip3 :: (a -> (b, c, d)) -> [a] -> ([b], [c], [d])
+
+mapAndUnzip3 f [] = ([],[],[])
+mapAndUnzip3 f (x:xs)
+  = let
+	(r1,  r2,  r3)  = f x
+	(rs1, rs2, rs3) = mapAndUnzip3 f xs
+    in
+    (r1:rs1, r2:rs2, r3:rs3)
 \end{code}
 
 \begin{code}
@@ -722,22 +717,10 @@ cmpString _ _ = panic# "cmpString"
 \end{code}
 
 \begin{code}
-#ifdef USE_FAST_STRINGS
 cmpPString :: FAST_STRING -> FAST_STRING -> TAG_
 
 cmpPString x y
   = case (_tagCmp x y) of { _LT -> LT_ ; _EQ -> EQ_ ; _GT -> GT_ }
-#endif
-\end{code}
-
-\begin{code}
-#ifndef USE_FAST_STRINGS
-substr :: FAST_STRING -> Int -> Int -> FAST_STRING
-
-substr str beg end
-  = ASSERT (beg >= 0 && beg <= end)
-    take (end - beg + 1) (drop beg str)
-#endif
 \end{code}
 
 %************************************************************************

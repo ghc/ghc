@@ -28,12 +28,13 @@ import Id		( idType, isDataCon, getIdDemandInfo,
 import IdInfo		( willBeDemanded, DemandInfo )
 import Literal		( isNoRepLit, Literal{-instance Eq-} )
 import Maybes		( maybeToBool )
-import PrelInfo		( voidPrimTy, voidPrimId )
+import PrelVals		( voidPrimId )
 import PrimOp		( primOpOkForSpeculation, PrimOp{-instance Eq-} )
 import SimplEnv
 import SimplMonad
 import SimplUtils	( mkValLamTryingEta )
 import Type		( isPrimType, maybeAppDataTyConExpandingDicts, mkFunTys, eqTy )
+import TysPrim		( voidPrimTy )
 import Unique		( Unique{-instance Eq-} )
 import Usage		( GenUsage{-instance Eq-} )
 import Util		( isIn, isSingleton, zipEqual, panic, assertPanic )

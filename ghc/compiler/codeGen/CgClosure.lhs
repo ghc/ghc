@@ -29,9 +29,7 @@ import CgBindery	( getCAddrMode, getArgAmodes,
 import CgCompInfo	( spARelToInt, spBRelToInt )
 import CgUpdate		( pushUpdateFrame )
 import CgHeapery	( allocDynClosure, heapCheck
-#ifdef GRAN
-			  , fetchAndReschedule  -- HWL
-#endif
+			  , heapCheckOnly, fetchAndReschedule, yield  -- HWL
 			)
 import CgRetConv	( mkLiveRegsMask,
 			  ctrlReturnConvAlg, dataReturnConvAlg, 
@@ -49,7 +47,7 @@ import CLabel		( mkClosureLabel, mkConUpdCodePtrVecLabel,
 			  mkErrorStdEntryLabel, mkRednCountsLabel
 			)
 import ClosureInfo	-- lots and lots of stuff
-import CmdLineOpts	( opt_EmitArityChecks, opt_ForConcurrent )
+import CmdLineOpts	( opt_ForConcurrent, opt_GranMacros )
 import CostCentre	( useCurrentCostCentre, currentOrSubsumedCosts,
 			  noCostCentreAttached, costsAreSubsumed,
 			  isCafCC, overheadCostCentre
@@ -432,7 +430,6 @@ closureCodeBody binder_info closure_info cc all_args body
   = getEntryConvention id lf_info
 		       (map idPrimRep all_args)		`thenFC` \ entry_conv ->
     let
-	do_arity_chks = opt_EmitArityChecks
 	is_concurrent = opt_ForConcurrent
 
 	stg_arity = length all_args
@@ -489,12 +486,6 @@ closureCodeBody binder_info closure_info cc all_args body
 	    -- Now adjust real stack pointers
 	    adjustRealSps spA_stk_args spB_stk_args		`thenC`
 
-	    -- set the arity checker, if asked
-	    absC (
-		if do_arity_chks
-		then CMacroStmt SET_ARITY [mkIntCLit stg_arity]
-		else AbsCNop
-	    )							`thenC`
     	    absC (CFallThrough (CLbl fast_label CodePtrRep))
 
 	assign_to_reg reg_id amode = CAssign (CReg reg_id) amode
@@ -515,11 +506,6 @@ closureCodeBody binder_info closure_info cc all_args body
 		    CString (_PK_ (show_wrapper_name wrapper_maybe)),
 		    CString (_PK_ (show_wrapper_arg_kinds wrapper_maybe))
 		]			`thenC`
-	    absC (
-		if do_arity_chks
-		then CMacroStmt CHK_ARITY [mkIntCLit stg_arity]
-		else AbsCNop
-	    )				`thenC`
 
 		-- Bind args to regs/stack as appropriate, and
 		-- record expected position of sps
@@ -659,35 +645,43 @@ argSatisfactionCheck closure_info args
 
     nodeMustPointToIt (closureLFInfo closure_info) 	`thenFC` \ node_points ->
 
-#ifdef GRAN
-    -- HWL:
+    let
+       emit_gran_macros = opt_GranMacros
+    in
+
+    -- HWL  ngo' ngoq:
     -- absC (CMacroStmt GRAN_FETCH []) 			`thenC`
-    -- forceHeapCheck [] node_points (absC AbsCNop)	`thenC`
-    (if node_points
-	then fetchAndReschedule  [] node_points
-	else absC AbsCNop)				`thenC`
-#endif  {- GRAN -}
+    -- forceHeapCheck [] node_points (absC AbsCNop)			`thenC`
+    (if emit_gran_macros 
+      then if node_points 
+             then fetchAndReschedule  [] node_points 
+             else yield [] node_points
+      else absC AbsCNop)                       `thenC`
 
     getCAddrMode (last args) 				`thenFC` \ last_amode ->
 
     if (isFollowableRep (getAmodeRep last_amode)) then
 	getSpARelOffset 0 	`thenFC` \ (SpARel spA off) ->
 	let
-	    lit = mkIntCLit (spARelToInt spA off)
+	    a_rel_int = spARelToInt spA off
+	    a_rel_arg = mkIntCLit a_rel_int
 	in
+	ASSERT(a_rel_int /= 0)
 	if node_points then
-	    absC (CMacroStmt ARGS_CHK_A [lit])
+	    absC (CMacroStmt ARGS_CHK_A [a_rel_arg])
 	else
-	    absC (CMacroStmt ARGS_CHK_A_LOAD_NODE [lit, set_Node_to_this])
+	    absC (CMacroStmt ARGS_CHK_A_LOAD_NODE [a_rel_arg, set_Node_to_this])
     else
 	getSpBRelOffset 0 	`thenFC` \ (SpBRel spB off) ->
 	let
-	    lit = mkIntCLit (spBRelToInt spB off)
+	    b_rel_int = spBRelToInt spB off
+	    b_rel_arg = mkIntCLit b_rel_int
 	in
+	ASSERT(b_rel_int /= 0)
 	if node_points then
-	    absC (CMacroStmt ARGS_CHK_B [lit])
+	    absC (CMacroStmt ARGS_CHK_B [b_rel_arg])
 	else
-	    absC (CMacroStmt ARGS_CHK_B_LOAD_NODE [lit, set_Node_to_this])
+	    absC (CMacroStmt ARGS_CHK_B_LOAD_NODE [b_rel_arg, set_Node_to_this])
   where
     -- We must tell the arg-satis macro whether Node is pointing to
     -- the closure or not.  If it isn't so pointing, then we give to
@@ -708,12 +702,16 @@ thunkWrapper closure_info thunk_code
   = 	-- Stack and heap overflow checks
     nodeMustPointToIt (closureLFInfo closure_info)  	`thenFC` \ node_points ->
 
-#ifdef GRAN
-    -- HWL insert macros for GrAnSim if node is live here
-    (if node_points
-       then fetchAndReschedule [] node_points
-       else absC AbsCNop)              			`thenC`
-#endif  {- GRAN -}
+    let
+       emit_gran_macros = opt_GranMacros
+    in
+    -- HWL: insert macros for GrAnSim; 2 versions depending on liveness of node
+    -- (we prefer fetchAndReschedule-style context switches to yield ones)
+    (if emit_gran_macros 
+      then if node_points 
+             then fetchAndReschedule  [] node_points 
+             else yield [] node_points
+      else absC AbsCNop)                       `thenC`
 
     stackCheck closure_info [] node_points (	-- stackCheck *encloses* the rest
 
@@ -739,6 +737,14 @@ funWrapper :: ClosureInfo 	-- Closure whose code body this is
 funWrapper closure_info arg_regs fun_body
   = 	-- Stack overflow check
     nodeMustPointToIt (closureLFInfo closure_info)  	`thenFC` \ node_points ->
+    let
+       emit_gran_macros = opt_GranMacros
+    in
+    -- HWL   chu' ngoq:
+    (if emit_gran_macros
+      then yield  arg_regs node_points
+      else absC AbsCNop)                                 `thenC`
+
     stackCheck closure_info arg_regs node_points (	-- stackCheck *encloses* the rest
 
 	-- Heap overflow check

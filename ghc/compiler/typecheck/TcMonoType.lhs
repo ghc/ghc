@@ -29,10 +29,10 @@ import Type		( GenType, Type(..), ThetaType(..),
 			  mkSigmaTy
 			)
 import TyVar		( GenTyVar, TyVar(..), mkTyVar )
-import PrelInfo		( mkListTy, mkTupleTy )
 import Type		( mkDictTy )
 import Class		( cCallishClassKeys )
 import TyCon		( TyCon, Arity(..) )
+import TysWiredIn	( mkListTy, mkTupleTy )
 import Unique		( Unique )
 import PprStyle
 import Pretty

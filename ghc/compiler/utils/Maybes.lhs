@@ -52,14 +52,6 @@ CHK_Ubiq() -- debugging consistency check
 %************************************************************************
 
 \begin{code}
-#if __HASKELL1__ < 3
-data Maybe a
-  = Nothing
-  | Just a
-#endif
-\end{code}
-
-\begin{code}
 maybeToBool :: Maybe a -> Bool
 maybeToBool Nothing  = False
 maybeToBool (Just x) = True
@@ -112,13 +104,6 @@ expectJust err Nothing  = error ("expectJust " ++ err)
 The Maybe monad
 ~~~~~~~~~~~~~~~
 \begin{code}
-#if __HASKELL1__ < 3
-thenMaybe :: Maybe a -> (a -> Maybe b) -> Maybe b
-m `thenMaybe` k = case m of
-		  Nothing -> Nothing
-		  Just a  -> k a
-#endif
-
 seqMaybe :: Maybe a -> Maybe a -> Maybe a
 seqMaybe (Just x) _  = Just x
 seqMaybe Nothing  my = my

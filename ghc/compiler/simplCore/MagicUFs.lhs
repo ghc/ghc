@@ -17,10 +17,10 @@ import Ubiq{-uitous-}
 import IdLoop		-- paranoia checking
 
 import CoreSyn
-import PrelInfo		( mkListTy )
 import SimplEnv		( SimplEnv )
 import SimplMonad	( SmplM(..), SimplCount )
 import Type		( mkFunTys )
+import TysWiredIn	( mkListTy )
 import Unique		( Unique{-instances-} )
 import Util		( assoc, zipWith3Equal, nOfThem, panic )
 \end{code}

@@ -228,7 +228,7 @@ setToAbleCostCentre :: CostCentre -> Bool
   -- be set?  setToAbleCostCentre is allowed to panic on
   -- "nonsense" cases, too...
 
-#if DEBUG
+#ifdef DEBUG
 setToAbleCostCentre NoCostCentre    = panic "setToAbleCC:NoCostCentre"
 setToAbleCostCentre SubsumedCosts   = panic "setToAbleCC:SubsumedCosts"
 setToAbleCostCentre CurrentCC	    = panic "setToAbleCC:CurrentCC"

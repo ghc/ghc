@@ -31,11 +31,8 @@ module AbsCSyn {- (
 
 	-- registers
 	MagicId(..), node, infoptr,
-	isVolatileReg, noLiveRegsMask, mkLiveRegsMask
-
-#ifdef GRAN
-	, CostRes(Cost)
-#endif
+	isVolatileReg, noLiveRegsMask, mkLiveRegsMask,
+	CostRes(Cost)
     )-} where
 
 import Ubiq{-uitous-}
@@ -224,14 +221,12 @@ data CStmtMacro
   | SET_ARITY
   | CHK_ARITY
   | SET_TAG
-#ifdef GRAN
   | GRAN_FETCH	    		-- for GrAnSim only  -- HWL
   | GRAN_RESCHEDULE   		-- for GrAnSim only  -- HWL
   | GRAN_FETCH_AND_RESCHEDULE	-- for GrAnSim only  -- HWL
   | THREAD_CONTEXT_SWITCH   	-- for GrAnSim only  -- HWL
-#endif
+  | GRAN_YIELD   		-- for GrAnSim only  -- HWL 
   deriving Text
-
 \end{code}
 
 \item[@CCallProfCtrMacro@:]
@@ -440,7 +435,7 @@ data MagicId
 
   -- Argument and return registers
   | VanillaReg		-- pointers, unboxed ints and chars
-	PrimRep	-- PtrRep, IntRep, CharRep, StablePtrRep or MallocPtrRep
+	PrimRep	-- PtrRep, IntRep, CharRep, StablePtrRep or ForeignObjRep
 			--	(in case we need to distinguish)
 	FAST_INT	-- its number (1 .. mAX_Vanilla_REG)
 

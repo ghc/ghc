@@ -32,9 +32,7 @@ import Id		( GenId, idType )
 import Kind		( Kind, mkBoxedTypeKind, mkTypeKind )
 import Maybes		( maybeToBool )
 import PprType		( GenType, GenTyVar )
-import PrelInfo		( charPrimTy, intPrimTy, floatPrimTy,
-			  doublePrimTy, charTy, stringTy, mkListTy,
-			  mkTupleTy, addrTy, addrPrimTy )
+import PprStyle--ToDo:rm
 import Pretty
 import RnHsSyn		( RnName{-instance Outputable-} )
 import Type		( splitFunTy, splitRhoTy, splitSigmaTy, mkTyVarTys,
@@ -42,6 +40,10 @@ import Type		( splitFunTy, splitRhoTy, splitSigmaTy, mkTyVarTys,
 			  Type(..), GenType
 			)
 import TyVar		( GenTyVar )
+import TysPrim		( charPrimTy, intPrimTy, floatPrimTy,
+			  doublePrimTy, addrPrimTy
+			)
+import TysWiredIn	( charTy, stringTy, mkListTy, mkTupleTy, addrTy )
 import Unique		( Unique, eqClassOpKey )
 import Util		( assertPanic, panic{-ToDo:rm-} )
 \end{code}
@@ -58,7 +60,7 @@ tcPat :: RenamedPat -> TcM s (TcPat s, LIE s, TcType s)
 
 \begin{code}
 tcPat (VarPatIn name)
-  = tcLookupLocalValueOK "tcPat1" name	`thenNF_Tc` \ id ->
+  = tcLookupLocalValueOK ("tcPat1:"++ppShow 80 (ppr PprDebug name)) name	`thenNF_Tc` \ id ->
     returnTc (VarPat (TcId id), emptyLIE, idType id)
 
 tcPat (LazyPatIn pat)

@@ -29,7 +29,6 @@ import Maybes		( maybeToBool )
 import Name		( isLocallyDefined )
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instance Outputable-} )
-import PrelInfo		( realWorldStateTy )
 import Pretty		( ppAbove )
 import PrimOp		( primOpOkForSpeculation, PrimOp(..) )
 import SimplCase	( simplCase, bindLargeRhs )
@@ -40,6 +39,7 @@ import SimplUtils
 import Type		( mkTyVarTy, mkTyVarTys, mkAppTy,
 			  splitFunTy, getFunTy_maybe, eqTy
 			)
+import TysWiredIn	( realWorldStateTy )
 import Util		( isSingleton, zipEqual, panic, pprPanic, assertPanic )
 \end{code}
 

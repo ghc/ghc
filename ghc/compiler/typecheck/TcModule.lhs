@@ -48,11 +48,11 @@ import ErrUtils		( Warning(..), Error(..) )
 import Id		( GenId, isDataCon, isMethodSelId, idType, IdEnv(..), nullIdEnv )
 import Maybes		( catMaybes )
 import Name		( isExported, isLocallyDefined )
-import PrelInfo		( unitTy, mkPrimIoTy )
 import Pretty
 import RnUtils		( RnEnv(..) )
-import TyCon		( TyCon )
+import TyCon		( isDataTyCon, TyCon )
 import Type		( mkSynTy )
+import TysWiredIn	( unitTy, mkPrimIoTy )
 import TyVar		( TyVarEnv(..), nullTyVarEnv )
 import Unify		( unifyTauTy )
 import UniqFM		( lookupUFM_Directly, lookupWithDefaultUFM_Directly,
@@ -185,6 +185,7 @@ tcModule rn_env
 	    --   any type errors are found (ie there's an inconsistency)
 	    --   we silently discard the pragma
 	tcInterfaceSigs sigs		`thenTc` \ sig_ids ->
+	tcGetEnv			`thenNF_Tc` \ env ->
 
 	returnTc (env, inst_info, data_binds, deriv_binds, ddump_deriv, defaulting_tys, sig_ids)
 
@@ -244,7 +245,7 @@ tcModule rn_env
 	tycons   = getEnv_TyCons final_env
 	classes  = getEnv_Classes final_env
 
-	local_tycons  = filter isLocallyDefined tycons
+	local_tycons  = [ tc | tc <- tycons, isLocallyDefined tc && isDataTyCon tc ]
 	local_classes = filter isLocallyDefined classes
 	exported_ids' = filter isExported (eltsUFM ve2)
     in    

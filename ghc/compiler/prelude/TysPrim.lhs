@@ -182,25 +182,26 @@ mkStablePtrPrimTy ty = applyTyCon stablePtrPrimTyCon [ty]
 
 %************************************************************************
 %*									*
-\subsection[TysPrim-malloc-ptrs]{The ``malloc''-pointer type}
+\subsection[TysPrim-foreign-objs]{The ``foreign object'' type}
 %*									*
 %************************************************************************
 
-``Malloc'' pointers provide a mechanism which will let Haskell's
-garbage collector communicate with a {\em simple\/} garbage collector
-in the IO world (probably \tr{malloc}, hence the name).We want Haskell
-to be able to hold onto references to objects in the IO world and for
-Haskell's garbage collector to tell the IO world when these references
-become garbage.  We are not aiming to provide a mechanism that could
+Foreign objects (formerly ``Malloc'' pointers) provide a mechanism which
+will let Haskell's garbage collector communicate with a {\em simple\/}
+garbage collector in the IO world. We want Haskell to be able to hold
+onto references to objects in the IO world and for Haskell's garbage
+collector to tell the IO world when these references become garbage.
+We are not aiming to provide a mechanism that could
 talk to a sophisticated garbage collector such as that provided by a
 LISP system (with a correspondingly complex interface); in particular,
 we shall ignore the danger of circular structures spread across the
 two systems.
 
-There are no primitive operations on @CHeapPtr#@s (although equality
+There are no primitive operations on @ForeignObj#@s (although equality
 could possibly be added?)
 
 \begin{code}
-mallocPtrPrimTyCon = pcPrimTyCon mallocPtrPrimTyConKey SLIT("MallocPtr#") 0
-			(\ [] -> MallocPtrRep)
+foreignObjPrimTy    = applyTyCon foreignObjPrimTyCon []
+foreignObjPrimTyCon = pcPrimTyCon foreignObjPrimTyConKey SLIT("ForeignObj#") 0
+			(\ [] -> ForeignObjRep)
 \end{code}

@@ -225,17 +225,17 @@ newOverloadedLit orig lit ty
 \begin{code}
 instToId :: Inst s -> TcIdOcc s
 instToId (Dict u clas ty orig loc)
-  = TcId (mkInstId u (mkDictTy clas ty) (mkLocalName u str loc))
+  = TcId (mkInstId u (mkDictTy clas ty) (mkLocalName u str False{-emph name-} loc))
   where
     str = SLIT("d.") _APPEND_ (getLocalName clas)
 instToId (Method u id tys rho_ty orig loc)
-  = TcId (mkInstId u tau_ty (mkLocalName u str loc))
+  = TcId (mkInstId u tau_ty (mkLocalName u str False{-emph name-} loc))
   where
     (_, tau_ty) = splitRhoTy rho_ty	-- NB The method Id has just the tau type
     str = SLIT("m.") _APPEND_ (getLocalName id)
 
 instToId (LitInst u list ty orig loc)
-  = TcId (mkInstId u ty (mkLocalName u SLIT("lit") loc))
+  = TcId (mkInstId u ty (mkLocalName u SLIT("lit") True{-emph uniq-} loc))
 \end{code}
 
 \begin{code}

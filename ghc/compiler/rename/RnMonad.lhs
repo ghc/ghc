@@ -308,7 +308,7 @@ mkLocalNames names_w_locs
     returnRn (zipWithEqual "mkLocalNames" new_local uniqs names_w_locs)
   where
     new_local uniq (Unqual str, srcloc)
-      = mkRnName (mkLocalName uniq str srcloc)
+      = mkRnName (mkLocalName uniq str False{-emph names-} srcloc)
 \end{code}
 
 

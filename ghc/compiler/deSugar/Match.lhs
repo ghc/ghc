@@ -32,19 +32,20 @@ import Id		( idType, mkTupleCon, dataConSig,
 			)
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instance-}, GenTyVar{-ditto-} )
-import PrelInfo		( nilDataCon, consDataCon, mkTupleTy, mkListTy,
-			  charTy, charDataCon, intTy, intDataCon,
-			  floatTy, floatDataCon, doubleTy, doubleDataCon,
-			  integerTy, intPrimTy, charPrimTy,
-			  floatPrimTy, doublePrimTy, stringTy,
-			  addrTy, addrPrimTy, addrDataCon,
-			  wordTy, wordPrimTy, wordDataCon,
-			  pAT_ERROR_ID
-			)
+import PrelVals		( pAT_ERROR_ID )
 import Type		( isPrimType, eqTy, getAppDataTyConExpandingDicts,
 			  instantiateTauTy
 			)
 import TyVar		( GenTyVar{-instance Eq-} )
+import TysPrim		( intPrimTy, charPrimTy, floatPrimTy, doublePrimTy,
+			  addrPrimTy, wordPrimTy
+			)
+import TysWiredIn	( nilDataCon, consDataCon, mkTupleTy, mkListTy,
+			  charTy, charDataCon, intTy, intDataCon,
+			  floatTy, floatDataCon, doubleTy,
+			  doubleDataCon, integerTy, stringTy, addrTy,
+			  addrDataCon, wordTy, wordDataCon
+			)
 import Unique		( Unique{-instance Eq-} )
 import Util		( panic, pprPanic, assertPanic )
 \end{code}

@@ -10,7 +10,8 @@ Stack-twiddling operations, which are pretty low-down and grimy.
 #include "HsVersions.h"
 
 module CgStackery (
-	allocAStack, allocBStack, allocUpdateFrame,
+	allocAStack, allocBStack, allocAStackTop, allocBStackTop,
+	allocUpdateFrame,
 	adjustRealSps, getFinalStackHW,
 	mkVirtStkOffsets, mkStkAmodes
     ) where
@@ -59,7 +60,20 @@ mkVirtStkOffsets init_SpA_offset init_SpB_offset kind_fun things
 	(last_SpA_offset, last_SpB_offset, boxd_w_offsets, ubxd_w_offsets)
   where
     computeOffset offset thing
-      = (offset + (getPrimRepSize . kind_fun) thing, (thing, offset+(1::Int)))
+      = (offset + (max 1 . getPrimRepSize . kind_fun) thing, (thing, offset+(1::Int)))
+	-- The "max 1" bit is ULTRA important
+	-- Why?  mkVirtStkOffsets is the unique function that lays out function
+	-- arguments on the stack. The "max 1" ensures that every argument takes
+	-- at least one stack slot, even if it's of kind VoidKind that actually
+	-- takes no space at all.
+	-- This is important to make sure that argument satisfaction checks work
+	-- properly.  Consider
+	--	f a b s# = (a,b)
+	-- where s# is a VoidKind.  f's argument satisfaction check will check
+	-- that s# is on the B stack above SuB; but if s# takes zero space, the
+	-- check will be ARGS_B_CHK(0), which always succeeds.  As a result, even
+	-- if a,b aren't available either, the PAP update won't trigger and
+	-- we are throughly hosed. (SLPJ 96/05)
 \end{code}
 
 @mkStackAmodes@ is a higher-level version of @mkStackOffsets@.
@@ -166,6 +180,28 @@ allocBStack size info_down (MkCgState absC binds
     delete_block free_b slot = [s | s <- free_b, (s<slot) || (s>=slot+size)]
 			      -- Retain slots which are not in the range
 			      -- slot..slot+size-1
+
+-- Allocate a chunk ON TOP OF the stack
+allocAStackTop :: Int -> FCode VirtualSpAOffset
+allocAStackTop size info_down (MkCgState absC binds
+	                     ((virt_a, free_a, real_a, hw_a), b_usage, h_usage))
+  = (chosen_slot, MkCgState absC binds (new_a_usage, b_usage, h_usage))
+  where
+    push_virt_a = virt_a + size
+    chosen_slot = virt_a + 1
+    new_a_usage = (push_virt_a, free_a, real_a, hw_a `max` push_virt_a)
+				                -- Adjust high water mark
+
+-- Allocate a chunk ON TOP OF the stack
+allocBStackTop :: Int -> FCode VirtualSpBOffset
+allocBStackTop size info_down (MkCgState absC binds
+	                     (a_usage, (virt_b, free_b, real_b, hw_b), h_usage))
+  = (chosen_slot, MkCgState absC binds (a_usage, new_b_usage, h_usage))
+  where
+    push_virt_b = virt_b + size
+    chosen_slot = virt_b+1
+    new_b_usage = (push_virt_b, free_b, real_b, hw_b `max` push_virt_b)
+				                -- Adjust high water mark
 \end{code}
 
 @allocUpdateFrame@ allocates enough space for an update frame

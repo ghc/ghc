@@ -43,10 +43,6 @@ module CLabel (
 #if ! OMIT_NATIVE_CODEGEN
 	, pprCLabel_asm
 #endif
-
-#ifdef GRAN
-	, isSlowEntryCCodeBlock
-#endif
     ) where
 
 import Ubiq{-uitous-}
@@ -299,19 +295,9 @@ externallyVisibleCLabel (IdLabel (CLabelId id) _)
     is_SuperDictSelId  id = maybeToBool (isSuperDictSelId_maybe  id)
 \end{code}
 
-These GRAN functions are needed for spitting out GRAN_FETCH() at the
+OLD?: These GRAN functions are needed for spitting out GRAN_FETCH() at the
 right places. It is used to detect when the abstractC statement of an
 CCodeBlock actually contains the code for a slow entry point.  -- HWL
-
-\begin{code}
-#ifdef GRAN
-
-isSlowEntryCCodeBlock :: CLabel -> Bool
-isSlowEntryCCodeBlock _ = False
--- Worth keeping?  ToDo (WDP)
-
-#endif {-GRAN-}
-\end{code}
 
 We need at least @Eq@ for @CLabels@, because we want to avoid
 duplicate declarations in generating C (see @labelSeenTE@ in

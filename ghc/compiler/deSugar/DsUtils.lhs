@@ -40,7 +40,7 @@ import DsMonad
 
 import CoreUtils	( coreExprType, mkCoreIfThenElse )
 import PprStyle		( PprStyle(..) )
-import PrelInfo		( stringTy, iRREFUT_PAT_ERROR_ID )
+import PrelVals		( iRREFUT_PAT_ERROR_ID )
 import Pretty		( ppShow )
 import Id		( idType, dataConArgTys, mkTupleCon,
 			  pprId{-ToDo:rm-},

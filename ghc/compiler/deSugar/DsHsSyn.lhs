@@ -16,7 +16,7 @@ import TcHsSyn		( TypecheckedPat(..), TypecheckedBind(..),
 			  TypecheckedMonoBinds(..) )
 
 import Id		( idType )
-import PrelInfo		( mkListTy, mkTupleTy, unitTy )
+import TysWiredIn	( mkListTy, mkTupleTy, unitTy )
 import Util		( panic )
 \end{code}
 

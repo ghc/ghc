@@ -44,11 +44,6 @@ import IdLoop	 -- for paranoia checking
 import TyLoop	 -- for paranoia checking
 import PrelLoop  -- for paranoia checking
 
--- ToDo:rm 
---import PprType	( pprGenType ) -- ToDo: rm
---import PprStyle ( PprStyle(..) )
---import Util	( pprPanic )
-
 -- friends:
 import Class	( classSig, classOpLocalType, GenClass{-instances-} )
 import Kind	( mkBoxedTypeKind, resultKind )
@@ -596,71 +591,6 @@ applyTypeEnvToTy tenv ty
 			    Nothing -> tv
 			    Just (TyVarTy tv2) -> tv2
 			    _ -> panic "applyTypeEnvToTy"
-{-
-instantiateTy tenv ty 
-  = go ty
-  where
-    go (TyVarTy tv)		= case [ty | (tv',ty) <- tenv, tv==tv'] of
-				  []     -> TyVarTy tv
-				  (ty:_) -> ty
-    go ty@(TyConTy tycon usage) = ty
-    go (SynTy tycon tys ty)	= SynTy tycon (map go tys) (go ty)
-    go (FunTy arg res usage)	= FunTy (go arg) (go res) usage
-    go (AppTy fun arg)		= AppTy (go fun) (go arg)
-    go (DictTy clas ty usage)	= DictTy clas (go ty) usage
-    go (ForAllTy tv ty)		= ASSERT(null tv_bound)
-				  ForAllTy tv (go ty)
-				where
-				  tv_bound = [() | (tv',_) <- tenv, tv==tv']
-
-    go (ForAllUsageTy uvar bds ty) = ForAllUsageTy uvar bds (go ty)
-
-instantiateTauTy tenv ty 
-  = go ty
-  where
-    go (TyVarTy tv)		= case [ty | (tv',ty) <- tenv, tv==tv'] of
-				  (ty:_) -> ty
-				  []     -> panic "instantiateTauTy"
-    go (TyConTy tycon usage)    = TyConTy tycon usage
-    go (SynTy tycon tys ty)	= SynTy tycon (map go tys) (go ty)
-    go (FunTy arg res usage)	= FunTy (go arg) (go res) usage
-    go (AppTy fun arg)		= AppTy (go fun) (go arg)
-    go (DictTy clas ty usage)	= DictTy clas (go ty) usage
-
-applyTypeEnvToTy tenv ty
-  = let
-	result = mapOverTyVars v_fn ty
-    in
---    pprTrace "applyTypeEnv:" (ppAboves [pprType PprDebug ty, pprType PprDebug result, ppAboves [ppCat [pprUnique u, pprType PprDebug t] | (u,t) <- ufmToList tenv]]) $
-    result
-  where
-    v_fn v = case (lookupTyVarEnv tenv v) of
-                Just ty -> ty
-		Nothing -> TyVarTy v
-\end{code}
-
-@mapOverTyVars@ is a local function which actually does the work.  It
-does no cloning or other checks for shadowing, so be careful when
-calling this on types with Foralls in them.
-
-\begin{code}
-mapOverTyVars :: (TyVar -> Type) -> Type -> Type
-
-mapOverTyVars v_fn ty
-  = let
-	mapper = mapOverTyVars v_fn
-    in
-    case ty of
-      TyVarTy v		-> v_fn v
-      SynTy c as e	-> SynTy c (map mapper as) (mapper e)
-      FunTy a r u	-> FunTy (mapper a) (mapper r) u
-      AppTy f a		-> AppTy (mapper f) (mapper a)
-      DictTy c t u	-> DictTy c (mapper t) u
-      ForAllTy v t	-> case (v_fn v) of
-			     TyVarTy v2 -> ForAllTy v2 (mapper t)
-			     _ -> panic "mapOverTyVars"
-      tc@(TyConTy _ _)	-> tc
--}
 \end{code}
 
 \begin{code}
@@ -779,7 +709,7 @@ eqSimpleTy :: (Eq t,Eq u) => GenType t u -> GenType t u -> Bool
 (AppTy f1 a1)  `eqSimpleTy` (AppTy f2 a2) =
   f1 `eqSimpleTy` f2 && a1 `eqSimpleTy` a2
 (TyConTy tc1 u1) `eqSimpleTy` (TyConTy tc2 u2) =
-  tc1 == tc2 && u1 == u2
+  tc1 == tc2 --ToDo: later: && u1 == u2
 
 (FunTy f1 a1 u1) `eqSimpleTy` (FunTy f2 a2 u2) =
   f1 `eqSimpleTy` f2 && a1 `eqSimpleTy` a2 && u1 == u2
@@ -828,7 +758,7 @@ eqTy t1 t2 =
   eq tve uve (AppTy f1 a1) (AppTy f2 a2) =
     eq tve uve f1 f2 && eq tve uve a1 a2
   eq tve uve (TyConTy tc1 u1) (TyConTy tc2 u2) =
-    tc1 == tc2 && eqUsage uve u1 u2
+    tc1 == tc2 -- ToDo: LATER: && eqUsage uve u1 u2
 
   eq tve uve (FunTy f1 a1 u1) (FunTy f2 a2 u2) =
     eq tve uve f1 f2 && eq tve uve a1 a2 && eqUsage uve u1 u2

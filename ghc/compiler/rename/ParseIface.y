@@ -119,8 +119,8 @@ module_stuff_pair   :  CONID INTEGER DCOLON name_version_pairs SEMI
 name_version_pairs  ::	{ Bag (FAST_STRING, Int) }
 name_version_pairs  :  name_version_pair
 			{ unitBag $1 }
-		    |  name_version_pairs COMMA name_version_pair
-			{ $1 `snocBag` $3 }
+		    |  name_version_pairs name_version_pair
+			{ $1 `snocBag` $2 }
 
 name_version_pair   ::	{ (FAST_STRING, Int) }
 name_version_pair   :  iname INTEGER

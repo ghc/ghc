@@ -30,9 +30,6 @@ import MagicUFs		( MagicUnfoldingFun )
 import Maybes		( maybeToBool )
 import Outputable	( Outputable(..){-instance * []-} )
 import PprStyle		( PprStyle(..) )
-import PrelInfo		( intTyCon, integerTyCon, doubleTyCon,
-			  floatTyCon, wordTyCon, addrTyCon
-			)
 import Pretty		( ppStr )
 import PrimOp		( PrimOp(..) )
 import SaLib
@@ -40,6 +37,9 @@ import TyCon		( maybeTyConSingleCon, isEnumerationTyCon,
 			  TyCon{-instance Eq-}
 			)
 import Type		( maybeAppDataTyConExpandingDicts, isPrimType )
+import TysWiredIn	( intTyCon, integerTyCon, doubleTyCon,
+			  floatTyCon, wordTyCon, addrTyCon
+			)
 import Util		( isIn, isn'tIn, nOfThem, zipWithEqual,
 			  pprTrace, panic, pprPanic, assertPanic
 			)

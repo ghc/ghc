@@ -32,11 +32,12 @@ import Id		( idType, isBottomingId, idWantsToBeINLINEd, dataConArgTys,
 			)
 import IdInfo		( arityMaybe )
 import Maybes		( maybeToBool )
-import PrelInfo		( augmentId, buildId, realWorldStateTy )
+import PrelVals		( augmentId, buildId )
 import PrimOp		( primOpIsCheap )
 import SimplEnv
 import SimplMonad
 import Type		( eqTy, isPrimType, maybeAppDataTyConExpandingDicts, getTyVar_maybe )
+import TysWiredIn	( realWorldStateTy )
 import TyVar		( GenTyVar{-instance Eq-} )
 import Util		( isIn, panic )
 

@@ -13,7 +13,7 @@
 module PprAbsC (
 	writeRealC,
 	dumpRealC
-#if defined(DEBUG)
+#ifdef DEBUG
 	, pprAmode -- otherwise, not exported
 #endif
     ) where
@@ -83,14 +83,11 @@ from a cost 5 tuple. %%  HWL
 \begin{code}
 emitMacro :: CostRes -> Unpretty
 
-#ifndef GRAN
-emitMacro _ = uppNil
-#else
+-- ToDo: Check a compile time flag to decide whether a macro should be emitted
 emitMacro (Cost (i,b,l,s,f))
   = uppBesides [ uppStr "GRAN_EXEC(",
-	uppInt i, uppComma, uppInt b, uppComma, uppInt l, uppComma,
-	uppInt s, uppComma, uppInt f, pp_paren_semi ]
-#endif {-GRAN-}
+                          uppInt i, uppComma, uppInt b, uppComma, uppInt l, uppComma,
+	                  uppInt s, uppComma, uppInt f, pp_paren_semi ]
 \end{code}
 
 \begin{code}
@@ -577,9 +574,11 @@ Some rough notes on generating code for @CCallOp@:
    (This happens after restoration of essential registers because we
    might need the @Base@ register to access all the others correctly.)
 
+{- Doesn't apply anymore with ForeignObj, structure create via primop.
+   makeForeignObj (ForeignObj is not CReturnable)
 7) If returning Malloc Pointer, build a closure containing the
    appropriate value.
-
+-}
    Otherwise, copy local variable into result register.
 
 8) If ccall (not casm), declare the function being called as extern so
@@ -593,11 +592,7 @@ Some rough notes on generating code for @CCallOp@:
   basic_restores;
   restores;
 
-  #if MallocPtr
-	constructMallocPtr(liveness, return_reg, _ccall_result);
-  #else
-	return_reg = _ccall_result;
-  #end
+  return_reg = _ccall_result;
 }
 \end{pseudocode}
 
@@ -607,7 +602,7 @@ Amendment to the above: if we can GC, we have to:
   can get at them.
 * be sure that there are no live registers or we're in trouble.
   (This can cause problems if you try something foolish like passing
-   an array or mallocptr to a _ccall_GC_ thing.)
+   an array or foreign obj to a _ccall_GC_ thing.)
 * increment/decrement the @inCCallGC@ counter before/after the call so
   that the runtime check that PerformGC is being used sensibly will work.
 
@@ -675,7 +670,7 @@ pprCCall sty op@(CCallOp op_str is_asm may_gc _ _) args results liveness_mask vo
 
 If the argument is a heap object, we need to reach inside and pull out
 the bit the C world wants to see.  The only heap objects which can be
-passed are @Array@s, @ByteArray@s and @MallocPtr@s.
+passed are @Array@s, @ByteArray@s and @ForeignObj@s.
 
 \begin{code}
 ppr_casm_arg :: PprStyle -> CAddrMode -> Int -> (Unpretty, Unpretty)
@@ -699,9 +694,9 @@ ppr_casm_arg sty amode a_num
 	      ByteArrayRep -> (pp_kind,
 				uppBesides [uppStr "BYTE_ARR_CTS(", pp_amode, uppRparen])
 
-	      -- for Malloc Pointers, use MALLOC_PTR_DATA to fish out the contents.
-	      MallocPtrRep -> (uppPStr SLIT("StgMallocPtr"),
-				uppBesides [uppStr "MallocPtr_CLOSURE_DATA(", pp_amode, uppStr")"])
+	      -- for ForeignObj, use FOREIGN_OBJ_DATA to fish out the contents.
+	      ForeignObjRep -> (uppPStr SLIT("StgForeignObj"),
+				uppBesides [uppStr "ForeignObj_CLOSURE_DATA(", pp_amode, uppStr")"])
 	      other	    -> (pp_kind, pp_amode)
 
 	declare_local_var
@@ -716,10 +711,11 @@ For l-values, the critical questions are:
 
    We only allow zero or one results.
 
-2) Is the result is a mallocptr?
+{- With the introduction of ForeignObj (MallocPtr++), no longer necess.
+2) Is the result is a foreign obj?
 
    The mallocptr must be encapsulated immediately in a heap object.
-
+-}
 \begin{code}
 ppr_casm_results ::
 	PprStyle	-- style
@@ -742,13 +738,20 @@ ppr_casm_results sty [r] liveness
 
 	(result_type, assign_result)
 	  = case r_kind of
-	      MallocPtrRep ->
-		(uppPStr SLIT("StgMallocPtr"),
-		 uppBesides [ uppStr "constructMallocPtr(",
+{- @ForeignObj@s replaces MallocPtrs and are *not* CReturnable.
+   Instead, external references have to be turned into ForeignObjs
+   using the primop makeForeignObj#. Benefit: Multiple finalisation
+   routines can be accommodated and the below special case is not needed.
+   Price is, of course, that you have to explicitly wrap `foreign objects'
+   with makeForeignObj#.
++ 
+	      ForeignObjRep ->
+		(uppPStr SLIT("StgForeignObj"),
+		 uppBesides [ uppStr "constructForeignObj(",
 				liveness, uppComma,
 				result_reg, uppComma,
 				local_var,
-			     pp_paren_semi ])
+			     pp_paren_semi ]) -}
 	      _ ->
 		(pprPrimKind sty r_kind,
 		 uppBesides [ result_reg, uppEquals, local_var, uppSemi ])
@@ -825,14 +828,6 @@ of the source addressing mode.)  If the kind of the assignment is of
 pprAssign :: PprStyle -> PrimRep -> CAddrMode -> CAddrMode -> Unpretty
 
 pprAssign sty VoidRep dest src = uppNil
-
-#if 0
-pprAssign sty kind dest src
- | (kind /= getAmodeRep dest) || (kind /= getAmodeRep src)
- = uppCat [uppStr "Bad kind:", pprPrimKind sty kind,
-	pprPrimKind sty (getAmodeRep dest), pprAmode sty dest,
-	pprPrimKind sty (getAmodeRep src),  pprAmode sty src]
-#endif
 \end{code}
 
 Special treatment for floats and doubles, to avoid unwanted conversions.
@@ -1089,7 +1084,7 @@ pprUnionTag FloatRep		= uppChar 'f'
 pprUnionTag DoubleRep		= panic "pprUnionTag:Double?"
 
 pprUnionTag StablePtrRep	= uppChar 'i'
-pprUnionTag MallocPtrRep	= uppChar 'p'
+pprUnionTag ForeignObjRep	= uppChar 'p'
 
 pprUnionTag ArrayRep		= uppChar 'p'
 pprUnionTag ByteArrayRep	= uppChar 'b'

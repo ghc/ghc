@@ -36,7 +36,7 @@ import CLabel		( mkStdUpdCodePtrVecLabel, mkConUpdCodePtrVecLabel )
 import ClosureInfo	( nodeMustPointToIt,
 			  getEntryConvention, EntryConvention(..)
 			)
-import CmdLineOpts	( opt_EmitArityChecks, opt_DoSemiTagging )
+import CmdLineOpts	( opt_DoSemiTagging )
 import HeapOffs		( zeroOff, VirtualSpAOffset(..) )
 import Id		( idType, dataConTyCon, dataConTag,
 			  fIRST_TAG
@@ -314,10 +314,7 @@ tailCallBusiness :: Id -> CAddrMode	-- Function and its amode
 		 -> Code
 
 tailCallBusiness fun fun_amode lf_info arg_amodes live_vars pending_assts
-  = let
-	do_arity_chks = opt_EmitArityChecks
-    in
-    nodeMustPointToIt lf_info			`thenFC` \ node_points ->
+  = nodeMustPointToIt lf_info			`thenFC` \ node_points ->
     getEntryConvention fun lf_info
 	(map getAmodeRep arg_amodes)		`thenFC` \ entry_conv ->
 
@@ -346,10 +343,7 @@ tailCallBusiness fun fun_amode lf_info arg_amodes live_vars pending_assts
 						     `mkAbsCStmts`
 						  CJump (CLbl lbl CodePtrRep))
 	      DirectEntry lbl arity regs  ->
-		(regs,	 (if do_arity_chks
-			  then CMacroStmt SET_ARITY [mkIntCLit arity]
-			  else AbsCNop)
-			 `mkAbsCStmts` CJump (CLbl lbl CodePtrRep))
+		(regs,	 CJump (CLbl lbl CodePtrRep))
 
 	no_of_args = length arg_amodes
 

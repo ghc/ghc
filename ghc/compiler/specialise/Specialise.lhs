@@ -49,7 +49,6 @@ import PprType		( pprGenType, pprParendGenType, pprMaybeTy,
 			  GenType{-instance Outputable-}, GenTyVar{-ditto-},
 			  TyCon{-ditto-}
 			)
-import PrelInfo		( liftDataCon )
 import Pretty		( ppHang, ppCat, ppStr, ppAboves, ppBesides,
 			  ppInt, ppSP, ppInterleave, ppNil, Pretty(..)
 			)
@@ -64,6 +63,7 @@ import TyVar		( cloneTyVar,
 			  nullTyVarEnv, growTyVarEnvList, TyVarEnv(..),
 			  GenTyVar{-instance Eq-}
 			)
+import TysWiredIn	( liftDataCon )
 import Unique		( Unique{-instance Eq-} )
 import UniqSet		( mkUniqSet, unionUniqSets, uniqSetToList )
 import UniqSupply	( splitUniqSupply, getUniques, getUnique )

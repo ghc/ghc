@@ -42,7 +42,6 @@ import Id		( isDataCon, dataConSig,
 import Maybes		( catMaybes )
 import PprStyle		( PprStyle(..) )
 import PprType		( TyCon{-instance Outputable-} )
-import PrelInfo		( integerDataCon )
 import PrimOp		( primOpCanTriggerGC,
 			  getPrimOpResultInfo, PrimOpResultInfo(..),
 			  PrimOp{-instance Outputable-}
@@ -129,8 +128,6 @@ dataReturnConvAlg data_con
     (reg_assignment, leftover_kinds)
       = assignRegs [node, infoptr] -- taken...
 		   (map typePrimRep arg_tys)
-
-    is_prim_result_ty = data_con == integerDataCon -- ***HACK***! (WDP 95/11)
 \end{code}
 
 %************************************************************************
@@ -158,7 +155,7 @@ dataReturnConvPrim ArrayRep     = VanillaReg ArrayRep ILIT(1)
 dataReturnConvPrim ByteArrayRep = VanillaReg ByteArrayRep ILIT(1)
 
 dataReturnConvPrim StablePtrRep = VanillaReg StablePtrRep ILIT(1)
-dataReturnConvPrim MallocPtrRep = VanillaReg MallocPtrRep ILIT(1)
+dataReturnConvPrim ForeignObjRep = VanillaReg ForeignObjRep ILIT(1)
 
 #ifdef DEBUG
 dataReturnConvPrim PtrRep	= panic "dataReturnConvPrim: PtrRep"
@@ -207,8 +204,8 @@ argument into it).
 
 Bug: it is assumed that robust amodes cannot contain pointers.  This
 seems reasonable but isn't true.  For example, \tr{Array#}'s
-\tr{MallocPtr#}'s are pointers.  (This is only known to bite on
-\tr{_ccall_GC_} with a MallocPtr argument.)
+\tr{ForeignObj#}'s are pointers.  (This is only known to bite on
+\tr{_ccall_GC_} with a ForeignObj argument.)
 
 See after for some ADR comments...
 

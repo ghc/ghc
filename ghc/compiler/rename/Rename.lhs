@@ -14,7 +14,7 @@ import Ubiq
 
 import HsSyn
 import RdrHsSyn		( RdrNameHsModule(..), RdrNameImportDecl(..) )
-import RnHsSyn		( RnName, RenamedHsModule(..), isRnTyConOrClass, isRnWired )
+import RnHsSyn		( RnName(..){-.. is for Ix hack only-}, RenamedHsModule(..), isRnTyConOrClass, isRnWired )
 
 --ToDo:rm: all for debugging only
 import Maybes
@@ -43,6 +43,7 @@ import Maybes		( catMaybes )
 import Name		( isLocallyDefined, mkBuiltinName, Name, RdrName(..) )
 import PrelInfo		( builtinNameInfo, BuiltinNames(..), BuiltinKeys(..) )
 import PrelMods		( pRELUDE )
+import Unique		( ixClassKey )
 import UniqFM		( emptyUFM, lookupUFM, addListToUFM_C, eltsUFM )
 import UniqSupply	( splitUniqSupply )
 import Util		( panic, assertPanic )
@@ -165,13 +166,18 @@ renameModule us input@(HsModule mod _ _ imports _ _ _ _ _ _ _ _ _ _)
 
 	-- we must ensure that the definitions of things in the BuiltinKey
 	-- table which may be *required* by the typechecker etc are read.
+	-- We *hack* in a requirement for Ix.Ix here
+	-- (it's the one thing that doesn't come from Prelude.<blah>)
 
 	must_haves
-	  = [ name_fn (mkBuiltinName u pRELUDE str) 
+	  = (RnImplicitClass (mkBuiltinName ixClassKey SLIT("Ix") SLIT("Ix")))
+	  : [ name_fn (mkBuiltinName u pRELUDE str) 
 	    | (str, (u, name_fn)) <- fmToList b_keys,
 	      str `notElem` [ SLIT("main"), SLIT("mainPrimIO")] ]
     in
-    ASSERT (isEmptyBag orig_occ_dups)
+--  ASSERT (isEmptyBag orig_occ_dups)
+    (if (isEmptyBag orig_occ_dups) then \x->x
+     else pprTrace "orig_occ_dups:" (ppAboves [ ppCat [ppr PprDebug m, ppr PprDebug n, ppr PprDebug o] | (m,n,o) <- bagToList orig_occ_dups])) $
     ASSERT (isEmptyBag orig_def_dups)
 
     rnIfaces iface_cache imp_mods us3 orig_def_env orig_occ_env
