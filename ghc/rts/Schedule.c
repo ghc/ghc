@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.193 2004/03/01 14:18:35 simonmar Exp $
+ * $Id: Schedule.c,v 1.194 2004/03/13 00:56:45 sof Exp $
  *
  * (c) The GHC Team, 1998-2003
  *
@@ -1380,13 +1380,22 @@ isThreadBound(StgTSO* tso USED_IN_THREADED_RTS)
  * Singleton fork(). Do not copy any running threads.
  * ------------------------------------------------------------------------- */
 
+#ifndef mingw32_TARGET_OS
+#define FORKPROCESS_PRIMOP_SUPPORTED
+#endif
+
+#ifdef FORKPROCESS_PRIMOP_SUPPORTED
 static void 
 deleteThreadImmediately(StgTSO *tso);
-
+#endif
 StgInt
-forkProcess(HsStablePtr *entry)
+forkProcess(HsStablePtr *entry
+#ifndef FORKPROCESS_PRIMOP_SUPPORTED
+	    STG_UNUSED
+#endif
+           )
 {
-#ifndef mingw32_TARGET_OS
+#ifdef FORKPROCESS_PRIMOP_SUPPORTED
   pid_t pid;
   StgTSO* t,*next;
   StgMainThread *m;
@@ -1420,17 +1429,17 @@ forkProcess(HsStablePtr *entry)
       // wipe the main thread list
     while((m = main_threads) != NULL) {
       main_threads = m->link;
-#ifdef THREADED_RTS
+# ifdef THREADED_RTS
       closeCondition(&m->bound_thread_cond);
-#endif
+# endif
       stgFree(m);
     }
     
-#ifdef RTS_SUPPORTS_THREADS
+# ifdef RTS_SUPPORTS_THREADS
     resetTaskManagerAfterFork();      // tell startTask() and friends that
     startingWorkerThread = rtsFalse;  // we have no worker threads any more
     resetWorkerWakeupPipeAfterFork();
-#endif
+# endif
     
     rc = rts_evalStableIO(entry, NULL);  // run the action
     rts_checkSchedStatus("forkProcess",rc);
@@ -1440,10 +1449,10 @@ forkProcess(HsStablePtr *entry)
     hs_exit();                      // clean up and exit
     stg_exit(0);
   }
-#else /* mingw32 */
-  barf("forkProcess#: primop not implemented for mingw32, sorry!\n");
+#else /* !FORKPROCESS_PRIMOP_SUPPORTED */
+  barf("forkProcess#: primop not supported, sorry!\n");
   return -1;
-#endif /* mingw32 */
+#endif
 }
 
 /* ---------------------------------------------------------------------------
@@ -2931,6 +2940,7 @@ deleteThread(StgTSO *tso)
   raiseAsync(tso,NULL);
 }
 
+#ifdef FORKPROCESS_PRIMOP_SUPPORTED
 static void 
 deleteThreadImmediately(StgTSO *tso)
 { // for forkProcess only:
@@ -2947,6 +2957,7 @@ deleteThreadImmediately(StgTSO *tso)
 
   tso->what_next = ThreadKilled;
 }
+#endif
 
 void
 raiseAsyncWithLock(StgTSO *tso, StgClosure *exception)
