@@ -274,7 +274,7 @@ loadDecl ignore_prags mod (_version, decl)
 	; implicit_names <- mapM (mk_new_bndr (Just main_name)) (ifaceDeclSubBndrs decl)
 
 	-- Typecheck the thing, lazily
-	; thing <- forkM doc (bumpDeclStats main_name >> tcIfaceDecl decl)
+	; thing <- forkM doc (bumpDeclStats main_name >> tcIfaceDecl stripped_decl)
 	; let mini_env = mkOccEnv [(getOccName t, t) | t <- implicitTyThings thing]
 	      lookup n = case lookupOccEnv mini_env (getOccName n) of
 			   Just thing -> thing
@@ -285,8 +285,8 @@ loadDecl ignore_prags mod (_version, decl)
 		-- as the TyThings.  That way we can extend the PTE without poking the
 		-- thunks
   where
-    decl' | ignore_prags = discardDeclPrags decl
-	  | otherwise    = decl
+    stripped_decl | ignore_prags = discardDeclPrags decl
+		  | otherwise    = decl
 
 	-- mk_new_bndr allocates in the name cache the final canonical
 	-- name for the thing, with the correct 
