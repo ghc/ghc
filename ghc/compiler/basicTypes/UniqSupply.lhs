@@ -80,14 +80,14 @@ mkSplitUniqSupply (C# c#)
 	-- here comes THE MAGIC:
 
 	mk_supply#
-	  = unsafeInterleavePrimIO {-unsafe_interleave-} (
+	  = unsafe_interleave (
 		mk_unique   `thenPrimIO` \ uniq ->
 		mk_supply#  `thenPrimIO` \ s1 ->
 		mk_supply#  `thenPrimIO` \ s2 ->
 		returnPrimIO (MkSplitUniqSupply uniq s1 s2)
 	    )
 	  where
-{-
+--
 	    -- inlined copy of unsafeInterleavePrimIO;
 	    -- this is the single-most-hammered bit of code
 	    -- in the compiler....
@@ -97,7 +97,7 @@ mkSplitUniqSupply (C# c#)
 		    (r, new_s) = m s
 		in
 		(r, s)
--}
+--
 
 	mk_unique = _ccall_ genSymZh		`thenPrimIO` \ (WHASH u#) ->
 		    returnPrimIO (I# (w2i (mask# `or#` u#)))

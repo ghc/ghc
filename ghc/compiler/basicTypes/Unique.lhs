@@ -114,6 +114,7 @@ module Unique (
 	listTyConKey,
 	ltDataConKey,
 	mainKey, mainPrimIoKey,
+	minusClassOpKey,
 	monadClassKey,
 	monadPlusClassKey,
 	monadZeroClassKey,
@@ -127,6 +128,7 @@ module Unique (
 	numClassKey,
 	ordClassKey,
 	orderingTyConKey,
+	otherwiseIdKey,
 	packCStringIdKey,
 	parErrorIdKey,
 	parIdKey,
@@ -148,6 +150,7 @@ module Unique (
 	return2GMPsTyConKey,
 	returnIntAndGMPDataConKey,
 	returnIntAndGMPTyConKey,
+	returnMClassOpKey,
 	runSTIdKey,
 	seqIdKey,
 	showClassKey,
@@ -658,6 +661,7 @@ to conjure them up during type checking.
 \begin{code}					  
 fromIntClassOpKey	= mkPreludeMiscIdUnique 53
 fromIntegerClassOpKey	= mkPreludeMiscIdUnique 54
+minusClassOpKey		= mkPreludeMiscIdUnique 69
 fromRationalClassOpKey	= mkPreludeMiscIdUnique 55
 enumFromClassOpKey	= mkPreludeMiscIdUnique 56
 enumFromThenClassOpKey	= mkPreludeMiscIdUnique 57
@@ -673,4 +677,7 @@ fromEnumClassOpKey	= mkPreludeMiscIdUnique 65
 
 mainKey			= mkPreludeMiscIdUnique 66
 mainPrimIoKey		= mkPreludeMiscIdUnique 67
+returnMClassOpKey	= mkPreludeMiscIdUnique 68
+-- Used for minusClassOp			69
+otherwiseIdKey		= mkPreludeMiscIdUnique 70
 \end{code}

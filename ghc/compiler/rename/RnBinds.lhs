@@ -26,7 +26,7 @@ import RdrHsSyn
 import RnHsSyn
 import RnMonad
 import RnExpr		( rnMatch, rnGRHSsAndBinds, rnPat, checkPrecMatch )
-import RnEnv		( bindLocatedLocalsRn, lookupRn, lookupOccRn, isUnboundName )
+import RnEnv		( bindLocatedLocalsRn, lookupBndrRn, lookupOccRn, isUnboundName )
 
 import CmdLineOpts	( opt_SigsRequired )
 import Digraph		( stronglyConnComp )
@@ -174,7 +174,7 @@ rnTopMonoBinds EmptyMonoBinds sigs
   = returnRn EmptyBinds
 
 rnTopMonoBinds mbinds sigs
- =  mapRn lookupRn binder_rdr_names	`thenRn` \ binder_names ->
+ =  mapRn lookupBndrRn binder_rdr_names	`thenRn` \ binder_names ->
     let
 	binder_set = mkNameSet binder_names
     in
@@ -312,7 +312,7 @@ flattenMonoBinds uniq sigs (PatMonoBind pat grhss_and_binds locn)
 flattenMonoBinds uniq sigs (FunMonoBind name inf matches locn)
   = pushSrcLocRn locn				 $
     mapRn (checkPrecMatch inf name) matches	`thenRn_`
-    lookupRn name				`thenRn` \ name' ->
+    lookupBndrRn name				`thenRn` \ name' ->
     mapAndUnzipRn rnMatch matches		`thenRn` \ (new_matches, fv_lists) ->
     let
 	fvs	    = unionManyNameSets fv_lists
@@ -346,13 +346,13 @@ rnMethodBinds (AndMonoBinds mb1 mb2)
 rnMethodBinds (FunMonoBind occname inf matches locn)
   = pushSrcLocRn locn				   $
     mapRn (checkPrecMatch inf occname) matches	`thenRn_`
-    lookupRn occname		  		`thenRn` \ op_name ->
+    lookupBndrRn occname		  		`thenRn` \ op_name ->
     mapAndUnzipRn rnMatch matches		`thenRn` \ (new_matches, _) ->
     returnRn (FunMonoBind op_name inf new_matches locn)
 
 rnMethodBinds (PatMonoBind (VarPatIn occname) grhss_and_binds locn)
   = pushSrcLocRn locn			$
-    lookupRn  occname			`thenRn` \ op_name ->
+    lookupBndrRn  occname			`thenRn` \ op_name ->
     rnGRHSsAndBinds grhss_and_binds	`thenRn` \ (grhss_and_binds', _) ->
     returnRn (PatMonoBind (VarPatIn op_name) grhss_and_binds' locn)
 
@@ -503,13 +503,13 @@ rnBindSigs is_toplev binders sigs
 
 renameSig (Sig v ty src_loc)
   = pushSrcLocRn src_loc $
-    lookupRn v			`thenRn` \ new_v ->
+    lookupBndrRn v			`thenRn` \ new_v ->
     rnHsType ty			`thenRn` \ new_ty ->
     returnRn (Sig new_v new_ty src_loc)
 
 renameSig (SpecSig v ty using src_loc)
   = pushSrcLocRn src_loc $
-    lookupRn v			`thenRn` \ new_v ->
+    lookupBndrRn v			`thenRn` \ new_v ->
     rnHsType ty			`thenRn` \ new_ty ->
     rn_using using		`thenRn` \ new_using ->
     returnRn (SpecSig new_v new_ty new_using src_loc)
@@ -520,17 +520,17 @@ renameSig (SpecSig v ty using src_loc)
 
 renameSig (InlineSig v src_loc)
   = pushSrcLocRn src_loc $
-    lookupRn v		`thenRn` \ new_v ->
+    lookupBndrRn v		`thenRn` \ new_v ->
     returnRn (InlineSig new_v src_loc)
 
 renameSig (DeforestSig v src_loc)
   = pushSrcLocRn src_loc $
-    lookupRn v        `thenRn` \ new_v ->
+    lookupBndrRn v        `thenRn` \ new_v ->
     returnRn (DeforestSig new_v src_loc)
 
 renameSig (MagicUnfoldingSig v str src_loc)
   = pushSrcLocRn src_loc $
-    lookupRn v		`thenRn` \ new_v ->
+    lookupBndrRn v		`thenRn` \ new_v ->
     returnRn (MagicUnfoldingSig new_v str src_loc)
 \end{code}
 
@@ -573,29 +573,29 @@ sig_name (MagicUnfoldingSig n _ _) = n
 \begin{code}
 dupSigDeclErr (sig:sigs)
   = pushSrcLocRn loc $
-    addErrRn (\sty -> ppSep [ppStr "more than one", 
-		      	    ppStr what_it_is, ppStr "given for", 
-			    ppQuote (ppr sty (sig_name sig))])
+    addErrRn (\sty -> ppSep [ppPStr SLIT("more than one"), 
+		      	     ppPStr what_it_is, ppPStr SLIT("given for"), 
+			     ppQuote (ppr sty (sig_name sig))])
   where
     (what_it_is, loc) = sig_doc sig
 
 unknownSigErr sig
   = pushSrcLocRn loc $
-    addErrRn (\sty -> ppSep [ppStr flavour, ppStr "but no definition for",
+    addErrRn (\sty -> ppSep [ppPStr flavour, ppPStr SLIT("but no definition for"),
 			     ppQuote (ppr sty (sig_name sig))])
   where
     (flavour, loc) = sig_doc sig
 
-sig_doc (Sig        _ _ loc) 	    = ("type signature",loc)
-sig_doc (ClassOpSig _ _ _ loc) 	    = ("class-method type signature", loc)
-sig_doc (SpecSig    _ _ _ loc) 	    = ("SPECIALIZE pragma",loc)
-sig_doc (InlineSig  _     loc) 	    = ("INLINE pragma",loc)
-sig_doc (MagicUnfoldingSig _ _ loc) = ("MAGIC_UNFOLDING pragma",loc)
+sig_doc (Sig        _ _ loc) 	    = (SLIT("type signature"),loc)
+sig_doc (ClassOpSig _ _ _ loc) 	    = (SLIT("class-method type signature"), loc)
+sig_doc (SpecSig    _ _ _ loc) 	    = (SLIT("SPECIALIZE pragma"),loc)
+sig_doc (InlineSig  _     loc) 	    = (SLIT("INLINE pragma"),loc)
+sig_doc (MagicUnfoldingSig _ _ loc) = (SLIT("MAGIC_UNFOLDING pragma"),loc)
 
 missingSigErr var sty
-  = ppSep [ppStr "a definition but no type signature for", ppQuote (ppr sty var)]
+  = ppSep [ppPStr SLIT("a definition but no type signature for"), ppQuote (ppr sty var)]
 
 methodBindErr mbind sty
- =  ppHang (ppStr "Can't handle multiple methods defined by one pattern binding")
+ =  ppHang (ppPStr SLIT("Can't handle multiple methods defined by one pattern binding"))
 	   4 (ppr sty mbind)
 \end{code}

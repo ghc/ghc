@@ -31,7 +31,7 @@ IMPORT_DELOOPER(IdLoop)
 -- friends:
 -- (PprType can see all the representations it's trying to print)
 import Type		( GenType(..), maybeAppTyCon,
-			  splitForAllTy, splitSigmaTy, splitRhoTy, splitAppTy )
+			  splitForAllTy, splitSigmaTy, splitRhoTy, splitAppTys )
 import TyVar		( GenTyVar(..) )
 import TyCon		( TyCon(..), NewOrData )
 import Class		( SYN_IE(Class), GenClass(..),
@@ -51,7 +51,7 @@ import PprEnv
 import PprStyle		( PprStyle(..), codeStyle, showUserishTypes )
 import Pretty
 import UniqFM		( addToUFM_Directly, lookupUFM_Directly{-, ufmToList ToDo:rm-} )
-import Unique		( pprUnique10, pprUnique, incrUnique, listTyConKey )
+import Unique	--TEMP:	( pprUnique10, pprUnique, incrUnique, listTyConKey )
 import Util
 \end{code}
 
@@ -177,13 +177,13 @@ ppr_ty env ctxt_prec (FunTy ty1 ty2 usage)
     -- so that right associativity comes out nicely...
   = maybeParen ctxt_prec fUN_PREC
 	(ppCat [ppr_ty env fUN_PREC ty1,
-		ppPStr SLIT("->"),
+		ppStr "->",
 		ppr_ty env tOP_PREC ty2])
 
 ppr_ty env ctxt_prec ty@(AppTy _ _)
   = ppr_corner env ctxt_prec fun_ty arg_tys
   where
-    (fun_ty, arg_tys) = splitAppTy ty
+    (fun_ty, arg_tys) = splitAppTys ty
 
 ppr_ty env ctxt_prec (SynTy tycon tys expansion)
   | codeStyle (pStyle env)
@@ -275,7 +275,7 @@ pprGenTyVar sty (TyVar uniq kind name usage)
   = case sty of
       PprInterface -> pp_u
       _		   -> ppBesides [pp_name, ppStr "{-", pp_u, ppStr "-}"]
-  where
+   where
     pp_u    = pprUnique uniq
     pp_name = case name of
 		Just n  -> pprOccName sty (getOccName n)
@@ -356,11 +356,11 @@ pprTyCon sty (SpecTyCon tc ty_maybes)
 pprTyCon sty (SynTyCon uniq name kind arity tyvars expansion)
   = ppBeside (ppr sty name)
 	     (ifPprShowAll sty
-		(ppCat [ ppStr " {-", 
+		(ppCat [ ppPStr SLIT(" {-"), 
 			 ppInt arity, 
 			 interpp'SP sty tyvars,
 			 pprParendGenType sty expansion,
-			 ppStr "-}"]))
+			 ppPStr SLIT("-}")]))
 -}
 \end{code}
 
@@ -405,7 +405,7 @@ ppr_class_op sty tyvars (ClassOp op_name i ty)
 getTypeString :: Type -> FAST_STRING
 
 getTypeString ty
-  = case (splitAppTy ty) of { (tc, args) ->
+  = case (splitAppTys ty) of { (tc, args) ->
     _CONCAT_ (do_tc tc : map do_arg_ty args) }
   where
     do_tc (TyConTy tc _) = nameString (getName tc)
@@ -537,7 +537,7 @@ nmbrTyVar tv@(TyVar u _ _ _) nenv@(NmbrEnv ui ut uu idenv tvenv uvenv)
   = case (lookupUFM_Directly tvenv u) of
       Just xx -> (nenv, xx)
       Nothing ->
-	--pprTrace "nmbrTyVar: lookup failed:" (ppCat (ppr PprDebug u : [ppCat [ppr PprDebug x, ppStr "=>", ppr PprDebug tv] | (x,tv) <- ufmToList tvenv])) $
+	--pprTrace "nmbrTyVar: lookup failed:" (ppCat (ppr PprDebug u : [ppCat [ppr PprDebug x, ppPStr SLIT("=>"), ppr PprDebug tv] | (x,tv) <- ufmToList tvenv])) $
 	(nenv, tv)
 \end{code}
 

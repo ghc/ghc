@@ -381,14 +381,16 @@ collectBinders ::
   ([uvar], [tyvar], [val_bdr], GenCoreExpr val_bdr val_occ tyvar uvar)
 
 collectBinders expr
-  = (usages, tyvars, vals, body)
+  = case collectValBinders body1 of { (vals,body) -> (usages, tyvars, vals, body) }
   where
     (usages, tyvars, body1) = collectUsageAndTyBinders expr
-    (vals, body) 	    = collectValBinders body1
+--    (vals, body) 	    = collectValBinders body1
 
 
 collectUsageAndTyBinders expr
-  = usages expr []
+  = case usages expr [] of
+      ([],tyvars,body) -> ([],tyvars,body)
+      v                -> v
   where
     usages (Lam (UsageBinder u) body) uacc = usages body (u:uacc)
     usages other uacc
@@ -411,7 +413,9 @@ collectUsageAndTyBinders expr
 collectValBinders :: GenCoreExpr val_bdr val_occ tyvar uvar ->
 		     ([val_bdr], GenCoreExpr val_bdr val_occ tyvar uvar)
 collectValBinders expr
-  = go [] expr
+  = case go [] expr of
+      ([],body) -> ([],body)
+      v         -> v
   where
     go acc (Lam (ValBinder v) b) = go (v:acc) b
     go acc body 		 = (reverse acc, body)

@@ -17,7 +17,11 @@ CHK_Ubiq() -- debugging consistency check
 # define PACK_STR   packCString
 #else
 # define ADDR	    _Addr
+# define PACK_STR   mkFastCharString
+/*
+# define ADDR	    _Addr
 # define PACK_STR   _packCString
+*/
 #endif
 
 argv :: [FAST_STRING]

@@ -208,16 +208,16 @@ Errors and contexts
 ~~~~~~~~~~~~~~~~~~~
 \begin{code}
 matchCtxt MCase match sty
-  = ppHang (ppStr "In a \"case\" branch:")
+  = ppHang (ppPStr SLIT("In a \"case\" branch:"))
 	 4 (pprMatch sty True{-is_case-} match)
 
 matchCtxt (MFun fun) match sty
-  = ppHang (ppBesides [ppStr "In an equation for function ", ppr sty fun, ppChar ':'])
+  = ppHang (ppBesides [ppPStr SLIT("In an equation for function "), ppr sty fun, ppChar ':'])
 	 4 (ppBesides [ppr sty fun, ppSP, pprMatch sty False{-not case-} match])
 \end{code}
 
 
 \begin{code}
 varyingArgsErr name matches sty
-  = ppSep [ppStr "Varying number of arguments for function", ppr sty name]
+  = ppSep [ppPStr SLIT("Varying number of arguments for function"), ppr sty name]
 \end{code}

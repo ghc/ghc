@@ -3,7 +3,8 @@ Things which are ubiquitous in the GHC compiler.
 \begin{code}
 interface Ubiq where
 
-import PreludePS(_PackedString)
+--import PreludePS(_PackedString)
+import FastString(FastString)
 
 import Bag		( Bag )
 import BinderInfo	( BinderInfo )
@@ -132,7 +133,7 @@ data Unique	-- NB: fails the optimisation criterion
 
 -- don't get clever and unexpand some of these synonyms
 -- (GHC 0.26 will barf)
-type Module = _PackedString
+type Module = FastString
 type Arity = Int
 type Class = GenClass (GenTyVar (GenUsage Unique)) Unique
 type ClassOp = GenClassOp (GenType (GenTyVar (GenUsage Unique)) Unique)

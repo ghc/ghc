@@ -326,7 +326,7 @@ mkWW ((arg,WwUnpack True cs) : ds)
 				     -- The main event: a single-constructor data type
 				     (arg_tycon, tycon_arg_tys, data_con)
 
-	      Just (_, _, data_cons) ->  panic "mk_ww_arg_processing: not one constr"
+	      Just (_, _, data_cons) ->  panic "mk_ww_arg_processing: not one constr (interface files not consistent/up to date ?)"
 	      Nothing		     ->  panic "mk_ww_arg_processing: not datatype"
 
 

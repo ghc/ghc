@@ -1,1075 +1,1156 @@
-%************************************************************************
-%*                                                                      *
-\section[syslibs]{System libraries}
-\index{system libraries}
-\index{libraries, system}
-%*                                                                      *
-%************************************************************************
+\documentstyle[a4wide,grasp]{article}
+\renewcommand{\textfraction}{0.1}
+\renewcommand{\floatpagefraction}{0.9}
+\renewcommand{\dblfloatpagefraction}{0.9}
 
-We intend to provide more and more ready-to-use Haskell code, so that
-every program doesn't have to invent everything from scratch.
+\sloppy
+\renewcommand{\today}{March 1997}
 
-If you provide a \tr{-syslib <name>}\index{-syslib <name> option} option,
-then the interfaces for that library will come into scope (and may be
-\tr{import}ed), and the code will be added in at link time.
+\begin{document}
 
-We supply a part of the HBC library (\tr{-syslib hbc}); as well as one
-of our own (\tr{-syslib ghc}); one for an interface to POSIX routines
-(\tr{-syslib posix}); and one of contributed stuff off the net, mostly
-numerical (\tr{-syslib contrib}).
+\title{The GHC Prelude and Libraries}
+\author{Simon L Peyton Jones \and Will Partain}
 
-If you have Haggis (our GUI X~toolkit for Haskell), it probably works
-with a \tr{-syslib haggis} flag.
+\maketitle
+\tableofcontents
 
-%************************************************************************
-%*                                                                      *
-\subsection[GHC-library]{The GHC system library}
-\index{library, GHC}
-\index{GHC library}
-%*                                                                      *
-%************************************************************************
+\section{Introduction}
 
-We have started to put together a ``GHC system library.''
+This document describes GHC's prelude and libraries.  The basic story is that of
+the Haskell 1.3 Report and Libraries document (which we do not reproduce here),
+but this document describes in addition:
+\begin{itemize}
+\item	GHC's additional non-standard libraries and types, such as state transformers,
+	packed strings, foreign objects, stable pointers, and so on.
 
-At the moment, the library is made of generally-useful bits of the
-compiler itself.
+\item	GHC's primitive types and operations.  The standard Haskell functions are implemented
+	on top of these, and it is sometimes useful to use them directly.
 
-To use this library, just give a \tr{-syslib ghc}\index{-syslib ghc option}
-option to GHC, both for compiling and linking.
+\item	The organsiation of these libraries into directories.
+\end{itemize}
 
-%************************************************************************
-%*                                                                      *
-\subsubsection[Bag]{The @Bag@ type}
-\index{Bag module (GHC syslib)}
-%*                                                                      *
-%************************************************************************
+\section{Overview}
 
-A {\em bag} is an unordered collection of elements which may contain
-duplicates.  To use, \tr{import Bag}.
-
-\begin{verbatim}
-emptyBag        :: Bag elt
-unitBag         :: elt -> Bag elt
-
-unionBags       :: Bag elt   -> Bag elt -> Bag elt
-unionManyBags   :: [Bag elt] -> Bag elt
-consBag		:: elt	     -> Bag elt -> Bag elt
-snocBag         :: Bag elt   -> elt     -> Bag elt
-
-concatBag	:: Bag (Bag a) -> Bag a
-mapBag		:: (a -> b) -> Bag a -> Bag b
-
-foldBag :: (r -> r -> r) -- Replace TwoBags with this; should be associative
-	-> (a -> r)	 -- Replace UnitBag with this
-	-> r		 -- Replace EmptyBag with this
-	-> Bag a
-	-> r
-
-elemBag         :: Eq elt => elt -> Bag elt -> Bool
-isEmptyBag      ::                  Bag elt -> Bool
-filterBag       :: (elt -> Bool) -> Bag elt -> Bag elt
-partitionBag    :: (elt -> Bool) -> Bag elt-> (Bag elt, Bag elt)
-        -- returns the elements that do/don't satisfy the predicate
-
-listToBag       :: [elt] -> Bag elt
-bagToList       :: Bag elt -> [elt]
-\end{verbatim}
-
-%************************************************************************
-%*                                                                      *
-\subsubsection[BitSet]{The @BitSet@ type}
-\index{BitSet module (GHC syslib)}
-%*                                                                      *
-%************************************************************************
-
-Bit sets are a fast implementation of sets of integers ranging from 0
-to one less than the number of bits in a machine word (typically 31).
-If any element exceeds the maximum value for a particular machine
-architecture, the results of these operations are undefined.  You have
-been warned.  [``If you put any safety checks in this code, I will have
-to kill you.'' --JSM]
-
-\begin{verbatim}
-mkBS        :: [Int]  -> BitSet
-listBS      :: BitSet -> [Int]
-emptyBS     :: BitSet 
-unitBS	    :: Int    -> BitSet
-
-unionBS     :: BitSet -> BitSet -> BitSet
-minusBS     :: BitSet -> BitSet -> BitSet
-elementBS   :: Int    -> BitSet -> Bool
-intersectBS :: BitSet -> BitSet -> BitSet
-
-isEmptyBS   :: BitSet -> Bool
-\end{verbatim}
-
-%************************************************************************
-%*                                                                      *
-\subsubsection[FiniteMap]{The @FiniteMap@ type}
-\index{FiniteMap module (GHC syslib)}
-%*                                                                      *
-%************************************************************************
-
-What functional programmers call a {\em finite map}, everyone else
-calls a {\em lookup table}.
-
-Out code is derived from that in this paper:
-\begin{display}
-S Adams
-"Efficient sets: a balancing act"
-Journal of functional programming 3(4) Oct 1993, pages 553-562
-\end{display}
-Guess what?  The implementation uses balanced trees.
-
-\begin{verbatim}
---      BUILDING
-emptyFM         :: FiniteMap key elt
-unitFM		:: key -> elt -> FiniteMap key elt
-listToFM        :: Ord key => [(key,elt)] -> FiniteMap key elt
-                        -- In the case of duplicates, the last is taken
-
---      ADDING AND DELETING
-                   -- Throws away any previous binding
-                   -- In the list case, the items are added starting with the
-                   -- first one in the list
-addToFM         :: Ord key => FiniteMap key elt -> key -> elt  -> FiniteMap key elt
-addListToFM     :: Ord key => FiniteMap key elt -> [(key,elt)] -> FiniteMap key elt
-
-                   -- Combines with previous binding
-addToFM_C       :: Ord key => (elt -> elt -> elt)
-                           -> FiniteMap key elt -> key -> elt  
-                           -> FiniteMap key elt
-addListToFM_C   :: Ord key => (elt -> elt -> elt)
-                           -> FiniteMap key elt -> [(key,elt)] 
-                           -> FiniteMap key elt
-
-                   -- Deletion doesn't complain if you try to delete something
-                   -- which isn't there
-delFromFM       :: Ord key => FiniteMap key elt -> key   -> FiniteMap key elt
-delListFromFM   :: Ord key => FiniteMap key elt -> [key] -> FiniteMap key elt
-
---      COMBINING
-                   -- Bindings in right argument shadow those in the left
-plusFM          :: Ord key => FiniteMap key elt -> FiniteMap key elt
-                           -> FiniteMap key elt
-
-                   -- Combines bindings for the same thing with the given function
-plusFM_C        :: Ord key => (elt -> elt -> elt) 
-                           -> FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt
-
-minusFM         :: Ord key => FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt
-                   -- (minusFM a1 a2) deletes from a1 any bindings which are bound in a2
-
-intersectFM     :: Ord key => FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt 
-intersectFM_C   :: Ord key => (elt -> elt -> elt)
-                           -> FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt 
-
---      MAPPING, FOLDING, FILTERING
-foldFM          :: (key -> elt -> a -> a) -> a -> FiniteMap key elt -> a
-mapFM           :: (key -> elt1 -> elt2) -> FiniteMap key elt1 -> FiniteMap key elt2
-filterFM        :: Ord key => (key -> elt -> Bool) 
-                           -> FiniteMap key elt -> FiniteMap key elt
-
---      INTERROGATING
-sizeFM          :: FiniteMap key elt -> Int
-isEmptyFM	:: FiniteMap key elt -> Bool
-
-elemFM		:: Ord key => key -> FiniteMap key elt -> Bool
-lookupFM        :: Ord key => FiniteMap key elt -> key -> Maybe elt
-lookupWithDefaultFM
-                :: Ord key => FiniteMap key elt -> elt -> key -> elt
-                -- lookupWithDefaultFM supplies a "default" elt
-                -- to return for an unmapped key
-
---      LISTIFYING
-fmToList        :: FiniteMap key elt -> [(key,elt)]
-keysFM          :: FiniteMap key elt -> [key]
-eltsFM          :: FiniteMap key elt -> [elt]
-\end{verbatim}
-
-%************************************************************************
-%*                                                                      *
-\subsubsection[ListSetOps]{The @ListSetOps@ type}
-\index{ListSetOps module (GHC syslib)}
-%*                                                                      *
-%************************************************************************
-
-Just a few set-sounding operations on lists.  If you want sets, use
-the \tr{Set} module.
-
-\begin{verbatim}
-unionLists          :: Eq a => [a] -> [a] -> [a]
-intersectLists      :: Eq a => [a] -> [a] -> [a]
-minusList           :: Eq a => [a] -> [a] -> [a]
-disjointLists       :: Eq a => [a] -> [a] -> Bool
-intersectingLists   :: Eq a => [a] -> [a] -> Bool
-\end{verbatim}
-
-%************************************************************************
-%*                                                                      *
-\subsubsection[Maybes]{The @Maybes@ type}
-\index{Maybes module (GHC syslib)}
-%*                                                                      *
-%************************************************************************
-
-The \tr{Maybe} type itself is in the Haskell~1.3 prelude.  Moreover,
-the required \tr{Maybe} library provides many useful functions on
-\tr{Maybe}s.  This (old) module provides more.
-
-An \tr{Either}-like type called \tr{MaybeErr}:
-\begin{verbatim}
-data MaybeErr val err = Succeeded val | Failed err
-\end{verbatim}
-
-Some operations to do with \tr{Maybe} (some commentary follows):
-\begin{verbatim}
-maybeToBool :: Maybe a -> Bool      -- Nothing => False; Just => True
-allMaybes   :: [Maybe a] -> Maybe [a]
-firstJust   :: [Maybe a] -> Maybe a
-findJust    :: (a -> Maybe b) -> [a] -> Maybe b
-
-assocMaybe  :: Eq a => [(a,b)] -> a -> Maybe b
-mkLookupFun :: (key -> key -> Bool) -- Equality predicate
-            -> [(key,val)]          -- The assoc list
-            -> (key -> Maybe val)   -- A lookup fun to use
-mkLookupFunDef :: (key -> key -> Bool) -- Ditto, with a default
-            -> [(key,val)]
-	    -> val		    -- the default
-            -> (key -> val)	    -- NB: not a Maybe anymore
-
-    -- a monad thing
-thenMaybe   :: Maybe a -> (a -> Maybe b) -> Maybe b
-returnMaybe :: a -> Maybe a
-failMaybe   :: Maybe a
-mapMaybe    :: (a -> Maybe b) -> [a] -> Maybe [b]
-\end{verbatim}
-
-NB: @catMaybes@, which used to be here, is in the Haskell~1.3 libraries.
-
-@allMaybes@ collects a list of @Justs@ into a single @Just@, returning
-@Nothing@ if there are any @Nothings@.
-
-@firstJust@ takes a list of @Maybes@ and returns the
-first @Just@ if there is one, or @Nothing@ otherwise.
-
-@assocMaybe@ looks up in an association list, returning
-@Nothing@ if it fails.
-
-Now, some operations to do with \tr{MaybeErr} (comments follow):
-\begin{verbatim}
-    -- a monad thing (surprise, surprise)
-thenMaB   :: MaybeErr a err -> (a -> MaybeErr b err) -> MaybeErr b err
-returnMaB :: val -> MaybeErr val err
-failMaB   :: err -> MaybeErr val err
-
-listMaybeErrs :: [MaybeErr val err] -> MaybeErr [val] [err]
-foldlMaybeErrs :: (acc -> input -> MaybeErr acc err)
-               -> acc
-               -> [input]
-               -> MaybeErr acc [err]
-\end{verbatim}
-
-@listMaybeErrs@ takes a list of @MaybeErrs@ and, if they all succeed,
-returns a @Succeeded@ of a list of their values.  If any fail, it
-returns a @Failed@ of the list of all the errors in the list.
-
-@foldlMaybeErrs@ works along a list, carrying an accumulator; it
-applies the given function to the accumulator and the next list item,
-accumulating any errors that occur.
-
-%************************************************************************
-%*                                                                      *
-\subsubsection[PackedString]{The @PackedString@ type}
-\index{PackedString module (GHC syslib)}
-%*                                                                      *
-%************************************************************************
-
-You need \tr{import PackedString}, and
-heave in your \tr{-syslib ghc}.
-
-The basic type and functions which are available are:
-\begin{verbatim}
-data PackedString
-
-packString      :: [Char] -> PackedString
-packStringST    :: [Char] -> ST s PackedString
-packCString     :: Addr  -> PackedString
-packCBytes      :: Int -> Addr -> PackedString
-packCBytesST    :: Int -> Addr -> ST s PackedString
-packBytesForC   :: [Char] -> ByteArray Int
-packBytesForCST :: [Char] -> ST s (ByteArray Int)
-byteArrayToPS   :: ByteArray Int -> PackedString
-psToByteArray   :: PackedString -> ByteArray Int
-
-unpackPS        :: PackedString -> [Char]
-\end{verbatim}
-
-We also provide a wad of list-manipulation-like functions:
-\begin{verbatim}
-nilPS      :: PackedString
-consPS     :: Char -> PackedString -> PackedString
-
-headPS     :: PackedString -> Char
-tailPS     :: PackedString -> PackedString
-nullPS     :: PackedString -> Bool
-appendPS   :: PackedString -> PackedString -> PackedString
-lengthPS   :: PackedString -> Int
-indexPS    :: PackedString -> Int -> Char
-           -- 0-origin indexing into the string
-mapPS      :: (Char -> Char) -> PackedString -> PackedString {-or String?-}
-filterPS   :: (Char -> Bool) -> PackedString -> PackedString {-or String?-}
-foldlPS    :: (a -> Char -> a) -> a -> PackedString -> a
-foldrPS    :: (Char -> a -> a) -> a -> PackedString -> a
-takePS     :: Int -> PackedString -> PackedString
-dropPS     :: Int -> PackedString -> PackedString
-splitAtPS  :: Int -> PackedString -> (PackedString, PackedString)
-takeWhilePS:: (Char -> Bool) -> PackedString -> PackedString
-dropWhilePS:: (Char -> Bool) -> PackedString -> PackedString
-spanPS     :: (Char -> Bool) -> PackedString -> (PackedString, PackedString)
-breakPS    :: (Char -> Bool) -> PackedString -> (PackedString, PackedString)
-linesPS    :: PackedString -> [PackedString]
-wordsPS    :: PackedString -> [PackedString]
-reversePS  :: PackedString -> PackedString
-concatPS   :: [PackedString] -> PackedString
-
-substrPS   :: PackedString -> Int -> Int -> PackedString
-           -- pluck out a piece of a PS
-           -- start and end chars you want; both 0-origin-specified
-\end{verbatim}
-
-%************************************************************************
-%*                                                                      *
-\subsubsection[Pretty]{The @Pretty@ type}
-\index{Pretty module (GHC syslib)}
-%*                                                                      *
-%************************************************************************
-
-This is the pretty-printer that we use in GHC.
-
-\begin{verbatim}
-type Pretty
-
-ppShow          :: Int{-width-} -> Pretty -> [Char]
-
-pp'SP           :: Pretty -- "comma space"
-ppComma         :: Pretty -- ,
-ppEquals        :: Pretty -- =
-ppLbrack        :: Pretty -- [
-ppLparen        :: Pretty -- (
-ppNil           :: Pretty -- nothing
-ppRparen        :: Pretty -- )
-ppRbrack        :: Pretty -- ]
-ppSP            :: Pretty -- space
-ppSemi          :: Pretty -- ;
-
-ppChar          :: Char -> Pretty
-ppDouble        :: Double -> Pretty
-ppFloat         :: Float -> Pretty
-ppInt           :: Int -> Pretty
-ppInteger       :: Integer -> Pretty
-ppRational      :: Rational -> Pretty
-ppStr           :: [Char] -> Pretty
-
-ppAbove         :: Pretty -> Pretty -> Pretty
-ppAboves        :: [Pretty] -> Pretty
-ppBeside        :: Pretty -> Pretty -> Pretty
-ppBesides       :: [Pretty] -> Pretty
-ppCat           :: [Pretty] -> Pretty
-ppHang          :: Pretty -> Int -> Pretty -> Pretty
-ppInterleave    :: Pretty -> [Pretty] -> Pretty -- spacing between
-ppIntersperse   :: Pretty -> [Pretty] -> Pretty -- no spacing between
-ppNest          :: Int -> Pretty -> Pretty
-ppSep           :: [Pretty] -> Pretty
-
-ppBracket 	:: Pretty -> Pretty -- [ ... ] around something
-ppParens  	:: Pretty -> Pretty -- ( ... ) around something
-ppQuote   	:: Pretty -> Pretty -- ` ... ' around something
-\end{verbatim}
-
-%************************************************************************
-%*                                                                      *
-\subsubsection[Set]{The @Set@ type}
-\index{Set module (GHC syslib)}
-%*                                                                      *
-%************************************************************************
-
-Our implementation of {\em sets} (key property: no duplicates) is just
-a variant of the \tr{FiniteMap} module.
-
-\begin{verbatim}
-mkSet           :: Ord a => [a]  -> Set a
-setToList       :: Set a -> [a]
-emptySet        :: Set a
-singletonSet    :: a -> Set a
-
-union           :: Ord a => Set a -> Set a -> Set a
-unionManySets   :: Ord a => [Set a] -> Set a
-intersect       :: Ord a => Set a -> Set a -> Set a
-minusSet        :: Ord a => Set a -> Set a -> Set a
-mapSet          :: Ord a => (b -> a) -> Set b -> Set a
-
-elementOf       :: Ord a => a -> Set a -> Bool
-isEmptySet      :: Set a -> Bool
-\end{verbatim}
-
-%************************************************************************
-%*                                                                      *
-\subsubsection[Util]{The @Util@ type}
-\index{Util module (GHC syslib)}
-%*                                                                      *
-%************************************************************************
-
-Stuff that has been useful to use in writing the compiler.  Don't be
-too surprised if this stuff moves/gets-renamed/etc.
-
-\begin{verbatim}
--- general list processing
-exists          :: (a -> Bool) -> [a] -> Bool
-forall          :: (a -> Bool) -> [a] -> Bool
-isSingleton     :: [a] -> Bool
-lengthExceeds   :: [a] -> Int -> Bool
-mapAndUnzip	:: (a -> (b, c)) -> [a] -> ([b], [c])
-mapAndUnzip3	:: (a -> (b, c, d)) -> [a] -> ([b], [c], [d])
-nOfThem         :: Int -> a -> [a]
-zipEqual        :: [a] -> [b] -> [(a,b)]
-zipWithEqual	:: String -> (a->b->c) -> [a]->[b]->[c]
-zipWith3Equal	:: String -> (a->b->c->d) -> [a]->[b]->[c]->[d]
-zipWith4Equal	:: String -> (a->b->c->d->e) -> [a]->[b]->[c]->[d]->[e]
-zipLazy		:: [a] -> [b] -> [(a,b)] -- lazy in 2nd arg
-
--- association lists
-assoc       :: Eq a => String -> [(a, b)] -> a -> b
-
--- duplicate handling
-hasNoDups    :: Eq a => [a] -> Bool
-equivClasses :: (a -> a -> Ordering) -> [a] -> [[a]]
-runs         :: (a -> a -> Bool)     -> [a] -> [[a]]
-removeDups   :: (a -> a -> Ordering) -> [a] -> ([a], [[a]])
-
--- sorting (don't complain of no choice...)
-quicksort          :: (a -> a -> Bool)     -> [a] -> [a]
-sortLt             :: (a -> a -> Bool)     -> [a] -> [a]
-stableSortLt       :: (a -> a -> Bool)     -> [a] -> [a]
-mergesort          :: (a -> a -> Ordering) -> [a] -> [a]
-mergeSort          :: Ord a => [a] -> [a]
-naturalMergeSort   :: Ord a => [a] -> [a]
-mergeSortLe        :: Ord a => [a] -> [a]
-naturalMergeSortLe :: Ord a => [a] -> [a]
-
--- transitive closures
-transitiveClosure :: (a -> [a])         -- Successor function
-                  -> (a -> a -> Bool)   -- Equality predicate
-                  -> [a] 
-                  -> [a]                -- The transitive closure
-
--- accumulating (Left, Right, Bi-directional)
-mapAccumL :: (acc -> x -> (acc, y))
-                        -- Function of elt of input list and
-                        -- accumulator, returning new accumulator and
-                        -- elt of result list
-          -> acc        -- Initial accumulator
-          -> [x]        -- Input list
-          -> (acc, [y]) -- Final accumulator and result list
-
-mapAccumR :: (acc -> x -> (acc, y)) -> acc -> [x] -> (acc, [y])
-
-mapAccumB :: (accl -> accr -> x -> (accl, accr,y))
-          -> accl -> accr -> [x]
-          -> (accl, accr, [y])
-
--- comparisons
-cmpString :: String -> String -> Ordering
-
--- pairs
-applyToPair :: ((a -> c), (b -> d)) -> (a, b) -> (c, d)
-applyToFst  :: (a -> c) -> (a, b) -> (c, b)
-applyToSnd  :: (b -> d) -> (a, b) -> (a, d)
-foldPair    :: (a->a->a, b->b->b) -> (a, b) -> [(a, b)] -> (a, b)
-unzipWith   :: (a -> b -> c) -> [(a, b)] -> [c]
-\end{verbatim}
-
-%************************************************************************
-%*                                                                      *
-\subsection[C-interfaces]{Interfaces to C libraries}
-\index{C library interfaces}
-\index{interfaces, C library}
-%*                                                                      *
-%************************************************************************
-
-The GHC system library (\tr{-syslib ghc}) also provides interfaces to
-several useful C libraries, mostly from the GNU project.
-
-%************************************************************************
-%*                                                                      *
-\subsubsection[Readline]{The @Readline@ interface}
-\index{Readline library (GHC syslib)}
-\index{command-line editing library}
-%*                                                                      *
-%************************************************************************
-
-(Darren Moffat supplied the \tr{Readline} interface.)
-
-The \tr{Readline} module is a straightforward interface to the GNU
-Readline library.  As such, you will need to look at the GNU
-documentation (and have a \tr{libreadline.a} file around somewhere...)
-
-You'll need to link any Readlining program with \tr{-lreadline -ltermcap},
-besides the usual \tr{-syslib ghc}.
-
-The main function you'll use is:
-\begin{verbatim}
-readline :: String{-the prompt-} -> IO String
-\end{verbatim}
-
-If you want to mess around with Full Readline G(l)ory, we also
-provide:
-\begin{verbatim}
-rlInitialize, addHistory,
-
-rlBindKey, rlAddDefun, RlCallbackFunction(..),
-
-rlGetLineBuffer, rlSetLineBuffer, rlGetPoint, rlSetPoint, rlGetEnd,
-rlSetEnd, rlGetMark, rlSetMark, rlSetDone, rlPendingInput,
-
-rlPrompt, rlTerminalName, rlSetReadlineName, rlGetReadlineName
-\end{verbatim}
-(All those names are just Haskellised versions of what you
-will see in the GNU readline documentation.)
-
-%************************************************************************
-%*                                                                      *
-\subsubsection[Regexp]{The @Regexp@ and @MatchPS@ interfaces}
-\index{Regex library (GHC syslib)}
-\index{MatchPS library (GHC syslib)}
-\index{regular-expressions library}
-%*                                                                      *
-%************************************************************************
-
-(Sigbjorn Finne supplied the regular-expressions interface.)
-
-The \tr{Regex} library provides quite direct interface to the GNU
-regular-expression library, for doing manipulation on
-\tr{PackedString}s.  You probably need to see the GNU documentation
-if you are operating at this level.
-
-The datatypes and functions that \tr{Regex} provides are:
-\begin{verbatim}
-data PatBuffer	# just a bunch of bytes (mutable)
-
-data REmatch
- = REmatch (Array Int GroupBounds)  -- for $1, ... $n
-	   GroupBounds		    -- for $` (everything before match)
-	   GroupBounds		    -- for $& (entire matched string)
-	   GroupBounds		    -- for $' (everything after)
-	   GroupBounds		    -- for $+ (matched by last bracket)
-
--- GroupBounds hold the interval where a group
--- matched inside a string, e.g.
---
--- matching "reg(exp)" "a regexp" returns the pair (5,7) for the
--- (exp) group. (PackedString indices start from 0)
-
-type GroupBounds = (Int, Int)
-
-re_compile_pattern
-	:: PackedString	-- pattern to compile
-	-> Bool			-- True <=> assume single-line mode
-	-> Bool			-- True <=> case-insensitive
-	-> PrimIO PatBuffer
-
-re_match :: PatBuffer		-- compiled regexp
-	 -> PackedString	-- string to match
-	 -> Int			-- start position
-	 -> Bool		-- True <=> record results in registers
-	 -> PrimIO (Maybe REmatch)
-
--- Matching on 2 strings is useful when you're dealing with multiple
--- buffers, which is something that could prove useful for
--- PackedStrings, as we don't want to stuff the contents of a file
--- into one massive heap chunk, but load (smaller chunks) on demand.
-
-re_match2 :: PatBuffer		-- 2-string version
-	  -> PackedString
-	  -> PackedString
-	  -> Int
-	  -> Int
-	  -> Bool
-	  -> PrimIO (Maybe REmatch)
-
-re_search :: PatBuffer		-- compiled regexp
-	  -> PackedString	-- string to search
-	  -> Int		-- start index
-	  -> Int		-- stop index
-	  -> Bool		-- True <=> record results in registers
-	  -> PrimIO (Maybe REmatch)
-
-re_search2 :: PatBuffer		-- Double buffer search
-	   -> PackedString
-	   -> PackedString
-	   -> Int		-- start index
-	   -> Int		-- range (?)
-	   -> Int		-- stop index
-	   -> Bool		-- True <=> results in registers
-	   -> PrimIO (Maybe REmatch)
-\end{verbatim}
-
-The \tr{MatchPS} module provides Perl-like ``higher-level'' facilities
-to operate on \tr{PackedStrings}.  The regular expressions in
-question are in Perl syntax.  The ``flags'' on various functions can
-include: \tr{i} for case-insensitive, \tr{s} for single-line mode, and
-\tr{g} for global.  (It's probably worth your time to peruse the
-source code...)
-
-\begin{verbatim}
-matchPS :: PackedString    -- regexp
-	-> PackedString    -- string to match
-	-> [Char]	    -- flags
-	-> Maybe REmatch    -- info about what matched and where
-
-searchPS :: PackedString   -- regexp
-	 -> PackedString   -- string to match
-	 -> [Char]	    -- flags
-	 -> Maybe REmatch
-
--- Perl-like match-and-substitute:
-substPS :: PackedString    -- regexp
-	-> PackedString    -- replacement
-	-> [Char]	    -- flags
-	-> PackedString    -- string
-	-> PackedString
-
--- same as substPS, but no prefix and suffix:
-replacePS :: PackedString  -- regexp
-	  -> PackedString  -- replacement
-	  -> [Char]	    -- flags
-	  -> PackedString  -- string
-	  -> PackedString
-
-match2PS :: PackedString   -- regexp
-	 -> PackedString   -- string1 to match
-	 -> PackedString   -- string2 to match
-	 -> [Char]	    -- flags
-	 -> Maybe REmatch
-
-search2PS :: PackedString  -- regexp
-	  -> PackedString  -- string to match
-	  -> PackedString  -- string to match
-	  -> [Char]	    -- flags
-	  -> Maybe REmatch
-
--- functions to pull the matched pieces out of an REmatch:
-
-getMatchesNo    :: REmatch -> Int
-getMatchedGroup :: REmatch -> Int -> PackedString -> PackedString
-getWholeMatch   :: REmatch -> PackedString -> PackedString
-getLastMatch    :: REmatch -> PackedString -> PackedString
-getAfterMatch   :: REmatch -> PackedString -> PackedString
-
--- (reverse) brute-force string matching;
--- Perl equivalent is index/rindex:
-findPS, rfindPS :: PackedString -> PackedString -> Maybe Int
-
--- Equivalent to Perl "chop" (off the last character, if any):
-chopPS :: PackedString -> PackedString
-
--- matchPrefixPS: tries to match as much as possible of strA starting
--- from the beginning of strB (handy when matching fancy literals in
--- parsers):
-matchPrefixPS :: PackedString -> PackedString -> Int
-\end{verbatim}
-
-%************************************************************************
-%*                                                                      *
-\subsubsection[Socket]{Network-interface toolkit---@Socket@ and @SocketPrim@}
-\index{SocketPrim interface (GHC syslib)}
-\index{Socket interface (GHC syslib)}
-\index{network-interface library}
-\index{sockets library}
-\index{BSD sockets library}
-%*                                                                      *
-%************************************************************************
-
-(Darren Moffat supplied the network-interface toolkit.)
-
-Your best bet for documentation is to look at the code---really!--- 
-normally in \tr{hslibs/ghc/src/{BSD,Socket,SocketPrim}.lhs}.
-
-The \tr{BSD} module provides functions to get at system-database info;
-pretty straightforward if you're into this sort of thing:
-\begin{verbatim}
-getHostName	    :: IO String
-
-getServiceByName    :: ServiceName -> IO ServiceEntry
-getServicePortNumber:: ServiceName -> IO PortNumber
-getServiceEntry	    :: IO ServiceEntry
-setServiceEntry	    :: Bool -> IO ()
-endServiceEntry	    :: IO ()
-
-getProtocolByName   :: ProtocolName -> IO ProtocolEntry
-getProtocolByNumber :: ProtocolNumber -> IO ProtcolEntry
-getProtocolNumber   :: ProtocolName -> ProtocolNumber
-getProtocolEntry    :: IO ProtocolEntry
-setProtocolEntry    :: Bool -> IO ()
-endProtocolEntry    :: IO ()
-
-getHostByName	    :: HostName -> IO HostEntry
-getHostByAddr	    :: Family -> HostAddress -> IO HostEntry
-getHostEntry	    :: IO HostEntry
-setHostEntry	    :: Bool -> IO ()
-endHostEntry	    :: IO ()
-\end{verbatim}
-
-The \tr{SocketPrim} interface provides quite direct access to the
-socket facilities in a BSD Unix system, including all the
-complications.  We hope you don't need to use it!  See the source if
-needed...
-
-The \tr{Socket} interface is a ``higher-level'' interface to sockets,
-and it is what we recommend.  Please tell us if the facilities it
-offers are inadequate to your task!
-
-The interface is relatively modest:
-\begin{verbatim}
-connectTo	:: Hostname -> PortID -> IO Handle
-listenOn	:: PortID -> IO Socket
-
-accept		:: Socket -> IO (Handle, HostName)
-sendTo		:: Hostname -> PortID -> String -> IO ()
-
-recvFrom	:: Hostname -> PortID -> IO String
-socketPort	:: Socket -> IO PortID
-
-data PortID	-- PortID is a non-abstract type
-  = Service String	-- Service Name eg "ftp"
-  | PortNumber Int	-- User defined Port Number
-  | UnixSocket String	-- Unix family socket in file system
-
-type Hostname = String
-\end{verbatim}
-
-Various examples of networking Haskell code are provided in
-\tr{ghc/misc/examples/}, notably the \tr{net???/Main.hs} programs.
-
-%************************************************************************
-%*                                                                      *
-\subsection[HBC-library]{The HBC system library}
-\index{HBC system library}
-\index{system library, HBC}
-%*                                                                      *
-%************************************************************************
-
-This documentation is stolen directly from the HBC distribution.  The
-modules that GHC does not support (because they require HBC-specific
-extensions) are omitted.
-
+The libraries are organised into the following three groups, each of which
+is kept in a separate sub-directory of GHC's installed @lib/@ directory:
 \begin{description}
-\item[\tr{ListUtil}:]
-\index{ListUtil module (HBC library)}%
-Various useful functions involving lists that are missing from the
-\tr{Prelude}:
-\begin{verbatim}
-assoc :: (Eq c) => (a -> b) -> b -> [(c, a)] -> c -> b
-        -- assoc f d l k looks for k in the association list l, if it
-        -- is found f is applied to the value, otherwise d is returned.
-concatMap :: (a -> [b]) -> [a] -> [b]
-        -- flattening map (LML's concmap)
-unfoldr :: (a -> (b, a)) -> (a -> Bool) -> a -> [b]
-        -- unfoldr f p x repeatedly applies f to x until (p x) holds.
-        -- (f x) should give a list element and a new x.
-mapAccuml :: (a -> b -> (a, c)) -> a -> [b] -> (a, [c])
-        -- mapAccuml f s l maps f over l, but also threads the state s
-        -- through (LML's mapstate).
-union :: (Eq a) => [a] -> [a] -> [a]
-        -- union of two lists
-intersection :: (Eq a) => [a] -> [a] -> [a]
-        -- intersection of two lists
-chopList :: ([a] -> (b, [a])) -> [a] -> [b]
-        -- LMLs choplist
-assocDef :: (Eq a) => [(a, b)] -> b -> a -> b
-        -- LMLs assocdef
-lookup :: (Eq a) => [(a, b)] -> a -> Option b
-        -- lookup l k looks for the key k in the association list l
-        -- and returns an optional value
-tails :: [a] -> [[a]]
-        -- return all the tails of a list
-rept :: (Integral a) => a -> b -> [b]
-        -- repeat a value a number of times
-groupEq :: (a->a->Bool) -> [a] -> [[a]]
-        -- group list elements according to an equality predicate
-group :: (Eq a) => [a] -> [[a]]
-        -- group according to} ==
-readListLazily :: (Read a) => String -> [a]
-        -- read a list in a lazy fashion
-\end{verbatim}
+\item[@lib/required/@]  These are the libraries {\em required} by the Haskell
+definition.  All are defined by the Haskell Report, or by the Haskell Libraries Report.
+They currently comprise:
+\begin{itemize}
+\item @Prelude@.
+\item @List@: more functions on lists.
+\item @Char@: more functions on characters.
+\item @Maybe@: more functions on @Maybe@ types.
+\item @Complex@: functions on complex numbers.
+\item @Ratio@: functions on rational numbers.
+\item @Monad@: functions on characters.
+\item @Ix@: the @Ix@ class of indexing operations.
+\item @Array@: monolithic arrays.
+\item @IO@: basic input/output functions.
+\item @Directory@: basic functions for accessing the file system.
+\item @System@: basic operating-system interface functions.
+\end{itemize}
 
-\item[\tr{Pretty}:]
-\index{Pretty module (HBC library)}%
-John Hughes's pretty printing library.  
-\begin{verbatim}
-type Context = (Bool, Int, Int, Int)
-type IText = Context -> [String]
-text :: String -> IText                 -- just text
-(~.) :: IText -> IText -> IText         -- horizontal composition
-(^.) :: IText -> IText -> IText         -- vertical composition
-separate :: [IText] -> IText            -- separate by spaces
-nest :: Int -> IText -> IText           -- indent
-pretty :: Int -> Int -> IText -> String -- format it
-\end{verbatim}
+\item[@lib/glaExts@]  GHC extension libraries, currently comprising:
+\begin{itemize}
+\item @PackedString@: functions that manipulate strings packed efficiently, one character per byte.
+\item @ST@: the state transformer monad.
+\item @Foreign@: types and operations for GHC's foreign-language interface.
+\end{itemize}
 
-\item[\tr{QSort}:]
-\index{QSort module (HBC library)}%
-A sort function using quicksort.
-\begin{verbatim}
-sortLe :: (a -> a -> Bool) -> [a] -> [a]
-        -- sort le l  sorts l with le as less than predicate
-sort :: (Ord a) => [a] -> [a]
-        -- sort l  sorts l using the Ord class
-\end{verbatim}
+\item[@lib/concurrent@] GHC extension libraries to support Concurrent Haskell, currently comprising:
+\begin{itemize}
+\item @Concurrent.hs@: main library.
+\item @Parallel.hs@: stuff for multi-processor parallelism.
+\item @Channel.hs@
+\item @ChannelVar.hs@
+\item @Merge.hs@
+\item @SampleVar.hs@
+\item @Semaphore.hs@
+\end{itemize}
 
-\item[\tr{Random}:]
-\index{Random module (HBC library)}%
-Random numbers.
-\begin{verbatim}
-randomInts :: Int -> Int -> [Int]
-        -- given two seeds gives a list of random Int
-randomDoubles :: Int -> Int -> [Double]
-        -- random Double with uniform distribution in (0,1)
-normalRandomDoubles :: Int -> Int -> [Double]
-        -- random Double with normal distribution, mean 0, variance 1
-\end{verbatim}
+\item[@lib/ghc@] These libraries are the pieces on which all the others are built.
+They aren't typically imported by Joe Programmer, but there's nothing to stop you
+doing so if you want.  In general, the modules prefixed by @Prel@ are pieces that go
+towards building @Prelude@.
 
-\item[\tr{Trace}:]
-Simple tracing.  (Note: This comes with GHC anyway.)
-\begin{verbatim}
-trace :: String -> a -> a       -- trace x y  prints x and returns y
-\end{verbatim}
+\begin{itemize}
+\item @GHC@: this ``library'' brings into scope all the primitive types and operations, such as
+@Int#@, @+#@,  @encodeFloat#@, etc etc.  It is unique in that there is no Haskell
+source code for it.  Details in Section \ref{sect:ghc}.
 
-\item[\tr{Miranda}:]
-\index{Miranda module (HBC library)}%
-Functions found in the Miranda library.
-(Note: Miranda is a registered trade mark of Research Software Ltd.)
+\item @PrelBase@: defines the basic types and classes without which very few Haskell programs can work.
+The classes are: @Eq@, @Ord@, @Enum@, @Bounded@, @Num@, @Show@, @Eval@, @Monad@, @MonadZero@, @MonadPlus@.
+The types are: list, @Bool@, @Char@, @Ordering@, @String@, @Int@, @Integer@, @Maybe@, @Either@.
 
-\item[\tr{Word}:]
-\index{Word module (HBC library)}
-Bit manipulation.  (GHC doesn't implement absolutely all of this.
-And don't count on @Word@ being 32 bits on a Alpha...)
-\begin{verbatim}
-class Bits a where
-    bitAnd :: a -> a -> a       -- bitwise and
-    bitOr :: a -> a -> a        -- bitwise or
-    bitXor :: a -> a -> a       -- bitwise xor
-    bitCompl :: a -> a          -- bitwise negation
-    bitRsh :: a -> Int -> a     -- bitwise right shift
-    bitLsh :: a -> Int -> a     -- bitwise left shift
-    bitSwap :: a -> a           -- swap word halves
-    bit0 :: a                   -- word with least significant bit set
-    bitSize :: a -> Int         -- number of bits in a word
+\item @PrelTup@: defines tuples and their instances.
+\item @PrelList@: defines most of the list operations required by @Prelude@.  (A few are in @PrelBase@,
+to avoid gratuitous mutual recursion between modules.)
 
-data Byte                       -- 8  bit quantity
-data Short                      -- 16 bit quantity
-data Word                       -- 32 bit quantity
+\item @PrelNum@ defines: the numeric classes beyond @Num@ (namely @Real@, @Integral@, 
+@Fractional@, @Floating@, @RealFrac@, @RealFloat@; instances for appropriate classes 
+for @Int@ and @Integer@; the types @Float@, @Double@, and @Ratio@ and their instances.
 
-instance Bits Byte, Bits Short, Bits Word
-instance Eq Byte, Eq Short, Eq Word
-instance Ord Byte, Ord Short, Ord Word
-instance Show Byte, Show Short, Show Word
-instance Num Byte, Num Short, Num Word
-wordToShorts :: Word -> [Short]   -- convert a Word to two Short
-wordToBytes :: Word -> [Byte]     -- convert a Word to four Byte
-bytesToString :: [Byte] -> String -- convert a list of Byte to a String (bit by bit)
-wordToInt :: Word -> Int          -- convert a Word to Int
-shortToInt :: Short -> Int        -- convert a Short to Int
-byteToInt :: Byte -> Int          -- convert a Byte to Int
-\end{verbatim}
+\item @PrelRead@: the @Read@ class and all its instances.  It's kept separate because many programs
+don't use @Read@ at all, so we don't even want to link in its code.
 
-\item[\tr{Time}:]
-\index{Time module (HBC library)}%
-Manipulate time values (a Double with seconds since 1970).
-\begin{verbatim}
---               year mon  day  hour min  sec  dec-sec  weekday
-data Time = Time Int  Int  Int  Int  Int  Int  Double  Int
-dblToTime :: Double -> Time     -- convert a Double to a Time
-timeToDbl :: Time -> Double     -- convert a Time to a Double
-timeToString :: Time -> String  -- convert a Time to a readable String
-\end{verbatim}
+\item @ConcBase@: substrate stuff for Concurrent Haskell.
 
-\item[\tr{Hash}:]
-\index{Hash module (HBC library)}%
-Hashing functions.
-\begin{verbatim}
-class Hashable a where
-    hash :: a -> Int                            -- hash a value, return an Int
--- instances for all Prelude types
-hashToMax :: (Hashable a) => Int -> a -> Int    -- hash into interval [0..x-1]
-\end{verbatim}
+\item @IOBase@: substrate stuff for the main I/O libraries.
+\item @IOHandle@: large blob of code for doing I/O on handles.
+\item @PrelIO@: the remaining small pieces to produce the I/O stuff needed by @Prelude@.
 
-\item[\tr{NameSupply}:]
-\index{NameSupply module (HBC library)}%
-Functions to generate unique names (Int).
-\begin{verbatim}
-type Name = Int
-initialNameSupply :: NameSupply
-        -- The initial name supply (may be different every
-        -- time the program is run.
-splitNameSupply :: NameSupply -> (NameSupply,NameSupply)
-        -- split the namesupply into two
-getName :: NameSupply -> Name
-        -- get the name associated with a name supply
-\end{verbatim}
+\item @STBase@: substrate stuff for @ST@.
+\item @ArrBase@: substrate stuff for @Array@.
 
-\item[\tr{Parse}:]
-\index{Parse module (HBC library)}%
-Higher order functions to build parsers.  With a little care these
-combinators can be used to build efficient parsers with good error
-messages.
-\begin{verbatim}
-infixr 8 +.+ , ..+ , +.. 
-infix  6 `act` , >>> , `into` , .> 
-infixr 4 ||| , ||! , |!! 
-data ParseResult a b 
-type Parser a b = a -> Int -> ParseResult a b 
-(|||) :: Parser a b -> Parser a b -> Parser a b
-        -- Alternative
-(||!) :: Parser a b -> Parser a b -> Parser a b
-        -- Alternative, but with committed choice
-(|!!) :: Parser a b -> Parser a b -> Parser a b
-        -- Alternative, but with committed choice
-(+.+) :: Parser a b -> Parser a c -> Parser a (b,c)
-        -- Sequence
-(..+) :: Parser a b -> Parser a c -> Parser a c
-        -- Sequence, throw away first part
-(+..) :: Parser a b -> Parser a c -> Parser a b
-        -- Sequence, throw away second part
-act   :: Parser a b -> (b->c) -> Parser a c
-        -- Action
-(>>>) :: Parser a (b,c) -> (b->c->d) -> Parser a d
-        -- Action on two items
-(.>) :: Parser a b -> c -> Parse a c
-        -- Action ignoring value
-into :: Parser a b -> (b -> Parser a c) -> Parser a c
-        -- Use a produced value in a parser.
-succeed b :: Parser a b
-        -- Always succeeds without consuming a token
-failP :: Parser a b
-        -- Always fails.
-many :: Parser a b -> Parser a [b]
-        -- Kleene star
-many1 :: Parser a b -> Parser a [b]
-        -- Kleene plus
-count :: Parser a b -> Int -> Parser a [b]
-        -- Parse an exact number of items
-sepBy1 :: Parser a b -> Parser a c -> Parser a [b]
-        -- Non-empty sequence of items separated by something
-sepBy :: Parser a b -> Parser a c -> Parser a [b]
-        -- Sequence of items separated by something
-lit :: (Eq a, Show a) => a -> Parser [a] a
-        -- Recognise a literal token from a list of tokens
-litp :: String -> (a->Bool) -> Parser [a] a
-        -- Recognise a token with a predicate.
-        -- The string is a description for error messages.
-testp :: String -> (a -> Bool) -> (Parser b a) -> Parser b a
-        -- Test a semantic value. 
-token :: (a -> Either String (b, a)) -> Parser a b
-        -- General token recogniser.
-parse :: Parser a b -> a -> Either ([String], a) [(b, a)]
-        -- Do a parse.  Return either error (possible tokens and rest
-        -- of tokens) or all possible parses.
-sParse :: (Show a) => (Parser [a] b) -> [a] -> Either String b
-        -- Simple parse.  Return error message or result.
-\end{verbatim}
-
-%%%simpleLex :: String -> [String]              -- A simple (but useful) lexical analyzer
-
-\item[\tr{Native}:]
-\index{Native module (HBC library)}%
-Functions to convert the primitive types \tr{Int}, \tr{Float}, and \tr{Double} to
-their native representation as a list of bytes (\tr{Char}).  If such a list
-is read/written to a file it will have the same format as when, e.g.,
-C read/writes the same kind of data.
-\begin{verbatim}
-type Bytes = [Char] -- A byte stream is just a list of characters
-
-class Native a where 
-    showBytes     :: a -> Bytes -> Bytes
-        -- prepend the representation of an item the a byte stream
-    listShowBytes :: [a] -> Bytes -> Bytes
-        -- prepend the representation of a list of items to a stream
-        -- (may be more efficient than repeating showBytes).
-    readBytes     :: Bytes -> Maybe (a, Bytes)
-        -- get an item from the stream and return the rest,
-        -- or fail if the stream is to short.
-    listReadBytes :: Int -> Bytes -> Maybe ([a], Bytes)
-        -- read n items from a stream.
-
-instance Native Int 
-instance Native Float 
-instance Native Double 
-instance (Native a, Native b) => Native (a,b)
-        -- juxtaposition of the two items
-instance (Native a, Native b, Native c) => Native (a, b, c)
-        -- juxtaposition of the three items
-instance (Native a) => Native [a]
-        -- an item count in an Int followed by the items
-
-shortIntToBytes :: Int -> Bytes -> Bytes
-        -- Convert an Int to what corresponds to a short in C.
-bytesToShortInt :: Bytes -> Maybe (Int, Bytes)
-        -- Get a short from a byte stream and convert to an Int.
-
-showB :: (Native a) => a -> Bytes       -- Simple interface to showBytes.
-readB :: (Native a) => Bytes -> a       -- Simple interface to readBytes.
-\end{verbatim}
-
-\item[\tr{Number}:]
-\index{Number module (HBC library)}%
-Simple numbers that belong to all numeric classes and behave like
-a naive user would expect (except that printing is still ugly).
-(NB: GHC does not provide a magic way to use \tr{Numbers} everywhere,
-but you should be able to do it with normal \tr{import}ing and
-\tr{default}ing.)
-\begin{verbatim}
-data Number                     -- The type itself.
-instance ...                    -- All reasonable instances.
-isInteger :: Number -> Bool     -- Test if a Number is an integer.
-\end{verbatim}
+\item @GHCerr@: error reporting code, called from code that the compiler plants in compiled programs.
+\item @GHCmain@: the definition of @mainPrimIO@, which is what {\em really} gets
+	called by the runtime system.  @mainPrimIO@ in turn calls @main@.
+\end{itemize}
 \end{description}
 
-%************************************************************************
-%*                                                                      *
-\subsection[contrib-library]{The `contrib' system library}
-\index{contrib system library}
-\index{system library, contrib}
-%*                                                                      *
-%************************************************************************
+The @...Base@ modules generally export representation information that
+is hidden from the public interface.  For example the module @STBase@
+exports the type @ST@ including its representation, whereas the module
+@ST@ exports @ST@ abstractly.
 
-Just for a bit of fun, we took all the old contributed ``Haskell
-library'' code---Stephen J.~Bevan the main hero, converted it to
-Haskell~1.3 and heaved it into a \tr{contrib} system library.  It is
-mostly code for numerical methods (@SetMap@ is an exception); we have
-{\em no idea} whether it is any good or not.
+None of these modules are involved in any mutual recursion, with the sole exception that
+many modules import @IOBase.error@.
 
-The modules provided are:
-@Adams_Bashforth_Approx@,
-@Adams_Predictor_Corrector_Approx@,
-@Choleski_Factorization@,
-@Crout_Reduction@,
-@Cubic_Spline@,
-@Fixed_Point_Approx@,
-@Gauss_Seidel_Iteration@,
-@Hermite_Interpolation@,
-@Horner@,
-@Jacobi_Iteration@,
-@LLDecompMethod@,
-@Least_Squares_Fit@,
-@Matrix_Ops@,
-@Neville_Iterated_Interpolation@,
-@Newton_Cotes@,
-@Newton_Interpolatory_Divided_Difference@,
-@Newton_Raphson_Approx@,
-@Runge_Kutta_Approx@,
-@SOR_Iteration@,
-@Secant_Approx@,
-@SetMap@,
-@Steffensen_Approx@,
-@Taylor_Approx@, and
-@Vector_Ops@.
+\section{The module @GHC@: really primitive stuff}
+\label{sect:ghc}
+
+This section defines all the types which are primitive in Glasgow Haskell, and the
+operations provided for them.
+
+A primitive type is one which cannot be defined in Haskell, and which
+is therefore built into the language and compiler.  Primitive types
+are always unboxed; that is, a value of primitive type cannot be
+bottom.
+
+Primitive values are often represented by a simple bit-pattern, such as @Int#@, 
+@Float#@, @Double#@.  But this is not necessarily the case: a primitive value 
+might be represented by a pointer to a heap-allocated object.  Examples include 
+@Array#@, the type of primitive arrays.  You might think this odd: doesn't being 
+heap-allocated mean that it has a box?  No, it does not.  A primitive array is 
+heap-allocated because it is too big a value to fit in a register, and would be 
+too expensive to copy around; in a sense, it is accidental that it is represented 
+by a pointer.  If a pointer represents a primitive value, then it really does 
+point to that value: no unevaluated thunks, no indirections...nothing can be at 
+the other end of the pointer than the primitive value.
+
+This section also describes a few non-primitive types, which are needed 
+to express the result types of some primitive operations.
+
+\subsection{Character and numeric types}
+
+There are the following obvious primitive types:
+@
+type Char#
+type Int#	-- see also Word# and Addr#, later
+type Float#
+type Double#
+@
+If you want to know their exact equivalents in C, see
+@ghc/includes/StgTypes.lh@ in the GHC source.
+
+Literals for these types may be written as follows:
+@
+1#		an Int#
+1.2#		a Float#
+1.34##		a Double#
+'a'#		a Char#; for weird characters, use '\o<octal>'#
+"a"#		an Addr# (a `char *')
+@
+
+\subsubsection{Comparison operations}
+@
+{gt,ge,eq,ne,lt,le}Char# :: Char# -> Char# -> Bool
+    -- ditto for Int#, Word#, Float#, Double#, and Addr#
+@
+
+\subsubsection{Unboxed-character operations}
+@
+ord# :: Char# -> Int#
+chr# :: Int# -> Char#
+@
+
+\subsubsection{Unboxed-@Int@ operations}
+@
+{plus,minus,times,quot,div,rem}Int# :: Int# -> Int# -> Int#
+negateInt# :: Int# -> Int#
+@
+NB: No error/overflow checking!
+
+\subsubsection{Unboxed-@Double@ and @Float@ operations}
+@
+{plus,minus,times,divide}Double# :: Double# -> Double# -> Double#
+negateDouble# :: Double# -> Double#
+
+float2Int#	:: Double# -> Int#   -- just a cast, no checking!
+int2Double#	:: Int# -> Double#
+
+expDouble#	:: Double# -> Double#
+logDouble#	:: Double# -> Double#
+sqrtDouble#	:: Double# -> Double#
+sinDouble#	:: Double# -> Double#
+cosDouble#	:: Double# -> Double#
+tanDouble#	:: Double# -> Double#
+asinDouble#	:: Double# -> Double#
+acosDouble#	:: Double# -> Double#
+atanDouble#	:: Double# -> Double#
+sinhDouble#	:: Double# -> Double#
+coshDouble#	:: Double# -> Double#
+tanhDouble#	:: Double# -> Double#
+powerDouble#	:: Double# -> Double# -> Double#
+@
+There's an exactly-matching set of unboxed-@Float@ ops; replace
+@Double#@ with @Float#@ in the list above.  There are two
+coercion functions for @Float#@/@Double#@:
+@
+float2Double#	:: Float# -> Double#
+double2Float#	:: Double# -> Float#
+@
+The primitive versions of @encodeDouble@/@decodeDouble@:
+@
+encodeDouble#	:: Int# -> Int# -> ByteArray#	-- Integer mantissa
+		-> Int#				-- Int exponent
+		-> Double#
+
+decodeDouble#	:: Double#
+		-> GHCbase.ReturnIntAndGMP
+@
+(And the same for @Float#@s.)
+
+\subsection{Operations on/for @Integers@ (interface to GMP)}
+\label{sect:horrid-Integer-pairing-types}
+
+We implement @Integers@ (arbitrary-precision integers) using the GNU
+multiple-precision (GMP) package.
+
+NB: some of this might change if we upgrade to using GMP~2.x.
+
+The data type for @Integer@ must mirror that for @MP_INT@ in @gmp.h@
+(see @gmp.info@).  It comes out as:
+@
+data Integer = J# Int# Int# ByteArray#
+@
+So, @Integer@ is really just a ``pairing'' type for a particular
+collection of primitive types.
+
+The operations in the GMP return other combinations of
+GMP-plus-something, so we need ``pairing'' types for those, too:
+@
+data Return2GMPs     = Return2GMPs Int# Int# ByteArray# Int# Int# ByteArray#
+data ReturnIntAndGMP = ReturnIntAndGMP Int# Int# Int# ByteArray#
+
+-- ????? something to return a string of bytes (in the heap?)
+@
+The primitive ops to support @Integers@ use the ``pieces'' of the
+representation, and are as follows:
+@
+negateInteger#	:: Int# -> Int# -> ByteArray# -> Integer
+
+{plus,minus,times}Integer# :: Int# -> Int# -> ByteArray#
+			   -> Int# -> Int# -> ByteArray#
+			   -> Integer
+
+cmpInteger# :: Int# -> Int# -> ByteArray#
+	    -> Int# -> Int# -> ByteArray#
+	    -> Int# -- -1 for <; 0 for ==; +1 for >
+
+divModInteger#, quotRemInteger#
+	:: Int# -> Int# -> ByteArray#
+	-> Int# -> Int# -> ByteArray#
+	-> GHCbase.Return2GMPs
+
+integer2Int# :: Int# -> Int# -> ByteArray#
+	     -> Int# 
+
+int2Integer#  :: Int#  -> Integer -- NB: no error-checking on these two!
+word2Integer# :: Word# -> Integer
+
+addr2Integer# :: Addr# -> Integer
+	-- the Addr# is taken to be a `char *' string
+	-- to be converted into an Integer
+@
+
+
+\subsection{Words and addresses}
+
+A @Word#@ is used for bit-twiddling operations.  It is the same size as
+an @Int#@, but has no sign nor any arithmetic operations.
+@
+type Word#	-- Same size/etc as Int# but *unsigned*
+type Addr#	-- A pointer from outside the "Haskell world" (from C, probably);
+		-- described under "arrays"
+@
+@Word#@s and @Addr#@s have the usual comparison operations.
+Other unboxed-@Word@ ops (bit-twiddling and coercions):
+@
+and#, or# :: Word# -> Word# -> Word#
+
+not# :: Word# -> Word#
+
+shiftL#, shiftRA#, shiftRL# :: Word# -> Int# -> Word#
+	-- shift left, right arithmetic, right logical
+
+iShiftL#, iShiftRA#, iShiftRL# :: Int# -> Int# -> Int#
+	-- same shift ops, but on Int#s
+
+int2Word#	:: Int#  -> Word# -- just a cast, really
+word2Int#	:: Word# -> Int#
+@
+
+Unboxed-@Addr@ ops (C casts, really):
+@
+int2Addr#	:: Int#  -> Addr#
+addr2Int#	:: Addr# -> Int#
+@
+Operations for indexing off of C pointers (@Addr#@s) to snatch values
+are listed under ``arrays''.
+
+\subsection{Arrays}
+
+The type @Array# elt@ is the type of primitive,
+unboxed arrays of values of type @elt@.  
+@
+type Array# elt
+@
+@Array#@ is more primitive than a Haskell
+array --- indeed, Haskell arrays are implemented using @Array#@ ---
+in that an @Array#@ is indexed only by @Int#@s, starting at zero.  It is also
+more primitive by virtue of being unboxed.  That doesn't mean that it isn't
+a heap-allocated object --- of course, it is.  Rather, being unboxed means
+that it is represented by a pointer to the array itself, and not to a thunk
+which will evaluate to the array (or to bottom).
+The components of an @Array#@ are themselves boxed.
+
+The type @ByteArray#@ is similar to @Array#@, except that it contains
+just a string of (non-pointer) bytes.
+@
+type ByteArray#
+@
+Arrays of these types are useful when a Haskell program wishes to
+construct a value to pass to a C procedure.  It is also possible to
+use them to build (say) arrays of unboxed characters for internal use
+in a Haskell program.  Given these uses, @ByteArray#@ is deliberately
+a bit vague about the type of its components.  Operations are provided
+to extract values of type @Char#@, @Int#@, @Float#@, @Double#@, and
+@Addr#@ from arbitrary offsets within a @ByteArray#@.  (For type @Foo#@,
+the $i$th offset gets you the $i$th @Foo#@, not the @Foo#@ at byte-position $i$.  Mumble.)
+(If you want a @Word#@, grab an @Int#@, then coerce it.)
+
+Lastly, we have static byte-arrays, of type @Addr#@ [mentioned
+previously].  (Remember the duality between arrays and pointers in C.)
+Arrays of this types are represented by a pointer to an array in the
+world outside Haskell, so this pointer is not followed by the garbage
+collector.  In other respects they are just like @ByteArray#@.  They
+are only needed in order to pass values from C to Haskell.
+
+\subsubsection{Reading and writing.}
+
+Primitive arrays are linear, and indexed starting at zero.
+
+The size and indices of a @ByteArray#@, @Addr#@, and
+@MutableByteArray#@ are all in bytes.  It's up to the program to
+calculate the correct byte offset from the start of the array.  This
+allows a @ByteArray#@ to contain a mixture of values of different
+type, which is often needed when preparing data for and unpicking
+results from C.  (Umm... not true of indices... WDP 95/09)
+
+{\em Should we provide some @sizeOfDouble#@ constants?}
+
+Out-of-range errors on indexing should be caught by the code which
+uses the primitive operation; the primitive operations themselves do
+{\em not} check for out-of-range indexes. The intention is that the
+primitive ops compile to one machine instruction or thereabouts.
+
+We use the terms ``reading'' and ``writing'' to refer to accessing {\em mutable} 
+arrays (see Section~\ref{sect:mutable}), and ``indexing'' 
+to refer to reading a value from an {\em immutable} 
+array.
+
+If you want to read/write a @Word#@, read an @Int#@ and coerce.
+
+Immutable byte arrays are straightforward to index (all indices in bytes):
+@
+indexCharArray#   :: ByteArray# -> Int# -> Char#
+indexIntArray#    :: ByteArray# -> Int# -> Int#
+indexAddrArray#   :: ByteArray# -> Int# -> Addr#
+indexFloatArray#  :: ByteArray# -> Int# -> Float#
+indexDoubleArray# :: ByteArray# -> Int# -> Double#
+
+indexCharOffAddr#   :: Addr# -> Int# -> Char#
+indexIntOffAddr#    :: Addr# -> Int# -> Int#
+indexFloatOffAddr#  :: Addr# -> Int# -> Float#
+indexDoubleOffAddr# :: Addr# -> Int# -> Double#
+indexAddrOffAddr#   :: Addr# -> Int# -> Addr#	-- Get an Addr# from an Addr# offset
+@
+The last of these, @indexAddrOffAddr#@, extracts an @Addr#@ using an offset
+from another @Addr#@, thereby providing the ability to follow a chain of
+C pointers.
+
+Something a bit more interesting goes on when indexing arrays of boxed
+objects, because the result is simply the boxed object. So presumably
+it should be entered --- we never usually return an unevaluated
+object!  This is a pain: primitive ops aren't supposed to do
+complicated things like enter objects.  The current solution is to
+return a lifted value, but I don't like it!
+@
+indexArray#       :: Array# elt -> Int# -> GHCbase.Lift elt  -- Yuk!
+@
+
+\subsubsection{The state type}
+
+The primitive type @State#@ represents the state of a state transformer.
+It is parameterised on the desired type of state, which serves to keep
+states from distinct threads distinct from one another.  But the {\em only}
+effect of this parameterisation is in the type system: all values of type
+@State#@ are represented in the same way.  Indeed, they are all 
+represented by nothing at all!  The code generator ``knows'' to generate no 
+code, and allocate no registers etc, for primitive states.
+@
+type State# s
+@
+
+The type @GHCbuiltins.RealWorld@ is truly opaque: there are no values defined
+of this type, and no operations over it.  It is ``primitive'' in that
+sense---but it is {\em not unboxed!} Its only role in life is to be the type
+which distinguishes the @PrimIO@ state transformer (see
+Section~\ref{sect:io-spec}).
+@
+data RealWorld
+@
+
+\subsubsection{States}
+
+A single, primitive, value of type @State# RealWorld@ is provided.
+@
+realWorld# :: State# GHCbuiltins.RealWorld
+@
+(Note: in the compiler, not a @PrimOp@; just a mucho magic @Id@.)
+
+\subsection{State pairing types}
+\label{sect:horrid-pairing-types}
+
+This subsection defines some types which, while they aren't quite primitive 
+because we can define them in Haskell, are very nearly so.  They define 
+constructors which pair a primitive state with a value of each primitive type.
+They are required to express the result type of the primitive operations in the 
+state monad.
+@
+data StateAndPtr#    s elt = StateAndPtr#    (State# s) elt 
+
+data StateAndChar#   s     = StateAndChar#   (State# s) Char# 
+data StateAndInt#    s     = StateAndInt#    (State# s) Int# 
+data StateAndWord#   s     = StateAndWord#   (State# s) Word#
+data StateAndFloat#  s     = StateAndFloat#  (State# s) Float# 
+data StateAndDouble# s     = StateAndDouble# (State# s) Double#  
+data StateAndAddr#   s     = StateAndAddr#   (State# s) Addr#
+
+data StateAndStablePtr# s a = StateAndStablePtr#  (State# s) (StablePtr# a)
+data StateAndForeignObj# s  = StateAndForeignObj# (State# s) ForeignObj#
+data StateAndSynchVar#  s a = StateAndSynchVar#  (State# s) (SynchVar# a)
+
+data StateAndArray#            s elt = StateAndArray#        (State# s) (Array# elt) 
+data StateAndMutableArray#     s elt = StateAndMutableArray# (State# s) (MutableArray# s elt)  
+data StateAndByteArray#        s = StateAndByteArray#        (State# s) ByteArray# 
+data StateAndMutableByteArray# s = StateAndMutableByteArray# (State# s) (MutableByteArray# s)
+@
+
+
+\subsection{Mutable arrays}
+\label{sect:mutable}
+
+Corresponding to @Array#@ and @ByteArray#@,
+we have the types of mutable versions of each.  
+In each case, the representation is a pointer
+to a suitable block of (mutable) heap-allocated storage.
+@
+type MutableArray# s elt
+type MutableByteArray# s
+@
+\subsubsection{Allocation.}
+
+Mutable arrays can be allocated.
+Only pointer-arrays are initialised; arrays of non-pointers are filled
+in by ``user code'' rather than by the array-allocation primitive.
+Reason: only the pointer case has to worry about GC striking with a
+partly-initialised array.
+@
+newArray#       :: Int# -> elt -> State# s -> StateAndMutableArray# s elt 
+
+newCharArray#   :: Int# -> State# s -> StateAndMutableByteArray# s 
+newIntArray#    :: Int# -> State# s -> StateAndMutableByteArray# s 
+newAddrArray#   :: Int# -> State# s -> StateAndMutableByteArray# s 
+newFloatArray#  :: Int# -> State# s -> StateAndMutableByteArray# s 
+newDoubleArray# :: Int# -> State# s -> StateAndMutableByteArray# s 
+@
+The size of a @ByteArray#@ is given in bytes.
+
+\subsubsection{Reading and writing}
+
+%OLD: Remember, offsets in a @MutableByteArray#@ are in bytes.
+@
+readArray#       :: MutableArray# s elt -> Int# -> State# s -> StateAndPtr#    s elt
+readCharArray#   :: MutableByteArray# s -> Int# -> State# s -> StateAndChar#   s
+readIntArray#    :: MutableByteArray# s -> Int# -> State# s -> StateAndInt#    s
+readAddrArray#	 :: MutableByteArray# s -> Int# -> State# s -> StateAndAddr#   s 
+readFloatArray#  :: MutableByteArray# s -> Int# -> State# s -> StateAndFloat#  s 
+readDoubleArray# :: MutableByteArray# s -> Int# -> State# s -> StateAndDouble# s 
+
+writeArray#       :: MutableArray# s elt -> Int# -> elt     -> State# s -> State# s 
+writeCharArray#   :: MutableByteArray# s -> Int# -> Char#   -> State# s -> State# s 
+writeIntArray#    :: MutableByteArray# s -> Int# -> Int#    -> State# s -> State# s 
+writeAddrArray#   :: MutableByteArray# s -> Int# -> Addr#   -> State# s -> State# s 
+writeFloatArray#  :: MutableByteArray# s -> Int# -> Float#  -> State# s -> State# s 
+writeDoubleArray# :: MutableByteArray# s -> Int# -> Double# -> State# s -> State# s 
+@
+
+\subsubsection{Equality.}
+
+One can take ``equality'' of mutable arrays.  What is compared is the
+{\em name} or reference to the mutable array, not its contents.
+@
+sameMutableArray#     :: MutableArray# s elt -> MutableArray# s elt -> Bool
+sameMutableByteArray# :: MutableByteArray# s -> MutableByteArray# s -> Bool
+@
+
+\subsubsection{Freezing mutable arrays}
+
+Only unsafe-freeze has a primitive.  (Safe freeze is done directly in Haskell 
+by copying the array and then using @unsafeFreeze@.) 
+@
+unsafeFreezeArray#     :: MutableArray# s elt -> State# s -> StateAndArray#     s elt
+unsafeFreezeByteArray# :: MutableByteArray# s -> State# s -> StateAndByteArray# s
+@
+
+\subsubsection{Stable pointers}
+
+{\em Andy's comment.} {\bf Errors:} The following is not strictly true: the current
+implementation is not as polymorphic as claimed.  The reason for this
+is that the C programmer will have to use a different entry-routine
+for each type of stable pointer.  At present, we only supply a very
+limited number (1) of these routines.  It might be possible to
+increase the range of these routines by providing general purpose
+entry points to apply stable pointers to (stable pointers to)
+arguments and to enter (stable pointers to) boxed primitive values.
+{\em End of Andy's comment.}
+
+A stable pointer is a name for a Haskell object which can be passed to the 
+external world.  It is ``stable'' in the sense that the name does not change when 
+the Haskell garbage collector runs --- in contrast to the address of the object 
+which may well change.
+
+The stable pointer type is parameterised by the type of the thing which is named.
+@
+type StablePtr# a
+@
+A stable pointer is represented by an index into the (static) 
+@StablePointerTable@.  The Haskell garbage collector treats the 
+@StablePointerTable@ as a source of roots for GC.
+
+The @makeStablePointer@ function converts a value into a stable pointer.
+It is part of the @PrimIO@ monad, because we want to be sure we don't
+allocate one twice by accident, and then only free one of the copies.
+@
+makeStablePointer#  :: a -> State# RealWorld -> StateAndStablePtr# RealWorld a
+freeStablePointer#  :: StablePtr# a -> State# RealWorld -> State# RealWorld
+deRefStablePointer# :: StablePtr# a -> State# RealWorld -> StateAndPtr RealWorld a
+@
+There is also a C procedure @FreeStablePtr@ which frees a stable pointer.
+
+%
+% Rewritten and updated for MallocPtr++ -- 4/96 SOF
+%
+\subsubsection{Foreign objects}
+
+A @ForeignObj@ is a reference to an object outside the Haskell
+world (i.e., from the C world, or a reference to an object on another
+machine completely.), where the Haskell world has been told ``Let me
+know when you're finished with this ...''.
+
+The @ForeignObj@ type is just a special @Addr#@ ({\em not} parameterised).
+@
+type ForeignObj#
+@
+
+A typical use of @ForeignObj@ is in constructing Haskell bindings
+to external libraries. A good example is that of writing a binding to
+an image-processing library (which was actually the main motivation
+for implementing @ForeignObj@'s precursor, @MallocPtr@). The
+images manipulated are not stored in the Haskell heap, either because
+the library insist on allocating them internally or we (sensibly)
+decide to spare the GC from having to heave heavy images around.
+
+@
+data Image = Image ForeignObj#
+
+instance CCallable Image
+@
+
+The @ForeignObj#@ type is then used to refer to the externally
+allocated image, and to acheive some type safety, the Haskell binding
+defines the @Image@ data type. So, a value of type @ForeignObj#@ is
+used to ``box'' up an external reference into a Haskell heap object
+that we can then indirectly reference:
+
+@
+createImage :: (Int,Int) -> PrimIO Image
+@
+
+So far, this looks just like an @Addr#@ type, but @ForeignObj#@
+offers a bit more, namely that we can specify a {\em finalisation
+routine} to invoke when the @ForeignObj#@ is discarded by the
+GC. The garbage collector invokes the finalisation routine associated
+with the @ForeignObj#@, saying `` Thanks, I'm through with this
+now..'' For the image-processing library, the finalisation routine could for
+the images free up memory allocated for them. The finalisation routine has
+currently to be written in C (the finalisation routine can in turn call on
+@FreeStablePtr@ to deallocate a stable pointer.).
+
+Associating a finalisation routine with an external object is done by 
+@makeForeignObj#@:
+
+@
+makeForeignObj# :: Addr# -- foreign reference
+                -> Addr# -- pointer to finalisation routine
+		-> StateAndForeignObj# RealWorld ForeignObj#
+@
+
+(Implementation: a linked list of all @ForeignObj#@s is maintained to allow the
+ garbage collector to detect when a @ForeignObj#@ becomes garbage.)
+
+Like @Array@, @ForeignObj#@s are represented by heap objects.
+
+{\bf ToDo:} Decide whether @FreeCHeapPointer@ is allowed to call on a
+stable pointer. (I sincerely hope not since we will still be in the
+GC at this point.)
+
+\subsubsection{Synchronizing variables (I-vars, M-vars)}
+
+ToDo ToDo ToDo
+
+@
+type SynchVar# s elt	-- primitive
+
+newSynchVar#:: State# s -> StateAndSynchVar# s elt
+
+takeMVar#   :: SynchVar# s elt -> State# s -> StateAndPtr# s elt
+putMVar#    :: SynchVar# s elt -> State# s -> State# s
+
+readIVar#   :: SynchVar# s elt -> State# s -> StateAndPtr# s elt
+writeIVar#  :: SynchVar# s elt -> State# s -> State# s
+@
+
+\subsubsection{Controlling the garbage collector}
+
+The C function {\tt PerformGC\/}, allows the C world to force Haskell
+to do a garbage collection.  It can only be called while Haskell
+is performing a C Call.
+
+Note that this function can be used to define a Haskell IO operation
+with the same effect:
+@
+>	performGCIO :: PrimIO ()
+>	performGCIO = _ccall_gc_ PerformGC
+@
+
+{\bf ToDo:} Is there any need for abnormal/normal termination to force
+a GC too?  Is there any need for a function that provides finer
+control over GC: argument = amount of space required; result = amount
+of space recovered.
+
+\subsection{@spark#@ primitive operation (for parallel execution)}
+
+{\em ToDo: say something}  It's used in the unfolding for @par@.
+
+\subsection{The @errorIO#@ primitive operation}
+
+The @errorIO#@ primitive takes an argument much like @PrimIO@.  It aborts execution of
+the current program, and continues instead by performing the given @PrimIO@-like value
+on the current state of the world.
+@
+errorIO# :: (State RealWorld -> ((), State RealWorld)) -> a
+@
+
+\subsection{C Calls}
+
+{\bf ToDo:} current implementation has state variable as second
+argument not last argument.
+
+The @ccall#@ primitive can't be given an ordinary type, because it has
+a variable number of arguments.  The nearest we can get is:
+@
+ccall# :: CRoutine -> a1# -> ... -> an# -> State# RealWorld -> StateAndR# RealWorld
+@
+where the type variables @a1#@\ldots@an#@ and @r#@ can be instantiated by any
+primitive type, and @StateAndR#@ is the appropriate pairing type from 
+Section~\ref{sect:horrid-pairing-types}.  The @CRoutine@ 
+isn't a proper Haskell type at all; it just reminds us that @ccall#@ needs to 
+know what C routine to call.
+
+This notation is really short for a massive family of @ccall#@ primitives, one 
+for each combination of types.  (Of course, the compiler simply remembers the 
+types involved, and generates appropriate code when it finally spits out the C.)
+
+Unlike all the other primitive operators, @ccall#@ is not bound to an in-scope 
+identifier.  The only way it is possible to generate a @ccall#@ is via the 
+@_ccall_@ construct.
+
+All this applies equally to @casm#@:
+@
+casm#  :: CAsmString -> a1# -> ... -> an# -> State# RealWorld -> StateAndR# RealWorld
+@
+
+%------------------------------------------------------------
+\section{Library stuff built with the Really Primitive Stuff}
+
+\subsection{The state transformer monad}
+
+\subsubsection{Types}
+
+A state transformer is a function from a state to a pair of a result and a new 
+state.  
+@
+newtype ST s a = ST (State s -> (a, State s))
+@
+The @ST@ type is {\em abstract}, so that the programmer cannot see its 
+representation.  If he could, he could write bad things like:
+@
+bad :: ST s a
+bad = ST $ \ s -> ...(f s)...(g s)...
+@
+Here, @s@ is duplicated, which would be bad news.
+
+A state is represented by a primitive state value, of type @State# s@, 
+wrapped up in a @State@ constructor.  The reason for boxing it in this
+way is so that we can be strict or lazy in the state.  (Remember, all 
+primitive types are unboxed, and hence can't be bottom; but types built
+with @data@ are all boxed.)
+@
+data State s = S# (State# s)
+@
+
+\subsubsection{The state transformer combinators}
+
+Now for the combinators, all of which live inside the @ST@
+abstraction.  Notice that @returnST@ and @thenST@ are lazy in the
+state.
+@
+returnST :: a -> ST s a
+returnST a s = (a, s)
+
+thenST :: ST s a -> (a -> ST s b) -> ST s b
+thenST m k s = let (r,new_s) = m s
+               in 
+               k r new_s
+
+fixST :: (a -> ST s a) -> ST s a
+fixST k s = let ans = k r s
+                (r,new_s) = ans
+            in
+            ans
+@
+The interesting one is, of course, @runST@.  We can't infer its type!
+(It has a funny name because it must be wired into the compiler.)
+@
+-- runST :: forall a. (forall s. ST s a) -> a
+runST m = case m (S# realWorld#) of
+           (r,_) -> r
+@
+
+\subsubsection{Other useful combinators}
+
+There are various other standard combinators, all defined in terms the
+fundamental combinators above. The @seqST@ combinator is like
+@thenST@, except that it discards the result of the first state
+transformer:
+@
+seqST :: ST s a -> ST s b -> ST s b
+seqST m1 m2 = m1 `thenST` (\_ -> m2)
+@
+
+We also have {\em strict} (... in the state...) variants of the
+then/return combinators (same types as their pals):
+@
+returnStrictlyST a s@(S# _) = (a, s)
+
+thenStrictlyST m k s@(S# _)
+  = case (m s) of { (r, new_s@(S# _)) ->
+    k r new_s }
+
+seqStrictlyST m k = ... ditto, for seqST ...
+@
+
+The combinator @listST@ takes a list of state transformers, and
+composes them in sequence, returning a list of their results:
+@
+listST :: [ST s a] -> ST s [a]
+listST []     = returnST []
+listST (m:ms) = m		`thenST` \ r ->
+		listST ms	`thenST` \ rs ->
+		returnST (r:rs)
+@
+The @mapST@ combinator ``lifts'' a function from a value to state
+transformers to one which works over a list of values:
+@
+mapST :: (a -> ST s b) -> [a] -> ST s [b]
+mapST f ms = listST (map f ms)
+@
+The @mapAndUnzipST@ combinator is similar to @mapST@, except that here the
+function returns a pair:
+@
+mapAndUnzipST :: (a -> ST s (b,c)) -> [a] -> ST s ([b],[c])
+mapAndUnzipST f (m:ms)
+  = f m			`thenST` \ ( r1,  r2) ->
+    mapAndUnzipST f ms	`thenST` \ (rs1, rs2) ->
+    returnST (r1:rs1, r2:rs2)
+@
+
+\subsubsection{The @PrimIO@ monad}
+\label{sect:io-spec}
+
+The @PrimIO@ type is defined in as a state transformer which manipulates the 
+@RealWorld@.
+@
+type PrimIO a = ST RealWorld a      -- Transparent
+@
+The @PrimIO@ type is an ordinary type synonym, transparent to the programmer.
+
+The type @RealWorld@ and value @realWorld#@ do not need to be hidden (although 
+there is no particular point in exposing them).  Even having a value of type 
+@realWorld#@ does not compromise safety, since the type @ST@ is hidden. 
+
+It is type-correct to use @returnST@ in an I/O context, but it is a
+bit more efficient to use @returnPrimIO@.  The latter is strict in the
+state, which propagates backwards to all the earlier combinators
+(provided they are unfolded).  Why is it safe for @returnPrimIO@ to be
+strict in the state?  Because every context in which an I/O state
+transformer is used will certainly evaluate the resulting state; it is
+the state of the real world!
+@
+returnPrimIO :: a -> PrimIO a
+returnPrimIO a s@(S# _) -> (a, s)
+@
+We provide strict versions of the other combinators too.
+@
+thenPrimIO m k s = case m s of
+		     (r,s) -> k r s
+@
+@fixPrimIO@ has to be lazy, though!
+@
+fixPrimIO  = fixST
+@
+The other combinators are just the same as before, but use the strict
+@thenPrimIO@ and @returnPrimIO@ for efficiency.
+@
+foldrPrimIO f z []     = z
+foldrPrimIO f z (m:ms) = foldrPrimIO f z ms `thenPrimIO` \ ms' ->
+			 f m ms'
+
+listPrimIO ms = foldrPrimIO (\ a xs -> a `thenPrimIO` \ x -> returnPrimIO (x : xs))
+		(returnPrimIO []) ms
+
+mapPrimIO f ms = listPrimIO (map f ms)
+
+mapAndUnzipPrimIO f (m:ms)
+  = f m			    `thenPrimIO` \ ( r1,  r2) ->
+    mapAndUnzipPrimIO f ms  `thenPrimIO` \ (rs1, rs2) ->
+    returnPrimIO (r1:rs1, r2:rs2)
+@
+
+\subsection{Arrays}
+
+\subsubsection{Types}
+
+@
+data Array      ix elt = Array     (ix,ix) (Array# elt)
+data ByteArray ix      = ByteArray (ix,ix) ByteArray#
+
+data MutableArray     s ix elt = MutableArray     (ix,ix) (MutableArray# s elt)
+data MutableByteArray s ix     = MutableByteArray (ix,ix) (MutableByteArray# s)
+@
+
+\subsubsection{Operations on immutable arrays}
+
+Ordinary array indexing is straightforward.
+@
+(!) :: Ix ix => Array ix elt -> ix -> elt
+@
+QUESTIONs: should @ByteArray@s be indexed by Ints or ix?  With byte offsets
+or sized ones? (sized ones [WDP])
+@
+indexCharArray   :: Ix ix => ByteArray ix -> ix -> Char
+indexIntArray    :: Ix ix => ByteArray ix -> ix -> Int
+indexAddrArray   :: Ix ix => ByteArray ix -> ix -> Addr
+indexFloatArray  :: Ix ix => ByteArray ix -> ix -> Float
+indexDoubleArray :: Ix ix => ByteArray ix -> ix -> Double
+@
+@Addr@s are indexed straightforwardly by @Int@s.  Unlike the primitive
+operations, though, the offsets assume that the array consists entirely of the
+type of value being indexed, and so there's an implicit multiplication by
+the size of that value.  To access @Addr@s with mixed values requires
+you to do a DIY job using the primitives.
+@
+indexAddrChar :: Addr -> Int -> Char
+...etc...
+indexStaticCharArray   :: Addr -> Int -> Char
+indexStaticIntArray    :: Addr -> Int -> Int
+indexStaticFloatArray  :: Addr -> Int -> Float
+indexStaticDoubleArray :: Addr -> Int -> Double
+indexStaticArray       :: Addr -> Int -> Addr
+@
+
+\subsubsection{Operations on mutable arrays}
+@
+newArray     :: Ix ix => (ix,ix) -> elt -> ST s (MutableArray s ix elt)
+newCharArray :: Ix ix => (ix,ix) -> ST s (MutableByteArray s ix) 
+...
+@
+
+@
+readArray   :: Ix ix => MutableArray s ix elt -> ix -> ST s elt 
+readCharArray   :: Ix ix => MutableByteArray s ix -> ix -> ST s Char 
+...
+@
+
+@
+writeArray  :: Ix ix => MutableArray s ix elt -> ix -> elt -> ST s () 
+writeCharArray  :: Ix ix => MutableByteArray s ix -> ix -> Char -> ST s () 
+...
+@
+
+@
+freezeArray :: Ix ix => MutableArray s ix elt -> ST s (Array ix elt)
+freezeCharArray :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
+...
+@
+
+We have no need on one-function-per-type for unsafe freezing:
+@
+unsafeFreezeArray :: Ix ix => MutableArray s ix elt -> ST s (Array ix elt)  
+unsafeFreezeByteArray :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
+@
+
+Sometimes we want to snaffle the bounds of one of these beasts:
+@
+boundsOfArray     :: Ix ix => MutableArray s ix elt -> (ix, ix)  
+boundsOfByteArray :: Ix ix => MutableByteArray s ix -> (ix, ix)
+@
+
+Lastly, ``equality'':
+@
+sameMutableArray     :: MutableArray s ix elt -> MutableArray s ix elt -> Bool
+sameMutableByteArray :: MutableByteArray s ix -> MutableByteArray s ix -> Bool
+@
+
+
+\subsection{Variables}
+
+\subsubsection{Types}
+
+Mutable variables are (for now anyway) implemented as arrays.  The @MutableVar@ type
+is opaque, so we can change the implementation later if we want.
+@
+type MutableVar s a = MutableArray s Int a
+@
+
+\subsubsection{Operations}
+@
+newVar   :: a -> ST s (MutableVar s a)
+readVar  :: MutableVar s a -> ST s a
+writeVar :: MutableVar s a -> a -> ST s ()
+sameVar  :: MutableVar s a -> MutableVar s a -> Bool
+@
+
+\subsection{Stable pointers}
+
+Nothing exciting here, just simple boxing up.
+@
+data StablePtr a = StablePtr (StablePtr# a)
+
+makeStablePointer :: a -> StablePtr a
+freeStablePointer :: StablePtr a -> PrimIO ()
+@
+
+\subsection{Foreign objects}
+
+Again, just boxing up.
+@
+data ForeignObj = ForeignObj ForeignObj#
+
+makeForeignObj :: Addr -> Addr -> PrimIO ForeignObj
+@
+
+\subsection{C calls}
+
+Everything in this section goes for @_casm_@ too.
+
+{\em ToDo: mention @_ccall_gc_@ and @_casm_gc_@...}
+
+The @_ccall_@ construct has the following form:
+$$@_ccall_@~croutine~a_1~\ldots~a_n$$
+This whole construct has type $@PrimIO@~res$.
+The rules are these:
+\begin{itemize}
+\item
+The first ``argument'', $croutine$, must be the literal name of a C procedure.
+It cannot be a Haskell expression which evaluates to a string, etc; it must be 
+simply the name of the procedure.
+\item
+The arguments $a_1, \ldots,a_n$ must be of {\em C-callable} type.
+\item
+The whole construct has type $@PrimIO@~ty$, where $ty$ is a {\em C-returnable} type.
+\end{itemize}
+A {\em boxed-primitive} type is both C-callable and C-returnable.
+A boxed primitive type is anything declared by:
+@
+data T = C# t
+@
+where @t@ is a primitive type.  Note that
+programmer-defined boxed-primitive types are perfectly OK:
+@
+data Widget = W# Int#
+data Screen = S# CHeapPtr#
+@
+
+There are other types that can be passed to C (C-callable).  This
+table summarises (including the standard boxed-primitive types):
+@
+Boxed	    	  Type of transferd   Corresp.     Which is
+Type	    	  Prim. component     C type       *probably*...
+------	    	  ---------------     ------       -------------
+Char	    	  Char#		      StgChar	    unsigned char
+Int 	    	  Int#		      StgInt	    long int
+Word	    	  Word#		      StgWord	    unsigned long int
+Addr	    	  Addr#		      StgAddr	    char *
+Float	    	  Float#	      StgFloat      float
+Double		  Double#	      StgDouble     double
+		  		       
+Array		  Array#	      StgArray      StgPtr
+ByteArray	  ByteArray#	      StgByteArray  StgPtr
+MutableArray	  MutableArray#	      StgArray      StgPtr
+MutableByteArray  MutableByteArray#   StgByteArray  StgPtr
+		  		      
+State		  State#	      nothing!
+		  		      
+StablePtr	  StablePtr#	      StgStablePtr  StgPtr
+ForeignObj	  ForeignObj#	      StgForeignObj StgPtr
+@
+
+All of the above are {\em C-returnable} except:
+@
+	Array, ByteArray, MutableArray, MutableByteArray
+@
+
+{\bf ToDo:} I'm pretty wary of @Array@ and @MutableArray@ being in
+this list, and not too happy about @State@ [WDP].
+
+{\bf ToDo:} Can code generator pass all the primitive types?  Should this be
+extended to include {\tt Bool\/} (or any enumeration type?)
+
+The type checker must be able to figure out just which of the C-callable/returnable
+types is being used.  If it can't, you have to add type signatures. For example,
+@
+f x = _ccall_ foo x
+@
+is not good enough, because the compiler can't work out what type @x@ is, nor 
+what type the @_ccall_@ returns.  You have to write, say:
+@
+f :: Int -> PrimIO Float
+f x = _ccall_ foo x
+@
+
+\subsubsection{Implementation}
+
+The desugarer unwraps the @_ccall_@ construct by inserting the necessary 
+evaluations etc to unbox the arguments.  For example, the body of the definition 
+of @f@ above would become:
+@
+        (\ s -> case x of { I# x# -> 
+                case s of { S# s# ->
+                case ccall# [Int#,Float#] x# s# of { StateAndFloat# f# new_s# ->
+                (F# f#, S# new_s#)
+                }}})
+@
+Notice that the state, too, is unboxed.
+
+The code generator must deal specially with primitive objects which
+are stored on the heap.
+
+... details omitted ...
+
+%
+%More importantly, it must construct a C Heap Pointer heap-object after
+%a @_ccall_@ which returns a @MallocPtr#@.
+%
+
+%--------------------------------------------------------
+\section{Non-primitive stuff that must be wired into GHC}
+
+@
+data Char    = C# Char#
+data Int     = I# Int#
+data Word    = W# Word#
+data Addr    = A# Addr#
+
+data Float   = F# Float#
+data Double  = D# Double#
+data Integer = J# Int# Int# ByteArray#
+
+-- and the other boxed-primitive types:
+    Array, ByteArray, MutableArray, MutableByteArray,
+    StablePtr, ForeignObj
+
+data Bool     = False | True
+data Ordering = LT | EQ | GT  -- used in derived comparisons
+
+data List a = [] | a : (List a)
+-- tuples...
+
+data Lift a = Lift a    -- used Yukkily as described elsewhere
+
+type String  = [Char]    -- convenience, only
+@
+
+%------------------------------------------------------------
+\section{Programmer interface(s)}
+
+\subsection{The bog-standard interface}
+
+If you rely on the implicit @import Prelude@ that GHC normally does
+for you, and if you don't use any weird flags (notably
+@-fglasgow-exts@), and if you don't import one of the fairly-magic
+@PreludeGla*@ interfaces, then GHC should work {\em exactly} as the
+Haskell report says, and the full user namespaces should be available
+to you.
+
+\subsection{If you mess about with @import Prelude@...}
+
+Innocent hiding, e.g.,
+@
+import Prelude hiding ( fromIntegral )
+@
+should work just fine.
+
+There are some things you can do that will make GHC crash, e.g.,
+hiding a standard class:
+@
+import Prelude hiding ( Eq(..) )
+@
+Don't do that.
+
+\subsection{Turning on Glasgow extensions with @-fglasgow-exts@}
+
+If you turn on @-fglasgow-exts@, then all the primitive types and
+operations described herein are available.
+
+It is possible that some name conflicts between your code and the
+wired-in things might spring to life (though we doubt it...).
+Change your names :-)
+
+\end{document}
+							

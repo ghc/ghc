@@ -77,7 +77,7 @@ So, here we go:
 writeRealAsm :: Handle -> AbstractC -> UniqSupply -> IO ()
 
 writeRealAsm handle absC us
-  = uppPutStr handle 80 (runNCG absC us)
+  = _scc_ "writeRealAsm" (uppPutStr handle 80 (runNCG absC us))
 
 dumpRealAsm :: AbstractC -> UniqSupply -> String
 

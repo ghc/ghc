@@ -54,7 +54,7 @@ installHstring(length, s)
   str->len = length;
 
   if (length == 0) {
-     str->bytes = NULL;
+     str->bytes = "";
 
   } else {
      p = xmalloc(length);

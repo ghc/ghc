@@ -29,8 +29,8 @@ import Id		( idWantsToBeINLINEd, isConstMethodId,
 			  unitIdSet, elementOfIdSet,
 			  addOneToIdSet, SYN_IE(IdSet),
 			  nullIdEnv, unitIdEnv, combineIdEnvs,
-			  delOneFromIdEnv, delManyFromIdEnv,
-			  mapIdEnv, lookupIdEnv, SYN_IE(IdEnv),
+			  delOneFromIdEnv, delManyFromIdEnv, isNullIdEnv, 
+			  mapIdEnv, lookupIdEnv, SYN_IE(IdEnv), 
 			  GenId{-instance Eq-}
 			)
 import Name		( isExported )
@@ -122,20 +122,39 @@ tagBinders :: UsageDetails	    -- Of scope
 	   -> (UsageDetails, 	    -- Details with binders removed
 	      [(Id,BinderInfo)])    -- Tagged binders
 
-tagBinders usage binders
+tagBinders usage binders =
+ let
+  usage' = usage `delManyFromIdEnv` binders
+  uss    = [ (binder, usage_of usage binder) | binder <- binders ]
+ in
+ if isNullIdEnv usage' then
+    (usage', uss)
+ else
+    (usage', uss)
+{-
   = (usage `delManyFromIdEnv` binders,
      [ (binder, usage_of usage binder) | binder <- binders ]
     )
-
+-}
 tagBinder :: UsageDetails	    -- Of scope
 	  -> Id			    -- Binders
 	  -> (UsageDetails, 	    -- Details with binders removed
 	      (Id,BinderInfo))	    -- Tagged binders
 
-tagBinder usage binder
-  = (usage `delOneFromIdEnv` binder,
-     (binder, usage_of usage binder)
-    )
+tagBinder usage binder =
+ let
+   usage'  = usage `delOneFromIdEnv` binder
+   us      = usage_of usage binder 
+   cont =
+    if isNullIdEnv usage' then  -- bogus test to force evaluation.
+       (usage', (binder, us))
+    else
+       (usage', (binder, us))
+ in
+ case us of { DeadCode -> cont; _ -> cont }
+
+--   (binder, usage_of usage binder)
+
 
 usage_of usage binder
   | isExported binder = ManyOcc 0 -- Visible-elsewhere things count as many
@@ -436,26 +455,40 @@ occAnal env expr@(Lam (ValBinder binder) body)
 
 -- ANDY: WE MUST THINK ABOUT THIS! (ToDo)
 occAnal env (Lam (TyBinder tyvar) body)
-  = (mapIdEnv markDangerousToDup body_usage,
-     Lam (TyBinder tyvar) body')
-  where
-    (body_usage, body') = occAnal env body
+  = case occAnal env body of { (body_usage, body') ->
+     (mapIdEnv markDangerousToDup body_usage,
+      Lam (TyBinder tyvar) body') }
+--  where
+--    (body_usage, body') = occAnal env body
 
 occAnal env (Lam (UsageBinder _) _) = panic "OccurAnal.occAnal Lam UsageBinder"
 
 occAnal env (Case scrut alts)
-  = (scrut_usage `combineUsageDetails` alts_usage,
-     Case scrut' alts')
+  = case occAnalAlts env alts of { (alts_usage, alts')   -> 
+     case occAnal env scrut   of { (scrut_usage, scrut') ->
+       let
+        det = scrut_usage `combineUsageDetails` alts_usage
+       in
+       if isNullIdEnv det then
+          (det, Case scrut' alts')
+       else
+          (det, Case scrut' alts') }}
+{-
+       (scrut_usage `combineUsageDetails` alts_usage,
+        Case scrut' alts')
   where
     (scrut_usage, scrut') = occAnal env scrut
     (alts_usage, alts')   = occAnalAlts env alts
+-}
 
 occAnal env (Let bind body)
-  = (final_usage, foldr Let body' new_binds) -- mkCoLet* wants Core... (sigh)
+  = case occAnal new_env body            of { (body_usage, body') ->
+    case occAnalBind env bind body_usage of { (final_usage, new_binds) ->
+       (final_usage, foldr Let body' new_binds) }} -- mkCoLet* wants Core... (sigh)
   where
     new_env		     = env `addNewCands` (bindersOf bind)
-    (body_usage, body')      = occAnal new_env body
-    (final_usage, new_binds) = occAnalBind env bind body_usage
+--    (body_usage, body')      = occAnal new_env body
+--    (final_usage, new_binds) = occAnalBind env bind body_usage
 \end{code}
 
 Case alternatives

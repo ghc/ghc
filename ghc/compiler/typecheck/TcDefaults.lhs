@@ -25,7 +25,7 @@ import TcSimplify	( tcSimplifyCheckThetas )
 
 import TysWiredIn	( intTy, doubleTy, unitTy )
 import Unique		( numClassKey )
-import Pretty		( ppStr, ppAboves )
+import Pretty		( ppPStr, ppAboves )
 import ErrUtils		( addShortErrLocLine )
 import Util
 \end{code}
@@ -67,10 +67,10 @@ dupDefaultDeclErr (DefaultDecl _ locn1 : dup_things) sty
   where
     item1
       = addShortErrLocLine locn1 (\ sty ->
-	ppStr "multiple default declarations") sty
+	ppPStr SLIT("multiple default declarations")) sty
 
     dup_item (DefaultDecl _ locn)
       = addShortErrLocLine locn (\ sty ->
-	ppStr "here was another default declaration") sty
+	ppPStr SLIT("here was another default declaration")) sty
 
 \end{code}

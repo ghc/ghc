@@ -71,7 +71,7 @@ module Util (
 	-- comparisons
 #if defined(COMPILING_GHC)
 	Ord3(..), thenCmp, cmpList,
-	cmpPString,
+	cmpPString, FAST_STRING,
 #else
 	cmpString,
 #endif
@@ -735,7 +735,7 @@ cmpString _ _ = error "cmpString"
 cmpPString :: FAST_STRING -> FAST_STRING -> TAG_
 
 cmpPString x y
-  = case (_tagCmp x y) of { _LT -> LT_ ; _EQ -> EQ_ ; _GT -> GT_ }
+  = case (tagCmpFS x y) of { _LT -> LT_ ; _EQ -> EQ_ ; _GT -> GT_ }
 \end{code}
 
 %************************************************************************

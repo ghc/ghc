@@ -24,7 +24,7 @@ import Outputable	( Outputable(..){-instance (,)-} )
 import PprCore
 import PprStyle		( PprStyle(..) )
 import PprType		( GenTyVar )
-import Pretty		( ppInt, ppStr, ppBesides, ppAboves )
+import Pretty		( ppInt, ppPStr, ppBesides, ppAboves )
 import SetLevels	-- all of it
 import TyVar		( GenTyVar{-instance Eq-} )
 import Unique		( Unique{-instance Eq-} )
@@ -106,9 +106,9 @@ floatOutwards us pgm
 	    (tlets, ntlets, lams) = get_stats (sum_stats fss)
 	 in
 	 pprTrace "FloatOut stats: " (ppBesides [
-		ppInt tlets,  ppStr " Lets floated to top level; ",
-		ppInt ntlets, ppStr " Lets floated elsewhere; from ",
-		ppInt lams,   ppStr " Lambda groups"])
+		ppInt tlets,  ppPStr SLIT(" Lets floated to top level; "),
+		ppInt ntlets, ppPStr SLIT(" Lets floated elsewhere; from "),
+		ppInt lams,   ppPStr SLIT(" Lambda groups")])
     )
     concat final_toplev_binds_s
     }}

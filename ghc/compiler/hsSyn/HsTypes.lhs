@@ -104,7 +104,7 @@ instance (Outputable name) => Outputable (HsType name) where
 
 instance (Outputable name) => Outputable (HsTyVar name) where
     ppr sty (UserTyVar name) = ppr_hs_tyname sty name
-    ppr sty (IfaceTyVar name kind) = ppCat [ppr_hs_tyname sty name, ppStr "::", ppr sty kind]
+    ppr sty (IfaceTyVar name kind) = ppCat [ppr_hs_tyname sty name, ppPStr SLIT("::"), ppr sty kind]
 
 
 -- Here comes a rather gross hack.  
@@ -118,8 +118,8 @@ ppr_hs_tyname other_sty    tv_name = ppr other_sty tv_name
 ppr_forall sty ctxt_prec [] [] ty
    = ppr_mono_ty sty ctxt_prec ty
 ppr_forall sty ctxt_prec tvs ctxt ty
-   = ppSep [ppStr "_forall_", ppBracket (interppSP sty tvs),
-	    pprContext sty ctxt,  ppStr "=>",
+   = ppSep [ppPStr SLIT("_forall_"), ppBracket (interppSP sty tvs),
+	    pprContext sty ctxt,  ppPStr SLIT("=>"),
 	    pprHsType sty ty]
 
 pprContext :: (Outputable name) => PprStyle -> (Context name) -> Pretty
@@ -156,7 +156,7 @@ ppr_mono_ty sty ctxt_prec (MonoFunTy ty1 ty2)
 	p2 = ppr_mono_ty sty pREC_TOP ty2
     in
     maybeParen (ctxt_prec >= pREC_FUN)
-	       (ppSep [p1, ppBeside (ppStr "-> ") p2])
+	       (ppSep [p1, ppBeside (ppPStr SLIT("-> ")) p2])
 
 ppr_mono_ty sty ctxt_prec (MonoTupleTy _ tys)
  = ppParens (ppInterleave ppComma (map (ppr sty) tys))

@@ -31,7 +31,7 @@ IMP_Ubiq()
 IMPORT_1_3(List(partition))
 
 import HsSyn		( HsBinds(..), Bind(..), MonoBinds(..), Match(..), GRHSsAndBinds(..),
-			  GRHS(..), HsExpr(..), HsLit(..), InPat(..), Qualifier(..), Stmt,
+			  GRHS(..), HsExpr(..), HsLit(..), InPat(..), Stmt(..), DoOrListComp(..),
 			  ArithSeqInfo, Sig, HsType, FixityDecl, Fixity, Fake )
 import RdrHsSyn		( RdrName(..), varQual, varUnqual, mkOpApp,
 			  SYN_IE(RdrNameMonoBinds), SYN_IE(RdrNameHsExpr), SYN_IE(RdrNamePat)
@@ -304,7 +304,8 @@ gen_Ord_binds tycon
       = partition isNullaryDataCon (tyConDataCons tycon)
 
     cmp_eq
-      = mk_FunMonoBind tycon_loc cmp_eq_RDR (map pats_etc nonnullary_cons ++ deflt_pats_etc)
+      = mk_FunMonoBind tycon_loc cmp_eq_RDR (map pats_etc nonnullary_cons ++
+					     [([WildPatIn, WildPatIn], default_rhs)])
       where
 	pats_etc data_con
 	  = ([con1_pat, con2_pat],
@@ -326,10 +327,10 @@ gen_Ord_binds tycon
 	      = let eq_expr = nested_compare_expr tys as bs
 		in  careful_compare_Case ty ltTag_Expr eq_expr gtTag_Expr (HsVar a) (HsVar b)
 
-	deflt_pats_etc
-	  = if null nullary_cons
-	    then []
-	    else [([a_Pat, b_Pat], eqTag_Expr)]
+	default_rhs | null nullary_cons = impossible_Expr	-- Keep desugarer from complaining about
+								-- inexhaustive patterns
+		    | otherwise		= eqTag_Expr		-- Some nullary constructors;
+								-- Tags are equal, no args => return EQ
     --------------------------------------------------------------------
 
 defaulted = foldr1 AndMonoBinds [lt, le, ge, gt, max_, min_]
@@ -597,12 +598,16 @@ gen_Ix_binds tycon
 
     --------------------------------------------------------------
     single_con_range
-      = mk_easy_FunMonoBind tycon_loc range_RDR [TuplePatIn [con_pat as_needed, con_pat bs_needed]] [] (
-	  ListComp (con_expr cs_needed) (zipWith3Equal "single_con_range" mk_qual as_needed bs_needed cs_needed)
-	)
+      = mk_easy_FunMonoBind tycon_loc range_RDR [TuplePatIn [con_pat as_needed, con_pat bs_needed]] [] $
+	HsDo ListComp stmts tycon_loc
       where
-	mk_qual a b c = GeneratorQual (VarPatIn c)
-			    (HsApp (HsVar range_RDR) (ExplicitTuple [HsVar a, HsVar b]))
+	stmts = zipWith3Equal "single_con_range" mk_qual as_needed bs_needed cs_needed
+		++
+		[ReturnStmt (con_expr cs_needed)]
+
+	mk_qual a b c = BindStmt (VarPatIn c)
+				 (HsApp (HsVar range_RDR) (ExplicitTuple [HsVar a, HsVar b]))
+				 tycon_loc
 
     ----------------
     single_con_index
@@ -673,11 +678,26 @@ gen_Read_binds tycon
 		nullary_con = isNullaryDataCon data_con
 
 		con_qual
-		  = GeneratorQual
+		  = BindStmt
 		      (TuplePatIn [LitPatIn (HsString data_con_str), d_Pat])
 		      (HsApp (HsVar lex_RDR) c_Expr)
+		      tycon_loc
 
 		field_quals = snd (mapAccumL mk_qual d_Expr (zipEqual "as_needed" as_needed bs_needed))
+		mk_qual draw_from (con_field, str_left)
+		  = (HsVar str_left,	-- what to draw from down the line...
+			 BindStmt
+			  (TuplePatIn [VarPatIn con_field, VarPatIn str_left])
+			  (HsApp (HsApp (HsVar readsPrec_RDR) (HsLit (HsInt 10))) draw_from)
+			  tycon_loc
+		    )
+
+		result_expr = ExplicitTuple [con_expr, if null bs_needed 
+						       then d_Expr 
+						       else HsVar (last bs_needed)]
+
+		stmts = (con_qual : field_quals) ++ [ReturnStmt result_expr]
+		
 
 		read_paren_arg
 		  = if nullary_con then -- must be False (parens are surely optional)
@@ -687,17 +707,9 @@ gen_Read_binds tycon
 	    in
 	    HsApp (
 	      readParen_Expr read_paren_arg $ HsPar $
-		 HsLam (mk_easy_Match tycon_loc [c_Pat] []  (
-		   ListComp (ExplicitTuple [con_expr,
-			    if null bs_needed then d_Expr else HsVar (last bs_needed)])
-		    (con_qual : field_quals)))
+		 HsLam (mk_easy_Match tycon_loc [c_Pat] [] $
+		        HsDo ListComp stmts tycon_loc)
 	      ) (HsVar b_RDR)
-	  where
-	    mk_qual draw_from (con_field, str_left)
-	      = (HsVar str_left,	-- what to draw from down the line...
-		 GeneratorQual
-		  (TuplePatIn [VarPatIn con_field, VarPatIn str_left])
-		  (HsApp (HsApp (HsVar readsPrec_RDR) (HsLit (HsInt 10))) draw_from))
 \end{code}
 
 %************************************************************************
@@ -795,7 +807,8 @@ gen_tag_n_con_monobind (rdr_name, tycon, GenCon2Tag)
 	var_RDR = qual_orig_name var
 
 gen_tag_n_con_monobind (rdr_name, tycon, GenTag2Con)
-  = mk_FunMonoBind (getSrcLoc tycon) rdr_name (map mk_stuff (tyConDataCons tycon))
+  = mk_FunMonoBind (getSrcLoc tycon) rdr_name (map mk_stuff (tyConDataCons tycon) ++ 
+							     [([WildPatIn], impossible_Expr)])
   where
     mk_stuff :: DataCon -> ([RdrNamePat], RdrNameHsExpr)
 
@@ -812,6 +825,7 @@ gen_tag_n_con_monobind (rdr_name, tycon, GenMaxTag)
   where
     max_tag =  case (tyConDataCons tycon) of
 		 data_cons -> toInteger ((length data_cons) - fIRST_TAG)
+
 \end{code}
 
 %************************************************************************
@@ -1005,6 +1019,10 @@ nested_compose_Expr :: [RdrNameHsExpr] -> RdrNameHsExpr
 nested_compose_Expr [e] = parenify e
 nested_compose_Expr (e:es)
   = HsApp (HsApp (HsVar compose_RDR) (parenify e)) (nested_compose_Expr es)
+
+-- impossible_Expr is used in case RHSs that should never happen.
+-- We generate these to keep the desugarer from complaining that they *might* happen!
+impossible_Expr = HsApp (HsVar error_RDR) (HsLit (HsString (_PK_ "Urk! in TcGenDeriv")))
 
 parenify e@(HsVar _) = e
 parenify e	     = HsPar e

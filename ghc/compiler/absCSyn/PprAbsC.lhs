@@ -88,7 +88,7 @@ emitMacro :: CostRes -> Unpretty
 
 -- ToDo: Check a compile time flag to decide whether a macro should be emitted
 emitMacro (Cost (i,b,l,s,f))
-  = uppBesides [ uppStr "GRAN_EXEC(",
+  = uppBesides [ uppPStr SLIT("GRAN_EXEC"), uppChar '(',
                           uppInt i, uppComma, uppInt b, uppComma, uppInt l, uppComma,
 	                  uppInt s, uppComma, uppInt f, pp_paren_semi ]
 \end{code}
@@ -114,21 +114,21 @@ pprAbsC sty (CAssign dest src) _ = pprAssign sty (getAmodeRep dest) dest src
 
 pprAbsC sty (CJump target) c
   = uppAbove (uppBesides [emitMacro c {-WDP:, uppStr "/* <--++  CJump */"-} ])
-	     (uppBesides [ uppStr "JMP_(", pprAmode sty target, pp_paren_semi ])
+	     (uppBesides [ uppStr jmp_lit, pprAmode sty target, pp_paren_semi ])
 
 pprAbsC sty (CFallThrough target) c
   = uppAbove (uppBesides [emitMacro c {-WDP:, uppStr "/* <--++  CFallThrough */"-} ])
-	     (uppBesides [ uppStr "JMP_(", pprAmode sty target, pp_paren_semi ])
+	     (uppBesides [ uppStr jmp_lit, pprAmode sty target, pp_paren_semi ])
 
 -- --------------------------------------------------------------------------
 -- Spit out GRAN_EXEC macro immediately before the return                 HWL
 
 pprAbsC sty (CReturn am return_info)  c
   = uppAbove (uppBesides [emitMacro c {-WDP:, uppStr "/* <----  CReturn */"-} ])
-	     (uppBesides [uppStr "JMP_(", target, pp_paren_semi ])
+	     (uppBesides [uppStr jmp_lit, target, pp_paren_semi ])
   where
    target = case return_info of
-    	DirectReturn -> uppBesides [uppStr "DIRECT(", pprAmode sty am, uppRparen]
+    	DirectReturn -> uppBesides [uppPStr SLIT("DIRECT"),uppChar '(', pprAmode sty am, uppRparen]
 	DynamicVectoredReturn am' -> mk_vector (pprAmode sty am')
 	StaticVectoredReturn n -> mk_vector (uppInt n)	-- Always positive
    mk_vector x = uppBesides [uppLparen, pprAmode sty am, uppStr ")[RVREL(", x, uppStr ")]"]
@@ -232,7 +232,7 @@ pprAbsC sty stmt@(COpStmt results op args liveness_mask vol_regs) _
       -- hence we can toss the provided cast...
 
 pprAbsC sty (CSimultaneous abs_c) c
-  = uppBesides [uppStr "{{", pprAbsC sty abs_c c, uppStr "}}"]
+  = uppBesides [uppPStr SLIT("{{"), pprAbsC sty abs_c c, uppPStr SLIT("}}")]
 
 pprAbsC sty stmt@(CMacroStmt macro as) _
   = uppBesides [uppStr (show macro), uppLparen,
@@ -285,7 +285,7 @@ pprAbsC sty stmt@(CStaticClosure closure_lbl cl_info cost_centre amodes) _
 	  PprForC -> pp_exts
 	  _ -> uppNil,
 	uppBesides [
-		uppStr "SET_STATIC_HDR(",
+		uppPStr SLIT("SET_STATIC_HDR"),uppChar '(',
 		pprCLabel sty closure_lbl,			uppComma,
 		pprCLabel sty info_lbl,				uppComma,
 		if_profiling sty (pprAmode sty cost_centre),	uppComma,
@@ -295,7 +295,7 @@ pprAbsC sty stmt@(CStaticClosure closure_lbl cl_info cost_centre amodes) _
 		],
 	uppNest 2 (uppBesides (map (ppr_item sty) amodes)),
 	uppNest 2 (uppBesides (map (ppr_item sty) padding_wds)),
-	uppStr "};" ]
+	uppPStr SLIT("};") ]
     }
   where
     info_lbl = infoTableLabelFromCI cl_info
@@ -328,7 +328,7 @@ pprAbsC sty stmt@(CClosureInfoAndCode cl_info slow maybe_fast upd cl_descr liven
   = uppAboves [
 	uppBesides [
 	    pp_info_rep,
-	    uppStr "_ITBL(",
+	    uppPStr SLIT("_ITBL"),uppChar '(',
 	    pprCLabel sty info_lbl,			uppComma,
 
 		-- CONST_ITBL needs an extra label for
@@ -404,16 +404,16 @@ pprAbsC sty stmt@(CClosureInfoAndCode cl_info slow maybe_fast upd cl_descr liven
     pp_type  = uppBesides [uppChar '"', uppStr (stringToC (closureTypeDescr cl_info)), uppChar '"']
 
 pprAbsC sty (CRetVector lbl maybes deflt) c
-  = uppAboves [ uppStr "{ // CRetVector (lbl????)",
+  = uppAboves [ uppPStr SLIT("{ // CRetVector (lbl????)"),
 	       uppNest 8 (uppSep (map (ppr_maybe_amode sty) maybes)),
 	       uppStr "} /*default=*/ {", pprAbsC sty deflt c,
-	       uppStr "}"]
+	       uppChar '}']
   where
     ppr_maybe_amode sty Nothing  = uppPStr SLIT("/*default*/")
     ppr_maybe_amode sty (Just a) = pprAmode sty a
 
 pprAbsC sty stmt@(CRetUnVector label amode) _
-  = uppBesides [uppStr "UNVECTBL(", pp_static, uppComma, pprCLabel sty label, uppComma,
+  = uppBesides [uppPStr SLIT("UNVECTBL"),uppChar '(', pp_static, uppComma, pprCLabel sty label, uppComma,
 	    pprAmode sty amode, uppRparen]
   where
     pp_static = if externallyVisibleCLabel label then uppNil else uppPStr SLIT("static")
@@ -442,15 +442,20 @@ ppLocalness label
     const  = if not (isReadOnly label)	        then uppNil else uppPStr SLIT("const")
 
 ppLocalnessMacro for_fun{-vs data-} clabel
-  = case (if externallyVisibleCLabel clabel then "E" else "I") of { prefix ->
-    case (if isReadOnly clabel then "RO_" else "")	      of { suffix ->
-    if for_fun
-       then uppStr (prefix ++ "F_")
-       else uppStr (prefix ++ "D_" ++ suffix)
-    } }
+  = uppBesides [ uppChar (if externallyVisibleCLabel clabel then 'E' else 'I'),
+                 if for_fun then 
+                    uppPStr SLIT("F_") 
+                 else 
+                    uppBeside (uppPStr SLIT("D_"))
+                              (if isReadOnly clabel then 
+			          uppPStr SLIT("RO_") 
+			       else 
+			          uppNil)]
 \end{code}
 
 \begin{code}
+jmp_lit = "JMP_("
+
 grab_non_void_amodes amodes
   = filter non_void amodes
 
@@ -662,7 +667,7 @@ pprCCall sty op@(CCallOp op_str is_asm may_gc _ _) args results liveness_mask vo
 	(uppBesides [
 		if null non_void_results
 		  then uppNil
-		  else uppPStr SLIT("%r = "),
+		  else uppStr "%r = ",
 		uppLparen, uppPStr op_str, uppLparen,
 		  uppIntersperse uppComma ccall_args,
 		uppStr "));"
@@ -693,13 +698,14 @@ ppr_casm_arg sty amode a_num
 	      -- for array arguments, pass a pointer to the body of the array
 	      -- (PTRS_ARR_CTS skips over all the header nonsense)
 	      ArrayRep	    -> (pp_kind,
-				uppBesides [uppStr "PTRS_ARR_CTS(", pp_amode, uppRparen])
+				uppBesides [uppPStr SLIT("PTRS_ARR_CTS"),uppChar '(', pp_amode, uppRparen])
 	      ByteArrayRep -> (pp_kind,
-				uppBesides [uppStr "BYTE_ARR_CTS(", pp_amode, uppRparen])
+				uppBesides [uppPStr SLIT("BYTE_ARR_CTS"),uppChar '(', pp_amode, uppRparen])
 
 	      -- for ForeignObj, use FOREIGN_OBJ_DATA to fish out the contents.
 	      ForeignObjRep -> (uppPStr SLIT("StgForeignObj"),
-				uppBesides [uppStr "ForeignObj_CLOSURE_DATA(", pp_amode, uppStr")"])
+				uppBesides [uppPStr SLIT("ForeignObj_CLOSURE_DATA"),uppChar '(', 
+					    pp_amode, uppChar ')'])
 	      other	    -> (pp_kind, pp_amode)
 
 	declare_local_var
@@ -750,7 +756,7 @@ ppr_casm_results sty [r] liveness
 + 
 	      ForeignObjRep ->
 		(uppPStr SLIT("StgForeignObj"),
-		 uppBesides [ uppStr "constructForeignObj(",
+		 uppBesides [ uppPStr SLIT("constructForeignObj"),uppChar '(',
 				liveness, uppComma,
 				result_reg, uppComma,
 				local_var,
@@ -841,10 +847,10 @@ Special treatment for floats and doubles, to avoid unwanted conversions.
 
 \begin{code}
 pprAssign sty FloatRep dest@(CVal reg_rel _) src
-  = uppBesides [ uppStr "ASSIGN_FLT(", ppr_amode sty (CAddr reg_rel), uppComma, pprAmode sty src, pp_paren_semi ]
+  = uppBesides [ uppPStr SLIT("ASSIGN_FLT"),uppChar '(', ppr_amode sty (CAddr reg_rel), uppComma, pprAmode sty src, pp_paren_semi ]
 
 pprAssign sty DoubleRep dest@(CVal reg_rel _) src
-  = uppBesides [ uppStr "ASSIGN_DBL(", ppr_amode sty (CAddr reg_rel), uppComma, pprAmode sty src, pp_paren_semi ]
+  = uppBesides [ uppPStr SLIT("ASSIGN_DBL"),uppChar '(', ppr_amode sty (CAddr reg_rel), uppComma, pprAmode sty src, pp_paren_semi ]
 \end{code}
 
 Lastly, the question is: will the C compiler think the types of the
@@ -924,7 +930,7 @@ no-cast case:
 \begin{code}
 pprAmode sty amode
   | mixedTypeLocn amode
-  = uppParens (uppBesides [ pprPrimKind sty (getAmodeRep amode), uppStr ")(",
+  = uppParens (uppBesides [ pprPrimKind sty (getAmodeRep amode), uppPStr SLIT(")("),
 		ppr_amode sty amode ])
   | otherwise	-- No cast needed
   = ppr_amode sty amode
@@ -950,13 +956,13 @@ ppr_amode sty (CTemp uniq kind) = prettyToUn (pprUnique uniq)
 ppr_amode sty (CLbl label kind) = pprCLabel sty label
 
 ppr_amode sty (CUnVecLbl direct vectored)
-  = uppBesides [uppStr "(StgRetAddr) UNVEC(", pprCLabel sty direct, uppComma,
+  = uppBesides [uppChar '(',uppPStr SLIT("StgRetAddr"),uppChar ')', uppPStr SLIT("UNVEC"),uppChar '(', pprCLabel sty direct, uppComma,
 	       pprCLabel sty vectored, uppRparen]
 
 ppr_amode sty (CCharLike char)
-  = uppBesides [uppStr "CHARLIKE_CLOSURE(", pprAmode sty char, uppRparen ]
+  = uppBesides [uppPStr SLIT("CHARLIKE_CLOSURE"),uppChar '(', pprAmode sty char, uppRparen ]
 ppr_amode sty (CIntLike int)
-  = uppBesides [uppStr "INTLIKE_CLOSURE(", pprAmode sty int, uppRparen ]
+  = uppBesides [uppPStr SLIT("INTLIKE_CLOSURE"),uppChar '(', pprAmode sty int, uppRparen ]
 
 ppr_amode sty (CString str) = uppBesides [uppChar '"', uppStr (stringToC (_UNPK_ str)), uppChar '"']
   -- ToDo: are these *used* for anything?
@@ -968,10 +974,10 @@ ppr_amode sty (CLitLit str _) = uppPStr str
 ppr_amode sty (COffset off) = pprHeapOffset sty off
 
 ppr_amode sty (CCode abs_C)
-  = uppAboves [ uppStr "{ -- CCode", uppNest 8 (pprAbsC sty abs_C (costs abs_C)), uppChar '}' ]
+  = uppAboves [ uppPStr SLIT("{ -- CCode"), uppNest 8 (pprAbsC sty abs_C (costs abs_C)), uppChar '}' ]
 
 ppr_amode sty (CLabelledCode label abs_C)
-  = uppAboves [ uppBesides [pprCLabel sty label, uppStr " = { -- CLabelledCode"],
+  = uppAboves [ uppBesides [pprCLabel sty label, uppPStr SLIT(" = { -- CLabelledCode")],
 	       uppNest 8 (pprAbsC sty abs_C (costs abs_C)), uppChar '}' ]
 
 ppr_amode sty (CJoinPoint _ _)
@@ -980,7 +986,7 @@ ppr_amode sty (CJoinPoint _ _)
 ppr_amode sty (CTableEntry base index kind)
   = uppBesides [uppStr "((", pprPrimKind sty kind, uppStr " *)(",
 	       ppr_amode sty base, uppStr "))[(I_)(", ppr_amode sty index,
-    	       uppStr ")]"]
+    	       uppPStr SLIT(")]")]
 
 ppr_amode sty (CMacroExpr pk macro as)
   = uppBesides [uppLparen, pprPrimKind sty pk, uppStr ")(", uppStr (show macro), uppLparen,
@@ -1353,7 +1359,7 @@ ppr_decls_Amode (CUnVecLbl direct vectored)
     returnTE (Nothing,
     	    	if (dlbl_seen || not (needsCDecl direct)) &&
     	    	   (vlbl_seen || not (needsCDecl vectored)) then Nothing
-    	        else Just (uppBesides [uppStr "UNVEC(", ddcl, uppComma, vdcl, uppRparen]))
+    	        else Just (uppBesides [uppPStr SLIT("UNVEC"),uppChar '(', ddcl, uppComma, vdcl, uppRparen]))
 -}
 
 ppr_decls_Amode (CUnVecLbl direct vectored)
@@ -1369,7 +1375,7 @@ ppr_decls_Amode (CUnVecLbl direct vectored)
     returnTE (Nothing,
     	    	if ({-dlbl_seen ||-} not (needsCDecl direct)) &&
     	    	   ({-vlbl_seen ||-} not (needsCDecl vectored)) then Nothing
-    	        else Just (uppBesides [uppStr "UNVEC(", ddcl, uppComma, vdcl, uppRparen]))
+    	        else Just (uppBesides [uppPStr SLIT("UNVEC"),uppChar '(', ddcl, uppComma, vdcl, uppRparen]))
 
 ppr_decls_Amode (CTableEntry base index _)
   = ppr_decls_Amode base    `thenTE` \ p1 ->

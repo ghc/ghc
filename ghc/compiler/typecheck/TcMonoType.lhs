@@ -208,5 +208,5 @@ Errors and contexts
 ~~~~~~~~~~~~~~~~~~~
 \begin{code}
 naughtyCCallContextErr clas_name sty
-  = ppSep [ppStr "Can't use class", ppr sty clas_name, ppStr "in a context"]
+  = ppSep [ppPStr SLIT("Can't use class"), ppr sty clas_name, ppPStr SLIT("in a context")]
 \end{code}

@@ -49,6 +49,9 @@ module UniqFM (
 	lookupWithDefaultUFM, lookupWithDefaultUFM_Directly,
 	eltsUFM,
 	ufmToList
+#if defined(COMPILING_GHC)
+	,FAST_STRING
+#endif
     ) where
 
 #if defined(COMPILING_GHC)
@@ -813,12 +816,7 @@ shiftR_ n p = n `quot` (2 ^ p)
 #endif {- not GHC -}
 \end{code}
 
-Andy's extras: ToDo: to Util.
-
 \begin{code}
-use_fst :: a -> b -> a
-use_fst a b = a
-
 use_snd :: a -> b -> b
 use_snd a b = b
 \end{code}

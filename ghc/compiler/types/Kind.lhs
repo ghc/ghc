@@ -91,9 +91,9 @@ Printing
 instance Outputable Kind where
   ppr sty kind = pprKind kind
 
-pprKind TypeKind        = ppStr "**"	-- Can be boxed or unboxed
-pprKind BoxedTypeKind   = ppStr "*"
-pprKind UnboxedTypeKind = ppStr "*#"	-- Unboxed
+pprKind TypeKind        = ppChar '*'	-- Can be boxed or unboxed
+pprKind BoxedTypeKind   = ppChar '*'
+pprKind UnboxedTypeKind = ppStr  "*#"	-- Unboxed
 pprKind (ArrowKind k1 k2) = ppSep [pprParendKind k1, ppStr "->", pprKind k2]
 
 pprParendKind k@(ArrowKind _ _) = ppBesides [ppLparen, pprKind k, ppRparen]

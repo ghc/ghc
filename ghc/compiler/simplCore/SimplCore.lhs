@@ -55,7 +55,7 @@ import Outputable	( Outputable(..){-instance * (,) -} )
 import PprCore
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instance Outputable-}, GenTyVar{-ditto-} )
-import Pretty		( ppShow, ppAboves, ppAbove, ppCat, ppStr )
+import Pretty		( ppShow, ppAboves, ppAbove, ppCat )
 import SAT		( doStaticArgs )
 import SimplMonad	( zeroSimplCount, showSimplCount, SimplCount )
 import SimplPgm		( simplifyPgm )
@@ -98,14 +98,16 @@ core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
       else return ())					 >>
 
 	-- Do the main business
+     --case (splitUniqSupply us) of { (us1,us2) ->
      foldl_mn do_core_pass
-		(binds, us1, init_specdata, zeroSimplCount)
+		(binds, us, init_specdata, zeroSimplCount)
 		core_todos
-		>>= \ (processed_binds, _, spec_data, simpl_stats) ->
+		>>= \ (processed_binds, us', spec_data, simpl_stats) ->
 
 	-- Do the final tidy-up
      let
-	final_binds = tidyCorePgm module_name us2 processed_binds
+	final_binds = core_linter "TidyCorePgm" True $
+		      tidyCorePgm module_name us' processed_binds
      in
 
 	-- Report statistics
@@ -116,25 +118,28 @@ core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
       else return ())						>>
 
 	-- 
-    return (final_binds, spec_data)
+    return (final_binds, spec_data) --}
   where
-    (us1, us2) = splitUniqSupply us
+--    (us1, us2) = splitUniqSupply us
     init_specdata = initSpecData local_tycons tycon_specs
 
     -------------
-    core_linter what = if opt_DoCoreLinting
-		       then (if opt_D_show_passes then 
+    core_linter what spec_done
+	= if opt_DoCoreLinting
+	  then (if opt_D_show_passes then 
 				trace ("\n*** Core Lint result of " ++ what)
-			     else id
-		            )
-			    lintCoreBindings ppr_style what
-		       else ( \ spec_done binds -> binds )
+	        else id
+	       )
+	      lintCoreBindings ppr_style what spec_done
+          else id
 
     --------------
-    do_core_pass info@(binds, us, spec_data, simpl_stats) to_do
-      = let
-	    (us1, us2) = splitUniqSupply us
-    	in
+    do_core_pass info@(binds, us, spec_data, simpl_stats) to_do =
+--     let
+--      (us1, us2) = splitUniqSupply us
+--     in
+     case (splitUniqSupply us) of 
+      (us1,us2) ->
     	case to_do of
 	  CoreDoSimplify simpl_sw_chkr
 	    -> _scc_ "CoreSimplify"
@@ -487,24 +492,24 @@ tidyCoreExpr (Case scrut@(Prim op args) (PrimAlts _ (BindDefault binder rhs)))
 -- Eliminate polymorphic case, for which we can't generate code just yet
 tidyCoreExpr (Case scrut (AlgAlts [] (BindDefault deflt_bndr rhs)))
   | not (maybeToBool (maybeAppSpecDataTyConExpandingDicts (coreExprType scrut)))
-  = pprTrace "Warning: discarding polymophic case:" (ppr PprDebug scrut) $
+  = pprTrace "Warning: discarding polymorphic case:" (ppr PprDebug scrut) $
     case scrut of
 	Var v -> extendEnvTM deflt_bndr v (tidyCoreExpr rhs)
 	other -> tidyCoreExpr (Let (NonRec deflt_bndr scrut) rhs)
   
 tidyCoreExpr (Case scrut alts)
   = tidyCoreExpr scrut			`thenTM` \ scrut' ->
-    tidy_alts alts			`thenTM` \ alts' ->
+    tidy_alts scrut' alts		`thenTM` \ alts' ->
     returnTM (Case scrut' alts')
   where
-    tidy_alts (AlgAlts alts deflt)
+    tidy_alts scrut (AlgAlts alts deflt)
 	= mapTM tidy_alg_alt alts	`thenTM` \ alts' ->
-	  tidy_deflt deflt		`thenTM` \ deflt' ->
+	  tidy_deflt scrut deflt	`thenTM` \ deflt' ->
 	  returnTM (AlgAlts alts' deflt')
 
-    tidy_alts (PrimAlts alts deflt)
+    tidy_alts scrut (PrimAlts alts deflt)
 	= mapTM tidy_prim_alt alts	`thenTM` \ alts' ->
-	  tidy_deflt deflt		`thenTM` \ deflt' ->
+	  tidy_deflt scrut deflt	`thenTM` \ deflt' ->
 	  returnTM (PrimAlts alts' deflt')
 
     tidy_alg_alt (con,bndrs,rhs) = tidyCoreExprEta rhs	`thenTM` \ rhs' ->
@@ -521,8 +526,8 @@ tidyCoreExpr (Case scrut alts)
 	-- It's quite easily done: simply extend the environment to bind the
 	-- default binder to the scrutinee.
 
-    tidy_deflt NoDefault = returnTM NoDefault
-    tidy_deflt (BindDefault bndr rhs)
+    tidy_deflt scrut NoDefault = returnTM NoDefault
+    tidy_deflt scrut (BindDefault bndr rhs)
 	= extend_env (tidyCoreExprEta rhs)	`thenTM` \ rhs' ->
 	  returnTM (BindDefault bndr rhs')
 	where
@@ -610,7 +615,7 @@ litToRep (NoRepInteger i integer_ty)
 litToRep (NoRepRational r rational_ty)
   = tidyCoreArg (LitArg (NoRepInteger (numerator   r) integer_ty))	`thenTM` \ num_arg ->
     tidyCoreArg (LitArg (NoRepInteger (denominator r) integer_ty))	`thenTM` \ denom_arg ->
-    returnTM (rational_ty, Con ratio_data_con [num_arg, denom_arg])
+    returnTM (rational_ty, Con ratio_data_con [TyArg integer_ty, num_arg, denom_arg])
   where
     (ratio_data_con, integer_ty)
       = case (maybeAppDataTyCon rational_ty) of
@@ -688,13 +693,22 @@ mungeTopBinders (b:bs) k = mungeTopBinder b	$ \ b' ->
 
 addTopFloat :: Type -> CoreExpr -> TidyM Id
 addTopFloat lit_ty lit_rhs mod env (us, floats)
-  = (lit_id, (us', floats `snocBag` NonRec lit_id lit_rhs))
+  = case splitUniqSupply us of 
+     (us',us1) ->
+       let
+        lit_local = mkSysLocal SLIT("nrlit") uniq lit_ty noSrcLoc
+        lit_id = setIdVisibility mod lit_local
+        --(us', us1) = splitUniqSupply us
+        uniq = getUnique us1
+       in
+       (lit_id, (us', floats `snocBag` NonRec lit_id lit_rhs))
+{-
   where
     lit_local = mkSysLocal SLIT("nrlit") uniq lit_ty noSrcLoc
     lit_id = setIdVisibility mod lit_local
     (us', us1) = splitUniqSupply us
     uniq = getUnique us1
-
+-}
 lookupTM v mod env usf
   = case lookupIdEnv env v of
 	Nothing -> (v, usf)

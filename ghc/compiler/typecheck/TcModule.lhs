@@ -303,17 +303,17 @@ tcCheckMainSig mod_name
 	       | otherwise = primIoTyCon_NAME
 
 mainTyCheckCtxt main_name sty
-  = ppCat [ppStr "When checking that", ppr sty main_name, ppStr "has the required type"]
+  = ppCat [ppPStr SLIT("When checking that"), ppr sty main_name, ppPStr SLIT("has the required type")]
 
 noMainErr mod_name main_name sty
-  = ppCat [ppStr "Module", pprModule sty mod_name, 
-	   ppStr "must include a definition for", ppr sty main_name]
+  = ppCat [ppPStr SLIT("Module"), pprModule sty mod_name, 
+	   ppPStr SLIT("must include a definition for"), ppr sty main_name]
 
 mainTyMisMatch :: Name -> Type -> TcType s -> Error
 mainTyMisMatch main_name expected actual sty
-  = ppHang (ppCat [ppr sty main_name, ppStr "has the wrong type"])
+  = ppHang (ppCat [ppr sty main_name, ppPStr SLIT("has the wrong type")])
 	 4 (ppAboves [
-			ppCat [ppStr "Expected:", ppr sty expected],
-			ppCat [ppStr "Inferred:", ppr sty actual]
+			ppCat [ppPStr SLIT("Expected:"), ppr sty expected],
+			ppCat [ppPStr SLIT("Inferred:"), ppr sty actual]
 		     ])
 \end{code}

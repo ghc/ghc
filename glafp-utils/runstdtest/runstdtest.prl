@@ -1,4 +1,10 @@
-#! /usr/local/bin/perl
+#
+# The perl script requires the following variables to be bound
+# to something meaningful before it will operate correctly:
+#   
+#   TMPDIR
+#   CONTEXT_DIFF
+#   RM
 #
 # Given:
 #	* a program to run (1st arg)
@@ -37,8 +43,8 @@ $PgmStdinFile  = '/dev/null';
 if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
     $TmpPrefix = $ENV{'TMPDIR'};
 } else {
-    $TmpPrefix ="$(TMPDIR)";
-    $ENV{'TMPDIR'} = '$(TMPDIR)'; # set the env var as well
+    $TmpPrefix ="$TMPDIR";
+    $ENV{'TMPDIR'} = "$TMPDIR"; # set the env var as well
 }
 $ScriptFile = "$TmpPrefix/run_me$$";
 $DefaultStdoutFile = "$TmpPrefix/no_stdout$$"; # can't use /dev/null (e.g. Alphas)
@@ -215,7 +221,7 @@ else
     if [ \$hit = 'NO' ] ; then
 	echo $ToRun @PgmArgs \\< $PgmStdinFile
 	echo expected stdout not matched by reality
-	$(CONTEXT_DIFF) $PgmStdoutFile[0] $TmpPrefix/runtest$$.1
+	${CONTEXT_DIFF} $PgmStdoutFile[0] $TmpPrefix/runtest$$.1
 	myexit=1
 	diffsShown=1
     fi
@@ -232,7 +238,7 @@ done
 if [ \$hit = 'NO' ] ; then
     echo $ToRun @PgmArgs \\< $PgmStdinFile
     echo expected stderr not matched by reality
-    $(CONTEXT_DIFF) $PgmStderrFile[0] $TmpPrefix/runtest$$.2
+    ${CONTEXT_DIFF} $PgmStderrFile[0] $TmpPrefix/runtest$$.2
     myexit=1
     diffsShown=1
 fi
@@ -244,7 +250,7 @@ if [ $SpixTiming = 'yes' -a \$myexit = 0 ] ; then
     $SpixstatsLine2
 fi
 
-$(RM) core $ToRunOrig.spix $DefaultStdoutFile $DefaultStderrFile $TmpPrefix/runtest$$.1 $TmpPrefix/runtest$$.2 $TmpPrefix/runtest$$.3
+${RM} core $ToRunOrig.spix $DefaultStdoutFile $DefaultStderrFile $TmpPrefix/runtest$$.1 $TmpPrefix/runtest$$.2 $TmpPrefix/runtest$$.3
 exit \$myexit
 EOSCRIPT
 

@@ -68,7 +68,7 @@ data HsBinds tyvar uvar id pat		-- binders and bindees
   | AbsBinds			-- Binds abstraction; TRANSLATION
 		[tyvar]
 		[id]		-- Dicts
-		[(id, id)]	-- (old, new) pairs
+		[(id, id)]	-- (momonmorphic, polymorphic) pairs
 		[(id, HsExpr tyvar uvar id pat)]	-- local dictionaries
 		(Bind tyvar uvar id pat)		-- "the business end"
 
@@ -79,6 +79,31 @@ data HsBinds tyvar uvar id pat		-- binders and bindees
 	-- (You can get a PhD for explaining the True Meaning
 	--  of this last construct.)
 \end{code}
+
+What AbsBinds means
+~~~~~~~~~~~~~~~~~~~
+	 AbsBinds [a,b]
+		  [d1,d2]
+		  [(fm,fp), (gm,gp)]
+		  [d3 = d1,
+		   d4 = df d2]
+		  BIND
+means
+
+	fp = /\ [a,b] -> \ [d1,d2] -> letrec DBINDS and BIND 
+				      in fm
+
+	gp = ...same again, with gm instead of fm
+
+This is a pretty bad translation, because it duplicates all the bindings.
+So the desugarer tries to do a better job:
+
+	fp = /\ [a,b] -> \ [d1,d2] -> case tp [a,b] [d1,d2] of
+					(fm,gm) -> fm
+	..ditto for gp..
+
+	p = /\ [a,b] -> \ [d1,d2] -> letrec DBINDS and BIND 
+				      in (fm,gm)
 
 \begin{code}
 nullBinds :: HsBinds tyvar uvar id pat -> Bool
@@ -129,9 +154,9 @@ data Sig name
 		(HsType name)
 		SrcLoc
 
-  | ClassOpSig	name		-- class-op sigs have different pragmas
+  | ClassOpSig	name			-- Selector name
+		name			-- Default-method name
 		(HsType name)
-		(ClassOpPragmas name)	-- only interface ones have pragmas
 		SrcLoc
 
   | SpecSig 	name		-- specialise a function or datatype ...
@@ -157,27 +182,28 @@ instance (NamedThing name, Outputable name) => Outputable (Sig name) where
       = ppHang (ppCat [ppr sty var, ppPStr SLIT("::")])
 	     4 (ppr sty ty)
 
-    ppr sty (ClassOpSig var ty pragmas _)
+    ppr sty (ClassOpSig var _ ty _)
       = ppHang (ppCat [ppr sty (getOccName var), ppPStr SLIT("::")])
-	     4 (ppHang (ppr sty ty)
-		     4 (ifnotPprForUser sty (ppr sty pragmas)))
+	     4 (ppr sty ty)
 
     ppr sty (DeforestSig var _)
       = ppHang (ppCat [ppStr "{-# DEFOREST", pprNonSym sty var])
-		   4 (ppStr "#-}")
+		   4 (ppStr "#-")
 
     ppr sty (SpecSig var ty using _)
-      = ppHang (ppCat [ppPStr SLIT("{-# SPECIALIZE"), pprNonSym sty var, ppPStr SLIT("::")])
-	     4 (ppCat [ppr sty ty, pp_using using, ppPStr SLIT("#-}")])
+      = ppHang (ppCat [ppStr "{-# SPECIALIZE", pprNonSym sty var, ppPStr SLIT("::")])
+	     4 (ppCat [ppr sty ty, pp_using using, ppStr "#-}"])
+
       where
 	pp_using Nothing   = ppNil
 	pp_using (Just me) = ppCat [ppChar '=', ppr sty me]
 
     ppr sty (InlineSig var _)
-      = ppCat [ppPStr SLIT("{-# INLINE"), pprNonSym sty var, ppPStr SLIT("#-}")]
+
+        = ppCat [ppStr "{-# INLINE", pprNonSym sty var, ppStr "#-}"]
 
     ppr sty (MagicUnfoldingSig var str _)
-      = ppCat [ppPStr SLIT("{-# MAGIC_UNFOLDING"), pprNonSym sty var, ppPStr str, ppPStr SLIT("#-}")]
+      = ppCat [ppStr "{-# MAGIC_UNFOLDING", pprNonSym sty var, ppPStr str, ppStr "#-}"]
 \end{code}
 
 %************************************************************************
@@ -215,10 +241,10 @@ instance (NamedThing id, Outputable id, Outputable pat,
 		Outputable (Bind tyvar uvar id pat) where
     ppr sty EmptyBind = ppNil
     ppr sty (NonRecBind binds)
-     = ppAbove (ifnotPprForUser sty (ppStr "{- nonrec -}"))
+     = ppAbove (ifnotPprForUser sty (ppPStr SLIT("{- nonrec -}")))
 	       (ppr sty binds)
     ppr sty (RecBind binds)
-     = ppAbove (ifnotPprForUser sty (ppStr "{- rec -}"))
+     = ppAbove (ifnotPprForUser sty (ppPStr SLIT("{- rec -}")))
 	       (ppr sty binds)
 \end{code}
 

@@ -1,0 +1,688 @@
+#
+# @configure_input@
+#
+#################################################################################
+#
+#			config.mk.in-template
+#
+#	This file defines all the variables that set the configuration of
+#	a particular build.
+#
+#
+#################################################################################
+
+# The configuration is defined in two steps:
+#
+#	1. The builder (i.e. the person doing the build)
+#	   copies this file, config.mk.in-template
+#	   to config.mk.in
+#
+#	2. S/he then edits it manually (gasp) to reflect any configuration
+#	   options s/he wants.
+#
+#	3. Then s/he runs "configure", which generates config.mk from
+#	   config.mk.in, substituting for system/platform-dependent things
+#	   enclosed in @at-signs@.
+#
+# This is one of only two files that configure generates (the other is config.h)
+#
+# Note that after subsequent edits of config.mk.in for a build, the configure script
+# will have to be re-run manually to have the change reflected in config.mk. 
+#
+
+# There is a section below for each project within the fptools suite
+#
+#	PLUS
+#
+# a section corresponding to each of the main .mk files 
+# included by boilerplate.mk (see boilerplate.mk for a list).
+
+
+
+#################################################################################
+#
+#		project-wide flags
+#
+# 	Set of options applicable to all fptools projects
+#
+#################################################################################
+
+#
+# What parts to build: An fptools build tree does not have to be built
+# all in one go. By setting the list of ProjectsToBuild in build.mk you can
+# control which projects are built.
+#
+# Caution: the projects are built in the order given here, so if some
+# projects use others you must list them in the correct order.
+#
+# Generally: 	* glafp-utils should be first
+#		* literate next
+#		* happy next
+#		* ghc&hslibs next
+#		then it's up to you
+
+ProjectsToBuild =  glafp-utils literate ghc hslibs
+
+#
+# Should the various project tests directories be built?
+#
+IncludeTestDirsInBuild=NO
+
+#################################################################################
+#
+#		GHC project
+# 
+# 	Set of (configurable) options needed by the ghc tree
+#	plus their default options (if any).
+#
+#################################################################################
+
+#
+# Name variables for ghc:
+# 
+GhcProjectName       =The Glorious Glasgow Haskell Compilation System
+GhcProjectNameShort  =ghc
+GhcProjectVersion    =2.02
+GhcProjectPatchLevel =0
+GhcBuildeeVersion    =202
+GhcBuilderVersion    =29
+
+#
+# Name variables for the fptools, for now equal to the above
+# ghc stuff
+#
+ProjectName       =$(GhcProjectName)
+ProjectNameShort  =$(GhcProjectNameShort)
+ProjectVersion    =$(GhcProjectVersion)
+ProjectPatchLevel =$(GhcProjectPatchLevel)
+
+
+#---------------------------------------------------------------
+#
+# Variables that control how the compiler itself is built
+
+# Specify the Haskell compiler to be used to compile the compiler itself
+#   WithGhcHc	Path name of the compiler to use
+#   Ghc2_0	Whether this compiler is GHC 2.0 or later
+#		(which affects gruesome details about
+# 		 how mutually recursive modules are handled)
+#   WithGhcHcType	What "type" of compiler is being used
+#			Valid options:
+#		       	     HC_CHALMERS_HBC
+#		       	     HC_GLASGOW_GHC
+#		       	     HC_ROJEMO_NHC
+#		       	     HC_UNSPECIFIED
+WithGhcHc = ghc-0.29
+Ghc2_0=NO
+# Unused, we think
+# WithGhcHcType=HC_GLASGOW_GHC
+
+# Extra ways in which to build the compiler (for example, you might want to
+# build a profiled compiler so you can see where it spends its time)
+GhcCompilerWays=
+
+# Extra option flags to pass to the compiler that compiles the compiler
+# (Ones that are essential are wired into ghc/compiler/Makefile)
+# Typical ones:
+#	-O		compiler an optimised compiler
+#	-DDEBUG		include consistency/assertion checks in the compiled compiler
+#	-fshow-import-specs	show import specialisations
+GhcHcOpts=
+
+# GhcWithHscBuiltViaC - build GHC compiler proper (\`hsc') from .hc files?
+GhcWithHscBuiltViaC=NO
+
+# Build hsc with -O and turn optimising flag on when compiling
+# the intermediate C file
+GhcUseGccForOptAsm=YES
+
+# Compile intermediate C file with debugging options set.
+GhcUseGccForDebuggingAsm=YES
+
+# Build a registerised version of hsc and runtime
+# (you'd be desperate or silly not to).
+GhcWithRegisterised=YES
+
+# Build a compiler with a native code generator backend
+# (as well as a C backend)
+#
+# Target platforms supported:
+#   i386, alpha & sparc
+GhcWithNativeCodeGen=YES
+
+# Build the compiler with the deforester included?
+GhcWithDeforester=NO
+
+
+#---------------------------------------------------------------
+#
+# Variables that control how the prelude libararies and runtime system are built
+
+# What extra ways to build the libraries in
+# In addition to the normal sequential way, the default is to also build
+# profiled prelude libraries.
+GhcLibWays=p
+
+# Option flags to pass to GHC when it's compiling prelude modules
+# Typically these are things like -O or -dcore-lint
+# The ones that are *essential* are wired into ghc/lib/Makefile
+GhcLibHcOpts= -split-objs -odir $(basename $*)
+
+
+#################################################################################
+#
+#		hslibs project
+#
+# 	Set of (configurable) options needed by the Haskell libraries (hslibs)
+# 	plus their default options (if any).
+#
+#################################################################################
+
+# Build the Haskell Readline bindings?
+#
+HsLibsWithReadline=YES
+
+# Build the socket libraries?
+#
+HsLibsWithSockets=YES
+
+#
+# The different ways to build hslibs. Default is just to mirror
+# what is done for the ghc prelude libraries.
+#
+HsLibWays=$(GhcLibWays)
+
+
+#################################################################################
+#
+#		happy project
+#
+# 	Happy specific options
+#
+#################################################################################
+
+
+
+#################################################################################
+#
+#		haggis project
+#
+# 	Haggis specific options
+#
+#################################################################################
+
+
+
+#################################################################################
+#
+#		green-card project
+#
+# 	Green-card specific options
+#
+#################################################################################
+
+
+#################################################################################
+#
+#		nofib project
+#
+# 	nofib specific options
+#
+#################################################################################
+
+
+# NoFibSubDirs controls which set of tests should be run
+# You can run one or more of
+#	imaginary 
+#	spectral
+#	real
+#	parallel
+#	PRIVATE
+#	GHC_ONLY
+#	PENDING
+#	UNUSED
+NoFibSubDirs = imaginary spectral real GHC_ONLY PRIVATE
+
+# The different ways to build nofib. Default is just to mirror
+# what is done for the ghc prelude libraries.
+#
+NoFibWays=$(GhcLibWays)
+
+# Haskell compiler options for nofib
+NoFibHcOpts=
+
+# ==============================================================================
+#
+#			END OF PROJECT-SPECIFIC STUFF
+#
+#		Now come the generic configuration options
+#
+# ==============================================================================
+
+#################################################################################
+#
+#		Paths (see paths.mk)
+#
+#################################################################################
+
+# These variables are all ":=" variables so that you can easily attach
+# extra stuff to the end of them, like this:
+#
+#	libdir := $(libdir)/ghc
+
+TMPDIR			:= /tmp
+
+# FPTOOLS_TOP: the top of the fptools hierarchy, absolute path.
+
+FPTOOLS_TOP_ABS		:= @hardtop@
+
+#
+# Installation directories, we don't use half of these,
+# but since the configure script has them on offer while
+# passing through, we might as well set them.
+
+prefix                  := @prefix@
+exec_prefix             := @exec_prefix@
+bindir                  := @bindir@
+sbindir                 := @sbindir@
+libexecdir              := @libexecdir@
+datadir                 := @datadir@
+sysconfdir              := @datadir@
+sharedstatedir          := @sharedstatedir@
+localstatedir           := @localstatedir@
+libdir                  := @libdir@
+infodir		        := @infodir@
+includedir              := @includedir@
+oldincludedir           := @oldincludedir@
+mandir			:= @mandir@
+srcdir                  := @srcdir@
+
+#################################################################################
+#
+#		Utilities programs: flags
+#
+#################################################################################
+
+# If you want to give any standard flags to pretty much any utility
+# (see utils.mk for a complete list), by adding a line here
+#
+# 	SRC_P_OPTS += ...
+#
+# where P is the utility. For example, to add -O to all Haskell
+# compilations, 
+#
+#	SRC_HC_OPTS += -O
+
+
+#################################################################################
+#
+#		Platform
+#
+#################################################################################
+
+# A "platform" is the GNU cpu-type/manufacturer/operating-system target machine
+# specifier.  E.g. sparc-sun-solaris2
+
+HOSTPLATFORM			= @HostPlatform@
+TARGETPLATFORM			= @TargetPlatform@
+BUILDPLATFORM			= @HostPlatform@
+
+HostPlatform_CPP		= @HostPlatform_CPP@
+HostArch_CPP			= @HostArch_CPP@
+HostOS_CPP			= @HostOS_CPP@
+HostVendor_CPP	                = @HostVendor_CPP@
+
+#
+# ToDo: check if these can be purged now. -- sof
+#
+
+@HostPlatform_CPP@_HOST        = 1
+@HostPlatform_CPP@_TARGET      = 1
+@HostPlatform_CPP@_BUILD       = 1
+
+@HostArch_CPP@_HOST_ARCH       = 1
+@HostArch_CPP@_TARGET_ARCH	= 1
+@HostArch_CPP@_BUILD_ARCH      = 1
+
+@HostOS_CPP@_HOST_OS           = 1
+@HostOS_CPP@_TARGET_OS         = 1
+@HostOS_CPP@_BUILD_OS          = 1
+
+@HostVendor_CPP@_HOST_VENDOR    = 1
+@HostVendor_CPP@_TARGET_VENDOR  = 1
+@HostVendor_CPP@_BUILD_VENDOR   = 1
+
+# Leading underscores on symbol names in object files
+# Valid options: YES/NO
+#
+LeadingUnderscore=@LeadingUnderscore@
+
+#################################################################################
+#
+#		Utilities programs: where to find them
+#
+#################################################################################
+
+#-----------------------------------------------------------------------------
+# FPtools Utility locations
+
+# By default, the various utils needed to be build ghc and chums
+# is set up to point to the utils/ directory. Define here the
+# path prefix for the utilities. Notice that it's a prefix with
+# a trailing slash, so that it can be concatenated directly on
+# front of a program name; if it's not set then we just look
+# along the shell's $(PATH)
+#
+# If instead you want to use installed or your own versions of these,
+# override the various *_PREFIX in build.mk, i.e., having the following
+# in build.mk:
+#
+#   FASTMAKE_PREFIX=
+#
+# will force `make' to rummage around in your PATH to find `fastmake' (not
+# sure it would need it in the first place, but still).
+#
+GLAFP_UTILS  		= $(FPTOOLS_TOP)/glafp-utils
+
+SCRIPT_PREFIX 		= $(GLAFP_UTILS)/scripts/
+FASTMAKE_PREFIX		= $(GLAFP_UTILS)/fastmake/
+MKDEPENDC_PREFIX	= $(GLAFP_UTILS)/mkdependC/
+LTX_PREFIX		= $(GLAFP_UTILS)/ltx/
+RUNTEST_PREFIX		= $(GLAFP_UTILS)/runstdtest/
+VERBATIM_PREFIX		= $(GLAFP_UTILS)/verbatim/
+ETAGS_PREFIX		= $(GLAFP_UTILS)/etags/
+MSUB_PREFIX		= $(GLAFP_UTILS)/msub/
+LNDIR_PREFIX		= $(GLAFP_UTILS)/lndir/
+MKDIRHIER_PREFIX	= $(GLAFP_UTILS)/mkdirhier/
+
+# Still used?
+LITERATE	    	= $(FPTOOLS_TOP)/literate
+
+LITERATE_PREFIX    	= $(FPTOOLS_TOP)/literate/
+TEXI2HTML_PREFIX        = $(LITERATE_PREFIX)texi2html/
+
+HAPPY_PREFIX    	= $(FPTOOLS_TOP)/happy/src/
+
+UNLIT_PREFIX    	= $(FPTOOLS_TOP)/ghc/utils/unlit/
+UGEN_PREFIX             = $(FPTOOLS_TOP)/ghc/utils/ugen/
+STAT2RESID_PREFIX       = $(FPTOOLS_TOP)/ghc/utils/stat2resid/
+HP2PS_PREFIX            = $(FPTOOLS_TOP)/ghc/utils/hp2ps/
+HSCPP_PREFIX            = $(FPTOOLS_TOP)/ghc/utils/hscpp/
+HSTAGS_PREFIX           = $(FPTOOLS_TOP)/ghc/utils/hstags/
+
+
+#-----------------------------------------------------------------------------
+# Haskell compiler and mkdependHS
+
+HC		= $(FPTOOLS_TOP)/ghc/driver/ghc
+MKDEPENDHS	= $(HC)
+
+#
+# The compiler proper is built with the 1.2 compiler,
+# so when building the dependencies, we need mkdependHS
+# for the 1.2 compiler.
+#
+MKDEPENDHS_1_2  = mkdependHS-1.2
+
+#-----------------------------------------------------------------------------
+# C compiler
+#
+#
+HaveGcc 	= @HaveGcc@
+UseGcc  	= YES
+WhatGccIsCalled = gcc
+ifeq "$(strip $(HaveGcc))" "YES"
+ifneq "$(strip $(UseGcc))"  "YES"
+  CC	= cc
+else
+  CC	= $(WhatGccIsCalled)
+endif
+endif
+
+#-----------------------------------------------------------------------------
+# Flex
+
+FLEX			= @LEX@
+FLEX_LIB		= @LEXLIB@
+
+#-----------------------------------------------------------------------------
+# Other standard (ha!) Unix utilities
+
+AR			= @ArCmd@
+# Yuckage: for ghc/utils/parallel -- todo: nuke this dependency!!
+BASH                    = /usr/local/bin/bash
+#
+# Could be either gzip or compress
+#
+COMPRESS		= @CompressCmd@
+COMPRESS_SUFFIX         = @CompressSuffix@
+
+CONTEXT_DIFF		= @ContextDiffCmd@
+CP			= cp
+CPP			= @RAWCPP@
+CTAGS 			= $(ETAGS)
+RAWCPP                  = @RAWCPP@
+GNUCPP                  = @GNUCPP@
+INSTALL			= @INSTALL@
+LATEX			= latex
+LN_S			= @LN_S@
+MANMACROS		= -man
+MSMACROS 		= -ms
+MV			= mv
+NROFF			= nroff
+PERL 			= @PerlCmd@
+PIC			= pic
+PREPROCESSCMD		= $(CC) -E
+PRINTER			= lpr
+RANLIB			= @RANLIB@
+RM			= rm -f
+SED			= @SedCmd@
+SHELL			= /bin/sh
+SIZE			= size
+STRIP			= strip
+TAR			= @TarCmd@
+#
+# This is special to literate/, ToDo: add literate-specific
+# configure setup to literate/.
+#
+TBL 			= tbl
+TEX			= tex
+TGRIND 			= tgrind
+TGRIND_HELPER 		= /usr/local/lib/tgrind/tfontedpr # XXX
+TIB			= tib
+
+TIME			= @TimeCmd@
+TROFF			= troff
+UNAME			= uname
+YACC			= @YaccCmd@
+
+
+#-----------------------------------------------------------------------------
+# 		FPtools support software
+
+# Stuff from fptools/glafp-utils
+MKDEPENDC 		= $(MKDEPENDC_PREFIX)mkdependC
+FASTMAKE 		= $(FASTMAKE_PREFIX)fastmake
+LTX 			= $(LTX_PREFIX)ltx
+MKDIRHIER		= $(MKDIRHIER_PREFIX)mkdirhier
+LNDIR			= $(LNDIR_PREFIX)lndir
+MSUB			= $(MSUB_PREFIX)msub
+ETAGS			= $(ETAGS_PREFIX)etags
+VERBATIM		= $(VERBATIM_PREFIX)verbatim
+RUNTEST			= $(RUNTEST_PREFIX)runstdtest
+HAPPY			= @HappyCmd@
+LX			= @LxCmd@
+
+ifneq "$(HAPPY)" ""
+HAPPY			= $(HAPPY_PREFIX)happy
+endif
+
+#
+# Stuff from fptools/literate
+#
+INFO         		= $(UTIL_PREFIX)info
+MAKEINFO     		= $(INFO_PREFIX)makeinfo
+POSTMAKEINFO 		= $(INFO_PREFIX)postmakeinfo
+LIT2PGM 		= $(LITERATE_PREFIX)lit2pgm
+LIT2TEXI      		= $(LITERATE_PREFIX)lit2texi
+LIT2HTML      		= $(LITERATE_PREFIX)lit2html
+LIT2LATEX     		= $(LITERATE_PREFIX)lit2latex
+MKDEPENDLIT   		= $(LITERATE_PREFIX)mkdependlit
+LIT2CHANGELOG 		= $(LITERATE_PREFIX)lit2changelog
+LIT2TEXT 		= $(LITERATE_PREFIX)lit2text
+TEXI2HTML               = $(TEXI2HTML_PREFIX)texi2html
+
+#
+# Stuff from fptools/ghc/utils
+#
+UNLIT	 		= $(UNLIT_PREFIX)unlit
+UGEN			= $(UGEN_PREFIX)ugen
+STAT2RESID		= $(STAT2RESID_PREFIX)stat2resid
+HP2PS			= $(HP2PS_PREFIX)hp2ps
+HSCPP			= $(HSCPP_PREFIX)hscpp
+HSTAGS			= $(HSTAGS_PREFIX)hstags
+
+#
+# Options for the compiling different `ways'. Various projects within
+# the glorious fptools tree support building in various user-configured
+# ways. For instance, you could set up one `way' such that the prelude
+# libraries and hslibs all were built with the option -ffoldr-build-on.
+# 
+# To configure up your own way, have a look at some of the standard ways
+# such as profiling, and create your own set of WAY_*_OPTS defs below.
+# After having done that, add your way string to WAYS, and after having
+# run the configure script, the different projects will add the new way
+# to the list of ways they support.
+#
+
+#
+# IMPORTANT! The WAYS variable configures the different `ways'
+# you want to build a project (or maybe just parts of it, as is
+# the case for ghc/). This variable is intended set inside the
+# project mk setup, enforcing a global fptools WAYS is a bit too
+# much (do you *really* want to build glafp-utils the profiled-concurrent 
+# way?)
+#
+
+#
+# Definitions of the different ways:
+#   
+#   * their name:
+#          - tag, e.g., p
+#          - description, e.g., profiling
+#   * what they mean to the driver:
+#          - WAY_p_HC_OPTS gives the list of command-line options
+#            to the driver.
+#
+
+#
+# The ways currently defined.
+#
+ALL_WAYS=p t u mc mr mt mp mg 1s 2s du a b c d e f g h i j k l m n o A B
+
+#
+# The following ways currently have treated specially, p u t mc mt my mp mg 1s 2d du,
+# as the driver script treats these guys specially and needs to carefully be told
+# about the options for these. Hence, we hide the required command line options
+# for these in the ghc/driver, as this is the only place they are needed.
+# 
+# If you want to add to these default options, fill in the variables below:
+# 
+WAY_p_NAME=profiling
+WAY_p_HC_OPTS= -prof
+
+# Way t:
+WAY_t_NAME=ticky-ticky profiling
+WAY_t_HC_OPTS= -ticky
+
+# Way `u':
+WAY_u_NAME=unregisterized (using portable C only)
+WAY_u_HC_OPTS=
+
+# Way `mc': concurrent
+WAY_mc_NAME=concurrent
+WAY_mc_HC_OPTS=-concurrent
+
+# Way `mr': 
+WAY_mr_NAME=profiled concurrent
+WAY_mr_HC_OPTS=-prof -concurrent
+
+# Way `mt': 
+WAY_mt_NAME=ticky-ticky concurrent
+WAY_mt_HC_OPTS=-ticky -concurrent
+
+# Way `mp': 
+WAY_mp_NAME=parallel
+WAY_mp_HC_OPTS=-parallel
+
+#
+# Way `mg': 
+#
+WAY_mg_NAME=GranSim
+WAY_mg_HC_OPTS=-gransim
+
+#
+# Ways for different garbage collectors
+#
+WAY_2s_NAME=2-space GC
+WAY_2s_HC_OPTS=-2s
+
+WAY_1s_NAME=1-space GC
+WAY_1s_HC_OPTS=-1s
+
+WAY_du_NAME=dual-mode GC
+WAY_du_HC_OPTS=-du
+
+#
+# Add user-way configurations here:
+#
+WAY_A_NAME=
+WAY_A_HC_OPTS=
+
+WAY_B_NAME=
+WAY_B_HC_OPTS=
+
+WAY_a_NAME=
+WAY_a_HC_OPTS=
+
+WAY_b_NAME=
+WAY_b_HC_OPTS=
+
+WAY_c_NAME=
+WAY_c_HC_OPTS=
+
+WAY_d_NAME=
+WAY_d_HC_OPTS=
+
+WAY_e_NAME=
+WAY_e_HC_OPTS=
+
+WAY_f_NAME=
+WAY_f_HC_OPTS=
+
+WAY_g_NAME=
+WAY_g_HC_OPTS=
+
+WAY_h_NAME=
+WAY_h_HC_OPTS=
+
+WAY_i_NAME=
+WAY_i_HC_OPTS=
+
+WAY_j_NAME=
+WAY_j_HC_OPTS=
+
+WAY_k_NAME=
+WAY_k_HC_OPTS=
+
+WAY_l_NAME=
+WAY_l_HC_OPTS=
+
+WAY_m_NAME=
+WAY_m_HC_OPTS=
+
+WAY_n_NAME=
+WAY_n_HC_OPTS=
+
+WAY_o_NAME=
+WAY_o_HC_OPTS=

@@ -363,12 +363,12 @@ pprCLabel sty (RtsLabel RtsBlackHoleInfoTbl) = uppPStr SLIT("BH_UPD_info")
 
 pprCLabel sty (RtsLabel (RtsSelectorInfoTbl upd_reqd offset))
   = uppBesides [uppPStr SLIT("__sel_info_"), uppStr (show offset),
-		uppStr (if upd_reqd then "upd" else "noupd"),
+		uppPStr (if upd_reqd then SLIT("upd") else SLIT("noupd")),
 		uppPStr SLIT("__")]
 
 pprCLabel sty (RtsLabel (RtsSelectorEntry upd_reqd offset))
   = uppBesides [uppPStr SLIT("__sel_entry_"), uppStr (show offset),
-		uppStr (if upd_reqd then "upd" else "noupd"),
+		uppPStr (if upd_reqd then SLIT("upd") else SLIT("noupd")),
 		uppPStr SLIT("__")]
 
 pprCLabel sty (IdLabel (CLabelId id) flavor)

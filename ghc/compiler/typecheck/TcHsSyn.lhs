@@ -14,13 +14,13 @@ module TcHsSyn (
 	
 	SYN_IE(TcMonoBinds), SYN_IE(TcHsBinds), SYN_IE(TcBind), SYN_IE(TcPat),
 	SYN_IE(TcExpr), SYN_IE(TcGRHSsAndBinds), SYN_IE(TcGRHS), SYN_IE(TcMatch),
-	SYN_IE(TcQual), SYN_IE(TcStmt), SYN_IE(TcArithSeqInfo), SYN_IE(TcRecordBinds),
+	SYN_IE(TcStmt), SYN_IE(TcArithSeqInfo), SYN_IE(TcRecordBinds),
 	SYN_IE(TcHsModule), SYN_IE(TcCoreExpr),
 	
 	SYN_IE(TypecheckedHsBinds), SYN_IE(TypecheckedBind),
 	SYN_IE(TypecheckedMonoBinds), SYN_IE(TypecheckedPat),
 	SYN_IE(TypecheckedHsExpr), SYN_IE(TypecheckedArithSeqInfo),
-	SYN_IE(TypecheckedQual), SYN_IE(TypecheckedStmt),
+	SYN_IE(TypecheckedStmt),
 	SYN_IE(TypecheckedMatch), SYN_IE(TypecheckedHsModule),
 	SYN_IE(TypecheckedGRHSsAndBinds), SYN_IE(TypecheckedGRHS),
 	SYN_IE(TypecheckedRecordBinds),
@@ -87,7 +87,6 @@ type TcExpr s	     	= HsExpr (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
 type TcGRHSsAndBinds s	= GRHSsAndBinds (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
 type TcGRHS s		= GRHS (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
 type TcMatch s		= Match (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
-type TcQual s		= Qualifier (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
 type TcStmt s		= Stmt (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
 type TcArithSeqInfo s	= ArithSeqInfo (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
 type TcRecordBinds s	= HsRecordBinds (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
@@ -101,7 +100,6 @@ type TypecheckedHsBinds		= HsBinds	TyVar UVar Id TypecheckedPat
 type TypecheckedBind		= Bind		TyVar UVar Id TypecheckedPat
 type TypecheckedHsExpr		= HsExpr	TyVar UVar Id TypecheckedPat
 type TypecheckedArithSeqInfo	= ArithSeqInfo	TyVar UVar Id TypecheckedPat
-type TypecheckedQual		= Qualifier	TyVar UVar Id TypecheckedPat
 type TypecheckedStmt		= Stmt		TyVar UVar Id TypecheckedPat
 type TypecheckedMatch		= Match		TyVar UVar Id TypecheckedPat
 type TypecheckedGRHSsAndBinds	= GRHSsAndBinds TyVar UVar Id TypecheckedPat
@@ -408,16 +406,16 @@ zonkExpr te ve (HsLet binds expr)
     zonkExpr  te new_ve expr	`thenNF_Tc` \ new_expr ->
     returnNF_Tc (HsLet new_binds new_expr)
 
-zonkExpr te ve (HsDo _ _) = panic "zonkExpr te ve:HsDo"
+zonkExpr te ve (HsDo _ _ _) = panic "zonkExpr te ve:HsDo"
 
-zonkExpr te ve (HsDoOut stmts then_id zero_id src_loc)
+zonkExpr te ve (HsDoOut do_or_lc stmts return_id then_id zero_id ty src_loc)
   = zonkStmts te ve stmts 	`thenNF_Tc` \ new_stmts ->
-    returnNF_Tc (HsDoOut new_stmts (zonkIdOcc ve then_id) (zonkIdOcc ve zero_id) src_loc)
-
-zonkExpr te ve (ListComp expr quals)
-  = zonkQuals te ve quals	`thenNF_Tc` \ (new_quals, new_ve) ->
-    zonkExpr te new_ve expr	`thenNF_Tc` \ new_expr ->
-    returnNF_Tc (ListComp new_expr new_quals)
+    zonkTcTypeToType te ty	`thenNF_Tc` \ new_ty   ->
+    returnNF_Tc (HsDoOut do_or_lc new_stmts 
+			 (zonkIdOcc ve return_id)
+			 (zonkIdOcc ve then_id)
+			 (zonkIdOcc ve zero_id)
+			 new_ty src_loc)
 
 zonkExpr te ve (ExplicitList _) = panic "zonkExpr te ve:ExplicitList"
 
@@ -531,63 +529,38 @@ zonkArithSeq te ve (FromThenTo e1 e2 e3)
     returnNF_Tc (FromThenTo new_e1 new_e2 new_e3)
 
 -------------------------------------------------------------------------
-zonkQuals :: TyVarEnv Type -> IdEnv Id 
-	  -> [TcQual s] -> NF_TcM s ([TypecheckedQual], IdEnv Id)
-
-zonkQuals te ve [] 
-  = returnNF_Tc ([], ve)
-
-zonkQuals te ve (GeneratorQual pat expr : quals)
-  = zonkPat te ve pat	`thenNF_Tc` \ (new_pat, ids) ->
-    zonkExpr te ve expr	`thenNF_Tc` \ new_expr ->
-    let
-	new_ve = extend_ve ve ids
-    in
-    zonkQuals te new_ve quals	`thenNF_Tc` \ (new_quals, final_ve) ->
-    returnNF_Tc (GeneratorQual new_pat new_expr : new_quals, final_ve)
-
-zonkQuals te ve (FilterQual expr : quals)
-  = zonkExpr te ve expr    	`thenNF_Tc` \ new_expr ->
-    zonkQuals te ve quals	`thenNF_Tc` \ (new_quals, final_ve) ->
-    returnNF_Tc (FilterQual new_expr : new_quals, final_ve)
-
-zonkQuals te ve (LetQual binds : quals)
-  = zonkBinds te ve binds	`thenNF_Tc` \ (new_binds, new_ve) ->
-    zonkQuals te new_ve quals	`thenNF_Tc` \ (new_quals, final_ve) ->
-    returnNF_Tc (LetQual new_binds : new_quals, final_ve)
-
--------------------------------------------------------------------------
 zonkStmts :: TyVarEnv Type -> IdEnv Id 
 	  -> [TcStmt s] -> NF_TcM s [TypecheckedStmt]
 
 zonkStmts te ve [] = returnNF_Tc []
 
-zonkStmts te ve [ExprStmt expr locn]
+zonkStmts te ve [ReturnStmt expr]
   = zonkExpr te ve expr		`thenNF_Tc` \ new_expr ->
-    returnNF_Tc [ExprStmt new_expr locn]
+    returnNF_Tc [ReturnStmt new_expr]
 
-zonkStmts te ve (ExprStmtOut expr locn a b : stmts)
-  = zonkExpr te ve      expr	`thenNF_Tc` \ new_expr  ->
-    zonkTcTypeToType te a	`thenNF_Tc` \ new_a     ->
-    zonkTcTypeToType te b	`thenNF_Tc` \ new_b     ->
+zonkStmts te ve (ExprStmt expr locn : stmts)
+  = zonkExpr te ve expr		`thenNF_Tc` \ new_expr ->
     zonkStmts te ve	stmts	`thenNF_Tc` \ new_stmts ->
-    returnNF_Tc (ExprStmtOut new_expr locn new_a new_b : new_stmts)
+    returnNF_Tc (ExprStmt new_expr locn : new_stmts)
+
+zonkStmts te ve (GuardStmt expr locn : stmts)
+  = zonkExpr te ve expr		`thenNF_Tc` \ new_expr ->
+    zonkStmts te ve	stmts	`thenNF_Tc` \ new_stmts ->
+    returnNF_Tc (GuardStmt new_expr locn : new_stmts)
 
 zonkStmts te ve (LetStmt binds : stmts)
   = zonkBinds te ve     binds	`thenNF_Tc` \ (new_binds, new_ve) ->
     zonkStmts te new_ve stmts	`thenNF_Tc` \ new_stmts ->
     returnNF_Tc (LetStmt new_binds : new_stmts)
 
-zonkStmts te ve (BindStmtOut pat expr locn a b : stmts)
+zonkStmts te ve (BindStmt pat expr locn : stmts)
   = zonkPat te ve pat		`thenNF_Tc` \ (new_pat, ids) ->
     zonkExpr te ve expr		`thenNF_Tc` \ new_expr ->
-    zonkTcTypeToType te a	`thenNF_Tc` \ new_a     ->
-    zonkTcTypeToType te b	`thenNF_Tc` \ new_b     ->
     let
 	new_ve = extend_ve ve ids
     in
     zonkStmts te new_ve stmts	`thenNF_Tc` \ new_stmts ->
-    returnNF_Tc (BindStmtOut new_pat new_expr locn new_a new_b : new_stmts)
+    returnNF_Tc (BindStmt new_pat new_expr locn : new_stmts)
 
 
 
@@ -667,6 +640,13 @@ zonkPat te ve (NPat lit ty expr)
   = zonkTcTypeToType te ty	`thenNF_Tc` \ new_ty   ->
     zonkExpr te ve expr		`thenNF_Tc` \ new_expr ->
     returnNF_Tc (NPat lit new_ty new_expr, [])
+
+zonkPat te ve (NPlusKPat n k ty e1 e2)
+  = zonkIdBndr te n		`thenNF_Tc` \ new_n ->
+    zonkTcTypeToType te ty	`thenNF_Tc` \ new_ty ->
+    zonkExpr te ve e1		`thenNF_Tc` \ new_e1 ->
+    zonkExpr te ve e2		`thenNF_Tc` \ new_e2 ->
+    returnNF_Tc (NPlusKPat new_n k new_ty new_e1 new_e2, [new_n])
 
 zonkPat te ve (DictPat ds ms)
   = mapNF_Tc (zonkIdBndr te) ds    `thenNF_Tc` \ new_ds ->

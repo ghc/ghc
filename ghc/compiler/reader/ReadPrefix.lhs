@@ -95,7 +95,7 @@ cvFlag 1 = True
 # define PACK_STR packCString
 # define CCALL_THEN `stThen`
 #else
-# define PACK_STR _packCString
+# define PACK_STR mkFastCharString
 # define CCALL_THEN `thenPrimIO`
 #endif
 
@@ -222,7 +222,7 @@ wlkExpr expr
       U_doe gdo srcline ->			-- do expression
 	mkSrcLocUgn srcline		$ \ src_loc ->
 	wlkList rd_stmt gdo	`thenUgn` \ stmts ->
-	returnUgn (HsDo stmts src_loc)
+	returnUgn (HsDo DoStmt stmts src_loc)
         where
 	rd_stmt pt
 	  = rdU_tree pt `thenUgn` \ bind ->
@@ -249,7 +249,8 @@ wlkExpr expr
       U_comprh cexp cquals -> -- list comprehension
 	wlkExpr cexp		`thenUgn` \ expr  ->
 	wlkList rd_qual cquals	`thenUgn` \ quals ->
-	returnUgn (ListComp expr quals)
+	getSrcLocUgn 		`thenUgn` \ loc ->
+	returnUgn (HsDo ListComp (quals ++ [ReturnStmt expr]) loc)
 	where
 	  rd_qual pt
 	    = rdU_tree pt	`thenUgn` \ qual ->
@@ -259,12 +260,14 @@ wlkExpr expr
 	    = case qual of
 		U_guard exp ->
 		  wlkExpr exp  	`thenUgn` \ expr ->
-		  returnUgn (FilterQual expr)
+		  getSrcLocUgn 	`thenUgn` \ loc ->
+		  returnUgn (GuardStmt expr loc)
 
 		U_qual qpat qexp ->
 		  wlkPat  qpat  `thenUgn` \ pat  ->
 		  wlkExpr qexp  `thenUgn` \ expr ->
-		  returnUgn (GeneratorQual pat expr)
+		  getSrcLocUgn 	`thenUgn` \ loc ->
+		  returnUgn (BindStmt pat expr loc)
 
 		U_seqlet seqlet ->
 		  wlkBinding seqlet	`thenUgn` \ bs ->
@@ -272,7 +275,7 @@ wlkExpr expr
 		  let
 		      binds = cvBinds sf cvValSig bs
 		  in
-		  returnUgn (LetQual binds)
+		  returnUgn (LetStmt binds)
 
       U_eenum efrom estep eto -> -- arithmetic sequence
 	wlkExpr efrom		`thenUgn` \ e1  ->
@@ -385,6 +388,11 @@ wlkPat pat
       U_lazyp lazyp -> 			-- irrefutable ("twiddle") pattern
 	wlkPat lazyp	`thenUgn` \ pat ->
 	returnUgn (LazyPatIn pat)
+
+      U_plusp avar lit ->
+	wlkVarId avar	`thenUgn` \ var ->
+	wlkLiteral lit	`thenUgn` \ lit ->
+	returnUgn (NPlusKPatIn var lit)
 
       U_wildp -> returnUgn WildPatIn 	-- wildcard pattern
 

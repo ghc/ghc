@@ -1,7 +1,7 @@
 \begin{onlystandalone}
 \documentstyle[11pt,literate]{article}
 \begin{document}
-\title{The Glorious Glasgow Haskell Compilation System\\ Version~2.01\\ User's Guide}
+\title{The Glorious Glasgow Haskell Compilation System\\ Version~2.02\\ User's Guide}
 \author{The GHC Team\\
 Department of Computing Science\\
 University of Glasgow\\
@@ -17,6 +17,7 @@ Email: glasgow-haskell-\{bugs,users\}-request\@dcs.gla.ac.uk}
 \end{onlystandalone}
 
 \input{intro.lit}
+\input{release.lit}
 \input{how_to_run.lit}
 \input{runtime_control.lit}
 \input{sooner.lit}

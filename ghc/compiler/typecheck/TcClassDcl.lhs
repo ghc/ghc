@@ -14,7 +14,7 @@ import HsSyn		( HsDecl(..), ClassDecl(..), HsBinds(..), Bind(..), MonoBinds(..),
 			  Match(..), GRHSsAndBinds(..), GRHS(..), HsExpr(..), 
 			  DefaultDecl, TyDecl, InstDecl, IfaceSig, Fixity,
 			  HsLit(..), OutPat(..), Sig(..), HsType(..), HsTyVar,
-			  Stmt, Qualifier, ArithSeqInfo, InPat, Fake )
+			  Stmt, DoOrListComp, ArithSeqInfo, InPat, Fake )
 import HsTypes		( getTyVarName )
 import HsPragmas	( ClassPragmas(..) )
 import RnHsSyn		( RenamedClassDecl(..), RenamedClassPragmas(..),
@@ -25,7 +25,8 @@ import TcHsSyn		( TcIdOcc(..), SYN_IE(TcHsBinds), SYN_IE(TcMonoBinds), SYN_IE(Tc
 			  mkHsTyApp, mkHsTyLam, mkHsDictApp, mkHsDictLam, tcIdType )
 
 import Inst		( Inst, InstOrigin(..), SYN_IE(LIE), emptyLIE, plusLIE, newDicts, newMethod )
-import TcEnv		( tcLookupClass, tcLookupTyVar, tcLookupTyCon, newLocalIds, tcExtendGlobalTyVars )
+import TcEnv		( tcLookupClass, tcLookupTyVar, tcLookupTyCon, newLocalIds, tcAddImportedIdInfo,
+			  tcExtendGlobalTyVars )
 import TcInstDcls	( processInstBinds )
 import TcKind		( unifyKind, TcKind )
 import TcMonad
@@ -204,9 +205,9 @@ tcClassSig :: Class	    		-- Knot tying only!
 		     Id)		-- default-method ids
 
 tcClassSig rec_clas rec_clas_tyvar rec_classop_spec_fn
-	   (ClassOpSig op_name
+	   (ClassOpSig op_name dm_name
 		       op_ty
-		       pragmas src_loc)
+		       src_loc)
   = tcAddSrcLoc src_loc $
     fixTc ( \ ~(_, rec_sel_id, rec_defm_id) ->	-- Knot for pragmas
 
@@ -227,13 +228,13 @@ tcClassSig rec_clas rec_clas_tyvar rec_classop_spec_fn
     in
 
 	-- Build the selector id and default method id
-    tcGetUnique					`thenNF_Tc` \ d_uniq ->
     let
-	sel_id  = mkMethodSelId     op_name        rec_clas class_op       global_ty
-	defm_id = mkDefaultMethodId op_name d_uniq rec_clas class_op False global_ty
+	sel_id  = mkMethodSelId     op_name rec_clas class_op       global_ty
+	defm_id = mkDefaultMethodId dm_name rec_clas class_op False global_ty
 			-- ToDo: improve the "False"
     in
-    returnTc (class_op, sel_id, defm_id)
+    tcAddImportedIdInfo defm_id			`thenNF_Tc` \ final_defm_id ->
+    returnTc (class_op, sel_id, final_defm_id)
     )
 \end{code}
 
@@ -431,6 +432,72 @@ buildDefaultMethodBinds clas clas_tyvar
     origin = ClassDeclOrigin
 \end{code}
 
+====================
+buildDefaultMethodBinds
+	:: Class
+	-> TcTyVar s
+	-> [Id]
+	-> RenamedMonoBinds
+	-> TcM s (LIE s, TcHsBinds s)
+
+buildDefaultMethodBinds clas clas_tyvar
+			default_method_ids default_binds
+  = newDicts origin [(clas,inst_ty)]			`thenNF_Tc` \ (this_dict, [this_dict_id]) ->
+    tcExtendGlobalTyVars clas_tyvar_set (
+	tcDefaultMethodBinds default_binds
+    )
+
+tcDefaultMethodBinds default_meth_ids default_binds
+  where
+    go (AndMonoBinds b1 b2)
+      = go b1		`thenTc` \ (new_b1, lie1) ->
+        go b2		`thenTc` \ (new_b2, lie2) ->
+	returnTc (new_b1 `ThenBinds` new_b2, lie1 `plusLIE` lie2)
+
+    go EmptyMonoBinds = EmptyBinds
+
+    go mbind = processInstBinds1 clas clas_dict meth_ids mbind	`thenTc` \ (tags
+
+tcDefaultMethodBinds EmptyMonoBinds
+  
+
+
+	processInstBinds
+	   clas
+	   (makeClassDeclDefaultMethodRhs clas local_defm_ids)
+	   avail_insts
+	   local_defm_ids
+	   default_binds
+    )					`thenTc` \ (insts_needed, default_binds') ->
+
+    let
+    mapAndUnzipNF_Tc mk_method default_method_ids	`thenNF_Tc` \ (insts_s, local_defm_ids) ->
+    let
+	avail_insts    = this_dict `plusLIE` unionManyBags insts_s 	-- Insts available
+	clas_tyvar_set = unitTyVarSet clas_tyvar
+    in
+
+    tcSimplifyAndCheck
+	clas_tyvar_set
+	avail_insts
+	insts_needed			`thenTc` \ (const_lie, dict_binds) ->
+	
+
+    let
+	defm_binds = AbsBinds
+		 	[clas_tyvar]
+			[this_dict_id]
+			(local_defm_ids `zip` map RealId default_method_ids)
+			dict_binds
+			(RecBind default_binds')
+    in
+    returnTc (const_lie, defm_binds)
+  where
+    inst_ty = mkTyVarTy clas_tyvar
+    mk_method defm_id = newMethod origin (RealId defm_id) [inst_ty]
+    origin = ClassDeclOrigin
+==================
+
 @makeClassDeclDefaultMethodRhs@ builds the default method for a
 class declaration when no explicit default method is given.
 
@@ -466,5 +533,5 @@ Contexts
 ~~~~~~~~
 \begin{code}
 classDeclCtxt class_name sty
-  = ppCat [ppStr "In the class declaration for", ppr sty class_name]
+  = ppCat [ppPStr SLIT("In the class declaration for"), ppr sty class_name]
 \end{code}

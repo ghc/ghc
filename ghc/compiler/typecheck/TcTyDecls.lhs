@@ -16,7 +16,7 @@ IMP_Ubiq(){-uitous-}
 
 import HsSyn		( TyDecl(..), ConDecl(..), BangType(..), HsExpr(..), 
 			  Match(..), GRHSsAndBinds(..), GRHS(..), OutPat(..), 
-			  HsBinds(..), HsLit, Stmt, Qualifier, ArithSeqInfo,
+			  HsBinds(..), HsLit, Stmt, DoOrListComp, ArithSeqInfo,
 			  HsType, Fake, InPat, HsTyVar, Fixity,
 			  Bind(..), MonoBinds(..), Sig 
 			)
@@ -350,19 +350,19 @@ Errors and contexts
 ~~~~~~~~~~~~~~~~~~~
 \begin{code}
 tySynCtxt tycon_name sty
-  = ppCat [ppStr "In the type declaration for", ppr sty tycon_name]
+  = ppCat [ppPStr SLIT("In the type declaration for"), ppr sty tycon_name]
 
 tyDataCtxt tycon_name sty
-  = ppCat [ppStr "In the data declaration for", ppr sty tycon_name]
+  = ppCat [ppPStr SLIT("In the data declaration for"), ppr sty tycon_name]
 
 tyNewCtxt tycon_name sty
-  = ppCat [ppStr "In the newtype declaration for", ppr sty tycon_name]
+  = ppCat [ppPStr SLIT("In the newtype declaration for"), ppr sty tycon_name]
 
 fieldTypeMisMatch field_name sty
-  = ppSep [ppStr "Declared types differ for field", ppr sty field_name]
+  = ppSep [ppPStr SLIT("Declared types differ for field"), ppr sty field_name]
 
 missingEvalErr con eval_theta sty
-  = ppCat [ppStr "Missing Eval context for constructor", 
+  = ppCat [ppPStr SLIT("Missing Eval context for constructor"), 
 	   ppQuote (ppr sty con),
-	   ppStr ":", ppr sty eval_theta]
+	   ppChar ':', ppr sty eval_theta]
 \end{code}

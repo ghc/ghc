@@ -13,6 +13,7 @@ module PprStyle (
     ) where
 
 CHK_Ubiq() -- debugging consistency check
+IMP_FASTSTRING() -- cheat to force fast string dependency.
 
 data PprStyle
   = PprForUser	 		-- Pretty-print in a way that will

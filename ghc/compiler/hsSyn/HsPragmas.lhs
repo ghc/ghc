@@ -173,34 +173,34 @@ Some instances for printing (just for debugging, really)
 instance Outputable name => Outputable (ClassPragmas name) where
     ppr sty NoClassPragmas = ppNil
     ppr sty (SuperDictPragmas sdsel_prags)
-      = ppAbove (ppStr "{-superdict pragmas-}")
+      = ppAbove (ppPStr SLIT("{-superdict pragmas-}"))
 		(ppr sty sdsel_prags)
 
 instance Outputable name => Outputable (ClassOpPragmas name) where
     ppr sty NoClassOpPragmas = ppNil
     ppr sty (ClassOpPragmas op_prags defm_prags)
-      = ppAbove (ppCat [ppStr "{-meth-}", ppr sty op_prags])
-		(ppCat [ppStr "{-defm-}", ppr sty defm_prags])
+      = ppAbove (ppCat [ppPStr SLIT("{-meth-}"), ppr sty op_prags])
+		(ppCat [ppPStr SLIT("{-defm-}"), ppr sty defm_prags])
 
 instance Outputable name => Outputable (InstancePragmas name) where
     ppr sty NoInstancePragmas = ppNil
     ppr sty (SimpleInstancePragma dfun_pragmas)
-      = ppCat [ppStr "{-dfun-}", ppr sty dfun_pragmas]
+      = ppCat [ppPStr SLIT("{-dfun-}"), ppr sty dfun_pragmas]
     ppr sty (ConstantInstancePragma dfun_pragmas name_pragma_pairs)
-      = ppAbove (ppCat [ppStr "{-constm-}", ppr sty dfun_pragmas])
+      = ppAbove (ppCat [ppPStr SLIT("{-constm-}"), ppr sty dfun_pragmas])
 	    	(ppAboves (map pp_pair name_pragma_pairs))
       where
 	pp_pair (n, prags)
 	  = ppCat [ppr sty n, ppEquals, ppr sty prags]
 
     ppr sty (SpecialisedInstancePragma dfun_pragmas spec_pragma_info)
-      = ppAbove (ppCat [ppStr "{-spec'd-}", ppr sty dfun_pragmas])
+      = ppAbove (ppCat [ppPStr SLIT("{-spec'd-}"), ppr sty dfun_pragmas])
 	    	(ppAboves (map pp_info spec_pragma_info))
       where
 	pp_info (ty_maybes, num_dicts, prags)
 	  = ppBesides [ppLbrack, ppInterleave ppSP (map pp_ty ty_maybes), ppRbrack,
 		       ppLparen, ppInt num_dicts, ppRparen, ppEquals, ppr sty prags]
-	pp_ty Nothing = ppStr "_N_"
+	pp_ty Nothing = ppPStr SLIT("_N_")
 	pp_ty (Just t)= ppr sty t
 
 instance Outputable name => Outputable (GenPragmas name) where
@@ -211,29 +211,29 @@ instance Outputable name => Outputable (GenPragmas name) where
 	       pp_specs specs]
       where
     	pp_arity Nothing  = ppNil
-	pp_arity (Just i) = ppBeside (ppStr "ARITY=") (ppInt i)
+	pp_arity (Just i) = ppBeside (ppPStr SLIT("ARITY=")) (ppInt i)
 
 	pp_upd Nothing  = ppNil
 	pp_upd (Just u) = ppUpdateInfo sty u
 
 	pp_str NoImpStrictness = ppNil
 	pp_str (ImpStrictness is_bot demands wrkr_prags)
-	  = ppBesides [ppStr "IS_BOT=", ppr sty is_bot,
-		       ppStr "STRICTNESS=", ppStr (showList demands ""),
-		       ppStr " {", ppr sty wrkr_prags, ppStr "}"]
+	  = ppBesides [ppPStr SLIT("IS_BOT="), ppr sty is_bot,
+		       ppPStr SLIT("STRICTNESS="), ppStr (showList demands ""),
+		       ppPStr SLIT(" {"), ppr sty wrkr_prags, ppChar '}']
 
-	pp_unf NoImpUnfolding = ppStr "NO_UNFOLDING"
-	pp_unf (ImpMagicUnfolding m) = ppBeside (ppStr "MAGIC=") (ppPStr m)
-	pp_unf (ImpUnfolding g core) = ppBeside (ppStr "UNFOLD=") (ppr sty core)
+	pp_unf NoImpUnfolding = ppPStr SLIT("NO_UNFOLDING")
+	pp_unf (ImpMagicUnfolding m) = ppBeside (ppPStr SLIT("MAGIC=")) (ppPStr m)
+	pp_unf (ImpUnfolding g core) = ppBeside (ppPStr SLIT("UNFOLD=")) (ppr sty core)
 
 	pp_specs [] = ppNil
 	pp_specs specs
-	  = ppBesides [ppStr "SPECS=[", ppInterleave ppSP (map pp_spec specs), ppStr "]"]
+	  = ppBesides [ppPStr SLIT("SPECS=["), ppInterleave ppSP (map pp_spec specs), ppChar ']']
 	  where
 	    pp_spec (ty_maybes, num_dicts, gprags)
 	      = ppCat [ppLbrack, ppInterleave ppSP (map pp_MaB ty_maybes), ppRbrack, ppInt num_dicts, ppr sty gprags]
 
-	    pp_MaB Nothing  = ppStr "_N_"
+	    pp_MaB Nothing  = ppPStr SLIT("_N_")
 	    pp_MaB (Just x) = ppr sty x
 \end{code}
 

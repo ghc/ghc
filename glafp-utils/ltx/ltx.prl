@@ -1,3 +1,10 @@
+#
+# The perl script requires bindings for the following
+# variables to be prepended:
+#     TMPDIR
+#     CONTEXTDIFF
+#
+
 $Pgm = $0; $Pgm =~ s/.*\/([^\/]+)$/\1/;
 #
 # set up signal handler
@@ -30,8 +37,8 @@ if (-f $ARGV[0]) {
 if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
     $Tmp_prefix = $ENV{'TMPDIR'} ;
 } else {
-    $Tmp_prefix ='$(TMPDIR)';
-    $ENV{'TMPDIR'} = '$(TMPDIR)'; # set the env var as well
+    $Tmp_prefix ="$TMPDIR";
+    $ENV{'TMPDIR'} = "$TMPDIR"; # set the env var as well
 }
 
 sub rm_temp_files {
@@ -188,7 +195,7 @@ sub something_more_needed {
 	 && (system("cmp -s $tmp_pre-.aux-cite.$$ $tmp_pre-.aux-prev-cite.$$") >> 8)) {
 	    $BibTeX_run_needed = 1 if $Bibliography_requested;
 	    if ($Verbose) {
-		system("$(CONTEXT_DIFF) $tmp_pre-.aux-prev-cite.$$ $tmp_pre-.aux-cite.$$");
+		system("$CONTEXT_DIFF $tmp_pre-.aux-prev-cite.$$ $tmp_pre-.aux-cite.$$");
 	    }
 	}
 
@@ -196,7 +203,7 @@ sub something_more_needed {
 	    $MakeIndex_run_needed =
 		(system("cmp -s $TeX_root.idx $TeX_root.idx-prev") >> 8) ? 1 : 0;
 	    if ($MakeIndex_run_needed && $Verbose) {
-		system("$(CONTEXT_DIFF) $TeX_root.idx-prev $TeX_root.idx");
+		system("$CONTEXT_DIFF $TeX_root.idx-prev $TeX_root.idx");
 	    }
 	}
     }

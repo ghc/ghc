@@ -15,8 +15,8 @@ module PrimRep (
 
 	separateByPtrFollowness, isFollowableRep, isFloatingRep,
 	getPrimRepSize, retPrimRepSize,
-	showPrimRep,
-	guessPrimRep
+	showPrimRep,  ppPrimRep,
+	guessPrimRep, decodePrimRep
     ) where
 
 IMP_Ubiq()
@@ -85,8 +85,12 @@ isFollowableRep :: PrimRep -> Bool
 isFollowableRep PtrRep        = True
 isFollowableRep ArrayRep      = True
 isFollowableRep ByteArrayRep  = True
--- why is a MallocPtr followable? 4/96 SOF
--- isFollowableRep ForeignObjRep  = True
+-- why is a ForeignObj followable? 4/96 SOF
+--
+-- A: they're followable because these objects
+-- should be lugged around by the storage manager
+-- (==> we need to generate code that identify them as such) -- 3/97 SOF
+isFollowableRep ForeignObjRep  = True
 
 isFollowableRep StablePtrRep  = False
 -- StablePtrs aren't followable because they are just indices into a
@@ -145,7 +149,32 @@ instance Outputable PrimRep where
     ppr sty kind = ppStr (showPrimRep kind)
 
 showPrimRep  :: PrimRep -> String
+-- dumping PrimRep tag for unfoldings
+ppPrimRep  :: PrimRep -> Pretty
+
 guessPrimRep :: String -> PrimRep	-- a horrible "inverse" function
+decodePrimRep :: Char  -> PrimRep       -- of equal nature
+
+ppPrimRep k =
+ ppChar 
+  (case k of
+     PtrRep        -> 'P'
+     CodePtrRep    -> 'p'
+     DataPtrRep    -> 'd'
+     CostCentreRep -> 'c'	-- Pointer to a cost centre
+     RetRep        -> 'R'
+     CharRep       -> 'C'
+     IntRep        -> 'I'
+     WordRep       -> 'W'
+     AddrRep       -> 'A'
+     FloatRep      -> 'F'
+     DoubleRep     -> 'D'
+     ArrayRep      -> 'a'
+     ByteArrayRep  -> 'b'
+     StablePtrRep  -> 'S'
+     ForeignObjRep -> 'f'
+     VoidRep       -> 'V'
+     _             -> panic "ppPrimRep")
 
 showPrimRep PtrRep	    = "P_"	-- short for StgPtr
 
@@ -168,6 +197,26 @@ showPrimRep ByteArrayRep  = "StgByteArray"
 showPrimRep StablePtrRep  = "StgStablePtr"
 showPrimRep ForeignObjRep  = "StgPtr" -- see comment below
 showPrimRep VoidRep	  = "!!VOID_KIND!!"
+
+decodePrimRep ch =
+ case ch of
+     'P' -> PtrRep        
+     'p' -> CodePtrRep    
+     'd' -> DataPtrRep    
+     'c' -> CostCentreRep 
+     'R' -> RetRep        
+     'C' -> CharRep       
+     'I' -> IntRep        
+     'W' -> WordRep       
+     'A' -> AddrRep       
+     'F' -> FloatRep      
+     'D' -> DoubleRep     
+     'a' -> ArrayRep      
+     'b' -> ByteArrayRep  
+     'S' -> StablePtrRep  
+     'f' -> ForeignObjRep 
+     'V' -> VoidRep
+     _   -> panic "decodePrimRep"
 
 guessPrimRep "D_"	     = DataPtrRep
 guessPrimRep "StgRetAddr"   = RetRep

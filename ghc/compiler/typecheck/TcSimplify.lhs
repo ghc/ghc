@@ -15,8 +15,8 @@ module TcSimplify (
 IMP_Ubiq()
 
 import HsSyn		( MonoBinds(..), HsExpr(..), InPat, OutPat, HsLit, 
-			  Match, HsBinds, Qualifier, HsType, ArithSeqInfo, Fixity,
-			  GRHSsAndBinds, Stmt, Fake )
+			  Match, HsBinds, HsType, ArithSeqInfo, Fixity,
+			  GRHSsAndBinds, Stmt, DoOrListComp, Fake )
 import TcHsSyn		( TcIdOcc(..), SYN_IE(TcIdBndr), SYN_IE(TcExpr), SYN_IE(TcMonoBinds) )
 
 import TcMonad
@@ -401,7 +401,7 @@ trySC :: LIE s				-- Givens
 trySC givens wanted@(Dict _ wanted_class wanted_ty wanted_orig loc)
   | not (maybeToBool maybe_best_subclass_chain)
   = 	-- No superclass relationship
-    returnNF_Tc (givens, emptyBag, unitLIE wanted)
+    returnNF_Tc ((wanted `consLIE` givens), emptyBag, unitLIE wanted)
 
   | otherwise
   = 	-- There's a subclass relationship with a "given"
@@ -457,11 +457,9 @@ sortSC :: LIE s     -- Expected to be all dicts (no MethodIds), all of
 sortSC dicts = sortLt lt (bagToList dicts)
   where
     (Dict _ c1 ty1 _ _) `lt` (Dict _ c2 ty2 _ _)
-       = if ty1 `eqSimpleTy` ty2 then
-		maybeToBool (c2 `isSuperClassOf` c1)
-	 else
-		-- Order is immaterial, I think...
-		False
+       = maybeToBool (c2 `isSuperClassOf` c1)
+	-- The ice is a bit thin here because this "lt" isn't a total order
+	-- But it *is* transitive, so it works ok
 \end{code}
 
 
@@ -712,7 +710,7 @@ now?
 
 \begin{code}
 genCantGenErr insts sty	-- Can't generalise these Insts
-  = ppHang (ppStr "Cannot generalise these overloadings (in a _ccall_):") 
+  = ppHang (ppPStr SLIT("Cannot generalise these overloadings (in a _ccall_):")) 
 	   4  (ppAboves (map (ppr sty) (bagToList insts)))
 \end{code}
 

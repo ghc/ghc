@@ -34,7 +34,7 @@ module TyCon(
 	getSynTyConDefn,
 
         maybeTyConSingleCon,
-	isEnumerationTyCon,
+	isEnumerationTyCon, isTupleTyCon,
 	derivedFor
 ) where
 
@@ -79,6 +79,11 @@ data TyCon
 		[TyVar]
 		[(Class,Type)]	-- Its context
 		[Id]		-- Its data constructors, with fully polymorphic types
+				-- 	This list can be empty, when we import a data type abstractly,
+				-- 	either (a) the interface is hand-written and doesn't give
+				--		   the constructors, or
+				--	       (b) in a quest for fast compilation we don't import 
+				--		   the constructors
 		[Class]		-- Classes which have derived instances
 		NewOrData
 
@@ -275,6 +280,13 @@ isEnumerationTyCon (TupleTyCon _ _ arity)
   = arity == 0
 isEnumerationTyCon (DataTyCon _ _ _ _ _ data_cons _ _)
   = not (null data_cons) && all isNullaryDataCon data_cons
+
+
+isTupleTyCon (TupleTyCon _ _ arity) = arity >= 2    -- treat "0-tuple" specially
+isTupleTyCon (SpecTyCon tc tys)     = isTupleTyCon tc
+isTupleTyCon other		    = False
+
+
 \end{code}
 
 @derivedFor@ reports if we have an {\em obviously}-derived instance

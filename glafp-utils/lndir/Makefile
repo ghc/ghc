@@ -1,8 +1,10 @@
-TOP=../..
-include $(TOP)/mk/gen.mk
+TOP=..
+include $(TOP)/mk/boilerplate.mk
 
-SRCS=lndir.c
-PROG=lndir
+C_SRCS=lndir.c
+C_PROG=lndir
+
+CLEAN_FILES += $(C_PROG) $(C_OBJS)
 DESTDIR=$(INSTBINDIR)
 
-include $(TOP)/mk/Cprog.mk
+include $(TOP)/mk/target.mk

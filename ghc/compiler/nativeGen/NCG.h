@@ -14,7 +14,7 @@ you will screw up the layout where they are used in case expressions!
 
 #define FAST_REG_NO FAST_INT
 
-#include "../../includes/platform.h"
+#include "../../includes/config.h"
 
 #if 0
 {-testing only-}

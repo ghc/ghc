@@ -1,79 +1,71 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.2 1996/11/21 16:46:26 simonm Exp $
+# $Id: Makefile,v 1.3 1997/03/14 07:53:55 simonpj Exp $
+#
 
-TOP=..
-include $(TOP)/ghc/mk/ghc.mk
+TOP=.
+include $(TOP)/mk/boilerplate.mk
 
 line = @echo "------------------------------------------------------------------------------"
 
-define BuildLibs
-$(line)
-@echo "Building Libraries"
-$(line)
-@$(MAKE) -C lib depend all
-endef
-
-define BuildCompiler
-$(line)
-@echo "Building Compiler"
-$(line)
-@$(MAKE) -C compiler depend all
-endef
-
-# dependencies:
+#
+# subdir dependencies:
 #	everything needs utils
-#	includes needs driver (for mkNativeGen.c)
+#	includes/ needs driver (to easily c.pile mkNativeGen.c)
 #	make depend except in {utils,driver} needs includes	
 #	RTS and compiler need includes
+#
 
 boot ::
 	$(line)
-	@echo "Building Utils"
+	@echo "Booting Utils"
 	$(line)
-	@$(MAKE) -C utils depend all
+	@$(MAKE) -C utils boot depend
 
 	$(line)
-	@echo "Building Driver"
+	@echo "Booting Driver"
 	$(line)
-	@$(MAKE) -C driver all
+	@$(MAKE) -C driver boot depend
 
 	$(line)
-	@echo "Building Includes"
+	@echo "Booting Includes"
 	$(line)
-	@$(MAKE) -C includes all
+	@$(MAKE) -C includes boot depend
 
 	$(line)
-	@echo "Building Runtime System"
+	@echo "Booting Runtime System"
 	$(line)
-	@$(MAKE) -C runtime depend all
+	@$(MAKE) -C runtime boot depend
 
 	$(line)
-	@echo "Building Docs"
+	@echo "Booting Docs"
 	$(line)
-	@$(MAKE) -C docs depend all
+	@$(MAKE) -C docs boot
 
-ifeq ($(HaskellCompilerType), HC_USE_HC_FILES)
-	$(BuildLibs)
-	$(BuildCompiler)
-else
-	$(BuildCompiler)
-	$(BuildLibs)
-endif
+	$(line)
+	@echo "Booting Compiler"
+	$(line)
+	@$(MAKE) -C compiler boot
+
+	$(line)
+	@echo "Booting Prelude libraries"
+	$(line)
+	@$(MAKE) -C compiler boot
+
 
 # "CONTRIB" is also a SUBDIR, but there is nothing to build there.
-SUBDIRS = utils driver includes runtime docs compiler lib
+# 
+# leave out docs for the moment -- SOF
+#
+# Order is important! driver/ has to come before includes/ which
+# again has to come before the rest.
+#
+# If we're booting from .hc files, swap the order
+# we descend into compiler/ and lib/
+#
+ifeq "$(GhcWithHscBuiltViaC)" "NO"
+SUBDIRS = utils driver includes runtime compiler lib
+else
+SUBDIRS = utils driver includes runtime lib compiler
+endif
 
-# Make the required directories for install.
-
-install_dirs ::
-	$(MKDIRHIER) $(INSTBINDIR_GHC)
-	$(MKDIRHIER) $(INSTSCRIPTDIR_GHC)
-	$(MKDIRHIER) $(INSTLIBDIR_GHC)
-	$(MKDIRHIER) $(INSTLIBDIR_GHC)/includes
-	$(MKDIRHIER) $(INSTDATADIR_GHC)
-	$(MKDIRHIER) $(INSTDATADIR_GHC)/includes
-	$(MKDIRHIER) $(INSTDATADIR_GHC)/imports
-
-install :: install_dirs
-
-include $(TOP)/mk/subdir.mk
+include $(TOP)/mk/target.mk

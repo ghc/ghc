@@ -3,7 +3,8 @@ Breaks the TyCon/types loop and the types/Id loop.
 \begin{code}
 interface TyLoop where
 
-import PreludePS(_PackedString)
+--import PreludePS(_PackedString)
+import FastString (FastString)
 import PreludeStdIO ( Maybe )
 import Unique ( Unique )
 
@@ -34,7 +35,7 @@ type Id	   = GenId (GenType (GenTyVar (GenUsage Unique)) Unique)
 -- Needed in TyCon
 tupleCon :: Int -> Id
 isNullaryDataCon :: Id -> Bool
-specMaybeTysSuffix :: [Maybe Type] -> _PackedString
+specMaybeTysSuffix :: [Maybe Type] -> FastString
 idType :: Id -> Type
 splitSigmaTy :: GenType t u -> ([t], [(Class,GenType t u)], GenType t u)
 splitFunTy   :: GenType t u -> ([GenType t u], GenType t u)

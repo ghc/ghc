@@ -65,11 +65,10 @@ import PprType		( GenType{-instance Outputable-}, TyCon{-ditto-} )
 import Pretty		( prettyToUn, ppBesides, ppChar, ppPStr, ppCat, ppStr )
 import PrimRep		( isFollowableRep, PrimRep(..) )
 import TyCon		( isPrimTyCon, tyConDataCons )
+import Type             ( showTypeCategory )
 import Unpretty		( uppShow )
 import Util		( isIn, panic, pprPanic, assertPanic, pprTrace{-ToDo:rm-} )
 
-myWrapperMaybe = panic "CgClosure.myWrapperMaybe (ToDo)"
-showTypeCategory = panic "CgClosure.showTypeCategory (ToDo)"
 getWrapperArgTypeCategories = panic "CgClosure.getWrapperArgTypeCategories (ToDo)"
 \end{code}
 
@@ -563,7 +562,7 @@ closureCodeBody binder_info closure_info cc all_args body
     wrapper_maybe = get_ultimate_wrapper Nothing id
       where
     	get_ultimate_wrapper deflt x -- walk all the way up a "wrapper chain"
-	  = case (myWrapperMaybe x) of
+	  = case myWrapperMaybe x of
 	      Nothing -> deflt
 	      Just xx -> get_ultimate_wrapper (Just xx) xx
 

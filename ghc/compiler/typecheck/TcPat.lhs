@@ -11,8 +11,8 @@ module TcPat ( tcPat ) where
 IMP_Ubiq(){-uitous-}
 
 import HsSyn		( InPat(..), OutPat(..), HsExpr(..), HsLit(..),
-			  Match, HsBinds, Qualifier, HsType, Fixity,
-			  ArithSeqInfo, Stmt, Fake )
+			  Match, HsBinds, HsType, Fixity,
+			  ArithSeqInfo, Stmt, DoOrListComp, Fake )
 import RnHsSyn		( SYN_IE(RenamedPat) )
 import TcHsSyn		( SYN_IE(TcPat), TcIdOcc(..) )
 
@@ -45,7 +45,7 @@ import TysPrim		( charPrimTy, intPrimTy, floatPrimTy,
 			  doublePrimTy, addrPrimTy
 			)
 import TysWiredIn	( charTy, stringTy, mkListTy, mkTupleTy, addrTy )
-import Unique		( Unique, eqClassOpKey )
+import Unique		( Unique, eqClassOpKey, geClassOpKey, minusClassOpKey )
 import Util		( assertPanic, panic )
 \end{code}
 
@@ -303,6 +303,30 @@ tcPat (LitPatIn lit@(HsFrac f))
 
 tcPat (LitPatIn lit@(HsLitLit s))
   = error "tcPat: can't handle ``literal-literal'' patterns"
+
+tcPat (NPlusKPatIn name lit@(HsInt i))
+  = tcLookupLocalValueOK "tcPat1:n+k" name	`thenNF_Tc` \ local ->
+    let
+	local_ty = idType local
+    in
+    tcLookupGlobalValueByKey geClassOpKey		`thenNF_Tc` \ ge_sel_id ->
+    tcLookupGlobalValueByKey minusClassOpKey		`thenNF_Tc` \ minus_sel_id ->
+
+    newOverloadedLit origin
+		     (OverloadedIntegral i) local_ty	`thenNF_Tc` \ (lie1, over_lit_id) ->
+
+    newMethod origin (RealId ge_sel_id)    [local_ty]	`thenNF_Tc` \ (lie2, ge_id) ->
+    newMethod origin (RealId minus_sel_id) [local_ty]	`thenNF_Tc` \ (lie3, minus_id) ->
+
+    returnTc (NPlusKPat (TcId local) lit local_ty
+			(SectionR (HsVar ge_id) (HsVar over_lit_id))
+			(SectionR (HsVar minus_id) (HsVar over_lit_id)),
+	      lie1 `plusLIE` lie2 `plusLIE` lie3,
+	      local_ty)
+  where
+    origin = LiteralOrigin lit	-- Not very good!
+
+tcPat (NPlusKPatIn pat other) = panic "TcPat:NPlusKPat: not an HsInt literal"
 \end{code}
 
 %************************************************************************
@@ -353,13 +377,13 @@ matchConArgTys con arg_tys
 Errors and contexts
 ~~~~~~~~~~~~~~~~~~~
 \begin{code}
-patCtxt pat sty = ppHang (ppStr "In the pattern:") 4 (ppr sty pat)
+patCtxt pat sty = ppHang (ppPStr SLIT("In the pattern:")) 4 (ppr sty pat)
 
 recordLabel field_label sty
-  = ppHang (ppBesides [ppStr "When matching record field", ppr sty field_label])
-	 4 (ppBesides [ppStr "with its immediately enclosing constructor"])
+  = ppHang (ppBesides [ppPStr SLIT("When matching record field"), ppr sty field_label])
+	 4 (ppBesides [ppPStr SLIT("with its immediately enclosing constructor")])
 
 recordRhs field_label pat sty
-  = ppHang (ppStr "In the record field pattern")
-	 4 (ppSep [ppr sty field_label, ppStr "=", ppr sty pat])
+  = ppHang (ppPStr SLIT("In the record field pattern"))
+	 4 (ppSep [ppr sty field_label, ppChar '=', ppr sty pat])
 \end{code}

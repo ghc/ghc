@@ -33,7 +33,7 @@ a_HASH   x = GHCbase.A# x
 pACK_STR x = packCString x
 #else
 a_HASH   x = A# x
-pACK_STR x = _packCString x
+pACK_STR x = mkFastCharString x --_packCString x
 #endif
 \end{code}
 
@@ -428,15 +428,15 @@ pprInstr (LABEL clab)
     ]
 
 pprInstr (ASCII False{-no backslash conversion-} str)
-  = uppBesides [ uppStr "\t.asciz \"", uppStr str, uppChar '"' ]
+  = uppBesides [ uppPStr SLIT("\t.asciz \""), uppStr str, uppChar '"' ]
 
 pprInstr (ASCII True str)
-  = uppBeside (uppStr "\t.ascii \"") (asciify str 60)
+  = uppBeside (uppPStr SLIT("\t.ascii \"")) (asciify str 60)
   where
     asciify :: String -> Int -> Unpretty
 
-    asciify [] _ = uppStr ("\\0\"")
-    asciify s     n | n <= 0 = uppBeside (uppStr "\"\n\t.ascii \"") (asciify s 60)
+    asciify [] _ = uppPStr SLIT("\\0\"")
+    asciify s     n | n <= 0 = uppBeside (uppPStr SLIT("\"\n\t.ascii \"")) (asciify s 60)
     asciify ('\\':cs)      n = uppBeside (uppStr "\\\\") (asciify cs (n-1))
     asciify ('\"':cs)      n = uppBeside (uppStr "\\\"") (asciify cs (n-1))
     asciify (c:cs) n | isPrint c = uppBeside (uppChar c) (asciify cs (n-1))

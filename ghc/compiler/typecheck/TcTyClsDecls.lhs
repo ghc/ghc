@@ -248,7 +248,7 @@ get_tys tys
 get_sigs sigs
   = unionManyUniqSets (map get_sig sigs)
   where 
-    get_sig (ClassOpSig _ ty _ _) = get_ty ty
+    get_sig (ClassOpSig _ _ ty _) = get_ty ty
     get_sig other = panic "TcTyClsDecls:get_sig"
 
 set_name name = unitUniqSet (uniqueOf name)
@@ -306,9 +306,9 @@ get_binders1 (ClD (ClassDecl _ name tyvar sigs _ _ _))
 
 sigs_tvs sigs = unionManyBags (map sig_tvs sigs)
   where 
-    sig_tvs (ClassOpSig _ ty  _ _) = pty_tvs ty
-    pty_tvs (HsForAllTy tvs _ _)   = listToBag tvs 	-- tvs doesn't include the class tyvar
-    pty_tvs other		   = emptyBag
+    sig_tvs (ClassOpSig _ _ ty _) = pty_tvs ty
+    pty_tvs (HsForAllTy tvs _ _)  = listToBag tvs 	-- tvs doesn't include the class tyvar
+    pty_tvs other		  = emptyBag
 \end{code}
 
 

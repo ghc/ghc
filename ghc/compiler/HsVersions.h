@@ -36,6 +36,7 @@ you will screw up the layout where they are used in case expressions!
 # define _GT GT
 # define _Addr GHCbase.Addr
 # define Text Show
+# define IMP_FASTSTRING()
 # define IMP_Ubiq() IMPORT_DELOOPER(Ubiq); import qualified GHCbase
 # define CHK_Ubiq() IMPORT_DELOOPER(Ubiq); import qualified GHCbase
 # define minInt (minBound::Int)
@@ -45,8 +46,9 @@ you will screw up the layout where they are used in case expressions!
 # define EXP_MODULE(a) a..
 # define IMPORT_DELOOPER(mod) import mod
 # define IMPORT_1_3(mod) {--}
-# define IMP_Ubiq() IMPORT_DELOOPER(Ubiq)
-# define CHK_Ubiq() IMPORT_DELOOPER(Ubiq)
+# define IMP_FASTSTRING() import FastString
+# define IMP_Ubiq() IMPORT_DELOOPER(Ubiq) ; import FastString
+# define CHK_Ubiq() IMPORT_DELOOPER(Ubiq) ; import FastString
 #endif
 
 #if __GLASGOW_HASKELL__ >= 26 && __GLASGOW_HASKELL__ < 200
@@ -107,21 +109,21 @@ you will screw up the layout where they are used in case expressions!
 #if __GLASGOW_HASKELL__ >= 23
 # define USE_FAST_STRINGS 1
 # if __GLASGOW_HASKELL__ < 200
-#  define FAST_STRING	_PackedString
-#  define SLIT(x)	(_packCString (A# x#))
+#  define FAST_STRING	FastString {-_PackedString -}
+#  define SLIT(x)	(mkFastCharString (A# (x#))) {- (_packCString (A# x#)) -}
 #  define _CMP_STRING_	cmpPString
 	/* cmpPString defined in utils/Util.lhs */
-#  define _NULL_	_nullPS
-#  define _NIL_		_nilPS
-#  define _CONS_	_consPS
-#  define _HEAD_	_headPS
-#  define _TAIL_	_tailPS
-#  define _LENGTH_	_lengthPS
-#  define _PK_		_packString
-#  define _UNPK_	_unpackPS
-#  define _SUBSTR_	_substrPS
-#  define _APPEND_	`_appendPS`
-#  define _CONCAT_	_concatPS
+#  define _NULL_	nullFastString {-_nullPS-}
+#  define _NIL_		(mkFastString "") {-_nilPS -}
+#  define _CONS_	consFS {-_consPS-}
+#  define _HEAD_	headFS {-_headPS-}
+#  define _TAIL_	tailFS {-_tailPS-} 
+#  define _LENGTH_	lengthFS {-_lengthPS-}
+#  define _PK_		mkFastString {-_packString-}
+#  define _UNPK_	unpackFS {-_unpackPS-}
+     /* #  define _SUBSTR_	_substrPS */
+#  define _APPEND_	`appendFS` {-`_appendPS`-}
+#  define _CONCAT_	concatFS {-_concatPS-}
 # else
 #  define FAST_STRING	GHCbase.PackedString
 #  define SLIT(x)	(packCString (GHCbase.A# x#))

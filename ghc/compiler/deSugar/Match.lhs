@@ -153,31 +153,27 @@ And gluing the ``success expressions'' together isn't quite so pretty.
 
 \begin{code}
 match [] eqns_info shadows
-  = pin_eqns eqns_info		`thenDs` \ match_result@(MatchResult _ _ _ cxt) ->
+  = complete_matches eqns_info (any eqn_cant_fail shadows)
+  where
+    complete_matches [eqn] is_shadowed 
+	= complete_match eqn is_shadowed
+ 
+    complete_matches (eqn:eqns) is_shadowed
+	= complete_match eqn is_shadowed 				`thenDs` \ match_result1 ->
+	  complete_matches eqns (is_shadowed || eqn_cant_fail eqn)	`thenDs` \ match_result2 ->
+	  combineMatchResults match_result1 match_result2
 
 	-- If at this stage we find that at least one of the shadowing
 	-- equations is guaranteed not to fail, then warn of an overlapping pattern
-    if not (all shadow_can_fail shadows) then
-	dsShadowError cxt 	`thenDs` \ _ ->
-	returnDs match_result
-    else
-	returnDs match_result
+    complete_match (EqnInfo [] match_result@(MatchResult _ _ _ cxt)) is_shadowed
+	| is_shadowed = dsShadowWarn cxt 	`thenDs` \ _ ->
+			returnDs match_result
 
-  where
-    pin_eqns [EqnInfo [] match_result] = returnDs match_result
-      -- Last eqn... can't have pats ...
+	| otherwise   = returnDs match_result
 
-    pin_eqns (EqnInfo [] match_result1 : more_eqns)
-      = pin_eqns more_eqns 			`thenDs` \ match_result2 ->
-	combineMatchResults match_result1 match_result2
-
-    pin_eqns other_pat = panic "match: pin_eqns"
-
-    shadow_can_fail :: EquationInfo -> Bool
-
-    shadow_can_fail (EqnInfo [] (MatchResult CanFail  _ _ _)) = True
-    shadow_can_fail (EqnInfo [] (MatchResult CantFail _ _ _)) = False
-    shadow_can_fail other = panic "match:shadow_can_fail"
+    eqn_cant_fail :: EquationInfo -> Bool
+    eqn_cant_fail (EqnInfo [] (MatchResult CanFail  _ _ _)) = False
+    eqn_cant_fail (EqnInfo [] (MatchResult CantFail _ _ _)) = True
 \end{code}
 
 %************************************************************************
@@ -253,6 +249,8 @@ Replace the `as' pattern @x@@p@ with the pattern p and a binding @x = v@.
 Removing lazy (irrefutable) patterns (you don't want to know...).
 \item
 Converting explicit tuple- and list-pats into ordinary @ConPats@.
+\item
+Convert the literal pat "" to [].
 \end{itemize}
 
 The result of this tidying is that the column of patterns will include
@@ -395,6 +393,7 @@ tidy1 v pat@(LitPat lit lit_ty) match_result
 
 -- NPats: we *might* be able to replace these w/ a simpler form
 
+
 tidy1 v pat@(NPat lit lit_ty _) match_result
   = returnDs (better_pat, match_result)
   where
@@ -405,6 +404,10 @@ tidy1 v pat@(NPat lit lit_ty _) match_result
       | lit_ty `eqTy` addrTy   = ConPat addrDataCon   lit_ty [LitPat (mk_addr lit)   addrPrimTy]
       | lit_ty `eqTy` floatTy  = ConPat floatDataCon  lit_ty [LitPat (mk_float lit)  floatPrimTy]
       | lit_ty `eqTy` doubleTy = ConPat doubleDataCon lit_ty [LitPat (mk_double lit) doublePrimTy]
+
+		-- Convert the literal pattern "" to the constructor pattern [].
+      | null_str_lit lit       = ConPat nilDataCon    lit_ty [] 
+
       | otherwise	   = pat
 
     mk_int    (HsInt i)      = HsIntPrim i
@@ -424,6 +427,9 @@ tidy1 v pat@(NPat lit lit_ty _) match_result
     mk_double (HsInt i)      = HsDoublePrim (fromInteger i)
     mk_double (HsFrac f)     = HsDoublePrim f
     mk_double l@(HsLitLit s) = l
+
+    null_str_lit (HsString s) = _NULL_ s
+    null_str_lit other_lit    = False
 
 -- and everything else goes through unchanged...
 
@@ -608,7 +614,7 @@ matchWrapper kind [(PatMatch (WildPat ty) match)] error_string
 
 matchWrapper kind [(GRHSMatch
 		     (GRHSsAndBindsOut [OtherwiseGRHS expr _] binds _))] error_string
-  = dsBinds False binds	`thenDs` \ core_binds ->
+  = dsBinds binds	`thenDs` \ core_binds ->
     dsExpr  expr	`thenDs` \ core_expr ->
     returnDs ([], mkCoLetsAny core_binds core_expr)
 
@@ -622,8 +628,14 @@ matchWrapper kind matches error_string
     match new_vars eqns_info []				`thenDs` \ match_result ->
 
     mkErrorAppDs pAT_ERROR_ID result_ty error_string	`thenDs` \ fail_expr ->
-    extractMatchResult match_result fail_expr		`thenDs` \ result_expr ->
 
+	-- Check for incomplete pattern match
+    (case match_result of
+	MatchResult CanFail result_ty match_fn cxt -> dsIncompleteWarn cxt
+	other					   -> returnDs ()
+    )							`thenDs` \ _ ->
+
+    extractMatchResult match_result fail_expr		`thenDs` \ result_expr ->
     returnDs (new_vars, result_expr)
 \end{code}
 
@@ -664,8 +676,8 @@ matchSimply scrut_expr pat result_ty result_expr msg
 extractMatchResult (MatchResult CantFail _ match_fn _) fail_expr
   = returnDs (match_fn (error "It can't fail!"))
 
-extractMatchResult (MatchResult CanFail result_ty match_fn _) fail_expr
-  = mkFailurePair result_ty 	`thenDs` \ (fail_bind_fn, if_it_fails) ->
+extractMatchResult (MatchResult CanFail result_ty match_fn cxt) fail_expr
+  = mkFailurePair result_ty	 	`thenDs` \ (fail_bind_fn, if_it_fails) ->
     returnDs (Let (fail_bind_fn fail_expr) (match_fn if_it_fails))
 \end{code}
 
@@ -699,7 +711,7 @@ flattenMatches kind (match : matches)
       = flatten_match (pat:pats_so_far) match
 
     flatten_match pats_so_far (GRHSMatch (GRHSsAndBindsOut grhss binds ty))
-      = dsBinds False binds			`thenDs` \ core_binds ->
+      = dsBinds binds				`thenDs` \ core_binds ->
 	dsGRHSs ty kind pats grhss 		`thenDs` \ match_result ->
 	returnDs (EqnInfo pats (mkCoLetsMatchResult core_binds match_result))
       where
@@ -707,12 +719,14 @@ flattenMatches kind (match : matches)
 
     flatten_match pats_so_far (SimpleMatch expr) 
       = dsExpr expr		`thenDs` \ core_expr ->
+	getSrcLocDs		`thenDs` \ locn ->
 	returnDs (EqnInfo pats
 		    (MatchResult CantFail (coreExprType core_expr) 
 			      (\ ignore -> core_expr)
-			      NoMatchContext))
-	-- The NoMatchContext is just a place holder.  In a simple match,
-	-- the matching can't fail, so we won't generate an error message.
-      where
-	pats = reverse pats_so_far	-- They've accumulated in reverse order
+			      (DsMatchContext kind pats locn)))
+
+	 -- the matching can't fail, so we won't generate an error message.
+        where
+	 pats = reverse pats_so_far	-- They've accumulated in reverse order
+
 \end{code}

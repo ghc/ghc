@@ -1,0 +1,8 @@
+_interface_ Id 1
+_exports_
+
+_declarations_
+
+1 type Id = Id.GenId Type.Type ;
+1 data GenId ty ;
+

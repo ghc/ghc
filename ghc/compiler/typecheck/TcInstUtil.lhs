@@ -20,7 +20,7 @@ import HsSyn		( MonoBinds, Fake, InPat, Sig )
 import RnHsSyn		( SYN_IE(RenamedMonoBinds), RenamedSig(..), 
 			  RenamedInstancePragmas(..) )
 
-import TcEnv		( tcLookupGlobalValueMaybe )
+import TcEnv		( tcAddImportedIdInfo )
 import TcMonad
 import Inst		( SYN_IE(InstanceMapper) )
 
@@ -30,7 +30,7 @@ import Class		( GenClass, GenClassOp, SYN_IE(ClassInstEnv),
 			  SYN_IE(ClassOp)
 			)
 import CoreSyn		( GenCoreExpr(..), mkValLam, mkTyApp )
-import Id		( GenId, mkDictFunId, mkConstMethodId, mkSysLocal, replaceIdInfo, getIdInfo )
+import Id		( GenId, mkDictFunId, mkConstMethodId, mkSysLocal )
 import MatchEnv		( nullMEnv, insertMEnv )
 import Maybes		( MaybeErr(..), mkLookupFunDef )
 import Name		( getSrcLoc, Name{--O only-} )
@@ -45,7 +45,6 @@ import Unique		( Unique )
 import Util		( equivClasses, zipWithEqual, panic{-, pprTrace-} )
 --import PprStyle
 
-import IdInfo		( noIdInfo )
 --import TcPragmas	( tcDictFunPragmas, tcGenPragmas )
 \end{code}
 
@@ -84,17 +83,8 @@ mkInstanceRelatedIds :: Name		-- Name to use for the dict fun;
 		     -> NF_TcM s (Id, ThetaType)
 
 mkInstanceRelatedIds dfun_name clas inst_tyvars inst_ty inst_decl_theta
-  = tcLookupGlobalValueMaybe dfun_name	`thenNF_Tc` \ maybe_id ->
-    let
-	-- Extract the dfun's IdInfo from the interface file,
-	-- provided it's imported.
-	-- We have to be lazy here; people look at the dfun Id itself
-	dfun_info = case maybe_id of
-			Nothing		      -> noIdInfo
-			Just imported_dfun_id -> getIdInfo imported_dfun_id
-    in
-    returnNF_Tc (new_dfun_id `replaceIdInfo` dfun_info, dfun_theta)
-
+  = tcAddImportedIdInfo dfun_id			`thenNF_Tc` \ new_dfun_id ->
+    returnNF_Tc (new_dfun_id, dfun_theta)
   where
     (_, super_classes, _, _, _, _) = classBigSig clas
     super_class_theta = super_classes `zip` repeat inst_ty
@@ -110,7 +100,7 @@ mkInstanceRelatedIds dfun_name clas inst_tyvars inst_ty inst_decl_theta
 
     dfun_ty = mkSigmaTy inst_tyvars dfun_theta (mkDictTy clas inst_ty)
 
-    new_dfun_id = mkDictFunId dfun_name dfun_ty clas inst_ty
+    dfun_id = mkDictFunId dfun_name dfun_ty clas inst_ty
 \end{code}
 
 
@@ -239,10 +229,10 @@ addClassInstance
 dupInstFailure clas info1@(ty1, locn1) info2@(ty2, locn2)
 	-- Overlapping/duplicate instances for given class; msg could be more glamourous
   = tcAddErrCtxt ctxt $
-    failTc (\sty -> ppStr "Duplicate or overlapping instance declarations")
+    failTc (\sty -> ppPStr SLIT("Duplicate or overlapping instance declarations"))
   where
-    ctxt sty = ppHang (ppSep [ppBesides[ppStr "Class `", ppr sty clas, ppStr "'"],
-			      ppBesides[ppStr "type `", ppr sty ty1, ppStr "'"]])
-		    4 (ppSep [ppBesides [ppStr "at ", ppr sty locn1],
-		    	      ppBesides [ppStr "and ", ppr sty locn2]])
+    ctxt sty = ppHang (ppSep [ppBesides[ppPStr SLIT("Class `"), ppr sty clas, ppChar '\''],
+			      ppBesides[ppPStr SLIT("type `"), ppr sty ty1, ppChar '\'']])
+		    4 (ppSep [ppBesides [ppPStr SLIT("at "), ppr sty locn1],
+		    	      ppBesides [ppPStr SLIT("and "), ppr sty locn2]])
 \end{code}

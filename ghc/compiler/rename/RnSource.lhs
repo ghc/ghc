@@ -21,12 +21,14 @@ import HsCore
 import CmdLineOpts	( opt_IgnoreIfacePragmas )
 
 import RnBinds		( rnTopBinds, rnMethodBinds )
-import RnEnv		( bindTyVarsRn, lookupRn, lookupOccRn, lookupImplicitOccRn, bindLocalsRn,
-			  lookupOptionalOccRn, newDfunName, 
+import RnEnv		( bindTyVarsRn, lookupBndrRn, lookupOccRn, lookupImplicitOccRn, bindLocalsRn,
+			  lookupOptionalOccRn, newSysName, newDfunName,
 			  listType_RDR, tupleType_RDR )
 import RnMonad
 
-import Name		( Name, isLocallyDefined, occNameString,
+import Name		( Name, isLocallyDefined, 
+			  OccName(..), occNameString, prefixOccName,
+			  ExportFlag(..),
 			  Provenance,
 			  SYN_IE(NameSet), unionNameSets, emptyNameSet, mkNameSet, unitNameSet,
 			  elemNameSet
@@ -84,7 +86,7 @@ rnDecl (ValD binds) = rnTopBinds binds	`thenRn` \ new_binds ->
 
 rnDecl (SigD (IfaceSig name ty id_infos loc))
   = pushSrcLocRn loc $
-    lookupRn name		`thenRn` \ name' ->
+    lookupBndrRn name		`thenRn` \ name' ->
     rnHsType ty			`thenRn` \ ty' ->
 
 	-- Get the pragma info, unless we should ignore it
@@ -118,7 +120,7 @@ checks at the same time.
 \begin{code}
 rnDecl (TyD (TyData context tycon tyvars condecls derivings pragmas src_loc))
   = pushSrcLocRn src_loc $
-    lookupRn tycon		    		`thenRn` \ tycon' ->
+    lookupBndrRn tycon		    		`thenRn` \ tycon' ->
     bindTyVarsRn "data declaration" tyvars	$ \ tyvars' ->
     rnContext context   			`thenRn` \ context' ->
     mapRn rnConDecl condecls			`thenRn` \ condecls' ->
@@ -128,7 +130,7 @@ rnDecl (TyD (TyData context tycon tyvars condecls derivings pragmas src_loc))
 
 rnDecl (TyD (TyNew context tycon tyvars condecl derivings pragmas src_loc))
   = pushSrcLocRn src_loc $
-    lookupRn tycon				`thenRn` \ tycon' ->
+    lookupBndrRn tycon				`thenRn` \ tycon' ->
     bindTyVarsRn "newtype declaration" tyvars 	$ \ tyvars' ->
     rnContext context				`thenRn` \ context' ->
     rnConDecl condecl				`thenRn` \ condecl' ->
@@ -138,7 +140,7 @@ rnDecl (TyD (TyNew context tycon tyvars condecl derivings pragmas src_loc))
 
 rnDecl (TyD (TySynonym name tyvars ty src_loc))
   = pushSrcLocRn src_loc $
-    lookupRn name				`thenRn` \ name' ->
+    lookupBndrRn name				`thenRn` \ name' ->
     bindTyVarsRn "type declaration" tyvars 	$ \ tyvars' ->
     rnHsType ty	    				`thenRn` \ ty' ->
     returnRn (TyD (TySynonym name' tyvars' ty' src_loc))
@@ -159,15 +161,22 @@ rnDecl (ClD (ClassDecl context cname tyvar sigs mbinds pragmas src_loc))
   = pushSrcLocRn src_loc $
     bindTyVarsRn "class declaration" [tyvar]		$ \ [tyvar'] ->
     rnContext context	    				`thenRn` \ context' ->
-    lookupRn cname					`thenRn` \ cname' ->
+    lookupBndrRn cname					`thenRn` \ cname' ->
     mapRn (rn_op cname' (getTyVarName tyvar')) sigs	`thenRn` \ sigs' ->
     rnMethodBinds mbinds				`thenRn` \ mbinds' ->
     ASSERT(isNoClassPragmas pragmas)
     returnRn (ClD (ClassDecl context' cname' tyvar' sigs' mbinds' NoClassPragmas src_loc))
   where
-    rn_op clas clas_tyvar sig@(ClassOpSig op ty pragmas locn)
+    rn_op clas clas_tyvar sig@(ClassOpSig op _ ty locn)
       = pushSrcLocRn locn $
-	lookupRn op			`thenRn` \ op_name ->
+	let
+		dm_occ = prefixOccName SLIT("$m") (rdrNameOcc op)
+	in
+	lookupBndrRn op				`thenRn` \ op_name ->
+	newSysName dm_occ Exported locn		`thenRn` \ dm_name ->
+        addOccurrenceName Optional dm_name	`thenRn_`
+		-- Call up interface info for default method, if such info exists
+	
 	rnHsType ty			`thenRn` \ new_ty  ->
 	let
 	    (ctxt, op_ty) = case new_ty of
@@ -187,8 +196,8 @@ rnDecl (ClD (ClassDecl context cname tyvar sigs mbinds pragmas src_loc))
 		(classTyVarInOpCtxtErr clas_tyvar sig)
 							 `thenRn_`
 
-	ASSERT(isNoClassOpPragmas pragmas)
-	returnRn (ClassOpSig op_name new_ty noClassOpPragmas locn)
+--	ASSERT(isNoClassOpPragmas pragmas)
+	returnRn (ClassOpSig op_name dm_name new_ty locn)
 \end{code}
 
 
@@ -199,42 +208,39 @@ rnDecl (ClD (ClassDecl context cname tyvar sigs mbinds pragmas src_loc))
 %*********************************************************
 
 \begin{code}
-rnDecl (InstD (InstDecl inst_ty mbinds uprags maybe_dfun_name src_loc))
+rnDecl (InstD (InstDecl inst_ty mbinds uprags maybe_dfun src_loc))
   = pushSrcLocRn src_loc $
-    rnHsType inst_ty			`thenRn` \ inst_ty' ->
-    rnMethodBinds mbinds		`thenRn` \ mbinds' ->
-    mapRn rn_uprag uprags		`thenRn` \ new_uprags ->
-    rn_dfun maybe_dfun_name		`thenRn` \ dfun_name' ->
+    rnHsType inst_ty				`thenRn` \ inst_ty' ->
+    rnMethodBinds mbinds			`thenRn` \ mbinds' ->
+    mapRn rn_uprag uprags			`thenRn` \ new_uprags ->
 
-    returnRn (InstD (InstDecl inst_ty' mbinds' new_uprags dfun_name' src_loc))
+    newDfunName maybe_dfun src_loc		`thenRn` \ dfun_name ->
+    addOccurrenceName Compulsory dfun_name	`thenRn_`
+			-- The dfun is not optional, because we use its version number
+			-- to identify the version of the instance declaration
+
+    returnRn (InstD (InstDecl inst_ty' mbinds' new_uprags (Just dfun_name) src_loc))
   where
-    rn_dfun Nothing  = newDfunName src_loc	`thenRn` \ n' ->
-		       returnRn (Just n')
-    rn_dfun (Just n) = lookupOccRn n		`thenRn` \ n' ->
-				-- The dfun is not optional, because we use its version number
-				-- to identify the version of the instance declaration
-		       returnRn (Just n')
-
     rn_uprag (SpecSig op ty using locn)
       = pushSrcLocRn src_loc $
-	lookupRn op			`thenRn` \ op_name ->
+	lookupBndrRn op			`thenRn` \ op_name ->
 	rnHsType ty			`thenRn` \ new_ty ->
 	rn_using using			`thenRn` \ new_using ->
 	returnRn (SpecSig op_name new_ty new_using locn)
 
     rn_uprag (InlineSig op locn)
       = pushSrcLocRn locn $
-	lookupRn op			`thenRn` \ op_name ->
+	lookupBndrRn op			`thenRn` \ op_name ->
 	returnRn (InlineSig op_name locn)
 
     rn_uprag (DeforestSig op locn)
       = pushSrcLocRn locn $
-	lookupRn op			`thenRn` \ op_name ->
+	lookupBndrRn op			`thenRn` \ op_name ->
 	returnRn (DeforestSig op_name locn)
 
     rn_uprag (MagicUnfoldingSig op str locn)
       = pushSrcLocRn locn $
-	lookupRn op			`thenRn` \ op_name ->
+	lookupBndrRn op			`thenRn` \ op_name ->
 	returnRn (MagicUnfoldingSig op_name str locn)
 
     rn_using Nothing  = returnRn Nothing
@@ -294,13 +300,13 @@ rnConDecl :: RdrNameConDecl -> RnMS s RenamedConDecl
 rnConDecl (ConDecl name tys src_loc)
   = pushSrcLocRn src_loc $
     checkConName name		`thenRn_` 
-    lookupRn name		`thenRn` \ new_name ->
+    lookupBndrRn name		`thenRn` \ new_name ->
     mapRn rnBangTy tys		`thenRn` \ new_tys  ->
     returnRn (ConDecl new_name new_tys src_loc)
 
 rnConDecl (ConOpDecl ty1 op ty2 src_loc)
   = pushSrcLocRn src_loc $
-    lookupRn op			`thenRn` \ new_op  ->
+    lookupBndrRn op			`thenRn` \ new_op  ->
     rnBangTy ty1  		`thenRn` \ new_ty1 ->
     rnBangTy ty2  		`thenRn` \ new_ty2 ->
     returnRn (ConOpDecl new_ty1 new_op new_ty2 src_loc)
@@ -308,18 +314,18 @@ rnConDecl (ConOpDecl ty1 op ty2 src_loc)
 rnConDecl (NewConDecl name ty src_loc)
   = pushSrcLocRn src_loc $
     checkConName name		`thenRn_` 
-    lookupRn name		`thenRn` \ new_name ->
+    lookupBndrRn name		`thenRn` \ new_name ->
     rnHsType ty			`thenRn` \ new_ty  ->
     returnRn (NewConDecl new_name new_ty src_loc)
 
 rnConDecl (RecConDecl name fields src_loc)
   = pushSrcLocRn src_loc $
-    lookupRn name		`thenRn` \ new_name ->
+    lookupBndrRn name		`thenRn` \ new_name ->
     mapRn rnField fields	`thenRn` \ new_fields ->
     returnRn (RecConDecl new_name new_fields src_loc)
 
 rnField (names, ty)
-  = mapRn lookupRn names	`thenRn` \ new_names ->
+  = mapRn lookupBndrRn names	`thenRn` \ new_names ->
     rnBangTy ty			`thenRn` \ new_ty ->
     returnRn (new_names, new_ty) 
 
@@ -542,6 +548,10 @@ rnCoreBndrs bndrs thing_inside		-- Expect them all to be ValBinders
   where
     names = map (\ (UfValBinder name _) -> name) bndrs
     tys   = map (\ (UfValBinder _   ty) -> ty)   bndrs
+
+rnCoreBndrNamess names thing_inside
+  = bindLocalsRn "unfolding value" names $ \ names' ->
+    thing_inside names'
 \end{code}    
 
 \begin{code}
@@ -555,9 +565,9 @@ rnCoreAlts (UfAlgAlts alts deflt)
     rnCoreDefault deflt		`thenRn` \ deflt' ->
     returnRn (UfAlgAlts alts' deflt')
   where
-    rn_alt (con, bndrs, rhs) =	lookupOptionalOccRn con	`thenRn` \ con' ->
-				rnCoreBndrs bndrs	$ \ bndrs' ->
-				rnCoreExpr rhs		`thenRn` \ rhs' ->
+    rn_alt (con, bndrs, rhs) =	lookupOptionalOccRn con			`thenRn` \ con' ->
+				bindLocalsRn "unfolding alt" bndrs	$ \ bndrs' ->
+				rnCoreExpr rhs				`thenRn` \ rhs' ->
 				returnRn (con', bndrs', rhs')
 
 rnCoreAlts (UfPrimAlts alts deflt)
@@ -569,8 +579,8 @@ rnCoreAlts (UfPrimAlts alts deflt)
 			returnRn (lit, rhs')
 
 rnCoreDefault UfNoDefault = returnRn UfNoDefault
-rnCoreDefault (UfBindDefault bndr rhs) = rnCoreBndr bndr	$ \ bndr' ->
-					 rnCoreExpr rhs		`thenRn` \ rhs' ->
+rnCoreDefault (UfBindDefault bndr rhs) = bindLocalsRn "unfolding default" [bndr]	$ \ [bndr'] ->
+					 rnCoreExpr rhs					`thenRn` \ rhs' ->
 				  	 returnRn (UfBindDefault bndr' rhs')
 
 rnCoercion (UfIn  n) = lookupOptionalOccRn n `thenRn` \ n' -> returnRn (UfIn  n')
@@ -594,23 +604,27 @@ rnCorePrim (UfCCallOp str casm gc arg_tys res_ty)
 
 \begin{code}
 derivingNonStdClassErr clas sty
-  = ppCat [ppStr "non-standard class in deriving:", ppr sty clas]
+  = ppCat [ppPStr SLIT("non-standard class in deriving:"), ppr sty clas]
 
 classTyVarNotInOpTyErr clas_tyvar sig sty
-  = ppHang (ppBesides [ppStr "Class type variable `", ppr sty clas_tyvar, ppStr "' does not appear in method signature:"])
+  = ppHang (ppBesides [ppPStr SLIT("Class type variable `"), 
+		       ppr sty clas_tyvar, 
+		       ppPStr SLIT("' does not appear in method signature:")])
 	 4 (ppr sty sig)
 
 classTyVarInOpCtxtErr clas_tyvar sig sty
-  = ppHang (ppBesides [ ppStr "Class type variable `", ppr sty clas_tyvar, 
-			ppStr "' present in method's local overloading context:"])
+  = ppHang (ppBesides [ ppPStr SLIT("Class type variable `"), ppr sty clas_tyvar, 
+			ppPStr SLIT("' present in method's local overloading context:")])
 	 4 (ppr sty sig)
 
 dupClassAssertWarn ctxt dups sty
-  = ppHang (ppBesides [ppStr "Duplicate class assertion `", ppr sty dups, ppStr "' in context:"])
+  = ppHang (ppBesides [ppPStr SLIT("Duplicate class assertion `"), 
+		       ppr sty dups, 
+		       ppPStr SLIT("' in context:")])
 	 4 (ppr sty ctxt)
 
 badDataCon name sty
-   = ppCat [ppStr "Illegal data constructor name:", ppr sty name]
+   = ppCat [ppPStr SLIT("Illegal data constructor name:"), ppr sty name]
 \end{code}
 
 

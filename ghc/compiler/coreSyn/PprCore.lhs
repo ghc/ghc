@@ -95,11 +95,20 @@ init_ppr_env sty tvbndr pbdr1 pbdr2 pocc
 	(Just (pprParendGenType sty)) -- types
 	(Just (ppr sty))	-- usages
   where
+
+    ppr_con con = ppr sty con
+
+{-	[We now use Con {a,b,c} for Con expressions. SLPJ March 97.]
+	[We can't treat them as ordinary applications because the Con doesn't have
+	 dictionaries in it, whereas the constructor Id does.]
+
+	OLD VERSION: 
 	-- ppr_con is used when printing Con expressions; we add a "!" 
 	-- to distinguish them from ordinary applications.  But not when
 	-- printing for interfaces, where they are treated as ordinary applications
     ppr_con con | ifaceStyle sty = ppr sty con
 	        | otherwise	 = ppr sty con `ppBeside` ppChar '!'
+-}
 
 	-- We add a "!" to distinguish Primitive applications from ordinary applications.  
 	-- But not when printing for interfaces, where they are treated 
@@ -113,9 +122,9 @@ pprCoreBinding sty (NonRec binder expr)
     	 4 (pprCoreExpr sty (pprBigCoreBinder sty) (pprBabyCoreBinder sty) (ppr sty) expr)
 
 pprCoreBinding sty (Rec binds)
-  = ppAboves [ifPprDebug sty (ppStr "{- plain Rec -}"),
+  = ppAboves [ifPprDebug sty (ppPStr SLIT("{- plain Rec -}")),
 	      ppAboves (map ppr_bind binds),
-	      ifPprDebug sty (ppStr "{- end plain Rec -}")]
+	      ifPprDebug sty (ppPStr SLIT("{- end plain Rec -}"))]
   where
     ppr_bind (binder, expr)
       = ppHang (ppCat [pprBigCoreBinder sty binder, ppEquals])
@@ -163,7 +172,7 @@ pprIfaceUnfolding = ppr_expr env
   where
     env = init_ppr_env PprInterface (pprTyVarBndr PprInterface)
 				    (pprTypedCoreBinder PprInterface)
-				    (pprTypedCoreBinder PprInterface)
+				    (ppr PprInterface)
 				    (ppr PprInterface)
 
 ppr_core_arg sty pocc arg
@@ -252,11 +261,10 @@ ppr_parend_expr pe expr
 \begin{code}
 ppr_expr pe (Var name)   = pOcc pe name
 ppr_expr pe (Lit lit)    = pLit pe lit
-ppr_expr pe (Con con []) = pCon pe con
 
 ppr_expr pe (Con con args)
   = ppHang (pCon pe con)
-	 4 (ppSep (map (ppr_arg pe) args))
+	 4 (ppCurlies $ ppSep (map (ppr_arg pe) args))
 
 ppr_expr pe (Prim prim args)
   = ppHang (pPrim pe prim)
@@ -268,12 +276,12 @@ ppr_expr pe expr@(Lam _ _)
     in
     ppHang (ppCat [pp_vars SLIT("/u\\") (pUVar    pe) uvars,
 		   pp_vars SLIT("_/\\_")  (pTyVarB  pe) tyvars,
-		   pp_vars SLIT("\\")   (pMinBndr pe) vars])
+		   pp_vars SLIT("\\")   (pMajBndr pe) vars])
 	 4 (ppr_expr pe body)
   where
     pp_vars lam pp [] = ppNil
     pp_vars lam pp vs
-      = ppCat [ppPStr lam, ppInterleave ppSP (map pp vs), ppStr "->"]
+      = ppCat [ppPStr lam, ppInterleave ppSP (map pp vs), ppPStr SLIT("->")]
 
 ppr_expr pe expr@(App fun arg)
   = let
@@ -288,18 +296,22 @@ ppr_expr pe (Case expr alts)
     -- johan thinks that single case patterns should be on same line as case,
     -- and no indent; all sane persons agree with him.
   = let
-	ppr_alt (AlgAlts  [] (BindDefault n _)) = ppBeside (pMinBndr pe n) (ppStr " ->")
-	ppr_alt (PrimAlts [] (BindDefault n _)) = ppBeside (pMinBndr pe n) (ppStr " ->")
-	ppr_alt (PrimAlts ((l, _):[]) NoDefault)= ppBeside (pLit pe l)	   (ppStr " ->")
+
+	ppr_alt (AlgAlts  [] (BindDefault n _)) = ppBeside (pMinBndr pe n) ppr_arrow
+	ppr_alt (PrimAlts [] (BindDefault n _)) = ppBeside (pMinBndr pe n) ppr_arrow
+	ppr_alt (PrimAlts ((l, _):[]) NoDefault)= ppBeside (pLit pe l)	   ppr_arrow
 	ppr_alt (AlgAlts  ((con, params, _):[]) NoDefault)
 	  = ppCat [pCon pe con,
 		   ppInterleave ppSP (map (pMinBndr pe) params),
-		   ppStr "->"]
+		   ppr_arrow]
 
 	ppr_rhs (AlgAlts [] (BindDefault _ expr))   = ppr_expr pe expr
 	ppr_rhs (AlgAlts ((_,_,expr):[]) NoDefault) = ppr_expr pe expr
 	ppr_rhs (PrimAlts [] (BindDefault _ expr))  = ppr_expr pe expr
 	ppr_rhs (PrimAlts ((_,expr):[]) NoDefault)  = ppr_expr pe expr
+
+
+        ppr_arrow = ppPStr SLIT(" ->")
     in 
     ppSep
     [ppSep [pp_keyword, ppNest 4 (ppr_expr pe expr), ppStr "of {", ppr_alt alts],
@@ -307,7 +319,7 @@ ppr_expr pe (Case expr alts)
 
   | otherwise -- default "case" printing
   = ppSep
-    [ppSep [pp_keyword, ppNest 4 (ppr_expr pe expr), ppStr "of {"],
+    [ppSep [pp_keyword, ppNest 4 (ppr_expr pe expr), ppPStr SLIT("of {")],
      ppNest 2 (ppr_alts pe alts),
      ppStr "}"]
   where
@@ -320,27 +332,27 @@ ppr_expr pe (Case expr alts)
 
 ppr_expr pe (Let bind@(NonRec val_bdr rhs@(Let _ _)) body)
   = ppAboves [
-      ppCat [ppStr "let {", pMajBndr pe val_bdr, ppEquals],
+      ppCat [ppPStr SLIT("let {"), pMajBndr pe val_bdr, ppEquals],
       ppNest 2 (ppr_expr pe rhs),
-      ppStr "} in",
+      ppPStr SLIT("} in"),
       ppr_expr pe body ]
 
 ppr_expr pe (Let bind@(NonRec val_bdr rhs) expr@(Let _ _))
   = ppAbove
-      (ppHang (ppStr "let {")
+      (ppHang (ppPStr SLIT("let {"))
 	    2 (ppCat [ppHang (ppCat [pMajBndr pe val_bdr, ppEquals])
 			   4 (ppr_expr pe rhs),
-       ppStr "} in"]))
+       ppPStr SLIT("} in")]))
       (ppr_expr pe expr)
 
 -- general case (recursive case, too)
 ppr_expr pe (Let bind expr)
-  = ppSep [ppHang (ppStr keyword) 2 (ppr_bind pe bind),
-	   ppHang (ppStr "} in ") 2 (ppr_expr pe expr)]
+  = ppSep [ppHang (ppPStr keyword) 2 (ppr_bind pe bind),
+	   ppHang (ppPStr SLIT("} in ")) 2 (ppr_expr pe expr)]
   where
     keyword = case bind of
-		Rec _      -> "letrec {"
-		NonRec _ _ -> "let {"
+		Rec _      -> SLIT("letrec {")
+		NonRec _ _ -> SLIT("let {")
 
 ppr_expr pe (SCC cc expr)
   = ppSep [ppCat [ppPStr SLIT("_scc_"), pSCC pe cc],
@@ -349,8 +361,8 @@ ppr_expr pe (SCC cc expr)
 ppr_expr pe (Coerce c ty expr)
   = ppSep [pp_coerce c, pTy pe ty, ppr_expr pe expr]
   where
-    pp_coerce (CoerceIn  v) = ppBeside (ppStr "_coerce_in_ ")  (ppr (pStyle pe) v)
-    pp_coerce (CoerceOut v) = ppBeside (ppStr "_coerce_out_ ") (ppr (pStyle pe) v)
+    pp_coerce (CoerceIn  v) = ppBeside (ppPStr SLIT("_coerce_in_ "))  (ppr (pStyle pe) v)
+    pp_coerce (CoerceOut v) = ppBeside (ppPStr SLIT("_coerce_out_ ")) (ppr (pStyle pe) v)
 
 only_one_alt (AlgAlts []     (BindDefault _ _)) = True
 only_one_alt (AlgAlts (_:[])  NoDefault) 	= True
@@ -363,14 +375,16 @@ only_one_alt _					= False
 ppr_alts pe (AlgAlts alts deflt)
   = ppAboves [ ppAboves (map ppr_alt alts), ppr_default pe deflt ]
   where
+    ppr_arrow = ppPStr SLIT("->")
+
     ppr_alt (con, params, expr)
       = ppHang (if isTupleCon con then
 		    ppCat [ppParens (ppInterleave ppComma (map (pMinBndr pe) params)),
-			   ppStr "->"]
+			   ppr_arrow]
 		else
 		    ppCat [pCon pe con,
 			   ppInterleave ppSP (map (pMinBndr pe) params),
-			   ppStr "->"]
+			   ppr_arrow]
 	       )
 	     4 (ppr_expr pe expr `ppBeside` ppSemi)
 
@@ -378,7 +392,7 @@ ppr_alts pe (PrimAlts alts deflt)
   = ppAboves [ ppAboves (map ppr_alt alts), ppr_default pe deflt ]
   where
     ppr_alt (lit, expr)
-      = ppHang (ppCat [pLit pe lit, ppStr "->"])
+      = ppHang (ppCat [pLit pe lit, ppPStr SLIT("->")])
 	     4 (ppr_expr pe expr `ppBeside` ppSemi)
 \end{code}
 
@@ -386,14 +400,14 @@ ppr_alts pe (PrimAlts alts deflt)
 ppr_default pe NoDefault = ppNil
 
 ppr_default pe (BindDefault val_bdr expr)
-  = ppHang (ppCat [pMinBndr pe val_bdr, ppStr "->"])
+  = ppHang (ppCat [pMinBndr pe val_bdr, ppPStr SLIT("->")])
 	 4 (ppr_expr pe expr `ppBeside` ppSemi)
 \end{code}
 
 \begin{code}
 ppr_arg pe (LitArg   lit) = pLit pe lit
 ppr_arg pe (VarArg   v)	  = pOcc pe v
-ppr_arg pe (TyArg    ty)  = ppStr "_@_ " `ppBeside` pTy pe ty
+ppr_arg pe (TyArg    ty)  = ppPStr SLIT("_@_ ") `ppBeside` pTy pe ty
 ppr_arg pe (UsageArg use) = pUse pe use
 \end{code}
 
@@ -417,7 +431,7 @@ pprBabyCoreBinder sty binder
     pp_strictness
       = case (getIdStrictness binder) of
 	  NoStrictnessInfo    -> ppNil
-	  BottomGuaranteed    -> ppStr "{- _!_ -}"
+	  BottomGuaranteed    -> ppPStr SLIT("{- _!_ -}")
 	  StrictnessInfo xx _ ->
 		panic "PprCore:pp_strictness:StrictnessInfo:ToDo"
 		-- ppStr ("{- " ++ (showList xx "") ++ " -}")
@@ -425,7 +439,7 @@ pprBabyCoreBinder sty binder
 pprTypedCoreBinder sty binder
   = ppBesides [ppr sty binder, ppDcolon, pprParendGenType sty (idType binder)]
 
-ppDcolon = ppStr " :: "
+ppDcolon = ppPStr SLIT(" :: ")
 		-- The space before the :: is important; it helps the lexer
 		-- when reading inferfaces.  Otherwise it would lex "a::b" as one thing.
 \end{code}

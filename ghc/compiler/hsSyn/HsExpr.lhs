@@ -82,16 +82,17 @@ data HsExpr tyvar uvar id pat
   | HsLet	(HsBinds tyvar uvar id pat)	-- let(rec)
 		(HsExpr  tyvar uvar id pat)
 
-  | HsDo	[Stmt tyvar uvar id pat]	-- "do":one or more stmts
+  | HsDo	DoOrListComp
+		[Stmt tyvar uvar id pat]	-- "do":one or more stmts
 		SrcLoc
 
-  | HsDoOut	[Stmt   tyvar uvar id pat]	-- "do":one or more stmts
-		id				-- id for >>=,  types applied
-		id				-- id for zero, typed applied
+  | HsDoOut	DoOrListComp
+		[Stmt   tyvar uvar id pat]	-- "do":one or more stmts
+		id				-- id for return
+		id				-- id for >>=
+		id				-- id for zero
+		(GenType tyvar uvar)		-- Type of the whole expression
 		SrcLoc
-
-  | ListComp	(HsExpr    tyvar uvar id pat)	-- list comprehension
-		[Qualifier tyvar uvar id pat]	-- at least one Qualifier
 
   | ExplicitList		-- syntactic list
 		[HsExpr tyvar uvar id pat]
@@ -200,7 +201,7 @@ pprExpr sty (HsLit    lit)   = ppr sty lit
 pprExpr sty (HsLitOut lit _) = ppr sty lit
 
 pprExpr sty (HsLam match)
-  = ppCat [ppStr "\\", ppNest 2 (pprMatch sty True match)]
+  = ppCat [ppChar '\\', ppNest 2 (pprMatch sty True match)]
 
 pprExpr sty expr@(HsApp e1 e2)
   = let (fun, args) = collect_args expr [] in
@@ -236,8 +237,8 @@ pprExpr sty (SectionL expr op)
   where
     pp_expr = pprParendExpr sty expr
 
-    pp_prefixly = ppHang (ppCat [ppStr "( \\ x_ ->", ppr sty op])
-		       4 (ppCat [pp_expr, ppStr "x_ )"])
+    pp_prefixly = ppHang (ppCat [ppStr " \\ x_ ->", ppr sty op])
+		       4 (ppCat [pp_expr, ppPStr SLIT("x_ )")])
     pp_infixly v
       = ppSep [ ppBeside ppLparen pp_expr,
 	    	ppBeside (ppr sty v) ppRparen ]
@@ -274,14 +275,8 @@ pprExpr sty (HsLet binds expr)
   = ppSep [ppHang (ppPStr SLIT("let")) 2 (ppr sty binds),
 	   ppHang (ppPStr SLIT("in"))  2 (ppr sty expr)]
 
-pprExpr sty (HsDo stmts _)
-  = ppHang (ppPStr SLIT("do")) 2 (ppAboves (map (ppr sty) stmts))
-pprExpr sty (HsDoOut stmts _ _ _)
-  = ppHang (ppPStr SLIT("do")) 2 (ppAboves (map (ppr sty) stmts))
-
-pprExpr sty (ListComp expr quals)
-  = ppHang (ppCat [ppLbrack, pprExpr sty expr, ppChar '|'])
-	 4 (ppSep [interpp'SP sty quals, ppRbrack])
+pprExpr sty (HsDo do_or_list_comp stmts _)            = pprDo do_or_list_comp sty stmts
+pprExpr sty (HsDoOut do_or_list_comp stmts _ _ _ _ _) = pprDo do_or_list_comp sty stmts
 
 pprExpr sty (ExplicitList exprs)
   = ppBracket (ppInterleave ppComma (map (pprExpr sty) exprs))
@@ -311,11 +306,11 @@ pprExpr sty (ArithSeqOut expr info)
   	PprForUser ->
     	  ppBracket (ppr sty info)
 	_   	   ->
-    	  ppBesides [ppLbrack, ppParens (ppr sty expr), ppr sty info, ppRbrack]
+    	  ppBesides [ppLbrack, ppParens (ppr sty expr), ppSP, ppr sty info, ppRbrack]
 
 pprExpr sty (CCall fun args _ is_asm result_ty)
   = ppHang (if is_asm
-	    then ppBesides [ppStr "_casm_ ``", ppPStr fun, ppStr "''"]
+	    then ppBesides [ppPStr SLIT("_casm_ ``"), ppPStr fun, ppPStr SLIT("''")]
 	    else ppBeside  (ppPStr SLIT("_ccall_ ")) (ppPStr fun))
 	 4 (ppSep (map (pprParendExpr sty) args))
 
@@ -324,7 +319,7 @@ pprExpr sty (HsSCC label expr)
 	    pprParendExpr sty expr ]
 
 pprExpr sty (TyLam tyvars expr)
-  = ppHang (ppCat [ppStr "/\\", interppSP sty tyvars, ppStr "->"])
+  = ppHang (ppCat [ppPStr SLIT("/\\"), interppSP sty tyvars, ppPStr SLIT("->")])
 	 4 (pprExpr sty expr)
 
 pprExpr sty (TyApp expr [ty])
@@ -335,7 +330,7 @@ pprExpr sty (TyApp expr tys)
 	 4 (ppBracket (interpp'SP sty tys))
 
 pprExpr sty (DictLam dictvars expr)
-  = ppHang (ppCat [ppStr "\\{-dict-}", interppSP sty dictvars, ppStr "->"])
+  = ppHang (ppCat [ppPStr SLIT("\\{-dict-}"), interppSP sty dictvars, ppPStr SLIT("->")])
 	 4 (pprExpr sty expr)
 
 pprExpr sty (DictApp expr [dname])
@@ -346,10 +341,10 @@ pprExpr sty (DictApp expr dnames)
 	 4 (ppBracket (interpp'SP sty dnames))
 
 pprExpr sty (ClassDictLam dicts methods expr)
-  = ppHang (ppCat [ppStr "\\{-classdict-}",
+  = ppHang (ppCat [ppPStr SLIT("\\{-classdict-}"),
 		   ppBracket (interppSP sty dicts),
 		   ppBracket (interppSP sty methods),
-		   ppStr "->"])
+		   ppPStr SLIT("->")])
 	 4 (pprExpr sty expr)
 
 pprExpr sty (Dictionary dicts methods)
@@ -402,27 +397,43 @@ pp_rbinds sty thing rbinds
 	 4 (ppCurlies (ppIntersperse pp'SP (map (pp_rbind sty) rbinds)))
   where
     pp_rbind PprForUser (v, _, True) = ppr PprForUser v
-    pp_rbind sty        (v, e, _)    = ppCat [ppr sty v, ppStr "=", ppr sty e]
+    pp_rbind sty        (v, e, _)    = ppCat [ppr sty v, ppChar '=', ppr sty e]
 \end{code}
 
 %************************************************************************
 %*									*
-\subsection{Do stmts}
+\subsection{Do stmts and list comprehensions}
 %*									*
 %************************************************************************
+
+\begin{code}
+data DoOrListComp = DoStmt | ListComp
+
+pprDo DoStmt sty stmts
+  = ppHang (ppPStr SLIT("do")) 2 (ppAboves (map (ppr sty) stmts))
+pprDo ListComp sty stmts
+  = ppHang (ppCat [ppLbrack, pprExpr sty expr, ppChar '|'])
+	 4 (ppSep [interpp'SP sty quals, ppRbrack])
+  where
+    ReturnStmt expr = last stmts	-- Last stmt should be a ReturnStmt for list comps
+    quals	    = init stmts
+\end{code}
 
 \begin{code}
 data Stmt tyvar uvar id pat
   = BindStmt	pat
 		(HsExpr  tyvar uvar id pat)
 		SrcLoc
-  | ExprStmt	(HsExpr  tyvar uvar id pat)
-		SrcLoc
+
   | LetStmt	(HsBinds tyvar uvar id pat)
- 
-	-- Translations; the types are the "a" and "b" types of the monad.
-  | BindStmtOut	pat (HsExpr tyvar uvar id pat) SrcLoc (GenType tyvar uvar) (GenType tyvar uvar)
-  | ExprStmtOut	(HsExpr tyvar uvar id pat)     SrcLoc (GenType tyvar uvar) (GenType tyvar uvar)
+
+  | GuardStmt	(HsExpr  tyvar uvar id pat)		-- List comps only
+		SrcLoc
+
+  | ExprStmt	(HsExpr  tyvar uvar id pat)		-- Do stmts only
+		SrcLoc
+
+  | ReturnStmt	(HsExpr  tyvar uvar id pat)		-- List comps only, at the end
 \end{code}
 
 \begin{code}
@@ -430,15 +441,15 @@ instance (NamedThing id, Outputable id, Outputable pat,
 	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar) =>
 		Outputable (Stmt tyvar uvar id pat) where
     ppr sty (BindStmt pat expr _)
-     = ppCat [ppr sty pat, ppStr "<-", ppr sty expr]
+     = ppCat [ppr sty pat, ppPStr SLIT("<-"), ppr sty expr]
     ppr sty (LetStmt binds)
      = ppCat [ppPStr SLIT("let"), ppr sty binds]
     ppr sty (ExprStmt expr _)
      = ppr sty expr
-    ppr sty (BindStmtOut pat expr _ _ _)
-     = ppCat [ppr sty pat, ppStr "<-", ppr sty expr]
-    ppr sty (ExprStmtOut expr _ _ _)
+    ppr sty (GuardStmt expr _)
      = ppr sty expr
+    ppr sty (ReturnStmt expr)
+     = ppCat [ppPStr SLIT("return"), ppr sty expr]    
 \end{code}
 
 %************************************************************************
@@ -470,25 +481,4 @@ instance (NamedThing id, Outputable id, Outputable pat,
       = ppBesides [ppr sty e1, pp'SP, ppr sty e2, pp_dotdot, ppr sty e3]
 
 pp_dotdot = ppPStr SLIT(" .. ")
-\end{code}
-
-``Qualifiers'' in list comprehensions:
-\begin{code}
-data Qualifier tyvar uvar id pat
-  = GeneratorQual   pat
-		    (HsExpr  tyvar uvar id pat)
-  | LetQual	    (HsBinds tyvar uvar id pat)
-  | FilterQual	    (HsExpr  tyvar uvar id pat)
-\end{code}
-
-\begin{code}
-instance (NamedThing id, Outputable id, Outputable pat,
-	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar) =>
-		Outputable (Qualifier tyvar uvar id pat) where
-    ppr sty (GeneratorQual pat expr)
-     = ppCat [ppr sty pat, ppStr "<-", ppr sty expr]
-    ppr sty (LetQual binds)
-     = ppCat [ppPStr SLIT("let"), ppr sty binds]
-    ppr sty (FilterQual expr)
-     = ppr sty expr
 \end{code}

@@ -35,7 +35,7 @@ import Id		( idType, mkSysLocal,
 			  idSetToList,
 			  lookupIdEnv, SYN_IE(IdEnv)
 			)
-import Pretty		( ppStr, ppBesides, ppChar, ppInt )
+import Pretty		( ppPStr, ppBesides, ppChar, ppInt )
 import SrcLoc		( noSrcLoc )
 import Type		( isPrimType, mkTyVarTys, mkForAllTys )
 import TyVar		( nullTyVarEnv, addOneToTyVarEnv,
@@ -143,7 +143,7 @@ unTopify Top = Level 0 0
 unTopify lvl = lvl
 
 instance Outputable Level where
-  ppr sty Top		  = ppStr "<Top>"
+  ppr sty Top		  = ppPStr SLIT("<Top>")
   ppr sty (Level maj min) = ppBesides [ ppChar '<', ppInt maj, ppChar ',', ppInt min, ppChar '>' ]
 \end{code}
 

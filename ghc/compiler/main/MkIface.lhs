@@ -19,6 +19,7 @@ import HsSyn
 import RdrHsSyn		( RdrName(..) )
 import RnHsSyn		( SYN_IE(RenamedHsModule) )
 import RnMonad
+import RnEnv		( availName )
 
 import TcInstUtil	( InstInfo(..) )
 
@@ -41,7 +42,7 @@ import Name		( isLocallyDefined, isWiredInName, modAndOcc, getName, pprOccName,
 			  OccName, occNameString, nameOccName, nameString, isExported, pprNonSym,
 			  Name {-instance NamedThing-}, Provenance
 			)
-import TyCon		( TyCon(..){-instance NamedThing-}, NewOrData(..) )
+import TyCon		( TyCon{-instance NamedThing-} )
 import Class		( GenClass(..){-instance NamedThing-}, GenClassOp, classOpLocalType )
 import FieldLabel	( FieldLabel{-instance NamedThing-} )
 import Type		( mkSigmaTy, mkDictTy, getAppTyCon, splitForAllTy )
@@ -160,10 +161,11 @@ ifaceExports if_hdl avails
 	-- Sort them into groups by module
     export_fm :: FiniteMap Module [AvailInfo]
     export_fm = foldr insert emptyFM avails
-    insert avail@(Avail name _) efm = addToFM_C (++) efm mod [avail] 
-			      where
-			  	    (mod,_) = modAndOcc name
+
     insert NotAvailable efm = efm
+    insert avail efm = addToFM_C (++) efm mod [avail] 
+		     where
+		       (mod,_) = modAndOcc (availName avail)
 
 	-- Print one module's worth of stuff
     do_one_module (mod_name, avails)
@@ -251,16 +253,18 @@ ifaceId get_idinfo needed_ids is_rec id rhs
   = Nothing 		-- Well, that was easy!
 
 ifaceId get_idinfo needed_ids is_rec id rhs
-  = Just (ppCat [sig_pretty, prag_pretty, ppStr ";;"], new_needed_ids)
+  = Just (ppCat [sig_pretty, pp_double_semi, prag_pretty], new_needed_ids)
   where
-    idinfo        = get_idinfo id
-    inline_pragma = idWantsToBeINLINEd id 
+    pp_double_semi = ppPStr SLIT(";;")
+    idinfo         = get_idinfo id
+    inline_pragma  = idWantsToBeINLINEd id 
 
     ty_pretty  = pprType PprInterface (initNmbr (nmbrType (idType id)))
-    sig_pretty = ppBesides [ppr PprInterface (getOccName id), ppPStr SLIT(" :: "), ty_pretty]
+    sig_pretty = ppBesides [ppr PprInterface (getOccName id), ppPStr SLIT(" _:_ "), ty_pretty]
 
-    prag_pretty | opt_OmitInterfacePragmas = ppNil
-		| otherwise		   = ppCat [arity_pretty, strict_pretty, unfold_pretty]
+    prag_pretty 
+     | opt_OmitInterfacePragmas = ppNil
+     | otherwise		= ppCat [arity_pretty, strict_pretty, unfold_pretty, pp_double_semi]
 
     ------------  Arity  --------------
     arity_pretty  = ppArityInfo PprInterface (arityInfo idinfo)
@@ -271,7 +275,7 @@ ifaceId get_idinfo needed_ids is_rec id rhs
     strict_pretty = ppStrictnessInfo PprInterface strict_info
 
     ------------  Unfolding  --------------
-    unfold_pretty | show_unfold = ppCat [ppStr "_U_", pprIfaceUnfolding rhs]
+    unfold_pretty | show_unfold = ppCat [ppPStr SLIT("_U_"), pprIfaceUnfolding rhs]
 		  | otherwise   = ppNil
 
     show_unfold = not implicit_unfolding && 			-- Unnecessary
@@ -373,22 +377,33 @@ ifaceBinds hdl needed_ids final_ids binds
 \subsection{Random small things}
 %*				 					*
 %************************************************************************
-				 
+
+When printing export lists, we print like this:
+	Avail   f		f
+	AvailTC C [C, x, y]	C(x,y)
+	AvailTC C [x, y]	C!(x,y)		-- Exporting x, y but not C
+
 \begin{code}
-upp_avail NotAvailable    = uppNil
-upp_avail (Avail name ns) = uppBesides [upp_occname (getOccName name), upp_export ns]
+upp_avail NotAvailable      = uppNil
+upp_avail (Avail name)      = upp_occname (getOccName name)
+upp_avail (AvailTC name []) = uppNil
+upp_avail (AvailTC name ns) = uppBesides [upp_occname (getOccName name), bang, upp_export ns']
+			    where
+			      bang | name `elem` ns = uppNil
+				   | otherwise	    = uppChar '!'
+			      ns' = filter (/= name) ns
 
 upp_export []    = uppNil
-upp_export names = uppBesides [uppStr "(", 
+upp_export names = uppBesides [uppChar '(', 
 			       uppIntersperse uppSP (map (upp_occname . getOccName) names), 
-			       uppStr ")"]
+			       uppChar ')']
 
 upp_fixity (occ, (Fixity prec dir, prov)) = uppBesides [upp_dir dir, uppSP, 
 						        uppInt prec, uppSP, 
 					       	        upp_occname occ, uppSemi]
-upp_dir InfixR = uppStr "infixr"				 
-upp_dir InfixL = uppStr "infixl"				 
-upp_dir InfixN = uppStr "infix"				 
+upp_dir InfixR = uppPStr SLIT("infixr")
+upp_dir InfixL = uppPStr SLIT("infixl")
+upp_dir InfixN = uppPStr SLIT("infix")
 
 ppr_unqual_name :: NamedThing a => a -> Unpretty		-- Just its occurrence name
 ppr_unqual_name name = upp_occname (getOccName name)
@@ -428,9 +443,7 @@ by unique
 \begin{code}
 lt_avail :: AvailInfo -> AvailInfo -> Bool
 
-NotAvailable `lt_avail` (Avail _ _)  = True
-(Avail n1 _) `lt_avail` (Avail n2 _) = n1 `lt_name` n2
-any	     `lt_avail` NotAvailable = False
+a1 `lt_avail` a2 = availName a1 `lt_name` availName a2
 
 lt_name :: Name -> Name -> Bool
 n1 `lt_name` n2 = modAndOcc n1 < modAndOcc n2

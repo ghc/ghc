@@ -4,7 +4,7 @@ dnl
 dnl * INITIAL SETUP, CHOICE OF PLATFORM(S)
 #!/bin/sh
 #
-# (c) The AQUA Project, Glasgow University, 1994-1995
+# (c) The AQUA Project, Glasgow University, 1994-1997
 #
 # Configure script for the Glasgow functional programming tools
 # (created automagically by autoconf...do not edit by hand)
@@ -12,163 +12,51 @@ dnl * INITIAL SETUP, CHOICE OF PLATFORM(S)
 # Do "./configure --help" to see what flags are available.
 # (Better yet, read the documentation!)
 #
-AC_INIT(mk/platform.mk.in)
+# First off, a distrib sanity check..
+AC_INIT(mk/config.mk.in)
 
 # -------------------------------------------------------------------------
 # Prepare to generate the following header files
 #
-AC_CONFIG_HEADER(ghc/includes/config.h literate/lit-deatify/config.h)
+#
+AC_CONFIG_HEADER(mk/config.h)
 
 # No, we don't do `--srcdir'...
 if test x"$srcdir" != 'x.' ; then
-    echo "This configuration does not support the \`--srcdir' option."
+    echo "This configuration does not support the \`--srcdir' option.."
     exit 1
 fi
 
+#
+# Remove some automounter nonsense (Glasgow specific gruff)
+#
 hardtop=`pwd`
-hardtop=`echo $hardtop | sed 's|^/tmp_mnt/|/|' | sed 's|^/export/|/|' | sed 's|^/grasp_tmp|/local/grasp_tmp|'`
+hardtop=`echo $hardtop | sed 's|^/tmp_mnt/|/|' | sed 's|^/grasp_tmp|/local/grasp_tmp|'`
+
+#OLD: hardtop=`echo $hardtop | sed 's|^/tmp_mnt/|/|' | sed 's|^/export/|/|' | sed 's|^/grasp_tmp|/local/grasp_tmp|'`
+
 echo ''
 echo "*** The top of your build tree is: $hardtop"
 AC_SUBST(hardtop)
 
 # -------------------------------------------------------------------------
-dnl ** choose what blobs to build (ghc,hslibs,haggis,happy,nofib,????)
-
-# set to the name for the dir if doing it, otherwise empty
-DoingHsLibs=''
-DoingNoFib=''
-DoingHappy=''
-DoingHaggis=''
-MkWorldSetup='std'
-
-AC_ARG_ENABLE(hslibs,
-   [
-**********************************************************************
-* Configuration options for the Glasgow functional-programming tools *
-**********************************************************************
-
-First, select *which* of the tools you want to build, with
---{enable,disable}-{hslibs,nofib,happy,haggis}.  (Currently, you have to
-build ghc.)
-
-Second, you may set one of a few applies-in-all-cases options.  For
-example, --with-tmpdir=/usr/tmp.
-
-Then you may set various options which are specifically for the tools you
-choose in step 1.  For GHC, perhaps --enable-concurrent.  For NoFib,
-perhaps --enable-all-tests.  And so on.
-
-The rest of this message lists all of the configure options.  If the option
-is enabled by default, the message says how to disable it.  And vice versa.
-
-If you are confused, don't forget the installation documents that came with
-the software!
-
-*******************************************************************
-** FOR SELECTING WHICH GLASGOW FP TOOLS TO BUILD:]
-   [--enable-hslibs   build suite of Haskell libraries],
-   [case "$enableval" in
-        yes) DoingHsLibs='hslibs'
-             ;;
-        no)  DoingHsLibs=''
-             ;;
-        *)   echo "I don't understand this option: --enable-hslibs=$enableval"
-             exit 1
-             ;;
-    esac])
-if test "xxx$DoingHsLibs" = 'xxxhslibs' -a \( ! -d hslibs \) ; then
-    DoingHsLibs=''
-    echo 'Doing --disable-hslibs, as there is no hslibs directory'
-fi
-
-AC_ARG_ENABLE(nofib,
-   [--enable-nofib    build NoFib suite as part of Glasgow FP tools],
-   [case "$enableval" in
-        yes) DoingNoFib='nofib'
-             ;;
-        no)  DoingNoFib=''
-             ;;
-        *)   echo "I don't understand this option: --enable-nofib=$enableval"
-             exit 1
-             ;;
-    esac])
-if test "xxx$DoingNoFib" = 'xxxnofib' -a \( ! -d nofib \) ; then
-    DoingNoFib=''
-    echo 'Doing --disable-nofib, as there is no nofib directory'
-fi
-
-AC_ARG_ENABLE(happy,
-   [--enable-happy    build Happy parser-generator as part of Glasgow FP tools],
-   [case "$enableval" in
-        yes) DoingHappy='happy'
-             ;;
-        no)  DoingHappy=''
-             ;;
-        *)   echo "I don't understand this option: --enable-happy=$enableval"
-             exit 1
-             ;;
-    esac])
-if test "xxx$DoingHappy" = 'xxxhappy' -a \( ! -d happy \) ; then
-    DoingHappy=''
-    echo 'Doing --disable-happy, as there is no happy directory'
-fi
-
-AC_ARG_ENABLE(haggis,
-   [--enable-haggis   build Haggis GUI toolkit as part of Glasgow FP tools],
-   [case "$enableval" in
-        yes) DoingHaggis='haggis'
-             ;;
-        no)  DoingHaggis=''
-             ;;
-        *)   echo "I don't understand this option: --enable-haggis=$enableval"
-             exit 1
-             ;;
-    esac])
-if test "xxx$DoingHaggis" = 'xxxhaggis' -a \( ! -d haggis \) ; then
-    DoingHaggis=''
-    echo 'Doing --disable-haggis, as there is no haggis directory'
-fi
-
-AC_SUBST(DoingHsLibs)
-AC_SUBST(DoingNoFib)
-AC_SUBST(DoingHappy)
-AC_SUBST(DoingHaggis)
-
-# -------------------------------------------------------------------------
 dnl ** choose host(/target/build) platform
-# Guess host/target/build platform(s) if necessary.
-# Partly stolen from GCC "configure".
 #
-if test "x$target" = xNONE ; then
-    if test "x$nonopt" != xNONE ; then
-        target=$nonopt
-    else
-        # This way of testing the result of a command substitution is
-        # defined by Posix.2 (section 3.9.1) as well as traditional shells.
-        if target=`$srcdir/config.guess` ; then
-            echo "Configuring for a ${target} host." 1>&2
-        else
-            echo 'Config.guess failed to determine the host type.  You need \
-to specify one.' 1>&2
-            if test -r config.status ; then
-                tail +2 config.status 1>&2
-            fi
-            exit 1
-        fi
-    fi
-fi
+# Guess host/target/build platform(s) if necessary.
+#
+AC_CANONICAL_SYSTEM
 
 # "$host" defaults to "$target"
 if test "x$host" = xNONE ; then
     host=$target
 fi
 # "$build" defaults to "$host"
-if test "x$build" = xNONE ; then
-    build=$host
-else
-    echo "This configuration does not support the \`--build' option."
-    exit 1
-fi
+#if test "x$build" = xNONE ; then
+#    build=$host
+#else
+#    echo "This configuration does not support the \`--build' option."
+#    exit 1
+#fi
 
 dnl ** canonicalize platform names
 # Canonicali[sz]e those babies
@@ -181,22 +69,23 @@ if test x"$TargetPlatform" != x"$HostPlatform" ; then
     exit 1
 fi
 
+#
 # The following will be more difficult when we *are* cross-compiling.
 # Suitable names to slam in *_CPP are in platform.h.in.
 # We also record the architecture, vendor, and operating system (OS)
 # separately.
 case $HostPlatform in
 alpha-dec-osf[[1234]]*)
-	HostPlatform=alpha-dec-osf1 # canonicalise for our purposes
+	HostPlatform=alpha-dec-osf1   # canonicalise for our purposes
 	TargetPlatform=alpha-dec-osf1 # this will work for now... (hack)
-	BuildPlatform=alpha-dec-osf1 #hack
+	BuildPlatform=alpha-dec-osf1  # hack
         HostPlatform_CPP='alpha_dec_osf1'
         HostArch_CPP='alpha'
         HostVendor_CPP='dec'
         HostOS_CPP='osf1'
         ;;
 hppa1.1-hp-hpux*)
-	HostPlatform=hppa1.1-hp-hpux # canonicalise for our purposes (hack)
+	HostPlatform=hppa1.1-hp-hpux  # canonicalise for our purposes (hack)
 	TargetPlatform=hppa1.1-hp-hpux
 	BuildPlatform=hppa1.1-hp-hpux
         HostPlatform_CPP='hppa1_1_hp_hpux'
@@ -205,7 +94,7 @@ hppa1.1-hp-hpux*)
         HostOS_CPP='hpux'
         ;;
 i[[3456]]86-*-linuxaout*)
-	HostPlatform=i386-unknown-linuxaout # hack again
+	HostPlatform=i386-unknown-linuxaout   # hack again
 	TargetPlatform=i386-unknown-linuxaout
 	BuildPlatform=i386-unknown-linuxaout
         HostPlatform_CPP='i386_unknown_linuxaout'
@@ -248,6 +137,15 @@ i[[3456]]86-*-solaris2*)
         HostArch_CPP='i386'
         HostVendor_CPP='unknown'
         HostOS_CPP='solaris2'
+        ;;
+i[[3456]]86-*-cygwin32*)
+	HostPlatform=i386-unknown-cygwin32 # hack again
+	TargetPlatform=i386-unknown-cygwin32
+	BuildPlatform=i386-unknown-cygwin32
+        HostPlatform_CPP='i386_unknown_cygwin32'
+        HostArch_CPP='i386'
+        HostVendor_CPP='unknown'
+        HostOS_CPP='cygwin32'
         ;;
 m68k-next-nextstep2)
         HostPlatform_CPP='m68k_next_nextstep2'
@@ -326,12 +224,9 @@ sparc-sun-solaris2*)
         exit 1
         ;;
 esac
-
-test -n "$verbose" && echo "Host platform set to $HostPlatform"
-test -n "$verbose" -a x"$HostPlatform" != x"$TargetPlatform" \
-        && echo "Target platform set to $TargetPlatform"
-test -n "$verbose" -a x"$BuildPlatform" != x"$HostPlatform" \
-        && echo "Build platform set to $BuildPlatform"
+echo "Which we'll canonicalise into: $HostPlatform"
+test  x"$HostPlatform" != x"$TargetPlatform" && echo "Target platform set to $TargetPlatform"
+test  x"$BuildPlatform" != x"$HostPlatform"  && echo "Build platform set to $BuildPlatform"
 
 BuildPlatform_CPP=$HostPlatform_CPP
 TargetPlatform_CPP=$HostPlatform_CPP
@@ -341,10 +236,11 @@ BuildOS_CPP=$HostOS_CPP
 TargetOS_CPP=$HostOS_CPP
 BuildVendor_CPP=$HostVendor_CPP
 TargetVendor_CPP=$HostVendor_CPP
-dnl Cannot afford all these AC_SUBSTs (because of braindead seds w/ 99 cmd limits
+
+dnl Cannot afford all these SUBSTs (because of braindead seds w/ 99 cmd limits)
 dnl AC_SUBST(BuildPlatform)
 AC_SUBST(HostPlatform)
-dnl AC_SUBST(TargetPlatform)
+AC_SUBST(TargetPlatform)
 AC_SUBST(HostPlatform_CPP)
 dnl AC_SUBST(BuildPlatform_CPP)
 dnl AC_SUBST(TargetPlatform_CPP)
@@ -363,6 +259,8 @@ dnl
 dnl * _GENERAL_ CONFIGURATION CHECKS
 #
 dnl ** are we at Glasgow?
+#
+# This stuff is in danger of going away..
 #
 if test -d /local/fp -a -d /users/fp/simonpj; then
     echo "Brilliant!  You must be a Glaswegian."
@@ -471,7 +369,8 @@ else
     rm -fr conftest*
 fi
 AC_SUBST(HaveGcc)
-AC_C_CROSS
+
+# Deprecated (AC_PROG_CC does it): AC_C_CROSS
 #
 dnl ** figure out how to do context diffs
 # (NB: NeXTStep thinks diff'ing a file against itself is "trouble")
@@ -507,7 +406,7 @@ if test -z "$YaccCmd"; then
         $WhatCmd $YaccCmd > conftest.out
         if egrep 'y1\.c 1\..*SMI' conftest.out >/dev/null 2>&1; then
             echo "I don't trust your $YaccCmd; it looks like an old Sun yacc"
-            if test -x /usr/lang/yacc; then
+            if test -f /usr/lang/yacc; then
                 echo "I'm going to use /usr/lang/yacc instead"
                 YaccCmd=/usr/lang/yacc
             else
@@ -528,146 +427,6 @@ fi
 dnl ** Find lex command (lex or flex) and library (-ll or -lfl)
 #
 AC_PROG_LEX
-
-#--------------------------------------------------------------
-WithHc='haskell-compiler-unspecified'
-WithHcType='HC_UNSPECIFIED'
-
-AC_ARG_WITH(hc,
-   [
-*******************************************************************
-** GENERAL OPTIONS WHICH APPLY TO ALL TOOLS:
-
---with-hc=<Haskell compiler>
-          ghc*     => Glasgow Haskell invoked by the name given
-          hbc*     => Chalmers HBC, invoked by the name given
-          nhc*     => Niklas Rojemo's "nhc", invoked by the name given
-          C or c   => Don't use a Haskell compiler;
-                      build from intermediate C (.hc) files.
-          in-place => Use ghc/driver/ghc; i.e. you've built GHC
-                      and you want to use it un-installed ("in-place").
-   ],
-   [case "$withval" in
-        ghc* | glhc* )
-                WithHc=$withval
-                ;;
-        hbc* )  WithHc=$withval
-                ;;
-        nhc* )  WithHc=$withval
-                ;;
-        c | C)  WithHc='C'
-                ;;
-        in-place )
-		WithHc='IN-PLACE'
-                ;;
-        *)      echo "I don't understand this option: --with-hc=$withval"
-                exit 1
-                ;;
-    esac])
-
-# make sure that what they said makes sense.... set WithHcType
-case $WithHc in
-    haskell-compiler-unspecified ) # maybe they will say something later...
-	    ;;
-    ghc* | glhc* )
-	    WithHcType='HC_GLASGOW_GHC'
-            AC_CHECK_PROG(have_ghc,$WithHc,$ac_dir/$ac_word)
-            if test -z "$have_ghc"; then
-                echo "Can't find Glasgow Haskell to compile with: $WithHc"
-		exit 1
-            fi
-            ;;
-    hbc* )  # Look for the dastardly competition
-	    WithHcType='HC_CHALMERS_HBC'
-            AC_CHECK_PROG(have_hbc,$WithHc,YES,NO)
-            if test $have_hbc = 'NO' ; then
-                echo "Can't find Chalmers HBC to compile with: $WithHc"
-                exit 1
-            fi
-            ;;
-    nhc* )  # Look for Niklas Rojemo's "nhc"
-	    WithHcType='HC_ROJEMO_NHC'
-            AC_CHECK_PROG(have_nhc,$WithHc,YES,NO)
-            if test $have_nhc = 'NO' ; then
-                echo "Can't find Niklas Rojemo's NHC to compile with: $WithHc"
-                exit 1
-            fi
-            ;;
-    c | C)  WithHcType='HC_USE_HC_FILES'
-            ;;
-    IN-PLACE) WithHcType='HC_GLASGOW_GHC'
-	      WithHc='$(TOP_PWD)/ghc/driver/ghc'
-	    ;;
-esac
-AC_SUBST(WithHc)
-AC_SUBST(WithHcType)
-
-dnl ** Possibly use something else instead of 'gcc'.
-WhatGccIsCalled=gcc
-AC_ARG_WITH(gcc,
-   [--with-gcc=<gcc command>
-	Use a different command instead of 'gcc' for the GNU C compiler.],
-   [HaveGcc=YES; WhatGccIsCalled="$withval"])
-AC_SUBST(WhatGccIsCalled)
-
-dnl ** Choose which make to use (default 'make')
-MakeCmd='make'
-AC_ARG_WITH(make,
-   [ 
---with-make=<make command> 
-	Use an alternate command instead of 'make'.  This is useful
-	when GNU make is required (for instance when the default make
-	supplied by the system won't work, as is the case on FreeBSD
-	and NetBSD).],
-   [MakeCmd="$withval"]) 
-AC_SUBST(MakeCmd)
-
-dnl ** possibly choose a different tmpdir (default /tmp)
-# let the user decide where the best tmpdir is
-# /tmp is the default; /usr/tmp is sometimes a good choice.
-# Very site-specific.
-TmpDir='/tmp'
-AC_ARG_WITH(tmpdir,
-   [
---with-tmpdir=<temp directory> 
-	Use an alternative directory for temporary files (presumably
-	because /tmp is too small).],
-   [TmpDir="$withval"])
-AC_SUBST(TmpDir)
-
-dnl ** possibly set a max heap for Haskell compilations
-HcMaxHeapFlag=''
-AC_ARG_WITH(max-heap,
-   [
---with-max-heap=<heap size, e.g., 32m> 
-	Do all Haskell compilations with a heap of this size.],
-   [HcMaxHeapFlag="-H$withval"])
-AC_SUBST(HcMaxHeapFlag)
-
-dnl ** possibly set a max stack for Haskell compilations
-HcMaxStackFlag=''
-AC_ARG_WITH(max-stack,
-   [
---with-max-stack=<stack size, e.g., 4m> 
-	Do all Haskell compilations with a stack of this size.],
-   [HcMaxStackFlag="-K$withval"])
-AC_SUBST(HcMaxStackFlag)
-
-dnl ** figure out about mkdependHS
-MkDependHSCmd='mkdependHS'
-if test -f ./ghc/utils/mkdependHS/mkdependHS \
-     -o -f ./ghc/utils/mkdependHS/mkdependHS.prl ; then
-    MkDependHSCmd='TopDirPwd/ghc/utils/mkdependHS/mkdependHS'
-fi
-AC_ARG_WITH(mkdependHS,
-   [--with-mkdependHS=<mkdependHS command>
-	Use a different command instead of 'mkdependHS'.],
-   [MkDependHSCmd="$withval"])
-dnl AC_CHECK_PROG(have_mkdependHS,$MkDependHSCmd,YES,NO)
-dnl if test $have_mkdependHS = 'NO' ; then
-dnl     MkDependHSCmd=':'
-dnl fi
-AC_SUBST(MkDependHSCmd)
 
 # -------------------------------------------------------------------------
 #
@@ -744,6 +503,59 @@ if test -n "$NeedRanLib"; then
 fi
 AC_SUBST(RANLIB)
 #
+#
+dnl ** Check to see whether ln -s works
+#
+AC_PROG_LN_S()
+AC_SUBST(LN_S)
+#
+dnl ** Find the path to sed **
+AC_PATH_PROG(SedCmd,sed,$ac_dir/$ac_word)
+# 
+# It better be around somewhere (we wouldn't
+# exec this script properly if it wasn't!)
+#
+AC_SUBST(SedCmd)
+#
+dnl ** check for time command **
+AC_PATH_PROG(TimeCmd,time,$ac_dir/$ac_word)
+# 
+AC_SUBST(TimeCmd)
+#
+dnl ** check for tar **
+#
+# if GNU tar is named gtar, look for it first.
+#
+AC_PATH_PROGS(TarCmd,gtar tar,tar)
+AC_SUBST(TarCmd)
+
+#
+dnl ** check for gzip/compress **
+AC_PATH_PROGS(CompressCmd,gzip compress,gzip)
+
+compress_nm=`basename $CompressCmd`
+
+if test x"$compress_nm" = xgzip; then
+  CompressCmd="$CompressCmd -d"
+  CompressSuffix="gz"
+else
+  CompressSuffix="Z"
+fi
+AC_SUBST(CompressCmd)
+AC_SUBST(CompressSuffix)
+#
+dnl ** check for installed happy binary
+#
+AC_PATH_PROG(HappyCmd,happy)
+AC_SUBST(HappyCmd)
+#
+#
+dnl ** check for installed lx binary
+#
+AC_PATH_PROG(LxCmd,lx)
+AC_SUBST(LxCmd)
+#
+#
 dnl ** check for full ANSI header (.h) files
 #
 AC_HEADER_STDC
@@ -797,1137 +609,26 @@ char **argv;
     exit(1);
 }], LeadingUnderscore='YES', LeadingUnderscore='NO', LeadingUnderscore='YES')
 test -n "$verbose" && echo "    setting LeadingUnderscore to $LeadingUnderscore"
+AC_SUBST(LeadingUnderscore)
 
-dnl -------------------------------------------------------
-dnl ** which builds to build?
-dnl ** (applies to anything w/ libraries (ghc, hslibs, ???)
-dnl -------------------------------------------------------
-# builds: normal = sequential _ap_o ; _p = profiling (sequential);
-# _t = ticky; _u = unregisterized
-Build_normal='YES'
-Build_p='YES'
-Build_t='NO'
-Build_u='NO'
-# _mc = concurrent; _mr = profiled concurrent; _mt = ticky concurrent
-# _mp = parallel; _mg = gransim
-Build_mc='NO'
-Build_mr='NO'
-Build_mt='NO'
-Build_mp='NO'
-Build_mg='NO'
-# GC builds: _2s, _1s, _du (, _gn)
-Build_2s='NO'
-Build_1s='NO'
-Build_du='NO'
-# user builds: a...o
-Build_a='NO'
-Build_b='NO'
-Build_c='NO'
-Build_d='NO'
-Build_e='NO'
-Build_f='NO'
-Build_g='NO'
-Build_h='NO'
-Build_i='NO'
-Build_j='NO'
-Build_k='NO'
-Build_l='NO'
-Build_m='NO'
-Build_n='NO'
-Build_o='NO'
-Build_A='NO'
-Build_B='NO'
-# More could be added here...
+AC_OUTPUT(mk/config.mk, echo timestamp > mk/stamp-h )
 
-AC_ARG_ENABLE(normal-build,
-   [
-*******************************************************************
-** \`GHC' (GLASGOW HASKELL COMPILER) OPTIONS:
-
-Choose all the \`builds' of GHC that you want:
-
---disable-normal-build do *not* build GHC for normal sequential code],
-   [case "$enableval" in
-        yes) Build_normal='YES'
-             ;;
-        no)  Build_normal='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-normal-build=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(profiling,
-   [--disable-profiling    do *not* build profiling features],
-   [case "$enableval" in
-        yes) Build_p='YES'
-             ;;
-        no)  Build_p='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-profiling=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(ticky,
-   [--enable-ticky         build for \`ticky-ticky' profiling (for implementors)],
-   [case "$enableval" in
-        yes) Build_t='YES'
-             ;;
-        no)  Build_t='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-ticky=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(concurrent,
-   [--enable-concurrent    turn on \`concurrent Haskell' features],
-   [case "$enableval" in
-        yes) Build_mc='YES'
-             ;;
-        no)  Build_mc='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-concurrent=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(profiled-concurrent,
-   [--enable-profiled-concurrent turn on profiling for \`concurrent Haskell'],
-   [case "$enableval" in
-        yes) Build_mr='YES'
-             ;;
-        no)  Build_mr='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-profiled-concurrent=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(ticky-concurrent,
-   [--enable-ticky-concurrent turn on \`ticky-ticky' profiling for \`concurrent Haskell'],
-   [case "$enableval" in
-        yes) Build_mt='YES'
-             ;;
-        no)  Build_mt='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-ticky-concurrent=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(parallel,
-   [--enable-parallel      turn on \`parallel Haskell' features],
-   [case "$enableval" in
-        yes) Build_mp='YES';
-             ;;
-        no)  Build_mp='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-parallel=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(gransim,
-   [--enable-gransim       turn on GranSim parallel simulator],
-   [case "$enableval" in
-        yes) Build_mg='YES';
-             ;;
-        no)  Build_mg='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-gransim=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(gc-2s,
-   [--enable-gc-2s         a build with the 2-space copying garbage collector],
-   [case "$enableval" in
-        yes) Build_2s='YES'
-             ;;
-        no)  Build_2s='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-gc-2s=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(gc-1s,
-   [--enable-gc-1s         a build with the 1-space compacting garbage collector],
-   [case "$enableval" in
-        yes) Build_1s='YES'
-             ;;
-        no)  Build_1s='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-gc-1s=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(gc-du,
-   [--enable-gc-du         a build with \`dual-mode' (1s/2s) garbage collector],
-   [case "$enableval" in
-        yes) Build_du='YES'
-             ;;
-        no)  Build_du='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-gc-du=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(user-way-a,
-   [--enable-user-way-a    build for \`user way a' (mostly for implementors)],
-   [case "$enableval" in
-        yes) Build_a='YES'
-             ;;
-        no)  Build_a='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-user-way-a=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(user-way-b,
-   [--enable-user-way-b    build for \`user way b' (mostly for implementors)],
-   [case "$enableval" in
-        yes) Build_b='YES'
-             ;;
-        no)  Build_b='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-user-way-b=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(user-way-c,
-   [--enable-user-way-c    build for \`user way c' (mostly for implementors)],
-   [case "$enableval" in
-        yes) Build_c='YES'
-             ;;
-        no)  Build_c='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-user-way-c=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(user-way-d,
-   [--enable-user-way-d    build for \`user way d' (mostly for implementors)],
-   [case "$enableval" in
-        yes) Build_d='YES'
-             ;;
-        no)  Build_d='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-user-way-d=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(user-way-e,
-   [--enable-user-way-e    build for \`user way e' (mostly for implementors)],
-   [case "$enableval" in
-        yes) Build_e='YES'
-             ;;
-        no)  Build_e='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-user-way-e=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(user-way-f,
-   [--enable-user-way-f    build for \`user way f' (mostly for implementors)],
-   [case "$enableval" in
-        yes) Build_f='YES'
-             ;;
-        no)  Build_f='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-user-way-f=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(user-way-g,
-   [--enable-user-way-g    build for \`user way g' (mostly for implementors)],
-   [case "$enableval" in
-        yes) Build_g='YES'
-             ;;
-        no)  Build_g='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-user-way-g=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(user-way-h,
-   [--enable-user-way-h    build for \`user way h' (mostly for implementors)],
-   [case "$enableval" in
-        yes) Build_h='YES'
-             ;;
-        no)  Build_h='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-user-way-h=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(user-way-i,
-   [--enable-user-way-i    build for \`user way i' (mostly for implementors)],
-   [case "$enableval" in
-        yes) Build_i='YES'
-             ;;
-        no)  Build_i='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-user-way-i=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(user-way-j,
-   [--enable-user-way-j    build for \`user way j' (mostly for implementors)],
-   [case "$enableval" in
-        yes) Build_j='YES'
-             ;;
-        no)  Build_j='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-user-way-j=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(user-way-k,
-   [--enable-user-way-k    build for \`user way k' (mostly for implementors)],
-   [case "$enableval" in
-        yes) Build_k='YES'
-             ;;
-        no)  Build_k='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-user-way-k=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(user-way-l,
-   [--enable-user-way-l    build for \`user way l' (mostly for implementors)],
-   [case "$enableval" in
-        yes) Build_l='YES'
-             ;;
-        no)  Build_l='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-user-way-l=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(user-way-m,
-   [--enable-user-way-m    build for \`user way m' (mostly for implementors)],
-   [case "$enableval" in
-        yes) Build_m='YES'
-             ;;
-        no)  Build_m='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-user-way-m=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(user-way-n,
-   [--enable-user-way-n    build for \`user way n' (mostly for implementors)],
-   [case "$enableval" in
-        yes) Build_n='YES'
-             ;;
-        no)  Build_n='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-user-way-n=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(user-way-o,
-   [--enable-user-way-o    build for \`user way o' (mostly for implementors)],
-   [case "$enableval" in
-        yes) Build_o='YES'
-             ;;
-        no)  Build_o='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-user-way-o=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(user-way-A,
-   [--enable-user-way-A    build for \`user way A' (mostly for implementors)],
-   [case "$enableval" in
-        yes) Build_A='YES'
-             ;;
-        no)  Build_A='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-user-way-A=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(user-way-B,
-   [--enable-user-way-B    build for \`user way B' (mostly for implementors)],
-   [case "$enableval" in
-        yes) Build_B='YES'
-             ;;
-        no)  Build_B='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-user-way-B=$enableval"
-             exit 1
-             ;;
-    esac])
-
-dnl We do not use AC_SUBST to communicate the Build_* info,
-dnl as some seds (notably OSF) only allow 99 commands (!!!).
-dnl We will do the equivalent by a HACK further down.
-
-# -------------------------------------------------------------------------
-dnl GHC CONFIGURATION STUFF
-
-dnl ** which Haskell compiler to bootstrap GHC with?
-# Figure out what Haskell compiler(s) to use for booting
 #
-# first, the defaults...
-WithGhcHc='haskell-compiler-unspecified'
-WithGhcHcType='HC_UNSPECIFIED'
-GhcBuilderVersion='28'
-
-AC_ARG_WITH(hc-for-ghc,
-   [
-The Haskell compiler for bootstrapping GHC (if any); this option,
-if used, overrides --with-hc=<...>:
-
-    --with-hc-for-ghc=<Haskell compiler>
-          ghc*     => Glasgow Haskell invoked by the name given
-          C or c   => Don't use a Haskell compiler;
-                      build from intermediate C (.hc) files.
-   ],
-   [case "$withval" in
-        ghc* | glhc* )
-                WithGhcHc=$withval
-                ;;
-	hbc* )  echo "HBC will not compile GHC 0.26 as is (sigh)"
-		exit 1
-		;;
-        c | C)  WithGhcHc='C'
-		WithGhcHcType='HC_USE_HC_FILES'
-                ;;
-        *)      echo "I don't understand this option: --with-hc-for-ghc=$withval"
-                exit 1
-                ;;
-    esac])
-
-# make sure that what they said makes sense.... set WithGhcHcType
-case $WithGhcHc in
-    haskell-compiler-unspecified ) # maybe they said something earlier...
-	    if test $WithHc = 'haskell-compiler-unspecified' ; then
-		echo "Neither --with-hc nor --with-hc-for-ghc was properly set"
-		exit 1
-	    fi
-	    if test $WithHcType = 'HC_GLASGOW_GHC' ; then
-                touch conftest.o
-                $WithHc -v -C conftest.o > conftest.out 2>&1
-                echo '/version (\d+)\.(\d+)/ && print ($1*100+$2);' > conftest.pl
-                GhcBuilderVersion=`eval $PerlCmd -n conftest.pl conftest.out`
-                rm -rf conftest*
-	    fi
-	    ;;
-    ghc* | glhc* )
-	    WithGhcHcType='HC_GLASGOW_GHC'
-            AC_CHECK_PROG(have_ghc_ghc,$WithGhcHc,$ac_dir/$ac_word)
-            if test -z "$have_ghc_ghc"; then
-                echo "Can't find Glasgow Haskell to compile GHC with: $WithGhcHc"
-		exit 1
-	    else
-                touch conftest.o
-                $WithGhcHc -v -C conftest.o > conftest.out 2>&1
-                echo '/version (\d+)\.(\d+)/ && print ($1*100+$2);' > conftest.pl
-                GhcBuilderVersion=`eval $PerlCmd -n conftest.pl conftest.out`
-                rm -rf conftest*
-            fi
-            ;;
-    c | C)  WithGhcHcType='HC_USE_HC_FILES'
-            ;;
-esac
-AC_SUBST(GhcBuilderVersion)
-AC_SUBST(WithGhcHc)
-AC_SUBST(WithGhcHcType)
-
-dnl ** use portable (slow) C? -- preferably not
-GhcWithRegisterised='YES'
-AC_ARG_ENABLE(portable-C,
-   [Other things for GHC:
-
---enable-portable-C       use portable C (slow), not \`registerised' (fast)],
-   [case "$enableval" in
-        yes) GhcWithRegisterised='NO'
-             ;;
-        no)  GhcWithRegisterised='YES'
-             ;;
-        *)   echo "I don't understand this option: --enable-portable-C=$enableval"
-             exit 1
-             ;;
-    esac])
-
-if test $GhcWithRegisterised = 'YES'; then
-    case $HostPlatform in
-    alpha-* | hppa1.1-* | i386-* | m68k-* | mips-* | powerpc-* | sparc-* )
-       ;;
-    *)
-       echo "Don't know non-portable C tricks for this platform: $HostPlatform"
-       GhcWithRegisterised='NO'
-       ;;
-    esac
-fi
-AC_SUBST(GhcWithRegisterised)
-
-if test $GhcWithRegisterised = 'NO'; then
-    Build_u='YES'
-    Build_normal='NO'
-    Build_p='NO'
-fi
-# ToDo: make sure we can do concurrent for platform/circs...
-# ToDo: make sure we can do profiling for platform/circs...
-# ToDo: make sure we can do parallel for platform/circs...
-# ToDo: make sure we can do gransim for platform/circs...
-
-dnl ** build GHC compiler proper (\`hsc') from .hc files?
-GhcWithHscBuiltViaC='NO'
-AC_ARG_ENABLE(hsc-built-via-C,
-   [--enable-hsc-built-via-C  build compiler proper (hsc) from intermediate .hc
-                          files (disabled by default)],
-   [case "$enableval" in
-        yes) GhcWithHscBuiltViaC='YES'
-             ;;
-        no)  GhcWithHscBuiltViaC='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-hsc-built-via-C=$enableval"
-             exit 1
-             ;;
-    esac])
-case $WithGhcHc in
-    haskell-compiler-unspecified ) # maybe they said something earlier...
-	    if test $WithHcType = 'HC_USE_HC_FILES' ; then
-		GhcWithHscBuiltViaC='YES'
-	    fi
-	    ;;
-    c | C)  GhcWithHscBuiltViaC='YES'
-            ;;
-    *)	    ;;
-esac
-AC_SUBST(GhcWithHscBuiltViaC)
-
-dnl ** build \`hsc' with -O?
-GhcWithHscOptimised='YES'
-AC_ARG_ENABLE(hsc-optimised,
-   [--disable-hsc-optimised   don't build compiler proper (hsc) with -O],
-   [case "$enableval" in
-        yes) GhcWithHscOptimised='YES'
-             ;;
-        no)  GhcWithHscOptimised='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-hsc-optimised=$enableval"
-             exit 1
-             ;;
-    esac])
-AC_SUBST(GhcWithHscOptimised)
-
-dnl ** build \`hsc' with -DDEBUG?
-GhcWithHscDebug='NO'
-AC_ARG_ENABLE(hsc-debug,
-   [--enable-hsc-debug        build compiler proper (hsc) with -DDEBUG],
-   [case "$enableval" in
-        yes) GhcWithHscDebug='YES'
-             ;;
-        no)  GhcWithHscDebug='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-hsc-debug=$enableval"
-             exit 1
-             ;;
-    esac])
-AC_SUBST(GhcWithHscDebug)
-
-dnl ** omit native-code generator from \`hsc'?
-GhcWithNativeCodeGen='YES'
-AC_ARG_ENABLE(native-code-generator,
-   [--enable-native-code-generator  build an n.c.g.
-                          [enabled for supported platforms]],
-   [case "$enableval" in
-        yes) GhcWithNativeCodeGen='YES'
-             ;;
-        no)  GhcWithNativeCodeGen='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-native-code-generator=$enableval"
-             exit 1
-             ;;
-    esac])
-if test $GhcWithNativeCodeGen = 'YES'; then
-    case $TargetPlatform in
-    i386-* | alpha-* | sparc-* )
-       ;;
-    *)
-       echo "Don't have a native-code generator for this platform: $TargetPlatform"
-       GhcWithNativeCodeGen='NO'
-       ;;
-    esac
-fi
-AC_SUBST(GhcWithNativeCodeGen)
-
-dnl ** include Marlow's deforester in \`hsc'?
-GhcWithDeforester='NO'
-AC_ARG_ENABLE(deforester,
-   [--enable-deforester       build deforester into compiler (HACKERS ONLY)],
-   [case "$enableval" in
-        yes) GhcWithDeforester='YES'
-             ;;
-        no)  GhcWithDeforester='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-deforester=$enableval"
-             exit 1
-             ;;
-    esac])
-AC_SUBST(GhcWithDeforester)
-
-dnl ** include Readline library?
-GhcWithReadline='NO'
-AC_ARG_ENABLE(readline-library,
-   [--enable-readline-library include (GNU) readline library in -syslib GHC],
-   [case "$enableval" in
-        yes) GhcWithReadline='YES'
-             ;;
-        no)  GhcWithReadline='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-readline-library=$enableval"
-             exit 1
-             ;;
-    esac])
-AC_SUBST(GhcWithReadline)
-
-dnl ** include Sockets library?
-GhcWithSockets='NO'
-AC_ARG_ENABLE(sockets-library,
-   [--enable-sockets-library  include the network-interface (sockets) library in -syslib GHC],
-   [case "$enableval" in
-        yes) GhcWithSockets='YES'
-             ;;
-        no)  GhcWithSockets='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-sockets-library=$enableval"
-             exit 1
-             ;;
-    esac])
-AC_SUBST(GhcWithSockets)
-
-# Here, by HACK means, we dump all the Build_ info
-# into a file.  See comment above.
-rm -f ghc/mk/buildinfo.mk
-echo creating ghc/mk/buildinfo.mk
-touch ghc/mk/buildinfo.mk
-for xx in normal p t u mc mr mt mp mg 2s 1s du a b c d e f g h i j k l m n o A B ; do
-    eval "yy=\$Build_$xx"
-    echo "Build_$xx = $yy" >> ghc/mk/buildinfo.mk
-done
-
-# -------------------------------------------------------------------------
-dnl
-dnl * `HsLibs' CONFIGURATION STUFF
-
-if test "xxx$DoingHsLibs" = 'xxxhslibs' ; then
-# a very big "if"!
-
-dnl ** which Haskell compiler to use on hslibs?
-WithHsLibsHc='haskell-compiler-unspecified'
-WithHsLibsHcType='HC_UNSPECIFIED'
-
-AC_ARG_WITH(hc-for-hslibs,
-   [
-*******************************************************************
-** \`HsLibs' HASKELL LIBRARIES OPTIONS:
-
-The Haskell compiler to compile the Haskell Libraries suite; this
-option, if used, overrides --with-hc=<...>:
-
-    --with-hc-for-hslibs=<Haskell compiler>
-          ghc*     => Glasgow Haskell invoked by the name given
-                      and you want to use it un-installed ("in-place").],
-   [case "$withval" in
-        ghc* | glhc* )
-                WithHsLibsHc=$withval
-                ;;
-        in-place )
-		WithHsLibsHc='IN-PLACE'
-                ;;
-        *)      echo "I don't understand this option: --with-hc-for-hslibs=$withval"
-                exit 1
-                ;;
-    esac])
-
-# make sure that what they said makes sense.... set WithHsLibsHcType
-case $WithHsLibsHc in
-    haskell-compiler-unspecified ) # maybe they said something earlier...
-	    if test $WithHc = 'haskell-compiler-unspecified' ; then
-		echo "Neither --with-hc nor --with-hc-for-hslibs was properly set"
-		exit 1
-	    fi
-	    ;;
-    ghc* | glhc* )
-	    WithHsLibsHcType='HC_GLASGOW_GHC'
-            AC_CHECK_PROG(have_ghc_hslibs,$WithHsLibsHc,$ac_dir/$ac_word)
-            if test -z "$have_ghc_hslibs"; then
-                echo "Can't find Glasgow Haskell to compile HsLibs with: $WithHsLibsHc"
-		exit 1
-            fi
-            ;;
-    IN-PLACE) WithHsLibsHcType='HC_GLASGOW_GHC'
-	      WithHsLibsHc='$(TOP_PWD)/ghc/driver/ghc'
-	    ;;
-esac
-AC_SUBST(WithHsLibsHc)
-AC_SUBST(WithHsLibsHcType)
-
-# Here, by HACK means, we dump all the Build_ info
-# into a file.  See comment above.
-rm -f hslibs/mk/buildinfo.mk
-echo creating hslibs/mk/buildinfo.mk
-cat > hslibs/mk/buildinfo.mk <<EOF
-# ** DO NOT EDIT! **
-# This file is obliterated every time 'configure' is run!
-
-EOF
-for xx in normal p t u mc mr mt mp mg 2s 1s du a b c d e f g h i j k l m n o A B ; do
-    eval "yy=\$Build_$xx"
-    echo "Build_$xx = $yy" >> hslibs/mk/buildinfo.mk
-done
-
-
-# here ends a very big if DoingHsLibs = 'hslibs' ...
-fi
+# It'll break soon enough if it didn't, but we perform a sanity
+# check here on the generated config.mk file to see if the
+# sed that was used is of the well-behaved sort.
 #
-# -------------------------------------------------------------------------
-dnl
-dnl * `Happy' CONFIGURATION STUFF
-
-if test "xxx$DoingHappy" = 'xxxhappy' ; then
-# a very big "if"!
-
-dnl ** which Haskell compiler to use on happy?
-WithHappyHc='haskell-compiler-unspecified'
-WithHappyHcType='HC_UNSPECIFIED'
-
-AC_ARG_WITH(hc-for-happy,
-   [
-*******************************************************************
-** \`Happy' PARSER-GENERATOR OPTIONS:
-
-The Haskell compiler to compile Happy; this option, if used, overrides
---with-hc=<...>:
-
-    --with-hc-for-happy=<Haskell compiler>
-          ghc*     => Glasgow Haskell invoked by the name given
-          hbc*     => Chalmers HBC, invoked by the name given
-          nhc*     => Niklas Rojemo's "nhc", invoked by the name given
-          in-place => Use ghc/driver/ghc; i.e. you've built GHC
-                      and you want to use it un-installed ("in-place").],
-   [case "$withval" in
-        ghc* | glhc* )
-                WithHappyHc=$withval
-                ;;
-        hbc* )  WithHappyHc=$withval
-                ;;
-        nhc* )  WithHappyHc=$withval
-                ;;
-        in-place )
-		WithHappyHc='IN-PLACE'
-                ;;
-        *)      echo "I don't understand this option: --with-hc-for-happy=$withval"
-                exit 1
-                ;;
-    esac])
-
-# make sure that what they said makes sense.... set WithHappyHcType
-case $WithHappyHc in
-    haskell-compiler-unspecified ) # maybe they said something earlier...
-	    if test $WithHc = 'haskell-compiler-unspecified' ; then
-		echo "Neither --with-hc nor --with-hc-for-happy was properly set"
-		exit 1
-	    fi
-	    ;;
-    ghc* | glhc* )
-	    WithHappyHcType='HC_GLASGOW_GHC'
-            AC_CHECK_PROG(have_ghc_happy,$WithHappyHc,$ac_dir/$ac_word)
-            if test -z "$have_ghc_happy"; then
-                echo "Can't find Glasgow Haskell to compile Happy with: $WithHappyHc"
-		exit 1
-            fi
-            ;;
-    hbc* )  # Look for the dastardly competition
-	    WithHappyHcType='HC_CHALMERS_HBC'
-            AC_CHECK_PROG(have_hbc,$WithHappyHc,YES,NO)
-            if test $have_hbc = 'NO' ; then
-                echo "Can't find Chalmers HBC to compile with: $WithHappyHc"
-                exit 1
-            fi
-            ;;
-    nhc* )  # Look for Niklas Rojemo's "nhc"
-	    WithHappyHcType='HC_ROJEMO_NHC'
-            AC_CHECK_PROG(have_nhc,$WithHappyHc,YES,NO)
-            if test $have_nhc = 'NO' ; then
-                echo "Can't find Niklas Rojemo's NHC to compile with: $WithHappyHc"
-                exit 1
-            fi
-            ;;
-    IN-PLACE) WithHappyHcType='HC_GLASGOW_GHC'
-                WithHappyHc='$(TOP_PWD)/ghc/driver/ghc'
-	    ;;
-esac
-AC_SUBST(WithHappyHc)
-AC_SUBST(WithHappyHcType)
-
-# here ends a very big if DoingHappy = 'happy' ...
+grep @ mk/config.mk > conftest.out
+if grep -v '#	   enclosed in @at-signs@.' conftest.out >/dev/null 2>&1; then
+   :
+else
+   echo 'Hmm..suspicious, did the configure script perform all the @..@ substitutions in mk/config.mk?..';
+   grep -v '#	   enclosed in @at-signs@.' conftest.out /dev/null
 fi
-#
-# -------------------------------------------------------------------------
-dnl
-dnl * `Haggis' CONFIGURATION STUFF
+rm -f conftest*
 
-if test "xxx$DoingHaggis" = 'xxxhaggis' ; then
-# a very big "if"!
-
-dnl ** which Haskell compiler to use on haggis?
-WithHaggisHc='haskell-compiler-unspecified'
-WithHaggisHcType='HC_UNSPECIFIED'
-
-AC_ARG_WITH(hc-for-haggis,
-   [
-*******************************************************************
-** \`Haggis' HASKELL GUI TOOLKIT OPTIONS:
-
-The Haskell compiler to compile the Haggis toolkit; this option, if
-used, overrides --with-hc=<...>:
-
-    --with-hc-for-haggis=<Haskell compiler>
-          ghc*     => Glasgow Haskell invoked by the name given
-                      and you want to use it un-installed ("in-place").],
-   [case "$withval" in
-        ghc* | glhc* )
-                WithHaggisHc=$withval
-                ;;
-        in-place )
-		WithHaggicHs='IN-PLACE'
-                ;;
-        *)      echo "I don't understand this option: --with-hc-for-haggis=$withval"
-                exit 1
-                ;;
-    esac])
-
-# make sure that what they said makes sense.... set WithHaggisHcType
-case $WithHaggisHc in
-    haskell-compiler-unspecified ) # maybe they said something earlier...
-	    if test $WithHc = 'haskell-compiler-unspecified' ; then
-		echo "Neither --with-hc nor --with-hc-for-haggis was properly set"
-		exit 1
-	    fi
-	    ;;
-    ghc* | glhc* )
-	    WithHaggisHcType='HC_GLASGOW_GHC'
-            AC_CHECK_PROG(have_ghc_haggis,$WithHaggisHc,$ac_dir/$ac_word)
-            if test -z "$have_ghc_haggis"; then
-                echo "Can't find Glasgow Haskell to compile Haggis with: $WithHaggisHc"
-		exit 1
-            fi
-            ;;
-    IN-PLACE) WithHaggisHcType='HC_GLASGOW_GHC'
-                WithHaggisHc='$(TOP_PWD)/ghc/driver/ghc'
-	    ;;
-esac
-AC_SUBST(WithHaggisHc)
-AC_SUBST(WithHaggisHcType)
-
-# builds stuff?? ToDo
-
-# here ends a very big if DoingHaggis = 'haggis' ...
-fi
-#
-# -------------------------------------------------------------------------
-dnl
-dnl * `NoFib' CONFIGURATION STUFF
-
-if test "xxx$DoingNoFib" = 'xxxnofib' ; then
-# a very big "if"!
-
-dnl ** which Haskell compiler to test with NoFib?
-WithNoFibHc='haskell-compiler-unspecified'
-WithNoFibHcType='HC_UNSPECIFIED'
-
-AC_ARG_WITH(hc-for-nofib,
-   [
-*******************************************************************
-** NoFib HASKELL BENCHMARK SUITE OPTIONS:
-
-The Haskell compiler to compile the NoFib programs; this option, if
-used, overrides --with-hc=<...>:
-
-    --with-hc-for-nofib=<Haskell compiler>
-          ghc*     => Glasgow Haskell invoked by the name given
-          hbc*     => Chalmers HBC, invoked by the name given
-          nhc*     => Niklas Rojemo's "nhc", invoked by the name given
-          in-place => Use ghc/driver/ghc; i.e. you've built GHC
-                      and you want to use it un-installed ("in-place").
-   ],
-   [case "$withval" in
-        ghc* | glhc* )
-                WithNoFibHc=$withval
-                ;;
-        hbc* )  WithNoFibHc=$withval
-                ;;
-        nhc* )  WithNoFibHc=$withval
-                ;;
-        in-place )
-		WithNoFibHc='IN-PLACE'
-                ;;
-        *)      echo "I don't understand this option: --with-hc-for-nofib=$withval"
-                exit 1
-                ;;
-    esac])
-
-# make sure that what they said makes sense.... set WithHappyHcType
-case $WithNoFibHc in
-    haskell-compiler-unspecified ) # maybe they said something earlier...
-	    if test $WithHc = 'haskell-compiler-unspecified' ; then
-		echo "Neither --with-hc nor --with-hc-for-nofib was properly set"
-		exit 1
-	    fi
-	    ;;
-    ghc* | glhc* )
-	    WithNoFibHcType='HC_GLASGOW_GHC'
-            AC_CHECK_PROG(have_ghc_nofib,$WithNoFibHc,$ac_dir/$ac_word)
-            if test -z "$have_ghc_nofib"; then
-                echo "Can't find Glasgow Haskell to compile NoFib with: $WithNoFibHc"
-		exit 1
-            fi
-            ;;
-    hbc* )  # Look for the dastardly competition
-	    WithNoFibHcType='HC_CHALMERS_HBC'
-            AC_CHECK_PROG(have_hbc,$WithNoFibHc,YES,NO)
-            if test $have_hbc = 'NO' ; then
-                echo "Can't find Chalmers HBC to compile NoFib with: $WithNoFibHc"
-                exit 1
-            fi
-            ;;
-    nhc* )  # Look for Niklas Rojemo's "nhc"
-	    WithNoFibHcType='HC_ROJEMO_NHC'
-            AC_CHECK_PROG(have_nhc,$WithNoFibHc,YES,NO)
-            if test $have_nhc = 'NO' ; then
-                echo "Can't find Niklas Rojemo's NHC to compile NoFib with: $WithNoFibHc"
-                exit 1
-            fi
-            ;;
-    IN-PLACE) WithNoFibHcType='HC_GLASGOW_GHC'
-                WithNoFibHc='$(TOP_PWD)/ghc/driver/ghc'
-	    ;;
-esac
-AC_SUBST(WithNoFibHc)
-AC_SUBST(WithNoFibHcType)
-
-dnl ** what mkworld \`setup' should be used?
-AC_ARG_WITH(setup,
-   [
---with-setup=<setup> : What mkworld \`setup' should be used?
-                       Choices: ghc, hbc, nhc
-],
-   [case "$withval" in
-        ghc )   MkWorldSetup='ghc'
-                ;;
-        hbc )   MkWorldSetup='hbc'
-                ;;
-        nhc )   MkWorldSetup='nhc'
-		;;
-        *)      echo "I don't understand this option: --with-setup=$withval"
-                exit 1
-                ;;
-    esac])
-
-if test $MkWorldSetup = 'std' ; then
-    echo 'You must do --with-setup=... (one of: ghc, hbc, or nhc) for NoFib'
-    exit 1
-fi
-
-# ---------------------------------------
-# What sets of tests should be run.
-#
-IncludeRealNoFibTests='YES'	# defaults
-IncludeSpectralNoFibTests='YES'
-IncludeImaginaryNoFibTests='YES'
-IncludeSpecialiseNoFibTests='NO'
-IncludeGHC_ONLYNoFibTests='NO'
-IncludePRIVATENoFibTests='NO'
-IncludeParallelNoFibTests='NO'
-
-dnl ** should *all* NoFib tests be run?
-# special catch-all variant
-AC_ARG_ENABLE(all-tests,
-   [Possibly turn on *all* of the possible tests (a sane choice
-only if using GHC):
-
---enable-all-tests    do *all* tests],
-   [case "$enableval" in
-        yes) IncludeGHC_ONLYNoFibTests='YES'
-	     IncludeSpecialiseNoFibTests='YES'
-	     IncludePRIVATENoFibTests='YES'
-	     IncludeParallelNoFibTests='YES'
-             ;;
-        no)  IncludeGHC_ONLYNoFibTests='NO'
-	     IncludeSpecialiseNoFibTests='NO'
-	     IncludePRIVATENoFibTests='NO'
-	     IncludeParallelNoFibTests='NO'
-
-	     IncludeRealNoFibTests='NO'
-	     IncludeSpectralNoFibTests='NO'
-	     IncludeImaginaryNoFibTests='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-all-tests=$enableval"
-             exit 1
-             ;;
-    esac])
-
-dnl ** turn on/off individual categories of tests...
-# individual categories
-AC_ARG_ENABLE(imaginary-tests,
-   [
-Enable/disable individual categories of tests:
-
---disable-imaginary-tests do *not* include imaginary tests],
-   [case "$enableval" in
-        yes) IncludeImaginaryNoFibTests='YES'
-             ;;
-        no)  IncludeImaginaryNoFibTests='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-imaginary-tests=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(spectral-tests,
-   [--disable-spectral-tests  do *not* include spectral tests],
-   [case "$enableval" in
-        yes) IncludeSpectralNoFibTests='YES'
-             ;;
-        no)  IncludeSpectralNoFibTests='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-spectral-tests=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(real-tests,
-   [--disable-real-tests      do *not* include real tests],
-   [case "$enableval" in
-        yes) IncludeRealNoFibTests='YES'
-             ;;
-        no)  IncludeRealNoFibTests='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-real-tests=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(GHC-ONLY-tests,
-   [--enable-GHC-ONLY-tests   include GHC_ONLY tests],
-   [case "$enableval" in
-        yes) IncludeGHC_ONLYNoFibTests='YES'
-             ;;
-        no)  IncludeGHC_ONLYNoFibTests='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-GHC-ONLY-tests=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(specialise-tests,
-   [--enable-specialise-tests  include specialisation tests],
-   [case "$enableval" in
-        yes) IncludeSpecialiseNoFibTests='YES'
-             ;;
-        no)  IncludeSpecialiseNoFibTests='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-specialise-tests=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(PRIVATE-tests,
-   [--enable-PRIVATE-tests    include PRIVATE tests],
-   [case "$enableval" in
-        yes) IncludePRIVATENoFibTests='YES'
-             ;;
-        no)  IncludePRIVATENoFibTests='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-PRIVATE-tests=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(parallel-tests,
-   [--enable-parallel-tests   include parallel tests
-],
-   [case "$enableval" in
-        yes) IncludeParallelNoFibTests='YES'
-             ;;
-        no)  IncludeParallelNoFibTests='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-parallel-tests=$enableval"
-             exit 1
-             ;;
-    esac])
-
-dnl not AC_SUBSTd because of 99-command seds (sigh)
-dnl (See what follows instead)
-dnl AC_SUBST(IncludeRealNoFibTests)
-dnl AC_SUBST(IncludeSpectralNoFibTests)
-dnl AC_SUBST(IncludeImaginaryNoFibTests)
-dnl AC_SUBST(IncludeGHC_ONLYNoFibTests)
-dnl AC_SUBST(IncludeSpecialiseNoFibTests)
-dnl AC_SUBST(IncludePRIVATENoFibTests)
-dnl AC_SUBST(IncludeParallelNoFibTests)
-
-# Here, by HACK means, we dump all the Include*NoFibTests info
-# into a file.  See comment above.
-rm -f nofib/mk/buildinfo.mk
-echo creating nofib/mk/buildinfo.mk
-cat > nofib/mkworld/buildinfo.jm <<EOF
-# ** DO NOT EDIT! **
-# This file is obliterated every time 'configure' is run!
-
-EOF
-for xx in Real Spectral Imaginary GHC_ONLY Specialise PRIVATE Parallel ; do
-    eval "yy=\$Include${xx}NoFibTests"
-    echo "Include${xx}NoFibTests = $yy" >> nofib/mk/buildinfo.mk
-done
-
-# Here, by HACK means, we add all the Build_ info
-# into a file.  See comment above.
- 
-for xx in normal p t u mc mr mt mp mg 2s 1s du a b c d e f g h i j k l m n o A B ; do
-    eval "yy=\$Build_$xx"
-    echo "Build_$xx = $yy"     >> nofib/mk/buildinfo.mk
-done
-
-# here ends a very big if DoingNoFib = 'nofib' ...
-fi
-#
-# -------------------------------------------------------------------------
-dnl
-dnl * extract non-header files with substitution (end)
-#
-AC_SUBST(MkWorldSetup)
-
-AC_OUTPUT(mk/platform.mk mk/utils.mk mk/install.mk ghc/mk/ghcconfig.mk ghc/includes/platform.h)
-
+echo ''
 echo '************************************************'
-echo '*** NOW DO: make boot; make all'
+echo '*** NOW DO: gmake boot followed by gmake all'
 echo '************************************************'
 exit 0

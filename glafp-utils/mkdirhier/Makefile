@@ -1,9 +1,12 @@
-TOP=../..
-include $(TOP)/mk/gen.mk
+#
+#
 
-PROG=mkdirhier
-SRC=mkdirhier.sh
+TOP=..
+include $(TOP)/mk/boilerplate.mk
+
+SCRIPT_PROG=mkdirhier
+SCRIPT_OBJS=mkdirhier.sh
 INTERP=$(SHELL)
-DESTDIR=$(INSTSCRIPTDIR)
+CLEAN_FILES += $(SCRIPT_PROG)
 
-include $(TOP)/mk/script.mk
+include $(TOP)/mk/target.mk

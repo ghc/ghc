@@ -10,7 +10,6 @@ module SpecUtils (
 	specialiseCallTys,
 	SYN_IE(ConstraintVector),
 	getIdOverloading,
-	mkConstraintVector,
 	isUnboxedSpecialisation,
 
 	specialiseConstrTys,
@@ -23,6 +22,9 @@ module SpecUtils (
 
 IMP_Ubiq(){-uitous-}
 
+import CmdLineOpts	( opt_SpecialiseOverloaded, opt_SpecialiseUnboxed,
+			  opt_SpecialiseAll
+			)
 import Bag		( isEmptyBag, bagToList )
 import Class		( GenClass{-instance NamedThing-}, GenClassOp {- instance NamedThing -} )
 import FiniteMap	( emptyFM, addListToFM_C, plusFM_C, keysFM,
@@ -60,23 +62,19 @@ specialiseTy = panic "SpecUtils.specialiseTy (ToDo)"
 based on flags, the overloading constraint vector, and the types.
 
 \begin{code}
-specialiseCallTys :: Bool 		-- Specialise on all type args
-		  -> Bool 		-- Specialise on unboxed type args
-		  -> Bool		-- Specialise on overloaded type args
-		  -> ConstraintVector	-- Tells which type args are overloaded
+specialiseCallTys :: ConstraintVector	-- Tells which type args are overloaded
 		  -> [Type]		-- Type args
 		  -> [Maybe Type]	-- Nothings replace non-specialised type args
 
-specialiseCallTys True _ _ cvec tys
-  = map Just tys
-specialiseCallTys False spec_unboxed spec_overloading cvec tys
-  = zipWithEqual "specialiseCallTys" spec_ty_other cvec tys
+specialiseCallTys cvec tys
+  | opt_SpecialiseAll = map Just tys
+  | otherwise 	      = zipWithEqual "specialiseCallTys" spec_ty_other cvec tys
   where
-    spec_ty_other c ty | (spec_unboxed && isUnboxedType ty)
-			 || (spec_overloading && c)
-			 = Just ty
-		       | otherwise
-			 = Nothing
+    spec_ty_other c ty | (opt_SpecialiseUnboxed && isUnboxedType ty) ||
+			 (opt_SpecialiseOverloaded && c)
+		       = Just ty
+
+		       | otherwise = Nothing
 \end{code}
 
 @getIdOverloading@ grabs the type of an Id, and returns a
@@ -119,15 +117,6 @@ getIdOverloading id
 
 \begin{code}
 type ConstraintVector = [Bool]	-- True for constrained tyvar, false otherwise
-
-mkConstraintVector :: Id
-		   -> ConstraintVector
-
-mkConstraintVector id
-  = [tyvar `elem` constrained_tyvars | tyvar <- tyvars]
-  where
-    (tyvars, class_tyvar_pairs) = getIdOverloading id
-    constrained_tyvars   = map snd class_tyvar_pairs 	-- May contain dups
 \end{code}
 
 \begin{code}
@@ -174,9 +163,9 @@ argTysMatchSpecTys_error :: [Maybe Type]
 argTysMatchSpecTys_error spec_tys arg_tys
   = if match spec_tys arg_tys
     then Nothing
-    else Just (ppSep [ppStr "Spec and Arg Types Inconsistent:",
-		      ppStr "spectys=", ppSep [pprMaybeTy PprDebug ty | ty <- spec_tys],
-		      ppStr "argtys=", ppSep [pprParendGenType PprDebug ty | ty <- arg_tys]])
+    else Just (ppSep [ppPStr SLIT("Spec and Arg Types Inconsistent:"),
+		      ppPStr SLIT("spectys="), ppSep [pprMaybeTy PprDebug ty | ty <- spec_tys],
+		      ppPStr SLIT("argtys="), ppSep [pprParendGenType PprDebug ty | ty <- arg_tys]])
   where
     match (Nothing:spec_tys) (arg:arg_tys)
       = not (isUnboxedType arg) &&
@@ -205,7 +194,7 @@ pprSpecErrs this_mod spec_errs spec_warn spec_tyerrs
 
   | otherwise
   = ppAboves [
-	ppStr "SPECIALISATION MESSAGES:",
+	ppPStr SLIT("SPECIALISATION MESSAGES:"),
 	ppAboves (map pp_module_specs use_modules)
 	]
   where
@@ -264,7 +253,7 @@ pprSpecErrs this_mod spec_errs spec_warn spec_tyerrs
     pp_module_specs mod
       | mod == _NIL_
       = ASSERT (null mod_tyspecs)
-	ppAboves (map (pp_idspec ty_sty (ppStr "UNKNOWN:")) mod_idspecs)
+	ppAboves (map (pp_idspec ty_sty (ppPStr SLIT("UNKNOWN:"))) mod_idspecs)
 
       | have_specs
       = ppAboves [
@@ -282,15 +271,15 @@ pprSpecErrs this_mod spec_errs spec_warn spec_tyerrs
 	ty_sty = PprInterface
 
 pp_module mod
-  = ppBesides [ppPStr mod, ppStr ":"]
+  = ppBesides [ppPStr mod, ppChar ':']
 
 pp_tyspec :: PprStyle -> Pretty -> (OccName, TyCon, [Maybe Type]) -> Pretty
 
 pp_tyspec sty pp_mod (_, tycon, tys)
   = ppCat [pp_mod,
-	   ppStr "{-# SPECIALIZE", ppStr "data",
+	   ppStr "{-# SPECIALIZE data",
 	   pprNonSym PprForUser tycon, ppCat (map (pprParendGenType sty) spec_tys),
-	   ppStr "#-}", ppStr "{- Essential -}"
+	   ppStr "-} {- Essential -}"
 	   ]
   where
     tvs = tyConTyVars tycon
@@ -305,8 +294,7 @@ pp_idspec :: PprStyle -> Pretty -> (OccName, Id, [Maybe Type], Bool) -> Pretty
 pp_idspec sty pp_mod (_, id, tys, is_err)
   | isDictFunId id
   = ppCat [pp_mod,
-	   ppStr "{-# SPECIALIZE",
-	   ppStr "instance",
+	   ppStr "{-# SPECIALIZE instance",
 	   pprGenType sty spec_ty,
 	   ppStr "#-}", pp_essential ]
 
@@ -329,7 +317,7 @@ pp_idspec sty pp_mod (_, id, tys, is_err)
     ppCat [pp_mod,
 	   ppStr "{- instance",
 	   pprOccName sty (getOccName cls),
-	   ppStr "EXPLICIT METHOD REQUIRED",
+	   ppPStr SLIT("EXPLICIT METHOD REQUIRED"),
 	   pprNonSym sty clsop, ppStr "::",
 	   pprGenType sty spec_ty,
 	   ppStr "-}", pp_essential ]
@@ -337,7 +325,7 @@ pp_idspec sty pp_mod (_, id, tys, is_err)
   | otherwise
   = ppCat [pp_mod,
 	   ppStr "{-# SPECIALIZE",
-	   pprNonSym PprForUser id, ppStr "::",
+	   pprNonSym PprForUser id, ppPStr SLIT("::"),
 	   pprGenType sty spec_ty,
 	   ppStr "#-}", pp_essential ]
   where

@@ -32,7 +32,7 @@ IMP_Ubiq()
 IMPORT_1_3(Ratio(Rational))
 
 import HsSyn	( HsLit(..), HsExpr(..), HsBinds, Fixity,
-		  InPat, OutPat, Stmt, Qualifier, Match,
+		  InPat, OutPat, Stmt, DoOrListComp, Match,
 		  ArithSeqInfo, HsType, Fake )
 import RnHsSyn	( SYN_IE(RenamedArithSeqInfo), SYN_IE(RenamedHsExpr) )
 import TcHsSyn	( TcIdOcc(..), SYN_IE(TcExpr), SYN_IE(TcIdBndr),
@@ -367,7 +367,7 @@ ppr_inst sty hdr ppr_orig (LitInst u lit ty orig loc)
 	 4 (ppCat [case lit of
 		      OverloadedIntegral   i -> ppInteger i
 		      OverloadedFractional f -> ppRational f,
-		   ppStr "at",
+		   ppPStr SLIT("at"),
 		   ppr sty ty,
 		   show_uniq sty u])
 
@@ -377,7 +377,7 @@ ppr_inst sty hdr ppr_orig (Dict u clas ty orig loc)
 
 ppr_inst sty hdr ppr_orig (Method u id tys rho orig loc)
   = ppHang (ppr_orig orig loc)
-	 4 (ppCat [ppr sty id, ppStr "at", interppSP sty tys, show_uniq sty u])
+	 4 (ppCat [ppr sty id, ppPStr SLIT("at"), interppSP sty tys, show_uniq sty u])
 
 show_uniq PprDebug u = ppr PprDebug u
 show_uniq sty	   u = ppNil
@@ -502,8 +502,8 @@ lookupSimpleInst class_inst_env clas ty
 		          (_, theta, _) = splitSigmaTy (idType dfun)
 
 noSimpleInst clas ty sty
-  = ppSep [ppStr "No instance for class", ppQuote (ppr sty clas),
-	   ppStr "at type", ppQuote (ppr sty ty)]
+  = ppSep [ppPStr SLIT("No instance for class"), ppQuote (ppr sty clas),
+	   ppPStr SLIT("at type"), ppQuote (ppr sty ty)]
 \end{code}
 
 
@@ -642,31 +642,31 @@ pprOrigin hdr orig locn
         ppBesides [ppPStr SLIT("at a use of an overloaded constructor: `"),
 		   ppr sty id, ppChar '\'']
       InstanceDeclOrigin ->
-	ppStr "in an instance declaration"
+	ppPStr SLIT("in an instance declaration")
       LiteralOrigin lit ->
-	ppCat [ppStr "at an overloaded literal:", ppr sty lit]
+	ppCat [ppPStr SLIT("at an overloaded literal:"), ppr sty lit]
       ArithSeqOrigin seq ->
-	ppCat [ppStr "at an arithmetic sequence:", ppr sty seq]
+	ppCat [ppPStr SLIT("at an arithmetic sequence:"), ppr sty seq]
       SignatureOrigin ->
-	ppStr "in a type signature"
+	ppPStr SLIT("in a type signature")
       DoOrigin ->
-	ppStr "in a do statement"
+	ppPStr SLIT("in a do statement")
       ClassDeclOrigin ->
-	ppStr "in a class declaration"
+	ppPStr SLIT("in a class declaration")
       InstanceSpecOrigin _ clas ty ->
 	ppBesides [ppStr "in a SPECIALIZE instance pragma; class \"",
 	 	   ppr sty clas, ppStr "\" type: ", ppr sty ty]
       ValSpecOrigin name ->
-	ppBesides [ppStr "in a SPECIALIZE user-pragma for `",
-		   ppr sty name, ppStr "'"]
+	ppBesides [ppPStr SLIT("in a SPECIALIZE user-pragma for `"),
+		   ppr sty name, ppChar '\'']
       CCallOrigin clabel Nothing{-ccall result-} ->
-	ppBesides [ppStr "in the result of the _ccall_ to `",
-		   ppStr clabel, ppStr "'"]
+	ppBesides [ppPStr SLIT("in the result of the _ccall_ to `"),
+		   ppStr clabel, ppChar '\'']
       CCallOrigin clabel (Just arg_expr) ->
-	ppBesides [ppStr "in an argument in the _ccall_ to `",
+	ppBesides [ppPStr SLIT("in an argument in the _ccall_ to `"),
 		  ppStr clabel, ppStr "', namely: ", ppr sty arg_expr]
       LitLitOrigin s ->
-	ppBesides [ppStr "in this ``literal-literal'': ", ppStr s]
+	ppBesides [ppPStr SLIT("in this ``literal-literal'': "), ppStr s]
       UnknownOrigin ->
-	ppStr "in... oops -- I don't know where the overloading came from!"
+	ppPStr SLIT("in... oops -- I don't know where the overloading came from!")
 \end{code}

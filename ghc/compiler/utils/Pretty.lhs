@@ -326,12 +326,12 @@ ppSep ps  width is_vert
 \begin{code}
 speakNth :: Int -> Pretty
 
-speakNth 1 = ppStr "first"
-speakNth 2 = ppStr "second"
-speakNth 3 = ppStr "third"
-speakNth 4 = ppStr "fourth"
-speakNth 5 = ppStr "fifth"
-speakNth 6 = ppStr "sixth"
+speakNth 1 = ppPStr SLIT("first")
+speakNth 2 = ppPStr SLIT("second")
+speakNth 3 = ppPStr SLIT("third")
+speakNth 4 = ppPStr SLIT("fourth")
+speakNth 5 = ppPStr SLIT("fifth")
+speakNth 6 = ppPStr SLIT("sixth")
 speakNth n = ppBesides [ ppInt n, ppStr st_nd_rd_th ]
   where
     st_nd_rd_th | n_rem_10 == 1 = "st"

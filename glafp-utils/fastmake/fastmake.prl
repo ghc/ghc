@@ -1,4 +1,7 @@
-#! /usr/local/bin/perl
+#
+# Perl stub requires the following variable to be prepended
+#   TMPDIR
+#
 #
 ($Pgm = $0) =~ s/.*\/([^\/]+)$/\1/;
 $Usage = "\n" . <<EOUSAGE;
@@ -34,8 +37,8 @@ $Makefile = 'Makefile';
 if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
     $Tmpfile = $ENV{'TMPDIR'} . "/Makefile$$";
 } else {
-    $Tmpfile  = "$(TMPDIR)/Makefile$$";
-    $ENV{'TMPDIR'} = '$(TMPDIR)'; # set the env var as well
+    $Tmpfile  = "${TMPDIR}/Makefile$$";
+    $ENV{'TMPDIR'} = "${TMPDIR}"; # set the env var as well
 }
 $SleazyTouch = '/usr/5bin/touch';
 $DoTouch = 0;

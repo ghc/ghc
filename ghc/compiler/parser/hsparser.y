@@ -47,6 +47,7 @@ static char *the_module_name;
 static maybe module_exports;
 
 extern list Lnil;
+extern list reverse_list();
 extern tree root;
 
 /* For FN, PREVPATT and SAMEFN macros */
@@ -170,7 +171,7 @@ BOOLEAN inpat;
 *                                                                     *
 **********************************************************************/
 
-%token	MINUS		BANG
+%token	MINUS		BANG		PLUS
 %token 	AS		HIDING		QUALIFIED
 
 
@@ -200,7 +201,7 @@ BOOLEAN inpat;
 	SCC	CASM	CCALL	CASM_GC	CCALL_GC
 
 %left	VARSYM	CONSYM	QVARSYM	QCONSYM
-	MINUS	BQUOTE	BANG	DARROW
+	MINUS	BQUOTE	BANG	DARROW	PLUS
 
 %left	DCOLON
 
@@ -223,7 +224,7 @@ BOOLEAN inpat;
 
 %type <ulist>   caserest alts alt quals
 		dorest stmts stmt
-		rbinds rpats list_exps 
+		rbinds rbinds1 rpats rpats1 list_exps list_rest
 		qvarsk qvars_list
 		constrs constr1 fields 
 		types atypes batypes
@@ -244,11 +245,11 @@ BOOLEAN inpat;
 %type <utree>	exp oexp dexp kexp fexp aexp rbind texps
 		expL oexpL kexpL expLno oexpLno dexpLno kexpLno
 		vallhs funlhs qual gd leftexp
- 		pat bpat apat apatc conpat rpat
- 		patk bpatk apatck conpatk
+ 		pat cpat bpat apat apatc conpat rpat
+          		patk bpatk apatck conpatk
 
 
-%type <uid>	MINUS DARROW AS LAZY
+%type <uid>	MINUS PLUS DARROW AS LAZY
 		VARID CONID VARSYM CONSYM 
   		var con varop conop op
 		vark varid varsym varsym_nominus
@@ -270,10 +271,8 @@ BOOLEAN inpat;
 
 %type <uttype>    simple ctype type atype btype
 		  gtyconvars 
-		  bbtype batype 
+		  bbtype batype bxtype bang_atype
 		  class tyvar
-/* 		  gtyconapp0 gtyconapp1 ntyconapp0 ntyconapp1 btyconapp */
-/*		  restrict_inst general_inst */
 
 %type <uconstr>	  constr field
 
@@ -734,24 +733,13 @@ constrs	:  constr				{ $$ = lsing($1); }
 	|  constrs VBAR constr			{ $$ = lapp($1,$3); }
 	;
 
-constr	:  
-/* 	 	This stuff looks really baroque. I've replaced it with simpler stuff.
-			SLPJ Jan 97
-	
-	   btyconapp				{ qid tyc; list tys;
+constr	:  btype				{ qid tyc; list tys;
 						  splittyconapp($1, &tyc, &tys);
 					          $$ = mkconstrpre(tyc,tys,hsplineno); }
- 	|  btyconapp qconop bbtype		{ checknobangs($1);
-						  $$ = mkconstrinf($1,$2,$3,hsplineno); }
-	|  ntyconapp0 qconop bbtype		{ $$ = mkconstrinf($1,$2,$3,hsplineno); }
-
-	|  BANG atype qconop bbtype		{ $$ = mkconstrinf(mktbang($2),$3,$4,hsplineno); }
-	|  OPAREN qconsym CPAREN		{ $$ = mkconstrpre($2,Lnil,hsplineno); }
-*/
-
-	   btype				{ qid tyc; list tys;
+	| bxtype 				{ qid tyc; list tys;
 						  splittyconapp($1, &tyc, &tys);
 					          $$ = mkconstrpre(tyc,tys,hsplineno); }
+
 	/* We have to parse the constructor application as a *type*, else we get
 	   into terrible ambiguity problems.  Consider the difference between
 
@@ -764,24 +752,30 @@ constr	:
 	   second.
 	*/
 
+	| btype qconop bbtype			{ $$ = mkconstrinf($1,$2,$3,hsplineno); }
+	| bang_atype qconop bbtype		{ $$ = mkconstrinf( $1, $2, $3, hsplineno ); }
+
+
 	|  OPAREN qconsym CPAREN batypes	{ $$ = mkconstrpre($2,$4,hsplineno); }
-	|  bbtype qconop bbtype			{ $$ = mkconstrinf($1,$2,$3,hsplineno); }
 	|  gtycon OCURLY fields CCURLY		{ $$ = mkconstrrec($1,$3,hsplineno); }
 		/* 1 S/R conflict on OCURLY -> shift */
 	;
 
-/* 
-btyconapp: gtycon				{ $$ = mktname($1); }
-	|  btyconapp batype			{ $$ = mktapp($1,$2); }
+/* S !Int Bool */
+bxtype	: btype bang_atype				{ $$ = mktapp($1, $2); }
+	| bxtype bbtype					{ $$ = mktapp($1, $2); }
 	;
-*/
+
 
 bbtype	:  btype				{ $$ = $1; }
-	|  BANG atype				{ $$ = mktbang($2); }
+	|  bang_atype				{ $$ = $1; }
 	;
 
 batype	:  atype				{ $$ = $1; }
-	|  BANG atype				{ $$ = mktbang($2); }
+	|  bang_atype				{ $$ = $1; }
+	;
+
+bang_atype : BANG atype				{ $$ = mktbang( $2 ) }
 	;
 
 batypes	:  					{ $$ = Lnil; }
@@ -913,6 +907,8 @@ gdrhs	:  gd EQUAL exp				{ $$ = lsing(mkpgdexp($1,$3)); }
 maybe_where:
 	   WHERE ocurly decls ccurly		{ $$ = $3; }
 	|  WHERE vocurly decls vccurly		{ $$ = $3; }
+           /* A where containing no decls is OK */
+	|  WHERE SEMI				{ $$ = mknullbind(); }
 	|  /* empty */				{ $$ = mknullbind(); }
 	;
 
@@ -1036,7 +1032,6 @@ aexp	:  qvar					{ $$ = mkident($1); }
 	|  gcon					{ $$ = mkident($1); }
 	|  lit_constant				{ $$ = mklit($1); }
 	|  OPAREN exp CPAREN			{ $$ = mkpar($2); }	    /* mkpar: stop infix parsing at ()'s */
-	|  qcon OCURLY CCURLY			{ $$ = mkrecord($1,Lnil); }
 	|  qcon OCURLY rbinds CCURLY		{ $$ = mkrecord($1,$3); }   /* 1 S/R conflict on OCURLY -> shift */
 	|  OBRACK list_exps CBRACK		{ $$ = mkllist($2); }
 	|  OPAREN exp COMMA texps CPAREN	{ if (ttree($4) == tuple)
@@ -1045,7 +1040,7 @@ aexp	:  qvar					{ $$ = mkident($1); }
 						     $$ = mktuple(ldub($2, $4)); }
 
 	/* only in expressions ... */
-	|  aexp OCURLY rbinds CCURLY		{ $$ = mkrupdate($1,$3); }
+	|  aexp OCURLY rbinds1 CCURLY		{ $$ = mkrupdate($1,$3); }
 	|  OBRACK exp VBAR quals CBRACK		{ $$ = mkcomprh($2,$4); }
 	|  OBRACK exp COMMA exp DOTDOT exp CBRACK {$$= mkeenum($2,mkjust($4),mkjust($6)); }
 	|  OBRACK exp COMMA exp DOTDOT CBRACK	{ $$ = mkeenum($2,mkjust($4),mknothing()); }
@@ -1073,8 +1068,12 @@ dorest  :  ocurly stmts ccurly			{ checkdostmts($2); $$ = $2; }
 	|  vocurly stmts vccurly		{ checkdostmts($2); $$ = $2; }
 	;
 
-rbinds	:  rbind				{ $$ = lsing($1); }
-	|  rbinds COMMA rbind			{ $$ = lapp($1,$3); }
+rbinds	:  /* empty */				{ $$ = Lnil; }
+	|  rbinds1
+	;
+
+rbinds1	:  rbind				{ $$ = lsing($1); }
+	|  rbinds1 COMMA rbind			{ $$ = lapp($1,$3); }
 	;
 
 rbind  	:  qvar					{ $$ = mkrbind($1,mknothing()); }
@@ -1093,10 +1092,22 @@ texps	:  exp	{ $$ = mkpar($1); }	/* mkpar: so we don't flatten last element in t
 	/* right recursion? WDP */
 	;
 
-
 list_exps :
 	   exp					{ $$ = lsing($1); }
+	|  exp COMMA exp			{ $$ = mklcons( $1, lsing($3) ); }
+	|  exp COMMA exp COMMA list_rest	{ $$ = mklcons( $1, mklcons( $3, reverse_list( $5 ))); }
+	;
+
+/* Use left recusion for list_rest, because we sometimes get programs with
+   very long explicit lists. */
+list_rest : 	exp				{ $$ = lsing($1); }
+	  | list_rest COMMA exp			{ $$ = mklcons( $3, $1 ); }
+	  ;
+
+/* 
+	   exp					{ $$ = lsing($1); }
 	|  exp COMMA list_exps		{ $$ = mklcons($1, $3); }
+*/
 	/* right recursion? (WDP)
 
 	   It has to be this way, though, otherwise you
@@ -1108,7 +1119,6 @@ list_exps :
 	   (In fact, if you change the grammar and throw yacc/bison
 	   at it, it *will* do the wrong thing [WDP 94/06])
 	*/
-	;
 
 letdecls:  LET ocurly decls ccurly		{ $$ = $3 }
 	|  LET vocurly decls vccurly		{ $$ = $3 }
@@ -1177,13 +1187,17 @@ leftexp	:  LARROW exp				{ $$ = $2; }
 *                                                                     *
 **********************************************************************/
 
-pat	:  pat qconop bpat			{ $$ = mkinfixap($2,$1,$3); }
+pat	:  qvar PLUS INTEGER			{ $$ = mkplusp($1, mkinteger($3)); }
+	|  cpat
+	;
+
+cpat	:  cpat qconop bpat			{ $$ = mkinfixap($2,$1,$3); }
 	|  bpat
 	;
 
 bpat	:  apatc
  	|  conpat
-	|  qcon OCURLY rpats CCURLY		{ $$ = mkrecord($1,$3); }
+ 	|  qcon OCURLY rpats CCURLY		{ $$ = mkrecord($1,$3); }
 	|  MINUS INTEGER			{ $$ = mknegate(mklit(mkinteger($2))); }
 	|  MINUS FLOAT				{ $$ = mknegate(mklit(mkfloatr($2))); }
 	;
@@ -1230,8 +1244,12 @@ pats	:  pat COMMA pats			{ $$ = mklcons($1, $3); }
     	/* right recursion? (WDP) */
 	;
 
-rpats	: rpat					{ $$ = lsing($1); }
-	| rpats COMMA rpat			{ $$ = lapp($1,$3); }
+rpats	: /* empty */				{ $$ = Lnil; }
+	| rpats1
+	;
+
+rpats1	: rpat					{ $$ = lsing($1); }
+	| rpats1 COMMA rpat			{ $$ = lapp($1,$3); }
 	;
 
 rpat	:  qvar					{ $$ = mkrbind($1,mknothing()); }
@@ -1450,6 +1468,12 @@ varsym	:  varsym_nominus
 	|  MINUS			{ $$ = install_literal("-"); }
 	;
 
+/* PLUS, BANG are valid varsyms */
+varsym_nominus : VARSYM
+	|  PLUS				{ $$ = install_literal("+"); }
+	|  BANG				{ $$ = install_literal("!"); }	
+	;
+
 /* AS HIDING QUALIFIED are valid varids */
 varid   :  VARID
 	|  AS				{ $$ = install_literal("as"); }
@@ -1457,10 +1481,6 @@ varid   :  VARID
 	|  QUALIFIED			{ $$ = install_literal("qualified"); }
 	;
 
-/* BANG are valid varsyms */
-varsym_nominus : VARSYM
-	|  BANG				{ $$ = install_literal("!"); }	
-	;
 
 ccallid	:  VARID
 	|  CONID
@@ -1577,7 +1597,7 @@ yyerror(s)
 	/*NOTHING*/;
 
     } else {
-	fprintf(stderr, "\"%s\", line %d, column %d: %s on input: ",
+	fprintf(stderr, "%s:%d:%d: %s on input: ",
 	  input_filename, hsplineno, hspcolno + 1, s);
 
 	if (yyleng == 1 && *yytext == '\0')

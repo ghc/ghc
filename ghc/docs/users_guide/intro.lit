@@ -1,10 +1,10 @@
 %
-% $Header: /srv/cvs/cvs.haskell.org/fptools/ghc/docs/users_guide/Attic/intro.lit,v 1.2 1996/07/25 20:48:26 partain Exp $
+% $Header: /srv/cvs/cvs.haskell.org/fptools/ghc/docs/users_guide/Attic/intro.lit,v 1.3 1997/03/14 07:59:31 simonpj Exp $
 %
 \section[introduction-GHC]{Introduction to GHC}
 
 This is a guide to using the Glasgow Haskell compilation (GHC) system.
-It is a batch compiler for the Haskell~1.3 language, with support for
+It is a batch compiler for the Haskell~1.4 language, with support for
 various Glasgow-only extensions.
 
 Many people will use GHC very simply: compile some
@@ -30,11 +30,11 @@ material in \sectionref{compiler-tutorial} may help.
 
 On the World-Wide Web, there are several URLs of likely interest:
 \begin{display}
-GHC home page -- http://www.dcs.gla.ac.uk/fp/software/ghc/
-Glasgow FP group page -- http://www.dcs.gla.ac.uk/fp/
-comp.lang.functional FAQ -- http://www.cs.nott.ac.uk/Department/Staff/mpj/faq.html
+GHC home page -- \tr{http://www.dcs.gla.ac.uk/fp/software/ghc/}
+Glasgow FP group page -- \tr{http://www.dcs.gla.ac.uk/fp/}
+comp.lang.functional FAQ -- \tr{http://www.cs.nott.ac.uk/Department/Staff/mpj/faq.html}
 programming language research page --
-   http://www.cs.cmu.edu/afs/cs.cmu.edu/user/mleone/web/language-research.html
+   \tr{http://www.cs.cmu.edu/afs/cs.cmu.edu/user/mleone/web/language-research.html}
 \end{display}
 We run two mailing lists about Glasgow Haskell.  We encourage you to
 join, as you feel is appropriate.
@@ -54,7 +54,7 @@ To contact the list administrator, send mail to
 \tr{glasgow-haskell-users-request}.  An archive of the list is
 available on the Web at:
 \begin{verbatim}
-\tr{http://www.dcs.gla.ac.uk/mail-www/glasgow-haskell-users}.
+\url{http://www.dcs.gla.ac.uk/mail-www/glasgow-haskell-users}
 \end{verbatim}
 
 \item[glasgow-haskell-bugs:]
@@ -72,7 +72,7 @@ Again, you may contact the list administrator at
 And, yes,  an archive of the list is
 available on the Web at:
 \begin{verbatim}
-\tr{http://www.dcs.gla.ac.uk/mail-www/glasgow-haskell-bugs}.
+\url{http://www.dcs.gla.ac.uk/mail-www/glasgow-haskell-bugs}
 \end{verbatim}
 \end{description}
 

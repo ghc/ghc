@@ -3,7 +3,8 @@ Breaks the IdInfo/<everything> loops.
 \begin{code}
 interface IdLoop where
 
-import PreludePS	( _PackedString )
+--import PreludePS	( _PackedString )
+import FastString       ( FastString )
 import PreludeStdIO	( Maybe )
 
 import BinderInfo	( BinderInfo )
@@ -16,7 +17,13 @@ import Id		( externallyVisibleId, isDataCon, isWorkerId, isWrapperId,
 			  nullIdEnv, lookupIdEnv, IdEnv(..),
 			  Id(..), GenId
 			)
-import CostCentre	( CostCentre )
+import CostCentre	( CostCentre,
+			  noCostCentre, subsumedCosts, cafifyCC,
+			  useCurrentCostCentre, dontCareCostCentre,
+			  overheadCostCentre, preludeCafsCostCentre,
+			  preludeDictsCostCentre, mkAllCafsCC,
+		          mkAllDictsCC, mkUserCC
+			)
 import IdInfo		( IdInfo )
 import SpecEnv		( SpecEnv, nullSpecEnv, isNullSpecEnv )
 import Literal		( Literal )
@@ -93,8 +100,16 @@ data UnfoldingGuidance
   | UnfoldIfGoodArgs Int Int [Bool] Int
 
 data CostCentre
+
+noCostCentre           :: CostCentre
+subsumedCosts          :: CostCentre
+useCurrentCostCentre   :: CostCentre
+dontCareCostCentre     :: CostCentre
+overheadCostCentre     :: CostCentre
+preludeCafsCostCentre  :: CostCentre
+preludeDictsCostCentre :: Bool -> CostCentre
+mkAllCafsCC	       :: FastString -> FastString -> CostCentre
+mkAllDictsCC	       :: FastString -> FastString -> Bool -> CostCentre
+mkUserCC	       :: FastString -> FastString -> FastString -> CostCentre
+cafifyCC	       :: CostCentre -> CostCentre
 \end{code}
-
-
-
-

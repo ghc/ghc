@@ -95,22 +95,22 @@ insertMEnv match_fn (ME alist) key value
     -- that point.
 
     insert [] = returnMaB (ME [(key, value)])
-    insert ((t,v) : rest)
+    insert ls@(r@(t,v) : rest)
       = case (match_fn t key) of
 	  Nothing ->
 	    -- New key is not an instance of this existing one, so
 	    -- continue down the list.
 	    insert rest			`thenMaB` \ (ME rest') ->
-	    returnMaB (ME((t,v):rest'))
+	    returnMaB (ME(r:rest'))
 
 	  Just match_info ->
 	    -- New key *is* an instance of the old one, so check the
 	    -- other way round in case of identity.
 
 	    case (match_fn key t) of
-	      Just _  -> failMaB (t,v)
+	      Just _  -> failMaB r
 			 -- Oops; overlap
 
-	      Nothing -> returnMaB (ME ((key,value):(t,v):rest))
+	      Nothing -> returnMaB (ME ((key,value):ls))
 			 -- All ok; insert here
 \end{code}

@@ -13,6 +13,7 @@
 #include "constants.h"
 #include "utils.h"
 #include "tree.h"
+#include "list.h"
 
 #include "hsparser.tab.h"
 
@@ -106,6 +107,9 @@ expORpat(int wanted, tree e)
       case lazyp:
 	error_if_expr_wanted(wanted, "irrefutable pattern instead of an expression");
 	expORpat(wanted, glazyp(e));
+	break;
+
+      case plusp:
 	break;
 
       case lit:
@@ -556,7 +560,7 @@ splittyconapp(app, tyc, tys)
       break;
 
     default:
-      hsperror("panic: splittyconap: bad tycon application (no tycon)");
+      hsperror("bad left argument to constructor op");
     }
 }
 
@@ -701,3 +705,20 @@ checkprec(exp,qfn,right)
 
 #endif /* 0 */
 
+
+
+/* Reverse a list, in place */
+
+list reverse_list( l )
+  list l;
+{
+  list temp, acc = Lnil;
+
+  while (tlist( l ) != lnil) {
+	temp = ltl( l );
+	ltl( l ) = acc;
+	acc = l;
+	l = temp;
+  }
+  return( acc );
+}

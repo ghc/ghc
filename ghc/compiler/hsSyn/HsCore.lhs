@@ -66,15 +66,14 @@ data UfPrimOp name
 data UfCoercion name = UfIn name | UfOut name
 
 data UfAlts name
-  = UfAlgAlts  [(name, [UfBinder name], UfExpr name)]
+  = UfAlgAlts  [(name, [name], UfExpr name)]
 		(UfDefault name)
   | UfPrimAlts [(Literal, UfExpr name)]
 		(UfDefault name)
 
 data UfDefault name
   = UfNoDefault
-  | UfBindDefault (UfBinder name)
-		  (UfExpr name)
+  | UfBindDefault name (UfExpr name)
 
 data UfBinding name
   = UfNonRec	(UfBinder name)
@@ -105,15 +104,15 @@ instance Outputable name => Outputable (UfExpr name) where
     ppr sty (UfLit l) = ppr sty l
 
     ppr sty (UfCon c as)
-      = ppCat [ppStr "(UfCon", ppr sty c, ppr sty as, ppStr ")"]
+      = ppCat [ppStr "UfCon", ppr sty c, ppr sty as, ppChar ')']
     ppr sty (UfPrim o as)
-      = ppCat [ppStr "(UfPrim", ppr sty o, ppr sty as, ppStr ")"]
+      = ppCat [ppStr "UfPrim", ppr sty o, ppr sty as, ppChar ')']
 
     ppr sty (UfLam b body)
-      = ppCat [ppChar '\\', ppr sty b, ppStr "->", ppr sty body]
+      = ppCat [ppChar '\\', ppr sty b, ppPStr SLIT("->"), ppr sty body]
 
     ppr sty (UfApp fun (UfTyArg ty))
-      = ppCat [ppr sty fun, ppStr "@", pprParendHsType sty ty]
+      = ppCat [ppr sty fun, ppChar '@', pprParendHsType sty ty]
 
     ppr sty (UfApp fun (UfLitArg lit))
       = ppCat [ppr sty fun, ppr sty lit]
@@ -122,34 +121,36 @@ instance Outputable name => Outputable (UfExpr name) where
       = ppCat [ppr sty fun, ppr sty var]
 
     ppr sty (UfCase scrut alts)
-      = ppCat [ppStr "case", ppr sty scrut, ppStr "of {", pp_alts alts, ppStr "}"]
+      = ppCat [ppPStr SLIT("case"), ppr sty scrut, ppPStr SLIT("of {"), pp_alts alts, ppChar '}']
       where
     	pp_alts (UfAlgAlts alts deflt)
 	  = ppCat [ppInterleave ppSemi (map pp_alt alts), pp_deflt deflt]
 	  where
-	   pp_alt (c,bs,rhs) = ppCat [ppr sty c, ppr sty bs, ppStr "->", ppr sty rhs]
+	   pp_alt (c,bs,rhs) = ppCat [ppr sty c, ppr sty bs, ppr_arrow, ppr sty rhs]
     	pp_alts (UfPrimAlts alts deflt)
 	  = ppCat [ppInterleave ppSemi (map pp_alt alts), pp_deflt deflt]
 	  where
-	   pp_alt (l,rhs) = ppCat [ppr sty l, ppStr "->", ppr sty rhs]
+	   pp_alt (l,rhs) = ppCat [ppr sty l, ppr_arrow, ppr sty rhs]
 
 	pp_deflt UfNoDefault = ppNil
-	pp_deflt (UfBindDefault b rhs) = ppCat [ppr sty b, ppStr "->", ppr sty rhs]
+	pp_deflt (UfBindDefault b rhs) = ppCat [ppr sty b, ppr_arrow, ppr sty rhs]
+
+        ppr_arrow = ppPStr SLIT("->")
 
     ppr sty (UfLet (UfNonRec b rhs) body)
-      = ppCat [ppStr "let", ppr sty b, ppEquals, ppr sty rhs, ppStr "in", ppr sty body]
+      = ppCat [ppPStr SLIT("let"), ppr sty b, ppEquals, ppr sty rhs, ppPStr SLIT("in"), ppr sty body]
     ppr sty (UfLet (UfRec pairs) body)
-      = ppCat [ppStr "letrec {", ppInterleave ppSemi (map pp_pair pairs), ppStr "} in", ppr sty body]
+      = ppCat [ppPStr SLIT("letrec {"), ppInterleave ppSemi (map pp_pair pairs), ppPStr SLIT("} in"), ppr sty body]
       where
 	pp_pair (b,rhs) = ppCat [ppr sty b, ppEquals, ppr sty rhs]
 
     ppr sty (UfSCC uf_cc body)
-      = ppCat [ppStr "_scc_ <cost-centre[ToDo]>", ppr sty body]
+      = ppCat [ppPStr SLIT("_scc_ <cost-centre[ToDo]>"), ppr sty body]
 
 instance Outputable name => Outputable (UfPrimOp name) where
     ppr sty (UfCCallOp str is_casm can_gc arg_tys result_ty)
       = let
-	    before = ppStr (if is_casm then "_casm_ ``" else "_ccall_ ")
+	    before = ppPStr (if is_casm then SLIT("_casm_ ``") else SLIT("_ccall_ "))
 	    after  = if is_casm then ppStr "'' " else ppSP
 	in
 	ppBesides [before, ppPStr str, after,
@@ -165,8 +166,8 @@ instance Outputable name => Outputable (UfArg name) where
     ppr sty (UfUsageArg name)	= ppr sty name
 
 instance Outputable name => Outputable (UfBinder name) where
-    ppr sty (UfValBinder name ty)  = ppCat [ppr sty name, ppStr "::", ppr sty ty]
-    ppr sty (UfTyBinder name kind) = ppCat [ppr sty name, ppStr "::", ppr sty kind]
+    ppr sty (UfValBinder name ty)  = ppCat [ppr sty name, ppPStr SLIT("::"), ppr sty ty]
+    ppr sty (UfTyBinder name kind) = ppCat [ppr sty name, ppPStr SLIT("::"), ppr sty kind]
     ppr sty (UfUsageBinder name)   = ppr sty name
 \end{code}
 

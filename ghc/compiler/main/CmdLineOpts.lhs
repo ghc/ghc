@@ -46,6 +46,7 @@ module CmdLineOpts (
 	opt_D_verbose_core2core,
 	opt_D_verbose_stg2stg,
 	opt_DoCoreLinting,
+	opt_DoStgLinting,
 	opt_DoSemiTagging,
 	opt_DoEtaReduction,
 	opt_DoTickyProfiling,
@@ -58,6 +59,7 @@ module CmdLineOpts (
 	opt_Haskell_1_3,
 	opt_HiMap,
 	opt_HiSuffix,
+	opt_HiSuffixPrelude,
 	opt_IgnoreIfacePragmas,
 	opt_IgnoreStrictnessPragmas,
 	opt_IrrefutableEverything,
@@ -95,7 +97,9 @@ module CmdLineOpts (
 	opt_UnfoldingUseThreshold,
 
 	opt_Verbose,
-	opt_WarnNameShadowing
+	opt_WarnNameShadowing,
+	opt_NoWarnIncompletePatterns
+
     ) where
 
 IMPORT_1_3(Array(array, (//)))
@@ -281,6 +285,7 @@ opt_D_source_stats		= lookUp  SLIT("-dsource-stats")
 opt_D_verbose_core2core		= lookUp  SLIT("-dverbose-simpl")
 opt_D_verbose_stg2stg		= lookUp  SLIT("-dverbose-stg")
 opt_DoCoreLinting		= lookUp  SLIT("-dcore-lint")
+opt_DoStgLinting		= lookUp  SLIT("-dstg-lint")
 opt_DoSemiTagging		= lookUp  SLIT("-fsemi-tagging")
 opt_DoTickyProfiling		= lookUp  SLIT("-fticky-ticky")
 opt_DoEtaReduction		= lookUp  SLIT("-fdo-eta-reduction")
@@ -293,6 +298,7 @@ opt_GlasgowExts			= lookUp  SLIT("-fglasgow-exts")
 opt_Haskell_1_3			= lookUp  SLIT("-fhaskell-1.3")
 opt_HiMap 			= lookup_str "-himap="  -- file saying where to look for .hi files
 opt_HiSuffix			= lookup_str "-hisuf="
+opt_HiSuffixPrelude		= lookup_str "-hisuf-prelude="
 opt_IgnoreIfacePragmas		= lookUp  SLIT("-fignore-interface-pragmas")
 opt_IgnoreStrictnessPragmas	= lookUp  SLIT("-fignore-strictness-pragmas")
 opt_IrrefutableEverything	= lookUp  SLIT("-firrefutable-everything")
@@ -331,6 +337,7 @@ opt_UnfoldingConDiscount	= lookup_def_int "-funfolding-con-discount"	   uNFOLDIN
 			
 opt_LiberateCaseThreshold	= lookup_def_int "-fliberate-case-threshold"	   lIBERATE_CASE_THRESHOLD
 opt_WarnNameShadowing		= lookUp  SLIT("-fwarn-name-shadowing")
+opt_NoWarnIncompletePatterns	= lookUp  SLIT("-fno-warn-incomplete-patterns")
 
 -- opt_UnfoldingUseThreshold	= lookup_int "-funfolding-use-threshold"
 -- opt_UnfoldingOverrideThreshold	= lookup_int "-funfolding-override-threshold"

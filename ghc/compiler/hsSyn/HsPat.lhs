@@ -50,6 +50,9 @@ data InPat name
 		    Fixity		-- c.f. OpApp in HsExpr
 		    (InPat name)
 
+  | NPlusKPatIn	    name		--  n+k pattern
+		    HsLit
+
   -- We preserve prefix negation and parenthesis for the precedence parser.
 
   | NegPatIn	    (InPat name)	-- negated pattern
@@ -104,6 +107,15 @@ data OutPat tyvar uvar id
    	    	    (HsExpr tyvar uvar id (OutPat tyvar uvar id))
 						-- of type t -> Bool; detects match
 
+  | NPlusKPat	    id
+		    HsLit			-- Same reason as for LitPat
+						-- (This could be an Integer, but then
+						-- it's harder to partitionEqnsByLit
+						-- in the desugarer.)
+		    (GenType tyvar uvar)    	-- Type of pattern, t
+   	    	    (HsExpr tyvar uvar id (OutPat tyvar uvar id)) 	-- Of type t -> Bool; detects match
+   	    	    (HsExpr tyvar uvar id (OutPat tyvar uvar id)) 	-- Of type t -> t; subtracts k
+
   | DictPat	    -- Used when destructing Dictionaries with an explicit case
 		    [id]			-- superclass dicts
 		    [id]			-- methods
@@ -115,7 +127,7 @@ instance (Outputable name, NamedThing name) => Outputable (InPat name) where
 
 pprInPat :: (Outputable name, NamedThing name) => PprStyle -> InPat name -> Pretty
 
-pprInPat sty (WildPatIn)	= ppStr "_"
+pprInPat sty (WildPatIn)	= ppChar '_'
 pprInPat sty (VarPatIn var)	= ppr sty var
 pprInPat sty (LitPatIn s)	= ppr sty s
 pprInPat sty (LazyPatIn pat)	= ppBeside (ppChar '~') (ppr sty pat)
@@ -151,12 +163,14 @@ pprInPat sty (ListPatIn pats)
   = ppBesides [ppLbrack, interpp'SP sty pats, ppRbrack]
 pprInPat sty (TuplePatIn pats)
   = ppParens (interpp'SP sty pats)
+pprInPat sty (NPlusKPatIn n k)
+  = ppBesides [ppLparen, ppr sty n, ppChar '+', ppr sty k, ppRparen]
 
 pprInPat sty (RecPatIn con rpats)
   = ppCat [ppr sty con, ppCurlies (ppIntersperse pp'SP (map (pp_rpat sty) rpats))]
   where
     pp_rpat PprForUser (v, _, True) = ppr PprForUser v
-    pp_rpat sty        (v, p, _)    = ppCat [ppr sty v, ppStr "=", ppr sty p]
+    pp_rpat sty        (v, p, _)    = ppCat [ppr sty v, ppChar '=', ppr sty p]
 \end{code}
 
 \begin{code}
@@ -193,10 +207,12 @@ pprOutPat sty (RecPat con ty rpats)
   = ppBesides [ppr sty con, ppCurlies (ppIntersperse pp'SP (map (pp_rpat sty) rpats))]
   where
     pp_rpat PprForUser (v, _, True) = ppr PprForUser v
-    pp_rpat sty (v, p, _)           = ppCat [ppr sty v, ppStr "=", ppr sty p]
+    pp_rpat sty (v, p, _)           = ppCat [ppr sty v, ppChar '=', ppr sty p]
 
 pprOutPat sty (LitPat l ty) 	= ppr sty l	-- ToDo: print more
 pprOutPat sty (NPat   l ty e)	= ppr sty l	-- ToDo: print more
+pprOutPat sty (NPlusKPat n k ty e1 e2)		-- ToDo: print more
+  = ppBesides [ppLparen, ppr sty n, ppChar '+', ppr sty k, ppRparen]
 
 pprOutPat sty (DictPat dicts methods)
  = ppSep [ppBesides [ppLparen, ppPStr SLIT("{-dict-}")],
@@ -279,10 +295,11 @@ isConPat other			= False
 patsAreAllLits :: [OutPat a b c] -> Bool
 patsAreAllLits pat_list = all isLitPat pat_list
 
-isLitPat (AsPat _ pat)	= isLitPat pat
-isLitPat (LitPat _ _)	= True
-isLitPat (NPat   _ _ _)	= True
-isLitPat other		= False
+isLitPat (AsPat _ pat)	       = isLitPat pat
+isLitPat (LitPat _ _)	       = True
+isLitPat (NPat   _ _ _)	       = True
+isLitPat (NPlusKPat _ _ _ _ _) = True
+isLitPat other		       = False
 \end{code}
 
 This function @collectPatBinders@ works with the ``collectBinders''
@@ -296,6 +313,7 @@ collectPatBinders (VarPatIn var)      	 = [var]
 collectPatBinders (LitPatIn _)	      	 = []
 collectPatBinders (LazyPatIn pat)     	 = collectPatBinders pat
 collectPatBinders (AsPatIn a pat)     	 = a : collectPatBinders pat
+collectPatBinders (NPlusKPatIn n _)      = [n]
 collectPatBinders (ConPatIn c pats)   	 = concat (map collectPatBinders pats)
 collectPatBinders (ConOpPatIn p1 c f p2) = collectPatBinders p1 ++ collectPatBinders p2
 collectPatBinders (NegPatIn  pat)     	 = collectPatBinders pat

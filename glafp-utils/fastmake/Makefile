@@ -1,9 +1,19 @@
-TOP=../..
-include $(TOP)/mk/gen.mk
+TOP=..
+include $(TOP)/mk/boilerplate.mk
 
-PROG=fastmake
-SRC=fastmake.prl
+SCRIPT_PROG=fastmake
+SCRIPT_OBJS=fastmake.prl
+
+#
+# Prepend (perl) bindings for these Makefile variables
+# when creating the final script
+#
+SCRIPT_SUBST_VARS=TMPDIR
+
 INTERP=$(PERL)
+# ToDo: install
 DESTDIR=$(INSTSCRIPTDIR)
+CLEAN_FILES += $(SCRIPT_PROG)
 
-include $(TOP)/mk/script.mk
+include $(TOP)/mk/target.mk
+

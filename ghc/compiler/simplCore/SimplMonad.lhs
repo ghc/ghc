@@ -243,46 +243,44 @@ Counting-related monad functions:
 tick :: TickType -> SmplM ()
 
 tick tick_type us (SimplCount n stuff)
-  = ((), SimplCount (n _ADD_ ILIT(1))
 #ifdef OMIT_SIMPL_COUNTS
-		    stuff -- don't change anything
+  = ((), SimplCount (n _ADD_ ILIT(1) stuff))		    stuff -- don't change anything
 #else
-		    (inc_tick stuff)
-#endif
-    )
+  = case inc_tick stuff of
+      [] -> ((), SimplCount (n _ADD_ ILIT(1)) [])
+      ls -> ((), SimplCount (n _ADD_ ILIT(1)) ls)
   where
     inc_tick [] = panic "couldn't inc_tick!"
-    inc_tick (x@(ttype, cnt) : xs)
+    inc_tick (x@(ttype, I# cnt#) : xs)
       = if ttype == tick_type then
-	    let
-		incd = cnt + 1
-	    in
-	    (ttype, incd) : xs
+	    case cnt# +# 1# of { incd -> (ttype, IBOX(incd)) : xs }
 	else
-	    x : inc_tick xs
+	    case inc_tick xs of { [] -> [x]; ls -> x:ls }
+
+#endif
 
 tickN :: TickType -> Int -> SmplM ()
 
 tickN tick_type 0 us counts 
   = ((), counts)
 tickN tick_type IBOX(increment) us (SimplCount n stuff)
-  = ((), SimplCount (n _ADD_ increment)
 #ifdef OMIT_SIMPL_COUNTS
-		    stuff -- don't change anything
+  = ((), SimplCount (n _ADD_ increment) stuff) -- don't change anything
 #else
-		    (inc_tick stuff)
-#endif
-    )
+    -- force list to avoid getting a chain of @inc_tick@ applications
+    -- building up on the heap. (Only true when not dumping stats).
+  = case inc_tick stuff of
+      [] -> ((), SimplCount (n _ADD_ increment) [] )
+      ls -> ((), SimplCount (n _ADD_ increment) ls )
   where
     inc_tick [] = panic "couldn't inc_tick!"
-    inc_tick (x@(ttype, cnt) : xs)
+    inc_tick (x@(ttype, I# cnt#) : xs)
       = if ttype == tick_type then
-	    let
-		incd = cnt + IBOX(increment)
-	    in
-	    (ttype, incd) : xs
+	    case cnt# +# increment of
+              incd -> (ttype,IBOX(incd)) : xs
 	else
-	    x : inc_tick xs
+	    case inc_tick xs of { [] -> [x]; ls -> x:ls }
+#endif
 
 simplCount :: SmplM Int
 simplCount us sc@(SimplCount n _) = (IBOX(n), sc)
@@ -298,8 +296,9 @@ combineSimplCounts (SimplCount n1 stuff1) (SimplCount n2 stuff2)
 	       stuff1 -- just pick one
 #else
 combineSimplCounts (SimplCount n1 stuff1) (SimplCount n2 stuff2)
-  = SimplCount (n1 _ADD_ n2)
-	       (zipWithEqual "combineSimplCounts" (\ (t1,c1) (t2,c2) -> (t1,c1+c2)) stuff1 stuff2)
+  = case (zipWithEqual "combineSimplCounts" (\ (t1,c1) (t2,c2) -> (t1,c1+c2)) stuff1 stuff2) of
+      [] -> SimplCount (n1 _ADD_ n2) []
+      ls -> SimplCount (n1 _ADD_ n2) ls
 #endif
 \end{code}
 

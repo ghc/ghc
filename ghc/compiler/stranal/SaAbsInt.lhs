@@ -31,7 +31,7 @@ import MagicUFs		( MagicUnfoldingFun )
 import Maybes		( maybeToBool )
 import Outputable	( Outputable(..){-instance * []-} )
 import PprStyle		( PprStyle(..) )
-import Pretty		( ppStr )
+import Pretty		( ppPStr )
 import PrimOp		( PrimOp(..) )
 import SaLib
 import TyCon		( maybeTyConSingleCon, isEnumerationTyCon,
@@ -432,11 +432,11 @@ absId anal var env
 			-- Try the strictness info
 			absValFromStrictness anal strictness_info
     in
-    -- pprTrace "absId:" (ppBesides [ppr PprDebug var, ppStr "=:", pp_anal anal, ppStr ":=",ppr PprDebug result]) $
+    -- pprTrace "absId:" (ppBesides [ppr PprDebug var, ppPStr SLIT("=:"), pp_anal anal, ppStr SLIT(":="),ppr PprDebug result]) $
     result
   where
-    pp_anal StrAnal = ppStr "STR"
-    pp_anal AbsAnal = ppStr "ABS"
+    pp_anal StrAnal = ppPStr SLIT("STR")
+    pp_anal AbsAnal = ppPStr SLIT("ABS")
 
 absEvalAtom anal (VarArg v) env = absId anal v env
 absEvalAtom anal (LitArg _) env = AbsTop

@@ -48,9 +48,10 @@ For example, if \tr{f}'s @SpecEnv@ contains the mapping:
 \begin{verbatim}
 	[List a, b]  ===>  (\d -> f' a b)
 \end{verbatim}
-then
+then when we find an application of f to matching types, we simply replace
+it by the matching RHS:
 \begin{verbatim}
-	f (List Int) Bool d  ===>  f' Int Bool
+	f (List Int) Bool ===>  (\d -> f' Int Bool)
 \end{verbatim}
 All the stuff about how many dictionaries to discard, and what types
 to apply the specialised function to, are handled by the fact that the
@@ -89,3 +90,5 @@ lookupSpecEnv (SpecEnv env) tys
   | otherwise	      = --pprTrace "lookupSpecEnv" (ppr PprDebug tys) $
 			lookupMEnv matchTys env tys
 \end{code}
+
+

@@ -1,15 +1,19 @@
-TOP=..
-include $(TOP)/mk/gen.mk
+#################################################################################
+#
+#			    glafp-utils/Makefile
+#
+#		Main Makefile for project glafp-utils
+#
+#################################################################################
 
-# We need to boot msub and mkdependC (in that order), to be sure that
+TOP=.
+include $(TOP)/mk/boilerplate.mk
+
+# We need to write mkdependC first (in that order), to be sure that
 # make depend will succeed in all the other directories.
+#
+# ToDo: remove msub for good
+#
+SUBDIRS = mkdependC fastmake lndir ltx mkdirhier runstdtest
 
-SUBDIRS = msub mkdependC fastmake lndir ltx mkdirhier runstdtest
-
-boot ::
-	$(MAKE) -C msub all
-	$(MAKE) -C mkdependC all
-	$(MAKE) depend
-	$(MAKE) all
-
-include $(TOP)/mk/subdir.mk
+include $(TOP)/mk/target.mk

@@ -307,8 +307,18 @@ NL  	    	    	[\n\r]
 			      nested_comments =1;
                               PUSH_STATE(Comment);
 			    }
+<Code,GlaExt>"{-#"{WS}*"OPTIONS" {
+			      /* these are by the driver! */
+			      nested_comments =1;
+                              PUSH_STATE(Comment);
+			    }
+<Code,GlaExt>"{-#"{WS}*"SOURCE" {
+			      /* these are used by `make depend' (temp) */
+			      nested_comments =1;
+                              PUSH_STATE(Comment);
+			    }
 <Code,GlaExt>"{-#"{WS}*[A-Z_]+ {
-    	    	    	      fprintf(stderr, "\"%s\", line %d: Warning: Unrecognised pragma '",
+    	    	    	      fprintf(stderr, "%s:%d: Warning: Unrecognised pragma '",
     	    	    	        input_filename, hsplineno);
     	    	    	      format_string(stderr, (unsigned char *) yytext, yyleng);
     	    	    	      fputs("'\n", stderr);
@@ -381,6 +391,7 @@ NL  	    	    	[\n\r]
 <Code,GlaExt>"<-"		{ RETURN(LARROW); }
 <Code,GlaExt,UserPragma>"->"	{ RETURN(RARROW); }
 <Code,GlaExt>"-"    		{ RETURN(MINUS); }
+<Code,GlaExt>"+"    		{ RETURN(PLUS); }
 
 <Code,GlaExt,UserPragma>"=>"	{ RETURN(DARROW); }
 <Code,GlaExt>"@"		{ RETURN(AT); }
@@ -558,7 +569,7 @@ NL  	    	    	[\n\r]
 			 }
 
     	    	    	 if (length > 1) {
-    	    	    	    fprintf(stderr, "\"%s\", line %d, column %d: Unboxed character literal '",
+    	    	    	    fprintf(stderr, "%s:%d:%d: Unboxed character literal '",
     	    	    	      input_filename, hsplineno, hspcolno + 1);
     	    	    	    format_string(stderr, (unsigned char *) text, length);
     	    	    	    fputs("' too long\n", stderr);
@@ -577,7 +588,7 @@ NL  	    	    	[\n\r]
     	    	    	 text = fetchtext(&length);
 
     	    	    	 if (length > 1) {
-    	    	    	    fprintf(stderr, "\"%s\", line %d, column %d: Character literal '",
+    	    	    	    fprintf(stderr, "%s:%d:%d: Character literal '",
     	    	    	      input_filename, hsplineno, hspcolno + 1);
     	    	    	    format_string(stderr, (unsigned char *) text, length);
     	    	    	    fputs("' too long\n", stderr);
@@ -799,21 +810,21 @@ NL  	    	    	[\n\r]
 %}
 
 <INITIAL,Code,GlaExt,UserPragma>(.|\n)	{ 
-    	    	    	 fprintf(stderr, "\"%s\", line %d, column %d: Illegal character: `", 
+    	    	    	 fprintf(stderr, "%s:%d:%d: Illegal character: `", 
     	    	    	    input_filename, hsplineno, hspcolno + 1); 
     	    	    	 format_string(stderr, (unsigned char *) yytext, 1);
     	    	    	 fputs("'\n", stderr);
 			 hsperror("");
 			}
 <Char>(.|\n)		{ 
-    	    	    	 fprintf(stderr, "\"%s\", line %d, column %d: Illegal character: `",
+    	    	    	 fprintf(stderr, "%s:%d:%d: Illegal character: `",
     	    	    	    input_filename, hsplineno, hspcolno + 1); 
     	    	    	 format_string(stderr, (unsigned char *) yytext, 1);
     	    	    	 fputs("' in a character literal\n", stderr);
 			 hsperror("");
 			}
 <CharEsc>(.|\n)		{
-    	    	    	 fprintf(stderr, "\"%s\", line %d, column %d: Illegal character escape: `\\",
+    	    	    	 fprintf(stderr, "%s:%d:%d: Illegal character escape: `\\",
     	    	    	    input_filename, hsplineno, hspcolno + 1); 
     	    	    	 format_string(stderr, (unsigned char *) yytext, 1);
     	    	    	 fputs("'\n", stderr);
@@ -822,7 +833,7 @@ NL  	    	    	[\n\r]
 <String>(.|\n)		{ if (nonstandardFlag) {
                              addtext(yytext, yyleng);
                           } else { 
-                                fprintf(stderr, "\"%s\", line %d, column %d: Illegal character: `", 
+                                fprintf(stderr, "%s:%d:%d: Illegal character: `", 
                                 input_filename, hsplineno, hspcolno + 1); 
                                 format_string(stderr, (unsigned char *) yytext, 1);
                                 fputs("' in a string literal\n", stderr);
@@ -831,13 +842,13 @@ NL  	    	    	[\n\r]
 			}
 <StringEsc>(.|\n)	{
     	    	    	 if (noGap) {
-    	    	    	     fprintf(stderr, "\"%s\", line %d, column %d: Illegal string escape: `\\", 
+    	    	    	     fprintf(stderr, "%s:%d:%d: Illegal string escape: `\\", 
     	    	    	    	input_filename, hsplineno, hspcolno + 1); 
     	    	    	     format_string(stderr, (unsigned char *) yytext, 1);
     	    	    	     fputs("'\n", stderr);
 			     hsperror("");
     	    	    	 } else {
-    	    	    	     fprintf(stderr, "\"%s\", line %d, column %d: Illegal character: `",
+    	    	    	     fprintf(stderr, "%s:%d:%d: Illegal character: `",
     	    	    	    	input_filename, hsplineno, hspcolno + 1);
     	    	    	     format_string(stderr, (unsigned char *) yytext, 1);
     	    	    	     fputs("' in a string gap\n", stderr);

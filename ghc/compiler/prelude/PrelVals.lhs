@@ -571,7 +571,7 @@ realWorldPrimId
 \end{code}
 
 \begin{code}
-voidId = pc_bottoming_Id voidIdKey gHC__ SLIT("void") voidTy
+voidId = pc_bottoming_Id voidIdKey pREL_BASE SLIT("void") voidTy
 \end{code}
 
 %************************************************************************

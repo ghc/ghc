@@ -45,7 +45,7 @@ cvValSig (RdrTySig vars poly_ty src_loc)
   = [ Sig v poly_ty src_loc | v <- vars ]
 
 cvClassOpSig (RdrTySig vars poly_ty src_loc)
-  = [ ClassOpSig v poly_ty noClassOpPragmas src_loc | v <- vars ]
+  = [ ClassOpSig v v poly_ty src_loc | v <- vars ]
 
 cvInstDeclSig (RdrSpecValSig        sigs) = sigs
 cvInstDeclSig (RdrInlineValSig      sig)  = [ sig ]

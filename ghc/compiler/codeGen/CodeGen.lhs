@@ -57,11 +57,8 @@ codeGen mod_name (local_CCs, extern_CCs) import_names gen_tycons tycon_specs stg
   = let
 	doing_profiling   = opt_SccProfilingOn
 	compiling_prelude = opt_CompilingGhcInternals
-	maybe_split       = if opt_EnsureSplittableC
-			    then CSplitMarker
-			    else AbsCNop
-
-	cinfo = MkCompInfo mod_name
+	maybe_split       = if opt_EnsureSplittableC then CSplitMarker else AbsCNop
+	cinfo             = MkCompInfo mod_name
     in
     if not doing_profiling then
 	mkAbstractCs [

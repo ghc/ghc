@@ -1,5 +1,9 @@
-# *** MSUB does some substitutions here ***
-# *** grep for $( ***
+#
+# This stub of perl assumes that the following two
+# variables are prepended:
+#
+#  RAWCPP
+#  HOSTPLATFORM
 #
 # tries to work like mkdependC
 #
@@ -23,7 +27,7 @@ $Makefile = '';
 
 # the following is a hack, so we can use RAWCPP, but there you go;
 # put in just enough #defines that mkdependC will not barf.
-$HostPlatform = '$(HOSTPLATFORM)';
+$HostPlatform = ${HOSTPLATFORM};
 
 if ( $HostPlatform =~ /^i386-/ ) {
     push(@Defines, '-D__i386__');
@@ -149,7 +153,7 @@ sub slurp_file { # follows an example in the `open' item in perl man page
 
     $fname = &tidy_dir_names($fname);
 
-    unless (open($fhandle, "$(RAWCPP) $Include_dirs @Defines $fname |")) {
+    unless (open($fhandle, "${RAWCPP} $Include_dirs @Defines $fname |")) {
          die "$Pgm: Can't open $fname: $!\n";
     }
     line: while (<$fhandle>) {

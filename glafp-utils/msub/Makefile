@@ -1,12 +1,7 @@
-TOP=../..
-include $(TOP)/mk/gen.mk
+TOP=..
+include $(TOP)/mk/boilerplate.mk
 
-SRCS=msub.c
-PROG=msub
-DESTDIR=$(INSTBINDIR)
-
-# No need for dependencies, which is just as well since
-# mkdependC can't be built until msub has been build!
-OmitCDepend = YES
-
-include $(TOP)/mk/Cprog.mk
+C_SRCS=msub.c
+C_PROG=msub
+CLEAN_FILES += $(C_PROG) $(C_OBJS)
+include $(TOP)/mk/target.mk

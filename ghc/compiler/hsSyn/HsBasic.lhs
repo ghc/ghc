@@ -92,9 +92,9 @@ instance Outputable Fixity where
     ppr sty (Fixity prec dir) = ppBesides [ppr sty dir, ppSP, ppInt prec]
 
 instance Outputable FixityDirection where
-    ppr sty InfixL = ppStr "infixl"
-    ppr sty InfixR = ppStr "infixr"
-    ppr sty InfixN = ppStr "infix"
+    ppr sty InfixL = ppPStr SLIT("infixl")
+    ppr sty InfixR = ppPStr SLIT("infixr")
+    ppr sty InfixN = ppPStr SLIT("infix")
 
 instance Eq Fixity where		-- Used to determine if two fixities conflict
   (Fixity p1 dir1) == (Fixity p2 dir2) = p1==p2 && dir1 == dir2

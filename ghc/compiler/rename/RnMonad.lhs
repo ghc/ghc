@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1997
 %
 \section[RnMonad]{The monad used by the renamer}
 
@@ -7,24 +7,36 @@
 #include "HsVersions.h"
 
 module RnMonad(
-	RnMonad..,
-	SST_R
+	EXP_MODULE(RnMonad),
+	 -- close it up (partly done to allow unfoldings)
+	EXP_MODULE(SST),
+	SYN_IE(Module),
+	FiniteMap,
+	Bag,
+	Name,
+	SYN_IE(RdrNameHsDecl),
+	SYN_IE(RdrNameInstDecl),
+	SYN_IE(Version),
+	SYN_IE(NameSet),
+	OccName,
+	Fixity
     ) where
 
 IMP_Ubiq(){-uitous-}
 
 import SST
-import PreludeGlaST	( SYN_IE(ST), thenST, returnST )
+import PreludeGlaST	( SYN_IE(ST), thenStrictlyST, returnStrictlyST )
 
 import HsSyn		
 import RdrHsSyn
 import ErrUtils		( addErrLoc, addShortErrLocLine, addShortWarnLocLine,
 			  pprBagOfErrors, SYN_IE(Error), SYN_IE(Warning)
 			)
-import Name		( SYN_IE(Module), Name, OccName, Provenance, SYN_IE(NameSet),
+import Name		( SYN_IE(Module), Name, OccName, Provenance, SYN_IE(NameSet), emptyNameSet,
+			  isLocallyDefinedName,
 			  modAndOcc, NamedThing(..)
 			)
-import CmdLineOpts	( opt_D_show_rn_trace )
+import CmdLineOpts	( opt_D_show_rn_trace, opt_IgnoreIfacePragmas )
 import PrelInfo		( builtinNames )
 import TyCon		( TyCon {- instance NamedThing -} )
 import TysWiredIn	( boolTyCon )
@@ -58,8 +70,8 @@ infixr 9 `thenRn`, `thenRn_`
 \begin{code}
 sstToIO :: SST REAL_WORLD r -> IO r
 sstToIO sst 
-  = sstToST sst 	`thenST` \ r -> 
-    returnST (Right r)
+  = sstToST sst 	`thenStrictlyST` \ r -> 
+    returnStrictlyST (Right r)
 
 ioToRnMG :: IO r -> RnMG (Either IOError13 r)
 ioToRnMG io rn_down g_down = stToSST io
@@ -106,7 +118,9 @@ data GDown = GDown
 
 	-- For renaming source code
 data SDown s = SDown
-		  RnEnv	
+		  RnEnv			-- Global envt
+		  NameEnv		-- Local name envt (includes global name envt, 
+					-- but may shadow it)
 		  Module
 		  RnSMode
 
@@ -152,7 +166,12 @@ type Fixities		= [(OccName, (Fixity, Provenance))]
 	
 type ModuleAvails	= FiniteMap Module Avails
 
-data AvailInfo		= NotAvailable | Avail Name [Name]
+data AvailInfo		= NotAvailable 
+			| Avail Name		-- An ordinary identifier
+			| AvailTC Name 		-- The name of the type or class
+				  [Name]	-- The available pieces of type/class. NB: If the type or
+						-- class is itself to be in scope, it must be in this list.
+						-- Thus, typically: Avail Eq [Eq, ==, /=]
 \end{code}
 
 ===================================================
@@ -187,16 +206,27 @@ data Ifaces = Ifaces
 		Module							-- Name of this module
 		(FiniteMap Module Version)
 		(FiniteMap Module (Avails, [(OccName,Fixity)]))		-- Exports
-		VersionMap
 		DeclsMap
-		(Bag IfaceInst)
+
+		NameSet			-- All the names (whether "big" or "small", whether wired-in or not,
+					-- whether locally defined or not) that have been slurped in so far.
+
+		[(Name,Version)]	-- All the (a) non-wired-in (b) "big" (c) non-locally-defined names that 
+					-- have been slurped in so far, with their versions.  Subset of
+					-- the previous field.  This is used to generate the "usage" information
+					-- for this module.
+
+		(Bag IfaceInst)		-- Un-slurped instance decls; this bag is depleted when we
+					-- slurp an instance decl so that we don't slurp the same one twice.
+
 		[Module]		-- Set of modules with "special" instance declarations
 					-- Excludes this module
 
-type DeclsMap    = FiniteMap Name (AvailInfo, RdrNameHsDecl)
-type VersionMap  = FiniteMap Name Version
-type IfaceInst   = ([Name], Module, RdrNameInstDecl)	-- The Names are those tycons and
-							-- classes mentioned by the instance type
+type DeclsMap    = FiniteMap Name (Version, AvailInfo, RdrNameHsDecl)
+type IfaceInst   = ((Module, RdrNameInstDecl),	-- Instance decl
+		    [Name])			-- "Gate" names.  Slurp this instance decl when this
+						-- list becomes empty.  It's depleted whenever we
+						-- slurp another type or class decl.
 \end{code}
 
 
@@ -230,15 +260,15 @@ initRn mod us dirs loc do_rn
 
 
 initRnMS :: RnEnv -> Module -> RnSMode -> RnMS REAL_WORLD r -> RnMG r
-initRnMS env mod_name mode m rn_down g_down
+initRnMS rn_env@(RnEnv name_env _) mod_name mode m rn_down g_down
   = let
-	s_down = SDown env mod_name mode
+	s_down = SDown rn_env name_env mod_name mode
     in
     m rn_down s_down
 
 
 emptyIfaces :: Module -> Ifaces
-emptyIfaces mod = Ifaces mod emptyFM emptyFM emptyFM emptyFM emptyBag []
+emptyIfaces mod = Ifaces mod emptyFM emptyFM emptyFM emptyNameSet [] emptyBag []
 
 builtins :: FiniteMap (Module,OccName) Name
 builtins = bagToFM (mapBag (\ name -> (modAndOcc name, name)) builtinNames)
@@ -280,7 +310,7 @@ renameSourceCode mod_name name_supply m
 	newMutVarSST []				`thenSST` \ occs_var ->
     	let
 	    rn_down = RnDown mkGeneratedSrcLoc names_var errs_var occs_var
-	    s_down = SDown emptyRnEnv mod_name InterfaceMode
+	    s_down = SDown emptyRnEnv emptyNameEnv mod_name InterfaceMode
 	in
 	m rn_down s_down			`thenSST` \ result ->
 	
@@ -417,20 +447,40 @@ getNameSupplyRn (RnDown loc names_var errs_var occs_var) l_down
 setNameSupplyRn :: RnNameSupply -> RnM s d ()
 setNameSupplyRn names' (RnDown loc names_var errs_var occs_var) l_down
   = writeMutVarSST names_var names'
+
+-- The "instance-decl unique supply", inst, is just an integer that's used to
+-- give a unique number for each instance declaration.
+newInstUniq :: RnM s d Int
+newInstUniq (RnDown loc names_var errs_var occs_var) l_down
+  = readMutVarSST names_var				`thenSST` \ (us, inst, cache) ->
+    writeMutVarSST names_var (us, inst+1, cache)	`thenSST_` 
+    returnSST inst
 \end{code}
 
 ================  Occurrences =====================
 
 \begin{code}
-addOccurrenceName :: Necessity -> Name -> RnM s d ()
+addOccurrenceName :: Necessity -> Name -> RnM s d Name	-- Same name returned as passed
 addOccurrenceName necessity name (RnDown loc names_var errs_var occs_var) l_down
+  | isLocallyDefinedName name ||
+    not_necessary necessity
+  = returnSST name
+
+  | otherwise
   = readMutVarSST occs_var			`thenSST` \ occs ->
-    writeMutVarSST occs_var ((name,necessity) : occs)
+--     pprTrace "Add occurrence:" (ppr PprDebug name) $
+    writeMutVarSST occs_var ((name,necessity) : occs)	`thenSST_`
+    returnSST name
+  where
+    not_necessary Compulsory = False
+    not_necessary Optional = opt_IgnoreIfacePragmas
+    		-- Never look for optional things if we're
+		-- ignoring optional input interface information
 
 addOccurrenceNames :: Necessity -> [Name] -> RnM s d ()
 addOccurrenceNames necessity names (RnDown loc names_var errs_var occs_var) l_down
   = readMutVarSST occs_var			`thenSST` \ occs ->
-    writeMutVarSST occs_var ([(name,necessity) | name <- names] ++ occs)
+    writeMutVarSST occs_var ([(name,necessity) | name <- names, not (isLocallyDefinedName name)] ++ occs)
 
 popOccurrenceName :: RnM s d (Maybe (Name,Necessity))
 popOccurrenceName (RnDown loc names_var errs_var occs_var) l_down
@@ -464,34 +514,34 @@ findOccurrencesRn enclosed_thing (RnDown loc names_var errs_var occs_var) l_down
 ================  RnEnv  =====================
 
 \begin{code}
+getGlobalNameEnv :: RnMS s NameEnv
+getGlobalNameEnv rn_down (SDown (RnEnv global_env fixity_env) local_env mod_name mode)
+  = returnSST global_env
+
 getNameEnv :: RnMS s NameEnv
-getNameEnv rn_down (SDown (RnEnv name_env fixity_env) mod_name mode)
-  = returnSST name_env
+getNameEnv rn_down (SDown rn_env local_env mod_name mode)
+  = returnSST local_env
 
 setNameEnv :: NameEnv -> RnMS s a -> RnMS s a
-setNameEnv name_env' m rn_down (SDown (RnEnv name_env fixity_env) mod_name mode)
-  = m rn_down (SDown (RnEnv name_env' fixity_env) mod_name mode)
+setNameEnv local_env' m rn_down (SDown rn_env local_env mod_name mode)
+  = m rn_down (SDown rn_env local_env' mod_name mode)
 
 getFixityEnv :: RnMS s FixityEnv
-getFixityEnv rn_down (SDown (RnEnv name_env fixity_env) mod_name mode)
+getFixityEnv rn_down (SDown (RnEnv name_env fixity_env) local_env mod_name mode)
   = returnSST fixity_env
-
-setRnEnv :: RnEnv -> RnMS s a -> RnMS s a 
-setRnEnv rn_env' m rn_down (SDown rn_env mod_name mode)
-  = m rn_down (SDown rn_env' mod_name mode)
 \end{code}
 
 ================  Module and Mode =====================
 
 \begin{code}
 getModuleRn :: RnMS s Module
-getModuleRn rn_down (SDown rn_env mod_name mode)
+getModuleRn rn_down (SDown rn_env local_env mod_name mode)
   = returnSST mod_name
 \end{code}
 
 \begin{code}
 getModeRn :: RnMS s RnSMode
-getModeRn rn_down (SDown rn_env mod_name mode)
+getModeRn rn_down (SDown rn_env local_env mod_name mode)
   = returnSST mode
 \end{code}
 

@@ -1,0 +1,137 @@
+# Instructions for configuring an fptools package.
+#
+# There are two ways you can get started with an fptools package, either
+# by using the unpacked distribution tree in-situ or by installing the
+# package.
+#
+# Using the package directly is easy, just do `make config', i.e.,
+# the distribution will *not* work out-of-the-box, you'll have to do
+# this first.
+#
+# To install the package, you'll have to set one or more of the
+# following variables:
+#
+#  * bindir 
+#     path to directory of where you want the executables
+#     to be installed.
+#  * libdir
+#     where you want the library archives to go.
+#     Note, if you specify /usr/foo/lib for libdir,
+#     the library files for your fptools package will be
+#     installed in  /usr/foo/lib/<package>-<version>, i.e.,
+#     /usr/foo/lib/ghc-2.02. If you don't want the package/version
+#     directory appended, you'll have to modify $(real_libdir)
+#     below.
+#
+#  * datadir
+#     path to where the platform-independent files will go.
+#     As for libdir, the effective path for the platform-indep
+#     stuff is $(datadir)/<package>-<version>. If you want
+#     complete control, see $(real_libdir)
+#
+#  * platform 
+#     the platform you're installing for. The configure
+#     makes an educated guess what it, so you will only
+#     have to set this if it clashes with your reality.
+#
+#  * infodir
+#     where to install the Emacs info files
+#  * htmldir
+#     where to install the documentation HTML files.
+#  * dvidir
+#     where to install the DVI files.
+#
+# Installing the documentation is not via the `install' rule, but
+# via the rules: `install-docs', `install-html', `install-dvi'
+# and `install-info'.
+#
+# For more complete instructions, consult the INSTALL file
+# that came with the bundle, and/or consult the installation
+# documentation in one of the document directories.
+#
+bindir    = @bindir@
+libdir    = @libdir@
+datadir   = @datadir@
+platform  = @platform@
+
+infodir   = @infodir@
+htmldir   = @htmldir@
+dvidir    = @dvidir@
+
+#
+# Putting the package stuff in package-specific
+# directories:
+#
+real_libdir  = $(libdir)/$(package)-$(version)
+real_datadir = $(datadir)/$(package)-$(version)
+
+
+
+
+package   = ghc
+version   = 2.02
+PERL      = @PerlCmd@
+
+.PHONY: config install install-dirs
+
+config:
+	@echo Configuring $(package), version $(version), on $(platform)
+	@RM `pwd`/bin/$(platform)/$(package)-$(version)/$(package)-$(version)
+	@RM `pwd`/bin/$(platform)/$(package)-$(version)/$(package)
+	@echo $(PerlCmd)                  > `pwd`/bin/$(platform)/$(package)
+	@echo "$""bindir='"`pwd`"/bin/$(platform)/$(package)-$(version)';"    >> `pwd`/bin/$(platform)/$(package)-$(version)/$(package)
+	@echo "$""libdir='"`pwd`"/lib/$(platform)/$(package)-$(version)';"    >> `pwd`/bin/$(platform)/$(package)-$(version)/$(package)
+	@echo "$""datadir='"`pwd`"/share/$(platform)/$(package)-$(version)';" >> `pwd`/bin/$(platform)/$(package)-$(version)/$(package)
+	@cat `pwd`/bin/$(platform)/$(package)-$(version)/$(package).prl';"    >> `pwd`/bin/$(platform)/$(package)-$(version)/$(package)
+	@(cd `pwd`/bin/$(platform)/$(package)-$(version); $(LN_S) $(package) $(package)-$(version) )
+	@echo Finished..to use, add `pwd`/bin/$(platform)/$(package)-$(version) to your PATH.
+
+libdirs  = . imports include
+datadirs = . include
+
+install-dirs:
+	$(MKDIRHIER) $(bindir) 
+	@for i in $(libdirs) ; do \
+	  echo (MKDIRHIER) $(real_libdir)/$$i; \
+	  (MKDIRHIER) $(real_libdir)/$$i; \
+	done;
+	@for i in $(datadirs) ; do \
+	  echo (MKDIRHIER) $(real_datadir)/$$i; \
+	  (MKDIRHIER) $(real_datadir)/$$i; \
+	done;
+
+install : install-dirs
+
+install :
+	$(INSTALL_PROGRAM) `pwd`/bin/$(platform)/$(package)-$(version)/* $(bindir)
+	@for i in $(libdirs); do \
+	   echo $(INSTALL) `pwd`/lib/$(platform)/$(package)-$(version)/$$i/* $(real_libdir)/$$i; \
+	   $(INSTALL) `pwd`/lib/$(platform)/$(package)-$(version)/$$i/* $(real_libdir)/$$i; \
+	done; 
+	@for i in $(datadirs); do \
+	   echo $(INSTALL) `pwd`/share/$(package)-$(version)/$$i/* $(real_datadir)/$$i; \
+	   $(INSTALL) `pwd`/share/$(package)-$(version)/$$i/* $(real_datadir)/$$i; \
+	done; 
+
+install-docs : install-info install-html install-dvi
+
+install-dirs-html:
+	$(MKDIRHIER) $(htmldir) 
+
+install-dirs-info:
+	$(MKDIRHIER) $(infodir) 
+
+install-dirs-dvi:
+	$(MKDIRHIER) $(dvidir) 
+
+install-docs : install-html install-info install-dvi 
+
+install-dvi: install-dirs-dvi
+	$(INSTALL) `pwd`/dvi/$(package)-$(version)/* $(dvidir)
+
+install-info: install-dirs-info
+	$(INSTALL) `pwd`/info/$(package)-$(version)/* $(infodir)
+
+install-html: install-dirs-html
+	$(INSTALL) `pwd`/html/$(package)-$(version)/* $(htmldir)
+

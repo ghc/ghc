@@ -14,7 +14,7 @@ import StgSyn
 
 import Bag		( emptyBag, unionBags, unitBag, snocBag, bagToList )
 import Id		( idType, mkSysLocal, addIdArity, 
-			  mkIdSet, unitIdSet, minusIdSet,
+			  mkIdSet, unitIdSet, minusIdSet, setIdVisibility,
 			  unionManyIdSets, idSetToList, SYN_IE(IdSet),
 			  nullIdEnv, growIdEnvList, lookupIdEnv, SYN_IE(IdEnv)
 			)
@@ -87,11 +87,13 @@ supercombinators on a selective basis:
   recursive calls, which may now have lots of free vars.
 
 Recent Observations:
+
 * 2 might be already ``too many'' variables to abstract.
   The problem is that the increase in the number of free variables
   of closures refering to the lifted function (which is always # of
   abstracted args - 1) may increase heap allocation a lot.
   Expeiments are being done to check this...
+
 * We do not lambda lift if the function has at least one occurrence
   without any arguments. This caused lots of problems. Ex:
   h = \ x -> ... let y = ...
@@ -120,8 +122,8 @@ Recent Observations:
 %************************************************************************
 
 \begin{code}
-liftProgram :: UniqSupply -> [StgBinding] -> [StgBinding]
-liftProgram us prog = concat (runLM Nothing us (mapLM liftTopBind prog))
+liftProgram :: Module -> UniqSupply -> [StgBinding] -> [StgBinding]
+liftProgram mod us prog = concat (runLM mod Nothing us (mapLM liftTopBind prog))
 
 
 liftTopBind :: StgBinding -> LiftM [StgBinding]
@@ -394,7 +396,8 @@ mkScPieces extra_arg_set (id, StgRhsClosure cc bi _ upd args body)
 The monad is used only to distribute global stuff, and the unique supply.
 
 \begin{code}
-type LiftM a =  LiftFlags
+type LiftM a =  Module 
+	     -> LiftFlags
 	     -> UniqSupply
 	     -> (IdEnv 				-- Domain = candidates for lifting
 		       (Id,			-- The supercombinator
@@ -407,22 +410,22 @@ type LiftFlags = Maybe Int	-- No of fvs reqd to float recursive
 				-- binding; Nothing == infinity
 
 
-runLM :: LiftFlags -> UniqSupply -> LiftM a -> a
-runLM flags us m = m flags us nullIdEnv
+runLM :: Module -> LiftFlags -> UniqSupply -> LiftM a -> a
+runLM mod flags us m = m mod flags us nullIdEnv
 
 thenLM :: LiftM a -> (a -> LiftM b) -> LiftM b
-thenLM m k ci us idenv
-  = k (m ci us1 idenv) ci us2 idenv
+thenLM m k mod ci us idenv
+  = k (m mod ci us1 idenv) mod ci us2 idenv
   where
     (us1, us2) = splitUniqSupply us
 
 returnLM :: a -> LiftM a
-returnLM a ci us idenv = a
+returnLM a mod ci us idenv = a
 
 fixLM :: (a -> LiftM a) -> LiftM a
-fixLM k ci us idenv = r
+fixLM k mod ci us idenv = r
 		       where
-			 r = k r ci us idenv
+			 r = k r mod ci us idenv
 
 mapLM :: (a -> LiftM b) -> [a] -> LiftM [b]
 mapLM f [] = returnLM []
@@ -442,22 +445,22 @@ newSupercombinator :: Type
 		   -> Int		-- Arity
 		   -> LiftM Id
 
-newSupercombinator ty arity ci us idenv
-  = (mkSysLocal SLIT("sc") uniq ty noSrcLoc)	-- ToDo: improve location
+newSupercombinator ty arity mod ci us idenv
+  = setIdVisibility mod (mkSysLocal SLIT("sc") uniq ty noSrcLoc)
     `addIdArity` exactArity arity
 	-- ToDo: rm the addIdArity?  Just let subsequent stg-saturation pass do it?
   where
     uniq = getUnique us
 
 lookUp :: Id -> LiftM (Id,[Id])
-lookUp v ci us idenv
+lookUp v mod ci us idenv
   = case (lookupIdEnv idenv v) of
       Just result -> result
       Nothing     -> (v, [])
 
 addScInlines :: [Id] -> [(Id,[Id])] -> LiftM a -> LiftM a
-addScInlines ids values m ci us idenv
-  = m ci us idenv'
+addScInlines ids values m mod ci us idenv
+  = m mod ci us idenv'
   where
     idenv' = growIdEnvList idenv (ids `zip_lazy` values)
 
@@ -487,7 +490,7 @@ addScInlines ids values m ci us idenv
 
 getFinalFreeVars :: IdSet -> LiftM IdSet
 
-getFinalFreeVars free_vars ci us idenv
+getFinalFreeVars free_vars mod ci us idenv
   = unionManyIdSets (map munge_it (idSetToList free_vars))
   where
     munge_it :: Id -> IdSet	-- Takes a free var and maps it to the "real"

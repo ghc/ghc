@@ -67,7 +67,7 @@ import Id		( idType,
 import Maybes		( maybeToBool )
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instance Outputable-} )
-import Pretty		( ppAboves, ppCat, ppStr )
+import Pretty		( ppAboves, ppCat, ppPStr )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
 import StgSyn		( SYN_IE(StgLiveVars) )
 import Type		( typePrimRep )
@@ -689,11 +689,11 @@ lookupBindC name info_down@(MkCgInfoDown _ static_binds _)
 		   Nothing
 		     -> pprPanic "lookupBindC:no info!\n"
 			(ppAboves [
-			    ppCat [ppStr "for:", ppr PprShowAll name],
-			    ppStr "(probably: data dependencies broken by an optimisation pass)",
-			    ppStr "static binds for:",
+			    ppCat [ppPStr SLIT("for:"), ppr PprShowAll name],
+			    ppPStr SLIT("(probably: data dependencies broken by an optimisation pass)"),
+			    ppPStr SLIT("static binds for:"),
 			    ppAboves [ ppr PprDebug i | (MkCgIdInfo i _ _ _) <- rngIdEnv static_binds ],
-			    ppStr "local binds for:",
+			    ppPStr SLIT("local binds for:"),
 			    ppAboves [ ppr PprDebug i | (MkCgIdInfo i _ _ _) <- rngIdEnv local_binds ]
 			 ])
 \end{code}

@@ -3,7 +3,8 @@ Breaks the PrelVal loop and the PrelInfo loop caused by primOpNameInfo.
 \begin{code}
 interface PrelLoop where
 
-import PreludePS	( _PackedString )
+--import PreludePS	( _PackedString )
+import FastString       ( FastSring )
 
 import Class		( GenClass )
 import CoreUnfold	( mkMagicUnfolding, Unfolding )

@@ -333,32 +333,32 @@ unifyCtxt ty1 ty2		-- ty1 expected, ty2 inferred
     returnNF_Tc (err ty1' ty2')
   where
     err ty1' ty2' sty = ppAboves [
-			   ppCat [ppStr "Expected:", ppr sty ty1'],
-			   ppCat [ppStr "Inferred:", ppr sty ty2']
+			   ppCat [ppPStr SLIT("Expected:"), ppr sty ty1'],
+			   ppCat [ppPStr SLIT("Inferred:"), ppr sty ty2']
 		        ]
 
 unifyMisMatch ty1 ty2 sty
-  = ppHang (ppStr "Couldn't match the type")
-	 4 (ppSep [ppr sty ty1, ppStr "against", ppr sty ty2])
+  = ppHang (ppPStr SLIT("Couldn't match the type"))
+	 4 (ppSep [ppr sty ty1, ppPStr SLIT("against"), ppr sty ty2])
 
 expectedFunErr ty sty
   = ppHang (ppStr "Function type expected, but found the type")
 	 4 (ppr sty ty)
 
 unifyKindErr tyvar ty sty
-  = ppHang (ppStr "Compiler bug: kind mis-match between")
-	 4 (ppSep [ppCat [ppr sty tyvar, ppStr "::", ppr sty (tyVarKind tyvar)],
-		   ppStr "and", 
-		   ppCat [ppr sty ty, ppStr "::", ppr sty (typeKind ty)]])
+  = ppHang (ppPStr SLIT("Compiler bug: kind mis-match between"))
+	 4 (ppSep [ppCat [ppr sty tyvar, ppPStr SLIT("::"), ppr sty (tyVarKind tyvar)],
+		   ppPStr SLIT("and"), 
+		   ppCat [ppr sty ty, ppPStr SLIT("::"), ppr sty (typeKind ty)]])
 
 unifyDontBindErr tyvar ty sty
-  = ppHang (ppStr "Couldn't match the *signature/existential* type variable")
+  = ppHang (ppPStr SLIT("Couldn't match the signature/existential type variable"))
 	 4 (ppSep [ppr sty tyvar,
-		   ppStr "with the type", 
+		   ppPStr SLIT("with the type"), 
 		   ppr sty ty])
 
 unifyOccurCheck tyvar ty sty
-  = ppHang (ppStr "Cannot construct the infinite type (occur check)")
-	 4 (ppSep [ppr sty tyvar, ppStr "=", ppr sty ty])
+  = ppHang (ppPStr SLIT("Cannot construct the infinite type (occur check)"))
+	 4 (ppSep [ppr sty tyvar, ppChar '=', ppr sty ty])
 \end{code}
 

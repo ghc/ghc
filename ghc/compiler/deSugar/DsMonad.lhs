@@ -20,8 +20,11 @@ module DsMonad (
 	SYN_IE(DsIdEnv),
 	lookupId,
 
-	dsShadowError,
-	DsMatchContext(..), DsMatchKind(..), pprDsWarnings
+	dsShadowWarn, dsIncompleteWarn,
+	DsWarnings(..),
+	DsMatchContext(..), DsMatchKind(..), pprDsWarnings,
+        DsWarnFlavour -- Nuke with 1.4
+
     ) where
 
 IMP_Ubiq()
@@ -60,8 +63,9 @@ type DsM result =
 	-> DsWarnings
 	-> (result, DsWarnings)
 
-type DsWarnings = Bag DsMatchContext	-- The desugarer reports matches which are
-					-- completely shadowed
+type DsWarnings = Bag (DsWarnFlavour, DsMatchContext)
+					-- The desugarer reports matches which are
+					-- completely shadowed or incomplete patterns
 {-# INLINE andDs #-}
 {-# INLINE thenDs #-}
 {-# INLINE returnDs #-}
@@ -181,9 +185,13 @@ putSrcLocDs :: SrcLoc -> DsM a -> DsM a
 putSrcLocDs new_loc expr us old_loc mod_and_grp env warns
   = expr us new_loc mod_and_grp env warns
 
-dsShadowError :: DsMatchContext -> DsM ()
-dsShadowError cxt us loc mod_and_grp env warns
-  = ((), warns `snocBag` cxt)
+dsShadowWarn :: DsMatchContext -> DsM ()
+dsShadowWarn cxt us loc mod_and_grp env warns
+  = ((), warns `snocBag` (Shadowed, cxt))
+
+dsIncompleteWarn :: DsMatchContext -> DsM ()
+dsIncompleteWarn cxt us loc mod_and_grp env warns
+  = ((), warns `snocBag` (Incomplete, cxt))
 \end{code}
 
 \begin{code}
@@ -237,9 +245,12 @@ lookupId env id
 %************************************************************************
 
 \begin{code}
+data DsWarnFlavour = Shadowed | Incomplete deriving ()
+
 data DsMatchContext
   = DsMatchContext DsMatchKind [TypecheckedPat] SrcLoc
   | NoMatchContext
+  deriving ()
 
 data DsMatchKind
   = FunMatch Id
@@ -247,23 +258,31 @@ data DsMatchKind
   | LambdaMatch
   | PatBindMatch
   | DoBindMatch
+  deriving ()
 
-pprDsWarnings :: PprStyle -> Bag DsMatchContext -> Pretty
+pprDsWarnings :: PprStyle -> DsWarnings -> Pretty
 pprDsWarnings sty warns
-  = ppAboves (map pp_cxt (bagToList warns))
+  = ppAboves (map pp_warn (bagToList warns))
   where
-    pp_cxt NoMatchContext = ppPStr SLIT("Some match is shadowed; I don't know what")
-    pp_cxt (DsMatchContext kind pats loc)
-      = ppHang (ppBesides [ppr PprForUser loc, ppPStr SLIT(": ")])
-	     4 (ppHang (ppPStr SLIT("Pattern match(es) completely overlapped:"))
+    pp_warn (flavour, NoMatchContext) = ppSep [ppPStr SLIT("Warning: Some match is"), 
+					       case flavour of
+							Shadowed   -> ppPStr SLIT("shadowed")
+							Incomplete -> ppPStr SLIT("possibly incomplete")]
+
+    pp_warn (flavour, DsMatchContext kind pats loc)
+       = ppHang (ppBesides [ppr PprForUser loc, ppPStr SLIT(": ")])
+	     4 (ppHang msg
 		     4 (pp_match kind pats))
+       where
+	msg = case flavour of
+		Shadowed   -> ppPStr SLIT("Warning: Pattern match(es) completely overlapped")     
+		Incomplete -> ppPStr SLIT("Warning: Possibly incomplete patterns")
 
     pp_match (FunMatch fun) pats
-      = ppHang (ppr sty fun)
-	4 (ppSep [ppSep (map (ppr sty) pats), ppPStr SLIT("= ...")])
+      = ppCat [ppPStr SLIT("in the definition of function"), ppQuote (ppr sty fun)]
 
     pp_match CaseMatch pats
-      = ppHang (ppPStr SLIT("in a case alternative:"))
+      = ppHang (ppPStr SLIT("in a group of case alternative beginning:"))
 	4 (ppSep [ppSep (map (ppr sty) pats), pp_arrow_dotdotdot])
 
     pp_match PatBindMatch pats

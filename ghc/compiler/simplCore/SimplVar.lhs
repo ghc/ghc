@@ -33,7 +33,7 @@ import Literal		( isNoRepLit )
 import MagicUFs		( applyMagicUnfoldingFun, MagicUnfoldingFun )
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instance Outputable-} )
-import Pretty		( ppBesides, ppStr )
+--import Pretty		( ppBesides, ppStr )
 import SimplEnv
 import SimplMonad
 import TyCon		( tyConFamilySize )
@@ -70,12 +70,12 @@ completeVar env var args
     costCentreOk (getEnclosingCC env) (getEnclosingCC unfold_env)
   = tick UnfoldingDone	`thenSmpl_`
 #ifdef DEBUG
-    simplCount		`thenSmpl` \ n ->
-    (if n > 3000 then
-	pprTrace "Ticks > 3000 and unfolding" (ppr PprDebug var)
-    else
-	id
-    )
+--    simplCount		`thenSmpl` \ n ->
+--    (if n > 3000 then
+--	pprTrace "Ticks > 3000 and unfolding" (ppr PprDebug var)
+--    else
+--	id
+--    )
 #endif
     simplExpr unfold_env unf_template args
 

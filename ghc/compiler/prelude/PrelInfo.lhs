@@ -292,6 +292,8 @@ knownKeyNames
 	-- ClassOps 
     , (fromInt_RDR,		fromIntClassOpKey)
     , (fromInteger_RDR,		fromIntegerClassOpKey)
+    , (ge_RDR,			geClassOpKey) 
+    , (minus_RDR,		minusClassOpKey)
     , (enumFrom_RDR,		enumFromClassOpKey)
     , (enumFromThen_RDR,	enumFromThenClassOpKey)
     , (enumFromTo_RDR,		enumFromToClassOpKey)
@@ -299,8 +301,12 @@ knownKeyNames
     , (fromEnum_RDR,		fromEnumClassOpKey)
     , (eq_RDR,			eqClassOpKey)
     , (thenM_RDR,		thenMClassOpKey)
+    , (returnM_RDR,		returnMClassOpKey)
     , (zeroM_RDR,		zeroClassOpKey)
     , (fromRational_RDR,	fromRationalClassOpKey)
+
+	-- Others
+    , (otherwiseId_RDR,		otherwiseIdKey)
     ]
 \end{code}
 
@@ -354,6 +360,7 @@ creturnableClass_RDR	= tcQual (fOREIGN,   SLIT("CReturnable"))
 
 fromInt_RDR	   = varQual (pREL_BASE, SLIT("fromInt"))
 fromInteger_RDR	   = varQual (pREL_BASE, SLIT("fromInteger"))
+minus_RDR	   = varQual (pREL_BASE, SLIT("-"))
 fromEnum_RDR	   = varQual (pREL_BASE, SLIT("fromEnum"))
 enumFrom_RDR	   = varQual (pREL_BASE, SLIT("enumFrom"))
 enumFromTo_RDR	   = varQual (pREL_BASE, SLIT("enumFromTo"))
@@ -361,6 +368,7 @@ enumFromThen_RDR   = varQual (pREL_BASE, SLIT("enumFromThen"))
 enumFromThenTo_RDR = varQual (pREL_BASE, SLIT("enumFromThenTo"))
 
 thenM_RDR	   = varQual (pREL_BASE, SLIT(">>="))
+returnM_RDR	   = varQual (pREL_BASE, SLIT("return"))
 zeroM_RDR	   = varQual (pREL_BASE, SLIT("zero"))
 fromRational_RDR   = varQual (pREL_NUM, SLIT("fromRational"))
 
@@ -428,6 +436,8 @@ minusH_RDR	= prelude_primop IntSubOp
 
 main_RDR	= varQual (mAIN,     SLIT("main"))
 mainPrimIO_RDR	= varQual (gHC_MAIN, SLIT("mainPrimIO"))
+
+otherwiseId_RDR = varQual (pREL_BASE, SLIT("otherwise"))
 \end{code}
 
 %************************************************************************
@@ -464,7 +474,7 @@ deriving_occ_info
 			 showParen_RDR, showSpace_RDR, showList___RDR])
     , (readClassKey,	[intTyCon_RDR, numClass_RDR, ordClass_RDR, append_RDR, 
 			 lex_RDR, readParen_RDR, readList___RDR])
-    , (ixClassKey,	[intTyCon_RDR, numClass_RDR, and_RDR, map_RDR])
+    , (ixClassKey,	[intTyCon_RDR, numClass_RDR, and_RDR, map_RDR, enumFromTo_RDR])
     ]
 	-- intTyCon: Practically any deriving needs Int, either for index calculations, 
 	--		or for taggery.

@@ -31,7 +31,7 @@ IMP_Ubiq()
 IMPORT_DELOOPER(DsLoop)		( match, matchSimply )
 
 import HsSyn		( HsExpr(..), OutPat(..), HsLit(..), Fixity,
-			  Match, HsBinds, Stmt, Qualifier, HsType, ArithSeqInfo )
+			  Match, HsBinds, Stmt, DoOrListComp, HsType, ArithSeqInfo )
 import TcHsSyn		( SYN_IE(TypecheckedPat) )
 import DsHsSyn		( outPatType )
 import CoreSyn
@@ -46,21 +46,20 @@ import Id		( idType, dataConArgTys,
 --			  pprId{-ToDo:rm-},
 			  SYN_IE(DataCon), SYN_IE(DictVar), SYN_IE(Id), GenId )
 import Literal		( Literal(..) )
+import PprType		( GenType, GenTyVar )
 import TyCon		( isNewTyCon, tyConDataCons )
 import Type		( mkTyVarTys, mkRhoTy, mkForAllTys, mkFunTy,
-			  mkTheta, isUnboxedType, applyTyCon, getAppTyCon
+			  mkTheta, isUnboxedType, applyTyCon, getAppTyCon,
+			  GenType {- instances -}
 			)
+import TyVar		( GenTyVar {- instances -} )
 import TysPrim		( voidTy )
 import TysWiredIn	( tupleTyCon, unitDataCon, tupleCon )
 import UniqSet		( mkUniqSet, minusUniqSet, uniqSetToList, SYN_IE(UniqSet) )
 import Util		( panic, assertPanic{-, pprTrace ToDo:rm-} )
+import Unique		( Unique )
 import Usage		( SYN_IE(UVar) )
 import SrcLoc		( SrcLoc {- instance Outputable -} )
---import PprCore{-ToDo:rm-}
---import PprType--ToDo:rm
---import Pretty--ToDo:rm
---import TyVar--ToDo:rm
---import Unique--ToDo:rm
 \end{code}
 
 %************************************************************************
@@ -316,7 +315,7 @@ mkErrorAppDs :: Id 		-- The error function
 mkErrorAppDs err_id ty msg
   = getSrcLocDs			`thenDs` \ src_loc ->
     let
-	full_msg = ppShow 80 (ppBesides [ppr PprForUser src_loc, ppStr ": ", ppStr msg])
+	full_msg = ppShow 80 (ppBesides [ppr PprForUser src_loc, ppStr "|", ppStr msg])
 	msg_lit  = NoRepStr (_PK_ full_msg)
     in
     returnDs (mkApp (Var err_id) [] [ty] [LitArg msg_lit])
@@ -356,7 +355,7 @@ mkSelectorBinds tyvars pat locals_and_globals val_expr
   = if is_simple_tuple_pat pat then
 	mkTupleBind tyvars [] locals_and_globals val_expr
     else
-	mkErrorAppDs iRREFUT_PAT_ERROR_ID res_ty ""	`thenDs` \ error_msg ->
+	mkErrorAppDs iRREFUT_PAT_ERROR_ID res_ty pat_string	`thenDs` \ error_msg ->
 	matchSimply val_expr pat res_ty local_tuple error_msg `thenDs` \ tuple_expr ->
 	mkTupleBind tyvars [] locals_and_globals tuple_expr
   where
@@ -369,6 +368,8 @@ mkSelectorBinds tyvars pat locals_and_globals val_expr
 
     is_var_pat (VarPat v) = True
     is_var_pat other      = False -- Even wild-card patterns aren't acceptable
+
+    pat_string = ppShow 80 (ppr PprForUser pat)
 \end{code}
 
 We're about to match against some patterns.  We want to make some

@@ -20,7 +20,7 @@ import RnMonad		( ExportEnv )
 
 import MkIface		-- several functions
 import TcModule		( typecheckModule )
-import Desugar		( deSugar, DsMatchContext, pprDsWarnings )
+import Desugar		( deSugar, DsMatchContext, pprDsWarnings, DsWarnFlavour {-TEMP!-} )
 import SimplCore	( core2core )
 import CoreToStg	( topCoreBindsToStg )
 import StgSyn		( collectFinalStgBinders )
@@ -56,12 +56,13 @@ import Unique		( Unique )		-- instances
 \end{code}
 
 \begin{code}
-main
-  = hGetContents stdin	>>= \ input_pgm ->
-    let
-	cmd_line_info = classifyOpts
-    in
-    doIt cmd_line_info input_pgm
+main =
+ _scc_ "main" 
+ hGetContents stdin	>>= \ input_pgm ->
+ let
+    cmd_line_info = classifyOpts
+ in
+ doIt cmd_line_info input_pgm
 \end{code}
 
 \begin{code}
@@ -82,13 +83,21 @@ doIt (core_cmds, stg_cmds) input_pgm
 	(pp_show (ppSourceStats rdr_module)) 	>>
 
     -- UniqueSupplies for later use (these are the only lower case uniques)
+    _scc_     "spl-rn"
     mkSplitUniqSupply 'r'	>>= \ rn_uniqs 	-> -- renamer
+    _scc_     "spl-tc"
     mkSplitUniqSupply 'a'	>>= \ tc_uniqs 	-> -- typechecker
+    _scc_     "spl-ds"
     mkSplitUniqSupply 'd'	>>= \ ds_uniqs 	-> -- desugarer
+    _scc_     "spl-sm"
     mkSplitUniqSupply 's'	>>= \ sm_uniqs 	-> -- core-to-core simplifier
+    _scc_     "spl-c2s"
     mkSplitUniqSupply 'c'	>>= \ c2s_uniqs -> -- core-to-stg
+    _scc_     "spl-st"
     mkSplitUniqSupply 'g'	>>= \ st_uniqs  -> -- stg-to-stg passes
+    _scc_     "spl-absc"
     mkSplitUniqSupply 'f'	>>= \ fl_uniqs  -> -- absC flattener
+    _scc_     "spl-ncg"
     mkSplitUniqSupply 'n'	>>= \ ncg_uniqs -> -- native-code generator
 
     -- ******* RENAMER
@@ -207,6 +216,7 @@ doIt (core_cmds, stg_cmds) input_pgm
     let
 	final_ids = collectFinalStgBinders stg_binds2
     in
+    _scc_     "Interface"
     ifaceDecls if_handle rn_mod inst_info final_ids simplified	>>
     endIface if_handle						>>
     -- We are definitely done w/ interface-file stuff at this point:

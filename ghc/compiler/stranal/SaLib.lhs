@@ -29,7 +29,7 @@ import IdInfo		( StrictnessInfo(..) )
 import Demand		( Demand{-instance Outputable-} )
 import Outputable	( Outputable(..){-instance * []-} )
 import PprType		( GenType{-instance Outputable-} )
-import Pretty		( ppStr, ppCat )
+import Pretty		( ppPStr, ppCat, ppChar )
 \end{code}
 
 %************************************************************************
@@ -74,15 +74,15 @@ data AbsVal
 			    -- argument if the  Demand so indicates.
 
 instance Outputable AbsVal where
-    ppr sty AbsTop = ppStr "AbsTop"
-    ppr sty AbsBot = ppStr "AbsBot"
-    ppr sty (AbsProd prod) = ppCat [ppStr "AbsProd", ppr sty prod]
+    ppr sty AbsTop = ppPStr SLIT("AbsTop")
+    ppr sty AbsBot = ppPStr SLIT("AbsBot")
+    ppr sty (AbsProd prod) = ppCat [ppPStr SLIT("AbsProd"), ppr sty prod]
     ppr sty (AbsFun arg body env)
-      = ppCat [ppStr "AbsFun{", ppr sty arg,
-	       ppStr "???", -- ppStr "}{env:", ppr sty (keysFM env `zip` eltsFM env),
-	       ppStr "}" ]
+      = ppCat [ppPStr SLIT("AbsFun{"), ppr sty arg,
+	       ppPStr SLIT("???"), -- ppStr "}{env:", ppr sty (keysFM env `zip` eltsFM env),
+	       ppChar '}' ]
     ppr sty (AbsApproxFun demand val)
-      = ppCat [ppStr "AbsApprox ", ppr sty demand, ppStr "", ppr sty val ]
+      = ppCat [ppPStr SLIT("AbsApprox "), ppr sty demand, ppr sty val ]
 \end{code}
 
 %-----------

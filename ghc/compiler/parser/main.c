@@ -24,6 +24,7 @@ main(int argc, char **argv)
 {
     Lnil = mklnil();	/* The null list -- used in lsing, etc. */
 
+    argv++; argc--;
     process_args(argc,argv);
 
     hash_init();

@@ -1400,9 +1400,13 @@ primOpHeapReq DoubleDecodeOp	= FixedHeapRequired
     	    	    	    	  (addOff (totHdrSize (DataRep mIN_MP_INT_SIZE))
     	    	    	    	    	  (intOff mIN_MP_INT_SIZE)))
 
--- ccall may allocate heap if it is explicitly allowed to (_ccall_gc_)
--- or if it returns a ForeignObj.
+{-
+  ccall may allocate heap if it is explicitly allowed to (_ccall_gc_)
+  or if it returns a ForeignObj.
 
+  Hmm..the allocation for makeForeignObj# is known (and fixed), so
+  why dod we need to be so indeterminate about it? --SOF
+-}
 primOpHeapReq (CCallOp _ _ mayGC@True  _ _) = VariableHeapRequired
 primOpHeapReq (CCallOp _ _ mayGC@False _ _) = NoHeapRequired
 

@@ -1,7 +1,6 @@
-TOP = ../../..
-LiterateSuffixRules = YES
-include $(TOP)/ghc/mk/ghc.mk
+TOP = ../..
+include $(TOP)/mk/boilerplate.mk
 
-#DocProcessingSuffixRules()
-#LitDocRootTarget(profiling,lit)
-#LitDocRootTarget(user,lit)
+DOC_SRCS = profiling.lit user.lit
+
+include $(TOP)/mk/target.mk

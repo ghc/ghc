@@ -797,12 +797,8 @@ mkMethodSelId op_name rec_c op ty
   = addStandardIdInfo $
     Id (uniqueOf op_name) op_name ty (MethodSelId rec_c op) NoPragmaInfo noIdInfo
 
-mkDefaultMethodId op_name uniq rec_c op gen ty
-  = Id uniq dm_name ty details NoPragmaInfo noIdInfo
-  where
-    dm_name        = mkCompoundName name_fn uniq op_name
-    details        = DefaultMethodId rec_c op gen
-    name_fn op_str = SLIT("dm_") _APPEND_ op_str
+mkDefaultMethodId dm_name rec_c op gen ty
+  = Id (uniqueOf dm_name) dm_name ty (DefaultMethodId rec_c op gen) NoPragmaInfo noIdInfo
 
 mkDictFunId dfun_name full_ty clas ity
   = Id (nameUnique dfun_name) dfun_name full_ty details NoPragmaInfo noIdInfo
@@ -822,7 +818,7 @@ mkWorkerId u unwrkr ty info
   where
     name    = mkCompoundName name_fn u (getName unwrkr)
     details = WorkerId unwrkr
-    name_fn wkr_str = wkr_str _APPEND_ SLIT("_wrk")
+    name_fn wkr_str = SLIT("$w") _APPEND_ wkr_str
 
 mkInstId u ty name 
   = Id u (changeUnique name u) ty (InstId (no_free_tvs ty)) NoPragmaInfo noIdInfo
@@ -866,9 +862,11 @@ mkImported  n ty info = Id (nameUnique n) n ty ImportedId NoPragmaInfo info
 mkPrimitiveId n ty primop 
   = addStandardIdInfo $
     Id (nameUnique n) n ty (PrimitiveId primop) NoPragmaInfo noIdInfo
+
 \end{code}
 
 \begin{code}
+
 type MyTy a b = GenType (GenTyVar a) b
 type MyId a b = GenId (MyTy a b)
 

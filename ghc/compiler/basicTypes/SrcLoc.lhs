@@ -81,13 +81,18 @@ isNoSrcLoc other    = False
 \begin{code}
 instance Outputable SrcLoc where
     ppr PprForUser (SrcLoc src_file src_line)
-      = ppBesides [ ppPStr src_file, ppStr ": ", ppStr (show IBOX(src_line)) ]
+      = ppBesides [ ppPStr src_file, ppChar ':', ppStr (show IBOX(src_line)) ]
 
     ppr sty (SrcLoc src_file src_line)
-      = ppBesides [ppPStr SLIT("{-# LINE "), ppStr (show IBOX(src_line)), ppSP,
-		   ppChar '"', ppPStr src_file, ppPStr SLIT("\" #-}")]
-
+      = ppBesides [ppStr "{-# LINE ", ppStr (show IBOX(src_line)), ppSP,
+		   ppChar '\"', ppPStr src_file, ppStr " #-}"]
     ppr sty (UnhelpfulSrcLoc s) = ppPStr s
 
     ppr sty NoSrcLoc = ppStr "<NoSrcLoc>"
 \end{code}
+
+{-
+      = ppBesides [ppPStr SLIT("{-# LINE "), ppStr (show IBOX(src_line)), ppSP,
+		   ppChar '"', ppPStr src_file, ppPStr SLIT(" #-}")]
+ --ppPStr SLIT("\" #-}")]
+-}

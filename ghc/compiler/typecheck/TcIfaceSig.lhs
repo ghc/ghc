@@ -24,14 +24,15 @@ import HsCore
 import HsDecls		( HsIdInfo(..) )
 import Literal		( Literal(..) )
 import CoreSyn
+import CoreUtils	( coreExprType )
 import CoreUnfold
 import MagicUFs		( MagicUnfoldingFun )
 import WwLib		( mkWrapper )
 import SpecEnv		( SpecEnv )
 import PrimOp		( PrimOp(..) )
 
-import Id		( GenId, mkImported, mkUserId, isPrimitiveId_maybe )
-import Type		( mkSynTy )
+import Id		( GenId, mkImported, mkUserId, isPrimitiveId_maybe, dataConArgTys )
+import Type		( mkSynTy, getAppDataTyConExpandingDicts )
 import TyVar		( mkTyVar )
 import Name		( Name )
 import Unique		( rationalTyConKey )
@@ -164,7 +165,7 @@ tcVar name
 	Nothing -> failTc (noDecl name)
     }
 
-noDecl name sty = ppCat [ppStr "Warning: no binding for", ppr sty name]
+noDecl name sty = ppCat [ppPStr SLIT("Warning: no binding for"), ppr sty name]
 \end{code}
 
 UfCore expressions.
@@ -208,8 +209,8 @@ tcCoreExpr (UfApp fun arg)
     returnTc (App fun' arg')
 
 tcCoreExpr (UfCase scrut alts) 
-  = tcCoreExpr scrut		`thenTc` \ scrut' ->
-    tcCoreAlts alts		`thenTc` \ alts' ->
+  = tcCoreExpr scrut				`thenTc` \ scrut' ->
+    tcCoreAlts (coreExprType scrut') alts	`thenTc` \ alts' ->
     returnTc (Case scrut' alts')
 
 tcCoreExpr (UfSCC cc expr) 
@@ -264,7 +265,7 @@ tcCoreLamBndr (UfUsageBinder name) thing_inside
 tcCoreValBndr (UfValBinder name ty) thing_inside
   = tcHsType ty			`thenTc` \ ty' ->
     let
-	id = mkUserId name ty' NoPragmaInfo
+	id = mk_id name ty'
     in
     tcExtendGlobalValEnv [id] $
     thing_inside id
@@ -273,13 +274,14 @@ tcCoreValBndrs bndrs thing_inside		-- Expect them all to be ValBinders
   = mapTc tcHsType tys			`thenTc` \ tys' ->
     let
 	ids = zipWithEqual "tcCoreValBndr" mk_id names tys'
-	mk_id name ty' = mkUserId name ty' NoPragmaInfo
     in
     tcExtendGlobalValEnv ids $
     thing_inside ids
   where
     names = map (\ (UfValBinder name _) -> name) bndrs
     tys   = map (\ (UfValBinder _   ty) -> ty)   bndrs
+
+mk_id name ty = mkUserId name ty NoPragmaInfo
 \end{code}    
 
 \begin{code}
@@ -288,28 +290,39 @@ tcCoreArg (UfTyArg ty)	 = tcHsTypeKind ty	`thenTc` \ (_,ty') -> returnTc (TyArg 
 tcCoreArg (UfLitArg lit) = returnTc (LitArg lit)
 tcCoreArg (UfUsageArg u) = error "tcCoreArg: usage"
 
-tcCoreAlts (UfAlgAlts alts deflt)
-  = mapTc tc_alt alts		`thenTc` \ alts' ->
-    tcCoreDefault deflt		`thenTc` \ deflt' ->
+tcCoreAlts scrut_ty (UfAlgAlts alts deflt)
+  = mapTc tc_alt alts			`thenTc` \ alts' ->
+    tcCoreDefault scrut_ty deflt	`thenTc` \ deflt' ->
     returnTc (AlgAlts alts' deflt')
   where
-    tc_alt (con, bndrs, rhs) =	tcVar con			`thenTc` \ con' ->
-				tcCoreValBndrs bndrs		$ \ bndrs' ->
-				tcCoreExpr rhs			`thenTc` \ rhs' ->
-				returnTc (con', bndrs', rhs')
+    tc_alt (con, names, rhs)
+      =	tcVar con			`thenTc` \ con' ->
+	let
+	    arg_tys		    = dataConArgTys con' inst_tys
+	    (tycon, inst_tys, cons) = getAppDataTyConExpandingDicts scrut_ty
+	    arg_ids		    = zipWithEqual "tcCoreAlts" mk_id names arg_tys
+	in
+	tcExtendGlobalValEnv arg_ids 	$
+	tcCoreExpr rhs			`thenTc` \ rhs' ->
+	returnTc (con', arg_ids, rhs')
 
-tcCoreAlts (UfPrimAlts alts deflt)
-  = mapTc tc_alt alts		`thenTc` \ alts' ->
-    tcCoreDefault deflt		`thenTc` \ deflt' ->
+tcCoreAlts scrut_ty (UfPrimAlts alts deflt)
+  = mapTc tc_alt alts			`thenTc` \ alts' ->
+    tcCoreDefault scrut_ty deflt	`thenTc` \ deflt' ->
     returnTc (PrimAlts alts' deflt')
   where
     tc_alt (lit, rhs) =	tcCoreExpr rhs		`thenTc` \ rhs' ->
 			returnTc (lit, rhs')
 
-tcCoreDefault UfNoDefault = returnTc NoDefault
-tcCoreDefault (UfBindDefault bndr rhs) = tcCoreValBndr bndr	$ \ bndr' ->
-					 tcCoreExpr rhs		`thenTc` \ rhs' ->
-				  	 returnTc (BindDefault bndr' rhs')
+tcCoreDefault scrut_ty UfNoDefault = returnTc NoDefault
+tcCoreDefault scrut_ty (UfBindDefault name rhs)
+  = let
+	deflt_id           = mk_id name scrut_ty
+    in
+    tcExtendGlobalValEnv [deflt_id] 	$
+    tcCoreExpr rhs			`thenTc` \ rhs' ->
+    returnTc (BindDefault deflt_id rhs')
+    
 
 tcCoercion (UfIn  n) = tcVar n `thenTc` \ n' -> returnTc (CoerceIn  n')
 tcCoercion (UfOut n) = tcVar n `thenTc` \ n' -> returnTc (CoerceOut n')

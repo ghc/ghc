@@ -49,6 +49,7 @@ import Type		( SYN_IE(Type), GenType )
 import TyVar		( SYN_IE(TyVar), GenTyVar )
 import Usage		( SYN_IE(Usage), GenUsage )
 import ErrUtils		( SYN_IE(Error), SYN_IE(Message), SYN_IE(Warning) )
+import CmdLineOpts      ( opt_PprStyle_All )
 
 import SST
 import Bag		( Bag, emptyBag, isEmptyBag,
@@ -484,20 +485,30 @@ mkTcErr :: SrcLoc 		-- Where
 	-> TcError		-- The complete error report
 
 mkTcErr locn ctxt msg sty
-  = ppHang (ppBesides [ppr PprForUser locn, ppStr ": ", msg sty])
-    	 4 (ppAboves [msg sty | msg <- ctxt])
+  = ppHang (ppBesides [ppr PprForUser locn, ppPStr SLIT(": "), msg sty])
+    	 4 (ppAboves [msg sty | msg <- ctxt_to_use])
+    where
+     ctxt_to_use =
+       if opt_PprStyle_All then
+	  ctxt
+       else
+	  takeAtMost 4 ctxt
 
+     takeAtMost :: Int -> [a] -> [a]
+     takeAtMost 0 ls = []
+     takeAtMost n [] = []
+     takeAtMost n (x:xs) = x:takeAtMost (n-1) xs
 
 arityErr kind name n m sty
-  = ppBesides [ ppStr "`", ppr sty name, ppStr "' should have ",
+  = ppBesides [ ppChar '`', ppr sty name, ppPStr SLIT("' should have "),
 		n_arguments, ppStr ", but has been given ", ppInt m, ppChar '.']
     where
 	errmsg = kind ++ " has too " ++ quantity ++ " arguments"
 	quantity | m < n     = "few"
 		 | otherwise = "many"
-	n_arguments | n == 0 = ppStr "no arguments"
-		    | n == 1 = ppStr "1 argument"
-		    | True   = ppCat [ppInt n, ppStr "arguments"]
+	n_arguments | n == 0 = ppPStr SLIT("no arguments")
+		    | n == 1 = ppPStr SLIT("1 argument")
+		    | True   = ppCat [ppInt n, ppPStr SLIT("arguments")]
 \end{code}
 
 

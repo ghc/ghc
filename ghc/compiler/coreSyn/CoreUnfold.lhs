@@ -96,10 +96,15 @@ data SimpleUnfolding
 noUnfolding = NoUnfolding
 
 mkUnfolding inline_me expr
-  = CoreUnfolding (SimpleUnfolding
-			(mkFormSummary expr)
-			(calcUnfoldingGuidance inline_me opt_UnfoldingCreationThreshold expr)
-			(occurAnalyseGlobalExpr expr))
+  = let
+     -- strictness mangling (depends on there being no CSE)
+     ufg = calcUnfoldingGuidance inline_me opt_UnfoldingCreationThreshold expr
+     occ = occurAnalyseGlobalExpr expr
+     cuf = CoreUnfolding (SimpleUnfolding (mkFormSummary expr) ufg occ)
+					  
+     cont = case occ of { Var _ -> cuf; _ -> cuf }
+    in
+    case ufg of { UnfoldAlways -> cont; _ -> cont }
 
 mkMagicUnfolding :: Unique -> Unfolding
 mkMagicUnfolding tag  = MagicUnfolding tag (mkMagicUnfoldingFun tag)
@@ -128,10 +133,10 @@ data UnfoldingGuidance
 
 \begin{code}
 instance Outputable UnfoldingGuidance where
-    ppr sty UnfoldAlways    	= ppStr "_ALWAYS_"
---    ppr sty EssentialUnfolding	= ppStr "_ESSENTIAL_" -- shouldn't appear in an iface
+    ppr sty UnfoldAlways    	= ppPStr SLIT("_ALWAYS_")
+--    ppr sty EssentialUnfolding	= ppPStr SLIT("_ESSENTIAL_") -- shouldn't appear in an iface
     ppr sty (UnfoldIfGoodArgs t v cs size)
-      = ppCat [ppStr "_IF_ARGS_", ppInt t, ppInt v,
+      = ppCat [ppPStr SLIT("_IF_ARGS_"), ppInt t, ppInt v,
 	       if null cs	-- always print *something*
 	       	then ppChar 'X'
 		else ppBesides (map (ppStr . show) cs),
@@ -154,10 +159,10 @@ data FormSummary
   | OtherForm		-- Anything else
 
 instance Outputable FormSummary where
-   ppr sty VarForm    = ppStr "Var"
-   ppr sty ValueForm  = ppStr "Value"
-   ppr sty BottomForm = ppStr "Bot"
-   ppr sty OtherForm  = ppStr "Other"
+   ppr sty VarForm    = ppPStr SLIT("Var")
+   ppr sty ValueForm  = ppPStr SLIT("Value")
+   ppr sty BottomForm = ppPStr SLIT("Bot")
+   ppr sty OtherForm  = ppPStr SLIT("Other")
 
 mkFormSummary ::GenCoreExpr bndr Id tyvar uvar -> FormSummary
 
@@ -238,9 +243,7 @@ calcUnfoldingGuidance
 calcUnfoldingGuidance True bOMB_OUT_SIZE expr = UnfoldAlways	-- Always inline if the INLINE pragma says so
 
 calcUnfoldingGuidance False bOMB_OUT_SIZE expr
-  = let
-    	(use_binders, ty_binders, val_binders, body) = collectBinders expr
-    in
+  = case collectBinders expr of { (use_binders, ty_binders, val_binders, body) ->
     case (sizeExpr bOMB_OUT_SIZE val_binders body) of
 
       Nothing -> UnfoldNever
@@ -250,7 +253,7 @@ calcUnfoldingGuidance False bOMB_OUT_SIZE expr
 			(length ty_binders)
 			(length val_binders)
 			(map discount_for val_binders)
-			size
+			size  
 	where        
 	    discount_for b
 	         | is_data && b `is_elem` cased_args = tyConFamilySize tycon
@@ -261,7 +264,7 @@ calcUnfoldingGuidance False bOMB_OUT_SIZE expr
 			  Nothing       -> (False, panic "discount")
 			  Just (tc,_,_) -> (True,  tc)
 
-	    is_elem = isIn "calcUnfoldingGuidance"
+	    is_elem = isIn "calcUnfoldingGuidance" }
 \end{code}
 
 \begin{code}
@@ -350,27 +353,27 @@ sizeExpr bOMB_OUT_SIZE args expr
 
     ------------
     size_up_alts scrut_ty (AlgAlts alts deflt)
-      = foldr (addSize . size_alg_alt) (size_up_deflt deflt) alts `addSizeN` 1
-		-- "1" for the case itself
-
-	--	`addSizeN` (if is_data then tyConFamilySize tycon else 1)
-	--
-	--	OLD COMMENT: looks unfair to me!  So I've nuked this extra charge
-	--		     SLPJ Jan 97
-	-- NB: we charge N for an alg. "case", where N is
-	-- the number of constructors in the thing being eval'd.
-	-- (You'll eventually get a "discount" of N if you
-	-- think the "case" is likely to go away.)
-
+      = foldr (addSize . size_alg_alt) (size_up_deflt deflt) alts 
+	`addSizeN`
+	alt_cost
       where
 	size_alg_alt (con,args,rhs) = size_up rhs
 	    -- Don't charge for args, so that wrappers look cheap
 
-	(is_data,tycon)
+	-- NB: we charge N for an alg. "case", where N is
+	-- the number of constructors in the thing being eval'd.
+	-- (You'll eventually get a "discount" of N if you
+	-- think the "case" is likely to go away.)
+	-- It's important to charge for alternatives.  If you don't then you
+	-- get size 1 for things like:
+	--		case x of { A -> 1#; B -> 2#; ... lots }
+
+	alt_cost :: Int
+	alt_cost
 	  = --trace "CoreUnfold.getAppDataTyConExpandingDicts:2" $ 
 	    case (maybeAppDataTyConExpandingDicts scrut_ty) of
-	      Nothing       -> (False, panic "size_up_alts")
-	      Just (tc,_,_) -> (True, tc)
+	      Nothing       -> 1
+	      Just (tc,_,_) -> tyConFamilySize tc
 
     size_up_alts _ (PrimAlts alts deflt)
       = foldr (addSize . size_prim_alt) (size_up_deflt deflt) alts

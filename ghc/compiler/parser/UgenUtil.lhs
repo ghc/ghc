@@ -22,8 +22,8 @@ import PreludeGlaST
 # define PACK_BYTES packCBytes
 #else
 # define ADDR	    _Addr
-# define PACK_STR   _packCString
-# define PACK_BYTES _packCBytes
+# define PACK_STR   mkFastCharString
+# define PACK_BYTES mkFastCharString2
 #endif
 
 import RdrHsSyn		( RdrName(..) )
@@ -85,7 +85,7 @@ rdU_hstring :: ADDR -> UgnM U_hstring
 rdU_hstring x
   = ioToUgnM (_ccall_ get_hstring_len   x)  `thenUgn` \ len ->
     ioToUgnM (_ccall_ get_hstring_bytes x)  `thenUgn` \ bytes ->
-    returnUgn (PACK_BYTES len bytes)
+    returnUgn (PACK_BYTES bytes len)
 \end{code}
 
 \begin{code}

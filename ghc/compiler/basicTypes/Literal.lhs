@@ -19,7 +19,7 @@ IMP_Ubiq(){-uitous-}
 IMPORT_1_3(Ratio)
 
 -- friends:
-import PrimRep		( PrimRep(..) ) -- non-abstract
+import PrimRep		( PrimRep(..), ppPrimRep ) -- non-abstract
 import TysPrim		( getPrimRepInfo, 
 			  addrPrimTy, intPrimTy, floatPrimTy,
 			  doublePrimTy, charPrimTy, wordPrimTy )
@@ -190,11 +190,11 @@ instance Outputable Literal where
 
     ppr sty (MachStr s)
       | codeStyle sty = ppBesides [ppChar '"', ppStr (stringToC (_UNPK_ s)), ppChar '"']
-      | otherwise     = ppStr (show (_UNPK_ s))
+      | otherwise     = ppBesides [ppChar '"', ppPStr s, ppChar '"']
 
     ppr sty lit@(NoRepStr s)
       | codeStyle sty = pprPanic "NoRep in code style" (ppr PprDebug lit)
-      | otherwise     = ppBesides [ppStr "_string_", ppStr (show (_UNPK_ s))]
+      | otherwise     = ppBesides [ppPStr SLIT("_string_"), ppChar '"', ppPStr s,ppChar '"']
 
     ppr sty (MachInt i signed)
       | codeStyle sty && out_of_range
@@ -210,25 +210,25 @@ instance Outputable Literal where
 
     ppr sty (MachFloat f)  
        | codeStyle sty = ppBesides [ppCast sty SLIT("(StgFloat)"), ppRational f]
-       | otherwise     = ppBesides [ppStr "_float_", ppRational f]
+       | otherwise     = ppBesides [ppPStr SLIT("_float_"), ppRational f]
 
     ppr sty (MachDouble d) = ppRational d
 
     ppr sty (MachAddr p) 
        | codeStyle sty = ppBesides [ppCast sty SLIT("(void*)"), ppInteger p]
-       | otherwise     = ppBesides [ppStr "_addr_", ppInteger p]
+       | otherwise     = ppBesides [ppPStr SLIT("_addr_"), ppInteger p]
 
     ppr sty lit@(NoRepInteger i _)
       | codeStyle sty  = pprPanic "NoRep in code style" (ppr PprDebug lit)
-      | otherwise      = ppCat [ppStr "_integer_", ppInteger i]
+      | otherwise      = ppCat [ppPStr SLIT("_integer_"), ppInteger i]
 
     ppr sty lit@(NoRepRational r _)
       | codeStyle sty = pprPanic "NoRep in code style" (ppr PprDebug lit)
-      | otherwise     = ppCat [ppStr "_rational_", ppInteger (numerator r), ppInteger (denominator r)]
+      | otherwise     = ppCat [ppPStr SLIT("_rational_"), ppInteger (numerator r), ppInteger (denominator r)]
 
     ppr sty (MachLitLit s k)
       | codeStyle  sty = ppPStr s
-      | otherwise      = ppBesides [ppStr "_litlit_", ppStr (show (_UNPK_ s))]
+      | otherwise      = ppBesides [ppPStr SLIT("_litlit_ "), ppPrimRep k, ppStr " \"", ppPStr s, ppChar '"']
 
 showLiteral :: PprStyle -> Literal -> String
 showLiteral sty lit = ppShow 80 (ppr sty lit)

@@ -94,9 +94,9 @@ lintCoreBindings sty whoDunnit spec_done binds
 	pprPanic "" (ppAboves [
 	  ppStr ("*** Core Lint Errors: in " ++ whoDunnit ++ " ***"),
 	  msg sty,
-	  ppStr "*** Offending Program ***",
+	  ppPStr SLIT("*** Offending Program ***"),
 	  ppAboves (map (pprCoreBinding sty) binds),
-	  ppStr "*** End of Offense ***"
+	  ppPStr SLIT("*** End of Offense ***")
 	])
   where
     lint_binds [] = returnL ()
@@ -126,9 +126,9 @@ lintUnfolding locn expr
       Just msg ->
         pprTrace "WARNING: Discarded bad unfolding from interface:\n"
 	(ppAboves [msg PprForUser,
-		   ppStr "*** Bad unfolding ***",
+		   ppPStr SLIT("*** Bad unfolding ***"),
 		   ppr PprDebug expr,
-		   ppStr "*** End unfolding ***"])
+		   ppPStr SLIT("*** End unfolding ***")])
 	Nothing
 \end{code}
 
@@ -276,8 +276,6 @@ lintCoreArg e ty (VarArg v)
 
 lintCoreArg e ty a@(TyArg arg_ty)
   = -- ToDo: Check that ty is well-kinded and has no unbound tyvars
-    checkIfSpecDoneL (not (isPrimType arg_ty)) (mkSpecTyAppMsg a)
-    `seqL`
     case (getForAllTyExpandingDicts_maybe ty) of
       Nothing -> addErrL (mkTyAppMsg SLIT("Illegal") ty arg_ty e) `seqL` returnL Nothing
 
@@ -415,18 +413,18 @@ data LintLocInfo
 
 instance Outputable LintLocInfo where
     ppr sty (RhsOf v)
-      = ppBesides [ppr sty (getSrcLoc v), ppStr ": [RHS of ", pp_binders sty [v], ppStr "]"]
+      = ppBesides [ppr sty (getSrcLoc v), ppPStr SLIT(": [RHS of "), pp_binders sty [v], ppChar ']']
 
     ppr sty (LambdaBodyOf b)
       = ppBesides [ppr sty (getSrcLoc b),
-		ppStr ": [in body of lambda with binder ", pp_binder sty b, ppStr "]"]
+		ppPStr SLIT(": [in body of lambda with binder "), pp_binder sty b, ppChar ']']
 
     ppr sty (BodyOfLetRec bs)
       = ppBesides [ppr sty (getSrcLoc (head bs)),
-		ppStr ": [in body of letrec with binders ", pp_binders sty bs, ppStr "]"]
+		ppPStr SLIT(": [in body of letrec with binders "), pp_binders sty bs, ppChar ']']
 
     ppr sty (ImportedUnfolding locn)
-      = ppBeside (ppr sty locn) (ppStr ": [in an imported unfolding]")
+      = ppBeside (ppr sty locn) (ppPStr SLIT(": [in an imported unfolding]"))
 
 pp_binders :: PprStyle -> [Id] -> Pretty
 pp_binders sty bs = ppInterleave ppComma (map (pp_binder sty) bs)
@@ -543,7 +541,7 @@ checkInScope id spec loc scope errs
 	id_name = getName id
     in
     if isLocallyDefined id_name && not (id `elementOfIdSet` scope) then
-      ((),addErr errs (\sty -> ppCat [ppr sty id, ppStr "is out of scope"]) loc)
+      ((),addErr errs (\sty -> ppCat [ppr sty id, ppPStr SLIT("is out of scope")]) loc)
     else
       ((),errs)
 
@@ -555,54 +553,54 @@ checkTys ty1 ty2 msg spec loc scope errs
 \begin{code}
 mkCaseAltMsg :: CoreCaseAlts -> ErrMsg
 mkCaseAltMsg alts sty
-  = ppAbove (ppStr "Type of case alternatives not the same:")
+  = ppAbove (ppPStr SLIT("Type of case alternatives not the same:"))
 	    (ppr sty alts)
 
 mkCaseDataConMsg :: CoreExpr -> ErrMsg
 mkCaseDataConMsg expr sty
-  = ppAbove (ppStr "A case scrutinee not of data constructor type:")
+  = ppAbove (ppPStr SLIT("A case scrutinee not of data constructor type:"))
 	    (pp_expr sty expr)
 
 mkCaseNotPrimMsg :: TyCon -> ErrMsg
 mkCaseNotPrimMsg tycon sty
-  = ppAbove (ppStr "A primitive case on a non-primitive type:")
+  = ppAbove (ppPStr SLIT("A primitive case on a non-primitive type:"))
 	    (ppr sty tycon)
 
 mkCasePrimMsg :: TyCon -> ErrMsg
 mkCasePrimMsg tycon sty
-  = ppAbove (ppStr "An algebraic case on a primitive type:")
+  = ppAbove (ppPStr SLIT("An algebraic case on a primitive type:"))
 	    (ppr sty tycon)
 
 mkCaseAbstractMsg :: TyCon -> ErrMsg
 mkCaseAbstractMsg tycon sty
-  = ppAbove (ppStr "An algebraic case on some weird type:")
+  = ppAbove (ppPStr SLIT("An algebraic case on some weird type:"))
 	    (ppr sty tycon)
 
 mkDefltMsg :: CoreCaseDefault -> ErrMsg
 mkDefltMsg deflt sty
-  = ppAbove (ppStr "Binder in case default doesn't match type of scrutinee:")
+  = ppAbove (ppPStr SLIT("Binder in case default doesn't match type of scrutinee:"))
 	    (ppr sty deflt)
 
 mkAppMsg :: Type -> Type -> CoreExpr -> ErrMsg
 mkAppMsg fun arg expr sty
-  = ppAboves [ppStr "Argument value doesn't match argument type:",
-	      ppHang (ppStr "Fun type:") 4 (ppr sty fun),
-	      ppHang (ppStr "Arg type:") 4 (ppr sty arg),
-	      ppHang (ppStr "Expression:") 4 (pp_expr sty expr)]
+  = ppAboves [ppPStr SLIT("Argument value doesn't match argument type:"),
+	      ppHang (ppPStr SLIT("Fun type:")) 4 (ppr sty fun),
+	      ppHang (ppPStr SLIT("Arg type:")) 4 (ppr sty arg),
+	      ppHang (ppPStr SLIT("Expression:")) 4 (pp_expr sty expr)]
 
 mkTyAppMsg :: FAST_STRING -> Type -> Type -> CoreExpr -> ErrMsg
 mkTyAppMsg msg ty arg expr sty
-  = ppAboves [ppCat [ppPStr msg, ppStr "type application:"],
-	      ppHang (ppStr "Exp type:")   4 (ppr sty ty),
-	      ppHang (ppStr "Arg type:")   4 (ppr sty arg),
-	      ppHang (ppStr "Expression:") 4 (pp_expr sty expr)]
+  = ppAboves [ppCat [ppPStr msg, ppPStr SLIT("type application:")],
+	      ppHang (ppPStr SLIT("Exp type:"))   4 (ppr sty ty),
+	      ppHang (ppPStr SLIT("Arg type:"))   4 (ppr sty arg),
+	      ppHang (ppPStr SLIT("Expression:")) 4 (pp_expr sty expr)]
 
 mkUsageAppMsg :: Type -> Usage -> CoreExpr -> ErrMsg
 mkUsageAppMsg ty u expr sty
-  = ppAboves [ppStr "Illegal usage application:",
-	      ppHang (ppStr "Exp type:") 4 (ppr sty ty),
-	      ppHang (ppStr "Usage exp:") 4 (ppr sty u),
-	      ppHang (ppStr "Expression:") 4 (pp_expr sty expr)]
+  = ppAboves [ppPStr SLIT("Illegal usage application:"),
+	      ppHang (ppPStr SLIT("Exp type:")) 4 (ppr sty ty),
+	      ppHang (ppPStr SLIT("Usage exp:")) 4 (ppr sty u),
+	      ppHang (ppPStr SLIT("Expression:")) 4 (pp_expr sty expr)]
 
 mkAlgAltMsg1 :: Type -> ErrMsg
 mkAlgAltMsg1 ty sty
@@ -643,22 +641,22 @@ mkPrimAltMsg alt sty
 mkRhsMsg :: Id -> Type -> ErrMsg
 mkRhsMsg binder ty sty
   = ppAboves
-    [ppCat [ppStr "The type of this binder doesn't match the type of its RHS:",
+    [ppCat [ppPStr SLIT("The type of this binder doesn't match the type of its RHS:"),
 	    ppr sty binder],
-     ppCat [ppStr "Binder's type:", ppr sty (idType binder)],
-     ppCat [ppStr "Rhs type:", ppr sty ty]]
+     ppCat [ppPStr SLIT("Binder's type:"), ppr sty (idType binder)],
+     ppCat [ppPStr SLIT("Rhs type:"), ppr sty ty]]
 
 mkRhsPrimMsg :: Id -> CoreExpr -> ErrMsg
 mkRhsPrimMsg binder rhs sty
-  = ppAboves [ppCat [ppStr "The type of this binder is primitive:",
+  = ppAboves [ppCat [ppPStr SLIT("The type of this binder is primitive:"),
 		     ppr sty binder],
-	      ppCat [ppStr "Binder's type:", ppr sty (idType binder)]
+	      ppCat [ppPStr SLIT("Binder's type:"), ppr sty (idType binder)]
 	     ]
 
 mkSpecTyAppMsg :: CoreArg -> ErrMsg
 mkSpecTyAppMsg arg sty
   = ppAbove
-      (ppStr "Unboxed types in a type application (after specialisation):")
+      (ppPStr SLIT("Unboxed types in a type application (after specialisation):"))
       (ppr sty arg)
 
 pp_expr :: PprStyle -> CoreExpr -> Pretty

@@ -33,7 +33,6 @@ module RdrHsSyn (
 	SYN_IE(RdrNameMonoBinds),
 	SYN_IE(RdrNamePat),
 	SYN_IE(RdrNameHsType),
-	SYN_IE(RdrNameQual),
 	SYN_IE(RdrNameSig),
 	SYN_IE(RdrNameSpecInstSig),
 	SYN_IE(RdrNameStmt),
@@ -51,8 +50,8 @@ module RdrHsSyn (
 	qual, varQual, tcQual, varUnqual,
 	dummyRdrVarName, dummyRdrTcName,
 	isUnqual, isQual,
-	showRdr, rdrNameOcc,
-	cmpRdr,
+	showRdr, rdrNameOcc, ieOcc,
+	cmpRdr, prefixRdrName,
 	mkOpApp
 
     ) where
@@ -63,7 +62,7 @@ import HsSyn
 import Lex
 import PrelMods		( pRELUDE )
 import Name		( ExportFlag(..), Module(..), pprModule,
-			  OccName(..), pprOccName )
+			  OccName(..), pprOccName, prefixOccName )
 import Pretty		
 import PprStyle		( PprStyle(..) )
 import Util		( cmpPString, panic, thenCmp )
@@ -93,7 +92,6 @@ type RdrNameMatch		= Match			Fake Fake RdrName RdrNamePat
 type RdrNameMonoBinds		= MonoBinds		Fake Fake RdrName RdrNamePat
 type RdrNamePat			= InPat			RdrName
 type RdrNameHsType		= HsType		RdrName
-type RdrNameQual		= Qualifier		Fake Fake RdrName RdrNamePat
 type RdrNameSig			= Sig			RdrName
 type RdrNameSpecInstSig		= SpecInstSig 		RdrName
 type RdrNameStmt		= Stmt			Fake Fake RdrName RdrNamePat
@@ -173,6 +171,11 @@ isUnqual (Qual _ _) = False
 isQual (Unqual _) = False
 isQual (Qual _ _) = True
 
+	-- Used for adding a prefix to a RdrName
+prefixRdrName :: FAST_STRING -> RdrName -> RdrName
+prefixRdrName prefix (Qual m n) = Qual m (prefixOccName prefix n)
+prefixRdrName prefix (Unqual n) = Unqual (prefixOccName prefix n)
+
 cmpRdr (Unqual  n1) (Unqual  n2) = n1 `cmp` n2
 cmpRdr (Unqual  n1) (Qual m2 n2) = LT_
 cmpRdr (Qual m1 n1) (Unqual  n2) = GT_
@@ -182,6 +185,9 @@ cmpRdr (Qual m1 n1) (Qual m2 n2) = (n1 `cmp` n2) `thenCmp` (_CMP_STRING_ m1 m2)
 rdrNameOcc :: RdrName -> OccName
 rdrNameOcc (Unqual occ) = occ
 rdrNameOcc (Qual _ occ) = occ
+
+ieOcc :: RdrNameIE -> OccName
+ieOcc ie = rdrNameOcc (ieName ie)
 
 instance Text RdrName where -- debugging
     showsPrec _ rn = showString (ppShow 80 (ppr PprDebug rn))
@@ -201,7 +207,7 @@ instance Ord3 RdrName where
 
 instance Outputable RdrName where
     ppr sty (Unqual n) = pprOccName sty n
-    ppr sty (Qual m n) = ppBesides [pprModule sty m, ppStr ".", pprOccName sty n]
+    ppr sty (Qual m n) = ppBesides [pprModule sty m, ppChar '.', pprOccName sty n]
 
 instance NamedThing RdrName where		-- Just so that pretty-printing of expressions works
     getOccName = rdrNameOcc

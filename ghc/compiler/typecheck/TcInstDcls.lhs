@@ -20,7 +20,7 @@ import HsSyn		( HsDecl(..), InstDecl(..), TyDecl, ClassDecl, DefaultDecl,
 			  SpecInstSig(..), HsBinds(..), Bind(..),
 			  MonoBinds(..), GRHSsAndBinds, Match, 
 			  InPat(..), OutPat(..), HsExpr(..), HsLit(..),
-			  Stmt, Qualifier, ArithSeqInfo, Fake, Fixity,
+			  Stmt, DoOrListComp, ArithSeqInfo, Fake, Fixity,
 			  HsType(..), HsTyVar )
 import RnHsSyn		( SYN_IE(RenamedHsBinds), SYN_IE(RenamedMonoBinds),
 			  SYN_IE(RenamedInstDecl), SYN_IE(RenamedFixityDecl),
@@ -34,10 +34,9 @@ import TcHsSyn		( TcIdOcc(..), SYN_IE(TcHsBinds),
 
 import TcMonad
 import RnMonad		( SYN_IE(RnNameSupply) )
-import GenSpecEtc	( checkSigTyVars )
 import Inst		( Inst, InstOrigin(..), SYN_IE(InstanceMapper),
 			  newDicts, newMethod, SYN_IE(LIE), emptyLIE, plusLIE )
-import TcBinds		( tcPragmaSigs )
+import TcBinds		( tcPragmaSigs, checkSigTyVars )
 import TcDeriv		( tcDeriving )
 import TcEnv		( tcLookupClass, newLocalId, tcExtendGlobalTyVars )
 import SpecEnv		( SpecEnv )
@@ -77,7 +76,7 @@ import SrcLoc		( SrcLoc )
 import Pretty
 import TyCon		( isSynTyCon, derivedFor )
 import Type		( GenType(..), SYN_IE(ThetaType), mkTyVarTys, isPrimType,
-			  splitSigmaTy, splitAppTy, isTyVarTy, matchTy, mkSigmaTy,
+			  splitSigmaTy, splitAppTys, isTyVarTy, matchTy, mkSigmaTy,
 			  getTyCon_maybe, maybeAppTyCon,
 			  maybeBoxedPrimType, maybeAppDataTyCon, splitRhoTy, eqTy
 			)
@@ -455,7 +454,7 @@ makeInstanceDeclDefaultMethodExpr src_loc clas meth_ids defm_ids inst_ty this_di
 
     Just (_, _, defm_is_err) = isDefaultMethodId_maybe defm_id
 
-    error_msg = ppShow 80 (ppSep [ppr PprForUser clas_op, ppStr "at", ppr PprForUser src_loc])
+    error_msg = ppShow 80 (ppSep [ppr PprForUser clas_op, ppPStr SLIT("at"), ppr PprForUser src_loc])
 
     clas_op = (classOps clas) !! idx
     clas_name = getOccString clas
@@ -751,12 +750,12 @@ tcSpecInstSig e ce tce inst_infos inst_mapper (SpecInstSig class_name ty src_loc
     (if sw_chkr SpecialiseTrace then
 	pprTrace "Specialised Instance: "
 	(ppAboves [ppCat [if null simpl_theta then ppNil else ppr PprDebug simpl_theta,
-			  if null simpl_theta then ppNil else ppStr "=>",
+			  if null simpl_theta then ppNil else ppPStr SLIT("=>"),
 			  ppr PprDebug clas,
 			  pprParendGenType PprDebug inst_ty],
-		   ppCat [ppStr "        derived from:",
+		   ppCat [ppPStr SLIT("        derived from:"),
 			  if null unspec_theta then ppNil else ppr PprDebug unspec_theta,
-			  if null unspec_theta then ppNil else ppStr "=>",
+			  if null unspec_theta then ppNil else ppPStr SLIT("=>"),
 			  ppr PprDebug clas,
 			  pprParendGenType PprDebug unspec_inst_ty]])
     else id) (
@@ -843,7 +842,7 @@ scrutiniseInstanceType dfun_name clas inst_tau
   = returnTc (inst_tycon,arg_tys)
 
   where
-    (possible_tycon, arg_tys) = splitAppTy inst_tau
+    (possible_tycon, arg_tys) = splitAppTys inst_tau
     inst_tycon_maybe	      = getTyCon_maybe possible_tycon
     inst_tycon 		      = expectJust "tcInstDecls1:inst_tycon" inst_tycon_maybe
 
@@ -885,51 +884,56 @@ creturnable_type ty = maybeToBool (maybeBoxedPrimType ty) ||
 
 instTypeErr ty sty
   = case ty of
-      SynTy tc _ _ -> ppBesides [ppStr "The type synonym `", ppr sty tc, rest_of_msg]
-      TyVarTy tv   -> ppBesides [ppStr "The type variable `", ppr sty tv, rest_of_msg]
-      other	   -> ppBesides [ppStr "The type `", ppr sty ty, rest_of_msg]
+      SynTy tc _ _ -> ppBesides [ppPStr SLIT("The type synonym `"), ppr sty tc, rest_of_msg]
+      TyVarTy tv   -> ppBesides [ppPStr SLIT("The type variable `"), ppr sty tv, rest_of_msg]
+      other	   -> ppBesides [ppPStr SLIT("The type `"), ppr sty ty, rest_of_msg]
   where
-    rest_of_msg = ppStr "' cannot be used as an instance type."
+    rest_of_msg = ppPStr SLIT("' cannot be used as an instance type.")
 
 derivingWhenInstanceExistsErr clas tycon sty
-  = ppHang (ppBesides [ppStr "Deriving class `", ppr sty clas, ppStr "' type `", ppr sty tycon, ppStr "'"])
-         4 (ppStr "when an explicit instance exists")
+  = ppHang (ppBesides [ppPStr SLIT("Deriving class `"), 
+		       ppr sty clas, 
+		       ppPStr SLIT("' type `"), ppr sty tycon, ppChar '\''])
+         4 (ppPStr SLIT("when an explicit instance exists"))
 
 derivingWhenInstanceImportedErr inst_mod clas tycon sty
-  = ppHang (ppBesides [ppStr "Deriving class `", ppr sty clas, ppStr "' type `", ppr sty tycon, ppStr "'"])
-         4 (ppBesides [ppStr "when an instance declared in module `", pp_mod, ppStr "' has been imported"])
+  = ppHang (ppBesides [ppPStr SLIT("Deriving class `"), 
+		       ppr sty clas, 
+		       ppPStr SLIT("' type `"), ppr sty tycon, ppChar '\''])
+         4 (ppBesides [ppPStr SLIT("when an instance declared in module `"), 
+		       pp_mod, ppPStr SLIT("' has been imported")])
   where
-    pp_mod = ppBesides [ppStr "module `", ppPStr inst_mod, ppStr "'"]
+    pp_mod = ppBesides [ppPStr SLIT("module `"), ppPStr inst_mod, ppChar '\'']
 
 nonBoxedPrimCCallErr clas inst_ty sty
-  = ppHang (ppStr "Unacceptable instance type for ccall-ish class")
-	 4 (ppBesides [ ppStr "class `", ppr sty clas, ppStr "' type `",
-    		        ppr sty inst_ty, ppStr "'"])
+  = ppHang (ppPStr SLIT("Unacceptable instance type for ccall-ish class"))
+	 4 (ppBesides [ ppPStr SLIT("class `"), ppr sty clas, ppPStr SLIT("' type `"),
+    		        ppr sty inst_ty, ppChar '\''])
 
 omitDefaultMethodWarn clas_op clas_name inst_ty sty
-  = ppCat [ppStr "Warning: Omitted default method for",
-	   ppr sty clas_op, ppStr "in instance",
+  = ppCat [ppPStr SLIT("Warning: Omitted default method for"),
+	   ppr sty clas_op, ppPStr SLIT("in instance"),
 	   ppStr clas_name, pprParendGenType sty inst_ty]
 
 instMethodNotInClassErr occ clas sty
-  = ppHang (ppStr "Instance mentions a method not in the class")
-	 4 (ppBesides [ppStr "class `", ppr sty clas, ppStr "' method `",
-    		       ppr sty occ, ppStr "'"])
+  = ppHang (ppPStr SLIT("Instance mentions a method not in the class"))
+	 4 (ppBesides [ppPStr SLIT("class `"), ppr sty clas, ppPStr SLIT("' method `"),
+    		       ppr sty occ, ppChar '\''])
 
 patMonoBindsCtxt pbind sty
-  = ppHang (ppStr "In a pattern binding:")
+  = ppHang (ppPStr SLIT("In a pattern binding:"))
 	 4 (ppr sty pbind)
 
 methodSigCtxt name ty sty
-  = ppHang (ppBesides [ppStr "When matching the definition of class method `",
-	               ppr sty name, ppStr "' to its signature :" ])
+  = ppHang (ppBesides [ppPStr SLIT("When matching the definition of class method `"),
+	               ppr sty name, ppPStr SLIT("' to its signature :") ])
 	 4 (ppr sty ty)
 
 bindSigCtxt method_ids sty
-  = ppHang (ppStr "When checking type signatures for: ")
+  = ppHang (ppPStr SLIT("When checking type signatures for: "))
 	 4 (ppInterleave (ppStr ", ") (map (ppr sty) method_ids))
 
 superClassSigCtxt sty
-  = ppStr "When checking superclass constraints on instance declaration"
+  = ppPStr SLIT("When checking superclass constraints on instance declaration")
 
 \end{code}

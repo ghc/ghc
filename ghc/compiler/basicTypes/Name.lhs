@@ -13,7 +13,8 @@ module Name (
 
 	-- The OccName type
 	OccName(..),
-	pprOccName, pprSymOcc, pprNonSymOcc, occNameString, occNameFlavour, isTvOcc, 
+	pprOccName, pprSymOcc, pprNonSymOcc, occNameString, occNameFlavour, 
+	isTvOcc, isTCOcc, isVarOcc, prefixOccName,
 	quoteInText, parenInCode,
 
 	-- The Name type
@@ -38,7 +39,7 @@ module Name (
 	-- Sets of Names
 	NameSet(..),
 	emptyNameSet, unitNameSet, mkNameSet, unionNameSets, unionManyNameSets,
-	minusNameSet, elemNameSet, nameSetToList, addListToNameSet,
+	minusNameSet, elemNameSet, nameSetToList, addListToNameSet, isEmptyNameSet,
 
 	-- Misc
 	DefnInfo(..),
@@ -65,7 +66,7 @@ import Pretty
 import Lex		( isLexSym, isLexConId )
 import SrcLoc		( noSrcLoc, SrcLoc )
 import Unique		( pprUnique, showUnique, Unique )
-import UniqSet		( UniqSet(..), emptyUniqSet, unitUniqSet, unionUniqSets, uniqSetToList,
+import UniqSet		( UniqSet(..), emptyUniqSet, unitUniqSet, unionUniqSets, uniqSetToList, isEmptyUniqSet,
 		 	  unionManyUniqSets, minusUniqSet, mkUniqSet, elementOfUniqSet, addListToUniqSet )
 import UniqFM		( UniqFM )
 import Util		( cmpPString, panic, assertPanic {-, pprTrace ToDo:rm-} )
@@ -102,6 +103,11 @@ occNameString (VarOcc s)  = s
 occNameString (TvOcc s)   = s
 occNameString (TCOcc s)   = s
 
+prefixOccName :: FAST_STRING -> OccName -> OccName
+prefixOccName prefix (VarOcc s) = VarOcc (prefix _APPEND_ s)
+prefixOccName prefix (TvOcc s)  = TvOcc (prefix _APPEND_ s)
+prefixOccName prefix (TCOcc s) = TCOcc (prefix _APPEND_ s)
+
 -- occNameFlavour is used only to generate good error messages, so it doesn't matter
 -- that the VarOcc case isn't mega-efficient.  We could have different Occ constructors for
 -- data constructors and values, but that makes everything else a bit more complicated.
@@ -111,9 +117,16 @@ occNameFlavour (VarOcc s) | isLexConId s = "data constructor"
 occNameFlavour (TvOcc s)  = "type variable"
 occNameFlavour (TCOcc s)  = "type constructor or class"
 
-isTvOcc :: OccName -> Bool
+isVarOcc, isTCOcc, isTvOcc :: OccName -> Bool
+isVarOcc (VarOcc s) = True
+isVarOcc other     = False
+
 isTvOcc (TvOcc s) = True
 isTvOcc other     = False
+
+isTCOcc (TCOcc s) = True
+isTCOcc other     = False
+
 
 instance Eq OccName where
     a == b = case (a `cmp` b) of { EQ_ -> True;  _ -> False }
@@ -287,7 +300,8 @@ setNameVisibility mod (Local uniq occ loc)
 setNameVisibility mod name = name
 
 all_toplev_ids_visible = not opt_OmitInterfacePragmas ||  -- Pragmas can make them visible
-			 opt_EnsureSplittableC		  -- Splitting requires visiblilty
+			 opt_EnsureSplittableC            -- Splitting requires visiblilty
+
 \end{code}
 
 %************************************************************************
@@ -408,13 +422,15 @@ instance Outputable Name where
     ppr sty name@(Global u m n _ _) = ppBesides [pp_name, pp_debug sty name]
 			       where
 				 pp_name | codeStyle sty = identToC qual_name
-				         | otherwise     = ppPStr qual_name
-				 qual_name = m _APPEND_ SLIT(".") _APPEND_ occNameString n
+				         | otherwise     = ppBesides[ ppPStr m, ppChar '.', ppPStr pk_n]
+		                 pk_n = occNameString n
+				 qual_name = m _APPEND_ SLIT(".") _APPEND_ pk_n
 
-pp_debug PprDebug (Global uniq m n _ prov) = ppBesides [ppStr "{-", pprUnique uniq, ppStr ",", 
+pp_debug PprDebug (Global uniq m n _ prov) = ppBesides [ppStr "{-", pprUnique uniq, ppChar ',', 
 						        pp_prov prov, ppStr "-}"]
 					where
-						pp_prov (LocalDef _ _) = ppChar 'l'
+						pp_prov (LocalDef Exported _)    = ppChar 'x'
+						pp_prov (LocalDef NotExported _) = ppChar 'l'
 						pp_prov (Imported _ _) = ppChar 'i'
 						pp_prov Implicit       = ppChar 'p'
 pp_debug other    name 		        = ppNil
@@ -426,9 +442,9 @@ pprNameProvenance sty (Global _ _ _ _ prov) = pprProvenance sty prov
 
 pprProvenance :: PprStyle -> Provenance -> Pretty
 pprProvenance sty (Imported mod loc)
-  = ppSep [ppStr "Imported from", pprModule sty mod, ppStr "at", ppr sty loc]
+  = ppSep [ppPStr SLIT("Imported from"), pprModule sty mod, ppPStr SLIT("at"), ppr sty loc]
 pprProvenance sty (LocalDef _ loc) 
-  = ppSep [ppStr "Defined at", ppr sty loc]
+  = ppSep [ppPStr SLIT("Defined at"), ppr sty loc]
 pprProvenance sty Implicit
   = panic "pprNameProvenance: Implicit"
 \end{code}
@@ -451,7 +467,9 @@ unionManyNameSets :: [NameSet] -> NameSet
 minusNameSet 	  :: NameSet -> NameSet -> NameSet
 elemNameSet	  :: Name -> NameSet -> Bool
 nameSetToList	  :: NameSet -> [Name]
+isEmptyNameSet	  :: NameSet -> Bool
 
+isEmptyNameSet    = isEmptyUniqSet
 emptyNameSet	  = emptyUniqSet
 unitNameSet	  = unitUniqSet
 mkNameSet         = mkUniqSet

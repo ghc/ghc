@@ -72,8 +72,9 @@ type tree;
 	as	: < gasid	: qid;
 		    gase	: tree; >;
 	lazyp	: < glazyp	: tree; >;
+	plusp	: < gplusp	: qid; 
+		    gplusi	: literal; >;
 	wildp	: < >;
-
 	restr	: < grestre	: tree;
 		    grestrt	: ttype; >;
 

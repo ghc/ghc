@@ -7,8 +7,8 @@
 %************************************************************************
 
 The Haskell~1.3 module system (nicely improved, thank you very much)
-requires a substantially different implementation, which we have done
-for GHC~2.01.
+requires a substantially different implementation, which we did
+(as of release GHC~2.01).
 
 We have taken a fairly radical approach and implemented a ``go to the
 horse's mouth'' scheme; that is, when seeking out information about an
@@ -31,11 +31,11 @@ GHC will now start ``compiling'' much more often than in the old days,
 but it will frequently bail out quickly, saying the recompile is
 \tr{NOT NEEDED}.  What a beautiful sight!
 
-The recompilation checker is not finished.  Its main faults are:
-(a)~it doesn't yet do the right things for instance declarations;
-(b)~it doesn't do anything about pragmas (happily, GHC~2.01 doesn't
-produce any); (c)~it has no good solution for mutually-recursive
-modules.
+%The recompilation checker is not finished.  Its main faults are:
+%(a)~it doesn't yet do the right things for instance declarations;
+%(b)~it doesn't do anything about pragmas (happily, GHC~2.01 doesn't
+%produce any); (c)~it has no good solution for mutually-recursive
+%modules.
 
 Patrick Sansom has a workshop paper about how all these things should
 be done.  Ask him (email: \tr{sansom}) if you want a copy.

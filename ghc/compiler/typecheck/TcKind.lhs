@@ -179,11 +179,11 @@ instance Outputable (TcKind s) where
   ppr sty kind = ppr_kind sty kind
 
 ppr_kind sty TcTypeKind 
-  = ppStr "*"
+  = ppChar '*'
 ppr_kind sty (TcArrowKind kind1 kind2) 
-  = ppSep [ppr_parend sty kind1, ppStr "->", ppr_kind sty kind2]
+  = ppSep [ppr_parend sty kind1, ppPStr SLIT("->"), ppr_kind sty kind2]
 ppr_kind sty (TcVarKind uniq box) 
-  = ppBesides [ppStr "k", pprUnique10 uniq]
+  = ppBesides [ppChar 'k', pprUnique10 uniq]
 
 ppr_parend sty kind@(TcArrowKind _ _) = ppBesides [ppChar '(', ppr_kind sty kind, ppChar ')']
 ppr_parend sty other_kind	      = ppr_kind sty other_kind
@@ -195,20 +195,20 @@ Errors and contexts
 ~~~~~~~~~~~~~~~~~~~
 \begin{code}
 unifyKindCtxt kind1 kind2 sty
-  = ppHang (ppStr "When unifying two kinds") 4
-	   (ppSep [ppr sty kind1, ppStr "and", ppr sty kind2])
+  = ppHang (ppPStr SLIT("When unifying two kinds")) 4
+	   (ppSep [ppr sty kind1, ppPStr SLIT("and"), ppr sty kind2])
 
 kindOccurCheck kind1 kind2 sty
-  = ppHang (ppStr "Cannot construct the infinite kind:") 4
-	(ppSep [ppBesides [ppStr "`", ppr sty kind1, ppStr "'"],
-		ppStr "=",
-		ppBesides [ppStr "`", ppr sty kind1, ppStr "'"],
-		ppStr "(\"occurs check\")"])
+  = ppHang (ppPStr SLIT("Cannot construct the infinite kind:")) 4
+	(ppSep [ppBesides [ppChar '`', ppr sty kind1, ppChar '\''],
+		ppChar '=',
+		ppBesides [ppChar '`', ppr sty kind1, ppChar '\''],
+		ppPStr SLIT("(\"occurs check\")")])
 
 kindMisMatchErr kind1 kind2 sty
- = ppHang (ppStr "Couldn't match the kind") 4
-	(ppSep [ppBesides [ppStr "`", ppr sty kind1, ppStr "'"],
-		ppStr "against",
-		ppBesides [ppStr "`", ppr sty kind2, ppStr "'"]
+ = ppHang (ppPStr SLIT("Couldn't match the kind")) 4
+	(ppSep [ppBesides [ppChar '`', ppr sty kind1, ppChar '\''],
+		ppPStr SLIT("against"),
+		ppBesides [ppChar '`', ppr sty kind2, ppChar '\'']
 	])
 \end{code}

@@ -305,7 +305,7 @@ pprHeapOffsetPieces sty int_offs fxdhdr_offs varhdr_offs tothdr_offs
 	    else if fxdhdr_offs _EQ_ ILIT(1) then
 		Just (uppPStr SLIT("_FHS"))
 	    else
-		Just (uppBesides [uppStr "(_FHS*", uppInt IBOX(fxdhdr_offs), uppChar ')'])
+		Just (uppBesides [uppChar '(', uppPStr SLIT("_FHS*"), uppInt IBOX(fxdhdr_offs), uppChar ')'])
 
 	pp_varhdr_offs = pp_hdrs (uppPStr SLIT("_VHS")) varhdr_offs
 

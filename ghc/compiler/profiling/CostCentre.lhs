@@ -30,7 +30,7 @@ module CostCentre (
 
 IMP_Ubiq(){-uitous-}
 
-import Id		( externallyVisibleId, GenId, SYN_IE(Id) )
+import Id		( externallyVisibleId, GenId, showId, SYN_IE(Id) )
 import CStrings		( identToC, stringToC )
 import Name		( OccName, getOccString, moduleString )
 import Pretty		( ppShow, prettyToUn )
@@ -39,7 +39,6 @@ import UniqSet
 import Unpretty
 import Util
 
-showId = panic "Whoops"
 pprIdInUnfolding = panic "Whoops"
 \end{code}
 
@@ -371,7 +370,6 @@ uppCostCentre sty print_as_string cc
     friendly_sty = friendly_style sty
 
     ----------------
-    do_cc OverheadCC	     = "OVERHEAD"
     do_cc DontCareCC	     = "DONT_CARE"
     do_cc (AllCafsCC  m _)   = if print_as_string
 			       then "CAFs_in_..."
@@ -432,14 +430,19 @@ even if we won't ultimately do a \tr{SET_CCC} from it.
 upp_cc_uf (PreludeDictsCC d)
   = uppCat [uppPStr SLIT("_PRELUDE_DICTS_CC_"), upp_dupd d]
 upp_cc_uf (AllDictsCC m g d)
-  = uppCat [uppPStr SLIT("_ALL_DICTS_CC_"), uppStr (show (_UNPK_ m)), uppStr (show (_UNPK_ g)), upp_dupd d]
+  = uppCat [uppPStr SLIT("_ALL_DICTS_CC_"), 
+            uppChar '"',uppPStr m,uppChar '"',
+            uppChar '"',uppPStr g,uppChar '"',
+            upp_dupd d]
 
 upp_cc_uf cc@(NormalCC cc_kind m g is_dupd is_caf)
   = ASSERT(sccAbleCostCentre cc)
-    uppCat [pp_kind cc_kind, uppStr (show (_UNPK_ m)), uppStr (show (_UNPK_ g)),
+    uppCat [pp_kind cc_kind, 
+            uppChar '"', uppPStr m, uppChar '"', 
+            uppChar '"', uppPStr g, uppChar '"',
 	    upp_dupd is_dupd, pp_caf is_caf]
   where
-    pp_kind (UserCC name) = uppBeside (uppPStr SLIT("_USER_CC_ ")) (uppStr (show (_UNPK_ name)))
+    pp_kind (UserCC name) = uppBesides [uppPStr SLIT("_USER_CC_ "), uppChar '"', uppPStr name, uppChar '"']
     pp_kind (AutoCC id)   = uppBeside (uppPStr SLIT("_AUTO_CC_ ")) (show_id id)
     pp_kind (DictCC id)	  = uppBeside (uppPStr SLIT("_DICT_CC_ ")) (show_id id)
 
@@ -455,7 +458,7 @@ upp_cc_uf other = panic ("upp_cc_uf:"++(showCostCentre PprDebug True other))
 #endif
 
 upp_dupd AnOriginalCC = uppPStr SLIT("_N_")
-upp_dupd ADupdCC      = uppPStr SLIT("_DUPD_CC_")
+upp_dupd ADupdCC      = uppPStr SLIT("_D_")
 \end{code}
 
 \begin{code}
@@ -467,7 +470,7 @@ uppCostCentreDecl sty is_local cc
 #endif
   = if is_local then
 	uppBesides [
-	    uppStr "CC_DECLARE(",
+	    uppPStr SLIT("CC_DECLARE"),uppChar '(',
 	    upp_ident, uppComma,
 	    uppCostCentre sty True {-as String!-} cc, uppComma,
 	    pp_str mod_name, uppComma,
@@ -476,12 +479,12 @@ uppCostCentreDecl sty is_local cc
 	    if externally_visible then uppNil else uppPStr SLIT("static"),
 	    uppStr ");"]
     else
-	uppBesides [ uppStr "CC_EXTERN(", upp_ident, uppStr ");" ]
+	uppBesides [ uppPStr SLIT("CC_EXTERN"),uppChar '(', upp_ident, uppStr ");" ]
   where
     upp_ident = uppCostCentre sty False{-as identifier!-} cc
 
-    pp_str s  = uppBeside (uppPStr (_CONS_ '"'  s))  (uppChar '"')
-    pp_char c = uppBeside (uppPStr (_CONS_ '\'' c)) (uppChar '\'')
+    pp_str s  = uppBesides [uppChar '"',uppPStr s, uppChar '"' ]
+    pp_char c = uppBesides [uppChar '\'', uppPStr c, uppChar '\'']
 
     (mod_name, grp_name, is_subsumed, externally_visible)
       = case cc of

@@ -5,18 +5,17 @@
 Command-line arguments are either options or file names.
 
 Command-line options begin with \tr{-}.  They may {\em not} be
-grouped: \tr{-vO} is different from \tr{-v -O}.
-Options need not precede filenames: e.g., \tr{ghc *.o -o foo}.
-All options are processed
-and then apply to all files; you cannot, for example,
-invoke \tr{ghc -c -O1 Foo.hs -O2 Bar.hs} to apply different
-optimisation levels to the files \tr{Foo.hs} and \tr{Bar.hs}.  For
-conflicting options, e.g., \tr{-c -S}, we reserve the right to do
-anything we want.  (Usually, the last one applies.)
+grouped: \tr{-vO} is different from \tr{-v -O}.  Options need not
+precede filenames: e.g., \tr{ghc *.o -o foo}.  All options are
+processed and then applied to all files; you cannot, for example, invoke
+\tr{ghc -c -O1 Foo.hs -O2 Bar.hs} to apply different optimisation
+levels to the files \tr{Foo.hs} and \tr{Bar.hs}.  For conflicting
+options, e.g., \tr{-c -S}, we reserve the right to do anything we
+want.  (Usually, the last one applies.)
 
 Options related to profiling, Glasgow extensions to Haskell (e.g.,
-unboxed values), Concurrent and Parallel Haskell are
-described in \sectionref{profiling}, \sectionref{glasgow-exts}, and
+unboxed values), Concurrent and Parallel Haskell are described in
+\sectionref{profiling}, \sectionref{glasgow-exts}, and
 \sectionref{concurrent-and-parallel}, respectively.
 
 %************************************************************************
@@ -85,6 +84,10 @@ Please, oh please, use the \tr{-v} option when reporting bugs!
 Knowing that you ran the right bits in the right order is always the
 first thing we want to verify.
 
+If you're just interested in the compiler version number, the
+\tr{--version}\index{--version option} option prints out a
+one-line string containing the requested info.
+
 %************************************************************************
 %*                                                                      *
 \subsection[options-order]{Running the right phases in the right order}
@@ -126,7 +129,8 @@ native-code generator is used (producing assembly language) or not
 %files as if they had suffix \pl{<suf>}. [NOT IMPLEMENTED YET]
 
 The option \tr{-cpp}\index{-cpp option} must be given for the C
-pre-processor phase to be run.
+pre-processor phase to be run, that is, the pre-processor will be run
+over your Haskell source file before continuing.
 
 The option \tr{-E}\index{-E option} runs just the C-preprocessor part
 of the C-compiling phase, sending the result to stdout [I think].  (For
@@ -156,8 +160,9 @@ following ``packages'' of optimisations (or lack thereof) should suffice.
 
 Once you choose a \tr{-O*} ``package,'' stick with it---don't chop and
 change.  Modules' interfaces {\em will} change with a shift to a new
-\tr{-O*} option, and you will have to recompile all importing modules
-before your program can again be run safely.
+\tr{-O*} option, and you may have to recompile a large chunk of all
+importing modules before your program can again be run
+safely\sectionref{recomp}.
 
 \begin{description}
 \item[No \tr{-O*}-type option specified:]
@@ -392,7 +397,7 @@ then `2'.  If `2' doesn't work, please report the bug to us.
 \index{GCC optimisation}
 
 The C~compiler (GCC) is run with \tr{-O} turned on.  (It has
-to be, actually.)
+to be, actually).
 
 If you want to run GCC with \tr{-O2}---which may be worth a few
 percent in execution speed---you can give a
@@ -404,7 +409,7 @@ percent in execution speed---you can give a
 
 %************************************************************************
 %*                                                                      *
-\subsection[options-sanity]{Sanity-checking options}
+\subsection[options-sanity]{Warnings and sanity-checking}
 \index{sanity-checking options}
 %*                                                                      *
 %************************************************************************
@@ -415,13 +420,30 @@ option.\index{-fsignatures-required option}
 
 If you would like to disallow ``name shadowing,'' i.e., an inner-scope
 value has the same name as an outer-scope value, then use the
-\tr{-fname-shadowing-not-ok}
-option.\index{-fname-shadowing-not-ok option}
+\tr{-fwarn-name-shadowing}
+option.\index{-fwarn-name-shadowing option}
 This option catches typographical errors that turn into hard-to-find
 bugs, e.g., in the inadvertent cyclic definition \tr{let x = ... x ... in}.
 
 Consequently, this option does {\em not} allow cyclic recursive
 definitions.
+
+By default, the compiler will warn you if a set of patterns are either
+incomplete (i.e., you're only matching on a subset of an algebraic
+data type's constructors), or overlapping, i.e.,
+
+\begin{verbatim}
+f :: String -> Int
+f []     = 0
+f (_:xs) = 1
+f "2"    = 2
+\end{verbatim}
+
+where the last pattern match won't ever be reached, as the second
+pattern overlaps it. More often than not, `completeness' of
+patterns is a programmer mistake/error, but if you don't want
+the compiler to ``baby-sit'', use \tr{-fno-warn-incomplete-patterns} option
+to turn them off.\index{-fno-warn-incomplete-patterns option}.
 
 If you're feeling really paranoid, the \tr{-dcore-lint}
 option\index{-dcore-lint option} is a good choice.  It turns on
@@ -467,8 +489,8 @@ Note: this ``feature'' can be counterintuitive:
 \tr{ghc -C -o foo.o foo.hs} will put the intermediate C code in the
 file \tr{foo.o}, name notwithstanding!
 
-EXOTICA: But the \tr{-o} option isn't much use if you have {\em
-several} input files...  Non-interface output files are normally put
+EXOTICA: But the \tr{-o} option isn't of much use if you have {\em
+several} input files... Non-interface output files are normally put
 in the same directory as their corresponding input file came from.
 You may specify that they be put in another directory using the
 \tr{-odir <dir>}\index{-odir <dir> option} (the ``Oh, dear'' option).
@@ -538,8 +560,9 @@ variable.\index{TMPDIR environment variable}  Set it to the name of
 the directory where temporary files should be put.  GCC and other
 programs will honour the \tr{TMPDIR} variable as well.
 
-EVEN BETTER IDEA: Configure GHC with \tr{--with-tmpdir=<mumble>} when
-you build it, and never worry about \tr{TMPDIR} again.
+EVEN BETTER IDEA: Set the \tr{TMPDIR} variable when building
+GHC, and never worry about \tr{TMPDIR} again. (see the build
+documentation).
 
 %************************************************************************
 %*                                                                      *
@@ -629,7 +652,7 @@ The \tr{ghc} driver pre-defines several macros:
 \index{__HASKELL1__ macro}
 If defined to $n$, that means GHC supports the
 Haskell language defined in the Haskell report version $1.n$.
-Currently 3.
+Currently 4.
 
 NB: This macro is set both when pre-processing Haskell source and
 when pre-processing generated C (\tr{.hc}) files.
@@ -654,9 +677,8 @@ implementations that support C-style pre-processing.
 \item[\tr{__CONCURRENT_HASKELL__}:]
 \index{__CONCURRENT_HASKELL__ macro}
 Only defined when \tr{-concurrent} is in use!
-This symbol is
-defined when pre-processing Haskell (input) and pre-processing C (GHC
-output).
+This symbol is defined when pre-processing Haskell (input) and
+pre-processing C (GHC output).
 
 \item[\tr{__PARALLEL_HASKELL__}:]
 \index{__PARALLEL_HASKELL__ macro}
@@ -696,7 +718,7 @@ THIS MAY CHANGE.  Meanwhile, options so sent are:
 \index{-dgcc-lint option (GCC paranoia)}
 
 If you are compiling with lots of \tr{ccalls}, etc., you may need to
-tell the C~compiler about some \tr{#include} files.  There is no
+tell the C~compiler about some \tr{#include} files.  There is no real
 pretty way to do this, but you can use this hack from the
 command-line:
 \begin{verbatim}
@@ -1171,6 +1193,38 @@ Main.skip2{-r1L6-} =
 
 (``It's just a simple functional language'' is an unregisterised
 trademark of Peyton Jones Enterprises, plc.)
+
+%----------------------------------------------------------------------
+\subsubsection[source-file-options]{Command line options in source files}
+\index{source-file options}
+
+Sometimes it is useful to make the connection between a source file
+and the command-line options it requires, quite tight. For instance,
+if a (Glasgow) Haskell source file uses \tr{casm}s, the C back-end
+often needs to be told about header files to use,
+\ref{-#include <file> option}. Rather than maintaining the list of
+files the source depends on in a \tr{Makefile}, it is possible to
+do this directly in the source file using the \tr{OPTIONS} pragma
+\index{OPTIONS pragma}:
+
+\begin{verbatim}
+{-# OPTIONS -#include "foo.h" #-}
+module X where
+
+...
+\end{verbatim}
+
+\tr{OPTIONS} pragmas are only looked for at the top of your source
+files, upto the first (non-literate,non-empty) line not containing
+\tr{OPTIONS}. Multiple \tr{OPTIONS} pragmas are recognised. Note
+that your command shell does not get to the source file options, they
+are just included literally in the array of command-line arguments
+the compiler driver maintains internally, so you'll be desperately
+disappointed if you try to glob etc. inside \tr{OPTIONS}.
+
+It is not recommended to move all the contents of your Makefiles into
+your source files, but in some circumstances, the \tr{OPTIONS} pragma
+is the Right Thing.
 
 %----------------------------------------------------------------------
 %\subsubsection[arity-checking]{Options to insert arity-checking code}

@@ -5,7 +5,7 @@ module Type (
 	GenType(..), SYN_IE(Type), SYN_IE(TauType),
 	mkTyVarTy, mkTyVarTys,
 	getTyVar, getTyVar_maybe, isTyVarTy,
-	mkAppTy, mkAppTys, splitAppTy,
+	mkAppTy, mkAppTys, splitAppTy, splitAppTys,
 	mkFunTy, mkFunTys,
 	splitFunTy, splitFunTyExpandingDicts, splitFunTyExpandingDictsAndPeeking,
 	getFunTy_maybe, getFunTyExpandingDicts_maybe,
@@ -37,7 +37,8 @@ module Type (
 
 	isTauTy,
 
-	tyVarsOfType, tyVarsOfTypes, namesOfType, typeKind
+	tyVarsOfType, tyVarsOfTypes, namesOfType, typeKind,
+        showTypeCategory
     ) where
 
 IMP_Ubiq()
@@ -48,7 +49,7 @@ IMPORT_DELOOPER(TyLoop)
 -- friends:
 import Class	( classSig, classOpLocalType, GenClass{-instances-} )
 import Kind	( mkBoxedTypeKind, resultKind, notArrowKind, Kind )
-import TyCon	( mkFunTyCon, isFunTyCon,
+import TyCon	( mkFunTyCon, isFunTyCon, isEnumerationTyCon, isTupleTyCon, maybeTyConSingleCon,
 		  isPrimTyCon, isDataTyCon, isSynTyCon, maybeNewTyCon, isNewTyCon,
 		  tyConKind, tyConDataCons, getSynTyConDefn, TyCon )
 import TyVar	( tyVarKind, GenTyVar{-instances-}, SYN_IE(GenTyVarSet),
@@ -210,8 +211,13 @@ mkAppTy = AppTy
 mkAppTys :: GenType t u -> [GenType t u] -> GenType t u
 mkAppTys t ts = foldl AppTy t ts
 
-splitAppTy :: GenType t u -> (GenType t u, [GenType t u])
-splitAppTy t = go t []
+splitAppTy :: GenType t u -> (GenType t u, GenType t u)
+splitAppTy (AppTy t arg) = (t,arg)
+splitAppTy (SynTy _ _ t) = splitAppTy t
+splitAppTy other	 = panic "splitAppTy"
+
+splitAppTys :: GenType t u -> (GenType t u, [GenType t u])
+splitAppTys t = go t []
   where
     go (AppTy t arg)     ts = go t (arg:ts)
     go (FunTy fun arg u) ts = (TyConTy mkFunTyCon u, fun:arg:ts)
@@ -421,7 +427,7 @@ maybeAppTyCon ty
 	Nothing    -> Nothing
 	Just tycon -> Just (tycon, arg_tys)
   where
-    (app_ty, arg_tys) = splitAppTy ty
+    (app_ty, arg_tys) = splitAppTys ty
 
 
 getAppTyCon
@@ -456,7 +462,7 @@ maybeAppSpecDataTyConExpandingDicts ty = maybe_app_data_tycon expandTy ty
 maybe_app_data_tycon expand ty
   = let
 	expanded_ty       = expand ty
-	(app_ty, arg_tys) = splitAppTy expanded_ty
+	(app_ty, arg_tys) = splitAppTys expanded_ty
     in
     case (getTyCon_maybe app_ty) of
 	Just tycon |  --pprTrace "maybe_app:" (ppCat [ppr PprDebug (isDataTyCon tycon), ppr PprDebug (notArrowKind (typeKind expanded_ty))]) $
@@ -743,7 +749,9 @@ tc_primrep_list
     ,(stablePtrPrimTyConKey, 	    StablePtrRep)
     ,(statePrimTyConKey,	    VoidRep)
     ,(synchVarPrimTyConKey,	    PtrRep)
-    ,(voidTyConKey,	     	    VoidRep)
+    ,(voidTyConKey,	     	    PtrRep)	-- Not VoidRep!  That's just for Void#
+						-- The type Void is represented by a pointer to
+						-- a bottom closure.
     ,(wordPrimTyConKey,	     	    WordRep)
     ]
 \end{code}
@@ -929,4 +937,54 @@ eqTy t1 t2 =
   eqBounds uve [] [] = True
   eqBounds uve (u1:b1) (u2:b2) = eqUVar uve u1 u2 && eqBounds uve b1 b2
   eqBounds uve _ _ = False
+\end{code}
+
+\begin{code}
+showTypeCategory :: Type -> Char
+  {-
+	{C,I,F,D}   char, int, float, double
+	T	    tuple
+	S	    other single-constructor type
+	{c,i,f,d}   unboxed ditto
+	t	    *unpacked* tuple
+	s	    *unpacked" single-cons...
+
+	v	    void#
+	a	    primitive array
+
+	E	    enumeration type
+	+	    dictionary, unless it's a ...
+	L	    List
+	>	    function
+	M	    other (multi-constructor) data-con type
+	.	    other type
+	-	    reserved for others to mark as "uninteresting"
+    -}
+showTypeCategory ty
+  = if isDictTy ty
+    then '+'
+    else
+      case getTyCon_maybe ty of
+	Nothing -> if maybeToBool (getFunTy_maybe ty)
+		   then '>'
+		   else '.'
+
+	Just tycon ->
+          let utc = uniqueOf tycon in
+	  if	  utc == charDataConKey    then 'C'
+	  else if utc == intDataConKey     then 'I'
+	  else if utc == floatDataConKey   then 'F'
+	  else if utc == doubleDataConKey  then 'D'
+	  else if utc == integerDataConKey then 'J'
+	  else if utc == charPrimTyConKey  then 'c'
+	  else if (utc == intPrimTyConKey || utc == wordPrimTyConKey
+		|| utc == addrPrimTyConKey)		   then 'i'
+	  else if utc  == floatPrimTyConKey		   then 'f'
+	  else if utc  == doublePrimTyConKey		   then 'd'
+	  else if isPrimTyCon tycon {- array, we hope -}   then 'A'
+	  else if isEnumerationTyCon tycon		   then 'E'
+	  else if isTupleTyCon tycon			   then 'T'
+	  else if maybeToBool (maybeTyConSingleCon tycon)  then 'S'
+	  else if utc == listTyConKey			   then 'L'
+	  else 'M' -- oh, well...
 \end{code}

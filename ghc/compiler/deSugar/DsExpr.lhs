@@ -13,7 +13,7 @@ IMPORT_DELOOPER(DsLoop)		-- partly to get dsBinds, partly to chk dsExpr
 
 import HsSyn		( failureFreePat,
 			  HsExpr(..), OutPat(..), HsLit(..), ArithSeqInfo(..),
-			  Stmt(..), Match(..), Qualifier, HsBinds, HsType, Fixity,
+			  Stmt(..), DoOrListComp(..), Match(..), HsBinds, HsType, Fixity,
 			  GRHSsAndBinds
 			)
 import TcHsSyn		( SYN_IE(TypecheckedHsExpr), SYN_IE(TypecheckedHsBinds),
@@ -47,16 +47,17 @@ import PprType		( GenType )
 import PrelVals		( rEC_CON_ERROR_ID, rEC_UPD_ERROR_ID, voidId )
 import Pretty		( ppShow, ppBesides, ppPStr, ppStr )
 import TyCon		( isDataTyCon, isNewTyCon )
-import Type		( splitSigmaTy, splitFunTy, typePrimRep,
-			  getAppDataTyConExpandingDicts, getAppTyCon, applyTy,
-			  maybeBoxedPrimType
+import Type		( splitSigmaTy, splitFunTy, typePrimRep, 
+			  getAppDataTyConExpandingDicts, maybeAppTyCon, getAppTyCon, applyTy,
+			  maybeBoxedPrimType, splitAppTy
 			)
 import TysPrim		( voidTy )
-import TysWiredIn	( mkTupleTy, tupleCon, nilDataCon, consDataCon,
+import TysWiredIn	( mkTupleTy, tupleCon, nilDataCon, consDataCon, listTyCon,
 			  charDataCon, charTy
 			)
 import TyVar		( nullTyVarEnv, addOneToTyVarEnv, GenTyVar{-instance Eq-} )
 import Usage		( SYN_IE(UVar) )
+import Maybes		( maybeToBool )
 import Util		( zipEqual, pprError, panic, assertPanic )
 
 mk_nil_con ty = mkCon nilDataCon [] [ty] []  -- micro utility...
@@ -75,7 +76,7 @@ around; if we get hits, we use the value accordingly.
 \begin{code}
 dsExpr :: TypecheckedHsExpr -> DsM CoreExpr
 
-dsExpr e@(HsVar var) = dsApp e []
+dsExpr e@(HsVar var) = dsId var
 \end{code}
 
 %************************************************************************
@@ -261,18 +262,25 @@ dsExpr expr@(HsCase discrim matches src_loc)
     matchWrapper CaseMatch matches "case"	`thenDs` \ ([discrim_var], matching_code) ->
     returnDs ( mkCoLetAny (NonRec discrim_var core_discrim) matching_code )
 
-dsExpr (ListComp expr quals)
-  = dsExpr expr `thenDs` \ core_expr ->
-    dsListComp core_expr quals
-
 dsExpr (HsLet binds expr)
-  = dsBinds False binds	`thenDs` \ core_binds ->
+  = dsBinds binds	`thenDs` \ core_binds ->
     dsExpr expr		`thenDs` \ core_expr ->
     returnDs ( mkCoLetsAny core_binds core_expr )
 
-dsExpr (HsDoOut stmts then_id zero_id src_loc)
+dsExpr (HsDoOut do_or_lc stmts return_id then_id zero_id result_ty src_loc)
+  | maybeToBool maybe_list_comp		-- Special case for list comprehensions
   = putSrcLocDs src_loc $
-    dsDo then_id zero_id stmts
+    dsListComp stmts elt_ty
+
+  | otherwise
+  = putSrcLocDs src_loc $
+    dsDo do_or_lc stmts return_id then_id zero_id result_ty
+  where
+    maybe_list_comp = case maybeAppTyCon result_ty of
+			Just (tycon, [elt_ty]) | tycon == listTyCon
+					       -> Just elt_ty
+			other		       -> Nothing
+    Just elt_ty = maybe_list_comp
 
 dsExpr (HsIf guard_expr then_expr else_expr src_loc)
   = putSrcLocDs src_loc $
@@ -519,7 +527,7 @@ dsExpr (ClassDictLam dicts methods expr)
 
 #ifdef DEBUG
 -- HsSyn constructs that just shouldn't be here:
-dsExpr (HsDo _ _)	    = panic "dsExpr:HsDo"
+dsExpr (HsDo _ _ _)	    = panic "dsExpr:HsDo"
 dsExpr (ExplicitList _)	    = panic "dsExpr:ExplicitList"
 dsExpr (ExprWithTySig _ _)  = panic "dsExpr:ExprWithTySig"
 dsExpr (ArithSeqIn _)	    = panic "dsExpr:ArithSeqIn"
@@ -565,13 +573,13 @@ dsApp (TyApp expr tys) args
 
 -- we might should look out for SectionLs, etc., here, but we don't
 
-dsApp (HsVar v) args
-  = lookupEnvDs v	`thenDs` \ maybe_expr ->
-    mkAppDs (case maybe_expr of { Nothing -> Var v; Just expr -> expr }) args
-
 dsApp anything_else args
   = dsExpr anything_else	`thenDs` \ core_expr ->
     mkAppDs core_expr args
+
+dsId v
+  = lookupEnvDs v	`thenDs` \ maybe_expr -> 
+    returnDs (case maybe_expr of { Nothing -> Var v; Just expr -> expr })
 \end{code}
 
 \begin{code}
@@ -611,47 +619,73 @@ dsRbinds ((sel_id, rhs, pun_flag) : rbinds) continue_with
 
 Basically does the translation given in the Haskell~1.3 report:
 \begin{code}
-dsDo	:: Id		-- id for: (>>=) m
-	-> Id		-- id for: zero m
+dsDo	:: DoOrListComp
 	-> [TypecheckedStmt]
+	-> Id		-- id for: return m
+	-> Id		-- id for: (>>=) m
+	-> Id		-- id for: zero m
+	-> Type		-- Element type; the whole expression has type (m t)
 	-> DsM CoreExpr
 
-dsDo then_id zero_id (stmt:stmts)
-  = case stmt of
-      ExprStmt expr locn -> ASSERT( null stmts ) do_expr expr locn
+dsDo do_or_lc stmts return_id then_id zero_id result_ty
+  = dsId return_id	`thenDs` \ return_ds -> 
+    dsId then_id	`thenDs` \ then_ds -> 
+    dsId zero_id	`thenDs` \ zero_ds -> 
+    let
+	(_, b_ty) = splitAppTy result_ty	-- result_ty must be of the form (m b)
+	
+	go [ReturnStmt expr] 
+	  = dsExpr expr			`thenDs` \ expr2 ->
+	    mkAppDs return_ds [TyArg b_ty, VarArg expr2]
+    
+	go (GuardStmt expr locn : stmts)
+	  = do_expr expr locn			`thenDs` \ expr2 ->
+	    go stmts				`thenDs` \ rest ->
+	    mkAppDs zero_ds [TyArg b_ty]	`thenDs` \ zero_expr ->
+	    returnDs (mkCoreIfThenElse expr2 rest zero_expr)
+    
+	go (ExprStmt expr locn : stmts)
+	  = do_expr expr locn		`thenDs` \ expr2 ->
+	    let
+		(_, a_ty) = splitAppTy (coreExprType expr2)	-- Must be of form (m a)
+	    in
+	    if null stmts then
+		returnDs expr2
+	    else
+		go stmts     		`thenDs` \ rest  ->
+		newSysLocalDs a_ty		`thenDs` \ ignored_result_id ->
+		mkAppDs then_ds [TyArg a_ty, TyArg b_ty, VarArg expr2, 
+				   VarArg (mkValLam [ignored_result_id] rest)]
+    
+	go (LetStmt binds : stmts )
+	  = dsBinds binds	`thenDs` \ binds2 ->
+	    go stmts 		`thenDs` \ rest   ->
+	    returnDs (mkCoLetsAny binds2 rest)
+    
+	go (BindStmt pat expr locn : stmts)
+	  = putSrcLocDs locn $
+	    dsExpr expr 	   `thenDs` \ expr2 ->
+	    let
+		(_, a_ty)  = splitAppTy (coreExprType expr2)	-- Must be of form (m a)
+		zero_expr  = TyApp (HsVar zero_id) [b_ty]
+		main_match = PatMatch pat (SimpleMatch (
+			     HsDoOut do_or_lc stmts return_id then_id zero_id result_ty locn))
+		the_matches
+		  = if failureFreePat pat
+		    then [main_match]
+		    else [main_match, PatMatch (WildPat a_ty) (SimpleMatch zero_expr)]
+	    in
+	    matchWrapper DoBindMatch the_matches match_msg
+				`thenDs` \ (binders, matching_code) ->
+	    mkAppDs then_ds [TyArg a_ty, TyArg b_ty,
+			     VarArg expr2, VarArg (mkValLam binders matching_code)]
+    in
+    go stmts
 
-      ExprStmtOut expr locn a b -> 
-	do_expr expr locn		`thenDs` \ expr2 ->
-	ds_rest	    			`thenDs` \ rest  ->
-	newSysLocalDs a			`thenDs` \ ignored_result_id ->
-	dsApp (HsVar then_id) [TyArg a, TyArg b, VarArg expr2, 
-			       VarArg (mkValLam [ignored_result_id] rest)]
-
-      LetStmt binds ->
-        dsBinds False binds	`thenDs` \ binds2 ->
-	ds_rest			`thenDs` \ rest   ->
-	returnDs (mkCoLetsAny binds2 rest)
-
-      BindStmtOut pat expr locn a b ->
-	do_expr expr locn   `thenDs` \ expr2 ->
-	let
-	    zero_expr = TyApp (HsVar zero_id) [b]
-	    main_match
-	      = PatMatch pat (SimpleMatch (HsDoOut stmts then_id zero_id locn))
-	    the_matches
-	      = if failureFreePat pat
-	        then [main_match]
-		else [main_match, PatMatch (WildPat a) (SimpleMatch zero_expr)]
-	in
-	matchWrapper DoBindMatch the_matches "`do' statement"
-			    `thenDs` \ (binders, matching_code) ->
-	dsApp (HsVar then_id) [TyArg a, TyArg b,
-			       VarArg expr2, VarArg (mkValLam binders matching_code)]
   where
-    ds_rest = dsDo then_id zero_id stmts
     do_expr expr locn = putSrcLocDs locn (dsExpr expr)
 
-#ifdef DEBUG
-dsDo then_expr zero_expr [] = panic "dsDo:[]"
-#endif
+    match_msg = case do_or_lc of
+			DoStmt   -> "`do' statement"
+			ListComp -> "comprehension"
 \end{code}

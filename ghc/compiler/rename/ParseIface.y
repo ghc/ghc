@@ -1,6 +1,5 @@
 {
 #include "HsVersions.h"
-
 module ParseIface ( parseIface ) where
 
 IMP_Ubiq(){-uitous-}
@@ -25,14 +24,16 @@ import RnMonad		( SYN_IE(ImportVersion), SYN_IE(LocalVersion), ParsedIface(..),
 			) 
 import Bag		( emptyBag, unitBag, snocBag )
 import FiniteMap	( emptyFM, unitFM, addToFM, plusFM, bagToFM, FiniteMap )
-import Name		( OccName(..), Provenance )
+import Name		( OccName(..), isTCOcc, Provenance )
 import SrcLoc		( mkIfaceSrcLoc )
 import Util		( panic{-, pprPanic ToDo:rm-} )
-
+import ParseType        ( parseType )
+import ParseUnfolding   ( parseUnfolding )
+import Maybes
 
 -----------------------------------------------------------------
 
-parseIface = parseIToks . lexIface
+parseIface ls = parseIToks (lexIface ls)
 
 -----------------------------------------------------------------
 }
@@ -51,33 +52,33 @@ parseIface = parseIToks . lexIface
 	FIXITIES_PART	    { ITfixities }
 	DECLARATIONS_PART   { ITdeclarations }
 	PRAGMAS_PART	    { ITpragmas }
-	BANG		    { ITbang }
-	CBRACK		    { ITcbrack }
-	CCURLY		    { ITccurly }
-	CLASS		    { ITclass }
-	COMMA		    { ITcomma }
-	CPAREN		    { ITcparen }
-	DARROW		    { ITdarrow }
 	DATA		    { ITdata }
-	DCOLON		    { ITdcolon }
+	TYPE		    { ITtype }
+	NEWTYPE		    { ITnewtype }
 	DERIVING	    { ITderiving }
-	DOTDOT		    { ITdotdot }
-	EQUAL		    { ITequal }
-	FORALL		    { ITforall }
-	INFIX		    { ITinfix }
+	CLASS		    { ITclass }
+	WHERE		    { ITwhere }
+	INSTANCE	    { ITinstance }
 	INFIXL		    { ITinfixl }
 	INFIXR		    { ITinfixr }
-	INSTANCE	    { ITinstance }
-	NEWTYPE		    { ITnewtype }
-	OBRACK		    { ITobrack }
+	INFIX		    { ITinfix }
+	FORALL		    { ITforall }
+	BANG		    { ITbang }
+	VBAR		    { ITvbar }
+	DCOLON		    { ITdcolon }
+	COMMA		    { ITcomma }
+	DARROW		    { ITdarrow }
+	DOTDOT		    { ITdotdot }
+	EQUAL		    { ITequal }
 	OCURLY		    { ITocurly }
+	OBRACK		    { ITobrack }
 	OPAREN		    { IToparen }
 	RARROW		    { ITrarrow }
+	CCURLY		    { ITccurly }
+	CBRACK		    { ITcbrack }
+	CPAREN		    { ITcparen }
 	SEMI		    { ITsemi }
-	TYPE		    { ITtype }
-	VBAR		    { ITvbar }
-	WHERE		    { ITwhere }
-	INTEGER		    { ITinteger  $$ }
+
 	VARID		    { ITvarid  	 $$ }
 	CONID		    { ITconid  	 $$ }
 	VARSYM		    { ITvarsym 	 $$ }
@@ -87,6 +88,8 @@ parseIface = parseIToks . lexIface
 	QVARSYM		    { ITqvarsym  $$ }
 	QCONSYM		    { ITqconsym  $$ }
 
+	IDINFO_PART     { ITidinfo $$ }
+	TYPE_PART       { ITtysig $$ }
 	ARITY_PART	{ ITarity }
 	STRICT_PART	{ ITstrict }
 	UNFOLD_PART	{ ITunfold }
@@ -96,23 +99,29 @@ parseIface = parseIToks . lexIface
 	BIGLAM		{ ITbiglam }
 	CASE		{ ITcase }
 	PRIM_CASE	{ ITprim_case }
-	OF		{ ITof }
 	LET		{ ITlet }
 	LETREC		{ ITletrec }
 	IN		{ ITin }
-	ATSIGN		{ ITatsign }
+	OF		{ ITof }
 	COERCE_IN	{ ITcoerce_in }
 	COERCE_OUT	{ ITcoerce_out }
+	ATSIGN		{ ITatsign }
+	CCALL		{ ITccall $$ }
+	SCC		{ ITscc $$ }
+
 	CHAR		{ ITchar $$ }
 	STRING		{ ITstring $$ }	
+	INTEGER		{ ITinteger  $$ }
 	DOUBLE		{ ITdouble $$ }
+
 	INTEGER_LIT	{ ITinteger_lit }
-	STRING_LIT	{ ITstring_lit }
 	FLOAT_LIT	{ ITfloat_lit }
 	RATIONAL_LIT	{ ITrational_lit }
 	ADDR_LIT	{ ITaddr_lit }
 	LIT_LIT		{ ITlit_lit }
-	CCALL		{ ITccall $$ }
+	STRING_LIT	{ ITstring_lit }
+
+	UNKNOWN         { ITunknown $$ }
 %%
 
 iface		:: { ParsedIface }
@@ -172,11 +181,14 @@ entities	: 						{ [] }
 		|  entity entities				{ $1 : $2 }
 
 entity		:: { (OccName, [OccName]) }
-entity		:  entity_occ maybe_inside			{ ($1, $2) }
+entity		:  entity_occ 					{ ($1, if isTCOcc $1 
+								       then [$1]  {- AvailTC -}
+								       else [])   {- Avail -} }
+		|  entity_occ stuff_inside			{ ($1, ($1 : $2)) {- TyCls exported too -} }
+		|  entity_occ BANG stuff_inside			{ ($1, $3) 	  {- TyCls not exported -} }
 
-maybe_inside	:: { [OccName] }
-maybe_inside	:	     					{ [] }
-		|  OPAREN val_occs CPAREN			{ $2
+stuff_inside	:: { [OccName] }
+stuff_inside	:  OPAREN val_occs1 CPAREN			{ $2
 --------------------------------------------------------------------------
 								}
 
@@ -219,22 +231,27 @@ version		:  INTEGER				{ fromInteger $1 }
 topdecl		:: { RdrNameHsDecl }
 topdecl		:  TYPE  tc_name tv_bndrs EQUAL type SEMI
 			{ TyD (TySynonym $2 $3 $5 mkIfaceSrcLoc) }
-		|  DATA decl_context tc_name tv_bndrs EQUAL constrs deriving SEMI
-			{ TyD (TyData $2 $3 $4 $6 $7 noDataPragmas mkIfaceSrcLoc) }
+		|  DATA decl_context tc_name tv_bndrs constrs deriving SEMI
+			{ TyD (TyData $2 $3 $4 $5 $6 noDataPragmas mkIfaceSrcLoc) }
 		|  NEWTYPE decl_context tc_name tv_bndrs EQUAL constr1 deriving SEMI
 			{ TyD (TyNew $2 $3 $4 $6 $7 noDataPragmas mkIfaceSrcLoc) }
 		|  CLASS decl_context tc_name tv_bndr csigs SEMI
 			{ ClD (ClassDecl $2 $3 $4 $5 EmptyMonoBinds noClassPragmas mkIfaceSrcLoc) }
-		|  var_name DCOLON type id_info SEMI SEMI
-			{ 	{- Double semicolon allows easy pragma discard in lexer -}
-			  let
-				id_info = if opt_IgnoreIfacePragmas then [] else $4
-			  in
-  		 	  SigD (IfaceSig $1 $3 id_info mkIfaceSrcLoc) }
+		|  var_name TYPE_PART id_info
+			{
+			 let
+			  (Succeeded tp) = parseType $2
+			 in
+  		 	 SigD (IfaceSig $1 tp $3 mkIfaceSrcLoc) }
+
+id_info 	:: { [HsIdInfo RdrName] }
+id_info		:				{ [] }
+		| IDINFO_PART   { let { (Succeeded id_info) = parseUnfolding $1 } in id_info}
 
 decl_context	:: { RdrNameContext }
 decl_context	:  					{ [] }
 		| OCURLY context_list1 CCURLY DARROW	{ $2 }
+
 
 csigs		:: { [RdrNameSig] }
 csigs		:  				{ [] }
@@ -245,13 +262,17 @@ csigs1		: csig				{ [$1] }
 		| csig SEMI csigs1		{ $1 : $3 }
 
 csig		:: { RdrNameSig }
-csig		:  var_name DCOLON type 	{ ClassOpSig $1 $3 noClassOpPragmas mkIfaceSrcLoc
+csig		:  var_name DCOLON type 	{ ClassOpSig $1 $1 $3 mkIfaceSrcLoc
 ----------------------------------------------------------------
 			 			 }
 
 constrs		:: { [RdrNameConDecl] }
-constrs		:  constr		{ [$1] }
-		|  constr VBAR constrs	{ $1 : $3 }
+		: 				{ [] }
+		| EQUAL constrs1		{ $2 }
+
+constrs1	:: { [RdrNameConDecl] }
+constrs1	:  constr		{ [$1] }
+		|  constr VBAR constrs1	{ $1 : $3 }
 
 constr		:: { RdrNameConDecl }
 constr		:  data_name batypes			{ ConDecl $1 $2 mkIfaceSrcLoc }
@@ -349,9 +370,9 @@ val_occ		:  var_occ 		{ $1 }
 		|  CONID		{ VarOcc $1 }
 		|  CONSYM		{ VarOcc $1 }
 
-val_occs	:: { [OccName] }
-		:  	    		{ [] }
-		|  val_occ val_occs	{ $1 : $2 }
+val_occs1	:: { [OccName] }
+		:  val_occ    		{ [$1] }
+		|  val_occ val_occs1	{ $1 : $2 }
 
 
 qvar_name	:: { RdrName }
@@ -431,123 +452,3 @@ instd		:  INSTANCE type EQUAL var_name SEMI
 				   mkIfaceSrcLoc 
 --------------------------------------------------------------------------
 		    }
-
-id_info		:: { [HsIdInfo RdrName] }
-id_info		: 	 					{ [] }
-		| id_info_item id_info				{ $1 : $2 }
-
-id_info_item	:: { HsIdInfo RdrName }
-id_info_item	: ARITY_PART arity_info			{ HsArity $2 }
-		| STRICT_PART strict_info		{ HsStrictness $2 }
-		| BOTTOM 				{ HsStrictness mkBottomStrictnessInfo }
-		| UNFOLD_PART core_expr			{ HsUnfold $2 }
-
-arity_info	:: { ArityInfo }
-arity_info	: INTEGER					{ exactArity (fromInteger $1) }
-
-strict_info	:: { StrictnessInfo RdrName }
-strict_info	: DEMAND any_var_name				{ mkStrictnessInfo $1 (Just $2) }
-		| DEMAND 					{ mkStrictnessInfo $1 Nothing }
-
-core_expr	:: { UfExpr RdrName }
-core_expr	: any_var_name					{ UfVar $1 }
-		| qdata_name					{ UfVar $1 }
-		| core_lit					{ UfLit $1 }
-		| OPAREN core_expr CPAREN			{ $2 }
-
-		| core_expr ATSIGN atype			{ UfApp $1 (UfTyArg $3) }
-		| core_expr core_arg				{ UfApp $1 $2 }
-		| LAM core_val_bndrs RARROW core_expr		{ foldr UfLam $4 $2 }
-		| BIGLAM core_tv_bndrs RARROW core_expr		{ foldr UfLam $4 $2 }
-
-		| CASE core_expr OF 
-		  OCURLY alg_alts core_default CCURLY		{ UfCase $2 (UfAlgAlts  $5 $6) }
-		| PRIM_CASE core_expr OF 
-		  OCURLY prim_alts core_default CCURLY		{ UfCase $2 (UfPrimAlts $5 $6) }
-
-
-		| LET OCURLY core_val_bndr EQUAL core_expr CCURLY
-		  IN core_expr					{ UfLet (UfNonRec $3 $5) $8 }
-		| LETREC OCURLY rec_binds CCURLY		
-		  IN core_expr					{ UfLet (UfRec $3) $6 }
-
-		| coerce atype core_expr			{ UfCoerce $1 $2 $3 }
-
-		| CCALL ccall_string 
-			OBRACK atype atypes CBRACK core_args	{ let
-									(is_casm, may_gc) = $1
-								  in
-								  UfPrim (UfCCallOp $2 is_casm may_gc $5 $4)
-									 $7
-								}
-
-rec_binds	:: { [(UfBinder RdrName, UfExpr RdrName)] }
-		:						{ [] }
-		| core_val_bndr EQUAL core_expr SEMI rec_binds	{ ($1,$3) : $5 }
-
-coerce		:: { UfCoercion RdrName }
-coerce		: COERCE_IN  qdata_name				{ UfIn  $2 }
-		| COERCE_OUT qdata_name				{ UfOut $2 }
-		
-prim_alts	:: { [(Literal,UfExpr RdrName)] }
-		:						{ [] }
-		| core_lit RARROW core_expr SEMI prim_alts	{ ($1,$3) : $5 }
-
-alg_alts	:: { [(RdrName, [UfBinder RdrName], UfExpr RdrName)] }
-		: 						{ [] }
-		| qdata_name core_val_bndrs RARROW 
-			core_expr SEMI alg_alts			{ ($1,$2,$4) : $6 }
-
-core_default	:: { UfDefault RdrName }
-		: 						{ UfNoDefault }
-		| core_val_bndr RARROW core_expr SEMI		{ UfBindDefault $1 $3 }
-
-core_arg	:: { UfArg RdrName }
-		: var_name					{ UfVarArg $1 }
-		| qvar_name					{ UfVarArg $1 }
-		| qdata_name					{ UfVarArg $1 }
-		| core_lit					{ UfLitArg $1 }
-
-core_args	:: { [UfArg RdrName] }
-		:						{ [] }
-		| core_arg core_args				{ $1 : $2 }
-
-core_lit	:: { Literal }
-core_lit	: INTEGER			{ MachInt $1 True }
-		| CHAR				{ MachChar $1 }
-		| STRING			{ MachStr $1 }
-		| STRING_LIT STRING		{ NoRepStr $2 }
-		| DOUBLE			{ MachDouble (toRational $1) }
-		| FLOAT_LIT DOUBLE		{ MachFloat (toRational $2) }
-
-		| INTEGER_LIT INTEGER		{ NoRepInteger  $2 (panic "NoRepInteger type") 
-							-- The type checker will add the types
-						}
-
-		| RATIONAL_LIT INTEGER INTEGER	{ NoRepRational ($2 % $3) 
-								(panic "NoRepRational type")
-									-- The type checker will add the type
-						}
-
-		| ADDR_LIT INTEGER		{ MachAddr $2 }
-		| LIT_LIT STRING		{ MachLitLit $2 (panic "ParseIface.y: ToDo: need PrimRep on LitLits in ifaces") }
-
-core_val_bndr 	:: { UfBinder RdrName }
-core_val_bndr	: var_name DCOLON atype				{ UfValBinder $1 $3 }
-
-core_val_bndrs 	:: { [UfBinder RdrName] }
-core_val_bndrs	: 						{ [] }
-		| core_val_bndr core_val_bndrs			{ $1 : $2 }
-
-core_tv_bndr	:: { UfBinder RdrName }
-core_tv_bndr	:  tv_name DCOLON akind				{ UfTyBinder $1 $3 }
-		|  tv_name					{ UfTyBinder $1 mkTypeKind }
-
-core_tv_bndrs	:: { [UfBinder RdrName] }
-core_tv_bndrs	: 						{ [] }
-		| core_tv_bndr core_tv_bndrs			{ $1 : $2 }
-
-ccall_string	:: { FAST_STRING }
-		: STRING					{ $1 }
-		| VARID						{ $1 }
-		| CONID						{ $1 }

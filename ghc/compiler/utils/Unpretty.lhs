@@ -82,7 +82,7 @@ uppPutStr	:: Handle -> Int -> Unpretty -> IO ()
 \begin{code}
 uppShow _ p	= cShow p
 
-uppPutStr f _ p = cPutStr f p
+uppPutStr f _ p = _scc_ "uppPutStr" (cPutStr f p)
 
 uppNil		= cNil
 uppStr s	= cStr s

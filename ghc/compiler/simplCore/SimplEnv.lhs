@@ -266,12 +266,18 @@ extendIdEnvWithAtom
 
 extendIdEnvWithAtom (SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps)
 		    (in_id,occ_info) atom
-  = SimplEnv chkr encl_cc ty_env new_in_id_env new_out_id_env con_apps
+  = case atom of
+     LitArg _      -> SimplEnv chkr encl_cc ty_env new_in_id_env out_id_env con_apps
+     VarArg out_id -> SimplEnv chkr encl_cc ty_env new_in_id_env 
+			       (modifyOccInfo out_id_env (uniqueOf out_id, occ_info)) con_apps
+--SimplEnv chkr encl_cc ty_env new_in_id_env new_out_id_env con_apps
   where
     new_in_id_env  = addOneToIdEnv in_id_env in_id atom
+{-
     new_out_id_env = case atom of
 			LitArg _      -> out_id_env
 			VarArg out_id -> modifyOccInfo out_id_env (uniqueOf out_id, occ_info)
+-}
 
 extendIdEnvWithAtoms :: SimplEnv -> [(InBinder, OutArg)] -> SimplEnv
 extendIdEnvWithAtoms = foldr (\ (bndr,val) env -> extendIdEnvWithAtom env bndr val)
@@ -344,13 +350,21 @@ modifyOutEnvItem :: (OutId, BinderInfo, RhsInfo)
 	         -> (OutId, BinderInfo, RhsInfo) 
 	         -> (OutId, BinderInfo, RhsInfo)
 modifyOutEnvItem (id, occ, info1) (_, _, info2)
-  = (id, occ, new_info)
+  = case (info1, info2) of
+		(OtherLit ls1, OtherLit ls2) -> (id,occ, OtherLit (ls1++ls2))
+		(OtherCon cs1, OtherCon cs2) -> (id,occ, OtherCon (cs1++cs2))
+		(_,            NoRhsInfo)    -> (id,occ, info1)
+		other	       		     -> (id,occ, info2)
+
+--(id, occ, new_info)
+{-
   where
     new_info = case (info1, info2) of
 		(OtherLit ls1, OtherLit ls2) -> OtherLit (ls1++ls2)
 		(OtherCon cs1, OtherCon cs2) -> OtherCon (cs1++cs2)
 		(_,            NoRhsInfo)    -> info1
 		other	       		     -> info2
+-}
 \end{code}
 
 
@@ -411,13 +425,23 @@ extendEnvGivenNewRhs env out_id rhs
 extendEnvGivenBinding :: SimplEnv -> BinderInfo -> OutId -> OutExpr -> SimplEnv
 extendEnvGivenBinding env@(SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps)
 	              occ_info out_id rhs
-  = SimplEnv chkr encl_cc ty_env in_id_env new_out_id_env new_con_apps
+  = let
+     s_env = SimplEnv chkr encl_cc ty_env in_id_env out_id_env new_con_apps 
+     s_env_uf = SimplEnv chkr encl_cc ty_env in_id_env out_id_env_with_unfolding new_con_apps
+    in
+    case guidance of 
+       -- Cheap and nasty hack to force strict insertion.  
+     UnfoldNever -> 
+         if isEmptyFM new_con_apps then s_env else s_env
+     other       -> 
+         if isEmptyFM new_con_apps then s_env_uf else s_env_uf
   where
-    new_con_apps   = extendConApps con_apps out_id rhs
+    new_con_apps = extendConApps con_apps out_id rhs
+{-
     new_out_id_env = case guidance of
 			UnfoldNever -> out_id_env		-- No new stuff to put in
 		        other	    -> out_id_env_with_unfolding
-
+-}
 	-- If there is an unfolding, we add rhs-info for out_id,
 	-- *and* modify the occ info for rhs's interesting free variables.
 	--
@@ -512,14 +536,21 @@ which is OK if not clever.
 \begin{code}
 extendEnvForRecBinding env@(SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps)
 		       (out_id, ((_,occ_info), old_rhs))
-  = SimplEnv chkr encl_cc ty_env in_id_env new_out_id_env con_apps
+  = case (form_summary, guidance) of
+     (_, UnfoldNever)	-> SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps -- No new stuff to put in
+     (ValueForm, _)	-> SimplEnv chkr encl_cc ty_env in_id_env out_id_env_with_unfolding con_apps
+     (VarForm, _)	-> SimplEnv chkr encl_cc ty_env in_id_env out_id_env_with_unfolding con_apps
+     other	    	-> SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps	-- Not a value or variable
+     
+-- SimplEnv chkr encl_cc ty_env in_id_env new_out_id_env con_apps
   where
+{-
     new_out_id_env = case (form_summary, guidance) of
 			(_, UnfoldNever)	-> out_id_env		-- No new stuff to put in
 			(ValueForm, _)		-> out_id_env_with_unfolding
 			(VarForm, _)		-> out_id_env_with_unfolding
 		        other	    		-> out_id_env		-- Not a value or variable
-
+-}
 	-- If there is an unfolding, we add rhs-info for out_id,
 	-- No need to modify occ info because RHS is pre-simplification
     out_id_env_with_unfolding =	addOneToIdEnv out_id_env out_id 
@@ -535,7 +566,9 @@ extendEnvForRecBinding env@(SimplEnv chkr encl_cc ty_env in_id_env out_id_env co
 
 
 mkSimplUnfoldingGuidance chkr out_id rhs
-  = calcUnfoldingGuidance inline_prag opt_UnfoldingCreationThreshold rhs
+  = case calcUnfoldingGuidance inline_prag opt_UnfoldingCreationThreshold rhs of
+     UnfoldNever -> UnfoldNever
+     v           -> v
   where
     inline_prag = not (switchIsOn chkr IgnoreINLINEPragma) && idWantsToBeINLINEd out_id
 

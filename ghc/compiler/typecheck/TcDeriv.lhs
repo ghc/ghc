@@ -49,7 +49,8 @@ import Name		( isLocallyDefined, getSrcLoc, ExportFlag(..), Provenance,
 import Outputable	( Outputable(..){-instances e.g., (,)-} )
 import PprType		( GenType, GenTyVar, GenClass, TyCon )
 import PprStyle		( PprStyle(..) )
-import Pretty		( ppAbove, ppAboves, ppCat, ppBesides, ppStr, ppHang, SYN_IE(Pretty) )
+import Pretty		( ppAbove, ppAboves, ppCat, ppBesides, 
+		          ppPStr, ppStr, ppChar, ppHang, SYN_IE(Pretty) )
 --import Pretty--ToDo:rm
 --import FiniteMap--ToDo:rm
 import SrcLoc		( mkGeneratedSrcLoc, SrcLoc )
@@ -242,8 +243,8 @@ tcDeriving modname rn_name_supply inst_decl_infos_in
 			mapRn rn_one method_binds_s		`thenRn` \ dfun_names_w_method_binds ->
 			returnRn (dfun_names_w_method_binds, rn_extra_binds)
 		  )
-	rn_one meth_binds = newDfunName mkGeneratedSrcLoc	`thenRn` \ dfun_name ->
-			    rnMethodBinds meth_binds	`thenRn` \ rn_meth_binds ->
+	rn_one meth_binds = newDfunName Nothing mkGeneratedSrcLoc	`thenRn` \ dfun_name ->
+			    rnMethodBinds meth_binds			`thenRn` \ rn_meth_binds ->
 			    returnRn (dfun_name, rn_meth_binds)
     in
 
@@ -716,6 +717,6 @@ gen_taggery_Names inst_infos
 derivingThingErr :: String -> TyCon -> Error
 
 derivingThingErr thing tycon sty
-  = ppHang (ppCat [ppStr "Can't make a derived instance of", ppStr thing])
-	 4 (ppBesides [ppStr "for the type `", ppr sty tycon, ppStr "'"])
+  = ppHang (ppCat [ppPStr SLIT("Can't make a derived instance of"), ppStr thing])
+	 4 (ppBesides [ppPStr SLIT("for the type `"), ppr sty tycon, ppChar '\''])
 \end{code}

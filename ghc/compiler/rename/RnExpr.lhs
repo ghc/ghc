@@ -26,16 +26,18 @@ import RnHsSyn
 import RnMonad
 import RnEnv
 import PrelInfo		( numClass_RDR, fractionalClass_RDR, eqClass_RDR, ccallableClass_RDR,
-			  creturnableClass_RDR, monadZeroClass_RDR, enumClass_RDR,
+			  creturnableClass_RDR, monadZeroClass_RDR, enumClass_RDR, ordClass_RDR,
 			  negate_RDR
 			)
 import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon, 
 			  floatPrimTyCon, doublePrimTyCon
 			)
 import TyCon		( TyCon )
+import Id		( GenId )
 import ErrUtils		( addErrLoc, addShortErrLocLine )
 import Name
 import Pretty
+import Unique		( Unique, otherwiseIdKey )
 import UniqFM		( lookupUFM{-, ufmToList ToDo:rm-} )
 import UniqSet		( emptyUniqSet, unitUniqSet,
 			  unionUniqSets, unionManyUniqSets,
@@ -58,7 +60,7 @@ rnPat :: RdrNamePat -> RnMS s RenamedPat
 rnPat WildPatIn = returnRn WildPatIn
 
 rnPat (VarPatIn name)
-  = lookupRn name	`thenRn` \ vname ->
+  = lookupBndrRn  name			`thenRn` \ vname ->
     returnRn (VarPatIn vname)
 
 rnPat (LitPatIn lit) 
@@ -72,17 +74,17 @@ rnPat (LazyPatIn pat)
 
 rnPat (AsPatIn name pat)
   = rnPat pat		`thenRn` \ pat' ->
-    lookupRn name	`thenRn` \ vname ->
+    lookupBndrRn name	`thenRn` \ vname ->
     returnRn (AsPatIn vname pat')
 
 rnPat (ConPatIn con pats)
-  = lookupRn con	`thenRn` \ con' ->
+  = lookupOccRn con	`thenRn` \ con' ->
     mapRn rnPat pats  	`thenRn` \ patslist ->
     returnRn (ConPatIn con' patslist)
 
 rnPat (ConOpPatIn pat1 con _ pat2)
   = rnPat pat1		`thenRn` \ pat1' ->
-    lookupRn con	`thenRn` \ con' ->
+    lookupOccRn con	`thenRn` \ con' ->
     lookupFixity con	`thenRn` \ fixity ->
     rnPat pat2		`thenRn` \ pat2' ->
     mkConOpPatRn pat1' con' fixity pat2'
@@ -105,6 +107,12 @@ rnPat (ParPatIn pat)
   = rnPat pat		`thenRn` \ pat' ->
     returnRn (ParPatIn pat')
 
+rnPat (NPlusKPatIn name lit)
+  = litOccurrence lit			`thenRn_`
+    lookupImplicitOccRn ordClass_RDR	`thenRn_`
+    lookupBndrRn name			`thenRn` \ name' ->
+    returnRn (NPlusKPatIn name' lit)
+
 rnPat (ListPatIn pats)
   = addImplicitOccRn listType_name	`thenRn_` 
     mapRn rnPat pats 			`thenRn` \ patslist ->
@@ -116,7 +124,7 @@ rnPat (TuplePatIn pats)
     returnRn (TuplePatIn patslist)
 
 rnPat (RecPatIn con rpats)
-  = lookupRn con 	`thenRn` \ con' ->
+  = lookupOccRn con 	`thenRn` \ con' ->
     rnRpats rpats	`thenRn` \ rpats' ->
     returnRn (RecPatIn con' rpats')
 \end{code}
@@ -168,7 +176,15 @@ rnGRHSsAndBinds (GRHSsAndBindsIn grhss binds)
       = pushSrcLocRn locn $		    
 	rnExpr guard	`thenRn` \ (guard', fvsg) ->
 	rnExpr expr	`thenRn` \ (expr',  fvse) ->
-	returnRn (GRHS guard' expr' locn, fvsg `unionNameSets` fvse)
+
+	-- Turn an "otherwise" guard into an OtherwiseGRHS.
+	-- This is the first moment that we can be sure we havn't got a shadowed binding
+	-- of "otherwise".
+	let grhs' = case guard' of
+			HsVar v | uniqueOf v == otherwiseIdKey -> OtherwiseGRHS expr' locn
+			other				       -> GRHS guard' expr' locn			   
+	in
+	returnRn (grhs', fvsg `unionNameSets` fvse)
 
     rnGRHS (OtherwiseGRHS expr locn)
       = pushSrcLocRn locn $
@@ -184,13 +200,15 @@ rnGRHSsAndBinds (GRHSsAndBindsIn grhss binds)
 
 \begin{code}
 rnExprs :: [RdrNameHsExpr] -> RnMS s ([RenamedHsExpr], FreeVars)
+rnExprs ls =
+ rnExprs' ls [] `thenRn` \  (exprs, fvExprs) ->
+ returnRn (exprs, unionManyNameSets fvExprs)
 
-rnExprs [] = returnRn ([], emptyNameSet)
-
-rnExprs (expr:exprs)
-  = rnExpr expr 	`thenRn` \ (expr', fvExpr) ->
-    rnExprs exprs	`thenRn` \ (exprs', fvExprs) ->
-    returnRn (expr':exprs', fvExpr `unionNameSets` fvExprs)
+rnExprs' [] acc = returnRn ([], acc)
+rnExprs' (expr:exprs) acc
+  = rnExpr expr 	        `thenRn` \ (expr', fvExpr) ->
+    rnExprs' exprs (fvExpr:acc)	`thenRn` \ (exprs', fvExprs) ->
+    returnRn (expr':exprs', fvExprs)
 \end{code}
 
 Variables. We look up the variable and return the resulting name.  The
@@ -280,16 +298,11 @@ rnExpr (HsLet binds expr)
     rnExpr expr			 `thenRn` \ (expr',fvExpr) ->
     returnRn (HsLet binds' expr', fvExpr)
 
-rnExpr (HsDo stmts src_loc)
+rnExpr (HsDo do_or_lc stmts src_loc)
   = pushSrcLocRn src_loc $
     lookupImplicitOccRn monadZeroClass_RDR	`thenRn_`	-- Forces Monad to come too
     rnStmts stmts				`thenRn` \ (stmts', fvStmts) ->
-    returnRn (HsDo stmts' src_loc, fvStmts)
-
-rnExpr (ListComp expr quals)
-  = addImplicitOccRn listType_name	`thenRn_` 
-    rnQuals expr quals 			`thenRn` \ ((expr', quals'), fvs) ->
-    returnRn (ListComp expr' quals', fvs)
+    returnRn (HsDo do_or_lc stmts' src_loc, fvStmts)
 
 rnExpr (ExplicitList exps)
   = addImplicitOccRn listType_name	`thenRn_` 
@@ -367,7 +380,7 @@ rnRbinds str rbinds
     field_dup_err dups = addErrRn (dupFieldErr str dups)
 
     rn_rbind (field, expr, pun)
-      = lookupOccRn field	`thenRn` \ fieldname ->
+      = lookupGlobalOccRn field	`thenRn` \ fieldname ->
 	rnExpr expr		`thenRn` \ (expr', fvExpr) ->
 	returnRn ((fieldname, expr', pun), fvExpr)
 
@@ -380,14 +393,14 @@ rnRpats rpats
     field_dup_err dups = addErrRn (dupFieldErr "pattern" dups)
 
     rn_rpat (field, pat, pun)
-      = lookupOccRn field	`thenRn` \ fieldname ->
+      = lookupGlobalOccRn field	`thenRn` \ fieldname ->
 	rnPat pat		`thenRn` \ pat' ->
 	returnRn (fieldname, pat', pun)
 \end{code}
 
 %************************************************************************
 %*									*
-\subsubsection{@Qualifier@s: in list comprehensions}
+\subsubsection{@Stmt@s: in @do@ expressions}
 %*									*
 %************************************************************************
 
@@ -400,59 +413,9 @@ be @{r}@, and the free var set for the entire Quals will be @{r}@. This
 Quals.
 
 \begin{code}
-rnQuals :: RdrNameHsExpr -> [RdrNameQual]
-	 -> RnMS s ((RenamedHsExpr, [RenamedQual]), FreeVars)
-
-rnQuals expr [qual] 				-- must be at least one qual
-  = rnQual qual 			$ \ new_qual ->
-    rnExpr expr				`thenRn` \ (expr', fvs) ->
-    returnRn ((expr', [new_qual]), fvs)
-
-rnQuals expr (qual: quals)
-  = rnQual qual			$ \ qual' ->
-    rnQuals expr quals		`thenRn` \ ((expr', quals'), fv_quals) ->
-    returnRn ((expr', qual' : quals'), fv_quals)
-
-
--- rnQual :: RdrNameQual
---        -> (RenamedQual -> RnMS s (a,FreeVars))
---        -> RnMS s (a,FreeVars)
--- Because of mutual recursion the actual type is a bit less general than this [Haskell 1.2]
-
-rnQual (GeneratorQual pat expr) thing_inside
-  = rnExpr expr		 					`thenRn` \ (expr', fv_expr) ->
-    bindLocalsRn "pattern in list comprehension" binders	$ \ new_binders ->
-    rnPat pat							`thenRn` \ pat' ->
-
-    thing_inside (GeneratorQual pat' expr')		`thenRn` \ (result, fvs) -> 	
-    returnRn (result, fv_expr `unionNameSets` (fvs `minusNameSet` mkNameSet new_binders))
-  where
-    binders = collectPatBinders pat
-
-rnQual (FilterQual expr) thing_inside
-  = rnExpr expr	 			`thenRn` \ (expr', fv_expr) ->
-    thing_inside (FilterQual expr')	`thenRn` \ (result, fvs) ->
-    returnRn (result, fv_expr `unionNameSets` fvs)
-
-rnQual (LetQual binds) thing_inside
-  = rnBinds binds			$ \ binds' ->
-    thing_inside (LetQual binds')
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsubsection{@Stmt@s: in @do@ expressions}
-%*									*
-%************************************************************************
-
-\begin{code}
 rnStmts :: [RdrNameStmt] -> RnMS s ([RenamedStmt], FreeVars)
 
-rnStmts [stmt@(ExprStmt expr src_loc)]		-- last stmt must be ExprStmt
-  = pushSrcLocRn src_loc $
-    rnExpr expr				`thenRn` \ (expr', fv_expr) ->
-    returnRn ([ExprStmt expr' src_loc], fv_expr)
+rnStmts [] = returnRn ([], emptyNameSet)
 
 rnStmts (stmt:stmts)
   = rnStmt stmt				$ \ stmt' ->
@@ -478,6 +441,17 @@ rnStmt (ExprStmt expr src_loc) thing_inside
   = pushSrcLocRn src_loc $
     rnExpr expr	 				`thenRn` \ (expr', fv_expr) ->
     thing_inside (ExprStmt expr' src_loc)	`thenRn` \ (result, fvs) ->
+    returnRn (result, fv_expr `unionNameSets` fvs)
+
+rnStmt (GuardStmt expr src_loc) thing_inside
+  = pushSrcLocRn src_loc $
+    rnExpr expr	 				`thenRn` \ (expr', fv_expr) ->
+    thing_inside (GuardStmt expr' src_loc)	`thenRn` \ (result, fvs) ->
+    returnRn (result, fv_expr `unionNameSets` fvs)
+
+rnStmt (ReturnStmt expr) thing_inside
+  = rnExpr expr	 				`thenRn` \ (expr', fv_expr) ->
+    thing_inside (ReturnStmt expr')		`thenRn` \ (result, fvs) ->
     returnRn (result, fv_expr `unionNameSets` fvs)
 
 rnStmt (LetStmt binds) thing_inside
@@ -663,12 +637,10 @@ litOccurrence (HsStringPrim _)
   = addImplicitOccRn (getName addrPrimTyCon)
 
 litOccurrence (HsInt _)
-  = lookupImplicitOccRn numClass_RDR	`thenRn_`	-- Int and Integer are forced in by Num
-    returnRn ()
+  = lookupImplicitOccRn numClass_RDR			-- Int and Integer are forced in by Num
 
 litOccurrence (HsFrac _)
-  = lookupImplicitOccRn fractionalClass_RDR	`thenRn_`	-- ... similarly Rational
-    returnRn ()
+  = lookupImplicitOccRn fractionalClass_RDR		-- ... similarly Rational
 
 litOccurrence (HsIntPrim _)
   = addImplicitOccRn (getName intPrimTyCon)
@@ -680,8 +652,7 @@ litOccurrence (HsDoublePrim _)
   = addImplicitOccRn (getName doublePrimTyCon)
 
 litOccurrence (HsLitLit _)
-  = lookupImplicitOccRn ccallableClass_RDR	`thenRn_`
-    returnRn ()
+  = lookupImplicitOccRn ccallableClass_RDR
 \end{code}
 
 
@@ -693,19 +664,23 @@ litOccurrence (HsLitLit _)
 
 \begin{code}
 dupFieldErr str (dup:rest) sty
-  = ppBesides [ppStr "duplicate field name `", ppr sty dup, ppStr "' in record ", ppStr str]
+  = ppBesides [ppPStr SLIT("duplicate field name `"), 
+               ppr sty dup, 
+	       ppPStr SLIT("' in record "), ppStr str]
 
 negPatErr pat  sty
-  = ppSep [ppStr "prefix `-' not applied to literal in pattern", ppr sty pat]
+  = ppSep [ppPStr SLIT("prefix `-' not applied to literal in pattern"), ppr sty pat]
 
 precParseNegPatErr op sty 
-  = ppHang (ppStr "precedence parsing error")
-      4 (ppBesides [ppStr "prefix `-' has lower precedence than ", pp_op sty op, ppStr " in pattern"])
+  = ppHang (ppPStr SLIT("precedence parsing error"))
+      4 (ppBesides [ppPStr SLIT("prefix `-' has lower precedence than "), 
+		    pp_op sty op, 
+		    ppPStr SLIT(" in pattern")])
 
 precParseErr op1 op2  sty
-  = ppHang (ppStr "precedence parsing error")
-      4 (ppBesides [ppStr "cannot mix ", pp_op sty op1, ppStr " and ", pp_op sty op2,
-	 	    ppStr " in the same infix expression"])
+  = ppHang (ppPStr SLIT("precedence parsing error"))
+      4 (ppBesides [ppPStr SLIT("cannot mix "), pp_op sty op1, ppPStr SLIT(" and "), pp_op sty op2,
+	 	    ppPStr SLIT(" in the same infix expression")])
 
 pp_op sty (op, fix) = ppBesides [pprSym sty op, ppLparen, ppr sty fix, ppRparen]
 \end{code}

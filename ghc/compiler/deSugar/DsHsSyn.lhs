@@ -36,6 +36,7 @@ outPatType (TuplePat pats)	= mkTupleTy (length pats) (map outPatType pats)
 outPatType (RecPat _ ty _)      = ty
 outPatType (LitPat lit ty)	= ty
 outPatType (NPat lit ty _)	= ty
+outPatType (NPlusKPat _ _ ty _ _) = ty
 outPatType (DictPat ds ms)      = case (length ds_ms) of
 				    0 -> unitTy
 				    1 -> idType (head ds_ms)

@@ -27,7 +27,7 @@ import IdInfo		( mkStrictnessInfo, mkBottomStrictnessInfo,
 import PprCore		( pprCoreBinding, pprBigCoreBinder )
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instance Outputable-}, GenTyVar{-ditto-} )
-import Pretty		( ppBesides, ppStr, ppInt, ppChar, ppAboves )
+import Pretty		( ppBesides, ppPStr, ppInt, ppChar, ppAboves )
 import SaAbsInt
 import SaLib
 import TyVar		( GenTyVar{-instance Eq-} )
@@ -123,9 +123,9 @@ saWwTopBinds us binds
   where
     pp_stats (SaStats tlam dlam tc dc tlet dlet)
       = pprTrace "Binders marked demanded: "
-	(ppBesides [ppStr "Lambda vars: ", ppInt IBOX(dlam), ppChar '/', ppInt IBOX(tlam),
-		  ppStr "; Case vars: ",   ppInt IBOX(dc),   ppChar '/', ppInt IBOX(tc),
-		  ppStr "; Let vars: ",    ppInt IBOX(dlet), ppChar '/', ppInt IBOX(tlet)
+	(ppBesides [ppPStr SLIT("Lambda vars: "), ppInt IBOX(dlam), ppChar '/', ppInt IBOX(tlam),
+		    ppPStr SLIT("; Case vars: "), ppInt IBOX(dc),   ppChar '/', ppInt IBOX(tc),
+		    ppPStr SLIT("; Let vars: "),  ppInt IBOX(dlet), ppChar '/', ppInt IBOX(tlet)
 	])
 #endif
 \end{code}

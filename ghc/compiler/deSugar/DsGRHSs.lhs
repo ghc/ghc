@@ -12,7 +12,8 @@ IMP_Ubiq()
 IMPORT_DELOOPER(DsLoop)		-- break dsExpr/dsBinds-ish loop
 
 import HsSyn		( GRHSsAndBinds(..), GRHS(..),
-			  HsExpr, HsBinds )
+			  HsExpr, HsBinds
+			 )
 import TcHsSyn		( SYN_IE(TypecheckedGRHSsAndBinds), SYN_IE(TypecheckedGRHS),
 			  SYN_IE(TypecheckedPat), SYN_IE(TypecheckedHsBinds),
 			  SYN_IE(TypecheckedHsExpr)	)
@@ -45,7 +46,7 @@ dsGuarded :: TypecheckedGRHSsAndBinds
 	  -> DsM CoreExpr
 
 dsGuarded (GRHSsAndBindsOut grhss binds err_ty)
-  = dsBinds False binds				`thenDs` \ core_binds ->
+  = dsBinds binds				`thenDs` \ core_binds ->
     dsGRHSs err_ty PatBindMatch [] grhss 	`thenDs` \ (MatchResult can_it_fail _ core_grhss_fn _) ->
     case can_it_fail of
 	CantFail -> returnDs (mkCoLetsAny core_binds (core_grhss_fn (panic "It can't fail")))
@@ -94,5 +95,6 @@ dsGRHS ty kind pats (GRHS guard expr locn)
     in
     returnDs (MatchResult CanFail ty expr_fn (DsMatchContext kind pats locn))
 \end{code}
+
 
 

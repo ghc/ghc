@@ -10,18 +10,18 @@ module RnEnv where		-- Export everything
 
 IMP_Ubiq()
 
-import CmdLineOpts	( opt_WarnNameShadowing, opt_IgnoreIfacePragmas )
+import CmdLineOpts	( opt_WarnNameShadowing )
 import HsSyn
 import RdrHsSyn		( RdrName(..), SYN_IE(RdrNameIE),
-			  rdrNameOcc, isQual, qual
+			  rdrNameOcc, ieOcc, isQual, qual
 			)
 import HsTypes		( getTyVarName, replaceTyVarName )
 import RnMonad
 import Name		( Name, OccName(..), Provenance(..), DefnInfo(..), ExportFlag(..),
 			  occNameString, occNameFlavour,
 			  SYN_IE(NameSet), emptyNameSet, addListToNameSet,
-			  mkLocalName, mkGlobalName, modAndOcc,
-			  isLocalName, isWiredInName, nameOccName, setNameProvenance,
+			  mkLocalName, mkGlobalName, modAndOcc, isLocallyDefinedName,
+			  isWiredInName, nameOccName, setNameProvenance, isVarOcc, 
 			  pprProvenance, pprOccName, pprModule, pprNonSymOcc, pprNameProvenance
 			)
 import TyCon		( TyCon )
@@ -49,7 +49,8 @@ newGlobalName :: Module -> OccName -> RnM s d Name
 newGlobalName mod occ
   = 	-- First check the cache
     getNameSupplyRn		`thenRn` \ (us, inst_ns, cache) ->
-    case lookupFM cache (mod,occ) of
+    let key = (mod,occ)         in
+    case lookupFM cache key of
 
 	-- A hit in the cache!  Return it, but change the src loc
 	-- of the thing we've found if this is a second definition site
@@ -63,7 +64,7 @@ newGlobalName mod occ
 		(us', us1) = splitUniqSupply us
 		uniq   	   = getUnique us1
 		name       = mkGlobalName uniq mod occ VanillaDefn Implicit
-		cache'     = addToFM cache (mod,occ) name
+		cache'     = addToFM cache key name
 	    in
 	    setNameSupplyRn (us', inst_ns, cache')		`thenRn_`
 	    returnRn name
@@ -86,28 +87,50 @@ newLocallyDefinedGlobalName mod occ rec_exp_fn loc
 	provenance = LocalDef (rec_exp_fn new_name) loc
 	(us', us1) = splitUniqSupply us
 	uniq   	   = getUnique us1
-	new_name   = case lookupFM cache (mod,occ) of
-			Just name -> setNameProvenance name provenance
-			Nothing   -> mkGlobalName uniq mod occ VanillaDefn provenance
-	cache'     = addToFM cache (mod,occ) new_name
+        key        = (mod,occ)
+	new_name   = case lookupFM cache key of
+		         Just name -> setNameProvenance name provenance
+		         Nothing   -> mkGlobalName uniq mod occ VanillaDefn provenance
+	new_cache  = addToFM cache key new_name
     in
-    setNameSupplyRn (us', inst_ns, cache')		`thenRn_`
+    setNameSupplyRn (us', inst_ns, new_cache)		`thenRn_`
     returnRn new_name
 
--- newDfunName is used to allocate a name for the dictionary function for
--- a local instance declaration.  No need to put it in the cache (I think!).
-newDfunName ::  SrcLoc -> RnMS s Name
-newDfunName src_loc
-  = getNameSupplyRn		`thenRn` \ (us, inst_ns, cache) ->
-    getModuleRn			`thenRn` \ mod_name ->
+-- newSysName is used to create the names for
+--	a) default methods
+-- These are never mentioned explicitly in source code (hence no point in looking
+-- them up in the NameEnv), but when reading an interface file
+-- we may want to slurp in their pragma info.  In the source file itself we
+-- need to create these names too so that we export them into the inferface file for this module.
+
+newSysName :: OccName -> ExportFlag -> SrcLoc -> RnMS s Name
+newSysName occ export_flag loc
+  = getModeRn	`thenRn` \ mode ->
+    getModuleRn	`thenRn` \ mod_name ->
+    case mode of 
+	SourceMode -> newLocallyDefinedGlobalName 
+				mod_name occ
+				(\_ -> export_flag)
+				loc
+	InterfaceMode -> newGlobalName mod_name occ
+
+-- newDfunName is a variant, specially for dfuns.  
+-- When renaming derived definitions we are in *interface* mode (because we can trip
+-- over original names), but we still want to make the Dfun locally-defined.
+-- So we can't use whether or not we're in source mode to decide the locally-defined question.
+newDfunName :: Maybe RdrName -> SrcLoc -> RnMS s Name
+newDfunName Nothing src_loc			-- Local instance decls have a "Nothing"
+  = getModuleRn		`thenRn` \ mod_name ->
+    newInstUniq		`thenRn` \ inst_uniq ->
     let
-	(us', us1) = splitUniqSupply us
-	uniq	   = getUnique us1
-	dfun_name  = mkGlobalName uniq mod_name (VarOcc (_PK_ ("df" ++ show inst_ns)))
-				  VanillaDefn (LocalDef Exported src_loc)
-   in
-   setNameSupplyRn (us', inst_ns+1, cache)	`thenRn_`
-   returnRn dfun_name
+	dfun_occ = VarOcc (_PK_ ("$d" ++ show inst_uniq))
+    in
+    newLocallyDefinedGlobalName mod_name dfun_occ 
+				(\_ -> Exported) src_loc
+
+newDfunName (Just n) src_loc			-- Imported ones have "Just n"
+  = getModuleRn		`thenRn` \ mod_name ->
+    newGlobalName mod_name (rdrNameOcc n)
 
 
 newLocalNames :: [(RdrName,SrcLoc)] -> RnM s d [Name]
@@ -189,10 +212,9 @@ bindTyVarsRn doc_str tyvar_names enclosed_scope
 Looking up a name in the RnEnv.
 
 \begin{code}
-lookupRn :: RdrName -> RnMS s Name
-lookupRn rdr_name
-  = getNameEnv 		`thenRn` \ name_env ->
-    case lookupFM name_env rdr_name of
+lookupRn :: NameEnv -> RdrName -> RnMS s Name
+lookupRn name_env rdr_name
+  = case lookupFM name_env rdr_name of
 
 	-- Found it!
 	Just name -> returnRn name
@@ -218,31 +240,37 @@ lookupRn rdr_name
 					      newGlobalName mod_name occ
 
 
+lookupBndrRn rdr_name
+  = getNameEnv 			`thenRn` \ name_env ->
+    lookupRn name_env rdr_name
+
 -- Just like lookupRn except that we record the occurrence too
 -- Perhaps surprisingly, even wired-in names are recorded.
 -- Why?  So that we know which wired-in names are referred to when
 -- deciding which instance declarations to import.
 lookupOccRn :: RdrName -> RnMS s Name
 lookupOccRn rdr_name
-  = lookupRn rdr_name	`thenRn` \ name ->
-    if isLocalName name then
-	returnRn name
-    else
-	addOccurrenceName Compulsory name		`thenRn_`
- 	returnRn name
+  = getNameEnv 			`thenRn` \ name_env ->
+    lookupRn name_env rdr_name	`thenRn` \ name ->
+    addOccurrenceName Compulsory name
+
+-- lookupGlobalOccRn is like lookupOccRn, except that it looks in the global 
+-- environment.  It's used for record field names only.
+lookupGlobalOccRn :: RdrName -> RnMS s Name
+lookupGlobalOccRn rdr_name
+  = getGlobalNameEnv		`thenRn` \ name_env ->
+    lookupRn name_env rdr_name	`thenRn` \ name ->
+    addOccurrenceName Compulsory name
 
 -- lookupOptionalOccRn is similar, but it's used in places where
 -- we don't *have* to find a definition for the thing.
 lookupOptionalOccRn :: RdrName -> RnMS s Name
 lookupOptionalOccRn rdr_name
-  = lookupRn rdr_name	`thenRn` \ name ->
-    if opt_IgnoreIfacePragmas || isLocalName name then
-    		-- Never look for optional things if we're
-		-- ignoring optional input interface information
-	returnRn name
-    else
-	addOccurrenceName Optional name		`thenRn_`
- 	returnRn name
+  = getNameEnv 			`thenRn` \ name_env ->
+    lookupRn name_env rdr_name	`thenRn` \ name ->
+    addOccurrenceName Optional name
+
+   
 
 -- lookupImplicitOccRn takes an RdrName representing an *original* name, and
 -- adds it to the occurrence pool so that it'll be loaded later.  This is
@@ -253,7 +281,7 @@ lookupOptionalOccRn rdr_name
 -- This doesn't apply in interface mode, where everything is explicit, but
 -- we don't check for this case: it does no harm to record an "extra" occurrence
 -- and lookupImplicitOccRn isn't used much in interface mode (it's only the
--- Nothing clause of rnDerivs that calls it at all I think.
+-- Nothing clause of rnDerivs that calls it at all I think).
 --
 -- For List and Tuple types it's important to get the correct
 -- isLocallyDefined flag, which is used in turn when deciding
@@ -263,10 +291,9 @@ lookupOptionalOccRn rdr_name
 lookupImplicitOccRn :: RdrName -> RnMS s Name 
 lookupImplicitOccRn (Qual mod occ)
  = newGlobalName mod occ		`thenRn` \ name ->
-   addOccurrenceName Compulsory name	`thenRn_`
-   returnRn name
+   addOccurrenceName Compulsory name
 
-addImplicitOccRn :: Name -> RnM s d ()
+addImplicitOccRn :: Name -> RnM s d Name
 addImplicitOccRn name = addOccurrenceName Compulsory name
 
 addImplicitOccsRn :: [Name] -> RnM s d ()
@@ -357,42 +384,112 @@ lookupModuleAvails = lookupFM
 
 ===============  AvailInfo  ================
 \begin{code}
-plusAvail (Avail n1 ns1) (Avail n2 ns2) = Avail n1 (nub (ns1 ++ ns2))
+plusAvail (Avail n1)	   (Avail n2)	    = Avail n1
+plusAvail (AvailTC n1 ns1) (AvailTC n2 ns2) = AvailTC n1 (nub (ns1 ++ ns2))
 plusAvail a NotAvailable = a
 plusAvail NotAvailable a = a
 
 addAvailToNameSet :: NameSet -> AvailInfo -> NameSet
-addAvailToNameSet names NotAvailable = names
-addAvailToNameSet names (Avail n ns) = addListToNameSet names (n:ns)
+addAvailToNameSet names avail = addListToNameSet names (availNames avail)
 
 availsToNameSet :: [AvailInfo] -> NameSet
 availsToNameSet avails = foldl addAvailToNameSet emptyNameSet avails
 
-availNames :: AvailInfo -> [Name]
-availNames NotAvailable      = []
-availNames (Avail n ns) = n:ns
+availName :: AvailInfo -> Name
+availName (Avail n)     = n
+availName (AvailTC n _) = n
 
-filterAvail :: RdrNameIE -> AvailInfo -> AvailInfo
-filterAvail (IEThingWith _ wanted) NotAvailable = NotAvailable
-filterAvail (IEThingWith _ wanted) (Avail n ns)
-  | sub_names_ok = Avail n (filter is_wanted ns)
-  | otherwise	 = NotAvailable
+availNames :: AvailInfo -> [Name]
+availNames NotAvailable   = []
+availNames (Avail n)      = [n]
+availNames (AvailTC n ns) = ns
+
+-- availEntityNames is used to extract the names that can appear on their own in
+-- an export or import list.  For class decls, class methods can appear on their
+-- own, thus 	import A( op )
+-- but constructors cannot; thus
+--		import B( T )
+-- means import type T from B, not constructor T.
+
+availEntityNames :: AvailInfo -> [Name]
+availEntityNames NotAvailable   = []
+availEntityNames (Avail n)      = [n]
+availEntityNames (AvailTC n ns) = n : filter (isVarOcc . nameOccName) ns
+
+filterAvail :: RdrNameIE	-- Wanted
+	    -> AvailInfo	-- Available
+	    -> AvailInfo	-- Resulting available; 
+				-- NotAvailable if wanted stuff isn't there
+
+filterAvail ie@(IEThingWith want wants) avail@(AvailTC n ns)
+  | sub_names_ok = AvailTC n (filter is_wanted ns)
+  | otherwise    = pprTrace "filterAvail" (ppCat [ppr PprDebug ie, pprAvail PprDebug avail]) $
+		   NotAvailable
   where
     is_wanted name = nameOccName name `elem` wanted_occs
     sub_names_ok   = all (`elem` avail_occs) wanted_occs
-    wanted_occs    = map rdrNameOcc wanted
     avail_occs	   = map nameOccName ns
+    wanted_occs    = map rdrNameOcc (want:wants)
+
+filterAvail (IEThingAbs _) (AvailTC n ns)      
+  | n `elem` ns = AvailTC n [n]
+
+filterAvail (IEThingAbs _) avail@(Avail n)      = avail		-- Type synonyms
+
+filterAvail (IEVar _)      avail@(Avail n)      = avail
+filterAvail (IEVar v)      avail@(AvailTC n ns) = AvailTC n (filter wanted ns)
+						where
+						  wanted n = nameOccName n == occ
+						  occ      = rdrNameOcc v
+	-- The second equation happens if we import a class op, thus
+	-- 	import A( op ) 
+	-- where op is a class operation
+
+filterAvail (IEThingAll _) avail@(AvailTC _ _)  = avail
+
+filterAvail ie avail = NotAvailable 
 
 
-filterAvail (IEThingAll _) avail        = avail
-filterAvail ie		   (Avail n ns) = Avail n []		-- IEThingAbs and IEVar
+hideAvail :: RdrNameIE		-- Hide this
+	  -> AvailInfo		-- Available
+	  -> AvailInfo		-- Resulting available;
+-- Don't complain about hiding non-existent things; that's done elsewhere
+
+hideAvail ie NotAvailable
+  = NotAvailable
+
+hideAvail ie (Avail n)
+  | not (ieOcc ie == nameOccName n) = Avail n		-- No match
+  | otherwise		            = NotAvailable	-- Names match
+
+hideAvail ie (AvailTC n ns)
+  | not (ieOcc ie == nameOccName n)		-- No match
+  = case ie of					-- But in case we are faced with ...hiding( (+) )
+						-- we filter the "ns" anyhow
+	IEVar op -> AvailTC n (filter keep ns)
+		 where
+		    op_occ = rdrNameOcc op
+		    keep n = nameOccName n /= op_occ
+
+	other	 -> AvailTC n ns
+
+  | otherwise					-- Names match
+  = case ie of
+	IEThingAbs _	       -> AvailTC n (filter (/= n) ns)
+	IEThingAll _ 	       -> NotAvailable
+	IEThingWith hide hides -> AvailTC n (filter keep ns)
+			       where
+				  keep n    = nameOccName n `notElem` hide_occs
+				  hide_occs = map rdrNameOcc (hide : hides)
+
 
 -- pprAvail gets given the OccName of the "host" thing
-pprAvail sty NotAvailable = ppStr "NotAvailable"
-pprAvail sty (Avail n ns) = ppCat [pprOccName sty (nameOccName n),
-				   ppStr "(",
-				   ppInterleave ppComma (map (pprOccName sty.nameOccName) ns),
-				   ppStr ")"]
+pprAvail sty NotAvailable = ppPStr SLIT("NotAvailable")
+pprAvail sty (AvailTC n ns) = ppCat [pprOccName sty (nameOccName n),
+				     ppChar '(',
+				     ppInterleave ppComma (map (pprOccName sty.nameOccName) ns),
+				     ppChar ')']
+pprAvail sty (Avail n) = pprOccName sty (nameOccName n)
 \end{code}
 
 
@@ -436,33 +533,35 @@ conflictFM bad fm key elt
 
 \begin{code}
 nameClashErr (rdr_name, (name1,name2)) sty
-  = ppHang (ppCat [ppStr "Conflicting definitions for: ", ppr sty rdr_name])
+  = ppHang (ppCat [ppPStr SLIT("Conflicting definitions for: "), ppr sty rdr_name])
 	4 (ppAboves [pprNameProvenance sty name1,
 		     pprNameProvenance sty name2])
 
 fixityClashErr (rdr_name, (fp1,fp2)) sty
-  = ppHang (ppCat [ppStr "Conflicting fixities for: ", ppr sty rdr_name])
+  = ppHang (ppCat [ppPStr SLIT("Conflicting fixities for: "), ppr sty rdr_name])
 	4 (ppAboves [pprFixityProvenance sty fp1,
 		     pprFixityProvenance sty fp2])
 
 shadowedNameWarn shadow sty
-  = ppBesides [ppStr "More than one value with the same name (shadowing): ", ppr sty shadow]
+  = ppBesides [ppPStr SLIT("This binding for"), 
+	       ppQuote (ppr sty shadow), 
+	       ppPStr SLIT("shadows an existing binding")]
 
 unknownNameErr name sty
-  = ppSep [ppStr flavour, ppStr "not in scope:", ppr sty name]
+  = ppSep [ppStr flavour, ppPStr SLIT("not in scope:"), ppr sty name]
   where
     flavour = occNameFlavour (rdrNameOcc name)
 
 qualNameErr descriptor (name,loc)
   = pushSrcLocRn loc $
-    addErrRn (\sty -> ppBesides [ppStr "invalid use of qualified ", 
-				 ppStr descriptor, ppStr ": ", 
+    addErrRn (\sty -> ppBesides [ppPStr SLIT("invalid use of qualified "), 
+				 ppStr descriptor, ppPStr SLIT(": "), 
 				 pprNonSymOcc sty (rdrNameOcc name) ])
 
 dupNamesErr descriptor ((name,loc) : dup_things)
   = pushSrcLocRn loc $
-    addErrRn (\sty -> ppBesides [ppStr "duplicate bindings of `", 
-				 ppr sty name, ppStr "' in ", 
+    addErrRn (\sty -> ppBesides [ppPStr SLIT("duplicate bindings of `"), 
+				 ppr sty name, ppPStr SLIT("' in "), 
 				 ppStr descriptor])
 \end{code}
 

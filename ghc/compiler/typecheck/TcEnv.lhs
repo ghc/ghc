@@ -15,6 +15,7 @@ module TcEnv(
 	tcExtendGlobalValEnv, tcExtendLocalValEnv,
 	tcLookupLocalValue, tcLookupLocalValueOK, tcLookupLocalValueByKey, 
 	tcLookupGlobalValue, tcLookupGlobalValueByKey, tcLookupGlobalValueMaybe,
+	tcAddImportedIdInfo,
 	tcLookupGlobalValueByKeyMaybe, 
 
 	newMonoIds, newLocalIds, newLocalId,
@@ -26,7 +27,7 @@ IMP_Ubiq()
 IMPORT_DELOOPER(TcMLoop)  -- for paranoia checking
 
 import HsTypes	( HsTyVar(..) )
-import Id	( SYN_IE(Id), GenId, idType, mkUserLocal, mkUserId )
+import Id	( SYN_IE(Id), GenId, idType, mkUserLocal, mkUserId, replaceIdInfo, getIdInfo )
 import PragmaInfo ( PragmaInfo(..) )
 import TcHsSyn	( SYN_IE(TcIdBndr), TcIdOcc(..) )
 import TcKind	( TcKind, newKindVars, newKindVar, tcDefaultKind, kindToTcKind )
@@ -40,6 +41,7 @@ import Class	( SYN_IE(Class), GenClass, classSig )
 
 import TcMonad
 
+import IdInfo		( noIdInfo )
 import Name		( Name, OccName(..), getSrcLoc, occNameString,
 			  maybeWiredInTyConName, maybeWiredInIdName, pprSym
 			)
@@ -280,6 +282,19 @@ tcLookupGlobalValueByKeyMaybe :: Unique -> NF_TcM s (Maybe Id)
 tcLookupGlobalValueByKeyMaybe uniq
   = tcGetEnv 		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
     returnNF_Tc (lookupUFM_Directly gve uniq)
+
+	-- Extract the IdInfo from an IfaceSig imported from an interface file
+tcAddImportedIdInfo :: Id -> NF_TcM s Id
+tcAddImportedIdInfo id
+  = tcLookupGlobalValueMaybe (getName id)	`thenNF_Tc` \ maybe_id ->
+    let 
+	new_info = case maybe_id of
+		     Nothing	      -> noIdInfo
+		     Just imported_id -> getIdInfo imported_id
+		-- ToDo: could check that types are the same
+    in
+    returnNF_Tc (id `replaceIdInfo` new_info)
+	-- The Id must be returned without a data dependency on maybe_id
 \end{code}
 
 
@@ -319,8 +334,8 @@ newLocalIds names tys
 
 \begin{code}
 classAsTyConErr name sty
-  = ppBesides [ppStr "Class used as a type constructor: ", pprSym sty name]
+  = ppBesides [ppPStr SLIT("Class used as a type constructor: "), pprSym sty name]
 
 tyConAsClassErr name sty
-  = ppBesides [ppStr "Type constructor used as a class: ", pprSym sty name]
+  = ppBesides [ppPStr SLIT("Type constructor used as a class: "), pprSym sty name]
 \end{code}

@@ -57,11 +57,11 @@ lintStgBindings sty whodunnit binds
     case (initL (lint_binds binds)) of
       Nothing  -> binds
       Just msg -> pprPanic "" (ppAboves [
-			ppStr ("*** Stg Lint Errors: in "++whodunnit++" ***"),
+			ppPStr SLIT("*** Stg Lint Errors: in "),ppStr whodunnit, ppPStr SLIT(" ***"),
 			msg sty,
-			ppStr "*** Offending Program ***",
+			ppPStr SLIT("*** Offending Program ***"),
 			ppAboves (map (pprPlainStgBinding sty) binds),
-			ppStr "*** End of Offense ***"])
+			ppPStr SLIT("*** End of Offense ***")])
   where
     lint_binds :: [StgBinding] -> LintM ()
 
@@ -279,22 +279,22 @@ data LintLocInfo
 
 instance Outputable LintLocInfo where
     ppr sty (RhsOf v)
-      = ppBesides [ppr sty (getSrcLoc v), ppStr ": [RHS of ", pp_binders sty [v], ppStr "]"]
+      = ppBesides [ppr sty (getSrcLoc v), ppPStr SLIT(": [RHS of "), pp_binders sty [v], ppChar ']']
 
     ppr sty (LambdaBodyOf bs)
       = ppBesides [ppr sty (getSrcLoc (head bs)),
-		ppStr ": [in body of lambda with binders ", pp_binders sty bs, ppStr "]"]
+		ppPStr SLIT(": [in body of lambda with binders "), pp_binders sty bs, ppChar ']']
 
     ppr sty (BodyOfLetRec bs)
       = ppBesides [ppr sty (getSrcLoc (head bs)),
-		ppStr ": [in body of letrec with binders ", pp_binders sty bs, ppStr "]"]
+		ppPStr SLIT(": [in body of letrec with binders "), pp_binders sty bs, ppChar ']']
 
 pp_binders :: PprStyle -> [Id] -> Pretty
 pp_binders sty bs
   = ppInterleave ppComma (map pp_binder bs)
   where
     pp_binder b
-      = ppCat [ppr sty b, ppStr "::", ppr sty (idType b)]
+      = ppCat [ppr sty b, ppPStr SLIT("::"), ppr sty (idType b)]
 \end{code}
 
 \begin{code}
@@ -423,7 +423,7 @@ checkFunApp fun_ty arg_tys msg loc scope errs
 checkInScope :: Id -> LintM ()
 checkInScope id loc scope errs
   = if isLocallyDefined id && not (isDataCon id) && not (id `elementOfIdSet` scope) then
-	((), addErr errs (\ sty -> ppCat [ppr sty id, ppStr "is out of scope"]) loc)
+	((), addErr errs (\ sty -> ppCat [ppr sty id, ppPStr SLIT("is out of scope")]) loc)
     else
 	((), errs)
 
@@ -443,38 +443,38 @@ mkCaseAltMsg alts sty
 
 mkCaseDataConMsg :: StgExpr -> ErrMsg
 mkCaseDataConMsg expr sty
-  = ppAbove (ppStr "A case scrutinee not a type-constructor type:")
+  = ppAbove (ppPStr SLIT("A case scrutinee not a type-constructor type:"))
 	    (pp_expr sty expr)
 
 mkCaseAbstractMsg :: TyCon -> ErrMsg
 mkCaseAbstractMsg tycon sty
-  = ppAbove (ppStr "An algebraic case on an abstract type:")
+  = ppAbove (ppPStr SLIT("An algebraic case on an abstract type:"))
 	    (ppr sty tycon)
 
 mkDefltMsg :: StgCaseDefault -> ErrMsg
 mkDefltMsg deflt sty
-  = ppAbove (ppStr "Binder in default case of a case expression doesn't match type of scrutinee:")
+  = ppAbove (ppPStr SLIT("Binder in default case of a case expression doesn't match type of scrutinee:"))
 	    --LATER: (ppr sty deflt)
 	    (panic "mkDefltMsg")
 
 mkFunAppMsg :: Type -> [Type] -> StgExpr -> ErrMsg
 mkFunAppMsg fun_ty arg_tys expr sty
   = ppAboves [ppStr "In a function application, function type doesn't match arg types:",
-	      ppHang (ppStr "Function type:") 4 (ppr sty fun_ty),
-	      ppHang (ppStr "Arg types:") 4 (ppAboves (map (ppr sty) arg_tys)),
-	      ppHang (ppStr "Expression:") 4 (pp_expr sty expr)]
+	      ppHang (ppPStr SLIT("Function type:")) 4 (ppr sty fun_ty),
+	      ppHang (ppPStr SLIT("Arg types:")) 4 (ppAboves (map (ppr sty) arg_tys)),
+	      ppHang (ppPStr SLIT("Expression:")) 4 (pp_expr sty expr)]
 
 mkRhsConMsg :: Type -> [Type] -> ErrMsg
 mkRhsConMsg fun_ty arg_tys sty
   = ppAboves [ppStr "In a RHS constructor application, con type doesn't match arg types:",
-	      ppHang (ppStr "Constructor type:") 4 (ppr sty fun_ty),
-	      ppHang (ppStr "Arg types:") 4 (ppAboves (map (ppr sty) arg_tys))]
+	      ppHang (ppPStr SLIT("Constructor type:")) 4 (ppr sty fun_ty),
+	      ppHang (ppPStr SLIT("Arg types:")) 4 (ppAboves (map (ppr sty) arg_tys))]
 
 mkUnappTyMsg :: Id -> Type -> ErrMsg
 mkUnappTyMsg var ty sty
   = ppAboves [ppStr "Variable has a for-all type, but isn't applied to any types.",
-	      ppBeside (ppStr "Var:      ") (ppr sty var),
-	      ppBeside (ppStr "Its type: ") (ppr sty ty)]
+	      ppBeside (ppPStr SLIT("Var:      ")) (ppr sty var),
+	      ppBeside (ppPStr SLIT("Its type: ")) (ppr sty ty)]
 
 mkAlgAltMsg1 :: Type -> ErrMsg
 mkAlgAltMsg1 ty sty
@@ -512,10 +512,10 @@ mkPrimAltMsg alt sty
 
 mkRhsMsg :: Id -> Type -> ErrMsg
 mkRhsMsg binder ty sty
-  = ppAboves [ppCat [ppStr "The type of this binder doesn't match the type of its RHS:",
+  = ppAboves [ppCat [ppPStr SLIT("The type of this binder doesn't match the type of its RHS:"),
 		     ppr sty binder],
-	      ppCat [ppStr "Binder's type:", ppr sty (idType binder)],
-	      ppCat [ppStr "Rhs type:", ppr sty ty]
+	      ppCat [ppPStr SLIT("Binder's type:"), ppr sty (idType binder)],
+	      ppCat [ppPStr SLIT("Rhs type:"), ppr sty ty]
 	     ]
 
 pp_expr :: PprStyle -> StgExpr -> Pretty

@@ -31,7 +31,7 @@ import Outputable	( interppSP, interpp'SP,
 			)
 import Pretty
 import SrcLoc		( SrcLoc )
-import PprStyle		( PprStyle(..) )
+import PprStyle		( PprStyle(..), ifaceStyle )
 \end{code}
 
 
@@ -71,6 +71,10 @@ instance (NamedThing name, Outputable name, Outputable pat,
     ppr sty (ValD binds) = ppr sty binds
     ppr sty (DefD def)   = ppr sty def
     ppr sty (InstD inst) = ppr sty inst
+
+-- In interfaces, top-level binders are printed without their "Module." prefix
+ppr_top_binder sty bndr | ifaceStyle sty = ppr sty (getOccName bndr)
+	  	        | otherwise	 = ppr sty bndr
 \end{code}
 
 
@@ -143,12 +147,12 @@ instance (NamedThing name, Outputable name)
 		  derivings
 
 pp_decl_head sty str pp_context tycon tyvars
-  = ppCat [ppPStr str, pp_context, ppr sty (getOccName tycon), 
+  = ppCat [ppPStr str, pp_context, ppr_top_binder sty tycon,
 	   interppSP sty tyvars, ppPStr SLIT("=")]
 
 pp_condecls sty [] = ppNil		-- Curious!
 pp_condecls sty (c:cs)
-  = ppSep (ppr sty c : map (\ c -> ppBeside (ppStr "| ") (ppr sty c)) cs)
+  = ppSep (ppr sty c : map (\ c -> ppBeside (ppPStr SLIT("| ")) (ppr sty c)) cs)
 
 pp_tydecl sty pp_head pp_decl_rhs derivings
   = ppHang pp_head 4 (ppSep [
@@ -215,25 +219,26 @@ data BangType name
 instance (NamedThing name, Outputable name) => Outputable (ConDecl name) where
 
     ppr sty (ConDecl con tys _)
-      = ppCat [ppr sty (getOccName con), ppInterleave ppNil (map (ppr_bang sty) tys)]
+      = ppCat [ppr_top_binder sty con, ppInterleave ppNil (map (ppr_bang sty) tys)]
 
 	-- We print ConOpDecls in prefix form in interface files
-    ppr PprInterface (ConOpDecl ty1 op ty2 _)
-      = ppCat [ppr PprInterface (getOccName op), ppr_bang PprInterface ty1, ppr_bang PprInterface ty2]
     ppr sty (ConOpDecl ty1 op ty2 _)
-      = ppCat [ppr_bang sty ty1, ppr sty (getOccName op), ppr_bang sty ty2]
+      | ifaceStyle sty
+      = ppCat [ppr_top_binder sty op, ppr_bang sty ty1, ppr_bang sty ty2]
+      | otherwise
+      = ppCat [ppr_bang sty ty1, ppr_top_binder sty op, ppr_bang sty ty2]
 
     ppr sty (NewConDecl con ty _)
-      = ppCat [ppr sty (getOccName con), pprParendHsType sty ty]
+      = ppCat [ppr_top_binder sty con, pprParendHsType sty ty]
     ppr sty (RecConDecl con fields _)
-      = ppCat [ppr sty (getOccName con),
+      = ppCat [ppr_top_binder sty con,
 	       ppCurlies (ppInterleave pp'SP (map pp_field fields))
 	      ]
       where
-	pp_field (ns, ty) = ppCat [ppCat (map (ppr sty . getOccName) ns), 
+	pp_field (ns, ty) = ppCat [ppCat (map (ppr_top_binder sty) ns), 
 				   ppPStr SLIT("::"), ppr_bang sty ty]
 
-ppr_bang sty (Banged   ty) = ppBeside (ppStr "! ") (pprParendHsType sty ty)
+ppr_bang sty (Banged   ty) = ppBeside (ppPStr SLIT("! ")) (pprParendHsType sty ty)
 				-- The extra space helps the lexical analyser that lexes
 				-- interface files; it doesn't make the rigid operator/identifier
 				-- distinction, so "!a" is a valid identifier so far as it is concerned
@@ -267,16 +272,16 @@ instance (NamedThing name, Outputable name, Outputable pat,
       = top_matter
 
       | iface_style	-- All on one line (for now at least)
-      = ppCat [top_matter, ppStr "where", 
+      = ppCat [top_matter, ppPStr SLIT("where"), 
 	       ppCurlies (ppInterleave (ppPStr SLIT("; ")) pp_sigs)]
 
       | otherwise	-- Laid out
-      = ppSep [ppCat [top_matter, ppStr "where {"],
+      = ppSep [ppCat [top_matter, ppPStr SLIT("where {")],
 	       ppNest 4 ((ppIntersperse ppSemi pp_sigs `ppAbove` pp_methods)
-			 `ppBeside` ppStr "}")]
+			 `ppBeside` ppChar '}')]
       where
-        top_matter = ppCat [ppStr "class", pp_context_and_arrow sty context,
-                            ppr sty (getOccName clas), ppr sty tyvar]
+        top_matter = ppCat [ppPStr SLIT("class"), pp_context_and_arrow sty context,
+                            ppr_top_binder sty clas, ppr sty tyvar]
 	pp_sigs     = map (ppr sty) sigs 
 	pp_methods  = ppr sty methods
 	iface_style = case sty of {PprInterface -> True; other -> False}
@@ -311,10 +316,10 @@ instance (NamedThing name, Outputable name, Outputable pat,
     ppr sty (InstDecl inst_ty binds uprags dfun_name src_loc)
       | case sty of { PprInterface -> True; other -> False} ||
 	nullMonoBinds binds && null uprags
-      = ppCat [ppStr "instance", ppr sty inst_ty]
+      = ppCat [ppPStr SLIT("instance"), ppr sty inst_ty]
 
       | otherwise
-      =	ppAboves [ppCat [ppStr "instance", ppr sty inst_ty, ppStr "where"],
+      =	ppAboves [ppCat [ppPStr SLIT("instance"), ppr sty inst_ty, ppPStr SLIT("where")],
 	          ppNest 4 (ppr sty uprags),
 	          ppNest 4 (ppr sty binds) ]
 \end{code}
@@ -372,7 +377,7 @@ data IfaceSig name
 
 instance (NamedThing name, Outputable name) => Outputable (IfaceSig name) where
     ppr sty (IfaceSig var ty _ _)
-      = ppHang (ppCat [ppr sty (getOccName var), ppPStr SLIT("::")])
+      = ppHang (ppCat [ppr_top_binder sty var, ppPStr SLIT("::")])
 	     4 (ppr sty ty)
 
 data HsIdInfo name

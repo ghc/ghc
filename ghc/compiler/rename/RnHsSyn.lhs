@@ -48,7 +48,6 @@ type RenamedMonoBinds		= MonoBinds		Fake Fake Name RenamedPat
 type RenamedPat			= InPat			Name
 type RenamedHsType		= HsType		Name
 type RenamedRecordBinds		= HsRecordBinds		Fake Fake Name RenamedPat
-type RenamedQual		= Qualifier		Fake Fake Name RenamedPat
 type RenamedSig			= Sig			Name
 type RenamedSpecInstSig		= SpecInstSig 		Name
 type RenamedStmt		= Stmt			Fake Fake Name RenamedPat

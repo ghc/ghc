@@ -70,8 +70,11 @@ module FiniteMap (
     ) where
 
 IMPORT_DELOOPER(SpecLoop)
+#if defined(USE_FAST_STRINGS)
+import FastString
+#endif
 import Maybes
-import Bag	  ( Bag, foldBag )
+import Bag	  ( Bag, foldrBag )
 import Outputable ( Outputable(..) )
 import PprStyle	( PprStyle )
 import Pretty	( SYN_IE(Pretty), PrettyRep )
@@ -215,7 +218,7 @@ unitFM key elt = Branch key elt IF_GHC(1#,1) emptyFM emptyFM
 listToFM = addListToFM emptyFM
 
 #ifdef COMPILING_GHC
-bagToFM = foldBag plusFM (\ (k,v) -> unitFM k v) emptyFM
+bagToFM = foldrBag (\(k,v) fm -> addToFM fm k v) emptyFM
 #endif
 \end{code}
 

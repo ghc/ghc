@@ -1,0 +1,9 @@
+#
+# hstags - generating a tags file from Haskell source
+#
+# To use the script on your system, the following variable
+# needs to be set (and uncommented), if it hasn't already
+# been set above:
+#
+#$INSTLIBDIR_GHC='/local/fp/lib/ghc';
+#

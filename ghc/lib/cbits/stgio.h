@@ -50,6 +50,10 @@ StgInt	fileSize    PROTO((StgForeignObj, StgByteArray));
 /* flushFile.lc */
 StgInt	flushFile   PROTO((StgForeignObj));
 
+/* freeFile.lc */
+void freeStdChannel PROTO((StgForeignObj));
+void freeFile PROTO((StgForeignObj));
+
 /* getBufferMode.lc */
 StgInt	getBufferMode PROTO((StgForeignObj));
 
@@ -58,6 +62,7 @@ StgInt	getClockTime PROTO((StgByteArray, StgByteArray));
 
 /* getCPUTime.lc */
 StgByteArray getCPUTime PROTO((StgByteArray));
+StgInt clockTicks();
 
 /* getCurrentDirectory.lc */
 StgAddr getCurrentDirectory(STG_NO_ARGS);
@@ -75,10 +80,6 @@ StgInt	inputReady  PROTO((StgForeignObj));
 
 /* openFile.lc */
 StgAddr openFile PROTO((StgByteArray, StgByteArray));
-
-/* freeFile.lc */
-void freeStdChannel PROTO((StgForeignObj));
-void freeFile PROTO((StgForeignObj));
 
 /* readFile.lc */
 StgInt	readBlock PROTO((StgAddr, StgForeignObj, StgInt));

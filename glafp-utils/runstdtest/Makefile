@@ -1,9 +1,15 @@
-TOP=../..
-include $(TOP)/mk/gen.mk
+#
+#
 
-PROG=runstdtest
-SRC=runstdtest.prl
+TOP=..
+include $(TOP)/mk/boilerplate.mk
+
+SCRIPT_PROG=runstdtest
+SCRIPT_OBJS=runstdtest.prl
+SCRIPT_SUBST_VARS=RM TMPDIR CONTEXT_DIFF
 INTERP=$(PERL)
-DESTDIR=$(INSTBINDIR)
 
-include $(TOP)/mk/script.mk
+CLEAN_FILES += $(SCRIPT_PROG)
+DESTDIR=$(INSTSCRIPTDIR)
+
+include $(TOP)/mk/target.mk

@@ -1,9 +1,12 @@
-TOP=../..
-include $(TOP)/mk/gen.mk
+TOP=..
+include $(TOP)/mk/boilerplate.mk
 
-PROG=ltx
-SRC=ltx.prl
+SCRIPT_PROG=ltx
+SCRIPT_OBJS=ltx.prl
+SCRIPT_SUBST_VARS=TMPDIR CONTEXT_DIFF
+
 INTERP=$(PERL)
-DESTDIR=$(INSTBINDIR)
+DESTDIR=$(INSTSCRIPTDIR)
+CLEAN_FILES += $(SCRIPT_PROG)
 
-include $(TOP)/mk/script.mk
+include $(TOP)/mk/target.mk

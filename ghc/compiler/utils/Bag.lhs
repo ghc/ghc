@@ -16,7 +16,7 @@ module Bag (
 #ifndef COMPILING_GHC
 	elemBag,
 #endif
-	filterBag, partitionBag, concatBag, foldBag,
+	filterBag, partitionBag, concatBag, foldBag, foldrBag,
 	isEmptyBag, consBag, snocBag,
 	listToBag, bagToList
     ) where
@@ -130,6 +130,16 @@ foldBag t u e (TwoBags b1 b2) = foldBag t u (foldBag t u e b2) b1
 foldBag t u e (ListBag xs)    = foldr (t.u) e xs
 foldBag t u e (ListOfBags bs) = foldr (\b r -> foldBag t u r b) e bs
 
+foldrBag :: (a -> r -> r) -> r
+	 -> Bag a
+	 -> r
+
+foldrBag k z EmptyBag        = z
+foldrBag k z (UnitBag x)     = k x z
+foldrBag k z (TwoBags b1 b2) = foldrBag k (foldrBag k z b2) b1
+foldrBag k z (ListBag xs)    = foldr k z xs
+foldrBag k z (ListOfBags bs) = foldr (\b r -> foldrBag k r b) z bs
+
 
 mapBag :: (a -> b) -> Bag a -> Bag b
 mapBag f EmptyBag 	 = EmptyBag
@@ -144,24 +154,14 @@ listToBag [] = EmptyBag
 listToBag vs = ListBag vs
 
 bagToList :: Bag a -> [a]
-bagToList EmptyBag     = []
-bagToList (ListBag vs) = vs
-bagToList b = bagToList_append b []
-
-    -- (bagToList_append b xs) flattens b and puts xs on the end.
-    -- (not exported)
-bagToList_append EmptyBag 	 xs = xs
-bagToList_append (UnitBag x)	 xs = x:xs
-bagToList_append (TwoBags b1 b2) xs = bagToList_append b1 (bagToList_append b2 xs)
-bagToList_append (ListBag xx)    xs = xx++xs
-bagToList_append (ListOfBags bs) xs = foldr bagToList_append xs bs
+bagToList b = foldrBag (:) [] b
 \end{code}
 
 \begin{code}
 #ifdef COMPILING_GHC
 
 instance (Outputable a) => Outputable (Bag a) where
-    ppr sty EmptyBag	    = ppStr "emptyBag"
+    ppr sty EmptyBag	    = ppPStr SLIT("emptyBag")
     ppr sty (UnitBag a)     = ppr sty a
     ppr sty (TwoBags b1 b2) = ppCat [ppr sty b1, pp'SP, ppr sty b2]
     ppr sty (ListBag as)    = interpp'SP sty as

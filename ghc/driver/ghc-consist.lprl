@@ -38,7 +38,7 @@ sub chk_consistency_info {
 		print STDERR "$Pgm: consistency warning: minor version not $HsC_minor_version:\n$_\n"
 		    if $minor_version != $HsC_minor_version;
 		$Status++,
-		print STDERR "$Pgm: consistency error: not options $HsC_consist_options:\n$_\n"
+		print STDERR "$Pgm: consistency error: not options $opts -- $HsC_consist_options:\n$_\n"
 		    if $opts ne $HsC_consist_options;
 
 	    } else { # phase is cc ...

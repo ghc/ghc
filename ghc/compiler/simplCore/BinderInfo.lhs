@@ -159,7 +159,9 @@ addBinderInfo, orBinderInfo
 addBinderInfo DeadCode info2 = info2
 addBinderInfo info1 DeadCode = info1
 addBinderInfo info1 info2
-	= ManyOcc (min (getBinderInfoArity info1) (getBinderInfoArity info2))
+ = case (min (getBinderInfoArity info1) (getBinderInfoArity info2)) of
+     (I# i#) -> ManyOcc (I# i#)
+      -- ManyOcc min (getBinderInfoArity info1) (getBinderInfoArity info2))
 
 -- (orBinderInfo orig new) is used when combining occurrence 
 -- info from branches of a case
@@ -168,13 +170,26 @@ orBinderInfo DeadCode info2 = info2
 orBinderInfo info1 DeadCode = info1
 orBinderInfo (OneOcc posn1 dup1 scc1 n_alts1 ar_1)
 	     (OneOcc posn2 dup2 scc2 n_alts2 ar_2)
-  = OneOcc (combine_posns posn1 posn2)
-	   (combine_dups  dup1  dup2)
-	   (combine_sccs  scc1  scc2)
-	   (n_alts1 + n_alts2)
-	   (min ar_1 ar_2)
+  = let
+      -- Seriously maligned in order to make it stricter,
+      -- let's hope it is worth it..
+     posn = combine_posns posn1 posn2
+     scc  = combine_sccs  scc1  scc2
+     dup  = combine_dups  dup1  dup2
+     alts = n_alts1 + n_alts2
+     ar   = min ar_1 ar_2
+
+      -- No CSE, please!
+     cont1 = case scc  of { InsideSCC -> cont2; _ -> cont2 }
+     cont2 = case dup  of { DupDanger -> cont3; _ -> cont3 }
+     cont3 = case alts of { (I# 0#)   -> cont4; _ -> cont4 }
+     cont4 = case ar   of { (I# 0#)   -> cont5; _ -> cont5 }
+     cont5 = OneOcc posn dup scc alts ar
+    in
+    case posn of { FunOcc -> cont1; _ -> cont1 }
 orBinderInfo info1 info2
-	= ManyOcc (min (getBinderInfoArity info1) (getBinderInfoArity info2))
+ = case (min (getBinderInfoArity info1) (getBinderInfoArity info2)) of
+     (I# i#) -> ManyOcc (I# i#)
 
 -- (andBinderInfo orig new) is used in two situations:
 -- First, when a variable whose occurrence info
@@ -190,14 +205,27 @@ orBinderInfo info1 info2
 
 andBinderInfo DeadCode info2 = DeadCode
 andBinderInfo info1 DeadCode = DeadCode
-andBinderInfo (OneOcc posn1 dup1 scc1 n_alts1 ar_1)
-	      (OneOcc posn2 dup2 scc2 n_alts2 ar_2)
-  = OneOcc (combine_posns posn1 posn2)
-	   (combine_dups  dup1  dup2)
-	   (combine_sccs  scc1  scc2)
-	   (n_alts1 + n_alts2)
-	   ar_1					-- Min arity just from orig
-andBinderInfo info1 info2 = ManyOcc (getBinderInfoArity info1)
+andBinderInfo (OneOcc posn1 dup1 scc1 (I# n_alts1#) (I# ar_1#))
+	      (OneOcc posn2 dup2 scc2 (I# n_alts2#) ar_2)
+  = let
+      -- Perversly maligned in order to make it stricter.
+     posn = combine_posns posn1 posn2
+     scc  = combine_sccs  scc1  scc2
+     dup  = combine_dups  dup1  dup2
+     alts = I# (n_alts1# +# n_alts2#)
+
+      -- No CSE, please!
+     cont1 = case scc  of { InsideSCC -> cont2; _ -> cont2 }
+     cont2 = case dup  of { DupDanger -> cont3; _ -> cont3 }
+     cont3 = case alts of { (I# 0#) -> cont4;   _ -> cont4 }
+     cont4 = OneOcc posn dup scc alts (I# ar_1#)
+    in
+    case posn of {FunOcc -> cont1; _ -> cont1}
+
+andBinderInfo info1 info2 = 
+ case getBinderInfoArity info1 of
+   (I# i#) -> ManyOcc (I# i#)
+               --ManyOcc (getBinderInfoArity info1)
 
 
 combine_posns FunOcc FunOcc = FunOcc -- see comment at FunOrArg defn
@@ -225,20 +253,20 @@ getBinderInfoArity (OneOcc _ _ _ _ i) = i
 
 \begin{code}
 instance Outputable BinderInfo where
-  ppr sty DeadCode     = ppStr "Dead"
-  ppr sty (ManyOcc ar) = ppBesides [ ppStr "Many-", ppInt ar ]
+  ppr sty DeadCode     = ppPStr SLIT("Dead")
+  ppr sty (ManyOcc ar) = ppBesides [ ppPStr SLIT("Many-"), ppInt ar ]
   ppr sty (OneOcc posn dup_danger in_scc n_alts ar)
-    = ppBesides [ ppStr "One-", pp_posn posn, ppChar '-', pp_danger dup_danger,
+    = ppBesides [ ppPStr SLIT("One-"), pp_posn posn, ppChar '-', pp_danger dup_danger,
 		  ppChar '-', pp_scc in_scc,  ppChar '-', ppInt n_alts,
 		  ppChar '-', ppInt ar ]
     where
-      pp_posn FunOcc = ppStr "fun"
-      pp_posn ArgOcc = ppStr "arg"
+      pp_posn FunOcc = ppPStr SLIT("fun")
+      pp_posn ArgOcc = ppPStr SLIT("arg")
 
-      pp_danger DupDanger   = ppStr "*dup*"
-      pp_danger NoDupDanger = ppStr "nodup"
+      pp_danger DupDanger   = ppPStr SLIT("*dup*")
+      pp_danger NoDupDanger = ppPStr SLIT("nodup")
 
-      pp_scc InsideSCC	  = ppStr "*SCC*"
-      pp_scc NotInsideSCC = ppStr "noscc"
+      pp_scc InsideSCC	  = ppPStr SLIT("*SCC*")
+      pp_scc NotInsideSCC = ppPStr SLIT("noscc")
 \end{code}
 

@@ -1,9 +1,21 @@
-TOP=../..
-include $(TOP)/mk/gen.mk
+#
+# Boilerplate Makefile for building perl script that
+# needs some configured constants prepended to it.
+#
+TOP=..
+include $(TOP)/mk/boilerplate.mk
 
-PROG=mkdependC
-SRC=mkdependC.prl
+boot :: all
+
+SCRIPT_PROG=mkdependC
+SCRIPT_OBJS=mkdependC.prl
+#
+# Prepend (perl) bindings for these Makefile variables
+# when creating `mkdependC' (a more flexible way of doing msub).
+#
+SCRIPT_SUBST_VARS=RAWCPP HOSTPLATFORM
+
+CLEAN_FILES += $(SCRIPT_PROG)
 INTERP=$(PERL)
-DESTDIR=$(INSTBINDIR)
 
-include $(TOP)/mk/script.mk
+include $(TOP)/mk/target.mk

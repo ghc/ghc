@@ -196,7 +196,8 @@ cPutStr handle sq = flat sq
     flat (CCh c)   	  = hPutChar handle c
     flat (CInt i)  	  = hPutStr  handle (show i)
     flat (CStr s)  	  = hPutStr  handle s
-    flat (CPStr s) 	  = hPutStr  handle (_UNPK_ s)
+    flat (CPStr s) 	  = hPutFS   handle s
+                            --hPutStr  handle (_UNPK_ s)
 
 #endif {- COMPILING_GHC -}
 \end{code}

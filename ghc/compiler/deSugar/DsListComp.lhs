@@ -11,8 +11,8 @@ module DsListComp ( dsListComp ) where
 IMP_Ubiq()
 IMPORT_DELOOPER(DsLoop)		-- break dsExpr-ish loop
 
-import HsSyn		( Qualifier(..), HsExpr, HsBinds )
-import TcHsSyn		( SYN_IE(TypecheckedQual), SYN_IE(TypecheckedHsExpr) , SYN_IE(TypecheckedHsBinds) )
+import HsSyn		( Stmt(..), HsExpr, HsBinds )
+import TcHsSyn		( SYN_IE(TypecheckedStmt), SYN_IE(TypecheckedHsExpr) , SYN_IE(TypecheckedHsBinds) )
 import DsHsSyn		( outPatType )
 import CoreSyn
 
@@ -37,42 +37,36 @@ turned on'' (if you read Gill {\em et al.}'s paper on the subject).
 There will be at least one ``qualifier'' in the input.
 
 \begin{code}
-dsListComp :: CoreExpr -> [TypecheckedQual] -> DsM CoreExpr
+dsListComp :: [TypecheckedStmt] 
+	   -> Type		-- Type of list elements
+	   -> DsM CoreExpr
 
-dsListComp expr quals
-  = let
-	expr_ty = coreExprType expr
+dsListComp quals elt_ty
+  | not opt_FoldrBuildOn 		 -- Be boring
+  = deListComp quals nil_expr
+
+  | otherwise				 -- foldr/build lives!
+  = newTyVarsDs [alphaTyVar]    `thenDs` \ [n_tyvar] ->
+    let
+        alpha_to_alpha = alphaTy `mkFunTy` alphaTy
+
+	n_ty = mkTyVarTy n_tyvar
+        c_ty = mkFunTys [elt_ty, n_ty] n_ty
+        g_ty = mkForAllTy alphaTyVar (
+    		(elt_ty `mkFunTy` alpha_to_alpha)
+    		`mkFunTy` 
+    		alpha_to_alpha
+    	   )
     in
-    if not opt_FoldrBuildOn then -- be boring
-	deListComp expr quals (nIL_EXPR expr_ty)
+    newSysLocalsDs [c_ty,n_ty,g_ty]  `thenDs` \ [c, n, g] ->
 
-    else -- foldr/build lives!
-	new_alpha_tyvar		    `thenDs` \ (n_tyvar, n_ty) ->
-	let
-	    alpha_to_alpha = alphaTy `mkFunTy` alphaTy
+    dfListComp	c_ty c
+    		n_ty n
+    		quals	    `thenDs` \ result ->
 
-	    c_ty = mkFunTys [expr_ty, n_ty] n_ty
-	    g_ty = mkForAllTy alphaTyVar (
-			(expr_ty `mkFunTy` alpha_to_alpha)
-			`mkFunTy` 
-			alpha_to_alpha
-		   )
-	in
-	newSysLocalsDs [c_ty,n_ty,g_ty]  `thenDs` \ [c, n, g] ->
-
-	dfListComp expr expr_ty
-			c_ty c
-			n_ty n
-			quals	    `thenDs` \ result ->
-
-	returnDs (mkBuild expr_ty n_tyvar c n g result)
+    returnDs (mkBuild elt_ty n_tyvar c n g result)
   where
-    nIL_EXPR ty = mkCon nilDataCon [] [ty] []
-
-    new_alpha_tyvar :: DsM (TyVar, Type)
-    new_alpha_tyvar
-      = newTyVarsDs [alphaTyVar]    `thenDs` \ [new_ty] ->
-	returnDs (new_ty, mkTyVarTy new_ty)
+    nil_expr    = mkCon nilDataCon [] [elt_ty] []
 \end{code}
 
 %************************************************************************
@@ -119,23 +113,24 @@ is the TE translation scheme.  Note that we carry around the @L@ list
 already desugared.  @dsListComp@ does the top TE rule mentioned above.
 
 \begin{code}
-deListComp :: CoreExpr -> [TypecheckedQual] -> CoreExpr -> DsM CoreExpr
+deListComp :: [TypecheckedStmt] -> CoreExpr -> DsM CoreExpr
 
-deListComp expr [] list		-- Figure 7.4, SLPJ, p 135, rule C above
-  = mkConDs consDataCon [TyArg (coreExprType expr), VarArg expr, VarArg list]
+deListComp [ReturnStmt expr] list		-- Figure 7.4, SLPJ, p 135, rule C above
+  = dsExpr expr			`thenDs` \ core_expr ->
+    mkConDs consDataCon [TyArg (coreExprType core_expr), VarArg core_expr, VarArg list]
 
-deListComp expr (FilterQual filt : quals) list	-- rule B above
-  = dsExpr filt                `thenDs` \ core_filt ->
-    deListComp expr quals list `thenDs` \ core_rest ->
-    returnDs ( mkCoreIfThenElse core_filt core_rest list )
+deListComp (GuardStmt guard locn : quals) list	-- rule B above
+  = dsExpr guard       		`thenDs` \ core_guard ->
+    deListComp quals list	`thenDs` \ core_rest ->
+    returnDs (mkCoreIfThenElse core_guard core_rest list)
 
 -- [e | let B, qs] = let B in [e | qs]
-deListComp expr (LetQual binds : quals) list
-  = dsBinds False binds		`thenDs` \ core_binds ->
-    deListComp expr quals list	`thenDs` \ core_rest ->
+deListComp (LetStmt binds : quals) list
+  = dsBinds binds		`thenDs` \ core_binds ->
+    deListComp quals list	`thenDs` \ core_rest ->
     returnDs (mkCoLetsAny core_binds core_rest)
 
-deListComp expr ((GeneratorQual pat list1):quals) core_list2 -- rule A' above
+deListComp (BindStmt pat list1 locn : quals) core_list2 -- rule A' above
   = dsExpr list1		    `thenDs` \ core_list1 ->
     let
 	u3_ty@u1_ty = coreExprType core_list1	-- two names, same thing
@@ -146,27 +141,14 @@ deListComp expr ((GeneratorQual pat list1):quals) core_list2 -- rule A' above
 	res_ty = coreExprType core_list2
 	h_ty   = u1_ty `mkFunTy` res_ty
     in
-    newSysLocalsDs [h_ty, u1_ty, u2_ty, u3_ty]
-				    `thenDs` \ [h', u1, u2, u3] ->
-    {-
-       Make the function h unfoldable by the deforester.
-       Since it only occurs once in the body, we can't get
-       an increase in code size by unfolding it.
-    -}
-    let
-	h = if False -- LATER: sw_chkr DoDeforest???
-	    then panic "deListComp:deforest"
-		 -- replaceIdInfo h' (addInfo (getIdInfo h') DoDeforest)
-	    else h'
-    in
+    newSysLocalsDs [h_ty, u1_ty, u2_ty, u3_ty]	`thenDs` \ [h, u1, u2, u3] ->
+
     -- the "fail" value ...
-    mkAppDs (Var h) [VarArg (Var u3)]  `thenDs` \ core_fail ->
-
-    deListComp expr quals core_fail `thenDs` \ rest_expr ->
-
-    matchSimply (Var u2) pat res_ty rest_expr core_fail `thenDs` \ core_match ->
-
-    mkAppDs (Var h) [VarArg core_list1]  `thenDs` \ letrec_body ->
+    mkAppDs (Var h) [VarArg (Var u3)]		`thenDs` \ core_fail ->
+    deListComp quals core_fail			`thenDs` \ rest_expr ->
+    matchSimply (Var u2) pat res_ty 
+		rest_expr core_fail		`thenDs` \ core_match ->
+    mkAppDs (Var h) [VarArg core_list1]		`thenDs` \ letrec_body ->
 
     returnDs (
       mkCoLetrecAny [
@@ -174,8 +156,8 @@ deListComp expr ((GeneratorQual pat list1):quals) core_list2 -- rule A' above
 	(Lam (ValBinder u1)
 	 (Case (Var u1)
 	    (AlgAlts
-	      [(nilDataCon,  [], core_list2),
-	       (consDataCon, [u2, u3], core_match)]
+	      [(nilDataCon,  [], 	core_list2),
+	       (consDataCon, [u2, u3],  core_match)]
 	    NoDefault)))
       )] letrec_body
     )
@@ -196,29 +178,27 @@ TE << [ e | p <- l , q ] c n =  foldr
 			   _          b  -> b)	n l
 \end{verbatim}
 \begin{code}
-dfListComp :: CoreExpr 		-- the inside of the comp
-	   -> Type			-- the type of the inside
-	   -> Type -> Id		-- 'c'; its type and id
+dfListComp :: Type -> Id		-- 'c'; its type and id
 	   -> Type -> Id		-- 'n'; its type and id
-	   -> [TypecheckedQual] 	-- the rest of the qual's
+	   -> [TypecheckedStmt] 	-- the rest of the qual's
 	   -> DsM CoreExpr
 
-dfListComp expr expr_ty c_ty c_id n_ty n_id []
-  = mkAppDs (Var c_id) [VarArg expr, VarArg (Var n_id)]
+dfListComp c_ty c_id n_ty n_id [ReturnStmt expr]
+  = dsExpr expr			`thenDs` \ core_expr ->
+    mkAppDs (Var c_id) [VarArg core_expr, VarArg (Var n_id)]
 
-dfListComp expr expr_ty c_ty c_id n_ty n_id (FilterQual filt : quals)
-  = dsExpr filt                			`thenDs` \ core_filt ->
-    dfListComp expr expr_ty c_ty c_id n_ty n_id quals
-						`thenDs` \ core_rest ->
-    returnDs (mkCoreIfThenElse core_filt core_rest (Var n_id))
+dfListComp c_ty c_id n_ty n_id (GuardStmt guard locn  : quals)
+  = dsExpr guard               			`thenDs` \ core_guard ->
+    dfListComp c_ty c_id n_ty n_id quals	`thenDs` \ core_rest ->
+    returnDs (mkCoreIfThenElse core_guard core_rest (Var n_id))
 
-dfListComp expr expr_ty c_ty c_id n_ty n_id (LetQual binds : quals)
+dfListComp c_ty c_id n_ty n_id (LetStmt binds : quals)
   -- new in 1.3, local bindings
-  = dsBinds False binds                               `thenDs` \ core_binds ->
-    dfListComp expr expr_ty c_ty c_id n_ty n_id quals `thenDs` \ core_rest ->
-    returnDs ( mkCoLetsAny core_binds core_rest )
+  = dsBinds binds                         `thenDs` \ core_binds ->
+    dfListComp c_ty c_id n_ty n_id quals  `thenDs` \ core_rest ->
+    returnDs (mkCoLetsAny core_binds core_rest)
 
-dfListComp expr expr_ty c_ty c_id n_ty n_id (GeneratorQual pat list1 : quals)
+dfListComp c_ty c_id n_ty n_id (BindStmt pat list1 locn : quals)
     -- evaluate the two lists
   = dsExpr list1				`thenDs` \ core_list1 ->
 
@@ -236,7 +216,7 @@ dfListComp expr expr_ty c_ty c_id n_ty n_id (GeneratorQual pat list1 : quals)
 
     -- build rest of the comprehesion
 
-    dfListComp expr expr_ty c_ty c_id b_ty b quals	`thenDs` \ core_rest ->
+    dfListComp c_ty c_id b_ty b quals			`thenDs` \ core_rest ->
     -- build the pattern match
 
     matchSimply (Var p) pat b_ty core_rest (Var b)	`thenDs` \ core_expr ->

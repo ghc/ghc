@@ -21,7 +21,11 @@ import Id		( mkIdEnv, lookupIdEnv, SYN_IE(IdEnv),
 			)
 import Maybes		( catMaybes )
 import OccurAnal	( occurAnalyseBinds )
-import Pretty		( ppAboves, ppBesides, ppInt, ppChar, ppStr )
+import Pretty		( ppAboves, ppBesides, ppInt, ppChar, ppStr, ppPStr,
+                          ppNil
+                        )
+import PprStyle         ( PprStyle(..) )   -- added SOF
+import PprCore          ( pprCoreBinding ) -- added SOF
 import SimplEnv
 import SimplMonad
 import Simplify		( simplTopBinds )
@@ -41,13 +45,11 @@ simplifyPgm :: [CoreBinding]	-- input
 		 SimplCount)	-- accumulated simpl stats
 
 simplifyPgm binds s_sw_chkr simpl_stats us
-  = case (splitUniqSupply us)		     of { (s1, s2) ->
-    case (initSmpl s1 (simpl_pgm 0 1 binds)) of { ((pgm2, it_count, simpl_stats2), _) ->
-    (pgm2, it_count, combineSimplCounts simpl_stats simpl_stats2) }}
+  = --case (splitUniqSupply us)		     of { (s1, s2) ->
+    case (initSmpl us (simpl_pgm 0 1 binds)) of { ((pgm2, it_count, simpl_stats2), _) ->
+    (pgm2, it_count, combineSimplCounts simpl_stats simpl_stats2) }
   where
     simpl_switch_is_on  = switchIsOn s_sw_chkr
-
-    occur_anal = occurAnalyseBinds
 
     max_simpl_iterations = getSimplIntSwitch s_sw_chkr MaxSimplifierIterations
 
@@ -57,7 +59,7 @@ simplifyPgm binds s_sw_chkr simpl_stats us
       =	-- find out what top-level binders are used,
 	-- and prepare to unfold all the "simple" bindings
 	let
-	    tagged_pgm = occur_anal pgm simpl_switch_is_on
+	    tagged_pgm = _scc_ "OccAnal" occurAnalyseBinds pgm simpl_switch_is_on
 	in
 	      -- do the business
 	simplTopBinds (nullSimplEnv s_sw_chkr) tagged_pgm `thenSmpl` \ new_pgm ->
@@ -69,7 +71,7 @@ simplifyPgm binds s_sw_chkr simpl_stats us
 	detailedSimplCount			`thenSmpl` \ dr ->
 	let
 	    show_status = pprTrace "Simplifer run: " (ppAboves [
-		ppBesides [ppStr "iteration ", ppInt iterations, ppStr " out of ", ppInt max_simpl_iterations],
+		ppBesides [ppPStr SLIT("iteration "), ppInt iterations, ppPStr SLIT(" out of "), ppInt max_simpl_iterations],
 		ppStr (showSimplCount dr),
 		if opt_D_dump_simpl_iterations then
 			ppAboves (map (pprCoreBinding PprDebug) new_pgm)
@@ -89,7 +91,7 @@ simplifyPgm binds s_sw_chkr simpl_stats us
 				trace
 				("NOTE: Simplifier still going after " ++ 
 				  show max_simpl_iterations ++ 
-				  " iterations; baling out.")
+				  " iterations; bailing out.")
 			     else id)
 			    True
 			 else

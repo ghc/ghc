@@ -10,15 +10,15 @@ module TcExpr ( tcExpr, tcId ) where
 
 IMP_Ubiq()
 
-import HsSyn		( HsExpr(..), Qualifier(..), Stmt(..),
+import HsSyn		( HsExpr(..), Stmt(..), DoOrListComp(..), 
 			  HsBinds(..), Bind(..), MonoBinds(..), 
 			  ArithSeqInfo(..), HsLit(..), Sig, GRHSsAndBinds,
 			  Match, Fake, InPat, OutPat, HsType, Fixity,
 			  pprParendExpr, failureFreePat, collectPatBinders )
-import RnHsSyn		( SYN_IE(RenamedHsExpr), SYN_IE(RenamedQual),
+import RnHsSyn		( SYN_IE(RenamedHsExpr), 
 			  SYN_IE(RenamedStmt), SYN_IE(RenamedRecordBinds)
 			)
-import TcHsSyn		( SYN_IE(TcExpr), SYN_IE(TcQual), SYN_IE(TcStmt),
+import TcHsSyn		( SYN_IE(TcExpr), SYN_IE(TcStmt),
 			  TcIdOcc(..), SYN_IE(TcRecordBinds),
 			  mkHsTyApp
 			)
@@ -27,7 +27,7 @@ import TcMonad
 import Inst		( Inst, InstOrigin(..), OverloadedLit(..),
 			  SYN_IE(LIE), emptyLIE, plusLIE, plusLIEs, newOverloadedLit,
 			  newMethod, newMethodWithGivenTy, newDicts )
-import TcBinds		( tcBindsAndThen )
+import TcBinds		( tcBindsAndThen, checkSigTyVars )
 import TcEnv		( tcLookupLocalValue, tcLookupGlobalValue, tcLookupClassByKey,
 			  tcLookupGlobalValueByKey, newMonoIds, tcGetGlobalTyVars,
 			  tcExtendGlobalTyVars
@@ -47,7 +47,6 @@ import Class		( SYN_IE(Class), classSig )
 import FieldLabel	( fieldLabelName )
 import Id		( idType, dataConFieldLabels, dataConSig, SYN_IE(Id), GenId )
 import Kind		( Kind, mkBoxedTypeKind, mkTypeKind, mkArrowKind )
-import GenSpecEtc	( checkSigTyVars )
 import Name		( Name{-instance Eq-} )
 import Type		( mkFunTy, mkAppTy, mkTyVarTy, mkTyVarTys, mkRhoTy,
 			  getTyVar_maybe, getFunTy_maybe, instantiateTy,
@@ -67,7 +66,7 @@ import Unify		( unifyTauTy, unifyTauTyList, unifyTauTyLists, unifyFunTy )
 import Unique		( Unique, cCallableClassKey, cReturnableClassKey, 
 			  enumFromClassOpKey, enumFromThenClassOpKey,
 			  enumFromToClassOpKey, enumFromThenToClassOpKey,
-			  thenMClassOpKey, zeroClassOpKey
+			  thenMClassOpKey, zeroClassOpKey, returnMClassOpKey
 			)
 import Outputable	( interpp'SP )
 import PprType		( GenType, GenTyVar )	-- Instances
@@ -314,15 +313,11 @@ tcExpr (HsIf pred b1 b2 src_loc)
     unifyTauTy result_ty b2Ty				`thenTc_`
 
     returnTc (HsIf pred' b1' b2' src_loc, plusLIE lie1 (plusLIE lie2 lie3), result_ty)
-
-tcExpr (ListComp expr quals) 
-  = tcListComp expr quals	`thenTc` \ ((expr',quals'), lie, ty) ->
-    returnTc (ListComp expr' quals', lie, ty)
 \end{code}
 
 \begin{code}
-tcExpr expr@(HsDo stmts src_loc)
-  = tcDoStmts stmts src_loc
+tcExpr expr@(HsDo do_or_lc stmts src_loc)
+  = tcDoStmts do_or_lc stmts src_loc
 \end{code}
 
 \begin{code}
@@ -671,72 +666,12 @@ tcId name
 
 %************************************************************************
 %*									*
-\subsection{@tcQuals@ typechecks list-comprehension qualifiers}
-%*									*
-%************************************************************************
-
-\begin{code}
-tcListComp expr []
-  = tcExpr expr		`thenTc` \ (expr', lie, ty) ->
-    returnTc ((expr',[]), lie, mkListTy ty)
-
-tcListComp expr (qual@(FilterQual filter) : quals)
-  = tcAddErrCtxt (qualCtxt qual) (
-	tcExpr filter			`thenTc` \ (filter', filter_lie, filter_ty) ->
-	unifyTauTy boolTy filter_ty	`thenTc_`
-	returnTc (FilterQual filter', filter_lie)
-    )					`thenTc` \ (qual', qual_lie) ->
-
-    tcListComp expr quals	`thenTc` \ ((expr',quals'), rest_lie, res_ty) ->
-
-    returnTc ((expr', qual' : quals'), 
-	      qual_lie `plusLIE` rest_lie,
-	      res_ty)
-
-tcListComp expr (qual@(GeneratorQual pat rhs) : quals)
-  = newMonoIds binder_names mkBoxedTypeKind (\ ids ->
-
-      tcAddErrCtxt (qualCtxt qual) (
-        tcPat pat				`thenTc` \ (pat',  lie_pat,  pat_ty)  ->
-        tcExpr rhs				`thenTc` \ (rhs', lie_rhs, rhs_ty) ->
-		-- NB: the environment has been extended with the new binders
-		-- which the rhs can't "see", but the renamer should have made
-		-- sure that everything is distinct by now, so there's no problem.
-		-- Putting the tcExpr before the newMonoIds messes up the nesting
-		-- of error contexts, so I didn't  bother
-
-        unifyTauTy (mkListTy pat_ty) rhs_ty	`thenTc_`
-	returnTc (GeneratorQual pat' rhs', 
-		  lie_pat `plusLIE` lie_rhs) 
-      )						`thenTc` \ (qual', lie_qual) ->
-
-      tcListComp expr quals 			`thenTc` \ ((expr',quals'), lie_rest, res_ty) ->
-
-      returnTc ((expr', qual' : quals'), 
-		lie_qual `plusLIE` lie_rest,
-	        res_ty)
-    )
-  where
-    binder_names = collectPatBinders pat
-
-tcListComp expr (LetQual binds : quals)
-  = tcBindsAndThen		-- No error context, but a binding group is
-	combine			-- rather a large thing for an error context anyway
-	binds
-	(tcListComp expr quals)
-  where
-    combine binds' (expr',quals') = (expr', LetQual binds' : quals')
-\end{code}
-
-
-%************************************************************************
-%*									*
 \subsection{@tcDoStmts@ typechecks a {\em list} of do statements}
 %*									*
 %************************************************************************
 
 \begin{code}
-tcDoStmts stmts src_loc
+tcDoStmts do_or_lc stmts src_loc
   =	-- get the Monad and MonadZero classes
 	-- create type consisting of a fresh monad tyvar
     tcAddSrcLoc src_loc	$
@@ -744,55 +679,80 @@ tcDoStmts stmts src_loc
 
 
 	-- Build the then and zero methods in case we need them
+    tcLookupGlobalValueByKey returnMClassOpKey	`thenNF_Tc` \ return_sel_id ->
     tcLookupGlobalValueByKey thenMClassOpKey	`thenNF_Tc` \ then_sel_id ->
     tcLookupGlobalValueByKey zeroClassOpKey	`thenNF_Tc` \ zero_sel_id ->
     newMethod DoOrigin
-	      (RealId then_sel_id) [m]		`thenNF_Tc` \ (m_lie, then_id) ->
+	      (RealId return_sel_id) [m]	`thenNF_Tc` \ (return_lie, return_id) ->
     newMethod DoOrigin
-	      (RealId zero_sel_id) [m]		`thenNF_Tc` \ (mz_lie, zero_id) ->
+	      (RealId then_sel_id) [m]		`thenNF_Tc` \ (then_lie, then_id) ->
+    newMethod DoOrigin
+	      (RealId zero_sel_id) [m]		`thenNF_Tc` \ (zero_lie, zero_id) ->
 
     let
-      get_m_arg ty 
-	= newTyVarTy mkTypeKind			`thenNF_Tc` \ arg_ty ->
-	  unifyTauTy (mkAppTy m arg_ty) ty	`thenTc_`
-	  returnTc arg_ty
+      -- go :: [RenamedStmt] -> TcM s ([TcStmt s], LIE s, TcType s)
 
-      go [stmt@(ExprStmt exp src_loc)]
-	= tcAddSrcLoc src_loc $
-	  tcSetErrCtxt (stmtCtxt stmt) $
+      go [stmt@(ReturnStmt exp)]	-- Must be last statement
+	= ASSERT( case do_or_lc of { DoStmt -> False; ListComp -> True } )
+	  tcSetErrCtxt (stmtCtxt do_or_lc stmt) $
 	  tcExpr exp			 	`thenTc`    \ (exp', exp_lie, exp_ty) ->
-	  returnTc ([ExprStmt exp' src_loc], exp_lie, exp_ty)
+	  returnTc ([ReturnStmt exp'], return_lie `plusLIE` exp_lie, mkAppTy m exp_ty)
 
+      go (stmt@(GuardStmt exp src_loc) : stmts)
+	= ASSERT( case do_or_lc of { DoStmt -> False; ListComp -> True } )
+	  tcAddSrcLoc src_loc 		(
+	  tcSetErrCtxt (stmtCtxt do_or_lc stmt) (
+		tcExpr exp	 		`thenTc`    \ (exp', exp_lie, exp_ty) ->
+		unifyTauTy boolTy exp_ty	`thenTc_`
+		returnTc (GuardStmt exp' src_loc, exp_lie)
+	  ))					`thenTc` \ (stmt', stmt_lie) ->
+	  go stmts			`thenTc` \ (stmts', stmts_lie, stmts_ty) ->
+	  returnTc (stmt' : stmts',
+		    stmt_lie `plusLIE` stmts_lie `plusLIE` zero_lie,
+		    stmts_ty)
+	 
       go (stmt@(ExprStmt exp src_loc) : stmts)
-	= tcAddSrcLoc src_loc 		(
-	  tcSetErrCtxt (stmtCtxt stmt)	(
+	= ASSERT( case do_or_lc of { DoStmt -> True; ListComp -> False } )
+	  tcAddSrcLoc src_loc 		(
+	  tcSetErrCtxt (stmtCtxt do_or_lc stmt)	(
 		tcExpr exp			`thenTc`    \ (exp', exp_lie, exp_ty) ->
-		get_m_arg exp_ty 		`thenTc` \ a ->
-		returnTc (a, exp', exp_lie)
-	  ))					`thenTc` \ (a, exp',  exp_lie) -> 
+		-- Check that exp has type (m tau) for some tau (doesn't matter what)
+		newTyVarTy mkTypeKind			`thenNF_Tc` \ tau ->
+	        unifyTauTy (mkAppTy m tau) exp_ty	`thenTc_`
+		returnTc (ExprStmt exp' src_loc, exp_lie, exp_ty, exp_ty)
+	  ))					`thenTc` \ (stmt',  stmt_lie, stmt_ty, result_ty) -> 
+	  if null stmts then
+		-- This is the last statement
+		returnTc ([stmt'], stmt_lie, result_ty)
+	  else
+		-- More statments follow
 	  go stmts				`thenTc` \ (stmts', stmts_lie, stmts_ty) ->
-	  get_m_arg stmts_ty			`thenTc` \ b ->
-	  returnTc (ExprStmtOut exp' src_loc a b : stmts',
-		    exp_lie `plusLIE` stmts_lie `plusLIE` m_lie,
+	  returnTc (stmt' : stmts',
+		    stmt_lie `plusLIE` stmts_lie `plusLIE` then_lie,
 		    stmts_ty)
 
       go (stmt@(BindStmt pat exp src_loc) : stmts)
 	= newMonoIds (collectPatBinders pat) mkBoxedTypeKind $ \ _ ->
 	  tcAddSrcLoc src_loc		(
-	  tcSetErrCtxt (stmtCtxt stmt)	(
+	  tcSetErrCtxt (stmtCtxt do_or_lc stmt)	(
 		tcPat pat		`thenTc`    \ (pat', pat_lie, pat_ty) ->  
 	    	tcExpr exp		`thenTc`    \ (exp', exp_lie, exp_ty) ->
-		-- See comments with tcListComp on GeneratorQual
+		unifyTauTy (mkAppTy m pat_ty) exp_ty	`thenTc_`
 
-		get_m_arg exp_ty	`thenTc` \ a ->
-		unifyTauTy pat_ty a	`thenTc_`
-		returnTc (a, pat', exp', pat_lie `plusLIE` exp_lie)
-	  ))				`thenTc` \ (a, pat', exp', stmt_lie) ->
+		-- NB: the environment has been extended with the new binders
+		-- which the rhs can't "see", but the renamer should have made
+		-- sure that everything is distinct by now, so there's no problem.
+		-- Putting the tcExpr before the newMonoIds messes up the nesting
+		-- of error contexts, so I didn't  bother
+
+		returnTc (BindStmt pat' exp' src_loc, pat', pat_lie `plusLIE` exp_lie)
+	  ))				`thenTc` \ (stmt', pat', stmt_lie) ->
+
 	  go stmts			`thenTc` \ (stmts', stmts_lie, stmts_ty) ->
-	  get_m_arg stmts_ty		`thenTc` \ b ->
-	  returnTc (BindStmtOut pat' exp' src_loc a b : stmts',
-		    stmt_lie `plusLIE` stmts_lie `plusLIE` m_lie `plusLIE` 
-			(if failureFreePat pat' then emptyLIE else mz_lie),
+
+	  returnTc (stmt' : stmts',
+		    stmt_lie `plusLIE` stmts_lie `plusLIE` then_lie `plusLIE` 
+			(if failureFreePat pat' then emptyLIE else zero_lie),
 		    stmts_ty)
 
       go (LetStmt binds : stmts)
@@ -804,11 +764,17 @@ tcDoStmts stmts src_loc
 	     combine binds' stmts' = LetStmt binds' : stmts'
     in
 
-    go stmts		`thenTc` \ (stmts', final_lie, final_ty) ->
-    returnTc (HsDoOut stmts' then_id zero_id src_loc,
+    go stmts		`thenTc` \ (stmts', final_lie, result_ty) ->
+    returnTc (HsDoOut do_or_lc stmts' return_id then_id zero_id result_ty src_loc,
 	      final_lie,
-	      final_ty)
+	      result_ty)
 \end{code}
+
+%************************************************************************
+%*									*
+\subsection{Record bindings}
+%*									*
+%************************************************************************
 
 Game plan for record bindings
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -901,70 +867,70 @@ pp_nest_hang label stuff = ppNest 2 (ppHang (ppStr label) 4 stuff)
 Boring and alphabetical:
 \begin{code}
 arithSeqCtxt expr sty
-  = ppHang (ppStr "In an arithmetic sequence:") 4 (ppr sty expr)
+  = ppHang (ppPStr SLIT("In an arithmetic sequence:")) 4 (ppr sty expr)
 
 branchCtxt b1 b2 sty
-  = ppSep [ppStr "In the branches of a conditional:",
+  = ppSep [ppPStr SLIT("In the branches of a conditional:"),
 	   pp_nest_hang "`then' branch:" (ppr sty b1),
 	   pp_nest_hang "`else' branch:" (ppr sty b2)]
 
 caseCtxt expr sty
-  = ppHang (ppStr "In a case expression:") 4 (ppr sty expr)
+  = ppHang (ppPStr SLIT("In a case expression:")) 4 (ppr sty expr)
 
 exprSigCtxt expr sty
-  = ppHang (ppStr "In an expression with a type signature:")
+  = ppHang (ppPStr SLIT("In an expression with a type signature:"))
 	 4 (ppr sty expr)
 
 listCtxt expr sty
-  = ppHang (ppStr "In a list expression:") 4 (ppr sty expr)
+  = ppHang (ppPStr SLIT("In a list expression:")) 4 (ppr sty expr)
 
 predCtxt expr sty
-  = ppHang (ppStr "In a predicate expression:") 4 (ppr sty expr)
+  = ppHang (ppPStr SLIT("In a predicate expression:")) 4 (ppr sty expr)
 
 sectionRAppCtxt expr sty
-  = ppHang (ppStr "In a right section:") 4 (ppr sty expr)
+  = ppHang (ppPStr SLIT("In a right section:")) 4 (ppr sty expr)
 
 sectionLAppCtxt expr sty
-  = ppHang (ppStr "In a left section:") 4 (ppr sty expr)
+  = ppHang (ppPStr SLIT("In a left section:")) 4 (ppr sty expr)
 
 funAppCtxt fun arg_no arg sty
-  = ppHang (ppCat [ ppStr "In the", speakNth arg_no, ppStr "argument of", 
+  = ppHang (ppCat [ ppPStr SLIT("In the"), speakNth arg_no, ppPStr SLIT("argument of"), 
 		    ppr sty fun `ppBeside` ppStr ", namely"])
 	 4 (pprParendExpr sty arg)
 
-qualCtxt qual sty
-  = ppHang (ppStr "In a list-comprehension qualifer:") 
-         4 (ppr sty qual)
+stmtCtxt ListComp stmt sty
+  = ppHang (ppPStr SLIT("In a list-comprehension qualifer:")) 
+         4 (ppr sty stmt)
 
-stmtCtxt stmt sty
-  = ppHang (ppStr "In a do statement:") 
+stmtCtxt DoStmt stmt sty
+  = ppHang (ppPStr SLIT("In a do statement:")) 
          4 (ppr sty stmt)
 
 tooManyArgsCtxt f sty
-  = ppHang (ppStr "Too many arguments in an application of the function")
+  = ppHang (ppPStr SLIT("Too many arguments in an application of the function"))
 	 4 (ppr sty f)
 
 lurkingRank2Err fun fun_ty sty
-  = ppHang (ppCat [ppStr "Illegal use of", ppr sty fun])
+  = ppHang (ppCat [ppPStr SLIT("Illegal use of"), ppr sty fun])
 	 4 (ppAboves [ppStr "It is applied to too few arguments,", 
-		      ppStr "so that the result type has for-alls in it"])
+		      ppPStr SLIT("so that the result type has for-alls in it")])
 
 rank2ArgCtxt arg expected_arg_ty sty
-  = ppHang (ppStr "In a polymorphic function argument:")
-	 4 (ppSep [ppBeside (ppr sty arg) (ppStr " ::"),
+  = ppHang (ppPStr SLIT("In a polymorphic function argument:"))
+	 4 (ppSep [ppBeside (ppr sty arg) (ppPStr SLIT(" ::")),
 		   ppr sty expected_arg_ty])
 
 badFieldsUpd rbinds sty
-  = ppHang (ppStr "No constructor has all these fields:")
+  = ppHang (ppPStr SLIT("No constructor has all these fields:"))
 	 4 (interpp'SP sty fields)
   where
     fields = [field | (field, _, _) <- rbinds]
 
-recordUpdCtxt sty = ppStr "In a record update construct"
+recordUpdCtxt sty = ppPStr SLIT("In a record update construct")
 
 badFieldsCon con rbinds sty
-  = ppHang (ppBesides [ppStr "Inconsistent constructor:", ppr sty con])
-	 4 (ppBesides [ppStr "and fields:", interpp'SP sty fields])
+  = ppHang (ppBesides [ppPStr SLIT("Inconsistent constructor:"), ppr sty con])
+	 4 (ppBesides [ppPStr SLIT("and fields:"), interpp'SP sty fields])
   where
     fields = [field | (field, _, _) <- rbinds]
 \end{code}
