@@ -20,19 +20,21 @@ module HsPat (
 IMP_Ubiq()
 
 -- friends:
-import HsBasic			( HsLit, Fixity )
-IMPORT_DELOOPER(IdLoop)
-IMPORT_DELOOPER(HsLoop)		( HsExpr )
-
+-- IMPORT_DELOOPER(IdLoop)
+import HsBasic		( HsLit )
+import HsExpr		( HsExpr )
+import BasicTypes	( Fixity )
 
 -- others:
-import Id		--( dataConTyCon, GenId )
+import Id		( SYN_IE(Id), dataConTyCon, GenId )
 import Maybes		( maybeToBool )
-import Outputable	--( interppSP, interpp'SP, ifPprShowAll )
-import PprStyle		( PprStyle(..), userStyle )
+import Outputable	( PprStyle(..), userStyle, interppSP, 
+			  interpp'SP, ifPprShowAll, Outputable(..) 
+			)
 import Pretty
 import TyCon		( maybeTyConSingleCon )
 import PprType		( GenType )
+import CmdLineOpts      ( opt_PprUserLength )
 #if __GLASGOW_HASKELL__ >= 202
 import Name
 #endif
@@ -173,7 +175,7 @@ pprInPat sty (NPlusKPatIn n k)
 pprInPat sty (RecPatIn con rpats)
   = hsep [ppr sty con, braces (hsep (punctuate comma (map (pp_rpat sty) rpats)))]
   where
-    pp_rpat sty (v, _, True) | userStyle sty = ppr PprForUser v
+    pp_rpat sty (v, _, True) | userStyle sty = ppr (PprForUser opt_PprUserLength) v
     pp_rpat sty (v, p, _)    		     = hsep [ppr sty v, char '=', ppr sty p]
 \end{code}
 
@@ -209,7 +211,7 @@ pprOutPat sty (TuplePat pats)
 pprOutPat sty (RecPat con ty rpats)
   = hcat [ppr sty con, braces (hsep (punctuate comma (map (pp_rpat sty) rpats)))]
   where
-    pp_rpat sty (v, _, True) | userStyle sty = ppr PprForUser v
+    pp_rpat sty (v, _, True) | userStyle sty = ppr (PprForUser opt_PprUserLength) v
     pp_rpat sty (v, p, _)           	     = hsep [ppr sty v, char '=', ppr sty p]
 
 pprOutPat sty (LitPat l ty) 	= ppr sty l	-- ToDo: print more
