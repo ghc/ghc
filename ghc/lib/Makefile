@@ -1,25 +1,9 @@
-#################################################################################
-#
-#			    ghc/lib/Makefile
-#
-#		Makefile for building the GHC Prelude libraries umpteen ways
-#
-#	
-#################################################################################
+# -----------------------------------------------------------------------------
+# $Id: Makefile,v 1.33 1999/11/26 16:29:12 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
 
-# posix must be before misc.
-
-ifeq "$(GhcWithHscBuiltViaC)" "YES"
-SUBDIRS = std exts
-else
-ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-SUBDIRS = std exts concurrent posix misc
-else
-SUBDIRS = std exts concurrent misc
-endif
-endif
+SUBDIRS = std
 
 include $(TOP)/mk/target.mk

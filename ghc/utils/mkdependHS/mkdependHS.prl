@@ -233,7 +233,7 @@ sub mangle_command_line_args {
 	} elsif ( /^-syslib$/ ) {
 	    push(@Syslibs, &grab_arg_arg(*Args,$_,''));
 	} elsif ( /^-fglasgow-exts$/ ) {
-	    push(@Syslibs, 'exts');
+	    push(@Syslibs, 'lang');
 	} elsif ( /^-concurrent$/ ) {
 	    push(@Syslibs, 'concurrent');
 	} elsif (/^-#include(.*)/) {
@@ -322,13 +322,24 @@ sub gather_import_dirs {
 	   local($dir);
 
            # Yuck ^ 2
+           if ( $lib eq 'text' && ! $INSTALLING ) {
+              push(@Import_dirs, "${TopPwd}/hslibs/${lib}/html");
+	   }
+           if ( $lib eq 'data' && ! $INSTALLING ) {
+              push(@Import_dirs, "${TopPwd}/hslibs/${lib}/edison");
+              push(@Import_dirs, "${TopPwd}/hslibs/${lib}/edison/Assoc");
+              push(@Import_dirs, "${TopPwd}/hslibs/${lib}/edison/Coll");
+              push(@Import_dirs, "${TopPwd}/hslibs/${lib}/edison/Seq");
+	   }
+
+           # Yuck ^ 3
            if ( $lib eq 'win32' && ! $INSTALLING ) {
               $dir = "${TopPwd}/hslibs/${lib}/src";
            } elsif ( $lib eq 'com' && ! $INSTALLING ) {
-              $dir = "${TopPwd}/hdirect/lib";
+              $dir = "${TopPwd}/hslibs/lib";
            } else {
               $dir = ($INSTALLING) ? "${InstLibDirGhc}/imports/${lib}" 
-	                           : "${TopPwd}/ghc/lib/${lib}";
+	                           : "${TopPwd}/hslibs/${lib}";
            }
     	   if (!$Include_prelude) {
               push(@Ignore_dirs,$dir);

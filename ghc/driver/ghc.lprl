@@ -875,7 +875,6 @@ Sort out @$BuildTag@, @$PROFing@, @$PARing@,
 \begin{code}
 sub setupBuildFlags {
 
-
    # PROFILING stuff after argv mangling:
    if ( ! $PROFing ) {
      # add -auto sccs even if not profiling !
@@ -2262,11 +2261,22 @@ sub run_something {
 	close(CCOUT) || &tidy_up_and_die(1,"$Pgm: failed closing `$Tmp_prefix.ccout'\n");
     }
 
+    local($signal_num)  = $? & 127;
+    local($dumped_core) = $? & 128;
+
     if ($return_val != 0) {
         if ($Using_dump_file) {
 	    print STDERR "Compilation Errors dumped in $Specific_dump_file\n";
 	}
 	&tidy_up_and_die($return_val, '');
+    }
+
+    if ($signal_num != 0) {
+	print STDERR "Phase $tidy_name received signal $signal_num";
+	if ($dumped_core != 0) {
+	 	print STDERR " (core dumped)";
+	}
+	print STDERR "\n";
     }
     $Using_dump_file = 0;
 }
@@ -2484,97 +2494,38 @@ sub add_syslib {
 
     # Lifting this out of this sub brings it out of scope - why??
     %Supported_syslibs =
-     ( exts,
+     ( lang,
 	[  # where to slurp interface files from
 	  ( $INSTALLING 
-	       ? "$InstLibDirGhc/imports/exts"
-	       : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/exts"
+	       ? "$InstLibDirGhc/imports/lang"
+	       : "$TopPwd/hslibs/lang"
 	  )
 	, # where to find the archive to use when linking
 	  ( $INSTALLING 
 	       ? "$InstLibDirGhc"
-	       : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/exts"
+	       : "$TopPwd/hslibs/lang"
 	  )
-	, '' # no cbits
+	, # where to find the cbits archive to use when linking
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc"
+	       : "$TopPwd/hslibs/lang/cbits"
+	  )
 	, '' # Syslib dependencies
 	, '' # extra ghc opts
 	, '' # extra cc opts
 	, '' # extra ld opts
 	],
 
-       misc,
-	[  # where to slurp interface files from
-	  ( $INSTALLING 
-	       ? "$InstLibDirGhc/imports/misc"
-	       : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/misc"
-	  )
-	, # where to find the archive to use when linking
-	  ( $INSTALLING 
-	       ? "$InstLibDirGhc"
-	       : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/misc"
-	  )
-	, # where to find the cbits archive to use when linking
-	  ( $INSTALLING 
-	       ? "$InstLibDirGhc"
-	       : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/misc/cbits"
-	  )
-	, 'exts concurrent' # Syslib dependencies
-	, ''     # extra ghc opts
-	, ''     # extra cc opts
-	, ( $TargetPlatform =~ /-solaris2$/  ? '-lnsl -lsocket' : '')
-	],
-       hbc,
-	[  # where to slurp interface files from
-	  ( $INSTALLING 
-	       ? "$InstLibDirGhc/imports/hbc"
-	       : "$TopPwd/CONTRIB/libraries/hbc/src"
-	  )
-	, # where to find the archive to use when linking
-	  ( $INSTALLING 
-	       ? "$InstLibDirGhc"
-	       : "$TopPwd/CONTRIB/libraries/src/hbc"
-	  )
-	, # where to find the cbits archive to use when linking
-	  ( $INSTALLING 
-	       ? "$InstLibDirGhc"
-	       : "$TopPwd/CONTRIB/libraries/hbc/cbits"
-	  )
-	, 'exts' # Syslib dependencies
-	, ''     # extra ghc opts
-	, ''     # extra cc opts
-	, ''
-	],
-       posix,
-	[  # where to slurp interface files from
-	  ( $INSTALLING 
-	       ? "$InstLibDirGhc/imports/posix"
-	       : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/posix"
-	  )
-	, # where to find the archive to use when linking
-	  ( $INSTALLING 
-	       ? "$InstLibDirGhc"
-	       : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/posix"
-	  )
-	, # where to find the cbits archive to use when linking
-	  ( $INSTALLING 
-	       ? "$InstLibDirGhc"
-	       : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/posix/cbits"
-	  )
-	, 'misc' # Syslib dependencies
-	, ''     # extra ghc opts
-	, ''     # extra cc opts
-	, ''     # extra ld opts
-	],
        concurrent,
 	[  # where to slurp interface files from
 	  ( $INSTALLING 
 	       ? "$InstLibDirGhc/imports/concurrent"
-	       : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/concurrent"
+	       : "$TopPwd/hslibs/concurrent"
 	  )
 	, # where to find the archive to use when linking
 	  ( $INSTALLING 
 	       ? "$InstLibDirGhc"
-	       : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/concurrent"
+	       : "$TopPwd/hslibs/concurrent"
 	  )
 	, '' # where to find the cbits archive to use when linking
 	, '' # Syslib dependencies
@@ -2582,6 +2533,113 @@ sub add_syslib {
 	, '' # extra cc opts
 	, '' # extra ld opts
 	],
+
+       data,
+	[  # where to slurp interface files from
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc/imports/data"
+	       : "$TopPwd/hslibs/data:$TopPwd/hslibs/data/edison:$TopPwd/hslibs/data/edison/Assoc:$TopPwd/hslibs/data/edison/Coll:$TopPwd/hslibs/data/edison/Seq"
+	  )
+	, # where to find the archive to use when linking
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc"
+	       : "$TopPwd/hslibs/data"
+	  )
+	, '' # where to find the cbits archive to use when linking
+	, '' # Syslib dependencies
+	, '' # extra ghc opts
+	, '' # extra cc opts
+	, '' # extra ld opts
+	],
+
+       net,
+	[  # where to slurp interface files from
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc/imports/net"
+	       : "$TopPwd/hslibs/net"
+	  )
+	, # where to find the archive to use when linking
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc"
+	       : "$TopPwd/hslibs/net"
+	  )
+	, # where to find the cbits archive to use when linking
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc"
+	       : "$TopPwd/hslibs/net/cbits"
+	  )
+	, 'lang text' # Syslib dependencies
+	, '' # extra ghc opts
+	, '' # extra cc opts
+	, ( $TargetPlatform =~ /-solaris2$/  ? '-lnsl -lsocket' : '')
+	],
+
+       posix,
+	[  # where to slurp interface files from
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc/imports/posix"
+	       : "$TopPwd/hslibs/posix"
+	  )
+	, # where to find the archive to use when linking
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc"
+	       : "$TopPwd/hslibs/posix"
+	  )
+	, # where to find the cbits archive to use when linking
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc"
+	       : "$TopPwd/hslibs/posix/cbits"
+	  )
+	, 'lang' # Syslib dependencies
+	, ''     # extra ghc opts
+	, ''     # extra cc opts
+	, ''     # extra ld opts
+	],
+
+       text,
+	[  # where to slurp interface files from
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc/imports/text"
+	       : "$TopPwd/hslibs/text:$TopPwd/hslibs/text/html"
+	  )
+	, # where to find the archive to use when linking
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc"
+	       : "$TopPwd/hslibs/text"
+	  )
+	, # where to find the cbits archive to use when linking
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc"
+	       : "$TopPwd/hslibs/text/cbits"
+	  )
+	, 'lang' # Syslib dependencies
+	, '' # extra ghc opts
+	, '' # extra cc opts
+	, '' # extra ld opts
+	],
+
+       util,
+	[  # where to slurp interface files from
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc/imports/util"
+	       : "$TopPwd/hslibs/util"
+	  )
+	, # where to find the archive to use when linking
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc"
+	       : "$TopPwd/hslibs/util"
+	  )
+	, # where to find the cbits archive to use when linking
+	  ( $INSTALLING 
+	       ? "$InstLibDirGhc"
+	       : "$TopPwd/hslibs/util/cbits"
+	  )
+	, 'lang concurrent' # Syslib dependencies
+	, ''     # extra ghc opts
+	, ''     # extra cc opts
+	, ''     # extra ld opts
+	],
+
        win32,
 	[  # where to slurp interface files from
 	  ( $INSTALLING 
@@ -2594,11 +2652,12 @@ sub add_syslib {
 	       : "$TopPwd/hslibs/win32/src"
 	  )
 	, ''
-	, 'exts' # Syslib dependencies
+	, 'lang' # Syslib dependencies
 	, ''     # extra ghc opts
 	, ''     # extra cc opts
 	, '-luser32 -lgdi32'     # extra ld opts
 	],
+
        com,
 	[  # where to slurp interface files from
 	  ( $INSTALLING 
@@ -2611,7 +2670,7 @@ sub add_syslib {
 	       : "$TopPwd/hdirect/lib"
 	  )
 	, ''
-	, 'exts' # Syslib dependencies
+	, 'lang' # Syslib dependencies
 	, ''     # extra ghc opts
 	, ''     # extra cc opts
 	, '-luser32 -lole32 -loleaut32 -ladvapi32'
@@ -2630,8 +2689,8 @@ sub add_syslib {
     # This check is here to avoid syslib loops from
     # spoiling the party. A side-effect of it is that
     # it disallows multiple mentions of a syslib on a command-line,
-    # explicit *and* implicit ones (i.e., "-syslib exts -syslib misc"
-    # is not equal to "-syslib exts -syslib misc -syslib exts",
+    # explicit *and* implicit ones (i.e., "-syslib lang -syslib misc"
+    # is not equal to "-syslib lang -syslib misc -syslib lang",
     # which it needs to be)
     # 
     # Since our current collection of syslibs don't have any
@@ -2643,12 +2702,13 @@ sub add_syslib {
     	
     $Syslibs_added{$syslib} = 1;
 
-    local ($hi_dir, $lib_dir, $lib_cbits_dir,
+    local ($hi_dirs, $lib_dir, $lib_cbits_dir,
     	   $syslib_deps, $syslib_ghc_opts,
 	   $syslib_cc_opts, $syslib_ld_opts) = @{ $Supported_syslibs{$syslib} };
 
-
-    unshift(@SysImport_dir, $hi_dir);
+    foreach(split(':',$hi_dirs)) {
+	unshift(@SysImport_dir, $_);
+    }
     push(@SysLibrary_dir, $lib_dir);
     push(@SysLibrary_dir, $lib_cbits_dir) if ( $lib_cbits_dir ne '');
 
@@ -3100,8 +3160,8 @@ arg: while($_ = $Args[0]) {
     /^-fglasgow-exts$/
 		&& do { push(@HsC_flags, $_);
 
-			# -fglasgow-exts implies -syslib exts
-			&add_syslib('exts');
+			# -fglasgow-exts implies -syslib lang
+			&add_syslib('lang');
 
 			next arg; };
 
