@@ -23,12 +23,12 @@ module GHC.Pack
        (
 	-- (**) - emitted by compiler.
 
-	packCString#,      -- :: [Char] -> ByteArray#    **
+	packCString#,      -- :: [Char] -> ByteArray#    (**)
 	unpackCString,
-	unpackCString#,    -- :: Addr# -> [Char]	 **
-	unpackNBytes#,     -- :: Addr# -> Int# -> [Char] **
-	unpackFoldrCString#,  -- **
-	unpackAppendCString#,  -- **
+	unpackCString#,    -- :: Addr# -> [Char]	 (**)
+	unpackNBytes#,     -- :: Addr# -> Int# -> [Char] (**)
+	unpackFoldrCString#,  -- (**)
+	unpackAppendCString#,  -- (**)
        ) 
 	where
 
