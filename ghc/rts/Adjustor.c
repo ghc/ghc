@@ -40,6 +40,7 @@ Haskell side.
 #include "Rts.h"
 #include "RtsUtils.h"
 #include "RtsFlags.h"
+
 #include <stdlib.h>
 
 /* Heavily arch-specific, I'm afraid.. */
@@ -156,92 +157,68 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
 	adj_code[0x10] = (unsigned char)0xe0; 
     }
 #elif defined(sparc_TARGET_ARCH)
-  /* Magic constant computed by inspecting the code length of
-     the following assembly language snippet
-     (offset and machine code prefixed):
+  /* Magic constant computed by inspecting the code length of the following
+     assembly language snippet (offset and machine code prefixed):
 
-  <00>: BA 10 00 1B     mov    %i3, %i5
-  <04>: B8 10 00 1A     mov    %i2, %i4
-  <08>: B6 10 00 19     mov    %i1, %i3
-  <0c>: B4 10 00 18     mov    %i0, %i2
-  <10>: 13 00 3f fb     sethi  %hi(0x00ffeffa), %o1 # load up wptr (1 of 2)
-  <14>: 11 37 ab 6f     sethi  %hi(0xdeadbeef), %o0 # load up hptr (1 of 2)
-  <18>: 81 c2 63 fa     jmp    %o1+%lo(0x00ffeffa)  # jump to wptr (load 2 of 2)
-  <1c>: 90 12 22 ef     or     %o0, %lo(0xdeadbeef), %o0 # load up hptr (2 of 2)
-                                                         # [in delay slot]
-  <20>: de ad be ef     # Place the value of the StgStablePtr somewhere readable
+     <00>: 9C23A008   sub   %sp, 8, %sp         ! make room for %o4/%o5 in caller's frame
+     <04>: DA23A060   st    %o5, [%sp + 96]     ! shift registers by 2 positions
+     <08>: D823A05C   st    %o4, [%sp + 92]
+     <0C>: 9A10000B   mov   %o3, %o5
+     <10>: 9810000A   mov   %o2, %o4
+     <14>: 96100009   mov   %o1, %o3
+     <18>: 94100008   mov   %o0, %o2
+     <1C>: 13000000   sethi %hi(wptr), %o1      ! load up wptr (1 of 2)
+     <20>: 11000000   sethi %hi(hptr), %o0      ! load up hptr (1 of 2)
+     <24>: 81C26000   jmp   %o1 + %lo(wptr)     ! jump to wptr (load 2 of 2)
+     <28>: 90122000   or    %o0, %lo(hptr), %o0 ! load up hptr (2 of 2, delay slot)
+     <2C>  00000000                             ! place for getting hptr back easily
 
-    ccall'ing on a SPARC leaves little to be performed by the caller.
-    The callee shifts the window on entry and restores it on exit.
-    Input paramters and results are passed via registers. (%o0 in the
-    code above contains the input paramter to wptr.) The return address
-    is stored in %o7/%i7. Since we don't shift the window in this code,
-    the return address is preserved and wptr will return to our caller.
-
-    JRS, 21 Aug 01: the above para is a fiction.  The caller passes
-    args in %i0 .. %i5 and then the rest at [%sp+92].  We want to
-    tailjump to wptr, passing hptr as the new first arg, and a dummy
-    second arg, which would be where the return address is on x86.
-    That means we have to shuffle the original caller's args along by
-    two.
-
-    We do a half-correct solution which works only if the original
-    caller passed 4 or fewer arg words.  Move %i0 .. %i3 into %i3
-    .. %i6, so we can park hptr in %i0 and a bogus arg in %i1.  The
-    fully correct solution would be to subtract 8 from %sp and then
-    place %i4 and %i5 at [%sp+92] and [%sp+96] respectively.  This
-    machinery should then work in all cases.  (Or would it?  Perhaps
-    it would trash parts of the caller's frame.  Dunno).  
-
-    SUP, 25 Apr 02: We are quite lucky to push a multiple of 8 bytes in
-    front of the existing arguments, because %sp must stay double-word
-    aligned at all times, see: http://www.sparc.org/standards/psABI3rd.pdf
-    Although we extend the *caller's* stack frame, this shouldn't cause
-    any problems for a C-like caller: alloca is implemented similarly, and
-    local variables should be accessed via %fp, not %sp. In a nutshell:
-    This should work. (Famous last words! :-)
+     ccall'ing on SPARC is easy, because we are quite lucky to push a
+     multiple of 8 bytes (1 word hptr + 1 word dummy arg) in front of the
+     existing arguments (note that %sp must stay double-word aligned at
+     all times, see ABI spec at http://www.sparc.org/standards/psABI3rd.pdf).
+     To do this, we extend the *caller's* stack frame by 2 words and shift
+     the output registers used for argument passing (%o0 - %o5, we are a *leaf*
+     procedure because of the tail-jump) by 2 positions. This makes room in
+     %o0 and %o1 for the additinal arguments, namely  hptr and a dummy (used
+     for destination addr of jump on SPARC, return address on x86, ...). This
+     shouldn't cause any problems for a C-like caller: alloca is implemented
+     similarly, and local variables should be accessed via %fp, not %sp. In a
+     nutshell: This should work! (Famous last words! :-)
   */
-    if ((adjustor = stgMallocBytes(4*(8+1), "createAdjustor")) != NULL) {
-	unsigned long *const adj_code = (unsigned long *)adjustor;
+    if ((adjustor = stgMallocBytes(4*(11+1), "createAdjustor")) != NULL) {
+        unsigned long *const adj_code = (unsigned long *)adjustor;
 
-	/* mov	%o3, %o5 */
-	adj_code[0] = (unsigned long)0x9A10000B;
-	/* mov	%o2, %o4 */
-	adj_code[1] = (unsigned long)0x9810000A;
-	/* mov	%o1, %o3 */
-	adj_code[2] = (unsigned long)0x96100009;
-	/* mov	%o0, %o2 */
-	adj_code[3] = (unsigned long)0x94100008;
+        adj_code[ 0]  = 0x9C23A008UL;   /* sub   %sp, 8, %sp         */
+        adj_code[ 1]  = 0xDA23A060UL;   /* st    %o5, [%sp + 96]     */
+        adj_code[ 2]  = 0xD823A05CUL;   /* st    %o4, [%sp + 92]     */
+        adj_code[ 3]  = 0x9A10000BUL;   /* mov   %o3, %o5            */
+        adj_code[ 4]  = 0x9810000AUL;   /* mov   %o2, %o4            */
+        adj_code[ 5]  = 0x96100009UL;   /* mov   %o1, %o3            */
+        adj_code[ 6]  = 0x94100008UL;   /* mov   %o0, %o2            */
+        adj_code[ 7]  = 0x13000000UL;   /* sethi %hi(wptr), %o1      */
+        adj_code[ 7] |= ((unsigned long)wptr) >> 10;
+        adj_code[ 8]  = 0x11000000UL;   /* sethi %hi(hptr), %o0      */
+        adj_code[ 8] |= ((unsigned long)hptr) >> 10;
+        adj_code[ 9]  = 0x81C26000UL;   /* jmp   %o1 + %lo(wptr)     */
+        adj_code[ 9] |= ((unsigned long)wptr) & 0x000003FFUL;
+        adj_code[10]  = 0x90122000UL;   /* or    %o0, %lo(hptr), %o0 */
+        adj_code[10] |= ((unsigned long)hptr) & 0x000003FFUL;
 
-	/* sethi %hi(wptr), %o1 */
-	adj_code[4] = (unsigned long)0x13000000;
-	adj_code[4] |= ((unsigned long)wptr) >> 10;
+        adj_code[11]  = (unsigned long)hptr;
 
-	/* sethi %hi(hptr), %o0 */
-	adj_code[5] = (unsigned long)0x11000000;
-	adj_code[5] |= ((unsigned long)hptr) >> 10;
+        /* flush cache */
+        asm("flush %0" : : "r" (adj_code     ));
+        asm("flush %0" : : "r" (adj_code +  2));
+        asm("flush %0" : : "r" (adj_code +  4));
+        asm("flush %0" : : "r" (adj_code +  6));
+        asm("flush %0" : : "r" (adj_code + 10));
 
-	/* jmp %o1+%lo(wptr) */
-	adj_code[6] = (unsigned long)0x81c26000;
-	adj_code[6] |= ((unsigned long)wptr) & 0x000003ff;
-
-	/* or %o0, %lo(hptr), %o0 */
-	adj_code[7] = (unsigned long)0x90122000;
-	adj_code[7] |= ((unsigned long)hptr) & 0x000003ff;
-
-	adj_code[8] = (StgStablePtr)hptr;
-
-	/* flush cache */
-	asm("flush %0" : : "r" (adj_code    ));
-	asm("flush %0" : : "r" (adj_code + 2));
-	asm("flush %0" : : "r" (adj_code + 4));
-	asm("flush %0" : : "r" (adj_code + 6));
-
-	/* max. 5 instructions latency, and we need at >= 1 for returning */
-	asm("nop");
-	asm("nop");
-	asm("nop");
-	asm("nop");
+        /* max. 5 instructions latency, and we need at >= 1 for returning */
+        asm("nop");
+        asm("nop");
+        asm("nop");
+        asm("nop");
     }
 #elif defined(alpha_TARGET_ARCH)
   /* Magic constant computed by inspecting the code length of
@@ -396,13 +373,13 @@ freeHaskellFunctionPtr(void* ptr)
     freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 0x02)));
  }    
 #elif defined(sparc_TARGET_ARCH)
- if ( *(unsigned long*)ptr != 0x9A10000B ) {
+ if ( *(unsigned long*)ptr != 0x9C23A008UL ) {
    fprintf(stderr, "freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
    return;
  }
 
  /* Free the stable pointer first..*/
- freeStablePtr(*((StgStablePtr*)((unsigned long*)ptr + 8)));
+ freeStablePtr(*((StgStablePtr*)((unsigned long*)ptr + 11)));
 #elif defined(alpha_TARGET_ARCH)
  if ( *(StgWord64*)ptr != 0xa77b0018a61b0010L ) {
    fprintf(stderr, "freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
