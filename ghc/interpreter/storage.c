@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.59 $
- * $Date: 2000/04/04 01:07:49 $
+ * $Revision: 1.60 $
+ * $Date: 2000/04/04 11:24:48 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -101,7 +101,7 @@ Cell v; {
     if (!isPair(v)) {
         internal("identToStr");
     }
-    switch (fst(v)) {
+    switch (whatIs(v)) {
         case VARIDCELL  :
         case VAROPCELL  : 
         case CONIDCELL  :
