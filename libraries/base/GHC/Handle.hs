@@ -28,10 +28,6 @@ module GHC.Handle (
   writeRawBuffer, writeRawBufferPtr,
   unlockFile,
   
-  {- ought to be unnecessary, but just in case.. -}
-  write_off, write_rawBuffer,
-  read_off,  read_rawBuffer,
-
   ioe_closedHandle, ioe_EOF, ioe_notReadable, ioe_notWritable,
 
   stdin, stdout, stderr,
@@ -516,48 +512,56 @@ fillReadBufferWithoutBlocking fd is_stream
 readRawBuffer :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
 readRawBuffer loc fd is_stream buf off len = 
   throwErrnoIfMinus1RetryMayBlock loc
-	    (read_rawBuffer fd is_stream buf off len)
+	    (read_rawBuffer fd buf off len)
 	    (threadWaitRead fd)
 
 readRawBufferNoBlock :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
 readRawBufferNoBlock loc fd is_stream buf off len = 
   throwErrnoIfMinus1RetryOnBlock loc
-	    (read_rawBuffer fd is_stream buf off len)
+	    (read_rawBuffer fd buf off len)
 	    (return 0)
 
 readRawBufferPtr :: String -> FD -> Bool -> Ptr CChar -> Int -> CInt -> IO CInt
 readRawBufferPtr loc fd is_stream buf off len = 
   throwErrnoIfMinus1RetryMayBlock loc
-	    (read_off fd is_stream buf off len)
+	    (read_off fd buf off len)
 	    (threadWaitRead fd)
 
 writeRawBuffer :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
 writeRawBuffer loc fd is_stream buf off len = 
   throwErrnoIfMinus1RetryMayBlock loc
-		(write_rawBuffer (fromIntegral fd) is_stream buf off len)
+		(write_rawBuffer (fromIntegral fd) buf off len)
 		(threadWaitWrite fd)
 
 writeRawBufferPtr :: String -> FD -> Bool -> Ptr CChar -> Int -> CInt -> IO CInt
 writeRawBufferPtr loc fd is_stream buf off len = 
   throwErrnoIfMinus1RetryMayBlock loc
-		(write_off (fromIntegral fd) is_stream buf off len)
+		(write_off (fromIntegral fd) buf off len)
 		(threadWaitWrite fd)
 
 foreign import ccall unsafe "__hscore_PrelHandle_read"
-   read_rawBuffer :: FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
+   read_rawBuffer :: FD -> RawBuffer -> Int -> CInt -> IO CInt
 
 foreign import ccall unsafe "__hscore_PrelHandle_read"
-   read_off :: FD -> Bool -> Ptr CChar -> Int -> CInt -> IO CInt
+   read_off :: FD -> Ptr CChar -> Int -> CInt -> IO CInt
 
 foreign import ccall unsafe "__hscore_PrelHandle_write"
-   write_rawBuffer :: CInt -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
+   write_rawBuffer :: CInt -> RawBuffer -> Int -> CInt -> IO CInt
 
 foreign import ccall unsafe "__hscore_PrelHandle_write"
-   write_off :: CInt -> Bool -> Ptr CChar -> Int -> CInt -> IO CInt
+   write_off :: CInt -> Ptr CChar -> Int -> CInt -> IO CInt
 
 #else
 readRawBuffer :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
 readRawBuffer loc fd is_stream buf off len = do
+  (l, rc) <- asyncReadBA fd (if is_stream then 1 else 0) (fromIntegral len) off buf
+  if l == (-1)
+   then 
+    ioError (errnoToIOError loc (Errno (fromIntegral rc)) Nothing Nothing)
+    else return (fromIntegral l)
+
+readRawBufferNoBlock :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
+readRawBufferNoBlock loc fd is_stream buf off len = do
   (l, rc) <- asyncReadBA fd (if is_stream then 1 else 0) (fromIntegral len) off buf
   if l == (-1)
    then 
@@ -587,19 +591,6 @@ writeRawBufferPtr loc fd is_stream buf off len = do
    then 
     ioError (errnoToIOError loc (Errno (fromIntegral rc)) Nothing Nothing)
     else return (fromIntegral l)
-
-foreign import ccall unsafe "__hscore_PrelHandle_read"
-   read_rawBuffer :: FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
-
-foreign import ccall unsafe "__hscore_PrelHandle_read"
-   read_off :: FD -> Bool -> Ptr CChar -> Int -> CInt -> IO CInt
-
-foreign import ccall unsafe "__hscore_PrelHandle_write"
-   write_rawBuffer :: CInt -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
-
-foreign import ccall unsafe "__hscore_PrelHandle_write"
-   write_off :: CInt -> Bool -> Ptr CChar -> Int -> CInt -> IO CInt
-
 #endif
 
 -- ---------------------------------------------------------------------------

@@ -47,6 +47,10 @@ import GHC.Show
 import GHC.List
 import GHC.Exception    ( ioError, catch )
 
+#ifdef mingw32_TARGET_OS
+import GHC.Conc
+#endif
+
 -- ---------------------------------------------------------------------------
 -- Simple input operations
 
