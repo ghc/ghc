@@ -385,7 +385,6 @@ __export PrelGHC
   reallyUnsafePtrEqualityzh
 
   newBCOzh
-  getBCOPtrszh
 
   unsafeCoercezh
 ;
