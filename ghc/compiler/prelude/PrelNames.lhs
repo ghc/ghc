@@ -267,7 +267,7 @@ pREL_FLOAT_Name   = mkModuleName "GHC.Float"
 pREL_TOP_HANDLER_Name = mkModuleName "GHC.TopHandler"
 sYSTEM_IO_Name	  = mkModuleName "System.IO"
 dYNAMIC_Name	  = mkModuleName "Data.Dynamic"
-tRAVERSE_Name	  = mkModuleName "Data.Traverse"
+tYPEABLE_Name	  = mkModuleName "Data.Typeable"
 gENERICS_Name	  = mkModuleName "Data.Generics"
 dOTNET_Name       = mkModuleName "GHC.Dotnet"
 
@@ -445,9 +445,9 @@ showString_RDR          = varQual_RDR pREL_SHOW_Name FSLIT("showString")
 showSpace_RDR           = varQual_RDR pREL_SHOW_Name FSLIT("showSpace") 
 showParen_RDR           = varQual_RDR pREL_SHOW_Name FSLIT("showParen") 
 
-typeOf_RDR     = varQual_RDR dYNAMIC_Name FSLIT("typeOf")
-mkTypeRep_RDR  = varQual_RDR dYNAMIC_Name FSLIT("mkAppTy")
-mkTyConRep_RDR = varQual_RDR dYNAMIC_Name FSLIT("mkTyCon")
+typeOf_RDR     = varQual_RDR tYPEABLE_Name FSLIT("typeOf")
+mkTypeRep_RDR  = varQual_RDR tYPEABLE_Name FSLIT("mkAppTy")
+mkTyConRep_RDR = varQual_RDR tYPEABLE_Name FSLIT("mkTyCon")
 
 constr_RDR  = dataQual_RDR gENERICS_Name FSLIT("Constr")
 gfoldl_RDR  = varQual_RDR gENERICS_Name FSLIT("gfoldl")
@@ -618,7 +618,7 @@ realFloatClassName = clsQual  pREL_FLOAT_Name FSLIT("RealFloat") realFloatClassK
 ixClassName	   = clsQual pREL_ARR_Name FSLIT("Ix") ixClassKey
 
 -- Class Typeable and Data
-typeableClassName = clsQual dYNAMIC_Name  FSLIT("Typeable") typeableClassKey
+typeableClassName = clsQual tYPEABLE_Name FSLIT("Typeable") typeableClassKey
 dataClassName     = clsQual gENERICS_Name FSLIT("Data")     dataClassKey
 
 -- Enum module (Enum, Bounded)
