@@ -58,6 +58,8 @@ import GHC.Real
 import GHC.Prim
 import GHC.Read
 import GHC.Show
+#else
+import Control.Monad
 #endif
 
 #include "Dynamic.h"
