@@ -117,7 +117,7 @@ preludePackage :: PackageName
 preludePackage = SLIT("std")
 
 packageInfoPackage :: PackageInfo -> PackageName
-packageInfoPackage ThisPackage        = SLIT("<THIS>")
+packageInfoPackage ThisPackage        = opt_InPackage
 packageInfoPackage DunnoYet	      = SLIT("<?>")
 packageInfoPackage (AnotherPackage p) = p
 
