@@ -192,8 +192,7 @@ tcInstDecls1 unf_env decls mod_name rn_name_supply
     in
 	-- Handle "derived" instances; note that we only do derivings
 	-- for things in this module; we ignore deriving decls from
-	-- interfaces! We pass fixities, because they may be used
-	-- in deriving Read and Show.
+	-- interfaces!
     tcDeriving mod_name rn_name_supply decl_inst_info
 		    	`thenTc` \ (deriv_inst_info, deriv_binds, ddump_deriv) ->
 

@@ -16,7 +16,7 @@ IMP_Ubiq(){-uitous-}
 import Kind		( mkUnboxedTypeKind, mkBoxedTypeKind, mkTypeKind, mkArrowKind )
 import Name		( mkWiredInTyConName )
 import PrimRep		( PrimRep(..) )	-- getPrimRepInfo uses PrimRep repn
-import TyCon		( mkPrimTyCon, mkDataTyCon, SYN_IE(TyCon) )
+import TyCon		( mkPrimTyCon, mkDataTyCon, TyCon )
 import BasicTypes	( NewOrData(..) )
 import Type		( applyTyCon, mkTyVarTys, mkTyConTy, SYN_IE(Type) )
 import TyVar		( GenTyVar(..), alphaTyVars )
@@ -44,9 +44,7 @@ pcPrimTyCon key str arity primrep
   = the_tycon
   where
     name      = mkWiredInTyConName key gHC__ str the_tycon
-    the_tycon = mkPrimTyCon name (mk_kind arity) primrep
-    mk_kind 0 = mkUnboxedTypeKind
-    mk_kind n = mkTypeKind `mkArrowKind` mk_kind (n-1)
+    the_tycon = mkPrimTyCon name arity primrep
 
 
 charPrimTy	= applyTyCon charPrimTyCon []

@@ -411,10 +411,14 @@ show_uniq PprDebug u = ppr PprDebug u
 show_uniq sty	   u = empty
 \end{code}
 
-Printing in error messages
+Printing in error messages.  These two must look the same.
 
 \begin{code}
 noInstanceErr inst sty = ptext SLIT("No instance for:") <+> ppr sty inst
+
+noSimpleInst clas ty sty
+  = ptext SLIT("No instance for:") <+> 
+    (pprQuote sty (\ sty -> ppr sty clas <+> pprParendGenType sty ty))
 \end{code}
 
 %************************************************************************
@@ -534,10 +538,6 @@ lookupSimpleInst class_inst_env clas ty
       Just (dfun,tenv) -> returnTc [(c,instantiateTy tenv t) | (c,t) <- theta]
 		       where
 		          (_, theta, _) = splitSigmaTy (idType dfun)
-
-noSimpleInst clas ty sty
-  = ptext SLIT("No instance for") <+> 
-    (pprQuote sty $ \ sty -> ppr sty clas <+> ppr sty ty)
 \end{code}
 
 

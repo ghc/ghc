@@ -34,7 +34,7 @@ import {-# SOURCE #-} Id
 import Type		( GenType(..), maybeAppTyCon, Type(..), splitFunTy,
 			  splitForAllTy, splitSigmaTy, splitRhoTy, splitAppTys )
 import TyVar		( GenTyVar(..), TyVar(..), cloneTyVar )
-import TyCon		( TyCon(..), NewOrData )
+import TyCon		( TyCon, NewOrData, isFunTyCon, isTupleTyCon, tyConArity )
 import Class		( SYN_IE(Class), GenClass(..) )
 import Kind		( Kind(..), isBoxedTypeKind, pprParendKind )
 import Usage		( pprUVar, GenUsage(..), SYN_IE(Usage), SYN_IE(UVar), cloneUVar )
@@ -199,15 +199,16 @@ ppr_ty env ctxt_prec (DictTy clas ty usage)
 
 
 -- Some help functions
-ppr_corner env ctxt_prec (TyConTy FunTyCon usage) arg_tys
-  | length arg_tys == 2
+ppr_corner env ctxt_prec (TyConTy tycon usage) arg_tys
+  | isFunTyCon tycon && length arg_tys == 2
   = ppr_ty env ctxt_prec (FunTy ty1 ty2 usage)
   where
     (ty1:ty2:_) = arg_tys
 
-ppr_corner env ctxt_prec (TyConTy (TupleTyCon _ _ arity) usage) arg_tys
-  |  not (codeStyle (pStyle env))		-- no magic in that case
-  && length arg_tys == arity			-- no magic if partially applied
+ppr_corner env ctxt_prec (TyConTy tycon usage) arg_tys
+  |  isTupleTyCon tycon
+  && not (codeStyle (pStyle env))		-- no magic in that case
+  && length arg_tys == tyConArity tycon		-- no magic if partially applied
   = parens arg_tys_w_commas
   where
     arg_tys_w_commas = hsep (punctuate comma (map (ppr_ty env tOP_PREC) arg_tys))

@@ -26,7 +26,7 @@ import TcHsSyn		( SYN_IE(TcHsBinds), SYN_IE(TcMonoBinds), SYN_IE(TcExpr),
 			  mkHsTyApp, mkHsTyLam, mkHsDictApp, mkHsDictLam, tcIdType )
 
 import Inst		( Inst, InstOrigin(..), SYN_IE(LIE), emptyLIE, plusLIE, newDicts, newMethod )
-import TcEnv		( tcLookupClass, tcLookupTyVar, tcLookupTyCon, newLocalIds, tcAddImportedIdInfo,
+import TcEnv		( tcLookupClass, tcLookupTyVar, newLocalIds, tcAddImportedIdInfo,
 			  tcExtendGlobalTyVars )
 import TcBinds		( tcBindWithSigs, TcSigInfo(..) )
 import TcKind		( unifyKind, TcKind )

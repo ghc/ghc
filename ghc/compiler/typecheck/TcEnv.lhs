@@ -39,7 +39,7 @@ import TcType	( SYN_IE(TcIdBndr), TcIdOcc(..),
 import TyVar	( unionTyVarSets, emptyTyVarSet, tyVarSetToList, SYN_IE(TyVar) )
 import PprType	( GenTyVar )
 import Type	( tyVarsOfTypes, splitForAllTy )
-import TyCon	( TyCon, tyConKind, synTyConArity, SYN_IE(Arity) )
+import TyCon	( TyCon, tyConKind, tyConArity, isSynTyCon, SYN_IE(Arity) )
 import Class	( SYN_IE(Class), GenClass )
 
 import TcMonad
@@ -141,21 +141,34 @@ tcLookupTyVar name
 
 
 tcLookupTyCon name
-  = case maybeWiredInTyConName name of
-	Just tc -> returnTc (kindToTcKind (tyConKind tc), synTyConArity tc, tc)
-	Nothing -> tcGetEnv		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
-		   case lookupUFM tce name of
-			Just stuff -> returnTc stuff
-			Nothing    -> 	-- Could be that he's using a class name as a type constructor
-				      case lookupUFM ce name of
-					Just _  -> failTc (classAsTyConErr name)
-					Nothing -> pprPanic "tcLookupTyCon:" (ppr PprDebug name)
+  =	-- Try for a wired-in tycon
+    case maybeWiredInTyConName name of {
+	Just tc | isSynTyCon tc -> returnTc (kind, Just (tyConArity tc), tc)
+		| otherwise     -> returnTc (kind, Nothing,              tc)
+		where {
+		  kind = kindToTcKind (tyConKind tc) 
+		};
+
+	Nothing -> 
+
+	    -- Try in the environment
+	  tcGetEnv	`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
+          case lookupUFM tce name of {
+	      Just stuff -> returnTc stuff;
+
+	      Nothing    ->
+
+		-- Could be that he's using a class name as a type constructor
+	       case lookupUFM ce name of
+		 Just _  -> failTc (classAsTyConErr name)
+		 Nothing -> pprPanic "tcLookupTyCon:" (ppr PprDebug name)
+	    } } 
 
 tcLookupTyConByKey uniq
   = tcGetEnv		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
     let 
        (kind, arity, tycon) =  lookupWithDefaultUFM_Directly tce 
-					(pprPanic "tcLookupTyCon:" (pprUnique10 uniq)) 
+					(pprPanic "tcLookupTyConByKey:" (pprUnique10 uniq)) 
 					uniq
     in
     returnNF_Tc tycon

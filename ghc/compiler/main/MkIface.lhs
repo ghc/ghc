@@ -45,7 +45,11 @@ import Name		( isLocallyDefined, isWiredInName, modAndOcc, nameModule, pprOccNam
 			  OccName, occNameString, nameOccName, nameString, isExported,
 			  Name {-instance NamedThing-}, Provenance, NamedThing(..)
 			)
-import TyCon		( TyCon(..) {-instance NamedThing-} )
+import TyCon		( TyCon {-instance NamedThing-},
+			  isSynTyCon, isAlgTyCon, isNewTyCon, tyConDataCons,
+			  tyConTheta, tyConTyVars,
+			  getSynTyConDefn
+			)
 import Class		( GenClass(..){-instance NamedThing-}, SYN_IE(Class), classBigSig )
 import FieldLabel	( FieldLabel{-instance NamedThing-}, 
 		          fieldLabelName, fieldLabelType )
@@ -403,30 +407,32 @@ upp_class clas  = ifaceClass PprInterface clas
 
 \begin{code}
 ifaceTyCon :: PprStyle -> TyCon -> Doc	
-ifaceTyCon sty tycon
-  = case tycon of
-	DataTyCon uniq name kind tyvars theta data_cons deriv new_or_data
-	   -> hsep [	ptext (keyword new_or_data), 
-			ppr_decl_context sty theta,
-			ppr sty name,
-			hsep (map (pprTyVarBndr sty) tyvars),
-			ptext SLIT("="),
-			hsep (punctuate (ptext SLIT(" | ")) (map ppr_con data_cons)),
-			semi
-		    ]
 
-	SynTyCon uniq name kind arity tyvars ty
-	   -> hsep [	ptext SLIT("type"),
-			ppr sty name,
-			hsep (map (pprTyVarBndr sty) tyvars),
-			ptext SLIT("="),
-			ppr sty ty,
-			semi
-		    ]
-	other -> pprPanic "pprIfaceTyDecl" (ppr PprDebug tycon)
+ifaceTyCon sty tycon
+  | isSynTyCon tycon
+  = hsep [ ptext SLIT("type"),
+	   ppr sty (getName tycon),
+	   hsep (map (pprTyVarBndr sty) tyvars),
+	   ptext SLIT("="),
+	   ppr sty ty,
+	   semi
+    ]
   where
-    keyword NewType  = SLIT("newtype")
-    keyword DataType = SLIT("data")
+    (tyvars, ty) = getSynTyConDefn tycon
+
+ifaceTyCon sty tycon
+  | isAlgTyCon tycon
+  = hsep [ ptext keyword,
+	   ppr_decl_context sty (tyConTheta tycon),
+	   ppr sty (getName tycon),
+	   hsep (map (pprTyVarBndr sty) (tyConTyVars tycon)),
+	   ptext SLIT("="),
+	   hsep (punctuate (ptext SLIT(" | ")) (map ppr_con (tyConDataCons tycon))),
+	   semi
+    ]
+  where
+    keyword | isNewTyCon tycon = SLIT("newtype")
+	    | otherwise	       = SLIT("data")
 
     ppr_con data_con 
 	| null field_labels
@@ -457,6 +463,9 @@ ifaceTyCon sty tycon
 		  ptext SLIT("::"),
 		  ppr_strict_mark strict_mark <> pprParendType sty (fieldLabelType field_label)
 		]
+
+ifaceTyCon sty tycon
+  = pprPanic "pprIfaceTyDecl" (ppr PprDebug tycon)
 
 ifaceClass sty clas
   = hsep [ptext SLIT("class"),

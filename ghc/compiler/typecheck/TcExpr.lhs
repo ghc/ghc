@@ -66,7 +66,9 @@ import TysWiredIn	( addrTy,
 			  boolTy, charTy, stringTy, mkListTy,
 			  mkTupleTy, mkPrimIoTy, stDataCon
 			)
-import Unify		( unifyTauTy, unifyTauTyList, unifyTauTyLists, unifyFunTy )
+import Unify		( unifyTauTy, unifyTauTyList, unifyTauTyLists, 
+			  unifyFunTy, unifyListTy, unifyTupleTy
+			)
 import Unique		( Unique, cCallableClassKey, cReturnableClassKey, 
 			  enumFromClassOpKey, enumFromThenClassOpKey,
 			  enumFromToClassOpKey, enumFromThenToClassOpKey,
@@ -334,15 +336,11 @@ tcExpr in_expr@(ExplicitList exprs) res_ty	-- Non-empty list
 	tcExpr expr elt_ty
 
 tcExpr (ExplicitTuple exprs) res_ty
-    -- ToDo: more direct way of testing if res_ty is a tuple type (cf. unifyListTy)?
-  = mapNF_Tc (\ _ -> newTyVarTy mkBoxedTypeKind) [1..len]	`thenNF_Tc` \ ty_vars ->
-    unifyTauTy (mkTupleTy len ty_vars) res_ty			`thenTc_`
-    mapAndUnzipTc (\ (expr,ty_var) -> tcExpr expr ty_var)
-               (exprs `zip` ty_vars) -- we know they're of equal length.
+  = unifyTupleTy (length exprs) res_ty		`thenTc` \ arg_tys ->
+    mapAndUnzipTc (\ (expr, arg_ty) -> tcExpr expr arg_ty)
+               (exprs `zip` arg_tys) -- we know they're of equal length.
                							 `thenTc` \ (exprs', lies) ->
     returnTc (ExplicitTuple exprs', plusLIEs lies)
-    where
-     len = length exprs
 
 tcExpr (RecordCon con rbinds) res_ty
   = tcLookupGlobalValue con		`thenNF_Tc` \ con_id ->
@@ -483,7 +481,7 @@ tcExpr (RecordUpd record_expr rbinds) res_ty
 
 tcExpr (ArithSeqIn seq@(From expr)) res_ty
   = unifyListTy res_ty                        `thenTc` \ elt_ty ->  
-    tcExpr expr elt_ty			      `thenTc`    \ (expr', lie1) ->
+    tcExpr expr elt_ty			      `thenTc` \ (expr', lie1) ->
 
     tcLookupGlobalValueByKey enumFromClassOpKey	`thenNF_Tc` \ sel_id ->
     newMethod (ArithSeqOrigin seq)
@@ -549,11 +547,9 @@ tcExpr in_expr@(ExprWithTySig expr poly_ty) res_ty
    let
 	(sig_tyvars', sig_theta', sig_tau') = splitSigmaTy sigma_sig'
    in
-   unifyTauTy sig_tau' res_ty		`thenTc_`
 
-	-- Type check the expression, *after* we've incorporated the signature
-	-- info into res_ty
-   tcExpr expr res_ty		`thenTc` \ (texpr, lie) ->
+	-- Type check the expression, expecting the signature type
+   tcExpr expr sig_tau'			`thenTc` \ (texpr, lie) ->
 
 	-- Check the type variables of the signature, 
 	-- *after* typechecking the expression
@@ -564,6 +560,13 @@ tcExpr in_expr@(ExprWithTySig expr poly_ty) res_ty
    tcSimplifyAndCheck
 	(mkTyVarSet sig_tyvars')
 	sig_dicts lie				`thenTc_`
+
+	-- Now match the signature type with res_ty.
+	-- We must not do this earlier, because res_ty might well
+	-- mention variables free in the environment, and we'd get
+	-- bogus complaints about not being able to for-all the
+	-- sig_tyvars
+   unifyTauTy sig_tau' res_ty		`thenTc_`
 
 	-- If everything is ok, return the stuff unchanged, except for
 	-- the effect of any substutions etc.  We simply discard the
@@ -588,20 +591,6 @@ tcExpr_id id_expr
 	other	   -> newTyVarTy mkTypeKind       `thenNF_Tc` \ id_ty ->
 		      tcExpr id_expr id_ty	  `thenTc`    \ (id_expr', lie_id) ->
 		      returnTc (id_expr', lie_id, id_ty) 
-
-
---ToDo: move to Unify?
-unifyListTy :: TcType s              -- expected list type
-	    -> TcM s (TcType s)      -- list element type
-unifyListTy res_ty
-    -- ToDo: more direct way of testing if res_ty is a list type (cf. unifyFunTy)?
-  = newTyVarTy mkBoxedTypeKind		 `thenNF_Tc` \ elt_ty ->
-    unifyTauTy (mkListTy elt_ty) res_ty  `thenTc_`
-
-	-- This zonking makes the returned type as informative
-	-- as possible.
-    zonkTcType elt_ty			 `thenNF_Tc` \ elt_ty' ->
-    returnTc elt_ty'
 \end{code}
 
 %************************************************************************

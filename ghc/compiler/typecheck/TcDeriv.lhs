@@ -37,7 +37,7 @@ import RnEnv		( newDfunName, bindLocatedLocalsRn )
 import RnMonad		( SYN_IE(RnM), RnDown, GDown, SDown, RnNameSupply(..), 
 			  setNameSupplyRn, renameSourceCode, thenRn, mapRn, returnRn )
 
-import Bag		( Bag, isEmptyBag, unionBags, listToBag )
+import Bag		( Bag, emptyBag, isEmptyBag, unionBags, listToBag )
 import Class		( classKey, GenClass, SYN_IE(Class) )
 import ErrUtils		( addErrLoc, SYN_IE(Error) )
 import Id		( dataConArgTys, isNullaryDataCon, mkDictFunId )
@@ -48,7 +48,7 @@ import Name		( isLocallyDefined, getSrcLoc, ExportFlag(..), Provenance,
 			)
 import Outputable	( PprStyle(..), Outputable(..){-instances e.g., (,)-} )
 import PprType		( GenType, GenTyVar, GenClass, TyCon )
-import Pretty		( ($$), vcat, hsep, hcat, parens,
+import Pretty		( ($$), vcat, hsep, hcat, parens, empty, (<+>),
 		          ptext, char, hang, Doc )
 import SrcLoc		( mkGeneratedSrcLoc, SrcLoc )
 import TyCon		( tyConTyVars, tyConDataCons, tyConDerivings,
@@ -207,7 +207,9 @@ tcDeriving  :: Module			-- name of module under scrutiny
 				     	   -- for debugging via -ddump-derivings.
 
 tcDeriving modname rn_name_supply inst_decl_infos_in
-  =	-- Fish the "deriving"-related information out of the TcEnv
+  = recoverTc (returnTc (emptyBag, EmptyBinds, \_ -> empty)) $
+
+  	-- Fish the "deriving"-related information out of the TcEnv
 	-- and make the necessary "equations".
     makeDerivEqns			    	`thenTc` \ eqns ->
 
@@ -431,13 +433,21 @@ solveDerivEqns inst_decl_infos_in orig_eqns
     initial_solutions :: [DerivSoln]
     initial_solutions = [ [] | _ <- orig_eqns ]
 
+    ------------------------------------------------------------------
 	-- iterateDeriv calculates the next batch of solutions,
 	-- compares it with the current one; finishes if they are the
 	-- same, otherwise recurses with the new solutions.
-
+	-- It fails if any iteration fails
     iterateDeriv :: [DerivSoln] ->TcM s [InstInfo]
-
     iterateDeriv current_solns
+      = checkNoErrsTc (iterateOnce current_solns)	`thenTc` \ (new_inst_infos, new_solns) ->
+	if (current_solns `eq_solns` new_solns) then
+	    returnTc new_inst_infos
+	else
+	    iterateDeriv new_solns
+
+    ------------------------------------------------------------------
+    iterateOnce current_solns
       =	    -- Extend the inst info from the explicit instance decls
 	    -- with the current set of solutions, giving a
 
@@ -448,27 +458,24 @@ solveDerivEqns inst_decl_infos_in orig_eqns
 	in
 	    -- Simplify each RHS
 
-	listTc [ tcSimplifyThetas class_to_inst_env [{-Nothing "given"-}] deriv_rhs
-	       | (_,_,_,deriv_rhs) <- orig_eqns ]  `thenTc` \ next_solns ->
+	listTc [ tcAddErrCtxt (derivCtxt tc) $
+		 tcSimplifyThetas class_to_inst_env [{-Nothing "given"-}] deriv_rhs
+	       | (_,tc,_,deriv_rhs) <- orig_eqns ]  `thenTc` \ next_solns ->
 
 	    -- Canonicalise the solutions, so they compare nicely
 	let canonicalised_next_solns
-	      = [ sortLt lt_rhs next_soln | next_soln <- next_solns ] in
+	      = [ sortLt lt_rhs next_soln | next_soln <- next_solns ]
+	in
+	returnTc (new_inst_infos, canonicalised_next_solns)
 
-	if (current_solns `eq_solns` canonicalised_next_solns) then
-	    returnTc new_inst_infos
-	else
-	    iterateDeriv canonicalised_next_solns
-
-      where
-	------------------------------------------------------------------
-	lt_rhs    r1 r2 = case cmp_rhs   r1 r2 of { LT_ -> True; _ -> False }
-        eq_solns  s1 s2 = case cmp_solns s1 s2 of { EQ_ -> True; _ -> False }
-	cmp_solns s1 s2 = cmpList (cmpList cmp_rhs) s1 s2
-	cmp_rhs (c1, TyVarTy tv1) (c2, TyVarTy tv2)
+    ------------------------------------------------------------------
+    lt_rhs    r1 r2 = case cmp_rhs   r1 r2 of { LT_ -> True; _ -> False }
+    eq_solns  s1 s2 = case cmp_solns s1 s2 of { EQ_ -> True; _ -> False }
+    cmp_solns s1 s2 = cmpList (cmpList cmp_rhs) s1 s2
+    cmp_rhs (c1, TyVarTy tv1) (c2, TyVarTy tv2)
 	  = (tv1 `cmp` tv2) `thenCmp` (c1 `cmp` c2)
 #ifdef DEBUG
-	cmp_rhs other_1 other_2
+    cmp_rhs other_1 other_2
 	  = panic# "tcDeriv:cmp_rhs:" --(hsep [ppr PprDebug other_1, ppr PprDebug other_2])
 #endif
 
@@ -483,9 +490,16 @@ add_solns :: Bag InstInfo			-- The global, non-derived ones
     -- because we need the LHS info for addClassInstance.
 
 add_solns inst_infos_in eqns solns
-  = discardErrsTc (buildInstanceEnvs all_inst_infos) `thenTc` \ inst_mapper ->
+
+-- ------------------
+-- OLD: checkErrsTc above now deals with this
+-- = discardErrsTc (buildInstanceEnvs all_inst_infos	`thenTc` \ inst_mapper ->
 	-- We do the discard-errs so that we don't get repeated error messages
-	-- about missing or duplicate instances.
+	-- about duplicate instances.
+	-- They'll appear later, when we do the top-level buildInstanceEnvs.
+-- ------------------
+
+  = buildInstanceEnvs all_inst_infos	`thenTc` \ inst_mapper ->
     returnTc (new_inst_infos, inst_mapper)
   where
     new_inst_infos = zipWithEqual "add_solns" mk_deriv_inst_info eqns solns
@@ -503,7 +517,8 @@ add_solns inst_infos_in eqns solns
 		 (my_panic "upragmas")
       where
 	dummy_dfun_id
-	  = mkDictFunId bottom dummy_dfun_ty bottom bottom
+	  = mkDictFunId (getName tycon) dummy_dfun_ty bottom bottom
+		-- The name is getSrcLoc'd in an error message 
 	  where
 	    bottom = panic "dummy_dfun_id"
 
@@ -722,4 +737,7 @@ derivingThingErr thing why tycon sty
   = hang (hsep [ptext SLIT("Can't make a derived instance of"), ptext thing])
 	 0 (hang (hsep [ptext SLIT("for the type"), ppr sty tycon])
 	         0 (parens (ptext why)))
+
+derivCtxt tycon sty
+  = ptext SLIT("When deriving classes for") <+> ppr sty tycon
 \end{code}

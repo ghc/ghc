@@ -9,21 +9,25 @@ updatable substitution).
 \begin{code}
 #include "HsVersions.h"
 
-module Unify ( unifyTauTy, unifyTauTyList, unifyTauTyLists, unifyFunTy ) where
+module Unify ( unifyTauTy, unifyTauTyList, unifyTauTyLists, 
+	       unifyFunTy, unifyListTy, unifyTupleTy
+ ) where
 
 IMP_Ubiq()
 
+
 -- friends: 
 import TcMonad
-import Type	( GenType(..), typeKind, mkFunTy, getFunTy_maybe )
-import TyCon	( TyCon, mkFunTyCon )
+import Type	( GenType(..), typeKind, mkFunTy, getFunTy_maybe, splitAppTys )
+import TyCon	( TyCon, mkFunTyCon, isTupleTyCon, tyConArity )
 import Class	( GenClass )
 import TyVar	( GenTyVar(..), SYN_IE(TyVar), tyVarKind )
 import TcType	( SYN_IE(TcType), TcMaybe(..), SYN_IE(TcTauType), SYN_IE(TcTyVar),
 		  newTyVarTy, tcReadTyVar, tcWriteTyVar, zonkTcType
 		)
 -- others:
-import Kind	( Kind, hasMoreBoxityInfo, mkTypeKind )
+import Kind	( Kind, hasMoreBoxityInfo, mkTypeKind, mkBoxedTypeKind )
+import TysWiredIn ( listTyCon, mkListTy, mkTupleTy )
 import Usage	( duffUsage )
 import PprType	( GenTyVar, GenType )	-- instances
 import Pretty
@@ -317,20 +321,62 @@ unifyFunTy ty@(TyVarTy tyvar)
   = tcReadTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
     case maybe_ty of
 	BoundTo ty' -> unifyFunTy ty'
+	other	    -> unify_fun_ty_help ty
 
-	UnBound	    -> newTyVarTy mkTypeKind			`thenNF_Tc` \ arg ->
-		       newTyVarTy mkTypeKind			`thenNF_Tc` \ res ->
-		       tcWriteTyVar tyvar (mkFunTy arg res)	`thenNF_Tc_`
-		       returnTc (arg,res)
-
-	DontBind    -> failTc (expectedFunErr ty)
-
-unifyFunTy other_ty
-  = case getFunTy_maybe other_ty of
+unifyFunTy ty
+  = case getFunTy_maybe ty of
 	Just arg_and_res -> returnTc arg_and_res
-	Nothing 	 -> failTc (expectedFunErr other_ty)
+	Nothing 	 -> unify_fun_ty_help ty
+
+unify_fun_ty_help ty	-- Special cases failed, so revert to ordinary unification
+  = newTyVarTy mkTypeKind		`thenNF_Tc` \ arg ->
+    newTyVarTy mkTypeKind		`thenNF_Tc` \ res ->
+    unifyTauTy (mkFunTy arg res) ty	`thenTc_`
+    returnTc (arg,res)
 \end{code}
 
+\begin{code}
+unifyListTy :: TcType s              -- expected list type
+	    -> TcM s (TcType s)      -- list element type
+
+unifyListTy ty@(TyVarTy tyvar)
+  = tcReadTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
+    case maybe_ty of
+	BoundTo ty' -> unifyListTy ty'
+	other	    -> unify_list_ty_help ty
+
+unifyListTy (AppTy (TyConTy tycon _) arg_ty)
+  | tycon == listTyCon
+  = returnTc arg_ty
+
+unifyListTy ty = unify_list_ty_help ty
+
+unify_list_ty_help ty	-- Revert to ordinary unification
+  = newTyVarTy mkBoxedTypeKind		`thenNF_Tc` \ elt_ty ->
+    unifyTauTy (mkListTy elt_ty) ty	`thenTc_`
+    returnTc elt_ty
+\end{code}
+
+\begin{code}
+unifyTupleTy :: Arity -> TcType s -> TcM s [TcType s]
+unifyTupleTy arity ty@(TyVarTy tyvar)
+  = tcReadTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
+    case maybe_ty of
+	BoundTo ty' -> unifyTupleTy arity ty'
+	other	    -> unify_tuple_ty_help arity ty
+
+unifyTupleTy arity ty
+  = case splitAppTys ty of
+	(TyConTy tycon _, arg_tys) |  isTupleTyCon tycon 
+				   && tyConArity tycon == arity
+				   -> returnTc arg_tys
+	other -> unify_tuple_ty_help arity ty
+
+unify_tuple_ty_help arity ty
+  = mapNF_Tc (\ _ -> newTyVarTy mkBoxedTypeKind) [1..arity]	`thenNF_Tc` \ arg_tys ->
+    unifyTauTy (mkTupleTy arity arg_tys) ty			`thenTc_`
+    returnTc arg_tys
+\end{code}
 
 %************************************************************************
 %*									*
