@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.49 2001/01/19 15:26:37 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.50 2001/02/05 17:52:49 rrt Exp $
 --
 -- GHC Driver
 --
@@ -335,6 +335,7 @@ run_phase Cpp basename suff input_fn output_fn
 							++ pkg_include_dirs)
 
 	    verb <- getVerbFlag
+	    (md_c_flags, _) <- machdepCCOpts
 
 	    runSomething "C pre-processor" 
 		(unwords
@@ -343,6 +344,7 @@ run_phase Cpp basename suff input_fn output_fn
 		    ++ include_paths
 		    ++ hs_src_cpp_opts
 		    ++ hscpp_opts
+		    ++ md_c_flags
 		    ++ [ "-x", "c", input_fn, ">>", output_fn ]
 		   ))
 	  else do
