@@ -53,7 +53,12 @@
       during the execution of the <code>boot</code> target in the
       <code>fptools/ghc/</code> directory.  This scheme significantly
       simplifies the maintenance of primitive operations.
-
+    <p> 
+      As of development version 5.02, the <code>primops.txt</code> file also allows the
+      recording of documentation about intended semantics of the primitives.  This can
+      be extracted into a latex document (or rather, into latex document fragments)
+      via an appropriate switch to <code>genprimopcode</code>. In particular, see <code>primops.txt</code>
+      for full details of how GHC is configured to cope with different machine word sizes.
     <p><small>
 <!-- hhmts start -->
 Last modified: Wed Aug  8 19:29:12 EST 2001
