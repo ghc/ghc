@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.74 2001/06/14 12:50:06 simonpj Exp $
+-- $Id: InteractiveUI.hs,v 1.75 2001/06/15 08:29:57 simonpj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -14,7 +14,7 @@ module InteractiveUI ( interactiveUI, ghciWelcomeMsg ) where
 #include "HsVersions.h"
 
 import CompManager
-import CmStaticInfo
+import HscTypes		( GhciMode(..) )
 import ByteCodeLink
 import DriverFlags
 import DriverState

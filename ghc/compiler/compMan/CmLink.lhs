@@ -26,7 +26,7 @@ import ByteCodeLink	( linkIModules, linkIExpr )
 import Interpreter
 import DriverPipeline
 import CmTypes
-import CmStaticInfo	( GhciMode(..) )
+import HscTypes		( GhciMode(..) )
 import Outputable	( SDoc )
 import Digraph		( SCC(..), flattenSCC )
 import Name		( Name )

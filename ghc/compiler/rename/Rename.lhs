@@ -62,10 +62,9 @@ import HscTypes		( PersistentCompilerState, HomeIfaceTable, HomeSymbolTable,
 			  GlobalRdrEnv, GlobalRdrElt(..), pprGlobalRdrEnv,
 			  AvailEnv, GenAvailInfo(..), AvailInfo, 
 			  Provenance(..), ImportReason(..), initialVersionInfo,
-			  Deprecations(..),
+			  Deprecations(..), GhciMode(..),
 			  LocalRdrEnv
 			 )
-import CmStaticInfo	( GhciMode(..) )
 import List		( partition, nub )
 \end{code}
 

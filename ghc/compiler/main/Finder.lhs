@@ -16,7 +16,7 @@ module Finder (
 #include "HsVersions.h"
 
 import HscTypes		( ModuleLocation(..) )
-import CmStaticInfo
+import Packages		( PackageConfig(..) )
 import DriverPhases
 import DriverState
 import Module

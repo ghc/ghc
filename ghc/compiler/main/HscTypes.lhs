@@ -5,6 +5,8 @@
 
 \begin{code}
 module HscTypes ( 
+	GhciMode(..),
+
 	ModuleLocation(..),
 
 	ModDetails(..),	ModIface(..), 
@@ -81,6 +83,18 @@ import SrcLoc		( SrcLoc, isGoodSrcLoc )
 import Util		( thenCmp, sortLt )
 import UniqSupply	( UniqSupply )
 \end{code}
+
+%************************************************************************
+%*									*
+\subsection{Which mode we're in
+%*									*
+%************************************************************************
+
+\begin{code}
+data GhciMode = Batch | Interactive | OneShot 
+     deriving Eq
+\end{code}
+
 
 %************************************************************************
 %*									*

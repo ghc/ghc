@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.78 2001/06/14 12:50:06 simonpj Exp $
+-- $Id: DriverPipeline.hs,v 1.79 2001/06/15 08:29:58 simonpj Exp $
 --
 -- GHC Driver
 --
@@ -26,7 +26,7 @@ module DriverPipeline (
 
 #include "HsVersions.h"
 
-import CmStaticInfo
+import Packages
 import CmTypes
 import GetImports
 import DriverState

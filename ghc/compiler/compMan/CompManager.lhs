@@ -34,7 +34,6 @@ where
 
 import CmLink
 import CmTypes
-import CmStaticInfo	( GhciMode(..) )
 import DriverPipeline
 import DriverFlags	( getDynFlags )
 import DriverPhases

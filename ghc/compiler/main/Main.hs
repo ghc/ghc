@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.71 2001/06/14 15:42:35 simonpj Exp $
+-- $Id: Main.hs,v 1.72 2001/06/15 08:29:58 simonpj Exp $
 --
 -- GHC Driver program
 --
@@ -23,10 +23,11 @@ import InteractiveUI(ghciWelcomeMsg, interactiveUI)
 
 import Finder		( initFinder )
 import CompManager	( cmInit, cmLoadModule )
-import CmStaticInfo	( GhciMode(..), PackageConfig(..) )
+import HscTypes		( GhciMode(..) )
 import Config		( cBooterVersion, cGhcUnregisterised, cProjectVersion )
 import SysTools		( packageConfigPath, initSysTools, cleanTempFiles )
-import ParsePkgConf	( parsePkgConf )
+import Packages		( showPackages, mungePackagePaths )
+import ParsePkgConf	( loadPackageConfig )
 
 import DriverPipeline	( GhcMode(..), doLink, doMkDLL, genPipeline,
 			  getGhcMode, pipeLoop, v_GhcMode
@@ -50,6 +51,7 @@ import CmdLineOpts	( dynFlag,
 			)
 
 import Outputable
+import ErrUtils		( dumpIfSet )
 import Util
 import Panic		( GhcException(..), panic )
 
@@ -138,14 +140,11 @@ main =
    let (minusB_args, argv') = partition (prefixMatch "-B") argv
    top_dir <- initSysTools minusB_args
 
-	-- read the package configuration
-   conf_file <- packageConfigPath
-   r	     <- parsePkgConf conf_file
-   case r of {
-	Left err -> throwDyn (InstallationError (showSDoc err));
-	Right pkg_details -> do
-
-   writeIORef v_Package_details (mungePackagePaths top_dir pkg_details)
+	-- Read the package configuration
+   conf_file	     <- packageConfigPath
+   proto_pkg_details <- loadPackageConfig conf_file
+   let pkg_details    = mungePackagePaths top_dir proto_pkg_details
+   writeIORef v_Package_details pkg_details
 
 	-- find the phase to stop after (i.e. -E, -C, -c, -S flags)
    (flags2, mode, stop_flag) <- getGhcMode argv'
@@ -222,6 +221,7 @@ main =
     	-- complain about any unknown flags
    mapM unknownFlagErr [ f | f@('-':_) <- srcs ]
 
+	-- Display details of the configuration in verbose mode
    verb <- dynFlag verbosity
 
    when (verb >= 2) 
@@ -235,6 +235,8 @@ main =
 
    when (verb >= 3) 
 	(hPutStrLn stderr ("Hsc static flags: " ++ unwords static_opts))
+
+   showPackages pkg_details
 
 	-- initialise the finder
    pkg_avails <- getPackageInfo
@@ -293,22 +295,7 @@ main =
    when (mode == DoMkDependHS) endMkDependHS
    when (mode == DoLink) (doLink o_files)
    when (mode == DoMkDLL) (doMkDLL o_files)
-  }
 
-
--- replace the string "$libdir" at the beginning of a path with the
--- current libdir (obtained from the -B option).
-mungePackagePaths top_dir ps = map munge_pkg ps
- where 
-  munge_pkg p = p{ import_dirs  = munge_paths (import_dirs p),
-		   include_dirs = munge_paths (include_dirs p),
-    		   library_dirs = munge_paths (library_dirs p) }
-
-  munge_paths = map munge_path
-
-  munge_path p 
-	  | Just p' <- my_prefix_match "$libdir" p = top_dir ++ p'
-	  | otherwise = trace ("not: " ++ p) p
 
 
 beginMake :: [String] -> IO ()

@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.158 2001/06/14 15:42:35 simonpj Exp $
+# $Id: Makefile,v 1.159 2001/06/15 08:29:57 simonpj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -175,6 +175,15 @@ SRC_HC_OPTS += \
   -cpp -fglasgow-exts -Rghc-timing \
   -I. -IcodeGen -InativeGen -Iparser \
   -i$(subst $(space),:,$(DIRS)) 
+
+# We should do this, to avoid the use of an explicit path
+# 	in GHC source files (include "../includes/config.h"
+# But alas GHC 4.08 (and others for all I know) uses this very
+# same include path when compiling the .hc files it generates.
+# Disaster!  Then the hc file sees the GHC 5.02 (or whatever)
+# include files.   For the moment we've reverted to using
+# an explicit path in the .hs sources
+#  -I$(GHC_INCLUDE_DIR) \
 
 ifneq "$(mingw32_TARGET_OS)" "1"
 SRC_HC_OPTS += -package concurrent -package posix -package text -package util

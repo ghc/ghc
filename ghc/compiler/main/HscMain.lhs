@@ -64,7 +64,6 @@ import UniqSupply	( mkSplitUniqSupply )
 import Bag		( emptyBag )
 import Outputable
 import Interpreter
-import CmStaticInfo	( GhciMode(..) )
 import HscStats		( ppSourceStats )
 import HscTypes
 import FiniteMap	( FiniteMap, plusFM, emptyFM, addToFM )

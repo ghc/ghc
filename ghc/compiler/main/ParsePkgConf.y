@@ -1,12 +1,17 @@
 {
-module ParsePkgConf (parsePkgConf) where
-import CmStaticInfo
+module ParsePkgConf( loadPackageConfig ) where
+
+import Packages  ( PackageConfig(..), defaultPackageConfig )
 import Lex
 import FastString
 import StringBuffer
 import SrcLoc
 import Outputable
+import Panic     ( GhcException(..) )
+import Exception ( throwDyn )
+
 #include "HsVersions.h"
+
 }
 
 %token
@@ -72,17 +77,17 @@ strs	:: { [String] }
 happyError :: P a
 happyError buf PState{ loc = loc } = PFailed (srcParseErr buf loc)
 
-parsePkgConf :: FilePath -> IO (Either SDoc [PackageConfig])
-parsePkgConf conf_filename = do
+loadPackageConfig :: FilePath -> IO [PackageConfig]
+loadPackageConfig conf_filename = do
    buf <- hGetStringBuffer False conf_filename
    case parse buf PState{ bol = 0#, atbol = 1#,
 	 	          context = [], glasgow_exts = 0#,
   			  loc = mkSrcLoc (_PK_ conf_filename) 1 } of
 	PFailed err -> do
 	    freeStringBuffer buf
-            return (Left err)
+            throwDyn (InstallationError (showSDoc err))
 
 	POk _ pkg_details -> do
 	    freeStringBuffer buf
-	    return (Right pkg_details)
+	    return pkg_details
 }

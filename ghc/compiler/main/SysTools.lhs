@@ -38,6 +38,7 @@ module SysTools (
 	-- Misc
 	showGhcUsage,		-- IO ()	Shows usage message and exits
 	getSysMan,		-- IO String	Parallel system only
+	dosifyPath,		-- String -> String
 
 	runSomething	-- ToDo: make private
  ) where
@@ -65,7 +66,7 @@ import System		( ExitCode(..) )
 #if !defined(mingw32_TARGET_OS)
 import qualified Posix
 #else
-import Ptr              ( nullPtr )
+import Addr              ( nullAddr )
 #endif
 
 #include "HsVersions.h"
@@ -344,8 +345,6 @@ getTopDir minusbs
 	 p1      = dropWhile (not . isSlash) (reverse dir)
 	 p2      = dropWhile (not . isSlash) (tail p1)	-- head is '/'
 	 top_dir = reverse (tail p2)			-- head is '/'
-
-getExecDir = return Nothing
 \end{code}
 
 
@@ -604,18 +603,23 @@ slash s1 s2 = s1 ++ ('/' : s2)
 
 -----------------------------------------------------------------------------
 -- Define	myGetProcessId :: IO Int
+--		getExecDir     :: IO (Maybe String)
 
 #ifdef mingw32_TARGET_OS
 foreign import "_getpid" getProcessID :: IO Int -- relies on Int == Int32 on Windows
-foreign import stdcall "GetCurrentDirectoryA" getCurrentDirectory :: Int32 -> CString -> IO Int32
+
 getExecDir :: IO (Maybe String)
-getExecDir = do len <- getCurrentDirectory 0 nullPtr
+getExecDir = return Nothing
+{-
+foreign import stdcall "GetCurrentDirectoryA" getCurrentDirectory :: Int32 -> CString -> IO Int32
+getExecDir = do len <- getCurrentDirectory 0 nullAddr
 		buf <- mallocArray (fromIntegral len)
 		ret <- getCurrentDirectory len buf
 		if ret == 0 then return Nothing
 		            else do s <- peekCString buf
 				    destructArray (fromIntegral len) buf
 				    return (Just s)
+-}
 #else
 getProcessID :: IO Int
 getProcessID = Posix.getProcessID

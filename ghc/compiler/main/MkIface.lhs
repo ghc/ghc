@@ -21,14 +21,13 @@ import BasicTypes	( Fixity(..), NewOrData(..),
 import RnMonad
 import RnHsSyn		( RenamedInstDecl, RenamedTyClDecl )
 import HscTypes		( VersionInfo(..), ModIface(..), ModDetails(..),
-			  ModuleLocation(..), 
+			  ModuleLocation(..), GhciMode(..),
 			  IfaceDecls, mkIfaceDecls, dcl_tycl, dcl_rules, dcl_insts,
 			  TyThing(..), DFunId, Avails,
 			  WhatsImported(..), GenAvailInfo(..), 
 			  ImportVersion, AvailInfo, Deprecations(..),
 			  lookupVersion,
 			)
-import CmStaticInfo	( GhciMode(..) )
 
 import CmdLineOpts
 import Id		( idType, idInfo, isImplicitId, idCgInfo,

@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.58 2001/06/14 12:50:06 simonpj Exp $
+-- $Id: DriverFlags.hs,v 1.59 2001/06/15 08:29:58 simonpj Exp $
 --
 -- Driver flags
 --
@@ -18,6 +18,7 @@ module DriverFlags (
   ) where
 
 #include "HsVersions.h"
+#include "../includes/config.h"
 
 import DriverState
 import DriverUtil

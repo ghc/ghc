@@ -17,6 +17,7 @@ module Outputable (
 	ifPprDebug, unqualStyle,
 
 	SDoc, 		-- Abstract
+	docToSDoc,
 	interppSP, interpp'SP, pprQuotedList, pprWithCommas,
 	empty, nest,
 	text, char, ptext,
@@ -224,6 +225,9 @@ showSDocDebug d = show (d PprDebug)
 \end{code}
 
 \begin{code}
+docToSDoc :: Doc -> SDoc
+docToSDoc d = \_ -> d
+
 empty sty      = Pretty.empty
 text s sty     = Pretty.text s
 char c sty     = Pretty.char c

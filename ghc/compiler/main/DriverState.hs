@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.44 2001/06/14 12:50:06 simonpj Exp $
+-- $Id: DriverState.hs,v 1.45 2001/06/15 08:29:58 simonpj Exp $
 --
 -- Settings for the driver
 --
@@ -12,7 +12,7 @@ module DriverState where
 #include "../includes/config.h"
 #include "HsVersions.h"
 
-import CmStaticInfo
+import Packages		( PackageConfig(..) )
 import CmdLineOpts
 import DriverUtil
 import Util
