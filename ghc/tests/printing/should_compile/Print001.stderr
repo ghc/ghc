@@ -19,56 +19,48 @@ Print001.MkFoo{-r50-} =
 			       x2_B2
 			       x3_B3}
 AbsBinds
-[a_ta19e, b_ta19g]
+[a_ta19O, b_ta19Q]
 []
-[([a_ta19e, b_ta19g], Print001.g{-r4W-}, g_a1aD)]
-    g_a1aD x_r56 = lit_a1aF
+[([a_ta19O, b_ta19Q], Print001.g{-r4W-}, g_a1bd)]
+    g_a1bd x_r56 = lit_a1bf
 AbsBinds
-[a_ta19y, b_ta19A, c_ta19C]
-[d.Eq_a19H, d.Ord_a19I, d.Ix_a19J]
-[([a_ta19y, b_ta19A, c_ta19C], Print001.f2{-r4X-}, f2_a1aM)]
-    f2_a1aM x_r54 = x_r54
+[a_ta1a8, b_ta1aa, c_ta1ac]
+[d.Eq_a1ah, d.Ord_a1ai, d.Ix_a1aj]
+[([a_ta1a8, b_ta1aa, c_ta1ac], Print001.f2{-r4X-}, f2_a1bm)]
+    f2_a1bm x_r54 = x_r54
 AbsBinds
-[a_ta19Y, b_ta1a0, c_ta1a2]
-[d.Eq_a1a7]
-[([a_ta19Y, b_ta1a0, c_ta1a2], Print001.f{-r4Y-}, f_a1aN)]
-    f_a1aN x_r52 = x_r52
+[a_ta1ay, b_ta1aA, c_ta1aC]
+[d.Eq_a1aH]
+[([a_ta1ay, b_ta1aA, c_ta1aC], Print001.f{-r4Y-}, f_a1bn)]
+    f_a1bn x_r52 = x_r52
 AbsBinds
-[a1ab, a1ad, a1af]
+[a1aL, a1aN, a1aP]
 []
-[([a1ab, a1ad, a1af], Print001.mkFoo{-r4Z-}, mkFoo_a1aO)]
-    mkFoo_a1aO = Print001.MkFoo{-r50-} [a1ab, a1ad, a1af]
+[([a1aL, a1aN, a1aP], Print001.mkFoo{-r4Z-}, mkFoo_a1bo)]
+    mkFoo_a1bo = Print001.MkFoo{-r50-} [a1aL, a1aN, a1aP]
 AbsBinds
-[a_ta1az]
+[a_ta1b9]
 []
-[([a_ta1az], Print001.$dEvalBar0{-r1aL-}, d.Eval_a1an)]
-    d.Eval_a1an =
+[([a_ta1b9], Print001.$dEvalBar0{-r1bl-}, d.Eval_a1aX)]
+    d.Eval_a1aX =
 	PrelErr.error{-87-}
-	    {PrelBase.Eval{-24-} (Print001.Bar{-r5d-} a_ta1az)} "Compiler error: bad dictionary Eval"
+	    {PrelBase.Eval{-24-} (Print001.Bar{-r5d-} a_ta1b9)} "Compiler error: bad dictionary Eval"
 AbsBinds
-[d_ta1aA, e_ta1aC, f_ta1aB]
+[d_ta1ba, e_ta1bc, f_ta1bb]
 []
-[([d_ta1aA, e_ta1aC, f_ta1aB],
-  Print001.$dEvalFoo0{-r1aK-},
-  d.Eval_a1av)]
-    d.Eval_a1av =
+[([d_ta1ba, e_ta1bc, f_ta1bb],
+  Print001.$dEvalFoo0{-r1bk-},
+  d.Eval_a1b5)]
+    d.Eval_a1b5 =
 	PrelErr.error{-87-}
-	    {PrelBase.Eval{-24-} (Print001.Foo{-r5e-} d_ta1aA e_ta1aC f_ta1aB)} "Compiler error: bad dictionary Eval"
-lit_a1aF = fromRational_a1aE 2.0
-fromRational_a1aE =
-    PrelNum.fromRational{-8S-} PrelBase.Float{-3c-} d.Fractional_a1ay
-d.Fractional_a1ay = PrelNum.$dFractionalFloat0{-rGQ-}
+	    {PrelBase.Eval{-24-} (Print001.Foo{-r5e-} d_ta1ba e_ta1bc f_ta1bb)} "Compiler error: bad dictionary Eval"
+lit_a1bf = fromRational_a1be 2.0
+fromRational_a1be =
+    PrelNum.fromRational{-8S-} PrelBase.Float{-3c-} d.Fractional_a1b8
+d.Fractional_a1b8 = PrelNum.$dFractionalFloat0{-rGQ-}
 
 
 ghc: module version changed to 1; reason: no old .hi file
-_interface_ Print001 1 302
-_instance_modules_
-IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
-_usages_
-Ix 1 :: $dIx2 1 $dIx3 1 $dIx4 1 $dIxBool0 1 $dIxChar0 1 $dIxInt0 1 $dIxOrdering0 1 Ix 1;
-PrelBase 1 :: $dEnum0 1 $dEnumBool0 1 $dEnumChar0 1 $dEnumInt0 1 $dEnumOrdering0 1 $dEq0 1 $dEq1 1 $dEqBool0 1 $dEqChar0 1 $dEqInt0 1 $dEqOrdering0 1 $dEval0 1 $dEval1 1 $dEval2 1 $dEvalBool0 1 $dEvalChar0 1 $dEvalDouble0 1 $dEvalFloat0 1 $dEvalInt0 1 $dEvalInteger0 1 $dEvalOrdering0 1 $dNumInt0 1 $dOrd0 1 $dOrd1 1 $dOrdBool0 1 $dOrdChar0 1 $dOrdInt0 1 $dOrdOrdering0 1 $dShow0 1 $dShow1 1 $dShow2 1 $dShowBool0 1 $dShowChar0 1 $dShowInt0 1 $dShowOrdering0 1 $m- 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $mcompare 1 $menumFromThenTo 1 $menumFromTo 1 $mfromInt 1 $mmax 1 $mmin 1 $mshowList 1 Enum 1 Eq 1 Eval 1 Num 1 Ord 1 Ordering 1 Show 1 String 1;
-PrelNum 1 :: $dEnumDouble0 1 $dEnumFloat0 1 $dEnumInteger0 1 $dEnumRatio0 1 $dEqDouble0 1 $dEqFloat0 1 $dEqInteger0 1 $dEqRatio0 1 $dEvalRatio0 1 $dFractionalDouble0 1 $dFractionalFloat0 1 $dFractionalRatio0 1 $dIntegralInt0 1 $dIntegralInteger0 1 $dIxInteger0 1 $dNumDouble0 1 $dNumFloat0 1 $dNumInteger0 1 $dNumRatio0 1 $dOrdDouble0 1 $dOrdFloat0 1 $dOrdInteger0 1 $dOrdRatio0 1 $dRealDouble0 1 $dRealFloat0 1 $dRealInt0 1 $dRealInteger0 1 $dRealRatio0 1 $dShowDouble0 1 $dShowFloat0 1 $dShowInteger0 1 $dShowRatio0 1 $mdiv 1 $mdivMod 1 $mmod 1 $mquot 1 $mrecip 1 $mrem 1 Fractional 1 Integral 1 Ratio 1 Rational 1 Real 1;
-PrelTup 1 :: $dEq0 1 $dEq1 1 $dEval0 1 $dEval1 1 $dOrd0 1 $dOrd1 1 $dShow2 1 $dShow3 1;
 _exports_
 Print001 f f2 g mkFoo Bar(BarNil BarCon) Foo(MkFoo);
 _instances_

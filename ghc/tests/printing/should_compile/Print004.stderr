@@ -13,82 +13,77 @@ ExportOpaque.Junk11{-r4-} =
 ExportOpaque.Junk2{-r3-} =
     _/\_ a_tr6V -> ExportOpaque.Junk2{-r3-} {_@_ a_tr6V}
 AbsBinds
-[a_taQG]
+[a_taRg]
 []
-[([a_taQG], ExportOpaque.$dEvalOpaqueType0{-rQJ-}, d.Eval_aPf)]
-    d.Eval_aPf =
+[([a_taRg], ExportOpaque.$dEvalOpaqueType0{-rRj-}, d.Eval_aPP)]
+    d.Eval_aPP =
 	PrelErr.error{-87-}
-	    {PrelBase.Eval{-24-} (ExportOpaque.OpaqueType{-r1e-} a_taQG)} "Compiler error: bad dictionary Eval"
+	    {PrelBase.Eval{-24-} (ExportOpaque.OpaqueType{-r1e-} a_taRg)} "Compiler error: bad dictionary Eval"
 AbsBinds
-[a_taQH]
+[a_taRh]
 []
-[([a_taQH],
-  ExportOpaque.$dEvalFunnyInternalType0{-rQO-},
-  d.Eval_aPl)]
-    d.Eval_aPl =
+[([a_taRh],
+  ExportOpaque.$dEvalFunnyInternalType0{-rRo-},
+  d.Eval_aPV)]
+    d.Eval_aPV =
 	PrelErr.error{-87-}
-	    {PrelBase.Eval{-24-} (ExportOpaque.FunnyInternalType{-r6P-} a_taQH)} "Compiler error: bad dictionary Eval"
+	    {PrelBase.Eval{-24-} (ExportOpaque.FunnyInternalType{-r6P-} a_taRh)} "Compiler error: bad dictionary Eval"
 AbsBinds
-[a_taPu]
-[d.Ord_aPW]
-[([a_taPu], ExportOpaque.$dShowOpaqueType0{-rQN-}, d.Show_aPr)]
-    showsPrec_aQP =
+[a_taQ4]
+[d.Ord_aQw]
+[([a_taQ4], ExportOpaque.$dShowOpaqueType0{-rRn-}, d.Show_aQ1)]
+    showsPrec_aRp =
 	PrelBase.showsPrec{-r5W-}
-	    (ExportOpaque.FunnyInternalType{-r6P-} a_taPu)
-	    d.Show_aQ6
-    showsPrec_aQI = showsPrec_aPF
-    d.Show_aQ6 =
-	ExportOpaque.$dShowFunnyInternalType0{-rQM-} a_taPu d.Ord_aQ8
-    d.Ord_aQ8 = d.Ord_aPW
-    AbsBinds [] [] [([], showList_aPt, showList_aQQ)]
-	showList_aQQ = PrelBase.showList__{-r70-}
-			   (ExportOpaque.OpaqueType{-r1e-} a_taPu) showsPrec_aQI PrelBase.I#{-5b-} 0#
-    AbsBinds [] [] [([], showsPrec_aPF, showsPrec_aQR)]
-	showsPrec_aQR a_rOA (ExportOpaque.Con{-r6Q-} b1_rOB)
-		      = PrelBase.showParen{-r6t-} a_rOA >=_aQK lit_aQL
+	    (ExportOpaque.FunnyInternalType{-r6P-} a_taQ4)
+	    d.Show_aQG
+    showsPrec_aRi = showsPrec_aQf
+    d.Show_aQG =
+	ExportOpaque.$dShowFunnyInternalType0{-rRm-} a_taQ4 d.Ord_aQI
+    d.Ord_aQI = d.Ord_aQw
+    AbsBinds [] [] [([], showList_aQ3, showList_aRq)]
+	showList_aRq = PrelBase.showList__{-r70-}
+			   (ExportOpaque.OpaqueType{-r1e-} a_taQ4) showsPrec_aRi PrelBase.I#{-5b-} 0#
+    AbsBinds [] [] [([], showsPrec_aQf, showsPrec_aRr)]
+	showsPrec_aRr a_rPa (ExportOpaque.Con{-r6Q-} b1_rPb)
+		      = PrelBase.showParen{-r6t-} a_rPa >=_aRk lit_aRl
 						  PrelBase..{-r6D-}
 						      [PrelBase.String{-r5U-}, PrelBase.String{-r5U-}, PrelBase.String{-r5U-}] PrelBase.showString{-r6s-} "Con "
-															       showsPrec_aQP PrelBase.I#{-5b-} 10#
-																	     b1_rOB
-    d.Show_aPr =
-	PrelBase.:Show{-r1d-}
-	    (ExportOpaque.OpaqueType{-r1e-} a_taPu) showList_aPt showsPrec_aPF
+															       showsPrec_aRp PrelBase.I#{-5b-} 10#
+																	     b1_rPb
+    d.Show_aQ1 =
+	PrelBase.:Show{-r1d-} (ExportOpaque.OpaqueType{-r1e-} a_taQ4)
+			      showList_aQ3
+			      showsPrec_aQf
 AbsBinds
-[a_taQk]
-[d.Ord_aQw]
-[([a_taQk],
-  ExportOpaque.$dShowFunnyInternalType0{-rQM-},
-  d.Show_aQh)]
-    $mshowList_aQS =
+[a_taQU]
+[d.Ord_aR6]
+[([a_taQU],
+  ExportOpaque.$dShowFunnyInternalType0{-rRm-},
+  d.Show_aQR)]
+    $mshowList_aRs =
 	PrelBase.$mshowList{-ri7-}
-	    (ExportOpaque.FunnyInternalType{-r6P-} a_taQk)
-	    d.Show_aQA
-    d.Show_aQA = d.Show_aQh
-    AbsBinds [] [] [([], showList_aQj, showList_aQT)]
-	showList_aQT = $mshowList_aQS
-    AbsBinds [] [] [([], showsPrec_aQs, showsPrec_aQU)]
-	showsPrec_aQU
+	    (ExportOpaque.FunnyInternalType{-r6P-} a_taQU)
+	    d.Show_aRa
+    d.Show_aRa = d.Show_aQR
+    AbsBinds [] [] [([], showList_aQT, showList_aRt)]
+	showList_aRt = $mshowList_aRs
+    AbsBinds [] [] [([], showsPrec_aR2, showsPrec_aRu)]
+	showsPrec_aRu
 	    = PrelErr.noMethodBindingError{-8k-}
 		  (PrelBase.Int{-3f-}
-		   -> ExportOpaque.FunnyInternalType{-r6P-} a_taQk
+		   -> ExportOpaque.FunnyInternalType{-r6P-} a_taQU
 		   -> PrelBase.String{-r5U-}
 		   -> PrelBase.String{-r5U-}) "Print004.hs:18|showsPrec"
-    d.Show_aQh =
-	PrelBase.:Show{-r1d-}
-	    (ExportOpaque.FunnyInternalType{-r6P-} a_taQk) showList_aQj
-							   showsPrec_aQs
-lit_aQL = PrelBase.I#{-5b-} 10#
->=_aQK = PrelBase.>={-8Y-} PrelBase.Int{-3f-} d.Ord_aQF
-d.Ord_aQF = PrelBase.$dOrdInt0{-rdN-}
+    d.Show_aQR =
+	PrelBase.:Show{-r1d-} (ExportOpaque.FunnyInternalType{-r6P-} a_taQU)
+			      showList_aQT
+			      showsPrec_aR2
+lit_aRl = PrelBase.I#{-5b-} 10#
+>=_aRk = PrelBase.>={-8Y-} PrelBase.Int{-3f-} d.Ord_aRf
+d.Ord_aRf = PrelBase.$dOrdInt0{-rdN-}
 
 
 ghc: module version changed to 1; reason: no old .hi file
-_interface_ ExportOpaque 1 302
-_instance_modules_
-IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
-_usages_
-PrelBase 1 :: $dEq0 1 $dEq1 1 $dEqBool0 1 $dEqChar0 1 $dEqInt0 1 $dEqOrdering0 1 $dEval0 1 $dEval1 1 $dEval2 1 $dEvalBool0 1 $dEvalChar0 1 $dEvalDouble0 1 $dEvalInt0 1 $dEvalInteger0 1 $dEvalOrdering0 1 $dNumInt0 1 $dOrd0 1 $dOrd1 1 $dOrdBool0 1 $dOrdChar0 1 $dOrdInt0 1 $dOrdOrdering0 1 $dShow0 1 $dShow1 1 $dShow2 1 $dShowBool0 1 $dShowChar0 1 $dShowInt0 1 $dShowOrdering0 1 $m- 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $mcompare 1 $mfromInt 1 $mmax 1 $mmin 1 $mshowList 1 . 1 showList__ 1 showParen 1 showSpace 1 showString 1 Eq 1 Eval 1 Num 1 Ord 1 Ordering 1 Show 1 ShowS 1 String 1;
-PrelNum 1 :: $dEqDouble0 1 $dEqInteger0 1 $dNumDouble0 1 $dNumInteger0 1 $dOrdDouble0 1 $dOrdInteger0 1 $dShowDouble0 1 $dShowInteger0 1;
 _exports_
 ExportOpaque OpaqueType;
 _instances_
