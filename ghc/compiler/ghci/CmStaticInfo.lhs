@@ -13,7 +13,7 @@ import List		( nub )
 import Char		( isUpper )
 import Directory	( getDirectoryContents )
 
-import Module		( ModuleName, PackageName )
+import Module		( ModuleName, mkModuleName, PackageName )
 \end{code}
 
 \begin{code}
@@ -63,7 +63,7 @@ mk_module_table raw_info
         return iface_table
      where
         fsifyStrings (mod_str, pkg_str, path_str)
-           = (_PK_ mod_str, _PK_ pkg_str, path_str)
+           = (mkModuleName mod_str, _PK_ pkg_str, path_str)
         -- nm_and_paths :: Package -> [(PkgName,Path)]
         nm_and_paths package 
            = [(name package, path) | path <- nub (import_dirs package)]

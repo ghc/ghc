@@ -21,7 +21,8 @@ in a different DLL, by setting the DLL flag.
 \begin{code}
 module Module 
     (
-      Module		    -- abstract, instance of Eq, Ord, Outputable
+      Module, mod_name, mod_kind
+			    -- abstract, instance of Eq, Ord, Outputable
     , ModuleName
     , ModuleKind(..)
     , isPackageKind
@@ -40,12 +41,13 @@ module Module
     
 --    , isLocalModule       -- :: Module -> Bool
 
-    , mkSrcModule
+--    , mkSrcModule
 
-    , mkSrcModuleFS         -- :: UserFS    -> ModuleName
-    , mkSysModuleFS         -- :: EncodedFS -> ModuleName
+    , mkModuleName		-- :: UserString -> ModuleName
+    , mkModuleNameFS		-- :: UserFS    -> ModuleName
+    , mkSysModuleNameFS		-- :: EncodedFS -> ModuleName
 
-    , pprModule, pprModuleName
+    , pprModule,
  
     , PackageName
 
@@ -137,35 +139,53 @@ instance Outputable WhereFrom where
 %************************************************************************
 
 \begin{code}
-type ModuleName = EncodedFS
+newtype ModuleName = ModuleName EncodedFS
 	-- Haskell module names can include the quote character ',
 	-- so the module names have the z-encoding applied to them
 
+instance Uniquable ModuleName where
+  getUnique (ModuleName nm) = mkUniqueGrimily (uniqueOfFS nm)
+
+instance Eq ModuleName where
+  nm1 == nm2 = getUnique nm1 == getUnique nm2
+
+-- Warning: gives an ordering relation based on the uniques of the
+-- FastStrings which are the (encoded) module names.  This is _not_
+-- a lexicographical ordering.
+instance Ord ModuleName where
+  nm1 `compare` nm2 = getUnique nm1 `compare` getUnique nm2
+
+instance Outputable ModuleName where
+  ppr = pprModuleName
+
+
 pprModuleName :: ModuleName -> SDoc
-pprModuleName nm = pprEncodedFS nm
+pprModuleName (ModuleName nm) = pprEncodedFS nm
 
 moduleNameString :: ModuleName -> EncodedString
-moduleNameString mod = _UNPK_ mod
+moduleNameString (ModuleName mod) = _UNPK_ mod
 
 moduleNameUserString :: ModuleName -> UserString
-moduleNameUserString mod = decode (_UNPK_ mod)
+moduleNameUserString (ModuleName mod) = decode (_UNPK_ mod)
 
-mkSrcModule :: UserString -> ModuleName
-mkSrcModule s = _PK_ (encode s)
+-- used to be called mkSrcModule
+mkModuleName :: UserString -> ModuleName
+mkModuleName s = ModuleName (_PK_ (encode s))
 
-mkSrcModuleFS :: UserFS -> ModuleName
-mkSrcModuleFS s = encodeFS s
+-- used to be called mkSrcModuleFS
+mkModuleNameFS :: UserFS -> ModuleName
+mkModuleNameFS s = ModuleName (encodeFS s)
 
-mkSysModuleFS :: EncodedFS -> ModuleName
-mkSysModuleFS s = s 
+-- used to be called mkSysModuleFS
+mkSysModuleNameFS :: EncodedFS -> ModuleName
+mkSysModuleNameFS s = ModuleName s 
 \end{code}
 
 \begin{code}
-data Module 
-   = Module {
-        mod_name :: ModuleName,
-        mod_kind :: ModuleKind
-     }
+data Module = Module ModuleName ModuleKind
+
+mod_name (Module nm kind) = nm
+mod_kind (Module nm kind) = kind
 \end{code}
 
 \begin{code}
@@ -173,7 +193,7 @@ instance Outputable Module where
   ppr = pprModule
 
 instance Uniquable Module where
-  getUnique (Module nm _) = mkUniqueGrimily (uniqueOfFS nm)
+  getUnique (Module nm _) = getUnique nm
 
 -- Same if they have the same name.
 instance Eq Module where
@@ -226,7 +246,7 @@ mkModule = Module
 --mkPrelModule name = mkModule name preludePackage
 
 moduleString :: Module -> EncodedString
-moduleString (Module mod _) = _UNPK_ mod
+moduleString (Module (ModuleName fs) _) = _UNPK_ fs
 
 moduleName :: Module -> ModuleName
 moduleName (Module mod _) = mod

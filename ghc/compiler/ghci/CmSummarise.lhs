@@ -15,14 +15,15 @@ where
 import List 		( nub )
 import Char		( ord, isAlphaNum )
 
-import CmFind	 	( ModName, ModLocation(..), ml_modname )
+import Module		( Module, mod_name, mod_kind, 
+			  ModuleName, mkModuleName, ModuleKind(..) )
 import Outputable
 \end{code}
 
 \begin{code}
 
 
--- The ModLocation contains the original source filename of the module.
+-- The Module contains the original source filename of the module.
 -- The ms_ppsource field contains another filename, which is intended to
 -- be the cleaned-up source file after all preprocessing has happened to
 -- it.  The point is that the summariser will have to cpp/unlit/whatever
@@ -31,7 +32,7 @@ import Outputable
 -- and let @compile@ read from that file on the way back up.
 data ModSummary
    = ModSummary {
-        ms_loc      :: ModLocation,                     -- location and kind
+        ms_mod      :: Module,                          -- location and kind
         ms_ppsource :: (Maybe (FilePath, Fingerprint)), -- preprocessed and sig if .hs
         ms_imports  :: (Maybe [ModImport])              -- imports if .hs or .hi
      }
@@ -39,7 +40,7 @@ data ModSummary
 instance Outputable ModSummary where
    ppr ms
       = sep [text "ModSummary {",
-             nest 3 (sep [text "ms_loc =" <+> ppr (ms_loc ms),
+             nest 3 (sep [text "ms_mod =" <+> ppr (ms_mod ms),
              text "ms_ppsource =" <+> fooble (ms_ppsource ms),
              text "ms_imports=" <+> ppr (ms_imports ms)]),
              char '}'
@@ -51,21 +52,21 @@ instance Outputable ModSummary where
                 <+> text (show cppd_source_name) <> text ")"
 
 data ModImport
-   = MINormal ModName | MISource ModName
+   = MINormal ModuleName | MISource ModuleName
      deriving Eq
 
 instance Outputable ModImport where
-   ppr (MINormal nm) = text nm
-   ppr (MISource nm) = text "{-# SOURCE #-}" <+> text nm
+   ppr (MINormal nm) = ppr nm
+   ppr (MISource nm) = text "{-# SOURCE #-}" <+> ppr nm
 
 
 mi_name (MINormal nm) = nm
 mi_name (MISource nm) = nm
 
-name_of_summary :: ModSummary -> ModName
-name_of_summary = ml_modname . ms_loc
+name_of_summary :: ModSummary -> ModuleName
+name_of_summary = mod_name . ms_mod
 
-deps_of_summary :: ModSummary -> [ModName]
+deps_of_summary :: ModSummary -> [ModuleName]
 deps_of_summary = map mi_name . ms_get_imports
 
 ms_get_imports :: ModSummary -> [ModImport]
@@ -74,24 +75,21 @@ ms_get_imports summ
 
 type Fingerprint = Int
 
-summarise :: ModLocation -> IO ModSummary
-
-summarise loc
-   = case loc of
-        InPackage mod path -- if in a package, investigate no further
-           -> return (ModSummary loc Nothing Nothing)
-        SourceOnly mod path -- source; read, cache and get imports
+summarise :: Module -> IO ModSummary
+summarise mod
+   = case mod_kind mod of
+        InPackage path -- if in a package, investigate no further
+           -> return (ModSummary mod Nothing Nothing)
+        SourceOnly path -- source; read, cache and get imports
            -> readFile path >>= \ modsrc ->
               let imps = getImports modsrc
                   fp   = fingerprint modsrc
-              in  return (ModSummary loc (Just (path,fp)) (Just imps))
-        ObjectCode mod oPath hiPath -- can we get away with the src summariser
-                                    -- for interface files?
+              in  return (ModSummary mod (Just (path,fp)) (Just imps))
+        ObjectCode oPath hiPath -- can we get away with the src summariser
+                                -- for interface files?
            -> readFile hiPath >>= \ hisrc ->
               let imps = getImports hisrc
-              in  return (ModSummary loc Nothing (Just imps))
-        NotFound
-           -> pprPanic "summarise:NotFound" (ppr loc)
+              in  return (ModSummary mod Nothing (Just imps))
 
 fingerprint :: String -> Int
 fingerprint s
@@ -123,17 +121,18 @@ gmiBase s
      where
 	f ("foreign" : "import" : ws) = f ws
         f ("import" : "{-#" : "SOURCE" : "#-}" : "qualified" : m : ws) 
-           = MISource (takeWhile isModId m) : f ws
+           = MISource (mkMN m) : f ws
         f ("import" : "{-#" : "SOURCE" : "#-}" : m : ws) 
-           = MISource (takeWhile isModId m) : f ws
+           = MISource (mkMN m) : f ws
         f ("import" : "qualified" : m : ws) 
-           = MINormal (takeWhile isModId m) : f ws
+           = MINormal (mkMN m) : f ws
         f ("import" : m : ws) 
-           = MINormal (takeWhile isModId m) : f ws
+           = MINormal (mkMN m) : f ws
         f (w:ws) = f ws
         f [] = []
 
-isModId c = isAlphaNum c || c `elem` "'_"
+        mkMN str = mkModuleName (takeWhile isModId str)
+        isModId c = isAlphaNum c || c `elem` "'_"
 
 -- remove literals and comments from a string
 clean :: String -> String
