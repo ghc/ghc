@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfRts.h,v 1.6 1999/09/16 12:29:55 simonmar Exp $
+ * $Id: ProfRts.h,v 1.7 1999/12/03 15:55:29 chak Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -17,14 +17,9 @@ void endProfiling  ( void );
 void report_ccs_profiling ( void );
 void heap_profile_finish (void);
 
-void initProfiling ( void );
-void endProfiling  ( void );
-
 void PrintNewStackDecls ( void );
 
 void print_ccs (FILE *, CostCentreStack *);
-
-void report_ccs_profiling( void );
 
 # define DEFAULT_INTERVAL TICK_FREQUENCY
 

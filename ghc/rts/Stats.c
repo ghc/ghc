@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.18 1999/11/11 13:17:36 simonmar Exp $
+ * $Id: Stats.c,v 1.19 1999/12/03 15:55:29 chak Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -160,9 +160,15 @@ elapsedtime(void)
 
 /* mut_user_time_during_GC() and mut_user_time()
  *
- * This function can be used to get the current mutator time *during*
- * a GC, i.e. between stat_startGC and stat_endGC.  This is used in
- * the heap profiler for accurately time stamping the heap sample.
+ * The former function can be used to get the current mutator time
+ * *during* a GC, i.e. between stat_startGC and stat_endGC.  This is
+ * used in the heap profiler for accurately time stamping the heap
+ * sample.  
+ *
+ * ATTENTION: mut_user_time_during_GC() relies on GC_start_time being 
+ *	      defined in stat_startGC() - to minimise system calls, 
+ *	      GC_start_time is, however, only defined when really needed (check
+ *	      stat_startGC() for details)
  */
 double
 mut_user_time_during_GC(void)
@@ -354,6 +360,11 @@ stat_endExit(void)
 
 static nat rub_bell = 0;
 
+/*  initialise global variables needed during GC
+ *
+ *  * GC_start_time is read in mut_user_time_during_GC(), which in turn is 
+ *    needed if either PROFILING or DEBUGing is enabled
+ */
 void
 stat_startGC(void)
 {
@@ -370,8 +381,14 @@ stat_startGC(void)
 	}
     }
 
+#if defined(PROFILING) || defined(DEBUG)
+    GC_start_time = usertime();  /* needed in mut_user_time_during_GC() */
+#endif
+
     if (sf != NULL) {
-	GC_start_time = usertime();
+#if !defined(PROFILING) && !defined(DEBUG)
+        GC_start_time = usertime();
+#endif
 	GCe_start_time = elapsedtime();
 	if (RtsFlags.GcFlags.giveStats) {
 	  GC_start_faults = pagefaults();
@@ -391,8 +408,8 @@ stat_endGC(lnat alloc, lnat collect, lnat live, lnat copied, lnat gen)
     if (sf != NULL) {
 	double time     = usertime();
 	double etime    = elapsedtime();
-	double gc_time  = time-GC_start_time;
-	double gc_etime = etime-GCe_start_time;
+	double gc_time  = time - GC_start_time;
+	double gc_etime = etime - GCe_start_time;
 
 	if (RtsFlags.GcFlags.giveStats >= VERBOSE_GC_STATS) {
 	    nat faults = pagefaults();
@@ -412,7 +429,7 @@ stat_endGC(lnat alloc, lnat collect, lnat live, lnat copied, lnat gen)
 	    fflush(sf);
 	}
 
-	GC_coll_times[gen] += time-GC_start_time;
+	GC_coll_times[gen] += gc_time;
 
 	GC_tot_copied += (ullong) copied;
 	GC_tot_alloc  += (ullong) alloc;
