@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.9 2000/02/28 10:57:44 simonmar Exp $
+ * $Id: Itimer.c,v 1.10 2000/03/14 01:43:27 sof Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -45,7 +45,12 @@
 lnat total_ticks = 0;
 rtsBool do_prof_ticks = rtsFalse;
 
-static void handle_tick(int unused STG_UNUSED);
+static
+void
+#if defined(mingw32_TARGET_OS) || (defined(cygwin32_TARGET_OS) && !defined(HAVE_SETITIMER))
+CALLBACK
+#endif
+handle_tick(int unused STG_UNUSED);
 
 /* -----------------------------------------------------------------------------
    Tick handler
@@ -58,7 +63,11 @@ static void handle_tick(int unused STG_UNUSED);
    signal handler.
    -------------------------------------------------------------------------- */
 
-static void
+static
+void
+#if defined(mingw32_TARGET_OS) || (defined(cygwin32_TARGET_OS) && !defined(HAVE_SETITIMER))
+CALLBACK
+#endif
 handle_tick(int unused STG_UNUSED)
 {
   total_ticks++;
@@ -87,6 +96,22 @@ handle_tick(int unused STG_UNUSED)
 
 #if defined(mingw32_TARGET_OS) || (defined(cygwin32_TARGET_OS) && !defined(HAVE_SETITIMER))
 
+/* 
+ * Sigh - to avoid requiring anyone that wants to build ghc to have
+ * to augment the Win32 header files that comes with cygwinb20.1,
+ * include the missing MM API decls here inline.
+ *
+ * ToDo: check and remove these once the next version of cygwin is
+ * released.
+ */
+#define TIMERR_NOERROR   0
+#define TIMERR_NOCANDO   97
+#define TIME_PERIODIC    1
+
+typedef UINT MMRESULT;
+typedef void CALLBACK (*TIMECALLBACK) (UINT, UINT, DWORD, DWORD, DWORD);
+typedef TIMECALLBACK *LPTIMECALLBACK;
+MMRESULT STDCALL  timeSetEvent(UINT, UINT, LPTIMECALLBACK, DWORD, UINT);
 /*
   vtalrm_handler is assigned and set up in Signals.c
 
