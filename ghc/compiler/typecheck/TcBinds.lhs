@@ -64,6 +64,8 @@ import Unique		( Unique )
 import SrcLoc           ( SrcLoc )
 
 import Outputable	--( interppSP, interpp'SP )
+
+
 \end{code}
 
 
@@ -635,7 +637,15 @@ tcPragmaSigs :: [RenamedSig]			-- The pragma signatures
 		       TcHsBinds s,
 		       LIE s)
 
-tcPragmaSigs sigs = returnTc ( \name -> NoPragmaInfo, EmptyBinds, emptyLIE )
+-- For now we just deal with INLINE pragmas
+tcPragmaSigs sigs = returnTc (prag_fn, EmptyBinds, emptyLIE )
+  where
+    prag_fn name | any has_inline sigs = IWantToBeINLINEd
+		 | otherwise	       = NoPragmaInfo
+		 where
+		    has_inline (InlineSig n _) = (n == name)
+		    has_inline other	       = False
+		
 
 {- 
 tcPragmaSigs sigs
