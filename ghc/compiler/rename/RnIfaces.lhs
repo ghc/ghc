@@ -44,12 +44,14 @@ import FiniteMap	( FiniteMap, sizeFM, emptyFM, delFromFM,
 			  fmToList
 			)
 import Name		( Name {-instance NamedThing-},
-			  nameModule, moduleUserString, pprModule, isLocallyDefined,
-			  isWiredInName, maybeWiredInTyConName,  pprModule,
-			  maybeWiredInIdName, nameUnique, NamedThing(..)
+			  nameModule, isLocallyDefined,
+			  isWiredInName, maybeWiredInTyConName,
+			  maybeWiredInIdName, nameUnique, NamedThing(..),
+			  pprEncodedFS
 			 )
-import OccName		( Module, mkBootModule, 
-			  moduleIfaceFlavour, bootFlavour, hiFile
+import Module		( Module, mkBootModule, moduleString, pprModule, 
+			  mkDynamicModule, moduleIfaceFlavour, bootFlavour, hiFile,
+			  moduleUserString, moduleFS, setModuleFlavour
 			)
 import RdrName		( RdrName, rdrNameOcc )
 import NameSet
@@ -162,16 +164,15 @@ count_decls decls
 %*********************************************************
 
 \begin{code}
-loadHomeInterface :: SDoc -> Name -> RnMG Ifaces
+loadHomeInterface :: SDoc -> Name -> RnMG (Module, Ifaces)
 loadHomeInterface doc_str name
   = loadInterface doc_str (nameModule name)
 
-loadInterface :: SDoc -> Module -> RnMG Ifaces
+loadInterface :: SDoc -> Module -> RnMG (Module, Ifaces)
 loadInterface doc_str load_mod
  = getIfacesRn 		`thenRn` \ ifaces ->
    let
 	new_hif		     = moduleIfaceFlavour load_mod
-	this_mod 	     = iMod ifaces
 	mod_map  	     = iModMap ifaces
 	(insts, tycls_names) = iDefInsts ifaces
    in
@@ -181,7 +182,7 @@ loadInterface doc_str load_mod
 		| bootFlavour new_hif || not (bootFlavour existing_hif)
 		-> 	-- Already in the cache, and new version is no better than old,
 			-- so don't re-read it
-		    returnRn ifaces ;
+		    returnRn (setModuleFlavour existing_hif load_mod, ifaces) ;
 	other ->
 
 	-- READ THE MODULE IN
@@ -195,10 +196,11 @@ loadInterface doc_str load_mod
 			new_ifaces = ifaces { iModMap = new_mod_map }
 		   in
 		   setIfacesRn new_ifaces		`thenRn_`
-		   failWithRn new_ifaces (noIfaceErr load_mod) ;
+		   failWithRn (load_mod, new_ifaces) (noIfaceErr load_mod) ;
 
 	-- Found and parsed!
-	Just (ParsedIface _ mod_vers usages exports rd_inst_mods rd_decls rd_insts) ->
+	Just (the_mod, ParsedIface mod_vers usages exports rd_inst_mods rd_decls rd_insts) ->
+
 
 	-- LOAD IT INTO Ifaces
 	-- First set the module
@@ -209,7 +211,7 @@ loadInterface doc_str load_mod
 	-- 	explicitly tag each export which seems a bit of a bore)
 
     getModuleRn 		`thenRn` \ this_mod ->
-    setModuleRn load_mod  $	-- First set the module name of the module being loaded,
+    setModuleRn the_mod  $	-- First set the module name of the module being loaded,
 				-- so that unqualified occurrences in the interface file
 				-- get the right qualifer
     foldlRn loadDecl (iDecls ifaces) rd_decls		`thenRn` \ new_decls ->
@@ -218,19 +220,22 @@ loadInterface doc_str load_mod
 
     mapRn (loadExport this_mod) exports			`thenRn` \ avails_s ->
     let
-	 mod_details = (new_hif, mod_vers, concat avails_s)
+	  -- Notice: the 'flavour' of the loaded Module does not have to 
+	  --  be the same as the requested Module.
+  	 the_mod_hif = moduleIfaceFlavour the_mod
+	 mod_details = (the_mod_hif, mod_vers, concat avails_s)
 
 			-- Exclude this module from the "special-inst" modules
 	 new_inst_mods = iInstMods ifaces `unionLists` (filter (/= this_mod) rd_inst_mods)
 
-	 new_ifaces = ifaces { iModMap   = addToFM mod_map load_mod mod_details,
+	 new_ifaces = ifaces { iModMap   = addToFM mod_map the_mod mod_details,
 			       iDecls    = new_decls,
 			       iFixes    = new_fixities,
 			       iDefInsts = (new_insts, tycls_names),
 			       iInstMods = new_inst_mods  }
     in
     setIfacesRn new_ifaces		`thenRn_`
-    returnRn new_ifaces
+    returnRn (the_mod, new_ifaces)
     }}
 
 loadExport :: Module -> ExportItem -> RnMG [AvailInfo]
@@ -253,16 +258,17 @@ loadExport this_mod (mod, entities)
 	-- but it's a bogus thing to do!
 
   | otherwise
-  = mapRn load_entity entities
+  = setModuleFlavourRn mod `thenRn` \ mod' ->
+    mapRn (load_entity mod') entities
   where
-    new_name occ = newImportedGlobalName mod occ
+    new_name mod occ = newImportedGlobalName mod occ
 
-    load_entity (Avail occ)
-      =	new_name occ 		`thenRn` \ name ->
+    load_entity mod (Avail occ)
+      =	new_name mod occ	`thenRn` \ name ->
 	returnRn (Avail name)
-    load_entity (AvailTC occ occs)
-      =	new_name occ 		`thenRn` \ name ->
-        mapRn new_name occs 	`thenRn` \ names ->
+    load_entity mod (AvailTC occ occs)
+      =	new_name mod occ	      `thenRn` \ name ->
+        mapRn (new_name mod) occs     `thenRn` \ names ->
         returnRn (AvailTC name names)
 
 
@@ -377,7 +383,7 @@ checkUpToDate mod_name
 				    pprModule mod_name])	`thenRn_`
 		    returnRn False
 
-	Just (ParsedIface _ _ usages _ _ _ _) 
+	Just (_, ParsedIface _ usages _ _ _ _) 
 		-> 	-- Found it, so now check it
 		    checkModUsage usages
   where
@@ -387,7 +393,7 @@ checkUpToDate mod_name
 checkModUsage [] = returnRn True		-- Yes!  Everything is up to date!
 
 checkModUsage ((mod, old_mod_vers, whats_imported) : rest)
-  = loadInterface doc_str mod 		`thenRn` \ ifaces ->
+  = loadInterface doc_str mod 		`thenRn` \ (mod, ifaces) ->
     let
 	maybe_new_mod_vers	  = lookupFM (iModMap ifaces) mod
 	Just (_, new_mod_vers, _) = maybe_new_mod_vers
@@ -488,7 +494,7 @@ importDecl (name, loc) mode
 getNonWiredInDecl :: Name -> SrcLoc -> RnMode -> RnMG (Maybe RdrNameHsDecl)
 getNonWiredInDecl needed_name loc mode
   = traceRn doc_str				`thenRn_`
-    loadHomeInterface doc_str needed_name	`thenRn` \ ifaces ->
+    loadHomeInterface doc_str needed_name	`thenRn` \ (_, ifaces) ->
     case lookupNameEnv (iDecls ifaces) needed_name of
 
 	-- Special case for data/newtype type declarations
@@ -630,17 +636,17 @@ get_wired_tycon tycon
 %*********************************************************
 
 \begin{code}
-getInterfaceExports :: Module -> RnMG Avails
+getInterfaceExports :: Module -> RnMG (Module, Avails)
 getInterfaceExports mod
-  = loadInterface doc_str mod	`thenRn` \ ifaces ->
+  = loadInterface doc_str mod	`thenRn` \ (mod, ifaces) ->
     case lookupFM (iModMap ifaces) mod of
 	Nothing ->	-- Not there; it must be that the interface file wasn't found;
 			-- the error will have been reported already.
 			-- (Actually loadInterface should put the empty export env in there
 			--  anyway, but this does no harm.)
-		      returnRn []
+		      returnRn (mod, [])
 
-	Just (_, _, avails) -> returnRn avails
+	Just (_, _, avails) -> returnRn (mod, avails)
   where
     doc_str = sep [pprModule mod, ptext SLIT("is directly imported")]
 \end{code}
@@ -1031,7 +1037,7 @@ getDeclSysBinders new_name other_decl
 %*********************************************************
 
 \begin{code}
-findAndReadIface :: SDoc -> Module -> RnMG (Maybe ParsedIface)
+findAndReadIface :: SDoc -> Module -> RnMG (Maybe (Module, ParsedIface))
 	-- Nothing <=> file not found, or unreadable, or illegible
 	-- Just x  <=> successfully found and parsed 
 
@@ -1043,7 +1049,7 @@ findAndReadIface doc_str mod_name
     getModuleHiMap from_hi_boot		`thenRn` \ himap ->
     case (lookupFM himap (moduleUserString mod_name)) of
          -- Found the file
-       Just fpath -> readIface fpath
+       Just fpath -> readIface mod_name fpath
     	 -- Hack alert!  When compiling PrelBase we have to load the
 	 -- decls for packCString# and friends; they are 'thin-air' Ids
 	 -- (see PrelInfo.lhs).  So if we don't find the HiFile we quietly
@@ -1067,27 +1073,40 @@ findAndReadIface doc_str mod_name
 @readIface@ tries just the one file.
 
 \begin{code}
-readIface :: String -> RnMG (Maybe ParsedIface)	
+readIface :: Module -> (String, Bool) -> RnMG (Maybe (Module, ParsedIface))
 	-- Nothing <=> file not found, or unreadable, or illegible
 	-- Just x  <=> successfully found and parsed 
-readIface file_path
+readIface requested_mod (file_path, is_dll)
   = ioToRnMG (hGetStringBuffer file_path)       `thenRn` \ read_result ->
     case read_result of
 	Right contents	  -> 
              case parseIface contents (mkSrcLoc (mkFastString file_path) 1) of
-	          Failed err      -> failWithRn Nothing err 
-		  Succeeded (PIface iface) -> 
-		        if opt_D_show_rn_imports then
-			   putDocRn (hcat[ptext SLIT("Read "), text file_path]) `thenRn_`
-			   returnRn (Just iface)
-			else
-			   returnRn (Just iface)
+	          Failed err                    -> failWithRn Nothing err 
+		  Succeeded (PIface mod_nm iface) ->
+			    (if mod_nm /=  moduleFS requested_mod then
+			        addWarnRn (hsep [ ptext SLIT("Something is amiss; requested module name")
+				                , pprModule requested_mod
+				                , ptext SLIT("differs from name found in the interface file ")
+						, pprEncodedFS mod_nm
+						])
+			     else
+			        returnRn ())	    `thenRn_`
+			    let
+			     the_mod 
+			       | is_dll    = mkDynamicModule requested_mod
+			       | otherwise = requested_mod
+			    in
+			    if opt_D_show_rn_imports then
+			       putDocRn (hcat[ptext SLIT("Read module "), pprEncodedFS mod_nm,
+					      ptext SLIT(" from "), text file_path]) `thenRn_`
+			       returnRn (Just (the_mod, iface))
+			    else
+			       returnRn (Just (the_mod, iface))
 
-        Left err ->
-	  if isDoesNotExistError err then
-	     returnRn Nothing
-	  else
-	     failWithRn Nothing (cannaeReadFile file_path err)
+        Left err
+	  | isDoesNotExistError err -> returnRn Nothing
+	  | otherwise               -> failWithRn Nothing (cannaeReadFile file_path err)
+
 \end{code}
 
 %*********************************************************
@@ -1107,9 +1126,10 @@ of (directory, suffix) pairs.  For example:
 
 \begin{code}
 mkSearchPath :: Maybe String -> SearchPath
-mkSearchPath Nothing = [(".",".hi")]
-mkSearchPath (Just s)
-  = go s
+mkSearchPath Nothing = [(".",".hi")]  -- ToDo: default should be to look in
+				      -- the directory the module we're compiling
+				      -- lives.
+mkSearchPath (Just s) = go s
   where
     go "" = []
     go s  = 

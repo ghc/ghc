@@ -24,12 +24,12 @@ import RnMonad		( ImportVersion, LocalVersion, ParsedIface(..), WhatsImported(..
 import Bag		( emptyBag, unitBag, snocBag )
 import FiniteMap	( emptyFM, unitFM, addToFM, plusFM, bagToFM, FiniteMap )
 import RdrName          ( RdrName, mkRdrUnqual, mkSysQual, mkSysUnqual )
-import Name		( OccName, Provenance, Module )
-import OccName          ( mkSysModuleFS, mkSysOccFS,
+import Name		( OccName, Provenance )
+import OccName          ( mkSysOccFS,
 			  tcName, varName, dataName, clsName, tvName,
-			  IfaceFlavour, hiFile, hiBootFile,
 			  EncodedFS 
 			)
+import Module           ( Module, mkSysModuleFS, IfaceFlavour, hiFile, hiBootFile )			
 import PrelMods         ( mkTupNameStr, mkUbxTupNameStr )
 import PrelInfo         ( mkTupConRdrName, mkUbxTupConRdrName )
 import SrcLoc		( SrcLoc )
@@ -151,26 +151,27 @@ import Ratio ( (%) )
 --		 (c) the IdInfo part of a signature (same reason)
 
 iface_stuff :: { IfaceStuff }
-iface_stuff : iface		{ PIface  $1 }
+iface_stuff : iface		{ let (nm, iff) = $1 in PIface nm iff }
       	    | type		{ PType   $1 }
       	    | id_info		{ PIdInfo $1 }
 
 
-iface		:: { ParsedIface }
-iface		: '__interface' mod_name INTEGER checkVersion 'where'
+iface		:: { (EncodedFS, ParsedIface) }
+iface		: '__interface' mod_fs INTEGER checkVersion 'where'
                   import_part
 		  instance_import_part
 		  exports_part
 		  instance_decl_part
 		  decls_part
-		  { ParsedIface 
-		        $2  		        -- Module name
+		  { ( $2                        -- Module name
+		    , ParsedIface 
 			(fromInteger $3) 	-- Module version
 			(reverse $6)	        -- Usages
 			(reverse $8)	        -- Exports
 			(reverse $7)	        -- Instance import modules
 			(reverse $10)		-- Decls
 			(reverse $9)		-- Local instances
+		    )
 		  }
 
 --------------------------------------------------------------------------
@@ -718,7 +719,7 @@ checkVersion :: { () }
 --			Haskell code 
 {
 
-data IfaceStuff = PIface 	ParsedIface
+data IfaceStuff = PIface 	EncodedFS{-.hi module name-} ParsedIface
 		| PIdInfo	[HsIdInfo RdrName]
 		| PType		RdrNameHsType
 

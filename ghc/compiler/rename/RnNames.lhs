@@ -34,6 +34,7 @@ import PrelMods
 import UniqFM	( lookupUFM )
 import Bag	( bagToList )
 import Maybes	( maybeToBool )
+import Module	( pprModule )
 import NameSet
 import Name
 import RdrName	( RdrName, rdrNameOcc, mkRdrQual, mkRdrUnqual )
@@ -209,7 +210,7 @@ importsFromImportDecl :: RdrNameImportDecl
 
 importsFromImportDecl (ImportDecl imp_mod qual_only as_mod import_spec iloc)
   = pushSrcLocRn iloc $
-    getInterfaceExports imp_mod 	`thenRn` \ avails ->
+    getInterfaceExports imp_mod 	`thenRn` \ (imp_mod, avails) ->
 
     if null avails then
 	-- If there's an error in getInterfaceExports, (e.g. interface

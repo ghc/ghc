@@ -32,12 +32,18 @@ import SrcLoc		( noSrcLoc )
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine,
 			  pprBagOfErrors, ErrMsg, WarnMsg, Message
 			)
-import Name		( Module, Name, OccName, NamedThing(..), IfaceFlavour,
-			  isLocallyDefinedName, nameModule, nameOccName
+import Name		( Name, OccName, NamedThing(..),
+			  isLocallyDefinedName, nameModule, nameOccName,
+			  decode
+			)
+import Module		( Module, IfaceFlavour, setModuleFlavour, mkSysModuleFS,
+			  bootFlavour, moduleString, moduleIfaceFlavour, mkDynFlavour
 			)
 import NameSet		
 import RdrName		( RdrName )
-import CmdLineOpts	( opt_D_show_rn_trace, opt_IgnoreIfacePragmas, opt_WarnHiShadows )
+import CmdLineOpts	( opt_D_show_rn_trace, opt_IgnoreIfacePragmas, 
+			  opt_WarnHiShadows, opt_Static
+			)
 import PrelInfo		( builtinNames )
 import TysWiredIn	( boolTyCon )
 import SrcLoc		( SrcLoc, mkGeneratedSrcLoc )
@@ -54,6 +60,7 @@ import UniqSupply
 import Util
 import Outputable
 import DirUtils		( getDirectoryContents )
+import Directory	( doesFileExist )
 import IO		( hPutStrLn, stderr, isDoesNotExistError )
 import Monad		( foldM )
 import Maybe		( fromMaybe )
@@ -109,7 +116,9 @@ data RnDown s = RnDown {
 		  rn_ns   :: SSTRef s RnNameSupply,
 		  rn_errs :: SSTRef s (Bag WarnMsg, Bag ErrMsg),
 		  rn_occs :: SSTRef s ([Occurrence],[Occurrence]),	-- Occurrences: compulsory and optional resp
-		  rn_mod  :: Module
+		  rn_hi_map     :: ModuleHiMap,   -- for .hi files
+		  rn_hiboot_map :: ModuleHiMap,   -- for .hi-boot files
+		  rn_mod        :: Module
 		}
 
 type Occurrence = (Name, SrcLoc)		-- The srcloc is the occurrence site
@@ -120,8 +129,6 @@ data Necessity = Compulsory | Optional		-- We *must* find definitions for
 
 	-- For getting global names
 data GDown = GDown {
-		rn_hi_map     :: ModuleHiMap,   -- for .hi files
-		rn_hiboot_map :: ModuleHiMap,   -- for .hi-boot files
 		rn_ifaces     :: SSTRWRef Ifaces
 	     }
 
@@ -152,7 +159,7 @@ data RnMode	= SourceMode			-- Renaming source code
 type SearchPath = [(String,String)]	-- List of (directory,suffix) pairs to search 
                                         -- for interface files.
 
-type ModuleHiMap = FiniteMap String String
+type ModuleHiMap = FiniteMap String (String, Bool)
    -- mapping from module name to the file path of its corresponding
    -- interface file.
 \end{code}
@@ -273,7 +280,6 @@ type LocalVersion name   = (name, Version)
 
 data ParsedIface
   = ParsedIface
-      Module		 		-- Module name
       Version		 		-- Module version number
       [ImportVersion OccName]		-- Usages
       [ExportItem]			-- Exports
@@ -284,6 +290,12 @@ data ParsedIface
 type InterfaceDetails = (VersionInfo Name,	-- Version information for what this module imports
 			 ExportEnv, 		-- What this module exports
 			 [Module])		-- Instance modules
+
+
+-- needed by Main to fish out the fixities assoc list.
+getIfaceFixities :: InterfaceDetails -> Fixities
+getIfaceFixities (_, ExportEnv _ fs, _) = fs
+
 
 type RdrNamePragma = ()				-- Fudge for now
 -------------------
@@ -357,8 +369,9 @@ initRn mod us dirs loc do_rn = do
   let
         rn_down = RnDown { rn_loc = loc, rn_omit = \n -> False, rn_ns = names_var, 
 			   rn_errs = errs_var, rn_occs = occs_var,
+			   rn_hi_map = himap, rn_hiboot_map = hibmap,
 			   rn_mod = mod }
-	g_down  = GDown { rn_hi_map = himap, rn_hiboot_map = hibmap, rn_ifaces = iface_var }
+	g_down  = GDown {rn_ifaces = iface_var }
 
 	-- do the business
   res <- sstToIO (do_rn rn_down g_down)
@@ -402,11 +415,26 @@ initOccs = ([(getName boolTyCon, noSrcLoc)], [])
 	-- to do as much as possible explicitly.
 \end{code}
 
+We (allege) that it is quicker to build up a mapping from module names
+to the paths to their corresponding interface files once, than to search
+along the import part every time we slurp in a new module (which we 
+do quite a lot of.)
+
 \begin{code}
 mkModuleHiMaps :: SearchPath -> IO (ModuleHiMap, ModuleHiMap)
 mkModuleHiMaps dirs = foldM (getAllFilesMatching dirs) (env,env) dirs
  where
   env = emptyFM
+
+{- a pseudo file which signals that the interface files
+   contained in a particular directory have got their
+   corresponding object codes stashed away in a DLL
+   
+   This stuff is only needed to deal with Win32 DLLs,
+   and conceivably we conditionally compile in support
+   for handling it. (ToDo?)
+-}
+dir_contain_dll_his = "dLL_ifs.hi"
 
 getAllFilesMatching :: SearchPath
 		    -> (ModuleHiMap, ModuleHiMap)
@@ -414,12 +442,18 @@ getAllFilesMatching :: SearchPath
 		    -> IO (ModuleHiMap, ModuleHiMap)
 getAllFilesMatching dirs hims (dir_path, suffix) = ( do
     -- fpaths entries do not have dir_path prepended
-  fpaths <- getDirectoryContents dir_path
-  return (foldl addModules hims fpaths)
+  fpaths  <- getDirectoryContents dir_path
+  is_dyns <- catch
+		(if dir_path == "." || opt_Static then
+		     return False
+		 else
+		     doesFileExist (dir_path ++ '/': dir_contain_dll_his))
+		(\ _ {-don't care-} -> return False)
+  return (foldl (addModules is_dyns) hims fpaths)
    )  -- soft failure
       `catch` 
         (\ err -> do
-	      hPutStrLn stderr 
+	      hPutStrLn stderr
 		     ("Import path element `" ++ dir_path ++ 
 		      if (isDoesNotExistError err) then
 	                 "' does not exist, ignoring."
@@ -441,14 +475,14 @@ getAllFilesMatching dirs hims (dir_path, suffix) = ( do
       reverse (show interfaceFileFormatVersion) ++ '-':hi_boot_xiffus
    hi_boot_xiffus = "toob-ih." -- .hi-boot reversed.
 
-   addModules his@(hi_env, hib_env) nm = fromMaybe his $ 
-        FMAP (\ (mod_nm,v) -> (addToFM_C addNewOne hi_env mod_nm v, hib_env))
+   addModules is_dll his@(hi_env, hib_env) nm = fromMaybe his $ 
+        FMAP (\ (mod_nm,v) -> (addToFM_C addNewOne hi_env mod_nm (v, is_dll), hib_env))
 	    (go xiffus rev_nm)		       `seqMaybe`
 
-        FMAP (\ (mod_nm,v) -> (hi_env, addToFM_C overrideNew hib_env mod_nm v))
+        FMAP (\ (mod_nm,v) -> (hi_env, addToFM_C overrideNew hib_env mod_nm (v,is_dll)))
 	    (go hi_boot_version_xiffus rev_nm) `seqMaybe`
 
-	FMAP (\ (mod_nm,v) -> (hi_env, addToFM_C addNewOne hib_env mod_nm v))
+	FMAP (\ (mod_nm,v) -> (hi_env, addToFM_C addNewOne hib_env mod_nm (v,is_dll)))
 	    (go hi_boot_xiffus rev_nm)
     where
      rev_nm  = reverse nm
@@ -468,7 +502,7 @@ getAllFilesMatching dirs hims (dir_path, suffix) = ( do
 
    conflict old_path new_path
     | old_path /= new_path = 
-        pprTrace "Warning: " (text "Identically named interface files present on import path, " $$
+        pprTrace "Warning: " (text "Identically named interface files present on the import path, " $$
 			      text (show old_path) <+> text "shadows" $$
 			      text (show new_path) $$
 			      text "on the import path: " <+> 
@@ -857,10 +891,33 @@ setIfacesRn :: Ifaces -> RnMG ()
 setIfacesRn ifaces rn_down (GDown {rn_ifaces = iface_var})
   = writeMutVarSST iface_var ifaces
 
-getModuleHiMap :: Bool -> RnMG ModuleHiMap
-getModuleHiMap want_hi_boot rn_down (GDown {rn_hi_map = himap, rn_hiboot_map = hibmap})
+getModuleHiMap :: Bool -> RnM s d ModuleHiMap
+getModuleHiMap want_hi_boot (RnDown {rn_hi_map = himap, rn_hiboot_map = hibmap}) _ 
   | want_hi_boot = returnSST hibmap
   | otherwise    = returnSST himap
+\end{code}
+
+The interface file format is capable of distinguishing
+between normal imports/exports of names from other modules
+and 'hi-boot' mentions of names, with the flavour in the
+being encoded inside a @Module@.
+
+@setModuleFlavourRn@ fixes up @Module@ values containing
+normal flavours, checking to see whether 
+
+\begin{code}
+setModuleFlavourRn :: Module -> RnM s d Module
+setModuleFlavourRn mod
+  | bootFlavour hif = returnRn mod
+  | otherwise       =
+     getModuleHiMap (bootFlavour hif) `thenRn` \ himap ->
+     let mod_pstr = moduleString mod in
+     case (lookupFM himap mod_pstr) of
+       Nothing -> returnRn mod
+       Just (_,is_in_a_dll) ->
+            returnRn (setModuleFlavour (mkDynFlavour is_in_a_dll hif) mod)
+  where
+    hif = moduleIfaceFlavour mod
 
 \end{code}
 

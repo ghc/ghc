@@ -26,9 +26,10 @@ import RnIfaces		( getImportedInstDecls, importDecl, getImportVersions, getSpeci
 import RnEnv		( addImplicitOccsRn, availName, availNames, availsToNameSet, 
 			  warnUnusedTopNames
 			)
+import Module           ( pprModule )
 import Name		( Name, isLocallyDefined,
 			  NamedThing(..), ImportReason(..), Provenance(..),
-			  nameModule, pprModule, pprOccName, nameOccName,
+			  nameModule, pprOccName, nameOccName,
 			  getNameProvenance, occNameUserString, 
 			)
 import RdrName		( RdrName )

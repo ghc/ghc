@@ -26,8 +26,9 @@ import Name		( Name, Provenance(..), ExportFlag(..), NamedThing(..),
 import NameSet
 import OccName		( OccName,
 			  mkDFunOcc, 
-			  occNameFlavour, moduleIfaceFlavour
+			  occNameFlavour
 			)
+import Module		( moduleIfaceFlavour )			
 import TyCon		( TyCon )
 import FiniteMap
 import Unique		( Unique, Uniquable(..), unboundKey )
@@ -49,14 +50,12 @@ import Maybes		( mapMaybe )
 %*********************************************************
 
 \begin{code}
-newImportedGlobalName :: Module -> OccName
-	      	      -> RnM s d Name
+newImportedGlobalName :: Module -> OccName -> RnM s d Name
 newImportedGlobalName mod occ
   = 	-- First check the cache
     getNameSupplyRn		`thenRn` \ (us, inst_ns, cache) ->
     let 
 	key     = (mod,occ)
-	mod_hif = moduleIfaceFlavour mod
     in
     case lookupFM cache key of
 	
@@ -83,10 +82,11 @@ newImportedGlobalName mod occ
 	Nothing -> 	-- Miss in the cache!
 			-- Build a new original name, and put it in the cache
 		   getOmitQualFn			`thenRn` \ omit_fn ->
+		   setModuleFlavourRn mod		`thenRn` \ mod' ->
 		   let
 			(us', us1) = splitUniqSupply us
 			uniq   	   = uniqFromSupply us1
-			name       = mkGlobalName uniq mod occ (NonLocalDef ImplicitImport (omit_fn name))
+			name       = mkGlobalName uniq mod' occ (NonLocalDef ImplicitImport (omit_fn name))
 					-- For in-scope things we improve the provenance
 					-- in RnNames.importsFromImportDecl
 			new_cache  = addToFM cache key name
