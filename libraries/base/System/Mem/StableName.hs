@@ -57,10 +57,10 @@ import GHC.Base		( Int(..), StableName#, makeStableName#
   The reverse is not necessarily true: if two stable names are not
   equal, then the objects they name may still be equal.
 
-  Stable Names are similar to Stable Pointers ('Foreign.StablePtr'),
+  Stable Names are similar to Stable Pointers ("Foreign.StablePtr"),
   but differ in the following ways:
 
-  * There is no @freeStableName@ operation, unlike 'Foreign.StablePtr's.
+  * There is no @freeStableName@ operation, unlike "Foreign.StablePtr"s.
     Stable names are reclaimed by the runtime system when they are no
     longer needed.
 
