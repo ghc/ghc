@@ -1,9 +1,8 @@
-{-# OPTIONS -fglasgow-exts #-}
-
 module RnAux017 where
-
-data Wibble 
-data Wobble
+import Test	-- Import main module so there really is a loop
+		-- (avoid warning message)
+data Wibble = Wibble
+data Wobble = Wobble
 
 a :: Int -> Int
 a = undefined
