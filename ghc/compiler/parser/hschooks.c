@@ -11,7 +11,7 @@ in instead of the defaults.
 #endif
 
 #if __GLASGOW_HASKELL__ >= 408
-#include "../rts/RtsFlags.h"
+#include "../includes/RtsFlags.h"
 #include "HsFFI.h"
 #endif
 

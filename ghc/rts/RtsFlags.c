@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.43 2001/08/07 09:20:52 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.44 2001/08/07 10:11:05 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -497,14 +497,43 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
     if ((last_slash = (char *) strrchr(argv[0], '/')) != NULL)
 	strcpy(argv[0], last_slash+1);
 
-    /* Split arguments (argv) into PGM (argv) and RTS (rts_argv) parts */
-    /*   argv[0] must be PGM argument -- leave in argv                 */
-
     total_arg = *argc;
     arg = 1;
 
     *argc = 1;
     *rts_argc = 0;
+
+    // process arguments from the GHCRTS environment variable first
+    // (arguments from the command line override these).
+    {
+	char *ghc_rts = getenv("GHCRTS");
+	char *c1, *c2, *s;
+
+	if (ghc_rts != NULL) {
+	    c1 = ghc_rts;
+	    do {
+		while (isspace(*c1)) { c1++; };
+		c2 = c1;
+		while (!isspace(*c2) && *c2 != '\0') { c2++; };
+
+		if (c1 == c2) { break; }
+
+		if (*rts_argc < MAX_RTS_ARGS-1) {
+		    s = malloc(c2-c1+1);
+		    strncpy(s, c1, c2-c1);
+		    s[c2-c1] = '\0';
+		    rts_argv[(*rts_argc)++] = s;
+		} else {
+		    barf("too many RTS arguments (max %d)", MAX_RTS_ARGS-1);
+		}
+
+		c1 = c2;
+	    } while (*c1 != '\0');
+	}
+    }
+
+    // Split arguments (argv) into PGM (argv) and RTS (rts_argv) parts
+    //   argv[0] must be PGM argument -- leave in argv
 
     for (mode = PGM; arg < total_arg && ! strequal("--RTS", argv[arg]); arg++) {
 	if (strequal("+RTS", argv[arg])) {
@@ -532,35 +561,7 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
     argv[*argc] = (char *) 0;
     rts_argv[*rts_argc] = (char *) 0;
 
-    // process arguments from the GHCRTS environment variable.
-    {
-	char *ghc_rts = getenv("GHCRTS");
-	char *c1, *c2, *s;
-
-	if (ghc_rts != NULL) {
-	    c1 = ghc_rts;
-	    do {
-		while (isspace(*c1)) { c1++; };
-		c2 = c1;
-		while (!isspace(*c2) && *c2 != '\0') { c2++; };
-
-		if (c1 == c2) { break; }
-
-		if (*rts_argc < MAX_RTS_ARGS-1) {
-		    s = malloc(c2-c1+1);
-		    strncpy(s, c1, c2-c1);
-		    s[c2-c1] = '\0';
-		    rts_argv[(*rts_argc)++] = s;
-		} else {
-		    barf("too many RTS arguments (max %d)", MAX_RTS_ARGS-1);
-		}
-
-		c1 = c2;
-	    } while (*c1 != '\0');
-	}
-    }
-    /* Process RTS (rts_argv) part: mainly to determine statsfile */
-
+    // Process RTS (rts_argv) part: mainly to determine statsfile
     for (arg = 0; arg < *rts_argc; arg++) {
 	if (rts_argv[arg][0] != '-') {
 	    fflush(stdout);
