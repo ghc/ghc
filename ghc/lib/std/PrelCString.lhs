@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelCString.lhs,v 1.1 2001/01/11 17:25:57 simonmar Exp $
+% $Id: PrelCString.lhs,v 1.2 2001/01/11 19:48:28 qrczak Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -102,7 +102,7 @@ withCStringLen str act  = withArray (charsToCChars str) $ act . pairLength str
 -- C's end of string character
 --
 nUL :: CChar
-nUL  = castCharToCChar '\0'
+nUL  = 0
 
 -- pair a C string with the length of the given Haskell string
 --
