@@ -4,14 +4,8 @@ module TH_spliceDecl3
 where
 
 import Language.Haskell.THSyntax
+import TH_spliceDecl3_Lib
 
 data T = C
 
-$(rename (reifyDecl T))
-
-rename :: Dec -> Q [Dec]
-rename (Data tyName tyvars cons derivs) =
-  Data (tyName ++ "'") tyvars (renameCons cons) derivs
-  where
-    renameCons (Constr conName tys) = Constr (conName ++ "'") tys
-
+$(do {d <- reifyDecl T; rename' d})
