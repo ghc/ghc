@@ -919,16 +919,8 @@ ifneq "$(SGML_DOC)" ""
 # multi-file SGML document: main document name is specified in $(SGML_DOC),
 # sub-documents (.sgml files) listed in $(SGML_SRCS).
 
-ifeq "$(VSGML_SRCS)" ""
-VSGML_SRCS = $(wildcard *.vsgml)
-endif
-
 ifeq "$(SGML_SRCS)" ""
-ifneq "$(VSGML_SRCS)" ""
-SGML_SRCS = $(patsubst %.vsgml, %.sgml, $(VSGML_SRCS))
-else
 SGML_SRCS = $(wildcard *.sgml)
-endif
 endif
 
 SGML_TEX  = $(addsuffix .tex,$(SGML_DOC))
@@ -951,7 +943,6 @@ txt  :: $(SGML_TEXT)
 
 CLEAN_FILES += $(SGML_TEXT) $(SGML_TEX) $(SGML_PS) $(SGML_DVI) $(SGML_PDF) $(SGML_RTF) $(SGML_HTML) $(SGML_DOC)-*.html
 # can't use $(SGML_SRCS) here, it was maybe used elsewhere
-MOSTLY_CLEAN_FILES += $(patsubst %.vsgml, %.sgml, $(VSGML_SRCS))
 
 extraclean ::
 	$(RM) -rf DBTOHTML_OUTPUT_*
