@@ -19,10 +19,12 @@ module Foreign.C.Types
 	  -- $ctypes
 
 	  -- ** Integral types
-	  -- | These types are are represented as @newtype@s of types in
-	  -- "Data.Int" and "Data.Word", and are instances of
-	  -- 'Eq', 'Ord', 'Num', 'Read', 'Show', 'Enum', 'Typeable',
-	  -- 'Storable', 'Bounded', 'Real', 'Integral' and 'Bits'.
+	  -- | These types are are represented as @newtype@s of
+	  -- types in "Data.Int" and "Data.Word", and are instances of
+	  -- 'Prelude.Eq', 'Prelude.Ord', 'Prelude.Num', 'Prelude.Read',
+	  -- 'Prelude.Show', 'Prelude.Enum', 'Typeable', 'Storable',
+	  -- 'Prelude.Bounded', 'Prelude.Real', 'Prelude.Integral' and
+	  -- 'Bits'.
 	  CChar,  CSChar,  CUChar
 	, CShort, CUShort, CInt,   CUInt
 	, CLong,  CULong
@@ -32,16 +34,17 @@ module Foreign.C.Types
 	  -- ** Numeric types
 	  -- | These types are are represented as @newtype@s of basic
 	  -- foreign types, and are instances of
-	  -- 'Eq', 'Ord', 'Num', 'Read', 'Show', 'Enum', 'Typeable' and
-	  -- 'Storable'.
+	  -- 'Prelude.Eq', 'Prelude.Ord', 'Prelude.Num', 'Prelude.Read',
+	  -- 'Prelude.Show', 'Prelude.Enum', 'Typeable' and 'Storable'.
 	, CClock,   CTime
 
 	  -- ** Floating types
-	  -- | These types are are represented as @newtype@s of 'Float'
-	  -- and 'Double', and are instances of
-	  -- 'Eq', 'Ord', 'Num', 'Read', 'Show', 'Enum', 'Typeable',
-	  -- 'Storable', 'Real', 'Fractional', 'Floating', 'RealFrac'
-	  -- and 'RealFloat'.
+	  -- | These types are are represented as @newtype@s of
+	  -- 'Prelude.Float' and 'Prelude.Double', and are instances of
+	  -- 'Prelude.Eq', 'Prelude.Ord', 'Prelude.Num', 'Prelude.Read',
+	  -- 'Prelude.Show', 'Prelude.Enum', 'Typeable', 'Storable',
+	  -- 'Prelude.Real', 'Prelude.Fractional', 'Prelude.Floating',
+	  -- 'Prelude.RealFrac' and 'Prelude.RealFloat'.
 	, CFloat,  CDouble, CLDouble
 #else
 	  -- Exported non-abstractly in nhc98 to fix an interface file problem.
@@ -199,32 +202,34 @@ is not required to represent those types exactly as C does, but the
 following guarantees are provided concerning a Haskell type @CT@
 representing a C type @t@:
 
-* If a C function prototype has @t@ as an argument or result type,
-  the use of @CT@ in the corresponding position in a foreign declaration
-  permits the Haskell program to access the full range of values encoded by
-  the C type; and conversely, any Haskell value for @CT@ has a valid
+* If a C function prototype has @t@ as an argument or result type, the
+  use of @CT@ in the corresponding position in a foreign declaration
+  permits the Haskell program to access the full range of values encoded
+  by the C type; and conversely, any Haskell value for @CT@ has a valid
   representation in C.
 
-* @'sizeOf' ('undefined' :: CT)@ will yield the same value as
+* @'sizeOf' ('Prelude.undefined' :: CT)@ will yield the same value as
   @sizeof (t)@ in C.
 
-* @'alignment' ('undefined' :: CT)@ matches the alignment constraint
-  enforced by the C implementation for @t@.
+* @'alignment' ('Prelude.undefined' :: CT)@ matches the alignment
+  constraint enforced by the C implementation for @t@.
 
-* The members 'peek' and 'poke' of the 'Storable' class map all values of
-  @CT@ to the corresponding value of @t@ and vice versa.
+* The members 'peek' and 'poke' of the 'Storable' class map all values
+  of @CT@ to the corresponding value of @t@ and vice versa.
 
-* When an instance of 'Bounded' is defined for @CT@, the values of
-  'minBound' and 'maxBound' coincide with @t_MIN@ and @t_MAX@ in C.
+* When an instance of 'Prelude.Bounded' is defined for @CT@, the values
+  of 'Prelude.minBound' and 'Prelude.maxBound' coincide with @t_MIN@
+  and @t_MAX@ in C.
 
-* When an instance of 'Eq' or 'Ord' is defined for @CT@, the predicates
-  defined by the type class implement the same relation as the
-  corresponding predicate in C on @t@.
+* When an instance of 'Prelude.Eq' or 'Prelude.Ord' is defined for @CT@,
+  the predicates defined by the type class implement the same relation
+  as the corresponding predicate in C on @t@.
 
-* When an instance of 'Num', 'Read', 'Integral', 'Fractional', 'Floating',
-  'RealFrac', or 'RealFloat' is defined for @CT@, the arithmetic
-  operations defined by the type class implement the same function as
-  the corresponding arithmetic operations (if available) in C on @t@.
+* When an instance of 'Prelude.Num', 'Prelude.Read', 'Prelude.Integral',
+  'Prelude.Fractional', 'Prelude.Floating', 'Prelude.RealFrac', or
+  'Prelude.RealFloat' is defined for @CT@, the arithmetic operations
+  defined by the type class implement the same function as the
+  corresponding arithmetic operations (if available) in C on @t@.
 
 * When an instance of 'Bits' is defined for @CT@, the bitwise operation
   defined by the type class implement the same function as the

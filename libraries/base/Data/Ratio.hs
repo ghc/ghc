@@ -52,13 +52,14 @@ import Ratio (Ratio(..), (%), numerator, denominator, approxRational)
 
 -- | 'approxRational', applied to two real fractional numbers @x@ and @epsilon@,
 -- returns the simplest rational number within @epsilon@ of @x@.
--- A rational number @y@ is said to be simpler than another @y'@ if
+-- A rational number @y@ is said to be /simpler/ than another @y'@ if
 --
 -- * @'abs' ('numerator' y) <= 'abs' ('numerator' y')@, and
 --
 -- * @'denominator' y <= 'denominator' y'@.
 --
--- Any real interval contains a unique simplest rational.
+-- Any real interval contains a unique simplest rational;
+-- in particular, note that @0\/1@ is the simplest rational of all.
 
 -- Implementation details: Here, for simplicity, we assume a closed rational
 -- interval.  If such an interval includes at least one whole number, then

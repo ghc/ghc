@@ -105,11 +105,30 @@ denominator (_ :% y)	=  y
 
 \begin{code}
 class  (Num a, Ord a) => Real a  where
+    -- | the rational equivalent of its real argument with full precision
     toRational		::  a -> Rational
 
+-- | Integral numbers, supporting integer division.
+--
+-- Minimal complete definition: 'quotRem' and 'toInteger'
 class  (Real a, Enum a) => Integral a  where
-    quot, rem, div, mod	:: a -> a -> a
-    quotRem, divMod	:: a -> a -> (a,a)
+    -- | integer division truncated toward zero
+    quot		:: a -> a -> a
+    -- | integer remainder, satisfying
+    --
+    -- > (x `quot` y)*y + (x `rem` y) == x
+    rem			:: a -> a -> a
+    -- | integer division truncated toward negative infinity
+    div			:: a -> a -> a
+    -- | integer modulus, satisfying
+    --
+    -- > (x `div` y)*y + (x `mod` y) == x
+    mod			:: a -> a -> a
+    -- | simultaneous 'quot' and 'rem'
+    quotRem		:: a -> a -> (a,a)
+    -- | simultaneous 'div' and 'mod'
+    divMod		:: a -> a -> (a,a)
+    -- | conversion to 'Integer'
     toInteger		:: a -> Integer
 
     n `quot` d		=  q  where (q,_) = quotRem n d
@@ -119,18 +138,46 @@ class  (Real a, Enum a) => Integral a  where
     divMod n d 		=  if signum r == negate (signum d) then (q-1, r+d) else qr
 			   where qr@(q,r) = quotRem n d
 
+-- | Fractional numbers, supporting real division.
+--
+-- Minimal complete definition: 'fromRational' and ('recip' or @('/')@)
 class  (Num a) => Fractional a  where
+    -- | fractional division
     (/)			:: a -> a -> a
+    -- | reciprocal fraction
     recip		:: a -> a
+    -- | Conversion from a 'Rational' (that is @'Ratio' 'Integer'@).
+    -- A floating literal stands for an application of 'fromRational'
+    -- to a value of type 'Rational', so such literals have type
+    -- @('Fractional' a) => a@.
     fromRational	:: Rational -> a
 
     recip x		=  1 / x
     x / y		= x * recip y
 
+-- | Extracting components of fractions.
+--
+-- Minimal complete definition: 'properFraction'
 class  (Real a, Fractional a) => RealFrac a  where
+    -- | The function 'properFraction' takes a real fractional number @x@
+    -- and returns a pair @(n,f)@ such that @x = n+f@, and:
+    --
+    -- * @n@ is an integral number with the same sign as @x@; and
+    --
+    -- * @f@ is a fraction with the same type and sign as @x@,
+    --   and with absolute value less than @1@.
+    --
+    -- The default definitions of the 'ceiling', 'floor', 'truncate'
+    -- and 'round' functions are in terms of 'properFraction'.
     properFraction	:: (Integral b) => a -> (b,a)
-    truncate, round	:: (Integral b) => a -> b
-    ceiling, floor	:: (Integral b) => a -> b
+    -- | @'truncate' x@ returns the integer nearest @x@ between zero and @x@
+    truncate		:: (Integral b) => a -> b
+    -- | @'round' x@ returns the nearest integer to @x@
+    round		:: (Integral b) => a -> b
+    -- | @'ceiling' x@ returns the least integer not less than @x@
+    ceiling		:: (Integral b) => a -> b
+    -- | @'floor' x@ returns the greatest integer not greater than @x@
+    floor		:: (Integral b) => a -> b
 
     truncate x		=  m  where (m,_) = properFraction x
     
@@ -299,6 +346,7 @@ instance  (Integral a)	=> Enum (Ratio a)  where
 %*********************************************************
 
 \begin{code}
+-- | general coercion from integral types
 fromIntegral :: (Integral a, Num b) => a -> b
 fromIntegral = fromInteger . toInteger
 
@@ -306,6 +354,7 @@ fromIntegral = fromInteger . toInteger
 "fromIntegral/Int->Int" fromIntegral = id :: Int -> Int
     #-}
 
+-- | general coercion to fractional types
 realToFrac :: (Real a, Fractional b) => a -> b
 realToFrac = fromRational . toRational
 
@@ -336,6 +385,7 @@ even n		=  n `rem` 2 == 0
 odd		=  not . even
 
 -------------------------------------------------------
+-- | raise a number to a non-negative integral power
 {-# SPECIALISE (^) ::
 	Integer -> Integer -> Integer,
 	Integer -> Int -> Integer,
@@ -349,6 +399,7 @@ x ^ n | n > 0	=  f x (n-1) x
 				         | otherwise = f b (i-1) (b*y)
 _ ^ _		= error "Prelude.^: negative exponent"
 
+-- | raise a number to an integral power
 {-# SPECIALISE (^^) ::
 	Rational -> Int -> Rational #-}
 (^^)		:: (Fractional a, Integral b) => a -> b -> a
@@ -356,12 +407,16 @@ x ^^ n		=  if n >= 0 then x^n else recip (x^(negate n))
 
 
 -------------------------------------------------------
+-- | @'gcd' x y@ is the greatest (positive) integer that divides both @x@
+-- and @y@; for example @'gcd' (-3) 6@ = @3@, @'gcd' (-3) (-6)@ = @3@,
+-- @'gcd' 0 4@ = @4@.  @'gcd' 0 0@ raises a runtime error.
 gcd		:: (Integral a) => a -> a -> a
 gcd 0 0		=  error "Prelude.gcd: gcd 0 0 is undefined"
 gcd x y		=  gcd' (abs x) (abs y)
 		   where gcd' a 0  =  a
 			 gcd' a b  =  gcd' b (a `rem` b)
 
+-- | @'lcm' x y@ is the smallest positive integer that both @x@ and @y@ divide.
 lcm		:: (Integral a) => a -> a -> a
 {-# SPECIALISE lcm :: Int -> Int -> Int #-}
 lcm _ 0		=  0

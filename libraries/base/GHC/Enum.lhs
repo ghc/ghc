@@ -55,7 +55,9 @@ class  Bounded a  where
 -- arithmetic sequences.
 --
 -- Instances of 'Enum' may be derived for any enumeration type (types
--- whose constructors have no fields); see Chapter 10 of the /Haskell Report/.
+-- whose constructors have no fields).  The nullary constructors are
+-- assumed to be numbered left-to-right by 'fromEnum' from @0@ through @n-1@.
+-- See Chapter 10 of the /Haskell Report/ for more details.
 --  
 -- For any type that is an instance of class 'Bounded' as well as 'Enum',
 -- the following should hold:

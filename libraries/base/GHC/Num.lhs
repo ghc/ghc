@@ -45,15 +45,37 @@ default ()		-- Double isn't available yet,
 %*********************************************************
 
 \begin{code}
+-- | Basic numeric class.
+--
+-- Minimal complete definition: all except 'negate' or @(-)@
 class  (Eq a, Show a) => Num a  where
     (+), (-), (*)	:: a -> a -> a
+    -- | Unary negation.
     negate		:: a -> a
-    abs, signum		:: a -> a
+    -- | Absolute value.
+    abs			:: a -> a
+    -- | Sign of a number.
+    -- The functions 'abs' and 'signum' should satisfy the law: 
+    --
+    -- > abs x * signum x == x
+    --
+    -- For real numbers, the 'signum' is either @-1@ (negative), @0@ (zero)
+    -- or @1@ (positive).
+    signum		:: a -> a
+    -- | Conversion from an 'Integer'.
+    -- An integer literal represents the application of the function
+    -- 'fromInteger' to the appropriate value of type 'Integer',
+    -- so such literals have type @('Num' a) => a@.
     fromInteger		:: Integer -> a
 
     x - y		= x + negate y
     negate x		= 0 - x
 
+-- | the same as @'flip' ('-')@.
+--
+-- Because @-@ is treated specially in the Haskell grammar,
+-- @(-@ /e/@)@ is not a section, but an application of prefix negation.
+-- However, @('subtract'@ /exp/@)@ is equivalent to the disallowed section.
 {-# INLINE subtract #-}
 subtract :: (Num a) => a -> a -> a
 subtract x y = y - x

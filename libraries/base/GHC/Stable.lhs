@@ -65,9 +65,9 @@ deRefStablePtr (StablePtr sp) = IO $ \s -> deRefStablePtr# sp s
 -- value. Afterwards, if the stable pointer is passed to
 -- 'deRefStablePtr' or 'freeStablePtr', the behaviour is
 -- undefined.  However, the stable pointer may still be passed to
--- 'castStablePtrToPtr', but the @Ptr ()@ value returned by
--- 'castStablePtrToPtr', in this case, is undefined (in
--- particular, it may be 'Ptr.nullPtr').  Nevertheless, the call
+-- 'castStablePtrToPtr', but the @'Foreign.Ptr.Ptr' ()@ value returned
+-- by 'castStablePtrToPtr', in this case, is undefined (in particular,
+-- it may be 'Foreign.Ptr.nullPtr').  Nevertheless, the call
 -- to 'castStablePtrToPtr' is guaranteed not to diverge.
 --
 foreign import ccall unsafe freeStablePtr :: StablePtr a -> IO ()

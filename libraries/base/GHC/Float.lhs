@@ -38,6 +38,11 @@ infixr 8  **
 %*********************************************************
 
 \begin{code}
+-- | Trigonometric and hyperbolic functions and related functions.
+--
+-- Minimal complete definition:
+--      'pi', 'exp', 'log', 'sin', 'cos', 'sinh', 'cosh'
+--      'asin', 'acos', 'atan', 'asinh', 'acosh' and 'atanh'
 class  (Fractional a) => Floating a  where
     pi			:: a
     exp, log, sqrt	:: a -> a
@@ -53,17 +58,58 @@ class  (Fractional a) => Floating a  where
     tan  x		=  sin  x / cos  x
     tanh x		=  sinh x / cosh x
 
+-- | Efficient, machine-independent access to the components of a
+-- floating-point number.
+--
+-- Minimal complete definition:
+--	all except 'exponent', 'significand', 'scaleFloat' and 'atan2'
 class  (RealFrac a, Floating a) => RealFloat a  where
+    -- | a constant function, returning the radix of the representation
+    -- (often @2@)
     floatRadix		:: a -> Integer
+    -- | a constant function, returning the number of digits of
+    -- 'floatRadix' in the significand
     floatDigits		:: a -> Int
+    -- | a constant function, returning the lowest and highest values
+    -- the exponent may assume
     floatRange		:: a -> (Int,Int)
+    -- | The function 'decodeFloat' applied to a real floating-point
+    -- number returns the significand expressed as an 'Integer' and an
+    -- appropriately scaled exponent (an 'Int').  If @'decodeFloat' x@
+    -- yields @(m,n)@, then @x@ is equal in value to @m*b^^n@, where @b@
+    -- is the floating-point radix, and furthermore, either @m@ and @n@
+    -- are both zero or else @b^(d-1) <= m < b^d@, where @d@ is the value
+    -- of @'floatDigits' x@.  In particular, @'decodeFloat' 0 = (0,0)@.
     decodeFloat		:: a -> (Integer,Int)
+    -- | 'encodeFloat' performs the inverse of 'decodeFloat'
     encodeFloat		:: Integer -> Int -> a
+    -- | the second component of 'decodeFloat'.
     exponent		:: a -> Int
+    -- | the first component of 'decodeFloat', scaled to lie in the open
+    -- interval (@-1@,@1@)
     significand		:: a -> a
+    -- | multiplies a floating-point number by an integer power of the radix
     scaleFloat		:: Int -> a -> a
-    isNaN, isInfinite, isDenormalized, isNegativeZero, isIEEE
-                        :: a -> Bool
+    -- | 'True' if the argument is an IEEE \"not-a-number\" (NaN) value
+    isNaN		:: a -> Bool
+    -- | 'True' if the argument is an IEEE infinity or negative infinity
+    isInfinite		:: a -> Bool
+    -- | 'True' if the argument is too small to be represented in
+    -- normalized format
+    isDenormalized	:: a -> Bool
+    -- | 'True' if the argument is an IEEE negative zero
+    isNegativeZero	:: a -> Bool
+    -- | 'True' if the argument is an IEEE floating point number
+    isIEEE		:: a -> Bool
+    -- | a version of arctangent taking two real floating-point arguments.
+    -- For real floating @x@ and @y@, @'atan2' y x@ computes the angle
+    -- (from the positive x-axis) of the vector from the origin to the
+    -- point @(x,y)@.  @'atan2' y x@ returns a value in the range [@-pi@,
+    -- @pi@].  It follows the Common Lisp semantics for the origin when
+    -- signed zeroes are supported.  @'atan2' y 1@, with @y@ in a type
+    -- that is 'RealFloat', should return the same value as @'atan' y@.
+    -- A default definition of 'atan2' is provided, but implementors
+    -- can provide a more accurate implementation.
     atan2	        :: a -> a -> a
 
 
@@ -99,9 +145,13 @@ class  (RealFrac a, Floating a) => RealFloat a  where
 
 \begin{code}
 -- | Single-precision floating point numbers.
+-- It is desirable that this type be at least equal in range and precision
+-- to the IEEE single-precision type.
 data Float	= F# Float#
 
 -- | Double-precision floating point numbers.
+-- It is desirable that this type be at least equal in range and precision
+-- to the IEEE double-precision type.
 data Double	= D# Double#
 \end{code}
 
