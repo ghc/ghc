@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: HsParseUtils.lhs,v 1.1 2002/04/04 16:23:43 simonmar Exp $
+-- $Id: HsParseUtils.lhs,v 1.2 2002/04/10 16:10:26 simonmar Exp $
 --
 -- (c) The GHC Team 1997-2000
 --
@@ -121,6 +121,8 @@ checkPat e [] = case e of
 	HsRecConstr c fs   -> mapP checkPatField fs `thenP` \fs ->
 			      returnP (HsPRec c fs)
 	HsNegApp (HsLit l) -> returnP (HsPNeg (HsPLit l))
+	HsExpTypeSig l e ty -> checkPat e [] `thenP` \e -> 
+			       returnP (HsPTypeSig e ty)
 	_ -> patFail
 
 checkPat _ _ = patFail

@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: HsSyn.lhs,v 1.1 2002/04/04 16:23:43 simonmar Exp $
+% $Id: HsSyn.lhs,v 1.2 2002/04/10 16:10:26 simonmar Exp $
 %
 % (c) The GHC Team, 1997-2002
 %
@@ -228,6 +228,7 @@ data HsPat
 	| HsPAsPat HsName HsPat
 	| HsPWildCard
 	| HsPIrrPat HsPat
+	| HsPTypeSig HsPat HsType
  deriving (Eq,Show)
 
 data HsPatField
