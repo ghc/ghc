@@ -45,7 +45,7 @@ main = do
 
   -- scanl1
   print (scanl1 (+) [1..10])
-  catch (print (scanl1 (+) [] :: [Int])) (\_ -> putStr "scanl1 []\n")
+  print (scanl1 (+) [] :: [Int])
 
   -- foldr1
   print (foldr1 (+) [1..10])
@@ -56,7 +56,7 @@ main = do
 
   -- scanr1
   print (scanr1 (+) [1..10])
-  catch (print (scanr1 (+) [] :: [Int])) (\_ -> putStr "scanr1 []\n")
+  print (scanr1 (+) [] :: [Int])
 
   -- iterate
   print (take 10 (cycle (take 4 (iterate (+1) 1))))
