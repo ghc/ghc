@@ -10,8 +10,6 @@ checker.
 #include "HsVersions.h"
 
 module TcHsSyn (
-	SYN_IE(TcIdBndr), TcIdOcc(..),
-	
 	SYN_IE(TcMonoBinds), SYN_IE(TcHsBinds), SYN_IE(TcPat),
 	SYN_IE(TcExpr), SYN_IE(TcGRHSsAndBinds), SYN_IE(TcGRHS), SYN_IE(TcMatch),
 	SYN_IE(TcStmt), SYN_IE(TcArithSeqInfo), SYN_IE(TcRecordBinds),
@@ -46,7 +44,7 @@ import Name	( Name{--O only-}, NamedThing(..) )
 import BasicTypes ( IfaceFlavour )
 import TcEnv	( tcLookupGlobalValueMaybe, tcExtendGlobalValEnv )
 import TcMonad
-import TcType	( SYN_IE(TcType), TcMaybe, SYN_IE(TcTyVar),
+import TcType	( TcIdOcc(..), SYN_IE(TcIdBndr), SYN_IE(TcType), TcMaybe, SYN_IE(TcTyVar),
 		  zonkTcTypeToType, zonkTcTyVarToTyVar
 		)
 import Usage	( SYN_IE(UVar) )
@@ -82,10 +80,6 @@ At the end of type checking we zonk everything to @Typechecked...@ datatypes,
 which have immutable type variables in them.
 
 \begin{code}
-type TcIdBndr s = GenId  (TcType s)	-- Binders are all TcTypes
-data TcIdOcc  s = TcId   (TcIdBndr s)	-- Bindees may be either
-		| RealId Id
-
 type TcHsBinds s     	= HsBinds (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
 type TcMonoBinds s	= MonoBinds (TcTyVar s) UVar (TcIdOcc s) (TcPat s)
 type TcDictBinds s	= TcMonoBinds s
@@ -135,22 +129,6 @@ tcIdType (RealId id) = pprPanic "tcIdType:" (ppr PprDebug id)
 tcIdTyVars (TcId id)  = tyVarsOfType (idType id)
 tcIdTyVars (RealId _) = emptyTyVarSet		-- Top level Ids have no free type variables
 \end{code}
-
-\begin{code}
-instance Eq (TcIdOcc s) where
-  (TcId id1)   == (TcId id2)   = id1 == id2
-  (RealId id1) == (RealId id2) = id1 == id2
-  _	       == _	       = False
-
-instance Outputable (TcIdOcc s) where
-  ppr sty (TcId id)   = ppr sty id
-  ppr sty (RealId id) = ppr sty id
-
-instance NamedThing (TcIdOcc s) where
-  getName (TcId id)   = getName id
-  getName (RealId id) = getName id
-\end{code}
-
 
 %************************************************************************
 %*									*
