@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: type.c,v $
- * $Revision: 1.21 $
- * $Date: 2000/01/07 17:49:29 $
+ * $Revision: 1.22 $
+ * $Date: 2000/01/12 14:52:54 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -2847,9 +2847,7 @@ Int what; {
 
                starToStar   = simpleKind(1);
 
-               typeUnit     = //addPrimTycon(findText("()"),
-                              //             STAR,0,DATATYPE,NIL);
-                              findTycon(findText("()"));
+               typeUnit     = findTycon(findText("()"));
                               assert(nonNull(typeUnit));
 
                typeArrow    = addPrimTycon(findText("(->)"),

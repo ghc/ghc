@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.36 $
- * $Date: 2000/01/12 10:44:50 $
+ * $Revision: 1.37 $
+ * $Date: 2000/01/12 14:52:53 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -381,15 +381,15 @@ assert(nonNull(typeInteger));
 	*/
         name(namePrimTakeMVar).type = primType(MONAD_Id, "rbc", "d");
 
-        if (combined) {
-        for (i=2; i<=NUM_DTUPLES; i++) {/* Add derived instances of tuples */
-            addTupInst(classEq,i);
-            addTupInst(classOrd,i);
-            addTupInst(classIx,i);
-            addTupInst(classShow,i);
-            addTupInst(classRead,i);
-            addTupInst(classBounded,i);
-        }
+        if (!combined) {
+           for (i=2; i<=NUM_DTUPLES; i++) {/* Add derived instances of tuples */
+               addTupInst(classEq,i);
+               addTupInst(classOrd,i);
+               addTupInst(classIx,i);
+               addTupInst(classShow,i);
+               addTupInst(classRead,i);
+               addTupInst(classBounded,i);
+           }
         }
     }
 }
@@ -429,10 +429,10 @@ Void linkPreludeCM(void) {              /* Hook to cfuns and mfuns in      */
         nameInRange      = linkName("inRange");
         nameMinus        = linkName("-");
         /* These come before calls to implementPrim */
-        if (combined) {
-        for(i=0; i<NUM_TUPLES; ++i) {
-            implementTuple(i);
-        }
+        if (!combined) {
+           for(i=0; i<NUM_TUPLES; ++i) {
+               if (i != 1) implementTuple(i);
+           }
         }
     }
 }
@@ -551,7 +551,7 @@ Int what; {
                        = addWiredInBoxingTycon("PrelGHC","ByteArray","PrimByteArray#",0 ,STAR );
 
                for (i=0; i<NUM_TUPLES; ++i) {
-                   addTupleTycon(i);
+                   if (i != 1) addTupleTycon(i);
                }
 	       addWiredInEnumTycon("PrelBase","Bool",
                                    doubleton(findText("False"),findText("True")));
@@ -575,7 +575,7 @@ Int what; {
                setCurrModule(modulePrelude);
         
                for (i=0; i<NUM_TUPLES; ++i) {
-                   addTupleTycon(i);
+                   if (i != 1) addTupleTycon(i);
                }
                setCurrModule(modulePrelude);
 

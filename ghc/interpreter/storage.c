@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.39 $
- * $Date: 2000/01/11 17:23:39 $
+ * $Revision: 1.40 $
+ * $Date: 2000/01/12 14:52:53 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -599,13 +599,15 @@ List   ts; {                            /* Null pattern matches every tycon*/
 
 Text ghcTupleText_n ( Int n )
 {
-    Int  i;
+    Int i;
+    Int x = 0; 
     char buf[104];
     if (n < 0 || n >= 100) internal("ghcTupleText_n");
-    buf[0] = '(';
-    for (i = 1; i <= n; i++) buf[i] = ',';
-    buf[n+1] = ')';
-    buf[n+2] = 0;
+    if (n == 1) internal("ghcTupleText_n==1");
+    buf[x++] = '(';
+    for (i = 1; i <= n-1; i++) buf[x++] = ',';
+    buf[x++] = ')';
+    buf[x++] = 0;
     return findText(buf);
 }
 
