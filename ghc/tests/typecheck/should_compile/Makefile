@@ -5,7 +5,7 @@ include $(TOP)/mk/should_compile.mk
 SRC_HC_OPTS += -noC -dcore-lint -fno-warn-incomplete-patterns -hi-with-declarations -hi-with-instances -hi-with-exports
 
 tc019_HC_OPTS = -fglasgow-exts
-tc065_HC_OPTS = -syslib lang
+tc065_HC_OPTS = -syslib lang -syslib data
 tc087_HC_OPTS = -fglasgow-exts
 tc088_HC_OPTS = -syslib lang
 tc089_HC_OPTS = -H12m
