@@ -1304,14 +1304,14 @@ sub print_doctored {
 
     if ($StolenX86Regs <= 2 ) { # YURGH! spurious uses of esi?
 	s/^\tmovl\s+(.*),\s*\%esi\n\tjmp\s+\*%esi\n/\tmovl $1,\%eax\n\tjmp \*\%eax\n/g;
-	s/^\tjmp\s+\*(-?\d*)\((.*\%esi.*)\)\n/\tmovl $2,\%eax\n\tjmp \*$1\(\%eax\)\n/g;
+	s/^\tjmp\s+\*(.*\(.*\%esi.*\))\n/\tmovl $1,\%eax\n\tjmp \*\%eax\n/g;
 	s/^\tjmp\s+\*\%esi\n/\tmovl \%esi,\%eax\n\tjmp \*\%eax\n/g;
 	die "$Pgm: (mangler) still have jump involving \%esi!\n$_"
 	    if /(jmp|call)\s+.*\%esi/;
     }
     if ($StolenX86Regs <= 3 ) { # spurious uses of edi?
 	s/^\tmovl\s+(.*),\s*\%edi\n\tjmp\s+\*%edi\n/\tmovl $1,\%eax\n\tjmp \*\%eax\n/g;
-	s/^\tjmp\s+\*(-?\d*\(.*\%edi.*\))\n/\tmovl $1,\%eax\n\tjmp \*\%eax\n/g;
+	s/^\tjmp\s+\*(.*\(.*\%edi.*\))\n/\tmovl $1,\%eax\n\tjmp \*\%eax\n/g;
 	s/^\tjmp\s+\*\%edi\n/\tmovl \%edi,\%eax\n\tjmp \*\%eax\n/g;
 	die "$Pgm: (mangler) still have jump involving \%edi!\n$_"
 	    if /(jmp|call)\s+.*\%edi/;
