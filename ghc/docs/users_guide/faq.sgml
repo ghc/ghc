@@ -372,6 +372,24 @@ details.</para>
       </listitem>
     </varlistentry>
 
+    <varlistentry>
+      <term>I can't get finalizers to work properly.  My program
+      sometimes just prints
+      <literal>&lt;&lt;loop&gt;&gt;</literal>.</term>
+      
+      <listitem>
+	<para>Chances are that your program is trying to write a
+	message to <literal>stdout</literal> or
+	<literal>stderr</literal> in the finalizer.  Handles have
+	finalizers themselves, and since finalizers don't keep other
+	finalized values alive, the <literal>stdout</literal> and
+	<literal>stderr</literal> Handles may be finalized before your
+	finalizer runs.  If this happens, your finalizer will block on
+	the handle, and probably end up receiving a
+	<literal>NonTermination</literal> exception (which is printed
+	as <literal>&lt;&lt;loop&gt;&gt;</literal>).</para>
+      </listitem>
+    </varlistentry>
   </variablelist>
 </chapter>
 
