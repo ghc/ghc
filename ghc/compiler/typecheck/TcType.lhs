@@ -1149,7 +1149,7 @@ match (TyVarTy v) ty tmpls k senv
 	Nothing | typeKind ty `eqKind` tyVarKind v	
 			-- We do a kind check, just as in the uVarX above
 			-- The kind check is needed to avoid bogus matches
-			-- of 	(a b) with (c d), where the kinds don't match
+			-- of (a b) with (c d), where the kinds don't match
 			-- An occur check isn't needed when matching.
 		-> k (extendSubstEnv senv v (DoneTy ty))
 
