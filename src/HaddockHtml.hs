@@ -761,7 +761,7 @@ ppHsType (HsTyFun a b) = hsep [ppHsBType a, toHtml "->", ppHsType b]
 ppHsType t = ppHsBType t
 
 ppHsBType (HsTyDoc ty doc) = ppHsBType ty
-ppHsBType (HsTyApp (HsTyCon (Qual (Module "Prelude") (HsTyClsName (HsSpecial "[]")))) b )
+ppHsBType (HsTyApp (HsTyCon (Qual _ (HsTyClsName (HsSpecial "[]")))) b )
   = brackets $ ppHsType b
 ppHsBType (HsTyApp a b) = ppHsBType a <+> ppHsAType b
 ppHsBType t = ppHsAType t
@@ -771,7 +771,7 @@ ppHsAType (HsTyTuple True l)  = parenList . map ppHsType $ l
 ppHsAType (HsTyTuple False l) = ubxParenList . map ppHsType $ l
 ppHsAType (HsTyVar name) = ppHsName name
 ppHsAType (HsTyCon name) = ppHsQName name
-ppHsAType (HsTyApp (HsTyCon (Qual (Module "Prelude") (HsTyClsName (HsSpecial "[]")))) b )
+ppHsAType (HsTyApp (HsTyCon (Qual _ (HsTyClsName (HsSpecial "[]")))) b )
   = brackets $ ppHsType b
 ppHsAType t = parens $ ppHsType t
 
