@@ -18,8 +18,7 @@ IMPORT_1_3(Char(isPrint,isDigit))
 import qualified GHCbase(Addr(..)) -- to see innards
 IMP_Ubiq(){-uitious-}
 #elif __GLASGOW_HASKELL__ >= 202
-import qualified GlaExts (Addr(..))
-import GlaExts hiding (Addr(..))
+import GlaExts
 import FastString
 #else
 IMP_Ubiq(){-uitious-}
@@ -39,9 +38,6 @@ import Pretty		-- all of it
 #if __GLASGOW_HASKELL__ == 201
 a_HASH   x = GHCbase.A# x
 pACK_STR x = packCString x
-#elif __GLASGOW_HASKELL__ >= 202
-a_HASH   x = GlaExts.A# x
-pACK_STR x = mkFastCharString x
 #else
 a_HASH   x = A# x
 pACK_STR x = mkFastCharString x --_packCString x
@@ -337,7 +333,7 @@ pprImm (HI i)
 %************************************************************************
 
 \begin{code}
-pprAddr :: Addr -> Doc
+pprAddr :: Address -> Doc
 
 #if alpha_TARGET_ARCH
 pprAddr (AddrReg r) = parens (pprReg r)
@@ -360,7 +356,7 @@ pprAddr (ImmAddr imm off)
     else
 	hcat [pp_imm, char '+', int off]
 
-pprAddr (Addr base index displacement)
+pprAddr (Address base index displacement)
   = let
 	pp_disp  = ppr_disp displacement
 	pp_off p = (<>) pp_disp (parens p)
@@ -412,6 +408,7 @@ pprAddr (AddrRegImm r1 imm)
 \begin{code}
 pprInstr :: Instr -> Doc
 
+--pprInstr (COMMENT s) = (<>) (ptext SLIT("# "))   (ptext s)
 pprInstr (COMMENT s) = empty -- nuke 'em
 --alpha:  = (<>) (ptext SLIT("\t# ")) (ptext s)
 --i386 :  = (<>) (ptext SLIT("# "))   (ptext s)
@@ -895,9 +892,14 @@ pprSizeRegRegReg name size reg1 reg2 reg3
 \begin{code}
 #if i386_TARGET_ARCH
 
-pprInstr (MOV size (OpReg src) (OpReg dst)) -- hack
+pprInstr v@(MOV size s@(OpReg src) d@(OpReg dst)) -- hack
   | src == dst
-  = ptext SLIT("")
+  =
+#ifdef DEBUG
+    (<>) (ptext SLIT("# warning: ")) (pprSizeOpOp SLIT("mov") size s d)
+#else
+    (ptext SLIT(""))
+#endif
 pprInstr (MOV size src dst)
   = pprSizeOpOp SLIT("mov") size src dst
 pprInstr (MOVZX size src dst) = pprSizeOpOpCoerce SLIT("movzx") L size src dst
@@ -905,13 +907,13 @@ pprInstr (MOVSX size src dst) = pprSizeOpOpCoerce SLIT("movxs") L size src dst
 
 -- here we do some patching, since the physical registers are only set late
 -- in the code generation.
-pprInstr (LEA size (OpAddr (Addr src1@(Just reg1) (Just (reg2,1)) (ImmInt 0))) dst@(OpReg reg3))
+pprInstr (LEA size (OpAddr (Address src1@(Just reg1) (Just (reg2,1)) (ImmInt 0))) dst@(OpReg reg3))
   | reg1 == reg3
   = pprSizeOpOp SLIT("add") size (OpReg reg2) dst
-pprInstr (LEA size (OpAddr (Addr src1@(Just reg1) (Just (reg2,1)) (ImmInt 0))) dst@(OpReg reg3))
+pprInstr (LEA size (OpAddr (Address src1@(Just reg1) (Just (reg2,1)) (ImmInt 0))) dst@(OpReg reg3))
   | reg2 == reg3
   = pprSizeOpOp SLIT("add") size (OpReg reg1) dst
-pprInstr (LEA size (OpAddr (Addr src1@(Just reg1) Nothing displ)) dst@(OpReg reg3))
+pprInstr (LEA size (OpAddr (Address src1@(Just reg1) Nothing displ)) dst@(OpReg reg3))
   | reg1 == reg3
   = pprInstr (ADD size (OpImm displ) dst)
 pprInstr (LEA size src dst) = pprSizeOpOp SLIT("lea") size src dst
@@ -931,9 +933,10 @@ pprInstr (OR  size src dst) = pprSizeOpOp SLIT("or")  size src dst
 pprInstr (XOR size src dst) = pprSizeOpOp SLIT("xor")  size src dst
 pprInstr (NOT size op) = pprSizeOp SLIT("not") size op
 pprInstr (NEGI size op) = pprSizeOp SLIT("neg") size op
-pprInstr (SHL size imm dst) = pprSizeOpOp SLIT("shl")  size imm dst
-pprInstr (SAR size imm dst) = pprSizeOpOp SLIT("sar")  size imm dst
-pprInstr (SHR size imm dst) = pprSizeOpOp SLIT("shr")  size imm dst
+
+pprInstr (SHL size imm dst) = pprSizeByteOpOp SLIT("shl")  size imm dst
+pprInstr (SAR size imm dst) = pprSizeByteOpOp SLIT("sar")  size imm dst
+pprInstr (SHR size imm dst) = pprSizeByteOpOp SLIT("shr")  size imm dst
 
 pprInstr (CMP size src dst) = pprSizeOpOp SLIT("cmp")  size src dst
 pprInstr (TEST size src dst) = pprSizeOpOp SLIT("test")  size src dst
@@ -1050,6 +1053,18 @@ pprSizeOpOp name size op1 op2
 	pprOperand size op2
     ]
 
+pprSizeByteOpOp :: FAST_STRING -> Size -> Operand -> Operand -> Doc
+pprSizeByteOpOp name size op1 op2
+  = hcat [
+    	char '\t',
+	ptext name,
+    	pprSize size,
+	space,
+	pprOperand B op1,
+	comma,
+	pprOperand size op2
+    ]
+
 pprSizeOpReg :: FAST_STRING -> Size -> Operand -> Reg -> Doc
 pprSizeOpReg name size op1 reg
   = hcat [
@@ -1062,7 +1077,7 @@ pprSizeOpReg name size op1 reg
 	pprReg size reg
     ]
 
-pprSizeAddr :: FAST_STRING -> Size -> Addr -> Doc
+pprSizeAddr :: FAST_STRING -> Size -> Address -> Doc
 pprSizeAddr name size op
   = hcat [
     	char '\t',
@@ -1072,7 +1087,7 @@ pprSizeAddr name size op
 	pprAddr op
     ]
 
-pprSizeAddrReg :: FAST_STRING -> Size -> Addr -> Reg -> Doc
+pprSizeAddrReg :: FAST_STRING -> Size -> Address -> Reg -> Doc
 pprSizeAddrReg name size op dst
   = hcat [
     	char '\t',
