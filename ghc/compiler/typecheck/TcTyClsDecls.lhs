@@ -338,6 +338,8 @@ get_ty (HsForAllTy _ ctxt mty)
   = get_ctxt ctxt `unionUniqSets` get_ty mty
 get_ty (MonoDictTy name _)
   = set_name name
+get_ty (MonoIParamTy name _)
+  = emptyUniqSet
 
 ----------------------------------------------------
 get_tys tys
