@@ -124,9 +124,9 @@ sub constructNewHiFile {
 
     &readHiFile('new',$hsc_hi)	      unless $HiHasBeenRead{'new'} == 1;
     if ($Specific_hi_file eq '') {  # -ohi is used even if  module name != stem of filename.
-        ($hiname = $hifile_target) =~ s/([^\/]*\/)*(.*)\.$HiSuffix/$2/;
+        ($hiname = $hifile_target) = $1 if  $hifile_target =~ /\/?([^\/\.]+)\.$HiSuffix/;
         if ($ModuleName{'new'} ne $hiname) {
-          ($hidir  = $hifile_target) =~ s/([^\/]*\/)*.*\.$HiSuffix/$1/;
+          ($hidir  = $hifile_target) =~ s/(.*)$hiname\.$HiSuffix/$1/;
 	  $hifile_target = $hidir . $ModuleName{'new'} . ".$HiSuffix";
         }
     }
