@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.15 1999/02/26 16:44:14 simonm Exp $
+ * $Id: Storage.c,v 1.16 1999/03/02 19:50:12 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -149,6 +149,7 @@ initStorage (void)
   step->blocks   = allocNursery(NULL, nursery_blocks);
   step->n_blocks = nursery_blocks;
   current_nursery = step->blocks;
+  g0s0->to_space = NULL;
   /* hp, hpLim, hp_bd, to_space etc. aren't used in G0S0 */
 
   weak_ptr_list = NULL;
