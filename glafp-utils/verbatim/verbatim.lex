@@ -42,9 +42,9 @@ miranda			([0-9]+(\-([0-9]+)?)?)?>
 <VERB>\{		{ printf ("{\\char'173}"); }
 <VERB>\}		{ printf ("{\\char'175}"); }
 
-<NORM>^@\n		{ printf( "\\begin{verbatim}\n" ); 
+<NORM>^@{sp}\n		{ printf( "\\begin{verbatim}\n" ); 
 			  PUSH NORM; BEGIN VERBATIMSIM; }
-<VERBATIMSIM>^@\n	{ printf( "\\end{verbatim}\n" ); POP; }
+<VERBATIMSIM>^@{sp}\n	{ printf( "\\end{verbatim}\n" ); POP; }
 
 <NORM>\\"begin{verbatim}"	{ printf( "\\begin{verbatim}" ); 
 				  PUSH NORM; BEGIN VERBATIM; }
