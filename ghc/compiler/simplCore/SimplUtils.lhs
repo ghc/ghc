@@ -36,10 +36,10 @@ import Id		( Id, idType, idInfo,
 			)
 import NewDemand	( isStrictDmd, isBotRes, splitStrictSig )
 import SimplMonad
-import Type		( Type, seqType, 
-			  splitTyConApp_maybe, tyConAppArgs, mkTyVarTys,
-			  splitRepFunTys, isStrictType
+import Type		( Type, seqType, splitRepFunTys, isStrictType,
+			  splitTyConApp_maybe, tyConAppArgs, mkTyVarTys
 			)
+import TcType		( isDictTy )
 import OccName		( UserFS )
 import TyCon		( tyConDataConsIfAvailable, isAlgTyCon, isNewTyCon )
 import DataCon		( dataConRepArity, dataConSig, dataConArgTys )
@@ -547,11 +547,20 @@ tryEtaReduce bndrs body
     go []       (Var fun)     | ok_fun fun   = Just (Var fun)	-- Success!
     go _        _			     = Nothing		-- Failure!
 
-    ok_fun fun   = not (fun `elem` bndrs) && 
-		   isEvaldUnfolding (idUnfolding fun)
-	-- The exprIsValue is because eta reduction is not 
+    ok_fun fun = not (fun `elem` bndrs) && 
+		 (isEvaldUnfolding (idUnfolding fun) || all ok_lam bndrs)
+    ok_lam v = isTyVar v || isDictTy (idType v)
+	-- The isEvaldUnfolding is because eta reduction is not 
 	-- valid in general:  \x. bot  /=  bot
 	-- So we need to be sure that the "fun" is a value.
+	--
+	-- However, we always want to reduce (/\a -> f a) to f
+	-- This came up in a RULE: foldr (build (/\a -> g a))
+	--	did not match 	   foldr (build (/\b -> ...something complex...))
+	-- The type checker can insert these eta-expanded versions,
+	-- with both type and dictionary lambdas; hence the slightly 
+	-- ad-hoc isDictTy
+
     ok_arg b arg = varToCoreExpr b `cheapEqExpr` arg
 \end{code}
 
@@ -1045,6 +1054,45 @@ So the case-elimination algorithm is:
 
 If so, then we can replace the case with one of the rhss.
 
+Further notes about case elimination
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider:	test :: Integer -> IO ()
+		test = print
+
+Turns out that this compiles to:
+    Print.test
+      = \ eta :: Integer
+	  eta1 :: State# RealWorld ->
+	  case PrelNum.< eta PrelNum.zeroInteger of wild { __DEFAULT ->
+	  case hPutStr stdout
+		 (PrelNum.jtos eta ($w[] @ Char))
+		 eta1
+	  of wild1 { (# new_s, a4 #) -> PrelIO.lvl23 new_s  }}
+
+Notice the strange '<' which has no effect at all. This is a funny one.  
+It started like this:
+
+f x y = if x < 0 then jtos x
+          else if y==0 then "" else jtos x
+
+At a particular call site we have (f v 1).  So we inline to get
+
+	if v < 0 then jtos x 
+	else if 1==0 then "" else jtos x
+
+Now simplify the 1==0 conditional:
+
+	if v<0 then jtos v else jtos v
+
+Now common-up the two branches of the case:
+
+	case (v<0) of DEFAULT -> jtos v
+
+Why don't we drop the case?  Because it's strict in v.  It's technically
+wrong to drop even unnecessary evaluations, and in practice they
+may be a result of 'seq' so we *definitely* don't want to drop those.
+I don't really know how to improve this situation.
+
 
 \begin{code}
 --------------------------------------------------
@@ -1078,6 +1126,7 @@ mkCase1 scrut case_bndr [(con,bndrs,rhs)]
 --	Here we must *not* discard the case, because dataToTag# just fetches the tag from
 --	the info pointer.  So we'll be pedantic all the time, and see if that gives any
 -- 	other problems
+--	Also we don't want to discard 'seq's
   = tick (CaseElim case_bndr)			`thenSmpl_` 
     returnSmpl (bindCaseBndr case_bndr scrut rhs)
 

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.63 2001/12/10 14:08:14 simonmar Exp $
+-- $Id: DriverState.hs,v 1.64 2001/12/14 17:24:04 simonpj Exp $
 --
 -- Settings for the driver
 --
@@ -238,7 +238,7 @@ buildCoreToDo = do
 	-- so that overloaded functions have all their dictionary lambdas manifest
 	CoreDoSpecialising,
 
-	CoreDoFloatOutwards False{-not full-},
+	CoreDoFloatOutwards (FloatOutSw False False),
 	CoreDoFloatInwards,
 
 	CoreDoSimplify (SimplPhase 2) [
@@ -279,9 +279,7 @@ buildCoreToDo = do
 	],
 	case rule_check of { Just pat -> CoreDoRuleCheck 0 pat; Nothing -> CoreDoNothing },
 
-#ifdef DEBUG
 	if cpr        then CoreDoCPResult   else CoreDoNothing,
-#endif
 	if strictness then CoreDoStrictness else CoreDoNothing,
 	CoreDoWorkerWrapper,
 	CoreDoGlomBinds,
@@ -290,20 +288,14 @@ buildCoreToDo = do
 	   MaxSimplifierIterations max_iter
 	],
 
-	CoreDoFloatOutwards False{-not full-},
+	CoreDoFloatOutwards (FloatOutSw False	-- Not lambdas
+					True),	-- Float constants
 		-- nofib/spectral/hartel/wang doubles in speed if you
 		-- do full laziness late in the day.  It only happens
 		-- after fusion and other stuff, so the early pass doesn't
 		-- catch it.  For the record, the redex is 
 		--	  f_el22 (f_el21 r_midblock)
 
-
--- Leave out lambda lifting for now
---	  "-fsimplify",	-- Tidy up results of full laziness
---	    "[", 
---		  "-fmax-simplifier-iterations2",
---	    "]",
---	  "-ffloat-outwards-full",	
 
 	-- We want CSE to follow the final full-laziness pass, because it may
 	-- succeed in commoning up things floated out by full laziness.

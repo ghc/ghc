@@ -13,11 +13,10 @@ module FloatOut ( floatOutwards ) where
 import CoreSyn
 import CoreUtils	( mkSCC )
 
-import CmdLineOpts	( DynFlags, DynFlag(..) )
+import CmdLineOpts	( DynFlags, DynFlag(..), FloatOutSwitches(..) )
 import ErrUtils		( dumpIfSet_dyn )
 import CostCentre	( dupifyCC, CostCentre )
 import Id		( Id )
-import VarEnv
 import CoreLint		( showPass, endPass )
 import SetLevels	( setLevels, isInlineCtxt,
 		 	  Level(..), tOP_LEVEL, ltMajLvl, ltLvl, isTopLvl
@@ -26,6 +25,46 @@ import UniqSupply       ( UniqSupply )
 import List		( partition )
 import Outputable
 \end{code}
+
+	-----------------
+	Overall game plan
+	-----------------
+
+The Big Main Idea is:
+
+  	To float out sub-expressions that can thereby get outside
+	a non-one-shot value lambda, and hence may be shared.
+
+
+To achieve this we may need to do two thing:
+
+   a) Let-bind the sub-expression:
+
+	f (g x)  ==>  let lvl = f (g x) in lvl
+
+      Now we can float the binding for 'lvl'.  
+
+   b) More than that, we may need to abstract wrt a type variable
+
+	\x -> ... /\a -> let v = ...a... in ....
+
+      Here the binding for v mentions 'a' but not 'x'.  So we
+      abstract wrt 'a', to give this binding for 'v':
+
+	    vp = /\a -> ...a...
+	    v  = vp a
+
+      Now the binding for vp can float out unimpeded.
+      I can't remember why this case seemed important enough to
+      deal with, but I certainly found cases where important floats
+      didn't happen if we did not abstract wrt tyvars.
+
+With this in mind we can also achieve another goal: lambda lifting.
+We can make an arbitrary (function) binding float to top level by
+abstracting wrt *all* local variables, not just type variables, leaving
+a binding that can be floated right to top level.  Whether or not this
+happens is controlled by a flag.
+
 
 Random comments
 ~~~~~~~~~~~~~~~
@@ -74,15 +113,15 @@ type FloatBinds    = [FloatBind]
 
 \begin{code}
 floatOutwards :: DynFlags
-	      -> Bool 		-- True <=> float lambdas to top level
+	      -> FloatOutSwitches
 	      -> UniqSupply 
 	      -> [CoreBind] -> IO [CoreBind]
 
-floatOutwards dflags float_lams us pgm
+floatOutwards dflags float_sws us pgm
   = do {
 	showPass dflags float_msg ;
 
-	let { annotated_w_levels = setLevels float_lams pgm us ;
+	let { annotated_w_levels = setLevels float_sws pgm us ;
 	      (fss, binds_s')    = unzip (map floatTopBind annotated_w_levels)
 	    } ;
 
@@ -100,20 +139,21 @@ floatOutwards dflags float_lams us pgm
 			{- no specific flag for dumping float-out -} 
     }
   where
-    float_msg | float_lams = "Float out (floating lambdas too)"
-	      | otherwise  = "Float out (not floating lambdas)"
+    float_msg = showSDoc (text "Float out" <+> parens (sws float_sws))
+    sws (FloatOutSw lam const) = pp_not lam   <+> text "lambdas" <> comma <+>
+				 pp_not const <+> text "constants"
+    pp_not True  = empty
+    pp_not False = text "not"
 
 floatTopBind bind@(NonRec _ _)
-  = case (floatBind emptyVarEnv tOP_LEVEL bind) of { (fs, floats, bind', _) ->
+  = case (floatBind bind) of { (fs, floats, bind') ->
     (fs, floatsToBinds floats ++ [bind'])
     }
 
 floatTopBind bind@(Rec _)
-  = case (floatBind emptyVarEnv tOP_LEVEL bind) of { (fs, floats, Rec pairs', _) ->
-	-- Actually floats will be empty
-    --false:ASSERT(null floats)
-    (fs, [Rec (floatsToBindPairs floats ++ pairs')])
-    }
+  = case (floatBind bind) of { (fs, floats, Rec pairs') ->
+    WARN( not (null floats), ppr bind $$ ppr floats )
+    (fs, [Rec (floatsToBindPairs floats ++ pairs')]) }
 \end{code}
 
 %************************************************************************
@@ -124,53 +164,44 @@ floatTopBind bind@(Rec _)
 
 
 \begin{code}
-floatBind :: IdEnv Level
-	  -> Level
-	  -> LevelledBind
-	  -> (FloatStats, FloatBinds, CoreBind, IdEnv Level)
+floatBind :: LevelledBind
+	  -> (FloatStats, FloatBinds, CoreBind)
 
-floatBind env lvl (NonRec (name,level) rhs)
-  = case (floatRhs env level rhs) of { (fs, rhs_floats, rhs') ->
-    (fs, rhs_floats,
-     NonRec name rhs',
-     extendVarEnv env name level)
-    }
+floatBind (NonRec (name,level) rhs)
+  = case (floatRhs level rhs) of { (fs, rhs_floats, rhs') ->
+    (fs, rhs_floats, NonRec name rhs') }
 
-floatBind env lvl bind@(Rec pairs)
+floatBind bind@(Rec pairs)
   = case (unzip3 (map do_pair pairs)) of { (fss, rhss_floats, new_pairs) ->
 
     if not (isTopLvl bind_level) then
 	-- Standard case
-	(sum_stats fss, concat rhss_floats, Rec new_pairs, new_env)
+	(sum_stats fss, concat rhss_floats, Rec new_pairs)
     else
-	{- In a recursive binding, destined for the top level (only),
-	   the rhs floats may contain
-	   references to the bound things.  For example
-
-		f = ...(let v = ...f... in b) ...
-
-	   might get floated to
-
-		v = ...f...
-		f = ... b ...
-
-	   and hence we must (pessimistically) make all the floats recursive
-	   with the top binding.  Later dependency analysis will unravel it.
-	-}
-
-	(sum_stats fss,
-	 [],
-	 Rec (new_pairs ++ floatsToBindPairs (concat rhss_floats)),
-	 new_env)
-
+	-- In a recursive binding, *destined for* the top level
+	-- (only), the rhs floats may contain references to the 
+	-- bound things.  For example
+	--
+	--	f = ...(let v = ...f... in b) ...
+	--
+	--  might get floated to
+	--
+	--	v = ...f...
+	--	f = ... b ...
+	--
+	-- and hence we must (pessimistically) make all the floats recursive
+	-- with the top binding.  Later dependency analysis will unravel it.
+	--
+	-- Can't happen on nested bindings because floatRhs will dump
+	-- the bindings in the RHS (partitionByMajorLevel treats top specially)
+	(sum_stats fss, [],
+	 Rec (new_pairs ++ floatsToBindPairs (concat rhss_floats)))
     }
   where
-    new_env = extendVarEnvList env (map fst pairs)
-
     bind_level = getBindLevel bind
 
     do_pair ((name, level), rhs)
-      = case (floatRhs new_env level rhs) of { (fs, rhs_floats, rhs') ->
+      = case (floatRhs level rhs) of { (fs, rhs_floats, rhs') ->
 	(fs, rhs_floats, (name, rhs'))
 	}
 \end{code}
@@ -183,13 +214,12 @@ floatBind env lvl bind@(Rec pairs)
 
 \begin{code}
 floatExpr, floatRhs
-	 :: IdEnv Level
-	 -> Level
+	 :: Level
 	 -> LevelledExpr
 	 -> (FloatStats, FloatBinds, CoreExpr)
 
-floatRhs env lvl arg
-  = case (floatExpr env lvl arg) of { (fsa, floats, arg') ->
+floatRhs lvl arg
+  = case (floatExpr lvl arg) of { (fsa, floats, arg') ->
     case (partitionByMajorLevel lvl floats) of { (floats', heres) ->
 	-- Dump bindings that aren't going to escape from a lambda
 	-- This is to avoid floating the x binding out of
@@ -197,44 +227,43 @@ floatRhs env lvl arg
 	-- unnecessarily.  It even causes a bug to do so if we have
 	--	y = writeArr# a n (let x = e in b)
 	-- because the y binding is an expr-ok-for-speculation one.
+	-- [SLPJ Dec 01: I don't understand this last comment; 
+	--	   	 writeArr# is not ok-for-spec because of its side effect]
     (fsa, floats', install heres arg') }}
 
-floatExpr env _ (Var v)	     = (zeroStats, [], Var v)
-floatExpr env _ (Type ty)    = (zeroStats, [], Type ty)
-floatExpr env _ (Lit lit)    = (zeroStats, [], Lit lit)
+floatExpr _ (Var v)   = (zeroStats, [], Var v)
+floatExpr _ (Type ty) = (zeroStats, [], Type ty)
+floatExpr _ (Lit lit) = (zeroStats, [], Lit lit)
 	  
-floatExpr env lvl (App e a)
-  = case (floatExpr env lvl e) of { (fse, floats_e, e') ->
-    case (floatRhs env lvl a) of { (fsa, floats_a, a') ->
+floatExpr lvl (App e a)
+  = case (floatExpr lvl e) of { (fse, floats_e, e') ->
+    case (floatRhs  lvl a) of { (fsa, floats_a, a') ->
     (fse `add_stats` fsa, floats_e ++ floats_a, App e' a') }}
 
-floatExpr env lvl (Lam (tv,incd_lvl) e)
-  | isTyVar tv
-  = case (floatExpr env incd_lvl e) of { (fs, floats, e') ->
+floatExpr lvl lam@(Lam _ _)
+  = let
+	(bndrs_w_lvls, body) = collectBinders lam
+	(bndrs, lvls)	     = unzip bndrs_w_lvls
 
-	-- Dump any bindings which absolutely cannot go any further
-    case (partitionByLevel incd_lvl floats)	of { (floats', heres) ->
-
-    (fs, floats', Lam tv (install heres e'))
-    }}
-
-floatExpr env lvl (Lam (arg,incd_lvl) rhs)
-  = ASSERT( isId arg )
-    let
-	new_env  = extendVarEnv env arg incd_lvl
+	-- For the all-tyvar case we are prepared to pull 
+	-- the lets out, to implement the float-out-of-big-lambda
+	-- transform; but otherwise we only float bindings that are
+	-- going to escape a value lambda.
+	-- In particular, for one-shot lambdas we don't float things
+	-- out; we get no saving by so doing.
+	partition_fn | all isTyVar bndrs = partitionByLevel
+		     | otherwise	 = partitionByMajorLevel
     in
-    case (floatExpr new_env incd_lvl rhs) of { (fs, floats, rhs') ->
+    case (floatExpr (last lvls) body) of { (fs, floats, body') ->
 
 	-- Dump any bindings which absolutely cannot go any further
-    case (partitionByLevel incd_lvl floats)	of { (floats', heres) ->
+    case (partition_fn (head lvls) floats)	of { (floats', heres) ->
 
-    (add_to_stats fs floats',
-     floats',
-     Lam arg (install heres rhs'))
+    (add_to_stats fs floats', floats', mkLams bndrs (install heres body'))
     }}
 
-floatExpr env lvl (Note note@(SCC cc) expr)
-  = case (floatExpr env lvl expr)    of { (fs, floating_defns, expr') ->
+floatExpr lvl (Note note@(SCC cc) expr)
+  = case (floatExpr lvl expr)    of { (fs, floating_defns, expr') ->
     let
 	-- Annotate bindings floated outwards past an scc expression
 	-- with the cc.  We mark that cc as "duplicated", though.
@@ -254,23 +283,23 @@ floatExpr env lvl (Note note@(SCC cc) expr)
 	ann_bind (Rec pairs)
 	  = Rec [(binder, mkSCC dupd_cc rhs) | (binder, rhs) <- pairs]
 
-floatExpr env lvl (Note InlineMe expr)	-- Other than SCCs
-  = case floatExpr env InlineCtxt expr of { (fs, floating_defns, expr') ->
+floatExpr lvl (Note InlineMe expr)	-- Other than SCCs
+  = case floatExpr InlineCtxt expr of { (fs, floating_defns, expr') ->
     WARN( not (null floating_defns),
 	  ppr expr $$ ppr floating_defns )	-- We do no floating out of Inlines
     (fs, [], Note InlineMe expr') }	-- See notes in SetLevels
 
-floatExpr env lvl (Note note expr)	-- Other than SCCs
-  = case (floatExpr env lvl expr)    of { (fs, floating_defns, expr') ->
+floatExpr lvl (Note note expr)	-- Other than SCCs
+  = case (floatExpr lvl expr)    of { (fs, floating_defns, expr') ->
     (fs, floating_defns, Note note expr') }
 
-floatExpr env lvl (Let bind body)
-  = case (floatBind env     lvl bind) of { (fsb, rhs_floats, bind', new_env) ->
-    case (floatExpr new_env lvl body) of { (fse, body_floats, body') ->
-    if isInlineCtxt lvl then	-- No floating inside an InlineMe
-	ASSERT( null rhs_floats && null body_floats )
-	(add_stats fsb fse, [], Let bind' body')
-    else
+floatExpr lvl (Let bind body)
+  = case (floatBind bind)     of { (fsb, rhs_floats,  bind') ->
+    case (floatExpr lvl body) of { (fse, body_floats, body') ->
+--    if isInlineCtxt lvl then	-- No floating inside an InlineMe
+--	ASSERT( null rhs_floats && null body_floats )
+--	(add_stats fsb fse, [], Let bind' body')
+--    else
 	(add_stats fsb fse,
 	 rhs_floats ++ [(bind_lvl, bind')] ++ body_floats,
 	 body')
@@ -278,24 +307,17 @@ floatExpr env lvl (Let bind body)
   where
     bind_lvl = getBindLevel bind
 
-floatExpr env lvl (Case scrut (case_bndr, case_lvl) alts)
-  = case floatExpr env lvl scrut	of { (fse, fde, scrut') ->
+floatExpr lvl (Case scrut (case_bndr, case_lvl) alts)
+  = case floatExpr lvl scrut	of { (fse, fde, scrut') ->
     case floatList float_alt alts	of { (fsa, fda, alts')  ->
     (add_stats fse fsa, fda ++ fde, Case scrut' case_bndr alts')
     }}
   where
-      alts_env = extendVarEnv env case_bndr case_lvl
-
-      partition_fn = partitionByMajorLevel
-
-      float_alt (con, bs, rhs)
-	= let
-	      bs' = map fst bs
-	      new_env = extendVarEnvList alts_env bs
-	  in
-	  case (floatExpr new_env case_lvl rhs)		of { (fs, rhs_floats, rhs') ->
-	  case (partition_fn case_lvl rhs_floats)	of { (rhs_floats', heres) ->
-	  (fs, rhs_floats', (con, bs', install heres rhs')) }}
+	-- Use floatRhs for the alternatives, so that we
+	-- don't gratuitiously float bindings out of the RHSs
+    float_alt (con, bs, rhs)
+	= case (floatRhs case_lvl rhs)	of { (fs, rhs_floats, rhs') ->
+	  (fs, rhs_floats, (con, map fst bs, rhs')) }
 
 
 floatList :: (a -> (FloatStats, FloatBinds, b)) -> [a] -> (FloatStats, FloatBinds, [b])
@@ -362,8 +384,7 @@ partitionByMajorLevel, partitionByLevel
 partitionByMajorLevel ctxt_lvl defns
   = partition float_further defns
   where
-	-- Float it if we escape a value lambda, 
-	-- or if we get to the top level
+	-- Float it if we escape a value lambda, or if we get to the top level
     float_further (my_lvl, bind) = my_lvl `ltMajLvl` ctxt_lvl || isTopLvl my_lvl
 	-- The isTopLvl part says that if we can get to the top level, say "yes" anyway
 	-- This means that 

@@ -36,7 +36,7 @@ module CoreSyn (
 
 	-- Annotated expressions
 	AnnExpr, AnnExpr'(..), AnnBind(..), AnnAlt, 
-	deAnnotate, deAnnotate', deAnnAlt,
+	deAnnotate, deAnnotate', deAnnAlt, collectAnnBndrs,
 
 	-- Core rules
 	CoreRules(..), 	-- Representation needed by friends
@@ -618,3 +618,11 @@ deAnnAlt :: AnnAlt bndr annot -> Alt bndr
 deAnnAlt (con,args,rhs) = (con,args,deAnnotate rhs)
 \end{code}
 
+\begin{code}
+collectAnnBndrs :: AnnExpr bndr annot -> ([bndr], AnnExpr bndr annot)
+collectAnnBndrs e
+  = collect [] e
+  where
+    collect bs (_, AnnLam b body) = collect (b:bs) body
+    collect bs body		  = (reverse bs, body)
+\end{code}

@@ -179,20 +179,23 @@ So we treat lambda in groups, using the following rule:
 	Otherwise drop all the bindings outside the group.
 
 \begin{code}
-fiExpr to_drop (_, AnnLam b body)
-  = case collect [b] body of
-      (bndrs, real_body)
---	| all is_ok bndrs -> mkLams bndrs (fiExpr to_drop real_body)
--- [July 01: I'm experiment with getting the full laziness
--- pass to floats bindings out past big lambdas (instead of the simplifier)
--- so I don't want the float-in pass to just push them right back in.
--- I'm going to try just dumping all bindings outside lambdas.]
-	| otherwise	  -> mkCoLets' to_drop (mkLams bndrs (fiExpr [] real_body))
-  where
-    collect bs (_, AnnLam b body) = collect (b:bs) body
-    collect bs body		  = (reverse bs, body)
+	-- Hack alert!  We only float in through one-shot lambdas, 
+	-- not (as you might guess) through big lambdas.  
+	-- Reason: we float *out* past big lambdas (see the test in the Lam
+	-- case of FloatOut.floatExpr) and we don't want to float straight
+	-- back in again.
+	--
+	-- It *is* important to float into one-shot lambdas, however;
+	-- see the remarks with noFloatIntoRhs.
+fiExpr to_drop lam@(_, AnnLam _ _)
+  | all is_one_shot bndrs 	-- Float in
+  = mkLams bndrs (fiExpr to_drop body)
 
---    is_ok bndr = isTyVar bndr || isOneShotLambda bndr
+  | otherwise	 	-- Dump it all here
+  = mkCoLets' to_drop (mkLams bndrs (fiExpr [] body))
+
+  where
+    (bndrs, body) = collectAnnBndrs lam
 \end{code}
 
 We don't float lets inwards past an SCC.
@@ -339,7 +342,7 @@ fiExpr to_drop (_, AnnCase scrut case_bndr alts)
     fi_alt to_drop (con, args, rhs) = (con, args, fiExpr to_drop rhs)
 
 noFloatIntoRhs (AnnNote InlineMe _) = True
-noFloatIntoRhs (AnnLam b _)   	    = not (isId b && isOneShotLambda b)
+noFloatIntoRhs (AnnLam b _)   	    = not (is_one_shot b)
 	-- IMPORTANT: don't say 'True' for a RHS with a one-shot lambda at the top.
 	-- This makes a big difference for things like
 	--	f x# = let x = I# x#
@@ -349,7 +352,9 @@ noFloatIntoRhs (AnnLam b _)   	    = not (isId b && isOneShotLambda b)
 	-- boxing constructor into it, else we box it every time which is very bad
 	-- news indeed.
 
-noFloatIntoRhs rhs = exprIsValue (deAnnotate' rhs)	-- We'd just float rigt back out again...
+noFloatIntoRhs rhs = exprIsValue (deAnnotate' rhs)	-- We'd just float right back out again...
+
+is_one_shot b = isId b && isOneShotLambda b
 \end{code}
 
 

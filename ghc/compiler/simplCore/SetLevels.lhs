@@ -43,7 +43,7 @@
 
 \begin{code}
 module SetLevels (
-	setLevels,
+	setLevels, 
 
 	Level(..), tOP_LEVEL,
 
@@ -54,6 +54,7 @@ module SetLevels (
 
 import CoreSyn
 
+import CmdLineOpts	( FloatOutSwitches(..) )
 import CoreUtils	( exprType, exprIsTrivial, exprIsBottom, mkPiTypes )
 import CoreFVs		-- all of it
 import Subst
@@ -203,7 +204,7 @@ instance Eq Level where
 %************************************************************************
 
 \begin{code}
-setLevels :: Bool		-- True <=> float lambdas to top level
+setLevels :: FloatOutSwitches
 	  -> [CoreBind]
 	  -> UniqSupply
 	  -> [LevelledBind]
@@ -365,6 +366,7 @@ lvlMFE strict_ctxt ctxt_lvl env ann_expr@(fvs, _)
 
     good_destination =  dest_lvl `ltMajLvl` ctxt_lvl	-- Escapes a value lambda
 		     || (isTopLvl dest_lvl		-- Goes to the top
+			 && floatConsts env
 			 && not strict_ctxt)		--   or from a strict context	
 	-- A decision to float entails let-binding this thing, and we only do 
 	-- that if we'll escape a value lambda, or will go to the top level.
@@ -375,6 +377,12 @@ lvlMFE strict_ctxt ctxt_lvl env ann_expr@(fvs, _)
 	--	concat = /\ a -> lvl a
 	--	lvl    = /\ a -> foldr ..a.. (++) []
 	-- which is pretty stupid.  Hence the strict_ctxt test
+	--
+	-- We are keen to float something to the top level, even if it does not
+	-- escape a lambda, because then it needs no allocation.  But it's controlled
+	-- by a flag, because doing this too early loses opportunities for RULES
+	-- which (needless to say) are important in some nofib programs
+	-- (gcd is an example).
 \end{code}
 
 
@@ -500,11 +508,6 @@ lvlFloatRhs abs_vars dest_lvl env rhs
 %************************************************************************
 
 \begin{code}
-collectAnnBndrs :: CoreExprWithFVs -> ([CoreBndr], CoreExprWithFVs)
-collectAnnBndrs (_, AnnLam b e) = case collectAnnBndrs e of
-					(bs,e') -> (b:bs, e')
-collectAnnBndrs e	  	= ([], e)
-
 lvlLamBndrs :: Level -> [CoreBndr] -> (Level, [(CoreBndr, Level)])
 -- Compute the levels for the binders of a lambda group
 -- The binders returned are exactly the same as the ones passed,
@@ -574,7 +577,7 @@ isFunction other 		       = False
 %************************************************************************
 
 \begin{code}
-type LevelEnv = (Bool, 				-- True <=> Float lambdas too
+type LevelEnv = (FloatOutSwitches,
 		 VarEnv Level, 			-- Domain is *post-cloned* TyVars and Ids
 	         Subst, 			-- Domain is pre-cloned Ids; tracks the in-scope set
 						-- 	so that subtitution is capture-avoiding
@@ -600,11 +603,14 @@ type LevelEnv = (Bool, 				-- True <=> Float lambdas too
 	--
 	-- The domain of the VarEnv Level is the *post-cloned* Ids
 
-initialEnv :: Bool -> LevelEnv
+initialEnv :: FloatOutSwitches -> LevelEnv
 initialEnv float_lams = (float_lams, emptyVarEnv, emptySubst, emptyVarEnv)
 
 floatLams :: LevelEnv -> Bool
-floatLams (float_lams, _, _, _) = float_lams
+floatLams (FloatOutSw float_lams _, _, _, _) = float_lams
+
+floatConsts :: LevelEnv -> Bool
+floatConsts (FloatOutSw _ float_consts, _, _, _) = float_consts
 
 extendLvlEnv :: LevelEnv -> [(Var,Level)] -> LevelEnv
 -- Used when *not* cloning

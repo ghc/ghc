@@ -26,7 +26,8 @@ import Id		( isDataConId, isOneShotLambda, setOneShotLambda,
 			  idSpecialisation, isLocalId,
 			  idType, idUnique, Id
 			)
-import IdInfo		( OccInfo(..), shortableIdInfo, copyIdInfo )
+import IdInfo		( shortableIdInfo, copyIdInfo )
+import BasicTypes	( OccInfo(..), isOneOcc )
 
 import VarSet
 import VarEnv
@@ -468,9 +469,7 @@ reOrderRec env (CyclicSCC (bind : binds))
 
     inlineCandidate :: Id -> CoreExpr -> Bool
     inlineCandidate id (Note InlineMe _) = True
-    inlineCandidate id rhs	         = case idOccInfo id of
-						OneOcc _ _ -> True
-						other	   -> False
+    inlineCandidate id rhs	         = isOneOcc (idOccInfo id)
 
 	-- Real example (the Enum Ordering instance from PrelBase):
 	--	rec	f = \ x -> case d of (p,q,r) -> p x
@@ -636,7 +635,7 @@ occAnal env expr@(Lam _ _)
     (binders, body)   = collectBinders expr
     (linear, env1, _) = oneShotGroup env binders
     env2	      = env1 `addNewCands` binders	-- Add in-scope binders
-    env_body	      = vanillaCtxt env2			-- Body is (no longer) an RhsContext
+    env_body	      = vanillaCtxt env2		-- Body is (no longer) an RhsContext
 
 occAnal env (Case scrut bndr alts)
   = case mapAndUnzip (occAnalAlt alt_env bndr) alts of { (alts_usage_s, alts')   -> 

@@ -327,6 +327,18 @@ simplNonRecX :: SimplEnv
 	     -> SimplM FloatsWithExpr
 
 simplNonRecX env bndr new_rhs thing_inside
+  | needsCaseBinding (idType bndr) new_rhs
+	-- Make this test *before* the preInlineUnconditionally
+	-- Consider 	case I# (quotInt# x y) of 
+	--		  I# v -> let w = J# v in ...
+	-- If we gaily inline (quotInt# x y) for v, we end up building an
+	-- extra thunk:
+	--		  let w = J# (quotInt# x y) in ...
+	-- because quotInt# can fail.
+  = simplBinder env bndr	`thenSmpl` \ (env, bndr') ->
+    thing_inside env 		`thenSmpl` \ (floats, body) ->
+    returnSmpl (emptyFloats env, Case new_rhs bndr' [(DEFAULT, [], wrapFloats floats body)])
+
   | preInlineUnconditionally env NotTopLevel  bndr
   	-- This happens; for example, the case_bndr during case of
 	-- known constructor:  case (a,b) of x { (p,q) -> ... }
@@ -344,11 +356,6 @@ simplNonRecX env bndr new_rhs thing_inside
 		    bndr bndr' new_rhs thing_inside
 
 completeNonRecX env is_strict old_bndr new_bndr new_rhs thing_inside
-  | needsCaseBinding (idType new_bndr) new_rhs
-  = thing_inside env 			`thenSmpl` \ (floats, body) ->
-    returnSmpl (emptyFloats env, Case new_rhs new_bndr [(DEFAULT, [], wrapFloats floats body)])
-
-  | otherwise
   = mkAtomicArgs is_strict 
 		 True {- OK to float unlifted -} 
 		 new_rhs			`thenSmpl` \ (aux_binds, rhs2) ->
@@ -550,7 +557,7 @@ completeLazyBind :: SimplEnv
 --     (as usual) use the in-scope-env from the floats
 
 completeLazyBind env top_lvl old_bndr new_bndr new_rhs
-  | postInlineUnconditionally env new_bndr loop_breaker new_rhs
+  | postInlineUnconditionally env new_bndr occ_info new_rhs
   = 		-- Drop the binding
     tick (PostInlineUnconditionally old_bndr)	`thenSmpl_`
     returnSmpl (emptyFloats env, extendSubst env old_bndr (DoneEx new_rhs))
@@ -1290,10 +1297,10 @@ We'll perform the binder-swap for the outer case, giving
     case x of w1 { DEFAULT -> case w1 of w2 { A -> e1; B -> e2 } 
 	           ...other cases .... }
 
-But there is no point in doing it for the inner case,
-because w1 can't be inlined anyway.   Furthermore, doing the case-swapping
-involves zapping w2's occurrence info (see paragraphs that follow),
-and that forces us to bind w2 when doing case merging.  So we get
+But there is no point in doing it for the inner case, because w1 can't
+be inlined anyway.  Furthermore, doing the case-swapping involves
+zapping w2's occurrence info (see paragraphs that follow), and that
+forces us to bind w2 when doing case merging.  So we get
 
     case x of w1 { A -> let w2 = w1 in e1
 		   B -> let w2 = w1 in e2

@@ -73,7 +73,7 @@ import UniqSupply	( uniqsFromSupply, uniqFromSupply, splitUniqSupply,
 import FiniteMap
 import BasicTypes	( TopLevelFlag, isTopLevel, 
 			  Activation, isActive, isAlwaysActive,
-			  OccInfo(..)
+			  OccInfo(..), isOneOcc
 			)
 import CmdLineOpts	( SimplifierSwitch(..), SimplifierMode(..),
 			  DynFlags, DynFlag(..), dopt, 
@@ -788,7 +788,7 @@ seems a bit fragile.
 \begin{code}
 preInlineUnconditionally :: SimplEnv -> TopLevelFlag -> InId -> Bool
 preInlineUnconditionally env top_lvl bndr
-  | isTopLevel top_lvl     = False
+  | isTopLevel top_lvl, SimplPhase 0 <- phase = False
 -- If we don't have this test, consider
 --	x = length [1,2,3]
 -- The full laziness pass carefully floats all the cons cells to
@@ -799,7 +799,10 @@ preInlineUnconditionally env top_lvl bndr
 -- 
 -- On the other hand, I have seen cases where top-level fusion is
 -- lost if we don't inline top level thing (e.g. string constants)
--- We'll have to see
+-- Hence the test for phase zero (which is the phase for all the final
+-- simplifications).  Until phase zero we take no special notice of
+-- top level things, but then we become more leery about inlining
+-- them.  
 
   | not active 		   = False
   | opt_SimplNoPreInlining = False
@@ -809,7 +812,8 @@ preInlineUnconditionally env top_lvl bndr
 			-- Not inside a lambda, one occurrence ==> safe!
 		  other 	     -> False
   where
-    active = case getMode env of
+    phase = getMode env
+    active = case phase of
 		   SimplGently  -> isAlwaysActive prag
 		   SimplPhase n -> isActive n prag
     prag = idInlinePragma bndr
@@ -844,12 +848,18 @@ our new view that inlining is like a RULE, so I'm sticking to the 'active'
 story for now.
 
 \begin{code}
-postInlineUnconditionally :: SimplEnv -> OutId -> Bool -> OutExpr -> Bool
-postInlineUnconditionally env bndr loop_breaker rhs 
-  =  exprIsTrivial rhs
-  && active
-  && not loop_breaker
-  && not (isExportedId bndr)
+postInlineUnconditionally :: SimplEnv -> OutId -> OccInfo -> OutExpr -> Bool
+postInlineUnconditionally env bndr occ_info rhs 
+  =  exprIsTrivial rhs && active && isOneOcc occ_info
+	-- We used to have (not loop_breaker && not (isExportedId bndr))
+	-- instead of (isOneOcc occ_info).  Indeed, you might suppose that
+	-- there is nothing wrong with substituting for a trivial RHS, even
+	-- if it occurs many times.  But consider
+	--	x = y
+	--	h = _inline_me_ (...x...)
+	-- Here we do *not* want to have x inlined, even though the RHS is
+	-- trivial, becuase the contract for an INLINE pragma is "no inlining".
+	-- This is important in the rules for the Prelude (e.g. PrelEnum.eftInt).
   where
     active = case getMode env of
 		   SimplGently  -> isAlwaysActive prag
@@ -887,10 +897,6 @@ activeInline env id occ
       SimplPhase n -> isActive n prag
   where
     prag = idInlinePragma id
-
--- Belongs in BasicTypes; this frag occurs in OccurAnal too
-isOneOcc (OneOcc _ _) = True
-isOneOcc other	      = False
 
 activeRule :: SimplEnv -> Maybe (Activation -> Bool)
 -- Nothing => No rules at all

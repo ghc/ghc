@@ -33,7 +33,8 @@ module BasicTypes(
 
 	Boxity(..), isBoxed, tupleParens,
 
-	OccInfo(..), seqOccInfo, isFragileOcc, isDeadOcc, isLoopBreaker,
+	OccInfo(..), seqOccInfo, isFragileOcc, isOneOcc, 
+	isDeadOcc, isLoopBreaker,
 
 	InsideLam, insideLam, notInsideLam,
 	OneBranch, oneBranch, notOneBranch,
@@ -319,6 +320,9 @@ isLoopBreaker other	      = False
 isDeadOcc :: OccInfo -> Bool
 isDeadOcc IAmDead = True
 isDeadOcc other	  = False
+
+isOneOcc (OneOcc _ _) = True
+isOneOcc other	      = False
 
 isFragileOcc :: OccInfo -> Bool
 isFragileOcc (OneOcc _ _) = True

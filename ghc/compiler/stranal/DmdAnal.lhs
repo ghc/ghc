@@ -894,7 +894,7 @@ lubs = zipWithDmds lub
 box (Call d)  = Call d	-- The odd man out.  Why?
 box (Box d)   = Box d
 box (Defer _) = lazyDmd
-box Top      = lazyDmd	-- Box Abs and Box Top
+box Top       = lazyDmd	-- Box Abs and Box Top
 box Abs       = lazyDmd	-- are the same <B,L>
 box d 	      = Box d	-- Bot, Eval
 

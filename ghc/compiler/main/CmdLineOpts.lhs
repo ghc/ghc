@@ -8,7 +8,7 @@
 module CmdLineOpts (
 	CoreToDo(..), StgToDo(..),
 	SimplifierSwitch(..), 
-	SimplifierMode(..),
+	SimplifierMode(..), FloatOutSwitches(..),
 
 	HscLang(..),
 	DynFlag(..),	-- needed non-abstractly by DriverFlags
@@ -172,7 +172,7 @@ data CoreToDo		-- These are diff core-to-core passes,
 			-- Each run of the simplifier can take a different
 			-- set of simplifier-specific flags.
   | CoreDoFloatInwards
-  | CoreDoFloatOutwards Bool	-- True <=> float lambdas to top level
+  | CoreDoFloatOutwards FloatOutSwitches
   | CoreLiberateCase
   | CoreDoPrintCore
   | CoreDoStaticArgs
@@ -206,6 +206,11 @@ data SimplifierMode 		-- See comments in SimplMonad
 data SimplifierSwitch
   = MaxSimplifierIterations Int
   | NoCaseOfCase
+
+data FloatOutSwitches
+  = FloatOutSw  Bool 	-- True <=> float lambdas to top level
+		Bool	-- True <=> float constants to top level,
+			-- 	    even if they do not escape a lambda
 \end{code}
 
 %************************************************************************
