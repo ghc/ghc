@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.14 $
- * $Date: 1999/10/29 11:41:05 $
+ * $Revision: 1.15 $
+ * $Date: 1999/11/09 00:40:12 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -952,8 +952,9 @@ Cell  cd; {                             /* definitions (w or w/o deriving) */
             con      = ty;
         }
 
-        if (nr2>0)                      /* Add rank 2 annotation           */
-            type = ap(RANK2,pair(mkInt(nr2),type));
+	if (nr2>0) {			/* Add rank 2 annotation	   */
+	    type = ap(RANK2,pair(mkInt(nr2-length(lps)),type));
+	}
 
         if (nonNull(evs)) {             /* Add existential annotation      */
             if (nonNull(derivs)) {
@@ -2544,6 +2545,28 @@ Inst in; {
         ERRMSG(line) "Illegal predicate in instance declaration"
         EEND;
     }
+
+    if (nonNull(cclass(inst(in).c).fds)) {
+        List fds = cclass(inst(in).c).fds;
+        for (; nonNull(fds); fds=tl(fds)) {
+            List as = otvars(inst(in).head, fst(hd(fds)));
+            List bs = otvars(inst(in).head, snd(hd(fds)));
+            if (!osubset(bs,as)) {
+		ERRMSG(inst(in).line)
+		   "Instance is more general than a dependency allows"
+		ETHEN
+		ERRTEXT "\n*** Instance         : "
+		ETHEN ERRPRED(inst(in).head);
+		ERRTEXT "\n*** For class        : "
+		ETHEN ERRPRED(cclass(inst(in).c).head);
+		ERRTEXT "\n*** Under dependency : "
+		ETHEN ERRFD(hd(fds));
+		ERRTEXT "\n"
+		EEND;
+            }
+        }
+    }
+
     kindInst(in,length(tyvars));
     insertInst(in);
 
@@ -2883,6 +2906,7 @@ Inst in; {                              /* of the context for a derived    */
     List spcs   = fst(snd(inst(in).specifics));
     Int  beta   = inst(in).numSpecifics;
     Int  its    = 1;
+    Int  factor = 1+length(ps);
 
 #ifdef DEBUG_DERIVING
     Printf("calcInstPreds: ");
@@ -2893,7 +2917,7 @@ Inst in; {                              /* of the context for a derived    */
     while (nonNull(ps)) {
         Cell p = hd(ps);
         ps     = tl(ps);
-	if (its++ >= cutoff) {
+	if (its++ >= factor*cutoff) {
 	    Cell bpi = inst(in).head;
 	    Cell pi  = copyPred(fun(p),intOf(snd(p)));
 	    ERRMSG(inst(in).line) "\n*** Cannot derive " ETHEN ERRPRED(bpi);

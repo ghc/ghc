@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.16 $
- * $Date: 1999/10/29 13:41:24 $
+ * $Revision: 1.17 $
+ * $Date: 1999/11/09 00:40:11 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -1724,7 +1724,10 @@ Text t; {
             List ms = cclass(cl).members;
             Printf(" where");
             do {
-                Type t = monotypeOf(name(hd(ms)).type);
+		Type t = name(hd(ms)).type;
+                if (isPolyType(t)) {
+		    t = monotypeOf(t);
+		}
                 Printf("\n  ");
                 printExp(stdout,hd(ms));
                 Printf(" :: ");
