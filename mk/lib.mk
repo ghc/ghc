@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: lib.mk,v 1.2 1996/11/21 16:50:35 simonm Exp $
+# $Id: lib.mk,v 1.3 1997/01/07 13:14:36 simonm Exp $
 
 # Useful variables:
 
@@ -28,6 +28,7 @@ install	:: $(ARCHIVE)
 	cd $(DESTDIR); $(RANLIB) $(INSTALLED_NAME)
 
 clean 	:: 
+	$(RM) $(LIBOBJS)
 	$(RM) $(ARCHIVE)
 
 ifdef C_DEP_SRCS
