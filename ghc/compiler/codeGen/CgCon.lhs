@@ -303,7 +303,8 @@ buildDynCon binder cc con [arg_amode] all_zero_size_args@False
   where
     (temp_amode, temp_id_info) = newTempAmodeAndIdInfo binder (mkConLFInfo con)
 
-    in_range_int_lit (CLit (MachInt val _)) = val <= mAX_INTLIKE && val >= mIN_INTLIKE
+    in_range_int_lit (CLit (MachInt val _)) = val <= mAX_INTLIKE && 
+					      val >= mIN_INTLIKE
     in_range_int_lit other_amode	    = False
 \end{code}
 

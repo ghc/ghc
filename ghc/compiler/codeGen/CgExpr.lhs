@@ -195,7 +195,7 @@ cgExpr x@(StgPrim op args live_vars)
     -- on as the first "argument"
     -- ToDo: un-duplicate?
 
-    pin_liveness (CCallOp _ _ _ _ _) _ args = args
+    pin_liveness (CCallOp _ _ _ _ _ _) _ args = args
     pin_liveness other_op liveness_arg args
       = liveness_arg :args
 

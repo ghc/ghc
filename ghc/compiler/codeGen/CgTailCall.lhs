@@ -436,7 +436,7 @@ tailCallBusiness fun fun_amode lf_info arg_amodes live_vars pending_assts
 			= load_regs_and_profiling_code		`mkAbsCStmts`
 			  CJump (CLbl join_lbl CodePtrRep)
 
-		    semi_tagged_alts = [ (mkMachInt (toInteger (tag - fIRST_TAG)),
+		    semi_tagged_alts = [ (mkMachInt (fromInt (tag - fIRST_TAG)),
 					  join_details_to_code join_details)
 				       | (tag, join_details) <- st_alts
 				       ]
