@@ -714,7 +714,7 @@ takePS (I# n) ps
 
 dropPS	:: Int -> PackedString -> PackedString
 dropPS (I# n) ps
-  | n ==# len = ps
+  | n ==# len = nilPS
   | otherwise = substrPS# ps n  (lengthPS# ps -# 1#)
   where
     len = lengthPS# ps
