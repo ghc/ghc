@@ -14,6 +14,7 @@ module Language.Haskell.TH(
 	mkName,  	-- :: String -> Name
 	newName, 	-- :: String -> Q Name
 	nameBase,	-- :: Name -> String
+	nameModule,	-- :: Name -> Maybe String
 	tupleTypeName, tupleDataName,	-- Int -> Name
 	
 	-- The algebraic data types

@@ -22,7 +22,7 @@ module Language.Haskell.TH.Syntax(
 	currentModule, runIO,
 
 	-- Names
-	Name(..), mkName, newName, nameBase,
+	Name(..), mkName, newName, nameBase, nameModule,
 
 	-- The algebraic data types
 	Dec(..), Exp(..), Con(..), Type(..), Cxt, Match(..), 
@@ -297,6 +297,10 @@ type Uniq = Int
 nameBase :: Name -> String
 nameBase (Name occ _) = occString occ
 
+nameModule :: Name -> Maybe String
+nameModule (Name _ (NameG _ m)) = Just (modString m)
+nameModule other_name		= Nothing
+
 mkName :: String -> Name
 mkName s = Name (mkOccName s) NameS
 
@@ -375,6 +379,13 @@ data Info
 	Fixity
 
   | TyConI Dec
+
+  | PrimTyConI 	-- Ones that can't be expressed with a data type 
+		-- decl, such as (->), Int#
+	Name 
+	Int	-- Arity
+	Bool	-- False => lifted type; True => unlifted
+
   | DataConI 
 	Name	-- The data con itself
 	Type 	-- Type of the constructor (fully polymorphic)
