@@ -40,7 +40,7 @@ The arguments passed to the Main-thread PE-executable are
 -------------------------------------------------------------------
 | main flag | pvm-executable path | Num. PEs | Program Args ... |
 -------------------------------------------------------------------
-\begin{verbatim}
+\end{verbatim}
 \item SysMan's algorithm is as follows.
 \begin{itemize}
 \item use PVM to spawn (nPE-1) PVM tasks 
