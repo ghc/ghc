@@ -556,7 +556,7 @@ in <Filename>/Program Files/</Filename>!)
 <Para>
 When the installer has completed, make sure you add the location of the
 ghc <Filename>bin/</Filename> directory to your path (e.g.
-<Filename>/ghc/ghc-4.08/bin </Filename>).
+<Filename>/ghc/ghc-4.08/bin</Filename>).
 You need to do this in order to bring the various GHC binaries into scope.
 Also, if the directory <Filename>C:/TEMP</Filename> doesn't already exist,
 you should create it.
