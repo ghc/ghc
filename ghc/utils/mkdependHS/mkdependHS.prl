@@ -102,6 +102,11 @@ $Makefile = '';
 @Src_files = ();
 $Include_prelude = 0;
 
+# Delete temp. file if script is halted.
+sub quit_upon_signal { print STDERR "Deleting $Tmp_prefix.hs .. \n"; unlink "$Tmp_prefix.hs"; }
+$SIG{'INT'}  = 'quit_upon_signal';
+$SIG{'QUIT'} = 'quit_upon_signal';
+
 &mangle_command_line_args();
 
 if ( $Status ) {
@@ -161,11 +166,6 @@ print STDERR "Include_dirs=@Include_dirs\n" if $Verbose;
 
 @Depend_lines = ();
 
-# Delete temp. file if script is halted.
-sub quit_upon_signal { print STDERR "Deleting $Tmp_prefix.hs .. \n"; unlink "$Tmp_prefix.hs"; }
-$SIG{'INT'}  = 'quit_upon_signal';
-$SIG{'QUIT'} = 'quit_upon_signal';
-
 foreach $sf (@Src_files) {
 
     # just like lit-inputter
@@ -189,7 +189,7 @@ foreach $sf (@Src_files) {
     } else {
     	$file_to_read = "$Tmp_prefix.hs";
 	local($to_do) = "$Unlit $sf $file_to_read";
-	&run_something($to_do, 'unlit');
+	&run_something($to_do, $sf, 'unlit');
     }
     &slurp_file_for_imports($file_to_read, $sf);
 
@@ -382,7 +382,7 @@ sub slurp_file_for_imports {
     local ($open_cmd);
     if ($Cpp_flag_set) {
 #       $open_cmd = "${SED} -e '/^# *include/{p;s/^# *include/!include/;};s/'\\''//g;s/\"//g' $file_to_read | $Cpp $Include_dirs -I$last_seen_dir @Defines |";
-       &run_something("${SED} -e '/^# *include/{p;s/^# *include/!include/;};s/'\\''//g;s/\"//g' $file_to_read | $Cpp $Include_dirs -I$last_seen_dir @Defines 2>&1 > ${file_to_read}.i", 'Running cpp');
+       &run_something("${SED} -e '/^# *include/{p;s/^# *include/!include/;};s/'\\''//g;s/\"//g' $file_to_read | $Cpp $Include_dirs -I$last_seen_dir @Defines 2>&1 > ${file_to_read}.i", $orig_src_file, 'cpp');
        $read_from_file="${file_to_read}.i";
        $cleanup=1;
     } else {
@@ -595,7 +595,7 @@ sub find_in_Include_dirs {
 
 # out of the driver, actually
 sub run_something {
-    local($str_to_do, $tidy_name) = @_;
+    local($str_to_do, $file_to_read, $tidy_name) = @_;
 
     print STDERR "\n$tidy_name:\n\t" if $Verbose;
     print STDERR "$str_to_do\n" if $Verbose;
@@ -603,8 +603,8 @@ sub run_something {
     local($return_val) = system($str_to_do) >> 8;
 
     if ($return_val != 0) {
-	local($die_msg) = "$Pgm: execution of the $tidy_name had trouble";
-	$die_msg .= " (program not found)" if $return_val == 255;
+	local($die_msg) = "$Pgm: Running $tidy_name ( on $file_to_read ) failed";
+        $die_msg .= " program not found: $str_to_do " if $return_val == 255;
 	$die_msg .= " ($!)" if $Verbose && $! != 0;
 	$die_msg .= "\n";
 	print STDERR $die_msg;
