@@ -18,23 +18,22 @@ module PprType(
 
 -- friends:
 -- (PprType can see all the representations it's trying to print)
-import TypeRep		( Type(..), TyNote(..), Kind, UsageAnn(..),
-			  boxedTypeKind,
-			)  -- friend
+import TypeRep		( Type(..), TyNote(..), Kind, boxedTypeKind )  -- friend
 import Type		( PredType(..), ThetaType,
 			  splitPredTy_maybe,
 			  splitForAllTys, splitSigmaTy, splitRhoTy,
 			  isDictTy, splitTyConApp_maybe, splitFunTy_maybe,
-                          splitUsForAllTys, predRepTy
+                          predRepTy, isUTyVar
 			)
 import Var		( TyVar, tyVarKind )
 import TyCon		( TyCon, isPrimTyCon, isTupleTyCon, isUnboxedTupleTyCon, 
 			  maybeTyConSingleCon, isEnumerationTyCon, 
-			  tyConArity
+			  tyConArity, tyConName
 			)
 import Class		( Class )
 
 -- others:
+import CmdLineOpts	( opt_PprStyle_RawTypes )
 import Maybes		( maybeToBool )
 import Name		( getOccString, getOccName )
 import Outputable
@@ -100,9 +99,9 @@ The precedence levels are:
 
 
 \begin{code}
-tOP_PREC    = (0 :: Int)
-fUN_PREC    = (1 :: Int)
-tYCON_PREC  = (2 :: Int)
+tOP_PREC    = (0 :: Int)  -- type   in ParseIface.y
+fUN_PREC    = (1 :: Int)  -- btype  in ParseIface.y
+tYCON_PREC  = (2 :: Int)  -- atype  in ParseIface.y
 
 maybeParen ctxt_prec inner_prec pretty
   | ctxt_prec < inner_prec = pretty
@@ -124,7 +123,12 @@ ppr_ty env ctxt_prec ty@(TyConApp tycon tys)
 	TyConApp bx [] -> ppr (getOccName bx)	-- Always unqualified
 	other	       -> maybeParen ctxt_prec tYCON_PREC 
 				     (sep [ppr tycon, nest 4 tys_w_spaces])
-		       
+
+	-- USAGE CASE
+  | (tycon `hasKey` usOnceTyConKey || tycon `hasKey` usManyTyConKey) && n_tys == 0
+  =	-- For usages (! and .), always print bare OccName, without pkg/mod/uniq
+    ppr (getOccName (tyConName tycon))
+	
 	-- TUPLE CASE (boxed and unboxed)
   |  isTupleTyCon tycon
   && length tys == tyConArity tycon	-- no magic if partially applied
@@ -165,15 +169,20 @@ ppr_ty env ctxt_prec ty@(TyConApp tycon tys)
 ppr_ty env ctxt_prec ty@(ForAllTy _ _)
   = getPprStyle $ \ sty -> 
     maybeParen ctxt_prec fUN_PREC $
-    sep [ ptext SLIT("forall") <+> pp_tyvars <> ptext SLIT("."), 
+    sep [ ptext SLIT("forall") <+> pp_tyvars sty <> ptext SLIT("."), 
 	  ppr_theta theta,
 	  ppr_ty env tOP_PREC tau
     ]
  where		
-    (tyvars, rho) = splitForAllTys ty  -- don't treat theta specially any more (KSW 1999-04)
+    (tyvars, rho) = splitForAllTys ty
     (theta, tau)  = splitRhoTy rho
     
-    pp_tyvars = hsep (map (pBndr env LambdaBind) tyvars)
+    pp_tyvars sty = hsep (map (pBndr env LambdaBind) some_tyvars)
+      where
+        some_tyvars | userStyle sty && not opt_PprStyle_RawTypes
+                    = filter (not . isUTyVar) tyvars  -- hide uvars from user
+                    | otherwise
+                    = tyvars
     
     ppr_theta []	= empty
     ppr_theta theta     = parens (hsep (punctuate comma (map (ppr_pred env) theta))) 
@@ -181,36 +190,28 @@ ppr_ty env ctxt_prec ty@(ForAllTy _ _)
 
 
 ppr_ty env ctxt_prec (FunTy ty1 ty2)
-  = maybeParen ctxt_prec fUN_PREC (sep (ppr_ty env fUN_PREC ty1 : pp_rest ty2))
   -- we don't want to lose usage annotations or synonyms,
   -- so we mustn't use splitFunTys here.
-  where
-    pp_rest (FunTy ty1 ty2) = pp_codom ty1 : pp_rest ty2
-    pp_rest ty              = [pp_codom ty]
-    pp_codom ty             = ptext SLIT("->") <+> ppr_ty env fUN_PREC ty
+  = maybeParen ctxt_prec fUN_PREC $
+    sep [ ppr_ty env fUN_PREC ty1
+        , ptext SLIT("->") <+> ppr_ty env tOP_PREC ty2
+        ]
 
 ppr_ty env ctxt_prec (AppTy ty1 ty2)
   = maybeParen ctxt_prec tYCON_PREC $
-    ppr_ty env tOP_PREC ty1 <+> ppr_ty env tYCON_PREC ty2
+    ppr_ty env fUN_PREC ty1 <+> ppr_ty env tYCON_PREC ty2
+
+ppr_ty env ctxt_prec (UsageTy u ty)
+  = maybeParen ctxt_prec tYCON_PREC $
+    ptext SLIT("__u") <+> ppr_ty env tYCON_PREC u
+                      <+> ppr_ty env tYCON_PREC ty
+    -- fUN_PREC would be logical for u, but it yields a reduce/reduce conflict with AppTy
 
 ppr_ty env ctxt_prec (NoteTy (SynNote ty) expansion)
   = ppr_ty env ctxt_prec ty
 --  = ppr_ty env ctxt_prec expansion -- if we don't want to see syntys
 
 ppr_ty env ctxt_prec (NoteTy (FTVNote _) ty) = ppr_ty env ctxt_prec ty
-
-ppr_ty env ctxt_prec ty@(NoteTy (UsgForAll _) _)
-  = maybeParen ctxt_prec fUN_PREC $
-    sep [ ptext SLIT("__fuall") <+> brackets pp_uvars <+> ptext SLIT("=>"),
-          ppr_ty env tOP_PREC sigma
-        ]
-  where
-    (uvars,sigma) = splitUsForAllTys ty
-    pp_uvars      = hsep (map ppr uvars)
-
-ppr_ty env ctxt_prec (NoteTy (UsgNote u) ty)
-  = maybeParen ctxt_prec tYCON_PREC $
-    ptext SLIT("__u") <+> ppr u <+> ppr_ty env tYCON_PREC ty
 
 ppr_ty env ctxt_prec (PredTy p) = braces (ppr_pred env p)
 
@@ -224,13 +225,6 @@ ppr_pred env (IParam n ty)    = hsep [char '?' <> ppr n, text "::",
 pprTyEnv = initPprEnv b (Just ppr) b (Just (\site -> pprTyVarBndr)) b
   where
     b = panic "PprType:init_ppr_env"
-\end{code}
-
-\begin{code}
-instance Outputable UsageAnn where
-  ppr UsOnce     = ptext SLIT("-")
-  ppr UsMany     = ptext SLIT("!")
-  ppr (UsVar uv) = ppr uv
 \end{code}
 
 
@@ -279,7 +273,6 @@ getTyDescription ty
       TyConApp tycon _ -> getOccString tycon
       NoteTy (FTVNote _) ty  -> getTyDescription ty
       NoteTy (SynNote ty1) _ -> getTyDescription ty1
-      NoteTy (UsgNote _) ty  -> getTyDescription ty
       PredTy p		     -> getTyDescription (predRepTy p)
       ForAllTy _ ty    -> getTyDescription ty
     }

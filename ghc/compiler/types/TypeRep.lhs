@@ -5,7 +5,7 @@
 
 \begin{code}
 module TypeRep (
-	Type(..), TyNote(..), PredType(..), UsageAnn(..),	-- Representation visible to friends
+	Type(..), TyNote(..), PredType(..), 		-- Representation visible to friends
 	
  	Kind, ThetaType, RhoType, TauType, SigmaType,		-- Synonyms
 	TyVarSubst,
@@ -17,27 +17,31 @@ module TypeRep (
 	boxedTypeKind, unboxedTypeKind, openTypeKind, 	-- :: KX
 	mkArrowKind, mkArrowKinds,			-- :: KX -> KX -> KX
 
+        usageKindCon,					-- :: KX
+        usageTypeKind,					-- :: KX
+        usOnceTyCon, usManyTyCon,			-- :: $
+        usOnce, usMany,					-- :: $
+
 	funTyCon
     ) where
 
 #include "HsVersions.h"
 
 -- friends:
-import Var	( TyVar, UVar )
+import Var	( TyVar )
 import VarEnv
 import VarSet
 
 import Name	( Name, mkGlobalName, mkKindOccFS, tcName )
 import OccName	( tcName )
-import TyCon	( TyCon, KindCon,
-		  mkFunTyCon, mkKindCon, mkSuperKindCon,
-		)
+import TyCon	( TyCon, KindCon, mkFunTyCon, mkKindCon, mkSuperKindCon )
 import Class	( Class )
 
 -- others
 import SrcLoc		( builtinSrcLoc )
-import PrelNames	( pREL_GHC, kindConKey, boxityConKey, boxedConKey, 
-			  unboxedConKey, typeConKey, anyBoxConKey, funTyConName
+import PrelNames	( pREL_GHC, superKindName, superBoxityName, boxedConName, 
+			  unboxedConName, typeConName, openKindConName, funTyConName,
+			  usageKindConName, usOnceTyConName, usManyTyConName
 			)
 \end{code}
 
@@ -125,6 +129,10 @@ data Type
   | PredTy		-- A Haskell predicate
 	PredType
 
+  | UsageTy		-- A usage-annotated type
+	Type		--   - Annotation of kind $ (i.e., usage annotation)
+	Type		--   - Annotated type
+
   | NoteTy 		-- A type with a note attached
 	TyNote
 	Type		-- The expanded version
@@ -132,14 +140,6 @@ data Type
 data TyNote
   = SynNote Type	-- The unexpanded version of the type synonym; always a TyConApp
   | FTVNote TyVarSet	-- The free type variables of the noted expression
-  | UsgNote UsageAnn    -- The usage annotation at this node
-  | UsgForAll UVar      -- Annotation variable binder
-
-data UsageAnn
-  = UsOnce		-- Used at most once
-  | UsMany		-- Used possibly many times (no info; this annotation can be omitted)
-  | UsVar    UVar	-- Annotation is variable (unbound OK only inside analysis)
-
 
 type ThetaType 	  = [PredType]
 type RhoType   	  = Type
@@ -147,6 +147,10 @@ type TauType   	  = Type
 type SigmaType    = Type
 \end{code}
 
+INVARIANT: UsageTys are optional, but may *only* appear immediately
+under a FunTy (either argument), or at top-level of a Type permitted
+to be annotated (such as the type of an Id).  NoteTys are transparent
+for the purposes of this rule.
 
 -------------------------------------
  		Predicates
@@ -186,8 +190,11 @@ represented by evidence (a dictionary, for example, of type (predRepTy p).
 Kinds
 ~~~~~
 kind :: KX = kind -> kind
+
            | Type boxity	-- (Type *) is printed as just *
 				-- (Type #) is printed as just #
+
+           | UsageKind		-- Printed '$'; used for usage annotations
 
            | OpenKind		-- Can be boxed or unboxed
 				-- Printed '?'
@@ -235,11 +242,9 @@ Define  KX, the type of a kind
 
 \begin{code}
 superKind :: SuperKind 		-- KX, the type of all kinds
-superKindName = mk_kind_name kindConKey SLIT("KX")
 superKind = TyConApp (mkSuperKindCon superKindName) []
 
 superBoxity :: SuperKind		-- BX, the type of all boxities
-superBoxityName = mk_kind_name boxityConKey SLIT("BX")
 superBoxity = TyConApp (mkSuperKindCon superBoxityName) []
 \end{code}
 
@@ -248,20 +253,16 @@ Define boxities: @*@ and @#@
 
 \begin{code}
 boxedBoxity, unboxedBoxity :: Kind		-- :: BX
-
-boxedConName = mk_kind_name boxedConKey SLIT("*")
 boxedBoxity  = TyConApp (mkKindCon boxedConName superBoxity) []
 
-unboxedConName = mk_kind_name unboxedConKey SLIT("#")
 unboxedBoxity  = TyConApp (mkKindCon unboxedConName superBoxity) []
 \end{code}
 
 ------------------------------------------
-Define kinds: Type, Type *, Type #, and OpenKind
+Define kinds: Type, Type *, Type #, OpenKind, and UsageKind
 
 \begin{code}
 typeCon :: KindCon	-- :: BX -> KX
-typeConName = mk_kind_name typeConKey SLIT("Type")
 typeCon     = mkKindCon typeConName (superBoxity `FunTy` superKind)
 
 boxedTypeKind, unboxedTypeKind, openTypeKind :: Kind	-- Of superkind superKind
@@ -269,9 +270,11 @@ boxedTypeKind, unboxedTypeKind, openTypeKind :: Kind	-- Of superkind superKind
 boxedTypeKind   = TyConApp typeCon [boxedBoxity]
 unboxedTypeKind = TyConApp typeCon [unboxedBoxity]
 
-openKindConName = mk_kind_name anyBoxConKey SLIT("?")
 openKindCon     = mkKindCon openKindConName superKind
 openTypeKind    = TyConApp openKindCon []
+
+usageKindCon     = mkKindCon usageKindConName superKind
+usageTypeKind    = TyConApp usageKindCon []
 \end{code}
 
 ------------------------------------------
@@ -298,4 +301,18 @@ We define a few wired-in type constructors here to avoid module knots
 funTyCon = mkFunTyCon funTyConName (mkArrowKinds [boxedTypeKind, boxedTypeKind] boxedTypeKind)
 \end{code}
 
+------------------------------------------
+Usage tycons @.@ and @!@
+
+The usage tycons are of kind usageTypeKind (`$').  The types contain
+no values, and are used purely for usage annotation.  mk_kind_name is
+used (hackishly) to avoid z-encoding of the names.
+
+\begin{code}
+usOnceTyCon     = mkKindCon usOnceTyConName usageTypeKind
+usOnce          = TyConApp usOnceTyCon []
+
+usManyTyCon     = mkKindCon usManyTyConName usageTypeKind
+usMany          = TyConApp usManyTyCon []
+\end{code}
 

@@ -34,7 +34,7 @@ module ParseIface ( parseIface, IfaceStuff(..) ) where
 
 import HsSyn		-- quite a bit of stuff
 import RdrHsSyn		-- oodles of synonyms
-import HsTypes		( mkHsForAllTy, mkHsUsForAllTy, mkHsTupCon )
+import HsTypes		( mkHsForAllTy, mkHsTupCon )
 import HsCore
 import Demand		( mkStrictnessInfo )
 import Literal		( Literal(..), mkMachInt, mkMachInt64, mkMachWord, mkMachWord64 )
@@ -43,7 +43,7 @@ import BasicTypes	( Fixity(..), FixityDirection(..),
 			)
 import CostCentre       ( CostCentre(..), IsCafCC(..), IsDupdCC(..) )
 import CallConv         ( cCallConv )
-import Type		( Kind, mkArrowKind, boxedTypeKind, openTypeKind )
+import Type		( Kind, mkArrowKind, boxedTypeKind, openTypeKind, usageTypeKind )
 import IdInfo           ( exactArity, InlinePragInfo(..) )
 import PrimOp           ( CCall(..), CCallTarget(..) )
 import Lex		
@@ -56,14 +56,13 @@ import HscTypes         ( WhetherHasOrphans, IsBootInterface, GenAvailInfo(..),
 import RdrName          ( RdrName, mkRdrUnqual, mkIfaceOrig )
 import Name		( OccName )
 import OccName          ( mkSysOccFS,
-			  tcName, varName, ipName, dataName, clsName, tvName, uvName,
+			  tcName, varName, ipName, dataName, clsName, tvName,
 			  EncodedFS 
 			)
 import Module           ( ModuleName, PackageName, mkSysModuleNameFS, mkModule )
 import SrcLoc		( SrcLoc )
 import CmdLineOpts	( opt_InPackage, opt_IgnoreIfacePragmas )
 import Outputable
-import List		( insert )
 import Class            ( DefMeth (..) )
 
 import GlaExts
@@ -136,7 +135,6 @@ import FastString	( tailFS )
  '__sccC'       { ITsccAllCafs }
 
  '__u'		{ ITusage }
- '__fuall'	{ ITfuall }
 
  '__A'		{ ITarity }
  '__P'		{ ITspecialise }
@@ -155,12 +153,9 @@ import FastString	( tailFS )
  '<-'		{ ITlarrow }
  '->'		{ ITrarrow }
  '@'		{ ITat }
- '~'		{ ITtilde }
  '=>'		{ ITdarrow }
  '-'		{ ITminus }
  '!'		{ ITbang }
-
- '/\\'		{ ITbiglam }			-- GHC-extension symbols
 
  '{'		{ ITocurly } 			-- special symbols
  '}'		{ ITccurly }
@@ -174,6 +169,7 @@ import FastString	( tailFS )
  '#)'		{ ITcubxparen }
  ';'		{ ITsemi }
  ','		{ ITcomma }
+ '.'		{ ITdot }
 
  VARID   	{ ITvarid    $$ }		-- identifiers
  CONID   	{ ITconid    $$ }
@@ -494,29 +490,26 @@ batypes		:  					{ [] }
 		|  batype batypes			{ $1 : $2 }
 
 batype		:: { RdrNameBangType }
-batype		:  atype				{ Unbanged $1 }
-		|  '!' atype				{ Banged   $2 }
-		|  '!' '!' atype			{ Unpacked $3 }
+batype		:  tatype				{ Unbanged $1 }
+		|  '!' tatype				{ Banged   $2 }
+		|  '!' '!' tatype			{ Unpacked $3 }
 
 fields1		:: { [([RdrName], RdrNameBangType)] }
 fields1		: field					{ [$1] }
 		| field ',' fields1			{ $1 : $3 }
 
 field		:: { ([RdrName], RdrNameBangType) }
-field		:  qvar_names1 '::' type		{ ($1, Unbanged $3) }
-		|  qvar_names1 '::' '!' type    	{ ($1, Banged   $4) }
-		|  qvar_names1 '::' '!' '!' type	{ ($1, Unpacked $5) }
+field		:  qvar_names1 '::' ttype		{ ($1, Unbanged $3) }
+		|  qvar_names1 '::' '!' ttype    	{ ($1, Banged   $4) }
+		|  qvar_names1 '::' '!' '!' ttype	{ ($1, Unpacked $5) }
+
 --------------------------------------------------------------------------
 
 type		:: { RdrNameHsType }
-type		: '__fuall'  fuall '=>' type    { mkHsUsForAllTy $2 $4 }
-                | '__forall' tv_bndrs 
+type 		: '__forall' tv_bndrs 
 			opt_context '=>' type	{ mkHsForAllTy (Just $2) $3 $5 }
 		| btype '->' type		{ HsFunTy $1 $3 }
 		| btype				{ $1 }
-
-fuall		:: { [RdrName] }
-fuall		: '[' uv_bndrs ']'		        { $2 }
 
 opt_context	:: { RdrNameContext }
 opt_context	:  					{ [] }
@@ -546,16 +539,13 @@ types2		:  type ',' type			{ [$1,$3] }
 btype		:: { RdrNameHsType }
 btype		:  atype				{ $1 }
 		|  btype atype				{ HsAppTy $1 $2 }
-                |  '__u' usage atype			{ HsUsgTy $2 $3 }
-
-usage		:: { HsUsageAnn RdrName }
-usage		: '-' 					{ HsUsOnce }
-		| '!' 					{ HsUsMany }
-		| uv_name 				{ HsUsVar $1 }
+		|  '__u' atype atype			{ HsUsageTy $2 $3 }
 
 atype		:: { RdrNameHsType }
 atype		:  qtc_name 			  	{ HsTyVar $1 }
 		|  tv_name			  	{ HsTyVar $1 }
+		|  '.'					{ hsUsOnce }
+		|  '!'					{ hsUsMany }
 	  	|  '(' ')' 				{ HsTupleTy (mkHsTupCon tcName Boxed   []) [] }
 		|  '(' types2 ')'	  		{ HsTupleTy (mkHsTupCon tcName Boxed   $2) $2 }
 		|  '(#' types0 '#)'			{ HsTupleTy (mkHsTupCon tcName Unboxed $2) $2 }
@@ -567,7 +557,34 @@ atype		:  qtc_name 			  	{ HsTyVar $1 }
 atypes		:: { [RdrNameHsType] 	{-  Zero or more -} }
 atypes		:  					{ [] }
 		|  atype atypes				{ $1 : $2 }
+--------------------------------------------------------------------------
+
+-- versions of type/btype/atype that cant begin with '!' (or '.')
+-- for use where the kind is definitely known NOT to be '$'
+
+ttype		:: { RdrNameHsType }
+ttype 		: '__forall' tv_bndrs 
+			opt_context '=>' type		{ mkHsForAllTy (Just $2) $3 $5 }
+		| tbtype '->' type			{ HsFunTy $1 $3 }
+		| tbtype				{ $1 }
+
+tbtype		:: { RdrNameHsType }
+tbtype		:  tatype				{ $1 }
+		|  tbtype atype				{ HsAppTy $1 $2 }
+		|  '__u' atype atype			{ HsUsageTy $2 $3 }
+
+tatype		:: { RdrNameHsType }
+tatype		:  qtc_name 			  	{ HsTyVar $1 }
+		|  tv_name			  	{ HsTyVar $1 }
+	  	|  '(' ')' 				{ HsTupleTy (mkHsTupCon tcName Boxed   []) [] }
+		|  '(' types2 ')'	  		{ HsTupleTy (mkHsTupCon tcName Boxed   $2) $2 }
+		|  '(#' types0 '#)'			{ HsTupleTy (mkHsTupCon tcName Unboxed $2) $2 }
+		|  '[' type ']'		  		{ HsListTy  $2 }
+		|  '{' qcls_name atypes '}'		{ mkHsDictTy $2 $3 }
+		|  '{' ipvar_name '::' type '}'		{ mkHsIParamTy $2 $4 }
+		|  '(' type ')'		  		{ $2 }
 ---------------------------------------------------------------------
+
 package		:: { PackageName }
 		:  STRING		{ $1 }
 		| {- empty -}		{ opt_InPackage }	-- Useful for .hi-boot files,
@@ -671,27 +688,15 @@ qcls_name	:: { RdrName }
 		| qdata_fs		{ mkIfaceOrig clsName $1 }
 
 ---------------------------------------------------
-uv_name		:: { RdrName }
-		:  VARID 		{ mkRdrUnqual (mkSysOccFS uvName $1) }
-
-uv_bndr		:: { RdrName }
-		:  uv_name		{ $1 }
-
-uv_bndrs	:: { [RdrName] }
-		:  			{ [] }
-		| uv_bndr uv_bndrs	{ $1 : $2 }
-
----------------------------------------------------
 tv_name		:: { RdrName }
 		:  VARID 		{ mkRdrUnqual (mkSysOccFS tvName $1) }
-		|  VARSYM		{ mkRdrUnqual (mkSysOccFS tvName $1) {- Allow t2 as a tyvar -} }
 
 tv_bndr		:: { HsTyVarBndr RdrName }
 		:  tv_name '::' akind	{ IfaceTyVar $1 $3 }
 		|  tv_name		{ IfaceTyVar $1 boxedTypeKind }
 
 tv_bndrs	:: { [HsTyVarBndr RdrName] }
-tv_bndrs	: tv_bndrs1		{ $1 }
+		: tv_bndrs1		{ $1 }
 		| '[' tv_bndrs1 ']'	{ $2 } 	-- Backward compatibility
 
 tv_bndrs1	:: { [HsTyVarBndr RdrName] }
@@ -724,7 +729,9 @@ akind		:: { Kind }
 						boxedTypeKind
 					  else if $1 == SLIT("?") then
 						openTypeKind
-					  else panic "ParseInterface: akind"
+					  else if $1 == SLIT("\36") then
+                                                usageTypeKind  -- dollar
+                                          else panic "ParseInterface: akind"
 					}
 		| '(' kind ')'	{ $2 }
 

@@ -31,14 +31,14 @@ import TcEnv		( TcId, TcEnv, RecTcEnv, TyThingDetails(..), tcAddImportedIdInfo,
 			  tcExtendLocalValEnv, tcExtendTyVarEnv, newDefaultMethodName
 			)
 import TcBinds		( tcBindWithSigs, tcSpecSigs )
-import TcMonoType	( tcHsSigType, tcClassContext, checkSigTyVars, checkAmbiguity, sigCtxt, mkTcSig )
+import TcMonoType	( tcHsRecType, tcRecClassContext, checkSigTyVars, checkAmbiguity, sigCtxt, mkTcSig )
 import TcSimplify	( tcSimplifyAndCheck, bindInstsOfLocalFuns )
 import TcType		( TcType, TcTyVar, tcInstTyVars, zonkTcSigTyVars )
 import TcMonad
 import Generics		( mkGenericRhs, validGenericMethodType )
 import PrelInfo		( nO_METHOD_BINDING_ERROR_ID )
-import Class		( classTyVars, classBigSig, classSelIds, classTyCon, classTvsFds,
-			  Class, ClassOpItem, DefMeth (..), FunDep )
+import Class		( classTyVars, classBigSig, classSelIds, classTyCon, 
+			  Class, ClassOpItem, DefMeth (..) )
 import MkId		( mkDictSelId, mkDataConId, mkDataConWrapId, mkDefaultMethodId )
 import DataCon		( mkDataCon, notMarkedStrict )
 import Id		( Id, idType, idName )
@@ -100,8 +100,9 @@ Death to "ExpandingDicts".
 %************************************************************************
 
 \begin{code}
-tcClassDecl1 :: RecTcEnv -> RenamedTyClDecl -> TcM (Name, TyThingDetails)
-tcClassDecl1 rec_env
+
+tcClassDecl1 :: RecFlag -> RecTcEnv -> RenamedTyClDecl -> TcM (Name, TyThingDetails)
+tcClassDecl1 is_rec rec_env
       	     (ClassDecl context class_name
 			tyvar_names fundeps class_sigs def_methods
 			sys_names src_loc)
@@ -113,7 +114,7 @@ tcClassDecl1 rec_env
 	-- LOOK THINGS UP IN THE ENVIRONMENT
     tcLookupClass class_name				`thenTc` \ clas ->
     let
-	(tyvars, fds) = classTvsFds clas
+	tyvars   = classTyVars clas
 	op_sigs  = filter isClassOpSig class_sigs
 	op_names = [n | ClassOpSig n _ _ _ <- op_sigs]
 	(_, datacon_name, datacon_wkr_name, sc_sel_names) = getClassDeclSysNames sys_names
@@ -125,11 +126,10 @@ tcClassDecl1 rec_env
     checkGenericClassIsUnary clas dm_info		`thenTc_`
 	
 	-- CHECK THE CONTEXT
-    tcSuperClasses clas context sc_sel_names	`thenTc` \ (sc_theta, sc_sel_ids) ->
+    tcSuperClasses is_rec clas context sc_sel_names	`thenTc` \ (sc_theta, sc_sel_ids) ->
 
 	-- CHECK THE CLASS SIGNATURES,
-    mapTc (tcClassSig rec_env clas tyvars fds dm_info) 
-	  op_sigs				`thenTc` \ sig_stuff ->
+    mapTc (tcClassSig is_rec rec_env clas tyvars dm_info) op_sigs	`thenTc` \ sig_stuff ->
 
 	-- MAKE THE CLASS DETAILS
     let
@@ -201,13 +201,13 @@ checkGenericClassIsUnary clas dm_info
 
 
 \begin{code}
-tcSuperClasses :: Class
+tcSuperClasses :: RecFlag -> Class
 	       -> RenamedContext 	-- class context
 	       -> [Name]		-- Names for superclass selectors
 	       -> TcM (ClassContext,	-- the superclass context
 		         [Id])  	-- superclass selector Ids
 
-tcSuperClasses clas context sc_sel_names
+tcSuperClasses is_rec clas context sc_sel_names
   = 	-- Check the context.
 	-- The renamer has already checked that the context mentions
 	-- only the type variable of the class decl.
@@ -221,7 +221,7 @@ tcSuperClasses clas context sc_sel_names
     )						`thenTc_`
 
 	-- Context is already kind-checked
-    tcClassContext context			`thenTc` \ sc_theta ->
+    tcRecClassContext is_rec context		`thenTc` \ sc_theta ->
     let
        sc_sel_ids = [mkDictSelId sc_name clas | sc_name <- sc_sel_names]
     in
@@ -236,10 +236,9 @@ tcSuperClasses clas context sc_sel_names
     is_tyvar other	 = False
 
 
-tcClassSig :: RecTcEnv
+tcClassSig :: RecFlag -> RecTcEnv	-- Knot tying only!
 	   -> Class	    		-- ...ditto...
 	   -> [TyVar]		 	-- The class type variable, used for error check only
-	   -> [FunDep TyVar]
 	   -> NameEnv (DefMeth Name)	-- Info about default methods
 	   -> RenamedClassOpSig
 	   -> TcM (Type,		-- Type of the method
@@ -250,19 +249,26 @@ tcClassSig :: RecTcEnv
 -- so we distinguish them in checkDefaultBinds, and pass this knowledge in the
 -- Class.DefMeth data structure. 
 
-tcClassSig unf_env clas clas_tyvars fds dm_info
+tcClassSig is_rec unf_env clas clas_tyvars dm_info
 	   (ClassOpSig op_name maybe_dm op_ty src_loc)
   = tcAddSrcLoc src_loc $
 
 	-- Check the type signature.  NB that the envt *already has*
 	-- bindings for the type variables; see comments in TcTyAndClassDcls.
 
-    tcHsSigType op_ty				`thenTc` \ local_ty ->
+    tcHsRecType is_rec op_ty				`thenTc` \ local_ty ->
+
+	-- Check for ambiguous class op types
     let
 	theta = [mkClassPred clas (mkTyVarTys clas_tyvars)]
     in
-	-- Check for ambiguous class op types
-    checkAmbiguity True clas_tyvars theta local_ty	 `thenTc` \ global_ty ->
+    checkAmbiguity is_rec True clas_tyvars theta local_ty	 `thenTc` \ global_ty ->
+          -- The default method's type should really come from the
+          -- iface file, since it could be usage-generalised, but this
+          -- requires altering the mess of knots in TcModule and I'm
+          -- too scared to do that.  Instead, I have disabled generalisation
+          -- of types of default methods (and dict funs) by annotating them
+          -- TyGenNever (in MkId).  Ugh!  KSW 1999-09.
 
     let
 	-- Build the selector id and default method id

@@ -21,7 +21,7 @@ import Type	( unboxedTypeKind, boxedTypeKind, openTypeKind,
 		  typeCon, openKindCon, hasMoreBoxityInfo, 
 		  tyVarsOfType, typeKind,
 		  mkFunTy, splitFunTy_maybe, splitTyConApp_maybe,
-                  isNotUsgTy, splitAppTy_maybe, mkTyConApp, 
+                  splitAppTy_maybe, mkTyConApp, 
 	   	  tidyOpenType, tidyOpenTypes, tidyTyVar
 		)
 import TyCon	( TyCon, isTupleTyCon, tupleTyConBoxity, tyConArity )
@@ -148,9 +148,13 @@ uTys :: TcTauType -> TcTauType	-- Error reporting ty1 and real ty1
      -> TcM ()
 
 	-- Always expand synonyms (see notes at end)
-        -- (this also throws away FTVs and usage annots)
+        -- (this also throws away FTVs)
 uTys ps_ty1 (NoteTy _ ty1) ps_ty2 ty2 = uTys ps_ty1 ty1 ps_ty2 ty2
 uTys ps_ty1 ty1 ps_ty2 (NoteTy _ ty2) = uTys ps_ty1 ty1 ps_ty2 ty2
+
+	-- Ignore usage annotations inside typechecker
+uTys ps_ty1 (UsageTy _ ty1) ps_ty2 ty2 = uTys ps_ty1 ty1 ps_ty2 ty2
+uTys ps_ty1 ty1 ps_ty2 (UsageTy _ ty2) = uTys ps_ty1 ty1 ps_ty2 ty2
 
 	-- Variables; go for uVar
 uTys ps_ty1 (TyVarTy tyvar1) ps_ty2 ty2 = uVar False tyvar1 ps_ty2 ty2
@@ -279,7 +283,7 @@ uVar swapped tv1 ps_ty2 ty2
 		 | otherwise -> uTys ty1 ty1 ps_ty2 ty2	-- Same order
 	other       -> uUnboundVar swapped tv1 maybe_ty1 ps_ty2 ty2
 
-	-- Expand synonyms; ignore FTVs; ignore usage annots
+	-- Expand synonyms; ignore FTVs
 uUnboundVar swapped tv1 maybe_ty1 ps_ty2 (NoteTy _ ty2)
   = uUnboundVar swapped tv1 maybe_ty1 ps_ty2 ty2
 
@@ -306,8 +310,7 @@ uUnboundVar swapped tv1 maybe_ty1 ps_ty2 ty2@(TyVarTy tv2)
 		|  otherwise
 
 		-> WARN( not (k2 `hasMoreBoxityInfo` k1), (ppr tv2 <+> ppr k2) $$ (ppr tv1 <+> ppr k1) )
-                   (ASSERT( isNotUsgTy ps_ty2 )
-		    tcPutTyVar tv1 ps_ty2		`thenNF_Tc_`
+                   (tcPutTyVar tv1 ps_ty2		`thenNF_Tc_`
 	  	    returnTc ())
   where
     k1 = tyVarKind tv1

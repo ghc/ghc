@@ -42,6 +42,7 @@ import HsTypes
 import BasicTypes	( Fixity, Version, NewOrData )
 
 -- others:
+import Name		( NamedThing )
 import Outputable
 import SrcLoc		( SrcLoc )
 import Bag
@@ -67,7 +68,7 @@ data HsModule name pat
 \end{code}
 
 \begin{code}
-instance (Outputable name, Outputable pat)
+instance (NamedThing name, Outputable name, Outputable pat)
 	=> Outputable (HsModule name pat) where
 
     ppr (HsModule name iface_version exports imports

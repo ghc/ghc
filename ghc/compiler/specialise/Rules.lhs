@@ -360,7 +360,7 @@ bind vs1 vs2 matcher tpl_vars kont subst
 
 ----------------------------------------
 match_ty ty1 ty2 tpl_vars kont subst
-  = case Unify.match ty1 ty2 tpl_vars Just (substEnv subst) of
+  = case Unify.match False {- for now: KSW 2000-10 -} ty1 ty2 tpl_vars Just (substEnv subst) of
 	Nothing    -> match_fail
 	Just senv' -> kont (setSubstEnv subst senv') 
 

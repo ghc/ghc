@@ -160,8 +160,6 @@ extract_ty (HsListTy ty)              acc = extract_ty ty acc
 extract_ty (HsTupleTy _ tys)          acc = foldr extract_ty acc tys
 extract_ty (HsFunTy ty1 ty2)          acc = extract_ty ty1 (extract_ty ty2 acc)
 extract_ty (HsPredTy p)		      acc = extract_pred p acc
-extract_ty (HsUsgTy usg ty)           acc = extract_ty ty acc
-extract_ty (HsUsgForAllTy uv ty)      acc = extract_ty ty acc
 extract_ty (HsTyVar tv)               acc = tv : acc
 extract_ty (HsForAllTy Nothing ctxt ty) acc = extract_ctxt ctxt (extract_ty ty acc)
 -- Generics

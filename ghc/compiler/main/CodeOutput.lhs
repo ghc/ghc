@@ -31,6 +31,7 @@ import ErrUtils		( dumpIfSet_dyn )
 import Outputable
 import CmdLineOpts	( DynFlags, HscLang(..), dopt_OutName )
 import TmpFiles		( newTempName )
+import UniqSupply	( mkSplitUniqSupply )
 
 import IO		( IOMode(..), hClose, openFile, Handle )
 \end{code}
@@ -182,7 +183,7 @@ outputForeignStubs_help is_header doc_str
        | is_header   = "h_stub"
        | otherwise   = "c_stub"
     include_prefix
-       | is_header   = "#include \"Rts.h\"\n"
+       | is_header   = "#include \"HsFFI.h\"\n"
        | otherwise   = "#include \"RtsAPI.h\"\n"
 \end{code}
 

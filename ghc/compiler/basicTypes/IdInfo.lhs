@@ -29,8 +29,12 @@ module IdInfo (
 	StrictnessInfo(..),
 	mkStrictnessInfo, noStrictnessInfo,
 	ppStrictnessInfo,isBottomingStrictness, 
-
 	strictnessInfo, setStrictnessInfo, 	
+
+        -- Usage generalisation
+        TyGenInfo(..),
+        tyGenInfo, setTyGenInfo,
+        noTyGenInfo, isNoTyGenInfo, ppTyGenInfo, tyGenInfoString,
 
         -- Worker
         WorkerInfo(..), workerExists, wrapperArity, workerId,
@@ -69,6 +73,7 @@ module IdInfo (
 
 
 import CoreSyn
+import Type		( Type, usOnce )
 import PrimOp	 	( PrimOp )
 import Var              ( Id )
 import BasicTypes	( OccInfo(..), isFragileOcc, isDeadOcc, seqOccInfo, isLoopBreaker,
@@ -78,10 +83,13 @@ import BasicTypes	( OccInfo(..), isFragileOcc, isDeadOcc, seqOccInfo, isLoopBrea
 			)
 import DataCon		( DataCon )
 import FieldLabel	( FieldLabel )
+import Type		( usOnce, usMany )
 import Demand		-- Lots of stuff
 import Outputable	
+import Util		( seqList )
 
 infixl 	1 `setDemandInfo`,
+    	  `setTyGenInfo`,
 	  `setStrictnessInfo`,
 	  `setSpecInfo`,
 	  `setArityInfo`,
@@ -89,6 +97,7 @@ infixl 	1 `setDemandInfo`,
 	  `setUnfoldingInfo`,
 	  `setCprInfo`,
 	  `setWorkerInfo`,
+	  `setLBVarInfo`,
 	  `setCafInfo`,
 	  `setOccInfo`
 	-- infixl so you can say (id `set` a `set` b)
@@ -118,6 +127,7 @@ data IdInfo
 	arityInfo 	:: ArityInfo,		-- Its arity
 	demandInfo 	:: Demand,		-- Whether or not it is definitely demanded
 	specInfo 	:: CoreRules,		-- Specialisations of this function which exist
+        tyGenInfo       :: TyGenInfo,           -- Restrictions on usage-generalisation of this Id
 	strictnessInfo	:: StrictnessInfo,	-- Strictness properties
         workerInfo      :: WorkerInfo,          -- Pointer to Worker Function
 	unfoldingInfo	:: Unfolding,		-- Its unfolding
@@ -137,6 +147,7 @@ megaSeqIdInfo info
     seqArity (arityInfo info)			`seq`
     seqDemand (demandInfo info)			`seq`
     seqRules (specInfo info)			`seq`
+    seqTyGenInfo (tyGenInfo info)               `seq`
     seqStrictnessInfo (strictnessInfo info)	`seq`
     seqWorker (workerInfo info)			`seq`
 
@@ -155,6 +166,7 @@ Setters
 \begin{code}
 setWorkerInfo     info wk = wk `seq` info { workerInfo = wk }
 setSpecInfo 	  info sp = PSEQ sp (info { specInfo = sp })
+setTyGenInfo      info tg = tg `seq` info { tyGenInfo = tg }
 setInlinePragInfo info pr = pr `seq` info { inlinePragInfo = pr }
 setOccInfo	  info oc = oc `seq` info { occInfo = oc }
 setStrictnessInfo info st = st `seq` info { strictnessInfo = st }
@@ -203,6 +215,7 @@ mkIdInfo flv = IdInfo {
 		    arityInfo		= UnknownArity,
 		    demandInfo		= wwLazy,
 		    specInfo		= emptyCoreRules,
+                    tyGenInfo		= noTyGenInfo,
 		    workerInfo		= NoWorker,
 		    strictnessInfo	= NoStrictnessInfo,
 		    unfoldingInfo	= noUnfolding,
@@ -345,6 +358,83 @@ pprInlinePragInfo (IMustNotBeINLINEd False (Just n)) = brackets (char '!' <> int
 							
 instance Show InlinePragInfo where
   showsPrec p prag = showsPrecSDoc p (ppr prag)
+\end{code}
+
+
+%************************************************************************
+%*                                                                    *
+\subsection[TyGen-IdInfo]{Type generalisation info about an @Id@}
+%*                                                                    *
+%************************************************************************
+
+Certain passes (notably usage inference) may change the type of an
+identifier, modifying all in-scope uses of that identifier
+appropriately to maintain type safety.
+
+However, some identifiers must not have their types changed in this
+way, because their types are conjured up in the front end of the
+compiler rather than being read from the interface file.  Default
+methods, dictionary functions, record selectors, and others are in
+this category.  (see comment at TcClassDcl.tcClassSig).
+
+To indicate this property, such identifiers are marked TyGenNever.
+
+Furthermore, if the usage inference generates a usage-specialised
+variant of a function, we must NOT re-infer a fully-generalised type
+at the next inference.  This finer property is indicated by a
+TyGenUInfo on the identifier.
+
+\begin{code}
+data TyGenInfo
+  = NoTyGenInfo              -- no restriction on type generalisation
+
+  | TyGenUInfo [Maybe Type]  -- restrict generalisation of this Id to
+                             -- preserve specified usage annotations
+
+  | TyGenNever               -- never generalise the type of this Id
+
+  deriving ( Eq )
+\end{code}
+
+For TyGenUInfo, the list has one entry for each usage annotation on
+the type of the Id, in left-to-right pre-order (annotations come
+before the type they annotate).  Nothing means no restriction; Just
+usOnce or Just usMany forces that annotation to that value.  Other
+usage annotations are illegal.
+
+\begin{code}
+seqTyGenInfo :: TyGenInfo -> ()
+seqTyGenInfo  NoTyGenInfo    = ()
+seqTyGenInfo (TyGenUInfo us) = seqList us ()
+seqTyGenInfo  TyGenNever     = ()
+
+noTyGenInfo :: TyGenInfo
+noTyGenInfo = NoTyGenInfo
+
+isNoTyGenInfo :: TyGenInfo -> Bool
+isNoTyGenInfo NoTyGenInfo = True
+isNoTyGenInfo _           = False
+
+-- NB: There's probably no need to write this information out to the interface file.
+-- Why?  Simply because imported identifiers never get their types re-inferred.
+-- But it's definitely nice to see in dumps, it for debugging purposes.
+
+ppTyGenInfo :: TyGenInfo -> SDoc
+ppTyGenInfo  NoTyGenInfo    = empty
+ppTyGenInfo (TyGenUInfo us) = ptext SLIT("__G") <+> text (tyGenInfoString us)
+ppTyGenInfo  TyGenNever     = ptext SLIT("__G N")
+
+tyGenInfoString us = map go us
+  where go  Nothing               = 'x'  -- for legibility, choose
+        go (Just u) | u == usOnce = '1'  -- chars with identity
+                    | u == usMany = 'M'  -- Z-encoding.
+        go other = pprPanic "IdInfo.tyGenInfoString: unexpected annotation" (ppr other)
+
+instance Outputable TyGenInfo where
+  ppr = ppTyGenInfo
+
+instance Show TyGenInfo where
+  showsPrec p c = showsPrecSDoc p (ppr c)
 \end{code}
 
 
@@ -495,8 +585,10 @@ work.
 data LBVarInfo
   = NoLBVarInfo
 
-  | IsOneShotLambda		-- The lambda that binds this Id is applied
-				--   at most once
+  | LBVarInfo Type		-- The lambda that binds this Id has this usage
+				--   annotation (i.e., if ==usOnce, then the
+				--   lambda is applied at most once).
+				-- The annotation's kind must be `$'
 				-- HACK ALERT! placing this info here is a short-term hack,
 				--   but it minimises changes to the rest of the compiler.
 				--   Hack agreed by SLPJ/KSW 1999-04.
@@ -510,9 +602,13 @@ noLBVarInfo = NoLBVarInfo
 -- not safe to print or parse LBVarInfo because it is not really a
 -- property of the definition, but a property of the context.
 pprLBVarInfo NoLBVarInfo     = empty
-pprLBVarInfo IsOneShotLambda = getPprStyle $ \ sty ->
-                               if ifaceStyle sty then empty
-                                                 else ptext SLIT("OneShot")
+pprLBVarInfo (LBVarInfo u)   | u == usOnce
+                             = getPprStyle $ \ sty ->
+                               if ifaceStyle sty
+                               then empty
+                               else ptext SLIT("OneShot")
+                             | otherwise
+                             = empty
 
 instance Outputable LBVarInfo where
     ppr = pprLBVarInfo

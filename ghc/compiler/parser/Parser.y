@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.46 2000/10/31 17:30:17 simonpj Exp $
+$Id: Parser.y,v 1.47 2000/11/07 15:21:40 simonmar Exp $
 
 Haskell grammar.
 
@@ -762,8 +762,14 @@ list :: { RdrNameHsExpr }
 	| exp ',' exp '..' 		{ ArithSeqIn (FromThen $1 $3) }
 	| exp '..' exp	 		{ ArithSeqIn (FromTo $1 $3) }
 	| exp ',' exp '..' exp		{ ArithSeqIn (FromThenTo $1 $3 $5) }
-	| exp srcloc '|' quals			{ HsDo ListComp (reverse 
-						(ReturnStmt $1 : $4)) $2 }
+	| exp srcloc pquals		{% let { body [qs] = qs;
+					         body  qss = [ParStmt (map reverse qss)] }
+					   in
+					   returnP ( HsDo ListComp
+							   (reverse (ReturnStmt $1 : body $3))
+							   $2
+						  )
+					}
 
 lexps :: { [RdrNameHsExpr] }
 	: lexps ',' exp 		{ $3 : $1 }
@@ -771,6 +777,10 @@ lexps :: { [RdrNameHsExpr] }
 
 -----------------------------------------------------------------------------
 -- List Comprehensions
+
+pquals :: { [[RdrNameStmt]] }
+	: pquals '|' quals		{ $3 : $1 }
+	| '|' quals			{ [$2] }
 
 quals :: { [RdrNameStmt] }
 	: quals ',' qual		{ $3 : $1 }

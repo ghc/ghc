@@ -29,21 +29,6 @@ module StgInterp (
 
 #include "HsVersions.h"
 
-#if __GLASGOW_HASKELL__ <= 408
-
-import Panic 		( panic )
-import RdrName 		( RdrName )
-import PrelAddr 	( Addr )
-import FiniteMap	( FiniteMap )
-import InterpSyn	( HValue )
-
-type ItblEnv    = FiniteMap RdrName Addr
-type ClosureEnv = FiniteMap RdrName HValue
-linkIModules   = panic "StgInterp.linkIModules: this hsc was not built with an interpreter"
-stgToInterpSyn = panic "StgInterp.linkIModules: this hsc was not built with an interpreter"
-
-#else
-
 import Linker
 import Id 		( Id, idPrimRep )
 import Outputable
@@ -65,10 +50,7 @@ import PrelGHC		--( unsafeCoerce#, dataToTag#,
 			--  indexPtrOffClosure#, indexWordOffClosure# )
 import PrelAddr 	( Addr(..) )
 import PrelFloat	( Float(..), Double(..) )
-import Word
 import Bits
-import Storable
-import CTypes
 import FastString
 import GlaExts		( Int(..) )
 import Module		( moduleNameFS )
@@ -83,12 +65,14 @@ import FiniteMap
 import Panic		( panic )
 import OccName		( occNameString )
 
+import Foreign
+import CTypes
 
 -- ---------------------------------------------------------------------------
 -- Environments needed by the linker
 -- ---------------------------------------------------------------------------
 
-type ItblEnv    = FiniteMap RdrName Addr
+type ItblEnv    = FiniteMap RdrName (Ptr StgInfoTable)
 type ClosureEnv = FiniteMap RdrName HValue
 
 -- ---------------------------------------------------------------------------
@@ -309,10 +293,10 @@ lit2expr lit
 		-- Addr#.  So, copy the string into C land and introduce a 
 		-- memory leak at the same time.
 		  let n = I# l in
-		  case unsafePerformIO (do a <- malloc (n+1); 
+		  case unsafePerformIO (do a <- mallocBytes (n+1); 
 				 	   strncpy a ba (fromIntegral n); 
-				 	   writeCharOffAddr a n '\0'
-				 	   return a) 
+				 	   pokeByteOff a n '\0'
+				 	   case a of { Ptr a -> return a })
 		  of  A# a -> LitI (addr2Int# a)
 
      		_ -> error "StgInterp.lit2expr: unhandled string constant type"
@@ -520,7 +504,7 @@ linkIExpr ie ce expr = case expr of
 
 lookupCon ie con = 
   case lookupFM ie con of
-    Just addr -> addr
+    Just (Ptr addr) -> addr
     Nothing   -> 
 	-- try looking up in the object files.
 	case {-HACK!!!-}
@@ -1053,6 +1037,12 @@ indexIntOffClosure con (I# offset)
 --- Manufacturing of info tables for DataCons defined in this module ---
 ------------------------------------------------------------------------
 
+#if __GLASGOW_HASKELL__ <= 408
+type ItblPtr = Addr
+#else
+type ItblPtr = Ptr StgInfoTable
+#endif
+
 -- Make info tables for the data decls in this module
 mkITbls :: [TyCon] -> IO ItblEnv
 mkITbls [] = return emptyFM
@@ -1090,7 +1080,7 @@ make_constr_itbls cons
         mk_dirret_itbl (dcon, conNo)
            = mk_itbl dcon conNo mci_constr_entry
 
-        mk_itbl :: DataCon -> Int -> Addr -> IO (RdrName,Addr)
+        mk_itbl :: DataCon -> Int -> Addr -> IO (RdrName,ItblPtr)
         mk_itbl dcon conNo entry_addr
            = let (tot_wds, ptr_wds, _) 
                     = mkVirtHeapOffsets typePrimRep (dataConRepArgTys dcon)
@@ -1120,12 +1110,12 @@ make_constr_itbls cons
                  entry_addr_w :: Word32
                  entry_addr_w = fromIntegral (addrToInt entry_addr)
              in
-                 do addr <- mallocElem itbl
+                 do addr <- malloc
                     putStrLn ("SIZE of itbl is " ++ show (sizeOf itbl))
                     putStrLn ("# ptrs  of itbl is " ++ show ptrs)
                     putStrLn ("# nptrs of itbl is " ++ show nptrs)
                     poke addr itbl
-                    return (toRdrName dcon, intToAddr (addrToInt addr + 8))
+                    return (toRdrName dcon, addr `plusPtr` 8)
 
 
 byte :: Int -> Word32 -> Word32
@@ -1186,7 +1176,7 @@ instance Storable StgInfoTable where
          fieldAl code4, fieldAl code5, fieldAl code6, fieldAl code7]
 
    poke a0 itbl
-      = do a1 <- store (ptrs   itbl) a0
+      = do a1 <- store (ptrs   itbl) (castPtr a0)
            a2 <- store (nptrs  itbl) a1
            a3 <- store (tipe   itbl) a2
            a4 <- store (srtlen itbl) a3
@@ -1201,7 +1191,7 @@ instance Storable StgInfoTable where
            return ()
 
    peek a0
-      = do (a1,ptrs)   <- load a0
+      = do (a1,ptrs)   <- load (castPtr a0)
            (a2,nptrs)  <- load a1
            (a3,tipe)   <- load a2
            (a4,srtlen) <- load a3
@@ -1225,18 +1215,16 @@ fieldSz sel x = sizeOf (sel x)
 fieldAl :: (Storable a, Storable b) => (a -> b) -> a -> Int
 fieldAl sel x = alignment (sel x)
 
-store :: Storable a => a -> Addr -> IO Addr
+store :: Storable a => a -> Ptr a -> IO (Ptr b)
 store x addr = do poke addr x
-                  return (addr `plusAddr` fromIntegral (sizeOf x))
+                  return (castPtr (addr `plusPtr` sizeOf x))
 
-load :: Storable a => Addr -> IO (Addr, a)
+load :: Storable a => Ptr a -> IO (Ptr b, a)
 load addr = do x <- peek addr
-               return (addr `plusAddr` fromIntegral (sizeOf x), x)
+               return (castPtr (addr `plusPtr` sizeOf x), x)
 
 -----------------------------------------------------------------------------q
 
-foreign import "strncpy" strncpy :: Addr -> ByteArray# -> CInt -> IO ()
-
-#endif /* #if __GLASGOW_HASKELL__ <= 408 */
+foreign import "strncpy" strncpy :: Ptr a -> ByteArray# -> CInt -> IO ()
 \end{code}
 

@@ -49,15 +49,13 @@ module TysPrim(
 #include "HsVersions.h"
 
 import Var		( TyVar, mkSysTyVar )
-import OccName		( tcName )
+import Name		( Name )
 import PrimRep		( PrimRep(..), isFollowableRep )
-import TyCon		( mkPrimTyCon, TyCon, ArgVrcs )
+import TyCon		( TyCon, ArgVrcs, mkPrimTyCon )
 import Type		( mkTyConApp, mkTyConTy, mkTyVarTys, mkTyVarTy,
 			  unboxedTypeKind, boxedTypeKind, openTypeKind, mkArrowKinds
 			)
-import Unique		( Unique, mkAlphaTyVarUnique )
-import Name		( mkKnownKeyGlobal )
-import RdrName		( mkOrig )
+import Unique		( mkAlphaTyVarUnique )
 import PrelNames
 import Outputable
 \end{code}
@@ -147,39 +145,38 @@ vrcsZP = [vrcZero,vrcPos]
 
 \begin{code}
 -- only used herein
-pcPrimTyCon :: Unique{-TyConKey-} -> FAST_STRING -> Int -> ArgVrcs -> PrimRep -> TyCon
-pcPrimTyCon key str arity arg_vrcs rep
+pcPrimTyCon :: Name -> Int -> ArgVrcs -> PrimRep -> TyCon
+pcPrimTyCon name arity arg_vrcs rep
   = the_tycon
   where
-    name      = mkKnownKeyGlobal (mkOrig tcName pREL_GHC_Name str) key
     the_tycon = mkPrimTyCon name kind arity arg_vrcs rep
     kind      = mkArrowKinds (take arity (repeat boxedTypeKind)) result_kind
     result_kind | isFollowableRep rep = boxedTypeKind	-- Represented by a GC-ish ptr
 	        | otherwise	      = unboxedTypeKind	-- Represented by a non-ptr
 
 charPrimTy	= mkTyConTy charPrimTyCon
-charPrimTyCon	= pcPrimTyCon charPrimTyConKey SLIT("Char#") 0 [] CharRep
+charPrimTyCon	= pcPrimTyCon charPrimTyConName 0 [] CharRep
 
 intPrimTy	= mkTyConTy intPrimTyCon
-intPrimTyCon	= pcPrimTyCon intPrimTyConKey SLIT("Int#") 0 [] IntRep
+intPrimTyCon	= pcPrimTyCon intPrimTyConName 0 [] IntRep
 
 int64PrimTy	= mkTyConTy int64PrimTyCon
-int64PrimTyCon	= pcPrimTyCon int64PrimTyConKey SLIT("Int64#") 0 [] Int64Rep
+int64PrimTyCon	= pcPrimTyCon int64PrimTyConName 0 [] Int64Rep
 
 wordPrimTy	= mkTyConTy wordPrimTyCon
-wordPrimTyCon	= pcPrimTyCon wordPrimTyConKey SLIT("Word#") 0 [] WordRep
+wordPrimTyCon	= pcPrimTyCon wordPrimTyConName 0 [] WordRep
 
 word64PrimTy	= mkTyConTy word64PrimTyCon
-word64PrimTyCon	= pcPrimTyCon word64PrimTyConKey SLIT("Word64#") 0 [] Word64Rep
+word64PrimTyCon	= pcPrimTyCon word64PrimTyConName 0 [] Word64Rep
 
 addrPrimTy	= mkTyConTy addrPrimTyCon
-addrPrimTyCon	= pcPrimTyCon addrPrimTyConKey SLIT("Addr#") 0 [] AddrRep
+addrPrimTyCon	= pcPrimTyCon addrPrimTyConName 0 [] AddrRep
 
 floatPrimTy	= mkTyConTy floatPrimTyCon
-floatPrimTyCon	= pcPrimTyCon floatPrimTyConKey SLIT("Float#") 0 [] FloatRep
+floatPrimTyCon	= pcPrimTyCon floatPrimTyConName 0 [] FloatRep
 
 doublePrimTy	= mkTyConTy doublePrimTyCon
-doublePrimTyCon	= pcPrimTyCon doublePrimTyConKey SLIT("Double#") 0 [] DoubleRep
+doublePrimTyCon	= pcPrimTyCon doublePrimTyConName 0 [] DoubleRep
 \end{code}
 
 
@@ -200,7 +197,7 @@ keep different state threads separate.  It is represented by nothing at all.
 
 \begin{code}
 mkStatePrimTy ty = mkTyConApp statePrimTyCon [ty]
-statePrimTyCon	 = pcPrimTyCon statePrimTyConKey SLIT("State#") 1 vrcsZ VoidRep
+statePrimTyCon	 = pcPrimTyCon statePrimTyConName 1 vrcsZ VoidRep
 \end{code}
 
 @_RealWorld@ is deeply magical.  It {\em is primitive}, but it
@@ -210,7 +207,7 @@ system, to parameterise State#.
 
 \begin{code}
 realWorldTy	     = mkTyConTy realWorldTyCon
-realWorldTyCon	     = pcPrimTyCon realWorldTyConKey SLIT("RealWorld") 0 [] PrimPtrRep
+realWorldTyCon	     = pcPrimTyCon realWorldTyConName 0 [] PrimPtrRep
 realWorldStatePrimTy = mkStatePrimTy realWorldTy	-- State# RealWorld
 \end{code}
 
@@ -225,15 +222,10 @@ defined in \tr{TysWiredIn.lhs}, not here.
 %************************************************************************
 
 \begin{code}
-arrayPrimTyCon	= pcPrimTyCon arrayPrimTyConKey SLIT("Array#") 1 vrcsP ArrayRep
-
-byteArrayPrimTyCon = pcPrimTyCon byteArrayPrimTyConKey SLIT("ByteArray#") 0 [] ByteArrayRep
-
-mutableArrayPrimTyCon = pcPrimTyCon mutableArrayPrimTyConKey SLIT("MutableArray#") 
-                                    2 vrcsZP ArrayRep
-
-mutableByteArrayPrimTyCon = pcPrimTyCon mutableByteArrayPrimTyConKey SLIT("MutableByteArray#")
-                                        1 vrcsZ ByteArrayRep
+arrayPrimTyCon		  = pcPrimTyCon arrayPrimTyConName	      1 vrcsP  ArrayRep
+byteArrayPrimTyCon	  = pcPrimTyCon byteArrayPrimTyConName	      0 []     ByteArrayRep
+mutableArrayPrimTyCon	  = pcPrimTyCon mutableArrayPrimTyConName     2 vrcsZP ArrayRep
+mutableByteArrayPrimTyCon = pcPrimTyCon mutableByteArrayPrimTyConName 1 vrcsZ  ByteArrayRep
 
 mkArrayPrimTy elt    	    = mkTyConApp arrayPrimTyCon [elt]
 byteArrayPrimTy	    	    = mkTyConTy byteArrayPrimTyCon
@@ -248,8 +240,7 @@ mkMutableByteArrayPrimTy s  = mkTyConApp mutableByteArrayPrimTyCon [s]
 %************************************************************************
 
 \begin{code}
-mutVarPrimTyCon = pcPrimTyCon mutVarPrimTyConKey SLIT("MutVar#")
-                              2 vrcsZP PrimPtrRep
+mutVarPrimTyCon = pcPrimTyCon mutVarPrimTyConName 2 vrcsZP PrimPtrRep
 
 mkMutVarPrimTy s elt 	    = mkTyConApp mutVarPrimTyCon [s, elt]
 \end{code}
@@ -261,8 +252,7 @@ mkMutVarPrimTy s elt 	    = mkTyConApp mutVarPrimTyCon [s, elt]
 %************************************************************************
 
 \begin{code}
-mVarPrimTyCon = pcPrimTyCon mVarPrimTyConKey SLIT("MVar#")
-                            2 vrcsZP PrimPtrRep
+mVarPrimTyCon = pcPrimTyCon mVarPrimTyConName 2 vrcsZP PrimPtrRep
 
 mkMVarPrimTy s elt 	    = mkTyConApp mVarPrimTyCon [s, elt]
 \end{code}
@@ -274,8 +264,7 @@ mkMVarPrimTy s elt 	    = mkTyConApp mVarPrimTyCon [s, elt]
 %************************************************************************
 
 \begin{code}
-stablePtrPrimTyCon = pcPrimTyCon stablePtrPrimTyConKey SLIT("StablePtr#")
-                                 1 vrcsP StablePtrRep
+stablePtrPrimTyCon = pcPrimTyCon stablePtrPrimTyConName 1 vrcsP StablePtrRep
 
 mkStablePtrPrimTy ty = mkTyConApp stablePtrPrimTyCon [ty]
 \end{code}
@@ -287,8 +276,7 @@ mkStablePtrPrimTy ty = mkTyConApp stablePtrPrimTyCon [ty]
 %************************************************************************
 
 \begin{code}
-stableNamePrimTyCon = pcPrimTyCon stableNamePrimTyConKey SLIT("StableName#")
-                                  1 vrcsP StableNameRep
+stableNamePrimTyCon = pcPrimTyCon stableNamePrimTyConName 1 vrcsP StableNameRep
 
 mkStableNamePrimTy ty = mkTyConApp stableNamePrimTyCon [ty]
 \end{code}
@@ -311,7 +299,7 @@ dead before it really was.
 
 \begin{code}
 foreignObjPrimTy    = mkTyConTy foreignObjPrimTyCon
-foreignObjPrimTyCon = pcPrimTyCon foreignObjPrimTyConKey SLIT("ForeignObj#") 0 [] ForeignObjRep
+foreignObjPrimTyCon = pcPrimTyCon foreignObjPrimTyConName 0 [] ForeignObjRep
 \end{code}
   
 %************************************************************************
@@ -322,7 +310,7 @@ foreignObjPrimTyCon = pcPrimTyCon foreignObjPrimTyConKey SLIT("ForeignObj#") 0 [
 
 \begin{code}
 bcoPrimTy    = mkTyConTy bcoPrimTyCon
-bcoPrimTyCon = pcPrimTyCon bcoPrimTyConKey SLIT("BCO#") 0 [] BCORep
+bcoPrimTyCon = pcPrimTyCon bcoPrimTyConName 0 [] BCORep
 \end{code}
   
 %************************************************************************
@@ -332,7 +320,7 @@ bcoPrimTyCon = pcPrimTyCon bcoPrimTyConKey SLIT("BCO#") 0 [] BCORep
 %************************************************************************
 
 \begin{code}
-weakPrimTyCon = pcPrimTyCon weakPrimTyConKey SLIT("Weak#") 1 vrcsP WeakPtrRep
+weakPrimTyCon = pcPrimTyCon weakPrimTyConName 1 vrcsP WeakPtrRep
 
 mkWeakPrimTy v = mkTyConApp weakPrimTyCon [v]
 \end{code}
@@ -354,7 +342,7 @@ to the thread id internally.
 
 \begin{code}
 threadIdPrimTy    = mkTyConTy threadIdPrimTyCon
-threadIdPrimTyCon = pcPrimTyCon threadIdPrimTyConKey SLIT("ThreadId#") 0 [] ThreadIdRep
+threadIdPrimTyCon = pcPrimTyCon threadIdPrimTyConName 0 [] ThreadIdRep
 \end{code}
 
 %************************************************************************

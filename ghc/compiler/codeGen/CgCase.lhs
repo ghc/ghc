@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.47 2000/11/07 13:12:22 simonpj Exp $
+% $Id: CgCase.lhs,v 1.48 2000/11/07 15:21:39 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -874,7 +874,7 @@ restoreCurrentCostCentre (Just slot)
    freeStackSlots [slot]			 `thenC`
    returnFC (CCallProfCCMacro SLIT("RESTORE_CCCS") [CVal sp_rel CostCentreRep])
     -- we use the RESTORE_CCCS macro, rather than just
-    -- assigning into CurCostCentre, in case RESTORE_CCC
+    -- assigning into CurCostCentre, in case RESTORE_CCCS
     -- has some sanity-checking in it.
 \end{code}
 

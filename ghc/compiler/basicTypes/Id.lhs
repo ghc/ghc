@@ -47,6 +47,7 @@ module Id (
 	setIdArityInfo,
 	setIdDemandInfo,
 	setIdStrictness,
+        setIdTyGenInfo,
 	setIdWorkerInfo,
 	setIdSpecialisation,
 	setIdCafInfo,
@@ -57,6 +58,7 @@ module Id (
 	idFlavour,
 	idDemandInfo,
 	idStrictness,
+        idTyGenInfo,
 	idWorkerInfo,
 	idUnfolding,
 	idSpecialisation,
@@ -82,14 +84,15 @@ import Var		( Id, DictId,
 			)
 import VarSet
 import Type		( Type, tyVarsOfType, typePrimRep, addFreeTyVars, 
-			  seqType, splitTyConApp_maybe )
+                          usOnce, seqType, splitTyConApp_maybe )
 
 import IdInfo 
 
 import Demand		( Demand )
 import Name	 	( Name, OccName,
 			  mkSysLocalName, mkLocalName,
-			  isUserExportedName, getOccName, isIPOcc
+			  isUserExportedName, nameIsLocallyDefined,
+			  getOccName, isIPOcc
 			) 
 import OccName		( UserFS )
 import PrimRep		( PrimRep )
@@ -98,11 +101,13 @@ import FieldLabel	( FieldLabel )
 import SrcLoc		( SrcLoc )
 import Unique		( Unique, mkBuiltinUnique, getBuiltinUniques, 
 			  getNumBuiltinUniques )
+import Outputable
 
 infixl 	1 `setIdUnfolding`,
 	  `setIdArityInfo`,
 	  `setIdDemandInfo`,
 	  `setIdStrictness`,
+	  `setIdTyGenInfo`,
 	  `setIdWorkerInfo`,
 	  `setIdSpecialisation`,
 	  `setInlinePragma`,
@@ -272,7 +277,15 @@ in some other interface unfolding.
 \begin{code}
 omitIfaceSigForId :: Id -> Bool
 omitIfaceSigForId id
-  | otherwise
+  = ASSERT2( not (omit && nameIsLocallyDefined (idName id)
+                       && idTyGenInfo id /= TyGenNever),
+             ppr id )
+    -- mustn't omit type signature for a name whose type might change!
+    omit
+  where
+    omit = omitIfaceSigForId' id
+
+omitIfaceSigForId' id
   = case idFlavour id of
 	RecordSelId _   -> True	-- Includes dictionary selectors
         PrimOpId _      -> True
@@ -330,6 +343,14 @@ setIdStrictness id strict_info = modifyIdInfo (`setStrictnessInfo` strict_info) 
 -- isBottomingId returns true if an application to n args would diverge
 isBottomingId :: Id -> Bool
 isBottomingId id = isBottomingStrictness (idStrictness id)
+
+	---------------------------------
+	-- TYPE GENERALISATION
+idTyGenInfo :: Id -> TyGenInfo
+idTyGenInfo id = tyGenInfo (idInfo id)
+
+setIdTyGenInfo :: Id -> TyGenInfo -> Id
+setIdTyGenInfo id tygen_info = modifyIdInfo (`setTyGenInfo` tygen_info) id
 
 	---------------------------------
 	-- WORKER ID
@@ -413,11 +434,14 @@ idLBVarInfo :: Id -> LBVarInfo
 idLBVarInfo id = lbvarInfo (idInfo id)
 
 isOneShotLambda :: Id -> Bool
-isOneShotLambda id = case idLBVarInfo id of
-			IsOneShotLambda -> True
-			NoLBVarInfo	-> case splitTyConApp_maybe (idType id) of
-						Just (tycon,_) -> tycon == statePrimTyCon
-						other	       -> False
+isOneShotLambda id = analysis || hack
+  where analysis = case idLBVarInfo id of
+                     LBVarInfo u    | u == usOnce             -> True
+                     other                                    -> False
+        hack     = case splitTyConApp_maybe (idType id) of
+                     Just (tycon,_) | tycon == statePrimTyCon -> True
+                     other                                    -> False
+
 	-- The last clause is a gross hack.  It claims that 
 	-- every function over realWorldStatePrimTy is a one-shot
 	-- function.  This is pretty true in practice, and makes a big
@@ -437,7 +461,7 @@ isOneShotLambda id = case idLBVarInfo id of
 	-- spot that fill_in has arity 2 (and when Keith is done, we will) but we can't yet.
 
 setOneShotLambda :: Id -> Id
-setOneShotLambda id = modifyIdInfo (`setLBVarInfo` IsOneShotLambda) id
+setOneShotLambda id = modifyIdInfo (`setLBVarInfo` LBVarInfo usOnce) id
 
 clearOneShotLambda :: Id -> Id
 clearOneShotLambda id 
@@ -456,14 +480,4 @@ zapFragileIdInfo id = maybeModifyIdInfo zapFragileInfo id
 zapLamIdInfo :: Id -> Id
 zapLamIdInfo id = maybeModifyIdInfo zapLamInfo id
 \end{code}
-
-
-
-
-
-
-
-
-
-
 

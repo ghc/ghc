@@ -131,7 +131,6 @@ tcModule :: PersistentCompilerState
 
 tcModule pcs hst get_fixity this_mod decls unf_env
   = 		 -- Type-check the type and class decls
-    traceTc (text "Tc1")	`thenTc_`
     tcTyAndClassDecls unf_env decls		`thenTc` \ env ->
     tcSetEnv env 				$
     let
@@ -140,14 +139,12 @@ tcModule pcs hst get_fixity this_mod decls unf_env
     in
     
     	-- Typecheck the instance decls, includes deriving
-    traceTc (text "Tc2")	`thenTc_`
     tcInstDecls1 (pcs_insts pcs) (pcs_PRS pcs) 
 		 hst unf_env get_fixity this_mod 
 		 tycons decls		`thenTc` \ (new_pcs_insts, inst_env, local_inst_info, deriv_binds) ->
     tcSetInstEnv inst_env			$
     
         -- Default declarations
-    traceTc (text "Tc3")	`thenTc_`
     tcDefaults decls				`thenTc` \ defaulting_tys ->
     tcSetDefaultTys defaulting_tys 		$
     
@@ -160,9 +157,7 @@ tcModule pcs hst get_fixity this_mod decls unf_env
     -- We must do this before mkImplicitDataBinds (which comes next), since
     -- the latter looks up unpackCStringId, for example, which is usually 
     -- imported
-    traceTc (text "Tc3")	`thenTc_`
     tcInterfaceSigs unf_env decls		`thenTc` \ sig_ids ->
-    traceTc (text "Tc5")	`thenTc_` (
     tcExtendGlobalValEnv sig_ids		$
     tcGetEnv					`thenTc` \ unf_env ->
     
@@ -185,18 +180,15 @@ tcModule pcs hst get_fixity this_mod decls unf_env
     tcExtendGlobalValEnv cls_ids		$
     
         -- Foreign import declarations next
-    traceTc (text "Tc6")	`thenTc_`
     tcForeignImports decls			`thenTc`    \ (fo_ids, foi_decls) ->
     tcExtendGlobalValEnv fo_ids			$
     
     -- Value declarations next.
     -- We also typecheck any extra binds that came out of the "deriving" process
-    traceTc (text "Tc7")	`thenTc_`
     tcTopBinds (get_binds decls `ThenBinds` deriv_binds)	`thenTc` \ ((val_binds, env), lie_valdecls) ->
     tcSetEnv env $
     
         -- Foreign export declarations next
-    traceTc (text "Tc8")	`thenTc_`
     tcForeignExports decls		`thenTc`    \ (lie_fodecls, foe_binds, foe_decls) ->
     
     	-- Second pass over class and instance declarations,

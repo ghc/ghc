@@ -8,7 +8,7 @@
 module OccName (
 	-- The NameSpace type; abstact
 	NameSpace, tcName, clsName, tcClsName, dataName, varName, ipName,
-	tvName, uvName, nameSpaceString, 
+	tvName, nameSpaceString, 
 
 	-- The OccName type
 	OccName, 	-- Abstract, instance of Outputable
@@ -20,7 +20,7 @@ module OccName (
  	mkDerivedTyConOcc, mkClassTyConOcc, mkClassDataConOcc, mkSpecOcc,
 	mkGenOcc1, mkGenOcc2, 
 	
-	isSysOcc, isTvOcc, isUvOcc, isDataOcc, isDataSymOcc, isSymOcc, isIPOcc, isValOcc,
+	isSysOcc, isTvOcc, isDataOcc, isDataSymOcc, isSymOcc, isIPOcc, isValOcc,
 
 	occNameFS, occNameString, occNameUserString, occNameSpace, occNameFlavour, 
 	setOccNameSpace,
@@ -86,7 +86,6 @@ data NameSpace = VarName	-- Variables
 	       | IPName		-- Implicit Parameters
 	       | DataName	-- Data constructors
 	       | TvName		-- Type variables
-	       | UvName		-- Usage variables
 	       | TcClsName	-- Type constructors and classes; Haskell has them
 				-- in the same name space for now.
 	       deriving( Eq, Ord )
@@ -99,7 +98,6 @@ tcClsName = TcClsName		-- Not sure which!
 
 dataName = DataName
 tvName   = TvName
-uvName   = UvName
 varName  = VarName
 ipName   = IPName
 
@@ -109,7 +107,6 @@ nameSpaceString DataName  = "Data constructor"
 nameSpaceString VarName   = "Variable"
 nameSpaceString IPName    = "Implicit Param"
 nameSpaceString TvName    = "Type variable"
-nameSpaceString UvName    = "Usage variable"
 nameSpaceString TcClsName = "Type constructor or class"
 \end{code}
 
@@ -177,7 +174,7 @@ mkCCallOcc :: EncodedString -> OccName
 -- But then alreadyEncoded complains about the braces!
 mkCCallOcc str = OccName varName (_PK_ str)
 
--- Kind constructors get a speical function.  Uniquely, they are not encoded,
+-- Kind constructors get a special function.  Uniquely, they are not encoded,
 -- so that they have names like '*'.  This means that *even in interface files*
 -- we'll get kinds like (* -> (* -> *)).  We can't use mkSysOcc because it
 -- has an ASSERT that doesn't hold.
@@ -225,13 +222,10 @@ occNameFlavour (OccName sp _) = nameSpaceString sp
 \end{code}
 
 \begin{code}
-isTvOcc, isDataSymOcc, isSymOcc, isUvOcc :: OccName -> Bool
+isTvOcc, isDataSymOcc, isSymOcc :: OccName -> Bool
 
 isTvOcc (OccName TvName _) = True
 isTvOcc other              = False
-
-isUvOcc (OccName UvName _) = True
-isUvOcc other              = False
 
 isValOcc (OccName VarName  _) = True
 isValOcc (OccName DataName _) = True

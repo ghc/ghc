@@ -37,8 +37,8 @@ module PrelNames (
 #include "HsVersions.h"
 
 import Module	  ( ModuleName, mkPrelModule, mkModuleName )
-import OccName	  ( NameSpace, UserFS, varName, dataName, tcName, clsName )
-import RdrName	  ( RdrName, mkOrig )
+import OccName	  ( NameSpace, UserFS, varName, dataName, tcName, clsName, mkKindOccFS )
+import RdrName	  ( RdrName, mkOrig, mkRdrOrig )
 import UniqFM
 import Unique	  ( Unique, Uniquable(..), hasKey,
 		    mkPreludeMiscIdUnique, mkPreludeDataConUnique,
@@ -123,7 +123,7 @@ knownKeyNames
 	fromRationalName,
     
 	deRefStablePtrName,
-	makeStablePtrName,
+	newStablePtrName,
 	bindIOName,
 	returnIOName,
 
@@ -253,9 +253,41 @@ and it's convenient to write them all down in one place.
 mainName = varQual mAIN_Name SLIT("main") mainKey
 
 -- Stuff from PrelGHC
-funTyConName	     = tcQual  pREL_GHC_Name SLIT("(->)")  funTyConKey
-cCallableClassName   = clsQual pREL_GHC_Name SLIT("CCallable") cCallableClassKey
-cReturnableClassName = clsQual pREL_GHC_Name SLIT("CReturnable") cReturnableClassKey
+usOnceTyConName  = kindQual SLIT(".") usOnceTyConKey
+usManyTyConName  = kindQual SLIT("!") usManyTyConKey
+superKindName    = kindQual SLIT("KX") kindConKey
+superBoxityName  = kindQual SLIT("BX") boxityConKey
+boxedConName     = kindQual SLIT("*") boxedConKey
+unboxedConName   = kindQual SLIT("#") unboxedConKey
+openKindConName  = kindQual SLIT("?") anyBoxConKey
+usageKindConName = kindQual SLIT("$") usageConKey
+typeConName	 = kindQual SLIT("Type") typeConKey
+
+funTyConName	    	      = tcQual  pREL_GHC_Name SLIT("(->)")  funTyConKey
+charPrimTyConName    	      = tcQual  pREL_GHC_Name SLIT("Char#") charPrimTyConKey 
+intPrimTyConName     	      = tcQual  pREL_GHC_Name SLIT("Int#") intPrimTyConKey 
+int64PrimTyConName   	      = tcQual  pREL_GHC_Name SLIT("Int64#") int64PrimTyConKey 
+wordPrimTyConName    	      = tcQual  pREL_GHC_Name SLIT("Word#") wordPrimTyConKey 
+word64PrimTyConName  	      = tcQual  pREL_GHC_Name SLIT("Word64#") word64PrimTyConKey 
+addrPrimTyConName    	      = tcQual  pREL_GHC_Name SLIT("Addr#") addrPrimTyConKey 
+floatPrimTyConName   	      = tcQual  pREL_GHC_Name SLIT("Float#") floatPrimTyConKey 
+doublePrimTyConName  	      = tcQual  pREL_GHC_Name SLIT("Double#") doublePrimTyConKey 
+statePrimTyConName   	      = tcQual  pREL_GHC_Name SLIT("State#") statePrimTyConKey 
+realWorldTyConName   	      = tcQual  pREL_GHC_Name SLIT("RealWorld") realWorldTyConKey 
+arrayPrimTyConName   	      = tcQual  pREL_GHC_Name SLIT("Array#") arrayPrimTyConKey 
+byteArrayPrimTyConName	      = tcQual  pREL_GHC_Name SLIT("ByteArray#") byteArrayPrimTyConKey 
+mutableArrayPrimTyConName     = tcQual  pREL_GHC_Name SLIT("MutableArray#") mutableArrayPrimTyConKey 
+mutableByteArrayPrimTyConName = tcQual  pREL_GHC_Name SLIT("MutableByteArray#") mutableByteArrayPrimTyConKey 
+mutVarPrimTyConName	      = tcQual  pREL_GHC_Name SLIT("MutVar#") mutVarPrimTyConKey 
+mVarPrimTyConName	      = tcQual  pREL_GHC_Name SLIT("MVar#") mVarPrimTyConKey 
+stablePtrPrimTyConName        = tcQual  pREL_GHC_Name SLIT("StablePtr#") stablePtrPrimTyConKey 
+stableNamePrimTyConName       = tcQual  pREL_GHC_Name SLIT("StableName#") stableNamePrimTyConKey 
+foreignObjPrimTyConName       = tcQual  pREL_GHC_Name SLIT("ForeignObj#") foreignObjPrimTyConKey 
+bcoPrimTyConName 	      = tcQual  pREL_GHC_Name SLIT("BCO#") bcoPrimTyConKey 
+weakPrimTyConName  	      = tcQual  pREL_GHC_Name SLIT("Weak#") weakPrimTyConKey 
+threadIdPrimTyConName  	      = tcQual  pREL_GHC_Name SLIT("ThreadId#") threadIdPrimTyConKey 
+cCallableClassName   	      = clsQual pREL_GHC_Name SLIT("CCallable") cCallableClassKey
+cReturnableClassName 	      = clsQual pREL_GHC_Name SLIT("CReturnable") cReturnableClassKey
 
 -- PrelBase data types and constructors
 charTyConName	  = tcQual   pREL_BASE_Name SLIT("Char") charTyConKey
@@ -395,11 +427,10 @@ mutableByteArrayTyConName = tcQual pREL_BYTEARR_Name  SLIT("MutableByteArray") m
 -- Forign objects and weak pointers
 foreignObjTyConName   = tcQual   pREL_IO_BASE_Name SLIT("ForeignObj") foreignObjTyConKey
 foreignObjDataConName = dataQual pREL_IO_BASE_Name SLIT("ForeignObj") foreignObjDataConKey
-bcoPrimTyConName      = tcQual   pREL_BASE_Name SLIT("BCO#") bcoPrimTyConKey
 stablePtrTyConName    = tcQual   pREL_STABLE_Name SLIT("StablePtr") stablePtrTyConKey
 stablePtrDataConName  = dataQual pREL_STABLE_Name SLIT("StablePtr") stablePtrDataConKey
 deRefStablePtrName    = varQual  pREL_STABLE_Name SLIT("deRefStablePtr") deRefStablePtrIdKey
-makeStablePtrName     = varQual  pREL_STABLE_Name SLIT("makeStablePtr") makeStablePtrIdKey
+newStablePtrName      = varQual  pREL_STABLE_Name SLIT("newStablePtr") newStablePtrIdKey
 
 errorName	   = varQual pREL_ERR_Name SLIT("error") errorIdKey
 assertName         = varQual pREL_GHC_Name SLIT("assert") assertIdKey
@@ -514,7 +545,7 @@ unpackCString_RDR      	= nameRdrName unpackCStringName
 unpackCStringFoldr_RDR 	= nameRdrName unpackCStringFoldrName
 unpackCStringUtf8_RDR  	= nameRdrName unpackCStringUtf8Name
 deRefStablePtr_RDR 	= nameRdrName deRefStablePtrName
-makeStablePtr_RDR 	= nameRdrName makeStablePtrName
+newStablePtr_RDR 	= nameRdrName newStablePtrName
 bindIO_RDR	  	= nameRdrName bindIOName
 returnIO_RDR	  	= nameRdrName returnIOName
 main_RDR	   	= nameRdrName mainName
@@ -536,6 +567,10 @@ varQual  mod str uq = mkKnownKeyGlobal (varQual_RDR  mod str) uq
 dataQual mod str uq = mkKnownKeyGlobal (dataQual_RDR mod str) uq
 tcQual   mod str uq = mkKnownKeyGlobal (tcQual_RDR   mod str) uq
 clsQual  mod str uq = mkKnownKeyGlobal (clsQual_RDR  mod str) uq
+
+kindQual str uq = mkKnownKeyGlobal (mkRdrOrig pREL_GHC_Name (mkKindOccFS tcName str)) uq
+	-- Kinds are not z-encoded in interface file, hence mkKindOccFS
+	-- And they all come from PrelGHC
 
 varQual_RDR  mod str = mkOrig varName  mod str
 tcQual_RDR   mod str = mkOrig tcName   mod str
@@ -636,10 +671,15 @@ typeConKey				= mkPreludeTyConUnique 69
 threadIdPrimTyConKey			= mkPreludeTyConUnique 70
 bcoPrimTyConKey				= mkPreludeTyConUnique 71
 
+-- Usage type constructors
+usageConKey				= mkPreludeTyConUnique 72
+usOnceTyConKey				= mkPreludeTyConUnique 73
+usManyTyConKey				= mkPreludeTyConUnique 74
+
 -- Generic Type Constructors
-crossTyConKey		      		= mkPreludeTyConUnique 72
-plusTyConKey		      		= mkPreludeTyConUnique 73
-genUnitTyConKey				= mkPreludeTyConUnique 74
+crossTyConKey		      		= mkPreludeTyConUnique 75
+plusTyConKey		      		= mkPreludeTyConUnique 76
+genUnitTyConKey				= mkPreludeTyConUnique 77
 \end{code}
 
 %************************************************************************
@@ -717,7 +757,7 @@ zipIdKey		      = mkPreludeMiscIdUnique 35
 bindIOIdKey		      = mkPreludeMiscIdUnique 36
 returnIOIdKey		      = mkPreludeMiscIdUnique 37
 deRefStablePtrIdKey	      = mkPreludeMiscIdUnique 38
-makeStablePtrIdKey	      = mkPreludeMiscIdUnique 39
+newStablePtrIdKey	      = mkPreludeMiscIdUnique 39
 getTagIdKey		      = mkPreludeMiscIdUnique 40
 plusIntegerIdKey	      = mkPreludeMiscIdUnique 41
 timesIntegerIdKey	      = mkPreludeMiscIdUnique 42

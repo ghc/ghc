@@ -17,11 +17,6 @@ module Var (
 	newMutTyVar, newSigTyVar,
 	readMutTyVar, writeMutTyVar, isMutTyVar, makeTyVarImmutable,
 
-        -- UVars
-        UVar,
-        isUVar,
-        mkUVar, mkNamedUVar,
-
 	-- Ids
 	Id, DictId,
 	idName, idType, idUnique, idInfo, modifyIdInfo, maybeModifyIdInfo,
@@ -76,7 +71,6 @@ data VarDetails
   | MutTyVar (IORef (Maybe Type)) 	-- Used during unification;
 	     Bool			-- True <=> this is a type signature variable, which
 					--	    should not be unified with a non-tyvar type
-  | UVar                                -- Usage variable
 
 -- For a long time I tried to keep mutable Vars statically type-distinct
 -- from immutable Vars, but I've finally given up.   It's just too painful.
@@ -209,43 +203,6 @@ isMutTyVar other			     = False
 isSigTyVar :: Var -> Bool
 isSigTyVar (Var {varDetails = MutTyVar _ is_sig}) = is_sig
 isSigTyVar other			          = False
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Usage variables}
-%*									*
-%************************************************************************
-
-\begin{code}
-type UVar = Var
-\end{code}
-
-\begin{code}
-mkUVar :: Unique -> UVar
-mkUVar unique = Var { varName    = name
-		    , realUnique = getKey unique
-		    , varDetails = UVar
-		    , varType    = pprPanic "mkUVar (varType)" (ppr name)
-		    , varInfo    = pprPanic "mkUVar (varInfo)" (ppr name)
-		    }
-	      where name = mkSysLocalName unique SLIT("u")
-
-mkNamedUVar :: Name -> UVar
-mkNamedUVar name = Var { varName    = name
-		       , realUnique = getKey (nameUnique name)
-		       , varDetails = UVar
-		       , varType    = pprPanic "mkNamedUVar (varType)" (ppr name)
-		       , varInfo    = pprPanic "mkNamedUVar (varInfo)" (ppr name)
-		       }
-\end{code}
-
-\begin{code}
-isUVar :: Var -> Bool
-isUVar (Var {varDetails = details}) = case details of
-					UVar	   -> True
-					other	   -> False
 \end{code}
 
 

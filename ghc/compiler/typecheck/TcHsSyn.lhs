@@ -510,6 +510,15 @@ zonkStmts :: [TcStmt]
 
 zonkStmts [] = returnNF_Tc []
 
+zonkStmts (ParStmtOut bndrstmtss : stmts)
+  = mapNF_Tc (mapNF_Tc zonkId) bndrss	`thenNF_Tc` \ new_bndrss ->
+    let new_binders = concat new_bndrss in
+    mapNF_Tc zonkStmts stmtss		`thenNF_Tc` \ new_stmtss ->
+    tcExtendGlobalValEnv new_binders	$ 
+    zonkStmts stmts			`thenNF_Tc` \ new_stmts ->
+    returnNF_Tc (ParStmtOut (zip new_bndrss new_stmtss) : new_stmts)
+  where (bndrss, stmtss) = unzip bndrstmtss
+
 zonkStmts [ReturnStmt expr]
   = zonkExpr expr		`thenNF_Tc` \ new_expr ->
     returnNF_Tc [ReturnStmt new_expr]

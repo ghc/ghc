@@ -21,15 +21,12 @@ import CoreSyn
 import CoreFVs		( mustHaveLocalBinding )
 import Rules            ( RuleBase )
 import TypeRep          ( Type(..), TyNote(..) ) -- friend
-import Type             ( UsageAnn(..),
-                          applyTy, applyTys,
+import Type             ( applyTy, applyTys,
                           splitFunTy_maybe, splitFunTys, splitTyConApp_maybe,
-                          mkUsgTy, splitUsgTy, isUsgTy, isNotUsgTy, unUsgTy, tyUsg,
-                          splitUsForAllTys, substUsTy,
                           mkFunTy, mkForAllTy )
 import TyCon            ( tyConArgVrcs_maybe, isFunTyCon )
 import Literal          ( Literal(..), literalType )
-import Var              ( Var, UVar, varType, setVarType, mkUVar, modifyIdInfo )
+import Var              ( Var, varType, setVarType, modifyIdInfo )
 import IdInfo           ( setLBVarInfo, LBVarInfo(..) )
 import Id               ( isExportedId )
 import VarEnv
@@ -99,7 +96,14 @@ doUsageSPInf dflags us binds
   = do { printErrs (text "WARNING: ignoring requested -fusagesp pass; requires -fusagesp-on") ;
 	 return binds
     }
-      
+
+{- ENTIRE PASS COMMENTED OUT FOR NOW  -- KSW 2000-10-13
+
+   This monomorphic version of the analysis is outdated.  I'm
+   currently ripping out the old one and inserting the new one.  For
+   now, I'm simply commenting out this entire pass.
+
+
   | otherwise
   = do
         let binds1 = doUnAnnotBinds binds
@@ -660,6 +664,9 @@ isUnAnnotated (AppTy ty1 ty2)           = isUnAnnotated ty1 && isUnAnnotated ty2
 isUnAnnotated (TyConApp tc tys)         = all isUnAnnotated tys
 isUnAnnotated (FunTy ty1 ty2)           = isUnAnnotated ty1 && isUnAnnotated ty2
 isUnAnnotated (ForAllTy tyv ty)         = isUnAnnotated ty
+
+
+END OF ENTIRELY-COMMENTED-OUT PASS   -- KSW 2000-10-13 -}
 \end{code}
 
 ======================================================================

@@ -169,8 +169,6 @@ data TyCon
     }
 
 type ArgVrcs = [(Bool,Bool)]  -- Tyvar variance info: [(occPos,occNeg)]
-                              -- *NB*: this is tyvar variance info, *not*
-                              --       termvar usage info.
 
 data AlgTyConFlavour
   = DataTyCon		-- Data type

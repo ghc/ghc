@@ -43,8 +43,7 @@ import Rules		( addRule )
 import Type		( Type, ThetaType, mkDictTy, mkDictTys, mkTyConApp, mkTyVarTys,
 			  mkFunTys, mkFunTy, mkSigmaTy,
 			  isUnLiftedType, mkForAllTys, mkTyVarTy, tyVarsOfType,
-			  splitFunTys, splitForAllTys, unUsgTy,
-			  mkUsgTy, UsageAnn(..)
+			  splitFunTys, splitForAllTys
 			)
 import Module		( Module )
 import CoreUtils	( exprType, mkInlineMe )
@@ -79,9 +78,9 @@ import Id		( idType, mkId,
 			)
 import IdInfo		( IdInfo, vanillaIdInfo, mkIdInfo,
 			  exactArity, setUnfoldingInfo, setCafInfo, setCprInfo,
-			  setArityInfo, setSpecInfo,
+			  setArityInfo, setSpecInfo, setTyGenInfo,
 			  mkStrictnessInfo, setStrictnessInfo,
-			  IdFlavour(..), CafInfo(..), CprInfo(..)
+			  IdFlavour(..), CafInfo(..), CprInfo(..), TyGenInfo(..)
 			)
 import FieldLabel	( mkFieldLabel, fieldLabelName, 
 			  firstFieldLabelTag, allFieldLabelTags, fieldLabelType
@@ -143,7 +142,11 @@ mkSpecPragmaId occ uniq ty loc
 	-- Maybe a SysLocal?  But then we'd lose the location
 
 mkDefaultMethodId dm_name rec_c ty
-  = mkVanillaId dm_name ty
+  = mkId dm_name ty info
+  where
+    info = vanillaIdInfo `setTyGenInfo` TyGenNever
+             -- type is wired-in (see comment at TcClassDcl.tcClassSig), so
+             -- do not generalise it
 
 mkWorkerId uniq unwrkr ty
   = mkVanillaId (mkDerivedName mkWorkerOcc (getName unwrkr) uniq) ty
@@ -243,6 +246,9 @@ mkDataConWrapId data_con
 		-- The wrapper Id ends up in STG code as an argument,
 		-- sometimes before its definition, so we want to
 		-- signal that it has no CAFs
+           `setTyGenInfo`     TyGenNever
+                -- No point generalising its type, since it gets eagerly inlined
+                -- away anyway
 
     wrap_ty = mkForAllTys all_tyvars $
 	      mkFunTys all_arg_tys
@@ -413,6 +419,7 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
 	   `setArityInfo`	exactArity (1 + length dict_tys)
 	   `setUnfoldingInfo`	unfolding	
 	   `setCafInfo`		NoCafRefs
+           `setTyGenInfo`	TyGenNever
 	-- ToDo: consider adding further IdInfo
 
     unfolding = mkTopUnfolding sel_rhs
@@ -428,7 +435,7 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
 	      mkLams dict_ids $ Lam data_id $
 	      sel_body
 
-    sel_body | isNewTyCon tycon = Note (Coerce (unUsgTy field_tau) (unUsgTy data_ty)) (Var data_id)
+    sel_body | isNewTyCon tycon = Note (Coerce field_tau data_ty) (Var data_id)
 	     | otherwise	= Case (Var data_id) data_id (the_alts ++ default_alt)
 
     mk_maybe_alt data_con 
@@ -446,8 +453,7 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
     	    maybe_the_arg_id  = assocMaybe (field_lbls `zip` arg_ids) field_label
     	    field_lbls	      = dataConFieldLabels data_con
 
-    error_expr = mkApps (Var rEC_SEL_ERROR_ID) [Type (unUsgTy field_tau), err_string]
-       -- preserves invariant that type args are *not* usage-annotated on top.  KSW 1999-04.
+    error_expr = mkApps (Var rEC_SEL_ERROR_ID) [Type field_tau, err_string]
     err_string
         | all safeChar full_msg
             = App (Var unpack_id) (Lit (MachStr (_PK_ full_msg)))
@@ -524,6 +530,7 @@ mkDictSelId name clas
 		`setArityInfo`	    exactArity 1
 		`setUnfoldingInfo`  unfolding
 		`setCafInfo`	    NoCafRefs
+                `setTyGenInfo`      TyGenNever
 		
 	-- We no longer use 'must-inline' on record selectors.  They'll
 	-- inline like crazy if they scrutinise a constructor
@@ -622,9 +629,12 @@ mkDictFunId :: Name		-- Name to use for the dict fun;
 	    -> Id
 
 mkDictFunId dfun_name clas inst_tyvars inst_tys dfun_theta
-  = mkVanillaId dfun_name dfun_ty
+  = mkId dfun_name dfun_ty info
   where
     dfun_ty = mkSigmaTy inst_tyvars dfun_theta (mkDictTy clas inst_tys)
+    info = vanillaIdInfo `setTyGenInfo` TyGenNever
+             -- type is wired-in (see comment at TcClassDcl.tcClassSig), so
+             -- do not generalise it
 
 {-  1 dec 99: disable the Mark Jones optimisation for the sake
     of compatibility with Hugs.
@@ -810,9 +820,8 @@ openAlphaTy  = mkTyVarTy openAlphaTyVar
 openBetaTy   = mkTyVarTy openBetaTyVar
 
 errorTy  :: Type
-errorTy  = mkUsgTy UsMany $
-           mkSigmaTy [openAlphaTyVar] [] (mkFunTys [mkUsgTy UsOnce (mkListTy charTy)] 
-                                                   (mkUsgTy UsMany openAlphaTy))
+errorTy  = mkSigmaTy [openAlphaTyVar] [] (mkFunTys [mkListTy charTy] 
+                                                   openAlphaTy)
     -- Notice the openAlphaTyVar.  It says that "error" can be applied
     -- to unboxed as well as boxed types.  This is OK because it never
     -- returns, so the return type is irrelevant.

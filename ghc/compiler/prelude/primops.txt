@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt,v 1.5 2000/09/26 16:45:34 simonpj Exp $
+-- $Id: primops.txt,v 1.6 2000/11/07 15:21:40 simonmar Exp $
 --
 -- Primitive Operations
 --
@@ -421,6 +421,22 @@ primop   IntegerToInt64Op   "integerToInt64#" GenPrimOp
 
 primop   IntegerToWord64Op   "integerToWord64#" GenPrimOp
    Int# -> ByteArr# -> Word64#
+
+primop   IntegerAndOp  "andInteger#" GenPrimOp
+   Int# -> ByteArr# -> Int# -> ByteArr# -> (# Int#, ByteArr# #)
+   with out_of_line = True
+
+primop   IntegerOrOp  "orInteger#" GenPrimOp
+   Int# -> ByteArr# -> Int# -> ByteArr# -> (# Int#, ByteArr# #)
+   with out_of_line = True
+
+primop   IntegerXorOp  "xorInteger#" GenPrimOp
+   Int# -> ByteArr# -> Int# -> ByteArr# -> (# Int#, ByteArr# #)
+   with out_of_line = True
+
+primop   IntegerComplementOp  "complementInteger#" GenPrimOp
+   Int# -> ByteArr# -> (# Int#, ByteArr# #)
+   with out_of_line = True
 
 ------------------------------------------------------------------------
 --- Word#                                                            ---

@@ -5,11 +5,12 @@
 
 \begin{code}
 module HsTypes (
-	  HsType(..), HsUsageAnn(..), HsTyVarBndr(..),
+	  HsType(..), HsTyVarBndr(..),
 	, HsContext, HsPred(..)
 	, HsTupCon(..), hsTupParens, mkHsTupCon,
+        , hsUsOnce, hsUsMany
 
-	, mkHsForAllTy, mkHsUsForAllTy, mkHsDictTy, mkHsIParamTy
+	, mkHsForAllTy, mkHsDictTy, mkHsIParamTy
 	, hsTyVarName, hsTyVarNames, replaceTyVarName
 
 	-- Printing
@@ -27,17 +28,20 @@ module HsTypes (
 
 import Class		( FunDep )
 import Type		( Type, Kind, PredType(..), ClassContext,
-			  splitSigmaTy, unUsgTy, boxedTypeKind
+			  splitSigmaTy, boxedTypeKind
 			)
 import TypeRep		( Type(..), TyNote(..) )	-- toHsType sees the representation
-import TyCon		( isTupleTyCon, tupleTyConBoxity, tyConArity )
-import RdrName		( RdrName )
-import Name		( Name, getName )
-import OccName		( NameSpace )
+import TyCon		( isTupleTyCon, tupleTyConBoxity, tyConArity, getSynTyConDefn )
+import RdrName		( RdrName, mkUnqual )
+import Name		( Name, getName, setLocalNameSort )
+import OccName		( NameSpace, tvName )
 import Var		( TyVar, tyVarKind )
+import Subst		( mkTyVarSubst, substTy )
 import PprType		( {- instance Outputable Kind -}, pprParendKind )
 import BasicTypes	( Boxity(..), tupleParens )
-import PrelNames	( mkTupConRdrName, listTyConKey, hasKey )
+import PrelNames	( mkTupConRdrName, listTyConKey, usOnceTyConKey, usManyTyConKey, hasKey,
+			  usOnceTyConName, usManyTyConName
+			)
 import FiniteMap
 import Outputable
 
@@ -73,18 +77,21 @@ data HsType name
   | HsNumTy             Integer
   -- these next two are only used in interfaces
   | HsPredTy		(HsPred name)
-
-  | HsUsgTy           (HsUsageAnn name)
-                        (HsType name)
-
-  | HsUsgForAllTy     name
-                        (HsType name)
-
-data HsUsageAnn name
-  = HsUsOnce
-  | HsUsMany
-  | HsUsVar name
   
+  | HsUsageTy		(HsType name)   -- Usage annotation
+			(HsType name)	-- Annotated type
+
+
+-----------------------
+hsUsOnce, hsUsMany :: HsType RdrName
+hsUsOnce = HsTyVar (mkUnqual tvName SLIT("."))  -- deep magic
+hsUsMany = HsTyVar (mkUnqual tvName SLIT("!"))  -- deep magic
+
+hsUsOnce_Name, hsUsMany_Name :: HsType Name
+-- Fudge the TyConName so that it prints unqualified
+-- I hate it! I hate it!
+hsUsOnce_Name = HsTyVar (setLocalNameSort usOnceTyConName False)
+hsUsMany_Name = HsTyVar (setLocalNameSort usManyTyConName False)
 
 -----------------------
 data HsTupCon name = HsTupCon name Boxity
@@ -115,9 +122,6 @@ mkHsForAllTy mtvs1     [] (HsForAllTy mtvs2 ctxt ty) = mkHsForAllTy (mtvs1 `plus
 						       Nothing     `plus` mtvs2       = mtvs2 
 						       (Just tvs1) `plus` (Just tvs2) = Just (tvs1 ++ tvs2)
 mkHsForAllTy tvs ctxt ty = HsForAllTy tvs ctxt ty
-
-mkHsUsForAllTy uvs ty = foldr (\ uv ty -> HsUsgForAllTy uv ty)
-                              ty uvs
 
 mkHsDictTy cls tys = HsPredTy (HsPClass cls tys)
 mkHsIParamTy v ty  = HsPredTy (HsPIParam v ty)
@@ -173,6 +177,8 @@ pprHsForAll tvs cxt
   = getPprStyle $ \ sty ->
     if userStyle sty then
 	ptext SLIT("forall") <+> interppSP tvs <> dot <+> 
+              -- **! ToDo: want to hide uvars from user, but not enough info
+              -- in a HsTyVarBndr name (see PprType).  KSW 2000-10.
 	(if null cxt then 
 		empty 
 	 else 
@@ -191,9 +197,9 @@ ppr_context cxt = parens (interpp'SP cxt)
 \end{code}
 
 \begin{code}
-pREC_TOP = (0 :: Int)
-pREC_FUN = (1 :: Int)
-pREC_CON = (2 :: Int)
+pREC_TOP = (0 :: Int)  -- type   in ParseIface.y
+pREC_FUN = (1 :: Int)  -- btype  in ParseIface.y
+pREC_CON = (2 :: Int)  -- atype  in ParseIface.y
 
 maybeParen :: Bool -> SDoc -> SDoc
 maybeParen True  p = parens p
@@ -235,26 +241,12 @@ ppr_mono_ty ctxt_prec (HsPredTy pred)
   = maybeParen (ctxt_prec >= pREC_FUN) $
     braces (ppr pred)
 
-ppr_mono_ty ctxt_prec ty@(HsUsgForAllTy _ _)
-  = 
-    sep [ ptext SLIT("__fuall") <+> brackets pp_uvars <+> ptext SLIT("=>"),
-          ppr_mono_ty pREC_TOP sigma
-        ]
-  where
-    (uvars,sigma) = split [] ty
-    pp_uvars      = interppSP uvars
+ppr_mono_ty ctxt_prec (HsUsageTy u ty)
+  = maybeParen (ctxt_prec >= pREC_CON)
+               (sep [ptext SLIT("__u") <+> ppr_mono_ty pREC_CON u,
+                     ppr_mono_ty pREC_CON ty])
+    -- pREC_FUN would be logical for u, but it yields a reduce/reduce conflict with AppTy
 
-    split uvs (HsUsgForAllTy uv ty') = split (uv:uvs) ty'
-    split uvs ty'                      = (reverse uvs,ty')
-
-ppr_mono_ty ctxt_prec (HsUsgTy u ty)
-  = maybeParen (ctxt_prec >= pREC_CON) $
-    ptext SLIT("__u") <+> pp_ua <+> ppr_mono_ty pREC_CON ty
-  where
-    pp_ua = case u of
-              HsUsOnce   -> ptext SLIT("-")
-              HsUsMany   -> ptext SLIT("!")
-              HsUsVar uv -> ppr uv
 -- Generics
 ppr_mono_ty ctxt_prec (HsNumTy n) = integer  n
 ppr_mono_ty ctxt_prec (HsOpTy ty1 op ty2) = ppr ty1 <+> ppr op <+> ppr ty2
@@ -278,35 +270,59 @@ toHsTyVar tv = IfaceTyVar (getName tv) (tyVarKind tv)
 toHsTyVars tvs = map toHsTyVar tvs
 
 toHsType :: Type -> HsType Name
-toHsType ty = toHsType' (unUsgTy ty)
-	-- For now we just discard the usage
-	
-toHsType' :: Type -> HsType Name
--- Called after the usage is stripped off
 -- This function knows the representation of types
-toHsType' (TyVarTy tv)    = HsTyVar (getName tv)
-toHsType' (FunTy arg res) = HsFunTy (toHsType arg) (toHsType res)
-toHsType' (AppTy fun arg) = HsAppTy (toHsType fun) (toHsType arg) 
+toHsType (TyVarTy tv)    = HsTyVar (getName tv)
+toHsType (FunTy arg res) = HsFunTy (toHsType arg) (toHsType res)
+toHsType (AppTy fun arg) = HsAppTy (toHsType fun) (toHsType arg) 
 
-toHsType' (NoteTy (SynNote ty) _) = toHsType ty		-- Use synonyms if possible!!
-toHsType' (NoteTy _ ty)		  = toHsType ty
+toHsType (NoteTy (SynNote syn_ty) real_ty)
+  | syn_matches = toHsType syn_ty             -- Use synonyms if possible!!
+  | otherwise   = 
+#ifdef DEBUG
+                  pprTrace "WARNING: synonym info lost in .hi file for " (ppr syn_ty) $
+#endif
+                  toHsType real_ty              -- but drop it if not.
+  where
+    syn_matches               = ty_from_syn == real_ty
 
-toHsType' (PredTy p)		  = HsPredTy (toHsPred p)
+    TyConApp syn_tycon tyargs = syn_ty
+    (tyvars,ty)               = getSynTyConDefn syn_tycon
+    ty_from_syn               = substTy (mkTyVarSubst tyvars tyargs) ty
 
-toHsType' ty@(TyConApp tc tys)	-- Must be saturated because toHsType's arg is of kind *
-  | not saturated	     = generic_case
-  | isTupleTyCon tc	     = HsTupleTy (HsTupCon (getName tc) (tupleTyConBoxity tc)) tys'
-  | tc `hasKey` listTyConKey = HsListTy (head tys')
-  | otherwise		     = generic_case
+    -- We only use the type synonym in the file if this doesn't cause
+    -- us to lose important information.  This matters for usage
+    -- annotations.  It's an issue if some of the args to the synonym
+    -- have arrows in them, or if the synonym's RHS has an arrow; for
+    -- example, with nofib/real/ebnf2ps/ in Parsers.using.
+
+    -- **! It would be nice if when this test fails we could still
+    -- write the synonym in as a Note, so we don't lose the info for
+    -- error messages, but it's too much work for right now.
+    -- KSW 2000-07.
+
+toHsType (NoteTy _ ty)		  = toHsType ty
+
+toHsType (PredTy p)		  = HsPredTy (toHsPred p)
+
+toHsType ty@(TyConApp tc tys)	-- Must be saturated because toHsType's arg is of kind *
+  | not saturated	       = generic_case
+  | isTupleTyCon tc	       = HsTupleTy (HsTupCon (getName tc) (tupleTyConBoxity tc)) tys'
+  | tc `hasKey` listTyConKey   = HsListTy (head tys')
+  | tc `hasKey` usOnceTyConKey = hsUsOnce_Name		 -- must print !, . unqualified
+  | tc `hasKey` usManyTyConKey = hsUsMany_Name		 -- must print !, . unqualified
+  | otherwise		       = generic_case
   where
      generic_case = foldl HsAppTy (HsTyVar (getName tc)) tys'
      tys'         = map toHsType tys
      saturated    = length tys == tyConArity tc
 
-toHsType' ty@(ForAllTy _ _) = case splitSigmaTy ty of
+toHsType ty@(ForAllTy _ _) = case splitSigmaTy ty of
 			        (tvs, preds, tau) -> HsForAllTy (Just (map toHsTyVar tvs))
 			 				        (map toHsPred preds)
 						                (toHsType tau)
+
+toHsType (UsageTy u ty) = HsUsageTy (toHsType u) (toHsType ty)
+                          -- **! consider dropping usMany annotations ToDo KSW 2000-10
 
 
 toHsPred (Class cls tys) = HsPClass (getName cls) (map toHsType tys)
@@ -410,11 +426,11 @@ eq_hsType env (HsFunTy a1 b1) (HsFunTy a2 b2)
 eq_hsType env (HsPredTy p1) (HsPredTy p2)
   = eq_hsPred env p1 p2
 
+eq_hsType env (HsUsageTy u1 ty1) (HsUsageTy u2 ty2)
+  = eq_hsType env u1 u2 && eq_hsType env ty1 ty2
+
 eq_hsType env (HsOpTy lty1 op1 rty1) (HsOpTy lty2 op2 rty2)
   = eq_hsVar env op1 op2 && eq_hsType env lty1 lty2 && eq_hsType env rty1 rty2
-
-eq_hsType env (HsUsgTy u1 ty1) (HsUsgTy u2 ty2)
-  = eqUsg u1 u2 && eq_hsType env ty1 ty2
 
 eq_hsType env ty1 ty2 = False
 
@@ -428,12 +444,6 @@ eq_hsPred env (HsPClass c1 tys1) (HsPClass c2 tys2)
 eq_hsPred env (HsPIParam n1 ty1) (HsPIParam n2 ty2)
   = n1 == n2 && eq_hsType env ty1 ty2
 eq_hsPred env _ _ = False
-
--------------------
-eqUsg  HsUsOnce     HsUsOnce    = True
-eqUsg  HsUsMany     HsUsMany    = True
-eqUsg (HsUsVar u1) (HsUsVar u2) = u1 == u2
-eqUsg _	_ = False
 
 -------------------
 eqListBy :: (a->a->Bool) -> [a] -> [a] -> Bool

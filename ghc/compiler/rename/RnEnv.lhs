@@ -381,6 +381,12 @@ bindLocalNames names enclosed_scope
   where
     pairs = [(mkRdrUnqual (nameOccName n), n) | n <- names]
 
+bindLocalNamesFV names enclosed_scope
+  = bindLocalNames names $
+    enclosed_scope `thenRn` \ (thing, fvs) ->
+    returnRn (thing, delListFromNameSet fvs names)
+
+
 -------------------------------------
 bindLocalRn doc rdr_name enclosed_scope
   = getSrcLocRn 				`thenRn` \ loc ->
@@ -400,10 +406,6 @@ bindLocalsFVRn doc rdr_names enclosed_scope
   = bindLocalsRn doc rdr_names		$ \ names ->
     enclosed_scope names		`thenRn` \ (thing, fvs) ->
     returnRn (thing, delListFromNameSet fvs names)
-
--------------------------------------
-bindUVarRn :: RdrName -> (Name -> RnMS a) -> RnMS a
-bindUVarRn = bindCoreLocalRn
 
 -------------------------------------
 extendTyVarEnvFVRn :: [Name] -> RnMS (a, FreeVars) -> RnMS (a, FreeVars)

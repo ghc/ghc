@@ -31,8 +31,9 @@ import Name	        ( setNameUnique )
 import VarEnv
 import PrimOp		( PrimOp(..), setCCallUnique )
 import Type		( isUnLiftedType, isUnboxedTupleType, Type, splitFunTy_maybe,
-                          UsageAnn(..), tyUsg, applyTy, repType, seqType,
-			  splitRepFunTys, mkFunTys
+                          applyTy, repType, seqType,
+			  splitRepFunTys, mkFunTys,
+                          uaUTy, usOnce, usMany, isTyVarTy
 			)
 import UniqSupply	-- all of it, really
 import BasicTypes	( TopLevelFlag(..), isNotTopLevel )
@@ -144,10 +145,12 @@ isOnceTy ty
 #ifdef USMANY
     opt_UsageSPOn &&  -- can't expect annotations if -fusagesp is off
 #endif
-    case tyUsg ty of
-      UsOnce   -> True
-      UsMany   -> False
-      UsVar uv -> pprPanic "CoreToStg: unexpected uvar annot:" (ppr uv)
+    once
+  where
+    u = uaUTy ty
+    once | u == usOnce  = True
+         | u == usMany  = False
+         | isTyVarTy u  = False  -- if unknown at compile-time, is Top ie usMany
 
 bdrDem :: Id -> RhsDemand
 bdrDem id = mkDem (idDemandInfo id) (isOnceTy (idType id))
@@ -297,7 +300,7 @@ exprToRhs dem toplev (StgConApp con args)
 	-- isDllConApp checks for LitLit args too
   = StgRhsCon noCCS con args
 
-exprToRhs dem _ expr
+exprToRhs dem toplev expr
   = upd `seq` 
     StgRhsClosure	noCCS		-- No cost centre (ToDo?)
 		  	stgArgOcc	-- safe
@@ -307,8 +310,22 @@ exprToRhs dem _ expr
 			[]
 			expr
   where
-    upd = if isOnceDem dem then SingleEntry else Updatable
-				-- HA!  Paydirt for "dem"
+    upd = if isOnceDem dem
+          then (if isNotTopLevel toplev 
+                then SingleEntry              -- HA!  Paydirt for "dem"
+                else 
+#ifdef DEBUG
+                     trace "WARNING: SE CAFs unsupported, forcing UPD instead" $
+#endif
+                     Updatable)
+          else Updatable
+        -- For now we forbid SingleEntry CAFs; they tickle the
+        -- ASSERT in rts/Storage.c line 215 at newCAF() re mut_link,
+        -- and I don't understand why.  There's only one SE_CAF (well,
+        -- only one that tickled a great gaping bug in an earlier attempt
+        -- at ClosureInfo.getEntryConvention) in the whole of nofib, 
+        -- specifically Main.lvl6 in spectral/cryptarithm2.
+        -- So no great loss.  KSW 2000-07.
 \end{code}
 
 
@@ -424,7 +441,7 @@ coreExprToStgFloat env expr@(Lam _ _)
 	(binders, body) = collectBinders expr
 	id_binders      = filter isId binders
     in
-    if null id_binders then	-- It was all type/usage binders; tossed
+    if null id_binders then	-- It was all type binders; tossed
 	coreExprToStgFloat env body
     else
 	-- At least some value binders
@@ -495,7 +512,6 @@ coreExprToStgFloat env expr@(App _ _)
     collect_args (Note (Coerce ty _) e) = let (the_fun,ads,_,ss) = collect_args e
                                           in  (the_fun,ads,ty,ss)
     collect_args (Note InlineCall    e) = collect_args e
-    collect_args (Note (TermUsg _)   e) = collect_args e
 
     collect_args (App fun (Type tyarg)) = let (the_fun,ads,fun_ty,ss) = collect_args fun
                                           in  (the_fun,ads,applyTy fun_ty tyarg,ss)

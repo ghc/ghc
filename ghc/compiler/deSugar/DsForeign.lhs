@@ -29,7 +29,7 @@ import Name		( mkGlobalName, nameModule, nameOccName, getOccString,
 			  mkForeignExportOcc, isLocalName,
 			  NamedThing(..),
 			)
-import Type		( unUsgTy, repType,
+import Type		( repType,
 			  splitTyConApp_maybe, splitFunTys, splitForAllTys,
 			  Type, mkFunTys, mkForAllTys, mkTyConApp,
 			  mkFunTy, splitAppTy, applyTy, funResultTy
@@ -37,8 +37,8 @@ import Type		( unUsgTy, repType,
 import PrimOp		( CCall(..), CCallTarget(..), dynamicTarget )
 import TysWiredIn	( unitTy, addrTy, stablePtrTyCon )
 import TysPrim		( addrPrimTy )
-import PrelNames	( hasKey, ioTyConKey, deRefStablePtrName, 
-			  bindIOName, returnIOName, makeStablePtrName
+import PrelNames	( hasKey, ioTyConKey, deRefStablePtrName, newStablePtrName,
+			  bindIOName, returnIOName
 			)
 import Outputable
 
@@ -305,7 +305,7 @@ foreign export dynamic f :: (Addr -> Int -> IO Int) -> IO Addr
 
 f :: (Addr -> Int -> IO Int) -> IO Addr
 f cback =
-   bindIO (makeStablePtr cback)
+   bindIO (newStablePtr cback)
           (\StablePtr sp# -> IO (\s1# ->
               case _ccall_ createAdjustor cconv sp# ``f_helper'' s1# of
                  (# s2#, a# #) -> (# s2#, A# a# #)))
@@ -332,9 +332,9 @@ dsFExportDynamic i ty mod_name ext_name cconv =
      dsFExport  i export_ty mod_name fe_ext_name cconv True
      	`thenDs` \ (feb, fe, h_code, c_code) ->
      newSysLocalDs arg_ty			`thenDs` \ cback ->
-     dsLookupGlobalValue makeStablePtrName	`thenDs` \ makeStablePtrId ->
+     dsLookupGlobalValue newStablePtrName	`thenDs` \ newStablePtrId ->
      let
-	mk_stbl_ptr_app    = mkApps (Var makeStablePtrId) [ Type arg_ty, Var cback ]
+	mk_stbl_ptr_app    = mkApps (Var newStablePtrId) [ Type arg_ty, Var cback ]
      in
      dsLookupGlobalValue bindIOName		        `thenDs` \ bindIOId ->
      newSysLocalDs (mkTyConApp stablePtrTyCon [arg_ty]) `thenDs` \ stbl_value ->
@@ -365,7 +365,7 @@ dsFExportDynamic i ty mod_name ext_name cconv =
      dsCCall adjustor adj_args False False io_res_ty `thenDs` \ ccall_adj ->
      let ccall_adj_ty = exprType ccall_adj
          ccall_io_adj = mkLams [stbl_value]		     $
-			Note (Coerce io_res_ty (unUsgTy ccall_adj_ty))
+			Note (Coerce io_res_ty ccall_adj_ty)
 			     ccall_adj
      in
      let io_app = mkLams tvs	 $
@@ -484,7 +484,7 @@ unpackHObj :: Type -> SDoc
 unpackHObj t = text "rts_get" <> text (showFFIType t)
 
 showStgType :: Type -> SDoc
-showStgType t = text "Stg" <> text (showFFIType t)
+showStgType t = text "Hs" <> text (showFFIType t)
 
 showFFIType :: Type -> String
 showFFIType t = getOccString (getName tc)

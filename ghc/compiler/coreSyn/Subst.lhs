@@ -42,18 +42,18 @@ import CoreSyn		( Expr(..), Bind(..), Note(..), CoreExpr,
 			  isEmptyCoreRules, seqRules
 			)
 import CoreFVs		( exprFreeVars, mustHaveLocalBinding )
-import TypeRep		( Type(..), TyNote(..), 
-			)  -- friend
+import TypeRep		( Type(..), TyNote(..) )  -- friend
 import Type		( ThetaType, PredType(..), ClassContext,
-			  tyVarsOfType, tyVarsOfTypes, mkAppTy
+			  tyVarsOfType, tyVarsOfTypes, mkAppTy, mkUTy, isUTy
 			)
 import VarSet
 import VarEnv
 import Var		( setVarUnique, isId )
-import Id		( idType, setIdType, idOccInfo, zapFragileIdInfo )
+import Id		( idType, setIdType, idOccInfo, zapFragileIdInfo, maybeModifyIdInfo )
 import IdInfo		( IdInfo, isFragileOcc,
 			  specInfo, setSpecInfo, 
-			  WorkerInfo(..), workerExists, workerInfo, setWorkerInfo, WorkerInfo
+			  WorkerInfo(..), workerExists, workerInfo, setWorkerInfo, WorkerInfo,
+                          lbvarInfo, LBVarInfo(..), setLBVarInfo
 			)
 import Unique		( Uniquable(..), deriveUnique )
 import UniqSet		( elemUniqSet_Directly )
@@ -245,10 +245,12 @@ zapSubstEnv :: Subst -> Subst
 zapSubstEnv (Subst in_scope env) = Subst in_scope emptySubstEnv
 
 extendSubst :: Subst -> Var -> SubstResult -> Subst
-extendSubst (Subst in_scope env) v r = Subst in_scope (extendSubstEnv env v r)
+extendSubst (Subst in_scope env) v r = UASSERT( case r of { DoneTy ty -> not (isUTy ty) ; _ -> True } )
+                                       Subst in_scope (extendSubstEnv env v r)
 
 extendSubstList :: Subst -> [Var] -> [SubstResult] -> Subst
-extendSubstList (Subst in_scope env) v r = Subst in_scope (extendSubstEnvList env v r)
+extendSubstList (Subst in_scope env) v r = UASSERT( all (\ r1 -> case r1 of { DoneTy ty -> not (isUTy ty) ; _ -> True }) r )
+                                           Subst in_scope (extendSubstEnvList env v r)
 
 lookupSubst :: Subst -> Var -> Maybe SubstResult
 lookupSubst (Subst _ env) v = lookupSubstEnv env v
@@ -377,7 +379,8 @@ mkTopTyVarSubst :: [TyVar] -> [Type] -> Subst
 mkTopTyVarSubst tyvars tys = Subst emptyInScopeSet (zip_ty_env tyvars tys emptySubstEnv)
 
 zip_ty_env []       []       env = env
-zip_ty_env (tv:tvs) (ty:tys) env = zip_ty_env tvs tys (extendSubstEnv env tv (DoneTy ty))
+zip_ty_env (tv:tvs) (ty:tys) env = UASSERT( not (isUTy ty) )
+                                   zip_ty_env tvs tys (extendSubstEnv env tv (DoneTy ty))
 \end{code}
 
 substTy works with general Substs, so that it can be called from substExpr too.
@@ -411,8 +414,6 @@ subst_ty subst ty
 
     go (NoteTy (SynNote ty1) ty2)  = NoteTy (SynNote $! (go ty1)) $! (go ty2)
     go (NoteTy (FTVNote _) ty2)    = go ty2		-- Discard the free tyvar note
-    go (NoteTy (UsgNote usg)  ty2) = (NoteTy $! UsgNote usg) $! go ty2  		-- Keep usage annot
-    go (NoteTy (UsgForAll uv) ty2) = (NoteTy $! UsgForAll uv) $! go ty2		  	-- Keep uvar bdr
 
     go (FunTy arg res)   	   = (FunTy $! (go arg)) $! (go res)
     go (AppTy fun arg)   	   = mkAppTy (go fun) $! (go arg)
@@ -422,6 +423,8 @@ subst_ty subst ty
 					
     go (ForAllTy tv ty)		   = case substTyVar subst tv of
 					(subst', tv') -> ForAllTy tv' $! (subst_ty subst' ty)
+
+    go (UsageTy u ty)              = mkUTy (go u) $! (go ty)
 \end{code}
 
 Here is where we invent a new binder if necessary.
@@ -565,9 +568,14 @@ substId subst@(Subst in_scope env) old_id
 	-- id2 has its IdInfo zapped
     id2 = zapFragileIdInfo id1
 
-	-- new_id is cloned if necessary
-    new_id = uniqAway in_scope id2
+        -- id3 has its LBVarInfo zapped
+    id3 = maybeModifyIdInfo (\ info -> go info (lbvarInfo info)) id2
+            where go info (LBVarInfo u@(TyVarTy _)) = Just $ setLBVarInfo info $
+                                                      LBVarInfo (subst_ty subst u)
+                  go info _                         = Nothing
 
+	-- new_id is cloned if necessary
+    new_id = uniqAway in_scope id3
 	-- Extend the substitution if the unique has changed,
 	-- or there's some useful occurrence information
 	-- See the notes with substTyVar for the delSubstEnv

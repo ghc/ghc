@@ -49,7 +49,7 @@ calcTyConArgVrcs tycons
     initial_oi   = foldl (\fm tc -> addToFM fm tc (initial tc)) emptyFM tycons
     initial tc   = if isAlgTyCon tc && null (tyConDataConsIfAvailable tc) then
                          -- make pessimistic assumption (and warn)
-                         take (tyConArity tc) abstractVrcs
+                         abstractVrcs tc
                        else
                          replicate (tyConArity tc) (False,False)
 
@@ -74,7 +74,7 @@ calcTyConArgVrcs tycons
     tcaoIter oi tc | isAlgTyCon tc
       = if null data_cons then
 		-- Abstract types get uninformative variances
-	    abstractVrcs
+	    abstractVrcs tc
 	else
             map (\v -> anyVrc (\ty -> vrcInTy myfao v ty) argtys)
                 vs
@@ -96,11 +96,18 @@ calcTyConArgVrcs tycons
         in  map (\v -> vrcInTy myfao v ty) tyvs
 
 
-abstractVrcs :: ArgVrcs
--- we pull this out as a CAF so the warning only appears *once*
-abstractVrcs = trace ("WARNING: tyConArgVrc info inaccurate due to unavailable constructors.\n"
-                      ++ "\tUse -fno-prune-tydecls to fix.") $
-                 repeat (True,True)
+abstractVrcs :: TyCon -> ArgVrcs
+abstractVrcs tc = 
+#ifdef DEBUG
+                  pprTrace "Vrc: abstract tycon:" (ppr tc) $
+#endif
+                  warn_abstract_vrcs `seq` replicate (tyConArity tc) (True,True)
+
+warn_abstract_vrcs
+-- we pull the message out as a CAF so the warning only appears *once*
+  = trace ("WARNING: tyConArgVrc info inaccurate due to unavailable constructors.\n"
+        ++ "         Use -fno-prune-tydecls to fix.") $
+                ()
 \end{code}
 
 
@@ -117,10 +124,6 @@ vrcInTy :: (TyCon -> ArgVrcs)  -- function to get argVrcs of a tycon (break out 
         -> TyVar               -- tyvar to check Vrcs of
         -> Type                -- type to check for occ in
         -> (Bool,Bool)         -- (occurs positively, occurs negatively)
-
-vrcInTy fao v (NoteTy (UsgNote _)   ty) = vrcInTy fao v ty
-
-vrcInTy fao v (NoteTy (UsgForAll _) ty) = vrcInTy fao v ty
 
 vrcInTy fao v (NoteTy (SynNote _)   ty) = vrcInTy fao v ty
     			-- SynTyCon doesn't neccessarily have vrcInfo at this point,
@@ -144,9 +147,9 @@ vrcInTy fao v (AppTy ty1 ty2)           = if vrcInTy fao v ty2 /= (False,False)
                         -- hence if v occurs in ty2 at all then it could occur with
                         -- either variance.  Otherwise it occurs as it does in ty1.
 
-vrcInTy fao v (FunTy ty1 ty2)           = let (p1,m1) = vrcInTy fao v ty1
-    					      (p2,m2) = vrcInTy fao v ty2
-    					  in (m1||p2,p1||m2)
+vrcInTy fao v (FunTy ty1 ty2)           = negVrc (vrcInTy fao v ty1)
+                                          `orVrc`
+                                          vrcInTy fao v ty2
 					 
 vrcInTy fao v (ForAllTy v' ty)          = if v==v'
 					  then (False,False)
@@ -155,6 +158,8 @@ vrcInTy fao v (ForAllTy v' ty)          = if v==v'
 vrcInTy fao v (TyConApp tc tys)         = let pms1 = map (vrcInTy fao v) tys
     					      pms2 = fao tc
     				          in  orVrcs (zipWith timesVrc pms1 pms2)
+
+vrcInTy fao v (UsageTy u ty)            = vrcInTy fao v u `orVrc` vrcInTy fao v ty
 \end{code}
 
 
@@ -178,6 +183,9 @@ orVrc (p1,m1) (p2,m2) = (p1||p2,m1||m2)
 
 orVrcs :: [(Bool,Bool)] -> (Bool,Bool)
 orVrcs = foldl orVrc (False,False)
+
+negVrc :: (Bool,Bool) -> (Bool,Bool)
+negVrc (p1,m1) = (m1,p1)
 
 anyVrc :: (a -> (Bool,Bool)) -> [a] -> (Bool,Bool)
 anyVrc p as = foldl (\ pm a -> pm `orVrc` p a)

@@ -930,7 +930,7 @@ even if they occur exactly once.  Reason:
 	(a) some might appear as a function argument, so we simply
 		replace static allocation with dynamic allocation:
 		   l = <...>
-		   x = f x
+		   x = f l
 	becomes
 		   x = f <...>
 

@@ -9,10 +9,11 @@ September 1998 .. May 1999.
 Keith Wansbrough 1998-09-04..1999-06-25
 
 \begin{code}
-module UsageSPLint ( doLintUSPAnnotsBinds,
+module UsageSPLint ( {- SEE BELOW:  -- KSW 2000-10-13
+                     doLintUSPAnnotsBinds,
                      doLintUSPConstBinds,
                      doLintUSPBinds,
-                     doCheckIfWorseUSP,
+                     doCheckIfWorseUSP, -}
                    ) where
 
 #include "HsVersions.h"
@@ -20,7 +21,7 @@ module UsageSPLint ( doLintUSPAnnotsBinds,
 import UsageSPUtils
 import CoreSyn
 import TypeRep          ( Type(..), TyNote(..) )  -- friend
-import Type             ( UsageAnn(..), isUsgTy, tyUsg )
+import Type             ( )
 import TyCon            ( isAlgTyCon, isPrimTyCon, isSynTyCon, isFunTyCon )
 import Var              ( Var, varType )
 import Id		( idLBVarInfo )
@@ -29,6 +30,13 @@ import ErrUtils         ( ghcExit )
 import Util             ( zipWithEqual )
 import Bag
 import Outputable
+
+{- ENTIRE FILE COMMENTED OUT FOR NOW  -- KSW 2000-10-13
+
+   This monomorphic version of the analysis is outdated.  I'm
+   currently ripping out the old one and inserting the new one.  For
+   now, I'm simply commenting out this entire file.
+
 \end{code}
 
 ======================================================================
@@ -419,6 +427,8 @@ runULM m = case (unULintM m) (panic "runULM: no location") of
              (_,errs) -> if isEmptyBag errs
                          then Nothing
                          else Just (vcat (map pprULintErr (bagToList errs)))
+
+END OF ENTIRELY-COMMENTED-OUT FILE   -- KSW 2000-10-13 -}
 \end{code}
 
 ======================================================================

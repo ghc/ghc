@@ -47,7 +47,7 @@ import DataCon		( dataConFieldLabels, dataConSig,
 			)
 import Name		( Name, getName )
 import Type		( mkFunTy, mkAppTy, mkTyVarTys, ipName_maybe,
-			  splitFunTy_maybe, splitFunTys, isNotUsgTy,
+			  splitFunTy_maybe, splitFunTys,
 			  mkTyConApp, splitSigmaTy, 
 			  splitRhoTy,
 			  isTauTy, tyVarsOfType, tyVarsOfTypes, 
@@ -475,8 +475,7 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
 	-- Figure out the tycon and data cons from the first field name
     let
 	(Just (AnId sel_id) : _)  = maybe_sel_ids
-	(_, _, tau)	      	  = ASSERT( isNotUsgTy (idType sel_id) )
-                                    splitSigmaTy (idType sel_id)	-- Selectors can be overloaded
+	(_, _, tau)	      	  = splitSigmaTy (idType sel_id)	-- Selectors can be overloaded
 									-- when the data type has a context
 	Just (data_ty, _)     	  = splitFunTy_maybe tau	-- Must succeed since sel_id is a selector
 	(tycon, _, data_cons) 	    = splitAlgTyConApp data_ty
@@ -792,12 +791,6 @@ tcArg the_fun (arg, expected_arg_ty, arg_no)
 %*									*
 %************************************************************************
 
-Between the renamer and the first invocation of the UsageSP inference,
-identifiers read from interface files will have usage information in
-their types, whereas other identifiers will not.  The unannotTy here
-in @tcId@ prevents this information from pointlessly propagating
-further prior to the first usage inference.
-
 \begin{code}
 tcId :: Name -> NF_TcM (TcExpr, LIE, TcType)
 
@@ -808,7 +801,6 @@ tcId name
       ATcId tc_id	-> instantiate_it (OccurrenceOf tc_id) tc_id (idType tc_id)
       AGlobal (AnId id) -> tcInstId id			`thenNF_Tc` \ (tyvars, theta, tau) ->
 			   instantiate_it2 (OccurrenceOf id) id tyvars theta tau
-
   where
 	-- The instantiate_it loop runs round instantiating the Id.
 	-- It has to be a loop because we are now prepared to entertain
@@ -858,7 +850,7 @@ tcDoStmts do_or_lc stmts src_loc res_ty
        ListComp -> unifyListTy res_ty `thenTc_` returnTc ()
        _	-> returnTc ())					`thenTc_`
 
-    tcStmts do_or_lc (mkAppTy m) stmts elt_ty	`thenTc`   \ (stmts', stmts_lie) ->
+    tcStmts do_or_lc (mkAppTy m) elt_ty src_loc stmts		`thenTc`   \ ((stmts', _), stmts_lie) ->
 
 	-- Build the then and zero methods in case we need them
 	-- It's important that "then" and "return" appear just once in the final LIE,

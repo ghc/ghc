@@ -18,6 +18,11 @@ module Type (
 
 	funTyCon,
 
+        usageKindCon,					-- :: KX
+        usageTypeKind,					-- :: KX
+        usOnceTyCon, usManyTyCon,			-- :: $
+        usOnce, usMany,					-- :: $
+
         -- exports from this module:
         hasMoreBoxityInfo, defaultKind,
 
@@ -31,19 +36,20 @@ module Type (
 	mkTyConApp, mkTyConTy, splitTyConApp_maybe,
 	splitAlgTyConApp_maybe, splitAlgTyConApp, 
 
+	mkUTy, splitUTy, splitUTy_maybe,
+        isUTy, uaUTy, unUTy, liftUTy, mkUTyM,
+        isUsageKind, isUsage, isUTyVar,
+
 	-- Predicates and the like
 	mkDictTy, mkDictTys, mkPredTy, splitPredTy_maybe, 
 	splitDictTy, splitDictTy_maybe, isDictTy, predRepTy, splitDFunTy,
 
-	mkSynTy, isSynTy, deNoteType, 
+	mkSynTy, deNoteType, 
 
 	repType, splitRepFunTys, splitNewType_maybe, typePrimRep,
 
-        UsageAnn(..), mkUsgTy, isUsgTy{- dont use -}, isNotUsgTy, splitUsgTy, unUsgTy, tyUsg,
-        mkUsForAllTy, mkUsForAllTys, splitUsForAllTys, substUsTy, 
-
 	mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
-	applyTy, applyTys, hoistForAllTys,
+	applyTy, applyTys, hoistForAllTys, isForAllTy,
 
 	TauType, RhoType, SigmaType, PredType(..), ThetaType,
 	ClassPred, ClassContext, mkClassPred,
@@ -57,7 +63,7 @@ module Type (
 
 	-- Free variables
 	tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta,
-	namesOfType, typeKind, addFreeTyVars,
+	namesOfType, usageAnnOfType, typeKind, addFreeTyVars,
 
 	-- Tidying up for printing
 	tidyType,     tidyTypes,
@@ -84,9 +90,7 @@ import {-# SOURCE #-}	PprType( pprType )	-- Only called in debug messages
 import {-# SOURCE #-}   Subst  ( mkTyVarSubst, substTy )
 
 -- friends:
-import Var	( TyVar, UVar,
-		  tyVarKind, tyVarName, setTyVarName, 
-		)
+import Var	( Var, TyVar, tyVarKind, tyVarName, setTyVarName )
 import VarEnv
 import VarSet
 
@@ -102,6 +106,7 @@ import TyCon	( TyCon,
 		)
 
 -- others
+import Maybes		( maybeToBool )
 import SrcLoc		( noSrcLoc )
 import PrimRep		( PrimRep(..), isFollowableRep )
 import Unique		( Uniquable(..) )
@@ -151,18 +156,21 @@ getTyVar :: String -> Type -> TyVar
 getTyVar msg (TyVarTy tv) = tv
 getTyVar msg (PredTy p)   = getTyVar msg (predRepTy p)
 getTyVar msg (NoteTy _ t) = getTyVar msg t
+getTyVar msg ty@(UsageTy _ _) = pprPanic "getTyVar: UTy:" (text msg $$ pprType ty)
 getTyVar msg other	  = panic ("getTyVar: " ++ msg)
 
 getTyVar_maybe :: Type -> Maybe TyVar
 getTyVar_maybe (TyVarTy tv) = Just tv
 getTyVar_maybe (NoteTy _ t) = getTyVar_maybe t
 getTyVar_maybe (PredTy p)   = getTyVar_maybe (predRepTy p)
+getTyVar_maybe ty@(UsageTy _ _) = pprPanic "getTyVar_maybe: UTy:" (pprType ty)
 getTyVar_maybe other	    = Nothing
 
 isTyVarTy :: Type -> Bool
 isTyVarTy (TyVarTy tv)  = True
 isTyVarTy (NoteTy _ ty) = isTyVarTy ty
 isTyVarTy (PredTy p)    = isTyVarTy (predRepTy p)
+isTyVarTy ty@(UsageTy _ _) = pprPanic "isTyVarTy: UTy:" (pprType ty)
 isTyVarTy other         = False
 \end{code}
 
@@ -176,33 +184,36 @@ invariant: use it.
 
 \begin{code}
 mkAppTy orig_ty1 orig_ty2
-  = ASSERT2( isNotUsgTy orig_ty1 && isNotUsgTy orig_ty2, pprType orig_ty1 <+> text "to" <+> pprType orig_ty2 )
-    ASSERT( not (isPredTy orig_ty1) )	-- Predicates are of kind *
+  = ASSERT( not (isPredTy orig_ty1) )	-- Predicates are of kind *
+    UASSERT2( not (isUTy orig_ty2), pprType orig_ty1 <+> pprType orig_ty2 )
+                                        -- argument must be unannotated
     mk_app orig_ty1
   where
     mk_app (NoteTy _ ty1)    = mk_app ty1
     mk_app (TyConApp tc tys) = mkTyConApp tc (tys ++ [orig_ty2])
+    mk_app ty@(UsageTy _ _)  = pprPanic "mkAppTy: UTy:" (pprType ty)
     mk_app ty1		     = AppTy orig_ty1 orig_ty2
 
 mkAppTys :: Type -> [Type] -> Type
 mkAppTys orig_ty1 []	    = orig_ty1
 	-- This check for an empty list of type arguments
-	-- avoids the needless of a type synonym constructor.
+	-- avoids the needless loss of a type synonym constructor.
 	-- For example: mkAppTys Rational []
 	--   returns to (Ratio Integer), which has needlessly lost
 	--   the Rational part.
 mkAppTys orig_ty1 orig_tys2
-  = ASSERT2( isNotUsgTy orig_ty1, pprType orig_ty1 )
-    ASSERT( not (isPredTy orig_ty1) )	-- Predicates are of kind *
+  = ASSERT( not (isPredTy orig_ty1) )	-- Predicates are of kind *
+    UASSERT2( not (any isUTy orig_tys2), pprType orig_ty1 <+> fsep (map pprType orig_tys2) )
+                                        -- arguments must be unannotated
     mk_app orig_ty1
   where
     mk_app (NoteTy _ ty1)    = mk_app ty1
     mk_app (TyConApp tc tys) = mkTyConApp tc (tys ++ orig_tys2)
-    mk_app ty1		     = ASSERT2( all isNotUsgTy orig_tys2, pprType orig_ty1 <+> text "to" <+> hsep (map pprType orig_tys2) )
-                               foldl AppTy orig_ty1 orig_tys2
+    mk_app ty@(UsageTy _ _)  = pprPanic "mkAppTys: UTy:" (pprType ty)
+    mk_app ty1		     = foldl AppTy orig_ty1 orig_tys2
 
 splitAppTy_maybe :: Type -> Maybe (Type, Type)
-splitAppTy_maybe (FunTy ty1 ty2)   = Just (TyConApp funTyCon [ty1], ty2)
+splitAppTy_maybe (FunTy ty1 ty2)   = Just (TyConApp funTyCon [unUTy ty1], unUTy ty2)
 splitAppTy_maybe (AppTy ty1 ty2)   = Just (ty1, ty2)
 splitAppTy_maybe (NoteTy _ ty)     = splitAppTy_maybe ty
 splitAppTy_maybe (PredTy p)        = splitAppTy_maybe (predRepTy p)
@@ -212,6 +223,7 @@ splitAppTy_maybe (TyConApp tc tys) = split tys []
 			       split [ty2]    acc = Just (TyConApp tc (reverse acc), ty2)
 			       split (ty:tys) acc = split tys (ty:acc)
 
+splitAppTy_maybe ty@(UsageTy _ _)  = pprPanic "splitAppTy_maybe: UTy:" (pprType ty)
 splitAppTy_maybe other	     	  = Nothing
 
 splitAppTy :: Type -> (Type, Type)
@@ -226,8 +238,9 @@ splitAppTys ty = split ty ty []
     split orig_ty (NoteTy _ ty)         args = split orig_ty ty args
     split orig_ty (PredTy p)            args = split orig_ty (predRepTy p) args
     split orig_ty (FunTy ty1 ty2)       args = ASSERT( null args )
-					       (TyConApp funTyCon [], [ty1,ty2])
+					       (TyConApp funTyCon [], [unUTy ty1,unUTy ty2])
     split orig_ty (TyConApp tc tc_args) args = (TyConApp tc [], tc_args ++ args)
+    split orig_ty (UsageTy _ _)         args = pprPanic "splitAppTys: UTy:" (pprType orig_ty)
     split orig_ty ty		        args = (orig_ty, args)
 \end{code}
 
@@ -238,20 +251,24 @@ splitAppTys ty = split ty ty []
 
 \begin{code}
 mkFunTy :: Type -> Type -> Type
-mkFunTy arg res = FunTy arg res
+mkFunTy arg res = UASSERT2( isUTy arg && isUTy res, pprType arg <+> pprType res )
+                  FunTy arg res
 
 mkFunTys :: [Type] -> Type -> Type
-mkFunTys tys ty = foldr FunTy ty tys
+mkFunTys tys ty = UASSERT2( all isUTy (ty:tys), fsep (map pprType (tys++[ty])) )
+                  foldr FunTy ty tys
 
 splitFunTy :: Type -> (Type, Type)
 splitFunTy (FunTy arg res) = (arg, res)
 splitFunTy (NoteTy _ ty)   = splitFunTy ty
 splitFunTy (PredTy p)      = splitFunTy (predRepTy p)
+splitFunTy ty@(UsageTy _ _) = pprPanic "splitFunTy: UTy:" (pprType ty)
 
 splitFunTy_maybe :: Type -> Maybe (Type, Type)
 splitFunTy_maybe (FunTy arg res) = Just (arg, res)
 splitFunTy_maybe (NoteTy _ ty)   = splitFunTy_maybe ty
 splitFunTy_maybe (PredTy p)    	 = splitFunTy_maybe (predRepTy p)
+splitFunTy_maybe ty@(UsageTy _ _) = pprPanic "splitFunTy_maybe: UTy:" (pprType ty)
 splitFunTy_maybe other	         = Nothing
 
 splitFunTys :: Type -> ([Type], Type)
@@ -260,6 +277,7 @@ splitFunTys ty = split [] ty ty
     split args orig_ty (FunTy arg res) = split (arg:args) res res
     split args orig_ty (NoteTy _ ty)   = split args orig_ty ty
     split args orig_ty (PredTy p)      = split args orig_ty (predRepTy p)
+    split args orig_ty (UsageTy _ _)   = pprPanic "splitFunTys: UTy:" (pprType orig_ty)
     split args orig_ty ty              = (reverse args, orig_ty)
 
 splitFunTysN :: String -> Int -> Type -> ([Type], Type)
@@ -269,6 +287,7 @@ splitFunTysN msg orig_n orig_ty = split orig_n [] orig_ty orig_ty
     split n args syn_ty (FunTy arg res) = split (n-1) (arg:args) res    res
     split n args syn_ty (NoteTy _ ty)   = split n     args       syn_ty ty
     split n args syn_ty (PredTy p)      = split n     args       syn_ty (predRepTy p)
+    split n args syn_ty (UsageTy _ _)   = pprPanic "splitFunTysN: UTy:" (pprType orig_ty)
     split n args syn_ty ty              = pprPanic ("splitFunTysN: " ++ msg) (int orig_n <+> pprType orig_ty)
 
 zipFunTys :: Outputable a => [a] -> Type -> ([(a,Type)], Type)
@@ -278,18 +297,21 @@ zipFunTys orig_xs orig_ty = split [] orig_xs orig_ty orig_ty
     split acc (x:xs) nty (FunTy arg res) = split ((x,arg):acc) xs res res
     split acc xs     nty (NoteTy _ ty)   = split acc           xs nty ty
     split acc xs     nty (PredTy p)      = split acc           xs nty (predRepTy p)
+    split acc xs     nty (UsageTy _ _)   = pprPanic "zipFunTys: UTy:" (ppr orig_xs <+> pprType orig_ty)
     split acc (x:xs) nty ty              = pprPanic "zipFunTys" (ppr orig_xs <+> pprType orig_ty)
     
 funResultTy :: Type -> Type
 funResultTy (FunTy arg res) = res
 funResultTy (NoteTy _ ty)   = funResultTy ty
 funResultTy (PredTy p)      = funResultTy (predRepTy p)
+funResultTy (UsageTy _ ty)  = funResultTy ty
 funResultTy ty		    = pprPanic "funResultTy" (pprType ty)
 
 funArgTy :: Type -> Type
 funArgTy (FunTy arg res) = arg
 funArgTy (NoteTy _ ty)   = funArgTy ty
 funArgTy (PredTy p)      = funArgTy (predRepTy p)
+funArgTy (UsageTy _ ty)  = funArgTy ty
 funArgTy ty		 = pprPanic "funArgTy" (pprType ty)
 \end{code}
 
@@ -303,10 +325,11 @@ mkTyConApp :: TyCon -> [Type] -> Type
 mkTyConApp tycon tys
   | isFunTyCon tycon && length tys == 2
   = case tys of 
-	(ty1:ty2:_) -> FunTy ty1 ty2
+	(ty1:ty2:_) -> FunTy (mkUTyM ty1) (mkUTyM ty2)
 
   | otherwise
   = ASSERT(not (isSynTyCon tycon))
+    UASSERT2( not (any isUTy tys), ppr tycon <+> fsep (map pprType tys) )
     TyConApp tycon tys
 
 mkTyConTy :: TyCon -> Type
@@ -319,9 +342,10 @@ mkTyConTy tycon = ASSERT( not (isSynTyCon tycon) )
 
 splitTyConApp_maybe :: Type -> Maybe (TyCon, [Type])
 splitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
-splitTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [arg,res])
+splitTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [unUTy arg,unUTy res])
 splitTyConApp_maybe (NoteTy _ ty)     = splitTyConApp_maybe ty
 splitTyConApp_maybe (PredTy p)	      = splitTyConApp_maybe (predRepTy p)
+splitTyConApp_maybe (UsageTy _ ty)    = splitTyConApp_maybe ty
 splitTyConApp_maybe other	      = Nothing
 
 -- splitAlgTyConApp_maybe looks for 
@@ -335,6 +359,7 @@ splitAlgTyConApp_maybe (TyConApp tc tys)
     tyConArity tc == length tys      = Just (tc, tys, tyConDataCons tc)
 splitAlgTyConApp_maybe (NoteTy _ ty) = splitAlgTyConApp_maybe ty
 splitAlgTyConApp_maybe (PredTy p)    = splitAlgTyConApp_maybe (predRepTy p)
+splitAlgTyConApp_maybe (UsageTy _ ty)= splitAlgTyConApp_maybe ty
 splitAlgTyConApp_maybe other	     = Nothing
 
 splitAlgTyConApp :: Type -> (TyCon, [Type], [DataCon])
@@ -343,6 +368,7 @@ splitAlgTyConApp (TyConApp tc tys) = ASSERT( isAlgTyCon tc && tyConArity tc == l
 	      			     (tc, tys, tyConDataCons tc)
 splitAlgTyConApp (NoteTy _ ty)     = splitAlgTyConApp ty
 splitAlgTyConApp (PredTy p)        = splitAlgTyConApp (predRepTy p)
+splitAlgTyConApp (UsageTy _ ty)    = splitAlgTyConApp ty
 #ifdef DEBUG
 splitAlgTyConApp ty = pprPanic "splitAlgTyConApp" (pprType ty)
 #endif
@@ -356,25 +382,26 @@ splitAlgTyConApp ty = pprPanic "splitAlgTyConApp" (pprType ty)
 \begin{code}
 mkSynTy syn_tycon tys
   = ASSERT( isSynTyCon syn_tycon )
-    ASSERT( isNotUsgTy body )
     ASSERT( length tyvars == length tys )
     NoteTy (SynNote (TyConApp syn_tycon tys))
 	   (substTy (mkTyVarSubst tyvars tys) body)
   where
     (tyvars, body) = getSynTyConDefn syn_tycon
 
-isSynTy (NoteTy (SynNote _) _) = True
-isSynTy other                  = False
-
 deNoteType :: Type -> Type
 	-- Remove synonyms, but not Preds
 deNoteType ty@(TyVarTy tyvar)	= ty
 deNoteType (TyConApp tycon tys) = TyConApp tycon (map deNoteType tys)
-deNoteType (PredTy p)		= PredTy p
+deNoteType (PredTy p)		= PredTy (deNotePred p)
 deNoteType (NoteTy _ ty)	= deNoteType ty
 deNoteType (AppTy fun arg)	= AppTy (deNoteType fun) (deNoteType arg)
 deNoteType (FunTy fun arg)	= FunTy (deNoteType fun) (deNoteType arg)
 deNoteType (ForAllTy tv ty)	= ForAllTy tv (deNoteType ty)
+deNoteType (UsageTy u ty)	= UsageTy u (deNoteType ty)
+
+deNotePred :: PredType -> PredType
+deNotePred (Class c tys) = Class c (map deNoteType tys)
+deNotePred (IParam n ty) = IParam n (deNoteType ty)
 \end{code}
 
 Notes on type synonyms
@@ -400,6 +427,7 @@ repType looks through
 	(b) newtypes
 	(c) synonyms
 	(d) predicates
+	(e) usage annotations
 It's useful in the back end where we're not
 interested in newtypes anymore.
 
@@ -408,6 +436,7 @@ repType :: Type -> Type
 repType (ForAllTy _ ty) = repType ty
 repType (NoteTy   _ ty) = repType ty
 repType (PredTy  p)     = repType (predRepTy p)
+repType (UsageTy  _ ty) = repType ty
 repType ty	 	= case splitNewType_maybe ty of
 			    Just ty' -> repType ty'	-- Still re-apply repType in case of for-all
 			    Nothing  -> ty
@@ -431,6 +460,7 @@ splitNewType_maybe :: Type -> Maybe Type
 -- Looks through multiple levels of newtype, but does not look through for-alls
 splitNewType_maybe (NoteTy _ ty)     = splitNewType_maybe ty
 splitNewType_maybe (PredTy p)        = splitNewType_maybe (predRepTy p)
+splitNewType_maybe (UsageTy _ ty)    = splitNewType_maybe ty
 splitNewType_maybe (TyConApp tc tys) = case newTyConRep tc of
 					 Just rep_ty -> ASSERT( length tys == tyConArity tc )
 						-- The assert should hold because repType should
@@ -443,194 +473,90 @@ splitNewType_maybe other 	     = Nothing
 
 
 ---------------------------------------------------------------------
-				UsgNote
-				~~~~~~~
-
-NB: Invariant: if present, usage note is at the very top of the type.
-This should be carefully preserved.
-
-In some parts of the compiler, comments use the _Once Upon a
-Polymorphic Type_ (POPL'99) usage of "rho = generalised
-usage-annotated type; sigma = usage-annotated type; tau =
-usage-annotated type except on top"; unfortunately this conflicts with
-the rho/tau/theta/sigma usage in the rest of the compiler.  (KSW
-1999-07)
-
-\begin{code}
-mkUsgTy :: UsageAnn -> Type -> Type
-#ifndef USMANY
-mkUsgTy UsMany ty = ASSERT2( isNotUsgTy ty, pprType ty )
-                    ty
-#endif
-mkUsgTy usg    ty = ASSERT2( isNotUsgTy ty, pprType ty )
-                    NoteTy (UsgNote usg) ty
-
--- The isUsgTy function is utterly useless if UsManys are omitted.
--- Be warned!  KSW 1999-04.
-isUsgTy :: Type -> Bool
-#ifndef USMANY
-isUsgTy _ = True
-#else
-isUsgTy (NoteTy (UsgForAll _) ty) = isUsgTy ty
-isUsgTy (NoteTy (UsgNote   _) _ ) = True
-isUsgTy other                     = False
-#endif
-
--- The isNotUsgTy function may return a false True if UsManys are omitted;
--- in other words, A SSERT( isNotUsgTy ty ) may be useful but
--- A SSERT( not (isNotUsg ty) ) is asking for trouble.  KSW 1999-04.
-isNotUsgTy :: Type -> Bool
-isNotUsgTy (NoteTy (UsgForAll _) _) = False
-isNotUsgTy (NoteTy (UsgNote   _) _) = False
-isNotUsgTy other                    = True
-
--- splitUsgTy_maybe is not exported, since it is meaningless if
--- UsManys are omitted.  It is used in several places in this module,
--- however.  KSW 1999-04.
-splitUsgTy_maybe :: Type -> Maybe (UsageAnn,Type)
-splitUsgTy_maybe (NoteTy (UsgNote usg) ty2) = ASSERT( isNotUsgTy ty2 )
-                                              Just (usg,ty2)
-splitUsgTy_maybe ty@(NoteTy (UsgForAll _) _) = pprPanic "splitUsgTy_maybe:" $ pprType ty
-splitUsgTy_maybe ty                          = Nothing
-
-splitUsgTy :: Type -> (UsageAnn,Type)
-splitUsgTy ty = case splitUsgTy_maybe ty of
-                  Just ans -> ans
-                  Nothing  -> 
-#ifndef USMANY
-                              (UsMany,ty)
-#else
-                              pprPanic "splitUsgTy: no usage annot:" $ pprType ty
-#endif
-
-tyUsg :: Type -> UsageAnn
-tyUsg = fst . splitUsgTy
-
-unUsgTy :: Type -> Type
--- strip outer usage annotation if present
-unUsgTy ty = case splitUsgTy_maybe ty of
-               Just (_,ty1) -> ASSERT2( isNotUsgTy ty1, pprType ty )
-                               ty1
-               Nothing      -> ty
-
-mkUsForAllTy :: UVar -> Type -> Type
-mkUsForAllTy uv ty = NoteTy (UsgForAll uv) ty
-
-mkUsForAllTys :: [UVar] -> Type -> Type
-mkUsForAllTys uvs ty = foldr (NoteTy . UsgForAll) ty uvs
-
-splitUsForAllTys :: Type -> ([UVar],Type)
-splitUsForAllTys ty = split ty []
-  where split (NoteTy (UsgForAll u) ty) uvs = split ty (u:uvs)
-        split other_ty                  uvs = (reverse uvs, other_ty)
-
-substUsTy :: VarEnv UsageAnn -> Type -> Type
--- assumes range is fresh uvars, so no conflicts
-substUsTy ve (NoteTy note@(UsgNote (UsVar u))
-                                         ty ) = NoteTy (case lookupVarEnv ve u of
-                                                          Just ua -> UsgNote ua
-                                                          Nothing -> note)
-                                                       (substUsTy ve ty)
-substUsTy ve (NoteTy (SynNote ty1)      ty2) = NoteTy (SynNote (substUsTy ve ty1)) (substUsTy ve ty2)
-substUsTy ve (NoteTy note ty) 		     = NoteTy note (substUsTy ve ty)
-	     
-substUsTy ve (PredTy (Class c tys)) = PredTy (Class c (map (substUsTy ve) tys))
-substUsTy ve (PredTy (IParam n ty)) = PredTy (IParam n (substUsTy ve ty))
-substUsTy ve (TyVarTy tv) 	    =  TyVarTy tv
-substUsTy ve (AppTy  ty1 ty2)       = AppTy (substUsTy ve ty1) (substUsTy ve ty2)
-substUsTy ve (FunTy  ty1 ty2)       = FunTy (substUsTy ve ty1) (substUsTy ve ty2)
-substUsTy ve (TyConApp tyc tys)     = TyConApp tyc (map (substUsTy ve) tys)
-substUsTy ve (ForAllTy yv ty )      = ForAllTy yv (substUsTy ve ty)
-\end{code}
-
-
----------------------------------------------------------------------
 				ForAllTy
 				~~~~~~~~
 
-We need to be clever here with usage annotations; they need to be
-lifted or lowered through the forall as appropriate.
-
 \begin{code}
 mkForAllTy :: TyVar -> Type -> Type
-mkForAllTy tyvar ty = case splitUsgTy_maybe ty of
-                        Just (usg,ty') -> NoteTy (UsgNote usg)
-						 (ForAllTy tyvar ty')
-                        Nothing        -> ForAllTy tyvar ty
+mkForAllTy tyvar ty
+  = mkForAllTys [tyvar] ty
 
 mkForAllTys :: [TyVar] -> Type -> Type
-mkForAllTys tyvars ty = case splitUsgTy_maybe ty of
-                          Just (usg,ty') -> NoteTy (UsgNote usg)
-						   (foldr ForAllTy ty' tyvars)
-                          Nothing        -> foldr ForAllTy ty tyvars
+mkForAllTys tyvars ty
+  = case splitUTy_maybe ty of
+      Just (u,ty1) -> UASSERT2( not (mkVarSet tyvars `intersectsVarSet` tyVarsOfType u),
+                                ptext SLIT("mkForAllTys: usage scope")
+                                <+> ppr tyvars <+> pprType ty )
+                      mkUTy u (foldr ForAllTy ty1 tyvars)  -- we lift usage annotations over foralls
+      Nothing      -> foldr ForAllTy ty tyvars
+
+isForAllTy :: Type -> Bool
+isForAllTy (NoteTy _ ty)  = isForAllTy ty
+isForAllTy (ForAllTy _ _) = True
+isForAllTy (UsageTy _ ty) = isForAllTy ty
+isForAllTy other_ty	  = False
 
 splitForAllTy_maybe :: Type -> Maybe (TyVar, Type)
-splitForAllTy_maybe ty = case splitUsgTy_maybe ty of
-                           Just (usg,ty') -> do (tyvar,ty'') <- splitFAT_m ty'
-					        return (tyvar, NoteTy (UsgNote usg) ty'')
-			   Nothing        -> splitFAT_m ty
+splitForAllTy_maybe ty = splitFAT_m ty
   where
     splitFAT_m (NoteTy _ ty)		= splitFAT_m ty
     splitFAT_m (PredTy p)		= splitFAT_m (predRepTy p)
     splitFAT_m (ForAllTy tyvar ty)	= Just(tyvar, ty)
+    splitFAT_m (UsageTy _ ty)           = splitFAT_m ty
     splitFAT_m _			= Nothing
 
 splitForAllTys :: Type -> ([TyVar], Type)
-splitForAllTys ty = case splitUsgTy_maybe ty of
-                      Just (usg,ty') -> let (tvs,ty'') = split ty' ty' []
-					in  (tvs, NoteTy (UsgNote usg) ty'')
-		      Nothing        -> split ty ty []
+splitForAllTys ty = split ty ty []
    where
      split orig_ty (ForAllTy tv ty)	  tvs = split ty ty (tv:tvs)
      split orig_ty (NoteTy _ ty)	  tvs = split orig_ty ty tvs
      split orig_ty (PredTy p)		  tvs = split orig_ty (predRepTy p) tvs
+     split orig_ty (UsageTy _ ty)         tvs = split orig_ty ty tvs
      split orig_ty t			  tvs = (reverse tvs, orig_ty)
 \end{code}
 
 -- (mkPiType now in CoreUtils)
 
-Applying a for-all to its arguments
+Applying a for-all to its arguments.  Lift usage annotation as required.
 
 \begin{code}
 applyTy :: Type -> Type -> Type
-applyTy (NoteTy note@(UsgNote   _) fun) arg = NoteTy note (applyTy fun arg)
-applyTy (NoteTy note@(UsgForAll _) fun) arg = NoteTy note (applyTy fun arg)
 applyTy (PredTy p) 	                arg = applyTy (predRepTy p) arg
 applyTy (NoteTy _ fun)                  arg = applyTy fun arg
-applyTy (ForAllTy tv ty)                arg = ASSERT( isNotUsgTy arg )
+applyTy (ForAllTy tv ty)                arg = UASSERT2( not (isUTy arg),
+                                                        ptext SLIT("applyTy")
+                                                        <+> pprType ty <+> pprType arg )
                                               substTy (mkTyVarSubst [tv] [arg]) ty
+applyTy (UsageTy u ty)                  arg = UsageTy u (applyTy ty arg)
 applyTy other		                arg = panic "applyTy"
 
 applyTys :: Type -> [Type] -> Type
 applyTys fun_ty arg_tys
- = substTy (mkTyVarSubst tvs arg_tys) ty
+ = UASSERT2( not (any isUTy arg_tys), ptext SLIT("applyTys") <+> pprType fun_ty )
+   (case mu of
+      Just u  -> UsageTy u
+      Nothing -> id) $
+   substTy (mkTyVarSubst tvs arg_tys) ty
  where
-   (tvs, ty) = split fun_ty arg_tys
+   (mu, tvs, ty) = split fun_ty arg_tys
    
-   split fun_ty               []         = ([], fun_ty)
-   split (NoteTy note@(UsgNote   _) fun_ty)
-                              args       = case split fun_ty args of
-                                             (tvs, ty) -> (tvs, NoteTy note ty)
-   split (NoteTy note@(UsgForAll _) fun_ty)
-                              args       = case split fun_ty args of
-                                             (tvs, ty) -> (tvs, NoteTy note ty)
+   split fun_ty               []         = (Nothing, [], fun_ty)
    split (NoteTy _ fun_ty)    args       = split fun_ty args
    split (PredTy p)	      args       = split (predRepTy p) args
-   split (ForAllTy tv fun_ty) (arg:args) = ASSERT2( isNotUsgTy arg, vcat (map pprType arg_tys) $$
-								    text "in application of" <+> pprType fun_ty)
-					   case split fun_ty args of
-						  (tvs, ty) -> (tv:tvs, ty)
+   split (ForAllTy tv fun_ty) (arg:args) = case split fun_ty args of
+						  (mu, tvs, ty) -> (mu, tv:tvs, ty)
+   split (UsageTy u ty)       args       = case split ty args of
+                                                  (Nothing, tvs, ty) -> (Just u, tvs, ty)
+                                                  (Just _ , _  , _ ) -> pprPanic "applyTys:"
+                                                                          (pprType fun_ty)
    split other_ty             args       = panic "applyTys"
 \end{code}
-
-Note that we allow applications to be of usage-annotated- types, as an
-extension: we handle them by lifting the annotation outside.  The
-argument, however, must still be unannotated.
 
 \begin{code}
 hoistForAllTys :: Type -> Type
 	-- Move all the foralls to the top
 	-- e.g.  T -> forall a. a  ==>   forall a. T -> a
+        -- Careful: LOSES USAGE ANNOTATIONS!
 hoistForAllTys ty
   = case hoist ty of { (tvs, body) -> mkForAllTys tvs body }
   where
@@ -641,6 +567,84 @@ hoistForAllTys ty
 		  (tvs1, body1) -> case hoist body1 of { (tvs2,body2) ->
 				   (tvs1 ++ tvs2, mkFunTys args body2)
 	       }}}
+\end{code}
+
+
+---------------------------------------------------------------------
+				UsageTy
+				~~~~~~~
+
+Constructing and taking apart usage types.
+
+\begin{code}
+mkUTy :: Type -> Type -> Type
+mkUTy u ty
+  = ASSERT2( typeKind u == usageTypeKind, ptext SLIT("mkUTy:") <+> pprType u <+> pprType ty )
+    UASSERT2( not (isUTy ty), ptext SLIT("mkUTy:") <+> pprType u <+> pprType ty )
+    -- if u == usMany then ty else  : ToDo? KSW 2000-10
+#ifdef DO_USAGES
+    UsageTy u ty
+#else
+    ty
+#endif
+
+splitUTy :: Type -> (Type {- :: $ -}, Type)
+splitUTy orig_ty
+  = case splitUTy_maybe orig_ty of
+      Just (u,ty) -> (u,ty)
+#ifdef DO_USAGES
+      Nothing     -> pprPanic "splitUTy:" (pprType orig_ty)
+#else
+      Nothing     -> (usMany,orig_ty)  -- default annotation ToDo KSW 2000-10
+#endif
+
+splitUTy_maybe :: Type -> Maybe (Type {- :: $ -}, Type)
+splitUTy_maybe (UsageTy u ty) = Just (u,ty)
+splitUTy_maybe (NoteTy _ ty)  = splitUTy_maybe ty
+splitUTy_maybe other_ty       = Nothing
+
+isUTy :: Type -> Bool
+  -- has usage annotation
+isUTy = maybeToBool . splitUTy_maybe
+
+uaUTy :: Type -> Type
+  -- extract annotation
+uaUTy = fst . splitUTy
+
+unUTy :: Type -> Type
+  -- extract unannotated type
+unUTy = snd . splitUTy
+\end{code}
+
+\begin{code}
+liftUTy :: (Type -> Type) -> Type -> Type
+  -- lift outer usage annot over operation on unannotated types
+liftUTy f ty
+  = let
+      (u,ty') = splitUTy ty
+    in
+    mkUTy u (f ty')
+\end{code}
+
+\begin{code}
+mkUTyM :: Type -> Type
+  -- put TOP (no info) annotation on unannotated type
+mkUTyM ty = mkUTy usMany ty
+\end{code}
+
+\begin{code}
+isUsageKind :: Kind -> Bool
+isUsageKind k
+  = ASSERT( typeKind k == superKind )
+    k == usageTypeKind
+
+isUsage :: Type -> Bool
+isUsage ty
+  = isUsageKind (typeKind ty)
+
+isUTyVar :: Var -> Bool
+isUTyVar v
+  = isUsageKind (tyVarKind v)
 \end{code}
 
 
@@ -657,10 +661,12 @@ ClassPred and ClassContext are used in class and instance declarations.
 tell from the type constructor whether it's a dictionary or not.
 
 \begin{code}
-mkClassPred clas tys = Class clas tys
+mkClassPred clas tys = UASSERT2( not (any isUTy tys), ppr clas <+> fsep (map pprType tys) )
+                       Class clas tys
 
 mkDictTy :: Class -> [Type] -> Type
-mkDictTy clas tys = mkPredTy (Class clas tys)
+mkDictTy clas tys = UASSERT2( not (any isUTy tys), ppr clas <+> fsep (map pprType tys) )
+                    mkPredTy (Class clas tys)
 
 mkDictTys :: ClassContext -> [Type]
 mkDictTys cxt = [mkDictTy cls tys | (cls,tys) <- cxt]
@@ -677,16 +683,19 @@ predRepTy (IParam n ty)    = ty
 isPredTy :: Type -> Bool
 isPredTy (NoteTy _ ty) = isPredTy ty
 isPredTy (PredTy _)    = True
+isPredTy (UsageTy _ ty)= isPredTy ty
 isPredTy _	       = False
 
 isDictTy :: Type -> Bool
 isDictTy (NoteTy _ ty)	      = isDictTy ty
 isDictTy (PredTy (Class _ _)) = True
+isDictTy (UsageTy _ ty)       = isDictTy ty
 isDictTy other		      = False
 
 splitPredTy_maybe :: Type -> Maybe PredType
 splitPredTy_maybe (NoteTy _ ty) = splitPredTy_maybe ty
 splitPredTy_maybe (PredTy p)    = Just p
+splitPredTy_maybe (UsageTy _ ty)= splitPredTy_maybe ty
 splitPredTy_maybe other	        = Nothing
 
 splitDictTy :: Type -> (Class, [Type])
@@ -727,12 +736,14 @@ isTauTy (AppTy a b)	 = isTauTy a && isTauTy b
 isTauTy (FunTy a b)	 = isTauTy a && isTauTy b
 isTauTy (PredTy p)	 = isTauTy (predRepTy p)
 isTauTy (NoteTy _ ty)	 = isTauTy ty
+isTauTy (UsageTy _ ty)   = isTauTy ty
 isTauTy other		 = False
 \end{code}
 
 \begin{code}
 mkRhoTy :: [PredType] -> Type -> Type
-mkRhoTy theta ty = foldr (\p r -> FunTy (mkPredTy p) r) ty theta
+mkRhoTy theta ty = UASSERT2( not (isUTy ty), pprType ty )
+                   foldr (\p r -> FunTy (mkUTyM (mkPredTy p)) (mkUTyM r)) ty theta
 
 splitRhoTy :: Type -> ([PredType], Type)
 splitRhoTy ty = split ty ty []
@@ -741,6 +752,7 @@ splitRhoTy ty = split ty ty []
 					Just p  -> split res res (p:ts)
 					Nothing -> (reverse ts, orig_ty)
   split orig_ty (NoteTy _ ty)	ts = split orig_ty ty ts
+  split orig_ty (UsageTy _ ty)  ts = split orig_ty ty ts
   split orig_ty ty		ts = (reverse ts, orig_ty)
 \end{code}
 
@@ -756,6 +768,7 @@ isSigmaTy :: Type -> Bool
 isSigmaTy (ForAllTy tyvar ty)	= True
 isSigmaTy (FunTy a b)		= isPredTy a
 isSigmaTy (NoteTy _ ty)		= isSigmaTy ty
+isSigmaTy (UsageTy _ ty)	= isSigmaTy ty
 isSigmaTy _			= False
 
 splitSigmaTy :: Type -> ([TyVar], [PredType], Type)
@@ -775,6 +788,7 @@ getDFunTyKey (AppTy fun _)   = getDFunTyKey fun
 getDFunTyKey (NoteTy _ t)    = getDFunTyKey t
 getDFunTyKey (FunTy arg _)   = getOccName funTyCon
 getDFunTyKey (ForAllTy _ t)  = getDFunTyKey t
+getDFunTyKey (UsageTy _ t)   = getDFunTyKey t
 -- PredTy shouldn't happen
 \end{code}
 
@@ -812,6 +826,7 @@ typeKind (FunTy arg res)	= fix_up (typeKind res)
 		-- a strange kind like (*->*).
 
 typeKind (ForAllTy tv ty)	= typeKind ty
+typeKind (UsageTy _ ty)         = typeKind ty  -- we don't have separate kinds for ann/unann
 \end{code}
 
 
@@ -825,12 +840,11 @@ tyVarsOfType (TyVarTy tv)		= unitVarSet tv
 tyVarsOfType (TyConApp tycon tys)	= tyVarsOfTypes tys
 tyVarsOfType (NoteTy (FTVNote tvs) ty2) = tvs
 tyVarsOfType (NoteTy (SynNote ty1) ty2)	= tyVarsOfType ty1
-tyVarsOfType (NoteTy (UsgNote _) ty)	= tyVarsOfType ty
-tyVarsOfType (NoteTy (UsgForAll _) ty)	= tyVarsOfType ty
 tyVarsOfType (PredTy p)			= tyVarsOfPred p
 tyVarsOfType (FunTy arg res)		= tyVarsOfType arg `unionVarSet` tyVarsOfType res
 tyVarsOfType (AppTy fun arg)		= tyVarsOfType fun `unionVarSet` tyVarsOfType arg
 tyVarsOfType (ForAllTy tyvar ty)	= tyVarsOfType ty `minusVarSet` unitVarSet tyvar
+tyVarsOfType (UsageTy u ty)		= tyVarsOfType u `unionVarSet` tyVarsOfType ty
 
 tyVarsOfTypes :: [Type] -> TyVarSet
 tyVarsOfTypes tys = foldr (unionVarSet.tyVarsOfType) emptyVarSet tys
@@ -843,10 +857,7 @@ tyVarsOfTheta :: ThetaType -> TyVarSet
 tyVarsOfTheta = foldr (unionVarSet . tyVarsOfPred) emptyVarSet
 
 -- Add a Note with the free tyvars to the top of the type
--- (but under a usage if there is one)
 addFreeTyVars :: Type -> Type
-addFreeTyVars (NoteTy note@(UsgNote   _) ty) = NoteTy note (addFreeTyVars ty)
-addFreeTyVars (NoteTy note@(UsgForAll _) ty) = NoteTy note (addFreeTyVars ty)
 addFreeTyVars ty@(NoteTy (FTVNote _) _)      = ty
 addFreeTyVars ty			     = NoteTy (FTVNote (tyVarsOfType ty)) ty
 
@@ -861,8 +872,32 @@ namesOfType (PredTy p)			= namesOfType (predRepTy p)
 namesOfType (FunTy arg res)		= namesOfType arg `unionNameSets` namesOfType res
 namesOfType (AppTy fun arg)		= namesOfType fun `unionNameSets` namesOfType arg
 namesOfType (ForAllTy tyvar ty)		= namesOfType ty `delFromNameSet` getName tyvar
+namesOfType (UsageTy u ty)		= namesOfType u `unionNameSets` namesOfType ty
 
 namesOfTypes tys = foldr (unionNameSets . namesOfType) emptyNameSet tys
+\end{code}
+
+Usage annotations of a type
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Get a list of usage annotations of a type, *in left-to-right pre-order*.
+
+\begin{code}
+usageAnnOfType :: Type -> [Type]
+usageAnnOfType ty
+  = goS ty
+  where
+    goT (TyVarTy _)       = []
+    goT (AppTy ty1 ty2)   = goT ty1 ++ goT ty2
+    goT (TyConApp tc tys) = concatMap goT tys
+    goT (FunTy sty1 sty2) = goS sty1 ++ goS sty2
+    goT (ForAllTy mv ty)  = goT ty
+    goT (PredTy p)        = goT (predRepTy p)
+    goT ty@(UsageTy _ _)  = pprPanic "usageAnnOfType: unexpected usage:" (pprType ty)
+    goT (NoteTy note ty)  = goT ty
+
+    goS sty = case splitUTy sty of
+                (u,tty) -> u : goT tty
 \end{code}
 
 
@@ -917,11 +952,10 @@ tidyType env@(tidy_env, subst) ty
     go (ForAllTy tv ty)	    = ForAllTy tvp SAPPLY (tidyType envp ty)
 			      where
 			        (envp, tvp) = tidyTyVar env tv
+    go (UsageTy u ty)	    = (UsageTy SAPPLY (go u)) SAPPLY (go ty)
 
     go_note (SynNote ty)        = SynNote SAPPLY (go ty)
     go_note note@(FTVNote ftvs) = note	-- No need to tidy the free tyvars
-    go_note note@(UsgNote _)    = note  -- Usage annotation is already tidy
-    go_note note@(UsgForAll _)  = note  -- Uvar binder is already tidy
 
     go_pred (Class c tys) = Class c (tidyTypes env tys)
     go_pred (IParam n ty) = IParam n (go ty)
@@ -970,6 +1004,7 @@ isUnLiftedType :: Type -> Bool
 isUnLiftedType (ForAllTy tv ty) = isUnLiftedType ty
 isUnLiftedType (NoteTy _ ty)	= isUnLiftedType ty
 isUnLiftedType (TyConApp tc _)  = isUnLiftedTyCon tc
+isUnLiftedType (UsageTy _ ty)	= isUnLiftedType ty
 isUnLiftedType other		= False
 
 isUnboxedTupleType :: Type -> Bool
@@ -1014,6 +1049,7 @@ seqType (NoteTy note t2)  = seqNote note `seq` seqType t2
 seqType (PredTy p) 	  = seqPred p
 seqType (TyConApp tc tys) = tc `seq` seqTypes tys
 seqType (ForAllTy tv ty)  = tv `seq` seqType ty
+seqType (UsageTy u ty)	  = seqType u `seq` seqType ty
 
 seqTypes :: [Type] -> ()
 seqTypes []       = ()
@@ -1022,7 +1058,6 @@ seqTypes (ty:tys) = seqType ty `seq` seqTypes tys
 seqNote :: TyNote -> ()
 seqNote (SynNote ty)  = seqType ty
 seqNote (FTVNote set) = sizeUniqSet set `seq` ()
-seqNote (UsgNote usg) = usg `seq` ()
 
 seqPred :: PredType -> ()
 seqPred (Class c tys) = c `seq` seqTypes tys
@@ -1036,9 +1071,6 @@ seqPred (IParam n ty) = n `seq` seqType ty
 %*									*
 %************************************************************************
 
-
-For the moment at least, type comparisons don't work if 
-there are embedded for-alls.
 
 \begin{code}
 instance Eq Type where
@@ -1070,8 +1102,9 @@ cmpTy env (AppTy f1 a1) (AppTy f2 a2) = cmpTy env f1 f2 `thenCmp` cmpTy env a1 a
 cmpTy env (FunTy f1 a1) (FunTy f2 a2) = cmpTy env f1 f2 `thenCmp` cmpTy env a1 a2
 cmpTy env (TyConApp tc1 tys1) (TyConApp tc2 tys2) = (tc1 `compare` tc2) `thenCmp` (cmpTys env tys1 tys2)
 cmpTy env (ForAllTy tv1 t1)   (ForAllTy tv2 t2)   = cmpTy (extendVarEnv env tv1 tv2) t1 t2
+cmpTy env (UsageTy   u1 t1)   (UsageTy   u2 t2)   = cmpTy env u1 u2 `thenCmp` cmpTy env t1 t2
     
-    -- Deal with the rest: TyVarTy < AppTy < FunTy < TyConApp < ForAllTy
+    -- Deal with the rest: TyVarTy < AppTy < FunTy < TyConApp < ForAllTy < UsageTy
 cmpTy env (AppTy _ _) (TyVarTy _) = GT
     
 cmpTy env (FunTy _ _) (TyVarTy _) = GT
@@ -1081,7 +1114,12 @@ cmpTy env (TyConApp _ _) (TyVarTy _) = GT
 cmpTy env (TyConApp _ _) (AppTy _ _) = GT
 cmpTy env (TyConApp _ _) (FunTy _ _) = GT
     
-cmpTy env (ForAllTy _ _) other       = GT
+cmpTy env (ForAllTy _ _) (TyVarTy _)    = GT
+cmpTy env (ForAllTy _ _) (AppTy _ _)    = GT
+cmpTy env (ForAllTy _ _) (FunTy _ _)    = GT
+cmpTy env (ForAllTy _ _) (TyConApp _ _) = GT
+
+cmpTy env (UsageTy  _ _) other       = GT
     
 cmpTy env _ _		             = LT
 

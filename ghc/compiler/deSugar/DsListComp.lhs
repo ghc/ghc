@@ -10,7 +10,8 @@ module DsListComp ( dsListComp ) where
 
 import {-# SOURCE #-} DsExpr ( dsExpr, dsLet )
 
-import HsSyn		( Stmt(..) )
+import BasicTypes	( Boxity(..) )
+import HsSyn		( OutPat(..), HsExpr(..), Stmt(..) )
 import TcHsSyn		( TypecheckedStmt )
 import DsHsSyn		( outPatType )
 import CoreSyn
@@ -24,9 +25,10 @@ import Id		( idType )
 import Var              ( Id )
 import Type		( mkTyVarTy, mkFunTys, mkFunTy, Type )
 import TysPrim		( alphaTyVar )
-import TysWiredIn	( nilDataCon, consDataCon )
+import TysWiredIn	( nilDataCon, consDataCon, unitDataConId, tupleCon, mkListTy, mkTupleTy )
 import Match		( matchSimply )
 import PrelNames	( foldrName, buildName )
+import List		( zip4 )
 \end{code}
 
 List comprehensions may be desugared in one of two ways: ``ordinary''
@@ -102,9 +104,79 @@ TQ << [ e | p <- L1, qs ]  ++  L2 >> =
 is the TE translation scheme.  Note that we carry around the @L@ list
 already desugared.  @dsListComp@ does the top TE rule mentioned above.
 
+To the above, we add an additional rule to deal with parallel list
+comprehensions.  The translation goes roughly as follows:
+     [ e | p1 <- e11, let v1 = e12, p2 <- e13
+         | q1 <- e21, let v2 = e22, q2 <- e23]
+     =>
+     [ e | ((p1,v1,p2), (q1,v2,q2)) <-
+               zip [(p1,v1,p2) | p1 <- e11, let v1 = e12, p2 <- e13]
+                   [(q1,v2,q2) | q1 <- e21, let v2 = e22, q2 <- e23]]
+In the translation below, the ParStmtOut branch translates each parallel branch
+into a sub-comprehension, and desugars each independently.  The resulting lists
+are fed to a zip function, we create a binding for all the variables bound in all
+the comprehensions, and then we hand things off the the desugarer for bindings.
+The zip function is generated here a) because it's small, and b) because then we
+don't have to deal with arbitrary limits on the number of zip functions in the
+prelude, nor which library the zip function came from.
+The introduced tuples are Boxed, but only because I couldn't get it to work
+with the Unboxed variety.
 
 \begin{code}
+
 deListComp :: [TypecheckedStmt] -> CoreExpr -> DsM CoreExpr
+
+deListComp (ParStmtOut bndrstmtss : quals) list
+  = mapDs doListComp qualss	`thenDs` \ exps ->
+    mapDs genAS  bndrss		`thenDs` \ ass ->
+    mapDs genA   bndrss		`thenDs` \ as ->
+    mapDs genAS' bndrss		`thenDs` \ as's ->
+    let retTy = myTupleTy Boxed (length bndrss) qualTys
+	zipTy = foldr mkFunTy (mkListTy retTy) (map mkListTy qualTys)
+    in
+    newSysLocalDs zipTy		`thenDs` \ zipFn ->
+    let target = mkConsExpr retTy (mkTupleExpr as) (foldl App (Var zipFn) (map Var as's))
+	zipExp = mkLet zipFn (zip4 (map fst bndrstmtss) ass as as's) exps target
+    in
+    deBindComp pat zipExp quals list
+  where (bndrss, stmtss) = unzip bndrstmtss
+	pats = map (\ps -> mkTuplePat (map VarPat ps)) bndrss
+	mkTuplePat [p] = p
+	mkTuplePat ps  = TuplePat ps Boxed
+	pat  = TuplePat pats Boxed
+
+	qualss = map mkQuals bndrstmtss
+	mkQuals (bndrs, stmts) = (bndrs, stmts ++ [ReturnStmt (myTupleExpr bndrs)])
+
+	qualTys = map mkBndrsTy bndrss
+	mkBndrsTy bndrs = myTupleTy Boxed (length bndrs) (map idType bndrs)
+
+	doListComp (bndrs, stmts)
+	  = dsListComp stmts (mkBndrsTy bndrs)
+	genA   bndrs = newSysLocalDs (mkBndrsTy bndrs)
+	genAS  bndrs = newSysLocalDs (mkListTy (mkBndrsTy bndrs))
+	genAS' bndrs = newSysLocalDs (mkListTy (mkBndrsTy bndrs))
+
+	mkLet zipFn vars exps target
+	  = Let (Rec [(zipFn,
+		       foldr Lam (mkBody target vars) (map getAs vars))])
+		(foldl App (Var zipFn) exps)
+	getAs (_, as, _, _) = as
+	mkBody target vars
+	  = foldr mkCase (foldr mkTuplCase target vars) vars
+	mkCase (ps, as, a, as') rest
+	  = Case (Var as) as [(DataAlt nilDataCon, [], mkConApp nilDataCon []),
+			      (DataAlt consDataCon, [a, as'], rest)]
+	mkTuplCase ([p], as, a, as') rest
+	  = App (Lam p rest) (Var a)
+	mkTuplCase (ps, as, a, as') rest
+	  = Case (Var a) a [(DataAlt (tupleCon Boxed (length ps)), ps, rest)]
+
+	myTupleTy boxity arity [ty] = ty
+	myTupleTy boxity arity tys  = mkTupleTy boxity arity tys
+	myTupleExpr []	 = HsVar unitDataConId
+	myTupleExpr [id] = HsVar id
+	myTupleExpr ids	 = ExplicitTuple [ HsVar i | i <- ids ] Boxed
 
 deListComp [ReturnStmt expr] list	-- Figure 7.4, SLPJ, p 135, rule C above
   = dsExpr expr			`thenDs` \ core_expr ->
@@ -122,7 +194,10 @@ deListComp (LetStmt binds : quals) list
 
 deListComp (BindStmt pat list1 locn : quals) core_list2 -- rule A' above
   = dsExpr list1		    `thenDs` \ core_list1 ->
-    let
+    deBindComp pat core_list1 quals core_list2
+
+deBindComp pat core_list1 quals core_list2
+  = let
 	u3_ty@u1_ty = exprType core_list1	-- two names, same thing
 
 	-- u1_ty is a [alpha] type, and u2_ty = alpha

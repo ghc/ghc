@@ -244,8 +244,8 @@ slurpSourceRefs source_binders source_fvs
 
     go_outer decls fvs all_gates refs	-- refs are not necessarily slurped yet
 	= traceRn (text "go_outer" <+> ppr refs)		`thenRn_`
-	  getImportedInstDecls all_gates			`thenRn` \ inst_decls ->
 	  foldlRn go_inner (decls, fvs, emptyFVs) refs		`thenRn` \ (decls1, fvs1, gates1) ->
+	  getImportedInstDecls (all_gates `plusFV` gates1)	`thenRn` \ inst_decls ->
 	  rnIfaceInstDecls decls1 fvs1 gates1 inst_decls	`thenRn` \ (decls2, fvs2, gates2) ->
 	  go_outer decls2 fvs2 (all_gates `plusFV` gates2)
 			       (nameSetToList (gates2 `minusNameSet` all_gates))

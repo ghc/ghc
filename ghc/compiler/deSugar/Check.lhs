@@ -414,12 +414,16 @@ get_unused_cons :: [TypecheckedPat] -> [DataCon]
 get_unused_cons used_cons = unused_cons
      where
        (ConPat _ ty _ _ _) = head used_cons
-       Just (ty_con,_) 	   = splitTyConApp_maybe ty
+       Just (ty_con,_) 	   = sTyConApp_maybe used_cons ty
        all_cons        	   = tyConDataCons ty_con
        used_cons_as_id 	   = map (\ (ConPat d _ _ _ _) -> d) used_cons
        unused_cons     	   = uniqSetToList
 		 (mkUniqSet all_cons `minusUniqSet` mkUniqSet used_cons_as_id) 
 
+sTyConApp_maybe used_cons ty =
+    case splitTyConApp_maybe ty of
+    Just x -> Just x
+    Nothing -> pprTrace "splitTyConApp_maybe" (ppr (used_cons, ty)) $ Nothing
 
 all_vars :: [TypecheckedPat] -> Bool
 all_vars []              = True

@@ -57,7 +57,7 @@ import TyCon		( TyCon, isSynTyCon )
 import Type		( splitDFunTy, isTyVarTy,
 			  splitTyConApp_maybe, splitDictTy,
 			  splitAlgTyConApp_maybe, splitForAllTys,
-			  unUsgTy, tyVarsOfTypes, mkClassPred, mkTyVarTy,
+			  tyVarsOfTypes, mkClassPred, mkTyVarTy,
 			  getClassTys_maybe
 			)
 import Subst		( mkTopTyVarSubst, substClasses )
@@ -369,9 +369,11 @@ getGenericBinds (AndMonoBinds m1 m2)
   = plusAssoc_C AndMonoBinds (getGenericBinds m1) (getGenericBinds m2)
 
 getGenericBinds (FunMonoBind id infixop matches loc)
-  = mapAssoc wrap (foldr add emptyAssoc matches)
+  = mapAssoc wrap (foldl add emptyAssoc matches)
+	-- Using foldl not foldr is vital, else
+	-- we reverse the order of the bindings!
   where
-    add match env = case maybeGenericMatch match of
+    add env match = case maybeGenericMatch match of
 		      Nothing		-> env
 		      Just (ty, match') -> extendAssoc_C (++) env (ty, [match'])
 
@@ -613,7 +615,7 @@ tcInstDecl2 (InstInfo { iLocal = is_local, iDFunId = dfun_id,
 		-- emit an error message.  This in turn means that we don't
 		-- mention the constructor, which doesn't exist for CCallable, CReturnable
 		-- Hardly beautiful, but only three extra lines.
-	    HsApp (TyApp (HsVar eRROR_ID) [(unUsgTy . idType) this_dict_id])
+	    HsApp (TyApp (HsVar eRROR_ID) [idType this_dict_id])
 		  (HsLit (HsString msg))
 
 	  | otherwise	-- The common case

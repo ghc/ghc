@@ -5,7 +5,7 @@
 
 \begin{code}
 module VarSet (
-	VarSet, IdSet, TyVarSet, UVarSet,
+	VarSet, IdSet, TyVarSet,
 	emptyVarSet, unitVarSet, mkVarSet,
 	extendVarSet, extendVarSet_C,
 	elemVarSet, varSetElems, subVarSet,
@@ -18,7 +18,7 @@ module VarSet (
 
 #include "HsVersions.h"
 
-import Var		( Var, Id, TyVar, UVar )
+import Var		( Var, Id, TyVar )
 import Unique		( Unique )
 import UniqSet
 import UniqFM		( delFromUFM_Directly, addToUFM_C )
@@ -34,7 +34,6 @@ import UniqFM		( delFromUFM_Directly, addToUFM_C )
 type VarSet       = UniqSet Var
 type IdSet 	  = UniqSet Id
 type TyVarSet	  = UniqSet TyVar
-type UVarSet      = UniqSet UVar
 
 emptyVarSet	:: VarSet
 intersectVarSet	:: VarSet -> VarSet -> VarSet

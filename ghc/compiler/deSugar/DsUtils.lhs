@@ -47,7 +47,7 @@ import TyCon		( isNewTyCon, tyConDataCons )
 import DataCon		( DataCon, StrictnessMark, maybeMarkedUnboxed, 
 			  dataConStrictMarks, dataConId, splitProductType_maybe
 			)
-import Type		( mkFunTy, isUnLiftedType, splitAlgTyConApp, unUsgTy,
+import Type		( mkFunTy, isUnLiftedType, splitAlgTyConApp,
 			  Type
 			)
 import TysPrim		( intPrimTy, charPrimTy, floatPrimTy, doublePrimTy )
@@ -278,8 +278,8 @@ mkCoAlgCaseMatchResult var match_alts
 	-- Stuff for newtype
     (_, arg_ids, match_result) = head match_alts
     arg_id 	   	       = head arg_ids
-    coercion_bind	       = NonRec arg_id (Note (Coerce (unUsgTy (idType arg_id)) 
-							     (unUsgTy scrut_ty))
+    coercion_bind	       = NonRec arg_id (Note (Coerce (idType arg_id)
+							     scrut_ty)
 						     (Var var))
     newtype_sanity	       = null (tail match_alts) && null (tail arg_ids)
 
@@ -362,8 +362,7 @@ mkErrorAppDs err_id ty msg
 	full_msg = showSDoc (hcat [ppr src_loc, text "|", text msg])
     in
     mkStringLit full_msg		`thenDs` \ core_msg ->
-    returnDs (mkApps (Var err_id) [(Type . unUsgTy) ty, core_msg])
-    -- unUsgTy *required* -- KSW 1999-04-07
+    returnDs (mkApps (Var err_id) [Type ty, core_msg])
 \end{code}
 
 
@@ -522,8 +521,7 @@ mkSelectorBinds pat val_expr
 
 
 @mkTupleExpr@ builds a tuple; the inverse to @mkTupleSelector@.  If it
-has only one element, it is the identity function.  Notice we must
-throw out any usage annotation on the outside of an Id. 
+has only one element, it is the identity function.
 
 \begin{code}
 mkTupleExpr :: [Id] -> CoreExpr
@@ -531,7 +529,7 @@ mkTupleExpr :: [Id] -> CoreExpr
 mkTupleExpr []	 = Var unitDataConId
 mkTupleExpr [id] = Var id
 mkTupleExpr ids	 = mkConApp (tupleCon Boxed (length ids))
-			    (map (Type . unUsgTy . idType) ids ++ [ Var i | i <- ids ])
+			    (map (Type . idType) ids ++ [ Var i | i <- ids ])
 \end{code}
 
 

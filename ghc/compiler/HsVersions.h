@@ -28,6 +28,15 @@ name = global (value) :: IORef (ty); \
 #define WARN(e,msg)
 #endif
 
+-- temporary usage assertion control KSW 2000-10
+#ifdef DO_USAGES
+#define UASSERT(e) ASSERT(e)
+#define UASSERT2(e,msg) ASSERT2(e,msg)
+#else
+#define UASSERT(e)
+#define UASSERT2(e,msg)
+#endif
+
 #if __STDC__
 #define CAT2(a,b)a##b
 #else

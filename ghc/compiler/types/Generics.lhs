@@ -8,12 +8,12 @@ import RnHsSyn		( RenamedHsExpr )
 import HsSyn		( HsExpr(..), InPat(..), mkSimpleMatch )
 
 import Type             ( Type, isUnLiftedType, applyTys, tyVarsOfType, tyVarsOfTypes,
-			  mkTyVarTys, mkForAllTys, mkTyConApp, splitFunTys,
-			  mkFunTy, isTyVarTy,
-			  splitSigmaTy, getTyVar, splitTyConApp_maybe, funTyCon
+			  mkTyVarTys, mkForAllTys, mkTyConApp, 
+			  mkFunTy, isTyVarTy, getTyVar_maybe,
+			  splitSigmaTy, splitTyConApp_maybe, funTyCon
 			)
 
-import DataCon          ( DataCon, dataConOrigArgTys, dataConWrapId, dataConId )
+import DataCon          ( DataCon, dataConOrigArgTys, dataConWrapId, dataConId, isExistentialDataCon )
 
 import TyCon            ( TyCon, tyConTyVars, tyConDataConsIfAvailable, 
 			  tyConGenInfo, isNewTyCon, newTyConRep, isBoxedTupleTyCon
@@ -23,7 +23,7 @@ import CoreSyn          ( mkLams, Expr(..), CoreExpr, AltCon(..), Note(..),
 			  mkConApp, Alt, mkTyApps, mkVarApps )
 import BasicTypes       ( EP(..), Boxity(..) )
 import Var              ( TyVar )
-import VarSet		( isEmptyVarSet )
+import VarSet		( varSetElems )
 import Id               ( Id, mkTemplateLocal, idType, idName, 
 			  mkTemplateLocalsNum, mkId
 			) 
@@ -197,17 +197,24 @@ validGenericMethodType :: Type -> Bool
   --	* function arrow
   --	* boxed tuples
   --	* an arbitrary type not involving the class type variables
-validGenericMethodType ty = valid ty
-
-valid ty
-  | isTyVarTy ty = True
-  | not (null arg_tys)  = all valid arg_tys && valid res_ty
-  | no_tyvars_in_ty	= True
-  | otherwise		= isBoxedTupleTyCon tc && all valid tys
+  --		e.g. this is ok: 	forall b. Ord b => [b] -> a
+  --	             where a is the class variable
+validGenericMethodType ty 
+  = valid tau
   where
-    (arg_tys, res_ty) = splitFunTys ty
-    no_tyvars_in_ty   = isEmptyVarSet (tyVarsOfType ty)
-    Just (tc,tys)     = splitTyConApp_maybe ty
+    (local_tvs, _, tau) = splitSigmaTy ty
+
+    valid ty
+      | isTyVarTy ty    = True
+      | no_tyvars_in_ty	= True
+      | otherwise	= case splitTyConApp_maybe ty of
+				Just (tc,tys) -> valid_tycon tc && all valid tys
+				Nothing	      -> False
+      where
+	no_tyvars_in_ty = all (`elem` local_tvs) (varSetElems (tyVarsOfType ty))
+
+    valid_tycon tc = tc == funTyCon || isBoxedTupleTyCon tc 
+	-- Compare bimapApp, below
 \end{code}
 
 
@@ -233,11 +240,13 @@ mkTyConGenInfo tycon from_name to_name
   | null datacons 	-- Abstractly imported types don't have
   = Nothing		-- to/from operations, (and should not need them)
 
-	-- If any of the constructor has an unboxed type as argument
+	-- If any of the constructor has an unboxed type as argument,
 	-- then we can't build the embedding-projection pair, because
 	-- it relies on instantiating *polymorphic* sum and product types
 	-- at the argument types of the constructors
-  | any (any isUnLiftedType . dataConOrigArgTys) datacons
+	-- Nor can we do the job if it's an existential data constructor,
+  | or [ any isUnLiftedType (dataConOrigArgTys dc) || isExistentialDataCon dc
+       | dc <- datacons ]
   = Nothing
 
   | otherwise
@@ -403,7 +412,51 @@ splitInHalf list = (left, right)
 
 Generating the Generic default method.  Uses the bimaps to generate the
 actual method. All of this is rather incomplete, but it would be nice
-to make even this work.
+to make even this work.  Example
+
+ 	class Foo a where
+	  op :: Op a
+
+	instance Foo T
+
+Then we fill in the RHS for op, RenamedHsExpr, by calling mkGenericRhs:
+
+	instance Foo T where
+	   op = <mkGenericRhs op a T>
+
+To do this, we generate a pair of RenamedHsExprs (EP toOp fromOp), where
+
+	toOp   :: Op Trep -> Op T
+	fromOp :: Op T    -> Op Trep
+
+(the bimap) and then fill in the RHS with
+
+	instance Foo T where
+	   op = toOp op
+
+Remember, we're generating a RenamedHsExpr, so the result of all this
+will be fed to the type checker.  So the 'op' on the RHS will be 
+at the representation type for T, Trep.
+
+
+A note about polymorphism.  Suppose the class op is polymorphic:
+
+	class Baz a where
+	  op :: forall b. Ord b => a -> b -> b
+
+Then we can still generate a bimap with
+
+	toOP :: forall b. (Trep -> b -> b) -> (T -> b -> b)
+
+and fill in the instance decl thus
+
+	instance Foo T where
+	   op = toOp op
+
+By the time the type checker has done its stuff we'll get
+
+	instance Foo T where
+	   op = \b. \dict::Ord b. toOp b (op Trep b dict)
 
 \begin{code}
 mkGenericRhs :: Id -> TyVar -> TyCon -> RenamedHsExpr
@@ -415,37 +468,51 @@ mkGenericRhs sel_id tyvar tycon
 	Just (EP from to) = tyConGenInfo tycon	-- Caller checked this will succeed
         ep        	  = EP (HsVar (idName from)) (HsVar (idName to)) 
 
-        -- Takes out the ForAll and the Class rstrictions in front of the
-        -- type of the method.
+        -- Takes out the ForAll and the Class restrictions 
+        -- in front of the type of the method.
 	(_,_,op_ty) = splitSigmaTy (idType sel_id)
+
+        -- Do it again!  This deals with the case where the method type 
+	-- is polymorphic -- see notes above
+	(local_tvs,_,final_ty) = splitSigmaTy op_ty
 
 	-- Now we probably have a tycon in front
         -- of us, quite probably a FunTyCon.
-        bimap = generate_bimap (tyvar, ep) op_ty
+        bimap = generate_bimap (tyvar, ep, local_tvs) final_ty
 
--- EP is the environment of to/from bimaps, but as we only have one type 
--- variable at the moment, there is only one EP.
+type EPEnv = (TyVar,		-- The class type variable
+	      EP RenamedHsExpr,	-- The EP it maps to
+	      [TyVar]		-- Other in-scope tyvars; they have an identity EP
+	     )
 
 -------------------
-generate_bimap ::  (TyVar, EP RenamedHsExpr) -> Type -> EP RenamedHsExpr
+generate_bimap :: EPEnv
+	       -> Type
+	       -> EP RenamedHsExpr
 -- Top level case - splitting the TyCon.
-generate_bimap (tv,ep) ty | isTyVarTy ty = ASSERT( getTyVar "Generics.generate_bimap" ty == tv) ep
-			  | otherwise    = bimapApp (tv,ep) (splitTyConApp_maybe ty)
+generate_bimap env@(tv,ep,local_tvs) ty 
+  = case getTyVar_maybe ty of
+	Just tv1 |  tv == tv1 -> ep				-- The class tyvar
+		 |  otherwise -> ASSERT( tv1 `elem` local_tvs)	-- One of the polymorphic tyvars of the method
+				 idEP	
+	Nothing	 -> bimapApp env (splitTyConApp_maybe ty)
 
 -------------------
-bimapApp :: (TyVar, EP RenamedHsExpr) -> Maybe (TyCon, [Type]) -> EP RenamedHsExpr
-bimapApp ep Nothing		    = panic "TcClassDecl: Type Application!"
-bimapApp ep (Just (tycon, ty_args)) 
+bimapApp :: EPEnv -> Maybe (TyCon, [Type]) -> EP RenamedHsExpr
+bimapApp env Nothing		    = panic "TcClassDecl: Type Application!"
+bimapApp env (Just (tycon, ty_args)) 
   | tycon == funTyCon       = bimapArrow arg_eps
   | isBoxedTupleTyCon tycon = bimapTuple arg_eps
   | otherwise		    =	-- Otherwise validGenericMethodType will 
 				-- have checked that the type is a constant type
-			      ASSERT( isEmptyVarSet (tyVarsOfTypes ty_args) )
-			      EP idexpr idexpr
+			      ASSERT( all (`elem` local_tvs) (varSetElems (tyVarsOfTypes ty_args)) )
+			      idEP
     where
-      arg_eps = map (generate_bimap ep) ty_args
+      arg_eps = map (generate_bimap env) ty_args
+      (_,_,local_tvs) = env
 
 -------------------
+-- bimapArrow :: [EP a a', EP b b'] -> EP (a->b) (a'->b')
 bimapArrow [ep1, ep2]
   = EP { fromEP = mk_hs_lam [VarPatIn g1, VarPatIn g2] from_body, 
 	 toEP   = mk_hs_lam [VarPatIn g1, VarPatIn g2] to_body }
@@ -470,5 +537,9 @@ genericNames = [mkSysLocalName (mkBuiltinUnique i) (_PK_ ('g' : show i)) | i <- 
 (g1:g2:g3:_) = genericNames
 
 mk_hs_lam pats body = HsPar (HsLam (mkSimpleMatch pats body Nothing builtinSrcLoc))
-idexpr		    = mk_hs_lam [VarPatIn g3] (HsVar g3)
+
+idEP :: EP RenamedHsExpr
+idEP = EP idexpr idexpr
+     where
+       idexpr = mk_hs_lam [VarPatIn g3] (HsVar g3)
 \end{code}

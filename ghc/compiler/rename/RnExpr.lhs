@@ -45,6 +45,7 @@ import NameSet
 import UniqFM		( isNullUFM )
 import FiniteMap	( elemFM )
 import UniqSet		( emptyUniqSet )
+import List		( intersectBy )
 import ListSetOps	( unionLists, removeDups )
 import Maybes		( maybeToBool )
 import Outputable
@@ -228,7 +229,7 @@ rnGRHS (GRHS guarded locn)
 		returnRn ()
     )		`thenRn_`
 
-    rnStmts rnExpr guarded	`thenRn` \ (guarded', fvs) ->
+    rnStmts rnExpr guarded	`thenRn` \ ((_, guarded'), fvs) ->
     returnRn (GRHS guarded' locn, fvs)
   where
 	-- Standard Haskell 1.4 guards are just a single boolean
@@ -375,13 +376,13 @@ rnExpr (HsWith expr binds)
 rnExpr e@(HsDo do_or_lc stmts src_loc)
   = pushSrcLocRn src_loc $
     lookupOrigNames implicit_rdr_names	`thenRn` \ implicit_fvs ->
-    rnStmts rnExpr stmts			`thenRn` \ (stmts', fvs) ->
+    rnStmts rnExpr stmts		`thenRn` \ ((_, stmts'), fvs) ->
 	-- check the statement list ends in an expression
     case last stmts' of {
 	ExprStmt _ _ -> returnRn () ;
 	ReturnStmt _ -> returnRn () ;	-- for list comprehensions
 	_            -> addErrRn (doStmtListErr e)
-    } 						`thenRn_`
+    }					`thenRn_`
     returnRn (HsDo do_or_lc stmts' src_loc, fvs `plusFV` implicit_fvs)
   where
     implicit_rdr_names = [foldr_RDR, build_RDR, monadClass_RDR]
@@ -542,29 +543,46 @@ Quals.
 type RnExprTy = RdrNameHsExpr -> RnMS (RenamedHsExpr, FreeVars)
 
 rnStmts :: RnExprTy
-	-> [RdrNameStmt] 
-	-> RnMS ([RenamedStmt], FreeVars)
+	-> [RdrNameStmt]
+	-> RnMS (([Name], [RenamedStmt]), FreeVars)
 
 rnStmts rn_expr []
-  = returnRn ([], emptyFVs)
+  = returnRn (([], []), emptyFVs)
 
 rnStmts rn_expr (stmt:stmts)
-  = rnStmt rn_expr stmt				$ \ stmt' ->
-    rnStmts rn_expr stmts			`thenRn` \ (stmts', fvs) ->
-    returnRn (stmt' : stmts', fvs)
+  = getLocalNameEnv 		`thenRn` \ name_env ->
+    rnStmt rn_expr stmt				$ \ stmt' ->
+    rnStmts rn_expr stmts			`thenRn` \ ((binders, stmts'), fvs) ->
+    returnRn ((binders, stmt' : stmts'), fvs)
 
 rnStmt :: RnExprTy -> RdrNameStmt
-       -> (RenamedStmt -> RnMS (a, FreeVars))
-       -> RnMS (a, FreeVars)
+       -> (RenamedStmt -> RnMS (([Name], a), FreeVars))
+       -> RnMS (([Name], a), FreeVars)
 -- Because of mutual recursion we have to pass in rnExpr.
+
+rnStmt rn_expr (ParStmt stmtss) thing_inside
+  = mapFvRn (rnStmts rn_expr) stmtss	`thenRn` \ (bndrstmtss, fv_stmtss) ->
+    let (binderss, stmtss') = unzip bndrstmtss
+	checkBndrs all_bndrs bndrs
+	  = checkRn (null (intersectBy eqOcc all_bndrs bndrs)) err `thenRn_`
+	    returnRn (bndrs ++ all_bndrs)
+	eqOcc n1 n2 = nameOccName n1 == nameOccName n2
+	err = text "duplicate binding in parallel list comprehension"
+    in
+    foldlRn checkBndrs [] binderss	`thenRn` \ binders ->
+    bindLocalNamesFV binders		$
+    thing_inside (ParStmtOut bndrstmtss)`thenRn` \ ((rest_bndrs, result), fv_rest) ->
+    returnRn ((rest_bndrs ++ binders, result), fv_stmtss `plusFV` fv_rest)
 
 rnStmt rn_expr (BindStmt pat expr src_loc) thing_inside
   = pushSrcLocRn src_loc $
-    rn_expr expr		 			`thenRn` \ (expr', fv_expr) ->
-    bindLocalsFVRn doc binders				$ \ new_binders ->
-    rnPat pat					 	`thenRn` \ (pat', fv_pat) ->
-    thing_inside (BindStmt pat' expr' src_loc)		`thenRn` \ (result, fvs) -> 
-    returnRn (result, fv_expr `plusFV` fvs `plusFV` fv_pat)
+    rn_expr expr				`thenRn` \ (expr', fv_expr) ->
+    bindLocalsFVRn doc binders			$ \ new_binders ->
+    rnPat pat					`thenRn` \ (pat', fv_pat) ->
+    thing_inside (BindStmt pat' expr' src_loc)	`thenRn` \ ((rest_binders, result), fvs) ->
+    -- ZZ is shadowing handled correctly?
+    returnRn ((rest_binders ++ new_binders, result),
+	      fv_expr `plusFV` fvs `plusFV` fv_pat)
   where
     binders = collectPatBinders pat
     doc = text "a pattern in do binding" 
@@ -587,8 +605,9 @@ rnStmt rn_expr (ReturnStmt expr) thing_inside
     returnRn (result, fv_expr `plusFV` fvs)
 
 rnStmt rn_expr (LetStmt binds) thing_inside
-  = rnBinds binds		$ \ binds' ->
+  = rnBinds binds				$ \ binds' ->
     thing_inside (LetStmt binds')
+
 \end{code}
 
 %************************************************************************

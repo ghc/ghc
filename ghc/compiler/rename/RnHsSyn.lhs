@@ -81,8 +81,6 @@ extractHsTyNames ty
 				   	 `unionNameSets` extractHsTyNames_s tys
     get (HsFunTy ty1 ty2)      = get ty1 `unionNameSets` get ty2
     get (HsPredTy p)	       = extractHsPredTyNames p
-    get (HsUsgForAllTy uv ty)  = get ty
-    get (HsUsgTy u ty)         = get ty
     get (HsOpTy ty1 tycon ty2) = get ty1 `unionNameSets` get ty2 `unionNameSets`
 				 unitNameSet tycon
     get (HsNumTy n)            = emptyNameSet

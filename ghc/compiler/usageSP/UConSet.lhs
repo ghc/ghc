@@ -9,24 +9,30 @@ February 1998 .. April 1999.
 Keith Wansbrough 1998-02-16..1999-04-29
 
 \begin{code}
-module UConSet ( UConSet, 
+module UConSet ( {- SEE BELOW:  -- KSW 2000-10-13
+                 UConSet, 
                  emptyUConSet,
                  eqManyUConSet,
 		 eqUConSet,
 		 leqUConSet,
                  unionUCS,
 		 unionUCSs,
-                 solveUCS,
+                 solveUCS,  -}
 	       ) where
 
 #include "HsVersions.h"
 
 import VarEnv
-import Type		( UsageAnn(..) )
-import Var		( UVar )
 import Bag              ( Bag, unitBag, emptyBag, unionBags, foldlBag, bagToList )
 import Outputable
 import PprType
+
+{- ENTIRE FILE COMMENTED OUT FOR NOW  -- KSW 2000-10-13
+
+   This monomorphic version of the analysis is outdated.  I'm
+   currently ripping out the old one and inserting the new one.  For
+   now, I'm simply commenting out this entire file.
+
 \end{code}
 
 ======================================================================
@@ -334,6 +340,8 @@ instance Outputable UConSet where
   ppr (UConFail d)
     = hang (text "UConSet inconsistent:")
         4 d
+
+END OF ENTIRELY-COMMENTED-OUT FILE   -- KSW 2000-10-13 -}
 \end{code}
 
 ======================================================================

@@ -24,7 +24,7 @@ import HsCore
 import RnBinds		( rnTopBinds, rnMethodBinds, renameSigs, renameSigsFVs )
 import RnEnv		( lookupTopBndrRn, lookupOccRn, newIPName, lookupIfaceName,
 			  lookupOrigNames, lookupSysBinder, newLocalsRn,
-			  bindLocalsFVRn, bindUVarRn,
+			  bindLocalsFVRn, 
 			  bindTyVarsRn, bindTyVars2Rn,
 			  bindTyVarsFV2Rn, extendTyVarEnvFVRn,
 			  bindCoreLocalRn, bindCoreLocalsRn, bindLocalNames,
@@ -36,7 +36,7 @@ import Class		( FunDep, DefMeth (..) )
 import Name		( Name, OccName, nameOccName, NamedThing(..) )
 import NameSet
 import PrelInfo		( derivableClassKeys, cCallishClassKeys )
-import PrelNames	( deRefStablePtr_RDR, makeStablePtr_RDR,
+import PrelNames	( deRefStablePtr_RDR, newStablePtr_RDR,
 			  bindIO_RDR, returnIO_RDR
 			)
 import List		( partition, nub )
@@ -131,7 +131,7 @@ rnDecl (ForD (ForeignDecl name imp_exp ty ext_nm cconv src_loc))
     lookupOccRn name		        `thenRn` \ name' ->
     let 
 	extra_fvs FoExport 
-	  | isDyn = lookupOrigNames [makeStablePtr_RDR, deRefStablePtr_RDR,
+	  | isDyn = lookupOrigNames [newStablePtr_RDR, deRefStablePtr_RDR,
 				     bindIO_RDR, returnIO_RDR]
 	  | otherwise =
 		lookupOrigNames [bindIO_RDR, returnIO_RDR] `thenRn` \ fvs ->
@@ -612,23 +612,6 @@ rnHsType doc (HsAppTy ty1 ty2)
 rnHsType doc (HsPredTy pred)
   = rnPred doc pred	`thenRn` \ pred' ->
     returnRn (HsPredTy pred')
-
-rnHsType doc (HsUsgForAllTy uv_rdr ty)
-  = bindUVarRn uv_rdr		$ \ uv_name ->
-    rnHsType doc ty     	`thenRn` \ ty' ->
-    returnRn (HsUsgForAllTy uv_name ty')
-
-rnHsType doc (HsUsgTy usg ty)
-  = newUsg usg                      `thenRn` \ usg' ->
-    rnHsType doc ty                 `thenRn` \ ty' ->
-	-- A for-all can occur inside a usage annotation
-    returnRn (HsUsgTy usg' ty')
-  where
-    newUsg usg = case usg of
-                   HsUsOnce       -> returnRn HsUsOnce
-                   HsUsMany       -> returnRn HsUsMany
-                   HsUsVar uv_rdr -> lookupOccRn uv_rdr `thenRn` \ uv_name ->
-                                     returnRn (HsUsVar uv_name)
 
 rnHsTypes doc tys = mapRn (rnHsType doc) tys
 \end{code}

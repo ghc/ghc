@@ -451,7 +451,9 @@ pprDo ListComp stmts
 
 \begin{code}
 data Stmt id pat
-  = BindStmt	pat
+  = ParStmt	[[Stmt id pat]]		-- List comp only: parallel set of quals
+  | ParStmtOut	[([id], [Stmt id pat])]	-- PLC after renaming
+  | BindStmt	pat
 		(HsExpr id pat)
 		SrcLoc
 
@@ -475,6 +477,10 @@ instance (Outputable id, Outputable pat) =>
 		Outputable (Stmt id pat) where
     ppr stmt = pprStmt stmt
 
+pprStmt (ParStmt stmtss)
+ = hsep (map (\stmts -> ptext SLIT("| ") <> ppr stmts) stmtss)
+pprStmt (ParStmtOut stmtss)
+ = hsep (map (\stmts -> ptext SLIT("| ") <> ppr stmts) stmtss)
 pprStmt (BindStmt pat expr _)
  = hsep [ppr pat, ptext SLIT("<-"), ppr expr]
 pprStmt (LetStmt binds)

@@ -33,7 +33,7 @@ import Id		( Id, mkId, mkVanillaId, isDataConWrapId_maybe )
 import MkId		( mkCCallOpId )
 import IdInfo
 import DataCon		( dataConSig, dataConArgTys )
-import Type		( mkTyVarTys, splitAlgTyConApp_maybe, unUsgTy )
+import Type		( mkTyVarTys, splitAlgTyConApp_maybe )
 import Var		( mkTyVar, tyVarKind )
 import Name		( Name, isLocallyDefined )
 import Demand		( wwLazy )
@@ -212,7 +212,7 @@ tcCoreExpr (UfTuple (HsTupCon name _) args)
     mapTc tcCoreExpr args	`thenTc` \ args' ->
     let
 	-- Put the missing type arguments back in
-	con_args = map (Type . unUsgTy . exprType) args' ++ args'
+	con_args = map (Type . exprType) args' ++ args'
     in
     returnTc (mkApps (Var con_id) con_args)
 
@@ -254,8 +254,8 @@ tcCoreExpr (UfNote note expr)
   = tcCoreExpr expr		`thenTc` \ expr' ->
     case note of
 	UfCoerce to_ty -> tcHsType to_ty	`thenTc` \ to_ty' ->
-			  returnTc (Note (Coerce (unUsgTy to_ty')
-                                                 (unUsgTy (exprType expr'))) expr')
+			  returnTc (Note (Coerce to_ty'
+                                                 (exprType expr')) expr')
 	UfInlineCall   -> returnTc (Note InlineCall expr')
 	UfInlineMe     -> returnTc (Note InlineMe   expr')
 	UfSCC cc       -> returnTc (Note (SCC cc)   expr')

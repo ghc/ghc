@@ -16,7 +16,7 @@ module HsCore (
 	UfBinding(..), UfConAlt(..),
 	HsIdInfo(..), pprHsIdInfo, 
 
-	eq_ufExpr, eq_ufBinders, pprUfExpr,
+	eq_ufExpr, eq_ufBinders, pprUfExpr, pprHsIdInfo,
 
 	toUfExpr, toUfBndr, ufBinderName
     ) where
@@ -25,9 +25,9 @@ module HsCore (
 
 -- friends:
 import HsTypes		( HsType, pprParendHsType, pprHsTyVarBndr, toHsType,
-			  HsTupCon(..), hsTupParens,
+			  HsTupCon(..), EqHsEnv, hsTupParens,
 			  emptyEqHsEnv, extendEqHsEnv, eqListBy, 
-			  eq_hsType, eq_hsVar, eq_hsVars
+			  eq_hsType, eq_hsVars
 			)
 
 -- others:
@@ -36,7 +36,9 @@ import Var		( varType, isId )
 import IdInfo		( ArityInfo, InlinePragInfo, 
 			  pprInlinePragInfo, ppArityInfo, ppStrictnessInfo
 			)
-import Name		( Name, getName )
+import Name		( Name, NamedThing(..), getName, toRdrName )
+import RdrName		( RdrName, rdrNameOcc )
+import OccName		( isTvOcc )
 import CoreSyn
 import CostCentre	( pprCostCentreCore )
 import PrimOp		( PrimOp(CCallOp) )
@@ -46,6 +48,7 @@ import PrimOp		( CCall, pprCCallOp )
 import DataCon		( dataConTyCon )
 import TyCon		( isTupleTyCon, tupleTyConBoxity )
 import Type		( Kind )
+import FiniteMap	( lookupFM )
 import CostCentre
 import Outputable
 \end{code}
@@ -179,13 +182,21 @@ toUfVar v = case isPrimOpId_maybe v of
 %************************************************************************
 
 \begin{code}
-instance Outputable name => Outputable (UfExpr name) where
+instance (NamedThing name, Outputable name) => Outputable (UfExpr name) where
     ppr e = pprUfExpr noParens e
+
+
+-- Small-hack alert: this instance allows us to do a getOccName on RdrNames.
+-- Important because we want to pretty-print UfExprs, and we have to
+-- print an '@' before tyvar-binders in a case alternative.
+instance NamedThing RdrName where
+    getOccName n = rdrNameOcc n
+    getName n	 = pprPanic "instance NamedThing RdrName" (ppr n)
 
 noParens :: SDoc -> SDoc
 noParens pp = pp
 
-pprUfExpr :: Outputable name => (SDoc -> SDoc) -> UfExpr name -> SDoc
+pprUfExpr :: (NamedThing name, Outputable name) => (SDoc -> SDoc) -> UfExpr name -> SDoc
 	-- The function adds parens in context that need
 	-- an atomic value (e.g. function args)
 
@@ -206,9 +217,13 @@ pprUfExpr add_par (UfCase scrut bndr alts)
 		       braces (hsep (map pp_alt alts))])
       where
 	pp_alt (UfTupleAlt tup_con, bs, rhs) = hsTupParens tup_con (interpp'SP bs) <+> ppr_rhs rhs
-	pp_alt (c,		    bs, rhs) = ppr c <+> interppSP bs <+> ppr_rhs rhs
+	pp_alt (c,		    bs, rhs) = ppr c <+> hsep (map pp_bndr bs) <+> ppr_rhs rhs
 
         ppr_rhs rhs = ptext SLIT("->") <+> pprUfExpr noParens rhs <> semi
+
+	-- This use of getOccName is the sole reason for the NamedThing in pprUfExpr's type
+	pp_bndr v   | isTvOcc (getOccName v) = char '@' <+> ppr v
+		    | otherwise		     = ppr v
 
 pprUfExpr add_par (UfLet (UfNonRec b rhs) body)
       = add_par (hsep [ptext SLIT("let"), 
@@ -222,6 +237,7 @@ pprUfExpr add_par (UfLet (UfRec pairs) body)
 	pp_pair (b,rhs) = ppr b <+> equals <+> pprUfExpr noParens rhs <> semi
 
 pprUfExpr add_par (UfNote note body) = add_par (ppr note <+> pprUfExpr parens body)
+
 
 collectUfBndrs :: UfExpr name -> ([UfBinder name], UfExpr name)
 collectUfBndrs expr
@@ -254,8 +270,26 @@ instance Outputable name => Outputable (UfBinder name) where
 %*									*
 %************************************************************************
 
+	----------------------------------------
+			HACK ALERT
+	----------------------------------------
+
+Whe comparing UfExprs, we compare names by converting to RdrNames and comparing
+those.  Reason: this is used when comparing ufoldings in interface files, and the
+uniques can differ.  Converting to RdrNames makes it more like comparing the file
+contents directly.  But this is bad: version numbers can change when only alpha-conversion
+has happened. 
+
+	The hack shows up in eq_ufVar
+	There are corresponding getOccName calls in MkIface.diffDecls
+
+	----------------------------------------
+			END OF HACK ALERT
+	----------------------------------------
+
+
 \begin{code}
-instance Ord name => Eq (UfExpr name) where
+instance (NamedThing name, Ord name) => Eq (UfExpr name) where
   (==) a b = eq_ufExpr emptyEqHsEnv a b
 
 -----------------
@@ -271,7 +305,17 @@ eq_ufBinders env (b1:bs1) (b2:bs2) k = eq_ufBinder env b1 b2 (\env -> eq_ufBinde
 eq_ufBinders env _	  _	   _ = False
 
 -----------------
-eq_ufExpr env (UfVar v1)	(UfVar v2)	  = eq_hsVar env v1 v2
+eq_ufVar :: (NamedThing name, Ord name) => EqHsEnv name -> name -> name -> Bool
+-- Compare *Rdr* names.  A real hack to avoid gratuitous 
+-- differences when comparing interface files
+eq_ufVar env n1 n2 = case lookupFM env n1 of
+		       Just n1 -> toRdrName n1 == toRdrName n2
+		       Nothing -> toRdrName n1 == toRdrName n2
+
+
+-----------------
+eq_ufExpr :: (NamedThing name, Ord name) => EqHsEnv name -> UfExpr name -> UfExpr name -> Bool
+eq_ufExpr env (UfVar v1)	(UfVar v2)	  = eq_ufVar env v1 v2
 eq_ufExpr env (UfLit l1)        (UfLit l2) 	  = l1 == l2
 eq_ufExpr env (UfLitLit l1 ty1) (UfLitLit l2 ty2) = l1==l2 && eq_hsType env ty1 ty2
 eq_ufExpr env (UfCCall c1 ty1)  (UfCCall c2 ty2)  = c1==c2 && eq_hsType env ty1 ty2
@@ -324,8 +368,9 @@ eq_ufConAlt env _ _ = False
 %************************************************************************
 
 \begin{code}
+pprHsIdInfo :: (NamedThing n, Outputable n) => [HsIdInfo n] -> SDoc
 pprHsIdInfo []   = empty
-pprHsIdInfo info = ptext SLIT("{-##") <+> hsep (map ppr info) <+> ptext SLIT("##-}")
+pprHsIdInfo info = ptext SLIT("{-##") <+> hsep (map ppr_hs_info info) <+> ptext SLIT("##-}")
 
 data HsIdInfo name
   = HsArity		ArityInfo
@@ -338,12 +383,11 @@ data HsIdInfo name
 -- NB: Specialisations and rules come in separately and are
 -- only later attached to the Id.  Partial reason: some are orphans.
 
-instance Outputable name => Outputable (HsIdInfo name) where
-  ppr (HsUnfold prag unf) = ptext SLIT("__U") <> pprInlinePragInfo prag <+> parens (ppr unf)
-  ppr (HsArity arity)     = ppArityInfo arity
-  ppr (HsStrictness str)  = ptext SLIT("__S") <+> ppStrictnessInfo str
-  ppr HsNoCafRefs	  = ptext SLIT("__C")
-  ppr HsCprInfo		  = ptext SLIT("__M")
-  ppr (HsWorker w)	  = ptext SLIT("__P") <+> ppr w
+ppr_hs_info (HsUnfold prag unf) = ptext SLIT("__U") <> pprInlinePragInfo prag <+> parens (pprUfExpr noParens unf)
+ppr_hs_info (HsArity arity)     = ppArityInfo arity
+ppr_hs_info (HsStrictness str)  = ptext SLIT("__S") <+> ppStrictnessInfo str
+ppr_hs_info HsNoCafRefs		= ptext SLIT("__C")
+ppr_hs_info HsCprInfo		= ptext SLIT("__M")
+ppr_hs_info (HsWorker w)	= ptext SLIT("__P") <+> ppr w
 \end{code}
 

@@ -55,9 +55,9 @@ import IdInfo		( LBVarInfo(..),
 			  megaSeqIdInfo )
 import Demand		( appIsBottom )
 import Type		( Type, mkFunTy, mkForAllTy,
-			  splitFunTy_maybe, 
-                          isNotUsgTy, mkUsgTy, unUsgTy, UsageAnn(..),
-			  applyTys, isUnLiftedType, seqType
+			  splitFunTy_maybe, tyVarsOfType, tyVarsOfTypes,
+			  applyTys, isUnLiftedType, seqType,
+                          mkUTy
 			)
 import TysWiredIn	( boolTy, trueDataCon, falseDataCon )
 import CostCentre	( CostCentre )
@@ -81,7 +81,6 @@ exprType (Lit lit)		= literalType lit
 exprType (Let _ body)	   	= exprType body
 exprType (Case _ _ alts)        = coreAltsType alts
 exprType (Note (Coerce ty _) e) = ty  -- **! should take usage from e
-exprType (Note (TermUsg u) e)   = mkUsgTy u (unUsgTy (exprType e))
 exprType (Note other_note e)    = exprType e
 exprType (Lam binder expr)      = mkPiType binder (exprType expr)
 exprType e@(App _ _)
@@ -102,8 +101,8 @@ case of a term variable.
 \begin{code}
 mkPiType :: Var -> Type -> Type		-- The more polymorphic version doesn't work...
 mkPiType v ty | isId v    = (case idLBVarInfo v of
-                               IsOneShotLambda -> mkUsgTy UsOnce
-                               otherwise       -> id) $
+                               LBVarInfo u -> mkUTy u
+                               otherwise   -> id) $
                             mkFunTy (idType v) ty
 	      | isTyVar v = mkForAllTy v ty
 \end{code}
@@ -115,9 +114,6 @@ applyTypeToArgs e op_ty [] = op_ty
 
 applyTypeToArgs e op_ty (Type ty : args)
   =	-- Accumulate type arguments so we can instantiate all at once
-    ASSERT2( all isNotUsgTy tys, 
-	     ppr e <+> text "of" <+> ppr op_ty <+> text "to" <+> 
-	     ppr (Type ty : args) <+> text "i.e." <+> ppr tys )
     applyTypeToArgs e (applyTys op_ty tys) rest_args
   where
     (tys, rest_args)        = go [ty] args
@@ -699,7 +695,6 @@ noteSize (SCC cc)       = cc `seq` 1
 noteSize (Coerce t1 t2) = seqType t1 `seq` seqType t2 `seq` 1
 noteSize InlineCall     = 1
 noteSize InlineMe       = 1
-noteSize (TermUsg usg)  = usg `seq` 1
 
 varSize :: Var -> Int
 varSize b  | isTyVar b = 1

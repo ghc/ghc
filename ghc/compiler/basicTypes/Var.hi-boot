@@ -6,6 +6,5 @@ _declarations_
 -- Used by Name
 1 type Id = Var ;
 1 type TyVar = Var ;
-1 type UVar = Var ;
 1 data Var ;
 1 setIdName _:_ Id -> Name.Name -> Id ;;

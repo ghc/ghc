@@ -21,6 +21,7 @@ module CmdLineOpts (
 	isStaticHscFlag,
 
 	opt_PprStyle_NoPrags,
+	opt_PprStyle_RawTypes,
 	opt_PprUserLength,
 	opt_PprStyle_Debug,
 
@@ -373,6 +374,7 @@ unpacked_opts =
 -- debugging opts
 opt_PprStyle_NoPrags		= lookUp  SLIT("-dppr-noprags")
 opt_PprStyle_Debug		= lookUp  SLIT("-dppr-debug")
+opt_PprStyle_RawTypes		= lookUp  SLIT("-dppr-rawtypes")
 opt_PprUserLength	        = lookup_def_int "-dppr-user-length" 5 --ToDo: give this a name
 
 -- profiling opts

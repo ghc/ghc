@@ -27,7 +27,9 @@ import IdInfo		( IdInfo, megaSeqIdInfo,
 			  arityInfo, ppArityInfo, ppFlavourInfo, flavourInfo,
 			  specInfo, cprInfo, ppCprInfo, 
 			  strictnessInfo, ppStrictnessInfo, cafInfo, ppCafInfo,
-			  workerInfo, ppWorkerInfo
+			  cprInfo, ppCprInfo, lbvarInfo,
+			  workerInfo, ppWorkerInfo,
+                          tyGenInfo, ppTyGenInfo
 			)
 import DataCon		( dataConTyCon )
 import TyCon		( tupleTyConBoxity, isTupleTyCon )
@@ -269,13 +271,6 @@ ppr_expr add_par pe (Note InlineCall expr)
 ppr_expr add_par pe (Note InlineMe expr)
   = add_par $ ptext SLIT("__inline_me") <+> ppr_parend_expr pe expr
 
-ppr_expr add_par pe (Note (TermUsg u) expr)
-  = getPprStyle $ \ sty ->
-    if ifaceStyle sty then
-      ppr_expr add_par pe expr
-    else
-      add_par (ppr u <+> ppr_noparend_expr pe expr)
-
 ppr_case_pat pe con@(DataAlt dc) args
   | isTupleTyCon tc
   = tupleParens (tupleTyConBoxity tc) (hsep (punctuate comma (map ppr_bndr args))) <+> arrow
@@ -339,6 +334,7 @@ ppIdInfo b info
   = hsep [
 	    ppFlavourInfo (flavourInfo info),
 	    ppArityInfo a,
+            ppTyGenInfo g,
 	    ppWorkerInfo (workerInfo info),
 	    ppStrictnessInfo s,
 	    ppCafInfo c,
@@ -350,6 +346,7 @@ ppIdInfo b info
 	]
   where
     a = arityInfo info
+    g = tyGenInfo info
     s = strictnessInfo info
     c = cafInfo info
     m = cprInfo info

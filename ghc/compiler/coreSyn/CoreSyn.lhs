@@ -49,7 +49,7 @@ module CoreSyn (
 
 import CostCentre	( CostCentre, noCostCentre )
 import Var		( Var, Id, TyVar, isTyVar, isId )
-import Type		( Type, UsageAnn, mkTyVarTy, seqType )
+import Type		( Type, mkTyVarTy, seqType )
 import Literal	        ( Literal, mkMachInt )
 import DataCon		( DataCon, dataConId )
 import VarSet
@@ -103,9 +103,6 @@ data Note
 
   | InlineMe		-- Instructs simplifer to treat the enclosed expression
 			-- as very small, and inline it at its call sites
-
-  | TermUsg             -- A term-level usage annotation
-        UsageAnn        -- (should not be a variable except during UsageSP inference)
 \end{code}
 
 

@@ -635,24 +635,29 @@ tryRhsTyLam rhs thing_inside		-- Only does something if there's a let
 		-- where x* has an INLINE prag on it.  Now, once x* is inlined,
 		-- the occurrences of x' will be just the occurrences originally
 		-- pinned on x.
-		-- 	   poly_info = vanillaIdInfo `setOccInfo` idOccInfo var
 	in
 	returnSmpl (poly_id, mkTyApps (Var poly_id) (mkTyVarTys tyvars_here))
 
-    mk_silly_bind var rhs = NonRec var rhs
+    mk_silly_bind var rhs = NonRec var (Note InlineMe rhs)
 		-- Suppose we start with:
 		--
-		--	x = let g = /\a -> \x -> f x x
-		--	    in 
-		--	    /\ b -> let g* = g b in E
+		--	x = /\ a -> let g = G in E
 		--
-		-- Then: 	* the binding for g gets floated out
-		-- 		* but then it MIGHT get inlined into the rhs of g*
-		--		* then the binding for g* is floated out of the /\b
-		--		* so we're back to square one
-		-- We rely on the simplifier not to inline g into the RHS of g*,
-		-- because it's a "lone" occurrence, and there is no benefit in
-		-- inlining.  But it's a slightly delicate property; hence this comment
+		-- Then we'll float to get
+		--
+		--	x = let poly_g = /\ a -> G
+		--	    in /\ a -> let g = poly_g a in E
+		--
+		-- But now the occurrence analyser will see just one occurrence
+		-- of poly_g, not inside a lambda, so the simplifier will
+		-- PreInlineUnconditionally poly_g back into g!  Badk to square 1!
+		-- (I used to think that the "don't inline lone occurrences" stuff
+		--  would stop this happening, but since it's the *only* occurrence,
+		--  PreInlineUnconditionally kicks in first!)
+		--
+		-- Solution: put an INLINE note on g's RHS, so that poly_g seems
+		--	     to appear many times.  (NB: mkInlineMe eliminates
+		--	     such notes on trivial RHSs, so do it manually.)
 \end{code}
 
 

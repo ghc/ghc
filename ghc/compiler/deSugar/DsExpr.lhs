@@ -38,7 +38,6 @@ import DataCon		( isExistentialDataCon )
 import Literal		( Literal(..) )
 import Type		( splitFunTys,
 			  splitAlgTyConApp, splitAlgTyConApp_maybe, splitTyConApp_maybe, 
-			  isNotUsgTy, unUsgTy,
 			  splitAppTy, isUnLiftedType, Type
 			)
 import TysWiredIn	( tupleCon, listTyCon, charDataCon, intDataCon, isIntegerTy )
@@ -285,14 +284,12 @@ dsExpr (ExplicitListOut ty xs)
     go []     = returnDs (mkNilExpr ty)
     go (x:xs) = dsExpr x				`thenDs` \ core_x ->
 		go xs					`thenDs` \ core_xs ->
-                ASSERT( isNotUsgTy ty )
 		returnDs (mkConsExpr ty core_x core_xs)
 
 dsExpr (ExplicitTuple expr_list boxity)
   = mapDs dsExpr expr_list	  `thenDs` \ core_exprs  ->
     returnDs (mkConApp (tupleCon boxity (length expr_list))
-	    	       (map (Type . unUsgTy . exprType) core_exprs ++ core_exprs))
-                -- the above unUsgTy is *required* -- KSW 1999-04-07
+	    	       (map (Type .  exprType) core_exprs ++ core_exprs))
 
 dsExpr (ArithSeqOut expr (From from))
   = dsExpr expr		  `thenDs` \ expr2 ->
@@ -498,8 +495,7 @@ dsDo do_or_lc stmts return_id then_id fail_id result_ty
 	go (GuardStmt expr locn : stmts)
 	  = do_expr expr locn			`thenDs` \ expr2 ->
 	    go stmts				`thenDs` \ rest ->
-	    let msg = ASSERT( isNotUsgTy b_ty )
-                      "Pattern match failure in do expression, " ++ showSDoc (ppr locn)
+	    let msg = "Pattern match failure in do expression, " ++ showSDoc (ppr locn)
 	    in
 	    mkStringLit msg			`thenDs` \ core_msg ->
 	    returnDs (mkIfThenElse expr2 
@@ -532,9 +528,7 @@ dsDo do_or_lc stmts return_id then_id fail_id result_ty
 		(_, a_ty)  = splitAppTy (exprType expr2) -- Must be of form (m a)
 		fail_expr  = HsApp (TyApp (HsVar fail_id) [b_ty])
                                    (HsLit (HsString (_PK_ msg)))
-	        msg = ASSERT2( isNotUsgTy a_ty, ppr a_ty )
-                      ASSERT2( isNotUsgTy b_ty, ppr b_ty )
-                      "Pattern match failure in do expression, " ++ showSDoc (ppr locn)
+	        msg = "Pattern match failure in do expression, " ++ showSDoc (ppr locn)
 		main_match = mkSimpleMatch [pat] 
 					   (HsDoOut do_or_lc stmts return_id then_id
                                                     fail_id result_ty locn)

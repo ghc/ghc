@@ -44,8 +44,8 @@ module TcType (
 -- friends:
 import TypeRep		( Type(..), Kind, TyNote(..) )  -- friend
 import Type		( PredType(..),
-			  getTyVar, mkAppTy,
-			  splitPredTy_maybe, splitForAllTys, isNotUsgTy,
+			  getTyVar, mkAppTy, mkUTy,
+			  splitPredTy_maybe, splitForAllTys, 
 			  isTyVarTy, mkTyVarTy, mkTyVarTys, 
 			  openTypeKind, boxedTypeKind, 
 			  superKind, superBoxity, 
@@ -92,6 +92,7 @@ tcSplitRhoTy t
 				  case maybe_ty of
 				    Just ty | not (isTyVarTy ty) -> go syn_t ty ts
 				    other			 -> returnNF_Tc (reverse ts, syn_t)
+    go syn_t (UsageTy _ t)   ts = go syn_t t ts
     go syn_t t		     ts = returnNF_Tc (reverse ts, syn_t)
 \end{code}
 
@@ -206,7 +207,8 @@ tcGetTyVar :: TcTyVar -> NF_TcM (Maybe TcType)
 Putting is easy:
 
 \begin{code}
-tcPutTyVar tyvar ty = tcWriteMutTyVar tyvar (Just ty)	`thenNF_Tc_`
+tcPutTyVar tyvar ty = UASSERT2( not (isUTy ty), ppr tyvar <+> ppr ty )
+                      tcWriteMutTyVar tyvar (Just ty)	`thenNF_Tc_`
 		      returnNF_Tc ty
 \end{code}
 
@@ -401,12 +403,6 @@ zonkType unbound_var_fn ty
 
     go (NoteTy (FTVNote _) ty2)   = go ty2	-- Discard free-tyvar annotations
 
-    go (NoteTy (UsgNote usg) ty2) = go ty2		`thenNF_Tc` \ ty2' ->
-				    returnNF_Tc (NoteTy (UsgNote usg) ty2')
-
-    go (NoteTy (UsgForAll uv) ty2)= go ty2		`thenNF_Tc` \ ty2' ->
-				    returnNF_Tc (NoteTy (UsgForAll uv) ty2')
-
     go (PredTy p)		  = go_pred p		`thenNF_Tc` \ p' ->
 				    returnNF_Tc (PredTy p')
 
@@ -417,6 +413,10 @@ zonkType unbound_var_fn ty
     go (AppTy fun arg)	 	  = go fun		`thenNF_Tc` \ fun' ->
 				    go arg		`thenNF_Tc` \ arg' ->
 				    returnNF_Tc (mkAppTy fun' arg')
+
+    go (UsageTy u ty)             = go u                `thenNF_Tc` \ u'  ->
+                                    go ty               `thenNF_Tc` \ ty' ->
+                                    returnNF_Tc (mkUTy u' ty')
 
 	-- The two interesting cases!
     go (TyVarTy tyvar)     = zonkTyVar unbound_var_fn tyvar
@@ -443,7 +443,6 @@ zonkTyVar unbound_var_fn tyvar
   =  tcGetTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
      case maybe_ty of
 	  Nothing	-> unbound_var_fn tyvar			-- Mutable and unbound
-	  Just other_ty	-> ASSERT( isNotUsgTy other_ty )
-                           zonkType unbound_var_fn other_ty	-- Bound
+	  Just other_ty	-> zonkType unbound_var_fn other_ty	-- Bound
 \end{code}
 

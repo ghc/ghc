@@ -19,7 +19,7 @@ import HsSyn		( HsDecl(..), TyClDecl(..),
 			  isIfaceSigDecl, isClassDecl, isSynDecl, isClassOpSig
 			)
 import RnHsSyn		( RenamedHsDecl, RenamedTyClDecl, tyClDeclFVs )
-import BasicTypes	( RecFlag(..), NewOrData(..) )
+import BasicTypes	( RecFlag(..), NewOrData(..), isRec )
 
 import TcMonad
 import TcEnv		( TcEnv, RecTcEnv, TcTyThing(..), TyThing(..), TyThingDetails(..),
@@ -103,9 +103,17 @@ Step 4: 	buildTyConOrClass
 Step 5: 	tcTyClDecl1
 	In this environment, walk over the decls, constructing the TyCons and Classes.
 	This uses in a strict way items (a)-(c) above, which is why they must
-	be constructed in Step 4.
-	Feed the results back to Step 4.
+	be constructed in Step 4. Feed the results back to Step 4.
+	For this step, pass the is-recursive flag as the wimp-out flag
+	to tcTyClDecl1.
 	
+
+Step 6:		tcTyClDecl1 again
+	For a recursive group only, check all the decls again, just
+	but this time with the wimp flag off.  Now we can check things
+	like whether a function argument is an unboxed tuple, looking
+	through type synonyms properly.  We can't do that in Step 5.
+
 The knot-tying parameters: @rec_details_list@ is an alist mapping @Name@s to
 @TyThing@s.  @rec_vrcs@ is a finite map from @Name@s to @ArgVrcs@s.
 
@@ -144,11 +152,23 @@ tcGroup unf_env scc
             rec_vrcs    = calcTyConArgVrcs [tc | (_, ATyCon tc) <- all_tyclss]
 	in
 		-- Step 5
-	tcExtendGlobalEnv all_tyclss		$
-	mapTc (tcTyClDecl1 unf_env) decls	`thenTc` \ tycls_details ->
-	tcGetEnv				`thenNF_Tc` \ env -> 
+	tcExtendGlobalEnv all_tyclss			$
+	mapTc (tcTyClDecl1 is_rec unf_env) decls	`thenTc` \ tycls_details ->
+
+		-- Return results
+	tcGetEnv					`thenNF_Tc` \ env -> 
 	returnTc (tycls_details, env)
     )						`thenTc` \ (_, env) ->
+
+	-- Step 6
+	-- For a recursive group, check all the types again,
+	-- this time with the wimp flag off
+    (if isRec is_rec then
+	tcSetEnv env (mapTc_ (tcTyClDecl1 NonRecursive unf_env) decls)
+     else
+	returnTc ()
+    )						`thenTc_`
+
     returnTc env
   where
     is_rec = case scc of
@@ -159,12 +179,9 @@ tcGroup unf_env scc
 		AcyclicSCC decl -> [decl]
 		CyclicSCC decls -> decls
 
-tcTyClDecl1 unf_env decl
-  = tcAddDeclCtxt decl			$
-    if isClassDecl decl then
-	tcClassDecl1 unf_env decl
-    else
-	tcTyDecl1 decl
+tcTyClDecl1 is_rec unf_env decl
+  | isClassDecl decl = tcAddDeclCtxt decl (tcClassDecl1 is_rec unf_env decl)
+  | otherwise	     = tcAddDeclCtxt decl (tcTyDecl1    is_rec         decl)
 \end{code}
 
 
@@ -221,7 +238,7 @@ kcTyClDecl decl@(TySynonym tycon_name hs_tyvars rhs loc)
     kcHsType rhs			`thenTc` \ rhs_kind ->
     unifyKind result_kind rhs_kind
 
-kcTyClDecl decl@(TyData _ context tycon_name hs_tyvars con_decls _ _ loc _ _)
+kcTyClDecl decl@(TyData new_or_data context tycon_name hs_tyvars con_decls _ _ loc _ _)
   = tcAddDeclCtxt decl			$
     kcTyClDeclBody tycon_name hs_tyvars	$ \ result_kind ->
     kcHsContext context			`thenTc_` 
@@ -231,7 +248,7 @@ kcTyClDecl decl@(TyData _ context tycon_name hs_tyvars con_decls _ _ loc _ _)
       = tcAddSrcLoc loc			$
 	kcHsTyVars ex_tvs		`thenNF_Tc` \ kind_env ->
 	tcExtendKindEnv kind_env	$
-	kcConDetails ex_ctxt details
+	kcConDetails new_or_data ex_ctxt details
 
 kcTyClDecl decl@(ClassDecl context class_name
 			   hs_tyvars fundeps class_sigs
@@ -406,7 +423,6 @@ mkClassEdges :: RenamedTyClDecl -> Maybe (RenamedTyClDecl, Name, [Name])
 mkClassEdges decl@(ClassDecl ctxt name _ _ _ _ _ _) = Just (decl, name, [c | HsPClass c _ <- ctxt])
 mkClassEdges other_decl				    = Nothing
 
-----------------------------------------------------
 mkEdges :: RenamedTyClDecl -> (RenamedTyClDecl, Name, [Name])
 mkEdges decl = (decl, tyClDeclName decl, tyClDeclFTVs decl)
 \end{code}

@@ -14,14 +14,14 @@ module TcTyDecls (
 
 import HsSyn		( MonoBinds(..), 
 			  TyClDecl(..), ConDecl(..), ConDetails(..), BangType(..),
-			  getBangType
+			  getBangType, conDetailsTys
 			)
 import RnHsSyn		( RenamedTyClDecl, RenamedConDecl, RenamedContext )
 import TcHsSyn		( TcMonoBinds, idsToMonoBinds )
-import BasicTypes	( NewOrData(..) )
+import BasicTypes	( NewOrData(..), RecFlag )
 
-import TcMonoType	( tcHsType, tcHsSigType, tcHsBoxedSigType, tcHsTyVars, tcClassContext,
-			  kcHsContext, kcHsSigType
+import TcMonoType	( tcHsRecType, tcHsTyVars, tcRecClassContext,
+			  kcHsContext, kcHsSigType, kcHsBoxedSigType
 			)
 import TcEnv		( tcExtendTyVarEnv, 
 			  tcLookupTyCon, tcLookupGlobalId, 
@@ -60,12 +60,12 @@ import ListSetOps	( equivClasses )
 %************************************************************************
 
 \begin{code}
-tcTyDecl1 :: RenamedTyClDecl -> TcM (Name, TyThingDetails)
-tcTyDecl1 (TySynonym tycon_name tyvar_names rhs src_loc)
+tcTyDecl1 :: RecFlag -> RenamedTyClDecl -> TcM (Name, TyThingDetails)
+tcTyDecl1 is_rec (TySynonym tycon_name tyvar_names rhs src_loc)
   = tcLookupTyCon tycon_name			`thenNF_Tc` \ tycon ->
     tcExtendTyVarEnv (tyConTyVars tycon)	$
-    tcHsType rhs				`thenTc` \ rhs_ty ->
-	-- Note tcHsType not tcHsSigType; we allow type synonyms
+    tcHsRecType is_rec rhs			`thenTc` \ rhs_ty ->
+	-- Note tcHsRecType not tcHsRecSigType; we allow type synonyms
 	-- that aren't types; e.g.  type List = []
 	--
 	-- If the RHS mentions tyvars that aren't in scope, we'll 
@@ -79,7 +79,7 @@ tcTyDecl1 (TySynonym tycon_name tyvar_names rhs src_loc)
 
     returnTc (tycon_name, SynTyDetails rhs_ty)
 
-tcTyDecl1 (TyData new_or_data context tycon_name _ con_decls _ derivings src_loc name1 name2)
+tcTyDecl1 is_rec (TyData new_or_data context tycon_name _ con_decls _ derivings src_loc name1 name2)
   = tcLookupTyCon tycon_name			`thenNF_Tc` \ tycon ->
     let
 	tyvars = tyConTyVars tycon
@@ -87,9 +87,8 @@ tcTyDecl1 (TyData new_or_data context tycon_name _ con_decls _ derivings src_loc
     tcExtendTyVarEnv tyvars				$
 
 	-- Typecheck the pieces
-    tcClassContext context					`thenTc` \ ctxt ->
-    mapTc (tcConDecl new_or_data tycon tyvars ctxt) con_decls	`thenTc` \ data_cons ->
-
+    tcRecClassContext is_rec context					`thenTc` \ ctxt ->
+    mapTc (tcConDecl is_rec new_or_data tycon tyvars ctxt) con_decls	`thenTc` \ data_cons ->
     returnTc (tycon_name, DataTyDetails ctxt data_cons)
 \end{code}
 
@@ -122,42 +121,35 @@ mkNewTyConRep tc
 %************************************************************************
 
 \begin{code}
-kcConDetails :: RenamedContext -> ConDetails Name -> TcM ()
-kcConDetails ex_ctxt details
+kcConDetails :: NewOrData -> RenamedContext -> ConDetails Name -> TcM ()
+kcConDetails new_or_data ex_ctxt details
   = kcHsContext ex_ctxt		`thenTc_`
-    kc_con_details details
+    mapTc_ kc_sig_type (conDetailsTys details)
   where
-    kc_con_details (VanillaCon btys)    = mapTc_ kc_bty btys
-    kc_con_details (InfixCon bty1 bty2) = mapTc_ kc_bty [bty1,bty2]
-    kc_con_details (RecCon flds)        = mapTc_ kc_field flds
+    kc_sig_type = case new_or_data of
+		    DataType -> kcHsSigType
+		    NewType  -> kcHsBoxedSigType
+	    -- Can't allow an unboxed type here, because we're effectively
+	    -- going to remove the constructor while coercing it to a boxed type.
 
-    kc_field (_, bty) = kc_bty bty
 
-    kc_bty bty = kcHsSigType (getBangType bty)
+tcConDecl :: RecFlag -> NewOrData -> TyCon -> [TyVar] -> ClassContext -> RenamedConDecl -> TcM DataCon
 
-tcConDecl :: NewOrData -> TyCon -> [TyVar] -> ClassContext -> RenamedConDecl -> TcM DataCon
-
-tcConDecl new_or_data tycon tyvars ctxt (ConDecl name wkr_name ex_tvs ex_ctxt details src_loc)
-  = tcAddSrcLoc src_loc					$
-    tcHsTyVars ex_tvs (kcConDetails ex_ctxt details)	$ \ ex_tyvars ->
-    tcClassContext ex_ctxt				`thenTc` \ ex_theta ->
+tcConDecl is_rec new_or_data tycon tyvars ctxt (ConDecl name wkr_name ex_tvs ex_ctxt details src_loc)
+  = tcAddSrcLoc src_loc							$
+    tcHsTyVars ex_tvs (kcConDetails new_or_data ex_ctxt details)	$ \ ex_tyvars ->
+    tcRecClassContext is_rec ex_ctxt					`thenTc` \ ex_theta ->
     case details of
 	VanillaCon btys    -> tc_datacon ex_tyvars ex_theta btys
 	InfixCon bty1 bty2 -> tc_datacon ex_tyvars ex_theta [bty1,bty2]
 	RecCon fields	   -> tc_rec_con ex_tyvars ex_theta fields
   where
-    tc_sig_type = case new_or_data of
-		    DataType -> tcHsSigType
-		    NewType  -> tcHsBoxedSigType
-	    -- Can't allow an unboxed type here, because we're effectively
-	    -- going to remove the constructor while coercing it to a boxed type.
-
     tc_datacon ex_tyvars ex_theta btys
       = let
 	    arg_stricts = map getBangStrictness btys
 	    tys	        = map getBangType btys
         in
-	mapTc tc_sig_type tys 	`thenTc` \ arg_tys ->
+	mapTc (tcHsRecType is_rec) tys		`thenTc` \ arg_tys ->
 	mk_data_con ex_tyvars ex_theta arg_stricts arg_tys []
 
     tc_rec_con ex_tyvars ex_theta fields
@@ -174,7 +166,7 @@ tcConDecl new_or_data tycon tyvars ctxt (ConDecl name wkr_name ex_tvs ex_ctxt de
 		    (map fieldLabelType field_labels) field_labels
 
     tc_field ((field_label_names, bty), tag)
-      = tc_sig_type (getBangType bty)	`thenTc` \ field_ty ->
+      = tcHsRecType is_rec (getBangType bty)		`thenTc` \ field_ty ->
 	returnTc [mkFieldLabel (getName name) tycon field_ty tag | name <- field_label_names]
 
     mk_data_con ex_tyvars ex_theta arg_stricts arg_tys fields

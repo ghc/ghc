@@ -17,7 +17,7 @@ module HsDecls (
 	hsDeclName, instDeclName, tyClDeclName, tyClDeclNames,
 	isClassDecl, isSynDecl, isDataDecl, isIfaceSigDecl, countTyClDecls,
 	mkClassDeclSysNames, isIfaceRuleDecl, ifaceRuleDeclName,
-	getClassDeclSysNames
+	getClassDeclSysNames, conDetailsTys
     ) where
 
 #include "HsVersions.h"
@@ -35,6 +35,7 @@ import BasicTypes	( NewOrData(..) )
 import CallConv		( CallConv, pprCallConv )
 
 -- others:
+import Name		( NamedThing )
 import FunDeps		( pprFundeps )
 import Class		( FunDep, DefMeth(..) )
 import CStrings		( CLabelString, pprCLabelString )
@@ -76,7 +77,7 @@ data HsDecl name pat
 
 \begin{code}
 #ifdef DEBUG
-hsDeclName :: (Outputable name, Outputable pat)
+hsDeclName :: (NamedThing name, Outputable name, Outputable pat)
 	   => HsDecl name pat -> name
 #endif
 hsDeclName (TyClD decl)				    = tyClDeclName decl
@@ -95,7 +96,7 @@ instDeclName (InstDecl _ _ _ (Just name) _) = name
 \end{code}
 
 \begin{code}
-instance (Outputable name, Outputable pat)
+instance (NamedThing name, Outputable name, Outputable pat)
 	=> Outputable (HsDecl name pat) where
 
     ppr (TyClD dcl)  = ppr dcl
@@ -106,14 +107,6 @@ instance (Outputable name, Outputable pat)
     ppr (FixD fd)    = ppr fd
     ppr (RuleD rd)   = ppr rd
     ppr (DeprecD dd) = ppr dd
-\end{code}
-
-\begin{code}
-instance Ord name => Eq (HsDecl name pat) where
-	-- Used only when comparing interfaces, 
-	-- at which time only signature and type/class decls
-   (TyClD d1) == (TyClD d2) = d1 == d2
-   _          == _          = False
 \end{code}
 
 
@@ -259,7 +252,7 @@ getClassDeclSysNames (a:b:c:ds) = (a,b,c,ds)
 \end{code}
 
 \begin{code}
-instance Ord name => Eq (TyClDecl name pat) where
+instance (NamedThing name, Ord name) => Eq (TyClDecl name pat) where
 	-- Used only when building interface files
   (==) (IfaceSig n1 t1 i1 _)
        (IfaceSig n2 t2 i2 _) = n1==n2 && t1==t2 && i1==i2
@@ -321,7 +314,7 @@ countTyClDecls decls
 \end{code}
 
 \begin{code}
-instance (Outputable name, Outputable pat)
+instance (NamedThing name, Outputable name, Outputable pat)
 	      => Outputable (TyClDecl name pat) where
 
     ppr (IfaceSig var ty info _) = hsep [ppr var, dcolon, ppr ty, pprHsIdInfo info]
@@ -425,6 +418,12 @@ conDeclsNames cons
 \end{code}
 
 \begin{code}
+conDetailsTys :: ConDetails name -> [HsType name]
+conDetailsTys (VanillaCon btys)    = map getBangType btys
+conDetailsTys (InfixCon bty1 bty2) = [getBangType bty1, getBangType bty2]
+conDetailsTys (RecCon fields)	   = [getBangType bty | (_, bty) <- fields]
+
+
 eq_ConDecl env (ConDecl n1 _ tvs1 cxt1 cds1 _)
 	       (ConDecl n2 _ tvs2 cxt2 cds2 _)
   = n1 == n2 &&
@@ -655,14 +654,14 @@ data RuleBndr name
   = RuleBndr name
   | RuleBndrSig name (HsType name)
 
-instance Ord name => Eq (RuleDecl name pat) where
+instance (NamedThing name, Ord name) => Eq (RuleDecl name pat) where
   -- Works for IfaceRules only; used when comparing interface file versions
   (IfaceRule n1 bs1 f1 es1 rhs1 _) == (IfaceRule n2 bs2 f2 es2 rhs2 _)
      = n1==n2 && f1 == f2 && 
        eq_ufBinders emptyEqHsEnv bs1 bs2 (\env -> 
        eqListBy (eq_ufExpr env) (rhs1:es1) (rhs2:es2))
 
-instance (Outputable name, Outputable pat)
+instance (NamedThing name, Outputable name, Outputable pat)
 	      => Outputable (RuleDecl name pat) where
   ppr (HsRule name tvs ns lhs rhs loc)
 	= sep [text "{-# RULES" <+> doubleQuotes (ptext name),

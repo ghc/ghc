@@ -9,7 +9,8 @@ September 1998 .. May 1999.
 Keith Wansbrough 1998-09-04..1999-07-07
 
 \begin{code}
-module UsageSPUtils ( AnnotM(AnnotM), initAnnotM,
+module UsageSPUtils ( {- SEE BELOW:  -- KSW 2000-10-13
+                      AnnotM(AnnotM), initAnnotM,
                       genAnnotBinds,
                       MungeFlags(isSigma,isLocal,isExp,hasUsg,mfLoc),
 
@@ -19,24 +20,32 @@ module UsageSPUtils ( AnnotM(AnnotM), initAnnotM,
                       newVarUs, newVarUSMM,
                       UniqSMM, usToUniqSMM, uniqSMMToUs,
 
-                      primOpUsgTys,
+                      primOpUsgTys, -}
                     ) where
 
 #include "HsVersions.h"
 
+{- ENTIRE FILE COMMENTED OUT FOR NOW  -- KSW 2000-10-13
 import CoreSyn
 import CoreFVs		( mustHaveLocalBinding )
 import Var              ( Var, varType, setVarType, mkUVar )
 import Id               ( isExportedId )
 import Name             ( isLocallyDefined )
 import TypeRep          ( Type(..), TyNote(..) )  -- friend
-import Type             ( UsageAnn(..), isUsgTy, splitFunTys )
+import Type             ( splitFunTys )
 import Subst		( substTy, mkTyVarSubst )
 import TyCon            ( isAlgTyCon, isPrimTyCon, isSynTyCon, isFunTyCon )
 import VarEnv
 import PrimOp           ( PrimOp, primOpUsg )
 import UniqSupply       ( UniqSupply, UniqSM, initUs, getUniqueUs, thenUs, returnUs )
 import Outputable
+
+
+   This monomorphic version of the analysis is outdated.  I'm
+   currently ripping out the old one and inserting the new one.  For
+   now, I'm simply commenting out this entire file.
+
+
 \end{code}
 
 ======================================================================
@@ -628,6 +637,9 @@ primOpUsgTys p tys = let (tyvs,ty0us,rtyu) = primOpUsg p
                                              -- substitution may reveal more args
                      in  ((map (substTy s) ty0us) ++ ty1us,
                           rty1u)
+
+
+END OF ENTIRELY-COMMENTED-OUT FILE   -- KSW 2000-10-13 -}
 \end{code}
 
 ======================================================================

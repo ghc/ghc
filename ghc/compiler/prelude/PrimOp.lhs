@@ -39,7 +39,7 @@ import TyCon		( TyCon, tyConArity )
 import Type		( Type, mkForAllTys, mkFunTy, mkFunTys, mkTyVarTys,
 			  mkTyConApp, typePrimRep,
 			  splitFunTy_maybe, splitAlgTyConApp_maybe, splitTyConApp_maybe,
-                          UsageAnn(..), mkUsgTy
+                          mkUTy, usOnce, usMany
 			)
 import Unique		( Unique, mkPrimOpIdUnique )
 import BasicTypes	( Arity, Boxity(..) )
@@ -489,11 +489,11 @@ primOpUsg p@(CCallOp _) = mangle p [] mkM
 
 -- Helper bits & pieces for usage info.
                                     
-mkZ          = mkUsgTy UsOnce  -- pointed argument used zero
-mkO          = mkUsgTy UsOnce  -- pointed argument used once
-mkM          = mkUsgTy UsMany  -- pointed argument used multiply
-mkP          = mkUsgTy UsOnce  -- unpointed argument
-mkR          = mkUsgTy UsMany  -- unpointed result
+mkZ          = mkUTy usOnce  -- pointed argument used zero
+mkO          = mkUTy usOnce  -- pointed argument used once
+mkM          = mkUTy usMany  -- pointed argument used multiply
+mkP          = mkUTy usOnce  -- unpointed argument
+mkR          = mkUTy usMany  -- unpointed result
 
 nomangle op
    = case primOpSig op of
