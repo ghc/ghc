@@ -2,10 +2,17 @@
 AC_INIT([Glasgow Haskell Compiler], [6.3], [glasgow-haskell-bugs@haskell.org], [ghc])
 AC_CONFIG_SRCDIR([ghc.spec.in])
 
-# Compute the version number and the release, they are needed by the .spec file.
-AC_SUBST([version], [[`sed 's/.* version \([0-9][0-9.]*\).*/\1/' VERSION`]])
+# Calculate project version as an integer, using 2 digits for minor version
+case $PACKAGE_VERSION in
+  *.?)  ProjectVersionInt=`echo "$PACKAGE_VERSION" | sed 's,^\(.*\)\.\(.\)$,\10\2,'` ;;
+  *.??) ProjectVersionInt=`echo "$PACKAGE_VERSION" | sed 's,^\(.*\)\.\(..\)$,\1\2,'` ;;
+  *) AC_MSG_ERROR([bad package version $PACKAGE_VERSION]) ;;
+esac
+AC_SUBST([ProjectVersionInt])
+
+# Hmmm, we fix the RPM release number to 1 here... Is this convenient?
 AC_SUBST([release], [1])
 
 # Write the results...
-AC_CONFIG_FILES([ghc.spec])
+AC_CONFIG_FILES([ghc.spec VERSION docs/users_guide/ug-book.xml])
 AC_OUTPUT

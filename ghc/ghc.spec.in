@@ -8,7 +8,7 @@
 # This file is subject to the same free software license as GHC.
 
 %define name    ghc
-%define version @version@
+%define version @PACKAGE_VERSION@
 %define release @release@
 
 Name:           %{name}
