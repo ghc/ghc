@@ -25,7 +25,7 @@ import RdrHsSyn
 import RnHsSyn
 import RnMonad
 import RnEnv
-import CmdLineOpts	( opt_GlasgowExts )
+import CmdLineOpts	( opt_GlasgowExts, opt_IgnoreAsserts )
 import BasicTypes	( Fixity(..), FixityDirection(..) )
 import PrelInfo		( numClass_RDR, fractionalClass_RDR, eqClass_RDR, 
 			  ccallableClass_RDR, creturnableClass_RDR, 
@@ -36,7 +36,9 @@ import PrelInfo		( numClass_RDR, fractionalClass_RDR, eqClass_RDR,
 import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon, 
 			  floatPrimTyCon, doublePrimTyCon
 			)
-import Name		( nameUnique, isLocallyDefined, NamedThing(..) )
+import Name		( nameUnique, isLocallyDefined, NamedThing(..)
+                        , mkSysLocalName, nameSrcLoc
+			)
 import NameSet
 import UniqFM		( isNullUFM )
 import FiniteMap	( elemFM )
@@ -741,11 +743,30 @@ mkAssertExpr =
   newImportedGlobalFromRdrName assertErr_RDR	`thenRn` \ name ->
   addOccurrenceName name				`thenRn_`
   getSrcLocRn           				`thenRn` \ sloc ->
-  let
-   expr = HsApp (HsVar name)
+
+    -- if we're ignoring asserts, return (\ _ e -> e)
+    -- if not, return (assertError "src-loc")
+
+  if opt_IgnoreAsserts then
+    getUniqRn				`thenRn` \ uniq ->
+    let
+     vname = mkSysLocalName uniq SLIT("v")
+     expr  = HsLam ignorePredMatch
+     loc   = nameSrcLoc vname
+     ignorePredMatch = Match [] [WildPatIn, VarPatIn vname] Nothing 
+                             (GRHSs [GRHS [ExprStmt (HsVar vname) loc] loc]
+			            EmptyBinds Nothing)
+    in
+    returnRn expr
+  else
+    let
+     expr = 
+          HsApp (HsVar name)
 	        (HsLit (HsString (_PK_ (showSDoc (ppr sloc)))))
-  in
-  returnRn expr
+
+    in
+    returnRn expr
+
 \end{code}
 
 %************************************************************************

@@ -705,6 +705,15 @@ newInstUniq key (RnDown {rn_ns = names_var}) l_down
     in
     writeMutVarSST names_var (us, mapInst', cache)	`thenSST_`
     returnSST uniq
+
+getUniqRn :: RnM s d Unique
+getUniqRn (RnDown {rn_ns = names_var}) l_down
+ = readMutVarSST names_var `thenSST` \ (us, mapInst, cache) ->
+   let
+     (us1,us') = splitUniqSupply us
+   in
+   writeMutVarSST names_var (us', mapInst, cache)  `thenSST_`
+   returnSST (uniqFromSupply us1)
 \end{code}
 
 ================  Occurrences =====================

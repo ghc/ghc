@@ -3055,6 +3055,7 @@ arg: while($_ = $Args[0]) {
     /^-keep-s-files?-too$/	&& do { $Keep_s_file_too = 1;  next arg; };
 
     /^-fignore-interface-pragmas$/ && do { push(@HsC_flags, $_); next arg; };
+    /^-fignore-asserts$/           && do { push(@HsC_flags, $_); next arg; };
 
     /^-fno-implicit-prelude$/      && do { $NoImplicitPrelude= 1; push(@HsC_flags, $_); next arg; };
 

@@ -1,5 +1,5 @@
 % 
-% $Id: glasgow_exts.vsgml,v 1.7 1999/03/26 19:50:31 sof Exp $
+% $Id: glasgow_exts.vsgml,v 1.8 1999/03/30 11:26:24 sof Exp $
 %
 % GHC Language Extensions.
 %
@@ -1493,8 +1493,8 @@ stands, unless there are convincing reasons to change it.
 <label id="sec:assertions">
 <p>
 
-If you want to use assertions in your standard Haskell code, you
-could define something like the following:
+If you want to make use of assertions in your standard Haskell code, you
+could define a function like the following:
 
 <tscreen><verb>
 assert :: Bool -> a -> a
@@ -1503,7 +1503,7 @@ assert _     x = x
 </verb></tscreen>
 
 which works, but gives you back a less than useful error message --
-an assertion failed, but which?
+an assertion failed, but which and where?
 
 One way out is to define an extended <tt/assert/ function which also
 takes a descriptive string to include in the error message and
@@ -1522,13 +1522,17 @@ Ghc will rewrite this to also include the source location where the
 assertion was made, 
 
 <tscreen><verb>
-assert pred val ==> assertError "Main.hs,15" pred val
+assert pred val ==> assertError "Main.hs|15" pred val
 </verb></tscreen>
 
 The rewrite is only performed by the compiler when applications of
 <tt>Exception.assert</tt> are spotted, so you can still define and use
 your own versions of <tt/assert/, should you so wish. If not, import
-<tt/Exception/ to use <tt/assert/ in your code.
+<tt/Exception/ to make use <tt/assert/ in your code.
+
+To have the compiler ignore uses of assert, use the compiler option
+@-fignore-asserts@. <nidx>-fignore-asserts option</nidx> That is,
+expressions of the form @assert pred e@ will be rewritten to @e@.
 
 Assertion failures can be caught, see the documentation for the
 Hugs/GHC Exception library for information of how.

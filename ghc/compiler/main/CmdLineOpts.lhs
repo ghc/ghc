@@ -60,6 +60,7 @@ module CmdLineOpts (
 	opt_HiMap,
 	opt_HiVersion,
 	opt_IgnoreIfacePragmas,
+	opt_IgnoreAsserts,
 	opt_IrrefutableTuples,
 	opt_LiberateCaseThreshold,
         opt_MaxContextReductionDepth,
@@ -328,6 +329,7 @@ opt_GlasgowExts			= lookUp  SLIT("-fglasgow-exts")
 opt_HiMap 			= lookup_str "-himap="       -- file saying where to look for .hi files
 opt_HiVersion			= lookup_def_int "-fhi-version=" 0 -- what version we're compiling.
 opt_IgnoreIfacePragmas		= lookUp  SLIT("-fignore-interface-pragmas")
+opt_IgnoreAsserts               = lookUp  SLIT("-fignore-asserts")
 opt_IrrefutableTuples		= lookUp  SLIT("-firrefutable-tuples")
 opt_MaxContextReductionDepth	= lookup_def_int "-fcontext-stack" mAX_CONTEXT_REDUCTION_DEPTH
 opt_MultiParamClasses		= opt_GlasgowExts
