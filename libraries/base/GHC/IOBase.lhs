@@ -399,7 +399,7 @@ type FilePath = String
 -- but not less frequently, than specified above.
 -- The output buffer is emptied as soon as it has been written out.
 --
--- Similarly, input occurs according to the buffer mode for handle {\em hdl}.
+-- Similarly, input occurs according to the buffer mode for the handle:
 --
 --  * /line-buffering/: when the buffer for the handle is not empty,
 --    the next item is obtained from the buffer; otherwise, when the
