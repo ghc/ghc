@@ -104,13 +104,18 @@ instance  Show Int  where
 
 instance Show a => Show (Maybe a) where
     showsPrec _p Nothing  = showString "Nothing"
-    showsPrec _p (Just x) = showString "Just " . shows x
-	-- Not sure I have the priorities right here
+    showsPrec p@(I# p#) (Just x)
+                          = showParen (p# >=# 10#) $ 
+    			    showString "Just " . 
+			    showsPrec (I# 10#) x
 
 instance (Show a, Show b) => Show (Either a b) where
-    showsPrec _p (Left a)  = showString "Left "  . shows a
-    showsPrec _p (Right b) = showString "Right " . shows b
-	-- Not sure I have the priorities right here
+    showsPrec p@(I# p#) e =
+       showParen (p# >=# 10#) $
+       case e of
+         Left  a -> showString "Left "  . showsPrec (I# 10#) a
+	 Right b -> showString "Right " . showsPrec (I# 10#) b
+
 \end{code}
 
 
