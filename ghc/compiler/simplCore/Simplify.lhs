@@ -15,7 +15,7 @@ import CmdLineOpts	( switchIsOn, opt_SimplDoEtaReduction,
 			)
 import SimplMonad
 import SimplUtils	( mkCase, tryRhsTyLam, tryEtaExpansion,
-			  simplBinder, simplBinders, simplRecIds, simplLetId,
+			  simplBinder, simplBinders, simplRecIds, simplLetId, simplLamBinder,
 			  SimplCont(..), DupFlag(..), mkStop, mkRhsStop,
 			  contResultType, discardInline, countArgs, contIsDupable,
 			  getContArgs, interestingCallContext, interestingArg, isStrictType
@@ -46,7 +46,7 @@ import CoreUnfold	( mkOtherCon, mkUnfolding, otherCons,
 import CoreUtils	( cheapEqExpr, exprIsDupable, exprIsTrivial, 
 			  exprIsConApp_maybe, mkPiType, findAlt, findDefault,
 			  exprType, coreAltsType, exprIsValue, 
-			  exprOkForSpeculation, exprArity, exprIsCheap,
+			  exprOkForSpeculation, exprArity, 
 			  mkCoerce, mkSCC, mkInlineMe, mkAltExpr
 			)
 import Rules		( lookupRule )
@@ -293,7 +293,7 @@ simplLam fun cont
 -- to avoid allocating this thing altogether
 
 completeLam rev_bndrs (Lam bndr body) cont
-  = simplBinder bndr			$ \ bndr' ->
+  = simplLamBinder bndr			$ \ bndr' ->
     completeLam (bndr':rev_bndrs) body cont
 
 completeLam rev_bndrs body cont
@@ -733,14 +733,6 @@ simplRhs top_lvl float_ubx rhs_ty rhs rhs_se thing_inside
     let
 	(floats2, rhs2) = splitFloats float_ubx floats1 rhs1
     in
-		-- There's a subtlety here.  There may be a binding (x* = e) in the
-		-- floats, where the '*' means 'will be demanded'.  So is it safe
-		-- to float it out?  Answer no, but it won't matter because
-		-- we only float if arg' is a WHNF,
-		-- and so there can't be any 'will be demanded' bindings in the floats.
-		-- Hence the assert
-    WARN( any demanded_float (fromOL floats2), ppr (filter demanded_float (fromOL floats2)) )
-
 	-- 			Transform the RHS
 	-- It's important that we do eta expansion on function *arguments* (which are
 	-- simplified with simplRhs), as well as let-bound right-hand sides.  
@@ -753,7 +745,25 @@ simplRhs top_lvl float_ubx rhs_ty rhs rhs_se thing_inside
 
  	-- Float lets if (a) we're at the top level
 	-- or 		 (b) the resulting RHS is one we'd like to expose
-    if (top_lvl || exprIsCheap rhs4) then
+	--
+	-- NB: the test used to say "exprIsValue", but that caused a strictness bug.
+	--     	   x = let y* = E in case (scc y) of { T -> F; F -> T}
+	-- The case expression is 'cheap', but it's wrong to transform to
+	-- 	   y* = E; x = case (scc y) of {...}
+ 	-- Either we must be careful not to float demanded non-values, or
+	-- we must use exprIsValue for the test, which ensures that the
+	-- thing is non-strict.  I think.  The WARN below tests for this
+    if (top_lvl || exprIsValue rhs4) then
+
+		-- There's a subtlety here.  There may be a binding (x* = e) in the
+		-- floats, where the '*' means 'will be demanded'.  So is it safe
+		-- to float it out?  Answer no, but it won't matter because
+		-- we only float if arg' is a WHNF,
+		-- and so there can't be any 'will be demanded' bindings in the floats.
+		-- Hence the assert
+        WARN( any demanded_float (fromOL floats2), 
+	      ppr (filter demanded_float (fromOL floats2)) )
+
 	(if (isNilOL floats2 && null floats3 && null floats4) then
 		returnSmpl ()
 	 else

@@ -5,7 +5,7 @@
 
 \begin{code}
 module SimplUtils (
-	simplBinder, simplBinders, simplRecIds, simplLetId,
+	simplBinder, simplBinders, simplRecIds, simplLetId, simplLamBinder,
 	tryRhsTyLam, tryEtaExpansion,
 	mkCase,
 
@@ -28,12 +28,11 @@ import CoreUtils	( exprIsTrivial, cheapEqExpr, exprType, exprIsCheap,
 			  findDefault
 			)
 import Subst		( InScopeSet, mkSubst, substExpr )
-import qualified Subst	( simplBndrs, simplBndr, simplLetId )
+import qualified Subst	( simplBndrs, simplBndr, simplLetId, simplLamBndr )
 import Id		( idType, idName, 
 			  idUnfolding, idNewStrictness,
 			  mkLocalId, idInfo
 			)
-import IdInfo		( StrictnessInfo(..) )
 import Maybes		( maybeToBool, catMaybes )
 import Name		( setNameUnique )
 import NewDemand	( isStrictDmd, isBotRes, splitStrictSig )
@@ -424,6 +423,16 @@ simplBinder bndr thing_inside
   = getSubst		`thenSmpl` \ subst ->
     let
 	(subst', bndr') = Subst.simplBndr subst bndr
+    in
+    seqBndr bndr'	`seq`
+    setSubst subst' (thing_inside bndr')
+
+
+simplLamBinder :: InBinder -> (OutBinder -> SimplM a) -> SimplM a
+simplLamBinder bndr thing_inside
+  = getSubst		`thenSmpl` \ subst ->
+    let
+	(subst', bndr') = Subst.simplLamBndr subst bndr
     in
     seqBndr bndr'	`seq`
     setSubst subst' (thing_inside bndr')
