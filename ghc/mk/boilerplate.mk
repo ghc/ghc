@@ -26,7 +26,7 @@ TOP:=$(GHC_TOP)
 # augments or overrides previously set variables.
 # -----------------------------------------------------------------
 
-include $(TOP)/mk/paths.mk
-include $(TOP)/mk/opts.mk
+-include $(TOP)/mk/paths.mk
+-include $(TOP)/mk/opts.mk
 include $(TOP)/mk/suffix.mk
 
