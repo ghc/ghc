@@ -1,4 +1,4 @@
--- $Id: net002.hs,v 1.3 2002/07/23 17:11:52 sof Exp $
+-- $Id: net002.hs,v 1.4 2003/01/09 16:13:48 simonmar Exp $
 -- http://www.bagley.org/~doug/shootout/
 -- Haskell echo/client server
 -- written by Brian Gregor
@@ -17,7 +17,7 @@
 
 module Main where
 
-import SocketPrim
+import Network.Socket
 
 import System.IO
 import Control.Concurrent

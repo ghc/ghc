@@ -1,8 +1,8 @@
 module Main where
 
-import Socket
-import Concurrent
-import IO
+import Network
+import Control.Concurrent
+import System.IO
 
 -- NOTE: this test depends on non-blocking I/O support,
 -- which win32 doesn't support. Rather than having the
