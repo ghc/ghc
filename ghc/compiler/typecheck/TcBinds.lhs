@@ -780,9 +780,10 @@ valSpecSigCtxt v ty
 sigContextsErr = ptext SLIT("Mismatched contexts")
 
 sigContextsCtxt s1 s2
-  = hang (hsep [ptext SLIT("When matching the contexts of the signatures for"), 
-		quotes (ppr s1), ptext SLIT("and"), quotes (ppr s2)])
-	 4 (ptext SLIT("(the signature contexts in a mutually recursive group should all be identical)"))
+  = vcat [ptext SLIT("When matching the contexts of the signatures for"), 
+	  nest 2 (vcat [ppr s1 <+> dcolon <+> ppr (idType s1),
+			ppr s2 <+> dcolon <+> ppr (idType s2)]),
+	  ptext SLIT("The signature contexts in a mutually recursive group should all be identical")]
 
 -----------------------------------------------
 unliftedBindErr flavour mbind
