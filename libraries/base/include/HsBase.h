@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.14 2002/09/25 15:24:07 simonmar Exp $
+ * $Id: HsBase.h,v 1.15 2002/10/03 12:43:50 panne Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -46,6 +46,9 @@
 #endif
 #ifdef HAVE_UTIME_H
 #include <utime.h>
+#endif
+#ifdef HAVE_SYS_UTSNAME_H
+#include <sys/utsname.h>
 #endif
 #if defined(HAVE_GETTIMEOFDAY)
 #  ifdef HAVE_SYS_TIME_H
