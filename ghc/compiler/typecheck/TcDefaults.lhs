@@ -24,8 +24,9 @@ import TcMonoType	( tcHsType )
 import TcSimplify	( tcSimplifyCheckThetas )
 
 import TysWiredIn	( intTy, doubleTy, unitTy )
+import Type             ( SYN_IE(Type) )
 import Unique		( numClassKey )
-import Pretty		( ppPStr, ppAboves )
+import Pretty		( ptext, vcat )
 import ErrUtils		( addShortErrLocLine )
 import Util
 \end{code}
@@ -63,14 +64,14 @@ tc_defaults decls
 
 
 dupDefaultDeclErr (DefaultDecl _ locn1 : dup_things) sty
-  = ppAboves (item1 : map dup_item dup_things)
+  = vcat (item1 : map dup_item dup_things)
   where
     item1
       = addShortErrLocLine locn1 (\ sty ->
-	ppPStr SLIT("multiple default declarations")) sty
+	ptext SLIT("multiple default declarations")) sty
 
     dup_item (DefaultDecl _ locn)
       = addShortErrLocLine locn (\ sty ->
-	ppPStr SLIT("here was another default declaration")) sty
+	ptext SLIT("here was another default declaration")) sty
 
 \end{code}
