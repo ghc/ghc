@@ -29,13 +29,14 @@ import PrelNames	( eqClassName, integralClassName,
 		  	  negateName, minusName, lengthPName, indexPName,
 			  plusIntegerName, fromIntegerName, timesIntegerName,
 			  ratioDataConName, fromRationalName )
+import TypeRep		( funTyCon )
 import Constants	( mAX_TUPLE_SIZE )
 import Name		( Name )
-import SrcLoc		( Located(..), unLoc )
+import SrcLoc		( SrcSpan, Located(..), unLoc, noLoc )
 import NameSet
 
 import Literal		( inIntRange, inCharRange )
-import BasicTypes	( compareFixity )
+import BasicTypes	( compareFixity, Fixity(..), FixityDirection(..) )
 import ListSetOps	( removeDups )
 import Outputable
 import Monad		( when )
@@ -112,10 +113,13 @@ rnHsType doc (HsTyVar tyvar)
 rnHsType doc (HsOpTy ty1 (L loc op) ty2)
   = setSrcSpan loc (
       lookupOccRn op			`thenM` \ op' ->
-      lookupTyFixityRn (L loc op')	`thenM` \ fix ->
+      let
+	l_op' = L loc op'
+      in
+      lookupTyFixityRn l_op'		`thenM` \ fix ->
       rnLHsType doc ty1			`thenM` \ ty1' ->
       rnLHsType doc ty2			`thenM` \ ty2' -> 
-      mkHsOpTyRn (L loc op') fix ty1' ty2'
+      mkHsOpTyRn (\t1 t2 -> HsOpTy t1 l_op' t2) (ppr op') fix ty1' ty2'
    )
 
 rnHsType doc (HsParTy ty)
@@ -139,7 +143,9 @@ rnHsType doc (HsFunTy ty1 ty2)
     rnLHsType doc ty2	`thenM` \ ty2' ->
 	-- Or as the result.  This happens when reading Prelude.hi
 	-- when we find return :: forall m. Monad m -> forall a. a -> m a
-    returnM (HsFunTy ty1' ty2')
+
+	-- Check for fixity rearrangements
+    mkHsOpTyRn HsFunTy (ppr funTyCon) funTyFixity ty1' ty2'
 
 rnHsType doc (HsListTy ty)
   = rnLHsType doc ty				`thenM` \ ty' ->
@@ -208,39 +214,55 @@ is always read in as
 
 mkHsOpTyRn rearranges where necessary.  The two arguments
 have already been renamed and rearranged.  It's made rather tiresome
-by the presence of ->
+by the presence of ->, which is a separate syntactic construct.
 
 \begin{code}
+---------------
+-- Building (ty1 `op1` (ty21 `op2` ty22))
+mkHsOpTyRn :: (LHsType Name -> LHsType Name -> HsType Name)
+	   -> SDoc -> Fixity -> LHsType Name -> LHsType Name 
+	   -> RnM (HsType Name)
+
+mkHsOpTyRn mk1 pp_op1 fix1 ty1 (L loc2 (HsOpTy ty21 op2 ty22))
+  = do  { fix2 <- lookupTyFixityRn op2
+	; mk_hs_op_ty mk1 pp_op1 fix1 ty1 
+		      (\t1 t2 -> HsOpTy t1 op2 t2)
+		      (ppr op2) fix2 ty21 ty22 loc2 }
+
+mkHsOpTyRn mk1 pp_op1 fix1 ty1 ty2@(L loc2 (HsFunTy ty21 ty22))
+  = mk_hs_op_ty mk1 pp_op1 fix1 ty1 
+		HsFunTy (ppr funTyCon) funTyFixity ty21 ty22 loc2
+
+mkHsOpTyRn mk1 pp_op1 fix1 ty1 ty2 		-- Default case, no rearrangment
+  = return (mk1 ty1 ty2)
+
+---------------
+mk_hs_op_ty :: (LHsType Name -> LHsType Name -> HsType Name)
+	    -> SDoc -> Fixity -> LHsType Name
+	    -> (LHsType Name -> LHsType Name -> HsType Name)
+	    -> SDoc -> Fixity -> LHsType Name -> LHsType Name -> SrcSpan
+	    -> RnM (HsType Name)
+mk_hs_op_ty mk1 pp_op1 fix1 ty1 
+	    mk2 pp_op2 fix2 ty21 ty22 loc2
+  | nofix_error     = do { addErr (precParseErr (quotes pp_op1,fix1) 
+			 		        (quotes pp_op2,fix2))
+		         ; return (mk1 ty1 (L loc2 (mk2 ty21 ty22))) }
+  | associate_right = return (mk1 ty1 (L loc2 (mk2 ty21 ty22)))
+  | otherwise	    = do { -- Rearrange to ((ty1 `op1` ty21) `op2` ty22)
+			   new_ty <- mkHsOpTyRn mk1 pp_op1 fix1 ty1 ty21
+			 ; return (mk2 (noLoc new_ty) ty22) }
+  where
+    (nofix_error, associate_right) = compareFixity fix1 fix2
+
+---------------
 lookupTyFixityRn (L loc n)
   = doptM Opt_GlasgowExts 			`thenM` \ glaExts ->
     when (not glaExts) 
     	(setSrcSpan loc $ addWarn (infixTyConWarn n))	`thenM_`
     lookupFixityRn n
 
--- Building (ty1 `op1` (ty21 `op2` ty22))
-mkHsOpTyRn :: Located Name -> Fixity 
-	   -> LHsType Name -> LHsType Name 
-	   -> RnM (HsType Name)
-
-mkHsOpTyRn op1 fix1 ty1 ty2@(L loc (HsOpTy ty21 op2 ty22))
-  = lookupTyFixityRn op2	`thenM` \ fix2 ->
-    let
-	(nofix_error, associate_right) = compareFixity fix1 fix2
-    in
-    if nofix_error then
-	addErr (precParseErr (quotes (ppr op1),fix1) 
-			       (quotes (ppr op2),fix2))	`thenM_`
-	returnM (HsOpTy ty1 op1 ty2)
-    else 
-    if not associate_right then
-	-- Rearrange to ((ty1 `op1` ty21) `op2` ty22)
-	mkHsOpTyRn op1 fix1 ty1 ty21		`thenM` \ new_ty ->
-	returnM (HsOpTy (L loc new_ty) op2 ty22)  -- XXX loc is wrong
-    else
-    returnM (HsOpTy ty1 op1 ty2)
-
-mkHsOpTyRn op fix ty1 ty2 			-- Default case, no rearrangment
-  = returnM (HsOpTy ty1 op ty2)
+---------------
+funTyFixity = Fixity 0 InfixR	-- Fixity of '->'
 \end{code}
 
 %*********************************************************
