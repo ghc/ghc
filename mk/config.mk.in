@@ -318,17 +318,6 @@ GhcLibHcOpts=-O -Rghc-timing
 # Win32 only: Enable the RTS and libraries to be built as DLLs
 DLLized=@EnableWin32DLLs@
 
-# Win32 only: are we building a compiler that tries to reduce external
-# dependencies? i.e., one that doesn't assume that the user has got
-# the cygwin toolchain installed on his/her Win32 box.
-#
-# GHC is still dependent on GNU tools in the backend (gcc to further process
-# .c/.hc/.s/.o files + 'perl' to mangle and split), but using this
-# option a GHC distribution can be put together which includes a minimal
-# set of these open source tools. 
-#
-MinimalUnixDeps=@MinimalUnixDeps@
-
 # Strip local symbols from libraries?  This can make the libraries smaller,
 # but makes debugging somewhat more difficult.  Doesn't work with all ld's.
 #
@@ -709,9 +698,6 @@ else
 GhcCanonVersion = $(GhcMajVersion)$(GhcMinVersion)
 endif
 
-# Set to YES if $(GHC) has the readline package installed
-GhcHasReadline	= @GhcHasReadline@
-
 HBC		= @HBC@
 NHC		= @NHC@
 
@@ -907,7 +893,6 @@ ETAGS			= $(ETAGS_PREFIX)etags
 VERBATIM		= $(VERBATIM_PREFIX)verbatim
 SGMLVERB		= $(SGMLVERB_PREFIX)sgmlverb
 RUNTEST			= $(RUNTEST_PREFIX)runstdtest
-LX			= @LxCmd@
 
 BLD_DLL			= dllwrap
 
