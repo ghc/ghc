@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.38 2000/06/28 14:00:37 simonmar Exp $
+# $Id: Makefile,v 1.39 2000/06/30 09:45:16 simonmar Exp $
 #
 
 TOP=..
@@ -10,7 +10,12 @@ ifeq "$(GhcWithHscBuiltViaC)" "YES"
 HC=$(GHC_INPLACE)
 endif
 
-SRC_HC_OPTS += -fglasgow-exts -cpp -syslib concurrent -syslib posix -syslib text
+ghc_406_at_least = $(shell expr "$(GhcMinVersion)" \> 6)
+ifeq "$(ghc_406_at_least)" "1"
+SRC_HC_OPTS += -fglasgow-exts -cpp -package concurrent -package posix -package text
+else
+SRC_HC_OPTS += -fglasgow-exts -cpp -syslib concurrent -syslib posix -syslib misc
+endif
 
 HS_PROG = ghc-$(ProjectVersion)
 HS_SRCS = Config.hs Package.hs Main.hs
