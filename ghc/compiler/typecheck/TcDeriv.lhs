@@ -13,7 +13,7 @@ module TcDeriv ( tcDeriving ) where
 IMP_Ubiq()
 
 import HsSyn		( HsDecl, FixityDecl, Fixity, InstDecl, 
-			  Sig, HsBinds(..), Bind(..), MonoBinds(..),
+			  Sig, HsBinds(..), MonoBinds(..),
 			  GRHSsAndBinds, Match, HsExpr, HsLit, InPat,
 			  ArithSeqInfo, Fake, HsType,
 			  collectMonoBinders
@@ -38,19 +38,19 @@ import RnMonad		( SYN_IE(RnM), RnDown, GDown, SDown, RnNameSupply(..),
 			  setNameSupplyRn, renameSourceCode, thenRn, mapRn, returnRn )
 
 import Bag		( Bag, isEmptyBag, unionBags, listToBag )
-import Class		( classKey, GenClass )
+import Class		( classKey, GenClass, SYN_IE(Class) )
 import ErrUtils		( pprBagOfErrors, addErrLoc, SYN_IE(Error) )
 import Id		( dataConArgTys, isNullaryDataCon, mkDictFunId )
 import PrelInfo		( needsDataDeclCtxtClassKeys )
 import Maybes		( maybeToBool )
 import Name		( isLocallyDefined, getSrcLoc, ExportFlag(..), Provenance, 
-			  Name{--O only-}
+			  Name{--O only-}, SYN_IE(Module)
 			)
 import Outputable	( Outputable(..){-instances e.g., (,)-} )
 import PprType		( GenType, GenTyVar, GenClass, TyCon )
 import PprStyle		( PprStyle(..) )
-import Pretty		( ppAbove, ppAboves, ppCat, ppBesides, 
-		          ppPStr, ppStr, ppChar, ppHang, SYN_IE(Pretty) )
+import Pretty		( ($$), vcat, hsep, hcat, 
+		          ptext, text, char, hang, Doc )
 --import Pretty--ToDo:rm
 --import FiniteMap--ToDo:rm
 import SrcLoc		( mkGeneratedSrcLoc, SrcLoc )
@@ -63,13 +63,14 @@ import Type		( GenType(..), SYN_IE(TauType), mkTyVarTys, applyTyCon,
 			  getAppDataTyCon, getAppTyCon
 			)
 import TysPrim		( voidTy )
-import TyVar		( GenTyVar )
+import TyVar		( GenTyVar, SYN_IE(TyVar) )
 import UniqFM		( emptyUFM )
 import Unique		-- Keys stuff
 import Bag		( bagToList )
 import Util		( zipWithEqual, zipEqual, sortLt, removeDups,  assoc,
 			  thenCmp, cmpList, panic, panic#, pprPanic, pprPanic#,
-			  assertPanic-- , pprTrace{-ToDo:rm-}
+			  Ord3(..), assertPanic-- , pprTrace{-ToDo:rm-}
+    
 			)
 \end{code}
 
@@ -205,7 +206,7 @@ tcDeriving  :: Module			-- name of module under scrutiny
 	    -> Bag InstInfo		-- What we already know about instances
 	    -> TcM s (Bag InstInfo,	-- The generated "instance decls".
 		      RenamedHsBinds,	-- Extra generated bindings
-		      PprStyle -> Pretty)  -- Printable derived instance decls;
+		      PprStyle -> Doc)  -- Printable derived instance decls;
 				     	   -- for debugging via -ddump-derivings.
 
 tcDeriving modname rn_name_supply inst_decl_infos_in
@@ -238,7 +239,7 @@ tcDeriving modname rn_name_supply inst_decl_infos_in
 	-- method bindings for the instances.
 	(dfun_names_w_method_binds, rn_extra_binds)
 		= renameSourceCode modname rn_name_supply (
-			bindLocatedLocalsRn "deriving" mbinders	$ \ _ ->
+			bindLocatedLocalsRn (\_ -> text "deriving") mbinders	$ \ _ ->
 			rnTopMonoBinds extra_mbinds []		`thenRn` \ rn_extra_binds ->
 			mapRn rn_one method_binds_s		`thenRn` \ dfun_names_w_method_binds ->
 			returnRn (dfun_names_w_method_binds, rn_extra_binds)
@@ -259,13 +260,13 @@ tcDeriving modname rn_name_supply inst_decl_infos_in
 	      rn_extra_binds,
 	      ddump_deriv)
   where
-    ddump_deriving :: [InstInfo] -> RenamedHsBinds -> (PprStyle -> Pretty)
+    ddump_deriving :: [InstInfo] -> RenamedHsBinds -> (PprStyle -> Doc)
 
     ddump_deriving inst_infos extra_binds sty
-      = ppAboves ((map pp_info inst_infos) ++ [ppr sty extra_binds])
+      = vcat ((map pp_info inst_infos) ++ [ppr sty extra_binds])
       where
 	pp_info (InstInfo clas tvs ty inst_decl_theta _ _ mbinds _ _)
-	  = ppAbove (ppr sty (mkSigmaTy tvs inst_decl_theta (mkDictTy clas ty)))
+	  = ($$) (ppr sty (mkSigmaTy tvs inst_decl_theta (mkDictTy clas ty)))
 		    (ppr sty mbinds)
 \end{code}
 
@@ -469,7 +470,7 @@ solveDerivEqns inst_decl_infos_in orig_eqns
 	  = (tv1 `cmp` tv2) `thenCmp` (c1 `cmp` c2)
 #ifdef DEBUG
 	cmp_rhs other_1 other_2
-	  = panic# "tcDeriv:cmp_rhs:" --(ppCat [ppr PprDebug other_1, ppr PprDebug other_2])
+	  = panic# "tcDeriv:cmp_rhs:" --(hsep [ppr PprDebug other_1, ppr PprDebug other_2])
 #endif
 
 \end{code}
@@ -517,7 +518,7 @@ add_solns inst_infos_in eqns solns
 		-- We can't leave it as a panic because to get the theta part we
 		-- have to run down the type!
 
-	my_panic str = panic "add_soln" -- pprPanic ("add_soln:"++str) (ppCat [ppChar ':', ppr PprDebug clas, ppr PprDebug tycon])
+	my_panic str = panic "add_soln" -- pprPanic ("add_soln:"++str) (hsep [char ':', ppr PprDebug clas, ppr PprDebug tycon])
 \end{code}
 
 %************************************************************************
@@ -669,7 +670,7 @@ gen_taggery_Names :: [InstInfo]
 			     TagThingWanted)]
 
 gen_taggery_Names inst_infos
-  = --pprTrace "gen_taggery:\n" (ppAboves [ppCat [ppr PprDebug c, ppr PprDebug t] | (c,t) <- all_CTs]) $
+  = --pprTrace "gen_taggery:\n" (vcat [hsep [ppr PprDebug c, ppr PprDebug t] | (c,t) <- all_CTs]) $
     foldlTc do_con2tag []           tycons_of_interest `thenTc` \ names_so_far ->
     foldlTc do_tag2con names_so_far tycons_of_interest
   where
@@ -717,6 +718,6 @@ gen_taggery_Names inst_infos
 derivingThingErr :: String -> TyCon -> Error
 
 derivingThingErr thing tycon sty
-  = ppHang (ppCat [ppPStr SLIT("Can't make a derived instance of"), ppStr thing])
-	 4 (ppBesides [ppPStr SLIT("for the type `"), ppr sty tycon, ppChar '\''])
+  = hang (hsep [ptext SLIT("Can't make a derived instance of"), text thing])
+	 4 (hsep [ptext SLIT("for the type"), ppr sty tycon])
 \end{code}
