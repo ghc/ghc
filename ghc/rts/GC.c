@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.59 1999/05/11 16:47:53 keithw Exp $
+ * $Id: GC.c,v 1.60 1999/06/29 13:04:38 panne Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -840,7 +840,7 @@ cleanup_weak_ptr_list ( StgWeak **list )
 StgClosure *
 isAlive(StgClosure *p)
 {
-  StgInfoTable *info;
+  const StgInfoTable *info;
 
   while (1) {
 
@@ -1130,6 +1130,9 @@ loop:
     }
     step = bd->step->to;
   }
+#ifdef DEBUG
+  else step = NULL; /* make sure copy() will crash if HEAP_ALLOCED is wrong */
+#endif
 
   /* make sure the info pointer is into text space */
   ASSERT(q && (LOOKS_LIKE_GHC_INFO(GET_INFO(q))
@@ -1281,7 +1284,8 @@ loop:
 	break;
 
       default:
-	barf("evacuate: THUNK_SELECTOR: strange selectee");
+	barf("evacuate: THUNK_SELECTOR: strange selectee %d",
+	     (int)(selectee_info->type));
       }
     }
     return copy(q,THUNK_SELECTOR_sizeW(),step);
@@ -1436,7 +1440,7 @@ loop:
     return q;
 
   default:
-    barf("evacuate: strange closure type");
+    barf("evacuate: strange closure type %d", (int)(info->type));
   }
 
   barf("evacuate");
@@ -1486,7 +1490,7 @@ relocate_TSO(StgTSO *src, StgTSO *dest)
       break;
 
     default:
-      barf("relocate_TSO");
+      barf("relocate_TSO %d", (int)(get_itbl(su)->type));
     }
     break;
   }
@@ -1881,7 +1885,7 @@ scavenge(step *step)
 static rtsBool
 scavenge_one(StgClosure *p)
 {
-  StgInfoTable *info;
+  const StgInfoTable *info;
   rtsBool no_luck;
 
   ASSERT(p && (LOOKS_LIKE_GHC_INFO(GET_INFO(p))
@@ -1979,7 +1983,7 @@ scavenge_one(StgClosure *p)
 static void
 scavenge_mut_once_list(generation *gen)
 {
-  StgInfoTable *info;
+  const StgInfoTable *info;
   StgMutClosure *p, *next, *new_list;
 
   p = gen->mut_once_list;
@@ -2099,7 +2103,7 @@ scavenge_mut_once_list(generation *gen)
 
     default:
       /* shouldn't have anything else on the mutables list */
-      barf("scavenge_mut_once_list: strange object?");
+      barf("scavenge_mut_once_list: strange object? %d", (int)(info->type));
     }
   }
 
@@ -2110,7 +2114,7 @@ scavenge_mut_once_list(generation *gen)
 static void
 scavenge_mutable_list(generation *gen)
 {
-  StgInfoTable *info;
+  const StgInfoTable *info;
   StgMutClosure *p, *next;
 
   p = gen->saved_mut_list;
@@ -2217,7 +2221,7 @@ scavenge_mutable_list(generation *gen)
 
     default:
       /* shouldn't have anything else on the mutables list */
-      barf("scavenge_mut_list: strange object?");
+      barf("scavenge_mut_list: strange object? %d", (int)(info->type));
     }
   }
 }

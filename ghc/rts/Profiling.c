@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.6 1999/04/23 09:47:32 simonm Exp $
+ * $Id: Profiling.c,v 1.7 1999/06/29 13:04:40 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -503,7 +503,9 @@ report_ccs_profiling( void )
 {
     nat count;
     char temp[128]; /* sigh: magic constant */
+#ifdef NOT_YET
     rtsBool do_groups = rtsFalse;
+#endif
 
     if (!RtsFlags.CcFlags.doCostCentres)
 	return;

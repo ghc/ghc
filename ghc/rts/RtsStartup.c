@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.13 1999/05/21 14:28:32 sof Exp $
+ * $Id: RtsStartup.c,v 1.14 1999/06/29 13:04:40 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -40,7 +40,9 @@ static int rts_has_started_up = 0;
 void
 startupHaskell(int argc, char *argv[])
 {
+#ifdef ENABLE_WIN32_DLL_SUPPORT
     int i;
+#endif
 
     /* To avoid repeated initialisations of the RTS */
    if (rts_has_started_up)

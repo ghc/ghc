@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.13 1999/05/11 16:47:54 keithw Exp $
+ * $Id: Printer.c,v 1.14 1999/06/29 13:04:39 panne Exp $
  *
  * Copyright (c) 1994-1999.
  *
@@ -9,6 +9,7 @@
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
+#include "Printer.h"
 
 #ifdef DEBUG
 
@@ -16,8 +17,6 @@
 #include "RtsFlags.h"
 #include "Bytecodes.h"  /* for InstrPtr */
 #include "Disassembler.h"
-
-#include "Printer.h"
 
 /* --------------------------------------------------------------------------
  * local function decls
@@ -54,7 +53,9 @@ char* lookupHugsItblName ( void* v )
 
 void printPtr( StgPtr p )
 {
+#ifdef INTERPRETER
     char* str;
+#endif
     const char *raw;
     if (lookupGHCName( p, &raw )) {
         printZcoded(raw);
@@ -734,6 +735,7 @@ static rtsBool isReal( flagword flags, const char *name )
         return rtsFalse;
     }
 #else
+    (void)flags;   /* keep gcc -Wall happy */
     if (*name == '\0'  || 
 	(name[0] == 'g' && name[1] == 'c' && name[2] == 'c') ||
 	(name[0] == 'c' && name[1] == 'c' && name[2] == '.')) {
