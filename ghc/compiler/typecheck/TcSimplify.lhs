@@ -670,9 +670,14 @@ tcSimplifyCheck
 
 -- tcSimplifyCheck is used when checking expression type signatures,
 -- class decls, instance decls etc.
--- Note that we psss isFree (not isFreeAndInheritable) to tcSimplCheck
+--
+-- NB: we psss isFree (not isFreeAndInheritable) to tcSimplCheck
 -- It's important that we can float out non-inheritable predicates
 -- Example:		(?x :: Int) is ok!
+--
+-- NB: tcSimplifyCheck does not consult the
+--	global type variables in the environment; so you don't
+--	need to worry about setting them before calling tcSimplifyCheck
 tcSimplifyCheck doc qtvs givens wanted_lie
   = tcSimplCheck doc get_qtvs
 		 givens wanted_lie	`thenTc` \ (qtvs', frees, binds) ->
