@@ -172,8 +172,7 @@ instance CReturnable Int8
 int8ToInt (I8# x)  = I# (i8ToInt# x)
 
 i8ToInt# :: Int# -> Int#
-i8ToInt# x = if x' <=# 0x7f# then x' else x' -# 0x100#
-   where x' = word2Int# (int2Word# x `and#` int2Word# 0xff#)
+i8ToInt# x = if x <=# 0x7f# then x else x -# 0x100#
 
 -- This doesn't perform any bounds checking on the value it is passed,
 -- nor its sign, i.e., show (intToInt8 511) => "-1"
@@ -188,12 +187,6 @@ instance Eq  Int8     where
 
 instance Ord Int8 where 
   compare (I8# x#) (I8# y#) = compareInt# (i8ToInt# x#) (i8ToInt# y#)
-
-compareInt# :: Int# -> Int# -> Ordering
-compareInt# x# y#
- | x# <#  y# = LT
- | x# ==# y# = EQ
- | otherwise = GT
 
 instance Num Int8 where
   (I8# x#) + (I8# y#) = I8# (intToInt8# (x# +# y#))
@@ -322,8 +315,8 @@ instance CReturnable Int16
 int16ToInt  (I16# x) = I# (i16ToInt# x)
 
 i16ToInt# :: Int# -> Int#
-i16ToInt# x = if x' <=# 0x7fff# then x' else x' -# 0x10000#
-   where x' = word2Int# (int2Word# x `and#` int2Word# 0xffff#)
+i16ToInt# x = if x <=# 0x7fff# then x else x -# 0x10000#
+	-- x's upper 16 bits should already be zero
 
 -- This doesn't perform any bounds checking on the value it is passed,
 -- nor its sign, i.e., show (intToInt8 131071) => "-1"
@@ -381,7 +374,6 @@ instance Integral Int16 where
 remInt16, quotInt16 :: Int16 -> Int16 -> Int16
 remInt16  (I16# x) (I16# y) = I16# (intToInt16# ((i16ToInt# x) `remInt#` (i16ToInt# y)))
 quotInt16 (I16# x) (I16# y) = I16# (intToInt16# ((i16ToInt# x) `quotInt#` (i16ToInt# y)))
-
 instance Ix Int16 where
     range (m,n)          = [m..n]
     index b@(m,_) i

@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelBase.lhs,v 1.40 2001/02/18 14:45:15 qrczak Exp $
+% $Id: PrelBase.lhs,v 1.41 2001/02/23 14:44:43 simonmar Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -490,9 +490,13 @@ instance Ord Int where
     (>)  x y = gtInt x y
 
 compareInt :: Int -> Int -> Ordering
-(I# x) `compareInt` (I# y) | x <# y    = LT
-			   | x ==# y   = EQ
-			   | otherwise = GT
+(I# x) `compareInt` (I# y)  = compareInt# x y
+
+compareInt# :: Int# -> Int# -> Ordering
+compareInt# x# y#
+ | x# <#  y# = LT
+ | x# ==# y# = EQ
+ | otherwise = GT
 \end{code}
 
 
