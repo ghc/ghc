@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.89 2001/10/25 02:13:13 sof Exp $
+-- $Id: Main.hs,v 1.90 2001/10/26 00:53:27 sof Exp $
 --
 -- GHC Driver program
 --
@@ -43,7 +43,7 @@ import DriverFlags	( dynFlag, buildStaticHscOpts, dynamic_flags,
 			  processArgs, static_flags)
 
 import DriverMkDepend	( beginMkDependHS, endMkDependHS )
-import DriverPhases	( Phase(Hsc, HCc), haskellish_src_file, objish_file )
+import DriverPhases	( Phase(HsPp, Hsc, HCc), haskellish_src_file, objish_file )
 
 import DriverUtil	( add, handle, handleDyn, later, splitFilename,
 			  unknownFlagErr, getFileSuffix )
@@ -286,11 +286,12 @@ main =
 
 	  -- just preprocess (Haskell source only)
    	  let src_and_suff = (src, getFileSuffix src)
-	  pp <- if not (haskellish_src_file src) || mode == StopBefore Hsc
+	  let not_hs_file  = not (haskellish_src_file src)
+	  pp <- if not_hs_file || mode == StopBefore Hsc || mode == StopBefore HsPp
 			then return src_and_suff else do
 		phases <- genPipeline (StopBefore Hsc) stop_flag
-			    False{-not persistent-} defaultHscLang
-			    src_and_suff
+				      False{-not persistent-} defaultHscLang
+				      src_and_suff
 	  	pipeLoop phases src_and_suff False{-no linking-} False{-no -o flag-}
 			basename suffix
 

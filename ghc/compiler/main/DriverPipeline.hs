@@ -159,26 +159,26 @@ genPipeline todo stop_flag persistent_output lang (filename,suffix)
    let
    ----------- -----  ----   ---   --   --  -  -  -
     pipeline
-      | todo == DoMkDependHS = [ Unlit, Cpp, MkDependHS ]
+      | todo == DoMkDependHS = [ Unlit, Cpp, HsPp, MkDependHS ]
 
       | haskellish = 
        case real_lang of
-	HscC    | split && mangle -> [ Unlit, Cpp, Hsc, HCc, Mangle, 
+	HscC    | split && mangle -> [ Unlit, Cpp, HsPp, Hsc, HCc, Mangle, 
 					SplitMangle, SplitAs ]
-	        | mangle          -> [ Unlit, Cpp, Hsc, HCc, Mangle, As ]
+	        | mangle          -> [ Unlit, Cpp, HsPp, Hsc, HCc, Mangle, As ]
 	        | split	       	  -> not_valid
-	        | otherwise       -> [ Unlit, Cpp, Hsc, HCc, As ]
+	        | otherwise       -> [ Unlit, Cpp, HsPp, Hsc, HCc, As ]
 
-	HscAsm  | split           -> [ Unlit, Cpp, Hsc, SplitMangle, SplitAs ]
-	        | otherwise       -> [ Unlit, Cpp, Hsc, As ]
+	HscAsm  | split           -> [ Unlit, Cpp, HsPp, Hsc, SplitMangle, SplitAs ]
+	        | otherwise       -> [ Unlit, Cpp, HsPp, Hsc, As ]
 
 	HscJava	| split	          -> not_valid
 		| otherwise       -> error "not implemented: compiling via Java"
 #ifdef ILX
 	HscILX  | split           -> not_valid
-		| otherwise       -> [ Unlit, Cpp, Hsc, Ilx2Il, Ilasm ]
+		| otherwise       -> [ Unlit, Cpp, HsPp, Hsc, Ilx2Il, Ilasm ]
 #endif
-	HscNothing 		  -> [ Unlit, Cpp, Hsc ]
+	HscNothing 		  -> [ Unlit, Cpp, HsPp, Hsc ]
 
       | cish      = [ Cc, As ]
 
@@ -198,22 +198,18 @@ genPipeline todo stop_flag persistent_output lang (filename,suffix)
    ----------- -----  ----   ---   --   --  -  -  -
 
 	-- this shouldn't happen.
-   if start_phase /= Ln && start_phase `notElem` pipeline
-	then throwDyn (CmdLineError ("can't find starting phase for "
-				     ++ filename))
-	else do
-
+   when (start_phase /= Ln && start_phase `notElem` pipeline)
+	(throwDyn (CmdLineError ("can't find starting phase for "
+			         ++ filename)))
 	-- if we can't find the phase we're supposed to stop before,
 	-- something has gone wrong.  This test carefully avoids the
 	-- case where we aren't supposed to do any compilation, because the file
 	-- is already in linkable form (for example).
-   if start_phase `elem` pipeline && 
- 	(stop_phase /= Ln && stop_phase `notElem` pipeline)
-      then throwDyn (UsageError 
-		("flag " ++ stop_flag
-		 ++ " is incompatible with source file `" ++ filename ++ "'"))
-      else do
-
+   when (start_phase `elem` pipeline && 
+   	 (stop_phase /= Ln && stop_phase `notElem` pipeline))
+        (throwDyn (UsageError 
+		    ("flag " ++ stop_flag
+		     ++ " is incompatible with source file `" ++ filename ++ "'")))
    let
 	-- .o and .hc suffixes can be overriden by command-line options:
       myPhaseInputExt Ln  | Just s <- osuf  = s
@@ -279,7 +275,8 @@ pipeLoop (all_phases@((phase, keep, o_suffix):phases))
 
      output_fn <- outputFileName (null phases) keep o_suffix
 
-     mbCarryOn <- run_phase phase orig_basename orig_suffix input_fn output_fn 
+     mbCarryOn <- run_phase phase orig_basename orig_suffix
+     			    input_fn output_fn 
 	-- sometimes we bail out early, eg. when the compiler's recompilation
 	-- checker has determined that recompilation isn't necessary.
      case mbCarryOn of
@@ -388,48 +385,71 @@ run_phase Cpp basename suff input_fn output_fn
 			       ])
 	    return (Just output_fn)
 
+-------------------------------------------------------------------------------
+-- HsPp phase 
+run_phase HsPp basename suff input_fn output_fn
+  = do src_opts <- getOptionsFromSource input_fn
+       unhandled_flags <- processArgs dynamic_flags src_opts []
+       checkProcessArgsResult unhandled_flags basename suff
+
+       let orig_fn = basename ++ '.':suff
+       do_pp   <- dynFlag ppFlag
+       if not do_pp then
+           -- no need to preprocess, just pass input file along
+	   -- to the next phase of the pipeline.
+          return (Just input_fn)
+	else do
+	    hspp_opts	   <- getOpts opt_F
+       	    hs_src_pp_opts <- readIORef v_Hs_source_pp_opts
+	    SysTools.runPp ( [ SysTools.Option     orig_fn
+			     , SysTools.Option     input_fn
+			     , SysTools.FileOption "" output_fn
+			     ] ++
+			     map SysTools.Option hs_src_pp_opts ++
+			     map SysTools.Option hspp_opts
+			   )
+	    return (Just output_fn)
+
 -----------------------------------------------------------------------------
 -- MkDependHS phase
 
-run_phase MkDependHS basename suff input_fn output_fn = do 
-   src <- readFile input_fn
-   let (import_sources, import_normals, _) = getImports src
+run_phase MkDependHS basename suff input_fn output_fn 
+ = do src <- readFile input_fn
+      let (import_sources, import_normals, _) = getImports src
+      let orig_fn = basename ++ '.':suff
+      deps_sources <- mapM (findDependency True  orig_fn) import_sources
+      deps_normals <- mapM (findDependency False orig_fn) import_normals
+      let deps = deps_sources ++ deps_normals
 
-   let orig_fn = basename ++ '.':suff
-   deps_sources <- mapM (findDependency True  orig_fn) import_sources
-   deps_normals <- mapM (findDependency False orig_fn) import_normals
-   let deps = deps_sources ++ deps_normals
+      osuf_opt <- readIORef v_Object_suf
+      let osuf = case osuf_opt of
+		   Nothing -> phaseInputExt Ln
+		   Just s  -> s
 
-   osuf_opt <- readIORef v_Object_suf
-   let osuf = case osuf_opt of
-			Nothing -> phaseInputExt Ln
-			Just s  -> s
+      extra_suffixes <- readIORef v_Dep_suffixes
+      let suffixes = osuf : map (++ ('_':osuf)) extra_suffixes
+          ofiles = map (\suf -> basename ++ '.':suf) suffixes
 
-   extra_suffixes <- readIORef v_Dep_suffixes
-   let suffixes = osuf : map (++ ('_':osuf)) extra_suffixes
-       ofiles = map (\suf -> basename ++ '.':suf) suffixes
-   	   
-   objs <- mapM odir_ify ofiles
-   
+      objs <- mapM odir_ify ofiles
+
 	-- Handle for file that accumulates dependencies 
-   hdl <- readIORef v_Dep_tmp_hdl
+      hdl <- readIORef v_Dep_tmp_hdl
 
 	-- std dependency of the object(s) on the source file
-   hPutStrLn hdl (unwords objs ++ " : " ++ basename ++ '.':suff)
+      hPutStrLn hdl (unwords objs ++ " : " ++ basename ++ '.':suff)
 
-   let genDep (dep, False {- not an hi file -}) = 
-	  hPutStrLn hdl (unwords objs ++ " : " ++ dep)
-       genDep (dep, True  {- is an hi file -}) = do
-	  hisuf <- readIORef v_Hi_suf
-	  let dep_base = remove_suffix '.' dep
-	      deps = (dep_base ++ hisuf)
-		     : map (\suf -> dep_base ++ suf ++ '_':hisuf) extra_suffixes
+      let genDep (dep, False {- not an hi file -}) = 
+	     hPutStrLn hdl (unwords objs ++ " : " ++ dep)
+          genDep (dep, True  {- is an hi file -}) = do
+	     hisuf <- readIORef v_Hi_suf
+	     let dep_base = remove_suffix '.' dep
+	         deps = (dep_base ++ hisuf)
+		        : map (\suf -> dep_base ++ suf ++ '_':hisuf) extra_suffixes
 		  -- length objs should be == length deps
-	  sequence_ (zipWith (\o d -> hPutStrLn hdl (o ++ " : " ++ d)) objs deps)
+	     sequence_ (zipWith (\o d -> hPutStrLn hdl (o ++ " : " ++ d)) objs deps)
 
-   mapM genDep [ d | Just d <- deps ]
-
-   return (Just output_fn)
+      sequence_ (map genDep [ d | Just d <- deps ])
+      return (Just output_fn)
 
 -- add the lines to dep_makefile:
 	   -- always:
@@ -965,9 +985,10 @@ preprocess :: FilePath -> IO FilePath
 preprocess filename =
   ASSERT(haskellish_src_file filename) 
   do restoreDynFlags	-- Restore to state of last save
+     let fInfo = (filename, getFileSuffix filename)
      pipeline <- genPipeline (StopBefore Hsc) ("preprocess") False 
-			     defaultHscLang (filename, getFileSuffix filename)
-     (fn,_)   <- runPipeline pipeline (filename,getFileSuffix filename)
+			     defaultHscLang fInfo
+     (fn,_)   <- runPipeline pipeline fInfo
      	                     False{-no linking-} False{-no -o flag-}
      return fn
 

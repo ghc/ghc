@@ -19,6 +19,7 @@ module SysTools (
 
 	-- Interface to system tools
 	runUnlit, runCpp, runCc, -- [Option] -> IO ()
+	runPp,                   -- [Option] -> IO ()
 	runMangle, runSplit,	 -- [Option] -> IO ()
 	runAs, runLink,		 -- [Option] -> IO ()
 	runMkDLL,
@@ -182,6 +183,7 @@ All these pathnames are maintained IN THE NATIVE FORMAT OF THE HOST MACHINE.
 \begin{code}
 GLOBAL_VAR(v_Pgm_L,   	error "pgm_L",   String)	-- unlit
 GLOBAL_VAR(v_Pgm_P,   	error "pgm_P",   String)	-- cpp
+GLOBAL_VAR(v_Pgm_F,   	error "pgm_F",   String)	-- pp
 GLOBAL_VAR(v_Pgm_c,   	error "pgm_c",   String)	-- gcc
 GLOBAL_VAR(v_Pgm_m,   	error "pgm_m",   String)	-- asm code mangler
 GLOBAL_VAR(v_Pgm_s,   	error "pgm_s",   String)	-- asm code splitter
@@ -385,6 +387,7 @@ initSysTools minusB_args
 
 	; writeIORef v_Pgm_L   	 	   unlit_path
 	; writeIORef v_Pgm_P   	 	   cpp_path
+	; writeIORef v_Pgm_F               ""
 	; writeIORef v_Pgm_c   	 	   gcc_path
 	; writeIORef v_Pgm_m   	 	   mangle_path
 	; writeIORef v_Pgm_s   	 	   split_path
@@ -416,6 +419,7 @@ setPgm :: String -> IO ()
 -- So the first character says which program to override
 
 setPgm ('P' : pgm) = writeIORef v_Pgm_P pgm
+setPgm ('F' : pgm) = writeIORef v_Pgm_F pgm
 setPgm ('c' : pgm) = writeIORef v_Pgm_c pgm
 setPgm ('m' : pgm) = writeIORef v_Pgm_m pgm
 setPgm ('s' : pgm) = writeIORef v_Pgm_s pgm
@@ -514,7 +518,7 @@ showOptions ls = unwords (map (quote.showOpt) ls)
 %************************************************************************
 %*									*
 \subsection{Running an external program}
-n%*									*
+%*									*
 %************************************************************************
 
 
@@ -526,6 +530,10 @@ runUnlit args = do p <- readIORef v_Pgm_L
 runCpp :: [Option] -> IO ()
 runCpp args =   do p <- readIORef v_Pgm_P
 		   runSomething "C pre-processor" p args
+
+runPp :: [Option] -> IO ()
+runPp args =   do p <- readIORef v_Pgm_F
+		  runSomething "Haskell pre-processor" p args
 
 runCc :: [Option] -> IO ()
 runCc args =   do p <- readIORef v_Pgm_c
@@ -781,7 +789,7 @@ dosifyPath stuff
   cygdrive_prefix = "/cygdrive/"
 
   real_stuff
-    | cygdrive_prefix `isPrefixOf` stuff = drop (length cygdrive_prefix) stuff
+    | cygdrive_prefix `isPrefixOf` stuff = dropList cygdrive_prefix stuff
     | otherwise = stuff
    
 #else
@@ -832,7 +840,7 @@ getExecDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
 		if ret == 0 then destructArray len buf >> return Nothing
 		            else do s <- peekCString buf
 				    destructArray len buf
-				    return (Just (reverse (drop (length "/bin/ghc.exe") (reverse (unDosifyPath s)))))
+				    return (Just (reverse (dropList "/bin/ghc.exe" (reverse (unDosifyPath s)))))
 
 
 foreign import stdcall "GetModuleFileNameA" getModuleFileName :: Addr -> CString -> Int -> IO Int32

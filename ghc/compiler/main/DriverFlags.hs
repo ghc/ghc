@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.76 2001/10/17 15:44:40 simonpj Exp $
+-- $Id: DriverFlags.hs,v 1.77 2001/10/26 00:53:27 sof Exp $
 --
 -- Driver flags
 --
@@ -300,12 +300,14 @@ static_flags =
 dynamic_flags = [
 
      ( "cpp",		NoArg  (updDynFlags (\s -> s{ cppFlag = True })) )
+  ,  ( "F",             NoArg  (updDynFlags (\s -> s{ ppFlag = True })) )
   ,  ( "#include",	HasArg (addCmdlineHCInclude) )
 
   ,  ( "v",		OptPrefix (setVerbosity) )
 
   ,  ( "optL",		HasArg (addOpt_L) )
   ,  ( "optP",		HasArg (addOpt_P) )
+  ,  ( "optF",          HasArg (addOpt_F) )
   ,  ( "optc",		HasArg (addOpt_c) )
   ,  ( "optm",		HasArg (addOpt_m) )
   ,  ( "opta",		HasArg (addOpt_a) )
@@ -541,6 +543,7 @@ machdepCCOpts
 
 addOpt_L a = updDynFlags (\s -> s{opt_L = a : opt_L s})
 addOpt_P a = updDynFlags (\s -> s{opt_P = a : opt_P s})
+addOpt_F a = updDynFlags (\s -> s{opt_F = a : opt_F s})
 addOpt_c a = updDynFlags (\s -> s{opt_c = a : opt_c s})
 addOpt_a a = updDynFlags (\s -> s{opt_a = a : opt_a s})
 addOpt_m a = updDynFlags (\s -> s{opt_m = a : opt_m s})

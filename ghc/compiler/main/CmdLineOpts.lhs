@@ -293,12 +293,14 @@ data DynFlags = DynFlags {
   extCoreName		:: String,	-- name of the .core output file
   verbosity  		:: Int,	 	-- verbosity level
   cppFlag    		:: Bool,	-- preprocess with cpp?
+  ppFlag                :: Bool,        -- preprocess with a Haskell Pp?
   stolen_x86_regs	:: Int,		
   cmdlineHcIncludes	:: [String],	-- -#includes
 
   -- options for particular phases
   opt_L			:: [String],
   opt_P			:: [String],
+  opt_F			:: [String],
   opt_c			:: [String],
   opt_a			:: [String],
   opt_m			:: [String],
@@ -328,10 +330,12 @@ defaultDynFlags = DynFlags {
   extCoreName = "",
   verbosity = 0, 
   cppFlag		= False,
+  ppFlag                = False,
   stolen_x86_regs	= 4,
   cmdlineHcIncludes	= [],
   opt_L			= [],
   opt_P			= [],
+  opt_F                 = [],
   opt_c			= [],
   opt_a			= [],
   opt_m			= [],

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.60 2001/10/22 10:33:50 simonmar Exp $
+-- $Id: DriverState.hs,v 1.61 2001/10/26 00:53:27 sof Exp $
 --
 -- Settings for the driver
 --
@@ -64,6 +64,7 @@ v_Hs_source_cpp_opts = global
 	]
 {-# NOINLINE v_Hs_source_cpp_opts #-}
 
+
 -- Keep output from intermediate phases
 GLOBAL_VAR(v_Keep_hi_diffs, 		False, 		Bool)
 GLOBAL_VAR(v_Keep_hc_files,		False,		Bool)
@@ -81,6 +82,9 @@ GLOBAL_VAR(v_Collect_ghc_timing, 	False,		Bool)
 GLOBAL_VAR(v_Do_asm_mangling,		True,		Bool)
 GLOBAL_VAR(v_Excess_precision,		False,		Bool)
 GLOBAL_VAR(v_Read_DotGHCi,		True,		Bool)
+
+-- Preprocessor flags
+GLOBAL_VAR(v_Hs_source_pp_opts, [], [String])
 
 -----------------------------------------------------------------------------
 -- Splitting object files (for libraries)
