@@ -1236,9 +1236,10 @@ summariseFile file
                  Nothing     -> noHsFileErr mod_name
                  Just src_fn -> getModificationTime src_fn
 
-        return (ModSummary mod
-                           location{ml_hspp_file=Just hspp_fn}
-                           srcimps the_imps src_timestamp)
+        return (ModSummary { ms_mod = mod, 
+                             ms_location = location{ml_hspp_file=Just hspp_fn},
+                             ms_srcimps = srcimps, ms_imps = the_imps,
+			     ms_hs_date = src_timestamp })
 
 -- Summarise a module, and pick up source and timestamp.
 summarise :: Module -> ModLocation -> Maybe ModSummary
