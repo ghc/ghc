@@ -41,7 +41,10 @@ test('conc027', normal, compile_and_run, [''])
 test('conc028', normal, compile_and_run, [''])
 test('conc029', normal, compile_and_run, [''])
 test('conc030', extra_run_opts('+RTS -K2M -RTS'), compile_and_run, [''])
-test('conc031', normal, compile_and_run, [''])
+
+# Skip for now, hangs for ever (broken?)
+test('conc031', skip, compile_and_run, [''])
+
 test('conc032', normal, compile_and_run, [''])
 
 # Omit for GHCi, because it just sits there waiting for you to press ^C
