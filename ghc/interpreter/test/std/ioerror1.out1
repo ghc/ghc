@@ -1,9 +1,0 @@
-userError "foo"
-Just "foo"
-Caught error
-
-Caught error
-Continuing
-
-
-foo

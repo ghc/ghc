@@ -1,1 +1,0 @@
-ERROR "test/static/s003.hs" (line 5): Binding for qualified variable "A.y" not allowed
