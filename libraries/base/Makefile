@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.27 2002/05/10 13:16:55 simonmar Exp $
+# $Id: Makefile,v 1.28 2002/05/27 14:30:49 simonmar Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -110,7 +110,7 @@ haddock-docs : $(HS_PPS)
 	$(GHC_INPLACE) $(HC_OPTS) -D__HADDOCK__ -E -cpp $< -o $<.tmp && sed -e 's/^#.*//' <$<.tmp >$@
 
 %.raw-hs : %.hs
-	$(GHC_INPLACE) $(HC_OPTS) -E -cpp $< -o $<.tmp && sed -e 's/^#.*//' <$<.tmp >$@
+	$(GHC_INPLACE) $(HC_OPTS) -D__HADDOCK__ -E -cpp $< -o $<.tmp && sed -e 's/^#.*//' <$<.tmp >$@
 
 # -----------------------------------------------------------------------------
 
