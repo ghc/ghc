@@ -349,16 +349,15 @@ doesLibExistIn lib d
  | otherwise                = doesFileExist (d ++ '/':lib)
 
 checkGHCiLib :: [String] -> String -> String -> String -> Bool -> IO ()
-checkGHCiLib dirs batch_lib_dir batch_lib_file lib auto_build = do
-  let ghci_lib_file = lib ++ ".o"
-  bs <- mapM (doesLibExistIn ghci_lib_file) dirs
-  case [ dir | (exists,dir) <- zip bs dirs, exists ] of
-        [] | auto_build -> 
-		autoBuildGHCiLib batch_lib_dir batch_lib_file ghci_lib_file
-	   | otherwise  -> 
-		hPutStrLn stderr ("warning: can't find GHCi lib `"
-					 ++ ghci_lib_file ++ "'")
+checkGHCiLib dirs batch_lib_dir batch_lib_file lib auto_build
+  | auto_build = autoBuildGHCiLib batch_lib_dir batch_lib_file ghci_lib_file
+  | otherwise  = do
+      bs <- mapM (doesLibExistIn ghci_lib_file) dirs
+      case [dir | (exists,dir) <- zip bs dirs, exists] of
+        []    -> hPutStrLn stderr ("warning: can't find GHCi lib `" ++ ghci_lib_file ++ "'")
    	(_:_) -> return ()
+  where
+    ghci_lib_file = lib ++ ".o"
 
 -- automatically build the GHCi version of a batch lib, 
 -- using ld --whole-archive.
