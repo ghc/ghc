@@ -10,6 +10,6 @@ __export RnSource rnBindsAndThen rnBinds rnSrcDecls;
 	-> TcRnTypes.RnM (RnHsSyn.RenamedHsBinds, NameSet.DefUses) ;
 
 1 rnSrcDecls :: HsDecls.HsGroup RdrName.RdrName
-	   -> TcRnTypes.RnM (TcRnTypes.TcGblEnv, HsDecls.HsGroup Name.Name, NameSet.DefUses) ;
+	   -> TcRnTypes.RnM (TcRnTypes.TcGblEnv, HsDecls.HsGroup Name.Name) ;
 
 

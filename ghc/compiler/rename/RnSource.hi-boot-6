@@ -9,5 +9,5 @@ rnBinds :: RdrHsSyn.RdrNameHsBinds
 	-> TcRnTypes.RnM (RnHsSyn.RenamedHsBinds, NameSet.DefUses) ;
 
 rnSrcDecls :: HsDecls.HsGroup RdrName.RdrName
-	   -> TcRnTypes.RnM (TcRnTypes.TcGblEnv, HsDecls.HsGroup Name.Name, NameSet.DefUses)
+	   -> TcRnTypes.RnM (TcRnTypes.TcGblEnv, HsDecls.HsGroup Name.Name)
 
