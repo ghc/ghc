@@ -360,26 +360,6 @@ stablePtrTyCon
 	    alpha_tyvar [] [mkStablePtrPrimTy alphaTy] stablePtrTyCon
 \end{code}
 
-\begin{code}
-foreignObjTyCon
-  = pcNonRecDataTyCon foreignObjTyConName
-	[] [] [foreignObjDataCon]
-  where
-    foreignObjDataCon
-      = pcDataCon foreignObjDataConName
-	    [] [] [foreignObjPrimTy] foreignObjTyCon
-\end{code}
-
-\begin{code}
-foreignPtrTyCon
-  = pcNonRecDataTyCon foreignPtrTyConName
-	alpha_tyvar  [(True,False)] [foreignPtrDataCon]
-  where
-    foreignPtrDataCon
-      = pcDataCon foreignPtrDataConName
-	    alpha_tyvar [] [foreignObjPrimTy] foreignPtrTyCon
-\end{code}
-
 %************************************************************************
 %*									*
 \subsection[TysWiredIn-Integer]{@Integer@ and its related ``pairing'' types}
