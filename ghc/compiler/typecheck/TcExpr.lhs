@@ -49,6 +49,7 @@ import Name		( Name )
 import TyCon		( TyCon, FieldLabel, tyConTyVars, tyConStupidTheta, 
 			  tyConDataCons, tyConFields )
 import Type		( zipTopTvSubst, substTheta, substTy )
+import Var		( tyVarKind )
 import VarSet		( emptyVarSet, elemVarSet )
 import TysWiredIn	( boolTy, parrTyCon, tupleTyCon )
 import PrelNames	( enumFromName, enumFromThenName, 
@@ -458,11 +459,11 @@ tc_expr expr@(RecordUpd record_expr rbinds) res_ty
 	non_upd_field_lbls  = concat relevant_field_lbls_s `minusList` upd_field_lbls
 	common_tyvars       = tyVarsOfTypes [ty | (fld,ty,_) <- tyConFields tycon,
 						  fld `elem` non_upd_field_lbls]
+ 	is_common_tv tv = tv `elemVarSet` common_tyvars
 
-	mk_inst_ty tyvar result_inst_ty 
-	  | tyvar `elemVarSet` common_tyvars = returnM result_inst_ty	-- Same as result type
--- gaw 2004 FIX?
-	  | otherwise			     = newTyFlexiVarTy liftedTypeKind	-- Fresh type
+	mk_inst_ty tv result_inst_ty 
+	  | is_common_tv tv = returnM result_inst_ty		-- Same as result type
+	  | otherwise	    = newTyFlexiVarTy (tyVarKind tv)	-- Fresh type, of correct kind
     in
     zipWithM mk_inst_ty tycon_tyvars result_inst_tys	`thenM` \ inst_tys ->
 
