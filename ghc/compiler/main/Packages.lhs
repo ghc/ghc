@@ -64,6 +64,11 @@ import Data.Maybe	( fromJust, isNothing )
 import System.Directory	( doesFileExist )
 import Control.Monad	( when, foldM )
 import Data.List	( nub, partition )
+
+#ifdef mingw32_TARGET_OS
+import Data.List	( isPrefixOf )
+#endif
+
 import FastString
 import DATA_IOREF
 import EXCEPTION	( throwDyn )
