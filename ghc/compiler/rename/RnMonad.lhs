@@ -287,14 +287,16 @@ data ParsedIface
       pi_deprecs   :: [(Maybe FAST_STRING, FAST_STRING)] -- Deprecations, the type is currently only a hack
     }
 
-type InterfaceDetails = (WhetherHasOrphans,
-			 VersionInfo Name, -- Version information for what this module imports
-			 ExportEnv)	   -- What modules this one depends on
+data InterfaceDetails
+   = InterfaceDetails WhetherHasOrphans
+		      (VersionInfo Name)   -- Version information for what this module imports
+		      ExportEnv		   -- What modules this one depends on
+		      [Deprecation Name]
 
 
 -- needed by Main to fish out the fixities assoc list.
 getIfaceFixities :: InterfaceDetails -> Fixities
-getIfaceFixities (_, _, ExportEnv _ fs _) = fs
+getIfaceFixities (InterfaceDetails _ _ (ExportEnv _ fs _) _) = fs
 
 
 type RdrNamePragma = ()				-- Fudge for now

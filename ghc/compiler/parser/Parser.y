@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.22 2000/02/17 14:47:26 panne Exp $
+$Id: Parser.y,v 1.23 2000/02/20 17:51:45 panne Exp $
 
 Haskell grammar.
 
@@ -36,7 +36,7 @@ import GlaExts
 -----------------------------------------------------------------------------
 Conflicts: 14 shift/reduce
 	(note: it's currently 21 -- JRL, 31/1/2000)
-        (note2: it' currently 36, but not because of me -- SUP, 15/2/2000 :-)
+        (note2: it's currently 36, but not because of me -- SUP, 15/2/2000 :-)
 
 8 for abiguity in 'if x then y else z + 1'
 	(shift parses as 'if x then y else (z + 1)', as per longest-parse rule)
@@ -218,8 +218,8 @@ module 	:: { RdrNameHsModule }
 	| srcloc body
 		{ HsModule mAIN_Name Nothing Nothing (fst $2) (snd $2) Nothing $1 }
 
-maybemoddeprec :: { Maybe FAST_STRING }
-	: '{-# DEPRECATED' STRING '#-}' 	{ Just $2 }
+maybemoddeprec :: { Maybe (Deprecation RdrName) }
+	: '{-# DEPRECATED' STRING '#-}' 	{ Just (DeprecMod $2) }
 	|  {- empty -}				{ Nothing }
 
 body 	:: { ([RdrNameImportDecl], [RdrNameHsDecl]) }
@@ -482,7 +482,7 @@ deprecations :: { RdrBinding }
 
 deprecation :: { RdrBinding }
 	: deprecated_names STRING
-		{ foldr1 RdrAndBindings [ RdrSig (DeprecSig n $2 l) | (l,n) <- $1 ] }
+		{ foldr1 RdrAndBindings [ RdrSig (DeprecSig (DeprecName n $2) l) | (l,n) <- $1 ] }
 
 deprecated_names :: { [(SrcLoc,RdrName)] }
 	: deprecated_names ',' deprecated_name	{ $3 : $1 }

@@ -255,14 +255,17 @@ data Sig name
 				-- current instance decl
 		SrcLoc
 
-  | FixSig	(FixitySig name)		-- Fixity declaration
+  | FixSig	(FixitySig name)	-- Fixity declaration
 
-  | DeprecSig	name		-- DEPRECATED
-		DeprecTxt
+  | DeprecSig	(Deprecation name)	-- DEPRECATED
 		SrcLoc
 
 
 data FixitySig name  = FixitySig name Fixity SrcLoc
+
+data Deprecation name
+   = DeprecMod       DeprecTxt	-- deprecation of a whole module
+   | DeprecName name DeprecTxt	-- deprecation of a single name
 
 type DeprecTxt = FAST_STRING	-- reason/explanation for deprecation
 \end{code}
@@ -272,14 +275,15 @@ sigsForMe :: (name -> Bool) -> [Sig name] -> [Sig name]
 sigsForMe f sigs
   = filter sig_for_me sigs
   where
-    sig_for_me (Sig         n _ _)    	  = f n
-    sig_for_me (ClassOpSig  n _ _ _ _) 	  = f n
-    sig_for_me (SpecSig     n _ _)  	  = f n
-    sig_for_me (InlineSig   n _   _)  	  = f n  
-    sig_for_me (NoInlineSig n _   _)  	  = f n  
-    sig_for_me (SpecInstSig _ _)      	  = False
-    sig_for_me (FixSig (FixitySig n _ _)) = f n
-    sig_for_me (DeprecSig n _ _)	  = f n
+    sig_for_me (Sig         n _ _)            = f n
+    sig_for_me (ClassOpSig  n _ _ _ _)        = f n
+    sig_for_me (SpecSig     n _ _)            = f n
+    sig_for_me (InlineSig   n _   _)          = f n  
+    sig_for_me (NoInlineSig n _   _)          = f n  
+    sig_for_me (SpecInstSig _ _)              = False
+    sig_for_me (FixSig (FixitySig n _ _))     = f n
+    sig_for_me (DeprecSig (DeprecMod    _) _) = False
+    sig_for_me (DeprecSig (DeprecName n _) _) = f n
 
 isFixitySig :: Sig name -> Bool
 isFixitySig (FixSig _) = True
@@ -295,7 +299,7 @@ isPragSig (SpecSig _ _ _)     = True
 isPragSig (InlineSig   _ _ _) = True
 isPragSig (NoInlineSig _ _ _) = True
 isPragSig (SpecInstSig _ _)   = True
-isPragSig (DeprecSig _ _ _)   = True
+isPragSig (DeprecSig _ _)     = True
 isPragSig other		      = False
 \end{code}
 
@@ -306,6 +310,11 @@ instance (Outputable name) => Outputable (Sig name) where
 instance Outputable name => Outputable (FixitySig name) where
   ppr (FixitySig name fixity loc) = sep [ppr fixity, ppr name]
 
+instance Outputable name => Outputable (Deprecation name) where
+   ppr (DeprecMod txt)
+      = hsep [text "{-# DEPRECATED",        doubleQuotes (ppr txt), text "#-}"]
+   ppr (DeprecName n txt)
+      = hsep [text "{-# DEPRECATED", ppr n, doubleQuotes (ppr txt), text "#-}"]
 
 ppr_sig (Sig var ty _)
       = sep [ppr var <+> dcolon, nest 4 (ppr ty)]
@@ -329,8 +338,7 @@ ppr_sig (SpecInstSig ty _)
 
 ppr_sig (FixSig fix_sig) = ppr fix_sig
 
-ppr_sig (DeprecSig n txt _)
-      = hsep [text "{-# DEPRECATED", ppr n, doubleQuotes(ppr txt), text "#-}"]
+ppr_sig (DeprecSig deprec _) = ppr deprec
 
 ppr_phase Nothing = empty
 ppr_phase (Just n) = int n

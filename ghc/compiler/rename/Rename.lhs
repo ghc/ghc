@@ -90,7 +90,7 @@ renameModule us this_mod@(HsModule mod_name vers exports imports local_decls _ l
 
 
 \begin{code}
-rename this_mod@(HsModule mod_name vers _ imports local_decls deprec loc)
+rename this_mod@(HsModule mod_name vers _ imports local_decls mod_deprec loc)
   =  	-- FIND THE GLOBAL NAME ENVIRONMENT
     getGlobalNames this_mod			`thenRn` \ maybe_stuff ->
 
@@ -120,6 +120,17 @@ rename this_mod@(HsModule mod_name vers _ imports local_decls deprec loc)
     slurpImpDecls real_source_fvs	`thenRn` \ rn_imp_decls ->
     let
 	rn_all_decls	   = rn_local_decls ++ rn_imp_decls
+
+	-- COLLECT ALL DEPRECATIONS
+	deprec_sigs = [ ds | ValD bnds <- rn_local_decls, ds <- collectDeprecs bnds ]
+
+	(rn_mod_deprec, deprecs) = case mod_deprec of
+	   Nothing -> (Nothing, deprec_sigs)
+	   Just (DeprecMod t) -> let dm = DeprecMod t in (Just dm, dm:deprec_sigs)
+
+	collectDeprecs EmptyBinds = []
+	collectDeprecs (ThenBinds x y) = collectDeprecs x ++ collectDeprecs y
+	collectDeprecs (MonoBind _ sigs _) = [ d | DeprecSig d _ <- sigs ]
     in
 
 	-- EXIT IF ERRORS FOUND
@@ -146,13 +157,13 @@ rename this_mod@(HsModule mod_name vers _ imports local_decls deprec loc)
 	renamed_module = HsModule mod_name vers 
 				  trashed_exports trashed_imports
 				  rn_all_decls
-			          deprec
+			          rn_mod_deprec
 			          loc
     in
     rnDump rn_imp_decls	rn_all_decls		`thenRn` \ dump_action ->
     returnRn (Just (mkThisModule mod_name,
 		    renamed_module, 
-		    (has_orphans, my_usages, export_env),
+		    (InterfaceDetails has_orphans my_usages export_env deprecs),
 		    name_supply,
 		    direct_import_mods), dump_action)
   where

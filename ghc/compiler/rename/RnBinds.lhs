@@ -541,10 +541,10 @@ renameSig lookup_occ_nm (FixSig (FixitySig v fix src_loc))
     lookup_occ_nm v		`thenRn` \ new_v ->
     returnRn (FixSig (FixitySig new_v fix src_loc), unitFV new_v)
 
-renameSig lookup_occ_nm (DeprecSig v txt src_loc)
+renameSig lookup_occ_nm (DeprecSig (DeprecName v txt) src_loc)
   = pushSrcLocRn src_loc $
     lookup_occ_nm v		`thenRn` \ new_v ->
-    returnRn (DeprecSig new_v txt src_loc, unitFV new_v)
+    returnRn (DeprecSig (DeprecName new_v txt) src_loc, unitFV new_v)
 
 renameSig lookup_occ_nm (InlineSig v p src_loc)
   = pushSrcLocRn src_loc $
@@ -561,12 +561,12 @@ Checking for distinct signatures; oh, so boring
 
 \begin{code}
 cmp_sig :: RenamedSig -> RenamedSig -> Ordering
-cmp_sig (Sig n1 _ _)	     (Sig n2 _ _)    	     = n1 `compare` n2
-cmp_sig (DeprecSig n1 _ _)     (DeprecSig n2 _ _)    = n1 `compare` n2
-cmp_sig (InlineSig n1 _ _)     (InlineSig n2 _ _)    = n1 `compare` n2
-cmp_sig (NoInlineSig n1 _ _)   (NoInlineSig n2 _ _)  = n1 `compare` n2
-cmp_sig (SpecInstSig ty1 _)  (SpecInstSig ty2 _)     = cmpHsType compare ty1 ty2
-cmp_sig (SpecSig n1 ty1 _)   (SpecSig n2 ty2 _) 
+cmp_sig (Sig n1 _ _)                    (Sig n2 _ _)                    = n1 `compare` n2
+cmp_sig (DeprecSig (DeprecName n1 _) _) (DeprecSig (DeprecName n2 _) _) = n1 `compare` n2
+cmp_sig (InlineSig n1 _ _)              (InlineSig n2 _ _)              = n1 `compare` n2
+cmp_sig (NoInlineSig n1 _ _)            (NoInlineSig n2 _ _)            = n1 `compare` n2
+cmp_sig (SpecInstSig ty1 _)             (SpecInstSig ty2 _)             = cmpHsType compare ty1 ty2
+cmp_sig (SpecSig n1 ty1 _)              (SpecSig n2 ty2 _) 
   = -- may have many specialisations for one value;
     -- but not ones that are exactly the same...
 	thenCmp (n1 `compare` n2) (cmpHsType compare ty1 ty2)
@@ -581,7 +581,7 @@ sig_tag (InlineSig n1 _ _)  	   = ILIT(3)
 sig_tag (NoInlineSig n1 _ _)  	   = ILIT(4)
 sig_tag (SpecInstSig _ _)	   = ILIT(5)
 sig_tag (FixSig _)		   = ILIT(6)
-sig_tag (DeprecSig _ _ _)	   = ILIT(7)
+sig_tag (DeprecSig _ _)		   = ILIT(7)
 sig_tag _			   = panic# "tag(RnBinds)"
 \end{code}
 
@@ -614,7 +614,7 @@ sig_doc (InlineSig  _ _    loc)	     = (SLIT("INLINE pragma"),loc)
 sig_doc (NoInlineSig  _ _  loc)	     = (SLIT("NOINLINE pragma"),loc)
 sig_doc (SpecInstSig _ loc)	     = (SLIT("SPECIALISE instance pragma"),loc)
 sig_doc (FixSig (FixitySig _ _ loc)) = (SLIT("fixity declaration"), loc)
-sig_doc (DeprecSig _ _ loc)          = (SLIT("DEPRECATED pragma"), loc)
+sig_doc (DeprecSig _ loc)            = (SLIT("DEPRECATED pragma"), loc)
 
 missingSigWarn var
   = sep [ptext SLIT("definition but no type signature for"), quotes (ppr var)]
