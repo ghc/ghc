@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.72 2001/09/25 18:08:47 ken Exp $
+-- $Id: DriverFlags.hs,v 1.73 2001/10/01 13:57:13 rrt Exp $
 --
 -- Driver flags
 --
@@ -222,6 +222,7 @@ static_flags =
   ,  ( "keep-hc-file"   , AnySuffix (\_ -> writeIORef v_Keep_hc_files True) )
   ,  ( "keep-s-file"    , AnySuffix (\_ -> writeIORef v_Keep_s_files  True) )
   ,  ( "keep-raw-s-file", AnySuffix (\_ -> writeIORef v_Keep_raw_s_files  True) )
+  ,  ( "keep-il-file"   , AnySuffix (\_ -> writeIORef v_Keep_il_files True) )
   ,  ( "keep-tmp-files" , AnySuffix (\_ -> writeIORef v_Keep_tmp_files True) )
 
   ,  ( "split-objs"	, NoArg (if can_split
