@@ -164,7 +164,7 @@ test('tc163', normal, compile, [''])
 test('tc164', normal, compile, [''])
 test('tc165', normal, compile, [''])
 test('tc166', normal, compile, [''])
-test('tc167', expect_fail, compile, [''])
+test('tc167', normal, compile, [''])
 test('tc168', normal, compile, ['-ddump-types'])
 test('tc169', normal, compile, [''])
 
