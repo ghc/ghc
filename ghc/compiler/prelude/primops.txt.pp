@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.23 2002/12/11 15:36:35 simonmar Exp $
+-- $Id: primops.txt.pp,v 1.24 2003/02/04 12:40:00 simonpj Exp $
 --
 -- Primitive Operations
 --
@@ -1481,7 +1481,7 @@ primop  DeRefWeakOp "deRefWeak#" GenPrimOp
 
 primop  FinalizeWeakOp "finalizeWeak#" GenPrimOp
    Weak# a -> State# RealWorld -> (# State# RealWorld, Int#, 
-              (State# RealWorld -> (# State# RealWorld, Unit #)) #)
+              (State# RealWorld -> (# State# RealWorld, () #)) #)
    with
    usage            = { mangle FinalizeWeakOp [mkM, mkP] 
                                (mkR . (inUB FinalizeWeakOp 

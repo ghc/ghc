@@ -383,7 +383,7 @@ ppType (TyApp "RealWorld"   []) = "realWorldTy"
 ppType (TyApp "ThreadId#"   []) = "threadIdPrimTy"
 ppType (TyApp "ForeignObj#" []) = "foreignObjPrimTy"
 ppType (TyApp "BCO#"        []) = "bcoPrimTy"
-ppType (TyApp "Unit"        []) = "unitTy"   -- dodgy
+ppType (TyApp "()"          []) = "unitTy" 	-- unitTy is TysWiredIn's name for ()
 
 
 ppType (TyVar "a")               = "alphaTy"
@@ -647,7 +647,7 @@ ppT = alts [apply TyVar pTyvar,
            ]
 
 pTyvar       = sat (`notElem` ["section","primop","with"]) pName
-pTycon       = pConstructor
+pTycon       = alts [pConstructor, lexeme (string "()")]
 pName        = lexeme (then2 (:) lower (many isIdChar))
 pConstructor = lexeme (then2 (:) upper (many isIdChar))
 
