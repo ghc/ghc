@@ -40,7 +40,7 @@ import Control.Monad.Writer
 import Data.FiniteMap
 import System.Console.GetOpt
 import Data.IORef
-import Debug.Trace
+--import Debug.Trace
 import System.IO.Unsafe	 ( unsafePerformIO )
 #endif
 
@@ -322,10 +322,14 @@ mkInterface no_implicit_prelude mod_map filename
 	where 
 		loc = SrcLoc 0 0
 	 	is_prel_import (HsImportDecl _ mdl0 _ _ _ ) = mdl0 == prelude_mod
+  -- in
 
      -- build the orig_env, which maps names to *original* names (so we can
      -- find the original declarations & docs for things).
-     orig_env = buildOrigEnv mod_map implicit_imps `plusFM` local_orig_env
+  imported_orig_env <- buildOrigEnv mdl mod_map implicit_imps 
+ 
+  let
+     orig_env = imported_orig_env `plusFM` local_orig_env
 
      -- convert names in source code to original, fully qualified, names
      (orig_exports, missing_names1) 
@@ -335,10 +339,11 @@ mkInterface no_implicit_prelude mod_map filename
 	= runRnFM orig_env (mapM renameDecl annotated_decls)
 
      -- gather up a list of entities that are exported (original names)
-     (exported_names, exported_visible_names)
-	 = exportedNames mdl mod_map
+  (exported_names, exported_visible_names)
+	 <- exportedNames mdl mod_map
 			locally_defined_names orig_env sub_map
 			orig_exports opts
+  let
 
      -- build the import env, which maps original names to import names
      local_import_env = listToFM (zip qual_local_names qual_local_names)
@@ -557,8 +562,7 @@ mkExportItems mod_map this_mod orig_env decl_map sub_map decls
 		| OptHide `elem` iface_options iface
 			-> return (iface_orig_exports iface)
 		| otherwise -> return [ ExportModule m ]
-	     Nothing -> do tell ["Warning: module not found: " ++ show m]
-			   return []
+	     Nothing -> return [] -- already emitted a warning in exportedNames
 
     findDecl :: HsQName -> Maybe HsDecl
     findDecl (UnQual _)
@@ -663,14 +667,17 @@ exportedNames :: Module -> ModuleMap -> [HsName]
 	-> FiniteMap HsName [HsName]
 	-> Maybe [HsExportSpec]
 	-> [DocOption]
-	-> ([HsQName], [HsQName])
+	-> ErrMsgM ([HsQName], [HsQName])
 
 exportedNames mdl mod_map local_names orig_env sub_map maybe_exps opts
-  | Nothing <- maybe_exps 	    = all_local_names_pr
-  | OptIgnoreExports `elem` opts    = all_local_names_pr
-  | Just expspecs <- maybe_exps     = 
-	(concat (map extract expspecs), 
-	 concat (map extract_vis expspecs))
+  | Nothing <- maybe_exps 	    
+	= return all_local_names_pr
+  | OptIgnoreExports `elem` opts
+	= return all_local_names_pr
+  | Just expspecs <- maybe_exps
+	= do all_names <- mapM extract expspecs
+	     all_vis_names <- mapM extract_vis expspecs
+	     return (concat all_names, concat all_vis_names)
  where
   all_local_names = map (Qual mdl) local_names
   all_local_names_pr = (all_local_names,all_local_names)
@@ -679,22 +686,25 @@ exportedNames mdl mod_map local_names orig_env sub_map maybe_exps opts
 
   extract e = 
    case e of
-    HsEVar x -> [x]
-    HsEAbs t -> [t]
+    HsEVar x -> return [x]
+    HsEAbs t -> return [t]
     HsEThingAll t@(Qual m x) ->
-	 t : filter (`elem` in_scope) (map (Qual m) all_subs)
+	 return (t : filter (`elem` in_scope) (map (Qual m) all_subs))
 	 where
 	      all_subs | m == mdl  = lookupWithDefaultFM sub_map [] x
 		       | otherwise = all_subs_of_qname mod_map t
 
-    HsEThingWith t cs -> t : cs
+    HsEThingWith t cs -> return (t : cs)
     HsEModuleContents m
-	| m == mdl  -> map (Qual mdl) local_names
+	| m == mdl  -> return (map (Qual mdl) local_names)
 	| otherwise ->
 	  case lookupFM mod_map m of
-	    Just iface -> filter (`elem` in_scope) (eltsFM (iface_env iface))
-	    Nothing    -> trace ("Warning: module not found: " ++ show m) $ []
-    _ -> []
+	    Just iface -> 
+		return (filter (`elem` in_scope) (eltsFM (iface_env iface)))
+	    Nothing    -> 
+		do tell (exportModuleMissingErr mdl m)
+		   return []
+    _ -> return []
 
   -- Just the names that will be visible in the documentation
   -- (ie. omit names exported via a 'module M' export, if we are just
@@ -702,16 +712,20 @@ exportedNames mdl mod_map local_names orig_env sub_map maybe_exps opts
   extract_vis e = 
    case e of
     HsEModuleContents m
-	| m == mdl  -> map (Qual mdl) local_names
+	| m == mdl  -> return (map (Qual mdl) local_names)
 	| otherwise ->
 	  case lookupFM mod_map m of
 	    Just iface
 		| OptHide `elem` iface_options iface ->
-			filter (`elem` in_scope) (eltsFM (iface_env iface))
-		| otherwise -> []
+		    return (filter (`elem` in_scope) (eltsFM (iface_env iface)))
+		| otherwise -> return []
 	    Nothing
-		-> trace ("Warning: module not found: " ++ show m) $ []
+		-> return []  -- we already emitted a warning above
     _ -> extract e
+
+exportModuleMissingErr this mdl 
+  = ["Warning: in export list of " ++ show this
+	 ++ ": module not found: " ++ show mdl]
 
 -- for a given entity, find all the names it "owns" (ie. all the
 -- constructors and field names of a tycon, or all the methods of a
@@ -753,16 +767,21 @@ getReExports mdl mod_map (Just exps)
 -- The orig env maps names in the current source file to
 -- fully-qualified "original" names.
 
-buildOrigEnv :: ModuleMap -> [HsImportDecl] -> FiniteMap HsQName HsQName
-buildOrigEnv mod_map imp_decls
-  = foldr plusFM emptyFM (map build imp_decls)
+buildOrigEnv :: Module -> ModuleMap -> [HsImportDecl]
+   -> ErrMsgM (FiniteMap HsQName HsQName)
+buildOrigEnv this_mdl mod_map imp_decls
+  = do maps <- mapM build imp_decls
+       return (foldr plusFM emptyFM maps)
   where
   build imp_decl@(HsImportDecl _ mdl qual maybe_as _)
     = case lookupFM mod_map mdl of
-       Nothing -> 
-	  trace ("Warning: module not found: " ++ show mdl) $ emptyFM
+       Nothing -> do 
+	  tell ["Warning: " ++ show this_mdl
+		   ++ ": imported module not found: " ++ show mdl]
+	  return emptyFM
        Just iface -> 
-	  listToFM (concat (map orig_map (processImportDecl mod_map imp_decl)))
+	  return (listToFM (concat (map orig_map 
+			(processImportDecl mod_map imp_decl))))
         where
 
 	-- bring both qualified and unqualified names into scope, unless
