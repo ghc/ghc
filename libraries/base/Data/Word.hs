@@ -17,9 +17,7 @@ module Data.Word
   ( 
 	-- * Unsigned integral types
 
-#ifndef __HUGS__
 	Word,
-#endif
 	Word8, Word16, Word32, Word64,
 	
 	-- * Notes
