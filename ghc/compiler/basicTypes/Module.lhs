@@ -40,7 +40,9 @@ module Module
     , moduleUserString		-- :: Module -> UserString
 
     , mkVanillaModule	        -- :: ModuleName -> Module
+    , isVanillaModule		-- :: Module -> Bool
     , mkPrelModule		-- :: UserString -> Module
+    , isPrelModule		-- :: Module -> Bool
     , mkModule			-- :: ModuleName -> PackageName -> Module
     , mkHomeModule		-- :: ModuleName -> Module
     , isHomeModule		-- :: Module -> Bool
@@ -252,8 +254,16 @@ isHomeModule _                       = False
 mkVanillaModule :: ModuleName -> Module
 mkVanillaModule name = Module name DunnoYet
 
+isVanillaModule :: Module -> Bool
+isVanillaModule (Module nm DunnoYet) = True
+isVanillaModule _                       = False
+
 mkPrelModule :: ModuleName -> Module
 mkPrelModule name = mkModule name preludePackage
+
+isPrelModule :: Module -> Bool
+isPrelModule (Module nm (AnotherPackage p)) | p == preludePackage = True
+isPrelModule _                       = False
 
 moduleString :: Module -> EncodedString
 moduleString (Module (ModuleName fs) _) = _UNPK_ fs

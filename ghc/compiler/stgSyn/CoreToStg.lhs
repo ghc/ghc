@@ -19,7 +19,7 @@ import Type
 import TyCon		( isAlgTyCon )
 import Literal
 import Id
-import Var		( Var, globalIdDetails )
+import Var		( Var, globalIdDetails, varType )
 import IdInfo
 import DataCon
 import CostCentre	( noCCS )
@@ -507,8 +507,21 @@ coreToStgApp maybe_thunk_body f args
     let
 	n_val_args	 = valArgCount args
 	not_letrec_bound = not (isLetBound how_bound)
-	fun_fvs	 	 = singletonFVInfo f how_bound fun_occ
+	fun_fvs	 	 
+          = let fvs = singletonFVInfo f how_bound fun_occ in
+            -- e.g. (f :: a -> int) (x :: a) 
+            -- Here the free variables are "f", "x" AND the type variable "a"
+            -- coreToStgArgs will deal with the arguments recursively
+            if opt_KeepStgTypes then
+	      fvs `unionFVInfo` tyvarFVInfo (tyVarsOfType (varType f))
+	    else fvs
 
+	-- Mostly, the arity info of a function is in the fn's IdInfo
+	-- But new bindings introduced by CoreSat may not have no
+	-- arity info; it would do us no good anyway.  For example:
+	--	let f = \ab -> e in f
+	-- No point in having correct arity info for f!
+	-- Hence the hasArity stuff below.
 	f_arity = case how_bound of 
 			LetBound _ _ arity -> arity
 			_                  -> 0
@@ -876,7 +889,7 @@ freeVarsToLiveVars fvs env live_in_cont
   = returnLne (lvs, cafs) env live_in_cont
   where
     (lvs_cont, cafs_cont) = live_in_cont -- not a strict pattern match!
-    (local, global) = partition isLocalId (allFVs fvs)
+    (local, global) = partition isLocalId (allFreeIds fvs)
 
     (lvs_from_fvs, caf_extras) = unzip (map do_one local)
 
@@ -894,7 +907,7 @@ freeVarsToLiveVars fvs env live_in_cont
 	      Nothing -> pprPanic "lookupLiveVarsForSet/do_one:" (ppr v)
 
     is_caf_one v
-	 = case lookupVarEnv env v of
+      = case lookupVarEnv env v of
 		Just (LetBound TopLevelHasCafs (lvs,_) _) ->
 		    ASSERT( isEmptyVarSet lvs ) True
 	        Just (LetBound _ _ _) -> False
@@ -976,13 +989,15 @@ lookupFVInfo fvs id
 			Nothing         -> noBinderInfo
 			Just (_,_,info) -> info
 
-allFVs :: FreeVarsInfo -> [Id]	-- Non-top-level things only
-allFVs fvs = [id | (id,_,_) <- rngVarEnv fvs]
+allFreeIds :: FreeVarsInfo -> [Id]	-- Non-top-level things only
+allFreeIds fvs = [id | (id,_,_) <- rngVarEnv fvs, isId id]
 
-getFVs :: FreeVarsInfo -> [Id]	-- Non-top-level things only
+-- Non-top-level things only, both type variables and ids (type variables
+-- only if opt_KeepStgTypes.
+getFVs :: FreeVarsInfo -> [Var]	
 getFVs fvs = [id | (id,NotTopLevelBound,_) <- rngVarEnv fvs]
 
-getFVSet :: FreeVarsInfo -> IdSet
+getFVSet :: FreeVarsInfo -> VarSet
 getFVSet fvs = mkVarSet (getFVs fvs)
 
 plusFVInfo (id1,top1,info1) (id2,top2,info2)
@@ -1103,7 +1118,12 @@ rhsIsNonUpd :: CoreExpr -> Bool
   -- 
   --    c) don't look through unfolding of f in (f x).  I'm suspicious of this one
 
-rhsIsNonUpd (Lam b e)          = isId b || rhsIsNonUpd e
+-- This function has to line up with what the update flag
+-- for the StgRhs gets set to in mkStgRhs (above)
+--
+-- When opt_KeepStgTypes is on, we keep type lambdas and treat
+-- them as making the RHS re-entrant (non-updatable).
+rhsIsNonUpd (Lam b e)          = isRuntimeVar b || rhsIsNonUpd e
 rhsIsNonUpd (Note (SCC _) e)   = False
 rhsIsNonUpd (Note _ e)         = rhsIsNonUpd e
 rhsIsNonUpd other_expr
@@ -1122,11 +1142,11 @@ rhsIsNonUpd other_expr
 
 idAppIsNonUpd :: Id -> Int -> [CoreExpr] -> Bool
 idAppIsNonUpd id n_val_args args
-  | Just con <- isDataConId_maybe id = not (isDynConApp con args)
+  | Just con <- isDataConId_maybe id = not (isCrossDllConApp con args)
   | otherwise 			     = n_val_args < idArity id
 
-isDynConApp :: DataCon -> [CoreExpr] -> Bool
-isDynConApp con args = isDllName (dataConName con) || any isDynArg args
+isCrossDllConApp :: DataCon -> [CoreExpr] -> Bool
+isCrossDllConApp con args = isDllName (dataConName con) || any isCrossDllArg args
 -- Top-level constructor applications can usually be allocated 
 -- statically, but they can't if 
 -- 	a) the constructor, or any of the arguments, come from another DLL
@@ -1137,10 +1157,12 @@ isDynConApp con args = isDllName (dataConName con) || any isDynArg args
 -- All this should match the decision in (see CoreToStg.coreToStgRhs)
 
 
-isDynArg :: CoreExpr -> Bool
-isDynArg (Var v)    = isDllName (idName v)
-isDynArg (Note _ e) = isDynArg e
-isDynArg (Lit lit)  = isLitLitLit lit
-isDynArg (App e _)  = isDynArg e	-- must be a type app
-isDynArg (Lam _ e)  = isDynArg e	-- must be a type lam
+isCrossDllArg :: CoreExpr -> Bool
+-- True if somewhere in the expression there's a cross-DLL reference
+isCrossDllArg (Type _)    = False
+isCrossDllArg (Var v)     = isDllName (idName v)
+isCrossDllArg (Note _ e)  = isCrossDllArg e
+isCrossDllArg (Lit lit)   = isLitLitLit lit
+isCrossDllArg (App e1 e2) = isCrossDllArg e1 || isCrossDllArg e2	-- must be a type app
+isCrossDllArg (Lam v e)   = isCrossDllArg e	-- must be a type lam
 \end{code}

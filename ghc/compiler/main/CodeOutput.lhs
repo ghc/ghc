@@ -75,9 +75,12 @@ codeOutput dflags mod_name tycons core_binds stg_binds
           		       >> return stub_names
              HscJava        -> outputJava dflags filenm mod_name tycons core_binds
           		       >> return stub_names
+	     HscILX         -> 
 #ifdef ILX
-	     HscILX         -> outputIlx dflags filenm mod_name tycons stg_binds
+	                       outputIlx dflags filenm mod_name tycons stg_binds
 			       >> return stub_names
+#else
+                               panic "ILX support not compiled into this ghc"
 #endif
 	}
 

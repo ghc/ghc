@@ -360,9 +360,7 @@ data HscLang
   = HscC
   | HscAsm
   | HscJava
-#ifdef ILX
   | HscILX
-#endif
   | HscInterpreted
     deriving (Eq, Show)
 

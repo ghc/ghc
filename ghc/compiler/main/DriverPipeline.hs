@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.68 2001/05/09 09:38:18 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.69 2001/05/24 15:10:19 dsyme Exp $
 --
 -- GHC Driver
 --
@@ -148,9 +148,6 @@ genPipeline todo stop_flag persistent_output lang filename
    keep_hc    <- readIORef v_Keep_hc_files
    keep_raw_s <- readIORef v_Keep_raw_s_files
    keep_s     <- readIORef v_Keep_s_files
-#ifdef ILX
-   writeIORef v_Object_suf (Just "ilx")
-#endif
    osuf       <- readIORef v_Object_suf
    hcsuf      <- readIORef v_HC_suf
 
@@ -189,10 +186,8 @@ genPipeline todo stop_flag persistent_output lang filename
 
 	HscJava	| split	          -> not_valid
 		| otherwise       -> error "not implemented: compiling via Java"
-#ifdef ILX
 	HscILX  | split           -> not_valid
 		| otherwise       -> [ Unlit, Cpp, Hsc ]
-#endif
 
       | cish      = [ Cc, As ]
 
@@ -983,9 +978,7 @@ compile ghci_mode summary source_unchanged have_object
 		    HscAsm         -> newTempName (phaseInputExt As)
 		    HscC           -> newTempName (phaseInputExt HCc)
         	    HscJava        -> newTempName "java" -- ToDo
-#ifdef ILX
 		    HscILX         -> newTempName "ilx"	-- ToDo
-#endif
 		    HscInterpreted -> return (error "no output file")
 
    let (basename, _) = splitFilename input_fn

@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.53 2001/05/09 09:38:18 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.54 2001/05/24 15:10:19 dsyme Exp $
 --
 -- Driver flags
 --
@@ -208,6 +208,7 @@ static_flags =
   ,  ( "osuf"		, HasArg (writeIORef v_Object_suf  . Just) )
   ,  ( "hcsuf"		, HasArg (writeIORef v_HC_suf      . Just) )
   ,  ( "hisuf"		, HasArg (writeIORef v_Hi_suf) )
+  ,  ( "buildtag"	, HasArg (writeIORef v_Build_tag) )
   ,  ( "tmpdir"		, HasArg (writeIORef v_TmpDir . (++ "/")) )
   ,  ( "ohi"		, HasArg (writeIORef v_Output_hi   . Just) )
 	-- -odump?
@@ -341,6 +342,7 @@ setLang l = do
    case hscLang dfs of
 	HscC   -> writeIORef v_DynFlags dfs{ hscLang = l }
 	HscAsm -> writeIORef v_DynFlags dfs{ hscLang = l }
+	HscILX -> writeIORef v_DynFlags dfs{ hscLang = l }
 	_      -> return ()
 
 setVerbosityAtLeast n =
@@ -435,9 +437,7 @@ dynamic_flags = [
   ,  ( "fasm",		AnySuffix (\_ -> setLang HscAsm) )
   ,  ( "fvia-c",	NoArg (setLang HscC) )
   ,  ( "fvia-C",	NoArg (setLang HscC) )
-#ifdef ILX
   ,  ( "filx",		NoArg (setLang HscILX) )
-#endif
 
 	-- "active negatives"
   ,  ( "fno-implicit-prelude",  NoArg (setDynFlag Opt_NoImplicitPrelude) )

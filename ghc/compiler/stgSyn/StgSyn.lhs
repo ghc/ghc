@@ -49,6 +49,7 @@ module StgSyn (
 
 import CostCentre	( CostCentreStack, CostCentre )
 import VarSet		( IdSet, isEmptyVarSet )
+import Var		( isId )
 import Id		( Id, idName, idPrimRep, idType )
 import Name		( isDllName )
 import Literal		( Literal, literalType, isLitLitLit, literalPrimRep )
@@ -56,6 +57,7 @@ import ForeignCall	( ForeignCall )
 import DataCon		( DataCon, dataConName )
 import PrimOp		( PrimOp )
 import Outputable
+import Util             ( count )
 import Type             ( Type )
 import TyCon            ( TyCon )
 import UniqSet		( isEmptyUniqSet, uniqSetToList, UniqSet )
@@ -111,6 +113,7 @@ isStgTypeArg other	    = False
 
 isDllArg :: StgArg -> Bool
 	-- Does this argument refer to something in a different DLL?
+isDllArg (StgTypeArg v)   = False
 isDllArg (StgVarArg v)   = isDllName (idName v)
 isDllArg (StgLitArg lit) = isLitLitLit lit
 
@@ -124,6 +127,7 @@ stgArgType :: StgArg -> Type
 	-- Very half baked becase we have lost the type arguments
 stgArgType (StgVarArg v)   = idType v
 stgArgType (StgLitArg lit) = literalType lit
+stgArgType (StgTypeArg lit) = panic "stgArgType called on stgTypeArg"
 \end{code}
 
 %************************************************************************
@@ -395,8 +399,11 @@ The second flavour of right-hand-side is for constructors (simple but important)
 \end{code}
 
 \begin{code}
-stgRhsArity :: GenStgRhs bndr occ -> Int
-stgRhsArity (StgRhsClosure _ _ _ _ args _) = length args
+stgRhsArity :: StgRhs -> Int
+stgRhsArity (StgRhsClosure _ _ _ _ bndrs _) = count isId bndrs
+  -- The arity never includes type parameters, so
+  -- when keeping type arguments and binders in the Stg syntax 
+  -- (opt_KeepStgTypes) we have to fliter out the type binders.
 stgRhsArity (StgRhsCon _ _ _) = 0
 \end{code}
 

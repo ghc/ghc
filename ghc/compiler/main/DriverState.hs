@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.38 2001/05/09 09:38:18 simonmar Exp $
+-- $Id: DriverState.hs,v 1.39 2001/05/24 15:10:19 dsyme Exp $
 --
 -- Settings for the driver
 --
@@ -459,7 +459,7 @@ findBuildTag :: IO [String]  -- new options
 findBuildTag = do
   way_names <- readIORef v_Ways
   case sort way_names of
-     []  -> do  writeIORef v_Build_tag ""
+     []  -> do  -- writeIORef v_Build_tag ""
 	        return []
 
      [w] -> do let details = lkupWay w

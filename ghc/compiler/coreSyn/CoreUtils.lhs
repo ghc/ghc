@@ -19,7 +19,7 @@ module CoreUtils (
 	exprIsValue,exprOkForSpeculation, exprIsBig, 
 	exprIsConApp_maybe, exprIsAtom,
 	idAppIsBottom, idAppIsCheap,
-	exprArity,
+	exprArity, isRuntimeVar, isRuntimeArg, 
 
 	-- Expr transformation
 	etaReduce, etaExpand,
@@ -60,13 +60,14 @@ import IdInfo		( LBVarInfo(..),
 import Demand		( appIsBottom )
 import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe, 
 			  applyTys, isUnLiftedType, seqType, mkUTy, mkTyVarTy,
-			  splitForAllTy_maybe, splitNewType_maybe
+			  splitForAllTy_maybe, splitNewType_maybe, isForAllTy
 			)
 import TysWiredIn	( boolTy, trueDataCon, falseDataCon )
 import CostCentre	( CostCentre )
 import UniqSupply	( UniqSupply, splitUniqSupply, uniqFromSupply )
 import Outputable
 import TysPrim		( alphaTy )	-- Debugging only
+import CmdLineOpts	( opt_KeepStgTypes )
 \end{code}
 
 
@@ -303,9 +304,9 @@ exprIsTrivial (Var v)
   | otherwise                          = True
 exprIsTrivial (Type _)	      	       = True
 exprIsTrivial (Lit lit)       	       = True
-exprIsTrivial (App e arg)     	       = isTypeArg arg && exprIsTrivial e
+exprIsTrivial (App e arg)     	       = not (isRuntimeArg arg) && exprIsTrivial e
 exprIsTrivial (Note _ e)      	       = exprIsTrivial e
-exprIsTrivial (Lam b body) | isTyVar b = exprIsTrivial body
+exprIsTrivial (Lam b body)             = not (isRuntimeVar b) && exprIsTrivial body
 exprIsTrivial other	      	       = False
 
 exprIsAtom :: CoreExpr -> Bool
@@ -385,7 +386,7 @@ exprIsCheap (Type _)        	  = True
 exprIsCheap (Var _)         	  = True
 exprIsCheap (Note InlineMe e)  	  = True
 exprIsCheap (Note _ e)      	  = exprIsCheap e
-exprIsCheap (Lam x e)       	  = if isId x then True else exprIsCheap e
+exprIsCheap (Lam x e)       	  = isRuntimeVar x || exprIsCheap e
 exprIsCheap (Case e _ alts)       = exprIsCheap e && 
 				    and [exprIsCheap rhs | (_,_,rhs) <- alts]
 	-- Experimentally, treat (case x of ...) as cheap
@@ -411,7 +412,7 @@ exprIsCheap other_expr
 			-- because it certainly doesn't need to be shared!
 	
     go (App f a) n_args args_cheap 
-	| isTypeArg a = go f n_args 	  args_cheap
+	| not (isRuntimeArg a) = go f n_args 	  args_cheap
 	| otherwise   = go f (n_args + 1) (exprIsCheap a && args_cheap)
 
     go other   n_args args_cheap = False
@@ -481,7 +482,7 @@ exprOkForSpeculation other_expr
 	  other -> False
 	
     go (App f a) n_args args_ok 
-	| isTypeArg a = go f n_args 	  args_ok
+	| not (isRuntimeArg a) = go f n_args 	  args_ok
 	| otherwise   = go f (n_args + 1) (exprOkForSpeculation a && args_ok)
 
     go other n_args args_ok = False
@@ -530,7 +531,7 @@ exprIsValue :: CoreExpr -> Bool		-- True => Value-lambda, constructor, PAP
 exprIsValue (Type ty)	  = True	-- Types are honorary Values; we don't mind
 					-- copying them
 exprIsValue (Lit l)	  = True
-exprIsValue (Lam b e)  	  = isId b || exprIsValue e
+exprIsValue (Lam b e)  	  = isRuntimeVar b || exprIsValue e
 exprIsValue (Note _ e) 	  = exprIsValue e
 exprIsValue other_expr
   = go other_expr 0
@@ -538,7 +539,7 @@ exprIsValue other_expr
     go (Var f) n_args = idAppIsValue f n_args
 	
     go (App f a) n_args
-	| isTypeArg a = go f n_args
+	| not (isRuntimeArg a) = go f n_args
 	| otherwise   = go f (n_args + 1) 
 
     go (Note _ f) n_args = go f n_args
@@ -556,7 +557,20 @@ idAppIsValue id n_val_args
 	-- then we could get an infinite loop...
 \end{code}
 
+@isRuntimeVar v@ returns if (Lam v _) really becomes a lambda at runtime,
+i.e. if type applications are actual lambdas because types are kept around
+at runtime.
+
 \begin{code}
+isRuntimeVar :: Var -> Bool
+isRuntimeVar v = opt_KeepStgTypes || isId v
+isRuntimeArg :: CoreExpr -> Bool
+isRuntimeArg v = opt_KeepStgTypes || isTypeArg v
+\end{code}
+
+\begin{code}
+
+
 exprIsConApp_maybe :: CoreExpr -> Maybe (DataCon, [CoreExpr])
 exprIsConApp_maybe (Note InlineMe expr) = exprIsConApp_maybe expr
     -- We ignore InlineMe notes in case we have
@@ -739,7 +753,16 @@ etaExpand :: Int	  	-- Add this number of value args
 --	(/\b. coerce T (\y::A -> (coerce (A->B) (E b) y)
 
 etaExpand n us expr ty
-  | n == 0	-- Saturated, so nothing to do
+  | n == 0 && 
+    -- The ILX code generator requires eta expansion for type arguments
+    -- too, but alas the 'n' doesn't tell us how many of them there 
+    -- may be.  So we eagerly eta expand any big lambdas, and just
+    -- cross our fingers about possible loss of sharing in the
+    -- ILX case. 
+    -- The Right Thing is probably to make 'arity' include
+    -- type variables throughout the compiler.  (ToDo.)
+    not (isForAllTy ty)	
+    -- Saturated, so nothing to do
   = expr
 
   | otherwise	-- An unsaturated constructor or primop; eta expand it

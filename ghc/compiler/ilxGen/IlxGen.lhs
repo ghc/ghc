@@ -24,7 +24,7 @@ import DataCon	( isUnboxedTupleCon, dataConTyCon, dataConRepType, dataConRepArgT
 import Literal	( Literal(..) )
 import PrelNames	-- Lots of keys
 import PrimOp		( PrimOp(..) )
-import ForeignCall	( ForeignCall(..), CCall(..), CCallTarget(..) )
+import ForeignCall	( CCallConv(..), ForeignCall(..), CCallSpec(..), CCallTarget(..), DNCallSpec(..) )
 import TysWiredIn	( mkTupleTy, tupleCon )
 import PrimRep		( PrimRep(..) )
 import Name		( nameModule, nameOccName, isGlobalName, isLocalName, NamedThing(getName) )
@@ -39,7 +39,6 @@ import Module		( Module, PackageName, ModuleName, moduleName,
 import UniqFM
 import BasicTypes	( Boxity(..) )
 import CStrings		( CLabelString, pprCLabelString )
-import CCallConv	( CCallConv )
 import Outputable
 import Char		( ord )
 import List		( partition, elem, insertBy,any  )
@@ -239,8 +238,8 @@ ilxTyCon env tycon =  ilxTyConDef False env tycon
 -- filter to get only dataTyCons?
 ilxTyConDef importing env tycon = 
 	vcat [empty $$ line,
-	      text ".classunion" <+> (if importing then text "extern" else empty) <+> text "thunk" 
-                  <+> ((nameReference env (getName tycon)) <> (ppr tycon))   <+> tyvars_text <+> alts_text]
+	      text ".classunion" <+> (if importing then text "import" else empty) <+>  tyvars_text <+> text ": thunk" 
+                  <> angleBrackets((nameReference env (getName tycon)) <> (ppr tycon))   <+> alts_text]
    where
      tyvars = tyConTyVars tycon
      (ilx_tvs, _) = categorizeTyVars tyvars
@@ -1633,7 +1632,7 @@ tyPrimConTable =
               -- These can all also accept unlifted parameter types so we explicitly lift.
 	     (arrayPrimTyConKey, 	(\[ty] -> repArray (ilxTypeL2 ty))),
 	     (mutableArrayPrimTyConKey, 	(\[_, ty] -> repMutArray (ilxTypeL2 ty))),
-	     (weakPrimTyConKey, 	(\[_, ty] -> repWeak (ilxTypeL2 ty))),
+	     (weakPrimTyConKey, 	(\[ty] -> repWeak (ilxTypeL2 ty))),
 	     (mVarPrimTyConKey, 	(\[_, ty] -> repMVar (ilxTypeL2 ty))),
 	     (mutVarPrimTyConKey, 	(\[ty1, ty2] -> repMutVar (ilxTypeL2 ty1) (ilxTypeL2 ty2))),
 	     (mutableByteArrayPrimTyConKey,	(\_ -> repByteArray)),
@@ -2289,10 +2288,10 @@ ilxFCall env (CCall (CCallSpec (StaticTarget c) cconv gc)) args ret_ty
                     <+> pprCValArgTys ilxTypeL env (map deepIlxRepType (filter (not. isVoidIlxRepType) (map stgArgType tm_args))) ]
   where 
     retdoc | isVoidIlxRepType ret_ty = text "void" 
-	   | otherwis		     = ilxTypeR env (deepIlxRepType ret_ty)
+	   | otherwise		     = ilxTypeR env (deepIlxRepType ret_ty)
     (ty_args,tm_args) = splitTyArgs1 args 
 
-ilxFCall env (CCall (DotNetCallSpec call_instr)) args ret_ty
+ilxFCall env (CCall (DNCallSpec call_instr)) args ret_ty
   = ilxComment (text "IL call") <+> 
     vcat [vcat (ilxMapPlaceArgs 0 pushILArg env tm_args), 
 	  text call_instr
@@ -2303,7 +2302,7 @@ ilxFCall env (CCall (DotNetCallSpec call_instr)) args ret_ty
   where
     (ty_args,tm_args) = splitTyArgs1 args 
 
-pushILArg env arg | isUnliftedType (stgArgType arg) = pushArg env arg
+pushILArg env arg | isUnLiftedType (stgArgType arg) = pushArg env arg
 		  | otherwise			    = pushArg env arg <+> error "call ilxFunAppArgs"
 
 hasTyCon (TyConApp tc _) tc2 = tc == tc2
