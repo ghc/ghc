@@ -11,7 +11,10 @@ section shows you how to make use of this facility.
 </Para>
 
 <Para>
-<Command>strip</Command> seems not to work reliably on DLLs, so it's probably best not to.
+Until recently, <Command>strip</Command> didn't work reliably on DLLs, so you
+should test your version with care, or make sure you have the latest
+binutils. Unfortunately, we don't know exactly which version of binutils
+cured the problem (it was supposedly fixed some years ago).
 </Para>
 
 
@@ -27,7 +30,6 @@ command-line, so
 </Para>
 
 <Para>
-
 <Screen>
 sh$ cat main.hs
 module Main where
@@ -36,20 +38,21 @@ sh$ ghc -o main main.hs
 ghc: module version changed to 1; reason: no old .hi file
 sh$ strip main.exe
 sh$ ls -l main.exe
--rwxr-xr-x   1 544      everyone     6144 May  3 17:11 main.exe*
+-rwxr-xr-x   1 544      everyone     4608 May  3 17:11 main.exe*
 sh$ ./main
 hello, world!
 sh$ 
 </Screen>
-
 </Para>
 
 <Para>
-will give you a binary as before, but the <Filename>main.exe</Filename> generated will use the Prelude and RTS DLLs instead.
+will give you a binary as before, but the <Filename>main.exe</Filename>
+generated will use the Prelude and RTS DLLs instead of linking them in
+statically.
 </Para>
 
 <Para>
-6K for a <Literal>"hello, world"</Literal> application---not bad, huh? :-)
+4K for a <Literal>"hello, world"</Literal> application---not bad, huh? :-)
 </Para>
 
 </Sect1>
@@ -79,14 +82,14 @@ option on all the Haskell modules that make up your application.
 <Para>
 <IndexTerm><Primary>Creating a Win32 DLL</Primary></IndexTerm>
 <IndexTerm><Primary>--mk-dll</Primary></IndexTerm>
-Sealing up your Haskell library inside a DLL is quite straightforward;
+Sealing up your Haskell library inside a DLL is straightforward;
 compile up the object files that make up the library, and then build
-the DLL by issuing the following command:
+the DLL by issuing a command of the form:
 </Para>
 
 <Para>
 <Screen>
-ghc --mk-dll -o HSsuper.dll A.o Super.o B.o libmine.a -lgdi32
+ghc --mk-dll -o foo.dll bar.o baz.o wibble.a -lfooble
 </Screen>
 </Para>
 
@@ -98,7 +101,9 @@ line.
 </Para>
 
 <Para>
-To create a `static' DLL, i.e. one that does not depend on the GHC DLLs, compile up your Haskell code using <Option>-static</Option>, and write a <Filename>.def</Filename> file containing the entry points you want to expose (see <XRef LinkEnd="win32-dlls-foreign"> for an example). Then link the DLL adding the <Option>-static</Option> flag, and <Option>-optdll--def=foo.def</Option>, where <Filename>foo.def</Filename> is the name of your <Filename>.def</Filename> file.
+To create a `static' DLL, i.e. one that does not depend on the GHC DLLs,
+use the <Option>-static</Option> when compiling up your Haskell code and
+building the DLL.
 </Para>
 
 <Para>
@@ -112,15 +117,22 @@ A couple of things to notice:
 <Para>
 Since DLLs correspond to packages (see <XRef LinkEnd="packages">) you need
 to use <Option>-package-name dll-name</Option> when compiling modules that
-belong to a DLL. If you don't, Haskell code that calls entry points in that
-DLL will do so incorrectly, and a crash will result.
+belong to a DLL if you're going to call them from Haskell. Otherwise, Haskell
+code that calls entry points in that DLL will do so incorrectly, and crash.
+For similar reasons, you can only compile a single module tree into a DLL,
+as <Function>startupHaskell</Function> needs to be able to call its
+initialisation function, and only takes one such argument (see <XRef
+LinkEnd="win32-dlls-foreign">). Hence the modules
+you compile into a DLL must have a common root.
 </Para>
 </ListItem>
 
 <ListItem>
 <Para>
-By default, the entry points of all the object files will
-be exported from the DLL when using <Option>--mk-dll</Option>. Should you want to constrain this, you can specify the <Emphasis>module definition file</Emphasis> to use on the command line as follows:
+By default, the entry points of all the object files will be exported from
+the DLL when using <Option>--mk-dll</Option>. Should you want to constrain
+this, you can specify the <Emphasis>module definition file</Emphasis> to use
+on the command line as follows:
 
 <Screen>
 ghc --mk-dll -o .... -optdll--def -optdllMyDef.def
@@ -150,9 +162,10 @@ name of the DLL, as follows:
 DLL: HScool.dll  ==&#62; import lib: libHScool_imp.a
 </ProgramListing>
 
-The naming scheme may look a bit weird, but it has the purpose of
-allowing the co-existence of import libraries with ordinary static
-libraries (e.g., <Filename>libHSfoo.a</Filename> and <Filename>libHSfoo&lowbar;imp.a</Filename>.
+The naming scheme may look a bit weird, but it has the purpose of allowing
+the co-existence of import libraries with ordinary static libraries (e.g.,
+<Filename>libHSfoo.a</Filename> and
+<Filename>libHSfoo&lowbar;imp.a</Filename>.
 
 Additionally, when the compiler driver is linking in non-static mode, it
 will rewrite occurrence of <Option>-lHSfoo</Option> on the command line to
@@ -185,7 +198,8 @@ combine this with DLL building, so here's an example:
 
 <ListItem>
 <Para>
-Use <Literal>foreign export</Literal> declarations to export the Haskell functions you want to call from the outside. For example,
+Use <Literal>foreign export</Literal> declarations to export the Haskell
+functions you want to call from the outside. For example,
 
 <ProgramListing>
 module Adder where
@@ -212,15 +226,17 @@ This will produce two files, adder.o and adder_stub.o
 
 <ListItem>
 <Para>
-compile up a <Function>DllMain()</Function> that starts up the Haskell RTS---a possible implementation is:
+compile up a <Function>DllMain()</Function> that starts up the Haskell
+RTS---a possible implementation is:
 
 <ProgramListing>
 #include &lt;windows.h&gt;
+#include &lt;Rts.h&gt;
 
-extern void startupHaskell(int , char** );
+EXTFUN(__init_Adder);
 
-static char* args[] = { "ghcDll" };
-
+static char* args[] = { "ghcDll", NULL };
+                       /* N.B. argv arrays must end with NULL */
 BOOL
 STDCALL
 DllMain
@@ -231,12 +247,16 @@ DllMain
 {
   if (reason == DLL_PROCESS_ATTACH) {
       /* By now, the RTS DLL should have been hoisted in, but we need to start it up. */
-      startupHaskell(1, args);
+      startupHaskell(1, args, __init_Adder);
       return TRUE;
   }
   return TRUE;
 }
 </ProgramListing>
+
+Here, <Literal>Adder</Literal> is the name of the root module in the module
+tree (as mentioned above, there must be a single root module, and hence a
+single module tree in the DLL).
 
 Compile this up:
 
@@ -259,16 +279,24 @@ ghc --mk-dll -o adder.dll adder.o adder_stub.o dllMain.o
 
 <ListItem>
 <Para>
-Start using <Function>adder</Function> from VBA---here's how I would <Constant>Declare</Constant> it:
+Start using <Function>adder</Function> from VBA---here's how I would
+<Constant>Declare</Constant> it:
 
 <ProgramListing>
-Private Declare adder Lib "adder.dll" Alias "adder@8"
+Private Declare Function adder Lib "adder.dll" Alias "adder@8"
       (ByVal x As Long, ByVal y As Long) As Long
 </ProgramListing>
 
 Since this Haskell DLL depends on a couple of the DLLs that come with GHC,
 make sure that they are in scope/visible.
 </Para>
+
+<Para>
+Building statically linked DLLs is the same as in the previous section: it
+suffices to add <Option>-static</Option> to the commands used to compile up
+the Haskell source and build the DLL.
+</Para>
+
 </ListItem>
 
 </ItemizedList>
