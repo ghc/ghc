@@ -145,9 +145,9 @@ BootingFromUnregisterisedHc = @BootingFromUnregisterisedHc@
 #
 # Build the libs first if we're bootstrapping from .hc files.
 ifeq "$(BootingFromHc)" "YES"
-AllProjects = glafp-utils happy alex haddock libraries hslibs ghc greencard hdirect hood nofib
+AllProjects = glafp-utils happy alex haddock libraries hslibs ghc greencard hdirect hood nofib docs
 else
-AllProjects = glafp-utils happy alex haddock ghc libraries hslibs greencard hdirect hood nofib
+AllProjects = glafp-utils happy alex haddock ghc libraries hslibs greencard hdirect hood nofib docs
 endif
 
 #

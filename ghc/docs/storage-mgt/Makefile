@@ -1,7 +1,8 @@
 #	General makefile for Latex stuff
 
+dvi: sm.dvi rp.dvi ldv.dvi
 ps: sm.ps rp.ps ldv.ps
-
+html:
 
 ######## General rules
 .SUFFIXES:
@@ -18,9 +19,11 @@ ps: sm.ps rp.ps ldv.ps
 	dvips -f < $< > $@
 
 clean:
-	rm -f *.aux *.log
+	$(RM) *.aux *.log
 
-nuke: clean
-	rm -f *.dvi *.ps *.bbl *.blg
+distclean: clean
+	$(RM) *.dvi *.ps *.bbl *.blg *.gz
+
+maintainer-clean: distclean
 
 # End of file

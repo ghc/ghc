@@ -1,7 +1,7 @@
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
 
-SUBDIRS = users_guide
+SUBDIRS = users_guide ext-core storage-mgt
 
 PAGES = index.html
 

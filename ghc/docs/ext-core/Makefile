@@ -1,6 +1,8 @@
 #	General makefile for Latex stuff
 
+dvi: core.dvi
 ps: core.ps
+html:
 
 core.dvi:	core.tex prims.tex
 		latex core.tex
@@ -22,9 +24,11 @@ prims.tex:	../../compiler/prelude/primops.txt
 	dvips -f < $< > $@
 
 clean:
-	rm -f *.aux *.log
+	$(RM) *.aux *.log
 
-nuke: clean
-	rm -f *.dvi *.ps *.bbl *.blg
+distclean: clean
+	$(RM) prims.tex *.dvi *.ps *.bbl *.blg *.gz
+
+maintainer-clean: distclean
 
 # End of file
