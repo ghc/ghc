@@ -83,13 +83,6 @@ module IO (
     readIO,		       -- :: Read a => String -> IO a
     readLn,		       -- :: Read a => IO a
 
-#ifndef __HUGS__
-    -- extensions
-    hPutBuf,
-    hPutBufBA,
-#endif
-    slurpFile
-
   ) where
 
 #ifdef __HUGS__
