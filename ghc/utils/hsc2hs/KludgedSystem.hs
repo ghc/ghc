@@ -1,6 +1,6 @@
 {-# OPTIONS -cpp -fglasgow-exts #-}
 -----------------------------------------------------------------------------
--- $Id: KludgedSystem.hs,v 1.3 2001/03/13 17:46:56 rrt Exp $
+-- $Id: KludgedSystem.hs,v 1.4 2001/03/14 12:13:02 rrt Exp $
 
 -- system that works feasibly under Windows (i.e. passes the command line to sh,
 -- because system() under Windows doesn't look at SHELL, and always uses CMD.EXE)
@@ -27,8 +27,7 @@ import Config
 system :: String -> IO ExitCode
 system cmd = do
     pid <- getProcessID
-    tmp_dir <- readIORef v_TmpDir
-    let tmp = tmp_dir++"/sh"++show pid
+    let tmp = cDEFAULT_TMPDIR++"/sh"++show pid
     writeFile tmp (cmd++"\n")
     bracket_ (return tmp) removeFile $ System.system ("sh - "++tmp)
 

@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.10 2001/03/05 00:07:23 qrczak Exp $
+# $Id: Makefile,v 1.11 2001/03/14 12:13:02 rrt Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -53,6 +53,22 @@ INSTALL_LIBEXECS += $(HS_PROG)
 
 override datadir=$(libdir)
 INSTALL_DATAS += template-hsc.h
+
+# -----------------------------------------------------------------------------
+# Create driver configuration
+
+CURRENT_DIR=ghc/utils/hsc2hs
+CONFIG_HS = Config.hs
+boot :: $(CONFIG_HS)
+
+$(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
+	@$(RM) -f $(CONFIG_HS)
+	@echo -n "Creating $(CONFIG_HS) ... "
+	@echo "module Config where" >>$(CONFIG_HS)
+	@echo "cDEFAULT_TMPDIR       = \"$(DEFAULT_TMPDIR)\"" >> $(CONFIG_HS)
+	@echo done.
+
+CLEAN_FILES += $(CONFIG_HS)
 
 # don't recurse on 'make install'
 #
