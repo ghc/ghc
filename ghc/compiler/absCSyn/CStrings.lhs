@@ -4,7 +4,7 @@ This module deals with printing C string literals
 module CStrings(
 	cSEP, pp_cSEP,
 
-	stringToC, charToC,
+	stringToC, charToC, pprFSInCStyle,
 	charToEasyHaskell
   ) where
 
@@ -21,6 +21,9 @@ pp_cSEP = char '_'
 
 stringToC   :: String -> String
 charToC, charToEasyHaskell :: Char -> String
+
+pprFSInCStyle :: FAST_STRING -> SDoc
+pprFSInCStyle fs = doubleQuotes (text (stringToC (_UNPK_ fs)))
 
 -- stringToC: the hassle is what to do w/ strings like "ESC 0"...
 
