@@ -11,37 +11,53 @@
 #define __OSTHREADS_H__
 #if defined(RTS_SUPPORTS_THREADS) /*to the end */
 
-#if defined(HAVE_PTHREAD_H) && !defined(WANT_NATIVE_WIN32_THREADS)
-#include <pthread.h>
-typedef pthread_cond_t  CondVar;
-typedef pthread_mutex_t MutexVar;
+# if defined(HAVE_PTHREAD_H) && !defined(WANT_NATIVE_WIN32_THREADS)
+#  include <pthread.h>
+typedef pthread_cond_t  Condition;
+typedef pthread_mutex_t Mutex;
 typedef pthread_t       OSThreadId;
 
-#define INIT_MUTEX_VAR  PTHREAD_MUTEX_INITIALIZER
-#define INIT_COND_VAR   PTHREAD_COND_INITIALIZER
-#elif defined(HAVE_WINDOWS_H)
+#define INIT_MUTEX_VAR      PTHREAD_MUTEX_INITIALIZER
+#define INIT_COND_VAR       PTHREAD_COND_INITIALIZER
+
+#define ACQUIRE_LOCK(mutex) pthread_mutex_lock(mutex)
+#define RELEASE_LOCK(mutex) pthread_mutex_unlock(mutex)
+
+# elif defined(HAVE_WINDOWS_H)
 #include <windows.h>
-typedef HANDLE CondVar;
-typedef HANDLE MutexVar;
+
+typedef HANDLE Condition;
+typedef HANDLE Mutex;
 typedef DWORD OSThreadId;
 
 #define INIT_MUTEX_VAR 0
 #define INIT_COND_VAR  0
+
+#define ACQURE_LOCK(mutex)    WaitForSingleObject(mutex,INFINITE)
+#define RELEASE_LOCK(mutex)   ReleaseMutex(handle)
+#define 
+# else
+#  error "Threads not supported"
+# endif
+
+extern void initCondition         ( Condition* pCond );
+extern void closeCondition        ( Condition* pCond );
+extern rtsBool broadcastCondition ( Condition* pCond );
+extern rtsBool signalCondition    ( Condition* pCond );
+extern rtsBool waitCondition      ( Condition* pCond, 
+				    Mutex* pMut );
+
+extern void initMutex             ( Mutex* pMut );
+
+extern OSThreadId osThreadId      ( void );
+extern void shutdownThread        ( void );
+extern void yieldThread           ( void );
+extern int  createOSThread        ( OSThreadId* tid,
+				    void (*startProc)(void) );
 #else
-#error "Threads not supported"
-#endif
 
-extern void initCondVar ( CondVar* pCond );
-extern void closeCondVar ( CondVar* pCond );
-extern rtsBool broadcastCondVar (CondVar* pCond );
-extern rtsBool signalCondVar ( CondVar* pCond );
-extern rtsBool waitCondVar   ( CondVar* pCond, MutexVar* pMut);
-
-extern OSThreadId osThreadId(void);
-extern void shutdownThread(void);
-extern int  createOSThread ( OSThreadId* tid, void *(*startProc)(void*));
-
-extern void initMutexVar ( MutexVar* pMut );
+#define ACQUIRE_LOCK(l)
+#define RELEASE_LOCK(l)
 
 #endif /* defined(RTS_SUPPORTS_THREADS) */
 

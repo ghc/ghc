@@ -20,52 +20,75 @@
  *
  */
 
-void initCondVar( CondVar* pCond )
+void
+initCondition( Condition* pCond )
 {
   pthread_cond_init(pCond, NULL);
   return;
 }
 
-void closeCondVar( CondVar* pCond )
+void
+closeCondition( Condition* pCond )
 {
   pthread_cond_destroy(pCond);
   return;
 }
 
 rtsBool
-broadcastCondVar ( CondVar* pCond )
+broadcastCondition ( Condition* pCond )
 {
   return (pthread_cond_broadcast(pCond) == 0);
 }
 
 rtsBool
-signalCondVar ( CondVar* pCond )
+signalCondition ( Condition* pCond )
 {
   return (pthread_cond_signal(pCond) == 0);
 }
 
 rtsBool
-waitCondVar ( CondVar* pCond, MutexVar* pMut )
+waitCondition ( Condition* pCond, Mutex* pMut )
 {
   return (pthread_cond_wait(pCond,pMut) == 0);
 }
 
-void shutdownThread()
+void
+yieldThread()
+{
+  sched_yield();
+  return;
+}
+
+void
+shutdownThread()
 {
   pthread_exit(NULL);
 }
 
-int createOSThread ( OSThreadId* pId, void *(*startProc)(void*))
+/* Don't need the argument nor the result, at least not yet. */
+static void* startProcWrapper(void* pProc);
+static void*
+startProcWrapper(void* pProc)
 {
-  return pthread_create(pId, NULL, startProc, NULL);
+  ((void (*)(void))pProc)();
+  return NULL;
 }
 
-OSThreadId osThreadId()
+
+int
+createOSThread ( OSThreadId* pId, void (*startProc)(void))
+{
+  return pthread_create(pId, NULL, startProcWrapper, (void*)startProc);
+}
+
+OSThreadId
+osThreadId()
 {
   return pthread_self();
 }
 
-void initMutexVar (MutexVar* pMut)
+void
+initMutex(Mutex* pMut)
 {
   pthread_mutex_init(pMut,NULL);
   return;
@@ -76,8 +99,8 @@ void initMutexVar (MutexVar* pMut)
 
 /* Win32 threads and synchronisation objects */
 
-/* A CondVar is represented by a Win32 Event object,
- * a MutexVar by a Mutex kernel object.
+/* A Condition is represented by a Win32 Event object;
+ * a Mutex by a Mutex kernel object.
  *
  * ToDo: go through the defn and usage of these to
  * make sure the semantics match up with that of 
@@ -85,7 +108,8 @@ void initMutexVar (MutexVar* pMut)
  * just a first pass at getting something compilable.
  */
 
-void initCondVar( CondVar* pCond )
+void
+initCondition( Condition* pCond )
 {
   HANDLE h =  CreateEvent(NULL, 
 			  TRUE,  /* manual reset */
@@ -93,36 +117,37 @@ void initCondVar( CondVar* pCond )
 			  NULL); /* unnamed => process-local. */
   
   if ( h == NULL ) {
-    belch("initCondVar: unable to create");
+    belch("initCondition: unable to create");
   }
   *pCond = h;
   return;
 }
 
-void closeCondVar( CondVar* pCond )
+void
+closeCondition( Condition* pCond )
 {
   if ( CloseHandle(*pCond) == 0 ) {
-    belch("closeCondVar: failed to close");
+    belch("closeCondition: failed to close");
   }
   return;
 }
 
 rtsBool
-broadcastCondVar ( CondVar* pCond )
+broadcastCondition ( Condition* pCond )
 {
   PulseEvent(*pCond);
   return rtsTrue;
 }
 
 rtsBool
-signalCondVar ( CondVar* pCond )
+signalCondition ( Condition* pCond )
 {
   SetEvent(*pCond);
   return rtsTrue;
 }
 
 rtsBool
-waitCondVar ( CondVar* pCond, MutexVar* pMut )
+waitCondition ( Condition* pCond, Mutex* pMut )
 {
   ReleaseMutex(*pMut);
   WaitForSingleObject(*pCond, INFINITE);
@@ -131,19 +156,22 @@ waitCondVar ( CondVar* pCond, MutexVar* pMut )
   return rtsTrue;
 }
 
-void shutdownThread()
+void
+shutdownThread()
 {
   _endthreadex(0);
 }
 
 static unsigned __stdcall startProcWrapper(void* pReal);
-static unsigned __stdcall startProcWrapper(void* pReal)
+static unsigned __stdcall
+startProcWrapper(void* pReal)
 {
-  ((void (*)(void*))pReal)(NULL);
+  ((void (*)(void))pReal)();
   return 0;
 }
 
-int createOSThread ( OSThreadId* pId, void *(*startProc)(void*))
+int
+createOSThread ( OSThreadId* pId, void (*startProc)(void*))
 {
   
   return _beginthreadex ( NULL,  /* default security attributes */
@@ -154,12 +182,14 @@ int createOSThread ( OSThreadId* pId, void *(*startProc)(void*))
 			  (unsigned*)pId);
 }
 
-OSThreadId osThreadId()
+OSThreadId
+osThreadId()
 {
   return GetCurrentThreadId();
 }
 
-void initMutexVar (MutexVar* pMut)
+void
+initMutex (Mutex* pMut)
 {
   HANDLE h = CreateMutex ( NULL,  /* default sec. attributes */
 			   FALSE, /* not owned => initially signalled */
