@@ -160,6 +160,7 @@ mkTemplateLocals tys = zipWith (mkSysLocal SLIT("tpl"))
 			       tys
 
 mkTemplateLocalsNum :: Int -> [Type] -> [Id]
+-- The Int gives the starting point for unique allocation
 mkTemplateLocalsNum n tys = zipWith (mkSysLocal SLIT("tpl"))
 			       (getNumBuiltinUniques n (length tys))
 			       tys
