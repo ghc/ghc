@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.156 2003/07/02 19:41:43 ross Exp $
+-- $Id: InteractiveUI.hs,v 1.157 2003/07/21 14:33:19 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -542,6 +542,14 @@ addModule files = do
 
 changeDirectory :: String -> GHCi ()
 changeDirectory dir = do
+  state    <- getGHCiState
+  when (targets state /= []) $
+	io $ putStr "Warning: changing directory causes all loaded modules to be unloaded, \n\ 
+	\because the search path has changed.\n"
+  dflags   <- io getDynFlags
+  cmstate1 <- io (cmUnload (cmstate state) dflags)
+  setGHCiState state{ cmstate = cmstate1, targets = [] }
+  setContextAfterLoad []
   dir <- expandPath dir
   io (setCurrentDirectory dir)
 
