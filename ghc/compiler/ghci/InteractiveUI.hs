@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.174 2004/08/16 09:53:57 simonpj Exp $
+-- $Id: InteractiveUI.hs,v 1.175 2004/08/20 15:02:40 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -68,6 +68,7 @@ import System.Directory
 import System.IO as IO
 import Data.Char
 import Control.Monad as Monad
+import Foreign.StablePtr	( newStablePtr )
 
 import GHC.Exts		( unsafeCoerce# )
 
@@ -158,6 +159,18 @@ interactiveUI srcs maybe_expr = do
    dflags <- getDynFlags
 
    cmstate <- cmInit Interactive dflags;
+
+   -- HACK! If we happen to get into an infinite loop (eg the user
+   -- types 'let x=x in x' at the prompt), then the thread will block
+   -- on a blackhole, and become unreachable during GC.  The GC will
+   -- detect that it is unreachable and send it the NonTermination
+   -- exception.  However, since the thread is unreachable, everything
+   -- it refers to might be finalized, including the standard Handles.
+   -- This sounds like a bug, but we don't have a good solution right
+   -- now.
+   newStablePtr stdin
+   newStablePtr stdout
+   newStablePtr stderr
 
    hFlush stdout
    hSetBuffering stdout NoBuffering
