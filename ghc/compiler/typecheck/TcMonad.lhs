@@ -59,7 +59,8 @@ import Name		( Name )
 import Var		( Id, TyVar, newMutTyVar, newSigTyVar, readMutTyVar, writeMutTyVar )
 import VarEnv		( TidyEnv, emptyTidyEnv )
 import VarSet		( TyVarSet )
-import UniqSupply	( UniqSupply, uniqFromSupply, uniqsFromSupply, splitUniqSupply,
+import UniqSupply	( UniqSupply, uniqFromSupply, uniqsFromSupply, 
+			  splitUniqSupply, mkSplitUniqSupply,
 			  UniqSM, initUs_ )
 import SrcLoc		( SrcLoc, noSrcLoc )
 import FiniteMap	( FiniteMap, lookupFM, addToFM, emptyFM )
@@ -124,24 +125,14 @@ type TcRef a = IORef a
 \end{code}
 
 \begin{code}
-<<<<<<< TcMonad.lhs
--- initEnv is passed in to avoid module recursion between TcEnv & TcMonad.
 
-initTc :: DynFlags
-       -> UniqSupply
-       -> (TcRef (UniqFM a) -> TcEnv)
-=======
-initTc :: TcEnv
+initTc :: DynFlags 
+       -> TcEnv
        -> SrcLoc
->>>>>>> 1.44
        -> TcM r
        -> IO (Maybe r, (Bag ErrMsg, Bag WarnMsg))
 
-<<<<<<< TcMonad.lhs
-initTc dflags us initenv do_this
-=======
-initTc tc_env src_loc do_this
->>>>>>> 1.44
+initTc dflags tc_env src_loc do_this
   = do {
       us       <- mkSplitUniqSupply 'a' ;
       us_var   <- newIORef us ;
@@ -150,17 +141,12 @@ initTc tc_env src_loc do_this
       tvs_var  <- newIORef emptyUFM ;
 
       let
-<<<<<<< TcMonad.lhs
           init_down = TcDown dflags [] us_var dfun_var
-			     noSrcLoc
-=======
-          init_down = TcDown [] us_var dfun_var
 			     src_loc
->>>>>>> 1.44
 			     [] errs_var
       ;
 
-      maybe_res <- catch (do {  res <- do_this init_down env ;
+      maybe_res <- catch (do {  res <- do_this init_down tc_env ;
 				return (Just res)})
 			 (\_ -> return Nothing) ;
         
@@ -321,7 +307,7 @@ addErrTc err_msg = addErrTcM (emptyTidyEnv, err_msg)
 
 addErrsTc :: [Message] -> NF_TcM ()
 addErrsTc []	   = returnNF_Tc ()
-addErrsTc err_msgs = listNF_Tc_ (map addErrTc err_msgs)	`thenNF_Tc_` returnNF_Tc ()
+addErrsTc err_msgs = listNF_Tc (map addErrTc err_msgs)	`thenNF_Tc_` returnNF_Tc ()
 
 -- The 'M' variants do the TidyEnv bit
 failWithTcM :: (TidyEnv, Message) -> TcM a	-- Add an error message and fail

@@ -54,7 +54,7 @@ import DataCon	( DataCon )
 import TyCon	( TyCon, tyConKind, tyConArity, isSynTyCon )
 import Class	( Class, ClassOpItem, ClassContext, classTyCon )
 import Subst	( substTy )
-import Name	( Name, OccName, Provenance(..), ExportFlag(..), NamedThing(..), 
+import Name	( Name, OccName, NamedThing(..), 
 		  nameOccName, nameModule, getSrcLoc, mkGlobalName,
 		  isLocallyDefined,
 		  NameEnv, emptyNameEnv, lookupNameEnv, nameEnvElts, 
@@ -64,7 +64,7 @@ import OccName	( mkDFunOcc, mkDefaultMethodOcc, occNameString )
 import Module	( Module )
 import Unify	( unifyTyListsX, matchTys )
 import HscTypes	( ModDetails(..), InstEnv, lookupTypeEnv, TyThing(..),
-		  GlobalSymbolTable )
+		  GlobalSymbolTable, Provenance(..) )
 import Unique	( pprUnique10, Unique, Uniquable(..) )
 import UniqFM
 import Unique	( Uniquable(..) )
