@@ -18,10 +18,13 @@ import Type	( Type, applyTy, splitFunTy_maybe, isTyVarTy,
 		  isUnLiftedType, isUnboxedTupleType, repType,	
 		  uaUTy, usOnce, usMany, seqType )
 import Demand	( Demand, isStrict, wwLazy, StrictnessInfo(..) )
+import PrimOp	( PrimOp(..) )
 import Var 	( Id, TyVar, setTyVarUnique )
 import VarSet
 import IdInfo	( IdFlavour(..) )
-import Id	( mkSysLocal, idType, idStrictness, idFlavour, idDemandInfo, idArity )
+import Id	( mkSysLocal, idType, idStrictness, idFlavour, idDemandInfo, idArity,
+		  isDeadBinder, setIdType, isPrimOpId_maybe
+		)
 
 import UniqSupply
 import Maybes
@@ -69,6 +72,8 @@ primary goals here are:
 
 4.  Ensure that lambdas only occur as the RHS of a binding
     (The code generator can't deal with anything else.)
+
+5.  Do the seq/par munging.  See notes with mkCase below.
 
 This is all done modulo type applications and abstractions, so that
 when type erasure is done for conversion to STG, we don't end up with
@@ -255,7 +260,7 @@ coreSatExprFloat expr@(Lam _ _)
 coreSatExprFloat (Case scrut bndr alts)
   = coreSatExprFloat scrut		`thenUs` \ (floats, scrut) ->
     mapUs sat_alt alts			`thenUs` \ alts ->
-    returnUs (floats, Case scrut bndr alts)
+    returnUs (floats, mkCase scrut bndr alts)
   where
     sat_alt (con, bs, rhs)
 	  = coreSatAnExpr rhs	  	`thenUs` \ rhs ->
@@ -422,7 +427,7 @@ mkBinds binds body
   | otherwise	  = deLam body		`thenUs` \ body' ->
 		    returnUs (foldOL mk_bind body' binds)
   where
-    mk_bind (FloatCase bndr rhs) body = Case rhs bndr [(DEFAULT, [], body)]
+    mk_bind (FloatCase bndr rhs) body = mkCase rhs bndr [(DEFAULT, [], body)]
     mk_bind (FloatLet bind)      body = Let bind body
 
 -- ---------------------------------------------------------------------------
@@ -486,11 +491,64 @@ tryEta bndrs (Let bind@(NonRec b r) body)
     fvs = exprFreeVars r
 
 tryEta bndrs _ = Nothing
+\end{code}
+
+
+-- -----------------------------------------------------------------------------
+-- 	Do the seq and par transformation
+-- -----------------------------------------------------------------------------
+
+Here we do two pre-codegen transformations:
+
+1.	case seq# a of {
+	  0 	  -> seqError ...
+	  DEFAULT -> rhs }
+  ==>
+	case a of { DEFAULT -> rhs }
+
+
+2.	case par# a of {
+	  0 	  -> parError ...
+	  DEFAULT -> rhs }
+  ==>
+	case par# a of {
+	  DEFAULT -> rhs }
+
+NB:	seq# :: a -> Int#	-- Evaluate value and return anything
+	par# :: a -> Int#	-- Spark value and return anything
+
+These transformations can't be done earlier, or else we might
+think that the expression was strict in the variables in which 
+rhs is strict --- but that would defeat the purpose of seq and par.
+
+
+\begin{code}
+mkCase scrut@(Var fn `App` Type ty `App` arg) bndr alts
+  = case isPrimOpId_maybe fn of
+	Just ParOp -> Case scrut bndr     [deflt_alt]
+	Just SeqOp -> 
+		      Case arg   new_bndr [deflt_alt]
+	other	   -> Case scrut bndr alts
+  where
+    (deflt_alt : _) = [alt | alt@(DEFAULT,_,_) <- alts]
+
+    new_bndr = ASSERT( isDeadBinder bndr )	-- The binder shouldn't be used in the expression!
+	       setIdType bndr (exprType arg)
+	-- NB:  SeqOp :: forall a. a -> Int#
+	-- So bndr has type Int# 
+	-- But now we are going to scrutinise the SeqOp's argument directly,
+	-- so we must change the type of the case binder to match that
+	-- of the argument expression e.
+
+mkCase scrut bndr alts = Case scrut bndr alts
+\end{code}
+
 
 -- -----------------------------------------------------------------------------
 -- Demands
 -- -----------------------------------------------------------------------------
 
+\begin{code}
 data RhsDemand
      = RhsDemand { isStrictDem :: Bool,  -- True => used at least once
                    isOnceDem   :: Bool   -- True => used at most once

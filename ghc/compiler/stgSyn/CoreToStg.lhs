@@ -329,7 +329,7 @@ coreToStgExpr (Case scrut bndr alts)
 	live_in_whole_case = live_in_alts `unionVarSet` scrut_lvs
     in
     returnLne (
-      mkStgCase scrut2 live_in_whole_case live_in_alts bndr' noSRT alts2,
+      StgCase scrut2 live_in_whole_case live_in_alts bndr' noSRT alts2,
       (scrut_fvs `unionFVInfo` alts_fvs) `minusFVBinders` [bndr],
       (alts_escs `minusVarSet` unitVarSet bndr) `unionVarSet` getFVSet scrut_fvs
 		-- You might think we should have scrut_escs, not (getFVSet scrut_fvs),
@@ -428,37 +428,6 @@ isForeignObjPrimTy ty
 \end{code}
 
 \begin{code}
-mkStgCase scrut@(StgPrimApp ParOp _ _) lvs1 lvs2 bndr srt
-	  (StgPrimAlts tycon _ deflt@(StgBindDefault _))
-  = StgCase scrut lvs1 lvs2 bndr srt (StgPrimAlts tycon [] deflt)
-
-mkStgCase (StgPrimApp SeqOp [scrut] _) lvs1 lvs2 bndr srt
-	  (StgPrimAlts _ _ deflt@(StgBindDefault rhs))
-  = StgCase scrut_expr lvs1 lvs2 new_bndr srt new_alts
-  where
-    new_alts
-       | isUnLiftedType scrut_ty     = WARN( True, text "mkStgCase" ) 
-	       				mkStgPrimAlts scrut_ty [] deflt
-       | otherwise                   = mkStgAlgAlts scrut_ty [] deflt
-
-    scrut_ty = stgArgType scrut
-    new_bndr = setIdType bndr scrut_ty
-	-- NB:  SeqOp :: forall a. a -> Int#
-	-- So bndr has type Int# 
-	-- But now we are going to scrutinise the SeqOp's argument directly,
-	-- so we must change the type of the case binder to match that
-	-- of the argument expression e.
-
-    scrut_expr = case scrut of
-		   StgVarArg v -> StgApp v []
-		   -- Others should not happen because 
-		   -- seq of a value should have disappeared
-		   StgLitArg l -> WARN( True, text "seq on" <+> ppr l ) StgLit l
-
-mkStgCase scrut lvs1 lvs2 bndr srt alts
-    = StgCase scrut lvs1 lvs2 bndr srt alts
-
-
 mkStgAlgAlts ty alts deflt
  =  case alts of
 		-- Get the tycon from the data con

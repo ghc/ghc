@@ -14,8 +14,8 @@ import CmdLineOpts	( switchIsOn, opt_SimplDoEtaReduction,
 			  SimplifierSwitch(..)
 			)
 import SimplMonad
-import SimplUtils	( mkCase, tryRhsTyLam, tryEtaExpansion, findAlt, 
-			  simplBinder, simplBinders, simplIds, findDefault,
+import SimplUtils	( mkCase, tryRhsTyLam, tryEtaExpansion,
+			  simplBinder, simplBinders, simplIds, 
 			  SimplCont(..), DupFlag(..), mkStop, mkRhsStop,
 			  contResultType, discardInline, countArgs, contIsDupable,
 			  getContArgs, interestingCallContext, interestingArg, isStrictType
@@ -44,7 +44,7 @@ import CoreUnfold	( mkOtherCon, mkUnfolding, otherCons,
 			  callSiteInline
 			)
 import CoreUtils	( cheapEqExpr, exprIsDupable, exprIsTrivial, 
-			  exprIsConApp_maybe, mkPiType,
+			  exprIsConApp_maybe, mkPiType, findAlt, findDefault,
 			  exprType, coreAltsType, exprIsValue, 
 			  exprOkForSpeculation, exprArity, exprIsCheap,
 			  mkCoerce, mkSCC, mkInlineMe, mkAltExpr

@@ -456,6 +456,7 @@ coreExprCc other               = noCostCentre
 \end{code}
 
 
+
 %************************************************************************
 %*									*
 \subsection{Predicates}
