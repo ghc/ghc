@@ -26,7 +26,8 @@ import PrimRep		( isFloatingRep, PrimRep(..) )
 import PrimOp		( PrimOp(..) )
 import CallConv		( cCallConv )
 import Stix		( getNatLabelNCG, StixTree(..),
-			  StixReg(..), CodeSegment(..), DestInfo,
+			  StixReg(..), CodeSegment(..), 
+                          DestInfo, hasDestInfo,
                           pprStixTree, ppStixReg,
                           NatM, thenNat, returnNat, mapNat, 
                           mapAndUnzipNat, mapAccumLNat,
@@ -2037,20 +2038,21 @@ genJump dsts tree
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if sparc_TARGET_ARCH
 
-genJump (StCLbl lbl)
-  | isAsmTemp lbl = returnNat (toOL [BI ALWAYS False target, NOP])
-  | otherwise     = returnNat (toOL [CALL target 0 True, NOP])
+genJump dsts (StCLbl lbl)
+  | hasDestInfo dsts = panic "genJump(sparc): CLbl and dsts"
+  | isAsmTemp lbl    = returnNat (toOL [BI ALWAYS False target, NOP])
+  | otherwise        = returnNat (toOL [CALL target 0 True, NOP])
   where
     target = ImmCLbl lbl
 
-genJump tree
+genJump dsts tree
   = getRegister tree	    	    	    `thenNat` \ register ->
     getNewRegNCG PtrRep    	    `thenNat` \ tmp ->
     let
     	code   = registerCode register tmp
     	target = registerName register tmp
     in
-    returnNat (code `snocOL` JMP (AddrRegReg target g0) `snocOL` NOP)
+    returnNat (code `snocOL` JMP dsts (AddrRegReg target g0) `snocOL` NOP)
 
 #endif {- sparc_TARGET_ARCH -}
 \end{code}

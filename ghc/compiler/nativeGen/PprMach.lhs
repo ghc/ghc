@@ -1539,7 +1539,7 @@ pprInstr (BF cond b lab)
 	pprImm lab
     ]
 
-pprInstr (JMP addr) = (<>) (ptext SLIT("\tjmp\t")) (pprAddr addr)
+pprInstr (JMP dsts addr) = (<>) (ptext SLIT("\tjmp\t")) (pprAddr addr)
 
 pprInstr (CALL imm n _)
   = hcat [ ptext SLIT("\tcall\t"), pprImm imm, comma, int n ]

@@ -7,7 +7,7 @@ module Stix (
 	CodeSegment(..), StixReg(..), StixTree(..), StixTreeList,
 	pprStixTrees, pprStixTree, ppStixReg,
         stixCountTempUses, stixSubst,
-	DestInfo(..),
+	DestInfo(..), hasDestInfo,
 
 	stgBaseReg, stgNode, stgSp, stgSu, stgSpLim, 
         stgHp, stgHpLim, stgTagReg, stgR9, stgR10, 
@@ -130,6 +130,9 @@ data StixTree
 data DestInfo
    = NoDestInfo             -- no supplied dests; infer from context
    | DestInfo [CLabel]      -- precisely these dests and no others
+
+hasDestInfo NoDestInfo   = False
+hasDestInfo (DestInfo _) = True
 
 pprDests :: DestInfo -> SDoc
 pprDests NoDestInfo      = text "NoDestInfo"

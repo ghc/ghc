@@ -367,7 +367,7 @@ regUsage instr = case instr of
     FxTOy s1 s2 r1 r2 	-> usage ([r1], [r2])
 
     -- We assume that all local jumps will be BI/BF.  JMP must be out-of-line.
-    JMP   addr 	    	-> usage (regAddr addr, [])
+    JMP   dst addr 	-> usage (regAddr addr, [])
 
     CALL  _ n True   	-> noUsage
     CALL  _ n False  	-> usage (argRegs n, callClobberedRegs)
@@ -541,9 +541,12 @@ insnFuture insn
     BF other  _ (ImmCLbl clbl) -> NextOrBranch clbl
     BF other  _ _ -> panic "nativeGen(sparc):insnFuture(BF)"
 
-    -- JMP and CALL(terminal) must be out-of-line.
-    JMP _         -> NoFuture
-    CALL _ _ True -> NoFuture
+    -- CALL(terminal) must be out-of-line.  JMP is not out-of-line
+    -- iff it specifies its destinations.
+    JMP NoDestInfo _      -> NoFuture  -- n.b. NoFuture == MultiFuture []
+    JMP (DestInfo dsts) _ -> MultiFuture dsts
+
+    CALL _ _ True         -> NoFuture
 
     boring -> Next
 
@@ -710,31 +713,31 @@ patchRegs instr env = case instr of
 #if sparc_TARGET_ARCH
 
 patchRegs instr env = case instr of
-    LD sz addr reg -> LD sz (fixAddr addr) (env reg)
-    ST sz reg addr -> ST sz (env reg) (fixAddr addr)
-    ADD x cc r1 ar r2 -> ADD x cc (env r1) (fixRI ar) (env r2)
-    SUB x cc r1 ar r2 -> SUB x cc (env r1) (fixRI ar) (env r2)
-    AND b r1 ar r2 -> AND b (env r1) (fixRI ar) (env r2)
-    ANDN b r1 ar r2 -> ANDN b (env r1) (fixRI ar) (env r2)
-    OR b r1 ar r2 -> OR b (env r1) (fixRI ar) (env r2)
-    ORN b r1 ar r2 -> ORN b (env r1) (fixRI ar) (env r2)
-    XOR b r1 ar r2 -> XOR b (env r1) (fixRI ar) (env r2)
-    XNOR b r1 ar r2 -> XNOR b (env r1) (fixRI ar) (env r2)
-    SLL r1 ar r2 -> SLL (env r1) (fixRI ar) (env r2)
-    SRL r1 ar r2 -> SRL (env r1) (fixRI ar) (env r2)
-    SRA r1 ar r2 -> SRA (env r1) (fixRI ar) (env r2)
-    SETHI imm reg -> SETHI imm (env reg)
-    FABS s r1 r2 -> FABS s (env r1) (env r2)
-    FADD s r1 r2 r3 -> FADD s (env r1) (env r2) (env r3)
-    FCMP e s r1 r2 -> FCMP e s (env r1) (env r2)
-    FDIV s r1 r2 r3 -> FDIV s (env r1) (env r2) (env r3)
-    FMOV s r1 r2 -> FMOV s (env r1) (env r2)
-    FMUL s r1 r2 r3 -> FMUL s (env r1) (env r2) (env r3)
-    FNEG s r1 r2 -> FNEG s (env r1) (env r2)
-    FSQRT s r1 r2 -> FSQRT s (env r1) (env r2)
-    FSUB s r1 r2 r3 -> FSUB s (env r1) (env r2) (env r3)
-    FxTOy s1 s2 r1 r2 -> FxTOy s1 s2 (env r1) (env r2)
-    JMP addr -> JMP (fixAddr addr)
+    LD    sz addr reg   -> LD sz (fixAddr addr) (env reg)
+    ST    sz reg addr   -> ST sz (env reg) (fixAddr addr)
+    ADD   x cc r1 ar r2 -> ADD x cc (env r1) (fixRI ar) (env r2)
+    SUB   x cc r1 ar r2 -> SUB x cc (env r1) (fixRI ar) (env r2)
+    AND   b r1 ar r2    -> AND b (env r1) (fixRI ar) (env r2)
+    ANDN  b r1 ar r2    -> ANDN b (env r1) (fixRI ar) (env r2)
+    OR    b r1 ar r2    -> OR b (env r1) (fixRI ar) (env r2)
+    ORN   b r1 ar r2    -> ORN b (env r1) (fixRI ar) (env r2)
+    XOR   b r1 ar r2    -> XOR b (env r1) (fixRI ar) (env r2)
+    XNOR  b r1 ar r2    -> XNOR b (env r1) (fixRI ar) (env r2)
+    SLL   r1 ar r2      -> SLL (env r1) (fixRI ar) (env r2)
+    SRL   r1 ar r2      -> SRL (env r1) (fixRI ar) (env r2)
+    SRA   r1 ar r2      -> SRA (env r1) (fixRI ar) (env r2)
+    SETHI imm reg       -> SETHI imm (env reg)
+    FABS  s r1 r2       -> FABS s (env r1) (env r2)
+    FADD  s r1 r2 r3    -> FADD s (env r1) (env r2) (env r3)
+    FCMP  e s r1 r2     -> FCMP e s (env r1) (env r2)
+    FDIV  s r1 r2 r3    -> FDIV s (env r1) (env r2) (env r3)
+    FMOV  s r1 r2       -> FMOV s (env r1) (env r2)
+    FMUL  s r1 r2 r3    -> FMUL s (env r1) (env r2) (env r3)
+    FNEG  s r1 r2       -> FNEG s (env r1) (env r2)
+    FSQRT s r1 r2       -> FSQRT s (env r1) (env r2)
+    FSUB  s r1 r2 r3    -> FSUB s (env r1) (env r2) (env r3)
+    FxTOy s1 s2 r1 r2   -> FxTOy s1 s2 (env r1) (env r2)
+    JMP   dsts addr     -> JMP dsts (fixAddr addr)
     _ -> instr
   where
     fixAddr (AddrRegReg r1 r2) = AddrRegReg (env r1) (env r2)
