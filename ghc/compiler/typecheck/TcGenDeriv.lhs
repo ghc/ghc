@@ -783,7 +783,7 @@ gen_Read_binds tycon
 	read_con data_con   -- note: "b" is the string being "read"
 	  = let
 		data_con_RDR = qual_orig_name data_con
-		data_con_str= occNameString (getOccName data_con)
+		data_con_str= occNameUserString (getOccName data_con)
 		con_arity   = argFieldCount data_con
 		con_expr    = mk_easy_App data_con_RDR as_needed
 		nullary_con = con_arity == 0
@@ -809,7 +809,7 @@ gen_Read_binds tycon
 		       tycon_loc
   
 		read_label f
-		  = let nm = occNameString (getOccName (fieldLabelName f))
+		  = let nm = occNameUserString (getOccName (fieldLabelName f))
 		    in 
 			[str_qual nm, str_qual "="] 
 			    -- There might be spaces between the label and '='
@@ -901,7 +901,7 @@ gen_Show_binds tycon
 		lab_fields   = length labels
 
 		show_con
-		  = let nm = occNameString (getOccName data_con)
+		  = let nm = occNameUserString (getOccName data_con)
 			space_ocurly_maybe
                           | nullary_con     = ""
 			  | lab_fields == 0 = " "
@@ -921,7 +921,7 @@ gen_Show_binds tycon
 		show_thingies = show_all show_con real_show_thingies_with_labs
                 
 		show_label l 
-		  = let nm = occNameString (getOccName (fieldLabelName l)) 
+		  = let nm = occNameUserString (getOccName (fieldLabelName l)) 
 		    in
 		    mk_showString_app (nm ++ "=")
 
