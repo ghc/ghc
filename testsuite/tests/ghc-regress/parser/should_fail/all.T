@@ -18,3 +18,4 @@ test "read014" { vtcf("") }
 test "read015" { vtcf("") }
 test "read016" { vtcf("") }
 test "read017" { vtcf("") }
+test "read018" { vtcf("") }
