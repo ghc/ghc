@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.h,v 1.20 2004/02/26 16:36:21 simonmar Exp $
+ * $Id: RtsUtils.h,v 1.21 2004/03/23 10:04:18 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -11,9 +11,9 @@
 #define RTSUTILS_H
 
 /* (Checked) dynamic allocation: */
-extern void *stgMallocBytes(int n, char *msg);
+extern void *stgMallocBytes(int n, char *msg) GNUC3_ATTRIBUTE(__malloc__);
 extern void *stgReallocBytes(void *p, int n, char *msg);
-extern void *stgCallocBytes(int n, int m, char *msg);
+extern void *stgCallocBytes(int n, int m, char *msg) GNUC3_ATTRIBUTE(__malloc__);
 extern void stgFree(void* p);
 
 extern void barf(char *s, ...) GNU_ATTRIBUTE(__noreturn__);
