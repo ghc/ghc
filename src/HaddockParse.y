@@ -10,6 +10,7 @@ import HsSyn
 %token	'/'	{ TokSpecial '/' }
 	'@'	{ TokSpecial '@' }
 	DQUO 	{ TokSpecial '\"' }
+	'#'	{ TokSpecial '#' }
 	URL	{ TokURL $$ }
 	'*'	{ TokBullet }
 	'(n)'	{ TokNumber }
@@ -65,6 +66,7 @@ seq1	:: { Doc }
 elem1	:: { Doc }
 	: STRING		{ DocString $1 }
 	| '/' STRING '/'	{ DocEmphasis (DocString $2) }
+	| '#' STRING '#'	{ DocAName $2 }
 	| URL			{ DocURL $1 }
 	| IDENT			{ DocIdentifier $1 }
 	| DQUO STRING DQUO	{ DocModule $2 }

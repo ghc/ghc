@@ -187,7 +187,8 @@ markupRename = Markup {
   markupUnorderedList = liftM DocUnorderedList . sequence,
   markupOrderedList   = liftM DocOrderedList . sequence,
   markupCodeBlock     = liftM DocCodeBlock,
-  markupURL	      = return . DocURL
+  markupURL	      = return . DocURL,
+  markupAName	      = return . DocAName
   }
 
 renameDoc :: Doc -> RnM Doc

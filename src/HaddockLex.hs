@@ -23,10 +23,11 @@ data Token
   | TokString String
   | TokURL String
   | TokBirdTrack
+  | TokAName String
   deriving Show
 
 isSpecial, isSingleQuote, isIdent :: Char -> Bool
-isSpecial c     = c `elem` ['\"', '@', '/']
+isSpecial c     = c `elem` ['\"', '@', '/', '#']
 isSingleQuote c = c `elem` ['\'', '`']
 isIdent c       = isAlphaNum c || c `elem` "_.!#$%&*+/<=>?@\\^|-~"
 

@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: HsSyn.lhs,v 1.13 2002/07/24 09:42:18 simonmar Exp $
+% $Id: HsSyn.lhs,v 1.14 2002/07/25 14:37:29 simonmar Exp $
 %
 % (c) The GHC Team, 1997-2002
 %
@@ -392,6 +392,7 @@ data GenDoc id
   | DocOrderedList [GenDoc id]
   | DocCodeBlock (GenDoc id)
   | DocURL String
+  | DocAName String
   deriving (Eq, Show)
 
 type Doc = GenDoc [HsQName]
@@ -412,7 +413,8 @@ data DocMarkup id a = Markup {
   markupUnorderedList :: [a] -> a,
   markupOrderedList   :: [a] -> a,
   markupCodeBlock     :: a -> a,
-  markupURL	      :: String -> a
+  markupURL	      :: String -> a,
+  markupAName	      :: String -> a
   }
 
 markup :: DocMarkup id a -> GenDoc id -> a
@@ -428,6 +430,7 @@ markup m (DocUnorderedList ds)	= markupUnorderedList m (map (markup m) ds)
 markup m (DocOrderedList ds)	= markupOrderedList m (map (markup m) ds)
 markup m (DocCodeBlock d)	= markupCodeBlock m (markup m d)
 markup m (DocURL url)		= markupURL m url
+markup m (DocAName ref)		= markupAName m ref
 
 -- | Since marking up is just a matter of mapping 'Doc' into some
 -- other type, we can \'rename\' documentation by marking up 'Doc' into
@@ -445,7 +448,8 @@ mapIdent f = Markup {
   markupUnorderedList = DocUnorderedList,
   markupOrderedList   = DocOrderedList,
   markupCodeBlock     = DocCodeBlock,
-  markupURL	      = DocURL
+  markupURL	      = DocURL,
+  markupAName	      = DocAName
   }
 
 -- -----------------------------------------------------------------------------

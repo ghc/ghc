@@ -852,10 +852,11 @@ linkId (Module mdl) str = moduleHtmlFile fp mdl ++ '#': hsNameStr str
 		Nothing  -> ""
 
 ppHsModule :: String -> Html
-ppHsModule mdl = anchor ! [href (moduleHtmlFile fp mdl)] << toHtml mdl
-  where fp = case lookupFM html_xrefs (Module mdl) of
+ppHsModule mdl = anchor ! [href ((moduleHtmlFile fp modname) ++ ref)] << toHtml mdl
+  where fp = case lookupFM html_xrefs (Module modname) of
 		Just fp0 -> fp0 
 		Nothing  -> ""
+        (modname,ref) = break (== '#') mdl
 
 -- -----------------------------------------------------------------------------
 -- * Doc Markup
@@ -872,7 +873,8 @@ htmlMarkup = Markup {
   markupUnorderedList = ulist . concatHtml . map (li <<),
   markupOrderedList   = olist . concatHtml . map (li <<),
   markupCodeBlock     = pre,
-  markupURL	      = \url -> anchor ! [href url] << toHtml url
+  markupURL	      = \url -> anchor ! [href url] << toHtml url,
+  markupAName	      = \aname -> anchor ! [name aname] << toHtml ""
   }
 
 -- If the doc is a single paragraph, don't surround it with <P> (this causes
