@@ -1812,8 +1812,14 @@ In Proceedings of the 9th European Symposium on Programming,
 ESOP 2000, Berlin, Germany, March 2000, Springer-Verlag LNCS 1782,
 .
 </para>
-
 <para>
+Functional dependencies are introduced by a vertical bar in the syntax of a 
+class declaration;  e.g. 
+<programlisting>
+  class (Monad m) => MonadState s m | m -> s where ...
+
+  class Foo a b c | a b -> c where ...
+</programlisting>
 There should be more documentation, but there isn't (yet).  Yell if you need it.
 </para>
 </sect2>
