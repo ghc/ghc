@@ -221,7 +221,6 @@ wired_in_ids
     , rEC_CON_ERROR_ID
     , rEC_UPD_ERROR_ID
     , realWorldPrimId
-    , runSTId
     , tRACE_ID
     , unpackCString2Id
     , unpackCStringAppendId

@@ -150,7 +150,6 @@ module Unique (
 	returnIntAndGMPDataConKey,
 	returnIntAndGMPTyConKey,
 	returnMClassOpKey,
-	runSTIdKey,
 	seqIdKey,
 	showClassKey,
 	showParenIdKey,
@@ -667,7 +666,6 @@ readParenIdKey		      = mkPreludeMiscIdUnique 28
 realWorldPrimIdKey	      = mkPreludeMiscIdUnique 29
 recConErrorIdKey	      = mkPreludeMiscIdUnique 30
 recUpdErrorIdKey	      = mkPreludeMiscIdUnique 31
-runSTIdKey		      = mkPreludeMiscIdUnique 32
 seqIdKey		      = mkPreludeMiscIdUnique 33
 showParenIdKey		      = mkPreludeMiscIdUnique 34
 showSpaceIdKey		      = mkPreludeMiscIdUnique 35

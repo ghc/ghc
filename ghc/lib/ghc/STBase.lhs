@@ -27,10 +27,6 @@ newtype ST s a = ST (State# s -> STret s a)
 
 data STret s a = STret (State# s) a
 
-runST (ST m)
-  = case m realWorld# of
-      STret _ r -> r
-
 instance Monad (ST s) where
     {-# INLINE return #-}
     {-# INLINE (>>)   #-}

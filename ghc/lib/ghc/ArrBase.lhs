@@ -18,6 +18,7 @@ import STBase
 import PrelBase
 import CCall
 import Addr
+import Unsafe ( runST )
 import GHC
 
 infixl 9  !, //
