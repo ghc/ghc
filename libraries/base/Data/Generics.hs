@@ -13,8 +13,11 @@
 -----------------------------------------------------------------------------
 
 module Data.Generics ( 
+
+#ifndef __HADDOCK__
 	-- * Data types for the sum-of-products type encoding
 	(:*:)(..), (:+:)(..), Unit(..),
+#endif
 
 	-- * Typeable and types-save cast
 	Typeable(..),  cast, sameType, 
@@ -31,7 +34,6 @@ module Data.Generics (
 	mkT,  mkQ,  mkM, 
 	extT, extQ, extM,
 	mkTT,
-
 
 	-- * Traversal combinators
 	everything, something, everywhere, everywhereBut,
@@ -121,6 +123,19 @@ mkTT (f::a ->a->a) x y =
 
 
 
+
+-------------------------------------------------------------------
+--
+--	The representation of datatype constructors 
+--      To be extended by fixity, associativity, and what else?
+--
+-------------------------------------------------------------------
+
+-- | Describes a constructor
+data Constr = Constr { conString :: String }
+
+
+
 ---------------------------------------------
 --
 --	The Data class and its operations
@@ -145,12 +160,12 @@ class Typeable a => Data a where
 
   -- | Find the constructor
   conOf   :: a -> Constr
+
   -- | Does not look at a; Could live in Typeable as well maybe
   consOf  :: a -> [Constr]
 
   gunfold :: (forall a b. Data a => c (a -> b) -> c b)
           -> (forall g. g -> c g)
-          -> c a
           -> Constr
           -> c a
 
@@ -193,9 +208,6 @@ class Typeable a => Data a where
     z  = const (Phantom [])
 -}
  
-
--- | Describes a constructor
-data Constr = Constr { conString :: String }		-- Will be extended
 
 -- | Instructive type synonyms
 type GenericT = forall a. Data a => a -> a
@@ -321,7 +333,6 @@ branches = length . gmapQ (const ())
 undefineds :: Data a => Constr -> Maybe a
 undefineds i =  gunfold (maybe Nothing (\x -> Just (x undefined)))
                         Just
-                        Nothing
                         i
 
 
@@ -336,7 +347,9 @@ geq :: forall a. Data a => a -> a -> Bool
 geq x y = geq' x y
  where
   geq' :: forall a b. (Data a, Data b) => a -> b -> Bool
-  geq' x y = and ( (conString (conOf x) == conString (conOf y)) : tmapQ geq' x y)
+  geq' x y = and ( (conString (conOf x) == conString (conOf y))
+                 : tmapQ geq' x y
+                 )
 
 
 
@@ -353,7 +366,10 @@ gzip f x y =
 
 -- Generic show
 gshow :: Data a => a -> String
-gshow t = "(" ++ conString (conOf t) ++ concat (gmapQ ((++) " ". gshow) t) ++ ")"
+gshow t =    "("
+          ++ conString (conOf t)
+          ++ concat (gmapQ ((++) " ". gshow) t)
+          ++ ")"
 
 
 
@@ -370,7 +386,7 @@ gread s
       guard (not (s' == ""))
       guard (head s' == '(')
       (c,s'')  <- breakConOf (dropWhile ((==) ' ') (tail s'))
-      (a,s''') <- unGRead (gunfold f z e c) s''
+      (a,s''') <- unGRead (gunfold f z c) s''
       guard (not (s''' == "")) 
       guard (head s''' == ')')
       return (a,tail s''')
@@ -379,7 +395,6 @@ gread s
                           (a,s'')  <- gread s'
                           return (ab a,s''))
   z c = GRead (\s -> Just (c,s))
-  e   = GRead (const Nothing)
 
 
 -- Get Constr at front
@@ -411,18 +426,18 @@ breakConOf s
 instance Data Float where
  conOf x = Constr (show x)
  consOf _ = []
- gunfold f z e c = z (read (conString c))
+ gunfold f z c = z (read (conString c))
 
 instance Data Char where
  conOf x = Constr (show x)
  consOf _ = []
- gunfold f z e c = z (read (conString c))
+ gunfold f z c = z (read (conString c))
 
 {-	 overlap
 instance Data String where
  conOf x = Constr (show x)
  consOf _ = []
- gunfold f z e = z . read
+ gunfold f z = z . read
 
 -}
 
@@ -430,9 +445,8 @@ instance Data Bool where
  conOf False = Constr "False"
  conOf True  = Constr "True"
  consOf _    = [Constr "False",Constr "True"]
- gunfold f z e (Constr "False") = z False
- gunfold f z e (Constr "True")  = z True
- gunfold _ _ e _       = e
+ gunfold f z (Constr "False") = z False
+ gunfold f z (Constr "True")  = z True
 
 instance Data a => Data [a] where
   gmapT  f   []     = []
@@ -447,9 +461,8 @@ instance Data a => Data [a] where
   gfoldr f z (x:xs) = f xs (f x (z (:)))
   conOf [] = Constr "[]"
   conOf (_:_) = Constr "(:)"
-  gunfold f z e (Constr "[]")  = z []
-  gunfold f z e (Constr "(:)") = f (f (z (:)))
-  gunfold _ _ e _     = e
+  gunfold f z (Constr "[]")  = z []
+  gunfold f z (Constr "(:)") = f (f (z (:)))
   consOf _ = [Constr "[]",Constr "(:)"]
 
 
@@ -480,9 +493,8 @@ instance Data a => Data [a] where
     conOf (Box _) = Constr "Box"
     conOf (Wrap _) = Constr "Wrap"
     consOf _ = map Constr ["Box","Wrap"]
-    gunfold f z e "Box"  = f (z Box)
-    gunfold f z e "Wrap" = f (z Wrap)
-    gunfold _ _ e _      = e
+    gunfold f z "Box"  = f (z Box)
+    gunfold f z "Wrap" = f (z Wrap)
    
    
    
@@ -577,6 +589,3 @@ count f = everything (+) (tick f)
 -- | Lift a monomorphic predicate to the polymorphic level
 alike :: (Typeable a, Typeable b) => (a -> Bool) -> b -> Bool
 alike f = False `mkQ` f
-
-
-
