@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.80 2001/06/28 11:29:26 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.81 2001/07/17 14:53:48 rrt Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -149,6 +149,11 @@ interactiveUI cmstate paths cmdline_libs = do
    startGHCi runGHCi GHCiState{ targets = paths,
 			        cmstate = cmstate,
 			        options = [] }
+
+#if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
+   Readline.resetTerminal Nothing
+#endif
+
    return ()
 
 
