@@ -96,7 +96,7 @@
 
       <listitem>
 	<para><ulink
-	url="../base/Network.Socket.html"><literal>Network.Socket</literal></ulink>:
+	url="../network/Network.Socket.html"><literal>Network.Socket</literal></ulink>:
 	Added <literal>sendFd</literal> and <literal>recvFd</literal>.</para>
       </listitem>
 
