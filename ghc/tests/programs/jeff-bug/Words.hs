@@ -1,6 +1,7 @@
 module Words where
 
 import Word
+import Int
 import Ix
 
 -- Begin Signature ---------------------------------------------------------

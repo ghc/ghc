@@ -4,6 +4,7 @@ import LazyST
 import List
 import Random
 import IOExts
+import Int
 
 -- infixl 9 *!
 

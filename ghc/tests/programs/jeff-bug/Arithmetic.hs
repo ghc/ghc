@@ -10,6 +10,7 @@ module Arithmetic
 
 import Words
 import Word
+import Int
 
 -- Begin Signature: Arithmetic ----------------------------------------------
 {- 
