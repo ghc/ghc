@@ -26,7 +26,7 @@ import Type	( unliftedTypeKind, liftedTypeKind, openTypeKind,
 		)
 import TyCon	( TyCon, isTupleTyCon, tupleTyConBoxity, tyConArity )
 import Var	( tyVarKind, varName, isSigTyVar )
-import VarSet	( varSetElems )
+import VarSet	( elemVarSet )
 import TcType	( TcType, TcTauType, TcTyVar, TcKind, newBoxityVar,
 		  newTyVarTy, newTyVarTys, tcGetTyVar, tcPutTyVar, zonkTcType
 		)
@@ -325,20 +325,23 @@ uUnboundVar swapped tv1 maybe_ty1 ps_ty2 ty2@(TyVarTy tv2)
 
 	-- Second one isn't a type variable
 uUnboundVar swapped tv1 maybe_ty1 ps_ty2 non_var_ty2
-  = checkKinds swapped tv1 non_var_ty2			`thenTc_`
-    occur_check non_var_ty2				`thenTc_`
+  = 	-- Check that the kinds match
+    checkKinds swapped tv1 non_var_ty2			`thenTc_`
+
+	-- Check that tv1 isn't a type-signature type variable
     checkTcM (not (isSigTyVar tv1))
 	     (failWithTcM (unifyWithSigErr tv1 ps_ty2))	`thenTc_`
 
+	-- Check that we aren't losing boxity info (shouldn't happen)
     warnTc (not (typeKind non_var_ty2 `hasMoreBoxityInfo` tyVarKind tv1))
 	   ((ppr tv1 <+> ppr (tyVarKind tv1)) $$ 
 	     (ppr non_var_ty2 <+> ppr (typeKind non_var_ty2)))		`thenNF_Tc_` 
 
-    tcPutTyVar tv1 non_var_ty2				`thenNF_Tc_`
-	-- This used to say "ps_ty2" instead of "non_var_ty2"
-
-	-- But that led to an infinite loop in the type checker!
-	-- Consider 
+	-- Occurs check
+	-- Basically we want to update     tv1 := ps_ty2
+	-- because ps_ty2 has type-synonym info, which improves later error messages
+	-- 
+	-- But consider 
 	--	type A a = ()
 	--
 	--	f :: (A a -> a -> ()) -> ()
@@ -347,27 +350,27 @@ uUnboundVar swapped tv1 maybe_ty1 ps_ty2 non_var_ty2
 	-- 	x :: ()
 	-- 	x = f (\ x p -> p x)
 	--
-	-- Here, we try to match "t" with "A t", and succeed
-	-- because the unifier looks through synonyms.  The occurs
-	-- check doesn't kick in because we are "really" binding "t" to "()",
-	-- but we *actually* bind "t" to "A t" if we store ps_ty2.
-	-- That leads the typechecker into an infinite loop later.
+	-- In the application (p x), we try to match "t" with "A t".  If we go
+	-- ahead and bind t to A t (= ps_ty2), we'll lead the type checker into 
+	-- an infinite loop later.
+ 	-- But we should not reject the program, because A t = ().
+	-- Rather, we should bind t to () (= non_var_ty2).
+	-- 
+	-- That's why we have this two-state occurs-check
+    zonkTcType ps_ty2					`thenNF_Tc` \ ps_ty2' ->
+    if not (tv1 `elemVarSet` tyVarsOfType ps_ty2') then
+	tcPutTyVar tv1 ps_ty2'				`thenNF_Tc_`
+	returnTc ()
+    else
+    zonkTcType non_var_ty2				`thenNF_Tc` \ non_var_ty2' ->
+    if not (tv1 `elemVarSet` tyVarsOfType non_var_ty2') then
+	-- This branch rarely succeeds, except in strange cases
+	-- like that in the example above
+	tcPutTyVar tv1 non_var_ty2'			`thenNF_Tc_`
+	returnTc ()
+    else
+    failWithTcM (unifyOccurCheck tv1 ps_ty2')
 
-    returnTc ()
-  where
-    occur_check ty = mapTc occur_check_tv (varSetElems (tyVarsOfType ty))	`thenTc_`
-		     returnTc ()
-
-    occur_check_tv tv2
-       | tv1 == tv2		-- Same tyvar; fail
-       = zonkTcType ps_ty2	`thenNF_Tc` \ zonked_ty2 ->
-	 failWithTcM (unifyOccurCheck tv1 zonked_ty2)
-
-       | otherwise		-- A different tyvar
-       = tcGetTyVar tv2	`thenNF_Tc` \ maybe_ty2 ->
-	 case maybe_ty2 of
-		Just ty2' -> occur_check ty2'
-		other	  -> returnTc ()
 
 checkKinds swapped tv1 ty2
 -- We're about to unify a type variable tv1 with a non-tyvar-type ty2.
