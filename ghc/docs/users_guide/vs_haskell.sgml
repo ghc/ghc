@@ -9,7 +9,7 @@
 
 <Para>
 This section lists Glasgow Haskell infelicities in its implementation
-of Haskell&nbsp;98.  See also the ``when things go wrong'' section
+of Haskell&nbsp;98.  See also the &ldquo;when things go wrong&rdquo; section
 (<XRef LinkEnd="wrong">)
 for information about crashes, space leaks, and other undesirable
 phenomena.
@@ -30,7 +30,7 @@ The limitations here are listed in Haskell-Report order (roughly).
 <Term>Very long <Literal>String</Literal> constants:</Term>
 <ListItem>
 <Para>
-May not go through.  If you add a ``string gap'' every
+May not go through.  If you add a &ldquo;string gap&rdquo; every
 few thousand characters, then the strings can be as long
 as you like.
 </Para>
@@ -45,7 +45,7 @@ option don't mix very well (see <XRef LinkEnd="c-pre-processor">).
 <Term>Very long literal lists:</Term>
 <ListItem>
 <Para>
-These may tickle a ``yacc stack overflow'' error in the parser.
+These may tickle a &ldquo;yacc stack overflow&rdquo; error in the parser.
 (It depends on the Yacc used to build your parser.)
 </Para>
 </ListItem>

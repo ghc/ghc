@@ -6,7 +6,7 @@
 <Para>
 Installing from binary distributions is easiest, and recommended!
 (Why binaries?  Because GHC is a Haskell compiler written in Haskell,
-so you've got to ``bootstrap'' it, somehow.  We provide
+so you've got to &ldquo;bootstrap&rdquo; it, somehow.  We provide
 machine-generated C-files-from-Haskell for this purpose, but it's
 really quite a pain to use them.  If you must build GHC from its
 sources, using a binary-distributed GHC to do so is a sensible way to
@@ -27,7 +27,7 @@ so binary distributions allow you to install them without having a Haskell compi
 </Para>
 
 <Para>
-Binary distributions come in ``bundles,'' one bundle per file called
+Binary distributions come in &ldquo;bundles,&rdquo; one bundle per file called
 <Literal>&lt;bundle&gt;-&lt;platform&gt;.tar.gz</Literal>.  (See the building guide for the definition of a platform.)  Suppose that you untar a binary-distribution bundle, thus:
 </Para>
 
@@ -35,8 +35,7 @@ Binary distributions come in ``bundles,'' one bundle per file called
 
 <Screen>
 % cd /your/scratch/space
-% gunzip &#60; ghc-x.xx-sun-sparc-solaris2.tar.gz | tar xvf -
-</Screen>
+% gunzip &#60; ghc-x.xx-sun-sparc-solaris2.tar.gz | tar xvf -</Screen>
 
 </Para>
 
@@ -209,8 +208,7 @@ moment
 <Screen>
 % cd /your/scratch/space
 % gunzip &#60; ghc-x.xx-sun-sparc-solaris2.tar.gz | tar xvf -
-% gunzip &#60; happy-x.xx-sun-sparc-sunos4.tar.gz | tar xvf -
-</Screen>
+% gunzip &#60; happy-x.xx-sun-sparc-sunos4.tar.gz | tar xvf -</Screen>
 
 </Para>
 
@@ -239,9 +237,6 @@ directory to <Literal>fptools</Literal> and typing <Literal>./configure</Literal
 <Para>
 <IndexTerm><Primary>installing in-place</Primary></IndexTerm>
 <IndexTerm><Primary>in-place installation</Primary></IndexTerm>
-</Para>
-
-<Para>
 You can now either start using the tools <Emphasis>in-situ</Emphasis> without going
 through any installation process, just type <Literal>make in-place</Literal> to set the
 tools up for this. You'll also want to add the path which <Literal>make</Literal> will
@@ -357,7 +352,7 @@ stuff in your bin directory.
 <ListItem>
 
 <Para>
- Once done, test your ``installation'' as suggested in 
+ Once done, test your &ldquo;installation&rdquo; as suggested in 
 <XRef LinkEnd="sec-GHC-test">.  Be sure to use a <Literal>-v</Literal>
 option, so you can see exactly what pathnames it's using.
 
@@ -376,7 +371,7 @@ When installing the user-invokable binaries, this installation
 procedure will install GHC as <Literal>ghc-x.xx</Literal> where <Literal>x.xx</Literal> is the version
 number of GHC.  It will also make a link (in the binary installation
 directory) from <Literal>ghc</Literal> to <Literal>ghc-x.xx</Literal>.  If you install multiple versions
-of GHC then the last one ``wins'', and ``<Literal>ghc</Literal>'' will invoke the last
+of GHC then the last one &ldquo;wins&rdquo;, and &ldquo;<Literal>ghc</Literal>&rdquo; will invoke the last
 one installed.  You can change this manually if you want.  But
 regardless, <Literal>ghc-x.xx</Literal> should always invoke GHC version <Literal>x.xx</Literal>.
 </Para>
@@ -389,7 +384,7 @@ regardless, <Literal>ghc-x.xx</Literal> should always invoke GHC version <Litera
 
 <Para>
 <IndexTerm><Primary>bundles, binary</Primary></IndexTerm>
-There are plenty of ``non-basic'' GHC bundles.  The files for them are
+There are plenty of &ldquo;non-basic&rdquo; GHC bundles.  The files for them are
 called <Literal>ghc-x.xx-&lt;bundle&gt;-&lt;platform&gt;.tar.gz</Literal>, where
 the <Literal>&lt;platform&gt;</Literal> is as above, and <Literal>&lt;bundle&gt;</Literal> is one
 of these:
@@ -421,7 +416,7 @@ You'll want this if you're into that kind of thing.
 <Term><Literal>gran</Literal>:</Term>
 <ListItem>
 <Para>
-The ``GranSim'' parallel-Haskell simulator
+The &ldquo;GranSim&rdquo; parallel-Haskell simulator
 (hmm&hellip; mainly for implementors).
 <IndexTerm><Primary>bundles, gransim</Primary></IndexTerm>
 <IndexTerm><Primary>gransim bundles</Primary></IndexTerm>
@@ -431,8 +426,8 @@ The ``GranSim'' parallel-Haskell simulator
 <Term><Literal>ticky</Literal>:</Term>
 <ListItem>
 <Para>
-``Ticky-ticky'' profiling; very detailed
-information about ``what happened when I ran this program''&mdash;really
+&ldquo;Ticky-ticky&rdquo; profiling; very detailed
+information about &ldquo;what happened when I ran this program&rdquo;&mdash;really
 for implementors.
 <IndexTerm><Primary>bundles, ticky-ticky</Primary></IndexTerm>
 <IndexTerm><Primary>ticky-ticky bundles</Primary></IndexTerm>
@@ -475,8 +470,7 @@ Compile the program, using the <Literal>-v</Literal> (verbose) flag to verify th
 libraries, etc., are being found properly:
 
 <Screen>
-% ghc -v -o hello Main.hs
-</Screen>
+% ghc -v -o hello Main.hs</Screen>
 
 </Para>
 
@@ -485,8 +479,7 @@ Now run it:
 
 <Screen>
 % ./hello
-Hello, world!
-</Screen>
+Hello, world!</Screen>
 
 </Para>
 
@@ -499,7 +492,7 @@ distributed in <Literal>ghc/misc/examples/nfib/</Literal> in a source distributi
 </Para>
 
 <Para>
-For more information on how to ``drive'' GHC, either do <Literal>ghc -help</Literal> or
+For more information on how to &ldquo;drive&rdquo; GHC, either do <Literal>ghc -help</Literal> or
 consult the User's Guide (distributed in several pre-compiled formats
 with a binary distribution, or in source form in
 <Literal>ghc/docs/users&lowbar;guide</Literal> in a source distribution).
@@ -559,8 +552,8 @@ do the following:
 </ItemizedList>
 
 <Para>
-Some environment variables are ``user variables'' and
-some are ``system variables''.  I'm not sure of the difference
+Some environment variables are &ldquo;user variables&rdquo; and
+some are &ldquo;system variables&rdquo;.  I'm not sure of the difference
 but both are changed though the same dialogue.
 </Para>
 
@@ -658,12 +651,6 @@ Create the following directories (if they aren't already there):
 
 <ListItem>
 <Para>
-Add the two <Filename>bin</Filename> directories to your <Constant>PATH</Constant>.
-</Para>
-</ListItem>
-
-<ListItem>
-<Para>
 Copy <Filename>bash.exe</Filename> from the <Filename>bin</Filename>
 directory of the cygwin tree
 (<Filename>cygwin-b20/H-i586-cygwin32/bin/bash.exe</Filename>) to
@@ -677,62 +664,6 @@ directory, but (a) some UNIX utils have got
 
 <ListItem>
 <Para>
-Add <Filename>C:\cygnus\cygwin-b20\H-i586-cygwin32\bin</Filename> to your <Constant>PATH</Constant>.
-<Command>bash</Command> needs this, and when it is invoked from <Filename>/bin</Filename> it can't
-find it.
-</Para>
-</ListItem>
-
-<ListItem>
-<Para>
-Set your <Constant>SHELL</Constant> user environment variable to <Filename>c:/bin/sh</Filename>.
-</Para>
-</ListItem>
-
-<ListItem>
-<Para>
-Set your <Filename>HOME</Filename> user environment variable to point to your
-home directory.  This is where, for example,
-<Command>bash</Command> will look for your <Filename>.bashrc</Filename>
-file.
-</Para>
-</ListItem>
-
-<ListItem>
-<Para>
-Set your <Constant>MAKE_MODE</Constant> user environment variable to <Literal>UNIX</Literal>.  If you don't do
-this you get very weird messages when you type `<Command>make</Command>', such as:
-</Para>
-
-<Screen>
-/c: /c: No such file or directory
-</Screen>
-</ListItem>
-
-<ListItem>
-<Para>
-Set the <Constant>TMPDIR</Constant> user environment variable to
-<Filename>c:/tmp</Filename>. For some reason, Win2k invisibly sets
-this variable to point to a temporary directory in your profile, that
-contains embedded spaces.  If GHC sees the <Constant>TMPDIR</Constant>
-variable set, it tries to use it for temporary files, but Cygwin
-doesn't grok filenames with spaces, so disaster results.
-</Para>
-<Para>
-Furthermore, it seems that <Constant>TMPDIR</Constant> must be set to a directory
-in the same file system in which you invoke GHC.  Otherwise you get very werid messages
-when you invoke GHC, such as:
-<Screen>
-  does not exist
-  Action: openFile
-  Reason: file does not exist /tmp/ghc11068.cpp
-</Screen>
-We think this is due to a bug in Cygwin.
-</Para>
-</ListItem>
-
-<ListItem>
-<Para>
 If you're an Emacs user and want to be able to run <Command>bash</Command>
 from within a shell buffer, see the <ULink URL="http://www.cs.washington.edu/homes/voelker/ntemacs.html">NT Emacs home page</ULink> for
 instructions on how to set this up.
@@ -740,7 +671,84 @@ instructions on how to set this up.
 </ListItem>
 
 </ItemizedList>
+
+<Para>
+The following environment variables must be set:
+</Para>
+
+<Para>
+<InformalTable>
+<TGroup cols="2">
+<ColSpec Align="Left" Colsep="0">
+<ColSpec Align="Left" Colsep="0">
+<TBody>
+
+<Row>
+<Entry><Constant>PATH</Constant></Entry>
+<Entry>System</Entry>
+<Entry><Para>
+Add <Filename>C:\cygnus\cygwin-b20\H-i586-cygwin32\bin</Filename>.
+<Command>bash</Command> needs this, and when it is invoked from <Filename>/bin</Filename> it can't
+find it. <Filename>c:/bin</Filename> and <Filename>c:/usr/local/bin</Filename> should also be added.
+</Para></Entry>
+</Row>
+
+<Row>
+<Entry><Constant>SHELL</Constant></Entry>
+<Entry>User</Entry>
+<Entry><Para>
+<Filename>c:/bin/sh</Filename>.
+</Para></Entry>
+</Row>
+
+<Row>
+<Entry><Constant>HOME</Constant></Entry>
+<Entry>User</Entry>
+<Entry><Para>
+Set to point to your home directory.  This is where, for example,
+<Command>bash</Command> will look for your <Filename>.bashrc</Filename>
+file.
+</Para></Entry>
+</Row>
+
+<Row>
+<Entry><Constant>MAKE_MODE</Constant></Entry>
+<Entry>User</Entry>
+<Entry><Para>
+Set to <Literal>UNIX</Literal>.  If you don't do
+this you get very weird messages when you type `<Command>make</Command>', such as:
+</Para><Screen>
+/c: /c: No such file or directory</Screen></Entry>
+</Row>
+
+<Row>
+<Entry><Constant>TMPDIR</Constant></Entry>
+<Entry>User</Entry>
+<Entry><Para>
+Set to <Filename>c:/tmp</Filename>. For some reason, Win2k invisibly sets
+this variable to point to a temporary directory in your profile, that
+contains embedded spaces.  If GHC sees the <Constant>TMPDIR</Constant>
+variable set, it tries to use it for temporary files, but Cygwin
+doesn't grok filenames with spaces, so disaster results.
+</Para><Para>
+Furthermore, it seems that <Constant>TMPDIR</Constant> must be set to a directory
+in the same file system in which you invoke GHC.  Otherwise you get very werid messages
+when you invoke GHC, such as:
+<Screen>
+does not exist
+Action: openFile
+Reason: file does not exist /tmp/ghc11068.cpp</Screen>
+We think this is due to a bug in Cygwin.
+</Para></Entry>
+</Row>
+</TBody>
+
+</TGroup>
+</InformalTable>
+</Para>
+
 </Sect3>
+
 
 <Sect3><Title>Perl5</Title>
 
@@ -847,8 +855,7 @@ bash$ /path/to/the/ghc/bin/directory/ghc-4.05 -o main main.hs
 ..
 bash$ ./main
 Hello, world!
-bash$ 
-</Screen>
+bash$ </Screen>
 
 <Para>
 OK, assuming that worked, you're all set. Go forth and write useful
@@ -903,8 +910,7 @@ When compiling up the <Literal>Hello World</Literal> example, the following happ
 bash$ /ghc/ghc-4.05/bin/ghc-4.05 main.hs
 &lt;stdin&gt;:0:25: Character literal '{-# LINE 1 "main.hs" -}' too long
 &lt;stdin&gt;:0:25:  on input: "'"
-bash$ 
-</Screen>
+bash$ </Screen>
 
 <Para>
 or
@@ -913,8 +919,7 @@ or
 <Screen>
 bash$ /ghc/ghc-4.05/bin/ghc-4.05 main.hs
 Program too big fit into memory under NT
-bash$ 
-</Screen>
+bash$ </Screen>
 </Question>
 
 <Answer>
@@ -944,8 +949,7 @@ files within the directory tree that the installer created:
 bin/ghc-4.xx   -- where xx is the minor release number
 bin/stat2resid
 bin/hstags
-lib/mkdependHS
-</Screen>
+lib/mkdependHS</Screen>
 
 <Para>
 For each of these files, you need to edit the first line from instead
@@ -965,7 +969,7 @@ of perl instead, a <ULink URL="http://cygutils.netpedia.net/">cygwin port</ULink
 
 <Question>
 <Para>
-<Function>System.getArgs</Function> always return the empty list, i.e. the following program always prints <Screen>"[]"</Screen>:
+<Function>System.getArgs</Function> always return the empty list, i.e. the following program always prints &ldquo;<Literal>[]</Literal>&rdquo;:
 </Para>
 
 <ProgramListing>

@@ -271,8 +271,8 @@ that index to jump around among these definitions.
 </Para>
 
 <Para>
-Rather than scratch your head, saying ``Now where did we define
-`foo'?'', you just do (in Emacs) <Literal>M-. foo RET</Literal>, and You're There!
+Rather than scratch your head, saying &ldquo;Now where did we define
+`foo'?&rdquo;, you just do (in Emacs) <Literal>M-. foo RET</Literal>, and You're There!
 Some people go wild over this stuff&hellip;
 </Para>
 
@@ -319,7 +319,7 @@ section&hellip;)
 </Sect1>
 
 <Sect1 id="happy">
-<Title>``Yacc for Haskell'': <Command>happy</Command>
+<Title>&ldquo;Yacc for Haskell&rdquo;: <Command>happy</Command>
 </Title>
 
 <Para>

@@ -10,9 +10,9 @@ the language.  To use them, you'll need to give a <Option>-fglasgow-exts</Option
 Virtually all of the Glasgow extensions serve to give you access to
 the underlying facilities with which we implement Haskell.  Thus, you
 can get at the Raw Iron, if you are willing to write some non-standard
-code at a more primitive level.  You need not be ``stuck'' on
+code at a more primitive level.  You need not be &ldquo;stuck&rdquo; on
 performance because of the implementation costs of Haskell's
-``high-level'' features&mdash;you can always code ``under'' them.  In an
+&ldquo;high-level&rdquo; features&mdash;you can always code &ldquo;under&rdquo; them.  In an
 extreme case, you can write all your time-critical code in C, and then
 just glue it together with Haskell!
 </Para>
@@ -29,7 +29,7 @@ Executive summary of our extensions:
 <ListItem>
 <Para>
 You can get right down to the raw machine types and operations;
-included in this are ``primitive arrays'' (direct access to Big Wads
+included in this are &ldquo;primitive arrays&rdquo; (direct access to Big Wads
 of Bytes).  Please see <XRef LinkEnd="glasgow-unboxed"> and following.
 </Para>
 </ListItem>
@@ -113,8 +113,8 @@ Details in <XRef LinkEnd="rewrite-rules">.
 <Para>
 Before you get too carried away working at the lowest level (e.g.,
 sloshing <Literal>MutableByteArray&num;</Literal>s around your program), you may wish to
-check if there are system libraries that provide a ``Haskellised
-veneer'' over the features you want.  See <XRef LinkEnd="ghc-prelude">.
+check if there are system libraries that provide a &ldquo;Haskellised
+veneer&rdquo; over the features you want.  See <XRef LinkEnd="ghc-prelude">.
 </Para>
 
 <Sect1 id="glasgow-unboxed">
@@ -126,7 +126,7 @@ veneer'' over the features you want.  See <XRef LinkEnd="ghc-prelude">.
 </Para>
 
 <Para>
-These types correspond to the ``raw machine'' types you would use in
+These types correspond to the &ldquo;raw machine&rdquo; types you would use in
 C: <Literal>Int&num;</Literal> (long int), <Literal>Double&num;</Literal> (double), <Literal>Addr&num;</Literal> (void *), etc.  The
 <Emphasis>primitive operations</Emphasis> (PrimOps) on these types are what you
 might expect; e.g., <Literal>(+&num;)</Literal> is addition on <Literal>Int&num;</Literal>s, and is the
@@ -149,7 +149,7 @@ results.  Even worse, the unboxed value might be larger than a pointer
 
 <Para>
 Nevertheless, A numerically-intensive program using unboxed types can
-go a <Emphasis>lot</Emphasis> faster than its ``standard'' counterpart&mdash;we saw a
+go a <Emphasis>lot</Emphasis> faster than its &ldquo;standard&rdquo; counterpart&mdash;we saw a
 threefold speedup on one example.
 </Para>
 
@@ -171,7 +171,7 @@ operations on them.
 
 <Para>
 This monad underlies our implementation of arrays, mutable and
-immutable, and our implementation of I/O, including ``C calls''.
+immutable, and our implementation of I/O, including &ldquo;C calls&rdquo;.
 </Para>
 
 <Para>
@@ -211,7 +211,7 @@ Second, it distinguishes between&hellip;
 <Term>Immutable:</Term>
 <ListItem>
 <Para>
-Arrays that do not change (as with ``standard'' Haskell arrays); you
+Arrays that do not change (as with &ldquo;standard&rdquo; Haskell arrays); you
 can only read from them.  Obviously, they do not need the care and
 attention of the state-transformer monad.
 </Para>
@@ -221,29 +221,29 @@ attention of the state-transformer monad.
 <Term>Mutable:</Term>
 <ListItem>
 <Para>
-Arrays that may be changed or ``mutated.''  All the operations on them
+Arrays that may be changed or &ldquo;mutated.&rdquo;  All the operations on them
 live within the state-transformer monad and the updates happen
 <Emphasis>in-place</Emphasis>.
 </Para>
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term>``Static'' (in C land):</Term>
+<Term>&ldquo;Static&rdquo; (in C land):</Term>
 <ListItem>
 <Para>
 A C routine may pass an <Literal>Addr&num;</Literal> pointer back into Haskell land.  There
 are then primitive operations with which you may merrily grab values
-over in C land, by indexing off the ``static'' pointer.
+over in C land, by indexing off the &ldquo;static&rdquo; pointer.
 </Para>
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term>``Stable'' pointers:</Term>
+<Term>&ldquo;Stable&rdquo; pointers:</Term>
 <ListItem>
 <Para>
 If, for some reason, you wish to hand a Haskell pointer (i.e.,
 <Emphasis>not</Emphasis> an unboxed value) to a C routine, you first make the
-pointer ``stable,'' so that the garbage collector won't forget that it
+pointer &ldquo;stable,&rdquo; so that the garbage collector won't forget that it
 exists.  That is, GHC provides a safe way to pass Haskell pointers to
 C.
 </Para>
@@ -254,14 +254,14 @@ Please see <XRef LinkEnd="glasgow-stablePtrs"> for more details.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term>``Foreign objects'':</Term>
+<Term>&ldquo;Foreign objects&rdquo;:</Term>
 <ListItem>
 <Para>
-A ``foreign object'' is a safe way to pass an external object (a
+A &ldquo;foreign object&rdquo; is a safe way to pass an external object (a
 C-allocated pointer, say) to Haskell and have Haskell do the Right
 Thing when it no longer references the object.  So, for example, C
-could pass a large bitmap over to Haskell and say ``please free this
-memory when you're done with it.''
+could pass a large bitmap over to Haskell and say &ldquo;please free this
+memory when you're done with it.&rdquo;
 </Para>
 
 <Para>
@@ -273,8 +273,8 @@ Please see <XRef LinkEnd="glasgow-foreignObjs"> for more details.
 </Para>
 
 <Para>
-The libraries section gives more details on all these ``primitive
-array'' types and the operations on them, <XRef LinkEnd="ghc-prelude">.  Some of these extensions
+The libraries section gives more details on all these &ldquo;primitive
+array&rdquo; types and the operations on them, <XRef LinkEnd="ghc-prelude">.  Some of these extensions
 are also supported by Hugs, and the supporting libraries are described
 in the <ULink
 URL="libs.html"
@@ -326,7 +326,7 @@ is to provide a Haskell wrapper:
 
 <ProgramListing>
 fooH :: Char -&#62; Int -&#62; Double -&#62; Word -&#62; IO Double
-fooH c i d w = _ccall_ fooC (``stdin''::Addr) c i d w
+fooH c i d w = _ccall_ fooC (&ldquo;stdin&rdquo;::Addr) c i d w
 </ProgramListing>
 
 </Para>
@@ -350,7 +350,7 @@ import Addr
 import CString
 
 oldGetEnv name
-  = _casm_ ``%r = getenv((char *) %0);'' name &#62;&#62;= \ litstring -&#62;
+  = _casm_ &ldquo;%r = getenv((char *) %0);&rdquo; name &#62;&#62;= \ litstring -&#62;
     return (
         if (litstring == nullAddr) then
             Left ("Fail:oldGetEnv:"++name)
@@ -363,7 +363,7 @@ oldGetEnv name
 
 <Para>
 The first literal-literal argument to a <Function>&lowbar;casm&lowbar;</Function> is like a <Function>printf</Function>
-format: <Literal>&percnt;r</Literal> is replaced with the ``result,'' <Literal>&percnt;0</Literal>&ndash;<Literal>&percnt;n-1</Literal> are
+format: <Literal>&percnt;r</Literal> is replaced with the &ldquo;result,&rdquo; <Literal>&percnt;0</Literal>&ndash;<Literal>&percnt;n-1</Literal> are
 replaced with the 1st&ndash;nth arguments.  As you can see above, it is an
 easy way to do simple C&nbsp;casting.  Everything said about <Function>&lowbar;ccall&lowbar;</Function> goes
 for <Function>&lowbar;casm&lowbar;</Function> as well.
@@ -409,7 +409,7 @@ from the <Function>&lowbar;casm&lowbar;</Function> construct itself. Indeed, we'
 
 <ProgramListing>
 fooH :: Char -&#62; Int -&#62; Double -&#62; Word -&#62; IO Double
-fooH c i d w = _ccall_ fooC (``stdin''::Addr) c i d w
+fooH c i d w = _ccall_ fooC (&ldquo;stdin&rdquo;::Addr) c i d w
 </ProgramListing>
 
 </Para>
@@ -562,7 +562,7 @@ solid code.  You're crazy not to do it.
 </Sect2>
 
 <Sect2 id="glasgow-stablePtrs">
-<Title>Subverting automatic unboxing with ``stable pointers''
+<Title>Subverting automatic unboxing with &ldquo;stable pointers&rdquo;
 </Title>
 
 <Para>
@@ -601,8 +601,8 @@ to boxed objects are not <Emphasis>stable</Emphasis>.
 </Para>
 
 <Para>
-It is possible to subvert the unboxing process by creating a ``stable
-pointer'' to a value and passing the stable pointer instead.  For
+It is possible to subvert the unboxing process by creating a &ldquo;stable
+pointer&rdquo; to a value and passing the stable pointer instead.  For
 example, to pass/return an integer lazily to C functions <Function>storeC</Function> and
 <Function>fetchC</Function> might write:
 </Para>
@@ -769,7 +769,7 @@ atan2d y x = unsafePerformIO (_ccall_ atan2d y x)
 sincosd :: Double -&#62; (Double, Double)
 sincosd x = unsafePerformIO $ do
         da &#60;- newDoubleArray (0, 1)
-        _casm_ ``sincosd( %0, &amp;((double *)%1[0]), &amp;((double *)%1[1]) );'' x da
+        _casm_ &ldquo;sincosd( %0, &amp;((double *)%1[0]), &amp;((double *)%1[1]) );&rdquo; x da
         s &#60;- readDoubleArray da 0
         c &#60;- readDoubleArray da 1
         return (s, c)
@@ -825,7 +825,7 @@ trace string expr
         ((_ccall_ PostTraceHook sTDERR{-msg-}):: IO ()) &#62;&#62;
         return expr )
   where
-    sTDERR = (``stderr'' :: Addr)
+    sTDERR = (&ldquo;stderr&rdquo; :: Addr)
 </ProgramListing>
 
 
@@ -841,7 +841,7 @@ useful in debugging code.)
 </Sect2>
 
 <Sect2 id="ccall-gotchas">
-<Title>C-calling ``gotchas'' checklist
+<Title>C-calling &ldquo;gotchas&rdquo; checklist
 </Title>
 
 <Para>
@@ -2851,7 +2851,7 @@ also OK to say:
 <ListItem>
 
 <Para>
-To avoid ambiguity, the type after the ``<Literal>::</Literal>'' in a result
+To avoid ambiguity, the type after the &ldquo;<Literal>::</Literal>&rdquo; in a result
 pattern signature on a lambda or <Literal>case</Literal> must be atomic (i.e. a single
 token or a parenthesised type of some sort).  To see why,
 consider how one would parse this:
@@ -2972,8 +2972,8 @@ but they might affect the efficiency of the generated code.
 <IndexTerm><Primary>pragma, INLINE</Primary></IndexTerm></Title>
 
 <Para>
-GHC (with <Option>-O</Option>, as always) tries to inline (or ``unfold'')
-functions/values that are ``small enough,'' thus avoiding the call
+GHC (with <Option>-O</Option>, as always) tries to inline (or &ldquo;unfold&rdquo;)
+functions/values that are &ldquo;small enough,&rdquo; thus avoiding the call
 overhead and possibly exposing other more-wonderful optimisations.
 </Para>
 
@@ -2983,7 +2983,7 @@ interface files.
 </Para>
 
 <Para>
-Normally, if GHC decides a function is ``too expensive'' to inline, it
+Normally, if GHC decides a function is &ldquo;too expensive&rdquo; to inline, it
 will not do so, nor will it export that unfolding for other modules to
 use.
 </Para>
@@ -3006,7 +3006,7 @@ to stick the code through HBC&mdash;it doesn't like <Literal>INLINE</Literal> pr
 
 <Para>
 The major effect of an <Literal>INLINE</Literal> pragma is to declare a function's
-``cost'' to be very low.  The normal unfolding machinery will then be
+&ldquo;cost&rdquo; to be very low.  The normal unfolding machinery will then be
 very keen to inline it.
 </Para>
 
@@ -3719,7 +3719,7 @@ If you add <Option>-dppr-debug</Option> you get a more detailed listing.
 </ProgramListing>
 
 Notice the <Literal>INLINE</Literal>!  That prevents <Literal>(:)</Literal> from being inlined when compiling
-<Literal>PrelBase</Literal>, so that an importing module will ``see'' the <Literal>(:)</Literal>, and can
+<Literal>PrelBase</Literal>, so that an importing module will &ldquo;see&rdquo; the <Literal>(:)</Literal>, and can
 match it on the LHS of a rule.  <Literal>INLINE</Literal> prevents any inlining happening
 in the RHS of the <Literal>INLINE</Literal> thing.  I regret the delicacy of this.
 

@@ -44,13 +44,13 @@ multiple processors, under a PVM (Parallel Virtual Machine) framework.
 </Para>
 
 <Para>
-Parallel Haskell is still relatively new; it is more about ``research
-fun'' than about ``speed.'' That will change.
+Parallel Haskell is still relatively new; it is more about &ldquo;research
+fun&rdquo; than about &ldquo;speed.&rdquo; That will change.
 </Para>
 
 <Para>
 Again, check Simon's Web page for publications about Parallel Haskell
-(including ``GUM'', the key bits of the runtime system).
+(including &ldquo;GUM&rdquo;, the key bits of the runtime system).
 </Para>
 
 <Para>

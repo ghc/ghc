@@ -12,7 +12,7 @@ execution behaviour, so you can improve it.
 
 <Para>
 Any comments, suggestions and/or improvements you have are welcome.
-Recommended ``profiling tricks'' would be especially cool!
+Recommended &ldquo;profiling tricks&rdquo; would be especially cool!
 </Para>
 
 <Sect1 id="profiling-intro">
@@ -21,7 +21,7 @@ Recommended ``profiling tricks'' would be especially cool!
 
 <Para>
 The GHC approach to profiling is very simple: annotate the expressions
-you consider ``interesting'' with <Emphasis>cost centre</Emphasis> labels (strings);
+you consider &ldquo;interesting&rdquo; with <Emphasis>cost centre</Emphasis> labels (strings);
 so, for example, you might have:
 </Para>
 
@@ -40,8 +40,8 @@ f x y
 
 <Para>
 The costs of the evaluating the expressions bound to <VarName>output1</VarName>,
-<VarName>output2</VarName> and <VarName>output3</VarName> will be attributed to the ``cost
-centres'' <VarName>Pass1</VarName>, <VarName>Pass2</VarName> and <VarName>Pass3</VarName>, respectively.
+<VarName>output2</VarName> and <VarName>output3</VarName> will be attributed to the &ldquo;cost
+centres&rdquo; <VarName>Pass1</VarName>, <VarName>Pass2</VarName> and <VarName>Pass3</VarName>, respectively.
 </Para>
 
 <Para>
@@ -52,8 +52,8 @@ will be inherited by the scope which referenced the function <Function>f</Functi
 <Para>
 You can put in cost-centres via <Function>&lowbar;scc&lowbar;</Function> constructs by hand, as in the
 example above.  Perfectly cool.  That's probably what you
-<Emphasis>would</Emphasis> do if your program divided into obvious ``passes'' or
-``phases'', or whatever.
+<Emphasis>would</Emphasis> do if your program divided into obvious &ldquo;passes&rdquo; or
+&ldquo;phases&rdquo;, or whatever.
 </Para>
 
 <Para>
@@ -71,7 +71,7 @@ your own.
 
 <Para>
 To use profiling, you must <Emphasis>compile</Emphasis> and <Emphasis>run</Emphasis> with special
-options.  (We usually forget the ``run'' magic!&mdash;Do as we say, not as
+options.  (We usually forget the &ldquo;run&rdquo; magic!&mdash;Do as we say, not as
 we do&hellip;) Details follow.
 </Para>
 
@@ -139,8 +139,8 @@ all top-level, exported functions.
 <Para>
 <IndexTerm><Primary>-caf-all option</Primary></IndexTerm>
 The costs of all CAFs in a module are usually attributed to one
-``big'' CAF cost-centre. With this option, all CAFs get their own cost-centre.
-An ``if all else fails'' option&hellip;
+&ldquo;big&rdquo; CAF cost-centre. With this option, all CAFs get their own cost-centre.
+An &ldquo;if all else fails&rdquo; option&hellip;
 </Para>
 </ListItem>
 </VarListEntry>
@@ -447,8 +447,8 @@ centre) is selected by the option (or the option is not specified).
 
 <Para>
 When you run your profiled program with the <Option>-p</Option> RTS option <IndexTerm><Primary>-p
-RTS option</Primary></IndexTerm>, you get the following information about your ``cost
-centres'':
+RTS option</Primary></IndexTerm>, you get the following information about your &ldquo;cost
+centres&rdquo;:
 </Para>
 
 <Para>
@@ -477,7 +477,7 @@ different modules.
 <ListItem>
 <Para>
 How many times this cost-centre was entered; think
-of it as ``I got to the <Function>&lowbar;scc&lowbar;</Function> construct this many times&hellip;''
+of it as &ldquo;I got to the <Function>&lowbar;scc&lowbar;</Function> construct this many times&hellip;&rdquo;
 </Para>
 </ListItem>
 </VarListEntry>
@@ -485,7 +485,7 @@ of it as ``I got to the <Function>&lowbar;scc&lowbar;</Function> construct this 
 <Term><Literal>&percnt;time</Literal>:</Term>
 <ListItem>
 <Para>
-What part of the time was spent in this cost-centre (see also ``ticks,''
+What part of the time was spent in this cost-centre (see also &ldquo;ticks,&rdquo;
 below).
 </Para>
 </ListItem>
@@ -495,7 +495,7 @@ below).
 <ListItem>
 <Para>
 What part of the memory allocation was done in this cost-centre
-(see also ``bytes,'' below).
+(see also &ldquo;bytes,&rdquo; below).
 </Para>
 </ListItem>
 </VarListEntry>
@@ -503,10 +503,10 @@ What part of the memory allocation was done in this cost-centre
 <Term><Literal>inner</Literal>:</Term>
 <ListItem>
 <Para>
-How many times this cost-centre ``passed control'' to an inner
+How many times this cost-centre &ldquo;passed control&rdquo; to an inner
 cost-centre; for example, <Literal>scc=4</Literal> plus <Literal>subscc=8</Literal> means
-``This <Literal>&lowbar;scc&lowbar;</Literal> was entered four times, but went out to
-other <Literal>&lowbar;scc&lowbar;s</Literal> eight times.''
+&ldquo;This <Literal>&lowbar;scc&lowbar;</Literal> was entered four times, but went out to
+other <Literal>&lowbar;scc&lowbar;s</Literal> eight times.&rdquo;
 </Para>
 </ListItem>
 </VarListEntry>
@@ -539,7 +539,7 @@ In addition you can use the <Option>-P</Option> RTS option <IndexTerm><Primary><
 <Term><Literal>ticks</Literal>:</Term>
 <ListItem>
 <Para>
-The raw number of time ``ticks'' which were
+The raw number of time &ldquo;ticks&rdquo; which were
 attributed to this cost-centre; from this, we get the <Literal>&percnt;time</Literal>
 figure mentioned above.
 </Para>
@@ -571,7 +571,7 @@ produce the following information:
 <IndexTerm><Primary>closures, profiling</Primary></IndexTerm>
 How many heap objects were allocated; these objects may be of varying
 size.  If you divide the number of bytes (mentioned below) by this
-number of ``closures'', then you will get the average object size.
+number of &ldquo;closures&rdquo;, then you will get the average object size.
 (Not too interesting, but still&hellip;)
 </Para>
 </ListItem>
@@ -855,7 +855,7 @@ distribution.
 </Sect1>
 
 <Sect1 id="ticky-ticky">
-<Title>Using ``ticky-ticky'' profiling (for implementors)
+<Title>Using &ldquo;ticky-ticky&rdquo; profiling (for implementors)
 </Title>
 
 <Para>
@@ -870,21 +870,21 @@ distribution.
 It is possible to compile Glasgow Haskell programs so that they will
 count lots and lots of interesting things, e.g., number of updates,
 number of data constructors entered, etc., etc.  We call this
-``ticky-ticky'' profiling,<IndexTerm><Primary>ticky-ticky profiling</Primary></IndexTerm>
+&ldquo;ticky-ticky&rdquo; profiling,<IndexTerm><Primary>ticky-ticky profiling</Primary></IndexTerm>
 <IndexTerm><Primary>profiling, ticky-ticky</Primary></IndexTerm> because that's the sound a Sun4 makes
 when it is running up all those counters (<Emphasis>slowly</Emphasis>).
 </Para>
 
 <Para>
 Ticky-ticky profiling is mainly intended for implementors; it is quite
-separate from the main ``cost-centre'' profiling system, intended for
+separate from the main &ldquo;cost-centre&rdquo; profiling system, intended for
 all users everywhere.
 </Para>
 
 <Para>
 To be able to use ticky-ticky profiling, you will need to have built
 appropriate libraries and things when you made the system.  See
-``Customising what libraries to build,'' in the installation guide.
+&ldquo;Customising what libraries to build,&rdquo; in the installation guide.
 </Para>
 
 <Para>

@@ -315,7 +315,7 @@ The RTS options related to profiling are described in <XRef LinkEnd="prof-rts-op
 
 <Para>
 These RTS options might be used (a)&nbsp;to avoid a GHC bug, (b)&nbsp;to see
-``what's really happening'', or (c)&nbsp;because you feel like it.  Not
+&ldquo;what's really happening&rdquo;, or (c)&nbsp;because you feel like it.  Not
 recommended for everyday use!
 </Para>
 
@@ -332,12 +332,12 @@ Sound the bell at the start of each (major) garbage collection.
 
 <Para>
 Oddly enough, people really do use this option!  Our pal in Durham
-(England), Paul Callaghan, writes: ``Some people here use it for a
+(England), Paul Callaghan, writes: &ldquo;Some people here use it for a
 variety of purposes&mdash;honestly!&mdash;e.g., confirmation that the
 code/machine is doing something, infinite loop detection, gauging cost
 of recently added code. Certain people can even tell what stage &lsqb;the
 program&rsqb; is in by the beep pattern. But the major use is for annoying
-others in the same office&hellip;''
+others in the same office&hellip;&rdquo;
 </Para>
 </ListItem>
 </VarListEntry>
@@ -347,17 +347,17 @@ others in the same office&hellip;''
 <Para>
 <IndexTerm><Primary>-r &lt;file&gt; RTS option</Primary></IndexTerm>
 <IndexTerm><Primary>ticky ticky profiling</Primary></IndexTerm>
-Produce ``ticky-ticky'' statistics at the end of the program run.
+Produce &ldquo;ticky-ticky&rdquo; statistics at the end of the program run.
 The <Filename>&lt;file&gt;</Filename> business works just like on the <Option>-S</Option> RTS option (above).
 </Para>
 
 <Para>
-``Ticky-ticky'' statistics are counts of various program actions
+&ldquo;Ticky-ticky&rdquo; statistics are counts of various program actions
 (updates, enters, etc.)  The program must have been compiled using
-<Option>-ticky</Option><IndexTerm><Primary>-ticky option</Primary></IndexTerm> (a.k.a. ``ticky-ticky profiling''),
+<Option>-ticky</Option><IndexTerm><Primary>-ticky option</Primary></IndexTerm> (a.k.a. &ldquo;ticky-ticky profiling&rdquo;),
 and, for it to be really useful, linked with suitable system
 libraries.  Not a trivial undertaking: consult the installation guide
-on how to set things up for easy ``ticky-ticky'' profiling.  For more
+on how to set things up for easy &ldquo;ticky-ticky&rdquo; profiling.  For more
 information, see <XRef LinkEnd="ticky-ticky">.
 </Para>
 </ListItem>
@@ -378,7 +378,7 @@ bits are set in <Literal>&lt;num&gt;</Literal>.  Only works if the RTS was compi
 <ListItem>
 <Para>
 <IndexTerm><Primary>-Z RTS option</Primary></IndexTerm>
-Turn <Emphasis>off</Emphasis> ``update-frame squeezing'' at garbage-collection
+Turn <Emphasis>off</Emphasis> &ldquo;update-frame squeezing&rdquo; at garbage-collection
 time.  (There's no particularly good reason to turn it off, except to
 ensure the accuracy of certain data collected regarding thunk entry
 counts.)
@@ -391,7 +391,7 @@ counts.)
 </Sect2>
 
 <Sect2 id="rts-hooks">
-<Title>``Hooks'' to change RTS behaviour
+<Title>&ldquo;Hooks&rdquo; to change RTS behaviour
 </Title>
 
 <Para>
@@ -402,7 +402,7 @@ counts.)
 
 <Para>
 GHC lets you exercise rudimentary control over the RTS settings for
-any given program, by compiling in a ``hook'' that is called by the
+any given program, by compiling in a &ldquo;hook&rdquo; that is called by the
 run-time system.  The RTS contains stub definitions for all these
 hooks, but by writing your own version and linking it on the GHC
 command line, you can override the defaults.
@@ -436,7 +436,7 @@ defined in <Filename>ghc/rts/RtsFlags.h</Filename> the the GHC source tree.
 
 <Para>
 You can also change the messages printed when the runtime system
-``blows up,'' e.g., on stack overflow.  The hooks for these are as
+&ldquo;blows up,&rdquo; e.g., on stack overflow.  The hooks for these are as
 follows:
 </Para>
 
@@ -511,7 +511,7 @@ What's printed out after a <Function>trace</Function> message.
 </Para>
 
 <Para>
-For example, here is the ``hooks'' code used by GHC itself:
+For example, here is the &ldquo;hooks&rdquo; code used by GHC itself:
 
 <ProgramListing>
 #include &#60;stdio.h&#62;

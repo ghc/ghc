@@ -390,10 +390,10 @@ when even <Option>-dverbose-simpl</Option> doesn't cut it.
 <Para>
 <IndexTerm><Primary>-dppr-user option</Primary></IndexTerm>
 <IndexTerm><Primary>-dppr-debug option</Primary></IndexTerm>
-Debugging output is in one of several ``styles.''  Take the printing
-of types, for example.  In the ``user'' style, the compiler's internal
+Debugging output is in one of several &ldquo;styles.&rdquo;  Take the printing
+of types, for example.  In the &ldquo;user&rdquo; style, the compiler's internal
 ideas about types are presented in Haskell source-level syntax,
-insofar as possible.  In the ``debug'' style (which is the default for
+insofar as possible.  In the &ldquo;debug&rdquo; style (which is the default for
 debugging output), the types are printed in with
 explicit foralls, and variables have their unique-id attached (so you
 can check for things that look the same but aren't).
@@ -415,7 +415,7 @@ of transformation too place.  If you add <Option>-dppr-debug</Option> you get mo
 <ListItem>
 <Para>
 <IndexTerm><Primary>-ddump-raw-asm option</Primary></IndexTerm>
-Dump out the assembly-language stuff, before the ``mangler'' gets it.
+Dump out the assembly-language stuff, before the &ldquo;mangler&rdquo; gets it.
 </Para>
 </ListItem>
 </VarListEntry>
@@ -522,16 +522,16 @@ skip2 m = m : skip2 (m+2)
 <Para>
 Before we jump in, a word about names of things.  Within GHC,
 variables, type constructors, etc., are identified by their
-``Uniques.''  These are of the form `letter' plus `number' (both
+&ldquo;Uniques.&rdquo;  These are of the form `letter' plus `number' (both
 loosely interpreted).  The `letter' gives some idea of where the
-Unique came from; e.g., <Literal>&lowbar;</Literal> means ``built-in type variable'';
-<Literal>t</Literal> means ``from the typechecker''; <Literal>s</Literal> means ``from the
-simplifier''; and so on.  The `number' is printed fairly compactly in
+Unique came from; e.g., <Literal>&lowbar;</Literal> means &ldquo;built-in type variable&rdquo;;
+<Literal>t</Literal> means &ldquo;from the typechecker&rdquo;; <Literal>s</Literal> means &ldquo;from the
+simplifier&rdquo;; and so on.  The `number' is printed fairly compactly in
 a `base-62' format, which everyone hates except me (WDP).
 </Para>
 
 <Para>
-Remember, everything has a ``Unique'' and it is usually printed out
+Remember, everything has a &ldquo;Unique&rdquo; and it is usually printed out
 when debugging, in some form or another.  So here we go&hellip;
 </Para>
 
@@ -610,7 +610,7 @@ Main.skip2{-r1L6-} =
 </Para>
 
 <Para>
-(``It's just a simple functional language'' is an unregisterised
+(&ldquo;It's just a simple functional language&rdquo; is an unregisterised
 trademark of Peyton Jones Enterprises, plc.)
 </Para>
 

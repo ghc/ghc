@@ -20,7 +20,7 @@ be of interest.)
 </Para>
 
 <Sect1 id="wrong-compiler">
-<Title>When the compiler ``does the wrong thing''
+<Title>When the compiler &ldquo;does the wrong thing&rdquo;
 </Title>
 
 <Para>
@@ -32,7 +32,7 @@ be of interest.)
 <VariableList>
 
 <VarListEntry>
-<Term>``Help! The compiler crashed (or `panic'd)!''</Term>
+<Term>&ldquo;Help! The compiler crashed (or `panic'd)!&rdquo;</Term>
 <ListItem>
 <Para>
 These events are <Emphasis>always</Emphasis> bugs in the GHC system&mdash;please report them.
@@ -40,7 +40,7 @@ These events are <Emphasis>always</Emphasis> bugs in the GHC system&mdash;please
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term>``The compiler ran out of heap (or stack) when compiling itself!''</Term>
+<Term>&ldquo;The compiler ran out of heap (or stack) when compiling itself!&rdquo;</Term>
 <ListItem>
 <Para>
 It happens.  We try to supply reasonable <Option>-H&lt;n&gt;</Option> flags for
@@ -61,15 +61,15 @@ heap.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term>``The compiler died with a pattern-matching error.''</Term>
+<Term>&ldquo;The compiler died with a pattern-matching error.&rdquo;</Term>
 <ListItem>
 <Para>
-This is a bug just as surely as a ``panic.'' Please report it.
+This is a bug just as surely as a &ldquo;panic.&rdquo; Please report it.
 </Para>
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term>``This is a terrible error message.''</Term>
+<Term>&ldquo;This is a terrible error message.&rdquo;</Term>
 <ListItem>
 <Para>
 If you think that GHC could have produced a better error message,
@@ -78,7 +78,7 @@ please report it as a bug.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term>``What about these `trace' messages from GHC?''</Term>
+<Term>&ldquo;What about these `trace' messages from GHC?&rdquo;</Term>
 <ListItem>
 <Para>
 Almost surely not a problem.  About some specific cases&hellip;
@@ -96,7 +96,7 @@ turning on the <Option>-fshow-simplifier-progress</Option>
 </Para>
 
 <Para>
-If the simplifier definitely seems to be ``looping,'' please report
+If the simplifier definitely seems to be &ldquo;looping,&rdquo; please report
 it.
 </Para>
 </ListItem>
@@ -106,10 +106,10 @@ it.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term>``What about this warning from the C compiler?''</Term>
+<Term>&ldquo;What about this warning from the C compiler?&rdquo;</Term>
 <ListItem>
 <Para>
-For example: ``&hellip;warning: `Foo' declared `static' but never defined.''
+For example: &ldquo;&hellip;warning: `Foo' declared `static' but never defined.&rdquo;
 Unsightly, but shouldn't be a problem.
 </Para>
 </ListItem>
@@ -132,11 +132,11 @@ running programs compiled using unstable interfaces.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term>``I think GHC is producing incorrect code'':</Term>
+<Term>&ldquo;I think GHC is producing incorrect code&rdquo;:</Term>
 <ListItem>
 <Para>
 Unlikely :-) A useful be-more-paranoid option to give to GHC is
-<Option>-dcore-lint</Option><IndexTerm><Primary>-dcore-lint option</Primary></IndexTerm>; this causes a ``lint''
+<Option>-dcore-lint</Option><IndexTerm><Primary>-dcore-lint option</Primary></IndexTerm>; this causes a &ldquo;lint&rdquo;
 pass to check for errors (notably type errors) after each Core-to-Core
 transformation pass.  We run with <Option>-dcore-lint</Option> on all the time; it
 costs about 5&percnt; in compile time.
@@ -144,7 +144,7 @@ costs about 5&percnt; in compile time.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term>``Why did I get a link error?''</Term>
+<Term>&ldquo;Why did I get a link error?&rdquo;</Term>
 <ListItem>
 <Para>
 If the linker complains about not finding <Literal>&lowbar;&lt;something&gt;&lowbar;fast</Literal>, then
@@ -154,7 +154,7 @@ proper dependency order.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term>``What's a `consistency error'?''</Term>
+<Term>&ldquo;What's a `consistency error'?&rdquo;</Term>
 <ListItem>
 <Para>
 (These are reported just after linking your program.)
@@ -176,11 +176,11 @@ tags/strings in your object files.  They must all be the same!
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term>``Is this line number right?''</Term>
+<Term>&ldquo;Is this line number right?&rdquo;</Term>
 <ListItem>
 <Para>
 On this score, GHC usually does pretty well, especially
-if you ``allow'' it to be off by one or two.  In the case of an
+if you &ldquo;allow&rdquo; it to be off by one or two.  In the case of an
 instance or class declaration, the line number
 may only point you to the declaration, not to a specific method.
 </Para>
@@ -196,7 +196,7 @@ Please report line-number errors that you find particularly unhelpful.
 </Sect1>
 
 <Sect1 id="wrong-compilee">
-<Title>When your program ``does the wrong thing''
+<Title>When your program &ldquo;does the wrong thing&rdquo;
 </Title>
 
 <Para>
@@ -212,7 +212,7 @@ please see <XRef LinkEnd="sooner-faster-quicker">).
 <VariableList>
 
 <VarListEntry>
-<Term>``Help! My program crashed!''</Term>
+<Term>&ldquo;Help! My program crashed!&rdquo;</Term>
 <ListItem>
 <Para>
 (e.g., a `segmentation fault' or `core dumped')
@@ -231,7 +231,7 @@ case these <Emphasis>must</Emphasis> be correct with respect to the module sourc
 For example, if an interface is lying about the type of an imported
 value then GHC may well generate duff code for the importing module.
 <Emphasis>This applies to pragmas inside interfaces too!</Emphasis>  If the pragma is
-lying (e.g., about the ``arity'' of a value), then duff code may result.
+lying (e.g., about the &ldquo;arity&rdquo; of a value), then duff code may result.
 Furthermore, arities may change even if types do not.
 </Para>
 
@@ -281,7 +281,7 @@ GHC-compiled program, please see <XRef LinkEnd="hard-core-debug">.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term>``My program entered an `absent' argument.''</Term>
+<Term>&ldquo;My program entered an `absent' argument.&rdquo;</Term>
 <ListItem>
 <Para>
 This is definitely caused by a bug in GHC. Please report it.
@@ -289,7 +289,7 @@ This is definitely caused by a bug in GHC. Please report it.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term>``What's with this `arithmetic (or `floating') exception' ''?</Term>
+<Term>&ldquo;What's with this `arithmetic (or `floating') exception' &rdquo;?</Term>
 <ListItem>
 <Para>
 <Literal>Int</Literal>, <Literal>Float</Literal>, and <Literal>Double</Literal> arithmetic is <Emphasis>unchecked</Emphasis>.
@@ -322,7 +322,7 @@ not-really-a problem.)
 
 <Para>
 The name of the bug-reporting game is: facts, facts, facts.
-Don't omit them because ``Oh, they won't be interested&hellip;''
+Don't omit them because &ldquo;Oh, they won't be interested&hellip;&rdquo;
 </Para>
 
 <Para>
@@ -348,7 +348,7 @@ version of the operating system are you using? (<Command>uname -a</Command> or <
 
 <Para>
  Run the sequence of compiles/runs that caused the offending
-behaviour, capturing all the input/output in a ``script'' (a UNIX
+behaviour, capturing all the input/output in a &ldquo;script&rdquo; (a UNIX
 command) or in an Emacs shell window.  We'd prefer to see the whole
 thing.
 

@@ -61,8 +61,8 @@ want.  (Usually, the last one applies.)
 </Para>
 
 <Para>
-File names with ``meaningful'' suffixes (e.g., <Filename>.lhs</Filename> or <Filename>.o</Filename>)
-cause the ``right thing'' to happen to those files.
+File names with &ldquo;meaningful&rdquo; suffixes (e.g., <Filename>.lhs</Filename> or <Filename>.o</Filename>)
+cause the &ldquo;right thing&rdquo; to happen to those files.
 </Para>
 
 <Para>
@@ -73,7 +73,7 @@ cause the ``right thing'' to happen to those files.
 <ListItem>
 <Para>
 <IndexTerm><Primary>lhs suffix</Primary></IndexTerm>
-A ``literate Haskell'' module.
+A &ldquo;literate Haskell&rdquo; module.
 </Para>
 </ListItem>
 </VarListEntry>
@@ -202,8 +202,8 @@ then go all the way through linking.  This table summarises:
 
 <Row>
 <Entry>Phase of the compilation system</Entry>
-<Entry>Suffix saying ``start here''</Entry>
-<Entry>Flag saying ``stop after''</Entry>
+<Entry>Suffix saying &ldquo;start here&rdquo;</Entry>
+<Entry>Flag saying &ldquo;stop after&rdquo;</Entry>
 <Entry>(suffix of) output file</Entry>
 </Row>
 
@@ -307,7 +307,7 @@ phase to file <Filename>foo</Filename>.
 </Para>
 
 <Para>
-Note: this ``feature'' can be counterintuitive:
+Note: this &ldquo;feature&rdquo; can be counterintuitive:
 <Command>ghc -C -o foo.o foo.hs</Command> will put the intermediate C code in the
 file <Filename>foo.o</Filename>, name notwithstanding!
 </Para>
@@ -318,7 +318,7 @@ EXOTICA: But the <Option>-o</Option> option isn't of much use if you have
 normally put in the same directory as their corresponding input file
 came from.  You may specify that they be put in another directory
 using the <Option>-odir &lt;dir&gt;</Option><IndexTerm><Primary>-odir &lt;dir&gt; option</Primary></IndexTerm> (the
-``Oh, dear'' option).  For example:
+&ldquo;Oh, dear&rdquo; option).  For example:
 </Para>
 
 <Para>
@@ -428,7 +428,7 @@ compilation.  By default, you get a standard set of warnings which are
 generally likely to indicate bugs in your program.  These are:
 <Option>-fwarn-overlpapping-patterns</Option>, <Option>-fwarn-duplicate-exports</Option>, and
 <Option>-fwarn-missing-methods</Option>.  The following flags are simple ways to
-select standard ``packages'' of warnings:
+select standard &ldquo;packages&rdquo; of warnings:
 </Para>
 
 <Para>
@@ -799,8 +799,8 @@ it looks.
 <ListItem>
 <Para>
 <IndexTerm><Primary>-i&lt;dirs&gt; option</Primary></IndexTerm>This flag
-prepends a colon-separated list of <Filename>dirs</Filename> to the ``import
-directories'' list.
+prepends a colon-separated list of <Filename>dirs</Filename> to the &ldquo;import
+directories&rdquo; list.
 See also <XRef LinkEnd="recomp"> for the significance of using
 relative and absolute pathnames in the <Option>-i</Option> list.
 </Para>
@@ -811,7 +811,7 @@ relative and absolute pathnames in the <Option>-i</Option> list.
 <Term><Option>-i</Option></Term>
 <ListItem>
 <Para>
-resets the ``import directories'' list back to nothing.
+resets the &ldquo;import directories&rdquo; list back to nothing.
 </Para>
 </ListItem>
 </VarListEntry>
@@ -888,7 +888,7 @@ record the difference in the interface file itself, the
 </Para>
 
 <Para>
-The <Filename>.hi</Filename> files from GHC contain ``usage'' information which changes
+The <Filename>.hi</Filename> files from GHC contain &ldquo;usage&rdquo; information which changes
 often and uninterestingly.  If you really want to see these changes
 reported, you need to use the
 <Option>-hi-diffs-with-usages</Option><IndexTerm><Primary>-hi-diffs-with-usages option</Primary></IndexTerm>
@@ -956,13 +956,13 @@ file was last compiled), GHC will be clever.  It compares the version
 numbers on the things it needs this time with the version numbers on
 the things it needed last time (gleaned from the interface file of the
 module being compiled); if they are all the same it stops compiling
-rather early in the process saying ``Compilation IS NOT required''.
+rather early in the process saying &ldquo;Compilation IS NOT required&rdquo;.
 What a beautiful sight!
 </Para>
 
 <Para>
-GHC <Emphasis>only</Emphasis> keeps detailed dependency information for ``user'' modules,
-not for ``library'' modules.  It distinguishes the two by a hack: a module
+GHC <Emphasis>only</Emphasis> keeps detailed dependency information for &ldquo;user&rdquo; modules,
+not for &ldquo;library&rdquo; modules.  It distinguishes the two by a hack: a module
 whose <Filename>.hi</Filename> file has an absolute path name is considered a library module,
 while a relative path name indicates a user module.  So if you have a
 multi-directory application, use <Emphasis>relative</Emphasis> path names in your
@@ -972,8 +972,8 @@ library modules.
 </Para>
 
 <Para>
-A path is considered ``absolute'' if it starts with ``<Filename>/</Filename>'', or
-``<Filename>A:/</Filename>'', or ``<Filename>A:\</Filename>'' (or ``<Filename>B:/</Filename>'', ``<Filename>B:\</Filename>'' etc).
+A path is considered &ldquo;absolute&rdquo; if it starts with &ldquo;<Filename>/</Filename>&rdquo;, or
+&ldquo;<Filename>A:/</Filename>&rdquo;, or &ldquo;<Filename>A:\</Filename>&rdquo; (or &ldquo;<Filename>B:/</Filename>&rdquo;, &ldquo;<Filename>B:\</Filename>&rdquo; etc).
 </Para>
 
 <Para>
@@ -1118,7 +1118,7 @@ interfaces in the first place (e.g., <Command>make Bar.o</Command> to create <Fi
 <Para>
  You may have to type <Command>make</Command> more than once for the dependencies
 to have full effect.  However, a <Command>make</Command> run that does nothing
-<Emphasis>does</Emphasis> mean ``everything's up-to-date.''
+<Emphasis>does</Emphasis> mean &ldquo;everything's up-to-date.&rdquo;
 
 </Para>
 </ListItem>
@@ -1126,7 +1126,7 @@ to have full effect.  However, a <Command>make</Command> run that does nothing
 
 <Para>
  This scheme will work with mutually-recursive modules but,
-again, it may take multiple iterations to ``settle.''
+again, it may take multiple iterations to &ldquo;settle.&rdquo;
 
 </Para>
 </ListItem>
@@ -1231,15 +1231,15 @@ Notice that we only put the declaration for the newtype <Literal>TA</Literal> in
 </Para>
 
 <Para>
-The number ``1'' after ``&lowbar;&lowbar;interface A'' gives the version number of module A;
-it is incremented whenever anything in A's interface file changes.  The ``404'' is
+The number &ldquo;1&rdquo; after &ldquo;&lowbar;&lowbar;interface A&rdquo; gives the version number of module A;
+it is incremented whenever anything in A's interface file changes.  The &ldquo;404&rdquo; is
 the version number of the interface file <Emphasis>syntax</Emphasis>; we change it when
 we change the syntax of interface files so that you get a better error message when
 you try to read an old-format file with a new-format compiler.
 </Para>
 
 <Para>
-The number ``1'' at the beginning of a declaration is the <Emphasis>version
+The number &ldquo;1&rdquo; at the beginning of a declaration is the <Emphasis>version
 number</Emphasis> of that declaration: for the purposes of <Filename>.hi-boot</Filename> files
 these can all be set to 1.  All names must be fully qualified with the
 <Emphasis>original</Emphasis> module that an object comes from: for example, the
@@ -1287,7 +1287,7 @@ construction of interface files, is (allegedly) in the works.
 </Para>
 
 <Para>
-The <Option>-O*</Option> options specify convenient ``packages'' of optimisation
+The <Option>-O*</Option> options specify convenient &ldquo;packages&rdquo; of optimisation
 flags; the <Option>-f*</Option> options described later on specify
 <Emphasis>individual</Emphasis> optimisations to be turned on/off; the <Option>-m*</Option>
 options specify <Emphasis>machine-specific</Emphasis> optimisations to be turned
@@ -1295,7 +1295,7 @@ on/off.
 </Para>
 
 <Sect2 id="optimise-pkgs">
-<Title><Option>-O*</Option>: convenient ``packages'' of optimisation flags.
+<Title><Option>-O*</Option>: convenient &ldquo;packages&rdquo; of optimisation flags.
 </Title>
 
 <Para>
@@ -1305,13 +1305,13 @@ on/off.
 <Para>
 There are <Emphasis>many</Emphasis> options that affect the quality of code
 produced by GHC.  Most people only have a general goal, something like
-``Compile quickly'' or ``Make my program run like greased lightning.''
-The following ``packages'' of optimisations (or lack thereof) should
+&ldquo;Compile quickly&rdquo; or &ldquo;Make my program run like greased lightning.&rdquo;
+The following &ldquo;packages&rdquo; of optimisations (or lack thereof) should
 suffice.
 </Para>
 
 <Para>
-Once you choose a <Option>-O*</Option> ``package,'' stick with it&mdash;don't chop and
+Once you choose a <Option>-O*</Option> &ldquo;package,&rdquo; stick with it&mdash;don't chop and
 change.  Modules' interfaces <Emphasis>will</Emphasis> change with a shift to a new
 <Option>-O*</Option> option, and you may have to recompile a large chunk of all
 importing modules before your program can again be run
@@ -1326,8 +1326,8 @@ safely (see <XRef LinkEnd="recomp">).
 <ListItem>
 <Para>
 <IndexTerm><Primary>-O* not specified</Primary></IndexTerm>
-This is taken to mean: ``Please compile quickly; I'm not over-bothered
-about compiled-code quality.''  So, for example: <Command>ghc -c Foo.hs</Command>
+This is taken to mean: &ldquo;Please compile quickly; I'm not over-bothered
+about compiled-code quality.&rdquo;  So, for example: <Command>ghc -c Foo.hs</Command>
 </Para>
 </ListItem>
 </VarListEntry>
@@ -1338,7 +1338,7 @@ about compiled-code quality.''  So, for example: <Command>ghc -c Foo.hs</Command
 <IndexTerm><Primary>-O option</Primary></IndexTerm>
 <IndexTerm><Primary>-O1 option</Primary></IndexTerm>
 <IndexTerm><Primary>optimise normally</Primary></IndexTerm>
-Means: ``Generate good-quality code without taking too long about it.''
+Means: &ldquo;Generate good-quality code without taking too long about it.&rdquo;
 Thus, for example: <Command>ghc -c -O Main.lhs</Command>
 </Para>
 </ListItem>
@@ -1349,12 +1349,12 @@ Thus, for example: <Command>ghc -c -O Main.lhs</Command>
 <Para>
 <IndexTerm><Primary>-O2 option</Primary></IndexTerm>
 <IndexTerm><Primary>optimise aggressively</Primary></IndexTerm>
-Means: ``Apply every non-dangerous optimisation, even if it means
-significantly longer compile times.''
+Means: &ldquo;Apply every non-dangerous optimisation, even if it means
+significantly longer compile times.&rdquo;
 </Para>
 
 <Para>
-The avoided ``dangerous'' optimisations are those that can make
+The avoided &ldquo;dangerous&rdquo; optimisations are those that can make
 runtime or space <Emphasis>worse</Emphasis> if you're unlucky.  They are
 normally turned on or off individually.
 </Para>
@@ -1389,7 +1389,7 @@ generator and bypass GCC altogether!
 </Para>
 
 <Para>
-This option will make GHC ``forget'' any <Option>-O</Option>ish options it has seen so
+This option will make GHC &ldquo;forget&rdquo; any <Option>-O</Option>ish options it has seen so
 far.  Sometimes useful; for example: <Command>make all EXTRA&lowbar;HC&lowbar;OPTS=-Onot</Command>.
 </Para>
 </ListItem>
@@ -1429,7 +1429,7 @@ something.  When we want to go for broke, we tend to use <Option>-O -fvia-C
 </Para>
 
 <Para>
-The easiest way to see what <Option>-O</Option> (etc.) ``really mean'' is to run with
+The easiest way to see what <Option>-O</Option> (etc.) &ldquo;really mean&rdquo; is to run with
 <Option>-v</Option>, then stand back in amazement.  Alternatively, just look at the
 <Literal>HsC&lowbar;minus&lt;blah&gt;</Literal> lists in the GHC driver script.
 </Para>
@@ -1491,7 +1491,7 @@ hard to do with command-line options.
 </Para>
 
 <Para>
-Here are some ``dangerous'' optimisations you <Emphasis>might</Emphasis> want to try:
+Here are some &ldquo;dangerous&rdquo; optimisations you <Emphasis>might</Emphasis> want to try:
 <VariableList>
 
 <VarListEntry>
@@ -1528,8 +1528,8 @@ using GHC's native code generator.
 <IndexTerm><Primary>unfolding, controlling</Primary></IndexTerm>
 (Default: 30) By raising or lowering this number, you can raise or
 lower the amount of pragmatic junk that gets spewed into interface
-files.  (An unfolding has a ``size'' that reflects the cost in terms
-of ``code bloat'' of expanding that unfolding in another module.  A
+files.  (An unfolding has a &ldquo;size&rdquo; that reflects the cost in terms
+of &ldquo;code bloat&rdquo; of expanding that unfolding in another module.  A
 bigger function would be assigned a bigger cost.)
 </Para>
 </ListItem>
@@ -1579,7 +1579,7 @@ it or not.
 
 <Para>
 OK, folks, these magic numbers `30', `8', and '2' are mildly
-arbitrary; they are of the ``seem to be OK'' variety.  The `8' is the
+arbitrary; they are of the &ldquo;seem to be OK&rdquo; variety.  The `8' is the
 more critical one; it's what determines how eager GHC is about
 expanding unfoldings.
 </Para>
@@ -1596,7 +1596,7 @@ expanding unfoldings.
 
 <Para>
 This option causes all constructor fields which are marked strict
-(i.e. ``!'') to be unboxed or unpacked if possible.  For example:
+(i.e. &ldquo;!&rdquo;) to be unboxed or unpacked if possible.  For example:
 </Para>
 
 <Para>
@@ -1729,7 +1729,7 @@ modules, maybe.  (Probably means you're in trouble&hellip;)
 <ListItem>
 <Para>
 (iX86 machines)<IndexTerm><Primary>-monly-N-regs option (iX86 only)</Primary></IndexTerm>
-GHC tries to ``steal'' four registers from GCC, for performance
+GHC tries to &ldquo;steal&rdquo; four registers from GCC, for performance
 reasons; it almost always works.  However, when GCC is compiling some
 modules with four stolen registers, it will crash, probably saying:
 
@@ -1923,8 +1923,8 @@ pre-processor with the <Option>-opt</Option> flags (see
 </Para>
 
 <Para>
-A small word of warning: <Option>-cpp</Option> is not friendly to ``string
-gaps''.<IndexTerm><Primary>-cpp vs string gaps</Primary></IndexTerm><IndexTerm><Primary>string gaps vs
+A small word of warning: <Option>-cpp</Option> is not friendly to &ldquo;string
+gaps&rdquo;.<IndexTerm><Primary>-cpp vs string gaps</Primary></IndexTerm><IndexTerm><Primary>string gaps vs
 -cpp</Primary></IndexTerm>.  In other words, strings such as the following:
 </Para>
 
@@ -1987,7 +1987,7 @@ THIS MAY CHANGE.  Meanwhile, options so sent are:
 <Row>
 <Entry>
 <Option>-dgcc-lint</Option> </Entry>
-<Entry> (hack) short for ``make GCC very paranoid''</Entry>
+<Entry> (hack) short for &ldquo;make GCC very paranoid&rdquo;</Entry>
 </Row>
 
 </TBody>
@@ -2113,7 +2113,7 @@ libraries automatically; these are:
 </Para>
 
 <Para>
-If you are using a Haskell ``system library'' (e.g., the POSIX
+If you are using a Haskell &ldquo;system library&rdquo; (e.g., the POSIX
 library), just use the <Option>-syslib posix</Option> option, and the correct code
 should be linked in.
 </Para>
@@ -2147,7 +2147,7 @@ Tell the linker to avoid shared libraries.
 <IndexTerm><Primary>consistency checking of executables</Primary></IndexTerm>
 By default, immediately after linking an executable, GHC verifies that
 the pieces that went into it were compiled with compatible flags; a
-``consistency check''.
+&ldquo;consistency check&rdquo;.
 (This is to avoid mysterious failures caused by non-meshing of
 incompatibly-compiled programs; e.g., if one <Filename>.o</Filename> file was compiled
 for a parallel machine and the others weren't.)  You may turn off this
@@ -2233,9 +2233,9 @@ into your Haskell modules.
 </Para>
 
 <Para>
-To run your parallel program, once PVM is going, just invoke it ``as
-normal''.  The main extra RTS option is <Option>-N&lt;n&gt;</Option>, to say how many
-PVM ``processors'' your program to run on.  (For more details of
+To run your parallel program, once PVM is going, just invoke it &ldquo;as
+normal&rdquo;.  The main extra RTS option is <Option>-N&lt;n&gt;</Option>, to say how many
+PVM &ldquo;processors&rdquo; your program to run on.  (For more details of
 all relevant RTS options, please see <XRef LinkEnd="parallel-rts-opts">.)
 </Para>
 
@@ -2264,14 +2264,14 @@ setenv PVM_DPATH $PVM_ROOT/lib/pvmd
 </Para>
 
 <Para>
-Creating and/or controlling your ``parallel machine'' is a purely-PVM
+Creating and/or controlling your &ldquo;parallel machine&rdquo; is a purely-PVM
 business; nothing specific to Parallel Haskell.
 </Para>
 
 <Para>
 You use the <Command>pvm</Command><IndexTerm><Primary>pvm command</Primary></IndexTerm> command to start PVM on your
 machine.  You can then do various things to control/monitor your
-``parallel machine;'' the most useful being:
+&ldquo;parallel machine;&rdquo; the most useful being:
 </Para>
 
 <Para>
@@ -2287,7 +2287,7 @@ machine.  You can then do various things to control/monitor your
 
 <Row>
 <Entry><Command>halt</Command></Entry>
-<Entry>kill off this ``parallel machine'' &amp; exit</Entry>
+<Entry>kill off this &ldquo;parallel machine&rdquo; &amp; exit</Entry>
 </Row>
 
 <Row>
@@ -2342,7 +2342,7 @@ The PVM documentation can tell you much, much more about <Command>pvm</Command>!
 
 <Para>
 With Parallel Haskell programs, we usually don't care about the
-results&mdash;only with ``how parallel'' it was!  We want pretty pictures.
+results&mdash;only with &ldquo;how parallel&rdquo; it was!  We want pretty pictures.
 </Para>
 
 <Para>
@@ -2376,7 +2376,7 @@ in <Filename>ghc/utils/parallel/</Filename>.
 <Title>Other useful info about running parallel programs</Title>
 
 <Para>
-The ``garbage-collection statistics'' RTS options can be useful for
+The &ldquo;garbage-collection statistics&rdquo; RTS options can be useful for
 seeing what parallel programs are doing.  If you do either
 <Option>+RTS -Sstderr</Option><IndexTerm><Primary>-Sstderr RTS option</Primary></IndexTerm> or <Option>+RTS -sstderr</Option>, then
 you'll get mutator, garbage-collection, etc., times on standard

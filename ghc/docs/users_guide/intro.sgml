@@ -7,7 +7,7 @@ This is a guide to using the Glasgow Haskell compilation (GHC) system. It is
 a batch compiler for the Haskell&nbsp;98 language, with support for various
 Glasgow-only extensions. In this document, we assume that GHC has been
 installed at your site as <Literal>ghc</Literal>.  A separate document,
-``Building and Installing the Glasgow Functional Programming Tools Suite'',
+&ldquo;Building and Installing the Glasgow Functional Programming Tools Suite&rdquo;,
 describes how to install <Literal>ghc</Literal>.
 </Para>
 
@@ -46,7 +46,7 @@ compilation systems, has several interacting parts:
 <Para>
 A <Emphasis>driver</Emphasis><IndexTerm><Primary>driver program</Primary></IndexTerm> 
 <Literal>ghc</Literal><IndexTerm><Primary>ghc</Primary></IndexTerm>&mdash;which
-you usually think of as ``the compiler''&mdash;is a program that merely
+you usually think of as &ldquo;the compiler&rdquo;&mdash;is a program that merely
 invokes/glues-together the other pieces of the system (listed below),
 passing the right options to each, slurping in the right libraries, etc.
 </Para>
@@ -70,7 +70,7 @@ The <Emphasis>Haskellised C pre-processor</Emphasis>
 <IndexTerm><Primary>C pre-processor, Haskellised</Primary></IndexTerm>
 <IndexTerm><Primary>pre-processor, Haskellised C</Primary></IndexTerm>
 <Literal>hscpp</Literal>,<IndexTerm><Primary>hscpp</Primary></IndexTerm> only needed by people requiring conditional
-compilation, probably for large systems.  The ``Haskellised'' part
+compilation, probably for large systems.  The &ldquo;Haskellised&rdquo; part
 just means that <Literal>&num;line</Literal> directives in the output have been
 converted into proper Haskell <Literal>&lcub;-&num; LINE ... -&rcub;</Literal> pragmas. You must give an explicit <Literal>-cpp</Literal> option 
 <IndexTerm><Primary>-cpp option</Primary></IndexTerm> for the C pre-processor to be invoked.
@@ -143,13 +143,13 @@ Parts of other <Emphasis>installed libraries</Emphasis> that you have at your si
 </Sect1>
 
 <Sect1 id="compile-what-really-happens">
-<Title>What really happens when I ``compile'' a Haskell program?
+<Title>What really happens when I &ldquo;compile&rdquo; a Haskell program?
 </Title>
 
 <Para>
 You invoke the Glasgow Haskell compilation system through the
 driver program <Literal>ghc</Literal>.<IndexTerm><Primary>ghc</Primary></IndexTerm> For example, if you had typed a
-literate ``Hello, world!'' program into <Literal>hello.lhs</Literal>, and you then
+literate &ldquo;Hello, world!&rdquo; program into <Literal>hello.lhs</Literal>, and you then
 invoked:
 
 <Screen>
@@ -181,7 +181,7 @@ input for
 <ListItem>
 
 <Para>
-The assembler (or that ubiquitous ``high-level assembler,'' a C
+The assembler (or that ubiquitous &ldquo;high-level assembler,&rdquo; a C
 compiler), which produces an object file and passes it to
 
 </Para>
@@ -201,8 +201,8 @@ the default output file named <Literal>a.out</Literal>.
 
 <Para>
 You have considerable control over the compilation process.  You feed
-command-line arguments (call them ``options,'' for short) to the
-driver, <Literal>ghc</Literal>; the ``types'' of the input files (as encoded in
+command-line arguments (call them &ldquo;options,&rdquo; for short) to the
+driver, <Literal>ghc</Literal>; the &ldquo;types&rdquo; of the input files (as encoded in
 their names' suffixes) also matter.
 </Para>
 

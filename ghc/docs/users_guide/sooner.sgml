@@ -3,7 +3,7 @@
 </Title>
 
 <Para>
-Please advise us of other ``helpful hints'' that should go here!
+Please advise us of other &ldquo;helpful hints&rdquo; that should go here!
 </Para>
 
 <Sect1 id="sooner">
@@ -67,9 +67,9 @@ bug.
 <Term>Don't use too much memory!</Term>
 <ListItem>
 <Para>
-As soon as GHC plus its ``fellow citizens'' (other processes on your
+As soon as GHC plus its &ldquo;fellow citizens&rdquo; (other processes on your
 machine) start using more than the <Emphasis>real memory</Emphasis> on your
-machine, and the machine starts ``thrashing,'' <Emphasis>the party is
+machine, and the machine starts &ldquo;thrashing,&rdquo; <Emphasis>the party is
 over</Emphasis>.  Compile times will be worse than terrible!  Use something
 like the csh-builtin <Command>time</Command> command to get a report on how many page
 faults you're getting.
@@ -203,8 +203,8 @@ Augustsson.)
 
 <Para>
 Please report any overly-slow GHC-compiled programs.  The current
-definition of ``overly-slow'' is ``the HBC-compiled version ran
-faster''&hellip;
+definition of &ldquo;overly-slow&rdquo; is &ldquo;the HBC-compiled version ran
+faster&rdquo;&hellip;
 </Para>
 
 <Para>
@@ -284,7 +284,7 @@ Specialize the overloading on key functions in your program.  See
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term>``But how do I know where overloading is creeping in?'':</Term>
+<Term>&ldquo;But how do I know where overloading is creeping in?&rdquo;:</Term>
 <ListItem>
 <Para>
 A low-tech way: grep (search) your interface files for overloaded
@@ -309,7 +309,7 @@ and, among other things, lazy pattern-matching is your enemy.
 </Para>
 
 <Para>
-(If you don't know what a ``strict function'' is, please consult a
+(If you don't know what a &ldquo;strict function&rdquo; is, please consult a
 functional-programming textbook.  A sentence or two of
 explanation here probably would not do much good.)
 </Para>
@@ -368,7 +368,7 @@ will be optimised away in most cases.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term>``How do I find out a function's strictness?''</Term>
+<Term>&ldquo;How do I find out a function's strictness?&rdquo;</Term>
 <ListItem>
 <Para>
 Don't guess&mdash;look it up.
@@ -378,17 +378,17 @@ Don't guess&mdash;look it up.
 Look for your function in the interface file, then for the third field
 in the pragma; it should say <Literal>&lowbar;S&lowbar; &lt;string&gt;</Literal>.  The <Literal>&lt;string&gt;</Literal>
 gives the strictness of the function's arguments.  <Function>L</Function> is lazy
-(bad), <Function>S</Function> and <Function>E</Function> are strict (good), <Function>P</Function> is ``primitive'' (good),
+(bad), <Function>S</Function> and <Function>E</Function> are strict (good), <Function>P</Function> is &ldquo;primitive&rdquo; (good),
 <Function>U(...)</Function> is strict and
-``unpackable'' (very good), and <Function>A</Function> is absent (very good).
+&ldquo;unpackable&rdquo; (very good), and <Function>A</Function> is absent (very good).
 </Para>
 
 <Para>
-For an ``unpackable'' <Function>U(...)</Function> argument, the info inside
+For an &ldquo;unpackable&rdquo; <Function>U(...)</Function> argument, the info inside
 tells the strictness of its components.  So, if the argument is a
-pair, and it says <Function>U(AU(LSS))</Function>, that means ``the first component of the
+pair, and it says <Function>U(AU(LSS))</Function>, that means &ldquo;the first component of the
 pair isn't used; the second component is itself unpackable, with three
-components (lazy in the first, strict in the second \&#38; third).''
+components (lazy in the first, strict in the second \&#38; third).&rdquo;
 </Para>
 
 <Para>
@@ -448,7 +448,7 @@ operations (e.g., <Literal>eqInt&num;</Literal>) are good,&hellip;
 <ListItem>
 <Para>
 When you are <Emphasis>really</Emphasis> desperate for speed, and you want to get
-right down to the ``raw bits.''  Please see <XRef LinkEnd="glasgow-unboxed"> for some information about using unboxed
+right down to the &ldquo;raw bits.&rdquo;  Please see <XRef LinkEnd="glasgow-unboxed"> for some information about using unboxed
 types.
 </Para>
 </ListItem>
@@ -519,11 +519,11 @@ indicate that it's doing lots of garbage-collection (say, more than
 </Para>
 
 <Para>
-Decrease the ``go-for-it'' threshold for unfolding smallish
+Decrease the &ldquo;go-for-it&rdquo; threshold for unfolding smallish
 expressions.  Give a
 <Option>-funfolding-use-threshold0</Option><IndexTerm><Primary>-funfolding-use-threshold0
-option</Primary></IndexTerm> option for the extreme case. (``Only unfoldings with
-zero cost should proceed.'')  Warning: except in certain specialiised
+option</Primary></IndexTerm> option for the extreme case. (&ldquo;Only unfoldings with
+zero cost should proceed.&rdquo;)  Warning: except in certain specialiised
 cases (like Happy parsers) this is likely to actually
 <Emphasis>increase</Emphasis> the size of your program, because unfolding
 generally enables extra simplifying optimisations to be performed.
@@ -550,7 +550,7 @@ Use <Literal>strip</Literal> on your executables.
 </Para>
 
 <Para>
-``I think I have a space leak&hellip;''  Re-run your program with
+&ldquo;I think I have a space leak&hellip;&rdquo;  Re-run your program with
 <Option>+RTS -Sstderr</Option>,<IndexTerm><Primary>-Sstderr RTS option</Primary></IndexTerm> and remove all doubt!
 (You'll see the heap usage get bigger and bigger&hellip;)  &lsqb;Hmmm&hellip;this
 might be even easier with the <Option>-F2s</Option><IndexTerm><Primary>-F2s RTS option</Primary></IndexTerm> RTS

@@ -552,7 +552,7 @@ data Integer = S# Int#             -- small integers
 </ProgramListing>
 
 <IndexTerm><Primary>Integer type</Primary></IndexTerm>
-The primitive ops to support large <Literal>Integers</Literal> use the ``pieces'' of the
+The primitive ops to support large <Literal>Integers</Literal> use the &ldquo;pieces&rdquo; of the
 representation, and are as follows:
 </Para>
 
@@ -681,7 +681,7 @@ type checker happy.
 
 <Para>
 Operations for indexing off of C pointers (<Literal>Addr&num;</Literal>s) to snatch values
-are listed under ``arrays''.
+are listed under &ldquo;arrays&rdquo;.
 </Para>
 
 </Sect2>
@@ -784,9 +784,9 @@ primitive ops compile to one machine instruction or thereabouts.
 </Para>
 
 <Para>
-We use the terms ``reading'' and ``writing'' to refer to accessing
+We use the terms &ldquo;reading&rdquo; and &ldquo;writing&rdquo; to refer to accessing
 <Emphasis>mutable</Emphasis> arrays (see <XRef LinkEnd="sect-mutable">), and
-``indexing'' to refer to reading a value from an <Emphasis>immutable</Emphasis>
+&ldquo;indexing&rdquo; to refer to reading a value from an <Emphasis>immutable</Emphasis>
 array.
 </Para>
 
@@ -861,7 +861,7 @@ serves to keep states from distinct threads distinct from one another.
 But the <Emphasis>only</Emphasis> effect of this parameterisation is in the type
 system: all values of type <Literal>State&num;</Literal> are represented in the same way.
 Indeed, they are all represented by nothing at all!  The code
-generator ``knows'' to generate no code, and allocate no registers
+generator &ldquo;knows&rdquo; to generate no code, and allocate no registers
 etc, for primitive states.
 </Para>
 
@@ -875,7 +875,7 @@ type State# s
 
 <Para>
 The type <Literal>GHC.RealWorld</Literal> is truly opaque: there are no values defined
-of this type, and no operations over it.  It is ``primitive'' in that
+of this type, and no operations over it.  It is &ldquo;primitive&rdquo; in that
 sense - but it is <Emphasis>not unlifted!</Emphasis> Its only role in life is to be
 the type which distinguishes the <Literal>IO</Literal> state transformer.
 </Para>
@@ -946,7 +946,7 @@ type MutableByteArray# s
 
 <Para>
 Mutable arrays can be allocated. Only pointer-arrays are initialised;
-arrays of non-pointers are filled in by ``user code'' rather than by
+arrays of non-pointers are filled in by &ldquo;user code&rdquo; rather than by
 the array-allocation primitive.  Reason: only the pointer case has to
 worry about GC striking with a partly-initialised array.
 </Para>
@@ -1026,7 +1026,7 @@ writeDoubleArray# :: MutableByteArray# s -&#62; Int# -&#62; Double# -&#62; State
 </Para>
 
 <Para>
-One can take ``equality'' of mutable arrays.  What is compared is the
+One can take &ldquo;equality&rdquo; of mutable arrays.  What is compared is the
 <Emphasis>name</Emphasis> or reference to the mutable array, not its contents.
 </Para>
 
