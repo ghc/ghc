@@ -21,7 +21,7 @@ import HsSyn as Hs
 		Pat(..), HsConDetails(..), HsOverLit, BangType(..),
 		placeHolderType, HsType(..), HsTupCon(..),
 		HsTyVarBndr(..), HsContext,
-		mkSimpleMatch
+		mkSimpleMatch, mkHsForAllTy
 	) 
 
 import RdrName	( RdrName, mkRdrUnqual, mkRdrQual, mkOrig )
@@ -287,6 +287,10 @@ cvtType ty = trans (root ty [])
 
 	trans (Tvar nm, args)	    = foldl HsAppTy (HsTyVar (tName nm)) args
         trans (Tcon tc, args)       = foldl HsAppTy (HsTyVar (tc_name tc)) args
+
+	trans (TForall tvs cxt ty, []) = mkHsForAllTy (Just (cvt_tvs tvs))
+				  		      (cvt_context cxt)
+				      		      (cvtType ty)
 
 	tc_name (TconName nm) = tconName nm
 	tc_name Arrow	      = tconName "->"
