@@ -130,6 +130,7 @@ name_version_pair   :  iname INTEGER
 
 exports_part	:: { ExportsMap }
 exports_part	:  EXPORTS_PART export_items { bagToFM $2 }
+		|			     { emptyFM }
 
 export_items	:: { Bag (FAST_STRING, (RdrName, ExportFlag)) }
 export_items	:  export_item		    { unitBag $1 }
@@ -171,6 +172,7 @@ fix		:  INFIXL INTEGER qop SEMI { (de_qual $3, InfixL $3 (fromInteger $2)) }
 
 decls_part	:: { (LocalTyDefsMap, LocalValDefsMap) }
 decls_part	: DECLARATIONS_PART topdecls { $2 }
+		|			     { (emptyFM, emptyFM) }
 
 topdecls	:: { (LocalTyDefsMap, LocalValDefsMap) }
 topdecls	:  topdecl	    { $1 }

@@ -40,7 +40,7 @@ import SimplUtils
 import Type		( mkTyVarTy, mkTyVarTys, mkAppTy,
 			  splitFunTy, getFunTy_maybe, eqTy
 			)
-import Util		( isSingleton, panic, pprPanic, assertPanic )
+import Util		( isSingleton, zipEqual, panic, pprPanic, assertPanic )
 \end{code}
 
 The controlling flags, and what they do
@@ -551,7 +551,7 @@ simplRhsExpr env binder@(id,occ_info) rhs
   = 	-- Deal with the big lambda part
     mapSmpl cloneTyVarSmpl tyvars			`thenSmpl` \ tyvars' ->
     let
-	lam_env  = extendTyEnvList rhs_env (tyvars `zip` (mkTyVarTys tyvars'))
+	lam_env  = extendTyEnvList rhs_env (zipEqual "simplRhsExpr" tyvars (mkTyVarTys tyvars'))
     in
 	-- Deal with the little lambda part
 	-- Note that we call simplLam even if there are no binders, in case
@@ -690,18 +690,17 @@ simplCoerce env coercion ty (Let bind body) args
   = simplBind env bind (\env -> simplCoerce env coercion ty body args)
 		       (computeResultType env body args)
 
--- Cancellation
-simplCoerce env (CoerceIn con1) ty (Coerce (CoerceOut con2) ty2 expr) args
-  | con1 == con2
-  = simplExpr env expr args
-simplCoerce env (CoerceOut con1) ty (Coerce (CoerceIn con2) ty2 expr) args
-  | con1 == con2
-  = simplExpr env expr args
-
 -- Default case
 simplCoerce env coercion ty expr args
   = simplExpr env expr []	`thenSmpl` \ expr' ->
-    returnSmpl (mkGenApp (Coerce coercion (simplTy env ty) expr') args)
+    returnSmpl (mkGenApp (mkCoerce coercion (simplTy env ty) expr') args)
+  where
+
+	-- Try cancellation; we do this "on the way up" because
+	-- I think that's where it'll bite best
+    mkCoerce (CoerceIn  con1) ty1 (Coerce (CoerceOut con2) ty2 body) | con1 == con2 = body
+    mkCoerce (CoerceOut con1) ty1 (Coerce (CoerceIn  con2) ty2 body) | con1 == con2 = body
+    mkCoerce coercion ty  body = Coerce coercion ty body
 \end{code}
 
 
@@ -844,7 +843,7 @@ simplBind env (NonRec binder@(id,occ_info) rhs) body_c body_ty
     -------------------------------------------
     done_float env rhs body_c
 	= simplRhsExpr env binder rhs 	`thenSmpl` \ rhs' ->
-	  completeLet env binder rhs rhs' body_c body_ty
+	  completeLet env binder rhs' body_c body_ty
 
     ---------------------------------------
     try_float env (Let bind rhs) body_c
@@ -973,7 +972,7 @@ simplBind env (Rec pairs) body_c body_ty
     cloneIds env binders		`thenSmpl` \ ids' ->
     let
 	env_w_clones = extendIdEnvWithClones env binders ids'
-	triples	     = ids' `zip` floated_pairs
+	triples	     = zipEqual "simplBind" ids' floated_pairs
     in
 
     simplRecursiveGroup env_w_clones triples	`thenSmpl` \ (binding, new_env) ->
@@ -1137,13 +1136,12 @@ x.  That's just what completeLetBinding does.
 completeLet
 	:: SimplEnv
 	-> InBinder
-	-> InExpr		-- Original RHS
 	-> OutExpr		-- The simplified RHS
 	-> (SimplEnv -> SmplM OutExpr)		-- Body handler
 	-> OutType		-- Type of body
 	-> SmplM OutExpr
 
-completeLet env binder old_rhs new_rhs body_c body_ty
+completeLet env binder new_rhs body_c body_ty
   -- See if RHS is an atom, or a reusable constructor
   | maybeToBool maybe_atomic_rhs
   = let
@@ -1158,7 +1156,7 @@ completeLet env binder old_rhs new_rhs body_c body_ty
 	-- otherwise Nothing
     Just (rhs_atom, atom_tick_type) = maybe_atomic_rhs
 
-completeLet env binder@(id,_) old_rhs new_rhs body_c body_ty
+completeLet env binder@(id,_) new_rhs body_c body_ty
   -- Maybe the rhs is an application of error, and sure to be demanded
   | will_be_demanded &&
     maybeToBool maybe_error_app
@@ -1170,7 +1168,7 @@ completeLet env binder@(id,_) old_rhs new_rhs body_c body_ty
     Just retyped_error_app = maybe_error_app
 
 {-
-completeLet env binder old_rhs (Coerce coercion ty rhs) body_c body_ty
+completeLet env binder (Coerce coercion ty rhs) body_c body_ty
    -- Rhs is a coercion
    | maybeToBool maybe_atomic_coerce_rhs
    = tick tick_type		`thenSmpl_`
@@ -1193,7 +1191,7 @@ completeLet env binder old_rhs (Coerce coercion ty rhs) body_c body_ty
 	 returnSmpl (Let (NonRec id' (Coerce coercion ty rhs) body')
 -}   
 
-completeLet env binder old_rhs new_rhs body_c body_ty
+completeLet env binder new_rhs body_c body_ty
   -- The general case
   = cloneId env binder			`thenSmpl` \ id' ->
     let

@@ -487,7 +487,7 @@ precParseExpr exp@(OpApp (OpApp e11 (HsVar op1) e12) (HsVar op) e2)
   = lookupFixity op		 `thenRn` \ (op_fix, op_prec) ->
     lookupFixity op1		 `thenRn` \ (op1_fix, op1_prec) ->
     -- pprTrace "precParse:" (ppCat [ppr PprDebug op, ppInt op_prec, ppr PprDebug op1, ppInt op1_prec]) $
-    case cmp op1_prec op_prec of
+    case (op1_prec `cmp` op_prec) of
       LT_  -> rearrange
       EQ_  -> case (op1_fix, op_fix) of
 		(INFIXR, INFIXR) -> rearrange
@@ -515,7 +515,7 @@ precParsePat pat@(ConOpPatIn (NegPatIn e1) op e2)
 precParsePat pat@(ConOpPatIn (ConOpPatIn p11 op1 p12) op p2)
   = lookupFixity op		 `thenRn` \ (op_fix, op_prec) ->
     lookupFixity op1		 `thenRn` \ (op1_fix, op1_prec) ->
-    case cmp op1_prec op_prec of
+    case (op1_prec `cmp` op_prec) of
       LT_  -> rearrange
       EQ_  -> case (op1_fix, op_fix) of
 		(INFIXR, INFIXR) -> rearrange

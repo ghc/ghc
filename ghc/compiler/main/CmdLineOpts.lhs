@@ -217,13 +217,11 @@ opt_SpecialiseTrace		= lookup  SLIT("-ftrace-specialisation")
 opt_SpecialiseUnboxed		= lookup  SLIT("-fspecialise-unboxed")
 opt_StgDoLetNoEscapes		= lookup  SLIT("-flet-no-escape")
 opt_Verbose			= lookup  SLIT("-v")
-opt_AsmTarget 			= lookup_str "-fasm="
 opt_SccGroup  			= lookup_str "-G="
 opt_ProduceC  			= lookup_str "-C="
 opt_ProduceS  			= lookup_str "-S="
-opt_MustRecompile		= lookup  SLIT("-fmust-recompile")
-opt_ProduceHi 			= lookup_str "-hifile="	  -- the one to produce this time 
-opt_MyHi 			= lookup_str "-myhifile=" -- the one produced last time
+opt_ProduceHi 			= lookup_str "-hifile=" -- the one to produce this time 
+opt_HiMap 			= lookup_str "-himap="  -- file saying where to look for .hi files
 opt_EnsureSplittableC		= lookup_str "-fglobalise-toplev-names="
 opt_UnfoldingUseThreshold	= lookup_int "-funfolding-use-threshold"
 opt_UnfoldingCreationThreshold	= lookup_int "-funfolding-creation-threshold"
@@ -232,26 +230,6 @@ opt_ReturnInRegsThreshold	= lookup_int "-freturn-in-regs-threshold"
 
 opt_NoImplicitPrelude		= lookup  SLIT("-fno-implicit-prelude")
 opt_IgnoreIfacePragmas		= lookup  SLIT("-fignore-interface-pragmas")
-
-opt_HiSuffix	 = case (lookup_str "-hisuffix=")    of { Nothing -> ".hi" ; Just x -> x }
-opt_SysHiSuffix	 = case (lookup_str "-syshisuffix=") of { Nothing -> ".hi" ; Just x -> x }
-
-opt_HiDirList	 = get_dir_list "-i="
-opt_SysHiDirList = get_dir_list "-j="
-
-get_dir_list tag
-  = case (lookup_str tag) of
-      Nothing -> [{-no dirs to search???-}]
-      Just xs -> colon_split xs "" [] -- character and dir accumulators, both reversed...
-  where
-    colon_split []	   cacc dacc = reverse (reverse cacc : dacc)
-    colon_split (':' : xs) cacc dacc = colon_split xs "" (reverse cacc : dacc)
-    colon_split ( x  : xs) cacc dacc = colon_split xs (x : cacc) dacc
-
--- -hisuf, -hisuf-prelude
--- -fno-implicit-prelude
--- -fignore-interface-pragmas
--- importdirs and sysimport dirs
 \end{code}
 
 \begin{code}

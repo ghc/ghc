@@ -292,7 +292,7 @@ combineSimplCounts (SimplCount n1 stuff1) (SimplCount n2 stuff2)
 #else
 combineSimplCounts (SimplCount n1 stuff1) (SimplCount n2 stuff2)
   = SimplCount (n1 _ADD_ n2)
-	       (zipWithEqual (\ (t1,c1) (t2,c2) -> (t1,c1+c2)) stuff1 stuff2)
+	       (zipWithEqual "combineSimplCounts" (\ (t1,c1) (t2,c2) -> (t1,c1+c2)) stuff1 stuff2)
 #endif
 \end{code}
 
@@ -311,7 +311,7 @@ newId ty us sc
 
 newIds :: [Type] -> SmplM [Id]
 newIds tys us sc
-  = (zipWithEqual mk_id tys uniqs, sc)
+  = (zipWithEqual "newIds" mk_id tys uniqs, sc)
   where
     uniqs  = getUniques (length tys) us
     mk_id ty uniq = mkSysLocal SLIT("s") uniq ty mkUnknownSrcLoc

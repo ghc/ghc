@@ -89,15 +89,15 @@ import Maybes		( assocMaybe, maybeToBool )
 import Name		( isLocallyDefined, getLocalName )
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instance Outputable-} )
+import PrelInfo		( maybeCharLikeTyCon, maybeIntLikeTyCon )
 import PrimRep		( getPrimRepSize, separateByPtrFollowness )
 import SMRep		-- all of it
 import TyCon		( maybeTyConSingleCon, TyCon{-instance NamedThing-} )
-import Type		( isPrimType, splitForAllTy, splitFunTyWithDictsAsArgs, mkFunTys )
+import Type		( isPrimType, splitForAllTy, splitFunTyExpandingDicts,
+			  mkFunTys, maybeAppSpecDataTyConExpandingDicts
+			)
 import Util		( isIn, mapAccumL, panic, pprPanic, assertPanic )
 
-maybeCharLikeTyCon = panic "ClosureInfo.maybeCharLikeTyCon (ToDo)"
-maybeIntLikeTyCon = panic "ClosureInfo.maybeIntLikeTyCon (ToDo)"
-getDataSpecTyCon_maybe = panic "ClosureInfo.getDataSpecTyCon_maybe (ToDo)"
 getTyDescription = panic "ClosureInfo.getTyDescription (ToDo)"
 \end{code}
 
@@ -1136,9 +1136,9 @@ closureType :: ClosureInfo -> Maybe (TyCon, [Type], [Id])
 -- rather than take it from the Id. The Id is probably just "f"!
 
 closureType (MkClosureInfo id (LFThunk _ _ _ (VapThunk fun_id args _)) _)
-  = getDataSpecTyCon_maybe (fun_result_ty (length args) fun_id)
+  = maybeAppSpecDataTyConExpandingDicts (fun_result_ty (length args) fun_id)
 
-closureType (MkClosureInfo id lf _) = getDataSpecTyCon_maybe (idType id)
+closureType (MkClosureInfo id lf _) = maybeAppSpecDataTyConExpandingDicts (idType id)
 \end{code}
 
 @closureReturnsUnboxedType@ is used to check whether a closure, {\em
@@ -1163,7 +1163,7 @@ closureReturnsUnboxedType other_closure = False
 fun_result_ty arity id
   = let
 	(_, de_foralld_ty) = splitForAllTy (idType id)
-	(arg_tys, res_ty)  = splitFunTyWithDictsAsArgs de_foralld_ty
+	(arg_tys, res_ty)  = splitFunTyExpandingDicts de_foralld_ty
     in
     ASSERT(arity >= 0 && length arg_tys >= arity)
     mkFunTys (drop arity arg_tys) res_ty

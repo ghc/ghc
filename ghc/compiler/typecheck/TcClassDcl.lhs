@@ -23,7 +23,7 @@ import RnHsSyn		( RenamedClassDecl(..), RenamedClassPragmas(..),
 			  RnName{-instance Uniquable-}
 			)
 import TcHsSyn		( TcIdOcc(..), TcHsBinds(..), TcMonoBinds(..), TcExpr(..),
-			  mkHsTyApp, mkHsTyLam, mkHsDictApp, mkHsDictLam, unZonkId )
+			  mkHsTyApp, mkHsTyLam, mkHsDictApp, mkHsDictLam )
 
 import TcMonad		hiding ( rnMtoTcM )
 import Inst		( Inst, InstOrigin(..), LIE(..), emptyLIE, plusLIE, newDicts )
@@ -118,7 +118,8 @@ tcClassContext rec_class rec_tyvar context pragmas
 
 	-- Make super-class selector ids
     mapTc (mk_super_id rec_class) 
-	  (super_classes `zip` maybe_pragmas)	`thenTc` \ sc_sel_ids ->
+	  (super_classes `zip` maybe_pragmas) `thenTc` \ sc_sel_ids ->
+	  -- NB: we worry about matching list lengths below
 
 	-- Done
     returnTc (super_classes, sc_sel_ids)
@@ -312,8 +313,8 @@ buildSelectors clas clas_tyvar clas_tc_tyvar scs sc_sel_ids ops op_sel_ids
 	mk_sel sel_id method_or_dict
 	  = mkSelBind sel_id clas_tc_tyvar clas_dict dict_ids method_ids method_or_dict
     in
-    listNF_Tc (zipWithEqual mk_sel op_sel_ids method_ids) `thenNF_Tc` \ op_sel_binds ->
-    listNF_Tc (zipWithEqual mk_sel sc_sel_ids dict_ids)   `thenNF_Tc` \ sc_sel_binds ->
+    listNF_Tc (zipWithEqual "mk_sel1" mk_sel op_sel_ids method_ids) `thenNF_Tc` \ op_sel_binds ->
+    listNF_Tc (zipWithEqual "mk_sel2" mk_sel sc_sel_ids dict_ids)   `thenNF_Tc` \ sc_sel_binds ->
 
     returnNF_Tc (SingleBind (
 		 NonRecBind (
@@ -474,13 +475,12 @@ buildDefaultMethodBinds
 buildDefaultMethodBinds clas clas_tyvar
 			default_method_ids default_binds
   =	-- Deal with the method declarations themselves
-    mapNF_Tc unZonkId default_method_ids	`thenNF_Tc` \ tc_defm_ids ->
     processInstBinds
 	 clas
 	 (makeClassDeclDefaultMethodRhs clas default_method_ids)
 	 []		-- No tyvars in scope for "this inst decl"
 	 emptyLIE 	-- No insts available
-	 (map TcId tc_defm_ids)
+	 (map RealId default_method_ids)
 	 default_binds		`thenTc` \ (dicts_needed, default_binds') ->
 
     returnTc (dicts_needed, SingleBind (NonRecBind default_binds'))

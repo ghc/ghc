@@ -379,7 +379,10 @@ pprAddr (AddrRegImm r1 imm)
 \begin{code}
 pprInstr :: Instr -> Unpretty
 
-pprInstr (COMMENT s) = uppBeside (uppPStr SLIT("\t# ")) (uppPStr s)
+pprInstr (COMMENT s) = uppNil -- nuke 'em
+--alpha:  = uppBeside (uppPStr SLIT("\t# ")) (uppPStr s)
+--i386 :  = uppBeside (uppPStr SLIT("# "))   (uppPStr s)
+--sparc:  = uppBeside (uppPStr SLIT("! "))   (uppPStr s)
 
 pprInstr (SEGMENT TextSegment)
     = uppPStr

@@ -145,7 +145,7 @@ unpackCStringAppendId
   = pcMiscPrelId unpackCStringAppendIdKey pRELUDE_BUILTIN SLIT("unpackAppendPS#")
 		(mkFunTys [addrPrimTy{-a "char *" pointer-},stringTy] stringTy)
 		((noIdInfo
-		 `addInfo_UF` mkMagicUnfolding unpackCStringAppendIdKey)
+		 {-LATER:`addInfo_UF` mkMagicUnfolding unpackCStringAppendIdKey-})
 		 `addInfo` mkArityInfo 2)
 
 unpackCStringFoldrId
@@ -156,7 +156,7 @@ unpackCStringFoldrId
 			   alphaTy]
 			  alphaTy))
 		((noIdInfo
-		 `addInfo_UF` mkMagicUnfolding unpackCStringFoldrIdKey)
+		 {-LATER:`addInfo_UF` mkMagicUnfolding unpackCStringFoldrIdKey-})
 		 `addInfo` mkArityInfo 3)
 \end{code}
 
@@ -455,7 +455,7 @@ realWorldPrimId
 buildId
   = pcMiscPrelId buildIdKey pRELUDE_CORE SLIT("_build") buildTy
 	((((noIdInfo
-		`addInfo_UF` mkMagicUnfolding buildIdKey)
+		{-LATER:`addInfo_UF` mkMagicUnfolding buildIdKey-})
 		`addInfo` mkStrictnessInfo [WwStrict] Nothing)
 		`addInfo` mkArgUsageInfo [ArgUsage 2])
 		`addInfo` pcGenerateSpecs buildIdKey buildId noIdInfo{-ToDo-} buildTy)
@@ -500,7 +500,7 @@ mkBuild ty tv c n g expr
 augmentId
   = pcMiscPrelId augmentIdKey pRELUDE_CORE SLIT("_augment") augmentTy
 	(((noIdInfo
-		`addInfo_UF` mkMagicUnfolding augmentIdKey)
+		{-LATER:`addInfo_UF` mkMagicUnfolding augmentIdKey-})
 		`addInfo` mkStrictnessInfo [WwStrict,WwLazy False] Nothing)
 		`addInfo` mkArgUsageInfo [ArgUsage 2,UnknownArgUsage])
 	-- cheating, but since _augment never actually exists ...
@@ -523,7 +523,7 @@ foldrId = pcMiscPrelId foldrIdKey pRELUDE_FB{-not "List"-} SLIT("foldr")
 		(mkFunTys [mkFunTys [alphaTy, betaTy] betaTy, betaTy, mkListTy alphaTy] betaTy)
 
 	idInfo = (((((noIdInfo
-			`addInfo_UF` mkMagicUnfolding foldrIdKey)
+			{-LATER:`addInfo_UF` mkMagicUnfolding foldrIdKey-})
 			`addInfo` mkStrictnessInfo [WwLazy False,WwLazy False,WwStrict] Nothing)
 			`addInfo` mkArityInfo 3)
 			`addInfo` mkUpdateInfo [2,2,1])
@@ -537,7 +537,7 @@ foldlId = pcMiscPrelId foldlIdKey pRELUDE_FB{-not "List"-} SLIT("foldl")
 		(mkFunTys [mkFunTys [alphaTy, betaTy] alphaTy, alphaTy, mkListTy betaTy] alphaTy)
 
 	idInfo = (((((noIdInfo
-			`addInfo_UF` mkMagicUnfolding foldlIdKey)
+			{-LATER:`addInfo_UF` mkMagicUnfolding foldlIdKey-})
 			`addInfo` mkStrictnessInfo [WwLazy False,WwLazy False,WwStrict] Nothing)
 			`addInfo` mkArityInfo 3)
 			`addInfo` mkUpdateInfo [2,2,1])

@@ -14,7 +14,7 @@ import CoreSyn		( CoreBinding(..) )
 import Util		( panic{-ToDo:rm?-} )
 
 --import Type		( cloneTyVarFromTemplate, mkTyVarTy,
---			  splitTypeWithDictsAsArgs, eqTyCon,  mkForallTy )
+--			  splitFunTyExpandingDicts, eqTyCon,  mkForallTy )
 --import TysPrim		( alphaTy )
 --import TyVar		( alphaTyVar )
 --
@@ -137,7 +137,7 @@ try_split_bind id expr =
 	n_ty = alphaTy
 	n_ty_templ = alphaTy
 
-	(templ,arg_tys,res) = splitTypeWithDictsAsArgs (idType id)
+	(templ,arg_tys,res) = splitFunTyExpandingDicts (idType id)
 	expr_ty = getListTy res
    	getListTy res = panic "FoldrBuildWW:getListTy:ToDo" {-LATER:case res of
 			 UniData lty [ty] | lty `eqTyCon` listTyCon -> ty

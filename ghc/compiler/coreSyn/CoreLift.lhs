@@ -28,7 +28,7 @@ import Id		( idType, mkSysLocal,
 import Name		( isLocallyDefined, getSrcLoc )
 import PrelInfo		( liftDataCon, mkLiftTy, statePrimTyCon )
 import TyCon		( isBoxedTyCon, TyCon{-instance-} )
-import Type		( maybeAppDataTyCon, eqTy )
+import Type		( maybeAppDataTyConExpandingDicts, eqTy )
 import UniqSupply	( getUnique, getUniques, splitUniqSupply, UniqSupply )
 import Util		( zipEqual, zipWithEqual, assertPanic, panic )
 
@@ -261,7 +261,7 @@ liftBinders top_lev bind liftM idenv s0
     (s1, s2)   = splitUniqSupply s0
     lift_ids   = [ id | id <- bindersOf bind, isUnboxedButNotState (idType id) ]
     lift_uniqs = getUniques (length lift_ids) s1
-    lift_map   = zipEqual lift_ids (zipWithEqual mkLiftedId lift_ids lift_uniqs)
+    lift_map   = zipEqual "liftBinders" lift_ids (zipWithEqual "liftBinders" mkLiftedId lift_ids lift_uniqs)
 
     -- ToDo: Give warning for recursive bindings involving unboxed values ???
 
@@ -312,7 +312,7 @@ applyBindUnlifts []     expr = expr
 applyBindUnlifts (f:fs) expr = f (applyBindUnlifts fs expr)
 
 isUnboxedButNotState ty
-  = case (maybeAppDataTyCon ty) of
+  = case (maybeAppDataTyConExpandingDicts ty) of
       Nothing -> False
       Just (tycon, _, _) ->
 	not (isBoxedTyCon tycon) && not (tycon == statePrimTyCon)

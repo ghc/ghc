@@ -26,7 +26,7 @@ module RnUtils (
 import Ubiq
 
 import Bag		( Bag, emptyBag, snocBag, unionBags )
-import ErrUtils		( addShortErrLocLine, addErrLoc )
+import ErrUtils		( addShortErrLocLine, addShortWarnLocLine, addErrLoc )
 import FiniteMap	( FiniteMap, emptyFM, isEmptyFM,
 			  lookupFM, addListToFM, addToFM )
 import Maybes		( maybeToBool )
@@ -197,15 +197,15 @@ dupNamesErr descriptor ((name1,locn1) : dup_things) sty
 		   pprNonSym sty name, ppStr "'" ]) sty
 
 shadowedNameWarn locn shadow
-  = addShortErrLocLine locn ( \ sty ->
+  = addShortWarnLocLine locn ( \ sty ->
     ppBesides [ppStr "more than one value with the same name (shadowing): ", ppr sty shadow] )
 
 multipleOccWarn (name, occs) sty
-  = ppBesides [ppStr "multiple names used to refer to `", ppr sty name, ppStr "': ",
+  = ppBesides [ppStr "warning:multiple names used to refer to `", ppr sty name, ppStr "': ",
 	       ppInterleave ppComma (map (ppr sty) occs)]
 
 negateNameWarn (name,locn) 
-  = addShortErrLocLine locn ( \ sty ->
+  = addShortWarnLocLine locn ( \ sty ->
     ppBesides [ppStr "local binding of `negate' will be used for prefix `-'"])
 \end{code}
 

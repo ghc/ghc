@@ -22,7 +22,7 @@ import PrefixToHs
 import CmdLineOpts	( opt_CompilingPrelude )
 import ErrUtils		( addErrLoc, ghcExit )
 import FiniteMap	( elemFM, FiniteMap )
-import Name		( RdrName(..), isRdrLexCon )
+import Name		( RdrName(..), isRdrLexConOrSpecial )
 import PprStyle		( PprStyle(..) )
 import PrelMods		( fromPrelude )
 import Pretty
@@ -379,7 +379,7 @@ wlkPat pat
       U_ident nn ->			-- simple identifier
 	wlkQid nn	`thenUgn` \ n ->
 	returnUgn (
-	  if isRdrLexCon n
+	  if isRdrLexConOrSpecial n
 	  then ConPatIn n []
 	  else VarPatIn n
 	)

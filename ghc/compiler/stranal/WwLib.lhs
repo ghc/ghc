@@ -20,7 +20,7 @@ import IdInfo		( mkStrictnessInfo, nonAbsentArgs, Demand(..) )
 import PrelInfo		( aBSENT_ERROR_ID )
 import SrcLoc		( mkUnknownSrcLoc )
 import Type		( isPrimType, mkTyVarTys, mkForAllTys, mkFunTys,
-			  maybeAppDataTyCon
+			  maybeAppDataTyConExpandingDicts
 			)
 import UniqSupply	( returnUs, thenUs, thenMaybeUs,
 			  getUniques, UniqSM(..)
@@ -309,8 +309,9 @@ mk_ww_arg_processing (arg : args) (WwLazy True : infos) max_extra_args
 mk_ww_arg_processing (arg : args) (WwUnpack cmpnt_infos : infos) max_extra_args
   | new_max_extra_args > 0	-- Check that we are prepared to add arguments
   = 	-- this is the complicated one.
-    --pprTrace "Unpack; num_wrkr_args=" (ppCat [ppInt num_wrkr_args, ppStr "; new_max=", ppInt new_num_wrkr_args, ppStr "; arg=", ppr PprDebug arg, ppr PprDebug (WwUnpack cmpnt_infos)]) (
-    case maybeAppDataTyCon arg_ty of
+    --pprTrace "Unpack; num_wrkr_args=" (ppCat [ppInt num_wrkr_args, ppStr "; new_max=", ppInt new_num_wrkr_args, ppStr "; arg=", ppr PprDebug arg, ppr PprDebug (WwUnpack cmpnt_infos)]) $
+
+    case (maybeAppDataTyConExpandingDicts arg_ty) of
 
 	  Nothing 	  -> 	   -- Not a data type
 				   panic "mk_ww_arg_processing: not datatype"
@@ -330,7 +331,7 @@ mk_ww_arg_processing (arg : args) (WwUnpack cmpnt_infos : infos) max_extra_args
 	    getUniques (length inst_con_arg_tys)    `thenUs` \ uniqs ->
 
 	    let
-		unpk_args = zipWithEqual
+		unpk_args = zipWithEqual "mk_ww_arg_processing"
 			     (\ u t -> mkSysLocal SLIT("upk") u t mkUnknownSrcLoc)
 			     uniqs inst_con_arg_tys
 	    in
@@ -350,7 +351,6 @@ mk_ww_arg_processing (arg : args) (WwUnpack cmpnt_infos : infos) max_extra_args
 	      work_args_info,
 	      \ hole -> work_rest (mk_pk_let arg data_con tycon_arg_tys unpk_args hole)
 	    ))
-    --)
   where
     arg_ty = idType arg
 

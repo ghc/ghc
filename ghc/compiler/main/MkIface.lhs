@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1996
 %
 \section[MkIface]{Print an interface for a module}
 
@@ -41,7 +41,8 @@ import ParseUtils	( UsagesMap(..), VersionsMap(..) )
 import PprEnv		-- not sure how much...
 import PprStyle		( PprStyle(..) )
 import PprType		-- most of it (??)
-import Pretty		-- quite a bit
+import Pretty		( prettyToUn )
+import Unpretty		-- ditto
 import RnHsSyn		( RenamedHsModule(..), RnName{-instance NamedThing-} )
 import TcModule		( TcIfaceInfo(..) )
 import TcInstUtil	( InstInfo(..) )
@@ -49,27 +50,27 @@ import TyCon		( TyCon(..){-instance NamedThing-}, NewOrData(..) )
 import Type		( mkSigmaTy, mkDictTy, getAppTyCon )
 import Util		( sortLt, zipWithEqual, zipWith3Equal, assertPanic, panic{-ToDo:rm-}, pprTrace{-ToDo:rm-} )
 
-ppSemid    x = ppBeside (ppr PprInterface x) ppSemi -- micro util
-ppr_ty	  ty = pprType PprInterface ty
-ppr_tyvar tv = ppr PprInterface tv
+uppSemid   x = uppBeside (prettyToUn (ppr PprInterface x)) uppSemi -- micro util
+ppr_ty	  ty = prettyToUn (pprType PprInterface ty)
+ppr_tyvar tv = prettyToUn (ppr PprInterface tv)
 ppr_name   n
   = let
 	on = origName n
 	s  = nameOf  on
-	pp = ppr PprInterface on
+	pp = prettyToUn (ppr PprInterface on)
     in
-    (if isLexSym s then ppParens else id) pp
+    (if isLexSym s then uppParens else id) pp
 ppr_unq_name n
   = let
 	on = origName n
 	s  = nameOf  on
-	pp = ppPStr   s
+	pp = uppPStr  s
     in
-    (if isLexSym s then ppParens else id) pp
+    (if isLexSym s then uppParens else id) pp
 \end{code}
 
 We have a function @startIface@ to open the output file and put
-(something like) ``interface Foo N'' in it.  It gives back a handle
+(something like) ``interface Foo'' in it.  It gives back a handle
 for subsequent additions to the interface file.
 
 We then have one-function-per-block-of-interface-stuff, e.g.,
@@ -119,7 +120,7 @@ startIface mod
       Nothing -> return Nothing -- not producing any .hi file
       Just fn ->
 	openFile fn WriteMode	>>= \ if_hdl ->
-	hPutStr if_hdl ("interface "++ _UNPK_ mod ++" 1\n") >>
+	hPutStr if_hdl ("interface "++ _UNPK_ mod) >>
 	return (Just if_hdl)
 
 endIface Nothing	= return ()
@@ -133,14 +134,17 @@ ifaceUsages (Just if_hdl) usages
   | null usages_list
   = return ()
   | otherwise
-  = hPutStr if_hdl "__usages__\n"   >>
-    hPutStr if_hdl (ppShow 10000 (ppAboves (map pp_uses usages_list)))
+  = hPutStr if_hdl "\n__usages__\n"   >>
+    hPutStr if_hdl (uppShow 0 (uppAboves (map upp_uses usages_list)))
   where
     usages_list = fmToList usages
 
-    pp_uses (m, (mv, versions))
-      = ppBesides [ppPStr m, ppSP, ppInt mv, ppPStr SLIT(" :: "),
-	       pp_versions (fmToList versions), ppSemi]
+    upp_uses (m, (mv, versions))
+      = uppBesides [uppPStr m, uppSP, uppPStr SLIT(" :: "),
+	       upp_versions (fmToList versions), uppSemi]
+
+    upp_versions nvs
+      = uppIntersperse upp'SP{-'-} [ uppCat [uppPStr n, uppInt v] | (n,v) <- nvs ]
 \end{code}
 
 \begin{code}
@@ -151,12 +155,12 @@ ifaceVersions (Just if_hdl) version_info
   = return ()
   | otherwise
   = hPutStr if_hdl "\n__versions__\n"	>>
-    hPutStr if_hdl (ppShow 10000 (pp_versions version_list))
+    hPutStr if_hdl (uppShow 0 (upp_versions version_list))
   where
     version_list = fmToList version_info
 
-pp_versions nvs
-  = ppInterleave ppComma [ ppCat [ppPStr n, ppInt v] | (n,v) <- nvs ]
+    upp_versions nvs
+      = uppAboves [ uppPStr n | (n,v) <- nvs ]
 \end{code}
 
 \begin{code}
@@ -165,7 +169,7 @@ ifaceInstanceModules (Just _)		       [] = return ()
 
 ifaceInstanceModules (Just if_hdl) imods
   = hPutStr if_hdl "\n__instance_modules__\n" >>
-    hPutStr if_hdl (ppShow 100 (ppCat (map ppPStr imods)))
+    hPutStr if_hdl (uppShow 0 (uppCat (map uppPStr imods)))
 \end{code}
 
 Export list: grab the Names of things that are marked Exported, sort
@@ -193,7 +197,7 @@ ifaceExportList (Just if_hdl)
 
     in
     hPutStr if_hdl "\n__exports__\n" >>
-    hPutStr if_hdl (ppShow 100 (ppAboves (map pp_pair sorted_pairs)))
+    hPutStr if_hdl (uppShow 0 (uppAboves (map upp_pair sorted_pairs)))
   where
     from_ty (TyData _ n _ _ _ _ _) acc = maybe_add acc n
     from_ty (TyNew  _ n _ _ _ _ _) acc = maybe_add acc n
@@ -223,11 +227,11 @@ ifaceExportList (Just if_hdl)
     lexical_lt (n1,_) (n2,_) = nameOrigName n1 < nameOrigName n2
 
     --------------
-    pp_pair (n, ef)
-      = ppBeside (ppr_name n) (pp_export ef)
+    upp_pair (n, ef)
+      = uppBeside (ppr_name n) (upp_export ef)
       where
-	pp_export ExportAll = ppPStr SLIT("(..)")
-	pp_export ExportAbs = ppNil
+	upp_export ExportAll = uppPStr SLIT("(..)")
+	upp_export ExportAbs = uppNil
 \end{code}
 
 \begin{code}
@@ -241,7 +245,7 @@ ifaceFixities (Just if_hdl) (HsModule _ _ _ _ fixities _ _ _ _ _ _ _ _ _)
 	return ()
     else 
 	hPutStr if_hdl "\n__fixities__\n" >>
-	hPutStr if_hdl (ppShow 100 (ppAboves (map ppSemid local_fixities)))
+	hPutStr if_hdl (uppShow 0 (uppAboves (map uppSemid local_fixities)))
   where
     from_here (InfixL v _) = isLocallyDefined v
     from_here (InfixR v _) = isLocallyDefined v
@@ -253,21 +257,23 @@ ifaceDecls Nothing{-no iface handle-} _ = return ()
 
 ifaceDecls (Just if_hdl) (vals, tycons, classes, _)
   = let
-	exported_classes = filter isExported classes
-	exported_tycons  = filter isExported tycons
+--	exported_classes = filter isExported classes
+--	exported_tycons  = filter isExported tycons
 	exported_vals	 = filter isExported vals
 
-	sorted_classes   = sortLt ltLexical exported_classes
-	sorted_tycons	 = sortLt ltLexical exported_tycons
+	sorted_classes   = sortLt ltLexical classes
+	sorted_tycons	 = sortLt ltLexical tycons
 	sorted_vals	 = sortLt ltLexical exported_vals
     in
-    ASSERT(not (null exported_classes && null exported_tycons && null exported_vals))
-
+    if (null sorted_classes && null sorted_tycons && null sorted_vals) then
+	--  You could have a module with just instances in it
+	return ()
+    else
     hPutStr if_hdl "\n__declarations__\n" >>
-    hPutStr if_hdl (ppShow 100 (ppAboves [
-	ppAboves (map ppr_class sorted_classes),
-	ppAboves (map ppr_tycon sorted_tycons),
-	ppAboves [ppr_val v (idType v) | v <- sorted_vals]]))
+    hPutStr if_hdl (uppShow 0 (uppAboves [
+	uppAboves (map ppr_class sorted_classes),
+	uppAboves (map ppr_tycon sorted_tycons),
+	uppAboves [ppr_val v (idType v) | v <- sorted_vals]]))
 \end{code}
 
 \begin{code}
@@ -283,7 +289,7 @@ ifaceInstances (Just if_hdl) (_, _, _, insts)
 	return ()
     else
 	hPutStr if_hdl "\n__instances__\n" >>
-	hPutStr if_hdl (ppShow 100 (ppAboves (map pp_inst sorted_insts)))
+	hPutStr if_hdl (uppShow 0 (uppAboves (map pp_inst sorted_insts)))
   where
     is_exported_inst (InstInfo clas _ ty _ _ _ _ _ from_here _ _ _)
       = from_here -- && ...
@@ -306,7 +312,7 @@ ifaceInstances (Just if_hdl) (_, _, _, insts)
 	    forall_ty     = mkSigmaTy tvs theta (mkDictTy clas ty)
 	    renumbered_ty = initNmbr (nmbrType forall_ty)
 	in
-	ppBesides [ppPStr SLIT("instance "), ppr_ty renumbered_ty, ppSemi]
+	uppBesides [uppPStr SLIT("instance "), ppr_ty renumbered_ty, uppSemi]
 \end{code}
 
 %************************************************************************
@@ -316,33 +322,30 @@ ifaceInstances (Just if_hdl) (_, _, _, insts)
 %************************************************************************
 
 \begin{code}
-ppr_class :: Class -> Pretty
+ppr_class :: Class -> Unpretty
 
 ppr_class c
   = --pprTrace "ppr_class:" (ppr PprDebug c) $
     case (initNmbr (nmbrClass c)) of { -- renumber it!
       Class _ n tyvar super_classes sdsels ops sels defms insts links ->
 
-	ppAbove (ppCat [ppPStr SLIT("class"), ppr_theta tyvar super_classes,
-		    ppr_name n, ppr_tyvar tyvar,
-		    if null ops then ppSemi else ppStr "where {"])
-	    (if (null ops)
-	     then ppNil
-	     else ppAbove (ppNest 2 (ppAboves (map ppr_op ops)))
-			  (ppStr "};")
-	    )
+	uppCat [uppPStr SLIT("class"), ppr_theta tyvar super_classes,
+		ppr_name n, ppr_tyvar tyvar,
+		if null ops
+		then uppSemi
+		else uppCat [uppStr "where {", uppCat (map ppr_op ops), uppStr "};"]]
     }
   where
-    ppr_theta :: TyVar -> [Class] -> Pretty
+    ppr_theta :: TyVar -> [Class] -> Unpretty
 
-    ppr_theta tv []   = ppNil
-    ppr_theta tv [sc] = ppBeside (ppr_assert tv sc) (ppStr " =>")
+    ppr_theta tv []   = uppNil
+    ppr_theta tv [sc] = uppBeside (ppr_assert tv sc) (uppPStr SLIT(" =>"))
     ppr_theta tv super_classes
-      = ppBesides [ppLparen,
-		   ppIntersperse pp'SP{-'-} (map (ppr_assert tv) super_classes),
-		   ppStr ") =>"]
+      = uppBesides [uppLparen,
+		    uppIntersperse upp'SP{-'-} (map (ppr_assert tv) super_classes),
+		    uppStr ") =>"]
 
-    ppr_assert tv (Class _ n _ _ _ _ _ _ _ _) = ppCat [ppr_name n, ppr_tyvar tv]
+    ppr_assert tv (Class _ n _ _ _ _ _ _ _ _) = uppCat [ppr_name n, ppr_tyvar tv]
 
     ppr_op (ClassOp o _ ty) = pp_sig (Unqual o) ty
 \end{code}
@@ -353,7 +356,7 @@ ppr_val v ty -- renumber the type first!
     pp_sig v (initNmbr (nmbrType ty))
 
 pp_sig op ty
-  = ppBesides [ppr_name op, ppPStr SLIT(" :: "), ppr_ty ty, ppSemi]
+  = uppBesides [ppr_name op, uppPStr SLIT(" :: "), ppr_ty ty, uppSemi]
 \end{code}
 
 \begin{code}
@@ -363,40 +366,40 @@ ppr_tycon tycon
 
 ------------------------
 ppr_tc (PrimTyCon _ n _)
-  = ppCat [ ppStr "{- data", ppr_name n, ppStr " *built-in* -}" ]
+  = uppCat [ uppStr "{- data", ppr_name n, uppStr " *built-in* -}" ]
 
 ppr_tc FunTyCon
-  = ppCat [ ppStr "{- data", ppr_name FunTyCon, ppStr " *built-in* -}" ]
+  = uppCat [ uppStr "{- data", ppr_name FunTyCon, uppStr " *built-in* -}" ]
 
 ppr_tc (TupleTyCon _ n _)
-  = ppCat [ ppStr "{- ", ppr_name n, ppStr "-}" ]
+  = uppCat [ uppStr "{- ", ppr_name n, uppStr "-}" ]
 
 ppr_tc (SynTyCon _ n _ _ tvs expand)
   = let
 	pp_tyvars   = map ppr_tyvar tvs
     in
-    ppBesides [ppPStr SLIT("type "), ppr_name n, ppSP, ppIntersperse ppSP pp_tyvars,
-	   ppPStr SLIT(" = "), ppr_ty expand, ppSemi]
+    uppBesides [uppPStr SLIT("type "), ppr_name n, uppSP, uppIntersperse uppSP pp_tyvars,
+	   uppPStr SLIT(" = "), ppr_ty expand, uppSemi]
 
 ppr_tc this_tycon@(DataTyCon u n k tvs ctxt cons derivings data_or_new)
-  = ppHang (ppCat [pp_data_or_new,
-		   ppr_context ctxt,
-		   ppr_name n,
-		   ppIntersperse ppSP (map ppr_tyvar tvs)])
-	   2
-	   (ppBeside pp_unabstract_condecls ppSemi)
+  = uppCat [pp_data_or_new,
+	   ppr_context ctxt,
+	   ppr_name n,
+	   uppIntersperse uppSP (map ppr_tyvar tvs),
+	   pp_unabstract_condecls,
+	   uppSemi]
 	   -- NB: we do not print deriving info in interfaces
   where
     pp_data_or_new = case data_or_new of
-		      DataType -> ppPStr SLIT("data")
-		      NewType  -> ppPStr SLIT("newtype")
+		      DataType -> uppPStr SLIT("data")
+		      NewType  -> uppPStr SLIT("newtype")
 
-    ppr_context []      = ppNil
-    ppr_context [(c,t)] = ppCat [ppr_name c, ppr_ty t, ppStr "=>"]
+    ppr_context []      = uppNil
+    ppr_context [(c,t)] = uppCat [ppr_name c, ppr_ty t, uppPStr SLIT("=>")]
     ppr_context cs
-      = ppBesides[ppLparen,
-		  ppInterleave ppComma [ppCat [ppr_name c, ppr_ty t] | (c,t) <- cs],
-		  ppRparen, ppStr " =>"]
+      = uppBesides[uppLparen,
+		   uppInterleave uppComma [uppCat [ppr_name c, ppr_ty t] | (c,t) <- cs],
+		   uppRparen, uppPStr SLIT(" =>")]
 
     yes_we_print_condecls
       = case (getExportFlag n) of
@@ -405,16 +408,16 @@ ppr_tc this_tycon@(DataTyCon u n k tvs ctxt cons derivings data_or_new)
 
     pp_unabstract_condecls
       = if yes_we_print_condecls
-	then ppCat [ppEquals, pp_condecls]
-	else ppNil
+	then uppCat [uppEquals, pp_condecls]
+	else uppNil
 
     pp_condecls
       = let
 	    (c:cs) = cons
 	in
-	ppSep ((ppr_con c) : (map ppr_next_con cs))
+	uppCat ((ppr_con c) : (map ppr_next_con cs))
 
-    ppr_next_con con = ppCat [ppChar '|', ppr_con con]
+    ppr_next_con con = uppCat [uppChar '|', ppr_con con]
 
     ppr_con con
       = let
@@ -422,22 +425,22 @@ ppr_tc this_tycon@(DataTyCon u n k tvs ctxt cons derivings data_or_new)
 	    labels       = dataConFieldLabels con -- none if not a record
 	    strict_marks = dataConStrictMarks con
 	in
-	ppCat [ppr_unq_name con, ppr_fields labels strict_marks con_arg_tys]
+	uppCat [ppr_unq_name con, ppr_fields labels strict_marks con_arg_tys]
 
     ppr_fields labels strict_marks con_arg_tys
       = if null labels then -- not a record thingy
-	    ppIntersperse ppSP (zipWithEqual  ppr_bang_ty strict_marks con_arg_tys)
+	    uppIntersperse uppSP (zipWithEqual  "ppr_fields" ppr_bang_ty strict_marks con_arg_tys)
 	else
-	    ppCat [ ppChar '{',
-	    ppInterleave ppComma (zipWith3Equal ppr_field labels strict_marks con_arg_tys),
-	    ppChar '}' ]
+	    uppCat [ uppChar '{',
+	    uppInterleave uppComma (zipWith3Equal "ppr_field" ppr_field labels strict_marks con_arg_tys),
+	    uppChar '}' ]
 
     ppr_bang_ty b t
-      = ppBeside (case b of { MarkedStrict -> ppChar '!'; _ -> ppNil })
-		 (pprParendType PprInterface t)
+      = uppBeside (case b of { MarkedStrict -> uppChar '!'; _ -> uppNil })
+		  (prettyToUn (pprParendType PprInterface t))
 
     ppr_field l b t
-      = ppBesides [ppr_unq_name l, ppPStr SLIT(" :: "),
-		   case b of { MarkedStrict -> ppChar '!'; _ -> ppNil },
+      = uppBesides [ppr_unq_name l, uppPStr SLIT(" :: "),
+		   case b of { MarkedStrict -> uppChar '!'; _ -> uppNil },
 		   ppr_ty t]
 \end{code}

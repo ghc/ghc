@@ -71,7 +71,7 @@ import Id		( idType, getIdArity, addIdArity, mkSysLocal,
 			)
 import IdInfo		( arityMaybe )
 import SrcLoc		( mkUnknownSrcLoc )
-import Type		( splitSigmaTy, splitForAllTy, splitFunTyWithDictsAsArgs )
+import Type		( splitSigmaTy, splitForAllTy, splitFunTyExpandingDicts )
 import UniqSupply	( returnUs, thenUs, mapUs, getUnique, UniqSM(..) )
 import Util		( panic, assertPanic )
 
@@ -167,7 +167,7 @@ satRhs top env (b, StgRhsClosure cc bi fv u args body)
 
 	     -- get type info for this function:
 	    (_, rho_ty) = splitForAllTy (idType b)
-	    (all_arg_tys, _) = splitFunTyWithDictsAsArgs rho_ty
+	    (all_arg_tys, _) = splitFunTyExpandingDicts rho_ty
 
 	     -- now, we already have "args"; we drop that many types
 	    args_we_dont_have_tys = drop num_args all_arg_tys

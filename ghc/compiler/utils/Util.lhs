@@ -103,6 +103,8 @@ import Pretty
 #if __HASKELL1__ < 3
 import Maybes		( Maybe(..) )
 #endif
+
+infixr 9 `thenCmp`
 \end{code}
 
 %************************************************************************
@@ -144,34 +146,34 @@ are of equal length.  Alastair Reid thinks this should only happen if
 DEBUGging on; hey, why not?
 
 \begin{code}
-zipEqual	:: [a] -> [b] -> [(a,b)]
-zipWithEqual	:: (a->b->c) -> [a]->[b]->[c]
-zipWith3Equal	:: (a->b->c->d) -> [a]->[b]->[c]->[d]
-zipWith4Equal	:: (a->b->c->d->e) -> [a]->[b]->[c]->[d]->[e]
+zipEqual	:: String -> [a] -> [b] -> [(a,b)]
+zipWithEqual	:: String -> (a->b->c) -> [a]->[b]->[c]
+zipWith3Equal	:: String -> (a->b->c->d) -> [a]->[b]->[c]->[d]
+zipWith4Equal	:: String -> (a->b->c->d->e) -> [a]->[b]->[c]->[d]->[e]
 
 #ifndef DEBUG
-zipEqual      = zip
-zipWithEqual  = zipWith
-zipWith3Equal = zipWith3
-zipWith4Equal = zipWith4
+zipEqual      _ = zip
+zipWithEqual  _ = zipWith
+zipWith3Equal _ = zipWith3
+zipWith4Equal _ = zipWith4
 #else
-zipEqual []     []     = []
-zipEqual (a:as) (b:bs) = (a,b) : zipEqual as bs
-zipEqual as     bs     = panic "zipEqual: unequal lists"
+zipEqual msg []     []     = []
+zipEqual msg (a:as) (b:bs) = (a,b) : zipEqual msg as bs
+zipEqual msg as     bs     = panic ("zipEqual: unequal lists:"++msg)
 
-zipWithEqual z (a:as) (b:bs)	=  z a b : zipWithEqual z as bs
-zipWithEqual _ [] []		=  []
-zipWithEqual _ _ _		=  panic "zipWithEqual: unequal lists"
+zipWithEqual msg z (a:as) (b:bs)=  z a b : zipWithEqual msg z as bs
+zipWithEqual msg _ [] []	=  []
+zipWithEqual msg _ _ _		=  panic ("zipWithEqual: unequal lists:"++msg)
 
-zipWith3Equal z (a:as) (b:bs) (c:cs)
-				=  z a b c : zipWith3Equal z as bs cs
-zipWith3Equal _ [] []  []	=  []
-zipWith3Equal _ _  _   _	=  panic "zipWith3Equal: unequal lists"
+zipWith3Equal msg z (a:as) (b:bs) (c:cs)
+				=  z a b c : zipWith3Equal msg z as bs cs
+zipWith3Equal msg _ [] []  []	=  []
+zipWith3Equal msg _ _  _   _	=  panic ("zipWith3Equal: unequal lists:"++msg)
 
-zipWith4Equal z (a:as) (b:bs) (c:cs) (d:ds)
-				=  z a b c d : zipWith4Equal z as bs cs ds
-zipWith4Equal _ [] [] [] []	=  []
-zipWith4Equal _ _  _  _  _	=  panic "zipWith4Equal: unequal lists"
+zipWith4Equal msg z (a:as) (b:bs) (c:cs) (d:ds)
+				=  z a b c d : zipWith4Equal msg z as bs cs ds
+zipWith4Equal msg _ [] [] [] []	=  []
+zipWith4Equal msg _ _  _  _  _	=  panic ("zipWith4Equal: unequal lists:"++msg)
 #endif
 \end{code}
 

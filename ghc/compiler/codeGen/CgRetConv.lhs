@@ -235,7 +235,7 @@ makePrimOpArgsRobust op arg_amodes
 			   other -> pprError "Cannot allocate enough registers for primop (try rearranging code or reducing number of arguments?)" (ppr PprDebug op)
 
 	arg_assts
-	  = mkAbstractCs (zipWithEqual assign_to_reg final_arg_regs non_robust_amodes)
+	  = mkAbstractCs (zipWithEqual "assign_to_reg" assign_to_reg final_arg_regs non_robust_amodes)
 
 	assign_to_reg reg_id amode = CAssign (CReg reg_id) amode
 

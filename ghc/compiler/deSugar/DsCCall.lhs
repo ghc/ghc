@@ -26,7 +26,7 @@ import PrelInfo		( byteArrayPrimTy, getStatePairingConInfo,
 			  stringTy )
 import Pretty
 import PrimOp		( PrimOp(..) )
-import Type		( isPrimType, maybeAppDataTyCon, eqTy )
+import Type		( isPrimType, maybeAppDataTyConExpandingDicts, eqTy )
 import Util		( pprPanic, pprError, panic )
 
 maybeBoxedPrimType = panic "DsCCall.maybeBoxedPrimType"
@@ -187,7 +187,7 @@ we decide what's happening with enumerations. ADR
     maybe_boxed_prim_arg_ty = maybeBoxedPrimType arg_ty
     (Just (box_data_con, the_prim_arg_ty)) = maybe_boxed_prim_arg_ty
 
-    maybe_data_type 			   = maybeAppDataTyCon arg_ty
+    maybe_data_type 			   = maybeAppDataTyConExpandingDicts arg_ty
     is_data_type			   = maybeToBool maybe_data_type
     (Just (tycon, tycon_arg_tys, data_cons)) = maybe_data_type
     (the_data_con : other_data_cons)       = data_cons
@@ -288,7 +288,7 @@ boxResult result_ty
   = pprPanic "boxResult: " (ppr PprDebug result_ty)
 
   where
-    maybe_data_type 			   = maybeAppDataTyCon result_ty
+    maybe_data_type 			   = maybeAppDataTyConExpandingDicts result_ty
     Just (tycon, tycon_arg_tys, data_cons) = maybe_data_type
     (the_data_con : other_data_cons)       = data_cons
 

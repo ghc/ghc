@@ -49,14 +49,13 @@ import PrelInfo		( mkTupleTy, unitTy, nilDataCon, consDataCon,
 import Pretty		( ppShow, ppBesides, ppPStr, ppStr )
 import TyCon		( isDataTyCon, isNewTyCon )
 import Type		( splitSigmaTy, splitFunTy, typePrimRep,
-			  getAppDataTyCon, getAppTyCon, applyTy
+			  getAppDataTyConExpandingDicts, getAppTyCon, applyTy
 			)
 import TyVar		( nullTyVarEnv, addOneToTyVarEnv, GenTyVar{-instance Eq-} )
 import Usage		( UVar(..) )
 import Util		( zipEqual, pprError, panic, assertPanic )
 
 maybeBoxedPrimType = panic "DsExpr.maybeBoxedPrimType"
-splitTyArgs = panic "DsExpr.splitTyArgs"
 
 mk_nil_con ty = mkCon nilDataCon [] [ty] []  -- micro utility...
 \end{code}
@@ -221,10 +220,9 @@ dsExpr (SectionL expr op)
     -- for the type of x, we need the type of op's 2nd argument
     let
 	x_ty  =	case (splitSigmaTy (coreExprType core_op)) of { (_, _, tau_ty) ->
-		case (splitTyArgs tau_ty)		  of {
+		case (splitFunTy tau_ty)		   of {
 		  ((_:arg2_ty:_), _) -> arg2_ty;
-		  _ -> panic "dsExpr:SectionL:arg 2 ty"
-		}}
+		  _ -> panic "dsExpr:SectionL:arg 2 ty" }}
     in
     newSysLocalDs x_ty		`thenDs` \ x_id ->
     returnDs (mkValLam [x_id] (core_op `App` y_atom `App` VarArg x_id)) 
@@ -238,10 +236,9 @@ dsExpr (SectionR op expr)
     -- for the type of x, we need the type of op's 1st argument
     let
 	x_ty  =	case (splitSigmaTy (coreExprType core_op)) of { (_, _, tau_ty) ->
-		case (splitTyArgs tau_ty)		  of {
+		case (splitFunTy tau_ty)		   of {
 		  ((arg1_ty:_), _) -> arg1_ty;
-		  _ -> panic "dsExpr:SectionR:arg 1 ty"
-		}}
+		  _ -> panic "dsExpr:SectionR:arg 1 ty" }}
     in
     newSysLocalDs x_ty		`thenDs` \ x_id ->
     returnDs (mkValLam [x_id] (core_op `App` VarArg x_id `App` y_atom))
@@ -386,7 +383,7 @@ dsExpr (RecordCon con_expr rbinds)
 		 	    dsExpr rhs
 	      []         -> mkErrorAppDs rEC_CON_ERROR_ID arg_ty (showForErr lbl)
     in
-    mapDs mk_arg (arg_tys `zipEqual` dataConFieldLabels con_id) `thenDs` \ con_args ->
+    mapDs mk_arg (zipEqual "dsExpr:RecordCon" arg_tys (dataConFieldLabels con_id)) `thenDs` \ con_args ->
     mkAppDs con_expr' [] con_args
   where
 	-- "con_expr'" is simply an application of the constructor Id
@@ -425,7 +422,8 @@ dsExpr (RecordUpdOut record_expr dicts rbinds)
     dsRbinds rbinds		$ \ rbinds' ->
     let
 	record_ty		= coreExprType record_expr'
-	(tycon, inst_tys, cons) = _trace "getAppDataTyCon.DsExpr" $ getAppDataTyCon record_ty
+	(tycon, inst_tys, cons) = _trace "DsExpr.getAppDataTyConExpandingDicts" $
+				  getAppDataTyConExpandingDicts record_ty
 	cons_to_upd  	 	= filter has_all_fields cons
 
 	-- initial_args are passed to every constructor
@@ -441,7 +439,7 @@ dsExpr (RecordUpdOut record_expr dicts rbinds)
 	mk_alt con
 	  = newSysLocalsDs (dataConArgTys con inst_tys)	`thenDs` \ arg_ids ->
 	    let 
-		val_args = map mk_val_arg (dataConFieldLabels con `zipEqual` arg_ids)
+		val_args = map mk_val_arg (zipEqual "dsExpr:RecordUpd" (dataConFieldLabels con) arg_ids)
 	    in
 	    returnDs (con, arg_ids, mkGenApp (mkGenApp (Var con) initial_args) val_args)
 

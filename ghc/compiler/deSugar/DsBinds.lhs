@@ -547,7 +547,7 @@ dsMonoBinds is_rec tyvars [] binder_subst (PatMonoBind pat grhss_and_binds locn)
 	-- we can just use the rhs directly
     else
 -}
-    pprTrace "dsMonoBinds:PatMonoBind:" (ppr PprDebug body_expr) $
+--  pprTrace "dsMonoBinds:PatMonoBind:" (ppr PprDebug body_expr) $
 
     mkSelectorBinds tyvars pat
 	[(binder, binder_subst binder) | binder <- pat_binders]

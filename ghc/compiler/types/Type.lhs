@@ -6,23 +6,27 @@ module Type (
 	mkTyVarTy, mkTyVarTys,
 	getTyVar, getTyVar_maybe, isTyVarTy,
 	mkAppTy, mkAppTys, splitAppTy,
-	mkFunTy, mkFunTys, splitFunTy, splitFunTyWithDictsAsArgs,
-	getFunTy_maybe,
+	mkFunTy, mkFunTys, splitFunTy, splitFunTyExpandingDicts,
+	getFunTy_maybe, getFunTyExpandingDicts_maybe,
 	mkTyConTy, getTyCon_maybe, applyTyCon,
 	mkSynTy,
 	mkForAllTy, mkForAllTys, getForAllTy_maybe, splitForAllTy,
 	mkForAllUsageTy, getForAllUsageTy,
 	applyTy,
-
+#ifdef DEBUG
+	expandTy, -- only let out for debugging (ToDo: rm?)
+#endif
 	isPrimType, isUnboxedType, typePrimRep,
 
 	RhoType(..), SigmaType(..), ThetaType(..),
 	mkDictTy,
-	mkRhoTy, splitRhoTy,
+	mkRhoTy, splitRhoTy, mkTheta,
 	mkSigmaTy, splitSigmaTy,
 
 	maybeAppTyCon, getAppTyCon,
-	maybeAppDataTyCon, getAppDataTyCon,
+	maybeAppDataTyCon, getAppDataTyCon, getAppSpecDataTyCon,
+	maybeAppDataTyConExpandingDicts, maybeAppSpecDataTyConExpandingDicts,
+	getAppDataTyConExpandingDicts,  getAppSpecDataTyConExpandingDicts,
 	maybeBoxedPrimType,
 
 	matchTy, matchTys, eqTy, eqSimpleTy, eqSimpleTheta,
@@ -59,10 +63,22 @@ import Usage	( usageOmega, GenUsage, Usage(..), UVar(..), UVarEnv(..),
 		  eqUsage )
 
 -- others
+import Maybes	( maybeToBool )
 import PrimRep	( PrimRep(..) )
-import Util	( thenCmp, zipEqual, panic, panic#, assertPanic,
+import Util	( thenCmp, zipEqual, panic, panic#, assertPanic, pprTrace{-ToDo:rm-}, pprPanic{-ToDo:rm-},
 		  Ord3(..){-instances-}
 		)
+-- ToDo:rm all these
+import	{-mumble-}
+	Pretty
+import  {-mumble-}
+	PprStyle
+import	{-mumble-}
+	PprType (pprType )
+import  {-mumble-}
+	UniqFM (ufmToList )
+import  {-mumble-}
+	Unique (pprUnique )
 \end{code}
 
 Data types
@@ -204,6 +220,13 @@ mkFunTy arg res = FunTy arg res usageOmega
 mkFunTys :: [GenType t u] -> GenType t u -> GenType t u
 mkFunTys ts t = foldr (\ f a -> FunTy f a usageOmega) t ts
 
+  -- getFunTy_maybe and splitFunTy *must* have the general type given, which
+  -- means they *can't* do the DictTy jiggery-pokery that
+  -- *is* sometimes required.  Hence we also have the ExpandingDicts variants
+  -- The relationship between these
+  -- two functions is like that between eqTy and eqSimpleTy.
+  -- ToDo: NUKE when we do dicts via newtype
+
 getFunTy_maybe :: GenType t u -> Maybe (GenType t u, GenType t u)
 getFunTy_maybe (FunTy arg result _) = Just (arg,result)
 getFunTy_maybe (AppTy (AppTy (TyConTy tycon _) arg) res)
@@ -211,36 +234,25 @@ getFunTy_maybe (AppTy (AppTy (TyConTy tycon _) arg) res)
 getFunTy_maybe (SynTy _ _ t)        = getFunTy_maybe t
 getFunTy_maybe other		    = Nothing
 
-splitFunTy		  :: GenType t u -> ([GenType t u], GenType t u)
-splitFunTyWithDictsAsArgs :: Type	 -> ([Type], Type)
-  -- splitFunTy *must* have the general type given, which
-  -- means it *can't* do the DictTy jiggery-pokery that
-  -- *is* sometimes required.  The relationship between these
-  -- two functions is like that between eqTy and eqSimpleTy.
+getFunTyExpandingDicts_maybe :: Type -> Maybe (Type, Type)
+getFunTyExpandingDicts_maybe (FunTy arg result _) = Just (arg,result)
+getFunTyExpandingDicts_maybe
+	(AppTy (AppTy (TyConTy tycon _) arg) res) | isFunTyCon tycon = Just (arg, res)
+getFunTyExpandingDicts_maybe (SynTy _ _ t)        = getFunTyExpandingDicts_maybe t
+getFunTyExpandingDicts_maybe ty@(DictTy _ _ _)	  = getFunTyExpandingDicts_maybe (expandTy ty)
+getFunTyExpandingDicts_maybe other		  = Nothing
 
-splitFunTy t = go t []
+splitFunTy		 :: GenType t u -> ([GenType t u], GenType t u)
+splitFunTyExpandingDicts :: Type	-> ([Type], Type)
+
+splitFunTy		 t = split_fun_ty getFunTy_maybe	       t
+splitFunTyExpandingDicts t = split_fun_ty getFunTyExpandingDicts_maybe t
+
+split_fun_ty get t = go t []
   where
-    go (FunTy arg res _) ts = go res (arg:ts)
-    go (AppTy (AppTy (TyConTy tycon _) arg) res) ts
-	| isFunTyCon tycon  = go res (arg:ts)
-    go (SynTy _ _ t) ts     = go t ts
-    go t ts		    = (reverse ts, t)
-
-splitFunTyWithDictsAsArgs t = go t []
-  where
-    go (FunTy arg res _) ts = go res (arg:ts)
-    go (AppTy (AppTy (TyConTy tycon _) arg) res) ts
-	| isFunTyCon tycon  = go res (arg:ts)
-    go (SynTy _ _ t) ts     = go t ts
-
-	-- For a dictionary type we try expanding it to see if we get a simple
-	-- function; if so we thunder on; if not we throw away the expansion.
-    go t@(DictTy _ _ _) ts | null ts'  = (reverse ts, t)
-			   | otherwise = (reverse ts ++ ts', t')
-			   where
-			     (ts', t') = go (expandTy t) []
-
-    go t ts = (reverse ts, t)
+    go t ts = case (get t) of
+		Just (arg,res) -> go res (arg:ts)
+		Nothing	       -> (reverse ts, t)
 \end{code}
 
 \begin{code}
@@ -254,16 +266,23 @@ applyTyCon tycon tys
   = ASSERT (not (isSynTyCon tycon))
     foldl AppTy (TyConTy tycon usageOmega) tys
 
-getTyCon_maybe :: GenType t u -> Maybe TyCon
+getTyCon_maybe		     :: GenType t u -> Maybe TyCon
+--getTyConExpandingDicts_maybe :: Type        -> Maybe TyCon
+
 getTyCon_maybe (TyConTy tycon _) = Just tycon
 getTyCon_maybe (SynTy _ _ t)     = getTyCon_maybe t
 getTyCon_maybe other_ty		 = Nothing
+
+--getTyConExpandingDicts_maybe (TyConTy tycon _) = Just tycon
+--getTyConExpandingDicts_maybe (SynTy _ _ t)     = getTyConExpandingDicts_maybe t
+--getTyConExpandingDicts_maybe ty@(DictTy _ _ _) = getTyConExpandingDicts_maybe (expandTy ty)
+--getTyConExpandingDicts_maybe other_ty	       = Nothing
 \end{code}
 
 \begin{code}
 mkSynTy syn_tycon tys
   = ASSERT(isSynTyCon syn_tycon)
-    SynTy syn_tycon tys (instantiateTauTy (zipEqual tyvars tys) body)
+    SynTy syn_tycon tys (instantiateTauTy (zipEqual "mkSynTy" tyvars tys) body)
   where
     (tyvars, body) = getSynTyConDefn syn_tycon
 \end{code}
@@ -302,6 +321,15 @@ splitRhoTy t =
 	= go r ((c,t):ts)
   go (SynTy _ _ t) ts = go t ts
   go t ts = (reverse ts, t)
+
+
+mkTheta :: [Type] -> ThetaType
+    -- recover a ThetaType from the types of some dictionaries
+mkTheta dict_tys
+  = map cvt dict_tys
+  where
+    cvt (DictTy clas ty _) = (clas, ty)
+    cvt other		   = pprPanic "mkTheta:" (pprType PprDebug other)
 \end{code}
 
 
@@ -373,8 +401,15 @@ maybeAppDataTyCon
 	-> Maybe (TyCon,		-- the type constructor
 		  [GenType tyvar uvar],	-- types to which it is applied
 		  [Id])			-- its family of data-constructors
+maybeAppDataTyConExpandingDicts, maybeAppSpecDataTyConExpandingDicts
+	:: Type -> Maybe (TyCon, [Type], [Id])
 
-maybeAppDataTyCon ty
+maybeAppDataTyCon		    ty = maybe_app_data_tycon (\x->x) ty
+maybeAppDataTyConExpandingDicts     ty = maybe_app_data_tycon expandTy ty
+maybeAppSpecDataTyConExpandingDicts ty = maybe_app_data_tycon expandTy ty
+
+
+maybe_app_data_tycon expand ty
   = case (getTyCon_maybe app_ty) of
 	Just tycon |  isDataTyCon tycon && 
 		      tyConArity tycon == length arg_tys
@@ -383,20 +418,28 @@ maybeAppDataTyCon ty
 
 	other      -> Nothing
   where
-    (app_ty, arg_tys) = splitAppTy ty
+    (app_ty, arg_tys) = splitAppTy (expand ty)
 
-
-getAppDataTyCon
+getAppDataTyCon, getAppSpecDataTyCon
 	:: GenType tyvar uvar
 	-> (TyCon,			-- the type constructor
 	    [GenType tyvar uvar],	-- types to which it is applied
 	    [Id])			-- its family of data-constructors
+getAppDataTyConExpandingDicts, getAppSpecDataTyConExpandingDicts
+	:: Type -> (TyCon, [Type], [Id])
 
-getAppDataTyCon ty
-  = case maybeAppDataTyCon ty of
+getAppDataTyCon               ty = get_app_data_tycon maybeAppDataTyCon ty
+getAppDataTyConExpandingDicts ty = get_app_data_tycon maybeAppDataTyConExpandingDicts ty
+
+-- these should work like the UniTyFuns.getUniDataSpecTyCon* things of old (ToDo)
+getAppSpecDataTyCon               = getAppDataTyCon
+getAppSpecDataTyConExpandingDicts = getAppDataTyConExpandingDicts
+
+get_app_data_tycon maybe ty
+  = case maybe ty of
       Just stuff -> stuff
 #ifdef DEBUG
-      Nothing    -> panic "Type.getAppDataTyCon: " -- (pprGenType PprShowAll ty)
+      Nothing    -> panic "Type.getAppDataTyCon" -- (pprGenType PprShowAll ty)
 #endif
 
 
@@ -462,12 +505,98 @@ tyVarsOfTypes tys = foldr (unionTyVarSets.tyVarsOfType) emptyTyVarSet tys
 Instantiating a type
 ~~~~~~~~~~~~~~~~~~~~
 \begin{code}
-applyTy :: Eq t => GenType t u -> GenType t u -> GenType t u
+applyTy :: GenType (GenTyVar flexi) uvar 
+	-> GenType (GenTyVar flexi) uvar 
+	-> GenType (GenTyVar flexi) uvar
+
 applyTy (SynTy _ _ fun)  arg = applyTy fun arg
 applyTy (ForAllTy tv ty) arg = instantiateTy [(tv,arg)] ty
 applyTy other		 arg = panic "applyTy"
+\end{code}
 
-instantiateTy :: Eq t => [(t, GenType t u)] -> GenType t u -> GenType t u
+\begin{code}
+instantiateTy	:: [(GenTyVar flexi, GenType (GenTyVar flexi) uvar)] 
+		-> GenType (GenTyVar flexi) uvar 
+		-> GenType (GenTyVar flexi) uvar
+
+instantiateTauTy :: Eq tv =>
+		   [(tv, GenType tv' u)]
+		-> GenType tv u
+		-> GenType tv' u
+
+applyTypeEnvToTy :: TyVarEnv Type -> SigmaType -> SigmaType
+
+-- instantiateTauTy works only (a) on types with no ForAlls,
+-- 	and when	       (b) all the type variables are being instantiated
+-- In return it is more polymorphic than instantiateTy
+
+instant_help ty lookup_tv deflt_tv choose_tycon
+		if_usage if_forall bound_forall_tv_BAD deflt_forall_tv
+  = go ty
+  where
+    go (TyVarTy tv)		   = case (lookup_tv tv) of
+				       Nothing -> deflt_tv tv
+				       Just ty -> ty
+    go ty@(TyConTy tycon usage)	   = choose_tycon ty tycon usage
+    go (SynTy tycon tys ty)	   = SynTy tycon (map go tys) (go ty)
+    go (FunTy arg res usage)	   = FunTy (go arg) (go res) usage
+    go (AppTy fun arg)		   = AppTy (go fun) (go arg)
+    go (DictTy clas ty usage)	   = DictTy clas (go ty) usage
+    go (ForAllUsageTy uvar bds ty) = if_usage $
+				     ForAllUsageTy uvar bds (go ty)
+    go (ForAllTy tv ty)		   = if_forall $
+				     (if (bound_forall_tv_BAD && maybeToBool (lookup_tv tv)) then
+					trace "instantiateTy: unexpected forall hit"
+				     else
+				        \x->x) ForAllTy (deflt_forall_tv tv) (go ty)
+
+instantiateTy tenv ty
+  = instant_help ty lookup_tv deflt_tv choose_tycon
+		    if_usage if_forall bound_forall_tv_BAD deflt_forall_tv
+  where
+    lookup_tv tv = case [ty | (tv',ty) <- tenv, tv == tv'] of
+		     []   -> Nothing
+		     [ty] -> Just ty
+		     _	  -> panic "instantiateTy:lookup_tv"
+
+    deflt_tv tv = TyVarTy tv
+    choose_tycon ty _ _ = ty
+    if_usage ty = ty
+    if_forall ty = ty
+    bound_forall_tv_BAD = True
+    deflt_forall_tv tv  = tv
+
+instantiateTauTy tenv ty
+  = instant_help ty lookup_tv deflt_tv choose_tycon
+		    if_usage if_forall bound_forall_tv_BAD deflt_forall_tv
+  where
+    lookup_tv tv = case [ty | (tv',ty) <- tenv, tv == tv'] of
+		     []   -> Nothing
+		     [ty] -> Just ty
+		     _	  -> panic "instantiateTauTy:lookup_tv"
+
+    deflt_tv tv = panic "instantiateTauTy"
+    choose_tycon _ tycon usage = TyConTy tycon usage
+    if_usage ty = panic "instantiateTauTy:ForAllUsageTy"
+    if_forall ty = panic "instantiateTauTy:ForAllTy"
+    bound_forall_tv_BAD = panic "instantiateTauTy:bound_forall_tv"
+    deflt_forall_tv tv  = panic "instantiateTauTy:deflt_forall_tv"
+
+applyTypeEnvToTy tenv ty
+  = instant_help ty lookup_tv deflt_tv choose_tycon
+		    if_usage if_forall bound_forall_tv_BAD deflt_forall_tv
+  where
+    lookup_tv = lookupTyVarEnv tenv
+    deflt_tv tv = TyVarTy tv
+    choose_tycon ty _ _ = ty
+    if_usage ty = ty
+    if_forall ty = ty
+    bound_forall_tv_BAD = False -- ToDo: probably should be True (i.e., no shadowing)
+    deflt_forall_tv tv  = case (lookup_tv tv) of
+			    Nothing -> tv
+			    Just (TyVarTy tv2) -> tv2
+			    _ -> panic "applyTypeEnvToTy"
+{-
 instantiateTy tenv ty 
   = go ty
   where
@@ -486,12 +615,6 @@ instantiateTy tenv ty
 
     go (ForAllUsageTy uvar bds ty) = ForAllUsageTy uvar bds (go ty)
 
-
--- instantiateTauTy works only (a) on types with no ForAlls,
--- 	and when	       (b) all the type variables are being instantiated
--- In return it is more polymorphic than instantiateTy
-
-instantiateTauTy :: Eq t => [(t, GenType t' u)] -> GenType t u -> GenType t' u
 instantiateTauTy tenv ty 
   = go ty
   where
@@ -504,17 +627,12 @@ instantiateTauTy tenv ty
     go (AppTy fun arg)		= AppTy (go fun) (go arg)
     go (DictTy clas ty usage)	= DictTy clas (go ty) usage
 
-instantiateUsage
-	:: Ord3 u => [(u, GenType t u')] -> GenType t u -> GenType t u'
-instantiateUsage = error "instantiateUsage: not implemented"
-\end{code}
-
-\begin{code}
-type TypeEnv = TyVarEnv Type
-
-applyTypeEnvToTy :: TypeEnv -> SigmaType -> SigmaType
 applyTypeEnvToTy tenv ty
-  = mapOverTyVars v_fn ty
+  = let
+	result = mapOverTyVars v_fn ty
+    in
+--    pprTrace "applyTypeEnv:" (ppAboves [pprType PprDebug ty, pprType PprDebug result, ppAboves [ppCat [pprUnique u, pprType PprDebug t] | (u,t) <- ufmToList tenv]]) $
+    result
   where
     v_fn v = case (lookupTyVarEnv tenv v) of
                 Just ty -> ty
@@ -538,8 +656,18 @@ mapOverTyVars v_fn ty
       FunTy a r u	-> FunTy (mapper a) (mapper r) u
       AppTy f a		-> AppTy (mapper f) (mapper a)
       DictTy c t u	-> DictTy c (mapper t) u
-      ForAllTy v t	-> ForAllTy v (mapper t)
+      ForAllTy v t	-> case (v_fn v) of
+			     TyVarTy v2 -> ForAllTy v2 (mapper t)
+			     _ -> panic "mapOverTyVars"
       tc@(TyConTy _ _)	-> tc
+-}
+\end{code}
+
+\begin{code}
+instantiateUsage
+	:: Ord3 u => [(u, GenType t u')] -> GenType t u -> GenType t u'
+
+instantiateUsage = panic "instantiateUsage: not implemented"
 \end{code}
 
 At present there are no unboxed non-primitive types, so
@@ -591,7 +719,7 @@ matchTys :: [GenType t1 u1]		-- Templates
 	 -> Maybe [(t1,GenType t2 u2)]	-- Matching substitution
 
 matchTy  ty1  ty2  = match  [] [] ty1 ty2
-matchTys tys1 tys2 = match' [] (zipEqual tys1 tys2)
+matchTys tys1 tys2 = match' [] (zipEqual "matchTys" tys1 tys2)
 \end{code}
 
 @match@ is the main function.

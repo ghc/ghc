@@ -46,12 +46,14 @@ import TyCon		( tyConTyVars, tyConDataCons, tyConDerivings,
 			  maybeTyConSingleCon, isEnumerationTyCon, TyCon )
 import Type		( GenType(..), TauType(..), mkTyVarTys, applyTyCon,
 			  mkSigmaTy, mkDictTy, isPrimType, instantiateTy,
-			  getAppTyCon, getAppDataTyCon )
+			  getAppTyCon, getAppDataTyCon
+			)
 import TyVar		( GenTyVar )
 import UniqFM		( emptyUFM )
 import Unique		-- Keys stuff
 import Util		( zipWithEqual, zipEqual, sortLt, removeDups, 
-			  thenCmp, cmpList, panic, pprPanic, pprPanic# )
+			  thenCmp, cmpList, panic, pprPanic, pprPanic#
+			)
 \end{code}
 
 %************************************************************************
@@ -317,7 +319,7 @@ makeDerivEqns
 	     ]
 	   where
 	     (con_tyvars, _, arg_tys, _) = dataConSig data_con
-	     inst_env = con_tyvars `zipEqual` tyvar_tys
+	     inst_env = zipEqual "mk_eqn" con_tyvars tyvar_tys
 	                -- same number of tyvars in data constr and type constr!
 \end{code}
 
@@ -417,7 +419,7 @@ add_solns inst_infos_in eqns solns
   = buildInstanceEnvs all_inst_infos `thenTc` \ inst_mapper ->
     returnTc (new_inst_infos, inst_mapper)
   where
-    new_inst_infos = zipWithEqual mk_deriv_inst_info eqns solns
+    new_inst_infos = zipWithEqual "add_solns" mk_deriv_inst_info eqns solns
 
     all_inst_infos = inst_infos_in `unionBags` listToBag new_inst_infos
 
@@ -519,7 +521,7 @@ gen_inst_info modname fixities deriver_rn_env
   =
 	-- Generate the various instance-related Ids
     mkInstanceRelatedIds
-		True {-from_here-} modname
+		True {-from_here-} locn modname
 		NoInstancePragmas
 		clas tyvars ty
 		inst_decl_theta

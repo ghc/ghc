@@ -48,8 +48,7 @@ import Id		( idType, dataConArgTys, mkTupleCon,
 import Literal		( Literal(..) )
 import TyCon		( mkTupleTyCon, isNewTyCon, tyConDataCons )
 import Type		( mkTyVarTys, mkRhoTy, mkForAllTys, mkFunTys,
-			  isUnboxedType, applyTyCon,
-			  getAppDataTyCon, getAppTyCon
+			  mkTheta, isUnboxedType, applyTyCon, getAppTyCon
 			)
 import UniqSet		( mkUniqSet, minusUniqSet, uniqSetToList, UniqSet(..) )
 import Util		( panic, assertPanic, pprTrace{-ToDo:rm-} )
@@ -59,8 +58,6 @@ import Pretty--ToDo:rm
 import TyVar--ToDo:rm
 import Unique--ToDo:rm
 import Usage--ToDo:rm
-
-splitDictType = panic "DsUtils.splitDictType"
 \end{code}
 
 %************************************************************************
@@ -449,7 +446,7 @@ mkTupleBind tyvars dicts local_global_prs tuple_expr
 	applyTyCon (mkTupleTyCon no_of_binders)
 		   (map idType locals)
       where
-	theta = map (splitDictType . idType) dicts
+	theta = mkTheta (map idType dicts)
 
     mk_selector :: CoreExpr -> (Id, Id) -> Int -> DsM (Id, CoreExpr)
 

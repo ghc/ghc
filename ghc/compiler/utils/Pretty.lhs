@@ -25,7 +25,7 @@ module Pretty (
 #endif
 	ppSP, pp'SP, ppLbrack, ppRbrack, ppLparen, ppRparen,
 	ppSemi, ppComma, ppEquals,
-	ppBracket, ppParens,
+	ppBracket, ppParens, ppQuote,
 
 	ppCat, ppBeside, ppBesides, ppAbove, ppAboves,
 	ppNest, ppSep, ppHang, ppInterleave, ppIntersperse,
@@ -164,6 +164,7 @@ ppEquals  = ppChar '='
 
 ppBracket p = ppBeside ppLbrack (ppBeside p ppRbrack)
 ppParens  p = ppBeside ppLparen (ppBeside p ppRparen)
+ppQuote   p = ppBeside (ppChar '`') (ppBeside p (ppChar '\''))
 
 ppInterleave sep ps = ppSep (pi ps)
   where

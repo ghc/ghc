@@ -233,7 +233,7 @@ do_strictness e (Just wrapper_ty) rec_final_id
   = -- Strictness info suggests a worker.  Things could still
     -- go wrong if there's an abstract type involved, mind you.
     let
-	(tv_tmpls, arg_tys, ret_ty) = splitTypeWithDictsAsArgs wrapper_ty
+	(tv_tmpls, arg_tys, ret_ty) = splitFunTyExpandingDicts wrapper_ty
 	n_wrapper_args		    = length wrap_arg_info
 		-- Don't have more args than this, else you risk
 		-- losing laziness!!
@@ -251,7 +251,7 @@ do_strictness e (Just wrapper_ty) rec_final_id
 	inst_ret_ty  = glueTyArgs dropped_inst_arg_tys
 				  (instantiateTy inst_env ret_ty)
 
-	args         = zipWithEqual mk_arg arg_uniqs	undropped_inst_arg_tys
+	args           = zipWithEqual "do_strictness" mk_arg arg_uniqs undropped_inst_arg_tys
 	mk_arg uniq ty = mkSysLocal SLIT("wrap") uniq ty mkUnknownSrcLoc
 	-- ASSERT: length args = n_wrapper_args
     in
@@ -483,7 +483,7 @@ tc_unfolding e (ImpUnfolding guidance uf_core)
 	in
 	mapB_Tc (tc_uf_core new_lve tve) rhss `thenB_Tc` \ new_rhss ->
 	tc_uf_core new_lve tve         body `thenB_Tc` \ new_body ->
-	returnB_Tc (Let (Rec (new_binders `zip` new_rhss)) new_body)
+	returnB_Tc (Let (Rec (zipEqual "tc_uf_core" new_binders new_rhss)) new_body)
 
     tc_uf_core lve tve (UfSCC uf_cc body)
       = tc_uf_cc   uf_cc	    `thenB_Tc` \ new_cc ->

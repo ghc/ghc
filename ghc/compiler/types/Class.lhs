@@ -36,6 +36,7 @@ import TyVar		( TyVar(..), GenTyVar )
 import Usage		( GenUsage, Usage(..), UVar(..) )
 
 import Maybes		( assocMaybe, Maybe )
+import Name		( changeUnique )
 import Unique		-- Keys for built-in classes
 import Pretty		( Pretty(..), ppCat{-ToDo:rm-}, ppPStr{-ditto-} )
 import PprStyle		( PprStyle )
@@ -117,7 +118,7 @@ mkClass :: Unique -> Name -> TyVar
 
 mkClass uniq full_name tyvar super_classes superdict_sels
 	class_ops dict_sels defms class_insts
-  = Class uniq full_name tyvar
+  = Class uniq (changeUnique full_name uniq) tyvar
 		super_classes superdict_sels
 		class_ops dict_sels defms
 		class_insts
@@ -233,8 +234,7 @@ We compare @Classes@ by their keys (which include @Uniques@).
 
 \begin{code}
 instance Ord3 (GenClass tyvar uvar) where
-  cmp (Class k1 _ _ _ _ _ _ _ _ _) (Class k2 _ _ _ _ _ _ _ _ _)
-    = cmp k1 k2
+  cmp (Class k1 _ _ _ _ _ _ _ _ _) (Class k2 _ _ _ _ _ _ _ _ _)  = cmp k1 k2
 
 instance Eq (GenClass tyvar uvar) where
     (Class k1 _ _ _ _ _ _ _ _ _) == (Class k2 _ _ _ _ _ _ _ _ _) = k1 == k2

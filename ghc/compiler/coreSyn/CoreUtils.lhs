@@ -671,7 +671,7 @@ do_CoreBinding venv tenv (Rec binds)
     let  new_venv = growIdEnvList venv new_maps in
 
     mapUs (do_CoreExpr new_venv tenv) rhss `thenUs` \ new_rhss ->
-    returnUs (Rec (new_binders `zipEqual` new_rhss), new_venv)
+    returnUs (Rec (zipEqual "do_CoreBinding" new_binders new_rhss), new_venv)
   where
     (binders, rhss) = unzip binds
 \end{code}

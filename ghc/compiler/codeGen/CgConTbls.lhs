@@ -41,12 +41,12 @@ import Id		( dataConTag, dataConSig,
 			  GenId{-instance NamedThing-}
 			)
 import Name		( getLocalName )
+import PrelInfo		( maybeIntLikeTyCon )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
 import TyCon		( tyConDataCons, mkSpecTyCon )
 import Type		( typePrimRep )
 import Util		( panic )
 
-maybeIntLikeTyCon = panic "CgConTbls.maybeIntLikeTyCon (ToDo)"
 mkSameSpecCon = panic "CgConTbls.mkSameSpecCon (ToDo)"
 \end{code}
 

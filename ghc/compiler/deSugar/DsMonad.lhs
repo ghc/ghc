@@ -154,7 +154,7 @@ duplicateLocalDs old_local us loc mod_and_grp env warns
 cloneTyVarsDs :: [TyVar] -> DsM [TyVar]
 cloneTyVarsDs tyvars us loc mod_and_grp env warns
   = case (getUniques (length tyvars) us) of { uniqs ->
-    (zipWithEqual cloneTyVar tyvars uniqs, warns) }
+    (zipWithEqual "cloneTyVarsDs" cloneTyVar tyvars uniqs, warns) }
 \end{code}
 
 \begin{code}
@@ -162,7 +162,7 @@ newTyVarsDs :: [TyVar] -> DsM [TyVar]
 
 newTyVarsDs tyvar_tmpls us loc mod_and_grp env warns
   = case (getUniques (length tyvar_tmpls) us) of { uniqs ->
-    (zipWithEqual cloneTyVar tyvar_tmpls uniqs, warns) }
+    (zipWithEqual "newTyVarsDs" cloneTyVar tyvar_tmpls uniqs, warns) }
 \end{code}
 
 We can also reach out and either set/grab location information from

@@ -72,7 +72,7 @@ doStaticArgs binds
     sat_bind (Rec pairs)
       = emptyEnvSAT		`thenSAT_`
 	mapSAT satExpr rhss	`thenSAT` \ rhss' ->
-	returnSAT (Rec (binders `zip` rhss'))
+	returnSAT (Rec (zipEqual "doStaticArgs" binders rhss'))
       where
 	(binders, rhss)	= unzip pairs
 \end{code}
@@ -163,7 +163,7 @@ satExpr (Let (Rec binds) body)
     in
     satExpr body		    `thenSAT` \ body' ->
     mapSAT satExpr rhss		    `thenSAT` \ rhss' ->
-    returnSAT (Let (Rec (binders `zip` rhss')) body')
+    returnSAT (Let (Rec (zipEqual "satExpr:Rec" binders rhss')) body')
 
 satExpr (SCC cc expr)
   = satExpr expr		    `thenSAT` \ expr2 ->

@@ -34,7 +34,7 @@ import Pretty		( ppBesides, ppStr )
 import SimplEnv
 import SimplMonad
 import TyCon		( tyConFamilySize )
-import Type		( isPrimType, getAppDataTyCon, maybeAppDataTyCon )
+import Type		( isPrimType, getAppDataTyConExpandingDicts, maybeAppDataTyConExpandingDicts )
 import Util		( pprTrace, assertPanic, panic )
 \end{code}
 
@@ -257,7 +257,7 @@ discountedCost env con_discount_weight size no_args is_con_vec args
       = let
 	    full_price	         = disc size
 	    take_something_off v = let
-				     (tycon, _, _) = getAppDataTyCon (idType v)
+				     (tycon, _, _) = getAppDataTyConExpandingDicts (idType v)
 				     no_cons = tyConFamilySize tycon
 				     reduced_size
 				       = size - (no_cons * con_discount_weight)
@@ -312,7 +312,7 @@ leastItCouldCost con_discount_weight size no_val_args is_con_vec arg_tys
 	if not want_con_here then
 	    disc size want_cons rest_arg_tys
 	else
-	    case (maybeAppDataTyCon arg_ty, isPrimType arg_ty) of
+	    case (maybeAppDataTyConExpandingDicts arg_ty, isPrimType arg_ty) of
 	      (Just (tycon, _, _), False) ->
 		disc (take_something_off tycon) want_cons rest_arg_tys
 

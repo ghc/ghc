@@ -90,7 +90,7 @@ saTransform binder rhs
       where
 	-- get type info for the local function:
 	(tv_tmpl, dict_tys, tau_ty) = (splitSigmaTy . idType) binder
-	(reg_arg_tys, res_type)	    = splitTyArgs tau_ty
+	(reg_arg_tys, res_type)	    = splitFunTy tau_ty
 
 	-- now, we drop the ones that are
 	-- static, that is, the ones we will not pass to the local function

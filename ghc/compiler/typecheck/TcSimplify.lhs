@@ -20,7 +20,8 @@ import HsSyn		( MonoBinds(..), HsExpr(..), InPat, OutPat, HsLit,
 import TcHsSyn		( TcIdOcc(..), TcIdBndr(..), TcExpr(..), TcMonoBinds(..) )
 
 import TcMonad		hiding ( rnMtoTcM )
-import Inst		( lookupInst, tyVarsOfInst, isTyVarDict, isDict, matchesInst,
+import Inst		( lookupInst, lookupSimpleInst,
+			  tyVarsOfInst, isTyVarDict, isDict, matchesInst,
 			  instToId, instBindingRequired, instCanBeGeneralised, newDictsAtLoc,
 			  Inst(..), LIE(..), zonkLIE, emptyLIE, plusLIE, unitLIE, consLIE,
 			  InstOrigin(..), OverloadedLit	)
@@ -30,8 +31,9 @@ import Unify		( unifyTauTy )
 
 import Bag		( Bag, unitBag, listToBag, foldBag, filterBag, emptyBag, bagToList, 
 			  snocBag, consBag, unionBags, isEmptyBag )
-import Class		( isNumericClass, isStandardClass, isCcallishClass,
-			  isSuperClassOf, classSuperDictSelId
+import Class		( GenClass, Class(..), ClassInstEnv(..),
+			  isNumericClass, isStandardClass, isCcallishClass,
+			  isSuperClassOf, classSuperDictSelId, classInstEnv
 			)
 import Id		( GenId )
 import Maybes		( expectJust, firstJust, catMaybes, seqMaybe, maybeToBool, Maybe(..) )
@@ -41,7 +43,8 @@ import PprType		( GenType, GenTyVar, GenClass{-instance Outputable;ToDo:rm-} )
 import Pretty
 import SrcLoc		( mkUnknownSrcLoc )
 import Util
-import Type		( GenType, Type(..), TauType(..), mkTyVarTy, getTyVar, eqSimpleTy )
+import Type		( GenType, Type(..), TauType(..), mkTyVarTy, getTyVar, eqSimpleTy,
+			  getTyVar_maybe )
 import TysWiredIn	( intTy )
 import TyVar		( GenTyVar, GenTyVarSet(..), 
 			  elementOfTyVarSet, emptyTyVarSet, unionTyVarSets,
@@ -228,71 +231,9 @@ mechansim with the extra flag to say ``beat out constant insts''.
 \begin{code}
 tcSimplifyTop :: LIE s -> TcM s [(TcIdOcc s, TcExpr s)]
 tcSimplifyTop dicts
-  = tcGetGlobalTyVars						`thenNF_Tc` \ global_tvs ->
-    tcSimpl True emptyTyVarSet emptyTyVarSet emptyBag dicts	`thenTc` \ (_, binds, _) ->
+  = tcSimpl True emptyTyVarSet emptyTyVarSet emptyBag dicts	`thenTc` \ (_, binds, _) ->
     returnTc binds
 \end{code}
-
-@tcSimplifyThetas@ simplifies class-type constraints formed by
-@deriving@ declarations and when specialising instances.  We are
-only interested in the simplified bunch of class/type constraints.
-
-\begin{code}
-tcSimplifyThetas :: (Class -> TauType -> InstOrigin s)  -- Creates an origin for the dummy dicts
-	       	 -> [(Class, TauType)]		      -- Simplify this
-	       	 -> TcM s [(Class, TauType)]  	      -- Result
-
-tcSimplifyThetas = panic "tcSimplifyThetas"
-
-{- 	LATER
-tcSimplifyThetas mk_inst_origin theta
-  = let
-	dicts = listToBag (map mk_dummy_dict theta)
-    in
-	 -- Do the business (this is just the heart of "tcSimpl")
-    elimTyCons True (\tv -> False) emptyLIE dicts    `thenTc`	\ (_, _, dicts2) ->
-
-	  -- Deal with superclass relationships
-    elimSCs [] dicts2		    `thenNF_Tc` \ (_, dicts3) ->
-
-    returnTc (map unmk_dummy_dict (bagToList dicts3))
-  where
-    mk_dummy_dict (clas, ty) = Dict uniq clas ty (mk_inst_origin clas ty) mkUnknownSrcLoc
-    uniq 		     = panic "tcSimplifyThetas:uniq"
-
-    unmk_dummy_dict (Dict _ clas ty _ _) = (clas, ty)
--}
-\end{code}
-
-@tcSimplifyCheckThetas@ just checks class-type constraints, essentially;
-used with \tr{default} declarations.  We are only interested in
-whether it worked or not.
-
-\begin{code}
-tcSimplifyCheckThetas :: InstOrigin s		-- context; for error msg
-		      -> [(Class, TauType)]	-- Simplify this
-		      -> TcM s ()
-
-tcSimplifyCheckThetas x y = _trace "tcSimplifyCheckThetas: does nothing" $
-		        returnTc ()
-
-{- 	LATER
-tcSimplifyCheckThetas origin theta
-  = let
-	dicts = map mk_dummy_dict theta
-    in
-	 -- Do the business (this is just the heart of "tcSimpl")
-    elimTyCons True (\tv -> False) emptyLIE dicts    `thenTc`	\ _ ->
-
-    returnTc ()
-  where
-    mk_dummy_dict (clas, ty)
-      = Dict uniq clas ty origin mkUnknownSrcLoc
-
-    uniq = panic "tcSimplifyCheckThetas:uniq"
--}
-\end{code}
-
 
 %************************************************************************
 %*									*
@@ -437,7 +378,7 @@ elimTyCons squash_consts is_free_tv givens wanteds
 %************************************************************************
 %*									*
 \subsection[elimSCs]{@elimSCs@}
-%*									*
+%*			2						*
 %************************************************************************
 
 \begin{code}
@@ -534,10 +475,87 @@ sortSC dicts = sortLt lt (bagToList dicts)
        = if ty1 `eqSimpleTy` ty2 then
 		maybeToBool (c2 `isSuperClassOf` c1)
 	 else
-		-- order is immaterial, I think...
+		-- Order is immaterial, I think...
 		False
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection[simple]{@Simple@ versions}
+%*									*
+%************************************************************************
+
+Much simpler versions when there are no bindings to make!
+
+@tcSimplifyThetas@ simplifies class-type constraints formed by
+@deriving@ declarations and when specialising instances.  We are
+only interested in the simplified bunch of class/type constraints.
+
+\begin{code}
+tcSimplifyThetas :: (Class -> ClassInstEnv)		-- How to find the ClassInstEnv
+	       	 -> [(Class, TauType)]			-- Given
+	       	 -> [(Class, TauType)]			-- Wanted
+	       	 -> TcM s [(Class, TauType)]
+
+
+tcSimplifyThetas inst_mapper given wanted
+  = elimTyConsSimple inst_mapper wanted	`thenTc`    \ wanted1 ->
+    returnTc (elimSCsSimple given wanted1)
+\end{code}
+
+@tcSimplifyCheckThetas@ just checks class-type constraints, essentially;
+used with \tr{default} declarations.  We are only interested in
+whether it worked or not.
+
+\begin{code}
+tcSimplifyCheckThetas :: [(Class, TauType)]	-- Simplify this to nothing at all
+		      -> TcM s ()
+
+tcSimplifyCheckThetas theta
+  = elimTyConsSimple classInstEnv theta    `thenTc`	\ theta1 ->
+    ASSERT( null theta1 )
+    returnTc ()
+\end{code}
+
+
+\begin{code}
+elimTyConsSimple :: (Class -> ClassInstEnv) 
+	         -> [(Class,Type)]
+	         -> TcM s [(Class,Type)]
+elimTyConsSimple inst_mapper theta
+  = elim theta
+  where
+    elim []	          = returnTc []
+    elim ((clas,ty):rest) = elim_one clas ty 	`thenTc` \ r1 ->
+			    elim rest		`thenTc` \ r2 ->
+			    returnTc (r1++r2)
+
+    elim_one clas ty
+	= case getTyVar_maybe ty of
+
+	    Just tv   -> returnTc [(clas,ty)]
+
+	    otherwise -> recoverTc (returnTc []) $
+			 lookupSimpleInst (inst_mapper clas) clas ty	`thenTc` \ theta ->
+			 elim theta
+
+elimSCsSimple :: [(Class,Type)] 	-- Given
+	      -> [(Class,Type)]		-- Wanted
+	      -> [(Class,Type)]		-- Subset of wanted; no dups, no subclass relnships
+
+elimSCsSimple givens [] = []
+elimSCsSimple givens (c_t@(clas,ty) : rest)
+  | any (`subsumes` c_t) givens ||
+    any (`subsumes` c_t) rest				-- (clas,ty) is old hat
+  = elimSCsSimple givens rest
+  | otherwise						-- (clas,ty) is new
+  = c_t : elimSCsSimple (c_t : givens) rest
+  where
+    rest' = elimSCsSimple rest
+    (c1,t1) `subsumes` (c2,t2) = t1 `eqSimpleTy` t2 && 
+				 maybeToBool (c2 `isSuperClassOf` c1)
+\end{code}
 
 %************************************************************************
 %*									*
@@ -676,7 +694,7 @@ disambigOne dict_infos
       try_default (default_ty : default_tys)
 	= tryTc (try_default default_tys) $	-- If default_ty fails, we try
 						-- default_tys instead
-	  tcSimplifyCheckThetas DefaultDeclOrigin thetas	`thenTc` \ _ ->
+	  tcSimplifyCheckThetas thetas	`thenTc` \ _ ->
 	  returnTc default_ty
         where
 	  thetas = classes `zip` repeat default_ty

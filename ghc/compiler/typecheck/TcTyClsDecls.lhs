@@ -52,7 +52,7 @@ data Decl = TyD RenamedTyDecl | ClD RenamedClassDecl
 
 tcTyAndClassDecls1 :: InstanceMapper
 		   -> Bag RenamedTyDecl -> Bag RenamedClassDecl
-		   -> TcM s (TcEnv s, TcHsBinds s)
+		   -> TcM s (TcEnv s)
 
 tcTyAndClassDecls1 inst_mapper rnty_decls rncls_decls
   = sortByDependency syn_decls cls_decls decls `thenTc` \ groups ->
@@ -67,33 +67,30 @@ tcTyAndClassDecls1 inst_mapper rnty_decls rncls_decls
     is_syn_decl _		          = False
 
 tcGroups inst_mapper []
-  = tcGetEnv		`thenNF_Tc` \ env ->
-    returnTc (env, EmptyBinds)
+  = tcGetEnv	`thenNF_Tc` \ env ->
+    returnTc env
 
 tcGroups inst_mapper (group:groups)
-  = tcGroup inst_mapper group	`thenTc` \ (new_env, binds1) ->
+  = tcGroup inst_mapper group	`thenTc` \ new_env ->
 
 	-- Extend the environment using the new tycons and classes
     tcSetEnv new_env $
 
 	-- Do the remaining groups
-    tcGroups inst_mapper groups	`thenTc` \ (final_env, binds2) ->
-
-    returnTc (final_env, binds1 `ThenBinds` binds2)
+    tcGroups inst_mapper groups
 \end{code}
 
 Dealing with a group
 ~~~~~~~~~~~~~~~~~~~~
 \begin{code}
-tcGroup :: InstanceMapper -> Bag Decl -> TcM s (TcEnv s, TcHsBinds s)
+tcGroup :: InstanceMapper -> Bag Decl -> TcM s (TcEnv s)
 tcGroup inst_mapper decls
-  = --pprTrace "tcGroup: " (ppCat (map (fst.fmt_decl) (bagToList decls))) $
+  = -- pprTrace "tcGroup: " (ppCat (map (fst.fmt_decl) (bagToList decls))) $
 
 	-- TIE THE KNOT
     fixTc ( \ ~(tycons,classes,_) ->
 
 		-- EXTEND TYPE AND CLASS ENVIRONMENTS
-		-- including their data constructors and class operations
 		-- NB: it's important that the tycons and classes come back in just
 		-- the same order from this fix as from get_binders, so that these
 		-- extend-env things work properly.  A bit UGH-ish.
@@ -117,24 +114,9 @@ tcGroup inst_mapper decls
       tcGetEnv					`thenNF_Tc` \ final_env ->
 
       returnTc (tycons, classes, final_env)
-    ) `thenTc` \ (tycons, classes, final_env) ->
+    ) `thenTc` \ (_, _, final_env) ->
 
-
-	-- Create any necessary record selector Ids and their bindings
-	-- "Necessary" includes data and newtype declarations
-    mapAndUnzipTc mkDataBinds (filter (not.isSynTyCon) tycons)	`thenTc` \ (data_ids_s, binds) ->
-	
-	-- Extend the global value environment with 
-	--	a) constructors
-	--	b) record selectors
-	--	c) class op selectors
-
-    tcSetEnv final_env						$
-    tcExtendGlobalValEnv (concat data_ids_s)			$
-    tcExtendGlobalValEnv (concat (map classSelIds classes))  $
-    tcGetEnv			`thenNF_Tc` \ really_final_env ->
-
-    returnTc (really_final_env, foldr ThenBinds EmptyBinds binds)
+    returnTc final_env
 
   where
     (tyvar_rn_names, tycon_names_w_arities, class_names) = get_binders decls
@@ -209,10 +191,10 @@ fmt_decl decl
 Edges in Type/Class decls
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
-mk_edges (TyD (TyData ctxt name _ condecls _ _ _))
-  = (uniqueOf name, set_to_bag (get_ctxt ctxt `unionUniqSets` get_cons condecls))
-mk_edges (TyD (TyNew  ctxt name _ condecl _ _ _))
-  = (uniqueOf name, set_to_bag (get_ctxt ctxt `unionUniqSets` get_cons condecl))
+mk_edges (TyD (TyData ctxt name _ condecls derivs _ _))
+  = (uniqueOf name, set_to_bag (get_ctxt ctxt `unionUniqSets` get_cons condecls `unionUniqSets` get_deriv derivs))
+mk_edges (TyD (TyNew  ctxt name _ condecl derivs _ _))
+  = (uniqueOf name, set_to_bag (get_ctxt ctxt `unionUniqSets` get_cons condecl  `unionUniqSets` get_deriv derivs))
 mk_edges (TyD (TySynonym name _ rhs _))
   = (uniqueOf name, set_to_bag (get_ty rhs))
 mk_edges (ClD (ClassDecl ctxt name _ sigs _ _ _))
@@ -220,6 +202,9 @@ mk_edges (ClD (ClassDecl ctxt name _ sigs _ _ _))
 
 get_ctxt ctxt
   = unionManyUniqSets (map (set_name.fst) ctxt)
+
+get_deriv Nothing     = emptyUniqSet
+get_deriv (Just clss) = unionManyUniqSets (map set_name clss)
 
 get_cons cons
   = unionManyUniqSets (map get_con cons)

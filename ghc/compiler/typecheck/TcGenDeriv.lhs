@@ -590,7 +590,7 @@ gen_Ix_binds tycon
     --------------------------------------------------------------
     single_con_range
       = mk_easy_FunMonoBind range_PN [TuplePatIn [con_pat as_needed, con_pat bs_needed]] [] (
-	  ListComp (con_expr cs_needed) (zipWith3Equal mk_qual as_needed bs_needed cs_needed)
+	  ListComp (con_expr cs_needed) (zipWith3Equal "single_con_range" mk_qual as_needed bs_needed cs_needed)
 	)
       where
 	mk_qual a b c = GeneratorQual (VarPatIn c)
@@ -619,7 +619,7 @@ gen_Ix_binds tycon
     ------------------
     single_con_inRange
       = mk_easy_FunMonoBind inRange_PN [TuplePatIn [con_pat as_needed, con_pat bs_needed], con_pat cs_needed] [] (
-	  foldl1 and_Expr (zipWith3Equal in_range as_needed bs_needed cs_needed))
+	  foldl1 and_Expr (zipWith3Equal "single_con_inRange" in_range as_needed bs_needed cs_needed))
       where
     	in_range a b c = HsApp (HsApp (HsVar inRange_PN) (ExplicitTuple [HsVar a, HsVar b])) (HsVar c)
 \end{code}
@@ -666,7 +666,7 @@ gen_Read_binds fixities tycon
 		      (TuplePatIn [LitPatIn (HsString data_con_str), d_Pat])
 		      (HsApp (HsVar lex_PN) c_Expr)
 
-		field_quals = snd (mapAccumL mk_qual d_Expr (as_needed `zip` bs_needed))
+		field_quals = snd (mapAccumL mk_qual d_Expr (zipEqual "as_needed" as_needed bs_needed))
 
 		read_paren_arg
 		  = if nullary_con then -- must be False (parens are surely optional)

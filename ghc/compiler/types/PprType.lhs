@@ -44,7 +44,7 @@ import CStrings		( identToC )
 import CmdLineOpts	( opt_OmitInterfacePragmas )
 import Maybes		( maybeToBool )
 import Name		( isLexVarSym, isLexSpecialSym, isPreludeDefined, origName, moduleOf,
-			  Name{-instance Outputable-}
+			  nameOrigName, nameOf, Name{-instance Outputable-}
 			)
 import Outputable	( ifPprShowAll, interpp'SP )
 import PprEnv
@@ -181,9 +181,7 @@ ppr_ty sty env ctxt_prec (DictTy clas ty usage)
 -- Some help functions
 ppr_corner sty env ctxt_prec (TyConTy FunTyCon usage) arg_tys
   | length arg_tys == 2
-  = (if length arg_tys /= 2 then pprTrace "ppr_corner:" (ppCat (map (ppr_ty sty env ctxt_prec) arg_tys)) else id) $
-    ASSERT(length arg_tys == 2)
-    ppr_ty sty env ctxt_prec (FunTy ty1 ty2 usage)
+  = ppr_ty sty env ctxt_prec (FunTy ty1 ty2 usage)
   where
     (ty1:ty2:_) = arg_tys
 
@@ -265,11 +263,11 @@ maybeParen ctxt_prec inner_prec pretty
 pprGenTyVar sty (TyVar uniq kind name usage)
   = case sty of
       PprInterface -> pp_u
-      _		   -> ppBeside pp_name pp_u
+      _		   -> ppBesides [pp_name, ppStr "{-", pp_u, ppStr "-}"]
   where
-    pp_u    = pprUnique10 uniq
+    pp_u    = pprUnique uniq
     pp_name = case name of
-		Just n  -> ppr sty n
+		Just n  -> ppPStr (nameOf (nameOrigName n))
 		Nothing -> case kind of
 				TypeKind        -> ppChar 'o'
 				BoxedTypeKind   -> ppChar 't'

@@ -219,15 +219,9 @@ cmpPolyType _ _ (HsPreForAllTy _ _) = panic# "cmpPolyType:HsPreForAllTy:2nd arg"
 # endif
 
 cmpPolyType cmp (HsForAllTy tvs1 c1 t1) (HsForAllTy tvs2 c2 t2)
-  = thenCmp (cmp_tvs tvs1 tvs2)
-	    (thenCmp (cmpContext cmp c1 c2) (cmpMonoType cmp t1 t2))
-  where
-    cmp_tvs [] [] = EQ_
-    cmp_tvs [] _  = LT_
-    cmp_tvs _  [] = GT_
-    cmp_tvs (a:as) (b:bs)
-      = thenCmp (cmp a b) (cmp_tvs as bs)
-    cmp_tvs _ _ = panic# "cmp_tvs"
+  = cmpList cmp tvs1 tvs2   `thenCmp`
+    cmpContext cmp c1 c2    `thenCmp`
+    cmpMonoType cmp t1 t2
 
 -----------
 cmpMonoType cmp (MonoTyVar n1) (MonoTyVar n2)
@@ -239,13 +233,14 @@ cmpMonoType cmp (MonoListTy ty1) (MonoListTy ty2)
   = cmpMonoType cmp ty1 ty2
 
 cmpMonoType cmp (MonoTyApp tc1 tys1) (MonoTyApp tc2 tys2)
-  = thenCmp (cmp tc1 tc2) (cmpList (cmpMonoType cmp) tys1 tys2)
+  = cmp tc1 tc2 `thenCmp`
+    cmpList (cmpMonoType cmp) tys1 tys2
 
 cmpMonoType cmp (MonoFunTy a1 b1) (MonoFunTy a2 b2)
-  = thenCmp (cmpMonoType cmp a1 a2) (cmpMonoType cmp b1 b2)
+  = cmpMonoType cmp a1 a2 `thenCmp` cmpMonoType cmp b1 b2
 
 cmpMonoType cmp (MonoDictTy c1 ty1)   (MonoDictTy c2 ty2)
-  = thenCmp (cmp c1 c2) (cmpMonoType cmp ty1 ty2)
+  = cmp c1 c2 `thenCmp` cmpMonoType cmp ty1 ty2
 
 cmpMonoType cmp ty1 ty2 -- tags must be different
   = let tag1 = tag ty1
@@ -265,7 +260,7 @@ cmpContext cmp a b
   = cmpList cmp_ctxt a b
   where
     cmp_ctxt (c1, tv1) (c2, tv2)
-      = thenCmp (cmp c1 c2) (cmp tv1 tv2)
+      = cmp c1 c2 `thenCmp` cmp tv1 tv2
 
 #endif {- COMPILING_GHC -}
 \end{code}

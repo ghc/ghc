@@ -22,7 +22,7 @@ import SimplEnv		( SimplEnv )
 import SimplMonad	( SmplM(..), SimplCount )
 import Type		( mkFunTys )
 import Unique		( Unique{-instances-} )
-import Util		( assoc, zipWith3Equal, panic )
+import Util		( assoc, zipWith3Equal, nOfThem, panic )
 \end{code}
 
 %************************************************************************
@@ -199,7 +199,7 @@ foldr_fun env (TypeArg ty1:TypeArg ty2:ValArg arg_k:ValArg arg_z:ValArg arg_list
   tick Foldr_List	`thenSmpl_`
   newIds (
 		mkFunTys [ty1, ty2] ty2 :
-		take (length the_list) (repeat ty2)
+		nOfThem (length the_list) ty2
 	)			`thenSmpl` \ (f_id:ele_id1:ele_ids) ->
   let
 	fst_bind = NonRec
@@ -209,7 +209,7 @@ foldr_fun env (TypeArg ty1:TypeArg ty2:ValArg arg_k:ValArg arg_z:ValArg arg_list
 				 ValArg (VarArg f_id),
 				 ValArg arg_z,
 				 ValArg the_tl])
-	rest_binds = zipWith3Equal
+	rest_binds = zipWith3Equal "Foldr:rest_binds"
 			 (\ e v e' -> NonRec e (mkRhs v e'))
 			 ele_ids
 			 (reverse (tail the_list))
@@ -520,10 +520,10 @@ foldl_fun env (TypeArg ty1:TypeArg ty2:ValArg arg_k:ValArg arg_z:ValArg arg_list
   tick Foldl_List	`thenSmpl_`
   newIds (
 		mkFunTys [ty1, ty2] ty1 :
-		take (length the_list) (repeat ty1)
+		nOfThem (length the_list) ty1
 	)			`thenSmpl` \ (f_id:ele_ids) ->
   let
-	rest_binds = zipWith3Equal
+	rest_binds = zipWith3Equal "foldl:rest_binds"
 			 (\ e v e' -> NonRec e (mkRhs v e'))
 			 ele_ids				-- :: [Id]
 			 the_list				-- :: [CoreArg]

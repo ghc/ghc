@@ -49,7 +49,6 @@ module Unique (
 	appendIdKey,
 	arrayPrimTyConKey,
 	augmentIdKey,
-	binaryClassKey,
 	boolTyConKey,
 	boundedClassKey,
 	buildDataConKey,
@@ -57,6 +56,7 @@ module Unique (
 	byteArrayPrimTyConKey,
 	cCallableClassKey,
 	cReturnableClassKey,
+	voidTyConKey,
 	charDataConKey,
 	charPrimTyConKey,
 	charTyConKey,
@@ -112,6 +112,8 @@ module Unique (
 	mallocPtrTyConKey,
 	monadClassKey,
 	monadZeroClassKey,
+	monadPlusClassKey,
+	functorClassKey,
 	mutableArrayPrimTyConKey,
 	mutableByteArrayPrimTyConKey,
 	nilDataConKey,
@@ -416,26 +418,29 @@ getBuiltinUniques n = map (mkUnique 'B') [1 .. n]
 %************************************************************************
 
 \begin{code}
-eqClassKey		= mkPreludeClassUnique 1
-ordClassKey		= mkPreludeClassUnique 2
-numClassKey		= mkPreludeClassUnique 3
-integralClassKey	= mkPreludeClassUnique 4
-fractionalClassKey	= mkPreludeClassUnique 5
-floatingClassKey	= mkPreludeClassUnique 6
-realClassKey		= mkPreludeClassUnique 7
-realFracClassKey	= mkPreludeClassUnique 8
-realFloatClassKey	= mkPreludeClassUnique 9
-ixClassKey		= mkPreludeClassUnique 10
-enumClassKey		= mkPreludeClassUnique 11
-showClassKey		= mkPreludeClassUnique 12
-readClassKey		= mkPreludeClassUnique 13
-monadClassKey		= mkPreludeClassUnique 14
-monadZeroClassKey	= mkPreludeClassUnique 15
-binaryClassKey		= mkPreludeClassUnique 16
-cCallableClassKey	= mkPreludeClassUnique 17	
-cReturnableClassKey	= mkPreludeClassUnique 18
-evalClassKey		= mkPreludeClassUnique 19
-boundedClassKey		= mkPreludeClassUnique 20
+boundedClassKey		= mkPreludeClassUnique 1 
+enumClassKey		= mkPreludeClassUnique 2 
+eqClassKey		= mkPreludeClassUnique 3 
+evalClassKey		= mkPreludeClassUnique 4 
+floatingClassKey	= mkPreludeClassUnique 5 
+fractionalClassKey	= mkPreludeClassUnique 6 
+integralClassKey	= mkPreludeClassUnique 7 
+monadClassKey		= mkPreludeClassUnique 8 
+monadZeroClassKey	= mkPreludeClassUnique 9 
+monadPlusClassKey	= mkPreludeClassUnique 10
+functorClassKey		= mkPreludeClassUnique 11
+numClassKey		= mkPreludeClassUnique 12
+ordClassKey		= mkPreludeClassUnique 13
+readClassKey		= mkPreludeClassUnique 14
+realClassKey		= mkPreludeClassUnique 15
+realFloatClassKey	= mkPreludeClassUnique 16
+realFracClassKey	= mkPreludeClassUnique 17
+showClassKey		= mkPreludeClassUnique 18
+					       
+cCallableClassKey	= mkPreludeClassUnique 19
+cReturnableClassKey	= mkPreludeClassUnique 20
+
+ixClassKey		= mkPreludeClassUnique 21
 \end{code}
 
 %************************************************************************
@@ -498,6 +503,7 @@ primIoTyConKey				= mkPreludeTyConUnique 51
 voidPrimTyConKey			= mkPreludeTyConUnique 52
 wordPrimTyConKey			= mkPreludeTyConUnique 53
 wordTyConKey				= mkPreludeTyConUnique 54
+voidTyConKey				= mkPreludeTyConUnique 55
 \end{code}
 
 %************************************************************************

@@ -41,7 +41,6 @@ import TyVar		( GenTyVar )
 import Unique		( Unique )
 import Util		( equivClasses, zipWithEqual, panic )
 
-
 import IdInfo		( noIdInfo )
 --import TcPragmas	( tcDictFunPragmas, tcGenPragmas )
 \end{code}
@@ -77,6 +76,7 @@ data InstInfo
 
 \begin{code}
 mkInstanceRelatedIds :: Bool
+		     -> SrcLoc
 		     -> Maybe Module
                      -> RenamedInstancePragmas
 		     -> Class 
@@ -86,7 +86,7 @@ mkInstanceRelatedIds :: Bool
 		     -> [RenamedSig]
 		     -> TcM s (Id, ThetaType, [Id])
 
-mkInstanceRelatedIds from_here inst_mod inst_pragmas
+mkInstanceRelatedIds from_here src_loc inst_mod inst_pragmas
 		     clas inst_tyvars inst_ty inst_decl_theta uprags
   = 	-- MAKE THE DFUN ID
     let
@@ -114,7 +114,7 @@ mkInstanceRelatedIds from_here inst_mod inst_pragmas
 -}
 	let dfun_id_info = noIdInfo in	-- For now
 
-	returnTc (mkDictFunId dfun_uniq clas inst_ty dfun_ty from_here inst_mod dfun_id_info)
+	returnTc (mkDictFunId dfun_uniq clas inst_ty dfun_ty from_here src_loc inst_mod dfun_id_info)
     ) `thenTc` \ dfun_id ->
 
 	-- MAKE THE CONSTANT-METHOD IDS
@@ -131,7 +131,7 @@ mkInstanceRelatedIds from_here inst_mod inst_pragmas
     (class_tyvar, super_classes, _, class_ops, _, _) = classBigSig clas
     tenv = [(class_tyvar, inst_ty)]
   
-    super_class_theta = super_classes `zip` (repeat inst_ty)
+    super_class_theta = super_classes `zip` repeat inst_ty
 
     mk_const_meth_id op
 	= tcGetUnique		`thenNF_Tc` \ uniq ->
@@ -147,7 +147,7 @@ mkInstanceRelatedIds from_here inst_mod inst_pragmas
 	     let id_info = noIdInfo 	-- For now
 	     in
 	     returnTc (mkConstMethodId uniq clas op inst_ty meth_ty
-				       from_here inst_mod id_info)
+				       from_here src_loc inst_mod id_info)
 	  )
 	where
 	  op_ty       = classOpLocalType op
@@ -235,8 +235,8 @@ addClassInstance
 
 	-- Add the instance to the class's instance environment
     case insertMEnv matchTy class_inst_env inst_ty dfun_id of {
-	Failed (ty', dfun_id')    -> failTc (dupInstErr clas (inst_ty, src_loc) 
-							     (ty', getSrcLoc dfun_id'));
+	Failed (ty', dfun_id')    -> dupInstFailure clas (inst_ty, src_loc) 
+							 (ty', getSrcLoc dfun_id');
 	Succeeded class_inst_env' -> 
 
 	-- If there are any constant methods, then add them to 
@@ -265,7 +265,7 @@ addClassInstance
 		-- a dictionary to be chucked away.
 
       op_spec_envs' | null const_meth_ids = op_spec_envs
-		    | otherwise		  = zipWithEqual add_const_meth op_spec_envs const_meth_ids
+		    | otherwise		  = zipWithEqual "add_const_meth" add_const_meth op_spec_envs const_meth_ids
 
       add_const_meth (op,spec_env) meth_id
         = (op, case addOneToSpecEnv spec_env (inst_ty : local_tyvar_tys) rhs of
@@ -283,13 +283,13 @@ addClassInstance
 \end{code}
 
 \begin{code}
-dupInstErr clas info1@(ty1, locn1) info2@(ty2, locn2) sty
+dupInstFailure clas info1@(ty1, locn1) info2@(ty2, locn2)
 	-- Overlapping/duplicate instances for given class; msg could be more glamourous
-  = ppHang (ppBesides [ppStr "Duplicate/overlapping instances: class `", ppr sty clas, ppStr "'"])
-	 4 (showOverlap sty info1 info2)
-
-showOverlap sty (ty1,loc1) (ty2,loc2)
-  = ppSep [ppBesides [ppStr "type `", ppr sty ty1, ppStr "'"],
-	   ppBesides [ppStr "at ", ppr sty loc1],
-	   ppBesides [ppStr "and ", ppr sty loc2]]
+  = tcAddErrCtxt ctxt $
+    failTc (\sty -> ppStr "Duplicate or overlapping instance declarations")
+  where
+    ctxt sty = ppHang (ppSep [ppBesides[ppStr "Class `", ppr sty clas, ppStr "'"],
+			      ppBesides[ppStr "type `", ppr sty ty1, ppStr "'"]])
+		    4 (ppSep [ppBesides [ppStr "at ", ppr sty locn1],
+		    	      ppBesides [ppStr "and ", ppr sty locn2]])
 \end{code}

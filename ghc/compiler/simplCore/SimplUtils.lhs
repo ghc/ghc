@@ -36,7 +36,7 @@ import PrelInfo		( augmentId, buildId, realWorldStateTy )
 import PrimOp		( primOpIsCheap )
 import SimplEnv
 import SimplMonad
-import Type		( eqTy, isPrimType, maybeAppDataTyCon, getTyVar_maybe )
+import Type		( eqTy, isPrimType, maybeAppDataTyConExpandingDicts, getTyVar_maybe )
 import TyVar		( GenTyVar{-instance Eq-} )
 import Util		( isIn, panic )
 
@@ -372,7 +372,7 @@ mkIdentityAlts rhs_ty
     returnSmpl (PrimAlts [] (BindDefault (binder, bad_occ_info) (Var binder)))
 
   | otherwise
-  = case (maybeAppDataTyCon rhs_ty) of
+  = case (maybeAppDataTyConExpandingDicts rhs_ty) of
 	Just (tycon, ty_args, [data_con]) ->  -- algebraic type suitable for unpacking
 	    let
 		inst_con_arg_tys = dataConArgTys data_con ty_args
@@ -405,7 +405,7 @@ simplIdWantsToBeINLINEd id env
 type_ok_for_let_to_case :: Type -> Bool
 
 type_ok_for_let_to_case ty
-  = case (maybeAppDataTyCon ty) of
+  = case (maybeAppDataTyConExpandingDicts ty) of
       Nothing                                   -> False
       Just (tycon, ty_args, [])                 -> False
       Just (tycon, ty_args, non_null_data_cons) -> True

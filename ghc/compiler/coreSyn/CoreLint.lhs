@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1996
 %
 \section[CoreLint]{A ``lint'' pass to check for Core correctness}
 
@@ -31,10 +31,12 @@ import Pretty
 import PrimOp		( primOpType, PrimOp(..) )
 import PrimRep		( PrimRep(..) )
 import SrcLoc		( SrcLoc )
-import Type		( mkFunTy,getFunTy_maybe,mkForAllTy,getForAllTy_maybe,
-			  isPrimType,typeKind,instantiateTy,
+import Type		( mkFunTy,getFunTy_maybe,mkForAllTy,mkForAllTys,getForAllTy_maybe,
+			  getFunTyExpandingDicts_maybe,
+			  isPrimType,typeKind,instantiateTy,splitSigmaTy,
 			  mkForAllUsageTy,getForAllUsageTy,instantiateUsage,
-			  maybeAppDataTyCon, eqTy
+			  maybeAppDataTyConExpandingDicts, eqTy
+--			  ,expandTy -- ToDo:rm
 			)
 import TyCon		( isPrimTyCon, tyConFamilySize )
 import TyVar		( tyVarKind, GenTyVar{-instances-} )
@@ -197,19 +199,25 @@ lintCoreExpr (Let binds body)
 	(addInScopeVars binders (lintCoreExpr body))
 
 lintCoreExpr e@(Con con args)
-  = lintCoreArgs False e (idType con) args
+  = lintCoreArgs {-False-} e unoverloaded_ty args
     -- Note: we don't check for primitive types in these arguments
+  where
+	-- Constructors are special in that they aren't passed their
+	-- dictionary arguments, so we swizzle them out of the
+	-- constructor type before handing over to lintCorArgs
+    unoverloaded_ty = mkForAllTys tyvars tau
+    (tyvars, theta, tau) = splitSigmaTy (idType con)
 
 lintCoreExpr e@(Prim op args)
-  = lintCoreArgs True e (primOpType op) args
+  = lintCoreArgs {-True-} e (primOpType op) args
     -- Note: we do check for primitive types in these arguments
 
 lintCoreExpr e@(App fun@(Var v) arg) | isBottomingId v
-  = lintCoreExpr fun `thenMaybeL` \ ty -> lintCoreArg False e ty arg
+  = lintCoreExpr fun `thenMaybeL` \ ty -> lintCoreArg {-False-} e ty arg
     -- Note: we don't check for primitive types in argument to 'error'
 
 lintCoreExpr e@(App fun arg)
-  = lintCoreExpr fun `thenMaybeL` \ty -> lintCoreArg True e ty arg
+  = lintCoreExpr fun `thenMaybeL` \ty -> lintCoreArg {-True-} e ty arg
     -- Note: we do check for primitive types in this argument
 
 lintCoreExpr (Lam (ValBinder var) expr)
@@ -238,12 +246,12 @@ The boolean argument indicates whether we should flag type
 applications to primitive types as being errors.
 
 \begin{code}
-lintCoreArgs :: Bool -> CoreExpr -> Type -> [CoreArg] -> LintM (Maybe Type)
+lintCoreArgs :: {-Bool ->-} CoreExpr -> Type -> [CoreArg] -> LintM (Maybe Type)
 
-lintCoreArgs _          _ ty [] = returnL (Just ty)
-lintCoreArgs checkTyApp e ty (a : args)
-  = lintCoreArg  checkTyApp e ty  a `thenMaybeL` \ res ->
-    lintCoreArgs checkTyApp e res args
+lintCoreArgs _ ty [] = returnL (Just ty)
+lintCoreArgs e ty (a : args)
+  = lintCoreArg  e ty  a `thenMaybeL` \ res ->
+    lintCoreArgs e res args
 \end{code}
 
 %************************************************************************
@@ -253,23 +261,27 @@ lintCoreArgs checkTyApp e ty (a : args)
 %************************************************************************
 
 \begin{code}
-lintCoreArg :: Bool -> CoreExpr -> Type -> CoreArg -> LintM (Maybe Type)
+lintCoreArg :: {-Bool ->-} CoreExpr -> Type -> CoreArg -> LintM (Maybe Type)
 
-lintCoreArg _ e ty (LitArg lit)
+lintCoreArg e ty (LitArg lit)
   = -- Make sure function type matches argument
-    case (getFunTy_maybe ty) of
-      Just (arg,res) | (literalType lit `eqTy` arg) -> returnL(Just res)
-      _ -> addErrL (mkAppMsg ty (literalType lit) e) `seqL` returnL Nothing
+    case (getFunTyExpandingDicts_maybe ty) of
+      Just (arg,res) | (lit_ty `eqTy` arg) -> returnL(Just res)
+      _ -> addErrL (mkAppMsg ty lit_ty e) `seqL` returnL Nothing
+  where
+    lit_ty = literalType lit
 
-lintCoreArg _ e ty (VarArg v)
+lintCoreArg e ty (VarArg v)
   = -- Make sure variable is bound
     checkInScope v `seqL`
     -- Make sure function type matches argument
-    case (getFunTy_maybe ty) of
-      Just (arg,res) | (idType v `eqTy` arg) -> returnL(Just res)
-      _ -> addErrL (mkAppMsg ty (idType v) e) `seqL` returnL Nothing
+    case (getFunTyExpandingDicts_maybe ty) of
+      Just (arg,res) | (var_ty `eqTy` arg) -> returnL(Just res)
+      _ -> addErrL (mkAppMsg ty var_ty e) `seqL` returnL Nothing
+  where
+    var_ty = idType v
 
-lintCoreArg checkTyApp e ty a@(TyArg arg_ty)
+lintCoreArg e ty a@(TyArg arg_ty)
   = -- ToDo: Check that ty is well-kinded and has no unbound tyvars
     checkIfSpecDoneL (not (isPrimType arg_ty)) (mkSpecTyAppMsg a)
     `seqL`
@@ -290,7 +302,7 @@ lintCoreArg checkTyApp e ty a@(TyArg arg_ty)
 	    pprTrace "lintCoreArg:kinds:" (ppCat [ppr PprDebug tyvar_kind, ppr PprDebug argty_kind]) $
 	    addErrL (mkTyAppMsg SLIT("Kinds not right in") ty arg_ty e) `seqL` returnL Nothing
 	
-lintCoreArg _ e ty (UsageArg u)
+lintCoreArg e ty (UsageArg u)
   = -- ToDo: Check that usage has no unbound usage variables
     case (getForAllUsageTy ty) of
       Just (uvar,bounds,body) ->
@@ -350,7 +362,7 @@ lintCoreAlts whole_alts@(PrimAlts alts deflt) ty --tycon
 	  check ty = checkTys first_ty ty (mkCaseAltMsg whole_alts)
 
 lintAlgAlt scrut_ty {-tycon-ToDo: use it!-} (con,args,rhs)
-  = (case maybeAppDataTyCon scrut_ty of
+  = (case maybeAppDataTyConExpandingDicts scrut_ty of
       Nothing ->
 	 addErrL (mkAlgAltMsg1 scrut_ty)
       Just (tycon, tys_applied, cons) ->
@@ -360,7 +372,7 @@ lintAlgAlt scrut_ty {-tycon-ToDo: use it!-} (con,args,rhs)
 	 checkL (con `elem` cons) (mkAlgAltMsg2 scrut_ty con) `seqL`
 	 checkL (length arg_tys == length args) (mkAlgAltMsg3 con args)
 								 `seqL`
-	 mapL check (arg_tys `zipEqual` args)			 `seqL`
+	 mapL check (zipEqual "lintAlgAlt" arg_tys args)	 `seqL`
 	 returnL ()
     )								 `seqL`
     addInScopeVars args 	(
@@ -575,7 +587,7 @@ mkDefltMsg deflt sty
 
 mkAppMsg :: Type -> Type -> CoreExpr -> ErrMsg
 mkAppMsg fun arg expr sty
-  = ppAboves [ppStr "Argument values doesn't match argument type:",
+  = ppAboves [ppStr "Argument value doesn't match argument type:",
 	      ppHang (ppStr "Fun type:") 4 (ppr sty fun),
 	      ppHang (ppStr "Arg type:") 4 (ppr sty arg),
 	      ppHang (ppStr "Expression:") 4 (pp_expr sty expr)]
@@ -598,6 +610,7 @@ mkAlgAltMsg1 :: Type -> ErrMsg
 mkAlgAltMsg1 ty sty
   = ppAbove (ppStr "In some case statement, type of scrutinee is not a data type:")
 	    (ppr sty ty)
+--	    (ppAbove (ppr sty ty) (ppr sty (expandTy ty))) -- ToDo: rm
 
 mkAlgAltMsg2 :: Type -> Id -> ErrMsg
 mkAlgAltMsg2 ty con sty

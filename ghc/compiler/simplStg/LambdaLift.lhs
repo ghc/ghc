@@ -198,7 +198,7 @@ liftExpr (StgLetNoEscape _ _ (StgNonRec binder rhs) body)
 liftExpr (StgLetNoEscape _ _ (StgRec pairs) body)
   = liftExpr body			`thenLM` \ (body', body_info) ->
     mapAndUnzipLM dontLiftRhs rhss	`thenLM` \ (rhss', rhs_infos) ->
-    returnLM (StgLet (StgRec (binders `zipEqual` rhss')) body',
+    returnLM (StgLet (StgRec (zipEqual "liftExpr" binders rhss')) body',
 	      foldr unionLiftInfo body_info rhs_infos)
   where
    (binders,rhss) = unzip pairs
@@ -240,7 +240,7 @@ liftExpr (StgLet (StgRec pairs) body)
   | not (all isLiftableRec rhss)
   = liftExpr body			`thenLM` \ (body', body_info) ->
     mapAndUnzipLM dontLiftRhs rhss	`thenLM` \ (rhss', rhs_infos) ->
-    returnLM (StgLet (StgRec (binders `zipEqual` rhss')) body',
+    returnLM (StgLet (StgRec (zipEqual "liftExpr2" binders rhss')) body',
 	      foldr unionLiftInfo body_info rhs_infos)
 
   | otherwise	-- All rhss are liftable

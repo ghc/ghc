@@ -16,7 +16,7 @@ module Inst (
 
 	newDicts, newDictsAtLoc, newMethod, newMethodWithGivenTy, newOverloadedLit,
 
-	instType, tyVarsOfInst, lookupInst,
+	instType, tyVarsOfInst, lookupInst, lookupSimpleInst,
 
 	isDict, isTyVarDict, 
 
@@ -39,7 +39,7 @@ import TcHsSyn	( TcIdOcc(..), TcExpr(..), TcIdBndr(..),
 import TcMonad	hiding ( rnMtoTcM )
 import TcEnv	( tcLookupGlobalValueByKey )
 import TcType	( TcType(..), TcRhoType(..), TcMaybe, TcTyVarSet(..),
-		  tcInstType, tcInstTcType, zonkTcType )
+		  tcInstType, zonkTcType )
 
 import Bag	( emptyBag, unitBag, unionBags, unionManyBags, listToBag, consBag )
 import Class	( Class(..), GenClass, ClassInstEnv(..), classInstEnv )
@@ -53,7 +53,7 @@ import Pretty
 import RnHsSyn	( RnName{-instance NamedThing-} )
 import SpecEnv	( SpecEnv(..) )
 import SrcLoc	( SrcLoc, mkUnknownSrcLoc )
-import Type	( GenType, eqSimpleTy,
+import Type	( GenType, eqSimpleTy, instantiateTy,
 		  isTyVarTy, mkDictTy, splitForAllTy, splitSigmaTy,
 		  splitRhoTy, matchTy, tyVarsOfType, tyVarsOfTypes )
 import TyVar	( GenTyVar )
@@ -62,7 +62,6 @@ import TysWiredIn ( intDataCon )
 import Unique	( Unique, showUnique,
 		  fromRationalClassOpKey, fromIntClassOpKey, fromIntegerClassOpKey )
 import Util	( panic, zipEqual, zipWithEqual, assoc, assertPanic )
-
 \end{code}
 
 %************************************************************************
@@ -158,7 +157,7 @@ newDicts orig theta
     tcGetUniques (length theta)		`thenNF_Tc` \ new_uniqs ->
     let
 	mk_dict u (clas, ty) = Dict u clas ty orig loc
-	dicts = zipWithEqual mk_dict new_uniqs theta
+	dicts = zipWithEqual "newDicts" mk_dict new_uniqs theta
     in
     returnNF_Tc (listToBag dicts, map instToId dicts)
 
@@ -167,7 +166,7 @@ newDictsAtLoc orig loc theta	-- Local function, similar to newDicts,
   = tcGetUniques (length theta)		`thenNF_Tc` \ new_uniqs ->
     let
 	mk_dict u (clas, ty) = Dict u clas ty orig loc
-	dicts = zipWithEqual mk_dict new_uniqs theta
+	dicts = zipWithEqual "newDictsAtLoc" mk_dict new_uniqs theta
     in
     returnNF_Tc (dicts, map instToId dicts)
 
@@ -179,9 +178,9 @@ newMethod orig id tys
   =   	-- Get the Id type and instantiate it at the specified types
     (case id of
        RealId id -> let (tyvars, rho) = splitForAllTy (idType id)
-		    in tcInstType (tyvars `zipEqual` tys) rho
+		    in tcInstType (zipEqual "newMethod" tyvars tys) rho
        TcId   id -> let (tyvars, rho) = splitForAllTy (idType id)
-		    in tcInstTcType (tyvars `zipEqual` tys) rho
+		    in returnNF_Tc (instantiateTy (zipEqual "newMethod(2)" tyvars tys) rho)
     )						`thenNF_Tc` \ rho_ty ->
 	 -- Our friend does the rest
     newMethodWithGivenTy orig id tys rho_ty
@@ -202,8 +201,8 @@ newMethodAtLoc orig loc real_id tys	-- Local function, similar to newMethod but 
     let
 	 (tyvars,rho) = splitForAllTy (idType real_id)
     in
-    tcInstType (tyvars `zipEqual` tys) rho	`thenNF_Tc` \ rho_ty ->
-    tcGetUnique					`thenNF_Tc` \ new_uniq ->
+    tcInstType (zipEqual "newMethodAtLoc" tyvars tys) rho `thenNF_Tc` \ rho_ty ->
+    tcGetUnique						  `thenNF_Tc` \ new_uniq ->
     let
 	meth_inst = Method new_uniq (RealId real_id) tys rho_ty orig loc
     in
@@ -226,11 +225,15 @@ newOverloadedLit orig lit ty
 \begin{code}
 instToId :: Inst s -> TcIdOcc s
 instToId (Dict u clas ty orig loc)
-  = TcId (mkInstId u (mkDictTy clas ty) (mkLocalName u SLIT("dict") loc))
+  = TcId (mkInstId u (mkDictTy clas ty) (mkLocalName u str loc))
+  where
+    str = SLIT("d.") _APPEND_ (getLocalName clas)
 instToId (Method u id tys rho_ty orig loc)
-  = TcId (mkInstId u tau_ty (mkLocalName u (getLocalName id) loc))
+  = TcId (mkInstId u tau_ty (mkLocalName u str loc))
   where
     (_, tau_ty) = splitRhoTy rho_ty	-- NB The method Id has just the tau type
+    str = SLIT("m.") _APPEND_ (getLocalName id)
+
 instToId (LitInst u list ty orig loc)
   = TcId (mkInstId u ty (mkLocalName u SLIT("lit") loc))
 \end{code}
@@ -467,15 +470,21 @@ appropriate dictionary if it exists.  It is used only when resolving
 ambiguous dictionaries.
 
 \begin{code}
-lookupClassInstAtSimpleType :: Class -> Type -> Maybe Id
+lookupSimpleInst :: ClassInstEnv
+		 -> Class
+		 -> Type			-- Look up (c,t)
+	         -> TcM s [(Class,Type)]	-- Here are the needed (c,t)s
 
-lookupClassInstAtSimpleType clas ty
-  = case (lookupMEnv matchTy (classInstEnv clas) ty) of
-      Nothing	    -> Nothing
-      Just (dfun,_) -> ASSERT( null tyvars && null theta )
-		       Just dfun
-		    where
-		       (tyvars, theta, _) = splitSigmaTy (idType dfun)
+lookupSimpleInst class_inst_env clas ty
+  = case (lookupMEnv matchTy class_inst_env ty) of
+      Nothing	       -> failTc (noSimpleInst clas ty)
+      Just (dfun,tenv) -> returnTc [(c,instantiateTy tenv t) | (c,t) <- theta]
+		       where
+		          (_, theta, _) = splitSigmaTy (idType dfun)
+
+noSimpleInst clas ty sty
+  = ppSep [ppStr "No instance for class", ppQuote (ppr sty clas),
+	   ppStr "at type", ppQuote (ppr sty ty)]
 \end{code}
 
 
@@ -551,9 +560,10 @@ data InstOrigin s
 
   | ClassDeclOrigin		-- Manufactured during a class decl
 
-  | DerivingOrigin	InstanceMapper
-			Class
-			TyCon
+-- 	NO MORE!
+--  | DerivingOrigin	InstanceMapper
+--			Class
+--			TyCon
 
 	-- During "deriving" operations we have an ever changing
 	-- mapping of classes to instances, so we record it inside the
@@ -569,7 +579,7 @@ data InstOrigin s
 	-- origin information.  This is a bit of a hack, but it works
 	-- fine.  (Patrick is to blame [WDP].)
 
-  | DefaultDeclOrigin		-- Related to a `default' declaration
+--  | DefaultDeclOrigin		-- Related to a `default' declaration
 
   | ValSpecOrigin	Name	-- in a SPECIALIZE pragma for a value
 
@@ -594,8 +604,8 @@ data InstOrigin s
 -- find a mapping from classes to envts inside the dict origin.
 
 get_inst_env :: Class -> InstOrigin s -> ClassInstEnv
-get_inst_env clas (DerivingOrigin inst_mapper _ _)
-  = fst (inst_mapper clas)
+-- get_inst_env clas (DerivingOrigin inst_mapper _ _)
+--  = fst (inst_mapper clas)
 get_inst_env clas (InstanceSpecOrigin inst_mapper _ _)
   = fst (inst_mapper clas)
 get_inst_env clas other_orig = classInstEnv clas
@@ -621,17 +631,17 @@ pprOrigin (DoOrigin) sty
       = ppStr "in a do statement"
 pprOrigin (ClassDeclOrigin) sty
       = ppStr "in a class declaration"
-pprOrigin (DerivingOrigin _ clas tycon) sty
-      = ppBesides [ppStr "in a `deriving' clause; class `",
-			  ppr sty clas,
-			  ppStr "'; offending type `",
-		          ppr sty tycon,
-			  ppStr "'"]
+-- pprOrigin (DerivingOrigin _ clas tycon) sty
+--      = ppBesides [ppStr "in a `deriving' clause; class `",
+--			  ppr sty clas,
+--			  ppStr "'; offending type `",
+--		          ppr sty tycon,
+--			  ppStr "'"]
 pprOrigin (InstanceSpecOrigin _ clas ty) sty
       = ppBesides [ppStr "in a SPECIALIZE instance pragma; class \"",
 	 	   ppr sty clas, ppStr "\" type: ", ppr sty ty]
-pprOrigin (DefaultDeclOrigin) sty
-      = ppStr "in a `default' declaration"
+-- pprOrigin (DefaultDeclOrigin) sty
+--      = ppStr "in a `default' declaration"
 pprOrigin (ValSpecOrigin name) sty
       = ppBesides [ppStr "in a SPECIALIZE user-pragma for `",
 		   ppr sty name, ppStr "'"]

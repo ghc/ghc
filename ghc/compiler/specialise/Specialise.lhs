@@ -10,9 +10,7 @@ module Specialise (
 	specProgram,
 	initSpecData,
 
-	SpecialiseData(..),
-	FiniteMap, Bag
-
+	SpecialiseData(..)
     ) where
 
 import Ubiq{-uitous-}
@@ -57,7 +55,7 @@ import Pretty		( ppHang, ppCat, ppStr, ppAboves, ppBesides,
 			)
 import PrimOp		( PrimOp(..) )
 import SpecUtils
-import Type		( mkTyVarTy, mkTyVarTys, isTyVarTy, getAppDataTyCon,
+import Type		( mkTyVarTy, mkTyVarTys, isTyVarTy, getAppDataTyConExpandingDicts,
 			  tyVarsOfTypes, applyTypeEnvToTy, isUnboxedType
 			)
 import TyCon		( TyCon{-instance Eq-} )
@@ -69,8 +67,8 @@ import TyVar		( cloneTyVar,
 import Unique		( Unique{-instance Eq-} )
 import UniqSet		( mkUniqSet, unionUniqSets, uniqSetToList )
 import UniqSupply	( splitUniqSupply, getUniques, getUnique )
-import Util		( equivClasses, mapAccumL, assoc, zipWithEqual,
-			  panic, pprTrace, pprPanic, assertPanic
+import Util		( equivClasses, mapAccumL, assoc, zipEqual, zipWithEqual,
+			  thenCmp, panic, pprTrace, pprPanic, assertPanic
 			)
 
 infixr 9 `thenSM`
@@ -721,7 +719,7 @@ Comparisons are based on the {\em types}, ignoring the dictionary args:
 
 cmpCI :: CallInstance -> CallInstance -> TAG_
 cmpCI (CallInstance id1 tys1 _ _ _) (CallInstance id2 tys2 _ _ _)
-  = case (id1 `cmp` id2) of { EQ_ -> cmpUniTypeMaybeList tys1 tys2; other -> other }
+  = cmp id1 id2 `thenCmp` cmpUniTypeMaybeList tys1 tys2
 
 cmpCI_tys :: CallInstance -> CallInstance -> TAG_
 cmpCI_tys (CallInstance _ tys1 _ _ _) (CallInstance _ tys2 _ _ _)
@@ -866,7 +864,7 @@ data TyConInstance
 
 cmpTyConI :: TyConInstance -> TyConInstance -> TAG_
 cmpTyConI (TyConInstance tc1 tys1) (TyConInstance tc2 tys2)
-  = case (cmp tc1 tc2) of { EQ_ -> cmpUniTypeMaybeList tys1 tys2; other -> other }
+  = cmp tc1 tc2 `thenCmp` cmpUniTypeMaybeList tys1 tys2
 
 cmpTyConI_tys :: TyConInstance -> TyConInstance -> TAG_
 cmpTyConI_tys (TyConInstance _ tys1) (TyConInstance _ tys2)
@@ -1533,7 +1531,7 @@ specAlts (AlgAlts alts deflt) scrutinee_ty args
     -- We use ty_args of scrutinee type to identify specialisation of
     -- alternatives:
 
-    (_, ty_args, _) = getAppDataTyCon scrutinee_ty
+    (_, ty_args, _) = getAppDataTyConExpandingDicts scrutinee_ty
 
     specAlgAlt ty_args (con,binders,rhs)
       = specLambdaOrCaseBody binders rhs args	`thenSM` \ (binders, rhs, rhs_uds) ->
@@ -2414,7 +2412,7 @@ newSpecIds :: [Id]		-- The id of which to make a specialised version
 
 newSpecIds new_ids maybe_tys dicts_to_ignore tvenv idenv us
   = [ mkSpecId uniq id maybe_tys (spec_id_ty id) (selectIdInfoForSpecId id)
-      | (id,uniq) <- new_ids `zip` uniqs ]
+      | (id,uniq) <- zipEqual "newSpecIds" new_ids uniqs ]
   where
     uniqs = getUniques (length new_ids) us
     spec_id_ty id = specialiseTy (idType id) maybe_tys dicts_to_ignore
@@ -2446,7 +2444,7 @@ cloneLambdaOrCaseBinders old_ids tvenv idenv us
   = let
 	uniqs = getUniques (length old_ids) us
     in
-    unzip (zipWithEqual clone_it old_ids uniqs)
+    unzip (zipWithEqual "cloneLambdaOrCaseBinders" clone_it old_ids uniqs)
   where
     clone_it old_id uniq
       = (new_id, NoLift (VarArg new_id))

@@ -71,7 +71,7 @@ specialiseCallTys :: Bool 		-- Specialise on all type args
 specialiseCallTys True _ _ cvec tys
   = map Just tys
 specialiseCallTys False spec_unboxed spec_overloading cvec tys
-  = zipWithEqual spec_ty_other cvec tys
+  = zipWithEqual "specialiseCallTys" spec_ty_other cvec tys
   where
     spec_ty_other c ty | (spec_unboxed && isUnboxedType ty)
 			 || (spec_overloading && c)

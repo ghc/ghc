@@ -35,7 +35,7 @@ import UniqFM		( emptyUFM, listToUFM, addToUFM, lookupUFM,
 			  plusUFM, sizeUFM, UniqFM
 			)
 import Maybes		( Maybe(..) )
-import Name		( mkLocalName, Name, RdrName(..) )
+import Name		( mkLocalName, changeUnique, Name, RdrName(..) )
 import Pretty		( Pretty(..), PrettyRep, ppBeside, ppPStr )
 import PprStyle		( PprStyle )
 --import Outputable	( Outputable(..), NamedThing(..), ExportFlag(..) )
@@ -63,7 +63,7 @@ Simple construction and analysis functions
 mkTyVar :: Name -> Unique -> Kind -> TyVar
 mkTyVar name uniq kind = TyVar  uniq
 				kind
-				(Just name)
+				(Just (changeUnique name uniq))
 				usageOmega
 
 tyVarKind :: GenTyVar flexi -> Kind
@@ -147,6 +147,6 @@ instance Uniquable (GenTyVar a) where
     uniqueOf (TyVar u _ _ _) = u
 
 instance NamedThing (GenTyVar a) where
-    getName		(TyVar _ _ (Just n) _) = n
-    getName		(TyVar u _ _        _) = mkLocalName u (showUnique u) mkUnknownSrcLoc
+    getName (TyVar _ _ (Just n) _) = n
+    getName (TyVar u _ _        _) = mkLocalName u (showUnique u) mkUnknownSrcLoc
 \end{code}

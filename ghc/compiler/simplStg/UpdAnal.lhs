@@ -21,7 +21,7 @@
 > updateAnalyse = panic "UpdAnal.updateAnalyse"
 >
 > {- LATER: to end of file:
-> --import Type		( splitTyArgs, splitSigmaTy, Class, TyVarTemplate,
+> --import Type		( splitFunTy, splitSigmaTy, Class, TyVarTemplate,
 > --			  TauType(..)
 > --			)
 > --import Id
@@ -489,7 +489,7 @@ Convert a Closure into a representation that can be placed in a .hi file.
 >	  		  (combine_IdEnvs (+) c' c, b', f')
 >
 >		(_,dict_tys,tau_ty) = (splitSigmaTy . idType) v
-> 	        (reg_arg_tys, _)    = splitTyArgs tau_ty
+> 	        (reg_arg_tys, _)    = splitFunTy tau_ty
 >		arity               = length dict_tys + length reg_arg_tys
 
   removeSuperfluous2s = reverse . dropWhile (> 1) . reverse

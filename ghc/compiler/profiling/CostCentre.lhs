@@ -271,10 +271,7 @@ cmpCostCentre DontCareCC       	  DontCareCC	      = EQ_
 cmpCostCentre (NormalCC k1 m1 _ _ c1) (NormalCC k2 m2 _ _ c2)
     -- first key is module name, then we use "kinds" (which include
     -- names)
-  = case (_CMP_STRING_ m1 m2) of
-      LT_  -> LT_
-      EQ_  -> cmp_kind k1 k2
-      GT__ -> GT_
+  = _CMP_STRING_ m1 m2 `thenCmp` cmp_kind k1 k2
 
 cmpCostCentre other_1 other_2
   = let

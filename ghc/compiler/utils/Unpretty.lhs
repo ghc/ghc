@@ -10,7 +10,7 @@ module Unpretty (
 	Unpretty(..),
 
 	uppNil, uppStr, uppPStr, uppChar, uppInt, uppInteger,
-	uppSP, uppLbrack, uppRbrack, uppLparen, uppRparen,
+	uppSP, upp'SP, uppLbrack, uppRbrack, uppLparen, uppRparen,
 	uppSemi, uppComma, uppEquals,
 
 	uppBracket, uppParens,
@@ -43,7 +43,7 @@ type Unpretty = CSeq
 
 \begin{code}
 uppNil		:: Unpretty
-uppSP, uppLbrack, uppRbrack, uppLparen, uppRparen, uppSemi, uppComma, uppEquals :: Unpretty
+uppSP, upp'SP, uppLbrack, uppRbrack, uppLparen, uppRparen, uppSemi, uppComma, uppEquals :: Unpretty
 
 uppStr		:: [Char] -> Unpretty
 uppPStr		:: FAST_STRING -> Unpretty
@@ -92,6 +92,7 @@ uppInt n	= cInt n
 uppInteger n	= cStr (show n)
 
 uppSP		= cCh ' '
+upp'SP{-'-}	= cPStr SLIT(", ")
 uppLbrack	= cCh '['
 uppRbrack	= cCh ']'
 uppLparen	= cCh '('

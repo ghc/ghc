@@ -23,20 +23,22 @@ import HsSyn		( TyDecl(..), ConDecl(..), BangType(..), HsExpr(..),
 import RnHsSyn		( RenamedTyDecl(..), RenamedConDecl(..),
 			  RnName{-instance Outputable-}
 			)
-import TcHsSyn		( mkHsTyLam, mkHsDictLam, tcIdType, zonkId,
+import TcHsSyn		( mkHsTyLam, mkHsDictLam, tcIdType,
 			  TcHsBinds(..), TcIdOcc(..)
 			)
 import Inst		( newDicts, InstOrigin(..), Inst )
 import TcMonoType	( tcMonoTypeKind, tcMonoType, tcPolyType, tcContext )
+import TcSimplify	( tcSimplifyThetas )
 import TcType		( tcInstTyVars, tcInstType, tcInstId )
 import TcEnv		( tcLookupTyCon, tcLookupTyVar, tcLookupClass,
-			  newLocalId, newLocalIds
+			  newLocalId, newLocalIds, tcLookupClassByKey
 			)
 import TcMonad		hiding ( rnMtoTcM )
 import TcKind		( TcKind, unifyKind, mkTcArrowKind, mkTcTypeKind )
 
-import Class		( GenClass{-instance Eq-} )
-import Id		( mkDataCon, dataConSig, mkRecordSelId,
+import PprType		( GenClass, GenType{-instance Outputable-} )
+import Class		( GenClass{-instance Eq-}, classInstEnv )
+import Id		( mkDataCon, dataConSig, mkRecordSelId, idType,
 			  dataConFieldLabels, dataConStrictMarks,
 			  StrictnessMark(..),
 			  GenId{-instance NamedThing-}
@@ -47,18 +49,21 @@ import SpecEnv		( SpecEnv(..), nullSpecEnv )
 import Name		( nameSrcLoc, isLocallyDefinedName, getSrcLoc,
 			  Name{-instance Ord3-}
 			)
+import Outputable	( Outputable(..), interpp'SP )
 import Pretty
 import TyCon		( TyCon, NewOrData(..), mkSynTyCon, mkDataTyCon, isDataTyCon, 
-			  isNewTyCon, tyConDataCons
+			  isNewTyCon, isSynTyCon, tyConDataCons
 			)
-import Type		( typeKind, getTyVar, tyVarsOfTypes, eqTy,
+import Type		( GenType, -- instances
+			  typeKind, getTyVar, tyVarsOfTypes, eqTy, splitSigmaTy,
 			  applyTyCon, mkTyVarTys, mkForAllTys, mkFunTy,
 			  splitFunTy, mkTyVarTy, getTyVar_maybe
 			)
+import PprType		( GenTyVar{-instance Outputable-}{-ToDo:possibly rm-} )
 import TyVar		( tyVarKind, elementOfTyVarSet, GenTyVar{-instance Eq-} )
 import Unique		( Unique {- instance Eq -}, evalClassKey )
 import UniqSet		( emptyUniqSet, mkUniqSet, uniqSetToList, unionManyUniqSets, UniqSet(..) )
-import Util		( equivClasses, zipEqual, panic, assertPanic )
+import Util		( equivClasses, zipEqual, nOfThem, panic, assertPanic )
 \end{code}
 
 \begin{code}
@@ -162,8 +167,15 @@ Generating constructor/selector bindings for data declarations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 \begin{code}
-mkDataBinds :: TyCon -> TcM s ([Id], TcHsBinds s)
-mkDataBinds tycon
+mkDataBinds :: [TyCon] -> TcM s ([Id], TcHsBinds s)
+mkDataBinds [] = returnTc ([], EmptyBinds)
+mkDataBinds (tycon : tycons) 
+  | isSynTyCon tycon = mkDataBinds tycons
+  | otherwise	     = mkDataBinds_one tycon	`thenTc` \ (ids1, b1) ->
+		       mkDataBinds tycons	`thenTc` \ (ids2, b2) ->
+		       returnTc (ids1++ids2, b1 `ThenBinds` b2)
+
+mkDataBinds_one tycon
   = ASSERT( isDataTyCon tycon || isNewTyCon tycon )
     mapAndUnzipTc mkConstructor data_cons		`thenTc` \ (con_ids, con_binds) ->	
     mapAndUnzipTc (mkRecordSelector tycon) groups	`thenTc` \ (sel_ids, sel_binds) ->
@@ -215,48 +227,49 @@ mkConstructor con_id
   = returnTc (con_id, EmptyMonoBinds)
 
   | otherwise	-- It is locally defined
-  = tcInstId con_id			`thenNF_Tc` \ (tyvars, theta, tau) ->
-    newDicts DataDeclOrigin theta	`thenNF_Tc` \ (_, dicts) ->
+  = tcInstId con_id			`thenNF_Tc` \ (tc_tyvars, tc_theta, tc_tau) ->
+    newDicts DataDeclOrigin tc_theta	`thenNF_Tc` \ (_, dicts) ->
     let
-	(arg_tys, result_ty) = splitFunTy tau
-	n_args = length arg_tys
+	(tc_arg_tys, tc_result_ty) = splitFunTy tc_tau
+	n_args = length tc_arg_tys
     in
-    newLocalIds (take n_args (repeat SLIT("con"))) arg_tys
-					`thenNF_Tc` \ args ->
+    newLocalIds (nOfThem n_args SLIT("con")) tc_arg_tys	`thenNF_Tc` \ args ->
 
-	-- Check that all the types of all the strict arguments are in Data.
-	-- This is trivially true of everything except type variables, for
-	-- which we must check the context.
+	-- Check that all the types of all the strict arguments are in Eval
+    tcLookupClassByKey evalClassKey	`thenNF_Tc` \ eval_clas ->
     let
-	strict_marks = dataConStrictMarks con_id
-	strict_args  = [arg | (arg, MarkedStrict) <- args `zipEqual` strict_marks]
-
-	data_tyvars = -- The tyvars in the constructor's context that are arguments 
-		      -- to the Data class
-	              [getTyVar "mkConstructor" ty
-		      | (clas,ty) <- theta, uniqueOf clas == evalClassKey]
-
-	check_data arg = case getTyVar_maybe (tcIdType arg) of
-			   Nothing    -> returnTc ()	-- Not a tyvar, so OK
-			   Just tyvar -> checkTc (tyvar `elem` data_tyvars) (missingDataErr tyvar)
+	(_,theta,tau) = splitSigmaTy (idType con_id)
+	(arg_tys, _)  = splitFunTy tau
+	strict_marks  = dataConStrictMarks con_id
+	eval_theta    = [ (eval_clas,arg_ty) 
+		        | (arg_ty, MarkedStrict) <- zipEqual "strict_args" 
+							arg_tys strict_marks
+			]
     in
-    mapTc check_data strict_args	`thenTc_`
+    tcSimplifyThetas classInstEnv theta eval_theta	`thenTc` \ eval_theta' ->
+    checkTc (null eval_theta')
+	    (missingEvalErr con_id eval_theta')		`thenTc_`
+
 
 	-- Build the data constructor
     let
-	con_rhs = mkHsTyLam tyvars $
+	con_rhs = mkHsTyLam tc_tyvars $
 		  mkHsDictLam dicts $
 		  mk_pat_match args $
-		  mk_case strict_args $
-		  HsCon con_id (mkTyVarTys tyvars) (map HsVar args)
+		  mk_case (zipEqual "strict_args" args strict_marks) $
+		  HsCon con_id (mkTyVarTys tc_tyvars) (map HsVar args)
 
 	mk_pat_match []         body = body
-	mk_pat_match (arg:args) body = HsLam (PatMatch (VarPat arg) (SimpleMatch (mk_pat_match args body)))
+	mk_pat_match (arg:args) body = HsLam $
+				       PatMatch (VarPat arg) $
+				       SimpleMatch (mk_pat_match args body)
 
 	mk_case [] body = body
-	mk_case (arg:args) body = HsCase (HsVar arg) 
-					 [PatMatch (VarPat arg) (SimpleMatch (mk_case args body))]
-					 src_loc
+	mk_case ((arg,MarkedStrict):args) body = HsCase (HsVar arg) 
+							 [PatMatch (VarPat arg) $
+						          SimpleMatch (mk_case args body)]
+							 src_loc
+	mk_case (_:args) body = mk_case args body
 
 	src_loc = nameSrcLoc (getName con_id)
     in
@@ -367,8 +380,7 @@ tcConDecl tycon tyvars ctxt (RecConDecl name fields src_loc)
       arg_tys	        = [ty     | (_, ty, _)     <- field_label_infos]
 
       field_labels      = [ mkFieldLabel (getName name) ty tag 
-			  | ((name, ty, _), tag) <- field_label_infos `zip` allFieldLabelTags
-			  ]
+			  | ((name, ty, _), tag) <- field_label_infos `zip` allFieldLabelTags ]
 
       data_con = mkDataCon (getName name)
 			   stricts
@@ -436,6 +448,8 @@ tyNewCtxt tycon_name sty
 fieldTypeMisMatch field_name sty
   = ppSep [ppStr "Declared types differ for field", ppr sty field_name]
 
-missingDataErr tyvar sty
-  = ppStr "Missing `data' (???)" -- ToDo: improve
+missingEvalErr con eval_theta sty
+  = ppCat [ppStr "Missing Eval context for constructor", 
+	   ppQuote (ppr sty con),
+	   ppStr ":", ppr sty eval_theta]
 \end{code}

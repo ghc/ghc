@@ -10,6 +10,7 @@ module TcEnv(
 
 	tcExtendTyConEnv, tcLookupTyCon, tcLookupTyConByKey, 
 	tcExtendClassEnv, tcLookupClass, tcLookupClassByKey,
+	tcGetTyConsAndClasses,
 
 	tcExtendGlobalValEnv, tcExtendLocalValEnv,
 	tcLookupLocalValue, tcLookupLocalValueOK, tcLookupLocalValueByKey, 
@@ -43,7 +44,9 @@ import RnHsSyn		( RnName(..) )
 import Type		( splitForAllTy )
 import Unique		( pprUnique10, pprUnique{-ToDo:rm-} )
 import UniqFM	     
-import Util		( zipWithEqual, zipWith3Equal, zipLazy, panic, pprPanic, pprTrace{-ToDo:rm-} )
+import Util		( zipEqual, zipWithEqual, zipWith3Equal, zipLazy,
+			  panic, pprPanic, pprTrace{-ToDo:rm-}
+			)
 \end{code}
 
 Data type declarations
@@ -87,7 +90,7 @@ tcTyVarScopeGivenKinds names kinds thing_inside
 
 	tcGetEnv				`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
 	let
-	    tve' = addListToUFM tve (names `zip` (kinds `zipLazy` rec_tyvars))
+	    tve' = addListToUFM tve (zipEqual "tcTyVarScopeGivenKinds" names (kinds `zipLazy` rec_tyvars))
 	in
 	tcSetEnv (TcEnv tve' tce ce gve lve gtvs) 
 		 (thing_inside rec_tyvars)	`thenTc` \ result ->
@@ -97,7 +100,7 @@ tcTyVarScopeGivenKinds names kinds thing_inside
 
 		-- Construct the real TyVars
 	let
-	  tyvars	     = zipWithEqual mk_tyvar names kinds'
+	  tyvars	     = zipWithEqual "tcTyVarScopeGivenKinds" mk_tyvar names kinds'
 	  mk_tyvar name kind = mkTyVar name (uniqueOf name) kind
 	in
 	returnTc (tyvars, result)
@@ -124,8 +127,8 @@ tcExtendTyConEnv names_w_arities tycons scope
     tcGetEnv					`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
     let
 	tce' = addListToUFM tce [ (name, (kind, arity, tycon)) 
-				| ((name,arity), (kind,tycon)) <- names_w_arities `zip`
-								  (kinds `zipLazy` tycons)
+				| ((name,arity), (kind,tycon))
+				  <- zipEqual "tcExtendTyConEnv" names_w_arities (kinds `zipLazy` tycons)
 				]
     in
     tcSetEnv (TcEnv tve tce' ce gve lve gtvs) scope	`thenTc` \ result ->
@@ -138,7 +141,7 @@ tcExtendClassEnv names classes scope
   = newKindVars (length names)	`thenNF_Tc` \ kinds ->
     tcGetEnv			`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
     let
-	ce' = addListToUFM ce (names `zip` (kinds `zipLazy` classes))
+	ce' = addListToUFM ce (zipEqual "tcExtendClassEnv" names (kinds `zipLazy` classes))
     in
     tcSetEnv (TcEnv tve tce ce' gve lve gtvs) scope	`thenTc` \ result ->
     mapNF_Tc tcDefaultKind kinds			`thenNF_Tc_`
@@ -184,6 +187,12 @@ tcLookupClassByKey uniq
 				uniq
     in
     returnNF_Tc clas
+
+tcGetTyConsAndClasses :: NF_TcM s ([TyCon], [Class])
+tcGetTyConsAndClasses
+  = tcGetEnv		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
+    returnNF_Tc ([tc | (_, _, tc) <- eltsUFM tce],
+	         [c  | (_, c)     <- eltsUFM ce])
 \end{code}
 
 
@@ -202,7 +211,7 @@ tcExtendLocalValEnv names ids scope
   = tcGetEnv		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
     tcReadMutVar gtvs	`thenNF_Tc` \ global_tvs ->
     let
-	lve' = addListToUFM lve (names `zip` ids)
+	lve' = addListToUFM lve (zipEqual "tcExtendLocalValEnv" names ids)
 	extra_global_tyvars = tyVarsOfTypes (map idType ids)
 	new_global_tyvars   = global_tvs `unionTyVarSets` extra_global_tyvars
     in
@@ -281,7 +290,7 @@ newMonoIds names kind m
   = newTyVarTys no_of_names kind	`thenNF_Tc` \ tys ->
     tcGetUniques no_of_names		`thenNF_Tc` \ uniqs ->
     let
-	new_ids = zipWith3Equal mk_id names uniqs tys
+	new_ids = zipWith3Equal "newMonoIds" mk_id names uniqs tys
 
 	mk_id name uniq ty
 	  = let
@@ -304,7 +313,7 @@ newLocalIds names tys
   = tcGetSrcLoc			`thenNF_Tc` \ loc ->
     tcGetUniques (length names) `thenNF_Tc` \ uniqs ->
     let
-	new_ids            = zipWith3Equal mk_id names uniqs tys
+	new_ids            = zipWith3Equal "newLocalIds" mk_id names uniqs tys
 	mk_id name uniq ty = TcId (mkUserLocal name uniq ty loc)
     in
     returnNF_Tc new_ids

@@ -81,7 +81,7 @@ import Type		( GenType(..),  ThetaType(..), mkTyVarTys,
 import TyVar		( GenTyVar, mkTyVarSet )
 import TysWiredIn	( stringTy )
 import Unique		( Unique )
-import Util		( panic )
+import Util		( zipEqual, panic )
 \end{code}
 
 Typechecking instance declarations is done in two passes. The first
@@ -244,7 +244,7 @@ tcInstDecl1 mod_name
     else
 
 	-- Make the dfun id and constant-method ids
-    mkInstanceRelatedIds from_here inst_mod pragmas
+    mkInstanceRelatedIds from_here src_loc inst_mod pragmas
 		         clas inst_tyvars inst_tau inst_theta uprags
 					`thenTc` \ (dfun_id, dfun_theta, const_meth_ids) ->
 
@@ -366,7 +366,7 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
     tcInstTheta tenv dfun_theta		`thenNF_Tc` \ dfun_theta' ->
     tcInstTheta tenv inst_decl_theta	`thenNF_Tc` \ inst_decl_theta' ->
     let
-	sc_theta'        = super_classes `zip` (repeat inst_ty')
+	sc_theta'        = super_classes `zip` repeat inst_ty'
  	origin    	 = InstanceDeclOrigin
 	mk_method sel_id = newMethodId sel_id inst_ty' origin locn
     in
@@ -435,8 +435,8 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
 		 inst_tyvars'
 		 dfun_arg_dicts_ids
 		 ((this_dict_id, RealId dfun_id) 
-		  : (meth_ids `zip` (map RealId const_meth_ids)))
-			-- const_meth_ids will often be empty
+		  : (meth_ids `zip` map RealId const_meth_ids))
+			-- NB: const_meth_ids will often be empty
 		 super_binds
 		 (RecBind dict_and_method_binds)
 
@@ -666,11 +666,18 @@ processInstBinds1 clas inst_tyvars avail_insts method_ids mbind
     let
 	tag       = classOpTagByString clas occ
 	method_id = method_ids !! (tag-1)
+    in
 
-	method_ty = tcIdType method_id
+    -- The "method" might be a RealId, when processInstBinds is used by
+    -- TcClassDcls:buildDefaultMethodBinds to make default-method bindings
+    (case method_id of
+	TcId id   -> returnNF_Tc (idType id)
+	RealId id -> tcInstType [] (idType id)
+    )		`thenNF_Tc` \ method_ty ->
+    let
 	(method_tyvars, method_theta, method_tau) = splitSigmaTy method_ty
     in
-    newDicts origin method_theta		`thenNF_Tc` \ (method_dicts,method_dict_ids) ->
+    newDicts origin method_theta	`thenNF_Tc` \ (method_dicts,method_dict_ids) ->
 
     case (method_tyvars, method_dict_ids) of
 
@@ -813,16 +820,19 @@ tcSpecInstSig e ce tce inst_infos inst_mapper (SpecInstSig class_name ty src_loc
 
 	mk_spec_origin clas ty
 	  = InstanceSpecOrigin inst_mapper clas ty src_loc
+	-- I'm VERY SUSPICIOUS ABOUT THIS
+	-- the inst-mapper is in a knot at this point so it's no good
+	-- looking at it in tcSimplify...
     in
     tcSimplifyThetas mk_spec_origin subst_tv_theta
 				`thenTc` \ simpl_tv_theta ->
     let
 	simpl_theta = [ (clas, tv_to_tmpl tv) | (clas, tv) <- simpl_tv_theta ]
 
-	tv_tmpl_map = inst_tv_tys `zipEqual` inst_tmpl_tys
+	tv_tmpl_map   = zipEqual "tcSpecInstSig" inst_tv_tys inst_tmpl_tys
 	tv_to_tmpl tv = assoc "tcSpecInstSig" tv_tmpl_map tv
     in
-    mkInstanceRelatedIds e True{-from here-} mod NoInstancePragmas src_loc
+    mkInstanceRelatedIds e True{-from here-} src_loc mod NoInstancePragmas 
 			 clas inst_tmpls inst_ty simpl_theta uprag
 				`thenTc` \ (dfun_id, dfun_theta, const_meth_ids) ->
 

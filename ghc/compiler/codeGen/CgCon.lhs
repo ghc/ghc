@@ -50,11 +50,10 @@ import Id		( idPrimRep, dataConTag, dataConTyCon,
 			)
 import Literal		( Literal(..) )
 import Maybes		( maybeToBool )
+import PrelInfo		( maybeCharLikeTyCon, maybeIntLikeTyCon )
 import PrimRep		( isFloatingRep, PrimRep(..) )
+import TyCon		( TyCon{-instance Uniquable-} )
 import Util		( isIn, zipWithEqual, panic, assertPanic )
-
-maybeCharLikeTyCon = panic "CgCon.maybeCharLikeTyCon (ToDo)"
-maybeIntLikeTyCon  = panic "CgCon.maybeIntLikeTyCon  (ToDo)"
 \end{code}
 
 %************************************************************************
@@ -438,7 +437,7 @@ cgReturnDataCon con amodes all_zero_size_args live_vars
 
 	      ReturnInRegs regs  ->
 	    	  let
-		      reg_assts = mkAbstractCs (zipWithEqual move_to_reg amodes regs)
+		      reg_assts = mkAbstractCs (zipWithEqual "move_to_reg" move_to_reg amodes regs)
 		      info_lbl  = mkPhantomInfoTableLabel con
 		  in
 		  profCtrC SLIT("RET_NEW_IN_REGS") [mkIntCLit (length amodes)] `thenC`

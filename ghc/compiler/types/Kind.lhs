@@ -58,9 +58,13 @@ UnboxedTypeKind `hasMoreBoxityInfo` UnboxedTypeKind = True
 
 TypeKind	`hasMoreBoxityInfo` TypeKind	    = True
 
-kind1	 	`hasMoreBoxityInfo` kind2    	    = ASSERT( notArrowKind kind1 &&
-							      notArrowKind kind2 )
-						      False
+kind1@(ArrowKind _ _) `hasMoreBoxityInfo` kind2@(ArrowKind _ _) = ASSERT( kind1 == kind2 )
+								  True
+	-- The two kinds can be arrow kinds; for example when unifying
+	-- (m1 Int) and (m2 Int) we end up unifying m1 and m2, which should
+	-- have the same kind.
+
+kind1		`hasMoreBoxityInfo` kind2	    = False
 
 -- Not exported
 notArrowKind (ArrowKind _ _) = False

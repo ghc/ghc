@@ -224,7 +224,7 @@ saTopBind str_env abs_env (Rec pairs)
 		      -- fixpoint returns widened values
       	new_str_env = growAbsValEnvList str_env (binders `zip` str_rhss)
       	new_abs_env = growAbsValEnvList abs_env (binders `zip` abs_rhss)
-	new_binders = zipWith4Equal (addStrictnessInfoToId strflags)
+	new_binders = zipWith4Equal "saTopBind" (addStrictnessInfoToId strflags)
 				    str_rhss abs_rhss binders rhss
     in
     mapSa (saExpr new_str_env new_abs_env) rhss	`thenSa` \ new_rhss ->
@@ -354,7 +354,7 @@ saExpr str_env abs_env (Let (Rec pairs) body)
 --		   deciding that y is absent, which is plain wrong!
 --		It's much easier simply not to do this.
 
-	improved_binders = zipWith4Equal (addStrictnessInfoToId strflags)
+	improved_binders = zipWith4Equal "saExpr" (addStrictnessInfoToId strflags)
 				         str_vals abs_vals binders rhss
 
 	whiter_than_white_binders = launder improved_binders

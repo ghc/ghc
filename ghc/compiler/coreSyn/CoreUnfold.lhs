@@ -47,7 +47,7 @@ import Literal		( isNoRepLit, isLitLitLit )
 import Pretty
 import PrimOp		( primOpCanTriggerGC, PrimOp(..) )
 import TyCon		( tyConFamilySize )
-import Type		( getAppDataTyCon )
+import Type		( getAppDataTyConExpandingDicts )
 import UniqSet		( emptyUniqSet, unitUniqSet, mkUniqSet,
 			  addOneToUniqSet, unionUniqSets
 			)
@@ -342,7 +342,7 @@ sizeExpr scc_s_OK bOMB_OUT_SIZE args expr
 	size_alg_alt (con,args,rhs) = size_up rhs
 	    -- Don't charge for args, so that wrappers look cheap
 
-	(tycon, _, _) = _trace "getAppDataTyCon.CoreUnfold" $ getAppDataTyCon scrut_ty
+	(tycon, _, _) = _trace "CoreUnfold.getAppDataTyConExpandingDicts" $ getAppDataTyConExpandingDicts scrut_ty
 
     size_up_alts _ (PrimAlts alts deflt)
       = foldr (addSize . size_prim_alt) (size_up_deflt deflt) alts

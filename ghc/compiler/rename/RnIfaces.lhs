@@ -7,7 +7,7 @@
 #include "HsVersions.h"
 
 module RnIfaces (
-	findHiFiles,
+--	findHiFiles,
 	cachedIface,
 	cachedDecl,
 	readIface,
@@ -35,14 +35,13 @@ import ParseUtils	( ParsedIface(..), RdrIfaceDecl(..), RdrIfaceInst(..),
 
 import Bag		( emptyBag, unitBag, consBag, snocBag,
 			  unionBags, unionManyBags, isEmptyBag, bagToList )
-import CmdLineOpts	( opt_HiSuffix, opt_SysHiSuffix )
 import ErrUtils		( Error(..), Warning(..) )
 import FiniteMap	( emptyFM, lookupFM, addToFM, addToFM_C, plusFM, eltsFM,
 			  fmToList, delListFromFM, sizeFM, foldFM, unitFM,
 			  plusFM_C, keysFM{-ToDo:rm-}
 			)
 import Maybes		( maybeToBool )
-import Name		( moduleNamePair, origName, isRdrLexCon, RdrName(..) )
+import Name		( moduleNamePair, origName, RdrName(..) )
 import PprStyle		-- ToDo:rm
 import Outputable	-- ToDo:rm
 import PrelInfo		( builtinNameInfo )
@@ -75,6 +74,7 @@ type IfaceCache
 Return a mapping from module-name to
 absolute-filename-for-that-interface.
 \begin{code}
+{- OLD:
 findHiFiles :: [FilePath] -> [FilePath] -> IO (FiniteMap Module FilePath)
 
 findHiFiles dirs sysdirs
@@ -136,6 +136,7 @@ findHiFiles dirs sysdirs
 	else Just cand
       where
 	is_modname_char c = isAlphanum c || c == '_'
+-}
 \end{code}
 
 *********************************************************
@@ -795,9 +796,9 @@ finalIfaceInfo ::
 
 finalIfaceInfo iface_cache modname if_final_env@((qual, unqual, tc_qual, tc_unqual), stack) if_instdecls
   =
-    pprTrace "usageIf:qual:"      (ppCat [ppBesides[ppPStr m,ppChar '.',ppPStr n] | (n,m) <- keysFM qual]) $
+--  pprTrace "usageIf:qual:"      (ppCat [ppBesides[ppPStr m,ppChar '.',ppPStr n] | (n,m) <- keysFM qual]) $
 --  pprTrace "usageIf:unqual:"    (ppCat (map ppPStr (keysFM unqual))) $
-    pprTrace "usageIf:tc_qual:"   (ppCat [ppBesides[ppPStr m,ppChar '.',ppPStr n] | (n,m) <- keysFM tc_qual]) $
+--  pprTrace "usageIf:tc_qual:"   (ppCat [ppBesides[ppPStr m,ppChar '.',ppPStr n] | (n,m) <- keysFM tc_qual]) $
 --  pprTrace "usageIf:tc_unqual:" (ppCat (map ppPStr (keysFM tc_unqual))) $
     let
 	val_stuff@(val_usages, val_versions)

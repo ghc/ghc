@@ -330,9 +330,9 @@ expectedFunErr ty sty
 
 unifyKindErr tyvar ty sty
   = ppHang (ppStr "Compiler bug: kind mis-match between")
-	 4 (ppSep [ppr sty tyvar, ppLparen, ppr sty (tyVarKind tyvar), ppRparen,
+	 4 (ppSep [ppCat [ppr sty tyvar, ppStr "::", ppr sty (tyVarKind tyvar)],
 		   ppStr "and", 
-		   ppr sty ty, ppLparen, ppr sty (typeKind ty), ppRparen])
+		   ppCat [ppr sty ty, ppStr "::", ppr sty (typeKind ty)]])
 
 unifyDontBindErr tyvar ty sty
   = ppHang (ppStr "Couldn't match the *signature/existential* type variable")

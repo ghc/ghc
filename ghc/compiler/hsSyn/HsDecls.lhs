@@ -27,7 +27,7 @@ import Outputable	( interppSP, interpp'SP,
 			)
 import Pretty
 import SrcLoc		( SrcLoc )
-import Util		( cmpList, panic#{-ToDo:rm eventually-} )
+import Util		( panic#{-ToDo:rm eventually-} )
 \end{code}
 
 %************************************************************************

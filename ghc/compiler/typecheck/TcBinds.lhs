@@ -43,7 +43,7 @@ import RnHsSyn		( RnName )	-- instances
 import Type		( mkTyVarTy, mkTyVarTys, isTyVarTy,
 			  mkSigmaTy, splitSigmaTy,
 			  splitRhoTy, mkForAllTy, splitForAllTy )
-import Util		( isIn, panic )
+import Util		( isIn, zipEqual, panic )
 \end{code}
 
 %************************************************************************
@@ -267,7 +267,7 @@ data SigInfo
 
 	more_sig_infos = [ SigInfo binder (mk_poly binder local_id) 
 				   local_id tys_to_gen dicts_to_gen lie_to_gen
-			 | (binder, local_id) <- nosig_binders `zipEqual` nosig_local_ids
+			 | (binder, local_id) <- zipEqual "???" nosig_binders nosig_local_ids
 			 ]
 
 	all_sig_infos = sig_infos ++ more_sig_infos	-- Contains a "signature" for each binder
@@ -296,7 +296,7 @@ data SigInfo
 				    `thenTc` \ (lie_free, dict_binds) ->
 	  returnTc (AbsBind tyvars_to_gen_here
 			    dicts
-			    (local_ids `zipEqual` poly_ids)
+			    (zipEqual "gen_bind" local_ids poly_ids)
 			    (dict_binds ++ local_binds)
 			    bind,
 		    lie_free)

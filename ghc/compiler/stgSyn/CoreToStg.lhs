@@ -37,7 +37,7 @@ import PrelInfo		( unpackCStringId, unpackCString2Id, stringTy,
 import PrimOp		( PrimOp(..) )
 import SpecUtils	( mkSpecialisedCon )
 import SrcLoc		( mkUnknownSrcLoc )
-import Type		( getAppDataTyCon )
+import Type		( getAppDataTyConExpandingDicts )
 import UniqSupply	-- all of it, really
 import Util		( panic )
 
@@ -543,7 +543,7 @@ coreExprToStg env (Case discrim alts)
     )
   where
     discrim_ty		    = coreExprType discrim
-    (_, discrim_ty_args, _) = getAppDataTyCon discrim_ty
+    (_, discrim_ty_args, _) = getAppDataTyConExpandingDicts discrim_ty
 
     alts_to_stg discrim (AlgAlts alts deflt)
       = default_to_stg discrim deflt		`thenUs` \ (stg_deflt, deflt_binds) ->

@@ -310,9 +310,9 @@ instance Outputable Reg where
     ppr sty r = ppStr (show r)
 #endif
 
-cmpReg (FixedReg i) (FixedReg i') = cmp_ihash i i'
-cmpReg (MappedReg i) (MappedReg i') = cmp_ihash i i'
-cmpReg (MemoryReg i _) (MemoryReg i' _) = cmp_i i i'
+cmpReg (FixedReg i)      (FixedReg i')      = cmp_ihash i i'
+cmpReg (MappedReg i)     (MappedReg i')     = cmp_ihash i i'
+cmpReg (MemoryReg i _)   (MemoryReg i' _)   = cmp_i i i'
 cmpReg (UnmappedReg u _) (UnmappedReg u' _) = cmp u u'
 cmpReg r1 r2
   = let tag1 = tagReg r1

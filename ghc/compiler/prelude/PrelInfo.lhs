@@ -68,6 +68,7 @@ module PrelInfo (
 	intPrimTy, intTy, intPrimTyCon, intTyCon, intDataCon,
 	wordPrimTyCon, wordPrimTy, wordTy, wordTyCon, wordDataCon,
 	addrPrimTyCon, addrPrimTy, addrTy, addrTyCon, addrDataCon,
+	maybeIntLikeTyCon, maybeCharLikeTyCon,
 
 	-- types: Integer, Rational (= Ratio Integer)
 	integerTy, rationalTy,
@@ -412,13 +413,15 @@ class_keys
     , (SLIT("Floating"),	floatingClassKey)	-- numeric
     , (SLIT("RealFrac"),	realFracClassKey)	-- numeric
     , (SLIT("RealFloat"),	realFloatClassKey)	-- numeric
---  , (SLIT("Ix"),		ixClassKey)
+--  , (SLIT("Ix"),		ixClassKey)		-- derivable (but it isn't Prelude.Ix; hmmm)
     , (SLIT("Bounded"),		boundedClassKey)	-- derivable
     , (SLIT("Enum"),		enumClassKey)		-- derivable
     , (SLIT("Show"),		showClassKey)		-- derivable
     , (SLIT("Read"),		readClassKey)		-- derivable
     , (SLIT("Monad"),		monadClassKey)
     , (SLIT("MonadZero"),	monadZeroClassKey)
+    , (SLIT("MonadPlus"),	monadPlusClassKey)
+    , (SLIT("Functor"),		functorClassKey)
     , (SLIT("CCallable"),	cCallableClassKey)	-- mentioned, ccallish
     , (SLIT("CReturnable"), 	cReturnableClassKey)	-- mentioned, ccallish
     ]]
@@ -434,4 +437,10 @@ class_op_keys
     , (SLIT("enumFromThenTo"),	enumFromThenToClassOpKey)
     , (SLIT("=="),		eqClassOpKey)
     ]]
+\end{code}
+
+ToDo: make it do the ``like'' part properly (as in 0.26 and before).
+\begin{code}
+maybeCharLikeTyCon tc = if (uniqueOf tc == charDataConKey) then Just charDataCon else Nothing
+maybeIntLikeTyCon  tc = if (uniqueOf tc == intDataConKey)  then Just intDataCon  else Nothing
 \end{code}

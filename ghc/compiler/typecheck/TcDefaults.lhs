@@ -47,8 +47,8 @@ tcDefaults [DefaultDecl mono_tys locn]
 	    -- We only care about whether it worked or not
 
 	tcLookupClassByKey numClassKey			`thenNF_Tc` \ num ->
-	tcSimplifyCheckThetas DefaultDeclOrigin
-		[ (num, ty) | ty <- tau_tys ]		`thenTc` \ _ ->
+	tcSimplifyCheckThetas
+		[ (num, ty) | ty <- tau_tys ]		`thenTc_`
 
 	returnTc tau_tys
 

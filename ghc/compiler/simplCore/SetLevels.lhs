@@ -47,7 +47,7 @@ import UniqSupply	( thenUs, returnUs, mapUs, mapAndUnzipUs,
 			  mapAndUnzip3Us, getUnique, UniqSM(..)
 			)
 import Usage		( UVar(..) )
-import Util		( mapAccumL, zipWithEqual, panic, assertPanic )
+import Util		( mapAccumL, zipWithEqual, zipEqual, panic, assertPanic )
 
 isLeakFreeType x y = False -- safe option; ToDo
 \end{code}
@@ -214,7 +214,7 @@ lvlBind ctxt_lvl envs@(venv, tenv) (AnnRec pairs)
 	binders_w_lvls = binders `zip` repeat final_lvl
 	new_envs       = (growIdEnvList venv binders_w_lvls, tenv)
     in
-    returnLvl (extra_binds ++ [Rec (binders_w_lvls `zip` rhss')], new_envs)
+    returnLvl (extra_binds ++ [Rec (zipEqual "lvlBind" binders_w_lvls rhss')], new_envs)
   where
     (binders,rhss) = unzip pairs
 \end{code}
@@ -568,11 +568,11 @@ type lambdas.
 \begin{code}
 decideRecFloatLevel ctxt_lvl envs@(venv, tenv) ids rhss
   | isTopMajLvl ids_only_lvl   &&		-- Destination = top
-    not (all canFloatToTop (tys `zip` rhss))	-- Some can't float to top
+    not (all canFloatToTop (zipEqual "decideRec" tys rhss)) -- Some can't float to top
   = 	-- Pin it here
     let
 	ids_w_lvls = ids `zip` repeat ctxt_lvl
-	new_envs       = (growIdEnvList venv ids_w_lvls, tenv)
+	new_envs   = (growIdEnvList venv ids_w_lvls, tenv)
     in
     mapLvl (lvlExpr ctxt_lvl new_envs) rhss	`thenLvl` \ rhss' ->
     returnLvl (ctxt_lvl, [], rhss')
@@ -605,20 +605,20 @@ decideRecFloatLevel ctxt_lvl envs@(venv, tenv) ids rhss
     mapLvl (lvlExpr incd_lvl new_envs) rhss	`thenLvl` \ rhss' ->
     mapLvl newLvlVar poly_tys			`thenLvl` \ poly_vars ->
     let
-	ids_w_poly_vars = ids `zip` poly_vars
+	ids_w_poly_vars = zipEqual "decideRec2" ids poly_vars
 
 		-- The "d_rhss" are the right-hand sides of "D" and "D'"
 		-- in the documentation above
 	d_rhss = [ mkTyApp (Var poly_var) offending_tyvar_tys | poly_var <- poly_vars]
 
 		-- "local_binds" are "D'" in the documentation above
-	local_binds = zipWithEqual NonRec ids_w_incd_lvl d_rhss
+	local_binds = zipWithEqual "SetLevels" NonRec ids_w_incd_lvl d_rhss
 
 	poly_var_rhss = [ mkTyLam offending_tyvars (foldr Let rhs' local_binds)
 			| rhs' <- rhss'	-- mkCoLet* requires Core...
 			]
 
-	poly_binds  = [(poly_var, ids_only_lvl) | poly_var <- poly_vars] `zip` poly_var_rhss
+	poly_binds  = zipEqual "poly_binds" [(poly_var, ids_only_lvl) | poly_var <- poly_vars] poly_var_rhss
 
     in
     returnLvl (ctxt_lvl, [Rec poly_binds], d_rhss)

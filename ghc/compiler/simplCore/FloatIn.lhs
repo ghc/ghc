@@ -25,7 +25,7 @@ import FreeVars
 import Id		( emptyIdSet, unionIdSets, unionManyIdSets,
 			  elementOfIdSet, IdSet(..)
 			)
-import Util		( panic )
+import Util		( nOfThem, panic, zipEqual )
 \end{code}
 
 Top-level interface function, @floatInwards@.  Note that we do not
@@ -268,7 +268,7 @@ fiExpr to_drop (_,AnnLet (AnnRec bindings) body)
 	    -> [(Id, CoreExpr)]
 
     fi_bind to_drops pairs
-      = [ (binder, fiExpr to_drop rhs) | ((binder, rhs), to_drop) <- zip pairs to_drops ]
+      = [ (binder, fiExpr to_drop rhs) | ((binder, rhs), to_drop) <- zipEqual "fi_bind" pairs to_drops ]
 \end{code}
 
 For @Case@, the possible ``drop points'' for the \tr{to_drop}
@@ -303,13 +303,13 @@ fiExpr to_drop (_, AnnCase scrut alts)
     fi_alts to_drop_deflt to_drop_alts (AnnAlgAlts alts deflt)
       = AlgAlts
 	    [ (con, params, fiExpr to_drop rhs)
-	    | ((con, params, rhs), to_drop) <- alts `zip` to_drop_alts ]
+	    | ((con, params, rhs), to_drop) <- zipEqual "fi_alts" alts to_drop_alts ]
 	    (fi_default to_drop_deflt deflt)
 
     fi_alts to_drop_deflt to_drop_alts (AnnPrimAlts alts deflt)
       = PrimAlts
 	    [ (lit, fiExpr to_drop rhs)
-	    | ((lit, rhs), to_drop) <- alts `zip` to_drop_alts ]
+	    | ((lit, rhs), to_drop) <- zipEqual "fi_alts2" alts to_drop_alts ]
 	    (fi_default to_drop_deflt deflt)
 
     fi_default to_drop AnnNoDefault	      = NoDefault
@@ -354,8 +354,7 @@ sepBindsByDropPoint drop_pts floaters
 	(per_drop_pt, must_stay_here, _)
 	    --= sep drop_pts emptyIdSet{-fvs of prev drop_pts-} floaters
 	    = split' drop_pts floaters [] empty_boxes
-	empty_boxes = take (length drop_pts) (repeat [])
-
+	empty_boxes = nOfThem (length drop_pts) []
     in
     (map reverse per_drop_pt, reverse must_stay_here)
   where

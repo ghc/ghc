@@ -61,15 +61,12 @@ import PrimRep		( getPrimRepSize, isFollowableRep, retPrimRepSize,
 			)
 import TyCon		( isEnumerationTyCon )
 import Type		( typePrimRep,
-			  getDataSpecTyCon, getDataSpecTyCon_maybe,
+			  getAppSpecDataTyConExpandingDicts, maybeAppSpecDataTyConExpandingDicts,
 			  isEnumerationTyCon
 			)
 import Util		( sortLt, isIn, isn'tIn, zipEqual,
 			  pprError, panic, assertPanic
 			)
-
-getDataSpecTyCon = panic "CgCase.getDataSpecTyCon (ToDo)"
-getDataSpecTyCon_maybe = panic "CgCase.getDataSpecTyCon_maybe (ToDo)"
 \end{code}
 
 \begin{code}
@@ -385,7 +382,7 @@ getPrimAppResultAmodes uniq (StgAlgAlts ty alts (StgBindDefault _ True {- used -
     -- A temporary variable to hold the tag; this is unaffected by GC because
     -- the heap-checks in the branches occur after the switch
     tag_amode     = CTemp uniq IntRep
-    (spec_tycon, _, _) = getDataSpecTyCon ty
+    (spec_tycon, _, _) = getAppSpecDataTyConExpandingDicts ty
 
 getPrimAppResultAmodes uniq (StgAlgAlts ty alts other_default)
 	-- Default is either StgNoDefault or StgBindDefault with unused binder
@@ -451,7 +448,7 @@ cgEvalAlts cc_slot uniq (StgAlgAlts ty alts deflt)
 	-- which is worse than having the alt code in the switch statement
 
     let
-	(spec_tycon, _, _) = getDataSpecTyCon ty
+	(spec_tycon, _, _) = getAppSpecDataTyConExpandingDicts ty
 
 	use_labelled_alts
 	  = case ctrlReturnConvAlg spec_tycon of
@@ -588,7 +585,7 @@ cgAlgAlts gc_flag uniq restore_cc semi_tagging
     default_join_lbl = mkDefaultLabel uniq
     jump_instruction = CJump (CLbl default_join_lbl CodePtrRep)
 
-    (spec_tycon, _, spec_cons) = getDataSpecTyCon ty
+    (spec_tycon, _, spec_cons) = getAppSpecDataTyConExpandingDicts ty
 
     alt_cons = [ con | (con,_,_,_) <- alts ]
 
@@ -714,7 +711,7 @@ cgAlgAltRhs gc_flag con args use_mask rhs
       (live_regs, node_reqd)
 	= case (dataReturnConvAlg con) of
 	    ReturnInHeap      -> ([],						  True)
-	    ReturnInRegs regs -> ([reg | (reg,True) <- regs `zipEqual` use_mask], False)
+	    ReturnInRegs regs -> ([reg | (reg,True) <- zipEqual "cgAlgAltRhs" regs use_mask], False)
 				-- Pick the live registers using the use_mask
 				-- Doing so is IMPORTANT, because with semi-tagging
 				-- enabled only the live registers will have valid
@@ -1053,7 +1050,7 @@ mkReturnVector uniq ty tagged_alt_absCs deflt_absC
     -- )
   where
 
-    (spec_tycon,_,_) = case (getDataSpecTyCon_maybe ty) of -- *must* be a real "data" type constructor
+    (spec_tycon,_,_) = case (maybeAppSpecDataTyConExpandingDicts ty) of -- *must* be a real "data" type constructor
 	      Just xx -> xx
 	      Nothing -> pprError "ERROR: can't generate code for polymorphic case;\nprobably a mis-use of `seq' or `par';\nthe User's Guide has more details.\nOffending type: " (ppr PprDebug ty)
 

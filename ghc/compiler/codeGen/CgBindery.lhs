@@ -340,7 +340,7 @@ bindNewToLit name lit
 
 bindArgsToRegs :: [Id] -> [MagicId] -> Code
 bindArgsToRegs args regs
-  = listCs (zipWithEqual bind args regs)
+  = listCs (zipWithEqual "bindArgsToRegs" bind args regs)
   where
     arg `bind` reg = bindNewToReg arg reg mkLFArgument
 \end{code}

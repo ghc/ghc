@@ -59,7 +59,7 @@ maybeFBtoFB (Nothing) = IsNotFB
 
 addArgs :: Int -> OurFBType -> OurFBType
 addArgs n (IsFB (FBType args prod))
-	= IsFB (FBType (take n (repeat FBBadConsum) ++ args) prod)
+	= IsFB (FBType (nOfThem n FBBadConsum ++ args) prod)
 addArgs n IsNotFB = IsNotFB
 addArgs n IsCons = panic "adding argument to a cons"
 addArgs n IsBottom = IsNotFB
@@ -74,7 +74,7 @@ joinFBType :: OurFBType -> OurFBType -> OurFBType
 joinFBType (IsBottom) a = a
 joinFBType a (IsBottom) = a
 joinFBType (IsFB (FBType args prod)) (IsFB (FBType args' prod'))
-	| length args == length args' = (IsFB (FBType (zipWith argJ args args')
+	| length args == length args' = (IsFB (FBType (zipWith{-Equal-} argJ args args')
 						      (prodJ prod prod')))
    where
 	argJ FBGoodConsum FBGoodConsum = FBGoodConsum

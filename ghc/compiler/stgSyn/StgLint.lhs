@@ -27,14 +27,13 @@ import PprType		( GenType{-instance Outputable-}, TyCon )
 import Pretty		-- quite a bit of it
 import PrimOp		( primOpType )
 import SrcLoc		( SrcLoc{-instance Outputable-} )
-import Type		( mkFunTys, splitFunTy, maybeAppDataTyCon,
-			  isTyVarTy, eqTy
+import Type		( mkFunTys, splitFunTy, maybeAppDataTyConExpandingDicts,
+			  isTyVarTy, eqTy, splitFunTyExpandingDicts
 			)
 import Util		( zipEqual, pprPanic, panic, panic# )
 
 infixr 9 `thenL`, `thenL_`, `thenMaybeL`, `thenMaybeL_`
 
-splitTypeWithDictsAsArgs = panic "StgLint.splitTypeWithDictsAsArgs (ToDo)"
 unDictifyTy = panic "StgLint.unDictifyTy (ToDo)"
 \end{code}
 
@@ -180,7 +179,7 @@ lintStgExpr e@(StgCase scrut _ _ _ alts)
   = lintStgExpr scrut		`thenMaybeL` \ _ ->
 
 	-- Check that it is a data type
-    case maybeAppDataTyCon scrut_ty of
+    case (maybeAppDataTyConExpandingDicts scrut_ty) of
       Nothing -> addErrL (mkCaseDataConMsg e)	`thenL_`
 		 returnL Nothing
       Just (tycon, _, _)
@@ -220,7 +219,7 @@ lintStgAlts alts scrut_ty case_tycon
 	  check ty = checkTys first_ty ty (mkCaseAltMsg alts)
 
 lintAlgAlt scrut_ty (con, args, _, rhs)
-  = (case maybeAppDataTyCon scrut_ty of
+  = (case maybeAppDataTyConExpandingDicts scrut_ty of
       Nothing ->
 	 addErrL (mkAlgAltMsg1 scrut_ty)
       Just (tycon, tys_applied, cons) ->
@@ -230,7 +229,7 @@ lintAlgAlt scrut_ty (con, args, _, rhs)
 	 checkL (con `elem` cons) (mkAlgAltMsg2 scrut_ty con) `thenL_`
 	 checkL (length arg_tys == length args) (mkAlgAltMsg3 con args)
 								 `thenL_`
-	 mapL check (arg_tys `zipEqual` args)			 `thenL_`
+	 mapL check (zipEqual "lintAlgAlt:stg" arg_tys args)	 `thenL_`
 	 returnL ()
     )								 `thenL_`
     addInScopeVars args 	(
@@ -397,7 +396,7 @@ checkFunApp :: Type 		-- The function type
 checkFunApp fun_ty arg_tys msg loc scope errs
   = cfa res_ty expected_arg_tys arg_tys
   where
-    (_, expected_arg_tys, res_ty) = splitTypeWithDictsAsArgs fun_ty
+    (expected_arg_tys, res_ty) = splitFunTyExpandingDicts fun_ty
 
     cfa res_ty expected []	-- Args have run out; that's fine
       = (Just (mkFunTys expected res_ty), errs)
@@ -523,13 +522,12 @@ pp_expr sty expr = ppr sty expr
 
 sleazy_eq_ty ty1 ty2
 	-- NB: probably severe overkill (WDP 95/04)
-  = case (splitTypeWithDictsAsArgs ty1) of { (_,tyargs1,tyres1) ->
-    case (splitTypeWithDictsAsArgs ty2) of { (_,tyargs2,tyres2) ->
+  = _trace "StgLint.sleazy_eq_ty:use eqSimplTy?" $
+    case (splitFunTyExpandingDicts ty1) of { (tyargs1,tyres1) ->
+    case (splitFunTyExpandingDicts ty2) of { (tyargs2,tyres2) ->
     let
 	ty11 = mkFunTys tyargs1 tyres1
 	ty22 = mkFunTys tyargs2 tyres2
     in
-    trace "StgLint.sleazy_cmp_ty" $
-    ty11 `eqTy` ty22
-    }}
+    ty11 `eqTy` ty22 }}
 \end{code}

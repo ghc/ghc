@@ -9,7 +9,7 @@
 module ErrUtils (
 	Error(..), Warning(..), Message(..),
 	addErrLoc,
-	addShortErrLocLine,
+	addShortErrLocLine, addShortWarnLocLine,
 	dontAddErrLoc,
 	pprBagOfErrors,
 	ghcExit
@@ -35,9 +35,14 @@ addErrLoc locn title rest_of_err_msg sty
 		       ppChar ':'])
     	 4 (rest_of_err_msg sty)
 
-addShortErrLocLine :: SrcLoc -> Error -> Error
+addShortErrLocLine, addShortWarnLocLine :: SrcLoc -> Error -> Error
+
 addShortErrLocLine locn rest_of_err_msg sty
   = ppHang (ppBeside (ppr PprForUser locn) (ppChar ':'))
+	 4 (rest_of_err_msg sty)
+
+addShortWarnLocLine locn rest_of_err_msg sty
+  = ppHang (ppBeside (ppr PprForUser locn) (ppPStr SLIT(":warning:")))
 	 4 (rest_of_err_msg sty)
 
 dontAddErrLoc :: String -> Error -> Error

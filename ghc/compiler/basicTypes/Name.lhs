@@ -12,7 +12,7 @@ module Name (
 	RdrName(..),
 	isUnqual,
 	isQual,
-	isRdrLexCon,
+	isRdrLexCon, isRdrLexConOrSpecial,
 	appendRdr,
 	showRdr,
 	cmpRdr,
@@ -22,7 +22,7 @@ module Name (
 	mkLocalName, isLocalName, 
 	mkTopLevName, mkImportedName,
 	mkImplicitName,	isImplicitName,
-	mkBuiltinName, mkCompoundName,
+	mkBuiltinName, mkCompoundName, mkCompoundName2,
 
 	mkFunTyConName, mkTupleDataConName, mkTupleTyConName,
 	mkTupNameStr,
@@ -31,7 +31,7 @@ module Name (
 	ExportFlag(..),
 	isExported{-overloaded-}, exportFlagOn{-not-},
 
-	nameUnique,
+	nameUnique, changeUnique,
 	nameOccName,
 	nameOrigName,
 	nameExportFlag,
@@ -88,6 +88,9 @@ isQual (Qual _ _) = True
 isRdrLexCon (Unqual n) = isLexCon n
 isRdrLexCon (Qual m n) = isLexCon n
 
+isRdrLexConOrSpecial (Unqual n) = isLexCon n || isLexSpecialSym n
+isRdrLexConOrSpecial (Qual m n) = isLexCon n || isLexSpecialSym n
+
 appendRdr (Unqual n) str = Unqual (n _APPEND_ str)
 appendRdr (Qual m n) str = ASSERT(not (fromPrelude m))
 			   Qual m (n _APPEND_ str)
@@ -95,7 +98,7 @@ appendRdr (Qual m n) str = ASSERT(not (fromPrelude m))
 cmpRdr (Unqual n1)  (Unqual n2)  = _CMP_STRING_ n1 n2
 cmpRdr (Unqual n1)  (Qual m2 n2) = LT_
 cmpRdr (Qual m1 n1) (Unqual n2)  = GT_
-cmpRdr (Qual m1 n1) (Qual m2 n2) = thenCmp (_CMP_STRING_ m1 m2) (_CMP_STRING_ n1 n2) 
+cmpRdr (Qual m1 n1) (Qual m2 n2) = _CMP_STRING_ m1 m2 `thenCmp` _CMP_STRING_ n1 n2
 
 instance Eq RdrName where
     a == b = case (a `cmp` b) of { EQ_ -> True;  _ -> False }
@@ -174,15 +177,36 @@ mkImplicitName :: Unique -> RdrName -> Name
 mkImplicitName u o = Global u o Implicit NotExported []
 
 mkBuiltinName :: Unique -> Module -> FAST_STRING -> Name
-mkBuiltinName u m n = Global u (Unqual n) Builtin NotExported []
+mkBuiltinName u m{-NB: unused(?)-} n = Global u (Unqual n) Builtin NotExported []
 
-mkCompoundName :: Unique -> [FAST_STRING] -> Name
-mkCompoundName u ns
-  = Global u (Unqual{-???-} (_CONCAT_ (dotify ns))) Builtin{--} NotExported []
-  where
-    dotify []  = []
-    dotify [n] = [n]
-    dotify (n:ns) = n : (map (_CONS_ '.') ns)
+mkCompoundName :: Unique
+	       -> FAST_STRING	-- indicates what kind of compound thing it is (e.g., "sdsel")
+	       -> [RdrName]	-- "dot" these names together
+	       -> Name		-- from which we get provenance, etc....
+	       -> Name		-- result!
+
+mkCompoundName u str ns (Local _ _ _) = panic "mkCompoundName:Local?"
+mkCompoundName u str ns (Global _ _ prov exp _)
+  = Global u (Unqual{-???-} (_CONCAT_ (glue ns [str]))) prov exp []
+
+glue []            acc = reverse acc
+glue (Unqual n:ns) acc = glue ns (_CONS_ '.' n : acc)
+glue (Qual m n:ns) acc = glue ns (_CONS_ '.' n : _CONS_ '.' m : acc)
+
+-- this ugly one is used for instance-y things
+mkCompoundName2 :: Unique
+	       -> FAST_STRING	-- indicates what kind of compound thing it is (e.g., "sdsel")
+	       -> [RdrName]	-- "dot" these names together
+	       -> [FAST_STRING] -- type-name strings
+	       -> Bool		-- True <=> defined in this module
+	       -> SrcLoc	
+	       -> Name		-- result!
+
+mkCompoundName2 u str ns ty_strs from_here locn
+  = Global u (Unqual{-???-} ((_CONCAT_ (glue ns [str])) _APPEND_ (_CONS_ '.' (_CONCAT_ ty_strs))))
+	     (if from_here then LocalDef locn else Imported ExportAll locn [])
+	     ExportAll{-instances-}
+	     []
 
 mkFunTyConName
   = mkBuiltinName funTyConKey		       pRELUDE_BUILTIN SLIT("->")
@@ -261,6 +285,13 @@ instance NamedThing Name where
 nameUnique (Local    u _ _)     = u
 nameUnique (Global   u _ _ _ _) = u
 
+-- when we renumber/rename things, we need to be
+-- able to change a Name's Unique to match the cached
+-- one in the thing it's the name of.  If you know what I mean.
+changeUnique (Local      _ n l)      u = Local u n l
+changeUnique n@(Global   _ o p e os) u = ASSERT(not (isBuiltinName n))
+					 Global u o p e os
+
 nameOrigName (Local    _ n _)	     = Unqual n
 nameOrigName (Global   _ orig _ _ _) = orig
 
@@ -302,18 +333,15 @@ isPreludeDefinedName (Global   _ orig _ _ _) = isUnqual orig
 
 \begin{code}
 instance Outputable Name where
-#ifdef DEBUG
-    ppr PprDebug (Local    u n _)     = pp_debug u (ppPStr n)
-    ppr PprDebug (Global   u o _ _ _) = pp_debug u (ppr PprDebug o)
-#endif
-    ppr sty        (Local    u n _)             = pp_name sty n
+    ppr sty (Local u n _)
+      | codeStyle sty = pprUnique u
+      | otherwise     = ppBesides [pprUnique u, ppStr "{-", ppPStr n, ppStr "-}"]
+
+    ppr PprDebug   (Global   u o _ _ _)		= ppBesides [ppr PprDebug o, ppStr "{-", pprUnique u, ppStr "-}"]
     ppr PprForUser (Global   u o _ _ []  )      = ppr PprForUser o
     ppr PprForUser (Global   u o _ _ occs)      = ppr PprForUser (head occs)
     ppr PprShowAll (Global   u o prov exp occs) = pp_all o prov exp occs
     ppr sty        (Global   u o _ _ _)         = ppr sty o
-
-pp_debug uniq thing
-  = ppBesides [thing, ppStr "{-", pprUnique uniq, ppStr "-}" ]
 
 pp_all orig prov exp occs
   = ppBesides [ppr PprShowAll orig, ppr PprShowAll occs, pp_prov prov, pp_exp exp]

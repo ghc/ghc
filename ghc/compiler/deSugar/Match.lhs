@@ -41,7 +41,7 @@ import PrelInfo		( nilDataCon, consDataCon, mkTupleTy, mkListTy,
 			  wordTy, wordPrimTy, wordDataCon,
 			  pAT_ERROR_ID
 			)
-import Type		( isPrimType, eqTy, getAppDataTyCon,
+import Type		( isPrimType, eqTy, getAppDataTyConExpandingDicts,
 			  instantiateTauTy
 			)
 import TyVar		( GenTyVar{-instance Eq-} )
@@ -334,7 +334,7 @@ tidy1 v (RecPat con_id pat_ty rpats) match_result
     pats 	     = map mk_pat tagged_arg_tys
 
 	-- Boring stuff to find the arg-tys of the constructor
-    (_, inst_tys, _) = {-_trace "getAppDataTyCon.Match" $-} getAppDataTyCon pat_ty
+    (_, inst_tys, _) = {-_trace "Match.getAppDataTyConExpandingDicts" $-} getAppDataTyConExpandingDicts pat_ty
     con_arg_tys'     = dataConArgTys con_id inst_tys 
     tagged_arg_tys   = con_arg_tys' `zip` allFieldLabelTags
 

@@ -179,14 +179,14 @@ genBinds binder_names mono_ids bind lie sig_infos prag_info_fn
     let
 	dict_tys    = map tcIdType dicts_bound
 	poly_tys    = map (mkForAllTys tyvars . mkFunTys dict_tys) mono_id_types
-	poly_ids    = zipWithEqual mk_poly binder_names poly_tys
+	poly_ids    = zipWithEqual "genspecetc" mk_poly binder_names poly_tys
 	mk_poly name ty = mkUserId name ty (prag_info_fn name)
     in
 	 -- BUILD RESULTS
     returnTc (
 	 AbsBinds tyvars
 		  dicts_bound
-		  (map TcId mono_ids `zip` map TcId poly_ids)
+		  (zipEqual "genBinds" (map TcId mono_ids) (map TcId poly_ids))
 		  dict_binds
 		  bind,
 	 lie',

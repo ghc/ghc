@@ -353,10 +353,11 @@ tailCallBusiness fun fun_amode lf_info arg_amodes live_vars pending_assts
 
 	no_of_args = length arg_amodes
 
-	(reg_arg_assts, stk_arg_amodes)
-	    = (mkAbstractCs (zipWithEqual assign_to_reg arg_regs arg_amodes),
-			drop (length arg_regs) arg_amodes) -- No regs, or
-							   -- args beyond arity
+	(reg_arg_amodes, stk_arg_amodes) = splitAt (length arg_regs) arg_amodes
+	    -- We get some stk_arg_amodes if (a) no regs, or (b) args beyond arity
+
+	reg_arg_assts
+	  = mkAbstractCs (zipWithEqual "assign_to_reg2" assign_to_reg arg_regs reg_arg_amodes)
 
 	assign_to_reg reg_id amode = CAssign (CReg reg_id) amode
     in

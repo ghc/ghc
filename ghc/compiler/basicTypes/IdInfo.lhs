@@ -81,11 +81,10 @@ import Outputable	( ifPprInterface, Outputable(..){-instances-} )
 import PprStyle		( PprStyle(..) )
 import Pretty
 import SrcLoc		( mkUnknownSrcLoc )
-import Type		( eqSimpleTy )
+import Type		( eqSimpleTy, splitFunTyExpandingDicts )
 import Util		( mapAccumL, panic, assertPanic, pprPanic )
 
 applySubstToTy = panic "IdInfo.applySubstToTy"
-splitTypeWithDictsAsArgs = panic "IdInfo.splitTypeWithDictsAsArgs"
 showTypeCategory = panic "IdInfo.showTypeCategory"
 mkFormSummary = panic "IdInfo.mkFormSummary"
 occurAnalyseGlobalExpr = panic "IdInfo.occurAnalyseGlobalExpr"
@@ -583,9 +582,8 @@ mkWrapperArgTypeCategories
 	-> String	-- a string saying lots about the args
 
 mkWrapperArgTypeCategories wrapper_ty wrap_info
-  = case (splitTypeWithDictsAsArgs wrapper_ty) of { (_,arg_tys,_) ->
-    map do_one (wrap_info `zip` (map showTypeCategory arg_tys))
-    }
+  = case (splitFunTyExpandingDicts wrapper_ty) of { (arg_tys,_) ->
+    map do_one (wrap_info `zip` (map showTypeCategory arg_tys)) }
   where
     -- ToDo: this needs FIXING UP (it was a hack anyway...)
     do_one (WwPrim, _) = 'P'

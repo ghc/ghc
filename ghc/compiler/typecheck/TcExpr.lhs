@@ -37,7 +37,7 @@ import TcMonoType	( tcPolyType )
 import TcPat		( tcPat )
 import TcSimplify	( tcSimplifyAndCheck, tcSimplifyRank2 )
 import TcType		( TcType(..), TcMaybe(..),
-			  tcInstId, tcInstType, tcInstTheta, tcInstTcType, tcInstTyVars,
+			  tcInstId, tcInstType, tcInstTheta, tcInstTyVars,
 			  newTyVarTy, zonkTcTyVars, zonkTcType )
 import TcKind		( TcKind )
 
@@ -52,7 +52,7 @@ import PrelInfo		( intPrimTy, charPrimTy, doublePrimTy,
 			  boolTy, charTy, stringTy, mkListTy,
 			  mkTupleTy, mkPrimIoTy )
 import Type		( mkFunTy, mkAppTy, mkTyVarTy, mkTyVarTys,
-			  getTyVar_maybe, getFunTy_maybe,
+			  getTyVar_maybe, getFunTy_maybe, instantiateTy,
 			  splitForAllTy, splitRhoTy, splitSigmaTy, splitFunTy,
 			  isTauTy, mkFunTys, tyVarsOfType, getForAllTy_maybe,
 			  getAppDataTyCon, maybeAppDataTyCon
@@ -166,7 +166,8 @@ tcExpr (HsLit lit@(HsString str))
 %************************************************************************
 
 \begin{code}
-tcExpr (HsPar expr) = tcExpr expr
+tcExpr (HsPar expr) -- preserve parens so printing needn't guess where they go
+  = tcExpr expr
 
 tcExpr (NegApp expr n) = tcExpr (HsApp (HsVar n) expr)
 
@@ -261,8 +262,8 @@ tcExpr (CCall lbl args may_gc is_asm ignored_fake_result_ty)
 
 	-- Construct the extra insts, which encode the
 	-- constraints on the argument and result types.
-    mapNF_Tc new_arg_dict (args `zip` arg_tys)			`thenNF_Tc` \ ccarg_dicts_s ->
-    newDicts result_origin [(cReturnableClass, result_ty)]	`thenNF_Tc` \ (ccres_dict, _) ->
+    mapNF_Tc new_arg_dict (zipEqual "tcExpr:CCall" args arg_tys)    `thenNF_Tc` \ ccarg_dicts_s ->
+    newDicts result_origin [(cReturnableClass, result_ty)]	    `thenNF_Tc` \ (ccres_dict, _) ->
 
     returnTc (CCall lbl args' may_gc is_asm result_ty,
 	      foldr plusLIE ccres_dict ccarg_dicts_s `plusLIE` args_lie,
@@ -394,14 +395,14 @@ tcExpr (RecordUpd record_expr rbinds)
 	-- Check that the field names are plausible
     zonkTcType record_ty		`thenNF_Tc` \ record_ty' ->
     let
-	(tycon, inst_tys, data_cons) = _trace "getAppDataTyCon.TcExpr" $ getAppDataTyCon record_ty'
+	(tycon, inst_tys, data_cons) = _trace "TcExpr.getAppDataTyCon" $ getAppDataTyCon record_ty'
 	-- The record binds are non-empty (syntax); so at least one field
 	-- label will have been unified with record_ty by tcRecordBinds;
 	-- field labels must be of data type; hencd the getAppDataTyCon must succeed.
 	(tyvars, theta, _, _) = dataConSig (head data_cons)
     in
-    tcInstTheta (tyvars `zipEqual` inst_tys) theta	`thenNF_Tc` \ theta' ->
-    newDicts RecordUpdOrigin theta'			`thenNF_Tc` \ (con_lie, dicts) ->
+    tcInstTheta (zipEqual "tcExpr:RecordUpd" tyvars inst_tys) theta `thenNF_Tc` \ theta' ->
+    newDicts RecordUpdOrigin theta'				    `thenNF_Tc` \ (con_lie, dicts) ->
     checkTc (any (checkRecordFields rbinds) data_cons)
 	    (badFieldsUpd rbinds)		`thenTc_`
 
@@ -626,11 +627,9 @@ tcArg expected_arg_ty arg
     )
   where
 
-    mk_binds []
-	= EmptyBinds
+    mk_binds [] = EmptyBinds
     mk_binds ((inst,rhs):inst_binds)
-	= (SingleBind (NonRecBind (VarMonoBind inst rhs)))
-		`ThenBinds`
+	= (SingleBind (NonRecBind (VarMonoBind inst rhs))) `ThenBinds`
 	  mk_binds inst_binds
 \end{code}
 
@@ -652,7 +651,9 @@ tcId name
 		        (tyvars, rho) = splitForAllTy (idType tc_id)
 		      in
 		      tcInstTyVars tyvars		`thenNF_Tc` \ (tyvars', arg_tys', tenv)  ->
-		      tcInstTcType tenv rho		`thenNF_Tc` \ rho' ->
+		      let 
+			 rho' = instantiateTy tenv rho
+		      in
 		      returnNF_Tc (TcId tc_id, arg_tys', rho')
 
 	Nothing ->    tcLookupGlobalValue name	`thenNF_Tc` \ id ->

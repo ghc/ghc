@@ -81,6 +81,7 @@ module TysWiredIn (
 	stringTyCon,
 	trueDataCon,
 	unitTy,
+	voidTy, voidTyCon,
 	wordDataCon,
 	wordTy,
 	wordTyCon
@@ -110,7 +111,7 @@ import TyCon		( mkDataTyCon, mkTupleTyCon, mkSynTyCon,
 			  NewOrData(..), TyCon
 			)
 import Type		( mkTyConTy, applyTyCon, mkSynTy, mkSigmaTy,
-			  mkFunTys, maybeAppDataTyCon,
+			  mkFunTys, maybeAppDataTyConExpandingDicts,
 			  GenType(..), ThetaType(..), TauType(..) )
 import TyVar		( tyVarKind, alphaTyVar, betaTyVar )
 import Unique
@@ -151,6 +152,13 @@ pcGenerateDataSpecs ty
 \subsection[TysWiredIn-boxed-prim]{The ``boxed primitive'' types (@Char@, @Int@, etc)}
 %*									*
 %************************************************************************
+
+\begin{code}
+-- The Void type is represented as a data type with no constructors
+voidTy = mkTyConTy voidTyCon
+
+voidTyCon = pcDataTyCon voidTyConKey pRELUDE_BUILTIN SLIT("Void") [] []
+\end{code}
 
 \begin{code}
 charTy = mkTyConTy charTyCon
@@ -401,7 +409,7 @@ getStatePairingConInfo
 	    Type)	-- type of state pair
 
 getStatePairingConInfo prim_ty
-  = case (maybeAppDataTyCon prim_ty) of
+  = case (maybeAppDataTyConExpandingDicts prim_ty) of
       Nothing -> panic "getStatePairingConInfo:1"
       Just (prim_tycon, tys_applied, _) ->
 	let
@@ -683,7 +691,7 @@ mkLiftTy ty
     (tvs, theta, tau) = splitSigmaTy ty
 
 isLiftTy ty
-  = case maybeAppDataTyCon tau of
+  = case (maybeAppDataTyConExpandingDicts tau) of
       Just (tycon, tys, _) -> tycon == liftTyCon
       Nothing -> False
   where

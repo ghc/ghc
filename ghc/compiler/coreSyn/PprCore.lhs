@@ -35,7 +35,7 @@ import Literal		( Literal{-instances-} )
 import Name		( isSymLexeme )
 import Outputable	-- quite a few things
 import PprEnv
-import PprType		( GenType{-instances-}, GenTyVar{-instance-} )
+import PprType		( pprParendGenType, GenType{-instances-}, GenTyVar{-instance-} )
 import PprStyle		( PprStyle(..) )
 import Pretty
 import PrimOp		( PrimOp{-instances-} )
@@ -91,7 +91,7 @@ init_ppr_env sty pbdr1 pbdr2 pocc
 	(Just (ppr sty)) -- tyvars
 	(Just (ppr sty)) -- usage vars
 	(Just pbdr1) (Just pbdr2) (Just pocc) -- value vars
-	(Just (ppr sty)) -- types
+	(Just (pprParendGenType sty)) -- types
 	(Just (ppr sty)) -- usages
 
 --------------

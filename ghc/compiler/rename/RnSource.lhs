@@ -21,7 +21,7 @@ import RnUtils		( lookupGlobalRnEnv, lubExportFlag )
 
 import Bag		( emptyBag, unitBag, consBag, unionManyBags, unionBags, listToBag, bagToList )
 import Class		( derivableClassKeys )
-import ErrUtils		( addErrLoc, addShortErrLocLine )
+import ErrUtils		( addErrLoc, addShortErrLocLine, addShortWarnLocLine )
 import FiniteMap	( emptyFM, lookupFM, addListToFM_C )
 import ListSetOps	( unionLists, minusList )
 import Maybes		( maybeToBool, catMaybes )
@@ -193,8 +193,9 @@ rnIE mods (IEThingAll name)
     checkIEAll (RnData n cons fields) = returnRn (exp_all n `consBag` listToBag (map exp_all cons)
 							  `unionBags` listToBag (map exp_all fields))
     checkIEAll (RnClass n ops)        = returnRn (exp_all n `consBag` listToBag (map exp_all ops))
-    checkIEAll rn@(RnSyn _)           = getSrcLocRn `thenRn` \ src_loc ->
-			                warnAndContinueRn emptyBag (synAllExportErr rn src_loc)
+    checkIEAll rn@(RnSyn n)           = getSrcLocRn `thenRn` \ src_loc ->
+			                warnAndContinueRn (unitBag (n, ExportAbs))
+					    (synAllExportErr False{-warning-} rn src_loc)
     checkIEAll rn                     = returnRn emptyBag
 
     exp_all n = (n, ExportAll)
@@ -218,7 +219,7 @@ rnIE mods (IEThingWith name names)
 	= rnWithErr "class ops" rn ops rns
     checkIEWith rn@(RnSyn _) rns
 	= getSrcLocRn `thenRn` \ src_loc ->
-	  failButContinueRn emptyBag (synAllExportErr rn src_loc)
+	  failButContinueRn emptyBag (synAllExportErr True{-error-} rn src_loc)
     checkIEWith rn rns
 	= returnRn emptyBag
 
@@ -661,7 +662,7 @@ rnContext tv_env ctxt
 
 \begin{code}
 dupNameExportWarn locn names@((n,_):_)
-  = addShortErrLocLine locn (\ sty ->
+  = addShortWarnLocLine locn (\ sty ->
     ppCat [pprNonSym sty n, ppStr "exported", ppInt (length names), ppStr "times"])
 
 dupLocalsExportErr locn locals@((str,_):_)
@@ -672,13 +673,13 @@ classOpExportErr op locn
   = addShortErrLocLine locn (\ sty ->
     ppBesides [ppStr "class operation `", ppr sty op, ppStr "' can only be exported with class"])
 
-synAllExportErr syn locn
-  = addShortErrLocLine locn (\ sty ->
+synAllExportErr is_error syn locn
+  = (if is_error then addShortErrLocLine else addShortWarnLocLine) locn (\ sty ->
     ppBesides [ppStr "type synonym `", ppr sty syn, ppStr "' should be exported abstractly"])
 
 withExportErr str rn has rns locn
   = addErrLoc locn "" (\ sty ->
-    ppAboves [ ppBesides [ppStr "inconsistent list of", ppStr str, ppStr "in export list for `", ppr sty rn, ppStr "'"],
+    ppAboves [ ppBesides [ppStr "inconsistent list of ", ppStr str, ppStr " in export list for `", ppr sty rn, ppStr "'"],
 	       ppCat [ppStr "    expected:", ppInterleave ppComma (map (ppr sty) has)],
 	       ppCat [ppStr "    found:   ", ppInterleave ppComma (map (ppr sty) rns)] ])
 
@@ -691,11 +692,11 @@ badModExportErr mod locn
     ppCat [ ppStr "unknown module in export list: module", ppPStr mod])
 
 emptyModExportWarn locn mod
-  = addShortErrLocLine locn (\ sty ->
+  = addShortWarnLocLine locn (\ sty ->
     ppCat [ppStr "module", ppPStr mod, ppStr "has no unqualified imports to export"])
 
 dupModExportWarn locn mods@(mod:_)
-  = addShortErrLocLine locn (\ sty ->
+  = addShortWarnLocLine locn (\ sty ->
     ppCat [ppStr "module", ppPStr mod, ppStr "appears", ppInt (length mods), ppStr "times in export list"])
 
 derivingNonStdClassErr clas locn

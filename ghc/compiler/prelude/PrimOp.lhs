@@ -42,7 +42,7 @@ import PprType		( pprParendGenType, GenTyVar{-instance Outputable-} )
 import Pretty
 import SMRep	    	( SMRep(..), SMSpecRepKind(..), SMUpdateKind(..) )
 import TyCon		( TyCon{-instances-} )
-import Type		( getAppDataTyCon, maybeAppDataTyCon,
+import Type		( getAppDataTyConExpandingDicts, maybeAppDataTyConExpandingDicts,
 			  mkForAllTys, mkFunTys, applyTyCon, typePrimRep
 			)
 import TyVar		( alphaTyVar, betaTyVar, GenTyVar{-instance Eq-} )
@@ -1285,7 +1285,8 @@ primOpInfo ErrorIOPrimOp -- errorIO# :: PrimIO () -> State# RealWorld#
 primOpInfo (CCallOp _ _ _ arg_tys result_ty)
   = AlgResult SLIT("ccall#") [] arg_tys result_tycon tys_applied
   where
-    (result_tycon, tys_applied, _) = _trace "getAppDataTyCon.PrimOp" $ getAppDataTyCon result_ty
+    (result_tycon, tys_applied, _) = _trace "PrimOp.getAppDataTyConExpandingDicts" $
+				     getAppDataTyConExpandingDicts result_ty
 \end{code}
 
 %************************************************************************
@@ -1345,7 +1346,7 @@ primOpHeapReq (CCallOp _ _ mayGC@False _ return_ty)
      else NoHeapRequired
   where
    returnsMallocPtr
-     = case (maybeAppDataTyCon return_ty) of
+     = case (maybeAppDataTyConExpandingDicts return_ty) of
 	 Nothing            -> False
 	 Just (tycon, _, _) -> tycon == stateAndMallocPtrPrimTyCon
 

@@ -43,7 +43,8 @@ import RnHsSyn		( RnName, mkRnName, mkRnUnbound, mkRnImplicit,
 import RnUtils		( RnEnv(..), extendLocalRnEnv,
 			  lookupRnEnv, lookupGlobalRnEnv, lookupTcRnEnv,
 			  unknownNameErr, badClassOpErr, qualNameErr,
-			  dupNamesErr, shadowedNameWarn, negateNameWarn )
+			  dupNamesErr, shadowedNameWarn, negateNameWarn
+			)
 
 import Bag		( Bag, emptyBag, isEmptyBag, snocBag )
 import CmdLineOpts	( opt_WarnNameShadowing )
@@ -306,7 +307,7 @@ newLocalNames str names_w_loc
 mkLocalNames :: [(RdrName, SrcLoc)] -> RnMonad x s [RnName]
 mkLocalNames names_w_locs
   = rnGetUniques (length names_w_locs) 	`thenRn` \ uniqs ->
-    returnRn (zipWithEqual new_local uniqs names_w_locs)
+    returnRn (zipWithEqual "mkLocalNames" new_local uniqs names_w_locs)
   where
     new_local uniq (Unqual str, srcloc)
       = mkRnName (mkLocalName uniq str srcloc)

@@ -32,11 +32,11 @@ import ParseUtils	( ParsedIface(..), RdrIfaceDecl(..), RdrIfaceInst(..),
 import RnMonad
 import RnNames		( getGlobalNames, GlobalNameInfo(..) )
 import RnSource		( rnSource )
-import RnIfaces		( findHiFiles, rnIfaces )
+import RnIfaces		( rnIfaces )
 import RnUtils		( RnEnv(..), extendGlobalRnEnv, emptyRnEnv, multipleOccWarn )
 
 import Bag		( isEmptyBag, unionBags, unionManyBags, bagToList, listToBag )
-import CmdLineOpts	( opt_HiDirList, opt_SysHiDirList )
+import CmdLineOpts	( opt_HiMap )
 import ErrUtils		( Error(..), Warning(..) )
 import FiniteMap	( emptyFM, eltsFM, fmToList, lookupFM{-ToDo:rm-} )
 import Maybes		( catMaybes )
@@ -80,7 +80,8 @@ renameModule us input@(HsModule mod _ _ imports _ _ _ _ _ _ _ _ _ _)
     --				     , ppCat (map ppPStr (keysFM b_keys))
     --				     ]}) $
 
-    findHiFiles opt_HiDirList opt_SysHiDirList	    >>=	         \ hi_files ->
+    makeHiMap opt_HiMap	    >>=	         \ hi_files ->
+--  pprTrace "HiMap:\n" (ppAboves [ ppCat [ppPStr m, ppStr p] | (m,p) <- fmToList hi_files])
     newVar (emptyFM,emptyFM,hi_files){-init iface cache-}  `thenPrimIO` \ iface_cache ->
 
     fixIO ( \ ~(_, _, _, _, rec_occ_fm, rec_export_fn) ->
@@ -192,6 +193,27 @@ renameModule us input@(HsModule mod _ _ imports _ _ _ _ _ _ _ _ _ _)
 
     (us1, us') = splitUniqSupply us
     (us2, us3) = splitUniqSupply us'
+\end{code}
+
+\begin{code}
+makeHiMap :: Maybe String -> IO (FiniteMap Module FilePath)
+
+makeHiMap Nothing = error "Rename.makeHiMap:no .hi map given by the GHC driver (?)"
+makeHiMap (Just f)
+  = readFile f	>>= \ cts ->
+    return (snag_mod emptyFM cts [])
+  where
+    -- we alternate between "snag"ging mod(ule names) and path(names),
+    -- accumulating names (reversed) and the final resulting map
+    -- as we move along.
+
+    snag_mod map  []       []   = map
+    snag_mod map  (' ':cs) rmod = snag_path map (_PK_ (reverse rmod)) cs []
+    snag_mod map  (c:cs)   rmod = snag_mod  map cs (c:rmod)
+
+    snag_path map mod []        rpath = addToFM map mod (reverse rpath)
+    snag_path map mod ('\n':cs) rpath = snag_mod (addToFM map mod (reverse rpath)) cs []
+    snag_path map mod (c:cs)    rpath = snag_path map mod cs (c:rpath)
 \end{code}
 
 \begin{code}

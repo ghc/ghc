@@ -39,7 +39,7 @@ import SaLib
 import TyCon		( maybeTyConSingleCon, isEnumerationTyCon,
 			  TyCon{-instance Eq-}
 			)
-import Type		( maybeAppDataTyCon, isPrimType )
+import Type		( maybeAppDataTyConExpandingDicts, isPrimType )
 import Util		( isIn, isn'tIn, nOfThem, zipWithEqual,
 			  pprTrace, panic, pprPanic, assertPanic
 			)
@@ -63,7 +63,7 @@ lub val1 val2 | isBot val2    = val1	-- one of the val's is a function which
 					-- always returns bottom, such as \y.x,
 					-- when x is bound to bottom.
 
-lub (AbsProd xs) (AbsProd ys) = AbsProd (zipWithEqual lub xs ys)
+lub (AbsProd xs) (AbsProd ys) = AbsProd (zipWithEqual "lub" lub xs ys)
 
 lub _		  _	      = AbsTop	-- Crude, but conservative
 					-- The crudity only shows up if there
@@ -119,7 +119,7 @@ glb v1 v2
 
 -- The non-functional cases are quite straightforward
 
-glb (AbsProd xs) (AbsProd ys) = AbsProd (zipWithEqual glb xs ys)
+glb (AbsProd xs) (AbsProd ys) = AbsProd (zipWithEqual "glb" glb xs ys)
 
 glb AbsTop	 v2	      = v2
 glb v1           AbsTop	      = v1
@@ -308,7 +308,7 @@ sameVal AbsBot other  = False	-- widen has reduced AbsFun bots to AbsBot
 sameVal AbsTop AbsTop = True
 sameVal AbsTop other  = False		-- Right?
 
-sameVal (AbsProd vals1) (AbsProd vals2) = and (zipWithEqual sameVal vals1 vals2)
+sameVal (AbsProd vals1) (AbsProd vals2) = and (zipWithEqual "sameVal" sameVal vals1 vals2)
 sameVal (AbsProd _)	AbsTop 		= False
 sameVal (AbsProd _)	AbsBot 		= False
 
@@ -338,7 +338,7 @@ evalStrictness (WwUnpack demand_info) val
   = case val of
       AbsTop	   -> False
       AbsBot	   -> True
-      AbsProd vals -> or (zipWithEqual evalStrictness demand_info vals)
+      AbsProd vals -> or (zipWithEqual "evalStrictness" evalStrictness demand_info vals)
       _	    	   -> trace "evalStrictness?" False
 
 evalStrictness WwPrim val
@@ -363,7 +363,7 @@ evalAbsence (WwUnpack demand_info) val
   = case val of
 	AbsTop	     -> False		-- No poison in here
 	AbsBot 	     -> True		-- Pure poison
-	AbsProd vals -> or (zipWithEqual evalAbsence demand_info vals)
+	AbsProd vals -> or (zipWithEqual "evalAbsence" evalAbsence demand_info vals)
 	_	     -> panic "evalAbsence: other"
 
 evalAbsence other val = anyBot val
@@ -841,7 +841,7 @@ findRecDemand strflags seen str_fn abs_fn ty
 
     else -- It's strict (or we're pretending it is)!
 
-       case maybeAppDataTyCon ty of
+       case (maybeAppDataTyConExpandingDicts ty) of
 
 	 Nothing    -> wwStrict
 
@@ -882,7 +882,7 @@ findRecDemand strflags seen str_fn abs_fn ty
     (all_strict, num_strict) = strflags
 
     is_numeric_type ty
-      = case (maybeAppDataTyCon ty) of -- NB: duplicates stuff done above
+      = case (maybeAppDataTyConExpandingDicts ty) of -- NB: duplicates stuff done above
 	  Nothing -> False
 	  Just (tycon, _, _)
 	    | tycon `is_elem`

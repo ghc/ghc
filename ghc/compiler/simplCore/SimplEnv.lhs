@@ -71,7 +71,7 @@ import PprCore		-- various instances
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType, GenTyVar )
 import Pretty
-import Type		( eqTy, getAppDataTyCon, applyTypeEnvToTy )
+import Type		( eqTy, getAppDataTyConExpandingDicts, applyTypeEnvToTy )
 import TyVar		( nullTyVarEnv, addOneToIdEnv, addOneToTyVarEnv,
 			  growTyVarEnvList,
 			  TyVarEnv(..), GenTyVar{-instance Eq-}
@@ -80,7 +80,7 @@ import Unique		( Unique{-instance Outputable-} )
 import UniqFM		( addToUFM_Directly, lookupUFM_Directly, ufmToList )
 import UniqSet		-- lots of things
 import Usage		( UVar(..), GenUsage{-instances-} )
-import Util		( zipEqual, panic, panic#, assertPanic )
+import Util		( zipEqual, thenCmp, cmpList, panic, panic#, assertPanic )
 
 type TypeEnv = TyVarEnv Type
 cmpType = panic "cmpType (SimplEnv)"
@@ -253,8 +253,8 @@ data UnfoldItem -- a glorified triple...
 					-- that was in force.
 
 data UnfoldConApp -- yet another glorified pair
-  = UCA		OutId			-- same fields as ConForm
-		[OutArg]
+  = UCA		OutId			-- data constructor
+		[OutArg]		-- *value* arguments; see use below
 
 data UnfoldEnv	-- yup, a glorified triple...
   = UFE		(IdEnv UnfoldItem)	-- Maps an OutId => its UnfoldItem
@@ -264,10 +264,13 @@ data UnfoldEnv	-- yup, a glorified triple...
 					-- These are the ones we have to worry
 					-- about when adding new items to the
 					-- unfold env.
-		(FiniteMap UnfoldConApp OutId)
+		(FiniteMap UnfoldConApp [([Type], OutId)])
 					-- Maps applications of constructors (to
-					-- types & atoms) back to OutIds that are
-					-- bound to them; i.e., this is a reversed
+					-- value atoms) back to an association list
+					-- that says "if the constructor was applied
+					-- to one of these lists-of-Types, then
+					-- this OutId is your man (in a non-gender-specific
+					-- sense)".  I.e., this is a reversed
 					-- mapping for (part of) the main IdEnv
 					-- (1st part of UFE)
 
@@ -308,13 +311,7 @@ grow_unfold_env (UFE u_env interesting_ids con_apps) id uf_details encl_cc
   where
     new_con_apps
       = case uf_details of
-	  ConForm con args
-	    -> case (lookupFM con_apps entry) of
-		 Just _  -> con_apps -- unchanged; we hang onto what we have
-		 Nothing -> addToFM con_apps entry id
-	    where
-	      entry = UCA con args
-
+	  ConForm con args  -> snd (lookup_conapp_help con_apps con args id)
 	  not_a_constructor -> con_apps -- unchanged
 
 addto_unfold_env (UFE u_env interesting_ids con_apps) extra_items
@@ -343,7 +340,33 @@ lookup_unfold_env_encl_cc (UFE u_env _ _) id
       Just (UnfoldItem _ _ encl_cc) -> encl_cc
 
 lookup_conapp (UFE _ _ con_apps) con args
-  = lookupFM con_apps (UCA con args)
+  = fst (lookup_conapp_help con_apps con args (panic "lookup_conapp"))
+
+-- Returns two things; we just fst or snd the one we want:
+lookup_conapp_help con_apps con args outid
+  = case (span notValArg args) of { (ty_args, val_args) ->
+    let
+	 entry   = UCA con val_args
+	 arg_tys = [ t | TyArg t <- ty_args ]
+    in
+    case (lookupFM con_apps entry) of
+      Nothing -> (Nothing,
+		 addToFM con_apps entry [(arg_tys, outid)])
+      Just assocs
+	-> ASSERT(not (null assocs))
+	   case [ oid | (ts,oid) <- assocs, ts `eq_tys` arg_tys ] of
+	     [o] -> (Just o,
+		    con_apps) -- unchanged; we hang onto what we have
+	     []  -> (Nothing,
+		    addToFM con_apps entry ((arg_tys, outid) : assocs))
+	     _   -> panic "grow_unfold_env:dup in assoc list"
+    }
+  where
+    eq_tys ts1 ts2
+      = case (cmpList cmp_ty ts1 ts2) of { EQ_ -> True; _ -> False }
+
+    cmp_ty ty1 ty2 -- NB: we really only know how to do *equality* on types
+      = if (ty1 `eqTy` ty2) then EQ_ else LT_{-random choice-}
 
 modify_unfold_env (UFE u_env interesting_ids con_apps) zapper id
   = UFE (modifyIdEnv u_env zapper id) interesting_ids con_apps
@@ -374,22 +397,13 @@ instance Ord3 UnfoldConApp where
     cmp = cmp_app
 
 cmp_app (UCA c1 as1) (UCA c2 as2)
-  = case (c1 `cmp` c2) of
-      LT_ -> LT_
-      GT_ -> GT_
-      _   -> cmp_lists cmp_arg as1 as2
+  = cmp c1 c2 `thenCmp` cmpList cmp_arg as1 as2
   where
-    cmp_lists cmp_item []     []     = EQ_
-    cmp_lists cmp_item (x:xs) []     = GT_
-    cmp_lists cmp_item []     (y:ys) = LT_
-    cmp_lists cmp_item (x:xs) (y:ys)
-      = case cmp_item x y of { EQ_ -> cmp_lists cmp_item xs ys; other -> other }
-
     -- ToDo: make an "instance Ord3 CoreArg"???
 
     cmp_arg (VarArg   x) (VarArg   y) = x `cmp` y
     cmp_arg (LitArg   x) (LitArg   y) = case _tagCmp x y of { _LT -> LT_; _EQ -> EQ_; GT__ -> GT_ }
-    cmp_arg (TyArg    x) (TyArg    y) = if x `eqTy` y then EQ_ else panic# "SimplEnv.cmp_app:TyArgs"
+    cmp_arg (TyArg    x) (TyArg    y) = panic# "SimplEnv.cmp_app:TyArgs"
     cmp_arg (UsageArg x) (UsageArg y) = panic# "SimplEnv.cmp_app:UsageArgs"
     cmp_arg x y
       | tag x _LT_ tag y = LT_
@@ -397,8 +411,8 @@ cmp_app (UCA c1 as1) (UCA c2 as2)
       where
 	tag (VarArg   _) = ILIT(1)
 	tag (LitArg   _) = ILIT(2)
-	tag (TyArg    _) = ILIT(3)
-	tag (UsageArg _) = ILIT(4)
+	tag (TyArg    _) = panic# "SimplEnv.cmp_app:TyArg"
+	tag (UsageArg _) = panic# "SimplEnv.cmp_app:UsageArg"
 \end{code}
 
 %************************************************************************
@@ -597,7 +611,7 @@ extendIdEnvWithClones (SimplEnv chkr encl_cc ty_env id_env unfold_env)
 	in_binders out_ids
   = SimplEnv chkr encl_cc ty_env new_id_env unfold_env
   where
-    new_id_env = growIdEnvList id_env (in_ids `zipEqual` out_vals)
+    new_id_env = growIdEnvList id_env (zipEqual "extendIdEnvWithClones" in_ids out_vals)
     in_ids     = [id | (id,_) <- in_binders]
     out_vals   = [ItsAnAtom (VarArg out_id) | out_id <- out_ids]
 
@@ -646,7 +660,7 @@ extendUnfoldEnvGivenConstructor env var con args
   = let
 	-- conjure up the types to which the con should be applied
 	scrut_ty	= idType var
-	(_, ty_args, _) = getAppDataTyCon scrut_ty
+	(_, ty_args, _) = getAppDataTyConExpandingDicts scrut_ty
     in
     extendUnfoldEnvGivenFormDetails
       env var (ConForm con (map VarArg args))

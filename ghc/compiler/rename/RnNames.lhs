@@ -22,14 +22,15 @@ import RnHsSyn
 import RnMonad
 import RnIfaces		( IfaceCache(..), cachedIface, cachedDecl )
 import RnUtils		( RnEnv(..), emptyRnEnv, extendGlobalRnEnv,
-			  lubExportFlag, qualNameErr, dupNamesErr, negateNameWarn )
+			  lubExportFlag, qualNameErr, dupNamesErr, negateNameWarn
+			)
 import ParseUtils	( ParsedIface(..), RdrIfaceDecl(..), RdrIfaceInst )
 
 
 import Bag		( emptyBag, unitBag, consBag, snocBag, unionBags,
 			  unionManyBags, mapBag, filterBag, listToBag, bagToList )
 import CmdLineOpts	( opt_NoImplicitPrelude )
-import ErrUtils		( Error(..), Warning(..), addErrLoc, addShortErrLocLine )
+import ErrUtils		( Error(..), Warning(..), addErrLoc, addShortErrLocLine, addShortWarnLocLine )
 import FiniteMap	( emptyFM, addListToFM, lookupFM, fmToList, eltsFM, delListFromFM )
 import Id		( GenId )
 import Maybes		( maybeToBool, catMaybes, MaybeErr(..) )
@@ -777,33 +778,33 @@ globalDupNamesErr rdr rns sty
     message   = ppBesides [ppStr "multiple declarations of `", pprNonSym sty rdr, ppStr "'"]
 
     pp_dup rn = addShortErrLocLine (get_loc rn) (\ sty ->
-	        ppBesides [pp_descrip rn, pprNonSym sty rn]) sty
+	        ppCat [pp_descrip rn, pprNonSym sty rn]) sty
 
     get_loc rn = case getImpLocs rn of
 		     []   -> getSrcLoc rn
 	 	     locs -> head locs
 
-    pp_descrip (RnName _)      = ppStr "a value"
-    pp_descrip (RnSyn  _)      = ppStr "a type synonym"
-    pp_descrip (RnData _ _ _)  = ppStr "a data type"
-    pp_descrip (RnConstr _ _)  = ppStr "a data constructor"
-    pp_descrip (RnField _ _)   = ppStr "a record field"
-    pp_descrip (RnClass _ _)   = ppStr "a class"
-    pp_descrip (RnClassOp _ _) = ppStr "a class method"
+    pp_descrip (RnName _)      = ppStr "as a value:"
+    pp_descrip (RnSyn  _)      = ppStr "as a type synonym:"
+    pp_descrip (RnData _ _ _)  = ppStr "as a data type:"
+    pp_descrip (RnConstr _ _)  = ppStr "as a data constructor:"
+    pp_descrip (RnField _ _)   = ppStr "as a record field:"
+    pp_descrip (RnClass _ _)   = ppStr "as a class:"
+    pp_descrip (RnClassOp _ _) = ppStr "as a class method:"
     pp_descrip _               = ppNil 
 
 dupImportWarn (ImportDecl m1 _ _ _ locn1 : dup_imps) sty
   = ppAboves (item1 : map dup_item dup_imps)
   where
-    item1 = addShortErrLocLine locn1 (\ sty ->
+    item1 = addShortWarnLocLine locn1 (\ sty ->
 	    ppCat [ppStr "multiple imports from module", ppPStr m1]) sty
 
     dup_item (ImportDecl m _ _ _ locn)
-          = addShortErrLocLine locn (\ sty ->
+          = addShortWarnLocLine locn (\ sty ->
             ppCat [ppStr "here was another import from module", ppPStr m]) sty
 
 qualPreludeImportWarn (ImportDecl m _ _ _ locn)
-  = addShortErrLocLine locn (\ sty ->
+  = addShortWarnLocLine locn (\ sty ->
     ppCat [ppStr "qualified import of prelude module", ppPStr m])
 
 unknownImpSpecErr ie imp_mod locn
@@ -815,7 +816,7 @@ duplicateImpSpecErr ie imp_mod locn
     ppBesides [ppStr "`", ppr sty (ie_name ie), ppStr "' already seen in import list"])
 
 allWhenSynImpSpecWarn n imp_mod locn
-  = addShortErrLocLine locn (\ sty ->
+  = addShortWarnLocLine locn (\ sty ->
     ppBesides [ppStr "type synonym `", ppr sty n, ppStr "' should not be imported with (..)"])
 
 allWhenAbsImpSpecErr n imp_mod locn

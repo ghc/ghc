@@ -8,7 +8,7 @@ module SST(
 	SST(..), SST_R, FSST(..), FSST_R,
 
 	_runSST, sstToST, stToSST,
-	thenSST, thenSST_, returnSST,
+	thenSST, thenSST_, returnSST, fixSST,
 	thenFSST, thenFSST_, returnFSST, failFSST,
 	recoverFSST, recoverSST, fixFSST,
 
@@ -64,6 +64,12 @@ thenSST_ m k s = case m s of { SST_R r s' -> k s' }
 returnSST :: r -> SST s r
 {-# INLINE returnSST #-}
 returnSST r s = SST_R r s
+
+fixSST :: (r -> SST s r) -> SST s r
+fixSST m s = result
+	   where
+	     result 	  = m loop s
+	     SST_R loop _ = result
 \end{code}
 
 

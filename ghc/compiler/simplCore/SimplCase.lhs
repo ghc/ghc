@@ -33,7 +33,7 @@ import PrimOp		( primOpOkForSpeculation, PrimOp{-instance Eq-} )
 import SimplEnv
 import SimplMonad
 import SimplUtils	( mkValLamTryingEta )
-import Type		( isPrimType, maybeAppDataTyCon, mkFunTys, eqTy )
+import Type		( isPrimType, maybeAppDataTyConExpandingDicts, mkFunTys, eqTy )
 import Unique		( Unique{-instance Eq-} )
 import Usage		( GenUsage{-instance Eq-} )
 import Util		( isIn, isSingleton, zipEqual, panic, assertPanic )
@@ -681,7 +681,7 @@ completeAlgCaseWithKnownCon env con con_args (AlgAlts alts deflt) rhs_c
       | alt_con == con
       = 	-- Matching alternative!
 	let
-	    new_env = extendIdEnvWithAtomList env (zipEqual alt_args (filter isValArg con_args))
+	    new_env = extendIdEnvWithAtomList env (zipEqual "SimplCase" alt_args (filter isValArg con_args))
 	in
 	rhs_c new_env rhs
 
@@ -791,7 +791,7 @@ mkCoCase scrut (AlgAlts outer_alts
 	 v | scrut_is_var = Var scrut_var
 	   | otherwise    = Con con (map TyArg arg_tys ++ map VarArg args)
 
-    arg_tys = case maybeAppDataTyCon (idType deflt_var) of
+    arg_tys = case (maybeAppDataTyConExpandingDicts (idType deflt_var)) of
 		Just (_, arg_tys, _) -> arg_tys
 
 mkCoCase scrut (PrimAlts

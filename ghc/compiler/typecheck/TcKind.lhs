@@ -14,12 +14,14 @@ module TcKind (
 	tcDefaultKind	-- TcKind s -> NF_TcM s Kind
   ) where
 
+import Ubiq{-uitous-}
+
 import Kind
 import TcMonad	hiding ( rnMtoTcM )
 
-import Ubiq
 import Unique	( Unique, pprUnique10 )
 import Pretty
+import Util	( nOfThem )
 \end{code}
 
 
@@ -39,7 +41,7 @@ newKindVar = tcGetUnique		`thenNF_Tc` \ uniq ->
 	     returnNF_Tc (TcVarKind uniq box)
 
 newKindVars :: Int -> NF_TcM s [TcKind s]
-newKindVars n = mapNF_Tc (\_->newKindVar) (take n (repeat ()))
+newKindVars n = mapNF_Tc (\ _ -> newKindVar) (nOfThem n ())
 \end{code}
 
 

@@ -54,9 +54,11 @@ import Name		( Name, RdrName(..), appendRdr, nameUnique,
 			  mkTupleTyConName, mkFunTyConName
 			)
 import Unique		( Unique, funTyConKey, mkTupleTyConUnique )
+import PrelInfo		( intDataCon, charDataCon )
 import Pretty		( Pretty(..), PrettyRep )
 import PprStyle		( PprStyle )
 import SrcLoc		( SrcLoc, mkBuiltinSrcLoc )
+import Unique		( intDataConKey, charDataConKey )
 import Util		( panic, panic#, nOfThem, isIn, Ord3(..) )
 \end{code}
 

@@ -41,7 +41,7 @@ import PprType		( GenType{-instance Outputable-}, GenTyVar{-ditto-} )
 import Pretty		( ppAboves )
 import TyVar		( GenTyVar{-instance Eq-} )
 import Unique		( Unique{-instance Eq-} )
-import Util		( assoc, pprTrace, panic )
+import Util		( assoc, zipEqual, pprTrace, panic )
 
 isSpecPragmaId_maybe = panic "OccurAnal.isSpecPragmaId_maybe (ToDo)"
 \end{code}
@@ -336,7 +336,7 @@ occAnalBind env (Rec pairs) body_usage
 	total_usage		         = foldr combineUsageDetails body_usage rhs_usages
 	(combined_usage, tagged_binders) = tagBinders total_usage sCC
 
-	new_bind	    	         = Rec (tagged_binders `zip` rhss')
+	new_bind = Rec (zipEqual "occAnalBind" tagged_binders rhss')
 \end{code}
 
 @occAnalRhs@ deals with the question of bindings where the Id is marked

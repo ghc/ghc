@@ -207,7 +207,7 @@ pprExpr sty (HsLam match)
 
 pprExpr sty expr@(HsApp e1 e2)
   = let (fun, args) = collect_args expr [] in
-    ppHang (pprParendExpr sty fun) 4 (ppSep (map (pprParendExpr sty) args))
+    ppHang (pprExpr sty fun) 4 (ppSep (map (pprExpr sty) args))
   where
     collect_args (HsApp fun arg) args = collect_args fun (arg:args)
     collect_args fun		 args = (fun, args)
@@ -217,11 +217,11 @@ pprExpr sty (OpApp e1 op e2)
       HsVar v -> pp_infixly v
       _	      -> pp_prefixly
   where
-    pp_e1 = pprParendExpr sty e1
-    pp_e2 = pprParendExpr sty e2
+    pp_e1 = pprExpr sty e1
+    pp_e2 = pprExpr sty e2
 
     pp_prefixly
-      = ppHang (pprParendExpr sty op) 4 (ppSep [pp_e1, pp_e2])
+      = ppHang (pprExpr sty op) 4 (ppSep [pp_e1, pp_e2])
 
     pp_infixly v
       = ppSep [pp_e1, ppCat [pprSym sty v, pp_e2]]

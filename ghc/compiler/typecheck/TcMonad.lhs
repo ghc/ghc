@@ -8,7 +8,7 @@ module TcMonad(
 	foldrTc, foldlTc, mapAndUnzipTc, mapAndUnzip3Tc,
 	mapBagTc, fixTc, tryTc,
 
-	returnNF_Tc, thenNF_Tc, thenNF_Tc_, mapNF_Tc, 
+	returnNF_Tc, thenNF_Tc, thenNF_Tc_, mapNF_Tc, fixNF_Tc,
 	listNF_Tc, mapAndUnzipNF_Tc, mapBagNF_Tc,
 
 	checkTc, checkTcM, checkMaybeTc, checkMaybeTcM, 
@@ -126,6 +126,9 @@ thenNF_Tc_ m k down env
 
 returnNF_Tc :: a -> NF_TcM s a
 returnNF_Tc v down env = returnSST v
+
+fixNF_Tc :: (a -> NF_TcM s a) -> NF_TcM s a
+fixNF_Tc m env down = fixSST (\ loop -> m loop env down)
 
 mapNF_Tc    :: (a -> NF_TcM s b) -> [a] -> NF_TcM s [b]
 mapNF_Tc f []     = returnNF_Tc []

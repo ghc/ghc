@@ -125,11 +125,10 @@ pprInPat sty (ConPatIn c pats)
  = if null pats then
       ppr sty c
    else
-      ppBesides [ppLparen, ppr sty c, ppSP, interppSP sty pats, ppRparen]
-
+      ppCat [ppr sty c, interppSP sty pats] -- ParPats put in the parens
 
 pprInPat sty (ConOpPatIn pat1 op pat2)
- = ppBesides [ppLparen, ppr sty pat1, ppSP, ppr sty op, ppSP, ppr sty pat2, ppRparen]
+ = ppCat [ppr sty pat1, ppr sty op, ppr sty pat2] -- ParPats put in parens
 
 	-- ToDo: use pprSym to print op (but this involves fiddling various
 	-- contexts & I'm lazy...); *PatIns are *rarely* printed anyway... (WDP)
