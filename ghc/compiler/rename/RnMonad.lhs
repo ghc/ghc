@@ -31,7 +31,7 @@ import IOExts		( IORef, newIORef, readIORef, writeIORef, unsafePerformIO )
 	
 import HsSyn		
 import RdrHsSyn
-import RnHsSyn		( RenamedFixitySig )
+import RnHsSyn		( RenamedFixitySig, RenamedDeprecation )
 import BasicTypes	( Version )
 import SrcLoc		( noSrcLoc )
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine,
@@ -193,6 +193,9 @@ type FixityEnv = NameEnv RenamedFixitySig
 	-- We keep the whole fixity sig so that we
 	-- can report line-number info when there is a duplicate
 	-- fixity declaration
+
+--------------------------------
+type DeprecationEnv = NameEnv RenamedDeprecation
 \end{code}
 
 \begin{code}
@@ -284,7 +287,7 @@ data ParsedIface
       pi_decls	   :: [(Version, RdrNameHsDecl)],	-- Local definitions
       pi_insts	   :: [RdrNameInstDecl],		-- Local instance declarations
       pi_rules	   :: [RdrNameRuleDecl],		-- Rules
-      pi_deprecs   :: [(Maybe FAST_STRING, FAST_STRING)] -- Deprecations, the type is currently only a hack
+      pi_deprecs   :: [RdrNameDeprecation]		-- Deprecations
     }
 
 data InterfaceDetails
@@ -330,8 +333,10 @@ data Ifaces = Ifaces {
 		-- Each is 'gated' by the names that must be available before
 		-- this instance decl is needed.
 
-		iRules :: Bag GatedDecl
+		iRules :: Bag GatedDecl,
 			-- Ditto transformation rules
+
+		iDeprecs :: DeprecationEnv
 	}
 
 type GatedDecl = (NameSet, (Module, RdrNameHsDecl))
@@ -419,7 +424,8 @@ emptyIfaces = Ifaces { iImpModInfo = emptyFM,
 			-- and we don't want thereby to try to suck it in!
 		       iVSlurp = [],
 		       iInsts = emptyBag,
-		       iRules = emptyBag
+		       iRules = emptyBag,
+		       iDeprecs = emptyNameEnv
 	      }
 
 -- mkUnboundName makes a place-holder Name; it shouldn't be looked at except possibly

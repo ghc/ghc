@@ -79,6 +79,7 @@ import Ratio ( (%) )
  'label'	{ ITlabel } 
  'dynamic'	{ ITdynamic }
  'unsafe'	{ ITunsafe }
+ 'with'		{ ITwith }
 
  '__interface'	{ ITinterface }			-- interface keywords
  '__export'	{ IT__export }
@@ -331,7 +332,7 @@ pragma	: src_loc PRAGMA	{ parseIface $2 PState{ bol = 0#, atbol = 1#,
 
 -----------------------------------------------------------------------------
 
-rules_and_deprecs :: { ([RdrNameRuleDecl], [(Maybe FAST_STRING, FAST_STRING)]) }
+rules_and_deprecs :: { ([RdrNameRuleDecl], [RdrNameDeprecation]) }
 rules_and_deprecs : {- empty -}	{ ([], []) }
 		  | rules_and_deprecs rule_or_deprec
 				{ let
@@ -342,7 +343,7 @@ rules_and_deprecs : {- empty -}	{ ([], []) }
 				  in append2 $1 $2
 				}
 
-rule_or_deprec :: { ([RdrNameRuleDecl], [(Maybe FAST_STRING, FAST_STRING)]) }
+rule_or_deprec :: { ([RdrNameRuleDecl], [RdrNameDeprecation]) }
 rule_or_deprec : pragma	{ case $1 of
 			     POk _ (PRules   rules)   -> (rules,[])
 			     POk _ (PDeprecs deprecs) -> ([],deprecs)
@@ -364,17 +365,17 @@ rule_forall	: '__forall' '{' core_bndrs '}'	{ $3 }
 		  
 -----------------------------------------------------------------------------
 
-deprecs 	:: { [(Maybe FAST_STRING, FAST_STRING)] }
+deprecs 	:: { [RdrNameDeprecation] }
 deprecs		: {- empty -}		{ [] }
 		| deprecs deprec ';'	{ $2 : $1 }
 
-deprec		:: { (Maybe FAST_STRING, FAST_STRING) }
-deprec		: STRING		{ (Nothing, $1) }
-		| deprec_name STRING	{ (Just $1, $2) }
+deprec		:: { RdrNameDeprecation }
+deprec		: STRING		{ DeprecMod     $1 }
+		| deprec_name STRING	{ DeprecName $1 $2 }
 
-deprec_name	:: { FAST_STRING }
-		: var_fs		{ $1 }
-		| tc_fs			{ $1 }
+deprec_name	:: { RdrName }
+		: var_name		{ $1 }
+		| tc_name		{ $1 }
 
 -----------------------------------------------------------------------------
 
@@ -510,6 +511,7 @@ var_fs		:: { EncodedFS }
 		| 'label'		{ SLIT("label") }
 		| 'dynamic'		{ SLIT("dynamic") }
 		| 'unsafe'		{ SLIT("unsafe") }
+		| 'with'		{ SLIT("with") }
 
 qvar_fs		:: { (EncodedFS, EncodedFS) }
 		:  QVARID		{ $1 }
@@ -853,7 +855,7 @@ data IfaceStuff = PIface 	EncodedFS{-.hi module name-} ParsedIface
 		| PIdInfo	[HsIdInfo RdrName]
 		| PType		RdrNameHsType
 		| PRules	[RdrNameRuleDecl]
-		| PDeprecs	[(Maybe FAST_STRING, FAST_STRING)]
+		| PDeprecs	[RdrNameDeprecation]
 
 mkConDecl name (ex_tvs, ex_ctxt) details loc = ConDecl name ex_tvs ex_ctxt details loc
 }

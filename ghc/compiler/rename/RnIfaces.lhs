@@ -24,11 +24,11 @@ import HsSyn		( HsDecl(..), TyClDecl(..), InstDecl(..), IfaceSig(..),
 			  HsType(..), ConDecl(..), IE(..), ConDetails(..), Sig(..),
 			  ForeignDecl(..), ForKind(..), isDynamic,
 			  FixitySig(..), RuleDecl(..),
-			  isClassOpSig
+			  isClassOpSig, Deprecation(..)
 			)
 import BasicTypes	( Version, NewOrData(..), defaultFixity )
 import RdrHsSyn		( RdrNameHsDecl, RdrNameInstDecl, RdrNameTyClDecl, RdrNameRuleDecl,
-			  extractHsTyRdrNames
+			  extractHsTyRdrNames, RdrNameDeprecation
 			)
 import RnEnv		( mkImportedGlobalName, newImportedBinder, mkImportedGlobalFromRdrName,
 			  lookupOccRn, lookupImplicitOccRn,
@@ -37,7 +37,7 @@ import RnEnv		( mkImportedGlobalName, newImportedBinder, mkImportedGlobalFromRdr
 			  FreeVars, emptyFVs
 			)
 import RnMonad
-import RnHsSyn          ( RenamedHsDecl )
+import RnHsSyn          ( RenamedHsDecl, RenamedDeprecation )
 import ParseIface	( parseIface, IfaceStuff(..) )
 
 import FiniteMap	( FiniteMap, sizeFM, emptyFM, delFromFM, listToFM,
@@ -148,13 +148,16 @@ loadInterface doc_str mod_name from
     let
 	rd_decls = pi_decls iface
     in
-    foldlRn (loadDecl mod)	     (iDecls ifaces) rd_decls 		`thenRn` \ new_decls ->
-    foldlRn (loadInstDecl mod)	     (iInsts ifaces) (pi_insts iface)	`thenRn` \ new_insts ->
-    (if (opt_IgnoreIfacePragmas) 
+    foldlRn (loadDecl mod)	      (iDecls ifaces) rd_decls 			`thenRn` \ new_decls ->
+    foldlRn (loadInstDecl mod)	      (iInsts ifaces) (pi_insts iface)		`thenRn` \ new_insts ->
+    (if opt_IgnoreIfacePragmas
 	then returnRn emptyBag
-	else foldlRn (loadRule mod)  (iRules ifaces) (pi_rules iface))	`thenRn` \ new_rules -> 
-    foldlRn (loadFixDecl mod_name)   (iFixes ifaces) rd_decls  		`thenRn` \ new_fixities ->
-    mapRn   (loadExport this_mod_nm) (pi_exports iface)			`thenRn` \ avails_s ->
+	else foldlRn (loadRule mod)   (iRules ifaces) (pi_rules iface))		`thenRn` \ new_rules ->
+    (if opt_IgnoreIfacePragmas
+	then returnRn emptyNameEnv
+	else foldlRn (loadDeprec mod) (iDeprecs ifaces) (pi_deprecs iface))	`thenRn` \ new_deprecs ->
+    foldlRn (loadFixDecl mod_name)    (iFixes ifaces) rd_decls  		`thenRn` \ new_fixities ->
+    mapRn   (loadExport this_mod_nm)  (pi_exports iface)			`thenRn` \ avails_s ->
     let
 	-- For an explicit user import, add to mod_map info about
 	-- the things the imported module depends on, extracted
@@ -170,8 +173,9 @@ loadInterface doc_str mod_name from
 	new_ifaces = ifaces { iImpModInfo = mod_map2,
 			      iDecls      = new_decls,
 			      iFixes      = new_fixities,
+			      iInsts      = new_insts,
 			      iRules	  = new_rules,
-			      iInsts      = new_insts }
+			      iDeprecs	  = new_deprecs }
     in
     setIfacesRn new_ifaces		`thenRn_`
     returnRn (mod, new_ifaces)
@@ -336,6 +340,16 @@ loadRule mod rules decl@(IfaceRuleDecl var body src_loc)
   = setModuleRn (moduleName mod) $
     mkImportedGlobalFromRdrName var		`thenRn` \ var_name ->
     returnRn ((unitNameSet var_name, (mod, RuleD decl)) `consBag` rules)
+
+loadDeprec :: Module -> DeprecationEnv -> RdrNameDeprecation -> RnM d DeprecationEnv
+loadDeprec mod deprec_env (DeprecMod txt)
+  = traceRn (text "module deprecation not yet implemented:" <+> ppr mod <> colon <+> ppr txt) `thenRn_`
+    returnRn deprec_env
+loadDeprec mod deprec_env (DeprecName rdr_name txt)
+  = setModuleRn (moduleName mod) $
+    mkImportedGlobalFromRdrName rdr_name `thenRn` \ name ->
+    traceRn (text "loaded deprecation for" <+> ppr name <> colon <+> ppr txt) `thenRn_`
+    returnRn (addToNameEnv deprec_env name (DeprecName name txt))
 \end{code}
 
 

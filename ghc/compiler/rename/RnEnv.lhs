@@ -57,6 +57,7 @@ import Maybes		( mapMaybe )
 %*********************************************************
 
 \begin{code}
+newImportedGlobalName :: ModuleName -> OccName -> Module -> RnM d Name
 newImportedGlobalName mod_name occ mod
   = getNameSupplyRn		`thenRn` \ (us, inst_ns, cache, ipcache) ->
     let
@@ -94,6 +95,7 @@ mkImportedGlobalName mod_name occ
   = lookupModuleRn mod_name `thenRn` \ mod ->
     newImportedGlobalName mod_name occ mod --(mkVanillaModule mod_name)
 	
+mkImportedGlobalFromRdrName :: RdrName -> RnM d Name 
 mkImportedGlobalFromRdrName rdr_name
   | isQual rdr_name
   = mkImportedGlobalName (rdrNameModule rdr_name) (rdrNameOcc rdr_name)

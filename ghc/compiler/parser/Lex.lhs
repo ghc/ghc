@@ -280,6 +280,7 @@ haskellKeywordsFM = listToUFM $
 	( "_scc_",	ITscc )
      ]
 
+-- IMPORTANT: Keep this in synch with ParseIface.y's var_fs production! (SUP)
 ghcExtensionKeywordsFM = listToUFM $
 	map (\ (x,y) -> (_PK_ x,y))
      [	( "forall",	ITforall ),

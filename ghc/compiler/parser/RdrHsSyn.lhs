@@ -36,6 +36,7 @@ module RdrHsSyn (
 	RdrNameTyClDecl,
 	RdrNameRuleDecl,
 	RdrNameRuleBndr,
+	RdrNameDeprecation,
 	RdrNameHsRecordBinds,
 
 	RdrBinding(..),
@@ -111,6 +112,7 @@ type RdrNameStmt		= Stmt			RdrName RdrNamePat
 type RdrNameTyClDecl		= TyClDecl		RdrName RdrNamePat
 type RdrNameRuleBndr            = RuleBndr              RdrName
 type RdrNameRuleDecl            = RuleDecl              RdrName RdrNamePat
+type RdrNameDeprecation         = Deprecation           RdrName
 
 type RdrNameHsRecordBinds	= HsRecordBinds		RdrName RdrNamePat
 

@@ -45,6 +45,7 @@ type RenamedRecordBinds		= HsRecordBinds		Name RenamedPat
 type RenamedSig			= Sig			Name
 type RenamedStmt		= Stmt			Name RenamedPat
 type RenamedFixitySig		= FixitySig		Name
+type RenamedDeprecation		= Deprecation		Name
 
 type RenamedClassOpPragmas	= ClassOpPragmas	Name
 type RenamedClassPragmas	= ClassPragmas		Name
