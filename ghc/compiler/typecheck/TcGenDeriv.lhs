@@ -1053,8 +1053,8 @@ we generate
     -- ToDo: add gmapT,Q,M, gfoldr
     
     fromConstr c = case conIndex c of
-    		1 -> T1 undefined undefined
-    		2 -> T2
+	    		I# 1# -> T1 undefined undefined
+    			I# 2# -> T2
     
     toConstr (T1 _ _) = $cT1
     toConstr T2	      = $cT2
@@ -1088,7 +1088,7 @@ gen_Data_binds fix_env tycon
     fromCon_bind = mk_FunMonoBind tycon_loc fromConstr_RDR [([c_Pat], from_con_rhs)]
     from_con_rhs = HsCase (HsVar conIndex_RDR `HsApp` c_Expr) 
 			  (map from_con_alt data_cons) tycon_loc
-    from_con_alt dc = mk_triv_Match (LitPat (HsInt (toInteger (dataConTag dc))))
+    from_con_alt dc = mk_triv_Match (ConPatIn mkInt_RDR (PrefixCon [LitPat (HsIntPrim (toInteger (dataConTag dc)))]))
 				    (mkHsVarApps (getRdrName dc)
 					         (replicate (dataConSourceArity dc) undefined_RDR))
 			  
@@ -1103,7 +1103,8 @@ gen_Data_binds fix_env tycon
 	------------ $dT
     data_type_name = mkDataTypeName tycon
     datatype_bind  = mkVarMonoBind tycon_loc data_type_name
-					     (ExplicitList placeHolderType constrs)
+				   (HsVar mkDataType_RDR `HsApp` 
+				    ExplicitList placeHolderType constrs)
     constrs = [HsVar (mkConstrName con) | con <- data_cons]
 
 	------------ $cT1 etc
