@@ -655,16 +655,22 @@ sub mangle_asm {
 		    || /^${T_US}.*_slow${T_POST_LBL}$/o         # slow entry
 		    || /^${T_US}__stginit.*${T_POST_LBL}$/o     # __stginit<module>
 		    || /^${T_US}.*_btm${T_POST_LBL}$/o          # large bitmaps
-		    || /^${T_US}.*_srtd${T_POST_LBL}$/o          # large bitmaps
 		    || /^${T_US}.*_fast${T_POST_LBL}$/o         # primops
-		    || /^${T_US}.*_closure_tbl${T_POST_LBL}$/o  # closure tables
                     || /^_uname:/o			        # x86/Solaris2
-		) {
-	    		$chkcat[$i]  = 'misc';
-		  } else {
-	       		print STDERR "Warning: retaining unknown function \`$thing' in output from C compiler\n";
-	    		$chkcat[$i]  = 'unknown';
-		}
+		)
+            {
+	    	$chkcat[$i]  = 'misc';
+            } elsif (
+		       /^${T_US}.*_srtd${T_POST_LBL}$/o          # large bitmaps
+		    || /^${T_US}.*_closure_tbl${T_POST_LBL}$/o  # closure tables
+                )
+            {
+                $chkcat[$i] = 'rodata';
+            } else
+            {
+	        print STDERR "Warning: retaining unknown function \`$thing' in output from C compiler\n";
+	    	$chkcat[$i]  = 'unknown';
+	    }
 
 	} elsif ( $TargetPlatform =~ /^powerpc-apple-.*/ && ( 
 		   /^\.picsymbol_stub/
