@@ -6,6 +6,7 @@ module TcEnv(
 	-- Getting stuff from the environment
 	TcEnv, initTcEnv, 
 	tcEnvTyCons, tcEnvClasses, tcEnvIds, tcEnvTcIds, tcEnvTyVars,
+	getTcGST,
 	
 	-- Instance environment
 	tcGetInstEnv, tcSetInstEnv, 
@@ -158,6 +159,8 @@ tcEnvTyCons  env = [tc | ATyCon tc <- nameEnvElts (tcGEnv env)]
 tcEnvIds     env = [id | AnId   id <- nameEnvElts (tcGEnv env)] 
 tcEnvTyVars  env = [tv | ATyVar tv <- nameEnvElts (tcLEnv env)]
 tcEnvTcIds   env = [id | ATcId  id <- nameEnvElts (tcLEnv env)]
+
+getTcGST (TcEnv { tcGST = gst }) = gst
 
 -- This data type is used to help tie the knot
 -- when type checking type and class declarations

@@ -121,7 +121,7 @@ nameModule name				  = pprPanic "nameModule" (ppr name)
 \begin{code}
 isLocallyDefinedName	:: Name -> Bool
 isUserExportedName	:: Name -> Bool
-isLocalName		:: Name -> Bool		-- Not globala
+isLocalName		:: Name -> Bool		-- Not globals
 isGlobalName		:: Name -> Bool
 isSystemName		:: Name -> Bool
 isExternallyVisibleName :: Name -> Bool

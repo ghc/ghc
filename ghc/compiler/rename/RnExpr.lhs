@@ -26,12 +26,12 @@ import RnHsSyn
 import RnMonad
 import RnEnv
 import RnIfaces		( lookupFixityRn )
-import CmdLineOpts	( dopt_GlasgowExts, opt_IgnoreAsserts )
+import CmdLineOpts	( DynFlag(..), opt_IgnoreAsserts )
 import Literal		( inIntRange )
 import BasicTypes	( Fixity(..), FixityDirection(..), defaultFixity, negateFixity )
 import PrelNames	( hasKey, assertIdKey,
 			  eqClass_RDR, foldr_RDR, build_RDR, eqString_RDR,
-			  ccallableClass_RDR, creturnableClass_RDR, 
+			  cCallableClass_RDR, cReturnableClass_RDR, 
 			  monadClass_RDR, enumClass_RDR, ordClass_RDR,
 			  ratioDataCon_RDR, negate_RDR, assertErr_RDR,
 			  ioDataCon_RDR, plusInteger_RDR, timesInteger_RDR
@@ -67,9 +67,9 @@ rnPat (VarPatIn name)
     returnRn (VarPatIn vname, emptyFVs)
 
 rnPat (SigPatIn pat ty)
-  = doptsRn dopt_GlasgowExts `thenRn` \ opt_GlasgowExts ->
+  = doptRn Opt_GlasgowExts `thenRn` \ glaExts ->
     
-    if opt_GlasgowExts
+    if glaExts
     then rnPat pat		`thenRn` \ (pat', fvs1) ->
          rnHsType doc ty	`thenRn` \ (ty',  fvs2) ->
          returnRn (SigPatIn pat' ty', fvs1 `plusFV` fvs2)
@@ -184,7 +184,7 @@ rnMatch match@(Match _ pats maybe_rhs_sig grhss)
 
     mapFvRn rnPat pats			`thenRn` \ (pats', pat_fvs) ->
     rnGRHSs grhss			`thenRn` \ (grhss', grhss_fvs) ->
-    doptsRn dopt_GlasgowExts		`thenRn` \ opt_GlasgowExts ->
+    doptRn Opt_GlasgowExts		`thenRn` \ opt_GlasgowExts ->
     (case maybe_rhs_sig of
 	Nothing -> returnRn (Nothing, emptyFVs)
 	Just ty | opt_GlasgowExts -> rnHsType doc_sig ty	`thenRn` \ (ty', ty_fvs) ->
@@ -220,7 +220,7 @@ rnGRHSs (GRHSs grhss binds maybe_ty)
     returnRn (GRHSs grhss' binds' Nothing, fvGRHSs)
 
 rnGRHS (GRHS guarded locn)
-  = doptsRn dopt_GlasgowExts		`thenRn` \ opt_GlasgowExts ->
+  = doptRn Opt_GlasgowExts		`thenRn` \ opt_GlasgowExts ->
     pushSrcLocRn locn $		    
     (if not (opt_GlasgowExts || is_standard_guard guarded) then
 		addWarnRn (nonStdGuardErr guarded)
@@ -345,8 +345,8 @@ rnExpr section@(SectionR op expr)
 
 rnExpr (HsCCall fun args may_gc is_casm fake_result_ty)
 	-- Check out the comment on RnIfaces.getNonWiredDataDecl about ccalls
-  = lookupOrigNames [ccallableClass_RDR, 
-			  creturnableClass_RDR, 
+  = lookupOrigNames [cCallableClass_RDR, 
+			  cReturnableClass_RDR, 
 			  ioDataCon_RDR]	`thenRn` \ implicit_fvs ->
     rnExprs args				`thenRn` \ (args', fvs_args) ->
     returnRn (HsCCall fun args' may_gc is_casm fake_result_ty, 
@@ -799,7 +799,7 @@ litFVs (HsInt i)	      = returnRn (unitFV (getName intTyCon))
 litFVs (HsIntPrim i)          = returnRn (unitFV (getName intPrimTyCon))
 litFVs (HsFloatPrim f)        = returnRn (unitFV (getName floatPrimTyCon))
 litFVs (HsDoublePrim d)       = returnRn (unitFV (getName doublePrimTyCon))
-litFVs (HsLitLit l bogus_ty)  = lookupOrigName ccallableClass_RDR	`thenRn` \ cc ->   
+litFVs (HsLitLit l bogus_ty)  = lookupOrigName cCallableClass_RDR	`thenRn` \ cc ->   
 				returnRn (unitFV cc)
 litFVs lit		      = pprPanic "RnExpr.litFVs" (ppr lit)	-- HsInteger and HsRat only appear 
 									-- in post-typechecker translations

@@ -8,7 +8,7 @@ The bits common to TcInstDcls and TcDeriv.
 \begin{code}
 module TcInstUtil (
 	InstInfo(..), pprInstInfo,
-	simpleInstInfoTy, simpleInstInfoTyCon, 
+	simpleInstInfoTy, simpleInstInfoTyCon, simpleDFunClassTyCon,
 
 	-- Instance environment
 	InstEnv, emptyInstEnv, extendInstEnv,

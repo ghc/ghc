@@ -31,15 +31,16 @@ import RnEnv		( bindLocatedLocalsRn, lookupBndrRn,
 			  warnUnusedLocalBinds, mapFvRn, extendTyVarEnvFVRn,
 			  FreeVars, emptyFVs, plusFV, plusFVs, unitFV, addOneFV
 			)
-import CmdLineOpts	( opt_WarnMissingSigs )
+import CmdLineOpts	( DynFlag(..) )
 import Digraph		( stronglyConnComp, SCC(..) )
-import Name		( OccName, Name, nameOccName, mkUnboundName, isUnboundName )
+import Name		( OccName, Name, nameOccName )
 import NameSet
 import RdrName		( RdrName, rdrNameOcc )
 import BasicTypes	( RecFlag(..) )
 import List		( partition )
 import Bag		( bagToList )
 import Outputable
+import PrelNames	( mkUnboundName, isUnboundName )
 \end{code}
 
 -- ToDo: Put the annotations into the monad, so that they arrive in the proper
@@ -169,11 +170,13 @@ rnTopMonoBinds mbinds sigs
     let
 	bndr_name_set = mkNameSet binder_names
     in
-    renameSigs (okBindSig bndr_name_set) sigs `thenRn` \ (siglist, sig_fvs) ->
+    renameSigs (okBindSig bndr_name_set) sigs 	`thenRn` \ (siglist, sig_fvs) ->
+    doptRn Opt_WarnMissingSigs			`thenRn` \ warnMissing ->
     let
 	type_sig_vars	= [n | Sig n _ _ <- siglist]
-	un_sigd_binders | opt_WarnMissingSigs = nameSetToList (delListFromNameSet bndr_name_set type_sig_vars)
-			| otherwise	      = []
+	un_sigd_binders | warnMissing = nameSetToList (delListFromNameSet 
+                                                          bndr_name_set type_sig_vars)
+			| otherwise   = []
     in
     mapRn_ (addWarnRn.missingSigWarn) un_sigd_binders	`thenRn_`
 

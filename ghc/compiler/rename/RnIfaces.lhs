@@ -5,7 +5,10 @@
 
 \begin{code}
 module RnIfaces (
-	findAndReadIface, 
+#if 1
+	lookupFixityRn
+#else
+ 	findAndReadIface, 
 
 	getInterfaceExports, getDeferredDecls,
 	getImportedInstDecls, getImportedRules,
@@ -17,6 +20,7 @@ module RnIfaces (
 
 	getDeclBinders, getDeclSysBinders,
 	removeContext	 	-- removeContext probably belongs somewhere else
+#endif
     ) where
 
 #include "HsVersions.h"
@@ -41,11 +45,11 @@ import ParseIface	( parseIface, IfaceStuff(..) )
 
 import Name		( Name {-instance NamedThing-}, nameOccName,
 			  nameModule, isLocallyDefined, 
-			  isWiredInName, NamedThing(..),
+			  {-isWiredInName, -} NamedThing(..),
 			  elemNameEnv, extendNameEnv
 			 )
-import Module		( Module, mkVanillaModule, pprModuleName,
-			  moduleName, isLocalModule,
+import Module		( Module, mkVanillaModule,
+			  moduleName, isModuleInThisPackage,
 			  ModuleName, WhereFrom(..),
 			)
 import RdrName		( RdrName, rdrNameOcc )
@@ -62,8 +66,14 @@ import Lex
 import FiniteMap
 import Outputable
 import Bag
+import HscTypes
 
 import List	( nub )
+
+#if 1
+import Panic ( panic )
+lookupFixityRn = panic "lookupFixityRn"
+#else
 \end{code}
 
 
@@ -82,12 +92,12 @@ loadOrphanModules :: [ModuleName] -> RnM d ()
 loadOrphanModules mods
   | null mods = returnRn ()
   | otherwise = traceRn (text "Loading orphan modules:" <+> 
-			 fsep (map pprModuleName mods))		`thenRn_` 
+			 fsep (map mods))			`thenRn_` 
 		mapRn_ load mods				`thenRn_`
 		returnRn ()
   where
     load mod   = loadInterface (mk_doc mod) mod ImportBySystem
-    mk_doc mod = pprModuleName mod <+> ptext SLIT("is a orphan-instance module")
+    mk_doc mod = ppr mod <+> ptext SLIT("is a orphan-instance module")
 	   
 
 loadInterface :: SDoc -> ModuleName -> WhereFrom -> RnM d Ifaces
@@ -164,7 +174,7 @@ tryLoadInterface doc_str mod_name from
 	-- about, it should be from a different package to this one
     WARN( not (maybeToBool mod_info) && 
 	  case from of { ImportBySystem -> True; other -> False } &&
-	  isLocalModule mod,
+	  isModuleInThisPackage mod,
 	  ppr mod )
 
     loadDecls mod		(iDecls ifaces)	  (pi_decls iface)	`thenRn` \ (decls_vers, new_decls) ->
@@ -220,7 +230,8 @@ addModDeps mod new_deps mod_deps
 	-- and in that case, forget about the boot indicator
     filtered_new_deps :: (ModuleName, (WhetherHasOrphans, IsBootInterface))
     filtered_new_deps
-	| isLocalModule mod = [ (imp_mod, (has_orphans, is_boot, False))
+	| isModuleInThisPackage mod 
+			    = [ (imp_mod, (has_orphans, is_boot, False))
 			      | (imp_mod, has_orphans, is_boot, _) <- new_deps 
 			      ]			      
 	| otherwise	    = [ (imp_mod, (True, False, False))
@@ -485,7 +496,7 @@ checkModUsage ((mod_name, _, _, whats_imported)  : rest)
   = tryLoadInterface doc_str mod_name ImportBySystem	`thenRn` \ (ifaces, maybe_err) ->
     case maybe_err of {
 	Just err -> out_of_date (sep [ptext SLIT("Can't find version number for module"), 
-				      pprModuleName mod_name]) ;
+				      ppr mod_name]) ;
 		-- Couldn't find or parse a module mentioned in the
 		-- old interface file.  Don't complain -- it might just be that
 		-- the current module doesn't need that import and it's been deleted
@@ -503,10 +514,10 @@ checkModUsage ((mod_name, _, _, whats_imported)  : rest)
     in
 	-- If the module version hasn't changed, just move on
     if new_mod_vers == old_mod_vers then
-	traceRn (sep [ptext SLIT("Module version unchanged:"), pprModuleName mod_name])
+	traceRn (sep [ptext SLIT("Module version unchanged:"), ppr mod_name])
 	`thenRn_` checkModUsage rest
     else
-    traceRn (sep [ptext SLIT("Module version has changed:"), pprModuleName mod_name])
+    traceRn (sep [ptext SLIT("Module version has changed:"), ppr mod_name])
     `thenRn_`
 	-- Module version changed, so check entities inside
 
@@ -534,7 +545,7 @@ checkModUsage ((mod_name, _, _, whats_imported)  : rest)
 	returnRn outOfDate	-- This one failed, so just bail out now
     }}
   where
-    doc_str = sep [ptext SLIT("need version info for"), pprModuleName mod_name]
+    doc_str = sep [ptext SLIT("need version info for"), ppr mod_name]
 
 
 checkEntityUsage mod decls [] 
@@ -699,15 +710,18 @@ getInterfaceExports mod_name from
   = getHomeSymbolTableRn 		`thenRn` \ hst ->
     case lookupModuleEnvByName hst mod_name of {
 	Just mds -> returnRn (mdModule mds, mdExports mds) ;
- 
-    loadInterface doc_str mod_name from	`thenRn` \ ifaces ->
-    case lookupModuleEnv (iPST ifaces) mod_name of
-	Just mds -> returnRn (mdModule mod, mdExports mds)
-	-- loadInterface always puts something in the map
-	-- even if it's a fake
+        Nothing  -> pprPanic "getInterfaceExports" (ppr mod_name)
+
+-- I think this is what it _used_ to say.  JRS, 001017 
+--    loadInterface doc_str mod_name from	`thenRn` \ ifaces ->
+--    case lookupModuleEnv (iPST ifaces) mod_name of
+--	Just mds -> returnRn (mdModule mod, mdExports mds)
+--	-- loadInterface always puts something in the map
+--	-- even if it's a fake
+
     }
     where
-      doc_str = sep [pprModuleName mod_name, ptext SLIT("is directly imported")]
+      doc_str = sep [ppr mod_name, ptext SLIT("is directly imported")]
 \end{code}
 
 
@@ -950,7 +964,7 @@ mkImportExportInfo this_mod export_avails exports
 						-- but don't actually *use* anything from Foo
 					 	-- In which case record an empty dependency list
 		   where
-		     is_lib_module = not (isLocalModule mod)
+		     is_lib_module = not (isModuleInThisPackage mod)
 		     is_sys_import = case how_imported of
 					ImportBySystem -> True
 					other	       -> False
@@ -1152,7 +1166,7 @@ findAndReadIface doc_str mod_name hi_boot_file
     trace_msg = sep [hsep [ptext SLIT("Reading"), 
 			   if hi_boot_file then ptext SLIT("[boot]") else empty,
 			   ptext SLIT("interface for"), 
-			   pprModuleName mod_name <> semi],
+			   ppr mod_name <> semi],
 		     nest 4 (ptext SLIT("reason:") <+> doc_str)]
 \end{code}
 
@@ -1199,7 +1213,7 @@ readIface wanted_mod file_path
 
 \begin{code}
 noIfaceErr mod_name boot_file search_path
-  = vcat [ptext SLIT("Could not find interface file for") <+> quotes (pprModuleName mod_name),
+  = vcat [ptext SLIT("Could not find interface file for") <+> quotes (ppr mod_name),
 	  ptext SLIT("in the directories") <+> 
 			-- \& to avoid cpp interpreting this string as a
 			-- comment starter with a pre-4.06 mkdependHS --SDM
@@ -1229,14 +1243,15 @@ importDeclWarn name
 
 warnRedundantSourceImport mod_name
   = ptext SLIT("Unnecessary {- SOURCE -} in the import of module")
-          <+> quotes (pprModuleName mod_name)
+          <+> quotes (ppr mod_name)
 
 hiModuleNameMismatchWarn :: Module -> ModuleName  -> Message
 hiModuleNameMismatchWarn requested_mod read_mod = 
     hsep [ ptext SLIT("Something is amiss; requested module name")
-	 , ppr requested_mod
+	 , ppr (moduleName requested_mod)
 	 , ptext SLIT("differs from name found in the interface file")
-   	 , pprModuleName read_mod
+   	 , ppr read_mod
   	 ]
 
 \end{code}
+#endif /* TEMP DEBUG HACK! */

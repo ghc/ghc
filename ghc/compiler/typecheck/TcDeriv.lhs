@@ -13,18 +13,20 @@ module TcDeriv ( tcDeriving ) where
 import HsSyn		( HsBinds(..), MonoBinds(..), collectLocatedMonoBinders )
 import RdrHsSyn		( RdrNameMonoBinds )
 import RnHsSyn		( RenamedHsBinds )
-import CmdLineOpts	( opt_D_dump_deriv )
+import CmdLineOpts	( DynFlag(..) )
 
 import TcMonad
-import TcEnv		( InstEnv, getEnvTyCons, tcSetInstEnv, newDFunName )
+import TcEnv		( TcEnv, tcSetInstEnv, getTcGST, newDFunName )
 import TcGenDeriv	-- Deriv stuff
-import TcInstUtil	( InstInfo(..), pprInstInfo, simpleDFunClassTyCon, extendInstEnv )
+import TcInstUtil	( InstInfo(..), InstEnv, 
+			  pprInstInfo, simpleDFunClassTyCon, extendInstEnv )
 import TcSimplify	( tcSimplifyThetas )
 
 import RnBinds		( rnMethodBinds, rnTopMonoBinds )
 import RnEnv		( bindLocatedLocalsRn )
-import RnMonad		( RnNameSupply, 
+import RnMonad		( --RnNameSupply, 
 			  renameSourceCode, thenRn, mapRn, returnRn )
+import HscTypes		( DFunId, GlobalSymbolTable, PersistentRenamerState )
 
 import Bag		( Bag, emptyBag, unionBags, listToBag )
 import Class		( classKey, Class )
@@ -35,17 +37,17 @@ import DataCon		( dataConArgTys, isNullaryDataCon, isExistentialDataCon )
 import PrelInfo		( needsDataDeclCtxtClassKeys )
 import Maybes		( maybeToBool, catMaybes )
 import Module		( Module )
-import Name		( isLocallyDefined, getSrcLoc, NamedThing(..) )
+import Name		( Name, isLocallyDefined, getSrcLoc, NamedThing(..) )
 import RdrName		( RdrName )
-import RnMonad		( FixityEnv )
+--import RnMonad		( FixityEnv )
 
 import TyCon		( tyConTyVars, tyConDataCons, tyConDerivings,
 			  tyConTheta, maybeTyConSingleCon, isDataTyCon,
 			  isEnumerationTyCon, isAlgTyCon, TyCon
 			)
 import Type		( TauType, mkTyVarTys, mkTyConApp,
-			  mkSigmaTy, mkDictTy, isUnboxedType,
-			  splitAlgTyConApp, classesToPreds
+			  mkSigmaTy, splitSigmaTy, splitDictTy, mkDictTy, 
+			  isUnboxedType, splitAlgTyConApp, classesToPreds
 			)
 import TysWiredIn	( voidTy )
 import Var		( TyVar )
@@ -215,7 +217,7 @@ tcDeriving prs mod inst_env_in local_tycons
     let
 	extra_mbind_list = map gen_tag_n_con_monobind nm_alist_etc
 	extra_mbinds     = foldr AndMonoBinds EmptyMonoBinds extra_mbind_list
-	method_binds_s   = map (gen_bind (tcGST env)) new_dfuns
+	method_binds_s   = map (gen_bind (getTcGST env)) new_dfuns
 	mbinders	 = collectLocatedMonoBinders extra_mbinds
 	
 	-- Rename to get RenamedBinds.
@@ -231,7 +233,7 @@ tcDeriving prs mod inst_env_in local_tycons
     in
     mapNF_Tc gen_inst_info (new_dfuns `zip` rn_method_binds_s)	`thenNF_Tc` \ new_inst_infos ->
 
-    ioToTc (dumpIfSet opt_D_dump_deriv "Derived instances" 
+    ioToTc (dumpIfSet Opt_D_dump_deriv "Derived instances" 
 		      (ddump_deriving new_inst_infos rn_extra_binds))	`thenTc_`
 
     returnTc (new_inst_infos, rn_extra_binds)
@@ -248,7 +250,7 @@ tcDeriving prs mod inst_env_in local_tycons
 		   iTys = tys, iTheta = theta, 
 		   iDFunId = dfun, iBinds = binds,
 		   iLoc = getSrcLoc dfun, iPrags = [] }
-      where
+        where
 	 (tyvars, theta, tau) = splitSigmaTy dfun
 	 (clas, tys)	      = splitDictTy tau
 
@@ -286,7 +288,7 @@ makeDerivEqns this_mod local_tycons
 	think_about_deriving = need_deriving local_tycons
 	(derive_these, _)    = removeDups cmp_deriv think_about_deriving
     in
-    if null local_data_tycons then
+    if null local_tycons then
 	returnTc []	-- Bale out now
     else
     mapTc mk_eqn derive_these `thenTc`	\ maybe_eqns ->
@@ -313,15 +315,16 @@ makeDerivEqns this_mod local_tycons
 
     mk_eqn (clas, tycon)
       = case chk_out clas tycon of
-	   Just err ->  addErrTc err	`thenNF_Tc_` 
+	   Just err ->  addErrTc err				`thenNF_Tc_` 
 			returnNF_Tc Nothing
-	   Nothing  ->  newDFunName this_mod clas tys locn 	`thenNF_Tc` \ dfun_name ->
+	   Nothing  ->  newDFunName this_mod clas tyvar_tys locn `thenNF_Tc` \ dfun_name ->
 			returnNF_Tc (Just (dfun_name, clas, tycon, tyvars, constraints))
       where
 	clas_key  = classKey clas
 	tyvars    = tyConTyVars tycon	-- ToDo: Do we need new tyvars ???
 	tyvar_tys = mkTyVarTys tyvars
 	data_cons = tyConDataCons tycon
+	locn	  = getSrcLoc tycon
 
 	constraints = extra_constraints ++ concat (map mk_constraints data_cons)
 
@@ -436,15 +439,15 @@ add_solns :: InstEnv				-- The global, non-derived ones
 
 add_solns inst_env_in eqns solns
   = (new_dfuns, inst_env)
-  where
-    new_dfuns     = zipWithEqual "add_solns" mk_deriv_dfun eqns solns
-    (inst_env, _) = extendInstEnv inst_env_in 	
+    where
+      new_dfuns     = zipWithEqual "add_solns" mk_deriv_dfun eqns solns
+      (inst_env, _) = extendInstEnv inst_env_in 	
 	-- Ignore the errors about duplicate instances.
 	-- We don't want repeated error messages
 	-- They'll appear later, when we do the top-level extendInstEnvs
 
-    mk_deriv_dfun (dfun_name clas, tycon, tyvars, _) theta
-      = mkDictFunId dfun_name clas tyvars [mkTyConApp tycon (mkTyVarTys tyvars)] theta
+      mk_deriv_dfun (dfun_name, clas, tycon, tyvars, _) theta
+        = mkDictFunId dfun_name clas tyvars [mkTyConApp tycon (mkTyVarTys tyvars)] theta
 \end{code}
 
 %************************************************************************
@@ -514,7 +517,7 @@ the renamer.  What a great hack!
 -- (paired with class name, as we need that when generating dict
 --  names.)
 gen_bind :: GlobalSymbolTable -> DFunId -> RdrNameMonoBinds
-gen_bind fixities inst
+gen_bind fixities dfun
   | not (isLocallyDefined tycon) = EmptyMonoBinds
   | clas `hasKey` showClassKey   = gen_Show_binds fixities tycon
   | clas `hasKey` readClassKey   = gen_Read_binds fixities tycon
@@ -575,7 +578,7 @@ gen_taggery_Names dfuns
   = foldlTc do_con2tag []           tycons_of_interest `thenTc` \ names_so_far ->
     foldlTc do_tag2con names_so_far tycons_of_interest
   where
-    all_CTs = map simplDFunClassTyCon dfuns
+    all_CTs = map simpleDFunClassTyCon dfuns
     all_tycons		    = map snd all_CTs
     (tycons_of_interest, _) = removeDups compare all_tycons
     
@@ -611,7 +614,6 @@ gen_taggery_Names dfuns
 	is_in_eqns clas_key tycon ((c,t):cts)
 	  =  (clas_key == classKey c && tycon == t)
 	  || is_in_eqns clas_key tycon cts
-
 \end{code}
 
 \begin{code}

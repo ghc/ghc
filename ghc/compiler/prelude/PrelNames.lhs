@@ -807,6 +807,16 @@ enumFrom_RDR		= nameRdrName enumFromName
 mkInt_RDR		= nameRdrName intDataConName
 enumFromThen_RDR	= nameRdrName enumFromThenName
 enumFromThenTo_RDR	= nameRdrName enumFromThenToName
+ratioDataCon_RDR	= nameRdrName ratioDataConName
+plusInteger_RDR		= nameRdrName plusIntegerName
+timesInteger_RDR	= nameRdrName timesIntegerName
+enumClass_RDR		= nameRdrName enumClassName
+monadClass_RDR		= nameRdrName monadClassName
+ioDataCon_RDR		= nameRdrName ioDataConName
+cCallableClass_RDR	= nameRdrName cCallableClassName
+cReturnableClass_RDR	= nameRdrName cReturnableClassName
+eqClass_RDR		= nameRdrName eqClassName
+eqString_RDR		= nameRdrName eqStringName
 \end{code}
 
 
