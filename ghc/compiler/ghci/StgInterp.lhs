@@ -913,6 +913,11 @@ repOf (NonRecI _ _)    = RepI
 repOf (NonRecF _ _)    = RepF
 repOf (NonRecD _ _)    = RepD
 
+repOf (RecP _ _)       = RepP
+repOf (RecI _ _)       = RepI
+repOf (RecF _ _)       = RepF
+repOf (RecD _ _)       = RepD
+
 repOf (LitI _)         = RepI
 repOf (LitF _)         = RepF
 repOf (LitD _)         = RepD
