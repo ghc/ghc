@@ -1,18 +1,13 @@
 
 rnfail014.hs:8:
-    All of the type variable(s) in the constraint `Eq a' are already in scope
-	At least one must be universally quantified here
-    In the type signature for an instance decl
+    Ambiguous constraint `Eq a'
+	for the type: {Eq Bool}
+	Each forall'd type variable mentioned by the constraint must appear after the =>
 
 rnfail014.hs:12:
-    All of the type variable(s) in the constraint `Eq a' are already in scope
-	At least one must be universally quantified here
-    In the type signature for `f'
-
-rnfail014.hs:17:
-    All of the type variable(s) in the constraint `Eq a' are already in scope
-	At least one must be universally quantified here
-    In the type signature for `op'
+    Ambiguous constraint `Eq a'
+	for the type: Int -> Int
+	Each forall'd type variable mentioned by the constraint must appear after the =>
 
 Compilation had errors
 
