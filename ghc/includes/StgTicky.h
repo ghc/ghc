@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: StgTicky.h,v 1.8 1999/10/14 13:12:22 simonmar Exp $
+ * $Id: StgTicky.h,v 1.9 1999/11/11 17:50:47 simonpj Exp $
  *
  * (c) The AQUA project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -136,7 +136,6 @@
 #define TICK_ENT_VIA_NODE()	ENT_VIA_NODE_ctr++
 
 #define TICK_ENT_THK()		ENT_THK_ctr++         /* thunk */
-#define TICK_ENT_FUN_STD()	ENT_FUN_STD_ctr++     /* std entry pt */
 
 typedef struct _StgEntCounter {
     unsigned	registeredp:16,	/* 0 == no, 1 == yes */
@@ -145,7 +144,8 @@ typedef struct _StgEntCounter {
 				/* (rest of args are in registers) */
     StgChar	*str;		/* name of the thing */
     StgChar	*arg_kinds;	/* info about the args types */
-    I_		ctr;		/* the actual counter */
+    I_		entry_count;	  /* Trips to fast entry code */
+    I_		slow_entry_count; /* Trips to slow entry code */
     I_          allocs;         /* number of allocations by this fun */
     struct _StgEntCounter *link;/* link to chain them all together */
 } StgEntCounter;
@@ -154,7 +154,14 @@ typedef struct _StgEntCounter {
    static StgEntCounter f_ct			\
 	= { 0, arity, args,			\
 	    str, arg_kinds, 			\
-	    0, 0, NULL };
+	    0, 0, 0, NULL };
+
+/* The slow entry point for a function always goes to
+   the fast entry point, which will register the stats block,
+   so no need to do so here */
+#define TICK_ENT_FUN_STD(f_ct)                          	\
+        f_ct.slow_entry_count++;                                \
+        ENT_FUN_STD_ctr++     /* The total one */
 
 #define TICK_ENT_FUN_DIRECT(f_ct)				\
 	{							\
@@ -165,9 +172,9 @@ typedef struct _StgEntCounter {
 	    /* mark it as "registered" */			\
 	    f_ct.registeredp = 1;				\
 	  }							\
-	  f_ct.ctr += 1;					\
+	  f_ct.entry_count += 1;				\
 	}							\
-	ENT_FUN_DIRECT_ctr++ /* the old boring one */
+	ENT_FUN_DIRECT_ctr++ /* The total one */
 
 extern StgEntCounter top_ct;
 extern StgEntCounter *ticky_entry_ctrs;
@@ -579,7 +586,7 @@ EXTERN unsigned long GC_WORDS_COPIED_ctr INIT(0);
 #define TICK_ENT_VIA_NODE()	
 				
 #define TICK_ENT_THK()
-#define TICK_ENT_FUN_STD()
+#define TICK_ENT_FUN_STD(n)
 #define TICK_ENT_FUN_DIRECT(n)
 				
 #define TICK_ENT_CON(n)

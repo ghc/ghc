@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Ticky.c,v 1.11 1999/10/14 13:44:55 simonpj Exp $
+ * $Id: Ticky.c,v 1.12 1999/11/11 17:50:48 simonpj Exp $
  *
  * (c) The AQUA project, Glasgow University, 1992-1997
  * (c) The GHC Team, 1998-1999
@@ -550,14 +550,15 @@ printRegisteredCounterInfo (FILE *tf)
     if ( ticky_entry_ctrs != NULL ) {
       fprintf(tf,"\n**************************************************\n\n");
     }
-    fprintf(tf, "%-11s%-11s %6s%6s    %-16s%-30s\n",
-	    "Entries", "Allocs", "Arity", "Stack", "Kinds", "Function");
+    fprintf(tf, "%11s%11s%11s %6s%6s    %-11s%-30s\n",
+	    "Entries", "Slow ent", "Allocs", "Arity", "Stack", "Kinds", "Function");
     fprintf(tf, "--------------------------------------------------------------------------------\n");
     /* Function name at the end so it doesn't mess up the tabulation */
 
     for (p = ticky_entry_ctrs; p != NULL; p = p->link) {
-	fprintf(tf, "%11ld%11ld%6u%6u     %-11s%-30s",
-		p->ctr,
+	fprintf(tf, "%11ld%11ld%11ld %6u%6u    %-11s%-30s",
+		p->entry_count,
+		p->slow_entry_count,
 		p->allocs,
 		p->arity,
 		p->stk_args,
@@ -575,7 +576,7 @@ printRegisteredCounterInfo (FILE *tf)
 StgEntCounter top_ct
 	= { 0, 0, 0,
 	    "TOP", "",
-	    0, 0, NULL };
+	    0, 0, 0, NULL };
 
 #endif /* TICKY_TICKY */
 

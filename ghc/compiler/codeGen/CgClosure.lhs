@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.37 1999/11/02 15:05:43 simonmar Exp $
+% $Id: CgClosure.lhs,v 1.38 1999/11/11 17:50:49 simonpj Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -342,7 +342,9 @@ closureCodeBody binder_info closure_info cc all_args body
 	--slow_entry_code = forceHeapCheck [] True slow_entry_code'
 
     	slow_entry_code
-      	  = profCtrC SLIT("TICK_ENT_FUN_STD") []	    `thenC`
+	  = profCtrC SLIT("TICK_ENT_FUN_STD") [
+		    CLbl ticky_ctr_label DataPtrRep
+	    ] `thenC`
 
 	    -- Bind args, and record expected position of stk ptrs
 	    mapCs bindNewToStack arg_offsets	  	    `thenC`
