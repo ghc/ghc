@@ -508,6 +508,8 @@ it looks.
 <tag>@-i<dirs>@</tag><nidx>-i&lt;dirs&gt; option</nidx> This flag
 prepends a colon-separated list of @dirs@ to the ``import
 directories'' list.
+See also Section <ref id="recomp"> for the significance of using
+relative and absolute pathnames in the @-i@ list.
 
 <tag>@-i@</tag> resets the ``import directories'' list back to nothing.
 
@@ -614,18 +616,24 @@ signature within the interface file.  It also keeps in every interface
 file a list of the version numbers of everything it used when it last
 compiled the file.  If the source file's modification date is earlier
 than the @.o@ file's date (i.e. the source hasn't changed since the
-file was last compiled), and you give GHC the @-recomp@<nidx>-recomp
-option</nidx> flag, then GHC will be clever.  It compares the version
+file was last compiled), GHC will be clever.  It compares the version
 numbers on the things it needs this time with the version numbers on
 the things it needed last time (gleaned from the interface file of the
 module being compiled); if they are all the same it stops compiling
 rather early in the process saying ``Compilation IS NOT required''.
 What a beautiful sight!
 
-It's still an experimental feature (that's why @-recomp@ is off by
-default), so tell us if you think it doesn't work.
+GHC <em>only</em> keeps detailed dependency information for ``user'' modules,
+not for ``library'' modules.  It distinguishes the two by a hack: a module
+whose @.hi@ file has an absolute path name is considered a library module,
+while a relative path name indicates a user module.  So if you have a 
+multi-directory application, use <em>relative</em> path names in your
+@-i@ path, to force GHC to record detailed dependency information.
+Use absolute path names only for directories containing slowly-changing
+library modules.
 
-Patrick Sansom has a workshop paper about how all this is done.  Ask
+Patrick Sansom had a workshop paper about how all this is done (though
+the details have changed quite a bit).  Ask
 him (email: <htmlurl name="sansom@@dcs.gla.ac.uk"
 url="mailto:sansom@@dcs.gla.ac.uk">) if you want a copy.
 
