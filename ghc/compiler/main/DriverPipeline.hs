@@ -33,7 +33,7 @@ import DriverUtil
 import DriverMkDepend
 import DriverPhases
 import DriverFlags
-import SysTools		( newTempName, addFilesToClean, getSysMan, unDosifyPath )
+import SysTools		( newTempName, addFilesToClean, getSysMan )
 import qualified SysTools	
 import HscMain
 import Finder
@@ -333,9 +333,7 @@ run_phase :: Phase
 
 run_phase Unlit _basename _suff input_fn output_fn
   = do unlit_flags <- getOpts opt_L
-       -- The -h option passes the file name for unlit to put in a #line directive;
-       -- we undosify it so that it doesn't contain backslashes in Windows, which
-       -- would disappear in error messages
+       -- The -h option passes the file name for unlit to put in a #line directive
        SysTools.runUnlit (map SysTools.Option unlit_flags ++
        			  [ SysTools.Option     "-h"
  			  , SysTools.Option     input_fn
