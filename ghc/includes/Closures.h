@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Closures.h,v 1.23 2000/12/19 12:34:00 sewardj Exp $
+ * $Id: Closures.h,v 1.24 2000/12/19 16:48:58 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -176,14 +176,6 @@ typedef struct {
 
 typedef struct {
     StgHeader   header;
-    StgClosure *instrs;		/* a pointer to an ArrWords */
-    StgClosure *literals;	/* a pointer to an ArrWords */
-    StgClosure *ptrs;		/* a pointer to a MutArrPtrs */
-    StgClosure *itbls;		/* a pointer to an ArrWords */
-} StgBCO;
-
-typedef struct {
-    StgHeader   header;
     StgClosure *indirectee;
 } StgInd;
 
@@ -225,6 +217,14 @@ typedef struct {
     StgClosure *var;
     StgMutClosure *mut_link;
 } StgMutVar;
+
+typedef struct {
+    StgHeader      header;
+    StgArrWords   *instrs;	/* a pointer to an ArrWords */
+    StgArrWords   *literals;	/* a pointer to an ArrWords */
+    StgMutArrPtrs *ptrs;	/* a pointer to a MutArrPtrs */
+    StgArrWords   *itbls;	/* a pointer to an ArrWords */
+} StgBCO;
 
 /* 
    A collective typedef for all linkable stack frames i.e.
