@@ -10,8 +10,12 @@ module Argv ( argv ) where
 
 import FastString
 
+#if __GLASGOW_HASKELL__ <= 302
 import GlaExts		( Addr )
 import ByteArray 	( indexAddrOffAddr )
+#else
+import Addr		( Addr, indexAddrOffAddr )
+#endif
 
 argv :: [FAST_STRING]
 argv = unpackArgv ``prog_argv'' (``prog_argc''::Int)
