@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Bytecodes.h,v 1.2 2000/12/08 15:45:55 sewardj Exp $
+ * $Id: Bytecodes.h,v 1.3 2000/12/12 17:16:54 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -27,20 +27,17 @@
 
 #define bci_ARGCHECK  1
 #define bci_PUSH_L    2
-#define bci_PUSH_LL   28
-#define bci_PUSH_LLL  29
-#define bci_PUSH_G    3
-#define bci_PUSH_AS   26
-#define bci_PUSHT_I   4
-#define bci_PUSHT_F   5
-#define bci_PUSHT_D   6
-#define bci_PUSHU_I   7
-#define bci_PUSHU_F   8
-#define bci_PUSHU_D   9
-#define bci_SLIDE     10
-#define bci_ALLOC     11
-#define bci_MKAP      12
-#define bci_UNPACK    13
+#define bci_PUSH_LL   3
+#define bci_PUSH_LLL  4
+#define bci_PUSH_G    5
+#define bci_PUSH_AS   6
+#define bci_PUSH_UBX  7
+#define bci_PUSH_TAG  8
+#define bci_SLIDE     9
+#define bci_ALLOC     10
+#define bci_MKAP      11
+#define bci_UNPACK    12
+#define bci_UPK_TAG   13
 #define bci_PACK      14
 #define bci_LABEL     15
 #define bci_TESTLT_I  16 
@@ -53,6 +50,6 @@
 #define bci_TESTEQ_P  23
 #define bci_CASEFAIL  24
 #define bci_ENTER     25
-#define bci_RETURN    27
+#define bci_RETURN    26
 
 /*-------------------------------------------------------------------------*/
