@@ -94,7 +94,7 @@ hWaitForInput         :: Handle -> Int -> IO Bool
 -- isFullError           :: IOError -> Bool
 -- isIllegalOperation    :: IOError -> Bool
 -- isPermissionError     :: IOError -> Bool
--- isUserError           :: IOError -> Maybe String
+-- isUserError           :: IOError -> Bool
 --IOHandle:openFile              :: FilePath -> IOMode -> IO Handle
 --IOHandle:stdin, stdout, stderr :: Handle
 \end{code}

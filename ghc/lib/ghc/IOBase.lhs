@@ -186,8 +186,8 @@ isPermissionError _			         = False
 isDoesNotExistError (IOError _ NoSuchThing _) = True
 isDoesNotExistError _                         = False
 
-isUserError (IOError _ UserError s) = Just s
-isUserError _		            = Nothing
+isUserError (IOError _ UserError _) = True
+isUserError _		            = False
 \end{code}
 
 Showing @IOError@s
