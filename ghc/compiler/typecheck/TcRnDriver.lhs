@@ -652,7 +652,7 @@ tc_rn_src_decls ds
 		      } ;
 
 	-- If there's a splice, we must carry on
-	   Just (SpliceDecl splice_expr splice_loc, rest_ds) -> 
+	   Just (SpliceDecl splice_expr splice_loc, rest_ds) -> do {
 #ifndef GHCI
 	failWithTc (text "Can't do a top-level splice; need a bootstrapped compiler")
 #else
@@ -673,7 +673,7 @@ tc_rn_src_decls ds
 	return (tc_envs, src_fvs1 `plusFV` src_fvs2)
     }
 #endif /* GHCI */
-    }}
+    }}}
 \end{code}
 
 
