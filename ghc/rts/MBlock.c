@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.24 2001/10/26 11:49:19 sewardj Exp $
+ * $Id: MBlock.c,v 1.25 2001/12/10 01:28:00 sebc Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -66,7 +66,7 @@ getMBlocks(nat n)
 #elif hpux_TARGET_OS
  ret = mmap(next_request, size, PROT_READ | PROT_WRITE, 
 	     MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-#elif macosx_TARGET_OS
+#elif darwin_TARGET_OS
  ret = mmap(next_request, size, PROT_READ | PROT_WRITE, 
             MAP_FIXED | MAP_ANON | MAP_PRIVATE, -1, 0);
 #else

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.h,v 1.10 2001/07/26 03:26:28 ken Exp $
+ * $Id: MBlock.h,v 1.11 2001/12/10 01:28:00 sebc Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -52,7 +52,7 @@ extern void * getMBlocks(nat n);
 /* guess */
 #define HEAP_BASE 0x50000000
 
-#elif macosx_TARGET_OS
+#elif darwin_TARGET_OS
 /* guess */
 #define HEAP_BASE 0x50000000
 

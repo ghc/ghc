@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.80 2001/12/05 00:08:26 sof Exp $
+-- $Id: DriverFlags.hs,v 1.81 2001/12/10 01:28:00 sebc Exp $
 --
 -- Driver flags
 --
@@ -535,7 +535,7 @@ machdepCCOpts
 	-- register used for global register variable", we simply
 	-- disable all warnings altogether using the -w flag. Oh well.
 
-   | prefixMatch "powerpc-apple-macosx" cTARGETPLATFORM
+   | prefixMatch "powerpc-apple-darwin" cTARGETPLATFORM
        = return ( ["-no-cpp-precomp"], [""] )
 
    | prefixMatch "powerpc" cTARGETPLATFORM || prefixMatch "rs6000" cTARGETPLATFORM

@@ -76,6 +76,8 @@ powerpc-ibm-aix*)
 	TargetPlatform=powerpc-ibm-aix;;
 rs6000-ibm-aix*)
 	TargetPlatform=rs6000-ibm-aix;;
+powerpc-apple-darwin*)
+	TargetPlatform=powerpc-apple-darwin;;
 sparc-sun-sunos4*)
 	TargetPlatform=sparc-sun-sunos4;;
 sparc-sun-solaris2*)

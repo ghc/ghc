@@ -1059,8 +1059,8 @@ or higher)</term>
 	</varlistentry>
 
 	<varlistentry>
-	  <term>powerpc-apple-macosx</term>
-	  <indexterm><primary>powerpc-apple-macosx</primary></indexterm> 
+	  <term>powerpc-apple-darwin</term>
+	  <indexterm><primary>powerpc-apple-darwin</primary></indexterm> 
 	  <listitem>
 	    <para>Works, unregisterised only at the moment.</para>
 	  </listitem>
