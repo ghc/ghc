@@ -241,7 +241,7 @@ $white_no_nl+ 				;
 
 <glaexts> {
   @qual @varid "#"+		{ idtoken qvarid }
-  @qual @conid "#"+		{ idtoken qconid }
+  @qual (@conid "#"+ | "()")	{ idtoken qconid }
   @varid "#"+			{ varid }
   @conid "#"+			{ idtoken conid }
 }
