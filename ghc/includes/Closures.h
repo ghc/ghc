@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Closures.h,v 1.30 2001/11/26 16:54:22 simonmar Exp $
+ * $Id: Closures.h,v 1.31 2002/01/29 16:52:46 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -28,43 +28,12 @@ typedef struct {
 } StgProfHeader;
 
 /* -----------------------------------------------------------------------------
-   The parallel header
-   -------------------------------------------------------------------------- */
-
-typedef struct {
-  /* StgWord ga; */  /* nope! global addresses are managed via a hash table */
-} StgParHeader;
-
-/* -----------------------------------------------------------------------------
    The GranSim header
    -------------------------------------------------------------------------- */
 
 typedef struct {
   StgWord procs; /* bitmask indicating on which PEs this closure resides */
 } StgGranHeader;
-
-/* -----------------------------------------------------------------------------
-   The ticky-ticky header
-
-   Comment from old Ticky.h:
-
-   This is used to record if a closure has been updated but not yet
-   entered. It is set when the closure is updated and cleared when
-   subsequently entered.
-   
-   NB: It is {\em not} an ``entry count'', it is an
-   ``entries-after-update count.''
-   
-   The commoning up of @CONST@, @CHARLIKE@ and @INTLIKE@ closures is
-   turned off(?) if this is required. This has only been done for 2s
-   collection.  It is done using a nasty hack which defines the
-   @_Evacuate@ and @_Scavenge@ code for @CONST@, @CHARLIKE@ and @INTLIKE@
-   info tables to be @_Evacuate_1@ and @_Scavenge_1_0@.
-   -------------------------------------------------------------------------- */
-
-typedef struct {
-  /* old: W_ updated; */
-} StgTickyHeader;
 
 /* -----------------------------------------------------------------------------
    The full fixed-size closure header
@@ -78,14 +47,8 @@ typedef struct {
 #ifdef PROFILING
 	StgProfHeader         prof;
 #endif
-#ifdef PAR
-	StgParHeader          par;
-#endif
 #ifdef GRAN
 	StgGranHeader         gran;
-#endif
-#ifdef TICKY_TICKY
-	StgTickyHeader        ticky;
 #endif
 } StgHeader;
 
