@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: stgio.h,v 1.25 2001/01/16 14:06:14 simonmar Exp $
+ * $Id: stgio.h,v 1.26 2001/02/28 14:24:46 sewardj Exp $
  *
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1999
  *
@@ -172,8 +172,8 @@ StgInt  write_ (StgForeignPtr ptr, StgAddr buf, StgInt len);
 /* tcSetAttr.c */
 #ifdef HAVE_TERMIOS_H
 #include <termios.h>
-#endif
 int tcSetAttr (int fd, int options, const struct termios *tp);
+#endif
 
 #endif /* ! STGIO_H */
 
