@@ -45,6 +45,9 @@
 /* Define to alignment constraint on unsigned int - whichever is the greater */
 #undef ALIGNMENT_UNSIGNED_INT
 
+/* Define if C Symbols have a leading underscore added by the compiler */
+#undef LEADING_UNDERSCORE
+
 
 /* Leave that blank line there!!  Autoheader needs it.
    If you're adding to this file, keep in mind:

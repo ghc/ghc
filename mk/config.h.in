@@ -215,3 +215,6 @@
 
 /* minimum alignment of double */
 #undef ALIGNMENT_DOUBLE
+
+/* need a leading underscore? */
+#undef LEADING_UNDERSCORE
