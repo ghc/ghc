@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="iso-8859-1"?>
 <bookinfo>
-<title>The @PACKAGE_NAME@ User's Guide, Version @PACKAGE_VERSION@</title>
+<title>@ProjectName@ User's Guide, Version @ProjectVersion@</title>
 <author><othername>The GHC Team</othername></author>
 <address>
 <email>glasgow-haskell-&lcub;bugs,users&rcub;-request@haskell.org</email>
