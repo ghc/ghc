@@ -260,26 +260,24 @@ AC_SUBST(HaveGcc)
 # Substitutes: GNUCPP and RAWCPP (latter is 'GNUCPP -traditional')
 #
 AC_DEFUN(AC_PROG_GNUCPP,
-[AC_CACHE_CHECK([how to invoke cpp directly], ac_cv_gnu_cpp,
-[if echo $CPP | grep gcc >/dev/null 2>&1; then
-    echo > conftest.c
-    gcc -v -E conftest.c >/dev/null 2>conftest.out
-    echo '/(\S+(\/|\\\\)cpp)/ && print "[$]1";' > conftest.pl
-    # GNUCPP: used in jmake.c (GnuCppCmd) and in mkdependC
-    # (where we could do with the usual pre-#defines)
-    ac_cv_gnu_cpp="`eval $PerlCmd -n conftest.pl conftest.out`"
-    rm -fr conftest*
-else
-    # It is likely that this will go terribly wrong..
-    ac_cv_gnu_cpp='cc -E'
-fi
+[AC_CACHE_CHECK([how to invoke GNU cpp directly], ac_cv_gnu_cpp,
+[if test "$HaveGcc" = "YES"; then
+	echo > conftest.c
+	gcc -v -E conftest.c >/dev/null 2>conftest.out
+	echo '/(\S+(\/|\\\\)cpp)/ && print "[$]1";' > conftest.pl
+	ac_cv_gnu_cpp="`eval $PerlCmd -n conftest.pl conftest.out`"
+	rm -fr conftest*
+ else
+	# We need to be able to invoke CPP directly, preferably
+	# with input from stdin (mkdependHS and hscpp depend on
+	# this at the moment).
+	# Take a guess at what to use, this probably won't work.
+	echo Warning: GNU cpp not found, using $CPP
+	ac_cv_gnu_cpp =	$CPP
+ fi
 ])
 GNUCPP=$ac_cv_gnu_cpp
-if test "$GNUCPP" = "cc -E"; then
-   RAWCPP="$GNUCPP"
-else
-   RAWCPP="$GNUCPP -traditional"
-fi
+RAWCPP="$GNUCPP -traditional"
 AC_SUBST(GNUCPP)
 AC_SUBST(RAWCPP)
 ])
