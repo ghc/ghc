@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPhases.hs,v 1.19 2002/04/11 12:03:33 simonpj Exp $
+-- $Id: DriverPhases.hs,v 1.20 2002/07/05 16:15:14 sof Exp $
 --
 -- GHC Driver
 --
@@ -19,7 +19,8 @@ module DriverPhases (
    hsbootish_file, hsbootish_suffix,
    objish_file, objish_suffix,
    cish_file, cish_suffix,
-   isExtCore_file, extcoreish_suffix
+   isExtCore_file, extcoreish_suffix,
+   isSourceFile         -- :: FilePath -> Bool
  ) where
 
 import DriverUtil
@@ -118,3 +119,8 @@ objish_file         = objish_suffix         . getFileSuffix
 hsbootish_file      = hsbootish_suffix      . getFileSuffix
 
 isExtCore_file      = extcoreish_suffix     . getFileSuffix
+
+isSourceFile :: FilePath -> Bool
+isSourceFile   f    =
+   haskellish_src_file f ||
+   cish_file   f

@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.106 2002/05/01 17:56:57 sof Exp $
+-- $Id: Main.hs,v 1.107 2002/07/05 16:15:14 sof Exp $
 --
 -- GHC Driver program
 --
@@ -42,7 +42,8 @@ import DriverFlags	( buildStaticHscOpts,
 			  dynamic_flags, processArgs, static_flags)
 
 import DriverMkDepend	( beginMkDependHS, endMkDependHS )
-import DriverPhases	( Phase(HsPp, Hsc), haskellish_src_file, objish_file )
+import DriverPhases	( Phase(HsPp, Hsc), haskellish_src_file, objish_file,
+			  isSourceFile )
 
 import DriverUtil	( add, handle, handleDyn, later, splitFilename,
 			  unknownFlagsErr, getFileSuffix )
@@ -257,12 +258,13 @@ main =
    if (mode == DoInteractive) then beginInteractive srcs else do
 
 	-- -o sanity checking
+   let real_srcs = filter isSourceFile srcs -- filters out .a and .o that might appear
    o_file <- readIORef v_Output_file
-   if (srcs `lengthExceeds` 1 && isJust o_file && mode /= DoLink && mode /= DoMkDLL)
+   if (real_srcs `lengthExceeds` 1 && isJust o_file && mode /= DoLink && mode /= DoMkDLL)
 	then throwDyn (UsageError "can't apply -o to multiple source files")
 	else do
 
-   if null srcs then throwDyn (UsageError "no input files") else do
+   if null real_srcs then throwDyn (UsageError "no input files") else do
 
    let compileFile src = do
 	  restoreDynFlags
@@ -280,19 +282,15 @@ main =
 	  let not_hs_file  = not (haskellish_src_file src)
 	  pp <- if not_hs_file || mode == StopBefore Hsc || mode == StopBefore HsPp
 			then return src_and_suff else do
---		hPutStrLn stderr "before" >> hFlush stderr
 		phases <- genPipeline (StopBefore Hsc) stop_flag
 				      False{-not persistent-} defaultHscLang
 				      src_and_suff
---		hPutStrLn stderr "after" >> hFlush stderr
 	  	pipeLoop phases src_and_suff False{-no linking-} False{-no -o flag-}
 			basename suffix
 
 	  -- rest of compilation
 	  hsc_lang <- dynFlag hscLang
---	  hPutStrLn stderr ("before-1 " ++ show (pp,mode)) >> hFlush stderr
 	  phases   <- genPipeline mode stop_flag True hsc_lang pp
---	  hPutStrLn stderr "after" >> hFlush stderr
 	  (r,_)    <- pipeLoop phases pp (mode==DoLink || mode==DoMkDLL)
 	  			      True{-use -o flag-} basename suffix
 	  return r
