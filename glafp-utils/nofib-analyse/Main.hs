@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.4 2000/07/05 15:42:19 keithw Exp $
+-- $Id: Main.hs,v 1.5 2001/02/21 16:24:34 simonmar Exp $
 
 -- (c) Simon Marlow 1997-1999
 -----------------------------------------------------------------------------
@@ -9,9 +9,9 @@ module Main where
 import GenUtils
 import Printf
 import Slurp
-import DataHtml
 import CmdLine
 
+import Html hiding ((!))
 import GlaExts
 import FiniteMap
 import GetOpt
@@ -21,6 +21,8 @@ import IO
 import Array
 import System
 import List
+
+(<!) = (Html.!)
 
 -----------------------------------------------------------------------------
 -- Top level stuff
@@ -112,20 +114,20 @@ time_ok t = t > tooquick_threshold
 -----------------------------------------------------------------------------
 -- HTML page generation
 
+--htmlPage :: Results -> [String] -> Html
 htmlPage results args
-   =  header [] (theTitle [] (htmlStr reportTitle))
-	  +++ bar []
-          +++ h1 [] (htmlStr reportTitle)
+   =  header << thetitle << reportTitle
+	  +++ hr
+          +++ h1 << reportTitle
 	  +++ gen_menu
-	  +++ bar []
-	  +++ body [] (gen_tables results args)
+	  +++ hr
+	  +++ body (gen_tables results args)
 
-gen_menu = ul [] (foldr1 (+++) (map (li [] +++)
-	(map (prog_menu_item)   per_prog_result_tab
-      ++ map (module_menu_item) per_module_result_tab)))
+gen_menu = unordList (map (prog_menu_item) per_prog_result_tab
+      	              ++ map (module_menu_item) per_module_result_tab)
 
-prog_menu_item (SpecP name anc _ _ _) = anchor [href ('#':anc)] (htmlStr name)
-module_menu_item (SpecM name anc _ _) = anchor [href ('#':anc)] (htmlStr name)
+prog_menu_item (SpecP name anc _ _ _) = anchor <! [href ('#':anc)] << name
+module_menu_item (SpecM name anc _ _) = anchor <! [href ('#':anc)] << name
 
 gen_tables results args =
   foldr1 (+++) (map (htmlGenProgTable results args) per_prog_result_tab)
@@ -133,19 +135,18 @@ gen_tables results args =
 
 htmlGenProgTable results args (SpecP title anc get_result get_status result_ok)
   =   sectHeading title anc
-  +++ font [size 1] (
-         mkTable (htmlShowResults results args get_result get_status result_ok))
-  +++ bar []
+  +++ font <! [size "1"]
+	<< mkTable (htmlShowResults results args get_result get_status result_ok)
+  +++ hr
 
 htmlGenModTable results args (SpecM title anc get_result result_ok)
   =   sectHeading title anc 
-  +++ font [size 1] (
-         mkTable (htmlShowMultiResults results args get_result result_ok))
-  +++ bar []
+  +++ font <![size "1"] 
+        << mkTable (htmlShowMultiResults results args get_result result_ok)
+  +++ hr
 
 sectHeading :: String -> String -> Html
-sectHeading s nm
-	= h2 [] (anchor [name nm] (htmlStr s))
+sectHeading s nm = h2 << anchor <! [name nm] << s
 
 htmlShowResults 
     :: Result a
@@ -158,10 +159,10 @@ htmlShowResults
 
 htmlShowResults (r:rs) ss f stat result_ok
   =   tabHeader ss
-  +/+ foldr1 (+/+) (zipWith tableRow [1..] results_per_prog)
-  +/+ foldr1 (+/+) ((if nodevs then []
-                               else [tableRow (-1) ("-1 s.d.", lows),
-                                     tableRow (-1) ("+1 s.d.", highs)])
+  </> aboves (zipWith tableRow [1..] results_per_prog)
+  </> aboves ((if nodevs then []
+                         else [tableRow (-1) ("-1 s.d.", lows),
+                               tableRow (-1) ("+1 s.d.", highs)])
                     ++ [tableRow (-1) ("Average", gms)])
  where
 	-- results_per_prog :: [ (String,[BoxValue a]) ]
@@ -180,14 +181,14 @@ htmlShowMultiResults
 
 htmlShowMultiResults (r:rs) ss f result_ok =
 	multiTabHeader ss 
-	 +/+ foldr1 (+/+) (map show_results_for_prog results_per_prog_mod_run)
-         +/+ foldr1 (+/+) ((if nodevs then []
-                                      else [(cellHtml [] (bold [] (htmlStr "-1 s.d.")))
-                                            +-+ tableRow (-1) ("", lows),
-                                            (cellHtml [] (bold [] (htmlStr "+1 s.d.")))
-                                            +-+ tableRow (-1) ("", highs)])
-                           ++ [cellHtml [] (bold [] (htmlStr "Average"))
-                               +-+ tableRow (-1) ("", gms)])
+	 </> aboves (map show_results_for_prog results_per_prog_mod_run)
+         </> aboves ((if nodevs then []
+                                      else [td << bold << "-1 s.d."
+                                            <-> tableRow (-1) ("", lows),
+                                            td << bold << "+1 s.d."
+                                            <-> tableRow (-1) ("", highs)])
+                           ++ [td << bold << "Average"
+                               <-> tableRow (-1) ("", gms)])
 
   where
 	base_results = fmToList r :: [(String,Results)]
@@ -208,11 +209,11 @@ htmlShowMultiResults (r:rs) ss f result_ok =
                                                              result_ok (id,attr)
 
         show_results_for_prog (prog,mrs) =
-	    cellHtml [valign "top"] (bold [] (htmlStr prog))
-	    +-+ (if null mrs then
-		   cellHtml [] (htmlStr "(no modules compiled)")
+	    td <! [valign "top"] << bold << prog
+	    <-> (if null mrs then
+		   td << "(no modules compiled)"
 	         else
-		   foldr1 (+/+) (map (tableRow 0) mrs))
+		   toHtml (aboves (map (tableRow 0) mrs)))
 
         results_per_run  = transpose [xs | (_,mods) <- results_per_prog_mod_run,
                                            (_,xs) <- mods]
@@ -220,9 +221,9 @@ htmlShowMultiResults (r:rs) ss f result_ok =
 
 tableRow :: Result a => Int -> (String, [BoxValue a]) -> HtmlTable
 tableRow row_no (prog, results)
-	=   cellHtml [bgcolor left_column_color] (htmlStr prog)
-	+-+ foldr1 (+-+) (map (cellHtml [align "right", clr] 
-			       . htmlStr . show_box) results)
+	=   td <! [bgcolor left_column_color] << prog
+	<-> besides (map (\s -> td <! [align "right", clr] << show_box s) 
+				results)
   where clr | row_no < 0  = bgcolor average_row_color
 	    | even row_no = bgcolor even_row_color
 	    | otherwise   = bgcolor odd_row_color
@@ -247,20 +248,18 @@ findBest stuff@(Result base : rest)
 -}
 
 logHeaders ss
-  = foldr1 (+-+) (map (\s -> cellHtml [align "right", width "100"] 
-	(bold [] (htmlStr s))) ss)
+  = besides (map (\s -> (td <! [align "right", width "100"] << bold << s)) ss)
 
-mkTable :: HtmlTable -> Html
-mkTable = renderTable [cellspacing 0, cellpadding 0, border 0]
+mkTable t = table <! [cellspacing 0, cellpadding 0, border 0] << t
 
 tabHeader ss
-  =   cellHtml [align "left", width "100"] (bold [] (htmlStr "Program"))
-  +-+ logHeaders ss
+  =   (td <! [align "left", width "100"] << bold << "Program") 
+  <-> logHeaders ss
 
 multiTabHeader ss
-  =   cellHtml [align "left", width "100"] (bold [] (htmlStr "Program"))
-  +-+ cellHtml [align "left", width "100"] (bold [] (htmlStr "Module"))
-  +-+ logHeaders ss
+  =   (td <! [align "left", width "100"] << bold << "Program")
+  <-> (td <! [align "left", width "100"] << bold << "Module")
+  <-> logHeaders ss
 
 -- Calculate a color ranging from bright blue for -100% to bright red for +100%.
 

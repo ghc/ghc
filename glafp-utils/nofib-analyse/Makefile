@@ -1,11 +1,11 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.2 2000/02/18 10:26:19 simonmar Exp $
+# $Id: Makefile,v 1.3 2001/02/21 16:24:34 simonmar Exp $
 # (c) Simon Marlow 1999-2000
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
 
-SRC_HC_OPTS    += -fglasgow-exts -syslib util -syslib data -syslib text -cpp
+SRC_HC_OPTS    += -fglasgow-exts -package util -package data -package text -cpp
 HS_PROG		= nofib-analyse
 
 include $(TOP)/mk/target.mk

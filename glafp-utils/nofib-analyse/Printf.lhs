@@ -1,12 +1,17 @@
 -----------------------------------------------------------------------------
--- $Id: Printf.lhs,v 1.1 1999/11/12 11:54:17 simonmar Exp $
+-- $Id: Printf.lhs,v 1.2 2001/02/21 16:24:34 simonmar Exp $
 
--- (c) Simon Marlow 1997-1999
+-- (c) Simon Marlow 1997-2001
 -----------------------------------------------------------------------------
 
 > module Printf (showFloat, showFloat') where
 
-> import GlaExts
+> import Foreign
+> import CTypes
+> import CTypesISO
+> import CString
+> import IOExts
+> import ByteArray
 > import PrelPack (unpackCString)
 
 > showFloat 
@@ -23,15 +28,15 @@
 > bUFSIZE = 512 :: Int
 
 > showFloat alt left sign blank zero width prec num =
->	unsafePerformPrimIO ( do
->		buf <- _ccall_ malloc bUFSIZE :: IO Addr
->		_ccall_ snprintf buf bUFSIZE format num
+>	unsafePerformIO ( do
+>		buf <- malloc bUFSIZE
+>		snprintf buf (fromIntegral bUFSIZE) (packString format) num
 >		let s = unpackCString buf
 >		length s `seq` -- urk! need to force the string before we
 >			       -- free the buffer.  A better solution would
 >			       -- be to use foreign objects and finalisers,
 >			       -- but that's just too heavyweight.
->		  _ccall_ free buf
+>		   free buf
 >		return s
 >	)
 >	
@@ -54,3 +59,6 @@
 
 > if_maybe Nothing  f = []
 > if_maybe (Just s) f = f s
+
+> type PackedString = ByteArray Int
+> foreign import unsafe snprintf :: Addr -> CSize -> PackedString -> Float -> IO ()
