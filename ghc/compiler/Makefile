@@ -439,7 +439,7 @@ PRIMOP_BITS=primop-data-decl.hs-incl \
 CLEAN_FILES += prelude/primops.txt
 CLEAN_FILES += $(PRIMOP_BITS)
 
-SRC_CPP_OPTS += -I$(GHC_INCLUDE_DIR) -traditional
+SRC_CPP_OPTS += -I$(GHC_INCLUDE_DIR)
 SRC_CPP_OPTS += ${GhcCppOpts}
 
 ifneq "$(BootingFromHc)" "YES"
