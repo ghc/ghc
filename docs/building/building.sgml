@@ -1342,6 +1342,26 @@ $ cvs checkout nofib/spectral
     software, and lay hands on them gently when they don't
     work.</para>
 
+    <sect2 id="quick-start">
+      <title>Quick Start</title>
+
+      <para>If you are starting from a source distribution, and just
+      want a completely standard build, then the following should
+      work:</para>
+
+<screen>$ ./configure
+$ make
+$ make install
+</screen>
+
+      <para>For GHC, this will do a 2-stage bootstrap build of the
+      compiler, with profiling libraries, and install the
+      results.</para>
+
+      <para>If you want to do anything at all non-standard, or you
+      want to do some development, read on...</para>
+    </sect2>
+
     <sect2 id="sec-source-tree">
       <title>Your source tree</title>
 
@@ -1495,6 +1515,9 @@ $ cvs checkout nofib/spectral
 	<varlistentry>
 	  <term>Step 1: get ready for configuration.</term>
 	  <listitem>
+	    <para>NOTE: if you're starting from a source distribution,
+	    rather than CVS sources, you can skip this step.</para>
+
 	    <para>Change directory to
             <constant>&dollar;(FPTOOLS&lowbar;TOP)</constant> and
             issue the command
@@ -1517,12 +1540,6 @@ $ cvs checkout nofib/spectral
             be short, although the resulting shell script,
             <command>configure</command>, and
             <filename>mk/config.h.in</filename>, are long.</para>
-
-	    <para>In case you don't have <command>autoconf</command>
-            we distribute the results, <command>configure</command>,
-            and <filename>mk/config.h.in</filename>, with the source
-            distribution.  They aren't kept in the repository,
-            though.</para>
 	  </listitem>
 	</varlistentry>
 
@@ -1865,7 +1882,92 @@ $ emacs mk/build.mk
       the top of your <literal>fptools</literal> tree and type
       <command>gmake</command>.  This will prepare the tree and build
       the various projects in the correct order.</para>
+    </sect2>
 
+    <sect2 id="sec-bootstrapping">
+      <title>Bootstrapping GHC</title>
+
+      <para>GHC requires a 2-stage bootstrap in order to provide 
+      full functionality, including GHCi.  By a 2-stage bootstrap, we
+      mean that the compiler is built once using the installed GHC,
+      and then again using the compiler built in the first stage.  You
+      can also build a stage 3 compiler, but this normally isn't
+      necessary except to verify that the stage 2 compiler is working
+      properly.</para>
+
+      <para>Note that when doing a bootstrap, the stage 1 compiler
+      must be built, followed by the runtime system and libraries, and
+      then the stage 2 compiler.  The correct ordering is implemented
+      by the top-level fptools <filename>Makefile</filename>, so if
+      you want everything to work automatically it's best to start
+      <command>make</command> from the top of the tree.  When building
+      GHC, the top-level fptools <filename>Makefile</filename> is set
+      up to do a 2-stage bootstrap by default (when you say
+      <command>make</command>).  Some other targets it supports
+      are:</para>
+
+      <variablelist>
+	<varlistentry>
+	  <term>stage1</term>
+	  <listitem>
+	    <para>Build everything as normal, including the stage 1
+	    compiler.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>stage2</term>
+	  <listitem>
+	    <para>Build the stage 2 compiler only.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>stage3</term>
+	  <listitem>
+	    <para>Build the stage 3 compiler only.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>bootstrap</term> <term>bootstrap2</term>
+	  <listitem>
+	    <para>Build stage 1 followed by stage 2.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>bootstrap3</term>
+	  <listitem>
+	    <para>Build stages 1, 2 and 3.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>install</term>
+	  <listitem>
+	    <para>Install everything, including the compiler built in
+	    stage 2.  To override the stage, say <literal>make install
+	    stage=<replaceable>n</replaceable></literal> where
+	    <replaceable>n</replaceable> is the stage to install.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+
+      <para>The top-level <filename>Makefile</filename> also arranges
+      to do the appropriate <literal>make boot</literal> steps (see
+      below) before actually building anything.</para>
+
+      <para>The <literal>stage1</literal>, <literal>stage2</literal>
+      and <literal>stage3</literal> targets also work in the
+      <literal>ghc/compiler</literal> directory, but don't forget that
+      each stage requires its own <literal>make boot</literal> step:
+      for example, you must do</para>
+
+      <screen>$ make boot stage=2</screen>
+
+      <para>before <literal>make stage2</literal> in
+      <literal>ghc/compiler</literal>.</para>
     </sect2>
 
     <sect2 id="sec-standard-targets">
