@@ -114,10 +114,6 @@ import System.Cmd       ( rawSystem )
 #else
 import SystemExts       ( rawSystem )
 #endif
-
-#else /* Not Win32 */
-
-import System		( system )
 #endif
 \end{code}
 
