@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.50 2001/08/30 10:21:40 simonmar Exp $
+ * $Id: Storage.c,v 1.51 2001/10/01 11:09:02 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -87,6 +87,13 @@ initStorage( void )
       RtsFlags.GcFlags.heapSizeSuggestion > 
       RtsFlags.GcFlags.maxHeapSize) {
     RtsFlags.GcFlags.maxHeapSize = RtsFlags.GcFlags.heapSizeSuggestion;
+  }
+
+  if (RtsFlags.GcFlags.maxHeapSize != 0 &&
+      RtsFlags.GcFlags.minAllocAreaSize > 
+      RtsFlags.GcFlags.maxHeapSize) {
+      prog_belch("maximum heap size (-M) is smaller than minimum alloc area size (-A)");
+      exit(1);
   }
 
   initBlockAllocator();
