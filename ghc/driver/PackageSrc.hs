@@ -112,9 +112,11 @@ package_details installing =
         package_deps   = [ "rts" ],
         extra_ghc_opts = [],
         extra_cc_opts  = [],
-        extra_ld_opts  = [ "-lm"
+        extra_ld_opts  = [
 #ifdef mingw32_TARGET_OS
-			 , "-lwsock32"
+                           "-lwsock32"
+#else
+                           "-lm"
 #endif
 			 ]
         },
@@ -311,7 +313,7 @@ package_details installing =
          extra_libraries   = [],
          include_dirs   = [],
          c_includes     = [],
-         package_deps   = [],
+         package_deps   = [ "lang" ],
          extra_ghc_opts = [],
          extra_cc_opts  = [],
          extra_ld_opts  = [],
@@ -332,7 +334,7 @@ package_details installing =
          package_deps   = [ "lang", "greencard" ],
          extra_ghc_opts = [],
          extra_cc_opts  = [],
-         extra_ld_opts  = [ "-luser32",  "-lgdi32" ]
+         extra_ld_opts  = [ "-luser32",  "-lgdi32", "-lwinmm" ]
         },
 
          Package {
