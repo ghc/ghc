@@ -127,8 +127,11 @@ tcMatches xve fun_or_case matches expected_ty
 tcMatch :: [(Name,Id)]
 	-> RenamedMatchContext
 	-> RenamedMatch
-	-> TcType 		-- Expected result-type of the Match.
-				-- Early unification with this guy gives better error messages
+	-> TcType 	-- Expected result-type of the Match.
+			-- Early unification with this guy gives better error messages
+			-- We regard the Match as having type 
+			--	(ty1 -> ... -> tyn -> result_ty)
+			-- where there are n patterns.
 	-> TcM (TcMatch, LIE)
 
 tcMatch xve1 ctxt match@(Match sig_tvs pats maybe_rhs_sig grhss) expected_ty
@@ -230,7 +233,12 @@ tcMatchPats pats expected_ty thing_inside
 	-- I'm a bit concerned that lie_req1 from an 'inner' pattern in the list
 	-- might need (via lie_req2) something made available from an 'outer' 
 	-- pattern.  But it's inconvenient to deal with, and I can't find an example
-    tcCheckExistentialPat pat_ids ex_tvs lie_avail lie_req2 rhs_ty	`thenTc` \ (lie_req2', ex_binds) ->
+    tcCheckExistentialPat pat_ids ex_tvs lie_avail lie_req2 expected_ty	`thenTc` \ (lie_req2', ex_binds) ->
+	-- NB: we *must* pass "expected_ty" not "result_ty" to tcCheckExistentialPat
+	-- For example, we must reject this program:
+	--	data C = forall a. C (a -> Int) 
+	-- 	f (C g) x = g x
+	-- Here, result_ty will be simply Int, but expected_ty is (a -> Int).
 
     returnTc (result, lie_req1 `plusLIE` lie_req2', ex_binds)
 
@@ -259,9 +267,9 @@ tcCheckExistentialPat :: [TcId]		-- Ids bound by this pattern
 		      -> Bag TcTyVar	-- Existentially quantified tyvars bound by pattern
 		      -> LIE		--   and context
 		      -> LIE		-- Required context
-		      -> TcType		--   and result type; vars in here must not escape
+		      -> TcType		--   and type of the Match; vars in here must not escape
 		      -> TcM (LIE, TcDictBinds)	-- LIE to float out and dict bindings
-tcCheckExistentialPat ids ex_tvs lie_avail lie_req result_ty
+tcCheckExistentialPat ids ex_tvs lie_avail lie_req match_ty
   | isEmptyBag ex_tvs && all not_overloaded ids
 	-- Short cut for case when there are no existentials
 	-- and no polymorphic overloaded variables
@@ -272,7 +280,7 @@ tcCheckExistentialPat ids ex_tvs lie_avail lie_req result_ty
     returnTc (lie_req, EmptyMonoBinds)
 
   | otherwise
-  = tcExtendGlobalTyVars (tyVarsOfType result_ty)		$
+  = tcExtendGlobalTyVars (tyVarsOfType match_ty)		$
     tcAddErrCtxtM (sigPatCtxt tv_list ids)			$
 
     	-- In case there are any polymorpic, overloaded binders in the pattern
