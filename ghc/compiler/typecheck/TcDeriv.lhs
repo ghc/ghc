@@ -40,6 +40,7 @@ import MkId		( mkDictFunId )
 import DataCon		( dataConOrigArgTys, isNullaryDataCon, isExistentialDataCon )
 import Maybes		( catMaybes )
 import Name		( Name, getSrcLoc )
+import NameSet		( NameSet, emptyNameSet, duDefs )
 import Unique		( Unique, getUnique )
 
 import TyCon		( tyConTyVars, tyConDataCons, tyConArity, 
@@ -194,29 +195,40 @@ version.  So now all classes are "offending".
 \begin{code}
 tcDeriving  :: [RenamedTyClDecl]	-- All type constructors
 	    -> TcM ([InstInfo],		-- The generated "instance decls"
-		    RenamedHsBinds)	-- Extra generated top-level bindings
+		    RenamedHsBinds,	-- Extra generated top-level bindings
+		    NameSet)		-- Binders to keep alive
 
 tcDeriving tycl_decls
-  = recoverM (returnM ([], EmptyBinds)) $
-    getDOpts			`thenM` \ dflags ->
+  = recoverM (returnM ([], EmptyBinds, emptyNameSet)) $
+    do	{   	-- Fish the "deriving"-related information out of the TcEnv
+		-- and make the necessary "equations".
+	; (ordinary_eqns, newtype_inst_info) <- makeDerivEqns tycl_decls
 
-  	-- Fish the "deriving"-related information out of the TcEnv
-	-- and make the necessary "equations".
-    makeDerivEqns tycl_decls		    		`thenM` \ (ordinary_eqns, newtype_inst_info) ->
-    extendLocalInstEnv (map iDFunId newtype_inst_info)  $
-	-- Add the newtype-derived instances to the inst env
-	-- before tacking the "ordinary" ones
+	; (ordinary_inst_info, deriv_binds) 
+		<- extendLocalInstEnv (map iDFunId newtype_inst_info)  $
+		   deriveOrdinaryStuff ordinary_eqns
+		-- Add the newtype-derived instances to the inst env
+		-- before tacking the "ordinary" ones
 
-    deriveOrdinaryStuff ordinary_eqns			`thenM` \ (ordinary_inst_info, binds) ->
-    let
-	inst_info  = newtype_inst_info ++ ordinary_inst_info
-    in
+	-- Generate the generic to/from functions from each type declaration
+	; tcg_env <- getGblEnv
+	; let gen_binds = mkGenericBinds (typeEnvTyCons (tcg_type_env tcg_env))
+	; let inst_info  = newtype_inst_info ++ ordinary_inst_info
 
-    ioToTcRn (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances" 
-	     (ddump_deriving inst_info binds))		`thenM_`
+	-- Rename these extra bindings, discarding warnings about unused bindings etc
+	; (rn_binds, gen_bndrs) 
+		<- discardWarnings $ do
+			{ (rn_deriv, _dus1) <- rnTopMonoBinds deriv_binds []
+			; (rn_gen, dus_gen) <- rnTopMonoBinds gen_binds   []
+			; return (rn_deriv `ThenBinds` rn_gen, duDefs dus_gen) }
 
-    returnM (inst_info, binds)
 
+	; dflags <- getDOpts
+	; ioToTcRn (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances" 
+	  	   (ddump_deriving inst_info rn_binds))
+
+	; returnM (inst_info, rn_binds, gen_bndrs)
+	}
   where
     ddump_deriving :: [InstInfo] -> RenamedHsBinds -> SDoc
     ddump_deriving inst_infos extra_binds
@@ -228,7 +240,7 @@ tcDeriving tycl_decls
 
 -----------------------------------------
 deriveOrdinaryStuff []	-- Short cut
-  = returnM ([], EmptyBinds)
+  = returnM ([], EmptyMonoBinds)
 
 deriveOrdinaryStuff eqns
   = do	{	-- Take the equation list and solve it, to deliver a list of
@@ -244,20 +256,8 @@ deriveOrdinaryStuff eqns
 	-- notably "con2tag" and/or "tag2con" functions.  
 	; extra_binds <- genTaggeryBinds new_dfuns
 
-	-- Generate the generic to/from functions from each type declaration
-	; tcg_env <- getGblEnv
-	; let gen_binds = mkGenericBinds (typeEnvTyCons (tcg_type_env tcg_env))
-
-	-- Rename these extra bindings, discarding warnings about unused bindings etc
-	; (rn_binds, _fvs1) <- discardWarnings $
-			       rnTopMonoBinds (extra_binds `AndMonoBinds` gen_binds) []
-
-	; let all_binds = rn_binds `ThenBinds` 
-			  foldr ThenBinds EmptyBinds aux_binds_s
-
 	-- Done
-	; traceTc (text "tcDeriv" <+> vcat (map pprInstInfo inst_infos))
-	; returnM (inst_infos, all_binds) }
+	; returnM (inst_infos, andMonoBindList (extra_binds : aux_binds_s)) }
 \end{code}
 
 
@@ -745,7 +745,7 @@ the renamer.  What a great hack!
 \begin{code}
 -- Generate the InstInfo for the required instance,
 -- plus any auxiliary bindings required
-genInst :: DFunId -> TcM (InstInfo, RenamedHsBinds)
+genInst :: DFunId -> TcM (InstInfo, RdrNameMonoBinds)
 genInst dfun
   = getFixityEnv		`thenM` \ fix_env -> 
     let
@@ -755,9 +755,6 @@ genInst dfun
     	(meth_binds, aux_binds) = assoc "gen_bind:bad derived class"
 	 			  gen_list (getUnique clas) fix_env tycon
     in
-	-- Rename the auxiliary bindings (if any)
-    rnTopMonoBinds aux_binds []			`thenM` \ (rn_aux_binds, _dus) ->
-    
 	-- Bring the right type variables into 
 	-- scope, and rename the method binds
     bindLocalNames (map varName tyvars)		$
@@ -765,7 +762,7 @@ genInst dfun
 
 	-- Build the InstInfo
     returnM (InstInfo { iDFunId = dfun, iBinds = VanillaInst rn_meth_binds [] }, 
-	     rn_aux_binds)
+	     aux_binds)
 
 gen_list :: [(Unique, FixityEnv -> TyCon -> (RdrNameMonoBinds, RdrNameMonoBinds))]
 gen_list = [(eqClassKey,      no_aux_binds (ignore_fix_env gen_Eq_binds))

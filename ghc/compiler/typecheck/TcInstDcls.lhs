@@ -159,20 +159,19 @@ tcInstDecls1 tycl_decls inst_decls
     getGenericInstances clas_decls		`thenM` \ generic_inst_info -> 
 
 	-- Next, construct the instance environment so far, consisting of
-	--      a) imported instance decls (from this module)
-	--	b) local instance decls
-	--	c) generic instances
+	--	a) local instance decls
+	--	b) generic instances
     addInsts local_inst_info	$
     addInsts generic_inst_info	$
 
 	-- (3) Compute instances from "deriving" clauses; 
 	-- This stuff computes a context for the derived instance decl, so it
 	-- needs to know about all the instances possible; hence inst_env4
-    tcDeriving tycl_decls	`thenM` \ (deriv_inst_info, deriv_binds) ->
+    tcDeriving tycl_decls	`thenM` \ (deriv_inst_info, deriv_binds, keep_alive) ->
     addInsts deriv_inst_info	$
 
     getGblEnv			`thenM` \ gbl_env ->
-    returnM (gbl_env, 
+    returnM (gbl_env { tcg_keep = tcg_keep gbl_env `unionNameSets` keep_alive }, 
 	     generic_inst_info ++ deriv_inst_info ++ local_inst_info,
 	     deriv_binds)
 

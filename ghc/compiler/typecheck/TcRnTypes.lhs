@@ -163,11 +163,18 @@ data TcGblEnv
 	tcg_imports :: ImportAvails,		-- Information about what was imported 
 						--    from where, including things bound
 						--    in this module
+
 	tcg_dus :: DefUses,  	-- What is defined in this module and what is used.
 				-- The latter is used to generate 
 				--	(a) version tracking; no need to recompile if these
 				--		things have not changed version stamp
 				-- 	(b) unused-import info
+
+	tcg_keep :: NameSet,	-- Set of names to keep alive, and to expose in the 
+				-- interface file (but not to export to the user).
+				-- These are typically extra definitions generated from
+				-- data type declarations which would otherwise be
+				-- dropped as dead code.  
 
 		-- The next fields accumulate the payload of the module
 		-- The binds, rules and foreign-decl fiels are collected

@@ -92,7 +92,8 @@ initTc hsc_env mod do_this
 		tcg_deprecs  = NoDeprecs,
 		tcg_insts    = [],
 		tcg_rules    = [],
-		tcg_fords    = []
+		tcg_fords    = [],
+		tcg_keep     = emptyNameSet
 	     } ;
 	     lcl_env = TcLclEnv {
 		tcl_errs       = errs_var,

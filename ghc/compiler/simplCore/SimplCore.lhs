@@ -13,10 +13,9 @@ import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..),
 			  dopt_CoreToDo, buildCoreToDo
 			)
 import CoreSyn
-import CoreFVs		( ruleRhsFreeVars )
 import TcIface		( loadImportedRules )
 import HscTypes		( HscEnv(..), GhciMode(..),
-			  ModGuts(..), ModGuts, Avails, availsToNameSet, 
+			  ModGuts(..), ModGuts, Avails, 
 			  ModDetails(..),
 			  HomeModInfo(..), ExternalPackageState(..), hscEPS
 			)
@@ -37,7 +36,7 @@ import ErrUtils		( dumpIfSet, dumpIfSet_dyn, showPass )
 import CoreLint		( endPass )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
-import Id		( idName, idIsFrom, setIdLocalExported )
+import Id		( idName, idIsFrom, idSpecialisation, setIdSpecialisation )
 import VarSet
 import LiberateCase	( liberateCase )
 import SAT		( doStaticArgs )
@@ -70,11 +69,9 @@ core2core :: HscEnv
 	  -> IO ModGuts
 
 core2core hsc_env 
-	  mod_impl@(ModGuts { mg_exports = exports, 
-			      mg_binds = binds_in })
+	  mod_impl@(ModGuts { mg_binds = binds_in })
   = do
         let dflags 	  = hsc_dflags hsc_env
-	    ghci_mode	  = hsc_mode hsc_env
 	    core_todos
 		| Just todo <- dopt_CoreToDo dflags  =  todo
 		| otherwise			     =  buildCoreToDo dflags
@@ -87,8 +84,7 @@ core2core hsc_env
 		<- prepareRules hsc_env mod_impl ru_us
 
 		-- PREPARE THE BINDINGS
-	let binds1 = updateBinders ghci_mode local_rule_ids 
-				   orphan_rules exports binds_in
+	let binds1 = updateBinders local_rule_ids binds_in
 
 		-- DO THE BUSINESS
 	(stats, processed_binds)
@@ -234,6 +230,7 @@ prepareRules hsc_env@(HscEnv { hsc_dflags = dflags, hsc_HPT = hpt })
 
 	      (local_rule_ids, final_rule_base) = getLocalRules this_mod full_rule_base
 		-- NB: the imported rules may include rules for Ids in this module
+		--     which is why we suck the local rules out of full_rule_base
 		      
 	      orphan_rules = filter (not . idIsFrom this_mod . fst) better_rules
 
@@ -251,23 +248,14 @@ prepareRules hsc_env@(HscEnv { hsc_dflags = dflags, hsc_HPT = hpt })
     local_ids = foldr (unionVarSet . mkVarSet . bindersOf) emptyVarSet binds
 
 
-updateBinders :: GhciMode
-	      -> IdSet	 		-- Locally defined ids with their Rules attached
-	      -> [IdCoreRule]		-- Orphan rules
-	      -> Avails			-- What is exported
+updateBinders :: IdSet	 		-- Locally defined ids with their Rules attached
 	      -> [CoreBind] -> [CoreBind]
 	-- A horrible function
 
--- Update the binders of top-level bindings as follows
--- 	a) Attach the rules for each locally-defined Id to that Id.
---	b) Set the no-discard flag if either the Id is exported,
---	   or it's mentioned in the RHS of a rule
---
--- You might wonder why exported Ids aren't already marked as such;
--- it's just because the type checker is rather busy already and
--- I didn't want to pass in yet another mapping.
+-- Update the binders of top-level bindings by
+-- attaching the rules for each locally-defined Id to that Id.
 -- 
--- Reason for (a)
+-- Reason
 -- 	- It makes the rules easier to look up
 --	- It means that transformation rules and specialisations for
 --	  locally defined Ids are handled uniformly
@@ -275,47 +263,16 @@ updateBinders :: GhciMode
 --	  (the occurrence analyser knows about rules attached to Ids)
 --	- It makes sure that, when we apply a rule, the free vars
 --	  of the RHS are more likely to be in scope
---
--- Reason for (b)
---     It means that the binding won't be discarded EVEN if the binding
---     ends up being trivial (v = w) -- the simplifier would usually just 
---     substitute w for v throughout, but we don't apply the substitution to
---     the rules (maybe we should?), so this substitution would make the rule
---     bogus.
 
-updateBinders ghci_mode rule_ids orphan_rules exports binds
+updateBinders rule_ids binds
   = map update_bndrs binds
   where
     update_bndrs (NonRec b r) = NonRec (update_bndr b) r
     update_bndrs (Rec prs)    = Rec [(update_bndr b, r) | (b,r) <- prs]
 
-    update_bndr bndr 
-	| dont_discard bndr = setIdLocalExported bndr_with_rules
-	| otherwise	    = bndr_with_rules
-	where
-	  bndr_with_rules = lookupVarSet rule_ids bndr `orElse` bndr
-
-    orph_rhs_fvs = unionVarSets (map (ruleRhsFreeVars . snd) orphan_rules)
-	-- An orphan rule must keep alive the free vars 
-	-- of its right-hand side.  
-	-- Non-orphan rules are attached to the Id (bndr_with_rules above)
-	-- and that keeps the rhs free vars alive
-
-    dont_discard bndr =  is_exported (idName bndr)
-		      || bndr `elemVarSet` orph_rhs_fvs 
-
-    	-- In interactive mode, we don't want to discard any top-level
-    	-- entities at all (eg. do not inline them away during
-    	-- simplification), and retain them all in the TypeEnv so they are
-    	-- available from the command line.
-	--
-	-- isExternalName separates the user-defined top-level names from those
-	-- introduced by the type checker.
-    is_exported :: Name -> Bool
-    is_exported | ghci_mode == Interactive = isExternalName
-		| otherwise 		   = (`elemNameSet` export_fvs)
-
-    export_fvs = availsToNameSet exports
+    update_bndr bndr = case lookupVarSet rule_ids bndr of
+			  Nothing -> bndr
+			  Just id -> bndr `setIdSpecialisation` idSpecialisation id
 \end{code}
 
 

@@ -612,8 +612,9 @@ getLocalRules :: Module -> RuleBase -> (IdSet,		-- Ids with local rules
 					RuleBase)	-- Non-local rules
 -- Get the rules for locally-defined Ids out of the RuleBase
 -- If we miss any rules for Ids defined here, then we end up
--- giving the local decl a new Unique (because the in-scope-set is the
--- same as the rule-id set), and now the binding for the class method 
+-- giving the local decl a new Unique (because the in-scope-set is (hackily) the
+-- same as the non-local-rule-id set, so the Id looks as if it's in scope
+-- and hence should be cloned), and now the binding for the class method 
 -- doesn't have the same Unique as the one in the Class and the tc-env
 --	Example:	class Foo a where
 --			  op :: a -> a

@@ -9,15 +9,16 @@ module Desugar ( deSugar, deSugarExpr ) where
 #include "HsVersions.h"
 
 import CmdLineOpts	( DynFlag(..), dopt, opt_SccProfilingOn )
-import HscTypes		( ModGuts(..), ModGuts, HscEnv(..), 
+import HscTypes		( ModGuts(..), ModGuts, HscEnv(..), GhciMode(..),
 			  Dependencies(..), TypeEnv, 
-	  		  unQualInScope )
+	  		  unQualInScope, availsToNameSet )
 import HsSyn		( MonoBinds, RuleDecl(..), RuleBndr(..), 
 			  HsExpr(..), HsBinds(..), MonoBinds(..) )
 import TcHsSyn		( TypecheckedRuleDecl, TypecheckedHsExpr )
 import TcRnTypes	( TcGblEnv(..), ImportAvails(..) )
 import MkIface		( mkUsageInfo )
-import Id		( Id )
+import Id		( Id, setIdLocalExported, idName )
+import Name		( Name, isExternalName )
 import CoreSyn
 import PprCore		( pprIdRules, pprCoreExpr )
 import Subst		( substExpr, mkSubst, mkInScopeSet )
@@ -35,6 +36,7 @@ import VarEnv
 import VarSet
 import Bag		( isEmptyBag, mapBag, emptyBag )
 import CoreLint		( showPass, endPass )
+import CoreFVs		( ruleRhsFreeVars )
 import ErrUtils		( doIfSet, dumpIfSet_dyn, pprBagOfWarnings, 
 			  addShortWarnLocLine, errorsFound )
 import Outputable
@@ -56,25 +58,22 @@ deSugar :: HscEnv -> TcGblEnv -> IO (Maybe ModGuts)
 -- Can modify PCS by faulting in more declarations
 
 deSugar hsc_env 
-        (TcGblEnv { tcg_mod       = mod,
-		    tcg_type_env  = type_env,
-		    tcg_imports   = imports,
-		    tcg_exports   = exports,
-		    tcg_dus	  = dus, 
-		    tcg_inst_uses = dfun_uses_var,
-		    tcg_rdr_env   = rdr_env,
-		    tcg_fix_env   = fix_env,
-	    	    tcg_deprecs   = deprecs,
-		    tcg_insts     = insts,
-		    tcg_binds	  = binds,
-		    tcg_fords     = fords,
-		    tcg_rules	  = rules })
+        tcg_env@(TcGblEnv { tcg_mod       = mod,
+		    	    tcg_type_env  = type_env,
+		    	    tcg_imports   = imports,
+		    	    tcg_exports   = exports,
+		    	    tcg_dus	  = dus, 
+		    	    tcg_inst_uses = dfun_uses_var,
+		    	    tcg_rdr_env   = rdr_env,
+		    	    tcg_fix_env   = fix_env,
+	    	    	    tcg_deprecs   = deprecs,
+		    	    tcg_insts     = insts })
   = do	{ showPass dflags "Desugar"
 
 	-- Do desugaring
 	; let { is_boot = imp_dep_mods imports }
 	; (results, warnings) <- initDs hsc_env mod type_env is_boot $
-				 dsProgram binds rules fords
+				 dsProgram ghci_mode tcg_env
 
 	; let { (ds_binds, ds_rules, ds_fords) = results
 	      ; warns    = mapBag mk_warn warnings
@@ -123,6 +122,7 @@ deSugar hsc_env
 
   where
     dflags       = hsc_dflags hsc_env
+    ghci_mode    = hsc_mode hsc_env
     print_unqual = unQualInScope rdr_env
 
 	-- Desugarer warnings are SDocs; here we
@@ -163,24 +163,81 @@ deSugarExpr hsc_env this_mod rdr_env type_env tc_expr
     mk_warn (loc,sdoc) = addShortWarnLocLine loc print_unqual sdoc
 
 
-dsProgram all_binds rules fo_decls
-  = dsMonoBinds auto_scc all_binds []	`thenDs` \ core_prs ->
-    dsForeigns fo_decls			`thenDs` \ (ds_fords, foreign_binds) ->
+dsProgram ghci_mode (TcGblEnv { tcg_exports = exports,
+		      		tcg_keep    = keep_alive,
+		      		tcg_binds   = binds,
+		      		tcg_fords   = fords,
+		      		tcg_rules   = rules })
+  = dsMonoBinds auto_scc binds []	`thenDs` \ core_prs ->
+    dsForeigns fords			`thenDs` \ (ds_fords, foreign_prs) ->
     let
-	ds_binds      = [Rec (foreign_binds ++ core_prs)]
+	all_prs = foreign_prs ++ core_prs
+	local_bndrs = mkVarSet (map fst all_prs)
+    in
+    mappM (dsRule local_bndrs) rules	`thenDs` \ ds_rules ->
+    let
+	final_prs = addExportFlags ghci_mode exports keep_alive 
+				   local_bndrs all_prs ds_rules
+	ds_binds  = [Rec final_prs]
 	-- Notice that we put the whole lot in a big Rec, even the foreign binds
 	-- When compiling PrelFloat, which defines data Float = F# Float#
 	-- we want F# to be in scope in the foreign marshalling code!
 	-- You might think it doesn't matter, but the simplifier brings all top-level
 	-- things into the in-scope set before simplifying; so we get no unfolding for F#!
-
-	local_binders = mkVarSet (bindersOfBinds ds_binds)
     in
-    mappM (dsRule local_binders) rules	`thenDs` \ ds_rules ->
     returnDs (ds_binds, ds_rules, ds_fords)
   where
     auto_scc | opt_SccProfilingOn = TopLevel
 	     | otherwise          = NoSccs
+
+--		addExportFlags
+-- Set the no-discard flag if either 
+--	a) the Id is exported
+--	b) it's mentioned in the RHS of an orphan rule
+--	c) it's in the keep-alive set
+--
+-- It means that the binding won't be discarded EVEN if the binding
+-- ends up being trivial (v = w) -- the simplifier would usually just 
+-- substitute w for v throughout, but we don't apply the substitution to
+-- the rules (maybe we should?), so this substitution would make the rule
+-- bogus.
+
+-- You might wonder why exported Ids aren't already marked as such;
+-- it's just because the type checker is rather busy already and
+-- I didn't want to pass in yet another mapping.
+
+addExportFlags ghci_mode exports keep_alive bndrs prs rules
+  = [(add_export bndr, rhs) | (bndr,rhs) <- prs]
+  where
+    add_export bndr | dont_discard bndr = setIdLocalExported bndr
+		    | otherwise	        = bndr
+
+    orph_rhs_fvs = unionVarSets [ ruleRhsFreeVars rule
+			        | (id, rule) <- rules, 
+				  not (id `elemVarSet` bndrs) ]
+	-- An orphan rule must keep alive the free vars 
+	-- of its right-hand side.  
+	-- Non-orphan rules are attached to the Id (bndr_with_rules above)
+	-- and that keeps the rhs free vars alive
+
+    dont_discard bndr = is_exported name
+		     || name `elemNameSet` keep_alive
+		     || bndr `elemVarSet` orph_rhs_fvs 
+		     where
+			name = idName bndr
+
+    	-- In interactive mode, we don't want to discard any top-level
+    	-- entities at all (eg. do not inline them away during
+    	-- simplification), and retain them all in the TypeEnv so they are
+    	-- available from the command line.
+	--
+	-- isExternalName separates the user-defined top-level names from those
+	-- introduced by the type checker.
+    is_exported :: Name -> Bool
+    is_exported | ghci_mode == Interactive = isExternalName
+		| otherwise 		   = (`elemNameSet` export_fvs)
+
+    export_fvs = availsToNameSet exports
 
 ppr_ds_rules [] = empty
 ppr_ds_rules rules
