@@ -28,7 +28,10 @@
    This function is required for alloca.c support on those systems.  */
 #undef CRAY_STACKSEG_END
 
-/* Define to symbol that terminates data section. */
+/* Define to decl that terminates data section. */
+#undef DATA_SECTION_END_MARKER_DECL
+
+/* Define to section that terminates data section. */
 #undef DATA_SECTION_END_MARKER
 
 /* Define if you have alloca, as a function or macro.  */
@@ -279,5 +282,9 @@
 /* Define if you have the iberty library (-liberty).  */
 #undef HAVE_LIBIBERTY
 
+/* Define to decl that terminates text section. */
+#undef TEXT_SECTION_END_MARKER_DECL
+
 /* Define to symbol that terminates text section. */
 #undef TEXT_SECTION_END_MARKER
+

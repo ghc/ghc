@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.31 1998/11/17 01:24:58 reid Exp $
+dnl $Id: aclocal.m4,v 1.32 1998/11/21 14:35:00 sof Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -50,6 +50,7 @@ if test "$fptools_cv_altzone" = yes; then
 fi
 ])
 
+
 dnl ** check for leading underscores in symbol names
 dnl 
 dnl Test for determining whether symbol names have a leading
@@ -74,7 +75,6 @@ changequote(<<, >>)dnl
 <<
 case $HostPlatform in
 alpha-dec-osf*) fptools_cv_lead_uscore='no';;
-*cygwin32)      fptools_cv_lead_uscore='yes';;
 *) >>
 changequote([, ])dnl
 AC_TRY_RUN([#ifdef HAVE_NLIST_H
@@ -441,7 +441,7 @@ int i;
 int main() { return ((char*)&f > (char*)&i); }
 
 ],
-fptools_cv_code_bef_data=yes, fptools_cv_code_bef_data=no)])
+fptools_cv_code_bef_data=yes, fptools_cv_code_bef_data=no,false)])
 if test "$fptools_cv_code_bef_data" = yes; then
   AC_DEFINE(CODE_BEFORE_DATA)
 fi
@@ -460,6 +460,7 @@ not_done=1
 for i in etext _etext __etext; do
   FPTOOLS_IN_SCOPE($i,$i,fptools_cv_end_of_text)
   if test "$fptools_cv_end_of_text" = yes; then
+   AC_DEFINE_UNQUOTED(TEXT_SECTION_END_MARKER_DECL, $i)
    AC_DEFINE_UNQUOTED(TEXT_SECTION_END_MARKER, $i)
    not_done=0
    break
@@ -468,7 +469,8 @@ done
 if test "$not_done" = 1; then
 FPTOOLS_IN_SCOPE(etext asm("etext"),etext,fptools_cv_end_of_text);
 if test "$fptools_cv_end_of_text" = yes; then
-  AC_DEFINE(TEXT_SECTION_END_MARKER, etext asm("etext"))
+  AC_DEFINE(TEXT_SECTION_END_MARKER_DECL, etext asm("etext"))
+  AC_DEFINE(TEXT_SECTION_END_MARKER, etext)
 else
   AC_DEFINE(TEXT_SECTION_END_MARKER, dunno_what_it_is)
 fi
@@ -484,6 +486,7 @@ not_done=1
 for i in end _end __end; do
   FPTOOLS_IN_SCOPE($i,$i,fptools_cv_end_of_data)
   if test "$fptools_cv_end_of_data" = yes; then
+   AC_DEFINE_UNQUOTED(DATA_SECTION_END_MARKER_DECL, $i)
    AC_DEFINE_UNQUOTED(DATA_SECTION_END_MARKER, $i)
    not_done=0
    break
@@ -492,8 +495,10 @@ done
 if test "$not_done" = 1; then
 FPTOOLS_IN_SCOPE(end asm("end"),end,fptools_cv_end_of_data);
 if test "$fptools_cv_end_of_data" = yes; then
-  AC_DEFINE(DATA_SECTION_END_MARKER, end asm("end"))
+  AC_DEFINE(DATA_SECTION_END_MARKER_DECL, end asm("end"))
+  AC_DEFINE(DATA_SECTION_END_MARKER, end)
 else
+  AC_DEFINE(DATA_SECTION_END_MARKER_DECL, dunno_what_it_is)
   AC_DEFINE(DATA_SECTION_END_MARKER, dunno_what_it_is)
 fi
 fi
