@@ -1,5 +1,4 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.35 2003/11/02 00:06:23 panne Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -17,77 +16,78 @@
 #include <stdlib.h>
 #include <math.h>
 
-#ifdef HAVE_SYS_TYPES_H
+#if HAVE_SYS_TYPES_H
 #include <sys/types.h>
 #endif
-#ifdef HAVE_UNISTD_H
+#if HAVE_UNISTD_H
 #include <unistd.h>
 #endif
-#ifdef HAVE_SYS_STAT_H
+#if HAVE_SYS_STAT_H
 #include <sys/stat.h>
 #endif
-#ifdef HAVE_FCNTL_H
+#if HAVE_FCNTL_H
 # include <fcntl.h>
 #endif
-#ifdef HAVE_TERMIOS_H
+#if HAVE_TERMIOS_H
 #include <termios.h>
 #endif
-#ifdef HAVE_SIGNAL_H
+#if HAVE_SIGNAL_H
 #include <signal.h>
-/* Ultra-ugly: OpenBSD uses a broken macro for sigfillset (missing cast) */
+/* Ultra-ugly: OpenBSD uses broken macros for sigemptyset and sigfillset (missing casts) */
 #if __OpenBSD__
+#undef sigemptyset
 #undef sigfillset
 #endif
 #endif
-#ifdef HAVE_ERRNO_H
+#if HAVE_ERRNO_H
 #include <errno.h>
 #endif
-#ifdef HAVE_STRING_H
+#if HAVE_STRING_H
 #include <string.h>
 #endif
-#ifdef HAVE_DIRENT_H
+#if HAVE_DIRENT_H
 #include <dirent.h>
 #endif
-#ifdef HAVE_UTIME_H
+#if HAVE_UTIME_H
 #include <utime.h>
 #endif
-#ifdef HAVE_SYS_UTSNAME_H
+#if HAVE_SYS_UTSNAME_H
 #include <sys/utsname.h>
 #endif
-#if defined(HAVE_GETTIMEOFDAY)
-#  ifdef HAVE_SYS_TIME_H
+#if HAVE_GETTIMEOFDAY
+#  if HAVE_SYS_TIME_H
 #   include <sys/time.h>
 #  endif
-#elif defined(HAVE_GETCLOCK)
-# ifdef HAVE_SYS_TIMERS_H
+#elif HAVE_GETCLOCK
+# if HAVE_SYS_TIMERS_H
 #  define POSIX_4D9 1
 #  include <sys/timers.h>
 # endif
 #endif
-#if defined(HAVE_TIME_H)
-# include <time.h>
+#if HAVE_TIME_H
+#include <time.h>
 #endif
-#ifdef HAVE_SYS_TIMEB_H
+#if HAVE_SYS_TIMEB_H
 #include <sys/timeb.h>
 #endif
-#ifdef HAVE_WINDOWS_H
+#if HAVE_WINDOWS_H
 #include <windows.h>
 #endif
-#ifdef HAVE_SYS_TIMES_H
+#if HAVE_SYS_TIMES_H
 #include <sys/times.h>
 #endif
-#if defined(HAVE_WINSOCK_H) && defined(mingw32_TARGET_OS)
+#if HAVE_WINSOCK_H && defined(mingw32_TARGET_OS)
 #include <winsock.h>
 #endif
-#ifdef HAVE_LIMITS_H
+#if HAVE_LIMITS_H
 #include <limits.h>
 #endif
-#ifdef HAVE_WCTYPE_H
+#if HAVE_WCTYPE_H
 #include <wctype.h>
 #endif
 
 #if !defined(mingw32_TARGET_OS) && !defined(irix_TARGET_OS)
-# if defined(HAVE_SYS_RESOURCE_H)
+# if HAVE_SYS_RESOURCE_H
 #  include <sys/resource.h>
 # endif
 #endif
@@ -99,10 +99,10 @@
 #endif
 
 /* For System */
-#ifdef HAVE_SYS_WAIT_H
+#if HAVE_SYS_WAIT_H
 #include <sys/wait.h>
 #endif
-#ifdef HAVE_VFORK_H
+#if HAVE_VFORK_H
 #include <vfork.h>
 #endif
 #include "lockFile.h"
@@ -437,7 +437,7 @@ __hscore_mkdir( HsAddr pathName, HsInt mode )
 INLINE HsInt
 __hscore_lstat( HsAddr fname, HsAddr st )
 {
-#ifdef HAVE_LSTAT
+#if HAVE_LSTAT
   return lstat((const char*)fname, (struct stat*)st);
 #else
   return stat((const char*)fname, (struct stat*)st);
