@@ -356,30 +356,17 @@ endif
 # ----------------------------------------------------------------------------
 # Options for GHC's RTS
 
-# This is a good way to set things like -optc-g and -optc-DDEBUG for the RTS.
-# GhcRtsHcOpts is used when compiling .hc files and .c files.
-# GhcRtsCcOpts is used when compiling .c  files only.
-
-# For a debugging RTS:
-# GhcRtsHcOpts = -optc-DDEBUG
-# GhcRtsCcOpts = -g
-
-# For an optimised RTS:
+# For an optimised RTS (you probably don't want to change these; we build
+# a debugging RTS by default now.  Use -package rts_debug to get it).
 GhcRtsHcOpts=-O2
 GhcRtsCcOpts=-fomit-frame-pointer
 
 # Include the front panel code?  Needs GTK+.
 GhcRtsWithFrontPanel = NO
 
-#
-# To have the RTS support interoperation with OS threads, set
-# GhcRtsThreaded to YES (preferably via the --enable-threaded-rts
-# configure script option). The consequence of this is spelled out
-# in details elsewhere, but, briefly, Concurrent Haskell threads
-# can now make external (i.e., C) calls without blocking the progress
-# of other CH threads. Multiple native threads can also execute
-# Haskell code without getting in each others way too.
-# 
+# DEPRECATED:
+# This option is no longer used.  We now always build the threaded RTS,
+# add the flag '-threaded' to GHC to get it.
 GhcRtsThreaded=@ThreadedRts@
 
 ################################################################################
