@@ -141,7 +141,7 @@ dsReify r@(ReifyOut ReifyDecl name)
 repTopDs :: HsGroup Name -> DsM (Core (M.Q [M.Dec]))
 repTopDs group
  = do { let { bndrs = groupBinders group } ;
-	ss    <- mkGenSyms bndrs ;
+	let { ss = mkGenSyms bndrs } ;
 
 	-- Bind all the names mainly to avoid repeated use of explicit strings.
 	-- Thus	we get
@@ -262,12 +262,16 @@ repTyClD' d = do { addDsWarn (hang msg 4 (ppr d)) ;
 
 repInstD' (InstDecl ty binds _ loc)
 	-- Ignore user pragmas for now
- = do { cxt1 <- repContext cxt ;
-	inst_ty1 <- repPred (HsClassP cls tys) ;
-	binds1 <- rep_monobind binds ;
-	decls1 <- coreList decQTyConName binds1 ;
-	i <- repInst cxt1 inst_ty1 decls1;
-    return (loc, i)}
+ = do	{ cxt1 <- repContext cxt 
+	; inst_ty1 <- repPred (HsClassP cls tys)
+	; let ss = mkGenSyms (collectMonoBinders binds)
+	; binds1 <- addBinds ss (rep_monobind binds)
+	; decls1 <- coreList decQTyConName binds1
+	; i <- repInst cxt1 inst_ty1 
+		       (wrapNonGenSyms ss decls1)
+		-- wrapNonGenSyms: do not clone the class op names!
+		-- They must be called 'op' etc, not 'op34'
+	; return (loc, i)}
  where
    (tvs, cxt, cls, tys) = splitHsInstDeclTy ty
 
@@ -345,7 +349,7 @@ addTyVarBinds :: [HsTyVarBndr Name]	         -- the binders to be added
 addTyVarBinds tvs m =
   do
     let names = map hsTyVarName tvs
-    freshNames <- mkGenSyms names
+    let freshNames = mkGenSyms names
     term       <- addBinds freshNames $ do
 		    bndrs <- mapM lookupBinder names 
 		    m bndrs
@@ -535,7 +539,7 @@ repE e                    =
 
 repMatchTup ::  Match Name -> DsM (Core M.MatchQ) 
 repMatchTup (Match [p] ty (GRHSs guards wheres ty2)) = 
-  do { ss1 <- mkGenSyms (collectPatBinders p) 
+  do { let ss1 = mkGenSyms (collectPatBinders p) 
      ; addBinds ss1 $ do {
      ; p1 <- repP p
      ; (ss2,ds) <- repBinds wheres
@@ -546,7 +550,7 @@ repMatchTup (Match [p] ty (GRHSs guards wheres ty2)) =
 
 repClauseTup ::  Match Name -> DsM (Core M.ClauseQ)
 repClauseTup (Match ps ty (GRHSs guards wheres ty2)) = 
-  do { ss1 <- mkGenSyms (collectPatsBinders ps) 
+  do { let ss1 = mkGenSyms (collectPatsBinders ps) 
      ; addBinds ss1 $ do {
        ps1 <- repPs ps
      ; (ss2,ds) <- repBinds wheres
@@ -576,7 +580,7 @@ repFields flds = do
 
 -----------------------------------------------------------------------------
 -- Representing Stmt's is tricky, especially if bound variables
--- shaddow each other. Consider:  [| do { x <- f 1; x <- f x; g x } |]
+-- shadow each other. Consider:  [| do { x <- f 1; x <- f x; g x } |]
 -- First gensym new names for every variable in any of the patterns.
 -- both static (x'1 and x'2), and dynamic ((gensym "x") and (gensym "y"))
 -- if variables didn't shaddow, the static gensym wouldn't be necessary
@@ -606,7 +610,7 @@ repSts [ResultStmt e loc] =
       ; return ([], [e1]) }
 repSts (BindStmt p e loc : ss) =
    do { e2 <- repE e 
-      ; ss1 <- mkGenSyms (collectPatBinders p) 
+      ; let ss1 = mkGenSyms (collectPatBinders p) 
       ; addBinds ss1 $ do {
       ; p1 <- repP p; 
       ; (ss2,zs) <- repSts ss
@@ -631,17 +635,23 @@ repSts other = panic "Exotic Stmt in meta brackets"
 
 repBinds :: HsBinds Name -> DsM ([GenSymBind], Core [M.DecQ]) 
 repBinds decs
- = do { let { bndrs = collectHsBinders decs } ;
-	ss	  <- mkGenSyms bndrs ;
-	core      <- addBinds ss (rep_binds decs) ;
-	core_list <- coreList decQTyConName core ;
-	return (ss, core_list) }
+ = do	{ let { bndrs = collectHsBinders decs }
+		-- No need to worrry about detailed scopes within
+		-- the binding group, because we are talking Names
+		-- here, so we can safely treat it as a mutually 
+		-- recursive group
+	; let ss    =  mkGenSyms bndrs
+	; core      <- addBinds ss (rep_binds decs)
+	; core_list <- coreList decQTyConName core 
+	; return (ss, core_list) }
 
 rep_binds :: HsBinds Name -> DsM [Core M.DecQ]
+-- Assumes: all the binders of the binding are alrady in the meta-env
 rep_binds binds = do locs_cores <- rep_binds' binds
                      return $ de_loc $ sort_by_loc locs_cores
 
 rep_binds' :: HsBinds Name -> DsM [(SrcLoc, Core M.DecQ)]
+-- Assumes: all the binders of the binding are alrady in the meta-env
 rep_binds' EmptyBinds = return []
 rep_binds' (ThenBinds x y)
  = do { core1 <- rep_binds' x
@@ -655,10 +665,12 @@ rep_binds' (IPBinds _)
   = panic "DsMeta:repBinds: can't do implicit parameters"
 
 rep_monobind :: MonoBinds Name -> DsM [Core M.DecQ]
+-- Assumes: all the binders of the binding are alrady in the meta-env
 rep_monobind binds = do locs_cores <- rep_monobind' binds
                         return $ de_loc $ sort_by_loc locs_cores
 
 rep_monobind' :: MonoBinds Name -> DsM [(SrcLoc, Core M.DecQ)]
+-- Assumes: all the binders of the binding are alrady in the meta-env
 rep_monobind' EmptyMonoBinds     = return []
 rep_monobind' (AndMonoBinds x y) = do { x1 <- rep_monobind' x; 
 				       y1 <- rep_monobind' y; 
@@ -725,7 +737,7 @@ repLambda :: Match Name -> DsM (Core M.ExpQ)
 repLambda (Match ps _ (GRHSs [GRHS [ResultStmt e _ ] _ ] 
 		             EmptyBinds _))
  = do { let bndrs = collectPatsBinders ps ;
-      ; ss <- mkGenSyms bndrs
+      ; let ss    = mkGenSyms bndrs
       ; lam <- addBinds ss (
 		do { xs <- repPs ps; body <- repE e; repLam xs body })
       ; wrapGenSyns ss lam }
@@ -783,26 +795,24 @@ de_loc = map snd
 --	The meta-environment
 
 -- A name/identifier association for fresh names of locally bound entities
---
 type GenSymBind = (Name, Id)	-- Gensym the string and bind it to the Id
 				-- I.e.		(x, x_id) means
 				--	let x_id = gensym "x" in ...
 
 -- Generate a fresh name for a locally bound entity
---
-mkGenSym :: Name -> DsM GenSymBind
-mkGenSym nm = do { id <- newUniqueId nm stringTy; return (nm,id) }
+
+mkGenSym :: Name -> GenSymBind
+mkGenSym nm = (nm, mkLocalId nm stringTy)
 
 -- Ditto for a list of names
 --
-mkGenSyms :: [Name] -> DsM [GenSymBind]
-mkGenSyms ns = mapM mkGenSym ns
+mkGenSyms :: [Name] -> [GenSymBind]
+mkGenSyms ns = map mkGenSym ns
 	     
--- Add a list of fresh names for locally bound entities to the meta
--- environment (which is part of the state carried around by the desugarer
--- monad) 
---
 addBinds :: [GenSymBind] -> DsM a -> DsM a
+-- Add a list of fresh names for locally bound entities to the 
+-- meta environment (which is part of the state carried around 
+-- by the desugarer monad) 
 addBinds bs m = dsExtendMetaEnv (mkNameEnv [(n,Bound id) | (n,id) <- bs]) m
 
 -- Look up a locally bound name
@@ -844,13 +854,13 @@ lookupType :: Name 	-- Name of type constructor (e.g. M.ExpQ)
 lookupType tc_name = do { tc <- dsLookupTyCon tc_name ;
 		          return (mkGenTyConApp tc []) }
 
+wrapGenSyns :: [GenSymBind] 
+	    -> Core (M.Q a) -> DsM (Core (M.Q a))
 -- wrapGenSyns [(nm1,id1), (nm2,id2)] y 
 --	--> bindQ (gensym nm1) (\ id1 -> 
 --	    bindQ (gensym nm2 (\ id2 -> 
 --	    y))
 
-wrapGenSyns :: [GenSymBind] 
-	    -> Core (M.Q a) -> DsM (Core (M.Q a))
 wrapGenSyns binds body@(MkC b)
   = go binds
   where
@@ -868,8 +878,10 @@ wrapGenSyns binds body@(MkC b)
 		      gensym_app (MkC (Lam id body')) }
 
 -- Just like wrapGenSym, but don't actually do the gensym
--- Instead use the existing name
--- Only used for [Decl]
+-- Instead use the existing name:
+--	let x = "x" in ...
+-- Only used for [Decl], and for the class ops in class 
+-- and instance decls
 wrapNongenSyms :: [GenSymBind] -> Core a -> DsM (Core a)
 wrapNongenSyms binds (MkC body)
   = do { binds' <- mapM do_one binds ;
