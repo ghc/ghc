@@ -12,8 +12,14 @@
 --
 -----------------------------------------------------------------------------
 
-module System.Locale
-    ( TimeLocale(..)
+module System.Locale (
+
+    -- |The 'Locale' library provides the ability to adapt to local conventions.
+    -- At present, it supports only time and date information as used by
+    -- 'calendarTimeToString' from the "System.Time" library.
+    
+    TimeLocale(..)
+
     , defaultTimeLocale
     
     , iso8601DateFormat
@@ -24,11 +30,15 @@ where
 import Prelude
 
 data TimeLocale = TimeLocale {
-        wDays  :: [(String, String)],   -- full and abbreviated week days
-        months :: [(String, String)],   -- full and abbreviated months
+	-- |full and abbreviated week days
+        wDays  :: [(String, String)],
+	-- |full and abbreviated months
+        months :: [(String, String)],
         intervals :: [(String, String)],
-        amPm   :: (String, String),     -- AM/PM symbols
-        dateTimeFmt, dateFmt,           -- formatting strings
+	-- |AM\/PM symbols
+        amPm   :: (String, String),
+	-- |formatting strings
+        dateTimeFmt, dateFmt,
         timeFmt, time12Fmt :: String     
         } deriving (Eq, Ord, Show)
 
@@ -63,11 +73,14 @@ defaultTimeLocale =  TimeLocale {
         }
 
 
+-- |Normally, ISO-8601 just defines YYYY-MM-DD
+-- but we can add a time spec.
+
 iso8601DateFormat :: Maybe String -> String
 iso8601DateFormat timeFmt =
     "%Y-%m-%d" ++ case timeFmt of
-             Nothing  -> "" -- normally, ISO-8601 just defines YYYY-MM-DD
-             Just fmt -> ' ' : fmt -- but we can add a time spec
+             Nothing  -> "" 
+             Just fmt -> ' ' : fmt
 
 
 rfc822DateFormat :: String
