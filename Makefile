@@ -10,13 +10,13 @@ TOP=.
 include $(TOP)/mk/boilerplate.mk
 
 # find the projects that actually exist...
-SUBDIRS = $(filter $(patsubst %/, %, $(wildcard */)), $(AllProjects))
+ProjectsThatExist = $(filter $(patsubst %/, %, $(wildcard */)), $(AllProjects))
 
 # and filter only those that the user requested, if necessary
 ifeq "$(ProjectsToBuild)" ""
-Projects = $(SUBDIRS)
+SUBDIRS = $(ProjectsThatExist)
 else
-Projects = $(filter $(ProjectsToBuild), $(SUBDIRS))
+SUBDIRS = $(filter $(ProjectsToBuild), $(ProjectsThatExist))
 endif
 
 ifneq "$(Project)" ""
@@ -258,7 +258,7 @@ SRC_DIST_DIR=$(shell pwd)/$(SRC_DIST_NAME)
 #
 # Files to include in source distributions
 #
-SRC_DIST_DIRS += docs distrib $(Projects)
+SRC_DIST_DIRS += docs distrib $(SUBDIRS)
 SRC_DIST_FILES += \
 	configure.in config.guess config.sub configure \
 	aclocal.m4 acconfig.h README Makefile install-sh \
@@ -302,7 +302,7 @@ MAINTAINER_CLEAN_FILES += configure
 
 all ::
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
-	for i in $(Projects); do \
+	for i in $(SUBDIRS); do \
 	   if [ -d $$i ]; then \
 	      $(MAKE) -C $$i boot all; \
 	      if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
@@ -315,7 +315,7 @@ boot ::
 
 install ::
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
-	for i in $(filter-out $(ProjectsDontInstall), $(Projects)); do \
+	for i in $(filter-out $(ProjectsDontInstall), $(SUBDIRS)); do \
 	   if [ -d $$i ]; then \
 	      $(MAKE) -C $$i install; \
 	      if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
