@@ -169,10 +169,9 @@ INSTANCE_TYPEABLE0(AsyncException,asyncExceptionTc,"AsyncException")
 -- might be a 'ThreadKilled', for example).  In this case it is usually better
 -- to use 'catchJust' and select the kinds of exceptions to catch.
 --
--- Also note that the "Prelude" also exports a
--- function called 'Prelude.catch' which has the same type as
--- 'Control.Exception.catch', the difference being that the
--- "Prelude" version only catches the IO and user
+-- Also note that the "Prelude" also exports a function called
+-- 'Prelude.catch' with a similar type to 'Control.Exception.catch',
+-- except that the "Prelude" version only catches the IO and user
 -- families of exceptions (as required by Haskell 98).  We recommend
 -- either hiding the "Prelude" version of
 -- 'Prelude.catch' when importing
@@ -244,6 +243,11 @@ mapException f v = unsafePerformIO (catch (evaluate v)
 -- to re-throw the exception after performing whatever cleanup is needed.
 -- Otherwise, 'tryJust' is generally considered to be better.
 --
+-- Also note that "System.IO.Error" also exports a function called
+-- 'System.IO.Error.try' with a similar type to 'Control.Exception.try',
+-- except that it catches only the IO and user families of exceptions
+-- (as required by the Haskell 98 @IO@ module).
+
 try :: IO a -> IO (Either Exception a)
 try a = catch (a >>= \ v -> return (Right v)) (\e -> return (Left e))
 
