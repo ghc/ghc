@@ -485,7 +485,7 @@ addl :: HsGroup a -> [LHsDecl a] -> (HsGroup a, Maybe (SpliceDecl a, [LHsDecl a]
 	-- This stuff reverses the declarations (again) but it doesn't matter
 
 -- Base cases
-addl gp []		   = (gp, Nothing)
+addl gp []	     = (gp, Nothing)
 addl gp (L l d : ds) = add gp l d ds
 
 
