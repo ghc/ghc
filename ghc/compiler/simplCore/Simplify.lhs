@@ -509,19 +509,34 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
     if isEmptyFloats floats && isNilOL aux_binds then	-- Shortcut a common case
 	completeLazyBind env1 top_lvl bndr bndr2 rhs2
 
-	-- We use exprIsTrivial here because we want to reveal lone variables.  
-	-- E.g.  let { x = letrec { y = E } in y } in ...
-	-- Here we definitely want to float the y=E defn. 
-	-- exprIsValue definitely isn't right for that.
-	--
-	-- BUT we can't use "exprIsCheap", because that causes a strictness bug.
+    else if is_top_level || exprIsTrivial rhs2 || exprIsValue rhs2 then
+	-- 	WARNING: long dodgy argument coming up
+	--	WANTED: a better way to do this
+	--		
+	-- We can't use "exprIsCheap" instead of exprIsValue, 
+	-- because that causes a strictness bug.
 	--     	   x = let y* = E in case (scc y) of { T -> F; F -> T}
 	-- The case expression is 'cheap', but it's wrong to transform to
 	-- 	   y* = E; x = case (scc y) of {...}
  	-- Either we must be careful not to float demanded non-values, or
 	-- we must use exprIsValue for the test, which ensures that the
-	-- thing is non-strict.  I think.  The WARN below tests for this.
-    else if is_top_level || exprIsTrivial rhs2 || exprIsValue rhs2 then
+	-- thing is non-strict.  So exprIsValue => bindings are non-strict
+	-- I think.  The WARN below tests for this.
+	--
+	-- We use exprIsTrivial here because we want to reveal lone variables.  
+	-- E.g.  let { x = letrec { y = E } in y } in ...
+	-- Here we definitely want to float the y=E defn. 
+	-- exprIsValue definitely isn't right for that.
+	--
+	-- Again, the floated binding can't be strict; if it's recursive it'll
+	-- be non-strict; if it's non-recursive it'd be inlined.
+	--
+	-- Note [SCC-and-exprIsTrivial]
+	-- If we have
+	--	y = let { x* = E } in scc "foo" x
+	-- then we do *not* want to float out the x binding, because
+	-- it's strict!  Fortunately, exprIsTrivial replies False to
+	-- (scc "foo" x).
 
 		-- There's a subtlety here.  There may be a binding (x* = e) in the
 		-- floats, where the '*' means 'will be demanded'.  So is it safe
@@ -529,8 +544,8 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
 		-- we only float if (a) arg' is a WHNF, or (b) it's going to top level
 		-- and so there can't be any 'will be demanded' bindings in the floats.
 		-- Hence the warning
-        WARN( not is_top_level && any demanded_float (floatBinds floats), 
-	      ppr (filter demanded_float (floatBinds floats)) )
+        ASSERT2( is_top_level || not (any demanded_float (floatBinds floats)), 
+	         ppr (filter demanded_float (floatBinds floats)) )
 
 	tick LetFloatFromLet			`thenSmpl_` (
 	addFloats env1 floats			$ \ env2 ->
