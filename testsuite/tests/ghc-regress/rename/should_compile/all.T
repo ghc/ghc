@@ -34,6 +34,7 @@ test "Rn037Help" { vtc("") }
 test "rn037"     { vtc("") }
 
 test "rn038" { $expect = "fail" vtc("") }
+test "rn039" { vtc("") }
 
 test "timing001" { vtc("") }
 test "timing002" { vtc("") }
