@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgStackery.lhs,v 1.15 2000/10/24 07:35:00 simonpj Exp $
+% $Id: CgStackery.lhs,v 1.16 2001/08/29 14:20:14 rje Exp $
 %
 \section[CgStackery]{Stack management functions}
 
@@ -141,34 +141,33 @@ allocStack :: FCode VirtualSpOffset
 allocStack = allocPrimStack 1
 
 allocPrimStack :: Int -> FCode VirtualSpOffset
-allocPrimStack size info_down (MkCgState absC binds
-				 ((virt_sp, free_stk, real_sp, hw_sp), h_usage))
-  = (chosen_slot, MkCgState absC binds (new_stk_usage, h_usage))
-  where
-    push_virt_sp = virt_sp + size
-
-    (chosen_slot, new_stk_usage)
-	= case find_block free_stk of
-		Nothing -> (push_virt_sp, (push_virt_sp, free_stk, real_sp,
+allocPrimStack size = do
+	((virt_sp, free_stk, real_sp, hw_sp),h_usage) <- getUsage
+	let push_virt_sp = virt_sp + size
+	let (chosen_slot, new_stk_usage) = 
+		case find_block free_stk of
+			Nothing -> (push_virt_sp, (push_virt_sp, free_stk, real_sp,
 				       hw_sp `max` push_virt_sp))
-				       -- Adjust high water mark
+						-- Adjust high water mark
+			Just slot -> (slot, (virt_sp, 
+						delete_block free_stk slot, real_sp, hw_sp))	
+	setUsage (new_stk_usage, h_usage)
+	return chosen_slot
+	
+	where
+		-- find_block looks for a contiguous chunk of free slots
+		find_block :: [(VirtualSpOffset,Slot)] -> Maybe VirtualSpOffset
+		find_block [] = Nothing
+		find_block ((off,free):slots)
+			| take size ((off,free):slots) == 
+			  zip [off..top_slot] (repeat Free) = Just top_slot
+			| otherwise				   = find_block slots
+				-- The stack grows downwards, with increasing virtual offsets.
+				-- Therefore, the address of a multi-word object is the *highest*
+				-- virtual offset it occupies (top_slot below).
+			where top_slot = off+size-1
 
-		Just slot -> (slot, (virt_sp, 
-				    delete_block free_stk slot, real_sp, hw_sp))
-
-    -- find_block looks for a contiguous chunk of free slots
-    find_block :: [(VirtualSpOffset,Slot)] -> Maybe VirtualSpOffset
-    find_block [] = Nothing
-    find_block ((off,free):slots)
-      | take size ((off,free):slots) == 
-		zip [off..top_slot] (repeat Free) = Just top_slot
-      | otherwise				   = find_block slots
-	-- The stack grows downwards, with increasing virtual offsets.
-	-- Therefore, the address of a multi-word object is the *highest*
-	-- virtual offset it occupies (top_slot below).
-      where top_slot = off+size-1
-
-    delete_block free_stk slot = [ (s,f) | (s,f) <- free_stk, 
+		delete_block free_stk slot = [ (s,f) | (s,f) <- free_stk, 
 				           (s<=slot-size) || (s>slot) ]
 			      -- Retain slots which are not in the range
 			      -- slot-size+1..slot
@@ -181,13 +180,12 @@ free list.
 
 \begin{code}
 allocStackTop :: Int -> FCode VirtualSpOffset
-allocStackTop size info_down (MkCgState absC binds
-	                     ((virt_sp, free_stk, real_sp, hw_sp), h_usage))
-  = (push_virt_sp, MkCgState absC binds (new_stk_usage, h_usage))
-  where
-    push_virt_sp = virt_sp + size
-    new_stk_usage = (push_virt_sp, free_stk, real_sp, hw_sp `max` push_virt_sp)
-				                -- Adjust high water mark
+allocStackTop size = do
+	((virt_sp, free_stk, real_sp, hw_sp), h_usage) <- getUsage
+	let push_virt_sp = virt_sp + size
+	let new_stk_usage = (push_virt_sp, free_stk, real_sp, hw_sp `max` push_virt_sp)
+	setUsage (new_stk_usage, h_usage)
+	return push_virt_sp
 \end{code}
 
 Pop some words from the current top of stack.  This is used for
@@ -195,33 +193,31 @@ de-allocating the return address in a case alternative.
 
 \begin{code}
 deAllocStackTop :: Int -> FCode VirtualSpOffset
-deAllocStackTop size info_down (MkCgState absC binds
-	                     ((virt_sp, free_stk, real_sp, hw_sp), h_usage))
-  = (pop_virt_sp, MkCgState absC binds (new_stk_usage, h_usage))
-  where
-    pop_virt_sp = virt_sp - size
-    new_stk_usage = (pop_virt_sp, free_stk, real_sp, hw_sp)
+deAllocStackTop size = do
+	((virt_sp, free_stk, real_sp, hw_sp), h_usage) <- getUsage
+	let pop_virt_sp = virt_sp - size
+	let new_stk_usage = (pop_virt_sp, free_stk, real_sp, hw_sp)
+	setUsage (new_stk_usage, h_usage)
+	return pop_virt_sp
 \end{code}
 
 \begin{code}
 adjustStackHW :: VirtualSpOffset -> Code
-adjustStackHW offset info_down (MkCgState absC binds usage) 
-  = MkCgState absC binds new_usage
-  where
-    ((vSp,fSp,realSp,hwSp), h_usage) = usage
-    new_usage = ((vSp, fSp, realSp, max offset hwSp), h_usage)
-    -- No need to fiddle with virtual Sp etc because this call is
-    -- only done just before the end of a block
+adjustStackHW offset = do
+	((vSp,fSp,realSp,hwSp), h_usage) <- getUsage
+	setUsage ((vSp, fSp, realSp, max offset hwSp), h_usage)
 \end{code}
 
 A knot-tying beast.
 
 \begin{code}
 getFinalStackHW :: (VirtualSpOffset -> Code) -> Code
-getFinalStackHW fcode info_down (MkCgState absC binds usages) = state1
-  where
-    state1 = fcode hwSp info_down (MkCgState absC binds usages)
-    (MkCgState _ _ ((_,_,_, hwSp), _)) = state1
+getFinalStackHW fcode = do
+	fixC (\hwSp -> do
+		fcode hwSp
+		((_,_,_, hwSp),_) <- getUsage
+		return hwSp)
+	return ()
 \end{code}
 
 \begin{code}
@@ -244,13 +240,12 @@ Explicitly free some stack space.
 
 \begin{code}
 addFreeStackSlots :: [VirtualSpOffset] -> Slot -> Code
-addFreeStackSlots extra_free slot info_down
-	state@(MkCgState abs_c binds ((vsp, free, real, hw), heap_usage))
-  = MkCgState abs_c binds new_usage
-  where
-    new_usage = ((new_vsp, new_free, real, hw), heap_usage)
-    (new_vsp, new_free) = trim vsp all_free
-    all_free = addFreeSlots free (zip extra_free (repeat slot))
+addFreeStackSlots extra_free slot = do
+	((vsp, free, real, hw),heap_usage) <- getUsage
+	let all_free = addFreeSlots free (zip extra_free (repeat slot))
+	let (new_vsp, new_free) = trim vsp all_free
+	let new_usage = ((new_vsp, new_free, real, hw), heap_usage)
+	setUsage new_usage
 
 freeStackSlots :: [VirtualSpOffset] -> Code
 freeStackSlots slots = addFreeStackSlots slots Free

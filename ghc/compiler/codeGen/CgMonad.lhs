@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgMonad.lhs,v 1.26 2000/11/06 08:15:21 simonpj Exp $
+% $Id: CgMonad.lhs,v 1.27 2001/08/29 14:20:14 rje Exp $
 %
 \section[CgMonad]{The code generation monad}
 
@@ -34,6 +34,13 @@ module CgMonad (
 
 	Sequel(..), -- ToDo: unabstract?
 	sequelToAmode,
+
+	-- ideally we wouldn't export these, but some other modules access internal state
+	getState, setState, getInfoDown,
+
+	-- more localised access to monad state	
+	getUsage, setUsage,
+	getBinds, setBinds, getStaticBinds,
 
 	-- out of general friendliness, we also export ...
 	CgInfoDownwards(..), CgState(..),	-- non-abstract
@@ -253,8 +260,12 @@ stateIncUsage (MkCgState abs_c bs ((v,f,r,h1),(vH1,rH1)))
 %************************************************************************
 
 \begin{code}
-type FCode a = CgInfoDownwards -> CgState -> (a, CgState)
-type Code    = CgInfoDownwards -> CgState -> CgState
+newtype FCode a = FCode (CgInfoDownwards -> CgState -> (a, CgState))
+type Code    = FCode ()
+
+instance Monad FCode where
+	(>>=) = thenFC
+	return = returnFC
 
 {-# INLINE thenC #-}
 {-# INLINE thenFC #-}
@@ -265,7 +276,7 @@ The Abstract~C is not in the environment so as to improve strictness.
 \begin{code}
 initC :: CompilationInfo -> Code -> AbstractC
 
-initC cg_info code
+initC cg_info (FCode code)
   = case (code (MkCgInfoDown 
 			cg_info 
 			(error "initC: statics")
@@ -273,82 +284,110 @@ initC cg_info code
 			(mkTopTickyCtrLabel)
 			initEobInfo)
 	       initialStateC) of
-      MkCgState abc _ _ -> abc
+      ((),MkCgState abc _ _) -> abc
 
 returnFC :: a -> FCode a
-
-returnFC val info_down state = (val, state)
+returnFC val = FCode (\info_down state -> (val, state))
 \end{code}
 
 \begin{code}
-thenC :: Code
-      -> (CgInfoDownwards -> CgState -> a)
-      -> CgInfoDownwards -> CgState -> a
-
--- thenC has both of the following types:
--- thenC :: Code -> Code    -> Code
--- thenC :: Code -> FCode a -> FCode a
-
-thenC m k info_down state
-  = k info_down new_state
-  where
-    new_state  = m info_down state
+thenC :: Code -> FCode a -> FCode a
+thenC (FCode m) (FCode k) = 
+  	FCode (\info_down state -> let ((),new_state) = m info_down state in 
+  		k info_down new_state)
 
 listCs :: [Code] -> Code
-
-listCs []     info_down state = state
-listCs (c:cs) info_down state = stateN
-  where
-    state1 = c	       info_down state
-    stateN = listCs cs info_down state1
-
+listCs [] = return ()
+listCs (fc:fcs) = do
+	fc
+	listCs fcs
+   	
 mapCs :: (a -> Code) -> [a] -> Code
-
-mapCs f []     info_down state = state
-mapCs f (c:cs) info_down state = stateN
-  where
-    state1 = (f c)      info_down state
-    stateN = mapCs f cs info_down state1
+mapCs = mapM_
 \end{code}
 
 \begin{code}
-thenFC	:: FCode a
-	-> (a -> CgInfoDownwards -> CgState -> c)
-	-> CgInfoDownwards -> CgState -> c
-
--- thenFC :: FCode a -> (a -> FCode b) -> FCode b
--- thenFC :: FCode a -> (a -> Code)    -> Code
-
-thenFC m k info_down state
-  = k m_result info_down new_state
-  where
-    (m_result, new_state) = m info_down state
+thenFC	:: FCode a -> (a -> FCode c) -> FCode c
+thenFC (FCode m) k = FCode (
+	\info_down state ->
+		let 
+			(m_result, new_state) = m info_down state
+			(FCode kcode) = k m_result
+		in 
+			kcode info_down new_state
+	)
 
 listFCs :: [FCode a] -> FCode [a]
-
-listFCs []	 info_down state = ([],		    state)
-listFCs (fc:fcs) info_down state = (thing : things, stateN)
-  where
-    (thing,  state1) = fc	   info_down state
-    (things, stateN) = listFCs fcs info_down state1
+listFCs = sequence
 
 mapFCs :: (a -> FCode b) -> [a] -> FCode [b]
-
-mapFCs f [] 	  info_down state = ([],	     state)
-mapFCs f (fc:fcs) info_down state = (thing : things, stateN)
-  where
-    (thing,  state1) = (f fc)	    info_down state
-    (things, stateN) = mapFCs f fcs info_down state1
+mapFCs = mapM
 \end{code}
 
 And the knot-tying combinator:
 \begin{code}
 fixC :: (a -> FCode a) -> FCode a
-fixC fcode info_down state = result
-  where
-    result@(v, _) = fcode v info_down state
-    --	    ^-------------^
+fixC fcode = FCode (
+	\info_down state -> 
+		let
+			FCode fc = fcode v
+			result@(v,_) = fc info_down state
+			--	    ^--------^
+		in
+			result
+	)
 \end{code}
+
+Operators for getting and setting the state and "info_down".
+To maximise encapsulation, code should try to only get and set the
+state it actually uses.
+
+\begin{code}
+getState :: FCode CgState
+getState = FCode $ \info_down state -> (state,state)
+
+setState :: CgState -> FCode ()
+setState state = FCode $ \info_down _ -> ((),state)
+
+getUsage :: FCode CgStksAndHeapUsage
+getUsage = do
+	MkCgState absC binds usage <- getState
+	return usage
+
+setUsage :: CgStksAndHeapUsage -> FCode ()
+setUsage newusage = do
+	MkCgState absC binds usage <- getState
+	setState $ MkCgState absC binds newusage
+
+getBinds :: FCode CgBindings
+getBinds = do
+	MkCgState absC binds usage <- getState
+	return binds
+	
+setBinds :: CgBindings -> FCode ()
+setBinds newbinds = do
+	MkCgState absC binds usage <- getState
+	setState $ MkCgState absC newbinds usage
+
+getStaticBinds :: FCode CgBindings
+getStaticBinds = do
+	(MkCgInfoDown _ static_binds _ _ _) <- getInfoDown
+	return static_binds
+
+withState :: FCode a -> CgState -> FCode (a,CgState)
+withState (FCode fcode) newstate = FCode $ \info_down state -> 
+	let (retval, state2) = fcode info_down newstate in ((retval,state2), state)
+
+getInfoDown :: FCode CgInfoDownwards
+getInfoDown = FCode $ \info_down state -> (info_down,state)
+
+withInfoDown :: FCode a -> CgInfoDownwards -> FCode a
+withInfoDown (FCode fcode) info_down = FCode $ \_ state -> fcode info_down state 
+
+doFCode :: FCode a -> CgInfoDownwards -> CgState -> (a,CgState)
+doFCode (FCode fcode) info_down state = fcode info_down state
+\end{code}
+
 
 @forkClosureBody@ takes a code, $c$, and compiles it in a completely
 fresh environment, except that:
@@ -369,36 +408,39 @@ bindings and usage information is otherwise unchanged.
 \begin{code}
 forkClosureBody :: Code -> Code
 
-forkClosureBody code
-	(MkCgInfoDown cg_info statics srt ticky _)
-	(MkCgState absC_in binds un_usage)
-  = MkCgState (AbsCStmts absC_in absC_fork) binds un_usage
-  where
-    fork_state		    = code body_info_down initialStateC
-    MkCgState absC_fork _ _ = fork_state
-    body_info_down = MkCgInfoDown cg_info statics srt ticky initEobInfo
-
+forkClosureBody (FCode code) = do
+	(MkCgInfoDown cg_info statics srt ticky _) <- getInfoDown
+	(MkCgState absC_in binds un_usage) <- getState
+   	let	body_info_down = MkCgInfoDown cg_info statics srt ticky initEobInfo
+	let	((),fork_state)		    = code body_info_down initialStateC
+	let	MkCgState absC_fork _ _ = fork_state
+	setState $ MkCgState (AbsCStmts absC_in absC_fork) binds un_usage
+	
 forkStatics :: FCode a -> FCode a
 
-forkStatics fcode (MkCgInfoDown cg_info _ srt ticky _)
-		  (MkCgState absC_in statics un_usage)
-  = (result, MkCgState (AbsCStmts absC_in absC_fork) statics un_usage)
-  where
-  (result, state) = fcode rhs_info_down initialStateC
-  MkCgState absC_fork _ _ = state	-- Don't merge these this line with the one
-					-- above or it becomes too strict!
-  rhs_info_down = MkCgInfoDown cg_info statics srt ticky initEobInfo
+forkStatics (FCode fcode) = FCode (
+	\(MkCgInfoDown cg_info _ srt ticky _)
+	(MkCgState absC_in statics un_usage)
+  -> 
+  	let
+		(result, state) = fcode rhs_info_down initialStateC
+		MkCgState absC_fork _ _ = state	-- Don't merge these this line with the one
+				-- above or it becomes too strict!
+  		rhs_info_down = MkCgInfoDown cg_info statics srt ticky initEobInfo
+	in
+		(result, MkCgState (AbsCStmts absC_in absC_fork) statics un_usage)
+	)
 
 forkAbsC :: Code -> FCode AbstractC
-forkAbsC code info_down (MkCgState absC1 bs usage)
-  = (absC2, new_state)
-  where
-    MkCgState absC2 _ ((_, _, _,h2), _) =
-	code info_down (MkCgState AbsCNop bs usage)
-    ((v, f, r, h1), heap_usage) = usage
-
-    new_usage = ((v, f, r, h1 `max` h2), heap_usage)
-    new_state = MkCgState absC1 bs new_usage
+forkAbsC (FCode code) =
+	do
+		info_down <- getInfoDown
+		(MkCgState absC1 bs usage) <- getState
+		let ((),MkCgState absC2 _ ((_, _, _,h2), _)) = code info_down (MkCgState AbsCNop bs usage)
+		let ((v, f, r, h1), heap_usage) = usage
+		let new_usage = ((v, f, r, h1 `max` h2), heap_usage)
+		setState $ MkCgState absC1 bs new_usage
+		return absC2
 \end{code}
 
 @forkAlts@ $bs~d$ takes fcodes $bs$ for the branches of a @case@, and
@@ -411,17 +453,17 @@ that
 \begin{code}
 forkAlts :: [FCode a] -> FCode b -> FCode ([a],b)
 
-forkAlts branch_fcodes deflt_fcode info_down in_state
- = ((branch_results , deflt_result), out_state)
-  where
-    compile fc = fc info_down in_state
+forkAlts branch_fcodes (FCode deflt_fcode) = 
+	do
+		info_down <- getInfoDown
+		in_state <- getState
+		let compile (FCode fc) = fc info_down in_state
+		let (branch_results, branch_out_states) = unzip (map compile branch_fcodes)
+		let (deflt_result, deflt_out_state) = deflt_fcode info_down in_state
+		setState $ foldl stateIncUsage in_state (deflt_out_state:branch_out_states)
+				-- NB foldl.  in_state is the *left* argument to stateIncUsage
+		return (branch_results, deflt_result)
 
-    (branch_results, branch_out_states) = unzip (map compile branch_fcodes)
-
-    (deflt_result, deflt_out_state) = deflt_fcode info_down in_state
-
-    out_state = foldl stateIncUsage in_state (deflt_out_state:branch_out_states)
-		-- NB foldl.  in_state is the *left* argument to stateIncUsage
 \end{code}
 
 @forkEval@ takes two blocks of code.
@@ -455,23 +497,21 @@ forkEvalHelp :: EndOfBlockInfo  -- For the body
 	     -> FCode (Int,	-- Sp
 		       a)	-- Result of the FCode
 
-forkEvalHelp body_eob_info env_code body_code
-	 info_down@(MkCgInfoDown cg_info statics srt ticky _) state
-  = ((v,value_returned), state `stateIncUsageEval` state_at_end_return)
-  where
-    info_down_for_body = MkCgInfoDown cg_info statics srt ticky body_eob_info
-
-    (MkCgState _ binds ((v,f,_,_), _)) = env_code info_down_for_body state
-	-- These v and f things are now set up as the body code expects them
-
-    (value_returned, state_at_end_return) 
-	= body_code info_down_for_body state_for_body
-
-    state_for_body = MkCgState AbsCNop
+forkEvalHelp body_eob_info env_code body_code =
+	do
+		info_down@(MkCgInfoDown cg_info statics srt ticky _) <- getInfoDown
+		state <- getState
+		let info_down_for_body = MkCgInfoDown cg_info statics srt ticky body_eob_info
+		let (_,MkCgState _ binds ((v,f,_,_),_)) = 
+			doFCode env_code info_down_for_body state
+		let state_for_body = MkCgState AbsCNop
 	 		     (nukeVolatileBinds binds)
 			     ((v,f,v,v), (0,0))
-
-
+		let (value_returned, state_at_end_return) = 
+			doFCode body_code info_down_for_body state_for_body		
+		setState $ state `stateIncUsageEval` state_at_end_return
+		return (v,value_returned)
+		
 stateIncUsageEval :: CgState -> CgState -> CgState
 stateIncUsageEval (MkCgState absC1 bs ((v,f,r,h1),heap_usage))
 		  (MkCgState absC2 _  ((_,_,_,h2),         _))
@@ -495,11 +535,12 @@ stateIncUsageEval (MkCgState absC1 bs ((v,f,r,h1),heap_usage))
 environment; @absC@ glues @ab_C@ onto the Abstract~C collected so far.
 \begin{code}
 nopC :: Code
-nopC info_down state = state
+nopC = return ()
 
 absC :: AbstractC -> Code
-absC more_absC info_down state@(MkCgState absC binds usage)
-  = MkCgState (mkAbsCStmts absC more_absC) binds usage
+absC more_absC = do
+	state@(MkCgState absC binds usage) <- getState
+	setState $ MkCgState (mkAbsCStmts absC more_absC) binds usage
 \end{code}
 
 These two are just like @absC@, except they examine the compilation
@@ -509,17 +550,21 @@ nothing.
 \begin{code}
 costCentresC :: FAST_STRING -> [CAddrMode] -> Code
 
-costCentresC macro args _ state@(MkCgState absC binds usage)
-  = if opt_SccProfilingOn
-    then MkCgState (mkAbsCStmts absC (CCallProfCCMacro macro args)) binds usage
-    else state
+costCentresC macro args = 
+	if opt_SccProfilingOn then do
+		(MkCgState absC binds usage) <- getState
+		setState $ MkCgState (mkAbsCStmts absC (CCallProfCCMacro macro args)) binds usage
+	else
+		nopC
 
 profCtrC :: FAST_STRING -> [CAddrMode] -> Code
 
-profCtrC macro args _ state@(MkCgState absC binds usage)
-  = if not opt_DoTickyProfiling
-    then state
-    else MkCgState (mkAbsCStmts absC (CCallProfCtrMacro macro args)) binds usage
+profCtrC macro args = 
+	if not opt_DoTickyProfiling
+    then nopC
+	else do
+		(MkCgState absC binds usage) <- getState
+		setState $ MkCgState (mkAbsCStmts absC (CCallProfCtrMacro macro args)) binds usage
 
 profCtrAbsC :: FAST_STRING -> [CAddrMode] -> AbstractC
 
@@ -543,48 +588,52 @@ obtained from the compilation.
 
 \begin{code}
 getAbsC :: Code -> FCode AbstractC
-
-getAbsC code info_down (MkCgState absC binds usage)
-  = (absC2, MkCgState absC binds2 usage2)
-  where
-    (MkCgState absC2 binds2 usage2) 
-	= code info_down (MkCgState AbsCNop binds usage)
+getAbsC code = do
+	MkCgState absC binds usage <- getState
+	((),MkCgState absC2 binds2 usage2) <- withState code (MkCgState AbsCNop binds usage)
+	setState $ MkCgState absC binds2 usage2
+	return absC2
 \end{code}
 
 \begin{code}
-
 moduleName :: FCode Module
-moduleName (MkCgInfoDown (MkCompInfo mod_name) _ _ _ _) state
-  = (mod_name, state)
-
+moduleName = do
+	(MkCgInfoDown (MkCompInfo mod_name) _ _ _ _) <- getInfoDown
+	return mod_name
 \end{code}
 
 \begin{code}
 setEndOfBlockInfo :: EndOfBlockInfo -> Code -> Code
-setEndOfBlockInfo eob_info code	(MkCgInfoDown c_info statics srt ticky _) state
-  = code (MkCgInfoDown c_info statics srt ticky eob_info) state
+setEndOfBlockInfo eob_info code	= do
+	(MkCgInfoDown c_info statics srt ticky _) <- getInfoDown
+	withInfoDown code (MkCgInfoDown c_info statics srt ticky eob_info)
 
 getEndOfBlockInfo :: FCode EndOfBlockInfo
-getEndOfBlockInfo (MkCgInfoDown c_info statics _ _ eob_info) state
-  = (eob_info, state)
+getEndOfBlockInfo = do
+	(MkCgInfoDown c_info statics _ _ eob_info) <- getInfoDown
+	return eob_info
 \end{code}
 
 \begin{code}
 getSRTLabel :: FCode CLabel
-getSRTLabel (MkCgInfoDown _ _ srt _ _) state
-  = (srt, state)
+getSRTLabel = do 
+	(MkCgInfoDown _ _ srt _ _) <- getInfoDown
+	return srt
 
 setSRTLabel :: CLabel -> Code -> Code
-setSRTLabel srt code (MkCgInfoDown c_info statics _ ticky eob_info) state
-  = code (MkCgInfoDown c_info statics srt ticky eob_info) state
+setSRTLabel srt code = do
+	(MkCgInfoDown c_info statics _ ticky eob_info) <- getInfoDown
+	withInfoDown code (MkCgInfoDown c_info statics srt ticky eob_info)
 \end{code}
 
 \begin{code}
 getTickyCtrLabel :: FCode CLabel
-getTickyCtrLabel (MkCgInfoDown _ _ _ ticky _) state
-  = (ticky, state)
+getTickyCtrLabel = do
+	(MkCgInfoDown _ _ _ ticky _) <- getInfoDown
+	return ticky
 
 setTickyCtrLabel :: CLabel -> Code -> Code
-setTickyCtrLabel ticky code (MkCgInfoDown c_info statics srt _ eob_info) state
-  = code (MkCgInfoDown c_info statics srt ticky eob_info) state
+setTickyCtrLabel ticky code = do
+	(MkCgInfoDown c_info statics srt _ eob_info) <- getInfoDown
+	withInfoDown code (MkCgInfoDown c_info statics srt ticky eob_info)
 \end{code}
