@@ -3,7 +3,7 @@
 
 We are pleased to announce a new release of the Glasgow Haskell
 Compiler (GHC), version 2.04. Source distribution is freely available
-via the World-Wide Web and anon. FTP; details below.
+via the World-Wide Web and through anon. FTP; details below.
 
 Haskell is "the" standard lazy functional programming language; the
 current language version is 1.4, agreed in April, 1997.  Haskell
@@ -17,8 +17,8 @@ related information is available from the Haskell home page at:
 
 Release 2.04 represent work done through May '97; highlights include:
 
- * Data constructors can now have polymophic fields, and ordinary
-   functions can have polymoprhic arguments.  Details on
+ * Data constructors can now have polymorphic fields, and ordinary
+   functions can have polymorphic arguments.  Details on
 
 	http://www.cse.ogi.edu/~simonpj/quantification.html
 
@@ -29,11 +29,12 @@ Release 2.04 represent work done through May '97; highlights include:
 	http://www.cse.ogi.edu/~simonpj/guards.html
 
  * Compiler can now compile itself (i.e., no real dependence on
-   the Haskell 1.2 compiler anymore (version 0.29)).
+   the Haskell 1.2 compiler anymore (version 0.29)). The release has
+   been tested with 2.03 and 0.29, not 2.02. 
 
  * Faster compilation
-   Compilation speeds has improved since 2.02, although it still slower
-   than GHC-0.29, the Good Old Compiler. (the gap is narrowing, though!)
+   Compilation speeds has improved since 2.02, although it is still slower
+   than the Good Old Compiler, GHC-0.29. (the gap is narrowing, though!)
 	
  * Code quality is better, the simplifier and inlining machinery has been
    refurbished. Not sure how much better.
@@ -42,8 +43,7 @@ Release 2.04 represent work done through May '97; highlights include:
    Heroic Efforts of Andr\'e Santos <alms@di.ufpe.br>.
 
  * It has been tested against a large suite of (mostly) Haskell 1.2
-   programs (the NoFib suite). Bunch of bugs related to new 
-   Haskell 1.4 has been weeded out.
+   programs (the NoFib suite). A fair chunk of bugs has been fixed.
 
  * A couple of Haskell 1.4 features are still incompletely supported,
    notably polymorphic strictness annotations, and Unicode.
@@ -100,8 +100,12 @@ version 0.29 or 2.02/2.03). We have seen GHC work on these platforms:
   * sparc-sun-{sunos4,solaris2}
   * mips-sgi-irix{5,6}
   * i386-unknown-{linux,solaris2,freebsd,cygwin32}.
-  * powerpc-ibm-aix
+  * {rs6000,powerpc}-ibm-aix
 
 Similar platforms should work with minimal hacking effort.  The installer's
-guide included in distribution gives a complete run-down of what-ports-work.
+guide included in distribution gives a complete run-down of what-ports-work;
+an on-line version can be found at
 
+   http://www.dcs.gla.ac.uk/fp/software/ghc/ghc-doc/install-guide.html
+
+EOF
