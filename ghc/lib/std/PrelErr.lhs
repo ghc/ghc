@@ -182,7 +182,7 @@ untangle coded message
   =  location
   ++ ": " 
   ++ message
-  ++ "\'" ++ details ++ "\'"
+  ++ details
   ++ "\n"
   where
     (location, details)
