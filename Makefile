@@ -391,13 +391,15 @@ hc-file-bundle : project-check
 	$(RM) -r $(ProjectNameShort)-$(ProjectVersion)
 	$(LN_S) . $(ProjectNameShort)-$(ProjectVersion)
 	$(FIND) $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler \
+	     $(ProjectNameShort)-$(ProjectVersion)/ghc/utils \
 	     $(ProjectNameShort)-$(ProjectVersion)/libraries -follow \
 	  \( -name "*.hc" -o -name "*_hsc.[ch]" -o -name "*_stub.[ch]" \) -print > hc-files-to-go
-	for f in `$(FIND) $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler $(ProjectNameShort)-$(ProjectVersion)/libraries -name "*.hsc" -print` ""; do \
+	for f in `$(FIND) $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler $(ProjectNameShort)-$(ProjectVersion)/ghc/utils $(ProjectNameShort)-$(ProjectVersion)/libraries -name "*.hsc" -follow -print` ""; do \
 	     if test "x$$f" != "x" && test -e `echo "$$f" | sed 's/hsc$$/hs/g'`; then \
 	        echo `echo "$$f" | sed 's/hsc$$/hs/g' ` >> hc-files-to-go ; \
 	     fi; \
 	done;
+	echo $(ProjectNameShort)-$(ProjectVersion)/ghc/rts/AutoApply.hc >> hc-files-to-go
 	echo $(ProjectNameShort)-$(ProjectVersion)/libraries/base/GHC/PrimopWrappers.hs >> hc-files-to-go
 	echo $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler/parser/Parser.hs >> hc-files-to-go
 	echo $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler/parser/ParserCore.hs >> hc-files-to-go
