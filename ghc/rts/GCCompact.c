@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GCCompact.c,v 1.7 2001/08/08 13:44:13 simonmar Exp $
+ * $Id: GCCompact.c,v 1.8 2001/08/10 09:40:11 simonmar Exp $
  *
  * (c) The GHC Team 2001
  *
@@ -446,18 +446,11 @@ update_fwd( bdescr *blocks )
 		break;
 	    }
 
-	    // specialise this case, because we want to update the
-	    // mut_link field too.
 	    case IND_OLDGEN:
 	    case IND_OLDGEN_PERM:
-	    {
-		StgIndOldGen *ind = (StgIndOldGen *)p;
-		thread((StgPtr)&ind->indirectee);
-		if (ind->mut_link != NULL) {
-		    thread((StgPtr)&ind->mut_link);
-		}
+		thread((StgPtr)&((StgIndOldGen *)p)->indirectee);
+		p += sizeofW(StgIndOldGen);
 		break;
-	    }
 
 	    case THUNK_SELECTOR:
 	    { 
@@ -661,17 +654,9 @@ update_fwd_compact( bdescr *blocks )
 
 	    case IND_OLDGEN:
 	    case IND_OLDGEN_PERM:
-		// specialise this case, because we want to update the
-		// mut_link field too.
-	    {
-		StgIndOldGen *ind = (StgIndOldGen *)p;
-		thread((StgPtr)&ind->indirectee);
-		if (ind->mut_link != NULL) {
-		    thread((StgPtr)&ind->mut_link);
-		}
+		thread((StgPtr)&((StgIndOldGen *)p)->indirectee);
 		p += sizeofW(StgIndOldGen);
 		break;
-	    }
 
 	    case THUNK_SELECTOR:
 	    { 
@@ -813,8 +798,6 @@ update_bkwd_compact( step *stp )
 	    }
 
 	    // Rebuild the mutable list for the old generation.
-	    // (the mut_once list is updated using threading, with
-	    // special cases for IND_OLDGEN and MUT_CONS above).
 	    if (ip_MUTABLE(info)) {
 		recordMutable((StgMutClosure *)free);
 	    }
@@ -841,7 +824,20 @@ update_bkwd_compact( step *stp )
     stp->n_blocks = free_blocks;
 
     return free_blocks;
-} 
+}
+
+static void
+thread_mut_once_list( generation *g )
+{
+    StgMutClosure *p, *next;
+
+    for (p = g->mut_once_list; p != END_MUT_LIST; p = next) {
+	next = p->mut_link;
+	thread((StgPtr)&p->mut_link);
+    }
+    
+    thread((StgPtr)&g->mut_once_list);
+}
 
 void
 compact( void (*get_roots)(evac_fn) )
@@ -864,7 +860,7 @@ compact( void (*get_roots)(evac_fn) )
     // mutable lists
     for (g = 1; g < RtsFlags.GcFlags.generations; g++) {
 	thread((StgPtr)&generations[g].mut_list);
-	thread((StgPtr)&generations[g].mut_once_list);
+	thread_mut_once_list(&generations[g]);
     }
 
     // the global thread list
