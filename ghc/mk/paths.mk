@@ -41,6 +41,7 @@ GHC_RUNTIME_DIR   	= $(TOP)/rts
 GHC_LIB_DIR	 	= $(TOP)/lib
 GHC_INCLUDE_DIR   	= $(TOP)/includes
 GHC_UTILS_DIR	 	= $(TOP)/utils
+GHC_INTERPRETER_DIR 	= $(TOP)/interpreter
 
 GHC 			= $(GHC_DRIVER_DIR)/ghc-inplace
 GHC_HSCPP_DIR 		= $(GHC_UTILS_DIR)/hscpp

@@ -1,6 +1,6 @@
 
 # --------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.18 1999/11/19 15:36:55 andy Exp $                      #
+# $Id: Makefile,v 1.19 1999/11/22 10:13:00 sewardj Exp $                      #
 # --------------------------------------------------------------------------- #
 
 TOP = ..
@@ -65,6 +65,8 @@ $(GHC_RUNTIME_DIR)/libHSrts.a:
 
 cleanish:
 	/bin/rm *.o
+rtsclean:
+	(cd $(GHC_RUNTIME_DIR) ; make clean)
 
 snapshot:
 	/bin/rm -f snapshot.tar
