@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1998
  *
- * $Id: writeError.c,v 1.6 2001/05/18 16:54:07 simonmar Exp $
+ * $Id: writeError.c,v 1.7 2001/07/12 10:34:54 rrt Exp $
  *
  * hPutStr Runtime Support
  */
@@ -19,12 +19,6 @@ implementation in one or two places.)
 #include "Rts.h"
 #include "RtsUtils.h"
 #include "HsStd.h"
-
-HsAddr
-addrOf_ErrorHdrHook(void)
-{
-  return &ErrorHdrHook;
-}
 
 void
 writeErrString__ (HsAddr msg_hdr, HsAddr msg, HsInt len)
