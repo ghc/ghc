@@ -6,7 +6,7 @@
 
 module HaddockTypes (
   -- * Module interfaces
-  NameEnv, Interface(..), ExportItem(..), ModuleMap,
+  NameEnv, Interface(..), ModuleInfo(..), ExportItem(..), ModuleMap,
 
   -- * User documentation strings
   DocString, GenDoc(..), Doc, ParsedDoc, DocMarkup(..),
@@ -49,14 +49,17 @@ data Interface
 		-- Includes not just "main names" but names of constructors,
 		-- record fields, etc.
 
-	iface_portability :: String,
-	iface_stability   :: String,
-	iface_maintainer  :: String,
+	iface_info :: Maybe ModuleInfo,
 		-- ^ information from the module header
 
-	iface_doc	  :: Maybe Doc
+	iface_doc :: Maybe Doc
 		-- ^ documentation from the module header
   }
+
+data ModuleInfo = ModuleInfo
+	{ portability :: String,
+	  stability   :: String,
+	  maintainer  :: String }
 
 type DocString = String
 

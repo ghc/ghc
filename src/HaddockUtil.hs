@@ -13,12 +13,18 @@ module HaddockUtil (
 
   -- * Filename utilities
   basename, dirname, splitFilename3, 
-  isPathSeparator, pathSeparator
+  isPathSeparator, pathSeparator,
+
+  -- * Miscellaneous utilities
+  die, dieMsg, mapSnd, mapMaybeM
 
  ) where
 
 import HsSyn
-import List (intersect)
+
+import List	( intersect )
+import IO	( hPutStr, stderr )
+import System
 
 -- -----------------------------------------------------------------------------
 -- Some Utilities
@@ -136,3 +142,19 @@ isPathSeparator ch =
 #else
   ch == '/'
 #endif
+
+-----------------------------------------------------------------------------
+-- misc.
+
+die :: String -> IO a
+die s = hPutStr stderr s >> exitWith (ExitFailure 1)
+
+dieMsg :: String -> IO a
+dieMsg s = getProgName >>= \prog -> die (prog ++ ": " ++ s)
+
+mapSnd f [] = []
+mapSnd f ((x,y):xs) = (x,f y) : mapSnd f xs
+
+mapMaybeM :: Monad m => (a -> m b) -> Maybe a -> m (Maybe b)
+mapMaybeM f Nothing = return Nothing
+mapMaybeM f (Just a) = f a >>= return . Just

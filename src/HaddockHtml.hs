@@ -108,23 +108,28 @@ pageHeader mod iface title source_url =
    tda [theclass "modulebar"] <<
 	(vanillaTable << (
 	  (td << font ! [size "6"] << toHtml mod) <->
-          (tda [align "right"] <<
+	  moduleInfo iface
+	)
+    )
+
+moduleInfo iface 
+  | Nothing   <- iface_info iface = Html.emptyTable
+  | Just info <- iface_info iface =
+          tda [align "right"] <<
              (table ! [width "300", border 0, cellspacing 0, cellpadding 0] << (
         	  (tda [width "50%"] << font ! [color "#ffffff"] <<
         		bold << toHtml "Portability") <->
         	  (tda [width "50%"] << font ! [color "#ffffff"] <<
-        		toHtml (iface_portability iface)) </>
+        		toHtml (portability info)) </>
         	  (tda [width "50%"] << font ! [color "#ffffff"] <<
         		bold << toHtml "Stability") <->
         	  (tda [width "50%"] << font ! [color "#ffffff"] <<
-        		toHtml (iface_stability iface)) </>
+        		toHtml (stability info)) </>
         	  (tda [width "50%"] << font ! [color "#ffffff"] <<
         		bold << toHtml "Maintainer") <->
         	  (tda [width "50%"] << font ! [color "#ffffff"] <<
-        		toHtml (iface_maintainer iface))
+        		toHtml (maintainer info))
               ))
-	  ))
-    )
 
 -- ---------------------------------------------------------------------------
 -- Generate the module contents

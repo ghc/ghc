@@ -24,6 +24,7 @@ import FiniteMap
 
 --import Pretty
 
+import RegexString
 import List	( nub )
 import Monad	( when )
 import Char	( isSpace )
@@ -144,9 +145,7 @@ mkInterface mod_map filename (HsModule mod exps imps decls maybe_doc)
 	   iface_exports = renamed_export_list,
 	   iface_orig_exports = orig_export_list,
 	   iface_decls =  decl_map,
-	   iface_portability = "portable",
-	   iface_maintainer  = "libraries@haskell.org",
-	   iface_stability   = "stable",
+	   iface_info = maybe_info,
 	   iface_name_docs   = doc_map,
 	   iface_doc         = module_doc
 	},
@@ -154,11 +153,13 @@ mkInterface mod_map filename (HsModule mod exps imps decls maybe_doc)
       missing_names1 ++ missing_names2 --ignore missing_names3 for now,
     )
   where
-  (module_doc, missing_names_doc1) = 
+  (module_doc, maybe_info, missing_names_doc1) = 
     case maybe_doc of
-	Nothing  -> (Nothing, [])
-	Just doc -> (Just doc', ns)
-	  where (doc',ns) = formatDocString (lookupForDoc import_env) doc
+	Nothing  -> (Nothing, Nothing, [])
+	Just doc -> (Just doc2, maybe_info, ns)
+	  where 
+	    (doc1, maybe_info) = parseModuleHeader doc
+	    (doc2,ns) = formatDocString (lookupForDoc import_env) doc1
 
   locally_defined_names = collectNames decls
 
@@ -524,19 +525,30 @@ strToHsQNames str
 		     Qual (Module mod) (HsVarName (HsSymbol str)) ]
 	other -> []
 
------------------------------------------------------------------------------
--- misc.
+-- -----------------------------------------------------------------------------
+-- Parsing module headers
 
-die :: String -> IO a
-die s = hPutStr stderr s >> exitWith (ExitFailure 1)
+parseModuleHeader :: String -> (String, Maybe ModuleInfo)
+parseModuleHeader str =
+  case matchRegexAll moduleHeaderRE str of
+	Just (before, match, after, _, (_:_:_:s1:s2:s3:_)) -> 
+	   (after, Just (ModuleInfo { 
+				 portability = s3,
+				 stability   = s2,
+				 maintainer  = s1 }))
+	_other -> (str, Nothing)
 
-dieMsg :: String -> IO a
-dieMsg s = getProgName >>= \prog -> die (prog ++ ": " ++ s)
-
-mapSnd f [] = []
-mapSnd f ((x,y):xs) = (x,f y) : mapSnd f xs
-
-mapMaybeM :: Monad m => (a -> m b) -> Maybe a -> m (Maybe b)
-mapMaybeM f Nothing = return Nothing
-mapMaybeM f (Just a) = f a >>= return . Just
-
+moduleHeaderRE = mkRegexWithOpts
+			 "^([ \t\n]*Module[ \t]*:.*\n)?\ 
+			  \([ \t\n]*Copyright[ \t]*:.*\n)?\ 
+			  \([ \t\n]*License[ \t]*:.*\n)?\ 
+			  \[ \t\n]*Maintainer[ \t]*:(.*)\n\ 
+			  \[ \t\n]*Stability[ \t]*:(.*)\n\ 
+			  \[ \t\n]*Portability[ \t]*:([^\n]*)\n"
+		True -- match "\n" with "."
+		False -- not case sensitive
+	-- All fields except the last (Portability) may be multi-line.
+	-- This is so that the portability field doesn't swallow up the
+	-- rest of the module documentation - we might want to revist
+	-- this at some point (perhaps have a separator between the 
+	-- portability field and the module documentation?).
