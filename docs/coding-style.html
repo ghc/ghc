@@ -1,6 +1,7 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
 <HTML>
 <HEAD>
+   <meta http-equiv="content-type" content="text/html;charset=iso-8859-1">
    <TITLE>GHC Style Guidelines for C code</TITLE>
 </HEAD>
 <BODY>
@@ -57,12 +58,12 @@ Hill C Style and Coding Standards</a>.
 <h2>Portability issues</h2>
 
 <ul>
-<p><li> We try to stick to C99 where possible.  We use the following
+<li> We try to stick to C99 where possible.  We use the following
 C99 features relative to C89, some of which were previously GCC
 extensions (possibly with different syntax):
 
 <ul>
-<p><li>Variable length arrays as the last field of a struct.  GCC has
+<li>Variable length arrays as the last field of a struct.  GCC has
 a similar extension, but the syntax is slightly different: in GCC you
 would declare the array as <tt>arr[0]</tt>, whereas in C99 it is
 declared as <tt>arr[]</tt>.
@@ -90,9 +91,9 @@ header file).
 <tt>#ifdef __GNUC__</tt>:
 
 <ul>
-<p><li>Function attributes (mostly just <code>no_return</code> and
+<li>Function attributes (mostly just <code>no_return</code> and
 <code>unused</code>)
-<p><li>Inline assembly.
+<li>Inline assembly.
 </ul>
 
 <p><li>
@@ -223,24 +224,24 @@ code is removed altogether if <tt>DEBUG</tt> is not defined).
 Particular guidelines for writing robust code:
 
 <ul>
-<p><li>
+<li>
 Use assertions.  Use lots of assertions.  If you write a comment
 that says "takes a +ve number" add an assertion.  If you're casting
 an int to a nat, add an assertion.  If you're casting an int to a char,
 add an assertion.  We use the <tt>ASSERT</tt> macro for writing
 assertions; it goes away when <tt>DEBUG</tt> is not defined.
 
-<p><li>
+<li>
 Write special debugging code to check the integrity of your data structures.
 (Most of the runtime checking code is in <tt>rts/Sanity.c</tt>)
 Add extra assertions which call this code at the start and end of any
 code that operates on your data structures.
 
-<p><li>
+<li>
 When you find a hard-to-spot bug, try to think of some assertions,
 sanity checks or whatever that would have made the bug easier to find.
 
-<p><li>
+<li>
 When defining an enumeration, it's a good idea not to use 0 for normal
 values.  Instead, make 0 raise an internal error.  The idea here is to
 make it easier to detect pointer-related errors on the assumption that
@@ -268,7 +269,7 @@ piece of incomplete/broken code.
 <h2>Syntactic details</h2>
 
 <ul>
-<p><li><b>Important:</b> Put "redundant" braces or parens in your code.
+<li><b>Important:</b> Put "redundant" braces or parens in your code.
 Omitting braces and parens leads to very hard to spot bugs -
 especially if you use macros (and you might have noticed that GHC does
 this a lot!)
@@ -276,13 +277,13 @@ this a lot!)
 <p>
 In particular:
 <ul>
-<p><li>
+<li>
 Put braces round the body of for loops, while loops, if statements, etc.
 even if they "aren't needed" because it's really hard to find the resulting
 bug if you mess up.  Indent them any way you like but put them in there!
 </ul>
 
-<p><li>
+<li>
 When defining a macro, always put parens round args - just in case.
 For example, write:
 <pre>
@@ -293,25 +294,25 @@ instead of
   #define add(x,y) x+y
 </pre>
 
-<p><li> Don't declare and initialize variables at the same time.
+<li> Don't declare and initialize variables at the same time.
 Separating the declaration and initialization takes more lines, but
 make the code clearer.
 
-<p><li>
+<li>
 Use inline functions instead of macros if possible - they're a lot
 less tricky to get right and don't suffer from the usual problems
 of side effects, evaluation order, multiple evaluation, etc.
 
 <ul>
-<p><li>Inline functions get the naming issue right.  E.g. they
+<li>Inline functions get the naming issue right.  E.g. they
   can have local variables which (in an expression context)
   macros can't.
 
-<p><li> Inline functions have call-by-value semantics whereas macros
+<li> Inline functions have call-by-value semantics whereas macros
   are call-by-name.  You can be bitten by duplicated computation
   if you aren't careful.
 
-<p><li> You can use inline functions from inside gdb if you compile with
+<li> You can use inline functions from inside gdb if you compile with
   -O0 or -fkeep-inline-functions.  If you use macros, you'd better
   know what they expand to.
 </ul>
@@ -327,13 +328,13 @@ can be "polymorphic" as these examples show:
   #define min(x,y) (((x)<=(y)) ? (x) : (y))
 </pre>
 
-<p><li>
+<li>
 Inline functions should be "static inline" because:
 <ul>
-<p><li>
+<li>
 gcc will delete static inlines if not used or theyre always inlined.
 
-<p><li>
+<li>
   if they're externed, we could get conflicts between 2 copies of the 
   same function if, for some reason, gcc is unable to delete them.
   If they're static, we still get multiple copies but at least they don't conflict.
@@ -397,9 +398,8 @@ up as well.  Use the doNothing macro instead.
 <pre>
   #define doNothing() do { } while (0)
 </pre>
-</ul>
 
-<p><li>
+<li>
 This code
 <pre>
 int* p, q;
@@ -416,7 +416,7 @@ int *p, *q;
 </pre>
 but it is preferrable to split the declarations.
 
-<p><li>
+<li>
 Try to use ANSI C's enum feature when defining lists of constants of
 the same type.  Among other benefits, you'll notice that gdb uses the
 name instead of its (usually inscrutable) number when printing values
@@ -467,16 +467,16 @@ instead of
     # define TIMEchar  'T'
 </pre>
 
-<p><li> Please keep to 80 columns: the line has to be drawn somewhere,
+<li> Please keep to 80 columns: the line has to be drawn somewhere,
 and by keeping it to 80 columns we can ensure that code looks OK on
 everyone's screen.  Long lines are hard to read, and a sign that the
 code needs to be restructured anyway.
 
-<p><li> When commenting out large chunks of code, use <code>#ifdef 0
+<li> When commenting out large chunks of code, use <code>#ifdef 0
 ... #endif</code> rather than <code>/* ... */</code> because C doesn't
 have nested comments.
 
-<p><li>When declaring a typedef for a struct, give the struct a name
+<li>When declaring a typedef for a struct, give the struct a name
 as well, so that other headers can forward-reference the struct name
 and it becomes possible to have opaque pointers to the struct.  Our
 convention is to name the struct the same as the typedef, but add a
@@ -488,10 +488,10 @@ leading underscore.  For example:
   } Foo;
 </pre>
 
-<p><li>Do not use <tt>!</tt> instead of explicit comparison against
+<li>Do not use <tt>!</tt> instead of explicit comparison against
 <tt>NULL</tt> or <tt>'\0'</tt>;  the latter is much clearer.
 
-<p><li> We don't care too much about your indentation style but, if
+<li> We don't care too much about your indentation style but, if
 you're modifying a function, please try to use the same style as the
 rest of the function (or file).  If you're writing new code, a
 tab width of 4 is preferred.
@@ -501,7 +501,7 @@ tab width of 4 is preferred.
 <h2>CVS issues</h2>
 
 <ul>
-<p><li>
+<li>
 Don't be tempted to reindent or reorganise large chunks of code - it
 generates large diffs in which it's hard to see whether anything else
 was changed.
