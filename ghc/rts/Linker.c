@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.104 2002/10/02 09:36:00 wolfgang Exp $
+ * $Id: Linker.c,v 1.105 2002/10/12 23:12:08 wolfgang Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -31,7 +31,9 @@
 #include <sys/stat.h>
 #endif
 
-#ifdef HAVE_DLFCN_H
+#if defined(HAVE_FRAMEWORK_HASKELLSUPPORT)
+#include <HaskellSupport/dlfcn.h>
+#elif defined(HAVE_DLFCN_H)
 #include <dlfcn.h>
 #endif
 
@@ -502,15 +504,15 @@ typedef struct _RtsSymbolVal {
 #define RTS_EXTRA_SYMBOLS			\
       Sym(__divsf3)
 #elif defined(powerpc_TARGET_ARCH)
-#define RTS_EXTRA_SYMBOLS						\
+#define RTS_EXTRA_SYMBOLS                	\
       Sym(__divdi3)                             \
       Sym(__udivdi3)                            \
       Sym(__moddi3)                             \
-      Sym(__umoddi3)							\
-	  Sym(__ashldi3)							\
-	  Sym(__ashrdi3)							\
-	  Sym(__lshrdi3)							\
-	  SymX(__eprintf)
+      Sym(__umoddi3)				\
+      Sym(__ashldi3)				\
+      Sym(__ashrdi3)				\
+      Sym(__lshrdi3)				\
+      Sym(__eprintf)
 #else
 #define RTS_EXTRA_SYMBOLS /* nothing */
 #endif

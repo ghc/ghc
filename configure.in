@@ -953,6 +953,21 @@ AC_CHECK_LIB(gmp,  __gmpz_fdiv_qr, HaveLibGmp=YES; LibGmp=gmp,
 AC_SUBST(HaveLibGmp)
 AC_SUBST(LibGmp)
 
+dnl ** (Mac OS X only: check for HaskellSupport.framework)
+HaveFrameworkHaskellSupport=NO
+if test $HostPlatform = "powerpc-apple-darwin"; then
+ AC_MSG_CHECKING([for HaskellSupport.framework])
+ save_libs="$LIBS"
+ LIBS="-framework HaskellSupport"
+ AC_TRY_LINK_FUNC(__gmpz_fdiv_qr, HaveFrameworkHaskellSupport=YES,)
+ if test $HaveFrameworkHaskellSupport = YES; then
+  AC_DEFINE(HAVE_FRAMEWORK_HASKELLSUPPORT)
+ fi;
+ LIBS="$save_libs"
+ AC_MSG_RESULT([$HaveFrameworkHaskellSupport])
+fi;
+AC_SUBST(HaveFrameworkHaskellSupport)
+
 dnl ** check for mingwex library
 AC_CHECK_LIB(mingwex, closedir, HaveLibMingwEx=YES, HaveLibMingwEx=NO)
 AC_SUBST(HaveLibMingwEx)
@@ -1027,85 +1042,104 @@ dnl ################################################################
 
 dnl ** check for libdl & RTLD_NEXT
 
-AC_CHECK_LIB(dl, dlopen, 
-	[HaveLibDL=YES
-	 AC_DEFINE(HAVE_LIBDL)
-	 LIBS="$LIBS -ldl"], 
-	[HaveLibDL=NO])
-AC_CHECK_FUNCS(dlopen)
-AC_SUBST(HaveLibDL)
+dnl (Mac OS X only) ... but don't check if we already have the
+dl HaskellSupport.framework
 
-dnl ** sometimes RTLD_NEXT is hidden in #ifdefs we really don't wan to set
-AC_MSG_CHECKING(for RTLD_NEXT from dlfcn.h)
-AC_EGREP_CPP(yes,
-[
- #include <dlfcn.h>
- #ifdef RTLD_NEXT
-        yes
- #endif
-], [
-  AC_MSG_RESULT(yes)
-  AC_DEFINE(HAVE_RTLDNEXT)
-  HaveRtldNext=YES
-], [
-  AC_MSG_RESULT(no)
-  HaveRtldNext=NO
-  ])    
-AC_SUBST(HaveRtldNext)
+if test $HaveFrameworkHaskellSupport = YES; then
+    HaveLibDL = NO
+    HaveRtldNext=NO
+    HaveRtldLocal=YES
+    AC_DEFINE(HAVE_RTLDLOCAL)
+    HaveRtldGlobal=YES
+    AC_DEFINE(HAVE_RTLDGLOBAL)
+    HaveRtldNow=YES
+    AC_DEFINE(HAVE_RTLDNOW)
+    AC_SUBST(HaveLibDL)
+    AC_SUBST(HaveRtldNext)
+    AC_SUBST(HaveRtldLocal)
+    AC_SUBST(HaveRtldGlobal)
+    AC_SUBST(HaveRtldNow)
+else
+    AC_CHECK_LIB(dl, dlopen, 
+    	[HaveLibDL=YES
+    	 AC_DEFINE(HAVE_LIBDL)
+    	 LIBS="$LIBS -ldl"], 
+    	[HaveLibDL=NO])
+    AC_CHECK_FUNCS(dlopen)
+    AC_SUBST(HaveLibDL)
 
-dnl ** RTLD_LOCAL isn't available on cygwin or openbsd
-AC_MSG_CHECKING(for RTLD_LOCAL from dlfcn.h)
-AC_EGREP_CPP(yes,
-[
- #include <dlfcn.h>
- #ifdef RTLD_LOCAL
-        yes
- #endif
-], [
-  AC_MSG_RESULT(yes)
-  AC_DEFINE(HAVE_RTLDLOCAL)
-  HaveRtldLocal=YES
-], [
-  AC_MSG_RESULT(no)
-  HaveRtldLocal=NO
-  ])    
-AC_SUBST(HaveRtldLocal)
+    dnl ** sometimes RTLD_NEXT is hidden in #ifdefs we really don't wan to set
+    AC_MSG_CHECKING(for RTLD_NEXT from dlfcn.h)
+    AC_EGREP_CPP(yes,
+    [
+     #include <dlfcn.h>
+     #ifdef RTLD_NEXT
+            yes
+     #endif
+    ], [
+      AC_MSG_RESULT(yes)
+      AC_DEFINE(HAVE_RTLDNEXT)
+      HaveRtldNext=YES
+    ], [
+      AC_MSG_RESULT(no)
+      HaveRtldNext=NO
+      ])    
+    AC_SUBST(HaveRtldNext)
 
-dnl ** RTLD_GLOBAL isn't available on openbsd
-AC_MSG_CHECKING(for RTLD_GLOBAL from dlfcn.h)
-AC_EGREP_CPP(yes,
-[
- #include <dlfcn.h>
- #ifdef RTLD_GLOBAL
-        yes
- #endif
-], [
-  AC_MSG_RESULT(yes)
-  AC_DEFINE(HAVE_RTLDGLOBAL)
-  HaveRtldGlobal=YES
-], [
-  AC_MSG_RESULT(no)
-  HaveRtldGlobal=NO
-  ])    
-AC_SUBST(HaveRtldGlobal)
+    dnl ** RTLD_LOCAL isn't available on cygwin or openbsd
+    AC_MSG_CHECKING(for RTLD_LOCAL from dlfcn.h)
+    AC_EGREP_CPP(yes,
+    [
+     #include <dlfcn.h>
+     #ifdef RTLD_LOCAL
+            yes
+     #endif
+    ], [
+      AC_MSG_RESULT(yes)
+      AC_DEFINE(HAVE_RTLDLOCAL)
+      HaveRtldLocal=YES
+    ], [
+      AC_MSG_RESULT(no)
+      HaveRtldLocal=NO
+      ])    
+    AC_SUBST(HaveRtldLocal)
 
-dnl ** RTLD_NOW isn't available on openbsd
-AC_MSG_CHECKING(for RTLD_NOW from dlfcn.h)
-AC_EGREP_CPP(yes,
-[
- #include <dlfcn.h>
- #ifdef RTLD_NOW
-        yes
- #endif
-], [
-  AC_MSG_RESULT(yes)
-  AC_DEFINE(HAVE_RTLDNOW)
-  HaveRtldNow=YES
-], [
-  AC_MSG_RESULT(no)
-  HaveRtldNow=NO
-  ])    
-AC_SUBST(HaveRtldNow)
+    dnl ** RTLD_GLOBAL isn't available on openbsd
+    AC_MSG_CHECKING(for RTLD_GLOBAL from dlfcn.h)
+    AC_EGREP_CPP(yes,
+    [
+     #include <dlfcn.h>
+     #ifdef RTLD_GLOBAL
+            yes
+     #endif
+    ], [
+      AC_MSG_RESULT(yes)
+      AC_DEFINE(HAVE_RTLDGLOBAL)
+      HaveRtldGlobal=YES
+    ], [
+      AC_MSG_RESULT(no)
+      HaveRtldGlobal=NO
+      ])    
+    AC_SUBST(HaveRtldGlobal)
+
+    dnl ** RTLD_NOW isn't available on openbsd
+    AC_MSG_CHECKING(for RTLD_NOW from dlfcn.h)
+    AC_EGREP_CPP(yes,
+    [
+     #include <dlfcn.h>
+     #ifdef RTLD_NOW
+            yes
+     #endif
+    ], [
+      AC_MSG_RESULT(yes)
+      AC_DEFINE(HAVE_RTLDNOW)
+      HaveRtldNow=YES
+    ], [
+      AC_MSG_RESULT(no)
+      HaveRtldNow=NO
+      ])    
+    AC_SUBST(HaveRtldNow)
+fi
 
 FPTOOLS_CHECK_LIB_NOWARN(m, atan)
 

@@ -21,8 +21,14 @@ Package {
 			  ],
 
         hs_libraries      = [ "HSrts" ],
-	extra_libraries   = [ "gmp"
-			    , "m"		/* for ldexp() */
+	extra_libraries   = [
+			    "m"		/* for ldexp() */
+#ifndef HAVE_FRAMEWORK_HASKELLSUPPORT
+			      , "gmp"
+#ifdef HAVE_LIBDL
+			      , "dl"
+#endif
+#endif
 #ifdef mingw32_TARGET_OS
 			      ,"winmm"		/* for the threadDelay timer */
 			      ,"wsock32"	/* for the linker */
@@ -127,4 +133,7 @@ Package {
          , "-u", "__stginit_Prelude"
 #endif
          ]
+#ifdef HAVE_FRAMEWORK_HASKELLSUPPORT
+        , extra_frameworks  = [ "HaskellSupport" ]
+#endif
 }

@@ -1057,3 +1057,5 @@
 /* Define if signal.h defines SIGPOLL */
 #undef HAVE_SIGPOLL
 
+/* Define if the HaskellSupport.framework is installed (Mac OS X only) */
+#undef HAVE_FRAMEWORK_HASKELLSUPPORT

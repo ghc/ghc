@@ -684,6 +684,11 @@ LibGmp		= @LibGmp@
 HaveLibMingwEx	= @HaveLibMingwEx@
 
 #-----------------------------------------------------------------------------
+# HaskellSupport framework (Mac OS X)
+#
+HaveFrameworkHaskellSupport = @HaveFrameworkHaskellSupport@
+
+#-----------------------------------------------------------------------------
 # Regex libraries
 # (if present in libc use that one, otherwise use the one in the tree)
 #

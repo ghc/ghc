@@ -177,6 +177,7 @@ endif
 # and not worth re-implementing in our Makefile framework.
 
 ifneq "$(HaveLibGmp)" "YES"
+ifneq "$(HaveFrameworkHaskellSupport)" "YES"
 ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 boot ::
 	cd gmp && ./configure --enable-shared=no \
@@ -207,6 +208,7 @@ clean distclean maintainer-clean ::
 	-$(MAKE) -C gmp MAKEFLAGS= $@
 
 INSTALL_LIBS += gmp/libgmp.a
+endif
 endif
 
 gmp/libgmp.a ::
