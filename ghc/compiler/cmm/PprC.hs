@@ -523,7 +523,7 @@ pprCallishMachOp_for_C mop
         MO_F64_Cosh -> ptext SLIT("cosh")
         MO_F64_Tanh -> ptext SLIT("tanh")
         MO_F64_Asin -> ptext SLIT("asin")
-        MO_F64_Acos -> ptext SLIT("asin")
+        MO_F64_Acos -> ptext SLIT("acos")
         MO_F64_Atan -> ptext SLIT("atan")
         MO_F64_Log  -> ptext SLIT("log")
         MO_F64_Exp  -> ptext SLIT("exp")
