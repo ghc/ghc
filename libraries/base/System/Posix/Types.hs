@@ -22,7 +22,7 @@ module System.Posix.Types (
   CDev(..), CIno(..), CMode(..), COff(..), CPid(..), CSsize(..),
 
 #ifndef mingw32_TARGET_OS
-  CGid(..), CNlink(..), CSsize(..), CUid(..), CCc(..), CSpeed(..),
+  CGid(..), CNlink(..), CUid(..), CCc(..), CSpeed(..),
   CTcflag(..),
 #endif
 
