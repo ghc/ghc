@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.36 $
- * $Date: 2000/01/10 17:19:32 $
+ * $Revision: 1.37 $
+ * $Date: 2000/01/11 14:51:43 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1469,8 +1469,10 @@ char* nameFromOPtr ( void* p )
    int i;
    Module m;
    for (m=MODMIN; m<moduleHw; m++) {
-      char* nm = ocLookupAddr ( module(m).object, p );
-      if (nm) return nm;
+      if (module(m).object) {
+         char* nm = ocLookupAddr ( module(m).object, p );
+         if (nm) return nm;
+      }
    }
    return NULL;
 }
@@ -1498,13 +1500,22 @@ void* lookupOExtraTabName ( char* sym )
 
 OSectionKind lookupSection ( void* ad )
 {
-   int i;
-   Module m;
+   int          i;
+   Module       m;
+   ObjectCode*  oc;
+   OSectionKind sect;
+
    for (m=MODMIN; m<moduleHw; m++) {
-      OSectionKind sect
-         = ocLookupSection ( module(m).object, ad );
-      if (sect != HUGS_SECTIONKIND_NOINFOAVAIL)
-         return sect;
+      if (module(m).object) {
+         sect = ocLookupSection ( module(m).object, ad );
+         if (sect != HUGS_SECTIONKIND_NOINFOAVAIL)
+            return sect;
+      }
+      for (oc = module(m).objectExtras; oc; oc=oc->next) {
+         sect = ocLookupSection ( oc, ad );
+         if (sect != HUGS_SECTIONKIND_NOINFOAVAIL)
+            return sect;
+      }
    }
    return HUGS_SECTIONKIND_OTHER;
 }
