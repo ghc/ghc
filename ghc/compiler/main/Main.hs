@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.102 2002/03/29 21:39:37 sof Exp $
+-- $Id: Main.hs,v 1.103 2002/04/05 16:43:56 sof Exp $
 --
 -- GHC Driver program
 --
@@ -36,7 +36,7 @@ import DriverState	( buildCoreToDo, buildStgToDo,
 			  v_Cmdline_libraries, v_Keep_tmp_files, v_Ld_inputs,
 			  v_OptLevel, v_Output_file, v_Output_hi, 
 			  v_Package_details, v_Ways, getPackageExtraGhcOpts,
-			  readPackageConf
+			  readPackageConf, verifyOutputFiles
 			)
 import DriverFlags	( buildStaticHscOpts,
 			  dynamic_flags, processArgs, static_flags)
@@ -45,7 +45,7 @@ import DriverMkDepend	( beginMkDependHS, endMkDependHS )
 import DriverPhases	( Phase(HsPp, Hsc), haskellish_src_file, objish_file )
 
 import DriverUtil	( add, handle, handleDyn, later, splitFilename,
-			  unknownFlagErr, getFileSuffix )
+			  unknownFlagsErr, getFileSuffix )
 import CmdLineOpts	( dynFlag, restoreDynFlags,
 			  saveDynFlags, setDynFlags, getDynFlags, dynFlag,
 			  DynFlags(..), HscLang(..), v_Static_hsc_opts,
@@ -211,9 +211,9 @@ main =
 	-- save the "initial DynFlags" away
    saveDynFlags
 
-    	-- complain about any unknown flags
-   mapM unknownFlagErr [ f | f@('-':_) <- srcs ]
-
+        -- perform some checks of the options set / report unknowns.
+   checkOptions srcs
+   
    verb <- dynFlag verbosity
 
 	-- Show the GHCi banner
@@ -333,3 +333,14 @@ beginInteractive fileish_args
        state <- cmInit Interactive
        interactiveUI state mods libs
 #endif
+
+checkOptions :: [String] -> IO ()
+checkOptions srcs = do
+     -- complain about any unknown flags
+   let unknown_opts = [ f | f@('-':_) <- srcs ]
+   when (not (null unknown_opts)) (unknownFlagsErr unknown_opts)
+     -- verify that output files point somewhere sensible.
+   verifyOutputFiles
+     -- and anything else that it might be worth checking for
+     -- before kicking of a compilation (pipeline).
+

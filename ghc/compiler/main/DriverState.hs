@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.74 2002/03/29 21:39:37 sof Exp $
+-- $Id: DriverState.hs,v 1.75 2002/04/05 16:43:56 sof Exp $
 --
 -- Settings for the driver
 --
@@ -27,6 +27,7 @@ import Panic
 import List
 import Char  
 import Monad
+import Maybe     ( fromJust, isJust )
 import Directory ( doesDirectoryExist )
 
 -----------------------------------------------------------------------------
@@ -124,6 +125,36 @@ can_split =  prefixMatch "i386"    cTARGETPLATFORM
 GLOBAL_VAR(v_Output_dir,  Nothing, Maybe String)
 GLOBAL_VAR(v_Output_file, Nothing, Maybe String)
 GLOBAL_VAR(v_Output_hi,   Nothing, Maybe String)
+
+-- called to verify that the output files & directories
+-- point somewhere valid. 
+--
+-- The assumption is that the directory portion of these output
+-- options will have to exist by the time 'verifyOutputFiles'
+-- is invoked.
+-- 
+verifyOutputFiles :: IO ()
+verifyOutputFiles = do
+  odir <- readIORef v_Output_dir
+  when (isJust odir) $ do
+     let dir = fromJust odir
+     flg <- doesDirectoryExist dir
+     when (not flg) (nonExistentDir "-odir" dir)
+  ofile <- readIORef v_Output_file
+  when (isJust ofile) $ do
+     let fn = fromJust ofile
+     flg <- doesDirNameExist fn
+     when (not flg) (nonExistentDir "-o" fn)
+  ohi <- readIORef v_Output_hi
+  when (isJust ohi) $ do
+     let hi = fromJust ohi
+     flg <- doesDirNameExist hi
+     when (not flg) (nonExistentDir "-ohi" hi)
+ where
+   nonExistentDir flg dir = 
+     throwDyn (CmdLineError ("error: directory portion of " ++ 
+                             show dir ++ " does not exist (used with " ++ 
+			     show flg ++ " option.)"))
 
 GLOBAL_VAR(v_Object_suf,  Nothing, Maybe String)
 GLOBAL_VAR(v_HC_suf,  	  Nothing, Maybe String)

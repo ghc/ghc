@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.31 2002/02/27 16:24:00 simonmar Exp $
+-- $Id: DriverUtil.hs,v 1.32 2002/04/05 16:43:56 sof Exp $
 --
 -- Utils for the driver
 --
@@ -20,7 +20,7 @@ import IOExts
 import Exception
 import Dynamic
 
-import Directory	( getDirectoryContents )
+import Directory	( getDirectoryContents, doesDirectoryExist )
 import IO
 import List
 import Char
@@ -69,6 +69,13 @@ softGetDirectoryContents d
 	  )
 
 -----------------------------------------------------------------------------
+-- Verify that the 'dirname' portion of a FilePath exists.
+-- 
+doesDirNameExist :: FilePath -> IO Bool
+doesDirNameExist fpath = doesDirectoryExist (getdir fpath)
+
+
+-----------------------------------------------------------------------------
 -- Prefixing underscore to linker-level names
 prefixUnderscore :: String -> String
 prefixUnderscore
@@ -80,6 +87,9 @@ prefixUnderscore
 
 unknownFlagErr :: String -> a
 unknownFlagErr f = throwDyn (UsageError ("unrecognised flag: " ++ f))
+
+unknownFlagsErr :: [String] -> a
+unknownFlagsErr fs = throwDyn (UsageError ("unrecognised flags: " ++ unwords fs))
 
 my_partition :: (a -> Maybe b) -> [a] -> ([(a,b)],[a])
 my_partition _ [] = ([],[])
