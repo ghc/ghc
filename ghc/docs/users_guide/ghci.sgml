@@ -719,11 +719,33 @@ Prelude> :def make (\_ -> return ":! ghc --make Main")
 	<term><literal>:load</literal> <replaceable>module</replaceable></term>
 	<indexterm><primary><literal>:load</literal></primary></indexterm>
 	<listitem>
-	  <para>Recursively loads <replaceable>module</replaceable>
-	  (which may be a module name or filename), and all the
-	  modules it depends on.  All previously loaded modules are
-	  forgotten.  The module <replaceable>module</replaceable> is
-	  known as the <firstterm>target</firstterm>.</para>
+	  <para>Recursively loads <replaceable>module</replaceable>,
+	  and all the modules it depends on.  Here,
+	  <replaceable>module</replaceable> must be a module name or
+	  filename, but may not be the name of a module in a
+	  package.</para> 
+
+	  <para>All previously loaded modules, except package modules,
+	  are forgotten.  The module <replaceable>module</replaceable>
+	  is known as the <firstterm>target</firstterm>.</para>
+
+	  <para>After a <literal>:load</literal> command, the current
+	  context is set to:</para>
+
+	  <itemizedlist>
+	    <listitem>
+	      <para><replaceable>module</replaceable>, if it was loaded
+	      successfully, or</para>
+	    </listitem>
+	    <listitem>
+	      <para>the most recently successfully loaded module, if
+	      any other modules were loaded as a result of the current
+	      <literal>:load</literal>, or</para>
+	    </listitem>
+	    <listitem>
+	      <para><literal>Prelude</literal> otherwise.</para>
+	    </listitem>
+	  </itemizedlist>
 	</listitem>
       </varlistentry>
 
