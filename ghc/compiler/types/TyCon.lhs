@@ -261,7 +261,7 @@ tyConGenIds tycon = case tyConGenInfo tycon of
 -- This is the making of a TyCon. Just the same as the old mkAlgTyCon,
 -- but now you also have to pass in the generic information about the type
 -- constructor - you can get hold of it easily (see Generics module)
-mkAlgTyCon name kind tyvars theta argvrcs cons sels flavour rec 
+mkAlgTyCon name kind tyvars theta argvrcs cons sels flavour is_rec 
 	      gen_info
   = AlgTyCon {	
 	tyConName 		= name,
@@ -275,11 +275,11 @@ mkAlgTyCon name kind tyvars theta argvrcs cons sels flavour rec
 	selIds			= sels,
 	algTyConClass		= Nothing,
 	algTyConFlavour 	= flavour,
-	algTyConRec		= rec,
+	algTyConRec		= is_rec,
 	genInfo   	        = gen_info
     }
 
-mkClassTyCon name kind tyvars argvrcs con clas flavour rec
+mkClassTyCon name kind tyvars argvrcs con clas flavour is_rec
   = AlgTyCon {	
 	tyConName 		= name,
 	tyConUnique		= nameUnique name,
@@ -292,7 +292,7 @@ mkClassTyCon name kind tyvars argvrcs con clas flavour rec
 	selIds			= [],
 	algTyConClass		= Just clas,
 	algTyConFlavour		= flavour,
-	algTyConRec		= rec,
+	algTyConRec		= is_rec,
 	genInfo   	        = Nothing
     }
 

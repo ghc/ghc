@@ -368,7 +368,6 @@ ifeq "$(HOSTPLATFORM)" "hppa1.1-hp-hpux9"
 rename/RnMonad_HC_OPTS 		=  -O2 -O2-for-C
 endif
 
-utils/StringBuffer_HC_OPTS	= -fvia-C -fno-prune-tydecls
 utils/Digraph_HC_OPTS		= -fglasgow-exts 
 
 ifeq "$(bootstrapped)" "YES"

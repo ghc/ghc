@@ -629,7 +629,7 @@ dsDo do_or_lc stmts ids result_ty
 	    returnDs (mkIfThenElse expr2 rest 
 				   (App (App fail_id (Type b_ty)) core_msg))
     
-	go (LetStmt binds : stmts )
+	go (LetStmt binds : stmts)
 	  = go stmts 		`thenDs` \ rest   ->
 	    dsLet binds	rest
 	    

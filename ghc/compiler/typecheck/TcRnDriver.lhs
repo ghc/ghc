@@ -408,8 +408,8 @@ tc_stmts stmts
 	-- OK, we're ready to typecheck the stmts
 	traceTc (text "tcs 2") ;
 	((ids, tc_stmts), lie) <- 
-		getLIE 					$ 
-		tcStmtsAndThen combine stmt_ctxt stmts	$ 
+		getLIE 						$ 
+		tcStmtsAndThen combine stmt_ctxt all_stmts	$ 
 		do {
 		    -- Look up the names right in the middle,
 		    -- where they will all be in scope
