@@ -144,8 +144,9 @@ toBig i@(J# _ _) = i
 
 \begin{code}
 quotRemInteger :: Integer -> Integer -> (Integer, Integer)
-quotRemInteger (S# i) (S# j)         
-  = case quotRemInt (I# i) (I# j) of ( I# i, I# j ) -> ( S# i, S# j ) 
+quotRemInteger i1@(S# i) i2@(S# j)         
+  | i ==# -2147483648# = quotRemInteger (toBig i1) i2
+  | otherwise          = case quotRemInt (I# i) (I# j) of ( I# i, I# j ) -> ( S# i, S# j ) 
 quotRemInteger i1@(J# _ _) i2@(S# _) = quotRemInteger i1 (toBig i2)
 quotRemInteger i1@(S# _) i2@(J# _ _) = quotRemInteger (toBig i1) i2
 quotRemInteger (J# s1 d1) (J# s2 d2)
@@ -153,8 +154,9 @@ quotRemInteger (J# s1 d1) (J# s2 d2)
 	  (# s3, d3, s4, d4 #)
 	    -> (J# s3 d3, J# s4 d4)
 
-divModInteger (S# i) (S# j)         
-  = case divModInt (I# i) (I# j) of ( I# i, I# j ) -> ( S# i, S# j) 
+divModInteger i1@(S# i) i2@(S# j)
+  | i ==# -2147483648# = divModInteger (toBig i1) i2
+  | otherwise          = case divModInt (I# i) (I# j) of ( I# i, I# j ) -> ( S# i, S# j) 
 divModInteger i1@(J# _ _) i2@(S# _) = divModInteger i1 (toBig i2)
 divModInteger i1@(S# _) i2@(J# _ _) = divModInteger (toBig i1) i2
 divModInteger (J# s1 d1) (J# s2 d2)
@@ -165,8 +167,9 @@ divModInteger (J# s1 d1) (J# s2 d2)
 remInteger :: Integer -> Integer -> Integer
 remInteger ia 0
   = error "Prelude.Integral.rem{Integer}: divide by 0"
-remInteger (S# a) (S# b) 
-  = S# (remInt# a b)
+remInteger ia@(S# a) ib@(S# b) 
+  | a ==# -2147483648# = remInteger (toBig ia) ib
+  | otherwise          = S# (remInt# a b)
 remInteger ia@(S# a) (J# sb b)
   | sb ==# 1#  = S# (remInt# a (word2Int# (integer2Word# sb b)))
   | sb ==# -1# = S# (remInt# a (0# -# (word2Int# (integer2Word# sb b))))
@@ -182,8 +185,9 @@ remInteger (J# sa a) (J# sb b)
 quotInteger :: Integer -> Integer -> Integer
 quotInteger ia 0
   = error "Prelude.Integral.quot{Integer}: divide by 0"
-quotInteger (S# a) (S# b) 
-  = S# (quotInt# a b)
+quotInteger ia@(S# a) ib@(S# b) 
+  | a ==# -2147483648# = quotInteger (toBig ia) ib
+  | otherwise          = S# (quotInt# a b)
 quotInteger (S# a) (J# sb b)
   | sb ==# 1#  = S# (quotInt# a (word2Int# (integer2Word# sb b)))
   | sb ==# -1# = S# (quotInt# a (0# -# (word2Int# (integer2Word# sb b))))
@@ -199,16 +203,17 @@ quotInteger (J# sa a) (J# sb b)
 
 \begin{code}
 gcdInteger :: Integer -> Integer -> Integer
-gcdInteger (S# a) (S# b)
-  = case gcdInt# a b of g -> S# g
+gcdInteger ia@(S# a) ib@(S# b)
+  | a ==# -2147483648# = gcdInteger (toBig ia) ib
+  | otherwise          = S# (gcdInt# a b)
 gcdInteger ia@(S# a) ib@(J# sb b)
   | a  ==# 0#  = abs ib
   | sb ==# 0#  = abs ia
-  | otherwise  = case gcdIntegerInt# sb b a of g -> S# g
+  | otherwise  = S# (gcdIntegerInt# sb b a)
 gcdInteger ia@(J# sa a) ib@(S# b)
   | sa ==# 0#  = abs ib
   | b ==# 0#   = abs ia
-  | otherwise  = case gcdIntegerInt# sa a b of g -> S# g
+  | otherwise  = S# (gcdIntegerInt# sa a b)
 gcdInteger (J# sa a) (J# sb b)
   = case gcdInteger# sa a sb b of (# sg, g #) -> J# sg g
 
@@ -223,8 +228,9 @@ lcmInteger a b
         ab = abs b
 
 divExact :: Integer -> Integer -> Integer
-divExact (S# a) (S# b)
-  = S# (quotInt# a b)
+divExact ia@(S# a) ib@(S# b)
+  | a ==# -2147483648# = divExact (toBig ia) ib
+  | otherwise          = S# (quotInt# a b)
 divExact (S# a) (J# sb b)
   = S# (quotInt# a (sb *# (word2Int# (integer2Word# sb b))))
 divExact (J# sa a) (S# b)
