@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GCCompact.c,v 1.5 2001/07/30 12:57:01 simonmar Exp $
+ * $Id: GCCompact.c,v 1.6 2001/08/02 15:33:35 ken Exp $
  *
  * (c) The GHC Team 2001
  *
@@ -173,7 +173,7 @@ thread_stack(StgPtr p, StgPtr stack_end)
 {
     StgPtr q;
     const StgInfoTable* info;
-    StgWord32 bitmap;
+    StgWord bitmap;
     
     // highly similar to scavenge_stack, but we do pointer threading here.
     
@@ -213,7 +213,7 @@ thread_stack(StgPtr p, StgPtr stack_end)
 	    p++;
 	    continue;
 	    
-	    // small bitmap (< 32 entries, or 64 on a 64-bit machine) 
+	    // small bitmap (<= 32 entries, or 64 on a 64-bit machine) 
 	case UPDATE_FRAME:
 	case STOP_FRAME:
 	case CATCH_FRAME:
@@ -234,7 +234,7 @@ thread_stack(StgPtr p, StgPtr stack_end)
 	    }
 	    continue;
 
-	    // large bitmap (> 32 entries) 
+	    // large bitmap (> 32 entries, or 64 on a 64-bit machine) 
 	case RET_BIG:
 	case RET_VEC_BIG:
 	{
@@ -247,7 +247,7 @@ thread_stack(StgPtr p, StgPtr stack_end)
 
 	    for (i=0; i<large_bitmap->size; i++) {
 		bitmap = large_bitmap->bitmap[i];
-		q = p + sizeof(W_) * 8;
+		q = p + BITS_IN(W_);
 		while (bitmap != 0) {
 		    if ((bitmap & 1) == 0) {
 			thread(p);

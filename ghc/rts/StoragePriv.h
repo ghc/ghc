@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StoragePriv.h,v 1.15 2001/07/23 17:23:20 simonmar Exp $
+ * $Id: StoragePriv.h,v 1.16 2001/08/02 15:33:35 ken Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -9,6 +9,8 @@
 
 #ifndef STORAGEPRIV_H
 #define STORAGEPRIV_H
+
+#include <stddef.h>
 
 #define END_OF_STATIC_LIST stgCast(StgClosure*,1)
 
@@ -21,7 +23,7 @@ extern generation *oldest_gen;
 extern void newCAF(StgClosure*);
 
 extern void move_TSO(StgTSO *src, StgTSO *dest);
-extern StgTSO *relocate_stack(StgTSO *dest, int diff);
+extern StgTSO *relocate_stack(StgTSO *dest, ptrdiff_t diff);
 
 extern StgClosure *static_objects;
 extern StgClosure *scavenged_static_objects;

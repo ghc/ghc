@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.111 2001/07/30 12:54:12 simonmar Exp $
+ * $Id: GC.c,v 1.112 2001/08/02 15:33:35 ken Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -40,7 +40,6 @@
 #if defined(RTS_GTK_FRONTPANEL)
 #include "FrontPanel.h"
 #endif
-#include <stddef.h>
 
 /* STATIC OBJECT LIST.
  *
