@@ -162,10 +162,6 @@ data Type
   | SourceTy		-- A high level source type 
 	SourceType	-- ...can be expanded to a representation type...
 
-  | UsageTy		-- A usage-annotated type
-	Type		--   - Annotation of kind $ (i.e., usage annotation)
-	Type		--   - Annotated type
-
   | NoteTy 		-- A type with a note attached
 	TyNote
 	Type		-- The expanded version
@@ -177,11 +173,6 @@ data TyNote
 			-- The Type is always a TyConApp, and is the un-expanded form.
 			-- The type to which the note is attached is the expanded form.
 \end{code}
-
-INVARIANT: UsageTys are optional, but may *only* appear immediately
-under a FunTy (either argument), or at top-level of a Type permitted
-to be annotated (such as the type of an Id).  NoteTys are transparent
-for the purposes of this rule.
 
 -------------------------------------
  		Source types

@@ -158,8 +158,6 @@ vrcInTy fao v (ForAllTy v' ty)          = if v==v'
 vrcInTy fao v (TyConApp tc tys)         = let pms1 = map (vrcInTy fao v) tys
     					      pms2 = fao tc
     				          in  orVrcs (zipWith timesVrc pms1 pms2)
-
-vrcInTy fao v (UsageTy u ty)            = vrcInTy fao v u `orVrc` vrcInTy fao v ty
 \end{code}
 
 

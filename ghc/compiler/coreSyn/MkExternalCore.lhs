@@ -142,7 +142,6 @@ make_ty (TyConApp tc ts) = foldl C.Tapp (C.Tcon (make_con_qid (tyConName tc))) (
 make_ty (FunTy t1 t2) = make_ty (TyConApp funTyCon [t1,t2])
 make_ty (ForAllTy tv t) = C.Tforall (make_tbind tv) (make_ty t)
 make_ty (SourceTy p) = make_ty (sourceTypeRep p)
-make_ty (UsageTy _ t) = make_ty t
 make_ty (NoteTy _ t) = make_ty t
 
 

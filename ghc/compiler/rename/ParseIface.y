@@ -547,7 +547,6 @@ types2		:  type ',' type			{ [$1,$3] }
 btype		:: { RdrNameHsType }
 btype		:  atype				{ $1 }
 		|  btype atype				{ HsAppTy $1 $2 }
-		|  '__u' atype atype			{ HsUsageTy $2 $3 }
 
 atype		:: { RdrNameHsType }
 atype		:  qtc_name 			  	{ HsTyVar $1 }
@@ -579,7 +578,6 @@ ttype 		: '__forall' tv_bndrs
 tbtype		:: { RdrNameHsType }
 tbtype		:  tatype				{ $1 }
 		|  tbtype atype				{ HsAppTy $1 $2 }
-		|  '__u' atype atype			{ HsUsageTy $2 $3 }
 
 tatype		:: { RdrNameHsType }
 tatype		:  qtc_name 			  	{ HsTyVar $1 }

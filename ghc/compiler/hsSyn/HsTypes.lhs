@@ -106,9 +106,6 @@ data HsType name
 
   -- these next two are only used in interfaces
   | HsPredTy		(HsPred name)
-  
-  | HsUsageTy		(HsType name)   -- Usage annotation
-			(HsType name)	-- Annotated type
 
 
 -----------------------
@@ -286,12 +283,6 @@ ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty)
 ppr_mono_ty ctxt_prec (HsPredTy pred) 
   = braces (ppr pred)
 
-ppr_mono_ty ctxt_prec (HsUsageTy u ty)
-  = maybeParen (ctxt_prec >= pREC_CON)
-               (sep [ptext SLIT("__u") <+> ppr_mono_ty pREC_CON u,
-                     ppr_mono_ty pREC_CON ty])
-    -- pREC_FUN would be logical for u, but it yields a reduce/reduce conflict with AppTy
-
 -- Generics
 ppr_mono_ty ctxt_prec (HsNumTy n) = integer  n
 ppr_mono_ty ctxt_prec (HsOpTy ty1 op ty2) = ppr ty1 <+> ppr op <+> ppr ty2
@@ -365,10 +356,6 @@ toHsType ty@(ForAllTy _ _) = case tcSplitSigmaTy ty of
 			        (tvs, preds, tau) -> HsForAllTy (Just (map toHsTyVar tvs))
 			 				        (map toHsPred preds)
 						                (toHsType tau)
-
-toHsType (UsageTy u ty) = HsUsageTy (toHsType u) (toHsType ty)
-                          -- **! consider dropping usMany annotations ToDo KSW 2000-10
-
 
 toHsPred (ClassP cls tys) = HsClassP (getName cls) (map toHsType tys)
 toHsPred (IParam n ty)    = HsIParam n		   (toHsType ty)
@@ -470,9 +457,6 @@ eq_hsType env (HsFunTy a1 b1) (HsFunTy a2 b2)
 
 eq_hsType env (HsPredTy p1) (HsPredTy p2)
   = eq_hsPred env p1 p2
-
-eq_hsType env (HsUsageTy u1 ty1) (HsUsageTy u2 ty2)
-  = eq_hsType env u1 u2 && eq_hsType env ty1 ty2
 
 eq_hsType env (HsOpTy lty1 op1 rty1) (HsOpTy lty2 op2 rty2)
   = eq_hsVar env op1 op2 && eq_hsType env lty1 lty2 && eq_hsType env rty1 rty2

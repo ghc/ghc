@@ -57,7 +57,7 @@ import IdInfo		( LBVarInfo(..),
 			  megaSeqIdInfo )
 import NewDemand	( appIsBottom )
 import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe, splitFunTy,
-			  applyTys, isUnLiftedType, seqType, mkUTy, mkTyVarTy,
+			  applyTys, isUnLiftedType, seqType, mkTyVarTy,
 			  splitForAllTy_maybe, isForAllTy, splitNewType_maybe, 
 			  splitTyConApp_maybe, eqType, funResultTy, applyTy,
 			  funResultTy, applyTy
@@ -111,12 +111,8 @@ mkPiTypes :: [Var] -> Type -> Type	--    doesn't work...
 mkPiTypes vs ty = foldr mkPiType ty vs
 
 mkPiType v ty
-   | isId v    = add_usage (mkFunTy (idType v) ty)
+   | isId v    = mkFunTy (idType v) ty
    | otherwise = mkForAllTy v ty
-   where	      
-     add_usage ty = case idLBVarInfo v of
-                      LBVarInfo u -> mkUTy u ty
-                      otherwise   -> ty
 \end{code}
 
 \begin{code}

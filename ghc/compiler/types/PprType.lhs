@@ -20,7 +20,7 @@ module PprType(
 -- (PprType can see all the representations it's trying to print)
 import TypeRep		( Type(..), TyNote(..), 
 			  Kind, liftedTypeKind ) -- friend
-import Type		( SourceType(..), isUTyVar, eqKind )
+import Type		( SourceType(..), eqKind )
 import TcType		( ThetaType, PredType,
 			  tcSplitSigmaTy, isPredTy, isDictTy,
 			  tcSplitTyConApp_maybe, tcSplitFunTy_maybe
@@ -165,13 +165,7 @@ ppr_ty ctxt_prec ty@(ForAllTy _ _)
     ]
  where		
     (tyvars, theta, tau) = tcSplitSigmaTy ty
-    
-    pp_tyvars sty = sep (map pprTyVarBndr some_tyvars)
-      where
-        some_tyvars | userStyle sty && not opt_PprStyle_RawTypes
-                    = filter (not . isUTyVar) tyvars  -- hide uvars from user
-                    | otherwise
-                    = tyvars
+    pp_tyvars sty	 = sep (map pprTyVarBndr tyvars)
     
     ppr_theta []     = empty
     ppr_theta theta  = pprTheta theta <+> ptext SLIT("=>")
@@ -190,12 +184,6 @@ ppr_ty ctxt_prec (FunTy ty1 ty2)
 ppr_ty ctxt_prec (AppTy ty1 ty2)
   = maybeParen ctxt_prec tYCON_PREC $
     ppr_ty fUN_PREC ty1 <+> ppr_ty tYCON_PREC ty2
-
-ppr_ty ctxt_prec (UsageTy u ty)
-  = maybeParen ctxt_prec tYCON_PREC $
-    ptext SLIT("__u") <+> ppr_ty tYCON_PREC u
-                      <+> ppr_ty tYCON_PREC ty
-    -- fUN_PREC would be logical for u, but it yields a reduce/reduce conflict with AppTy
 
 ppr_ty ctxt_prec (NoteTy (SynNote ty) expansion)
   = ppr_ty ctxt_prec ty

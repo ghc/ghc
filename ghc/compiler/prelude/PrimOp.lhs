@@ -6,7 +6,7 @@
 \begin{code}
 module PrimOp (
 	PrimOp(..), allThePrimOps,
-	primOpType, primOpSig, primOpUsg, primOpArity,
+	primOpType, primOpSig, primOpArity,
 	mkPrimOpIdName, primOpRdrName, primOpTag, primOpOcc,
 
 	commutableOp,
@@ -31,8 +31,7 @@ import RdrName		( RdrName, mkRdrOrig )
 import OccName		( OccName, pprOccName, mkVarOcc )
 import TyCon		( TyCon, isPrimTyCon, tyConPrimRep )
 import Type		( Type, mkForAllTys, mkFunTy, mkFunTys, typePrimRep,
-			  splitFunTy_maybe, tyConAppTyCon, splitTyConApp,
-                          mkUTy, usOnce, usMany
+			  splitFunTy_maybe, tyConAppTyCon, splitTyConApp
 			)
 import PprType          () -- get at Outputable Type instance.
 import Unique		( mkPrimOpIdUnique )
@@ -427,49 +426,6 @@ primOpSig op
 	  Compare   occ ty -> ([],     [ty,ty], boolTy)
 	  GenPrimOp occ tyvars arg_tys res_ty
                            -> (tyvars, arg_tys, res_ty)
-
--- primOpUsg is like primOpSig but the types it yields are the
--- appropriate sigma (i.e., usage-annotated) types,
--- as required by the UsageSP inference.
-
-primOpUsg :: PrimOp -> ([TyVar],[Type],Type)
-#include "primop-usage.hs-incl"
-
--- Things with no Haskell pointers inside: in actuality, usages are
--- irrelevant here (hence it doesn't matter that some of these
--- apparently permit duplication; since such arguments are never 
--- ENTERed anyway, the usage annotation they get is entirely irrelevant
--- except insofar as it propagates to infect other values that *are*
--- pointed.
-
-
--- Helper bits & pieces for usage info.
-                                    
-mkZ          = mkUTy usOnce  -- pointed argument used zero
-mkO          = mkUTy usOnce  -- pointed argument used once
-mkM          = mkUTy usMany  -- pointed argument used multiply
-mkP          = mkUTy usOnce  -- unpointed argument
-mkR          = mkUTy usMany  -- unpointed result
-
-nomangle op
-   = case primOpSig op of
-        (tyvars, arg_tys, res_ty, _, _)
-           -> (tyvars, map mkP arg_tys, mkR res_ty)
-
-mangle op fs g  
-   = case primOpSig op of
-        (tyvars, arg_tys, res_ty, _, _)
-           -> (tyvars, zipWithEqual "primOpUsg" ($) fs arg_tys, g res_ty)
-
-inFun op f g ty 
-   = case splitFunTy_maybe ty of
-        Just (a,b) -> mkFunTy (f a) (g b)
-        Nothing    -> pprPanic "primOpUsg:inFun" (ppr op <+> ppr ty)
-
-inUB op fs ty
-   = case splitTyConApp ty of
-        (tc,tys) -> ASSERT( tc == tupleTyCon Unboxed (length fs) )
-                    mkTupleTy Unboxed (length fs) (zipWithEqual "primOpUsg" ($) fs tys)
 \end{code}
 
 \begin{code}

@@ -157,7 +157,6 @@ tcSplitRhoTyM t
 				  case maybe_ty of
 				    Just ty | not (tcIsTyVarTy ty) -> go syn_t ty ts
 				    other			   -> returnNF_Tc (reverse ts, syn_t)
-    go syn_t (UsageTy _ t)   ts = go syn_t t ts
     go syn_t t		     ts = returnNF_Tc (reverse ts, syn_t)
 \end{code}
 
@@ -274,7 +273,6 @@ putTcTyVar tyvar ty
 
   | otherwise
   = ASSERT( isMutTyVar tyvar )
-    UASSERT2( not (isUTy ty), ppr tyvar <+> ppr ty )
     tcWriteMutTyVar tyvar (Just ty)	`thenNF_Tc_`
     returnNF_Tc ty
 \end{code}
@@ -497,10 +495,6 @@ zonkType unbound_var_fn ty
     go (AppTy fun arg)	 	  = go fun		`thenNF_Tc` \ fun' ->
 				    go arg		`thenNF_Tc` \ arg' ->
 				    returnNF_Tc (mkAppTy fun' arg')
-
-    go (UsageTy u ty)             = go u                `thenNF_Tc` \ u'  ->
-                                    go ty               `thenNF_Tc` \ ty' ->
-                                    returnNF_Tc (UsageTy u' ty')
 
 	-- The two interesting cases!
     go (TyVarTy tyvar)     = zonkTyVar unbound_var_fn tyvar
@@ -725,7 +719,6 @@ check_tau_type :: Rank -> UbxTupFlag -> Type -> TcM ()
 -- Rank is allowed rank for function args
 -- No foralls otherwise
 
-check_tau_type rank ubx_tup ty@(UsageTy _ _)  = failWithTc (usageTyErr ty)
 check_tau_type rank ubx_tup ty@(ForAllTy _ _) = failWithTc (forAllTyErr ty)
 check_tau_type rank ubx_tup (SourceTy sty)    = getDOptsTc		`thenNF_Tc` \ dflags ->
 						check_source_ty dflags TypeCtxt sty
@@ -778,7 +771,6 @@ check_tau_type rank ubx_tup ty@(TyConApp tc tys)
 
 ----------------------------------------
 forAllTyErr     ty = ptext SLIT("Illegal polymorphic type:") <+> ppr_ty ty
-usageTyErr      ty = ptext SLIT("Illegal usage type:") <+> ppr_ty ty
 unliftedArgErr  ty = ptext SLIT("Illegal unlifted type argument:") <+> ppr_ty ty
 ubxArgTyErr     ty = ptext SLIT("Illegal unboxed tuple type as function argument:") <+> ppr_ty ty
 kindErr kind       = ptext SLIT("Expecting an ordinary type, but found a type of kind") <+> ppr kind

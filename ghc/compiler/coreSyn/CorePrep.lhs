@@ -15,8 +15,7 @@ import CoreFVs	( exprFreeVars )
 import CoreLint	( endPass )
 import CoreSyn
 import Type	( Type, applyTy, splitFunTy_maybe, isTyVarTy,
-		  isUnLiftedType, isUnboxedTupleType, repType,	
-		  uaUTy, usOnce, usMany, eqUsage, seqType )
+		  isUnLiftedType, isUnboxedTupleType, repType, seqType )
 import NewDemand  ( Demand, isStrictDmd, lazyDmd, StrictSig(..), DmdType(..) )
 import PrimOp	( PrimOp(..) )
 import Var 	( Var, Id, setVarUnique )
@@ -702,23 +701,12 @@ mkDem :: Demand -> Bool -> RhsDemand
 mkDem strict once = RhsDemand (isStrictDmd strict) once
 
 mkDemTy :: Demand -> Type -> RhsDemand
-mkDemTy strict ty = RhsDemand (isStrictDmd strict) (isOnceTy ty)
-
-isOnceTy :: Type -> Bool
-isOnceTy ty
-  =
-#ifdef USMANY
-    opt_UsageSPOn &&  -- can't expect annotations if -fusagesp is off
-#endif
-    once
-  where
-    u = uaUTy ty
-    once | u `eqUsage` usOnce  = True
-         | u `eqUsage` usMany  = False
-         | isTyVarTy u 	       = False  -- if unknown at compile-time, is Top ie usMany
+mkDemTy strict ty = RhsDemand (isStrictDmd strict) 
+			      False {- For now -}
 
 bdrDem :: Id -> RhsDemand
-bdrDem id = mkDem (idNewDemandInfo id) (isOnceTy (idType id))
+bdrDem id = mkDem (idNewDemandInfo id)
+		  False {- For now -}
 
 safeDem, onceDem :: RhsDemand
 safeDem = RhsDemand False False  -- always safe to use this

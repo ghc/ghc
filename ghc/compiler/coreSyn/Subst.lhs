@@ -45,7 +45,7 @@ import CoreSyn		( Expr(..), Bind(..), Note(..), CoreExpr,
 import CoreFVs		( exprFreeVars )
 import TypeRep		( Type(..), TyNote(..) )  -- friend
 import Type		( ThetaType, SourceType(..), PredType,
-			  tyVarsOfType, tyVarsOfTypes, mkAppTy, mkUTy, isUTy
+			  tyVarsOfType, tyVarsOfTypes, mkAppTy, 
 			)
 import VarSet
 import VarEnv
@@ -249,12 +249,10 @@ zapSubstEnv :: Subst -> Subst
 zapSubstEnv (Subst in_scope env) = Subst in_scope emptySubstEnv
 
 extendSubst :: Subst -> Var -> SubstResult -> Subst
-extendSubst (Subst in_scope env) v r = UASSERT( case r of { DoneTy ty -> not (isUTy ty) ; _ -> True } )
-                                       Subst in_scope (extendSubstEnv env v r)
+extendSubst (Subst in_scope env) v r = Subst in_scope (extendSubstEnv env v r)
 
 extendSubstList :: Subst -> [Var] -> [SubstResult] -> Subst
-extendSubstList (Subst in_scope env) v r = UASSERT( all (\ r1 -> case r1 of { DoneTy ty -> not (isUTy ty) ; _ -> True }) r )
-                                           Subst in_scope (extendSubstEnvList env v r)
+extendSubstList (Subst in_scope env) v r = Subst in_scope (extendSubstEnvList env v r)
 
 lookupSubst :: Subst -> Var -> Maybe SubstResult
 lookupSubst (Subst _ env) v = lookupSubstEnv env v
@@ -440,8 +438,6 @@ subst_ty subst ty
 					
     go (ForAllTy tv ty)		   = case substTyVar subst tv of
 					(subst', tv') -> ForAllTy tv' $! (subst_ty subst' ty)
-
-    go (UsageTy u ty)              = mkUTy (go u) $! (go ty)
 \end{code}
 
 Here is where we invent a new binder if necessary.

@@ -108,7 +108,6 @@ import {-# SOURCE #-} PprType( pprType )
 
 -- friends:
 import TypeRep		( Type(..), TyNote(..), funTyCon )  -- friend
-import Type		( mkUTyM, unUTy )	-- Used locally
 
 import Type		(	-- Re-exports
 			  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta,
@@ -289,9 +288,7 @@ tyVarBindingInfo tv
 mkSigmaTy tyvars theta tau = mkForAllTys tyvars (mkRhoTy theta tau)
 
 mkRhoTy :: [SourceType] -> Type -> Type
-mkRhoTy theta ty = UASSERT2( not (isUTy ty), pprType ty )
-                   foldr (\p r -> FunTy (mkUTyM (mkPredTy p)) (mkUTyM r)) ty theta
-
+mkRhoTy theta ty = foldr (\p r -> FunTy (mkPredTy p) r) ty theta
 \end{code}
 
 
@@ -305,7 +302,6 @@ isTauTy (AppTy a b)	 = isTauTy a && isTauTy b
 isTauTy (FunTy a b)	 = isTauTy a && isTauTy b
 isTauTy (SourceTy p)	 = True		-- Don't look through source types
 isTauTy (NoteTy _ ty)	 = isTauTy ty
-isTauTy (UsageTy _ ty)   = isTauTy ty
 isTauTy other		 = False
 \end{code}
 
@@ -318,7 +314,6 @@ getDFunTyKey (AppTy fun _)   	     = getDFunTyKey fun
 getDFunTyKey (NoteTy _ t)    	     = getDFunTyKey t
 getDFunTyKey (FunTy arg _)   	     = getOccName funTyCon
 getDFunTyKey (ForAllTy _ t)  	     = getDFunTyKey t
-getDFunTyKey (UsageTy _ t)   	     = getDFunTyKey t
 getDFunTyKey (SourceTy (NType tc _)) = getOccName tc	-- Newtypes are quite reasonable
 getDFunTyKey ty		     	     = pprPanic "getDFunTyKey" (pprType ty)
 -- SourceTy shouldn't happen
@@ -345,12 +340,10 @@ tcSplitForAllTys ty = split ty ty []
    where
      split orig_ty (ForAllTy tv ty) tvs = split ty ty (tv:tvs)
      split orig_ty (NoteTy n  ty)   tvs = split orig_ty ty tvs
-     split orig_ty (UsageTy _ ty)   tvs = split orig_ty ty tvs
      split orig_ty t		    tvs = (reverse tvs, orig_ty)
 
 tcIsForAllTy (ForAllTy tv ty) = True
 tcIsForAllTy (NoteTy n ty)    = tcIsForAllTy ty
-tcIsForAllTy (UsageTy n ty)   = tcIsForAllTy ty
 tcIsForAllTy t		      = False
 
 tcSplitRhoTy :: Type -> ([PredType], Type)
@@ -360,7 +353,6 @@ tcSplitRhoTy ty = split ty ty []
 					Just p  -> split res res (p:ts)
 					Nothing -> (reverse ts, orig_ty)
   split orig_ty (NoteTy n ty)	ts = split orig_ty ty ts
-  split orig_ty (UsageTy _ ty)  ts = split orig_ty ty ts
   split orig_ty ty		ts = (reverse ts, orig_ty)
 
 tcSplitSigmaTy ty = case tcSplitForAllTys ty of
@@ -381,9 +373,8 @@ tcSplitTyConApp ty = case tcSplitTyConApp_maybe ty of
 tcSplitTyConApp_maybe :: Type -> Maybe (TyCon, [Type])
 -- Newtypes are opaque, so they may be split
 tcSplitTyConApp_maybe (TyConApp tc tys) 	= Just (tc, tys)
-tcSplitTyConApp_maybe (FunTy arg res)   	= Just (funTyCon, [unUTy arg,unUTy res])
+tcSplitTyConApp_maybe (FunTy arg res)   	= Just (funTyCon, [arg,res])
 tcSplitTyConApp_maybe (NoteTy n ty)     	= tcSplitTyConApp_maybe ty
-tcSplitTyConApp_maybe (UsageTy _ ty)    	= tcSplitTyConApp_maybe ty
 tcSplitTyConApp_maybe (SourceTy (NType tc tys)) = Just (tc,tys)
 	-- However, predicates are not treated
 	-- as tycon applications by the type checker
@@ -399,7 +390,6 @@ tcSplitFunTys ty = case tcSplitFunTy_maybe ty of
 tcSplitFunTy_maybe :: Type -> Maybe (Type, Type)
 tcSplitFunTy_maybe (FunTy arg res)  = Just (arg, res)
 tcSplitFunTy_maybe (NoteTy n ty)    = tcSplitFunTy_maybe ty
-tcSplitFunTy_maybe (UsageTy _ ty)   = tcSplitFunTy_maybe ty
 tcSplitFunTy_maybe other	    = Nothing
 
 tcFunArgTy    ty = case tcSplitFunTy_maybe ty of { Just (arg,res) -> arg }
@@ -407,10 +397,9 @@ tcFunResultTy ty = case tcSplitFunTy_maybe ty of { Just (arg,res) -> res }
 
 
 tcSplitAppTy_maybe :: Type -> Maybe (Type, Type)
-tcSplitAppTy_maybe (FunTy ty1 ty2)   	     = Just (TyConApp funTyCon [unUTy ty1], unUTy ty2)
+tcSplitAppTy_maybe (FunTy ty1 ty2)   	     = Just (TyConApp funTyCon [ty1], ty2)
 tcSplitAppTy_maybe (AppTy ty1 ty2)   	     = Just (ty1, ty2)
 tcSplitAppTy_maybe (NoteTy n ty)     	     = tcSplitAppTy_maybe ty
-tcSplitAppTy_maybe (UsageTy _ ty)    	     = tcSplitAppTy_maybe ty
 tcSplitAppTy_maybe (SourceTy (NType tc tys)) = tc_split_app tc tys
 	--- Don't forget that newtype!
 tcSplitAppTy_maybe (TyConApp tc tys)	     = tc_split_app tc tys
@@ -429,7 +418,6 @@ tcSplitAppTy ty = case tcSplitAppTy_maybe ty of
 tcGetTyVar_maybe :: Type -> Maybe TyVar
 tcGetTyVar_maybe (TyVarTy tv) 	= Just tv
 tcGetTyVar_maybe (NoteTy _ t) 	= tcGetTyVar_maybe t
-tcGetTyVar_maybe ty@(UsageTy _ _) = pprPanic "tcGetTyVar_maybe: UTy:" (pprType ty)
 tcGetTyVar_maybe other	        = Nothing
 
 tcGetTyVar :: String -> Type -> TyVar
@@ -455,7 +443,6 @@ tcSplitMethodTy ty = split ty
 			    Just p  -> (p, res)
 			    Nothing -> panic "splitMethodTy"
   split (NoteTy n ty)	= split ty
-  split (UsageTy _ ty)  = split ty
   split _               = panic "splitMethodTy"
 
 tcSplitDFunTy :: Type -> ([TyVar], [SourceType], Class, [Type])
@@ -483,14 +470,12 @@ isPred (NType _ _)  = False
 
 isPredTy :: Type -> Bool
 isPredTy (NoteTy _ ty)  = isPredTy ty
-isPredTy (UsageTy _ ty) = isPredTy ty
 isPredTy (SourceTy sty) = isPred sty
 isPredTy _	        = False
 
 tcSplitPredTy_maybe :: Type -> Maybe PredType
    -- Returns Just for predicates only
 tcSplitPredTy_maybe (NoteTy _ ty)  	    = tcSplitPredTy_maybe ty
-tcSplitPredTy_maybe (UsageTy _ ty)	    = tcSplitPredTy_maybe ty
 tcSplitPredTy_maybe (SourceTy p) | isPred p = Just p
 tcSplitPredTy_maybe other	      	    = Nothing
 	
@@ -513,8 +498,7 @@ mkPredName uniq loc (IParam ip ty)   = mkLocalName uniq (getOccName (ipNameName 
 --------------------- Dictionary types ---------------------------------
 
 \begin{code}
-mkClassPred clas tys = UASSERT2( not (any isUTy tys), ppr clas <+> fsep (map pprType tys) )
-                       ClassP clas tys
+mkClassPred clas tys = ClassP clas tys
 
 isClassPred :: SourceType -> Bool
 isClassPred (ClassP clas tys) = True
@@ -531,13 +515,11 @@ getClassPredTys :: PredType -> (Class, [Type])
 getClassPredTys (ClassP clas tys) = (clas, tys)
 
 mkDictTy :: Class -> [Type] -> Type
-mkDictTy clas tys = UASSERT2( not (any isUTy tys), ppr clas <+> fsep (map pprType tys) )
-                    mkPredTy (ClassP clas tys)
+mkDictTy clas tys = mkPredTy (ClassP clas tys)
 
 isDictTy :: Type -> Bool
 isDictTy (SourceTy p)   = isClassPred p
 isDictTy (NoteTy _ ty)	= isDictTy ty
-isDictTy (UsageTy _ ty) = isDictTy ty
 isDictTy other		= False
 \end{code}
 
@@ -597,11 +579,9 @@ cmpTy :: TyVarEnv TyVar -> Type -> Type -> Ordering
   -- So when comparing for-alls.. (forall tv1 . t1) (forall tv2 . t2)
   -- we in effect substitute tv2 for tv1 in t1 before continuing
 
-    -- Look through NoteTy and UsageTy
+    -- Look through NoteTy
 cmpTy env (NoteTy _ ty1) ty2 = cmpTy env ty1 ty2
 cmpTy env ty1 (NoteTy _ ty2) = cmpTy env ty1 ty2
-cmpTy env (UsageTy _ ty1) ty2 = cmpTy env ty1 ty2
-cmpTy env ty1 (UsageTy _ ty2) = cmpTy env ty1 ty2
 
     -- Deal with equal constructors
 cmpTy env (TyVarTy tv1) (TyVarTy tv2) = case lookupVarEnv env tv1 of
@@ -674,14 +654,12 @@ isSigmaTy :: Type -> Bool
 isSigmaTy (ForAllTy tyvar ty) = True
 isSigmaTy (FunTy a b)	      = isPredTy a
 isSigmaTy (NoteTy n ty)	      = isSigmaTy ty
-isSigmaTy (UsageTy _ ty)      = isSigmaTy ty
 isSigmaTy _		      = False
 
 isOverloadedTy :: Type -> Bool
 isOverloadedTy (ForAllTy tyvar ty) = isOverloadedTy ty
 isOverloadedTy (FunTy a b)	   = isPredTy a
 isOverloadedTy (NoteTy n ty)	   = isOverloadedTy ty
-isOverloadedTy (UsageTy _ ty)	   = isOverloadedTy ty
 isOverloadedTy _		   = False
 \end{code}
 
@@ -732,7 +710,6 @@ hoistForAllTys ty
 					(tvs,theta,tau) -> (tvs,theta,mkFunTy arg tau)
 
     hoist orig_ty (NoteTy _ ty)    = hoist orig_ty ty
-    hoist orig_ty (UsageTy _ ty)   = hoist orig_ty ty
     hoist orig_ty ty		   = ([], [], orig_ty)
 \end{code}
 
@@ -747,7 +724,6 @@ deNoteType (NoteTy _ ty)	= deNoteType ty
 deNoteType (AppTy fun arg)	= AppTy (deNoteType fun) (deNoteType arg)
 deNoteType (FunTy fun arg)	= FunTy (deNoteType fun) (deNoteType arg)
 deNoteType (ForAllTy tv ty)	= ForAllTy tv (deNoteType ty)
-deNoteType (UsageTy u ty)	= UsageTy u (deNoteType ty)
 
 deNoteSourceType :: SourceType -> SourceType
 deNoteSourceType (ClassP c tys)   = ClassP c (map deNoteType tys)
@@ -770,7 +746,6 @@ namesOfType (SourceTy (NType tc tys))	= unitNameSet (getName tc) `unionNameSets`
 namesOfType (FunTy arg res)		= namesOfType arg `unionNameSets` namesOfType res
 namesOfType (AppTy fun arg)		= namesOfType fun `unionNameSets` namesOfType arg
 namesOfType (ForAllTy tyvar ty)		= namesOfType ty `delFromNameSet` getName tyvar
-namesOfType (UsageTy u ty)		= namesOfType u `unionNameSets` namesOfType ty
 
 namesOfTypes tys = foldr (unionNameSets . namesOfType) emptyNameSet tys
 
@@ -1025,10 +1000,6 @@ uTysX (ForAllTy _ _) ty2 k subst = panic "Unify.uTysX subst:ForAllTy (1st arg)"
 uTysX ty1 (ForAllTy _ _) k subst = panic "Unify.uTysX subst:ForAllTy (2nd arg)"
 #endif
 
-	-- Ignore usages
-uTysX (UsageTy _ t1) t2 k subst = uTysX t1 t2 k subst
-uTysX t1 (UsageTy _ t2) k subst = uTysX t1 t2 k subst
-
 	-- Anything else fails
 uTysX ty1 ty2 k subst = Nothing
 
@@ -1049,7 +1020,6 @@ uVarX tv1 ty2 k subst@(tmpls, env)
 	       |  typeKind ty2 `eqKind` tyVarKind tv1
 	       && occur_check_ok ty2
 	       ->     -- No kind mismatch nor occur check
-	          UASSERT( not (isUTy ty2) )
                   k (tmpls, extendSubstEnv env tv1 (DoneTy ty2))
 
 	       | otherwise -> Nothing	-- Fail if kind mis-match or occur check
@@ -1117,8 +1087,7 @@ match (TyVarTy v) ty tmpls k senv
   | v `elemVarSet` tmpls
   =     -- v is a template variable
     case lookupSubstEnv senv v of
-	Nothing -> UASSERT( not (isUTy ty) )
-                   k (extendSubstEnv senv v (DoneTy ty))
+	Nothing -> k (extendSubstEnv senv v (DoneTy ty))
 	Just (DoneTy ty')  | ty' `tcEqType` ty   -> k senv   -- Succeeds
 			   | otherwise	         -> Nothing  -- Fails
 
@@ -1158,9 +1127,6 @@ match (TyConApp tc1 tys1) (TyConApp tc2 tys2) tmpls k senv
 -- Newtypes are opaque; other source types should not happen
 match (SourceTy (NType tc1 tys1)) (SourceTy (NType tc2 tys2)) tmpls k senv
   | tc1 == tc2 = match_list_exactly tys1 tys2 tmpls k senv
-
-match (UsageTy _ ty1) ty2 tmpls k senv = match ty1 ty2 tmpls k senv
-match ty1 (UsageTy _ ty2) tmpls k senv = match ty1 ty2 tmpls k senv
 
 	-- With type synonyms, we have to be careful for the exact
 	-- same reasons as in the unifier.  Please see the
