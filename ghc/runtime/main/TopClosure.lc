@@ -2,7 +2,7 @@
 \begin{code}
 #include "rtsdefs.h"
 
-EXTDATA(GHCmain_mainIO_closure);
+EXTDATA(PrelMain_mainIO_closure);
 
-P_ TopClosure = GHCmain_mainIO_closure;
+P_ TopClosure = PrelMain_mainIO_closure;
 \end{code}

@@ -12,13 +12,9 @@ defined here so as to avod
 \begin{code}
 module PrelMods
         (
-         gHC__, pRELUDE, pREL_BASE,
-         pREL_READ , pREL_NUM, pREL_LIST,
-	 pREL_TUP  , pACKED_STRING, cONC_BASE,
-         iO_BASE   , mONAD, rATIO, iX,
-         sT_BASE   , aRR_BASE, fOREIGN, mAIN,
-         gHC_MAIN  , gHC_ERR,
-	 cCALL     , aDDR
+	pREL_GHC, pRELUDE, mONAD, rATIO, iX, mAIN, pREL_MAIN, pREL_ERR,
+	pREL_BASE, pREL_NUM, pREL_LIST, pREL_TUP, pREL_ADDR, pREL_READ,
+	pREL_PACK, pREL_CONC, pREL_IO_BASE, pREL_ST, pREL_ARR, pREL_FOREIGN
 	) where
 
 #include "HsVersions.h"
@@ -27,32 +23,33 @@ import BasicTypes( Module )
 \end{code}
 
 \begin{code}
-gHC__, pRELUDE, pREL_BASE, pREL_NUM, pREL_LIST, pREL_TUP :: Module
-pACKED_STRING, cONC_BASE, iO_BASE, mONAD, rATIO, iX      :: Module
-sT_BASE, aRR_BASE, fOREIGN, mAIN, gHC_MAIN, gHC_ERR      :: Module	
+pREL_GHC, pRELUDE, mONAD, rATIO, iX, mAIN, pREL_MAIN, pREL_ERR      :: Module
+pREL_BASE, pREL_NUM, pREL_LIST, pREL_TUP, pREL_ADDR, pREL_READ      :: Module	
+pREL_PACK, pREL_CONC, pREL_IO_BASE, pREL_ST, pREL_ARR, pREL_FOREIGN :: Module	
 
-gHC__	     = SLIT("GHC")	   -- Primitive types and values
 
 pRELUDE	     = SLIT("Prelude")
+pREL_GHC     = SLIT("PrelGHC")	   -- Primitive types and values
 pREL_BASE    = SLIT("PrelBase")
 pREL_READ    = SLIT("PrelRead")
 pREL_NUM     = SLIT("PrelNum")
 pREL_LIST    = SLIT("PrelList")
 pREL_TUP     = SLIT("PrelTup")
-pACKED_STRING= SLIT("PackBase")
-cONC_BASE    = SLIT("ConcBase")
-iO_BASE	     = SLIT("IOBase")
+pREL_PACK    = SLIT("PrelPack")
+pREL_CONC    = SLIT("PrelConc")
+pREL_IO_BASE = SLIT("PrelIOBase")
+pREL_ST	     = SLIT("PrelST")
+pREL_ARR     = SLIT("PrelArr")
+pREL_FOREIGN = SLIT("PrelForeign")
+pREL_CCALL   = SLIT("PrelCCall")
+pREL_ADDR    = SLIT("PrelAddr")
+pREL_ERR     = SLIT("PrelErr")
+
 mONAD	     = SLIT("Monad")
 rATIO	     = SLIT("Ratio")
 iX	     = SLIT("Ix")
-sT_BASE	     = SLIT("STBase")
-aRR_BASE     = SLIT("ArrBase")
-fOREIGN	     = SLIT("Foreign")
-cCALL        = SLIT("CCall")
-aDDR         = SLIT("Addr")
 
+pREL_MAIN    = SLIT("PrelMain")
 mAIN	     = SLIT("Main")
-gHC_MAIN     = SLIT("GHCmain")
-gHC_ERR	     = SLIT("GHCerr")
 
 \end{code}

@@ -16,7 +16,7 @@ import StdIdInfo
 import Name		( mkWiredInIdName, Name )
 import PrimOp		( primOpInfo, tagOf_PrimOp, primOp_str,
 			  PrimOpInfo(..), PrimOpResultInfo(..), PrimOp )
-import PrelMods		( gHC__ )
+import PrelMods		( pREL_GHC )
 import Type		( mkForAllTys, mkFunTy, mkFunTys, mkTyVarTy, mkTyConApp )
 import TysWiredIn	( boolTy )
 import Unique		( mkPrimOpIdUnique )
@@ -57,7 +57,7 @@ primOpName op
       = name
       where
 	key     = mkPrimOpIdUnique (IBOX(tagOf_PrimOp prim_op))
-	name    = mkWiredInIdName key gHC__ occ_name the_id
+	name    = mkWiredInIdName key pREL_GHC occ_name the_id
 	the_id  = mkPrimitiveId name ty prim_op
 \end{code}
 

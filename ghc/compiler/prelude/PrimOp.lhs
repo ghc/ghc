@@ -1822,8 +1822,8 @@ pprPrimOp other_op
   = getPprStyle $ \ sty ->
     if codeStyle sty then	-- For C just print the primop itself
        identToC str
-    else if ifaceStyle sty then	-- For interfaces Print it qualified with GHC.
-       ptext SLIT("GHC.") <> ptext str
+    else if ifaceStyle sty then	-- For interfaces Print it qualified with PrelGHC.
+       ptext SLIT("PrelGHC.") <> ptext str
     else		  	-- Unqualified is good enough
        ptext str
   where

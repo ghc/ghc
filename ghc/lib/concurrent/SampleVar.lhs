@@ -29,7 +29,7 @@ module SampleVar
 
        ) where
 
-import ConcBase
+import PrelConc
 
 
 type SampleVar a

@@ -53,7 +53,7 @@ import Maybes
 import Name		( Name, nameUnique, mkWiredInTyConName, NamedThing(getName) )
 import Unique		( Unique, funTyConKey, Uniquable(..) )
 import PrimRep		( PrimRep(..), isFollowableRep )
-import PrelMods		( gHC__, pREL_TUP, pREL_BASE )
+import PrelMods		( pREL_GHC, pREL_TUP, pREL_BASE )
 import Lex		( mkTupNameStr )
 import SrcLoc		( SrcLoc, mkBuiltinSrcLoc )
 import Util		( nOfThem, isIn )
@@ -122,7 +122,7 @@ data TyCon
 
 \begin{code}
 mkFunTyCon     = FunTyCon
-mkFunTyConName = mkWiredInTyConName funTyConKey gHC__ SLIT("->") FunTyCon
+mkFunTyConName = mkWiredInTyConName funTyConKey pREL_GHC SLIT("->") FunTyCon
 
 mkSpecTyCon  = SpecTyCon
 mkTupleTyCon = TupleTyCon

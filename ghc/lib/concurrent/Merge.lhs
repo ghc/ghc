@@ -15,9 +15,9 @@ module Merge
 	) where
 
 import Semaphore
-import ConcBase
-import Unsafe  ( unsafeInterleaveIO )
-import IOBase
+import PrelConc
+import PrelUnsafe  ( unsafeInterleaveIO )
+import PrelIOBase
 
 max_buff_size = 1
 

@@ -1,0 +1,11 @@
+Test 1
+N = 13133
+Tot sum = 26264
+Differences: [(1, 1)]; [(13133, 1)]
+Sum intersection:26262
+
+Test 2
+N = 9798
+Sizes =[9798, 1]
+Sums = [9798, 48005301]
+

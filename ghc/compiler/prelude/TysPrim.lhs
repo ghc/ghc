@@ -18,7 +18,7 @@ import TyCon		( mkPrimTyCon, mkDataTyCon, TyCon )
 import BasicTypes	( NewOrData(..), RecFlag(..) )
 import Type		( mkTyConApp, mkTyConTy, mkTyVarTys, Type )
 import TyVar		( GenTyVar(..), alphaTyVars )
-import PrelMods		( gHC__ )
+import PrelMods		( pREL_GHC )
 import Unique
 \end{code}
 
@@ -40,7 +40,7 @@ pcPrimTyCon :: Unique{-TyConKey-} -> FAST_STRING -> Int -> PrimRep -> TyCon
 pcPrimTyCon key str arity primrep
   = the_tycon
   where
-    name      = mkWiredInTyConName key gHC__ str the_tycon
+    name      = mkWiredInTyConName key pREL_GHC str the_tycon
     the_tycon = mkPrimTyCon name arity primrep
 
 
@@ -132,7 +132,7 @@ voidTyCon = mk_no_constr_tycon voidTyConKey SLIT("Void")
 mk_no_constr_tycon key str
   = the_tycon
   where
-    name      = mkWiredInTyConName key gHC__ str the_tycon
+    name      = mkWiredInTyConName key pREL_GHC str the_tycon
     the_tycon = mkDataTyCon name mkBoxedTypeKind 
 			[]		-- No tyvars
 			[]		-- No context

@@ -23,7 +23,7 @@ module Semaphore
 	
       ) where
 
-import ConcBase
+import PrelConc
 \end{code}
 
 General semaphores are also implemented readily in terms of shared

@@ -52,7 +52,7 @@ import Class		( Class, classSelIds, classTyCon )
 import Type		( mkTyConApp, mkSynTy, Type )
 import TyVar		( emptyTyVarEnv )
 import TysWiredIn	( unitTy )
-import PrelMods		( gHC_MAIN, mAIN )
+import PrelMods		( pREL_MAIN, mAIN )
 import PrelInfo		( main_NAME, ioTyCon_NAME )
 import Unify		( unifyTauTy )
 import UniqFM		( lookupUFM_Directly, lookupWithDefaultUFM_Directly,

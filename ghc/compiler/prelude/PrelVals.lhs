@@ -80,10 +80,10 @@ pc_bottoming_Id key mod name ty
 	-- these "bottom" out, no matter what their arguments
 
 eRROR_ID
-  = pc_bottoming_Id errorIdKey gHC_ERR SLIT("error") errorTy
+  = pc_bottoming_Id errorIdKey pREL_ERR SLIT("error") errorTy
 
 generic_ERROR_ID u n
-  = pc_bottoming_Id u gHC_ERR n errorTy
+  = pc_bottoming_Id u pREL_ERR n errorTy
 
 pAT_ERROR_ID
   = generic_ERROR_ID patErrorIdKey SLIT("patError")
@@ -99,11 +99,11 @@ nO_METHOD_BINDING_ERROR_ID
   = generic_ERROR_ID noMethodBindingErrorIdKey SLIT("noMethodBindingError")
 
 aBSENT_ERROR_ID
-  = pc_bottoming_Id absentErrorIdKey gHC_ERR SLIT("absentErr")
+  = pc_bottoming_Id absentErrorIdKey pREL_ERR SLIT("absentErr")
 	(mkSigmaTy [openAlphaTyVar] [] openAlphaTy)
 
 pAR_ERROR_ID
-  = pcMiscPrelId parErrorIdKey gHC_ERR SLIT("parError")
+  = pcMiscPrelId parErrorIdKey pREL_ERR SLIT("parError")
     (mkSigmaTy [openAlphaTyVar] [] openAlphaTy) noIdInfo
 
 openAlphaTy = mkTyVarTy openAlphaTyVar
@@ -121,7 +121,7 @@ decide that the second argument is strict, evaluate that first (!!),
 and make a jolly old mess.
 \begin{code}
 tRACE_ID
-  = pcMiscPrelId traceIdKey iO_BASE SLIT("trace") traceTy
+  = pcMiscPrelId traceIdKey pREL_IO_BASE SLIT("trace") traceTy
 	(noIdInfo `addSpecInfo` pcGenerateSpecs traceIdKey tRACE_ID noIdInfo traceTy)
   where
     traceTy = mkSigmaTy [alphaTyVar] [] (mkFunTys [mkListTy charTy, alphaTy] alphaTy)
@@ -135,33 +135,33 @@ tRACE_ID
 
 \begin{code}
 packStringForCId
-  = pcMiscPrelId packCStringIdKey{-ToDo:rename-} pACKED_STRING SLIT("packCString#")
+  = pcMiscPrelId packCStringIdKey{-ToDo:rename-} pREL_PACK SLIT("packCString#")
 	(mkFunTys [stringTy] byteArrayPrimTy) noIdInfo
 
 --------------------------------------------------------------------
 
 unpackCStringId
-  = pcMiscPrelId unpackCStringIdKey pACKED_STRING SLIT("unpackCString#")
+  = pcMiscPrelId unpackCStringIdKey pREL_PACK SLIT("unpackCString#")
 		 (mkFunTys [addrPrimTy{-a char *-}] stringTy) noIdInfo
 -- Andy says:
 --	(FunTy addrPrimTy{-a char *-} stringTy) (noIdInfo `addInfo` exactArity 1)
 -- but I don't like wired-in IdInfos (WDP)
 
 unpackCString2Id -- for cases when a string has a NUL in it
-  = pcMiscPrelId unpackCString2IdKey pACKED_STRING SLIT("unpackNBytes#")
+  = pcMiscPrelId unpackCString2IdKey pREL_PACK SLIT("unpackNBytes#")
 		 (mkFunTys [addrPrimTy{-a char *-}, intPrimTy{-length-}] stringTy)
 		 noIdInfo
 
 --------------------------------------------------------------------
 unpackCStringAppendId
-  = pcMiscPrelId unpackCStringAppendIdKey pACKED_STRING SLIT("unpackAppendCString#")
+  = pcMiscPrelId unpackCStringAppendIdKey pREL_PACK SLIT("unpackAppendCString#")
 		(mkFunTys [addrPrimTy{-a "char *" pointer-},stringTy] stringTy)
 		((noIdInfo
 		 {-LATER:`addUnfoldInfo` mkMagicUnfolding unpackCStringAppendIdKey-})
 		 `addArityInfo` exactArity 2)
 
 unpackCStringFoldrId
-  = pcMiscPrelId unpackCStringFoldrIdKey pACKED_STRING SLIT("unpackFoldrCString#")
+  = pcMiscPrelId unpackCStringFoldrIdKey pREL_PACK SLIT("unpackFoldrCString#")
 		(mkSigmaTy [alphaTyVar] []
 		(mkFunTys [addrPrimTy{-a "char *" pointer-},
 			   mkFunTys [charTy, alphaTy] alphaTy,
@@ -481,7 +481,7 @@ noFollowId = pcMiscPrelId noFollowIdKey cONC_BASE SLIT("noFollow")
 nasty as-is, change it back to a literal (@Literal@).
 \begin{code}
 realWorldPrimId
-  = pcMiscPrelId realWorldPrimIdKey gHC__ SLIT("realWorld#")
+  = pcMiscPrelId realWorldPrimIdKey pREL_GHC SLIT("realWorld#")
 	realWorldStatePrimTy
 	noIdInfo
 \end{code}
@@ -498,7 +498,7 @@ voidId = pc_bottoming_Id voidIdKey pREL_BASE SLIT("void") voidTy
 
 \begin{code}
 buildId
-  = pcMiscPrelId buildIdKey gHC_ERR SLIT("build") buildTy
+  = pcMiscPrelId buildIdKey pREL_ERR SLIT("build") buildTy
 	((((noIdInfo
 		{-LATER:`addUnfoldInfo` mkMagicUnfolding buildIdKey-})
 		`addStrictnessInfo` mkStrictnessInfo [WwStrict] False)
@@ -543,7 +543,7 @@ mkBuild ty tv c n g expr
 
 \begin{code}
 augmentId
-  = pcMiscPrelId augmentIdKey gHC_ERR SLIT("augment") augmentTy
+  = pcMiscPrelId augmentIdKey pREL_ERR SLIT("augment") augmentTy
 	(((noIdInfo
 		{-LATER:`addUnfoldInfo` mkMagicUnfolding augmentIdKey-})
 		`addStrictnessInfo` mkStrictnessInfo [WwStrict,WwLazy False] False)

@@ -19,7 +19,7 @@ module ChannelVar
        ) where
 
 import Prelude
-import ConcBase
+import PrelConc
 \end{code}
 
 @MVars@ provide the basic mechanisms for synchronising access to a shared

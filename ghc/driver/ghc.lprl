@@ -2786,7 +2786,7 @@ arg: while($_ = $Args[0]) {
 
     /^-syslib(.*)/  && do { local($syslib) = &grab_arg_arg(*Args,'-syslib',$1);
 			    print STDERR "$Pgm: no such system library (-syslib): $syslib\n",
-			      $Status++ unless $syslib =~ /^(hbc|ghc|posix|contrib)$/;
+			      $Status++ unless $syslib =~ /^(exts|misc|posix)$/;
 
 			    #
 			    # The posix library is a `special' in that it relies on

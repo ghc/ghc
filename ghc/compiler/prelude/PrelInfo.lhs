@@ -338,18 +338,18 @@ to write them all down in one place.
 prelude_primop op = qual (modAndOcc (primOpName op))
 
 intTyCon_RDR		= qual (modAndOcc intTyCon)
-ioTyCon_RDR		= tcQual (iO_BASE,   SLIT("IO"))
-ioDataCon_RDR  	   	= varQual (iO_BASE,   SLIT("IO"))
-ioOkDataCon_RDR		= varQual (iO_BASE,   SLIT("IOok"))
+ioTyCon_RDR		= tcQual (pREL_IO_BASE,   SLIT("IO"))
+ioDataCon_RDR  	   	= varQual (pREL_IO_BASE,   SLIT("IO"))
+ioOkDataCon_RDR		= varQual (pREL_IO_BASE,   SLIT("IOok"))
 orderingTyCon_RDR	= tcQual (pREL_BASE, SLIT("Ordering"))
 rationalTyCon_RDR	= tcQual (pREL_NUM,  SLIT("Rational"))
 ratioTyCon_RDR		= tcQual (pREL_NUM,  SLIT("Ratio"))
 ratioDataCon_RDR	= varQual (pREL_NUM, SLIT(":%"))
 
-byteArrayTyCon_RDR		= tcQual (aRR_BASE,  SLIT("ByteArray"))
-mutableByteArrayTyCon_RDR	= tcQual (aRR_BASE,  SLIT("MutableByteArray"))
+byteArrayTyCon_RDR		= tcQual (pREL_ARR,  SLIT("ByteArray"))
+mutableByteArrayTyCon_RDR	= tcQual (pREL_ARR,  SLIT("MutableByteArray"))
 
-allClass_RDR		= tcQual (gHC__,     SLIT("All"))
+allClass_RDR		= tcQual (pREL_GHC,  SLIT("All"))
 eqClass_RDR		= tcQual (pREL_BASE, SLIT("Eq"))
 ordClass_RDR		= tcQual (pREL_BASE, SLIT("Ord"))
 evalClass_RDR 		= tcQual (pREL_BASE, SLIT("Eval"))
@@ -369,8 +369,8 @@ realFracClass_RDR	= tcQual (pREL_NUM,  SLIT("RealFrac"))
 realFloatClass_RDR	= tcQual (pREL_NUM,  SLIT("RealFloat"))
 readClass_RDR		= tcQual (pREL_READ, SLIT("Read"))
 ixClass_RDR		= tcQual (iX,	     SLIT("Ix"))
-ccallableClass_RDR	= tcQual (gHC__,   SLIT("CCallable"))
-creturnableClass_RDR	= tcQual (gHC__,   SLIT("CReturnable"))
+ccallableClass_RDR	= tcQual (pREL_GHC,  SLIT("CCallable"))
+creturnableClass_RDR	= tcQual (pREL_GHC,  SLIT("CReturnable"))
 
 fromInt_RDR	   = varQual (pREL_BASE, SLIT("fromInt"))
 fromInteger_RDR	   = varQual (pREL_BASE, SLIT("fromInteger"))
@@ -431,8 +431,8 @@ plus_RDR	   = varQual (pREL_BASE, SLIT("+"))
 times_RDR	   = varQual (pREL_BASE, SLIT("*"))
 mkInt_RDR	   = varQual (pREL_BASE, SLIT("I#"))
 
-error_RDR	   = varQual (gHC_ERR, SLIT("error"))
-assert_RDR         = varQual (gHC_ERR, SLIT("assert__"))
+error_RDR	   = varQual (pREL_ERR, SLIT("error"))
+assert_RDR         = varQual (pREL_ERR, SLIT("assert__"))
 
 eqH_Char_RDR	= prelude_primop CharEqOp
 ltH_Char_RDR	= prelude_primop CharLtOp

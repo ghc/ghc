@@ -27,9 +27,9 @@ module Channel
        ) where
 
 import Prelude
-import ConcBase
-import STBase
-import Unsafe ( unsafeInterleaveIO )
+import PrelConc
+import PrelST
+import PrelUnsafe ( unsafeInterleaveIO )
 \end{code}
 
 A channel is represented by two @MVar@s keeping track of the two ends

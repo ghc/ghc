@@ -48,7 +48,7 @@ install ::
 	$(RM) $(SCRIPT_PROG)
 	$(MAKE) $(MFLAGS) INSTALLING=1 $(SCRIPT_PROG)
 
-CLEAN_FILES += $(SCRIPT_PROG)
+CLEAN_FILES += $(SCRIPT_PROG) $(SCRIPT_LINK)
 
 include $(TOP)/mk/target.mk
 

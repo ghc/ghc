@@ -780,7 +780,7 @@ nonBoxedPrimCCallErr clas inst_ty
     		        ppr inst_ty])
 
 omittedMethodWarn sel_id clas
-  = sep [ptext SLIT("Warning: no explicit method nor default method for") <+> quotes (ppr sel_id), 
+  = sep [ptext SLIT("No explicit method nor default method for") <+> quotes (ppr sel_id), 
 	 ptext SLIT("in an instance declaration for") <+> quotes (ppr clas)]
 
 {-

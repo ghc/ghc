@@ -19,7 +19,7 @@ module Concurrent (
 	module Semaphore,
 	module Merge,
 	module SampleVar,
-	module ConcBase
+	module PrelConc
     ) where
 
 import Parallel
@@ -28,5 +28,5 @@ import Channel
 import Semaphore
 import Merge
 import SampleVar
-import ConcBase
+import PrelConc
 \end{code}

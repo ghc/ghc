@@ -1,0 +1,13 @@
+---------------------------------------------------------------------------
+--                              Main.hi
+-- 
+--      This hand-written interface file fakes a "Main" module
+--      It is used *solely* so that GHCmain generates the right kind of
+--      external reference to Main.main
+---------------------------------------------------------------------------
+ 
+_interface_ Main 1
+_exports_
+Main main ;
+_declarations_
+1 main _:_ PrelIOBase.IO PrelBase.();;

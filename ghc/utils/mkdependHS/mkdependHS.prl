@@ -117,11 +117,8 @@ push(@Defines,
 
 # set up array of ignored modules
 local(@dirs) = ($INSTALLING) ? 
-    	       ("$InstLibDirGhc/imports")
-	     : ("$TopPwd/ghc/lib/ghc",
-	        "$TopPwd/ghc/lib/required",
-	        "$TopPwd/ghc/lib/glaExts",
-	        "$TopPwd/ghc/lib/concurrent");
+    	       ("$InstLibDirGhc/imports/std")
+	     : ("$TopPwd/ghc/lib/std");
 if (!$Include_prelude) {
     push(@Ignore_dirs, @dirs);
 } else {
@@ -130,8 +127,8 @@ if (!$Include_prelude) {
 
 foreach $lib ( @Syslibs ) {
     local($dir) = 
-      ($INSTALLING) ? "${InstHsLibDirGhc}/${lib}/imports" 
-	            : "${TopPwd}/hslibs/${lib}/src";
+      ($INSTALLING) ? "${InstLibDirGhc}/imports/${lib}" 
+	            : "${TopPwd}/ghc/lib/${lib}";
     if (!$Include_prelude) {
        push(@Ignore_dirs,$dir);
     } else {
@@ -248,6 +245,8 @@ sub mangle_command_line_args {
 	    $Include_dirs .= " $_";
 	} elsif ( /^-syslib$/ ) {
 	    push(@Syslibs, &grab_arg_arg($_,''));
+	} elsif ( /^-fglasgow-exts$/ ) {
+	    push(@Syslibs, 'exts');
 	} elsif ($Dashdashes_seen != 1) { # not between -- ... --
 	    if ( /^-v$/ ) {
 		$Verbose++;

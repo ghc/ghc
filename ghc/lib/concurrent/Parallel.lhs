@@ -10,12 +10,12 @@ module Parallel (par, seq -- re-exported
 #endif
     ) where
 
-import ConcBase	( par )
+import PrelConc	( par )
 
 #if defined(__GRANSIM__)
 import PrelBase
-import GHCerr   ( parError )
-import GHC      ( parGlobal#, parLocal#, parAt#, parAtAbs#, parAtRel#, parAtForNow# )
+import PrelErr   ( parError )
+import PrelGHC   ( parGlobal#, parLocal#, parAt#, parAtAbs#, parAtRel#, parAtForNow# )
 
 {-# INLINE parGlobal #-}
 {-# INLINE parLocal #-}

@@ -235,15 +235,15 @@ min_int = toInteger minInt
 \begin{code}
 wordTy = mkTyConTy wordTyCon
 
-wordTyCon = pcNonRecDataTyCon wordTyConKey   fOREIGN SLIT("Word") [] [wordDataCon]
-wordDataCon = pcDataCon wordDataConKey fOREIGN SLIT("W#") [] [] [wordPrimTy] wordTyCon
+wordTyCon = pcNonRecDataTyCon wordTyConKey   pREL_FOREIGN SLIT("Word") [] [wordDataCon]
+wordDataCon = pcDataCon wordDataConKey pREL_FOREIGN SLIT("W#") [] [] [wordPrimTy] wordTyCon
 \end{code}
 
 \begin{code}
 addrTy = mkTyConTy addrTyCon
 
-addrTyCon = pcNonRecDataTyCon addrTyConKey   aDDR SLIT("Addr") [] [addrDataCon]
-addrDataCon = pcDataCon addrDataConKey aDDR SLIT("A#") [] [] [addrPrimTy] addrTyCon
+addrTyCon = pcNonRecDataTyCon addrTyConKey   pREL_ADDR SLIT("Addr") [] [addrDataCon]
+addrDataCon = pcDataCon addrDataConKey pREL_ADDR SLIT("A#") [] [] [addrPrimTy] addrTyCon
 \end{code}
 
 \begin{code}
@@ -264,29 +264,29 @@ doubleDataCon = pcDataCon doubleDataConKey pREL_BASE SLIT("D#") [] [] [doublePri
 mkStateTy ty	 = mkTyConApp stateTyCon [ty]
 realWorldStateTy = mkStateTy realWorldTy -- a common use
 
-stateTyCon = pcNonRecDataTyCon stateTyConKey sT_BASE SLIT("State") alpha_tyvar [stateDataCon]
+stateTyCon = pcNonRecDataTyCon stateTyConKey pREL_ST SLIT("State") alpha_tyvar [stateDataCon]
 stateDataCon
-  = pcDataCon stateDataConKey sT_BASE SLIT("S#")
+  = pcDataCon stateDataConKey pREL_ST SLIT("S#")
 	alpha_tyvar [] [mkStatePrimTy alphaTy] stateTyCon
 \end{code}
 
 \begin{code}
 stablePtrTyCon
-  = pcNonRecDataTyCon stablePtrTyConKey fOREIGN SLIT("StablePtr")
+  = pcNonRecDataTyCon stablePtrTyConKey pREL_FOREIGN SLIT("StablePtr")
 	alpha_tyvar [stablePtrDataCon]
   where
     stablePtrDataCon
-      = pcDataCon stablePtrDataConKey fOREIGN SLIT("StablePtr")
+      = pcDataCon stablePtrDataConKey pREL_FOREIGN SLIT("StablePtr")
 	    alpha_tyvar [] [mkStablePtrPrimTy alphaTy] stablePtrTyCon
 \end{code}
 
 \begin{code}
 foreignObjTyCon
-  = pcNonRecDataTyCon foreignObjTyConKey fOREIGN SLIT("ForeignObj")
+  = pcNonRecDataTyCon foreignObjTyConKey pREL_FOREIGN SLIT("ForeignObj")
 	[] [foreignObjDataCon]
   where
     foreignObjDataCon
-      = pcDataCon foreignObjDataConKey fOREIGN SLIT("ForeignObj")
+      = pcDataCon foreignObjDataConKey pREL_FOREIGN SLIT("ForeignObj")
 	    [] [] [foreignObjPrimTy] foreignObjTyCon
 \end{code}
 
@@ -346,118 +346,118 @@ We fish one of these \tr{StateAnd<blah>#} things with
 
 \begin{code}
 stateAndPtrPrimTyCon
-  = pcNonRecDataTyCon stateAndPtrPrimTyConKey sT_BASE SLIT("StateAndPtr#")
+  = pcNonRecDataTyCon stateAndPtrPrimTyConKey pREL_ST SLIT("StateAndPtr#")
 		alpha_beta_tyvars [stateAndPtrPrimDataCon]
 stateAndPtrPrimDataCon
-  = pcDataCon stateAndPtrPrimDataConKey sT_BASE SLIT("StateAndPtr#")
+  = pcDataCon stateAndPtrPrimDataConKey pREL_ST SLIT("StateAndPtr#")
 		alpha_beta_tyvars [] [mkStatePrimTy alphaTy, betaTy]
 		stateAndPtrPrimTyCon
 
 stateAndCharPrimTyCon
-  = pcNonRecDataTyCon stateAndCharPrimTyConKey sT_BASE SLIT("StateAndChar#")
+  = pcNonRecDataTyCon stateAndCharPrimTyConKey pREL_ST SLIT("StateAndChar#")
 		alpha_tyvar [stateAndCharPrimDataCon]
 stateAndCharPrimDataCon
-  = pcDataCon stateAndCharPrimDataConKey sT_BASE SLIT("StateAndChar#")
+  = pcDataCon stateAndCharPrimDataConKey pREL_ST SLIT("StateAndChar#")
 		alpha_tyvar [] [mkStatePrimTy alphaTy, charPrimTy]
 		stateAndCharPrimTyCon
 
 stateAndIntPrimTyCon
-  = pcNonRecDataTyCon stateAndIntPrimTyConKey sT_BASE SLIT("StateAndInt#")
+  = pcNonRecDataTyCon stateAndIntPrimTyConKey pREL_ST SLIT("StateAndInt#")
 		alpha_tyvar [stateAndIntPrimDataCon]
 stateAndIntPrimDataCon
-  = pcDataCon stateAndIntPrimDataConKey sT_BASE SLIT("StateAndInt#")
+  = pcDataCon stateAndIntPrimDataConKey pREL_ST SLIT("StateAndInt#")
 		alpha_tyvar [] [mkStatePrimTy alphaTy, intPrimTy]
 		stateAndIntPrimTyCon
 
 stateAndWordPrimTyCon
-  = pcNonRecDataTyCon stateAndWordPrimTyConKey sT_BASE SLIT("StateAndWord#")
+  = pcNonRecDataTyCon stateAndWordPrimTyConKey pREL_ST SLIT("StateAndWord#")
 		alpha_tyvar [stateAndWordPrimDataCon]
 stateAndWordPrimDataCon
-  = pcDataCon stateAndWordPrimDataConKey sT_BASE SLIT("StateAndWord#")
+  = pcDataCon stateAndWordPrimDataConKey pREL_ST SLIT("StateAndWord#")
 		alpha_tyvar [] [mkStatePrimTy alphaTy, wordPrimTy]
 		stateAndWordPrimTyCon
 
 stateAndAddrPrimTyCon
-  = pcNonRecDataTyCon stateAndAddrPrimTyConKey sT_BASE SLIT("StateAndAddr#")
+  = pcNonRecDataTyCon stateAndAddrPrimTyConKey pREL_ST SLIT("StateAndAddr#")
 		alpha_tyvar [stateAndAddrPrimDataCon]
 stateAndAddrPrimDataCon
-  = pcDataCon stateAndAddrPrimDataConKey sT_BASE SLIT("StateAndAddr#")
+  = pcDataCon stateAndAddrPrimDataConKey pREL_ST SLIT("StateAndAddr#")
 		alpha_tyvar [] [mkStatePrimTy alphaTy, addrPrimTy]
 		stateAndAddrPrimTyCon
 
 stateAndStablePtrPrimTyCon
-  = pcNonRecDataTyCon stateAndStablePtrPrimTyConKey fOREIGN SLIT("StateAndStablePtr#")
+  = pcNonRecDataTyCon stateAndStablePtrPrimTyConKey pREL_FOREIGN SLIT("StateAndStablePtr#")
 		alpha_beta_tyvars [stateAndStablePtrPrimDataCon]
 stateAndStablePtrPrimDataCon
-  = pcDataCon stateAndStablePtrPrimDataConKey fOREIGN SLIT("StateAndStablePtr#")
+  = pcDataCon stateAndStablePtrPrimDataConKey pREL_FOREIGN SLIT("StateAndStablePtr#")
 		alpha_beta_tyvars []
 		[mkStatePrimTy alphaTy, mkTyConApp stablePtrPrimTyCon [betaTy]]
 		stateAndStablePtrPrimTyCon
 
 stateAndForeignObjPrimTyCon
-  = pcNonRecDataTyCon stateAndForeignObjPrimTyConKey fOREIGN SLIT("StateAndForeignObj#")
+  = pcNonRecDataTyCon stateAndForeignObjPrimTyConKey pREL_FOREIGN SLIT("StateAndForeignObj#")
 		alpha_tyvar [stateAndForeignObjPrimDataCon]
 stateAndForeignObjPrimDataCon
-  = pcDataCon stateAndForeignObjPrimDataConKey fOREIGN SLIT("StateAndForeignObj#")
+  = pcDataCon stateAndForeignObjPrimDataConKey pREL_FOREIGN SLIT("StateAndForeignObj#")
 		alpha_tyvar []
 		[mkStatePrimTy alphaTy, mkTyConTy foreignObjPrimTyCon]
 		stateAndForeignObjPrimTyCon
 
 stateAndFloatPrimTyCon
-  = pcNonRecDataTyCon stateAndFloatPrimTyConKey sT_BASE SLIT("StateAndFloat#")
+  = pcNonRecDataTyCon stateAndFloatPrimTyConKey pREL_ST SLIT("StateAndFloat#")
 		alpha_tyvar [stateAndFloatPrimDataCon]
 stateAndFloatPrimDataCon
-  = pcDataCon stateAndFloatPrimDataConKey sT_BASE SLIT("StateAndFloat#")
+  = pcDataCon stateAndFloatPrimDataConKey pREL_ST SLIT("StateAndFloat#")
 		alpha_tyvar [] [mkStatePrimTy alphaTy, floatPrimTy]
 		stateAndFloatPrimTyCon
 
 stateAndDoublePrimTyCon
-  = pcNonRecDataTyCon stateAndDoublePrimTyConKey sT_BASE SLIT("StateAndDouble#")
+  = pcNonRecDataTyCon stateAndDoublePrimTyConKey pREL_ST SLIT("StateAndDouble#")
 		alpha_tyvar [stateAndDoublePrimDataCon]
 stateAndDoublePrimDataCon
-  = pcDataCon stateAndDoublePrimDataConKey sT_BASE SLIT("StateAndDouble#")
+  = pcDataCon stateAndDoublePrimDataConKey pREL_ST SLIT("StateAndDouble#")
 		alpha_tyvar [] [mkStatePrimTy alphaTy, doublePrimTy]
 		stateAndDoublePrimTyCon
 \end{code}
 
 \begin{code}
 stateAndArrayPrimTyCon
-  = pcNonRecDataTyCon stateAndArrayPrimTyConKey aRR_BASE SLIT("StateAndArray#")
+  = pcNonRecDataTyCon stateAndArrayPrimTyConKey pREL_ARR SLIT("StateAndArray#")
 		alpha_beta_tyvars [stateAndArrayPrimDataCon]
 stateAndArrayPrimDataCon
-  = pcDataCon stateAndArrayPrimDataConKey aRR_BASE SLIT("StateAndArray#")
+  = pcDataCon stateAndArrayPrimDataConKey pREL_ARR SLIT("StateAndArray#")
 		alpha_beta_tyvars [] [mkStatePrimTy alphaTy, mkArrayPrimTy betaTy]
 		stateAndArrayPrimTyCon
 
 stateAndMutableArrayPrimTyCon
-  = pcNonRecDataTyCon stateAndMutableArrayPrimTyConKey aRR_BASE SLIT("StateAndMutableArray#")
+  = pcNonRecDataTyCon stateAndMutableArrayPrimTyConKey pREL_ARR SLIT("StateAndMutableArray#")
 		alpha_beta_tyvars [stateAndMutableArrayPrimDataCon]
 stateAndMutableArrayPrimDataCon
-  = pcDataCon stateAndMutableArrayPrimDataConKey aRR_BASE SLIT("StateAndMutableArray#")
+  = pcDataCon stateAndMutableArrayPrimDataConKey pREL_ARR SLIT("StateAndMutableArray#")
 		alpha_beta_tyvars [] [mkStatePrimTy alphaTy, mkMutableArrayPrimTy alphaTy betaTy]
 		stateAndMutableArrayPrimTyCon
 
 stateAndByteArrayPrimTyCon
-  = pcNonRecDataTyCon stateAndByteArrayPrimTyConKey aRR_BASE SLIT("StateAndByteArray#")
+  = pcNonRecDataTyCon stateAndByteArrayPrimTyConKey pREL_ARR SLIT("StateAndByteArray#")
 		alpha_tyvar [stateAndByteArrayPrimDataCon]
 stateAndByteArrayPrimDataCon
-  = pcDataCon stateAndByteArrayPrimDataConKey aRR_BASE SLIT("StateAndByteArray#")
+  = pcDataCon stateAndByteArrayPrimDataConKey pREL_ARR SLIT("StateAndByteArray#")
 		alpha_tyvar [] [mkStatePrimTy alphaTy, byteArrayPrimTy]
 		stateAndByteArrayPrimTyCon
 
 stateAndMutableByteArrayPrimTyCon
-  = pcNonRecDataTyCon stateAndMutableByteArrayPrimTyConKey aRR_BASE SLIT("StateAndMutableByteArray#")
+  = pcNonRecDataTyCon stateAndMutableByteArrayPrimTyConKey pREL_ARR SLIT("StateAndMutableByteArray#")
 		alpha_tyvar [stateAndMutableByteArrayPrimDataCon]
 stateAndMutableByteArrayPrimDataCon
-  = pcDataCon stateAndMutableByteArrayPrimDataConKey aRR_BASE SLIT("StateAndMutableByteArray#")
+  = pcDataCon stateAndMutableByteArrayPrimDataConKey pREL_ARR SLIT("StateAndMutableByteArray#")
 		alpha_tyvar [] [mkStatePrimTy alphaTy, mkTyConApp mutableByteArrayPrimTyCon alpha_ty]
 		stateAndMutableByteArrayPrimTyCon
 
 stateAndSynchVarPrimTyCon
-  = pcNonRecDataTyCon stateAndSynchVarPrimTyConKey cONC_BASE SLIT("StateAndSynchVar#")
+  = pcNonRecDataTyCon stateAndSynchVarPrimTyConKey pREL_CONC SLIT("StateAndSynchVar#")
 		alpha_beta_tyvars [stateAndSynchVarPrimDataCon]
 stateAndSynchVarPrimDataCon
-  = pcDataCon stateAndSynchVarPrimDataConKey cONC_BASE SLIT("StateAndSynchVar#")
+  = pcDataCon stateAndSynchVarPrimDataConKey pREL_CONC SLIT("StateAndSynchVar#")
 		alpha_beta_tyvars [] [mkStatePrimTy alphaTy, mkSynchVarPrimTy alphaTy betaTy]
 		stateAndSynchVarPrimTyCon
 \end{code}
@@ -512,9 +512,9 @@ type of runST.
 \begin{code}
 mkStateTransformerTy s a = mkTyConApp stTyCon [s, a]
 
-stTyCon = pcNonRecNewTyCon stTyConKey sT_BASE SLIT("ST") alpha_beta_tyvars [stDataCon]
+stTyCon = pcNonRecNewTyCon stTyConKey pREL_ST SLIT("ST") alpha_beta_tyvars [stDataCon]
 
-stDataCon = pcDataCon stDataConKey sT_BASE SLIT("ST")
+stDataCon = pcDataCon stDataConKey pREL_ST SLIT("ST")
 			alpha_beta_tyvars [] [ty] stTyCon
   where
     ty = mkFunTy (mkStatePrimTy alphaTy) (mkSTretTy alphaTy betaTy)
@@ -522,10 +522,10 @@ stDataCon = pcDataCon stDataConKey sT_BASE SLIT("ST")
 mkSTretTy alpha beta = mkTyConApp stRetTyCon [alpha,beta]
 
 stRetTyCon
-  = pcNonRecDataTyCon stRetTyConKey sT_BASE SLIT("STret") 
+  = pcNonRecDataTyCon stRetTyConKey pREL_ST SLIT("STret") 
 	alpha_beta_tyvars [stRetDataCon]
 stRetDataCon
-  = pcDataCon stRetDataConKey sT_BASE SLIT("STret")
+  = pcDataCon stRetDataConKey pREL_ST SLIT("STret")
 	alpha_beta_tyvars [] [mkStatePrimTy alphaTy, betaTy] 
 		stRetTyCon
 \end{code}

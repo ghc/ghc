@@ -61,7 +61,6 @@ import CStrings		( identToC, modnameToC, cSEP )
 import CmdLineOpts	( opt_PprStyle_All, opt_OmitInterfacePragmas, opt_EnsureSplittableC )
 import BasicTypes	( Module, IfaceFlavour(..), moduleString, pprModule )
 
-import PrelMods		( gHC__ )
 import Lex		( isLexSym, isLexConId )
 import SrcLoc		( noSrcLoc, mkBuiltinSrcLoc, SrcLoc )
 import Unique		( pprUnique, showUnique, Unique, Uniquable(..) )
