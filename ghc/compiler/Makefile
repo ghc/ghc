@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.84 2000/07/17 11:15:08 simonmar Exp $
+# $Id: Makefile,v 1.85 2000/07/21 08:45:05 rrt Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -17,7 +17,11 @@ WAYS=$(GhcCompilerWays)
 # be to do ` env PATH=$(PATH) make hsc 'to minimise the environment. (or the
 # equivalent of `env' if it doesn't exist locally).
 #
+ifneq "$(way)" "dll"
 HS_PROG=hsc$(_way)
+else
+HS_PROG=hsc
+endif
 
 
 # -----------------------------------------------------------------------------
