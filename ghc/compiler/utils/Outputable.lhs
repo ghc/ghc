@@ -425,14 +425,15 @@ speakNth 3 = ptext SLIT("third")
 speakNth 4 = ptext SLIT("fourth")
 speakNth 5 = ptext SLIT("fifth")
 speakNth 6 = ptext SLIT("sixth")
-speakNth n = hcat [ int n, text st_nd_rd_th ]
+speakNth n = hcat [ int n, text suffix ]
   where
-    st_nd_rd_th | n_rem_10 == 1 = "st"
-		| n_rem_10 == 2 = "nd"
-		| n_rem_10 == 3 = "rd"
-		| otherwise     = "th"
+    suffix | n <= 20       = "th"	-- 11,12,13 are non-std
+	   | last_dig == 1 = "st"
+	   | last_dig == 2 = "nd"
+	   | last_dig == 3 = "rd"
+	   | otherwise     = "th"
 
-    n_rem_10 = n `rem` 10
+    last_dig = n `rem` 10
 \end{code}
 
 \begin{code}
