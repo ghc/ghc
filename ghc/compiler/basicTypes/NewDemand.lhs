@@ -7,18 +7,18 @@
 module NewDemand(
 	Demand(..), 
 	topDmd, lazyDmd, seqDmd, evalDmd, errDmd, isStrictDmd, 
-	isTop, isAbsent,
+	isTop, isAbsent, seqDemand,
 
 	DmdType(..), topDmdType, botDmdType, mkDmdType, mkTopDmdType, 
-		dmdTypeDepth, dmdTypeRes,
+		dmdTypeDepth, dmdTypeRes, seqDmdType,
 	DmdEnv, emptyDmdEnv,
 	DmdResult(..), isBotRes, returnsCPR, resTypeArgDmd,
 	
-	Demands(..), mapDmds, zipWithDmds, allTop,
+	Demands(..), mapDmds, zipWithDmds, allTop, seqDemands,
 
 	StrictSig(..), mkStrictSig, topSig, botSig, isTopSig,
 	splitStrictSig, strictSigResInfo,
-	pprIfaceStrictSig, appIsBottom, isBottomingSig
+	pprIfaceStrictSig, appIsBottom, isBottomingSig, seqStrictSig,
      ) where
 
 #include "HsVersions.h"
@@ -93,6 +93,21 @@ isStrictDmd (Call _) = True
 isStrictDmd (Box d)  = isStrictDmd d
 isStrictDmd other    = False
 
+seqDemand :: Demand -> ()
+seqDemand (Call d)   = seqDemand d
+seqDemand (Eval ds)  = seqDemands ds
+seqDemand (Defer ds) = seqDemands ds
+seqDemand (Box d)    = seqDemand d
+seqDemand _          = ()
+
+seqDemands :: Demands -> ()
+seqDemands (Poly d)  = seqDemand d
+seqDemands (Prod ds) = seqDemandList ds
+
+seqDemandList :: [Demand] -> ()
+seqDemandList [] = ()
+seqDemandList (d:ds) = seqDemand d `seq` seqDemandList ds
+
 instance Outputable Demand where
     ppr Top  = char 'T'
     ppr Abs  = char 'A'
@@ -139,6 +154,9 @@ data DmdType = DmdType
 	--	Bot, Defer d
 	-- Handwavey reason: these don't correspond to calling conventions
 	-- See DmdAnal.funArgDemand for details
+
+seqDmdType (DmdType env ds res) = 
+  {- ??? env `seq` -} seqDemandList ds `seq` res `seq` ()
 
 type DmdEnv = VarEnv Demand
 
@@ -272,6 +290,8 @@ appIsBottom _				      _ = False
 
 isBottomingSig (StrictSig (DmdType _ _ BotRes)) = True
 isBottomingSig _				= False
+
+seqStrictSig (StrictSig ty) = seqDmdType ty
 
 pprIfaceStrictSig :: StrictSig -> SDoc
 -- Used for printing top-level strictness pragmas in interface files
