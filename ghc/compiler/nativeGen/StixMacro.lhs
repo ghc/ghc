@@ -13,7 +13,7 @@ import MachMisc
 import MachRegs
 import AbsCSyn		( CStmtMacro(..), MagicId(..), CAddrMode, tagreg,
 			  CCheckMacro(..) )
-import Constants	( uF_RET, uF_SU, uF_UPDATEE, uF_SIZE )
+import Constants	( uF_RET, uF_SU, uF_UPDATEE, uF_SIZE, sEQ_FRAME_SIZE )
 import CallConv		( cCallConv )
 import OrdList		( OrdList )
 import PrimOp		( PrimOp(..) )
@@ -131,6 +131,17 @@ macroCode PUSH_UPD_FRAME args
 		(StIndex PtrRep stgSp (StInt (toInteger (-uF_SIZE))))
     in
     returnUs (\xs -> a1 : a3 : a4 : updSu : xs)
+
+
+macroCode PUSH_SEQ_FRAME args
+   = let [arg_frame] = map amodeToStix args
+         frame n = StInd PtrRep
+            (StIndex PtrRep arg_frame (StInt (toInteger n)))
+         a1 = StAssign PtrRep (frame 0) seq_frame_info
+         a2 = StAssign PtrRep (frame 1) stgSu
+         updSu = StAssign PtrRep stgSu arg_frame 
+     in
+     returnUs (\xs -> a1 : a2 : updSu : xs)
 \end{code}
 
 -----------------------------------------------------------------------------
@@ -145,7 +156,9 @@ macroCode SET_TAG [tag]
     case stgReg tagreg of
       Always _ -> returnUs id
       Save   _ -> returnUs (\ xs -> set_tag : xs)
+
 \end{code}
+
 
 Do the business for a @HEAP_CHK@, having converted the args to Trees
 of StixOp.
@@ -161,7 +174,8 @@ bh_info, ind_static_info, ind_info :: StixTree
 bh_info   	= sStLitLbl SLIT("BLACKHOLE_info")
 ind_static_info	= sStLitLbl SLIT("IND_STATIC_info")
 ind_info  	= sStLitLbl SLIT("IND_info")
-upd_frame_info	= sStLitLbl SLIT("Upd_frame_entry")
+upd_frame_info	= sStLitLbl SLIT("Upd_frame_info")
+seq_frame_info	= sStLitLbl SLIT("seq_frame_info")
 
 -- Some common call trees
 
