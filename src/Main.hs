@@ -176,7 +176,7 @@ mkInterface mod_map filename
 
      -- build the orig_env, which maps names to *original* names (so we can
      -- find the original declarations & docs for things).
-     orig_env = local_orig_env `plusFM` buildOrigEnv mod_map imps
+     orig_env = buildOrigEnv mod_map imps `plusFM` local_orig_env
 
      -- convert names in source code to original, fully qualified, names
      (orig_exports, missing_names1) 
