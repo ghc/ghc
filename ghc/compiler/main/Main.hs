@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.74 2001/06/18 21:45:49 sof Exp $
+-- $Id: Main.hs,v 1.75 2001/06/27 11:14:08 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -309,10 +309,9 @@ beginMake fileish_args
 
        case mods of
 	 []    -> throwDyn (UsageError "no input files")
-	 [mod] -> do state <- cmInit Batch
-		     cmLoadModule state mod
+	 mod   -> do state <- cmInit Batch
+		     cmLoadModule state mods
 		     return ()
-	 _     -> throwDyn (UsageError "only one module allowed with --make")
 
 
 beginInteractive :: [String] -> IO ()
@@ -326,9 +325,5 @@ beginInteractive fileish_args
 	   libs = map Left objs ++ map Right minus_ls
 
        state <- cmInit Interactive
-       case mods of
-	  []    -> interactiveUI state Nothing    libs
-	  [mod] -> interactiveUI state (Just mod) libs
-	  _     -> throwDyn (UsageError 
-                             "only one module allowed with --interactive")
+       interactiveUI state mods libs
 #endif

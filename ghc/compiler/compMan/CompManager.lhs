@@ -343,12 +343,12 @@ cmUnload state@CmState{ gmode=mode, pls=pls, pcs=pcs } dflags
 -- the system state at the same time.
 
 cmLoadModule :: CmState 
-             -> FilePath
+             -> [FilePath]
              -> IO (CmState,		-- new state
 		    Bool, 		-- was successful
 		    [String])		-- list of modules loaded
 
-cmLoadModule cmstate1 rootname
+cmLoadModule cmstate1 rootnames
    = do -- version 1's are the original, before downsweep
         let pls1      = pls    cmstate1
         let pcs1      = pcs    cmstate1
@@ -368,9 +368,11 @@ cmLoadModule cmstate1 rootname
 
 	showPass dflags "Chasing dependencies"
         when (verb >= 1 && ghci_mode == Batch) $
-           hPutStrLn stderr (progName ++ ": chasing modules from: " ++ rootname)
+           hPutStrLn stderr (showSDoc (hcat [
+	     text progName, text ": chasing modules from: ",
+	     hcat (punctuate comma (map text rootnames))]))
 
-        (mg2unsorted, a_root_is_Main) <- downsweep [rootname] mg1
+        (mg2unsorted, a_root_is_Main) <- downsweep rootnames mg1
         let mg2unsorted_names = map name_of_summary mg2unsorted
 
         -- reachable_from follows source as well as normal imports
@@ -888,10 +890,9 @@ downwards_closure_of_module summaries root
 
          res = simple_transitive_closure (map toEdge summaries) [root]
      in
-         --trace (showSDoc (text "DC of mod" <+> ppr root
-         --                 <+> text "=" <+> ppr res)) (
+--         trace (showSDoc (text "DC of mod" <+> ppr root
+--                          <+> text "=" <+> ppr res)) $
          res
-         --)
 
 -- Calculate transitive closures from a set of roots given an adjacency list
 simple_transitive_closure :: Eq a => [(a,[a])] -> [a] -> [a]
