@@ -8,7 +8,7 @@ else
 ifeq "$(BootingFromHc)" "YES"
 SUBDIRS = genapply genprimopcode ghc-pkg unlit
 else
-SUBDIRS = hasktags ghc-pkg hp2ps hsc2hs parallel stat2resid prof unlit genprimopcode genapply
+SUBDIRS = hasktags ghc-pkg hp2ps hsc2hs parallel stat2resid prof unlit genprimopcode genapply runghc
 endif
 endif
 
