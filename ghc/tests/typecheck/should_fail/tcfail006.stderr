@@ -1,0 +1,6 @@
+ 
+tcfail006.hs:4: No instance for: `PrelBase.Num PrelBase.Bool'
+    arising from the literal 1 at tcfail006.hs:4
+
+
+Compilation had errors

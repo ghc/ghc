@@ -1,0 +1,10 @@
+ 
+tcfail042.hs:16: Context `{PrelBase.Num taHh}'
+		     required by inferred type, but missing on a type signature
+		     `PrelBase.Num' `taHh' arising from an instance declaration at tcfail042.hs:16
+    When checking superclass constraints of an instance declaration
+ 
+tcfail042.hs:4: Module Main must include a definition for `Main.main'
+
+
+Compilation had errors

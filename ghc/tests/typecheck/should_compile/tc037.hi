@@ -1,0 +1,6 @@
+interface ShouldSucceed where {
+class Eq' a where {
+    deq :: a -> a -> Bool
+    };
+instance (Eq' a) => Eq' [a] {-# FROMMODULE ShouldSucceed #-}
+}

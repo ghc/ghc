@@ -1,0 +1,12 @@
+ 
+tcfail016.hs:9: Couldn't match the type
+		    `PrelTup.(,) taRi' against `Expr'
+    Expected: `Expr taRd'
+    Inferred: `AnnExpr taRi'
+    In the first argument of `g', namely `e1'
+    In the first argument of `PrelBase.++', namely `(g e1)'
+    In an equation for function `g':
+	`g (App e1 e2) = (g e1) PrelBase.++ (g e2)'
+
+
+Compilation had errors

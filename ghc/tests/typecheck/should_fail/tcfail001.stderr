@@ -1,0 +1,12 @@
+ 
+tcfail001.hs:9:warning:
+    Duplicated class assertion `A a' in context: `(A a, A a)'
+ 
+tcfail001.hs:9: Couldn't match the type
+		    `PrelBase.[]' against `GHC.-> [takw]'
+    Expected: `[takv]'
+    Inferred: `[takw] -> [takx]'
+    In an equation for function `op': `op PrelBase.[] = PrelBase.[]'
+
+
+Compilation had errors

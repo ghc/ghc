@@ -1,0 +1,5 @@
+ 
+tcfail052.hs:4: Type variable not in scope: `c'
+
+
+Compilation had errors

@@ -1,0 +1,4 @@
+interface ShouldSucceed where {
+import PreludeCore(Eq)
+f  ::  Eq a => a -> [a]
+}

@@ -1,0 +1,13 @@
+ 
+tcfail044.hs:12: The type `a
+			   -> a' cannot be used as an instance type
+ 
+tcfail044.hs:5: The type `a
+			  -> a' cannot be used as an instance type
+ 
+tcfail044.hs:20: No instance for:
+		     `PrelBase.Num (PrelBase.Float -> PrelBase.Float)'
+    arising from use of `PrelBase.+' at tcfail044.hs:20
+
+
+Compilation had errors

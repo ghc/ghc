@@ -1,0 +1,19 @@
+ 
+tcfail019.hs:20: No instance for: `B [tal6]'
+    arising from an instance declaration at tcfail019.hs:20
+    When checking methods of an instance declaration
+ 
+tcfail019.hs:20: No instance for: `C [tal6]'
+    arising from an instance declaration at tcfail019.hs:20
+    When checking methods of an instance declaration
+ 
+tcfail019.hs:20: No instance for: `B [tal6]'
+    arising from an instance declaration at tcfail019.hs:20
+    When checking superclass constraints of an instance declaration
+ 
+tcfail019.hs:20: No instance for: `C [tal6]'
+    arising from an instance declaration at tcfail019.hs:20
+    When checking superclass constraints of an instance declaration
+
+
+Compilation had errors

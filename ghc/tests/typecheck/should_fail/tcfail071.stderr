@@ -1,0 +1,18 @@
+ 
+tcfail071.hs:10: Couldn't match the signature/existential type variable
+		     `taCF' with the type `taCR -> taCS -> taCS'
+    Expected: `taCR -> taCS -> taCS'
+    Inferred: `taCF'
+    In the first argument of `PrelBase.foldr', namely `(f c)'
+    In an equation for function `g':
+	`g c
+	   = c
+	   where
+	       p = PrelBase.foldr (f c) PrelBase.[] PrelBase.[]'
+ 
+tcfail071.hs:8: Mismatched contexts
+    When matching the contexts of the signatures for `f' and `g'
+	(the signature contexts in a mutually recursive group should all be identical)
+
+
+Compilation had errors

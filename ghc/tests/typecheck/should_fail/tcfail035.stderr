@@ -1,0 +1,47 @@
+ 
+tcfail035.hs:3: Duplicate or overlapping instance declarations
+    for `PrelBase.Num NUM' at tcfail035.hs:6 and tcfail035.hs:7
+ 
+tcfail035.hs:9: No explicit method nor default method for `PrelBase.showsPrec'
+		in an instance declaration for `PrelBase.Show'
+ 
+tcfail035.hs:8: No explicit method nor default method for `PrelBase.=='
+		in an instance declaration for `PrelBase.Eq'
+ 
+tcfail035.hs:7: No explicit method nor default method for `PrelBase.+'
+		in an instance declaration for `PrelBase.Num'
+ 
+tcfail035.hs:7: No explicit method nor default method for `PrelBase.*'
+		in an instance declaration for `PrelBase.Num'
+ 
+tcfail035.hs:7: No explicit method nor default method for `PrelBase.negate'
+		in an instance declaration for `PrelBase.Num'
+ 
+tcfail035.hs:7: No explicit method nor default method for `PrelBase.abs'
+		in an instance declaration for `PrelBase.Num'
+ 
+tcfail035.hs:7: No explicit method nor default method for `PrelBase.signum'
+		in an instance declaration for `PrelBase.Num'
+ 
+tcfail035.hs:7: No explicit method nor default method for `PrelBase.fromInteger'
+		in an instance declaration for `PrelBase.Num'
+ 
+tcfail035.hs:6: No explicit method nor default method for `PrelBase.+'
+		in an instance declaration for `PrelBase.Num'
+ 
+tcfail035.hs:6: No explicit method nor default method for `PrelBase.*'
+		in an instance declaration for `PrelBase.Num'
+ 
+tcfail035.hs:6: No explicit method nor default method for `PrelBase.negate'
+		in an instance declaration for `PrelBase.Num'
+ 
+tcfail035.hs:6: No explicit method nor default method for `PrelBase.abs'
+		in an instance declaration for `PrelBase.Num'
+ 
+tcfail035.hs:6: No explicit method nor default method for `PrelBase.signum'
+		in an instance declaration for `PrelBase.Num'
+ 
+tcfail035.hs:6: No explicit method nor default method for `PrelBase.fromInteger'
+		in an instance declaration for `PrelBase.Num'
+
+Compilation had errors

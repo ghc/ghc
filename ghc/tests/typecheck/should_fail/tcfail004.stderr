@@ -1,0 +1,9 @@
+ 
+tcfail004.hs:3: Couldn't match the type
+		    `PrelTup.(,)' against `PrelTup.(,,) taRU'
+    Expected: `(taRO, taRR)'
+    Inferred: `(taRU, taRX, taS0)'
+    In a pattern binding: `(f, g) = (1, 2, 3)'
+
+
+Compilation had errors

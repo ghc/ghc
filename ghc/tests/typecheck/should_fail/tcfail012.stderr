@@ -1,0 +1,9 @@
+ 
+tcfail012.hs:3: Couldn't match the type
+		    `PrelBase.Bool' against `[tajU]'
+    Expected: `PrelBase.Bool'
+    Inferred: `[tajU]'
+    In a pattern binding: `PrelBase.True = PrelBase.[]'
+
+
+Compilation had errors

@@ -1,0 +1,7 @@
+interface  ShouldSucceed  where {
+{- TCE -}
+{- CE -}
+{- LVE -}
+a :: Num t64 => t64 -> t64
+{- GIEinst -}
+}

@@ -1,0 +1,5 @@
+ 
+tcfail045.hs:10: Type constructor or class not in scope: `PrimIO'
+
+
+Compilation had errors

@@ -1,0 +1,9 @@
+ 
+tcfail018.hs:5: No instance for: `PrelBase.Num [taBB]'
+    arising from the literal 1 at tcfail018.hs:5
+ 
+tcfail018.hs:5: No instance for: `PrelBase.Num [taBB]'
+    arising from the literal 1 at tcfail018.hs:5
+
+
+Compilation had errors

@@ -1,0 +1,5 @@
+ 
+tcfail011.hs:3: Value not in scope: `y'
+
+
+Compilation had errors

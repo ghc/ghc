@@ -1,0 +1,7 @@
+ 
+tcfail020.hs:12: No instance for: `A [taBn]'
+    arising from an instance declaration at tcfail020.hs:12
+    When checking superclass constraints of an instance declaration
+
+
+Compilation had errors

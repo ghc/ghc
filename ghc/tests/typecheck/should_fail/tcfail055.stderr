@@ -1,0 +1,10 @@
+ 
+tcfail055.hs:3: Couldn't match the type
+		    `PrelBase.Int' against `PrelBase.Float'
+    Expected: `PrelBase.Float'
+    Inferred: `PrelBase.Int'
+    In an expression with a type signature:
+	`(x PrelBase.+ 1 :: PrelBase.Int) :: PrelBase.Float'
+
+
+Compilation had errors
