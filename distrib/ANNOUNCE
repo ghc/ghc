@@ -1,5 +1,5 @@
-	     The Glasgow Haskell Compiler -- version 2.02
-	     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	  The Glasgow Haskell Compiler -- version 2.02
+	  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 We are pleased to announce the first release of the Glasgow Haskell
 Compiler (GHC, version 2.02) for *Haskell 1.4*.  Sources and binaries
@@ -12,27 +12,27 @@ Report is online at
 
 	http://haskell.cs.yale.edu/1.4/haskell-report.html
 
-GHC 2.02 is a beta-quality release:
+GHC 2.02 is a beta-quality release - some highlights:
 
   * It is reliable.
-    It has been extensively tested against a large suite of Haskell 1.2 
-    programs, but not so extensively tested against Haskell 1.4 programs 
-    because we don't have a comprehensive set (Donations of Haskell 1.4
-    programs to our test suite are most welcome).
+     It has been extensively tested against a large suite of Haskell 1.2 
+     programs, but not so extensively tested against Haskell 1.4 programs 
+     because we don't have a comprehensive set (Donations of Haskell 1.4
+     programs to our test suite are most welcome).
 
   * It should generate good code.
-    All the optimisations that GHC 0.29 used to do are back in, with 
-    the exception of specialisation.  It ought to be the case that
-    GHC 2.02 outperforms GHC 0.29, because it has a much better
-    handle on cross-module inlining, but there's a good chance that
-    there are performance "holes" lurking.  We have yet to make
-    a systematic comparison.  (Please send us programs where 2.02
-    does noticeably worse than 0.29.)
+     All the optimisations that GHC 0.29 used to do are back in, with 
+     the exception of specialisation.  It ought to be the case that
+     GHC 2.02 outperforms GHC 0.29, because it has a much better
+     handle on cross-module inlining, but there's a good chance that
+     there are performance "holes" lurking.  We have yet to make
+     a systematic comparison.  (Please send us programs where 2.02
+     does noticeably worse than 0.29.)
 
   * It is more expensive than it should be.
-    GHC 2.02 has received even less attention to its own performance.
-    At present it eats more space and time than GHC 0.29, especially
-    for very small programs.  We'll work on this.
+     GHC 2.02 has received even less attention to its own performance.
+     At present it eats more space and time than GHC 0.29, especially
+     for very small programs.  We're working on this.
 
   * A couple of Haskell 1.4 features are incompletely supported,
     notably polymorphic strictness annotations, and Unicode.
@@ -54,10 +54,11 @@ include:
     it expands into tons of "ccall" boilerplate that marshalls
     your arguments to and from C.
 
-  * GHC 2.02 is available for Windows NT.  From now on, Windows NT
-    will be a fully supported platform for GHC.
+  * GHC 2.02 is available for Win32 platforms.  From now on, Win32
+    (Windows NT and Windows 95) will be a fully supported platform
+    for GHC.
 
-  * GHC 2.02 supports full cross moudule inlining.  Unlike 0.29 and
+  * GHC 2.02 supports full cross module inlining.  Unlike 0.29 and
     its predecessors, inlining can happen even if the inlined body
     mentions a function or type that is not itself exported.  This is
     one place Haskell 1.4's new module system really pays off.
@@ -80,15 +81,15 @@ To run this release, you need a machine with 16+MB memory (more if
 building from sources), GNU C (`gcc'), and `perl'.  We have seen GHC
 2.01 work on these platforms: alpha-dec-osf2, hppa1.1-hp-hpux9,
 sparc-sun-{sunos4,solaris2}, mips-sgi-irix5, and
-i386-unknown-{linux,solaris2,freebsd}.  Similar platforms should work
-with minimal hacking effort.  The installer's guide give a full
-what-ports-work report.
+i386-unknown-{linux,solaris2,freebsd,cygwin32}.  Similar platforms
+should work with minimal hacking effort.  The installer's guide give a
+complete run-down of what-ports-work.
 
 Binaries are distributed in `bundles', e.g. a "profiling bundle" or a
 "concurrency bundle" for your platform.  Just grab the ones you need.
 
-Once you have the distribution, please follow the pointers in
-ghc/README to find all of the documentation about this release.  NB:
+Once you have the distribution, please follow the pointers in the
+README file to find all of the documentation about this release.  NB:
 preserve modification times when un-tarring the files (no `m' option
 for tar, please)!
 
@@ -124,6 +125,9 @@ computing/programming/languages/haskell/glasgow.
 
 These are the available files (.gz files are gzipped) -- some are `on
 demand', ask if you don't see them:
+
+README.html             A WWW `front-end' to the contents of the glasgow
+			directory.
 
 ghc-2.02-src.tar.gz	The source distribution; about 3MB.
 
@@ -176,3 +180,4 @@ ghc-2.02-hi-files-<blah>.tar.gz Sometimes it's more convenient to
 			use a different set of interface files than
 			the ones in *-src.tar.gz.  (The installation
 			guide will advise you of this.)
+

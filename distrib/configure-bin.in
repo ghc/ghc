@@ -4,6 +4,7 @@ dnl
 #!/bin/sh
 #
 
+# Is it there?
 AC_INIT(Makefile.in)
 
 #
@@ -20,7 +21,7 @@ TargetPlatform=`/bin/sh $srcdir/config.sub $target` || exit 1
 # Suitable names to slam in *_CPP are in platform.h.in.
 # We also record the architecture, vendor, and operating system (OS)
 # separately.
-case $HostPlatform in
+case $TargetPlatform in
 alpha-dec-osf[[1234]]*)
 	TargetPlatform=alpha-dec-osf1;;
 hppa1.1-hp-hpux*)
@@ -42,9 +43,9 @@ m68k-next-nextstep2)
 m68k-next-nextstep3)
 	TargetPlatform=m68k-next-nextstep3;;
 i[[3456]]86-next-nextstep3)
-	TargetPlatform=i386-next-nextstep3
+	TargetPlatform=i386-next-nextstep3;;
 m68k-sun-sunos4*)
-	TargetPlatform=m68k-sun-sunos4 #hack
+	TargetPlatform=m68k-sun-sunos4;;
 mips-dec-ultrix*)
         TargetPlaformP=mips-dec-ultrix;;
 mips-sgi-irix*)
@@ -60,41 +61,16 @@ sparc-sun-solaris2*)
         exit 1
         ;;
 esac
-echo "Which we'll canonicalise into: $TargetPlatform"
+echo "Which we'll further canonicalise into: $TargetPlatform"
 
-platform=$TargetPlatform
-AC_SUBST(platform)
+AC_SUBST(TargetPlatform)
 
 AC_CHECK_PROG(PerlCmd,perl,$ac_dir/$ac_word)
 if test -z "$PerlCmd"; then
     echo "You must install perl before you can continue"
     echo "Perhaps it is already installed, but not in your PATH?"
-    exit 1
-else
-    $PerlCmd -v >conftest.out 2>&1
-    if egrep "version 4" conftest.out >/dev/null 2>&1; then
-        if egrep "Patch level: 35" conftest.out >/dev/null 2>&1; then
-            echo "
-************************************************************************
-Uh-oh...looks like you have Perl 4.035.
-
-Perl version 4.035 has a bug to do with recursion that will bite if
-you run the lit2texi script, when making Info files from
-literate files of various sorts.  Either use the current version
-(4.036), an older version (e.g., perl 4.019) or apply the patch in
-glafp-utils/perl-4.035-fixes to your 4.035 perl.
-************************************************************************
-"
-        fi
-    else
-	if egrep "version 5" conftest.out >/dev/null 2>&1; then
-	    :
-	else
-	    echo "I'm not sure if your version of perl will work,"
-	    echo "but it's worth a shot, eh?"
-	fi
-    fi
-    rm -fr conftest*
+    echo ""
+    echo "Continuing, assuming perl will be available as: perl"
 fi
 #
 dnl ** does #!.../perl work? (sometimes it's too long...)
@@ -120,12 +96,13 @@ else
     echo "I think your perl library is misinstalled."
     echo "The following script did not work:"
     echo '      do "getopts.pl" || exit(1); exit(0);'
-    exit 1
+    echo "But, nevermind, let us continue.."
 fi
 
 dnl ** figure out how to do a BSD-ish install
 #
 AC_PROG_INSTALL
+AC_PROG_LN_S()
 #
 
 
