@@ -47,59 +47,7 @@ Mailing Lists
 Contributors
 =============
 
-Current GHC team:
+Please see
+  
+   http://www.haskell.org/ghc/contributors.html
 
-    Simon Peyton Jones	<simonpj@microsoft.com>     [our Fearless Leader]
-    Simon Marlow	<simonmar@microsoft.com>    [hired hand]
-    Julian Seward       <v-julsew@microsoft.com>    [hired hand]
-    Reuben Thomas	<v-reubth@microsoft.com>    [hired hand]
-
-Additional Contributors (in alphabetical order):
-
-    Manuel Chakravarty   <chak@cse.unsw.edu.au>
-    Sigbjorn Finne	 <sof@galois.com>
-    Kevin Glynn		 <keving@cs.mu.oz.au>
-    Jeff Lewis		 <lewie@galois.com>
-    Marcin Kowalczyk	 <qrczak@knm.org.pl>
-    Hans Wolfgang Lloidl <hwloidl@cee.hw.ac.uk>
-    Sven Panne		 <Sven_Panne@BetaResearch.de>
-    Ken Shan		 <ken@digitas.harvard.edu>
-    Keith Wansborough    <Keith.Wansbrough@cl.cam.ac.uk>
-    Michael Weber	 <michael.weber@post.rwth-aachen.de>
-
-Past contributors and/or continuing advisors (all @dcs.gla.ac.uk):
-
-    Juan Quintela       (quintela)
-    Thomas Nordin       (nordin)    [@cse.ogi.edu; Green Card Hero]
-    Patrick Sansom	(sansom)    [hired hand, Bidirectional Analyses]
-    Phil Trinder	(trinder)   [hired hand, Parade]
-    Andy Gill		(andy)	    [ex-PhD student; at Galois]
-    Cordy Hall		(cvh) 	    [GRASP]
-    Kevin Hammond	(kh)	    [GRASP; at St. Andrews]
-    John Launchbury	(jl)	    [AQUA; at OGI]
-    Jim Mattson		(mattson)   [hired hand, AQUA; HP]
-    Darren Moffat	(moffatd)   [slave, summer '95; at MoD]
-    Will Partain	(partain)   [GRASP/AQUA; touring with Johnny Cash]
-    Bryan O'Sullivan	(bos)	    [visiting slave, summer '94; at Sun]
-    Alastair Reid	(areid)	    [GHCI, STG/Hugs etc.]
-    Andr\'e Santos	(andre)	    [PhD student; back in Brazil]
-    David N Turner	(dnt)	    [Linear Types; at An-Teallach]
-    Phil Wadler		(wadler)    [GRASP; at Lucent]
-
-And many others who've contributed bits of code / bug reports in the past.
-
-Cool people who've let us use their machines:
-
-    sparc-sun-sunos{4,5}   PacSoft, Oregon Graduate Institute
-    hppa1.1-hp-hpux,
-    i386-unknown-linux	   Charles Krasic, Oregon Graduate Institute
-    alpha-dec-osf,        
-    i386-*-solaris2        Mark Fanty, CSLU, Oregon Graduate Institute
-
-Also thanks to Conal Elliott, Microsoft Research for facilitating the work
-on the Win32 port of GHC.
-
-Simon's projects' acronyms:
-    GRIP  ('87-'90): Graph reduction in parallel
-    GRASP ('90-'92): Graph reduction applications support project
-    AQUA  ('93-   ): Declarative systems architecture: a quantitative approach
