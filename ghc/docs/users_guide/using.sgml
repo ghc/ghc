@@ -925,24 +925,40 @@ Haskell libraries.
 <Title>The recompilation checker
 </Title>
 
-<Para>
 <IndexTerm><Primary>recompilation checker</Primary></IndexTerm>
+
+<Para>
+<variablelist>
+<VarListEntry>
+<Term><Option>-recomp</Option></Term>
+<IndexTerm><Primary><option>-recomp</option> option</Primary></IndexTerm>
+<ListItem>
+<Para>
+Turn on recompilation checking.  This will stop compilation early,
+leaving an existing <filename>.o</filename> file in place, if it can
+be determined that the module does not need to be recompiled.
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
 </Para>
 
 <Para>
-In the olden days, GHC compared the newly-generated <Filename>.hi</Filename> file with
-the previous version; if they were identical, it left the old one
-alone and didn't change its modification date.  In consequence,
-importers of a module with an unchanged output <Filename>.hi</Filename> file were not
-recompiled.
+In the olden days, GHC compared the newly-generated
+<Filename>.hi</Filename> file with the previous version; if they were
+identical, it left the old one alone and didn't change its
+modification date.  In consequence, importers of a module with an
+unchanged output <Filename>.hi</Filename> file were not recompiled.
 </Para>
 
 <Para>
-This doesn't work any more.  In our earlier example, module <Literal>C</Literal> does
-not import module <Literal>A</Literal> directly, yet changes to <Filename>A.hi</Filename> should force a
-recompilation of <Literal>C</Literal>.  And some changes to <Literal>A</Literal> (changing the
-definition of a function that appears in an inlining of a function
-exported by <Literal>B</Literal>, say) may conceivably not change <Filename>B.hi</Filename> one jot.  So
+This doesn't work any more.  In our earlier example, module
+<Literal>C</Literal> does not import module <Literal>A</Literal>
+directly, yet changes to <Filename>A.hi</Filename> should force a
+recompilation of <Literal>C</Literal>.  And some changes to
+<Literal>A</Literal> (changing the definition of a function that
+appears in an inlining of a function exported by <Literal>B</Literal>,
+say) may conceivably not change <Filename>B.hi</Filename> one jot.  So
 now&hellip;
 </Para>
 
@@ -951,29 +967,37 @@ GHC keeps a version number on each interface file, and on each type
 signature within the interface file.  It also keeps in every interface
 file a list of the version numbers of everything it used when it last
 compiled the file.  If the source file's modification date is earlier
-than the <Filename>.o</Filename> file's date (i.e. the source hasn't changed since the
-file was last compiled), GHC will be clever.  It compares the version
-numbers on the things it needs this time with the version numbers on
-the things it needed last time (gleaned from the interface file of the
-module being compiled); if they are all the same it stops compiling
-rather early in the process saying &ldquo;Compilation IS NOT required&rdquo;.
-What a beautiful sight!
+than the <Filename>.o</Filename> file's date (i.e. the source hasn't
+changed since the file was last compiled), and the
+<option>-recomp</option> is given on the command line, GHC will be
+clever.  It compares the version numbers on the things it needs this
+time with the version numbers on the things it needed last time
+(gleaned from the interface file of the module being compiled); if
+they are all the same it stops compiling rather early in the process
+saying &ldquo;Compilation IS NOT required&rdquo;.  What a beautiful
+sight!
 </Para>
 
 <Para>
-GHC <Emphasis>only</Emphasis> keeps detailed dependency information for &ldquo;user&rdquo; modules,
-not for &ldquo;library&rdquo; modules.  It distinguishes the two by a hack: a module
-whose <Filename>.hi</Filename> file has an absolute path name is considered a library module,
-while a relative path name indicates a user module.  So if you have a
-multi-directory application, use <Emphasis>relative</Emphasis> path names in your
-<Option>-i</Option> path, to force GHC to record detailed dependency information.
-Use absolute path names only for directories containing slowly-changing
+GHC <Emphasis>only</Emphasis> keeps detailed dependency information
+for &ldquo;user&rdquo; modules, not for &ldquo;library&rdquo; modules.
+It distinguishes the two by a hack: a module whose
+<Filename>.hi</Filename> file has an absolute path name is considered
+a library module, while a relative path name indicates a user module.
+So if you have a multi-directory application, use
+<Emphasis>relative</Emphasis> path names in your <Option>-i</Option>
+path, to force GHC to record detailed dependency information.  Use
+absolute path names only for directories containing slowly-changing
 library modules.
 </Para>
 
 <Para>
-A path is considered &ldquo;absolute&rdquo; if it starts with &ldquo;<Filename>/</Filename>&rdquo;, or
-&ldquo;<Filename>A:/</Filename>&rdquo;, or &ldquo;<Filename>A:\</Filename>&rdquo; (or &ldquo;<Filename>B:/</Filename>&rdquo;, &ldquo;<Filename>B:\</Filename>&rdquo; etc).
+A path is considered &ldquo;absolute&rdquo; if it starts with
+&ldquo;<Filename>/</Filename>&rdquo;, or
+&ldquo;<Filename>A:/</Filename>&rdquo;, or
+&ldquo;<Filename>A:\</Filename>&rdquo; (or
+&ldquo;<Filename>B:/</Filename>&rdquo;,
+&ldquo;<Filename>B:\</Filename>&rdquo; etc).
 </Para>
 
 <Para>
