@@ -22,7 +22,7 @@
 #     Note, if you specify /usr/foo/lib for libdir,
 #     the library files for your fptools package will be
 #     installed in  /usr/foo/lib/<package>-<version>, e.g.,
-#     /usr/foo/lib/ghc-2.07. If you don't want the package/version
+#     /usr/foo/lib/ghc-3.00. If you don't want the package/version
 #     directory appended, you'll have to modify $(real_libdir)
 #     below.
 #
@@ -85,8 +85,11 @@ CP          = cp
 LN_S        = @LN_S@
 CHMOD       = chmod
 INSTALL	    = @INSTALL@
+exeext      = @exeext@
 RAWCPP      = @RAWCPP@
 SED	    = @SedCmd@
+TMPDIR      = /tmp
+
 # sigh
 INSTALL_DIR  = ./mkdirhier
 
@@ -135,6 +138,7 @@ config-pkgs ::
 	   echo '$$'"datadir='$(real_datadir)';"                 >> bin/$(platform)/$(package)-$(version)/$$i ; \
 	   echo '$$'"SED='$(SED)';"		>> bin/$(platform)/$(package)-$(version)/$$i ; \
 	   echo '$$'"RAWCPP='$(RAWCPP)';"		>> bin/$(platform)/$(package)-$(version)/$$i ; \
+	   echo '$$'"TMPDIR='$(TMPDIR)';"		>> bin/$(platform)/$(package)-$(version)/$$i ; \
 	   cat bin/$(platform)/$(package)-$(version)/$$i.prl   >> bin/$(platform)/$(package)-$(version)/$$i ; \
 	   $(CHMOD) $(BIN_PERMS) bin/$(platform)/$(package)-$(version)/$$i; \
 	   echo "Done."; \
@@ -152,6 +156,7 @@ config-pkgs ::
 	   echo '$$'"datadir='$(real_datadir)';"   >> lib/$(platform)/$(package)-$(version)/$$i ; \
 	   echo '$$'"SED='$(SED)';"		 >> lib/$(platform)/$(package)-$(version)/$$i ; \
 	   echo '$$'"RAWCPP='$(RAWCPP)';"		 >> lib/$(platform)/$(package)-$(version)/$$i ; \
+	   echo '$$'"TMPDIR='$(TMPDIR)';"		 >> lib/$(platform)/$(package)-$(version)/$$i ; \
 	   cat lib/$(platform)/$(package)-$(version)/$$i.prl >> lib/$(platform)/$(package)-$(version)/$$i; \
 	   $(CHMOD) $(BIN_PERMS) lib/$(platform)/$(package)-$(version)/$$i; \
 	   echo "Done."; \
@@ -169,6 +174,7 @@ config-pkgs ::
 	   echo "datadir='$(real_datadir)'"   >> bin/$(platform)/$(package)-$(version)/$$i ; \
 	   echo "SED='$(SED)'"			 >> bin/$(platform)/$(package)-$(version)/$$i ; \
 	   echo "RAWCPP='$(RAWCPP)'"		 >> bin/$(platform)/$(package)-$(version)/$$i ; \
+	   echo "TMPDIR='$(TMPDIR)'"		 >> bin/$(platform)/$(package)-$(version)/$$i ; \
 	   cat bin/$(platform)/$(package)-$(version)/$$i.sh >> bin/$(platform)/$(package)-$(version)/$$i; \
 	   $(CHMOD) $(BIN_PERMS) bin/$(platform)/$(package)-$(version)/$$i; \
 	   echo "Done."; \
