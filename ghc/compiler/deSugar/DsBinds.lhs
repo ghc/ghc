@@ -33,7 +33,8 @@ import Match		( matchWrapper )
 
 import BasicTypes       ( SYN_IE(Module) )
 import CmdLineOpts	( opt_SccProfilingOn, opt_AutoSccsOnAllToplevs, 
-			  opt_AutoSccsOnExportedToplevs, opt_CompilingGhcInternals )
+			  opt_AutoSccsOnExportedToplevs
+		        )
 import CostCentre	( mkAutoCC, IsCafCC(..), mkAllDictsCC, preludeDictsCostCentre )
 import Id		( idType, SYN_IE(DictVar), GenId, SYN_IE(Id) )
 --ToDo: rm import ListSetOps	( minusList, intersectLists )
@@ -209,8 +210,10 @@ addDictScc var rhs
     || not (isDictTy (idType var))
   = returnDs rhs				-- That's easy: do nothing
 
+{-
   | opt_CompilingGhcInternals
   = returnDs (SCC prel_dicts_cc rhs)
+-}
 
   | otherwise
   = getModuleAndGroupDs 	`thenDs` \ (mod, grp) ->
@@ -218,5 +221,7 @@ addDictScc var rhs
 	-- ToDo: do -dicts-all flag (mark dict things with individual CCs)
     returnDs (SCC (mkAllDictsCC mod grp False) rhs)
 
+{- UNUSED:
 prel_dicts_cc = preludeDictsCostCentre False{-not dupd-} -- ditto
+-}
 \end{code}

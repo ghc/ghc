@@ -32,8 +32,8 @@ import CgClosure	( cgTopRhsClosure )
 import CgCon		( cgTopRhsCon )
 import CgConTbls	( genStaticConBits )
 import ClosureInfo	( mkClosureLFInfo )
-import CmdLineOpts	( opt_SccProfilingOn, opt_CompilingGhcInternals,
-			  opt_EnsureSplittableC, opt_SccGroup
+import CmdLineOpts	( opt_SccProfilingOn, opt_EnsureSplittableC, 
+					      opt_SccGroup
 			)
 import CostCentre       ( CostCentre )
 import CStrings		( modnameToC )
@@ -61,7 +61,6 @@ codeGen :: FAST_STRING		-- module name
 codeGen mod_name (local_CCs, extern_CCs) import_names gen_tycons tycon_specs stg_pgm
   = let
 	doing_profiling   = opt_SccProfilingOn
-	compiling_prelude = opt_CompilingGhcInternals
 	maybe_split       = if opt_EnsureSplittableC then CSplitMarker else AbsCNop
 	cinfo             = MkCompInfo mod_name
     in
@@ -80,15 +79,11 @@ codeGen mod_name (local_CCs, extern_CCs) import_names gen_tycons tycon_specs stg
 	 -- (The local cost-centres involved in this are passed
 	 -- into the code-generator, as are the imported-modules' names.)
 	 --
-	 -- Note: we don't register/etc if compiling Prelude bits.
-
+	 --
 	mkAbstractCs [
-		if compiling_prelude
-		then AbsCNop
-		else mkAbstractCs [mkAbstractCs (map (CCostCentreDecl True)  local_CCs),
+		mkAbstractCs [mkAbstractCs (map (CCostCentreDecl True)  local_CCs),
 				   mkAbstractCs (map (CCostCentreDecl False) extern_CCs),
-				   mkCcRegister local_CCs import_names],
-
+				   mkCcRegister local_CCs import_names]],
 		genStaticConBits cinfo gen_tycons tycon_specs,
 		initC cinfo (cgTopBindings maybe_split stg_pgm) ]
   where
