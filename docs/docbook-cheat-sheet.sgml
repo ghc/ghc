@@ -1,6 +1,6 @@
 <!DOCTYPE Article PUBLIC "-//OASIS//DTD DocBook V3.1//EN">
 
-<Article>
+<Article id="docbook-cheat-sheet">
 
 <ArtHeader>
 
@@ -12,16 +12,16 @@
 </ArtHeader>
 
 
-<Sect1><Title>Getting the DocBook tools</Title>
+<Sect1 id="sec-getting-docbook"><Title>Getting the DocBook tools</Title>
 
 <Para>
-See the building guide.
+See the installation guide.
 </Para>
 
 </Sect1>
 
 
-<Sect1><Title>Document layout</Title>
+<Sect1 id="doc-layout"><Title>Document layout</Title>
 
 <Para>
 The GHC documentation is written using DocBook 3.1, so the DTD line should be:
@@ -150,7 +150,7 @@ Used for variables, but not type variables.
 
 </Sect1>
 
-<Sect1><Title>Tables</Title>
+<Sect1 id="docbook-tables"><Title>Tables</Title>
 
 <Para>
 Tables are quite complicated to write in SGML (as in HTML, there are lots of fiddly tags), so here's an example you can cannibalise. In the spirit of the LaTeX short introduction I don't repeat all the markup verbatim; you have to look at the source for that.
