@@ -991,3 +991,12 @@ unpackNBytes#  addr len# = unpack [] (len# -# 1#)
 
   #-}
 \end{code}
+
+#ifdef __HADDOCK__
+\begin{code}
+-- | A placeholder argument for the 'Control.Monad.ST.ST' type constructor,
+-- to mark a state embedded in the 'Prelude.IO' monad by
+-- 'Control.Monad.ST.stToIO'.
+data RealWorld
+\end{code}
+#endif

@@ -112,7 +112,9 @@ returnIO x = IO (\ s -> (# s, x #))
 -- ---------------------------------------------------------------------------
 -- Coercions between IO and ST
 
---stToIO        :: (forall s. ST s a) -> IO a
+-- | A monad transformer embedding strict state transformers in the 'IO'
+-- monad.  The 'RealWorld' parameter is a technical device to keep the
+-- state used by such computations separate from those inside 'runST'.
 stToIO	      :: ST RealWorld a -> IO a
 stToIO (ST m) = IO m
 

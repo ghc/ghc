@@ -21,13 +21,13 @@ module Control.Monad.ST
 	runST,		-- :: (forall s. ST s a) -> a
 	fixST,		-- :: (a -> ST s a) -> ST s a
 
-	-- * Unsafe operations
-	unsafeInterleaveST,  	-- :: ST s a -> ST s a
-	unsafeIOToST,		-- :: IO a -> ST s a
-
 	-- * Converting 'ST' to 'IO'
 	RealWorld,		-- abstract
-	stToIO			-- :: ST RealWorld a -> IO a
+	stToIO,			-- :: ST RealWorld a -> IO a
+
+	-- * Unsafe operations
+	unsafeInterleaveST,  	-- :: ST s a -> ST s a
+	unsafeIOToST		-- :: IO a -> ST s a
       ) where
 
 import Prelude

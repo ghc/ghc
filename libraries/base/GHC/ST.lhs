@@ -33,6 +33,11 @@ The state-transformer monad proper.  By default the monad is strict;
 too many people got bitten by space leaks when it was lazy.
 
 \begin{code}
+-- | The strict state-transformer monad.
+-- The first parameter is used solely to keep the states of different
+-- invocations of 'runST' separate from each other and from invocations
+-- of 'Control.Monad.ST.stToIO'.  In the first case the type parameter
+-- is not instantiated; in the second it is 'RealWorld'.
 newtype ST s a = ST (STRep s a)
 type STRep s a = State# s -> (# State# s, a #)
 
@@ -70,6 +75,9 @@ unsafeInterleaveST (ST m) = ST ( \ s ->
     (# s, r #)
   )
 
+-- | Allow the result of a state transformer computation to be used (lazily)
+-- inside the computation.
+-- Note that if @f@ is strict, @'fixST' f@ will diverge.
 fixST :: (a -> ST s a) -> ST s a
 fixST k = ST $ \ s ->
     let ans       = liftST (k r) s
@@ -119,6 +127,10 @@ All calls to @f@ will share a {\em single} array!  End SLPJ 95/04.
 -- The INLINE prevents runSTRep getting inlined in *this* module
 -- so that it is still visible when runST is inlined in an importing
 -- module.  Regrettably delicate.  runST is behaving like a wrapper.
+
+-- | Return the value computed by a state transformer computation.
+-- The @forall@ is a technical device to ensure that the state used
+-- by the 'ST' computation is inaccessible to the rest of the program.
 runST :: (forall s. ST s a) -> a
 runST st = runSTRep (case st of { ST st_rep -> st_rep })
 

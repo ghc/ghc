@@ -20,16 +20,16 @@ module Control.Monad.ST.Lazy (
 	runST,
 	fixST,
 
-	-- * Unsafe operations
-	unsafeInterleaveST,
-	unsafeIOToST,
+	-- * Converting between strict and lazy 'ST'
+	strictToLazyST, lazyToStrictST,
 
 	-- * Converting 'ST' To 'IO'
 	RealWorld,
 	stToIO,
 
-	-- * Converting between strict and lazy 'ST'
-	strictToLazyST, lazyToStrictST
+	-- * Unsafe operations
+	unsafeInterleaveST,
+	unsafeIOToST
     ) where
 
 import Prelude
@@ -50,6 +50,11 @@ import Hugs.LazyST
 #endif
 
 #ifdef __GLASGOW_HASKELL__
+-- | The lazy state-transformer monad.
+-- The first parameter is used solely to keep the states of different
+-- invocations of 'runST' separate from each other and from invocations
+-- of 'Control.Monad.ST.stToIO'.  In the first case the type parameter
+-- is not instantiated; in the second it is 'RealWorld'.
 newtype ST s a = ST (State s -> (a, State s))
 data State s = S# (State# s)
 
@@ -76,9 +81,15 @@ instance Monad (ST s) where
            k_a new_s
 
 {-# NOINLINE runST #-}
+-- | Return the value computed by a state transformer computation.
+-- The @forall@ is a technical device to ensure that the state used
+-- by the 'ST' computation is inaccessible to the rest of the program.
 runST :: (forall s. ST s a) -> a
 runST st = case st of ST the_st -> let (r,_) = the_st (S# realWorld#) in r
 
+-- | Allow the result of a state transformer computation to be used (lazily)
+-- inside the computation.
+-- Note that if @f@ is strict, @'fixST' f@ will diverge.
 fixST :: (a -> ST s a) -> ST s a
 fixST m = ST (\ s -> 
 		let 
@@ -123,5 +134,8 @@ unsafeInterleaveST = strictToLazyST . ST.unsafeInterleaveST . lazyToStrictST
 unsafeIOToST :: IO a -> ST s a
 unsafeIOToST = strictToLazyST . ST.unsafeIOToST
 
+-- | A monad transformer embedding lazy state transformers in the 'IO'
+-- monad.  The 'RealWorld' parameter is a technical device to keep the
+-- state used by such computations separate from those inside 'runST'.
 stToIO :: ST RealWorld a -> IO a
 stToIO = ST.stToIO . lazyToStrictST
