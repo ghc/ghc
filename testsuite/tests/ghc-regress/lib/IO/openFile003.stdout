@@ -1,16 +1,4 @@
-Left inappropriate type
-Action: openFile
-Reason: is a directory
-File: .
-Left inappropriate type
-Action: openFile
-Reason: Is a directory
-File: .
-Left inappropriate type
-Action: openFile
-Reason: Is a directory
-File: .
-Left inappropriate type
-Action: openFile
-Reason: Is a directory
-File: .
+Left .: openFile: inappropriate type (is a directory)
+Left .: openFile: inappropriate type (Is a directory)
+Left .: openFile: inappropriate type (Is a directory)
+Left .: openFile: inappropriate type (Is a directory)

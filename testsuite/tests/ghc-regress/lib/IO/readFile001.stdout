@@ -1,7 +1,4 @@
-Left resource busy
-Action: openFile
-Reason: file is locked
-File: readFile001.out
+Left readFile001.out: openFile: resource busy (file is locked)
 -- !!! readFile test
 
 import IO
@@ -29,4 +26,4 @@ main = do
   print h
 
 
-{loc=readFile001.out,type=writable,binary=False,buffering=block (8192)}
+{handle: readFile001.out}
