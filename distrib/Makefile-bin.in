@@ -87,6 +87,8 @@ CP          = cp
 LN_S        = @LN_S@
 CHMOD       = chmod
 INSTALL	    = @INSTALL@
+RAWCPP      = @RAWCPP@
+SED	    = @SedCmd@
 # sigh
 INSTALL_DIR  = ./mkdirhier
 
@@ -136,7 +138,7 @@ config-pkgs ::
 	   echo "Creating a configured version of $$i .."; \
 	   $(RM) bin/$(platform)/$(package)-$(version)/$$i.bak; \
 	   test -f bin/$(platform)/$(package)-$(version)/$$i && $(MV) bin/$(platform)/$(package)-$(version)/$$i bin/$(platform)/$(package)-$(version)/$$i.bak; \
-	   echo "#! $(PERL)"  		        > bin/$(platform)/$(package)-$(version)/$$i ; \
+	   echo "#! $(PERL)"  		        		> bin/$(platform)/$(package)-$(version)/$$i ; \
 	   echo $$"bindir='$(bindir)';"                        >> bin/$(platform)/$(package)-$(version)/$$i ; \
 	   echo $$"libdir='$(real_libdir)';"                   >> bin/$(platform)/$(package)-$(version)/$$i ; \
 	   echo $$"libexecdir='$(real_libdir)';"               >> bin/$(platform)/$(package)-$(version)/$$i ; \
@@ -154,6 +156,8 @@ config-pkgs ::
 	   echo $$"libdir='$(real_libdir)';"     >> lib/$(platform)/$(package)-$(version)/$$i ; \
 	   echo $$"libexecdir='$(real_libdir)';" >> lib/$(platform)/$(package)-$(version)/$$i ; \
 	   echo $$"datadir='$(real_datadir)';"   >> lib/$(platform)/$(package)-$(version)/$$i ; \
+	   echo $$"SED='$(SED)';"		 >> lib/$(platform)/$(package)-$(version)/$$i ; \
+	   echo $$"RAWCPP='$(RAWCPP)';"		 >> lib/$(platform)/$(package)-$(version)/$$i ; \
 	   cat lib/$(platform)/$(package)-$(version)/$$i.prl >> lib/$(platform)/$(package)-$(version)/$$i; \
 	   $(CHMOD) $(BIN_PERMS) lib/$(platform)/$(package)-$(version)/$$i; \
 	   echo "Done."; \
