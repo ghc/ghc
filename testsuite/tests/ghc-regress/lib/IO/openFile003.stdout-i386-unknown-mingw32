@@ -1,16 +1,4 @@
-Left permission denied
-Action: openFile
-Reason: Permission denied
-File: .
-Left permission denied
-Action: openFile
-Reason: Permission denied
-File: .
-Left permission denied
-Action: openFile
-Reason: Permission denied
-File: .
-Left permission denied
-Action: openFile
-Reason: Permission denied
-File: .
+Left .: openFile: permission denied (Permission denied)
+Left .: openFile: permission denied (Permission denied)
+Left .: openFile: permission denied (Permission denied)
+Left .: openFile: permission denied (Permission denied)
