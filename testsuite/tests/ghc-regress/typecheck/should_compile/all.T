@@ -136,3 +136,4 @@ test "tc129" { myvtc("") }
 test "tc130" { myvtc("") }
 test "tc131" { myvtc("") }
 test "tc132" { myvtc("-package lang") }
+test "tc133" { myvtc("") }
