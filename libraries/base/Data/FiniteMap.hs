@@ -277,6 +277,8 @@ listToFM = addListToFM emptyFM
 bagToFM = foldBag plusFM (\ (k,v) -> unitFM k v) emptyFM
 #endif
 
+instance (Show k, Show e) => Show (FiniteMap k e) where
+  showsPrec p m = showsPrec p (fmToList m)
 
 -- ---------------------------------------------------------------------------
 -- Adding to and deleting from @FiniteMaps@
