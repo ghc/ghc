@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.c,v 1.5 1999/01/18 15:18:06 simonm Exp $
+ * $Id: Sanity.c,v 1.6 1999/01/19 16:56:50 simonm Exp $
  *
  * Sanity checking code for the heap and stack.
  *
@@ -340,8 +340,10 @@ checkHeap(bdescr *bd, StgPtr start)
         /* This is the smallest size of closure that can live in the heap. */
         ASSERT( size >= MIN_NONUPD_SIZE + sizeofW(StgHeader) );
 	p += size;
+
+	/* skip over slop */
 	while (p < bd->free &&
-	       *p && !LOOKS_LIKE_GHC_INFO(*p)) { p++; } /* skip over slop */
+	       (*p == 0 || !LOOKS_LIKE_GHC_INFO(*p))) { p++; } 
       }
       bd = bd->link;
       if (bd != NULL) {
