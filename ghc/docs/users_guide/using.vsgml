@@ -748,19 +748,19 @@ module A where
 
 import B
 
-newtype A = A Int
+newtype TA = MkTA Int
 
-f :: B -> A
-f (B x) = A x
+f :: TB -> TA
+f (MkTB x) = MkTA x
 --------
 module B where
 
 import A
 
-data B = B !Int
+data TB = MkTB !Int
 
-g :: A -> B
-g (A x) = B x
+g :: TA -> TB
+g (MkTA x) = MkTB x
 </verb></tscreen>
 
 When compiling either module A and B, the compiler will try (in vain)
@@ -787,20 +787,24 @@ For the example at hand, the boot interface file for A would look like
 the following:
 
 <tscreen><verb>
-__interface A 1 where
-__exports A A f;
-__import PrelBase Int;
-1 newtype A = A PrelBase.Int ;
-1 f :: A -> A ;
+__interface A 1 404 where
+__export A TA{MkTA} ;
+1 newtype TA = MkTA PrelBase.Int ;
 </verb></tscreen>
 
 The syntax is essentially the same as a normal @.hi@ file
 (unfortunately), but you can usually tailor an existing @.hi@ file to
 make a @.hi-boot@ file.
 
-Notice that we only put the declaration for the newtype @A@ in the
+Notice that we only put the declaration for the newtype @TA@ in the
 @hi-boot@ file, not the signature for @f@, since @f@ isn't used by
 @B@.
+
+The number ``1'' after ``__interface A'' gives the version number of module A;
+it is incremented whenever anything in A's interface file changes.  The ``404'' is
+the version number of the interface file <em>syntax</em>; we change it when
+we change the syntax of interface files so that you get a better error message when
+you try to read an old-format file with a new-format compiler.
 
 The number ``1'' at the beginning of a declaration is the <em>version
 number</em> of that declaration: for the purposes of @.hi-boot@ files
@@ -810,9 +814,20 @@ reference to @Int@ in the interface for @A@ comes from @PrelBase@,
 which is a module internal to GHC's prelude.  It's a pain, but that's
 the way it is.
 
+If you want an hi-boot file to export a data type, but you don't want to give its constructors
+(because the constructors aren't used by the SOURCE-importing module), you can write simply:
+
+<tscreen><verb>
+__interface A 1 404 where
+__export A TA;
+1 data TA
+</verb></tscreen>
+
+(You must write all the type parameters, but leave out the '=' and everything that follows it.)
+
 <bf>Note:</bf> This is all a temporary solution, a version of the
 compiler that handles mutually recursive properly without the manual
-construction of interface files, is in the works.
+construction of interface files, is (allegedly) in the works.
 
 %************************************************************************
 %*                                                                      *
