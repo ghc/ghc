@@ -1,6 +1,3 @@
-DOCBOOK_CATALOG=$1
-shift
-
 if [ ! -f "$DOCBOOK_CATALOG" ] ; then
   echo "CATALOG file not set up; see installation guide for details."
   exit 1

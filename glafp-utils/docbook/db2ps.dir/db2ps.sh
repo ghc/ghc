@@ -8,9 +8,10 @@ fi
 
 output="`echo $1 | sed 's,\.sgml$,.ps,;s,\.sgm$,.ps,'`"
 outdvi="`echo $1 | sed 's,\.sgml$,.dvi,;s,\.sgm$,.dvi,'`"
-db2dvi $1
+db2dvi "$@"
 dvips $outdvi -o $output
 
+# SUP: What's this stuff below???
 exit 0
 
 if [ $# -eq 1 ]
@@ -31,7 +32,7 @@ then
   fi
 fi
 
-db2dvi $1
+db2dvi "$@"
 
 if [ ! -f ${TMPFN}.dvi ]
 then
