@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.112 2002/10/15 13:20:18 simonmar Exp $
+-- $Id: Main.hs,v 1.113 2002/10/24 13:08:35 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -326,7 +326,7 @@ beginMake fileish_args  = do
 		    when (failed ok_flag) (exitWith (ExitFailure 1))
 		    return ()
   where
-    looks_like_an_input m = haskellish_src_file m || looksLikeModuleName m
+    looks_like_an_input m = haskellish_src_file m || '.' `notElem` m
 
 
 beginInteractive :: [String] -> IO ()
