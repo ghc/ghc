@@ -113,13 +113,13 @@ ifeq "$(stage)" "3"
 HC=$(GHC_STAGE2)
 endif
 
-stage1 :
+stage1 ::
 	$(MAKE) stage=1
 
-stage2 : 
+stage2 ::
 	$(MAKE) stage=2
 
-stage3 : 
+stage3 ::
 	$(MAKE) stage=3
 
 odir=stage$(stage)
