@@ -21,7 +21,7 @@ module ParseUtil (
 	, checkSimple		-- HsType -> [HsName] -> P ((HsName,[HsName]))
 	, checkPattern		-- HsExp -> P HsPat
 	, checkPatterns		-- SrcLoc -> [HsExp] -> P [HsPat]
-	-- , checkExpr		-- HsExp -> P HsExp
+	, checkDo		-- [HsStmt] -> P [HsStmt]
 	, checkValDef		-- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
 	, checkValSig		-- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
  ) where
@@ -100,13 +100,6 @@ callConvFM = listToUFM $
 --	("fastcall", fastCallConv)
      ]
 
-checkCallConv :: FAST_STRING -> P CallConv
-checkCallConv s = 
-  case lookupUFM callConvFM s of
-	Nothing -> parseError ("unknown calling convention: `"
-				 ++ unpackFS s ++ "'")
-	Just conv -> returnP conv
-
 checkInstType :: RdrNameHsType -> P RdrNameHsType
 checkInstType t 
   = case t of
@@ -165,6 +158,19 @@ checkSimple (HsOpTy (HsTyVar t1) tycon (HsTyVar t2)) []
   = returnP (tycon,[t1,t2])
 
 checkSimple t _ = parseError "Illegal left hand side in data/newtype declaration"
+
+---------------------------------------------------------------------------
+-- Checking statements in a do-expression
+-- 	We parse   do { e1 ; e2 ; }
+-- 	as [ExprStmt e1, ExprStmt e2]
+-- checkDo (a) checks that the last thing is an ExprStmt
+--	   (b) transforms it to a ResultStmt
+
+checkDo []	       = parseError "Empty 'do' construct"
+checkDo [ExprStmt e l] = returnP [ResultStmt e l]
+checkDo [s] 	       = parseError "The last statment in a 'do' construct must be an expression"
+checkDo (s:ss)	       = checkDo ss	`thenP` \ ss' ->
+			 returnP (s:ss')
 
 ---------------------------------------------------------------------------
 -- Checking Patterns.

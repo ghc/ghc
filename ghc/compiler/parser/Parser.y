@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.62 2001/05/08 16:25:30 simonpj Exp $
+$Id: Parser.y,v 1.63 2001/05/09 13:05:07 simonpj Exp $
 
 Haskell grammar.
 
@@ -697,7 +697,8 @@ exp10 :: { RdrNameHsExpr }
 	| 'if' srcloc exp 'then' exp 'else' exp { HsIf $3 $5 $7 $2 }
    	| 'case' srcloc exp 'of' altslist	{ HsCase $3 $5 $2 }
 	| '-' fexp				{ mkHsNegApp $2 }
-  	| srcloc 'do' stmtlist			{ HsDo DoExpr $3 $1 }
+  	| srcloc 'do' stmtlist			{% checkDo $3  `thenP` \ stmts ->
+						   returnP (HsDo DoExpr stmts $1) }
 
 	| '_ccall_'    ccallid aexps0		{ HsCCall $2 $3 False False cbot }
 	| '_ccall_GC_' ccallid aexps0		{ HsCCall $2 $3 True  False cbot }
@@ -837,13 +838,22 @@ stmtlist :: { [RdrNameStmt] }
 	: '{'            	stmts '}'	{ $2 }
 	|     layout_on_for_do  stmts close	{ $2 }
 
+--	do { ;; s ; s ; ; s ;; }
+-- The last Stmt should be a ResultStmt, but that's hard to enforce
+-- here, because we need too much lookahead if we see do { e ; }
+-- So we use ExprStmts throughout, and switch the last one over
+-- in ParseUtils.checkDo instead
 stmts :: { [RdrNameStmt] }
-	: ';' stmts			{ $2 }
-	| stmt ';' stmts		{ $1 : $3 }
-	| srcloc exp			{ [ResultStmt $2 $1] }
+	: stmt stmts_help		{ $1 : $2 }
+	| ';' stmts			{ $2 }
+	| {- empty -}			{ [] }
 
--- for typing stmts at the GHCi prompt, where the input may consist of
--- just comments.
+stmts_help :: { [RdrNameStmt] }
+	: ';' stmts			{ $2 }
+	| {- empty -}			{ [] }
+
+-- For typing stmts at the GHCi prompt, where 
+-- the input may consist of just comments.
 maybe_stmt :: { Maybe RdrNameStmt }
 	: stmt				{ Just $1 }
 	| {- nothing -}			{ Nothing }
