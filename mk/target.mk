@@ -452,7 +452,7 @@ ifneq "$(HS_SRCS)" ""
 ifneq "$(filter -split-objs,$(HC_OPTS))" ""
 define BUILD_LIB
 $(RM) $@
-TMPDIR=$(TMPDIR); export TMPDIR; find $(patsubst %.$(way_)o,%,$(LIBOBJS)) -name '*.$(way_)o' -print | xargs ar q $@
+TMPDIR=$(TMPDIR); export TMPDIR; $(FIND) $(patsubst %.$(way_)o,%,$(LIBOBJS)) -name '*.$(way_)o' -print | xargs ar q $@
 $(RANLIB) $@
 endef
 endif # $(filter...
@@ -911,8 +911,8 @@ endif
 dist-pre::
 	-rm -rf $(SRC_DIST_DIR)
 	-rm -f $(SRC_DIST_NAME).tar.gz
-	(cd $(FPTOOLS_TOP_ABS); find $(SRC_DIST_DIRS) -type d \( -name CVS -prune -o -name SRC -prune -o -name tests -prune -o -exec $(MKDIRHIER) $(SRC_DIST_DIR)/{} \; \) ; )
-	(cd $(FPTOOLS_TOP_ABS); find $(SRC_DIST_DIRS) -name CVS -prune -o -name SRC -prune -o -name tests -prune -o -name "*~" -prune -o -name ".cvsignore" -prune -o -name "\#*" -prune -o -name ".\#*" -prune -o -type l -exec $(LN_S) $(FPTOOLS_TOP_ABS)/{} $(SRC_DIST_DIR)/{} \; )
+	(cd $(FPTOOLS_TOP_ABS); $(FIND) $(SRC_DIST_DIRS) -type d \( -name CVS -prune -o -name SRC -prune -o -name tests -prune -o -exec $(MKDIRHIER) $(SRC_DIST_DIR)/{} \; \) ; )
+	(cd $(FPTOOLS_TOP_ABS); $(FIND) $(SRC_DIST_DIRS) -name CVS -prune -o -name SRC -prune -o -name tests -prune -o -name "*~" -prune -o -name ".cvsignore" -prune -o -name "\#*" -prune -o -name ".\#*" -prune -o -type l -exec $(LN_S) $(FPTOOLS_TOP_ABS)/{} $(SRC_DIST_DIR)/{} \; )
 
 #
 # After having created a shadow distribution tree and copied/linked
@@ -924,13 +924,13 @@ dist-pre::
 #
 dist-post::
 	@echo Deleting the following empty directories..
-	( cd $(SRC_DIST_DIR) ; cd .. ; find $(SRC_DIST_NAME) -type d -exec sh -c 'test x`ls $$0 | wc -l | sed -e "s/ //g"` = x0' {} \; -print -exec rm -rf {} \; -prune )
+	( cd $(SRC_DIST_DIR) ; cd .. ; $(FIND) $(SRC_DIST_NAME) -type d -exec sh -c 'test x`ls $$0 | wc -l | sed -e "s/ //g"` = x0' {} \; -print -exec rm -rf {} \; -prune )
 	( cd $(SRC_DIST_DIR) ; cd .. ; chmod -R a+rw $(SRC_DIST_NAME) ) 
 
 # Automatic generation of a MANIFEST file for a source distribution
 # tree that is ready to go.
 dist-manifest ::
-	cd $(SRC_DIST_DIR); find . \( -type l -o -type f \) -exec ls -lLG {} \; | sed -e 's/\.\///' > /tmp/MANIFEST ; mv /tmp/MANIFEST MANIFEST
+	cd $(SRC_DIST_DIR); $(FIND) . \( -type l -o -type f \) -exec ls -lLG {} \; | sed -e 's/\.\///' > /tmp/MANIFEST ; mv /tmp/MANIFEST MANIFEST
 
 dist-package:: dist-package-tar-gz
 
@@ -1078,7 +1078,7 @@ endif
 ifneq "$(HS_OBJS)" ""
 ifneq "$(filter -split-objs,$(HC_OPTS))" ""
 clean ::
-	find $(patsubst %.$(way_)o,%,$(HS_OBJS)) -name '*.$(way_)o' -print | xargs $(RM) __rm_food
+	$(FIND) $(patsubst %.$(way_)o,%,$(HS_OBJS)) -name '*.$(way_)o' -print | xargs $(RM) __rm_food
 	-rmdir $(patsubst %.$(way_)o,%,$(HS_OBJS)) > /dev/null 2>&1
 endif
 endif

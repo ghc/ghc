@@ -32,7 +32,7 @@ endif
 
 HC_SPLIT_PRE= \
  $(RM) $@ ; if [ ! -d $(basename $@) ]; then mkdir $(basename $@); else \
- find $(basename $@) -name '*.$(way_)o' -print | xargs $(RM) __rm_food ; fi
+ $(FIND) $(basename $@) -name '*.$(way_)o' -print | xargs $(RM) __rm_food ; fi
 HC_SPLIT_POST  = touch $@
 
 HC_PRE__       = $(patsubst %,$(HC_SPLIT_PRE) ; ,$(filter -split-objs,$(HC_OPTS)))
