@@ -24,8 +24,9 @@ module MachMisc (
 
 	Instr(..),  IF_ARCH_i386(Operand(..) COMMA,)
 	Cond(..),
-	Size(..)
-	
+	Size(..),
+        IF_ARCH_i386(i386_insert_ffrees COMMA,)	
+
 #if alpha_TARGET_ARCH
 	, RI(..)
 #endif
@@ -41,7 +42,7 @@ module MachMisc (
 
 import AbsCSyn		( MagicId(..) ) 
 import AbsCUtils	( magicIdPrimRep )
-import CLabel           ( CLabel )
+import CLabel           ( CLabel, isAsmTemp )
 import Const		( mkMachInt, Literal(..) )
 import MachRegs		( stgReg, callerSaves, RegLoc(..),
 			  Imm(..), Reg(..), 
@@ -76,7 +77,7 @@ fmtAsmLbl s
      -}
      '$' : s
      ,{-otherwise-}
-     s
+     '.':'L':s
      )
 
 ---------------------------
@@ -514,6 +515,7 @@ current translation.
 
               -- all the 3-operand fake fp insns are src1 src2 dst
               -- and furthermore are constrained to be fp regs only.
+              -- IMPORTANT: keep is_G_insn up to date with any changes here
     	      | GMOV	      Reg Reg -- src(fpreg), dst(fpreg)
               | GLD           Size MachRegsAddr Reg -- src, dst(fpreg)
               | GST           Size Reg MachRegsAddr -- src(fpreg), dst
@@ -538,6 +540,7 @@ current translation.
     	      | GNEG	      Size Reg Reg -- src, dst
     	      | GSQRT	      Size Reg Reg -- src, dst
 
+              | GFREE         -- do ffree on all x86 regs; an ugly hack
 -- Comparison
 
 	      | TEST          Size Operand Operand
@@ -565,6 +568,38 @@ data Operand
   = OpReg  Reg	        -- register
   | OpImm  Imm	        -- immediate value
   | OpAddr MachRegsAddr	-- memory reference
+
+
+i386_insert_ffrees :: [Instr] -> [Instr]
+i386_insert_ffrees insns
+   | any is_G_instr insns
+   = concatMap ffree_before_nonlocal_transfers insns
+   | otherwise
+   = insns
+
+ffree_before_nonlocal_transfers insn
+   = case insn of
+        CALL _                                      -> [GFREE, insn]
+        JMP (OpImm (ImmCLbl clbl)) | isAsmTemp clbl -> [insn]
+        JMP _                                       -> [GFREE, insn]
+        other                                       -> [insn]
+
+
+-- if you ever add a new FP insn to the fake x86 FP insn set,
+-- you must update this too
+is_G_instr :: Instr -> Bool
+is_G_instr instr
+   = case instr of
+        GMOV _ _ -> True; GLD _ _ _ -> True; GST _ _ _ -> True;
+        GFTOD _ _ -> True; GFTOI _ _ -> True;
+        GDTOF _ _ -> True; GDTOI _ _ -> True;
+        GITOF _ _ -> True; GITOD _ _ -> True;
+	GADD _ _ _ _ -> True; GDIV _ _ _ _ -> True
+	GSUB _ _ _ _ -> True; GMUL _ _ _ _ -> True
+    	GCMP _ _ _ -> True; GABS _ _ _ -> True
+    	GNEG _ _ _ -> True; GSQRT _ _ _ -> True
+        GFREE -> panic "is_G_instr: GFREE (!)"
+        other -> False
 
 #endif {- i386_TARGET_ARCH -}
 \end{code}

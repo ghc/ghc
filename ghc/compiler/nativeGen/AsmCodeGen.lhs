@@ -6,6 +6,7 @@
 module AsmCodeGen ( nativeCodeGen ) where
 
 #include "HsVersions.h"
+#include "nativeGen/NCG.h"
 
 import IO		( Handle )
 import List		( intersperse )
@@ -26,10 +27,10 @@ import PrimRep		( isFloatingRep )
 import UniqSupply	( returnUs, thenUs, mapUs, initUs, 
                           initUs_, UniqSM, UniqSupply )
 import UniqFM		( UniqFM, emptyUFM, addToUFM, lookupUFM )
+import MachMisc		( IF_ARCH_i386(i386_insert_ffrees,) )
+
 import Outputable	
 
-import GlaExts (trace) --tmp
-#include "nativeGen/NCG.h"
 \end{code}
 
 The 96/03 native-code generator has machine-independent and
@@ -97,7 +98,11 @@ codeGen :: [[StixTree]] -> UniqSM SDoc
 codeGen stixFinal
   = mapUs genMachCode stixFinal	`thenUs` \ dynamic_codes ->
     let
-	static_instrss = scheduleMachCode dynamic_codes
+        fp_kludge :: [Instr] -> [Instr]
+        fp_kludge = IF_ARCH_i386(i386_insert_ffrees,id)
+
+        static_instrss :: [[Instr]]
+	static_instrss = map fp_kludge (scheduleMachCode dynamic_codes)
         docs           = map (vcat . map pprInstr) static_instrss       
     in
     returnUs (vcat (intersperse (char ' ' 

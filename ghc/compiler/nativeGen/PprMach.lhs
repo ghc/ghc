@@ -998,12 +998,8 @@ pprInstr (JXX cond lab) = pprCondInstr SLIT("j") cond (pprCLabel_asm lab)
 
 pprInstr (JMP (OpImm imm)) = (<>) (ptext SLIT("\tjmp ")) (pprImm imm)
 pprInstr (JMP op) = (<>) (ptext SLIT("\tjmp *")) (pprOperand L op)
-
 pprInstr (CALL imm)
-   = vcat [ ptext SLIT("\tffree %st(0) ;ffree %st(1) ;ffree %st(2) ;ffree %st(3)"),
-            ptext SLIT("\tffree %st(4) ;ffree %st(5) ;ffree %st(6) ;ffree %st(7)"),
-            hcat [ ptext SLIT("\tcall "), pprImm imm ]
-          ]
+   = (<>) (ptext SLIT("\tcall ")) (pprImm imm)
 
 
 -- Simulating a flat register set on the x86 FP stack is tricky.
@@ -1069,6 +1065,11 @@ pprInstr g@(GDIV sz src1 src2 dst)
    = pprG g (hcat [gtab, gpush src1 0, 
                    text " ; fdiv ", greg src2 1, text ",%st(0)",
                    gsemi, gpop dst 1])
+
+pprInstr GFREE 
+   = vcat [ ptext SLIT("\tffree %st(0) ;ffree %st(1) ;ffree %st(2) ;ffree %st(3)"),
+            ptext SLIT("\tffree %st(4) ;ffree %st(5) ;ffree %st(6) ;ffree %st(7)") 
+          ]
 
 --------------------------
 gpush reg offset
