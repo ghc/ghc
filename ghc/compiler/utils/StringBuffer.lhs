@@ -92,13 +92,13 @@ data StringBuffer
 
 hGetStringBuffer :: FilePath -> IO StringBuffer
 hGetStringBuffer fname =
---    _trace ("Renamer: opening " ++ fname)
+--    trace ("Renamer: opening " ++ fname) $
     openFile fname ReadMode >>= \ hndl ->
     hFileSize hndl          >>= \ len@(J# _ _ d#) ->
     let len_i = fromInteger len in
       -- Allocate an array for system call to store its bytes into.
       -- ToDo: make it robust
---    _trace (show (len_i::Int)+1) 
+--    trace (show ((len_i::Int)+1)) $
     (_casm_ `` %r=(char *)malloc(sizeof(char)*(int)%0); '' (len_i::Int))  `CCALL_THEN` \ arr@(A# a#) ->
     if addr2Int# a# ==# 0# then
        failWith MkIOError(hndl,UserError,("hGetStringBuffer: Could not allocate "++show len_i ++ " bytes"))
@@ -110,7 +110,7 @@ hGetStringBuffer fname =
      _writeHandle hndl hndl_ >>
      let ptr = _filePtr hndl_ in
      _ccall_ fread arr (1::Int) len_i ptr                     `CCALL_THEN` \  (I# read#) ->
---      _trace ("DEBUG: opened " ++ fname ++ show (I# read#)) $
+--     trace ("DEBUG: opened " ++ fname ++ show (I# read#)) $
      hClose hndl		     >>
      if read# ==# 0# then -- EOF or other error
         failWith MkIOError(hndl,UserError,"hGetStringBuffer: EOF reached or some other error")
@@ -196,6 +196,7 @@ stepOnUntil pred (StringBuffer fo l# s# c#) =
    loop c# = 
     case indexCharOffAddr# fo c# of
      ch# | pred (C# ch#) -> StringBuffer fo l# c# c#
+	 | ch# `eqChar#` '\NUL'# && c# >=# l# -> StringBuffer fo l# l# l# -- EOB, return immediately.
          | otherwise     -> loop (c# +# 1#)
 
 stepOverLexeme :: StringBuffer -> StringBuffer
@@ -208,6 +209,7 @@ expandWhile pred (StringBuffer fo l# s# c#) =
    loop c# = 
     case indexCharOffAddr# fo c# of
      ch# | pred (C# ch#) -> loop (c# +# 1#)
+	 | ch# `eqChar#` '\NUL'# && c# >=# l# -> StringBuffer fo l# l# l# -- EOB, return immediately.
          | otherwise     -> StringBuffer fo l# s# c#
 
 
@@ -218,6 +220,7 @@ scanNumLit (I# acc#) (StringBuffer fo l# s# c#) =
    loop acc# c# = 
     case indexCharOffAddr# fo c# of
      ch# | isDigit (C# ch#) -> loop (acc# *# 10# +# (ord# ch# -# ord# '0'#)) (c# +# 1#)
+	 | ch# `eqChar#` '\NUL'# && c# >=# l# -> (I# acc#, StringBuffer fo l# l# l#) -- EOB, return immediately.
          | otherwise        -> (I# acc#,StringBuffer fo l# s# c#)
 
 
@@ -271,12 +274,17 @@ untilEndOfString# (StringBuffer fo l# s# c#) =
 	         '\\'# -> odd_slashes (not flg) (i# -# 1#)
 	         _     -> flg
               in
-	      if odd_slashes True (c# -# 1#) then
+	      if odd_slashes True (c# -# 2#) then
 	          -- odd number, " is ecaped.
 		  loop (c# +# 1#)
 	      else  -- a real end of string delimiter after all.
 		  StringBuffer fo l# s# c#
         _ -> StringBuffer fo l# s# c#
+    '\NUL'# ->
+	if c# >=# l# then -- hit sentinel, this doesn't look too good..
+	   StringBuffer fo l# l# l#
+	else
+	   loop (c# +# 1#)
     _ -> loop (c# +# 1#)
 
 
@@ -294,6 +302,11 @@ untilEndOfChar# (StringBuffer fo l# s# c#) =
 		   StringBuffer fo l# s# c#
              _ -> loop (c# +# 1#) -- false alarm
         _ -> StringBuffer fo l# s# c#
+    '\NUL'# ->
+	if c# >=# l# then -- hit sentinel, this doesn't look too good..
+	   StringBuffer fo l# l# l#
+	else
+	   loop (c# +# 1#)
     _ -> loop (c# +# 1#)
 
 untilChar# :: StringBuffer -> Char# -> StringBuffer
