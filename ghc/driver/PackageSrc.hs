@@ -9,8 +9,8 @@ import Package
 main = do
   args <- getArgs
   case args of
-	[ "install"  ] -> do { putStr (pprPackage (package_details True)) }
-	[ "in-place" ] -> do { putStr (pprPackage (package_details False)) }
+	[ "install"  ] -> do { putStr (dumpPackages (package_details True)) }
+	[ "in-place" ] -> do { putStr (dumpPackages (package_details False)) }
 	_ -> do hPutStr stderr "usage: pkgconf (install | in-place)\n"
 	        exitWith (ExitFailure 1)
 
@@ -74,11 +74,11 @@ package_details installing =
          "-u PrelBase_False_closure",
          "-u PrelBase_True_closure",
          "-u PrelPack_unpackCString_closure",
-         "-u PrelException_stackOverflow_closure",
-         "-u PrelException_heapOverflow_closure",
-         "-u PrelException_NonTermination_closure",
-         "-u PrelException_PutFullMVar_closure",
-         "-u PrelException_BlockedOnDeadMVar_closure",
+         "-u PrelIOBase_stackOverflow_closure",
+         "-u PrelIOBase_heapOverflow_closure",
+         "-u PrelIOBase_NonTermination_closure",
+         "-u PrelIOBase_PutFullMVar_closure",
+         "-u PrelIOBase_BlockedOnDeadMVar_closure",
 	 "-u PrelWeak_runFinalizzerBatch_closure",
          "-u __init_Prelude",
          "-u __init_PrelMain"
@@ -257,6 +257,26 @@ package_details installing =
 			     else cFPTOOLS_TOP_ABS ++ "/hslibs/util/cbits",
 	 c_include      = "HsUtil.h",
 	 package_deps   = ["lang", "concurrent", "posix"],
+	 extra_ghc_opts = "",
+	 extra_cc_opts  = "",
+	 extra_ld_opts  = ""
+	}
+       ),
+
+	-- no cbits at the moment, we'll need to add one if this library
+	-- ever calls out to any C libs.
+       ( "hssource",
+	 Package {
+	 import_dirs    = if installing 
+	       		     then [ clibdir ++ "/imports/hssource" ]
+	       		     else [ cFPTOOLS_TOP_ABS ++ "/hslibs/hssource" ],
+	 library_dirs   = if installing 
+	       		     then [ clibdir ]
+	       		     else [ cFPTOOLS_TOP_ABS ++ "/hslibs/hssource" ],
+	 libraries      = [ "HShssource" ],
+	 include_dir    = "",
+	 c_include      = "",
+	 package_deps   = ["text"],
 	 extra_ghc_opts = "",
 	 extra_cc_opts  = "",
 	 extra_ld_opts  = ""

@@ -15,10 +15,17 @@ data Package = Package {
      		}
   deriving (Read, Show)
 
-pprPackage :: [(String,Package)] -> String
-pprPackage pkgs = render (brackets (vcat (punctuate comma (map pprPkg pkgs))))
+listPkgs :: [(String,Package)] -> String
+listPkgs pkgs = render (fsep (punctuate comma (map (text . fst) pkgs)))
 
-pprPkg (name, (Package
+dumpPackages :: [(String,Package)] -> String
+dumpPackages pkgs = 
+   render (brackets (vcat (punctuate comma (map dumpPkg pkgs))))
+
+dumpPkg (name, pkg) = parens (hang (text (show name) <> comma) 
+				2 (dumpPkgGuts pkg))
+
+dumpPkgGuts (Package
 	{ import_dirs    = import_dirs    
       	, library_dirs   = library_dirs   
       	, libraries      = libraries      
@@ -27,19 +34,18 @@ pprPkg (name, (Package
       	, package_deps   = package_deps   
       	, extra_ghc_opts = extra_ghc_opts 
       	, extra_cc_opts  = extra_cc_opts  
-      	, extra_ld_opts  = extra_ld_opts   }))
-   = parens ( 
-	text (show name) <> comma
-    <+> text "Package" <+> braces (
-   	vcat [
-   	   text "import_dirs = "    <> text (show import_dirs) <> comma,
-   	   text "library_dirs = "   <> text (show library_dirs) <> comma,
-   	   text "libraries = "      <> text (show libraries) <> comma,
-   	   text "include_dir = "    <> text (show include_dir) <> comma,
-   	   text "c_include = "      <> text (show c_include) <> comma,
-   	   text "package_deps = "   <> text (show package_deps) <> comma,
-   	   text "extra_ghc_opts = " <> text (show extra_ghc_opts) <> comma,
-   	   text "extra_cc_opts = "  <> text (show extra_cc_opts) <> comma,
-   	   text "extra_ld_opts = "  <> text (show extra_ld_opts)
-   	])
-    )
+      	, extra_ld_opts  = extra_ld_opts   })
+   = text "Package" $$ nest 3 (braces (
+   	sep (punctuate comma [
+   	   hang (text "import_dirs ="     ) 2 (pprStrs import_dirs),
+   	   hang (text "library_dirs = "   ) 2 (pprStrs library_dirs),
+   	   hang (text "libraries = "      ) 2 (pprStrs libraries),
+   	   hang (text "include_dir = "    ) 2 (text (show include_dir)),
+   	   hang (text "c_include = "      ) 2 (text (show c_include)),
+   	   hang (text "package_deps = "   ) 2 (pprStrs package_deps),
+   	   hang (text "extra_ghc_opts = " ) 2 (text (show extra_ghc_opts)),
+   	   hang (text "extra_cc_opts = "  ) 2 (text (show extra_cc_opts)),
+   	   hang (text "extra_ld_opts = "  ) 2 (text (show extra_ld_opts))
+   	])))
+
+pprStrs strs = brackets (sep (punctuate comma (map (text . show) strs)))

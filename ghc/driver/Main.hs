@@ -18,6 +18,7 @@ import Exception
 import Dynamic
 
 import IO
+import Monad
 import Array
 import List
 import System
@@ -38,6 +39,7 @@ name = global (value) :: IORef (ty); \
 -- user ways
 -- Win32 support
 -- make sure OPTIONS in .hs file propogate to .hc file if -C or -keep-hc-file-too
+-- reading the package configuration file is too slow
 
 -----------------------------------------------------------------------------
 -- Differences vs. old driver:
@@ -120,6 +122,7 @@ data BarfKind
   | PhaseFailed String ExitCode
   | Interrupted
   | NoInputFiles
+  | OtherError String
   deriving Eq
 
 GLOBAL_VAR(prog_name, "ghc", String)
@@ -146,6 +149,8 @@ showBarf (WayCombinationNotSupported ws)
 	(map (showString . wayName . lkupWay) ws)
 showBarf (NoInputFiles)
    = showString "no input files"
+showBarf (OtherError str)
+   = showString str
 
 barfKindTc = mkTyCon "BarfKind"
 
@@ -532,6 +537,66 @@ augment_library_paths path
 
 -----------------------------------------------------------------------------
 -- Packages
+
+GLOBAL_VAR(package_config, (findFile "package.conf" (cGHC_DRIVER_DIR++"/package.conf.inplace")), String)
+
+listPackages :: IO ()
+listPackages = do 
+  details <- readIORef package_details
+  hPutStr stdout (listPkgs details)
+  hPutChar stdout '\n'
+  exitWith ExitSuccess
+
+newPackage :: IO ()
+newPackage = do
+  hPutStr stdout "Reading package info from stdin... "
+  stuff <- getContents
+  let new_pkg = read stuff :: (String,Package)
+  catchAll new_pkg
+  	(\e -> throwDyn (OtherError "parse error in package info"))
+  hPutStrLn stdout "done."
+  conf_file <- readIORef package_config
+  savePackageConfig conf_file
+  maybeRestoreOldConfig conf_file $ do
+  writeNewConfig conf_file ( ++ [new_pkg])
+  exitWith ExitSuccess
+
+maybeRestoreOldConfig :: String -> IO () -> IO ()
+maybeRestoreOldConfig conf_file io
+  = catchAllIO io (\e -> do
+        hPutStr stdout "\nWARNING: an error was encountered while the new \n\ 
+        	       \configuration was being written.  Attempting to \n\ 
+        	       \restore the old configuration... "
+        system ("cp " ++ conf_file ++ ".old " ++ conf_file)
+        hPutStrLn stdout "done."
+	throw e
+    )
+
+writeNewConfig :: String -> ([(String,Package)] -> [(String,Package)]) -> IO ()
+writeNewConfig conf_file fn = do
+  hPutStr stdout "Writing new package config file... "
+  old_details <- readIORef package_details
+  h <- openFile conf_file WriteMode
+  hPutStr h (dumpPackages (fn old_details))
+  hClose h
+  hPutStrLn stdout "done."
+
+savePackageConfig :: String -> IO ()
+savePackageConfig conf_file = do
+  hPutStr stdout "Saving old package config file... "
+    -- mv rather than cp because we've already done an hGetContents
+    -- on this file so we won't be able to open it for writing
+    -- unless we move the old one out of the way...
+  system ("mv " ++ conf_file ++ " " ++ conf_file ++ ".old")
+  hPutStrLn stdout "done."
+
+deletePackage :: String -> IO ()
+deletePackage pkg = do  
+  conf_file <- readIORef package_config
+  savePackageConfig conf_file
+  maybeRestoreOldConfig conf_file $ do
+  writeNewConfig conf_file (filter ((/= pkg) . fst))
+  exitWith ExitSuccess
 
 -- package list is maintained in dependency order
 packages = global ["std", "rts", "gmp"] :: IORef [String]
@@ -1025,8 +1090,8 @@ main =
    argv'  <- setTopDir argv
 
    -- read the package configuration
-   let conf = findFile "package.conf" (cGHC_DRIVER_DIR++"/package.conf.inplace")
-   contents <- readFile conf
+   conf_file <- readIORef package_config
+   contents <- readFile conf_file
    writeIORef package_details (read contents)
 
    -- find the phase to stop after (i.e. -E, -C, -c, -S flags)
@@ -1038,6 +1103,11 @@ main =
    -- find the build tag, and re-process the build-specific options
    more_opts <- findBuildTag
    _ <- processArgs more_opts []
+
+   -- get the -v flag
+   verb <- readIORef verbose
+
+   when verb (hPutStrLn stderr ("Using package config file: " ++ conf_file))
 
    if stop_phase == MkDependHS		-- mkdependHS is special
 	then do_mkdependHS flags2 srcs
@@ -1699,6 +1769,10 @@ opts =
 
   ,  ( "package"        , HasArg (addPackage) )
   ,  ( "syslib"         , HasArg (addPackage) )	-- for compatibility w/ old vsns
+
+  ,  ( "-list-packages"  , NoArg (listPackages) )
+  ,  ( "-add-package"    , NoArg (newPackage) )
+  ,  ( "-delete-package" , SepArg (deletePackage) )
 
         ------- Specific phases  --------------------------------------------
   ,  ( "pgmdep"         , HasArg (writeIORef pgm_dep) )
