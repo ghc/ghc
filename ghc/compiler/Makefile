@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.186 2001/08/15 14:02:54 sewardj Exp $
+# $Id: Makefile,v 1.187 2001/08/15 14:36:21 rrt Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -143,18 +143,15 @@ HS_SRCS += $(CONFIG_HS)
 # GHC with GHC 5.02 or better, but lacking that we have the following
 # hack: 
 #	copy rawSystem.c from hslibs/lang/cbits
-#       and SystemExts.lhs from hslibs/lang
-#	into main/ (where they'll be compiled and linked with the compiler)
+#	into main/ (where it'll be compiled and linked with the compiler)
+#       (the Haskell-side code is ifdefed into main/SysTools.lhs)
 
 ifneq "$(ghc_502_at_least)" "YES"
 C_SRCS += main/rawSystem.c
-HS_SRCS := $(filter-out main/SystemExts.lhs,$(HS_SRCS)) main/SystemExts.lhs
 SRC_CC_OPTS += -I$(GHC_LIB_DIR)/std/cbits
 SRC_MKDEPENDC_OPTS += -I$(GHC_LIB_DIR)/std/cbits
 HS_OBJS += main/rawSystem.o
 main/rawSystem.c : $(FPTOOLS_TOP)/hslibs/lang/cbits/rawSystem.c
-	$(CP) $< main
-main/SystemExts.lhs: $(FPTOOLS_TOP)/hslibs/lang/SystemExts.lhs
 	$(CP) $< main
 endif
 endif

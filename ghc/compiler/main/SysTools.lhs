@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: SysTools.lhs,v 1.49 2001/08/15 09:32:40 rrt Exp $
+-- $Id: SysTools.lhs,v 1.50 2001/08/15 14:36:21 rrt Exp $
 --
 -- (c) The University of Glasgow 2001
 --
@@ -74,7 +74,12 @@ import qualified Posix
 #else
 import List		( isPrefixOf )
 import MarshalArray
-import SystemExts       ( rawSystem )
+-- use the line below when we can be sure of compiling with GHC >=
+-- 5.02, and remove the implementation of rawSystem at the end of this
+-- file
+import PrelIOBase -- this can be removed when SystemExts is used
+import CError     ( throwErrnoIfMinus1 ) -- as can this
+-- import SystemExts       ( rawSystem )
 #endif
 
 #include "HsVersions.h"
@@ -795,4 +800,16 @@ foreign import "_getpid" getProcessID :: IO Int -- relies on Int == Int32 on Win
 getProcessID :: IO Int
 getProcessID = Posix.getProcessID
 #endif
+
+rawSystem :: String -> IO ExitCode
+rawSystem "" = ioException (IOError Nothing InvalidArgument "rawSystem" "null command" Nothing)
+rawSystem cmd =
+  withUnsafeCString cmd $ \s -> do
+    status <- throwErrnoIfMinus1 "rawSystem" (primRawSystem s)
+    case status of
+        0  -> return ExitSuccess
+        n  -> return (ExitFailure n)
+
+foreign import ccall "rawSystemCmd" unsafe primRawSystem :: UnsafeCString -> IO Int
+
 \end{code}
