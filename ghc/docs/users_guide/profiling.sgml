@@ -4,13 +4,13 @@
   </indexterm>
   <indexterm><primary>cost-centre profiling</primary></indexterm>
 
-  <Para> Glasgow Haskell comes with a time and space profiling
+  <para> Glasgow Haskell comes with a time and space profiling
   system. Its purpose is to help you improve your understanding of
-  your program's execution behaviour, so you can improve it.</Para>
+  your program's execution behaviour, so you can improve it.</para>
   
-  <Para> Any comments, suggestions and/or improvements you have are
+  <para> Any comments, suggestions and/or improvements you have are
   welcome.  Recommended &ldquo;profiling tricks&rdquo; would be
-  especially cool! </Para>
+  especially cool! </para>
 
   <para>Profiling a program is a three-step process:</para>
 
@@ -30,12 +30,10 @@
     </listitem>
 
     <listitem>
-      <para> Run your program with one of the profiling options
-      <literal>-p</literal> or <literal>-h</literal>.  This generates
-      a file of profiling information.</para>
-      <indexterm><primary><literal>-p</literal></primary><secondary>RTS
-      option</secondary></indexterm>
-      <indexterm><primary><literal>-h</literal></primary><secondary>RTS
+      <para> Run your program with one of the profiling options, eg.
+      <literal>+RTS -p -RTS</literal>.  This generates a file of
+      profiling information.</para>
+      <indexterm><primary><option>-p</option></primary><secondary>RTS
       option</secondary></indexterm>
     </listitem>
       
@@ -94,7 +92,7 @@ nfib                 Main       100.0  100.0
 
 
                                               individual     inherited
-COST CENTRE              MODULE         scc  %time %alloc   %time %alloc
+COST CENTRE              MODULE      entries %time %alloc   %time %alloc
 
 MAIN                     MAIN             0    0.0   0.0    100.0 100.0
  main                    Main             0    0.0   0.0      0.0   0.0
@@ -218,20 +216,20 @@ MAIN                     MAIN             0    0.0   0.0    100.0 100.0
       <varlistentry>
 	<term><literal>ticks</literal></term>
 	<listitem>
-	  <Para>The raw number of time &ldquo;ticks&rdquo; which were
+	  <para>The raw number of time &ldquo;ticks&rdquo; which were
           attributed to this cost-centre; from this, we get the
           <literal>&percnt;time</literal> figure mentioned
-          above.</Para>
+          above.</para>
 	</listitem>
       </varlistentry>
 
       <varlistentry>
 	<term><literal>bytes</literal></term>
 	<listItem>
-	  <Para>Number of bytes allocated in the heap while in this
+	  <para>Number of bytes allocated in the heap while in this
           cost-centre; again, this is the raw number from which we get
           the <literal>&percnt;alloc</literal> figure mentioned
-          above.</Para>
+          above.</para>
 	</listItem>
       </varListEntry>
     </variablelist>
@@ -333,6 +331,136 @@ x = nfib 25
     </sect2>
   </sect1>
 
+  <sect1 id="prof-compiler-options">
+    <title>Compiler options for profiling</title>
+
+    <indexterm><primary>profiling</primary><secondary>options</secondary></indexterm>
+    <indexterm><primary>options</primary><secondary>for profiling</secondary></indexterm>
+
+    <variableList>
+      <varListEntry>
+	<term><Option>-prof</Option>:</Term>
+	<indexterm><primary><option>-prof</option></primary></indexterm>
+	<listItem>
+	  <para> To make use of the profiling system
+          <emphasis>all</emphasis> modules must be compiled and linked
+          with the <option>-prof</option> option. Any
+          <literal>SCC</literal> annotations you've put in your source
+          will spring to life.</para>
+
+	  <para> Without a <option>-prof</option> option, your
+          <literal>SCC</literal>s are ignored; so you can compile
+          <literal>SCC</literal>-laden code without changing
+          it.</para>
+	</listItem>
+      </varListEntry>
+    </variablelist>
+      
+    <para>There are a few other profiling-related compilation options.
+    Use them <emphasis>in addition to</emphasis>
+    <option>-prof</option>.  These do not have to be used consistently
+    for all modules in a program.</para>
+
+    <variablelist>
+      <varlistentry>
+	<term><option>-auto</option>:</Term>
+	<indexterm><primary><option>-auto</option></primary></indexterm>
+	<indexterm><primary>cost centres</primary><secondary>automatically inserting</secondary></indexterm>
+	<listItem>
+	  <para> GHC will automatically add
+          <Function>&lowbar;scc&lowbar;</Function> constructs for all
+          top-level, exported functions.</para>
+	</listItem>
+      </varListEntry>
+      
+      <varListEntry>
+	<term><option>-auto-all</option>:</Term>
+	<indexterm><primary><option>-auto-all</option></primary></indexterm>
+	<listItem>
+	  <para> <Emphasis>All</Emphasis> top-level functions,
+	  exported or not, will be automatically
+	  <Function>&lowbar;scc&lowbar;</Function>'d.</para>
+	</listItem>
+      </varListEntry>
+
+      <varListEntry>
+	<term><option>-caf-all</option>:</Term>
+	<indexterm><primary><option>-caf-all</option></primary></indexterm>
+	<listItem>
+	  <para> The costs of all CAFs in a module are usually
+	  attributed to one &ldquo;big&rdquo; CAF cost-centre. With
+	  this option, all CAFs get their own cost-centre.  An
+	  &ldquo;if all else fails&rdquo; option&hellip;</para>
+	</listItem>
+      </varListEntry>
+
+      <varListEntry>
+	<term><option>-ignore-scc</option>:</Term>
+	<indexterm><primary><option>-ignore-scc</option></primary></indexterm>
+	<listItem>
+	  <para>Ignore any <Function>&lowbar;scc&lowbar;</Function>
+          constructs, so a module which already has
+          <Function>&lowbar;scc&lowbar;</Function>s can be compiled
+          for profiling with the annotations ignored.</para>
+	</listItem>
+      </varListEntry>
+
+    </variableList>
+
+  </sect1>
+
+  <sect1 id="prof-time-options">
+    <title>Time and allocation profiling</Title>
+
+    <para>To generate a time and allocation profile, give one of the
+    following RTS options to the compiled program when you run it (RTS
+    options should be enclosed between <literal>+RTS...-RTS</literal>
+    as usual):</para>
+
+    <variableList>
+      <varListEntry>
+	<term><Option>-p</Option> or <Option>-P</Option>:</Term>
+	<indexterm><primary><option>-p</option></primary></indexterm>
+	<indexterm><primary><option>-P</option></primary></indexterm>
+	<indexterm><primary>time profile</primary></indexterm>
+	<listItem>
+	  <para>The <Option>-p</Option> option produces a standard
+          <Emphasis>time profile</Emphasis> report.  It is written
+          into the file
+          <Filename><replaceable>program</replaceable>.prof</Filename>.</para>
+
+	  <para>The <Option>-P</Option> option produces a more
+          detailed report containing the actual time and allocation
+          data as well.  (Not used much.)</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-px</option>:</term>
+	<indexterm><primary><option>-px</option></primary></indexterm>
+	<listitem>
+	  <para>The <option>-px</option> option generates profiling
+	  information in the XML format understood by our new
+	  profiling tool, see <xref linkend="prof-xml-tool">.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-xc</option></term>
+	<indexterm><primary><option>-xc</option></primary><secondary>RTS
+	option</secondary></indexterm>
+	<listitem>
+	  <para>This option makes use of the extra information
+	  maintained by the cost-centre-stack profiler to provide
+	  useful information about the location of runtime errors.
+	  See <xref linkend="rts-options-debugging">.</para>
+	</listitem>
+      </varlistentry>
+
+    </variableList>
+    
+  </sect1>
+
   <sect1 id="prof-heap">
     <title>Profiling memory usage</title>
 
@@ -344,19 +472,371 @@ x = nfib 25
     longer run-times due to heavy garbage collector ativity, and may
     even cause the program to run out of memory altogether.</para>
 
-    <para>To generate a heap profile from your program, compile it as
-    before, but this time run it with the <option>-h</option> runtime
-    option.  This generates a file
-    <filename>&lt;prog&gt;.hp</filename> file, which you then process
-    with <command>hp2ps</command> to produce a Postscript file
-    <filename>&lt;prog&gt;.ps</filename>.  The Postscript file can be
-    viewed with something like <command>ghostview</command>, or
-    printed out on a Postscript-compatible printer.</para>
+    <para>To generate a heap profile from your program:</para>
 
-    <para>For the RTS options that control the kind of heap profile
-    generated, see <xref linkend="prof-rts-options">.  Details on the
-    usage of the <command>hp2ps</command> program are given in <xref
-    linkend="hp2ps"></para>
+    <orderedlist>
+      <listitem>
+	<para>Compile the program for profiling (<xref
+	linkend="prof-compiler-options">).</para>
+      </listitem>
+      <listitem>
+	<para>Run it with one of the heap profiling options described
+	below (eg. <option>-hc</option> for a basic producer profile).
+	This generates the file
+	<filename><replaceable>prog</replaceable>.hp</filename>.</para>
+      </listitem>
+      <listitem>
+	<para>Run <command>hp2ps</command> to produce a Postscript
+	file,
+	<filename><replaceable>prog</replaceable>.ps</filename>.  The
+	<command>hp2ps</command> utility is described in detail in
+	<xref linkend="hp2ps">.</para> 
+      </listitem>
+      <listitem>
+	<para>Display the heap profile using a postscript viewer such
+	as <application>Ghostview</application>, or print it out on a
+	Postscript-capable printer.</para>
+      </listitem>
+    </orderedlist>
+
+    <sect2 id="rts-options-heap-prof">
+      <title>RTS options for heap profiling</title>
+
+      <para>There are several different kinds of heap profile that can
+      be generated.  All the different profile types yield a graph of
+      live heap against time, but they differ in how the live heap is
+      broken down into bands.  The following RTS options select which
+      break-down to use:</para>
+
+      <variablelist>
+	<varlistentry>
+	  <term><option>-hc</option></term>
+	  <indexterm><primary><option>-hc</option></primary><secondary>RTS
+	  option</secondary></indexterm>
+	  <listitem>
+	    <para>Breaks down the graph by the cost-centre stack which
+	    produced the data.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-hm</option></term>
+	  <indexterm><primary><option>-hm</option></primary><secondary>RTS
+	  option</secondary></indexterm>
+	  <listitem>
+	    <para>Break down the live heap by the module containing
+	    the code which produced the data.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-hd</option></term>
+	  <indexterm><primary><option>-hd</option></primary><secondary>RTS
+	  option</secondary></indexterm>
+	  <listitem>
+	    <para>Breaks down the graph by <firstterm>closure
+	    description</firstterm>.  For actual data, the description
+	    is just the constructor name, for other closures it is a
+	    compiler-generated string identifying the closure.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-hy</option></term>
+	  <indexterm><primary><option>-hy</option></primary><secondary>RTS
+	  option</secondary></indexterm>
+	  <listitem>
+	    <para>Breaks down the graph by
+	    <firstterm>type</firstterm>.  For closures which have
+	    function type or unknown/polymorphic type, the string will
+	    represent an approximation to the actual type.</para>
+	  </listitem>
+	</varlistentry>
+	
+	<varlistentry>
+	  <term><option>-hr</option></term>
+	  <indexterm><primary><option>-hr</option></primary><secondary>RTS
+	  option</secondary></indexterm>
+	  <listitem>
+	    <para>Break down the graph by <firstterm>retainer
+	    set</firstterm>.  Retainer profiling is described in more
+	    detail below (<xref linkend="retainer-prof">).</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-hb</option></term>
+	  <indexterm><primary><option>-hb</option></primary><secondary>RTS
+	  option</secondary></indexterm>
+	  <listitem>
+	    <para>Break down the graph by
+	    <firstterm>biography</firstterm>.  Biographical profiling
+	    is described in more detail below (<xref
+	    linkend="biography-prof">).</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+
+      <para>In addition, the profile can be restricted to heap data
+      which satisfies certain criteria - for example, you might want
+      to display a profile by type but only for data produced by a
+      certain module, or a profile by retainer for a certain type of
+      data.  Restrictions are specified as follows:</para>
+      
+      <variablelist>
+	<varlistentry>
+	  <term><option>-hc</option><replaceable>name</replaceable>,...</term>
+	  <indexterm><primary><option>-hc</option></primary><secondary>RTS
+	  option</secondary></indexterm>
+	  <listitem>
+	    <para>Restrict the profile to closures produced by
+	    cost-centre stacks with one of the specified cost centres
+	    at the top.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-hC</option><replaceable>name</replaceable>,...</term>
+	  <indexterm><primary><option>-hC</option></primary><secondary>RTS
+	  option</secondary></indexterm>
+	  <listitem>
+	    <para>Restrict the profile to closures produced by
+	    cost-centre stacks with one of the specified cost centres
+	    anywhere in the stack.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-hm</option><replaceable>module</replaceable>,...</term>
+	  <indexterm><primary><option>-hm</option></primary><secondary>RTS
+	  option</secondary></indexterm>
+	  <listitem>
+	    <para>Restrict the profile to closures produced by the
+	    specified modules.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-hd</option><replaceable>desc</replaceable>,...</term>
+	  <indexterm><primary><option>-hd</option></primary><secondary>RTS
+	  option</secondary></indexterm>
+	  <listitem>
+	    <para>Restrict the profile to closures with the specified
+	    description strings.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-hy</option><replaceable>type</replaceable>,...</term>
+	  <indexterm><primary><option>-hy</option></primary><secondary>RTS
+	  option</secondary></indexterm>
+	  <listitem>
+	    <para>Restrict the profile to closures with the specified
+	    types.</para>
+	  </listitem>
+	</varlistentry>
+	
+	<varlistentry>
+	  <term><option>-hr</option><replaceable>cc</replaceable>,...</term>
+	  <indexterm><primary><option>-hr</option></primary><secondary>RTS
+	  option</secondary></indexterm>
+	  <listitem>
+	    <para>Restrict the profile to closures with retainer sets
+	    containing cost-centre stacks with one of the specified
+	    cost centres at the top.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-hb</option><replaceable>bio</replaceable>,...</term>
+	  <indexterm><primary><option>-hb</option></primary><secondary>RTS
+	  option</secondary></indexterm>
+	  <listitem>
+	    <para>Restrict the profile to closures with one of the
+	    specified biographies, where
+	    <replaceable>bio</replaceable> is one of
+	    <literal>lag</literal>, <literal>drag</literal>,
+	    <literal>void</literal>, or <literal>use</literal>.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+
+      <para>For example, the following options will generate a
+      retainer profile restricted to <literal>Branch</literal> and
+      <literal>Leaf</literal> constructors:</para>
+
+<screen>
+<replaceable>prog</replaceable> +RTS -hr -hdBranch,Leaf
+</screen>
+
+      <para>There can only be one "break-down" option
+      (eg. <option>-hr</option> in the example above), but there is no
+      limit on the number of further restrictions that may be applied.
+      All the options may be combined, with one exception: GHC doesn't
+      currently support mixing the <option>-hr</option> and
+      <option>-hb</option> options.</para>
+
+      <para>There's one more option which relates to heap
+      profiling:</para>
+
+      <variablelist>
+	<varlistentry>
+	  <term><Option>-i<replaceable>secs</replaceable></Option>:</Term>
+	  <indexterm><primary><option>-i</option></primary></indexterm>
+	  <listItem>
+	    <para> Set the profiling (sampling) interval to
+            <replaceable>secs</replaceable> seconds (the default is
+            0.1&nbsp;second).  Fractions are allowed: for example
+            <Option>-i0.2</Option> will get 5 samples per second.
+            This only affects heap profiling; time profiles are always
+            sampled on a 1/50 second frequency.</para>
+	  </listItem>
+	</varlistentry>
+      </variablelist>
+
+    </sect2>
+    
+    <sect2 id="retainer-prof">
+      <title>Retainer Profiling</title>
+
+      <para>Retainer profiling is designed to help answer questions
+      like <quote>why is this data being retained?</quote>.  We start
+      by defining what we mean by a retainer:</para>
+
+      <blockquote>
+	<para>A retainer is either the system stack, or an unevaluated
+	closure (thunk).</para>
+      </blockquote>
+
+      <para>In particular, constructors are <emphasis>not</emphasis>
+      retainers.</para>
+
+      <para>An object A is retained by an object B if object A can be
+      reached by recursively following pointers starting from object
+      B but not meeting any other retainers on the way.  Each object
+      has one or more retainers, collectively called its
+      <firstterm>retainer set</firstterm>.</para>
+
+      <para>When retainer profiling is requested by giving the program
+      the <option>-hr</option> option, a graph is generated which is
+      broken down by retainer set.  A retainer set is displayed as a
+      set of cost-centre stacks; because this is usually too large to
+      fit on the profile graph, each retainer set is numbered and
+      shown abbreviated on the graph along with its number, and the
+      full list of retainer sets is dumped into the file
+      <filename><replaceable>prog</replaceable>.prof</filename>.</para>
+
+      <para>Retainer profiling requires multiple passes over the live
+      heap in order to discover the full retainer set for each
+      object, which can be quite slow.  So we set a limit on the
+      maximum size of a retainer set, where all retainer sets larger
+      than the maximum retainer set size are replaced by the special
+      set <literal>MANY</literal>.  The maximum set size defaults to 8
+      and can be altered with the <option>-R</option> RTS
+      option:</para>
+      
+      <variablelist>
+	<varlistentry>
+	  <term><option>-R</option><replaceable>size</replaceable></term>
+	  <listitem>
+	    <para>Restrict the number of elements in a retainer set to
+	    <replaceable>size</replaceable> (default 8).</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+
+      <sect3>
+	<title>Hints for using retainer profiling</title>
+
+	<para>The definition of retainers is designed to reflect a
+        common cause of space leaks: a large structure is retained by
+        an unevaluated computation, and will be released once the
+        compuation is forced.  A good example is looking up a value in
+        a finite map, where unless the lookup is forced in a timely
+        manner the unevaluated lookup will cause the whole mapping to
+        be retained.  These kind of space leaks can often be
+        eliminated by forcing the relevant computations to be
+        performed eagerly, using <literal>seq</literal> or strictness
+        annotations on data constructor fields.</para>
+
+	<para>Often a particular data structure is being retained by a
+        chain of unevaluated closures, only the nearest of which will
+        be reported by retainer profiling - for example A retains B, B
+        retains C, and C retains a large structure.  There might be a
+        large number of Bs but only a single A, so A is really the one
+        we're interested in eliminating.  However, retainer profiling
+        will in this case report B as the retainer of the large
+        structure.  To move further up the chain of retainers, we can
+        ask for another retainer profile but this time restrict the
+        profile to B objects, so we get a profile of the retainers of
+        B:</para>
+
+<screen>
+<replaceable>prog</replaceable> +RTS -hr -hcB
+</screen>
+	
+	<para>This trick isn't foolproof, because there might be other
+        B closures in the heap which aren't the retainers we are
+        interested in, but we've found this to be a useful technique
+        in most cases.</para>
+      </sect3>
+    </sect2>
+
+    <sect2 id="biography-prof">
+      <title>Biographical Profiling</title>
+
+      <para>A typical heap object may be in one of the following four
+      states at each point in its lifetime:</para>
+
+      <itemizedlist>
+	<listitem>
+	  <para>The <firstterm>lag</firstterm> stage, which is the
+	  time between creation and the first use of the
+	  object,</para>
+	</listitem>
+	<listitem>
+	  <para>the <firstterm>use</firstterm> stage, which lasts from
+	  the first use until the last use of the object, and</para>
+	</listitem>
+	<listitem>
+	  <para>The <firstterm>drag</firstterm> stage, which lasts
+	  from the final use until the last reference to the object
+	  is dropped.</para>
+	</listitem>
+	<listitem>
+	  <para>An object which is never used is said to be in the
+	  <firstterm>void</firstterm> state for its whole
+	  lifetime.</para>
+	</listitem>
+      </itemizedlist>
+
+      <para>A biographical heap profile displays the portion of the
+      live heap in each of the four states listed above.  Usually the
+      most interesting states are the void and drag states: live heap
+      in these states is more likely to be wasted space than heap in
+      the lag or use states.</para>
+
+      <para>It is also possible to break down the heap in one or more
+      of these states by a different criteria, by restricting a
+      profile by biography.  For example, to show the portion of the
+      heap in the drag or void state by producer: </para>
+
+<screen>
+<replaceable>prog</replaceable> +RTS -hc -hbdrag,void
+</screen>
+
+      <para>Once you know the producer or the type of the heap in the
+      drag or void states, the next step is usually to find the
+      retainer(s):</para>
+
+<screen>
+<replaceable>prog</replaceable> +RTS -hr -hc<replaceable>cc</replaceable>...
+</screen>
+
+      <para>NOTE: this two stage process is required because GHC
+      cannot currently profile using both biographical and retainer
+      information simultaneously.</para>
+    </sect2>
 
   </sect1>
 
@@ -366,7 +846,11 @@ x = nfib 25
     <para>You can view the time and allocation profiling graph of your
     program graphically, using <command>ghcprof</command>.  This is a
     new tool with GHC 4.08, and will eventually be the de-facto
-    standard way of viewing GHC profiles.</para>
+    standard way of viewing GHC profiles<footnote><para>Actually this
+    isn't true any more, we are working on a new tool for
+    displaying heap profiles using Gtk+HS, so
+    <command>ghcprof</command> may go away at some point in the future.</para>
+      </footnote></para>
 
     <para>To run <command>ghcprof</command>, you need
     <productname>daVinci</productname> installed, which can be
@@ -398,296 +882,6 @@ $ ghcprof &lt;prog&gt;.prof
     Cost-Centre Stack Profiling Tool for
     GHC</citetitle></ulink>.</para>
 
-  </sect1>
-
-  <sect1 id="prof-compiler-options">
-    <title>Compiler options for profiling</title>
-
-    <indexterm><primary>profiling</primary><secondary>options</secondary></indexterm>
-    <indexterm><primary>options</primary><secondary>for profiling</secondary></indexterm>
-
-    <Para> To make use of the cost centre profiling system
-    <Emphasis>all</Emphasis> modules must be compiled and linked with
-    the <Option>-prof</Option> option. Any
-    <Function>&lowbar;scc&lowbar;</Function> constructs you've put in
-    your source will spring to life.</Para> 
-
-    <indexterm><primary><literal>-prof</literal></primary></indexterm>
-
-    <Para> Without a <Option>-prof</Option> option, your
-    <Function>&lowbar;scc&lowbar;</Function>s are ignored; so you can
-    compiled <Function>&lowbar;scc&lowbar;</Function>-laden code
-    without changing it.</Para>
-    
-    <Para>There are a few other profiling-related compilation options.
-    Use them <Emphasis>in addition to</Emphasis>
-    <Option>-prof</Option>.  These do not have to be used consistently
-    for all modules in a program.</Para>
-
-    <variableList>
-
-      <varListEntry>
-	<term><Option>-auto</Option>:</Term>
-	<indexterm><primary><literal>-auto</literal></primary></indexterm>
-	<indexterm><primary>cost centres</primary><secondary>automatically inserting</secondary></indexterm>
-	<listItem>
-	  <Para> GHC will automatically add
-          <Function>&lowbar;scc&lowbar;</Function> constructs for all
-          top-level, exported functions.</Para>
-	</listItem>
-      </varListEntry>
-      
-      <varListEntry>
-	<term><Option>-auto-all</Option>:</Term>
-	<indexterm><primary><literal>-auto-all</literal></primary></indexterm>
-	<listItem>
-	  <Para> <Emphasis>All</Emphasis> top-level functions,
-	  exported or not, will be automatically
-	  <Function>&lowbar;scc&lowbar;</Function>'d.</Para>
-	</listItem>
-      </varListEntry>
-
-      <varListEntry>
-	<term><Option>-caf-all</Option>:</Term>
-	<indexterm><primary><literal>-caf-all</literal></primary></indexterm>
-	<listItem>
-	  <Para> The costs of all CAFs in a module are usually
-	  attributed to one &ldquo;big&rdquo; CAF cost-centre. With
-	  this option, all CAFs get their own cost-centre.  An
-	  &ldquo;if all else fails&rdquo; option&hellip;</Para>
-	</listItem>
-      </varListEntry>
-
-      <varListEntry>
-	<term><Option>-ignore-scc</Option>:</Term>
-	<indexterm><primary><literal>-ignore-scc</literal></primary></indexterm>
-	<listItem>
-	  <Para>Ignore any <Function>&lowbar;scc&lowbar;</Function>
-          constructs, so a module which already has
-          <Function>&lowbar;scc&lowbar;</Function>s can be compiled
-          for profiling with the annotations ignored.</Para>
-	</listItem>
-      </varListEntry>
-
-    </variableList>
-
-  </sect1>
-
-  <sect1 id="prof-rts-options">
-    <title>Runtime options for profiling</Title>
-
-    <indexterm><primary>profiling RTS options</primary></indexterm>
-    <indexterm><primary>RTS options, for profiling</primary></indexterm>
-
-    <Para>It isn't enough to compile your program for profiling with
-    <Option>-prof</Option>!</Para>
-
-    <Para>When you <Emphasis>run</Emphasis> your profiled program, you
-    must tell the runtime system (RTS) what you want to profile (e.g.,
-    time and/or space), and how you wish the collected data to be
-    reported.  You also may wish to set the sampling interval used in
-    time profiling.</Para>
-
-    <Para>Executive summary: <command>./a.out +RTS -pT</command>
-    produces a time profile in <Filename>a.out.prof</Filename>;
-    <command>./a.out +RTS -hC</command> produces space-profiling info
-    which can be mangled by <command>hp2ps</command> and viewed with
-    <command>ghostview</command> (or equivalent).</Para>
-
-    <Para>Profiling runtime flags are passed to your program between
-    the usual <Option>+RTS</Option> and <Option>-RTS</Option>
-    options.</Para>
-
-    <variableList>
-      
-      <varListEntry>
-	<term><Option>-p</Option> or <Option>-P</Option>:</Term>
-	<indexterm><primary><option>-p</option></primary></indexterm>
-	<indexterm><primary><option>-P</option></primary></indexterm>
-	<indexterm><primary>time profile</primary></indexterm>
-	<listItem>
-	  <Para>The <Option>-p</Option> option produces a standard
-          <Emphasis>time profile</Emphasis> report.  It is written
-          into the file
-          <Filename>&lt;program&gt;.prof</Filename>.</Para>
-
-	  <Para>The <Option>-P</Option> option produces a more
-          detailed report containing the actual time and allocation
-          data as well.  (Not used much.)</Para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term><option>-px</option>:</term>
-	<indexterm><primary><option>-px</option></primary></indexterm>
-	<listitem>
-	  <para>The <option>-px</option> option generates profiling
-	  information in the XML format understood by our new
-	  profiling tool, see <xref linkend="prof-xml-tool">.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term><Option>-i&lt;secs&gt;</Option>:</Term>
-	<indexterm><primary><option>-i</option></primary></indexterm>
-	<listItem>
-	  <Para> Set the profiling (sampling) interval to
-          <literal>&lt;secs&gt;</literal> seconds (the default is
-          1&nbsp;second).  Fractions are allowed: for example
-          <Option>-i0.2</Option> will get 5 samples per second.  This
-          only affects heap profiling; time profiles are always
-          sampled on a 1/50 second frequency.</Para>
-	</listItem>
-      </varlistentry>
-
-      <varlistentry>
-	<term><Option>-h&lt;break-down&gt;</Option>:</Term>
-	<indexterm><primary><option>-h&lt;break-down&gt</option></primary></indexterm>
-	<indexterm><primary>heap profile</primary></indexterm>
-	<listItem>
-	  <Para>Produce a detailed <Emphasis>heap profile</Emphasis>
-          of the heap occupied by live closures. The profile is
-          written to the file <Filename>&lt;program&gt;.hp</Filename>
-          from which a PostScript graph can be produced using
-          <command>hp2ps</command> (see <XRef
-          LinkEnd="hp2ps">).</Para>
-
-	  <Para>The heap space profile may be broken down by different
-	  criteria:</para>
-
-	  <variableList>
-
-	    <varListEntry>
-	      <term><Option>-hC</Option>:</Term>
-	      <listItem>
-		<Para>cost centre which produced the closure (the
-		default).</Para>
-	      </listItem>
-	    </varListEntry>
-
-	    <varListEntry>
-	      <term><Option>-hM</Option>:</Term>
-	      <listItem>
-		<Para>cost centre module which produced the
-		closure.</Para>
-	      </listItem>
-	    </varListEntry>
-
-	    <varListEntry>
-	      <term><Option>-hD</Option>:</Term>
-	      <listItem>
-		<Para>closure description&mdash;a string describing
-		the closure.</Para>
-	      </listItem>
-	    </varListEntry>
-
-	    <varListEntry>
-	      <term><Option>-hY</Option>:</Term>
-	      <listItem>
-		<Para>closure type&mdash;a string describing the
-		closure's type.</Para>
-	      </listItem>
-	    </varListEntry>
-	  </variableList>
-
-	</listItem>
-      </varListEntry>
-
-      <varlistentry>
-	<term><Option>-h&lt;filtering-options&gt;</Option>:</Term>
-	<indexterm><primary><option>-h&lt;filtering-options&gt
-                           </option></primary></indexterm>
-	<indexterm><primary>heap profile filtering options</primary></indexterm>
-	<listItem>
-	  <Para>It's often useful to select just some subset of the
-          heap when profiling.  To do this, the following filters are
-          available.  You may use multiple filters, in which case a
-          closure has to satisfy all filters to appear in the final
-          profile.  Filtering criterion are independent of what it is
-          you ask to see.  So, for example, you can specify a profile
-          by closure description (<Literal>-hD</literal>) but ask to
-          filter closures by producer module (<Literal>-hm{...}</literal>).
-          </para>
-
-          <Para>Available filters are:</para>
-
-	  <variableList>
-
-	    <varListEntry>
-	      <term><Option>-hc{cc1, cc2 .. ccN}</Option>:</Term>
-	      <listItem>
-		<Para>Restrict to one of the specified cost centers.
-		Since GHC deals in cost center stacks, the specified
-		cost centers pertain to the top stack element.  For
-		example, <Literal>-hc{Wurble,Burble}</literal> selects
-		all cost center stacks whose top element is
-		<Literal>Wurble</literal> or
-		<Literal>Burble</literal>.
-              </para>
-	      </listItem>
-	    </varListEntry>
-
-	    <varListEntry>
-	      <term><Option>-hm{module1, module2 .. moduleN}</Option>:</Term>
-	      <listItem>
-		<Para>Restrict to closures produced by functions in
-		one of the specified modules.
-		</Para>
-	      </listItem>
-	    </varListEntry>
-
-	    <varListEntry>
-	      <term><Option>-hd{descr1, descr2 .. descrN}</Option>:</Term>
-	      <listItem>
-		<Para>Restrict to closures whose description-string is
-		one of the specified descriptions.  Description
-		strings are pretty arcane.  An easy way to find
-		plausible strings to specify is to first do a
-		<Literal>-hD</literal> profile and then inspect the
-		description-strings which appear in the resulting profile.
-		</Para>
-	      </listItem>
-	    </varListEntry>
-
-	    <varListEntry>
-	      <term><Option>-hy{type1, type2 .. typeN}</Option>:</Term>
-	      <listItem>
-		<Para>Restrict to closures having one of the specified
-		types.
-                </Para>
-	      </listItem>
-	    </varListEntry>
-	  </variableList>
-
-	</listItem>
-      </varListEntry>
-
-      <varlistentry>
-	<term><option>-hx</option>:</term>
-	<indexterm><primary><option>-hx</option></primary></indexterm>
-	<listitem>
-	  <para>The <option>-hx</option> option generates heap
-	  profiling information in the XML format understood by our
-	  new profiling tool (NOTE: heap profiling with the new tool
-	  is not yet working!  Use <command>hp2ps</command>-style heap
-	  profiling for the time being).</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term><option>-xc</option></term>
-	<indexterm><primary><option>-xc</option></primary><secondary>RTS
-	option</secondary></indexterm>
-	<listitem>
-	  <para>This option makes use of the extra information
-	  maintained by the cost-centre-stack profiler to provide
-	  useful information about the location of runtime errors.
-	  See <xref linkend="rts-options-debugging">.</para>
-	</listitem>
-      </varlistentry>
-
-    </variableList>
-    
   </sect1>
 
   <sect1 id="hp2ps">
