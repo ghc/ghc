@@ -421,6 +421,7 @@ percent in execution speed---you can give a
 %*                                                                      *
 \subsection[options-sanity]{Warnings and sanity-checking}
 \index{sanity-checking options}
+\index{warnings}
 %*                                                                      *
 %************************************************************************
 
@@ -460,6 +461,7 @@ the command line.
 
 \item[\tr{-fwarn-name-shadowing}:] 
 \index{-fwarn-name-shadowing option}
+\index{shadowing, warning}
 
 This option causes a warning to be emitted whenever an inner-scope
 value has the same name as an outer-scope value, i.e. the inner value
@@ -472,6 +474,8 @@ definitions.
 
 \item[\tr{-fwarn-overlapping-patterns}:]
 \index{-fwarn-overlapping-patterns option}
+\index{overlapping patterns, warning}
+\index{patterns, overlapping}
 
 By default, the compiler will warn you if a set of patterns are either
 incomplete (i.e., you're only matching on a subset of an algebraic
@@ -492,6 +496,8 @@ is a programmer mistake/error, so this option is enabled by default.
 
 \item[\tr{-fwarn-incomplete-patterns}:]
 \index{-fwarn-incomplete-patterns option}
+\index{incomplete patterns, warning}
+\index{patterns, incomplete}
 
 Similarly for incomplete patterns, the function \tr{g} will fail when
 applied to non-empty lists, so the compiler will emit a warning about
@@ -499,6 +505,7 @@ this when this option is enabled.
 
 \item[\tr{-fwarn-missing-methods}:]
 \index{-fwarn-missing-methods option}
+\index{methods, missing}
 
 This option is on by default, and warns you whenever an instance
 declaration is missing one or more methods, and the corresponding
