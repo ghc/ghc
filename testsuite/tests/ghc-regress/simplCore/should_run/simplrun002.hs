@@ -12,6 +12,8 @@ module Main where
 import IO
 import PrelIOBase( unsafePerformIO )
 
+{-# NOINLINE [0] sndSnd #-}
+-- Dont inline till last, to give the rule a chance
 sndSnd (a,(b,c)) = (a,c)
 
 trace x y = unsafePerformIO (hPutStr stderr x >> hPutStr stderr "\n" >> return y)
