@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.37 2001/03/22 03:51:10 hwloidl Exp $
+ * $Id: Storage.c,v 1.38 2001/05/25 18:35:29 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -268,7 +268,7 @@ newCAF(StgClosure* caf)
     newGA=makeGlobal(caf,rtsTrue); /*given full weight*/
     ASSERT(newGA);
   } 
-#endif PAR  
+#endif /* PAR */
 }
 
 /* -----------------------------------------------------------------------------
