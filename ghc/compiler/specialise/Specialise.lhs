@@ -1029,10 +1029,9 @@ mkCallUDs subst f args
     spec_tys = [mk_spec_ty tv ty | (tv, Type ty) <- tyvars `zip` args]
     dicts    = [dict_expr | (_, dict_expr) <- theta `zip` (drop n_tyvars args)]
     
-    mk_spec_ty tyvar ty | tyvar `elemVarSet` constrained_tyvars
-			= Just ty
-			| otherwise
-			= Nothing
+    mk_spec_ty tyvar ty 
+	| tyvar `elemVarSet` constrained_tyvars = Just ty
+	| otherwise				= Nothing
 
 ------------------------------------------------------------			
 plusUDs :: UsageDetails -> UsageDetails -> UsageDetails
