@@ -1200,7 +1200,7 @@ STGFUN(_PRIn_TSO)
     default:
     	/* update the register we just did; save the old mstack */
 	mstack = r->rR[oldpos - 2].p;
-	r->rR[oldpos - 2] = Mark;
+	r->rR[oldpos - 2].p = Mark;
     	break;
     }
 
