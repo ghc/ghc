@@ -1,0 +1,3 @@
+
+rnfail029.hs:2:
+    The export items `List.map' and `module ShouldFail' create conflicting exports for `map'
