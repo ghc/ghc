@@ -39,7 +39,8 @@ import TcType		( Type, mkFunTys, mkForAllTys, mkTyConApp,
 import ForeignCall	( ForeignCall(..), CCallSpec(..), 
 			  Safety(..), playSafe,
 			  CExportSpec(..),
-			  CCallConv(..), ccallConvToInt
+			  CCallConv(..), ccallConvToInt,
+			  ccallConvAttribute
 			)
 import CStrings		( CLabelString )
 import TysWiredIn	( addrTy, unitTy, stablePtrTyCon )
@@ -496,7 +497,7 @@ fexportEntry mod_nm c_nm helper args res_ty cc isDyn = (header_bits, c_bits)
 
   pprCconv = case cc of
 		CCallConv   -> empty
-		StdCallConv -> ppr cc
+		StdCallConv -> text (ccallConvAttribute cc)
      
   declareResult  = text "HaskellObj ret;"
 
