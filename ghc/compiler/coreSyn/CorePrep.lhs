@@ -504,11 +504,17 @@ mkLocalNonRec :: Id  -> RhsDemand 			-- Lhs: id with demand
 	      -> UniqSM (OrdList FloatingBind)
 
 mkLocalNonRec bndr dem floats rhs
-  |  isUnLiftedType (idType bndr) || isStrict dem 
-	-- It's a strict let, or the binder is unlifted,
-	-- so we definitely float all the bindings
+  | isUnLiftedType (idType bndr)
+	-- If this is an unlifted binding, we always make a case for it.
   = ASSERT( not (isUnboxedTupleType (idType bndr)) )
-    let		-- Don't make a case for a value binding,
+    let
+	float = FloatCase bndr rhs (exprOkForSpeculation rhs)
+    in
+    returnUs (floats `snocOL` float)
+
+  | isStrict dem 
+	-- It's a strict let so we definitely float all the bindings
+ = let		-- Don't make a case for a value binding,
 		-- even if it's strict.  Otherwise we get
 		-- 	case (\x -> e) of ...!
 	float | exprIsValue rhs = FloatLet (NonRec bndr rhs)
