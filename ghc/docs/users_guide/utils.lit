@@ -44,7 +44,7 @@ then @mkdependHS@ will generate a dependency line of the form:
 \begin{verbatim}
 	A.o : B.hi-boot
 \end{verbatim}
-(See \Sectionref{hi-boot} for details of @.hi-boot@ files.)
+(See \Sectionref{hi-files} for details of interface files.)
 If @A@ imports multiple modules, then there will be multiple lines with @A.o@ as the
 target.
 
