@@ -33,9 +33,18 @@ import ThinAir		( unpackCStringFoldrId )
 import Maybes		( maybeToBool )
 import Char		( ord, chr )
 import Bits		( Bits(..) )
-import PrelAddr		( intToWord, wordToInt )
+import PrelAddr		( wordToInt )
 import Word		( Word64 )
 import Outputable
+
+#if __GLASGOW_HASKELL__ > 404
+import PrelAddr ( intToWord )
+#else
+import PrelAddr ( Word(..) )
+import PrelGHC  ( int2Word# )
+intToWord :: Int -> Word
+intToWord (I# i#) = W# (int2Word# i#)
+#endif
 \end{code}
 
 
