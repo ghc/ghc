@@ -1833,7 +1833,6 @@ ilxPrimOpTable op
 	IntRemOp    -> simp_op (ilxOp "rem")
 
     -- Addr# ops:
-        AddrNullOp -> simp_op (ilxOp "pop ldnull")
         AddrAddOp  -> simp_op (ilxOp "add")
 	AddrSubOp  -> simp_op (ilxOp "sub")
 	AddrRemOp  -> simp_op (ilxOp "rem")
