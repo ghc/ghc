@@ -680,18 +680,20 @@ ppHsBType (HsTyApp (HsTyCon (Qual (Module "Prelude") (HsTyClsName (HsSpecial "[]
 ppHsBType (HsTyApp a b) = ppHsBType a <+> ppHsAType b
 ppHsBType t = ppHsAType t
 
--- -----------------------------------------------------------------------------
--- Names
-
-linkTarget :: HsName -> Html
-linkTarget nm = anchor ! [name (hsNameStr nm)] << toHtml ""
-
 ppHsAType :: HsType -> Html
 ppHsAType (HsTyTuple True l)  = parenList . map ppHsType $ l
 ppHsAType (HsTyTuple False l) = ubxParenList . map ppHsType $ l
 ppHsAType (HsTyVar name) = ppHsName name
 ppHsAType (HsTyCon name) = ppHsQName name
+ppHsAType (HsTyApp (HsTyCon (Qual (Module "Prelude") (HsTyClsName (HsSpecial "[]")))) b )
+  = brackets $ ppHsType b
 ppHsAType t = parens $ ppHsType t
+
+-- -----------------------------------------------------------------------------
+-- Names
+
+linkTarget :: HsName -> Html
+linkTarget nm = anchor ! [name (hsNameStr nm)] << toHtml ""
 
 ppHsQName :: HsQName -> Html
 ppHsQName (UnQual str)			= ppHsName str
