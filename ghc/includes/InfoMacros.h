@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoMacros.h,v 1.18 2002/02/26 05:03:27 sof Exp $
+ * $Id: InfoMacros.h,v 1.19 2002/06/03 12:56:41 matthewc Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -33,13 +33,6 @@
 		},
 #else
 #define PROF_INFO(type_str, desc_str)
-#endif
-
-/* Why no empty array initializer in the 'else' branch? sof 2/02 */
-#ifdef USE_MINIINTERPRETER
-#define INIT_VECTOR vector : {}
-#else
-#define INIT_VECTOR
 #endif
 
 /*
@@ -88,7 +81,6 @@ INFO_TABLE_SRT(info,				/* info-table label */	\
 		SRT_INFO(RBH,srt_,srt_off_,srt_len_),                  	\
                 INCLUDE_RBH_INFO(info),			                \
                 INIT_ENTRY(stg_RBH_##entry),                           	\
-                INIT_VECTOR                                             \
 	} ; 								\
         StgFunPtr stg_RBH_##entry (void) {                                  \
           FB_                                                           \
@@ -101,7 +93,6 @@ INFO_TABLE_SRT(info,				/* info-table label */	\
 		SRT_INFO(type,srt_,srt_off_,srt_len_),			\
                 INCLUDE_RBH_INFO(stg_RBH_##info),				\
                 INIT_ENTRY(entry),                                      \
-                INIT_VECTOR                                             \
 	}
 
 #else
@@ -120,7 +111,6 @@ INFO_TABLE_SRT(info,				/* info-table label */	\
                 PROF_INFO(prof_type, prof_descr)			\
 		SRT_INFO(type,srt_,srt_off_,srt_len_),			\
                 INIT_ENTRY(entry),                                      \
-                INIT_VECTOR                                             \
 	}
 
 #endif
@@ -142,7 +132,6 @@ INFO_TABLE_SRT_BITMAP(info, entry, bitmap_, srt_, srt_off_, srt_len_,	\
 		SRT_INFO(RBH,srt_,srt_off_,srt_len_),			\
                 INCLUDE_RBH_INFO(info),					\
                 INIT_ENTRY(stg_RBH_##entry),				\
-                INIT_VECTOR						\
 	};								\
         StgFunPtr stg_RBH_##entry (void) {                              \
           FB_                                                           \
@@ -155,7 +144,6 @@ INFO_TABLE_SRT_BITMAP(info, entry, bitmap_, srt_, srt_off_, srt_len_,	\
 		SRT_INFO(type,srt_,srt_off_,srt_len_),			\
                 INCLUDE_RBH_INFO(stg_RBH_##info),			\
                 INIT_ENTRY(entry),					\
-                INIT_VECTOR						\
 	}
 
 #else
@@ -170,7 +158,6 @@ INFO_TABLE_SRT_BITMAP(info, entry, bitmap_, srt_, srt_off_, srt_len_,	\
                 PROF_INFO(prof_type, prof_descr)			\
 		SRT_INFO(type,srt_,srt_off_,srt_len_),			\
                 INIT_ENTRY(entry),					\
-                INIT_VECTOR						\
 	}
 #endif
 
@@ -190,7 +177,6 @@ INFO_TABLE(info, entry, ptrs, nptrs, type, info_class,		\
 		STD_INFO(RBH),					\
                 INCLUDE_RBH_INFO(info),			        \
                 INIT_ENTRY(stg_RBH_##entry),		        \
-                INIT_VECTOR					\
 	} ;                                                     \
         StgFunPtr stg_RBH_##entry (void) {                          \
           FB_                                                   \
@@ -203,7 +189,6 @@ INFO_TABLE(info, entry, ptrs, nptrs, type, info_class,		\
 		STD_INFO(type),					\
                 INCLUDE_RBH_INFO(stg_RBH_##info),			\
                 INIT_ENTRY(entry),				\
-                INIT_VECTOR					\
 	}
 
 #else
@@ -217,7 +202,6 @@ INFO_TABLE(info, entry, ptrs, nptrs, type, info_class,	\
                 PROF_INFO(prof_type, prof_descr)	\
 		STD_INFO(type),				\
                 INIT_ENTRY(entry),			\
-                INIT_VECTOR				\
 	}
 
 #endif
@@ -238,7 +222,6 @@ INFO_TABLE_SELECTOR(info, entry, offset, info_class,		\
 		STD_INFO(RBH),					\
                 INCLUDE_RBH_INFO(info),				\
                 INIT_ENTRY(stg_RBH_##entry),			\
-                INIT_VECTOR					\
 	};							\
         StgFunPtr stg_RBH_##entry (void) {                          \
           FB_                                                   \
@@ -251,7 +234,6 @@ INFO_TABLE_SELECTOR(info, entry, offset, info_class,		\
 		STD_INFO(THUNK_SELECTOR),			\
                 INCLUDE_RBH_INFO(stg_RBH_##info),			\
                 INIT_ENTRY(entry),				\
-                INIT_VECTOR					\
 	}
 
 #else
@@ -265,7 +247,6 @@ INFO_TABLE_SELECTOR(info, entry, offset, info_class,	\
                 PROF_INFO(prof_type, prof_descr)	\
 		STD_INFO(THUNK_SELECTOR),		\
                 INIT_ENTRY(entry),			\
-                INIT_VECTOR				\
 	}
 
 #endif
@@ -281,7 +262,6 @@ INFO_TABLE_CONSTR(info, entry, ptrs, nptrs, tag_,type_,info_class,	\
                 PROF_INFO(prof_type, prof_descr)			\
                 CONSTR_INFO(type_,tag_),				\
                 INIT_ENTRY(entry),					\
-                INIT_VECTOR						\
 	}
 
 #define constrTag(con) (get_itbl(con)->srt_len)
@@ -576,7 +556,6 @@ typedef vec_info_8 StgPolyInfoTable;
 		i : { layout : { bitmap : (StgWord)bitmap_ },	\
 		      SRT_INFO(type,srt_,srt_off_,srt_len_),	\
                       INIT_ENTRY(nm##_entry),			\
-		      INIT_VECTOR				\
 		},						\
 		vec : {						\
 			(F_) nm##_0_entry,			\
