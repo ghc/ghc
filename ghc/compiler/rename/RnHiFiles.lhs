@@ -594,13 +594,15 @@ lookupFixityRn name
 	returnRn (lookupLocalFixity local_fix_env name)
 
     else	-- It's imported
-      -- For imported names, we have to get their fixities by doing a loadHomeInterface,
-      -- and consulting the Ifaces that comes back from that, because the interface
-      -- file for the Name might not have been loaded yet.  Why not?  Suppose you import module A,
-      -- which exports a function 'f', which is defined in module B.  Then B isn't loaded
-      -- right away (after all, it's possible that nothing from B will be used).
-      -- When we come across a use of 'f', we need to know its fixity, and it's then,
-      -- and only then, that we load B.hi.  That is what's happening here.
+      -- For imported names, we have to get their fixities by doing a
+      -- loadHomeInterface, and consulting the Ifaces that comes back
+      -- from that, because the interface file for the Name might not
+      -- have been loaded yet.  Why not?  Suppose you import module A,
+      -- which exports a function 'f', which is defined in module B.
+      -- Then B isn't loaded right away (after all, it's possible that
+      -- nothing from B will be used).  When we come across a use of
+      -- 'f', we need to know its fixity, and it's then, and only
+      -- then, that we load B.hi.  That is what's happening here.
   	loadHomeInterface doc name		`thenRn` \ iface ->
 	returnRn (lookupNameEnv (mi_fixities iface) name `orElse` defaultFixity)
   where
