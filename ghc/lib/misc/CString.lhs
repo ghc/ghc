@@ -55,6 +55,7 @@ import PrelPack
 import GlaExts
 import Addr
 import PrelIOBase ( IO(..) )
+import MutableArray
 
 \end{code}
 
@@ -66,7 +67,7 @@ packStringIO str = stToIO (packStringST str)
 \begin{code}
 unpackCStringIO :: Addr -> IO String
 unpackCStringIO addr
- | addr == ``NULL'' = return ""
+ | addr == nullAddr = return ""
  | otherwise        = unpack 0#
   where
     unpack nh = do
@@ -119,8 +120,8 @@ Turn a NULL-terminated vector of null-terminated strings into a string list
 \begin{code}
 unvectorize :: Addr -> Int -> IO [String]
 unvectorize ptr n
-  | str == ``NULL'' = return []
-  | otherwise = do
+  | str == nullAddr = return []
+  | otherwise       = do
 	x  <- unpackCStringIO str
 	xs <- unvectorize ptr (n+1)
 	return (x : xs)
@@ -145,10 +146,9 @@ vectorize vs = do
     fill :: MutableByteArray RealWorld Int -> Int -> [String] -> IO ()
     fill arr n [] =
 	_casm_ ``((PP_)%0)[%1] = NULL;'' arr n
-    fill arr n (x:xs) =
-	packStringIO x			    >>= \ barr ->
+    fill arr n (x:xs) = do
+	barr <- packStringIO x
         _casm_ ``((PP_)%0)[%1] = (P_)%2;'' arr n barr
-					    >>= \ () ->
 	fill arr (n+1) xs
 
 \end{code}
@@ -159,23 +159,14 @@ out the bounds - use with care.
 \begin{code}
 -- Allocate a mutable array of characters with no indices.
 allocChars :: Int -> IO (MutableByteArray RealWorld Int)
-allocChars (I# size#) = IO $ \ s# ->
-    case newCharArray# size# s# of
-      (# s2#, barr# #) ->
-	(# s2#, (MutableByteArray (I# 1#, I# size#) barr#) #)
+allocChars size = stToIO (newCharArray (0,size))
 
 allocWords :: Int -> IO (MutableByteArray RealWorld Int)
-allocWords (I# size#) = IO $ \ s# ->
-    case newIntArray# size# s# of
-      (# s2#, barr# #) ->
-	(# s2#, (MutableByteArray (I# 1#, I# size#) barr#) #)
+allocWords size = stToIO (newIntArray (0,size))
 
 -- Freeze these index-free mutable arrays
 freeze :: MutableByteArray RealWorld Int -> IO (ByteArray Int)
-freeze (MutableByteArray ixs arr#) = IO $ \ s# ->
-    case unsafeFreezeByteArray# arr# s# of
-      (# s2#, frozen# #) ->
-	(# s2#, (ByteArray ixs frozen#) #)
+freeze mb = stToIO (unsafeFreezeByteArray mb)
 
 -- Copy a null-terminated string from outside the heap to
 -- Haskellized nonsense inside the heap
