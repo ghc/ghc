@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgProf.h,v 1.11 2001/10/03 13:57:42 simonmar Exp $
+ * $Id: StgProf.h,v 1.12 2001/10/18 13:19:49 simonmar Exp $
  *
  * (c) The GHC Team, 1998
  *
@@ -20,7 +20,7 @@ typedef struct _CostCentre {
  
   /* used for accumulating costs at the end of the run... */
   unsigned long time_ticks;
-  unsigned long long mem_alloc;
+  unsigned long mem_alloc;
 
   char is_caf;
 
@@ -35,14 +35,14 @@ typedef struct _CostCentreStack {
   struct _CostCentreStack *prevStack;
   struct _IndexTable *indexTable;
   
-  unsigned long long scc_count;
+  unsigned long scc_count;
     
   unsigned long time_ticks;
-  unsigned long long mem_alloc;
+  unsigned long mem_alloc;
   unsigned long mem_resid;
 
   unsigned long inherited_ticks;
-  unsigned long long inherited_alloc;
+  unsigned long inherited_alloc;
 
   CostCentre *root;
 } CostCentreStack;
@@ -52,14 +52,8 @@ typedef struct _CostCentreStack {
  * The rest is PROFILING only...
  * ---------------------------------------------------------------------------*/
 
-#if !defined(PROFILING)
+#if defined(PROFILING)
   
-#define CCS_ALLOC(ccs, amount) doNothing()
-#define ENTER_CC_PAP_CL(r)     doNothing()
-#define ENTER_CCS_PAP_CL(r)    doNothing()
- 
-#else /* PROFILING... */
-
 /* -----------------------------------------------------------------------------
  * Constants
  * ---------------------------------------------------------------------------*/
@@ -72,12 +66,10 @@ typedef struct _CostCentreStack {
 #define CC_IS_CAF      'c'            /* 'c'  => *is* a CAF cc           */
 #define CC_IS_BORING   'B'            /* 'B'  => *not* a CAF/sub cc      */
 
+
 /* -----------------------------------------------------------------------------
- * Data Structures 
- * ---------------------------------------------------------------------------*/  
-/* 
- * IndexTable 
- */
+ * Data Structures
+ * ---------------------------------------------------------------------------*/
 
 typedef struct _IndexTable {
   CostCentre *cc;
@@ -360,6 +352,15 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
  /* temp EW */
 #define STATIC_CCS_REF(ccs) (ccs)
 
+/* -----------------------------------------------------------------------------
+   When not profiling, these macros do nothing...
+   -------------------------------------------------------------------------- */
+#else /* !PROFILING */
+
+#define CCS_ALLOC(ccs, amount) doNothing()
+#define ENTER_CC_PAP_CL(r)     doNothing()
+#define ENTER_CCS_PAP_CL(r)    doNothing()
+ 
 #endif /* PROFILING */
 
 #endif /* STGPROF_H */
