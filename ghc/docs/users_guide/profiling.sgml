@@ -674,6 +674,18 @@ $ ghcprof &lt;prog&gt;.prof
 	</listitem>
       </varlistentry>
 
+      <varlistentry>
+	<term><option>-xc</option></term>
+	<indexterm><primary><option>-xc</option></primary><secondary>RTS
+	option</secondary></indexterm>
+	<listitem>
+	  <para>This option makes use of the extra information
+	  maintained by the cost-centre-stack profiler to provide
+	  useful information about the location of runtime errors.
+	  See <xref linkend="stack-trace-option">.</para>
+	</listitem>
+      </varlistentry>
+
     </variableList>
     
   </sect1>
