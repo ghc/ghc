@@ -27,7 +27,7 @@ matchSimply
 
 matchSinglePat
 	:: CoreExpr
-	-> DsMatchContext
+	-> HsMatchContext Name
 	-> LPat Id
         -> TcType
 	-> MatchResult
