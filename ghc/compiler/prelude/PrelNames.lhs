@@ -38,7 +38,7 @@ module PrelNames (
 
 #include "HsVersions.h"
 
-import Module	  ( ModuleName, mkPrelModule, mkModuleName )
+import Module	  ( ModuleName, mkPrelModule, mkHomeModule, mkModuleName )
 import OccName	  ( NameSpace, UserFS, varName, dataName, tcName, clsName, 
 		    mkKindOccFS, mkOccFS
 		  )
@@ -245,6 +245,8 @@ pREL_ERR     	= mkPrelModule pREL_ERR_Name
 pREL_NUM     	= mkPrelModule pREL_NUM_Name
 pREL_REAL    	= mkPrelModule pREL_REAL_Name
 pREL_FLOAT   	= mkPrelModule pREL_FLOAT_Name
+
+iNTERACTIVE     = mkHomeModule (mkModuleName "$Interactive")
 \end{code}
 
 %************************************************************************
