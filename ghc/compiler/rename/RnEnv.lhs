@@ -59,7 +59,7 @@ newGlobalName mod occ iface_flavour
 	-- A hit in the cache!  Return it, but change the src loc
 	-- of the thing we've found if this is a second definition site
 	-- (that is, if loc /= NoSrcLoc)
-	Just name ->  returnRn name
+	Just name -> returnRn name
 
 	-- Miss in the cache, so build a new original name,
 	-- And put it in the cache
