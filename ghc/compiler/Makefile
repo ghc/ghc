@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.199 2001/11/09 17:02:09 sof Exp $
+# $Id: Makefile,v 1.200 2001/11/09 17:39:45 sof Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -109,15 +109,9 @@ SRC_HC_OPTS += -DJAVA
 endif
 
 #
-# Canonicalize the GHC version number - assume it is has the form x.yy.[z] or 
-# x.yy[.date] where date = yyyymmdd
+# Canonicalized GHC version number for easy version comparisons.
 #
-# [First sed substitution gets rid of the '.', second gets rid of the date portion,
-#  third appends a '0' if the z portion is missing]
-#
-CANON_HC_VERSION=$(shell echo "$(GhcVersion)" | sed -e 's/\.//g;s/^\(...\)........$$/\1/g;s/^\(...\)$$/\10/g')
-
-# 20010625
+CANON_HC_VERSION=$(GhcMajVersion)$(GhcMinVersion)$(GhcPatchLevel)
 
 ifeq "$(BootingFromHc)" "YES"
 # HC files are always from a self-booted compiler
