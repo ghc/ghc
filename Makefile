@@ -324,7 +324,7 @@ ifeq "$(HAPPY)" "$(FPTOOLS_TOP_ABS)/happy/src/happy-inplace"
 all :: $(FPTOOLS_TOP_ABS)/happy/src/happy-inplace
 
 $(FPTOOLS_TOP_ABS)/happy/src/happy-inplace : glafp-utils
-	cd happy && make boot all
+	$(MAKE) -C happy boot all
 endif
 
 all ::
