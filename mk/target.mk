@@ -1004,6 +1004,18 @@ endif	# if way
 
 # No ways, so iterate over the SUBDIRS
 
+# note about recursively invoking make: we'd like make to drop all the
+# way back to the top level if it fails in any of the
+# sub(sub-...)directories.  This is done by setting the -e flag to the
+# shell during the loop, which causes an immediate failure if any of
+# the shell commands fail.
+
+# One exception: if the user gave the -i or -k flag to make in the
+# first place, we'd like to reverse this behaviour.  So we check for
+# these flags, and set the -e flag appropriately.  NOTE: watch out for
+# the --no-print-directory flag which is passed to recursive
+# invocations of make.
+
 ifeq "$(way)" ""
 ifneq "$(SUBDIRS)" ""
 
