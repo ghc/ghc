@@ -369,7 +369,10 @@ interestingCallContext some_args some_val_args cont
   where
     interesting (InlinePlease _)       = True
     interesting (Select _ _ _ _ _)     = some_args
-    interesting (ApplyTo _ _ _ _)      = some_args	-- Can happen if we have (coerce t (f x)) y
+    interesting (ApplyTo _ _ _ _)      = True	-- Can happen if we have (coerce t (f x)) y
+						-- Perhaps True is a bit over-keen, but I've
+						-- seen (coerce f) x, where f has an INLINE prag,
+						-- So we have to give some motivaiton for inlining it
     interesting (ArgOf _ _ _)	       = some_val_args
     interesting (Stop ty upd_in_place) = some_val_args && upd_in_place
     interesting (CoerceIt _ cont)      = interesting cont
