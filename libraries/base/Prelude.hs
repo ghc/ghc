@@ -31,7 +31,6 @@ module Prelude (
 
     Ordering(LT, EQ, GT),
     Char, String,
-    IO,
 
     -- *** Tuples
     fst, snd, curry, uncurry,
@@ -119,6 +118,7 @@ module Prelude (
     showChar, showString, readParen, showParen,
     
     -- * Basic Input and output
+    IO,
     -- ** Simple I\/O operations
     -- All I/O functions defined here are character oriented.  The
     -- treatment of the newline character will vary on different systems.
