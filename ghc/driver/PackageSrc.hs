@@ -107,7 +107,13 @@ package_details installing =
                             else [ ghc_src_dir cGHC_LIB_DIR ++ "/std"
                                  , ghc_src_dir cGHC_LIB_DIR ++ "/std/cbits" ],
         hs_libraries      = [ "HSstd" ],
-	extra_libraries   = [ "HSstd_cbits" ],
+	extra_libraries   = [ "HSstd_cbits" ] ++
+#                           ifdef mingw32_TARGET_OS
+                            ["wsock32"]
+#                           else
+                            ["m"]   -- libm, that is
+#                           endif
+                            ,
         include_dirs   = if installing
                             then []
                             else [ ghc_src_dir cGHC_LIB_DIR ++ "/std/cbits" ],
@@ -115,13 +121,7 @@ package_details installing =
         package_deps   = [ "rts" ],
         extra_ghc_opts = [],
         extra_cc_opts  = [],
-        extra_ld_opts  = [
-#ifdef mingw32_TARGET_OS
-                           "-lwsock32"
-#else
-                           "-lm"
-#endif
-			 ]
+        extra_ld_opts  = []
         },
 
          Package { 
@@ -206,7 +206,11 @@ package_details installing =
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/net"
                                   , cFPTOOLS_TOP_ABS ++ "/hslibs/net/cbits" ],
          hs_libraries      = [ "HSnet" ],
-	 extra_libraries   = [ "HSnet_cbits" ],
+	 extra_libraries   = [ "HSnet_cbits" ] 
+                             ++ if suffixMatch "solaris2" cTARGETPLATFORM
+                                then [ "nsl",  "socket" ]
+                                else []
+                             ,
          include_dirs   = if installing
                              then []
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/net/cbits" ],
@@ -214,9 +218,7 @@ package_details installing =
          package_deps   = [ "lang", "text", "concurrent" ],
          extra_ghc_opts = [],
          extra_cc_opts  = [],
-         extra_ld_opts  = if suffixMatch "solaris2" cTARGETPLATFORM
-                             then [ "-lnsl",  "-lsocket" ]
-                             else []
+         extra_ld_opts  = []
         },
 
          Package {
@@ -337,13 +339,13 @@ package_details installing =
                              then [ clibdir ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/win32" ],
          hs_libraries      = [ "HSwin32" ],
-	 extra_libraries   = [],
+	 extra_libraries   = [ "user32",  "gdi32", "winmm" ],
          include_dirs   = [],
          c_includes     = [],           -- ???
          package_deps   = [ "lang", "greencard" ],
          extra_ghc_opts = [],
          extra_cc_opts  = [],
-         extra_ld_opts  = [ "-luser32",  "-lgdi32", "-lwinmm" ]
+         extra_ld_opts  = []
         },
 
          Package {
@@ -355,13 +357,13 @@ package_details installing =
                              then [ clibdir ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hdirect/lib" ],
          hs_libraries      = [ "HScom" ],
-	 extra_libraries   = [],
+	 extra_libraries   = [ "user32",  "ole32",  "oleaut32", "advapi32" ],
          include_dirs   = [],
          c_includes     = [],           -- ???
          package_deps   = [ "lang" ],
          extra_ghc_opts = [],
          extra_cc_opts  = [],
-         extra_ld_opts  = [ "-luser32",  "-lole32",  "-loleaut32", "-ladvapi32" ]
+         extra_ld_opts  = []
         }
    ]
 
