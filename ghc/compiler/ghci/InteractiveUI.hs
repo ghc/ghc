@@ -1,6 +1,6 @@
-{-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
+{-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.141 2002/12/19 15:12:01 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.142 2002/12/27 12:20:06 panne Exp $
 --
 -- GHC Interactive User Interface
 --
