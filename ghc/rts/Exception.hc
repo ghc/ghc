@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Exception.hc,v 1.20 2001/03/23 16:36:21 simonmar Exp $
+ * $Id: Exception.hc,v 1.21 2001/08/17 14:44:54 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -349,7 +349,6 @@ FN_(raisezh_fast)
 
 
 #if defined(PROFILING)
-
     /* Debugging tool: on raising an  exception, show where we are. */
 
     /* ToDo: currently this is a hack.  Would be much better if
@@ -358,7 +357,6 @@ FN_(raisezh_fast)
     if (RtsFlags.ProfFlags.showCCSOnException) {
       STGCALL2(print_ccs,stderr,CCCS);
     }
-
 #endif
 
     p = Su;
@@ -369,7 +367,7 @@ FN_(raisezh_fast)
      */
     raise_closure = (StgClosure *)RET_STGCALL1(P_,allocate,
 					       sizeofW(StgClosure)+1);
-    raise_closure->header.info = &stg_raise_info;
+    SET_HDR(raise_closure, &stg_raise_info, CCCS);
     raise_closure->payload[0] = R1.cl;
 
     while (1) {
