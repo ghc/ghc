@@ -256,8 +256,8 @@ kcHsPred pred@(HsPClass cls tys)
 %*									*
 %************************************************************************
 
-tcHsType and tcHsTypeKind
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tcHsSigType and tcHsBoxedSigType
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 tcHsSigType and tcHsBoxedSigType are used for type signatures written by the programmer
 
@@ -283,8 +283,8 @@ tcHsBoxedSigType ty
 \end{code}
 
 
-The main work horse
-~~~~~~~~~~~~~~~~~~~
+tcHsType, the main work horse
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 \begin{code}
 tcHsType :: RenamedHsType -> TcM s Type

@@ -20,7 +20,7 @@ import RnHsSyn		( RenamedTyClDecl, RenamedConDecl, RenamedContext )
 import TcHsSyn		( TcMonoBinds, idsToMonoBinds )
 import BasicTypes	( RecFlag(..), NewOrData(..) )
 
-import TcMonoType	( tcHsSigType, tcHsBoxedSigType, kcTyVarScope, tcClassContext,
+import TcMonoType	( tcHsType, tcHsSigType, tcHsBoxedSigType, kcTyVarScope, tcClassContext,
 			  kcHsContext, kcHsSigType, mkImmutTyVars
 			)
 import TcEnv		( tcExtendTyVarEnv, tcLookupTy, tcLookupValueByKey, TyThing(..), TyThingDetails(..) )
@@ -66,7 +66,7 @@ tcTyDecl1 :: RenamedTyClDecl -> TcM s (Name, TyThingDetails)
 tcTyDecl1 (TySynonym tycon_name tyvar_names rhs src_loc)
   = tcLookupTy tycon_name			`thenNF_Tc` \ (ATyCon tycon) ->
     tcExtendTyVarEnv (tyConTyVars tycon)	$
-    tcHsSigType rhs				`thenTc` \ rhs_ty ->
+    tcHsType rhs				`thenTc` \ rhs_ty ->
 	-- If the RHS mentions tyvars that aren't in scope, we'll 
 	-- quantify over them.  With gla-exts that's right, but for H98
 	-- we should complain. We can now do that here without falling into
