@@ -82,9 +82,10 @@ mkPrefixCon ty tys
 			     returnP (data_con, PrefixCon ts)
    split _		 _ = parseError "Illegal data/newtype declaration"
 
-mkRecCon :: [([RdrName],RdrNameBangType)] -> RdrNameConDetails
-mkRecCon fields
-  = RecCon [ (l,t) | (ls,t) <- fields, l <- ls ] 
+mkRecCon :: RdrName -> [([RdrName],RdrNameBangType)] -> P (RdrName, RdrNameConDetails)
+mkRecCon con fields
+  = tyConToDataCon con	`thenP` \ data_con ->
+    returnP (data_con, RecCon [ (l,t) | (ls,t) <- fields, l <- ls ])
 
 tyConToDataCon :: RdrName -> P RdrName
 tyConToDataCon tc

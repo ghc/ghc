@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.102 2002/09/13 15:02:37 simonpj Exp $
+$Id: Parser.y,v 1.103 2002/09/19 12:31:09 simonmar Exp $
 
 Haskell grammar.
 
@@ -48,18 +48,33 @@ import Outputable
 
 {-
 -----------------------------------------------------------------------------
-Conflicts: 21 shift/reduce, -=chak[4Feb2]
+Conflicts: 29 shift/reduce, [SDM 19/9/2002]
 
-11 for abiguity in 'if x then y else z + 1'		[State 128]
+10 for abiguity in 'if x then y else z + 1'		[State 136]
 	(shift parses as 'if x then y else (z + 1)', as per longest-parse rule)
-	8 because op might be: - ! * . `x` VARSYM CONSYM QVARSYM QCONSYM
+	10 because op might be: : - ! * . `x` VARSYM CONSYM QVARSYM QCONSYM
 
-1 for ambiguity in '{-# RULES "name" [ ... #-}		[State 210]
+1 for ambiguity in 'if x then y else z with ?x=3' 	[State 136]
+	(shift parses as 'if x then y else (z with ?x=3)'
+
+1 for ambiguity in 'if x then y else z :: T'		[State 136]
+	(shift parses as 'if x then y else (z :: T)', as per longest-parse rule)
+
+8 for ambiguity in 'e :: a `b` c'.  Does this mean 	[States 160,246]
+	(e::a) `b` c, or 
+	(e :: (a `b` c))
+
+1 for ambiguity in 'let ?x ...'				[State 268]
+	the parser can't tell whether the ?x is the lhs of a normal binding or
+	an implicit binding.  Fortunately resolving as shift gives it the only
+	sensible meaning, namely the lhs of an implicit binding.
+
+1 for ambiguity in '{-# RULES "name" [ ... #-}		[State 332]
 	we don't know whether the '[' starts the activation or not: it
   	might be the start of the declaration with the activation being
 	empty.  --SDM 1/4/2002
 
-1 for ambiguity in '{-# RULES "name" forall = ... #-}' 	[State 412]
+1 for ambiguity in '{-# RULES "name" forall = ... #-}' 	[State 394]
 	since 'forall' is a valid variable name, we don't know whether
 	to treat a forall on the input as the beginning of a quantifier
 	or the beginning of the rule itself.  Resolving to shift means
@@ -67,28 +82,9 @@ Conflicts: 21 shift/reduce, -=chak[4Feb2]
 	This saves explicitly defining a grammar for the rule lhs that
 	doesn't include 'forall'.
 
-1 for ambiguity in 'let ?x ...'				[State 278]
-	the parser can't tell whether the ?x is the lhs of a normal binding or
-	an implicit binding.  Fortunately resolving as shift gives it the only
-	sensible meaning, namely the lhs of an implicit binding.
-
-
-8 for ambiguity in 'e :: a `b` c'.  Does this mean 	[States 238,267]
-	(e::a) `b` c, or 
-	(e :: (a `b` c))
-
-6 for conflicts between `fdecl' and `fdeclDEPRECATED', 	[States 402,403]
-  which are resolved correctly, and moreover, 
-  should go away when `fdeclDEPRECATED' is removed.
-
-1 for ambiguity in 'if x then y else z :: T'
-	(shift parses as 'if x then y else (z :: T)', as per longest-parse rule)
-1 for ambiguity in 'if x then y else z with ?x=3'
-	(shift parses as 'if x then y else (z with ?x=3)'
-3 for ambiguity in 'case x of y :: a -> b'
-	(don't know whether to reduce 'a' as a btype or shift the '->'.
-	 conclusion:  bogus expression anyway, doesn't matter)
-
+6 for conflicts between `fdecl' and `fdeclDEPRECATED', 	[States 384,385]
+  	which are resolved correctly, and moreover, 
+  	should go away when `fdeclDEPRECATED' is removed.
 
 -----------------------------------------------------------------------------
 -}
@@ -907,8 +903,8 @@ forall :: { [RdrNameHsTyVar] }
 constr_stuff :: { (RdrName, RdrNameConDetails) }
 	: btype				{% mkPrefixCon $1 [] }
 	| btype '!' atype satypes	{% mkPrefixCon $1 (BangType MarkedUserStrict $3 : $4) }
-	| conid '{' '}' 		{ ($1, RecCon []) }
-	| conid '{' fielddecls '}' 	{ ($1, mkRecCon $3) }
+	| oqtycon '{' '}' 		{% mkRecCon $1 [] }
+	| oqtycon '{' fielddecls '}' 	{% mkRecCon $1 $3 }
 	| sbtype conop sbtype		{ ($2, InfixCon $1 $3) }
 
 satypes	:: { [RdrNameBangType] }
@@ -1317,24 +1313,29 @@ gtycon 	:: { RdrName }	-- A "general" qualified tycon
 
 oqtycon :: { RdrName }	-- An "ordinary" qualified tycon
 	: qtycon			{ $1 }
- 	| '(' qtyconop ')'		{ $2 }
-
-qtycon :: { RdrName }	-- Qualified or unqualified
-	: QCONID		{ mkQual tcClsName $1 }
-	| tycon			{ $1 }
+ 	| '(' qtyconsym ')'		{ $2 }
 
 qtyconop :: { RdrName }	-- Qualified or unqualified
-	  : QCONSYM		{ mkQual tcClsName $1 }
-	  | '`' QCONID '`'	{ mkQual tcClsName $2 }
-	  | tyconop		{ $1 }
-
-tycon 	:: { RdrName }	-- Unqualified
-	: CONID			{ mkUnqual tcClsName $1 }
+	: qtyconsym			{ $1 }
+	| '`' qtycon '`'		{ $2 }
 
 tyconop	:: { RdrName }	-- Unqualified
-	: CONSYM		{ mkUnqual tcClsName $1 }
-	| '`' tycon '`'		{ $2 }
+	: tyconsym			{ $1 }
+	| '`' tycon '`'			{ $2 }
 
+qtycon :: { RdrName }	-- Qualified or unqualified
+	: QCONID			{ mkQual tcClsName $1 }
+	| tycon				{ $1 }
+
+tycon 	:: { RdrName }	-- Unqualified
+	: CONID				{ mkUnqual tcClsName $1 }
+
+qtyconsym :: { RdrName }
+	: QCONSYM			{ mkQual tcClsName $1 }
+	| tyconsym			{ $1 }
+
+tyconsym :: { RdrName }
+	: CONSYM			{ mkUnqual tcClsName $1 }
 
 -----------------------------------------------------------------------------
 -- Any operator
