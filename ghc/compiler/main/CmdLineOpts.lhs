@@ -123,6 +123,7 @@ module CmdLineOpts (
 	opt_EnsureSplittableC,
 	opt_GranMacros,
 	opt_HiMap,
+	opt_HiMapSep,
 	opt_HiVersion,
 	opt_HistorySize,
 	opt_IgnoreAsserts,
@@ -260,6 +261,10 @@ lookup_def_int sw def = case (lookup_str sw) of
 			    Nothing -> def		-- Use default
 		  	    Just xx -> read xx
 
+lookup_def_char sw def = case (lookup_str sw) of
+		  	    Just (xx:_) -> xx
+			    _           -> def		-- Use default
+
 lookup_def_float sw def = case (lookup_str sw) of
 			    Nothing -> def		-- Use default
 		  	    Just xx -> read xx
@@ -392,6 +397,7 @@ opt_EmitCExternDecls	        = lookUp  SLIT("-femit-extern-decls")
 opt_EnsureSplittableC		= lookUp  SLIT("-fglobalise-toplev-names")
 opt_GranMacros			= lookUp  SLIT("-fgransim")
 opt_HiMap 			= lookup_str "-himap="       -- file saying where to look for .hi files
+opt_HiMapSep                    = lookup_def_char "-himap-sep=" ':'
 opt_HiVersion			= lookup_def_int "-fhi-version=" 0 -- what version we're compiling.
 opt_HistorySize			= lookup_def_int "-fhistory-size" 20
 opt_IgnoreAsserts               = lookUp  SLIT("-fignore-asserts")

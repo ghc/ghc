@@ -48,7 +48,7 @@ module Module
 import OccName
 import Outputable
 import FiniteMap
-import CmdLineOpts	( opt_Static, opt_CompilingPrelude, opt_WarnHiShadows )
+import CmdLineOpts	( opt_Static, opt_CompilingPrelude, opt_WarnHiShadows, opt_HiMapSep )
 import Constants	( interfaceFileFormatVersion )
 import Maybes		( seqMaybe )
 import Maybe		( fromMaybe )
@@ -384,7 +384,7 @@ mkSearchPath (Just s) = go s
     go s  = 
       case span (/= '%') s of
        (dir,'%':rs) ->
-         case span (/= ':') rs of
+         case span (/= opt_HiMapSep) rs of
           (hisuf,_:rest) -> (dir,hisuf):go rest
           (hisuf,[])     -> [(dir,hisuf)]
 \end{code}

@@ -425,6 +425,9 @@ $CoreLint      = '';
 $USPLint       = '';
 $StgLint       = '';
 
+# The SplitMarker is the string/character used to mark end of element
+# in import lists.
+$SplitMarker    = ':';
 @Import_dir	= ('.'); #-i things
 @Include_dir	= ('.'); #-I things; other default(s) stuck on AFTER option processing
 
@@ -1704,7 +1707,8 @@ sub runHsc {
     local($ifile_root, $hsc_out, $hsc_hi, $hsc_out_c_stub, $hsc_out_h_stub, $going_interactive) = @_;
 
     &makeHiMap() unless $HiMapDone;
-    push(@HsC_flags, "-himap=$HiIncludeString");
+    push(@HsC_flags, "\"-himap=$HiIncludeString\"");
+    push(@HsC_flags, "\"-himap-sep=${SplitMarker}\"");
 
     # here, we may produce .hc/.s and/or .hi files
     local($output) = '';
@@ -1789,7 +1793,7 @@ sub makeHiMap {
     
     foreach $d ( @Import_dir ) {
 	if ($HiIncludeString) { 
-	   $HiIncludeString = "$HiIncludeString:${d}%.${HiSuffix}";
+	   $HiIncludeString = "$HiIncludeString${SplitMarker}${d}%.${HiSuffix}";
 	} else { 
 	   $HiIncludeString = "$d%.${HiSuffix}"; 
 	}
@@ -1798,7 +1802,7 @@ sub makeHiMap {
 
     foreach $d ( @SysImport_dir ) {
 	if ($HiIncludeString) { 
-	    $HiIncludeString = "$HiIncludeString:${d}%.${HiSuffix_prelude}";
+	    $HiIncludeString = "$HiIncludeString${SplitMarker}${d}%.${HiSuffix_prelude}";
 	} else { 
 	    $HiIncludeString = "${d}%.${HiSuffix_prelude}";
         }
@@ -2966,8 +2970,16 @@ arg: while($_ = $Args[0]) {
 			    print STDERR "WARNING: import paths cleared by `-i'\n";
 			    next arg; };
 
-    /^-i(.*)/	    && do { local(@new_items)
-			      = split( /:/, &grab_arg_arg(*Args,'-i', $1));
+    /^-i(.*)/	    && do { local(@new_items);
+    			    local($arg) = $1;
+    
+			    #
+    			    if ( $arg =~ /;/ ) {
+			       $SplitMarker=";";
+			       @new_items = split( /;/, &grab_arg_arg(*Args,'-i', $arg));
+			    } else {
+			       @new_items = split( /:/, &grab_arg_arg(*Args,'-i', $arg));
+			    }
 			    unshift(@Import_dir, @new_items);
 			    next arg; };
 
