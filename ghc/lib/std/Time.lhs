@@ -578,32 +578,32 @@ formatTimeDiff l fmt (TimeDiff year month day hour min sec _)
 
 \begin{code}
 #ifdef __HUGS__
-foreign import stdcall "libHS_cbits.so" "get_tm_sec"   get_tm_sec   :: Bytes -> IO Int
-foreign import stdcall "libHS_cbits.so" "get_tm_min"   get_tm_min   :: Bytes -> IO Int
-foreign import stdcall "libHS_cbits.so" "get_tm_hour"  get_tm_hour  :: Bytes -> IO Int
-foreign import stdcall "libHS_cbits.so" "get_tm_mday"  get_tm_mday  :: Bytes -> IO Int
-foreign import stdcall "libHS_cbits.so" "get_tm_mon"   get_tm_mon   :: Bytes -> IO Int
-foreign import stdcall "libHS_cbits.so" "get_tm_year"  get_tm_year  :: Bytes -> IO Int
-foreign import stdcall "libHS_cbits.so" "get_tm_wday"  get_tm_wday  :: Bytes -> IO Int
-foreign import stdcall "libHS_cbits.so" "get_tm_yday"  get_tm_yday  :: Bytes -> IO Int
-foreign import stdcall "libHS_cbits.so" "get_tm_isdst" get_tm_isdst :: Bytes -> IO Int
+foreign import ccall "libHS_cbits.so" "get_tm_sec"   get_tm_sec   :: Bytes -> IO Int
+foreign import ccall "libHS_cbits.so" "get_tm_min"   get_tm_min   :: Bytes -> IO Int
+foreign import ccall "libHS_cbits.so" "get_tm_hour"  get_tm_hour  :: Bytes -> IO Int
+foreign import ccall "libHS_cbits.so" "get_tm_mday"  get_tm_mday  :: Bytes -> IO Int
+foreign import ccall "libHS_cbits.so" "get_tm_mon"   get_tm_mon   :: Bytes -> IO Int
+foreign import ccall "libHS_cbits.so" "get_tm_year"  get_tm_year  :: Bytes -> IO Int
+foreign import ccall "libHS_cbits.so" "get_tm_wday"  get_tm_wday  :: Bytes -> IO Int
+foreign import ccall "libHS_cbits.so" "get_tm_yday"  get_tm_yday  :: Bytes -> IO Int
+foreign import ccall "libHS_cbits.so" "get_tm_isdst" get_tm_isdst :: Bytes -> IO Int
 
-foreign import stdcall "libHS_cbits.so" "prim_ZONE"    prim_ZONE    :: Bytes -> IO Addr
-foreign import stdcall "libHS_cbits.so" "prim_GMTOFF"  prim_GMTOFF  :: Bytes -> IO Int
+foreign import ccall "libHS_cbits.so" "prim_ZONE"    prim_ZONE    :: Bytes -> IO Addr
+foreign import ccall "libHS_cbits.so" "prim_GMTOFF"  prim_GMTOFF  :: Bytes -> IO Int
 
-foreign import stdcall "libHS_cbits.so" "prim_SETZONE" prim_SETZONE :: Bytes -> Bytes -> IO Int
+foreign import ccall "libHS_cbits.so" "prim_SETZONE" prim_SETZONE :: Bytes -> Bytes -> IO Int
 
-foreign import stdcall "libHS_cbits.so" "sizeof_word"      sizeof_word      :: Int
-foreign import stdcall "libHS_cbits.so" "sizeof_struct_tm" sizeof_struct_tm :: Int
-foreign import stdcall "libHS_cbits.so" "sizeof_time_t"    sizeof_time_t    :: Int
+foreign import ccall "libHS_cbits.so" "sizeof_word"      sizeof_word      :: Int
+foreign import ccall "libHS_cbits.so" "sizeof_struct_tm" sizeof_struct_tm :: Int
+foreign import ccall "libHS_cbits.so" "sizeof_time_t"    sizeof_time_t    :: Int
 
 -- believed to be at least 1 bit (the sign bit!) bigger than sizeof_time_t
 sizeof_int64 :: Int
 sizeof_int64 = 8
 
-foreign import stdcall "libHS_cbits.so" "prim_getClockTime" prim_getClockTime :: Bytes -> Bytes -> IO Int
-foreign import stdcall "libHS_cbits.so" "prim_toClockSec"   prim_toClockSec   :: Int -> Int -> Int -> Int -> Int -> Int -> Int -> Bytes -> IO Int
-foreign import stdcall "libHS_cbits.so" "prim_toLocalTime"  prim_toLocalTime  :: Int64 -> Bytes -> IO Int
-foreign import stdcall "libHS_cbits.so" "prim_toUTCTime"    prim_toUTCTime    :: Int64 -> Bytes -> IO Int
+foreign import ccall "libHS_cbits.so" "prim_getClockTime" prim_getClockTime :: Bytes -> Bytes -> IO Int
+foreign import ccall "libHS_cbits.so" "prim_toClockSec"   prim_toClockSec   :: Int -> Int -> Int -> Int -> Int -> Int -> Int -> Bytes -> IO Int
+foreign import ccall "libHS_cbits.so" "prim_toLocalTime"  prim_toLocalTime  :: Int64 -> Bytes -> IO Int
+foreign import ccall "libHS_cbits.so" "prim_toUTCTime"    prim_toUTCTime    :: Int64 -> Bytes -> IO Int
 #endif
 \end{code}
