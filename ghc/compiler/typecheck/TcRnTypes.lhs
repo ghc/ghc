@@ -478,6 +478,9 @@ data ImportAvails
 		-- Used to figure out "module M" export specifiers
 		-- Domain is only modules with *unqualified* imports
 		-- (see 1.4 Report Section 5.1.1)
+		-- The list of Avails is cumulative, not necessarily
+		-- nicely uniquified. For example, we might have Maybe(Nothing)
+		-- and Maybe(Just) in the list, separately.
 
 	imp_mods :: ModuleEnv (Module, Bool)
 		-- Domain is all directly-imported modules
@@ -502,7 +505,7 @@ plusImportAvails
   (ImportAvails { imp_env = env1, imp_unqual = unqual1, imp_mods = mods1 })
   (ImportAvails { imp_env = env2, imp_unqual = unqual2, imp_mods = mods2 })
   = ImportAvails { imp_env    = env1 `plusAvailEnv` env2, 
-		   imp_unqual = unqual1 `plusModuleEnv` unqual2, 
+		   imp_unqual = plusModuleEnv_C (++) unqual1 unqual2, 
 		   imp_mods   = mods1 `plusModuleEnv` mods2 }
 
 mkImportAvails :: ModuleName -> Bool
