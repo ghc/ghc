@@ -671,10 +671,6 @@ tcSimplifyCheck
 -- tcSimplifyCheck is used when checking expression type signatures,
 -- class decls, instance decls etc.
 --
--- NB: we psss isFree (not isFreeAndInheritable) to tcSimplCheck
--- It's important that we can float out non-inheritable predicates
--- Example:		(?x :: Int) is ok!
---
 -- NB: tcSimplifyCheck does not consult the
 --	global type variables in the environment; so you don't
 --	need to worry about setting them before calling tcSimplifyCheck
@@ -1458,7 +1454,7 @@ addFree :: Avails -> Inst -> NF_TcM Avails
 	-- an optimisation, and perhaps it is more trouble that it is worth,
 	-- as the following comments show!
 	--
-	-- NB1: do *not* add superclasses.  If we have
+	-- NB: do *not* add superclasses.  If we have
 	--	df::Floating a
 	--	dn::Num a
 	-- but a is not bound here, then we *don't* want to derive
@@ -1468,42 +1464,55 @@ addFree avails free = returnNF_Tc (addToFM avails free IsFree)
 
 addWanted :: Avails -> Inst -> TcExpr -> [Inst] -> NF_TcM Avails
 addWanted avails wanted rhs_expr wanteds
--- Do *not* add superclasses as well.  Here's an example of why not
--- 	class Eq b => Foo a b
---	instance Eq a => Foo [a] a
--- If we are reducing
---	(Foo [t] t)
--- we'll first deduce that it holds (via the instance decl).  We
--- must not then overwrite the Eq t constraint with a superclass selection!
--- 	ToDo: this isn't entirely satisfactory, because
---	      we may also lose some entirely-legitimate sharing this way
-
-  = ASSERT( not (wanted `elemFM` avails) )
-    returnNF_Tc (addToFM avails wanted avail)
+  = ASSERT2( not (wanted `elemFM` avails), ppr wanted $$ ppr avails )
+    addAvailAndSCs avails wanted avail
   where
     avail | instBindingRequired wanted = Rhs rhs_expr wanteds
 	  | otherwise		       = ASSERT( null wanteds ) NoRhs
 
 addGiven :: Avails -> Inst -> NF_TcM Avails
 addGiven state given = addAvailAndSCs state given (Given (instToId given) False)
+	-- No ASSERT( not (given `elemFM` avails) ) because in an instance
+	-- decl for Ord t we can add both Ord t and Eq t as 'givens', 
+	-- so the assert isn't true
 
 addIrred :: WantSCs -> Avails -> Inst -> NF_TcM Avails
-addIrred NoSCs  state irred = returnNF_Tc (addToFM state irred Irred)
-addIrred AddSCs state irred = addAvailAndSCs state irred Irred
+addIrred NoSCs  avails irred = returnNF_Tc (addToFM avails irred Irred)
+addIrred AddSCs avails irred = ASSERT2( not (irred `elemFM` avails), ppr irred $$ ppr avails )
+    	      		       addAvailAndSCs avails irred Irred
 
 addAvailAndSCs :: Avails -> Inst -> Avail -> NF_TcM Avails
-addAvailAndSCs avails wanted avail
-  = add_scs (addToFM avails wanted avail) wanted
+addAvailAndSCs avails inst avail
+  | not (isClassDict inst) = returnNF_Tc avails1
+  | otherwise		   = addSCs is_loop avails1 inst 
+  where
+    avails1 = addToFM avails inst avail
+    is_loop inst = inst `elem` deps
+    deps         = findAllDeps avails avail
 
-add_scs :: Avails -> Inst -> NF_TcM Avails
+findAllDeps :: Avails -> Avail -> [Inst]
+-- Find all the Insts that this one depends on
+-- See Note [SUPERCLASS-LOOP]
+findAllDeps avails (Rhs _ kids) = kids ++ concat (map (find_all_deps_help avails) kids)
+findAllDeps avails other	= []
+
+find_all_deps_help :: Avails -> Inst -> [Inst]
+find_all_deps_help avails inst
+  = case lookupFM avails inst of
+	Just avail -> findAllDeps avails avail
+	Nothing    -> []
+
+addSCs :: (Inst -> Bool) -> Avails -> Inst -> NF_TcM Avails
 	-- Add all the superclasses of the Inst to Avails
+	-- The first param says "dont do this because the original thing
+	--	depends on this one, so you'd build a loop"
 	-- Invariant: the Inst is already in Avails.
 
-add_scs avails dict
-  | not (isClassDict dict)
+addSCs is_loop avails dict
+  | is_loop dict	-- See Note [SUPERCLASS-LOOP]
   = returnNF_Tc avails
 
-  | otherwise	-- It is a dictionary
+  | otherwise	-- No loop
   = newDictsFromOld dict sc_theta'	`thenNF_Tc` \ sc_dicts ->
     foldlNF_Tc add_sc avails (zipEqual "add_scs" sc_dicts sc_sels)
   where
@@ -1513,14 +1522,19 @@ add_scs avails dict
 
     add_sc avails (sc_dict, sc_sel)	-- Add it, and its superclasses
       = case lookupFM avails sc_dict of
-	  Just (Given _ _) -> returnNF_Tc avails	-- See Note [SUPER] below
-	  other		   -> addAvailAndSCs avails sc_dict avail
+	  Just (Given _ _) -> returnNF_Tc avails	-- Given is cheaper than
+							--   a superclass selection
+	  Just other       -> returnNF_Tc avails'	-- SCs already added
+	  Nothing	   -> addSCs is_loop avails' sc_dict
       where
 	sc_sel_rhs = DictApp (TyApp (HsVar sc_sel) tys) [instToId dict]
 	avail      = Rhs sc_sel_rhs [dict]
+	avails'    = addToFM avails sc_dict avail
 \end{code}
 
-Note [SUPER].  We have to be careful here.  If we are *given* d1:Ord a,
+Note [SUPERCLASS-LOOP]: Checking for loops
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We have to be careful here.  If we are *given* d1:Ord a,
 and want to deduce (d2:C [a]) where
 
 	class Ord a => C a where
@@ -1529,8 +1543,27 @@ and want to deduce (d2:C [a]) where
 Then we'll use the instance decl to deduce C [a] and then add the
 superclasses of C [a] to avails.  But we must not overwrite the binding
 for d1:Ord a (which is given) with a superclass selection or we'll just
-build a loop!  Hence looking for Given.  Crudely, Given is cheaper
-than a selection.
+build a loop! 
+
+Here's another example 
+ 	class Eq b => Foo a b
+	instance Eq a => Foo [a] a
+If we are reducing
+	(Foo [t] t)
+
+we'll first deduce that it holds (via the instance decl).  We must not
+then overwrite the Eq t constraint with a superclass selection!
+
+At first I had a gross hack, whereby I simply did not add superclass constraints
+in addWanted, though I did for addGiven and addIrred.  This was sub-optimal,
+becuase it lost legitimate superclass sharing, and it still didn't do the job:
+I found a very obscure program (now tcrun021) in which improvement meant the
+simplifier got two bites a the cherry... so something seemed to be an Irred
+first time, but reducible next time.
+
+Now we implement the Right Solution, which is to check for loops directly 
+when adding superclasses.  It's a bit like the occurs check in unification.
+
 
 
 %************************************************************************

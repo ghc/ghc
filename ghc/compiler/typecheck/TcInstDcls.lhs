@@ -43,7 +43,7 @@ import InstEnv		( InstEnv, extendInstEnv )
 import PprType		( pprClassPred )
 import TcMonoType	( tcSigPolyId, tcHsTyVars, kcHsSigType, tcHsType, tcHsSigType )
 import TcUnify		( checkSigTyVars )
-import TcSimplify	( tcSimplifyCheck )
+import TcSimplify	( tcSimplifyCheck, tcSimplifyTop )
 import HscTypes		( HomeSymbolTable, DFunId, FixityEnv,
 			  PersistentCompilerState(..), PersistentRenamerState,
 			  ModDetails(..)
@@ -548,59 +548,38 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = monobinds, iPrags = uprags }
 	(clas, inst_tys') = getClassPredTys pred
         (class_tyvars, sc_theta, _, op_items) = classBigSig clas
 
-	sel_names = [idName sel_id | (sel_id, _) <- op_items]
-
         -- Instantiate the super-class context with inst_tys
 	sc_theta' = substTheta (mkTyVarSubst class_tyvars inst_tys') sc_theta
-
-	-- Find any definitions in monobinds that aren't from the class
-	bad_bndrs = collectMonoBinders monobinds `minusList` sel_names
 	origin	  = InstanceDeclOrigin
     in
-	 -- Check that all the method bindings come from this class
-    mapTc (addErrTc . badMethodErr clas) bad_bndrs		`thenNF_Tc_`
-
 	 -- Create dictionary Ids from the specified instance contexts.
-    newDicts origin sc_theta'			 `thenNF_Tc` \ sc_dicts ->
-    newDicts origin dfun_theta'			 `thenNF_Tc` \ dfun_arg_dicts ->
-    newDicts origin [mkClassPred clas inst_tys'] `thenNF_Tc` \ [this_dict] ->
+    newDicts origin sc_theta'		`thenNF_Tc` \ sc_dicts ->
+    newDicts origin dfun_theta'		`thenNF_Tc` \ dfun_arg_dicts ->
+    newDicts origin [pred] 		`thenNF_Tc` \ [this_dict] ->
 		-- Default-method Ids may be mentioned in synthesised RHSs,
 		-- but they'll already be in the environment.
 
-    mapAndUnzipTc (mkMethodBind origin clas inst_tys' monobinds) 
-		  op_items  `thenTc` \ (meth_insts, meth_infos) ->
+	 -- Check that all the method bindings come from this class
+    mkMethodBinds clas inst_tys' op_items monobinds `thenTc` \ (meth_insts, meth_infos) ->
 
-    let		
-		 -- These insts are in scope; quite a few, eh?
-	avail_insts = [this_dict] ++
-		      dfun_arg_dicts ++
-		      sc_dicts ++
-		      meth_insts
+    let		 -- These insts are in scope; quite a few, eh?
+	avail_insts = [this_dict] ++ dfun_arg_dicts ++
+		      sc_dicts    ++ meth_insts
 
 	xtve    = inst_tyvars `zip` inst_tyvars'
 	tc_meth = tcMethodBind xtve inst_tyvars' dfun_theta' avail_insts
     in
-    mapAndUnzipTc tc_meth meth_infos 	`thenTc` \ (meth_binds_s, meth_lie_s) ->
+    mapAndUnzipTc tc_meth meth_infos 		`thenTc` \ (meth_binds_s, meth_lie_s) ->
 
 	-- Figure out bindings for the superclass context
-    tcAddErrCtxt superClassCtxt 	$
-    tcSimplifyCheck
-		 (ptext SLIT("instance declaration superclass context"))
-		 inst_tyvars'
-		 dfun_arg_dicts		-- NB! Don't include this_dict here, else the sc_dicts
-					-- get bound by just selecting from this_dict!!
-		 (mkLIE sc_dicts)
-						`thenTc` \ (sc_lie, sc_binds) ->
-	-- It's possible that the superclass stuff might have done unification
-    checkSigTyVars inst_tyvars' 	`thenNF_Tc` \ zonked_inst_tyvars ->
+    tcSuperClasses inst_tyvars' dfun_arg_dicts sc_dicts	
+		`thenTc` \ (zonked_inst_tyvars, sc_binds_inner, sc_binds_outer) ->
 
 	-- Deal with SPECIALISE instance pragmas by making them
 	-- look like SPECIALISE pragmas for the dfun
     let
-	mk_prag (SpecInstSig ty loc) = SpecSig (idName dfun_id) ty loc
-	mk_prag prag 		     = prag
-
-	all_prags = map mk_prag uprags
+	spec_prags = [ SpecSig (idName dfun_id) ty loc
+		     | SpecInstSig ty loc <- uprags] 
     in
      
     tcExtendGlobalValEnv [dfun_id] (
@@ -608,7 +587,7 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = monobinds, iPrags = uprags }
 	tcExtendLocalValEnv2 [(idName sel_id, tcSigPolyId sig) 
 			     | (sel_id, sig, _) <- meth_infos]	$
 		-- Map sel_id to the local method name we are using
-	tcSpecSigs all_prags
+	tcSpecSigs spec_prags
     )					`thenTc` \ (prag_binds, prag_lie) ->
 
 	-- Create the result bindings
@@ -655,7 +634,7 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = monobinds, iPrags = uprags }
 
 	dict_bind  = VarMonoBind this_dict_id dict_rhs
 	meth_binds = andMonoBindList meth_binds_s
-	all_binds  = sc_binds `AndMonoBinds` meth_binds	`AndMonoBinds` dict_bind
+	all_binds  = sc_binds_inner `AndMonoBinds` meth_binds `AndMonoBinds` dict_bind
 
 	main_bind = AbsBinds
 		 	 zonked_inst_tyvars
@@ -663,9 +642,86 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = monobinds, iPrags = uprags }
 		 	 [(inst_tyvars', local_dfun_id, this_dict_id)] 
 		 	 inlines all_binds
     in
-    returnTc (plusLIEs meth_lie_s `plusLIE` sc_lie `plusLIE` prag_lie,
-	      main_bind `AndMonoBinds` prag_binds)
+    returnTc (plusLIEs meth_lie_s `plusLIE` prag_lie,
+	      main_bind `AndMonoBinds` prag_binds `AndMonoBinds` sc_binds_outer)
 \end{code}
+
+We have to be very, very careful when generating superclasses, lest we
+accidentally build a loop. Here's an example:
+
+  class S a
+
+  class S a => C a where { opc :: a -> a }
+  class S b => D b where { opd :: b -> b }
+  
+  instance C Int where
+     opc = opd
+  
+  instance D Int where
+     opd = opc
+
+From (instance C Int) we get the constraint set {ds1:S Int, dd:D Int}
+Simplifying, we may well get:
+	$dfCInt = :C ds1 (opd dd)
+	dd  = $dfDInt
+	ds1 = $p1 dd
+Notice that we spot that we can extract ds1 from dd.  
+
+Alas!  Alack! We can do the same for (instance D Int):
+
+	$dfDInt = :D ds2 (opc dc)
+	dc  = $dfCInt
+	ds2 = $p1 dc
+
+And now we've defined the superclass in terms of itself.
+
+
+Solution: treat the superclass context separately, and simplify it
+all the way down to nothing on its own.  Don't toss any 'free' parts
+out to be simplified together with other bits of context.
+Hence the tcSimplifyTop below.
+
+At a more basic level, don't include this_dict in the context wrt
+which we simplify sc_dicts, else sc_dicts get bound by just selecting
+from this_dict!!
+
+\begin{code}
+tcSuperClasses inst_tyvars' dfun_arg_dicts sc_dicts
+  = tcAddErrCtxt superClassCtxt 	$
+    tcSimplifyCheck doc inst_tyvars'
+		    dfun_arg_dicts
+		    (mkLIE sc_dicts)	`thenTc` \ (sc_lie, sc_binds1) ->
+
+	-- It's possible that the superclass stuff might have done unification
+    checkSigTyVars inst_tyvars' 	`thenTc` \ zonked_inst_tyvars ->
+
+	-- We must simplify this all the way down 
+	-- lest we build superclass loops
+    tcSimplifyTop sc_lie		`thenTc` \ sc_binds2 ->
+
+    returnTc (zonked_inst_tyvars, sc_binds1, sc_binds2)
+
+  where
+    doc = ptext SLIT("instance declaration superclass context")
+\end{code}
+
+\begin{code}
+mkMethodBinds clas inst_tys' op_items monobinds
+  = 	 -- Check that all the method bindings come from this class
+    mapTc (addErrTc . badMethodErr clas) bad_bndrs	`thenNF_Tc_`
+
+	-- Make the method bindings
+    mapAndUnzipTc mk_method_bind op_items
+
+  where
+    mk_method_bind op_item = mkMethodBind InstanceDeclOrigin clas 
+					  inst_tys' monobinds op_item 
+
+	-- Find any definitions in monobinds that aren't from the class
+    sel_names = [idName sel_id | (sel_id, _) <- op_items]
+    bad_bndrs = collectMonoBinders monobinds `minusList` sel_names
+\end{code}
+
 
 		------------------------------
 		Inlining dfuns unconditionally
