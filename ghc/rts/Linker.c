@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.5 2000/12/14 15:19:48 sewardj Exp $
+ * $Id: Linker.c,v 1.6 2000/12/15 17:29:35 simonmar Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -143,6 +143,7 @@ static int ocResolve_PEi386     ( ObjectCode* oc );
       SymX(tryTakeMVarzh_fast)			\
       SymX(catchzh_fast)			\
       SymX(raisezh_fast)			\
+      SymX(forkzh_fast)				\
       SymX(delayzh_fast)			\
       SymX(yieldzh_fast)			\
       SymX(killThreadzh_fast)			\
@@ -152,25 +153,11 @@ static int ocResolve_PEi386     ( ObjectCode* oc );
       SymX(resumeThread)			\
       SymX(stackOverflow)			\
       SymX(int2Integerzh_fast)			\
-      SymX(ErrorHdrHook)			\
+      SymX(word2Integerzh_fast)			\
       SymX(mkForeignObjzh_fast)			\
       SymX(__encodeDouble)			\
       SymX(decodeDoublezh_fast)			\
-      SymX(isDoubleNaN)				\
-      SymX(isDoubleInfinite)			\
-      SymX(isDoubleDenormalized)		\
-      SymX(isDoubleNegativeZero)		\
-      SymX(__encodeFloat)			\
       SymX(decodeFloatzh_fast)			\
-      SymX(isFloatNaN)				\
-      SymX(isFloatInfinite)			\
-      SymX(isFloatDenormalized)			\
-      SymX(isFloatNegativeZero)			\
-      SymX(__int_encodeFloat)			\
-      SymX(__int_encodeDouble)			\
-      SymX(__gmpz_cmp_si)			\
-      SymX(__gmpz_cmp)				\
-      SymX(__gmpn_gcd_1)			\
       SymX(gcdIntegerzh_fast)			\
       SymX(newArrayzh_fast)			\
       SymX(unsafeThawArrayzh_fast)		\
@@ -184,7 +171,29 @@ static int ocResolve_PEi386     ( ObjectCode* oc );
       SymX(timesIntegerzh_fast)			\
       SymX(minusIntegerzh_fast)			\
       SymX(plusIntegerzh_fast)			\
+      SymX(andIntegerzh_fast)			\
+      SymX(orIntegerzh_fast)			\
+      SymX(xorIntegerzh_fast)			\
+      SymX(complementIntegerzh_fast)		\
       SymX(mkWeakzh_fast)			\
+      SymX(makeStableNamezh_fast)		\
+      SymX(finalizzeWeakzh_fast)		\
+      SymX(blockAsyncExceptionszh_fast)		\
+      SymX(unblockAsyncExceptionszh_fast)	\
+      SymX(isDoubleNaN)				\
+      SymX(isDoubleInfinite)			\
+      SymX(isDoubleDenormalized)		\
+      SymX(isDoubleNegativeZero)		\
+      SymX(__encodeFloat)			\
+      SymX(isFloatNaN)				\
+      SymX(isFloatInfinite)			\
+      SymX(isFloatDenormalized)			\
+      SymX(isFloatNegativeZero)			\
+      SymX(__int_encodeFloat)			\
+      SymX(__int_encodeDouble)			\
+      SymX(__gmpz_cmp_si)			\
+      SymX(__gmpz_cmp)				\
+      SymX(__gmpn_gcd_1)			\
       SymX(prog_argv)				\
       SymX(prog_argc)				\
       SymX(resetNonBlockingFd)			\
@@ -195,9 +204,62 @@ static int ocResolve_PEi386     ( ObjectCode* oc );
       Sym(stg_yield_to_interpreter)		\
       Sym(StgReturn)				\
       Sym(init_stack)				\
-      SymX(blockAsyncExceptionszh_fast)		\
-      SymX(unblockAsyncExceptionszh_fast)	\
-      Sym(__init_PrelGHC)
+      SymX(cmp_thread)				\
+      Sym(__init_PrelGHC)			\
+      SymX(freeHaskellFunctionPtr)		\
+      SymX(OnExitHook)				\
+      SymX(ErrorHdrHook)			\
+      SymX(NoRunnableThreadsHook)		\
+      SymX(StackOverflowHook)			\
+      SymX(OutOfHeapHook)			\
+      SymX(MallocFailHook)			\
+      SymX(PatErrorHdrHook)			\
+      SymX(defaultsHook)			\
+      SymX(PreTraceHook)			\
+      SymX(PostTraceHook)
+
+#ifndef SUPPORT_LONG_LONGS
+#define RTS_LONG_LONG_SYMS /* nothing */
+#else
+#define RTS_LONG_LONG_SYMS \
+      SymX(stg_gtWord64)			\
+      SymX(stg_geWord64)			\
+      SymX(stg_eqWord64)			\
+      SymX(stg_neWord64)			\
+      SymX(stg_ltWord64)			\
+      SymX(stg_leWord64)			\
+      SymX(stg_gtInt64)				\
+      SymX(stg_geInt64)				\
+      SymX(stg_eqInt64)				\
+      SymX(stg_neInt64)				\
+      SymX(stg_ltInt64)				\
+      SymX(stg_leInt64)				\
+      SymX(stg_remWord64)			\
+      SymX(stg_quotWord64)			\
+      SymX(stg_remInt64)			\
+      SymX(stg_quotInt64)			\
+      SymX(stg_negateInt64)			\
+      SymX(stg_plusInt64)			\
+      SymX(stg_minusInt64)			\
+      SymX(stg_timesInt64)			\
+      SymX(stg_and64)				\
+      SymX(stg_or64)				\
+      SymX(stg_xor64)				\
+      SymX(stg_not64)				\
+      SymX(stg_shiftL64)			\
+      SymX(stg_shiftRL64)			\
+      SymX(stg_iShiftL64)			\
+      SymX(stg_iShiftRL64)			\
+      SymX(stg_iShiftRA64)			\
+      SymX(stg_intToInt64)			\
+      SymX(stg_int64ToInt)			\
+      SymX(stg_int64ToWord64)			\
+      SymX(stg_wordToWord64)			\
+      SymX(stg_word64ToWord)			\
+      SymX(stg_word64ToInt64) 			\
+      SymX(int64ToIntegerzh_fast)		\
+      SymX(word64ToIntegerzh_fast)
+#endif /* SUPPORT_LONG_LONGS */
 
 /* entirely bogus claims about types of these symbols */
 #define Sym(vvv)  extern void (vvv);
@@ -218,6 +280,7 @@ RTS_SYMBOLS
 
 static SymbolVal rtsSyms[] = {
       RTS_SYMBOLS
+      RTS_LONG_LONG_SYMS
       { 0, 0 } /* sentinel */
 };
 
@@ -1403,7 +1466,7 @@ ocResolve_ELF ( ObjectCode* oc )
  * Used by the garbage collector when walking the stack.
  * -------------------------------------------------------------------------- */
 
-SectionKind
+static __inline__ SectionKind
 lookupSection ( void* addr )
 {
    int          i;
@@ -1423,7 +1486,7 @@ int
 is_dynamically_loaded_code_or_rodata_ptr ( char* p )
 {
    SectionKind sk = lookupSection(p);
-   assert (sk != SECTIONKIND_NOINFOAVAIL);
+   ASSERT (sk != SECTIONKIND_NOINFOAVAIL);
    return (sk == SECTIONKIND_CODE_OR_RODATA);
 }
 
@@ -1432,7 +1495,7 @@ int
 is_dynamically_loaded_rwdata_ptr ( char* p )
 {
    SectionKind sk = lookupSection(p);
-   assert (sk != SECTIONKIND_NOINFOAVAIL);
+   ASSERT (sk != SECTIONKIND_NOINFOAVAIL);
    return (sk == SECTIONKIND_RWDATA);
 }
 
@@ -1441,7 +1504,7 @@ int
 is_not_dynamically_loaded_ptr ( char* p )
 {
    SectionKind sk = lookupSection(p);
-   assert (sk != SECTIONKIND_NOINFOAVAIL);
+   ASSERT (sk != SECTIONKIND_NOINFOAVAIL);
    return (sk == SECTIONKIND_OTHER);
 }
 
