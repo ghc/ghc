@@ -364,11 +364,6 @@ GhcRtsCcOpts=-fomit-frame-pointer
 # Include the front panel code?  Needs GTK+.
 GhcRtsWithFrontPanel = NO
 
-# DEPRECATED:
-# This option is no longer used.  We now always build the threaded RTS,
-# add the flag '-threaded' to GHC to get it.
-GhcRtsThreaded=@ThreadedRts@
-
 ################################################################################
 #
 # libraries project
