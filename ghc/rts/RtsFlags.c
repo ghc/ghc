@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.72 2003/11/12 17:49:09 sof Exp $
+ * $Id: RtsFlags.c,v 1.73 2004/03/18 13:52:09 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -147,7 +147,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.statsFile		= NULL;
     RtsFlags.GcFlags.giveStats		= NO_GC_STATS;
 
-    RtsFlags.GcFlags.maxStkSize		= (1024 * 1024) / sizeof(W_);
+    RtsFlags.GcFlags.maxStkSize		= (8 * 1024 * 1024) / sizeof(W_);
     RtsFlags.GcFlags.initialStkSize	= 1024 / sizeof(W_);
 
     RtsFlags.GcFlags.minAllocAreaSize   = (256 * 1024)        / BLOCK_SIZE;
@@ -245,7 +245,7 @@ void initRtsFlagsDefaults(void)
 
 #if defined(GRAN)
     /* ToDo: check defaults for GranSim and GUM */
-    RtsFlags.GcFlags.maxStkSize		= (1024 * 1024) / sizeof(W_);
+    RtsFlags.GcFlags.maxStkSize		= (8 * 1024 * 1024) / sizeof(W_);
     RtsFlags.GcFlags.initialStkSize	= 1024 / sizeof(W_);
 
     RtsFlags.GranFlags.maxThreads	= 65536; // refers to mandatory threads
@@ -331,7 +331,7 @@ usage_text[] = {
 "",
 "  -?       Prints this message and exits; the program is not executed",
 "",
-"  -K<size> Sets the maximum stack size (default 1M)  Egs: -K32k   -K512k",
+"  -K<size> Sets the maximum stack size (default 8M)  Egs: -K32k   -K512k",
 "  -k<size> Sets the initial thread stack size (default 1k)  Egs: -k4k   -k2m",
 "",
 "  -A<size> Sets the minimum allocation area size (default 256k) Egs: -A1m -A10k",
