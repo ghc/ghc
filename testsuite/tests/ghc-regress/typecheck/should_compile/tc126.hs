@@ -5,7 +5,7 @@
 
 module ShouldCompile where
 
-module Foo where
+-- module Foo where
 
 class Bug f a r | f a -> r where
    bug::f->a->r
