@@ -5,5 +5,5 @@ include ($confdir ++ "/../multimod-test.T")
 --                  extra run flags
 --                  expected process return value, if not zero
 
-test "okeefe_neural" { mtr("-package lang -H120m", "", "") }
+test "okeefe_neural" { mtr("-package lang", "", "") }
 
