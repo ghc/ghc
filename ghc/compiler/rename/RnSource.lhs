@@ -23,7 +23,7 @@ import CmdLineOpts	( opt_IgnoreIfacePragmas )
 
 import RnBinds		( rnTopBinds, rnMethodBinds )
 import RnEnv		( bindTyVarsRn, lookupBndrRn, lookupOccRn, lookupImplicitOccRn, bindLocalsRn,
-			  lookupOptionalOccRn, newSysName, newDfunName, checkDupOrQualNames, checkDupNames,
+			  newSysName, newDfunName, checkDupOrQualNames, checkDupNames,
 			  listType_RDR, tupleType_RDR )
 import RnMonad
 
@@ -46,11 +46,9 @@ import PrelInfo		( derivingOccurrences, evalClass_RDR, numClass_RDR, allClass_NA
 import ListSetOps	( unionLists, minusList )
 import Maybes		( maybeToBool, catMaybes )
 import Bag		( emptyBag, unitBag, consBag, unionManyBags, unionBags, listToBag, bagToList )
-import Outputable	( Outputable(..){-instances-} )
-import PprStyle 	
+import Outputable	( PprStyle(..), Outputable(..){-instances-} )
 import Pretty
 import SrcLoc		( SrcLoc )
--- import TyCon		( TyCon{-instance NamedThing-} )
 import Unique		( Unique )
 import UniqSet		( SYN_IE(UniqSet) )
 import UniqFM		( UniqFM, lookupUFM )
@@ -94,6 +92,9 @@ rnDecl (SigD (IfaceSig name ty id_infos loc))
     (if opt_IgnoreIfacePragmas then
 	returnRn []
      else
+	setModeRn (InterfaceMode Optional) $
+		-- In all the rest of the signature we read in optional mode,
+		-- so that (a) we don't die
 	mapRn rnIdInfo id_infos
     )				`thenRn` \ id_infos' -> 
 
@@ -191,11 +192,12 @@ rnDecl (ClD (ClassDecl context cname tyvar sigs mbinds pragmas src_loc))
 
 		-- Call up interface info for default method, if such info exists
 	let
-		dm_occ = prefixOccName SLIT("$m") (rdrNameOcc op)
+	    dm_occ = prefixOccName SLIT("$m") (rdrNameOcc op)
 	in
-	newSysName dm_occ Exported locn		`thenRn` \ dm_name ->
-        addOccurrenceName Optional dm_name	`thenRn_`
-	
+        newSysName dm_occ Exported locn		`thenRn` \ dm_name ->
+	setModeRn (InterfaceMode Optional) (
+            addOccurrenceName dm_name
+	)						`thenRn_`
 
 		-- Checks.....
 	let
@@ -239,7 +241,7 @@ rnDecl (InstD (InstDecl inst_ty mbinds uprags maybe_dfun src_loc))
     mapRn rn_uprag uprags			`thenRn` \ new_uprags ->
 
     newDfunName maybe_dfun src_loc		`thenRn` \ dfun_name ->
-    addOccurrenceName Compulsory dfun_name	`thenRn_`
+    addOccurrenceName dfun_name			`thenRn_`
 			-- The dfun is not optional, because we use its version number
 			-- to identify the version of the instance declaration
 
@@ -410,8 +412,8 @@ rnHsSigType doc_str full_ty@(HsPreForAllTy ctxt ty)	-- From source code (no kind
 					not (tv `elem` forall_tyvars)
 				  ]
     in
---    checkRn (null non_foralld_constrained)
---	    (ctxtErr sig_doc non_foralld_constrained)	`thenRn_`
+    checkRn (null non_foralld_constrained)
+	    (ctxtErr sig_doc non_foralld_constrained)	`thenRn_`
 
     (bindTyVarsRn sig_doc (map UserTyVar forall_tyvars)	$ \ new_tyvars ->
      rnContext ctxt					`thenRn` \ new_ctxt ->
@@ -507,7 +509,7 @@ rnContext  ctxt
 		-- Easiest thing is simply not to put it in the occurrence set.
 	lookupBndrRn clas	`thenRn` \ clas_name ->
 	(if clas_name /= allClass_NAME then
-		addOccurrenceName Compulsory clas_name
+		addOccurrenceName clas_name
 	 else
 		returnRn clas_name
 	)			`thenRn_`
@@ -533,17 +535,21 @@ rnIdInfo (HsStrictness strict)
   = rnStrict strict	`thenRn` \ strict' ->
     returnRn (HsStrictness strict')
 
-rnIdInfo (HsUnfold expr)	= rnCoreExpr expr	`thenRn` \ expr' ->
-				  returnRn (HsUnfold expr')
+rnIdInfo (HsUnfold inline expr)	= rnCoreExpr expr	`thenRn` \ expr' ->
+				  returnRn (HsUnfold inline expr')
 rnIdInfo (HsArity arity)	= returnRn (HsArity arity)
 rnIdInfo (HsUpdate update)	= returnRn (HsUpdate update)
 rnIdInfo (HsFBType fb)		= returnRn (HsFBType fb)
 rnIdInfo (HsArgUsage au)	= returnRn (HsArgUsage au)
 rnIdInfo (HsDeforest df)	= returnRn (HsDeforest df)
 
-rnStrict (StrictnessInfo demands (Just worker))
-  = lookupOptionalOccRn worker		`thenRn` \ worker' ->
-    returnRn (StrictnessInfo demands (Just worker'))
+rnStrict (StrictnessInfo demands (Just (worker,cons)))
+	-- The sole purpose of the "cons" field is so that we can mark the constructors
+	-- needed to build the wrapper as "needed", so that their data type decl will be
+	-- slurped in. After that their usefulness is o'er, so we just put in the empty list.
+  = lookupOccRn worker			`thenRn` \ worker' ->
+    mapRn lookupOccRn cons		`thenRn_` 
+    returnRn (StrictnessInfo demands (Just (worker',[])))
 
 -- Boring, but necessary for the type checker.
 rnStrict (StrictnessInfo demands Nothing) = returnRn (StrictnessInfo demands Nothing)
@@ -555,13 +561,13 @@ UfCore expressions.
 
 \begin{code}
 rnCoreExpr (UfVar v)
-  = lookupOptionalOccRn v 	`thenRn` \ v' ->
+  = lookupOccRn v 	`thenRn` \ v' ->
     returnRn (UfVar v')
 
 rnCoreExpr (UfLit lit) = returnRn (UfLit lit)
 
 rnCoreExpr (UfCon con args) 
-  = lookupOptionalOccRn con		`thenRn` \ con' ->
+  = lookupOccRn con		`thenRn` \ con' ->
     mapRn rnCoreArg args	`thenRn` \ args' ->
     returnRn (UfCon con' args')
 
@@ -638,8 +644,8 @@ rnCoreBndrNamess names thing_inside
 \end{code}    
 
 \begin{code}
-rnCoreArg (UfVarArg v)	 = lookupOptionalOccRn v	`thenRn` \ v' -> returnRn (UfVarArg v')
-rnCoreArg (UfUsageArg u) = lookupOptionalOccRn u	`thenRn` \ u' -> returnRn (UfUsageArg u')
+rnCoreArg (UfVarArg v)	 = lookupOccRn v	`thenRn` \ v' -> returnRn (UfVarArg v')
+rnCoreArg (UfUsageArg u) = lookupOccRn u	`thenRn` \ u' -> returnRn (UfUsageArg u')
 rnCoreArg (UfTyArg ty)	 = rnHsType ty			`thenRn` \ ty' -> returnRn (UfTyArg ty')
 rnCoreArg (UfLitArg lit) = returnRn (UfLitArg lit)
 
@@ -648,7 +654,7 @@ rnCoreAlts (UfAlgAlts alts deflt)
     rnCoreDefault deflt		`thenRn` \ deflt' ->
     returnRn (UfAlgAlts alts' deflt')
   where
-    rn_alt (con, bndrs, rhs) =	lookupOptionalOccRn con			`thenRn` \ con' ->
+    rn_alt (con, bndrs, rhs) =	lookupOccRn con			`thenRn` \ con' ->
 				bindLocalsRn "unfolding alt" bndrs	$ \ bndrs' ->
 				rnCoreExpr rhs				`thenRn` \ rhs' ->
 				returnRn (con', bndrs', rhs')
@@ -666,11 +672,11 @@ rnCoreDefault (UfBindDefault bndr rhs) = bindLocalsRn "unfolding default" [bndr]
 					 rnCoreExpr rhs					`thenRn` \ rhs' ->
 				  	 returnRn (UfBindDefault bndr' rhs')
 
-rnCoercion (UfIn  n) = lookupOptionalOccRn n `thenRn` \ n' -> returnRn (UfIn  n')
-rnCoercion (UfOut n) = lookupOptionalOccRn n `thenRn` \ n' -> returnRn (UfOut n')
+rnCoercion (UfIn  n) = lookupOccRn n `thenRn` \ n' -> returnRn (UfIn  n')
+rnCoercion (UfOut n) = lookupOccRn n `thenRn` \ n' -> returnRn (UfOut n')
 
 rnCorePrim (UfOtherOp op) 
-  = lookupOptionalOccRn op	`thenRn` \ op' ->
+  = lookupOccRn op	`thenRn` \ op' ->
     returnRn (UfOtherOp op')
 
 rnCorePrim (UfCCallOp str casm gc arg_tys res_ty)
