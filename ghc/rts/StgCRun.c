@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.26 2001/08/14 13:40:09 sewardj Exp $
+ * $Id: StgCRun.c,v 1.27 2002/01/07 22:35:55 ken Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -19,17 +19,17 @@
  * the whatever way C returns a value.
  *
  * NOTE: StgRun/StgReturn do *NOT* load or store Hp or any
- * other registers (other than saving the C callee-saves 
+ * other registers (other than saving the C callee-saves
  * registers).  Instead, the called function "f" must do that
  * in STG land.
- * 
+ *
  * GCC will have assumed that pushing/popping of C-stack frames is
  * going on when it generated its code, and used stack space
  * accordingly.  However, we actually {\em post-process away} all
  * such stack-framery (see \tr{ghc/driver/ghc-asm.lprl}). Things will
  * be OK however, if we initially make sure there are
  * @RESERVED_C_STACK_BYTES@ on the C-stack to begin with, for local
- * variables.  
+ * variables.
  *
  * -------------------------------------------------------------------------- */
 
@@ -46,13 +46,13 @@
  * definition has been read.  Any point after #include "Stg.h" would be too
  * late.
  *
- * You can define alpha_EXTRA_CAREFUL here to save $s6, $f8 and $f9 -- registers
- * that we don't use but which are callee-save registers.  It shouldn't be
- * necessary.
+ * We define alpha_EXTRA_CAREFUL here to save $s6, $f8 and $f9 -- registers
+ * that we don't use but which are callee-save registers.  The __divq() routine
+ * in libc.a clobbers $s6.
  */
 #include "config.h"
 #ifdef alpha_TARGET_ARCH
-#undef alpha_EXTRA_CAREFUL
+#define alpha_EXTRA_CAREFUL
 register long   fake_ra __asm__("$26");
 #ifdef alpha_EXTRA_CAREFUL
 register long   fake_s6 __asm__("$15");
@@ -79,7 +79,7 @@ register double fake_f9 __asm__("$f9");
 /* -----------------------------------------------------------------------------
    any architecture (using miniinterpreter)
    -------------------------------------------------------------------------- */
-	
+
 extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg)
 {
    while (f) {
@@ -109,7 +109,7 @@ EXTFUN(StgReturn)
 /* -----------------------------------------------------------------------------
    x86 architecture
    -------------------------------------------------------------------------- */
-	
+
 #ifdef i386_TARGET_ARCH
 
 StgThreadReturnCode
@@ -119,7 +119,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
     StgThreadReturnCode r;
 
     __asm__ volatile (
-	/* 
+	/*
 	 * save callee-saves registers on behalf of the STG code.
 	 */
 	"movl %%esp, %%eax\n\t"
@@ -166,7 +166,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 /* -----------------------------------------------------------------------------
    Sparc architecture
 
-   -- 
+   --
    OLD COMMENT from GHC-3.02:
 
    We want tailjumps to be calls, because `call xxx' is the only Sparc
@@ -193,7 +193,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 
    Updated info (GHC 4.08.2): not saving %i7 any more (see below).
    -------------------------------------------------------------------------- */
-	
+
 #ifdef sparc_TARGET_ARCH
 
 StgThreadReturnCode
@@ -206,9 +206,9 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 #endif
     f();
     __asm__ volatile (
-	    ".align 4\n"		
+	    ".align 4\n"
             ".global " STG_RETURN "\n"
-       	    STG_RETURN ":" 
+       	    STG_RETURN ":"
 	    : : : "l0","l1","l2","l3","l4","l5","l6","l7");
     /* we tell the C compiler that l0-l7 are clobbered on return to
      * StgReturn, otherwise it tries to use these to save eg. the
@@ -226,7 +226,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
      * call to f(), this gets clobbered in STG land and we end up
      * dereferencing a bogus pointer in StgReturn.
      */
-    __asm__ volatile ("ld %1,%0" 
+    __asm__ volatile ("ld %1,%0"
 		      : "=r" (i7) : "m" (((void **)(space))[100]));
 #endif
     return (StgThreadReturnCode)R1.i;
@@ -257,7 +257,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
     Architecture Reference Manual_, and as a result of asynchronous software
     actions."
 
-   -- Compaq Computer Corporation, Houston. Tru64 UNIX Calling Standard for   
+   -- Compaq Computer Corporation, Houston. Tru64 UNIX Calling Standard for
       Alpha Systems, 5.1 edition, August 2000, section 3.2.1.  http://www.
       tru64unix.compaq.com/docs/base_doc/DOCUMENTATION/V51_PDF/ARH9MBTE.PDF
    -------------------------------------------------------------------------- */
@@ -265,7 +265,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 #ifdef alpha_TARGET_ARCH
 
 StgThreadReturnCode
-StgRun(StgFunPtr f, StgRegTable *basereg) 
+StgRun(StgFunPtr f, StgRegTable *basereg)
 {
     register long   real_ra __asm__("$26"); volatile long   save_ra;
 
@@ -278,7 +278,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg)
 #ifdef alpha_EXTRA_CAREFUL
     register long   real_s6 __asm__("$15"); volatile long   save_s6;
 #endif
-                                                                                  
+
     register double real_f2 __asm__("$f2"); volatile double save_f2;
     register double real_f3 __asm__("$f3"); volatile double save_f3;
     register double real_f4 __asm__("$f4"); volatile double save_f4;
@@ -364,7 +364,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg)
 #ifdef hppa1_1_TARGET_ARCH
 
 StgThreadReturnCode
-StgRun(StgFunPtr f, StgRegTable *basereg) 
+StgRun(StgFunPtr f, StgRegTable *basereg)
 {
     StgChar space[RESERVED_C_STACK_BYTES+16*sizeof(long)+10*sizeof(double)];
     StgThreadReturnCode ret;
@@ -439,7 +439,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg)
 		      "\tfldds   8(0,%%r19),%%fr19\n"
 		      "\tldo 32(%%r19),%%r19\n"
 		      "\tfldds -16(0,%%r19),%%fr20\n"
-		      "\tfldds  -8(0,%%r19),%%fr21\n" 
+		      "\tfldds  -8(0,%%r19),%%fr21\n"
 		         : "=r" (ret)
 		         : "n" (-(116 * sizeof(long) + 10 * sizeof(double)))
 		         : "%r19"
