@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.38 2004/08/13 13:10:26 simonmar Exp $
+ * $Id: Profiling.c,v 1.39 2004/09/01 08:43:23 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -461,8 +461,7 @@ static CostCentreStack *
 ActualPush_ ( CostCentreStack *ccs, CostCentre *cc, CostCentreStack *new_ccs )
 {
   /* assign values to each member of the structure */
-  ASSIGN_CCS_ID(new_ccs->ccsID);
-  
+  new_ccs->ccsID = CCS_ID++;
   new_ccs->cc = cc;
   new_ccs->prevStack = ccs;
   
@@ -665,7 +664,7 @@ report_per_cc_costs( void )
 	  );
       
       if (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
-	  fprintf(prof_file, "  %5ld %9lld", cc->time_ticks, cc->mem_alloc);
+	  fprintf(prof_file, "  %5lu %9llu", cc->time_ticks, cc->mem_alloc);
       }
       fprintf(prof_file, "\n");
   }
@@ -779,7 +778,7 @@ reportCCS(CostCentreStack *ccs, nat indent)
 	    );
 
     if (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
-      fprintf(prof_file, "  %5ld %9lld", ccs->time_ticks, ccs->mem_alloc*sizeof(W_));
+      fprintf(prof_file, "  %5lu %9llu", ccs->time_ticks, ccs->mem_alloc*sizeof(W_));
 #if defined(PROFILING_DETAIL_COUNTS)
       fprintf(prof_file, "  %8ld %8ld %8ld %8ld %8ld %8ld %8ld",
 	      ccs->mem_allocs, ccs->thunk_count,
