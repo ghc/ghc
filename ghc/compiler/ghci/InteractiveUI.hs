@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.47 2001/02/13 17:13:39 sewardj Exp $
+-- $Id: InteractiveUI.hs,v 1.48 2001/02/13 18:01:23 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -254,25 +254,16 @@ doCommand expr
    = do expr_expanded <- expandExpr expr
         -- io (putStrLn ( "Before: " ++ expr ++ "\nAfter:  " ++ expr_expanded))
         expr_ok <- timeIt (do stuff <- evalExpr expr_expanded
-			      finishEvalExpr stuff)
+			      finishEvalExpr expr_expanded stuff)
         when expr_ok (rememberExpr expr_expanded)
         return False
 
--- possibly print the type and revert CAFs after evaluating an expression
-finishEvalExpr Nothing = return False
-finishEvalExpr (Just (unqual,ty))
- = do b <- isOptionSet ShowType
-      io (when b (printForUser stdout unqual (text "::" <+> ppr ty)))
-      b <- isOptionSet RevertCAFs
-      io (when b revertCAFs)
-      return True
-
 -- Returned Maybe indicates whether or not the expr was successfully
 -- parsed, renamed and typechecked.
-evalExpr :: String -> GHCi (Maybe (PrintUnqualified,Type))
+evalExpr :: String -> GHCi Bool
 evalExpr expr
  | null (filter (not.isSpace) expr)
- = return Nothing
+ = return False
  | otherwise
  = do st <- getGHCiState
       dflags <- io (getDynFlags)
@@ -280,10 +271,21 @@ evalExpr expr
       	 io (cmGetExpr (cmstate st) dflags True (current_module st) expr)
       setGHCiState st{cmstate = new_cmstate}
       case maybe_stuff of
-      	 Nothing -> return Nothing
-      	 Just (hv, unqual, ty) -> do io (cmRunExpr hv)
-		 		     flushEverything
-		 		     return (Just (unqual,ty))
+      	 Nothing -> return False
+      	 Just (hv, unqual, ty) -> 
+		do io (cmRunExpr hv)
+		   return True
+
+-- possibly print the type and revert CAFs after evaluating an expression
+finishEvalExpr _ False = return False
+finishEvalExpr expr True
+ = do b <- isOptionSet ShowType
+	-- re-typecheck, don't wrap with print this time
+      when b (io (putStr ":: ") >> typeOfExpr expr)
+      b <- isOptionSet RevertCAFs
+      io (when b revertCAFs)
+      flushEverything
+      return True
 
 flushEverything :: GHCi ()
 flushEverything
@@ -322,9 +324,14 @@ setContext ""
   = throwDyn (OtherError "syntax: `:m <module>'")
 setContext m | not (isUpper (head m)) || not (all isAlphaNum (tail m))
   = throwDyn (OtherError ("strange looking module name: `" ++ m ++ "'"))
-setContext mn
-  = do m <- io (moduleNameToModule (mkModuleName mn))
-       st <- getGHCiState
+setContext str
+  = do st <- getGHCiState
+
+       let mn = mkModuleName str
+       m <- case [ m | m <- modules st, moduleName m == mn ] of
+		(m:_) -> return m
+		[]    -> io (moduleNameToModule mn)
+
        if (isHomeModule m && m `notElem` modules st)
 	  then throwDyn (OtherError (showSDoc (quotes (ppr (moduleName m))
 				<+> text "is not currently loaded, use :load")))
@@ -334,9 +341,9 @@ moduleNameToModule :: ModuleName -> IO Module
 moduleNameToModule mn
  = do maybe_stuff <- findModule mn
       case maybe_stuff of
-	 Nothing -> throwDyn (OtherError ("can't find module `"
-					    ++ moduleNameUserString mn ++ "'"))
-   	 Just (m,_) -> return m
+	Nothing -> throwDyn (OtherError ("can't find module `"
+				    ++ moduleNameUserString mn ++ "'"))
+	Just (m,_) -> return m
 
 changeDirectory :: String -> GHCi ()
 changeDirectory d = io (setCurrentDirectory d)
@@ -679,8 +686,8 @@ linkPackages cmdline_libs pkgs
                              else do loadObj static_ish
                                      putStr "done.\n"
                    Right dll_unadorned
-                      -> do dll_ok <- ocAddDLL (packString dll_unadorned)
-                            if    dll_ok == 1
+                      -> do dll_ok <- addDLL dll_unadorned
+                            if    dll_ok
                              then putStr "done.\n"
                              else do putStr "not found.\n"
                                      croak
@@ -732,8 +739,8 @@ loadClassified :: Either FilePath String -> IO ()
 loadClassified (Left obj_absolute_filename)
    = do loadObj obj_absolute_filename
 loadClassified (Right dll_unadorned)
-   = do dll_ok <- ocAddDLL (packString dll_unadorned)
-        if    dll_ok == 1
+   = do dll_ok <- addDLL dll_unadorned
+        if dll_ok
          then return ()
          else throwDyn (OtherError ("can't find .o or .so/.DLL for: " 
                                     ++ dll_unadorned))
@@ -745,10 +752,6 @@ locateOneObj (d:ds) obj
    = do let path = d ++ '/':obj ++ ".o"
         b <- doesFileExist path
         if b then return (Left path) else locateOneObj ds obj
-
-
-type PackedString = ByteArray Int
-foreign import "ocAddDLL" unsafe ocAddDLL :: PackedString -> IO Int
 
 -----------------------------------------------------------------------------
 -- timing & statistics

@@ -11,6 +11,7 @@ module Linker (
    unloadObj,    -- :: String -> IO ()
    lookupSymbol, -- :: String -> IO (Maybe (Ptr a))
    resolveObjs,  -- :: IO ()
+   addDLL	 -- :: String -> IO Bool
   )  where
 
 import Foreign		( Ptr, nullPtr )
@@ -46,6 +47,9 @@ resolveObjs = do
 	then panic "resolveObjs: failed"
 	else return ()
 
+addDLL str = do
+   r <- c_addDLL (packString str)
+   return (r == 0)
 
 type PackedString = ByteArray Int
 
@@ -63,4 +67,8 @@ foreign import "resolveObjs" unsafe
 
 foreign import "initLinker" unsafe
    initLinker :: IO ()
+
+foreign import "addDLL" unsafe 
+   c_addDLL :: PackedString -> IO Int
+
 \end{code}
