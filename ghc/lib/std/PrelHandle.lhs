@@ -42,15 +42,8 @@ import PrelForeign  ( makeForeignObj )
 #endif /* ndef(__HUGS__) */
 
 #ifdef __HUGS__
-#define cat2(x,y)  x/**/y
-#define CCALL(fun) cat2(prim_,fun)
 #define __CONCURRENT_HASKELL__
 #define stToIO id
-#define sizeof_int64 8
-#else
-#define CCALL(fun) _ccall_ fun
-#define const_BUFSIZ ``BUFSIZ''
-#define primPackString
 #endif
 
 #ifndef __PARALLEL_HASKELL__
@@ -184,16 +177,11 @@ mkErrorHandle__ ioe =
 %*********************************************************
 
 \begin{code}
-#ifndef __HUGS__
-freeStdFileObject :: ForeignObj -> IO ()
-freeStdFileObject fo = CCALL(freeStdFileObject) fo
+foreign import "libHS_cbits" "freeStdFileObject"
+        freeStdFileObject :: FILE_OBJECT -> IO ()
+foreign import "libHS_cbits" "freeFileObject"
+        freeFileObject :: FILE_OBJECT -> IO ()
 
-freeFileObject :: ForeignObj -> IO ()
-freeFileObject fo = CCALL(freeFileObject) fo
-#else
-foreign import stdcall "libHS_cbits.so" "freeStdFileObject" freeStdFileObject :: ForeignObj -> IO ()
-foreign import stdcall "libHS_cbits.so" "freeFileObject" freeFileObject :: ForeignObj -> IO ()
-#endif
 \end{code}
 
 %*********************************************************
@@ -212,19 +200,12 @@ standard error channel. These handles are initially open.
 stdin, stdout, stderr :: Handle
 
 stdout = unsafePerformIO (do
-    rc <- CCALL(getLock) (1::Int) (1::Int)   -- ConcHask: SAFE, won't block
+    rc <- getLock (1::Int) (1::Int)   -- ConcHask: SAFE, won't block
     case (rc::Int) of
        0 -> newHandle (mkClosedHandle__)
        1 -> do
-#if !defined(__CONCURRENT_HASKELL__) || defined(mingw32_TARGET_OS)
- 	    fo <- CCALL(openStdFile) (1::Int) 
-				     (1::Int){-flush on close-}
-				     (0::Int){-writeable-}  -- ConcHask: SAFE, won't block
-#else
- 	    fo <- CCALL(openStdFile) (1::Int)
-				     ((1{-flush on close-})::Int)
-				     (0::Int){-writeable-}  -- ConcHask: SAFE, won't block
-#endif
+ 	    fo <- openStdFile (1::Int) 
+			      (0::Int){-writeable-}  -- ConcHask: SAFE, won't block
 
 #ifndef __PARALLEL_HASKELL__
             fo <- makeForeignObj fo
@@ -246,19 +227,12 @@ stdout = unsafePerformIO (do
   )
 
 stdin = unsafePerformIO (do
-    rc <- CCALL(getLock) (0::Int) (0::Int)   -- ConcHask: SAFE, won't block
+    rc <- getLock (0::Int) (0::Int)   -- ConcHask: SAFE, won't block
     case (rc::Int) of
        0 -> newHandle (mkClosedHandle__)
        1 -> do
-#if !defined(__CONCURRENT_HASKELL__) || defined(mingw32_TARGET_OS)
-	    fo <- CCALL(openStdFile) (0::Int)
-				     (0::Int){-don't flush on close -}
-				     (1::Int){-readable-}  -- ConcHask: SAFE, won't block
-#else
-	    fo <- CCALL(openStdFile) (0::Int)
-				     ((0{-flush on close-})::Int)
-				     (1::Int){-readable-}  -- ConcHask: SAFE, won't block
-#endif
+	    fo <- openStdFile (0::Int)
+			      (1::Int){-readable-}  -- ConcHask: SAFE, won't block
 
 #ifndef __PARALLEL_HASKELL__
             fo <- makeForeignObj fo
@@ -278,19 +252,12 @@ stdin = unsafePerformIO (do
 
 
 stderr = unsafePerformIO (do
-    rc <- CCALL(getLock) (2::Int) (1::Int){-writeable-}  -- ConcHask: SAFE, won't block
+    rc <- getLock (2::Int) (1::Int){-writeable-}  -- ConcHask: SAFE, won't block
     case (rc::Int) of
        0 -> newHandle (mkClosedHandle__)
        1 -> do
-#if !defined(__CONCURRENT_HASKELL__) || defined(mingw32_TARGET_OS)
- 	    fo <- CCALL(openStdFile) (2::Int)
-				     (1::Int){-flush on close-}
-				     (0::Int){-writeable-} -- ConcHask: SAFE, won't block
-#else
- 	    fo <- CCALL(openStdFile) (2::Int)
-				     ((1{-flush on close-})::Int)
-				     (0::Int){-writeable-} -- ConcHask: SAFE, won't block
-#endif
+ 	    fo <- openStdFile (2::Int)
+			      (0::Int){-writeable-} -- ConcHask: SAFE, won't block
 
 #ifndef __PARALLEL_HASKELL__
             fo <- makeForeignObj fo
@@ -329,9 +296,9 @@ openFile fp im = openFileEx fp (TextMode im)
 openFileEx :: FilePath -> IOModeEx -> IO Handle
 
 openFileEx f m = do
-    fo <- CCALL(openFile) (primPackString f) (file_mode::Int) 
-					     (binary::Int)
-					     (file_flags::Int) -- ConcHask: SAFE, won't block
+    fo <- primOpenFile (packString f)
+                       (file_mode::Int) 
+		       (binary::Int)     -- ConcHask: SAFE, won't block
     if fo /= nullAddr then do
 #ifndef __PARALLEL_HASKELL__
 	fo  <- makeForeignObj fo
@@ -348,12 +315,12 @@ openFileEx f m = do
         BinaryMode bmo -> (bmo, 1)
 	TextMode tmo   -> (tmo, 0)
 
-    (file_flags, file_mode) =
+    file_mode =
       case imo of
-           AppendMode    -> (1, 0)
-           WriteMode     -> (1, 1)
-           ReadMode      -> (0, 2)
-           ReadWriteMode -> (1, 3)
+           AppendMode    -> 0
+           WriteMode     -> 1
+           ReadMode      -> 2
+           ReadWriteMode -> 3
 
     htype = case imo of 
               ReadMode      -> ReadHandle
@@ -395,7 +362,8 @@ hClose handle =
       ErrorHandle theError -> ioError theError
       ClosedHandle 	   -> return handle_
       _ -> do
-          rc      <- CCALL(closeFile) (haFO__ handle_) (1::Int){-flush if you can-}  -- ConcHask: SAFE, won't block
+          rc      <- closeFile (haFO__ handle_)
+	  		       (1::Int){-flush if you can-}  -- ConcHask: SAFE, won't block
           {- We explicitly close a file object so that we can be told
              if there were any errors. Note that after @hClose@
              has been performed, the ForeignObj embedded in the Handle
@@ -436,8 +404,8 @@ hFileSize handle =
       SemiClosedHandle 		-> ioe_closedHandle "hFileSize" handle
 #ifdef __HUGS__
       _ -> do
-          mem <- primNewByteArray sizeof_int64
-          rc <- CCALL(fileSize_int64) (haFO__ handle_) mem  -- ConcHask: SAFE, won't block
+          mem <- primNewByteArray 8{-sizeof_int64-}
+          rc <- fileSize_int64 (haFO__ handle_) mem  -- ConcHask: SAFE, won't block
           if rc == 0 then do
 	     result <- primReadInt64Array mem 0
              return (primInt64ToInteger result)
@@ -449,12 +417,9 @@ hFileSize handle =
           -- a single unsigned word, and we let the C routine 
 	  -- change the data bits
 	  --
-	  -- For some reason, this fails to typecheck if converted to a do
-	  -- expression --SDM
-          _casm_ ``%r = 1;'' >>= \(I# hack#) ->
-          case int2Integer# hack# of
+          case int2Integer# 1# of
               (# s, d #) -> do
-                rc <- CCALL(fileSize) (haFO__ handle_) d  -- ConcHask: SAFE, won't block
+                rc <- fileSize (haFO__ handle_) d  -- ConcHask: SAFE, won't block
                 if rc == (0::Int) then
 		   return (J# s d)
                  else
@@ -472,7 +437,7 @@ hIsEOF :: Handle -> IO Bool
 hIsEOF handle =
     wantReadableHandle "hIsEOF" handle $ \ handle_ -> do
     let fo = haFO__ handle_
-    rc      <- mayBlock fo (CCALL(fileEOF) fo)  -- ConcHask: UNSAFE, may block
+    rc      <- mayBlock fo (fileEOF fo)  -- ConcHask: UNSAFE, may block
     case rc of
       0 -> return False
       1 -> return True
@@ -542,7 +507,7 @@ hSetBuffering handle mode =
 		      of semi-closed handles to change [sof 6/98]
 		-}
 		let fo = haFO__ handle_
-                rc <- mayBlock fo (CCALL(setBuffering) fo bsize) -- ConcHask: UNSAFE, may block
+                rc <- mayBlock fo (setBuffering fo bsize) -- ConcHask: UNSAFE, may block
                 if rc == 0 
 		 then do
 		   return (handle_{ haBufferMode__ = mode })
@@ -567,7 +532,7 @@ hFlush :: Handle -> IO ()
 hFlush handle =
     wantWriteableHandle "hFlush" handle $ \ handle_ -> do
     let fo = haFO__ handle_
-    rc	    <- mayBlock fo (CCALL(flushFile) fo)   -- ConcHask: UNSAFE, may block
+    rc	    <- mayBlock fo (flushFile fo)   -- ConcHask: UNSAFE, may block
     if rc == 0 then 
        return ()
      else
@@ -586,7 +551,17 @@ hFlush handle =
 data HandlePosn
  = HandlePosn 
 	Handle   -- Q: should this be a weak or strong ref. to the handle?
-	Int
+	         --    [what's the winning argument for it not being strong? --sof]
+	HandlePosition
+
+  -- HandlePosition is the Haskell equivalent of POSIX' off_t.
+  -- We represent it as an Integer on the Haskell side, but
+  -- cheat slightly in that hGetPosn calls upon a C helper
+  -- that reports the position back via (merely) an Int.
+type HandlePosition = Integer
+
+mkHandlePosn :: Handle -> HandlePosition -> HandlePosn
+mkHandlePosn h p = HandlePosn h p
 
 data SeekMode    =  AbsoluteSeek | RelativeSeek | SeekFromEnd
                     deriving (Eq, Ord, Ix, Enum, Read, Show)
@@ -601,17 +576,19 @@ to a previously obtained position {\em p}.
 hGetPosn :: Handle -> IO HandlePosn
 hGetPosn handle =
     wantSeekableHandle "hGetPosn" handle $ \ handle_ -> do
-    posn    <- CCALL(getFilePosn) (haFO__ handle_)   -- ConcHask: SAFE, won't block
+    posn    <- getFilePosn (haFO__ handle_)   -- ConcHask: SAFE, won't block
     if posn /= -1 then do
-      return (HandlePosn handle posn)
+      return (mkHandlePosn handle (fromInt posn))
      else
       constructErrorAndFail "hGetPosn"
 
 hSetPosn :: HandlePosn -> IO () 
-hSetPosn (HandlePosn handle posn) = 
-    wantSeekableHandle "hSetPosn" handle $ \ handle_ -> do -- not as silly as it looks: the handle may have been closed in the meantime.
+hSetPosn (HandlePosn handle i@(S# _))   = hSetPosn (HandlePosn handle (toBig i))
+hSetPosn (HandlePosn handle (J# s# d#)) = 
+    wantSeekableHandle "hSetPosn" handle $ \ handle_ -> do 
+           -- not as silly as it looks: the handle may have been closed in the meantime.
     let fo = haFO__ handle_
-    rc     <- mayBlock fo (CCALL(setFilePosn) fo posn)    -- ConcHask: UNSAFE, may block
+    rc     <- mayBlock fo (setFilePosn fo (I# s#) d#)    -- ConcHask: UNSAFE, may block
     if rc == 0 then do
        return ()
      else
@@ -620,25 +597,24 @@ hSetPosn (HandlePosn handle posn) =
 
 The action @hSeek hdl mode i@ sets the position of handle
 @hdl@ depending on @mode@.  If @mode@ is
-\begin{itemize}
-\item[{\bf AbsoluteSeek}] The position of @hdl@ is set to @i@.
-\item[{\bf RelativeSeek}] The position of @hdl@ is set to offset @i@ from
-the current position.
-\item[{\bf SeekFromEnd}] The position of @hdl@ is set to offset @i@ from
-the end of the file.
-\end{itemize}
 
-Some handles may not be seekable (see @hIsSeekable@), or only support a
-subset of the possible positioning operations (e.g. it may only be
-possible to seek to the end of a tape, or to a positive offset from
-the beginning or current position).
+ * AbsoluteSeek - The position of @hdl@ is set to @i@.
+ * RelativeSeek - The position of @hdl@ is set to offset @i@ from
+                  the current position.
+ * SeekFromEnd  - The position of @hdl@ is set to offset @i@ from
+                  the end of the file.
+
+Some handles may not be seekable (see @hIsSeekable@), or only
+support a subset of the possible positioning operations (e.g. it may
+only be possible to seek to the end of a tape, or to a positive
+offset from the beginning or current position).
 
 It is not possible to set a negative I/O position, or for a physical
 file, an I/O position beyond the current end-of-file. 
 
 Note: 
- - when seeking using @SeekFromEnd@, positive offsets (>=0) means seeking
-   at or past EOF.
+ - when seeking using @SeekFromEnd@, positive offsets (>=0) means
+   seeking at or past EOF.
  - relative seeking on buffered handles can lead to non-obvious results.
 
 \begin{code}
@@ -647,13 +623,13 @@ hSeek :: Handle -> SeekMode -> Integer -> IO ()
 hSeek handle mode offset = 
     wantSeekableHandle "hSeek" handle $ \ handle_ -> do
     let fo = haFO__ handle_
-    rc      <- mayBlock fo (CCALL(seekFile_int64) fo whence (primIntegerToInt64 offset))  -- ConcHask: UNSAFE, may block
+    rc      <- mayBlock fo (seekFile fo whence (primIntegerToInt64 offset))  -- ConcHask: UNSAFE, may block
 #else
 hSeek handle mode i@(S# _) = hSeek handle mode (toBig i)
 hSeek handle mode (J# s# d#) =
     wantSeekableHandle "hSeek" handle $ \ handle_ -> do
     let fo = haFO__ handle_
-    rc      <- mayBlock fo (CCALL(seekFile) fo whence (I# s#) d#)  -- ConcHask: UNSAFE, may block
+    rc      <- mayBlock fo (seekFile fo whence (I# s#) d#)  -- ConcHask: UNSAFE, may block
 #endif
     if rc == 0 then do
        return ()
@@ -745,7 +721,7 @@ getBMode__ :: ForeignObj -> IO (BufferMode, Int)
 getBMode__ :: Addr -> IO (BufferMode, Int)
 #endif
 getBMode__ fo = do
-  rc <- CCALL(getBufferMode) fo    -- ConcHask: SAFE, won't block
+  rc <- getBufferMode fo    -- ConcHask: SAFE, won't block
   case (rc::Int) of
     0  -> return (NoBuffering, 0)
     -1 -> return (LineBuffering, default_buffer_size)
@@ -784,7 +760,7 @@ hIsSeekable handle =
       SemiClosedHandle 	   -> ioe_closedHandle "hIsSeekable" handle
       AppendHandle 	   -> return False
       _ -> do
-	  rc <- CCALL(seekFileP) (haFO__ handle_)   -- ConcHask: SAFE, won't block
+	  rc <- seekFileP (haFO__ handle_)   -- ConcHask: SAFE, won't block
 	  case (rc::Int) of
             0 -> return False
             1 -> return True
@@ -813,7 +789,7 @@ hSetEcho handle on = do
          ErrorHandle theError -> ioError theError
          ClosedHandle	      -> ioe_closedHandle "hSetEcho" handle
          _ -> do
-            rc <- CCALL(setTerminalEcho) (haFO__ handle_) ((if on then 1 else 0)::Int)  -- ConcHask: SAFE, won't block
+            rc <- setTerminalEcho (haFO__ handle_) (if on then 1 else 0)  -- ConcHask: SAFE, won't block
 	    if rc /= ((-1)::Int)
 	     then return ()
 	     else constructErrorAndFail "hSetEcho"
@@ -829,7 +805,7 @@ hGetEcho handle = do
          ErrorHandle theError -> ioError theError
          ClosedHandle	      -> ioe_closedHandle "hGetEcho" handle
          _ -> do
-            rc <- CCALL(getTerminalEcho) (haFO__ handle_)  -- ConcHask: SAFE, won't block
+            rc <- getTerminalEcho (haFO__ handle_)  -- ConcHask: SAFE, won't block
 	    case (rc::Int) of
 	      1 -> return True
 	      0 -> return False
@@ -842,7 +818,7 @@ hIsTerminalDevice handle = do
        ErrorHandle theError -> ioError theError
        ClosedHandle	    -> ioe_closedHandle "hIsTerminalDevice" handle
        _ -> do
-          rc <- CCALL(isTerminalDevice) (haFO__ handle_)   -- ConcHask: SAFE, won't block
+          rc <- isTerminalDevice (haFO__ handle_)   -- ConcHask: SAFE, won't block
 	  case (rc::Int) of
 	    1 -> return True
 	    0 -> return False
@@ -860,7 +836,7 @@ hConnectHdl_ :: Handle -> Handle -> Int -> IO ()
 hConnectHdl_ hW hR is_tty =
   wantRWHandle "hConnectTo" hW $ \ hW_ ->
   wantRWHandle "hConnectTo" hR $ \ hR_ -> do
-  CCALL(setConnectedTo) (haFO__ hR_) (haFO__ hW_) is_tty  -- ConcHask: SAFE, won't block
+  setConnectedTo (haFO__ hR_) (haFO__ hW_) is_tty  -- ConcHask: SAFE, won't block
 
 #ifndef __PARALLEL_HASKELL__
 #define FILE_OBJECT     ForeignObj
@@ -868,8 +844,6 @@ hConnectHdl_ hW hR is_tty =
 #define FILE_OBJECT     Addr
 #endif
 
-flushConnectedBuf :: FILE_OBJECT -> IO ()
-flushConnectedBuf fo = CCALL(flushConnectedBuf) fo
 \end{code}
 
 As an extension, we also allow characters to be pushed back.
@@ -881,7 +855,7 @@ pushback. (For unbuffered channels, the (default) push-back limit is
 hUngetChar :: Handle -> Char -> IO ()
 hUngetChar handle c = 
     wantReadableHandle "hLookAhead" handle $ \ handle_ -> do
-    rc      <- CCALL(ungetChar) (haFO__ handle_) c  -- ConcHask: SAFE, won't block
+    rc      <- ungetChar (haFO__ handle_) c  -- ConcHask: SAFE, won't block
     if rc == ((-1)::Int)
      then constructErrorAndFail "hUngetChar"
      else return ()
@@ -902,7 +876,7 @@ slurpFile fname = do
     ioError (userError "slurpFile: file too big")
    else do
      let sz_i = fromInteger sz
-     chunk <- CCALL(allocMemory__) (sz_i::Int)
+     chunk <- allocMemory__ sz_i
      if chunk == nullAddr 
       then do
         hClose handle
@@ -910,7 +884,7 @@ slurpFile fname = do
       else do
         rc <- withHandle_ handle ( \ handle_ -> do
           let fo = haFO__ handle_
-	  mayBlock fo (CCALL(readChunk) fo chunk sz_i)    -- ConcHask: UNSAFE, may block.
+	  mayBlock fo (readChunk fo chunk sz_i)    -- ConcHask: UNSAFE, may block.
 	 )
 	hClose handle
         if rc < (0::Int)
@@ -927,11 +901,7 @@ hFillBufBA handle buf sz
   | otherwise = 
     wantReadableHandle "hFillBufBA" handle $ \ handle_ -> do
     let fo  = haFO__ handle_
-#ifdef __HUGS__
-    rc      <- mayBlock fo (CCALL(readChunkBA) fo buf sz)    -- ConcHask: UNSAFE, may block.
-#else
-    rc      <- mayBlock fo (CCALL(readChunk) fo buf sz)    -- ConcHask: UNSAFE, may block.
-#endif
+    rc      <- mayBlock fo (readChunkBA fo buf sz)    -- ConcHask: UNSAFE, may block.
     if rc >= (0::Int)
      then return rc
      else constructErrorAndFail "hFillBufBA"
@@ -946,7 +916,7 @@ hFillBuf handle buf sz
   | otherwise = 
     wantReadableHandle "hFillBuf" handle $ \ handle_ -> do
     let fo  = haFO__ handle_
-    rc      <- mayBlock fo (CCALL(readChunk) fo buf sz)    -- ConcHask: UNSAFE, may block.
+    rc      <- mayBlock fo (readChunk fo buf sz)    -- ConcHask: UNSAFE, may block.
     if rc >= 0
      then return rc
      else constructErrorAndFail "hFillBuf"
@@ -961,7 +931,7 @@ hPutBuf :: Handle -> Addr -> Int -> IO ()
 hPutBuf handle buf len = 
     wantWriteableHandle "hPutBuf" handle $ \ handle_ -> do
     let fo  = haFO__ handle_
-    rc      <- mayBlock fo (CCALL(writeBuf) fo buf len)  -- ConcHask: UNSAFE, may block.
+    rc      <- mayBlock fo (writeBuf fo buf len)  -- ConcHask: UNSAFE, may block.
     if rc == (0::Int)
      then return ()
      else constructErrorAndFail "hPutBuf"
@@ -971,7 +941,7 @@ hPutBufBA :: Handle -> ByteArray Int -> Int -> IO ()
 hPutBufBA handle buf len =
     wantWriteableHandle "hPutBufBA" handle $ \ handle_ -> do
     let fo = haFO__ handle_
-    rc      <- mayBlock fo (CCALL(writeBufBA) fo buf len)  -- ConcHask: UNSAFE, may block.
+    rc      <- mayBlock fo (writeBufBA fo buf len)  -- ConcHask: UNSAFE, may block.
     if rc == (0::Int)
      then return ()
      else constructErrorAndFail "hPutBuf"
@@ -989,7 +959,7 @@ getHandleFd handle =
       ErrorHandle theError -> ioError theError
       ClosedHandle 	   -> ioe_closedHandle "getHandleFd" handle
       _ -> do
-          fd <- CCALL(getFileFd) (haFO__ handle_)
+          fd <- getFileFd (haFO__ handle_)
 	  return fd
 \end{code}
 
@@ -1122,7 +1092,6 @@ wantSeekableHandle fun handle act =
       ErrorHandle theError -> ioError theError
       ClosedHandle 	   -> ioe_closedHandle fun handle
       SemiClosedHandle	   -> ioe_closedHandle fun handle
-      AppendHandle  	   -> ioError not_seekable_error
       _ 		   -> act handle_
   where
    not_seekable_error = 
@@ -1154,91 +1123,127 @@ mayBlock fo act = do
    rc <- act
    case rc of
      -5 -> do  -- (possibly blocking) read
-        fd <- CCALL(getFileFd) fo
+        fd <- getFileFd fo
         threadWaitRead fd
 	mayBlock fo act  -- input available, re-try
      -6 -> do  -- (possibly blocking) write
-        fd <- CCALL(getFileFd) fo
+        fd <- getFileFd fo
         threadWaitWrite fd
 	mayBlock fo act  -- output possible
      -7 -> do  -- (possibly blocking) write on connected handle
-        fd <- CCALL(getConnFileFd) fo
+        fd <- getConnFileFd fo
         threadWaitWrite fd
 	mayBlock fo act  -- output possible
      _ -> do
         return rc
 \end{code}
 
+Foreign import declarations of helper functions:
 
 \begin{code}
+
 #ifdef __HUGS__
-type FD           = Int
-type Exclusive    = Int  -- really Bool
-type How          = Int
-type Binary       = Int
-type OpenStdFlags = Int
-type OpenFlags    = Int
-type Readable     = Int  -- really Bool
-type Flush        = Int  -- really Bool
-type RC           = Int  -- standard return code
-
-type IOFileAddr   = Addr  -- as returned from functions
-type CString      = PrimByteArray
-type Bytes        = PrimMutableByteArray RealWorld
-
-#ifndef __PARALLEL_HASKELL__
-type FILE_OBJ  = ForeignObj -- as passed into functions
+type Bytes = PrimByteArray RealWorld
 #else
-type FILE_OBJ  = Addr
+type Bytes = ByteArray#
 #endif
 
-foreign import ccall "libHS_cbits.so" "setBuf"                unsafe prim_setBuf           :: FILE_OBJ -> Addr -> Int -> IO ()
-foreign import ccall "libHS_cbits.so" "getBufSize"            unsafe prim_getBufSize       :: FILE_OBJ -> IO Int
-foreign import ccall "libHS_cbits.so" "inputReady"            unsafe prim_inputReady       :: FILE_OBJ -> Int -> IO RC
-foreign import ccall "libHS_cbits.so" "fileGetc"              unsafe prim_fileGetc         :: FILE_OBJ -> IO Int
-foreign import ccall "libHS_cbits.so" "fileLookAhead"         unsafe prim_fileLookAhead    :: FILE_OBJ -> IO Int
-foreign import ccall "libHS_cbits.so" "readBlock"             unsafe prim_readBlock        :: FILE_OBJ -> IO Int
-foreign import ccall "libHS_cbits.so" "readLine"              unsafe prim_readLine         :: FILE_OBJ -> IO Int
-foreign import ccall "libHS_cbits.so" "readChar"              unsafe prim_readChar         :: FILE_OBJ -> IO Int
-foreign import ccall "libHS_cbits.so" "writeFileObject"       unsafe prim_writeFileObject  :: FILE_OBJ -> Int -> IO RC
-foreign import ccall "libHS_cbits.so" "filePutc"              unsafe prim_filePutc         :: FILE_OBJ -> Char -> IO RC
-foreign import ccall "libHS_cbits.so" "getBufStart"           unsafe prim_getBufStart      :: FILE_OBJ -> Int -> IO Addr
-foreign import ccall "libHS_cbits.so" "getWriteableBuf"       unsafe prim_getWriteableBuf  :: FILE_OBJ -> IO Addr
-foreign import ccall "libHS_cbits.so" "getBufWPtr"            unsafe prim_getBufWPtr       :: FILE_OBJ -> IO Int
-foreign import ccall "libHS_cbits.so" "setBufWPtr"            unsafe prim_setBufWPtr       :: FILE_OBJ -> Int -> IO ()
-foreign import ccall "libHS_cbits.so" "closeFile"             unsafe prim_closeFile        :: FILE_OBJ -> Flush -> IO RC
-foreign import ccall "libHS_cbits.so" "fileEOF"               unsafe prim_fileEOF           :: FILE_OBJ -> IO RC
-foreign import ccall "libHS_cbits.so" "setBuffering"          unsafe prim_setBuffering      :: FILE_OBJ -> Int -> IO RC
-foreign import ccall "libHS_cbits.so" "flushFile"             unsafe prim_flushFile         :: FILE_OBJ -> IO RC
-foreign import ccall "libHS_cbits.so" "flushConnectedBuf"     unsafe prim_flushConnectedBuf :: FILE_OBJ -> IO RC
-foreign import ccall "libHS_cbits.so" "getBufferMode"         unsafe prim_getBufferMode     :: FILE_OBJ -> IO RC
-foreign import ccall "libHS_cbits.so" "seekFile_int64"        unsafe prim_seekFile_int64    :: FILE_OBJ -> Int -> Int64 -> IO RC
-foreign import ccall "libHS_cbits.so" "seekFileP"             unsafe prim_seekFileP        :: FILE_OBJ -> IO RC
-foreign import ccall "libHS_cbits.so" "setTerminalEcho"       unsafe prim_setTerminalEcho  :: FILE_OBJ -> Int -> IO RC
-foreign import ccall "libHS_cbits.so" "getTerminalEcho"       unsafe prim_getTerminalEcho  :: FILE_OBJ -> IO RC
-foreign import ccall "libHS_cbits.so" "isTerminalDevice"      unsafe prim_isTerminalDevice :: FILE_OBJ -> IO RC
-foreign import ccall "libHS_cbits.so" "setConnectedTo"        unsafe prim_setConnectedTo   :: FILE_OBJ -> FILE_OBJ -> Int -> IO ()
-foreign import ccall "libHS_cbits.so" "ungetChar"             unsafe prim_ungetChar        :: FILE_OBJ -> Char -> IO RC
-foreign import ccall "libHS_cbits.so" "readChunk"             unsafe prim_readChunk        :: FILE_OBJ -> Addr          -> Int -> IO RC
-foreign import ccall "libHS_cbits.so" "writeBuf"              unsafe prim_writeBuf         :: FILE_OBJ -> Addr -> Int -> IO RC
-foreign import ccall "libHS_cbits.so" "getFileFd"             unsafe prim_getFileFd        :: FILE_OBJ -> IO FD
-foreign import ccall "libHS_cbits.so" "fileSize_int64"        unsafe prim_fileSize_int64   :: FILE_OBJ -> Bytes -> IO RC
-foreign import ccall "libHS_cbits.so" "getFilePosn"           unsafe prim_getFilePosn      :: FILE_OBJ -> IO Int
-foreign import ccall "libHS_cbits.so" "setFilePosn"           unsafe prim_setFilePosn      :: FILE_OBJ -> Int -> IO Int
-foreign import ccall "libHS_cbits.so" "getConnFileFd"         unsafe prim_getConnFileFd    :: FILE_OBJ -> IO FD
-foreign import ccall "libHS_cbits.so" "allocMemory__"         unsafe prim_allocMemory__    :: Int -> IO Addr
-foreign import ccall "libHS_cbits.so" "getLock"               unsafe prim_getLock          :: FD -> Exclusive -> IO RC
-foreign import ccall "libHS_cbits.so" "openStdFile"           unsafe prim_openStdFile      :: FD -> OpenStdFlags -> Readable -> IO IOFileAddr
-foreign import ccall "libHS_cbits.so" "openFile"              unsafe prim_openFile         :: CString -> How -> Binary -> OpenFlags -> IO IOFileAddr
-foreign import ccall "libHS_cbits.so" "freeFileObject"        unsafe prim_freeFileObject    :: FILE_OBJ -> IO ()
-foreign import ccall "libHS_cbits.so" "freeStdFileObject"     unsafe prim_freeStdFileObject :: FILE_OBJ -> IO ()
-foreign import ccall "libHS_cbits.so" "const_BUFSIZ"          unsafe const_BUFSIZ          :: Int
+foreign import "libHS_cbits" "inputReady"  unsafe
+           inputReady       :: FILE_OBJECT -> Int -> IO Int{-ret code-}
+foreign import "libHS_cbits" "fileGetc"    unsafe
+           fileGetc         :: FILE_OBJECT -> IO Int
+foreign import "libHS_cbits" "fileLookAhead" unsafe
+           fileLookAhead    :: FILE_OBJECT -> IO Int
+foreign import "libHS_cbits" "readBlock" unsafe
+           readBlock        :: FILE_OBJECT -> IO Int
+foreign import "libHS_cbits" "readLine" unsafe
+           readLine         :: FILE_OBJECT -> IO Int
+foreign import "libHS_cbits" "readChar" unsafe
+           readChar         :: FILE_OBJECT -> IO Int
+foreign import "libHS_cbits" "writeFileObject" unsafe
+           writeFileObject  :: FILE_OBJECT -> Int -> IO Int{-ret code-}
+foreign import "libHS_cbits" "filePutc" unsafe
+           filePutc         :: FILE_OBJECT -> Char -> IO Int{-ret code-}
+foreign import "libHS_cbits" "getBufStart" unsafe
+           getBufStart      :: FILE_OBJECT -> Int -> IO Addr
+foreign import "libHS_cbits" "getWriteableBuf" unsafe
+           getWriteableBuf  :: FILE_OBJECT -> IO Addr
+foreign import "libHS_cbits" "getBufWPtr" unsafe
+           getBufWPtr       :: FILE_OBJECT -> IO Int
+foreign import "libHS_cbits" "setBufWPtr" unsafe
+           setBufWPtr       :: FILE_OBJECT -> Int -> IO ()
+foreign import "libHS_cbits" "closeFile" unsafe
+           closeFile        :: FILE_OBJECT -> Int{-Flush-} -> IO Int{-ret code-}
+foreign import "libHS_cbits" "fileEOF" unsafe
+           fileEOF           :: FILE_OBJECT -> IO Int{-ret code-}
+foreign import "libHS_cbits" "setBuffering" unsafe
+           setBuffering      :: FILE_OBJECT -> Int -> IO Int{-ret code-}
+foreign import "libHS_cbits" "flushFile" unsafe
+           flushFile         :: FILE_OBJECT -> IO Int{-ret code-}
+foreign import "libHS_cbits" "flushConnectedBuf" unsafe
+           flushConnectedBuf :: FILE_OBJECT -> IO ()
+foreign import "libHS_cbits" "getBufferMode" unsafe
+           getBufferMode     :: FILE_OBJECT -> IO Int{-ret code-}
+#ifdef __HUGS__
+foreign import "libHS_cbits" "seekFile_int64" unsafe
+           seekFile    :: FILE_OBJECT -> Int -> Int64 -> IO Int
+#else
+foreign import "libHS_cbits" "seekFile" unsafe
+           seekFile    :: FILE_OBJECT -> Int -> Int -> Bytes -> IO Int
+#endif 
 
-foreign import ccall "libHS_cbits.so" "getErrStr__"  unsafe prim_getErrStr__  :: IO Addr 
-foreign import ccall "libHS_cbits.so" "getErrNo__"   unsafe prim_getErrNo__   :: IO Int  
-foreign import ccall "libHS_cbits.so" "getErrType__" unsafe prim_getErrType__ :: IO Int  
-
+foreign import "libHS_cbits" "seekFileP" unsafe
+           seekFileP        :: FILE_OBJECT -> IO Int{-ret code-}
+foreign import "libHS_cbits" "setTerminalEcho" unsafe
+           setTerminalEcho  :: FILE_OBJECT -> Int -> IO Int{-ret code-}
+foreign import "libHS_cbits" "getTerminalEcho" unsafe
+           getTerminalEcho  :: FILE_OBJECT -> IO Int{-ret code-}
+foreign import "libHS_cbits" "isTerminalDevice" unsafe
+           isTerminalDevice :: FILE_OBJECT -> IO Int{-ret code-}
+foreign import "libHS_cbits" "setConnectedTo" unsafe
+           setConnectedTo   :: FILE_OBJECT -> FILE_OBJECT -> Int -> IO ()
+foreign import "libHS_cbits" "ungetChar" unsafe
+           ungetChar        :: FILE_OBJECT -> Char -> IO Int{-ret code-}
+foreign import "libHS_cbits" "readChunk" unsafe
+           readChunk        :: FILE_OBJECT -> Addr -> Int -> IO Int{-ret code-}
+foreign import "libHS_cbits" "readChunk" unsafe
+           readChunkBA      :: FILE_OBJECT -> ByteArray Int -> Int -> IO Int{-ret code-}
+foreign import "libHS_cbits" "writeBuf" unsafe
+           writeBuf         :: FILE_OBJECT -> Addr -> Int -> IO Int{-ret code-}
+#ifndef __HUGS__
+foreign import "libHS_cbits" "writeBufBA" unsafe
+           writeBufBA       :: FILE_OBJECT -> ByteArray Int -> Int -> IO Int{-ret code-}
 #endif
+foreign import "libHS_cbits" "getFileFd" unsafe
+           getFileFd        :: FILE_OBJECT -> IO Int{-fd-}
+#ifdef __HUGS__
+foreign import "libHS_cbits" "fileSize_int64" unsafe
+           fileSize_int64   :: FILE_OBJECT -> Bytes -> IO Int{-ret code-}
+#else
+foreign import "libHS_cbits" "fileSize" unsafe
+           fileSize  :: FILE_OBJECT -> Bytes -> IO Int{-ret code-}
+#endif
+
+foreign import "libHS_cbits" "getFilePosn" unsafe
+           getFilePosn      :: FILE_OBJECT -> IO Int
+foreign import "libHS_cbits" "setFilePosn" unsafe
+           setFilePosn      :: FILE_OBJECT -> Int -> ByteArray# -> IO Int
+foreign import "libHS_cbits" "getConnFileFd" unsafe
+           getConnFileFd    :: FILE_OBJECT -> IO Int{-fd-}
+foreign import "libHS_cbits" "getLock" unsafe
+           getLock  :: Int{-Fd-} -> Int{-exclusive-} -> IO Int{-return code-}
+foreign import "libHS_cbits" "openStdFile" unsafe
+           openStdFile      :: Int{-fd-} -> Int{-Readable?-} -> IO Addr{-file obj-}
+foreign import "libHS_cbits" "openFile" unsafe
+           primOpenFile         :: ByteArray Int{-CString-}
+	                        -> Int{-How-}
+				-> Int{-Binary-}
+				-> IO Addr {-file obj-}
+foreign import "libHS_cbits" "const_BUFSIZ" unsafe
+           const_BUFSIZ          :: Int
+
+foreign import "libHS_cbits" "setBinaryMode__" 
+	   setBinaryMode :: FILE_OBJECT -> Int -> IO Int
 \end{code}
 
 

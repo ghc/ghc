@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.12 1999/08/23 12:53:25 keithw Exp $
+% $Id: PrelIOBase.lhs,v 1.13 1999/09/19 19:12:41 sof Exp $
 % 
 % (c) The AQUA Project, Glasgow University, 1994-1998
 %
@@ -33,14 +33,9 @@ import PrelArr	  ( MutableVar, readVar )
 #endif
 
 #ifdef __HUGS__
-#define cat2(x,y)  x/**/y
-#define CCALL(fun) cat2(prim_,fun)
 #define __CONCURRENT_HASKELL__
 #define stToIO id
 #define unpackCString primUnpackString
-#else
-#define CCALL(fun) _ccall_ fun
-#define ref_freeStdFileObject (``&freeStdFileObject''::Addr)
 #endif
 
 #ifndef __PARALLEL_HASKELL__
@@ -306,8 +301,8 @@ constructError call_site = constructErrorMsg call_site Nothing
 
 constructErrorMsg	      :: String -> Maybe String -> IO IOError
 constructErrorMsg call_site reason =
- CCALL(getErrType__)            >>= \ errtype ->
- CCALL(getErrStr__)             >>= \ str ->
+ getErrType__            >>= \ errtype ->
+ getErrStr__             >>= \ str ->
  let
   iot =
    case (errtype::Int) of
@@ -476,7 +471,7 @@ instance Show Handle where
 	BlockBuffering Nothing  -> showString "block " . showParen True (showsPrec p def)
       where
        def :: Int 
-       def = unsafePerformIO (CCALL(getBufSize) fo)
+       def = unsafePerformIO (getBufSize fo)
 
 mkBuffer__ :: FILE_OBJECT -> Int -> IO ()
 mkBuffer__ fo sz_in_bytes = do
@@ -484,11 +479,11 @@ mkBuffer__ fo sz_in_bytes = do
   case sz_in_bytes of
     0 -> return nullAddr  -- this has the effect of overwriting the pointer to the old buffer.
     _ -> do
-     chunk <- CCALL(allocMemory__) sz_in_bytes
+     chunk <- allocMemory__ sz_in_bytes
      if chunk == nullAddr
       then ioError (IOError Nothing ResourceExhausted "mkBuffer__" "not enough virtual memory")
       else return chunk
- CCALL(setBuf) fo chunk sz_in_bytes
+ setBuf fo chunk sz_in_bytes
 
 \end{code}
 
@@ -541,5 +536,21 @@ data BufferMode
  = NoBuffering | LineBuffering | BlockBuffering (Maybe Int)
    deriving (Eq, Ord, Show)
    {- Read instance defined in IO. -}
+
+\end{code}
+
+Foreign import declarations to helper routines:
+
+\begin{code}
+foreign import "libHS_cbits" "getErrStr__"  unsafe getErrStr__  :: IO Addr 
+foreign import "libHS_cbits" "getErrNo__"   unsafe getErrNo__   :: IO Int  
+foreign import "libHS_cbits" "getErrType__" unsafe getErrType__ :: IO Int  
+
+foreign import "libHS_cbits" "allocMemory__" unsafe
+           allocMemory__    :: Int -> IO Addr
+foreign import "libHS_cbits" "getBufSize"  unsafe
+           getBufSize       :: FILE_OBJECT -> IO Int
+foreign import "libHS_cbits" "setBuf" unsafe
+           setBuf       :: FILE_OBJECT -> Addr -> Int -> IO ()
 
 \end{code}

@@ -127,16 +127,9 @@ import Char		( ord, chr )
 #ifndef HEAD
 
 #ifdef __HUGS__
-#define cat2(x,y)  x/**/y
-#define CCALL(fun) cat2(prim_,fun)
 #define __CONCURRENT_HASKELL__
 #define stToIO id
 #define unpackNBytesAccST primUnpackCStringAcc
-#else
-#define CCALL(fun) _ccall_ fun
-#define ref_freeStdFileObject (``&freeStdFileObject''::Addr)
-#define ref_freeFileObject    (``&freeFileObject''::Addr)
-#define const_BUFSIZ ``BUFSIZ''
 #endif
 
 \end{code}
@@ -193,7 +186,7 @@ hReady h = hWaitForInput h 0
 hWaitForInput :: Handle -> Int -> IO Bool 
 hWaitForInput handle msecs =
     wantReadableHandle "hWaitForInput" handle $ \ handle_ -> do
-    rc       <- CCALL(inputReady) (haFO__ handle_) (msecs::Int)     -- ConcHask: SAFE, won't block
+    rc       <- inputReady (haFO__ handle_) (msecs::Int)     -- ConcHask: SAFE, won't block
     case (rc::Int) of
       0 -> return False
       1 -> return True
@@ -208,7 +201,7 @@ hGetChar :: Handle -> IO Char
 hGetChar handle = 
     wantReadableHandle "hGetChar" handle $ \ handle_ -> do
     let fo = haFO__ handle_
-    intc     <- mayBlock fo (CCALL(fileGetc) fo)  -- ConcHask: UNSAFE, may block
+    intc     <- mayBlock fo (fileGetc fo)  -- ConcHask: UNSAFE, may block
     if intc /= ((-1)::Int)
      then return (chr intc)
      else constructErrorAndFail "hGetChar"
@@ -253,7 +246,7 @@ hLookAhead :: Handle -> IO Char
 hLookAhead handle =
     wantReadableHandle "hLookAhead" handle $ \ handle_ -> do
     let fo = haFO__ handle_
-    intc    <- mayBlock fo (CCALL(fileLookAhead) fo)  -- ConcHask: UNSAFE, may block
+    intc    <- mayBlock fo (fileLookAhead fo)  -- ConcHask: UNSAFE, may block
     if intc /= (-1)
      then return (chr intc)
      else constructErrorAndFail "hLookAhead"
@@ -322,15 +315,15 @@ lazyReadChar  :: Handle -> Addr -> IO String
 #endif
 
 lazyReadBlock handle fo = do
-   buf   <- CCALL(getBufStart) fo (0::Int)
-   bytes <- mayBlock fo (CCALL(readBlock) fo) -- ConcHask: UNSAFE, may block.
+   buf   <- getBufStart fo 0
+   bytes <- mayBlock fo (readBlock fo) -- ConcHask: UNSAFE, may block.
    case (bytes::Int) of
      -3 -> -- buffering has been turned off, use lazyReadChar instead
            lazyReadChar handle fo
      -2 -> return ""
      -1 -> -- an error occurred, close the handle
 	  withHandle handle $ \ handle_ -> do
-          CCALL(closeFile) (haFO__ handle_) (0::Int){-don't bother flushing-}  -- ConcHask: SAFE, won't block.
+          closeFile (haFO__ handle_) 0{-don't bother flushing-}  -- ConcHask: SAFE, won't block.
 	  return (handle_ { haType__    = ClosedHandle,
 			    haFO__      = nullFile__ }, 
 		  "")
@@ -339,24 +332,24 @@ lazyReadBlock handle fo = do
       stToIO (unpackNBytesAccST buf bytes more)
 
 lazyReadLine handle fo = do
-     bytes <- mayBlock fo (CCALL(readLine) fo)   -- ConcHask: UNSAFE, may block.
+     bytes <- mayBlock fo (readLine fo)   -- ConcHask: UNSAFE, may block.
      case (bytes::Int) of
        -3 -> -- buffering has been turned off, use lazyReadChar instead
              lazyReadChar handle fo
        -2 -> return "" -- handle closed by someone else, stop reading.
        -1 -> -- an error occurred, close the handle
   	     withHandle handle $ \ handle_ -> do
-             CCALL(closeFile) (haFO__ handle_) (0::Int){- don't bother flushing-}  -- ConcHask: SAFE, won't block
+             closeFile (haFO__ handle_) 0{- don't bother flushing-}  -- ConcHask: SAFE, won't block
 	     return (handle_ { haType__    = ClosedHandle,
 			       haFO__      = nullFile__ },
 		     "")
        _ -> do
           more <- unsafeInterleaveIO (lazyReadLine handle fo)
-          buf  <- CCALL(getBufStart) fo bytes  -- ConcHask: won't block
+          buf  <- getBufStart fo bytes  -- ConcHask: won't block
 	  stToIO (unpackNBytesAccST buf bytes more)
 
 lazyReadChar handle fo = do
-    char <- mayBlock fo (CCALL(readChar) fo)   -- ConcHask: UNSAFE, may block.
+    char <- mayBlock fo (readChar fo)   -- ConcHask: UNSAFE, may block.
     case (char::Int) of
       -4 -> -- buffering is now block-buffered, use lazyReadBlock instead
 	    lazyReadBlock handle fo
@@ -366,7 +359,7 @@ lazyReadChar handle fo = do
       -2 -> return ""
       -1 -> -- error, silently close handle.
  	 withHandle handle $ \ handle_ -> do
-         CCALL(closeFile) (haFO__ handle_) (0::Int){-don't bother flusing-}  -- ConcHask: SAFE, won't block
+         closeFile (haFO__ handle_) 0{-don't bother flusing-}  -- ConcHask: SAFE, won't block
 	 return (handle_{ haType__  = ClosedHandle,
 			  haFO__    = nullFile__ },
 		 "")
@@ -393,7 +386,7 @@ hPutChar handle c =
     wantWriteableHandle "hPutChar" handle $ \ handle_  -> do
     let fo = haFO__ handle_
     flushConnectedBuf fo
-    rc       <- mayBlock fo (CCALL(filePutc) fo c)   -- ConcHask: UNSAFE, may block.
+    rc       <- mayBlock fo (filePutc fo c)   -- ConcHask: UNSAFE, may block.
     if rc == 0
      then return ()
      else constructErrorAndFail "hPutChar"
@@ -411,14 +404,14 @@ hPutStr handle str =
     flushConnectedBuf fo
     case haBufferMode__ handle_ of
        LineBuffering -> do
-	    buf <- CCALL(getWriteableBuf) fo
-	    pos <- CCALL(getBufWPtr) fo
-	    bsz <- CCALL(getBufSize) fo
+	    buf <- getWriteableBuf fo
+	    pos <- getBufWPtr fo
+	    bsz <- getBufSize fo
 	    writeLines fo buf bsz pos str
        BlockBuffering _ -> do
-	    buf <- CCALL(getWriteableBuf) fo
-	    pos <- CCALL(getBufWPtr) fo
-	    bsz <- CCALL(getBufSize) fo
+	    buf <- getWriteableBuf fo
+	    pos <- getBufWPtr fo
+	    bsz <- getBufSize fo
             writeBlocks fo buf bsz pos str
        NoBuffering -> do
 	    writeChars fo str
@@ -448,7 +441,7 @@ writeLines obj buf bufLen initPos s =
      case ls of
       [] ->   
         if n == 0 then
-	  CCALL(setBufWPtr) obj (0::Int)
+	  setBufWPtr obj 0{-new pos-}
         else do
 	  {-
 	    At the end of a buffer write, update the buffer position
@@ -463,14 +456,14 @@ writeLines obj buf bufLen initPos s =
 	    that killing of threads is supported at the moment.
 
 	  -}
-	  CCALL(setBufWPtr) obj n
+	  setBufWPtr obj n
 
       (x:xs) -> do
         primWriteCharOffAddr buf n x
           {- Flushing on buffer exhaustion or newlines (even if it isn't the last one) -}
 	if n == bufLen || x == '\n'
 	 then do
-	   rc <-  mayBlock obj (CCALL(writeFileObject) obj (n + 1))  -- ConcHask: UNSAFE, may block.
+	   rc <-  mayBlock obj (writeFileObject obj (n + 1))  -- ConcHask: UNSAFE, may block.
 	   if rc == 0 
 	    then shoveString 0 xs
 	    else constructErrorAndFail "writeLines"
@@ -496,7 +489,7 @@ writeLines obj buf (I# bufLen) (I# initPos#) s =
      case ls of
       [] ->   
         if n ==# 0# then
-	  CCALL(setBufWPtr) obj (0::Int)
+	  setBufWPtr obj 0
         else do
 	  {-
 	    At the end of a buffer write, update the buffer position
@@ -511,14 +504,14 @@ writeLines obj buf (I# bufLen) (I# initPos#) s =
 	    that killing of threads is supported at the moment.
 
 	  -}
-	  CCALL(setBufWPtr) obj (I# n)
+	  setBufWPtr obj (I# n)
 
       ((C# x):xs) -> do
         write_char buf n x
           {- Flushing on buffer exhaustion or newlines (even if it isn't the last one) -}
 	if n ==# bufLen || x `eqChar#` '\n'#
 	 then do
-	   rc <-  mayBlock obj (CCALL(writeFileObject) obj (I# (n +# 1#)))  -- ConcHask: UNSAFE, may block.
+	   rc <-  mayBlock obj (writeFileObject obj (I# (n +# 1#)))  -- ConcHask: UNSAFE, may block.
 	   if rc == 0 
 	    then shoveString 0# xs
 	    else constructErrorAndFail "writeLines"
@@ -541,7 +534,7 @@ writeBlocks obj buf bufLen initPos s =
      case ls of
       [] ->   
         if n == 0 then
-          CCALL(setBufWPtr) obj (0::Int)
+          setBufWPtr obj (0::Int)
         else do
 	  {-
 	    At the end of a buffer write, update the buffer position
@@ -558,13 +551,13 @@ writeBlocks obj buf bufLen initPos s =
 	    alltogether.
 
 	  -}
-	  CCALL(setBufWPtr) obj n
+	  setBufWPtr obj n
 
       (x:xs) -> do
         primWriteCharOffAddr buf n x
 	if n == bufLen
 	 then do
-	   rc <-  mayBlock obj (CCALL(writeFileObject) obj (n + 1))   -- ConcHask: UNSAFE, may block.
+	   rc <-  mayBlock obj (writeFileObject obj (n + 1))   -- ConcHask: UNSAFE, may block.
 	   if rc == 0 
             then shoveString 0 xs
 	    else constructErrorAndFail "writeChunks"
@@ -590,7 +583,7 @@ writeBlocks obj buf (I# bufLen) (I# initPos#) s =
      case ls of
       [] ->   
         if n ==# 0# then
-          CCALL(setBufWPtr) obj (0::Int)
+          setBufWPtr obj (0::Int)
         else do
 	  {-
 	    At the end of a buffer write, update the buffer position
@@ -607,13 +600,13 @@ writeBlocks obj buf (I# bufLen) (I# initPos#) s =
 	    alltogether.
 
 	  -}
-	  CCALL(setBufWPtr) obj (I# n)
+	  setBufWPtr obj (I# n)
 
       ((C# x):xs) -> do
         write_char buf n x
 	if n ==# bufLen
 	 then do
-	   rc <-  mayBlock obj (CCALL(writeFileObject) obj (I# (n +# 1#)))   -- ConcHask: UNSAFE, may block.
+	   rc <-  mayBlock obj (writeFileObject obj (I# (n +# 1#)))   -- ConcHask: UNSAFE, may block.
 	   if rc == 0 
 	    then shoveString 0# xs
 	    else constructErrorAndFail "writeChunks"
@@ -630,7 +623,7 @@ writeChars :: Addr -> String -> IO ()
 #endif
 writeChars _fo ""    = return ()
 writeChars fo (c:cs) = do
-  rc <- mayBlock fo (CCALL(filePutc) fo c)   -- ConcHask: UNSAFE, may block.
+  rc <- mayBlock fo (filePutc fo c)   -- ConcHask: UNSAFE, may block.
   if rc == 0 
    then writeChars fo cs
    else constructErrorAndFail "writeChars"

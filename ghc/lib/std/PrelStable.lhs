@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelStable.lhs,v 1.1 1999/01/26 12:25:01 simonm Exp $
+% $Id: PrelStable.lhs,v 1.2 1999/09/19 19:12:42 sof Exp $
 %
 % (c) The GHC Team, 1992-1999
 %
@@ -28,14 +28,13 @@ instance CReturnable (StablePtr a)
 
 makeStablePtr  :: a -> IO (StablePtr a)
 deRefStablePtr :: StablePtr a -> IO a
-freeStablePtr  :: StablePtr a -> IO ()
+foreign import "freeStablePtr" freeStablePtr :: StablePtr a -> IO ()
 
 makeStablePtr a = IO $ \ s ->
     case makeStablePtr# a s of (# s', sp #) -> (# s', StablePtr sp #)
 
 deRefStablePtr (StablePtr sp) = IO $ \s -> deRefStablePtr# sp s
 
-freeStablePtr  sp = _ccall_ freeStablePtr sp
 
 instance Eq (StablePtr a) where 
     (StablePtr sp1) == (StablePtr sp2) =

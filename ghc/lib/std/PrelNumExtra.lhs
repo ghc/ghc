@@ -28,7 +28,7 @@ import Maybe		( fromMaybe )
 import PrelArr		( Array, array, (!) )
 import PrelIOBase   	( unsafePerformIO )
 import PrelCCall	()	-- we need the definitions of CCallable and 
-				-- CReturnable for the _ccall_s herein.
+				-- CReturnable for the foreign calls herein.
 \end{code}
 
 %*********************************************************

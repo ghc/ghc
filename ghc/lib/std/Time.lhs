@@ -44,7 +44,7 @@ import PrelHandle
 import PrelArr
 import PrelST
 import PrelAddr
-import PrelPack 	( unpackCString )
+import PrelPack 	( unpackCString, new_ps_array )
 #endif
 
 import Ix
@@ -101,7 +101,7 @@ instance Show ClockTime where
     showsPrec _ (TOD (J# s# d#) _nsec) = 
       showString $ unsafePerformIO $ do
 	    buf <- allocChars 38 -- exactly enough for error message
-	    str <- _ccall_ showTime (I# s#) d# buf
+	    str <- showTime (I# s#) d# buf
 	    return (unpackCString str)
 
     showList = showList__ (showsPrec 0)
@@ -180,12 +180,11 @@ data TimeDiff
 @getClockTime@ returns the current time in its internal representation.
 
 \begin{code}
-#ifdef __HUGS__
 getClockTime :: IO ClockTime
 getClockTime = do
     i1 <- malloc1
     i2 <- malloc1
-    rc <- prim_getClockTime i1 i2
+    rc <- primGetClockTime i1 i2
     if rc == 0 
 	then do
 	    sec  <- cvtUnsigned i1
@@ -194,22 +193,10 @@ getClockTime = do
     	else
 	    constructErrorAndFail "getClockTime"
   where
+#ifdef __HUGS__
     malloc1 = primNewByteArray sizeof_int64
     cvtUnsigned arr = primReadInt64Array arr 0
 #else
-getClockTime :: IO ClockTime
-getClockTime = do
-    i1 <- malloc1
-    i2 <- malloc1
-    rc <- _ccall_ getClockTime i1 i2
-    if rc == (0 ::Int)
-	then do
-	    sec  <- cvtUnsigned i1
-	    nsec <- cvtUnsigned i2
-	    return (TOD sec (nsec * 1000))
-    	else
-	    constructErrorAndFail "getClockTime"
-  where
     malloc1 = IO $ \ s# ->
 	case newIntArray# 1# s# of 
           (# s2#, barr# #) -> 
@@ -244,7 +231,7 @@ addToClockTime  :: TimeDiff  -> ClockTime -> ClockTime
 addToClockTime (TimeDiff year mon day hour min sec psec) 
 	       (TOD c_sec c_psec) = unsafePerformIO $ do
     res <- allocWords sizeof_int64
-    rc <- prim_toClockSec year mon day hour min sec 0 res 
+    rc <- toClockSec year mon day hour min sec 0 res 
     if rc /= (0::Int)
      then do
             diff_sec <- primReadInt64Array res 0
@@ -256,14 +243,14 @@ addToClockTime (TimeDiff year mon day hour min sec psec)
 addToClockTime  :: TimeDiff  -> ClockTime -> ClockTime
 addToClockTime (TimeDiff year mon day hour min sec psec) 
 	       (TOD c_sec c_psec) = unsafePerformIO $ do
-    res <- allocWords (``sizeof(time_t)'')
-    ptr <- _ccall_ toClockSec year mon day hour min sec (0::Int) res 
-    let (A# ptr#) = ptr
-    if ptr /= nullAddr
-     then let
-	    diff_sec  = (int2Integer (indexIntOffAddr# ptr# 0#))
+    res <- stToIO (newIntArray (0,sizeof_time_t))
+    rc <- toClockSec year mon day hour min sec (0::Int) res 
+    if rc /= 0
+     then do
+          diff_sec_i <- stToIO (readIntArray res 0)
+          let
+	    diff_sec  = int2Integer (case diff_sec_i of I# i# -> i#)
 	    diff_psec = psec
-       	  in
           return (TOD (c_sec + diff_sec) (c_psec + diff_psec))
      else
           error "Time.addToClockTime: can't perform conversion of TimeDiff"
@@ -346,7 +333,7 @@ toClockTime (CalendarTime year mon mday hour min sec psec wday yday tzname tz is
     else
         unsafePerformIO ( do
 	    res <- allocWords sizeof_int64
-	    rc <- prim_toClockSec year mon mday hour min sec isDst res
+	    rc <- toClockSec year mon mday hour min sec isDst res
             if rc /= (0::Int)
              then do
                tm <- primReadInt64Array res 0
@@ -360,24 +347,24 @@ toCalendarTime :: ClockTime -> IO CalendarTime
 toCalendarTime (TOD (S# i) psec) 
   = case int2Integer# i of (# s, d #) -> toCalendarTime (TOD (J# s d) psec)
 toCalendarTime (TOD (J# s# d#) psec) = do
-    res    <- allocWords (``sizeof(struct tm)''::Int)
+    res    <- allocWords sizeof_struct_tm
     zoneNm <- allocChars 32
-    _casm_ ``SETZONE((struct tm *)%0,(char *)%1); '' res zoneNm
-    tm     <- _ccall_ toLocalTime (I# s#) d# res
-    if tm == nullAddr
+    prim_SETZONE res zoneNm
+    rc     <- prim_toLocalTime (I# s#) d# res
+    if rc == 0
      then constructErrorAndFail "Time.toCalendarTime: out of range"
      else do
-       sec   <-  _casm_ ``%r = ((struct tm *)%0)->tm_sec;'' tm
-       min   <-  _casm_ ``%r = ((struct tm *)%0)->tm_min;'' tm
-       hour  <-  _casm_ ``%r = ((struct tm *)%0)->tm_hour;'' tm
-       mday  <-  _casm_ ``%r = ((struct tm *)%0)->tm_mday;'' tm
-       mon   <-  _casm_ ``%r = ((struct tm *)%0)->tm_mon;'' tm
-       year  <-  _casm_ ``%r = ((struct tm *)%0)->tm_year;'' tm
-       wday  <-  _casm_ ``%r = ((struct tm *)%0)->tm_wday;'' tm
-       yday  <-  _casm_ ``%r = ((struct tm *)%0)->tm_yday;'' tm
-       isdst <-  _casm_ ``%r = ((struct tm *)%0)->tm_isdst;'' tm
-       zone  <-  _ccall_ get_ZONE tm
-       tz    <-  _ccall_ GMTOFF tm
+       sec   <-  get_tm_sec res
+       min   <-  get_tm_min res
+       hour  <-  get_tm_hour res
+       mday  <-  get_tm_mday res
+       mon   <-  get_tm_mon  res
+       year  <-  get_tm_year res
+       wday  <-  get_tm_wday res
+       yday  <-  get_tm_yday res
+       isdst <-  get_tm_isdst res
+       zone  <-  get_ZONE res
+       tz    <-  get_GMTOFF res
        let tzname = unpackCString zone
        return (CalendarTime (1900+year) mon mday hour min sec psec 
             		    (toEnum wday) yday tzname tz (isdst /= (0::Int)))
@@ -386,21 +373,21 @@ toUTCTime :: ClockTime -> CalendarTime
 toUTCTime (TOD (S# i) psec) 
   = case int2Integer# i of (# s, d #) -> toUTCTime (TOD (J# s d) psec)
 toUTCTime  (TOD (J# s# d#) psec) = unsafePerformIO $ do
-       res    <- allocWords (``sizeof(struct tm)''::Int)
+       res    <- allocWords sizeof_struct_tm
        zoneNm <- allocChars 32
-       _casm_ ``SETZONE((struct tm *)%0,(char *)%1); '' res zoneNm
-       tm     <-  _ccall_ toUTCTime (I# s#) d# res
-       if tm == nullAddr
+       prim_SETZONE res zoneNm
+       rc     <-  prim_toUTCTime (I# s#) d# res
+       if rc == 0
 	then error "Time.toUTCTime: out of range"
         else do
-	    sec   <- _casm_ ``%r = ((struct tm *)%0)->tm_sec;'' tm
-	    min   <- _casm_ ``%r = ((struct tm *)%0)->tm_min;'' tm
-	    hour  <- _casm_ ``%r = ((struct tm *)%0)->tm_hour;'' tm
-	    mday  <- _casm_ ``%r = ((struct tm *)%0)->tm_mday;'' tm
-	    mon   <- _casm_ ``%r = ((struct tm *)%0)->tm_mon;'' tm
-	    year  <- _casm_ ``%r = ((struct tm *)%0)->tm_year;'' tm
-	    wday  <- _casm_ ``%r = ((struct tm *)%0)->tm_wday;'' tm
-	    yday  <- _casm_ ``%r = ((struct tm *)%0)->tm_yday;'' tm
+	    sec   <- get_tm_sec res
+	    min   <- get_tm_min res
+	    hour  <- get_tm_hour res
+	    mday  <- get_tm_mday res
+	    mon   <- get_tm_mon res
+	    year  <- get_tm_year res
+	    wday  <- get_tm_wday res
+	    yday  <- get_tm_yday res
             return (CalendarTime (1900+year) mon mday hour min sec psec 
             		  (toEnum wday) yday "UTC" 0 False)
 
@@ -412,11 +399,12 @@ toClockTime (CalendarTime year mon mday hour min sec psec _wday _yday _tzname tz
         error "Time.toClockTime: timezone offset out of range"
     else
         unsafePerformIO ( do
-	    res <- allocWords (``sizeof(time_t)'')
-	    ptr <- _ccall_ toClockSec year mon mday hour min sec isDst res
-            let (A# ptr#) = ptr
-            if ptr /= nullAddr
-             then return (TOD (int2Integer (indexIntOffAddr# ptr# 0#)) psec)
+	    res <- stToIO (newIntArray (0, sizeof_time_t))
+	    rc  <- toClockSec year mon mday hour min sec isDst res
+            if rc /= 0
+             then do
+	       i <- stToIO (readIntArray res 0)
+	       return (TOD (int2Integer (case i of I# i# -> i#)) psec)
 	     else error "Time.toClockTime: can't perform conversion"
         )
     where
@@ -439,17 +427,12 @@ allocChars size = primNewByteArray size
 allocWords :: Int -> IO (PrimMutableByteArray RealWorld)
 allocWords size = primNewByteArray size
 #else
-allocChars :: Int -> IO (MutableByteArray RealWorld ())
-allocChars (I# size#) = IO $ \ s# ->
-    case newCharArray# size# s# of 
-      (# s2#, barr# #) -> 
-	(# s2#, MutableByteArray bot barr# #)
-  where
-    bot = error "Time.allocChars"
+allocChars :: Int -> IO (MutableByteArray RealWorld Int)
+allocChars (I# size#) = stToIO (new_ps_array size#)
 
 -- Allocate a mutable array of words with no indices
 
-allocWords :: Int -> IO (MutableByteArray RealWorld ())
+allocWords :: Int -> IO (MutableByteArray RealWorld Int)
 allocWords (I# size#) = IO $ \ s# ->
     case newIntArray# size# s# of 
       (# s2#, barr# #) -> 
@@ -578,33 +561,55 @@ formatTimeDiff l fmt (TimeDiff year month day hour min sec _)
 \end{code}
 
 \begin{code}
+foreign import "libHS_cbits" "get_tm_sec"   get_tm_sec   :: MBytes -> IO Int
+foreign import "libHS_cbits" "get_tm_min"   get_tm_min   :: MBytes -> IO Int
+foreign import "libHS_cbits" "get_tm_hour"  get_tm_hour  :: MBytes -> IO Int
+foreign import "libHS_cbits" "get_tm_mday"  get_tm_mday  :: MBytes -> IO Int
+foreign import "libHS_cbits" "get_tm_mon"   get_tm_mon   :: MBytes -> IO Int
+foreign import "libHS_cbits" "get_tm_year"  get_tm_year  :: MBytes -> IO Int
+foreign import "libHS_cbits" "get_tm_wday"  get_tm_wday  :: MBytes -> IO Int
+foreign import "libHS_cbits" "get_tm_yday"  get_tm_yday  :: MBytes -> IO Int
+foreign import "libHS_cbits" "get_tm_isdst" get_tm_isdst :: MBytes -> IO Int
+	       		   
+foreign import "libHS_cbits" "prim_ZONE"    prim_ZONE    :: Bytes -> IO Addr
+foreign import "libHS_cbits" "prim_GMTOFF"  prim_GMTOFF  :: Bytes -> IO Int
+	       		   
+foreign import "libHS_cbits" "sizeof_struct_tm" sizeof_struct_tm :: Int
+
 #ifdef __HUGS__
-foreign import ccall "libHS_cbits.so" "get_tm_sec"   get_tm_sec   :: Bytes -> IO Int
-foreign import ccall "libHS_cbits.so" "get_tm_min"   get_tm_min   :: Bytes -> IO Int
-foreign import ccall "libHS_cbits.so" "get_tm_hour"  get_tm_hour  :: Bytes -> IO Int
-foreign import ccall "libHS_cbits.so" "get_tm_mday"  get_tm_mday  :: Bytes -> IO Int
-foreign import ccall "libHS_cbits.so" "get_tm_mon"   get_tm_mon   :: Bytes -> IO Int
-foreign import ccall "libHS_cbits.so" "get_tm_year"  get_tm_year  :: Bytes -> IO Int
-foreign import ccall "libHS_cbits.so" "get_tm_wday"  get_tm_wday  :: Bytes -> IO Int
-foreign import ccall "libHS_cbits.so" "get_tm_yday"  get_tm_yday  :: Bytes -> IO Int
-foreign import ccall "libHS_cbits.so" "get_tm_isdst" get_tm_isdst :: Bytes -> IO Int
-
-foreign import ccall "libHS_cbits.so" "prim_ZONE"    prim_ZONE    :: Bytes -> IO Addr
-foreign import ccall "libHS_cbits.so" "prim_GMTOFF"  prim_GMTOFF  :: Bytes -> IO Int
-
-foreign import ccall "libHS_cbits.so" "prim_SETZONE" prim_SETZONE :: Bytes -> Bytes -> IO Int
-
-foreign import ccall "libHS_cbits.so" "sizeof_word"      sizeof_word      :: Int
-foreign import ccall "libHS_cbits.so" "sizeof_struct_tm" sizeof_struct_tm :: Int
-foreign import ccall "libHS_cbits.so" "sizeof_time_t"    sizeof_time_t    :: Int
-
 -- believed to be at least 1 bit (the sign bit!) bigger than sizeof_time_t
 sizeof_int64 :: Int
 sizeof_int64 = 8
-
-foreign import ccall "libHS_cbits.so" "prim_getClockTime" prim_getClockTime :: Bytes -> Bytes -> IO Int
-foreign import ccall "libHS_cbits.so" "prim_toClockSec"   prim_toClockSec   :: Int -> Int -> Int -> Int -> Int -> Int -> Int -> Bytes -> IO Int
-foreign import ccall "libHS_cbits.so" "prim_toLocalTime"  prim_toLocalTime  :: Int64 -> Bytes -> IO Int
-foreign import ccall "libHS_cbits.so" "prim_toUTCTime"    prim_toUTCTime    :: Int64 -> Bytes -> IO Int
 #endif
+
+type MBytes = MutableByteArray RealWorld Int
+
+foreign import "libHS_cbits" "sizeof_time_t"    sizeof_time_t    :: Int
+
+foreign import "libHS_cbits" "prim_SETZONE" prim_SETZONE :: MBytes -> MBytes -> IO Int
+#ifdef __HUGS__
+foreign import "libHS_cbits" "prim_toLocalTime"  prim_toLocalTime :: Int64 -> MBytes -> IO Int
+foreign import "libHS_cbits" "prim_toUTCTime"    prim_toUTCTime   :: Int64 -> MBytes -> IO Int
+#else
+foreign import "libHS_cbits" "toLocalTime"  prim_toLocalTime :: Int -> Bytes -> MBytes -> IO Int
+foreign import "libHS_cbits" "toUTCTime"    prim_toUTCTime   :: Int -> Bytes -> MBytes -> IO Int
+#endif
+
+foreign import "libHS_cbits" "get_ZONE"  get_ZONE    :: MBytes -> IO Addr
+foreign import "libHS_cbits" "GMTOFF"   get_GMTOFF   :: MBytes -> IO Int
+
+
+foreign import "libHS_cbits" "toClockSec"
+            toClockSec   :: Int -> Int -> Int -> Int -> Int 
+	    		 -> Int -> Int -> MBytes -> IO Int
+
+foreign import "libHS_cbits" "prim_getClockTime" 
+           primGetClockTime :: MutableByteArray RealWorld Int
+	                    -> MutableByteArray RealWorld Int
+			    -> IO Int
+foreign import "libHS_cbits" "showTime" 
+           showTime :: Int
+	            -> Bytes
+		    -> MBytes
+		    -> IO Addr{-packed C string -}
 \end{code}
