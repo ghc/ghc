@@ -58,8 +58,10 @@ module  Data.Array
 import Data.Ix
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.Arr		-- Most of the hard work is done here
-import GHC.Err		( undefined )
+import GHC.Arr		        -- Most of the hard work is done here
+import Data.Generics.Basics     -- To provide a Data instance
+import Data.Generics.Instances  -- To provide a Data instance
+import GHC.Err ( error )        -- Needed for Data instance
 #endif
 
 #ifdef __HUGS__
@@ -77,6 +79,20 @@ import Data.Typeable
 #ifndef __NHC__
 #include "Typeable.h"
 INSTANCE_TYPEABLE2(Array,arrayTc,"Array")
+#endif
+
+#ifdef __GLASGOW_HASKELL__
+
+-- This instance preserves data abstraction at the cost of inefficiency.
+-- We omit reflection services for the sake of data abstraction.
+
+instance (Typeable a, Data b, Ix a) => Data (Array a b)
+ where
+  gfoldl f z a = z (listArray (bounds a)) `f` (elems a)
+  toConstr _   = error "toConstr"
+  gunfold _ _  = error "gunfold"
+  dataTypeOf _ = mkNorepType "Data.Array.Array"
+
 #endif
 
 {- $intro

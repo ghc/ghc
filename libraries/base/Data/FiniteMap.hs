@@ -93,6 +93,9 @@ import Prelude -- necessary to get dependencies right
 import Data.Maybe ( isJust )
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
+import Data.Typeable
+import Data.Generics.Basics
+import Data.Generics.Instances
 #endif
 
 #ifdef __HADDOCK__
@@ -119,6 +122,7 @@ import Bag	( foldBag )
 #else /* not GHC */
 #define IF_GHC(a,b) b
 #endif /* not GHC */
+
 
 
 -- ---------------------------------------------------------------------------
@@ -288,6 +292,23 @@ instance (Show k, Show e) => Show (FiniteMap k e) where
 
 instance Functor (FiniteMap k) where
   fmap f = mapFM (const f)
+
+#if __GLASGOW_HASKELL__
+
+#include "Typeable.h"
+INSTANCE_TYPEABLE2(FiniteMap,arrayTc,"FiniteMap")
+
+-- This instance preserves data abstraction at the cost of inefficiency.
+-- We omit reflection services for the sake of data abstraction.
+
+instance (Data a, Data b, Ord a) => Data (FiniteMap a b) where
+  gfoldl f z fm = z listToFM `f` (fmToList fm)
+  toConstr _    = error "toConstr"
+  gunfold _ _   = error "gunfold"
+  dataTypeOf _  = mkNorepType "Data.Array.Array"
+
+#endif
+
 
 -- ---------------------------------------------------------------------------
 -- Adding to and deleting from @FiniteMaps@

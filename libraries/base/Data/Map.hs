@@ -161,6 +161,11 @@ import Debug.QuickCheck
 import List(nub,sort)    
 -}
 
+#if __GLASGOW_HASKELL__
+import Data.Generics.Basics
+import Data.Generics.Instances
+#endif
+
 {--------------------------------------------------------------------
   Operators
 --------------------------------------------------------------------}
@@ -182,6 +187,23 @@ data Map k a  = Tip
               | Bin {-# UNPACK #-} !Size !k a !(Map k a) !(Map k a) 
 
 type Size     = Int
+
+{--------------------------------------------------------------------
+  A Data instance  
+--------------------------------------------------------------------}
+
+#if __GLASGOW_HASKELL__
+
+-- This instance preserves data abstraction at the cost of inefficiency.
+-- We omit reflection services for the sake of data abstraction.
+
+instance (Data k, Data a, Ord k) => Data (Map k a) where
+  gfoldl f z map = z fromList `f` (toList map)
+  toConstr _     = error "toConstr"
+  gunfold _ _    = error "gunfold"
+  dataTypeOf _   = mkNorepType "Data.Map.Map"
+
+#endif
 
 {--------------------------------------------------------------------
   Query

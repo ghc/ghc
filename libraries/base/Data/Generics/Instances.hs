@@ -34,7 +34,10 @@ import Data.Word             -- So we can give Data instance for Word8, ...
 import GHC.Real( Ratio(..) ) -- So we can give Data instance for Ratio
 import GHC.IOBase	     -- So we can give Data instance for IO, Handle
 import GHC.Ptr	     	     -- So we can give Data instance for Ptr
+import GHC.ForeignPtr	     -- So we can give Data instance for ForeignPtr
 import GHC.Stable	     -- So we can give Data instance for StablePtr
+import GHC.ST	     	     -- So we can give Data instance for ST
+import GHC.Conc		     -- So we can give Data instance for MVar & Co.
 
 #include "Typeable.h"
 
@@ -545,6 +548,60 @@ instance Typeable a => Data (IORef a) where
   toConstr _   = error "toConstr"
   gunfold _ _  = error "gunfold"
   dataTypeOf _ = mkNorepType "GHC.IOBase.IORef"
+
+
+------------------------------------------------------------------------------
+
+
+instance Typeable a => Data (ForeignPtr a) where
+  toConstr _   = error "toConstr"
+  gunfold _ _  = error "gunfold"
+  dataTypeOf _ = mkNorepType "GHC.ForeignPtr.ForeignPtr"
+
+
+------------------------------------------------------------------------------
+
+
+instance (Typeable s, Typeable a) => Data (ST s a) where
+  toConstr _   = error "toConstr"
+  gunfold _ _  = error "gunfold"
+  dataTypeOf _ = mkNorepType "GHC.ST.ST"
+
+
+------------------------------------------------------------------------------
+
+
+instance Data ThreadId where
+  toConstr _   = error "toConstr"
+  gunfold _ _  = error "gunfold"
+  dataTypeOf _ = mkNorepType "GHC.Conc.ThreadId"
+
+
+------------------------------------------------------------------------------
+
+
+instance Typeable a => Data (TVar a) where
+  toConstr _   = error "toConstr"
+  gunfold _ _  = error "gunfold"
+  dataTypeOf _ = mkNorepType "GHC.Conc.TVar"
+
+
+------------------------------------------------------------------------------
+
+
+instance Typeable a => Data (MVar a) where
+  toConstr _   = error "toConstr"
+  gunfold _ _  = error "gunfold"
+  dataTypeOf _ = mkNorepType "GHC.Conc.MVar"
+
+
+------------------------------------------------------------------------------
+
+
+instance Typeable a => Data (STM a) where
+  toConstr _   = error "toConstr"
+  gunfold _ _  = error "gunfold"
+  dataTypeOf _ = mkNorepType "GHC.Conc.STM"
 
 
 ------------------------------------------------------------------------------

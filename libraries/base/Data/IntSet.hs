@@ -104,6 +104,11 @@ import List (nub,sort)
 import qualified List
 -}
 
+#if __GLASGOW_HASKELL__
+import Data.Generics.Basics
+import Data.Generics.Instances
+#endif
+
 #if __GLASGOW_HASKELL__ >= 503
 import GHC.Word
 import GHC.Exts ( Word(..), Int(..), shiftRL# )
@@ -153,6 +158,23 @@ data IntSet = Nil
 
 type Prefix = Int
 type Mask   = Int
+
+{--------------------------------------------------------------------
+  A Data instance  
+--------------------------------------------------------------------}
+
+#if __GLASGOW_HASKELL__
+
+-- This instance preserves data abstraction at the cost of inefficiency.
+-- We omit reflection services for the sake of data abstraction.
+
+instance Data IntSet where
+  gfoldl f z is = z fromList `f` (toList is)
+  toConstr _    = error "toConstr"
+  gunfold _ _   = error "gunfold"
+  dataTypeOf _  = mkNorepType "Data.IntSet.IntSet"
+
+#endif
 
 {--------------------------------------------------------------------
   Query

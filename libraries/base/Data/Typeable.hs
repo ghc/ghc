@@ -98,6 +98,7 @@ import GHC.Real( rem, Ratio )
 import GHC.IOBase
 import GHC.ST		-- So we can give Typeable instance for ST
 import GHC.Ptr          -- So we can give Typeable instance for Ptr
+import GHC.ForeignPtr   -- So we can give Typeable instance for ForeignPtr
 import GHC.Stable       -- So we can give Typeable instance for StablePtr
 #endif
 
@@ -466,6 +467,7 @@ INSTANCE_TYPEABLE2((->),funTc,"->")
 INSTANCE_TYPEABLE1(IO,ioTc,"IO")
 #ifdef __GLASGOW_HASKELL__
 INSTANCE_TYPEABLE2(ST,stTc,"ST")
+INSTANCE_TYPEABLE1(ForeignPtr,foreignPtrTc,"ForeignPtr")
 #endif
 INSTANCE_TYPEABLE0((),unitTc,"()")
 #ifndef __NHC__
@@ -534,7 +536,6 @@ INSTANCE_TYPEABLE0(TypeRep,typeRepTc,"TypeRep")
 
 #ifdef __GLASGOW_HASKELL__
 INSTANCE_TYPEABLE0(RealWorld,realWorldTc,"RealWorld")
-INSTANCE_TYPEABLE1(MVar,mvarTc,"MVar" )
 #endif
 
 ---------------------------------------------

@@ -147,6 +147,11 @@ import List (nub,sort)
 import qualified List
 -}  
 
+#if __GLASGOW_HASKELL__
+import Data.Generics.Basics
+import Data.Generics.Instances
+#endif
+
 #if __GLASGOW_HASKELL__ >= 503
 import GHC.Word
 import GHC.Exts ( Word(..), Int(..), shiftRL# )
@@ -203,6 +208,23 @@ data IntMap a = Nil
 type Prefix = Int
 type Mask   = Int
 type Key    = Int
+
+{--------------------------------------------------------------------
+  A Data instance  
+--------------------------------------------------------------------}
+
+#if __GLASGOW_HASKELL__
+
+-- This instance preserves data abstraction at the cost of inefficiency.
+-- We omit reflection services for the sake of data abstraction.
+
+instance Data a => Data (IntMap a) where
+  gfoldl f z im = z fromList `f` (toList im)
+  toConstr _    = error "toConstr"
+  gunfold _ _   = error "gunfold"
+  dataTypeOf _  = mkNorepType "Data.IntMap.IntMap"
+
+#endif
 
 {--------------------------------------------------------------------
   Query

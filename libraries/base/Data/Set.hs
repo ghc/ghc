@@ -123,6 +123,11 @@ import List (nub,sort)
 import qualified List
 -}
 
+#if __GLASGOW_HASKELL__
+import Data.Generics.Basics
+import Data.Generics.Instances
+#endif
+
 {--------------------------------------------------------------------
   Operators
 --------------------------------------------------------------------}
@@ -140,6 +145,23 @@ data Set a    = Tip
               | Bin {-# UNPACK #-} !Size a !(Set a) !(Set a) 
 
 type Size     = Int
+
+{--------------------------------------------------------------------
+  A Data instance  
+--------------------------------------------------------------------}
+
+#if __GLASGOW_HASKELL__
+
+-- This instance preserves data abstraction at the cost of inefficiency.
+-- We omit reflection services for the sake of data abstraction.
+
+instance (Data a, Ord a) => Data (Set a) where
+  gfoldl f z set = z fromList `f` (toList set)
+  toConstr _     = error "toConstr"
+  gunfold _ _    = error "gunfold"
+  dataTypeOf _   = mkNorepType "Data.Set.Set"
+
+#endif
 
 {--------------------------------------------------------------------
   Query

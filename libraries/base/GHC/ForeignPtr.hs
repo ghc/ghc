@@ -32,7 +32,6 @@ module GHC.ForeignPtr
 import Control.Monad 	( sequence_ )
 import Foreign.Ptr
 import Foreign.Storable
-import Data.Typeable
 
 import GHC.List  	( null )
 import GHC.Base
@@ -69,9 +68,6 @@ instance Ord (ForeignPtr a) where
 
 instance Show (ForeignPtr a) where
     showsPrec p f = showsPrec p (unsafeForeignPtrToPtr f)
-
-#include "Typeable.h"
-INSTANCE_TYPEABLE1(ForeignPtr,foreignPtrTc,"ForeignPtr")
 
 -- |A Finalizer is represented as a pointer to a foreign function that, at
 -- finalisation time, gets as an argument a plain pointer variant of the
