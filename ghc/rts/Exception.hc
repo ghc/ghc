@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Exception.hc,v 1.4 2000/01/14 11:45:21 hwloidl Exp $
+ * $Id: Exception.hc,v 1.5 2000/01/22 18:00:03 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -51,8 +51,11 @@ FN_(blockAsyncExceptionszh_fast)
 
     if (CurrentTSO->blocked_exceptions == NULL) {
       CurrentTSO->blocked_exceptions = END_TSO_QUEUE;
-      Sp--;
-      Sp[0] = (W_)&unblockAsyncExceptionszh_ret_info;
+      /* avoid growing the stack unnecessarily */
+      if (Sp[0] != (W_)&blockAsyncExceptionszh_ret_info) {
+	Sp--;
+	Sp[0] = (W_)&blockAsyncExceptionszh_ret_info;
+      }
     }
     Sp--;
     Sp[0] = ARG_TAG(0);
@@ -101,8 +104,12 @@ FN_(unblockAsyncExceptionszh_fast)
       awakenBlockedQueue(CurrentTSO->blocked_exceptions);
 #endif
       CurrentTSO->blocked_exceptions = NULL;
-      Sp--;
-      Sp[0] = (W_)&blockAsyncExceptionszh_ret_info;
+
+      /* avoid growing the stack unnecessarily */
+      if (Sp[0] != (W_)&blockAsyncExceptionszh_ret_info) {
+	Sp--;	
+	Sp[0] = (W_)&blockAsyncExceptionszh_ret_info;
+      }
     }
     Sp--;
     Sp[0] = ARG_TAG(0);
@@ -126,6 +133,13 @@ FN_(killThreadzh_fast)
 {
   FB_
   /* args: R1.p = TSO to kill, R2.p = Exception */
+
+  /* This thread may have been relocated.
+   * (see Schedule.c:threadStackOverflow)
+   */
+  while (R1.t->whatNext == ThreadRelocated) {
+    R1.t = R1.t->link;
+  }
 
   /* If the target thread is currently blocking async exceptions,
    * we'll have to block until it's ready to accept them.

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.71 2000/01/14 14:55:03 simonmar Exp $
+ * $Id: GC.c,v 1.72 2000/01/22 18:00:03 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -933,7 +933,6 @@ isAlive(StgClosure *p)
 StgClosure *
 MarkRoot(StgClosure *root)
 {
-  //if (root != END_TSO_QUEUE)
   return evacuate(root);
 }
 
@@ -1490,9 +1489,16 @@ loop:
 
   case TSO:
     {
-      StgTSO *tso = stgCast(StgTSO *,q);
+      StgTSO *tso = (StgTSO *)q;
       nat size = tso_sizeW(tso);
       int diff;
+
+      /* Deal with redirected TSOs (a TSO that's had its stack enlarged).
+       */
+      if (tso->whatNext == ThreadRelocated) {
+	q = (StgClosure *)tso->link;
+	goto loop;
+      }
 
       /* Large TSOs don't get moved, so no relocation is required.
        */

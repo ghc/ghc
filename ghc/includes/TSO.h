@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.10 2000/01/13 14:34:01 hwloidl Exp $
+ * $Id: TSO.h,v 1.11 2000/01/22 18:00:03 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -71,12 +71,16 @@ typedef enum {
     tso_state_stopped
 } StgTSOState;
 
+/*
+ * The whatNext field of a TSO indicates how the thread is to be run. 
+ */
 typedef enum {
-  ThreadEnterGHC,
-  ThreadRunGHC,
-  ThreadEnterHugs,
-  ThreadKilled,
-  ThreadComplete
+  ThreadEnterGHC,		/* enter top thunk on stack */
+  ThreadRunGHC,			/* return to address on top of stack */
+  ThreadEnterHugs,		/* enter top thunk on stack (w/ interpreter) */
+  ThreadKilled,			/* thread has died, don't run it */
+  ThreadRelocated,		/* thread has moved, link points to new locn */
+  ThreadComplete		/* thread has finished */
 } StgTSOWhatNext;
 
 /*

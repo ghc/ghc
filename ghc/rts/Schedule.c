@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.44 2000/01/14 13:39:59 simonmar Exp $
+ * $Id: Schedule.c,v 1.45 2000/01/22 18:00:03 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -697,13 +697,15 @@ schedule( void )
 	
 	/* This TSO has moved, so update any pointers to it from the
 	 * main thread stack.  It better not be on any other queues...
-	 * (it shouldn't be)
+	 * (it shouldn't be).
 	 */
 	for (m = main_threads; m != NULL; m = m->link) {
 	  if (m->tso == t) {
 	    m->tso = new_t;
 	  }
 	}
+	ready_to_gc = rtsTrue;
+	context_switch = 1;
 	PUSH_ON_RUN_QUEUE(new_t);
       }
       break;
@@ -1583,9 +1585,10 @@ performGCWithRoots(void (*get_roots)(void))
 /* -----------------------------------------------------------------------------
    Stack overflow
 
-   If the thread has reached its maximum stack size,
-   then bomb out.  Otherwise relocate the TSO into a larger chunk of
-   memory and adjust its stack size appropriately.
+   If the thread has reached its maximum stack size, then raise the
+   StackOverflow exception in the offending thread.  Otherwise
+   relocate the TSO into a larger chunk of memory and adjust its stack
+   size appropriately.
    -------------------------------------------------------------------------- */
 
 static StgTSO *
@@ -1642,14 +1645,15 @@ threadStackOverflow(StgTSO *tso)
   /* and relocate the update frame list */
   relocate_TSO(tso, dest);
 
-  /* Mark the old one as dead so we don't try to scavenge it during
-   * garbage collection (the TSO will likely be on a mutables list in
-   * some generation, but it'll get collected soon enough).  It's
-   * important to set the sp and su values to just beyond the end of
-   * the stack, so we don't attempt to scavenge any part of the dead
-   * TSO's stack.
+  /* Mark the old TSO as relocated.  We have to check for relocated
+   * TSOs in the garbage collector and any primops that deal with TSOs.
+   *
+   * It's important to set the sp and su values to just beyond the end
+   * of the stack, so we don't attempt to scavenge any part of the
+   * dead TSO's stack.
    */
-  tso->whatNext = ThreadKilled;
+  tso->whatNext = ThreadRelocated;
+  tso->link = dest;
   tso->sp = (P_)&(tso->stack[tso->stack_size]);
   tso->su = (StgUpdateFrame *)tso->sp;
   tso->why_blocked = NotBlocked;
@@ -1660,12 +1664,6 @@ threadStackOverflow(StgTSO *tso)
   IF_DEBUG(scheduler,printTSO(dest));
 #endif
 
-#if 0
-  /* This will no longer work: KH */
-  if (tso == MainTSO) { /* hack */
-      MainTSO = dest;
-  }
-#endif
   return dest;
 }
 
