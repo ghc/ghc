@@ -269,7 +269,7 @@ instance (Typeable a, Typeable b) => Typeable (Either a b) where
     where
       getL :: Either a b -> a
       getL = undefined
-      getR :: Either a b -> a
+      getR :: Either a b -> b
       getR = undefined
 
 instance (Typeable a, Typeable b) => Typeable (a -> b) where
