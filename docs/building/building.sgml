@@ -457,7 +457,7 @@ setsockopt IPTOS_THROUGHPUT: Invalid argument
           modules (for a full list of the projects available, see
           <xref linkend="projects">).</para>
 
-	  <para>Remeber that if you do not have
+	  <para>Remember that if you do not have
           <literal>happy</literal> installed, you need to check it out
           as well.</para>
 	</listitem>
@@ -495,7 +495,14 @@ $ cvs diff
           you the results.</para>
 	</listitem>
 
-      <listitem>
+	<listitem>
+	  <para>If you changed something in the 
+          <literal>fptools/libraries</literal> subdirectories, also run
+          <literal>make html</literal> to check if the documentation can
+          be generated successfully, too.</para>
+	</listitem>
+
+	<listitem>
 	  <para>Before checking in a change, you need to update your
           source tree:</para>
 
@@ -578,7 +585,10 @@ $ cvs commit -F <replaceable>commit-message</replaceable> <replaceable>directory
       major cause of headaches. </para>
 
       <para>So, to avoid a lot of hassle, follow this recipe for
-      updating your tree: </para>
+      updating your tree.  Usually you will only want to run cvs update
+      in the sub-projects because running <literal>cvs update -Pd</literal>
+      on top-level will also retrieve any directories you intentionally did
+      not check out:</para>
 
 <screen>
 $ cd fptools
@@ -1220,7 +1230,7 @@ $ cvs checkout nofib/spectral
 	  <para>GCC 3.2 is currently known to have problems building
 	  GHC on Sparc, but is stable on x86.</para>
 	  
-	  <para>GCC 3.3 currnetly cannot be used to build GHC, due to
+	  <para>GCC 3.3 currently cannot be used to build GHC, due to
 	  some problems with the new C preprocessor.</para>
 
 	  <para>If your GCC dies with &ldquo;internal error&rdquo; on
@@ -1254,7 +1264,7 @@ $ cvs checkout nofib/spectral
           (<literal>fptools/happy</literal>).  It can be built from
           source, but bear in mind that you'll need GHC installed in
           order to build it.  To avoid the chicken/egg problem,
-          install a binary distribtion of either Happy or GHC to get
+          install a binary distribution of either Happy or GHC to get
           started.  Happy distributions are available from <ulink
           url="http://www.haskell.org/happy/">Happy's Web
           Page</ulink>.</para>
