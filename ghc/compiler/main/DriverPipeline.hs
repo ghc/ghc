@@ -135,7 +135,10 @@ genPipeline todo stop_flag persistent_output lang (filename,suffix)
    split      <- readIORef v_Split_object_files
    mangle     <- readIORef v_Do_asm_mangling
    keep_hc    <- readIORef v_Keep_hc_files
+#ifdef ILX
    keep_il    <- readIORef v_Keep_il_files
+   keep_ilx   <- readIORef v_Keep_ilx_files
+#endif
    keep_raw_s <- readIORef v_Keep_raw_s_files
    keep_s     <- readIORef v_Keep_s_files
    osuf       <- readIORef v_Object_suf
@@ -237,6 +240,7 @@ genPipeline todo stop_flag persistent_output lang (filename,suffix)
      			     As     | keep_s     -> Persistent
      			     HCc    | keep_hc    -> Persistent
 #ifdef ILX
+			     Ilx2Il | keep_ilx   -> Persistent
 			     Ilasm  | keep_il    -> Persistent
 #endif
      			     _other              -> Temporary
@@ -1072,7 +1076,9 @@ compile ghci_mode summary source_unchanged have_object
        (basename, _) = splitFilename input_fn
        
    keep_hc <- readIORef v_Keep_hc_files
+#ifdef ILX
    keep_il <- readIORef v_Keep_il_files
+#endif
    keep_s  <- readIORef v_Keep_s_files
 
    output_fn <- 

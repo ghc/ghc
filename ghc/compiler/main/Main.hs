@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.91 2001/11/03 01:30:42 sof Exp $
+-- $Id: Main.hs,v 1.92 2001/12/05 00:08:27 sof Exp $
 --
 -- GHC Driver program
 --
@@ -125,7 +125,7 @@ main =
   handleDyn (\dyn -> do
   		hFlush stdout
   		case dyn of
-		     PhaseFailed _phase code -> exitWith code
+		     PhaseFailed _ code -> exitWith code
 		     Interrupted -> exitWith (ExitFailure 1)
 		     _ -> do hPutStrLn stderr (show (dyn :: GhcException))
 			     exitWith (ExitFailure 1)
