@@ -10,7 +10,7 @@ module CostCentre (
 	CostCentre, CcKind, IsDupdCC{-ToDo:rm-}, IsCafCC(..),
 	noCostCentre, subsumedCosts,
 	useCurrentCostCentre,
-	noCostCentreAttached, costsAreSubsumed,
+	noCostCentreAttached, costsAreSubsumed, isCurrentCostCentre,
 	currentOrSubsumedCosts,
 	preludeCafsCostCentre, preludeDictsCostCentre,
 	overheadCostCentre, dontCareCostCentre,
@@ -32,11 +32,10 @@ IMP_Ubiq(){-uitous-}
 
 import Id		( externallyVisibleId, GenId, showId, SYN_IE(Id) )
 import CStrings		( identToC, stringToC )
-import Name		( OccName, getOccString, moduleString )
+import Name		( OccName, getOccString, moduleString, nameString )
 import Outputable	( PprStyle(..), codeStyle, ifaceStyle )
-import UniqSet
 import Pretty
-import Util
+import Util	        ( panic, panic#, assertPanic, cmpPString, thenCmp, Ord3(..) )
 
 pprIdInUnfolding = panic "Whoops"
 \end{code}
@@ -150,6 +149,9 @@ preludeDictsCostCentre is_dupd
 
 noCostCentreAttached NoCostCentre  = True
 noCostCentreAttached _		   = False
+
+isCurrentCostCentre CurrentCC = True
+isCurrentCostCentre _	      = False
 
 costsAreSubsumed SubsumedCosts	= True
 costsAreSubsumed _		= False
@@ -388,18 +390,25 @@ uppCostCentre sty print_as_string cc
 
     do_cc (NormalCC kind mod_name grp_name is_dupd is_caf)
       = let
-	    basic_kind = do_caf is_caf           ++ 
-	                 moduleString mod_name   ++ 
-			 ('/' : _UNPK_ grp_name) ++ 
-			 ('/' : do_kind kind)
+            basic_kind  = do_kind kind
+	    module_kind = do_caf is_caf (moduleString mod_name ++ '/':
+					       basic_kind)
+            grp_str   = if (_NULL_ grp_name) then mod_name else grp_name
+            full_kind = do_caf is_caf
+	                 (moduleString mod_name  ++ 
+			  ('/' : _UNPK_ grp_str) ++ 
+			  ('/' : basic_kind))
 	in
-	if friendly_sty then
-	    do_dupd is_dupd basic_kind
-	else
-	    basic_kind
+        case sty of
+          PprForC -> do_caf is_caf basic_kind
+          _ ->
+	    if friendly_sty then
+	      do_dupd is_dupd full_kind
+	    else
+	      module_kind
       where
-	do_caf IsCafCC = "CAF:"
-	do_caf _       = ""
+	do_caf IsCafCC ls = "CAF:" ++ ls
+	do_caf _       ls = ls
 
     	do_kind (UserCC name) = _UNPK_ name
 	do_kind (AutoCC id)   = do_id id ++ (if friendly_sty then "/AUTO" else "")
@@ -417,7 +426,15 @@ uppCostCentre sty print_as_string cc
     do_dupd _	    str = str
 
 friendly_style sty -- i.e., probably for human consumption
+  = case sty of
+      PprForUser _ -> True
+      PprDebug   -> True
+      PprShowAll -> True
+      _ 	 -> False
+{-
+friendly_style sty -- i.e., probably for human consumption
   = not (codeStyle sty || ifaceStyle sty)
+-}
 \end{code}
 
 Printing unfoldings is sufficiently weird that we do it separately.
@@ -446,9 +463,7 @@ upp_cc_uf cc@(NormalCC cc_kind m g is_dupd is_caf)
     pp_kind (AutoCC id)   = (<>) (ptext SLIT("_AUTO_CC_ ")) (show_id id)
     pp_kind (DictCC id)	  = (<>) (ptext SLIT("_DICT_CC_ ")) (show_id id)
 
-    show_id id = pprIdInUnfolding no_in_scopes id
-	where
-	  no_in_scopes = emptyUniqSet
+    show_id id = pprIdInUnfolding {-no_in_scopes-} id
 
     pp_caf IsCafCC    = ptext SLIT("_CAF_CC_")
     pp_caf IsNotCafCC = ptext SLIT("_N_")
