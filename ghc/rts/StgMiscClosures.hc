@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.34 2000/01/30 10:25:29 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.35 2000/02/04 11:18:05 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -694,6 +694,7 @@ SET_STATIC_HDR(dummy_ret_closure,dummy_ret_info,CCS_DONTZuCARE,,EI_)
 
  * -------------------------------------------------------------------------- */
 
+#ifdef REG_R1
 INFO_TABLE_SRT_BITMAP(forceIO_ret_info,forceIO_ret_entry,0,0,0,0,RET_SMALL,,EF_,0,0);
 FN_(forceIO_ret_entry)
 {
@@ -703,7 +704,19 @@ FN_(forceIO_ret_entry)
   PUSH_SEQ_FRAME(Sp);
   JMP_(GET_ENTRY(R1.cl));
 }
-
+#else
+INFO_TABLE_SRT_BITMAP(forceIO_ret_info,forceIO_ret_entry,0,0,0,0,RET_SMALL,,EF_,0,0);
+FN_(forceIO_ret_entry)
+{
+  StgClosure *rval;
+  FB_
+  rval = (StgClosure *)Sp[0];
+  Sp += 2;
+  Sp -= sizeofW(StgSeqFrame);
+  PUSH_SEQ_FRAME(Sp);
+  JMP_(GET_ENTRY(rval));
+}
+#endif
 
 INFO_TABLE(forceIO_info,forceIO_entry,1,0,FUN_STATIC,,EF_,0,0);
 FN_(forceIO_entry)
