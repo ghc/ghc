@@ -92,6 +92,9 @@ instance (Eq a) => Eq (Set a) where
   (MkSet set_1) == (MkSet set_2) = set_1 == set_2
   (MkSet set_1) /= (MkSet set_2) = set_1 /= set_2
 
+instance Show e => Show (Set e) where
+  showsPrec p s = showsPrec p (setToList s)
+
 -- but not so clear what the right thing to do is:
 {- NO:
 instance (Ord a) => Ord (Set a) where
