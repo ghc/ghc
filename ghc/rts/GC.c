@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.156 2003/06/19 12:47:08 simonmar Exp $
+ * $Id: GC.c,v 1.157 2003/06/26 20:47:47 panne Exp $
  *
  * (c) The GHC Team 1998-2003
  *
@@ -2193,7 +2193,7 @@ scavenge_large_srt_bitmap( StgLargeSRT *large_srt )
     b = 0;
     bitmap = large_srt->l.bitmap[b];
     size   = (nat)large_srt->l.size;
-    p      = large_srt->srt;
+    p      = (StgClosure **)large_srt->srt;
     for (i = 0; i < size; ) {
 	if ((bitmap & 1) != 0) {
 	    evacuate(*p);
