@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.79 2002/06/04 19:17:57 sof Exp $
+-- $Id: DriverState.hs,v 1.80 2002/06/12 22:04:26 wolfgang Exp $
 --
 -- Settings for the driver
 --
@@ -379,6 +379,11 @@ GLOBAL_VAR(v_Library_paths, [],	 [String])
 
 GLOBAL_VAR(v_Cmdline_libraries,   [], [String])
 
+#ifdef darwin_TARGET_OS
+GLOBAL_VAR(v_Framework_paths, [], [String])
+GLOBAL_VAR(v_Cmdline_frameworks, [], [String])
+#endif
+
 addToDirList :: IORef [String] -> String -> IO ()
 addToDirList ref path
   = do paths           <- readIORef ref
@@ -553,6 +558,18 @@ getPackageExtraLdOpts  :: IO [String]
 getPackageExtraLdOpts = do
   ps <- getPackageInfo
   return (concatMap extra_ld_opts ps)
+
+#ifdef darwin_TARGET_OS
+getPackageFrameworkPath  :: IO [String]
+getPackageFrameworkPath = do
+  ps <- getPackageInfo
+  return (nub (filter notNull (concatMap framework_dirs ps)))
+
+getPackageFrameworks  :: IO [String]
+getPackageFrameworks = do
+  ps <- getPackageInfo
+  return (concatMap extra_frameworks ps)
+#endif
 
 getPackageInfo :: IO [PackageConfig]
 getPackageInfo = do

@@ -43,7 +43,8 @@ mungePackagePaths top_dir ps = map munge_pkg ps
  where 
   munge_pkg p = p{ import_dirs  = munge_paths (import_dirs p),
 		   include_dirs = munge_paths (include_dirs p),
-    		   library_dirs = munge_paths (library_dirs p) }
+    		   library_dirs = munge_paths (library_dirs p),
+		   framework_dirs = munge_paths (framework_dirs p) }
 
   munge_paths = map munge_path
 

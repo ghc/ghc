@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.125 2002/06/04 18:09:00 sof Exp $
+-- $Id: InteractiveUI.hs,v 1.126 2002/06/12 22:04:25 wolfgang Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -998,6 +998,9 @@ ghciUnblock (GHCi a) = GHCi $ \s -> Exception.unblock (a s)
 -- directories specified in v_Library_Paths before giving up.
 
 data LibrarySpec = Object FilePath | DLL String
+#ifdef darwin_TARGET_OS
+		    | Framework String
+#endif
 
 -- Packages that don't need loading, because the compiler shares them with
 -- the interpreted program.
@@ -1015,6 +1018,9 @@ loaded_in_ghci
 
 showLS (Object nm)  = "(static) " ++ nm
 showLS (DLL nm) = "(dynamic) " ++ nm
+#ifdef darwin_TARGET_OS
+showLS (Framework nm) = "(framework) " ++ nm
+#endif
 
 linkPackages :: DynFlags -> [LibrarySpec] -> [PackageConfig] -> IO ()
 linkPackages dflags cmdline_lib_specs pkgs

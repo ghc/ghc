@@ -903,6 +903,21 @@ doLink o_files = do
     let lib_opts = map ("-l"++) (reverse libs)
 	 -- reverse because they're added in reverse order from the cmd line
 
+#ifdef darwin_TARGET_OS
+    pkg_framework_paths <- getPackageFrameworkPath
+    let pkg_framework_path_opts = map ("-F"++) pkg_framework_paths
+
+    framework_paths <- readIORef v_Framework_paths
+    let framework_path_opts = map ("-F"++) framework_paths
+
+    pkg_frameworks <- getPackageFrameworks
+    let pkg_framework_opts = map ("-framework " ++) pkg_frameworks
+
+    frameworks <- readIORef v_Cmdline_frameworks
+    let framework_opts = map ("-framework "++) (reverse frameworks)
+	 -- reverse because they're added in reverse order from the cmd line
+#endif
+
     pkg_extra_ld_opts <- getPackageExtraLdOpts
 
 	-- probably _stub.o files
@@ -930,8 +945,16 @@ doLink o_files = do
 		      ++ extra_ld_inputs
 	 	      ++ lib_path_opts
 	 	      ++ lib_opts
+#ifdef darwin_TARGET_OS
+	 	      ++ framework_path_opts
+	 	      ++ framework_opts
+#endif
 	 	      ++ pkg_lib_path_opts
 	 	      ++ pkg_lib_opts
+#ifdef darwin_TARGET_OS
+	 	      ++ pkg_framework_path_opts
+	 	      ++ pkg_framework_opts
+#endif
 	 	      ++ pkg_extra_ld_opts
 	 	      ++ extra_ld_opts
 	              ++ if static && not no_hs_main then

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Package.hs,v 1.2 2001/03/27 14:10:34 simonmar Exp $
+-- $Id: Package.hs,v 1.3 2002/06/12 22:04:27 wolfgang Exp $
 --
 -- Package configuration defn.
 -----------------------------------------------------------------------------
@@ -33,11 +33,10 @@ data PackageConfig
 	package_deps    :: [String],
 	extra_ghc_opts  :: [String],
 	extra_cc_opts   :: [String],
-	extra_ld_opts   :: [String]
+	extra_ld_opts   :: [String],
+	framework_dirs  :: [String], -- ignored everywhere but on Darwin/MacOS X
+	extra_frameworks:: [String]  -- ignored everywhere but on Darwin/MacOS X
      }
-#ifdef PKG_TOOL
-	deriving (Read)
-#endif
 
 defaultPackageConfig
    = Package {
@@ -52,7 +51,9 @@ defaultPackageConfig
 	package_deps    = [],
 	extra_ghc_opts  = [],
 	extra_cc_opts   = [],
-	extra_ld_opts   = []
+	extra_ld_opts   = [],
+	framework_dirs  = [],
+	extra_frameworks= []
     }
 
 -----------------------------------------------------------------------------
@@ -81,7 +82,9 @@ dumpPkgGuts pkg =
          dumpField "package_deps"    (package_deps    pkg),
          dumpField "extra_ghc_opts"  (extra_ghc_opts  pkg),
          dumpField "extra_cc_opts"   (extra_cc_opts   pkg),
-         dumpField "extra_ld_opts"   (extra_ld_opts   pkg)
+         dumpField "extra_ld_opts"   (extra_ld_opts   pkg),
+         dumpField "framework_dirs"  (framework_dirs   pkg),
+         dumpField "extra_frameworks"(extra_frameworks pkg)
       ])))
 
 dumpField :: String -> [String] -> Doc

@@ -63,6 +63,8 @@ field	:: { PackageConfig -> PackageConfig }
 		        "extra_ghc_opts"  -> p{extra_ghc_opts  = $3}
 		        "extra_cc_opts"   -> p{extra_cc_opts   = $3}
 		        "extra_ld_opts"   -> p{extra_ld_opts   = $3}
+		        "framework_dirs"  -> p{framework_dirs  = $3}
+		        "extra_frameworks"-> p{extra_frameworks= $3}
 			_other            -> p
 		}
 

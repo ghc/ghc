@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.24 2002/06/03 10:27:11 simonmar Exp $
+-- $Id: Main.hs,v 1.25 2002/06/12 22:04:27 wolfgang Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -21,6 +21,8 @@ import System	( getEnv, getArgs,
 		)
 import IO
 import List ( isPrefixOf )
+
+import ParsePkgConfLite
 
 #include "../../includes/config.h"
 
@@ -105,12 +107,14 @@ runit clis = do
       toField "extra_ghc_opts"  = return extra_ghc_opts
       toField "extra_cc_opts"   = return extra_cc_opts
       toField "extra_ld_opts"   = return extra_ld_opts  
+      toField "framework_dirs"  = return framework_dirs  
+      toField "extra_frameworks"= return extra_frameworks  
       toField s			= die ("unknown field: `" ++ s ++ "'")
 
   fields <- mapM toField [ f | Field f <- clis ]
 
   s <- readFile conf_file
-  let packages = read s :: [PackageConfig]
+  let packages = parsePackageConfig s
   eval_catch packages (\_ -> die "parse error in package config file")
 
   let auto_ghci_libs = any isAuto clis 
@@ -156,7 +160,7 @@ addPackage packages pkgconf inputFile auto_ghci_libs updatePkg force = do
       f   -> do
         hPutStr stdout ("Reading package info from " ++ show f)
 	readFile f
-  let new_pkg = read s :: PackageConfig
+  let new_pkg = parseOnePackageConfig s
   eval_catch new_pkg (\_ -> die "parse error in package info")
   hPutStrLn stdout "done."
   hPutStr stdout "Expanding embedded variables..."
@@ -315,6 +319,8 @@ expandEnvVars pkg force = do
   e_g_opts <- expandStrings (extra_ghc_opts pkg)
   e_c_opts <- expandStrings (extra_cc_opts pkg)
   e_l_opts <- expandStrings (extra_ld_opts pkg)
+  f_dirs   <- expandStrings (framework_dirs pkg)
+  e_frames <- expandStrings (extra_frameworks pkg)
   return (pkg { name            = nm
   	      , import_dirs     = imp_dirs
 	      , source_dirs     = src_dirs
@@ -327,6 +333,8 @@ expandEnvVars pkg force = do
 	      , extra_ghc_opts  = e_g_opts
 	      , extra_cc_opts   = e_c_opts
 	      , extra_ld_opts   = e_l_opts
+	      , framework_dirs  = f_dirs
+	      , extra_frameworks= e_frames
 	      })
   where
    expandStrings = mapM expandString

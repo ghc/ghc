@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.96 2002/06/03 23:36:40 sof Exp $
+-- $Id: DriverFlags.hs,v 1.97 2002/06/12 22:04:26 wolfgang Exp $
 --
 -- Driver flags
 --
@@ -263,6 +263,12 @@ static_flags =
   ,  ( "L"		, Prefix (addToDirList v_Library_paths) )
   ,  ( "l"		, Prefix (add v_Cmdline_libraries) )
 
+#ifdef darwin_TARGET_OS
+	------- Frameworks --------------------------------------------------
+        -- -framework-path should really be -F ...
+  ,  ( "framework-path" , HasArg (addToDirList v_Framework_paths) )
+  ,  ( "framework"	, HasArg (add v_Cmdline_frameworks) )
+#endif
         ------- Packages ----------------------------------------------------
   ,  ( "package-name"   , HasArg (\s -> add v_Opt_C ("-inpackage="++s)) )
 
