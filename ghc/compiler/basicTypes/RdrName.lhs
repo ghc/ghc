@@ -476,11 +476,13 @@ pprNameProvenance (GRE {gre_name = name, gre_prov = LocalDef _})
 pprNameProvenance (GRE {gre_name = name, gre_prov = Imported (why:whys) _})
   = sep [ppr why, nest 2 (ppr_defn (nameSrcLoc name))]
 
+-- If we know the exact definition point (which we may do with GHCi)
+-- then show that too.  But not if it's just "imported from X".
+ppr_defn loc | isGoodSrcLoc loc = parens (ptext SLIT("defined at") <+> ppr loc)
+	     | otherwise	= empty
+
 instance Outputable ImportSpec where
    ppr imp_spec
      = ptext SLIT("imported from") <+> ppr (is_mod imp_spec) 
 	<+> ptext SLIT("at") <+> ppr (is_loc imp_spec)
-
-ppr_defn loc | isGoodSrcLoc loc = parens (ptext SLIT("defined at") <+> ppr loc)
-	     | otherwise	= empty
 \end{code}
