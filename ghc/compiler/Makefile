@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.66 1999/11/24 10:03:32 simonmar Exp $
+# $Id: Makefile,v 1.67 1999/12/08 11:21:39 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -7,13 +7,6 @@ include $(TOP)/mk/boilerplate.mk
 #-----------------------------------------------------------------------------
 # Building hsc different ways (default is just `normal' sequential)
 WAYS=$(GhcCompilerWays)
-
-#-----------------------------------------------------------------------------
-#		Set SUBDIRS
-
-ifeq ($(IncludeTestDirsInBuild),YES)
-  SUBDIRS = tests
-endif
 
 # -----------------------------------------------------------------------------
 #		Set HS_PROG, LIBRARY
@@ -102,7 +95,7 @@ SRC_MKDEPENDC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
 ifneq "$(GhcWithHscBuiltViaC)" "YES"
 HC=$(WithGhcHc)
 else
-HC=$(GHC)
+HC=$(GHC_INPLACE)
 endif
 
 # magic from GNU make manual to convert a list of values
@@ -231,7 +224,7 @@ SRC_C_OPTS     += -O -I. -IcodeGen
 
 parser/hschooks.o : parser/hschooks.c
 	@$(RM) $@
-	$(HC) -c -o $@ -I$(GHC_INCLUDE_DIR) $(HC_OPTS) parser/hschooks.c
+	$(HC) -c -o $@ $(HC_OPTS) parser/hschooks.c
 
 
 # Interface-file parser uses Happy
