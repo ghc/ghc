@@ -431,7 +431,7 @@ esac
 AC_DEFUN([FP_PROG_AR_IS_GNU],
 [AC_REQUIRE([FP_PROG_AR])
 AC_CACHE_CHECK([whether $fp_prog_ar_raw is GNU ar], [fp_cv_prog_ar_is_gnu],
-[if $fp_prog_ar_raw --version | grep "GNU" > /dev/null 2> /dev/null; then
+[if $fp_prog_ar_raw --version 2> /dev/null | grep "GNU" > /dev/null 2>&1; then
   fp_cv_prog_ar_is_gnu=yes
 else
   fp_cv_prog_ar_is_gnu=no
