@@ -8,13 +8,13 @@ GHC is a batch compiler for Haskell 98.  See the file ANNOUNCE for
 information on the current version.
 
 Haskell is "the" standard lazy functional programming language.
-Haskell 98 is the current version of the language, released in 
+Haskell 98 is the current version of the language, released in
 December 1998.  The language definition is on the Web at
-http://research.microsoft.com/Users/simonpj/Haskell/haskell98.html
+http://www.haskell.org/definition/.
 
 More information on GHC can be found on its web page
 
-	http://www.dcs.gla.ac.uk/fp/software/ghc/
+	http://www.haskell.org/ghc/
 
 GHC documentation of interest:
 
@@ -87,8 +87,3 @@ E-mail contacts:
 Send mail to majordomo@haskell.org with 'help' in the body of the
 message for information on joining/leaving either of these mailing
 lists.
-
-Anonymous FTP site: ftp://ftp.dcs.gla.ac.uk/pub/haskell/glasgow.
-Mostly mirrored by ftp.cs.chalmers.se and haskell.org (same
-directory).  Also: sunsite.doc.ic.ac.uk, in
-computing/programming/languages/haskell/glasgow/.

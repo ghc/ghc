@@ -9,11 +9,11 @@ Haskell is "the" standard lazy functional programming language; the
 current language version is Haskell 98, agreed in December 1998.
 Haskell related information is available from the Haskell home page at
 
-	http://haskell.org/
+	http://www.haskell.org/
 
 GHC's Web page lives at
 
-	http://research.microsoft.com/users/t-simonm/ghc/
+	http://www.haskell.org/ghc/
 
 + What's new
 =============
@@ -31,7 +31,7 @@ GHC's Web page lives at
 
 For full details see the release notes:
 
-	http://research.microsoft.com/users/t-simonm/ghc/Docs/latest/users_guide/users_guide-1.html#ss1.4
+	http://www.haskell.org/ghc/docs/latest/users_guide/users_guide-1.html#ss1.4
 
 + Mailing lists
 ================
@@ -50,8 +50,8 @@ users hang out on glasgow-haskell-users@haskell.org
 
 Relevant URLs on the World-Wide Web:
 
-GHC home page    	  http://research.microsoft.com/users/t-simonm/ghc/
-Haskell home page	  http://haskell.org/
+GHC home page    	  http://www.haskell.org/ghc/
+Haskell home page	  http://www.haskell.org/
 comp.lang.functional FAQ  http://www.cs.nott.ac.uk/Department/Staff/mpj/faq.html
 
 
@@ -61,7 +61,7 @@ comp.lang.functional FAQ  http://www.cs.nott.ac.uk/Department/Staff/mpj/faq.html
 The easy way is to go to the WWW page, which should be
 self-explanatory:
 
-	http://research.microsoft.com/users/t-simonm/ghc/
+	http://www.haskell.org/ghc/
 
 Once you have the distribution, please follow the pointers in the
 README file to find all of the documentation about this release.  NB:
@@ -90,4 +90,4 @@ haven't been tested due to lack of time/hardware:
 The installer's guide included in distribution gives a complete
 run-down of what-ports-work; an on-line version can be found at
 
-   http://research.microsoft.com/users/t-simonm/ghc/Docs/latest/installation_guide/installing.html
+   http://www.haskell.org/ghc/docs/latest/installation_guide/installing.html

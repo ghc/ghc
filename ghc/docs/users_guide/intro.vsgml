@@ -161,8 +161,8 @@ of this guide!
 On the World-Wide Web, there are several URLs of likely interest:
 
 <itemize>
-<item>  <url name="Haskell home page" url="http://haskell.org/">
-<item>  <url name="GHC home page" url="http://research.microsoft.com/users/t-simonm/ghc/">
+<item>  <url name="Haskell home page" url="http://www.haskell.org/">
+<item>  <url name="GHC home page"     url="http://www.haskell.org/ghc/">
 <item>  <url name="Glasgow FP group page" url="http://www.dcs.gla.ac.uk/fp/">
 <item>  <url name="comp.lang.functional FAQ" url="http://www.cs.nott.ac.uk/Department/Staff/mpj/faq.html">
 </itemize>
