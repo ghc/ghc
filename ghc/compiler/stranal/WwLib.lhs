@@ -14,24 +14,27 @@ module WwLib (
     ) where
 
 IMP_Ubiq(){-uitous-}
+IMPORT_1_3(List(nub))
 
 import CoreSyn
-import Id		( idType, mkSysLocal, dataConArgTys, SYN_IE(Id) )
+import Id		( GenId, idType, mkSysLocal, dataConArgTys, isDataCon, isNewCon, SYN_IE(Id) )
 import IdInfo		( mkStrictnessInfo, {-??nonAbsentArgs,-} Demand(..) )
 import PrelVals		( aBSENT_ERROR_ID, voidId )
 import TysPrim		( voidTy )
 import SrcLoc		( noSrcLoc )
 import Type		( isPrimType, mkTyVarTys, mkForAllTys, mkFunTys,
-			  splitForAllTy, splitFunTyExpandingDicts,
-			  maybeAppDataTyConExpandingDicts,
+			  splitForAllTyExpandingDicts, splitForAllTy, splitFunTyExpandingDicts,
+			  maybeAppDataTyConExpandingDicts, 
 			  SYN_IE(Type)
 			)
+import TyCon		( isNewTyCon, isDataTyCon )
+import BasicTypes	( NewOrData(..) )
 import TyVar            ( SYN_IE(TyVar) )
+import PprType		( GenType, GenTyVar )
 import UniqSupply	( returnUs, thenUs, thenMaybeUs,
 			  getUniques, getUnique, SYN_IE(UniqSM)
 			)
 import Util		( zipWithEqual, zipEqual, assertPanic, panic, pprPanic )
-import PprStyle
 import Pretty
 import Outputable
 \end{code}
@@ -182,15 +185,15 @@ setUnpackStrategy ds
        -> [Demand]
        -> (Int, [Demand])	-- Args remaining after subcomponents of [Demand] are unpacked
 
-    go n (WwUnpack _ cs : ds) | n' >= 0
-			      = WwUnpack True cs' `cons` go n'' ds
-			      | otherwise
-			      = WwUnpack False cs `cons` go n ds
-			      where
-				n' = n + 1 - nonAbsentArgs cs
+    go n (WwUnpack nd _ cs : ds) | n' >= 0
+			         = WwUnpack nd True cs' `cons` go n'' ds
+			         | otherwise
+			         = WwUnpack nd False cs `cons` go n ds
+			         where
+			 	   n' = n + 1 - nonAbsentArgs cs
 					-- Add one because we don't pass the top-level arg any more
 					-- Delete # of non-absent args to which we'll now be committed
-				(n'',cs') = go n' cs
+				   (n'',cs') = go n' cs
 				
     go n (d:ds) = d `cons` go n ds
     go n []     = (n,[])
@@ -205,14 +208,14 @@ nonAbsentArgs (d	   : ds) = 1 + nonAbsentArgs ds
 worthSplitting :: [Demand] -> Bool	-- True <=> the wrapper would not be an identity function
 worthSplitting [] 			= False
 worthSplitting (WwLazy True : ds)	= True		-- Absent arg
-worthSplitting (WwUnpack True _ : ds)	= True		-- Arg to unpack
+worthSplitting (WwUnpack _ True _ : ds)	= True		-- Arg to unpack
 worthSplitting (d : ds)			= worthSplitting ds
 
 allAbsent :: [Demand] -> Bool
-allAbsent (WwLazy True      : ds) = allAbsent ds
-allAbsent (WwUnpack True cs : ds) = allAbsent cs && allAbsent ds
-allAbsent (d		    : ds) = False
-allAbsent []			  = True
+allAbsent (WwLazy True      : ds)   = allAbsent ds
+allAbsent (WwUnpack _ True cs : ds) = allAbsent cs && allAbsent ds
+allAbsent (d		    : ds)   = False
+allAbsent []			    = True
 \end{code}
 
 
@@ -236,8 +239,15 @@ mkWrapper fun_ty demands
     in
     getUniques n_wrap_args	`thenUs` \ wrap_uniqs ->
     let
+--	(tyvars, tau_ty)   = splitForAllTyExpandingDicts fun_ty
 	(tyvars, tau_ty)   = splitForAllTy fun_ty
 	(arg_tys, body_ty) = splitFunTyExpandingDicts tau_ty
+		-- The "expanding dicts" part here is important, even for the splitForAll
+		-- The imported thing might be a dictionary, such as Functor Foo
+		-- But Functor Foo = forall a b. (a->b) -> Foo a -> Foo b
+		-- and as such might have some strictness info attached.
+		-- Then we need to have enough args to zip to the strictness info
+	
 	wrap_args	   = zipWith mk_ww_local wrap_uniqs arg_tys
 	leftover_arg_tys   = drop n_wrap_args arg_tys
 	final_body_ty	   = mkFunTys leftover_arg_tys body_ty
@@ -312,16 +322,16 @@ mkWW ((arg,WwLazy True) : ds)
 
 
 	-- Unpack case
-mkWW ((arg,WwUnpack True cs) : ds)
+mkWW ((arg,WwUnpack new_or_data True cs) : ds)
   = getUniques (length inst_con_arg_tys)		`thenUs` \ uniqs ->
     let
 	unpk_args	 = zipWith mk_ww_local uniqs inst_con_arg_tys
 	unpk_args_w_ds   = zipEqual "mkWW" unpk_args cs
     in
     mkWW (unpk_args_w_ds ++ ds)		`thenUs` \ (wrap_fn, worker_args, work_fn) ->
-    returnUs (\ wrapper_body -> mk_unpk_case arg unpk_args data_con arg_tycon (wrap_fn wrapper_body),
+    returnUs (\ wrapper_body -> mk_unpk_case new_or_data arg unpk_args data_con arg_tycon (wrap_fn wrapper_body),
 	      worker_args,
-	      \ worker_body  -> work_fn (mk_pk_let arg data_con tycon_arg_tys unpk_args worker_body))
+	      \ worker_body  -> work_fn (mk_pk_let new_or_data arg data_con tycon_arg_tys unpk_args worker_body))
   where
     inst_con_arg_tys = dataConArgTys data_con tycon_arg_tys
     (arg_tycon, tycon_arg_tys, data_con)
@@ -360,16 +370,34 @@ mk_absent_let arg body
   where
     arg_ty = idType arg
 
-mk_unpk_case arg unpk_args boxing_con boxing_tycon body
-  = Case (Var arg)
+mk_unpk_case NewType arg unpk_args boxing_con boxing_tycon body
+  	-- A newtype!  Use a coercion not a case
+  = ASSERT( null other_args && isNewTyCon boxing_tycon )
+    Let (NonRec unpk_arg (Coerce (CoerceOut boxing_con) (idType unpk_arg) (Var arg)))
+	body
+  where
+    (unpk_arg:other_args) = unpk_args
+
+mk_unpk_case DataType arg unpk_args boxing_con boxing_tycon body
+	-- A data type
+  = ASSERT( isDataTyCon boxing_tycon )
+    Case (Var arg)
 	 (AlgAlts [(boxing_con, unpk_args, body)]
 		  NoDefault
 	 )
 
-mk_pk_let arg boxing_con con_tys unpk_args body
-  = Let (NonRec arg (Con boxing_con con_args)) body
+mk_pk_let NewType arg boxing_con con_tys unpk_args body
+  = ASSERT( null other_args && isNewCon boxing_con )
+    Let (NonRec arg (Coerce (CoerceIn boxing_con) (idType arg) (Var unpk_arg))) body
+  where
+    (unpk_arg:other_args) = unpk_args
+
+mk_pk_let DataType arg boxing_con con_tys unpk_args body
+  = ASSERT( isDataCon boxing_con )
+    Let (NonRec arg (Con boxing_con con_args)) body
   where
     con_args = map TyArg con_tys ++ map VarArg unpk_args
+
 
 mk_ww_local uniq ty
   = mkSysLocal SLIT("ww") uniq ty noSrcLoc
