@@ -71,7 +71,10 @@ newTopBinder mod rdr_name loc
   = returnM name
 
   | otherwise
-  = newGlobalName mod (rdrNameOcc rdr_name) loc
+  = ASSERT( not (isOrig rdr_name) || rdrNameModule rdr_name == moduleName mod )
+	-- When reading External Core we get Orig names as binders, 
+	-- but they should agree with the module gotten from the monad
+    newGlobalName mod (rdrNameOcc rdr_name) loc
 
 newGlobalName :: Module -> OccName -> SrcLoc -> TcRn m Name
 newGlobalName mod occ loc
@@ -233,16 +236,12 @@ lookupTopBndrRn rdr_name
 -- A separate function (importsFromLocalDecls) reports duplicate top level
 -- decls, so here it's safe just to choose an arbitrary one.
 
-  	-- There should never be a qualified name in a binding position in Haskell,
-	-- but there can be if we have read in an external-Core file.
-	-- The Haskell parser checks for the illegal qualified name, so we 
-	-- don't need to do so here.
+-- There should never be a qualified name in a binding position in Haskell,
+-- but there can be if we have read in an external-Core file.
+-- The Haskell parser checks for the illegal qualified name in Haskell 
+-- source files, so we don't need to do so here.
 
-  = ASSERT( not (isOrig rdr_name) )
-	-- Original names are used only for occurrences, 
-	-- not binding sites
-
-    getModeRn			`thenM` \ mode ->
+  = getModeRn			`thenM` \ mode ->
     case mode of
 	InterfaceMode mod -> 
 	    getSrcLocM		`thenM` \ loc ->
@@ -829,7 +828,8 @@ checkDupOrQualNames doc_str rdr_names_w_loc
   =	-- Qualified names in patterns are now rejected by the parser
 	-- but I'm not 100% certain that it finds all cases, so I've left
 	-- this check in for now.  Should go eventually.
-    mappM_ (qualNameErr doc_str) quals 	`thenM_`
+	--	Hmm.  Sooner rather than later.. data type decls
+--     mappM_ (qualNameErr doc_str) quals 	`thenM_`
     checkDupNames doc_str rdr_names_w_loc
   where
     quals = filter (isQual . fst) rdr_names_w_loc
