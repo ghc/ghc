@@ -527,6 +527,8 @@ var_fs		:: { EncodedFS }
 		| 'dynamic'		{ SLIT("dynamic") }
 		| 'unsafe'		{ SLIT("unsafe") }
 		| 'with'		{ SLIT("with") }
+		| 'ccall' 		{ SLIT("ccall") }
+		| 'stdcall' 		{ SLIT("stdcall") }
 
 qvar_fs		:: { (EncodedFS, EncodedFS) }
 		:  QVARID		{ $1 }
