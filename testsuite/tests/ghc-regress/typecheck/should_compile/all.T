@@ -174,3 +174,4 @@ test('Tc170_Aux', normal, compile, ['-O'])
 test('tc170', normal, compile, ['-O'])
 
 test('tc171', normal, compile, [''])
+test('tc172', normal, compile, [''])
