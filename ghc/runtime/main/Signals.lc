@@ -175,8 +175,10 @@ install_segv_handler(void)
 # else	/* Not SunOS 4, FreeBSD, or Linux(a.out) */
 
 #  if defined(irix_TARGET_OS)
-     /* certainly BOGUS (WDP 94/05) -- copied from /usr/include/sys/siginfo.h */
-#   define si_addr _data._fault._addr
+#    ifndef irix6_TARGET_OS /* will this do for irix-6.x ? ToDo: check. (SOF 5/97) */
+        /* certainly BOGUS (WDP 94/05) -- copied from /usr/include/sys/siginfo.h */
+#     define si_addr _data._fault._addr
+#    endif
 #  endif
 
 #if defined(cygwin32_TARGET_OS)
