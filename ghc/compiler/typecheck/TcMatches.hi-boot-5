@@ -1,14 +1,14 @@
 __interface TcMatches 1 0 where
 __export TcMatches tcGRHSs tcMatchesFun;
-1 tcGRHSs :: __forall [s] => 
+1 tcGRHSs :: 
 	      RnHsSyn.RenamedGRHSs
 	      -> TcMonad.TcType
 	      -> HsExpr.StmtCtxt
-	      -> TcMonad.TcM s (TcHsSyn.TcGRHSs, Inst.LIE) ;
-1 tcMatchesFun :: __forall [s] => 
+	      -> TcMonad.TcM (TcHsSyn.TcGRHSs, Inst.LIE) ;
+1 tcMatchesFun :: 
 		[(Name.Name,Var.Id)]
 	     ->	Name.Name
 	     -> TcMonad.TcType
 	     -> [RnHsSyn.RenamedMatch]
-	     -> TcMonad.TcM s ([TcHsSyn.TcMatch], Inst.LIE) ;
+	     -> TcMonad.TcM ([TcHsSyn.TcMatch], Inst.LIE) ;
 

@@ -4,7 +4,7 @@
 \section[TcBinds]{TcBinds}
 
 \begin{code}
-module TcBinds ( tcBindsAndThen, tcTopBinds,y
+module TcBinds ( tcBindsAndThen, tcTopBinds,
 	         tcSpecSigs, tcBindWithSigs ) where
 
 #include "HsVersions.h"
@@ -58,7 +58,7 @@ import Util		( isIn )
 import Maybes		( maybeToBool )
 import BasicTypes	( TopLevelFlag(..), RecFlag(..), isNotTopLevel )
 import FiniteMap	( listToFM, lookupFM )
-import PrelNames	( ioTyConKey, mainKey, hasKey )
+import PrelNames	( ioTyConName, mainKey, hasKey )
 import Outputable
 \end{code}
 
