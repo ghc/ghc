@@ -8,15 +8,15 @@
 ------------------------------------------------------------------------
 
 {- | 
-The computation @rawSystem cmd args@ runs the operating system command
+The computation @'rawSystem' cmd args@ runs the operating system command
 whose file name is @cmd@, passing it the arguments @args@.  It
 bypasses the shell, so that @cmd@ should see precisely the argument
 strings @args@, with no funny escaping or shell meta-syntax expansion.
 (Unix users will recognise this behaviour 
 as @execvp@, and indeed that's how it's implemented.)
-It will therefore behave more portably between operating systems than @system@.
+It will therefore behave more portably between operating systems than 'system'.
 
-The return codes are the same as for @system@.
+The return codes are the same as for 'system'.
 -}
 
 rawSystem :: FilePath -> [String] -> IO ExitCode
