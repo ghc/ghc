@@ -926,10 +926,10 @@ sanityChk_StkO(P_ stko)
     }
 
     while(sub > 0) {
-    	P_ subptr;
-    	P_ suaptr;
-    	P_ updptr;
-    	P_ retptr;
+    	P_  subptr;
+    	PP_ suaptr;
+    	P_  updptr;
+    	P_  retptr;
 
 	ASSERT(sub >= 1);
 	ASSERT(sub <= cts_size);
