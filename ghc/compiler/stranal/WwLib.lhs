@@ -16,19 +16,24 @@ module WwLib (
 IMP_Ubiq(){-uitous-}
 
 import CoreSyn
-import Id		( idType, mkSysLocal, dataConArgTys )
-import IdInfo		( mkStrictnessInfo, nonAbsentArgs, Demand(..) )
+import Id		( idType, mkSysLocal, dataConArgTys, SYN_IE(Id) )
+import IdInfo		( mkStrictnessInfo, {-??nonAbsentArgs,-} Demand(..) )
 import PrelVals		( aBSENT_ERROR_ID, voidId )
 import TysPrim		( voidTy )
 import SrcLoc		( noSrcLoc )
 import Type		( isPrimType, mkTyVarTys, mkForAllTys, mkFunTys,
 			  splitForAllTy, splitFunTyExpandingDicts,
-			  maybeAppDataTyConExpandingDicts
+			  maybeAppDataTyConExpandingDicts,
+			  SYN_IE(Type)
 			)
+import TyVar            ( SYN_IE(TyVar) )
 import UniqSupply	( returnUs, thenUs, thenMaybeUs,
 			  getUniques, getUnique, SYN_IE(UniqSM)
 			)
-import Util		( zipWithEqual, zipEqual, assertPanic, panic )
+import Util		( zipWithEqual, zipEqual, assertPanic, panic, pprPanic )
+import PprStyle
+import Pretty
+import Outputable
 \end{code}
 
 %************************************************************************
@@ -326,7 +331,7 @@ mkWW ((arg,WwUnpack True cs) : ds)
 				     -- The main event: a single-constructor data type
 				     (arg_tycon, tycon_arg_tys, data_con)
 
-	      Just (_, _, data_cons) ->  panic "mk_ww_arg_processing: not one constr (interface files not consistent/up to date ?)"
+	      Just (_, _, data_cons) ->  pprPanic "mk_ww_arg_processing: not one constr (interface files not consistent/up to date ?)" ((ppr PprDebug arg) <+> (ppr PprDebug (idType arg)))
 	      Nothing		     ->  panic "mk_ww_arg_processing: not datatype"
 
 
