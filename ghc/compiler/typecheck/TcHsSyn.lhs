@@ -617,56 +617,63 @@ zonkArithSeq env (FromThenTo e1 e2 e3)
 
 
 -------------------------------------------------------------------------
-zonkStmts :: ZonkEnv -> [TcStmt] -> TcM [TypecheckedStmt]
+zonkStmts  :: ZonkEnv -> [TcStmt] -> TcM [TypecheckedStmt]
 
-zonkStmts env [] = returnM []
+zonkStmts env stmts = zonk_stmts env stmts	`thenM` \ (_, stmts) ->
+		      returnM stmts
 
-zonkStmts env (ParStmtOut bndrstmtss : stmts)
+zonk_stmts :: ZonkEnv -> [TcStmt] -> TcM (ZonkEnv, [TypecheckedStmt])
+
+zonk_stmts env [] = returnM (env, [])
+
+zonk_stmts env (ParStmtOut bndrstmtss : stmts)
   = mappM (mappM zonkId) bndrss		`thenM` \ new_bndrss ->
     mappM (zonkStmts env) stmtss	`thenM` \ new_stmtss ->
     let 
 	new_binders = concat new_bndrss
 	env1 = extendZonkEnv env new_binders
     in
-    zonkStmts env1 stmts		`thenM` \ new_stmts ->
-    returnM (ParStmtOut (zip new_bndrss new_stmtss) : new_stmts)
+    zonk_stmts env1 stmts		`thenM` \ (env2, new_stmts) ->
+    returnM (env2, ParStmtOut (zip new_bndrss new_stmtss) : new_stmts)
   where
     (bndrss, stmtss) = unzip bndrstmtss
 
-zonkStmts env (RecStmt vs segStmts rets : stmts)
+zonk_stmts env (RecStmt vs segStmts rets : stmts)
   = mappM zonkId vs		`thenM` \ new_vs ->
     let
 	env1 = extendZonkEnv env new_vs
     in
-    zonkStmts env1 segStmts	`thenM` \ new_segStmts ->
-    zonkExprs env1 rets		`thenM` \ new_rets ->
-    zonkStmts env1 stmts	`thenM` \ new_stmts ->
-    returnM (RecStmt new_vs new_segStmts new_rets : new_stmts)
+    zonk_stmts env1 segStmts	`thenM` \ (env2, new_segStmts) ->
+	-- Zonk the ret-expressions in an envt that 
+	-- has the polymorphic bindings in the envt
+    zonkExprs env2 rets		`thenM` \ new_rets ->
+    zonk_stmts env1 stmts	`thenM` \ (env3, new_stmts) ->
+    returnM (env3, RecStmt new_vs new_segStmts new_rets : new_stmts)
 
-zonkStmts env (ResultStmt expr locn : stmts)
-  = zonkExpr env expr	`thenM` \ new_expr ->
-    zonkStmts env stmts	`thenM` \ new_stmts ->
-    returnM (ResultStmt new_expr locn : new_stmts)
+zonk_stmts env (ResultStmt expr locn : stmts)
+  = ASSERT( null stmts )
+    zonkExpr env expr	`thenM` \ new_expr ->
+    returnM (env, [ResultStmt new_expr locn])
 
-zonkStmts env (ExprStmt expr ty locn : stmts)
+zonk_stmts env (ExprStmt expr ty locn : stmts)
   = zonkExpr env expr		`thenM` \ new_expr ->
     zonkTcTypeToType env ty	`thenM` \ new_ty ->
-    zonkStmts env stmts		`thenM` \ new_stmts ->
-    returnM (ExprStmt new_expr new_ty locn : new_stmts)
+    zonk_stmts env stmts	`thenM` \ (env1, new_stmts) ->
+    returnM (env1, ExprStmt new_expr new_ty locn : new_stmts)
 
-zonkStmts env (LetStmt binds : stmts)
-  = zonkBinds env binds		`thenM` \ (new_env, new_binds) ->
-    zonkStmts new_env stmts	`thenM` \ new_stmts ->
-    returnM (LetStmt new_binds : new_stmts)
+zonk_stmts env (LetStmt binds : stmts)
+  = zonkBinds env binds		`thenM` \ (env1, new_binds) ->
+    zonk_stmts env1 stmts	`thenM` \ (env2, new_stmts) ->
+    returnM (env2, LetStmt new_binds : new_stmts)
 
-zonkStmts env (BindStmt pat expr locn : stmts)
+zonk_stmts env (BindStmt pat expr locn : stmts)
   = zonkExpr env expr			`thenM` \ new_expr ->
     zonkPat env pat			`thenM` \ (new_pat, new_ids) ->
     let
 	env1 = extendZonkEnv env (bagToList new_ids)
     in
-    zonkStmts env1 stmts		`thenM` \ new_stmts ->
-    returnM (BindStmt new_pat new_expr locn : new_stmts)
+    zonk_stmts env1 stmts		`thenM` \ (env2, new_stmts) ->
+    returnM (env2, BindStmt new_pat new_expr locn : new_stmts)
 
 
 

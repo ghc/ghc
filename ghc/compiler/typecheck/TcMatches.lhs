@@ -26,7 +26,7 @@ import TcHsSyn		( TcMatch, TcGRHSs, TcStmt, TcDictBinds,
 import TcRnMonad
 import TcMonoType	( tcAddScopedTyVars, tcHsSigType, UserTypeCtxt(..) )
 import Inst		( tcSyntaxName )
-import TcEnv		( TcId, tcLookupLocalIds, tcExtendLocalValEnv, tcExtendLocalValEnv2 )
+import TcEnv		( TcId, tcLookupLocalIds, tcLookupId, tcExtendLocalValEnv, tcExtendLocalValEnv2 )
 import TcPat		( tcPat, tcMonoPatBndr )
 import TcMType		( newTyVarTy, newTyVarTys, zonkTcType, zapToType )
 import TcType		( TcType, TcTyVar, tyVarsOfType, tidyOpenTypes, tidyOpenType,
@@ -460,25 +460,29 @@ tcStmtAndThen combine do_or_lc m_ty (ParStmtOut bndr_stmts_s) thing_inside
 	-- RecStmt
 tcStmtAndThen combine do_or_lc m_ty (RecStmt recNames stmts _) thing_inside
   = newTyVarTys (length recNames) liftedTypeKind		`thenM` \ recTys ->
-    tcExtendLocalValEnv (zipWith mkLocalId recNames recTys)	$
+    let
+	mono_ids = zipWith mkLocalId recNames recTys
+    in
+    tcExtendLocalValEnv mono_ids			$
     tcStmtsAndThen combine_rec do_or_lc m_ty stmts (
-	tcLookupLocalIds recNames  `thenM` \ rn ->
-	returnM ([], rn)
-    )								`thenM` \ (stmts', recIds) ->
+	mappM tc_ret (recNames `zip` recTys)	`thenM` \ rets ->
+	returnM ([], rets)
+    )						`thenM` \ (stmts', rets) ->
 
-    -- Unify the types of the "final" Ids with those of "knot-tied" Ids
-    mappM tc_ret (recIds `zip` recTys)			`thenM` \ rets' ->
+	-- NB: it's the mono_ids that scope over this part
+    thing_inside				`thenM` \ thing ->
   
-    thing_inside					`thenM` \ thing ->
-  
-    returnM (combine (RecStmt recIds stmts' rets') thing)
+    returnM (combine (RecStmt mono_ids stmts' rets) thing)
   where 
     combine_rec stmt (stmts, thing) = (stmt:stmts, thing)
 
     -- Unify the types of the "final" Ids with those of "knot-tied" Ids
-    tc_ret (rec_id, rec_ty)
-	= tcSubExp rec_ty (idType rec_id) 	`thenM` \ co_fn ->
-	  returnM (co_fn <$> HsVar rec_id) 
+    tc_ret (rec_name, mono_ty)
+	= tcLookupId rec_name			`thenM` \ poly_id ->
+		-- poly_id may have a polymorphic type
+		-- but mono_ty is just a monomorphic type variable
+	  tcSubExp mono_ty (idType poly_id) 	`thenM` \ co_fn ->
+	  returnM (co_fn <$> HsVar poly_id) 
 
 	-- ExprStmt
 tcStmtAndThen combine do_or_lc m_ty@(m, res_elt_ty) stmt@(ExprStmt exp _ locn) thing_inside
