@@ -19,8 +19,9 @@ Packages
     the <ulink url="http://www.haskell.org/cabal/">Cabal</ulink> infrastructure which
     automates the process of configuring, building, installing and distributing
     a package.  All you need to do is write a simple configuration file, put a
-    few files in the right places, and you have a package.  See the Cabal
-    documentation for details, and also the Cabal libraries (<ulink url="../libraries/Cabal/Distribution.Simple.html">Distribution.Simple</ulink>,
+    few files in the right places, and you have a package.  See the
+    <ulink url="../Cabal/index.html">Cabal documentation</ulink>
+    for details, and also the Cabal libraries (<ulink url="../libraries/Cabal/Distribution.Simple.html">Distribution.Simple</ulink>,
     for example).</para>
 
   <sect2 id="using-packages">
@@ -256,7 +257,7 @@ exposed-modules: Network.BSD,
       <secondary>building</secondary></indexterm>
 
     <para>We don't recommend building packages the hard way.  Instead, use the
-      <ulink url="http://www.haskell.org/cabal/">Cabal</ulink> infrastructure
+      <ulink url="../Cabal/index.html">Cabal</ulink> infrastructure
       if possible.  If your package is particularly complicated or requires a
       lot of configuration, then you might have to fall back to the low-level
       mechanisms, so a few hints for those brave souls follow.</para>
@@ -624,9 +625,9 @@ includes: HsUnix.h
 depends: base-1.0
 </screen>
 
-    <para>The full Cabal documentation is still in preparation (at time of
-      writing), so in the meantime here is a brief description of the syntax of
-      this file:</para>
+    <para>The full <ulink url="../Cabal/index.html">Cabal documentation</ulink>
+      is still in preparation (at time of writing), so in the meantime
+      here is a brief description of the syntax of this file:</para>
 
     <para>A package description consists of a number of field/value pairs.  A
       field starts with the field name in the left-hand column followed by a
