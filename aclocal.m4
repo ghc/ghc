@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.118 2003/05/30 09:09:09 simonmar Exp $
+dnl $Id: aclocal.m4,v 1.119 2003/06/05 14:05:36 reid Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -192,19 +192,19 @@ dnl Check for Greencard and version.
 dnl
 AC_DEFUN(FPTOOLS_GREENCARD,
 [
-AC_PATH_PROG(GreencardCmd,green-card)
-AC_CACHE_CHECK([for version of green-card], fptools_cv_greencard_version,
+AC_PATH_PROG(GreencardCmd,greencard)
+AC_CACHE_CHECK([for version of greencard], fptools_cv_greencard_version,
 changequote(, )dnl
 [if test x"$GreencardCmd" != x; then
    fptools_cv_greencard_version="`$GreencardCmd --version |
-			  grep 'version' | sed -e 's/green-card. version \([^ ]*\).*/\1/g'`"
+			  grep 'version' | sed -e 's/greencard. version \([^ ]*\).*/\1/g'`"
 else
    fptools_cv_greencard_version=""
 fi
 changequote([, ])dnl
 ])
 FPTOOLS_PROG_CHECK_VERSION([$fptools_cv_greencard_version],-lt,$1,
-  [AC_MSG_ERROR([green-card version $1 or later is required (found '$fptools_cv_greencard_version')])])dnl
+  [AC_MSG_ERROR([greencard version $1 or later is required (found '$fptools_cv_greencard_version')])])dnl
 GreencardVersion=$fptools_cv_greencard_version
 AC_SUBST(GreencardVersion)
 ])
