@@ -57,6 +57,13 @@ else
 EXCLUDED_SRCS += Main.c
 endif
 
+# This file ends up being empty unless we're building for a powerpc
+# system, and it is reported that Solaris ld chokes on it when building
+# HSrts.o.
+ifeq "$(findstring $(TargetArch_CPP), powerpc powerpc64)" ""
+EXCLUDED_SRCS += AdjustorAsm.S
+endif
+
 EXCLUDED_SRCS += parallel/SysMan.c
 
 # The build system doesn't give us these
