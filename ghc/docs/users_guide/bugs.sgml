@@ -191,6 +191,8 @@ main = print (array (1,1) [(1,2), (1,3)])</programlisting>
 	      98 report doesn't).  So, for example,
 <programlisting>read "0xf00" :: Int</programlisting>
               works in GHC.</para>
+	      <para>A possible reason for this is that <literal>readLitChar</literal> accepts hex and
+		octal escapes, so it seems inconsistent not to do so for integers too.</para>
 	    </listitem>
 	  </varlistentry>
 	</variablelist>
