@@ -17,13 +17,25 @@
 
 module Prelude (
 
-    -- * Basic data types
+    -- * Standard types, classes and related functions
+
+    -- ** Basic data types
     Bool(False, True),
+    (&&), (||), not, otherwise,
+
     Maybe(Nothing, Just),
+    maybe,
+
     Either(Left, Right),
+    either,
+
     Ordering(LT, EQ, GT),
-    Char, String, Int, Integer, Float, Double, IO,
-    Rational,
+    Char, String,
+    IO,
+
+    -- *** Tuples
+    fst, snd, curry, uncurry,
+
 #if defined(__NHC__)
     []((:), []),	-- Not legal Haskell 98;
 			-- ... available through built-in syntax
@@ -35,14 +47,20 @@ module Prelude (
     (:),		-- Not legal Haskell 98
 #endif
     
-    -- * Basic type classes
+    -- ** Basic type classes
     Eq((==), (/=)),
     Ord(compare, (<), (<=), (>=), (>), max, min),
     Enum(succ, pred, toEnum, fromEnum, enumFrom, enumFromThen,
          enumFromTo, enumFromThenTo),
     Bounded(minBound, maxBound),
 
-    -- * Numeric type classes
+    -- ** Numbers
+
+    -- *** Numeric types
+    Int, Integer, Float, Double,
+    Rational,
+
+    -- *** Numeric type classes
     Num((+), (-), (*), negate, abs, signum, fromInteger),
     Real(toRational),
     Integral(quot, rem, div, mod, quotRem, divMod, toInteger),
@@ -54,19 +72,44 @@ module Prelude (
               encodeFloat, exponent, significand, scaleFloat, isNaN,
               isInfinite, isDenormalized, isIEEE, isNegativeZero, atan2),
 
-    -- * List operations
-    map, (++), filter, concat,
-    head, last, tail, init, null, length, (!!), 
-    foldl, foldl1, scanl, scanl1, foldr, foldr1, scanr, scanr1,
-    iterate, repeat, replicate, cycle,
-    take, drop, splitAt, takeWhile, dropWhile, span, break,
-    reverse, and, or,
-    any, all, elem, notElem, lookup,
-    maximum, minimum, concatMap,
-    zip, zip3, zipWith, zipWith3, unzip, unzip3,
+    -- *** Numeric functions
+    subtract, even, odd, gcd, lcm, (^), (^^), 
+    fromIntegral, realToFrac,
 
-    lines, words, unlines, unwords,
+    -- ** Monads and functors
+    Monad((>>=), (>>), return, fail),
+    Functor(fmap),
+    mapM, mapM_, sequence, sequence_, (=<<),
+
+    -- ** Miscellaneous functions
+    id, const, (.), flip, ($), until,
+    asTypeOf, error, undefined,
+    seq, ($!),
+
+    -- * List operations
+    map, (++), filter,
+    head, last, tail, init, null, length, (!!), 
+    reverse,
+    -- ** Reducing lists (folds)
+    foldl, foldl1, foldr, foldr1,
+    -- *** Special folds
+    and, or, any, all,
     sum, product,
+    concat, concatMap,
+    maximum, minimum,
+    -- ** Building lists
+    -- *** Scans
+    scanl, scanl1, scanr, scanr1,
+    -- *** Infinite lists
+    iterate, repeat, replicate, cycle,
+    -- ** Sublists
+    take, drop, splitAt, takeWhile, dropWhile, span, break,
+    -- ** Searching lists
+    elem, notElem, lookup,
+    -- ** Zipping and unzipping lists
+    zip, zip3, zipWith, zipWith3, unzip, unzip3,
+    -- ** Functions on strings
+    lines, words, unlines, unwords,
 
     -- * Converting to and from @String@
     ReadS, ShowS,
@@ -92,22 +135,7 @@ module Prelude (
     FilePath,
     readFile, writeFile, appendFile, readIO, readLn,
     -- ** Exception handling in the I\/O monad
-    IOError, ioError, userError, catch,
-
-    -- * Monads
-    Monad((>>=), (>>), return, fail),
-    Functor(fmap),
-    mapM, mapM_, sequence, sequence_, (=<<),
-
-    -- * Miscellaneous functions
-    maybe, either,
-    (&&), (||), not, otherwise,
-    subtract, even, odd, gcd, lcm, (^), (^^), 
-    fromIntegral, realToFrac,
-    fst, snd, curry, uncurry,
-    id, const, (.), flip, ($), until,
-    asTypeOf, error, undefined,
-    seq, ($!)
+    IOError, ioError, userError, catch
 
   ) where
 

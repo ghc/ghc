@@ -54,11 +54,7 @@ infix  4 `elem`, `notElem`
 %*********************************************************
 
 \begin{code}
--- head and tail extract the first element and remaining elements,
--- respectively, of a list, which must be non-empty.  last and init
--- are the dual functions working from the end of a finite list,
--- rather than the beginning.
-
+-- | Extract the first element of a list, which must be non-empty.
 head                    :: [a] -> a
 head (x:_)              =  x
 head []                 =  badHead
@@ -74,10 +70,12 @@ badHead = errorEmptyList "head"
 		head (augment g xs) = g (\x _ -> x) (head xs)
  #-}
 
+-- | Extract the elements after the head of a list, which must be non-empty.
 tail                    :: [a] -> [a]
 tail (_:xs)             =  xs
 tail []                 =  errorEmptyList "tail"
 
+-- | Extract the last element of a list, which must be finite and non-empty.
 last                    :: [a] -> a
 #ifdef USE_REPORT_PRELUDE
 last [x]                =  x
@@ -91,6 +89,8 @@ last (x:xs) 		=  last' x xs
 	last' _ (y:ys) = last' y ys
 #endif
 
+-- | Return all the elements of a list except the last one.
+-- The list must be finite and non-empty.
 init                    :: [a] -> [a]
 #ifdef USE_REPORT_PRELUDE
 init [x]                =  []
@@ -104,13 +104,14 @@ init (x:xs)             =  init' x xs
 	init' y (z:zs) = y : init' z zs
 #endif
 
+-- | Test whether a list is empty.
 null                    :: [a] -> Bool
 null []                 =  True
 null (_:_)              =  False
 
--- length returns the length of a finite list as an Int; it is an instance
--- of the more general genericLength, the result type of which may be
--- any kind of number.
+-- | 'length' returns the length of a finite list as an 'Int'.
+-- It is an instance of the more general 'Data.List.genericLength',
+-- the result type of which may be any kind of number.
 length                  :: [a] -> Int
 length l                =  len l 0#
   where
@@ -118,9 +119,11 @@ length l                =  len l 0#
     len []     a# = I# a#
     len (_:xs) a# = len xs (a# +# 1#)
 
--- filter, applied to a predicate and a list, returns the list of those
--- elements that satisfy the predicate; i.e.,
--- filter p xs = [ x | x <- xs, p x]
+-- | 'filter', applied to a predicate and a list, returns the list of
+-- those elements that satisfy the predicate; i.e.,
+--
+-- > filter p xs = [ x | x <- xs, p x]
+
 filter :: (a -> Bool) -> [a] -> [a]
 filter _pred []    = []
 filter pred (x:xs)
@@ -147,17 +150,13 @@ filterFB c p x r | p x       = x `c` r
 -- gave rise to a live bug report.  SLPJ.
 
 
--- foldl, applied to a binary operator, a starting value (typically the
--- left-identity of the operator), and a list, reduces the list using
--- the binary operator, from left to right:
---  foldl f z [x1, x2, ..., xn] == (...((z `f` x1) `f` x2) `f`...) `f` xn
--- foldl1 is a variant that has no starting value argument, and  thus must
--- be applied to non-empty lists.  scanl is similar to foldl, but returns
--- a list of successive reduced values from the left:
---      scanl f z [x1, x2, ...] == [z, z `f` x1, (z `f` x1) `f` x2, ...]
--- Note that  last (scanl f z xs) == foldl f z xs.
--- scanl1 is similar, again without the starting element:
---      scanl1 f [x1, x2, ...] == [x1, x1 `f` x2, ...]
+-- | 'foldl', applied to a binary operator, a starting value (typically
+-- the left-identity of the operator), and a list, reduces the list
+-- using the binary operator, from left to right:
+--
+-- > foldl f z [x1, x2, ..., xn] == (...((z `f` x1) `f` x2) `f`...) `f` xn
+--
+-- The list must be finite.
 
 -- We write foldl as a non-recursive thing, so that it
 -- can be inlined, and then (often) strictness-analysed,
@@ -169,14 +168,30 @@ foldl f z xs = lgo z xs
 		lgo z []     =  z
 		lgo z (x:xs) = lgo (f z x) xs
 
+-- | 'foldl1' is a variant of 'foldl' that has no starting value argument,
+-- and thus must be applied to non-empty lists.
+
 foldl1                  :: (a -> a -> a) -> [a] -> a
 foldl1 f (x:xs)         =  foldl f x xs
 foldl1 _ []             =  errorEmptyList "foldl1"
+
+-- | 'scanl' is similar to 'foldl', but returns a list of successive
+-- reduced values from the left:
+--
+-- > scanl f z [x1, x2, ...] == [z, z `f` x1, (z `f` x1) `f` x2, ...]
+--
+-- Note that
+--
+-- > last (scanl f z xs) == foldl f z xs.
 
 scanl                   :: (a -> b -> a) -> a -> [b] -> [a]
 scanl f q ls            =  q : (case ls of
                                 []   -> []
                                 x:xs -> scanl f (f q x) xs)
+
+-- | 'scanl1' is a variant of 'scanl' that has no starting value argument:
+--
+-- > scanl1 f [x1, x2, ...] == [x1, x1 `f` x2, ...]
 
 scanl1			:: (a -> a -> a) -> [a] -> [a]
 scanl1 f (x:xs)		=  scanl f x xs
@@ -185,15 +200,25 @@ scanl1 _ []		=  []
 -- foldr, foldr1, scanr, and scanr1 are the right-to-left duals of the
 -- above functions.
 
+-- | 'foldr1' is a variant of 'foldr' that has no starting value argument,
+-- and thus must be applied to non-empty lists.
+
 foldr1                  :: (a -> a -> a) -> [a] -> a
 foldr1 _ [x]            =  x
 foldr1 f (x:xs)         =  f x (foldr1 f xs)
 foldr1 _ []             =  errorEmptyList "foldr1"
 
+-- | 'scanr' is the right-to-left dual of 'scanl'.
+-- Note that
+--
+-- > head (scanr f z xs) == foldr f z xs.
+
 scanr                   :: (a -> b -> b) -> b -> [a] -> [b]
 scanr _ q0 []           =  [q0]
 scanr f q0 (x:xs)       =  f x q : qs
                            where qs@(q:_) = scanr f q0 xs 
+
+-- | 'scanr1' is a variant of 'scanr' that has no starting value argument.
 
 scanr1                  :: (a -> a -> a) -> [a] -> [a]
 scanr1 f []		=  []
@@ -201,8 +226,11 @@ scanr1 f [x]		=  [x]
 scanr1 f (x:xs)		=  f x q : qs
                            where qs@(q:_) = scanr1 f xs 
 
--- iterate f x returns an infinite list of repeated applications of f to x:
--- iterate f x == [x, f x, f (f x), ...]
+-- | 'iterate' @f x@ returns an infinite list of repeated applications
+-- of @f@ to @x@:
+--
+-- > iterate f x == [x, f x, f (f x), ...]
+
 iterate :: (a -> a) -> a -> [a]
 iterate f x =  x : iterate f (f x)
 
@@ -215,7 +243,7 @@ iterateFB c f x = x `c` iterateFB c f (f x)
  #-}
 
 
--- repeat x is an infinite list, with x the value of every element.
+-- | 'repeat' @x@ is an infinite list, with @x@ the value of every element.
 repeat :: a -> [a]
 {-# INLINE [0] repeat #-}
 -- The pragma just gives the rules more chance to fire
@@ -230,11 +258,14 @@ repeatFB c x = xs where xs = x `c` xs
 "repeatFB"  [1]  repeatFB (:)	    = repeat
  #-}
 
--- replicate n x is a list of length n with x the value of every element
+-- | 'replicate' @n x@ is a list of length @n@ with @x@ the value of
+-- every element.
+-- It is an instance of the more general 'Data.List.genericReplicate',
+-- in which @n@ may be of any integral type.
 replicate               :: Int -> a -> [a]
 replicate n x           =  take n (repeat x)
 
--- cycle ties a finite list into a circular one, or equivalently,
+-- | 'cycle' ties a finite list into a circular one, or equivalently,
 -- the infinite repetition of the original list.  It is the identity
 -- on infinite lists.
 
@@ -242,10 +273,8 @@ cycle                   :: [a] -> [a]
 cycle []		= error "Prelude.cycle: empty list"
 cycle xs		= xs' where xs' = xs ++ xs'
 
--- takeWhile, applied to a predicate p and a list xs, returns the longest
--- prefix (possibly empty) of xs of elements that satisfy p.  dropWhile p xs
--- returns the remaining suffix.  Span p xs is equivalent to 
--- (takeWhile p xs, dropWhile p xs), while break p uses the negation of p.
+-- | 'takeWhile', applied to a predicate @p@ and a list @xs@, returns the
+-- longest prefix (possibly empty) of @xs@ of elements that satisfy @p@.
 
 takeWhile               :: (a -> Bool) -> [a] -> [a]
 takeWhile _ []          =  []
@@ -253,32 +282,43 @@ takeWhile p (x:xs)
             | p x       =  x : takeWhile p xs
             | otherwise =  []
 
+-- | 'dropWhile' @p xs@ returns the suffix remaining after 'takeWhile' @p xs@.
+
 dropWhile               :: (a -> Bool) -> [a] -> [a]
 dropWhile _ []          =  []
 dropWhile p xs@(x:xs')
             | p x       =  dropWhile p xs'
             | otherwise =  xs
 
--- take n, applied to a list xs, returns the prefix of xs of length n,
--- or xs itself if n > length xs.  drop n xs returns the suffix of xs
--- after the first n elements, or [] if n > length xs.  splitAt n xs
--- is equivalent to (take n xs, drop n xs).
-#ifdef USE_REPORT_PRELUDE
+-- | 'take' @n@, applied to a list @xs@, returns the prefix of @xs@
+-- of length @n@, or @xs@ itself if @n > 'length' xs@.
+-- It is an instance of the more general 'Data.List.genericTake',
+-- in which @n@ may be of any integral type.
 take                   :: Int -> [a] -> [a]
+
+-- | 'drop' @n xs@ returns the suffix of @xs@
+-- after the first @n@ elements, or @[]@ if @n > 'length' xs@.
+-- It is an instance of the more general 'Data.List.genericDrop',
+-- in which @n@ may be of any integral type.
+drop                   :: Int -> [a] -> [a]
+
+-- | 'splitAt' @n xs@ is equivalent to @('take' n xs, 'drop' n xs)@.
+-- It is an instance of the more general 'Data.List.genericSplitAt',
+-- in which @n@ may be of any integral type.
+splitAt                :: Int -> [a] -> ([a],[a])
+
+#ifdef USE_REPORT_PRELUDE
 take n _      | n <= 0 =  []
 take _ []              =  []
 take n (x:xs)          =  x : take (n-1) xs
 
-drop                   :: Int -> [a] -> [a]
 drop n xs     | n <= 0 =  xs
 drop _ []              =  []
 drop n (_:xs)          =  drop (n-1) xs
 
-splitAt                  :: Int -> [a] -> ([a],[a])
-splitAt n xs             =  (take n xs, drop n xs)
+splitAt n xs           =  (take n xs, drop n xs)
 
 #else /* hack away */
-take	:: Int -> [b] -> [b]
 take (I# n#) xs = takeUInt n# xs
 
 -- The general code for take, below, checks n <= maxInt
@@ -309,7 +349,6 @@ take_unsafe_UInt_append	m  ls rs  =
     []     -> rs
     (x:xs) -> x : take_unsafe_UInt_append (m -# 1#) xs rs
 
-drop		:: Int -> [b] -> [b]
 drop (I# n#) ls
   | n# <# 0#	= []
   | otherwise	= drop# n# ls
@@ -319,7 +358,6 @@ drop (I# n#) ls
 	drop# _  xs@[]	 = xs
 	drop# m# (_:xs)  = drop# (m# -# 1#) xs
 
-splitAt	:: Int -> [b] -> ([b], [b])
 splitAt (I# n#) ls
   | n# <# 0#	= ([], ls)
   | otherwise	= splitAt# n# ls
@@ -333,12 +371,17 @@ splitAt (I# n#) ls
 
 #endif /* USE_REPORT_PRELUDE */
 
-span, break             :: (a -> Bool) -> [a] -> ([a],[a])
+-- | 'span' @p xs@ is equivalent to @('takeWhile' p xs, 'dropWhile' p xs)@
+
+span                    :: (a -> Bool) -> [a] -> ([a],[a])
 span _ xs@[]            =  (xs, xs)
 span p xs@(x:xs')
          | p x          =  let (ys,zs) = span p xs' in (x:ys,zs)
          | otherwise    =  ([],xs)
 
+-- | 'break' @p@ is equivalent to @'span' ('not' . p)@.
+
+break                   :: (a -> Bool) -> [a] -> ([a],[a])
 #ifdef USE_REPORT_PRELUDE
 break p                 =  span (not . p)
 #else
@@ -349,7 +392,8 @@ break p xs@(x:xs')
 	   | otherwise	=  let (ys,zs) = break p xs' in (x:ys,zs)
 #endif
 
--- reverse xs returns the elements of xs in reverse order.  xs must be finite.
+-- | 'reverse' @xs@ returns the elements of @xs@ in reverse order.
+-- @xs@ must be finite.
 reverse                 :: [a] -> [a]
 #ifdef USE_REPORT_PRELUDE
 reverse                 =  foldl (flip (:)) []
@@ -360,11 +404,15 @@ reverse l =  rev l []
     rev (x:xs) a = rev xs (x:a)
 #endif
 
--- and returns the conjunction of a Boolean list.  For the result to be
--- True, the list must be finite; False, however, results from a False
--- value at a finite index of a finite or infinite list.  or is the
--- disjunctive dual of and.
-and, or                 :: [Bool] -> Bool
+-- | 'and' returns the conjunction of a Boolean list.  For the result to be
+-- 'True', the list must be finite; 'False', however, results from a 'False'
+-- value at a finite index of a finite or infinite list.
+and                     :: [Bool] -> Bool
+
+-- | 'or' returns the disjunction of a Boolean list.  For the result to be
+-- 'False', the list must be finite; 'True', however, results from a 'True'
+-- value at a finite index of a finite or infinite list.
+or                      :: [Bool] -> Bool
 #ifdef USE_REPORT_PRELUDE
 and                     =  foldr (&&) True
 or                      =  foldr (||) False
@@ -382,9 +430,13 @@ or (x:xs)	=  x || or xs
  #-}
 #endif
 
--- Applied to a predicate and a list, any determines if any element
--- of the list satisfies the predicate.  Similarly, for all.
-any, all                :: (a -> Bool) -> [a] -> Bool
+-- | Applied to a predicate and a list, 'any' determines if any element
+-- of the list satisfies the predicate.
+any                     :: (a -> Bool) -> [a] -> Bool
+
+-- | Applied to a predicate and a list, 'all' determines if all elements
+-- of the list satisfy the predicate.
+all                     :: (a -> Bool) -> [a] -> Bool
 #ifdef USE_REPORT_PRELUDE
 any p                   =  or . map p
 all p                   =  and . map p
@@ -402,9 +454,12 @@ all p (x:xs)	=  p x && all p xs
  #-}
 #endif
 
--- elem is the list membership predicate, usually written in infix form,
--- e.g., x `elem` xs.  notElem is the negation.
-elem, notElem           :: (Eq a) => a -> [a] -> Bool
+-- | 'elem' is the list membership predicate, usually written in infix form,
+-- e.g., @x `elem` xs@.
+elem                    :: (Eq a) => a -> [a] -> Bool
+
+-- | 'notElem' is the negation of 'elem'.
+notElem                 :: (Eq a) => a -> [a] -> Bool
 #ifdef USE_REPORT_PRELUDE
 elem x                  =  any (== x)
 notElem x               =  all (/= x)
@@ -416,28 +471,37 @@ notElem	_ []	=  True
 notElem x (y:ys)=  x /= y && notElem x ys
 #endif
 
--- lookup key assocs looks up a key in an association list.
+-- | 'lookup' @key assocs@ looks up a key in an association list.
 lookup                  :: (Eq a) => a -> [(a,b)] -> Maybe b
 lookup _key []          =  Nothing
 lookup  key ((x,y):xys)
     | key == x          =  Just y
     | otherwise         =  lookup key xys
 
-
--- maximum and minimum return the maximum or minimum value from a list,
--- which must be non-empty, finite, and of an ordered type.
 {-# SPECIALISE maximum :: [Int] -> Int #-}
 {-# SPECIALISE minimum :: [Int] -> Int #-}
-maximum, minimum        :: (Ord a) => [a] -> a
+
+-- | 'maximum' returns the maximum value from a list,
+-- which must be non-empty, finite, and of an ordered type.
+-- It is a special case of 'Data.List.maximumBy', which allows the
+-- programmer to supply their own comparison function.
+maximum                 :: (Ord a) => [a] -> a
 maximum []              =  errorEmptyList "maximum"
 maximum xs              =  foldl1 max xs
 
+-- | 'minimum' returns the minimum value from a list,
+-- which must be non-empty, finite, and of an ordered type.
+-- It is a special case of 'Data.List.minimumBy', which allows the
+-- programmer to supply their own comparison function.
+minimum                 :: (Ord a) => [a] -> a
 minimum []              =  errorEmptyList "minimum"
 minimum xs              =  foldl1 min xs
 
+-- | Map a function over a list and concatenate the results.
 concatMap               :: (a -> [b]) -> [a] -> [b]
 concatMap f             =  foldr ((++) . f) []
 
+-- | Concatenate a list of lists.
 concat :: [[a]] -> [a]
 concat = foldr (++) []
 
@@ -450,7 +514,9 @@ concat = foldr (++) []
 
 
 \begin{code}
--- List index (subscript) operator, 0-origin
+-- | List index (subscript) operator, starting from 0.
+-- It is an instance of the more general 'Data.List.genericIndex',
+-- which takes an index of any integral type.
 (!!)                    :: [a] -> Int -> a
 #ifdef USE_REPORT_PRELUDE
 xs     !! n | n < 0 =  error "Prelude.!!: negative index"
@@ -512,13 +578,13 @@ E.g. main = print (null (zip nonobviousNil (build undefined)))
 I'm going to leave it though.
 
 
-zip takes two lists and returns a list of corresponding pairs.  If one
-input list is short, excess elements of the longer list are discarded.
-zip3 takes three lists and returns a list of triples.  Zips for larger
-tuples are in the List module.
+Zips for larger tuples are in the List module.
 
 \begin{code}
 ----------------------------------------------
+-- | 'zip' takes two lists and returns a list of corresponding pairs.
+-- If one input list is short, excess elements of the longer list are
+-- discarded.
 zip :: [a] -> [b] -> [(a,b)]
 zip (a:as) (b:bs) = (a,b) : zip as bs
 zip _      _      = []
@@ -534,6 +600,8 @@ zipFB c x y r = (x,y) `c` r
 
 \begin{code}
 ----------------------------------------------
+-- | 'zip3' takes three lists and returns a list of triples, analogous to
+-- 'zip'.
 zip3 :: [a] -> [b] -> [c] -> [(a,b,c)]
 -- Specification
 -- zip3 =  zipWith3 (,,)
@@ -544,12 +612,13 @@ zip3 _      _      _      = []
 
 -- The zipWith family generalises the zip family by zipping with the
 -- function given as the first argument, instead of a tupling function.
--- For example, zipWith (+) is applied to two lists to produce the list
--- of corresponding sums.
-
 
 \begin{code}
 ----------------------------------------------
+-- | 'zipWith' generalises 'zip' by zipping with the function given
+-- as the first argument, instead of a tupling function.
+-- For example, @'zipWith' (+)@ is applied to two lists to produce the
+-- list of corresponding sums.
 zipWith :: (a->b->c) -> [a]->[b]->[c]
 zipWith f (a:as) (b:bs) = f a b : zipWith f as bs
 zipWith _ _      _      = []
@@ -564,16 +633,22 @@ zipWithFB c f x y r = (x `f` y) `c` r
 \end{code}
 
 \begin{code}
+-- | The 'zipWith3' function takes a function which combines three
+-- elements, as well as three lists and returns a list of their point-wise
+-- combination, analogous to 'zipWith'.
 zipWith3                :: (a->b->c->d) -> [a]->[b]->[c]->[d]
 zipWith3 z (a:as) (b:bs) (c:cs)
                         =  z a b c : zipWith3 z as bs cs
 zipWith3 _ _ _ _        =  []
 
--- unzip transforms a list of pairs into a pair of lists.  
+-- | 'unzip' transforms a list of pairs into a list of first components
+-- and a list of second components.
 unzip    :: [(a,b)] -> ([a],[b])
 {-# INLINE unzip #-}
 unzip    =  foldr (\(a,b) ~(as,bs) -> (a:as,b:bs)) ([],[])
 
+-- | The 'unzip3' function takes a list of triples and returns three
+-- lists, analogous to 'unzip'.
 unzip3   :: [(a,b,c)] -> ([a],[b],[c])
 {-# INLINE unzip3 #-}
 unzip3   =  foldr (\(a,b,c) ~(as,bs,cs) -> (a:as,b:bs,c:cs))

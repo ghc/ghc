@@ -279,6 +279,12 @@ The rest of the prelude list functions are in GHC.List.
 ----------------------------------------------
   
 \begin{code}
+-- | 'foldr', applied to a binary operator, a starting value (typically
+-- the right-identity of the operator), and a list, reduces the list
+-- using the binary operator, from right to left:
+--
+-- > foldr f z [x1, x2, ..., xn] == x1 `f` (x2 `f` ... (xn `f` z)...)
+
 foldr            :: (a -> b -> b) -> b -> [a] -> b
 -- foldr _ z []     =  z
 -- foldr f z (x:xs) =  f x (foldr f z xs)
@@ -344,6 +350,12 @@ augment g xs = g (:) xs
 ----------------------------------------------
 
 \begin{code}
+-- | 'map' @f xs@ is the list obtained by applying @f@ to each element
+-- of @xs@, i.e.,
+--
+-- > map f [x1, x2, ..., xn] == [f x1, f x2, ..., f xn]
+-- > map f [x1, x2, ...] == [f x1, f x2, ...]
+
 map :: (a -> b) -> [a] -> [b]
 map _ []     = []
 map f (x:xs) = f x : map f xs
@@ -383,6 +395,13 @@ mapFB c f x ys = c (f x) ys
 --		append	
 ----------------------------------------------
 \begin{code}
+-- | Append two lists, i.e.,
+--
+-- > [x1, ..., xm] ++ [y1, ..., yn] == [x1, ..., xm, y1, ..., yn]
+-- > [x1, ..., xm] ++ [y1, ...] == [x1, ..., xm, y1, ...]
+--
+-- If the first list is not finite, the result is the first list.
+
 (++) :: [a] -> [a] -> [a]
 (++) []     ys = ys
 (++) (x:xs) ys = x : xs ++ ys
