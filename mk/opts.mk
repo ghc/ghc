@@ -5,7 +5,7 @@
 #	This file defines Make variables for the
 #	option flags for each utility program
 #
-# 	$Id: opts.mk,v 1.5 1998/01/14 16:09:10 sof Exp $
+# 	$Id: opts.mk,v 1.6 1998/02/26 10:17:32 sof Exp $
 #
 #################################################################################
 
@@ -84,8 +84,8 @@ SRC_TEXI2HTML_OPTS +=-menu -verbose -glossary
 
 
 HC_OPTS            = $(SRC_HC_OPTS) $(WAY$(_way)_HC_OPTS) $($*_HC_OPTS) $(EXTRA_HC_OPTS)
-HC_POST            = $(SRC_HC_POST_OPTS) $(WAY$(_way)_HC_POST_OPTS) $($*_HC_POST_OPTS) $(EXTRA_HC_POST_OPTS)
-HC_PRE             = $(SRC_HC_PRE_OPTS) $(WAY$(_way)_HC_OPTS) $($*_HC_PRE_OPTS) $(EXTRA_HC_PRE_OPTS)
+HC_POST_OPTS       = $(SRC_HC_POST_OPTS) $(WAY$(_way)_HC_POST_OPTS) $($*_HC_POST_OPTS) $(EXTRA_HC_POST_OPTS)
+HC_PRE_OPTS        = $(SRC_HC_PRE_OPTS) $(WAY$(_way)_HC_PRE_OPTS) $($*_HC_PRE_OPTS) $(EXTRA_HC_PRE_OPTS)
 
 RUNTEST_OPTS       = $(SRC_RUNTEST_OPTS) $(WAY$(_way)_RUNTEST_OPTS) \
                      $($*_RUNTEST_OPTS) $(EXTRA_RUNTEST_OPTS)

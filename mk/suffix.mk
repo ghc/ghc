@@ -38,18 +38,18 @@ HC_SPLIT_POST  = touch $@
 HC_PRE__       = $(patsubst %,$(HC_SPLIT_PRE) ; ,$(filter -split-objs,$(HC_OPTS)))
 HC_POST__      = $(patsubst %,$(HC_SPLIT_POST) ; ,$(filter -split-objs,$(HC_OPTS)))
 
-SRC_HC_POST += $(HC_POST__)
-SRC_HC_PRE  += $(HC_PRE__)
+SRC_HC_POST_OPTS += $(HC_POST__)
+SRC_HC_PRE_OPTS  += $(HC_PRE__)
 
 %.$(way_)o : %.hs
-	$(SRC_HC_PRE)
+	$(HC_PRE_OPTS)
 	$(HC) $(HC_OPTS) -c $< -o $@ -osuf $(subst .,,$(suffix $@))
-	$(SRC_HC_POST)
+	$(HC_POST_OPTS)
 			 
 %.$(way_)o : %.lhs	 
-	$(SRC_HC_PRE)
+	$(HC_PRE_OPTS)
 	$(HC) $(HC_OPTS) -c $< -o $@ -osuf $(subst .,,$(suffix $@))
-	$(SRC_HC_POST)
+	$(HC_POST_OPTS)
 			 
 %.$(way_)hc : %.lhs	 
 	$(RM) $@
@@ -60,9 +60,9 @@ SRC_HC_PRE  += $(HC_PRE__)
 	$(HC) $(HC_OPTS) -C $< -o $@
 			 
 %.$(way_)o : %.$(way_)hc 
-	$(SRC_HC_PRE)
+	$(HC_PRE_OPTS)
 	$(HC) $(HC_OPTS) -c $< -o $@ -osuf $(subst .,,$(suffix $@))
-	$(SRC_HC_POST)
+	$(HC_POST_OPTS)
 
 %.$(way_)hc : %.lhc
 	@$(RM) $@
