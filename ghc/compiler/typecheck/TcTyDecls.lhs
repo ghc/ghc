@@ -44,14 +44,14 @@ import List		( nubBy )
 %************************************************************************
 
 \begin{code}
-tcTyDecl :: RecTcEnv -> RenamedTyClDecl -> TcM (Name, TyThingDetails)
-tcTyDecl unf_env (TySynonym {tcdName = tycon_name, tcdSynRhs = rhs})
+tcTyDecl :: RenamedTyClDecl -> TcM (Name, TyThingDetails)
+tcTyDecl (TySynonym {tcdName = tycon_name, tcdSynRhs = rhs})
   = tcLookupTyCon tycon_name			`thenNF_Tc` \ tycon ->
     tcExtendTyVarEnv (tyConTyVars tycon)	$
     tcHsType rhs				`thenTc` \ rhs_ty ->
     returnTc (tycon_name, SynTyDetails rhs_ty)
 
-tcTyDecl unf_env (TyData {tcdND = new_or_data, tcdCtxt = context,
+tcTyDecl (TyData {tcdND = new_or_data, tcdCtxt = context,
 			  tcdName = tycon_name, tcdCons = con_decls})
   = tcLookupTyCon tycon_name			`thenNF_Tc` \ tycon ->
     let
@@ -61,26 +61,23 @@ tcTyDecl unf_env (TyData {tcdND = new_or_data, tcdCtxt = context,
     tcHsTheta context					`thenTc` \ ctxt ->
     tcConDecls new_or_data tycon tyvars ctxt con_decls	`thenTc` \ data_cons ->
     let
-	sel_ids = mkRecordSelectors unf_env tycon data_cons
+	sel_ids = mkRecordSelectors tycon data_cons
     in
     returnTc (tycon_name, DataTyDetails ctxt data_cons sel_ids)
 
-tcTyDecl unf_env (ForeignType {tcdName = tycon_name})
+tcTyDecl (ForeignType {tcdName = tycon_name})
   = returnTc (tycon_name, ForeignTyDetails)
 
 
-mkRecordSelectors unf_env tycon data_cons
+mkRecordSelectors tycon data_cons
   = 	-- We'll check later that fields with the same name 
 	-- from different constructors have the same type.
-     [ mkRecordSelId tycon field unpack_id unpackUtf8_id
+     [ mkRecordSelId tycon field 
      | field <- nubBy eq_name fields ]
   where
     fields = [ field | con <- visibleDataCons data_cons, 
 		       field <- dataConFieldLabels con ]
     eq_name field1 field2 = fieldLabelName field1 == fieldLabelName field2
-
-    unpack_id     = tcLookupRecId unf_env unpackCStringName
-    unpackUtf8_id = tcLookupRecId unf_env unpackCStringUtf8Name
 \end{code}
 
 

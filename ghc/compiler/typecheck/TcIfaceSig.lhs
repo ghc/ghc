@@ -14,6 +14,7 @@ module TcIfaceSig ( tcInterfaceSigs,
 #include "HsVersions.h"
 
 import HsSyn		( TyClDecl(..), HsTupCon(..) )
+import TcHsSyn		( TypecheckedCoreBind )
 import TcMonad
 import TcMonoType	( tcIfaceType )
 import TcEnv		( RecTcEnv, tcExtendTyVarEnv, 
@@ -379,18 +380,22 @@ tcConAlt (UfDataAlt con_name)
 
 
 \begin{code}
-tcCoreBinds :: [RenamedTyClDecl]
-            -> TcM [(Id, Type, CoreExpr)]
-tcCoreBinds ls = mapTc tcOne ls
- where
-  tcOne (CoreDecl { tcdName = nm, tcdType = ty, tcdRhs = rhs }) =
-   tcVar nm         `thenTc` \ i ->
-   tcIfaceType ty   `thenTc` \ ty' ->
-   tcCoreExpr  rhs  `thenTc` \ rhs' ->
-   returnTc (i,ty',rhs')
+tcCoreBinds :: [RenamedTyClDecl] -> TcM [TypecheckedCoreBind]
+-- We don't assume the bindings are in dependency order
+-- So first build the environment, then check the RHSs
+tcCoreBinds ls = mapTc tcCoreBinder ls		`thenTc` \ bndrs ->
+		 tcExtendGlobalValEnv bndrs	$
+		 mapTc tcCoreBind ls
 
+tcCoreBinder (CoreDecl { tcdName = nm, tcdType = ty })
+ = tcIfaceType ty   `thenTc` \ ty' ->
+   returnTc (mkLocalId nm ty')
+
+tcCoreBind (CoreDecl { tcdName = nm, tcdRhs = rhs })
+ = tcVar nm		`thenTc` \ id ->
+   tcCoreExpr rhs	`thenTc` \ rhs' ->
+   returnTc (id, rhs')
 \end{code}
-
 
 
 \begin{code}

@@ -18,7 +18,7 @@ import CoreSyn
 
 import DsMonad
 
-import CoreUtils	( exprType, mkCoerce )
+import CoreUtils	( exprType, mkCoerce2 )
 import Id		( Id, mkWildId, idType )
 import MkId		( mkFCallId, realWorldPrimId, mkPrimOpId )
 import Maybes		( maybeToBool )
@@ -150,7 +150,7 @@ unboxArg arg
 
   -- Recursive newtypes
   | Just rep_ty <- splitNewType_maybe arg_ty
-  = unboxArg (mkCoerce rep_ty arg_ty arg)
+  = unboxArg (mkCoerce2 rep_ty arg_ty arg)
       
   -- Booleans
   | Just (tc,_) <- splitTyConApp_maybe arg_ty, 
@@ -328,7 +328,7 @@ resultWrapper result_ty
   = let
         (maybe_ty, wrapper) = resultWrapper rep_ty
     in
-    (maybe_ty, \e -> mkCoerce result_ty rep_ty (wrapper e))
+    (maybe_ty, \e -> mkCoerce2 result_ty rep_ty (wrapper e))
 
   -- Data types with a single constructor, which has a single arg
   | Just (tycon, tycon_arg_tys, data_con, data_con_arg_tys) <- splitProductType_maybe result_ty,

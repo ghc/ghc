@@ -17,7 +17,7 @@ import TcHsSyn		( TcPat, TcId, simpleHsLitTy )
 import TcMonad
 import Inst		( InstOrigin(..),
 			  emptyLIE, plusLIE, LIE, mkLIE, unitLIE, instToId, isEmptyLIE,
-			  newMethod, newOverloadedLit, newDicts, tcInstDataCon
+			  newMethod, newMethodFromName, newOverloadedLit, newDicts, tcInstDataCon
 			)
 import Id		( mkLocalId, mkSysLocal )
 import Name		( Name )
@@ -306,9 +306,8 @@ tcPat tc_bndr (LitPatIn simple_lit) pat_ty
     returnTc (LitPat simple_lit pat_ty, emptyLIE, emptyBag, emptyBag, emptyLIE)
 
 tcPat tc_bndr pat@(NPatIn over_lit) pat_ty
-  = newOverloadedLit (PatOrigin pat) over_lit pat_ty	`thenNF_Tc` \ (over_lit_expr, lie1) ->
-    tcLookupGlobalId eqName				`thenNF_Tc` \ eq_sel_id ->
-    newMethod origin eq_sel_id [pat_ty]			`thenNF_Tc` \ eq ->
+  = newOverloadedLit origin over_lit pat_ty		`thenNF_Tc` \ (over_lit_expr, lie1) ->
+    newMethodFromName origin pat_ty eqName		`thenNF_Tc` \ eq ->
 
     returnTc (NPat lit' pat_ty (HsApp (HsVar (instToId eq)) over_lit_expr),
 	      lie1 `plusLIE` unitLIE eq,
@@ -329,11 +328,11 @@ tcPat tc_bndr pat@(NPatIn over_lit) pat_ty
 \begin{code}
 tcPat tc_bndr pat@(NPlusKPatIn name lit@(HsIntegral i _) minus_name) pat_ty
   = tc_bndr name pat_ty				`thenTc` \ (co_fn, lie1, bndr_id) ->
+    newOverloadedLit origin lit pat_ty		`thenNF_Tc` \ (over_lit_expr, lie2) ->
+    newMethodFromName origin pat_ty geName	`thenNF_Tc` \ ge ->
+
 	-- The '-' part is re-mappable syntax
     tcLookupId minus_name			`thenNF_Tc` \ minus_sel_id ->
-    tcLookupGlobalId geName			`thenNF_Tc` \ ge_sel_id ->
-    newOverloadedLit origin lit pat_ty		`thenNF_Tc` \ (over_lit_expr, lie2) ->
-    newMethod origin ge_sel_id    [pat_ty]	`thenNF_Tc` \ ge ->
     newMethod origin minus_sel_id [pat_ty]	`thenNF_Tc` \ minus ->
 
     returnTc (NPlusKPat bndr_id i pat_ty

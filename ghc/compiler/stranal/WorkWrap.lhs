@@ -202,17 +202,17 @@ tryWW is_rec fn_id rhs
 	--	fw = \ab -> (__inline (\x -> E)) (a,b)
 	-- and the original __inline now vanishes, so E is no longer
 	-- inside its __inline wrapper.  Death!  Disaster!
-  = returnUs [ (fn_id', rhs) ]
+  = returnUs [ (new_fn_id, rhs) ]
 
   | is_thunk && worthSplittingThunk maybe_fn_dmd res_info
-  = ASSERT( isNonRec is_rec )	-- The thunk must be non-recursive
-    splitThunk fn_id' rhs
+  = ASSERT2( isNonRec is_rec, ppr new_fn_id )	-- The thunk must be non-recursive
+    splitThunk new_fn_id rhs
 
   | is_fun && worthSplittingFun wrap_dmds res_info
-  = splitFun fn_id' fn_info wrap_dmds res_info inline_prag rhs
+  = splitFun new_fn_id fn_info wrap_dmds res_info inline_prag rhs
 
   | otherwise
-  = returnUs [ (fn_id', rhs) ]
+  = returnUs [ (new_fn_id, rhs) ]
 
   where
     fn_info   	 = idInfo fn_id
@@ -226,14 +226,14 @@ tryWW is_rec fn_id rhs
     strict_sig  = newStrictnessInfo fn_info `orElse` topSig
     StrictSig (DmdType env wrap_dmds res_info) = strict_sig
 
-	-- fn_id' has the DmdEnv zapped.  
+	-- new_fn_id has the DmdEnv zapped.  
 	--	(a) it is never used again
 	--	(b) it wastes space
 	--	(c) it becomes incorrect as things are cloned, because
 	--	    we don't push the substitution into it
-    fn_id' | isEmptyVarEnv env = fn_id
-	   | otherwise	       = fn_id `setIdNewStrictness` 
-				   StrictSig (mkTopDmdType wrap_dmds res_info)
+    new_fn_id | isEmptyVarEnv env = fn_id
+	      | otherwise	  = fn_id `setIdNewStrictness` 
+				     StrictSig (mkTopDmdType wrap_dmds res_info)
 
     is_fun    = notNull wrap_dmds
     is_thunk  = not is_fun && not (exprIsValue rhs)

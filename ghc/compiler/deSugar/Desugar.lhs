@@ -60,7 +60,6 @@ deSugar dflags pcs hst mod_name unqual
 		    tc_binds  = all_binds,
 		    tc_insts  = insts,
 		    tc_rules  = rules,
---		    tc_cbinds = core_binds,
 		    tc_fords  = fo_decls})
   = do	{ showPass dflags "Desugar"
 	; us <- mkSplitUniqSupply 'd'
@@ -71,12 +70,6 @@ deSugar dflags pcs hst mod_name unqual
 
 	      (ds_binds, ds_rules, foreign_stuff) = ds_result
 	      
-{-
-	      addCoreBinds ls =
-	        case core_binds of
-		  [] -> ls
-		  cs -> (Rec cs) : ls
--}	
 	      mod_details = ModDetails { md_types = type_env,
 					 md_insts = insts,
 					 md_rules = ds_rules,
@@ -165,20 +158,19 @@ ppr_ds_rules rules
 Simplest thing in the world, desugaring External Core:
 
 \begin{code}
-deSugarCore :: TypeEnv -> [TypecheckedCoreBind]
+deSugarCore :: (TypeEnv, [TypecheckedCoreBind], [TypecheckedRuleDecl])
 	    -> IO (ModDetails, (SDoc, SDoc, [FAST_STRING], [CoreBndr]))
-deSugarCore type_env cs = do
-  let
-    mod_details 
-      = ModDetails { md_types = type_env
-	  	   , md_insts = []
-		   , md_rules = []
-		   , md_binds = [Rec (map (\ (lhs,_,rhs) -> (lhs,rhs)) cs)]
-		   }
+deSugarCore (type_env, pairs, rules) 
+  = return (mod_details, no_foreign_stuff)
+  where
+    mod_details = ModDetails { md_types = type_env
+			     , md_insts = []
+			     , md_rules = ds_rules
+			     , md_binds = ds_binds }
+    ds_binds = [Rec pairs]
+    ds_rules = [(fun,rule) | IfaceRuleOut fun rule <- rules]
 
     no_foreign_stuff = (empty,empty,[],[])
-  return (mod_details, no_foreign_stuff)
-    
 \end{code}
 
 

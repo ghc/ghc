@@ -1,5 +1,7 @@
 module ParserCoreUtils where
 
+import IO 
+
 data ParseResult a = OkP a | FailP String
 type P a = String -> Int -> ParseResult a
 
@@ -14,6 +16,23 @@ returnP m _ _ = OkP m
 
 failP :: String -> P a
 failP s s' _ = FailP (s ++ ":" ++ s')
+
+getCoreModuleName :: FilePath -> IO String
+getCoreModuleName fpath = 
+   catch (do 
+     h  <- openFile fpath ReadMode
+     ls <- hGetContents h
+     let mo = findMod (words ls)
+      -- make sure we close up the file right away.
+     (length mo) `seq` return ()
+     hClose h
+     return mo)
+    (\ _ -> return "Main")
+ where
+   findMod [] = "Main"
+   findMod ("%module":m:_) = m
+   findMod (_:xs) = findMod xs
+
 
 data Token =
    TKmodule

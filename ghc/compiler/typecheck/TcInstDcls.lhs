@@ -53,7 +53,7 @@ import DataCon		( classDataCon )
 import Class		( Class, classBigSig )
 import Var		( idName, idType )
 import Id		( setIdLocalExported )
-import MkId		( mkDictFunId, unsafeCoerceId, eRROR_ID )
+import MkId		( mkDictFunId, unsafeCoerceId, rUNTIME_ERROR_ID )
 import FunDeps		( checkInstFDs )
 import Generics		( validGenericInstanceType )
 import Module		( Module, foldModuleEnv )
@@ -65,6 +65,7 @@ import SrcLoc           ( SrcLoc )
 import Unique		( Uniquable(..) )
 import Util             ( lengthExceeds, isSingleton )
 import BasicTypes	( NewOrData(..) )
+import UnicodeUtil	( stringToUtf8 )
 import ErrUtils		( dumpIfSet_dyn )
 import ListSetOps	( Assoc, emptyAssoc, plusAssoc_C, mapAssoc, 
 			  assocElts, extendAssoc_C, equivClassesByUniq, minusList
@@ -617,8 +618,8 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = monobinds, iPrags = uprags }
 		-- emit an error message.  This in turn means that we don't
 		-- mention the constructor, which doesn't exist for CCallable, CReturnable
 		-- Hardly beautiful, but only three extra lines.
-	    HsApp (TyApp (HsVar eRROR_ID) [idType this_dict_id])
-		  (HsLit (HsString msg))
+	    HsApp (TyApp (HsVar rUNTIME_ERROR_ID) [idType this_dict_id])
+		  (HsLit (HsStringPrim (_PK_ (stringToUtf8 msg))))
 
 	  | otherwise	-- The common case
 	  = mkHsConApp dict_constr inst_tys' (map HsVar scs_and_meths)
@@ -630,7 +631,7 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = monobinds, iPrags = uprags }
 		-- than needing to be repeated here.
 
 	  where
-	    msg = _PK_ ("Compiler error: bad dictionary " ++ showSDoc (ppr clas))
+	    msg = "Compiler error: bad dictionary " ++ showSDoc (ppr clas)
 
 	dict_bind  = VarMonoBind this_dict_id dict_rhs
 	meth_binds = andMonoBindList meth_binds_s

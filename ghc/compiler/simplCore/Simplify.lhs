@@ -41,7 +41,7 @@ import CoreUtils	( exprIsDupable, exprIsTrivial, needsCaseBinding,
 			  exprIsConApp_maybe, mkPiTypes, findAlt, 
 			  exprType, exprIsValue, 
 			  exprOkForSpeculation, exprArity, 
-			  mkCoerce, mkSCC, mkInlineMe, mkAltExpr, applyTypeToArg
+			  mkCoerce, mkCoerce2, mkSCC, mkInlineMe, mkAltExpr, applyTypeToArg
 			)
 import Rules		( lookupRule )
 import BasicTypes	( isMarkedStrict )
@@ -802,7 +802,7 @@ simplNote env (Coerce to from) body cont
 		-- But it isn't a common case.
 	  = let 
 		(t1,t2) = splitFunTy t1t2
-		new_arg = mkCoerce s1 t1 (substExpr (mkSubst in_scope (getSubstEnv arg_se)) arg)
+		new_arg = mkCoerce2 s1 t1 (substExpr (mkSubst in_scope (getSubstEnv arg_se)) arg)
 	    in
 	    ApplyTo dup new_arg (zapSubstEnv env) (addCoerce t2 s2 cont)
 			
@@ -1189,7 +1189,7 @@ rebuild :: SimplEnv -> OutExpr -> SimplCont -> SimplM FloatsWithExpr
 
 rebuild env expr (Stop _ _ _)		      = rebuildDone env expr
 rebuild env expr (ArgOf _ _ _ cont_fn)	      = cont_fn env expr
-rebuild env expr (CoerceIt to_ty cont)	      = rebuild env (mkCoerce to_ty (exprType expr) expr) cont
+rebuild env expr (CoerceIt to_ty cont)	      = rebuild env (mkCoerce to_ty expr) cont
 rebuild env expr (InlinePlease cont) 	      = rebuild env (Note InlineCall expr) cont
 rebuild env expr (Select _ bndr alts se cont) = rebuildCase (setInScope se env) expr bndr alts cont
 rebuild env expr (ApplyTo _ arg se cont)      = rebuildApp  (setInScope se env) expr arg cont

@@ -25,10 +25,11 @@ module MkId (
 	-- And some particular Ids; see below for why they are wired in
 	wiredInIds, ghcPrimIds,
 	unsafeCoerceId, realWorldPrimId, voidArgId, nullAddrId, seqId,
-	eRROR_ID, eRROR_CSTRING_ID, rEC_SEL_ERROR_ID, pAT_ERROR_ID,
-	rEC_CON_ERROR_ID, rEC_UPD_ERROR_ID, iRREFUT_PAT_ERROR_ID,
+
+	mkRuntimeErrorApp,
+	rEC_CON_ERROR_ID, iRREFUT_PAT_ERROR_ID, rUNTIME_ERROR_ID,
 	nON_EXHAUSTIVE_GUARDS_ERROR_ID,	nO_METHOD_BINDING_ERROR_ID,
-	aBSENT_ERROR_ID, pAR_ERROR_ID
+	pAT_ERROR_ID
     ) where
 
 #include "HsVersions.h"
@@ -115,16 +116,12 @@ wiredInIds
 	-- error-reporting functions that they have an 'open' 
 	-- result type. -- sof 1/99]
 
-    aBSENT_ERROR_ID,
-    eRROR_ID,
-    eRROR_CSTRING_ID,
+    rUNTIME_ERROR_ID,
     iRREFUT_PAT_ERROR_ID,
     nON_EXHAUSTIVE_GUARDS_ERROR_ID,
     nO_METHOD_BINDING_ERROR_ID,
-    pAR_ERROR_ID,
     pAT_ERROR_ID,
-    rEC_CON_ERROR_ID,
-    rEC_UPD_ERROR_ID
+    rEC_CON_ERROR_ID
     ] ++ ghcPrimIds
 
 -- These Ids are exported from GHC.Prim
@@ -390,7 +387,7 @@ Similarly for newtypes
 	unN = /\a -> \n:N -> coerce (a->a) n
 
 \begin{code}
-mkRecordSelId tycon field_label unpack_id unpackUtf8_id
+mkRecordSelId tycon field_label
 	-- Assumes that all fields with the same field label have the same type
 	--
 	-- Annoyingly, we have to pass in the unpackCString# Id, because
@@ -512,17 +509,7 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
     	    maybe_the_arg_id  = assocMaybe (field_lbls `zip` arg_ids) field_label
     	    field_lbls	      = dataConFieldLabels data_con
 
-    error_expr = mkApps (Var rEC_SEL_ERROR_ID) [Type field_tau, err_string]
-    err_string
-        | all safeChar full_msg
-            = App (Var unpack_id) (Lit (MachStr (_PK_ full_msg)))
-        | otherwise
-            = App (Var unpackUtf8_id) (Lit (MachStr (_PK_ (stringToUtf8 (map ord full_msg)))))
-        where
-        safeChar c = c >= '\1' && c <= '\xFF'
-        -- TODO: Putting this Unicode stuff here is ugly. Find a better
-        -- generic place to make string literals. This logic is repeated
-        -- in DsUtils.
+    error_expr = mkRuntimeErrorApp rEC_SEL_ERROR_ID field_tau full_msg
     full_msg   = showSDoc (sep [text "No match in record selector", ppr sel_id]) 
 
 
@@ -911,33 +898,30 @@ not know to be a bottoming Id.  It is used in the @_par_@ and @_seq_@
 templates, but we don't ever expect to generate code for it.
 
 \begin{code}
-eRROR_ID
-  = pc_bottoming_Id errorIdKey pREL_ERR FSLIT("error") errorTy
-eRROR_CSTRING_ID
-  = pc_bottoming_Id errorCStringIdKey pREL_ERR FSLIT("errorCString") 
-		    (mkSigmaTy [openAlphaTyVar] [] (mkFunTy addrPrimTy openAlphaTy))
-pAT_ERROR_ID
-  = generic_ERROR_ID patErrorIdKey FSLIT("patError")
-rEC_SEL_ERROR_ID
-  = generic_ERROR_ID recSelErrIdKey FSLIT("recSelError")
-rEC_CON_ERROR_ID
-  = generic_ERROR_ID recConErrorIdKey FSLIT("recConError")
-rEC_UPD_ERROR_ID
-  = generic_ERROR_ID recUpdErrorIdKey FSLIT("recUpdError")
-iRREFUT_PAT_ERROR_ID
-  = generic_ERROR_ID irrefutPatErrorIdKey FSLIT("irrefutPatError")
-nON_EXHAUSTIVE_GUARDS_ERROR_ID
-  = generic_ERROR_ID nonExhaustiveGuardsErrorIdKey FSLIT("nonExhaustiveGuardsError")
-nO_METHOD_BINDING_ERROR_ID
-  = generic_ERROR_ID noMethodBindingErrorIdKey FSLIT("noMethodBindingError")
+mkRuntimeErrorApp 
+	:: Id 		-- Should be of type (forall a. Addr# -> a)
+			-- 	where Addr# points to a UTF8 encoded string
+	-> Type 	-- The type to instantiate 'a'
+	-> String	-- The string to print
+	-> CoreExpr
 
-aBSENT_ERROR_ID
-  = pc_bottoming_Id absentErrorIdKey pREL_ERR FSLIT("absentErr")
-	(mkSigmaTy [openAlphaTyVar] [] openAlphaTy)
+mkRuntimeErrorApp err_id res_ty err_msg 
+  = mkApps (Var err_id) [Type res_ty, err_string]
+  where
+    err_string = Lit (MachStr (_PK_ (stringToUtf8 err_msg)))
 
-pAR_ERROR_ID
-  = pcMiscPrelId parErrorIdKey pREL_ERR FSLIT("parError")
-    (mkSigmaTy [openAlphaTyVar] [] openAlphaTy) noCafNoTyGenIdInfo
+rEC_SEL_ERROR_ID		= mkRuntimeErrorId recSelErrIdKey 	    	 FSLIT("recSelError")
+rUNTIME_ERROR_ID	 	= mkRuntimeErrorId runtimeErrorIdKey 	    	 FSLIT("runtimeError")
+
+iRREFUT_PAT_ERROR_ID		= mkRuntimeErrorId irrefutPatErrorIdKey	         FSLIT("irrefutPatError")
+rEC_CON_ERROR_ID		= mkRuntimeErrorId recConErrorIdKey    		 FSLIT("recConError")
+nON_EXHAUSTIVE_GUARDS_ERROR_ID	= mkRuntimeErrorId nonExhaustiveGuardsErrorIdKey FSLIT("nonExhaustiveGuardsError")
+pAT_ERROR_ID			= mkRuntimeErrorId patErrorIdKey		 FSLIT("patError")
+nO_METHOD_BINDING_ERROR_ID      = mkRuntimeErrorId noMethodBindingErrorIdKey	 FSLIT("noMethodBindingError")
+
+-- The runtime error Ids take a UTF8-encoded string as argument
+mkRuntimeErrorId key name = pc_bottoming_Id key pREL_ERR name runtimeErrorTy
+runtimeErrorTy 		  = mkSigmaTy [openAlphaTyVar] [] (mkFunTy addrPrimTy openAlphaTy)
 \end{code}
 
 

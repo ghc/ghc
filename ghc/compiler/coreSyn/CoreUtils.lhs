@@ -6,7 +6,7 @@
 \begin{code}
 module CoreUtils (
 	-- Construction
-	mkNote, mkInlineMe, mkSCC, mkCoerce,
+	mkNote, mkInlineMe, mkSCC, mkCoerce, mkCoerce2,
 	bindNonRec, needsCaseBinding,
 	mkIfThenElse, mkAltExpr, mkPiType, mkPiTypes,
 
@@ -152,7 +152,7 @@ mkNote removes redundant coercions, and SCCs where possible
 
 \begin{code}
 mkNote :: Note -> CoreExpr -> CoreExpr
-mkNote (Coerce to_ty from_ty) expr = mkCoerce to_ty from_ty expr
+mkNote (Coerce to_ty from_ty) expr = mkCoerce2 to_ty from_ty expr
 mkNote (SCC cc)	expr		   = mkSCC cc expr
 mkNote InlineMe expr		   = mkInlineMe expr
 mkNote note     expr		   = Note note expr
@@ -193,13 +193,15 @@ mkInlineMe e	   = Note InlineMe e
 
 
 \begin{code}
-mkCoerce :: Type -> Type -> CoreExpr -> CoreExpr
+mkCoerce :: Type -> CoreExpr -> CoreExpr
+mkCoerce to_ty expr = mkCoerce2 to_ty (exprType expr) expr
 
-mkCoerce to_ty from_ty (Note (Coerce to_ty2 from_ty2) expr)
+mkCoerce2 :: Type -> Type -> CoreExpr -> CoreExpr
+mkCoerce2 to_ty from_ty (Note (Coerce to_ty2 from_ty2) expr)
   = ASSERT( from_ty `eqType` to_ty2 )
-    mkCoerce to_ty from_ty2 expr
+    mkCoerce2 to_ty from_ty2 expr
 
-mkCoerce to_ty from_ty expr
+mkCoerce2 to_ty from_ty expr
   | to_ty `eqType` from_ty = expr
   | otherwise	  	   = ASSERT( from_ty `eqType` exprType expr )
 			     Note (Coerce to_ty from_ty) expr
@@ -629,7 +631,7 @@ exprIsConApp_maybe (Note (Coerce to_ty from_ty) expr)
 	arity   	 = tyConArity tc
 	val_args	 = drop arity args
 	to_arg_tys 	 = dataConArgTys dc tc_arg_tys
-	mk_coerce ty arg = mkCoerce ty (exprType arg) arg
+	mk_coerce ty arg = mkCoerce ty arg
 	new_val_args	 = zipWith mk_coerce to_arg_tys val_args
     in
     ASSERT( all isTypeArg (take arity args) )
@@ -869,7 +871,7 @@ eta_expand n us expr ty
 	; Nothing ->
 
     	case splitNewType_maybe ty of {
- 	  Just ty' -> mkCoerce ty ty' (eta_expand n us (mkCoerce ty' ty expr) ty') ;
+ 	  Just ty' -> mkCoerce2 ty ty' (eta_expand n us (mkCoerce2 ty' ty expr) ty') ;
  	  Nothing  -> pprTrace "Bad eta expand" (ppr expr $$ ppr ty) expr
     	}}}
 \end{code}

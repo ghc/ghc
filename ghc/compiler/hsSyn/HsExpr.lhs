@@ -93,9 +93,8 @@ data HsExpr id pat
 
   | HsDoOut	HsDoContext
 		[Stmt id pat]	-- "do":one or more stmts
-		id		-- id for return
-		id		-- id for >>=
-		id		-- id for fail
+		[id]		-- ids for [return,fail,>>=,>>]
+				--	Brutal but simple
 		Type		-- Type of the whole expression
 		SrcLoc
 
@@ -310,8 +309,8 @@ ppr_expr (HsWith expr binds is_with)
   = sep [hang (ptext SLIT("let")) 2 (pp_ipbinds binds),
 	 hang (ptext SLIT("in"))  2 (ppr expr)]
 
-ppr_expr (HsDo do_or_list_comp stmts _)            = pprDo do_or_list_comp stmts
-ppr_expr (HsDoOut do_or_list_comp stmts _ _ _ _ _) = pprDo do_or_list_comp stmts
+ppr_expr (HsDo do_or_list_comp stmts _)        = pprDo do_or_list_comp stmts
+ppr_expr (HsDoOut do_or_list_comp stmts _ _ _) = pprDo do_or_list_comp stmts
 
 ppr_expr (ExplicitList _ exprs)
   = brackets (fsep (punctuate comma (map ppr_expr exprs)))

@@ -227,8 +227,11 @@ tcDeriving prs mod inst_env get_fixity tycl_decls
   where
     ddump_deriving :: [InstInfo] -> RenamedHsBinds -> SDoc
     ddump_deriving inst_infos extra_binds
-      = vcat (map pprInstInfo inst_infos) $$ ppr extra_binds
+      = vcat (map ppr_info inst_infos) $$ ppr extra_binds
 
+    ppr_info inst_info = pprInstInfo inst_info $$ 
+			 nest 4 (ppr (iBinds inst_info))
+	-- pprInstInfo doesn't print much: only the type
 
 -----------------------------------------
 deriveOrdinaryStuff mod prs inst_env_in get_fixity []	-- Short cut

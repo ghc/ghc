@@ -221,7 +221,7 @@ hscRecomp ghci_mode dflags have_object
 	; case front_res of
 	    Left flure -> return flure;
 	    Right (this_mod, rdr_module, 
-	    	   Just (dont_discard, new_iface, rn_result), 
+	    	   dont_discard, new_iface, 
 	    	   pcs_tc, ds_details, foreign_stuff) -> do {
  	    -------------------
  	    -- FLATTENING
@@ -415,23 +415,23 @@ hscCoreFrontEnd ghci_mode dflags location hst hit pcs_ch = do {
       	     <- renameExtCore dflags hit hst pcs_ch this_mod rdr_module
       	; case maybe_rn_result of {
       	     Nothing -> return (Left (HscFail pcs_ch));
-      	     Just (dont_discard, new_iface, rn_result) -> do {
+      	     Just (dont_discard, new_iface, rn_decls) -> do {
 
  	    -------------------
  	    -- TYPECHECK
  	    -------------------
 	; maybe_tc_result 
 	    <- _scc_ "TypeCheck" 
-	       typecheckCoreModule dflags pcs_rn hst new_iface (rr_decls rn_result)
+	       typecheckCoreModule dflags pcs_rn hst new_iface rn_decls
 	; case maybe_tc_result of {
       	     Nothing -> return (Left (HscFail pcs_ch));
-      	     Just (pcs_tc, ty_env, core_binds) -> do {
+      	     Just (pcs_tc, tc_result) -> do {
     
  	    -------------------
  	    -- DESUGAR
  	    -------------------
-	; (ds_details, foreign_stuff) <- deSugarCore ty_env core_binds
-	; return (Right (this_mod, rdr_module, maybe_rn_result, 
+	; (ds_details, foreign_stuff) <- deSugarCore tc_result
+	; return (Right (this_mod, rdr_module, dont_discard, new_iface,
 		         pcs_tc, ds_details, foreign_stuff))
 	}}}}}}
 	 
@@ -473,7 +473,7 @@ hscFrontEnd ghci_mode dflags location hst hit pcs_ch = do {
 	; (ds_details, foreign_stuff) 
              <- _scc_ "DeSugar" 
 		deSugar dflags pcs_tc hst this_mod print_unqual tc_result
-	; return (Right (this_mod, rdr_module, maybe_rn_result, 
+	; return (Right (this_mod, rdr_module, dont_discard, new_iface,
 		         pcs_tc, ds_details, foreign_stuff))
 	}}}}}}}
 

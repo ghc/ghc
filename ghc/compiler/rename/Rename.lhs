@@ -209,55 +209,72 @@ renameExtCore :: DynFlags
 	      -> Module
 	      -> RdrNameHsModule 
 	      -> IO (PersistentCompilerState, PrintUnqualified,
- 	             Maybe (IsExported, ModIface, RnResult))
+ 	             Maybe (IsExported, ModIface, [RenamedHsDecl]))
 
 	-- Nothing => some error occurred in the renamer
 renameExtCore dflags hit hst pcs this_module 
-              rdr_module@(HsModule _ _ exports imports local_decls mod_deprec loc)
+              rdr_module@(HsModule _ _ _ _ local_decls _ loc)
 	-- Rename the (Core) module
   = renameSource dflags hit hst pcs this_module $
     pushSrcLocRn loc $  
-	-- RENAME THE SOURCE
-    rnSourceDecls emptyRdrEnv emptyAvailEnv
-		  emptyLocalFixityEnv 
-		  InterfaceMode local_decls `thenRn` \ (rn_local_decls, source_fvs) ->
-    let
-        tycl_decls     = [d | (TyClD d) <- rn_local_decls ]
-	local_names    = foldl add emptyNameSet tycl_decls
-	add names decl = addListToNameSet names (map fst (tyClDeclSysNames decl ++ tyClDeclNames decl))
-    in
-    recordLocalSlurps local_names	`thenRn_`
 
-    closeDecls rn_local_decls source_fvs    `thenRn` \ final_decls ->		  
-       -- print everything qualified.
-    let	print_unqualified = const False in
+	-- Rename the source
+    initIfaceRnMS this_module (rnExtCoreDecls local_decls)	`thenRn` \ (rn_local_decls, binders, fvs) ->
+    recordLocalSlurps binders					`thenRn_`
+    closeDecls rn_local_decls fvs    				`thenRn` \ final_decls ->		  
+
 	-- Bail out if we fail
     checkErrsRn				`thenRn` \ no_errs_so_far ->
     if not no_errs_so_far then
         returnRn (print_unqualified, Nothing)
     else
-     let
+    rnDump final_decls []		`thenRn_` 
+    let
 	mod_iface = ModIface {	mi_module   = this_module,
 			        mi_package  = opt_InPackage,
 				mi_version  = initialVersionInfo,
 				mi_usages   = [],
 				mi_boot	    = False,
 				mi_orphan   = panic "is_orphan",
-				mi_exports  = [],
+                                 -- ToDo: export the data types also.
+				mi_exports  = [(moduleName this_module,
+ 				                map Avail (nameSetToList binders))],
 				mi_globals  = Nothing,
 				mi_fixities = mkNameEnv [],
 				mi_deprecs  = NoDeprecs,
 				mi_decls    = panic "mi_decls"
 		    }
 
-	rn_result = RnResult { rr_mod      = this_module,
-			       rr_fixities = mkNameEnv [],
-			       rr_decls    = final_decls,
-			       rr_main     = Nothing }
-
         is_exported _ = True
      in
-     returnRn (print_unqualified, Just (is_exported, mod_iface, rn_result))
+     returnRn (print_unqualified, Just (is_exported, mod_iface, final_decls))
+
+  where
+    print_unqualified = const False        -- print everything qualified.
+
+
+rnExtCoreDecls :: [RdrNameHsDecl] 
+	       -> RnMS ([RenamedHsDecl],
+			NameSet,		-- Binders
+			FreeVars)		-- Free variables
+
+rnExtCoreDecls decls
+	-- Renaming external-core decls is rather like renaming an interface file
+	-- All the decls are TyClDecls, and all the names are original names
+  = go [] emptyNameSet emptyNameSet decls
+  where
+    go rn_decls bndrs fvs [] = returnRn (rn_decls, bndrs, fvs)
+
+    go rn_decls bndrs fvs (TyClD decl : decls)
+	= rnTyClDecl decl		`thenRn` \ rn_decl ->
+	  go (TyClD rn_decl : rn_decls)
+	     (addListToNameSet bndrs (map fst (tyClDeclSysNames rn_decl ++ tyClDeclNames rn_decl)))
+	     (fvs `plusFV` tyClDeclFVs rn_decl)
+	     decls
+
+    go rn_decls bndrs fvs (decl : decls)
+	= addErrRn (text "Unexpected decl in ExtCore file" $$ ppr decl)	`thenRn_`
+	  go rn_decls bndrs fvs decls
 \end{code}
 
 

@@ -46,6 +46,7 @@ import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon,
 import TysWiredIn	( intTyCon )
 import Name		( NamedThing(..), mkSystemName, nameSrcLoc )
 import NameSet
+import UnicodeUtil	( stringToUtf8 )
 import UniqFM		( isNullUFM )
 import UniqSet		( emptyUniqSet )
 import List		( intersectBy )
@@ -917,11 +918,9 @@ mkAssertExpr =
     let
      expr = 
           HsApp (HsVar name)
-	        (HsLit (HsString (_PK_ (showSDoc (ppr sloc)))))
-
+	        (HsLit (HsStringPrim (_PK_ (stringToUtf8 (showSDoc (ppr sloc))))))
     in
     returnRn (expr, unitFV name)
-
 \end{code}
 
 %************************************************************************

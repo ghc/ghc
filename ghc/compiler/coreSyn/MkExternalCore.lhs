@@ -72,7 +72,7 @@ collect_tdefs _ tdefs = tdefs
 make_cdef :: DataCon -> C.Cdef
 make_cdef dcon =  C.Constr dcon_name existentials tys
   where 
-    dcon_name    = make_con_qid (idName (dataConWorkId dcon))
+    dcon_name    = make_con_qid (dataConName dcon)
     existentials = map make_tbind ex_tyvars
     ex_tyvars    = dataConExistentialTyVars dcon
     tys 	 = map make_ty (dataConRepArgTys dcon)
@@ -93,7 +93,8 @@ make_vdef b =
 make_exp :: CoreExpr -> C.Exp
 make_exp (Var v) =  
   case globalIdDetails v of
-    DataConId _ -> C.Dcon (make_con_qid (Var.varName v))
+     -- a DataConId represents the Id of a worker, which is a varName. -- sof 4/02
+--    DataConId _ -> C.Dcon (make_con_qid (Var.varName v))
     FCallId (CCall (CCallSpec (StaticTarget nm) _ _)) -> C.External (_UNPK_ nm) (make_ty (varType v))
     FCallId _ -> error "MkExternalCore died: can't handle non-static-C foreign call"
     _ -> C.Var (make_var_qid (Var.varName v))
@@ -113,7 +114,10 @@ make_exp _ = error "MkExternalCore died: make_exp"
 
 make_alt :: CoreAlt -> C.Alt
 make_alt (DataAlt dcon, vs, e) = 
-    C.Acon (make_con_qid (idName (dataConWorkId dcon))) (map make_tbind tbs) (map make_vbind vbs) (make_exp e)
+    C.Acon (make_con_qid (dataConName dcon))
+           (map make_tbind tbs)
+           (map make_vbind vbs)
+	   (make_exp e)    
 	where (tbs,vbs) = span isTyVar vs
 make_alt (LitAlt l,_,e) = C.Alit (make_lit l) (make_exp e)
 make_alt (DEFAULT,[],e) = C.Adefault (make_exp e)
@@ -157,6 +161,9 @@ make_kind _ = error "MkExternalCore died: make_kind"
 {- Use encoded strings.
    Also, adjust casing to work around some badly-chosen internal names. -}
 make_id :: Bool -> Name -> C.Id
+make_id is_var nm = (occNameString . nameOccName) nm
+
+{-	SIMON thinks this stuff isn't necessary
 make_id is_var nm = 
   case n of
     'Z':cs | is_var -> 'z':cs 
@@ -165,6 +172,7 @@ make_id is_var nm =
     c:cs | isLower c && (not is_var) -> 'Z':'d':n
     _ -> n
   where n = (occNameString . nameOccName) nm
+-}
 
 make_var_id :: Name -> C.Id
 make_var_id = make_id True

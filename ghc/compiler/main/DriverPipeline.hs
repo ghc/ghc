@@ -45,6 +45,8 @@ import Config
 import Panic
 import Util
 
+import ParserCoreUtils ( getCoreModuleName )
+
 #ifdef GHCI
 import Time 		( getClockTime )
 #endif
@@ -514,7 +516,14 @@ run_phase Hsc basename suff input_fn output_fn
 	writeIORef v_HCHeader cc_injects
 
   -- gather the imports and module name
-        (srcimps,imps,mod_name) <- getImportsFromFile input_fn
+        (srcimps,imps,mod_name) <- 
+            if extcoreish_suffix suff
+	     then do
+               -- no explicit imports in ExtCore input.
+	       m <- getCoreModuleName input_fn
+	       return ([], [], mkModuleName m)
+	     else 
+  	       getImportsFromFile input_fn
 
   -- build a ModuleLocation to pass to hscMain.
 	(mod, location')

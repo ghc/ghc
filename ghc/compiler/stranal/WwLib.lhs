@@ -17,7 +17,7 @@ import Id		( Id, idType, mkSysLocal, idNewDemandInfo, setIdNewDemandInfo,
 import IdInfo		( vanillaIdInfo )
 import DataCon		( splitProductType_maybe, splitProductType )
 import NewDemand	( Demand(..), DmdResult(..), Demands(..) ) 
-import MkId		( realWorldPrimId, voidArgId, eRROR_CSTRING_ID )
+import MkId		( realWorldPrimId, voidArgId, mkRuntimeErrorApp, rUNTIME_ERROR_ID )
 import TysWiredIn	( tupleCon )
 import Type		( Type, isUnLiftedType, mkFunTys,
 			  splitForAllTys, splitFunTys, splitNewType_maybe, isAlgType
@@ -483,8 +483,7 @@ mk_absent_let arg body
   = panic "WwLib: haven't done mk_absent_let for primitives yet"
   where
     arg_ty = idType arg
---    abs_rhs = mkTyApps (Var aBSENT_ERROR_ID) [arg_ty]
-    abs_rhs = mkApps (Var eRROR_CSTRING_ID) [Type arg_ty, Lit (MachStr (_PK_ msg))] 
+    abs_rhs = mkRuntimeErrorApp rUNTIME_ERROR_ID arg_ty msg
     msg     = "Oops!  Entered absent arg " ++ showSDocDebug (ppr arg <+> ppr (idType arg))
 
 mk_unpk_case arg unpk_args boxing_con boxing_tycon body

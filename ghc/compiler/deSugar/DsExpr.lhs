@@ -265,18 +265,18 @@ dsExpr (HsWith expr binds is_with)
 -- We need the `ListComp' form to use `deListComp' (rather than the "do" form)
 -- because the interpretation of `stmts' depends on what sort of thing it is.
 --
-dsExpr (HsDoOut ListComp stmts return_id then_id fail_id result_ty src_loc)
+dsExpr (HsDoOut ListComp stmts _ result_ty src_loc)
   =	-- Special case for list comprehensions
     putSrcLocDs src_loc $
     dsListComp stmts elt_ty
   where
     (_, [elt_ty]) = tcSplitTyConApp result_ty
 
-dsExpr (HsDoOut DoExpr   stmts return_id then_id fail_id result_ty src_loc)
+dsExpr (HsDoOut DoExpr stmts ids result_ty src_loc)
   = putSrcLocDs src_loc $
-    dsDo DoExpr stmts return_id then_id fail_id result_ty
+    dsDo DoExpr stmts ids result_ty
 
-dsExpr (HsDoOut PArrComp stmts return_id then_id fail_id result_ty src_loc)
+dsExpr (HsDoOut PArrComp stmts _ result_ty src_loc)
   =	-- Special case for array comprehensions
     putSrcLocDs src_loc $
     dsPArrComp stmts elt_ty
@@ -556,13 +556,11 @@ Basically does the translation given in the Haskell~1.3 report:
 \begin{code}
 dsDo	:: HsDoContext
 	-> [TypecheckedStmt]
-	-> Id		-- id for: return m
-	-> Id		-- id for: (>>=) m
-	-> Id		-- id for: fail m
+	-> [Id]		-- id for: [return,fail,>>=,>>]
 	-> Type		-- Element type; the whole expression has type (m t)
 	-> DsM CoreExpr
 
-dsDo do_or_lc stmts return_id then_id fail_id result_ty
+dsDo do_or_lc stmts ids@[return_id, fail_id, bind_id, then_id] result_ty
   = let
 	(_, b_ty) = tcSplitAppTy result_ty	-- result_ty must be of the form (m b)
 	is_do	  = case do_or_lc of
@@ -583,9 +581,7 @@ dsDo do_or_lc stmts return_id then_id fail_id result_ty
 	  | is_do	-- Do expression
 	  = do_expr expr locn		`thenDs` \ expr2 ->
 	    go stmts     		`thenDs` \ rest  ->
-	    newSysLocalDs a_ty		`thenDs` \ ignored_result_id ->
-	    returnDs (mkApps (Var then_id) [Type a_ty, Type b_ty, expr2, 
-					    Lam ignored_result_id rest])
+	    returnDs (mkApps (Var then_id) [Type a_ty, Type b_ty, expr2, rest])
 
 	   | otherwise	-- List comprehension
 	  = do_expr expr locn			`thenDs` \ expr2 ->
@@ -610,8 +606,7 @@ dsDo do_or_lc stmts return_id then_id fail_id result_ty
                                    (HsLit (HsString (_PK_ msg)))
 	        msg = "Pattern match failure in do expression, " ++ showSDoc (ppr locn)
 		main_match = mkSimpleMatch [pat] 
-					   (HsDoOut do_or_lc stmts return_id then_id
-                                                    fail_id result_ty locn)
+					   (HsDoOut do_or_lc stmts ids result_ty locn)
 					   result_ty locn
 		the_matches
 		  | failureFreePat pat = [main_match]
@@ -621,7 +616,7 @@ dsDo do_or_lc stmts return_id then_id fail_id result_ty
 		      ]
 	    in
 	    matchWrapper (DoCtxt do_or_lc) the_matches	`thenDs` \ (binders, matching_code) ->
-	    returnDs (mkApps (Var then_id) [Type a_ty, Type b_ty, expr2,
+	    returnDs (mkApps (Var bind_id) [Type a_ty, Type b_ty, expr2,
 				            mkLams binders matching_code])
     in
     go stmts

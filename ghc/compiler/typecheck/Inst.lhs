@@ -12,7 +12,7 @@ module Inst (
 	pprInst, pprInsts, pprInstsInFull, tidyInsts, tidyMoreInsts,
 
 	newDictsFromOld, newDicts, cloneDict,
-	newMethod, newMethodWithGivenTy, newMethodAtLoc,
+	newMethod, newMethodFromName, newMethodWithGivenTy, newMethodAtLoc,
 	newOverloadedLit, newIPDict, tcInstCall, tcInstDataCon,
 
 	tyVarsOfInst, tyVarsOfInsts, tyVarsOfLIE, 
@@ -39,7 +39,7 @@ import TcHsSyn	( TcExpr, TcId, TypecheckedHsExpr,
 		  mkHsTyApp, mkHsDictApp, mkHsConApp, zonkId
 		)
 import TcMonad
-import TcEnv	( TcIdSet, tcGetInstEnv, tcLookupId )
+import TcEnv	( TcIdSet, tcGetInstEnv, tcLookupId, tcLookupGlobalId )
 import InstEnv	( InstLookupResult(..), lookupInstEnv )
 import TcMType	( zonkTcType, zonkTcTypes, zonkTcPredType, zapToType,
 		  zonkTcThetaType, tcInstTyVar, tcInstType, tcInstTyVars
@@ -390,6 +390,11 @@ tcInstDataCon orig data_con
     returnNF_Tc (ty_args', map instToId ex_dicts, arg_tys', result_ty,
 		 mkLIE stupid_dicts, mkLIE ex_dicts, ex_tvs')
 
+
+newMethodFromName :: InstOrigin -> TcType -> Name -> NF_TcM Inst
+newMethodFromName origin ty name
+  = tcLookupGlobalId name		`thenNF_Tc` \ id ->
+    newMethod origin id [ty]
 
 newMethod :: InstOrigin
 	  -> TcId

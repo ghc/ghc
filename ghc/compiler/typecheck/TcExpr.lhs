@@ -22,7 +22,7 @@ import TcUnify		( tcSubExp, tcGen, (<$>),
 import BasicTypes	( RecFlag(..),  isMarkedStrict )
 import Inst		( InstOrigin(..), 
 			  LIE, mkLIE, emptyLIE, unitLIE, plusLIE, plusLIEs,
-			  newOverloadedLit, newMethod, newIPDict,
+			  newOverloadedLit, newMethodFromName, newIPDict,
 			  newDicts, newMethodWithGivenTy,
 			  instToId, tcInstCall, tcInstDataCon
 			)
@@ -60,7 +60,7 @@ import PrelNames	( cCallableClassName,
 			  enumFromName, enumFromThenName, 
 			  enumFromToName, enumFromThenToName,
 			  enumFromToPName, enumFromThenToPName,
-			  thenMName, failMName, returnMName, ioTyConName
+			  thenMName, bindMName, failMName, returnMName, ioTyConName
 			)
 import Outputable
 import ListSetOps	( minusList )
@@ -522,9 +522,8 @@ tcMonoExpr (ArithSeqIn seq@(From expr)) res_ty
   = unifyListTy res_ty 				`thenTc` \ elt_ty ->  
     tcMonoExpr expr elt_ty		 	`thenTc` \ (expr', lie1) ->
 
-    tcLookupGlobalId enumFromName		`thenNF_Tc` \ sel_id ->
-    newMethod (ArithSeqOrigin seq)
-	      sel_id [elt_ty]			`thenNF_Tc` \ enum_from ->
+    newMethodFromName (ArithSeqOrigin seq) 
+		      elt_ty enumFromName	`thenNF_Tc` \ enum_from ->
 
     returnTc (ArithSeqOut (HsVar (instToId enum_from)) (From expr'),
 	      lie1 `plusLIE` unitLIE enum_from)
@@ -534,8 +533,8 @@ tcMonoExpr in_expr@(ArithSeqIn seq@(FromThen expr1 expr2)) res_ty
     unifyListTy  res_ty         			`thenTc`    \ elt_ty ->  
     tcMonoExpr expr1 elt_ty				`thenTc`    \ (expr1',lie1) ->
     tcMonoExpr expr2 elt_ty				`thenTc`    \ (expr2',lie2) ->
-    tcLookupGlobalId enumFromThenName			`thenNF_Tc` \ sel_id ->
-    newMethod (ArithSeqOrigin seq) sel_id [elt_ty]	`thenNF_Tc` \ enum_from_then ->
+    newMethodFromName (ArithSeqOrigin seq) 
+		      elt_ty enumFromThenName		`thenNF_Tc` \ enum_from_then ->
 
     returnTc (ArithSeqOut (HsVar (instToId enum_from_then))
 			  (FromThen expr1' expr2'),
@@ -546,8 +545,8 @@ tcMonoExpr in_expr@(ArithSeqIn seq@(FromTo expr1 expr2)) res_ty
     unifyListTy  res_ty         			`thenTc`    \ elt_ty ->  
     tcMonoExpr expr1 elt_ty				`thenTc`    \ (expr1',lie1) ->
     tcMonoExpr expr2 elt_ty				`thenTc`    \ (expr2',lie2) ->
-    tcLookupGlobalId enumFromToName			`thenNF_Tc` \ sel_id ->
-    newMethod (ArithSeqOrigin seq) sel_id [elt_ty]	`thenNF_Tc` \ enum_from_to ->
+    newMethodFromName (ArithSeqOrigin seq) 
+	  	      elt_ty enumFromToName		`thenNF_Tc` \ enum_from_to ->
 
     returnTc (ArithSeqOut (HsVar (instToId enum_from_to))
 			  (FromTo expr1' expr2'),
@@ -559,8 +558,8 @@ tcMonoExpr in_expr@(ArithSeqIn seq@(FromThenTo expr1 expr2 expr3)) res_ty
     tcMonoExpr expr1 elt_ty				`thenTc`    \ (expr1',lie1) ->
     tcMonoExpr expr2 elt_ty				`thenTc`    \ (expr2',lie2) ->
     tcMonoExpr expr3 elt_ty				`thenTc`    \ (expr3',lie3) ->
-    tcLookupGlobalId enumFromThenToName			`thenNF_Tc` \ sel_id ->
-    newMethod (ArithSeqOrigin seq) sel_id [elt_ty]	`thenNF_Tc` \ eft ->
+    newMethodFromName (ArithSeqOrigin seq) 
+		      elt_ty enumFromThenToName		`thenNF_Tc` \ eft ->
 
     returnTc (ArithSeqOut (HsVar (instToId eft))
 			  (FromThenTo expr1' expr2' expr3'),
@@ -571,8 +570,8 @@ tcMonoExpr in_expr@(PArrSeqIn seq@(FromTo expr1 expr2)) res_ty
     unifyPArrTy  res_ty         			`thenTc`    \ elt_ty ->  
     tcMonoExpr expr1 elt_ty				`thenTc`    \ (expr1',lie1) ->
     tcMonoExpr expr2 elt_ty				`thenTc`    \ (expr2',lie2) ->
-    tcLookupGlobalId enumFromToPName			`thenNF_Tc` \ sel_id ->
-    newMethod (PArrSeqOrigin seq) sel_id [elt_ty]	`thenNF_Tc` \ enum_from_to ->
+    newMethodFromName (PArrSeqOrigin seq) 
+		      elt_ty enumFromToPName 		`thenNF_Tc` \ enum_from_to ->
 
     returnTc (PArrSeqOut (HsVar (instToId enum_from_to))
 			 (FromTo expr1' expr2'),
@@ -584,8 +583,8 @@ tcMonoExpr in_expr@(PArrSeqIn seq@(FromThenTo expr1 expr2 expr3)) res_ty
     tcMonoExpr expr1 elt_ty				`thenTc`    \ (expr1',lie1) ->
     tcMonoExpr expr2 elt_ty				`thenTc`    \ (expr2',lie2) ->
     tcMonoExpr expr3 elt_ty				`thenTc`    \ (expr3',lie3) ->
-    tcLookupGlobalId enumFromThenToPName		`thenNF_Tc` \ sel_id ->
-    newMethod (PArrSeqOrigin seq) sel_id [elt_ty]	`thenNF_Tc` \ eft ->
+    newMethodFromName (PArrSeqOrigin seq)
+		      elt_ty enumFromThenToPName	`thenNF_Tc` \ eft ->
 
     returnTc (PArrSeqOut (HsVar (instToId eft))
 			 (FromThenTo expr1' expr2' expr3'),
@@ -829,7 +828,7 @@ tcDoStmts PArrComp stmts src_loc res_ty
     in
     tcStmts (DoCtxt PArrComp) m_ty stmts      `thenTc` \(stmts', stmts_lie) ->
     returnTc (HsDoOut PArrComp stmts'
-		      undefined undefined undefined  -- don't touch!
+		      undefined 	-- don't touch!
 		      res_ty src_loc,
 	      stmts_lie)
 
@@ -866,19 +865,13 @@ tcDoStmts do_or_lc stmts src_loc res_ty
 	--	then = then
 	-- where the second "then" sees that it already exists in the "available" stuff.
 	--
-    tcLookupGlobalId returnMName		`thenNF_Tc` \ return_sel_id ->
-    tcLookupGlobalId thenMName			`thenNF_Tc` \ then_sel_id ->
-    tcLookupGlobalId failMName			`thenNF_Tc` \ fail_sel_id ->
-    newMethod DoOrigin return_sel_id [tc_ty]	`thenNF_Tc` \ return_inst ->
-    newMethod DoOrigin then_sel_id   [tc_ty]	`thenNF_Tc` \ then_inst ->
-    newMethod DoOrigin fail_sel_id   [tc_ty]	`thenNF_Tc` \ fail_inst ->
-    let
-	monad_lie = mkLIE [return_inst, then_inst, fail_inst]
-    in
+    mapNF_Tc (newMethodFromName DoOrigin tc_ty)
+	     [returnMName, failMName, bindMName, thenMName]	`thenNF_Tc` \ insts ->
+
     returnTc (HsDoOut do_or_lc stmts'
-		      (instToId return_inst) (instToId then_inst) (instToId fail_inst)
+		      (map instToId insts)
 		      res_ty src_loc,
-	      stmts_lie `plusLIE` monad_lie)
+	      stmts_lie `plusLIE` mkLIE insts)
 \end{code}
 
 

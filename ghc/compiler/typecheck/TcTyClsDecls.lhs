@@ -14,7 +14,7 @@ import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
 import HsSyn		( TyClDecl(..),  
 			  ConDecl(..),   Sig(..), HsPred(..), 
 			  tyClDeclName, hsTyVarNames, tyClDeclTyVars,
-			  isIfaceSigDecl, isClassDecl, isSynDecl, isClassOpSig
+			  isTypeOrClassDecl, isClassDecl, isSynDecl, isClassOpSig
 			)
 import RnHsSyn		( RenamedTyClDecl, tyClDeclFVs )
 import BasicTypes	( RecFlag(..), NewOrData(..) )
@@ -22,7 +22,7 @@ import HscTypes		( implicitTyThingIds )
 import Module		( Module )
 
 import TcMonad
-import TcEnv		( TcEnv, RecTcEnv, TcTyThing(..), TyThing(..), TyThingDetails(..),
+import TcEnv		( TcEnv, TcTyThing(..), TyThing(..), TyThingDetails(..),
 			  tcExtendKindEnv, tcLookup, tcExtendGlobalEnv,
 			  isLocalThing )
 import TcTyDecls	( tcTyDecl, kcConDetails )
@@ -65,24 +65,22 @@ import Generics         ( mkTyConGenInfo )
 The main function
 ~~~~~~~~~~~~~~~~~
 \begin{code}
-tcTyAndClassDecls :: RecTcEnv		-- Knot tying stuff
-		  -> Module 		-- Current module
+tcTyAndClassDecls :: Module 		-- Current module
 		  -> [RenamedTyClDecl]
 		  -> TcM [TyThing]	-- Returns newly defined things:
 					-- types, classes and implicit Ids
 
-tcTyAndClassDecls unf_env this_mod decls
+tcTyAndClassDecls this_mod decls
   = sortByDependency decls 		`thenTc` \ groups ->
-    tcGroups unf_env this_mod groups
+    tcGroups this_mod groups
 
-tcGroups unf_env this_mod []
-  = tcGetEnv	`thenNF_Tc` \ env ->
-    returnTc []
+tcGroups this_mod []
+  = returnTc []
 
-tcGroups unf_env this_mod (group:groups)
-  = tcGroup unf_env this_mod group	`thenTc` \ (env, new_things1) ->
-    tcSetEnv env			$
-    tcGroups unf_env this_mod groups	`thenTc` \ new_things2 ->
+tcGroups this_mod (group:groups)
+  = tcGroup this_mod group	`thenTc` \ (env, new_things1) ->
+    tcSetEnv env		$
+    tcGroups this_mod groups	`thenTc` \ new_things2 ->
     returnTc (new_things1 ++ new_things2)
 \end{code}
 
@@ -130,11 +128,11 @@ The knot-tying parameters: @rec_details_list@ is an alist mapping @Name@s to
 @TyThing@s.  @rec_vrcs@ is a finite map from @Name@s to @ArgVrcs@s.
 
 \begin{code}
-tcGroup :: RecTcEnv -> Module -> SCC RenamedTyClDecl 
+tcGroup :: Module -> SCC RenamedTyClDecl 
 	-> TcM (TcEnv, 		-- Input env extended by types and classes only
 		[TyThing])	-- Things defined by this group
 					
-tcGroup unf_env this_mod scc
+tcGroup this_mod scc
   = getDOptsTc							`thenNF_Tc` \ dflags ->
 	-- Step 1
     mapNF_Tc getInitialKind decls 				`thenNF_Tc` \ initial_kinds ->
@@ -169,11 +167,11 @@ tcGroup unf_env this_mod scc
 		-- Step 5
 		-- Extend the environment with the final 
 		-- TyCons/Classes and check the decls
-	tcExtendGlobalEnv all_tyclss			$
-	mapTc (tcTyClDecl1 unf_env) decls		`thenTc` \ tycls_details ->
+	tcExtendGlobalEnv all_tyclss		$
+	mapTc tcTyClDecl1 decls			`thenTc` \ tycls_details ->
 
 		-- Return results
-	tcGetEnv					`thenNF_Tc` \ env ->
+	tcGetEnv				`thenNF_Tc` \ env ->
 	returnTc (tycls_details, env, all_tyclss)
     )						`thenTc` \ (_, env, all_tyclss) ->
 
@@ -199,9 +197,9 @@ tcGroup unf_env this_mod scc
 		AcyclicSCC decl -> [decl]
 		CyclicSCC decls -> decls
 
-tcTyClDecl1 unf_env decl
+tcTyClDecl1 decl
   | isClassDecl decl = tcAddDeclCtxt decl (tcClassDecl1 decl)
-  | otherwise	     = tcAddDeclCtxt decl (tcTyDecl     unf_env decl)
+  | otherwise	     = tcAddDeclCtxt decl (tcTyDecl     decl)
 
 -- We do the validity check over declarations, rather than TyThings
 -- only so that we can add a nice context with tcAddDeclCtxt
@@ -474,7 +472,7 @@ sortByDependency decls
     in
     returnTc decl_sccs
   where
-    tycl_decls = filter (not . isIfaceSigDecl) decls
+    tycl_decls = filter isTypeOrClassDecl decls
     edges      = map mkEdges tycl_decls
     
     is_syn_decl (d, _, _) = isSynDecl d

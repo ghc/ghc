@@ -72,9 +72,9 @@ tdefs	:: { [RdrNameHsDecl] }
 	| tdef ';' tdefs	{$1:$3}
 
 tdef	:: { RdrNameHsDecl }
-	: '%data' qcname tbinds '=' '{' cons1 '}'
+	: '%data' q_tc_name tbinds '=' '{' cons1 '}'
                 { TyClD (TyData DataType [] $2 $3 (DataCons $6) Nothing [] noSrcLoc) }
-	| '%newtype' qcname tbinds trep 
+	| '%newtype' q_tc_name tbinds trep 
 		{ TyClD (TyData NewType []  $2 $3 ($4 $2 $3) Nothing [] noSrcLoc) }
 
 trep    :: { (RdrName -> [HsTyVarBndr RdrName] -> DataConDetails (ConDecl RdrName)) }
@@ -139,7 +139,7 @@ cons1	:: { [ConDecl RdrName] }
 	| con ';' cons1	{ $1:$3 }
 
 con	:: { ConDecl RdrName }
-	: qcname attbinds atys 
+	: q_d_name attbinds atys 
 		{ ConDecl $1 $1 $2 [] (VanillaCon (map unbangedType $3)) noSrcLoc}
 
 atys	:: { [ RdrNameHsType] }
@@ -148,7 +148,7 @@ atys	:: { [ RdrNameHsType] }
 
 aty	:: { RdrNameHsType }
 	: name	     { HsTyVar $1 }
-	| qcname     { HsTyVar $1 }
+	| q_tc_name     { HsTyVar $1 }
 	| '(' ty ')' { $2 }
 
 
@@ -163,7 +163,7 @@ ty	:: { RdrNameHsType }
 
 aexp    :: { UfExpr RdrName }
 	: qname 	{ UfVar $1 }
-        | qcname 	{ UfVar $1 } 
+        | q_d_name 	{ UfVar $1 } 
 	| lit		{ UfLit $1 }
 	| '(' exp ')' 	{ $2 }
 
@@ -192,7 +192,7 @@ alts1	:: { [UfAlt RdrName] }
 	| alt ';' alts1	{ $1:$3 }
 
 alt	:: { UfAlt RdrName }
-	: qcname attbinds vbinds '->' exp 
+	: q_d_name attbinds vbinds '->' exp 
 		{ {- ToDo: sort out-} (UfDataAlt $1, (map hsTyVarName $2 ++ map fst $3), $5) } 
 	| lit '->' exp
 		{ (UfLitAlt $1, [], $3) }
@@ -206,7 +206,7 @@ lit	:: { Literal }
 	| '(' STRING '::' aty ')'	{ MachStr (_PK_ $2) }
 
 name	:: { RdrName }
-	: NAME	{ mkUnqual varName (_PK_ $1) }
+	: NAME	{ mkRdrUnqual (mkVarOccEncoded (_PK_ $1)) }
 
 cname	:: { String }
 	: CNAME	{ $1 }
@@ -222,13 +222,18 @@ qname	:: { RdrName }
 	| mname '.' NAME
 	  { mkIfaceOrig varName (_PK_ $1,_PK_ $3) }
 
-qcname	:: { RdrName }
+-- Type constructor
+q_tc_name	:: { RdrName }
+        : mname '.' cname 
+		{ mkIfaceOrig tcName (_PK_ $1,_PK_ $3) }
+
+-- Data constructor
+q_d_name	:: { RdrName }
         : mname '.' cname 
 		{ mkIfaceOrig dataName (_PK_ $1,_PK_ $3) }
 
 
 {
-
 toUfBinder :: [RdrNameHsDecl] -> UfBinding RdrName
 toUfBinder xs  = 
  case xs of 
@@ -241,3 +246,4 @@ happyError :: P a
 happyError s l = failP (show l ++ ": Parse error\n") (take 100 s) l
 
 }
+

@@ -18,7 +18,7 @@ module HsDecls (
 	hsDeclName, instDeclName, 
 	tyClDeclName, tyClDeclNames, tyClDeclSysNames, tyClDeclTyVars,
 	isClassDecl, isSynDecl, isDataDecl, isIfaceSigDecl, isCoreDecl,
-	countTyClDecls,
+	isTypeOrClassDecl, countTyClDecls,
 	mkClassDeclSysNames, isSourceInstDecl, ifaceRuleDeclName,
 	getClassDeclSysNames, conDetailsTys,
 	collectRuleBndrSigTys
@@ -328,6 +328,12 @@ isDataDecl other       = False
 
 isClassDecl (ClassDecl {}) = True
 isClassDecl other	   = False
+
+isTypeOrClassDecl (ClassDecl   {}) = True
+isTypeOrClassDecl (TyData      {}) = True
+isTypeOrClassDecl (TySynonym   {}) = True
+isTypeOrClassDecl (ForeignType {}) = True
+isTypeOrClassDecl other		   = False
 
 isCoreDecl (CoreDecl {}) = True
 isCoreDecl other	 = False

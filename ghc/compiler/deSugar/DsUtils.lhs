@@ -38,7 +38,7 @@ import CoreSyn
 
 import DsMonad
 
-import CoreUtils	( exprType, mkIfThenElse )
+import CoreUtils	( exprType, mkIfThenElse, mkCoerce )
 import PrelInfo		( iRREFUT_PAT_ERROR_ID )
 import MkId		( mkReboxingAlt, mkNewTypeBody )
 import Id		( idType, Id, mkWildId )
@@ -62,7 +62,7 @@ import PrelNames	( unpackCStringName, unpackCStringUtf8Name,
 			  plusIntegerName, timesIntegerName, 
 			  lengthPName, indexPName )
 import Outputable
-import UnicodeUtil      ( stringToUtf8 )
+import UnicodeUtil      ( intsToUtf8, stringToUtf8 )
 import Util             ( isSingleton, notNull )
 \end{code}
 
@@ -389,8 +389,8 @@ mkErrorAppDs err_id ty msg
   = getSrcLocDs			`thenDs` \ src_loc ->
     let
 	full_msg = showSDoc (hcat [ppr src_loc, text "|", text msg])
+	core_msg = Lit (MachStr (_PK_ (stringToUtf8 full_msg)))
     in
-    mkStringLit full_msg		`thenDs` \ core_msg ->
     returnDs (mkApps (Var err_id) [Type ty, core_msg])
 \end{code}
 
@@ -447,16 +447,16 @@ mkStringLitFS str
     in
     returnDs (mkConsExpr charTy the_char (mkNilExpr charTy))
 
-  | all safeChar chars
+  | all safeChar int_chars
   = dsLookupGlobalValue unpackCStringName	`thenDs` \ unpack_id ->
     returnDs (App (Var unpack_id) (Lit (MachStr str)))
 
   | otherwise
   = dsLookupGlobalValue unpackCStringUtf8Name	`thenDs` \ unpack_id ->
-    returnDs (App (Var unpack_id) (Lit (MachStr (_PK_ (stringToUtf8 chars)))))
+    returnDs (App (Var unpack_id) (Lit (MachStr (_PK_ (intsToUtf8 int_chars)))))
 
   where
-    chars = _UNPK_INT_ str
+    int_chars = _UNPK_INT_ str
     safeChar c = c >= 1 && c <= 0xFF
 \end{code}
 
@@ -495,17 +495,14 @@ mkSelectorBinds pat val_expr
   | isSingleton binders || is_simple_pat pat
   = newSysLocalDs (exprType val_expr)	`thenDs` \ val_var ->
 
-	-- For the error message we don't use mkErrorAppDs to avoid
-	-- duplicating the string literal each time
-    newSysLocalDs stringTy			`thenDs` \ msg_var ->
-    getSrcLocDs					`thenDs` \ src_loc ->
-    let
-	full_msg = showSDoc (hcat [ppr src_loc, text "|", ppr pat])
-    in
-    mkStringLit full_msg			`thenDs` \ core_msg -> 
-    mapDs (mk_bind val_var msg_var) binders	`thenDs` \ binds ->
+	-- For the error message we make one error-app, to avoid duplication.
+	-- But we need it at different types... so we use coerce for that
+    mkErrorAppDs iRREFUT_PAT_ERROR_ID 
+		 unitTy (showSDoc (ppr pat))	`thenDs` \ err_expr ->
+    newSysLocalDs unitTy			`thenDs` \ err_var ->
+    mapDs (mk_bind val_var err_var) binders	`thenDs` \ binds ->
     returnDs ( (val_var, val_expr) : 
-	       (msg_var, core_msg) :
+	       (err_var, err_expr) :
 	       binds )
 
 
@@ -524,16 +521,15 @@ mkSelectorBinds pat val_expr
     local_tuple = mkTupleExpr binders
     tuple_ty    = exprType local_tuple
 
-    mk_bind scrut_var msg_var bndr_var
-    -- (mk_bind sv bv) generates
-    --		bv = case sv of { pat -> bv; other -> error-msg }
+    mk_bind scrut_var err_var bndr_var
+    -- (mk_bind sv err_var) generates
+    --		bv = case sv of { pat -> bv; other -> coerce (type-of-bv) err_var }
     -- Remember, pat binds bv
       = matchSimply (Var scrut_var) PatBindRhs pat
 		    (Var bndr_var) error_expr			`thenDs` \ rhs_expr ->
         returnDs (bndr_var, rhs_expr)
       where
-        binder_ty = idType bndr_var
-        error_expr = mkApps (Var iRREFUT_PAT_ERROR_ID) [Type binder_ty, Var msg_var]
+        error_expr = mkCoerce (idType bndr_var) (Var err_var)
 
     is_simple_pat (TuplePat ps Boxed)  = all is_triv_pat ps
     is_simple_pat (ConPat _ _ _ _ ps)  = all is_triv_pat ps

@@ -18,7 +18,7 @@ import HsSyn		( HsBinds(..), MonoBinds(..), HsDecl(..), HsExpr(..),
 			  isSourceInstDecl, mkSimpleMatch, placeHolderType, isCoreDecl
 			)
 import PrelNames	( ioTyConName, printName,
-			  returnIOName, bindIOName, failIOName, runMainName, 
+			  returnIOName, bindIOName, failIOName, thenIOName, runMainName, 
 			  dollarMainName, itName
 			)
 import MkId		( unsafeCoerceId )
@@ -28,7 +28,7 @@ import TcHsSyn		( TypecheckedMonoBinds, TypecheckedHsExpr,
 			  TypecheckedForeignDecl, TypecheckedRuleDecl,
 			  TypecheckedCoreBind,
 			  zonkTopBinds, zonkForeignExports, zonkRules, mkHsLet,
-			  zonkExpr, zonkIdBndr, zonkCoreBinds
+			  zonkExpr, zonkIdBndr
 			)
 
 import Rename		( RnResult(..) )
@@ -175,12 +175,13 @@ tcUserStmt names stmt
     
 
 tc_stmts names stmts
-  = tcLookupGlobalId returnIOName	`thenNF_Tc` \ return_id ->
-    tcLookupGlobalId bindIOName		`thenNF_Tc` \ bind_id ->
-    tcLookupGlobalId failIOName		`thenNF_Tc` \ fail_id ->
+  = mapNF_Tc tcLookupGlobalId 
+	[returnIOName, failIOName, bindIOName, thenIOName]	`thenNF_Tc` \ io_ids ->
     tcLookupTyCon ioTyConName		`thenNF_Tc` \ ioTyCon ->
     newTyVarTy liftedTypeKind		`thenNF_Tc` \ res_ty ->
     let
+	return_id  = head io_ids	-- Rather gruesome
+
 	io_ty = (\ ty -> mkTyConApp ioTyCon [ty], res_ty)
 
 		-- mk_return builds the expression
@@ -212,7 +213,7 @@ tc_stmts names stmts
     traceTc (text "tcs 4") `thenNF_Tc_`
 
     returnTc (mkHsLet const_binds $
-	      HsDoOut DoExpr tc_stmts return_id bind_id fail_id 
+	      HsDoOut DoExpr tc_stmts io_ids
 		      (mkTyConApp ioTyCon [mkListTy unitTy]) noSrcLoc,
 	      ids)
   where
@@ -569,7 +570,7 @@ tcIfaceImports this_mod decls
     fixTc (\ ~(unf_env, _, _, _) ->
 	-- This fixTc follows the same general plan as tcImports,
 	-- which is better commented (below)
-	tcTyAndClassDecls unf_env this_mod tycl_decls	`thenTc` \ tycl_things ->
+	tcTyAndClassDecls this_mod tycl_decls		`thenTc` \ tycl_things ->
 	tcExtendGlobalEnv tycl_things			$
 	tcInterfaceSigs unf_env this_mod tycl_decls	`thenTc` \ sig_ids ->
 	tcExtendGlobalValEnv sig_ids			$
@@ -616,9 +617,9 @@ tcImports unf_env pcs hst this_mod
 	-- tcImports recovers internally, but if anything gave rise to
 	-- an error we'd better stop now, to avoid a cascade
 	
-    traceTc (text "Tc1")				`thenNF_Tc_`
-    tcTyAndClassDecls unf_env this_mod tycl_decls	`thenTc` \ tycl_things ->
-    tcExtendGlobalEnv tycl_things			$
+    traceTc (text "Tc1")			`thenNF_Tc_`
+    tcTyAndClassDecls  this_mod tycl_decls	`thenTc` \ tycl_things ->
+    tcExtendGlobalEnv tycl_things		$
     
 	-- Interface type signatures
 	-- We tie a knot so that the Ids read out of interfaces are in scope
@@ -682,12 +683,10 @@ typecheckCoreModule
 	-> HomeSymbolTable
 	-> ModIface		-- Iface for this module (just module & fixities)
 	-> [RenamedHsDecl]
-	-> IO (Maybe (PersistentCompilerState, TypeEnv, [TypecheckedCoreBind]))
+	-> IO (Maybe (PersistentCompilerState, (TypeEnv, [TypecheckedCoreBind], [TypecheckedRuleDecl])))
 typecheckCoreModule dflags pcs hst mod_iface decls
   = do	{ maybe_tc_stuff <- typecheck dflags pcs hst alwaysQualify $
-                            (tcCoreDecls this_mod decls `thenTc` \ (env,bs) ->
-			     zonkCoreBinds bs           `thenNF_Tc` \ bs' ->
-			     returnTc (env, bs'))
+                            tcCoreDecls this_mod decls
 
 --	; printIfaceDump dflags maybe_tc_stuff
 
@@ -695,35 +694,48 @@ typecheckCoreModule dflags pcs hst mod_iface decls
 	   -- (in the event that it needs to be, I'm returning the PCS passed in.)
         ; case maybe_tc_stuff of
 	    Nothing -> return Nothing
-	    Just (e,bs) -> return (Just (pcs, e, bs)) }
+	    Just result -> return (Just (pcs, result)) }
   where
     this_mod = mi_module mod_iface
     core_decls = [d | (TyClD d) <- decls, isCoreDecl d]
 
+
 tcCoreDecls :: Module 
 	    -> [RenamedHsDecl]	-- All interface-file decls
-	    -> TcM (TypeEnv, [TypecheckedCoreBind])
+	    -> TcM (TypeEnv, [TypecheckedCoreBind], [TypecheckedRuleDecl])
 tcCoreDecls this_mod decls
 -- The decls are all TyClD declarations coming from External Core input.
   = let
 	tycl_decls = [d | TyClD d <- decls]
+	rule_decls = [d | RuleD d <- decls]
 	core_decls = filter isCoreDecl tycl_decls
     in
     fixTc (\ ~(unf_env, _) ->
 	-- This fixTc follows the same general plan as tcImports,
 	-- which is better commented.
 	-- [ Q: do we need to tie a knot for External Core? ]
-	tcTyAndClassDecls unf_env this_mod tycl_decls	`thenTc` \ tycl_things ->
+	tcTyAndClassDecls this_mod tycl_decls		`thenTc` \ tycl_things ->
 	tcExtendGlobalEnv tycl_things			$
-	tcCoreBinds tycl_decls                          `thenTc` \ core_binds ->
-	tcGetEnv					`thenTc` \ env ->
-    	returnTc (env, core_binds)
-    ) `thenTc` \ ~(final_env,bs) ->
-    let	
-      src_things = filter (isLocalThing this_mod) (typeEnvElts (getTcGEnv final_env))
-    in  
-    returnTc (mkTypeEnv src_things, bs)
 
+        tcInterfaceSigs unf_env this_mod tycl_decls	`thenTc` \ sig_ids ->
+        tcExtendGlobalValEnv sig_ids			$
+
+	tcCoreBinds core_decls                          `thenTc` \ core_prs ->
+	let
+	   local_ids = map fst core_prs
+ 	in
+	tcExtendGlobalValEnv local_ids			$
+
+	tcIfaceRules rule_decls				`thenTc` \ rules ->
+
+	let	
+	   src_things = filter (isLocalThing this_mod) tycl_things
+			++ map AnId local_ids
+	in
+	tcGetEnv					`thenNF_Tc` \ env -> 	
+    	returnTc (env, (mkTypeEnv src_things, core_prs, rules))
+    )							`thenTc` \ (_, result) ->
+    returnTc result
 \end{code}
 
 

@@ -26,7 +26,7 @@ import CmdLineOpts	( SimplifierSwitch(..),
 			)
 import CoreSyn
 import CoreUtils	( cheapEqExpr, exprType, 
-			  etaExpand, exprEtaExpandArity, bindNonRec, mkCoerce,
+			  etaExpand, exprEtaExpandArity, bindNonRec, mkCoerce2,
 			  findDefault, exprOkForSpeculation, exprIsValue
 			)
 import qualified Subst	( simplBndrs, simplBndr, simplLetId, simplLamBndr )
@@ -1244,7 +1244,7 @@ mkCase1 scrut case_bndr alts	-- Identity case
 
 	-- re_note wraps a coerce if it might be necessary
     re_note scrut = case head alts of
-			(_,_,rhs1@(Note _ _)) -> mkCoerce (exprType rhs1) (idType case_bndr) scrut
+			(_,_,rhs1@(Note _ _)) -> mkCoerce2 (exprType rhs1) (idType case_bndr) scrut
 			other		      -> scrut
 
 

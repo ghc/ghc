@@ -54,6 +54,7 @@ import NameSet		( emptyNameSet )
 import Outputable
 import Var		( TyVar )
 import CmdLineOpts
+import UnicodeUtil	( stringToUtf8 )
 import ErrUtils		( dumpIfSet )
 import Util		( count, lengthIs, equalLength )
 import Maybes		( seqMaybe )
@@ -527,7 +528,7 @@ mkDefMethRhs origin clas inst_tys sel_id loc NoDefMeth
     returnTc error_rhs
   where
     error_rhs = HsApp (HsVar (getName nO_METHOD_BINDING_ERROR_ID)) 
-	    		  (HsLit (HsString (_PK_ error_msg)))
+	    	      (HsLit (HsStringPrim (_PK_ (stringToUtf8 error_msg))))
     error_msg = showSDoc (hcat [ppr loc, text "|", ppr sel_id ])
 
 

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPhases.hs,v 1.18 2002/04/05 15:18:26 sof Exp $
+-- $Id: DriverPhases.hs,v 1.19 2002/04/11 12:03:33 simonpj Exp $
 --
 -- GHC Driver
 --
@@ -19,7 +19,7 @@ module DriverPhases (
    hsbootish_file, hsbootish_suffix,
    objish_file, objish_suffix,
    cish_file, cish_suffix,
-   isExtCore_file
+   isExtCore_file, extcoreish_suffix
  ) where
 
 import DriverUtil

@@ -321,43 +321,42 @@ slurpSourceRefs source_fvs
 -------------------------------------------------------
 -- closeDecls keeps going until the free-var set is empty
 closeDecls decls needed
-  | not (isEmptyFVs needed)
-  = slurpDecls decls needed	`thenRn` \ (decls1, needed1) ->
-    closeDecls decls1 needed1
-
-  | otherwise
-  = getImportedRules 			`thenRn` \ rule_decls ->
+  = slurpIfaceDecls decls needed	`thenRn` \ decls1 ->
+    getImportedRules 			`thenRn` \ rule_decls ->
     case rule_decls of
-	[]    -> returnRn decls	-- No new rules, so we are done
+	[]    -> returnRn decls1	-- No new rules, so we are done
 	other -> rnIfaceDecls rnIfaceRuleDecl rule_decls	`thenRn` \ rule_decls' ->
 		 let
 			rule_fvs = plusFVs (map ruleDeclFVs rule_decls')
 		 in
-		 traceRn (text "closeRules" <+> ppr rule_decls' $$ fsep (map ppr (nameSetToList rule_fvs)))	`thenRn_`
-		 closeDecls (map RuleD rule_decls' ++ decls) rule_fvs
-
+		 traceRn (text "closeRules" <+> ppr rule_decls' $$ 
+			  fsep (map ppr (nameSetToList rule_fvs)))	`thenRn_`
+		 closeDecls (map RuleD rule_decls' ++ decls1) rule_fvs
 		 
 
 -------------------------------------------------------
--- Augment decls with any decls needed by needed.
--- Return also free vars of the new decls (only)
-slurpDecls decls needed
-  = go decls emptyFVs (nameSetToList needed) 
+-- Augment decls with any decls needed by needed,
+-- and so on transitively
+slurpIfaceDecls :: [RenamedHsDecl] -> FreeVars -> RnMG [RenamedHsDecl]
+slurpIfaceDecls decls needed
+  = slurp decls (nameSetToList needed) 
   where
-    go decls fvs []         = returnRn (decls, fvs)
-    go decls fvs (ref:refs) = slurpDecl decls fvs ref	`thenRn` \ (decls1, fvs1) ->
-			      go decls1 fvs1 refs
+    slurp decls []     = returnRn decls
+    slurp decls (n:ns) = slurp_one decls n	`thenRn` \ decls1 ->
+			 slurp decls1 ns
 
--------------------------------------------------------
-slurpDecl decls fvs wanted_name
-  = importDecl wanted_name 		`thenRn` \ import_result ->
-    case import_result of
-	-- Found a declaration... rename it
-	HereItIs decl -> rnIfaceTyClDecl decl		`thenRn` \ (new_decl, fvs1) ->
-			 returnRn (TyClD new_decl:decls, fvs1 `plusFV` fvs)
-
-	-- No declaration... (wired in thing, or deferred, or already slurped)
-	other -> returnRn (decls, fvs)
+    slurp_one decls wanted_name
+      = importDecl wanted_name 		`thenRn` \ import_result ->
+	case import_result of
+	  HereItIs decl ->  	-- Found a declaration... rename it
+				-- and get the things it needs
+		   rnIfaceTyClDecl decl		`thenRn` \ (new_decl, fvs) ->
+		   slurp (TyClD new_decl : decls) (nameSetToList fvs)
+  
+	  
+	  other -> 	-- No declaration... (wired in thing, or deferred, 
+			-- 	or already slurped)
+		   returnRn decls
 
 
 -------------------------------------------------------

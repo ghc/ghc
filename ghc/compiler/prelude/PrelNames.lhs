@@ -144,6 +144,7 @@ knownKeyNames
 	toEnumName,
 	eqName,
 	thenMName,
+	bindMName,
 	returnMName,
 	failMName,
 	fromRationalName,
@@ -248,6 +249,9 @@ pREL_REAL_Name    = mkModuleName "GHC.Real"
 pREL_FLOAT_Name   = mkModuleName "GHC.Float"
 pREL_TOP_HANDLER_Name = mkModuleName "GHC.TopHandler"
 sYSTEM_IO_Name	  = mkModuleName "System.IO"
+
+rEAD_PREC_Name = mkModuleName "Text.ParserCombinators.ReadPrec"
+lEX_Name       = mkModuleName "Text.Read.Lex"
 
 mAIN_Name	  = mkModuleName "Main"
 pREL_INT_Name	  = mkModuleName "GHC.Int"
@@ -424,7 +428,8 @@ geName		  = varQual  pREL_BASE_Name FSLIT(">=") geClassOpKey
 
 -- Class Monad
 monadClassName	   = clsQual pREL_BASE_Name FSLIT("Monad") monadClassKey
-thenMName	   = varQual pREL_BASE_Name FSLIT(">>=") thenMClassOpKey
+thenMName	   = varQual pREL_BASE_Name FSLIT(">>")  thenMClassOpKey
+bindMName	   = varQual pREL_BASE_Name FSLIT(">>=") bindMClassOpKey
 returnMName	   = varQual pREL_BASE_Name FSLIT("return") returnMClassOpKey
 failMName	   = varQual pREL_BASE_Name FSLIT("fail") failMClassOpKey
 
@@ -510,6 +515,7 @@ indexOfPName      = varQual pREL_PARR_Name FSLIT("indexOfP")   indexOfPIdKey
 -- IOBase things
 ioTyConName	  = tcQual   pREL_IO_BASE_Name FSLIT("IO") ioTyConKey
 ioDataConName     = dataQual pREL_IO_BASE_Name FSLIT("IO") ioDataConKey
+thenIOName	  = varQual  pREL_IO_BASE_Name FSLIT("thenIO") thenIOIdKey
 bindIOName	  = varQual  pREL_IO_BASE_Name FSLIT("bindIO") bindIOIdKey
 returnIOName	  = varQual  pREL_IO_BASE_Name FSLIT("returnIO") returnIOIdKey
 failIOName	  = varQual  pREL_IO_BASE_Name FSLIT("failIO") failIOIdKey
@@ -608,11 +614,29 @@ showsPrec_RDR	   = varQual_RDR  pREL_SHOW_Name FSLIT("showsPrec")
 showSpace_RDR	   = varQual_RDR  pREL_SHOW_Name FSLIT("showSpace")
 showString_RDR	   = varQual_RDR  pREL_SHOW_Name FSLIT("showString")
 showParen_RDR	   = varQual_RDR  pREL_SHOW_Name FSLIT("showParen")
+
 readsPrec_RDR	   = varQual_RDR  pREL_READ_Name FSLIT("readsPrec")
+readPrec_RDR	   = varQual_RDR  pREL_READ_Name FSLIT("readPrec")
+readListPrec_RDR   = varQual_RDR  pREL_READ_Name FSLIT("readListPrec")
 readList_RDR	   = varQual_RDR  pREL_READ_Name FSLIT("readList")
-readParen_RDR	   = varQual_RDR  pREL_READ_Name FSLIT("readParen")
-lex_RDR		   = varQual_RDR  pREL_READ_Name FSLIT("lex")
-readList___RDR     = varQual_RDR  pREL_READ_Name FSLIT("readList__")
+
+readListDefault_RDR     = varQual_RDR  pREL_READ_Name FSLIT("readListDefault")
+readListPrecDefault_RDR = varQual_RDR  pREL_READ_Name FSLIT("readListPrecDefault")
+parens_RDR	        = varQual_RDR  pREL_READ_Name FSLIT("parens")
+choose_RDR	        = varQual_RDR  pREL_READ_Name FSLIT("choose")
+lexP_RDR	        = varQual_RDR  pREL_READ_Name FSLIT("lexP")
+
+-- Module ReadPrec
+step_RDR	   = varQual_RDR  rEAD_PREC_Name FSLIT("step")
+reset_RDR	   = varQual_RDR  rEAD_PREC_Name FSLIT("reset")
+alt_RDR		   = varQual_RDR  rEAD_PREC_Name FSLIT("+++")
+prec_RDR	   = varQual_RDR  rEAD_PREC_Name FSLIT("prec")
+
+-- Module Lex
+symbol_RDR	   = dataQual_RDR  lEX_Name FSLIT("Symbol")
+ident_RDR	   = dataQual_RDR  lEX_Name FSLIT("Ident")
+single_RDR	   = dataQual_RDR  lEX_Name FSLIT("Single")
+
 times_RDR	   = varQual_RDR  pREL_NUM_Name FSLIT("*")
 plus_RDR	   = varQual_RDR  pREL_NUM_Name FSLIT("+")
 negate_RDR	   = varQual_RDR  pREL_NUM_Name FSLIT("negate")
@@ -646,7 +670,7 @@ foldr_RDR 		= nameRdrName foldrName
 build_RDR 		= nameRdrName buildName
 enumFromTo_RDR 		= nameRdrName enumFromToName
 returnM_RDR 		= nameRdrName returnMName
-thenM_RDR 		= nameRdrName thenMName
+bindM_RDR 		= nameRdrName bindMName
 failM_RDR 		= nameRdrName failMName
 false_RDR		= nameRdrName falseDataConName
 true_RDR		= nameRdrName trueDataConName
@@ -881,7 +905,7 @@ irrefutPatErrorIdKey	      = mkPreludeMiscIdUnique 15
 eqStringIdKey		      = mkPreludeMiscIdUnique 16
 noMethodBindingErrorIdKey     = mkPreludeMiscIdUnique 17
 nonExhaustiveGuardsErrorIdKey = mkPreludeMiscIdUnique 18
-errorCStringIdKey	      = mkPreludeMiscIdUnique 19 
+runtimeErrorIdKey	      = mkPreludeMiscIdUnique 19 
 parErrorIdKey		      = mkPreludeMiscIdUnique 20
 parIdKey		      = mkPreludeMiscIdUnique 21
 patErrorIdKey		      = mkPreludeMiscIdUnique 22
@@ -922,6 +946,7 @@ runMainKey		      = mkPreludeMiscIdUnique 56
 
 andIdKey		      = mkPreludeMiscIdUnique 57
 orIdKey			      = mkPreludeMiscIdUnique 58
+thenIOIdKey		      = mkPreludeMiscIdUnique 59
 
 -- Parallel array functions
 nullPIdKey	              = mkPreludeMiscIdUnique 70
@@ -958,7 +983,8 @@ eqClassOpKey		      = mkPreludeMiscIdUnique 109
 geClassOpKey		      = mkPreludeMiscIdUnique 110
 negateClassOpKey	      = mkPreludeMiscIdUnique 111
 failMClassOpKey		      = mkPreludeMiscIdUnique 112
-thenMClassOpKey		      = mkPreludeMiscIdUnique 113 -- (>>=)
+bindMClassOpKey		      = mkPreludeMiscIdUnique 113 -- (>>=)
+thenMClassOpKey		      = mkPreludeMiscIdUnique 114 -- (>>)
 fromEnumClassOpKey	      = mkPreludeMiscIdUnique 115
 returnMClassOpKey	      = mkPreludeMiscIdUnique 117
 toEnumClassOpKey	      = mkPreludeMiscIdUnique 119
@@ -1031,25 +1057,25 @@ derivableClassKeys  = map fst deriving_occ_info
 
 deriving_occ_info
   = [ (eqClassKey, 	[intTyCon_RDR, and_RDR, not_RDR])
-    , (ordClassKey, 	[intTyCon_RDR, compose_RDR, eqTag_RDR])
+    , (ordClassKey, 	[intTyCon_RDR, compose_RDR, eqTag_RDR, error_RDR])
 				-- EQ (from Ordering) is needed to force in the constructors
 				-- as well as the type constructor.
-    , (enumClassKey, 	[intTyCon_RDR, eq_RDR, ge_RDR, and_RDR, map_RDR, plus_RDR, showsPrec_RDR, append_RDR]) 
+    , (enumClassKey, 	[intTyCon_RDR, eq_RDR, ge_RDR, and_RDR, map_RDR, plus_RDR, 
+			 error_RDR, showsPrec_RDR, append_RDR]) 
 				-- The last two Enum deps are only used to produce better
 				-- error msgs for derived toEnum methods.
     , (boundedClassKey,	[intTyCon_RDR])
     , (showClassKey,	[intTyCon_RDR, numClass_RDR, ordClass_RDR, compose_RDR, showString_RDR, 
 			 showParen_RDR, showSpace_RDR, showList___RDR])
-    , (readClassKey,	[intTyCon_RDR, numClass_RDR, ordClass_RDR, append_RDR,
-                         foldr_RDR, build_RDR,
-                             -- foldr and build required for list comprehension
-                             -- KSW 2000-06
-			 lex_RDR, readParen_RDR, readList___RDR, thenM_RDR])
-			     -- returnM (and the rest of the Monad class decl) 
-			     -- will be forced in as result of depending
-			     -- on thenM.   -- SOF 1/99
-    , (ixClassKey,	[intTyCon_RDR, numClass_RDR, and_RDR, map_RDR, enumFromTo_RDR,
-                         foldr_RDR, build_RDR,
+    , (readClassKey,	[intTyCon_RDR, numClass_RDR, ordClass_RDR,
+			 lexP_RDR, readPrec_RDR, 
+			 readListDefault_RDR, readListPrecDefault_RDR,
+			 step_RDR, parens_RDR, reset_RDR, prec_RDR, alt_RDR, choose_RDR,
+			 ident_RDR,	-- Pulls in the entire Lex.Lexeme data type
+			 bindM_RDR	-- Pulls in the entire Monad class decl
+			] )
+    , (ixClassKey,	[intTyCon_RDR, numClass_RDR, and_RDR, map_RDR, enumFromTo_RDR, error_RDR,
+                         foldr_RDR, build_RDR, 
                              -- foldr and build required for list comprehension used
                              -- with single constructor types  -- KSW 2000-06
 			 returnM_RDR, failM_RDR])
