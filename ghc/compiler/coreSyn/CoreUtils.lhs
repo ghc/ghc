@@ -793,6 +793,11 @@ arityType (App f a)  	   = case arityType f of
 							   
 	-- Case/Let; keep arity if either the expression is cheap
 	-- or it's a 1-shot lambda
+	-- The former is not really right for Haskell
+	--	f x = case x of { (a,b) -> \y. e }
+	--  ===>
+	--	f x y = case x of { (a,b) -> e }
+	-- The difference is observable using 'seq'
 arityType (Case scrut _ alts) = case foldr1 andArityType [arityType rhs | (_,_,rhs) <- alts] of
 				  xs@(AFun one_shot _) | one_shot -> xs
 				  xs | exprIsCheap scrut	  -> xs
