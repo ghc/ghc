@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.21 2000/12/04 12:31:20 simonmar Exp $
+ * $Id: Updates.h,v 1.22 2001/01/29 17:23:41 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -60,6 +60,16 @@
 			      (StgClosure *)heapptr);	\
    }
 #endif
+
+#define UPD_STATIC_IND(updclosure, heapptr)			\
+   {								\
+	const StgInfoTable *info;				\
+	info = ((StgClosure *)updclosure)->header.info;		\
+        AWAKEN_STATIC_BQ(info,updclosure);			\
+	updateWithStaticIndirection(info,			\
+			            (StgClosure *)updclosure,	\
+  			            (StgClosure *)heapptr);	\
+   }
 
 #if defined(PROFILING) || defined(TICKY_TICKY)
 #define UPD_PERM_IND(updclosure, heapptr)			\
@@ -157,6 +167,11 @@ extern void awakenBlockedQueue(StgTSO *q);
 
 #define AWAKEN_BQ(info,closure)						\
      	if (info == &stg_BLACKHOLE_BQ_info) {				\
+          DO_AWAKEN_BQ(closure);                                        \
+	}
+
+#define AWAKEN_STATIC_BQ(info,closure)					\
+     	if (info == &stg_BLACKHOLE_BQ_STATIC_info) {			\
           DO_AWAKEN_BQ(closure);                                        \
 	}
 

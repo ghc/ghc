@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.32 2001/01/15 16:55:25 sewardj Exp $
+ * $Id: StgMiscClosures.h,v 1.33 2001/01/29 17:23:41 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -21,8 +21,8 @@ STGFUN(stg_IND_OLDGEN_entry);
 STGFUN(stg_IND_OLDGEN_PERM_entry);
 STGFUN(stg_CAF_UNENTERED_entry);
 STGFUN(stg_CAF_ENTERED_entry);
-STGFUN(stg_CAF_BLACKHOLE_entry);
 STGFUN(stg_BLACKHOLE_entry);
+STGFUN(stg_CAF_BLACKHOLE_entry);
 STGFUN(stg_BLACKHOLE_BQ_entry);
 #ifdef SMP
 STGFUN(stg_WHITEHOLE_entry);
@@ -97,8 +97,8 @@ extern DLL_IMPORT_RTS const StgInfoTable stg_IND_OLDGEN_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_IND_OLDGEN_PERM_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_CAF_UNENTERED_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_CAF_ENTERED_info;
-extern DLL_IMPORT_RTS const StgInfoTable stg_CAF_BLACKHOLE_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_BLACKHOLE_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_CAF_BLACKHOLE_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_BLACKHOLE_BQ_info;
 #ifdef SMP
 extern DLL_IMPORT_RTS const StgInfoTable stg_WHITEHOLE_info;

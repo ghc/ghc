@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.92 2001/01/16 11:50:30 simonmar Exp $
+ * $Id: GC.c,v 1.93 2001/01/29 17:23:40 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -162,6 +162,11 @@ static void         scavenge_mut_once_list  ( generation *g );
 
 #ifdef DEBUG
 static void         gcCAFs                  ( void );
+#endif
+
+#ifdef GHCI
+void revertCAFs   ( void );
+void scavengeCAFs ( void );
 #endif
 
 //@node Garbage Collect, Weak Pointers, Static function declarations
@@ -384,6 +389,10 @@ void GarbageCollect ( void (*get_roots)(void), rtsBool force_major_gc )
       }
     }
   }
+
+#ifdef GHCI
+  scavengeCAFs();
+#endif
 
   /* follow all the roots that the application knows about.
    */
@@ -773,8 +782,8 @@ void GarbageCollect ( void (*get_roots)(void), rtsBool force_major_gc )
   /* check for memory leaks if sanity checking is on */
   IF_DEBUG(sanity, memInventory());
 
-#ifdef RTS_GTK_VISUALS
-  if (RtsFlags.GcFlags.visuals) {
+#ifdef RTS_GTK_FRONTPANEL
+  if (RtsFlags.GcFlags.frontpanel) {
       updateFrontPanelAfterGC( N, live );
   }
 #endif
@@ -1392,8 +1401,6 @@ loop:
   case CONSTR:
   case IND_PERM:
   case IND_OLDGEN_PERM:
-  case CAF_UNENTERED:
-  case CAF_ENTERED:
   case WEAK:
   case FOREIGN:
   case STABLE_NAME:
@@ -1466,10 +1473,6 @@ loop:
 	selectee = ((StgInd *)selectee)->indirectee;
 	goto selector_loop;
 
-      case CAF_ENTERED:
-	selectee = ((StgCAF *)selectee)->value;
-	goto selector_loop;
-
       case EVACUATED:
 	selectee = ((StgEvacuated *)selectee)->evacuee;
 	goto selector_loop;
@@ -1484,7 +1487,6 @@ loop:
       case THUNK_STATIC:
       case THUNK_SELECTOR:
 	/* aargh - do recursively???? */
-      case CAF_UNENTERED:
       case CAF_BLACKHOLE:
       case SE_CAF_BLACKHOLE:
       case SE_BLACKHOLE:
@@ -1523,9 +1525,17 @@ loop:
     return q;
 
   case IND_STATIC:
+#ifdef GHCI
+    /* a revertible CAF - it'll be on the CAF list, so don't do
+     * anything with it here (we'll scavenge it later).
+     */
+    if (((StgIndStatic *)q)->saved_info != NULL) {
+       return q;
+    }
+#endif
     if (major_gc && IND_STATIC_LINK((StgClosure *)q) == NULL) {
-      IND_STATIC_LINK((StgClosure *)q) = static_objects;
-      static_objects = (StgClosure *)q;
+       IND_STATIC_LINK((StgClosure *)q) = static_objects;
+       static_objects = (StgClosure *)q;
     }
     return q;
 
@@ -1979,37 +1989,6 @@ scavenge(step *stp)
       p += sizeofW(StgIndOldGen);
       break;
 
-    case CAF_UNENTERED:
-      {
-	StgCAF *caf = (StgCAF *)p;
-
-	caf->body = evacuate(caf->body);
-	if (failed_to_evac) {
-	  failed_to_evac = rtsFalse;
-	  recordOldToNewPtrs((StgMutClosure *)p);
-	} else {
-	  caf->mut_link = NULL;
-	}
-        p += sizeofW(StgCAF);
-	break;
-      }
-
-    case CAF_ENTERED:
-      {
-	StgCAF *caf = (StgCAF *)p;
-
-	caf->body = evacuate(caf->body);
-	caf->value = evacuate(caf->value);
-	if (failed_to_evac) {
-	  failed_to_evac = rtsFalse;
-	  recordOldToNewPtrs((StgMutClosure *)p);
-	} else {
-	  caf->mut_link = NULL;
-	}
-        p += sizeofW(StgCAF);
-	break;
-      }
-
     case MUT_VAR:
       /* ignore MUT_CONSs */
       if (((StgMutVar *)p)->header.info != &stg_MUT_CONS_info) {
@@ -2273,7 +2252,6 @@ scavenge_one(StgClosure *p)
   case FOREIGN:
   case IND_PERM:
   case IND_OLDGEN_PERM:
-  case CAF_UNENTERED:
     {
       StgPtr q, end;
       
@@ -2434,35 +2412,6 @@ scavenge_mut_once_list(generation *gen)
       } 
       continue;
       
-    case CAF_ENTERED:
-      { 
-	StgCAF *caf = (StgCAF *)p;
-	caf->body  = evacuate(caf->body);
-	caf->value = evacuate(caf->value);
-	if (failed_to_evac) {
-	  failed_to_evac = rtsFalse;
-	  p->mut_link = new_list;
-	  new_list = p;
-	} else {
-	  p->mut_link = NULL;
-	}
-      }
-      continue;
-
-    case CAF_UNENTERED:
-      { 
-	StgCAF *caf = (StgCAF *)p;
-	caf->body  = evacuate(caf->body);
-	if (failed_to_evac) {
-	  failed_to_evac = rtsFalse;
-	  p->mut_link = new_list;
-	  new_list = p;
-	} else {
-          p->mut_link = NULL;
-        }
-      }
-      continue;
-
     default:
       /* shouldn't have anything else on the mutables list */
       barf("scavenge_mut_once_list: strange object? %d", (int)(info->type));
@@ -3057,7 +3006,6 @@ zero_static_object_list(StgClosure* first_static)
  * It doesn't do any harm to zero all the mutable link fields on the
  * mutable list.
  */
-//@cindex zero_mutable_list
 
 static void
 zero_mutable_list( StgMutClosure *first )
@@ -3070,43 +3018,37 @@ zero_mutable_list( StgMutClosure *first )
   }
 }
 
-//@node Reverting CAFs, Sanity code for CAF garbage collection, Scavenging
-//@subsection Reverting CAFs
-
 /* -----------------------------------------------------------------------------
    Reverting CAFs
    -------------------------------------------------------------------------- */
-//@cindex RevertCAFs
 
-void RevertCAFs(void)
+#ifdef GHCI
+
+void
+revertCAFs( void )
 {
-#ifdef INTERPRETER
-   StgInt i;
+    StgIndStatic *c;
 
-   /* Deal with CAFs created by compiled code. */
-   for (i = 0; i < usedECafTable; i++) {
-      SET_INFO( (StgInd*)(ecafTable[i].closure), ecafTable[i].origItbl );
-      ((StgInd*)(ecafTable[i].closure))->indirectee = 0;
-   }
-
-   /* Deal with CAFs created by the interpreter. */
-   while (ecafList != END_ECAF_LIST) {
-      StgCAF* caf  = ecafList;
-      ecafList     = caf->link;
-      ASSERT(get_itbl(caf)->type == CAF_ENTERED);
-      SET_INFO(caf,&CAF_UNENTERED_info);
-      caf->value   = (StgClosure *)0xdeadbeef;
-      caf->link    = (StgCAF *)0xdeadbeef;
-   }
-
-   /* Empty out both the table and the list. */
-   clearECafTable();
-   ecafList = END_ECAF_LIST;
-#endif
+    for (c = (StgIndStatic *)caf_list; c != NULL; c = (StgIndStatic *)c->static_link) {
+	c->header.info = c->saved_info;
+	c->saved_info = NULL;
+	/* could, but not necessary: c->static_link = NULL; */
+    }
+    caf_list = NULL;
 }
 
-//@node Sanity code for CAF garbage collection, Lazy black holing, Reverting CAFs
-//@subsection Sanity code for CAF garbage collection
+void
+scavengeCAFs( void )
+{
+    StgIndStatic *c;
+
+    evac_gen = 0;
+    for (c = (StgIndStatic *)caf_list; c != NULL; c = (StgIndStatic *)c->static_link) {
+	c->indirectee = evacuate(c->indirectee);
+    }
+}
+
+#endif /* GHCI */
 
 /* -----------------------------------------------------------------------------
    Sanity code for CAF garbage collection.
@@ -3288,16 +3230,20 @@ threadSqueezeStack(StgTSO *tso)
 		    frame, prev_frame);
 	     })
     switch (get_itbl(frame)->type) {
-    case UPDATE_FRAME: upd_frames++;
-                       if (frame->updatee->header.info == &stg_BLACKHOLE_info)
-			 bhs++;
-                       break;
-    case STOP_FRAME:  stop_frames++;
-                      break;
-    case CATCH_FRAME: catch_frames++;
-                      break;
-    case SEQ_FRAME: seq_frames++;
-                    break;
+    case UPDATE_FRAME:
+	upd_frames++;
+	if (frame->updatee->header.info == &stg_BLACKHOLE_info)
+	    bhs++;
+	break;
+    case STOP_FRAME:
+	stop_frames++;
+	break;
+    case CATCH_FRAME:
+	catch_frames++;
+	break;
+    case SEQ_FRAME:
+	seq_frames++;
+	break;
     default:
       barf("Found non-frame during stack squeezing at %p (prev frame was %p)\n",
 	   frame, prev_frame);

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.c,v 1.24 2000/12/11 12:37:00 simonmar Exp $
+ * $Id: Sanity.c,v 1.25 2001/01/29 17:23:41 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -282,14 +282,12 @@ checkClosure( StgClosure* p )
     case IND_PERM:
     case IND_OLDGEN:
     case IND_OLDGEN_PERM:
-    case CAF_UNENTERED:
-    case CAF_ENTERED:
-    case CAF_BLACKHOLE:
 #ifdef TICKY_TICKY
-    case SE_CAF_BLACKHOLE:
     case SE_BLACKHOLE:
+    case SE_CAF_BLACKHOLE:
 #endif
     case BLACKHOLE:
+    case CAF_BLACKHOLE:
     case FOREIGN:
     case BCO:
     case STABLE_NAME:

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureTypes.h,v 1.13 2000/04/05 14:26:31 panne Exp $
+ * $Id: ClosureTypes.h,v 1.14 2001/01/29 17:23:41 simonmar Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -47,19 +47,17 @@
 #define IND_PERM	        31
 #define IND_OLDGEN_PERM	        32
 #define IND_STATIC	        33
-#define CAF_UNENTERED           34
-#define CAF_ENTERED		35
-#define CAF_BLACKHOLE		36
-#define RET_BCO                 37
-#define RET_SMALL	        38
-#define RET_VEC_SMALL	        39
-#define RET_BIG		        40
-#define RET_VEC_BIG	        41
-#define RET_DYN		        42
-#define UPDATE_FRAME	        43
-#define CATCH_FRAME	        44
-#define STOP_FRAME	        45
-#define SEQ_FRAME	        46
+#define RET_BCO                 36
+#define RET_SMALL	        37
+#define RET_VEC_SMALL	        38
+#define RET_BIG		        39
+#define RET_VEC_BIG	        40
+#define RET_DYN		        41
+#define UPDATE_FRAME	        42
+#define CATCH_FRAME	        43
+#define STOP_FRAME	        44
+#define SEQ_FRAME	        45
+#define CAF_BLACKHOLE		46
 #define BLACKHOLE	        47
 #define BLACKHOLE_BQ	        48
 #define SE_BLACKHOLE		49

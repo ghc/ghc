@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.60 2001/01/16 12:44:34 sewardj Exp $
+ * $Id: StgMiscClosures.hc,v 1.61 2001/01/29 17:23:41 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -228,7 +228,6 @@ STG_CtoI_RET_D1_Template(stg_ctoi_ret_D1_7_entry);
 
 VEC_POLY_INFO_TABLE(stg_ctoi_ret_D1,0, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, EF_);
 
-
 /* The other way round: when the interpreter returns a value to
    compiled code.  The stack looks like this:
 
@@ -366,34 +365,6 @@ STGFUN(stg_IND_OLDGEN_PERM_entry)
     R1.p = (P_) ((StgInd*)R1.p)->indirectee;
     TICK_ENT_VIA_NODE();
     JMP_(ENTRY_CODE(*R1.p));
-    FE_
-}
-
-/* -----------------------------------------------------------------------------
-   Entry code for CAFs
-
-   This code assumes R1 is in a register for now.
-   -------------------------------------------------------------------------- */
-
-INFO_TABLE(stg_CAF_UNENTERED_info,stg_CAF_UNENTERED_entry,1,3,CAF_UNENTERED,,EF_,0,0);
-STGFUN(stg_CAF_UNENTERED_entry)
-{
-    FB_
-    /* ToDo: implement directly in GHC */
-    Sp -= 1;
-    Sp[0] = R1.w;
-    JMP_(stg_yield_to_interpreter);
-    FE_
-}
-
-/* 0,4 is entirely bogus; _do not_ rely on this info */
-INFO_TABLE(stg_CAF_ENTERED_info,stg_CAF_ENTERED_entry,0,4,CAF_ENTERED,,EF_,0,0);
-STGFUN(stg_CAF_ENTERED_entry)
-{
-    FB_
-    R1.p = (P_) ((StgCAF*)R1.p)->value; /* just a fancy indirection */
-    TICK_ENT_VIA_NODE();
-    JMP_(GET_ENTRY(R1.cl));
     FE_
 }
 
@@ -592,7 +563,7 @@ STGFUN(stg_CAF_BLACKHOLE_entry)
     CurrentTSO->block_info.closure = R1.cl;
     /* closure is mutable since something has just been added to its BQ */
     recordMutable((StgMutClosure *)R1.cl);
-    /* Change the CAF_BLACKHOLE into a BLACKHOLE_BQ */
+    /* Change the CAF_BLACKHOLE into a BLACKHOLE_BQ_STATIC */
     ((StgBlockingQueue *)R1.p)->header.info = &stg_BLACKHOLE_BQ_info;
 
     /* PAR: dumping of event now done in blockThread -- HWL */
@@ -843,7 +814,7 @@ STGFUN(stg_forceIO_ret_entry)
 }
 #else
 INFO_TABLE_SRT_BITMAP(stg_forceIO_ret_info,stg_forceIO_ret_entry,0,0,0,0,RET_SMALL,,EF_,0,0);
-STGFUN(forceIO_ret_entry)
+STGFUN(stg_forceIO_ret_entry)
 {
   StgClosure *rval;
   FB_

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.33 2001/01/24 15:46:19 simonmar Exp $
+ * $Id: Storage.c,v 1.34 2001/01/29 17:23:41 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -198,6 +198,43 @@ exitStorage (void)
 
 /* -----------------------------------------------------------------------------
    CAF management.
+
+   The entry code for every CAF does the following:
+     
+      - builds a CAF_BLACKHOLE in the heap
+      - pushes an update frame pointing to the CAF_BLACKHOLE
+      - invokes UPD_CAF(), which:
+          - calls newCaf, below
+	  - updates the CAF with a static indirection to the CAF_BLACKHOLE
+      
+   Why do we build a BLACKHOLE in the heap rather than just updating
+   the thunk directly?  It's so that we only need one kind of update
+   frame - otherwise we'd need a static version of the update frame too.
+
+   newCaf() does the following:
+       
+      - it puts the CAF on the oldest generation's mut-once list.
+        This is so that we can treat the CAF as a root when collecting
+	younger generations.
+
+   For GHCI, we have additional requirements when dealing with CAFs:
+
+      - we must *retain* all dynamically-loaded CAFs ever entered,
+        just in case we need them again.
+      - we must be able to *revert* CAFs that have been evaluated, to
+        their pre-evaluated form.
+
+      To do this, we use an additional CAF list.  When newCaf() is
+      called on a dynamically-loaded CAF, we add it to the CAF list
+      instead of the old-generation mutable list, and save away its
+      old info pointer (in caf->saved_info) for later reversion.
+
+      To revert all the CAFs, we traverse the CAF list and reset the
+      info pointer to caf->saved_info, then throw away the CAF list.
+      (see GC.c:revertCAFs()).
+
+      -- SDM 29/1/01
+
    -------------------------------------------------------------------------- */
 
 void
@@ -212,30 +249,20 @@ newCAF(StgClosure* caf)
    */
   ACQUIRE_LOCK(&sm_mutex);
 
+#ifdef GHCI
+  if (is_dynamically_loaded_rwdata_ptr((StgPtr)caf)) {
+      ((StgIndStatic *)caf)->saved_info  = (StgInfoTable *)caf->header.info;
+      ((StgIndStatic *)caf)->static_link = caf_list;
+      caf_list = caf;
+  } else {
+      ((StgIndStatic *)caf)->saved_info = NULL;
+      ((StgMutClosure *)caf)->mut_link = oldest_gen->mut_once_list;
+      oldest_gen->mut_once_list = (StgMutClosure *)caf;
+  }
+#else
   ASSERT( ((StgMutClosure*)caf)->mut_link == NULL );
   ((StgMutClosure *)caf)->mut_link = oldest_gen->mut_once_list;
   oldest_gen->mut_once_list = (StgMutClosure *)caf;
-
-#ifdef GHCI
-  /* For dynamically-loaded code, we retain all the CAFs.  There is no
-   * way of knowing which ones we'll need in the future.
-   */
-  if (is_dynamically_loaded_rwdata_ptr((StgPtr)caf)) {
-      caf->payload[2] = caf_list; /* IND_STATIC_LINK2() */
-      caf_list = caf;
-  }
-#endif
-
-#ifdef INTERPRETER
-  /* If we're Hugs, we also have to put it in the CAF table, so that
-     the CAF can be reverted.  When reverting, CAFs created by compiled
-     code are recorded in the CAF table, which lives outside the
-     heap, in mallocville.  CAFs created by interpreted code are
-     chained together via the link fields in StgCAFs, and are not
-     recorded in the CAF table.
-  */
-  ASSERT( get_itbl(caf)->type == THUNK_STATIC );
-  addToECafTable ( caf, get_itbl(caf) );
 #endif
 
   RELEASE_LOCK(&sm_mutex);
@@ -252,58 +279,6 @@ markCafs( void )
     }
 }
 #endif /* GHCI */
-
-#ifdef INTERPRETER
-void
-newCAF_made_by_Hugs(StgCAF* caf)
-{
-  ACQUIRE_LOCK(&sm_mutex);
-
-  ASSERT( get_itbl(caf)->type == CAF_ENTERED );
-  recordOldToNewPtrs((StgMutClosure*)caf);
-  caf->link = ecafList;
-  ecafList = caf->link;
-
-  RELEASE_LOCK(&sm_mutex);
-}
-#endif
-
-#ifdef INTERPRETER
-/* These initialisations are critical for correct operation
-   on the first call of addToECafTable. 
-*/
-StgCAF*         ecafList      = END_ECAF_LIST;
-StgCAFTabEntry* ecafTable     = NULL;
-StgInt          usedECafTable = 0;
-StgInt          sizeECafTable = 0;
-
-
-void clearECafTable ( void )
-{
-   usedECafTable = 0;
-}
-
-void addToECafTable ( StgClosure* closure, StgInfoTable* origItbl )
-{
-   StgInt          i;
-   StgCAFTabEntry* et2;
-   if (usedECafTable == sizeECafTable) {
-      /* Make the initial table size be 8 */
-      sizeECafTable *= 2;
-      if (sizeECafTable == 0) sizeECafTable = 8;
-      et2 = stgMallocBytes ( 
-               sizeECafTable * sizeof(StgCAFTabEntry),
-               "addToECafTable" );
-      for (i = 0; i < usedECafTable; i++) 
-         et2[i] = ecafTable[i];
-      if (ecafTable) free(ecafTable);
-      ecafTable = et2;
-   }
-   ecafTable[usedECafTable].closure  = closure;
-   ecafTable[usedECafTable].origItbl = origItbl;
-   usedECafTable++;
-}
-#endif
 
 /* -----------------------------------------------------------------------------
    Nursery management.

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.24 2001/01/26 14:36:40 simonpj Exp $
+ * $Id: Storage.h,v 1.25 2001/01/29 17:23:41 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -533,9 +533,6 @@ static __inline__ StgOffset THUNK_SELECTOR_sizeW ( void )
 
 static __inline__ StgOffset BLACKHOLE_sizeW ( void )                    
 { return sizeofW(StgHeader) + MIN_UPD_SIZE; }
-
-static __inline__ StgOffset CAF_sizeW ( void )                    
-{ return sizeofW(StgCAF); }
 
 /* --------------------------------------------------------------------------
  * Sizes of closures

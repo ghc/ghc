@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.14 2001/01/28 20:53:38 qrczak Exp $
+ * $Id: Linker.c,v 1.15 2001/01/29 17:23:41 simonmar Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -151,7 +151,6 @@ static int ocResolve_PEi386     ( ObjectCode* oc );
       SymX(stg_WEAK_info)                       \
       SymX(stg_CHARLIKE_closure)		\
       SymX(stg_INTLIKE_closure)			\
-      SymX(stg_CAF_UNENTERED_entry)		\
       SymX(newCAF)				\
       SymX(newBCOzh_fast)			\
       SymX(mkApUpd0zh_fast)			\

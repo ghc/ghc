@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Closures.h,v 1.24 2000/12/19 16:48:58 sewardj Exp $
+ * $Id: Closures.h,v 1.25 2001/01/29 17:23:41 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -186,18 +186,13 @@ typedef struct {
 } StgIndOldGen;
 
 typedef struct {
-    StgHeader   header;
-    StgClosure *indirectee;
-    StgClosure *static_link;
-} StgIndStatic;
-
-typedef struct StgCAF_ {
     StgHeader     header;
-    StgClosure    *body;
-    StgMutClosure *mut_link;
-    StgClosure    *value;
-    struct StgCAF_ *link;
-} StgCAF;
+    StgClosure   *indirectee;
+    StgClosure   *static_link;
+#ifdef GHCI
+    struct _StgInfoTable *saved_info;
+#endif
+} StgIndStatic;
 
 typedef struct {
     StgHeader  header;

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.33 2001/01/15 16:55:25 sewardj Exp $
+ * $Id: Printer.c,v 1.34 2001/01/29 17:23:41 simonmar Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -144,32 +144,6 @@ void printClosure( StgClosure *obj )
             printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
             fprintf(stderr,")\n"); 
             break;
-
-    case CAF_UNENTERED:
-        {
-	    StgCAF* caf = stgCast(StgCAF*,obj);
-            fprintf(stderr,"CAF_UNENTERED("); 
-            printPtr((StgPtr)caf->body);
-            fprintf(stderr,", ");
-            printPtr((StgPtr)caf->value); /* should be null */
-            fprintf(stderr,", ");
-            printPtr((StgPtr)caf->link);
-            fprintf(stderr,")\n"); 
-            break;
-        }
-
-    case CAF_ENTERED:
-        {
-	    StgCAF* caf = stgCast(StgCAF*,obj);
-            fprintf(stderr,"CAF_ENTERED("); 
-            printPtr((StgPtr)caf->body);
-            fprintf(stderr,", ");
-            printPtr((StgPtr)caf->value);
-            fprintf(stderr,", ");
-            printPtr((StgPtr)caf->link);
-            fprintf(stderr,")\n"); 
-            break;
-        }
 
     case CAF_BLACKHOLE:
             fprintf(stderr,"CAF_BH("); 
@@ -563,8 +537,6 @@ static char *closure_type_names[] = {
   "IND_PERM",	        	/* 31 */
   "IND_OLDGEN_PERM",	        /* 32 */
   "IND_STATIC",	        	/* 33 */
-  "CAF_UNENTERED",           	/* 34 */
-  "CAF_ENTERED",		/* 35 */
   "CAF_BLACKHOLE",		/* 36 */
   "RET_BCO",                 	/* 37 */
   "RET_SMALL",	        	/* 38 */
