@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: codegen.c,v $
- * $Revision: 1.9 $
- * $Date: 1999/10/15 21:41:02 $
+ * $Revision: 1.10 $
+ * $Date: 1999/11/11 16:27:30 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -165,17 +165,8 @@ static Void pushAtom( AsmBCO bco, StgAtom e )
             asmConstInteger(bco,bignumToString(e)); 
             break;
     case FLOATCELL: 
-#if 0
-            asmConstFloat(bco,e); /* ToDo: support both float and double! */
-#else
             asmConstDouble(bco,floatOf(e));
-#endif
             break;
-#if DOUBLES
-    case DOUBLECELL: 
-            asmConstDouble(bco,doubleOf(e));
-            break;
-#endif
     case STRCELL: 
 #if USE_ADDR_FOR_STRINGS
             asmConstAddr(bco,textToStr(textOf(e)));
