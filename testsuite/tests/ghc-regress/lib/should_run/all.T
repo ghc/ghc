@@ -15,6 +15,7 @@ test "enum03"  		{ lang_vtr("-cpp","","") }
 test "enum04"  		{ $expect = "fail" lang_vtr("","","") }
 test "exceptions001"  	{ lang_vtr("","","") }
 test "list001"		{ lang_vtr("","","") }
+test "list002"		{ lang_vtr("","","") }
 test "memo001"		{ lang_vtr("-package util","+RTS -A10k -G1 -RTS","") }
 test "memo002"		{ lang_vtr("-package util","20","") }
 test "packedstring001"  { lang_vtr("","","") }
