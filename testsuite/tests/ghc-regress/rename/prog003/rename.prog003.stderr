@@ -1,2 +1,2 @@
 
-B.hs:4:5: Type constructor or class not in scope: `Class'
+B.hs:4:5: Not in scope: type constructor or class `Class'
