@@ -223,12 +223,13 @@ seqDmd  = Seq Keep []	-- Polymorphic seq demand
 evalDmd = Eval
 
 isStrictDmd :: Demand -> Bool
-isStrictDmd Bot       = True
-isStrictDmd Err	      = True    	   
-isStrictDmd (Seq _ _) = True
-isStrictDmd Eval      = True
-isStrictDmd (Call _)  = True
-isStrictDmd other     = False
+isStrictDmd Bot       	 = True
+isStrictDmd Err	      	 = True    	   
+isStrictDmd (Seq Drop _) = True	-- But not Defer!
+isStrictDmd (Seq Keep _) = True
+isStrictDmd Eval      	 = True
+isStrictDmd (Call _)  	 = True
+isStrictDmd other     	 = False
 
 instance Outputable Demand where
     ppr Lazy 	   = char 'L'
