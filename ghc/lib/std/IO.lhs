@@ -886,7 +886,6 @@ openFile_main f mode
 hClose :: Handle -> IO ()
 hClose h
    = do mut <- readIORef (mut h)
-        putStrLn ( "hClose: state is " ++ show mut)
         if    state mut == HClosed
          then mkErr h
                  ("hClose on closed handle " ++ show h)
