@@ -156,7 +156,7 @@ endif
 # These are droppings from hsc2hs - ignore them if we see them.
 EXCLUDED_C_SRCS += $(patsubst %.hsc, %_hsc_make.c, $(HSC_SRCS))
 
-C_SRCS      = $(filter-out $(EXCLUDED_C_SRCS),$(filter %.c,$(SRCS)))
+C_SRCS      = $(filter-out $(EXCLUDED_C_SRCS),$(filter %.c %.S,$(SRCS)))
 C_OBJS      = $(addsuffix .$(way_)o,$(basename $(C_SRCS)))
 
 # SCRIPT_SRCS:  list of raw script files (in literate form)
