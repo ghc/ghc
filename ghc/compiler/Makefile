@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.211 2002/02/13 20:14:42 sof Exp $
+# $Id: Makefile,v 1.212 2002/02/14 08:23:25 sof Exp $
 
 TOP = ..
 
@@ -144,27 +144,6 @@ endif
 
 # There are some C files to include in HS_PROG, so add these to HS_OBJS
 HS_OBJS	 += $(C_OBJS)
-
-# -----------------------------------------------
-# system hack.
-#
-# GHCi calls the C procedure 'rawSystem'; but alas GHC 4.08 
-# does not have this.  Everything is fine if you are compiling
-# GHC with GHC 5.02 or better, but lacking that we have the following
-# hack: 
-#	copy rawSystem.c from hslibs/lang/cbits
-#	into main/ (where it'll be compiled and linked with the compiler)
-#       (the Haskell-side code is ifdefed into main/SysTools.lhs)
-
-ifeq "$(bootstrapped)/$(ghc_502_at_least)" "NO/NO"
-SRC_CC_OPTS += -I$(GHC_LIB_DIR)/std/cbits
-SRC_MKDEPENDC_OPTS += -I$(GHC_LIB_DIR)/std/cbits
-ALL_SRCS += main/rawSystem.c
-main/rawSystem.c : $(FPTOOLS_TOP)/hslibs/lang/cbits/rawSystem.c
-	$(CP) $< main/
-else
-EXCLUDED_SRCS = main/rawSystem.c
-endif
 
 # -----------------------------------------------
 # mkdependC stuff

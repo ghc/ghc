@@ -81,24 +81,15 @@ import List		( isPrefixOf )
 import MarshalArray
 #endif
 
--- This is a kludge for bootstrapping with 4.08.X.  Given that
--- all distributed compilers >= 5.0 will be compiled with themselves.
--- I don't think this kludge is a problem.  And we have to start
--- building with >= 5.0 on Win32 anyway.
 #if __GLASGOW_HASKELL__ > 408
--- use the line below when we can be sure of compiling with GHC >=
--- 5.02, and remove the implementation of rawSystem at the end of this
--- file
 # if __GLASGOW_HASKELL__ >= 503
 import GHC.IOBase
 # else
-import PrelIOBase -- this can be removed when SystemExts is used
 # endif
 # ifdef mingw32_TARGET_OS
 import SystemExts       ( rawSystem )
 # endif
 #else
-import CError           ( throwErrnoIfMinus1 ) -- as can this
 import System		( system )
 #endif
 
@@ -864,15 +855,12 @@ getProcessID = Posix.getProcessID
 
 #if defined(mingw32_TARGET_OS) && (__GLASGOW_HASKELL__ <= 408)
 rawSystem :: String -> IO ExitCode
-rawSystem "" = ioException (IOError Nothing InvalidArgument "rawSystem" "null command" Nothing)
-rawSystem cmd =
-  withCString cmd $ \s -> do
-    status <- throwErrnoIfMinus1 "rawSystem" (primRawSystem s)
-    case status of
-        0  -> return ExitSuccess
-        n  -> return (ExitFailure n)
-
-foreign import ccall "rawSystemCmd" unsafe primRawSystem :: CString -> IO Int
+rawSystem cmd = system cmd
+ -- mingw only: if you try to build a stage2 compiler with a stage1
+ -- that has been bootstrapped with 4.08 (or earlier), this will run
+ -- into problems with limits on command-line lengths with the std.
+ -- Win32 command interpreters. So don't this - use 5.00 or later
+ -- to compile up the GHC sources.
 #endif
 
 
