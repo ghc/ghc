@@ -21,7 +21,12 @@ module Lex (
 
 IMPORT_1_3(Char(isDigit, isAlpha, isAlphanum, isUpper,isLower, isSpace, ord))
 IMPORT_DELOOPER(Ubiq)
+
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(IdLoop)    -- get the CostCentre type&constructors from here
+#else
+import {-# SOURCE #-} CostCentre
+#endif
 
 import CmdLineOpts	( opt_IgnoreIfacePragmas )
 import Demand		( Demand(..) {- instance Read -} )
@@ -398,14 +403,14 @@ lex_scc buf =
 	                case untilChar# buf '/'# of
 	                 buf' -> 
                           let mod_name = lexemeToFastString buf' in
-	                  case untilChar# (stepOn (stepOverLexeme buf')) '/'# of
-	                   buf'' -> 
-                            let grp_name = lexemeToFastString buf'' in
-			    case untilChar# (stepOn (stepOverLexeme buf'')) '\"'# of
-			     buf''' ->
-			       let cc_name = lexemeToFastString buf''' in
-			       (mkUserCC cc_name mod_name grp_name, 
-			        stepOn (stepOverLexeme buf'''))
+--	                  case untilChar# (stepOn (stepOverLexeme buf')) '/'# of
+--	                   buf'' -> 
+--                            let grp_name = lexemeToFastString buf'' in
+			    case untilChar# (stepOn (stepOverLexeme buf')) '\"'# of
+			     buf'' ->
+			       let cc_name = lexemeToFastString buf'' in
+			       (mkUserCC cc_name mod_name _NIL_{-grp_name-}, 
+			        stepOn (stepOverLexeme buf''))
                       in
                       case prefixMatch (stepOn buf) "CAF:" of
                        Just buf' ->
