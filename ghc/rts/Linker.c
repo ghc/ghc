@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.62 2001/08/31 14:32:03 sewardj Exp $
+ * $Id: Linker.c,v 1.63 2001/09/04 16:33:04 sewardj Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -138,6 +138,7 @@ typedef struct _RtsSymbolVal {
       Sym(mktime)                               \
       Sym(_imp___timezone)                      \
       Sym(_imp___tzname)                        \
+      Sym(_imp___iob)                           \
       Sym(localtime)                            \
       Sym(gmtime)                               \
       SymX(getenv)                              \
@@ -506,15 +507,15 @@ lookupSymbol( char *lbl )
         void* sym;
         for (o_dll = opened_dlls; o_dll != NULL; o_dll = o_dll->next) {
            /* fprintf(stderr, "look in %s for %s\n", o_dll->name, lbl); */
-	   if (lbl[0] == '_') {
-	     /* HACK: if the name has an initial underscore, try stripping
-		it off & look that up first. I've yet to verify whether there's
-		a Rule that governs whether an initial '_' *should always* be
-		stripped off when mapping from import lib name to the DLL name.
-	     */
-	     sym = GetProcAddress(o_dll->instance, (lbl+1));
-	     if (sym != NULL) return sym;
-	   }
+           if (lbl[0] == '_') {
+              /* HACK: if the name has an initial underscore, try stripping
+                 it off & look that up first. I've yet to verify whether there's
+                 a Rule that governs whether an initial '_' *should always* be
+                 stripped off when mapping from import lib name to the DLL name.
+              */
+              sym = GetProcAddress(o_dll->instance, (lbl+1));
+              if (sym != NULL) return sym;
+           }
            sym = GetProcAddress(o_dll->instance, lbl);
            if (sym != NULL) return sym;
         }
@@ -741,6 +742,21 @@ static void checkProddableBlock ( ObjectCode* oc, void* addr )
    }
    barf("checkProddableBlock: invalid fixup in runtime linker");
 }
+
+/* -----------------------------------------------------------------------------
+ * Section management.
+ */
+static void addSection ( ObjectCode* oc, SectionKind kind,
+                         void* start, void* end )
+{
+   Section* s   = stgMallocBytes(sizeof(Section), "addSection");
+   s->start     = start;
+   s->end       = end;
+   s->kind      = kind;
+   s->next      = oc->sections;
+   oc->sections = s;
+}
+
 
 
 /* --------------------------------------------------------------------------
@@ -1015,8 +1031,14 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
             (int)(hdr->Characteristics));
       return 0;
    }
+   /* If the string table size is way crazy, this might indicate that
+      there are more than 64k relocations, despite claims to the
+      contrary.  Hence this test. */
    /* fprintf(stderr, "strtab size %d\n", * (UInt32*)strtab); */
-   if (* (UInt32*)strtab > 510000) {
+   if (* (UInt32*)strtab > 600000) {
+      /* Note that 600k has no special significance other than being
+         big enough to handle the almost-2MB-sized lumps that
+         constitute HSwin32*.o. */
       belch("PEi386 object has suspiciously large string table; > 64k relocs?");
       return 0;
    }
@@ -1186,7 +1208,56 @@ ocGetNames_PEi386 ( ObjectCode* oc )
                               "ocGetNames_PEi386(anonymous bss)");
       sectab_i->PointerToRawData = ((UChar*)zspace) - ((UChar*)(oc->image));
       addProddableBlock(oc, zspace, sectab_i->VirtualSize);
-      /* fprintf(stderr, "BSS section at 0x%x\n", zspace); */
+      /* fprintf(stderr, "BSS anon section at 0x%x\n", zspace); */
+   }
+
+   /* Copy section information into the ObjectCode. */
+
+   for (i = 0; i < hdr->NumberOfSections; i++) {
+      UChar* start;
+      UChar* end;
+      UInt32 sz;
+
+      SectionKind kind 
+         = SECTIONKIND_OTHER;
+      COFF_section* sectab_i
+         = (COFF_section*)
+           myindex ( sizeof_COFF_section, sectab, i );
+      IF_DEBUG(linker, belch("section name = %s\n", sectab_i->Name ));
+
+#     if 0
+      /* I'm sure this is the Right Way to do it.  However, the 
+         alternative of testing the sectab_i->Name field seems to
+         work ok with Cygwin.
+      */
+      if (sectab_i->Characteristics & MYIMAGE_SCN_CNT_CODE || 
+          sectab_i->Characteristics & MYIMAGE_SCN_CNT_INITIALIZED_DATA)
+         kind = SECTIONKIND_CODE_OR_RODATA;
+#     endif
+
+      if (0==strcmp(".text",sectab_i->Name) ||
+          0==strcmp(".rodata",sectab_i->Name))
+         kind = SECTIONKIND_CODE_OR_RODATA;
+      if (0==strcmp(".data",sectab_i->Name) ||
+          0==strcmp(".bss",sectab_i->Name))
+         kind = SECTIONKIND_RWDATA;
+
+      ASSERT(sectab_i->SizeOfRawData == 0 || sectab_i->VirtualSize == 0);
+      sz = sectab_i->SizeOfRawData;
+      if (sz < sectab_i->VirtualSize) sz = sectab_i->VirtualSize;
+
+      start = ((UChar*)(oc->image)) + sectab_i->PointerToRawData;
+      end   = start + sz - 1;
+
+      if (kind == SECTIONKIND_OTHER) {
+         belch("Unknown PEi386 section name `%s'", sectab_i->Name);
+         return 0;
+      }
+
+      if (end >= start) {
+         addSection(oc, kind, start, end);
+         addProddableBlock(oc, start, end - start + 1);
+      }
    }
 
    /* Copy exported symbols into the ObjectCode. */
@@ -1230,7 +1301,10 @@ ocGetNames_PEi386 ( ObjectCode* oc )
             Allocate zeroed space for it. */
          addr = stgCallocBytes(1, symtab_i->Value, 
                                "ocGetNames_PEi386(non-anonymous bss)");
+         addSection(oc, SECTIONKIND_RWDATA, addr, 
+                        ((UChar*)addr) + symtab_i->Value - 1);
          addProddableBlock(oc, addr, symtab_i->Value);
+         /* fprintf(stderr, "BSS      section at 0x%x\n", addr); */
       }
 
       if (addr != NULL) {
@@ -1267,58 +1341,6 @@ ocGetNames_PEi386 ( ObjectCode* oc )
 
       i += symtab_i->NumberOfAuxSymbols;
       i++;
-   }
-
-   /* Copy section information into the ObjectCode. */
-
-   oc->n_sections = hdr->NumberOfSections;
-   oc->sections = stgMallocBytes( oc->n_sections * sizeof(Section), 
-                                  "ocGetNamesPEi386" );
-
-   for (i = 0; i < oc->n_sections; i++) {
-      UChar* start;
-      UChar* end;
-
-      SectionKind kind 
-         = SECTIONKIND_OTHER;
-      COFF_section* sectab_i
-         = (COFF_section*)
-           myindex ( sizeof_COFF_section, sectab, i );
-      IF_DEBUG(linker, belch("section name = %s\n", sectab_i->Name ));
-
-#     if 0
-      /* I'm sure this is the Right Way to do it.  However, the 
-         alternative of testing the sectab_i->Name field seems to
-         work ok with Cygwin.
-      */
-      if (sectab_i->Characteristics & MYIMAGE_SCN_CNT_CODE || 
-          sectab_i->Characteristics & MYIMAGE_SCN_CNT_INITIALIZED_DATA)
-         kind = SECTIONKIND_CODE_OR_RODATA;
-#     endif
-
-      if (0==strcmp(".text",sectab_i->Name) ||
-          0==strcmp(".rodata",sectab_i->Name))
-         kind = SECTIONKIND_CODE_OR_RODATA;
-      if (0==strcmp(".data",sectab_i->Name) ||
-          0==strcmp(".bss",sectab_i->Name))
-         kind = SECTIONKIND_RWDATA;
-
-      start = ((UChar*)(oc->image)) 
-              + sectab_i->PointerToRawData;
-      end   = start 
-              + sectab_i->SizeOfRawData - 1;
-
-      if (kind == SECTIONKIND_OTHER) {
-         belch("Unknown PEi386 section name `%s'", sectab_i->Name);
-         return 0;
-      }
-
-      if (end >= start) {
-         oc->sections[i].start = start;
-         oc->sections[i].end   = end;
-         oc->sections[i].kind  = kind;
-         addProddableBlock(oc, start, end - start + 1);
-      }
    }
 
    return 1;   
@@ -1406,14 +1428,18 @@ ocResolve_PEi386 ( ObjectCode* oc )
                    + sym->Value);
          } else {
             copyName ( sym->Name, strtab, symbol, 1000-1 );
+            (void*)S = lookupLocalSymbol( oc, symbol );
+            if ((void*)S != NULL) goto foundit;
+            (void*)S = lookupSymbol( symbol );
+            if ((void*)S != NULL) goto foundit;
             zapTrailingAtSign ( symbol );
             (void*)S = lookupLocalSymbol( oc, symbol );
-            if ((void*)S == NULL)
-               (void*)S = lookupSymbol( symbol );
-            if (S == 0) {
-	        belch("%s: unknown symbol `%s'", oc->fileName, symbol);
-	        return 0;
-            }
+            if ((void*)S != NULL) goto foundit;
+            (void*)S = lookupSymbol( symbol );
+            if ((void*)S != NULL) goto foundit;
+            belch("%s: unknown symbol `%s'", oc->fileName, symbol);
+            return 0;
+           foundit:
          }
          checkProddableBlock(oc, pP);
          switch (reltab_j->Type) {

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: LinkerInternals.h,v 1.4 2001/08/29 15:12:21 sewardj Exp $
+ * $Id: LinkerInternals.h,v 1.5 2001/09/04 16:33:04 sewardj Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -13,13 +13,20 @@ typedef enum { OBJECT_LOADED, OBJECT_RESOLVED } OStatus;
    the GC for deciding whether or not a pointer on the stack
    is a code pointer.
 */
-typedef enum { SECTIONKIND_CODE_OR_RODATA,
-               SECTIONKIND_RWDATA,
-               SECTIONKIND_OTHER,
-               SECTIONKIND_NOINFOAVAIL } 
+typedef 
+   enum { SECTIONKIND_CODE_OR_RODATA,
+          SECTIONKIND_RWDATA,
+          SECTIONKIND_OTHER,
+          SECTIONKIND_NOINFOAVAIL } 
    SectionKind;
 
-typedef struct { void* start; void* end; SectionKind kind; } 
+typedef 
+   struct _Section { 
+      void* start; 
+      void* end; 
+      SectionKind kind;
+      struct _Section* next;
+   } 
    Section;
 
 typedef 
@@ -49,9 +56,9 @@ typedef struct _ObjectCode {
     /* ptr to malloc'd lump of memory holding the obj file */
     void*      image;
 
-    /* The section-kind entries for this object module.  Dynamically expands. */
-    Section*   sections;
-    int        n_sections;
+    /* The section-kind entries for this object module.  Linked
+       list. */
+    Section* sections;
 
     /* A private hash table for local symbols. */
     HashTable* lochash;

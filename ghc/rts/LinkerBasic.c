@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: LinkerBasic.c,v 1.3 2001/08/14 13:40:09 sewardj Exp $
+ * $Id: LinkerBasic.c,v 1.4 2001/09/04 16:33:04 sewardj Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -25,14 +25,13 @@ ObjectCode *objects = NULL;	/* initially empty */
 static __inline__ SectionKind
 lookupSection ( void* addr )
 {
-   int          i;
-   ObjectCode*  oc;
+   Section*    se;
+   ObjectCode* oc;
    
-   for ( oc = objects; oc; oc = oc->next ) {
-       for (i = 0; i < oc->n_sections; i++) {
-	   if (oc->sections[i].start <= addr 
-	       && addr <= oc->sections[i].end)
-	       return oc->sections[i].kind;
+   for (oc=objects; oc; oc=oc->next) {
+       for (se=oc->sections; se; se=se->next) {
+	   if (se->start <= addr && addr <= se->end)
+	       return se->kind;
        }
    }
    return SECTIONKIND_OTHER;
