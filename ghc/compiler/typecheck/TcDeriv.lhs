@@ -44,7 +44,7 @@ import Id		( dataConArgTys, isNullaryDataCon, mkDictFunId )
 import PrelInfo		( needsDataDeclCtxtClassKeys )
 import Maybes		( maybeToBool )
 import Name		( isLocallyDefined, getSrcLoc, ExportFlag(..), Provenance, 
-			  Name{--O only-}, SYN_IE(Module)
+			  Name{--O only-}, SYN_IE(Module), NamedThing(..)
 			)
 import Outputable	( PprStyle(..), Outputable(..){-instances e.g., (,)-} )
 import PprType		( GenType, GenTyVar, GenClass, TyCon )

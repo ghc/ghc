@@ -19,7 +19,7 @@ IMP_Ubiq()
 -- friends: 
 import TcMonad
 import Type	( GenType(..), typeKind, mkFunTy, getFunTy_maybe, splitAppTys )
-import TyCon	( TyCon, mkFunTyCon, isTupleTyCon, tyConArity )
+import TyCon	( TyCon, mkFunTyCon, isTupleTyCon, tyConArity, SYN_IE(Arity) )
 import Class	( GenClass )
 import TyVar	( GenTyVar(..), SYN_IE(TyVar), tyVarKind )
 import TcType	( SYN_IE(TcType), TcMaybe(..), SYN_IE(TcTauType), SYN_IE(TcTyVar),

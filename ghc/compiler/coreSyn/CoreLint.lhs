@@ -12,6 +12,7 @@ module CoreLint (
     ) where
 
 IMP_Ubiq()
+IMPORT_1_3(IO(hPutStr,stderr))
 
 import CmdLineOpts      ( opt_D_show_passes, opt_PprUserLength, opt_DoCoreLinting )
 import CoreSyn
