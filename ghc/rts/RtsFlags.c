@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.57 2002/07/17 09:21:50 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.58 2002/07/18 09:13:10 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -840,10 +840,6 @@ error = rtsTrue;
 	      case 'R':
 		  PROFILING_BUILD_ONLY(
 		      RtsFlags.ProfFlags.maxRetainerSetSize = atof(rts_argv[arg]+2);
-		      
-		      if (RtsFlags.ProfFlags.maxRetainerSetSize < 0)
-		         bad_option( rts_argv[arg] );
-		      break;
   	          ) break;
 
 	      case 'h': /* serial heap profile */
