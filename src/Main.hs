@@ -833,7 +833,7 @@ getReExports mdl mod_map exported exported_visible
   where
    invisible_names = [ n | n <- exported, n `notElem` exported_visible ]
 
-   get_name (UnQual _) = error "getReExports"
+   get_name (UnQual _) = []
    get_name (Qual m n) = 
 	case lookupFM mod_map m of
 	    Nothing -> []
