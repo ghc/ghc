@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.146 2002/12/11 15:36:42 simonmar Exp $
+ * $Id: GC.c,v 1.147 2003/02/12 11:59:49 simonmar Exp $
  *
- * (c) The GHC Team 1998-2002
+ * (c) The GHC Team 1998-2003
  *
  * Generational garbage collector
  *
@@ -2059,8 +2059,19 @@ selector_loop:
 	      // because we are guaranteed that p is in a generation
 	      // that we are collecting, and we never want to put the
 	      // indirection on a mutable list.
+#ifdef PROFILING
+	      // For the purposes of LDV profiling, we have destroyed
+	      // the original selector thunk.
+	      SET_INFO(p, info_ptr);
+	      LDV_recordDead_FILL_SLOP_DYNAMIC(selectee);
+#endif
 	      ((StgInd *)selectee)->indirectee = val;
 	      SET_INFO(selectee,&stg_IND_info);
+#ifdef PROFILING
+	      // For the purposes of LDV profiling, we have created an
+	      // indirection.
+	      LDV_recordCreate(selectee);
+#endif
 	      selectee = val;
 	      goto selector_loop;
 	  }
