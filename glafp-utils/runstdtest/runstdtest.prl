@@ -41,7 +41,8 @@
 #
 ($Pgm = $0) =~ s|.*/||;
 $Verbose = 0;
-$SaveTmpFile = 0;
+$SaveStderr = 0;
+$SaveStdout = 0;
 $Status = 0;
 @PgmArgs = ();
 $PgmExitStatus = 0;
@@ -77,7 +78,9 @@ arg: while ($_ = $ARGV[0]) {
 			last arg; };
 
     /^-v$/	       && do { $Verbose = 1; next arg; };
-    /^-accept-output$/ && do { $SaveTmpFile = 1; next arg; };
+    /^-accept-output-stderr$/ && do { $SaveStderr = 1; next arg; };
+    /^-accept-output-stdout$/ && do { $SaveStdout = 1; next arg; };
+    /^-accept-output$/        && do { $SaveStdout = 1; $SaveStderr = 1; next arg; };
 
     /^-O(.*)/	&& do { push(@PgmArgs, &grab_arg_arg('-O',$1)); next arg; };
     /^-i(.*)/	&& do { $PgmStdinFile = &grab_arg_arg('-i',$1);
@@ -115,22 +118,16 @@ arg: while ($_ = $ARGV[0]) {
 }
 
 foreach $out_file ( @PgmStdoutFile ) {
-    if ( ! -f $out_file ) {
-        #$Status++;
-    	print STDERR "$Pgm: warning: expected-stdout file missing: $out_file\n";
-	pop(@PgmStdoutFile);
+    if ( ! -f $out_file && !$SaveStdout ) {
+    	    print STDERR "$Pgm: warning: expected-stderr file missing: $out_file\n";
+	    pop(@PgmStdoutFile);
     }
 }
 
 foreach $out_file ( @PgmStderrFile ) {
-    if ( ! -f $out_file ) {
-	#$Status++;
-        pop(@PgmStderrFile);
-	if ( $SaveTmpFile ) {
-	    system("touch $out_file");
-	} else {
-    	    print STDERR "$Pgm: warning: expected-stderr file missing: $out_file\n";
-	}
+    if ( ! -f $out_file && !$SaveStderr ) {
+   	    print STDERR "$Pgm: warning: expected-stderr file missing: $out_file\n";
+	    pop(@PgmStderrFile);
     }
 }
 
@@ -237,14 +234,19 @@ else
     if [ \$hit = 'NO' ] ; then
 	echo $ToRun @PgmArgs \\< $PgmStdinFile
 	echo expected stdout not matched by reality
-	${CONTEXT_DIFF} $PgmStdoutFile[0] $TmpPrefix/runtest$$.1
-	myexit=1
+	orig_file="$PgmStdoutFile[0]";
+	[ ! -f \$orig_file ] && orig_file="/dev/null"
+	${CONTEXT_DIFF} \$orig_file $TmpPrefix/runtest$$.1
+	myexit=\$?
 	diffsShown=1
     fi
-    if [ $SaveTmpFile = 1 ] && [ \$progexit = $PgmExitStatus ] ; then
-	rm -f $PgmStdoutFile[0].bak
+    if [ $SaveStdout = 1 ] && [ \$progexit = $PgmExitStatus ] && 
+       [ $PgmStdoutFile[0] != $DefaultStdoutFile ] && [ -s $TmpPrefix/runtest$$.1 ]; then
 	echo Saving away stdout output in $PgmStdoutFile[0] ...
-	cp $PgmStdoutFile[0] $PgmStdoutFile[0].bak
+	if [ -f $PgmStdoutFile[0] ]; then
+	     rm -f $PgmStdoutFile[0].bak
+	     cp $PgmStdoutFile[0] $PgmStdoutFile[0].bak
+	fi;
 	cp $TmpPrefix/runtest$$.1 $PgmStdoutFile[0]
     fi
 fi
@@ -260,14 +262,19 @@ done
 if [ \$hit = 'NO' ] ; then
     echo $ToRun @PgmArgs \\< $PgmStdinFile
     echo expected stderr not matched by reality
-    ${CONTEXT_DIFF} $PgmStderrFile[0] $TmpPrefix/runtest$$.2
-    myexit=1
+    orig_file="$PgmStderrFile[0]"
+    [ ! -f \$orig_file ] && orig_file="/dev/null"
+    ${CONTEXT_DIFF} \$orig_file $TmpPrefix/runtest$$.2
+    myexit=\$?
     diffsShown=1
 fi
-if [ $SaveTmpFile = 1 ] && [ \$progexit = $PgmExitStatus ] ; then
-	rm -f $PgmStderrFile[0].bak
+if [ $SaveStderr = 1 ] && [ \$progexit = $PgmExitStatus ] && 
+   [ $PgmStderrFile[0] != $DefaultStderrFile ] && [ -s $TmpPrefix/runtest$$.2 ]; then
 	echo Saving away stderr output in $PgmStderrFile[0] ...
-	cp $PgmStderrFile[0] $PgmStderrFile[0].bak
+	if [ -f $PgmStderrFile[0] ]; then
+	   rm -f $PgmStderrFile[0].bak
+	   cp $PgmStderrFile[0] $PgmStderrFile[0].bak
+	fi;
 	cp $TmpPrefix/runtest$$.2 $PgmStderrFile[0]
 fi
 $SpixstatsLine1
