@@ -714,7 +714,7 @@ data FFFormat = FFExponent | FFFixed | FFGeneric --no need: deriving (Eq, Ord, S
 formatRealFloat :: (RealFloat a) => FFFormat -> Maybe Int -> a -> String
 formatRealFloat fmt decs x
    | isNaN x		       = "NaN"
-   | isInfinite x && x < 0     = if x < 0 then "-Infinity" else "Infinity"
+   | isInfinite x              = if x < 0 then "-Infinity" else "Infinity"
    | x < 0 || isNegativeZero x = '-':doFmt fmt (floatToDigits (toInteger base) (-x))
    | otherwise		       = doFmt fmt (floatToDigits (toInteger base) x)
  where 
@@ -731,7 +731,7 @@ formatRealFloat fmt decs x
        Nothing ->
         let e' = if e==0 then 0 else e-1 in
 	(case ds of
-          [d]     -> d : ".0e"     ++ show e'
+          [d]     -> d : ".0e"
 	  (d:ds') -> d : '.' : ds' ++ "e") ++ show e'
        Just dec ->
         let dec' = max dec 1 in
