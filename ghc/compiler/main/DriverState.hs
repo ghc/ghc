@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.95 2003/08/20 18:48:20 sof Exp $
+-- $Id: DriverState.hs,v 1.96 2003/09/04 11:08:47 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -47,6 +47,7 @@ data GhcMode
   | DoMake				-- ghc --make
   | DoInteractive			-- ghc --interactive
   | DoLink				-- [ the default ]
+  | DoEval String			-- ghc -e
   deriving (Eq,Show)
 
 GLOBAL_VAR(v_GhcMode,     DoLink, GhcMode)

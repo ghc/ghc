@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.131 2003/07/21 15:14:18 ross Exp $
+-- $Id: Main.hs,v 1.132 2003/09/04 11:08:47 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -142,11 +142,11 @@ main =
 	-- -O and --interactive are not a good combination
 	-- ditto with any kind of way selection
    orig_opt_level <- readIORef v_OptLevel
-   when (orig_opt_level > 0 && mode == DoInteractive) $
+   when (orig_opt_level > 0 && isInteractive mode) $
       do putStr "warning: -O conflicts with --interactive; -O turned off.\n"
          writeIORef v_OptLevel 0
    orig_ways <- readIORef v_Ways
-   when (notNull orig_ways && mode == DoInteractive) $
+   when (notNull orig_ways && isInteractive mode) $
       do throwDyn (UsageError 
                    "--interactive can't be used with -prof, -ticky, -unreg or -smp.")
 
@@ -177,6 +177,7 @@ main =
    build_tag <- readIORef v_Build_tag
    let lang = case mode of 
 		 DoInteractive  -> HscInterpreted
+		 DoEval _	-> HscInterpreted
 		 _other | build_tag /= "" -> HscC
 			| otherwise       -> hscLang dyn_flags
 		-- for ways other that the normal way, we must 
@@ -187,7 +188,9 @@ main =
                   	   hscLang  = lang,
 			   -- leave out hscOutName for now
 	                   hscOutName = panic "Main.main:hscOutName not set",
-		  	   verbosity = 1
+		  	   verbosity = case mode of
+				 	 DoEval _ -> 0
+				 	 _other   -> 1
 			})
 
 	-- The rest of the arguments are "dynamic"
@@ -255,9 +258,13 @@ main =
 				    (staticLink o_files def_hs_pkgs) }
 
 #ifndef GHCI
-	DoInteractive -> throwDyn (CmdLineError "not built for interactive use")
+	DoInteractive -> noInteractiveError
+	DoEval _      -> noInteractiveError
+     where
+       noInteractiveError = throwDyn (CmdLineError "not built for interactive use")
 #else
-	DoInteractive -> interactiveUI srcs
+	DoInteractive -> interactiveUI srcs Nothing
+	DoEval expr   -> interactiveUI srcs (Just expr)
 #endif
 
 -- -----------------------------------------------------------------------------
@@ -273,7 +280,7 @@ checkOptions mode srcs objs = do
 	-- -ohi sanity check
    ohi <- readIORef v_Output_hi
    if (isJust ohi && 
-      (mode == DoMake || mode == DoInteractive || srcs `lengthExceeds` 1))
+      (mode == DoMake || isInteractive mode || srcs `lengthExceeds` 1))
 	then throwDyn (UsageError "-ohi can only be used when compiling a single source file")
 	else do
 
@@ -285,13 +292,16 @@ checkOptions mode srcs objs = do
 
 	-- Check that there are some input files (except in the interactive 
 	-- case)
-   if null srcs && null objs && mode /= DoInteractive
+   if null srcs && null objs && not (isInteractive mode)
 	then throwDyn (UsageError "no input files")
 	else do
 
      -- Verify that output files point somewhere sensible.
    verifyOutputFiles
 
+isInteractive DoInteractive = True
+isInteractive (DoEval _)    = True
+isInteractive _             = False
 
 -- -----------------------------------------------------------------------------
 -- Compile files in one-shot mode.

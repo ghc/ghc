@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.158 2003/08/27 12:29:21 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.159 2003/09/04 11:08:46 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -155,8 +155,8 @@ helpText = "\
 \                         (eg. -v2, -fglasgow-exts, etc.)\n\ 
 \"
 
-interactiveUI :: [FilePath] -> IO ()
-interactiveUI srcs = do
+interactiveUI :: [FilePath] -> Maybe String -> IO ()
+interactiveUI srcs maybe_expr = do
    dflags <- getDynFlags
 
    cmstate <- cmInit Interactive;
@@ -178,7 +178,7 @@ interactiveUI srcs = do
    Readline.initialize
 #endif
 
-   startGHCi (runGHCi srcs dflags) 
+   startGHCi (runGHCi srcs dflags maybe_expr)
 	GHCiState{ progname = "<interactive>",
 		   args = [],
 		   targets = srcs,
@@ -191,8 +191,8 @@ interactiveUI srcs = do
 
    return ()
 
-runGHCi :: [FilePath] -> DynFlags -> GHCi ()
-runGHCi paths dflags = do
+runGHCi :: [FilePath] -> DynFlags -> Maybe String -> GHCi ()
+runGHCi paths dflags maybe_expr = do
   read_dot_files <- io (readIORef v_Read_DotGHCi)
 
   when (read_dot_files) $ do
@@ -234,8 +234,14 @@ runGHCi paths dflags = do
   is_tty <- io (hIsTerminalDevice stdin)
   let show_prompt = verbosity dflags > 0 || is_tty
 
-  -- enter the interactive loop
-  interactiveLoop is_tty show_prompt
+  case maybe_expr of
+	Nothing -> 
+	    -- enter the interactive loop
+	    interactiveLoop is_tty show_prompt
+	Just expr -> do
+	    -- just evaluate the expression we were given
+	    runCommand expr
+	    return ()
 
   -- and finally, exit
   io $ do when (verbosity dflags > 0) $ putStrLn "Leaving GHCi."

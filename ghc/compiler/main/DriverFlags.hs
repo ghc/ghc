@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.122 2003/08/29 16:00:25 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.123 2003/09/04 11:08:47 simonmar Exp $
 --
 -- Driver flags
 --
@@ -178,6 +178,7 @@ static_flags =
   ,  ( "-make"		, PassFlag (setMode DoMake))
   ,  ( "-interactive"	, PassFlag (setMode DoInteractive))
   ,  ( "-mk-dll"	, PassFlag (setMode DoMkDLL))
+  ,  ( "e"              , HasArg   (\s -> setMode (DoEval s) "-e"))
 
 	-- -fno-code says to stop after Hsc but don't generate any code.
   ,  ( "fno-code"	, PassFlag (\f -> do setMode (StopBefore HCc) f

@@ -441,6 +441,13 @@ lexer cont buf s@(PState{
 
 		-- special GHC extension: we grok cpp-style #line pragmas
 	    '#'# | lexemeIndex buf ==# bol -> 	-- the '#' must be in column 0
+		-- SPECIAL CASE: if we see "#!" at the beginning of the line,
+		-- we ignore the rest of the line.  This is for script-files
+		-- on Unix which begin with the special syntax "#! /bin/sh", 
+		-- for example.
+		if lookAhead# buf 1# `eqChar#` '!'#
+		   then next_line (stepOnBy# buf 2#) s'
+		   else
 		let buf1 | lookAhead# buf 1# `eqChar#` 'l'# &&
 		   	   lookAhead# buf 2# `eqChar#` 'i'# &&
 		    	   lookAhead# buf 3# `eqChar#` 'n'# &&
