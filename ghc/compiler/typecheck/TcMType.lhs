@@ -19,9 +19,7 @@ module TcMType (
 
   --------------------------------
   -- Instantiation
-  tcInstTyVar, tcInstTyVars,
-  tcInstSigTyVars, tcInstType, tcInstSigType,
-  tcSplitRhoTyM,
+  tcInstTyVar, tcInstTyVars, tcInstType, 
 
   --------------------------------
   -- Checking type validity
@@ -139,44 +137,14 @@ newBoxityVar
 %*									*
 %************************************************************************
 
-I don't understand why this is needed
-An old comments says "No need for tcSplitForAllTyM because a type 
-	variable can't be instantiated to a for-all type"
-But the same is true of rho types!
-
-\begin{code}
-tcSplitRhoTyM :: TcType -> NF_TcM (TcThetaType, TcType)
-tcSplitRhoTyM t
-  = go t t []
- where
-	-- A type variable is never instantiated to a dictionary type,
-	-- so we don't need to do a tcReadVar on the "arg".
-    go syn_t (FunTy arg res) ts = case tcSplitPredTy_maybe arg of
-					Just pair -> go res res (pair:ts)
-					Nothing   -> returnNF_Tc (reverse ts, syn_t)
-    go syn_t (NoteTy n t)    ts = go syn_t t ts
-    go syn_t (TyVarTy tv)    ts = getTcTyVar tv		`thenNF_Tc` \ maybe_ty ->
-				  case maybe_ty of
-				    Just ty | not (tcIsTyVarTy ty) -> go syn_t ty ts
-				    other			   -> returnNF_Tc (reverse ts, syn_t)
-    go syn_t t		     ts = returnNF_Tc (reverse ts, syn_t)
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Type instantiation}
-%*									*
-%************************************************************************
-
 Instantiating a bunch of type variables
 
 \begin{code}
-tcInstTyVars :: [TyVar] 
+tcInstTyVars :: TyVarDetails -> [TyVar] 
 	     -> NF_TcM ([TcTyVar], [TcType], Subst)
 
-tcInstTyVars tyvars
-  = mapNF_Tc tcInstTyVar tyvars	`thenNF_Tc` \ tc_tyvars ->
+tcInstTyVars tv_details tyvars
+  = mapNF_Tc (tcInstTyVar tv_details) tyvars	`thenNF_Tc` \ tc_tyvars ->
     let
 	tys = mkTyVarTys tc_tyvars
     in
@@ -185,7 +153,7 @@ tcInstTyVars tyvars
 		-- they cannot possibly be captured by
 		-- any existing for-alls.  Hence mkTopTyVarSubst
 
-tcInstTyVar tyvar
+tcInstTyVar tv_details tyvar
   = tcGetUnique 		`thenNF_Tc` \ uniq ->
     let
 	name = setNameUnique (tyVarName tyvar) uniq
@@ -196,62 +164,27 @@ tcInstTyVar tyvar
 	-- Better watch out for this.  If worst comes to worst, just
 	-- use mkSysLocalName.
     in
-    tcNewMutTyVar name (tyVarKind tyvar) VanillaTv
+    tcNewMutTyVar name (tyVarKind tyvar) tv_details
 
-tcInstSigTyVars :: TyVarDetails -> [TyVar] -> NF_TcM [TcTyVar]
-tcInstSigTyVars details tyvars	-- Very similar to tcInstTyVar
-  = tcGetUniques 	`thenNF_Tc` \ uniqs ->
-    listTc [ ASSERT( not (kind `eqKind` openTypeKind) )	-- Shouldn't happen
-	     tcNewMutTyVar name kind details
-	   | (tyvar, uniq) <- tyvars `zip` uniqs,
-	     let name = setNameUnique (tyVarName tyvar) uniq, 
-	     let kind = tyVarKind tyvar
-	   ]
-\end{code}
-
-@tcInstType@ instantiates the outer-level for-alls of a TcType with
-fresh type variables, splits off the dictionary part, and returns the results.
-
-\begin{code}
-tcInstType :: TcType -> NF_TcM ([TcTyVar], TcThetaType, TcType)
-tcInstType ty
+tcInstType :: TyVarDetails -> TcType -> NF_TcM ([TcTyVar], TcThetaType, TcType)
+-- tcInstType instantiates the outer-level for-alls of a TcType with
+-- fresh (mutable) type variables, splits off the dictionary part, 
+-- and returns the pieces.
+tcInstType tv_details ty
   = case tcSplitForAllTys ty of
-	([],     rho) -> 	-- There may be overloading but no type variables;
+	([],     rho) -> 	-- There may be overloading despite no type variables;
 				-- 	(?x :: Int) => Int -> Int
 			 let
-			   (theta, tau) = tcSplitRhoTy rho	-- Used to be tcSplitRhoTyM
+			   (theta, tau) = tcSplitRhoTy rho
 			 in
 			 returnNF_Tc ([], theta, tau)
 
-	(tyvars, rho) -> tcInstTyVars tyvars			`thenNF_Tc` \ (tyvars', _, tenv)  ->
+	(tyvars, rho) -> tcInstTyVars tv_details tyvars		`thenNF_Tc` \ (tyvars', _, tenv) ->
 			 let
-			   (theta, tau) = tcSplitRhoTy (substTy tenv rho)	-- Used to be tcSplitRhoTyM
+			   (theta, tau) = tcSplitRhoTy (substTy tenv rho)
 			 in
 			 returnNF_Tc (tyvars', theta, tau)
-
-
-tcInstSigType :: TyVarDetails -> Type -> NF_TcM ([TcTyVar], TcThetaType, TcType)
--- Very similar to tcInstSigType, but uses signature type variables
--- Also, somewhat arbitrarily, don't deal with the monomorphic case so efficiently
-tcInstSigType tv_details poly_ty
- = let
-	(tyvars, rho) = tcSplitForAllTys poly_ty
-   in
-   tcInstSigTyVars tv_details tyvars		`thenNF_Tc` \ tyvars' ->
-	-- Make *signature* type variables
-
-   let
-     tyvar_tys' = mkTyVarTys tyvars'
-     rho' = substTy (mkTopTyVarSubst tyvars tyvar_tys') rho
-	-- mkTopTyVarSubst because the tyvars' are fresh
-
-     (theta', tau') = tcSplitRhoTy rho'
-	-- This splitRhoTy tries hard to make sure that tau' is a type synonym
-	-- wherever possible, which can improve interface files.
-   in
-   returnNF_Tc (tyvars', theta', tau')
 \end{code}
-
 
 
 %************************************************************************

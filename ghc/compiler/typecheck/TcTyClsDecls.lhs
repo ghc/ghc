@@ -334,6 +334,9 @@ buildTyConOrClass dflags is_rec kenv rec_vrcs  rec_details
 	tycon = mkAlgTyCon tycon_name tycon_kind tyvars ctxt argvrcs
 			   data_cons sel_ids
 			   flavour is_rec gen_info
+	-- It's not strictly necesary to mark newtypes as
+	-- recursive if the loop is broken via a data type.
+	-- But I'm not sure it's worth the hassle of discovering that.
 
 	gen_info | not (dopt Opt_Generics dflags) = Nothing
 		 | otherwise = mkTyConGenInfo tycon sys_names

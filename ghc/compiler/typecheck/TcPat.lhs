@@ -24,7 +24,7 @@ import Name		( Name )
 import FieldLabel	( fieldLabelName )
 import TcEnv		( tcLookupClass, tcLookupDataCon, tcLookupGlobalId, tcLookupId )
 import TcMType 		( tcInstTyVars, newTyVarTy, getTcTyVar, putTcTyVar )
-import TcType		( TcType, TcTyVar, TcSigmaType,
+import TcType		( TcType, TcTyVar, TcSigmaType, TyVarDetails(VanillaTv),
 			  mkTyConApp, mkClassPred, liftedTypeKind, tcGetTyVar_maybe,
 			  isHoleTyVar, openTypeKind )
 import TcUnify		( tcSub, unifyTauTy, unifyListTy, unifyPArrTy,
@@ -393,7 +393,7 @@ tcConstructor pat con_name
 	     -- behave differently when called, not when used for
 	     -- matching.
     in
-    tcInstTyVars (ex_tvs ++ tvs)	`thenNF_Tc` \ (all_tvs', ty_args', tenv) ->
+    tcInstTyVars VanillaTv (ex_tvs ++ tvs)	`thenNF_Tc` \ (all_tvs', ty_args', tenv) ->
     let
 	ex_theta' = substTheta tenv ex_theta
 	arg_tys'  = map (substTy tenv) arg_tys

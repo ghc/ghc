@@ -53,7 +53,7 @@ import Class		( Class )
 import Name		( Name )
 import Var		( Id, TyVar, newMutTyVar, readMutTyVar, writeMutTyVar )
 import VarEnv		( TidyEnv, emptyTidyEnv )
-import UniqSupply	( UniqSupply, uniqFromSupply, uniqsFromSupply, 
+import UniqSupply	( UniqSupply, uniqFromSupply, uniqsFromSupply,
 			  splitUniqSupply, mkSplitUniqSupply,
 			  UniqSM, initUs_ )
 import SrcLoc		( SrcLoc, noSrcLoc )

@@ -41,7 +41,7 @@ import Inst		( lookupInst, LookupInstResult(..),
 import TcEnv		( tcGetGlobalTyVars, tcGetInstEnv, tcLookupGlobalId )
 import InstEnv		( lookupInstEnv, classInstEnv, InstLookupResult(..) )
 import TcMType		( zonkTcTyVarsAndFV, tcInstTyVars, checkAmbiguity )
-import TcType		( TcTyVar, TcTyVarSet, ThetaType, 
+import TcType		( TcTyVar, TcTyVarSet, ThetaType, TyVarDetails(VanillaTv),
 			  mkClassPred, isOverloadedTy, mkTyConApp,
 			  mkTyVarTy, tcGetTyVar, isTyVarClassPred, mkTyVarTys,
 			  tyVarsOfPred, isIPPred, isInheritablePred, predHasFDs )
@@ -1315,8 +1315,8 @@ tcImprove avails
 	returnTc False
   where
     unify ((qtvs, t1, t2), doc)
-	 = tcAddErrCtxt doc			$
-	   tcInstTyVars (varSetElems qtvs)	`thenNF_Tc` \ (_, _, tenv) ->
+	 = tcAddErrCtxt doc				$
+	   tcInstTyVars VanillaTv (varSetElems qtvs)	`thenNF_Tc` \ (_, _, tenv) ->
 	   unifyTauTy (substTy tenv t1) (substTy tenv t2)
 \end{code}
 
@@ -1734,7 +1734,7 @@ tcSimplifyDeriv :: [TyVar]
 	        -> TcM ThetaType	-- Needed
 
 tcSimplifyDeriv tyvars theta
-  = tcInstTyVars tyvars					`thenNF_Tc` \ (tvs, _, tenv) ->
+  = tcInstTyVars VanillaTv tyvars			`thenNF_Tc` \ (tvs, _, tenv) ->
 	-- The main loop may do unification, and that may crash if 
 	-- it doesn't see a TcTyVar, so we have to instantiate. Sigh
 	-- ToDo: what if two of them do get unified?

@@ -21,7 +21,7 @@ import TcMonoType	( tcHsSigType, UserTypeCtxt(..), tcAddScopedTyVars )
 import TcExpr		( tcMonoExpr )
 import TcEnv		( tcExtendLocalValEnv, tcLookupId )
 import Inst		( LIE, plusLIEs, emptyLIE, instToId )
-import Id		( idName, idType, mkLocalId )
+import Id		( idType, mkLocalId )
 import Outputable
 \end{code}
 
@@ -63,12 +63,12 @@ tcSourceRule (HsRule name act vars lhs rhs src_loc)
     tcAddScopedTyVars (collectRuleBndrSigTys vars) (
 
 		-- Ditto forall'd variables
-	mapNF_Tc new_id vars					`thenNF_Tc` \ ids ->
-	tcExtendLocalValEnv [(idName id, id) | id <- ids]	$
+	mapNF_Tc new_id vars				`thenNF_Tc` \ ids ->
+	tcExtendLocalValEnv ids				$
 	
 		-- Now LHS and RHS
-	tcMonoExpr lhs rule_ty					`thenTc` \ (lhs', lhs_lie) ->
-	tcMonoExpr rhs rule_ty					`thenTc` \ (rhs', rhs_lie) ->
+	tcMonoExpr lhs rule_ty				`thenTc` \ (lhs', lhs_lie) ->
+	tcMonoExpr rhs rule_ty				`thenTc` \ (rhs', rhs_lie) ->
 	
 	returnTc (ids, lhs', rhs', lhs_lie, rhs_lie)
     )						`thenTc` \ (ids, lhs', rhs', lhs_lie, rhs_lie) ->

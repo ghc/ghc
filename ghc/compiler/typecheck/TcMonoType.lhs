@@ -13,7 +13,7 @@ module TcMonoType ( tcHsSigType, tcHsType, tcIfaceType, tcHsTheta, tcHsPred,
 		    kcHsLiftedSigType, kcHsContext,
 		    tcAddScopedTyVars, tcHsTyVars, mkImmutTyVars,
 
-		    TcSigInfo(..), tcTySig, mkTcSig, maybeSig
+		    TcSigInfo(..), tcTySig, mkTcSig, maybeSig, tcSigPolyId, tcSigMonoId
 	          ) where
 
 #include "HsVersions.h"
@@ -28,7 +28,7 @@ import TcEnv		( tcExtendTyVarEnv, tcLookup, tcLookupGlobal,
 			  tcInLocalScope,
 		 	  TyThing(..), TcTyThing(..), tcExtendKindEnv
 			)
-import TcMType		( newKindVar, zonkKindEnv, tcInstSigType,
+import TcMType		( newKindVar, zonkKindEnv, tcInstType,
 			  checkValidType, UserTypeCtxt(..), pprUserTypeCtxt
 			)
 import TcUnify		( unifyKind, unifyOpenTypeKind )
@@ -549,8 +549,6 @@ been instantiated.
 \begin{code}
 data TcSigInfo
   = TySigInfo	    
-	Name			-- N, the Name in corresponding binding
-
 	TcId			-- *Polymorphic* binder for this value...
 				-- Has name = N
 
@@ -568,15 +566,21 @@ data TcSigInfo
 	SrcLoc			-- Of the signature
 
 instance Outputable TcSigInfo where
-    ppr (TySigInfo nm id tyvars theta tau _ inst loc) =
-	ppr nm <+> ptext SLIT("::") <+> ppr tyvars <+> ppr theta <+> ptext SLIT("=>") <+> ppr tau
+    ppr (TySigInfo id tyvars theta tau _ inst loc) =
+	ppr id <+> ptext SLIT("::") <+> ppr tyvars <+> ppr theta <+> ptext SLIT("=>") <+> ppr tau
+
+tcSigPolyId :: TcSigInfo -> TcId
+tcSigPolyId (TySigInfo id _ _ _ _ _ _) = id
+
+tcSigMonoId :: TcSigInfo -> TcId
+tcSigMonoId (TySigInfo _ _ _ _ id _ _) = id
 
 maybeSig :: [TcSigInfo] -> Name -> Maybe (TcSigInfo)
 	-- Search for a particular signature
 maybeSig [] name = Nothing
-maybeSig (sig@(TySigInfo sig_name _ _ _ _ _ _ _) : sigs) name
-  | name == sig_name = Just sig
-  | otherwise	     = maybeSig sigs name
+maybeSig (sig@(TySigInfo sig_id _ _ _ _ _ _) : sigs) name
+  | name == idName sig_id = Just sig
+  | otherwise	     	  = maybeSig sigs name
 \end{code}
 
 
@@ -598,7 +602,7 @@ mkTcSig poly_id src_loc
 	-- the tyvars *do* get unified with something, we want to carry on
 	-- typechecking the rest of the program with the function bound
 	-- to a pristine type, namely sigma_tc_ty
-   tcInstSigType SigTv (idType poly_id)		`thenNF_Tc` \ (tyvars', theta', tau') ->
+   tcInstType SigTv (idType poly_id)		`thenNF_Tc` \ (tyvars', theta', tau') ->
 
    newMethodWithGivenTy SignatureOrigin 
 			poly_id
@@ -606,7 +610,7 @@ mkTcSig poly_id src_loc
 			theta' tau'		`thenNF_Tc` \ inst ->
 	-- We make a Method even if it's not overloaded; no harm
 	
-   returnNF_Tc (TySigInfo (idName poly_id) poly_id tyvars' theta' tau' 
+   returnNF_Tc (TySigInfo poly_id tyvars' theta' tau' 
 			  (instToId inst) [inst] src_loc)
 \end{code}
 

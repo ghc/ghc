@@ -5,7 +5,7 @@
 
 \begin{code}
 module TcClassDcl ( tcClassDecl1, checkValidClass, tcClassDecls2, 
-		    tcMethodBind, badMethodErr
+		    tcMethodBind, mkMethodBind, badMethodErr
 		  ) where
 
 #include "HsVersions.h"
@@ -16,24 +16,24 @@ import HsSyn		( TyClDecl(..), Sig(..), MonoBinds(..),
 			  isClassOpSig, isPragSig,
 			  getClassDeclSysNames, placeHolderType
 			)
-import BasicTypes	( TopLevelFlag(..), RecFlag(..), StrictnessMark(..) )
+import BasicTypes	( RecFlag(..), StrictnessMark(..) )
 import RnHsSyn		( RenamedTyClDecl, 
 			  RenamedClassOpSig, RenamedMonoBinds,
-			  RenamedSig, maybeGenericMatch
+			  maybeGenericMatch
 			)
 import TcHsSyn		( TcMonoBinds )
 
 import Inst		( Inst, InstOrigin(..), LIE, emptyLIE, plusLIE, plusLIEs, 
 			  instToId, newDicts, newMethod )
-import TcEnv		( TyThingDetails(..), tcExtendGlobalTyVars,
-			  tcLookupClass, tcExtendTyVarEnvForMeths, 
-			  tcExtendLocalValEnv, tcExtendTyVarEnv
+import TcEnv		( TyThingDetails(..), 
+			  tcLookupClass, tcExtendTyVarEnv2, 
+			  tcExtendTyVarEnv
 			)
-import TcBinds		( tcBindWithSigs, tcSpecSigs )
-import TcMonoType	( tcHsType, tcHsTheta, mkTcSig )
-import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
+import TcBinds		( tcMonoBinds )
+import TcMonoType	( TcSigInfo(..), tcHsType, tcHsTheta, mkTcSig )
+import TcSimplify	( tcSimplifyCheck )
 import TcUnify		( checkSigTyVars, sigCtxt )
-import TcMType		( tcInstSigTyVars, checkValidTheta, checkValidType, SourceTyCtxt(..), UserTypeCtxt(..) )
+import TcMType		( tcInstTyVars, checkValidTheta, checkValidType, SourceTyCtxt(..), UserTypeCtxt(..) )
 import TcType		( Type, TyVarDetails(..), TcType, TcThetaType, TcTyVar, 
 			  mkTyVarTys, mkPredTys, mkClassPred, 
 			  tcIsTyVarTy, tcSplitTyConApp_maybe, tcSplitSigmaTy
@@ -407,7 +407,7 @@ tcDefMeth clas tyvars binds_in prags (_, GenDefMeth) = returnTc (EmptyMonoBinds,
 	-- (If necessary we can fix that, but we don't have a convenient Id to hand.)
 
 tcDefMeth clas tyvars binds_in prags op_item@(sel_id, DefMeth dm_name)
-  = tcInstSigTyVars ClsTv tyvars			`thenNF_Tc` \ clas_tyvars ->
+  = tcInstTyVars ClsTv tyvars		`thenNF_Tc` \ (clas_tyvars, inst_tys, _) ->
     let
 	dm_ty = idType sel_id	-- Same as dict selector!
           -- The default method's type should really come from the
@@ -417,18 +417,17 @@ tcDefMeth clas tyvars binds_in prags op_item@(sel_id, DefMeth dm_name)
           -- of types of default methods (and dict funs) by annotating them
           -- TyGenNever (in MkId).  Ugh!  KSW 1999-09.
 
-	inst_tys    = mkTyVarTys clas_tyvars
         theta       = [mkClassPred clas inst_tys]
  	dm_id       = mkDefaultMethodId dm_name dm_ty
 	local_dm_id = setIdLocalExported dm_id
 		-- Reason for setIdLocalExported: see notes with MkId.mkDictFunId
+	xtve = tyvars `zip` clas_tyvars
     in
-    newDicts origin theta 		`thenNF_Tc` \ [this_dict] ->
+    newDicts origin theta 				`thenNF_Tc` \ [this_dict] ->
 
-    tcExtendTyVarEnvForMeths tyvars clas_tyvars (
-        tcMethodBind clas origin clas_tyvars inst_tys theta
-	             binds_in prags False op_item
-    )					`thenTc` \ (defm_bind, insts_needed, local_dm_inst) ->
+    mkMethodBind origin clas inst_tys binds_in op_item	`thenTc` \ (dm_inst, meth_info) ->
+    tcMethodBind xtve clas_tyvars theta 
+		 [this_dict] meth_info			`thenTc` \ (defm_bind, insts_needed) ->
     
     tcAddErrCtxt (defltMethCtxt clas) $
     
@@ -446,7 +445,7 @@ tcDefMeth clas tyvars binds_in prags op_item@(sel_id, DefMeth dm_name)
         full_bind = AbsBinds
     		    clas_tyvars'
     		    [instToId this_dict]
-    		    [(clas_tyvars', local_dm_id, instToId local_dm_inst)]
+    		    [(clas_tyvars', local_dm_id, instToId dm_inst)]
     		    emptyNameSet	-- No inlines (yet)
     		    (dict_binds `andMonoBinds` defm_bind)
     in
@@ -470,87 +469,104 @@ tyvar sets.
 
 \begin{code}
 tcMethodBind 
-	:: Class
-	-> InstOrigin
+	:: [(TyVar,TcTyVar)]	-- Bindings for type environment
 	-> [TcTyVar]		-- Instantiated type variables for the
-				--  enclosing class/instance decl. 
-				--  They'll be signature tyvars, and we
-				--  want to check that they don't get bound
-	-> [TcType]		-- Instance types
-	-> TcThetaType		-- Available theta; this could be used to check
-				--  the method signature, but actually that's done by
-				--  the caller;  here, it's just used for the error message
-	-> RenamedMonoBinds	-- Method binding (pick the right one from in here)
-	-> [RenamedSig]		-- Pramgas (just for this one)
-	-> Bool			-- True <=> This method is from an instance declaration
-	-> ClassOpItem		-- The method selector and default-method Id
-	-> TcM (TcMonoBinds, LIE, Inst)
+				--  	enclosing class/instance decl. 
+				--  	They'll be signature tyvars, and we
+				--  	want to check that they don't get bound
+				-- Always equal the range of the type envt
+	-> TcThetaType		-- Available theta; it's just used for the error message
+	-> [Inst]		-- Available from context, used to simplify constraints 
+				-- 	from the method body
+	-> (Id, TcSigInfo, RenamedMonoBinds)	-- Details of this method
+	-> TcM (TcMonoBinds, LIE)
 
-tcMethodBind clas origin inst_tyvars inst_tys inst_theta
-	     meth_binds prags is_inst_decl (sel_id, dm_info)
+tcMethodBind xtve inst_tyvars inst_theta avail_insts
+	     (sel_id, meth_sig, meth_bind)
+  =  
+	-- Check the bindings; first adding inst_tyvars to the envt
+	-- so that we don't quantify over them in nested places
+     tcExtendTyVarEnv2 xtve (
+	tcAddErrCtxt (methodCtxt sel_id)		$
+	tcMonoBinds meth_bind [meth_sig] NonRecursive
+     )							`thenTc` \ (meth_bind, meth_lie, _, _) ->
+
+	-- Now do context reduction.   We simplify wrt both the local tyvars
+	-- and the ones of the class/instance decl, so that there is
+	-- no problem with
+	--	class C a where
+	--	  op :: Eq a => a -> b -> a
+	--
+	-- We do this for each method independently to localise error messages
+
+     let
+	TySigInfo meth_id meth_tvs meth_theta _ local_meth_id _ _ = meth_sig
+     in
+     tcAddErrCtxtM (sigCtxt sel_id inst_tyvars inst_theta (idType meth_id))	$
+     newDicts SignatureOrigin meth_theta		`thenNF_Tc` \ meth_dicts ->
+     let
+	all_tyvars = meth_tvs ++ inst_tyvars
+	all_insts  = avail_insts ++ meth_dicts
+     in
+     tcSimplifyCheck
+	 (ptext SLIT("class or instance method") <+> quotes (ppr sel_id))
+	 all_tyvars all_insts meth_lie			`thenTc` \ (lie, lie_binds) ->
+
+     checkSigTyVars all_tyvars				`thenTc` \ all_tyvars' ->
+
+     let
+	meth_tvs'      = take (length meth_tvs) all_tyvars'
+	poly_meth_bind = AbsBinds meth_tvs'
+				  (map instToId meth_dicts)
+     				  [(meth_tvs', meth_id, local_meth_id)]
+				  emptyNameSet	-- Inlines?
+				  (lie_binds `andMonoBinds` meth_bind)
+     in
+     returnTc (poly_meth_bind, lie)
+
+
+mkMethodBind :: InstOrigin
+	     -> Class -> [TcType]	-- Class and instance types
+	     -> RenamedMonoBinds	-- Method binding (pick the right one from in here)
+	     -> ClassOpItem
+	     -> TcM (Inst,		-- Method inst
+		     (Id,			-- Global selector Id
+		      TcSigInfo,		-- Signature 
+		      RenamedMonoBinds))	-- Binding for the method
+
+mkMethodBind origin clas inst_tys meth_binds (sel_id, dm_info)
   = tcGetSrcLoc 			`thenNF_Tc` \ loc -> 
-    newMethod origin sel_id inst_tys	`thenNF_Tc` \ meth ->
+    newMethod origin sel_id inst_tys	`thenNF_Tc` \ meth_inst ->
     let
-	meth_id	   = instToId meth
+	meth_id	   = instToId meth_inst
 	meth_name  = idName meth_id
-	meth_prags = find_prags (idName sel_id) meth_name prags
     in
-    mkTcSig meth_id loc			`thenNF_Tc` \ sig_info -> 
-
 	-- Figure out what method binding to use
 	-- If the user suppplied one, use it, else construct a default one
     (case find_bind (idName sel_id) meth_name meth_binds of
 	Just user_bind -> returnTc user_bind 
-	Nothing	       -> mkDefMethRhs is_inst_decl clas inst_tys sel_id loc dm_info	`thenTc` \ rhs ->
+	Nothing	       -> mkDefMethRhs origin clas inst_tys sel_id loc dm_info	`thenTc` \ rhs ->
 			  returnTc (FunMonoBind meth_name False	-- Not infix decl
 				                [mkSimpleMatch [] rhs placeHolderType loc] loc)
     )								`thenTc` \ meth_bind ->
-     -- Check the bindings; first add inst_tyvars to the envt
-     -- so that we don't quantify over them in nested places
-     -- The *caller* put the class/inst decl tyvars into the tyvar envt,
-     -- but not into the global tyvars, so that the call to checkSigTyVars below works ok
-     tcExtendGlobalTyVars inst_tyvars 
-     		    (tcAddErrCtxt (methodCtxt sel_id)		$
-     		     tcBindWithSigs NotTopLevel meth_bind 
-		   		    [sig_info] meth_prags NonRecursive 
-     		    ) 						`thenTc` \ (binds, insts, _) -> 
 
-     tcExtendLocalValEnv [(meth_name, meth_id)] 
-			 (tcSpecSigs meth_prags)		`thenTc` \ (prag_binds1, prag_lie) ->
-     
-     -- The prag_lie for a SPECIALISE pragma will mention the function
-     -- itself, so we have to simplify them away right now lest they float
-     -- outwards!
-     bindInstsOfLocalFuns prag_lie [meth_id]	`thenTc` \ (prag_lie', prag_binds2) ->
+    mkTcSig meth_id loc			`thenNF_Tc` \ meth_sig ->
 
-     -- Now check that the instance type variables
-     -- (or, in the case of a class decl, the class tyvars)
-     -- have not been unified with anything in the environment
-     --	
-     -- We do this for each method independently to localise error messages
-     -- ...and this is why the call to tcExtendGlobalTyVars must be here
-     --    rather than in the caller
-     tcAddErrCtxt (ptext SLIT("When checking the type of class method") 
-		   <+> quotes (ppr sel_id))				$
-     tcAddErrCtxtM (sigCtxt inst_tyvars inst_theta (idType meth_id))	$
-     checkSigTyVars inst_tyvars						`thenTc_` 
-
-     returnTc (binds `AndMonoBinds` prag_binds1 `AndMonoBinds` prag_binds2, 
-	       insts `plusLIE` prag_lie',
-	       meth)
+    returnTc (meth_inst, (sel_id, meth_sig, meth_bind))
+    
 
      -- The user didn't supply a method binding, 
      -- so we have to make up a default binding
      -- The RHS of a default method depends on the default-method info
-mkDefMethRhs is_inst_decl clas inst_tys sel_id loc (DefMeth dm_name)
+mkDefMethRhs origin clas inst_tys sel_id loc (DefMeth dm_name)
   =  -- An polymorphic default method
     returnTc (HsVar dm_name)
 
-mkDefMethRhs is_inst_decl clas inst_tys sel_id loc NoDefMeth
+mkDefMethRhs origin clas inst_tys sel_id loc NoDefMeth
   =  	-- No default method
 	-- Warn only if -fwarn-missing-methods
     doptsTc Opt_WarnMissingMethods 		`thenNF_Tc` \ warn -> 
-    warnTc (is_inst_decl && warn)
+    warnTc (isInstDecl origin && warn)
    	   (omittedMethodWarn sel_id)		`thenNF_Tc_`
     returnTc error_rhs
   where
@@ -559,13 +575,13 @@ mkDefMethRhs is_inst_decl clas inst_tys sel_id loc NoDefMeth
     error_msg = showSDoc (hcat [ppr loc, text "|", ppr sel_id ])
 
 
-mkDefMethRhs is_inst_decl clas inst_tys sel_id loc GenDefMeth 
+mkDefMethRhs origin clas inst_tys sel_id loc GenDefMeth 
   =  	-- A generic default method
 	-- If the method is defined generically, we can only do the job if the
 	-- instance declaration is for a single-parameter type class with
 	-- a type constructor applied to type arguments in the instance decl
 	-- 	(checkTc, so False provokes the error)
-     checkTc (not is_inst_decl || simple_inst)
+     checkTc (not (isInstDecl origin) || simple_inst)
 	     (badGenericInstance sel_id)			`thenTc_`
 
      ioToTc (dumpIfSet opt_PprStyle_Debug "Generic RHS" stuff)	`thenNF_Tc_`
@@ -588,6 +604,9 @@ mkDefMethRhs is_inst_decl clas inst_tys sel_id loc GenDefMeth
 				  Just (tycon, arg_tys) | all tcIsTyVarTy arg_tys -> Just tycon
 				  other						  -> Nothing
 			other -> Nothing
+
+isInstDecl InstanceDeclOrigin = True
+isInstDecl ClassDeclOrigin    = False
 \end{code}
 
 

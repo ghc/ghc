@@ -31,7 +31,7 @@ import TypeRep		( Type(..), SourceType(..), TyNote(..),
 
 import TcMonad          -- TcType, amongst others
 import TcType		( TcKind, TcType, TcSigmaType, TcPhiType, TcTyVar, TcTauType,
-			  TcTyVarSet, TcThetaType,
+			  TcTyVarSet, TcThetaType, TyVarDetails(SigTv),
 			  isTauTy, isSigmaTy, 
 			  tcSplitAppTy_maybe, tcSplitTyConApp_maybe, 
 			  tcGetTyVar_maybe, tcGetTyVar, 
@@ -54,7 +54,7 @@ import TysWiredIn	( listTyCon, parrTyCon, mkListTy, mkPArrTy, mkTupleTy )
 import TcEnv		( TcTyThing(..), tcGetGlobalTyVars, tcLEnvElts )
 import TyCon		( tyConArity, isTupleTyCon, tupleTyConBoxity )
 import PprType		( pprType )
-import Id		( mkSysLocal, idType )
+import Id		( Id, mkSysLocal, idType )
 import Var		( Var, varName, tyVarKind )
 import VarSet		( emptyVarSet, unionVarSet, elemVarSet, varSetElems )
 import VarEnv
@@ -271,10 +271,10 @@ tcGen :: TcSigmaType				-- expected_ty
 
 tcGen expected_ty extra_tvs thing_inside	-- We expect expected_ty to be a forall-type
 						-- If not, the call is a no-op
-  = tcInstType expected_ty 		`thenNF_Tc` \ (forall_tvs, theta, phi_ty) ->
+  = tcInstType SigTv expected_ty 	`thenNF_Tc` \ (forall_tvs, theta, phi_ty) ->
 
 	-- Type-check the arg and unify with poly type
-    thing_inside phi_ty		`thenTc` \ (result, lie) ->
+    thing_inside phi_ty			`thenTc` \ (result, lie) ->
 
 	-- Check that the "forall_tvs" havn't been constrained
 	-- The interesting bit here is that we must include the free variables
@@ -1153,9 +1153,9 @@ mk_msg tv          = ptext SLIT("Quantified type variable") <+> quotes (ppr tv)
 These two context are used with checkSigTyVars
     
 \begin{code}
-sigCtxt :: [TcTyVar] -> TcThetaType -> TcTauType
+sigCtxt :: Id -> [TcTyVar] -> TcThetaType -> TcTauType
 	-> TidyEnv -> NF_TcM (TidyEnv, Message)
-sigCtxt sig_tvs sig_theta sig_tau tidy_env
+sigCtxt id sig_tvs sig_theta sig_tau tidy_env
   = zonkTcType sig_tau		`thenNF_Tc` \ actual_tau ->
     let
 	(env1, tidy_sig_tvs)    = tidyOpenTyVars tidy_env sig_tvs
@@ -1164,7 +1164,8 @@ sigCtxt sig_tvs sig_theta sig_tau tidy_env
 	sub_msg = vcat [ptext SLIT("Signature type:    ") <+> pprType (mkForAllTys tidy_sig_tvs tidy_sig_rho),
 		        ptext SLIT("Type to generalise:") <+> pprType tidy_actual_tau
 		   ]
- 	msg = ptext SLIT("When trying to generalise an inferred type") $$ nest 4 sub_msg
+ 	msg = vcat [ptext SLIT("When trying to generalise the type inferred for") <+> quotes (ppr id),
+		    nest 4 sub_msg]
     in
     returnNF_Tc (env3, msg)
 \end{code}

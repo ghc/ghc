@@ -23,9 +23,9 @@ import RnHsSyn		( RenamedHsBinds, RenamedInstDecl,
 			)
 import TcHsSyn		( TcMonoBinds, mkHsConApp )
 import TcBinds		( tcSpecSigs )
-import TcClassDcl	( tcMethodBind, badMethodErr )
+import TcClassDcl	( tcMethodBind, mkMethodBind, badMethodErr )
 import TcMonad       
-import TcMType		( tcInstSigType, checkValidTheta, checkValidInstHead, instTypeErr, 
+import TcMType		( tcInstType, checkValidTheta, checkValidInstHead, instTypeErr, 
 			  UserTypeCtxt(..), SourceTyCtxt(..) )
 import TcType		( mkClassPred, mkTyVarTy, tcSplitForAllTys,
 			  tcSplitSigmaTy, getClassPredTys, tcSplitPredTy_maybe,
@@ -34,21 +34,21 @@ import TcType		( mkClassPred, mkTyVarTy, tcSplitForAllTys,
 import Inst		( InstOrigin(..), newDicts, instToId,
 			  LIE, mkLIE, emptyLIE, plusLIE, plusLIEs )
 import TcDeriv		( tcDeriving )
-import TcEnv		( tcExtendGlobalValEnv, 
-			  tcExtendTyVarEnvForMeths, tcLookupId, tcLookupClass,
+import TcEnv		( tcExtendGlobalValEnv, tcExtendLocalValEnv2,
+			  tcLookupId, tcLookupClass, tcExtendTyVarEnv2,
  			  InstInfo(..), pprInstInfo, simpleInstInfoTyCon, 
 			  simpleInstInfoTy, newDFunName
 			)
 import InstEnv		( InstEnv, extendInstEnv )
 import PprType		( pprClassPred )
-import TcMonoType	( tcHsTyVars, kcHsSigType, tcHsType, tcHsSigType )
+import TcMonoType	( tcSigPolyId, tcHsTyVars, kcHsSigType, tcHsType, tcHsSigType )
 import TcUnify		( checkSigTyVars )
 import TcSimplify	( tcSimplifyCheck )
 import HscTypes		( HomeSymbolTable, DFunId, FixityEnv,
 			  PersistentCompilerState(..), PersistentRenamerState,
 			  ModDetails(..)
 			)
-import Subst		( substTheta )
+import Subst		( mkTyVarSubst, substTheta )
 import DataCon		( classDataCon )
 import Class		( Class, classBigSig )
 import Var		( idName, idType )
@@ -60,7 +60,6 @@ import Module		( Module, foldModuleEnv )
 import Name		( getSrcLoc )
 import NameSet		( unitNameSet, emptyNameSet, nameSetToList )
 import TyCon		( TyCon )
-import Subst		( mkTopTyVarSubst, substTheta )
 import TysWiredIn	( genericTyCons )
 import SrcLoc           ( SrcLoc )
 import Unique		( Uniquable(..) )
@@ -512,7 +511,7 @@ First comes the easy case of a non-local instance decl.
 tcInstDecl2 :: InstInfo -> TcM (LIE, TcMonoBinds)
 
 tcInstDecl2 (NewTypeDerived { iDFunId = dfun_id })
-  = tcInstSigType InstTv (idType dfun_id)	`thenNF_Tc` \ (inst_tyvars', dfun_theta', inst_head') ->
+  = tcInstType InstTv (idType dfun_id)		`thenNF_Tc` \ (inst_tyvars', dfun_theta', inst_head') ->
     newDicts InstanceDeclOrigin dfun_theta'	`thenNF_Tc` \ rep_dicts ->
     let
 	rep_dict_id = ASSERT( isSingleton rep_dicts )
@@ -534,9 +533,16 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = monobinds, iPrags = uprags }
     recoverNF_Tc (returnNF_Tc (emptyLIE, EmptyMonoBinds))	$
     tcAddSrcLoc (getSrcLoc dfun_id)			   	$
     tcAddErrCtxt (instDeclCtxt (toHsType (idType dfun_id)))	$
+    let
+	inst_ty = idType dfun_id
+	(inst_tyvars, _) = tcSplitForAllTys inst_ty
+		-- The tyvars of the instance decl scope over the 'where' part
+		-- Those tyvars are inside the dfun_id's type, which is a bit
+		-- bizarre, but OK so long as you realise it!
+    in
 
 	-- Instantiate the instance decl with tc-style type variables
-    tcInstSigType InstTv (idType dfun_id)	`thenNF_Tc` \ (inst_tyvars', dfun_theta', inst_head') ->
+    tcInstType InstTv inst_ty		`thenNF_Tc` \ (inst_tyvars', dfun_theta', inst_head') ->
     let
 	Just pred         = tcSplitPredTy_maybe inst_head'
 	(clas, inst_tys') = getClassPredTys pred
@@ -545,12 +551,11 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = monobinds, iPrags = uprags }
 	sel_names = [idName sel_id | (sel_id, _) <- op_items]
 
         -- Instantiate the super-class context with inst_tys
-	sc_theta' = substTheta (mkTopTyVarSubst class_tyvars inst_tys') sc_theta
+	sc_theta' = substTheta (mkTyVarSubst class_tyvars inst_tys') sc_theta
 
 	-- Find any definitions in monobinds that aren't from the class
-	bad_bndrs        = collectMonoBinders monobinds `minusList` sel_names
-	(inst_tyvars, _) = tcSplitForAllTys (idType dfun_id)
-	origin	         = InstanceDeclOrigin
+	bad_bndrs = collectMonoBinders monobinds `minusList` sel_names
+	origin	  = InstanceDeclOrigin
     in
 	 -- Check that all the method bindings come from this class
     mapTc (addErrTc . badMethodErr clas) bad_bndrs		`thenNF_Tc_`
@@ -559,61 +564,52 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = monobinds, iPrags = uprags }
     newDicts origin sc_theta'			 `thenNF_Tc` \ sc_dicts ->
     newDicts origin dfun_theta'			 `thenNF_Tc` \ dfun_arg_dicts ->
     newDicts origin [mkClassPred clas inst_tys'] `thenNF_Tc` \ [this_dict] ->
-
-    tcExtendTyVarEnvForMeths inst_tyvars inst_tyvars' (
-	-- The type variable from the dict fun actually scope 
-	-- over the bindings.  They were gotten from
-	-- the original instance declaration
-
 		-- Default-method Ids may be mentioned in synthesised RHSs,
 		-- but they'll already be in the environment.
 
-	mapAndUnzip3Tc (tcMethodBind clas origin inst_tyvars' inst_tys'
-				     dfun_theta'
-				     monobinds uprags True)
-		       op_items
-    )		 	`thenTc` \ (method_binds_s, insts_needed_s, meth_insts) ->
+    mapAndUnzipTc (mkMethodBind origin clas inst_tys' monobinds) 
+		  op_items  `thenTc` \ (meth_insts, meth_infos) ->
 
-	-- Deal with SPECIALISE instance pragmas by making them
-	-- look like SPECIALISE pragmas for the dfun
-    let
-	dfun_prags = [SpecSig (idName dfun_id) ty loc | SpecInstSig ty loc <- uprags]
-    in
-    tcExtendGlobalValEnv [dfun_id] (
-	tcSpecSigs dfun_prags
-    )					`thenTc` \ (prag_binds, prag_lie) ->
-
-	-- Check the overloading constraints of the methods and superclasses
-    let
+    let		
 		 -- These insts are in scope; quite a few, eh?
 	avail_insts = [this_dict] ++
 		      dfun_arg_dicts ++
 		      sc_dicts ++
 		      meth_insts
 
-        methods_lie    = plusLIEs insts_needed_s
+	xtve    = inst_tyvars `zip` inst_tyvars'
+	tc_meth = tcMethodBind xtve inst_tyvars' dfun_theta' avail_insts
     in
+    mapAndUnzipTc tc_meth meth_infos 	`thenTc` \ (meth_binds_s, meth_lie_s) ->
 
-	-- Simplify the constraints from methods
-    tcAddErrCtxt methodCtxt (
-      tcSimplifyCheck
-		 (ptext SLIT("instance declaration context"))
-		 inst_tyvars'
-		 avail_insts
-		 methods_lie
-    )						 `thenTc` \ (const_lie1, lie_binds1) ->
-    
 	-- Figure out bindings for the superclass context
-    tcAddErrCtxt superClassCtxt (
-      tcSimplifyCheck
-		 (ptext SLIT("instance declaration context"))
+    tcAddErrCtxt superClassCtxt 	$
+    tcSimplifyCheck
+		 (ptext SLIT("instance declaration superclass context"))
 		 inst_tyvars'
 		 dfun_arg_dicts		-- NB! Don't include this_dict here, else the sc_dicts
 					-- get bound by just selecting from this_dict!!
 		 (mkLIE sc_dicts)
-    )					`thenTc` \ (const_lie2, lie_binds2) ->
-
+						`thenTc` \ (sc_lie, sc_binds) ->
+	-- It's possible that the superclass stuff might have done unification
     checkSigTyVars inst_tyvars' 	`thenNF_Tc` \ zonked_inst_tyvars ->
+
+	-- Deal with SPECIALISE instance pragmas by making them
+	-- look like SPECIALISE pragmas for the dfun
+    let
+	mk_prag (SpecInstSig ty loc) = SpecSig (idName dfun_id) ty loc
+	mk_prag prag 		     = prag
+
+	all_prags = map mk_prag uprags
+    in
+     
+    tcExtendGlobalValEnv [dfun_id] (
+	tcExtendTyVarEnv2 xtve					$
+	tcExtendLocalValEnv2 [(idName sel_id, tcSigPolyId sig) 
+			     | (sel_id, sig, _) <- meth_infos]	$
+		-- Map sel_id to the local method name we are using
+	tcSpecSigs all_prags
+    )					`thenTc` \ (prag_binds, prag_lie) ->
 
 	-- Create the result bindings
     let
@@ -657,21 +653,17 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = monobinds, iPrags = uprags }
 	  where
 	    msg = _PK_ ("Compiler error: bad dictionary " ++ showSDoc (ppr clas))
 
-	dict_bind    = VarMonoBind this_dict_id dict_rhs
-	method_binds = andMonoBindList method_binds_s
+	dict_bind  = VarMonoBind this_dict_id dict_rhs
+	meth_binds = andMonoBindList meth_binds_s
+	all_binds  = sc_binds `AndMonoBinds` meth_binds	`AndMonoBinds` dict_bind
 
-	main_bind
-	  = AbsBinds
-		 zonked_inst_tyvars
-		 (map instToId dfun_arg_dicts)
-		 [(inst_tyvars', local_dfun_id, this_dict_id)] 
-		 inlines
-		 (lie_binds1	`AndMonoBinds` 
-		  lie_binds2	`AndMonoBinds`
-		  method_binds	`AndMonoBinds`
-		  dict_bind)
+	main_bind = AbsBinds
+		 	 zonked_inst_tyvars
+		 	 (map instToId dfun_arg_dicts)
+		 	 [(inst_tyvars', local_dfun_id, this_dict_id)] 
+		 	 inlines all_binds
     in
-    returnTc (const_lie1 `plusLIE` const_lie2 `plusLIE` prag_lie,
+    returnTc (plusLIEs meth_lie_s `plusLIE` sc_lie `plusLIE` prag_lie,
 	      main_bind `AndMonoBinds` prag_binds)
 \end{code}
 

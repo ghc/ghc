@@ -35,7 +35,7 @@ import TcPat		( badFieldCon )
 import TcSimplify	( tcSimplifyIPs )
 import TcMType		( tcInstTyVars, tcInstType, newHoleTyVarTy,
 			  newTyVarTy, newTyVarTys, zonkTcType )
-import TcType		( TcType, TcSigmaType, TcPhiType,
+import TcType		( TcType, TcSigmaType, TcPhiType, TyVarDetails(VanillaTv),
 			  tcSplitFunTys, tcSplitTyConApp, mkTyVarTys,
 			  isSigmaTy, mkFunTy, mkAppTy, mkTyConTy,
 			  mkTyConApp, mkClassPred, tcFunArgTy,
@@ -444,7 +444,7 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
 	data_cons		    = tyConDataCons tycon
 	(con_tyvars, _, _, _, _, _) = dataConSig (head data_cons)
     in
-    tcInstTyVars con_tyvars			`thenNF_Tc` \ (_, result_inst_tys, _) ->
+    tcInstTyVars VanillaTv con_tyvars		`thenNF_Tc` \ (_, result_inst_tys, _) ->
 
 	-- STEP 2
 	-- Check that at least one constructor has all the named fields
@@ -482,7 +482,7 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
 
 	mk_inst_ty (tyvar, result_inst_ty) 
 	  | tyvar `elemVarSet` common_tyvars = returnNF_Tc result_inst_ty	-- Same as result type
-	  | otherwise			            = newTyVarTy liftedTypeKind	-- Fresh type
+	  | otherwise			     = newTyVarTy liftedTypeKind	-- Fresh type
     in
     mapNF_Tc mk_inst_ty (zip con_tyvars result_inst_tys)	`thenNF_Tc` \ inst_tys ->
 
@@ -742,7 +742,7 @@ tcId name	-- Look up the Id and instantiate its type
   where
     loop orig (HsVar fun_id) lie fun_ty
 	| want_method_inst fun_ty
-	= tcInstType fun_ty			`thenNF_Tc` \ (tyvars, theta, tau) ->
+	= tcInstType VanillaTv fun_ty		`thenNF_Tc` \ (tyvars, theta, tau) ->
 	  newMethodWithGivenTy orig fun_id 
 		(mkTyVarTys tyvars) theta tau	`thenNF_Tc` \ meth ->
 	  loop orig (HsVar (instToId meth)) 

@@ -250,7 +250,9 @@ isUserTyVar tv = case mutTyVarDetails tv of
 
 isSkolemTyVar :: TcTyVar -> Bool
 isSkolemTyVar tv = case mutTyVarDetails tv of
-		      SigTv -> True
+		      SigTv  -> True
+		      ClsTv  -> True
+		      InstTv -> True
 		      oteher -> False
 
 isHoleTyVar :: TcTyVar -> Bool

@@ -45,7 +45,7 @@ import TcMType	( zonkTcType, zonkTcTypes, zonkTcPredType,
 		  zonkTcThetaType, tcInstTyVar, tcInstType,
 		)
 import TcType	( Type, TcType, TcThetaType, TcPredType, TcTauType, TcTyVarSet,
-		  SourceType(..), PredType, ThetaType,
+		  SourceType(..), PredType, ThetaType, TyVarDetails(VanillaTv),
 		  tcSplitForAllTys, tcSplitForAllTys, 
 		  tcSplitMethodTy, tcSplitRhoTy, tcFunArgTy,
 		  isIntTy,isFloatTy, isIntegerTy, isDoubleTy,
@@ -358,7 +358,7 @@ newIPDict orig ip_name ty
 \begin{code}
 tcInstCall :: InstOrigin  -> TcType -> NF_TcM (TypecheckedHsExpr -> TypecheckedHsExpr, LIE, TcType)
 tcInstCall orig fun_ty	-- fun_ty is usually a sigma-type
-  = tcInstType fun_ty		`thenNF_Tc` \ (tyvars, theta, tau) ->
+  = tcInstType VanillaTv fun_ty	`thenNF_Tc` \ (tyvars, theta, tau) ->
     newDicts orig theta		`thenNF_Tc` \ dicts ->
     let
 	inst_fn e = mkHsDictApp (mkHsTyApp e (mkTyVarTys tyvars)) (map instToId dicts)
@@ -550,18 +550,18 @@ lookupInst dict@(Dict _ (ClassP clas tys) loc)
     case lookupInstEnv dflags inst_env clas tys of
 
       FoundInst tenv dfun_id
-	-> let
-		(tyvars, rho) = tcSplitForAllTys (idType dfun_id)
-		mk_ty_arg tv  = case lookupSubstEnv tenv tv of
-				   Just (DoneTy ty) -> returnNF_Tc ty
-				   Nothing 	    -> tcInstTyVar tv 	`thenNF_Tc` \ tc_tv ->
-						       returnTc (mkTyVarTy tc_tv)
-	   in
-		-- It's possible that not all the tyvars are in
+	->	-- It's possible that not all the tyvars are in
 		-- the substitution, tenv. For example:
 		--	instance C X a => D X where ...
 		-- (presumably there's a functional dependency in class C)
 		-- Hence the mk_ty_arg to instantiate any un-substituted tyvars.	
+	   let
+		(tyvars, rho) = tcSplitForAllTys (idType dfun_id)
+		mk_ty_arg tv  = case lookupSubstEnv tenv tv of
+				   Just (DoneTy ty) -> returnNF_Tc ty
+				   Nothing 	    -> tcInstTyVar VanillaTv tv `thenNF_Tc` \ tc_tv ->
+						       returnTc (mkTyVarTy tc_tv)
+	   in
 	   mapNF_Tc mk_ty_arg tyvars	`thenNF_Tc` \ ty_args ->
 	   let
 		dfun_rho   = substTy (mkTyVarSubst tyvars ty_args) rho

@@ -4,7 +4,7 @@
 \section[TcBinds]{TcBinds}
 
 \begin{code}
-module TcBinds ( tcBindsAndThen, tcTopBinds,
+module TcBinds ( tcBindsAndThen, tcTopBinds, tcMonoBinds,
 	         tcSpecSigs, tcBindWithSigs ) where
 
 #include "HsVersions.h"
@@ -25,11 +25,11 @@ import TcMonad
 import Inst		( LIE, emptyLIE, mkLIE, plusLIE, InstOrigin(..),
 			  newDicts, instToId
 			)
-import TcEnv		( tcExtendLocalValEnv, newLocalName )
+import TcEnv		( tcExtendLocalValEnv, tcExtendLocalValEnv2, newLocalName )
 import TcUnify		( unifyTauTyLists, checkSigTyVarsWrt, sigCtxt )
 import TcSimplify	( tcSimplifyInfer, tcSimplifyInferCheck, tcSimplifyRestricted, tcSimplifyToDicts )
-import TcMonoType	( tcHsSigType, UserTypeCtxt(..), 
-			  TcSigInfo(..), tcTySig, maybeSig, tcAddScopedTyVars
+import TcMonoType	( tcHsSigType, UserTypeCtxt(..), TcSigInfo(..), 
+			  tcTySig, maybeSig, tcSigPolyId, tcSigMonoId, tcAddScopedTyVars
 			)
 import TcPat		( tcPat, tcSubPat, tcMonoPatBndr )
 import TcSimplify	( bindInstsOfLocalFuns )
@@ -131,7 +131,7 @@ tc_binds_and_then top_lvl combiner (MonoBind bind sigs is_rec) do_next
 		     sigs is_rec 			`thenTc` \ (poly_binds, poly_lie, poly_ids) ->
   
 	  -- Extend the environment to bind the new polymorphic Ids
-      tcExtendLocalValEnv [(idName poly_id, poly_id) | poly_id <- poly_ids] $
+      tcExtendLocalValEnv poly_ids			$
   
 	  -- Build bindings and IdInfos corresponding to user pragmas
       tcSpecSigs sigs		`thenTc` \ (prag_binds, prag_lie) ->
@@ -219,8 +219,8 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
           binder_names  = collectMonoBinders mbind
 	  poly_ids      = map mk_dummy binder_names
 	  mk_dummy name = case maybeSig tc_ty_sigs name of
-			    Just (TySigInfo _ poly_id _ _ _ _ _ _) -> poly_id	-- Signature
-			    Nothing -> mkLocalId name forall_a_a          	-- No signature
+			    Just sig -> tcSigPolyId sig			-- Signature
+			    Nothing  -> mkLocalId name forall_a_a      	-- No signature
 	in
 	returnTc (EmptyMonoBinds, emptyLIE, poly_ids)
     )						$
@@ -273,7 +273,7 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
 	  where
 	    (tyvars, poly_id) = 
 		case maybeSig tc_ty_sigs binder_name of
-		  Just (TySigInfo _ sig_poly_id sig_tyvars _ _ _ _ _) -> 
+		  Just (TySigInfo sig_poly_id sig_tyvars _ _ _ _ _) -> 
 			(sig_tyvars, sig_poly_id)
 		  Nothing -> (real_tyvars_to_gen, new_poly_id)
 
@@ -452,8 +452,8 @@ generalise binder_names mbind tau_tvs lie_req sigs =
     returnTc (forall_tvs, lie_free, dict_binds, sig_dicts)
 
   where
-    tysig_names = [name | (TySigInfo name _ _ _ _ _ _ _) <- sigs]
-    is_mono_sig (TySigInfo _ _ _ theta _ _ _ _) = null theta
+    tysig_names = map (idName . tcSigPolyId) sigs
+    is_mono_sig (TySigInfo _ _ theta _ _ _ _) = null theta
 
     doc = ptext SLIT("type signature(s) for") <+> pprBinders binder_names
 
@@ -465,7 +465,7 @@ generalise binder_names mbind tau_tvs lie_req sigs =
 	-- We unify them because, with polymorphic recursion, their types
 	-- might not otherwise be related.  This is a rather subtle issue.
 	-- ToDo: amplify
-checkSigsCtxts sigs@(TySigInfo _ id1 sig_tvs theta1 _ _ _ src_loc : other_sigs)
+checkSigsCtxts sigs@(TySigInfo id1 sig_tvs theta1 _ _ _ src_loc : other_sigs)
   = tcAddSrcLoc src_loc			$
     mapTc_ check_one other_sigs		`thenTc_` 
     if null theta1 then
@@ -481,20 +481,20 @@ checkSigsCtxts sigs@(TySigInfo _ id1 sig_tvs theta1 _ _ _ src_loc : other_sigs)
     returnTc (sig_avails, map instToId sig_dicts)
   where
     sig1_dict_tys = map mkPredTy theta1
-    sig_meths 	  = concat [insts | TySigInfo _ _ _ _ _ _ insts _ <- sigs]
+    sig_meths 	  = concat [insts | TySigInfo _ _ _ _ _ insts _ <- sigs]
 
-    check_one sig@(TySigInfo _ id _ theta _ _ _ src_loc)
+    check_one sig@(TySigInfo id _ theta _ _ _ _)
        = tcAddErrCtxt (sigContextsCtxt id1 id)			$
 	 checkTc (equalLength theta theta1) sigContextsErr	`thenTc_`
 	 unifyTauTyLists sig1_dict_tys (map mkPredTy theta)
 
 checkSigsTyVars sigs = mapTc_ check_one sigs
   where
-    check_one (TySigInfo _ id sig_tyvars sig_theta sig_tau _ _ src_loc)
+    check_one (TySigInfo id sig_tyvars sig_theta sig_tau _ _ src_loc)
       = tcAddSrcLoc src_loc						$
 	tcAddErrCtxt (ptext SLIT("When checking the type signature for") 
 		      <+> quotes (ppr id))				$
-	tcAddErrCtxtM (sigCtxt sig_tyvars sig_theta sig_tau)		$
+	tcAddErrCtxtM (sigCtxt id sig_tyvars sig_theta sig_tau)		$
 	checkSigTyVarsWrt (idFreeTyVars id) sig_tyvars
 \end{code}
 
@@ -612,8 +612,10 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
   where
 
     mk_bind (name, mono_id) = case maybeSig tc_ty_sigs name of
-				Nothing 				  -> (name, mono_id)
-				Just (TySigInfo name poly_id _ _ _ _ _ _) -> (name, poly_id)
+				Nothing  -> (name, mono_id)
+				Just sig -> (idName poly_id, poly_id)
+					 where
+					    poly_id = tcSigPolyId sig
 
     tc_mb_pats EmptyMonoBinds
       = returnTc (\ xve -> returnTc (EmptyMonoBinds, emptyLIE), emptyLIE, emptyBag, emptyBag, emptyLIE)
@@ -634,14 +636,13 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
 
     tc_mb_pats (FunMonoBind name inf matches locn)
       = (case maybeSig tc_ty_sigs name of
-	    Just (TySigInfo _ _ _ _ _ mono_id _ _) 
-		    -> returnNF_Tc mono_id
-	    Nothing -> newLocalName name	`thenNF_Tc` \ bndr_name ->
-		       newTyVarTy openTypeKind	`thenNF_Tc` \ bndr_ty -> 
+	    Just sig -> returnNF_Tc (tcSigMonoId sig)
+	    Nothing  -> newLocalName name	`thenNF_Tc` \ bndr_name ->
+		        newTyVarTy openTypeKind	`thenNF_Tc` \ bndr_ty -> 
 			-- NB: not a 'hole' tyvar; since there is no type 
 			-- signature, we revert to ordinary H-M typechecking
 			-- which means the variable gets an inferred tau-type
-		       returnNF_Tc (mkLocalId bndr_name bndr_ty)
+		        returnNF_Tc (mkLocalId bndr_name bndr_ty)
 	)					`thenNF_Tc` \ bndr_id ->
 	let
 	   bndr_ty	   = idType bndr_id
@@ -667,7 +668,7 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
 	let
 	   complete_it xve = tcAddSrcLoc locn		 		$
 			     tcAddErrCtxt (patMonoBindsCtxt bind)	$
-			     tcExtendLocalValEnv xve			$
+			     tcExtendLocalValEnv2 xve			$
 			     tcGRHSs PatBindRhs grhss pat_ty		`thenTc` \ (grhss', lie) ->
 			     returnTc (PatMonoBind pat' grhss' locn, lie)
 	in
@@ -687,10 +688,11 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
 		-> newLocalName name	`thenNF_Tc` \ bndr_name ->
 		   tcMonoPatBndr bndr_name pat_ty
 
-	    Just (TySigInfo _ _ _ _ _ mono_id _ _)
-		-> tcAddSrcLoc (getSrcLoc name)		$
-		   tcSubPat pat_ty (idType mono_id)	`thenTc` \ (co_fn, lie) ->
-		   returnTc (co_fn, lie, mono_id)
+	    Just sig -> tcAddSrcLoc (getSrcLoc name)		$
+			tcSubPat pat_ty (idType mono_id)	`thenTc` \ (co_fn, lie) ->
+			returnTc (co_fn, lie, mono_id)
+		     where
+			mono_id = tcSigMonoId sig
 \end{code}
 
 

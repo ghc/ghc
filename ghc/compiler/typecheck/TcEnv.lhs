@@ -19,12 +19,13 @@ module TcEnv(
 	tcLookupGlobal_maybe, tcLookupGlobal, 
 
 	-- Local environment
-	tcExtendKindEnv,  tcLookupLocalIds, tcInLocalScope,
-	tcExtendTyVarEnv, tcExtendTyVarEnvForMeths, 
-	tcExtendLocalValEnv, tcLookup, tcLookup_maybe, tcLookupId,
+	tcExtendKindEnv,  tcInLocalScope,
+	tcExtendTyVarEnv,    tcExtendTyVarEnv2, 
+	tcExtendLocalValEnv, tcExtendLocalValEnv2, 
+	tcLookup, tcLookupLocalIds, tcLookup_maybe, tcLookupId,
 
 	-- Global type variables
-	tcGetGlobalTyVars, tcExtendGlobalTyVars,
+	tcGetGlobalTyVars,
 
 	-- Random useful things
 	RecTcEnv, tcLookupRecId, tcLookupRecId_maybe, 
@@ -45,7 +46,7 @@ import TcType		( Type, ThetaType, TcKind, TcTyVar, TcTyVarSet,
 			  tyVarsOfTypes, tcSplitDFunTy,
 			  getDFunTyKey, tcTyConAppTyCon
 			)
-import Id		( isDataConWrapId_maybe )
+import Id		( idName, isDataConWrapId_maybe )
 import Var		( TyVar, Id, idType )
 import VarSet
 import DataCon		( DataCon )
@@ -66,7 +67,6 @@ import HscTypes		( DFunId,
 import Module		( Module )
 import InstEnv		( InstEnv, emptyInstEnv )
 import HscTypes		( lookupType, TyThing(..) )
-import Util		( zipEqual )
 import SrcLoc		( SrcLoc )
 import Outputable
 
@@ -386,10 +386,19 @@ tcExtendKindEnv pairs thing_inside
     tcSetEnv (env {tcLEnv = le'}) thing_inside
     
 tcExtendTyVarEnv :: [TyVar] -> TcM r -> TcM r
-tcExtendTyVarEnv tyvars thing_inside
+tcExtendTyVarEnv tvs thing_inside
+  = tc_extend_tv_env [(getName tv, ATyVar tv) | tv <- tvs] tvs thing_inside
+
+tcExtendTyVarEnv2 :: [(TyVar,TcTyVar)] -> TcM r -> TcM r
+tcExtendTyVarEnv2 tv_pairs thing_inside
+  = tc_extend_tv_env [(getName tv1, ATyVar tv2) | (tv1,tv2) <- tv_pairs]
+		     [tv | (_,tv) <- tv_pairs]
+		     thing_inside
+
+tc_extend_tv_env binds tyvars thing_inside
   = tcGetEnv			`thenNF_Tc` \ env@(TcEnv {tcLEnv = le, tcTyVars = gtvs}) ->
     let
- 	le'        = extendNameEnvList le [ (getName tv, ATyVar tv) | tv <- tyvars]
+ 	le'        = extendNameEnvList le binds
 	new_tv_set = mkVarSet tyvars
     in
 	-- It's important to add the in-scope tyvars to the global tyvar set
@@ -400,29 +409,23 @@ tcExtendTyVarEnv tyvars thing_inside
 	-- when typechecking the methods.
     tc_extend_gtvs gtvs new_tv_set		`thenNF_Tc` \ gtvs' ->
     tcSetEnv (env {tcLEnv = le', tcTyVars = gtvs'}) thing_inside
-
--- This variant, tcExtendTyVarEnvForMeths, takes *two* bunches of tyvars:
---	the signature tyvars contain the original names
---	the instance  tyvars are what those names should be mapped to
--- It's needed when typechecking the method bindings of class and instance decls
--- It does *not* extend the global tyvars; tcMethodBind does that for itself
-
-tcExtendTyVarEnvForMeths :: [TyVar] -> [TcTyVar] -> TcM r -> TcM r
-tcExtendTyVarEnvForMeths sig_tyvars inst_tyvars thing_inside
-  = tcGetEnv					`thenNF_Tc` \ env ->
-    let
-	le'   = extendNameEnvList (tcLEnv env) stuff
-	stuff = [ (getName sig_tv, ATyVar inst_tv)
-		| (sig_tv, inst_tv) <- zipEqual "tcMeth" sig_tyvars inst_tyvars
-		]
-    in
-    tcSetEnv (env {tcLEnv = le'}) thing_inside
 \end{code}
 
 
 \begin{code}
-tcExtendLocalValEnv :: [(Name,TcId)] -> TcM a -> TcM a
-tcExtendLocalValEnv names_w_ids thing_inside
+tcExtendLocalValEnv :: [TcId] -> TcM a -> TcM a
+tcExtendLocalValEnv ids thing_inside
+  = tcGetEnv		`thenNF_Tc` \ env ->
+    let
+	extra_global_tyvars = tyVarsOfTypes [idType id | id <- ids]
+	extra_env	    = [(idName id, ATcId id) | id <- ids]
+	le'		    = extendNameEnvList (tcLEnv env) extra_env
+    in
+    tc_extend_gtvs (tcTyVars env) extra_global_tyvars	`thenNF_Tc` \ gtvs' ->
+    tcSetEnv (env {tcLEnv = le', tcTyVars = gtvs'}) thing_inside
+
+tcExtendLocalValEnv2 :: [(Name,TcId)] -> TcM a -> TcM a
+tcExtendLocalValEnv2 names_w_ids thing_inside
   = tcGetEnv		`thenNF_Tc` \ env ->
     let
 	extra_global_tyvars = tyVarsOfTypes [idType id | (name,id) <- names_w_ids]
@@ -441,11 +444,6 @@ tcExtendLocalValEnv names_w_ids thing_inside
 %************************************************************************
 
 \begin{code}
-tcExtendGlobalTyVars extra_global_tvs thing_inside
-  = tcGetEnv							`thenNF_Tc` \ env ->
-    tc_extend_gtvs (tcTyVars env) (mkVarSet extra_global_tvs)	`thenNF_Tc` \ gtvs' ->
-    tcSetEnv (env {tcTyVars = gtvs'}) thing_inside
-
 tc_extend_gtvs gtvs extra_global_tvs
   = tcReadMutVar gtvs			`thenNF_Tc` \ global_tvs ->
     tcNewMutVar (global_tvs `unionVarSet` extra_global_tvs)

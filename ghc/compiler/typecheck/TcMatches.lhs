@@ -23,7 +23,7 @@ import TcHsSyn		( TcMatch, TcGRHSs, TcStmt, TcDictBinds, TypecheckedPat )
 import TcMonad
 import TcMonoType	( tcAddScopedTyVars, tcHsSigType, UserTypeCtxt(..) )
 import Inst		( LIE, isEmptyLIE, plusLIE, emptyLIE, plusLIEs, lieToList )
-import TcEnv		( TcId, tcLookupLocalIds, tcExtendLocalValEnv )
+import TcEnv		( TcId, tcLookupLocalIds, tcExtendLocalValEnv2 )
 import TcPat		( tcPat, tcMonoPatBndr )
 import TcMType		( newTyVarTy, zonkTcType )
 import TcType		( TcType, TcTyVar, tyVarsOfType, tidyOpenTypes, tidyOpenType,
@@ -144,7 +144,7 @@ tcMatch xve1 ctxt match@(Match pats maybe_rhs_sig grhss) expected_ty
 
   where
     tc_grhss pats' rhs_ty 
-	= tcExtendLocalValEnv xve1 			$
+	= tcExtendLocalValEnv2 xve1 			$
 
 		-- Deal with the result signature
 	  case maybe_rhs_sig of
@@ -223,7 +223,7 @@ tcMatchPats pats expected_ty thing_inside
 	  xve     = bagToList pat_bndrs
 	  pat_ids = map snd xve
 	in
-	tcExtendLocalValEnv xve (thing_inside pats' rhs_ty)		`thenTc` \ (result, lie_req2) ->
+	tcExtendLocalValEnv2 xve (thing_inside pats' rhs_ty)		`thenTc` \ (result, lie_req2) ->
 
 	returnTc (lie_req1, ex_tvs, pat_ids, lie_avail, result, lie_req2)
     ) `thenTc` \ (lie_req1, ex_tvs, pat_ids, lie_avail, result, lie_req2) -> 
