@@ -15,6 +15,7 @@ module PrelArrExtra where
 
 import Ix
 import PrelArr
+import PrelByteArr
 import PrelST
 import PrelBase
 import PrelGHC

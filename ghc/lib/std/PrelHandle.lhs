@@ -16,17 +16,18 @@ module PrelHandle where
 
 import PrelBase
 import PrelAddr		( Addr, nullAddr )
-import PrelArr		( newVar, readVar, writeVar, ByteArray(..) )
+import PrelArr		( newVar, readVar, writeVar )
+import PrelByteArr	( ByteArray(..) )
 import PrelRead		( Read )
 import PrelList 	( span )
 import PrelIOBase
 import PrelException
 import PrelMaybe	( Maybe(..) )
 import PrelEnum
-import PrelNum
+import PrelNum		( toBig, Integer(..), Num(..) )
 import PrelShow
 import PrelAddr		( Addr, nullAddr )
-import PrelNum		( toInteger, toBig )
+import PrelReal		( toInteger )
 import PrelPack         ( packString )
 import PrelWeak		( addForeignFinalizer )
 import Ix

@@ -21,7 +21,7 @@ module Name (
 	tidyTopName, 
 	nameOccName, nameModule, setNameOcc, nameRdrName, setNameModule,
 
-	isUserExportedName, nameSrcLoc,
+	isUserExportedName, isUserImportedExplicitlyName, nameSrcLoc,
 	isLocallyDefinedName,
 
 	isSystemName, isLocalName, isGlobalName, isExternallyVisibleName,
@@ -397,6 +397,9 @@ nameRdrName (Name { n_sort = sort,  n_occ = occ }) = mkRdrQual (moduleName (name
 
 isUserExportedName (Name { n_prov = LocalDef _ Exported }) = True
 isUserExportedName other			           = False
+
+isUserImportedExplicitlyName (Name { n_prov = NonLocalDef (UserImport _ _ explicit) _ }) = explicit
+isUserImportedExplicitlyName other			           			 = False
 
 nameSrcLoc name = provSrcLoc (n_prov name)
 

@@ -14,7 +14,8 @@ module PrelRead where
 import PrelErr		( error )
 import PrelEnum		( Enum(..) )
 import PrelNum
-import PrelNumExtra
+import PrelReal
+import PrelFloat
 import PrelList
 import PrelTup
 import PrelMaybe

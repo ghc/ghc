@@ -413,10 +413,9 @@ filterImports mod (Just (want_hiding, import_items)) avails
       = addErrRn (badImportItemErr mod item)	`thenRn_`
 	returnRn Nothing
 
-      | dodgy_import = addWarnRn (dodgyImportWarn mod item)	`thenRn_`
-		       returnRn (Just (filtered_avail, explicits))
-
-      | otherwise    = returnRn (Just (filtered_avail, explicits))
+      | otherwise    
+      = warnCheckRn (okItem item avail) (dodgyImportWarn mod item)	`thenRn_`
+        returnRn (Just (filtered_avail, explicits))
 		
       where
  	wanted_occ	       = rdrNameOcc (ieName item)
@@ -432,13 +431,12 @@ filterImports mod (Just (want_hiding, import_items)) avails
 		    IEThingAll _    -> True
 		    other	    -> False
 
-	dodgy_import = case (item, avail) of
-			  (IEThingAll _, AvailTC _ [n]) -> True
-				-- This occurs when you import T(..), but
-				-- only export T abstractly.  The single [n]
-				-- in the AvailTC is the type or class itself
-					
-			  other -> False
+
+okItem (IEThingAll _) (AvailTC _ [n]) = False
+		-- This occurs when you import T(..), but
+		-- only export T abstractly.  The single [n]
+		-- in the AvailTC is the type or class itself
+okItem _ _ = True
 \end{code}
 
 
@@ -608,7 +606,10 @@ exportsFromAvail this_mod (Just export_items)
 	= failWithRn acc (exportItemErr ie)
 
 	| otherwise	-- Phew!  It's OK!  Now to check the occurrence stuff!
-	= check_occs ie occs export_avail	`thenRn` \ occs' ->
+
+
+	= warnCheckRn (okItem ie avail) (dodgyExportWarn ie)	`thenRn_`
+          check_occs ie occs export_avail			`thenRn` \ occs' ->
 	  returnRn (mods, occs', add_avail avails export_avail)
 
        where
@@ -659,17 +660,20 @@ badImportItemErr mod ie
   = sep [ptext SLIT("Module"), quotes (pprModuleName mod), 
 	 ptext SLIT("does not export"), quotes (ppr ie)]
 
-dodgyImportWarn mod (IEThingAll tc)
-  = sep [ptext SLIT("Module") <+> quotes (pprModuleName mod)
-			      <+> ptext SLIT("exports") <+> quotes (ppr tc), 
-	 ptext SLIT("with no constructors/class operations;"),
-	 ptext SLIT("yet it is imported with a (..)")]
+dodgyImportWarn mod item = dodgyMsg (ptext SLIT("import")) item
+dodgyExportWarn     item = dodgyMsg (ptext SLIT("export")) item
 
+dodgyMsg kind item@(IEThingAll tc)
+  = sep [ ptext SLIT("The") <+> kind <+> ptext SLIT("item") <+> quotes (ppr item),
+	  ptext SLIT("suggests that") <+> quotes (ppr tc) <+> ptext SLIT("has constructor or class methods"),
+	  ptext SLIT("but it has none; it is a type synonym or abstract type or class") ]
+	  
 modExportErr mod
   = hsep [ ptext SLIT("Unknown module in export list: module"), quotes (pprModuleName mod)]
 
 exportItemErr export_item
-  = sep [ ptext SLIT("Bad export item"), quotes (ppr export_item)]
+  = sep [ ptext SLIT("The export item") <+> quotes (ppr export_item),
+	  ptext SLIT("attempts to export constructors or class methods that are not visible here") ]
 
 exportClashErr occ_name ie1 ie2
   = hsep [ptext SLIT("The export items"), quotes (ppr ie1)
@@ -703,5 +707,4 @@ dupFixityDecl rdr_name loc1 loc2
   = vcat [ptext SLIT("Multiple fixity declarations for") <+> quotes (ppr rdr_name),
 	  ptext SLIT("at ") <+> ppr loc1,
 	  ptext SLIT("and") <+> ppr loc2]
-
 \end{code}

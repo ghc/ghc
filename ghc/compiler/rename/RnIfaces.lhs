@@ -58,7 +58,7 @@ import NameSet
 import Var		( Id )
 import SrcLoc		( mkSrcLoc, SrcLoc )
 import PrelMods		( pREL_GHC )
-import PrelInfo		( cCallishTyKeys, thinAirModules )
+import PrelInfo		( cCallishTyKeys )
 import Bag
 import Maybes		( MaybeErr(..), maybeToBool, orElse )
 import ListSetOps	( unionLists )
@@ -973,11 +973,17 @@ readIface the_mod file_path
 				context = [],
 				glasgow_exts = 1#,
 				loc = mkSrcLoc (mkFastString file_path) 1 } of
-	          PFailed err                    -> failWithRn Nothing err 
 		  POk _  (PIface mod_nm iface) ->
 		    warnCheckRn (mod_nm == moduleName the_mod)
 		    	        (hiModuleNameMismatchWarn the_mod mod_nm) `thenRn_`
 		    returnRn (Just (the_mod, iface))
+
+	          PFailed err   -> failWithRn Nothing err 
+	          other 	-> failWithRn Nothing (ptext SLIT("Unrecognisable interface file"))
+			 	-- This last case can happen if the interface file is (say) empty
+				-- in which case the parser thinks it looks like an IdInfo or
+				-- something like that.  Just an artefact of the fact that the
+				-- parser is used for several purposes at once.
 
         Left err
 	  | isDoesNotExistError err -> returnRn Nothing

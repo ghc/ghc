@@ -7,7 +7,7 @@
 module ThinAir (
 	thinAirIdNames,	-- Names of non-wired-in Ids that may be used out of
 	setThinAirIds,	-- thin air in any compilation. If they are not wired in
-	thinAirModules,	-- we must be sure to import them from some Prelude 
+			-- we must be sure to import them from some Prelude 
 			-- interface file even if they are not overtly 
 			-- mentioned.  Subset of builtinNames.
 	-- Here are the thin-air Ids themselves
@@ -55,7 +55,7 @@ thinAirIdNames
   = map mkKnownKeyGlobal
     [
 	-- Needed for converting literals to Integers (used in tidyCoreExpr)
-      (varQual pREL_BASE_Name SLIT("addr2Integer"), addr2IntegerIdKey)
+      (varQual pREL_NUM_Name SLIT("addr2Integer"), addr2IntegerIdKey)
 
 	-- String literals
     , (varQual pREL_PACK_Name SLIT("packCString#"),   packCStringIdKey)
@@ -70,8 +70,6 @@ thinAirIdNames
     ]
 
 varQual = mkPreludeQual varName
-
-thinAirModules = [pREL_PACK_Name,pREL_BASE_Name]	-- See notes with RnIfaces.findAndReadIface
 \end{code}
 
 

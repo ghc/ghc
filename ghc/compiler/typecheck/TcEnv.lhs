@@ -13,7 +13,7 @@ module TcEnv(
 
 	tcLookupTy,
 	tcLookupTyCon, tcLookupTyConByKey, 
-	tcLookupClass, tcLookupClassByKey,
+	tcLookupClass, tcLookupClassByKey, tcLookupClassByKey_maybe,
 
 	tcExtendGlobalValEnv, tcExtendLocalValEnv,
 	tcGetValueEnv,        tcSetValueEnv, 
@@ -331,6 +331,13 @@ tcLookupClassByKey key
     case lookupUFM_Directly te key of
 	Just (_, _, AClass cl) -> returnNF_Tc cl
 	other		       -> pprPanic "tcLookupClassByKey:" (pprUnique10 key)
+
+tcLookupClassByKey_maybe :: Unique -> NF_TcM s (Maybe Class)
+tcLookupClassByKey_maybe key
+  = tcGetEnv		`thenNF_Tc` \ (TcEnv ue te ve gtvs) ->
+    case lookupUFM_Directly te key of
+	Just (_, _, AClass cl) -> returnNF_Tc (Just cl)
+	other		       -> returnNF_Tc Nothing
 
 tcLookupTyConByKey :: Unique -> NF_TcM s TyCon
 tcLookupTyConByKey key

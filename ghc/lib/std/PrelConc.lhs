@@ -44,7 +44,7 @@ import PrelIOBase	( IO(..), MVar(..), unsafePerformIO )
 import PrelBase		( Int(..) )
 import PrelException    ( Exception(..), AsyncException(..) )
 
-infixr 0 `par`
+infixr 0 `par`, `seq`
 \end{code}
 
 %************************************************************************

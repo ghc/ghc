@@ -25,14 +25,14 @@ import RnIfaces		( getImportedInstDecls, importDecl, getImportVersions,
 			  getImportedRules, loadHomeInterface, getSlurped, removeContext
 			)
 import RnEnv		( availName, availNames, availsToNameSet, 
-			  warnUnusedTopNames, mapFvRn, lookupImplicitOccRn,
+			  warnUnusedImports, warnUnusedLocalBinds, mapFvRn, lookupImplicitOccRn,
 			  FreeVars, plusFVs, plusFV, unitFV, emptyFVs, isEmptyFVs
 			)
 import Module           ( Module, ModuleName, pprModule, mkSearchPath, mkThisModule )
 import Name		( Name, isLocallyDefined,
 			  NamedThing(..), ImportReason(..), Provenance(..),
-			  pprOccName, nameOccName,
-			  getNameProvenance, 
+			  pprOccName, nameOccName, nameUnique,
+			  getNameProvenance, isUserImportedExplicitlyName,
 			  maybeWiredInTyConName, maybeWiredInIdName, isWiredInName
 			)
 import Id		( idType )
@@ -42,7 +42,7 @@ import RdrName		( RdrName )
 import NameSet
 import PrelMods		( mAIN_Name, pREL_MAIN_Name )
 import TysWiredIn	( unitTyCon, intTyCon, doubleTyCon, boolTyCon )
-import PrelInfo		( ioTyCon_NAME, numClass_RDR, thinAirIdNames, derivingOccurrences )
+import PrelInfo		( ioTyCon_NAME, thinAirIdNames, fractionalClassKeys, derivingOccurrences )
 import Type		( namesOfType, funTyCon )
 import ErrUtils		( printErrorsAndWarnings, dumpIfSet, ghcExit )
 import BasicTypes	( NewOrData(..) )
@@ -52,6 +52,7 @@ import UniqSupply	( UniqSupply )
 import UniqFM		( lookupUFM )
 import Util		( equivClasses )
 import Maybes		( maybeToBool )
+import SrcLoc		( mkBuiltinSrcLoc )
 import Outputable
 \end{code}
 
@@ -118,7 +119,7 @@ rename this_mod@(HsModule mod_name vers _ imports local_decls loc)
     in
     slurpImpDecls real_source_fvs	`thenRn` \ rn_imp_decls ->
     let
-	rn_all_decls	   = rn_imp_decls ++ rn_local_decls 
+	rn_all_decls	   = rn_local_decls ++ rn_imp_decls
     in
 
 	-- EXIT IF ERRORS FOUND
@@ -164,21 +165,20 @@ mentioned explicitly, but which might be needed by the type checker.
 \begin{code}
 implicitFVs mod_name decls
   = mapRn lookupImplicitOccRn implicit_occs	`thenRn` \ implicit_names ->
-    returnRn (implicit_main		`plusFV` 
-	      mkNameSet default_tys	`plusFV`
-	      mkNameSet thinAirIdNames	`plusFV`
+    returnRn (implicit_main				`plusFV` 
+	      mkNameSet (map getName default_tycons)	`plusFV`
+	      mkNameSet thinAirIdNames			`plusFV`
 	      mkNameSet implicit_names)
-    
   where
-	-- Add occurrences for Int, Double, and (), because they
+ 	-- Add occurrences for Int, and (), because they
 	-- are the types to which ambigious type variables may be defaulted by
 	-- the type checker; so they won't always appear explicitly.
 	-- [The () one is a GHC extension for defaulting CCall results.]
 	-- ALSO: funTyCon, since it occurs implicitly everywhere!
 	--  	 (we don't want to be bothered with making funTyCon a
 	--	  free var at every function application!)
-    default_tys = [getName intTyCon, getName doubleTyCon,
-		   getName unitTyCon, getName funTyCon, getName boolTyCon]
+	-- Double is dealt with separately in getGates
+    default_tycons = [unitTyCon, funTyCon, boolTyCon, intTyCon]
 
 	-- Add occurrences for IO or PrimIO
     implicit_main |  mod_name == mAIN_Name
@@ -190,7 +190,6 @@ implicitFVs mod_name decls
 	-- generate code
     implicit_occs = foldr ((++) . get) [] decls
 
-    get (DefD _) = [numClass_RDR]
     get (TyClD (TyData _ _ _ _ _ (Just deriv_classes) _ _))
        = concat (map get_deriv deriv_classes)
     get other = []
@@ -226,6 +225,17 @@ isOrphanDecl (RuleD (RuleDecl _ _ _ lhs _ _))
     check other	      	  = True 	-- Safe fall through
 
 isOrphanDecl other = False
+\end{code}
+
+
+\begin{code}
+dupDefaultDeclErrRn (DefaultDecl _ locn1 : dup_things)
+  = pushSrcLocRn locn1	$
+    addErrRn msg
+  where
+    msg = hang (ptext SLIT("Multiple default declarations"))
+	       4  (vcat (map pp dup_things))
+    pp (DefaultDecl _ locn) = ptext SLIT("here was another default declaration") <+> ppr locn
 \end{code}
 
 
@@ -285,7 +295,7 @@ slurpSourceRefs source_binders source_fvs
 	  rnInstDecls decls1 fvs1 gates1 inst_decls		`thenRn` \ (decls2, fvs2, gates2) ->
 	  go_outer decls2 fvs2 (all_gates `plusFV` gates2)
 			       (nameSetToList (gates2 `minusNameSet` all_gates))
-		-- Knock out the all_gates because even ifwe don't slurp any new
+		-- Knock out the all_gates because even if we don't slurp any new
 		-- decls we can get some apparently-new gates from wired-in names
 
     go_inner decls fvs gates []
@@ -408,13 +418,24 @@ getGates source_fvs (SigD (IfaceSig _ ty _ _))
   = extractHsTyNames ty
 
 getGates source_fvs (TyClD (ClassDecl ctxt cls tvs _ sigs _ _ _ _ _ _))
-  = delListFromNameSet (foldr (plusFV . get) (extractHsCtxtTyNames ctxt) sigs)
+  = (delListFromNameSet (foldr (plusFV . get) (extractHsCtxtTyNames ctxt) sigs)
 		       (map getTyVarName tvs)
-    `addOneToNameSet` cls
+     `addOneToNameSet` cls)
+    `plusFV` maybe_double
   where
     get (ClassOpSig n _ _ ty _) 
 	| n `elemNameSet` source_fvs = extractHsTyNames ty
 	| otherwise		     = emptyFVs
+
+	-- If we load any numeric class that doesn't have
+	-- Int as an instance, add Double to the gates. 
+	-- This takes account of the fact that Double might be needed for
+	-- defaulting, but we don't want to load Double (and all its baggage)
+	-- if the more exotic classes aren't used at all.
+    maybe_double | nameUnique cls `elem` fractionalClassKeys 
+		 = unitFV (getName doubleTyCon)
+		 | otherwise
+		 = emptyFVs
 
 getGates source_fvs (TyClD (TySynonym tycon tvs ty _))
   = delListFromNameSet (extractHsTyNames ty)
@@ -510,20 +531,11 @@ reportUnusedNames gbl_env avail_env (ExportEnv export_avails _ _) mentioned_name
 	   nameSetToList (defined_names `minusNameSet` really_used_names)
 
 	-- Filter out the ones only defined implicitly
-	bad_guys = filter reportableUnusedName defined_but_not_used
+	bad_locals = [n | n <- defined_but_not_used, isLocallyDefined		  n]
+	bad_imps   = [n | n <- defined_but_not_used, isUserImportedExplicitlyName n]
     in
-    warnUnusedTopNames bad_guys
-
-reportableUnusedName :: Name -> Bool
-reportableUnusedName name
-  = explicitlyImported (getNameProvenance name)
-  where
-    explicitlyImported (LocalDef _ _) 		             = True
-	-- Report unused defns of local vars
-    explicitlyImported (NonLocalDef (UserImport _ _ expl) _) = expl
- 	-- Report unused explicit imports
-    explicitlyImported other			             = False
-	-- Don't report others
+    warnUnusedLocalBinds bad_locals	`thenRn_`
+    warnUnusedImports bad_imps
 
 rnDump  :: [RenamedHsDecl] 	-- Renamed imported decls
 	-> [RenamedHsDecl] 	-- Renamed local decls

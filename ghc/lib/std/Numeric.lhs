@@ -8,7 +8,6 @@ Odds and ends, mostly functions for reading and showing
 
 
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude #-}
 module Numeric
 
         ( fromRat          -- :: (RealFloat a) => Rational -> a
@@ -34,22 +33,26 @@ module Numeric
           -- Implementation checked wrt. Haskell 98 lib report, 1/99.
 	) where
 
-#ifndef __HUGS__
-import PrelBase
-import PrelMaybe
-import PrelShow
-import PrelArr
-import PrelNum
-import PrelNumExtra
-import PrelRead
-import PrelErr ( error )
-#else
 import Char
-import Array
-#endif
-\end{code}
 
 #ifndef __HUGS__
+	-- GHC imports
+import Prelude		-- For dependencies
+import PrelBase		( Char(..) )
+import PrelRead		-- Lots of things
+import PrelReal		( showSigned )
+import PrelFloat	( fromRat, FFFormat(..), 
+			  formatRealFloat, floatToDigits, showFloat
+			)
+import PrelNum		( ord_0 )
+#else
+	-- Hugs imports
+import Array
+#endif
+
+#ifndef __HUGS__
+
+\end{code}
 
 \begin{code}
 showInt :: Integral a => a -> ShowS
@@ -82,7 +85,15 @@ showGFloat d x =  showString (formatRealFloat FFGeneric d x)
 
 \end{code}
 
-#else
+#else	
+
+%*********************************************************
+%*							*
+	All of this code is for Hugs only
+	GHC gets it from PrelFloat!
+%*							*
+%*********************************************************
+
 \begin{code}
 -- This converts a rational to a floating.  This should be used in the
 -- Fractional instances of Float and Double.

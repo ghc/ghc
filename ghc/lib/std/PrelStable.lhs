@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelStable.lhs,v 1.2 1999/09/19 19:12:42 sof Exp $
+% $Id: PrelStable.lhs,v 1.3 1999/12/20 10:34:35 simonpj Exp $
 %
 % (c) The GHC Team, 1992-1999
 %
@@ -23,7 +23,6 @@ import PrelIOBase
 data StablePtr  a = StablePtr  (StablePtr#  a)
 
 instance CCallable   (StablePtr a)
-instance CCallable   (StablePtr# a)
 instance CReturnable (StablePtr a)
 
 makeStablePtr  :: a -> IO (StablePtr a)

@@ -26,7 +26,7 @@ module PrelInfo (
 	maybeCharLikeCon, maybeIntLikeCon,
 	needsDataDeclCtxtClassKeys, cCallishClassKeys, cCallishTyKeys, 
 	isNoDictClass, isNumericClass, isStandardClass, isCcallishClass, 
-	isCreturnableClass, numericTyKeys,
+	isCreturnableClass, numericTyKeys, fractionalClassKeys,
 
 	-- RdrNames for lots of things, mainly used in derivings
 	eq_RDR, ne_RDR, le_RDR, lt_RDR, ge_RDR, gt_RDR, max_RDR, min_RDR, 
@@ -319,12 +319,13 @@ ioDataCon_RDR  	   	= dataQual pREL_IO_BASE_Name SLIT("IO")
 bindIO_RDR	        = varQual  pREL_IO_BASE_Name SLIT("bindIO")
 
 orderingTyCon_RDR	= tcQual   pREL_BASE_Name SLIT("Ordering")
-rationalTyCon_RDR	= tcQual   pREL_NUM_Name  SLIT("Rational")
-ratioTyCon_RDR		= tcQual   pREL_NUM_Name  SLIT("Ratio")
-ratioDataCon_RDR	= dataQual pREL_NUM_Name  SLIT(":%")
 
-byteArrayTyCon_RDR		= tcQual pREL_ARR_Name  SLIT("ByteArray")
-mutableByteArrayTyCon_RDR	= tcQual pREL_ARR_Name  SLIT("MutableByteArray")
+rationalTyCon_RDR	= tcQual   pREL_REAL_Name  SLIT("Rational")
+ratioTyCon_RDR		= tcQual   pREL_REAL_Name  SLIT("Ratio")
+ratioDataCon_RDR	= dataQual pREL_REAL_Name  SLIT(":%")
+
+byteArrayTyCon_RDR		= tcQual pREL_BYTEARR_Name  SLIT("ByteArray")
+mutableByteArrayTyCon_RDR	= tcQual pREL_BYTEARR_Name  SLIT("MutableByteArray")
 
 foreignObjTyCon_RDR	= tcQual   pREL_IO_BASE_Name SLIT("ForeignObj")
 stablePtrTyCon_RDR	= tcQual   pREL_STABLE_Name SLIT("StablePtr")
@@ -401,13 +402,14 @@ plus_RDR	   = varQual pREL_NUM_Name SLIT("+")
 times_RDR	   = varQual pREL_NUM_Name SLIT("*")
 
 -- Other numberic classes
-realClass_RDR		= clsQual pREL_NUM_Name  SLIT("Real")
-integralClass_RDR	= clsQual pREL_NUM_Name  SLIT("Integral")
-fractionalClass_RDR	= clsQual pREL_NUM_Name  SLIT("Fractional")
-floatingClass_RDR	= clsQual pREL_NUM_Name  SLIT("Floating")
-realFracClass_RDR	= clsQual pREL_NUM_Name  SLIT("RealFrac")
-realFloatClass_RDR	= clsQual pREL_NUM_Name  SLIT("RealFloat")
-fromRational_RDR   	= varQual pREL_NUM_Name  SLIT("fromRational")
+realClass_RDR		= clsQual pREL_REAL_Name  SLIT("Real")
+integralClass_RDR	= clsQual pREL_REAL_Name  SLIT("Integral")
+realFracClass_RDR	= clsQual pREL_REAL_Name  SLIT("RealFrac")
+fractionalClass_RDR	= clsQual pREL_REAL_Name  SLIT("Fractional")
+fromRational_RDR   	= varQual pREL_REAL_Name  SLIT("fromRational")
+
+floatingClass_RDR	= clsQual pREL_FLOAT_Name  SLIT("Floating")
+realFloatClass_RDR	= clsQual pREL_FLOAT_Name  SLIT("RealFloat")
 
 -- Class Ix
 ixClass_RDR	   = clsQual iX_Name	  SLIT("Ix")
@@ -549,6 +551,7 @@ because the list of ambiguous dictionaries hasn't been simplified.
 isCcallishClass, isCreturnableClass, isNoDictClass, 
   isNumericClass, isStandardClass :: Class -> Bool
 
+isFractionalClass  clas = classKey clas `is_elem` fractionalClassKeys
 isNumericClass     clas = classKey clas `is_elem` numericClassKeys
 isStandardClass    clas = classKey clas `is_elem` standardClassKeys
 isCcallishClass	   clas = classKey clas `is_elem` cCallishClassKeys
@@ -560,7 +563,11 @@ numericClassKeys =
 	[ numClassKey
     	, realClassKey
     	, integralClassKey
-    	, fractionalClassKey
+	]
+	++ fractionalClassKeys
+
+fractionalClassKeys = 
+    	[ fractionalClassKey
     	, floatingClassKey
     	, realFracClassKey
     	, realFloatClassKey

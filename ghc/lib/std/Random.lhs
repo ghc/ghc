@@ -29,17 +29,18 @@ module Random
 	) where
 
 #ifndef __HUGS__
-import CPUTime (getCPUTime)
-import PrelST
-import PrelRead
-import PrelShow
-import PrelNum		-- So we get fromInt, toInt
-import PrelIOBase
-import PrelNumExtra ( float2Double, double2Float )
-import PrelBase
-import PrelArr
-import Time (getClockTime, ClockTime(..))
+import PrelGHC		( RealWorld )
+import PrelNum		( fromInt )
+import PrelShow		( showSignedInt, showSpace )
+import PrelRead		( readDec )
+import PrelIOBase	( unsafePerformIO, stToIO )
+import PrelArr		( MutableVar, newVar, readVar, writeVar )
+import PrelReal		( toInt )
+import CPUTime		( getCPUTime )
+import PrelFloat	( float2Double, double2Float )
+import Time		( getClockTime, ClockTime(..) )
 #endif
+
 import Char ( isSpace, chr, ord )
 \end{code}
 

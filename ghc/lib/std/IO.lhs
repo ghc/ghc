@@ -107,7 +107,7 @@ import PrelRead         ( readParen, Read(..), reads, lex,
 import PrelShow
 import PrelMaybe	( Either(..), Maybe(..) )
 import PrelAddr		( Addr(..), nullAddr )
-import PrelArr		( ByteArray )
+import PrelByteArr	( ByteArray )
 import PrelPack		( unpackNBytesAccST )
 import PrelException    ( ioError, catch )
 

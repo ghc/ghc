@@ -19,7 +19,6 @@ module PrelForeign (
 import PrelIOBase
 import PrelST
 import PrelBase
-import PrelCCall
 import PrelAddr
 import PrelGHC
 \end{code}

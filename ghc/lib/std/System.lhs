@@ -25,7 +25,7 @@ import Prelude
 import PrelAddr
 import PrelIOBase	( IOError(..), IOErrorType(..), constructErrorAndFailWithInfo, stToIO )
 import PrelPack    	( unpackCString, unpackCStringST, packString )
-import PrelArr		( ByteArray )
+import PrelByteArr	( ByteArray )
 
 type PrimByteArray  = ByteArray Int
 

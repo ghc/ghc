@@ -15,15 +15,16 @@ module PrelMods
         mkTupNameStr, mkUbxTupNameStr,
 
 	pREL_GHC, pREL_BASE, pREL_ADDR, pREL_STABLE,
-	pREL_IO_BASE, pREL_PACK, pREL_ERR,
+	pREL_IO_BASE, pREL_PACK, pREL_ERR, pREL_NUM, pREL_FLOAT, pREL_REAL,
 
 	pREL_GHC_Name, pRELUDE_Name, mONAD_Name, rATIO_Name, 
 	iX_Name, mAIN_Name, pREL_MAIN_Name, pREL_ERR_Name,
 	pREL_BASE_Name, pREL_NUM_Name, pREL_LIST_Name, 
 	pREL_TUP_Name, pREL_ADDR_Name, pREL_READ_Name,
 	pREL_PACK_Name, pREL_CONC_Name, pREL_IO_BASE_Name, 
-	pREL_ST_Name, pREL_ARR_Name, pREL_FOREIGN_Name,
-	pREL_STABLE_Name, pREL_SHOW_Name, pREL_ENUM_Name, iNT_Name, wORD_Name
+	pREL_ST_Name, pREL_ARR_Name, pREL_BYTEARR_Name, pREL_FOREIGN_Name,
+	pREL_STABLE_Name, pREL_SHOW_Name, pREL_ENUM_Name, iNT_Name, wORD_Name,
+	pREL_REAL_Name, pREL_FLOAT_Name
 	) where
 
 #include "HsVersions.h"
@@ -48,10 +49,13 @@ pREL_CONC_Name    = mkSrcModule "PrelConc"
 pREL_IO_BASE_Name = mkSrcModule "PrelIOBase"
 pREL_ST_Name	  = mkSrcModule "PrelST"
 pREL_ARR_Name     = mkSrcModule "PrelArr"
+pREL_BYTEARR_Name = mkSrcModule "PrelByteArr"
 pREL_FOREIGN_Name = mkSrcModule "PrelForeign"
 pREL_STABLE_Name  = mkSrcModule "PrelStable"
 pREL_ADDR_Name    = mkSrcModule "PrelAddr"
 pREL_ERR_Name     = mkSrcModule "PrelErr"
+pREL_REAL_Name    = mkSrcModule "PrelReal"
+pREL_FLOAT_Name   = mkSrcModule "PrelFloat"
 
 mONAD_Name	 = mkSrcModule "Monad"
 rATIO_Name	 = mkSrcModule "Ratio"
@@ -68,6 +72,9 @@ pREL_STABLE  = mkPrelModule pREL_STABLE_Name
 pREL_IO_BASE = mkPrelModule pREL_IO_BASE_Name
 pREL_PACK    = mkPrelModule pREL_PACK_Name
 pREL_ERR     = mkPrelModule pREL_ERR_Name
+pREL_NUM     = mkPrelModule pREL_NUM_Name
+pREL_REAL    = mkPrelModule pREL_REAL_Name
+pREL_FLOAT   = mkPrelModule pREL_FLOAT_Name
 \end{code}
 
 %************************************************************************

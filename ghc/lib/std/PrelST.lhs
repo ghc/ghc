@@ -13,6 +13,8 @@ import PrelShow
 import PrelBase
 import PrelGHC
 import PrelNum ()	-- So that we get the .hi file for system imports
+
+default ()
 \end{code}
 
 %*********************************************************

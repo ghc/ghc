@@ -38,17 +38,21 @@ module Time
 #ifdef __HUGS__
 import PreludeBuiltin
 #else
-import PrelBase
-import PrelShow
-import PrelIOBase
-import PrelHandle
-import PrelArr
-import PrelST
-import PrelAddr
-import PrelNum
-import PrelPack 	( unpackCString, new_ps_array,
-			  freeze_ps_array, unpackCStringBA
+import PrelGHC		( RealWorld, (>#), (<#), (==#),
+			  newIntArray#, readIntArray#, 
+			  unsafeFreezeByteArray#,
+			  int2Integer#, negateInt# )
+import PrelBase		( Int(..) )
+import PrelNum		( Integer(..), fromInt )
+import PrelIOBase	( IO(..), unsafePerformIO, stToIO, constructErrorAndFail )
+import PrelShow		( showList__ )
+import PrelPack 	( unpackCString, unpackCStringBA,
+			  new_ps_array, freeze_ps_array
 			)
+import PrelByteArr	( MutableByteArray(..) )
+import PrelHandle	( Bytes )
+import PrelAddr		( Addr )
+
 #endif
 
 import Ix

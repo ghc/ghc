@@ -631,7 +631,10 @@ filterAvail (IEVar v)      avail@(AvailTC n ns) = Just (AvailTC n (filter wanted
 	-- 	import A( op ) 
 	-- where op is a class operation
 
-filterAvail (IEThingAll _) avail@(AvailTC _ _)  = Just avail
+filterAvail (IEThingAll _) avail@(AvailTC _ _)   = Just avail
+	-- We don't complain even if the IE says T(..), but
+	-- no constrs/class ops of T are available
+	-- Instead that's caught with a warning by the caller
 
 filterAvail ie avail = Nothing
 
@@ -694,18 +697,19 @@ mapFvRn f xs = mapRn f xs	`thenRn` \ stuff ->
 %************************************************************************
 
 
-\begin{code}
-warnUnusedLocalBinds, warnUnusedTopNames, warnUnusedMatches :: [Name] -> RnM d ()
 
-warnUnusedTopNames names
-  | not opt_WarnUnusedBinds && not opt_WarnUnusedImports
-  = returnRn () 	-- Don't force ns unless necessary
+\begin{code}
+warnUnusedLocalBinds, warnUnusedImports, warnUnusedMatches :: [Name] -> RnM d ()
+
+warnUnusedImports names
+  | not opt_WarnUnusedImports
+  = returnRn () 	-- Don't force names unless necessary
   | otherwise
-  = warnUnusedBinds (\ is_local -> not is_local) names
+  = warnUnusedBinds (const True) names
 
 warnUnusedLocalBinds ns
   | not opt_WarnUnusedBinds = returnRn ()
-  | otherwise		    = warnUnusedBinds (\ is_local -> is_local) ns
+  | otherwise		    = warnUnusedBinds (const True) ns
 
 warnUnusedMatches names
   | opt_WarnUnusedMatches = warnUnusedGroup (const True) names
@@ -730,6 +734,12 @@ warnUnusedBinds warn_when_local names
 			-- In-scope NonLocalDefs must have UserImport info on them
 
 -------------------------
+
+--	NOTE: the function passed to warnUnusedGroup is
+--	now always (const True) so we should be able to
+--	simplify the code slightly.  I'm leaving it there
+--	for now just in case I havn't realised why it was there.
+--	Looks highly bogus to me.  SLPJ Dec 99
 
 warnUnusedGroup :: (Bool -> Bool) -> [Name] -> RnM d ()
 warnUnusedGroup emit_warning names

@@ -891,6 +891,43 @@ construction of interface files, is (allegedly) in the works.
 
 %************************************************************************
 %*                                                                      *
+<sect1>Command line options in source files
+<label id="source-file-options">
+<p>
+<nidx>source-file options</nidx>
+%*                                                                      *
+%************************************************************************
+
+GHC expects its flags on the command line, but it is also possible
+to embed them in the Haskell module itself, using the  @OPTIONS@
+pragma <nidx>OPTIONS pragma</nidx>: 
+<tscreen><verb>
+  {-# OPTIONS -fglasgow-exts -fno-cpr-analyse #-}
+  module X where
+  
+  ...
+</verb></tscreen>
+@OPTIONS@ pragmas are only looked for at the top of your source
+files, upto the first (non-literate,non-empty) line not containing
+@OPTIONS@. Multiple @OPTIONS@ pragmas are recognised. Note
+that your command shell does not get to the source file options, they
+are just included literally in the array of command-line arguments
+the compiler driver maintains internally, so you'll be desperately
+disappointed if you try to @glob@ etc. inside @OPTIONS@.
+
+The contents of @OPTIONS@ are prepended to the command-line
+options, so you *do* have the ability to override @OPTIONS@ settings
+via the command line.
+
+It is not recommended to move all the contents of your Makefiles into
+your source files, but in some circumstances, the @OPTIONS@ pragma
+is the Right Thing. (If you use @-keep-hc-file-too@ and have @OPTIONS@
+flags in your module, the @OPTIONS@ will get put into the generated .hc
+file).
+
+
+%************************************************************************
+%*                                                                      *
 <sect1>Optimisation (code improvement)
 <label id="options-optimise">
 <p>

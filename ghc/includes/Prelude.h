@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.h,v 1.9 1999/07/14 11:15:09 simonmar Exp $
+ * $Id: Prelude.h,v 1.10 1999/12/20 10:34:33 simonpj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -25,14 +25,14 @@ extern const StgClosure PrelMain_mainIO_closure;
 
 extern DLL_IMPORT const StgInfoTable PrelBase_Czh_static_info;
 extern DLL_IMPORT const StgInfoTable PrelBase_Izh_static_info;
-extern DLL_IMPORT const StgInfoTable PrelBase_Fzh_static_info;
-extern DLL_IMPORT const StgInfoTable PrelBase_Dzh_static_info;
+extern DLL_IMPORT const StgInfoTable PrelFloat_Fzh_static_info;
+extern DLL_IMPORT const StgInfoTable PrelFloat_Dzh_static_info;
 extern DLL_IMPORT const StgInfoTable PrelAddr_Azh_static_info;
 extern DLL_IMPORT const StgInfoTable PrelAddr_Wzh_static_info;
 extern DLL_IMPORT const StgInfoTable PrelBase_Czh_con_info;
 extern DLL_IMPORT const StgInfoTable PrelBase_Izh_con_info;
-extern DLL_IMPORT const StgInfoTable PrelBase_Fzh_con_info;
-extern DLL_IMPORT const StgInfoTable PrelBase_Dzh_con_info;
+extern DLL_IMPORT const StgInfoTable PrelFloat_Fzh_con_info;
+extern DLL_IMPORT const StgInfoTable PrelFloat_Dzh_con_info;
 extern DLL_IMPORT const StgInfoTable PrelAddr_Azh_con_info;
 extern DLL_IMPORT const StgInfoTable PrelAddr_Wzh_con_info;
 extern DLL_IMPORT const StgInfoTable PrelAddr_I64zh_con_info;
@@ -53,14 +53,14 @@ extern DLL_IMPORT const StgInfoTable PrelStable_StablePtr_con_info;
 #define NonTermination_closure PrelException_NonTermination_static_closure
 #define Czh_static_info        PrelBase_Czh_static_info
 #define Izh_static_info        PrelBase_Izh_static_info
-#define Fzh_static_info        PrelBase_Fzh_static_info
-#define Dzh_static_info        PrelBase_Dzh_static_info
+#define Fzh_static_info        PrelFloat_Fzh_static_info
+#define Dzh_static_info        PrelFloat_Dzh_static_info
 #define Azh_static_info        PrelAddr_Azh_static_info
 #define Wzh_static_info        PrelAddr_Wzh_static_info
 #define Czh_con_info           PrelBase_Czh_con_info
 #define Izh_con_info           PrelBase_Izh_con_info
-#define Fzh_con_info           PrelBase_Fzh_con_info
-#define Dzh_con_info           PrelBase_Dzh_con_info
+#define Fzh_con_info           PrelFloat_Fzh_con_info
+#define Dzh_con_info           PrelFloat_Dzh_con_info
 #define Azh_con_info           PrelAddr_Azh_con_info
 #define Wzh_con_info           PrelAddr_Wzh_con_info
 #define W64zh_con_info         PrelAddr_W64zh_con_info

@@ -53,14 +53,20 @@ module Directory
 #ifdef __HUGS__
 --import PreludeBuiltin
 #else
-import PrelBase
-import PrelIOBase
-import PrelHandle	
-import PrelST
-import PrelArr
+
+import Prelude		-- Just to get it in the dependencies
+
+import PrelGHC		( RealWorld, int2Word#, or#, and# )
+import PrelByteArr	( ByteArray, MutableByteArray,
+			  newWordArray, readWordArray, newCharArray,
+			  unsafeFreezeByteArray
+			)
 import PrelPack		( unpackNBytesST, packString, unpackCStringST )
-import PrelAddr
+import PrelIOBase	( stToIO,
+			  constructErrorAndFail, constructErrorAndFailWithInfo,
+			  IOError(IOError), IOErrorType(SystemError) )
 import Time             ( ClockTime(..) )
+import PrelAddr		( Addr, nullAddr, Word(..), wordToInt )
 #endif
 
 \end{code}

@@ -37,6 +37,8 @@ import PrelList( null )
 import PrelEnum
 import PrelShow
 import PrelNum
+
+default()
 \end{code}
 
 %*********************************************************

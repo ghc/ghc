@@ -77,7 +77,8 @@ import PrelList
 import PrelRead
 import PrelEnum
 import PrelNum
-import PrelNumExtra
+import PrelReal
+import PrelFloat
 import PrelTup
 import PrelMaybe
 import PrelShow
@@ -100,6 +101,12 @@ undefined               :: a
 undefined               =  error "Prelude.undefined"
 \end{code}
 
+
+%*********************************************************
+%*							*
+\subsection{List sum and product}
+%*							*
+%*********************************************************
 
 List sum and product are defined here because PrelList is too far
 down the compilation chain to "see" the Num class.
@@ -124,4 +131,40 @@ product	l	= prod l 1
     prod []     a = a
     prod (x:xs) a = prod xs (a*x)
 #endif
+\end{code}
+
+
+%*********************************************************
+%*							*
+\subsection{Coercions}
+%*							*
+%*********************************************************
+
+\begin{code}
+{-# SPECIALIZE fromIntegral ::
+    Int		-> Rational,
+    Integer	-> Rational,
+    Int  	-> Int,
+    Int 	-> Integer,
+    Int		-> Float,
+    Int		-> Double,
+    Integer  	-> Int,
+    Integer 	-> Integer,
+    Integer	-> Float,
+    Integer	-> Double #-}
+fromIntegral	:: (Integral a, Num b) => a -> b
+fromIntegral	=  fromInteger . toInteger
+
+{-# SPECIALIZE realToFrac ::
+    Double	-> Rational, 
+    Rational	-> Double,
+    Float	-> Rational,
+    Rational	-> Float,
+    Rational	-> Rational,
+    Double	-> Double,
+    Double	-> Float,
+    Float	-> Float,
+    Float	-> Double #-}
+realToFrac	:: (Real a, Fractional b) => a -> b
+realToFrac	=  fromRational . toRational
 \end{code}

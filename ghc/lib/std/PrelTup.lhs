@@ -13,6 +13,8 @@ module PrelTup where
 
 import {-# SOURCE #-} PrelErr ( error )
 import PrelBase
+
+default ()		-- Double isn't available yet
 \end{code}
 
 

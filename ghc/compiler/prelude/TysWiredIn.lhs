@@ -317,8 +317,8 @@ isAddrTy ty
 \begin{code}
 floatTy	= mkTyConTy floatTyCon
 
-floatTyCon = pcNonRecDataTyCon floatTyConKey pREL_BASE SLIT("Float") [] [] [floatDataCon]
-floatDataCon = pcDataCon floatDataConKey pREL_BASE SLIT("F#") [] [] [floatPrimTy] floatTyCon
+floatTyCon = pcNonRecDataTyCon floatTyConKey pREL_FLOAT SLIT("Float") [] [] [floatDataCon]
+floatDataCon = pcDataCon floatDataConKey pREL_FLOAT SLIT("F#") [] [] [floatPrimTy] floatTyCon
 
 isFloatTy :: Type -> Bool
 isFloatTy ty
@@ -337,8 +337,8 @@ isDoubleTy ty
 	Just (tycon, [], _) -> getUnique tycon == doubleTyConKey
 	_		    -> False
 
-doubleTyCon = pcNonRecDataTyCon doubleTyConKey pREL_BASE SLIT("Double") [] [] [doubleDataCon]
-doubleDataCon = pcDataCon doubleDataConKey pREL_BASE SLIT("D#") [] [] [doublePrimTy] doubleTyCon
+doubleTyCon = pcNonRecDataTyCon doubleTyConKey pREL_FLOAT SLIT("Double") [] [] [doubleDataCon]
+doubleDataCon = pcDataCon doubleDataConKey pREL_FLOAT SLIT("D#") [] [] [doublePrimTy] doubleTyCon
 \end{code}
 
 \begin{code}
@@ -372,12 +372,12 @@ foreignObjTyCon
 integerTy :: Type
 integerTy = mkTyConTy integerTyCon
 
-integerTyCon = pcNonRecDataTyCon integerTyConKey pREL_BASE SLIT("Integer")
+integerTyCon = pcNonRecDataTyCon integerTyConKey pREL_NUM SLIT("Integer")
                    [] [] [smallIntegerDataCon, largeIntegerDataCon]
 
-smallIntegerDataCon = pcDataCon smallIntegerDataConKey pREL_BASE SLIT("S#")
+smallIntegerDataCon = pcDataCon smallIntegerDataConKey pREL_NUM SLIT("S#")
 		[] [] [intPrimTy] integerTyCon
-largeIntegerDataCon = pcDataCon largeIntegerDataConKey pREL_BASE SLIT("J#")
+largeIntegerDataCon = pcDataCon largeIntegerDataConKey pREL_NUM SLIT("J#")
 		[] [] [intPrimTy, byteArrayPrimTy] integerTyCon
 
 

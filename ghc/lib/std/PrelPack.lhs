@@ -53,6 +53,7 @@ import PrelList ( length )
 import PrelST
 import PrelNum
 import PrelArr
+import PrelByteArr
 import PrelAddr
 
 \end{code}

@@ -4,6 +4,72 @@
 \section[PrelBase]{Module @PrelBase@}
 
 
+The overall structure of the GHC Prelude is a bit tricky.
+
+  a) We want to avoid "orphan modules", i.e. ones with instance
+	decls that don't belong either to a tycon or a class
+	defined in the same module
+
+  b) We want to avoid giant modules
+
+So the rough structure is as follows, in (linearised) dependency order
+
+
+PrelGHC		Has no implementation.  It defines built-in things, and
+		by importing it you bring them into scope.
+		The source file is PrelGHC.hi-boot, which is just
+		copied to make PrelGHC.hi
+
+		Classes: CCallable, CReturnable
+
+PrelBase	Classes: Eq, Ord, Functor, Monad
+		Types:   list, (), Int, Bool, Ordering, Char, String
+
+PrelTup		Types: tuples, plus instances for PrelBase classes
+
+PrelShow	Class: Show, plus instances for PrelBase/PrelTup types
+
+PrelEnum	Class: Enum,  plus instances for PrelBase/PrelTup types
+
+PrelMaybe	Type: Maybe, plus instances for PrelBase classes
+
+PrelNum		Class: Num, plus instances for Int
+		Type:  Integer, plus instances for all classes so far (Eq, Ord, Num, Show)
+
+		Integer is needed here because it is mentioned in the signature
+		of 'fromInteger' in class Num
+
+PrelReal	Classes: Real, Integral, Fractional, RealFrac
+			 plus instances for Int, Integer
+		Types:  Ratio, Rational
+			plus intances for classes so far
+
+		Rational is needed here because it is mentioned in the signature
+		of 'toRational' in class Real
+
+Ix		Classes: Ix, plus instances for Int, Bool, Char, Integer, Ordering, tuples
+
+PrelArr		Types: Array, MutableArray, MutableVar
+
+		Does *not* contain any ByteArray stuff (see PrelByteArr)
+		Arrays are used by a function in PrelFloat
+
+PrelFloat	Classes: Floating, RealFloat
+		Types:   Float, Double, plus instances of all classes so far
+
+		This module contains everything to do with floating point.
+		It is a big module (900 lines)
+		With a bit of luck, many modules can be compiled without ever reading PrelFloat.hi
+
+PrelByteArr	Types: ByteArray, MutableByteArray
+		
+		We want this one to be after PrelFloat, because it defines arrays
+		of unboxed floats.
+
+
+Other Prelude modules are much easier with fewer complex dependencies.
+
+
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
 
@@ -25,6 +91,8 @@ infixr 3  &&
 infixr 2  ||
 infixl 1  >>, >>=
 infixr 0  $
+
+default ()		-- Double isn't available yet
 \end{code}
 
 
@@ -360,74 +428,6 @@ compareInt :: Int -> Int -> Ordering
 
 %*********************************************************
 %*							*
-\subsection{Type @Integer@, @Float@, @Double@}
-%*							*
-%*********************************************************
-
-\begin{code}
-data Float	= F# Float#
-data Double	= D# Double#
-
-data Integer	
-   = S# Int#				-- small integers
-   | J# Int# ByteArray#			-- large integers
-
-instance  Eq Integer  where
-    (S# i)     ==  (S# j)     = i ==# j
-    (S# i)     ==  (J# s d)   = cmpIntegerInt# s d i ==# 0#
-    (J# s d)   ==  (S# i)     = cmpIntegerInt# s d i ==# 0#
-    (J# s1 d1) ==  (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) ==# 0#
-
-    (S# i)     /=  (S# j)     = i /=# j
-    (S# i)     /=  (J# s d)   = cmpIntegerInt# s d i /=# 0#
-    (J# s d)   /=  (S# i)     = cmpIntegerInt# s d i /=# 0#
-    (J# s1 d1) /=  (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) /=# 0#
-
-instance  Ord Integer  where
-    (S# i)     <=  (S# j)     = i <=# j
-    (J# s d)   <=  (S# i)     = cmpIntegerInt# s d i <=# 0#
-    (S# i)     <=  (J# s d)   = cmpIntegerInt# s d i >=# 0#
-    (J# s1 d1) <=  (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) <=# 0#
-
-    (S# i)     >   (S# j)     = i ># j
-    (J# s d)   >   (S# i)     = cmpIntegerInt# s d i ># 0#
-    (S# i)     >   (J# s d)   = cmpIntegerInt# s d i <# 0#
-    (J# s1 d1) >   (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) ># 0#
-
-    (S# i)     <   (S# j)     = i <# j
-    (J# s d)   <   (S# i)     = cmpIntegerInt# s d i <# 0#
-    (S# i)     <   (J# s d)   = cmpIntegerInt# s d i ># 0#
-    (J# s1 d1) <   (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) <# 0#
-
-    (S# i)     >=  (S# j)     = i >=# j
-    (J# s d)   >=  (S# i)     = cmpIntegerInt# s d i >=# 0#
-    (S# i)     >=  (J# s d)   = cmpIntegerInt# s d i <=# 0#
-    (J# s1 d1) >=  (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) >=# 0#
-
-    compare (S# i)  (S# j)
-       | i ==# j = EQ
-       | i <=# j = LT
-       | otherwise = GT
-    compare (J# s d) (S# i)
-       = case cmpIntegerInt# s d i of { res# ->
-	 if res# <# 0# then LT else 
-	 if res# ># 0# then GT else EQ
-	 }
-    compare (S# i) (J# s d)
-       = case cmpIntegerInt# s d i of { res# ->
-	 if res# ># 0# then LT else 
-	 if res# <# 0# then GT else EQ
-	 }
-    compare (J# s1 d1) (J# s2 d2)
-       = case cmpInteger# s1 d1 s2 d2 of { res# ->
-	 if res# <# 0# then LT else 
-	 if res# ># 0# then GT else EQ
-	 }
-\end{code}
-
-
-%*********************************************************
-%*							*
 \subsection{The function type}
 %*							*
 %*********************************************************
@@ -469,6 +469,28 @@ asTypeOf		=  const
 
 %*********************************************************
 %*							*
+\subsection{CCallable instances}
+%*							*
+%*********************************************************
+
+Defined here to avoid orphans
+
+\begin{code}
+instance CCallable Char
+instance CReturnable Char
+
+instance CCallable   Int
+instance CReturnable Int
+
+-- DsCCall knows how to pass strings...
+instance CCallable   [Char]
+
+instance CReturnable () -- Why, exactly?
+\end{code}
+
+
+%*********************************************************
+%*							*
 \subsection{Numeric primops}
 %*							*
 %*********************************************************
@@ -490,15 +512,29 @@ used in the case of partial applications, etc.
 {-# INLINE remInt #-}
 {-# INLINE negateInt #-}
 
-plusInt, minusInt, timesInt, quotInt, remInt :: Int -> Int -> Int
+plusInt, minusInt, timesInt, quotInt, remInt, gcdInt :: Int -> Int -> Int
 plusInt	(I# x) (I# y) = I# (x +# y)
 minusInt(I# x) (I# y) = I# (x -# y)
 timesInt(I# x) (I# y) = I# (x *# y)
 quotInt	(I# x) (I# y) = I# (quotInt# x y)
 remInt	(I# x) (I# y) = I# (remInt# x y)
+gcdInt (I# a)  (I# b) = I# (gcdInt# a b)
 
 negateInt :: Int -> Int
 negateInt (I# x)      = I# (negateInt# x)
+
+divInt, modInt :: Int -> Int -> Int
+x `divInt` y 
+  | x > zeroInt && y < zeroInt = quotInt ((x `minusInt` y) `minusInt` oneInt) y
+  | x < zeroInt && y > zeroInt = quotInt ((x `minusInt` y) `plusInt`  oneInt) y
+  | otherwise	   = quotInt x y
+
+x `modInt` y 
+  | x > zeroInt && y < zeroInt || 
+    x < zeroInt && y > zeroInt  = if r/=zeroInt then r `plusInt` y else zeroInt
+  | otherwise	   		= r
+  where
+    r = remInt x y
 
 gtInt, geInt, eqInt, neInt, ltInt, leInt :: Int -> Int -> Bool
 gtInt	(I# x) (I# y) = x ># y
@@ -509,14 +545,3 @@ ltInt	(I# x) (I# y) = x <# y
 leInt	(I# x) (I# y) = x <=# y
 \end{code}
 
-Convenient boxed Integer PrimOps.  These are 'thin-air' Ids, so
-it's nice to have them in PrelBase.
-
-\begin{code}
-{-# INLINE int2Integer #-}
-{-# INLINE addr2Integer #-}
-int2Integer :: Int# -> Integer
-int2Integer  i = S# i
-addr2Integer :: Addr# -> Integer
-addr2Integer x = case addr2Integer# x of (# s, d #) -> J# s d
-\end{code}

@@ -104,7 +104,7 @@ output) by using @-ddump-all@, or most of them with @-ddump-most@.
 Some of the most useful ones are:
 
 <descrip>
-<tag>@-ddump-parsed@:</tag> oarser output
+<tag>@-ddump-parsed@:</tag> parser output
 <tag>@-ddump-rn@:</tag>  renamer output
 <tag>@-ddump-tc@:</tag>  typechecker output
 <tag>@-ddump-deriv@:</tag>  derived instances
@@ -122,6 +122,10 @@ Some of the most useful ones are:
 <tag>@-ddump-flatC@:</tag>  <em>flattened</em> Abstract~C
 <tag>@-ddump-realC@:</tag>  same as what goes to the C compiler
 <tag>@-ddump-asm@:</tag>  assembly language from the native-code generator
+<tag>@-ddump-most@:</tag> most of the above, plus @-dshow-passes@, @-dsource-stats@, @-ddump-simpl-stats@,
+<tag>@-ddump-all@:</tag> all the above, plus @-ddump-inlinings@, 
+@-ddump-simpl-iterations@, @-ddump-rn-trace@,
+@-ddump-verbose-simpl@, @-ddump-verbose-stg@.
 </descrip>
 
 <nidx>-ddump-all option</nidx>%
@@ -329,45 +333,5 @@ Main.skip2{-r1L6-} =
 
 (``It's just a simple functional language'' is an unregisterised
 trademark of Peyton Jones Enterprises, plc.)
-
-%----------------------------------------------------------------------
-<sect2>Command line options in source files
-<label id="source-file-options">
-<p>
-<nidx>source-file options</nidx>
-
-Sometimes it is useful to make the connection between a source file
-and the command-line options it requires quite tight. For instance,
-if a (Glasgow) Haskell source file uses @casm@s, the C back-end
-often needs to be told about which header files to include. Rather than
-maintaining the list of files the source depends on in a
-@Makefile@ (using the @-#include@ command-line option), it is
-possible to do this directly in the source file using the @OPTIONS@
-pragma <nidx>OPTIONS pragma</nidx>: 
-
-<tscreen><verb>
-{-# OPTIONS -#include "foo.h" #-}
-module X where
-
-...
-</verb></tscreen>
-
-@OPTIONS@ pragmas are only looked for at the top of your source
-files, upto the first (non-literate,non-empty) line not containing
-@OPTIONS@. Multiple @OPTIONS@ pragmas are recognised. Note
-that your command shell does not get to the source file options, they
-are just included literally in the array of command-line arguments
-the compiler driver maintains internally, so you'll be desperately
-disappointed if you try to glob etc. inside @OPTIONS@.
-
-NOTE: the contents of OPTIONS are prepended to the command-line
-options, so you *do* have the ability to override OPTIONS settings
-via the command line.
-
-It is not recommended to move all the contents of your Makefiles into
-your source files, but in some circumstances, the @OPTIONS@ pragma
-is the Right Thing. (If you use @-keep-hc-file-too@ and have OPTION
-flags in your module, the OPTIONS will get put into the generated .hc
-file).
 
 %----------------------------------------------------------------------

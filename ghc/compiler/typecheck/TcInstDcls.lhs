@@ -585,7 +585,7 @@ creturnable_type ty = maybeToBool (maybeBoxedPrimType ty) ||
 
 \begin{code}
 instConstraintErr clas tys
-  = hang (ptext SLIT("Illegal constaint") <+> 
+  = hang (ptext SLIT("Illegal constraint") <+> 
 	  quotes (pprConstraint clas tys) <+> 
 	  ptext SLIT("in instance context"))
 	 4 (ptext SLIT("(Instance contexts must constrain only type variables)"))

@@ -466,7 +466,7 @@ ifaceBinds hdl needed_ids final_ids binds
 %************************************************************************
 
 \begin{code}
-ifaceTyCons hdl tycons   = hPutCol hdl upp_tycon (sortLt (<) (filter (for_iface_name . getName) tycons ))
+ifaceTyCons hdl tycons   = hPutCol hdl upp_tycon (sortLt (<) (filter (for_iface_name . getName) tycons))
 ifaceClasses hdl classes = hPutCol hdl upp_class (sortLt (<) (filter (for_iface_name . getName) classes))
 
 for_iface_name name = isLocallyDefined name && 

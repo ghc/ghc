@@ -4,7 +4,7 @@
 \section[CPUTime]{Haskell 1.4 CPU Time Library}
 
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude -#include "cbits/stgio.h" #-}
+{-# OPTIONS -#include "cbits/stgio.h" #-}
 
 module CPUTime 
 	(
@@ -17,15 +17,13 @@ module CPUTime
 #ifndef __HUGS__
 
 \begin{code}
-import PrelBase
-import PrelArr  	( ByteArray(..), newIntArray, unsafeFreezeByteArray )
-import PrelMaybe
-import PrelNum
-import PrelNumExtra
-import PrelIOBase
-import PrelST
-import IO		( ioError )
-import PrelNum ( Num(..), Integral(..) )	-- To get fromInt/toInt
+import Prelude		-- To generate the dependency
+import PrelGHC		( indexIntArray# )
+import PrelBase		( Int(..) )
+import PrelByteArr  	( ByteArray(..), newIntArray, unsafeFreezeByteArray )
+import PrelNum		( fromInt )
+import PrelIOBase	( IOError(..), IOErrorType( UnsupportedOperation ), 
+			  unsafePerformIO, stToIO )
 import Ratio
 \end{code}
 

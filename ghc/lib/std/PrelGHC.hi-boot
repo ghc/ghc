@@ -344,7 +344,7 @@ instance {CCallable Wordzh} = zdfCCallableWordzh;
 instance {CCallable ByteArrayzh} = zdfCCallableByteArrayzh;
 instance __forall [s] => {CCallable (MutableByteArrayzh s)} = zdfCCallableMutableByteArrayzh;
 instance {CCallable ForeignObjzh} = zdfCCallableForeignObjzh;
-
+instance __forall [s] => {CCallable (StablePtrzh s)} = zdfCCallableStablePtrzh;
 -- CCallable and CReturnable have kind (Type AnyBox) so that
 -- things like Int# can be instances of CCallable. 
 1 class CCallable a :: ? ;
@@ -365,3 +365,4 @@ instance {CCallable ForeignObjzh} = zdfCCallableForeignObjzh;
 1 zdfCCallableByteArrayzh :: {CCallable ByteArrayzh} ;
 1 zdfCCallableMutableByteArrayzh :: __forall [s] => {CCallable (MutableByteArrayzh s)} ;
 1 zdfCCallableForeignObjzh :: {CCallable ForeignObjzh} ;
+1 zdfCCallableStablePtrzh :: __forall [a] => {CCallable (StablePtrzh a)} ;

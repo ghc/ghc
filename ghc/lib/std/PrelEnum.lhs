@@ -19,6 +19,8 @@ module PrelEnum(
 import {-# SOURCE #-} PrelErr ( error )
 import PrelBase
 import PrelTup	()	-- To make sure we look for the .hi file
+
+default ()		-- Double isn't available yet
 \end{code}
 
 

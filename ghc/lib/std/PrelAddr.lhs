@@ -22,7 +22,6 @@ module PrelAddr (
 
 import PrelGHC
 import PrelBase
-import PrelCCall
 \end{code}
 
 \begin{code}
