@@ -45,8 +45,6 @@ module FiniteMap (
 	fmToList, keysFM, eltsFM
 
 	, bagToFM
-	, FiniteSet, emptySet, mkSet, isEmptySet
-	, elementOf, setToList, union, insert, minusSet
 
     ) where
 
@@ -668,33 +666,6 @@ instance (Ord key, Ord elt) => Ord (FiniteMap key elt) where
 		 (fmToList fm_1 <= fmToList fm_2)
 -}
 #endif
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{FiniteSets---a thin veneer}
-%*									*
-%************************************************************************
-
-\begin{code}
-type FiniteSet key = FiniteMap key ()
-emptySet	:: FiniteSet key
-mkSet		:: (Ord key OUTPUTABLE_key) => [key] -> FiniteSet key
-isEmptySet	:: FiniteSet key -> Bool
-elementOf	:: (Ord key OUTPUTABLE_key) => key -> FiniteSet key -> Bool
-minusSet	:: (Ord key OUTPUTABLE_key) => FiniteSet key -> FiniteSet key -> FiniteSet key
-setToList	:: FiniteSet key -> [key]
-union		:: (Ord key OUTPUTABLE_key) => FiniteSet key -> FiniteSet key -> FiniteSet key
-insert		:: (Ord key OUTPUTABLE_key) => FiniteSet key -> key -> FiniteSet key
-
-emptySet = emptyFM
-mkSet xs = listToFM [ (x, ()) | x <- xs]
-isEmptySet = isEmptyFM
-elementOf = elemFM
-minusSet  = minusFM
-setToList = keysFM
-union = plusFM
-insert s v = addToFM s v ()
 \end{code}
 
 %************************************************************************
