@@ -215,12 +215,21 @@ follows
 A heap object is reachable if:
 
 <itemize>
+<item> It is a member of the <em/root set/.
 <item> It is directly pointed to by a reachable object, other than
 a weak pointer object.
 <item> It is a weak pointer object whose key is reachable.
 <item> It is the value or finaliser of an object whose key is
 reachable.
 </itemize>
+
+The root set consists of all runnable threads, and all stable pointers
+(see Section <ref id="sec:stable-pointers" name="Stable Pointers">).
+NOTE: currently all top-level objects are considered to be reachable,
+although we hope to remove this restriction in the future.  A
+<tt/Char/ or small <tt/Int/ will also be constantly reachable, since
+the garbage collector replaces heap-resident <tt/Char/s and small
+<tt/Int/s with pointers to static copies.
 
 Notice that a pointer to the key from its associated 
 value or finaliser does not make the key reachable.
