@@ -1,4 +1,4 @@
- 
+
 rnfail002.hs:4:
     Multiple declarations of `y'
 	defined at rnfail002.hs:5

@@ -1,4 +1,4 @@
- 
+
 rnfail013.hs:3:
     Multiple declarations of `MkT'
 	defined at rnfail013.hs:7

@@ -6,7 +6,8 @@
             land_i, lnot_i, lor_i, lshift_i, rshift_i,
             descr,
             destr_update, indassoc, lowbound, tabulate, upbound, update, valassoc) where {
-            import Word2;
+	    import Bits;
+            import Word;
 	    import Complex; -- 1.3
 	    import Array; -- 1.3
             type Complex_type   = Complex Double;
@@ -19,23 +20,22 @@
             force         x                   = x; -- error  "force not implemented";
             iff           b     x  y          = if b then x else y;
             iffrev        y  x      b         = if b then x else y;
-            seQ           x    y              = seq_const y (x{-#STRICT-});
-            seq_const     x    y              = x ;
+            seQ           x    y              = x `seq` y;
             pair          []                  = False;
             pair          x                   = True;
             strcmp        :: [Char] -> [Char] -> Bool;
             strcmp        x      y            = x == y;
             entier        x                   = fromIntegral (floor x);
             land_i        :: Int -> Int -> Int;
-            land_i        x    y              = wordToInt (bitAnd (fromInt x) (fromInt y));
+            land_i        x    y              = wordToInt (fromInt x .&. fromInt y);
             lnot_i        :: Int -> Int;
-            lnot_i        x                   = wordToInt (bitCompl (fromInt x));
+            lnot_i        x                   = wordToInt (complement (fromInt x));
             lor_i         :: Int -> Int -> Int;
-            lor_i         x    y              = wordToInt (bitOr (fromInt x) (fromInt y));
+            lor_i         x    y              = wordToInt (fromInt x .|. fromInt y);
             lshift_i      :: Int -> Int -> Int;
-            lshift_i      x    y              = wordToInt (bitLsh (fromInt x) y);
+            lshift_i      x    y              = wordToInt (fromInt x `shiftL` y);
             rshift_i      :: Int -> Int -> Int;
-            rshift_i      x    y              = wordToInt (bitRsh (fromInt x) y);
+            rshift_i      x    y              = wordToInt (fromInt x `shiftR` y);
             write         x                   = abortstr "write not implemented";
             descr         l    u              = (l,u);
             destr_update  ar  i  x            = ar // [(i,x)];

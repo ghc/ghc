@@ -1,6 +1,5 @@
- 
-rnfail007.hs:3:
-    Module `Main' must include a definition for `Main.main'
+
+rnfail007.hs:3: Module `Main' must include a definition for `main'
 
 
 Compilation had errors

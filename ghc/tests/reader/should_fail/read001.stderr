@@ -1,9 +1,9 @@
 
 ==================== Reader ====================
 module OneOfEverything (
-	fixn, FooData, FooDataB(..), FooDataC(..), EqTree(EqLeaf,
-							  EqBranch), EqClass(..), OrdClass(orda,
-											   ordb), module OneC, module OneOfEverything
+	fixn, FooData, FooDataB(..), FooDataC(..),
+	EqTree(EqLeaf, EqBranch), EqClass(..), OrdClass(orda, ordb),
+	module OneC, module OneOfEverything
     ) where
 import Prelude
 import IO (putStr)
@@ -32,31 +32,32 @@ mat a b c d
       | foof b c = d
       where
 	  {- rec -}
-	  foof a b = a == b
+	  foof a b = a zeze b
 expr a b c d
-       = ((((((((a + (: a b)) + (a : b)) + (((1 - 'c') - "abc") - 1.293))
-	      + ((\ x y z -> x) 42))
-	     + ((9 *)))
-	    + ((* 8)))
-	   + (case x of
-		Prelude.[]
-		  | null x -> 99
-		  | otherwise -> 98
-		  | True -> 97
-		  where
-		      {- rec -}
-		      null x = False))
-	  + ([z | z <- c, isSpace z]))
-	 + (let
-	      {- rec -}
-	      y = foo
-	    in
-	      (((((((y + [1, 2, 3, 4]) + (4, 3, 2, 1)) + (4 :: (Num a) => a))
-		  + (if 42 == 42.0 then 1 else 4))
-		 + ([1 .. ]))
-		+ ([2, 4 .. ]))
-	       + ([3 .. 5]))
-	      + ([4, 8 .. 999]))
+       = ((((((((a zp (ZC a b)) zp (a ZC b))
+	       zp (((1 zm 'c') zm "abc") zm 1.293))
+	      zp ((\ x y zz -> x) 42))
+	     zp ((9 zt)))
+	    zp ((zt 8)))
+	   zp (case x of
+		 Prelude.ZMZN
+		   | null x -> 99
+		   | otherwise -> 98
+		   | True -> 97
+		   where
+		       {- rec -}
+		       null x = False))
+	  zp ([zz | zz <- c, isSpace zz]))
+	 zp (let
+	       {- rec -}
+	       y = foo
+	     in
+	       (((((((y zp [1, 2, 3, 4]) zp (4, 3, 2, 1)) zp (4 :: (Num a) => a))
+		   zp (if 42 zeze 42.0 then 1 else 4))
+		  zp ([1 .. ]))
+		 zp ([2, 4 .. ]))
+		zp ([3 .. 5]))
+	       zp ([4, 8 .. 999]))
 f _
   x
   1
@@ -64,13 +65,13 @@ f _
   'c'
   "dog"
   ~y
-  (z@(Foo a b))
+  (zz@(Foo a b))
   (c Bar d)
   [1, 2]
   (3, 4)
   ((n+42))
     = y
-g x y z = head y
+g x y zz = head y
 default (Integer, Rational)
 instance (Eq a) => EqClass (EqTree a) where
     []
@@ -87,36 +88,32 @@ data FooDataB = FooConB Double
 data FooData = FooCon Int
 type Pair a b = (a, b)
 infixr 8 fixr
-infixl 7 +#
+infixl 7 zpzh
 infix 6 fixn
 
 
- 
-read001.hs:20: Warning: Unused fixity declaration for `+#'
 
- 
 read001.hs:5: Type constructor or class not in scope: `FooDataC'
- 
-read001.hs:5: Unknown module in export list: module `OneC'
- 
-read001.hs:40: Type constructor or class not in scope: `EqLeaf'
- 
-read001.hs:40: Type constructor or class not in scope: `EqLeaf'
- 
-read001.hs:80: Value not in scope: `isSpace'
- 
-read001.hs:87: Value not in scope: `x'
- 
-read001.hs:87: Value not in scope: `x'
- 
-read001.hs:95: Value not in scope: `foo'
- 
-read001.hs:107: Data constructor not in scope: `Foo'
- 
-read001.hs:107: Data constructor not in scope: `Bar'
- 
-read001.hs:112: Type constructor or class not in scope: `Foo'
 
+read001.hs:5: Unknown module in export list: module `OneC'
+
+read001.hs:40: Type constructor or class not in scope: `EqLeaf'
+
+read001.hs:40: Type constructor or class not in scope: `EqLeaf'
+
+read001.hs:80: Variable not in scope: `isSpace'
+
+read001.hs:87: Variable not in scope: `x'
+
+read001.hs:87: Variable not in scope: `x'
+
+read001.hs:95: Variable not in scope: `foo'
+
+read001.hs:107: Data constructor not in scope: `Foo'
+
+read001.hs:107: Data constructor not in scope: `Bar'
+
+read001.hs:112: Type constructor or class not in scope: `Foo'
 
 Compilation had errors
 

@@ -1,4 +1,4 @@
- 
+
 rnfail003.hs:2:
     Multiple declarations of `f'
 	defined at rnfail003.hs:2

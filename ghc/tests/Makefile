@@ -13,11 +13,11 @@ SUBDIRS = \
 	rename \
 	simplCore \
 	stranal \
-	typecheck 
+	typecheck \
+	programs
 
 #	printing \
 #	io \
-#	programs
 
 include $(TOP)/mk/target.mk
 

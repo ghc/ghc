@@ -49,7 +49,7 @@ Likewise if you change the type of LinearCode to Int!
 > getRepInterp (RepInterp a ) = a
 
 > instance Functor Interpreter where
->  map f (RepInterp intp ) 
+>  fmap f (RepInterp intp ) 
 >   = RepInterp (\s -> case intp s of
 >			 g -> g >>= \q -> 
 >		          case q of
@@ -81,4 +81,4 @@ Likewise if you change the type of LinearCode to Int!
 > class Monad m => OutputMonad m  where   
 >   out      :: String -> m ()
 > instance OutputMonad IO where
->  out s = catch (putStr s) (\_ ->  fail $userError "Oh MY")
+>  out s = catch (putStr s) (\_ ->  ioError $ userError "Oh MY")

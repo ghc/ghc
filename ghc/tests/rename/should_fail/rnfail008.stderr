@@ -1,5 +1,5 @@
- 
-rnfail008.hs:18: Value not in scope: `op3'
+
+rnfail008.hs:18: Variable not in scope: `op3'
 
 
 Compilation had errors

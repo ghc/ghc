@@ -1,4 +1,4 @@
- 
+
 rnfail011.hs:2:
     Multiple declarations of `A'
 	defined at rnfail011.hs:2

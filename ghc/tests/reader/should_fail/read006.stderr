@@ -1,1 +1,1 @@
-read006.hs:5:7: pattern syntax used in expression on input: "_"
+read006.hs:8:12: parse error on input: "@"
