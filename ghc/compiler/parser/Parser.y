@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.1 1999/06/01 16:40:48 simonmar Exp $
+$Id: Parser.y,v 1.2 1999/06/02 14:42:43 simonmar Exp $
 
 Haskell grammar.
 
@@ -429,8 +429,7 @@ rules	:: { RdrBinding }
 
 rule  	:: { RdrBinding }
 	: STRING rule_forall fexp '=' srcloc exp
-	     { RdrHsDecl (RuleD (RuleDecl $1 (error "rule tyvars") 
-		  $2 $3 $6 $5)) }
+	     { RdrHsDecl (RuleD (RuleDecl $1 [] $2 $3 $6 $5)) }
 
 rule_forall :: { [RdrNameRuleBndr] }
 	: 'forall' rule_var_list '.'            { $2 }
