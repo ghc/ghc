@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: bootstrap.mk,v 1.25 2003/07/24 11:46:01 simonmar Exp $
+# $Id: bootstrap.mk,v 1.26 2003/07/24 13:40:05 simonmar Exp $
 #
 # Makefile rules for booting from .hc files without a driver.
 #
@@ -58,7 +58,10 @@ PLATFORM_HC_BOOT_CC_OPTS += -w
 endif
 
 ifeq "$(BootingFromUnregisterisedHc)" "YES"
-PLATFORM_HC_BOOT_CC_OPTS +=-DNO_REGS -DUSE_MINIINTERPRETER
+PLATFORM_HC_BOOT_CC_OPTS += -DNO_REGS -DUSE_MINIINTERPRETER
+SRC_CC_OPTS += -DNO_REGS -DUSE_MINIINTERPRETER
+# Add these flags to SRC_CC_OPTS too, because they need to be passed to the plain .c
+# files in ghc/rts.
 endif
 
 PLATFORM_CC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt) 
