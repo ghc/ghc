@@ -226,7 +226,6 @@ int main(int argc, char *argv[])
       <indexterm><primary>C calls, function headers</primary></indexterm>
 
       <para>When generating C (using the <option>-fvia-C</option>
-
       directive), one can assist the C compiler in detecting type
       errors by using the <option>-&num;include</option> directive
       (<xref linkend="options-C-compiler">) to provide
@@ -255,6 +254,37 @@ HsInt        lookupEFS (HsForeignObj a, HsInt i);
       sizeof(int *)</literal> on your architecture) but is a Good
       Thing for anyone who cares about writing solid code.  You're
       crazy not to do it.</para>
+
+<para>
+What if you are importing a module from another package, and
+a cross-module inlining exposes a foreign call that needs a supporting
+<option>-&num;include</option>?  If the imported module is from the same package as
+the module being compiled, you should supply all the <option>-&num;include</option>
+that you supplied when compiling the imported module.  If the imported module comes
+from another package, you won't necessarily know what the appropriate 
+<option>-&num;include</option> options are; but they should be in the package 
+configuration, which GHC knows about.  So if you are building a package, remember
+to put all those <option>-&num;include</option> options into the package configuration.
+See the <literal>c_includes</literal> field in <xref linkend="package-management">.
+</para>
+
+<para>
+It is also possible, according the FFI specification, to put the 
+<option>-&num;include</option> option in the foreign import 
+declaration itself:
+<programlisting>
+  foreign import "#include foo.h f" f :: Int -> IO Int
+</programlisting>
+When compiling this module, GHC will generate a C file that includes
+the specified <option>-&num;include</option>.  However, GHC
+<emphasis>disables</emphasis> cross-module inlinding for such foreign
+calls, because it doesn't transport the <option>-&num;include</option>
+information across module boundaries.  (There is no fundamental reason for this;
+it was just tiresome to implement.  The wrapper, which unboxes the arguments
+etc, is still inlined across modules.)  So if you want the foreign call itself
+to be inlined across modules, use the command-line and package-configuration
+<option>-&num;include</option> mechanism.
+</para>
 
     </sect2>
   </sect1>
