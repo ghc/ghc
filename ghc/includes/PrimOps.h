@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.94 2002/06/03 11:31:55 simonmar Exp $
+ * $Id: PrimOps.h,v 1.95 2002/06/04 16:13:53 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -48,11 +48,11 @@
 #if SIZEOF_VOID_P == 4
 
 #ifdef WORDS_BIGENDIAN
-#define C 0
-#define R 1
+#define RTS_CARRY_IDX__ 0
+#define RTS_REM_IDX__  1
 #else
-#define C 1
-#define R 0
+#define RTS_CARRY_IDX__ 1
+#define RTS_REM_IDX__ 0
 #endif
 
 typedef union {
@@ -65,8 +65,8 @@ typedef union {
   StgInt32 r, c;				\
   long_long_u z;				\
   z.l = (StgInt64)a * (StgInt64)b;		\
-  r = z.i[R];					\
-  c = z.i[C];					\
+  r = z.i[RTS_REM_IDX__];			\
+  c = z.i[RTS_CARRY_IDX__];			\
   if (c == 0 || c == -1) {			\
     c = ((StgWord)((a^b) ^ r))			\
       >> (BITS_IN (I_) - 1);			\
@@ -77,9 +77,6 @@ typedef union {
 /* Careful: the carry calculation above is extremely delicate.  Make sure
  * you test it thoroughly after changing it.
  */
-
-#undef C
-#undef R
 
 #else
 
