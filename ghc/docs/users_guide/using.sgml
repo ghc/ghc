@@ -1066,6 +1066,20 @@ f "2"    = 2
 	  patterns that can fail, eg. <literal>\(x:xs)->...</literal>.
 	  Normally, these aren't treated as incomplete patterns by
 	  <option>-fwarn-incomplete-patterns</option>.</para>
+	  <para>``Lambda-bound patterns'' includes all places where there is a single pattern,
+	    including list comprehensions and do-notation.  In these cases, a pattern-match 
+	    failure is quite legitimate, and triggers filtering (list comprehensions) or
+	    the monad <literal>fail</literal> operation (monads). For example:
+	    <programlisting>
+	      f :: [Maybe a] -> [a]
+	      f xs = [y | Just y <- xs]
+	      </programlisting>
+	    Switching on <option>-fwarn-simple-patterns</option> will elicit warnings about
+	    these probably-innocent cases, which is why the flag is off by default. </para>
+	  <para> The <literal>deriving( Read )</literal> mechanism produces monadic code with
+	    pattern matches, so you will also get misleading warnings about the compiler-generated
+	    code.  (This is arguably a Bad Thing, but it's awkward to fix.)</para>
+
 	</listitem>
       </varlistentry>
 

@@ -77,7 +77,7 @@ import BasicTypes	( TopLevelFlag, isTopLevel, isLoopBreaker,
 			)
 import CmdLineOpts	( SimplifierSwitch(..), SimplifierMode(..),
 			  DynFlags, DynFlag(..), dopt, 
-			  opt_PprStyle_Debug, opt_HistorySize, opt_SimplNoPreInlining,
+			  opt_PprStyle_Debug, opt_HistorySize, opt_SimplNoPreInlining, opt_RulesOff
 			)
 import Unique		( Unique )
 import Outputable
@@ -926,6 +926,8 @@ activeInline env id occ
 activeRule :: SimplEnv -> Maybe (Activation -> Bool)
 -- Nothing => No rules at all
 activeRule env
+  | opt_RulesOff = Nothing
+  | otherwise
   = case getMode env of
 	SimplGently  -> Just isAlwaysActive
 			-- Used to be Nothing (no rules in gentle mode)

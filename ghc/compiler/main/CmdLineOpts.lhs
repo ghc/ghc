@@ -73,11 +73,11 @@ module CmdLineOpts (
 	-- optimisation opts
 	opt_NoMethodSharing,
 	opt_DoSemiTagging,
-	opt_FoldrBuildOn,
 	opt_LiberateCaseThreshold,
 	opt_StgDoLetNoEscapes,
 	opt_UnfoldCasms,
 	opt_CprOff,
+	opt_RulesOff,
 	opt_UnboxStrictFields,
 	opt_SimplNoPreInlining,
 	opt_SimplDoEtaReduction,
@@ -107,7 +107,6 @@ module CmdLineOpts (
         opt_NoHiCheck,
 	opt_OmitBlackHoling,
 	opt_OmitInterfacePragmas,
-	opt_NoPruneTyDecls,
 	opt_NoPruneDecls,
 	opt_Static,
 	opt_Unregisterised,
@@ -586,8 +585,8 @@ opt_Flatten			= lookUp  FSLIT("-fflatten")
 -- optimisation opts
 opt_NoMethodSharing		= lookUp  FSLIT("-fno-method-sharing")
 opt_DoSemiTagging		= lookUp  FSLIT("-fsemi-tagging")
-opt_FoldrBuildOn		= lookUp  FSLIT("-ffoldr-build-on")
 opt_CprOff			= lookUp  FSLIT("-fcpr-off")
+opt_RulesOff			= lookUp  FSLIT("-frules-off")
 	-- Switch off CPR analysis in the new demand analyser
 opt_LiberateCaseThreshold	= lookup_def_int "-fliberate-case-threshold" (10::Int)
 opt_StgDoLetNoEscapes		= lookUp  FSLIT("-flet-no-escape")
@@ -636,7 +635,6 @@ opt_UF_CheapOp  = ( 1 :: Int)	-- Only one instruction; and the args are charged 
 opt_UF_DearOp   = ( 4 :: Int)
 			
 opt_NoPruneDecls		= lookUp  FSLIT("-fno-prune-decls")
-opt_NoPruneTyDecls		= lookUp  FSLIT("-fno-prune-tydecls")
 opt_Static			= lookUp  FSLIT("-static")
 opt_Unregisterised		= lookUp  FSLIT("-funregisterised")
 opt_EmitExternalCore		= lookUp  FSLIT("-fext-core")
@@ -665,7 +663,6 @@ isStaticHscFlag f =
 	"fsmp",
 	"fflatten",
 	"fsemi-tagging",
-	"ffoldr-build-on",
 	"flet-no-escape",
 	"funfold-casms-in-hi-file",
 	"funbox-strict-fields",
@@ -686,11 +683,11 @@ isStaticHscFlag f =
 	"fexcess-precision",
 	"funfolding-update-in-place",
 	"fno-prune-decls",
-	"fno-prune-tydecls",
 	"static",
 	"funregisterised",
 	"fext-core",
 	"frule-check",
+	"frules-off",
 	"fcpr-off"
 	]
   || any (flip prefixMatch f) [

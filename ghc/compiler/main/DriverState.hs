@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.93 2003/06/24 12:56:44 stolz Exp $
+-- $Id: DriverState.hs,v 1.94 2003/06/25 08:20:21 simonpj Exp $
 --
 -- Settings for the driver
 --
@@ -213,7 +213,6 @@ hsc_minusNoO_flags =
 hsc_minusO_flags =
   [ 
 	"-fignore-asserts",
-	"-ffoldr-build-on",
         "-fdo-eta-reduction",
 	"-fdo-lambda-eta-expansion",
  	"-fcase-merge",

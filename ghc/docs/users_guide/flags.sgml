@@ -728,10 +728,10 @@
 	    </row>
 
 	    <row>
-	      <entry><option>-ffoldr-build-on</option></entry>
-	      <entry>Enable foldr-build optimisation</entry>
+	      <entry><option>-frules-off</option></entry>
+	      <entry>Switch off all rewrite rules</entry>
 	      <entry>static</entry>
-	      <entry><option>-fno-foldr-build-on</option></entry>
+	      <entry><option>-frules-off</option></entry>
 	    </row>
 
 	    <row>

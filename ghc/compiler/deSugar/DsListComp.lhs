@@ -22,7 +22,7 @@ import CoreSyn
 import DsMonad		-- the monadery used in the desugarer
 import DsUtils
 
-import CmdLineOpts	( opt_FoldrBuildOn )
+import CmdLineOpts	( opt_IgnoreIfacePragmas, opt_RulesOff )
 import CoreUtils	( exprType, mkIfThenElse )
 import Id		( idType )
 import Var              ( Id )
@@ -51,11 +51,16 @@ dsListComp :: [TypecheckedStmt]
 	   -> DsM CoreExpr
 
 dsListComp quals elt_ty
-  |  not opt_FoldrBuildOn 		 -- Be boring
-  || isParallelComp quals
+  |  opt_RulesOff || opt_IgnoreIfacePragmas 	-- Either rules are switched off, or
+						--   we are ignoring what there are;
+						--   Either way foldr/build won't happen, so
+						--   use the more efficient Wadler-style desugaring
+  || isParallelComp quals			-- Foldr-style desugaring can't handle
+						--   parallel list comprehensions
   = deListComp quals (mkNilExpr elt_ty)
 
-  | otherwise				 -- foldr/build lives!
+  | otherwise		-- Foldr/build should be enabled, so desugar 
+			-- into foldrs and builds
   = newTyVarsDs [alphaTyVar]    `thenDs` \ [n_tyvar] ->
     let
 	n_ty = mkTyVarTy n_tyvar
