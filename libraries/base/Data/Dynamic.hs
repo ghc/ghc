@@ -89,7 +89,12 @@ unsafeCoerce :: a -> b
 unsafeCoerce = unsafeCoerce#
 #endif
 
+#ifdef __NHC__
+import NonStdUnsafeCoerce (unsafeCoerce)
+import NHC.IOExtras (IORef,newIORef,readIORef,writeIORef,unsafePerformIO)
+#else
 #include "Dynamic.h"
+#endif
 
 {-|
   A value of type 'Dynamic' is an object encapsulated together with its type.
@@ -355,6 +360,7 @@ instance (Typeable a, Typeable b) => Typeable (a -> b) where
   typeOf f = mkFunTy (typeOf ((undefined :: (a -> b) -> a) f))
 		     (typeOf ((undefined :: (a -> b) -> b) f))
 
+#ifndef __NHC__
 INSTANCE_TYPEABLE0(Bool,boolTc,"Bool")
 INSTANCE_TYPEABLE0(Char,charTc,"Char")
 INSTANCE_TYPEABLE0(Float,floatTc,"Float")
@@ -383,7 +389,6 @@ INSTANCE_TYPEABLE0(TyCon,tyconTc,"TyCon")
 INSTANCE_TYPEABLE0(TypeRep,typeRepTc,"TypeRep")
 INSTANCE_TYPEABLE0(Dynamic,dynamicTc,"Dynamic")
 
-#ifndef __NHC__
 #include "Dynamic.h"
 INSTANCE_TYPEABLE1(IORef,ioRefTc,"IORef")
 #endif
