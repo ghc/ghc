@@ -2920,6 +2920,49 @@ when you install it.
 
 </Sect2>
 
+    <sect2>
+      <title>Building the Windows InstallShield&reg; Installer</title>
+
+      <para>
+	This section is intended for GHC developers only; no-one else
+	should need to build an InstallShield.
+      </para>
+
+      <para>
+	Having built a second-stage tree and done <command>make
+	install</command> on it, open the InstallShield
+	(<filename>.ism</filename>) file. Open the Project screen, and
+	then the Project subfolder of the Path variables folder, and
+	set <literal>SourceFiles</literal> to the top of your
+	tree. You might also need to set <literal>GHCBITS</literal> to
+	point to the tree of various external bits that are added into
+	the IS mix. You should then be able to build an InstallShield.
+      </para>
+
+      <sect3>
+	<title>External add-ins</title>
+
+	<para>
+	  The external add-ins consist of Mingwin gcc and Mingwin
+	  Perl. The layout of the add-ins tree is as follows:
+
+	  <screen>
+extra-bin/
+  gcc.exe
+  perl.exe    (Mingwin perl)
+  perl56.dll
+gcc-lib/
+  Mingwin gcc binaries, libraries and headers
+imports/
+  com/
+    imports for HDirect's com library
+include/
+  Mingwin includes
+</screen>
+	  </para>
+      
+    </sect2>
+
 </Sect1>
 
 </Article>
