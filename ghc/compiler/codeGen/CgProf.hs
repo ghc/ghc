@@ -457,7 +457,8 @@ ldvEnter cl_ptr
 		 (cmmOrWord loadEra (CmmLit (mkWordCLit lDV_STATE_USE)))
 
 loadEra :: CmmExpr 
-loadEra = CmmLoad (mkLblExpr (mkRtsDataLabel SLIT("era"))) cIntRep
+loadEra = CmmMachOp (MO_U_Conv cIntRep wordRep)
+	  [CmmLoad (mkLblExpr (mkRtsDataLabel SLIT("era"))) cIntRep]
 
 ldvWord :: CmmExpr -> CmmExpr
 -- Takes the address of a closure, and returns 
