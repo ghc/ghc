@@ -6,7 +6,7 @@
 module ShouldCompile where
 
     f :: ((?param :: a) => b) -> a -> b
-    f foo a = foo with ?param=a
+    f foo a = let ?param = a in foo 
 
     g :: (?param :: a) => a
     g = ?param
