@@ -421,32 +421,33 @@ data TextDetails = Chr  Char
 space_text = Chr ' '
 nl_text    = Chr '\n'
 
--- Here are the invariants:
-
--- * The argument of NilAbove is never Empty. Therefore
---   a NilAbove occupies at least two lines.
--- 
--- * The arugment of @TextBeside@ is never @Nest@.
--- 
---
--- * The layouts of the two arguments of @Union@ both flatten to the same 
---   string.
---
--- * The arguments of @Union@ are either @TextBeside@, or @NilAbove@.
--- 
--- * The right argument of a union cannot be equivalent to the empty set
---   (@NoDoc@).  If the left argument of a union is equivalent to the
---   empty set (@NoDoc@), then the @NoDoc@ appears in the first line.
-
--- * An empty document is always represented by @Empty@.  It can't be
---   hidden inside a @Nest@, or a @Union@ of two @Empty@s.
-
--- * The first line of every layout in the left argument of @Union@ is
---   longer than the first line of any layout in the right argument.
---   (1) ensures that the left argument has a first line.  In view of
---   (3), this invariant means that the right argument must have at
---   least two lines.
-
+{-
+  Here are the invariants:
+  
+  * The argument of NilAbove is never Empty. Therefore
+    a NilAbove occupies at least two lines.
+  
+  * The arugment of @TextBeside@ is never @Nest@.
+  
+  
+  * The layouts of the two arguments of @Union@ both flatten to the same 
+    string.
+  
+  * The arguments of @Union@ are either @TextBeside@, or @NilAbove@.
+  
+  * The right argument of a union cannot be equivalent to the empty set
+    (@NoDoc@).  If the left argument of a union is equivalent to the
+    empty set (@NoDoc@), then the @NoDoc@ appears in the first line.
+  
+  * An empty document is always represented by @Empty@.  It can't be
+    hidden inside a @Nest@, or a @Union@ of two @Empty@s.
+  
+  * The first line of every layout in the left argument of @Union@ is
+    longer than the first line of any layout in the right argument.
+    (1) ensures that the left argument has a first line.  In view of
+    (3), this invariant means that the right argument must have at
+    least two lines.
+-}
 
         -- Arg of a NilAbove is always an RDoc
 nilAbove_ p = NilAbove p
