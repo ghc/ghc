@@ -28,7 +28,7 @@ import HscTypes		( Provenance(..), pprNameProvenance, hasBetterProv,
 import RnMonad
 import Name		( Name, 
 			  getSrcLoc, nameIsLocalOrFrom,
-			  mkLocalName, mkGlobalName,
+			  mkLocalName, mkGlobalName, nameModule,
 			  mkIPName, nameOccName, nameModule_maybe,
 			  setNameModuleAndLoc
 			)
@@ -243,6 +243,28 @@ lookupTopBndrRn rdr_name
 -- as the binding occurrence of 'f', using lookupBndrRn
 lookupSigOccRn :: RdrName -> RnMS Name
 lookupSigOccRn = lookupBndrRn
+
+-- lookupInstDeclBndr is used for the binders in an 
+-- instance declaration.   Here we use the class name to
+-- disambiguate.  
+
+lookupInstDeclBndr :: Name -> RdrName -> RnMS Name
+	-- We use the selector name as the binder
+lookupInstDeclBndr cls_name rdr_name
+  | isOrig rdr_name	-- Occurs in derived instances, where we just
+			-- refer diectly to the right method
+  = lookupOrigName rdr_name
+
+  | otherwise	
+  = getGlobalAvails	`thenRn` \ avail_env ->
+    case lookupNameEnv avail_env cls_name of
+	Just (AvailTC _ ns) -> case [n | n <- ns, nameOccName n == occ] of
+				(n:ns)-> ASSERT( null ns ) returnRn n
+				[]    -> failWithRn (mkUnboundName rdr_name)
+						    (unknownNameErr rdr_name)
+	other		    -> pprPanic "lookupInstDeclBndr" (ppr cls_name)
+  where
+    occ = rdrNameOcc rdr_name
 
 -- lookupOccRn looks up an occurrence of a RdrName
 lookupOccRn :: RdrName -> RnMS Name
@@ -797,7 +819,6 @@ plusAvail a1 a2 = pprPanic "RnEnv.plusAvail" (hsep [ppr a1,ppr a2])
 addAvail :: AvailEnv -> AvailInfo -> AvailEnv
 addAvail avails avail = extendNameEnv_C plusAvail avails (availName avail) avail
 
-emptyAvailEnv = emptyNameEnv
 unitAvailEnv :: AvailInfo -> AvailEnv
 unitAvailEnv a = unitNameEnv (availName a) a
 

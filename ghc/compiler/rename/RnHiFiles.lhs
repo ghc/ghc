@@ -29,7 +29,7 @@ import HscTypes		( ModuleLocation(..),
 			 )
 import HsSyn		( TyClDecl(..), InstDecl(..),
 			  HsType(..), HsPred(..), FixitySig(..), RuleDecl(..),
-			  tyClDeclNames, tyClDeclSysNames, hsTyVarNames
+			  tyClDeclNames, tyClDeclSysNames, hsTyVarNames, getHsInstHead,
 			)
 import RdrHsSyn		( RdrNameTyClDecl, RdrNameInstDecl, RdrNameRuleDecl )
 import RnHsSyn		( extractHsTyNames_s )
@@ -384,7 +384,7 @@ loadInstDecl mod insts decl@(InstDecl inst_ty _ _ _ _)
 	rnHsType (text "In an interface instance decl") inst_ty
     )					`thenRn` \ inst_ty' ->
     let 
-	(tvs,(cls,tys)) = get_head inst_ty'
+	(tvs,(cls,tys)) = getHsInstHead inst_ty'
 	free_tcs  = nameSetToList (extractHsTyNames_s tys) `minusList` hsTyVarNames tvs
 
 	gate_fn vis_fn = vis_fn cls && (null free_tcs || any vis_fn free_tcs)
@@ -393,22 +393,6 @@ loadInstDecl mod insts decl@(InstDecl inst_ty _ _ _ _)
 	--  no tycons at all.  Hence the null free_ty_names.)
     in
     returnRn ((gate_fn, (mod, decl)) `consBag` insts)
-
-
--- In interface files, the instance decls now look like
---	forall a. Foo a -> Baz (T a)
--- so we have to strip off function argument types,
--- as well as the bit before the '=>' (which is always 
--- empty in interface files)
---
--- The parser ensures the type will have the right shape.
--- (e.g. see ParseUtil.checkInstType)
-
-get_head  (HsForAllTy (Just tvs) _ tau) = (tvs, get_head1 tau)
-get_head  tau				= ([],  get_head1 tau)
-
-get_head1 (HsFunTy _ ty)		= get_head1 ty
-get_head1 (HsPredTy (HsClassP cls tys)) = (cls,tys)
 
 
 

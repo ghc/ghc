@@ -32,7 +32,8 @@ module HscTypes (
 	PersistentRenamerState(..), IsBootInterface, DeclsMap,
 	IfaceInsts, IfaceRules, GatedDecl, GatedDecls, GateFn, IsExported,
 	NameSupply(..), OrigNameCache, OrigIParamCache,
-	Avails, AvailEnv, GenAvailInfo(..), AvailInfo, RdrAvailInfo, 
+	Avails, AvailEnv, emptyAvailEnv,
+	GenAvailInfo(..), AvailInfo, RdrAvailInfo, 
 	PersistentCompilerState(..),
 
 	Deprecations(..), lookupDeprec,
@@ -444,7 +445,10 @@ data GenAvailInfo name	= Avail name	 -- An ordinary identifier
 			deriving( Eq )
 			-- Equality used when deciding if the interface has changed
 
-type AvailEnv	  = NameEnv AvailInfo	-- Maps a Name to the AvailInfo that contains it
+type AvailEnv = NameEnv AvailInfo	-- Maps a Name to the AvailInfo that contains it
+
+emptyAvailEnv :: AvailEnv
+emptyAvailEnv = emptyNameEnv
 				
 instance Outputable n => Outputable (GenAvailInfo n) where
    ppr = pprAvail

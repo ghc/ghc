@@ -11,7 +11,7 @@ module RnSource ( rnTyClDecl, rnIfaceRuleDecl, rnInstDecl, rnSourceDecls,
 
 import RnExpr
 import HsSyn
-import HscTypes		( GlobalRdrEnv )
+import HscTypes		( GlobalRdrEnv, AvailEnv )
 import RdrName		( RdrName, isRdrDataCon, elemRdrEnv )
 import RdrHsSyn		( RdrNameConDecl, RdrNameTyClDecl,
 			  extractGenericPatTyVars
@@ -73,13 +73,13 @@ Checks the @(..)@ etc constraints in the export list.
 %*********************************************************
 
 \begin{code}
-rnSourceDecls :: GlobalRdrEnv -> LocalFixityEnv
+rnSourceDecls :: GlobalRdrEnv -> AvailEnv -> LocalFixityEnv
 	      -> [RdrNameHsDecl] 
 	      -> RnMG ([RenamedHsDecl], FreeVars)
 	-- The decls get reversed, but that's ok
 
-rnSourceDecls gbl_env local_fixity_env decls
-  = initRnMS gbl_env emptyRdrEnv local_fixity_env SourceMode (go emptyFVs [] decls)
+rnSourceDecls gbl_env avails local_fixity_env decls
+  = initRnMS gbl_env avails emptyRdrEnv local_fixity_env SourceMode (go emptyFVs [] decls)
   where
 	-- Fixity and deprecations have been dealt with already; ignore them
     go fvs ds' []             = returnRn (ds', fvs)
@@ -177,9 +177,7 @@ finishSourceInstDecl (InstDecl _       mbinds uprags _               _      )
     let
 	meth_doc    = text "In the bindings in an instance declaration"
 	meth_names  = collectLocatedMonoBinders mbinds
-	inst_tyvars = case inst_ty of
-			HsForAllTy (Just inst_tyvars) _ _ -> inst_tyvars
-			other			          -> []
+	(inst_tyvars, (cls,_)) = getHsInstHead inst_ty
 	-- (Slightly strangely) the forall-d tyvars scope over
 	-- the method bindings too
     in
@@ -188,7 +186,7 @@ finishSourceInstDecl (InstDecl _       mbinds uprags _               _      )
 	-- NB meth_names can be qualified!
     checkDupNames meth_doc meth_names 		`thenRn_`
     extendTyVarEnvFVRn (map hsTyVarName inst_tyvars) (		
-	rnMethodBinds [] mbinds
+	rnMethodBinds cls [] mbinds
     )						`thenRn` \ (mbinds', meth_fvs) ->
     let 
 	binders    = collectMonoBinders mbinds'
@@ -411,7 +409,7 @@ finishSourceTyClDecl (TyData {tcdDerivs = Just derivs, tcdLoc = src_loc})	-- Der
     returnRn (rn_ty_decl {tcdDerivs = Just derivs'}, mkNameSet derivs')
 
 finishSourceTyClDecl (ClassDecl {tcdMeths = Just mbinds, tcdLoc = src_loc})	-- Get mbinds from here
-	 rn_cls_decl@(ClassDecl {tcdTyVars = tyvars})				-- Everything else is here
+	 rn_cls_decl@(ClassDecl {tcdName = cls, tcdTyVars = tyvars})		-- Everything else is here
   -- There are some default-method bindings (abeit possibly empty) so 
   -- this is a source-code class declaration
   = 	-- The newLocals call is tiresome: given a generic class decl
@@ -433,7 +431,7 @@ finishSourceTyClDecl (ClassDecl {tcdMeths = Just mbinds, tcdLoc = src_loc})	-- G
     in
     checkDupOrQualNames meth_doc meth_rdr_names_w_locs	`thenRn_`
     newLocalsRn gen_rdr_tyvars_w_locs			`thenRn` \ gen_tyvars ->
-    rnMethodBinds gen_tyvars mbinds			`thenRn` \ (mbinds', meth_fvs) ->
+    rnMethodBinds cls gen_tyvars mbinds			`thenRn` \ (mbinds', meth_fvs) ->
     returnRn (rn_cls_decl {tcdMeths = Just mbinds'}, meth_fvs)
   where
     meth_doc = text "In the default-methods for class"	<+> ppr (tcdName rn_cls_decl)

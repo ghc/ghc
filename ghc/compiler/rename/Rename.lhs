@@ -34,7 +34,7 @@ import RnHiFiles	( readIface, loadInterface,
 			  loadExports, loadFixDecls, loadDeprecs,
 			)
 import RnEnv		( availsToNameSet, mkIfaceGlobalRdrEnv,
-			  emptyAvailEnv, unitAvailEnv, availEnvElts, 
+			  unitAvailEnv, availEnvElts, 
 			  plusAvailEnv, groupAvails, warnUnusedImports, 
 			  warnUnusedLocalBinds, warnUnusedModules, 
 			  lookupSrcName, getImplicitStmtFVs, 
@@ -106,7 +106,7 @@ renameStmt dflags hit hst pcs this_module ic stmt
     loadContextModule (ic_module ic) $ \ (rdr_env, print_unqual) ->
 
 	-- Rename the stmt
-    initRnMS rdr_env (ic_rn_env ic) emptyLocalFixityEnv CmdLineMode (
+    initRnMS rdr_env emptyAvailEnv (ic_rn_env ic) emptyLocalFixityEnv CmdLineMode (
 	rnStmt stmt	$ \ stmt' ->
 	returnRn (([], stmt'), emptyFVs)
     )					`thenRn` \ ((binders, stmt), fvs) -> 
@@ -162,7 +162,7 @@ renameRdrName dflags hit hst pcs this_module ic rdr_names =
   loadContextModule (ic_module ic) $ \ (rdr_env, print_unqual) ->
 
   -- rename the rdr_name
-  initRnMS rdr_env (ic_rn_env ic) emptyLocalFixityEnv CmdLineMode
+  initRnMS rdr_env emptyAvailEnv (ic_rn_env ic) emptyLocalFixityEnv CmdLineMode
 	(mapRn (tryRn.lookupOccRn) rdr_names)	`thenRn` \ maybe_names ->
   let 
 	ok_names = [ a | Right a <- maybe_names ]
@@ -269,7 +269,8 @@ rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec
     fixitiesFromLocalDecls local_gbl_env local_decls	`thenRn` \ local_fixity_env ->
 
 	-- RENAME THE SOURCE
-    rnSourceDecls gbl_env local_fixity_env local_decls	`thenRn` \ (rn_local_decls, source_fvs) ->
+    rnSourceDecls gbl_env global_avail_env 
+		  local_fixity_env local_decls		`thenRn` \ (rn_local_decls, source_fvs) ->
 
 	-- EXIT IF ERRORS FOUND
 	-- We exit here if there are any errors in the source, *before*

@@ -30,14 +30,14 @@ import RnMonad		( renameDerivedCode, thenRn, mapRn, returnRn )
 import HscTypes		( DFunId, PersistentRenamerState )
 
 import BasicTypes	( Fixity )
-import Class		( classKey, Class )
+import Class		( className, classKey, Class )
 import ErrUtils		( dumpIfSet_dyn, Message )
 import MkId		( mkDictFunId )
 import DataCon		( dataConArgTys, isNullaryDataCon, isExistentialDataCon )
 import PrelInfo		( needsDataDeclCtxtClassKeys )
 import Maybes		( maybeToBool, catMaybes )
 import Module		( Module )
-import Name		( Name, getSrcLoc )
+import Name		( Name, getSrcLoc, nameUnique )
 import RdrName		( RdrName )
 
 import TyCon		( tyConTyVars, tyConDataCons,
@@ -245,11 +245,10 @@ tcDeriving prs mod inst_env_in get_fixity tycl_decls
 	-- Make a Real dfun instead of the dummy one we have so far
     gen_inst_info :: DFunId -> RenamedMonoBinds -> InstInfo
     gen_inst_info dfun binds
-      = InstInfo { iDFunId = dfun, 
-		   iBinds = binds, iPrags = [] }
+      = InstInfo { iDFunId = dfun, iBinds = binds, iPrags = [] }
 
-    rn_meths meths = rnMethodBinds [] meths `thenRn` \ (meths', _) -> returnRn meths'
-	-- Ignore the free vars returned
+    rn_meths (cls, meths) = rnMethodBinds cls [] meths `thenRn` \ (meths', _) -> 
+			    returnRn meths'	-- Ignore the free vars returned
 \end{code}
 
 
@@ -508,24 +507,26 @@ the renamer.  What a great hack!
 
 \begin{code}
 -- Generate the method bindings for the required instance
--- (paired with class name, as we need that when generating dict
---  names.)
-gen_bind :: (Name -> Maybe Fixity) -> DFunId -> RdrNameMonoBinds
+-- (paired with class name, as we need that when renaming
+--  the method binds)
+gen_bind :: (Name -> Maybe Fixity) -> DFunId -> (Name, RdrNameMonoBinds)
 gen_bind get_fixity dfun
-  | clas `hasKey` showClassKey   = gen_Show_binds get_fixity tycon
-  | clas `hasKey` readClassKey   = gen_Read_binds get_fixity tycon
-  | otherwise
-  = assoc "gen_bind:bad derived class"
-	   [(eqClassKey,      gen_Eq_binds)
-	   ,(ordClassKey,     gen_Ord_binds)
-	   ,(enumClassKey,    gen_Enum_binds)
-	   ,(boundedClassKey, gen_Bounded_binds)
-	   ,(ixClassKey,      gen_Ix_binds)
-	   ]
-	   (classKey clas)
-	   tycon
+  = (cls_nm, binds)
   where
+    cls_nm	  = className clas
     (clas, tycon) = simpleDFunClassTyCon dfun
+
+    binds = assoc "gen_bind:bad derived class" gen_list 
+		  (nameUnique cls_nm) tycon
+
+    gen_list = [(eqClassKey,      gen_Eq_binds)
+	       ,(ordClassKey,     gen_Ord_binds)
+	       ,(enumClassKey,    gen_Enum_binds)
+	       ,(boundedClassKey, gen_Bounded_binds)
+	       ,(ixClassKey,      gen_Ix_binds)
+	       ,(showClassKey,    gen_Show_binds get_fixity)
+	       ,(readClassKey,    gen_Read_binds get_fixity)
+	       ]
 \end{code}
 
 

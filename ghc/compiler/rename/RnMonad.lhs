@@ -36,7 +36,7 @@ import IO		( hPutStr, stderr )
 import HsSyn		
 import RdrHsSyn
 import RnHsSyn		( RenamedFixitySig )
-import HscTypes		( AvailEnv, lookupType,
+import HscTypes		( AvailEnv, emptyAvailEnv, lookupType,
 			  NameSupply(..), 
 			  ImportedModuleInfo, WhetherHasOrphans, ImportVersion, 
 			  PersistentRenamerState(..), Avails,
@@ -147,6 +147,13 @@ data SDown = SDown {
 		  rn_mode :: RnMode,
 
 		  rn_genv :: GlobalRdrEnv,	-- Top level environment
+
+		  rn_avails :: AvailEnv,	
+			-- Top level AvailEnv; contains all the things that
+			-- are nameable in the top-level scope, regardless of
+			-- *how* they can be named (qualified, unqualified...)
+			-- It is used only to map a Class to its class ops, and 
+			-- hence to resolve the binders in an instance decl
 
 		  rn_lenv :: LocalRdrEnv,	-- Local name envt
 			--   Does *not* include global name envt; may shadow it
@@ -369,22 +376,24 @@ initRn dflags hit hst pcs mod do_rn
 	
 	return (new_pcs, (warns, errs), res)
 
-initRnMS :: GlobalRdrEnv -> LocalRdrEnv -> LocalFixityEnv -> RnMode
+initRnMS :: GlobalRdrEnv -> AvailEnv -> LocalRdrEnv -> LocalFixityEnv -> RnMode
 	 -> RnMS a -> RnM d a
 
-initRnMS rn_env local_env fixity_env mode thing_inside rn_down g_down
+initRnMS rn_env avails local_env fixity_env mode thing_inside rn_down g_down
 	-- The fixity_env appears in both the rn_fixenv field
 	-- and in the HIT.  See comments with RnHiFiles.lookupFixityRn
   = let
-	s_down = SDown { rn_genv = rn_env, rn_lenv = local_env, 
-			 rn_fixenv = fixity_env, rn_mode = mode }
+	s_down = SDown { rn_genv = rn_env, rn_avails = avails, 
+			 rn_lenv = local_env, rn_fixenv = fixity_env, 
+			 rn_mode = mode }
     in
     thing_inside rn_down s_down
 
 initIfaceRnMS :: Module -> RnMS r -> RnM d r
 initIfaceRnMS mod thing_inside 
-  = initRnMS emptyRdrEnv emptyRdrEnv emptyLocalFixityEnv InterfaceMode $
-    setModuleRn mod thing_inside
+  = initRnMS emptyRdrEnv emptyAvailEnv emptyRdrEnv 
+	     emptyLocalFixityEnv InterfaceMode
+	     (setModuleRn mod thing_inside)
 \end{code}
 
 @renameDerivedCode@ is used to rename stuff ``out-of-line'';
@@ -420,8 +429,9 @@ renameDerivedCode dflags mod prs thing_inside
 				 rn_hit    = bogus "rn_hit",
 			       	 rn_ifaces = bogus "rn_ifaces"
 			       }
-	; let s_down = SDown { rn_mode = InterfaceMode,
+	; let s_down = SDown { rn_mode = InterfaceMode, 
 			       -- So that we can refer to PrelBase.True etc
+			       rn_avails = emptyAvailEnv,
 			       rn_genv = emptyRdrEnv, rn_lenv = emptyRdrEnv,
 			       rn_fixenv = emptyLocalFixityEnv }
 
@@ -688,6 +698,10 @@ getLocalNameEnv rn_down (SDown {rn_lenv = local_env})
 getGlobalNameEnv :: RnMS GlobalRdrEnv
 getGlobalNameEnv rn_down (SDown {rn_genv = global_env})
   = return global_env
+
+getGlobalAvails :: RnMS AvailEnv
+getGlobalAvails  rn_down (SDown {rn_avails = avails})
+  = return avails
 
 setLocalNameEnv :: LocalRdrEnv -> RnMS a -> RnMS a
 setLocalNameEnv local_env' m rn_down l_down

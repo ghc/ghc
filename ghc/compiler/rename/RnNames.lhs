@@ -32,7 +32,7 @@ import NameSet
 import NameEnv
 import HscTypes		( Provenance(..), ImportReason(..), GlobalRdrEnv,
 			  GenAvailInfo(..), AvailInfo, Avails, AvailEnv, 
-			  Deprecations(..), ModIface(..)
+			  Deprecations(..), ModIface(..), emptyAvailEnv
 			)
 import RdrName		( rdrNameOcc, setRdrNameOcc )
 import OccName		( setOccNameSpace, dataName )

@@ -26,7 +26,7 @@ import RnHsSyn
 import RnMonad
 import RnTypes		( rnHsSigType, rnHsType )
 import RnExpr		( rnMatch, rnGRHSs, rnPat, checkPrecMatch )
-import RnEnv		( bindLocatedLocalsRn, lookupBndrRn, 
+import RnEnv		( bindLocatedLocalsRn, lookupBndrRn, lookupInstDeclBndr,
 			  lookupGlobalOccRn, lookupSigOccRn, bindPatSigTyVars,
 			  warnUnusedLocalBinds, mapFvRn, extendTyVarEnvFVRn,
 			)
@@ -367,21 +367,22 @@ in many ways the @op@ in an instance decl is just like an occurrence, not
 a binder.
 
 \begin{code}
-rnMethodBinds :: [Name]			-- Names for generic type variables
+rnMethodBinds :: Name			-- Class name
+	      -> [Name]			-- Names for generic type variables
 	      -> RdrNameMonoBinds
 	      -> RnMS (RenamedMonoBinds, FreeVars)
 
-rnMethodBinds gen_tyvars EmptyMonoBinds = returnRn (EmptyMonoBinds, emptyFVs)
+rnMethodBinds cls gen_tyvars EmptyMonoBinds = returnRn (EmptyMonoBinds, emptyFVs)
 
-rnMethodBinds gen_tyvars (AndMonoBinds mb1 mb2)
-  = rnMethodBinds gen_tyvars mb1	`thenRn` \ (mb1', fvs1) ->
-    rnMethodBinds gen_tyvars mb2	`thenRn` \ (mb2', fvs2) ->
+rnMethodBinds cls gen_tyvars (AndMonoBinds mb1 mb2)
+  = rnMethodBinds cls gen_tyvars mb1	`thenRn` \ (mb1', fvs1) ->
+    rnMethodBinds cls gen_tyvars mb2	`thenRn` \ (mb2', fvs2) ->
     returnRn (mb1' `AndMonoBinds` mb2', fvs1 `plusFV` fvs2)
 
-rnMethodBinds gen_tyvars (FunMonoBind name inf matches locn)
+rnMethodBinds cls gen_tyvars (FunMonoBind name inf matches locn)
   = pushSrcLocRn locn				   	$
 
-    lookupGlobalOccRn name				`thenRn` \ sel_name -> 
+    lookupInstDeclBndr cls name				`thenRn` \ sel_name -> 
 	-- We use the selector name as the binder
 
     mapFvRn rn_match matches				`thenRn` \ (new_matches, fvs) ->
@@ -400,7 +401,7 @@ rnMethodBinds gen_tyvars (FunMonoBind name inf matches locn)
 	
 
 -- Can't handle method pattern-bindings which bind multiple methods.
-rnMethodBinds gen_tyvars mbind@(PatMonoBind other_pat _ locn)
+rnMethodBinds cls gen_tyvars mbind@(PatMonoBind other_pat _ locn)
   = pushSrcLocRn locn	$
     failWithRn (EmptyMonoBinds, emptyFVs) (methodBindErr mbind)
 \end{code}

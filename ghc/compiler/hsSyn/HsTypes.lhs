@@ -11,10 +11,11 @@ module HsTypes (
         , hsUsOnce, hsUsMany
 
 	, mkHsForAllTy, mkHsDictTy, mkHsIParamTy
-	, hsTyVarName, hsTyVarNames, replaceTyVarName,
+	, hsTyVarName, hsTyVarNames, replaceTyVarName
+	, getHsInstHead
 	
 	-- Type place holder
-	PostTcType, placeHolderType,
+	, PostTcType, placeHolderType,
 
 	-- Printing
 	, pprParendHsType, pprHsForAll, pprHsContext, pprHsTyVarBndr
@@ -169,6 +170,27 @@ hsTyVarNames tvs = map hsTyVarName tvs
 replaceTyVarName :: HsTyVarBndr name1 -> name2 -> HsTyVarBndr name2
 replaceTyVarName (UserTyVar n)    n' = UserTyVar n'
 replaceTyVarName (IfaceTyVar n k) n' = IfaceTyVar n' k
+\end{code}
+
+
+\begin{code}
+getHsInstHead :: HsType name -> ([HsTyVarBndr name], (name, [HsType name]))
+	-- Split up an instance decl type, returning the 'head' part
+
+-- In interface fiels, the type of the decl is held like this:
+--	forall a. Foo a -> Baz (T a)
+-- so we have to strip off function argument types,
+-- as well as the bit before the '=>' (which is always 
+-- empty in interface files)
+--
+-- The parser ensures the type will have the right shape.
+-- (e.g. see ParseUtil.checkInstType)
+
+getHsInstHead  (HsForAllTy (Just tvs) _ tau) = (tvs, get_head1 tau)
+getHsInstHead  tau			     = ([],  get_head1 tau)
+
+get_head1 (HsFunTy _ ty)		= get_head1 ty
+get_head1 (HsPredTy (HsClassP cls tys)) = (cls,tys)
 \end{code}
 
 
