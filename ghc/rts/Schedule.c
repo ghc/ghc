@@ -2425,7 +2425,7 @@ unblockOneLocked(StgBlockingQueueElement *bqe, StgClosure *node)
       ASSERT(((StgTSO *)bqe)->why_blocked != NotBlocked);
       /* if it's a TSO just push it onto the run_queue */
       next = bqe->link;
-      // ((StgTSO *)bqe)->link = END_TSO_QUEUE; // debugging?
+      ((StgTSO *)bqe)->link = END_TSO_QUEUE; // debugging?
       APPEND_TO_RUN_QUEUE((StgTSO *)bqe); 
       THREAD_RUNNABLE();
       unblockCount(bqe, node);
@@ -2470,6 +2470,7 @@ unblockOneLocked(StgTSO *tso)
   ASSERT(tso->why_blocked != NotBlocked);
   tso->why_blocked = NotBlocked;
   next = tso->link;
+  tso->link = END_TSO_QUEUE;
   APPEND_TO_RUN_QUEUE(tso);
   THREAD_RUNNABLE();
   IF_DEBUG(scheduler,sched_belch("waking up thread %ld", tso->id));
