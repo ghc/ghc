@@ -1,1 +1,5 @@
-[".", "..", ".depend", "CVS", "Main.hi", "Main.hs", "Main.o", "Makefile", "io009", "io009.stdout"]
+io009.bin
+io009.hs
+io009.o
+io009.stdout
+

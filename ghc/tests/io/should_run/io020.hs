@@ -7,7 +7,7 @@ main =
         time' = toClockTime (CalendarTime (year - 1) month mday hour min sec psec
                              wday yday timezone gmtoff isdst)
     in
-        print time >>
+        print (length (show time)) >>
 	putChar '\n' >>
-	print time' >> 
+	print (length (show time')) >> 
 	putChar '\n'

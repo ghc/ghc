@@ -1,7 +1,7 @@
 import IO -- 1.3
 
 main =
-    openFile "io007.in" ReadMode >>= \ hIn ->
+    openFile "io007.hs" ReadMode >>= \ hIn ->
     hPutStr hIn "test" `catch`
     \ err ->
         if isIllegalOperation err then

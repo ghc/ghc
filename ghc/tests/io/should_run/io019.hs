@@ -1,16 +1,18 @@
+
 import Time
 
 main = 
-    getClockTime >>= \ time ->
-    print   time >>
+    getClockTime		 >>= \ time ->
+    print   (length (show time)) >>
 
     let (CalendarTime year month mday hour min sec psec 
                       wday yday timezone gmtoff isdst) = toUTCTime time
-    in
-      putStr (wdays !! fromEnum wday) >>
-      putStr (' ' : months !! fromEnum month) >>
-      putStr (' ' : shows2 mday (' ' : shows2 hour (':' : shows2 min (':' : shows2 sec
-             (' ' : timezone ++ ' ' : shows year "\n")))))
+        time2 = wdays !! fromEnum wday ++
+	        (' ' : months !! fromEnum month) ++
+		(' ' : shows2 mday (' ' : shows2 hour (':' : shows2 min (':' : shows2 sec
+		(' ' : timezone ++ ' ' : shows year "\n")))))
+    in  
+    print (length time2)
 
   where
     wdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]

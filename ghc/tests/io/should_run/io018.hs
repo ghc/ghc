@@ -2,12 +2,11 @@
 -- It simply hangs on stdin!
 
 import IO -- 1.3
+import Directory (removeFile)
 
-import System(getArgs)
-
-main =   getArgs                            >>=        \ [user,host] ->
-         let username = (user ++ "@" ++ host) in
+main =   let username = "io018.inout"	    in
          openFile username ReadWriteMode    >>=        \ cd          ->
+         removeFile username		    >>
          hSetBuffering stdin NoBuffering    >>
          hSetBuffering stdout NoBuffering   >>
          hSetBuffering cd NoBuffering       >>
@@ -16,7 +15,8 @@ main =   getArgs                            >>=        \ [user,host] ->
 
 speakString = "Someone wants to speak with you\n"
 
-speak cd =
+speak cd = return ()
+{-
          (hReady cd                         >>=        \ ready       ->
          if ready then (hGetChar cd >>= putChar)
          else return ()                     >>
@@ -26,3 +26,4 @@ speak cd =
          else return ())                    >>
 
          speak cd
+-}

@@ -2,8 +2,17 @@ TOP = ../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/should_run.mk
 
-HC_OPTS += -dcore-lint
+HC_OPTS += -dcore-lint -syslib posix -syslib misc -fglasgow-exts
+io022_HC_OPTS += -fglasgow-exts
+io010_HC_OPTS += -fglasgow-exts
+io011_HC_OPTS += -fglasgow-exts
 
-io002_RUNTEST_OPTS = -x 1
+io004_RUNTEST_OPTS += -x 42
+io016_RUNTEST_OPTS += io016.hs io016.out
+io017_RUNTEST_OPTS += -i io017.stdin
+io021_RUNTEST_OPTS += -i io021.hs
+io022_RUNTEST_OPTS += -i io022.hs
+
+.PRECIOUS: %.o %.bin
 
 include $(TOP)/mk/target.mk

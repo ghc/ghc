@@ -1,18 +1,18 @@
 import Directory (getCurrentDirectory, setCurrentDirectory, 
                      createDirectory, removeDirectory, getDirectoryContents)
 
-main =
-    getCurrentDirectory >>= \ oldpwd ->
-    createDirectory "foo" >>
-    setCurrentDirectory "foo" >> 
-    getDirectoryContents "." >>= \ [n1, n2] ->
-    if dot n1 && dot n2 then
-        setCurrentDirectory oldpwd >>
-        removeDirectory "foo" >>
+main = do
+    oldpwd <- getCurrentDirectory
+    createDirectory "foo"
+    setCurrentDirectory "foo"
+    ~[n1, n2] <- getDirectoryContents "."
+    if dot n1 && dot n2 
+     then do
+        setCurrentDirectory oldpwd
+        removeDirectory "foo"
         putStr "Okay\n"
-    else
+      else
         fail (userError "Oops")
-
 
 dot :: String -> Bool
 dot "." = True

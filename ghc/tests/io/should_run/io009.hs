@@ -1,6 +1,7 @@
 import Directory (getDirectoryContents)
-import QSort (sort)
+import List (sort, isPrefixOf)
 
-main =
-    getDirectoryContents "." >>= \ names ->
-    print (sort names)
+main = do
+    names <- getDirectoryContents "."
+    let names' = filter (isPrefixOf "io009") names
+    putStrLn (unlines (sort names'))

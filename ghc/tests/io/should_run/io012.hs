@@ -2,11 +2,11 @@ import IO -- 1.3
 
 import CPUTime
 
-main = 
-    openFile "/dev/null" WriteMode >>= \ h ->
-    hPrint h (nfib 30) >>
-    getCPUTime >>= \ t ->
-    print t
+main = do
+    h <- openFile "/dev/null" WriteMode
+    hPrint h (nfib 30)
+    t <- getCPUTime
+    print (length (show t)) -- printing the CPU time itself is un-cool if you want to diff the output..
 
 nfib :: Integer -> Integer
 nfib n 
