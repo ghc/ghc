@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.49 2001/07/17 15:28:30 simonpj Exp $
+-- $Id: DriverState.hs,v 1.50 2001/07/20 10:08:56 simonpj Exp $
 --
 -- Settings for the driver
 --
@@ -243,9 +243,17 @@ buildCoreToDo = do
 	]),
 
 	CoreDoSimplify (isAmongSimpl [
-	   MaxSimplifierIterations 2
+	   MaxSimplifierIterations 3
 		-- No -finline-phase: allow all Ids to be inlined now
 		-- This gets foldr inlined before strictness analysis
+		--
+		-- At least 3 iterations because otherwise we land up with
+		-- huge dead expressions because of an infelicity in the 
+		-- simpifier.   
+		--	let k = BIG in foldr k z xs
+		-- ==>  let k = BIG in letrec go = \xs -> ...(k x).... in go xs
+		-- ==>  let k = BIG in letrec go = \xs -> ...(BIG x).... in go xs
+		-- Don't stop now!
 	]),
 
 	if cpr        then CoreDoCPResult   else CoreDoNothing,
