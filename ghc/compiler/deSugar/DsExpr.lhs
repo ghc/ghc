@@ -507,7 +507,7 @@ dsDo do_or_lc stmts return_id then_id fail_id result_ty
 	--
 	-- In dsDo we can only see DoStmt and ListComp (no gaurds)
 
-	go [ExprStmt expr locn] 
+	go [ResultStmt expr locn]
 	  | isDoExpr do_or_lc = do_expr expr locn
 	  | otherwise	      = do_expr expr locn	`thenDs` \ expr2 ->
 				returnDs (mkApps (Var return_id) [Type b_ty, expr2])

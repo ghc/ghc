@@ -512,6 +512,11 @@ zonkStmts (ParStmtOut bndrstmtss : stmts)
     returnNF_Tc (ParStmtOut (zip new_bndrss new_stmtss) : new_stmts)
   where (bndrss, stmtss) = unzip bndrstmtss
 
+zonkStmts (ResultStmt expr locn : stmts)
+  = zonkExpr expr	`thenNF_Tc` \ new_expr ->
+    zonkStmts stmts	`thenNF_Tc` \ new_stmts ->
+    returnNF_Tc (ResultStmt new_expr locn : new_stmts)
+
 zonkStmts (ExprStmt expr locn : stmts)
   = zonkExpr expr	`thenNF_Tc` \ new_expr ->
     zonkStmts stmts	`thenNF_Tc` \ new_stmts ->

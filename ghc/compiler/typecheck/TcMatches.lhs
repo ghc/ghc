@@ -381,7 +381,9 @@ tcStmtsAndThen combine do_or_lc m_ty (ParStmtOut bndr_stmts_s : stmts) do_next
 
     loop ((bndrs,stmts) : pairs)
       = tcStmtsAndThen 
-		combine_par ListComp (mkListTy, not_required) stmts
+		combine_par ListComp m_ty stmts
+			-- Notice we pass on m_ty; the result type is used only
+			-- to get escaping type variables for checkExistentialPat
 		(tcLookupLocalIds bndrs	`thenNF_Tc` \ bndrs' ->
 		 loop pairs		`thenTc` \ ((pairs', thing), lie) ->
 		 returnTc (([], (bndrs', pairs', thing)), lie))	`thenTc` \ ((stmts', (bndrs', pairs', thing)), lie) ->
@@ -389,12 +391,15 @@ tcStmtsAndThen combine do_or_lc m_ty (ParStmtOut bndr_stmts_s : stmts) do_next
 	returnTc ( ((bndrs',stmts') : pairs', thing), lie)
 
     combine_par stmt (stmts, thing) = (stmt:stmts, thing)
-    not_required = panic "tcStmtsAndThen: elt_ty"
 
-	-- The simple-statment case
-tcStmtsAndThen combine do_or_lc m_ty (stmt@(ExprStmt exp locn):stmts) do_next
+	-- ExprStmt
+tcStmtsAndThen combine do_or_lc m_ty@(m, res_elt_ty) (stmt@(ExprStmt exp locn):stmts) do_next
   = tcSetErrCtxt (stmtCtxt do_or_lc stmt) (
-	tcExprStmt do_or_lc m_ty exp (null stmts)
+	if isDoExpr do_or_lc then
+		newTyVarTy openTypeKind 	`thenNF_Tc` \ any_ty ->
+		tcExpr exp (m any_ty)	
+	else
+		tcExpr exp boolTy
     )							`thenTc` \ (exp', stmt_lie) ->
 
     tcStmtsAndThen combine do_or_lc m_ty stmts do_next	`thenTc` \ (thing, stmts_lie) ->
@@ -403,24 +408,20 @@ tcStmtsAndThen combine do_or_lc m_ty (stmt@(ExprStmt exp locn):stmts) do_next
 	      stmt_lie `plusLIE` stmts_lie)
 
 
-------------------------------
-	-- ExprStmt; see comments with HsExpr.HsStmt 
-	-- 	     for meaning of ExprStmt
-tcExprStmt do_or_lc (m, res_elt_ty) exp is_last_stmt
-  = compute_expr_ty		`thenNF_Tc` \ expr_ty ->
-    tcExpr exp expr_ty
-  where
-    compute_expr_ty
-	| is_last_stmt = if isDoExpr do_or_lc then
-				returnNF_Tc (m res_elt_ty)
-			 else
-				returnNF_Tc res_elt_ty
+	-- Result statements
+tcStmtsAndThen combine do_or_lc m_ty@(m, res_elt_ty) (stmt@(ResultStmt exp locn):stmts) do_next
+  = tcSetErrCtxt (stmtCtxt do_or_lc stmt) (
+	if isDoExpr do_or_lc then
+		tcExpr exp (m res_elt_ty)
+	else
+		tcExpr exp res_elt_ty
+    )							`thenTc` \ (exp', stmt_lie) ->
 
-	| otherwise    = if isDoExpr do_or_lc then
-				newTyVarTy openTypeKind 	`thenNF_Tc` \ any_ty ->
-				returnNF_Tc (m any_ty)	
-			 else
-				returnNF_Tc boolTy	
+    tcStmtsAndThen combine do_or_lc m_ty stmts do_next	`thenTc` \ (thing, stmts_lie) ->
+
+    returnTc (combine (ResultStmt exp' locn) thing,
+	      stmt_lie `plusLIE` stmts_lie)
+
 
 ------------------------------
 glue_binds combine is_rec binds thing 

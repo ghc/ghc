@@ -200,7 +200,7 @@ tc_stmts names stmts
 	-- Look up the names right in the middle,
 	-- where they will all be in scope
 	mapNF_Tc tcLookupId names			`thenNF_Tc` \ ids ->
-	returnTc ((ids, [ExprStmt (mk_return ids) noSrcLoc]), emptyLIE)
+	returnTc ((ids, [ResultStmt (mk_return ids) noSrcLoc]), emptyLIE)
     )							`thenTc` \ ((ids, tc_stmts), lie) ->
 
 	-- Simplify the context right here, so that we fail

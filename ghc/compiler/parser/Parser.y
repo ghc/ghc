@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.60 2001/05/07 14:38:15 simonmar Exp $
+$Id: Parser.y,v 1.61 2001/05/08 14:44:37 simonpj Exp $
 
 Haskell grammar.
 
@@ -777,7 +777,7 @@ list :: { RdrNameHsExpr }
 					         body  qss = [ParStmt (map reverse qss)] }
 					   in
 					   returnP ( HsDo ListComp
-							   (reverse (ExprStmt $1 $2 : body $3))
+							   (reverse (ResultStmt $1 $2 : body $3))
 							   $2
 						  )
 					}
@@ -820,7 +820,7 @@ alt 	:: { RdrNameMatch }
 					             (GRHSs $4 $5 Nothing))  )}
 
 ralt :: { [RdrNameGRHS] }
-	: '->' srcloc exp		{ [GRHS [ExprStmt $3 $2] $2] }
+	: '->' srcloc exp		{ [GRHS [ResultStmt $3 $2] $2] }
 	| gdpats			{ (reverse $1) }
 
 gdpats :: { [RdrNameGRHS] }
@@ -828,27 +828,19 @@ gdpats :: { [RdrNameGRHS] }
 	| gdpat				{ [$1] }
 
 gdpat	:: { RdrNameGRHS }
-	: srcloc '|' quals '->' exp 	{ GRHS (reverse (ExprStmt $5 $1:$3)) $1}
+	: srcloc '|' quals '->' exp 	{ GRHS (reverse (ResultStmt $5 $1:$3)) $1}
 
 -----------------------------------------------------------------------------
 -- Statement sequences
 
 stmtlist :: { [RdrNameStmt] }
-	: '{'            	stmts '}'	{ reverse $2 }
-	|     layout_on_for_do  stmts close	{ reverse $2 }
-
--- Stmt list should really end in an expression, but it's not
--- convenient to enforce this here, so we throw out erroneous
--- statement sequences in the renamer instead.
+	: '{'            	stmts '}'	{ $2 }
+	|     layout_on_for_do  stmts close	{ $2 }
 
 stmts :: { [RdrNameStmt] }
-	: ';' stmts1			{ $2 }
-	| stmts1			{ $1 }
-
-stmts1 :: { [RdrNameStmt] }
-	: stmts1 ';' stmt		{ $3 : $1 }
-	| stmts1 ';'			{ $1 }
-	| stmt 				{ [$1] }
+	: ';' stmts			{ $2 }
+	| stmt ';' stmts		{ $1 : $3 }
+	| srcloc exp			{ [ResultStmt $2 $1] }
 
 -- for typing stmts at the GHCi prompt, where the input may consist of
 -- just comments.

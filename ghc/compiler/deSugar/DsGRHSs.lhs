@@ -77,11 +77,11 @@ matchGuard :: [TypecheckedStmt] 	-- Guard
 -- See comments with HsExpr.HsStmt re what an ExprStmt means
 -- Here we must be in a guard context (not do-expression, nor list-comp)	
 
-matchGuard [ExprStmt expr locn] ctx 
+matchGuard [ResultStmt expr locn] ctx 
   = putSrcLocDs locn (dsExpr expr) 	`thenDs` \ core_expr ->
     returnDs (cantFailMatchResult core_expr)
 
-	-- Other ExprStmts must be guards
+	-- ExprStmts must be guards
 	-- Turn an "otherwise" guard is a no-op
 matchGuard (ExprStmt (HsVar v) _ : stmts) ctx
   |  v `hasKey` otherwiseIdKey

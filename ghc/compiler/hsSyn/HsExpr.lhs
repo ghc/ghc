@@ -452,7 +452,7 @@ data GRHSs id pat
 	  (Maybe Type)		-- Just rhs_ty after type checking
 
 data GRHS id pat
-  = GRHS  [Stmt id pat]		-- The RHS is the final ExprStmt
+  = GRHS  [Stmt id pat]		-- The RHS is the final ResultStmt
 				-- I considered using a RetunStmt, but
 				-- it printed 'wrong' in error messages 
 	  SrcLoc
@@ -462,7 +462,7 @@ mkSimpleMatch pats rhs maybe_rhs_ty locn
   = Match [] pats Nothing (GRHSs (unguardedRHS rhs locn) EmptyBinds maybe_rhs_ty)
 
 unguardedRHS :: HsExpr id pat -> SrcLoc -> [GRHS id pat]
-unguardedRHS rhs loc = [GRHS [ExprStmt rhs loc] loc]
+unguardedRHS rhs loc = [GRHS [ResultStmt rhs loc] loc]
 \end{code}
 
 @getMatchLoc@ takes a @Match@ and returns the
@@ -508,16 +508,16 @@ pprGRHSs is_case (GRHSs grhss binds maybe_ty)
 pprGRHS :: (Outputable id, Outputable pat)
 	=> Bool -> GRHS id pat -> SDoc
 
-pprGRHS is_case (GRHS [ExprStmt expr _] locn)
- =  text (if is_case then "->" else "=") <+> pprDeeper (ppr expr)
+pprGRHS is_case (GRHS [ResultStmt expr _] locn)
+ =  pp_rhs is_case expr
 
 pprGRHS is_case (GRHS guarded locn)
- = sep [char '|' <+> interpp'SP guards,
-	text (if is_case then "->" else "=") <+> pprDeeper (ppr expr)
-   ]
+ = sep [char '|' <+> interpp'SP guards, pp_rhs is_case expr]
  where
-    ExprStmt expr _ = last guarded	-- Last stmt should be a ExprStmt for guards
-    guards	    = init guarded
+    ResultStmt expr _ = last guarded	-- Last stmt should be a ResultStmt for guards
+    guards	      = init guarded
+
+pp_rhs is_case rhs = text (if is_case then "->" else "=") <+> pprDeeper (ppr rhs)
 \end{code}
 
 
@@ -532,45 +532,48 @@ pprGRHS is_case (GRHS guarded locn)
 data Stmt id pat
   = BindStmt	pat (HsExpr id pat) SrcLoc
   | LetStmt	(HsBinds id pat)
+  | ResultStmt	(HsExpr id pat)	SrcLoc	-- See notes that follow
   | ExprStmt	(HsExpr id pat)	SrcLoc	-- See notes that follow
   | ParStmt	[[Stmt id pat]]		-- List comp only: parallel set of quals
-  | ParStmtOut	[([id], [Stmt id pat])]	-- PLC after renaming
+  | ParStmtOut	[([id], [Stmt id pat])]	-- PLC after renaming; the ids are the binders
+					-- bound by the stmts
 \end{code}
 
-ExprStmts are a bit tricky, because what 
-they mean depends on the context.  Consider 
-		ExprStmt E
-in the following contexts:
+ExprStmts and ResultStmts are a bit tricky, because what they mean
+depends on the context.  Consider the following contexts:
 
 	A do expression of type (m res_ty)
 	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-	* Non-last stmt in list:   do { ....; E; ... }
+	* ExprStmt E:   do { ....; E; ... }
 		E :: m any_ty
 	  Translation: E >> ...
 	
-	* Last stmt in list:   do { ....; E }
+	* ResultStmt E:   do { ....; E }
 		E :: m res_ty
 	  Translation: E
 	
 	A list comprehensions of type [elt_ty]
 	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-	* Non-last stmt in list:   [ .. | ..., E, ... ]
+	* ExprStmt E:   [ .. | .... E ]
+			[ .. | ..., E, ... ]
+			[ .. | .... | ..., E | ... ]
 		E :: Bool
 	  Translation: if E then fail else ...
-	
-	* Last stmt in list:   [ E | ... ]
+
+	* ResultStmt E:   [ E | ... ]
 		E :: elt_ty
 	  Translation: return E
 	
 	A guard list, guarding a RHS of type rhs_ty
 	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-	* Non-last stmt in list:   f x | ..., E, ... = ...rhs...
+	* ExprStmt E:   f x | ..., E, ... = ...rhs...
 		E :: Bool
 	  Translation: if E then fail else ...
 	
-	* Last stmt in list:   f x | ...guards... = E
+	* ResultStmt E:   f x | ...guards... = E
 		E :: rhs_ty
 	  Translation: E
+
 
 \begin{code}
 consLetStmt :: HsBinds id pat -> [Stmt id pat] -> [Stmt id pat]
@@ -583,16 +586,14 @@ instance (Outputable id, Outputable pat) =>
 		Outputable (Stmt id pat) where
     ppr stmt = pprStmt stmt
 
+pprStmt (BindStmt pat expr _) = hsep [ppr pat, ptext SLIT("<-"), ppr expr]
+pprStmt (LetStmt binds)       = hsep [ptext SLIT("let"), pprBinds binds]
+pprStmt (ExprStmt expr _)     = ppr expr
+pprStmt (ResultStmt expr _)   = ppr expr
 pprStmt (ParStmt stmtss)
  = hsep (map (\stmts -> ptext SLIT("| ") <> ppr stmts) stmtss)
 pprStmt (ParStmtOut stmtss)
  = hsep (map (\stmts -> ptext SLIT("| ") <> ppr stmts) stmtss)
-pprStmt (BindStmt pat expr _)
- = hsep [ppr pat, ptext SLIT("<-"), ppr expr]
-pprStmt (LetStmt binds)
- = hsep [ptext SLIT("let"), pprBinds binds]
-pprStmt (ExprStmt expr _)
- = ppr expr
 
 pprDo :: (Outputable id, Outputable pat) => HsMatchContext -> [Stmt id pat] -> SDoc
 pprDo DoExpr stmts   = hang (ptext SLIT("do")) 2 (vcat (map ppr stmts))
@@ -600,8 +601,8 @@ pprDo ListComp stmts = brackets $
 		       hang (pprExpr expr <+> char '|')
 			  4 (interpp'SP quals)
 		     where
-		       ExprStmt expr _ = last stmts	-- Last stmt should
-		       quals	       = init stmts	-- be an ExprStmt
+		       ResultStmt expr _ = last stmts	-- Last stmt should
+		       quals	         = init stmts	-- be an ResultStmt
 \end{code}
 
 %************************************************************************

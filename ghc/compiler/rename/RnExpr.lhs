@@ -235,9 +235,9 @@ rnGRHS (GRHS guarded locn)
 	-- Standard Haskell 1.4 guards are just a single boolean
 	-- expression, rather than a list of qualifiers as in the
 	-- Glasgow extension
-    is_standard_guard [ExprStmt _ _]               = True
-    is_standard_guard [ExprStmt _ _, ExprStmt _ _] = True
-    is_standard_guard other	      		   = False
+    is_standard_guard [ResultStmt _ _]               = True
+    is_standard_guard [ExprStmt _ _, ResultStmt _ _] = True
+    is_standard_guard other	      		     = False
 \end{code}
 
 %************************************************************************
@@ -378,8 +378,8 @@ rnExpr e@(HsDo do_or_lc stmts src_loc)
     rnStmts stmts			`thenRn` \ ((_, stmts'), fvs) ->
 	-- check the statement list ends in an expression
     case last stmts' of {
-	ExprStmt _ _ -> returnRn () ;
-	_            -> addErrRn (doStmtListErr e)
+	ResultStmt _ _ -> returnRn () ;
+	_              -> addErrRn (doStmtListErr e)
     }					`thenRn_`
     returnRn (HsDo do_or_lc stmts' src_loc, fvs `plusFV` implicit_fvs)
   where
@@ -589,6 +589,12 @@ rnStmt (ExprStmt expr src_loc) thing_inside
   = pushSrcLocRn src_loc $
     rnExpr expr 				`thenRn` \ (expr', fv_expr) ->
     thing_inside (ExprStmt expr' src_loc)	`thenRn` \ (result, fvs) ->
+    returnRn (result, fv_expr `plusFV` fvs)
+
+rnStmt (ResultStmt expr src_loc) thing_inside
+  = pushSrcLocRn src_loc $
+    rnExpr expr 				`thenRn` \ (expr', fv_expr) ->
+    thing_inside (ResultStmt expr' src_loc)	`thenRn` \ (result, fvs) ->
     returnRn (result, fv_expr `plusFV` fvs)
 
 rnStmt (LetStmt binds) thing_inside
@@ -860,9 +866,7 @@ mkAssertExpr =
      vname = mkSysLocalName uniq SLIT("v")
      expr  = HsLam ignorePredMatch
      loc   = nameSrcLoc vname
-     ignorePredMatch = Match [] [WildPatIn, VarPatIn vname] Nothing 
-                             (GRHSs [GRHS [ExprStmt (HsVar vname) loc] loc]
-			            EmptyBinds Nothing)
+     ignorePredMatch = mkSimpleMatch [WildPatIn, VarPatIn vname] (HsVar vname) Nothing loc
     in
     returnRn (expr, unitFV name)
   else
