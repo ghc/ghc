@@ -99,8 +99,7 @@ import Demand		hiding( Demand )
 import qualified Demand
 import NewDemand	( Demand(..), Keepity(..), Deferredness(..), DmdResult(..),
 			  lazyDmd, topDmd,
-			  StrictSig, mkStrictSig, 
-			  DmdType, mkTopDmdType
+			  StrictSig, mkStrictSig, mkTopDmdType
 			)
 import Outputable	
 import Util		( seqList )
