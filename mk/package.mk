@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.7 2002/02/17 17:41:44 panne Exp $
+# $Id: package.mk,v 1.8 2002/02/17 18:38:07 panne Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -13,7 +13,7 @@ $(PACKAGE).conf.inplace   : $(PACKAGE).conf.in
 		| sed 's/^#.*$$//g' >$@
 
 $(PACKAGE).conf.installed : $(PACKAGE).conf.in
-	$(CPP) $(RAWCPP_FLAGS) -I$(GHC_INCLUDE_DIR) -DINSTALLED -x c $(PACKAGE_CPP_OPTS) $< \
+	$(CPP) $(RAWCPP_FLAGS) -I$(GHC_INCLUDE_DIR) -DINSTALLING -x c $(PACKAGE_CPP_OPTS) $< \
 		| sed 's/^#.*$$//g' >$@
 
 boot all :: $(PACKAGE).conf.inplace $(PACKAGE).conf.installed
