@@ -864,14 +864,14 @@ AC_CHECK_HEADERS(windows.h)
 dnl ** check for OpenGL/GLUT include paths and libraries
 FP_CHECK_GLUT
 
-if test x"$no_glu" = xyes; then
+if test x"$no_GLU" = xyes; then
   GhcLibsWithOpenGL=NO
 else
   GhcLibsWithOpenGL=YES
 fi
 AC_SUBST([GhcLibsWithOpenGL])
 
-if test x"$no_glut" = xyes; then
+if test x"$no_GLUT" = xyes; then
   GhcLibsWithGLUT=NO
 else
   GhcLibsWithGLUT=YES
