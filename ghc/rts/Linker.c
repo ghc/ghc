@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.52 2001/07/20 01:05:11 sof Exp $
+ * $Id: Linker.c,v 1.53 2001/07/22 03:28:25 chak Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -1368,7 +1368,12 @@ ocResolve_PEi386 ( ObjectCode* oc )
 
 #if defined(sparc_TARGET_ARCH)
 #  define ELF_TARGET_SPARC  /* Used inside <elf.h> */
+#elif defined(i386_TARGET_ARCH)
+#  define ELF_TARGET_386    /* Used inside <elf.h> */
 #endif
+/* There is a similar case for IA64 in the Solaris2 headers if this
+ * ever becomes relevant.
+ */
 
 #include <elf.h>
 
