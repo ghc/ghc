@@ -819,8 +819,10 @@ openFile' filepath mode binary =
 	-- (so we don't need to worry about removing the newly created file
 	--  in the event of an error).
 #ifndef mingw32_TARGET_OS
-    throwErrnoIf (/=0) "openFile" 
-       (c_ftruncate (fromIntegral fd) 0)
+    if mode == WriteMode
+      then throwErrnoIf (/=0) "openFile" 
+              (c_ftruncate (fromIntegral fd) 0)
+      else return 0
 #endif
     return h
 
