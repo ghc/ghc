@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.26 2002/05/09 10:43:42 simonmar Exp $
+# $Id: Makefile,v 1.27 2002/05/10 13:16:55 simonmar Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -65,6 +65,7 @@ GHC/PrimopWrappers.hs: $(GHC_COMPILER_DIR)/prelude/primops.txt
 
 boot :: GHC/PrimopWrappers.hs
 
+EXTRA_SRCS  += GHC/PrimopWrappers.hs
 CLEAN_FILES += GHC/PrimopWrappers.hs
 
 #-----------------------------------------------------------------------------
