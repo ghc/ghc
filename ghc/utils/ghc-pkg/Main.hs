@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.11 2001/07/11 11:01:59 rrt Exp $
+-- $Id: Main.hs,v 1.12 2001/08/13 16:32:22 simonmar Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -57,17 +57,16 @@ unDosifyPath xs = subst '\\' '/' xs
 #endif
 
 runit clis = do
-#ifndef mingw32_TARGET_OS
   conf_file <- 
      case [ f | Config f <- clis ] of
-        []  -> die "missing -f option, location of package.conf unknown"
-        [f] -> return f
-        _   -> die (usageInfo usageHeader flags)
+        fs@(_:_)  -> return (last fs)
+#ifndef mingw32_TARGET_OS
+	[] -> die "missing -f option, location of package.conf unknown"
 #else
-  h <- getModuleHandle Nothing
-  n <- getModuleFileName h
-  let conf_file = reverse (tail (dropWhile (not . isSlash) (reverse (unDosifyPath n))))
-		   ++ "/package.conf"
+	[] -> do h <- getModuleHandle Nothing
+	  	 n <- getModuleFileName h
+  		 return (reverse (tail (dropWhile (not . isSlash) 
+			   (reverse (unDosifyPath n)))) ++ "/package.conf")
 #endif
 
   let toField "import_dirs"     = return import_dirs
