@@ -277,6 +277,8 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5) => Ix (a1,a2,a3,a4,a5)  where
 \begin{code}
 type IPr = (Int, Int)
 
+-- | The type of immutable non-strict (boxed) arrays
+-- with indices in @i@ and elements in @e@.
 data Ix i => Array     i e = Array   !i !i (Array# e)
 
 -- | Mutable, boxed, non-strict arrays in the 'ST' monad.  The type
@@ -310,12 +312,45 @@ instance Eq (STArray s i e) where
 arrEleBottom :: a
 arrEleBottom = error "(Array.!): undefined array element"
 
--- | Note: GHC's implementation of @array@ differs slightly from the Haskell 98
--- report.  If the same index appears twice, GHC's implementation takes the 
--- value from last (index,value) pair in the list, rather than yielding bottom
--- for that array slot.  
+-- | Construct an array with the specified bounds and containing values
+-- for given indices within these bounds.
+--
+-- The array is undefined (i.e. bottom) if any index in the list is
+-- out of bounds.  The Haskell 98 Report further specifies that if any
+-- two associations in the list have the same index, the value at that
+-- index is undefined (i.e. bottom).  However in GHC's implementation,
+-- the value at such an index is the value part of the last association
+-- with that index in the list.
+--
+-- Because the indices must be checked for these errors, 'array' is
+-- strict in the bounds argument and in the indices of the association
+-- list, but nonstrict in the values.  Thus, recurrences such as the
+-- following are possible:
+--
+-- > a = array (1,100) ((1,1) : [(i, i * a!(i-1)) | i <- [2..100]])
+--
+-- Not every index within the bounds of the array need appear in the
+-- association list, but the values associated with indices that do not
+-- appear will be undefined (i.e. bottom).
+--
+-- If, in any dimension, the lower bound is greater than the upper bound,
+-- then the array is legal, but empty.  Indexing an empty array always
+-- gives an array-bounds error, but 'bounds' still yields the bounds
+-- with which the array was constructed.
 {-# INLINE array #-}
-array :: Ix i => (i,i) -> [(i, e)] -> Array i e
+array :: Ix i
+	=> (i,i)	-- ^ a pair of /bounds/, each of the index type
+			-- of the array.  These bounds are the lowest and
+			-- highest indices in the array, in that order.
+			-- For example, a one-origin vector of length
+			-- '10' has bounds '(1,10)', and a one-origin '10'
+			-- by '10' matrix has bounds '((1,1),(10,10))'.
+	-> [(i, e)]	-- ^ a list of /associations/ of the form
+			-- (/index/, /value/).  Typically, this list will
+			-- be expressed as a comprehension.  An
+			-- association '(i, x)' defines the value of
+			-- the array at index 'i' to be 'x'.
+	-> Array i e
 array (l,u) ies = unsafeArray (l,u) [(index (l,u) i, e) | (i, e) <- ies]
 
 {-# INLINE unsafeArray #-}
@@ -343,6 +378,8 @@ done l u marr# s1# =
 -- transformation on the list of elements; I guess it's impossible
 -- using mechanisms currently available.
 
+-- | Construct an array from a pair of bounds and a list of values in
+-- index order.
 {-# INLINE listArray #-}
 listArray :: Ix i => (i,i) -> [e] -> Array i e
 listArray (l,u) es = runST (ST $ \s1# ->
@@ -356,6 +393,7 @@ listArray (l,u) es = runST (ST $ \s1# ->
     case fillFromList 0# es s2#         of { s3# ->
     done l u marr# s3# }}})
 
+-- | The value at the given index in an array.
 {-# INLINE (!) #-}
 (!) :: Ix i => Array i e -> i -> e
 arr@(Array l u _) ! i = unsafeAt arr (index (l,u) i)
@@ -365,26 +403,49 @@ unsafeAt :: Ix i => Array i e -> Int -> e
 unsafeAt (Array _ _ arr#) (I# i#) =
     case indexArray# arr# i# of (# e #) -> e
 
+-- | The bounds with which an array was constructed.
 {-# INLINE bounds #-}
 bounds :: Ix i => Array i e -> (i,i)
 bounds (Array l u _) = (l,u)
 
+-- | The list of indices of an array in ascending order.
 {-# INLINE indices #-}
 indices :: Ix i => Array i e -> [i]
 indices (Array l u _) = range (l,u)
 
+-- | The list of elements of an array in index order.
 {-# INLINE elems #-}
 elems :: Ix i => Array i e -> [e]
 elems arr@(Array l u _) =
     [unsafeAt arr i | i <- [0 .. rangeSize (l,u) - 1]]
 
+-- | The list of associations of an array in index order.
 {-# INLINE assocs #-}
 assocs :: Ix i => Array i e -> [(i, e)]
 assocs arr@(Array l u _) =
     [(i, unsafeAt arr (unsafeIndex (l,u) i)) | i <- range (l,u)]
 
+-- | The 'accumArray' deals with repeated indices in the association
+-- list using an /accumulating function/ which combines the values of
+-- associations with the same index.
+-- For example, given a list of values of some index type, @hist@
+-- produces a histogram of the number of occurrences of each index within
+-- a specified range:
+--
+-- > hist :: (Ix a, Num b) => (a,a) -> [a] -> Array a b
+-- > hist bnds is = accumArray (+) 0 bnds [(i, 1) | i<-is, inRange bnds i]
+--
+-- If the accumulating function is strict, then 'accumArray' is strict in
+-- the values, as well as the indices, in the association list.  Thus,
+-- unlike ordinary arrays built with 'array', accumulated arrays should
+-- not in general be recursive.
 {-# INLINE accumArray #-}
-accumArray :: Ix i => (e -> a -> e) -> e -> (i,i) -> [(i, a)] -> Array i e
+accumArray :: Ix i
+	=> (e -> a -> e)	-- ^ accumulating function
+	-> e			-- ^ initial value
+	-> (i,i)		-- ^ bounds of the array
+	-> [(i, a)]		-- ^ association list
+	-> Array i e
 accumArray f init (l,u) ies =
     unsafeAccumArray f init (l,u) [(index (l,u) i, e) | (i, e) <- ies]
 
@@ -402,6 +463,17 @@ adjust f marr# (I# i#, new) next s1# =
     case writeArray# marr# i# (f old new) s2# of { s3# ->
     next s3# }}
 
+-- | Constructs an array identical to the first argument except that it has
+-- been updated by the associations in the right argument.
+-- For example, if @m@ is a 1-origin, @n@ by @n@ matrix, then
+--
+-- > m//[((i,i), 0) | i <- [1..n]]
+--
+-- is the same matrix, except with the diagonal zeroed.
+--
+-- Repeated indices in the association list are handled as for 'array':
+-- Haskell 98 specifies that the resulting array is undefined (i.e. bottom),
+-- but GHC's implementation uses the last association for each index.
 {-# INLINE (//) #-}
 (//) :: Ix i => Array i e -> [(i, e)] -> Array i e
 arr@(Array l u _) // ies =
@@ -413,6 +485,12 @@ unsafeReplace arr@(Array l u _) ies = runST (do
     STArray _ _ marr# <- thawSTArray arr
     ST (foldr (fill marr#) (done l u marr#) ies))
 
+-- | @'accum' f@ takes an array and an association list and accumulates
+-- pairs from the list into the array with the accumulating function @f@.
+-- Thus 'accumArray' can be defined using 'accum':
+--
+-- > accumArray f z b = accum f (array b [(i, z) | i <- range b])
+--
 {-# INLINE accum #-}
 accum :: Ix i => (e -> a -> e) -> Array i e -> [(i, a)] -> Array i e
 accum f arr@(Array l u _) ies =
@@ -429,6 +507,12 @@ amap :: Ix i => (a -> b) -> Array i a -> Array i b
 amap f arr@(Array l u _) =
     unsafeArray (l,u) [(i, f (unsafeAt arr i)) | i <- [0 .. rangeSize (l,u) - 1]]
 
+-- | 'ixmap' allows for transformations on array indices.
+-- It may be thought of as providing function composition on the right
+-- with the mapping that the original array embodies.
+--
+-- A similar transformation of array values may be achieved using 'fmap'
+-- from the 'Array' instance of the 'Functor' class.
 {-# INLINE ixmap #-}
 ixmap :: (Ix i, Ix j) => (i,i) -> (i -> j) -> Array j e -> Array i e
 ixmap (l,u) f arr =

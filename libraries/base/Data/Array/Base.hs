@@ -56,7 +56,8 @@ import Data.Typeable
 -----------------------------------------------------------------------------
 -- Class of immutable arrays
 
--- | Class of array types with bounds
+-- | Class of array types with immutable bounds
+-- (even if the array elements are mutable).
 class HasBounds a where
     -- | Extracts the bounds of an array
     bounds :: Ix i => a i e -> (i,i)
@@ -118,10 +119,13 @@ the array respectively.  For example, a one-origin vector of length 10
 has bounds (1,10), and a one-origin 10 by 10 matrix has bounds
 ((1,1),(10,10)).
 
-An association is a pair of the form @(i,x)@, which defines the value
-of the array at index @i@ to be @x@.  The array is undefined if any
-index in the list is out of bounds.  If any two associations in the
-list have the same index, the value at that index is undefined.
+An association is a pair of the form @(i,x)@, which defines the value of
+the array at index @i@ to be @x@.  The array is undefined if any index
+in the list is out of bounds.  If any two associations in the list have
+the same index, the value at that index is implementation-dependent.
+(In GHC, the last value specified for that index is used.
+Other implementations will also do this for unboxed arrays, but Haskell
+98 requires that for 'Array' the value at such indices is bottom.)
 
 Because the indices must be checked for these errors, 'array' is
 strict in the bounds argument and in the indices of the association
@@ -290,11 +294,15 @@ accumArray f init (l,u) ies =
 {-|
 Takes an array and a list of pairs and returns an array identical to
 the left argument except that it has been updated by the associations
-in the right argument. (As with the array function, the indices in the
-association list must be unique for the updated elements to be
-defined.) For example, if m is a 1-origin, n by n matrix, then
-@m\/\/[((i,i), 0) | i \<- [1..n]]@ is the same matrix, except with the
-diagonal zeroed.
+in the right argument.  For example, if m is a 1-origin, n by n matrix,
+then @m\/\/[((i,i), 0) | i \<- [1..n]]@ is the same matrix, except with
+the diagonal zeroed.
+
+As with the 'array' function, if any two associations in the list have
+the same index, the value at that index is implementation-dependent.
+(In GHC, the last value specified for that index is used.
+Other implementations will also do this for unboxed arrays, but Haskell
+98 requires that for 'Array' the value at such indices is bottom.)
 
 For most array types, this operation is O(/n/) where /n/ is the size
 of the array.  However, the 'Data.Array.Diff.DiffArray' type provides
