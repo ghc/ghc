@@ -333,6 +333,8 @@ sub process_asm_block_hppa {
     while ( $str =~ /^(\s+\.align.*\n(L\$C\d+)\n(\s.*\n)+); end literal\n/ ) {
 	local($label) = $2;
 	local($body)  = $1;
+	local($prefix) = $`;
+	local($suffix) = $';
 	$label =~ s/\$/\\\$/g;
 
 	&tidy_up_and_die(1,"Local constant label $label already defined!\n")
@@ -340,7 +342,7 @@ sub process_asm_block_hppa {
 
 	$LocalConstant{$label} = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$LIT\$\n\n" . $body;
 	
-	$str =~ s/^\s+\.SPACE \$TEXT\$\n\s+\.SUBSPA \$LIT\$\s+\.align.*\nL\$C\d+\n(\s.*\n)+; end literal\n//;
+	$str = $prefix . $suffix;
     }
 
     # inject definitions for any local constants now used herein
