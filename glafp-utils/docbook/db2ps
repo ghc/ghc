@@ -33,18 +33,12 @@ then
   fi
 fi
 
-#rm -f ${TMPFN}.dvi
-#cat $* | db2dvi > ${TMPFN}.dvi
-
 db2dvi $1
 
 if [ ! -f ${TMPFN}.dvi ]
 then
   exit 1
 fi
-
-
-# dvips ${TMPFN}.dvi
 
 dvips $outdvi -o $output
 
