@@ -1202,9 +1202,8 @@ run_phase Unlit basename input_fn output_fn
   = do unlit <- readIORef pgm_L
        unlit_flags <- getOpts opt_L
        run_something "Literate pre-processor"
-	  (unlit ++ ' ':input_fn ++ " - >> " ++ output_fn)
-
---    $to_do  = "echo '#line 1 \"$in_lit2pgm\"' > $lit2pgm_hscpp && " if ($Cpp_flag_set);
+	  ("echo '{-# LINE 1 \"" ++input_fn++"\" -}' > "++output_fn++" && "
+	   ++ unlit ++ ' ':input_fn ++ " - >> " ++ output_fn)
 
 -------------------------------------------------------------------------------
 -- HsCpp phase 
@@ -1221,14 +1220,16 @@ run_phase Cpp basename input_fn output_fn
        	    hs_src_cpp_opts <- readIORef hs_source_cpp_opts
 
 	    cmdline_include_paths <- readIORef include_paths
-	    let cmdline_include_flags = map (\p -> "-I"++p) cmdline_include_paths
+	    pkg_include_dirs <- getPackageIncludePath
+	    let include_paths = map (\p -> "-I"++p) (cmdline_include_paths
+							++ pkg_include_dirs)
 
 	    verb <- is_verbose
 	    run_something "C pre-processor" 
 		(unwords
-       	    	   (["echo \'{-# LINE 1 \"hello.hs\" -}\'", ">", output_fn, "&&",
+       	    	   (["echo '{-# LINE 1 \"" ++ input_fn ++ "\" -}'", ">", output_fn, "&&",
 		     cpp, verb] 
-		    ++ cmdline_include_flags
+		    ++ include_paths
 		    ++ hs_src_cpp_opts
 		    ++ hscpp_opts
 		    ++ [ input_fn, ">>", output_fn ]
@@ -1386,6 +1387,8 @@ run_phase cc_phase basename input_fn output_fn
 	let opt_flag | o2        = "-O2"
 		     | otherwise = "-O"
 
+	pkg_extra_cc_opts <- getPackageExtraCcOpts
+
 	run_something "C Compiler"
 	 (unwords ([ cc, "-x", "c", cc_help, "-o", output_fn ]
 		   ++ md_c_flags
@@ -1393,8 +1396,10 @@ run_phase cc_phase basename input_fn output_fn
 			 then md_regd_c_flags
 			 else [])
 		   ++ [ verb, "-S", "-Wimplicit", opt_flag ]
+		   ++ [ "-D__GLASGOW_HASKELL__="++_ProjectVersionInt ]
 		   ++ cc_opts
 		   ++ include_paths
+		   ++ pkg_extra_cc_opts
 --		   ++ [">", ccout]
 		   ))
 
