@@ -9,7 +9,6 @@ module ParsePkgConfLite{- ( parsePackageConfig, parseOnePackageConfig ) -}where
 import Package  ( PackageConfig(..), defaultPackageConfig )
 import Char(isSpace, isAlpha, isAlphaNum, isUpper)
 import List(break)
-import Debug.Trace
 }
 
 %token
