@@ -34,7 +34,7 @@ import TcHsSyn		( TcIdOcc(..), SYN_IE(TcIdBndr), SYN_IE(TcHsBinds),
 			  mkHsTyLam, mkHsTyApp,
 			  mkHsDictLam, mkHsDictApp )
 
-import TcBinds		( tcBindWithSigs, TcSigInfo(..) )
+import TcBinds		( tcBindWithSigs, tcPragmaSigs, TcSigInfo(..) )
 import TcMonad
 import RnMonad		( SYN_IE(RnNameSupply) )
 import Inst		( Inst, InstOrigin(..), SYN_IE(InstanceMapper),
@@ -68,11 +68,11 @@ import Class		( GenClass, GenClassOp,
 			  classBigSig, classOps, classOpLocalType,
 			  classDefaultMethodId, SYN_IE(Class)
 			  )
-import Id		( GenId, idType, isDefaultMethodId_maybe, 
+import Id		( GenId, idType, isDefaultMethodId_maybe, replacePragmaInfo,
 			  isNullaryDataCon, dataConArgTys, SYN_IE(Id) )
 import ListSetOps	( minusList )
 import Maybes 		( maybeToBool, expectJust, seqMaybe )
-import Name		( nameOccName, getOccString, occNameString, moduleString, getOccName,
+import Name		( nameOccName, getOccString, occNameString, moduleString,
 			  isLocallyDefined, OccName, Name{--O only-}, SYN_IE(Module),
 			  NamedThing(..)
 			)
@@ -375,6 +375,10 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
     newDicts origin inst_decl_theta'	`thenNF_Tc` \ (inst_decl_dicts, _) ->
     newDicts origin [(clas,inst_ty')]	`thenNF_Tc` \ (this_dict,       [this_dict_id]) ->
 
+	-- Now process any INLINE or SPECIALIZE pragmas for the methods
+	-- ...[NB May 97; all ignored except INLINE]
+    tcPragmaSigs uprags		`thenTc` \ (prag_fn, spec_binds, spec_lie) ->
+
 	 -- Check the method bindings
     let
 	inst_tyvars_set' = mkTyVarSet inst_tyvars'
@@ -387,7 +391,7 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
     in
     mapTc check_from_this_class (bagToList (collectMonoBinders monobinds))	`thenTc_`
     tcExtendGlobalTyVars inst_tyvars_set' (
-	mapAndUnzip3Tc (tcMethodBind (getDefmRhs clas) inst_ty' monobinds) 
+	mapAndUnzip3Tc (tcMethodBind (getDefmRhs clas) inst_ty' prag_fn monobinds) 
 		       (op_sel_ids `zip` [0..])
     )				 	`thenTc` \ (method_binds_s, insts_needed_s, meth_lies_w_ids) ->
 
@@ -417,12 +421,6 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
     )					`thenTc_`
 						-- Ignore the result; we're only doing
 						-- this to make sure it can be done.
-
-	-- Now process any SPECIALIZE pragmas for the methods
-    let
-	spec_sigs = [ s | s@(SpecSig _ _ _ _) <- uprags ]
-    in
-    tcPragmaSigs spec_sigs		`thenTc` \ (_, spec_binds, spec_lie) ->
 
 	-- Create the result bindings
     let
@@ -465,12 +463,13 @@ getDefmRhs clas idx = HsVar (getName (classDefaultMethodId clas idx))
 tcMethodBind 
 	:: (Int -> RenamedHsExpr)			-- Function mapping a tag to default RHS
 	-> TcType s					-- Instance type
+	-> (Name -> PragmaInfo)
 	-> RenamedMonoBinds				-- Method binding
 	-> (Id, Int)					-- Selector ID (and its 0-indexed tag)
 							--  for which binding is wanted
 	-> TcM s (TcMonoBinds s, LIE s, (LIE s, TcIdOcc s))
 
-tcMethodBind deflt_fn inst_ty meth_binds (sel_id, idx)
+tcMethodBind deflt_fn inst_ty prag_fn meth_binds (sel_id, idx)
   = newMethod origin (RealId sel_id) [inst_ty]	`thenNF_Tc` \ meth@(_, TcId meth_id) ->
     tcInstSigTcType (idType meth_id)		`thenNF_Tc` \ (tyvars', rho_ty') ->
     let
@@ -483,8 +482,9 @@ tcMethodBind deflt_fn inst_ty meth_binds (sel_id, idx)
 				Just stuff -> stuff
 				Nothing    -> (meth_name, default_bind)
 
-	(theta', tau') = splitRhoTy rho_ty'
-	sig_info       = TySigInfo op_name meth_id tyvars' theta' tau' noSrcLoc
+	(theta', tau')  = splitRhoTy rho_ty'
+	meth_id_w_prags = replacePragmaInfo meth_id (prag_fn meth_name)
+	sig_info        = TySigInfo op_name meth_id_w_prags tyvars' theta' tau' noSrcLoc
     in
     tcBindWithSigs [op_name] op_bind [sig_info]
 		   nonRecursive (\_ -> NoPragmaInfo)	`thenTc` \ (binds, insts, _) ->
