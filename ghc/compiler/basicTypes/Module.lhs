@@ -21,11 +21,10 @@ in a different DLL, by setting the DLL flag.
 \begin{code}
 module Module 
     (
-      Module, moduleName, moduleKind
+      Module, moduleName
 			    -- abstract, instance of Eq, Ord, Outputable
     , ModuleName
-    , ModuleKind(..)
-    , isLocalModuleKind
+    , isModuleInThisPackage
 
     , moduleNameString		-- :: ModuleName -> EncodedString
     , moduleNameUserString	-- :: ModuleName -> UserString
@@ -39,7 +38,6 @@ module Module
 --    , mkThisModule	    -- :: ModuleName -> Module
     , mkPrelModule		-- :: UserString -> Module
     , mkModule			-- :: ModuleName -> ModuleKind -> Module
-    , isLocalModule	 	-- :: Module -> Bool
 
 --    , mkSrcModule
 
@@ -78,47 +76,36 @@ import UniqFM
 %*									*
 %************************************************************************
 
-A further twist to the tale is the support for dynamically linked libraries under
-Win32. Here, dealing with the use of global variables that's residing in a DLL
-requires special handling at the point of use (there's an extra level of indirection,
-i.e., (**v) to get at v's value, rather than just (*v) .) When slurping in an
-interface file we then record whether it's coming from a .hi corresponding to a
-module that's packaged up in a DLL or not, so that we later can emit the
+A further twist to the tale is the support for dynamically linked
+libraries under Win32. Here, dealing with the use of global variables
+that's residing in a DLL requires special handling at the point of use
+(there's an extra level of indirection, i.e., (**v) to get at v's
+value, rather than just (*v) .) When slurping in an interface file we
+then record whether it's coming from a .hi corresponding to a module
+that's packaged up in a DLL or not, so that we later can emit the
 appropriate code.
 
-The logic for how an interface file is marked as corresponding to a module that's
-hiding in a DLL is explained elsewhere (ToDo: give renamer href here.)
-
-@SourceOnly@ and @ObjectCode@ indicate a module from the same package
-as the one being compiled, i.e. a home module.  @InPackage@ means one
-from a different package.
+The logic for how an interface file is marked as corresponding to a
+module that's hiding in a DLL is explained elsewhere (ToDo: give
+renamer href here.)
 
 \begin{code}
-data Module = Module ModuleName ModuleKind
+data Module = Module ModuleName PackageInfo
 
-data ModuleKind
-   = SourceOnly FilePath            -- .hs
-   | ObjectCode FilePath FilePath   -- .o, .hi
-   | InPackage  PackageName
-
-moduleName (Module m _) = m
-moduleKind (Module _ k) = k
-
-isLocalModuleKind (InPackage _) = False
-isLocalModuleKind _             = True
+data PackageInfo 
+  = ThisPackage				-- A module from the same package 
+					-- as the one being compiled
+  | AnotherPackage PackageName		-- A module from a different package
 
 type PackageName = FastString		-- No encoding at all
 
-preludePackage :: ModuleKind
-preludePackage = InPackage SLIT("std")
+preludePackage :: PackageName
+preludePackage = SLIT("std")
 
-instance Outputable ModuleKind where
-   ppr (SourceOnly path_hs) 
-      = text "SourceOnly" <+> text (show path_hs)
-   ppr (ObjectCode path_o path_hi)
-      = text "ObjectCode" <+> text (show path_o) <+> text (show path_hi)
-   ppr (InPackage pkgname)
-      = text "InPackage" <+> text (show pkgname)
+instance Outputable PackageInfo where
+	-- Just used in debug prints of lex tokens and in debug modde
+   ppr ThisPackage        = ptext SLIT("<THIS>")
+   ppr (AnotherPackage p) = ptext p
 \end{code}
 
 
@@ -227,40 +214,37 @@ pprModule (Module mod p) = getPprStyle $ \ sty ->
 
 
 \begin{code}
-mkModule :: ModuleName -> ModuleKind -> Module
-mkModule = Module
--- I don't think anybody except the Finder should ever try to create a
--- Module now, so this lot commented out pro tem (JRS)
---mkModule :: ModuleName	-- Name of the module
---	 -> PackageName
---	 -> Module
---mkModule mod_nm pack_name
---  = Module mod_nm pack_info
---  where
---    pack_info | pack_name == opt_InPackage = ThisPackage
---	      | otherwise		   = AnotherPackage pack_name
+mkModule :: ModuleName	-- Name of the module
+	 -> PackageName
+	 -> Module
+mkModule mod_nm pack_name
+  = Module mod_nm pack_info
+  where
+    pack_info | pack_name == opt_InPackage = ThisPackage
+	      | otherwise		   = AnotherPackage pack_name
 
 
 -- Used temporarily when we first come across Foo.x in an interface
 -- file, but before we've opened Foo.hi.
 -- (Until we've opened Foo.hi we don't know what the PackageInfo is.)
 mkVanillaModule :: ModuleName -> Module
-mkVanillaModule name = Module name (panic "mkVanillaModule:unknown mod_kind field")
-
---mkThisModule :: ModuleName -> Module	-- The module being compiled
---mkThisModule name = Module name ThisPackage
+mkVanillaModule name = mkModule name (panic "mkVanillaModule:unknown mod_kind field")
 
 mkPrelModule :: ModuleName -> Module
-mkPrelModule name = Module name preludePackage
+mkPrelModule name = mkModule name preludePackage
 
 moduleString :: Module -> EncodedString
 moduleString (Module (ModuleName fs) _) = _UNPK_ fs
 
+moduleName :: Module -> ModuleName
+moduleName (Module mod _) = mod
+
 moduleUserString :: Module -> UserString
 moduleUserString (Module mod _) = moduleNameUserString mod
 
-isLocalModule :: Module -> Bool
-isLocalModule (Module nm kind) = isLocalModuleKind kind
+isModuleInThisPackage :: Module -> Bool
+isModuleInThisPackage (Module nm ThisPackage) = True
+isModuleInThisPackage _                       = False
 \end{code}
 
 %************************************************************************
