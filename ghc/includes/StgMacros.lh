@@ -1156,6 +1156,7 @@ of one ptr (not bytes).
 
 #define readCharArrayZh(r,a,i)	 indexCharOffAddrZh(r,BYTE_ARR_CTS(a),i)
 #define readIntArrayZh(r,a,i)	 indexIntOffAddrZh(r,BYTE_ARR_CTS(a),i)
+#define readWordArrayZh(r,a,i)	 indexWordOffAddrZh(r,BYTE_ARR_CTS(a),i)
 #define readAddrArrayZh(r,a,i)	 indexAddrOffAddrZh(r,BYTE_ARR_CTS(a),i)
 #define readFloatArrayZh(r,a,i)	 indexFloatOffAddrZh(r,BYTE_ARR_CTS(a),i)
 #define readDoubleArrayZh(r,a,i) indexDoubleOffAddrZh(r,BYTE_ARR_CTS(a),i)
@@ -1165,6 +1166,7 @@ of one ptr (not bytes).
 
 #define writeCharArrayZh(a,i,v)	  ((C_ *)(BYTE_ARR_CTS(a)))[i] = (v)
 #define writeIntArrayZh(a,i,v)	  ((I_ *)(BYTE_ARR_CTS(a)))[i] = (v)
+#define writeWordArrayZh(a,i,v)	  ((W_ *)(BYTE_ARR_CTS(a)))[i] = (v)
 #define writeAddrArrayZh(a,i,v)	  ((PP_)(BYTE_ARR_CTS(a)))[i] = (v)
 #define writeFloatArrayZh(a,i,v)  \
 	ASSIGN_FLT((P_) (((StgFloat *)(BYTE_ARR_CTS(a))) + i),v)
@@ -1175,18 +1177,21 @@ of one ptr (not bytes).
 
 #define indexCharArrayZh(r,a,i)	  indexCharOffAddrZh(r,BYTE_ARR_CTS(a),i)
 #define indexIntArrayZh(r,a,i)	  indexIntOffAddrZh(r,BYTE_ARR_CTS(a),i)
+#define indexWordArrayZh(r,a,i)	  indexWordOffAddrZh(r,BYTE_ARR_CTS(a),i)
 #define indexAddrArrayZh(r,a,i)	  indexAddrOffAddrZh(r,BYTE_ARR_CTS(a),i)
 #define indexFloatArrayZh(r,a,i)  indexFloatOffAddrZh(r,BYTE_ARR_CTS(a),i)
 #define indexDoubleArrayZh(r,a,i) indexDoubleOffAddrZh(r,BYTE_ARR_CTS(a),i)
 
 #define indexCharOffForeignObjZh(r,fo,i)   indexCharOffAddrZh(r,ForeignObj_CLOSURE_DATA(fo),i)
 #define indexIntOffForeignObjZh(r,fo,i)    indexIntOffAddrZh(r,ForeignObj_CLOSURE_DATA(fo),i)
+#define indexWordOffForeignObjZh(r,fo,i)   indexWordOffAddrZh(r,ForeignObj_CLOSURE_DATA(fo),i)
 #define indexAddrOffForeignObjZh(r,fo,i)   indexAddrOffAddrZh(r,ForeignObj_CLOSURE_DATA(fo),i)
 #define indexFloatOffForeignObjZh(r,fo,i)  indexFloatOffAddrZh(r,ForeignObj_CLOSURE_DATA(fo),i)
 #define indexDoubleOffForeignObjZh(r,fo,i) indexDoubleOffAddrZh(r,ForeignObj_CLOSURE_DATA(fo),i)
 
 #define indexCharOffAddrZh(r,a,i)   r= ((C_ *)(a))[i]
 #define indexIntOffAddrZh(r,a,i)    r= ((I_ *)(a))[i]
+#define indexWordOffAddrZh(r,a,i)   r= ((W_ *)(a))[i]
 #define indexAddrOffAddrZh(r,a,i)   r= ((PP_)(a))[i]
 #define indexFloatOffAddrZh(r,a,i)  r= PK_FLT((P_) (((StgFloat *)(a)) + i))
 #define indexDoubleOffAddrZh(r,a,i) r= PK_DBL((P_) (((StgDouble *)(a)) + i))
@@ -1204,6 +1209,9 @@ of one ptr (not bytes).
 	}while(0)
 
 #define unsafeFreezeByteArrayZh(r,a)	r=(B_)(a)
+
+#define sizeofByteArrayZh(r,a)        r=(W_)sizeof(W_)*(W_)(DATA_CLOSURE_SIZE(a)-DATA_VHS)
+#define sizeofMutableByteArrayZh(r,a) r=(W_)sizeof(W_)*(W_)(DATA_CLOSURE_SIZE(a)-DATA_VHS)
 \end{code}
 
 Now the \tr{newArr*} ops:
@@ -1233,6 +1241,7 @@ For char arrays, the size is in {\em BYTES}.
 \begin{code}
 #define newCharArrayZh(r,liveness,n)	newByteArray(r,liveness,(n) * sizeof(C_))
 #define newIntArrayZh(r,liveness,n)	newByteArray(r,liveness,(n) * sizeof(I_))
+#define newWordArrayZh(r,liveness,n)	newByteArray(r,liveness,(n) * sizeof(W_))
 #define newAddrArrayZh(r,liveness,n)	newByteArray(r,liveness,(n) * sizeof(P_))
 #define newFloatArrayZh(r,liveness,n)	newByteArray(r,liveness,(n) * sizeof(StgFloat))
 #define newDoubleArrayZh(r,liveness,n)	newByteArray(r,liveness,(n) * sizeof(StgDouble))

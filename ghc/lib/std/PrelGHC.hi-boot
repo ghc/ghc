@@ -186,6 +186,7 @@ PrelGHC
   newArray#
   newCharArray#
   newIntArray#
+  newWordArray#
   newFloatArray#
   newDoubleArray#
   newAddrArray#
@@ -193,6 +194,7 @@ PrelGHC
   indexArray#
   indexCharArray#
   indexIntArray#
+  indexWordArray#
   indexFloatArray#
   indexDoubleArray#
   indexAddrArray#
@@ -200,6 +202,7 @@ PrelGHC
 --  indexOffAddr#
 indexCharOffAddr#
 indexIntOffAddr#
+indexWordOffAddr#
 indexAddrOffAddr#
 indexFloatOffAddr#
 indexDoubleOffAddr#
@@ -207,6 +210,7 @@ indexDoubleOffAddr#
 --  indexOffForeignObj#
 indexCharOffForeignObj#
 indexIntOffForeignObj#
+indexWordOffForeignObj#
 indexAddrOffForeignObj#
 indexFloatOffForeignObj#
 indexDoubleOffForeignObj#
@@ -214,6 +218,7 @@ indexDoubleOffForeignObj#
   writeArray#
   writeCharArray#
   writeIntArray#
+  writeWordArray#
   writeFloatArray#
   writeDoubleArray#
   writeAddrArray#
@@ -221,6 +226,7 @@ indexDoubleOffForeignObj#
   readArray#
   readCharArray#
   readIntArray#
+  readWordArray#
   readFloatArray#
   readDoubleArray#
   readAddrArray#
@@ -228,6 +234,9 @@ indexDoubleOffForeignObj#
   unsafeFreezeArray#
   unsafeFreezeByteArray#
   
+  sizeofByteArray#
+  sizeofMutableByteArray#
+
   ForeignObj#
   makeForeignObj#
   writeForeignObj#
