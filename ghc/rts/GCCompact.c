@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GCCompact.c,v 1.1 2001/07/23 17:23:19 simonmar Exp $
+ * $Id: GCCompact.c,v 1.2 2001/07/24 14:29:13 simonmar Exp $
  *
  * (c) The GHC Team 2001
  *
@@ -17,14 +17,40 @@
 #include "Schedule.h"
 #include "StablePriv.h"
 
+/* -----------------------------------------------------------------------------
+   Threading / unthreading pointers.
+
+   The basic idea here is to chain together all the fields pointing at
+   a particular object, with the root of the chain in the object's
+   info table field.  The original contents of the info pointer goes
+   at the end of the chain.
+
+   Adding a new field to the chain is a matter of swapping the
+   contents of the field with the contents of the object's info table
+   field.
+
+   To unthread the chain, we walk down it updating all the fields on
+   the chain with the new location of the object.  We stop when we
+   reach the info pointer at the end.
+
+   We use a trick to identify the info pointer, because the
+   LOOKS_LIKE_GHC_INFO() macro involves a function call and can be
+   expensive.  The trick is that when swapping pointers for threading,
+   we set the low bit of the original pointer, with the result that
+   all the pointers in the chain have their low bits set except for
+   the info pointer.
+   -------------------------------------------------------------------------- */
+
 static inline void
 thread( StgPtr p )
 {
     StgPtr q = (StgPtr)*p;
     ASSERT(!LOOKS_LIKE_GHC_INFO(q));
     if (HEAP_ALLOCED(q)) {
-	*p = (StgWord)*q;
-	*q = (StgWord)p;
+	if (Bdescr(q)->gen_no > 0) {
+	    *p = (StgWord)*q;
+	    *q = (StgWord)p + 1;	// set the low bit
+	}
     }
 }
 
@@ -32,8 +58,9 @@ static inline void
 unthread( StgPtr p, StgPtr free )
 {
     StgPtr q = (StgPtr)*p, r;
-
-    while (!LOOKS_LIKE_GHC_INFO(q)) {
+    
+    while (((StgWord)q & 1) != 0) {
+	(StgWord)q -= 1;	// unset the low bit again
 	r = (StgPtr)*q;
 	*q = (StgWord)free;
 	q = r;
@@ -46,8 +73,8 @@ get_threaded_info( StgPtr p )
 {
     StgPtr q = (P_)GET_INFO((StgClosure *)p);
 
-    while (!LOOKS_LIKE_GHC_INFO(q)) {
-	q = (P_)*q;
+    while (((StgWord)q & 1) != 0) {
+	q = (P_)*((StgPtr)((StgWord)q-1));
     }
     return INFO_PTR_TO_STRUCT((StgInfoTable *)q);
 }
