@@ -96,6 +96,7 @@ import ForeignCall	( ForeignCall )
 import FieldLabel	( FieldLabel )
 import Type		( usOnce, usMany )
 import Demand		hiding( Demand )
+import qualified Demand
 import NewDemand	( Demand(..), Keepity(..), Deferredness(..), DmdResult(..),
 			  lazyDmd, topDmd,
 			  StrictSig, mkStrictSig, 
