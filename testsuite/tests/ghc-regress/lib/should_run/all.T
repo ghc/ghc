@@ -1,6 +1,8 @@
 test('char001', 	normal, compile_and_run, [''])
 test('char002', 	normal, compile_and_run, [''])
 
+test('ratio001', 	normal, compile_and_run, [''])
+
 test('rand001',		normal, compile_and_run, [''])
 test('read001',		normal, compile_and_run, [''])
 test('show001',		normal, compile_and_run, [''])
