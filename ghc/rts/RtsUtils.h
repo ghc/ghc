@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.h,v 1.13 2003/03/19 18:56:14 sof Exp $
+ * $Id: RtsUtils.h,v 1.14 2003/03/25 17:26:09 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -32,7 +32,9 @@ extern void stg_exit(I_ n) __attribute__((noreturn));
 char *time_str(void);
 char *ullong_format_string(ullong, char *, rtsBool);
 
+#ifdef PAR
 ullong   msTime(void);
+#endif
 
 #ifdef DEBUG
 extern void heapCheckFail( void );

@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.163 2003/03/19 18:41:19 sof Exp $
+ * $Id: Schedule.c,v 1.164 2003/03/25 17:26:09 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1765,11 +1765,8 @@ labelThread(StgPtr tso, char *label)
 
   /* Caveat: Once set, you can only set the thread name to "" */
   len = strlen(label)+1;
-  buf = malloc(len);
-  if (buf == NULL) {
-    fprintf(stderr,"insufficient memory for labelThread!\n");
-  } else
-    strncpy(buf,label,len);
+  buf = stgMallocBytes(len * sizeof(char), "Schedule.c:labelThread()");
+  strncpy(buf,label,len);
   /* Update will free the old memory for us */
   updateThreadLabel((StgWord)tso,buf);
 }

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.66 2003/02/22 04:51:53 sof Exp $
+ * $Id: RtsFlags.c,v 1.67 2003/03/25 17:26:08 sof Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -528,7 +528,7 @@ splitRtsFlags(char *s, int *rts_argc, char *rts_argv[])
 	if (c1 == c2) { break; }
 	
 	if (*rts_argc < MAX_RTS_ARGS-1) {
-	    s = malloc(c2-c1+1);
+	    s = stgMallocBytes(c2-c1+1, "RtsFlags.c:splitRtsFlags()");
 	    strncpy(s, c1, c2-c1);
 	    s[c2-c1] = '\0';
 	    rts_argv[(*rts_argc)++] = s;
