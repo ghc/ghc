@@ -131,7 +131,7 @@ __asm__ (
 extern void obscure_ccall_ret_code(void);
 #endif
 
-#if defined(x86_64_TARGET_ARCH)
+#if defined(x86_64_HOST_ARCH)
 __asm__ (
    ".globl " UNDERSCORE "obscure_ccall_ret_code\n"
    UNDERSCORE "obscure_ccall_ret_code:\n\t"
@@ -238,7 +238,7 @@ void*
 createAdjustor(int cconv, StgStablePtr hptr,
 	       StgFunPtr wptr,
 	       char *typeString
-#if !defined(powerpc_HOST_ARCH) && !defined(powerpc64_HOST_ARCH) && !defined(x86_64_TARGET_ARCH)
+#if !defined(powerpc_HOST_ARCH) && !defined(powerpc64_HOST_ARCH) && !defined(x86_64_HOST_ARCH)
 	          STG_UNUSED
 #endif
               )
