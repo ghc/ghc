@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.29 1999/11/02 15:05:40 simonmar Exp $
+% $Id: CLabel.lhs,v 1.30 1999/12/02 17:57:13 simonmar Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -371,6 +371,8 @@ internal names. <type> is one of the following:
 	 static_info		Static Constructor info table
 	 sel_info		Selector info table
 	 sel_entry		Selector entry code
+	 cc			Cost centre
+	 ccs			Cost centre stack
 
 \begin{code}
 -- specialised for PprAsm: saves lots of arg passing in NCG

@@ -302,7 +302,7 @@ instance Outputable CostCentreStack where
 		OverheadCCS	-> ptext SLIT("CCS_OVERHEAD")
 		DontCareCCS	-> ptext SLIT("CCS_DONTZuCARE")
 		SubsumedCCS	-> ptext SLIT("CCS_SUBSUMED")
-		SingletonCCS cc -> ptext SLIT("CCS_") <> ppr cc
+		SingletonCCS cc -> ppr cc <> ptext SLIT("_ccs")
 
 pprCostCentreStackDecl :: CostCentreStack -> SDoc
 pprCostCentreStackDecl ccs@(SingletonCCS cc)
@@ -363,11 +363,11 @@ pp_caf other   = empty
 
 
 -- Printing as a C label
-ppCostCentreLbl (NoCostCentre)		  	     = text "CC_NONE"
-ppCostCentreLbl (AllCafsCC  {cc_mod = m}) 	     = text "CC_CAFs_"  <> pprModuleName m
+ppCostCentreLbl (NoCostCentre)		  = text "NONE_cc"
+ppCostCentreLbl (AllCafsCC  {cc_mod = m}) = pprModuleName m <> text "_CAFs_cc"
 ppCostCentreLbl (NormalCC {cc_name = n, cc_mod = m, cc_is_caf = is_caf}) 
-  = text "CC_" <> text (case is_caf of { CafCC -> "CAF_"; _ -> "" }) 
-    <> pprModuleName m <> ptext n
+  = pprModuleName m <> ptext n <> 
+	text (case is_caf of { CafCC -> "_CAF"; _ -> "" }) <> text "_cc"
 
 -- This is the name to go in the user-displayed string, 
 -- recorded in the cost centre declaration

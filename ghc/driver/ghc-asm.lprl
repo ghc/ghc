@@ -492,7 +492,6 @@ sub mangle_asm {
 
 	} elsif ( /^$TUS[A-Za-z0-9_]+\.\d+$TPOSTLBL[@]?$/o
 	       || /^$TUS[@]?.*_CAT$TPOSTLBL[@]?$/o 		# PROF: _entryname_CAT
-	       || /^$TUS[@]?CC_.*_struct$TPOSTLBL[@]?$/o	# PROF: _CC_ccident_struct
 	       || /^$TUS[@]?.*_done$TPOSTLBL[@]?$/o		# PROF: _module_done
 	       || /^$TUS[@]?_module_registered$TPOSTLBL[@]?$/o	# PROF: _module_registered
 	       ) {
@@ -510,7 +509,7 @@ sub mangle_asm {
  	    $chkcat[$i]  = 'toc';
    	    $chksymb[$i] = $1;
 
- 	} elsif ( /^$TUS[@]?CC(S)?_.*$/ ) {
+	} elsif ( /^$TUS[@]?([A-Za-z0-9_]+)_cc(s)?$TPOSTLBL[@]?$/o ) {
             # all CC_ symbols go in the data section...
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'data';
