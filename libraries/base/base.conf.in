@@ -1,30 +1,30 @@
 #include "config.h"
 
 Package {
-        name           = "core",
+        name           = "base",
 #ifdef INSTALLING
 	import_dirs    = [ "$libdir/imports" ]
 #else
-	import_dirs    = [ "$libdir/libraries/core" ],
+	import_dirs    = [ "$libdir/libraries/base" ],
 #endif
         source_dirs    = [],
 #ifdef INSTALLING
         library_dirs   = [ "$libdir" ]
 #else
-        library_dirs   = [ "$libdir/libraries/core"
-                         , "$libdir/libraries/core/cbits" ],
+        library_dirs   = [ "$libdir/libraries/base"
+                         , "$libdir/libraries/base/cbits" ],
 #endif
         hs_libraries      =
 #                           ifndef mingw32_TARGET_OS
-                            [ "HScore" ],
+                            [ "HSbase" ],
 #                           else
                             -- This splitting is the subject of a totally 
                             -- horrible hack, which glues HSstd1 and HSstd2 
                             -- back into HSstd for the purposes of static linking.
                             -- See DriverState.getPackageLibraries for details.
-                            [ "HScore1", "HScore2" ],
+                            [ "HSbase1", "HSbase2" ],
 #                           endif
-	extra_libraries   = [ "HScore_cbits"
+	extra_libraries   = [ "HSbase_cbits"
 #ifdef mingw32_TARGET_OS
                             , "wsock32", "msvcrt", "kernel32", "user32"
 #endif
@@ -32,9 +32,9 @@ Package {
 #ifdef INSTALLING
         include_dirs   = []
 #else
-        include_dirs   = [ "$libdir/libraries/core/include" ],
+        include_dirs   = [ "$libdir/libraries/base/include" ],
 #endif
-        c_includes     = [ "HsCore.h" ],
+        c_includes     = [ "HsBase.h" ],
         package_deps   = [ "rts" ],
         extra_ghc_opts = [],
         extra_cc_opts  = [],

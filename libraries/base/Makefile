@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.9 2002/02/05 17:32:24 simonmar Exp $
+# $Id: Makefile,v 1.10 2002/02/06 11:51:12 simonmar Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -36,7 +36,7 @@ ALL_DIRS = \
 	Text/Regex \
 	Text/Show
 
-PKG=core
+PKG = base
 
 # -----------------------------------------------------------------------------
 # PrimOpWrappers
@@ -45,7 +45,7 @@ GHC/PrimopWrappers.hs: $(GHC_COMPILER_DIR)/prelude/primops.txt
 	rm -f $@
 	$(GHC_GENPRIMOP) --make-haskell-wrappers < $< > $@
 
-boot :: GHC/PrimOpWrappers.hs
+boot :: GHC/PrimopWrappers.hs
 
 CLEAN_FILES += GHC/PrimopWrappers.hs
 
