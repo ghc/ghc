@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.96 2002/02/17 13:56:35 panne Exp $
+dnl $Id: aclocal.m4,v 1.97 2002/03/04 23:06:40 qrczak Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -418,15 +418,6 @@ changequote([, ])dnl
         echo "gcc prior to 2.0 and have never worked with ghc."
         echo "we recommend 2.95.3, although versions back to 2.7.2 should be ok."
         AC_MSG_ERROR([gcc 1.X has never been supported])
-    fi
-    if test `eval $is_gcc_v3 2>/dev/null` = "1"; then
-        fptools_cv_have_gcc='no'
-        echo ""
-	echo "your gcc version appears to be ..."
-        $CC --version
-        echo "gcc versions 3.0 and above are not yet supported."
-        echo "we recommend 2.95.3, although versions back to 2.7.2 should be ok."
-        AC_MSG_ERROR([gcc 3.0 and above is not currently supported])
     fi
 fi
 ])
