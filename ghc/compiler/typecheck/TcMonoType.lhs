@@ -30,7 +30,6 @@ import TyCon		( TyCon )
 import Name		( Name, OccName, isTvOcc, getOccName )
 import TysWiredIn	( mkListTy, mkTupleTy )
 import Unique		( Unique )
-import PprStyle
 import Pretty
 import UniqFM           ( Uniquable(..) )
 import Util		( zipWithEqual, zipLazy, panic{-, pprPanic ToDo:rm-} )
