@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.24 $
- * $Date: 2000/01/05 18:05:34 $
+ * $Revision: 1.25 $
+ * $Date: 2000/01/05 19:10:21 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -490,7 +490,9 @@ Int what; {
                        break;
 
         case POSTPREL: 
+#if 0
 	  fprintf(stderr, "linkControl(POSTPREL)\n");
+#endif
 if (combined) assert(0);
 break;
 

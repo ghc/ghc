@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.31 $
- * $Date: 2000/01/05 18:05:33 $
+ * $Revision: 1.32 $
+ * $Date: 2000/01/05 19:10:21 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -2406,7 +2406,9 @@ FILE* fp; {
 
 Void everybody(what)            /* send command `what' to each component of*/
 Int what; {                     /* system to respond as appropriate ...    */
-fprintf ( stderr, "EVERYBODY %d\n", what );
+#if 0
+  fprintf ( stderr, "EVERYBODY %d\n", what );
+#endif
     machdep(what);              /* The order of calling each component is  */
     storage(what);              /* important for the PREPREL command       */
     substitution(what);

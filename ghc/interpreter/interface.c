@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.17 $
- * $Date: 2000/01/05 18:05:33 $
+ * $Revision: 1.18 $
+ * $Date: 2000/01/05 19:10:21 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -590,11 +590,11 @@ Void processInterfaces ( void )
     List ifaces       = NIL;  /* :: List I_INTERFACE */
     List iface_sizes  = NIL;  /* :: List Int         */
     List iface_onames = NIL;  /* :: List Text        */
-
+#if 0
     fprintf ( stderr, 
               "processInterfaces: %d interfaces to process\n", 
               length(ifaces_outstanding) );
-
+#endif
 
     /* unzip3 ifaces_outstanding into ifaces, iface_sizes, iface_onames */
     for (xs = ifaces_outstanding; nonNull(xs); xs=tl(xs)) {
@@ -630,7 +630,9 @@ Void processInterfaces ( void )
 
        /* Have we reached a fixed point? */
        i = length(all_known_types);
+#if 0
        printf ( "\n============= %d known types =============\n", i );
+#endif
        if (num_known_types == i) break;
        num_known_types = i;
 
@@ -760,7 +762,9 @@ printf("\n");
 
        /* Have we reached a fixed point? */
        i = length(all_known_types);
+#if 0
        printf ( "\n------------- %d known types -------------\n", i );
+#endif
        if (num_known_types == i) break;
        num_known_types = i;
 
@@ -867,9 +871,11 @@ printf("\n");
           }
        }       
     }
+#if 0
 
     fprintf(stderr, "\n=========================================================\n");
     fprintf(stderr, "=========================================================\n");
+#endif
 
     /* Traverse again the decl lists of the modules, this time 
        calling the finishGHC* functions.  But don't process
@@ -930,9 +936,10 @@ printf("\n");
           }
        }       
     }
-
+#if 0
     fprintf(stderr, "\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
     fprintf(stderr, "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+#endif
     /* Build the module(m).export lists for each module, by running
        through the export lists in the iface.  Also, do the implicit
        'import Prelude' thing.  And finally, do the object code 
@@ -2393,6 +2400,10 @@ Type type; {
       Sym(mktime)                    \
       Sym(gmtime)                    \
 
+
+/* AJG Hack */
+#undef EXTERN_SYMS
+#define EXTERN_SYMS
 
 /* entirely bogus claims about types of these symbols */
 #define Sym(vvv)  extern int vvv;
