@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.65 2002/02/12 05:01:26 sof Exp $
+# $Id: Makefile,v 1.66 2002/02/12 15:17:22 simonmar Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -29,11 +29,19 @@ include $(TOP)/mk/boilerplate.mk
 
 HC=$(GHC_INPLACE)
 
-PACKAGE = rts
 WAYS=$(GhcLibWays)
+
+PACKAGE = rts
+
+# Tells the build system not to add various Haskellish options to $(SRC_HC_OPTS)
+NON_HS_PKG = YES
 
 # grab sources from these subdirectories
 ALL_DIRS = hooks parallel
+
+ifeq "$(HaveLibGmp)" "YES"
+PKG_CPP_OPTS += -DHAVE_LIBGMP
+endif
 
 ifneq "$(DLLized)" "YES"
 EXCLUDED_SRCS += RtsDllMain.c
@@ -49,7 +57,7 @@ HC_OBJS = $(patsubst %.hc,%.$(way_)o, $(HC_SRCS))
 
 CLEAN_FILES += $(HC_OBJS)
 
-# Override the default $(LIBOBJS) (the default provides for building Haskell libs)
+# Override the default $(LIBOBJS) (defaults to $(HS_OBJS))
 LIBOBJS = $(C_OBJS) $(HC_OBJS)
 
 SplitObjs=NO

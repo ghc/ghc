@@ -52,7 +52,7 @@ import BasicTypes	( Boxity(..) )
 import FastString	( FastString, uniqueOfFS )
 import GlaExts
 import ST
-import PrelBase ( Char(..), chr, ord )
+import Char		( chr, ord )
 import FastTypes
 
 import Outputable

@@ -99,9 +99,9 @@ BootingFromUnregisterisedHc = @BootingFromUnregisterisedHc@
 
 # build the libs first if we're bootstrapping from .hc files
 ifeq "$(BootingFromHc)" "YES"
-AllProjects = glafp-utils hslibs ghc green-card happy hdirect hood nofib
+AllProjects = glafp-utils libraries hslibs ghc green-card happy hdirect hood nofib
 else
-AllProjects = glafp-utils ghc hslibs green-card happy hdirect hood nofib
+AllProjects = glafp-utils ghc libraries hslibs green-card happy hdirect hood nofib
 endif
 
 #
@@ -236,10 +236,10 @@ else
 GhcLibWays=p
 endif
 
-# Option flags to pass to GHC when it's compiling prelude modules
-# *and* standard library modules (std) *and* modules in hslibs
-# Typically these are things like -O or -dcore-lint
-# The ones that are *essential* are wired into ghc/lib/Makefile
+# Option flags to pass to GHC when it's compiling modules in
+# fptools/libraries.  Typically these are things like -O or
+# -dcore-lint or -H32m.  The ones that are *essential* are wired into
+# the build system.
 #
 # 	-O is pretty desirable, otherwise no inlining of prelude
 #		things (incl "+") happens when compiling with this compiler
@@ -310,20 +310,9 @@ GhcRtsThreaded=@ThreadedRts@
 
 ################################################################################
 #
-#		hslibs project
+# libraries project
 #
 ################################################################################
-
-# Build HsLibs for which compiler?  
-
-# If $(HsLibsFor) == hugs or ghc, we assume we're building for the
-# compiler/interpreter in the same source tree.
-
-# HsLibsFor = ghc | hugs | nhc | hbc
-HsLibsFor	= ghc
-
-# hslibs for GHC also uses the following variables (defined above):
-#   GhcLibWays, GhcLibHcOpts, GhcLibToolsHcOpts, DLLized, StripLibraries
 
 # Build the Haskell Readline bindings?
 #

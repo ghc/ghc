@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.20 2002/02/03 17:06:12 sof Exp $
+-- $Id: Main.hs,v 1.21 2002/02/12 15:17:24 simonmar Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -238,9 +238,12 @@ validatePackageConfig pkg pkgs auto_ghci_libs updatePkg = do
        | otherwise = pkgs
   return (existing_pkgs ++ [pkg])
 
-checkDir d = do
-  there <- doesDirectoryExist d
-  when (not there)
+checkDir d
+ | "$libdir" `isPrefixOf` d = return ()
+	-- can't check this, because we don't know what $libdir is
+ | otherwise = do
+   there <- doesDirectoryExist d
+   when (not there)
        (die ("`" ++ d ++ "' doesn't exist or isn't a directory"))
 
 checkDep :: [PackageConfig] -> String -> IO ()
@@ -251,10 +254,14 @@ checkDep pkgs n
 checkHSLib :: [String] -> Bool -> String -> IO ()
 checkHSLib dirs auto_ghci_libs lib = do
   let batch_lib_file = "lib" ++ lib ++ ".a"
-  bs <- mapM (\d -> doesFileExist (d ++ '/':batch_lib_file)) dirs
+  bs <- mapM (doesLibExistIn batch_lib_file) dirs
   case [ dir | (exists,dir) <- zip bs dirs, exists ] of
 	[] -> die ("cannot find `" ++ batch_lib_file ++ "' on library path") 
 	(dir:_) -> checkGHCiLib dirs dir batch_lib_file lib auto_ghci_libs
+
+doesLibExistIn lib d
+ | "$libdir" `isPrefixOf` d = return True
+ | otherwise                = doesFileExist (d ++ '/':lib)
 
 checkGHCiLib :: [String] -> String -> String -> String -> Bool -> IO ()
 checkGHCiLib dirs batch_lib_dir batch_lib_file lib auto_build = do

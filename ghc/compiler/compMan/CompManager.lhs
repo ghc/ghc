@@ -101,8 +101,7 @@ import VarEnv		( emptyTidyEnv )
 import BasicTypes	( Fixity, defaultFixity )
 import Interpreter	( HValue )
 import HscMain		( hscStmt )
-import PrelGHC		( unsafeCoerce# )
-
+import GlaExts		( unsafeCoerce# )
 import Foreign
 import CForeign
 import Exception	( Exception, try )

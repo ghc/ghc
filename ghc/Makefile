@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.19 2001/10/24 10:07:57 rrt Exp $
+# $Id: Makefile,v 1.20 2002/02/12 15:17:13 simonmar Exp $
 #
 
 TOP=.
@@ -21,13 +21,13 @@ include $(TOP)/mk/boilerplate.mk
 # we descend into compiler/ and lib/.
 #
 ifeq "$(BootingFromHc)" "YES"
-SUBDIRS = includes utils rts docs lib compiler driver
+SUBDIRS = includes utils rts docs compiler driver
 else
 ifneq "$(ILXized)" "YES"
-SUBDIRS = includes utils driver docs compiler rts lib
+SUBDIRS = includes utils driver docs compiler rts
 else
 # No RTS for ILX
-SUBDIRS = includes utils driver docs compiler lib
+SUBDIRS = includes utils driver docs compiler
 endif
 endif
 

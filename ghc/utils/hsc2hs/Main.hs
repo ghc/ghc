@@ -1,5 +1,5 @@
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.35 2002/01/17 08:37:57 sof Exp $
+-- $Id: Main.hs,v 1.36 2002/02/12 15:17:24 simonmar Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -445,7 +445,8 @@ output flags name toks = do
     let cProgName    = outDir++outBase++"_hsc_make.c"
         oProgName    = outDir++outBase++"_hsc_make.o"
         progName     = outDir++outBase++"_hsc_make" ++ progNameSuffix
-        outHName     = outDir++outBase++"_hsc.h"
+	outHFile     = outBase++"_hsc.h"
+        outHName     = outDir++outHFile
         outCName     = outDir++outBase++"_hsc.c"
 
     let execProgName
@@ -524,8 +525,10 @@ output flags name toks = do
         "#endif\n"
     
     when needsC $ writeFile outCName $
-        "#include \""++outHName++"\"\n"++
+        "#include \""++outHFile++"\"\n"++
         concatMap outTokenC specials
+	-- NB. outHFile not outHName; works better when processed
+	-- by gcc or mkdependC.
 
 onlyOne :: String -> IO a
 onlyOne what = do

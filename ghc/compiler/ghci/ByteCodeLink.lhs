@@ -31,34 +31,35 @@ import Linker		( lookupSymbol )
 import FastString	( FastString(..) )
 import ByteCodeInstr	( BCInstr(..), ProtoBCO(..) )
 import ByteCodeItbls	( ItblEnv, ItblPtr )
-
-
-import Monad		( when, foldM )
-import ST		( runST )
-import IArray		( array )
-import MArray		( castSTUArray, 
-			  newInt64Array, writeInt64Array,
-			  newFloatArray, writeFloatArray,
-			  newDoubleArray, writeDoubleArray,
-			  newIntArray, writeIntArray,
-			  newAddrArray, writeAddrArray,
-			  readWordArray )
-import Foreign		( Word16, Ptr(..), free )
-import Addr 		( Word, Addr(..), nullAddr )
-import Weak		( addFinalizer )
 import FiniteMap
-
-import PrelBase		( Int(..) )
-import PrelGHC		( BCO#, newBCO#, unsafeCoerce#, 
-			  ByteArray#, Array#, addrToHValue#, mkApUpd0# )
-import IOExts		( fixIO )
-import Exception        ( throwDyn )
 import Panic            ( GhcException(..) )
-import PrelArr		( Array(..) )
-import ArrayBase	( UArray(..) )
-import PrelIOBase	( IO(..) )
-import Int		( Int64 )
 
+import Control.Monad	( when, foldM )
+import Control.Monad.ST	( runST )
+import Data.Array.IArray ( array )
+
+import GHC.Word		( Word )
+import Data.Array.MArray ( MArray, newArray_, readArray, writeArray )
+import Data.Array.ST	( castSTUArray )
+import Data.Array.Base	( UArray(..) )
+import Foreign.Ptr	( Ptr, nullPtr )
+import Foreign		( Word16, Ptr(..), free )
+import System.Mem.Weak  ( addFinalizer )
+import Data.Int		( Int64 )
+
+import System.IO	( fixIO )
+import Control.Exception ( throwDyn )
+
+import GlaExts		( BCO#, newBCO#, unsafeCoerce#, 
+			  ByteArray#, Array#, addrToHValue#, mkApUpd0# )
+
+#if __GLASGOW_HASKELL__ >= 503
+import GHC.Arr		( Array(..) )
+import GHC.IOBase	( IO(..) )
+#else
+import PrelArr		( Array(..) )
+import PrelIOBase	( IO(..) )
+#endif
 \end{code}
 
 %************************************************************************
@@ -206,8 +207,8 @@ assembleBCO (ProtoBCO nm instrs origin malloced)
 
          return ul_bco
      where
-         zonk (A# a#) = do -- putStrLn ("freeing malloc'd block at " ++ show (A# a#))
-                           free (Ptr a#)
+         zonk ptr = do -- putStrLn ("freeing malloc'd block at " ++ show (A# a#))
+                           free ptr
 
 -- instrs nonptrs ptrs itbls
 type AsmState = (SizedSeq Word16, SizedSeq Word, 
@@ -329,7 +330,7 @@ mkBits findLabel st proto_insns
                return (sizeSS st_l0, (st_i0,st_l1,st_p0,st_I0))
 
        addr (st_i0,st_l0,st_p0,st_I0) a
-          = do let ws = mkLitA a
+          = do let ws = mkLitPtr a
                st_l1 <- addListToSS st_l0 ws
                return (sizeSS st_l0, (st_i0,st_l1,st_p0,st_I0))
 
@@ -376,19 +377,19 @@ mkBits findLabel st proto_insns
                        AddrRep   -> stg_gc_unbx_r1_info
                        FloatRep  -> stg_gc_f1_info
                        DoubleRep -> stg_gc_d1_info
-                       VoidRep   -> nullAddr  
+                       VoidRep   -> nullPtr
                        -- Interpreter.c spots this special case
                        other     -> pprPanic "ByteCodeLink.itoc_itbl" (ppr pk)
                      
-foreign label "stg_ctoi_ret_R1p_info" stg_ctoi_ret_R1p_info :: Addr
-foreign label "stg_ctoi_ret_R1n_info" stg_ctoi_ret_R1n_info :: Addr
-foreign label "stg_ctoi_ret_F1_info"  stg_ctoi_ret_F1_info :: Addr
-foreign label "stg_ctoi_ret_D1_info"  stg_ctoi_ret_D1_info :: Addr
-foreign label "stg_ctoi_ret_V_info"   stg_ctoi_ret_V_info :: Addr
+foreign label "stg_ctoi_ret_R1p_info" stg_ctoi_ret_R1p_info :: Ptr ()
+foreign label "stg_ctoi_ret_R1n_info" stg_ctoi_ret_R1n_info :: Ptr ()
+foreign label "stg_ctoi_ret_F1_info"  stg_ctoi_ret_F1_info :: Ptr ()
+foreign label "stg_ctoi_ret_D1_info"  stg_ctoi_ret_D1_info :: Ptr ()
+foreign label "stg_ctoi_ret_V_info"   stg_ctoi_ret_V_info :: Ptr ()
 
-foreign label "stg_gc_unbx_r1_info" stg_gc_unbx_r1_info :: Addr
-foreign label "stg_gc_f1_info"      stg_gc_f1_info :: Addr
-foreign label "stg_gc_d1_info"      stg_gc_d1_info :: Addr
+foreign label "stg_gc_unbx_r1_info" stg_gc_unbx_r1_info :: Ptr ()
+foreign label "stg_gc_f1_info"      stg_gc_f1_info :: Ptr ()
+foreign label "stg_gc_d1_info"      stg_gc_d1_info :: Ptr ()
 
 -- The size in 16-bit entities of an instruction.
 instrSize16s :: BCInstr -> Int
@@ -430,74 +431,73 @@ instrSize16s instr
 mkLitI   :: Int    -> [Word]
 mkLitF   :: Float  -> [Word]
 mkLitD   :: Double -> [Word]
-mkLitA   :: Addr   -> [Word]
+mkLitPtr :: Ptr ()   -> [Word]
 mkLitI64 :: Int64  -> [Word]
 
 mkLitF f
    = runST (do
-        arr <- newFloatArray ((0::Int),0)
-        writeFloatArray arr 0 f
+        arr <- newArray_ ((0::Int),0)
+        writeArray arr 0 f
         f_arr <- castSTUArray arr
-        w0 <- readWordArray f_arr 0
-        return [w0]
+        w0 <- readArray f_arr 0
+        return [w0 :: Word]
      )
 
 mkLitD d
    | wORD_SIZE == 4
    = runST (do
-        arr <- newDoubleArray ((0::Int),1)
-        writeDoubleArray arr 0 d
+        arr <- newArray_ ((0::Int),1)
+        writeArray arr 0 d
         d_arr <- castSTUArray arr
-        w0 <- readWordArray d_arr 0
-        w1 <- readWordArray d_arr 1
-        return [w0,w1]
+        w0 <- readArray d_arr 0
+        w1 <- readArray d_arr 1
+        return [w0 :: Word, w1]
      )
    | wORD_SIZE == 8
    = runST (do
-        arr <- newDoubleArray ((0::Int),0)
-        writeDoubleArray arr 0 d
+        arr <- newArray_ ((0::Int),0)
+        writeArray arr 0 d
         d_arr <- castSTUArray arr
-        w0 <- readWordArray d_arr 0
-        return [w0]
+        w0 <- readArray d_arr 0
+        return [w0 :: Word]
      )
 
 mkLitI64 ii
    | wORD_SIZE == 4
    = runST (do
-        arr <- newInt64Array ((0::Int),1)
-        writeInt64Array arr 0 ii
+        arr <- newArray_ ((0::Int),1)
+        writeArray arr 0 ii
         d_arr <- castSTUArray arr
-        w0 <- readWordArray d_arr 0
-        w1 <- readWordArray d_arr 1
-        return [w0,w1]
+        w0 <- readArray d_arr 0
+        w1 <- readArray d_arr 1
+        return [w0 :: Word,w1]
      )
    | wORD_SIZE == 8
    = runST (do
-        arr <- newInt64Array ((0::Int),0)
-        writeInt64Array arr 0 ii
+        arr <- newArray_ ((0::Int),0)
+        writeArray arr 0 ii
         d_arr <- castSTUArray arr
-        w0 <- readWordArray d_arr 0
-        return [w0]
+        w0 <- readArray d_arr 0
+        return [w0 :: Word]
      )
 
 mkLitI i
    = runST (do
-        arr <- newIntArray ((0::Int),0)
-        writeIntArray arr 0 i
+        arr <- newArray_ ((0::Int),0)
+        writeArray arr 0 i
         i_arr <- castSTUArray arr
-        w0 <- readWordArray i_arr 0
-        return [w0]
+        w0 <- readArray i_arr 0
+        return [w0 :: Word]
      )
 
-mkLitA a
+mkLitPtr a
    = runST (do
-        arr <- newAddrArray ((0::Int),0)
-        writeAddrArray arr 0 a
+        arr <- newArray_ ((0::Int),0)
+        writeArray arr 0 a
         a_arr <- castSTUArray arr
-        w0 <- readWordArray a_arr 0
-        return [w0]
+        w0 <- readArray a_arr 0
+        return [w0 :: Word]
      )
-
 \end{code}
 
 %************************************************************************

@@ -56,16 +56,15 @@ import ByteCodeFFI	( taggedSizeW, untaggedSizeW, mkMarshalCode, moan64 )
 import Linker		( lookupSymbol )
 
 import List		( intersperse, sortBy, zip4 )
-import Foreign		( Ptr(..), mallocBytes )
-import Addr		( Addr(..), writeCharOffAddr )
+import Foreign		( Ptr(..), castPtr, mallocBytes, pokeByteOff, Word8 )
 import CTypes		( CInt )
 import Exception	( throwDyn )
 
-import PrelBase		( Int(..) )
-import PrelGHC		( ByteArray# )
-import PrelIOBase	( IO(..) )
+import GlaExts		( Int(..), ByteArray# )
+
 import Monad		( when )
 import Maybe		( isJust )
+import Char		( ord )
 \end{code}
 
 %************************************************************************
@@ -885,7 +884,7 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
                     -> let sym_to_find = _UNPK_ target in
                        ioToBc (lookupSymbol sym_to_find) `thenBc` \res ->
                        case res of
-                           Just aa -> case aa of Ptr a# -> returnBc (True, A# a#)
+                           Just aa -> returnBc (True, aa)
                            Nothing -> ioToBc (linkFail "ByteCodeGen.generateCCall" 
                                                        sym_to_find)
                  CasmTarget _
@@ -935,7 +934,7 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
          recordMallocBc addr_of_marshaller	`thenBc_`
      let
          -- do the call
-         do_call      = unitOL (CCALL addr_of_marshaller)
+         do_call      = unitOL (CCALL (castPtr addr_of_marshaller))
          -- slide and return
          wrapup       = mkSLIDE r_tsizeW (d_after_r - r_tsizeW - s)
                         `snocOL` RETURN r_rep
@@ -1189,7 +1188,7 @@ pushAtom False d p (AnnLit lit)
         pushStr s 
            = let getMallocvilleAddr
                     = case s of
-                         CharStr s i -> returnBc (A# s)
+                         CharStr s i -> returnBc (Ptr s)
 
                          FastString _ l ba -> 
                             -- sigh, a string in the heap is no good to us.
@@ -1199,12 +1198,12 @@ pushAtom False d p (AnnLit lit)
                             -- at the same time.
                             let n = I# l
                             -- CAREFUL!  Chars are 32 bits in ghc 4.09+
-                            in  ioToBc (mallocBytes (n+1)) `thenBc` \ (Ptr a#) ->
-                                recordMallocBc (A# a#)     `thenBc_`
+                            in  ioToBc (mallocBytes (n+1)) `thenBc` \ ptr ->
+                                recordMallocBc ptr         `thenBc_`
                                 ioToBc (
-                                   do memcpy (Ptr a#) ba (fromIntegral n)
-                                      writeCharOffAddr (A# a#) n '\0'
-                                      return (A# a#)
+                                   do memcpy ptr ba (fromIntegral n)
+				      pokeByteOff ptr n (fromIntegral (ord '\0') :: Word8)
+                                      return ptr
                                    )
                          other -> panic "ByteCodeGen.pushAtom.pushStr"
              in
@@ -1406,7 +1405,7 @@ bind x f    = f x
 data BcM_State 
    = BcM_State { bcos      :: [ProtoBCO Name],	-- accumulates completed BCOs
                  nextlabel :: Int,		-- for generating local labels
-                 malloced  :: [Addr] }		-- ptrs malloced for current BCO
+                 malloced  :: [Ptr ()] }	-- ptrs malloced for current BCO
                                                 -- Should be free()d when it is GCd
 type BcM r = BcM_State -> IO (BcM_State, r)
 
@@ -1441,7 +1440,7 @@ mapBc f (x:xs)
     mapBc f xs   `thenBc` \ rs ->
     returnBc (r:rs)
 
-emitBc :: ([Addr] -> ProtoBCO Name) -> BcM ()
+emitBc :: ([Ptr ()] -> ProtoBCO Name) -> BcM ()
 emitBc bco st
    = return (st{bcos = bco (malloced st) : bcos st, malloced=[]}, ())
 
@@ -1452,9 +1451,9 @@ newbcoBc st
    | otherwise
    = return (st, ())
 
-recordMallocBc :: Addr -> BcM ()
+recordMallocBc :: Ptr a -> BcM ()
 recordMallocBc a st
-   = return (st{malloced = a : malloced st}, ())
+   = return (st{malloced = castPtr a : malloced st}, ())
 
 getLabelBc :: BcM Int
 getLabelBc st

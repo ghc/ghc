@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.67 2002/02/11 08:20:41 chak Exp $
+-- $Id: DriverState.hs,v 1.68 2002/02/12 15:17:15 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -432,7 +432,7 @@ GLOBAL_VAR(v_HCHeader, "", String)
 -- Packages
 
 -- package list is maintained in dependency order
-GLOBAL_VAR(v_Packages, ("std":"rts":"gmp":[]), [String])
+GLOBAL_VAR(v_Packages, ("haskell98":"base":"rts":[]), [String])
 
 readPackageConf :: String -> IO ()
 readPackageConf conf_file = do
@@ -491,23 +491,23 @@ getPackageLibraries = do
   where
      -- This is a totally horrible (temporary) hack, for Win32.  Problem is
      -- that package.conf for Win32 says that the main prelude lib is 
-     -- split into HSstd1 and HSstd2, which is needed due to limitations in
+     -- split into HSbase1 and HSbase2, which is needed due to limitations in
      -- the PEi386 file format, to make GHCi work.  However, we still only
-     -- have HSstd.a for static linking, not HSstd1.a and HSstd2.a.  
+     -- have HSbase.a for static linking, not HSbase1.a and HSbase2.a.  
      -- getPackageLibraries is called to find the .a's to add to the static
-     -- link line.  On Win32, this hACK detects HSstd1 and HSstd2 and 
-     -- replaces them with HSstd, so static linking still works.
+     -- link line.  On Win32, this hACK detects HSbase1 and HSbase2 and 
+     -- replaces them with HSbase, so static linking still works.
      -- Libraries needed for dynamic (GHCi) linking are discovered via
      -- different route (in InteractiveUI.linkPackage).
-     -- See driver/PackageSrc.hs for the HSstd1/HSstd2 split definition.
+     -- See driver/PackageSrc.hs for the HSbase1/HSbase2 split definition.
      -- THIS IS A STRICTLY TEMPORARY HACK (famous last words ...)
      -- JRS 04 Sept 01: Same appalling hack for HSwin32[1,2]
      hACK libs
 #      ifndef mingw32_TARGET_OS
        = libs
 #      else
-       = if   "HSstd1" `elem` libs && "HSstd2" `elem` libs
-         then "HSstd" : filter ((/= "HSstd").(take 5)) libs
+       = if   "HSbase1" `elem` libs && "HSbase2" `elem` libs
+         then "HSbase" : filter ((/= "HSbase").(take 5)) libs
          else
          if   "HSwin321" `elem` libs && "HSwin322" `elem` libs
          then "HSwin32" : filter ((/= "HSwin32").(take 7)) libs

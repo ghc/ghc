@@ -191,6 +191,9 @@ SCRIPT_OBJS = $(addsuffix .prl,$(basename $(SCRIPT_SRCS)))
 
 OBJS        = $(HS_OBJS) $(C_OBJS) $(SCRIPT_OBJS)
 
+# The default is for $(LIBOBJS) to be the same as $(OBJS)
+LIBOBJS	    = $(OBJS)
+
 #
 # Note that as long as you use the standard variables for setting
 # which C & Haskell programs you want to work on, you don't have

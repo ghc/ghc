@@ -50,8 +50,13 @@ module FastString
 #define COMPILING_FAST_STRING
 #include "HsVersions.h"
 
+#if __GLASGOW_HASKELL__ < 503
 import PrelPack
 import PrelIOBase	( IO(..) )
+#else
+import CString
+import GHC.IOBase	( IO(..) )
+#endif
 
 import PrimPacked
 import GlaExts
@@ -61,11 +66,14 @@ import PrelAddr		( Addr(..) )
 import Addr		( Addr(..) )
 import Ptr		( Ptr(..) )
 #endif
-#if __GLASGOW_HASKELL__ < 407
-import MutableArray	( MutableArray(..) )
-#else
+#if __GLASGOW_HASKELL__ < 503
 import PrelArr		( STArray(..), newSTArray )
 import IOExts		( hPutBufFull, hPutBufBAFull )
+#else
+import GHC.Arr		( STArray(..), newSTArray )
+import System.IO	( hPutBuf )
+import IOExts 		( hPutBufBA )
+import CString		( unpackNBytesBA# )
 #endif
 
 import IOExts		( IORef, newIORef, readIORef, writeIORef )
@@ -73,6 +81,11 @@ import IO
 import Char             ( chr, ord )
 
 #define hASH_TBL_SIZE 993
+
+#if __GLASGOW_HASKELL__ < 503
+hPutBuf = hPutBufFull
+hPutBufBA = hPutBufBAFull
+#endif
 \end{code} 
 
 @FastString@s are packed representations of strings
@@ -216,16 +229,8 @@ type FastStringTableVar = IORef FastStringTable
 string_table :: FastStringTableVar
 string_table = 
  unsafePerformIO (
-#if __GLASGOW_HASKELL__ < 405
-   stToIO (newArray (0::Int,hASH_TBL_SIZE) [])
-	>>= \ (MutableArray _ arr#) ->
-#elif __GLASGOW_HASKELL__ < 407
-   stToIO (newArray (0::Int,hASH_TBL_SIZE) [])
-	>>= \ (MutableArray _ _ arr#) ->
-#else
    stToIO (newSTArray (0::Int,hASH_TBL_SIZE) [])
 	>>= \ (STArray _ _ arr#) ->
-#endif
    newIORef (FastStringTable 0# arr#))
 
 lookupTbl :: FastStringTable -> Int# -> IO [FastString]
@@ -254,11 +259,7 @@ mkFastString# a# len# =
        -- the string into a ByteArray
        -- _trace "empty bucket" $
        case copyPrefixStr (A# a#) (I# len#) of
-#if __GLASGOW_HASKELL__ < 405
-	 (ByteArray _ barr#) ->  
-#else
 	 (ByteArray _ _ barr#) ->  
-#endif
 	   let f_str = FastString uid# len# barr# in
            updTbl string_table ft h [f_str] >>
            ({- _trace ("new: " ++ show f_str)   $ -} return f_str)
@@ -269,11 +270,7 @@ mkFastString# a# len# =
        case bucket_match ls len# a# of
 	 Nothing -> 
            case copyPrefixStr (A# a#) (I# len#) of
-#if __GLASGOW_HASKELL__ < 405
-	     (ByteArray _ barr#) ->  
-#else
 	     (ByteArray _ _ barr#) ->  
-#endif
               let f_str = FastString uid# len# barr# in
               updTbl string_table ft h (f_str:ls) >>
 	      ( {- _trace ("new: " ++ show f_str)  $ -} return f_str)
@@ -305,13 +302,8 @@ mkFastSubStringBA# barr# start# len# =
        -- no match, add it to table by copying out the
        -- the string into a ByteArray
        -- _trace "empty bucket(b)" $
-#if __GLASGOW_HASKELL__ < 405
-       case copySubStrBA (ByteArray btm barr#) (I# start#) (I# len#) of
-         (ByteArray _ ba#) ->  
-#else
        case copySubStrBA (ByteArray btm btm barr#) (I# start#) (I# len#) of
          (ByteArray _ _ ba#) ->  
-#endif
           let f_str = FastString uid# len# ba# in
           updTbl string_table ft h [f_str]     >>
           -- _trace ("new(b): " ++ show f_str)   $
@@ -322,13 +314,8 @@ mkFastSubStringBA# barr# start# len# =
        -- _trace ("non-empty bucket(b)"++show ls) $
        case bucket_match ls start# len# barr# of
 	 Nothing -> 
-#if __GLASGOW_HASKELL__ < 405
-          case copySubStrBA (ByteArray btm barr#) (I# start#) (I# len#) of
-            (ByteArray _ ba#) ->  
-#else
           case copySubStrBA (ByteArray btm btm barr#) (I# start#) (I# len#) of
             (ByteArray _ _ ba#) ->  
-#endif
               let f_str = FastString uid# len# ba# in
               updTbl string_table ft h (f_str:ls) >>
 	      -- _trace ("new(b): " ++ show f_str)   $
@@ -401,11 +388,7 @@ mkFastCharString2 a@(A# a#) (I# len#) = CharStr a# len#
 mkFastStringNarrow :: String -> FastString
 mkFastStringNarrow str =
  case packString str of
-#if __GLASGOW_HASKELL__ < 405
-  (ByteArray (_,I# len#) frozen#) -> 
-#else
   (ByteArray _ (I# len#) frozen#) -> 
-#endif
     mkFastSubStringBA# frozen# 0# len#
     {- 0-indexed array, len# == index to one beyond end of string,
        i.e., (0,1) => empty string.    -}
@@ -488,22 +471,14 @@ cmpFS (FastString u1# _ b1#) (FastString u2# _ b2#) = -- assume non-null chars
      EQ
   else
    unsafePerformIO (
-#if __GLASGOW_HASKELL__ < 405
-    _ccall_ strcmp (ByteArray bot b1#) (ByteArray bot b2#)	>>= \ (I# res) ->
-#else
     _ccall_ strcmp (ByteArray bot bot b1#) (ByteArray bot bot b2#) >>= \ (I# res) ->
-#endif
     return (
     if      res <#  0# then LT
     else if res ==# 0# then EQ
     else		    GT
     ))
   where
-#if __GLASGOW_HASKELL__ < 405
-   bot :: (Int,Int)
-#else
    bot :: Int
-#endif
    bot = error "tagCmp"
 cmpFS (CharStr bs1 len1) (CharStr bs2 len2)
   = unsafePerformIO (
@@ -525,11 +500,7 @@ cmpFS (FastString _ len1 bs1) (CharStr bs2 len2)
      else		     GT
     ))
   where
-#if __GLASGOW_HASKELL__ < 405
-    ba1 = ByteArray ((error "")::(Int,Int)) bs1
-#else
     ba1 = ByteArray (error "") ((error "")::Int) bs1
-#endif
     ba2 = A# bs2
 
 cmpFS a@(CharStr _ _) b@(FastString _ _ _)
@@ -545,13 +516,8 @@ Outputting @FastString@s is quick, just block copying the chunk (using
 hPutFS :: Handle -> FastString -> IO ()
 hPutFS handle (FastString _ l# ba#)
   | l# ==# 0#  = return ()
-#if __GLASGOW_HASKELL__ < 405
-  | otherwise  = hPutBufBA handle (ByteArray bot ba#) (I# l#)
-#elif __GLASGOW_HASKELL__ < 407
-  | otherwise  = hPutBufBA handle (ByteArray bot bot ba#) (I# l#)
-#else
   | otherwise  = do mba <- stToIO $ unsafeThawByteArray (ByteArray (bot::Int) bot ba#)
-                    hPutBufBAFull  handle mba (I# l#)
+                    hPutBufBA  handle mba (I# l#)
  where
   bot = error "hPutFS.ba"
 
@@ -559,18 +525,14 @@ hPutFS handle (FastString _ l# ba#)
 
 hPutFS handle (CharStr a# l#)
   | l# ==# 0#  = return ()
-#if __GLASGOW_HASKELL__ < 407
+#if __GLASGOW_HASKELL__ < 411
   | otherwise  = hPutBuf handle (A# a#) (I# l#)
-#elif __GLASGOW_HASKELL__ < 411
-  | otherwise  = hPutBufFull handle (A# a#) (I# l#)
 #else
-  | otherwise  = hPutBufFull handle (Ptr a#) (I# l#)
+  | otherwise  = hPutBuf handle (Ptr a#) (I# l#)
 #endif
 
 -- ONLY here for debugging the NCG (so -ddump-stix works for string
 -- literals); no idea if this is really necessary.  JRS, 010131
 hPutFS handle (UnicodeStr _ is) 
   = hPutStr handle ("(UnicodeStr " ++ show is ++ ")")
-
-#endif
 \end{code}

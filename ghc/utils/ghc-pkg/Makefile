@@ -1,11 +1,16 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.13 2001/10/23 16:31:37 rrt Exp $
+# $Id: Makefile,v 1.14 2002/02/12 15:17:24 simonmar Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
 
 # hack for ghci-inplace script, see below
 INSTALLING=1
+
+# ghc-pkg is needed to boot in ghc/rts and library dirs
+ifneq "$(BootingFromHc)" "YES"
+boot :: all
+endif
 
 # -----------------------------------------------------------------------------
 # ghc-pkg.bin

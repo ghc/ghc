@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.209 2002/02/11 08:20:38 chak Exp $
+# $Id: Makefile,v 1.210 2002/02/12 15:17:13 simonmar Exp $
 
 TOP = ..
 
@@ -61,17 +61,18 @@ $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "cRAWCPP_FLAGS         = \"$(RAWCPP_FLAGS)\"" >> $(CONFIG_HS)
 	@echo "cGCC                  = \"$(WhatGccIsCalled)\"" >> $(CONFIG_HS)
 	@echo "cMKDLL                = \"$(BLD_DLL)\"" >> $(CONFIG_HS)
-	@echo "cGHC_DRIVER_DIR       = \"$(GHC_DRIVER_DIR)\"" >> $(CONFIG_HS)
-	@echo "cGHC_TOUCHY           = \"$(GHC_TOUCHY)\"" >> $(CONFIG_HS)
-	@echo "cGHC_TOUCHY_DIR       = \"$(GHC_TOUCHY_DIR)\"" >> $(CONFIG_HS)
-	@echo "cGHC_UNLIT            = \"$(GHC_UNLIT)\"" >> $(CONFIG_HS)
-	@echo "cGHC_UNLIT_DIR        = \"$(GHC_UNLIT_DIR)\"" >> $(CONFIG_HS)
-	@echo "cGHC_MANGLER          = \"$(GHC_MANGLER)\"" >> $(CONFIG_HS)
-	@echo "cGHC_MANGLER_DIR      = \"$(GHC_MANGLER_DIR)\"" >> $(CONFIG_HS)
-	@echo "cGHC_SPLIT            = \"$(GHC_SPLIT)\"" >> $(CONFIG_HS)
-	@echo "cGHC_SPLIT_DIR        = \"$(GHC_SPLIT_DIR)\"" >> $(CONFIG_HS)
-	@echo "cGHC_SYSMAN           = \"$(GHC_SYSMAN)\"" >> $(CONFIG_HS)
-	@echo "cGHC_SYSMAN_DIR       = \"$(GHC_SYSMAN_DIR)\"" >> $(CONFIG_HS)
+	@echo "cPROJECT_DIR          = \"$(PROJECT_DIR)\"" >> $(CONFIG_HS)
+	@echo "cGHC_DRIVER_DIR_REL   = \"$(GHC_DRIVER_DIR_REL)\"" >> $(CONFIG_HS)
+	@echo "cGHC_TOUCHY_PGM       = \"$(GHC_TOUCHY_PGM)\"" >> $(CONFIG_HS)
+	@echo "cGHC_TOUCHY_DIR_REL   = \"$(GHC_TOUCHY_DIR_REL)\"" >> $(CONFIG_HS)
+	@echo "cGHC_UNLIT_PGM        = \"$(GHC_UNLIT_PGM)\"" >> $(CONFIG_HS)
+	@echo "cGHC_UNLIT_DIR_REL    = \"$(GHC_UNLIT_DIR_REL)\"" >> $(CONFIG_HS)
+	@echo "cGHC_MANGLER_PGM      = \"$(GHC_MANGLER_PGM)\"" >> $(CONFIG_HS)
+	@echo "cGHC_MANGLER_DIR_REL  = \"$(GHC_MANGLER_DIR_REL)\"" >> $(CONFIG_HS)
+	@echo "cGHC_SPLIT_PGM        = \"$(GHC_SPLIT_PGM)\"" >> $(CONFIG_HS)
+	@echo "cGHC_SPLIT_DIR_REL    = \"$(GHC_SPLIT_DIR_REL)\"" >> $(CONFIG_HS)
+	@echo "cGHC_SYSMAN_PGM       = \"$(GHC_SYSMAN)\"" >> $(CONFIG_HS)
+	@echo "cGHC_SYSMAN_DIR_REL   = \"$(GHC_SYSMAN_DIR)\"" >> $(CONFIG_HS)
 	@echo "cGHC_CP               = \"$(GHC_CP)\"" >> $(CONFIG_HS)
 	@echo "cGHC_PERL             = \"$(GHC_PERL)\"" >> $(CONFIG_HS)
 ifeq ($(GhcWithIlx),YES)

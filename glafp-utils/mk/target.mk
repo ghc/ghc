@@ -1,7 +1,9 @@
 # -----------------------------------------------------------------------------
-# $Id: target.mk,v 1.1 2000/04/27 10:44:02 simonmar Exp $
+# $Id: target.mk,v 1.2 2002/02/12 15:17:24 simonmar Exp $
 #
 # (c) The GHC Team 2000
 # 
 
-include $(FPTOOLS_TOP)/mk/target.mk
+TOP:=$(TOP)/..
+include $(TOP)/mk/target.mk
+TOP:=$(GLAFP_UTILS_TOP)

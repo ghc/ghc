@@ -86,10 +86,10 @@ import Array		( array, (//) )
 import FastTypes
 import GlaExts		( indexArray# )
 
-#if __GLASGOW_HASKELL__ < 301
-import ArrBase	( Array(..) )
-#else
+#if __GLASGOW_HASKELL__ < 503
 import PrelArr  ( Array(..) )
+#else
+import GHC.Arr  ( Array(..) )
 #endif
 
 infixr 0  `thenSmpl`, `thenSmpl_`

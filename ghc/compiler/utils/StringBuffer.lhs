@@ -78,26 +78,34 @@ import Addr		( Addr(..) )
 import Ptr		( Ptr(..) )
 #endif
 
-#if __GLASGOW_HASKELL__ >= 501
+#if __GLASGOW_HASKELL__  < 501
+import Char		( chr )
+#elif __GLASGOW_HASKELL__ < 503
 import PrelIO		( hGetcBuffered )
 #else
-import Char		( chr )
+import GHC.IO		( hGetcBuffered )
 #endif
+
+import PrimPacked
+import FastString
 
 import GlaExts
 import Foreign
-
-import IO		( openFile  )
+import IO		( openFile, isEOFError )
 import IOExts		( slurpFile )
+import Addr
+import Exception	( bracket )
+
+import CString		( unpackCStringBA )
+
+#if __GLASGOW_HASKELL__ < 503
 import PrelIOBase
 import PrelHandle
-import Addr
+#else
+import GHC.IOBase
+import GHC.Handle
+#endif
 
-import PrelPack		( unpackCStringBA )
-
-import Exception	( bracket )
-import PrimPacked
-import FastString
 import Char 		( isDigit )
 \end{code} 
 

@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.112 2002/01/28 13:34:10 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.113 2002/02/12 15:17:15 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -67,7 +67,8 @@ import IO
 import Char
 import Monad
 
-import PrelGHC 		( unsafeCoerce# )
+import GlaExts		( unsafeCoerce# )
+
 import Foreign		( nullPtr )
 import CString		( peekCString )
 
@@ -271,7 +272,7 @@ interactiveLoop is_tty = do
 
 checkPerms :: String -> IO Bool
 checkPerms name =
-  handle (\_ -> return False) $ do
+  DriverUtil.handle (\_ -> return False) $ do
 #ifdef mingw32_TARGET_OS
      doesFileExist name
 #else

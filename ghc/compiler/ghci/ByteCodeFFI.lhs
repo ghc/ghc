@@ -15,13 +15,12 @@ import ForeignCall	( CCallConv(..) )
 -- DON'T remove apparently unused imports here .. there is ifdeffery
 -- below
 import Bits		( Bits(..), shiftR, shiftL )
+import Foreign		( newArray )
 
 import Word		( Word8, Word32 )
-import Addr		( Addr(..), writeWord8OffAddr )
 import Foreign		( Ptr(..), mallocBytes )
 import IOExts		( trace, unsafePerformIO )
 import IO		( hPutStrLn, stderr )
-
 \end{code}
 
 %************************************************************************
@@ -49,15 +48,6 @@ sizeOfTagW :: PrimRep -> Int
 sizeOfTagW pr
    | isFollowableRep pr = 0
    | otherwise          = 1
-
--- Blast a bunch of bytes into malloc'd memory and return the addr.
-sendBytesToMallocville :: [Word8] -> IO Addr
-sendBytesToMallocville bytes
-   = do let n = length bytes
-        (Ptr a#) <- mallocBytes n
-        mapM ( \(off,byte) -> writeWord8OffAddr (A# a#) off byte )
-             (zip [0 ..] bytes)
-        return (A# a#)
 \end{code}
 
 %************************************************************************
@@ -103,11 +93,11 @@ we don't clear our own (single) arg off the C stack.
 -}
 mkMarshalCode :: CCallConv
               -> (Int, PrimRep) -> Int -> [(Int, PrimRep)] 
-              -> IO Addr
+              -> IO (Ptr Word8)
 mkMarshalCode cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
    = let bytes = mkMarshalCode_wrk cconv (r_offW, r_rep) 
                                    addr_offW arg_offs_n_reps
-     in  sendBytesToMallocville bytes
+     in  Foreign.newArray bytes
 
 
 

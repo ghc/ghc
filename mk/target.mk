@@ -40,6 +40,11 @@
 PRE_SRCS := $(ALL_SRCS)
 
 ##################################################################
+# Include package building machinery
+
+include $(TOP)/mk/package.mk
+
+##################################################################
 # 		FPtools standard targets
 #
 # depend:
@@ -242,74 +247,6 @@ $(C_PROG) :: $(C_OBJS)
 	$(CC) -o $@ $(CC_OPTS) $(LD_OPTS) $(C_OBJS) $(LIBS)
 endif
 
-
-#----------------------------------------
-#	Building HsLibs libraries.
-#
-# Inputs:
-#   $(PACKAGE) is the name of the library to build
-#   $(IS_CBITS_LIB) should be "YES" for a "cbits" library
-#
-# Outputs:
-#   $(LIBRARY)		the name of the library.a
-#   $(GHIC_LIBRARY)	the name of the library.o (for GHCi)
-#   $(LIBOBJS)		objects to put in library
-#   $(STUBOBJS)		more objects to put in library
-# 
-# $(LIBOBJS) is set to $(HS_OBJS) or $(C_OBJS) depending
-# on whether or not it's a "cbits" library.  But you can
-# override this by setting $(LIBOBJS) yourself
-
-ifneq "$(PACKAGE)" ""
-
-# add syslib dependencies and current package name
-
-# HACK!!! The conditional below is needed because we pass $(HC_OPTS)
-# directly to mkdependC and sometimes the C compiler in ghc/rts. Todo.
-ifneq "$(PACKAGE)" "rts"
-SRC_HC_OPTS += -package-name $(PACKAGE)
-endif
-
-SRC_HC_OPTS += $(patsubst %, -package %, $(PACKAGE_DEPS))
-
-ifeq "$(IS_CBITS_LIB)" "YES"
-_cbits := _cbits
-STUBOBJS += $(HSC_C_OBJS)
-# Add _hsc.c files to the cbits library
-C_SRCS += $(wildcard ../*_hsc.c)
-# Make .hsc.h include files from the directory above visible
-# (and the cbits/ library too).
-SRC_CC_OPTS += -I.. -I.
-SRC_HSC2HS_OPTS += -I.. -I.
-endif
-
-ifneq "$(way)" "i"
-LIBRARY      = libHS$(PACKAGE)$(_cbits)$(_way).a
-GHCI_LIBRARY = HS$(PACKAGE)$(_cbits)$(_way).o
-else
-LIBRARY      = $(PACKAGE).dll
-endif
-
-ifneq "$(IS_CBITS_LIB)" "YES"
-WAYS=$(GhcLibWays)
-endif
-
-ifeq "$(LIBOBJS)" ""
-  ifeq "$(IS_CBITS_LIB)" "YES"
-  LIBOBJS = $(C_OBJS)
-  else
-  LIBOBJS = $(HS_OBJS)
-  endif
-endif
-
-ifeq "$(IS_CBITS_LIB)" "YES"
-override datadir:=$(libdir)/include
-else
-SRC_CC_OPTS += -Icbits
-endif
-
-endif # PACKAGE
-
 #----------------------------------------
 #	Libraries/archives
 #
@@ -420,51 +357,9 @@ SRC_HC_POST_OPTS += \
 endif # SplitObjs
 endif # StripLibraries
 
-$(LIBRARY) :: $(STUBOBJS) $(LIBOBJS)
+$(LIBRARY) : $(STUBOBJS) $(LIBOBJS)
 	$(BUILD_LIB)
 endif # LIBRARY = ""
-
-#--------------------------------------------------------------
-#	Build dynamically-linkable libraries for GHCi
-#
-# Build $(GHCI_LIBRARY) from $(LIBOBJS)+$(STUBOBJS)
-#
-# Why?  GHCi can only link .o files (at the moment), not .a files
-# so we have to build libFoo.o as well as libFoo.a
-#
-# Furthermore, GHCi currently never loads 
-# profiling libraries (or other non-std ways)
-#
-# Inputs:
-#   $(GHCI_LIBRARY)
-#
-# Outputs:
-#   Rule to build $(GHCI_LIBRARY)
-
-
-ifneq "$(GHCI_LIBRARY)" ""
-ifeq "$(way)" ""
-ifeq "$(GhcWithInterpreter)" "YES"
-
-
-INSTALL_LIBS += $(GHCI_LIBRARY)
-CLEAN_FILES += $(GHCI_LIBRARY)
-
-all :: $(GHCI_LIBRARY)
-
-ifneq "$(DONT_WANT_STD_GHCI_LIB_RULE)" "YES"
-# If you don't want to build GHCI_LIBRARY the 'standard' way,
-# set DONT_WANT_STD_GHCI_LIB_RULE to YES. The Prelude and
-# hslibs/Win32 uses this 'feature'.
-#
-$(GHCI_LIBRARY) :: $(LIBOBJS)
-	$(LD) -r $(LD_X) -o $@ $(LIBOBJS) $(STUBOBJS)
-
-endif # DONT_WANT_STD_GHCI_LIB_RULE
-endif # GhcWithInterpreter
-endif # way
-endif # GHCI_LIBRARY != ""
-
 
 #----------------------------------------
 #	Building Win32 DLLs
@@ -777,6 +672,7 @@ install-dirs ::
 #install:: install-dirs
 
 # Install libraries automatically
+# ToDo: this is a bit magical, maybe do this for packages only? --SDM
 ifneq "$(LIBRARY)" ""
 INSTALL_LIBS  += $(LIBRARY)
 ifeq "$(DLLized)" "YES"
@@ -1165,7 +1061,7 @@ endif
 # 		Recursive stuff
 #
 # This was once at the top of the file, allegedly because it was
-# needed for some targets, e.g. when building DLLs in hslibs.  But
+# needed for some targets, e.g. when building DLLs in libraries.  But
 # since this reason is a little short on information, and I'm having
 # trouble with subdirectory builds happening before the current
 # directory when building hslibs (bad interaction with including

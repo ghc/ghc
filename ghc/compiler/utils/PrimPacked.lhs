@@ -38,16 +38,10 @@ import Addr	( Addr(..) )
 import ST
 import Foreign
 
-#if __GLASGOW_HASKELL__ < 301
-import ArrBase  	( StateAndMutableByteArray#(..), 
-			  StateAndByteArray#(..) )
-import STBase
-#elif __GLASGOW_HASKELL__ < 400
-import PrelArr  	( StateAndMutableByteArray#(..), 
-			  StateAndByteArray#(..) )
+#if __GLASGOW_HASKELL__ < 503
 import PrelST
 #else
-import PrelST
+import GHC.ST
 #endif
 
 \end{code} 
@@ -117,11 +111,7 @@ addrOffset# a# i# =
     A# a -> a
 
 copySubStrBA :: ByteArray Int -> Int -> Int -> ByteArray Int
-#if __GLASGOW_HASKELL__ >= 405
 copySubStrBA (ByteArray _ _ barr#) (I# start#) len@(I# length#) =
-#else
-copySubStrBA (ByteArray _ barr#) (I# start#) len@(I# length#) =
-#endif
  runST (
   {- allocate an array that will hold the string
     (not forgetting the NUL at the end)
@@ -153,13 +143,7 @@ write_ps_array	:: MutableByteArray s Int -> Int# -> Char# -> ST s ()
 freeze_ps_array :: MutableByteArray s Int -> Int# -> ST s (ByteArray Int)
 
 new_ps_array size = ST $ \ s ->
-#if __GLASGOW_HASKELL__ < 400
-    case (newCharArray# size s)	  of { StateAndMutableByteArray# s2# barr# ->
-    STret s2# (MutableByteArray bot barr#) }
-#elif __GLASGOW_HASKELL__ < 405
-    case (newCharArray# size s)	  of { (# s2#, barr# #) ->
-    (# s2#, MutableByteArray bot barr# #) }
-#elif __GLASGOW_HASKELL__ < 411
+#if __GLASGOW_HASKELL__ < 411
     case (newCharArray# size s)	  of { (# s2#, barr# #) ->
     (# s2#, MutableByteArray bot bot barr# #) }
 #else /* 411 and higher */
@@ -169,34 +153,14 @@ new_ps_array size = ST $ \ s ->
   where
     bot = error "new_ps_array"
 
-#if __GLASGOW_HASKELL__ < 400
-write_ps_array (MutableByteArray _ barr#) n ch = ST $ \ s# ->
-    case writeCharArray# barr# n ch s#	of { s2#   ->
-    STret s2# () }
-#elif __GLASGOW_HASKELL__ < 405
-write_ps_array (MutableByteArray _ barr#) n ch = ST $ \ s# ->
-    case writeCharArray# barr# n ch s#	of { s2#   ->
-    (# s2#, () #) }
-#else
 write_ps_array (MutableByteArray _ _ barr#) n ch = ST $ \ s# ->
     case writeCharArray# barr# n ch s#	of { s2#   ->
     (# s2#, () #) }
-#endif
 
 -- same as unsafeFreezeByteArray
-#if __GLASGOW_HASKELL__ < 400
-freeze_ps_array (MutableByteArray _ arr#) len# = ST $ \ s# ->
-    case unsafeFreezeByteArray# arr# s# of { StateAndByteArray# s2# frozen# ->
-    STret s2# (ByteArray (0,I# len#) frozen#) }
-#elif __GLASGOW_HASKELL__ < 405
-freeze_ps_array (MutableByteArray _ arr#) len# = ST $ \ s# ->
-    case unsafeFreezeByteArray# arr# s# of { (# s2#, frozen# #) ->
-    (# s2#, ByteArray (0,I# len#) frozen# #) }
-#else
 freeze_ps_array (MutableByteArray _ _ arr#) len# = ST $ \ s# ->
     case unsafeFreezeByteArray# arr# s# of { (# s2#, frozen# #) ->
     (# s2#, ByteArray 0 (I# len#) frozen# #) }
-#endif
 \end{code}
 
 
@@ -206,18 +170,10 @@ Compare two equal-length strings for equality:
 eqStrPrefix :: Addr# -> ByteArray# -> Int# -> Bool
 eqStrPrefix a# barr# len# = 
   unsafePerformIO (
-#if __GLASGOW_HASKELL__ < 405
-   _ccall_ strncmp (A# a#) (ByteArray bot barr#) (I# len#) >>= \ (I# x#) ->
-#else
    _ccall_ strncmp (A# a#) (ByteArray bot bot barr#) (I# len#) >>= \ (I# x#) ->
-#endif
    return (x# ==# 0#))
   where
-#if __GLASGOW_HASKELL__ < 405
-   bot :: (Int,Int)
-#else
    bot :: Int
-#endif
    bot = error "eqStrPrefix"
 
 eqCharStrPrefix :: Addr# -> Addr# -> Int# -> Bool
@@ -230,45 +186,25 @@ eqStrPrefixBA :: ByteArray# -> ByteArray# -> Int# -> Int# -> Bool
 eqStrPrefixBA b1# b2# start# len# = 
   unsafePerformIO (
    _casm_ ``%r=(int)strncmp((char *)%0+(int)%1,%2,%3); '' 
-#if __GLASGOW_HASKELL__ < 405
-	  (ByteArray bot b2#)
-#else
 	  (ByteArray bot bot b2#) 
-#endif 
 	  (I# start#) 
-#if __GLASGOW_HASKELL__ < 405
-          (ByteArray bot b1#) 
-#else
           (ByteArray bot bot b1#) 
-#endif
           (I# len#)                  >>= \ (I# x#) ->
    return (x# ==# 0#))
   where
-#if __GLASGOW_HASKELL__ < 405
-   bot :: (Int,Int)
-#else
    bot :: Int
-#endif
    bot = error "eqStrPrefixBA"
 
 eqCharStrPrefixBA :: Addr# -> ByteArray# -> Int# -> Int# -> Bool
 eqCharStrPrefixBA a# b2# start# len# = 
   unsafePerformIO (
    _casm_ ``%r=(int)strncmp((char *)%0+(int)%1,%2,%3); '' 
-#if __GLASGOW_HASKELL__ < 405
-	  (ByteArray bot b2#) 
-#else
 	  (ByteArray bot bot b2#) 
-#endif
 	  (I# start#) 
           (A# a#)
           (I# len#)                  >>= \ (I# x#) ->
    return (x# ==# 0#))
   where
-#if __GLASGOW_HASKELL__ < 405
-   bot :: (Int,Int)
-#else
    bot :: Int
-#endif
    bot = error "eqCharStrPrefixBA"
 \end{code}

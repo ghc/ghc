@@ -15,7 +15,7 @@ module Ctype
 \begin{code}
 import Bits	( Bits((.&.)) )
 import Int	( Int32 )
-import PrelBase ( Char#, Char(..) )
+import GlaExts  ( Char#, Char(..) )
 \end{code}
 
 Bit masks

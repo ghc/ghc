@@ -1,0 +1,3 @@
+__interface StixPrim 1 0 where
+__export StixPrim amodeToStix;
+1 amodeToStix :: AbsCSyn.CAddrMode -> Stix.StixExpr ;

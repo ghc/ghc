@@ -249,15 +249,15 @@ gen_latex_doc (Info defaults entries)
 	   latex_encode (c:cs) = c:(latex_encode cs)
 
 gen_wrappers (Info defaults entries)
-   = "module PrelPrimopWrappers where\n" 
-     ++ "import qualified PrelGHC\n" 
+   = "module GHC.PrimopWrappers where\n" 
+     ++ "import qualified GHC.Prim\n" 
      ++ unlines (map f (filter (not.dodgy) (filter is_primop entries)))
      where
         f spec = let args = map (\n -> "a" ++ show n) [1 .. arity (ty spec)]
                      src_name = wrap (name spec)
                  in "{-# NOINLINE " ++ src_name ++ " #-}\n" ++ 
                     src_name ++ " " ++ unwords args 
-                     ++ " = (PrelGHC." ++ name spec ++ ") " ++ unwords args
+                     ++ " = (GHC.Prim." ++ name spec ++ ") " ++ unwords args
         wrap nm | isLower (head nm) = nm
                 | otherwise = "(" ++ nm ++ ")"
 

@@ -118,7 +118,6 @@ knownKeyNames
 	numClassName,			-- mentioned, numeric
 	enumClassName,			-- derivable
 	monadClassName,
-    	monadPlusClassName,
     	functorClassName,
 	showClassName,			-- derivable
 	realClassName,			-- numeric
@@ -233,35 +232,35 @@ knownKeyNames
 
 \begin{code}
 pRELUDE_Name      = mkModuleName "Prelude"
-pREL_GHC_Name     = mkModuleName "PrelGHC"	   -- Primitive types and values
-pREL_BASE_Name    = mkModuleName "PrelBase"
-pREL_ENUM_Name    = mkModuleName "PrelEnum"
-pREL_SHOW_Name    = mkModuleName "PrelShow"
-pREL_READ_Name    = mkModuleName "PrelRead"
-pREL_NUM_Name     = mkModuleName "PrelNum"
-pREL_LIST_Name    = mkModuleName "PrelList"
-pREL_PARR_Name    = mkModuleName "PrelPArr"
-pREL_TUP_Name     = mkModuleName "PrelTup"
-pREL_PACK_Name    = mkModuleName "PrelPack"
-pREL_CONC_Name    = mkModuleName "PrelConc"
-pREL_IO_BASE_Name = mkModuleName "PrelIOBase"
-pREL_IO_Name	  = mkModuleName "PrelIO"
-pREL_ST_Name	  = mkModuleName "PrelST"
-pREL_ARR_Name     = mkModuleName "PrelArr"
+pREL_GHC_Name     = mkModuleName "GHC.Prim"	   -- Primitive types and values
+pREL_BASE_Name    = mkModuleName "GHC.Base"
+pREL_ENUM_Name    = mkModuleName "GHC.Enum"
+pREL_SHOW_Name    = mkModuleName "GHC.Show"
+pREL_READ_Name    = mkModuleName "GHC.Read"
+pREL_NUM_Name     = mkModuleName "GHC.Num"
+pREL_LIST_Name    = mkModuleName "GHC.List"
+pREL_PARR_Name    = mkModuleName "GHC.PArr"
+pREL_TUP_Name     = mkModuleName "Data.Tuple"
+pREL_PACK_Name    = mkModuleName "GHC.Pack"
+pREL_CONC_Name    = mkModuleName "GHC.Conc"
+pREL_IO_BASE_Name = mkModuleName "GHC.IOBase"
+pREL_IO_Name	  = mkModuleName "GHC.IO"
+pREL_ST_Name	  = mkModuleName "GHC.ST"
+pREL_ARR_Name     = mkModuleName "GHC.Arr"
 pREL_BYTEARR_Name = mkModuleName "PrelByteArr"
-pREL_FOREIGN_Name = mkModuleName "PrelForeign"
-pREL_STABLE_Name  = mkModuleName "PrelStable"
-pREL_SPLIT_Name   = mkModuleName "PrelSplit"
-pREL_ADDR_Name    = mkModuleName "PrelAddr"
-pREL_PTR_Name     = mkModuleName "PrelPtr"
-pREL_ERR_Name     = mkModuleName "PrelErr"
-pREL_REAL_Name    = mkModuleName "PrelReal"
-pREL_FLOAT_Name   = mkModuleName "PrelFloat"
-pREL_TOP_HANDLER_Name = mkModuleName "PrelTopHandler"
+fOREIGN_PTR_Name  = mkModuleName "Foreign.ForeignPtr"
+pREL_STABLE_Name  = mkModuleName "GHC.Stable"
+pREL_SPLIT_Name   = mkModuleName "GHC.Split"
+pREL_ADDR_Name    = mkModuleName "GHC.Addr"
+pREL_PTR_Name     = mkModuleName "GHC.Ptr"
+pREL_ERR_Name     = mkModuleName "GHC.Err"
+pREL_REAL_Name    = mkModuleName "GHC.Real"
+pREL_FLOAT_Name   = mkModuleName "GHC.Float"
+pREL_TOP_HANDLER_Name = mkModuleName "GHC.TopHandler"
 
 mAIN_Name	  = mkModuleName "Main"
-pREL_INT_Name	  = mkModuleName "PrelInt"
-pREL_WORD_Name	  = mkModuleName "PrelWord"
+pREL_INT_Name	  = mkModuleName "GHC.Int"
+pREL_WORD_Name	  = mkModuleName "GHC.Word"
 
 fOREIGNOBJ_Name	  = mkModuleName "ForeignObj"
 aDDR_Name	  = mkModuleName "Addr"
@@ -442,7 +441,6 @@ geName		  = varQual  pREL_BASE_Name SLIT(">=") geClassOpKey
 
 -- Class Monad
 monadClassName	   = clsQual pREL_BASE_Name SLIT("Monad") monadClassKey
-monadPlusClassName = clsQual pREL_BASE_Name SLIT("MonadPlus") monadPlusClassKey
 thenMName	   = varQual pREL_BASE_Name SLIT(">>=") thenMClassOpKey
 returnMName	   = varQual pREL_BASE_Name SLIT("return") returnMClassOpKey
 failMName	   = varQual pREL_BASE_Name SLIT("fail") failMClassOpKey
@@ -566,8 +564,8 @@ mutableByteArrayTyConName = tcQual pREL_BYTEARR_Name  SLIT("MutableByteArray") m
 -- Foreign objects and weak pointers
 foreignObjTyConName   = tcQual   fOREIGNOBJ_Name SLIT("ForeignObj") foreignObjTyConKey
 foreignObjDataConName = dataQual fOREIGNOBJ_Name SLIT("ForeignObj") foreignObjDataConKey
-foreignPtrTyConName   = tcQual   pREL_FOREIGN_Name SLIT("ForeignPtr") foreignPtrTyConKey
-foreignPtrDataConName = dataQual pREL_FOREIGN_Name SLIT("ForeignPtr") foreignPtrDataConKey
+foreignPtrTyConName   = tcQual   fOREIGN_PTR_Name SLIT("ForeignPtr") foreignPtrTyConKey
+foreignPtrDataConName = dataQual fOREIGN_PTR_Name SLIT("ForeignPtr") foreignPtrDataConKey
 stablePtrTyConName    = tcQual   pREL_STABLE_Name SLIT("StablePtr") stablePtrTyConKey
 stablePtrDataConName  = dataQual pREL_STABLE_Name SLIT("StablePtr") stablePtrDataConKey
 deRefStablePtrName    = varQual  pREL_STABLE_Name SLIT("deRefStablePtr") deRefStablePtrIdKey
@@ -737,7 +735,6 @@ floatingClassKey	= mkPreludeClassUnique 5
 fractionalClassKey	= mkPreludeClassUnique 6 
 integralClassKey	= mkPreludeClassUnique 7 
 monadClassKey		= mkPreludeClassUnique 8 
-monadPlusClassKey	= mkPreludeClassUnique 9
 functorClassKey		= mkPreludeClassUnique 10
 numClassKey		= mkPreludeClassUnique 11
 ordClassKey		= mkPreludeClassUnique 12
@@ -746,7 +743,7 @@ realClassKey		= mkPreludeClassUnique 14
 realFloatClassKey	= mkPreludeClassUnique 15
 realFracClassKey	= mkPreludeClassUnique 16
 showClassKey		= mkPreludeClassUnique 17
-					       
+
 cCallableClassKey	= mkPreludeClassUnique 18
 cReturnableClassKey	= mkPreludeClassUnique 19
 

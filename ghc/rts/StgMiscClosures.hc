@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.72 2002/01/22 13:54:23 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.73 2002/02/12 15:17:22 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -923,8 +923,8 @@ static INFO_TBL_CONST StgInfoTable izh_static_info;
 #define Char_hash_static_info czh_static_info
 #define Int_hash_static_info izh_static_info
 #else
-#define Char_hash_static_info PrelBase_Czh_static_info
-#define Int_hash_static_info PrelBase_Izh_static_info
+#define Char_hash_static_info GHCziBase_Czh_static_info
+#define Int_hash_static_info GHCziBase_Izh_static_info
 #endif
 
 #define CHARLIKE_HDR(n)						\

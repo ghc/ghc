@@ -89,7 +89,11 @@ import MarshalArray
 -- use the line below when we can be sure of compiling with GHC >=
 -- 5.02, and remove the implementation of rawSystem at the end of this
 -- file
+#if __GLASGOW_HASKELL__ >= 503
+import GHC.IOBase
+#else
 import PrelIOBase -- this can be removed when SystemExts is used
+#endif
 import CError     ( throwErrnoIfMinus1 ) -- as can this
 -- import SystemExts       ( rawSystem )
 #else
@@ -141,9 +145,9 @@ Config.hs contains two sorts of things
   etc		They do *not* include paths
 				
 
-  cUNLIT_DIR	The *path* to the directory containing unlit, split etc
-  cSPLIT_DIR	*relative* to the root of the build tree,
-		for use when running *in-place* in a build tree (only)
+  cUNLIT_DIR_REL   The *path* to the directory containing unlit, split etc
+  cSPLIT_DIR_REL   *relative* to the root of the build tree,
+		   for use when running *in-place* in a build tree (only)
 		
 
 
@@ -238,30 +242,31 @@ initSysTools minusB_args
 	; let installed, installed_bin :: FilePath -> FilePath
               installed_bin pgm   =  pgmPath top_dir pgm
 	      installed     file  =  pgmPath top_dir file
-	      inplace dir   pgm   =  pgmPath (top_dir `slash` dir) pgm
+	      inplace dir   pgm   =  pgmPath (top_dir `slash` 
+						cPROJECT_DIR `slash` dir) pgm
 
 	; let pkgconfig_path
 		| am_installed = installed "package.conf"
-		| otherwise    = inplace cGHC_DRIVER_DIR "package.conf.inplace"
+		| otherwise    = inplace cGHC_DRIVER_DIR_REL "package.conf.inplace"
 
 	      ghc_usage_msg_path
 		| am_installed = installed "ghc-usage.txt"
-		| otherwise    = inplace cGHC_DRIVER_DIR "ghc-usage.txt"
+		| otherwise    = inplace cGHC_DRIVER_DIR_REL "ghc-usage.txt"
 
 		-- For all systems, unlit, split, mangle are GHC utilities
 		-- architecture-specific stuff is done when building Config.hs
 	      unlit_path
-		| am_installed = installed_bin cGHC_UNLIT
-		| otherwise    = inplace cGHC_UNLIT_DIR cGHC_UNLIT
+		| am_installed = installed_bin cGHC_UNLIT_PGM
+		| otherwise    = inplace cGHC_UNLIT_DIR_REL cGHC_UNLIT_PGM
 
 		-- split and mangle are Perl scripts
 	      split_script
-		| am_installed = installed_bin cGHC_SPLIT
-		| otherwise    = inplace cGHC_SPLIT_DIR cGHC_SPLIT
+		| am_installed = installed_bin cGHC_SPLIT_PGM
+		| otherwise    = inplace cGHC_SPLIT_DIR_REL cGHC_SPLIT_PGM
 
 	      mangle_script
-		| am_installed = installed_bin cGHC_MANGLER
-		| otherwise    = inplace cGHC_MANGLER_DIR cGHC_MANGLER
+		| am_installed = installed_bin cGHC_MANGLER_PGM
+		| otherwise    = inplace cGHC_MANGLER_DIR_REL cGHC_MANGLER_PGM
 
 #ifndef mingw32_TARGET_OS
 	-- check whether TMPDIR is set in the environment
@@ -334,8 +339,8 @@ initSysTools minusB_args
 		        | otherwise    = cGHC_PERL
 
 	-- 'touch' is a GHC util for Windows, and similarly unlit, mangle
-	; let touch_path  | am_installed = installed_bin cGHC_TOUCHY
-		       	  | otherwise    = inplace cGHC_TOUCHY_DIR cGHC_TOUCHY
+	; let touch_path  | am_installed = installed_bin cGHC_TOUCHY_PGM
+		       	  | otherwise    = inplace cGHC_TOUCHY_DIR_REL cGHC_TOUCHY_PGM
 
 	-- On Win32 we don't want to rely on #!/bin/perl, so we prepend 
 	-- a call to Perl to get the invocation of split and mangle
@@ -349,7 +354,7 @@ initSysTools minusB_args
 	-- in the same place whether we are running "in-place" or "installed"
 	-- That place is wherever the build-time configure script found them.
 	; let   gcc_path   = cGCC
-		touch_path = cGHC_TOUCHY
+		touch_path = "touch"
 		mkdll_path = panic "Can't build DLLs on a non-Win32 system"
 
 	-- On Unix, scripts are invoked using the '#!' method.  Binary

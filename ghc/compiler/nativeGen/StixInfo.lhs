@@ -31,10 +31,6 @@ import Maybes		( maybeToBool )
 
 import Bits
 import Word
-
-#if __GLASGOW_HASKELL__ >= 404
-import GlaExts		( fromInt )
-#endif
 \end{code}
 
 Generating code for info tables (arrays of data).
@@ -64,11 +60,11 @@ genCodeInfoTable (CClosureInfoAndCode cl_info _ _ cl_descr)
 	-- ToDo: do this using .byte and .word directives.
 	type_info :: Word32
 #ifdef WORDS_BIGENDIAN
-        type_info = (fromInt closure_type `shiftL` 16) .|.
-		    (fromInt srt_len)
+        type_info = (fromIntegral closure_type `shiftL` 16) .|.
+		    (fromIntegral srt_len)
 #else 
-        type_info = (fromInt closure_type) .|.
-		    (fromInt srt_len `shiftL` 16)
+        type_info = (fromIntegral closure_type) .|.
+		    (fromIntegral srt_len `shiftL` 16)
 #endif	     
 	srt	  = closureSRT cl_info	     
         needs_srt = needsSRT srt
@@ -87,9 +83,9 @@ genCodeInfoTable (CClosureInfoAndCode cl_info _ _ cl_descr)
 
 	layout_info :: Word32
 #ifdef WORDS_BIGENDIAN
-	layout_info = (fromInt ptrs `shiftL` 16) .|. fromInt nptrs
+	layout_info = (fromIntegral ptrs `shiftL` 16) .|. fromIntegral nptrs
 #else 
-	layout_info = (fromInt ptrs) .|. (fromInt nptrs `shiftL` 16)
+	layout_info = (fromIntegral ptrs) .|. (fromIntegral nptrs `shiftL` 16)
 #endif	     
 
     	ptrs    = closurePtrsSize cl_info
@@ -133,11 +129,11 @@ genBitmapInfoTable liveness srt closure_type include_srt
 
 	type_info :: Word32
 #ifdef WORDS_BIGENDIAN
-        type_info = (fromInt closure_type `shiftL` 16) .|.
-		    (fromInt srt_len)
+        type_info = (fromIntegral closure_type `shiftL` 16) .|.
+		    (fromIntegral srt_len)
 #else 
-        type_info = (fromInt closure_type) .|.
-		    (fromInt srt_len `shiftL` 16)
+        type_info = (fromIntegral closure_type) .|.
+		    (fromIntegral srt_len `shiftL` 16)
 #endif	     
 
 	(srt_label,srt_len) = 
