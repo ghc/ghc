@@ -16,6 +16,7 @@ import Foreign	( Addr )
 import IOBase
 import IO
 import STBase
+import UnsafeST	( unsafePerformPrimIO )
 import Ratio
 
 \end{code}

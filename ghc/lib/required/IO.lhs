@@ -34,6 +34,7 @@ module IO (
 
 import Ix
 import STBase
+import UnsafeST		( unsafePerformPrimIO, unsafeInterleavePrimIO )
 import IOBase
 import ArrBase		( MutableByteArray(..), newCharArray )
 import IOHandle		-- much of the real stuff is in here

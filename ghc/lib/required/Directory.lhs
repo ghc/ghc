@@ -43,6 +43,7 @@ import PrelBase
 import Foreign
 import IOBase
 import STBase
+import UnsafeST		( unsafePerformPrimIO )
 import ArrBase
 import PackedString	( packCBytesST, unpackPS, psToByteArrayST )
 import Time             ( ClockTime(..) )

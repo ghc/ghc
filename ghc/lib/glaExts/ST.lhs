@@ -33,6 +33,7 @@ module ST (
 import IOBase	( error )	-- [Source not needed]
 import ArrBase
 import STBase
+import UnsafeST	( unsafeInterleaveST )
 import PrelBase	( Int, Bool, ($), ()(..) )
 import GHC	( newArray#, readArray#, writeArray#, sameMutableArray#, sameMutableByteArray# )
 import Monad

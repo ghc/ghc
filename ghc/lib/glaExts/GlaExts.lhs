@@ -61,6 +61,7 @@ module GlaExts
 
 import GHC
 import STBase
+import UnsafeST
 import PrelBase
 import ByteArray
 import MutableArray

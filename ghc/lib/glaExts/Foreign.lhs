@@ -14,7 +14,7 @@ module Foreign (
    ) where
 
 import STBase
--- import ArrBase
+import UnsafeST	( unsafePerformPrimIO )
 import PrelBase
 import GHC
 \end{code}

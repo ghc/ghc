@@ -29,6 +29,7 @@ import ST
 import IOBase
 import ArrBase
 import STBase
+import UnsafeST	( unsafePerformPrimIO )
 import ST
 import Ix
 import Foreign( Addr(..) )

@@ -78,6 +78,7 @@ import {-# SOURCE #-}	IOBase	( error )
 import Ix
 import PrelList
 import STBase
+import UnsafeST	( unsafePerformPrimIO )
 import ArrBase
 import PrelBase
 import Foreign	( Addr(..) )
