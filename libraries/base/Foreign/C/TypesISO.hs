@@ -17,11 +17,11 @@
 module Foreign.C.TypesISO
 	( -- Integral types, instances of: Eq, Ord, Num, Read, Show, Enum,
 	  -- Typeable, Storable, Bounded, Real, Integral, Bits
-	  CPtrdiff(..), CSize(..), CWchar(..), CSigAtomic(..)
+	  CPtrdiff, CSize, CWchar, CSigAtomic
 
 	  -- Numeric types, instances of: Eq, Ord, Num, Read, Show, Enum,
 	  -- Typeable, Storable
-	, CClock(..),   CTime(..)
+	, CClock,   CTime
 
           -- Instances of: Eq and Storable
 	, CFile,        CFpos,     CJmpBuf
@@ -29,12 +29,12 @@ module Foreign.C.TypesISO
 
 #ifdef __NHC__
 import NHC.FFI
-  ( CPtrdiff(..)
-  , CSize(..)
-  , CWchar(..)
-  , CSigAtomic(..)
-  , CClock(..)
-  , CTime(..)
+  ( CPtrdiff
+  , CSize
+  , CWchar
+  , CSigAtomic
+  , CClock
+  , CTime
   , CFile
   , CFpos
   , CJmpBuf

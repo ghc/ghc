@@ -19,11 +19,11 @@
 module System.Posix.Types (
 
   -- * POSIX data types
-  CDev(..), CIno(..), CMode(..), COff(..), CPid(..), CSsize(..),
+  CDev, CIno, CMode, COff, CPid, CSsize,
 
 #ifndef mingw32_TARGET_OS
-  CGid(..), CNlink(..), CUid(..), CCc(..), CSpeed(..),
-  CTcflag(..), CRLim(..),
+  CGid, CNlink, CUid, CCc, CSpeed,
+  CTcflag, CRLim,
 #endif
 
   Fd(..),
