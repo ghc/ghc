@@ -1,7 +1,5 @@
-{-# OPTIONS -cpp #-}
-
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.20 2001/02/13 16:11:27 rrt Exp $
+-- $Id: Main.hs,v 1.21 2001/02/13 17:40:37 qrczak Exp $
 --
 -- (originally "GlueHsc.hs" by Marcin 'Qrczak' Kowalczyk)
 --
@@ -12,8 +10,6 @@
 -- within structures, etc.
 --
 -- See the documentation in the Users' Guide for more details.
-
-#include "../../includes/config.h"
 
 import GetOpt
 import System        (getProgName, getArgs, ExitCode(..), exitWith, exitFailure)
@@ -256,15 +252,15 @@ output flags name toks = let
     removeFile progName
     
     when needsH $ writeFile outHName $
-        "#ifndef "++includeGuard++"\n\ 
-        \#define "++includeGuard++"\n\ 
-        \#if __GLASGOW_HASKELL__ && __GLASGOW_HASKELL__ < 409\n\ 
-        \#include <Rts.h>\n\ 
-        \#endif\n\ 
-        \#include <HsFFI.h>\n\ 
-        \#if __NHC__\n\ 
-        \#undef HsChar\n\ 
-        \#define HsChar int\n\ 
+        "#ifndef "++includeGuard++"\n\
+        \#define "++includeGuard++"\n\
+        \#if __GLASGOW_HASKELL__ && __GLASGOW_HASKELL__ < 409\n\
+        \#include <Rts.h>\n\
+        \#endif\n\
+        \#include <HsFFI.h>\n\
+        \#if __NHC__\n\
+        \#undef HsChar\n\
+        \#define HsChar int\n\
         \#endif\n"++
         concat ["#include "++n++"\n" | Include n <- flags]++
         concatMap outTokenH specials++
@@ -295,7 +291,7 @@ outHeaderCProg =
             (header, _:body) -> case break isSpace header of
                 (name, args) ->
                     outCLine pos++
-                    "#define hsc_"++name++"("++dropWhile isSpace args++") \ 
+                    "#define hsc_"++name++"("++dropWhile isSpace args++") \
                     \printf ("++joinLines body++");\n"
         _ -> ""
     where
@@ -303,9 +299,9 @@ outHeaderCProg =
 
 outHeaderHs :: [Flag] -> Maybe String -> [(SourcePos, String, String)] -> String
 outHeaderHs flags inH toks =
-    "#if __GLASGOW_HASKELL__ && __GLASGOW_HASKELL__ < 409\n\ 
-    \    printf (\"{-# OPTIONS -optc-D__GLASGOW_HASKELL__=%d #-}\\n\", \ 
-    \__GLASGOW_HASKELL__);\n\ 
+    "#if __GLASGOW_HASKELL__ && __GLASGOW_HASKELL__ < 409\n\
+    \    printf (\"{-# OPTIONS -optc-D__GLASGOW_HASKELL__=%d #-}\\n\", \
+    \__GLASGOW_HASKELL__);\n\
     \#endif\n"++
     includeH++
     concatMap outSpecial toks
@@ -367,11 +363,11 @@ outEnum arg =
                     (enum, rest) -> let
                         this = case break (== '=') $ dropWhile isSpace enum of
                             (name, []) ->
-                                "    hsc_enum ("++t++", "++f++", \ 
+                                "    hsc_enum ("++t++", "++f++", \
                                 \hsc_haskellize (\""++name++"\"), "++
                                 name++");\n"
                             (hsName, _:cName) ->
-                                "    hsc_enum ("++t++", "++f++", \ 
+                                "    hsc_enum ("++t++", "++f++", \
                                 \printf (\"%s\", \""++hsName++"\"), "++
                                 cName++");\n"
                         in this++enums rest
@@ -387,8 +383,8 @@ outTokenH (pos, key, arg) =
             's':'t':'r':'u':'c':'t':' ':_ -> arg++"\n"
             't':'y':'p':'e':'d':'e':'f':' ':_ -> arg++"\n"
             'i':'n':'l':'i':'n':'e':' ':_ ->
-                "#ifdef __GNUC__\n\ 
-                \extern\n\ 
+                "#ifdef __GNUC__\n\
+                \extern\n\
                 \#endif\n"++
                 arg++"\n"
             _ -> "extern "++header++";\n"
@@ -404,12 +400,12 @@ outTokenC (pos, key, arg) =
             't':'y':'p':'e':'d':'e':'f':' ':_ -> ""
             'i':'n':'l':'i':'n':'e':' ':_ ->
                 outCLine pos++
-                "#ifndef __GNUC__\n\ 
-                \extern\n\ 
+                "#ifndef __GNUC__\n\
+                \extern\n\
                 \#endif\n"++
                 header++
-                "\n#ifndef __GNUC__\n\ 
-                \;\n\ 
+                "\n#ifndef __GNUC__\n\
+                \;\n\
                 \#else\n"++
                 body++
                 "\n#endif\n"
