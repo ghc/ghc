@@ -28,7 +28,8 @@ import ForeignCall	( ForeignCall, CCallTarget(..) )
 
 import TcType		( Type, isUnLiftedType, mkFunTys, mkFunTy,
 			  tyVarsOfType, mkForAllTys, mkTyConApp, 
-			  isBoolTy, isUnitTy, isPrimitiveType
+			  isBoolTy, isUnitTy, isPrimitiveType,
+			  tcSplitTyConApp_maybe
 			)
 import Type		( splitTyConApp_maybe, repType, eqType )	-- Sees the representation type
 import PrimOp		( PrimOp(TouchOp) )
@@ -95,7 +96,7 @@ dsCCall :: CLabelString	-- C routine to invoke
 
 dsCCall lbl args may_gc is_asm result_ty
   = mapAndUnzipDs unboxArg args	`thenDs` \ (unboxed_args, arg_wrappers) ->
-    boxResult [] result_ty	`thenDs` \ (ccall_result_ty, res_wrapper) ->
+    boxResult [] ({-repType-} result_ty)	`thenDs` \ (ccall_result_ty, res_wrapper) ->
     getUniqueDs			`thenDs` \ uniq ->
     let
 	target | is_asm    = CasmTarget lbl
@@ -190,7 +191,7 @@ unboxArg arg
     (data_con_arg_ty1 : _)			= data_con_arg_tys
 
     (_ : _ : data_con_arg_ty3 : _) = data_con_arg_tys
-    maybe_arg3_tycon    	   = splitTyConApp_maybe data_con_arg_ty3
+    maybe_arg3_tycon    	   = tcSplitTyConApp_maybe data_con_arg_ty3
     Just (arg3_tycon,_)		   = maybe_arg3_tycon
 \end{code}
 
@@ -215,7 +216,7 @@ boxResult :: [Id] -> Type -> DsM (Type, CoreExpr -> CoreExpr)
 -- the call.  The arg_ids passed in are the Ids passed to the actual ccall.
 
 boxResult arg_ids result_ty
-  = case splitTyConApp_maybe result_ty of
+  = case tcSplitTyConApp_maybe result_ty of
 
 	-- The result is IO t, so wrap the result in an IO constructor
 	Just (io_tycon, [io_res_ty]) | io_tycon `hasKey` ioTyConKey
@@ -324,4 +325,5 @@ resultWrapper result_ty
   = pprPanic "resultWrapper" (ppr result_ty)
   where
     result_ty_rep = repType result_ty
+
 \end{code}
