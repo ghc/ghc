@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.25 2001/06/27 10:14:13 rrt Exp $
+-- $Id: DriverUtil.hs,v 1.26 2001/07/23 20:19:53 sof Exp $
 --
 -- Utils for the driver
 --
@@ -14,6 +14,7 @@ module DriverUtil where
 
 import Util
 import Panic
+import Config		( cLeadingUnderscore )
 
 import IOExts
 import Exception
@@ -64,6 +65,13 @@ softGetDirectoryContents d
 		          ("WARNING: error while reading directory " ++ d)
 		    return []
 	  )
+
+-----------------------------------------------------------------------------
+-- Prefixing underscore to linker-level names
+prefixUnderscore :: String -> String
+prefixUnderscore
+ | cLeadingUnderscore == "YES" = ('_':)
+ | otherwise                   = id
 
 -----------------------------------------------------------------------------
 -- Utils

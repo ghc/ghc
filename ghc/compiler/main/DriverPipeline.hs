@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.91 2001/07/19 14:23:16 rrt Exp $
+-- $Id: DriverPipeline.hs,v 1.92 2001/07/23 20:19:53 sof Exp $
 --
 -- GHC Driver
 --
@@ -806,8 +806,8 @@ doLink o_files = do
 			    [ "-u", "_PrelMain_mainIO_closure" ,
 			      "-u", "___init_PrelMain"] 
 #else
-			    [ "-u", "PrelMain_mainIO_closure" ,
-			      "-u", "__init_PrelMain"] 
+			    [ "-u", prefixUnderscore "PrelMain_mainIO_closure" ,
+			      "-u", prefixUnderscore "__init_PrelMain"] 
 #endif
 			 else [])
 
