@@ -18,6 +18,8 @@ module CoreUtils (
 
 import {-# SOURCE #-} CoreUnfold	( isEvaldUnfolding )
 
+import GlaExts		-- For `xori` 
+
 import CoreSyn
 import PprCore		( pprCoreExpr )
 import Var		( IdOrTyVar, isId, isTyVar )
@@ -400,19 +402,29 @@ eqExpr e1 e2
 
 \begin{code}
 hashExpr :: CoreExpr -> Int
-hashExpr (Note _ e)   		 = hashExpr e
-hashExpr (Let (NonRec b r) e)    = hashId b
-hashExpr (Let (Rec ((b,r):_)) e) = hashId b
-hashExpr (Case _ b _)		 = hashId b
-hashExpr (App f e)   		 = hashExpr f
-hashExpr (Var v)     		 = hashId v
-hashExpr (Con con args)   	 = hashArgs args (hashCon con)
-hashExpr (Lam b _)	         = hashId b
-hashExpr (Type t)	         = trace "hashExpr: type" 0		-- Shouldn't happen
+hashExpr e = abs (hash_expr e)
+	-- Negative numbers kill UniqFM
 
-hashArgs []		 con = con
-hashArgs (Type t : args) con = hashArgs args con
-hashArgs (arg    : args) con = hashExpr arg
+hash_expr (Note _ e)   		  = hash_expr e
+hash_expr (Let (NonRec b r) e)    = hashId b
+hash_expr (Let (Rec ((b,r):_)) e) = hashId b
+hash_expr (Case _ b _)		  = hashId b
+hash_expr (App f e)   		  = hash_expr f + fast_hash_expr e
+hash_expr (Var v)     		  = hashId v
+hash_expr (Con con args)   	  = foldr ((+) . fast_hash_expr) (hashCon con) args
+hash_expr (Lam b _)	          = hashId b
+hash_expr (Type t)	          = trace "hash_expr: type" 0		-- Shouldn't happen
+
+fast_hash_expr (Var v)     	= hashId v
+fast_hash_expr (Con con args) 	= fast_hash_args args con
+fast_hash_expr (App f (Type _)) = fast_hash_expr f
+fast_hash_expr (App f a)        = fast_hash_expr a
+fast_hash_expr (Lam b _)        = hashId b
+fast_hash_expr other	        = 0
+
+fast_hash_args []	       con = hashCon con
+fast_hash_args (Type t : args) con = fast_hash_args args con
+fast_hash_args (arg    : args) con = fast_hash_expr arg
 
 hashId :: Id -> Int
 hashId id = hashName (idName id)

@@ -7,7 +7,7 @@
 module Const (
 	Con(..),
 	conType, conPrimRep,
-	conOkForApp, conOkForAlt, isWHNFCon, isDataCon,
+	conOkForApp, conOkForAlt, isWHNFCon, isDataCon, isBoxedDataCon,
 	conIsTrivial, conIsCheap, conIsDupable, conStrictness, 
 	conOkForSpeculation, hashCon,
 
@@ -31,7 +31,9 @@ import Name		( hashName )
 import PrimOp		( PrimOp, primOpType, primOpIsDupable, primOpTag,
 			  primOpIsCheap, primOpStrictness, primOpOkForSpeculation )
 import PrimRep		( PrimRep(..) )
-import DataCon		( DataCon, dataConName, dataConType, dataConTyCon, isNullaryDataCon, dataConRepStrictness )
+import DataCon		( DataCon, dataConName, dataConType, dataConTyCon, 
+			  isNullaryDataCon, dataConRepStrictness, isUnboxedTupleCon
+			)
 import TyCon		( isNewTyCon )
 import Type		( Type, typePrimRep )
 import PprType		( pprParendType )
@@ -112,6 +114,9 @@ isWHNFCon (PrimOp _)   = False
 
 isDataCon (DataCon dc) = True
 isDataCon other	       = False
+
+isBoxedDataCon (DataCon dc) = not (isUnboxedTupleCon dc)
+isBoxedDataCon other	    = False
 
 -- conIsTrivial is true for constants we are unconditionally happy to duplicate
 -- cf CoreUtils.exprIsTrivial

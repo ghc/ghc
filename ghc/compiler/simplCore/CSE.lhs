@@ -13,8 +13,7 @@ module CSE (
 import CmdLineOpts	( opt_D_dump_cse, opt_D_verbose_core2core )
 import Id		( Id, idType )
 import CoreUtils	( hashExpr, cheapEqExpr, exprIsBig )
-import Const		( Con(..) )
-import DataCon		( isUnboxedTupleCon )
+import Const		( isBoxedDataCon )
 import Type		( splitTyConApp_maybe )
 import CoreSyn
 import VarEnv	
@@ -131,13 +130,15 @@ cseAlts env bndr alts
 		other		  -> pprPanic "cseAlts" (ppr bndr)
 
     cse_alt (con, args, rhs)
-	| ok_for_cse con = (con, args, cseExpr (extendCSEnv env bndr (Con con (arg_tys ++ (map varToCoreExpr args)))) rhs)
-	| otherwise      = (con, args, cseExpr env rhs)
-
-    ok_for_cse DEFAULT      = False
-    ok_for_cse (Literal l)  = True
-    ok_for_cse (DataCon dc) = not (isUnboxedTupleCon dc)
-	-- Unboxed tuples aren't shared
+	| null args || not (isBoxedDataCon con) = (con, args, cseExpr env rhs)
+		-- Don't try CSE if there are no args; it just increases the number
+		-- of live vars.  E.g.
+		--	case x of { True -> ....True.... }
+		-- Don't replace True by x!  
+		-- Hence the 'null args', which also deal with literals and DEFAULT
+		-- And we can't CSE on unboxed tuples
+	| otherwise
+	= (con, args, cseExpr (extendCSEnv env bndr (Con con (arg_tys ++ (map varToCoreExpr args)))) rhs)
 \end{code}
 
 
