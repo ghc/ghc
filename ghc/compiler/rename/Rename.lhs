@@ -764,8 +764,9 @@ reportUnusedNames mod_name direct_import_mods
 
 	-- unused_imp_mods are the directly-imported modules 
 	-- that are not mentioned in minimal_imports
-	unused_imp_mods = [m | m <- direct_import_mods, 
-				not (maybeToBool (lookupFM minimal_imports m))]
+	unused_imp_mods = [m | m <- direct_import_mods,
+			       not (maybeToBool (lookupFM minimal_imports m)),
+			       moduleName m /= pRELUDE_Name]
 
 	module_unused :: Name -> Bool
 	-- Name is imported from a module that's completely unused,
