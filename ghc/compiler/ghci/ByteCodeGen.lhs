@@ -30,7 +30,7 @@ import PrimRep		( getPrimRepSize, isFollowableRep )
 import Constants	( wORD_SIZE )
 
 import Monad		( foldM )
-import Foreign		( Addr, Word16, Word32, nullAddr )
+import Foreign		( Addr, Word16, Word32 )
 import ST		( runST )
 --import MutableArray	( readWord32Array,
 --			  newFloatArray, writeFloatArray,
@@ -82,7 +82,9 @@ data BCInstr
    | PUSH_AS   Name PrimRep	-- push alts and BCO_ptr_ret_info
 				-- PrimRep so we know which itbl
    -- Pushing literals
-   | PUSH_UBX  Literal	-- push this int/float/double, NO TAG, on the stack
+   | PUSH_UBX  Literal	Int 
+                        -- push this int/float/double, NO TAG, on the stack
+			-- Int is # of items in literal pool to push
    | PUSH_TAG  Int      -- push this tag on the stack
 
    | SLIDE     Int{-this many-} Int{-down by this much-}
@@ -469,11 +471,14 @@ pushAtom True d p (AnnLit lit)
 
 pushAtom False d p (AnnLit lit)
    = case lit of
-        MachInt i    -> (code, untaggedSizeW IntRep)
-        MachFloat r  -> (code, untaggedSizeW FloatRep)
-        MachDouble r -> (code, untaggedSizeW DoubleRep)
+        MachInt i    -> code IntRep
+        MachFloat r  -> code FloatRep
+        MachDouble r -> code DoubleRep
      where
-        code = unitOL (PUSH_UBX lit)
+        code rep
+           = let size_host_words = untaggedSizeW rep
+                 size_in_word32s = (size_host_words * wORD_SIZE) `div` 4
+             in (unitOL (PUSH_UBX lit size_in_word32s), size_host_words)
 
 pushAtom tagged d p (AnnApp f (_, AnnType _))
    = pushAtom tagged d p (snd f)
@@ -759,99 +764,105 @@ mkBits :: (Int -> Int) 			-- label finder
 
 mkBits findLabel st proto_insns
   = foldM doInstr st proto_insns
-  where
-   doInstr :: AsmState -> BCInstr -> IO AsmState
-   doInstr st i
-     = case i of
-        ARGCHECK  n        -> instr2 st i_ARGCHECK n
-{-
-        PUSH_L    o1       -> do { instr2 i_PUSH_L o1 }
-        PUSH_LL   o1 o2    -> do { instr3 i_PUSH_LL o1 o2 }
-        PUSH_LLL  o1 o2 o3 -> do { instr4 i_PUSH_LLL o1 o2 o3 }
-        PUSH_G    nm       -> do { p <- ptr nm; instr2 i_PUSH_G p }
-        PUSH_AS   nm pk    -> do { p <- ptr nm ; np <- ret_itbl pk; 
-                                   instr3 i_PUSH_AS p np }
-        PUSH_UBX  lit      -> do { np <- literal lit; instr2 i_PUSH_UBX np }
-        PUSH_TAG  tag      -> do { instr2 i_PUSH_TAG tag }
-        SLIDE     n by     -> do { instr3 i_SLIDE n by }
-        ALLOC     n        -> do { instr2 i_ALLOC n }
-        MKAP      off sz   -> do { instr3 i_MKAP off sz }
-        UNPACK    n        -> do { instr2 i_UNPACK n }
-        UPK_TAG   n m k    -> do { instr4 i_UPK_TAG n m k }
-        PACK      dcon sz  -> do { np <- itbl dcon; instr3 i_PACK np sz }
-        LABEL     lab      -> do { instr0 }
-        TESTLT_I  i l      -> do { np <- int i; instr3 i_TESTLT_I np (findLabel l) }
-        TESTRQ_I  i l      -> do { np <- int i; instr3 i_TESTEQ_I np (findLabel l) }
-        TESTLT_F  f l      -> do { np <- float f; instr3 i_TESTLT_F np (findLabel l) }
-        TESTEQ_F  f l      -> do { np <- float f; instr3 i_TESTEQ_F np (findLabel l) }
-        TESTLT_D  d l      -> do { np <- double d; instr3 i_TESTLT_D np (findLabel l) }
-        TESTEQ_D  d l      -> do { np <- double d; instr3 i_TESTEQ_D np (findLabel l) }
-        TESTLT_P  i l      -> do { np <- int i; instr3 i_TESTLT_P np (findLabel l) }
-        TESTEQ_P  i l      -> do { np <- int i; instr3 i_TESTEQ_P np (findLabel l) }
-        CASEFAIL           -> do { instr1 i_CASEFAIL }
-        ENTER              -> do { instr1 i_ENTER }
--}
-     where
-        instr2 (st_i0,st_l0,st_p0) i1 i2
-           = do st_i1 <- addToXIOUArray st_i0 (i2s i1)
-                st_i2 <- addToXIOUArray st_i1 (i2s i2)
-                return (st_i2,st_l0,st_p0)
+    where
+       doInstr :: AsmState -> BCInstr -> IO AsmState
+       doInstr st i
+          = case i of
+               ARGCHECK  n        -> instr2 st i_ARGCHECK n
+               PUSH_L    o1       -> instr2 st i_PUSH_L o1
+               PUSH_LL   o1 o2    -> instr3 st i_PUSH_LL o1 o2
+               PUSH_LLL  o1 o2 o3 -> instr4 st i_PUSH_LLL o1 o2 o3
+               PUSH_G    nm       -> do (p, st2) <- ptr st nm
+                                        instr2 st2 i_PUSH_G p
+               PUSH_AS   nm pk    -> do (p, st2)  <- ptr st nm
+                                        (np, st3) <- ret_itbl st2 pk
+                                        instr3 st3 i_PUSH_AS p np
+               PUSH_UBX lit nw32s -> do (np, st2) <- literal st lit
+                                        instr3 st2 i_PUSH_UBX np nw32s
+               PUSH_TAG  tag      -> instr2 st i_PUSH_TAG tag
+               SLIDE     n by     -> instr3 st i_SLIDE n by
+               ALLOC     n        -> instr2 st i_ALLOC n
+               MKAP      off sz   -> instr3 st i_MKAP off sz
+               UNPACK    n        -> instr2 st i_UNPACK n
+               UPK_TAG   n m k    -> instr4 st i_UPK_TAG n m k
+               PACK      dcon sz  -> do (np,st2) <- itbl st dcon
+                                        instr3 st2 i_PACK np sz
+               LABEL     lab      -> return st
+               TESTLT_I  i l      -> do (np, st2) <- int st i
+                                        instr3 st2 i_TESTLT_I np (findLabel l)
+               TESTEQ_I  i l      -> do (np, st2) <- int st i
+                                        instr3 st2 i_TESTEQ_I np (findLabel l)
+               TESTLT_F  f l      -> do (np, st2) <- float st f
+                                        instr3 st2 i_TESTLT_F np (findLabel l)
+               TESTEQ_F  f l      -> do (np, st2) <- float st f
+                                        instr3 st2 i_TESTEQ_F np (findLabel l)
+               TESTLT_D  d l      -> do (np, st2) <- double st d
+                                        instr3 st2 i_TESTLT_D np (findLabel l)
+               TESTEQ_D  d l      -> do (np, st2) <- double st d
+                                        instr3 st2 i_TESTEQ_D np (findLabel l)
+               TESTLT_P  i l      -> do (np, st2) <- int st i
+                                        instr3 st2 i_TESTLT_P np (findLabel l)
+               TESTEQ_P  i l      -> do (np, st2) <- int st i
+                                        instr3 st2 i_TESTEQ_P np (findLabel l)
+               CASEFAIL           -> instr1 st i_CASEFAIL
+               ENTER              -> instr1 st i_ENTER
+               RETURN             -> instr1 st i_RETURN
 
-        i2s :: Int -> Word16
-        i2s = fromIntegral
+       i2s :: Int -> Word16
+       i2s = fromIntegral
 
-{-
-        instr2 i1 i2       = instr i1 >> instr i2
-        instr3 i1 i2 i3    = instr2 i1 i2 >> instr i3
-        instr4 i1 i2 i3 i4 = instr2 i1 i2 >> instr2 i3 i4
+       instr1 (st_i0,st_l0,st_p0) i1
+          = do st_i1 <- addToXIOUArray st_i0 (i2s i1)
+               return (st_i1,st_l0,st_p0)
 
-        instr :: Word16 -> IO Ctrs
-        instr i 
-           = do n_is <- readIORef v_n_is
-                writeInstr n_is i
-                writeIORef v_n_is (n_is+1)
+       instr2 (st_i0,st_l0,st_p0) i1 i2
+          = do st_i1 <- addToXIOUArray st_i0 (i2s i1)
+               st_i2 <- addToXIOUArray st_i1 (i2s i2)
+               return (st_i2,st_l0,st_p0)
 
+       instr3 (st_i0,st_l0,st_p0) i1 i2 i3
+          = do st_i1 <- addToXIOUArray st_i0 (i2s i1)
+               st_i2 <- addToXIOUArray st_i1 (i2s i2)
+               st_i3 <- addToXIOUArray st_i2 (i2s i3)
+               return (st_i3,st_l0,st_p0)
 
-        nop = go n_is n_lits n_ptrs instrs
+       instr4 (st_i0,st_l0,st_p0) i1 i2 i3 i4
+          = do st_i1 <- addToXIOUArray st_i0 (i2s i1)
+               st_i2 <- addToXIOUArray st_i1 (i2s i2)
+               st_i3 <- addToXIOUArray st_i2 (i2s i3)
+               st_i4 <- addToXIOUArray st_i3 (i2s i4)
+               return (st_i4,st_l0,st_p0)
 
-        instr1 i1 next
-           = do writeInstr r_is i1 n_is
-	        next (n_is+1) n_lits n_ptrs instrs
-        instr2 i1 i2 next
-           = do writeInstr r_is i1 n_is
-		writeInstr r_is i1 (n_is+1)
-		next (n_is+2) n_lits n_ptrs instrs
-        instr3 i1 i2 i3 next
-           = do writeInstr r_is i1 n_is
-		writeInstr r_is i2 (n_is+1)
-		writeInstr r_is i3 (n_is+2)
-		next (n_is+3) n_lits n_ptrs instrs
+       float (st_i0,st_l0,st_p0) f
+          = do let w32s = mkLitF f
+               st_l1 <- addListToXIOUArray st_l0 w32s
+               return (usedXIOU st_l0, (st_i0,st_l1,st_p0))
 
-	ptr p n_is n_lits n_ptrs instrs
-	   = do writeArray r_ptrs p n_ptrs
-		mkBits n_is n_lits (n_ptrs+1) instrs
+       double (st_i0,st_l0,st_p0) d
+          = do let w32s = mkLitD d
+               st_l1 <- addListToXIOUArray st_l0 w32s
+               return (usedXIOU st_l0, (st_i0,st_l1,st_p0))
 
-	int i n_is n_lits n_ptrs instrs
-	   = do n_lits <- doILit r_lits i n_lits
-		mkBits n_is n_lits n_ptrs instrs
+       int (st_i0,st_l0,st_p0) i
+          = do let w32s = mkLitI i
+               st_l1 <- addListToXIOUArray st_l0 w32s
+               return (usedXIOU st_l0, (st_i0,st_l1,st_p0))
 
-	float f n_is n_lits n_ptrs instrs
-	   = do n_lits <- doFLit r_lits f n_lits
-		mkBits n_is n_lits n_ptrs instrs
+       addr (st_i0,st_l0,st_p0) a
+          = do let w32s = mkLitA a
+               st_l1 <- addListToXIOUArray st_l0 w32s
+               return (usedXIOU st_l0, (st_i0,st_l1,st_p0))
 
-	double d n_is n_lits n_ptrs instrs
-	   = do n_lits <- doDLit r_lits d n_lits
-		mkBits n_is n_lits n_ptrs instrs
+       ptr (st_i0,st_l0,st_p0) p
+          = do st_p1 <- addToXIOArray st_p0 p
+               return (usedXIO st_p0, (st_i0,st_l0,st_p1))
 
-	addr a n_is n_lits n_ptrs instrs
-	   = do n_lits <- doALit r_lits a n_lits
-		mkBits n_is n_lits n_ptrs instrs
--}
+       literal st (MachInt j)    = int st (fromIntegral j)
+       literal st (MachFloat r)  = float st (fromRational r)
+       literal st (MachDouble r) = double st (fromRational r)
 
---writeInstr :: MutableByteArray# -> Int -> Int -> IO ()
---writeInstr arr# ix e = IO $ \s ->
---  case writeWord16Array# arr# ix e of
-
+       ret_itbl st pk = panic "ret_itbl" -- return (65535, st)
+       itbl st dcon = panic "itbl" -- return (65536, st)
 
 
 -- The size in bytes of an instruction.
@@ -892,12 +903,12 @@ addrLitSz32s   = intLitSz32s
 -- Make lists of 32-bit words for literals, so that when the
 -- words are placed in memory at increasing addresses, the
 -- bit pattern is correct for the host's word size and endianness.
-mkILit :: Int    -> [Word32]
-mkFLit :: Float  -> [Word32]
-mkDLit :: Double -> [Word32]
-mkALit :: Addr   -> [Word32]
+mkLitI :: Int    -> [Word32]
+mkLitF :: Float  -> [Word32]
+mkLitD :: Double -> [Word32]
+mkLitA :: Addr   -> [Word32]
 
-mkFLit f
+mkLitF f
    = runST (do
         arr <- newFloatArray ((0::Int),0)
         writeFloatArray arr 0 f
@@ -906,7 +917,7 @@ mkFLit f
         return [w0]
      )
 
-mkDLit d
+mkLitD d
    = runST (do
         arr <- newDoubleArray ((0::Int),0)
         writeDoubleArray arr 0 d
@@ -916,7 +927,7 @@ mkDLit d
         return [w0,w1]
      )
 
-mkILit i
+mkLitI i
    | wORD_SIZE == 4
    = runST (do
         arr <- newIntArray ((0::Int),0)
@@ -935,7 +946,7 @@ mkILit i
         return [w0,w1]
      )
    
-mkALit a
+mkLitA a
    | wORD_SIZE == 4
    = runST (do
         arr <- newAddrArray ((0::Int),0)
@@ -957,12 +968,20 @@ mkALit a
 
 
 -- Zero-based expandable arrays
-data XIOUArray ele = XIOUArray Int (IOUArray Int ele)
-data XIOArray  ele = XIOArray  Int (IOArray Int ele)
+data XIOUArray ele 
+   = XIOUArray { usedXIOU :: Int, stuffXIOU :: (IOUArray Int ele) }
+data XIOArray ele 
+   = XIOArray { usedXIO :: Int , stuffXIO :: (IOArray Int ele) }
 
 newXIOUArray size
    = do arr <- newArray (0, size-1)
         return (XIOUArray 0 arr)
+
+addListToXIOUArray xarr []
+   = return xarr
+addListToXIOUArray xarr (x:xs)
+   = addToXIOUArray xarr x >>= \ xarr' -> addListToXIOUArray xarr' xs
+
 
 addToXIOUArray :: MArray IOUArray a IO
                   => XIOUArray a -> a -> IO (XIOUArray a)
@@ -1012,23 +1031,20 @@ addToXIOArray (XIOArray n_arr arr) x
 #include "Bytecodes.h"
 
 i_ARGCHECK = (bci_ARGCHECK :: Int)
-i_PUSH_L   = (bci_PUSH_L   :: Int)
-i_PUSH_LL  = (bci_PUSH_LL  :: Int)
+i_PUSH_L   = (bci_PUSH_L :: Int)
+i_PUSH_LL  = (bci_PUSH_LL :: Int)
 i_PUSH_LLL = (bci_PUSH_LLL :: Int)
-i_PUSH_G   = (bci_PUSH_G   :: Int)
-i_PUSH_AS  = (bci_PUSH_AS  :: Int)
-i_PUSHT_I  = (bci_PUSHT_I  :: Int)
-i_PUSHT_F  = (bci_PUSHT_F  :: Int)
-i_PUSHT_D  = (bci_PUSHT_D  :: Int)
-i_PUSHU_I  = (bci_PUSHU_I  :: Int)
-i_PUSHU_F  = (bci_PUSHU_F  :: Int)
-i_PUSHU_D  = (bci_PUSHU_D  :: Int)
-i_SLIDE    = (bci_SLIDE    :: Int)
-i_ALLOC    = (bci_ALLOC    :: Int)
-i_MKAP     = (bci_MKAP     :: Int)
-i_UNPACK   = (bci_UNPACK   :: Int)
-i_PACK     = (bci_PACK     :: Int)
-i_LABEL    = (bci_LABEL    :: Int)
+i_PUSH_G   = (bci_PUSH_G :: Int)
+i_PUSH_AS  = (bci_PUSH_AS :: Int)
+i_PUSH_UBX = (bci_PUSH_UBX :: Int)
+i_PUSH_TAG = (bci_PUSH_TAG :: Int)
+i_SLIDE    = (bci_SLIDE :: Int)
+i_ALLOC    = (bci_ALLOC :: Int)
+i_MKAP     = (bci_MKAP :: Int)
+i_UNPACK   = (bci_UNPACK :: Int)
+i_UPK_TAG  = (bci_UPK_TAG :: Int)
+i_PACK     = (bci_PACK :: Int)
+i_LABEL    = (bci_LABEL :: Int)
 i_TESTLT_I = (bci_TESTLT_I :: Int)
 i_TESTEQ_I = (bci_TESTEQ_I :: Int)
 i_TESTLT_F = (bci_TESTLT_F :: Int)
@@ -1038,7 +1054,7 @@ i_TESTEQ_D = (bci_TESTEQ_D :: Int)
 i_TESTLT_P = (bci_TESTLT_P :: Int)
 i_TESTEQ_P = (bci_TESTEQ_P :: Int)
 i_CASEFAIL = (bci_CASEFAIL :: Int)
-i_ENTER    = (bci_ENTER    :: Int)
-i_RETURN   = (bci_RETURN   :: Int)
+i_ENTER    = (bci_ENTER :: Int)
+i_RETURN   = (bci_RETURN :: Int)
 
 \end{code}
