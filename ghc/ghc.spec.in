@@ -140,7 +140,7 @@ make prefix=$RPM_BUILD_ROOT%{prefix} install-dirs
 
 make prefix=$RPM_BUILD_ROOT%{prefix} install
 
-make prefix=$RPM_BUILD_ROOT%{prefix} datadir=$RPM_BUILD_ROOT%{prefix}/share/doc/%{version} SGMLDocWays="html ps" install-docs
+make prefix=$RPM_BUILD_ROOT%{prefix} datadir=$RPM_BUILD_ROOT%{prefix}/share/doc/ghc-%{version} SGMLDocWays="html ps" install-docs
 
 # generate the file list for lib/ _excluding_ all files needed for profiling
 # only
