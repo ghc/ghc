@@ -137,7 +137,8 @@ mkIPName :: Unique -> OccName -> Name
 mkIPName uniq occ
   = Name { n_uniq = uniq,
 	   n_sort = Local,
-	   n_occ  = mkIPOcc occ,
+	   n_occ  = occ,
+	   -- ZZ is this an appropriate provinence?
 	   n_prov = SystemProv }
 
 ------------------------- Wired in names -------------------------
@@ -239,6 +240,7 @@ all_toplev_ids_visible =
 	not opt_OmitInterfacePragmas ||  -- Pragmas can make them visible
 	opt_EnsureSplittableC            -- Splitting requires visiblilty
 \end{code}
+
 
 \begin{code}
 setNameProvenance :: Name -> Provenance -> Name	

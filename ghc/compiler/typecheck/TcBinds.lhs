@@ -291,7 +291,7 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
 	-- SIMPLIFY THE LIE
     tcExtendGlobalTyVars tyvars_not_to_gen (
 	let ips = getIPsOfLIE lie_req in
-	if null real_tyvars_to_gen_list && null ips then
+	if null real_tyvars_to_gen_list && (null ips || not is_unrestricted) then
 		-- No polymorphism, and no IPs, so no need to simplify context
 	    returnTc (lie_req, EmptyMonoBinds, [])
 	else

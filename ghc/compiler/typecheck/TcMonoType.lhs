@@ -198,13 +198,13 @@ tc_type_kind (HsForAllTy (Just tv_names) context ty)
 		--	f :: forall a. Num a => (# a->a, a->a #)
 		-- And we want these to get through the type checker
         check ct@(Class c tys) | ambiguous = failWithTc (ambigErr (c,tys) tau)
-			       | otherwise = returnTc ()
 	  where ct_vars = tyVarsOfTypes tys
 		forall_tyvars = map varName in_scope_vars
 		tau_vars = tyVarsOfType tau
 		ambig ct_var = (varName ct_var `elem` forall_tyvars) &&
 			       not (ct_var `elemUFM` tau_vars)
 		ambiguous = foldUFM ((||) . ambig) False ct_vars
+	check _ = returnTc ()
     in
     mapTc check theta			`thenTc_`
     returnTc (body_kind, mkSigmaTy tyvars theta tau)

@@ -145,7 +145,8 @@ import Ratio ( (%) )
  QCONID  	{ ITqconid   $$ }
  QVARSYM 	{ ITqvarsym  $$ }
  QCONSYM 	{ ITqconsym  $$ }
- IPVARID   	{ ITipvarid  $$ }
+
+ IPVARID   	{ ITipvarid  $$ }		-- GHC extension
 
  PRAGMA		{ ITpragma   $$ }
 
@@ -452,6 +453,7 @@ atype		:  qtc_name 			  	{ MonoTyVar $1 }
 		|  '(#' types0 '#)'			{ MonoTupleTy $2 False{-unboxed-} }
 		|  '[' type ']'		  		{ MonoListTy  $2 }
 		|  '{' qcls_name atypes '}'		{ MonoDictTy $2 $3 }
+		|  '{' IPVARID '::' type '}'		{ MonoIParamTy (mkSysUnqual ipName $2) $4 }
 		|  '(' type ')'		  		{ $2 }
 
 -- This one is dealt with via qtc_name

@@ -89,7 +89,7 @@ import Var	( TyVar, IdOrTyVar, UVar,
 import VarEnv
 import VarSet
 
-import Name	( Name, NamedThing(..), mkLocalName, tidyOccName,
+import Name	( Name, NamedThing(..), mkLocalName, tidyOccName
 		)
 import NameSet
 import Class	( classTyCon, Class )
@@ -864,7 +864,7 @@ tidyType env@(tidy_env, subst) ty
     go_note note@(FTVNote ftvs) = note	-- No need to tidy the free tyvars
     go_note note@(UsgNote _)    = note  -- Usage annotation is already tidy
     go_note note@(UsgForAll _)  = note  -- Uvar binder is already tidy
-    go_note note@(IPNote _)	= note  -- IP is already tidy
+    go_note (IPNote n)		= IPNote (tidyIPName n)
 
 tidyTypes  env tys    = map (tidyType env) tys
 \end{code}
@@ -886,6 +886,12 @@ tidyOpenTypes env tys = mapAccumL tidyOpenType env tys
 
 tidyTopType :: Type -> Type
 tidyTopType ty = tidyType emptyTidyEnv ty
+\end{code}
+
+\begin{code}
+tidyIPName :: Name -> Name
+tidyIPName name
+  = mkLocalName (getUnique name) (getOccName name) noSrcLoc
 \end{code}
 
 

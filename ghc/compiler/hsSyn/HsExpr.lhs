@@ -213,7 +213,7 @@ pprExpr e = pprDeeper (ppr_expr e)
 pprBinds b = pprDeeper (ppr b)
 
 ppr_expr (HsVar v) = ppr v
-ppr_expr (HsIPVar v) = char '?' <> ppr v
+ppr_expr (HsIPVar v) = {- char '?' <> -} ppr v
 
 ppr_expr (HsLit    lit)   = ppr lit
 ppr_expr (HsLitOut lit _) = ppr lit

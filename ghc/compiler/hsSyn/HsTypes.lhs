@@ -52,6 +52,8 @@ data HsType name
   | MonoTupleTy		[HsType name]	-- Element types (length gives arity)
 			Bool		-- boxed?
 
+  | MonoIParamTy	name (HsType name)
+
   -- these next two are only used in interfaces
   | MonoDictTy		name	-- Class
 			[HsType name]
@@ -135,7 +137,7 @@ pprHsPred :: (Outputable name) => HsPred name -> SDoc
 pprHsPred (HsPClass clas tys)
   = ppr clas <+> hsep (map pprParendHsType tys)
 pprHsPred (HsPIParam n ty)
-  = hsep [char '?' <> ppr n, text "::", ppr ty]
+  = hsep [{- char '?' <> -} ppr n, text "::", ppr ty]
 \end{code}
 
 \begin{code}

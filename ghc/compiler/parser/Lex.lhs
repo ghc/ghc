@@ -595,7 +595,7 @@ lexToken cont glaexts buf =
 	       cont (ITunknown "\NUL") (stepOn buf)
 
     '?'# | flag glaexts && is_lower (lookAhead# buf 1#) ->
-	    lex_ip cont (setCurrentPos# buf 1#)
+	    lex_ip cont (stepOn buf)
     c | is_digit  c -> lex_num cont glaexts 0 buf
       | is_symbol c -> lex_sym cont buf
       | is_upper  c -> lex_con cont glaexts buf

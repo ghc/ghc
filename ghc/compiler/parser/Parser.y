@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.19 2000/01/28 20:52:39 lewie Exp $
+$Id: Parser.y,v 1.20 2000/02/09 18:32:10 lewie Exp $
 
 Haskell grammar.
 
@@ -35,6 +35,7 @@ import GlaExts
 {-
 -----------------------------------------------------------------------------
 Conflicts: 14 shift/reduce
+	(note: it's currently 21 -- JRL, 31/1/2000)
 
 8 for abiguity in 'if x then y else z + 1'
 	(shift parses as 'if x then y else (z + 1)', as per longest-parse rule)
@@ -85,7 +86,6 @@ Conflicts: 14 shift/reduce
  'then' 	{ ITthen }
  'type' 	{ ITtype }
  'where' 	{ ITwhere }
- 'with' 	{ ITwith }
  '_scc_'	{ ITscc }
 
  'forall'	{ ITforall }			-- GHC extension keywords
@@ -94,6 +94,7 @@ Conflicts: 14 shift/reduce
  'label'	{ ITlabel } 
  'dynamic'	{ ITdynamic }
  'unsafe'	{ ITunsafe }
+ 'with' 	{ ITwith }
  'stdcall'      { ITstdcallconv }
  'ccall'        { ITccallconv }
  '_ccall_'	{ ITccall (False, False, False) }
@@ -174,7 +175,8 @@ Conflicts: 14 shift/reduce
  QCONID  	{ ITqconid   $$ }
  QVARSYM 	{ ITqvarsym  $$ }
  QCONSYM 	{ ITqconsym  $$ }
- IPVARID   	{ ITipvarid  $$ }
+
+ IPVARID   	{ ITipvarid  $$ }		-- GHC extension
 
  PRAGMA		{ ITpragma   $$ }
 
@@ -489,6 +491,7 @@ type :: { RdrNameHsType }
 
 btype :: { RdrNameHsType }
 	: btype atype			{ MonoTyApp $1 $2 }
+	| IPVARID '::' type		{ MonoIParamTy (mkSrcUnqual ipName $1) $3 }
 	| atype				{ $1 }
 
 atype :: { RdrNameHsType }

@@ -136,13 +136,21 @@ checkInstType t
 
 checkContext :: RdrNameHsType -> P RdrNameContext
 checkContext (MonoTupleTy ts True) 
-  = mapP (\t -> checkAssertion t []) ts `thenP` \cs ->
-    returnP (map (uncurry HsPClass) cs)
+  = mapP (\t -> checkPred t []) ts `thenP` \ps ->
+    returnP ps
 checkContext (MonoTyVar t) -- empty contexts are allowed
   | t == unitTyCon_RDR = returnP []
 checkContext t 
-  = checkAssertion t [] `thenP` \(c,ts) ->
-    returnP [HsPClass c ts]
+  = checkPred t [] `thenP` \p ->
+    returnP [p]
+
+checkPred :: RdrNameHsType -> [RdrNameHsType] 
+	-> P (HsPred RdrName)
+checkPred (MonoTyVar t) args@(_:_) | not (isRdrTyVar t) 
+  	= returnP (HsPClass t args)
+checkPred (MonoTyApp l r) args = checkPred l (r:args)
+checkPred (MonoIParamTy n ty) [] = returnP (HsPIParam n ty)
+checkPred _ _ = parseError "Illegal class assertion"
 
 checkAssertion :: RdrNameHsType -> [RdrNameHsType] 
 	-> P (HsClassAssertion RdrName)

@@ -132,7 +132,8 @@ import TcHsSyn		( TcExpr, TcId,
 import TcMonad
 import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
 			  tyVarsOfInst, tyVarsOfInsts,
-			  isDict, isStdClassTyVarDict, isMethodFor, notFunDep,
+			  isDict, isClassDict, isStdClassTyVarDict,
+			  isMethodFor, notFunDep,
 			  instToId, instBindingRequired, instCanBeGeneralised,
 			  newDictFromOld,
 			  getDictClassTys, getIPs,
@@ -220,8 +221,6 @@ tcSimplify str local_tvs wanted_lie
 	(irreds', bad_guys) = partition (isEmptyVarSet . ambig_tv_fn) irreds
 	ambig_tv_fn dict    = tyVarsOfInst dict `minusVarSet` avail_tvs
     in
-    -- pprTrace "tcS" (ppr (frees, irreds')) $
-    -- pprTrace "tcS bad" (ppr bad_guys) $
     addAmbigErrs ambig_tv_fn bad_guys	`thenNF_Tc_`
 
 
@@ -288,7 +287,7 @@ tcSimplifyAndCheck str local_tvs given_lie wanted_lie
     givens  = lieToList given_lie
     -- see comment on wanteds in tcSimplify
     wanteds = filter notFunDep (lieToList wanted_lie)
-    given_dicts = filter isDict givens
+    given_dicts = filter isClassDict givens
 
     try_me inst 
       -- Does not constrain a local tyvar
@@ -722,7 +721,7 @@ addSuperClasses :: Avails s -> Inst -> NF_TcM s (Avails s)
 		-- Invariant: the Inst is already in Avails.
 
 addSuperClasses avails dict
-  | not (isDict dict)
+  | not (isClassDict dict)
   = returnNF_Tc avails
 
   | otherwise	-- It is a dictionary
@@ -1217,7 +1216,7 @@ addNoInstanceErr str givens dict
 	 ptext SLIT("Probable cause:") <+> 
 	      vcat [sep [ptext SLIT("missing") <+> quotes (pprInst tidy_dict),
 		    ptext SLIT("in") <+> str],
-		    if isDict dict && all_tyvars then empty else
+		    if isClassDict dict && all_tyvars then empty else
 		    ptext SLIT("or missing instance declaration for") <+> quotes (pprInst tidy_dict)]
     )
   where

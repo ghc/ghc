@@ -12,7 +12,7 @@ import TcMonad
 import TcType		( zonkTcType, zonkTcTypes )
 import TcUnify		( unifyTauTyLists )
 import Inst		( Inst, LookupInstResult(..),
-			  lookupInst, isDict, getFunDepsOfLIE, getIPsOfLIE,
+			  lookupInst, getFunDepsOfLIE, getIPsOfLIE,
 			  zonkLIE, zonkFunDeps {- for debugging -} )
 import InstEnv		( InstEnv )		-- Reqd for 4.02; InstEnv is a synonym, and
 						-- 4.02 doesn't "see" it soon enough

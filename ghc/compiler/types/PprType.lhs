@@ -69,7 +69,7 @@ pprParendKind = pprParendType
 
 pprPred :: PredType -> SDoc
 pprPred (Class clas tys) = pprConstraint clas tys
-pprPred (IParam n ty)    = ppr n <+> ppr ty
+pprPred (IParam n ty)    = hsep [ppr n, ptext SLIT("::"), ppr ty]
 
 pprConstraint :: Class -> [Type] -> SDoc
 pprConstraint clas tys = ppr clas <+> hsep (map (pprParendType) tys)
@@ -189,7 +189,7 @@ ppr_ty env ctxt_prec ty@(ForAllTy _ _)
 			  <+> ptext SLIT("=>")
 
     ppr_pred (Class clas tys) = ppr clas <+> hsep (map (ppr_ty env tYCON_PREC) tys)
-    ppr_pred (IParam n ty)    = hsep [char '?' <> ppr n, text "::",
+    ppr_pred (IParam n ty)    = hsep [{- char '?' <> -} ppr n, text "::",
 				      ppr_ty env tYCON_PREC ty]
 
 ppr_ty env ctxt_prec (FunTy ty1 ty2)

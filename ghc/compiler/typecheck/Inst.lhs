@@ -25,10 +25,11 @@ module Inst (
 
 	lookupInst, lookupSimpleInst, LookupInstResult(..),
 
-	isDict, isTyVarDict, isStdClassTyVarDict, isMethodFor, notFunDep,
+	isDict, isClassDict, isTyVarDict, isStdClassTyVarDict, isMethodFor, notFunDep,
 	instBindingRequired, instCanBeGeneralised,
 
-	zonkInst, zonkFunDeps, zonkTvFunDeps, instToId, instToIdBndr,
+	zonkInst, zonkInsts, zonkFunDeps, zonkTvFunDeps,
+	instToId, instToIdBndr, ipToId,
 
 	InstOrigin(..), InstLoc, pprInstLoc
     ) where
@@ -52,7 +53,8 @@ import Class	( classInstEnv, Class )
 import FunDeps	( instantiateFdClassTys )
 import Id	( Id, idFreeTyVars, idType, mkUserLocal, mkSysLocal )
 import PrelInfo	( isStandardClass, isCcallishClass, isNoDictClass )
-import Name	( OccName, Name, mkDictOcc, mkMethodOcc, getOccName, nameUnique )
+import Name	( OccName, Name, mkDictOcc, mkMethodOcc, mkIPOcc,
+		  getOccName, nameUnique )
 import PprType	( pprPred )	
 import InstEnv	( InstEnv, lookupInstEnv )
 import SrcLoc	( SrcLoc )
@@ -310,8 +312,11 @@ Predicates
 ~~~~~~~~~~
 \begin{code}
 isDict :: Inst -> Bool
-isDict (Dict _ (Class _ _) _) = True
+isDict (Dict _ _ _) = True
 isDict other	      = False
+isClassDict :: Inst -> Bool
+isClassDict (Dict _ (Class _ _) _) = True
+isClassDict other	      = False
 
 isMethodFor :: TcIdSet -> Inst -> Bool
 isMethodFor ids (Method uniq id tys _ _ loc) 
@@ -485,9 +490,7 @@ instToIdBndr :: Inst -> TcId
 instToIdBndr (Dict u (Class clas ty) (_,loc,_))
   = mkUserLocal (mkDictOcc (getOccName clas)) u (mkDictTy clas ty) loc
 instToIdBndr (Dict u (IParam n ty) (_,loc,_))
---  = mkUserLocal (mkIPOcc (getOccName n)) u (mkPredTy (IParam n ty)) loc
-  = mkUserLocal (getOccName n) (nameUnique n) (mkPredTy (IParam n ty)) loc
---  = mkVanillaId n ty
+  = ipToId n ty loc
 
 instToIdBndr (Method u id tys theta tau (_,loc,_))
   = mkUserLocal (mkMethodOcc (getOccName id)) u tau loc
@@ -497,6 +500,9 @@ instToIdBndr (LitInst u list ty loc)
 
 instToIdBndr (FunDep clas fds _)
   = panic "FunDep escaped!!!"
+
+ipToId n ty loc
+  = mkUserLocal (mkIPOcc (getOccName n)) (nameUnique n) (mkPredTy (IParam n ty)) loc
 \end{code}
 
 
@@ -538,6 +544,8 @@ zonkInst (LitInst u lit ty loc)
 zonkInst (FunDep clas fds loc)
   = zonkFunDeps fds			`thenNF_Tc` \ fds' ->
     returnNF_Tc (FunDep clas fds' loc)
+
+zonkInsts insts = mapNF_Tc zonkInst insts
 
 zonkFunDeps fds = mapNF_Tc zonkFd fds
   where

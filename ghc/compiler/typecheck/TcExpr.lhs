@@ -25,7 +25,7 @@ import Inst		( Inst, InstOrigin(..), OverloadedLit(..),
 			  lieToList, listToLIE, tyVarsOfLIE, zonkLIE,
 			  newOverloadedLit, newMethod, newIPDict,
 			  instOverloadedFun, newDicts, newClassDicts,
-			  partitionLIEbyMeth, getIPsOfLIE
+			  partitionLIEbyMeth, getIPsOfLIE, instToId, ipToId
 			)
 import TcBinds		( tcBindsAndThen )
 import TcEnv		( tcInstId,
@@ -200,10 +200,11 @@ tcMonoExpr (HsVar name) res_ty
 
 \begin{code}
 tcMonoExpr (HsIPVar name) res_ty
+  -- ZZ What's the `id' used for here...
   = let id = mkVanillaId name res_ty in
     tcGetInstLoc (OccurrenceOf id)	`thenNF_Tc` \ loc ->
     newIPDict name res_ty loc		`thenNF_Tc` \ ip ->
-    returnNF_Tc (HsIPVar id, unitLIE ip)
+    returnNF_Tc (HsIPVar (instToId ip), unitLIE ip)
 \end{code}
 
 %************************************************************************
@@ -746,7 +747,8 @@ tcMonoExpr (HsWith expr binds) res_ty
 
 tcIPBinds ((name, expr) : binds)
   = newTyVarTy_OpenKind		`thenTc` \ ty ->
-    let id = mkVanillaId name ty in
+    tcGetSrcLoc			`thenTc` \ loc ->
+    let id = ipToId name ty loc in
     tcMonoExpr expr ty		`thenTc` \ (expr', lie) ->
     zonkTcType ty		`thenTc` \ ty' ->
     tcIPBinds binds		`thenTc` \ (binds', types, lie2) ->

@@ -50,7 +50,7 @@ import Class		( Class, classExtraBigSig )
 import FieldLabel	( fieldLabelName, fieldLabelType )
 import Type		( mkSigmaTy, splitSigmaTy, mkDictTy, tidyTopType,
 			  deNoteType, classesToPreds,
-			  Type, ThetaType
+			  Type, ThetaType, PredType(..), ClassContext
 		        )
 
 import PprType
@@ -578,15 +578,21 @@ ppr_decl_context :: ThetaType -> SDoc
 ppr_decl_context []    = empty
 ppr_decl_context theta = pprIfaceTheta theta <+> ptext SLIT(" =>")
 
-ppr_decl_class_context :: [(Class,[Type])] -> SDoc
+ppr_decl_class_context :: ClassContext -> SDoc
 ppr_decl_class_context []    = empty
 ppr_decl_class_context ctxt  = pprIfaceClasses ctxt <+> ptext SLIT(" =>")
 
 pprIfaceTheta :: ThetaType -> SDoc	-- Use braces rather than parens in interface files
 pprIfaceTheta []    = empty
-pprIfaceTheta theta = braces (hsep (punctuate comma [pprPred p | p <- theta]))
+pprIfaceTheta theta = braces (hsep (punctuate comma [pprIfacePred p | p <- theta]))
 
-pprIfaceClasses :: [(Class,[Type])] -> SDoc
+-- ZZ - not sure who uses this - i.e. whether IParams really show up or not
+-- (it's not used to print normal value signatures)
+pprIfacePred :: PredType -> SDoc
+pprIfacePred (Class clas tys) = pprConstraint clas tys
+pprIfacePred (IParam n ty)    = char '?' <> ppr n <+> ptext SLIT("::") <+> ppr ty
+
+pprIfaceClasses :: ClassContext -> SDoc
 pprIfaceClasses []    = empty
 pprIfaceClasses theta = braces (hsep (punctuate comma [pprConstraint c tys | (c,tys) <- theta]))
 \end{code}
