@@ -87,6 +87,7 @@ version_str = cProjectVersion ++
 		( if cProjectPatchLevel /= "0" && cProjectPatchLevel /= ""
 			then '.':cProjectPatchLevel
 			else "")
+	-- umm, isn't the patchlevel included in the version number? --SDM
 
 -----------------------------------------------------------------------------
 -- Phases
@@ -115,9 +116,7 @@ data Phase
 	| SplitAs
 	| As
 	| Ln 
-  deriving (Eq,Ord,Enum,Ix,Show,Bounded)
-
-initial_phase = Unlit
+  deriving (Eq)
 
 -----------------------------------------------------------------------------
 -- Errors
@@ -182,11 +181,11 @@ cleanTempFiles = do
   verb <- readIORef verbose
 
   let blowAway f =
-	   (do  on verb (hPutStrLn stderr ("removing: " ++ f))
+	   (do  when verb (hPutStrLn stderr ("removing: " ++ f))
 		if '*' `elem` f then system ("rm -f " ++ f) >> return ()
 			        else removeFile f)
 	    `catchAllIO`
-	   (\e -> on verb (hPutStrLn stderr 
+	   (\e -> when verb (hPutStrLn stderr 
 				("warning: can't remove tmp file" ++ f)))
   mapM_ blowAway fs
 
@@ -195,23 +194,24 @@ cleanTempFiles = do
 
 GLOBAL_VAR(stop_after, Ln, Phase)
 
-end_phase_flag :: String -> Maybe Phase
-end_phase_flag "-M" = Just MkDependHS
-end_phase_flag "-E" = Just Cpp
-end_phase_flag "-C" = Just Hsc
-end_phase_flag "-S" = Just Mangle
-end_phase_flag "-c" = Just As
-end_phase_flag _    = Nothing
+endPhaseFlag :: String -> Maybe Phase
+endPhaseFlag "-M" = Just MkDependHS
+endPhaseFlag "-E" = Just Cpp
+endPhaseFlag "-C" = Just Hsc
+endPhaseFlag "-S" = Just Mangle
+endPhaseFlag "-c" = Just As
+endPhaseFlag _    = Nothing
 
 getStopAfter :: [String]
 	 -> IO ( [String]   -- rest of command line
 	       , Phase	    -- stop after phase
+	       , String	    -- "stop after" flag
 	       , Bool	    -- do linking?
 	       )
 getStopAfter flags 
-  = case my_partition end_phase_flag flags of
-	([]   , rest) -> return (rest, As,  True)
-	([one], rest) -> return (rest, one, False)
+  = case my_partition endPhaseFlag flags of
+	([]   , rest) -> return (rest, As,  "",  True)
+	([(flag,one)], rest) -> return (rest, one, flag, False)
 	(_    , rest) -> throwDyn AmbiguousPhase
 
 -----------------------------------------------------------------------------
@@ -366,7 +366,7 @@ setOptLevel "not" 	    = writeIORef opt_level 0
 setOptLevel [c] | isDigit c = do
    let level = ord c - ord '0'
    writeIORef opt_level level
-   on (level >= 1) go_via_C
+   when (level >= 1) go_via_C
 setOptLevel s = throwDyn (UnknownFlag ("-O"++s))
 
 go_via_C = do
@@ -1074,41 +1074,6 @@ optionRegex = mkRegex "{-#[ \t]+OPTIONS[ \t]+(.*)#-}"
 get_source_files :: [String] -> ([String],[String])
 get_source_files = partition (('-' /=) . head)
 
-suffixes :: [(String,Phase)]
-suffixes =
-  [ ("lhs",   Unlit)
-  , ("hs",    Cpp)
-  , ("hc",    HCc)
-  , ("c",     Cc)
-  , ("raw_s", Mangle)
-  , ("s",     As)
-  , ("S",     As)
-  , ("o",     Ln)
-  ]
-
-phase_input_ext Unlit       = "lhs"
-phase_input_ext	Cpp         = "lpp"
-phase_input_ext	Hsc         = "cpp"
-phase_input_ext	HCc         = "hc"
-phase_input_ext Cc          = "c"
-phase_input_ext	Mangle      = "raw_s"
-phase_input_ext	SplitMangle = "split_s"	-- not really generated
-phase_input_ext	As          = "s"
-phase_input_ext	SplitAs     = "split_s" -- not really generated
-phase_input_ext	Ln          = "o"
-
-find_phase :: String -> ([(Phase,String)], [String])
-   -> ([(Phase,String)], [String])
-find_phase f (phase_srcs, unknown_srcs)
-  = case lookup ext suffixes of
-	Just the_phase -> ((the_phase,f):phase_srcs, unknown_srcs)
-	Nothing        -> (phase_srcs, f:unknown_srcs)
-  where (basename,ext) = split_filename f
-
-
-find_phases srcs = (phase_srcs, unknown_srcs)
-  where (phase_srcs, unknown_srcs) = foldr find_phase ([],[]) srcs
-
 main =
   -- all error messages are propagated as exceptions
   my_catchDyn (\dyn -> case dyn of
@@ -1147,7 +1112,7 @@ main =
    writeIORef package_details (read contents)
 
    -- find the phase to stop after (i.e. -E, -C, -c, -S flags)
-   (flags2, stop_phase, do_linking) <- getStopAfter argv'
+   (flags2, stop_phase, stop_flag, do_linking) <- getStopAfter argv'
 
    -- process all the other arguments, and get the source files
    srcs   <- processArgs flags2 []
@@ -1165,36 +1130,31 @@ main =
 	then do_mkdependHS flags2 srcs
 	else do
 
-   -- for each source file, find which phase to start at
-   let (phase_srcs, unknown_srcs) = find_phases srcs
+   -- for each source file, find which phases to run
+   pipelines <- mapM (genPipeline stop_phase stop_flag) srcs
+   let src_pipelines = zip srcs pipelines
 
    o_file <- readIORef output_file
-   if isJust o_file && not do_linking && length phase_srcs > 1
+   if isJust o_file && not do_linking && length srcs > 1
 	then throwDyn MultipleSrcsOneOutput
 	else do
 
-   if null unknown_srcs && null phase_srcs
-	then throwDyn NoInputFiles
-	else do
+   if null srcs then throwDyn NoInputFiles else do
 
-   -- if we have unknown files, and we're not doing linking, complain
-   -- (otherwise pass them through to the linker).
-   if not (null unknown_srcs) && not do_linking
-	then throwDyn (UnknownFileType (head unknown_srcs))
-	else do
+   let compileFile (src, phases) =
+	  run_pipeline phases src do_linking True orig_base
+	  where (orig_base, _) = splitFilename src
 
-   let  compileFile :: (Phase, String) -> IO String
-	compileFile (phase, src) = do
-	  let (orig_base, _) = split_filename src
-	  if phase < Ln	-- anything to do?
-	      	then run_pipeline stop_phase do_linking True orig_base (phase,src)
-		else return src
+   o_files <- mapM compileFile src_pipelines
 
-   o_files <- mapM compileFile phase_srcs
+   when do_linking (do_link o_files)
 
-   when do_linking $
-	do_link o_files unknown_srcs
-
+-----------------------------------------------------------------------------
+-- genPipeline
+--
+-- Herein is all the magic about which phases to run in which order, whether
+-- the intermediate files should be in /tmp or in the current directory,
+-- what the suffix of the intermediate files should be, etc.
 
 -- The following compilation pipeline algorithm is fairly hacky.  A
 -- better way to do this would be to express the whole comilation as a
@@ -1216,80 +1176,162 @@ main =
 -- that the C compiler from the first comilation can be overlapped
 -- with the hsc comilation for the second file.
 
-run_pipeline
-  :: Phase		-- phase to end on (never Linker)
-  -> Bool		-- doing linking afterward?
-  -> Bool		-- take into account -o when generating output?
-  -> String		-- original basename (eg. Main)
-  -> (Phase, String)    -- phase to run, input file
-  -> IO String		-- return final filename
+data IntermediateFileType
+  = Temporary
+  | Persistent
+  deriving (Eq)
 
-run_pipeline last_phase do_linking use_ofile orig_basename (phase, input_fn) 
-  | phase > last_phase = return input_fn
-  | otherwise
+-- the first compilation phase for a given file is determined
+-- by its suffix.
+startPhase "lhs"   = Unlit
+startPhase "hs"    = Cpp
+startPhase "hc"    = HCc
+startPhase "c"     = Cc
+startPhase "raw_s" = Mangle
+startPhase "s"     = As
+startPhase "S"     = As
+startPhase "o"     = Ln     
+
+genPipeline
+   :: Phase		-- stop after this phase
+   -> String		-- "stop after" flag (for error messages)
+   -> String		-- original filename
+   -> IO [ 		-- list of phases to run for this file
+	     (Phase,
+	      IntermediateFileType,  -- keep the output from this phase?
+	      String)   	     -- output file suffix
+         ]	
+
+genPipeline stop_after stop_after_flag filename
+ = do
+   split      <- readIORef split_object_files
+   mangle     <- readIORef do_asm_mangling
+   lang       <- readIORef hsc_lang
+   keep_hc    <- readIORef keep_hc_files
+   keep_raw_s <- readIORef keep_raw_s_files
+   keep_s     <- readIORef keep_s_files
+
+   let
+   ----------- -----  ----   ---   --   --  -  -  -
+    start_phase = startPhase suffix
+
+    (basename, suffix) = splitFilename filename
+
+    haskell_ish_file = suffix `elem` [ "hs", "lhs", "hc" ]
+    c_ish_file       = suffix `elem` [ "c", "s", "S" ]  -- maybe .cc et al.??
+
+    pipeline
+      | haskell_ish_file = 
+       case lang of
+	HscC    | split && mangle -> [ Unlit, Cpp, Hsc, HCc, Mangle, 
+					SplitMangle, SplitAs ]
+	        | mangle          -> [ Unlit, Cpp, Hsc, HCc, Mangle, As ]
+	        | split	       	  -> not_valid
+	        | otherwise       -> [ Unlit, Cpp, Hsc, HCc, As ]
+
+	HscAsm  | split           -> not_valid
+	        | otherwise       -> [ Unlit, Cpp, Hsc, As ]
+
+	HscJava	| split	          -> not_valid
+		| otherwise       -> error "not implemented: compiling via Java"
+
+      | c_ish_file      = [ Cc, As ]
+
+      | otherwise       = [ ]  -- just pass this file through to the linker
+
+	-- ToDo: this is somewhat cryptic
+    not_valid = throwDyn (OtherError ("invalid option combination"))
+   ----------- -----  ----   ---   --   --  -  -  -
+
+	-- this shouldn't happen.
+   if start_phase /= Ln && start_phase `notElem` pipeline
+	then throwDyn (OtherError ("can't find starting phase for "
+				    ++ filename))
+	else do
+
+	-- this might happen, eg.  ghc -S Foo.o
+   if stop_after /= As && stop_after `notElem` pipeline
+	then throwDyn (OtherError ("flag " ++ stop_after_flag
+				   ++ " is incompatible with source file "
+				   ++ filename))
+	else do
+
+
+   let
+   ----------- -----  ----   ---   --   --  -  -  -
+      annotatePipeline
+	 :: [Phase] -> Phase
+     	 -> [(Phase, IntermediateFileType, String{-file extension-})]
+      annotatePipeline []     _    = []
+      annotatePipeline (Ln:_) _    = []
+      annotatePipeline (phase:next_phase:ps) stop = 
+     	  (phase, keep_this_output, phase_input_ext next_phase)
+	     : annotatePipeline (next_phase:ps) stop
+     	  where
+     		keep_this_output
+     		     | phase == stop = Persistent
+     		     | otherwise =
+     			case next_phase of
+     			     Ln -> Persistent
+     			     Mangle | keep_raw_s -> Persistent
+     			     As     | keep_s     -> Persistent
+     			     HCc    | keep_hc    -> Persistent
+     			     _other              -> Temporary
+
+	-- add information about output files to the pipeline
+	-- the suffix on an output file is determined by the next phase
+	-- in the pipeline, so we add linking to the end of the pipeline
+	-- to force the output from the final phase to be a .o file.
+      annotated_pipeline = annotatePipeline (pipeline ++ [ Ln ]) stop_after
+
+      phase_ne p (p1,_,_) = (p1 /= p)
+   ----------- -----  ----   ---   --   --  -  -  -
+
+   return $
+     dropWhile (phase_ne start_phase) . 
+	foldr (\p ps -> if phase_ne stop_after p then p:ps else [p])  []
+		$ annotated_pipeline
+
+
+
+-- the output suffix for a given phase is uniquely determined by
+-- the input requirements of the next phase.
+phase_input_ext Unlit       = "lhs"
+phase_input_ext	Cpp         = "lpp"
+phase_input_ext	Hsc         = "cpp"
+phase_input_ext	HCc         = "hc"
+phase_input_ext Cc          = "c"
+phase_input_ext	Mangle      = "raw_s"
+phase_input_ext	SplitMangle = "split_s"	-- not really generated
+phase_input_ext	As          = "s"
+phase_input_ext	SplitAs     = "split_s" -- not really generated
+phase_input_ext	Ln          = "o"
+
+run_pipeline
+  :: [ (Phase, IntermediateFileType, String) ] -- phases to run
+  -> String			-- input file
+  -> Bool			-- doing linking afterward?
+  -> Bool			-- take into account -o when generating output?
+  -> String			-- original basename (eg. Main)
+  -> IO String			-- return final filename
+
+run_pipeline [] input_fn _ _ _ = return input_fn
+run_pipeline ((phase, keep, o_suffix):phases) 
+	input_fn do_linking use_ofile orig_basename
   = do
 
-     let (basename,ext) = split_filename input_fn
-
-     split  <- readIORef split_object_files
-     mangle <- readIORef do_asm_mangling
-     lang   <- readIORef hsc_lang
-
-	-- figure out what the next phase is.  This is
-	-- straightforward, apart from the fact that hsc can generate
-	-- either C or assembler direct, and assembly mangling is
-	-- optional, and splitting involves one extra phase and an alternate
-	-- assembler.
-     let next_phase =
-	  case phase of
-		Hsc -> case lang of
-		 	    HscC   -> HCc
-			    HscAsm | split     -> SplitMangle
-				   | otherwise -> As
-
-		HCc  | mangle    -> Mangle
-		     | otherwise -> As
-
-		Cc -> As
-
-		Mangle | not split -> As
-		SplitMangle -> SplitAs
-		SplitAs -> Ln
-
-		_  -> succ phase
-
-
-	-- filename extension for the output, determined by next_phase
-     let new_ext = phase_input_ext next_phase
-
-	-- Figure out what the output from this pass should be called.
-
-	-- If we're keeping the output from this phase, then we just save
-	-- it in the current directory, otherwise we generate a new temp file.
-     keep_s <- readIORef keep_s_files
-     keep_raw_s <- readIORef keep_raw_s_files
-     keep_hc <- readIORef keep_hc_files
-     let keep_this_output = 
-	   case next_phase of
-		Ln -> True
-		Mangle | keep_raw_s -> True -- first enhancement :)
-		As | keep_s  -> True
-		HCc | keep_hc -> True
-		_other -> False
-
      output_fn <- 
-	(if next_phase > last_phase && not do_linking && use_ofile
+	(if null phases && not do_linking && use_ofile
 	    then do o_file <- readIORef output_file
 		    case o_file of 
 		        Just s  -> return s
 			Nothing -> do
-			    f <- odir_ify (orig_basename ++ '.':new_ext)
+			    f <- odir_ify (orig_basename ++ '.':o_suffix)
 			    osuf_ify f
 
-		-- .o files are always kept.  .s files and .hc file may be kept.
-	    else if keep_this_output
-			then odir_ify (orig_basename ++ '.':new_ext)
-			else do filename <- newTempName new_ext
+	    else if keep == Persistent
+			then odir_ify (orig_basename ++ '.':o_suffix)
+			else do filename <- newTempName o_suffix
 				add files_to_clean filename
 				return filename
 	)
@@ -1298,12 +1340,11 @@ run_pipeline last_phase do_linking use_ofile orig_basename (phase, input_fn)
 
 	-- sadly, ghc -E is supposed to write the file to stdout.  We
 	-- generate <file>.cpp, so we also have to cat the file here.
-     when (next_phase > last_phase && last_phase == Cpp) $
+     when (null phases && phase == Cpp) $
 	run_something "Dump pre-processed file to stdout"
 		      ("cat " ++ output_fn)
 
-     run_pipeline last_phase do_linking use_ofile 
-	  orig_basename (next_phase, output_fn)
+     run_pipeline phases output_fn do_linking use_ofile orig_basename
 
 
 -- find a temporary name that doesn't already exist.
@@ -1445,7 +1486,7 @@ run_phase Hsc	basename input_fn output_fn
 		 )))
 
   -- Generate -Rghc-timing info
-	on (timing) (
+	when (timing) (
   	    run_something "Generate timing stats"
 		(findFile "ghc-stats" cGHC_STATS ++ ' ':stat_file)
 	 )
@@ -1456,7 +1497,7 @@ run_phase Hsc	basename input_fn output_fn
 	
 		-- copy .h_stub file into current dir if present
 	b <- doesFileExist tmp_stub_h
-	on b (do
+	when b (do
 	      	run_something "Copy stub .h file"
 				("cp " ++ tmp_stub_h ++ ' ':stub_h)
 	
@@ -1472,10 +1513,10 @@ run_phase Hsc	basename input_fn output_fn
 			])
 
 			-- compile the _stub.c file w/ gcc
-		run_pipeline As False{-no linking-} 
+		pipeline <- genPipeline As "" stub_c
+		run_pipeline pipeline stub_c False{-no linking-} 
 				False{-no -o option-}
 				(basename++"_stub")
-				(Cc, stub_c)
 
 		add ld_inputs (basename++"_stub.o")
 	 )
@@ -1649,8 +1690,8 @@ run_phase SplitAs basename input_fn output_fn
 -----------------------------------------------------------------------------
 -- Linking
 
-do_link :: [String] -> [String] -> IO ()
-do_link o_files unknown_srcs = do
+do_link :: [String] -> IO ()
+do_link o_files = do
     ln <- readIORef pgm_l
     verb <- is_verbose
     o_file <- readIORef output_file
@@ -1681,7 +1722,6 @@ do_link o_files unknown_srcs = do
        (unwords 
 	 ([ ln, verb, "-o", output_fn ]
 	 ++ o_files
-	 ++ unknown_srcs
 	 ++ extra_ld_inputs
 	 ++ lib_path_opts
 	 ++ lib_opts
@@ -1724,7 +1764,7 @@ run_something phase_name cmd
 
    if exit_code /= ExitSuccess
 	then throwDyn (PhaseFailed phase_name exit_code)
-	else do on verb (putStr "\n")
+	else do when verb (putStr "\n")
 	        return ()
 
 -----------------------------------------------------------------------------
@@ -2042,13 +2082,13 @@ findFile name alt_path = unsafePerformIO (do
 -----------------------------------------------------------------------------
 -- Utils
 
-my_partition :: (a -> Maybe b) -> [a] -> ([b],[a])
+my_partition :: (a -> Maybe b) -> [a] -> ([(a,b)],[a])
 my_partition p [] = ([],[])
 my_partition p (a:as)
   = let (bs,cs) = my_partition p as in
     case p a of
 	Nothing -> (bs,a:cs)
-	Just b  -> (b:bs,cs)
+	Just b  -> ((a,b):bs,cs)
 
 my_prefix_match :: String -> String -> Maybe String
 my_prefix_match [] rest = Just rest
@@ -2068,16 +2108,14 @@ postfixMatch pat str = prefixMatch (reverse pat) (reverse str)
 
 later = flip finally
 
-on b io = if b then io >> return (error "on") else return (error "on")
-
 my_catch = flip catchAllIO
 my_catchDyn = flip catchDyn
 
 global :: a -> IORef a
 global a = unsafePerformIO (newIORef a)
 
-split_filename :: String -> (String,String)
-split_filename f = (reverse (stripDot rev_basename), reverse rev_ext)
+splitFilename :: String -> (String,String)
+splitFilename f = (reverse (stripDot rev_basename), reverse rev_ext)
   where (rev_ext, rev_basename) = span ('.' /=) (reverse f)
         stripDot ('.':xs) = xs
         stripDot xs       = xs
