@@ -44,7 +44,7 @@ import SrcLoc		( mkSrcLoc, noSrcLoc )
 import TcRnDriver	( checkOldIface, tcRnModule, tcRnExtCore, tcRnIface )
 import RnEnv		( extendOrigNameCache )
 import Rules		( emptyRuleBase )
-import PrelInfo		( wiredInThingEnv, wiredInThings, knownKeyNames )
+import PrelInfo		( wiredInThingEnv, knownKeyNames )
 import PrelRules	( builtinRules )
 import MkIface		( mkIface )
 import InstEnv		( emptyInstEnv )
@@ -722,10 +722,5 @@ initExternalPackageState
 	   gate_fn vis_fn = vis_fn name		-- Load the rule whenever name is visible
 
 initOrigNames :: OrigNameCache
-initOrigNames 
-   = insert knownKeyNames $
-     insert (map getName wiredInThings) $
-     emptyModuleEnv
-  where
-     insert names env = foldl extendOrigNameCache env names
+initOrigNames = foldl extendOrigNameCache emptyModuleEnv knownKeyNames 
 \end{code}

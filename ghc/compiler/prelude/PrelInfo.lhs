@@ -40,7 +40,7 @@ import DataCon		( DataCon )
 import Id		( idName )
 import MkId		( mkPrimOpId, wiredInIds )
 import MkId		-- All of it, for re-export
-import Name		( Name, nameOccName )
+import Name		( Name, nameOccName, NamedThing(..) )
 import RdrName		( mkRdrUnqual, getRdrName )
 import HsSyn		( HsTyVarBndr(..) )
 import OccName		( mkVarOcc )
@@ -87,7 +87,8 @@ wiredInThingEnv = mkTypeEnv wiredInThings
 
 knownKeyNames :: [Name]
 knownKeyNames 
-  = basicKnownKeyNames
+  = map getName wiredInThings 
+    ++ basicKnownKeyNames
 #ifdef GHCI
     ++ nameSetToList templateHaskellNames
 #endif
