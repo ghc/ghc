@@ -302,7 +302,7 @@ sub calcNewModuleVersion {
 	return(&mv_change($changed_version,"$v changed")) if $Decl{"old:$v"} ne $Decl{"new:$v"};
     }
     
-    print STDERR "Module version unchanged at $unchanged_version\n";
+    print STDERR "$Pgm: module version unchanged at $unchanged_version\n";
     return($unchanged_version);
 }
 
