@@ -1,0 +1,15 @@
+<sect1>Release notes for version~3-03---4/97
+<label id="release-3-03">
+<p>
+
+Changes made since 3.02:
+
+<itemize>
+
+<item> Fix bug in FloatIn to do with <tt/idSpecVars/.
+
+<item> Remove restrictions on superclasses in class declarations.
+
+</itemize>
+
+
