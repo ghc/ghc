@@ -31,9 +31,6 @@ name = global (value) :: IORef (ty); \
 -----------------------------------------------------------------------------
 -- ToDo:
 
--- test:
--- stub files
-
 -- time commands when run with -v
 -- split marker
 -- mkDLL
@@ -98,6 +95,7 @@ data Phase
 	| Mangle	-- assembly mangling, now done by a separate script.
 	| SplitMangle	-- after mangler if splitting
 	| As
+	| SplitAs
 	| Ln 
   deriving (Eq,Ord,Enum,Ix,Show,Bounded)
 
@@ -975,6 +973,7 @@ phase_input_ext Cc          = "c"
 phase_input_ext	Mangle      = "raw_s"
 phase_input_ext	SplitMangle = "split_s"	-- not really generated
 phase_input_ext	As          = "s"
+phase_input_ext	SplitAs     = "split_s" -- not really generated
 phase_input_ext	Ln          = "o"
 
 find_phase :: String -> ([(Phase,String)], [String])
@@ -1059,7 +1058,7 @@ main =
 	compileFile (phase, src) = do
 	  let (orig_base, _) = split_filename src
 	  if phase < Ln	-- anything to do?
-	      	then run_pipeline stop_phase do_linking orig_base (phase,src)
+	      	then run_pipeline stop_phase do_linking True orig_base (phase,src)
 		else return src
 
    o_files <- mapM compileFile phase_srcs
@@ -1092,11 +1091,15 @@ main =
 run_pipeline
   :: Phase		-- phase to end on (never Linker)
   -> Bool		-- doing linking afterward?
+  -> Bool		-- take into account -o when generating output?
   -> String		-- original basename (eg. Main)
   -> (Phase, String)    -- phase to run, input file
   -> IO String		-- return final filename
 
-run_pipeline last_phase do_linking orig_basename (phase, input_fn) = do
+run_pipeline last_phase do_linking use_ofile orig_basename (phase, input_fn) 
+  | phase > last_phase = return input_fn
+  | otherwise
+  = do
 
      let (basename,ext) = split_filename input_fn
 
@@ -1118,8 +1121,10 @@ run_pipeline last_phase do_linking orig_basename (phase, input_fn) = do
 		     | otherwise -> As
 
 		Cc -> As
+		As -> Ln
 
 		Mangle | not split -> As
+		SplitMangle -> SplitAs
 	
 		_  -> succ phase
 
@@ -1143,7 +1148,7 @@ run_pipeline last_phase do_linking orig_basename (phase, input_fn) = do
 		_other -> False
 
      output_fn <- 
-	(if phase == last_phase && not do_linking
+	(if phase == last_phase && not do_linking && use_ofile
 	    then do o_file <- readIORef output_file
 		    case o_file of 
 		        Just s  -> return s
@@ -1161,10 +1166,8 @@ run_pipeline last_phase do_linking orig_basename (phase, input_fn) = do
 
      run_phase phase orig_basename input_fn output_fn
 
-     if (phase == last_phase)
-	then return output_fn
-	else run_pipeline last_phase do_linking 
-		orig_basename (next_phase, output_fn)
+     run_pipeline last_phase do_linking use_ofile 
+	  orig_basename (next_phase, output_fn)
 
 
 -- find a temporary name that doesn't already exist.
@@ -1337,7 +1340,11 @@ run_phase Hsc	basename input_fn output_fn
 			])
 
 			-- compile the _stub.c file w/ gcc
-		run_pipeline As False (basename++"_stub") (Cc, stub_c)
+		run_pipeline As False{-no linking-} 
+				False{-no -o option-}
+				(basename++"_stub")
+				(Cc, stub_c)
+
 		add ld_inputs (basename++"_stub.o")
 	 )
 
@@ -1463,42 +1470,43 @@ run_phase SplitMangle basename input_fn outputfn
 -- As phase
 
 run_phase As basename input_fn output_fn
-  = do 	split <- readIORef split_object_files
-	as <- readIORef pgm_a
+  = do 	as <- readIORef pgm_a
         as_opts <- getOpts opt_a
 
-        if not split then do
-            cmdline_include_paths <- readIORef include_paths
-            let cmdline_include_flags = map (\p -> "-I"++p) cmdline_include_paths
-            run_something "Assembler"
-	     (unwords (as : as_opts
-	  	       ++ cmdline_include_flags
-	  	       ++ [ "-c", input_fn, "-o",  output_fn ]
-	  	    ))
+        cmdline_include_paths <- readIORef include_paths
+        let cmdline_include_flags = map (\p -> "-I"++p) cmdline_include_paths
+        run_something "Assembler"
+	   (unwords (as : as_opts
+		       ++ cmdline_include_flags
+		       ++ [ "-c", input_fn, "-o",  output_fn ]
+		    ))
 
-	 else do
-	    odir_opt <- readIORef output_dir
-    	    let odir | Just s <- odir_opt = s
-	    	     | otherwise          = basename
-	    
-	    split_s_prefix <- readIORef split_prefix
-	    n <- readIORef n_split_files
+run_phase SplitAs basename input_fn output_fn
+  = do  as <- readIORef pgm_a
+        as_opts <- getOpts opt_a
 
-	    odir <- readIORef output_dir
-	    let real_odir = case odir of
+	odir_opt <- readIORef output_dir
+    	let odir | Just s <- odir_opt = s
+		     | otherwise          = basename
+	
+	split_s_prefix <- readIORef split_prefix
+	n <- readIORef n_split_files
+	
+	odir <- readIORef output_dir
+	let real_odir = case odir of
 				Nothing -> basename
 				Just d  -> d
-	    
-	    let assemble_file n = do
+	
+	let assemble_file n = do
 		    let input_s  = split_s_prefix ++ "__" ++ show n ++ ".s"
-	    	    let output_o = newdir real_odir 
+		    let output_o = newdir real_odir 
 					(basename ++ "__" ++ show n ++ ".o")
-	    	    run_something "Assembler" 
-	    		    (unwords (as : as_opts
-	    			      ++ [ "-c", "-o ", output_o, input_s ]
-	    		    ))
-	    
-	    mapM_ assemble_file [1..n]
+		    run_something "Assembler" 
+			    (unwords (as : as_opts
+				      ++ [ "-c", "-o ", output_o, input_s ]
+			    ))
+	
+	mapM_ assemble_file [1..n]
 
 -----------------------------------------------------------------------------
 -- Linking
