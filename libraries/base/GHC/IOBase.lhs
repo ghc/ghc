@@ -751,7 +751,7 @@ instance Eq IOErrorType where
    x == y = 
      case x of
        DynIOError{} -> False -- from a strictness POV, compatible with a derived Eq inst?
-       _ -> getTag# x ==# getTag# y
+       _ -> getTag x ==# getTag y
  
 instance Show IOErrorType where
   showsPrec _ e =
