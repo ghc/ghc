@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.77 2003/03/21 16:18:38 sof Exp $
+ * $Id: Storage.c,v 1.78 2003/03/26 17:33:49 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -73,13 +73,13 @@ initStorage( void )
       return;
   }
 
-    /* Sanity check to make sure the LOOKS_LIKE_ macros appear to be
-     * doing something reasonable.
-     */
-    ASSERT(LOOKS_LIKE_INFO_PTR(&stg_BLACKHOLE_info));
-    ASSERT(LOOKS_LIKE_CLOSURE_PTR(&stg_dummy_ret_closure));
-    ASSERT(!HEAP_ALLOCED(&stg_dummy_ret_closure));
-
+  /* Sanity check to make sure the LOOKS_LIKE_ macros appear to be
+   * doing something reasonable.
+   */
+  ASSERT(LOOKS_LIKE_INFO_PTR(&stg_BLACKHOLE_info));
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(&stg_dummy_ret_closure));
+  ASSERT(!HEAP_ALLOCED(&stg_dummy_ret_closure));
+  
   if (RtsFlags.GcFlags.maxHeapSize != 0 &&
       RtsFlags.GcFlags.heapSizeSuggestion > 
       RtsFlags.GcFlags.maxHeapSize) {
@@ -96,7 +96,7 @@ initStorage( void )
   initBlockAllocator();
   
 #if defined(SMP)
-  initCondition(&sm_mutex);
+  initMutex(&sm_mutex);
 #endif
 
   /* allocate generation info array */
@@ -208,10 +208,6 @@ initStorage( void )
 
   /* Tell GNU multi-precision pkg about our custom alloc functions */
   mp_set_memory_functions(stgAllocForGMP, stgReallocForGMP, stgDeallocForGMP);
-
-#if defined(SMP)
-  initMutex(&sm_mutex);
-#endif
 
   IF_DEBUG(gc, statDescribeGens());
 }
