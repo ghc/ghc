@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1998
  *
- * $Id: directoryAux.c,v 1.2 1998/12/02 13:27:17 simonm Exp $
+ * $Id: directoryAux.c,v 1.3 2000/08/24 10:27:01 simonmar Exp $
  *
  * Support functions for manipulating directories
  */
@@ -77,8 +77,6 @@ get_dirent_d_name(StgAddr d)
     return ((struct dirent*)d)->d_name;
 }
 
-StgInt const_F_OK( void ) { return F_OK; }
-
 StgInt sizeof_stat( void ) { return sizeof(struct stat); }
 
 StgInt  prim_stat(StgAddr x, StgAddr y)
@@ -123,3 +121,8 @@ prim_S_ISREG( StgWord x )
     return S_ISREG(x);
 }
 
+
+StgWord const_R_OK( void ) { return R_OK; }
+StgWord const_W_OK( void ) { return W_OK; }
+StgWord const_X_OK( void ) { return X_OK; }
+StgWord const_F_OK( void ) { return F_OK; }

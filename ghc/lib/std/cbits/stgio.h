@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: stgio.h,v 1.22 2000/06/19 13:28:35 simonmar Exp $
+ * $Id: stgio.h,v 1.23 2000/08/24 10:27:01 simonmar Exp $
  *
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1999
  *
@@ -34,10 +34,13 @@ StgInt64 get_stat_st_mtime(StgAddr);
 void     set_stat_st_mtime(StgByteArray, StgByteArray);
 StgInt  sizeof_stat       (void);
 StgInt  prim_stat         (StgAddr,StgAddr);
-StgInt  const_F_OK        (void);
 StgWord const_S_IRUSR 	  (void);
 StgWord const_S_IWUSR 	  (void);
 StgWord const_S_IXUSR 	  (void);
+StgWord const_R_OK 	  (void);
+StgWord const_W_OK 	  (void);
+StgWord const_X_OK 	  (void);
+StgWord const_F_OK 	  (void);
 StgInt  prim_S_ISDIR  	  (StgWord);
 StgInt  prim_S_ISREG  	  (StgWord);
 

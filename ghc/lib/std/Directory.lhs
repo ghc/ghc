@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Directory.lhs,v 1.19 2000/07/07 11:03:57 simonmar Exp $
+% $Id: Directory.lhs,v 1.20 2000/08/24 10:27:01 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -447,8 +447,6 @@ doesFileExist name = do
    (getFileStatus name >>= \ st -> return (not (isDirectory st)))
    (\ _ -> return False)
 
-foreign import ccall "libHS_cbits" "const_F_OK" unsafe const_F_OK  :: Int
-
 #ifndef __HUGS__
 getModificationTime :: FilePath -> IO ClockTime
 getModificationTime name =
@@ -459,16 +457,16 @@ getModificationTime name =
 getPermissions :: FilePath -> IO Permissions
 getPermissions name = do
   st <- getFileStatus name
-  let
-   fm = fileMode st
-   isect v = intersectFileMode v fm == v
+  read  <- primAccess (primPackString name) readOK
+  write <- primAccess (primPackString name) writeOK
+  exec  <- primAccess (primPackString name) executeOK
 
   return (
     Permissions {
-      readable   = isect ownerReadMode,
-      writable   = isect ownerWriteMode,
-      executable = not (isDirectory st)   && isect ownerExecuteMode,
-      searchable = not (isRegularFile st) && isect ownerExecuteMode
+      readable   = read  == 0,
+      writable   = write == 0,
+      executable = not (isDirectory st)   && exec == 0,
+      searchable = not (isRegularFile st) && exec == 0
     }
    )
 
@@ -551,7 +549,14 @@ emptyFileMode     = intToWord 0
 unionFileMode     = orWord
 intersectFileMode = andWord
 #endif
+\end{code}
 
+\begin{code}
+type AccessMode = Word
+
+foreign import ccall "libHS_cbits" "const_R_OK" unsafe readOK       :: AccessMode
+foreign import ccall "libHS_cbits" "const_W_OK" unsafe writeOK      :: AccessMode
+foreign import ccall "libHS_cbits" "const_X_OK" unsafe executeOK    :: AccessMode
 \end{code}
 
 Some defns. to allow us to share code.
@@ -590,5 +595,8 @@ foreign import ccall "libHS_cbits" "getCurrentDirectory" unsafe primGetCurrentDi
 foreign import ccall "libc"        "free"                unsafe primFree                :: Addr -> IO ()
 foreign import ccall "libc"        "malloc"              unsafe primMalloc              :: Word -> IO Addr
 foreign import ccall "libc"        "chmod"               unsafe primChmod               :: CString -> Word -> IO Int
+
+foreign import ccall "libc" "access" unsafe 
+	primAccess :: CString -> Word -> IO Int
 \end{code}
 
