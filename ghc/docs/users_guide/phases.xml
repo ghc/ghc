@@ -500,11 +500,19 @@ $ cat foo.hspp</screen>
 
     <para>If you are compiling with lots of foreign calls, you may
     need to tell the C&nbsp;compiler about some
-    <literal>&num;include</literal> files.  There is no real pretty
-    way to do this, but you can use this hack from the
-    command-line:</para>
+    <literal>&num;include</literal> files.  The Right Way to do this is to
+      add an <literal>INCLUDE</literal> pragma to the top of your source file
+      (<xref linkend="include-pragma" />):</para>
+
+<programlisting>{-# INCLUDE &lt;X/Xlib.h&gt; #-}</programlisting>
+      
+    <para>Sometimes this isn't convenient.  In those cases there's an
+      equivalent command-line option:</para>
 
 <screen>% ghc -c '-#include &lt;X/Xlib.h&gt;' Xstuff.lhs</screen>
+
+    <indexterm><primary><option>-#include</option></primary>
+    </indexterm>
 
   </sect2>
 
