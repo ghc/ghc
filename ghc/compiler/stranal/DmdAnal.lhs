@@ -518,11 +518,23 @@ dmdTransform sigs var dmd
 ------ 	DATA CONSTRUCTOR
   | isDataConId var,		-- Data constructor
     Seq k Now ds <- res_dmd,	-- and the demand looks inside its fields
-    let StrictSig dmd_ty = idNewStrictness var	-- It must have a strictness sig
-  = if dmdTypeDepth dmd_ty == length ds then	-- Saturated, so unleash the demand
+    let StrictSig dmd_ty = idNewStrictness var,	-- It must have a strictness sig
+    let DmdType _ con_ds con_res = dmd_ty
+  = if length con_ds == length ds then	-- Saturated, so unleash the demand
 	-- ds can be empty, when we are just seq'ing the thing
-	mkDmdType emptyDmdEnv ds (dmdTypeRes dmd_ty)
-		-- Need to extract whether it's a product, hence dmdTypeRes
+	let 
+	   arg_ds = case k of
+			Keep -> zipWith lub ds con_ds
+			Drop -> ds
+		-- Important!  If we Keep the constructor application, then
+		-- we need the demands the constructor places (usually lazy)
+		-- If not, we don't need to.  For example:
+		--	f p@(x,y) = (p,y)	-- S(AL)
+		--	g a b     = f (a,b)
+		-- It's vital that we don't calculate Absent for a!
+	in
+	mkDmdType emptyDmdEnv arg_ds con_res
+		-- Must remember whether it's a product, hence con_res, not TopRes
     else
 	topDmdType
 
