@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.84 2001/08/07 10:54:01 simonmar Exp $
+-- $Id: Main.hs,v 1.85 2001/08/08 08:44:47 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -121,9 +121,7 @@ main =
 
   -- all error messages are propagated as exceptions
   handleDyn (\dyn -> case dyn of
-			  PhaseFailed _phase code -> do
-			  		hPutStr stderr "\nCompilation had errors\n"
-					exitWith code
+			  PhaseFailed _phase code -> exitWith code
 			  Interrupted -> exitWith (ExitFailure 1)
 			  _ -> do hPutStrLn stderr (show (dyn :: GhcException))
 			          exitWith (ExitFailure 1)
