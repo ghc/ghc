@@ -26,7 +26,7 @@
 \put(3642,2767){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}drag}}}}}
 \put(1767,2092){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}first used}}}}}
 \put(3417,2092){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}last used}}}}}
-\put(5067,2092){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}destoryed}}}}}
+\put(5067,2092){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}destroyed}}}}}
 \path(4992,292)(4992,667)
 \path(5022.000,547.000)(4992.000,667.000)(4962.000,547.000)
 \path(4992,667)(4992,1117)
@@ -35,7 +35,7 @@
 \path(42,292)(42,667)
 \path(72.000,547.000)(42.000,667.000)(12.000,547.000)
 \put(117,67){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}created}}}}}
-\put(5067,67){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}destoryed}}}}}
+\put(5067,67){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}destroyed}}}}}
 \put(1992,742){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}void}}}}}
 \end{picture}
 }
