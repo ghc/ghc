@@ -7,7 +7,8 @@
 
 \begin{code}
 module TcSimplify (
-	tcSimplifyInfer, tcSimplifyInferCheck, tcSimplifyCheck, 
+	tcSimplifyInfer, tcSimplifyInferCheck, tcSimplifyCheck,
+	tcSimplifyRestricted,
 	tcSimplifyToDicts, tcSimplifyIPs, tcSimplifyTop, 
 
 	tcSimplifyThetas, tcSimplifyCheckThetas,
@@ -479,33 +480,45 @@ tcSimplifyCheck
 		 TcDictBinds)	-- Bindings
 
 tcSimplifyCheck doc qtvs givens wanted_lie
-  = checkLoop doc qtvs givens (lieToList wanted_lie)	`thenTc` \ (frees, binds, irreds) ->
+  = checkLoop doc qtvs givens (lieToList wanted_lie) try `thenTc` \ (frees, binds, irreds) ->
 
 	-- Complain about any irreducible ones
     complainCheck doc givens irreds		`thenNF_Tc_`
 
 	-- Done
     returnTc (mkLIE frees, binds)
+  where
+	-- When checking against a given signature we always reduce
+	-- until we find a match against something given, or can't reduce
+    try qtvs inst | isFree qtvs inst  = Free
+		  | otherwise         = ReduceMe 
 
-checkLoop doc qtvs givens wanteds
-  =   	-- Step 1
+tcSimplifyRestricted doc qtvs givens wanted_lie
+  = checkLoop doc qtvs givens (lieToList wanted_lie) try `thenTc` \ (frees, binds, irreds) ->
+
+	-- Complain about any irreducible ones
+    complainCheck doc givens irreds		`thenNF_Tc_`
+
+	-- Done
+    returnTc (mkLIE frees, binds)
+  where
+    try qtvs inst | not (tyVarsOfInst inst `intersectsVarSet` qtvs) = Free
+	          | otherwise                                       = ReduceMe
+
+checkLoop doc qtvs givens wanteds try_me
+  =		-- Step 1
     zonkTcTyVarsAndFV qtvs		`thenNF_Tc` \ qtvs' ->
     mapNF_Tc zonkInst givens		`thenNF_Tc` \ givens' ->
     mapNF_Tc zonkInst wanteds		`thenNF_Tc` \ wanteds' ->
-    let
-	      -- When checking against a given signature we always reduce
-	      -- until we find a match against something given, or can't reduce
-	try_me inst | isFree qtvs' inst  = Free
-		    | otherwise          = ReduceMe 
-    in
+
 		-- Step 2
-    reduceContext doc try_me givens' wanteds'    `thenTc` \ (no_improvement, frees, binds, irreds) ->
+    reduceContext doc (try_me qtvs') givens' wanteds'		`thenTc` \ (no_improvement, frees, binds, irreds) ->
 	
 		-- Step 3
     if no_improvement then
 	returnTc (frees, binds, irreds)
     else
-	checkLoop doc qtvs givens' (irreds ++ frees)	`thenTc` \ (frees1, binds1, irreds1) ->
+	checkLoop doc qtvs givens' (irreds ++ frees) try_me	`thenTc` \ (frees1, binds1, irreds1) ->
 	returnTc (frees1, binds `AndMonoBinds` binds1, irreds1)
 
 complainCheck doc givens irreds

@@ -27,7 +27,7 @@ import Inst		( LIE, emptyLIE, mkLIE, plusLIE, InstOrigin(..),
 import TcEnv		( tcExtendLocalValEnv,
 			  newSpecPragmaId, newLocalId
 			)
-import TcSimplify	( tcSimplifyInfer, tcSimplifyInferCheck, tcSimplifyCheck, tcSimplifyToDicts )
+import TcSimplify	( tcSimplifyInfer, tcSimplifyInferCheck, tcSimplifyCheck, tcSimplifyRestricted, tcSimplifyToDicts )
 import TcMonoType	( tcHsSigType, checkSigTyVars,
 			  TcSigInfo(..), tcTySig, maybeSig, sigCtxt
 			)
@@ -289,10 +289,11 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
 		-- at all.
     in
 
+    traceTc (text "binding:" <+> ppr ((zonked_dict_ids, dict_binds),
+	     exports, [idType poly_id | (_, poly_id, _) <- exports])) `thenTc_`
+
 	 -- BUILD RESULTS
     returnTc (
-	-- pprTrace "binding.." (ppr ((zonked_dict_ids, dict_binds), 
-	--				exports, [idType poly_id | (_, poly_id, _) <- exports])) $
 	AbsBinds real_tyvars_to_gen
 		 zonked_dict_ids
 		 exports
@@ -462,7 +463,7 @@ generalise binder_names mbind tau_tvs lie_req sigs
 
 	-- Now simplify with exactly that set of tyvars
 	-- We have to squash those Methods
-    tcSimplifyCheck doc final_forall_tvs [] lie_req	`thenTc` \ (lie_free, binds) ->
+    tcSimplifyRestricted doc final_forall_tvs [] lie_req	`thenTc` \ (lie_free, binds) ->
 
     returnTc (final_forall_tvs, lie_free, binds, [])
 
