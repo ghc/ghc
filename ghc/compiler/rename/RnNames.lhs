@@ -392,12 +392,15 @@ mkExportAvails mod_name unqual_imp gbl_env hides avails
     unqual_in_scope n = unQualInScope gbl_env n
 
 
-    entity_avail_env  = mkNameEnv ([ (availName avail,avail) | avail <- effective_avails ] ++
+    entity_avail_env  = mkNameEnv ([ (availName avail,avail) | avail <- effective_avails ]  ++
 					-- sigh - need to have the method/field names in
 					-- the environment also, so that export lists
 					-- can be computed precisely (cf. exportsFromAvail)
     				   [ (name,avail) | avail <- effective_avails,
-				   		    name  <- availNames avail ])
+				   		    name  <- avNames avail ] )
+
+    avNames (Avail n) = [n]
+    avNames (AvailTC n ns) = filter (/=n) ns
 
 	-- remove 'hides' names from the avail list.
     effective_avails = foldl wipeOut avails hides
