@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.hc,v 1.7 1999/05/13 17:31:10 simonm Exp $
+ * $Id: HeapStackCheck.hc,v 1.8 1999/05/24 10:58:09 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -293,11 +293,24 @@ EXTFUN(stg_gc_seq_1)
    cases are covered below.
    -------------------------------------------------------------------------- */
 
-/*-- No regsiters live, return address already on the stack: ---------------- */
+/*-- No regsiters live (probably a void return) ----------------------------- */
+
+INFO_TABLE_SRT_BITMAP(stg_gc_noregs_ret_info, stg_gc_noregs_ret, 0/*BITMAP*/, 
+		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		      RET_SMALL,, EF_, 0, 0);
+
+EXTFUN(stg_gc_noregs_ret)
+{
+  FB_
+  JMP_(ENTRY_CODE(Sp[0]));
+  FE_
+}
 
 EXTFUN(stg_gc_noregs)
 {
   FB_
+  Sp -= 1;
+  Sp[0] = (W_)&stg_gc_noregs_ret_info;
   GC_GENERIC
   FE_
 }
