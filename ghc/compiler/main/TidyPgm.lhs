@@ -8,7 +8,7 @@ module TidyPgm( tidyCorePgm, tidyCoreExpr ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( DynFlags, DynFlag(..), opt_OmitInterfacePragmas )
+import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
 import CoreSyn
 import CoreUnfold	( noUnfolding, mkTopUnfolding )
 import CoreFVs		( ruleLhsFreeIds, ruleRhsFreeVars, exprSomeFreeVars )
@@ -129,8 +129,9 @@ tidyCorePgm dflags pcs
 				mg_binds = binds_in, mg_rules = orphans_in })
   = do	{ showPass dflags "Tidy Core"
 
-	; let ext_ids   = findExternalSet   binds_in orphans_in
-	; let ext_rules = findExternalRules binds_in orphans_in ext_ids
+	; let omit_iface_prags = dopt Opt_OmitInterfacePragmas dflags
+	; let ext_ids   = findExternalSet   omit_iface_prags binds_in orphans_in
+	; let ext_rules = findExternalRules omit_iface_prags binds_in orphans_in ext_ids
 		-- findExternalRules filters ext_rules to avoid binders that 
 		-- aren't externally visible; but the externally-visible binders 
 		-- are computed (by findExternalSet) assuming that all orphan
@@ -165,7 +166,7 @@ tidyCorePgm dflags pcs
 
 	; let pcs' = pcs { pcs_nc = orig_ns' }
 
-	; let tidy_type_env = mkFinalTypeEnv env_tc tidy_binds
+	; let tidy_type_env = mkFinalTypeEnv omit_iface_prags env_tc tidy_binds
 
 		-- Dfuns are local Ids that might have
 		-- changed their unique during tidying.  Remember
@@ -209,7 +210,8 @@ tidyCoreExpr expr = return (tidyExpr emptyTidyEnv expr)
 %************************************************************************
 
 \begin{code}
-mkFinalTypeEnv :: TypeEnv 	-- From typechecker
+mkFinalTypeEnv :: Bool		-- Omit interface pragmas
+	       -> TypeEnv 	-- From typechecker
 	       -> [CoreBind]	-- Final Ids
 	       -> TypeEnv
 
@@ -228,7 +230,7 @@ mkFinalTypeEnv :: TypeEnv 	-- From typechecker
 -- in interface files, because they are needed by importing modules when
 -- using the compilation manager
 
-mkFinalTypeEnv type_env tidy_binds
+mkFinalTypeEnv omit_iface_prags type_env tidy_binds
   = extendTypeEnvList (filterNameEnv keep_it type_env) final_ids
   where
     final_ids  = [ AnId (strip_id_info id)
@@ -237,8 +239,8 @@ mkFinalTypeEnv type_env tidy_binds
 		   isExternalName (idName id)]
 
     strip_id_info id
-	  | opt_OmitInterfacePragmas = id `setIdInfo` vanillaIdInfo
-	  | otherwise		     = id
+	  | omit_iface_prags = id `setIdInfo` vanillaIdInfo
+	  | otherwise	     = id
 	-- If the interface file has no pragma info then discard all
 	-- info right here.
 	--
@@ -264,15 +266,16 @@ mkFinalTypeEnv type_env tidy_binds
 \end{code}
 
 \begin{code}
-findExternalRules :: [CoreBind]
+findExternalRules :: Bool	  -- Omit interface pragmas 
+		  -> [CoreBind]
 		  -> [IdCoreRule] -- Orphan rules
 	          -> IdEnv a	  -- Ids that are exported, so we need their rules
 	          -> [IdCoreRule]
   -- The complete rules are gotten by combining
   --	a) the orphan rules
   --	b) rules embedded in the top-level Ids
-findExternalRules binds orphan_rules ext_ids
-  | opt_OmitInterfacePragmas = []
+findExternalRules omit_iface_prags binds orphan_rules ext_ids
+  | omit_iface_prags = []
   | otherwise
   = filter needed_rule (orphan_rules ++ local_rules)
   where
@@ -302,11 +305,12 @@ findExternalRules binds orphan_rules ext_ids
 %************************************************************************
 
 \begin{code}
-findExternalSet :: [CoreBind] -> [IdCoreRule]
+findExternalSet :: Bool -- omit interface pragmas
+		-> [CoreBind] -> [IdCoreRule]
 		-> IdEnv Bool	-- In domain => external
 				-- Range = True <=> show unfolding
 	-- Step 1 from the notes above
-findExternalSet binds orphan_rules
+findExternalSet omit_iface_prags binds orphan_rules
   = foldr find init_needed binds
   where
     orphan_rule_ids :: IdSet
@@ -320,7 +324,7 @@ findExternalSet binds orphan_rules
 	-- (When we come to the binding site we may change our mind, of course.)
 
     find (NonRec id rhs) needed
-	| need_id needed id = addExternal (id,rhs) needed
+	| need_id needed id = addExternal omit_iface_prags (id,rhs) needed
 	| otherwise 	    = needed
     find (Rec prs) needed   = find_prs prs needed
 
@@ -330,7 +334,7 @@ findExternalSet binds orphan_rules
 	| otherwise	  = find_prs other_prs new_needed
 	where
 	  (needed_prs, other_prs) = partition (need_pr needed) prs
-	  new_needed = foldr addExternal needed needed_prs
+	  new_needed = foldr (addExternal omit_iface_prags) needed needed_prs
 
 	-- The 'needed' set contains the Ids that are needed by earlier
 	-- interface file emissions.  If the Id isn't in this set, and isn't
@@ -338,10 +342,10 @@ findExternalSet binds orphan_rules
     need_id needed_set id       = id `elemVarEnv` needed_set || isExportedId id 
     need_pr needed_set (id,rhs)	= need_id needed_set id
 
-addExternal :: (Id,CoreExpr) -> IdEnv Bool -> IdEnv Bool
+addExternal :: Bool -> (Id,CoreExpr) -> IdEnv Bool -> IdEnv Bool
 -- The Id is needed; extend the needed set
 -- with it and its dependents (free vars etc)
-addExternal (id,rhs) needed
+addExternal omit_iface_prags (id,rhs) needed
   = extendVarEnv (foldVarSet add_occ needed new_needed_ids)
 		 id show_unfold
   where
@@ -349,10 +353,10 @@ addExternal (id,rhs) needed
 	-- "False" because we don't know we need the Id's unfolding
 	-- We'll override it later when we find the binding site
 
-    new_needed_ids | opt_OmitInterfacePragmas = emptyVarSet
-	           | otherwise		      = worker_ids	`unionVarSet`
-						unfold_ids	`unionVarSet`
-						spec_ids
+    new_needed_ids | omit_iface_prags = emptyVarSet
+	           | otherwise	      = worker_ids	`unionVarSet`
+					unfold_ids	`unionVarSet`
+					spec_ids
 
     idinfo	   = idInfo id
     dont_inline	   = isNeverActive (inlinePragInfo idinfo)

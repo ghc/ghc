@@ -31,7 +31,7 @@ import RnEnv
 import RnNames		( importsFromLocalDecls )
 import RnTypes		( rnHsTypeFVs, rnPat, litFVs, rnOverLit, rnPatsAndThen,
 			  dupFieldErr, precParseErr, sectionPrecErr, patSigErr, checkTupSize )
-import CmdLineOpts	( DynFlag(..), opt_IgnoreAsserts )
+import CmdLineOpts	( DynFlag(..) )
 import BasicTypes	( Fixity(..), FixityDirection(..), IPName(..),
 			  defaultFixity, negateFixity, compareFixity )
 import PrelNames	( hasKey, assertIdKey, 
@@ -159,7 +159,8 @@ rnExpr :: RdrNameHsExpr -> RnM (RenamedHsExpr, FreeVars)
 
 rnExpr (HsVar v)
   = lookupOccRn v	`thenM` \ name ->
-    if name `hasKey` assertIdKey && not opt_IgnoreAsserts then
+    doptM Opt_IgnoreAsserts `thenM` \ ignore_asserts ->
+    if name `hasKey` assertIdKey && not ignore_asserts then
 	-- We expand it to (GHC.Err.assertError location_string)
         mkAssertErrorExpr	`thenM` \ (e, fvs) ->
 	returnM (e, fvs `addOneFV` name)

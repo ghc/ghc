@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.123 2003/09/16 13:03:44 simonmar Exp $
+$Id: Parser.y,v 1.124 2003/09/23 14:33:02 simonmar Exp $
 
 Haskell grammar.
 
@@ -814,19 +814,19 @@ forall :: { [RdrNameHsTyVar] }
 
 constr_stuff :: { (RdrName, RdrNameConDetails) }
 	: btype				{% mkPrefixCon $1 [] }
-	| btype '!' atype satypes	{% mkPrefixCon $1 (BangType MarkedUserStrict $3 : $4) }
+	| btype strict_mark atype satypes {% mkPrefixCon $1 (BangType $2 $3 : $4) }
 	| oqtycon '{' '}' 		{% mkRecCon $1 [] }
 	| oqtycon '{' fielddecls '}' 	{% mkRecCon $1 $3 }
 	| sbtype conop sbtype		{ ($2, InfixCon $1 $3) }
 
 satypes	:: { [RdrNameBangType] }
 	: atype satypes			{ unbangedType $1 : $2 }
-	| '!' atype satypes		{ BangType MarkedUserStrict $2 : $3 }
+	| strict_mark atype satypes	{ BangType $1 $2 : $3 }
 	| {- empty -}			{ [] }
 
 sbtype :: { RdrNameBangType }
 	: btype				{ unbangedType $1 }
-	| '!' atype			{ BangType MarkedUserStrict $2 }
+	| strict_mark atype		{ BangType $1 $2 }
 
 fielddecls :: { [([RdrName],RdrNameBangType)] }
 	: fielddecl ',' fielddecls	{ $1 : $3 }
@@ -837,7 +837,11 @@ fielddecl :: { ([RdrName],RdrNameBangType) }
 
 stype :: { RdrNameBangType }
 	: ctype				{ unbangedType $1 }
-	| '!' atype			{ BangType MarkedUserStrict $2 }
+	| strict_mark atype		{ BangType $1 $2 }
+
+strict_mark :: { StrictnessMark }
+	: '!'				{ MarkedUserStrict }
+	| '!' '!'			{ MarkedUserUnboxed }
 
 deriving :: { Maybe RdrNameContext }
 	: {- empty -}			{ Nothing }

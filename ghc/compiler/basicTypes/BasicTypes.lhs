@@ -402,6 +402,7 @@ e.g. 	data T = MkT !Int !(Bool,Bool)
 \begin{code}
 data StrictnessMark
    = MarkedUserStrict	-- "!"  in a source decl
+   | MarkedUserUnboxed  -- "!!" in a source decl
    | MarkedStrict	-- "!"  in an interface decl: strict but not unboxed
    | MarkedUnboxed	-- "!!" in an interface decl: unboxed 
    | NotMarkedStrict	-- No annotation at all

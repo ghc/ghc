@@ -10,7 +10,7 @@ module SimplCore ( core2core, simplifyExpr ) where
 
 import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..),
 			  SimplifierMode(..), DynFlags, DynFlag(..), dopt,
-			  dopt_CoreToDo
+			  dopt_CoreToDo, buildCoreToDo
 			)
 import CoreSyn
 import CoreFVs		( ruleRhsFreeVars )
@@ -77,7 +77,9 @@ core2core hsc_env pkg_rule_base
         let dflags 	  = hsc_dflags hsc_env
 	    hpt		  = hsc_HPT hsc_env
 	    ghci_mode	  = hsc_mode hsc_env
-	    core_todos    = dopt_CoreToDo dflags
+	    core_todos
+		| Just todo <- dopt_CoreToDo dflags  =  todo
+		| otherwise			     =  buildCoreToDo dflags
 
 	us <-  mkSplitUniqSupply 's'
 	let (cp_us, ru_us) = splitUniqSupply us

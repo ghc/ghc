@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.124 2003/09/10 16:44:05 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.125 2003/09/23 14:32:59 simonmar Exp $
 --
 -- Driver flags
 --
@@ -307,27 +307,10 @@ static_flags =
   ,  ( "Rghc-timing"	   , NoArg  (enableTimingStats) )
 
         ------ Compiler flags -----------------------------------------------
-  ,  ( "O2-for-C"	   , NoArg (writeIORef v_minus_o2_for_C True) )
-  ,  ( "O"		   , NoArg (setOptLevel 1))
-  ,  ( "Onot"		   , NoArg (setOptLevel 0))
-  ,  ( "O"		   , PrefixPred (all isDigit) (setOptLevel . read))
-
   ,  ( "fno-asm-mangling"  , NoArg (writeIORef v_Do_asm_mangling False) )
-
-  ,  ( "fmax-simplifier-iterations", 
-		PrefixPred (all isDigit) (writeIORef v_MaxSimplifierIterations . read) )
-
-  ,  ( "frule-check", 
-		SepArg (\s -> writeIORef v_RuleCheck (Just s)) )
 
   ,  ( "fexcess-precision" , NoArg (do writeIORef v_Excess_precision True
 				       add v_Opt_C "-fexcess-precision"))
-
-	-- Optimisation flags are treated specially, so the normal
-	-- -fno-* pattern below doesn't work.  We therefore allow
-	-- certain optimisation passes to be turned off explicitly:
-  ,  ( "fno-strictness"	   , NoArg (writeIORef v_Strictness False) )
-  ,  ( "fno-cse"	   , NoArg (writeIORef v_CSE False) )
 
 	-- All other "-fno-<blah>" options cancel out "-f<blah>" on the hsc cmdline
   ,  ( "fno-",			PrefixPred (\s -> isStaticHscFlag ("f"++s))
@@ -417,6 +400,19 @@ dynamic_flags = [
   ,  ( "Wnot"		, NoArg (mapM_ unSetDynFlag minusWallOpts) ) /* DEPREC */
   ,  ( "w"		, NoArg (mapM_ unSetDynFlag minusWallOpts) )
 
+	------ Optimisation flags ------------------------------------------
+  ,  ( "O"		   , NoArg (setOptLevel 1))
+  ,  ( "Onot"		   , NoArg (setOptLevel 0))
+  ,  ( "O"		   , PrefixPred (all isDigit) (setOptLevel . read))
+
+  ,  ( "fmax-simplifier-iterations", 
+		PrefixPred (all isDigit) 
+		  (\n -> updDynFlags (\dfs -> 
+			dfs{ maxSimplIterations = read n })) )
+
+  ,  ( "frule-check", 
+		SepArg (\s -> updDynFlags (\dfs -> dfs{ ruleCheck = Just s })))
+
         ------ Compiler flags -----------------------------------------------
 
   ,  ( "fasm",		AnySuffix (\_ -> setLang HscAsm) )
@@ -464,7 +460,16 @@ fFlags = [
   ( "allow-overlapping-instances", 	Opt_AllowOverlappingInstances ),
   ( "allow-undecidable-instances", 	Opt_AllowUndecidableInstances ),
   ( "allow-incoherent-instances", 	Opt_AllowIncoherentInstances ),
-  ( "generics",  			Opt_Generics )
+  ( "generics",  			Opt_Generics ),
+  ( "strictness",			Opt_Strictness ),
+  ( "cse",				Opt_CSE ),
+  ( "ignore-interface-pragmas",		Opt_IgnoreInterfacePragmas ),
+  ( "omit-interface-pragmas",		Opt_OmitInterfacePragmas ),
+  ( "do-lambda-eta-expansion",		Opt_DoLambdaEtaExpansion ),
+  ( "ignore-asserts",			Opt_IgnoreAsserts ),
+  ( "do-eta-reduction",			Opt_DoEtaReduction ),
+  ( "case-merge",			Opt_CaseMerge ),
+  ( "unbox-strict-fields",		Opt_UnboxStrictFields )
   ]
 
 glasgowExtsFlags = [ Opt_GlasgowExts, Opt_FFI, Opt_TH, Opt_ImplicitParams ]
@@ -506,21 +511,10 @@ buildStaticHscOpts = do
 
   opt_C_ <- getStaticOpts v_Opt_C	-- misc hsc opts from the command line
 
-	-- optimisation
-  minus_o <- readIORef v_OptLevel
-  let optimisation_opts = 
-        case minus_o of
-	    0 -> hsc_minusNoO_flags
-	    1 -> hsc_minusO_flags
-	    2 -> hsc_minusO2_flags
-	    n -> throwDyn (CmdLineError ("unknown optimisation level: "
-					  ++ show n))
-	    -- ToDo: -Ofile
- 
 	-- take into account -fno-* flags by removing the equivalent -f*
 	-- flag from our list.
   anti_flags <- getStaticOpts v_Anti_opt_C
-  let basic_opts = opt_C_ ++ optimisation_opts
+  let basic_opts = opt_C_
       filtered_opts = filter (`notElem` anti_flags) basic_opts
 
   static <- (do s <- readIORef v_Static; if s then return "-static" 

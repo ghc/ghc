@@ -690,10 +690,6 @@ runPhase cc_phase basename suff input_fn get_output_fn maybe_loc
 
         verb <- getVerbFlag
 
-	o2 <- readIORef v_minus_o2_for_C
-	let opt_flag | o2        = "-O2"
-		     | otherwise = "-O"
-
 	pkg_extra_cc_opts <- getPackageExtraCcOpts pkgs
 
 	split_objs <- readIORef v_Split_object_files
@@ -718,7 +714,7 @@ runPhase cc_phase basename suff input_fn get_output_fn maybe_loc
 		       ++ (if cc_phase == HCc && mangle
 		  	     then md_regd_c_flags
 		  	     else [])
-		       ++ [ verb, "-S", "-Wimplicit", opt_flag ]
+		       ++ [ verb, "-S", "-Wimplicit", "-O" ]
 		       ++ [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt ]
 		       ++ cc_opts
 		       ++ split_opt

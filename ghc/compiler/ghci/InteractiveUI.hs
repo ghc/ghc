@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.159 2003/09/04 11:08:46 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.160 2003/09/23 14:32:58 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -492,7 +492,7 @@ info s = do
     showThing (ty_thing, fixity) 
 	= vcat [ text "-- " <> showTyThing ty_thing, 
 		 showFixity fixity (getName ty_thing),
-	         ppr (ifaceTyThing ty_thing) ]
+	         ppr (ifaceTyThing True{-omit prags-} ty_thing) ]
 
     showFixity fix name
 	| fix == defaultFixity = empty
@@ -723,10 +723,10 @@ browseModule m exports_only = do
 
       thing_names = map getName things
 
-      thingDecl thing@(AnId id)  = ifaceTyThing thing
+      thingDecl thing@(AnId id)  = ifaceTyThing True{-omit prags-} thing
 
       thingDecl thing@(AClass c) =
-        let rn_decl = ifaceTyThing thing in
+        let rn_decl = ifaceTyThing True{-omit prags-} thing in
 	case rn_decl of
 	  ClassDecl { tcdSigs = cons } -> 
 		rn_decl{ tcdSigs = filter methodIsVisible cons }
@@ -735,7 +735,7 @@ browseModule m exports_only = do
            methodIsVisible (ClassOpSig n _ _ _) = n `elem` thing_names
 
       thingDecl thing@(ATyCon t) =
-        let rn_decl = ifaceTyThing thing in
+        let rn_decl = ifaceTyThing True{-omit prags-} thing in
 	case rn_decl of
 	  TyData { tcdCons = DataCons cons } -> 
 		rn_decl{ tcdCons = DataCons (filter conIsVisible cons) }
@@ -746,8 +746,6 @@ browseModule m exports_only = do
   io (putStrLn (showSDocForUser unqual (
    	 vcat (map (ppr . thingDecl) things')))
    )
-
-  where
 
 -----------------------------------------------------------------------------
 -- Setting the module context
@@ -963,7 +961,7 @@ showBindings = do
   cms <- getCmState
   let
 	unqual = cmGetPrintUnqual cms
-	showBinding b = putStrLn (showSDocForUser unqual (ppr (ifaceTyThing b)))
+	showBinding b = putStrLn (showSDocForUser unqual (ppr (ifaceTyThing True{-omit prags-} b)))
 
   io (mapM_ showBinding (cmGetBindings cms))
   return ()

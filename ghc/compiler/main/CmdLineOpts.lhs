@@ -6,7 +6,7 @@
 \begin{code}
 
 module CmdLineOpts (
-	CoreToDo(..), StgToDo(..),
+	CoreToDo(..), buildCoreToDo, StgToDo(..),
 	SimplifierSwitch(..), 
 	SimplifierMode(..), FloatOutSwitches(..),
 
@@ -30,6 +30,7 @@ module CmdLineOpts (
 	getOpts,			-- (DynFlags -> [a]) -> IO [a]
 	setLang,
 	getVerbFlag,
+	setOptLevel,
 
 	-- Manipulating the DynFlags state
 	getDynFlags,			-- IO DynFlags
@@ -74,14 +75,9 @@ module CmdLineOpts (
 	opt_NoMethodSharing,
 	opt_DoSemiTagging,
 	opt_LiberateCaseThreshold,
-	opt_StgDoLetNoEscapes,
 	opt_CprOff,
 	opt_RulesOff,
-	opt_UnboxStrictFields,
 	opt_SimplNoPreInlining,
-	opt_SimplDoEtaReduction,
-	opt_SimplDoLambdaEtaExpansion,
-	opt_SimplCaseMerge,
 	opt_SimplExcessPrecision,
 	opt_MaxWorkerArgs,
 
@@ -101,11 +97,8 @@ module CmdLineOpts (
 	opt_GranMacros,
 	opt_HiVersion,
 	opt_HistorySize,
-	opt_IgnoreAsserts,
-	opt_IgnoreIfacePragmas,
         opt_NoHiCheck,
 	opt_OmitBlackHoling,
-	opt_OmitInterfacePragmas,
 	opt_NoPruneDecls,
 	opt_Static,
 	opt_Unregisterised,
@@ -297,10 +290,21 @@ data DynFlag
    | Opt_Generics
    | Opt_NoImplicitPrelude 
 
+   -- optimisation opts
+   | Opt_Strictness
+   | Opt_CSE
+   | Opt_IgnoreInterfacePragmas
+   | Opt_OmitInterfacePragmas
+   | Opt_DoLambdaEtaExpansion
+   | Opt_IgnoreAsserts
+   | Opt_DoEtaReduction
+   | Opt_CaseMerge
+   | Opt_UnboxStrictFields
+
    deriving (Eq)
 
 data DynFlags = DynFlags {
-  coreToDo   		:: [CoreToDo],
+  coreToDo   		:: Maybe [CoreToDo], -- reserved for use with -Ofile
   stgToDo    		:: [StgToDo],
   hscLang    		:: HscLang,
   hscOutName 		:: String,  	-- name of the output file
@@ -308,6 +312,9 @@ data DynFlags = DynFlags {
   hscStubCOutName	:: String,  	-- name of the .stub_c output file
   extCoreName		:: String,	-- name of the .core output file
   verbosity  		:: Int,	 	-- verbosity level
+  optLevel		:: Int,		-- optimisation level
+  maxSimplIterations    :: Int,		-- max simplifier iterations
+  ruleCheck		:: Maybe String,
   cppFlag    		:: Bool,	-- preprocess with cpp?
   ppFlag                :: Bool,        -- preprocess with a Haskell Pp?
   stolen_x86_regs	:: Int,		
@@ -346,12 +353,15 @@ defaultHscLang
   | otherwise					=  HscC
 
 defaultDynFlags = DynFlags {
-  coreToDo = [], stgToDo = [], 
+  coreToDo = Nothing, stgToDo = [], 
   hscLang = defaultHscLang, 
   hscOutName = "", 
   hscStubHOutName = "", hscStubCOutName = "",
   extCoreName = "",
-  verbosity = 0, 
+  verbosity		= 0, 
+  optLevel		= 0,
+  maxSimplIterations    = 4,
+  ruleCheck		= Nothing,
   cppFlag		= False,
   ppFlag                = False,
   stolen_x86_regs	= 4,
@@ -366,9 +376,21 @@ defaultDynFlags = DynFlags {
   opt_I                 = [],
   opt_i                 = [],
 #endif
-  flags = [Opt_Generics] ++ standardWarnings,
-	-- Generating the helper-functions for
-	-- generics is now on by default
+  flags = [ 
+	    Opt_Generics,
+			-- Generating the helper-functions for
+			-- generics is now on by default
+	    Opt_Strictness,
+			-- strictness is on by default, but this only
+			-- applies to -O.
+	    Opt_CSE,
+			-- similarly for CSE.
+	    Opt_DoLambdaEtaExpansion
+			-- This one is important for a tiresome reason:
+			-- we want to make sure that the bindings for data 
+			-- constructors are eta-expanded.  This is probably
+			-- a good thing anyway, but it seems fragile.
+           ] ++ standardWarnings,
   }
 
 {- 
@@ -385,7 +407,7 @@ defaultDynFlags = DynFlags {
 dopt :: DynFlag -> DynFlags -> Bool
 dopt f dflags  = f `elem` (flags dflags)
 
-dopt_CoreToDo :: DynFlags -> [CoreToDo]
+dopt_CoreToDo :: DynFlags -> Maybe [CoreToDo]
 dopt_CoreToDo = coreToDo
 
 dopt_StgToDo :: DynFlags -> [StgToDo]
@@ -418,9 +440,173 @@ setLang l = updDynFlags (\ dfs -> case hscLang dfs of
 getVerbFlag = do
    verb <- dynFlag verbosity
    if verb >= 3  then return  "-v" else return ""
-\end{code}
 
 -----------------------------------------------------------------------------
+-- Setting the optimisation level
+
+setOptLevel :: Int -> IO ()
+setOptLevel n 
+  = do dflags <- getDynFlags
+       if hscLang dflags == HscInterpreted && n > 0
+	  then putStr "warning: -O conflicts with --interactive; -O ignored.\n"
+	  else updDynFlags (setOptLevel' n)
+
+setOptLevel' n dfs
+  = if (n >= 1)
+     then dfs2{ hscLang = HscC, optLevel = n } -- turn on -fvia-C with -O
+     else dfs2{ optLevel = n }
+  where
+   dfs1 = foldr (flip dopt_unset) dfs  remove_dopts
+   dfs2 = foldr (flip dopt_set)   dfs1 extra_dopts
+
+   extra_dopts
+	| n == 0    = opt_0_dopts
+	| otherwise = opt_1_dopts
+
+   remove_dopts
+	| n == 0    = opt_1_dopts
+	| otherwise = opt_0_dopts
+	
+opt_0_dopts =  [ 
+	Opt_IgnoreInterfacePragmas,
+	Opt_OmitInterfacePragmas
+    ]
+
+opt_1_dopts = [
+	Opt_IgnoreAsserts,
+	Opt_DoEtaReduction,
+	Opt_CaseMerge
+     ]
+
+-- Core-to-core phases:
+
+buildCoreToDo :: DynFlags -> [CoreToDo]
+buildCoreToDo dflags = core_todo
+  where
+    opt_level  = optLevel dflags
+    max_iter   = maxSimplIterations dflags
+    strictness = dopt Opt_Strictness dflags
+    cse        = dopt Opt_CSE dflags
+    rule_check = ruleCheck dflags
+
+    core_todo = 
+     if opt_level == 0 then
+      [
+	CoreDoSimplify (SimplPhase 0) [
+	    MaxSimplifierIterations max_iter
+	]
+      ]
+
+     else {- opt_level >= 1 -} [ 
+
+	-- initial simplify: mk specialiser happy: minimum effort please
+	CoreDoSimplify SimplGently [
+			-- 	Simplify "gently"
+			-- Don't inline anything till full laziness has bitten
+			-- In particular, inlining wrappers inhibits floating
+			-- e.g. ...(case f x of ...)...
+			--  ==> ...(case (case x of I# x# -> fw x#) of ...)...
+			--  ==> ...(case x of I# x# -> case fw x# of ...)...
+			-- and now the redex (f x) isn't floatable any more
+			-- Similarly, don't apply any rules until after full 
+			-- laziness.  Notably, list fusion can prevent floating.
+
+            NoCaseOfCase,
+			-- Don't do case-of-case transformations.
+			-- This makes full laziness work better
+	    MaxSimplifierIterations max_iter
+	],
+
+	-- Specialisation is best done before full laziness
+	-- so that overloaded functions have all their dictionary lambdas manifest
+	CoreDoSpecialising,
+
+	CoreDoFloatOutwards (FloatOutSw False False),
+	CoreDoFloatInwards,
+
+	CoreDoSimplify (SimplPhase 2) [
+		-- Want to run with inline phase 2 after the specialiser to give
+		-- maximum chance for fusion to work before we inline build/augment
+		-- in phase 1.  This made a difference in 'ansi' where an 
+		-- overloaded function wasn't inlined till too late.
+	   MaxSimplifierIterations max_iter
+	],
+	case rule_check of { Just pat -> CoreDoRuleCheck 2 pat; Nothing -> CoreDoNothing },
+
+	CoreDoSimplify (SimplPhase 1) [
+		-- Need inline-phase2 here so that build/augment get 
+		-- inlined.  I found that spectral/hartel/genfft lost some useful
+		-- strictness in the function sumcode' if augment is not inlined
+		-- before strictness analysis runs
+	   MaxSimplifierIterations max_iter
+	],
+	case rule_check of { Just pat -> CoreDoRuleCheck 1 pat; Nothing -> CoreDoNothing },
+
+	CoreDoSimplify (SimplPhase 0) [
+		-- Phase 0: allow all Ids to be inlined now
+		-- This gets foldr inlined before strictness analysis
+
+	   MaxSimplifierIterations 3
+		-- At least 3 iterations because otherwise we land up with
+		-- huge dead expressions because of an infelicity in the 
+		-- simpifier.   
+		--	let k = BIG in foldr k z xs
+		-- ==>  let k = BIG in letrec go = \xs -> ...(k x).... in go xs
+		-- ==>  let k = BIG in letrec go = \xs -> ...(BIG x).... in go xs
+		-- Don't stop now!
+
+	],
+	case rule_check of { Just pat -> CoreDoRuleCheck 0 pat; Nothing -> CoreDoNothing },
+
+#ifdef OLD_STRICTNESS
+	CoreDoOldStrictness
+#endif
+	if strictness then CoreDoStrictness else CoreDoNothing,
+	CoreDoWorkerWrapper,
+	CoreDoGlomBinds,
+
+	CoreDoSimplify (SimplPhase 0) [
+	   MaxSimplifierIterations max_iter
+	],
+
+	CoreDoFloatOutwards (FloatOutSw False	-- Not lambdas
+					True),	-- Float constants
+		-- nofib/spectral/hartel/wang doubles in speed if you
+		-- do full laziness late in the day.  It only happens
+		-- after fusion and other stuff, so the early pass doesn't
+		-- catch it.  For the record, the redex is 
+		--	  f_el22 (f_el21 r_midblock)
+
+
+	-- We want CSE to follow the final full-laziness pass, because it may
+	-- succeed in commoning up things floated out by full laziness.
+	-- CSE used to rely on the no-shadowing invariant, but it doesn't any more
+
+	if cse then CoreCSE else CoreDoNothing,
+
+	CoreDoFloatInwards,
+
+-- Case-liberation for -O2.  This should be after
+-- strictness analysis and the simplification which follows it.
+
+	case rule_check of { Just pat -> CoreDoRuleCheck 0 pat; Nothing -> CoreDoNothing },
+
+	if opt_level >= 2 then
+	   CoreLiberateCase
+	else
+	   CoreDoNothing,
+	if opt_level >= 2 then
+	   CoreDoSpecConstr
+	else
+	   CoreDoNothing,
+
+	-- Final clean-up simplification:
+	CoreDoSimplify (SimplPhase 0) [
+	  MaxSimplifierIterations max_iter
+	]
+     ]
+
+-- --------------------------------------------------------------------------
 -- Mess about with the mutable variables holding the dynamic arguments
 
 -- v_InitDynFlags 
@@ -433,7 +619,6 @@ getVerbFlag = do
 --	to the value of v_InitDynFlags before each compilation, then
 --	updated by reading any OPTIONS pragma in the current module.
 
-\begin{code}
 GLOBAL_VAR(v_InitDynFlags, defaultDynFlags, DynFlags)
 GLOBAL_VAR(v_DynFlags,     defaultDynFlags, DynFlags)
 
@@ -590,8 +775,6 @@ opt_CprOff			= lookUp  FSLIT("-fcpr-off")
 opt_RulesOff			= lookUp  FSLIT("-frules-off")
 	-- Switch off CPR analysis in the new demand analyser
 opt_LiberateCaseThreshold	= lookup_def_int "-fliberate-case-threshold" (10::Int)
-opt_StgDoLetNoEscapes		= lookUp  FSLIT("-flet-no-escape")
-opt_UnboxStrictFields		= lookUp  FSLIT("-funbox-strict-fields")
 opt_MaxWorkerArgs		= lookup_def_int "-fmax-worker-args" (10::Int)
 
 {-
@@ -608,20 +791,14 @@ opt_EnsureSplittableC		= lookUp  FSLIT("-fglobalise-toplev-names")
 opt_GranMacros			= lookUp  FSLIT("-fgransim")
 opt_HiVersion			= read (cProjectVersionInt ++ cProjectPatchLevel) :: Int
 opt_HistorySize			= lookup_def_int "-fhistory-size" 20
-opt_IgnoreAsserts               = lookUp  FSLIT("-fignore-asserts")
-opt_IgnoreIfacePragmas		= lookUp  FSLIT("-fignore-interface-pragmas")
 opt_NoHiCheck                   = lookUp  FSLIT("-fno-hi-version-check")
 opt_OmitBlackHoling		= lookUp  FSLIT("-dno-black-holing")
-opt_OmitInterfacePragmas	= lookUp  FSLIT("-fomit-interface-pragmas")
 opt_RuntimeTypes		= lookUp  FSLIT("-fruntime-types")
 
 -- Simplifier switches
 opt_SimplNoPreInlining		= lookUp  FSLIT("-fno-pre-inlining")
 	-- NoPreInlining is there just to see how bad things
 	-- get if you don't do it!
-opt_SimplDoEtaReduction		= lookUp  FSLIT("-fdo-eta-reduction")
-opt_SimplDoLambdaEtaExpansion	= lookUp  FSLIT("-fdo-lambda-eta-expansion")
-opt_SimplCaseMerge		= lookUp  FSLIT("-fcase-merge")
 opt_SimplExcessPrecision	= lookUp  FSLIT("-fexcess-precision")
 
 -- Unfolding control
@@ -664,21 +841,14 @@ isStaticHscFlag f =
 	"fflatten",
 	"fsemi-tagging",
 	"flet-no-escape",
-	"funbox-strict-fields",
 	"femit-extern-decls",
 	"fglobalise-toplev-names",
 	"fgransim",
-	"fignore-asserts",
-	"fignore-interface-pragmas",
 	"fno-hi-version-check",
 	"dno-black-holing",
 	"fno-method-sharing",
-	"fomit-interface-pragmas",
 	"fruntime-types",
 	"fno-pre-inlining",
-	"fdo-eta-reduction",
-	"fdo-lambda-eta-expansion",
-	"fcase-merge",
 	"fexcess-precision",
 	"funfolding-update-in-place",
 	"fno-prune-decls",

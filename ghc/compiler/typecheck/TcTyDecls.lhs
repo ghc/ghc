@@ -12,7 +12,7 @@ import HsSyn		( TyClDecl(..), ConDecl(..), HsConDetails(..), BangType,
 			  getBangType, getBangStrictness, conDetailsTys
 			)
 import RnHsSyn		( RenamedTyClDecl, RenamedConDecl, RenamedContext )
-import BasicTypes	( NewOrData(..), StrictnessMark )
+import BasicTypes	( NewOrData(..), StrictnessMark(..) )
 
 import TcMonoType	( tcHsTyVars, tcHsTheta, tcHsType, 
 			  kcHsContext, kcHsSigType, kcHsLiftedSigType
@@ -178,8 +178,18 @@ tcMkDataCon src_name arg_stricts fields
 	-- This last one takes the name of the data constructor in the source
 	-- code, which (for Haskell source anyway) will be in the SrcDataName name
 	-- space, and makes it into a "real data constructor name"
+
+    doptM Opt_UnboxStrictFields  `thenM` \ unbox_strict_fields ->
+
     let
-	data_con = mkDataCon src_name arg_stricts fields
+	real_stricts 
+	  | unbox_strict_fields  = map unboxUserStrict arg_stricts
+	  | otherwise            = arg_stricts
+
+	unboxUserStrict MarkedUserStrict = MarkedUserUnboxed
+	unboxUserStrict other            = other
+
+	data_con = mkDataCon src_name real_stricts fields
 			     tyvars (thinContext arg_tys ctxt) 
 			     ex_tyvars ex_theta
 			     arg_tys tycon 

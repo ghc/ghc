@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.132 2003/09/04 11:08:47 simonmar Exp $
+-- $Id: Main.hs,v 1.133 2003/09/23 14:33:00 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -31,12 +31,12 @@ import Packages		( showPackages, getPackageConfigMap, basePackage,
 			  haskell98Package
 			)
 import DriverPipeline	( staticLink, doMkDLL, runPipeline )
-import DriverState	( buildCoreToDo, buildStgToDo,
+import DriverState	( buildStgToDo,
 			  findBuildTag, 
 			  getPackageExtraGhcOpts, unregFlags, 
 			  v_GhcMode, v_GhcModeFlag, GhcMode(..),
 			  v_Keep_tmp_files, v_Ld_inputs, v_Ways, 
-			  v_OptLevel, v_Output_file, v_Output_hi, 
+			  v_Output_file, v_Output_hi, 
 			  readPackageConf, verifyOutputFiles, v_NoLink,
 			  v_Build_tag
 			)
@@ -141,10 +141,6 @@ main =
 
 	-- -O and --interactive are not a good combination
 	-- ditto with any kind of way selection
-   orig_opt_level <- readIORef v_OptLevel
-   when (orig_opt_level > 0 && isInteractive mode) $
-      do putStr "warning: -O conflicts with --interactive; -O turned off.\n"
-         writeIORef v_OptLevel 0
    orig_ways <- readIORef v_Ways
    when (notNull orig_ways && isInteractive mode) $
       do throwDyn (UsageError 
@@ -167,7 +163,6 @@ main =
    -- build the default DynFlags (these may be adjusted on a per
    -- module basis by OPTIONS pragmas and settings in the interpreter).
 
-   core_todo <- buildCoreToDo
    stg_todo  <- buildStgToDo
 
    -- set the "global" HscLang.  The HscLang can be further adjusted on a module
@@ -183,8 +178,7 @@ main =
 		-- for ways other that the normal way, we must 
 		-- compile via C.
 
-   setDynFlags (dyn_flags{ coreToDo = core_todo,
-			   stgToDo  = stg_todo,
+   setDynFlags (dyn_flags{ stgToDo  = stg_todo,
                   	   hscLang  = lang,
 			   -- leave out hscOutName for now
 	                   hscOutName = panic "Main.main:hscOutName not set",

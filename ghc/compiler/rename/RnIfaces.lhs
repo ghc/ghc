@@ -12,7 +12,7 @@ where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_IgnoreIfacePragmas, opt_NoPruneDecls )
+import CmdLineOpts	( DynFlag(..), opt_NoPruneDecls )
 import HscTypes
 import HsSyn		( HsDecl(..), Sig(..), TyClDecl(..), ConDecl(..), HsConDetails(..),
 			  InstDecl(..), HsType(..), hsTyVarNames, getBangType
@@ -535,9 +535,9 @@ ppr_brief_inst_decl (mod, InstDecl inst_ty _ _ _ _)
 getImportedRules :: NameSet 	-- Slurped already
 		 -> TcRn m [(Module,RdrNameRuleDecl)]
 getImportedRules slurped
-  | opt_IgnoreIfacePragmas = returnM []
-  | otherwise
-  = getEps		`thenM` \ eps ->
+  = doptM Opt_IgnoreInterfacePragmas 	`thenM` \ ignore_prags ->
+    if ignore_prags then returnM [] else -- ...
+    getEps		`thenM` \ eps ->
     getInGlobalScope	`thenM` \ in_type_env ->
     let		-- Slurp rules for anything that is slurped, 
 		-- either now, or previously

@@ -41,7 +41,6 @@ import FieldLabel	( FieldLabel )
 import BasicTypes	( Arity, StrictnessMark(..) )
 import Outputable
 import Unique		( Unique, Uniquable(..) )
-import CmdLineOpts	( opt_UnboxStrictFields )
 import Maybes		( orElse )
 import ListSetOps	( assoc )
 import Util		( zipEqual, zipWithEqual, notNull )
@@ -555,12 +554,13 @@ chooseBoxingStrategy :: TyCon -> Type -> StrictnessMark -> StrictnessMark
 	-- Transforms any MarkedUserStricts into MarkUnboxed or MarkedStrict
 chooseBoxingStrategy tycon arg_ty strict
   = case strict of
-	MarkedUserStrict
-	  | opt_UnboxStrictFields
-		&& unbox arg_ty -> MarkedUnboxed
+	MarkedUserStrict -> MarkedStrict
+	MarkedUserUnboxed
+	  | can_unbox -> MarkedUnboxed
 	  | otherwise -> MarkedStrict
 	other -> strict
   where
+    can_unbox = unbox arg_ty
 	-- beware: repType will go into a loop if we try this on a recursive
 	-- type (for reasons unknown...), hence the check for recursion below.
     unbox ty =  

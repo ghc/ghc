@@ -15,7 +15,7 @@ module RnHiFiles (
 
 import DriverState	( v_GhcMode, isCompManagerMode )
 import DriverUtil	( replaceFilenameSuffix )
-import CmdLineOpts	( opt_IgnoreIfacePragmas )
+import CmdLineOpts	( DynFlag(..) )
 import Parser		( parseIface )
 import HscTypes		( ModIface(..), emptyModIface,
 			  ExternalPackageState(..), noDependencies,
@@ -287,7 +287,8 @@ loadDecls mod (decls_map, n_slurped) decls
     returnM (vers, (decls_map', n_slurped))
 
 loadDecl mod (version_map, decls_map) (version, decl)
-  = getTyClDeclBinders mod decl		`thenM` \ avail ->
+  = maybeStripPragmas decl		`thenM` \ decl ->
+    getTyClDeclBinders mod decl		`thenM` \ avail ->
     getSysBinders mod decl		`thenM` \ sys_names ->
     let
 	full_avail    = case avail of
@@ -303,7 +304,13 @@ loadDecl mod (version_map, decls_map) (version, decl)
 --    traceRn (text "Loading" <+> ppr full_avail) `thenM_`
     returnM (new_version_map, new_decls_map)
 
-
+maybeStripPragmas sig@(IfaceSig {tcdIdInfo = idinfo})
+  = doptM Opt_IgnoreInterfacePragmas 	`thenM` \ ignore_prags ->
+    if ignore_prags 
+	then returnM sig{ tcdIdInfo = [] }
+	else returnM sig
+maybeStripPragmas other
+  = returnM other
 
 -----------------
 getTyClDeclBinders :: Module -> RdrNameTyClDecl -> TcRn m AvailInfo	
@@ -435,11 +442,12 @@ loadRules :: Module
 	  -> (Version, [RdrNameRuleDecl])
 	  -> RnM (Version, IfaceRules)
 loadRules mod (rule_bag, n_slurped) (version, rules)
-  | null rules || opt_IgnoreIfacePragmas 
-  = returnM (version, (rule_bag, n_slurped))
-  | otherwise
-  = mappM (loadRule mod) rules		`thenM` \ new_rules ->
-    returnM (version, (rule_bag `unionBags` listToBag new_rules, n_slurped))
+  = doptM Opt_IgnoreInterfacePragmas 	`thenM` \ ignore_prags ->
+    if null rules || ignore_prags
+	then returnM (version, (rule_bag, n_slurped))
+	else mappM (loadRule mod) rules		`thenM` \ new_rules ->
+    	     returnM (version, (rule_bag `unionBags` 
+				  listToBag new_rules, n_slurped))
 
 loadRule :: Module -> RdrNameRuleDecl -> RnM (GatedDecl RdrNameRuleDecl)
 -- "Gate" the rule simply by whether the rule variable is

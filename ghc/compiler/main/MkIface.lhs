@@ -182,6 +182,7 @@ mkIface hsc_env location maybe_old_iface
   where
      dflags    = hsc_dflags hsc_env
      ghci_mode = hsc_mode hsc_env
+     omit_pragmas = dopt Opt_OmitInterfacePragmas dflags
 
      must_write_hi_file Nothing       = False
      must_write_hi_file (Just _diffs) = ghci_mode /= Interactive
@@ -194,7 +195,7 @@ mkIface hsc_env location maybe_old_iface
      hi_file_path = ml_hi_file location
      new_decls    = mkIfaceDecls ty_cls_dcls rule_dcls inst_dcls
      inst_dcls    = map ifaceInstance insts
-     ty_cls_dcls  = foldNameEnv ifaceTyThing_acc [] types
+     ty_cls_dcls  = foldNameEnv (ifaceTyThing_acc omit_pragmas) [] types
      rule_dcls    = map ifaceRule rules
      orphan_mod   = isOrphanModule impl
 
@@ -225,20 +226,21 @@ Implicit Ids and class tycons aren't included in interface files, so
 we miss them out of the accumulating parameter here.
 
 \begin{code}
-ifaceTyThing_acc :: TyThing -> [RenamedTyClDecl] -> [RenamedTyClDecl]
+ifaceTyThing_acc :: Bool -> TyThing -> [RenamedTyClDecl] -> [RenamedTyClDecl]
 -- Don't put implicit things into the result
-ifaceTyThing_acc (ADataCon dc) so_far 		      = so_far
-ifaceTyThing_acc (AnId   id) so_far | isImplicitId id = so_far
-ifaceTyThing_acc (ATyCon id) so_far | isClassTyCon id = so_far
-ifaceTyThing_acc other so_far = ifaceTyThing other : so_far
+ifaceTyThing_acc omit_pragmas (ADataCon dc) so_far 		     = so_far
+ifaceTyThing_acc omit_pragmas (AnId   id)   so_far | isImplicitId id = so_far
+ifaceTyThing_acc omit_pragmas (ATyCon id)   so_far | isClassTyCon id = so_far
+ifaceTyThing_acc omit_pragmas other so_far  
+ = ifaceTyThing omit_pragmas other : so_far
 \end{code}
 
 Convert *any* TyThing into a RenamedTyClDecl.  Used both for
 generating interface files and for the ':info' command in GHCi.
 
 \begin{code}
-ifaceTyThing :: TyThing -> RenamedTyClDecl
-ifaceTyThing (AClass clas) = cls_decl
+ifaceTyThing :: Bool -> TyThing -> RenamedTyClDecl
+ifaceTyThing omit_pragmas (AClass clas) = cls_decl
   where
     cls_decl = ClassDecl { tcdCtxt	= toHsContext sc_theta,
 			   tcdName	= getName clas,
@@ -264,7 +266,7 @@ ifaceTyThing (AClass clas) = cls_decl
 	  (sel_tyvars, rho_ty) = tcSplitForAllTys (idType sel_id)
 	  op_ty		       = tcFunResultTy rho_ty
 
-ifaceTyThing (ATyCon tycon) = ty_decl
+ifaceTyThing omit_pragmas (ATyCon tycon) = ty_decl
   where
     ty_decl | isSynTyCon tycon
 	    = TySynonym { tcdName   = getName tycon,
@@ -332,7 +334,7 @@ ifaceTyThing (ATyCon tycon) = ty_decl
     mk_field strict_mark field_label
 	= (getName field_label, BangType strict_mark (toHsType (fieldLabelType field_label)))
 
-ifaceTyThing (AnId id) = iface_sig
+ifaceTyThing omit_pragmas (AnId id) = iface_sig
   where
     iface_sig = IfaceSig { tcdName   = getName id, 
 			   tcdType   = toHsType id_type,
@@ -344,7 +346,7 @@ ifaceTyThing (AnId id) = iface_sig
     arity_info = arityInfo id_info
     caf_info   = idCafInfo id
 
-    hs_idinfo | opt_OmitInterfacePragmas
+    hs_idinfo | omit_pragmas
 	      = []
  	      | otherwise
   	      = catMaybes [arity_hsinfo,  caf_hsinfo,
@@ -384,7 +386,7 @@ ifaceTyThing (AnId id) = iface_sig
 		  | otherwise	= Just (HsUnfold inline_prag (toUfExpr rhs))
 
 
-ifaceTyThing (ADataCon dc)
+ifaceTyThing omit_pragmas (ADataCon dc)
 	-- This case only happens in the call to ifaceThing in InteractiveUI
 	-- Otherwise DataCons are filtered out in ifaceThing_acc
  = IfaceSig { tcdName   = getName dc, 

@@ -20,10 +20,8 @@ module SimplUtils (
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( SimplifierSwitch(..),
-			  opt_SimplDoLambdaEtaExpansion, opt_SimplDoEtaReduction,
-			  opt_SimplCaseMerge, opt_UF_UpdateInPlace
-			)
+import CmdLineOpts	( SimplifierSwitch(..), opt_UF_UpdateInPlace,
+			  DynFlag(..), dopt )
 import CoreSyn
 import CoreFVs		( exprFreeVars )
 import CoreUtils	( cheapEqExpr, exprType, exprIsTrivial,
@@ -504,15 +502,19 @@ Try three things
 
 \begin{code}
 mkLam env bndrs body cont
- | opt_SimplDoEtaReduction,
-   Just etad_lam <- tryEtaReduce bndrs body
- = tick (EtaReduction (head bndrs)) 	`thenSmpl_`
-   returnSmpl (emptyFloats env, etad_lam)
+ = getDOptsSmpl	 `thenSmpl` \dflags ->
+   mkLam' dflags env bndrs body cont
+ where
+ mkLam' dflags env bndrs body cont
+   | dopt Opt_DoEtaReduction dflags,
+     Just etad_lam <- tryEtaReduce bndrs body
+   = tick (EtaReduction (head bndrs)) 	`thenSmpl_`
+     returnSmpl (emptyFloats env, etad_lam)
 
- | opt_SimplDoLambdaEtaExpansion,
-   any isRuntimeVar bndrs
- = tryEtaExpansion body		`thenSmpl` \ body' ->
-   returnSmpl (emptyFloats env, mkLams bndrs body')
+   | dopt Opt_DoLambdaEtaExpansion dflags,
+     any isRuntimeVar bndrs
+   = tryEtaExpansion body		`thenSmpl` \ body' ->
+     returnSmpl (emptyFloats env, mkLams bndrs body')
 
 {-	Sept 01: I'm experimenting with getting the
 	full laziness pass to float out past big lambdsa
@@ -525,8 +527,8 @@ mkLam env bndrs body cont
    returnSmpl (floats, mkLams bndrs body')
 -}
 
- | otherwise 
- = returnSmpl (emptyFloats env, mkLams bndrs body)
+   | otherwise 
+   = returnSmpl (emptyFloats env, mkLams bndrs body)
 \end{code}
 
 
@@ -1007,12 +1009,16 @@ mkAlts scrut case_bndr alts@((con1,bndrs1,rhs1) : con_alts)
 --------------------------------------------------
 
 mkAlts scrut outer_bndr outer_alts
-  | opt_SimplCaseMerge,
-    (outer_alts_without_deflt, maybe_outer_deflt)   <- findDefault outer_alts,
-    Just (Case (Var scrut_var) inner_bndr inner_alts) <- maybe_outer_deflt,
-    scruting_same_var scrut_var
+  = getDOptsSmpl   `thenSmpl` \dflags ->
+    mkAlts' dflags scrut outer_bndr outer_alts
+  where
+  mkAlts' dflags scrut outer_bndr outer_alts
+    | dopt Opt_CaseMerge dflags,
+      (outer_alts_without_deflt, maybe_outer_deflt)   <- findDefault outer_alts,
+      Just (Case (Var scrut_var) inner_bndr inner_alts) <- maybe_outer_deflt,
+      scruting_same_var scrut_var
 
-  = let	    --  Eliminate any inner alts which are shadowed by the outer ones
+    = let    --  Eliminate any inner alts which are shadowed by the outer ones
     	outer_cons = [con | (con,_,_) <- outer_alts_without_deflt]
     
     	munged_inner_alts = [ (con, args, munge_rhs rhs) 
@@ -1033,24 +1039,24 @@ mkAlts scrut outer_bndr outer_alts
 	-- mkCase applied to them, so they won't have a case in their default
 	-- Secondly, if you do, you get an infinite loop, because the bindCaseBndr
 	-- in munge_rhs may put a case into the DEFAULT branch!
-  where
+    where
 	-- We are scrutinising the same variable if it's
 	-- the outer case-binder, or if the outer case scrutinises a variable
 	-- (and it's the same).  Testing both allows us not to replace the
 	-- outer scrut-var with the outer case-binder (Simplify.simplCaseBinder).
-    scruting_same_var = case scrut of
+      scruting_same_var = case scrut of
 			  Var outer_scrut -> \ v -> v == outer_bndr || v == outer_scrut
 			  other		  -> \ v -> v == outer_bndr
 
-    add_default (Just rhs) alts = (DEFAULT,[],rhs) : alts
-    add_default Nothing    alts = alts
+      add_default (Just rhs) alts = (DEFAULT,[],rhs) : alts
+      add_default Nothing    alts = alts
 
 
 --------------------------------------------------
 --	Catch-all
 --------------------------------------------------
 
-mkAlts scrut case_bndr other_alts = returnSmpl other_alts
+  mkAlts' dflags scrut case_bndr other_alts = returnSmpl other_alts
 \end{code}
 
 

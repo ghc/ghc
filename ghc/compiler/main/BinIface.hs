@@ -28,7 +28,7 @@ import Module		( moduleName )
 import OccName		( OccName )
 import RnHsSyn
 import DriverState	( v_Build_tag )
-import CmdLineOpts	( opt_IgnoreIfacePragmas, opt_HiVersion )
+import CmdLineOpts	( opt_HiVersion )
 import Panic
 import SrcLoc
 import Binary
@@ -170,9 +170,7 @@ instance (Binary name) => Binary (TyClDecl name) where
 		    name <- get bh
 		    ty <- lazyGet bh
 		    idinfo <- lazyGet bh
-		    let idinfo' | opt_IgnoreIfacePragmas = []
-			        | otherwise = idinfo
-		    return (IfaceSig name ty idinfo' noSrcLoc)
+		    return (IfaceSig name ty idinfo noSrcLoc)
 	      1 -> error "Binary.get(TyClDecl): ForeignType"
 	      2 -> do
 		    n_or_d <- get bh

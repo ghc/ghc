@@ -113,7 +113,7 @@ dsReify (ReifyOut ReifyType name)
 
 dsReify r@(ReifyOut ReifyDecl name)
   = do { thing <- dsLookupGlobal name ;
-	 mb_d <- repTyClD (ifaceTyThing thing) ;
+	 mb_d <- repTyClD (ifaceTyThing True{-omit pragmas-} thing) ;
 	 case mb_d of
 	   Just (MkC d) -> return d 
 	   Nothing	-> pprPanic "dsReify" (ppr r)
