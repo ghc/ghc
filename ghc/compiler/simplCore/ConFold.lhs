@@ -107,6 +107,16 @@ tryPrimOp TagToEnumOp [Type ty, Con (Literal (MachInt i _)) _]
 
 tryPrimOp DataToTagOp [Type ty, Con (DataCon dc) _]
   = Just (Con (Literal (mkMachInt (toInteger (dataConTag dc - fIRST_TAG)))) [])
+tryPrimOp DataToTagOp [Type ty, Var x]
+  | unfolding_is_constr
+  = Just (Con (Literal (mkMachInt (toInteger (dataConTag dc - fIRST_TAG)))) [])
+  where
+    unfolding = getIdUnfolding var
+    CoreUnfolding form guidance unf_template = unfolding
+    unfolding_is_constr = case unf_template of
+				  Con con@(DataCon _) _ -> conOkForAlt con
+				  other	    -> False
+    Con (DataCon dc) con_args = unf_template
 \end{code}
 
 \begin{code}
