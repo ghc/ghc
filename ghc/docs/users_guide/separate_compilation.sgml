@@ -83,11 +83,21 @@
 	  <term><option>-i&lt;dirs&gt;</option></term>
 	  <listitem>
 	    <para><indexterm><primary><option>-i&lt;dirs&gt;</option>
-            </primary></indexterm>This flag prepends a colon-separated
+            </primary></indexterm>This flag appends a colon-separated
             list of <filename>dirs</filename> to the &ldquo;import
-            directories&rdquo; list.  See also <XRef LinkEnd="recomp">
-            for the significance of using relative and absolute
-            pathnames in the <option>-i</option> list.</para>
+            directories&rdquo; list, which initially contains a single
+            entry: <quote>.</quote>.</para>
+
+	    <para>This list is scanned before any package directories
+            (see <xref linkend="packages">) when looking for imports,
+            but note that if you have a home module with the same name
+            as a package module then this is likely to cause trouble
+            in other ways, with link errors being the least nasty
+            thing that can go wrong...</para>
+
+	    <para>See also <XRef LinkEnd="recomp"> for the
+            significance of using relative and absolute pathnames in
+            the <option>-i</option> list.</para>
 	  </listitem>
 	</varlistentry>
 
