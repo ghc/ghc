@@ -1,4 +1,8 @@
+#if __GLASGOW_HASKELL__ && __GLASGOW_HASKELL__ < 409
+#include <Rts.h>
+#endif
 #include <HsFFI.h>
+
 #include <stddef.h>
 #include <string.h>
 #include <stdio.h>
@@ -7,7 +11,18 @@
 #define offsetof(t, f) ((size_t) &((t *)0)->f)
 #endif
 
-static int hsc_options_started = 0;
+#if __GLASGOW_HASKELL__
+static int hsc_options_started;
+
+static void hsc_begin_options (void)
+{
+#if __GLASGOW_HASKELL__ < 409
+    printf ("{-# OPTIONS -optc-D__GLASGOW_HASKELL__=%d", __GLASGOW_HASKELL__);
+    hsc_options_started = 1;
+#else
+    hsc_options_started = 0;
+#endif
+}
 
 static void hsc_option (const char *s)
 {
@@ -23,6 +38,11 @@ static void hsc_end_options (void)
 {
     if (hsc_options_started) printf (" #-}\n");
 }
+#else
+#define hsc_begin_options()
+#define hsc_option(s)
+#define hsc_end_options()
+#endif
 
 #define hsc_const(x)                        \
     if ((x) < 0)                            \

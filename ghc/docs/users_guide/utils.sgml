@@ -98,13 +98,13 @@ tags:
   </sect1>
 -->
 
-  <sect1 id="hs2c">
+  <sect1 id="hsc2hs">
     <title>Writing Haskell interfaces to C code:
-    <command>hs2c</command></title>
-    <indexterm><primary><command>hs2c</command></primary>
+    <command>hsc2hs</command></title>
+    <indexterm><primary><command>hsc2hs</command></primary>
     </indexterm>
 
-    <para>The <command>hs2c</command> command can be used to automate
+    <para>The <command>hsc2hs</command> command can be used to automate
     some parts of the process of writing Haskell bindings to C code.
     It reads an almost-Haskell source with embedded special
     constructs, and outputs a real Haskell file with these constructs
@@ -118,7 +118,7 @@ tags:
     two files are created when the <literal>#def</literal> construct
     is used.</para>
 
-    <para>Actually <command>hs2c</command> does not output the Haskell
+    <para>Actually <command>hsc2hs</command> does not output the Haskell
     file directly.  It creates a C program that includes the headers,
     gets automatically compiled and run. That program outputs the
     Haskell code.</para>
@@ -236,8 +236,8 @@ tags:
 	  <term><literal>#include "file.h"</literal></term>
 	  <listitem>
 	    <para>The specified file gets included into the C program,
-            the compiled Haskell file, and the C
-            header. <literal>&lt;HsFFI.h&gt;</literal> is included
+            the compiled Haskell file, and the C header.
+            <literal>&lt;HsFFI.h&gt;</literal> is included
             automatically.</para>
 	  </listitem>
 	</varlistentry>
@@ -245,11 +245,31 @@ tags:
 	<varlistentry>
 	  <term><literal>#define name</literal></term>
 	  <term><literal>#define name value</literal></term>
+	  <term><literal>#undef name</literal></term>
 	  <listitem>
 	    <para>Similar to <literal>#include</literal>. Note that
             <literal>#includes</literal> and
             <literal>#defines</literal> may be put in the same file
             twice so they should not assume otherwise.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>#let name parameters = "definition"</literal></term>
+	  <listitem>
+            <para>Defines a macro to be applied to the Haskell
+            source. Parameter names are comma-separated, not
+            inside parens. Such macro is invoked as other
+            <literal>#</literal>-constructs, starting with
+            <literal>#name</literal>. The definition will be
+            put in the C program inside parens as arguments of
+            <literal>printf</literal>. To refer to a parameter,
+            close the quote, put a parameter name and open the
+            quote again, to let C string literals concatenate.
+            Or use <literal>printf</literal>'s format directives.
+            Values of arguments must be given as strings, unless the
+            macro stringifies them itself using the C preprocessor's
+            <literal>#parameter</literal> syntax.</para>
 	  </listitem>
 	</varlistentry>
 
@@ -286,6 +306,7 @@ tags:
 	  <term><literal>#elif condition</literal></term>
 	  <term><literal>#else</literal></term>
 	  <term><literal>#endif</literal></term>
+	  <term><literal>#error message</literal></term>
 	  <listitem>
 	    <para>Conditional compilation directives are passed
             unmodified to the C program, C file, and C header. Putting
@@ -362,7 +383,7 @@ tags:
       <para><literal>#const</literal>, <literal>#type</literal>,
       <literal>#peek</literal>, <literal>#poke</literal> and
       <literal>#ptr</literal> are not hardwired into the
-      <command>hs2c</command>, but are defined in a C template that is
+      <command>hsc2hs</command>, but are defined in a C template that is
       included in the C program: <filename>template-hsc.h</filename>.
       Custom constructs and templates can be used too. Any
       <literal>#</literal>-construct with unknown key is expected to

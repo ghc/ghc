@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.2 2000/11/07 15:28:36 simonmar Exp $
+-- $Id: Main.hs,v 1.3 2000/12/28 10:34:56 qrczak Exp $
 --
 -- (originally "GlueHsc.hs" by Marcin 'Qrczak' Kowalczyk)
 --
@@ -17,6 +17,7 @@ import Directory (removeFile)
 import Parsec
 import Monad     (liftM, liftM2, when)
 import Char      (ord, intToDigit, isSpace, isAlphaNum, toUpper)
+import List      (intersperse)
 
 data Flag
     = Help
@@ -124,7 +125,7 @@ output flags name toks = let
     
     specials = [(key, arg) | Special key arg <- toks]
     
-    needsC = any (\(key, _) -> key=="def") specials
+    needsC = any (\(key, _) -> key == "def") specials
     needsH = needsC
     
     includeGuard = map fixChar outHName
@@ -178,6 +179,9 @@ output flags name toks = let
     when needsH $ writeFile outHName $
         "#ifndef "++includeGuard++"\n\
         \#define "++includeGuard++"\n\
+        \#if __GLASGOW_HASKELL__ && __GLASGOW_HASKELL__ < 409\n\
+        \#include <Rts.h>\n\
+        \#endif\n\
         \#include <HsFFI.h>\n"++
         concatMap outTokenH specials++
         "#endif\n"
@@ -195,52 +199,70 @@ outHeaderCProg :: [(String, String)] -> String
 outHeaderCProg = concatMap $ \(key, arg) -> case key of
     "include"           -> "#include "++arg++"\n"
     "define"            -> "#define "++arg++"\n"
+    "undef"             -> "#undef "++arg++"\n"
     "def"               -> case arg of
         's':'t':'r':'u':'c':'t':' ':_ -> arg++"\n"
         't':'y':'p':'e':'d':'e':'f':' ':_ -> arg++"\n"
         _ -> ""
     _ | conditional key -> "#"++key++" "++arg++"\n"
-    _                   -> ""
+    "let"               -> case break (== '=') arg of
+        (_,      "")     -> ""
+        (header, _:body) -> case break isSpace header of
+            (name, args) ->
+                "#define hsc_"++name++"("++dropWhile isSpace args++") \
+                \printf ("++joinLines body++");\n"
+    _ -> ""
+    where
+    joinLines = concat . intersperse " \\\n" . lines
 
 outHeaderHs :: Maybe String -> [(String, String)] -> String
 outHeaderHs inH toks =
+    "    hsc_begin_options();\n"++
     concatMap outSpecial toks ++
     includeH ++
     "    hsc_end_options();\n\n"
     where
     outSpecial (key, arg) = case key of
         "include" -> case inH of
-            Nothing -> out ("-#include "++arg)
+            Nothing -> outOption ("-#include "++arg)
             Just _  -> ""
         "define" -> case inH of
-            Nothing -> out ("-optc-D"++toOptD arg)
-            Just _  -> ""
-        "option" -> out arg
+            Nothing | goodForOptD arg -> outOption ("-optc-D"++toOptD arg)
+            _ -> ""
+        "option" -> outOption arg
         _ | conditional key -> "#"++key++" "++arg++"\n"
         _ -> ""
+    goodForOptD arg = case arg of
+        ""              -> True
+        c:_ | isSpace c -> True
+        '(':_           -> False
+        _:s             -> goodForOptD s
     toOptD arg = case break isSpace arg of
         (name, "")      -> name
         (name, _:value) -> name++'=':dropWhile isSpace value
     includeH = case inH of
         Nothing   -> ""
-        Just name -> out ("-#include \""++name++"\"")
-    out s = "    hsc_option (\""++showCString s++"\");\n"
+        Just name -> outOption ("-#include \""++name++"\"")
+    outOption s = "    hsc_option (\""++showCString s++"\");\n"
 
 outTokenHs :: Token -> String
 outTokenHs (Text s) = "    fputs (\""++showCString s++"\", stdout);\n"
 outTokenHs (Special key arg) = case key of
     "include"           -> ""
     "define"            -> ""
+    "undef"             -> ""
     "option"            -> ""
     "def"               -> ""
     _ | conditional key -> "#"++key++" "++arg++"\n"
+    "let"               -> ""
     _                   -> "    hsc_"++key++" ("++arg++");\n"
 
 outTokenH :: (String, String) -> String
 outTokenH (key, arg) = case key of
     "include" -> "#include "++arg++"\n"
-    "define" -> "#define " ++arg++"\n"
-    "def" -> case arg of
+    "define"  -> "#define " ++arg++"\n"
+    "undef"   -> "#undef "  ++arg++"\n"
+    "def"     -> case arg of
         's':'t':'r':'u':'c':'t':' ':_ -> arg++"\n"
         't':'y':'p':'e':'d':'e':'f':' ':_ -> arg++"\n"
         'i':'n':'l':'i':'n':'e':' ':_ ->
@@ -280,6 +302,7 @@ conditional "ifndef" = True
 conditional "elif"   = True
 conditional "else"   = True
 conditional "endif"  = True
+conditional "error"  = True
 conditional _        = False
 
 showCString :: String -> String
