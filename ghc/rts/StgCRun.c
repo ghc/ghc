@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.38 2003/01/31 17:29:46 wolfgang Exp $
+ * $Id: StgCRun.c,v 1.39 2003/06/09 13:17:41 matthewc Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -498,6 +498,7 @@ static void StgRunIsImplementedInAssembler(void)
    loc16 - loc28: STG registers
            loc29: saved ar.pfs
            loc30: saved b0
+           loc31: saved gp (gcc 3.3 uses this slot)
    -------------------------------------------------------------------------- */
 
 #ifdef ia64_TARGET_ARCH
@@ -506,12 +507,19 @@ static void StgRunIsImplementedInAssembler(void)
 #undef RESERVED_C_STACK_BYTES
 #define RESERVED_C_STACK_BYTES 1024
 
+#if ((__GNUC__ == 3) && (__GNUC_MINOR__ >= 3)) || (__GNUC__ > 3)
+/* gcc 3.3+: leave an extra slot for gp saves */
+#define LOCALS 32
+#else
+#define LOCALS 31
+#endif
+
 static void StgRunIsImplementedInAssembler(void)
 {
     __asm__ volatile(
 		".global StgRun\n"
 		"StgRun:\n"
-		"\talloc loc29 = ar.pfs, 0, 31, 8, 0\n"	/* setup register frame */
+		"\talloc loc29 = ar.pfs, 0, %1, 8, 0\n"	/* setup register frame */
 		"\tld8 r18 = [r32],8\n"			/* get procedure address */
 		"\tadds sp = -%0, sp ;;\n"		/* setup stack */
 		"\tld8 gp = [r32]\n"			/* get procedure GP */
@@ -541,7 +549,7 @@ static void StgRunIsImplementedInAssembler(void)
 		"\tldf.fill f21 = [r17],32\n"
 		"\tadds sp = %0, sp\n"		/* restore stack */
 		"\tbr.ret.sptk.many b0 ;;\n"	/* return */
-	: : "i"(RESERVED_C_STACK_BYTES + 6*16));
+	: : "i"(RESERVED_C_STACK_BYTES + 6*16), "i"(LOCALS));
 }
 
 #endif

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.h,v 1.16 2003/03/31 19:19:34 sof Exp $
+ * $Id: RtsUtils.h,v 1.17 2003/06/09 13:17:40 matthewc Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -27,7 +27,7 @@ extern void resetNonBlockingFd(int fd);
 extern nat stg_strlen(char *str);
 
 /*Defined in Main.c, but made visible here*/
-extern void stg_exit(I_ n) __attribute__((noreturn));
+extern void stg_exit(int n) __attribute__((noreturn));
 
 char *time_str(void);
 char *ullong_format_string(ullong, char *, rtsBool);

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.120 2003/05/30 09:06:24 simonmar Exp $
+ * $Id: Linker.c,v 1.121 2003/06/09 13:17:40 matthewc Exp $
  *
  * (c) The GHC Team, 2000-2003
  *
@@ -553,16 +553,16 @@ typedef struct _RtsSymbolVal {
       Sym(__ashrdi3)				\
       Sym(__lshrdi3)				\
       Sym(__eprintf)
+#elif defined(ia64_TARGET_ARCH)
+#define RTS_LIBGCC_SYMBOLS			\
+      Sym(__divdi3)				\
+      Sym(__udivdi3)                            \
+      Sym(__moddi3)				\
+      Sym(__umoddi3)				\
+      Sym(__divsf3)				\
+      Sym(__divdf3)
 #else
 #define RTS_LIBGCC_SYMBOLS
-#endif
-
-#ifdef ia64_TARGET_ARCH
-/* force these symbols to be present */
-#define RTS_EXTRA_SYMBOLS			\
-      Sym(__divsf3)
-#else
-#define RTS_EXTRA_SYMBOLS /* nothing */
 #endif
 
 #ifdef darwin_TARGET_OS
@@ -575,12 +575,11 @@ typedef struct _RtsSymbolVal {
 #endif
 
 /* entirely bogus claims about types of these symbols */
-#define Sym(vvv)  extern void (vvv);
+#define Sym(vvv)  extern void vvv();
 #define SymX(vvv) /**/
 #define SymX_redirect(vvv,xxx) /**/
 RTS_SYMBOLS
 RTS_LONG_LONG_SYMS
-RTS_EXTRA_SYMBOLS
 RTS_POSIX_ONLY_SYMBOLS
 RTS_MINGW_ONLY_SYMBOLS
 RTS_CYGWIN_ONLY_SYMBOLS
@@ -608,7 +607,6 @@ RTS_LIBGCC_SYMBOLS
 static RtsSymbolVal rtsSyms[] = {
       RTS_SYMBOLS
       RTS_LONG_LONG_SYMS
-      RTS_EXTRA_SYMBOLS
       RTS_POSIX_ONLY_SYMBOLS
       RTS_MINGW_ONLY_SYMBOLS
       RTS_CYGWIN_ONLY_SYMBOLS
@@ -2708,8 +2706,8 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 #ifdef ELF_FUNCTION_DESC
 	    /* If a function, already a function descriptor - we would
 	       have to copy it to add an offset. */
-            if (S && ELF_ST_TYPE(sym.st_info) == STT_FUNC)
-               assert(A == 0);
+            if (S && (ELF_ST_TYPE(sym.st_info) == STT_FUNC) && (A != 0))
+               belch("%s: function %s with addend %p", oc->fileName, symbol, (void *)A);
 #endif
 	 }
          if (!S) {
@@ -2768,6 +2766,9 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 	 case R_IA64_FPTR64LSB:
 	    *pP = value;
 	    break;
+	 case R_IA64_PCREL64LSB:
+	    *pP = value - P;
+	    break;
 	 case R_IA64_SEGREL64LSB:
 	    addr = findElfSegment(ehdrC, value);
 	    *pP = value - addr;
@@ -2776,12 +2777,17 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 	    ia64_reloc_gprel22(P, value);
 	    break;
 	 case R_IA64_LTOFF22:
+	 case R_IA64_LTOFF22X:
 	 case R_IA64_LTOFF_FPTR22:
 	    addr = allocateGOTEntry(value);
 	    ia64_reloc_gprel22(P, addr);
 	    break;
 	 case R_IA64_PCREL21B:
 	    ia64_reloc_pcrel21(P, S, oc);
+	    break;
+	 case R_IA64_LDXMOV:
+	    /* This goes with R_IA64_LTOFF22X and points to the load to
+	     * convert into a move.  We don't implement relaxation. */
 	    break;
 #        endif
          default:

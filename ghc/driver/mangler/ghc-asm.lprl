@@ -701,12 +701,18 @@ sub mangle_asm {
 
 		} elsif ($TargetPlatform =~ /^ia64-/) {
 		    $p =~ s/^\t\.prologue .*\n//;
-		    $p =~ s/^\t\.save ar\.pfs, r\d+\n\talloc r\d+ = ar\.pfs, 0, 31, \d+, 0\n//;
+		    $p =~ s/^\t\.save ar\.pfs, r\d+\n\talloc r\d+ = ar\.pfs, 0, 3[12], \d+, 0\n//;
 		    $p =~ s/^\t\.fframe \d+\n\tadds r12 = -\d+, r12\n//;
 		    $p =~ s/^\t\.save rp, r\d+\n\tmov r\d+ = b0\n//;
-		    $p =~ s/^\t\.(mii|mmi)\n//;	# bundling is no longer sensible
+		    $p =~ s/^\t\.(mii|mmi)\n//g;	# bundling is no longer sensible
 		    $p =~ s/^\t;;\n//g;		# discard stops
 		    $p =~ s/^\t\/\/.*\n//g;	# gcc inserts timings in // comments
+
+		    # GCC 3.3 saves r1 in the prologue, move this to the body
+		    if ($p =~ /^\tmov r\d+ = r1\n/) {
+			  $p = $` . $';
+			  $r = $& . $r;
+		    }
 		} elsif ($TargetPlatform =~ /^m68k-/) {
 		    $p =~ s/^\tlink a6,#-?\d.*\n//;
  		    $p =~ s/^\tpea a6@\n\tmovel sp,a6\n//;    
@@ -840,8 +846,13 @@ sub mangle_asm {
 	$c =~ s/^\tbl\s+L___DISCARD__\$stub\n//go if $TargetPlatform =~ /^powerpc-apple-.*/;
 
 	# IA64: mangle tailcalls into jumps here
-	$c =~ s/^\tbr\.call\.sptk\.many b0 = (.*)\n\t;;\n(\tmov r1 = r\d+\n)?\t;;\n\t--- TAILCALL ---\n/\tbr\.few $1\n/g
-		if $TargetPlatform =~ /^ia64-/;
+	if ($TargetPlatform =~ /^ia64-/) {
+	    while ($c =~ s/^\tbr\.call\.sptk\.many b0 = (.*)\n(?:^\.L([0-9]*):\n)?(?:\t;;\n)?(?:\tmov r1 = r\d+\n)?(?:\t;;\n)?\t--- TAILCALL ---\n(?:\t;;\n\tbr \.L\d+\n)?/\tbr\.few $1\n/) {
+		# Eek, the gcc optimiser is getting smarter... if we see a jump to the --- TAILCALL ---
+		# marker then we reapply the substitution at the source sites
+		$c =~ s/^\tbr \.L$2\n/\t--- TAILCALL ---\n/g if ($2);
+	    }
+	}
 
 	# MIPS: that may leave some gratuitous asm macros around
 	# (no harm done; but we get rid of them to be tidier)

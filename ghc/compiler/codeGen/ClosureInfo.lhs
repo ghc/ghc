@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: ClosureInfo.lhs,v 1.57 2003/05/14 09:13:56 simonmar Exp $
+% $Id: ClosureInfo.lhs,v 1.58 2003/06/09 13:17:38 matthewc Exp $
 %
 \section[ClosureInfo]{Data structures which describe closures}
 
@@ -1127,8 +1127,8 @@ represented by a label+offset expression).
 \begin{code}
 mkInfoTable :: ClosureInfo -> [CAddrMode]
 mkInfoTable cl_info
- | opt_Unregisterised = std_info ++ extra_bits
- | otherwise          = extra_bits ++ std_info
+ | tablesNextToCode = extra_bits ++ std_info
+ | otherwise        = std_info ++ extra_bits
  where
     std_info = mkStdInfoTable entry_amode
 		  ty_descr_amode cl_descr_amode cl_type srt_len layout_amode
@@ -1184,8 +1184,8 @@ mkInfoTable cl_info
     (Just (arity, arg_descr)) = maybe_fun_stuff
 
     fun_extra_bits
-	| opt_Unregisterised = reverse reg_fun_extra_bits
-	| otherwise 	     = reg_fun_extra_bits
+	| tablesNextToCode = reg_fun_extra_bits
+	| otherwise        = reverse reg_fun_extra_bits
 
     reg_fun_extra_bits
 	| ArgGen slow_lbl liveness <- arg_descr
@@ -1229,8 +1229,8 @@ mkBitmapInfoTable
    -> [CAddrMode]
    -> [CAddrMode]
 mkBitmapInfoTable entry_amode srt liveness vector
- | opt_Unregisterised = std_info ++ extra_bits
- | otherwise          = extra_bits ++ std_info
+ | tablesNextToCode = extra_bits ++ std_info
+ | otherwise        = std_info ++ extra_bits
  where
    std_info = mkStdInfoTable entry_amode zero_amode zero_amode 
 		cl_type srt_len liveness_amode
@@ -1253,8 +1253,8 @@ mkBitmapInfoTable entry_amode srt liveness vector
    srt_bit | needsSRT srt || not (null vector) = [srt_label]
 	   | otherwise = []
 
-   extra_bits | opt_Unregisterised = srt_bit ++ vector
-	      | otherwise          = reverse vector ++ srt_bit
+   extra_bits | tablesNextToCode = reverse vector ++ srt_bit
+              | otherwise        = srt_bit ++ vector
 
 -- The standard bits of an info table.  This part of the info table
 -- corresponds to the StgInfoTable type defined in InfoTables.h.
@@ -1271,8 +1271,8 @@ mkStdInfoTable entry_lbl type_descr closure_descr cl_type srt_len layout_amode
  = std_info
  where  
     std_info
-	| opt_Unregisterised  = entry_lbl : std_info'
-	| otherwise 	      = std_info'
+	| tablesNextToCode = std_info'
+	| otherwise        = entry_lbl : std_info'
 
     std_info' =
 	  -- par info
@@ -1312,4 +1312,12 @@ livenessToAddrMode (Liveness lbl size bits)
 			_   -> panic "livenessToAddrMode"
 
 zero_amode = mkIntCLit 0
+
+-- IA64 mangler doesn't place tables next to code
+tablesNextToCode :: Bool
+#ifdef ia64_TARGET_ARCH
+tablesNextToCode = False
+#else
+tablesNextToCode = not opt_Unregisterised
+#endif
 \end{code}
