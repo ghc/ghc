@@ -2,7 +2,8 @@
 
 \begin{code}
 module Types where
-import PrelBase
+
+import GHC.Exts
 
 data F a = FN | F1 a | F2 a a | F3 a a a 
          | F4 a a a a 

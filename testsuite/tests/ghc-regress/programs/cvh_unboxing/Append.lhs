@@ -3,7 +3,7 @@
 \begin{code}
 module Append where
 
-import PrelBase
+import GHC.Exts
 import Types
 \end{code}
 

@@ -1,5 +1,5 @@
 \begin{code}
-import PrelBase
+import GHC.Exts
 import Types
 import Append
 
