@@ -388,7 +388,6 @@ endif
 
 ifeq "$(IS_CBITS_LIB)" "YES"
 override datadir:=$(libdir)/include
-INSTALL_DATAS += Hs$(shell perl -e 'print ucfirst "$(PACKAGE)"').h
 else
 SRC_CC_OPTS += -Icbits
 endif
