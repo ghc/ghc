@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.42 2000/07/17 15:25:05 rrt Exp $
+# $Id: Makefile,v 1.43 2000/08/02 15:27:25 simonmar Exp $
 #
 
 TOP=..
@@ -22,8 +22,8 @@ SRC_HC_OPTS += -fglasgow-exts -cpp -syslib concurrent -syslib posix -syslib misc
 endif
 
 HS_PROG = ghc-$(ProjectVersion)
-HS_SRCS = Config.hs Package.hs Main.hs
-MKDEPENDHS_SRCS = Config.hs Main.hs PackageSrc.hs
+HS_SRCS = Config.hs Package.hs GetImports.hs Main.hs
+MKDEPENDHS_SRCS = Config.hs Main.hs GetImports.hs PackageSrc.hs
 LINK = ghc
 
 SUBDIRS = mangler split stats
@@ -40,7 +40,7 @@ Config.hs : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "cProjectName          = \"$(ProjectName)\"" >> Config.hs            
 	@echo "cProjectVersion       = \"$(ProjectVersion)\"" >> Config.hs         
 	@echo "cProjectVersionInt    = \"$(ProjectVersionInt)\"" >> Config.hs      
-	@echo "cProjectPatchLevel    = \"$(ProjectPatchLevel)\"" >> Config.hs      
+	@echo "cHscIfaceFileVersion  = \"$(HscIfaceFileVersion)\"" >> Config.hs      
 	@echo "cHOSTPLATFORM         = \"$(HOSTPLATFORM)\"" >> Config.hs           
 	@echo "cTARGETPLATFORM       = \"$(TARGETPLATFORM)\"" >> Config.hs         
 	@echo "cCURRENT_DIR          = \"$(CURRENT_DIR)\"" >> Config.hs            
@@ -52,7 +52,6 @@ Config.hs : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "cGCC                  = \"$(WhatGccIsCalled)\"" >> Config.hs
 	@echo "cGhcWithNativeCodeGen = \"$(GhcWithNativeCodeGen)\"" >> Config.hs   
 	@echo "cLeadingUnderscore    = \"$(LeadingUnderscore)\"" >> Config.hs      
-	@echo "cGHC_MKDEPENDHS       = \"$(GHC_MKDEPENDHS)\"" >> Config.hs
 	@echo "cGHC_UNLIT            = \"$(GHC_UNLIT)\"" >> Config.hs              
 	@echo "cGHC_HSC              = \"$(GHC_HSC)\"" >> Config.hs                
 	@echo "cGHC_MANGLER          = \"$(GHC_MANGLER)\"" >> Config.hs

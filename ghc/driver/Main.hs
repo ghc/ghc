@@ -1,4 +1,7 @@
+{-# OPTIONS -W #-}
 -----------------------------------------------------------------------------
+-- $Id: Main.hs,v 1.45 2000/08/02 15:27:25 simonmar Exp $
+--
 -- GHC Driver program
 --
 -- (c) Simon Marlow 2000
@@ -10,6 +13,7 @@
 
 module Main (main) where
 
+import GetImports
 import Package
 import Config
 
@@ -25,7 +29,6 @@ import Dynamic
 
 import IO
 import Monad
-import Array
 import List
 import System
 import Maybe
@@ -42,6 +45,8 @@ name = global (value) :: IORef (ty); \
 -----------------------------------------------------------------------------
 -- ToDo:
 
+-- certain options in OPTIONS pragmas are persistent through subsequent compilations.
+-- new mkdependHS doesn't support all the options that the old one did (-X et al.)
 -- time commands when run with -v
 -- split marker
 -- mkDLL
@@ -68,9 +73,7 @@ cHaskell1Version = "5" -- i.e., Haskell 98
 -----------------------------------------------------------------------------
 -- Usage Message
 
-short_usage = do
-  hPutStr stderr "\nUsage: For basic information, try the `-help' option.\n"
-  exitWith ExitSuccess
+short_usage = "Usage: For basic information, try the `-help' option."
    
 long_usage = do
   let usage_file = "ghc-usage.txt"
@@ -83,11 +86,104 @@ long_usage = do
      dump ('$':'$':s) = hPutStr stderr get_prog_name >> dump s
      dump (c:s) = hPutChar stderr c >> dump s
 
-version_str = cProjectVersion ++ 
-		( if cProjectPatchLevel /= "0" && cProjectPatchLevel /= ""
-			then '.':cProjectPatchLevel
-			else "")
-	-- umm, isn't the patchlevel included in the version number? --SDM
+version_str = cProjectVersion
+
+-----------------------------------------------------------------------------
+-- Driver state
+
+-- certain flags can be specified on a per-file basis, in an OPTIONS
+-- pragma at the beginning of the source file.  This means that when
+-- compiling mulitple files, we have to restore the global option
+-- settings before compiling a new file.  
+--
+-- The DriverState record contains the per-file-mutable state.
+
+data DriverState = DriverState {
+
+	-- are we runing cpp on this file?
+	cpp_flag 		:: Bool,
+
+	-- heap/stack sizes
+	specific_heap_size	:: Integer,
+	specific_stack_size	:: Integer,
+  
+	-- misc
+	stolen_x86_regs		:: Int,
+	excess_precision	:: Bool,
+	warning_opt		:: WarningState,
+	cmdline_hc_includes	:: [String],
+
+	-- options for a particular phase
+	anti_opt_C		:: [String],
+	opt_dep			:: [String],
+	opt_L			:: [String],
+	opt_P			:: [String],
+	opt_C			:: [String],
+	opt_Crts		:: [String],
+	opt_c			:: [String],
+	opt_a			:: [String],
+	opt_m			:: [String],
+	opt_l			:: [String],
+	opt_dll			:: [String]
+   }
+
+initDriverState = DriverState {
+	cpp_flag		= False,
+	specific_heap_size	= 6 * 1000 * 1000,
+	specific_stack_size	= 1000 * 1000,
+	stolen_x86_regs		= 4,
+	excess_precision	= False,
+	warning_opt		= W_default,
+	cmdline_hc_includes	= [],
+	anti_opt_C		= [],
+	opt_dep			= [],
+	opt_L			= [],
+	opt_P			= [],
+	opt_C			= [],
+	opt_Crts		= [],
+	opt_c			= [],
+	opt_a			= [],
+	opt_m			= [],
+	opt_l			= [],
+	opt_dll			= []
+   }
+	
+GLOBAL_VAR(driver_state, initDriverState, DriverState)
+
+readState :: (DriverState -> a) -> IO a
+readState f = readIORef driver_state >>= return . f
+
+updateState :: (DriverState -> DriverState) -> IO ()
+updateState f = readIORef driver_state >>= writeIORef driver_state . f
+
+addAntiOpt_C a = updateState (\s -> s{anti_opt_C =  a : anti_opt_C s})
+addOpt_dep   a = updateState (\s -> s{opt_dep    =  a : opt_dep    s})
+addOpt_L     a = updateState (\s -> s{opt_L      =  a : opt_L      s})
+addOpt_P     a = updateState (\s -> s{opt_P      =  a : opt_P      s})
+addOpt_C     a = updateState (\s -> s{opt_C      =  a : opt_C      s})
+addOpt_Crts  a = updateState (\s -> s{opt_Crts   =  a : opt_Crts   s})
+addOpt_c     a = updateState (\s -> s{opt_c      =  a : opt_c      s})
+addOpt_a     a = updateState (\s -> s{opt_a      =  a : opt_a      s})
+addOpt_m     a = updateState (\s -> s{opt_m      =  a : opt_m      s})
+addOpt_l     a = updateState (\s -> s{opt_l      =  a : opt_l      s})
+addOpt_dll   a = updateState (\s -> s{opt_dll    =  a : opt_dll    s})
+
+addCmdlineHCInclude a = 
+   updateState (\s -> s{cmdline_hc_includes =  a : cmdline_hc_includes s})
+
+	-- we add to the options from the front, so we need to reverse the list
+getOpts :: (DriverState -> [a]) -> IO [a]
+getOpts opts = readState opts >>= return . reverse
+
+newHeapSize :: Integer -> IO ()
+newHeapSize new = updateState 
+   (\s -> let current = specific_heap_size s in
+	  s{ specific_heap_size = if new > current then new else current })
+
+newStackSize :: Integer -> IO ()
+newStackSize new = updateState 
+   (\s -> let current = specific_stack_size s in
+	  s{ specific_stack_size = if new > current then new else current })
 
 -----------------------------------------------------------------------------
 -- Phases
@@ -122,16 +218,10 @@ data Phase
 -- Errors
 
 data BarfKind
-  = UnknownFileType String
-  | UnknownFlag String
-  | AmbiguousPhase
-  | MultipleSrcsOneOutput
-  | UnknownPackage String
-  | WayCombinationNotSupported [WayName]
-  | PhaseFailed String ExitCode
+  = PhaseFailed String ExitCode
   | Interrupted
-  | NoInputFiles
-  | OtherError String
+  | UsageError String			-- prints the short usage msg after the error
+  | OtherError String			-- just prints the error message
   deriving Eq
 
 GLOBAL_VAR(prog_name, "ghc", String)
@@ -142,27 +232,15 @@ instance Show BarfKind where
   showsPrec _ e 
 	= showString get_prog_name . showString ": " . showBarf e
 
-showBarf AmbiguousPhase
-   = showString "only one of the flags -M, -E, -C, -S, -c is allowed"
-showBarf (UnknownFileType s)
-   = showString "unknown file type, and linking not done: " . showString s
-showBarf (UnknownFlag s)
-   = showString "unrecognised flag: " . showString s
-showBarf MultipleSrcsOneOutput
-   = showString "can't apply -o option to multiple source files"
-showBarf (UnknownPackage s)
-   = showString "unknown package name: " . showString s
-showBarf (WayCombinationNotSupported ws)
-   = showString "combination not supported: " 
-   . foldr1 (\a b -> a . showChar '/' . b) 
-	(map (showString . wayName . lkupWay) ws)
-showBarf (NoInputFiles)
-   = showString "no input files"
-showBarf (OtherError str)
-   = showString str
+showBarf (UsageError str) = showString str . showChar '\n' . showString short_usage
+showBarf (OtherError str) = showString str
+showBarf (PhaseFailed phase code) = 
+	showString phase . showString " failed, code = " . shows code
+showBarf (Interrupted) = showString "interrupted"
+
+unknownFlagErr f = throwDyn (UsageError ("unrecognised flag: " ++ f))
 
 barfKindTc = mkTyCon "BarfKind"
-
 instance Typeable BarfKind where
   typeOf _ = mkAppTy barfKindTc []
 
@@ -185,14 +263,12 @@ cleanTempFiles = do
 		if '*' `elem` f then system ("rm -f " ++ f) >> return ()
 			        else removeFile f)
 	    `catchAllIO`
-	   (\e -> when verb (hPutStrLn stderr 
+	   (\_ -> when verb (hPutStrLn stderr 
 				("warning: can't remove tmp file" ++ f)))
   mapM_ blowAway fs
 
 -----------------------------------------------------------------------------
 -- Which phase to stop at
-
-GLOBAL_VAR(stop_after, Ln, Phase)
 
 endPhaseFlag :: String -> Maybe Phase
 endPhaseFlag "-M" = Just MkDependHS
@@ -210,15 +286,15 @@ getStopAfter :: [String]
 	       )
 getStopAfter flags 
   = case my_partition endPhaseFlag flags of
-	([]   , rest) -> return (rest, As,  "",  True)
+	([]   , rest) -> return (rest, Ln,  "",  True) -- default is to do linking
 	([(flag,one)], rest) -> return (rest, one, flag, False)
-	(_    , rest) -> throwDyn AmbiguousPhase
+	(_    , _   ) -> 
+	  throwDyn (OtherError "only one of the flags -M, -E, -C, -S, -c is allowed")
 
 -----------------------------------------------------------------------------
 -- Global compilation flags
 
 	-- Cpp-related flags
-GLOBAL_VAR(cpp_flag, False, Bool)
 hs_source_cpp_opts = global
 	[ "-D__HASKELL1__="++cHaskell1Version
 	, "-D__GLASGOW_HASKELL__="++cProjectVersionInt				
@@ -226,26 +302,21 @@ hs_source_cpp_opts = global
 	, "-D__CONCURRENT_HASKELL__"
 	]
 
+	-- Verbose
+GLOBAL_VAR(verbose, False, Bool)
+is_verbose = do v <- readIORef verbose; if v then return "-v" else return ""
+
 	-- Keep output from intermediate phases
 GLOBAL_VAR(keep_hi_diffs, 	False, 		Bool)
 GLOBAL_VAR(keep_hc_files,	False,		Bool)
 GLOBAL_VAR(keep_s_files,	False,		Bool)
 GLOBAL_VAR(keep_raw_s_files,	False,		Bool)
 
-	-- Compiler RTS options
-GLOBAL_VAR(specific_heap_size,  6 * 1000 * 1000, Integer)
-GLOBAL_VAR(specific_stack_size, 1000 * 1000,     Integer)
-GLOBAL_VAR(scale_sizes_by,      1.0,		 Double)
-
-	-- Verbose
-GLOBAL_VAR(verbose, False, Bool)
-is_verbose = do v <- readIORef verbose; if v then return "-v" else return ""
-
 	-- Misc
+GLOBAL_VAR(scale_sizes_by,      1.0,		Double)
 GLOBAL_VAR(dry_run, 		False,		Bool)
 GLOBAL_VAR(recomp,  		True,		Bool)
 GLOBAL_VAR(tmp_prefix, 		cTMPDIR,	String)
-GLOBAL_VAR(stolen_x86_regs, 	4, 		Int)
 #if !defined(HAVE_WIN32_DLL_SUPPORT) || defined(DONT_WANT_WIN32_DLL_SUPPORT)
 GLOBAL_VAR(static, 		True,		Bool)
 #else
@@ -253,7 +324,6 @@ GLOBAL_VAR(static,              False,          Bool)
 #endif
 GLOBAL_VAR(collect_ghc_timing, 	False,		Bool)
 GLOBAL_VAR(do_asm_mangling,	True,		Bool)
-GLOBAL_VAR(excess_precision,	False,		Bool)
 
 -----------------------------------------------------------------------------
 -- Splitting object files (for libraries)
@@ -353,8 +423,6 @@ minusWallOpts 	  = minusWOpts ++
 
 data WarningState = W_default | W_ | W_all | W_not
 
-GLOBAL_VAR(warning_opt, W_default, WarningState)
-
 -----------------------------------------------------------------------------
 -- Compiler optimisation options
 
@@ -367,7 +435,7 @@ setOptLevel [c] | isDigit c = do
    let level = ord c - ord '0'
    writeIORef opt_level level
    when (level >= 1) go_via_C
-setOptLevel s = throwDyn (UnknownFlag ("-O"++s))
+setOptLevel s = unknownFlagErr ("-O"++s)
 
 go_via_C = do
    l <- readIORef hsc_lang
@@ -536,7 +604,6 @@ GLOBAL_VAR(include_paths, ["."], [String])
 GLOBAL_VAR(library_paths, [],	 [String])
 
 GLOBAL_VAR(cmdline_libraries,   [], [String])
-GLOBAL_VAR(cmdline_hc_includes,	[], [String])
 
 augment_import_paths :: String -> IO ()
 augment_import_paths "" = writeIORef import_paths []
@@ -575,7 +642,7 @@ newPackage = do
   stuff <- getContents
   let new_pkg = read stuff :: (String,Package)
   catchAll new_pkg
-  	(\e -> throwDyn (OtherError "parse error in package info"))
+  	(\_ -> throwDyn (OtherError "parse error in package info"))
   hPutStrLn stdout "done."
   if (fst new_pkg `elem` map fst details)
 	then throwDyn (OtherError ("package `" ++ fst new_pkg ++ 
@@ -645,7 +712,7 @@ addPackage :: String -> IO ()
 addPackage package
   = do pkg_details <- readIORef package_details
        case lookup package pkg_details of
-	  Nothing -> throwDyn (UnknownPackage package)
+	  Nothing -> throwDyn (OtherError ("unknown package name: " ++ package))
 	  Just details -> do
 	    ps <- readIORef packages
 	    unless (package `elem` ps) $ do
@@ -780,7 +847,10 @@ findBuildTag = do
 	       return (wayOpts details)
 
      ws  -> if  ws `notElem` allowed_combinations
-		then throwDyn (WayCombinationNotSupported ws)
+		then throwDyn (OtherError $
+				"combination not supported: "  ++
+   				foldr1 (\a b -> a ++ '/':b) 
+				(map (wayName . lkupWay) ws))
 		else let stuff = map lkupWay ws
 			 tag   = concat (map wayTag stuff)
 			 flags = map wayOpts stuff
@@ -868,7 +938,6 @@ way_details =
 -----------------------------------------------------------------------------
 -- Programs for particular phases
 
-GLOBAL_VAR(pgm_dep, findFile "mkdependHS" cGHC_MKDEPENDHS, String)
 GLOBAL_VAR(pgm_L,   findFile "unlit"      cGHC_UNLIT,      String)
 GLOBAL_VAR(pgm_P,   cRAWCPP,				   String)
 GLOBAL_VAR(pgm_C,   findFile "hsc"        cGHC_HSC,        String)
@@ -877,26 +946,6 @@ GLOBAL_VAR(pgm_m,   findFile "ghc-asm"    cGHC_MANGLER,    String)
 GLOBAL_VAR(pgm_s,   findFile "ghc-split"  cGHC_SPLIT,      String)
 GLOBAL_VAR(pgm_a,   cGCC,	      	     	           String)
 GLOBAL_VAR(pgm_l,   cGCC,       	     	           String)
-
------------------------------------------------------------------------------
--- Options for particular phases
-
-GLOBAL_VAR(opt_dep, [], [String])
-GLOBAL_VAR(opt_L, [], [String])
-GLOBAL_VAR(opt_P, [], [String])
-GLOBAL_VAR(opt_C, [], [String])
-GLOBAL_VAR(opt_Crts, [], [String])
-GLOBAL_VAR(opt_c, [], [String])
-GLOBAL_VAR(opt_a, [], [String])
-GLOBAL_VAR(opt_m, [], [String])
-GLOBAL_VAR(opt_l, [], [String])
-GLOBAL_VAR(opt_dll, [], [String])
-
-	-- we add to the options from the front, so we need to reverse the list
-getOpts :: IORef [String] -> IO [String]
-getOpts opts = readIORef opts >>= return . reverse
-
-GLOBAL_VAR(anti_opt_C, [], [String])
 
 -----------------------------------------------------------------------------
 -- Via-C compilation stuff
@@ -931,7 +980,7 @@ machdepCCOpts
       --
       -- -fomit-frame-pointer : *must* in .hc files; because we're stealing
       --   the fp (%ebp) for our register maps.
-	= do n_regs <- readIORef stolen_x86_regs
+	= do n_regs <- readState stolen_x86_regs
 	     sta    <- readIORef static
 	     return ( [ if sta then "-DDONT_WANT_WIN32_DLL_SUPPORT" else "" ],
 		      [ "-fno-defer-pop", "-fomit-frame-pointer",
@@ -955,7 +1004,7 @@ build_hsc_opts = do
   opt_C_ <- getOpts opt_C		-- misc hsc opts
 
 	-- warnings
-  warn_level <- readIORef warning_opt
+  warn_level <- readState warning_opt
   let warn_opts =  case warn_level of
 		  	W_default -> standardWarnings
 		  	W_        -> minusWOpts
@@ -969,6 +1018,7 @@ build_hsc_opts = do
 	    0 -> hsc_minusNoO_flags
 	    1 -> hsc_minusO_flags
 	    2 -> hsc_minusO2_flags
+	    _ -> error "unknown opt level"
 	    -- ToDo: -Ofile
  
 	-- STG passes
@@ -1014,8 +1064,8 @@ build_hsc_opts = do
       hi_map_sep = "-himap-sep=" ++ [split_marker]
 
   scale <- readIORef scale_sizes_by
-  heap  <- readIORef specific_heap_size
-  stack <- readIORef specific_stack_size
+  heap  <- readState specific_heap_size
+  stack <- readState specific_stack_size
   cmdline_rts_opts <- getOpts opt_Crts
   let heap'  = truncate (fromIntegral heap  * scale) :: Integer
       stack' = truncate (fromIntegral stack * scale) :: Integer
@@ -1054,7 +1104,8 @@ getOptionsFromSource
 	-> IO [String]		-- options, if any
 getOptionsFromSource file
   = do h <- openFile file ReadMode
-       look h
+       catchIO justIoErrors (look h)
+	  (\e -> if isEOFError e then return [] else ioError e)
   where
 	look h = do
 	    l <- hGetLine h
@@ -1077,10 +1128,11 @@ get_source_files = partition (('-' /=) . head)
 main =
   -- all error messages are propagated as exceptions
   my_catchDyn (\dyn -> case dyn of
-			  PhaseFailed phase code -> exitWith code
+			  PhaseFailed _phase code -> exitWith code
 			  Interrupted -> exitWith (ExitFailure 1)
 			  _ -> do hPutStrLn stderr (show (dyn :: BarfKind))
-			          exitWith (ExitFailure 1)) $
+			          exitWith (ExitFailure 1)
+	      ) $
 
   later cleanTempFiles $
 	-- exceptions will be blocked while we clean the temporary files,
@@ -1103,49 +1155,57 @@ main =
 
    argv   <- getArgs
 
-   -- grab any -B options from the command line first
+	-- grab any -B options from the command line first
    argv'  <- setTopDir argv
 
-   -- read the package configuration
+	-- read the package configuration
    conf_file <- readIORef package_config
    contents <- readFile conf_file
    writeIORef package_details (read contents)
 
-   -- find the phase to stop after (i.e. -E, -C, -c, -S flags)
+	-- find the phase to stop after (i.e. -E, -C, -c, -S flags)
    (flags2, stop_phase, stop_flag, do_linking) <- getStopAfter argv'
 
-   -- process all the other arguments, and get the source files
-   srcs   <- processArgs flags2 []
+	-- process all the other arguments, and get the source files
+   srcs <- processArgs driver_opts flags2 []
 
-   -- find the build tag, and re-process the build-specific options
+	-- find the build tag, and re-process the build-specific options
    more_opts <- findBuildTag
-   _ <- processArgs more_opts []
+   _ <- processArgs driver_opts more_opts []
 
-   -- get the -v flag
+	-- get the -v flag
    verb <- readIORef verbose
 
    when verb (hPutStrLn stderr ("Using package config file: " ++ conf_file))
 
-   if stop_phase == MkDependHS		-- mkdependHS is special
-	then do_mkdependHS flags2 srcs
-	else do
+	-- mkdependHS is special
+   when (stop_phase == MkDependHS) beginMkDependHS
 
-   -- for each source file, find which phases to run
+	-- for each source file, find which phases to run
    pipelines <- mapM (genPipeline stop_phase stop_flag) srcs
    let src_pipelines = zip srcs pipelines
 
    o_file <- readIORef output_file
    if isJust o_file && not do_linking && length srcs > 1
-	then throwDyn MultipleSrcsOneOutput
+	then throwDyn (UsageError "can't apply -o option to multiple source files")
 	else do
 
-   if null srcs then throwDyn NoInputFiles else do
+   if null srcs then throwDyn (UsageError "no input files") else do
 
-   let compileFile (src, phases) =
-	  run_pipeline phases src do_linking True orig_base
-	  where (orig_base, _) = splitFilename src
+	-- save the flag state, because this could be modified by OPTIONS pragmas
+	-- during the compilation, and we'll need to restore it before starting
+	-- the next compilation.
+   saved_driver_state <- readIORef driver_state
+
+   let compileFile (src, phases) = do
+	  r <- run_pipeline phases src do_linking True orig_base orig_suff
+	  writeIORef driver_state saved_driver_state
+	  return r
+	  where (orig_base, orig_suff) = splitFilename src
 
    o_files <- mapM compileFile src_pipelines
+
+   when (stop_phase == MkDependHS) endMkDependHS
 
    when do_linking (do_link o_files)
 
@@ -1191,6 +1251,7 @@ startPhase "raw_s" = Mangle
 startPhase "s"     = As
 startPhase "S"     = As
 startPhase "o"     = Ln     
+startPhase _       = Ln	   -- all unknown file types
 
 genPipeline
    :: Phase		-- stop after this phase
@@ -1215,7 +1276,7 @@ genPipeline stop_after stop_after_flag filename
    ----------- -----  ----   ---   --   --  -  -  -
     start_phase = startPhase suffix
 
-    (basename, suffix) = splitFilename filename
+    (_basename, suffix) = splitFilename filename
 
     haskell_ish_file = suffix `elem` [ "hs", "lhs", "hc" ]
     c_ish_file       = suffix `elem` [ "c", "s", "S" ]  -- maybe .cc et al.??
@@ -1225,6 +1286,8 @@ genPipeline stop_after stop_after_flag filename
 	      | otherwise      = lang
 
     pipeline
+      | stop_after == MkDependHS =   [ Unlit, Cpp, MkDependHS ]
+
       | haskell_ish_file = 
        case real_lang of
 	HscC    | split && mangle -> [ Unlit, Cpp, Hsc, HCc, Mangle, 
@@ -1254,10 +1317,11 @@ genPipeline stop_after stop_after_flag filename
 	else do
 
 	-- this might happen, eg.  ghc -S Foo.o
-   if stop_after /= As && stop_after `notElem` pipeline
+   if stop_after /= Ln && stop_after `notElem` pipeline
+	   && (stop_after /= As || SplitAs `notElem` pipeline)
 	then throwDyn (OtherError ("flag " ++ stop_after_flag
-				   ++ " is incompatible with source file "
-				   ++ filename))
+				   ++ " is incompatible with source file `"
+				   ++ filename ++ "'"))
 	else do
 
 
@@ -1310,6 +1374,7 @@ phase_input_ext	SplitMangle = "split_s"	-- not really generated
 phase_input_ext	As          = "s"
 phase_input_ext	SplitAs     = "split_s" -- not really generated
 phase_input_ext	Ln          = "o"
+phase_input_ext MkDependHS  = "dep"
 
 run_pipeline
   :: [ (Phase, IntermediateFileType, String) ] -- phases to run
@@ -1317,11 +1382,12 @@ run_pipeline
   -> Bool			-- doing linking afterward?
   -> Bool			-- take into account -o when generating output?
   -> String			-- original basename (eg. Main)
+  -> String			-- original suffix   (eg. hs)
   -> IO String			-- return final filename
 
-run_pipeline [] input_fn _ _ _ = return input_fn
+run_pipeline [] input_fn _ _ _ _ = return input_fn
 run_pipeline ((phase, keep, o_suffix):phases) 
-	input_fn do_linking use_ofile orig_basename
+	input_fn do_linking use_ofile orig_basename orig_suffix
   = do
 
      output_fn <- 
@@ -1340,7 +1406,7 @@ run_pipeline ((phase, keep, o_suffix):phases)
 				return filename
 	)
 
-     run_phase phase orig_basename input_fn output_fn
+     run_phase phase orig_basename orig_suffix input_fn output_fn
 
 	-- sadly, ghc -E is supposed to write the file to stdout.  We
 	-- generate <file>.cpp, so we also have to cat the file here.
@@ -1348,7 +1414,7 @@ run_pipeline ((phase, keep, o_suffix):phases)
 	run_something "Dump pre-processed file to stdout"
 		      ("cat " ++ output_fn)
 
-     run_pipeline phases output_fn do_linking use_ofile orig_basename
+     run_pipeline phases output_fn do_linking use_ofile orig_basename orig_suffix
 
 
 -- find a temporary name that doesn't already exist.
@@ -1364,30 +1430,185 @@ newTempName extn = do
 		else return filename
 
 -------------------------------------------------------------------------------
--- mkdependHS phase 
+-- mkdependHS
 
-do_mkdependHS :: [String] -> [String] -> IO ()
-do_mkdependHS cmd_opts srcs = do
-   -- HACK
-   let quote_include_opt o | prefixMatch "-#include" o = "'" ++ o ++ "'"
-                           | otherwise                 = o
+	-- flags
+GLOBAL_VAR(dep_makefile, 	"Makefile", String);
+GLOBAL_VAR(dep_include_prelude, False, Bool);
+GLOBAL_VAR(dep_ignore_dirs,	[], [String]);
+GLOBAL_VAR(dep_suffixes,	[], [String]);
+GLOBAL_VAR(dep_warnings,	True, Bool);
 
-   mkdependHS      <- readIORef pgm_dep
-   mkdependHS_opts <- getOpts opt_dep
-   hs_src_cpp_opts <- readIORef hs_source_cpp_opts
+	-- global vars
+GLOBAL_VAR(dep_makefile_hdl,   	error "dep_makefile_hdl", Maybe Handle);
+GLOBAL_VAR(dep_tmp_file,       	error "dep_tmp_file", String);
+GLOBAL_VAR(dep_tmp_hdl,        	error "dep_tmp_hdl", Handle);
+GLOBAL_VAR(dep_dir_contents,   	error "dep_dir_contents", [(String,[String])]);
 
-   run_something "Dependency generation"
-	(unwords (mkdependHS : 
-		      mkdependHS_opts
-		   ++ hs_src_cpp_opts
-		   ++ ("--" : map quote_include_opt cmd_opts )
-		   ++ ("--" : srcs)
-	))
+depStartMarker = "# DO NOT DELETE: Beginning of Haskell dependencies"
+depEndMarker   = "# DO NOT DELETE: End of Haskell dependencies"
+
+-- for compatibility with the old mkDependHS, we accept options of the form
+-- -optdep-f -optdep.depend, etc.
+dep_opts = [
+   (  "s", 	SepArg (add dep_suffixes) ),
+   (  "f", 	SepArg (writeIORef dep_makefile) ),
+   (  "w", 	NoArg (writeIORef dep_warnings False))
+ ]
+
+beginMkDependHS :: IO ()
+beginMkDependHS = do
+
+  	-- slurp in the mkdependHS-style options
+  flags <- getOpts opt_dep
+  _ <- processArgs dep_opts flags []
+
+     	-- open a new temp file in which to stuff the dependency info
+     	-- as we go along.
+  dep_file <- newTempName "dep"
+  add files_to_clean dep_file
+  writeIORef dep_tmp_file dep_file
+  tmp_hdl <- openFile dep_file WriteMode
+  writeIORef dep_tmp_hdl tmp_hdl
+
+  	-- open the makefile
+  makefile <- readIORef dep_makefile
+  exists <- doesFileExist makefile
+  if not exists
+	then do 
+	   writeIORef dep_makefile_hdl Nothing
+	   return ()
+
+	else do
+  	   makefile_hdl <- openFile makefile ReadMode
+  	   writeIORef dep_makefile_hdl (Just makefile_hdl)
+
+		-- slurp through until we get the magic start string,
+		-- copying the contents into dep_makefile
+  	   let slurp = do
+		l <- hGetLine makefile_hdl
+		if (l == depStartMarker)
+			then return ()
+			else do hPutStrLn tmp_hdl l; slurp
+	 
+		-- slurp through until we get the magic end marker,
+		-- throwing away the contents
+  	   let chuck = do
+		l <- hGetLine makefile_hdl
+		if (l == depEndMarker)
+			then return ()
+			else chuck
+	 
+	   catchIO justIoErrors slurp 
+		(\e -> if isEOFError e then return () else ioError e)
+	   catchIO justIoErrors chuck
+		(\e -> if isEOFError e then return () else ioError e)
+
+
+	-- write the magic marker into the tmp file
+  hPutStrLn tmp_hdl depStartMarker
+
+  	-- cache the contents of all the import directories, for future
+	-- reference.
+  import_dirs <- readIORef import_paths
+  pkg_import_dirs <- getPackageImportPath
+  import_dir_contents <- mapM getDirectoryContents import_dirs
+  pkg_import_dir_contents <- mapM getDirectoryContents pkg_import_dirs
+  writeIORef dep_dir_contents 
+	(zip import_dirs import_dir_contents ++
+  	 zip pkg_import_dirs pkg_import_dir_contents)
+
+	-- ignore packages unless --include-prelude is on
+  include_prelude <- readIORef dep_include_prelude
+  when (not include_prelude) $
+    mapM_ (add dep_ignore_dirs) pkg_import_dirs
+
+  return ()
+
+
+endMkDependHS :: IO ()
+endMkDependHS = do
+  makefile     <- readIORef dep_makefile
+  makefile_hdl <- readIORef dep_makefile_hdl
+  tmp_file     <- readIORef dep_tmp_file
+  tmp_hdl      <- readIORef dep_tmp_hdl
+
+	-- write the magic marker into the tmp file
+  hPutStrLn tmp_hdl depEndMarker
+
+  case makefile_hdl of
+     Nothing  -> return ()
+     Just hdl -> do
+
+	  -- slurp the rest of the orignal makefile and copy it into the output
+  	let slurp = do
+		l <- hGetLine hdl
+		hPutStrLn tmp_hdl l
+		slurp
+	 
+  	catchIO justIoErrors slurp 
+		(\e -> if isEOFError e then return () else ioError e)
+
+	hClose hdl
+
+  hClose tmp_hdl  -- make sure it's flushed
+
+	-- create a backup of the original makefile
+  when (isJust makefile_hdl) $
+     run_something ("Backing up " ++ makefile)
+	(unwords [ "cp", makefile, makefile++".bak" ])
+
+  	-- copy the new makefile in place
+  run_something "Installing new makefile"
+	(unwords [ "cp", tmp_file, makefile ])
+
+
+findDependency :: String -> Import -> IO (Maybe (String, Bool))
+findDependency mod imp = do
+   dir_contents <- readIORef dep_dir_contents
+   ignore_dirs  <- readIORef dep_ignore_dirs
+   hisuf <- readIORef hi_suf
+
+   let
+     (imp_mod, is_source) = 
+	case imp of
+	   Normal str -> (str, False)
+	   Source str -> (str, True )	
+
+     imp_hi = imp_mod ++ '.':hisuf
+     imp_hiboot = imp_mod ++ ".hi-boot"
+     imp_hiboot_v = imp_mod ++ ".hi-boot-" ++ cHscIfaceFileVersion
+     imp_hs = imp_mod ++ ".hs"
+     imp_lhs = imp_mod ++ ".lhs"
+
+     deps | is_source = [ imp_hiboot_v, imp_hiboot, imp_hs, imp_lhs ]
+     	  | otherwise = [ imp_hi, imp_hs, imp_lhs ]
+
+     search [] = throwDyn (OtherError ("can't find one of the following: " ++
+				      unwords (map (\d -> '`': d ++ "'") deps) ++
+				      " (imported from `" ++ mod ++ "')"))
+     search ((dir, contents) : dirs)
+	   | null present = search dirs
+	   | otherwise = 
+		if dir `elem` ignore_dirs 
+			then return Nothing
+			else if is_source
+				then if dep /= imp_hiboot_v 
+					then return (Just (dir++'/':imp_hiboot, False))	
+					else return (Just (dir++'/':dep, False))	
+				else return (Just (dir++'/':imp_hi, not is_source))
+	   where
+		present = filter (`elem` contents) deps
+		dep     = head present
+ 
+   -- in
+   search dir_contents
+
 
 -------------------------------------------------------------------------------
 -- Unlit phase 
 
-run_phase Unlit basename input_fn output_fn
+run_phase Unlit _basename _suff input_fn output_fn
   = do unlit <- readIORef pgm_L
        unlit_flags <- getOpts opt_L
        run_something "Literate pre-processor"
@@ -1397,11 +1618,13 @@ run_phase Unlit basename input_fn output_fn
 -------------------------------------------------------------------------------
 -- Cpp phase 
 
-run_phase Cpp basename input_fn output_fn
+run_phase Cpp _basename _suff input_fn output_fn
   = do src_opts <- getOptionsFromSource input_fn
-       processArgs src_opts []
+	-- ToDo: this is *wrong* if we're processing more than one file:
+	-- the OPTIONS will persist through the subsequent compilations.
+       _ <- processArgs driver_opts src_opts []
 
-       do_cpp <- readIORef cpp_flag
+       do_cpp <- readState cpp_flag
        if do_cpp
           then do
        	    cpp <- readIORef pgm_P
@@ -1430,9 +1653,66 @@ run_phase Cpp basename input_fn output_fn
 		    ++ " >> " ++ output_fn)
 
 -----------------------------------------------------------------------------
+-- MkDependHS phase
+
+run_phase MkDependHS basename suff input_fn _output_fn = do 
+   src <- readFile input_fn
+   let imports = getImports src
+
+   deps <- mapM (findDependency basename) imports
+
+   osuf_opt <- readIORef output_suf
+   let osuf = case osuf_opt of
+			Nothing -> "o"
+			Just s  -> s
+
+   extra_suffixes <- readIORef dep_suffixes
+   let suffixes = osuf : map (++ ('_':osuf)) extra_suffixes
+       ofiles = map (\suf -> basename ++ '.':suf) suffixes
+   	   
+   objs <- mapM odir_ify ofiles
+   
+   hdl <- readIORef dep_tmp_hdl
+
+	-- std dependeny of the object(s) on the source file
+   hPutStrLn hdl (unwords objs ++ " : " ++ basename ++ '.':suff)
+
+   let genDep (dep, False {- not an hi file -}) = 
+	  hPutStrLn hdl (unwords objs ++ " : " ++ dep)
+       genDep (dep, True  {- is an hi file -}) = do
+	  hisuf <- readIORef hi_suf
+	  let dep_base = remove_suffix '.' dep
+	      deps = (dep_base ++ hisuf)
+		     : map (\suf -> dep_base ++ suf ++ '_':hisuf) extra_suffixes
+		  -- length objs should be == length deps
+	  sequence_ (zipWith (\o d -> hPutStrLn hdl (o ++ " : " ++ d)) objs deps)
+
+   mapM genDep [ d | Just d <- deps ]
+
+   return ()
+
+-- add the lines to dep_makefile:
+	   -- always:
+		   -- this.o : this.hs
+
+  	   -- if the dependency is on something other than a .hi file:
+   		   -- this.o this.p_o ... : dep
+   	   -- otherwise
+   		   -- if the import is {-# SOURCE #-}
+   			   -- this.o this.p_o ... : dep.hi-boot[-$vers]
+   			   
+   		   -- else
+   			   -- this.o ...   : dep.hi
+   			   -- this.p_o ... : dep.p_hi
+   			   -- ...
+   
+   	   -- (where .o is $osuf, and the other suffixes come from
+   	   -- the cmdline -s options).
+   
+-----------------------------------------------------------------------------
 -- Hsc phase
 
-run_phase Hsc	basename input_fn output_fn
+run_phase Hsc	basename _suff input_fn output_fn
   = do  hsc <- readIORef pgm_C
 	
   -- we add the current directory (i.e. the directory in which
@@ -1452,9 +1732,6 @@ run_phase Hsc	basename input_fn output_fn
 				  add files_to_clean fn
 				  return fn
 			  else return ""
-	
-	let hi_flag = if doing_hi then "-hifile=" ++ tmp_hi_file
-				  else ""
 	
   -- deal with -Rghc-timing
 	timing <- readIORef collect_ghc_timing
@@ -1506,7 +1783,7 @@ run_phase Hsc	basename input_fn output_fn
 				("cp " ++ tmp_stub_h ++ ' ':stub_h)
 	
 			-- #include <..._stub.h> in .hc file
-		add cmdline_hc_includes tmp_stub_h	-- hack
+		addCmdlineHCInclude tmp_stub_h	-- hack
 
 			-- copy the _stub.c file into the current dir
 		run_something "Copy stub .c file" 
@@ -1520,7 +1797,7 @@ run_phase Hsc	basename input_fn output_fn
 		pipeline <- genPipeline As "" stub_c
 		run_pipeline pipeline stub_c False{-no linking-} 
 				False{-no -o option-}
-				(basename++"_stub")
+				(basename++"_stub") "c"
 
 		add ld_inputs (basename++"_stub.o")
 	 )
@@ -1531,7 +1808,7 @@ run_phase Hsc	basename input_fn output_fn
 -- we don't support preprocessing .c files (with -E) now.  Doing so introduces
 -- way too many hacks, and I can't say I've ever used it anyway.
 
-run_phase cc_phase basename input_fn output_fn
+run_phase cc_phase _basename _suff input_fn output_fn
    | cc_phase == Cc || cc_phase == HCc
    = do	cc <- readIORef pgm_c
        	cc_opts <- (getOpts opt_c)
@@ -1547,7 +1824,7 @@ run_phase cc_phase basename input_fn output_fn
 							++ pkg_include_dirs)
 
 	c_includes <- getPackageCIncludes
-	cmdline_includes <- readIORef cmdline_hc_includes -- -#include options
+	cmdline_includes <- readState cmdline_hc_includes -- -#include options
 
 	let cc_injects | hcc = unlines (map mk_include 
 					(c_includes ++ reverse cmdline_includes))
@@ -1579,7 +1856,7 @@ run_phase cc_phase basename input_fn output_fn
 
 	pkg_extra_cc_opts <- getPackageExtraCcOpts
 
-	excessPrecision <- readIORef excess_precision
+	excessPrecision <- readState excess_precision
 
 	run_something "C Compiler"
 	 (unwords ([ cc, "-x", "c", cc_help, "-o", output_fn ]
@@ -1604,12 +1881,12 @@ run_phase cc_phase basename input_fn output_fn
 -----------------------------------------------------------------------------
 -- Mangle phase
 
-run_phase Mangle basename input_fn output_fn
+run_phase Mangle _basename _suff input_fn output_fn
   = do mangler <- readIORef pgm_m
        mangler_opts <- getOpts opt_m
        machdep_opts <-
 	 if (prefixMatch "i386" cTARGETPLATFORM)
-	    then do n_regs <- readIORef stolen_x86_regs
+	    then do n_regs <- readState stolen_x86_regs
 		    return [ show n_regs ]
 	    else return []
        run_something "Assembly Mangler"
@@ -1622,7 +1899,7 @@ run_phase Mangle basename input_fn output_fn
 -----------------------------------------------------------------------------
 -- Splitting phase
 
-run_phase SplitMangle basename input_fn outputfn
+run_phase SplitMangle _basename _suff input_fn _output_fn
   = do  splitter <- readIORef pgm_s
 
 	-- this is the prefix used for the split .s files
@@ -1651,7 +1928,7 @@ run_phase SplitMangle basename input_fn outputfn
 -----------------------------------------------------------------------------
 -- As phase
 
-run_phase As basename input_fn output_fn
+run_phase As _basename _suff input_fn output_fn
   = do 	as <- readIORef pgm_a
         as_opts <- getOpts opt_a
 
@@ -1663,14 +1940,10 @@ run_phase As basename input_fn output_fn
 		       ++ [ "-c", input_fn, "-o",  output_fn ]
 		    ))
 
-run_phase SplitAs basename input_fn output_fn
+run_phase SplitAs basename _suff _input_fn _output_fn
   = do  as <- readIORef pgm_a
         as_opts <- getOpts opt_a
 
-	odir_opt <- readIORef output_dir
-    	let odir | Just s <- odir_opt = s
-		     | otherwise          = basename
-	
 	split_s_prefix <- readIORef split_prefix
 	n <- readIORef n_split_files
 
@@ -1755,7 +2028,7 @@ run_something phase_name cmd
    -- and run it!
 #ifndef mingw32_TARGET_OS
    exit_code <- system cmd `catchAllIO` 
-		   (\e -> throwDyn (PhaseFailed phase_name (ExitFailure 1)))
+		   (\_ -> throwDyn (PhaseFailed phase_name (ExitFailure 1)))
 #else
    tmp <- newTempName "sh"
    h <- openFile tmp WriteMode
@@ -1787,7 +2060,7 @@ data OptKind
 -- is a prefix flag (i.e. HasArg, Prefix, OptPrefix, AnySuffix) will override
 -- flags further down the list with the same prefix.
 
-opts = 
+driver_opts = 
   [  ------- help -------------------------------------------------------
      ( "?"    		, NoArg long_usage)
   ,  ( "-help"		, NoArg long_usage)
@@ -1829,15 +2102,15 @@ opts =
 	--"hi-with-*"    -> hiw <- readIORef hi_with  (ToDo)
 
 	--------- Profiling --------------------------------------------------
-  ,  ( "auto-dicts"	, NoArg (add opt_C "-fauto-sccs-on-dicts") )
-  ,  ( "auto-all"	, NoArg (add opt_C "-fauto-sccs-on-all-toplevs") )
-  ,  ( "auto"		, NoArg (add opt_C "-fauto-sccs-on-exported-toplevs") )
-  ,  ( "caf-all"	, NoArg (add opt_C "-fauto-sccs-on-individual-cafs") )
+  ,  ( "auto-dicts"	, NoArg (addOpt_C "-fauto-sccs-on-dicts") )
+  ,  ( "auto-all"	, NoArg (addOpt_C "-fauto-sccs-on-all-toplevs") )
+  ,  ( "auto"		, NoArg (addOpt_C "-fauto-sccs-on-exported-toplevs") )
+  ,  ( "caf-all"	, NoArg (addOpt_C "-fauto-sccs-on-individual-cafs") )
          -- "ignore-sccs"  doesn't work  (ToDo)
 
 	------- Miscellaneous -----------------------------------------------
-  ,  ( "cpp"		, NoArg (writeIORef cpp_flag True) )
-  ,  ( "#include"	, HasArg (add cmdline_hc_includes) )
+  ,  ( "cpp"		, NoArg (updateState (\s -> s{ cpp_flag = True })) )
+  ,  ( "#include"	, HasArg (addCmdlineHCInclude) )
   ,  ( "no-link-chk"    , NoArg (return ()) ) -- ignored for backwards compat
 
 	------- Output Redirection ------------------------------------------
@@ -1858,8 +2131,8 @@ opts =
 
   ,  ( "split-objs"	, NoArg (if can_split
 				    then do writeIORef split_object_files True
-					    add opt_C "-fglobalise-toplev-names"
-					    add opt_c "-DUSE_SPLIT_MARKERS"
+					    addOpt_C "-fglobalise-toplev-names"
+					    addOpt_c "-DUSE_SPLIT_MARKERS"
 				    else hPutStrLn stderr
 					    "warning: don't know how to  split \
 					    \object files on this architecture"
@@ -1874,7 +2147,7 @@ opts =
   ,  ( "l"		, Prefix (add cmdline_libraries) )
 
         ------- Packages ----------------------------------------------------
-  ,  ( "package-name"   , HasArg (\s -> add opt_C ("-inpackage="++s)) )
+  ,  ( "package-name"   , HasArg (\s -> addOpt_C ("-inpackage="++s)) )
 
   ,  ( "package"        , HasArg (addPackage) )
   ,  ( "syslib"         , HasArg (addPackage) )	-- for compatibility w/ old vsns
@@ -1884,7 +2157,6 @@ opts =
   ,  ( "-delete-package" , SepArg (deletePackage) )
 
         ------- Specific phases  --------------------------------------------
-  ,  ( "pgmdep"         , HasArg (writeIORef pgm_dep) )
   ,  ( "pgmL"           , HasArg (writeIORef pgm_L) )
   ,  ( "pgmP"           , HasArg (writeIORef pgm_P) )
   ,  ( "pgmC"           , HasArg (writeIORef pgm_C) )
@@ -1894,55 +2166,55 @@ opts =
   ,  ( "pgma"           , HasArg (writeIORef pgm_a) )
   ,  ( "pgml"           , HasArg (writeIORef pgm_l) )
 
-  ,  ( "optdep"		, HasArg (add opt_dep) )
-  ,  ( "optL"		, HasArg (add opt_L) )
-  ,  ( "optP"		, HasArg (add opt_P) )
-  ,  ( "optCrts"        , HasArg (add opt_Crts) )
-  ,  ( "optC"		, HasArg (add opt_C) )
-  ,  ( "optc"		, HasArg (add opt_c) )
-  ,  ( "optm"		, HasArg (add opt_m) )
-  ,  ( "opta"		, HasArg (add opt_a) )
-  ,  ( "optl"		, HasArg (add opt_l) )
-  ,  ( "optdll"		, HasArg (add opt_dll) )
+  ,  ( "optdep"		, HasArg (addOpt_dep) )
+  ,  ( "optL"		, HasArg (addOpt_L) )
+  ,  ( "optP"		, HasArg (addOpt_P) )
+  ,  ( "optCrts"        , HasArg (addOpt_Crts) )
+  ,  ( "optC"		, HasArg (addOpt_C) )
+  ,  ( "optc"		, HasArg (addOpt_c) )
+  ,  ( "optm"		, HasArg (addOpt_m) )
+  ,  ( "opta"		, HasArg (addOpt_a) )
+  ,  ( "optl"		, HasArg (addOpt_l) )
+  ,  ( "optdll"		, HasArg (addOpt_dll) )
 
 	------ HsCpp opts ---------------------------------------------------
-  ,  ( "D"		, Prefix (\s -> add opt_P ("-D'"++s++"'") ) )
-  ,  ( "U"		, Prefix (\s -> add opt_P ("-U'"++s++"'") ) )
+  ,  ( "D"		, Prefix (\s -> addOpt_P ("-D'"++s++"'") ) )
+  ,  ( "U"		, Prefix (\s -> addOpt_P ("-U'"++s++"'") ) )
 
 	------ Warning opts -------------------------------------------------
-  ,  ( "W"		, NoArg (writeIORef warning_opt W_))
-  ,  ( "Wall"		, NoArg (writeIORef warning_opt W_all))
-  ,  ( "Wnot"		, NoArg (writeIORef warning_opt W_not))
-  ,  ( "w"		, NoArg (writeIORef warning_opt W_not))
+  ,  ( "W"		, NoArg (updateState (\s -> s{ warning_opt = W_ })))
+  ,  ( "Wall"		, NoArg (updateState (\s -> s{ warning_opt = W_all })))
+  ,  ( "Wnot"		, NoArg (updateState (\s -> s{ warning_opt = W_not })))
+  ,  ( "w"		, NoArg (updateState (\s -> s{ warning_opt = W_not })))
 
 	----- Linker --------------------------------------------------------
   ,  ( "static" 	, NoArg (writeIORef static True) )
 
         ------ Compiler RTS options -----------------------------------------
-  ,  ( "H"                 , HasArg (sizeOpt specific_heap_size) )
-  ,  ( "K"                 , HasArg (sizeOpt specific_stack_size) )
+  ,  ( "H"                 , HasArg (newHeapSize  . decodeSize) )
+  ,  ( "K"                 , HasArg (newStackSize . decodeSize) )
   ,  ( "Rscale-sizes"	   , HasArg (floatOpt scale_sizes_by) )
-  ,  ( "Rghc-timing" 	   , NoArg (writeIORef collect_ghc_timing True) )
+  ,  ( "Rghc-timing" 	   , NoArg  (writeIORef collect_ghc_timing True) )
 
 	------ Debugging ----------------------------------------------------
   ,  ( "dstg-stats"	   , NoArg (writeIORef opt_StgStats True) )
 
-  ,  ( "dno-"		   , Prefix (\s -> add anti_opt_C ("-d"++s)) )
-  ,  ( "d"		   , AnySuffix (add opt_C) )
+  ,  ( "dno-"		   , Prefix (\s -> addAntiOpt_C ("-d"++s)) )
+  ,  ( "d"		   , AnySuffix (addOpt_C) )
 
 	------ Machine dependant (-m<blah>) stuff ---------------------------
 
-  ,  ( "monly-2-regs", 		NoArg (writeIORef stolen_x86_regs 2) )
-  ,  ( "monly-3-regs", 		NoArg (writeIORef stolen_x86_regs 3) )
-  ,  ( "monly-4-regs", 		NoArg (writeIORef stolen_x86_regs 4) )
+  ,  ( "monly-2-regs", 		NoArg (updateState (\s -> s{stolen_x86_regs = 2}) ))
+  ,  ( "monly-3-regs", 		NoArg (updateState (\s -> s{stolen_x86_regs = 3}) ))
+  ,  ( "monly-4-regs", 		NoArg (updateState (\s -> s{stolen_x86_regs = 4}) ))
 
         ------ Compiler flags -----------------------------------------------
   ,  ( "O2-for-C"	   , NoArg (writeIORef opt_minus_o2_for_C True) )
   ,  ( "O"		   , OptPrefix (setOptLevel) )
 
-  ,  ( "fglasgow-exts-no-lang", NoArg ( do add opt_C "-fglasgow-exts") )
+  ,  ( "fglasgow-exts-no-lang", NoArg ( do addOpt_C "-fglasgow-exts") )
 
-  ,  ( "fglasgow-exts"     , NoArg (do add opt_C "-fglasgow-exts"
+  ,  ( "fglasgow-exts"     , NoArg (do addOpt_C "-fglasgow-exts"
 				       addPackage "lang"))
 
   ,  ( "fasm"		   , OptPrefix (\_ -> writeIORef hsc_lang HscAsm) )
@@ -1956,62 +2228,64 @@ opts =
 		Prefix (writeIORef opt_MaxSimplifierIterations . read) )
 
   ,  ( "fusagesp"	   , NoArg (do writeIORef opt_UsageSPInf True
-				       add opt_C "-fusagesp-on") )
+				       addOpt_C "-fusagesp-on") )
 
-  ,  ( "fexcess-precision" , NoArg (do writeIORef excess_precision True
-				       add opt_C "-fexcess-precision"))
+  ,  ( "fexcess-precision" , NoArg (do updateState 
+					   (\s -> s{ excess_precision = True })
+				       addOpt_C "-fexcess-precision"))
 
 	-- flags that are "active negatives"
-  ,  ( "fno-implicit-prelude"	, PassFlag (add opt_C) )
-  ,  ( "fno-prune-tydecls"	, PassFlag (add opt_C) )
-  ,  ( "fno-prune-instdecls"	, PassFlag (add opt_C) )
-  ,  ( "fno-pre-inlining"	, PassFlag (add opt_C) )
+  ,  ( "fno-implicit-prelude"	, PassFlag (addOpt_C) )
+  ,  ( "fno-prune-tydecls"	, PassFlag (addOpt_C) )
+  ,  ( "fno-prune-instdecls"	, PassFlag (addOpt_C) )
+  ,  ( "fno-pre-inlining"	, PassFlag (addOpt_C) )
 
 	-- All other "-fno-<blah>" options cancel out "-f<blah>" on the hsc cmdline
-  ,  ( "fno-",			Prefix (\s -> add anti_opt_C ("-f"++s)) )
+  ,  ( "fno-",			Prefix (\s -> addAntiOpt_C ("-f"++s)) )
 
 	-- Pass all remaining "-f<blah>" options to hsc
-  ,  ( "f", 			AnySuffix (add opt_C) )
+  ,  ( "f", 			AnySuffix (addOpt_C) )
   ]
 
 -----------------------------------------------------------------------------
 -- Process command-line  
 
-processArgs :: [String] -> [String] -> IO [String]  -- returns spare args
-processArgs [] spare = return (reverse spare)
-processArgs args@(('-':_):_) spare = do
-  args' <- processOneArg args
-  processArgs args' spare
-processArgs (arg:args) spare = 
-  processArgs args (arg:spare)
+processArgs :: [(String,OptKind)] -> [String] -> [String]
+   -> IO [String]  -- returns spare args
+processArgs _spec [] spare = return (reverse spare)
+processArgs spec args@(('-':_):_) spare = do
+  args' <- processOneArg spec args
+  processArgs spec args' spare
+processArgs spec (arg:args) spare = 
+  processArgs spec args (arg:spare)
 
-processOneArg :: [String] -> IO [String]
-processOneArg (('-':arg):args) = do
-  let (rest,action) = findArg arg
+processOneArg :: [(String,OptKind)] -> [String] -> IO [String]
+processOneArg spec (('-':arg):args) = do
+  let (rest,action) = findArg spec arg
       dash_arg = '-':arg
   case action of
 
 	NoArg  io -> 
 		if rest == ""
 			then io >> return args
-			else throwDyn (UnknownFlag dash_arg)
+			else unknownFlagErr dash_arg
 
 	HasArg fio -> 
 		if rest /= "" 
 			then fio rest >> return args
 			else case args of
-				[] -> throwDyn (UnknownFlag dash_arg)
+				[] -> unknownFlagErr dash_arg
 				(arg1:args1) -> fio arg1 >> return args1
 
 	SepArg fio -> 
 		case args of
-			[] -> throwDyn (UnknownFlag dash_arg)
+			[] -> unknownFlagErr dash_arg
 			(arg1:args1) -> fio arg1 >> return args1
 
 	Prefix fio -> 
 		if rest /= ""
 			then fio rest >> return args
-			else throwDyn (UnknownFlag dash_arg)
+			else unknownFlagErr dash_arg
 	
 	OptPrefix fio -> fio rest >> return args
 
@@ -2019,15 +2293,15 @@ processOneArg (('-':arg):args) = do
 
 	PassFlag fio  -> 
 		if rest /= ""
-			then throwDyn (UnknownFlag dash_arg)
+			then unknownFlagErr dash_arg
 			else fio ('-':arg) >> return args
 
-findArg :: String -> (String,OptKind)
-findArg arg
-  = case [ (remove_spaces rest, k) | (pat,k) <- opts, 
+findArg :: [(String,OptKind)] -> String -> (String,OptKind)
+findArg spec arg
+  = case [ (remove_spaces rest, k) | (pat,k) <- spec,
 				     Just rest <- [my_prefix_match pat arg],
 				     is_prefix k || null rest ] of
-	[] -> throwDyn (UnknownFlag ('-':arg))
+	[] -> unknownFlagErr ('-':arg)
 	(one:_) -> one
 
 is_prefix (NoArg _) = False
@@ -2038,22 +2312,16 @@ is_prefix _ = True
 -----------------------------------------------------------------------------
 -- convert sizes like "3.5M" into integers
 
-sizeOpt :: IORef Integer -> String -> IO ()
-sizeOpt ref str
-  | c == ""		 = writeSizeOpt	ref (truncate n)
-  | c == "K" || c == "k" = writeSizeOpt	ref (truncate (n * 1000))
-  | c == "M" || c == "m" = writeSizeOpt	ref (truncate (n * 1000 * 1000))
-  | c == "G" || c == "g" = writeSizeOpt	ref (truncate (n * 1000 * 1000 * 1000))
-  | otherwise            = throwDyn (UnknownFlag str)
+decodeSize :: String -> Integer
+decodeSize str
+  | c == ""		 = truncate n
+  | c == "K" || c == "k" = truncate (n * 1000)
+  | c == "M" || c == "m" = truncate (n * 1000 * 1000)
+  | c == "G" || c == "g" = truncate (n * 1000 * 1000 * 1000)
+  | otherwise            = throwDyn (OtherError ("can't decode size: " ++ str))
   where (m, c) = span pred str
         n      = read m  :: Double
 	pred c = isDigit c || c == '.'
-
-writeSizeOpt :: IORef Integer -> Integer -> IO ()
-writeSizeOpt ref new = do
-  current <- readIORef ref
-  when (new > current) $
-	writeIORef ref new
 
 floatOpt :: IORef Double -> String -> IO ()
 floatOpt ref str
@@ -2087,7 +2355,7 @@ findFile name alt_path = unsafePerformIO (do
 -- Utils
 
 my_partition :: (a -> Maybe b) -> [a] -> ([(a,b)],[a])
-my_partition p [] = ([],[])
+my_partition _ [] = ([],[])
 my_partition p (a:as)
   = let (bs,cs) = my_partition p as in
     case p a of
@@ -2096,14 +2364,14 @@ my_partition p (a:as)
 
 my_prefix_match :: String -> String -> Maybe String
 my_prefix_match [] rest = Just rest
-my_prefix_match (p:pat) [] = Nothing
+my_prefix_match (_:_) [] = Nothing
 my_prefix_match (p:pat) (r:rest)
   | p == r    = my_prefix_match pat rest
   | otherwise = Nothing
 
 prefixMatch :: Eq a => [a] -> [a] -> Bool
-prefixMatch [] str = True
-prefixMatch pat [] = False
+prefixMatch [] _str = True
+prefixMatch _pat [] = False
 prefixMatch (p:ps) (s:ss) | p == s    = prefixMatch ps ss
 			  | otherwise = False
 
@@ -2112,7 +2380,6 @@ postfixMatch pat str = prefixMatch (reverse pat) (reverse str)
 
 later = flip finally
 
-my_catch = flip catchAllIO
 my_catchDyn = flip catchDyn
 
 global :: a -> IORef a
@@ -2123,6 +2390,9 @@ splitFilename f = (reverse (stripDot rev_basename), reverse rev_ext)
   where (rev_ext, rev_basename) = span ('.' /=) (reverse f)
         stripDot ('.':xs) = xs
         stripDot xs       = xs
+
+suffixOf :: String -> String
+suffixOf s = drop_longest_prefix s '.'
 
 split :: Char -> String -> [String]
 split c s = case rest of
@@ -2140,22 +2410,22 @@ addNoDups var x = do
   xs <- readIORef var
   unless (x `elem` xs) $ writeIORef var (x:xs)
 
-remove_suffix :: String -> Char -> String
-remove_suffix s c 
+remove_suffix :: Char -> String -> String
+remove_suffix c s
   | null pre  = reverse suf
   | otherwise = reverse pre
   where (suf,pre) = break (==c) (reverse s)
 
 drop_longest_prefix :: String -> Char -> String
 drop_longest_prefix s c = reverse suf
-  where (suf,pre) = break (==c) (reverse s)
+  where (suf,_pre) = break (==c) (reverse s)
 
 take_longest_prefix :: String -> Char -> String
 take_longest_prefix s c = reverse pre
-  where (suf,pre) = break (==c) (reverse s)
+  where (_suf,pre) = break (==c) (reverse s)
 
 newsuf :: String -> String -> String
-newsuf suf s = remove_suffix s '.' ++ suf
+newsuf suf s = remove_suffix '.' s ++ suf
 
 -- getdir strips the filename off the input string, returning the directory.
 getdir :: String -> String
