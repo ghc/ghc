@@ -55,7 +55,8 @@ import PrelNames	( mAIN_Name, pREL_MAIN_Name, pRELUDE_Name,
 			)
 import PrelInfo		( derivingOccurrences )
 import Type		( funTyCon )
-import ErrUtils		( dumpIfSet, showPass, printErrorsAndWarnings, errorsFound )
+import ErrUtils		( dumpIfSet, dumpIfSet_dyn, showPass, 
+			  printErrorsAndWarnings, errorsFound )
 import Bag		( bagToList )
 import FiniteMap	( FiniteMap, fmToList, emptyFM, lookupFM, 
 			  addToFM_C, elemFM, addToFM
@@ -126,16 +127,29 @@ renameExpr dflags hit hst pcs this_module expr
  
 	  initRnMS rdr_env emptyLocalFixityEnv SourceMode (rnExpr expr)	
 						`thenRn` \ (e,fvs) -> 
+
+	  checkErrsRn				`thenRn` \ no_errs_so_far ->
+    	  if not no_errs_so_far then
+		-- Found errors already, so exit now
+	        doDump e [] `thenRn_` 
+		returnRn Nothing
+	  else
+
 	  lookupOrigNames implicit_occs		`thenRn` \ implicit_names ->
 	  slurpImpDecls (fvs `plusFV` implicit_names) `thenRn` \ decls ->
-	  doptRn Opt_D_dump_rn			`thenRn` \ dump_rn ->
-	  ioToRnM (dumpIfSet dump_rn "Renamer:" (ppr e))
-						`thenRn_`
+
+	  doDump e decls  `thenRn_`
 	  returnRn (Just (print_unqual, (e, decls)))
 	}}
   where
      implicit_occs = string_occs
      doc = text "context for compiling expression"
+
+     doDump :: RenamedHsExpr -> [RenamedHsDecl] -> RnMG (Either IOError ())
+     doDump e decls = 
+	getDOptsRn  `thenRn` \ dflags ->
+	ioToRnM (dumpIfSet_dyn dflags Opt_D_dump_rn "Renamer:" 
+			(vcat (ppr e : map ppr decls)))
 \end{code}
 
 
@@ -210,6 +224,18 @@ rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec
 	-- CHECK THAT main IS DEFINED, IF REQUIRED
     checkMain this_module local_gbl_env		`thenRn_`
 
+	-- EXIT IF ERRORS FOUND
+	-- We exit here if there are any errors in the source, *before*
+	-- we attempt to slurp the decls from the interfaces, otherwise
+	-- the slurped decls may get lost when we return up the stack
+	-- to hscMain/hscExpr.
+    checkErrsRn					`thenRn` \ no_errs_so_far ->
+    if not no_errs_so_far then
+	-- Found errors already, so exit now
+        rnDump [] rn_local_decls		`thenRn_` 
+	returnRn Nothing
+    else
+
 	-- SLURP IN ALL THE NEEDED DECLARATIONS
     implicitFVs mod_name rn_local_decls 	`thenRn` \ implicit_fvs -> 
     let
@@ -221,13 +247,7 @@ rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec
     traceRn (text "Source FVs:" <+> fsep (map ppr (nameSetToList slurp_fvs)))	`thenRn_`
     slurpImpDecls slurp_fvs		`thenRn` \ rn_imp_decls ->
 
-	-- EXIT IF ERRORS FOUND
     rnDump rn_imp_decls rn_local_decls		`thenRn_` 
-    checkErrsRn					`thenRn` \ no_errs_so_far ->
-    if not no_errs_so_far then
-	-- Found errors already, so exit now
-	returnRn Nothing
-    else
 
 	-- GENERATE THE VERSION/USAGE INFO
     mkImportInfo mod_name imports 			`thenRn` \ my_usages ->
