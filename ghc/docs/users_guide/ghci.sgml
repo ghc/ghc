@@ -927,6 +927,21 @@ Prelude> :set -fno-glasgow-exts
     
     <variablelist>
       <varlistentry>
+	<term>GHCi complains about <function>main</function> not being
+	in scope when I load a module.</term>
+	<indexterm><primary><function>main</function></primary><secondary>with GHCi</secondary>
+	</indexterm>
+	<listitem>
+	  <para>You probably omitted the <literal>module</literal>
+	  declaration at the top of the module, which causes the
+	  module name to default to <literal>Main</literal>.  In
+	  Haskell, the <literal>Main</literal> module must define a
+	  function called <function>main</function>.  Admittedly this
+	  doesn't make a great deal of sense for an interpreter, but
+	  the rule was kept for compatibility with GHC.</para>
+	</listitem>
+
+      <varlistentry>
 	<term><literal>System.exit</literal> causes GHCi to exit!</term>
 	<indexterm><primary><literal>System.exit</literal></primary><secondary>in
 	GHCi</secondary></indexterm>
