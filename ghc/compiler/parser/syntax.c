@@ -318,6 +318,7 @@ lhs_is_patt(tree e)
       case llist:
       case tuple:
       case negate:
+      case record:
 	expORpat(LEGIT_PATT, e);
 	return TRUE;
 
@@ -327,13 +328,17 @@ lhs_is_patt(tree e)
       case ap:
 	{
 	  tree f = function(e);
-	  tree a = garg(e);       /* do not "unparen", otherwise the error
-				       fromInteger ((x,y) {-no comma-} z)
-				     will be missed.
-			          */
 
-	  /* definitions must have pattern arguments */
+/*  These lines appear to duplicate what's in function(e).
+    Nuked SLPJ May 97
+ 	
+	  tree a = garg(e);       -- do not "unparen", otherwise the error
+				  --     fromInteger ((x,y) {-no comma-} z)
+				  --   will be missed.
+
+	  -- definitions must have pattern arguments
 	  expORpat(LEGIT_PATT, a);
+*/
 
 	  if(ttree(f) == ident)
 	    return(isconstr(qid_to_string(gident(f))));
@@ -342,7 +347,7 @@ lhs_is_patt(tree e)
 	    return(lhs_is_patt(f));
 
 	  else
-	    hsperror("Not a legal pattern binding in LHS");
+	    hsperror("Syntax error: not a legal pattern binding in LHS");
 	}
 
       case infixap:
@@ -363,7 +368,7 @@ lhs_is_patt(tree e)
 
       /* Anything else must be an illegal LHS */
       default:
-	hsperror("Not a valid LHS");
+	hsperror("Syntax error: not a valid LHS");
       }
 
   abort(); /* should never get here */
@@ -372,7 +377,8 @@ lhs_is_patt(tree e)
 
 
 /*
-  Return the function at the root of a series of applications.
+  Return the function at the root of a series of applications,
+  checking on the way that the arguments are patterns.
 */
 
 tree
