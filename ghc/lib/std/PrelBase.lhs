@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelBase.lhs,v 1.42 2001/02/28 00:01:03 qrczak Exp $
+% $Id: PrelBase.lhs,v 1.43 2001/03/01 09:23:40 qrczak Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -208,29 +208,20 @@ data [] a = [] | a : [a]  -- do explicitly: deriving (Eq, Ord)
 
 
 instance (Eq a) => Eq [a]  where
-{-
     {-# SPECIALISE instance Eq [Char] #-}
--}
     []     == []     = True
     (x:xs) == (y:ys) = x == y && xs == ys
     _xs    == _ys    = False
 
 instance (Ord a) => Ord [a] where
-{-
     {-# SPECIALISE instance Ord [Char] #-}
--}
-    a <  b  = case compare a b of { LT -> True;  EQ -> False; GT -> False }
-    a <= b  = case compare a b of { LT -> True;  EQ -> True;  GT -> False }
-    a >= b  = case compare a b of { LT -> False; EQ -> True;  GT -> True  }
-    a >  b  = case compare a b of { LT -> False; EQ -> False; GT -> True  }
 
     compare []     []     = EQ
-    compare (_:_)  []     = GT
     compare []     (_:_)  = LT
+    compare (_:_)  []     = GT
     compare (x:xs) (y:ys) = case compare x y of
-				LT -> LT
-				GT -> GT
-				EQ -> compare xs ys
+                                EQ    -> compare xs ys
+                                other -> other
 
 instance Functor [] where
     fmap = map
@@ -417,7 +408,7 @@ data Ordering = LT | EQ | GT deriving (Eq, Ord)
 %*********************************************************
 
 \begin{code}
-type  String = [Char]
+type String = [Char]
 
 data Char = C# Char#
 
@@ -436,9 +427,8 @@ instance Ord Char where
   (C# c1) <  (C# c2) = c1 `ltChar#` c2
 
 chr :: Int -> Char
-chr (I# i) | i >=# 0# && i <=# 0x10FFFF#
-	     = C# (chr# i)
-	   | otherwise = error "Prelude.chr: bad argument"
+chr (I# i) | i >=# 0# && i <=# 0x10FFFF# = C# (chr# i)
+           | otherwise                   = error "Prelude.chr: bad argument"
 
 unsafeChr :: Int -> Char
 unsafeChr (I# i) =  C# (chr# i)
@@ -448,18 +438,10 @@ ord (C# c) =  I# (ord# c)
 \end{code}
 
 String equality is used when desugaring pattern-matches against strings.
-It's worth making it fast, and providing a rule to use the fast version
-where possible.
 
 \begin{code}
 eqString :: String -> String -> Bool
-eqString []            []            = True
-eqString (C# c1 : cs1) (C# c2 : cs2) = c1 `eqChar#` c2 && cs1 `eqString` cs2
-eqString _	       _	     = False
-
-{-# RULES
-"eqString"  (==) = eqString
-  #-}  
+eqString = (==)
 \end{code}
 
 %*********************************************************
