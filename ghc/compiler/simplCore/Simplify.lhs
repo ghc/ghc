@@ -275,10 +275,10 @@ simplExpr env (Prim op prim_args) args result_ty
   where
     -- PrimOps just need any types in them renamed.
 
-    simpl_op (CCallOp label is_asm may_gc arg_tys result_ty)
+    simpl_op (CCallOp label is_asm may_gc cconv arg_tys result_ty)
       = mapEager (simplTy env) arg_tys	`appEager` \ arg_tys' ->
 	simplTy env result_ty		`appEager` \ result_ty' ->
-	returnEager (CCallOp label is_asm may_gc arg_tys' result_ty')
+	returnEager (CCallOp label is_asm may_gc cconv arg_tys' result_ty')
 
     simpl_op other_op = returnEager other_op
 \end{code}
@@ -327,8 +327,8 @@ simplExpr env tylam@(Lam (TyBinder tyvar) body) [] result_ty
     returnSmpl (Lam (TyBinder tyvar') body')
 
 #ifdef DEBUG
-simplExpr env (Lam (TyBinder _) _) (_ : _) result_ty
-  = panic "simplExpr:TyLam with non-TyArg"
+simplExpr env e@(Lam (TyBinder _) _) args@(_ : _) result_ty
+  = pprPanic "simplExpr:TyLam with non-TyArg" (ppr e $$ ppr args)
 #endif
 \end{code}
 

@@ -27,7 +27,7 @@ import CoreSyn
 import CoreUtils	( coreExprType )
 import SimplUtils	( etaCoreExpr, typeOkForCase )
 import CoreUnfold
-import Literal		( Literal(..), literalType, mkMachInt )
+import Literal		( Literal(..), literalType, mkMachInt, mkMachInt_safe )
 import ErrUtils		( ghcExit, dumpIfSet, doIfSet )
 import FiniteMap	( FiniteMap, emptyFM )
 import FloatIn		( floatInwards )
@@ -482,10 +482,10 @@ tidyCoreArg (TyArg ty)   = tidyTy ty 	`thenTM` \ ty' ->
 \end{code}
 
 \begin{code}
-tidyPrimOp (CCallOp fn casm gc tys ty)
+tidyPrimOp (CCallOp fn casm gc cconv tys ty)
   = mapTM tidyTy tys	`thenTM` \ tys' ->
     tidyTy ty		`thenTM` \ ty' ->
-    returnTM (CCallOp fn casm gc tys' ty')
+    returnTM (CCallOp fn casm gc cconv tys' ty')
 
 tidyPrimOp other_prim_op = returnTM other_prim_op
 \end{code}    
@@ -513,7 +513,7 @@ litToRep (NoRepStr s)
 	  then	 -- Must cater for NULs in literal string
 		mkGenApp (Var unpackCString2Id)
 			 [LitArg (MachStr s),
-		      	  LitArg (mkMachInt (toInteger (_LENGTH_ s)))]
+		      	  LitArg (mkMachInt_safe (toInteger (_LENGTH_ s)))]
 
 	  else	-- No NULs in the string
 		App (Var unpackCStringId) (LitArg (MachStr s))
@@ -536,7 +536,7 @@ litToRep (NoRepInteger i integer_ty)
   
   	| i > tARGET_MIN_INT &&		-- Small enough, so start from an Int
 	  i < tARGET_MAX_INT
-	= Prim Int2IntegerOp [LitArg (mkMachInt i)]
+	= Prim Int2IntegerOp [LitArg (mkMachInt (fromInteger i))]
   
   	| otherwise 			-- Big, so start from a string
 	= Prim Addr2IntegerOp [LitArg (MachStr (_PK_ (show i)))]

@@ -25,10 +25,9 @@ import UniqSupply	( thenUs, returnUs, mapUs,
 			  splitUniqSupply, UniqSM,
 			  UniqSupply
 			 )
-import Util		( isIn, isn'tIn, removeDups )
+import Util		( isIn, isn'tIn, removeDups, trace )
 import Outputable 
 
-import GlaExts		( trace )
 \end{code}
 
 \begin{code}
