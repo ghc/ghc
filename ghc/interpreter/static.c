@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.11 $
- * $Date: 1999/10/16 02:17:30 $
+ * $Revision: 1.12 $
+ * $Date: 1999/10/19 12:05:27 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -65,7 +65,7 @@ static List   local classBindings       Args((String,Class,List));
 static Name   local memberName          Args((Class,Text));
 static List   local numInsert           Args((Int,Cell,List));
 
-static List   local typeVarsIn		Args((Cell,List,List,List));
+       List   local typeVarsIn		Args((Cell,List,List,List));
 static List   local maybeAppendVar      Args((Cell,List));
 
 static Type   local checkSigType        Args((Int,String,Cell,Type));
@@ -1666,7 +1666,7 @@ List xs; {
  * occur in the type expression when read from left to right.
  * ------------------------------------------------------------------------*/
 
-static List local typeVarsIn(ty,us,ws,vs)/*Calculate list of type variables*/
+List local typeVarsIn(ty,us,ws,vs)      /*Calculate list of type variables*/
 Cell ty;				/* used in type expression, reading*/
 List us;				/* from left to right ignoring any */
 List ws;				/* listed in us.		   */
