@@ -9,11 +9,16 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- Bitwise operations.
+--  This module defines bitwise operations for signed and unsigned
+--  integers.  Instances of the class 'Bits' for the 'Int' and
+--  'Integer' types are available from this module, and instances for
+--  explicitly sized integral types are available from the
+--  "Int" and "Word" modules.
 --
 -----------------------------------------------------------------------------
 
 module Data.Bits ( 
+  -- * The 'Bits' class
   Bits(
     (.&.), (.|.), xor, -- :: a -> a -> a
     complement,        -- :: a -> a
@@ -27,8 +32,13 @@ module Data.Bits (
     bitSize,           -- :: a -> Int
     isSigned           -- :: a -> Bool
   ),
+
+  -- * Shifts and rotates
+
+  -- $shifts
   shiftL, shiftR,      -- :: Bits a => a -> Int -> a
   rotateL, rotateR,    -- :: Bits a => a -> Int -> a
+
   -- instance Bits Int
   -- instance Bits Integer
  ) where
@@ -54,17 +64,58 @@ infixl 6 `xor`
 infixl 5 .|.
 #endif
 
+{-| 
+The 'Bits' class defines bitwise operations over integral types.
+
+* Bits are numbered from 0 with bit 0 being the least
+  significant bit.
+-}
 class Num a => Bits a where
-    (.&.), (.|.), xor :: a -> a -> a
+    -- | Bitwise \"and\"
+    (.&.) :: a -> a -> a
+
+    -- | Bitwise \"or\"
+    (.|.) :: a -> a -> a
+
+    -- | Bitwise \"xor\"
+    xor :: a -> a -> a
+
+    {-| Reverse all the bits in the argument -}
     complement        :: a -> a
+
+    {-| Signed shift the argument left by the specified number of bits.
+	Right shifts are specified by giving a negative value. -}
     shift             :: a -> Int -> a
+
+    {-| Signed rotate the argument left by the specified number of bits.
+	Right rotates are specified by giving a negative value.
+
+        'rotate' is well defined only if 'bitSize' is also well defined
+        ('bitSize' is undefined for 'Integer', for example).
+    -}
     rotate            :: a -> Int -> a
+
+    -- | @bit i@ is a value with the @i@th bit set
     bit               :: Int -> a
+
+    -- | @x \`setBit\` i@ is the same as @x .|. bit i@
     setBit            :: a -> Int -> a
+
+    -- | @x \`clearBit\` i@ is the same as @x .&. complement (bit i)@
     clearBit          :: a -> Int -> a
+
+    -- | @x \`complementBit\` i@ is the same as @x \`xor\` bit i@
     complementBit     :: a -> Int -> a
+
+    -- | Return 'True' if the @n@th bit of the argument is 1
     testBit           :: a -> Int -> Bool
+
+    {-| Return the number of bits in the type of the argument.  The actual
+        value of the argument is ignored -}
     bitSize           :: a -> Int
+
+    {-| Return 'True' if the argument is a signed type.  The actual
+        value of the argument is ignored -}
     isSigned          :: a -> Bool
 
     bit i               = 1 `shift` i
@@ -72,6 +123,10 @@ class Num a => Bits a where
     x `clearBit` i      = x .&. complement (bit i)
     x `complementBit` i = x `xor` bit i
     x `testBit` i       = (x .&. bit i) /= 0
+
+-- $shifts
+-- These functions might sometimes be more convenient than the unified
+-- versions 'shift' and 'rotate'.
 
 shiftL, shiftR   :: Bits a => a -> Int -> a
 rotateL, rotateR :: Bits a => a -> Int -> a
