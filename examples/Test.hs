@@ -53,6 +53,18 @@ module Test (
 
 	-- $aux5
 
+	-- $aux6
+
+	-- $aux7
+
+	-- $aux8
+
+	-- $aux9
+
+	-- $aux10
+
+	-- $aux11
+
 	-- | This is some inline documentation in the export list
 	--
 	-- > a code block using bird-tracks
@@ -77,6 +89,10 @@ module Test (
 	-- and without an intervening comma:
 	-- ** A subsection 
 
+{-|
+ > a literal line
+ $ a non /literal/ line $
+-}
    ) where
 
 import Hidden
@@ -258,6 +274,62 @@ h = 42
    @ and a code block @
 -}
 
+-- some tests for various arrangements of code blocks:
+
+{- $aux6
+>test
+>test1
+
+@ test2
+  test3
+@
+-}
+
+{- $aux7
+@
+test1
+test2
+@
+-}
+
+{- $aux8
+>test3
+>test4
+-}
+
+{- $aux9
+@
+test1
+test2
+@
+
+>test3
+>test4
+-}
+
+{- $aux10
+>test3
+>test4
+
+@
+test1
+test2
+@
+-}
+
+-- This one is currently wrong (Haddock 0.4).  The @...@ part is
+-- interpreted as part of the bird-tracked code block.
+{- $aux11
+aux11:
+
+>test3
+>test4
+@
+test1
+test2
+@
+-}
+
 -- | A data-type using existential\/universal types
 data Ex a 
   = forall b . C b => Ex1 b
@@ -292,3 +364,4 @@ n :: R		-- ^ one of the arguments, an 'R'
 foreign import ccall unsafe 
  o :: Float  -- ^ The input float
    -> IO Float  -- ^ The output float
+
