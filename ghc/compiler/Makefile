@@ -347,9 +347,6 @@ endif
 #	The standard suffix rule for compiling a Haskell file
 #	adds these flags to the command line
 
-# not sure if this is required --SDM
-main/Main_HC_OPTS 		= -fvia-C
-
 prelude/PrimOp_HC_OPTS 		= -no-recomp -H80m
 
 # because the NCG can't handle the 64-bit math in here
@@ -407,6 +404,9 @@ main/SysTools_HC_OPTS		= -fno-cse
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 main/SysTools_HC_OPTS		+= '-\#include <windows.h>' '-\#include <process.h>'
 endif
+
+# Required due to use of Concurrent.myThreadId
+utils/Panic_HC_OPTS += -fvia-C
 
 # ghc_strlen percolates through so many modules that it is easier to get its
 # prototype via a global option instead of a myriad of per-file OPTIONS
