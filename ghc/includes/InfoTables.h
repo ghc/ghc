@@ -321,7 +321,9 @@ typedef struct _StgFunInfoExtraFwd {
     StgHalfWord    fun_type;    /* function type */
     StgHalfWord    arity;       /* function arity */
     StgSRT         *srt;	/* pointer to the SRT table */
-    StgWord        bitmap;	/* arg ptr/nonptr bitmap */
+    union { /* union for compat. with TABLES_NEXT_TO_CODE version */
+	StgWord        bitmap;	/* arg ptr/nonptr bitmap */
+    } b;
     StgFun         *slow_apply; /* apply to args on the stack */
 } StgFunInfoExtraFwd;
 
@@ -414,7 +416,7 @@ typedef struct _StgThunkInfoTable {
 #define GET_FUN_LARGE_BITMAP(info) ((StgLargeBitmap*) (((StgWord) ((info)+1)) \
                                         + (info)->f.b.bitmap_offset))
 #else
-#define GET_FUN_LARGE_BITMAP(info) ((StgLargeBitmap*) ((info)->f.b.bitmap_offset))
+#define GET_FUN_LARGE_BITMAP(info) ((StgLargeBitmap*) ((info)->f.b.bitmap))
 #endif
 
 
