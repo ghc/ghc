@@ -56,7 +56,7 @@ import TcType		( Type, TcKind, TcTyVar, TcTyVarSet, TcType,
 			)
 import qualified Type	( getTyVar_maybe )
 import Id		( idName, isLocalId )
-import Var		( TyVar, Id, idType )
+import Var		( TyVar, Id, idType, tyVarName )
 import VarSet
 import VarEnv
 import RdrName		( extendLocalRdrEnv )
@@ -248,21 +248,17 @@ tcExtendKindEnv things thing_inside
 
 tcExtendTyVarEnv :: [TyVar] -> TcM r -> TcM r
 tcExtendTyVarEnv tvs thing_inside
-  = tc_extend_tv_env [ATyVar tv (mkTyVarTy tv) | tv <- tvs] thing_inside
+  = tcExtendTyVarEnv2 [(tyVarName tv, mkTyVarTy tv) | tv <- tvs] thing_inside
 
-tcExtendTyVarEnv2 :: [(TyVar,TcType)] -> TcM r -> TcM r
-tcExtendTyVarEnv2 ty_pairs thing_inside
-  = tc_extend_tv_env [ATyVar tv1 ty2 | (tv1,ty2) <- ty_pairs] thing_inside
-
-tc_extend_tv_env binds thing_inside
+tcExtendTyVarEnv2 :: [(Name,TcType)] -> TcM r -> TcM r
+tcExtendTyVarEnv2 binds thing_inside
   = getLclEnv	   `thenM` \ env@(TcLclEnv {tcl_env = le, 
 					    tcl_tyvars = gtvs, 
 					    tcl_rdr = rdr_env}) ->
     let
-	names      = [getName tv | ATyVar tv _ <- binds]
-	rdr_env'   = extendLocalRdrEnv rdr_env names
- 	le'        = extendNameEnvList le (names `zip` binds)
-	new_tv_set = tyVarsOfTypes [ty | ATyVar _ ty <- binds]
+	rdr_env'   = extendLocalRdrEnv rdr_env (map fst binds)
+	new_tv_set = tyVarsOfTypes (map snd binds)
+ 	le'        = extendNameEnvList le [(name, ATyVar name ty) | (name, ty) <- binds]
     in
 	-- It's important to add the in-scope tyvars to the global tyvar set
 	-- as well.  Consider
@@ -347,17 +343,17 @@ find_thing ignore_it tidy_env (ATyVar tv ty)
     if ignore_it tv_ty then
 	returnM (tidy_env, Nothing)
     else let
-	(tidy_env1, tv1)     = tidyOpenTyVar tidy_env  tv
-	(tidy_env2, tidy_ty) = tidyOpenType  tidy_env1 tv_ty
-	msg = sep [ppr tv1 <+> eq_stuff, nest 2 bound_at]
+	-- The name tv is scoped, so we don't need to tidy it
+	(tidy_env1, tidy_ty) = tidyOpenType  tidy_env tv_ty
+	msg = sep [ppr tv <+> eq_stuff, nest 2 bound_at]
 
 	eq_stuff | Just tv' <- Type.getTyVar_maybe tv_ty, 
-		   tv == tv' = empty
+		   tv == tyVarName tv' = empty
 		 | otherwise = equals <+> ppr tidy_ty
 		-- It's ok to use Type.getTyVar_maybe because ty is zonked by now
 	bound_at = ptext SLIT("bound at:") <+> ppr (getSrcLoc tv)
     in
-    returnM (tidy_env2, Just msg)
+    returnM (tidy_env1, Just msg)
 \end{code}
 
 

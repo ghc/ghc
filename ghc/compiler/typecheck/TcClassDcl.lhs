@@ -26,11 +26,11 @@ import TcEnv		( tcLookupLocatedClass, tcExtendIdEnv2,
 			  InstBindings(..), newDFunName
 			)
 import TcBinds		( tcMonoBinds, tcSpecSigs )
-import TcHsType		( TcSigInfo(..), mkTcSig, tcHsKindedType, tcHsSigType )
+import TcHsType		( TcSigInfo(..), tcHsKindedType, tcHsSigType )
 import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
 import TcUnify		( checkSigTyVars, sigCtxt )
-import TcMType		( tcSkolSigTyVars, UserTypeCtxt( GenPatCtxt ) )
-import TcType		( Type, SkolemInfo(ClsSkol, InstSkol), 
+import TcMType		( tcSkolSigTyVars, UserTypeCtxt( GenPatCtxt ), tcSkolType )
+import TcType		( Type, SkolemInfo(ClsSkol, InstSkol, SigSkol), 
 			  TcType, TcThetaType, TcTyVar, mkTyVarTys,
 			  mkClassPred, tcSplitSigmaTy, tcSplitFunTys,
 			  tcIsTyVarTy, tcSplitTyConApp_maybe, tcSplitForAllTys, tcSplitPhiTy,
@@ -342,15 +342,23 @@ tcMethodBind inst_tyvars inst_theta avail_insts prags
 
     	-- Check the bindings; first adding inst_tyvars to the envt
 	-- so that we don't quantify over them in nested places
-     mkTcSig meth_id 				`thenM` \ meth_sig ->
-     let lookup_sig name = ASSERT( name == idName meth_id ) 
-			   Just meth_sig
-     in
-     tcExtendTyVarEnv inst_tyvars (
+
+	
+    let -- Fake up a TcSigInfo to pass to tcMonoBinds
+	rigid_info = SigSkol (idName meth_id)
+    in
+    tcSkolType rigid_info (idType meth_id)	`thenM` \ (tyvars', theta', tau') ->
+    getInstLoc (SigOrigin rigid_info)		`thenM` \ loc ->
+    let meth_sig = TcSigInfo { sig_id = meth_id, sig_tvs = tyvars', sig_scoped = [],
+			       sig_theta = theta', sig_tau = tau', sig_loc = loc }
+        lookup_sig name = ASSERT( name == idName meth_id ) 
+			  Just meth_sig
+    in
+    tcExtendTyVarEnv inst_tyvars (
 	addErrCtxt (methodCtxt sel_id)			$
 	getLIE 						$
 	tcMonoBinds (unitBag meth_bind) lookup_sig NonRecursive
-     )							`thenM` \ ((meth_bind, mono_bind_infos), meth_lie) ->
+    )							`thenM` \ ((meth_bind, mono_bind_infos), meth_lie) ->
 
 	-- Now do context reduction.   We simplify wrt both the local tyvars
 	-- and the ones of the class/instance decl, so that there is
@@ -360,20 +368,20 @@ tcMethodBind inst_tyvars inst_theta avail_insts prags
 	--
 	-- We do this for each method independently to localise error messages
 
-     addErrCtxtM (sigCtxt sel_id inst_tyvars inst_theta (idType meth_id))	$
-     newDictsAtLoc (sig_loc meth_sig) (sig_theta meth_sig)	`thenM` \ meth_dicts ->
-     let
+    addErrCtxtM (sigCtxt sel_id inst_tyvars inst_theta (idType meth_id))	$
+    newDictsAtLoc (sig_loc meth_sig) (sig_theta meth_sig)	`thenM` \ meth_dicts ->
+    let
 	meth_tvs   = sig_tvs meth_sig
 	all_tyvars = meth_tvs ++ inst_tyvars
 	all_insts  = avail_insts ++ meth_dicts
-     in
-     tcSimplifyCheck
+    in
+    tcSimplifyCheck
 	 (ptext SLIT("class or instance method") <+> quotes (ppr sel_id))
 	 all_tyvars all_insts meth_lie		`thenM` \ lie_binds ->
 
-     checkSigTyVars all_tyvars			`thenM_`
+    checkSigTyVars all_tyvars			`thenM_`
 
-     let
+    let
 	sel_name = idName sel_id
 	inline_prags  = [ (is_inl, phase)
 		        | L _ (InlineSig is_inl (L _ name) phase) <- prags, 
@@ -397,19 +405,19 @@ tcMethodBind inst_tyvars inst_theta avail_insts prags
 				  inlines
 				  (lie_binds `unionBags` meth_bind)
 
-     in
+    in
 	-- Deal with specialisation pragmas
 	-- The sel_name is what appears in the pragma
-     tcExtendIdEnv2 [(sel_name, final_meth_id)] (
+    tcExtendIdEnv2 [(sel_name, final_meth_id)] (
 	getLIE (tcSpecSigs spec_prags)			`thenM` \ (spec_binds1, prag_lie) ->
      
 	     -- The prag_lie for a SPECIALISE pragma will mention the function itself, 
 	     -- so we have to simplify them away right now lest they float outwards!
 	bindInstsOfLocalFuns prag_lie [final_meth_id]	`thenM` \ spec_binds2 ->
 	returnM (spec_binds1 `unionBags` spec_binds2)
-     )							`thenM` \ spec_binds ->
+    )							`thenM` \ spec_binds ->
 
-     returnM (poly_meth_bind `consBag` spec_binds)
+    returnM (poly_meth_bind `consBag` spec_binds)
 
 
 mkMethodBind :: InstOrigin

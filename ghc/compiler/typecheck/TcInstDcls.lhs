@@ -16,7 +16,7 @@ import TcRnMonad
 import TcMType		( tcSkolSigType, checkValidTheta, checkValidInstHead, instTypeErr, 
 			  checkAmbiguity, SourceTyCtxt(..) )
 import TcType		( mkClassPred, tyVarsOfType, 
-			  tcSplitSigmaTy, getClassPredTys, tcSplitDFunHead, mkTyVarTys,
+			  tcSplitSigmaTy, tcSplitDFunHead, mkTyVarTys,
 			  SkolemInfo(InstSkol), tcSplitDFunTy, pprClassPred )
 import Inst		( tcInstClassOp, newDicts, instToId, showLIE, tcExtendLocalInstEnv )
 import TcDeriv		( tcDeriving )

@@ -11,6 +11,7 @@ module TcExpr ( tcCheckSigma, tcCheckRho, tcInferRho, tcMonoExpr ) where
 #ifdef GHCI 	/* Only if bootstrapped */
 import {-# SOURCE #-}	TcSplice( tcSpliceExpr, tcBracket )
 import Id		( Id )
+import Name		( isExternalName )
 import TcType		( isTauTy )
 import TcEnv		( checkWellStaged )
 import HsSyn		( nlHsApp )
@@ -36,19 +37,19 @@ import TcMatches	( tcMatchesCase, tcMatchLambda, tcDoStmts, tcThingWithSig, TcMa
 import TcHsType		( tcHsSigType, UserTypeCtxt(..) )
 import TcPat		( badFieldCon, refineTyVars )
 import TcMType		( tcInstTyVars, tcInstType, newTyFlexiVarTy, zonkTcType )
-import TcType		( Type, TcTyVar, TcType, TcSigmaType, TcRhoType, MetaDetails(..),
+import TcType		( Type, TcTyVar, TcType, TcSigmaType, TcRhoType, 
 			  tcSplitFunTys, tcSplitTyConApp, mkTyVarTys,
 			  isSigmaTy, mkFunTy, mkTyConApp, tyVarsOfTypes, isLinearPred,
 			  tcSplitSigmaTy, tidyOpenType
 			)
 import Kind		( openTypeKind, liftedTypeKind, argTypeKind )
 
-import Id		( idType, recordSelectorFieldLabel, isRecordSelector, idName )
+import Id		( idType, recordSelectorFieldLabel, isRecordSelector )
 import DataCon		( DataCon, dataConFieldLabels, dataConStrictMarks, dataConWrapId )
-import Name		( Name, isExternalName )
+import Name		( Name )
 import TyCon		( TyCon, FieldLabel, tyConTyVars, tyConStupidTheta, 
 			  tyConDataCons, tyConFields )
-import Type		( zipTopTvSubst, mkTopTvSubst, substTheta, substTy )
+import Type		( zipTopTvSubst, substTheta, substTy )
 import VarSet		( emptyVarSet, elemVarSet )
 import TysWiredIn	( boolTy, parrTyCon, tupleTyCon )
 import PrelNames	( enumFromName, enumFromThenName, 
@@ -60,7 +61,6 @@ import CmdLineOpts
 import HscTypes		( TyThing(..) )
 import SrcLoc		( Located(..), unLoc, getLoc )
 import Util
-import Maybes		( catMaybes )
 import Outputable
 import FastString
 

@@ -389,7 +389,7 @@ data TcTyThing
 
   | ATcId   TcId ThLevel ProcLevel 	-- Ids defined in this module; may not be fully zonked
 
-  | ATyVar  TyVar TcType		-- Type variables; tv -> type.  It can't just be a TyVar
+  | ATyVar  Name TcType			-- Type variables; tv -> type.  It can't just be a TyVar
 					-- that is mutated to point to the type it is bound to,
 					-- because that would make it a wobbly type, and we
 					-- want pattern-bound lexically-scoped type variables to

@@ -13,7 +13,8 @@ import {-# SOURCE #-} TcExpr  ( tcCheckSigma, tcCheckRho )
 
 import CmdLineOpts	( DynFlag(Opt_MonomorphismRestriction) )
 import HsSyn		( HsExpr(..), HsBind(..), LHsBinds, Sig(..),
-			  LSig, Match(..), HsBindGroup(..), IPBind(..),
+			  LSig, Match(..), HsBindGroup(..), IPBind(..), 
+			  HsType(..), hsLTyVarNames,
 			  LPat, GRHSs, MatchGroup(..), emptyLHsBinds, isEmptyLHsBinds,
 			  collectHsBindBinders, collectPatBinders, pprPatBind
 			)
@@ -21,7 +22,7 @@ import TcHsSyn		( TcId, TcDictBinds, zonkId, mkHsLet )
 
 import TcRnMonad
 import Inst		( InstOrigin(..), newDictsAtLoc, newIPDict, instToId )
-import TcEnv		( tcExtendIdEnv, tcExtendIdEnv2, tcExtendTyVarEnv, newLocalName, tcLookupLocalIds )
+import TcEnv		( tcExtendIdEnv, tcExtendIdEnv2, tcExtendTyVarEnv2, newLocalName, tcLookupLocalIds )
 import TcUnify		( Expected(..), tcInfer, checkSigTyVars, sigCtxt )
 import TcSimplify	( tcSimplifyInfer, tcSimplifyInferCheck, tcSimplifyRestricted, 
 			  tcSimplifyToDicts, tcSimplifyIPs )
@@ -30,7 +31,7 @@ import TcHsType		( tcHsSigType, UserTypeCtxt(..), tcAddLetBoundTyVars,
 			)
 import TcPat		( tcPat, PatCtxt(..) )
 import TcSimplify	( bindInstsOfLocalFuns )
-import TcMType		( newTyFlexiVarTy, tcSkolSigType, zonkQuantifiedTyVar, zonkTcTypes )
+import TcMType		( newTyFlexiVarTy, tcSkolType, zonkQuantifiedTyVar, zonkTcTypes )
 import TcType		( TcTyVar, SkolemInfo(SigSkol), 
 			  TcTauType, TcSigmaType, 
 			  TvSubstEnv, mkTvSubst, substTheta, substTy, 
@@ -442,10 +443,12 @@ tcMonoBinds binds lookup_sig is_rec
 	-- though each type sig should scope only over its own RHS,
 	-- because the renamer has sorted all that out.
 	; let mono_info  = getMonoBindInfo tc_binds
-	      rhs_tvs    = [ tv | (_, Just sig, _) <- mono_info, tv <- sig_tvs sig ]
+	      rhs_tvs    = [ (name, mkTyVarTy tv)
+			   | (_, Just sig, _) <- mono_info, 
+			     (name, tv) <- sig_scoped sig `zip` sig_tvs sig ]
 	      rhs_id_env = map mk mono_info 	-- A binding for each term variable
 
-	; binds' <- tcExtendTyVarEnv rhs_tvs    $
+	; binds' <- tcExtendTyVarEnv2 rhs_tvs   $
 		    tcExtendIdEnv2   rhs_id_env $
 		    mapBagM (wrapLocM tcRhs) tc_binds
 	; return (binds', mono_info) }
@@ -562,10 +565,18 @@ tcTySig (L span (Sig (L _ name) ty))
     do	{ sigma_ty <- tcHsSigType (FunSigCtxt name) ty
 	; let rigid_info = SigSkol name
 	      poly_id    = mkLocalId name sigma_ty
-	; (tvs, theta, tau) <- tcSkolSigType rigid_info sigma_ty
+
+		-- The scoped names are the ones explicitly mentioned
+		-- in the HsForAll.  (There may be more in sigma_ty, because
+		-- of nested type synonyms.  See Note [Scoped] with TcSigInfo.)
+	      scoped_names = case ty of
+				L _ (HsForAllTy _ tvs _ _) -> hsLTyVarNames tvs
+				other 		    	   -> []
+
+	; (tvs, theta, tau) <- tcSkolType rigid_info sigma_ty
 	; loc <- getInstLoc (SigOrigin rigid_info)
-	; return (TcSigInfo { sig_id = poly_id, sig_tvs = tvs, 
-			      sig_theta = theta, sig_tau = tau, 
+	; return (TcSigInfo { sig_id = poly_id, sig_scoped = scoped_names,
+			      sig_tvs = tvs, sig_theta = theta, sig_tau = tau, 
 			      sig_loc = loc }) }
 
 checkSigCtxt :: TcSigInfo -> TcSigInfo -> TcM TcSigInfo

@@ -18,8 +18,7 @@ module TcHsType (
 
 	tcHsPatSigType, tcAddLetBoundTyVars,
 	
-	TcSigInfo(..), mkTcSig, 
-	TcSigFun, lookupSig 
+	TcSigInfo(..), TcSigFun, lookupSig 
    ) where
 
 #include "HsVersions.h"
@@ -33,21 +32,20 @@ import TcEnv		( tcExtendTyVarEnv, tcExtendKindEnv,
 			  tcLookup, tcLookupClass, tcLookupTyCon,
 		 	  TyThing(..), getInLocalScope, wrongThingErr
 			)
-import TcMType		( newKindVar, tcSkolType, newMetaTyVar, 
-			  zonkTcKindToKind, 
+import TcMType		( newKindVar, newMetaTyVar, zonkTcKindToKind, 
 			  checkValidType, UserTypeCtxt(..), pprHsSigCtxt
 			)
 import TcUnify		( unifyFunKind, checkExpectedKind )
 import TcType		( Type, PredType(..), ThetaType, 
-			  SkolemInfo(SigSkol), MetaDetails(Flexi),
+			  MetaDetails(Flexi),
 			  TcType, TcTyVar, TcKind, TcThetaType, TcTauType,
 		 	  mkForAllTys, mkFunTys, tcEqType, isPredTy, mkFunTy, 
 			  mkSigmaTy, mkPredTy, mkGenTyConApp, mkTyConApp, mkAppTys, 
-			  tcSplitFunTy_maybe, tcSplitForAllTys )
+			  tcSplitFunTy_maybe, tcSplitForAllTys, typeKind )
 import Kind 		( Kind, isLiftedTypeKind, liftedTypeKind, ubxTupleKind, 
 			  openTypeKind, argTypeKind, splitKindFunTys )
-import Id		( idName, idType )
-import Var		( TyVar, mkTyVar, tyVarKind )
+import Id		( idName )
+import Var		( TyVar, mkTyVar )
 import TyCon		( TyCon, tyConKind )
 import Class		( Class, classTyCon )
 import Name		( Name, mkInternalName )
@@ -150,6 +148,9 @@ the TyCon being defined.
 \begin{code}
 tcHsSigType :: UserTypeCtxt -> LHsType Name -> TcM Type
   -- Do kind checking, and hoist for-alls to the top
+  -- NB: it's important that the foralls that come from the top-level
+  --	 HsForAllTy in hs_ty occur *first* in the returned type.
+  --     See Note [Scoped] with TcSigInfo
 tcHsSigType ctxt hs_ty 
   = addErrCtxt (pprHsSigCtxt ctxt hs_ty) $
     do	{ kinded_ty <- kcTypeType hs_ty
@@ -391,7 +392,7 @@ kcTyVar name	-- Could be a tyvar or a tycon
     tcLookup name	`thenM` \ thing ->
     traceTc (text "lk2" <+> ppr name <+> ppr thing) 	`thenM_`
     case thing of 
-	ATyVar tv _	    	-> returnM (tyVarKind tv)
+	ATyVar _ ty	    	-> returnM (typeKind ty)
 	AThing kind		-> returnM kind
 	AGlobal (ATyCon tc) 	-> returnM (tyConKind tc) 
 	other			-> wrongThingErr "type" thing name
@@ -501,8 +502,6 @@ ds_var_app name arg_tys
     case thing of
 	ATyVar _ ty 	     -> returnM (mkAppTys ty arg_tys)
 	AGlobal (ATyCon tc)  -> returnM (mkGenTyConApp tc arg_tys)
---	AThing _ 	     -> tcLookupTyCon name	`thenM` \ tc ->
---			        returnM (mkGenTyConApp tc arg_tys)
 	other -> pprPanic "ds_app_type" (ppr name <+> ppr arg_tys)
 \end{code}
 
@@ -775,12 +774,41 @@ been instantiated.
 \begin{code}
 data TcSigInfo
   = TcSigInfo {
-	sig_id :: TcId,		    -- *Polymorphic* binder for this value...
-	sig_tvs   :: [TcTyVar],	    -- tyvars
-	sig_theta :: TcThetaType,   -- theta
-	sig_tau   :: TcTauType,	    -- tau
-	sig_loc :: InstLoc	    -- The location of the signature
+	sig_id     :: TcId,		-- *Polymorphic* binder for this value...
+
+	sig_scoped :: [Name],		-- Names for any scoped type variables
+					-- Invariant: correspond 1-1 with an initial
+					-- segment of sig_tvs (see Note [Scoped])
+
+	sig_tvs    :: [TcTyVar],	-- Instantiated type variables
+					-- See Note [Instantiate sig]
+
+	sig_theta  :: TcThetaType,	-- Instantiated theta
+	sig_tau    :: TcTauType,	-- Instantiated tau
+	sig_loc    :: InstLoc	 	-- The location of the signature
     }
+
+-- 	Note [Scoped]
+-- There may be more instantiated type variables than scoped 
+-- ones.  For example:
+--	type T a = forall b. b -> (a,b)
+--	f :: forall c. T c
+-- Here, the signature for f will have one scoped type variable, c,
+-- but two instantiated type variables, c' and b'.  
+--
+-- We assume that the scoped ones are at the *front* of sig_tvs,
+-- and remember the names from the original HsForAllTy in sig_scoped
+
+-- 	Note [Instantiate sig]
+-- It's vital to instantiate a type signature with fresh variable.
+-- For example:
+--	type S = forall a. a->a
+--	f,g :: S
+--	f = ...
+--	g = ...
+-- Here, we must use distinct type variables when checking f,g's right hand sides.
+-- (Instantiation is only necessary because of type synonyms.  Otherwise,
+-- it's all cool; each signature has distinct type variables from the renamer.)
 
 type TcSigFun = Name -> Maybe TcSigInfo
 
@@ -793,21 +821,6 @@ lookupSig [] name = Nothing
 lookupSig (sig : sigs) name
   | name == idName (sig_id sig) = Just sig
   | otherwise	     	 	= lookupSig sigs name
-
-mkTcSig :: TcId -> TcM TcSigInfo
-mkTcSig poly_id
-  = 	-- Instantiate this type
-	-- It's important to do this even though in the error-free case
-	-- we could just split the sigma_tc_ty (since the tyvars don't
-	-- unified with anything).  But in the case of an error, when
-	-- the tyvars *do* get unified with something, we want to carry on
-	-- typechecking the rest of the program with the function bound
-	-- to a pristine type, namely sigma_tc_ty
-    do	{ let rigid_info = SigSkol (idName poly_id)
-	; (tyvars', theta', tau') <- tcSkolType rigid_info (idType poly_id)
-	; loc <- getInstLoc (SigOrigin rigid_info)
-	; return (TcSigInfo { sig_id = poly_id, sig_tvs = tyvars', 
-			      sig_theta = theta', sig_tau = tau', sig_loc = loc }) }
 \end{code}
 
 

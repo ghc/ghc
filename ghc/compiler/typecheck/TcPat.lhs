@@ -18,6 +18,7 @@ import Inst		( InstOrigin(..),
 			  instToId, tcInstStupidTheta, tcSyntaxName
 			)
 import Id		( Id, idType, mkLocalId )
+import Var		( tyVarName )
 import Name		( Name )
 import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
 import TcEnv		( newLocalName, tcExtendIdEnv1, tcExtendTyVarEnv2,
@@ -245,7 +246,7 @@ tc_pat ctxt (SigPatIn pat sig) pat_ty thing_inside
 	  (sig_tvs, sig_ty) <- tcHsPatSigType PatSigCtxt sig
  	; tcSubPat sig_ty pat_ty
 	; subst <- refineTyVars sig_tvs	-- See note [Type matching]
-	; let tv_binds = [(tv, substTyVar subst  tv) | tv <- sig_tvs]
+	; let tv_binds = [(tyVarName tv, substTyVar subst tv) | tv <- sig_tvs]
 	      sig_ty'  = substTy subst sig_ty
 	; (pat', tvs, res) 
 	      <- tcExtendTyVarEnv2 tv_binds $
