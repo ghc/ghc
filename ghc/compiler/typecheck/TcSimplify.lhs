@@ -31,7 +31,7 @@ import Inst		( lookupInst, LookupInstResult(..),
 			  isStdClassTyVarDict, isMethodFor, isMethod,
 			  instToId, tyVarsOfInsts,  cloneDict,
 			  ipNamesOfInsts, ipNamesOfInst, dictPred,
-			  instBindingRequired,
+			  instBindingRequired, fdPredsOfInst,
 			  newDictsFromOld, tcInstClassOp,
 			  getDictClassTys, isTyVarDict,
 			  instLoc, zonkInst, tidyInsts, tidyMoreInsts,
@@ -1532,9 +1532,9 @@ tcImprove :: Avails -> TcM Bool		-- False <=> no change
 tcImprove avails
  =  tcGetInstEnvs 			`thenM` \ inst_envs -> 
     let
-	preds = [ (dictPred inst, pp_loc)
-		| inst <- keysFM avails,
-		  isDict inst,
+	preds = [ (pred, pp_loc)
+		| (inst, avail) <- fmToList avails,
+		  pred <- get_preds inst avail,
 		  let pp_loc = pprInstLoc (instLoc inst)
 		]
 		-- Avails has all the superclasses etc (good)
@@ -1542,9 +1542,15 @@ tcImprove avails
 		-- It does not have duplicates (good)
 		-- NB that (?x::t1) and (?x::t2) will be held separately in avails
 		--    so that improve will see them separate
-		--
-		-- Notice that we only look at dicts; LitInsts and Methods will have
-		-- been squished, so their dicts will be in Avails too
+
+	-- For free Methods, we want to take predicates from their context,
+	-- but for Methods that have been squished their context will already
+	-- be in Avails, and we don't want duplicates.  Hence this rather
+	-- horrid get_preds function
+	get_preds inst IsFree = fdPredsOfInst inst
+	get_preds inst other | isDict inst = [dictPred inst]
+			     | otherwise   = []
+
 	eqns = improve get_insts preds
 	get_insts clas = classInstances inst_envs clas
      in
