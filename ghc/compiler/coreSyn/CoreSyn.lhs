@@ -79,11 +79,26 @@ data Expr b	-- "b" for the type of binders,
   | Lam   b (Expr b)
   | Let   (Bind b) (Expr b)
   | Case  (Expr b) b [Alt b]  	-- Binder gets bound to value of scrutinee
-	-- Invariant: the list of alternatives is ALWAYS EXHAUSTIVE
-	-- Invariant: the DEFAULT case must be *first*, if it occurs at all
+	-- Invariant: The list of alternatives is ALWAYS EXHAUSTIVE,
+	--	      meaning that it covers all cases that can occur
+	--	      See the example below
+	--
+	-- Invariant: The DEFAULT case must be *first*, if it occurs at all
   | Note  Note (Expr b)
   | Type  Type			-- This should only show up at the top
 				-- level of an Arg
+
+-- An "exhausive" case does not necessarily mention all constructors:
+--	data Foo = Red | Green | Blue
+--
+--	...case x of 
+--		Red   -> True
+--		other -> f (case x of 
+--				Green -> ...
+--				Blue  -> ... )
+-- The inner case does not need a Red alternative, because x can't be Red at
+-- that program point.
+
 
 type Arg b = Expr b		-- Can be a Type
 

@@ -497,6 +497,11 @@ makeDerivEqns tycl_decls
 						-- Don't want
 						--	instance Eq [A] => Eq A !!
 
+			-- Here's a recursive newtype that's actually OK
+			--	newtype S1 = S1 [T1 ()]
+			--	newtype T1 a = T1 (StateT S1 IO a ) deriving( Monad )
+			-- It's currently rejected.  Oh well.
+
 	-- Check that eta reduction is OK
 	-- 	(a) the dropped-off args are identical
 	--	(b) the remaining type args mention 
