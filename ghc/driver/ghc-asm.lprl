@@ -976,6 +976,7 @@ sub mangle_asm {
 			$c =~ s/^\s+ldil.*\n\s+ldo.*\n\s+bv.*\n(.*\n)?\s+\.EXIT/$1\t.EXIT/;
 		    } elsif ( $TargetPlatform =~ /^i386-/ ) {
 			$c =~ s/^\tmovl \$${T_US}${symb}_fast\d+,\%edx\n\tjmp \*\%edx\n//;
+			$c =~ s/^\tmovl \$${T_US}${symb}_fast\d+,\%ecx\n\tjmp \*\%ecx\n//;
 			$c =~ s/^\tmovl \$${T_US}${symb}_fast\d+,\%eax\n\tjmp \*\%eax\n//;
 		    } elsif ( $TargetPlatform =~ /^mips-/ ) {
 			$c =~ s/^\tjmp \$31,\(\$27\),0\n\t\.align 4\n\t\.end/\t.align 4\n\t.end/;
