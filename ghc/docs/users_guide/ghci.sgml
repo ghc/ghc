@@ -105,18 +105,19 @@ fac n = n * fac (n-1)
 Prelude> :load Main
 Compiling Main             ( Main.hs, interpreted )
 Ok, modules loaded: Main.
-Main>
+*Main>
 </screen>
 
     <para>GHCi has loaded the <literal>Main</literal> module, and the
-    prompt has changed to &ldquo;<literal>Main></literal>&rdquo; to
+    prompt has changed to &ldquo;<literal>*Main></literal>&rdquo; to
     indicate that the current context for expressions typed at the
-    prompt is the <literal>Main</literal> module we just
-    loaded.  So we can now type expressions involving the functions
-    from <filename>Main.hs</filename>:</para>
+    prompt is the <literal>Main</literal> module we just loaded (we'll
+    explain what the <literal>*</literal> means later in <xref
+    linkend="ghci-scope">).  So we can now type expressions involving
+    the functions from <filename>Main.hs</filename>:</para>
 
 <screen>
-Main> fac 17
+*Main> fac 17
 355687428096000
 </screen>
 
@@ -234,7 +235,7 @@ Compiling C                ( C.hs, interpreted )
 Compiling B                ( B.hs, interpreted )
 Compiling A                ( A.hs, interpreted )
 Ok, modules loaded: A, B, C, D.
-Main>
+*Main>
 </screen>
 
     <para>In the messages from the compiler, we see that it skipped D,
@@ -244,20 +245,33 @@ Main>
     isn't necessary, because the source and everything it depends on
     is unchanged since the last compilation.</para>
 
+    <para>At any time you can use the command 
+    <literal>:show modules</literal>
+    to get a list of the modules currently loaded
+    into GHCi:</para>
+
+<screen>
+*Main> :show modules
+D                ( D.hs, D.o )
+C                ( C.hs, interpreted )
+B                ( B.hs, interpreted )
+A                ( A.hs, interpreted )
+*Main></screen>
+
     <para>If we now modify the source of D (or pretend to: using Unix
     command <literal>touch</literal> on the source file is handy for
     this), the compiler will no longer be able to use the object file,
     because it might be out of date:</para>
 
 <screen>
-Main> :! touch D.hs
-Main> :reload
+*Main> :! touch D.hs
+*Main> :reload
 Compiling D                ( D.hs, interpreted )
 Skipping  C                ( C.hs, interpreted )
 Skipping  B                ( B.hs, interpreted )
 Skipping  A                ( A.hs, interpreted )
 Ok, modules loaded: A, B, C, D.
-Main> 
+*Main> 
 </screen>
 
     <para>Note that module D was compiled, but in this instance
@@ -268,8 +282,8 @@ Main>
     <para>So let's try compiling one of the other modules:</para>
 
 <screen>
-Main> :! ghc -c C.hs
-Main> :load A
+*Main> :! ghc -c C.hs
+*Main> :load A
 Compiling D                ( D.hs, interpreted )
 Compiling C                ( C.hs, interpreted )
 Compiling B                ( B.hs, interpreted )
@@ -284,8 +298,8 @@ Ok, modules loaded: A, B, C, D.
     also compile D:</para>
 
 <screen>
-Main> :! ghc -c D.hs
-Main> :reload
+*Main> :! ghc -c D.hs
+*Main> :reload
 Ok, modules loaded: A, B, C, D.
 </screen>
 
@@ -294,7 +308,7 @@ Ok, modules loaded: A, B, C, D.
     <literal>:load</literal>:</para>
 
 <screen>
-Main> :load A
+*Main> :load A
 Skipping  D                ( D.hs, D.o )
 Skipping  C                ( C.hs, C.o )
 Compiling B                ( B.hs, interpreted )
@@ -357,60 +371,108 @@ in a `do' expression pattern binding: print it
     <sect2 id="ghci-scope">
       <title>What's really in scope at the prompt?</title> 
 
-       <para>When you type an expression at the prompt, what
-       identifiers and types are in scope?  GHCi has a concept of a
-       <firstterm>context</firstterm> module, which can be set using
-       the <literal>:module</literal> command.</para>
+      <para>When you type an expression at the prompt, what
+      identifiers and types are in scope?  GHCi provides a flexible
+      way to control exactly how the context for an expression is
+      constructed.  Let's start with the simple cases; when you start
+      GHCi the prompt looks like this:</para>
 
-      <para>The context module is shown in the prompt: for example,
-      the prompt <literal>Prelude></literal> indicates that the
-      current context for evaluating expressions is the Haskell
-      <literal>Prelude</literal> module.  The Prelude is the default
-      context when you start up GHCi.</para>
-      <indexterm><primary><literal>Prelude</literal></primary></indexterm>
+<screen>Prelude></screen>
 
-      <para>Exactly which entities are in scope in a given context
-      depends on whether the context module is compiled or
-      interpreted:</para>
+      <para>Which indicates that everything from the module
+      <literal>Prelude</literal> is currently in scope.  If we now
+      load a file into GHCi, the prompt will change:</para>
 
-      <itemizedlist>
-	<listitem>
-	  <para>If the context module is interpreted, then everything
-  	  that was in scope during compilation of that module is also
-  	  in scope at the prompt, i.e. all the imports and any
-  	  top-level functions, types and classes defined in that
-  	  module.</para>
-	</listitem>
+<screen>
+Prelude> :load Main.hs
+Compiling Main             ( Main.hs, interpreted )
+*Main>
+</screen>
 
-	<listitem>
-	  <para>If the context module comes from a package, or is
- 	  otherwise compiled, then only the exports of that module are
- 	  in scope at the prompt.  So for example, when the current
- 	  context module is <literal>Prelude</literal>, everything the
- 	  <literal>Prelude</literal> exports is in scope, but if we
- 	  switch context to eg. <literal>Time</literal>, then
- 	  everything from the <literal>Prelude</literal> is now
- 	  invisible.</para>
-	</listitem>
-      </itemizedlist>
+      <para>The new prompt is <literal>*Main</literal>, which
+      indicates that we are typing expressions in the context of the
+      top-level of the <literal>Main</literal> module.  Everything
+      that is in scope at the top-level in the module
+      <literal>Main</literal> we just loaded is also in scope at the
+      prompt (probably including <literal>Prelude</literal>, as long
+      as <literal>Main</literal> doesn't explicitly hide it).</para>
 
-      <para>The reason for this unfortunate distinction is boring: for
-      a compiled module when the source isn't available, the compiler
-      has no way of knowing what was in scope when the module was
-      compiled (and we don't store this information in the interface
-      file).  However, in practice it shouldn't be a problem: if you
-      want both <literal>Time</literal> and <literal>Prelude</literal>
-      in scope at the same time, just create a file containing the
-      line <literal>import Time</literal> and load it into
-      GHCi.</para>
+      <para>The syntax
+      <literal>*<replaceable>module</replaceable></literal> indicates
+      that it is the full top-level scope of
+      <replaceable>module</replaceable> that is contributing to the
+      scope for expressions typed at the prompt.  Without the
+      <literal>*</literal>, just the exports of the module are
+      visible.</para>
 
-      <para>To make life slightly easier, the GHCi prompt also behaves
-      as if there is an implicit <literal>import qualified</literal>
-      declaration for every module in every package, and every module
-      currently loaded into GHCi.  So in the above example where the
-      <literal>Prelude</literal> was invisible, we can always get at
-      <literal>Prelude</literal> identifiers by qualifying them, eg.
-      <literal>Prelude.map</literal>.</para>
+      <para>We're not limited to a single module: GHCi can combine
+      scopes from multiple modules, in any mixture of
+      <literal>*</literal> and non-<literal>*</literal> forms.  GHCi
+      combines the scopes from all of these modules to form the scope
+      that is in effect at the prompt.  For technical reasons, GHCi
+      can only support the <literal>*</literal>-form for modules which
+      are interpreted, so compiled modules and package modules can
+      only contribute their exports to the current scope.</para>
+
+      <para>The scope is manipulated using the
+      <literal>:module</literal> command.  For example, if the current
+      scope is <literal>Prelude</literal>, then we can bring into
+      scope the exports from the module <literal>IO</literal> like
+      so:</para>
+
+<screen>
+Prelude> :module +IO
+Prelude,IO> hPutStrLn stdout "hello\n"
+hello
+Prelude,IO>
+</screen>
+
+      <para>(Note: <literal>:module</literal> can be shortened to
+      <literal>:m</literal>). The full syntax of the
+      <literal>:module</literal> command is:</para>
+
+<screen>
+:module <optional>+|-</optional> <optional>*</optional><replaceable>mod<subscript>1</subscript></replaceable> ... <optional>*</optional><replaceable>mod<subscript>n</subscript></replaceable>
+</screen>
+
+      <para>Using the <literal>+</literal> form of the
+      <literal>module</literal> commands adds modules to the current
+      scope, and <literal>-</literal> removes them.  Without either
+      <literal>+</literal> or <literal>-</literal>, the current scope
+      is replaced by the set of modules specified.  Note that if you
+      use this form and leave out <literal>Prelude</literal>, GHCi
+      will assume that you really wanted the
+      <literal>Prelude</literal> and add it in for you (if you don't
+      want the <literal>Prelude</literal>, then ask to remove it with
+      <literal>:m -Prelude</literal>).</para>
+
+      <para>The scope is automatically set after a
+      <literal>:load</literal> command, to the most recently loaded
+      "target" module, in a <literal>*</literal>-form if possible.
+      For example, if you say <literal>:load foo.hs bar.hs</literal>
+      and <filename>bar.hs</filename> contains module
+      <literal>Bar</literal>, then the scope will be set to
+      <literal>*Bar</literal> if <literal>Bar</literal> is
+      interpreted, or if <literal>Bar</literal> is compiled it will be
+      set to <literal>Prelude,Bar</literal> (GHCi automatically adds
+      <literal>Prelude</literal> if it isn't present and there aren't
+      any <literal>*</literal>-form modules).</para>
+
+      <para>With multiple modules in scope, especially multiple
+      <literal>*</literal>-form modules, it is likely that name
+      clashes will occur.  Haskell specifies that name clashes are
+      only reported when an ambiguous identifier is used, and GHCi
+      behaves in the same way for expressions typed at the
+      prompt.</para>
+
+      <sect3>
+	<title>Qualified names</title>
+
+	<para>To make life slightly easier, the GHCi prompt also
+        behaves as if there is an implicit <literal>import
+        qualified</literal> declaration for every module in every
+        package, and every module currently loaded into GHCi.</para>
+      </sect3>
     </sect2>
   
     <sect2>
@@ -477,6 +539,14 @@ Prelude>
       simply lost.  However, they do survive a change of context with
       <literal>:module</literal>: the temporary bindings just move to
       the new location.</para>
+
+      <para>HINT: To get a list of the bindings currently in scope, use the
+      <literal>:show bindings</literal> command:</para>
+
+<screen>
+Prelude> :show bindings
+x :: Int
+Prelude></screen>
 
       <para>HINT: if you turn on the <literal>+t</literal> option,
       GHCi will show the type of each variable bound by a statement.
@@ -673,6 +743,28 @@ $ ghci -lm
       </varlistentry>
 
       <varlistentry>
+	<term><literal>:browse</literal>
+	<optional><literal>*</literal></optional><replaceable>module</replaceable>
+	...</term>
+	<indexterm><primary><literal>:browse</literal></primary>
+	</indexterm>
+	<listitem>
+	  <para>Displays the identifiers defined by the module
+	  <replaceable>module</replaceable>, which must be either
+	  loaded into GHCi or be a member of a package.  If the
+	  <literal>*</literal> symbol is placed before the module
+	  name, then <emphasis>all</emphasis> the identifiers defined
+	  in <replaceable>module</replaceable> are shown; otherwise
+	  the list is limited to the exports of
+	  <replaceable>module</replaceable>.  The
+	  <literal>*</literal>-form is only available for modules
+	  which are interpreted; for compiled modules (including
+	  modules from packages) only the non-<literal>*</literal>
+	  form of <literal>:browse</literal> is available.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term><literal>:cd</literal> <replaceable>dir</replaceable></term>
 	<indexterm><primary><literal>:cd</literal></primary></indexterm>
 	<listitem>
@@ -802,15 +894,12 @@ Prelude> :def make (\_ -> return ":! ghc &ndash;&ndash;make Main")
       </varlistentry>
 
       <varlistentry>
-	<term><literal>:module</literal> <replaceable>module</replaceable></term>
+	<term><literal>:module <optional>+|-</optional> <optional>*</optional><replaceable>mod<subscript>1</subscript></replaceable> ... <optional>*</optional><replaceable>mod<subscript>n</subscript></replaceable></literal></term>
 	<indexterm><primary><literal>:module</literal></primary></indexterm>
 	<listitem>
-	  <para>Sets the current context for statements typed at the
-	  prompt to <replaceable>module</replaceable>, which must be a
-	  module name which is already loaded or in a package.  See
-	  <xref linkend="ghci-scope"> for more information on what
-	  effect the context has on what entities are in scope at the
-	  prompt.</para>
+	  <para>Sets or modifies the current context for statements
+	  typed at the prompt.  See <xref linkend="ghci-scope"> for
+	  more details.</para>
 	</listitem>
       </varlistentry>
 
@@ -843,6 +932,45 @@ Prelude> :def make (\_ -> return ":! ghc &ndash;&ndash;make Main")
 	  for a list of available options.  The
 	  <literal>:set</literal> command by itself shows which
 	  options are currently set.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><literal>:set</literal> <literal>args</literal>
+	<replaceable>arg</replaceable> ...</term>
+	<indexterm><primary><literal>:set</literal></primary></indexterm>
+	<listitem>
+	  <para>Sets the list of arguments which are returned when the
+	  program calls <literal>System.getArgs</literal><indexterm><primary>getArgs</primary>
+	    </indexterm>.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><literal>:set</literal> <literal>prog</literal>
+	<replaceable>prog</replaceable></term>
+	<indexterm><primary><literal>:set</literal></primary></indexterm>
+	<listitem>
+	  <para>Sets the string to be returned when the program calls
+	  <literal>System.getProgName</literal><indexterm><primary>getProgName</primary>
+	    </indexterm>.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><literal>:show bindings</literal></term>
+	<indexterm><primary><literal>:show bindings</literal></primary></indexterm>
+	<listitem>
+	  <para>Show the bindings made at the prompt and their
+	  types.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><literal>:show modules</literal></term>
+	<indexterm><primary><literal>:show modules</literal></primary></indexterm>
+	<listitem>
+	  <para>Show the list of modules currently load.</para>
 	</listitem>
       </varlistentry>
 
@@ -1067,14 +1195,6 @@ Prelude> :set -fno-glasgow-exts
 	  function called <function>main</function>.  Admittedly this
 	  doesn't make a great deal of sense for an interpreter, but
 	  the rule was kept for compatibility with GHC.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term><literal>System.getArgs</literal> returns GHCi's command
-	line arguments!</term>
-	<listitem>
-	  <para>Yes, it does.</para>
 	</listitem>
       </varlistentry>
 
