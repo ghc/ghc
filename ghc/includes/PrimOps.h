@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.20 1999/02/18 12:26:11 simonm Exp $
+ * $Id: PrimOps.h,v 1.21 1999/03/01 10:25:20 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -153,15 +153,16 @@ typedef union {
     StgInt32 i[2];
 } long_long_u ;
 
-#define mulIntCzh(r,c,a,b)						\
-  long_long_u z;							\
-  z.l = (StgInt64)a * (StgInt64)b;					\
-  r = z.i[R];								\
-  c = z.i[C];								\
-  if (c == 0 || c == -1) {						\
-    c = ((StgWord)((a^b) ^ r))						\
-      >> (BITS_PER_BYTE * sizeof(I_) - 1);				\
-  }									\
+#define mulIntCzh(r,c,a,b)			\
+{						\
+  long_long_u z;				\
+  z.l = (StgInt64)a * (StgInt64)b;		\
+  r = z.i[R];					\
+  c = z.i[C];					\
+  if (c == 0 || c == -1) {			\
+    c = ((StgWord)((a^b) ^ r))			\
+      >> (BITS_PER_BYTE * sizeof(I_) - 1);	\
+  }						\
 }
 /* Careful: the carry calculation above is extremely delicate.  Make sure
  * you test it thoroughly after changing it.
