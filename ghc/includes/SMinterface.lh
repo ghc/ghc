@@ -453,6 +453,12 @@ Each garbage collector requires different garbage collection entries
 in the info-table.
 
 \begin{code}
+
+#if defined(GCdu) || defined (GCap) || defined (GCgn)
+#define _INFO_COPYING
+#define _INFO_COMPACTING
+#define _INFO_MARKING
+#else
 #if   defined(GC2s)
 #define _INFO_COPYING
 
@@ -460,13 +466,6 @@ in the info-table.
 #if defined(GC1s)
 #define _INFO_COMPACTING
 #define _INFO_MARKING
-
-#else
-#if defined(GCdu) || defined (GCap) || defined (GCgn)
-#define _INFO_COPYING
-#define _INFO_COMPACTING
-#define _INFO_MARKING
-
 #else
 /* NO_INFO_SPECIFIED (ToDo: an #error ?) */
 #endif
