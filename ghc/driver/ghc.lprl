@@ -191,7 +191,7 @@ $Cmp  = 'cmp';
 $Time = '';
 
 $HsCpp	 = # but this is re-set to "cat" (after options) if -cpp not seen
-	   ( $INSTALLING ) ? "$InstLibexecDirGhc/hscpp"
+	   ( $INSTALLING ) ? "$InstLibExecDirGhc/hscpp"
 			   : "$TopPwd/${CURRENT_DIR}/${GHC_HSCPP}";
 
 @HsCpp_flags	= ();
