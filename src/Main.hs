@@ -525,11 +525,11 @@ docsFromDecl _
   = []
 
 docsFromConDecl :: HsConDecl -> [(HsName, DocString)]
-docsFromConDecl (HsConDecl loc nm tys (Just doc))
+docsFromConDecl (HsConDecl loc nm tvs ctxt tys (Just doc))
   = finishedDoc nm doc []
-docsFromConDecl (HsRecDecl loc nm fields (Just doc))
+docsFromConDecl (HsRecDecl loc nm tvs ctxt fields (Just doc))
   = finishedDoc nm doc (foldr docsFromField [] fields)
-docsFromConDecl (HsRecDecl loc nm fields Nothing)
+docsFromConDecl (HsRecDecl loc nm tvs ctxt fields Nothing)
   = foldr docsFromField [] fields
 docsFromConDecl _ 
   = []

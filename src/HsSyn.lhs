@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: HsSyn.lhs,v 1.6 2002/05/08 11:21:56 simonmar Exp $
+% $Id: HsSyn.lhs,v 1.7 2002/05/08 14:48:41 simonmar Exp $
 %
 % (c) The GHC Team, 1997-2002
 %
@@ -140,8 +140,8 @@ data HsMatch
   deriving (Eq,Show)
 
 data HsConDecl
-	 = HsConDecl SrcLoc HsName [HsBangType] (Maybe String)
-	 | HsRecDecl SrcLoc HsName [HsFieldDecl] (Maybe String)
+     = HsConDecl SrcLoc HsName [HsName] HsContext [HsBangType] (Maybe String)
+     | HsRecDecl SrcLoc HsName [HsName] HsContext [HsFieldDecl] (Maybe String)
   deriving (Eq,Show)
 
 data HsFieldDecl

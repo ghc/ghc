@@ -104,12 +104,12 @@ renameClassHead (HsForAllType tvs ctx ty) = do
 renameClassHead ty = do
   return ty
 
-renameConDecl (HsConDecl loc nm tys maybe_doc) = do
+renameConDecl (HsConDecl loc nm tvs ctxt tys maybe_doc) = do
   tys <- mapM renameBangTy tys
-  return (HsConDecl loc nm tys maybe_doc)
-renameConDecl (HsRecDecl loc nm fields maybe_doc) = do
+  return (HsConDecl loc nm tvs ctxt tys maybe_doc)
+renameConDecl (HsRecDecl loc nm tvs ctxt fields maybe_doc) = do
   fields <- mapM renameField fields
-  return (HsRecDecl loc nm fields maybe_doc)
+  return (HsRecDecl loc nm tvs ctxt fields maybe_doc)
 
 renameField (HsFieldDecl ns ty doc) = do 
   ty <- renameBangTy ty

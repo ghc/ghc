@@ -519,9 +519,9 @@ ppHsDataDecl doc_map summary is_newty decl@(HsDataDecl loc ctx nm args cons drv)
 
 	no_constr_docs = all constr_has_no_doc cons
 
-	constr_has_no_doc (HsConDecl _ nm _ _) 
+	constr_has_no_doc (HsConDecl _ nm _ _ _ _) 
 	   = isNothing (lookupFM doc_map nm)
-	constr_has_no_doc (HsRecDecl _ nm fields _)
+	constr_has_no_doc (HsRecDecl _ nm _ _ fields _)
 	   = isNothing (lookupFM doc_map nm) && all field_has_no_doc fields
 
  	field_has_no_doc (HsFieldDecl nms _ _)
@@ -529,26 +529,36 @@ ppHsDataDecl doc_map summary is_newty decl@(HsDataDecl loc ctx nm args cons drv)
 
 
 ppShortConstr :: Bool -> HsConDecl -> Html
-ppShortConstr summary (HsConDecl pos nm typeList _maybe_doc) = 
-   hsep (ppHsBinder summary nm : map ppHsBangType typeList)
-ppShortConstr summary (HsRecDecl pos nm fields maybe_doc) =
+ppShortConstr summary (HsConDecl pos nm tvs ctxt typeList _maybe_doc) = 
+   ppHsConstrHdr tvs ctxt +++
+	hsep (ppHsBinder summary nm : map ppHsBangType typeList)
+ppShortConstr summary (HsRecDecl pos nm tvs ctxt fields maybe_doc) =
+   ppHsConstrHdr tvs ctxt +++
    ppHsBinder summary nm +++
    braces (vanillaTable << aboves (map (ppShortField summary) fields))
 
-ppHsFullConstr doc_map (HsConDecl pos nm typeList _maybe_doc) = 
+ppHsConstrHdr tvs ctxt
+ = (if null tvs then noHtml else keyword "forall" <+> 
+				 hsep (map ppHsName tvs) <+> 
+				 toHtml ". ")
+   +++
+   (if null ctxt then noHtml else ppHsContext ctxt <+> toHtml "=> ")
+
+ppHsFullConstr doc_map (HsConDecl pos nm tvs ctxt typeList _maybe_doc) = 
      declWithDoc False doc (
-	hsep (ppHsBinder False nm : map ppHsBangType typeList)
+	hsep ((ppHsConstrHdr tvs ctxt +++ 
+		ppHsBinder False nm) : map ppHsBangType typeList)
       )
    where
      doc = lookupFM doc_map nm
-ppHsFullConstr doc_map (HsRecDecl pos nm fields maybe_doc) =
+ppHsFullConstr doc_map (HsRecDecl pos nm tvs ctxt fields maybe_doc) =
    td << vanillaTable << (
      case doc of
        Nothing  -> aboves [hdr, fields_html]
        Just doc -> aboves [hdr, constr_doc, fields_html]
    )
 
-  where hdr = declBox (ppHsBinder False nm)
+  where hdr = declBox (ppHsConstrHdr tvs ctxt +++ ppHsBinder False nm)
 	constr_doc = docBox (markup htmlMarkup (fromJust doc))
 	fields_html = 
 	   td << 
@@ -757,7 +767,7 @@ equals = char '='
 comma  = char ','
 
 char c = toHtml [c]
-empty  = toHtml ""
+empty  = noHtml
 
 parens p        = char '(' +++ p +++ char ')'
 brackets p      = char '[' +++ p +++ char ']'

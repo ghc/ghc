@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
-$Id: HsParser.ly,v 1.8 2002/05/08 11:21:56 simonmar Exp $
+$Id: HsParser.ly,v 1.9 2002/05/08 14:48:41 simonmar Exp $
 
 (c) Simon Marlow, Sven Panne 1997-2000
 
@@ -426,9 +426,11 @@ C a, or (C1 a, C2 b, ... Cn z) and convert it into a context.  Blaach!
 
 > ctype :: { HsType }
 >	: 'forall' tyvars '.' ctype	{ mkHsForAllType (Just $2) [] $4 }
->	| btype '=>' type		{% checkContext $1 `thenP` \c ->
->					   returnP (mkHsForAllType Nothing c $3) }
+>	| context '=>' type		{ mkHsForAllType Nothing $1 $3 }
 >	| type				{ $1 }
+
+> context :: { HsContext }
+> 	: btype				{% checkContext $1 }
 
 > types	:: { [HsType] }
 >	: type ',' types		{ $1 : $3 }
@@ -453,12 +455,22 @@ Datatype declarations
 >	| constr			{ [$1] }
 
 > constr :: { HsConDecl }
->	: srcloc maybe_docnext scontype maybe_docprev
->		{ HsConDecl $1 (fst $3) (snd $3) ($2 `mplus` $4) }
->	| srcloc maybe_docnext sbtype conop sbtype maybe_docprev
->		{ HsConDecl $1 $4 [$3,$5] ($2 `mplus` $6) }
->	| srcloc maybe_docnext con '{' fielddecls '}' maybe_docprev
->		{ HsRecDecl $1 $3 $5 ($2 `mplus` $7) }
+>	: srcloc maybe_docnext forall_stuff constr_stuff maybe_docprev
+>		{ HsConDecl $1 (fst $4) $3 [] (snd $4) ($2 `mplus` $5) }
+>	| srcloc maybe_docnext forall_stuff context '=>' constr_stuff maybe_docprev
+>		{ HsConDecl $1 (fst $6) $3 $4 (snd $6) ($2 `mplus` $7) }
+> 	| srcloc maybe_docnext forall_stuff con '{' fielddecls '}' maybe_docprev
+> 		{ HsRecDecl $1 $4 $3 [] $6 ($2 `mplus` $8) }
+> 	| srcloc maybe_docnext forall_stuff context '=>' con '{' fielddecls '}' maybe_docprev
+> 		{ HsRecDecl $1 $6 $3 $4 $8 ($2 `mplus` $10) }
+
+> forall_stuff :: { [HsName] }
+> 	: 'forall' tyvars '.'		 	{ $2 }
+> 	| {- empty -}				{ [] }
+
+> constr_stuff :: { (HsName, [HsBangType]) }
+> 	: scontype 				{ $1 }
+>	| sbtype conop sbtype			{ ($2, [$1,$3]) }
 
 > maybe_docprev :: { Maybe String }
 > 	: DOCPREV			{ Just $1 }

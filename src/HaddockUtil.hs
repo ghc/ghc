@@ -58,8 +58,9 @@ declBinders d =
      HsForeignImport _ _ _ _ n _ -> [n]
      _                           -> []
 
-conDeclBinders (HsConDecl _ n _ _) = [n]
-conDeclBinders (HsRecDecl _ n fields _) = n : concat (map fieldDeclBinders fields)
+conDeclBinders (HsConDecl _ n _ _ _ _) = [n]
+conDeclBinders (HsRecDecl _ n _ _ fields _) = 
+  n : concat (map fieldDeclBinders fields)
 
 fieldDeclBinders (HsFieldDecl ns _ _) = ns
 
@@ -89,8 +90,8 @@ restrictTo names decl = case decl of
    
 restrictCons :: [HsName] -> [HsConDecl] -> [HsConDecl]
 restrictCons names decls = filter keep decls
-  where keep (HsConDecl _ n _ _) = n `elem` names
-	keep (HsRecDecl _ n _ _) = n `elem` names
+  where keep (HsConDecl _ n _ _ _ _) = n `elem` names
+	keep (HsRecDecl _ n _ _ _ _) = n `elem` names
 	-- ToDo: records not right
 
 restrictDecls :: [HsName] -> [HsDecl] -> [HsDecl]

@@ -76,10 +76,10 @@ ppIfaces mods
 	= empty
 
 ppHsConstr :: HsConDecl -> Doc
-ppHsConstr (HsRecDecl pos name fieldList maybe_doc) =
+ppHsConstr (HsRecDecl pos name tvs ctxt fieldList maybe_doc) =
 	 ppHsName name
 	 <> (braces . hsep . punctuate comma . map ppField $ fieldList)
-ppHsConstr (HsConDecl pos name typeList maybe_doc) = 
+ppHsConstr (HsConDecl pos name tvs ctxt typeList maybe_doc) = 
 	 hsep (ppHsName name : map ppHsBangType typeList)
 
 ppField (HsFieldDecl ns ty doc)
