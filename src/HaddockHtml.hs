@@ -10,6 +10,8 @@ import Prelude hiding (div)
 import HaddockVersion
 import HaddockTypes
 import HaddockUtil
+import HaddockModuleTree
+import HaddockHH
 import HsSyn
 
 import IO
@@ -69,11 +71,9 @@ ppHtml title source_url ifaces odir maybe_css libdir inst_maps prologue =  do
 
   ppHtmlContents odir title source_url (map fst visible_ifaces) prologue
   ppHtmlIndex odir title visible_ifaces
+  ppHHContents odir (map fst visible_ifaces)
+  ppHHIndex odir visible_ifaces
   mapM_ (ppHtmlModule odir title source_url inst_maps) visible_ifaces
-
-moduleHtmlFile :: FilePath -> String -> FilePath
-moduleHtmlFile "" mod  = mod ++ ".html" -- ToDo: Z-encode filename?
-moduleHtmlFile dir mod = dir ++ pathSeparator : mod ++ ".html"
 
 contentsHtmlFile = "index.html"
 indexHtmlFile    = "doc-index.html"
@@ -197,28 +197,6 @@ mkLeaf s ss True  = anchor ! [href (moduleHtmlFile "" mod)] << toHtml s
   where mod = foldr (++) "" (s' : map ('.':) ss')
 	(s':ss') = reverse (s:ss)
 	 -- reconstruct the module name
-
-data ModuleTree = Node String Bool [ModuleTree]
-
-mkModuleTree :: [Module] -> [ModuleTree]
-mkModuleTree mods = foldr addToTrees [] (map splitModule mods)
-
-addToTrees :: [String] -> [ModuleTree] -> [ModuleTree]
-addToTrees [] ts = ts
-addToTrees ss [] = mkSubTree ss
-addToTrees (s1:ss) (t@(Node s2 leaf subs) : ts)
-  | s1 >  s2  = t : addToTrees (s1:ss) ts
-  | s1 == s2  = Node s2 (leaf || null ss) (addToTrees ss subs) : ts
-  | otherwise = mkSubTree (s1:ss) ++ t : ts
-
-mkSubTree [] = []
-mkSubTree (s:ss) = [Node s (null ss) (mkSubTree ss)]
-
-splitModule :: Module -> [String]
-splitModule (Module mod) = split mod
-  where split mod = case break (== '.') mod of
-     			(s1, '.':s2) -> s1 : split s2
-     			(s1, _) -> [s1]
 
 -- ---------------------------------------------------------------------------
 -- Generate the index

@@ -14,6 +14,7 @@ module HaddockUtil (
   -- * Filename utilities
   basename, dirname, splitFilename3, 
   isPathSeparator, pathSeparator,
+  moduleHtmlFile,
 
   -- * Miscellaneous utilities
   die, dieMsg, mapSnd, mapMaybeM,
@@ -208,6 +209,10 @@ isPathSeparator ch =
 #else
   ch == '/'
 #endif
+
+moduleHtmlFile :: FilePath -> String -> FilePath
+moduleHtmlFile "" mod  = mod ++ ".html" -- ToDo: Z-encode filename?
+moduleHtmlFile dir mod = dir ++ pathSeparator : mod ++ ".html"
 
 -----------------------------------------------------------------------------
 -- misc.
