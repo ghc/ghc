@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.77 2001/10/26 00:53:27 sof Exp $
+-- $Id: DriverFlags.hs,v 1.78 2001/10/29 13:25:19 simonmar Exp $
 --
 -- Driver flags
 --
@@ -22,7 +22,7 @@ module DriverFlags (
 
 import DriverState
 import DriverUtil
-import SysTools		( setTmpDir, setPgm, setDryRun, showGhcUsage )
+import SysTools
 import CmdLineOpts
 import Config
 import Util
@@ -152,16 +152,15 @@ arg_ok (AnySuffixPred p _)  rest arg = p arg
 -- flags further down the list with the same prefix.
 
 static_flags = 
-  [  ------- help -------------------------------------------------------
-     ( "?"    		, NoArg showGhcUsage)
-  ,  ( "-help"		, NoArg showGhcUsage)
-  
-
-      ------- version ----------------------------------------------------
-  ,  ( "-version"	 , NoArg (do hPutStrLn stdout (cProjectName
+  [  ------- help / version ----------------------------------------------
+     ( "?"    		 , NoArg showGhcUsage)
+  ,  ( "-help"	 	 , NoArg showGhcUsage)
+  ,  ( "-print-libdir"   , NoArg (do getTopDir >>= putStrLn
+				     exitWith ExitSuccess))  
+  ,  ( "-version"	 , NoArg (do putStrLn (cProjectName
 				      ++ ", version " ++ cProjectVersion)
 				     exitWith ExitSuccess))
-  ,  ( "-numeric-version", NoArg (do hPutStrLn stdout cProjectVersion
+  ,  ( "-numeric-version", NoArg (do putStrLn cProjectVersion
 				     exitWith ExitSuccess))
 
       ------- verbosity ----------------------------------------------------
