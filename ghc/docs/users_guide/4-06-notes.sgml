@@ -1,0 +1,250 @@
+<Sect1 id="release-4-06">
+<Title>Release notes for version&nbsp;4.06&mdash;1/00
+</Title>
+
+<Para>
+
+<ItemizedList>
+<ListItem>
+
+<Para>
+User visible changes
+
+<ItemizedList>
+
+<ListItem>
+<Para>
+Major library reorganisation.  The libraries are now split into 8
+categories:
+
+<VariableList>
+
+<VarListEntry>
+<Term><Literal>concurrent</Literal></Term>
+<ListItem>
+<Para>
+Same as the old <literal>concurrent</literal> library
+</Para>
+</ListItem>
+</VarListEntry>
+
+<VarListEntry>
+<Term><Literal>data</Literal></Term>
+<ListItem>
+<Para>
+Datatypes.  Contains old <literal>FiniteMap</literal>
+and <literal>Set</literal> modules, and Chris Okasaki's Edison
+library.
+</Para>
+</ListItem>
+</VarListEntry>
+
+<VarListEntry>
+<Term><Literal>lang</Literal></Term>
+<ListItem>
+<Para>
+contains most of the contents of
+the old <literal>exts</literal> library
+</Para>
+</ListItem>
+</VarListEntry>
+
+<VarListEntry>
+<Term><Literal>net</Literal></Term>
+<ListItem>
+<Para>
+networking-related libraries (Socket, SocketPrim, and
+new URI library).
+</Para>
+</ListItem>
+</VarListEntry>
+
+<VarListEntry>
+<Term><Literal>num</Literal></Term>
+<ListItem>
+<Para>
+numerical-related libraries (currently empty).
+</Para>
+</ListItem>
+</VarListEntry>
+
+<VarListEntry>
+<Term><Literal>posix</Literal></Term>
+<ListItem>
+<Para>
+the old POSIX library
+</Para>
+</ListItem>
+</VarListEntry>
+
+<VarListEntry>
+<Term><Literal>text</Literal></Term>
+<ListItem>
+<Para>
+text-processing related libraries (including Andy Gill's
+HTML library)
+</Para>
+</ListItem>
+</VarListEntry>
+
+<VarListEntry>
+<Term><Literal>util</Literal></Term>
+<ListItem>
+<Para>
+various miscellaneous libraries, including John Hughes'
+and Koen Claessen's QuickCheck library.
+</Para>
+</ListItem>
+</VarListEntry>
+
+</VariableList>
+
+See the accompanying libraries documentation for more details.
+</Para>
+</ListItem>
+
+<ListItem>
+<Para>
+Cleanup of concurrent I/O system.  We now use non-blocking I/O on
+all Handles, so that multiple threads can do I/O simultaneously.
+We <Emphasis>don't</Emphasis> however do non-blocking I/O on <Constant>stdout</Constant>/<Constant>stderr</Constant>,
+due to reports that some shells don't correctly restore
+blocking mode on these file descriptors after running a program.
+</Para>
+</ListItem>
+
+<ListItem>
+<Para>
+Exception changes
+
+<ItemizedList>
+<ListItem>
+<Para>
+<Function>raiseInThread</Function> can now raise exceptions in threads blocked on I/O or time delays.
+</Para>
+</ListItem>
+
+<ListItem>
+<Para>
+New functions in <literal>Exception</literal>
+
+<ProgramListing>
+blockAsyncExceptions   :: IO a -> IO a
+unblockAsyncExceptions :: IO a -> IO a
+</ProgramListing>
+
+used to control the delivery of asynchronous exceptions to
+a thread (including those raised via <Function>raiseInThread</Function>).
+</Para>
+</ListItem>
+
+<ListItem>
+<Para>
+Asynchronous exceptions are now blocked by default inside
+an exception handler.  Use <Function>unblockAsyncExceptions</Function> to
+restore the previous behaviour.
+</Para>
+</ListItem>
+
+</ItemizedList>
+
+</Para>
+</ListItem>
+
+<ListItem>
+<Para>
+Add NetBSD/x86 support.
+</Para>
+</ListItem>
+
+<ListItem>
+<Para>
+Added support for <Literal>foreign export dynamic</Literal>.
+</Para>
+</ListItem>
+
+</ItemizedList>
+
+</Para>
+</ListItem>
+
+<ListItem>
+<Para>
+Minor changes
+
+<ItemizedList>
+
+<ListItem>
+<Para>
+Build system cleanup&mdash;<Command>BIN_DIST=1</Command> is now needed in <Filename>build.mk</Filename> (before building!) to build binary dists.
+</Para>
+</ListItem>
+
+<ListItem>
+<Para>
+New RTS option <Option>-xc</Option>, which prints the current cost-centre
+stack to stderr whenever an exception is raised (only for
+profiling builds).
+</Para>  
+</ListItem>
+
+</ItemizedList>
+
+</Para>
+</ListItem>
+
+<ListItem>
+<Para>
+Not-quite-ready-yet, but in there nontheless
+
+<VariableList>
+
+<VarListEntry>
+<Term>
+SMP support
+</Term>
+<ListItem>
+<Para>
+Building way '<Literal>s</Literal>' on a system with pthreads (only tested on
+Linux so far) will include support for running multiple
+Haskell threads on several pthreads simultaneously.  If
+your system supports it, this will enable Haskell programs
+to take advantage of multiprocessor SMP machines.
+</Para>
+</ListItem>
+</VarListEntry>
+
+<VarListEntry>
+<Term>
+GranSim and GUM
+</Term>
+<ListItem>
+<Para>
+Initial ports of GranSim and GUM to GHC 4 are in there.  Not quite
+ready yet.
+</Para>
+</ListItem>
+</VarListEntry>
+
+<VarListEntry>
+<Term>
+Profiling
+</Term>
+<ListItem>
+<Para>
+Heap profiling sort-of works.  Only cost-centre heap
+profiles are supported so far.
+</Para>
+</ListItem>
+</VarListEntry>
+
+</VariableList>
+
+</Para>
+</ListItem>
+
+</ItemizedList>
+
+</Para>
+
+</Sect1>

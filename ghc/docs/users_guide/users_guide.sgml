@@ -1,7 +1,7 @@
 <!DOCTYPE BOOK PUBLIC "-//OASIS//DTD DocBook V3.1//EN" [
         <!ENTITY license        SYSTEM "license.sgml">
         <!ENTITY intro          SYSTEM "intro.sgml" >
-        <!ENTITY relnotes       SYSTEM "4-04-notes.sgml" >
+        <!ENTITY relnotes       SYSTEM "4-06-notes.sgml" >
         <!ENTITY installing     SYSTEM "installing.sgml" >
         <!ENTITY using          SYSTEM "using.sgml" >
         <!ENTITY runtime        SYSTEM "runtime_control.sgml" >
@@ -20,7 +20,7 @@
 <Book>
 
 <BookInfo>
-<Title>The Glasgow Haskell Compiler User's Guide, Version&nbsp;4.04</Title>
+<Title>The Glasgow Haskell Compiler User's Guide, Version&nbsp;4.06</Title>
 <Author><OtherName>The GHC Team</OtherName></Author>
 <Address>
 <Email>glasgow-haskell-&lcub;bugs,users&rcub;-request@haskell.org</Email>

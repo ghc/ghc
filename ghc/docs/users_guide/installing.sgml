@@ -585,8 +585,9 @@ the new settings take effect.
 
 <Sect2 id="sec-required"><Title>Software required</Title>
 
-You need two chunks of software other than GHC itself: the Cygwin toolchain, and
-Perl.  Here's how to get and install them.
+<Para>
+You need two chunks of software other than GHC itself: the Cygwin toolchain, and Perl.  Here's how to get and install them.
+</Para>
 
 <Sect3><Title>The cygwin toolchain (beta20.1)</Title>
 
@@ -727,6 +728,7 @@ when you invoke GHC, such as:
   Reason: file does not exist /tmp/ghc11068.cpp
 </Screen>
 We think this is due to a bug in Cygwin.
+</Para>
 </ListItem>
 
 <ListItem>
