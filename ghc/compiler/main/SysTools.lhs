@@ -56,7 +56,13 @@ import Panic		( progName, GhcException(..) )
 import Util		( global )
 import CmdLineOpts	( dynFlag, verbosity )
 
-import Exception	( throwDyn, catch )
+import Exception	( throwDyn )
+#if __GLASGOW_HASKELL__ > 408
+import Exception        ( catch )
+#else
+import Exception        ( catchAllIO )
+#define catch catchAllIO
+#endif
 import IO
 import Directory	( doesFileExist, removeFile )
 import IOExts		( IORef, readIORef, writeIORef )
