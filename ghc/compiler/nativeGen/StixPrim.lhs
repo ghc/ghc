@@ -21,7 +21,8 @@ import UniqSupply	( returnUs, thenUs, getUniqueUs, UniqSM )
 import Constants	( mIN_INTLIKE, mIN_CHARLIKE, uF_UPDATEE, bLOCK_SIZE,
 			  rESERVED_STACK_WORDS )
 import CLabel		( mkIntlikeClosureLabel, mkCharlikeClosureLabel,
-			  mkMAP_FROZEN_infoLabel, mkForeignLabel )
+			  mkMAP_FROZEN_infoLabel, mkEMPTY_MVAR_infoLabel,
+			  mkForeignLabel )
 import CallConv		( cCallConv )
 import Outputable
 import FastTypes
@@ -97,9 +98,29 @@ primCode res@[_] SameMutableByteArrayOp args
 
 primCode res@[_] SameMutVarOp args
   = primCode res SameMutableArrayOp args
+\end{code}
 
+\begin{code}
 primCode res@[_] SameMVarOp args
   = primCode res SameMutableArrayOp args
+
+-- #define isEmptyMVarzh(r,a) \
+--     r =(I_)((GET_INFO((StgMVar*)(a))) == &stg_EMPTY_MVAR_info )
+primCode [res] IsEmptyMVarOp [arg] 
+   = let res'     = amodeToStix res
+         arg'     = amodeToStix arg
+         arg_info = StInd PtrRep arg'
+         em_info  = StCLbl mkEMPTY_MVAR_infoLabel
+         same     = StPrim IntEqOp [arg_info, em_info]
+         assign   = StAssign IntRep res' same
+     in
+     returnUs (\xs -> assign : xs)
+
+-- #define myThreadIdzh(t) (t = CurrentTSO)
+primCode [res] MyThreadIdOp [] 
+   = let res' = amodeToStix res
+     in  returnUs (\xs -> StAssign ThreadIdRep res' stgCurrentTSO : xs)
+
 \end{code}
 
 Freezing an array of pointers is a double assignment.  We fix the
