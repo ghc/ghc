@@ -337,7 +337,7 @@ SRC_HC_POST_OPTS += \
   done
 else
 SRC_HC_POST_OPTS += \
-  ld -r -x -o $@.tmp; $(MV) $@.tmp $@
+  ld -r -x -o $@.tmp $@; $(MV) $@.tmp $@
 endif
 endif
 
