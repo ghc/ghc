@@ -4,7 +4,7 @@
 #
 #		Makefile for building the GHC Prelude libraries umpteen ways
 #
-# 	$Id: Makefile,v 1.9 1997/05/18 04:27:38 sof Exp $
+# 	$Id: Makefile,v 1.10 1997/05/26 05:15:12 sof Exp $
 #
 #	
 #################################################################################
@@ -36,7 +36,7 @@ HS_IFACES= $(HS_SRCS:.lhs=.$(way_)hi) ghc/GHC.$(way_)hi
 #-----------------------------------------------------------------------------
 # 	Setting the GHC compile options
 
-SRC_HC_OPTS += -recomp -cpp -fglasgow-exts -fvia-C $(GhcLibHcOpts)
+SRC_HC_OPTS += -recomp -cpp -fglasgow-exts -fvia-C -Rghc-timing $(GhcLibHcOpts)
 
 #
 # Profiling options
