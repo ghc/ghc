@@ -52,12 +52,15 @@ import CmdLineOpts	( dynFlag, verbosity )
 import List		( isPrefixOf )
 import Exception	( throw, throwDyn, catchAllIO )
 import IO		( hPutStr, hPutChar, hPutStrLn, hFlush, stderr )
-import IO		( openFile, IOMode(..), hClose )	-- For temp "system"
 import Directory	( doesFileExist, removeFile )
 import IOExts		( IORef, readIORef, writeIORef )
 import Monad		( when, unless )
+#if defined(mingw32_TARGET_OS) && __GLASGOW_HASKELL__ < 501
 import qualified System
-import System		( ExitCode(..) )
+#else
+import System           ( system )
+#endif
+import System		( ExitCode(..), exitWith )
 
 #include "../includes/config.h"
 
@@ -228,7 +231,7 @@ initSysTools minusB_args
 	; let	cpp_path   = cRAWCPP
 		gcc_path   = cGCC
 		touch_path = cGHC_TOUCHY
-		mkdll_path = panic "Cant build DLLs on a non-Win32 system"
+		mkdll_path = panic "Can't build DLLs on a non-Win32 system"
 
 	-- On Unix, scripts are invoked using the '#!' method.  Binary
 	-- installations of GHC on Unix place the correct line on the front
@@ -418,7 +421,7 @@ Show the usage message and exit
 showGhcUsage = do { usage_path <- readIORef v_Path_usage
 		  ; usage      <- readFile usage_path
 		  ; dump usage
-		  ; System.exitWith System.ExitSuccess }
+		  ; exitWith ExitSuccess }
   where
      dump ""	      = return ()
      dump ('$':'$':s) = hPutStr stderr progName >> dump s
@@ -433,9 +436,6 @@ packageConfigPath = readIORef v_Path_package_config
 \subsection{Managing temporary files
 %*									*
 %************************************************************************
-
-One reason this code is here is because SysTools.system needs to make
-a temporary file.
 
 \begin{code}
 GLOBAL_VAR(v_FilesToClean, [],               [String] )
@@ -519,13 +519,7 @@ runSomething phase_name pgm args
   	  else return ()
 	}
   where
--- Don't convert paths to DOS format when using the kludged
--- version of 'system' on mingw32.  See comments with 'system' below.
-#if __GLASGOW_HASKELL__ > 501
     cmd_line = unwords (dosifyPaths (pgm : args))
-#else
-    cmd_line = unwords (pgm : args)
-#endif
 
 traceCmd :: String -> String -> IO () -> IO ()
 -- a) trace the command (at two levels of verbosity)
@@ -673,30 +667,22 @@ long command lines.  But GHC may need to make a system call with
 a very long command line, notably when it links itself during
 bootstrapping.  
 
-Solution: when compiling SysTools for Windows, using GHC prior
-to 5.01, write the command to a file and use "sh" (not cmd.exe)
-to execute it.  Such GHCs require "sh" on the path, but once
-bootstrapped this problem goes away.
+Solution: import the new definition (which involves compiling up
+lib/std/cbits/system.c)
 
 ToDo: remove when compiling with GHC < 5 is not relevant any more
 
 \begin{code}
-system cmd
+#if defined(mingw32_TARGET_OS) && __GLASGOW_HASKELL__ > 500
+-- copied from lib/std/System.lhs
+system cmd =
+  withUnsafeCString cmd $ \s -> do
+    status <- throwErrnoIfMinus1 "system" (primSystem s)
+    case status of
+        0  -> return ExitSuccess
+        n  -> return (ExitFailure n)
+system "" = ioException (IOError Nothing InvalidArgument "system" "null command" Nothing)
 
-#if !defined(mingw32_TARGET_OS) || __GLASGOW_HASKELL__ > 501
-    -- The usual case
- = System.system cmd
-
-#else	-- The Hackoid case
- = do pid     <- getProcessID
-      tmp_dir <- readIORef v_TmpDir
-      let tmp = tmp_dir++"/sh"++show pid
-      h <- openFile tmp WriteMode
-      hPutStrLn h cmd
-      hClose h
-      exit_code <- System.system ("sh - " ++ tmp) `catchAllIO` 
- 			         (\exn -> removeFile tmp >> throw exn)
-      removeFile tmp
-      return exit_code
+foreign import ccall "systemCmd" unsafe primSystem :: UnsafeCString -> IO Int
 #endif
 \end{code}
