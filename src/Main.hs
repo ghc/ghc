@@ -144,7 +144,7 @@ run flags files = do
      bye (usageInfo (usageHeader prog) options)
 
   when (Flag_Version `elem` flags) $
-     bye ("Haddock version " ++ projectVersion ++ ", (c) Simon Marlow 2002\n")
+     bye ("Haddock version " ++ projectVersion ++ ", (c) Simon Marlow 2003\n")
 
   let title = case [str | Flag_Heading str <- flags] of
 		[] -> ""
