@@ -341,6 +341,7 @@ struct ent_counter {
 extern struct ent_counter *ListOfEntryCtrs;
 
 #define ENT_FUN_DIRECT(f_ct,f_str,f_arity,Aargs,Bargs,arg_kinds,wrap,wrap_kinds) \
+	{							\
 	static struct ent_counter f_ct				\
 	  = { 0,						\
 	      (f_arity), (Aargs), (Bargs), (f_str), (arg_kinds),\
@@ -355,6 +356,7 @@ extern struct ent_counter *ListOfEntryCtrs;
 	    f_ct.registeredp = 1;				\
 	}							\
 	f_ct.ctr += 1;						\
+	}							\
 	ENT_FUN_DIRECT_ctr++ /* the old boring one */
 \end{code}
 
