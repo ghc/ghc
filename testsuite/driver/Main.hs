@@ -11,7 +11,8 @@ import List
 import Maybe		( isJust, fromJust )
 import Monad		( when )
 import Time		( ClockTime, getClockTime )
-import IO		( try )
+import IO		( try, stdout, hFlush,
+			  hSetBuffering, BufferMode(NoBuffering) )
 
 
 --import IOExts(trace)
@@ -171,6 +172,8 @@ got_args opts args start_time
           )
          let parsed_ok = map unRight (filter isRight all_parsed)
         -- Run all the tests in each successfully-parsed .T file.
+         hFlush stdout
+         hSetBuffering stdout NoBuffering
          resultss 
              <- mapM ( \ (path,topdefs) -> processParsedTFile 
                                               tests_to_run
