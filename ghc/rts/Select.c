@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Select.c,v 1.2 1999/09/13 08:28:45 sof Exp $
+ * $Id: Select.c,v 1.3 1999/10/04 16:14:34 simonmar Exp $
  *
  * (c) The GHC Team 1995-1999
  *
@@ -15,6 +15,7 @@
 #include "RtsUtils.h"
 #include "RtsFlags.h"
 #include "Itimer.h"
+#include "Signals.h"
 
 # if defined(HAVE_SYS_TYPES_H)
 #  include <sys/types.h>
@@ -113,6 +114,15 @@ awaitEvent(rtsBool wait)
 	/* fflush(stdout); */
 	fprintf(stderr, "awaitEvent: select failed\n");
 	stg_exit(EXIT_FAILURE);
+      }
+      /* We got a signal; could be one of ours.  If so, we need
+       * to start up the signal handler straight away, otherwise
+       * we could block for a long time before the signal is
+       * serviced.
+       */
+      if (signals_pending()) {
+	start_signal_handlers();
+	return;
       }
     }	
 
