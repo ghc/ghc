@@ -22,7 +22,7 @@
 #     Note, if you specify /usr/foo/lib for libdir,
 #     the library files for your fptools package will be
 #     installed in  /usr/foo/lib/<package>-<version>, e.g.,
-#     /usr/foo/lib/ghc-2.03. If you don't want the package/version
+#     /usr/foo/lib/ghc-2.07. If you don't want the package/version
 #     directory appended, you'll have to modify $(real_libdir)
 #     below.
 #
