@@ -53,6 +53,8 @@ include $(TOP)/mk/suffix.mk
 # (Optional) build-specific configuration
 #
 
+ifndef FAST
 -include .depend
+endif
 # The dependencies file from the current directory
 
