@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: TmpFiles.hs,v 1.20 2001/05/28 17:34:24 qrczak Exp $
+-- $Id: TmpFiles.hs,v 1.21 2001/05/29 17:53:59 sof Exp $
 --
 -- Temporary file management
 --
@@ -88,9 +88,9 @@ removeTmpFiles verb fs = do
 	   (do  when verbose (hPutStrLn stderr ("Removing: " ++ f))
 		if '*' `elem` f 
 #if defined(mingw32_TARGET_OS) && defined(MINIMAL_UNIX_DEPS)
-		  then kludgedSystem (cRM ++ ' ':dosifyPath f) "Cleaning temp files" >> return ()
+		  then kludgedSystem (unwords [cRM, dosifyPath f]) "Cleaning temp files" >> return ()
 #else
-		  then kludgedSystem (cRM ++ ' ':f) "Cleaning temp files" >> return ()
+		  then kludgedSystem (unwords [cRM, f]) "Cleaning temp files" >> return ()
 #endif
 		  else removeFile f)
 	    `catchAllIO`

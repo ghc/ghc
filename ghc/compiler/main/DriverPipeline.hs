@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.71 2001/05/28 03:31:19 sof Exp $
+-- $Id: DriverPipeline.hs,v 1.72 2001/05/29 17:53:59 sof Exp $
 --
 -- GHC Driver
 --
@@ -526,7 +526,7 @@ run_phase Hsc basename suff input_fn output_fn
 		  touch <- readIORef v_Pgm_T;
 		  runSomething "Touching object file" (unwords [dosifyPath touch, dosifyPath o_file]);
 #else
-		  runSomething "Touching object file" (cTOUCH ++ o_file);
+		  runSomething "Touching object file" (unwords [cTOUCH, o_file]);
 #endif
 		  return False;
 		};
