@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.23 2000/06/29 21:08:02 panne Exp $
+# $Id: Makefile,v 1.24 2000/09/04 15:23:55 simonmar Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
@@ -12,6 +12,7 @@ exceptions001_HC_OPTS   = -fglasgow-exts -fno-warn-missing-methods
 stableptr001_HC_OPTS    = -fglasgow-exts
 stableptr002_HC_OPTS    = -fglasgow-exts
 stableptr003_HC_OPTS    = -fglasgow-exts
+stableptr004_HC_OPTS    = -fglasgow-exts
 list001_HC_OPTS         = -fglasgow-exts
 uri001_HC_OPTS		= -package lang -package net
 time001_HC_OPTS	        = -package lang
@@ -21,6 +22,7 @@ enum02_HC_OPTS		= -cpp -fglasgow-exts -H12m
 enum03_HC_OPTS		= -cpp -fglasgow-exts -H12m
 
 stableptr001_RUNTEST_OPTS = +RTS -K4m
+stableptr004_RUNTEST_OPTS = +RTS -K4m
 dynamic001_HC_OPTS = -package lang
 dynamic002_HC_OPTS = -package lang
 
