@@ -60,10 +60,35 @@
   <literal>+RTS -M128m -RTS</literal>
   to the command line.</para>
 
-  <sect2 id="rts-options-gc">
-    <title>RTS options to control the garbage-collector</title>
+  <sect2 id="rts-optinos-environment">
+    <title>Setting global RTS options</title>
 
-    <indexterm><primary>RTS options, garbage-collection</primary></indexterm>
+    <indexterm><primary>RTS options</primary><secondary>from the environment</secondary></indexterm>
+    <indexterm><primary>environment variable</primary><secondary>for
+    setting RTS options</secondary></indexterm>
+
+    <para>RTS options are also taken from the environment variable
+    <envar>GHCRTS</envar><indexterm><primary><envar>GHCRTS</envar></primary>
+      </indexterm>.  For example, to set the maximum heap size
+    to 128M for all GHC-compiled programs (using an
+    <literal>sh</literal>-like shell):</para>
+
+<screen>
+   GHCRTS='-M128m'
+   export GHCRTS
+</screen>
+
+    <para>RTS options taken from the <envar>GHCRTS</envar> environment
+    variable can be overriden by options given on the command
+    line.</para>
+
+  </sect2>
+
+  <sect2 id="rts-options-gc">
+    <title>RTS options to control the garbage collector</title>
+
+    <indexterm><primary>garbage collector</primary><secondary>options</secondary></indexterm>
+    <indexterm><primary>RTS options</primary><secondary>garbage collection</secondary></indexterm>
 
     <para>There are several options to give you precise control over
     garbage collection.  Hopefully, you won't need any of these in
@@ -92,6 +117,34 @@
           area, since the actual size of the allocation area will be
           resized according to the amount of data in the heap (see
           <option>-F</option>, below).</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-c</option></term>
+	<indexterm><primary><option>-c</option></primary><secondary>RTS option</secondary>
+	</indexterm>
+	<indexterm><primary>garbage collection</primary><secondary>compacting</secondary>
+	</indexterm>
+	<indexterm><primary>compacting garbage collection</primary></indexterm>
+
+	<listitem>
+	  <para>Use a compacting algorithm for collecting the oldest
+	  generation.  By default, the oldest generation is collected
+	  using a copying algorithm; this option causes it to be
+	  compacted in-place instead.  The compaction algorithm is
+	  slower than the copying algorithm, but the savings in memory
+	  use can be considerable.</para>
+
+	  <para>For a given heap size (using the <option>-H</option>
+	  option), compaction can in fact reduce the GC cost by
+	  allowing fewer GCs to be performed.  This is more likely
+	  when the ratio of live data to heap size is high, say
+	  &gt;30&percnt;.</para>
+
+	  <para>NOTE: compaction doesn't currently work when a single
+	  generation is requested using the <option>-G1</option>
+	  option.</para>
 	</listitem>
       </varlistentry>
 
