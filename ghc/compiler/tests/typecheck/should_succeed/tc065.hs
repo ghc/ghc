@@ -1,6 +1,8 @@
 module Digraphs where
 
 import TheUtils
+import Set
+import List (partition )
 
 data Digraph vertex = MkDigraph [vertex]
 

@@ -1,45 +1,94 @@
+
+
+--================================================================================
 Typechecked:
 {- nonrec -}
-ShouldSucceed.Eq'.deq = /\ a.t29 -> \{-classdict-} [] [deq.t30] -> deq.t30
+deq{-r3D,x-} =
+    _/\_ a{-r3B-} -> \ tpl_B1 ->
+	tpl_B1
 {- nonrec -}
-defm.ShouldSucceed.Eq'.deq =
-    /\ a.t31 ->
-	\{-dict-} d.ShouldSucceed.Eq'.t32 ->
-	    (error (a.t31 -> a.t31 -> Bool))
-		"No default method for \"ShouldSucceed.Eq'.defm.ShouldSucceed.Eq'.deq\"\n"
-{- rec -}
-dfun.ShouldSucceed.Eq'.Int = ({-dict-} [] [const.ShouldSucceed.Eq'.Int.deq])
-const.ShouldSucceed.Eq'.Int.deq :: Int -> Int -> Bool
-const.ShouldSucceed.Eq'.Int.deq
-    x.r29 y.r30
-	    = True
 AbsBinds
-[a.t13]
-[d.ShouldSucceed.Eq'.t14]
-[(d.ShouldSucceed.Eq'.t15, dfun.ShouldSucceed.Eq'.List)]
-    (d.ShouldSucceed.Eq'.t27, d.ShouldSucceed.Eq'.t15)
-    (ShouldSucceed.Eq'.deq.t26,
-	ShouldSucceed.Eq'.deq [a.t13] d.ShouldSucceed.Eq'.t27)
-    (d.ShouldSucceed.Eq'.t28, d.ShouldSucceed.Eq'.t14)
-    (ShouldSucceed.Eq'.deq.t24,
-	ShouldSucceed.Eq'.deq a.t13 d.ShouldSucceed.Eq'.t28)
-    {- rec -}
-    d.ShouldSucceed.Eq'.t15 = ({-dict-} [] [deq.t16])
-    deq.t16 :: [a.t13] -> [a.t13] -> Bool
-    deq.t16
-	(a.r32 : as.r33) (b.r34 : bs.r35)
-		= if ShouldSucceed.Eq'.deq.t24 a.r32 b.r34 then
-		      ShouldSucceed.Eq'.deq.t26 as.r33 bs.r35
-		  else
-		      False
-AbsBinds [tt5] [d.Num.t8, d.ShouldSucceed.Eq'.t10] [(f.t1, ShouldSucceed.f)]
-    (fromInt.t7, fromInt tt5 d.Num.t8)
-    (lit.t6, fromInt.t7 (MkInt 1#))
-    (d.ShouldSucceed.Eq'.t9,
-	dfun.ShouldSucceed.Eq'.List tt5 d.ShouldSucceed.Eq'.t10)
-    (ShouldSucceed.Eq'.deq.t4,
-	ShouldSucceed.Eq'.deq [tt5] d.ShouldSucceed.Eq'.t9)
-    {- nonrec -}
-    f.t1 :: [tt5] -> Bool
-    f.t1 x.r63 = ShouldSucceed.Eq'.deq.t4 x.r63 ([lit.t6] (tt5))
-
+[a{-aIm-}]
+[d.Eq'_aIf]
+[([a{-aIm-}], $mdeq{-rHb,x-}, deq_aIh)]
+    AbsBinds [] [] [([], deq_aIh, deq_aIj)]
+	deq_aIj
+	    =   GHCerr.noDefaultMethodError{-8k,p-}
+		    (a{-aIm-}
+		     -> a{-aIm-}
+		     -> PrelBase.Bool{-34,p-}) "Class Eq' Method deq"
+{- rec -}
+AbsBinds
+[a{-aHK-}]
+[d.Eq'_aHW]
+[([a{-aHK-}], $d1{-rIn,x-}, d.Eq'_aHA)]
+    d.Eq'_aI0 =
+	d.Eq'_aHW
+    deq_aIq =
+	deq{-r3D,x-}
+	    a{-aHK-}
+	    d.Eq'_aI0
+    deq_aIp =
+	deq_aIo
+    AbsBinds [] [] [([], deq_aIo, deq_aHD)]
+	deq_aHD
+	    (a_r3m PrelBase.:{-55,p-}{i} as_r3n)
+	    (b_r3p PrelBase.:{-55,p-}{i} bs_r3q)
+		    =   if deq_aIq a_r3m b_r3p then
+			    deq_aIp as_r3n bs_r3q
+			else
+			    PrelBase.False{-58,p-}{i}
+    d.Eq'_aHA =
+	({-dict-} [] [deq_aIo])
+{- rec -}
+AbsBinds [] [] [([], $d2{-rIr,x-}, d.Eq'_aI6)]
+    AbsBinds [] [] [([], deq_aIs, deq_aI9)]
+	deq_aI9
+	    x_r3w y_r3y
+		    =   PrelBase.True{-5E,p-}{i}
+    d.Eq'_aI6 =
+	({-dict-} [] [deq_aIs])
+{- nonrec -}
+{- nonrec -}
+AbsBinds
+[t{-aHl-}]
+[d.Eq'_aHr, d.Num_aHu]
+[([t{-aHl-}], f{-r3C,x-}, f_aHa)]
+    d.Eq'_aHp =
+	$d1{-rIn,x-}
+	    t{-aHl-}
+	    d.Eq'_aHr
+    deq_aIv =
+	deq{-r3D,x-}
+	    [t{-aHl-}]
+	    d.Eq'_aHp
+    fromInt_aIu =
+	PrelBase.fromInt{-8R,p-}
+	    t{-aHl-}
+	    d.Num_aHu
+    lit_aIt =
+	fromInt_aIu PrelBase.I#{-5b,p-}{i} 1#
+    f_aHa
+	x_r3f   =   deq_aIv x_r3f [lit_aIt] (t{-aHl-})
+{- nonrec -}
+tc053.hs:10: 
+    Warning: Possibly incomplete patterns
+	in the definition of function `deq'
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d1 1 $d11 1 $d15 1 $d2 1 $d21 1 $d27 1 $d3 1 $d32 1 $d33 1 $d37 1 $d38 1 $d39 1 $d41 1 $d42 1 $d44 1 $d46 1 $d54 1 $d7 1 $d8 1 Eq 1 Eval 1 Num 1 Show 1 String 1;
+PrelNum 1 :: $d10 1 $d16 1 $d18 1 $d29 1 $d33 1 $d35 1;
+_exports_
+ShouldSucceed f Eq'(deq);
+_instances_
+instance _forall_ [a] {Eq' a} => {Eq' [a]} = $d1;
+instance {Eq' PrelBase.Int} = $d2;
+_declarations_
+1 $d1 _:_ _forall_ [a] {Eq' a} => {Eq' [a]} ;;
+1 $d2 _:_ {Eq' PrelBase.Int} ;;
+1 $mdeq _:_ _forall_ [a] {Eq' a} => a -> a -> PrelBase.Bool ;;
+1 class Eq' r3B where {deq :: r3B -> r3B -> PrelBase.Bool} ;
+1 f _:_ _forall_ [a] {Eq' a, PrelBase.Num a} => [a] -> PrelBase.Bool ;;

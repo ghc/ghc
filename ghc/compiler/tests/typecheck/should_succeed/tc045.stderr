@@ -1,32 +1,70 @@
+
+
+--================================================================================
 Typechecked:
 {- nonrec -}
-H.B.op2 = /\ a.t11 -> \{-classdict-} [d.H.C.t13] [op2.t12] -> op2.t12
-sdsel.H.B.H.C = /\ a.t11 -> \{-classdict-} [d.H.C.t13] [op2.t12] -> d.H.C.t13
+scsel_BHC{-aow,x-} =
+    _/\_ a{-r3x-} -> \ tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,p-}{i} tpl_B1 tpl_B2  -> tpl_B1;}
+op2{-r3D,x-} =
+    _/\_ a{-r3x-} -> \ tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,p-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
 {- nonrec -}
-defm.H.B.op2 =
-    /\ a.t14 ->
-	\{-dict-} d.H.B.t15 ->
-	    (error (a.t14 -> a.t14 -> a.t14))
-		"No default method for \"H.B.defm.H.B.op2\"\n"
+AbsBinds
+[a{-aok-}]
+[d.B_aod]
+[([a{-aok-}], $mop2{-rox,x-}, op2_aof)]
+    AbsBinds [] [] [([], op2_aof, op2_aoh)]
+	op2_aoh
+	    =   GHCerr.noDefaultMethodError{-8k,p-}
+		    (a{-aok-} -> a{-aok-} -> a{-aok-}) "Class B Method op2"
 {- nonrec -}
-H.C.op1 = /\ a.t16 -> \{-classdict-} [] [op1.t17] -> op1.t17
+op1{-r3E,x-} =
+    _/\_ a{-r3C-} -> \ tpl_B1 ->
+	tpl_B1
 {- nonrec -}
-defm.H.C.op1 =
-    /\ a.t18 ->
-	\{-dict-} d.H.C.t19 ->
-	    (error (a.t18 -> a.t18))
-		"No default method for \"H.C.defm.H.C.op1\"\n"
-AbsBinds [a.t0] [d.H.B.t2, d.H.C.t1] [(d.H.B.t3, dfun.H.B.List)]
-    {- rec -}
-    d.H.B.t3 = ({-dict-} [d.H.C.t1] [op2.t4])
-    op2.t4 :: [a.t0] -> [a.t0] -> [a.t0]
-    op2.t4
-	xs.r13 ys.r14
-		= xs.r13
-AbsBinds [a.t7] [] [(d.H.C.t8, dfun.H.C.List)]
-    {- rec -}
-    d.H.C.t8 = ({-dict-} [] [op1.t9])
-    op1.t9 :: [a.t7] -> [a.t7]
-    op1.t9
-	xs.r16 = xs.r16
-
+AbsBinds
+[a{-aov-}]
+[d.C_aoo]
+[([a{-aov-}], $mop1{-roy,x-}, op1_aoq)]
+    AbsBinds [] [] [([], op1_aoq, op1_aos)]
+	op1_aos
+	    =   GHCerr.noDefaultMethodError{-8k,p-}
+		    (a{-aov-} -> a{-aov-}) "Class C Method op1"
+{- rec -}
+AbsBinds [a{-anP-}] [] [([a{-anP-}], $d1{-roz,x-}, d.C_anJ)]
+    AbsBinds [] [] [([], op1_aoA, op1_anM)]
+	op1_anM
+	    xs_r3k  =   xs_r3k
+    d.C_anJ =
+	({-dict-} [] [op1_aoA])
+{- rec -}
+AbsBinds
+[a{-ao2-}]
+[d.B_ao5, d.C_ao6]
+[([a{-ao2-}], $d2{-roB,x-}, d.B_anW)]
+    d.C_ao7 =
+	d.C_ao6
+    AbsBinds [] [] [([], op2_aoC, op2_anZ)]
+	op2_anZ
+	    xs_r3s ys_r3u
+		    =   xs_r3s
+    d.B_anW =
+	({-dict-} [d.C_ao7] [op2_aoC])
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ H 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+H B(op2) C(op1);
+_instances_
+instance _forall_ [a] => {C [a]} = $d1;
+instance _forall_ [a] {B a} => {B [a]} = $d2;
+_declarations_
+1 $d1 _:_ _forall_ [a] => {C [a]} ;;
+1 $d2 _:_ _forall_ [a] {B a, C [a]} => {B [a]} ;;
+1 $mop1 _:_ _forall_ [a] {C a} => a -> a ;;
+1 $mop2 _:_ _forall_ [a] {B a} => a -> a -> a ;;
+1 class {C r3x} => B r3x where {op2 :: r3x -> r3x -> r3x} ;
+1 class C r3C where {op1 :: r3C -> r3C} ;

@@ -1,42 +1,122 @@
+
+
+--================================================================================
 Typechecked:
 {- nonrec -}
-Main.Foo.op1 = /\ a.t7 -> \{-classdict-} [] [op1.t8 op2.t9] -> op1.t8
-Main.Foo.op2 =
-    /\ a.t7 b.t10 -> \{-classdict-} [] [op1.t8 op2.t9] -> op2.t9 b.t10
 {- nonrec -}
-defm.Main.Foo.op1 =
-    let
-      AbsBinds [a.t11] [d.Main.Foo.t12] [(op1.t13, op1.t14)]
-	  {- nonrec -}
-	  op1.t13 :: a.t11 -> Bool
-	  op1.t13
-	      x.r11 = True
-    in op1.t14
-defm.Main.Foo.op2 =
-    let
-      AbsBinds [a.t16, b.t17] [d.Main.Foo.t18, d.Ord.t19] [(op2.t20, op2.t21)]
-	  (d.Ord.t31, d.Ord.t19)
-	  (<.t28, (<) b.t17 d.Ord.t31)
-	  (d.Main.Foo.t32, d.Main.Foo.t18)
-	  (Main.Foo.op1.t26, Main.Foo.op1 a.t16 d.Main.Foo.t32)
-	  {- nonrec -}
-	  op2.t20 :: a.t16 -> b.t17 -> b.t17 -> b.t17
-	  op2.t20
-	      x.r12 y.r13 z.r14
-		      = if (Main.Foo.op1.t26 x.r12) && (y.r13 <.t28 z.r14) then
-			    y.r13
+op1{-r3F,x-} =
+    _/\_ a{-r3l-} -> \ tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,p-}{i} tpl_B1 tpl_B2  -> tpl_B1;}
+op2{-r3E,x-} =
+    _/\_ a{-r3l-} -> \ tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,p-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
+{- nonrec -}
+AbsBinds
+[a{-aI8-}]
+[d.Foo_aI2]
+[([a{-aI8-}], $mop1{-rGN,x-}, op1_aIG)]
+    AbsBinds [] [] [([], op1_aIG, op1_aI5)]
+	op1_aI5
+	    x_r3u   =   PrelBase.True{-5E,p-}{i}
+AbsBinds
+[a{-aI8-}]
+[d.Foo_aIb]
+[([a{-aI8-}], $mop2{-rGQ,x-}, op2_aIJ)]
+    d.Foo_aIA =
+	d.Foo_aIb
+    op1_aIK =
+	op1{-r3F,x-}
+	    a{-aI8-}
+	    d.Foo_aIA
+    AbsBinds [b{-aIm-}] [d.Ord_aIw] [([b{-aIm-}], op2_aIJ, op2_aIg)]
+	d.Ord_aIy =
+	    d.Ord_aIw
+	<_aIL =
+	    PrelBase.<{-rd6,p-}
+		b{-aIm-}
+		d.Ord_aIy
+	op2_aIg
+	    x_r3y y_r3A z_r3C
+		    =   if (op1_aIK x_r3y)
+			   PrelBase.&&{-r3D,p-} (y_r3A <_aIL z_r3C) then
+			    y_r3A
 			else
-			    z.r14
-    in op2.t21
+			    z_r3C
 {- rec -}
-dfun.Main.Foo.Int =
-    ({-dict-} [] [const.Main.Foo.Int.op1, const.Main.Foo.Int.op2])
-const.Main.Foo.Int.op1 = defm.Main.Foo.op1 Int dfun.Main.Foo.Int
-const.Main.Foo.Int.op2 =
-    /\ b.t0 -> defm.Main.Foo.op2 [Int, b.t0] dfun.Main.Foo.Int
-AbsBinds [a.t1] [d.Main.Foo.t2] [(d.Main.Foo.t3, dfun.Main.Foo.List)]
-    {- rec -}
-    d.Main.Foo.t3 = ({-dict-} [] [op1.t4, op2.t5])
-    op1.t4 = defm.Main.Foo.op1 [a.t1] d.Main.Foo.t3
-    op2.t5 = /\ b.t6 -> defm.Main.Foo.op2 [[a.t1], b.t6] d.Main.Foo.t3
-
+AbsBinds
+[a{-aGT-}]
+[d.Foo_aHg]
+[([a{-aGT-}], $d1{-rIM,x-}, d.Foo_aGK)]
+    d.Foo_aHi =
+	d.Foo_aGK
+    $mop1_aIO =
+	$mop1{-rGN,x-}
+	    [a{-aGT-}]
+	    d.Foo_aHi
+    d.Foo_aHk =
+	d.Foo_aGK
+    $mop2_aIN =
+	$mop2{-rGQ,x-}
+	    [a{-aGT-}]
+	    d.Foo_aHk
+    AbsBinds [] [] [([], op1_aGM, op1_aGP)]
+	op1_aGP
+	    =   $mop1_aIO
+    AbsBinds [b{-aH7-}] [d.Ord_aHd] [([b{-aH7-}], op2_aGY, op2_aH1)]
+	d.Ord_aHf =
+	    d.Ord_aHd
+	$mop2_aIP =
+	    $mop2_aIN
+		b{-aH7-}
+		d.Ord_aHf
+	op2_aH1
+	    =   $mop2_aIP
+    d.Foo_aGK =
+	({-dict-} [] [op1_aGM, op2_aGY])
+{- rec -}
+AbsBinds [] [] [([], $d2{-rIQ,x-}, d.Foo_aHq)]
+    AbsBinds [] [] [([], op1_aHs, op1_aHu)]
+	op1_aHu
+	    =   $mop1_aII
+    AbsBinds [b{-aHL-}] [d.Ord_aHR] [([b{-aHL-}], op2_aHC, op2_aHF)]
+	d.Ord_aHV =
+	    d.Ord_aHR
+	$mop2_aIR =
+	    $mop2_aIH
+		b{-aHL-}
+		d.Ord_aHV
+	op2_aHF
+	    =   $mop2_aIR
+    d.Foo_aHq =
+	({-dict-} [] [op1_aHs, op2_aHC])
+{- nonrec -}
+d.Foo_aIC =
+    $d2{-rIQ,x-}
+$mop1_aII =
+    $mop1{-rGN,x-}
+	PrelBase.Int{-3g,p-}
+	d.Foo_aIC
+d.Foo_aIF =
+    d.Foo_aIC
+$mop2_aIH =
+    $mop2{-rGQ,x-}
+	PrelBase.Int{-3g,p-}
+	d.Foo_aIF
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ Test 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d14 1 $d15 1 $d26 1 $d27 1 $d32 1 $d34 1 $d49 1 $d51 1 $d6 1 $d7 1 && 1 Eq 1 Ord 1 Ordering 1;
+PrelNum 1 :: $d17 1 $d18 1;
+_exports_
+Test Foo(op1 op2);
+_instances_
+instance _forall_ [a] {Foo a} => {Foo [a]} = $d1;
+instance {Foo PrelBase.Int} = $d2;
+_declarations_
+1 $d1 _:_ _forall_ [a] {Foo a} => {Foo [a]} ;;
+1 $d2 _:_ {Foo PrelBase.Int} ;;
+1 $mop1 _:_ _forall_ [a] {Foo a} => a -> PrelBase.Bool ;;
+1 $mop2 _:_ _forall_ [a] {Foo a} => _forall_ [b] {PrelBase.Ord b} => a -> b -> b -> b ;;
+1 class Foo r3l where {op1 :: r3l -> PrelBase.Bool; op2 :: _forall_ [r3p] {PrelBase.Ord r3p} => r3l -> r3p -> r3p -> r3p} ;

@@ -1,7 +1,22 @@
-Typechecked:
-AbsBinds [tt5, tt6, ot2] [] [(u.t1, ShouldSucceed.u)]
-    {- nonrec -}
-    u.t1 :: ot2 -> (tt5, tt6) -> ot2
-    u.t1 x.r54 = \ (y.r55, z.r56)
-			   -> x.r54
 
+
+--================================================================================
+Typechecked:
+{- nonrec -}
+{- nonrec -}
+AbsBinds
+[t{-aB8-}, t{-aBb-}, t{-aBg-}]
+[]
+[([t{-aB8-}, t{-aBb-}, t{-aBg-}], u{-r3h,x-}, u_aB2)]
+    u_aB2
+	x_r3d   =   \ (y_r3f, z_r3g)
+			      ->  x_r3d
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed u;
+_declarations_
+1 u _:_ _forall_ [a b c] => c -> (a, b) -> c ;;

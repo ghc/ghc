@@ -1,15 +1,38 @@
-Typechecked:
-AbsBinds [ot9] [] [(f.t2, ShouldSucceed.f), (g.t3, ShouldSucceed.g)]
-    {- rec -}
-    f.t2 :: Bool -> ot9 -> ot9
-    f.t2 x.r57 y.r58
-		 = if x.r57 then y.r58 else g.t3 y.r58 x.r57
-    g.t3 :: ot9 -> Bool -> ot9
-    g.t3 y.r60 x.r59
-		 = if x.r59 then y.r60 else f.t2 x.r59 y.r60
-AbsBinds [] [] [(h.t11, ShouldSucceed.h)]
-    {- nonrec -}
-    h.t11 :: Bool -> Bool
-    h.t11
-	x.r56 = (ShouldSucceed.f Bool) ((ShouldSucceed.f Bool) True x.r56) x.r56
 
+
+--================================================================================
+Typechecked:
+{- nonrec -}
+{- rec -}
+AbsBinds
+[t{-anz-}]
+[]
+[([t{-anz-}], f{-r3p,x-}, f_ane), ([t{-anz-}], g{-r3o,x-}, g_anf)]
+    f_ane
+	x_r3h y_r3j
+		=   if x_r3h then y_r3j else g_anf y_r3j x_r3h
+    g_anf
+	y_r3l x_r3n
+		=   if x_r3n then y_r3l else f_ane x_r3n y_r3l
+{- nonrec -}
+{- nonrec -}
+AbsBinds [] [] [([], h{-r3q,x-}, h_anB)]
+    h_anB
+	x_r3f   =   f{-r3p,x-}
+			PrelBase.Bool{-34,p-} f{-r3p,x-}
+						  PrelBase.Bool{-34,p-} PrelBase.True{-5E,p-}{i}
+									x_r3f
+					      x_r3f
+{- nonrec -}
+
+NOTE: Simplifier still going after 4 iterations; bailing out.
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed f g h;
+_declarations_
+1 f _:_ _forall_ [a] => PrelBase.Bool -> a -> a ;;
+1 g _:_ _forall_ [a] => a -> PrelBase.Bool -> a ;;
+1 h _:_ PrelBase.Bool -> PrelBase.Bool ;;

@@ -1,11 +1,26 @@
-Typechecked:
-AbsBinds [ot2] [] [(id.t1, ShouldSucceed.id)]
-    {- nonrec -}
-    id.t1 :: ot2 -> ot2
-    id.t1
-	x.r55 = x.r55
-AbsBinds [tt6] [] [(main.t4, ShouldSucceed.main)]
-    {- nonrec -}
-    main.t4 :: tt6 -> tt6
-    main.t4 = (ShouldSucceed.id (tt6 -> tt6)) (ShouldSucceed.id tt6)
 
+
+--================================================================================
+Typechecked:
+{- nonrec -}
+{- nonrec -}
+AbsBinds [t{-ana-}] [] [([t{-ana-}], iD{-r3f,x-}, iD_an4)]
+    iD_an4
+	x_r3e   =   x_r3e
+{- nonrec -}
+{- nonrec -}
+AbsBinds [t{-anh-}] [] [([t{-anh-}], main{-r3g,x-}, main_anc)]
+    main_anc
+	=   iD{-r3f,x-}
+		(t{-anh-} -> t{-anh-}) iD{-r3f,x-}
+					   t{-anh-}
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed iD main;
+_declarations_
+1 iD _:_ _forall_ [a] => a -> a ;;
+1 main _:_ _forall_ [a] => a -> a ;;

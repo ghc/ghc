@@ -1,35 +1,68 @@
+
+
+--================================================================================
 Typechecked:
 {- nonrec -}
-ShouldSucceed.Eq2.deq = /\ a.t18 -> \{-classdict-} [] [deq.t19] -> deq.t19
+deq{-r3z,x-} =
+    _/\_ a{-r3y-} -> \ tpl_B1 ->
+	tpl_B1
 {- nonrec -}
-defm.ShouldSucceed.Eq2.deq =
-    /\ a.t20 ->
-	\{-dict-} d.ShouldSucceed.Eq2.t21 ->
-	    (error (a.t20 -> a.t20 -> Bool))
-		"No default method for \"ShouldSucceed.Eq2.defm.ShouldSucceed.Eq2.deq\"\n"
-{- rec -}
-dfun.ShouldSucceed.Eq2.Int = ({-dict-} [] [const.ShouldSucceed.Eq2.Int.deq])
-const.ShouldSucceed.Eq2.Int.deq :: Int -> Int -> Bool
-const.ShouldSucceed.Eq2.Int.deq
-    x.r28 y.r29
-	    = True
 AbsBinds
-[a.t2]
-[d.ShouldSucceed.Eq2.t3]
-[(d.ShouldSucceed.Eq2.t4, dfun.ShouldSucceed.Eq2.List)]
-    (d.ShouldSucceed.Eq2.t16, d.ShouldSucceed.Eq2.t4)
-    (ShouldSucceed.Eq2.deq.t15,
-	ShouldSucceed.Eq2.deq [a.t2] d.ShouldSucceed.Eq2.t16)
-    (d.ShouldSucceed.Eq2.t17, d.ShouldSucceed.Eq2.t3)
-    (ShouldSucceed.Eq2.deq.t13,
-	ShouldSucceed.Eq2.deq a.t2 d.ShouldSucceed.Eq2.t17)
-    {- rec -}
-    d.ShouldSucceed.Eq2.t4 = ({-dict-} [] [deq.t5])
-    deq.t5 :: [a.t2] -> [a.t2] -> Bool
-    deq.t5
-	(a.r31 : as.r32) (b.r33 : bs.r34)
-		= if ShouldSucceed.Eq2.deq.t13 a.r31 b.r33 then
-		      ShouldSucceed.Eq2.deq.t15 as.r32 bs.r34
-		  else
-		      False
-
+[a{-aol-}]
+[d.Eq2_aoe]
+[([a{-aol-}], $mdeq{-ro0,x-}, deq_aog)]
+    AbsBinds [] [] [([], deq_aog, deq_aoi)]
+	deq_aoi
+	    =   GHCerr.noDefaultMethodError{-8k,p-}
+		    (a{-aol-}
+		     -> a{-aol-}
+		     -> PrelBase.Bool{-34,p-}) "Class Eq2 Method deq"
+{- rec -}
+AbsBinds [] [] [([], $d1{-rom,x-}, d.Eq2_anx)]
+    AbsBinds [] [] [([], deq_aon, deq_anA)]
+	deq_anA
+	    x_r3h y_r3j
+		    =   PrelBase.True{-5E,p-}{i}
+    d.Eq2_anx =
+	({-dict-} [] [deq_aon])
+{- rec -}
+AbsBinds
+[a{-anT-}]
+[d.Eq2_ao6]
+[([a{-anT-}], $d2{-roo,x-}, d.Eq2_anJ)]
+    d.Eq2_aoa =
+	d.Eq2_ao6
+    deq_aor =
+	deq{-r3z,x-}
+	    a{-anT-}
+	    d.Eq2_aoa
+    deq_aoq =
+	deq_aop
+    AbsBinds [] [] [([], deq_aop, deq_anM)]
+	deq_anM
+	    (a_r3r PrelBase.:{-55,p-}{i} as_r3s)
+	    (b_r3u PrelBase.:{-55,p-}{i} bs_r3v)
+		    =   if deq_aor a_r3r b_r3u then
+			    deq_aoq as_r3s bs_r3v
+			else
+			    PrelBase.False{-58,p-}{i}
+    d.Eq2_anJ =
+	({-dict-} [] [deq_aop])
+{- nonrec -}
+tc060.hs:7: 
+    Warning: Possibly incomplete patterns
+	in the definition of function `deq'
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed Eq2(deq);
+_instances_
+instance {Eq2 PrelBase.Int} = $d1;
+instance _forall_ [a] {Eq2 a} => {Eq2 [a]} = $d2;
+_declarations_
+1 $d1 _:_ {Eq2 PrelBase.Int} ;;
+1 $d2 _:_ _forall_ [a] {Eq2 a} => {Eq2 [a]} ;;
+1 $mdeq _:_ _forall_ [a] {Eq2 a} => a -> a -> PrelBase.Bool ;;
+1 class Eq2 r3y where {deq :: r3y -> r3y -> PrelBase.Bool} ;

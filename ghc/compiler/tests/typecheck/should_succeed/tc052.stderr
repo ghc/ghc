@@ -1,3 +1,15 @@
+
+
+--================================================================================
 Typechecked:
-
-
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed A B C;
+_declarations_
+1 type A r3i = B r3i ;
+1 type B r3g = C ;
+1 type C = PrelBase.Int ;

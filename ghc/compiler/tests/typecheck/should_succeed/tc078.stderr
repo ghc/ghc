@@ -1,27 +1,132 @@
+
+
+--================================================================================
 Typechecked:
-AbsBinds [a.t0] [d.Eq.t1] [(d.Eq.t2, dfun.Eq.M.Bar)]
-    {- rec -}
-    d.Eq.t2 = ({-dict-} [] [==.t3, /=.t4])
-    (==.t3) = defm.== (M.Bar a.t0) d.Eq.t2
-    (/=.t4) = defm./= (M.Bar a.t0) d.Eq.t2
-AbsBinds [a.t5] [d.Ord.t7, d.Eq.t6] [(d.Ord.t8, dfun.Ord.M.Bar)]
-    {- rec -}
-    d.Ord.t8 =
+{- nonrec -}
+{- nonrec -}
+MkBar{-r3l,x-}{i} =
+    _/\_ a{-r3k-} -> \ tpl_B1 tpl_B2 ->
+	MkBar{-r3l,x-}{i}
+	    {_@_ a{-r3k-} tpl_B1 tpl_B2}
+{- rec -}
+AbsBinds [a{-aId-}] [] [([a{-aId-}], $d3{-rIh,x-}, d.Eval_aGn)]
+    d.Eval_aGn =
+	({-dict-} [] [])
+{- rec -}
+AbsBinds
+[a{-aGA-}]
+[d.Ord_aHn, d.Eq_aHo]
+[([a{-aGA-}], $d1{-rIi,x-}, d.Ord_aGt)]
+    d.Eq_aHp =
+	d.Eq_aHo
+    d.Ord_aHt =
+	d.Ord_aGt
+    $mcompare_aIp =
+	PrelBase.$mcompare{-rbW,p-}
+	    (Bar{-r3m,x-} a{-aGA-})
+	    d.Ord_aHt
+    d.Ord_aHv =
+	d.Ord_aGt
+    $m<_aIo =
+	PrelBase.$m<{-rbO,p-}
+	    (Bar{-r3m,x-} a{-aGA-})
+	    d.Ord_aHv
+    d.Ord_aHx =
+	d.Ord_aGt
+    $m<=_aIn =
+	PrelBase.$m<={-rbP,p-}
+	    (Bar{-r3m,x-} a{-aGA-})
+	    d.Ord_aHx
+    d.Ord_aHz =
+	d.Ord_aGt
+    $m>=_aIm =
+	PrelBase.$m>={-rbS,p-}
+	    (Bar{-r3m,x-} a{-aGA-})
+	    d.Ord_aHz
+    d.Ord_aHB =
+	d.Ord_aGt
+    $m>_aIl =
+	PrelBase.$m>{-rbR,p-}
+	    (Bar{-r3m,x-} a{-aGA-})
+	    d.Ord_aHB
+    d.Ord_aHD =
+	d.Ord_aGt
+    $mmax_aIk =
+	PrelBase.$mmax{-rc5,p-}
+	    (Bar{-r3m,x-} a{-aGA-})
+	    d.Ord_aHD
+    d.Ord_aHF =
+	d.Ord_aGt
+    $mmin_aIj =
+	PrelBase.$mmin{-rc7,p-}
+	    (Bar{-r3m,x-} a{-aGA-})
+	    d.Ord_aHF
+    AbsBinds [] [] [([], compare_aGv, compare_aGx)]
+	compare_aGx
+	    =   $mcompare_aIp
+    AbsBinds [] [] [([], <_aGE, <_aGG)]
+	<_aGG
+	    =   $m<_aIo
+    AbsBinds [] [] [([], <=_aGM, <=_aGO)]
+	<=_aGO
+	    =   $m<=_aIn
+    AbsBinds [] [] [([], >=_aGU, >=_aGW)]
+	>=_aGW
+	    =   $m>=_aIm
+    AbsBinds [] [] [([], >_aH2, >_aH4)]
+	>_aH4
+	    =   $m>_aIl
+    AbsBinds [] [] [([], max_aHa, max_aHc)]
+	max_aHc
+	    =   $mmax_aIk
+    AbsBinds [] [] [([], min_aHi, min_aHk)]
+	min_aHk
+	    =   $mmin_aIj
+    d.Ord_aGt =
 	({-dict-}
-	[d.Eq.t6]
-	[<.t9, <=.t10, >=.t11, >.t12, max.t13, min.t14, cmp3.t15])
-    (<.t9) = defm.< (M.Bar a.t5) d.Ord.t8
-    (<=.t10) = defm.<= (M.Bar a.t5) d.Ord.t8
-    (>=.t11) = defm.>= (M.Bar a.t5) d.Ord.t8
-    (>.t12) = defm.> (M.Bar a.t5) d.Ord.t8
-    max.t13 = defm.max (M.Bar a.t5) d.Ord.t8
-    min.t14 = defm.min (M.Bar a.t5) d.Ord.t8
-    cmp3.t15 = /\ tt16 -> defm.cmp3 [M.Bar a.t5, tt16] d.Ord.t8
-
-=-=-=-=-=INTERFACE STARTS HERE=-=-=-=-= M
-interface M where
-data Bar a = MkBar Int a
-instance Eq a => Eq (Bar a)
-instance Ord a => Ord (Bar a)
-=-=-=-=-=INTERFACE STOPS  HERE=-=-=-=-=
-
+	 [d.Eq_aHp]
+	 [compare_aGv, <_aGE, <=_aGM, >=_aGU, >_aH2, max_aHa, min_aHi])
+{- rec -}
+AbsBinds
+[a{-aHW-}]
+[d.Eq_aI5]
+[([a{-aHW-}], $d2{-rIq,x-}, d.Eq_aHP)]
+    d.Eq_aI9 =
+	d.Eq_aHP
+    $m==_aIs =
+	PrelBase.$m=={-rbQ,p-}
+	    (Bar{-r3m,x-} a{-aHW-})
+	    d.Eq_aI9
+    d.Eq_aIb =
+	d.Eq_aHP
+    $m/=_aIr =
+	PrelBase.$m/={-rbN,p-}
+	    (Bar{-r3m,x-} a{-aHW-})
+	    d.Eq_aIb
+    AbsBinds [] [] [([], ==_aHR, ==_aHT)]
+	==_aHT
+	    =   $m==_aIs
+    AbsBinds [] [] [([], /=_aI0, /=_aI2)]
+	/=_aI2
+	    =   $m/=_aIr
+    d.Eq_aHP =
+	({-dict-} [] [==_aHR, /=_aI0])
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ M 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d14 1 $d15 1 $d32 1 $d34 1 $d37 1 $d39 1 $d41 1 $d45 1 $d46 1 $d49 1 $d51 1 $d6 1 $d7 1 Eq 1 Eval 1 Ord 1 Ordering 1;
+PrelNum 1 :: $d17 1 $d18 1;
+_exports_
+M Bar(MkBar);
+_instances_
+instance _forall_ [a] {PrelBase.Ord a} => {PrelBase.Ord (Bar a)} = $d1;
+instance _forall_ [a] {PrelBase.Eq a} => {PrelBase.Eq (Bar a)} = $d2;
+instance _forall_ [a] => {PrelBase.Eval (Bar a)} = $d3;
+_declarations_
+1 $d1 _:_ _forall_ [a] {PrelBase.Ord a, PrelBase.Eq (Bar a)} => {PrelBase.Ord (Bar a)} ;;
+1 $d2 _:_ _forall_ [a] {PrelBase.Eq a} => {PrelBase.Eq (Bar a)} ;;
+1 $d3 _:_ _forall_ [a] => {PrelBase.Eval (Bar a)} ;;
+1 data Bar r3k = MkBar PrelBase.Int r3k ;

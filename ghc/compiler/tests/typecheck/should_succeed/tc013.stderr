@@ -1,9 +1,31 @@
-Typechecked:
-d.Num.t9 = dfun.Num.Integer
-fromInt.t8 = fromInt tt6 d.Num.t9
-lit.t7 = fromInt.t8 (MkInt 1#)
-AbsBinds [] [] [(r.t2, ShouldSucceed.r), (s.t3, ShouldSucceed.s)]
-    {- nonrec -}
-    (r.t2, s.t3) :: (tt6, Char)
-    (r.t2, s.t3) = (lit.t7, 'a')
 
+
+--================================================================================
+Typechecked:
+{- nonrec -}
+d.Num_aWr =
+    PrelBase.$d3{-rb2,p-}
+fromInt_aWs =
+    PrelBase.fromInt{-8R,p-}
+	PrelBase.Int{-3g,p-}
+	d.Num_aWr
+lit_aWt =
+    fromInt_aWs PrelBase.I#{-5b,p-}{i} 1#
+{- nonrec -}
+AbsBinds [] [] [([], r{-r3,x-}, r_aW6), ([], s{-r2,x-}, s_aW7)]
+    (r_aW6, s_aW7)
+	=   (lit_aWt, 'a')
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d1 1 $d11 1 $d15 1 $d2 1 $d21 1 $d27 1 $d3 1 $d32 1 $d33 1 $d37 1 $d38 1 $d39 1 $d41 1 $d42 1 $d44 1 $d46 1 $d54 1 $d7 1 $d8 1 Eq 1 Eval 1 Num 1 Show 1 String 1;
+PrelNum 1 :: $d10 1 $d16 1 $d18 1 $d29 1 $d33 1 $d35 1;
+PrelTup 1 :: $d13 1 $d4 1 $d9 1;
+_exports_
+ShouldSucceed r s;
+_declarations_
+1 r _:_ PrelBase.Int ;;
+1 s _:_ PrelBase.Char ;;

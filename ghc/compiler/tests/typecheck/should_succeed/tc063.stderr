@@ -1,35 +1,75 @@
+
+
+--================================================================================
 Typechecked:
 {- nonrec -}
-ShouldSucceed.Reps.f = /\ r.t13 -> \{-classdict-} [] [f.t14] -> f.t14
+Tag{-r3K,x-}{i} =
+    _/\_ a{-r3G-} -> \ tpl_B1 ->
+	Tag{-r3K,x-}{i}
+	    {_@_ a{-r3G-} tpl_B1}
 {- nonrec -}
-defm.ShouldSucceed.Reps.f =
-    /\ r.t15 ->
-	\{-dict-} d.ShouldSucceed.Reps.t16 ->
-	    (error (r.t15 -> r.t15 -> r.t15))
-		"No default method for \"ShouldSucceed.Reps.defm.ShouldSucceed.Reps.f\"\n"
-{- rec -}
-dfun.ShouldSucceed.Reps.Bool = ({-dict-} [] [const.ShouldSucceed.Reps.Bool.f])
-const.ShouldSucceed.Reps.Bool.f :: Bool -> Bool -> Bool
-const.ShouldSucceed.Reps.Bool.f
-    True True
-	    = True
-const.ShouldSucceed.Reps.Bool.f
-    x.r50 y.r51
-	    = False
+f{-r3I,x-} =
+    _/\_ r{-r3C-} -> \ tpl_B1 ->
+	tpl_B1
+{- nonrec -}
 AbsBinds
-[q.t8]
-[]
-[(d.ShouldSucceed.Reps.t9, dfun.ShouldSucceed.Reps.ShouldSucceed.X)]
-    {- rec -}
-    d.ShouldSucceed.Reps.t9 = ({-dict-} [] [f.t10])
-    f.t10 ::
-	ShouldSucceed.X q.t8 -> ShouldSucceed.X q.t8 -> ShouldSucceed.X q.t8
-    f.t10
-	x.r53 y.r54
-		= y.r54
-AbsBinds [r.t3] [d.ShouldSucceed.Reps.t5] [(g.t1, ShouldSucceed.g)]
-    (ShouldSucceed.Reps.f.t4, ShouldSucceed.Reps.f r.t3 d.ShouldSucceed.Reps.t5)
-    {- nonrec -}
-    g.t1 :: r.t3 -> r.t3
-    g.t1 x.r64 = ShouldSucceed.Reps.f.t4 x.r64 x.r64
-
+[r{-aHm-}]
+[d.Reps_aHf]
+[([r{-aHm-}], $mf{-rGx,x-}, f_aHh)]
+    AbsBinds [] [] [([], f_aHh, f_aHj)]
+	f_aHj
+	    =   GHCerr.noDefaultMethodError{-8k,p-}
+		    (r{-aHm-} -> r{-aHm-} -> r{-aHm-}) "Class Reps Method f"
+{- rec -}
+AbsBinds [a{-aHn-}] [] [([a{-aHn-}], $d3{-rHq,x-}, d.Eval_aGM)]
+    d.Eval_aGM =
+	({-dict-} [] [])
+{- rec -}
+AbsBinds [] [] [([], $d1{-rHr,x-}, d.Reps_aGR)]
+    AbsBinds [] [] [([], f_aHs, f_aGU)]
+	f_aGU
+	    PrelBase.True{-5E,p-}{i} PrelBase.True{-5E,p-}{i}
+		    =   PrelBase.True{-5E,p-}{i}
+	f_aGU
+	    x_r3o y_r3q
+		    =   PrelBase.False{-58,p-}{i}
+    d.Reps_aGR =
+	({-dict-} [] [f_aHs])
+{- rec -}
+AbsBinds [q{-aH9-}] [] [([q{-aH9-}], $d2{-rHt,x-}, d.Reps_aH3)]
+    AbsBinds [] [] [([], f_aHu, f_aH6)]
+	f_aH6
+	    x_r3x y_r3z
+		    =   y_r3z
+    d.Reps_aH3 =
+	({-dict-} [] [f_aHu])
+{- nonrec -}
+{- nonrec -}
+AbsBinds [r{-aGB-}] [d.Reps_aGG] [([r{-aGB-}], g{-r3H,x-}, g_aGw)]
+    f_aHv =
+	f{-r3I,x-}
+	    r{-aGB-}
+	    d.Reps_aGG
+    g_aGw
+	x_r3h   =   f_aHv x_r3h x_r3h
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d37 1 $d39 1 $d41 1 $d46 1 Eval 1;
+_exports_
+ShouldSucceed g Reps(f) X(Tag);
+_instances_
+instance {Reps PrelBase.Bool} = $d1;
+instance _forall_ [a] => {Reps (X a)} = $d2;
+instance _forall_ [a] => {PrelBase.Eval (X a)} = $d3;
+_declarations_
+1 $d1 _:_ {Reps PrelBase.Bool} ;;
+1 $d2 _:_ _forall_ [a] => {Reps (X a)} ;;
+1 $d3 _:_ _forall_ [a] => {PrelBase.Eval (X a)} ;;
+1 $mf _:_ _forall_ [a] {Reps a} => a -> a -> a ;;
+1 class Reps r3C where {f :: r3C -> r3C -> r3C} ;
+1 data X r3G = Tag r3G ;
+1 g _:_ _forall_ [a] {Reps a} => a -> a ;;

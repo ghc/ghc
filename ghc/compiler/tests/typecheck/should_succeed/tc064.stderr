@@ -1,7 +1,35 @@
-Typechecked:
-AbsBinds [] [] [(idb.t1, ShouldSucceed.idb)]
-    {- nonrec -}
-    idb.t1 :: ShouldSucceed.Boolean -> ShouldSucceed.Boolean
-    idb.t1
-	x.r57 = x.r57
 
+
+--================================================================================
+Typechecked:
+{- nonrec -}
+FF{-r5,x-}{i} =
+    FF{-r5,x-}{i}
+	{}
+TT{-r4,x-}{i} =
+    TT{-r4,x-}{i}
+	{}
+{- rec -}
+AbsBinds [] [] [([], $d1{-rG8,x-}, d.Eval_aG5)]
+    d.Eval_aG5 =
+	({-dict-} [] [])
+{- nonrec -}
+{- nonrec -}
+AbsBinds [] [] [([], idb{-r6,x-}, idb_aFY)]
+    idb_aFY
+	x_r3k   =   x_r3k
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d37 1 $d39 1 $d41 1 $d46 1 Eval 1;
+_exports_
+ShouldSucceed idb Boolean(FF TT);
+_instances_
+instance {PrelBase.Eval Boolean} = $d1;
+_declarations_
+1 $d1 _:_ {PrelBase.Eval Boolean} ;;
+1 data Boolean = FF |  TT ;
+1 idb _:_ Boolean -> Boolean ;;

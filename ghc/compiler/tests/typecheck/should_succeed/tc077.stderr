@@ -1,25 +1,62 @@
+
+
+--================================================================================
 Typechecked:
 {- nonrec -}
-(M.EQ.===) =
-    /\ a.t0 -> \{-classdict-} [d.M.ORD.t2 d.Text.t3] [===.t1] -> (===.t1)
-sdsel.M.EQ.M.ORD =
-    /\ a.t0 -> \{-classdict-} [d.M.ORD.t2 d.Text.t3] [===.t1] -> d.M.ORD.t2
-sdsel.M.EQ.Text =
-    /\ a.t0 -> \{-classdict-} [d.M.ORD.t2 d.Text.t3] [===.t1] -> d.Text.t3
+ONE{-r7,x-}{i} =
+    ONE{-r7,x-}{i}
+	{}
+TWO{-r6,x-}{i} =
+    TWO{-r6,x-}{i}
+	{}
 {- nonrec -}
-defm.M.EQ.=== =
-    /\ a.t4 ->
-	\{-dict-} d.M.EQ.t5 ->
-	    (error (a.t4 -> a.t4 -> Bool))
-		"No default method for \"M.EQ.defm.M.EQ.===\"\n"
+scsel_EQMORD{-aHj,x-} =
+    _/\_ a{-r3k-} -> \ tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,,){-63,p-}{i} tpl_B1 tpl_B2 tpl_B3  ->
+	tpl_B1;}
+scsel_EQPrelBaseShow{-aHk,x-} =
+    _/\_ a{-r3k-} -> \ tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,,){-63,p-}{i} tpl_B1 tpl_B2 tpl_B3  ->
+	tpl_B2;}
+==={-r3q,x-} =
+    _/\_ a{-r3k-} -> \ tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,,){-63,p-}{i} tpl_B1 tpl_B2 tpl_B3  ->
+	tpl_B3;}
 {- nonrec -}
-sdsel.M.ORD.Num = /\ a.t6 -> \{-classdict-} [d.Num.t7] [] -> d.Num.t7
+AbsBinds
+[a{-aHi-}]
+[d.EQ_aHb]
+[([a{-aHi-}], $m==={-rHl,x-}, ===_aHd)]
+    AbsBinds [] [] [([], ===_aHd, ===_aHf)]
+	===_aHf
+	    =   GHCerr.noDefaultMethodError{-8k,p-}
+		    (a{-aHi-}
+		     -> a{-aHi-}
+		     -> PrelBase.Bool{-34,p-}) "Class EQ Method ==="
 {- nonrec -}
-
-=-=-=-=-=INTERFACE STARTS HERE=-=-=-=-= M
-interface M where
-class (ORD a, Text a) => EQ a where (===) :: a -> a -> Bool
-class (Num a) => ORD a
-data NUM = ONE | TWO
-=-=-=-=-=INTERFACE STOPS  HERE=-=-=-=-=
-
+scsel_ORDPrelBaseNum{-aHm,x-} =
+    _/\_ a{-r3p-} -> \ tpl_B1 ->
+	tpl_B1
+{- nonrec -}
+{- rec -}
+AbsBinds [] [] [([], $d1{-rHp,x-}, d.Eval_aH8)]
+    d.Eval_aH8 =
+	({-dict-} [] [])
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ M 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d1 1 $d11 1 $d15 1 $d2 1 $d21 1 $d27 1 $d3 1 $d32 1 $d33 1 $d37 1 $d38 1 $d39 1 $d41 1 $d42 1 $d44 1 $d46 1 $d54 1 $d7 1 $d8 1 Eq 1 Eval 1 Num 1 Show 1 String 1;
+PrelNum 1 :: $d10 1 $d16 1 $d18 1 $d29 1 $d33 1 $d35 1;
+_exports_
+M EQ(===) NUM(ONE TWO) ORD;
+_instances_
+instance {PrelBase.Eval NUM} = $d1;
+_declarations_
+1 class {PrelBase.Num r3p} => ORD r3p ;
+1 $d1 _:_ {PrelBase.Eval NUM} ;;
+1 $m=== _:_ _forall_ [a] {EQ a} => a -> a -> PrelBase.Bool ;;
+1 class {ORD r3k, PrelBase.Show r3k} => EQ r3k where {=== :: r3k -> r3k -> PrelBase.Bool} ;
+1 data NUM = ONE |  TWO ;

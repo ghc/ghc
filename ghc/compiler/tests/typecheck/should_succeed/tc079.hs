@@ -2,6 +2,8 @@
 --!!! "easy" to check default methods and such...
 --!!! (this is the example given in TcClassDcl)
 --
+module Test where
+
 class Foo a where
     op1 :: a -> Bool
     op2 :: Ord b => a -> b -> b -> b

@@ -1,58 +1,126 @@
+
+
+--================================================================================
 Typechecked:
 {- nonrec -}
-ShouldSucceed.Eq'.deq = /\ a.t38 -> \{-classdict-} [] [deq.t39] -> deq.t39
+deq{-r3R,x-} =
+    _/\_ a{-r3Q-} -> \ tpl_B1 ->
+	tpl_B1
 {- nonrec -}
-defm.ShouldSucceed.Eq'.deq =
-    /\ a.t40 ->
-	\{-dict-} d.ShouldSucceed.Eq'.t41 ->
-	    (error (a.t40 -> a.t40 -> Bool))
-		"No default method for \"ShouldSucceed.Eq'.defm.ShouldSucceed.Eq'.deq\"\n"
-{- rec -}
-dfun.ShouldSucceed.Eq'.Int = ({-dict-} [] [const.ShouldSucceed.Eq'.Int.deq])
-const.ShouldSucceed.Eq'.Int.deq :: Int -> Int -> Bool
-const.ShouldSucceed.Eq'.Int.deq
-    x.r30 y.r31
-	    = True
 AbsBinds
-[a.t22]
-[d.ShouldSucceed.Eq'.t23]
-[(d.ShouldSucceed.Eq'.t24, dfun.ShouldSucceed.Eq'.List)]
-    (d.ShouldSucceed.Eq'.t36, d.ShouldSucceed.Eq'.t24)
-    (ShouldSucceed.f.t35, ShouldSucceed.f [a.t22] d.ShouldSucceed.Eq'.t36)
-    (d.ShouldSucceed.Eq'.t37, d.ShouldSucceed.Eq'.t23)
-    (ShouldSucceed.f.t33, ShouldSucceed.f a.t22 d.ShouldSucceed.Eq'.t37)
-    {- rec -}
-    d.ShouldSucceed.Eq'.t24 = ({-dict-} [] [deq.t25])
-    deq.t25 :: [a.t22] -> [a.t22] -> Bool
-    deq.t25
-	(a.r33 : as.r34) (b.r35 : bs.r36)
-		= ShouldSucceed.dand
-		      (ShouldSucceed.f.t33 a.r33 b.r35)
-		      (ShouldSucceed.f.t35 as.r34 bs.r36)
-lit.t17 = MkInt 2#
-lit.t15 = MkInt 1#
-d.ShouldSucceed.Eq'.t43 = dfun.ShouldSucceed.Eq'.Int
-d.ShouldSucceed.Eq'.t42 =
-    dfun.ShouldSucceed.Eq'.List Int d.ShouldSucceed.Eq'.t43
-ShouldSucceed.Eq'.deq.t13 = ShouldSucceed.Eq'.deq [Int] d.ShouldSucceed.Eq'.t42
-AbsBinds [] [] [(dand.t1, ShouldSucceed.dand)]
-    {- nonrec -}
-    dand.t1 :: Bool -> Bool -> Bool
-    dand.t1
-	True True
-		= True
-    dand.t1
-	x.r65 y.r66
-		= False
-AbsBinds [a.t10] [d.ShouldSucceed.Eq'.t7] [(f.t5, ShouldSucceed.f)]
-    (d.ShouldSucceed.Eq'.t19, d.ShouldSucceed.Eq'.t7)
-    (ShouldSucceed.Eq'.deq.t11,
-	ShouldSucceed.Eq'.deq a.t10 d.ShouldSucceed.Eq'.t19)
-    {- nonrec -}
-    f.t5 :: a.t10 -> a.t10 -> Bool
-    f.t5 p.r67 q.r68
-		 = ShouldSucceed.dand
-		       (ShouldSucceed.Eq'.deq.t11 p.r67 q.r68)
-		       (ShouldSucceed.Eq'.deq.t13
-			    ([lit.t15] (Int)) ([lit.t17] (Int)))
-
+[a{-aIY-}]
+[d.Eq'_aIR]
+[([a{-aIY-}], $mdeq{-rHC,x-}, deq_aIT)]
+    AbsBinds [] [] [([], deq_aIT, deq_aIV)]
+	deq_aIV
+	    =   GHCerr.noDefaultMethodError{-8k,p-}
+		    (a{-aIY-}
+		     -> a{-aIY-}
+		     -> PrelBase.Bool{-34,p-}) "Class Eq' Method deq"
+{- rec -}
+AbsBinds
+[a{-aIk-}]
+[d.Eq'_aIw]
+[([a{-aIk-}], $d1{-rJf,x-}, d.Eq'_aIa)]
+    d.Eq'_aIA =
+	d.Eq'_aIw
+    f_aJi =
+	f{-r3i,x-}
+	    a{-aIk-}
+	    d.Eq'_aIA
+    d.Eq'_aIC =
+	d.Eq'_aIa
+    f_aJh =
+	f{-r3i,x-}
+	    [a{-aIk-}]
+	    d.Eq'_aIC
+    AbsBinds [] [] [([], deq_aJg, deq_aId)]
+	deq_aId
+	    (a_r3B PrelBase.:{-55,p-}{i} as_r3C)
+	    (b_r3E PrelBase.:{-55,p-}{i} bs_r3F)
+		    =   dand{-r3j,x-} f_aJi a_r3B b_r3E f_aJh as_r3C bs_r3F
+    d.Eq'_aIa =
+	({-dict-} [] [deq_aJg])
+{- rec -}
+AbsBinds [] [] [([], $d2{-rJj,x-}, d.Eq'_aII)]
+    AbsBinds [] [] [([], deq_aJk, deq_aIL)]
+	deq_aIL
+	    x_r3L y_r3N
+		    =   PrelBase.True{-5E,p-}{i}
+    d.Eq'_aII =
+	({-dict-} [] [deq_aJk])
+{- nonrec -}
+d.Eq'_aJ3 =
+    $d2{-rJj,x-}
+d.Eq'_aJ1 =
+    $d1{-rJf,x-}
+	PrelBase.Int{-3g,p-}
+	d.Eq'_aJ3
+deq_aJe =
+    deq{-r3R,x-}
+	[PrelBase.Int{-3g,p-}]
+	d.Eq'_aJ1
+d.Num_aJ7 =
+    PrelBase.$d3{-rbH,p-}
+fromInt_aJd =
+    PrelBase.fromInt{-8R,p-}
+	PrelBase.Int{-3g,p-}
+	d.Num_aJ7
+lit_aJc =
+    fromInt_aJd PrelBase.I#{-5b,p-}{i} 1#
+fromInt_aJb =
+    fromInt_aJd
+lit_aJ8 =
+    fromInt_aJb PrelBase.I#{-5b,p-}{i} 2#
+{- nonrec -}
+AbsBinds [] [] [([], dand{-r3j,x-}, dand_aHo)]
+    dand_aHo
+	PrelBase.True{-5E,p-}{i} PrelBase.True{-5E,p-}{i}
+		=   PrelBase.True{-5E,p-}{i}
+    dand_aHo
+	x_r3n y_r3p
+		=   PrelBase.False{-58,p-}{i}
+{- nonrec -}
+{- nonrec -}
+AbsBinds [a{-aHz-}] [d.Eq'_aHY] [([a{-aHz-}], f{-r3i,x-}, f_aHw)]
+    d.Eq'_aI0 =
+	d.Eq'_aHY
+    deq_aJl =
+	deq{-r3R,x-}
+	    a{-aHz-}
+	    d.Eq'_aI0
+    f_aHw
+	p_r3r q_r3t
+		=   dand{-r3j,x-} deq_aJl p_r3r q_r3t
+				  deq_aJe [lit_aJc] (PrelBase.Int{-3g,p-})
+					  [lit_aJ8] (PrelBase.Int{-3g,p-})
+{- nonrec -}
+tc057.hs:12: 
+    Warning: Possibly incomplete patterns
+	in the definition of function `deq'
+ghc:junk old iface line?:section::interface ShouldSucceed where {
+ghc:junk old iface line?:section::class Eq' a where { deq }
+ghc:junk old iface line?:section::instance <Eq' Int>
+ghc:junk old iface line?:section::instance Eq' a => <Eq' [a]>
+ghc:junk old iface line?:section::dand  ::  Bool -> Bool -> Bool
+ghc:junk old iface line?:section::f  ::  Eq' t93 => t93 -> t93 -> Bool
+ghc:junk old iface line?:section::}
+ghc: module version changed to 1; reason: usages changed
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d1 1 $d11 1 $d15 1 $d2 1 $d21 1 $d27 1 $d3 1 $d32 1 $d33 1 $d37 1 $d38 1 $d39 1 $d41 1 $d42 1 $d44 1 $d46 1 $d54 1 $d7 1 $d8 1 Eq 1 Eval 1 Num 1 Show 1 String 1;
+PrelNum 1 :: $d10 1 $d16 1 $d18 1 $d29 1 $d33 1 $d35 1;
+_exports_
+ShouldSucceed dand f Eq'(deq);
+_instances_
+instance _forall_ [a] {Eq' a} => {Eq' [a]} = $d1;
+instance {Eq' PrelBase.Int} = $d2;
+_declarations_
+1 $d1 _:_ _forall_ [a] {Eq' a} => {Eq' [a]} ;;
+1 $d2 _:_ {Eq' PrelBase.Int} ;;
+1 $mdeq _:_ _forall_ [a] {Eq' a} => a -> a -> PrelBase.Bool ;;
+1 class Eq' r3Q where {deq :: r3Q -> r3Q -> PrelBase.Bool} ;
+1 dand _:_ PrelBase.Bool -> PrelBase.Bool -> PrelBase.Bool ;;
+1 f _:_ _forall_ [a] {Eq' a} => a -> a -> PrelBase.Bool ;;

@@ -1,44 +1,105 @@
+
+
+--================================================================================
 Typechecked:
 {- nonrec -}
-ShouldSucceed.A.op1 = /\ a.t26 -> \{-classdict-} [] [op1.t27] -> op1.t27
+op2{-r3D,x-} =
+    _/\_ b{-r3t-} -> \ tpl_B1 ->
+	tpl_B1
 {- nonrec -}
-defm.ShouldSucceed.A.op1 =
-    /\ a.t28 ->
-	\{-dict-} d.ShouldSucceed.A.t29 ->
-	    (error a.t28)
-		"No default method for \"ShouldSucceed.A.defm.ShouldSucceed.A.op1\"\n"
-{- nonrec -}
-ShouldSucceed.B.op2 = /\ b.t30 -> \{-classdict-} [] [op2.t31] -> op2.t31
-{- nonrec -}
-defm.ShouldSucceed.B.op2 =
-    /\ b.t32 ->
-	\{-dict-} d.ShouldSucceed.B.t33 ->
-	    (error (b.t32 -> Int))
-		"No default method for \"ShouldSucceed.B.defm.ShouldSucceed.B.op2\"\n"
-{- rec -}
-dfun.ShouldSucceed.A.Int = ({-dict-} [] [const.ShouldSucceed.A.Int.op1])
-const.ShouldSucceed.A.Int.op1 :: Int
-const.ShouldSucceed.A.Int.op1 = lit.t7
 AbsBinds
-[a.t8]
-[d.ShouldSucceed.B.t9]
-[(d.ShouldSucceed.B.t10, dfun.ShouldSucceed.B.List)]
-    (d.ShouldSucceed.B.t25, d.ShouldSucceed.B.t10)
-    (ShouldSucceed.B.op2.t23, ShouldSucceed.B.op2 [a.t8] d.ShouldSucceed.B.t25)
-    (+.t19, plusInt)
-    {- rec -}
-    d.ShouldSucceed.B.t10 = ({-dict-} [] [op2.t11])
-    op2.t11 :: [a.t8] -> Int
-    op2.t11
-	[] = lit.t14
-    op2.t11
-	(x.r14 : xs.r15)
-		= lit.t21 +.t19 (ShouldSucceed.B.op2.t23 xs.r15)
-lit.t7 = MkInt 2#
-lit.t14 = MkInt 0#
-lit.t21 = MkInt 1#
-AbsBinds [ot2, a.t3] [d.ShouldSucceed.A.t5] [(f.t1, ShouldSucceed.f)]
-    (ShouldSucceed.A.op1.t4, ShouldSucceed.A.op1 a.t3 d.ShouldSucceed.A.t5)
-    {- nonrec -}
-    f.t1 :: ot2 -> a.t3
-    f.t1 x.r61 = ShouldSucceed.A.op1.t4
+[b{-aIu-}]
+[d.B_aIn]
+[([b{-aIu-}], $mop2{-rHi,x-}, op2_aIp)]
+    AbsBinds [] [] [([], op2_aIp, op2_aIr)]
+	op2_aIr
+	    =   GHCerr.noDefaultMethodError{-8k,p-}
+		    (b{-aIu-} -> PrelBase.Int{-3g,p-}) "Class B Method op2"
+{- nonrec -}
+op1{-r3E,x-} =
+    _/\_ a{-r3B-} -> \ tpl_B1 ->
+	tpl_B1
+{- nonrec -}
+AbsBinds
+[a{-aID-}]
+[d.A_aIy]
+[([a{-aID-}], $mop1{-rHh,x-}, op1_aIA)]
+    AbsBinds [] [] [([], op1_aIA, op1_aIC)]
+	op1_aIC
+	    =   GHCerr.noDefaultMethodError{-8k,p-}
+		    a{-aID-} "Class A Method op1"
+{- rec -}
+AbsBinds [a{-aHF-}] [d.B_aI1] [([a{-aHF-}], $d1{-rIW,x-}, d.B_aHz)]
+    op2_aIY =
+	op2_aIX
+    AbsBinds [] [] [([], op2_aIX, op2_aHC)]
+	op2_aHC
+	    PrelBase.[]{-5i,p-}{i}
+		    =   lit_aIU
+	op2_aHC
+	    (x_r3p PrelBase.:{-55,p-}{i} xs_r3q)
+		    =   lit_aIR +_aIT (op2_aIY xs_r3q)
+    d.B_aHz =
+	({-dict-} [] [op2_aIX])
+{- rec -}
+AbsBinds [] [] [([], $d2{-rIZ,x-}, d.A_aIc)]
+    AbsBinds [] [] [([], op1_aJ0, op1_aIf)]
+	op1_aIf
+	    =   lit_aIN
+    d.A_aIc =
+	({-dict-} [] [op1_aJ0])
+{- nonrec -}
+d.Num_aIJ =
+    PrelBase.$d3{-rbv,p-}
+fromInt_aIV =
+    PrelBase.fromInt{-8R,p-}
+	PrelBase.Int{-3g,p-}
+	d.Num_aIJ
+lit_aIU =
+    fromInt_aIV PrelBase.I#{-5b,p-}{i} 0#
+d.Num_aIM =
+    d.Num_aIJ
++_aIT =
+    PrelBase.+{-rd3,p-}
+	PrelBase.Int{-3g,p-}
+	d.Num_aIM
+fromInt_aIS =
+    fromInt_aIV
+lit_aIR =
+    fromInt_aIS PrelBase.I#{-5b,p-}{i} 1#
+fromInt_aIQ =
+    fromInt_aIV
+lit_aIN =
+    fromInt_aIQ PrelBase.I#{-5b,p-}{i} 2#
+{- nonrec -}
+AbsBinds
+[t{-aHr-}, a{-aHo-}]
+[d.A_aHt]
+[([t{-aHr-}, a{-aHo-}], f{-r3C,x-}, f_aHg)]
+    op1_aJ1 =
+	op1{-r3E,x-}
+	    a{-aHo-}
+	    d.A_aHt
+    f_aHg
+	x_r3h   =   op1_aJ1
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d1 1 $d11 1 $d15 1 $d2 1 $d21 1 $d27 1 $d3 1 $d32 1 $d33 1 $d37 1 $d38 1 $d39 1 $d41 1 $d42 1 $d44 1 $d46 1 $d54 1 $d7 1 $d8 1 Eq 1 Eval 1 Num 1 Show 1 String 1;
+PrelNum 1 :: $d10 1 $d16 1 $d18 1 $d29 1 $d33 1 $d35 1;
+_exports_
+ShouldSucceed f A(op1) B(op2);
+_instances_
+instance _forall_ [a] {B a} => {B [a]} = $d1;
+instance {A PrelBase.Int} = $d2;
+_declarations_
+1 $d1 _:_ _forall_ [a] {B a} => {B [a]} ;;
+1 $d2 _:_ {A PrelBase.Int} ;;
+1 $mop1 _:_ _forall_ [a] {A a} => a ;;
+1 $mop2 _:_ _forall_ [a] {B a} => a -> PrelBase.Int ;;
+1 class A r3B where {op1 :: r3B} ;
+1 class B r3t where {op2 :: r3t -> PrelBase.Int} ;
+1 f _:_ _forall_ [a b] {A b} => a -> b ;;

@@ -1,4 +1,5 @@
-interface ClassFoo where
-class Foo a where
-    op1 :: a -> Int
-    op2 :: a -> a -> Int {-# ARITY op2 = 3 #-}{-# UPDATE op2 = 000 #-} {-# ARITY op1 = 1 #-}{-# UPDATE op1 = 0 #-}
+_interface_ ClassFoo 1
+_exports_
+ClassFoo Foo(op1 op2);
+_declarations_
+1 class Foo a where { op1 :: a -> PrelBase.Int; op2 :: a -> a -> PrelBase.Int} ;

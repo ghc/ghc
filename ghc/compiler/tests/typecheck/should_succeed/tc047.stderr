@@ -1,29 +1,61 @@
-Typechecked:
-AbsBinds [tt8, tt4] [] [(mp.t1, ShouldSucceed.mp)]
-    {- rec -}
-    mp.t1 :: (tt8 -> tt4) -> [tt8] -> [tt4]
-    mp.t1
-	f.r61 [] = [] (tt4)
-    mp.t1
-	f.r62 (x.r63 : xs.r64)
-		= ((:) tt4) (f.r62 x.r63) (mp.t1 f.r62 xs.r64)
-AbsBinds [tt17, tt18] [] [(sd.t14, ShouldSucceed.sd)]
-    {- nonrec -}
-    sd.t14 :: (tt17, tt18) -> tt18
-    sd.t14
-	(f.r65, s.r66)
-		= s.r66
-AbsBinds [ot21, tt29, tt30] [] [(f.t20, ShouldSucceed.f)]
-    {- nonrec -}
-    f.t20 :: ot21 -> [(tt29, tt30)] -> [tt30]
-    f.t20
-	x.r58 = ranOAL.r59 [tt29, tt30]
-	      where
-		  AbsBinds [tt27, tt28] [] [(ranOAL.t23, ranOAL.r59)]
-		      {- nonrec -}
-		      ranOAL.t23 :: [(tt27, tt28)] -> [tt28]
-		      ranOAL.t23
-			  xs.r60 = (ShouldSucceed.mp [(tt27, tt28), tt28])
-				       (ShouldSucceed.sd [tt27, tt28]) xs.r60
-		  {- nonrec -}
 
+
+--================================================================================
+Typechecked:
+{- nonrec -}
+{- nonrec -}
+AbsBinds
+[t{-aBv-}, t{-aBy-}]
+[]
+[([t{-aBv-}, t{-aBy-}], sd{-r3y,x-}, sd_aBq)]
+    sd_aBq
+	(f_r3u, s_r3v)
+		=   s_r3v
+{- nonrec -}
+{- rec -}
+AbsBinds
+[t{-aBI-}, t{-aBK-}]
+[]
+[([t{-aBI-}, t{-aBK-}], mp{-r3z,x-}, mp_aBC)]
+    mp_aBC
+	f_r3m PrelBase.[]{-5i,p-}{i}
+		=   PrelBase.[]{-5i,p-}{i}
+			t{-aBK-}
+    mp_aBC
+	f_r3p (x_r3r PrelBase.:{-55,p-}{i} xs_r3s)
+		=   PrelBase.:{-55,p-}{i}
+			t{-aBK-}
+			(f_r3p x_r3r) (mp_aBC f_r3p xs_r3s)
+{- nonrec -}
+{- nonrec -}
+AbsBinds
+[t{-aCo-}, t{-aCk-}, t{-aCm-}]
+[]
+[([t{-aCo-}, t{-aCk-}, t{-aCm-}], f{-r3A,x-}, f_aC0)]
+    f_aC0
+	x_r3g   =   ranOAL_r3i
+			[t{-aCk-}, t{-aCm-}]
+		where
+		    {- nonrec -}
+		    AbsBinds
+		    [t{-aCb-}, t{-aCd-}]
+		    []
+		    [([t{-aCb-}, t{-aCd-}], ranOAL_r3i, ranOAL_aC4)]
+			ranOAL_aC4
+			    xs_r3k  =   mp{-r3z,x-}
+					    [(t{-aCb-}, t{-aCd-}), t{-aCd-}] sd{-r3y,x-}
+										 [t{-aCb-}, t{-aCd-}]
+									     xs_r3k
+		    {- nonrec -}
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed f mp sd OL;
+_declarations_
+1 type OL r3x = [r3x] ;
+1 f _:_ _forall_ [a b c] => a -> [(b, c)] -> [c] ;;
+1 mp _:_ _forall_ [a b] => (a -> b) -> [a] -> [b] ;;
+1 sd _:_ _forall_ [a b] => (a, b) -> b ;;

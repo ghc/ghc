@@ -1,22 +1,51 @@
+
+
+--================================================================================
 Typechecked:
 {- nonrec -}
-ShouldSucceed.H.op1 = /\ a.t8 -> \{-classdict-} [] [op1.t9] -> op1.t9
+op1{-r3u,x-} =
+    _/\_ a{-r3t-} -> \ tpl_B1 ->
+	tpl_B1
 {- nonrec -}
-defm.ShouldSucceed.H.op1 =
-    /\ a.t10 ->
-	\{-dict-} d.ShouldSucceed.H.t11 ->
-	    (error (a.t10 -> a.t10 -> a.t10))
-		"No default method for \"ShouldSucceed.H.defm.ShouldSucceed.H.op1\"\n"
+AbsBinds
+[a{-anU-}]
+[d.H_anN]
+[([a{-anU-}], $mop1{-rnq,x-}, op1_anP)]
+    AbsBinds [] [] [([], op1_anP, op1_anR)]
+	op1_anR
+	    =   GHCerr.noDefaultMethodError{-8k,p-}
+		    (a{-anU-} -> a{-anU-} -> a{-anU-}) "Class H Method op1"
 {- rec -}
-dfun.ShouldSucceed.H.Bool = ({-dict-} [] [const.ShouldSucceed.H.Bool.op1])
-const.ShouldSucceed.H.Bool.op1 :: Bool -> Bool -> Bool
-const.ShouldSucceed.H.Bool.op1
-    x.r29 y.r30
-	    = y.r30
-AbsBinds [] [] [(f.t1, ShouldSucceed.f)]
-    (ShouldSucceed.H.op1.t5, const.ShouldSucceed.H.Bool.op1)
-    {- nonrec -}
-    f.t1 :: Bool -> Int -> Bool
-    f.t1 x.r58 y.r59
-		 = ShouldSucceed.H.op1.t5 x.r58 x.r58
-
+AbsBinds [] [] [([], $d1{-rnZ,x-}, d.H_anE)]
+    AbsBinds [] [] [([], op1_ao0, op1_anH)]
+	op1_anH
+	    x_r3o y_r3q
+		    =   y_r3q
+    d.H_anE =
+	({-dict-} [] [op1_ao0])
+{- nonrec -}
+d.H_anX =
+    $d1{-rnZ,x-}
+op1_anY =
+    op1{-r3u,x-}
+	PrelBase.Bool{-34,p-}
+	d.H_anX
+{- nonrec -}
+AbsBinds [] [] [([], f{-r1,x-}, f_anp)]
+    f_anp
+	x_r3h y_r3j
+		=   op1_anY x_r3h x_r3h
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed f H(op1);
+_instances_
+instance {H PrelBase.Bool} = $d1;
+_declarations_
+1 $d1 _:_ {H PrelBase.Bool} ;;
+1 $mop1 _:_ _forall_ [a] {H a} => a -> a -> a ;;
+1 class H r3t where {op1 :: r3t -> r3t -> r3t} ;
+1 f _:_ PrelBase.Bool -> PrelBase.Int -> PrelBase.Bool ;;

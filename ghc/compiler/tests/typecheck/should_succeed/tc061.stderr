@@ -1,29 +1,63 @@
+
+
+--================================================================================
 Typechecked:
 {- nonrec -}
-ShouldSucceed.Eq1.deq = /\ a.t15 -> \{-classdict-} [] [deq.t16] -> deq.t16
+deq{-r3z,x-} =
+    _/\_ a{-r3y-} -> \ tpl_B1 ->
+	tpl_B1
 {- nonrec -}
-defm.ShouldSucceed.Eq1.deq =
-    /\ a.t17 ->
-	\{-dict-} d.ShouldSucceed.Eq1.t18 ->
-	    (error (a.t17 -> a.t17 -> Bool))
-		"No default method for \"ShouldSucceed.Eq1.defm.ShouldSucceed.Eq1.deq\"\n"
-{- rec -}
-dfun.ShouldSucceed.Eq1.Int = ({-dict-} [] [const.ShouldSucceed.Eq1.Int.deq])
-const.ShouldSucceed.Eq1.Int.deq :: Int -> Int -> Bool
-const.ShouldSucceed.Eq1.Int.deq
-    x.r28 y.r29
-	    = True
 AbsBinds
-[a.t2]
-[d.ShouldSucceed.Eq1.t3]
-[(d.ShouldSucceed.Eq1.t4, dfun.ShouldSucceed.Eq1.List)]
-    (d.ShouldSucceed.Eq1.t14, d.ShouldSucceed.Eq1.t3)
-    (ShouldSucceed.Eq1.deq.t13,
-	ShouldSucceed.Eq1.deq a.t2 d.ShouldSucceed.Eq1.t14)
-    {- rec -}
-    d.ShouldSucceed.Eq1.t4 = ({-dict-} [] [deq.t5])
-    deq.t5 :: [a.t2] -> [a.t2] -> Bool
-    deq.t5
-	(a.r31 : as.r32) (b.r33 : bs.r34)
-		= ShouldSucceed.Eq1.deq.t13 a.r31 b.r33
-
+[a{-aoi-}]
+[d.Eq1_aob]
+[([a{-aoi-}], $mdeq{-ro0,x-}, deq_aod)]
+    AbsBinds [] [] [([], deq_aod, deq_aof)]
+	deq_aof
+	    =   GHCerr.noDefaultMethodError{-8k,p-}
+		    (a{-aoi-}
+		     -> a{-aoi-}
+		     -> PrelBase.Bool{-34,p-}) "Class Eq1 Method deq"
+{- rec -}
+AbsBinds [] [] [([], $d1{-roj,x-}, d.Eq1_anx)]
+    AbsBinds [] [] [([], deq_aok, deq_anA)]
+	deq_anA
+	    x_r3h y_r3j
+		    =   PrelBase.True{-5E,p-}{i}
+    d.Eq1_anx =
+	({-dict-} [] [deq_aok])
+{- rec -}
+AbsBinds
+[a{-anT-}]
+[d.Eq1_ao3]
+[([a{-anT-}], $d2{-rol,x-}, d.Eq1_anJ)]
+    d.Eq1_ao7 =
+	d.Eq1_ao3
+    deq_aon =
+	deq{-r3z,x-}
+	    a{-anT-}
+	    d.Eq1_ao7
+    AbsBinds [] [] [([], deq_aom, deq_anM)]
+	deq_anM
+	    (a_r3r PrelBase.:{-55,p-}{i} as_r3s)
+	    (b_r3u PrelBase.:{-55,p-}{i} bs_r3v)
+		    =   deq_aon a_r3r b_r3u
+    d.Eq1_anJ =
+	({-dict-} [] [deq_aom])
+{- nonrec -}
+tc061.hs:7: 
+    Warning: Possibly incomplete patterns
+	in the definition of function `deq'
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed Eq1(deq);
+_instances_
+instance {Eq1 PrelBase.Int} = $d1;
+instance _forall_ [a] {Eq1 a} => {Eq1 [a]} = $d2;
+_declarations_
+1 $d1 _:_ {Eq1 PrelBase.Int} ;;
+1 $d2 _:_ _forall_ [a] {Eq1 a} => {Eq1 [a]} ;;
+1 $mdeq _:_ _forall_ [a] {Eq1 a} => a -> a -> PrelBase.Bool ;;
+1 class Eq1 r3y where {deq :: r3y -> r3y -> PrelBase.Bool} ;

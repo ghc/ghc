@@ -1,11 +1,33 @@
-Typechecked:
-d.Num.t7 = dfun.Num.Integer
-fromInt.t6 = fromInt tt4 d.Num.t7
-lit.t5 = fromInt.t6 (MkInt 2#)
-fromInt.t8 = fromInt.t6
-lit.t3 = fromInt.t8 (MkInt 1#)
-AbsBinds [] [] [(b.t1, Main.b)]
-    {- nonrec -}
-    b.t1 :: tt4
-    b.t1 = if True then lit.t3 else lit.t5
 
+
+--================================================================================
+Typechecked:
+{- nonrec -}
+d.Num_aGV =
+    PrelBase.$d3{-rb0,p-}
+fromInt_aGW =
+    PrelBase.fromInt{-8R,p-}
+	PrelBase.Int{-3g,p-}
+	d.Num_aGV
+lit_aH1 =
+    fromInt_aGW PrelBase.I#{-5b,p-}{i} 1#
+fromInt_aH0 =
+    fromInt_aGW
+lit_aGX =
+    fromInt_aH0 PrelBase.I#{-5b,p-}{i} 2#
+{- nonrec -}
+AbsBinds [] [] [([], b{-r1,x-}, b_aGC)]
+    b_aGC
+	=   if PrelBase.True{-5E,p-}{i} then lit_aH1 else lit_aGX
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d1 1 $d11 1 $d15 1 $d2 1 $d21 1 $d27 1 $d3 1 $d32 1 $d33 1 $d37 1 $d38 1 $d39 1 $d41 1 $d42 1 $d44 1 $d46 1 $d54 1 $d7 1 $d8 1 Eq 1 Eval 1 Num 1 Show 1 String 1;
+PrelNum 1 :: $d10 1 $d16 1 $d18 1 $d29 1 $d33 1 $d35 1;
+_exports_
+ShouldSucceed b;
+_declarations_
+1 b _:_ PrelBase.Int ;;

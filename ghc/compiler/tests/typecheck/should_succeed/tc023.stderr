@@ -1,19 +1,43 @@
-Typechecked:
-AbsBinds [ot6, ot4, ot5] [] [(s.t1, ShouldSucceed.s)]
-    {- nonrec -}
-    s.t1 :: (ot4 -> ot6 -> ot5) -> (ot4 -> ot6) -> ot4 -> ot5
-    s.t1 f.r56 g.r57 x.r58
-		 = f.r56 x.r58 (g.r57 x.r58)
-AbsBinds [ot10, ot9] [] [(k.t8, ShouldSucceed.k)]
-    {- nonrec -}
-    k.t8 :: ot9 -> ot10 -> ot9
-    k.t8 x.r59 y.r60
-		 = x.r59
-AbsBinds [tt19] [] [(main.t12, ShouldSucceed.main)]
-    {- nonrec -}
-    main.t12 :: tt19 -> tt19
-    main.t12
-	= (ShouldSucceed.s [tt18 -> tt19, tt19, tt19])
-	      (ShouldSucceed.k [tt18 -> tt19, tt19])
-	      (ShouldSucceed.k [tt18, tt19])
 
+
+--================================================================================
+Typechecked:
+{- nonrec -}
+{- nonrec -}
+AbsBinds
+[t{-anm-}, t{-ano-}]
+[]
+[([t{-anm-}, t{-ano-}], k{-r3o,x-}, k_ane)]
+    k_ane
+	x_r3l y_r3n
+		=   x_r3l
+{- nonrec -}
+{- nonrec -}
+AbsBinds
+[t{-anM-}, t{-anO-}, t{-anQ-}]
+[]
+[([t{-anM-}, t{-anO-}, t{-anQ-}], s{-r3p,x-}, s_anq)]
+    s_anq
+	f_r3f g_r3h x_r3j
+		=   f_r3f x_r3j g_r3h x_r3j
+{- nonrec -}
+{- nonrec -}
+AbsBinds [t{-ao5-}] [] [([t{-ao5-}], main{-r3q,x-}, main_anS)]
+    main_anS
+	=   s{-r3p,x-}
+		[t{-ao5-}, GHC.Void{-3T,p-} -> t{-ao5-}, t{-ao5-}] k{-r3o,x-}
+								       [t{-ao5-}, GHC.Void{-3T,p-}
+										  -> t{-ao5-}]
+								   k{-r3o,x-}
+								       [t{-ao5-}, GHC.Void{-3T,p-}]
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed k main s;
+_declarations_
+1 k _:_ _forall_ [a b] => a -> b -> a ;;
+1 main _:_ _forall_ [a] => a -> a ;;
+1 s _:_ _forall_ [a b c] => (a -> b -> c) -> (a -> b) -> a -> c ;;

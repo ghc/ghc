@@ -1,45 +1,114 @@
-Typechecked:
-AbsBinds [b.t0] [d.Eq.t1] [(d.Eq.t2, dfun.Eq.ShouldSucc.B)]
-    (d.Eq.t21, d.Eq.t1)
-    (==.t12, (==) b.t0 d.Eq.t21)
-    (d.Eq.t22, d.Eq.t2)
-    (==.t19, (==) (ShouldSucc.B b.t0) d.Eq.t22)
-    {- rec -}
-    d.Eq.t2 = ({-dict-} [] [==.t3, /=.t4])
-    (==.t3) :: ShouldSucc.B b.t0 -> ShouldSucc.B b.t0 -> Bool
-    (==.t3)
-	ShouldSucc.X ShouldSucc.X
-		= True
-    (==.t3)
-	(ShouldSucc.Y a.r17) (ShouldSucc.Y b.r18)
-		= a.r17 ==.t12 b.r18
-    (==.t3)
-	a.r19 b.r20
-		= False
-    (/=.t4) :: ShouldSucc.B b.t0 -> ShouldSucc.B b.t0 -> Bool
-    (/=.t4)
-	a.r21 b.r22
-		= not (a.r21 ==.t19 b.r22)
-AbsBinds [a.t23] [d.Eq.t24] [(d.Eq.t25, dfun.Eq.ShouldSucc.T)]
-    (d.Eq.t45, d.Eq.t24)
-    (d.Eq.t44, dfun.Eq.ShouldSucc.B a.t23 d.Eq.t45)
-    (==.t33, (==) (ShouldSucc.B a.t23) d.Eq.t44)
-    (d.Eq.t46, d.Eq.t25)
-    (==.t42, (==) (ShouldSucc.T a.t23) d.Eq.t46)
-    {- rec -}
-    d.Eq.t25 = ({-dict-} [] [==.t26, /=.t27])
-    (==.t26) :: ShouldSucc.T a.t23 -> ShouldSucc.T a.t23 -> Bool
-    (==.t26)
-	(ShouldSucc.D x.r24) (ShouldSucc.D y.r25)
-		= x.r24 ==.t33 y.r25
-    (==.t26)
-	ShouldSucc.C ShouldSucc.C
-		= True
-    (==.t26)
-	a.r26 b.r27
-		= False
-    (/=.t27) :: ShouldSucc.T a.t23 -> ShouldSucc.T a.t23 -> Bool
-    (/=.t27)
-	a.r28 b.r29
-		= not (a.r28 ==.t42 b.r29)
 
+
+--================================================================================
+Typechecked:
+{- nonrec -}
+X{-r4,x-}{i} =
+    _/\_ b{-r42-} ->
+	X{-r4,x-}{i}
+	    {_@_ b{-r42-}}
+Y{-r3,x-}{i} =
+    _/\_ b{-r42-} -> \ tpl_B1 ->
+	Y{-r3,x-}{i}
+	    {_@_ b{-r42-} tpl_B1}
+{- nonrec -}
+D{-r9,x-}{i} =
+    _/\_ a{-r44-} -> \ tpl_B1 ->
+	D{-r9,x-}{i}
+	    {_@_ a{-r44-} tpl_B1}
+C{-r8,x-}{i} =
+    _/\_ a{-r44-} ->
+	C{-r8,x-}{i}
+	    {_@_ a{-r44-}}
+{- rec -}
+AbsBinds [b{-aIF-}] [] [([b{-aIF-}], $d3{-rIJ,x-}, d.Eval_aH4)]
+    d.Eval_aH4 =
+	({-dict-} [] [])
+{- rec -}
+AbsBinds [a{-aIG-}] [] [([a{-aIG-}], $d4{-rIL,x-}, d.Eval_aHa)]
+    d.Eval_aHa =
+	({-dict-} [] [])
+{- rec -}
+AbsBinds
+[b{-aHm-}]
+[d.Eq_aHO]
+[([b{-aHm-}], $d1{-rIM,x-}, d.Eq_aHg)]
+    d.Eq_aHS =
+	d.Eq_aHO
+    ==_aIQ =
+	PrelBase.=={-8Y,p-}
+	    b{-aHm-}
+	    d.Eq_aHS
+    ==_aIP =
+	==_aIO
+    AbsBinds [] [] [([], ==_aIO, ==_aHj)]
+	==_aHj
+	    X{-r4,x-}{i} X{-r4,x-}{i}
+		    =   PrelBase.True{-5E,p-}{i}
+	==_aHj
+	    (Y{-r3,x-}{i} a_r3s) (Y{-r3,x-}{i} b_r3u)
+		    =   a_r3s ==_aIQ b_r3u
+	==_aHj
+	    a_r3w b_r3y
+		    =   PrelBase.False{-58,p-}{i}
+    AbsBinds [] [] [([], /=_aIN, /=_aHH)]
+	/=_aHH
+	    a_r3C b_r3E
+		    =   PrelBase.not{-rfZ,p-} a_r3C ==_aIP b_r3E
+    d.Eq_aHg =
+	({-dict-} [] [==_aIO, /=_aIN])
+{- rec -}
+AbsBinds
+[a{-aI7-}]
+[d.Eq_aIx]
+[([a{-aI7-}], $d2{-rIR,x-}, d.Eq_aHZ)]
+    d.Eq_aID =
+	d.Eq_aIx
+    d.Eq_aIB =
+	$d1{-rIM,x-}
+	    a{-aI7-}
+	    d.Eq_aID
+    ==_aIV =
+	PrelBase.=={-8Y,p-}
+	    (B{-r45,x-} a{-aI7-})
+	    d.Eq_aIB
+    ==_aIU =
+	==_aIT
+    AbsBinds [] [] [([], ==_aIT, ==_aI2)]
+	==_aI2
+	    (D{-r9,x-}{i} x_r3L) (D{-r9,x-}{i} y_r3N)
+		    =   x_r3L ==_aIV y_r3N
+	==_aI2
+	    C{-r8,x-}{i} C{-r8,x-}{i}
+		    =   PrelBase.True{-5E,p-}{i}
+	==_aI2
+	    a_r3R b_r3T
+		    =   PrelBase.False{-58,p-}{i}
+    AbsBinds [] [] [([], /=_aIS, /=_aIq)]
+	/=_aIq
+	    a_r3X b_r3Z
+		    =   PrelBase.not{-rfZ,p-} a_r3X ==_aIU b_r3Z
+    d.Eq_aHZ =
+	({-dict-} [] [==_aIT, /=_aIS])
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucc 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d15 1 $d32 1 $d37 1 $d39 1 $d41 1 $d46 1 $d7 1 not 1 Eq 1 Eval 1;
+PrelNum 1 :: $d18 1;
+_exports_
+ShouldSucc B(X Y) T(D C);
+_instances_
+instance _forall_ [a] {PrelBase.Eq a} => {PrelBase.Eq (B a)} = $d1;
+instance _forall_ [a] {PrelBase.Eq a} => {PrelBase.Eq (T a)} = $d2;
+instance _forall_ [a] => {PrelBase.Eval (B a)} = $d3;
+instance _forall_ [a] => {PrelBase.Eval (T a)} = $d4;
+_declarations_
+1 $d1 _:_ _forall_ [a] {PrelBase.Eq a} => {PrelBase.Eq (B a)} ;;
+1 $d2 _:_ _forall_ [a] {PrelBase.Eq a} => {PrelBase.Eq (T a)} ;;
+1 $d3 _:_ _forall_ [a] => {PrelBase.Eval (B a)} ;;
+1 $d4 _:_ _forall_ [a] => {PrelBase.Eval (T a)} ;;
+1 data B r42 = X |  Y r42 ;
+1 data T r44 = D (B r44) |  C ;

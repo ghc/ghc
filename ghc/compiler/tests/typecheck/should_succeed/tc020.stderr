@@ -1,12 +1,26 @@
-Typechecked:
-AbsBinds [tt5] [] [(f.t1, ShouldSucceed.f)]
-    {- nonrec -}
-    f.t1 :: tt5 -> [tt5]
-    f.t1 x.r54 = a.r55
-	       where
-		   AbsBinds [] [] [(a.t4, a.r55)]
-		       {- rec -}
-		       a.t4 :: [tt5]
-		       a.t4 = ((:) tt5) x.r54 a.t4
-		   {- nonrec -}
 
+
+--================================================================================
+Typechecked:
+{- nonrec -}
+{- nonrec -}
+AbsBinds [t{-anb-}] [] [([t{-anb-}], f{-r3g,x-}, f_an4)]
+    f_an4
+	x_r3d   =   a_r3f
+		where
+		    {- rec -}
+		    AbsBinds [] [] [([], a_r3f, a_an8)]
+			a_an8
+			    =   PrelBase.:{-55,p-}{i}
+				    t{-anb-}
+				    x_r3d a_an8
+		    {- nonrec -}
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed f;
+_declarations_
+1 f _:_ _forall_ [a] => a -> [a] ;;

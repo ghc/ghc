@@ -1,6 +1,21 @@
-Typechecked:
-AbsBinds [ot2] [] [(f.t1, P.f)]
-    {- nonrec -}
-    f.t1 :: ot2 -> ()
-    f.t1 _ | otherwise = ()
 
+
+--================================================================================
+Typechecked:
+{- nonrec -}
+{- nonrec -}
+AbsBinds [t{-auu-}] [] [([t{-auu-}], f{-r1,x-}, f_auo)]
+    f_auo
+	_       | [PrelBase.otherwise{-818,p-}] =
+		    PrelBase.(){-60,p-}{i}
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ P 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: otherwise 1;
+_exports_
+P f;
+_declarations_
+1 f _:_ _forall_ [a] => a -> PrelBase.() ;;

@@ -1,0 +1,65 @@
+
+
+--================================================================================
+Typechecked:
+{- rec -}
+AbsBinds
+[a{-auS-}]
+[d.Foo_av1]
+[([a{-auS-}], $d1{-rvF,x-}, d.Foo_auJ)]
+    d.Foo_av5 =
+	d.Foo_auJ
+    $mop1_avJ =
+	ClassFoo.$mop1{-ruM,p-}
+	    [a{-auS-}]
+	    d.Foo_av5
+    d.Foo_av7 =
+	d.Foo_auJ
+    $mop2_avI =
+	ClassFoo.$mop2{-ruP,p-}
+	    [a{-auS-}]
+	    d.Foo_av7
+    AbsBinds [] [] [([], op1_auL, op1_auO)]
+	op1_auO
+	    =   $mop1_avJ
+    AbsBinds [] [] [([], op2_auW, op2_auY)]
+	op2_auY
+	    =   $mop2_avI
+    d.Foo_auJ =
+	({-dict-} [] [op1_auL, op2_auW])
+{- rec -}
+AbsBinds [] [] [([], $d2{-rvK,x-}, d.Foo_avd)]
+    AbsBinds [] [] [([], op1_avf, op1_avh)]
+	op1_avh
+	    =   $mop1_avH
+    AbsBinds [] [] [([], op2_avo, op2_avq)]
+	op2_avq
+	    =   $mop2_avG
+    d.Foo_avd =
+	({-dict-} [] [op1_avf, op2_avo])
+{- nonrec -}
+d.Foo_avB =
+    $d2{-rvK,x-}
+$mop1_avH =
+    ClassFoo.$mop1{-ruM,p-}
+	PrelBase.Int{-3g,p-}
+	d.Foo_avB
+d.Foo_avE =
+    d.Foo_avB
+$mop2_avG =
+    ClassFoo.$mop2{-ruP,p-}
+	PrelBase.Int{-3g,p-}
+	d.Foo_avE
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ Bar 1
+_instance_modules_
+ArrBase Bar IO PrelNum
+_usages_
+ClassFoo 1 :: Foo 1;
+_exports_
+_instances_
+instance _forall_ [a] {ClassFoo.Foo a} => {ClassFoo.Foo [a]} = $d1;
+instance {ClassFoo.Foo PrelBase.Int} = $d2;
+_declarations_
+1 $d1 _:_ _forall_ [a] {ClassFoo.Foo a} => {ClassFoo.Foo [a]} ;;
+1 $d2 _:_ {ClassFoo.Foo PrelBase.Int} ;;

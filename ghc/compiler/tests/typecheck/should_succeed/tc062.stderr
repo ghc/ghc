@@ -1,44 +1,86 @@
+
+
+--================================================================================
 Typechecked:
 {- nonrec -}
-ShouldSucceed.Eq1.deq = /\ a.t28 -> \{-classdict-} [] [deq.t29] -> deq.t29
+deq{-r3G,x-} =
+    _/\_ a{-r3E-} -> \ tpl_B1 ->
+	tpl_B1
 {- nonrec -}
-defm.ShouldSucceed.Eq1.deq =
-    /\ a.t30 ->
-	\{-dict-} d.ShouldSucceed.Eq1.t31 ->
-	    (error (a.t30 -> a.t30 -> Bool))
-		"No default method for \"ShouldSucceed.Eq1.defm.ShouldSucceed.Eq1.deq\"\n"
-{- rec -}
-dfun.ShouldSucceed.Eq1.Int = ({-dict-} [] [const.ShouldSucceed.Eq1.Int.deq])
-const.ShouldSucceed.Eq1.Int.deq :: Int -> Int -> Bool
-const.ShouldSucceed.Eq1.Int.deq
-    x.r29 y.r30
-	    = True
 AbsBinds
-[a.t12]
-[d.ShouldSucceed.Eq1.t13]
-[(d.ShouldSucceed.Eq1.t14, dfun.ShouldSucceed.Eq1.List)]
-    (d.ShouldSucceed.Eq1.t26, d.ShouldSucceed.Eq1.t14)
-    (ShouldSucceed.Eq1.deq.t25,
-	ShouldSucceed.Eq1.deq [a.t12] d.ShouldSucceed.Eq1.t26)
-    (d.ShouldSucceed.Eq1.t27, d.ShouldSucceed.Eq1.t13)
-    (ShouldSucceed.Eq1.deq.t23,
-	ShouldSucceed.Eq1.deq a.t12 d.ShouldSucceed.Eq1.t27)
-    {- rec -}
-    d.ShouldSucceed.Eq1.t14 = ({-dict-} [] [deq.t15])
-    deq.t15 :: [a.t12] -> [a.t12] -> Bool
-    deq.t15
-	(a.r32 : as.r33) (b.r34 : bs.r35)
-		= if ShouldSucceed.Eq1.deq.t23 a.r32 b.r34 then
-		      ShouldSucceed.Eq1.deq.t25 as.r33 bs.r35
-		  else
-		      False
-AbsBinds [tt5] [d.ShouldSucceed.Eq1.t9] [(f.t1, ShouldSucceed.f)]
-    (d.ShouldSucceed.Eq1.t8,
-	dfun.ShouldSucceed.Eq1.List tt5 d.ShouldSucceed.Eq1.t9)
-    (ShouldSucceed.Eq1.deq.t7,
-	ShouldSucceed.Eq1.deq [tt5] d.ShouldSucceed.Eq1.t8)
-    {- nonrec -}
-    f.t1 :: [tt5] -> [tt5] -> Bool
-    f.t1 x.r63 (y.r64 : ys.r65)
-		 = ShouldSucceed.Eq1.deq.t7 x.r63 ys.r65
-
+[a{-aoL-}]
+[d.Eq1_aoE]
+[([a{-aoL-}], $mdeq{-rnK,x-}, deq_aoG)]
+    AbsBinds [] [] [([], deq_aoG, deq_aoI)]
+	deq_aoI
+	    =   GHCerr.noDefaultMethodError{-8k,p-}
+		    (a{-aoL-}
+		     -> a{-aoL-}
+		     -> PrelBase.Bool{-34,p-}) "Class Eq1 Method deq"
+{- rec -}
+AbsBinds
+[a{-ao9-}]
+[d.Eq1_aol]
+[([a{-ao9-}], $d1{-roM,x-}, d.Eq1_anZ)]
+    d.Eq1_aop =
+	d.Eq1_aol
+    deq_aoP =
+	deq{-r3G,x-}
+	    a{-ao9-}
+	    d.Eq1_aop
+    deq_aoO =
+	deq_aoN
+    AbsBinds [] [] [([], deq_aoN, deq_ao2)]
+	deq_ao2
+	    (a_r3p PrelBase.:{-55,p-}{i} as_r3q)
+	    (b_r3s PrelBase.:{-55,p-}{i} bs_r3t)
+		    =   if deq_aoP a_r3p b_r3s then
+			    deq_aoO as_r3q bs_r3t
+			else
+			    PrelBase.False{-58,p-}{i}
+    d.Eq1_anZ =
+	({-dict-} [] [deq_aoN])
+{- rec -}
+AbsBinds [] [] [([], $d2{-roQ,x-}, d.Eq1_aov)]
+    AbsBinds [] [] [([], deq_aoR, deq_aoy)]
+	deq_aoy
+	    x_r3z y_r3B
+		    =   PrelBase.True{-5E,p-}{i}
+    d.Eq1_aov =
+	({-dict-} [] [deq_aoR])
+{- nonrec -}
+{- nonrec -}
+AbsBinds [t{-anH-}] [d.Eq1_anT] [([t{-anH-}], f{-r3F,x-}, f_anB)]
+    d.Eq1_anR =
+	$d1{-roM,x-}
+	    t{-anH-}
+	    d.Eq1_anT
+    deq_aoS =
+	deq{-r3G,x-}
+	    [t{-anH-}]
+	    d.Eq1_anR
+    f_anB
+	x_r3f (y_r3h PrelBase.:{-55,p-}{i} ys_r3i)
+		=   deq_aoS x_r3f ys_r3i
+{- nonrec -}
+tc062.hs:10: 
+    Warning: Possibly incomplete patterns
+	in the definition of function `deq'
+tc062.hs:12: 
+    Warning: Possibly incomplete patterns
+	in the definition of function `f'
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed f Eq1(deq);
+_instances_
+instance _forall_ [a] {Eq1 a} => {Eq1 [a]} = $d1;
+instance {Eq1 PrelBase.Int} = $d2;
+_declarations_
+1 $d1 _:_ _forall_ [a] {Eq1 a} => {Eq1 [a]} ;;
+1 $d2 _:_ {Eq1 PrelBase.Int} ;;
+1 $mdeq _:_ _forall_ [a] {Eq1 a} => a -> a -> PrelBase.Bool ;;
+1 class Eq1 r3E where {deq :: r3E -> r3E -> PrelBase.Bool} ;
+1 f _:_ _forall_ [a] {Eq1 a} => [a] -> [a] -> PrelBase.Bool ;;

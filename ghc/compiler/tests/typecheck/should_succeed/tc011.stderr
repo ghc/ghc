@@ -1,6 +1,18 @@
-Typechecked:
-AbsBinds [tt0] [] [(x.t1, ShouldSucceed.x)]
-    {- rec -}
-    (x.t1@_) :: tt0
-    (x.t1@_) = x.t1
 
+
+--================================================================================
+Typechecked:
+{- nonrec -}
+{- rec -}
+AbsBinds [t{-an2-}] [] [([t{-an2-}], x{-r1,x-}, x_an0)]
+    (x_an0@_)
+	=   x_an0
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed x;
+_declarations_
+1 x _:_ _forall_ [a] => a ;;

@@ -1,19 +1,45 @@
+
+
+--================================================================================
 Typechecked:
 {- nonrec -}
-H.B.op2 = /\ a.t0 -> \{-classdict-} [d.H.C.t2] [op2.t1] -> op2.t1
-sdsel.H.B.H.C = /\ a.t0 -> \{-classdict-} [d.H.C.t2] [op2.t1] -> d.H.C.t2
+scsel_BHC{-anH,x-} =
+    _/\_ a{-r3g-} -> \ tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,p-}{i} tpl_B1 tpl_B2  -> tpl_B1;}
+op2{-r3m,x-} =
+    _/\_ a{-r3g-} -> \ tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,p-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
 {- nonrec -}
-defm.H.B.op2 =
-    /\ a.t3 ->
-	\{-dict-} d.H.B.t4 ->
-	    (error (a.t3 -> a.t3 -> a.t3))
-		"No default method for \"H.B.defm.H.B.op2\"\n"
+AbsBinds
+[a{-anv-}]
+[d.B_ano]
+[([a{-anv-}], $mop2{-rnI,x-}, op2_anq)]
+    AbsBinds [] [] [([], op2_anq, op2_ans)]
+	op2_ans
+	    =   GHCerr.noDefaultMethodError{-8k,p-}
+		    (a{-anv-} -> a{-anv-} -> a{-anv-}) "Class B Method op2"
 {- nonrec -}
-H.C.op1 = /\ a.t5 -> \{-classdict-} [] [op1.t6] -> op1.t6
+op1{-r3o,x-} =
+    _/\_ a{-r3l-} -> \ tpl_B1 ->
+	tpl_B1
 {- nonrec -}
-defm.H.C.op1 =
-    /\ a.t7 ->
-	\{-dict-} d.H.C.t8 ->
-	    (error (a.t7 -> a.t7))
-		"No default method for \"H.C.defm.H.C.op1\"\n"
-
+AbsBinds
+[a{-anG-}]
+[d.C_anz]
+[([a{-anG-}], $mop1{-rnJ,x-}, op1_anB)]
+    AbsBinds [] [] [([], op1_anB, op1_anD)]
+	op1_anD
+	    =   GHCerr.noDefaultMethodError{-8k,p-}
+		    (a{-anG-} -> a{-anG-}) "Class C Method op1"
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ H 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+H B(op2) C(op1);
+_declarations_
+1 $mop1 _:_ _forall_ [a] {C a} => a -> a ;;
+1 $mop2 _:_ _forall_ [a] {B a} => a -> a -> a ;;
+1 class {C r3g} => B r3g where {op2 :: r3g -> r3g -> r3g} ;
+1 class C r3l where {op1 :: r3l -> r3l} ;

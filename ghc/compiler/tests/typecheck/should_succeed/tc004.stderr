@@ -1,8 +1,22 @@
-Typechecked:
-AbsBinds [] [] [(f.t1, ShouldSucceed.f)]
-    {- nonrec -}
-    f.t1 :: Bool -> Bool
-    f.t1 x.r54 = case x.r54 of
-		   True -> True
-		   False -> x.r54
 
+
+--================================================================================
+Typechecked:
+{- nonrec -}
+{- nonrec -}
+AbsBinds [] [] [([], f{-r3e,x-}, f_an4)]
+    f_an4
+	x_r3d   =   case x_r3d of
+		      PrelBase.True{-5E,p-}{i}
+			      ->  PrelBase.True{-5E,p-}{i}
+		      PrelBase.False{-58,p-}{i}
+			      ->  x_r3d
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed f;
+_declarations_
+1 f _:_ PrelBase.Bool -> PrelBase.Bool ;;

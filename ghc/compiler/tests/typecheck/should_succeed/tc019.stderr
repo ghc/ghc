@@ -1,17 +1,61 @@
-Typechecked:
-d.Num.t19 = dfun.Num.Integer
-d.Num.t22 = dfun.Num.Integer
-fromInt.t18 = fromInt tt4 d.Num.t19
-lit.t16 = fromInt.t18 (MkInt 1#)
-d.Num.t20 = d.Num.t19
-(+.t14) = (+) tt4 d.Num.t20
-fromInt.t21 = fromInt tt6 d.Num.t22
-lit.t12 = fromInt.t21 (MkInt 2#)
-lit.t10 = lit.t16
-AbsBinds [] [] [(al.t2, ShouldSucceed.al), (am.t3, ShouldSucceed.am)]
-    {- nonrec -}
-    (al.t2 : am.t3) :: [tt4]
-    (al.t2 : am.t3)
-	= [ y.r55 +.t14 lit.t16 |
-	      (y.r55, z.r56) <- [(lit.t10, lit.t12)] ((tt4, tt6)) ]
 
+
+--================================================================================
+Typechecked:
+{- nonrec -}
+d.Num_aY3 =
+    PrelBase.$d3{-rb6,p-}
+fromInt_aYg =
+    PrelBase.fromInt{-8R,p-}
+	PrelBase.Int{-3g,p-}
+	d.Num_aY3
+lit_aYm =
+    fromInt_aYg PrelBase.I#{-5b,p-}{i} 1#
+fromInt_aYl =
+    fromInt_aYg
+lit_aYk =
+    fromInt_aYl PrelBase.I#{-5b,p-}{i} 2#
+d.Num_aY7 =
+    d.Num_aY3
++_aYj =
+    PrelBase.+{-r3g,p-}
+	PrelBase.Int{-3g,p-}
+	d.Num_aY7
+d.Monad_aY9 =
+    PrelBase.$d24{-rb0,p-}
+>>=_aYi =
+    PrelBase.>>={-811,p-}
+	PrelBase.[]{-3j,p-}
+	d.Monad_aY9
+d.Monad_aYc =
+    d.Monad_aY9
+return_aYh =
+    PrelBase.return{-816,p-}
+	PrelBase.[]{-3j,p-}
+	d.Monad_aYc
+{- nonrec -}
+AbsBinds
+[]
+[]
+[([], al{-r3i,x-}, al_aWK), ([], am{-r3h,x-}, am_aWL)]
+    lit_aYn =
+	lit_aYm
+    (al_aWK PrelBase.:{-55,p-}{i} am_aWL)
+	=   [ y_r3e +_aYj lit_aYn |
+		(y_r3e, z_r3f) <- [(lit_aYm,
+				    lit_aYk)] ((PrelBase.Int{-3g,p-}, PrelBase.Int{-3g,p-}))
+		]
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d1 1 $d11 1 $d15 1 $d2 1 $d21 1 $d23 1 $d24 1 $d27 1 $d3 1 $d32 1 $d33 1 $d37 1 $d38 1 $d39 1 $d41 1 $d42 1 $d44 1 $d46 1 $d54 1 $d7 1 $d8 1 Eq 1 Eval 1 Monad 1 MonadZero 1 Num 1 Show 1 String 1;
+PrelNum 1 :: $d10 1 $d16 1 $d18 1 $d29 1 $d33 1 $d35 1;
+PrelTup 1 :: $d13 1 $d4 1 $d9 1;
+_exports_
+ShouldSucceed al am;
+_declarations_
+1 al _:_ PrelBase.Int ;;
+1 am _:_ [PrelBase.Int] ;;

@@ -1,20 +1,40 @@
-Typechecked:
-d.Num.t9 = dfun.Num.Integer
-fromInt.t8 = fromInt tt4 d.Num.t9
-lit.t5 = fromInt.t8 (MkInt 2#)
-AbsBinds [] [] [(w.t1, ShouldSucceed.w)]
-    {- nonrec -}
-    w.t1 :: tt4
-    w.t1 = a.r54
-     where
-	AbsBinds [] [] [(y.t3, y.r55)]
-	    {- nonrec -}
-	    y.t3 :: tt4
-	    y.t3 = lit.t5
-	{- nonrec -}
-	AbsBinds [] [] [(a.t7, a.r54)]
-	    {- nonrec -}
-	    a.t7 :: tt4
-	    a.t7 = y.r55
-	{- nonrec -}
 
+
+--================================================================================
+Typechecked:
+{- nonrec -}
+d.Num_aH4 =
+    PrelBase.$d3{-rb3,p-}
+fromInt_aH5 =
+    PrelBase.fromInt{-8R,p-}
+	PrelBase.Int{-3g,p-}
+	d.Num_aH4
+lit_aH6 =
+    fromInt_aH5 PrelBase.I#{-5b,p-}{i} 2#
+{- nonrec -}
+AbsBinds [] [] [([], w{-r3f,x-}, w_aGI)]
+    w_aGI
+	=   a_r3d
+	where
+	    {- nonrec -}
+	    AbsBinds [] [] [([], y_r3e, y_aGH)]
+		y_aGH
+		    =   lit_aH6
+	    {- nonrec -}
+	    {- nonrec -}
+	    AbsBinds [] [] [([], a_r3d, a_aGT)]
+		a_aGT
+		    =   y_r3e
+	    {- nonrec -}
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d1 1 $d11 1 $d15 1 $d2 1 $d21 1 $d27 1 $d3 1 $d32 1 $d33 1 $d37 1 $d38 1 $d39 1 $d41 1 $d42 1 $d44 1 $d46 1 $d54 1 $d7 1 $d8 1 Eq 1 Eval 1 Num 1 Show 1 String 1;
+PrelNum 1 :: $d10 1 $d16 1 $d18 1 $d29 1 $d33 1 $d35 1;
+_exports_
+ShouldSucceed w;
+_declarations_
+1 w _:_ PrelBase.Int ;;

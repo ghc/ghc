@@ -1,14 +1,40 @@
-Typechecked:
-AbsBinds [tt0] [] [(x.t1, ShouldSucceed.x)]
-    {- rec -}
-    x.t1 :: tt0
-    x.t1 = x.t1
-AbsBinds [tt4, tt5] [] [(a.t3, ShouldSucceed.a)]
-    {- nonrec -}
-    a.t3 :: (tt4, tt5)
-    a.t3 = (ShouldSucceed.x tt4, ShouldSucceed.x tt5)
-AbsBinds [ot8, tt9, tt10] [] [(f.t7, ShouldSucceed.f)]
-    {- nonrec -}
-    f.t7 :: ot8 -> (tt9, tt10)
-    f.t7 x.r56 = ShouldSucceed.a [tt9, tt10]
 
+
+--================================================================================
+Typechecked:
+{- nonrec -}
+{- rec -}
+AbsBinds [t{-aB5-}] [] [([t{-aB5-}], x{-r3g,x-}, x_aB3)]
+    x_aB3
+	=   x_aB3
+{- nonrec -}
+{- nonrec -}
+AbsBinds
+[t{-aBb-}, t{-aBd-}]
+[]
+[([t{-aBb-}, t{-aBd-}], a{-r3h,x-}, a_aB7)]
+    a_aB7
+	=   (x{-r3g,x-}
+		 t{-aBb-},
+	     x{-r3g,x-}
+		 t{-aBd-})
+{- nonrec -}
+{- nonrec -}
+AbsBinds
+[t{-aBp-}, t{-aBl-}, t{-aBn-}]
+[]
+[([t{-aBp-}, t{-aBl-}, t{-aBn-}], f{-r3i,x-}, f_aBf)]
+    f_aBf
+	x_r3f   =   a{-r3h,x-}
+			[t{-aBl-}, t{-aBn-}]
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed a f x;
+_declarations_
+1 a _:_ _forall_ [a b] => (a, b) ;;
+1 f _:_ _forall_ [a b c] => a -> (b, c) ;;
+1 x _:_ _forall_ [a] => a ;;

@@ -1,3 +1,32 @@
+
+
+--================================================================================
 Typechecked:
-
-
+{- nonrec -}
+Node{-r4,x-}{i} =
+    _/\_ b{-r3h-} -> \ tpl_B1 tpl_B2 ->
+	Node{-r4,x-}{i}
+	    {_@_ b{-r3h-} tpl_B1 tpl_B2}
+Other{-r3,x-}{i} =
+    _/\_ b{-r3h-} -> \ tpl_B1 ->
+	Other{-r3,x-}{i}
+	    {_@_ b{-r3h-} tpl_B1}
+{- rec -}
+AbsBinds [b{-aVe-}] [] [([b{-aVe-}], $d1{-rVh,x-}, d.Eval_aVd)]
+    d.Eval_aVd =
+	({-dict-} [] [])
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d37 1 $d38 1 $d39 1 $d41 1 $d44 1 $d46 1 Eval 1;
+PrelTup 1 :: $d13 1;
+_exports_
+ShouldSucceed AList(Node Other);
+_instances_
+instance _forall_ [a] => {PrelBase.Eval (AList a)} = $d1;
+_declarations_
+1 $d1 _:_ _forall_ [a] => {PrelBase.Eval (AList a)} ;;
+1 data AList r3h = Node r3h [r3h] |  Other (r3h, PrelBase.Char) ;

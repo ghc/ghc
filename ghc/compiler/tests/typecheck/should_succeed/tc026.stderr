@@ -1,12 +1,29 @@
-Typechecked:
-AbsBinds [ot4] [] [(f.t1, ShouldSucceed.f)]
-    {- rec -}
-    f.t1 :: Bool -> ot4 -> ot4
-    f.t1 x.r56 y.r57
-		 = if x.r56 then y.r57 else f.t1 x.r56 y.r57
-AbsBinds [] [] [(g.t6, ShouldSucceed.g)]
-    {- nonrec -}
-    g.t6 :: Bool -> Bool
-    g.t6 x.r55 = (ShouldSucceed.f Bool)
-		     ((ShouldSucceed.f Bool) True x.r55) x.r55
 
+
+--================================================================================
+Typechecked:
+{- nonrec -}
+{- rec -}
+AbsBinds [t{-ann-}] [] [([t{-ann-}], f{-r3j,x-}, f_an8)]
+    f_an8
+	x_r3g y_r3i
+		=   if x_r3g then y_r3i else f_an8 x_r3g y_r3i
+{- nonrec -}
+{- nonrec -}
+AbsBinds [] [] [([], g{-r3k,x-}, g_anp)]
+    g_anp
+	x_r3e   =   f{-r3j,x-}
+			PrelBase.Bool{-34,p-} f{-r3j,x-}
+						  PrelBase.Bool{-34,p-} PrelBase.True{-5E,p-}{i}
+									x_r3e
+					      x_r3e
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_exports_
+ShouldSucceed f g;
+_declarations_
+1 f _:_ _forall_ [a] => PrelBase.Bool -> a -> a ;;
+1 g _:_ PrelBase.Bool -> PrelBase.Bool ;;

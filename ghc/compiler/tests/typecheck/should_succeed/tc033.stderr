@@ -1,3 +1,40 @@
+
+
+--================================================================================
 Typechecked:
-
-
+{- nonrec -}
+Twist2{-r4,x-}{i} =
+    \ tpl_B1 ->
+	Twist2{-r4,x-}{i}
+	    {tpl_B1}
+{- nonrec -}
+Twine2{-r8,x-}{i} =
+    \ tpl_B1 ->
+	Twine2{-r8,x-}{i}
+	    {tpl_B1}
+{- rec -}
+AbsBinds [] [] [([], $d1{-rGe,x-}, d.Eval_aG6)]
+    d.Eval_aG6 =
+	({-dict-} [] [])
+{- rec -}
+AbsBinds [] [] [([], $d2{-rGg,x-}, d.Eval_aGb)]
+    d.Eval_aGb =
+	({-dict-} [] [])
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d37 1 $d39 1 $d41 1 $d46 1 Eval 1;
+_exports_
+ShouldSucceed F Twine(Twine2) Twist(Twist2);
+_instances_
+instance {PrelBase.Eval Twist} = $d1;
+instance {PrelBase.Eval Twine} = $d2;
+_declarations_
+1 $d1 _:_ {PrelBase.Eval Twist} ;;
+1 $d2 _:_ {PrelBase.Eval Twine} ;;
+1 type F = Twine ;
+1 data Twine = Twine2 Twist ;
+1 data Twist = Twist2 Twine ;

@@ -1,31 +1,108 @@
-Typechecked:
-AbsBinds [tt8, tt4] [] [(map.t1, ShouldSucceed.map)]
-    {- rec -}
-    map.t1 :: (tt8 -> tt4) -> [tt8] -> [tt4]
-    map.t1
-	f.r75 [] = [] (tt4)
-    map.t1
-	f.r76 (x.r77 : xs.r78)
-		= ((:) tt4) (f.r76 x.r77) (map.t1 f.r76 xs.r78)
-AbsBinds [tt17, tt18] [] [(snd.t14, ShouldSucceed.snd)]
-    {- nonrec -}
-    snd.t14 :: (tt17, tt18) -> tt18
-    snd.t14
-	(f.r79, s.r80)
-		= s.r80
-AbsBinds [a.t21, v.t22] [] [(ranOAL.t20, ShouldSucceed.ranOAL)]
-    {- nonrec -}
-    ranOAL.t20 :: ShouldSucceed.OL (a.t21, v.t22) -> [v.t22]
-    ranOAL.t20
-	(ShouldSucceed.MkOL xs.r74)
-		= (ShouldSucceed.map [(a.t21, v.t22), v.t22])
-		      (ShouldSucceed.snd [a.t21, v.t22]) xs.r74
-AbsBinds [a.t38, a.t36, b.t37] [] [(ranAFE.t30, ShouldSucceed.ranAFE)]
-    {- nonrec -}
-    ranAFE.t30 ::
-	ShouldSucceed.AFE a.t38 a.t36 b.t37 -> [ShouldSucceed.FG a.t36 b.t37]
-    ranAFE.t30
-	(ShouldSucceed.MkAFE nfs.r81)
-		= (ShouldSucceed.ranOAL [a.t38, ShouldSucceed.FG a.t36 b.t37])
-		      nfs.r81
 
+
+--================================================================================
+Typechecked:
+{- nonrec -}
+MkAFE{-r3U,x-}{i} =
+    _/\_ n{-r3M-} a{-r3N-} b{-r3O-} -> \ tpl_B1 ->
+	MkAFE{-r3U,x-}{i}
+	    {_@_ n{-r3M-} _@_ a{-r3N-} _@_ b{-r3O-} tpl_B1}
+{- nonrec -}
+MkFG{-r3W,x-}{i} =
+    _/\_ a{-r3Q-} b{-r3R-} -> \ tpl_B1 ->
+	MkFG{-r3W,x-}{i}
+	    {_@_ a{-r3Q-} _@_ b{-r3R-} tpl_B1}
+{- nonrec -}
+MkOL{-r3Y,x-}{i} =
+    _/\_ a{-r3T-} -> \ tpl_B1 ->
+	MkOL{-r3Y,x-}{i}
+	    {_@_ a{-r3T-} tpl_B1}
+{- rec -}
+AbsBinds
+[n{-aXN-}, a{-aXP-}, b{-aXO-}]
+[]
+[([n{-aXN-}, a{-aXP-}, b{-aXO-}], $d1{-rXV,x-}, d.Eval_aXz)]
+    d.Eval_aXz =
+	({-dict-} [] [])
+{- rec -}
+AbsBinds
+[a{-aXQ-}, b{-aXR-}]
+[]
+[([a{-aXQ-}, b{-aXR-}], $d2{-rXX,x-}, d.Eval_aXG)]
+    d.Eval_aXG =
+	({-dict-} [] [])
+{- rec -}
+AbsBinds [a{-aXS-}] [] [([a{-aXS-}], $d3{-rXZ,x-}, d.Eval_aXM)]
+    d.Eval_aXM =
+	({-dict-} [] [])
+{- nonrec -}
+{- nonrec -}
+AbsBinds
+[t{-aWc-}, t{-aWf-}]
+[]
+[([t{-aWc-}, t{-aWf-}], sNd{-r3u,x-}, sNd_aW7)]
+    sNd_aW7
+	(f_r3H, s_r3I)
+		=   s_r3I
+{- nonrec -}
+{- rec -}
+AbsBinds
+[t{-aWp-}, t{-aWr-}]
+[]
+[([t{-aWp-}, t{-aWr-}], mAp{-r3v,x-}, mAp_aWj)]
+    mAp_aWj
+	f_r3z PrelBase.[]{-5i,p-}{i}
+		=   PrelBase.[]{-5i,p-}{i}
+			t{-aWr-}
+    mAp_aWj
+	f_r3C (x_r3E PrelBase.:{-55,p-}{i} xs_r3F)
+		=   PrelBase.:{-55,p-}{i}
+			t{-aWr-}
+			(f_r3C x_r3E) (mAp_aWj f_r3C xs_r3F)
+{- nonrec -}
+{- nonrec -}
+AbsBinds
+[a{-aWR-}, v{-aWS-}]
+[]
+[([a{-aWR-}, v{-aWS-}], ranOAL{-r3s,x-}, ranOAL_aWM)]
+    ranOAL_aWM
+	(MkOL{-r3Y,x-}{i} xs_r3x)
+		=   mAp{-r3v,x-}
+			[(a{-aWR-}, v{-aWS-}), v{-aWS-}] sNd{-r3u,x-}
+							     [a{-aWR-}, v{-aWS-}]
+							 xs_r3x
+{- nonrec -}
+{- nonrec -}
+AbsBinds
+[n{-aXk-}, a{-aXl-}, b{-aXm-}]
+[]
+[([n{-aXk-}, a{-aXl-}, b{-aXm-}], ranAFE{-r3t,x-}, ranAFE_aXb)]
+    ranAFE_aXb
+	(MkAFE{-r3U,x-}{i} nfs_r3K)
+		=   ranOAL{-r3s,x-}
+			[n{-aXk-}, FG{-r3X,x-} a{-aXl-} b{-aXm-}] nfs_r3K
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d37 1 $d39 1 $d41 1 $d44 1 $d46 1 Eval 1;
+PrelTup 1 :: $d13 1;
+_exports_
+ShouldSucceed mAp ranAFE ranOAL sNd AFE(MkAFE) FG(MkFG) OL(MkOL);
+_instances_
+instance _forall_ [a b c] => {PrelBase.Eval (AFE a b c)} = $d1;
+instance _forall_ [a b] => {PrelBase.Eval (FG a b)} = $d2;
+instance _forall_ [a] => {PrelBase.Eval (OL a)} = $d3;
+_declarations_
+1 $d1 _:_ _forall_ [a b c] => {PrelBase.Eval (AFE a b c)} ;;
+1 $d2 _:_ _forall_ [a b] => {PrelBase.Eval (FG a b)} ;;
+1 $d3 _:_ _forall_ [a] => {PrelBase.Eval (OL a)} ;;
+1 data AFE r3M r3N r3O = MkAFE (OL (r3M, FG r3N r3O)) ;
+1 data FG r3Q r3R = MkFG (OL (r3Q, r3R)) ;
+1 data OL r3T = MkOL [r3T] ;
+1 mAp _:_ _forall_ [a b] => (a -> b) -> [a] -> [b] ;;
+1 ranAFE _:_ _forall_ [a b c] => AFE a b c -> [FG b c] ;;
+1 ranOAL _:_ _forall_ [a b] => OL (a, b) -> [b] ;;
+1 sNd _:_ _forall_ [a b] => (a, b) -> b ;;

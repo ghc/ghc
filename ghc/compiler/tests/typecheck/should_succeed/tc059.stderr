@@ -1,70 +1,120 @@
+
+
+--================================================================================
 Typechecked:
 {- nonrec -}
-ShouldSucceed.Eq2.deq =
-    /\ a.t38 -> \{-classdict-} [] [deq.t39 foo.t40] -> deq.t39
-ShouldSucceed.Eq2.foo =
-    /\ a.t38 -> \{-classdict-} [] [deq.t39 foo.t40] -> foo.t40
+deq{-r3N,x-} =
+    _/\_ a{-r3K-} -> \ tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,p-}{i} tpl_B1 tpl_B2  -> tpl_B1;}
+foo{-r3M,x-} =
+    _/\_ a{-r3K-} -> \ tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,p-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
 {- nonrec -}
-defm.ShouldSucceed.Eq2.deq =
-    /\ a.t41 ->
-	\{-dict-} d.ShouldSucceed.Eq2.t42 ->
-	    (error (a.t41 -> a.t41 -> Bool))
-		"No default method for \"ShouldSucceed.Eq2.defm.ShouldSucceed.Eq2.deq\"\n"
-defm.ShouldSucceed.Eq2.foo =
-    /\ a.t43 ->
-	\{-dict-} d.ShouldSucceed.Eq2.t44 ->
-	    (error (a.t43 -> a.t43))
-		"No default method for \"ShouldSucceed.Eq2.defm.ShouldSucceed.Eq2.foo\"\n"
-{- rec -}
-dfun.ShouldSucceed.Eq2.Int =
-    ({-dict-}
-    []
-    [const.ShouldSucceed.Eq2.Int.deq, const.ShouldSucceed.Eq2.Int.foo])
-const.ShouldSucceed.Eq2.Int.deq :: Int -> Int -> Bool
-const.ShouldSucceed.Eq2.Int.deq
-    x.r29 y.r30
-	    = True
-const.ShouldSucceed.Eq2.Int.foo :: Int -> Int
-const.ShouldSucceed.Eq2.Int.foo
-    x.r31 = x.r31
 AbsBinds
-[a.t14]
-[d.ShouldSucceed.Eq2.t15]
-[(d.ShouldSucceed.Eq2.t16, dfun.ShouldSucceed.Eq2.List)]
-    (d.ShouldSucceed.Eq2.t34, d.ShouldSucceed.Eq2.t16)
-    (ShouldSucceed.Eq2.foo.t32,
-	ShouldSucceed.Eq2.foo [a.t14] d.ShouldSucceed.Eq2.t34)
-    (d.ShouldSucceed.Eq2.t35, d.ShouldSucceed.Eq2.t34)
-    (ShouldSucceed.Eq2.deq.t30,
-	ShouldSucceed.Eq2.deq [a.t14] d.ShouldSucceed.Eq2.t35)
-    (d.ShouldSucceed.Eq2.t36, d.ShouldSucceed.Eq2.t15)
-    (ShouldSucceed.Eq2.foo.t28,
-	ShouldSucceed.Eq2.foo a.t14 d.ShouldSucceed.Eq2.t36)
-    (d.ShouldSucceed.Eq2.t37, d.ShouldSucceed.Eq2.t36)
-    (ShouldSucceed.Eq2.deq.t26,
-	ShouldSucceed.Eq2.deq a.t14 d.ShouldSucceed.Eq2.t37)
-    {- rec -}
-    d.ShouldSucceed.Eq2.t16 = ({-dict-} [] [deq.t17, foo.t18])
-    deq.t17 :: [a.t14] -> [a.t14] -> Bool
-    deq.t17
-	(a.r33 : as.r34) (b.r35 : bs.r36)
-		= if ShouldSucceed.Eq2.deq.t26
-			 a.r33 (ShouldSucceed.Eq2.foo.t28 b.r35) then
-		      ShouldSucceed.Eq2.deq.t30
-			  as.r34 (ShouldSucceed.Eq2.foo.t32 bs.r36)
-		  else
-		      False
-    foo.t18 :: [a.t14] -> [a.t14]
-    foo.t18
-	x.r37 = x.r37
-AbsBinds [tt5] [d.Num.t8, d.ShouldSucceed.Eq2.t10] [(f.t1, ShouldSucceed.f)]
-    (fromInt.t7, fromInt tt5 d.Num.t8)
-    (lit.t6, fromInt.t7 (MkInt 1#))
-    (d.ShouldSucceed.Eq2.t9,
-	dfun.ShouldSucceed.Eq2.List tt5 d.ShouldSucceed.Eq2.t10)
-    (ShouldSucceed.Eq2.deq.t4,
-	ShouldSucceed.Eq2.deq [tt5] d.ShouldSucceed.Eq2.t9)
-    {- nonrec -}
-    f.t1 :: [tt5] -> Bool
-    f.t1 x.r65 = ShouldSucceed.Eq2.deq.t4 x.r65 ([lit.t6] (tt5))
-
+[a{-aIS-}]
+[d.Eq2_aIL]
+[([a{-aIS-}], $mdeq{-rHo,x-}, deq_aIN)]
+    AbsBinds [] [] [([], deq_aIN, deq_aIP)]
+	deq_aIP
+	    =   GHCerr.noDefaultMethodError{-8k,p-}
+		    (a{-aIS-}
+		     -> a{-aIS-}
+		     -> PrelBase.Bool{-34,p-}) "Class Eq2 Method deq"
+AbsBinds
+[a{-aIS-}]
+[d.Eq2_aIV]
+[([a{-aIS-}], $mfoo{-rHn,x-}, foo_aIX)]
+    AbsBinds [] [] [([], foo_aIX, foo_aIZ)]
+	foo_aIZ
+	    =   GHCerr.noDefaultMethodError{-8k,p-}
+		    (a{-aIS-} -> a{-aIS-}) "Class Eq2 Method foo"
+{- rec -}
+AbsBinds
+[a{-aHX-}]
+[d.Eq2_aIm]
+[([a{-aHX-}], $d1{-rJ2,x-}, d.Eq2_aHN)]
+    d.Eq2_aIp =
+	d.Eq2_aIm
+    deq_aJ8 =
+	deq{-r3N,x-}
+	    a{-aHX-}
+	    d.Eq2_aIp
+    d.Eq2_aIr =
+	d.Eq2_aIm
+    foo_aJ7 =
+	foo{-r3M,x-}
+	    a{-aHX-}
+	    d.Eq2_aIr
+    deq_aJ6 =
+	deq_aJ4
+    foo_aJ5 =
+	foo_aJ3
+    AbsBinds [] [] [([], deq_aJ4, deq_aHQ)]
+	deq_aHQ
+	    (a_r3n PrelBase.:{-55,p-}{i} as_r3o)
+	    (b_r3q PrelBase.:{-55,p-}{i} bs_r3r)
+		    =   if deq_aJ8 a_r3n foo_aJ7 b_r3q then
+			    deq_aJ6 as_r3o foo_aJ5 bs_r3r
+			else
+			    PrelBase.False{-58,p-}{i}
+    AbsBinds [] [] [([], foo_aJ3, foo_aIj)]
+	foo_aIj
+	    x_r3v   =   x_r3v
+    d.Eq2_aHN =
+	({-dict-} [] [deq_aJ4, foo_aJ3])
+{- rec -}
+AbsBinds [] [] [([], $d2{-rJ9,x-}, d.Eq2_aIx)]
+    AbsBinds [] [] [([], deq_aJb, deq_aIA)]
+	deq_aIA
+	    x_r3B y_r3D
+		    =   PrelBase.True{-5E,p-}{i}
+    AbsBinds [] [] [([], foo_aJa, foo_aIG)]
+	foo_aIG
+	    x_r3H   =   x_r3H
+    d.Eq2_aIx =
+	({-dict-} [] [deq_aJb, foo_aJa])
+{- nonrec -}
+{- nonrec -}
+AbsBinds
+[t{-aHy-}]
+[d.Eq2_aHE, d.Num_aHH]
+[([t{-aHy-}], f{-r3L,x-}, f_aHm)]
+    d.Eq2_aHC =
+	$d1{-rJ2,x-}
+	    t{-aHy-}
+	    d.Eq2_aHE
+    deq_aJe =
+	deq{-r3N,x-}
+	    [t{-aHy-}]
+	    d.Eq2_aHC
+    fromInt_aJd =
+	PrelBase.fromInt{-8R,p-}
+	    t{-aHy-}
+	    d.Num_aHH
+    lit_aJc =
+	fromInt_aJd PrelBase.I#{-5b,p-}{i} 1#
+    f_aHm
+	x_r3g   =   deq_aJe x_r3g [lit_aJc] (t{-aHy-})
+{- nonrec -}
+tc059.hs:12: 
+    Warning: Possibly incomplete patterns
+	in the definition of function `deq'
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d1 1 $d11 1 $d15 1 $d2 1 $d21 1 $d27 1 $d3 1 $d32 1 $d33 1 $d37 1 $d38 1 $d39 1 $d41 1 $d42 1 $d44 1 $d46 1 $d54 1 $d7 1 $d8 1 Eq 1 Eval 1 Num 1 Show 1 String 1;
+PrelNum 1 :: $d10 1 $d16 1 $d18 1 $d29 1 $d33 1 $d35 1;
+_exports_
+ShouldSucceed f Eq2(deq foo);
+_instances_
+instance _forall_ [a] {Eq2 a} => {Eq2 [a]} = $d1;
+instance {Eq2 PrelBase.Int} = $d2;
+_declarations_
+1 $d1 _:_ _forall_ [a] {Eq2 a} => {Eq2 [a]} ;;
+1 $d2 _:_ {Eq2 PrelBase.Int} ;;
+1 $mdeq _:_ _forall_ [a] {Eq2 a} => a -> a -> PrelBase.Bool ;;
+1 $mfoo _:_ _forall_ [a] {Eq2 a} => a -> a ;;
+1 class Eq2 r3K where {deq :: r3K -> r3K -> PrelBase.Bool; foo :: r3K -> r3K} ;
+1 f _:_ _forall_ [a] {Eq2 a, PrelBase.Num a} => [a] -> PrelBase.Bool ;;

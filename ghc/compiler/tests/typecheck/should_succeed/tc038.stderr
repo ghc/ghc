@@ -1,15 +1,49 @@
-Typechecked:
-fromInt.t16 = int2Integer
-lit.t10 = fromInt.t16 (MkInt 2#)
-AbsBinds [tt12] [d.Num.t14] [(f.t1, ShouldSucceed.f)]
-    (d.Eq.t15, sdsel.Num.Eq tt12 d.Num.t14)
-    (fromInteger.t8, fromInteger tt12 d.Num.t14)
-    (==.t6, (==) tt12 d.Eq.t15)
-    {- nonrec -}
-    f.t1 :: [tt12] -> [tt12]
-    f.t1 (x.r54 : xs.r55)
-		 = if x.r54 ==.t6 (fromInteger.t8 lit.t10) then
-		       xs.r55
-		   else
-		       [] (tt12)
 
+
+--================================================================================
+Typechecked:
+{- nonrec -}
+d.Num_aH6 =
+    PrelNum.$d33{-rxe,p-}
+fromInt_aH7 =
+    PrelBase.fromInt{-8R,p-}
+	PrelBase.Integer{-3h,p-}
+	d.Num_aH6
+lit_aH8 =
+    fromInt_aH7 PrelBase.I#{-5b,p-}{i} 2#
+{- nonrec -}
+AbsBinds [t{-aGW-}] [d.Num_aH1] [([t{-aGW-}], f{-r3f,x-}, f_aGF)]
+    d.Eq_aGZ =
+	PrelBase.scsel_NumPrelBaseEq{-aHb,p-}
+	    t{-aGW-}
+	    d.Num_aH1
+    ==_aHa =
+	PrelBase.=={-8Y,p-}
+	    t{-aGW-}
+	    d.Eq_aGZ
+    fromInteger_aH9 =
+	PrelBase.fromInteger{-8S,p-}
+	    t{-aGW-}
+	    d.Num_aH1
+    f_aGF
+	(x_r3d PrelBase.:{-55,p-}{i} xs_r3e)
+		=   if x_r3d ==_aHa (fromInteger_aH9 lit_aH8) then
+			xs_r3e
+		    else
+			PrelBase.[]{-5i,p-}{i}
+			    t{-aGW-}
+{- nonrec -}
+tc038.hs:3: 
+    Warning: Possibly incomplete patterns
+	in the definition of function `f'
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d1 1 $d11 1 $d15 1 $d2 1 $d21 1 $d27 1 $d3 1 $d32 1 $d33 1 $d37 1 $d38 1 $d39 1 $d41 1 $d42 1 $d44 1 $d46 1 $d54 1 $d7 1 $d8 1 Eq 1 Eval 1 Num 1 Show 1 String 1;
+PrelNum 1 :: $d10 1 $d16 1 $d18 1 $d29 1 $d33 1 $d35 1;
+_exports_
+ShouldSucceed f;
+_declarations_
+1 f _:_ _forall_ [a] {PrelBase.Num a} => [a] -> [a] ;;

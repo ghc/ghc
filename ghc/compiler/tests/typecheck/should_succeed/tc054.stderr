@@ -1,52 +1,98 @@
+
+
+--================================================================================
 Typechecked:
 {- nonrec -}
-ShouldSucceed.Eq'.doubleeq =
-    /\ a.t16 -> \{-classdict-} [] [doubleeq.t17] -> doubleeq.t17
+scsel_Ord'ShouldSucceedEq'{-aIr,x-} =
+    _/\_ a{-r3B-} -> \ tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,p-}{i} tpl_B1 tpl_B2  -> tpl_B1;}
+lt{-r3I,x-} =
+    _/\_ a{-r3B-} -> \ tpl_B1 ->
+	case tpl_B1 of { PrelTup.(,){-62,p-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
 {- nonrec -}
-defm.ShouldSucceed.Eq'.doubleeq =
-    /\ a.t18 ->
-	\{-dict-} d.ShouldSucceed.Eq'.t19 ->
-	    (error (a.t18 -> a.t18 -> Bool))
-		"No default method for \"ShouldSucceed.Eq'.defm.ShouldSucceed.Eq'.doubleeq\"\n"
-{- nonrec -}
-ShouldSucceed.Ord'.lt =
-    /\ a.t20 -> \{-classdict-} [d.ShouldSucceed.Eq'.t22] [lt.t21] -> lt.t21
-sdsel.ShouldSucceed.Ord'.ShouldSucceed.Eq' =
-    /\ a.t20 ->
-	\{-classdict-} [d.ShouldSucceed.Eq'.t22] [lt.t21] ->
-	    d.ShouldSucceed.Eq'.t22
-{- nonrec -}
-defm.ShouldSucceed.Ord'.lt =
-    /\ a.t23 ->
-	\{-dict-} d.ShouldSucceed.Ord'.t24 ->
-	    (error (a.t23 -> a.t23 -> Bool))
-		"No default method for \"ShouldSucceed.Ord'.defm.ShouldSucceed.Ord'.lt\"\n"
-{- rec -}
-dfun.ShouldSucceed.Eq'.Int =
-    ({-dict-} [] [const.ShouldSucceed.Eq'.Int.doubleeq])
-const.ShouldSucceed.Eq'.Int.doubleeq :: Int -> Int -> Bool
-const.ShouldSucceed.Eq'.Int.doubleeq
-    x.r22 y.r23
-	    = True
-{- rec -}
-dfun.ShouldSucceed.Ord'.Int =
-    ({-dict-} [d.ShouldSucceed.Eq'.t13] [const.ShouldSucceed.Ord'.Int.lt])
-const.ShouldSucceed.Ord'.Int.lt :: Int -> Int -> Bool
-const.ShouldSucceed.Ord'.Int.lt
-    x.r51 y.r52
-	    = True
-d.ShouldSucceed.Eq'.t13 = dfun.ShouldSucceed.Eq'.Int
 AbsBinds
-[a.t4, ot3]
-[d.Num.t9, d.ShouldSucceed.Ord'.t10]
-[(f.t1, ShouldSucceed.f)]
-    (fromInt.t8, fromInt a.t4 d.Num.t9)
-    (lit.t7, fromInt.t8 (MkInt 1#))
-    (ShouldSucceed.Ord'.lt.t5,
-	ShouldSucceed.Ord'.lt a.t4 d.ShouldSucceed.Ord'.t10)
-    {- nonrec -}
-    f.t1 :: a.t4 -> ot3 -> Bool
-    f.t1 x.r62 y.r63
-		 | ShouldSucceed.Ord'.lt.t5 x.r62 lit.t7 = True
-		 | otherwise = False
-
+[a{-aIf-}]
+[d.Ord'_aI8]
+[([a{-aIf-}], $mlt{-rHm,x-}, lt_aIa)]
+    AbsBinds [] [] [([], lt_aIa, lt_aIc)]
+	lt_aIc
+	    =   GHCerr.noDefaultMethodError{-8k,p-}
+		    (a{-aIf-}
+		     -> a{-aIf-}
+		     -> PrelBase.Bool{-34,p-}) "Class Ord' Method lt"
+{- nonrec -}
+doubleeq{-r3K,x-} =
+    _/\_ a{-r3G-} -> \ tpl_B1 ->
+	tpl_B1
+{- nonrec -}
+AbsBinds
+[a{-aIq-}]
+[d.Eq'_aIj]
+[([a{-aIq-}], $mdoubleeq{-rHn,x-}, doubleeq_aIl)]
+    AbsBinds [] [] [([], doubleeq_aIl, doubleeq_aIn)]
+	doubleeq_aIn
+	    =   GHCerr.noDefaultMethodError{-8k,p-}
+		    (a{-aIq-}
+		     -> a{-aIq-}
+		     -> PrelBase.Bool{-34,p-}) "Class Eq' Method doubleeq"
+{- rec -}
+AbsBinds [] [] [([], $d1{-rIs,x-}, d.Ord'_aHL)]
+    d.Eq'_aHP =
+	$d2{-rIu,x-}
+    AbsBinds [] [] [([], lt_aIt, lt_aHO)]
+	lt_aHO
+	    x_r3o y_r3q
+		    =   PrelBase.True{-5E,p-}{i}
+    d.Ord'_aHL =
+	({-dict-} [d.Eq'_aHP] [lt_aIt])
+{- rec -}
+AbsBinds [] [] [([], $d2{-rIu,x-}, d.Eq'_aHZ)]
+    AbsBinds [] [] [([], doubleeq_aIv, doubleeq_aI2)]
+	doubleeq_aI2
+	    x_r3w y_r3y
+		    =   PrelBase.True{-5E,p-}{i}
+    d.Eq'_aHZ =
+	({-dict-} [] [doubleeq_aIv])
+{- nonrec -}
+{- nonrec -}
+AbsBinds
+[t{-aHw-}, t{-aHB-}]
+[d.Ord'_aHD, d.Num_aHG]
+[([t{-aHw-}, t{-aHB-}], f{-r3H,x-}, f_aHl)]
+    lt_aIy =
+	lt{-r3I,x-}
+	    t{-aHw-}
+	    d.Ord'_aHD
+    fromInt_aIx =
+	PrelBase.fromInt{-8R,p-}
+	    t{-aHw-}
+	    d.Num_aHG
+    lit_aIw =
+	fromInt_aIx PrelBase.I#{-5b,p-}{i} 1#
+    f_aHl
+	x_r3h y_r3j
+		| [lt_aIy x_r3h lit_aIw] =
+		    PrelBase.True{-5E,p-}{i}
+		| [PrelBase.otherwise{-818,p-}] =
+		    PrelBase.False{-58,p-}{i}
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d1 1 $d11 1 $d15 1 $d2 1 $d21 1 $d27 1 $d3 1 $d32 1 $d33 1 $d37 1 $d38 1 $d39 1 $d41 1 $d42 1 $d44 1 $d46 1 $d54 1 $d7 1 $d8 1 otherwise 1 Eq 1 Eval 1 Num 1 Show 1 String 1;
+PrelNum 1 :: $d10 1 $d16 1 $d18 1 $d29 1 $d33 1 $d35 1;
+_exports_
+ShouldSucceed f Eq'(doubleeq) Ord'(lt);
+_instances_
+instance {Ord' PrelBase.Int} = $d1;
+instance {Eq' PrelBase.Int} = $d2;
+_declarations_
+1 $d1 _:_ {Ord' PrelBase.Int} ;;
+1 $d2 _:_ {Eq' PrelBase.Int} ;;
+1 $mdoubleeq _:_ _forall_ [a] {Eq' a} => a -> a -> PrelBase.Bool ;;
+1 $mlt _:_ _forall_ [a] {Ord' a} => a -> a -> PrelBase.Bool ;;
+1 class Eq' r3G where {doubleeq :: r3G -> r3G -> PrelBase.Bool} ;
+1 class {Eq' r3B} => Ord' r3B where {lt :: r3B -> r3B -> PrelBase.Bool} ;
+1 f _:_ _forall_ [a b] {Ord' a, PrelBase.Num a} => a -> b -> PrelBase.Bool ;;

@@ -1,3 +1,27 @@
+
+
+--================================================================================
 Typechecked:
-
-
+{- nonrec -}
+Node{-r2,x-}{i} =
+    \ tpl_B1 tpl_B2 ->
+	Node{-r2,x-}{i}
+	    {tpl_B1 tpl_B2}
+{- rec -}
+AbsBinds [] [] [([], $d1{-rFX,x-}, d.Eval_aFU)]
+    d.Eval_aFU =
+	({-dict-} [] [])
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d37 1 $d39 1 $d41 1 $d46 1 Eval 1;
+_exports_
+ShouldSucceed Rec(Node);
+_instances_
+instance {PrelBase.Eval Rec} = $d1;
+_declarations_
+1 $d1 _:_ {PrelBase.Eval Rec} ;;
+1 data Rec = Node PrelBase.Int Rec ;
