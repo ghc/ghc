@@ -40,24 +40,13 @@
 **********************************************************************/
 
 static BOOLEAN expect_ccurly = FALSE; /* Used to signal that a CCURLY could be inserted here */
-
-extern BOOLEAN nonstandardFlag;
 extern BOOLEAN etags;
-
-extern VOID find_module_on_imports_dirlist PROTO((char *, BOOLEAN, char *));
 
 extern char *input_filename;
 static char *the_module_name;
-static char *iface_name;
-static char iface_filename[FILENAME_SIZE];
+static maybe module_exports;
 
-static maybe module_exports;		/* Exported entities */
-static list prelude_core_import, prelude_imports;
-					/* Entities imported from the Prelude */
-
-extern tree niltree;
 extern list Lnil;
-
 extern tree root;
 
 /* For FN, PREVPATT and SAMEFN macros */
@@ -80,28 +69,13 @@ extern int endlineno;
 *                                                                     *
 **********************************************************************/
 
-/* OLD 95/08: list fixlist; */
 static int Fixity = 0, Precedence = 0;
-struct infix;
 
 char *ineg PROTO((char *));
 
-int importlineno = 0;		/* The line number where an import starts */
+long    source_version = 0;
 
-long	inimport; 		/* Info about current import */
-id 	importmod;
-long 	importas;
-id	asmod;
-long 	importqual;
-long 	importspec;
-long 	importhide;
-list 	importlist;
-
-extern BOOLEAN inpat;			/*  True when parsing a pattern */
-extern BOOLEAN implicitPrelude;		/*  True when we should read the Prelude if not given */
-extern BOOLEAN haskell1_2Flag;		/*  True if we are attempting (proto)Haskell 1.3 */
-
-extern int thisIfacePragmaVersion;
+BOOLEAN inpat;
 %}
 
 %union {
@@ -121,8 +95,6 @@ extern int thisIfacePragmaVersion;
 	float ufloat;
 	char *ustring;
 	hstring uhstring;
-	hpragma uhpragma;
-	coresyn ucoresyn;
 }
 
 
@@ -186,7 +158,7 @@ extern int thisIfacePragmaVersion;
 %token	MODULE		NEWTYPE		OF
 %token	THEN		TYPE		WHERE
 
-%token  INTERFACE	SCC
+%token  SCC
 %token	CCALL		CCALL_GC	CASM		CASM_GC
 
 
@@ -210,20 +182,9 @@ extern int thisIfacePragmaVersion;
 *                                                                     *
 **********************************************************************/
 
-%token	LEOF
-%token  GHC_PRAGMA END_PRAGMA NO_PRAGMA NOINFO_PRAGMA SPECIALISE_PRAGMA
-%token  ARITY_PRAGMA UPDATE_PRAGMA STRICTNESS_PRAGMA KIND_PRAGMA
-%token  UNFOLDING_PRAGMA MAGIC_UNFOLDING_PRAGMA DEFOREST_PRAGMA
-%token  SPECIALISE_UPRAGMA INLINE_UPRAGMA MAGIC_UNFOLDING_UPRAGMA
+%token  INTERFACE_UPRAGMA SPECIALISE_UPRAGMA
+%token  INLINE_UPRAGMA MAGIC_UNFOLDING_UPRAGMA
 %token  DEFOREST_UPRAGMA END_UPRAGMA
-%token  TYLAMBDA COCON COPRIM COAPP COTYAPP FORALL TYVAR_TEMPLATE_ID
-%token  CO_ALG_ALTS CO_PRIM_ALTS CO_NO_DEFAULT CO_LETREC
-%token  CO_SDSEL_ID CO_METH_ID CO_DEFM_ID CO_DFUN_ID CO_CONSTM_ID
-%token  CO_SPEC_ID CO_WRKR_ID CO_ORIG_NM
-%token  UNFOLD_ALWAYS UNFOLD_IF_ARGS
-%token  NOREP_INTEGER NOREP_RATIONAL NOREP_STRING
-%token  CO_PRELUDE_DICTS_CC CO_ALL_DICTS_CC CO_USER_CC CO_AUTO_CC CO_DICT_CC
-%token  CO_CAF_CC CO_DUPD_CC
 
 /**********************************************************************
 *                                                                     *
@@ -275,19 +236,8 @@ extern int thisIfacePragmaVersion;
 		dtyclses dtycls_list
   		gdrhs gdpat valrhs
   		lampats	cexps
-		idata_pragma_specs idata_pragma_specslist
-		gen_pragma_list type_pragma_pairs
-		type_pragma_pairs_maybe name_pragma_pairs
-		type_maybes
-		core_binders core_tyvars core_tv_templates
-		core_types core_type_list
-		core_atoms core_atom_list
-		core_alg_alts core_prim_alts corec_binds
-		core_type_maybes
 
-%type <umaybe>  maybeexports impas maybeimpspec
-		type_maybe core_type_maybe
-
+%type <umaybe>  maybeexports impas maybeimpspec deriving
 
 %type <ueither> impspec  
 
@@ -302,7 +252,6 @@ extern int thisIfacePragmaVersion;
 
 %type <uid>	MINUS DARROW AS LAZY
 		VARID CONID VARSYM CONSYM 
-		TYVAR_TEMPLATE_ID
   		var con varop conop op
 		vark varid varsym varsym_nominus
 	        tycon modid impmod ccallid
@@ -317,13 +266,7 @@ extern int thisIfacePragmaVersion;
 %type <ubinding>  topdecl topdecls letdecls
 		  typed datad newtd classd instd defaultd
 		  decl decls valdef instdef instdefs
-  		  maybeifixes iimport iimports maybeiimports
-		  ityped idatad inewtd iclassd iinstd ivarsd
-  		  itopdecl itopdecls
-  		  maybe_where
-  		  interface dointerface readinterface ibody
-		  cbody rinst
-		  type_and_maybe_id
+ 		  maybe_where cbody rinst type_and_maybe_id
 
 %type <upbinding> valrhs1 altrest
 
@@ -331,7 +274,6 @@ extern int thisIfacePragmaVersion;
 		  gtyconapp ntyconapp ntycon gtyconvars
 		  bbtype batype btyconapp
 		  class restrict_inst general_inst tyvar
-		  core_type
 
 %type <uconstr>	  constr field
 
@@ -341,18 +283,6 @@ extern int thisIfacePragmaVersion;
 %type <uhstring>  STRING STRINGPRIM CHAR CHARPRIM
 
 %type <uentid>	  export import
-
-%type <uhpragma>  idata_pragma inewt_pragma idata_pragma_spectypes
-		  iclas_pragma iclasop_pragma
-		  iinst_pragma gen_pragma ival_pragma arity_pragma
-		  update_pragma strictness_pragma worker_info
-		  deforest_pragma
-		  unfolding_pragma unfolding_guidance type_pragma_pair
-		  name_pragma_pair
-
-%type <ucoresyn>  core_expr core_case_alts core_id core_binder core_atom
-		  core_alg_alt core_prim_alt core_default corec_bind
-		  co_primop co_scc co_caf co_dupd
 
 %type <ulong>     commas impqual
 
@@ -364,66 +294,56 @@ extern int thisIfacePragmaVersion;
 *                                                                     *
 **********************************************************************/
 
-%start pmodule
-
+%start module
 
 %%
-
-pmodule	:  	{
-		  inimport   = 1;
-		  importmod  = install_literal("Prelude");
-		  importas   = 0;
-		  asmod      = NULL;
-		  importqual = 0;
-		  importspec = 0;
-		  importhide = 0;
-		  importlist = Lnil;
-		}
-	   readpreludecore readprelude
-		{
-		  inimport   = 0;
-		  importmod  = NULL;
-
-	  	  modulelineno = 0;
-		}
-	   module
-	;
-
 module	:  modulekey modid maybeexports
 		{
+		  modulelineno = startlineno;
 		  the_module_name = $2;
 		  module_exports = $3;
 		}
 	   WHERE body
 	|	{ 
+		  modulelineno = 0;
 		  the_module_name = install_literal("Main");
 		  module_exports = mknothing();
                 }
 	   body
 	;
 
-body	:  ocurly { setstartlineno(); } orestm
-	|  vocurly vrestm
+body	:  ocurly { setstartlineno(); } interface_pragma orestm
+	|  vocurly interface_pragma vrestm
 	;
+
+interface_pragma : /* empty */
+	| INTERFACE_UPRAGMA INTEGER END_UPRAGMA SEMI
+	       {
+		 source_version = atoi($2);
+	       }
+        ;
 
 orestm  :  maybeimpdecls maybefixes topdecls ccurly
 	       {
-		 root = mkhmodule(the_module_name,lconc(prelude_imports,$1),module_exports,$2,$3,modulelineno);
+		 root = mkhmodule(the_module_name,$1,module_exports,
+				  $2,$3,source_version,modulelineno);
 	       }
 	|  impdecls ccurly
 	       {
-		 root = mkhmodule(the_module_name,lconc(prelude_imports,$1),module_exports,Lnil,mknullbind(),modulelineno);
+		 root = mkhmodule(the_module_name,$1,module_exports,
+			          Lnil,mknullbind(),source_version,modulelineno);
 	       }
 
 vrestm  :  maybeimpdecls maybefixes topdecls vccurly
 	       {
-		 root = mkhmodule(the_module_name,lconc(prelude_imports,$1),module_exports,$2,$3,modulelineno);
+		 root = mkhmodule(the_module_name,$1,module_exports,
+				  $2,$3,source_version,modulelineno);
 	       }
 	|  impdecls vccurly
 	       {
-		 root = mkhmodule(the_module_name,lconc(prelude_imports,$1),module_exports,Lnil,mknullbind(),modulelineno);
+		 root = mkhmodule(the_module_name,$1,module_exports,
+				  Lnil,mknullbind(),source_version,modulelineno);
 	       }
-
 
 maybeexports :	/* empty */			{ $$ = mknothing(); }
 	|  OPAREN export_list CPAREN		{ $$ = mkjust($2); }
@@ -460,46 +380,32 @@ impdecls:  impdecl				{ $$ = $1; }
 	;
 
 
-impdecl	:  importkey
+impdecl	:  importkey impqual impmod impas maybeimpspec
 		{ 
-		  inimport = 1;
-		  importlineno = startlineno;
-		}
-	   impqual impmod dointerface impas maybeimpspec
-		{ 
-		  $$ = lsing(mkimport(iface_name,xstrdup(iface_filename),$5,
-				      $4,$3,$6,$7,importlineno));
-		  inimport   = 0;
-		  importmod  = NULL;	
-		  importas   = 0;
-		  asmod      = NULL;
-		  importqual = 0;
-		  importspec = 0;
-		  importhide = 0;
-		  importlist = Lnil;
+		  $$ = lsing(mkimport($3,$2,$4,$5,startlineno));
 	        }
 	;
 
-impmod  : modid					{ $$ = importmod = $1; }
+impmod  : modid					{ $$ = $1; }
 	;
 
-impqual :  /* noqual */				{ $$ = importqual = 0; }
-	|  QUALIFIED 				{ $$ = importqual = 1; }
+impqual :  /* noqual */				{ $$ = 0; }
+	|  QUALIFIED 				{ $$ = 1; }
 	;
 
-impas   :  /* noas */				{ $$ = mknothing(); importas = 0; asmod = NULL; }
-	|  AS modid				{ $$ = mkjust($2);  importas = 1; asmod = $2;   }
+impas   :  /* noas */				{ $$ = mknothing(); }
+	|  AS modid				{ $$ = mkjust($2);  }
 	;
 
-maybeimpspec :	/* empty */			{ $$ = mknothing(); importspec = 0; }
-	|  impspec				{ $$ = mkjust($1);  importspec = 1; }
+maybeimpspec :	/* empty */			{ $$ = mknothing(); }
+	|  impspec				{ $$ = mkjust($1);  }
 	;
 
-impspec	:  OPAREN CPAREN			  { $$ = mkleft(Lnil); importhide = 0; importlist = Lnil; }
-	|  OPAREN import_list CPAREN		  { $$ = mkleft($2);   importhide = 0; importlist = $2; }
-	|  OPAREN import_list COMMA CPAREN	  { $$ = mkleft($2);   importhide = 0; importlist = $2; }
-	|  HIDING OPAREN import_list CPAREN	  { $$ = mkright($3);  importhide = 1; importlist = $3; }
-	|  HIDING OPAREN import_list COMMA CPAREN { $$ = mkright($3);  importhide = 1; importlist = $3; }
+impspec	:  OPAREN CPAREN			  { $$ = mkleft(Lnil); }
+	|  OPAREN import_list CPAREN		  { $$ = mkleft($2);   }
+	|  OPAREN import_list COMMA CPAREN	  { $$ = mkleft($2);   }
+	|  HIDING OPAREN import_list CPAREN	  { $$ = mkright($3);  }
+	|  HIDING OPAREN import_list COMMA CPAREN { $$ = mkright($3);  }
   	;
 
 import_list:
@@ -520,546 +426,6 @@ inames  :  iname				{ $$ = lsing($1); }
 iname   :  var					{ $$ = mknoqual($1); }
 	|  con					{ $$ = mknoqual($1); }
 	;
-
-
-/**********************************************************************
-*                                                                     *
-*                                                                     *
-*      Reading interface files					      *
-*                                                                     *
-*                                                                     *
-**********************************************************************/
-
-dointerface :	{ /* filename returned in "iface_filename" */
-		  char *module_name = id_to_string(importmod);
-		  if ( ! etags ) {
-		      find_module_on_imports_dirlist(
-			(haskell1_2Flag && strcmp(module_name, "Prelude") == 0)
-			    ? "Prel12" : module_name,
-			FALSE, iface_filename);
-		  } else {
-		     find_module_on_imports_dirlist("PreludeNull_",TRUE,iface_filename);
-		  }
-		  if (strcmp(module_name,"PreludeCore")==0) {
-			    hsperror("Cannot explicitly import `PreludeCore'");
-
-		  } else if (strcmp(module_name,"Prelude")==0) {
-		    prelude_imports = prelude_core_import; /* unavoidable */
-		  }
-		  thisIfacePragmaVersion = 0;
-		  setyyin(iface_filename);
-		}
-	readinterface
-		{ $$ = $2; }
-	;
-
-readpreludecore:{
-		  if ( implicitPrelude && !etags ) {
-		     /* we try to avoid reading interfaces when etagging */
-		     find_module_on_imports_dirlist(
-			(haskell1_2Flag) ? "PrelCore12" : "PreludeCore",
-			TRUE,iface_filename);
-		  } else {
-		     find_module_on_imports_dirlist("PreludeNull_",TRUE,iface_filename);
-		  }
-		  thisIfacePragmaVersion = 0;
-		  setyyin(iface_filename);
-		}
-	   readinterface
-		{
-		  binding prelude_core = mkimport(iface_name,xstrdup(iface_filename),$2,
-				                  install_literal("PreludeCore"),
-						  0,mknothing(),mknothing(),0);
-		  prelude_core_import = (! implicitPrelude) ? Lnil : lsing(prelude_core);
-		}
-	;
-
-readprelude :   {
-		  if ( implicitPrelude && !etags ) {
-		     find_module_on_imports_dirlist(
-			( haskell1_2Flag ) ? "Prel12" : "Prelude",
-			TRUE,iface_filename);
-		  } else {
-		     find_module_on_imports_dirlist("PreludeNull_",TRUE,iface_filename);
-		  }
-		  thisIfacePragmaVersion = 0;
-		  setyyin(iface_filename);
-		}
-	   readinterface
-		{
-		  binding prelude = mkimport(iface_name,xstrdup(iface_filename),$2,
-				             install_literal("Prelude"),
-					     0,mknothing(),mknothing(),0);
-		  prelude_imports = (! implicitPrelude) ? Lnil
-					: lconc(prelude_core_import,lsing(prelude));
-		}
-	;
-
-readinterface:
-	   interface LEOF
-		{
-		  $$ = $1;
-		}
-	;
-
-interface:
-  	   INTERFACE modid
-		{ 
-		  iface_name = $2;
-		}
-	   WHERE ibody
-		{
-		  $$ = $5;
-		}
-	;
-
-ibody	:  ocurly maybeiimports maybeifixes itopdecls ccurly
-		{
-		  $$ = mkabind($2,mkabind($3,$4));
-		}
-	|  ocurly iimports ccurly
-		{
-		  $$ = $2;
-		}
-	|  vocurly maybeiimports maybeifixes itopdecls vccurly
-		{
-		  $$ = mkabind($2,mkabind($3,$4));
-		}
-	|  vocurly iimports vccurly
-		{
-		  $$ = $2;
-		}
-  	;
-
-maybeifixes:  /* empty */			{ $$ = mknullbind(); }
-	|  fixes SEMI				{ $$ = mkmfbind($1); }
-	;
-
-maybeiimports : /* empty */			{ $$ = mknullbind(); }
-	|  iimports SEMI			{ $$ = $1; }
-	;
-
-iimports : iimport				{ $$ = $1; }
-	 | iimports SEMI iimport		{ $$ = mkabind($1,$3); }
-	 ;
-
-iimport :  importkey modid OPAREN import_list CPAREN
-		{ $$ = mkmbind($2,$4,startlineno); }
-	;
-
-
-itopdecls : itopdecl				{ $$ = $1; }
-	| itopdecls SEMI itopdecl		{ $$ = mkabind($1,$3); }
-  	;
-
-itopdecl:  ityped	 			{ $$ = $1; }
-	|  idatad 				{ $$ = $1; }
-	|  inewtd 				{ $$ = $1; }
-	|  iclassd 				{ $$ = $1; }
-	|  iinstd 				{ $$ = $1; }
-	|  ivarsd				{ $$ = $1; }
-	|  /* empty */				{ $$ = mknullbind(); }
-	;
-
-ivarsd	:  qvarsk DCOLON ctype ival_pragma
-		{ $$ = mksbind($1,$3,startlineno,$4); }
-	;
-
-ityped	:  typekey simple EQUAL type
-		{ $$ = mknbind($2,$4,startlineno); }
-	;
-
-idatad	:  datakey simple idata_pragma
-		{ $$ = mktbind(Lnil,$2,Lnil,mknothing(),startlineno,$3); }
-	|  datakey simple EQUAL constrs idata_pragma
-		{ $$ = mktbind(Lnil,$2,$4,mknothing(),startlineno,$5); }
-	|  datakey context DARROW simple idata_pragma
-		{ $$ = mktbind($2,$4,Lnil,mknothing(),startlineno,$5); }
-	|  datakey context DARROW simple EQUAL constrs idata_pragma
-		{ $$ = mktbind($2,$4,$6,mknothing(),startlineno,$7); }
-	;
-
-inewtd	:  newtypekey simple inewt_pragma
-		{ $$ = mkntbind(Lnil,$2,Lnil,mknothing(),startlineno,$3); }
-	|  newtypekey simple EQUAL constr1 inewt_pragma
-		{ $$ = mkntbind(Lnil,$2,$4,mknothing(),startlineno,$5); }
-	|  newtypekey context DARROW simple inewt_pragma
-		{ $$ = mkntbind($2,$4,Lnil,mknothing(),startlineno,$5); }
-	|  newtypekey context DARROW simple EQUAL constr1 inewt_pragma
-		{ $$ = mkntbind($2,$4,$6,mknothing(),startlineno,$7); }
-	;
-
-iclassd	:  classkey context DARROW class iclas_pragma cbody
-		{ $$ = mkcbind($2,$4,$6,startlineno,$5); }
-	|  classkey class iclas_pragma cbody
-		{ $$ = mkcbind(Lnil,$2,$4,startlineno,$3); }
-	;
-
-iinstd	:  instkey modid context DARROW gtycon general_inst iinst_pragma
-		{ $$ = mkibind(0/*not source*/,$2,$3,$5,$6,mknullbind(),startlineno,$7); }
-	|  instkey modid gtycon general_inst iinst_pragma
-		{ $$ = mkibind(0/*not source*/,$2,Lnil,$3,$4,mknullbind(),startlineno,$5); }
-	;
-
-
-/**********************************************************************
-*                                                                     *
-*                                                                     *
-*     Interface pragma stuff					      *
-*                                                                     *
-*                                                                     *
-**********************************************************************/
-
-idata_pragma:
-	   GHC_PRAGMA constrs idata_pragma_specs END_PRAGMA
-						{ $$ = mkidata_pragma($2, $3); }
-	|  GHC_PRAGMA idata_pragma_specs END_PRAGMA
-						{ $$ = mkidata_pragma(Lnil, $2); }
-	|  /* empty */			    	{ $$ = mkno_pragma(); }
-	;
-
-inewt_pragma:
-	   GHC_PRAGMA constr1 idata_pragma_specs END_PRAGMA
-						{ $$ = mkidata_pragma($2, $3); }
-	|  GHC_PRAGMA idata_pragma_specs END_PRAGMA
-						{ $$ = mkidata_pragma(Lnil, $2); }
-	|  /* empty */			    	{ $$ = mkno_pragma(); }
-	;
-
-idata_pragma_specs : 
-	   SPECIALISE_PRAGMA idata_pragma_specslist
-						{ $$ = $2; }
-	|  /* empty */			    	{ $$ = Lnil; }
-	;
-
-idata_pragma_specslist:
-	   idata_pragma_spectypes		{ $$ = lsing($1); }
-	|  idata_pragma_specslist COMMA idata_pragma_spectypes
-						{ $$ = lapp($1, $3); }
-	;
-
-idata_pragma_spectypes:
-	   OBRACK type_maybes CBRACK		{ $$ = mkidata_pragma_4s($2); }
-	;
-
-iclas_pragma:
-	   GHC_PRAGMA gen_pragma_list END_PRAGMA { $$ = mkiclas_pragma($2); }
-	|  /* empty */				 { $$ = mkno_pragma(); }
-	;
-
-iclasop_pragma:
-	   GHC_PRAGMA gen_pragma gen_pragma END_PRAGMA
-		{ $$ = mkiclasop_pragma($2, $3); }
-	|  /* empty */
-		{ $$ = mkno_pragma(); }
-	;
-
-iinst_pragma:
-	   GHC_PRAGMA gen_pragma END_PRAGMA
-		{ $$ = mkiinst_simpl_pragma($2); }
-
-	|  GHC_PRAGMA gen_pragma name_pragma_pairs END_PRAGMA
-		{ $$ = mkiinst_const_pragma($2, $3); }
-
-	|  /* empty */
-		{ $$ = mkno_pragma(); }
-	;
-
-ival_pragma:
-	   GHC_PRAGMA gen_pragma END_PRAGMA
-		{ $$ = $2; }
-	|  /* empty */
-		{ $$ = mkno_pragma(); }
-	;
-
-gen_pragma:
-	   NOINFO_PRAGMA
-		{ $$ = mkno_pragma(); }
-	|  arity_pragma update_pragma deforest_pragma strictness_pragma unfolding_pragma type_pragma_pairs_maybe
-		{ $$ = mkigen_pragma($1, $2, $3, $4, $5, $6); }
-	;
-
-arity_pragma:
-	   NO_PRAGMA		    { $$ = mkno_pragma(); }
-	|  ARITY_PRAGMA INTEGER	    { $$ = mkiarity_pragma($2); }
-	;
-
-update_pragma:
-	   NO_PRAGMA		    { $$ = mkno_pragma(); }
-	|  UPDATE_PRAGMA INTEGER    { $$ = mkiupdate_pragma($2); }
-	;
-
-deforest_pragma:
-           NO_PRAGMA                { $$ = mkno_pragma(); }
-        |  DEFOREST_PRAGMA          { $$ = mkideforest_pragma(); }
-        ;
-
-strictness_pragma:
-	   NO_PRAGMA		    { $$ = mkno_pragma(); }
-	|  STRICTNESS_PRAGMA COCON  { $$ = mkistrictness_pragma(installHstring(1, "B"),
-				      /* _!_ = COCON = bottom */ mkno_pragma());
-				    }
-	|  STRICTNESS_PRAGMA STRING worker_info
-				    { $$ = mkistrictness_pragma($2, $3); }
-	;
-
-worker_info:
-	   OCURLY gen_pragma CCURLY { $$ = $2; }
-	|  /* empty */		    { $$ = mkno_pragma(); }
-
-unfolding_pragma:
-	   NO_PRAGMA		    { $$ = mkno_pragma(); }
-	|  MAGIC_UNFOLDING_PRAGMA vark
-				    { $$ = mkimagic_unfolding_pragma($2); }
-	|  UNFOLDING_PRAGMA unfolding_guidance core_expr
-				    { $$ = mkiunfolding_pragma($2, $3); }
-	;
-
-unfolding_guidance:
-	   UNFOLD_ALWAYS
-				    { $$ = mkiunfold_always(); }
-	|  UNFOLD_IF_ARGS INTEGER INTEGER CONID INTEGER
-				    { $$ = mkiunfold_if_args($2, $3, $4, $5); }
-	;
-
-gen_pragma_list:
-	   gen_pragma				{ $$ = lsing($1); }
-	|  gen_pragma_list COMMA gen_pragma	{ $$ = lapp($1, $3); }
-	;
-
-type_pragma_pairs_maybe:
-	  NO_PRAGMA				{ $$ = Lnil; }
-	| SPECIALISE_PRAGMA type_pragma_pairs	{ $$ = $2; }
-	;
-
-/* 1 S/R conflict at COMMA -> shift */
-type_pragma_pairs:
-	   type_pragma_pair			    { $$ = lsing($1); }
-	|  type_pragma_pairs COMMA type_pragma_pair { $$ = lapp($1, $3); }
-	;
-
-type_pragma_pair:
-	   OBRACK type_maybes CBRACK INTEGER worker_info
-		{ $$ = mkitype_pragma_pr($2, $4, $5); }
-	;
-
-type_maybes:
-	   type_maybe			{ $$ = lsing($1); }
-	|  type_maybes COMMA type_maybe	{ $$ = lapp($1, $3); }
-	;
-
-type_maybe:
-	   NO_PRAGMA			{ $$ = mknothing(); }
-    	|  type				{ $$ = mkjust($1); }
-	;
-
-name_pragma_pairs:
-	   name_pragma_pair			    { $$ = lsing($1); }
-	|  name_pragma_pairs COMMA name_pragma_pair { $$ = lapp($1, $3); }
-	;
-
-name_pragma_pair:
-	   /* if the gen_pragma concludes with a *comma*-separated SPECs list,
-	      we get a parse error --- we have to bracket the gen_pragma
-	   */
-
-	   var EQUAL OCURLY gen_pragma CCURLY
-		{ $$ = mkiname_pragma_pr($1, $4); }
-	;
-
-/**********************************************************************
-*                                                                     *
-*                                                                     *
-*     Core syntax stuff 					      *
-*                                                                     *
-*                                                                     *
-**********************************************************************/
-
-core_expr:
-	   LAMBDA core_binders RARROW core_expr
-			{ $$ = mkcolam($2, $4); }
-	|  TYLAMBDA core_tyvars RARROW core_expr
-			{ $$ = mkcotylam($2, $4); }
-	|  COCON con core_types core_atoms
-			{ $$ = mkcocon(mkco_id($2), $3, $4); }
-	|  COCON CO_ORIG_NM modid con core_types core_atoms
-			{ $$ = mkcocon(mkco_orig_id($3,$4), $5, $6); }
-	|  COPRIM co_primop core_types core_atoms
-			{ $$ = mkcoprim($2, $3, $4); }
-	|  COAPP core_expr core_atoms
-			{ $$ = mkcoapp($2, $3); }
-	|  COTYAPP core_expr OCURLY core_type CCURLY
-			{ $$ = mkcotyapp($2, $4); }
-	|  CASE core_expr OF OCURLY core_case_alts CCURLY
-			{ $$ = mkcocase($2, $5); }
-	|  LET OCURLY core_binder EQUAL core_expr CCURLY IN core_expr
-			{ $$ = mkcolet(mkcononrec($3, $5), $8); }
-	|  CO_LETREC OCURLY corec_binds CCURLY IN core_expr
-			{ $$ = mkcolet(mkcorec($3), $6); }
-	|  SCC OCURLY co_scc CCURLY core_expr
-			{ $$ = mkcoscc($3, $5); }
-	|  lit_constant { $$ = mkcoliteral($1); }
-	|  core_id	{ $$ = mkcovar($1); }
-	;
-
-core_case_alts :
-	   CO_ALG_ALTS  core_alg_alts  core_default
-			{ $$ = mkcoalg_alts($2, $3); }
-	|  CO_PRIM_ALTS core_prim_alts core_default
-			{ $$ = mkcoprim_alts($2, $3); }
-	;
-
-core_alg_alts :
-	   /* empty */			{ $$ = Lnil; }
-	|  core_alg_alts core_alg_alt	{ $$ = lapp($1, $2); }
-	;
-
-core_alg_alt:
-	   core_id core_binders RARROW core_expr SEMI { $$ = mkcoalg_alt($1, $2, $4); }
-	   /* core_id is really too generous */
-	;
-
-core_prim_alts :
-	   /* empty */			{ $$ = Lnil; }
-	|  core_prim_alts core_prim_alt	{ $$ = lapp($1, $2); }
-	;
-
-core_prim_alt:
-	   lit_constant RARROW core_expr SEMI { $$ = mkcoprim_alt($1, $3); }
-	;
-
-core_default:
-	   CO_NO_DEFAULT		{ $$ = mkconodeflt(); }
-	|  core_binder RARROW core_expr	{ $$ = mkcobinddeflt($1, $3); }
-	;
-
-corec_binds:
-	   corec_bind			{ $$ = lsing($1); }
-	|  corec_binds SEMI corec_bind	{ $$ = lapp($1, $3); }
-	;
-
-corec_bind:
-	   core_binder EQUAL core_expr	{ $$ = mkcorec_pair($1, $3); }
-	;
-
-co_scc	:
-	   CO_PRELUDE_DICTS_CC co_dupd		 { $$ = mkco_preludedictscc($2); }
-	|  CO_ALL_DICTS_CC STRING STRING co_dupd { $$ = mkco_alldictscc($2,$3,$4); }
-	|  CO_USER_CC STRING  STRING STRING co_dupd co_caf
-						{ $$ = mkco_usercc($2,$3,$4,$5,$6); }
-	|  CO_AUTO_CC core_id STRING STRING co_dupd co_caf
-						{ $$ = mkco_autocc($2,$3,$4,$5,$6); }
-	|  CO_DICT_CC core_id STRING STRING co_dupd co_caf
-						{ $$ = mkco_dictcc($2,$3,$4,$5,$6); }
-
-co_caf	:  NO_PRAGMA	{ $$ = mkco_scc_noncaf(); }
-	|  CO_CAF_CC	{ $$ = mkco_scc_caf(); }
-
-co_dupd	:  NO_PRAGMA	{ $$ = mkco_scc_nondupd(); }
-	|  CO_DUPD_CC	{ $$ = mkco_scc_dupd(); }
-
-core_id: /* more to come?? */
-	   CO_SDSEL_ID  tycon tycon	{ $$ = mkco_sdselid($2, $3); }
-	|  CO_METH_ID   tycon var	{ $$ = mkco_classopid($2, $3); }
-	|  CO_DEFM_ID   tycon var	{ $$ = mkco_defmid($2, $3); }
-	|  CO_DFUN_ID   tycon OPAREN core_type CPAREN
-					{ $$ = mkco_dfunid($2, $4); }
-	|  CO_CONSTM_ID tycon var OPAREN core_type CPAREN
-					{ $$ = mkco_constmid($2, $3, $5); }
-	|  CO_SPEC_ID	core_id OBRACK core_type_maybes CBRACK
-					{ $$ = mkco_specid($2, $4); }
-	|  CO_WRKR_ID	core_id		{ $$ = mkco_wrkrid($2); }
-	|  CO_ORIG_NM   modid var	{ $$ = mkco_orig_id($2, $3); }
-	|  CO_ORIG_NM   modid con	{ $$ = mkco_orig_id($2, $3); }
-	|  var				{ $$ = mkco_id($1); }
-	|  con				{ $$ = mkco_id($1); }
-	;
-
-co_primop :
-	   OPAREN CCALL ccallid	     OCURLY core_types core_type CCURLY CPAREN
-					{ $$ = mkco_ccall($3,0,$5,$6); }
-	|  OPAREN CCALL_GC ccallid   OCURLY core_types core_type CCURLY CPAREN
-					{ $$ = mkco_ccall($3,1,$5,$6); }
-	|  OPAREN CASM  lit_constant OCURLY core_types core_type CCURLY CPAREN
-					{ $$ = mkco_casm($3,0,$5,$6); }
-	|  OPAREN CASM_GC lit_constant OCURLY core_types core_type CCURLY CPAREN
-					{ $$ = mkco_casm($3,1,$5,$6); }
-	|  VARID			{ $$ = mkco_primop($1); }
-	;
-
-core_binders :
-	   /* empty */			{ $$ = Lnil; }
-	|  core_binders core_binder	{ $$ = lapp($1, $2); }
-	;
-
-core_binder :
-	   OPAREN VARID DCOLON core_type CPAREN	{ $$ = mkcobinder($2, $4); }
-
-core_atoms :
-	   OBRACK CBRACK		{ $$ = Lnil; }
-	|  OBRACK core_atom_list CBRACK	{ $$ = $2; }
-	;
-
-core_atom_list :
-	   core_atom			    { $$ = lsing($1); }
-	|  core_atom_list COMMA core_atom   { $$ = lapp($1, $3); }
-	;
-
-core_atom :
-	   lit_constant		{ $$ = mkcolit($1); }
-	|  core_id		{ $$ = mkcolocal($1); }
-	;
-
-core_tyvars :
-	   VARID		{ $$ = lsing($1); }
-	|  core_tyvars VARID  	{ $$ = lapp($1, $2); }
-	;
-
-core_tv_templates :
-	   TYVAR_TEMPLATE_ID				{ $$ = lsing($1); }
-	|  core_tv_templates COMMA TYVAR_TEMPLATE_ID 	{ $$ = lapp($1, $3); }
-	;
-
-core_types :
-	   OBRACK CBRACK		{ $$ = Lnil; }
-	|  OBRACK core_type_list CBRACK	{ $$ = $2; }
-	;
-
-core_type_list :
-	   core_type			    { $$ = lsing($1); }
-	|  core_type_list COMMA core_type   { $$ = lapp($1, $3); }
-	;
-
-core_type :
-	   type { $$ = $1; }
-	;
-
-/*
-core_type :
-	   FORALL core_tv_templates DARROW core_type
-		{ $$ = mkuniforall($2, $4); }
-	|  OCURLY OCURLY CONID core_type CCURLY CCURLY RARROW core_type
-		{ $$ = mktfun(mkunidict($3, $4), $8); }
-	|  OCURLY OCURLY CONID core_type CCURLY CCURLY
-		{ $$ = mkunidict($3, $4); }
-	|  OPAREN OCURLY OCURLY CONID core_type CCURLY CCURLY COMMA core_type_list CPAREN RARROW core_type
-		{ $$ = mktfun(mkttuple(mklcons(mkunidict($4, $5), $9)), $12); }
-	|  OPAREN OCURLY OCURLY CONID core_type CCURLY CCURLY COMMA core_type_list CPAREN
-		{ $$ = mkttuple(mklcons(mkunidict($4,$5), $9)); }
-	|  type { $$ = $1; }
-	;
-*/
-
-core_type_maybes:
-	   core_type_maybe			    { $$ = lsing($1); }
-	|  core_type_maybes COMMA core_type_maybe   { $$ = lapp($1, $3); }
-	;
-
-core_type_maybe:
-	   NO_PRAGMA			{ $$ = mknothing(); }
-    	|  core_type			{ $$ = mkjust($1); }
-	;
-
 
 /**********************************************************************
 *                                                                     *
@@ -1091,16 +457,8 @@ fix	:  INFIXL INTEGER	{ Precedence = checkfixity($2); Fixity = INFIXL; }
 	   ops  		{ $$ = $3; }
 	;
 
-ops	:  op		 { makeinfix($1,Fixity,Precedence,the_module_name,
-				     inimport,importas,importmod,asmod,importqual,
-				     importspec,importhide,importlist);
-			   $$ = lsing(mkfixop($1,infixint(Fixity),Precedence));
-			 }
-	|  ops COMMA op  { makeinfix($3,Fixity,Precedence,the_module_name,
-				     inimport,importas,importmod,asmod,importqual,
-				     importspec,importhide,importlist);
-			   $$ = lapp($1,mkfixop($3,infixint(Fixity),Precedence));
-			 }
+ops	:  op		 { $$ = lsing(mkfixop(mknoqual($1),infixint(Fixity),Precedence)); }
+	|  ops COMMA op  { $$ = lapp($1,mkfixop(mknoqual($3),infixint(Fixity),Precedence)); }
 	;
 
 topdecls:  topdecl
@@ -1121,7 +479,7 @@ topdecls:  topdecl
 		    $$ = $3;
 		  SAMEFN = 0;
 		}
-	;
+        ;
 
 topdecl	:  typed				{ $$ = $1; }
 	|  datad 				{ $$ = $1; }
@@ -1136,28 +494,26 @@ typed	:  typekey simple EQUAL type		{ $$ = mknbind($2,$4,startlineno); }
 	;
 
 
-datad	:  datakey simple EQUAL constrs
-		{ $$ = mktbind(Lnil,$2,$4,mknothing(),startlineno,mkno_pragma()); }
-	|  datakey simple EQUAL constrs DERIVING dtyclses
-		{ $$ = mktbind(Lnil,$2,$4,mkjust($6),startlineno,mkno_pragma()); }
-	|  datakey context DARROW simple EQUAL constrs
-		{ $$ = mktbind($2,$4,$6,mknothing(),startlineno,mkno_pragma()); }
-	|  datakey context DARROW simple EQUAL constrs DERIVING dtyclses
-		{ $$ = mktbind($2,$4,$6,mkjust($8),startlineno,mkno_pragma()); }
+datad	:  datakey simple EQUAL constrs deriving
+		{ $$ = mktbind(Lnil,$2,$4,$5,startlineno); }
+	|  datakey context DARROW simple EQUAL constrs deriving
+		{ $$ = mktbind($2,$4,$6,$7,startlineno); }
 	;
 
-newtd	:  newtypekey simple EQUAL constr1
-		{ $$ = mkntbind(Lnil,$2,$4,mknothing(),startlineno,mkno_pragma()); }
-	|  newtypekey simple EQUAL constr1 DERIVING dtyclses
-		{ $$ = mkntbind(Lnil,$2,$4,mkjust($6),startlineno,mkno_pragma()); }
-	|  newtypekey context DARROW simple EQUAL constr1
-		{ $$ = mkntbind($2,$4,$6,mknothing(),startlineno,mkno_pragma()); }
-	|  newtypekey context DARROW simple EQUAL constr1 DERIVING dtyclses
-		{ $$ = mkntbind($2,$4,$6,mkjust($8),startlineno,mkno_pragma()); }
+newtd	:  newtypekey simple EQUAL constr1 deriving
+		{ $$ = mkntbind(Lnil,$2,$4,$5,startlineno); }
+	|  newtypekey context DARROW simple EQUAL constr1 deriving
+		{ $$ = mkntbind($2,$4,$6,$7,startlineno); }
 	;
 
-classd	:  classkey context DARROW class cbody	{ $$ = mkcbind($2,$4,$5,startlineno,mkno_pragma()); }
-	|  classkey class cbody		 	{ $$ = mkcbind(Lnil,$2,$3,startlineno,mkno_pragma()); }
+deriving: /* empty */				{ $$ = mknothing(); }
+        | DERIVING dtyclses                     { $$ = mkjust($2); }
+	;
+
+classd	:  classkey context DARROW class cbody
+		{ $$ = mkcbind($2,$4,$5,startlineno); }
+	|  classkey class cbody		 	
+		{ $$ = mkcbind(Lnil,$2,$3,startlineno); }
 	;
 
 cbody	:  /* empty */				{ $$ = mknullbind(); }
@@ -1166,14 +522,14 @@ cbody	:  /* empty */				{ $$ = mknullbind(); }
 	;
 
 instd	:  instkey context DARROW gtycon restrict_inst rinst
-		{ $$ = mkibind(1/*source*/,the_module_name,$2,$4,$5,$6,startlineno,mkno_pragma()); }
+		{ $$ = mkibind($2,$4,$5,$6,startlineno); }
 	|  instkey gtycon general_inst rinst
-	 	{ $$ = mkibind(1/*source*/,the_module_name,Lnil,$2,$3,$4,startlineno,mkno_pragma()); }
+	 	{ $$ = mkibind(Lnil,$2,$3,$4,startlineno); }
 	;
 
-rinst	:  /* empty */			  	{ $$ = mknullbind(); }
-	|  WHERE ocurly  instdefs ccurly  	{ $$ = $3; }
-	|  WHERE vocurly instdefs vccurly 	{ $$ = $3; }
+rinst	:  /* empty */			  			{ $$ = mknullbind(); }
+	|  WHERE ocurly  instdefs ccurly  			{ $$ = $3; }
+	|  WHERE vocurly instdefs vccurly 			{ $$ = $3; }
 	;
 
 restrict_inst : gtycon				{ $$ = mktname($1); }
@@ -1194,8 +550,8 @@ defaultd:  defaultkey OPAREN types CPAREN       { $$ = mkdbind($3,startlineno); 
 	|  defaultkey OPAREN CPAREN		{ $$ = mkdbind(Lnil,startlineno); }
 	;
 
-decls	:  decl
-	|  decls SEMI decl
+decls	: decl
+	| decls SEMI decl
 		{
 		  if(SAMEFN)
 		    {
@@ -1207,17 +563,17 @@ decls	:  decl
 		}
 	;
 
-
 /*
     Note: if there is an iclasop_pragma here, then we must be
     doing a class-op in an interface -- unless the user is up
     to real mischief (ugly, but likely to work).
 */
 
-decl	:  qvarsk DCOLON ctype iclasop_pragma
-		{ $$ = mksbind($1,$3,startlineno,$4);
+decl	: qvarsk DCOLON ctype
+		{ $$ = mksbind($1,$3,startlineno);
 		  PREVPATT = NULL; FN = NULL; SAMEFN = 0;
 		}
+
 	/* User-specified pragmas come in as "signatures"...
 	   They are similar in that they can appear anywhere in the module,
 	   and have to be "joined up" with their related entity.
@@ -1313,8 +669,6 @@ ctype   : type DARROW type			{ $$ = mkcontext(type2context($1),$3); }
 	/* 1 S/R conflict at RARROW -> shift */
 type	:  btype				{ $$ = $1; }
 	|  btype RARROW type			{ $$ = mktfun($1,$3); }
-
-	|  FORALL core_tv_templates DARROW type { $$ = mkuniforall($2, $4); }
 	;
 
 /* btype is split so we can parse gtyconapp without S/R conflicts */
@@ -1339,10 +693,7 @@ ntycon	:  tyvar				{ $$ = $1; }
 	|  OPAREN type COMMA types CPAREN	{ $$ = mkttuple(mklcons($2,$4)); }
 	|  OBRACK type CBRACK			{ $$ = mktllist($2); }
 	|  OPAREN type CPAREN			{ $$ = $2; }
-
-	|  OCURLY OCURLY gtycon type CCURLY CCURLY { $$ = mkunidict($3, $4); }
-	|  TYVAR_TEMPLATE_ID			{ $$ = mkunityvartemplate($1); }
-	;
+        ;
 
 gtycon	:  qtycon
 	|  OPAREN RARROW CPAREN			{ $$ = creategid(-2); }
@@ -1563,7 +914,7 @@ exp	:  oexp DCOLON ctype			{ $$ = mkrestr($1,$3); }
   precedence parsing to work.
 */
 	/* 9 S/R conflicts on qop -> shift */
-oexp	:  oexp qop oexp %prec MINUS		{ $$ = mkinfixap($2,$1,$3); precparse($$); }
+oexp	:  oexp qop oexp %prec MINUS		{ $$ = mkinfixap($2,$1,$3); }
 	|  dexp
 	;
 
@@ -1571,7 +922,7 @@ oexp	:  oexp qop oexp %prec MINUS		{ $$ = mkinfixap($2,$1,$3); precparse($$); }
   This comes here because of the funny precedence rules concerning
   prefix minus.
 */
-dexp	:  MINUS kexp				{ $$ = mknegate($2,NULL,NULL); }
+dexp	:  MINUS kexp				{ $$ = mknegate($2); }
 	|  kexp
 	;
 
@@ -1582,17 +933,17 @@ dexp	:  MINUS kexp				{ $$ = mknegate($2,NULL,NULL); }
 expLno 	:  oexpLno DCOLON ctype			{ $$ = mkrestr($1,$3); }
 	|  oexpLno
 	;
-oexpLno	:  oexpLno qop oexp %prec MINUS		{ $$ = mkinfixap($2,$1,$3); precparse($$); }
+oexpLno	:  oexpLno qop oexp %prec MINUS		{ $$ = mkinfixap($2,$1,$3); }
 	|  dexpLno
 	;
-dexpLno	:  MINUS kexp				{ $$ = mknegate($2,NULL,NULL); }
+dexpLno	:  MINUS kexp				{ $$ = mknegate($2); }
 	|  kexpLno
 	;
 
 expL 	:  oexpL DCOLON ctype			{ $$ = mkrestr($1,$3); }
 	|  oexpL
 	;
-oexpL	:  oexpL qop oexp %prec MINUS		{ $$ = mkinfixap($2,$1,$3); precparse($$); }
+oexpL	:  oexpL qop oexp %prec MINUS		{ $$ = mkinfixap($2,$1,$3); }
 	|  kexpL
 	;
 
@@ -1661,9 +1012,9 @@ fexp	:  fexp aexp				{ $$ = mkap($1,$2); }
 aexp	:  qvar					{ $$ = mkident($1); }
 	|  gcon					{ $$ = mkident($1); }
 	|  lit_constant				{ $$ = mklit($1); }
-	|  OPAREN exp CPAREN			{ $$ = mkpar($2); }	  /* mkpar: stop infix parsing at ()'s */
+	|  OPAREN exp CPAREN			{ $$ = mkpar($2); }	    /* mkpar: stop infix parsing at ()'s */
 	|  qcon OCURLY CCURLY			{ $$ = mkrecord($1,Lnil); }
-	|  qcon OCURLY rbinds CCURLY		{ $$ = mkrecord($1,$3); } /* 1 S/R conflict on OCURLY -> shift */
+	|  qcon OCURLY rbinds CCURLY		{ $$ = mkrecord($1,$3); }   /* 1 S/R conflict on OCURLY -> shift */
 	|  OBRACK list_exps CBRACK		{ $$ = mkllist($2); }
 	|  OPAREN exp COMMA texps CPAREN	{ if (ttree($4) == tuple)
 			     			     $$ = mktuple(mklcons($2, gtuplelist((struct Stuple *) $4)));
@@ -1711,8 +1062,10 @@ texps	:  exp	{ $$ = mkpar($1); }	/* mkpar: so we don't flatten last element in t
 	|  exp COMMA texps
 		{ if (ttree($3) == tuple)
 		    $$ = mktuple(mklcons($1, gtuplelist((struct Stuple *) $3)));
+		  else if (ttree($3) == par)
+		    $$ = mktuple(ldub($1, gpare((struct Spar *) $3)));
 		  else
-		    $$ = mktuple(ldub($1, $3));
+		    hsperror("hsparser:texps: panic");
 		}
 	/* right recursion? WDP */
 	;
@@ -1807,33 +1160,11 @@ leftexp	:  LARROW exp				{ $$ = $2; }
 */
 
 opatk	:  dpatk
-	|  opatk qop opat %prec MINUS
-		{
-		  $$ = mkinfixap($2,$1,$3);
-
-		  if (isconstr(qid_to_string($2)))
-		    precparse($$);
-		  else
-		    {
-		      checkprec($1,$2,FALSE);	/* Check the precedence of the left pattern */
-		      checkprec($3,$2,TRUE);	/* then check the right pattern */
-		    }
-		}
+	|  opatk qop opat %prec MINUS		{ $$ = mkinfixap($2,$1,$3); }
 	;
 
 opat	:  dpat
-	|  opat qop opat %prec MINUS
-		{
-		  $$ = mkinfixap($2,$1,$3);
-
-		  if(isconstr(qid_to_string($2)))
-		    precparse($$);
-		  else
-		    {
-		      checkprec($1,$2,FALSE);	/* Check the precedence of the left pattern */
-		      checkprec($3,$2,TRUE);	/* then check the right pattern */
-		    }
-		}
+	|  opat qop opat %prec MINUS		{ $$ = mkinfixap($2,$1,$3); }
 	;
 
 /*
@@ -1842,7 +1173,7 @@ opat	:  dpat
 */
 
 
-dpat	:  MINUS fpat				{ $$ = mknegate($2,NULL,NULL); }
+dpat	:  MINUS fpat				{ $$ = mknegate($2); }
 	|  fpat
 	;
 
@@ -1851,7 +1182,7 @@ fpat	:  fpat aapat				{ $$ = mkap($1,$2); }
 	|  aapat
 	;
 
-dpatk	:  minuskey fpat			{ $$ = mknegate($2,NULL,NULL); }
+dpatk	:  minuskey fpat			{ $$ = mknegate($2); }
 	|  fpatk
 	;
 
@@ -1907,7 +1238,7 @@ pats	:  pat COMMA pats			{ $$ = mklcons($1, $3); }
     	/* right recursion? (WDP) */
 	;
 
-pat	:  pat qconop bpat			{ $$ = mkinfixap($2,$1,$3); precparse($$); }
+pat	:  pat qconop bpat			{ $$ = mkinfixap($2,$1,$3); }
 	|  bpat
 	;
 
@@ -1947,11 +1278,7 @@ lit_constant:
 	|  INTPRIM				{ $$ = mkintprim($1); }
 	|  FLOATPRIM				{ $$ = mkfloatprim($1); }
 	|  DOUBLEPRIM				{ $$ = mkdoubleprim($1); }
-	|  CLITLIT /* yurble yurble */		{ $$ = mkclitlit($1, ""); }
-	|  CLITLIT KIND_PRAGMA CONID		{ $$ = mkclitlit($1, $3); }
-	|  NOREP_INTEGER  INTEGER		{ $$ = mknorepi($2); }
-	|  NOREP_RATIONAL INTEGER INTEGER	{ $$ = mknorepr($2, $3); }
-	|  NOREP_STRING   STRING		{ $$ = mknoreps($2); }
+	|  CLITLIT /* yurble yurble */		{ $$ = mkclitlit($1); }
 	;
 
 rpats	: rpat					{ $$ = lsing($1); }
@@ -2141,7 +1468,6 @@ varid   :  VARID
 	|  AS				{ $$ = install_literal("as"); }
 	|  HIDING			{ $$ = install_literal("hiding"); }
 	|  QUALIFIED			{ $$ = install_literal("qualified"); }
-	|  INTERFACE			{ $$ = install_literal("interface"); }
 	;
 
 /* DARROW BANG are valid varsyms */
@@ -2154,7 +1480,7 @@ ccallid	:  VARID
 	|  CONID
 	;
 
-tyvar	:  varid			{ $$ = mknamedtvar($1); }
+tyvar	:  varid			{ $$ = mknamedtvar(mknoqual($1)); }
 	;
 tycon	:  CONID
 	;
@@ -2215,6 +1541,14 @@ vccurly1:
 *  (This stuff is here in case we want to use Yacc macros and such.)  *
 *                                                                     *
 **********************************************************************/
+
+void
+checkinpat()
+{
+  if(!inpat)
+    hsperror("pattern syntax used in expression");
+}
+
 
 /* The parser calls "hsperror" when it sees a
    `report this and die' error.  It sets the stage

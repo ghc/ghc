@@ -19,7 +19,9 @@ import HsSyn		( TyDecl(..), ConDecl(..), BangType(..), HsExpr(..),
 			  HsBinds(..), HsLit, Stmt, Qual, ArithSeqInfo, PolyType, 
 			  Bind(..), MonoBinds(..), Sig, 
 			  MonoType )
-import RnHsSyn		( RenamedTyDecl(..), RenamedConDecl(..) )
+import RnHsSyn		( RenamedTyDecl(..), RenamedConDecl(..),
+			  RnName{-instance Outputable-}
+			)
 import TcHsSyn		( TcHsBinds(..), TcIdOcc(..), mkHsTyLam )
 
 import TcMonoType	( tcMonoTypeKind, tcMonoType, tcContext )
@@ -30,13 +32,13 @@ import TcEnv		( tcLookupTyCon, tcLookupTyVar, tcLookupClass,
 import TcMonad
 import TcKind		( TcKind, unifyKind, mkTcArrowKind, mkTcTypeKind )
 
-import Id		( mkDataCon, dataConSig, mkRecordSelectorId,
+import Id		( mkDataCon, dataConSig, mkRecordSelId,
 			  dataConFieldLabels, StrictnessMark(..)
 			)
 import FieldLabel
 import Kind		( Kind, mkArrowKind, mkBoxedTypeKind )
 import SpecEnv		( SpecEnv(..), nullSpecEnv )
-import Name		( getNameFullName, Name(..) )
+import Name		( Name{-instance Ord3-} )
 import Pretty
 import TyCon		( TyCon, NewOrData(..), mkSynTyCon, mkDataTyCon, tyConDataCons )
 import Type		( getTypeKind, getTyVar, tyVarsOfTypes, eqTy, applyTyCon,
@@ -80,8 +82,7 @@ tcTyDecl (TySynonym tycon_name tyvar_names rhs src_loc)
 	final_tycon_kind = foldr (mkArrowKind . getTyVarKind) result_kind rec_tyvars
 
 	-- Construct the tycon
-	tycon = mkSynTyCon (getItsUnique tycon_name)
-			   (getNameFullName tycon_name)
+	tycon = mkSynTyCon (getName tycon_name)
 			   final_tycon_kind
 			   (length tyvar_names)
 			   rec_tyvars
@@ -126,9 +127,8 @@ tcTyDataOrNew data_or_new context tycon_name tyvar_names con_decls derivings pra
 	final_tycon_kind :: Kind 		-- NB not TcKind!
 	final_tycon_kind = foldr (mkArrowKind . getTyVarKind) mkBoxedTypeKind rec_tyvars
 
-	tycon = mkDataTyCon (getItsUnique tycon_name)
+	tycon = mkDataTyCon (getName tycon_name)
 			    final_tycon_kind
-			    (getNameFullName tycon_name)
 			    rec_tyvars
 			    ctxt
 			    con_ids
@@ -213,7 +213,7 @@ tcRecordSelector tycon fields@((first_con, first_field_label) : other_fields)
 		     mkFunTy data_ty' $
 		     field_ty'
       
-      selector_id = mkRecordSelectorId first_field_label selector_ty
+      selector_id = mkRecordSelId first_field_label selector_ty
 
 	-- HsSyn is dreadfully verbose for defining the selector!
       selector_rhs = mkHsTyLam tyvars' $
@@ -252,8 +252,7 @@ tcConDecl tycon tyvars ctxt (NewConDecl name ty src_loc)
   = tcAddSrcLoc src_loc	$
     tcMonoType ty `thenTc` \ arg_ty ->
     let
-      data_con = mkDataCon (getItsUnique name)
-			   (getNameFullName name)
+      data_con = mkDataCon (getName name)
 			   [NotMarkedStrict]
 			   [{- No labelled fields -}]
 		      	   tyvars
@@ -272,12 +271,11 @@ tcConDecl tycon tyvars ctxt (RecConDecl name fields src_loc)
       stricts           = [strict | (_, _, strict) <- field_label_infos]
       arg_tys	        = [ty     | (_, ty, _)     <- field_label_infos]
 
-      field_labels      = [ mkFieldLabel name ty tag 
+      field_labels      = [ mkFieldLabel (getName name) ty tag 
 			  | ((name, ty, _), tag) <- field_label_infos `zip` allFieldLabelTags
 			  ]
 
-      data_con = mkDataCon (getItsUnique name)
-			   (getNameFullName name)
+      data_con = mkDataCon (getName name)
 			   stricts
 			   field_labels
 		      	   tyvars
@@ -300,8 +298,7 @@ tcDataCon tycon tyvars ctxt name btys src_loc
     in
     mapTc tcMonoType tys `thenTc` \ arg_tys ->
     let
-      data_con = mkDataCon (getItsUnique name)
-			   (getNameFullName name)
+      data_con = mkDataCon (getName name)
 			   stricts
 			   [{- No field labels -}]
 		      	   tyvars

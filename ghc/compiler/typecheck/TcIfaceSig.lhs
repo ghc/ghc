@@ -14,11 +14,11 @@ import TcMonad
 import TcMonoType	( tcPolyType )
 
 import HsSyn		( Sig(..), PolyType )
-import RnHsSyn		( RenamedSig(..) )
+import RnHsSyn		( RenamedSig(..), RnName(..) )
 
 import CmdLineOpts	( opt_CompilingPrelude )
 import Id		( mkImported )
-import Name		( Name(..) )
+--import Name		( Name(..) )
 import Pretty
 import Util		( panic )
 
@@ -41,13 +41,13 @@ tcInterfaceSigs :: [RenamedSig] -> TcM s [Id]
 
 tcInterfaceSigs [] = returnTc []
 
-tcInterfaceSigs (Sig name@(ValName uniq full_name) ty pragmas src_loc : sigs)
+tcInterfaceSigs (Sig name@(RnName full_name) ty pragmas src_loc : sigs)
   = tcAddSrcLoc src_loc		(
     tcPolyType ty		`thenTc` \ sigma_ty ->
     fixTc ( \ rec_id ->
 	tcGenPragmas (Just sigma_ty) rec_id pragmas
 				`thenNF_Tc` \ id_info ->
-        returnTc (mkImported uniq full_name sigma_ty id_info)
+        returnTc (mkImported full_name sigma_ty id_info)
     ))				`thenTc` \ id ->
     tcInterfaceSigs sigs	`thenTc` \ sigs' ->
     returnTc (id:sigs')
@@ -55,7 +55,7 @@ tcInterfaceSigs (Sig name@(ValName uniq full_name) ty pragmas src_loc : sigs)
 
 tcInterfaceSigs (Sig odd_name _ _ src_loc : sigs)
   = case odd_name of
-      WiredInVal _ | opt_CompilingPrelude
+      WiredInId _ | opt_CompilingPrelude
         -> tcInterfaceSigs sigs
       _ -> tcAddSrcLoc src_loc	$
 	   failTc (ifaceSigNameErr odd_name)

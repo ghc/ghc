@@ -9,14 +9,13 @@ Support routines for reading prefix-form from the Lex/Yacc parser.
 #include "HsVersions.h"
 
 module PrefixToHs (
-	cvBinds,
+	cvValSig,
 	cvClassOpSig,
 	cvInstDeclSig,
+	cvBinds,
 	cvMatches,
 	cvMonoBinds,
 	cvSepdBinds,
-	cvValSig,
-	sepDeclsForInterface,
 	sepDeclsForTopBinds,
 	sepDeclsIntoSigsAndBinds
     ) where
@@ -28,7 +27,6 @@ import HsSyn
 import RdrHsSyn
 import HsPragmas	( noGenPragmas, noClassOpPragmas )
 
-import ProtoName	( ProtoName(..) )
 import SrcLoc		( mkSrcLoc2 )
 import Util		( panic, assertPanic )
 \end{code}
@@ -44,17 +42,11 @@ these conversion functions:
 \begin{code}
 cvValSig, cvClassOpSig, cvInstDeclSig :: SigConverter
 
-cvValSig (RdrTySig vars poly_ty pragmas src_loc)
-  = [ Sig v poly_ty (cvt_pragmas pragmas) src_loc | v <- vars ]
-  where
-    cvt_pragmas RdrNoPragma	   = noGenPragmas
-    cvt_pragmas (RdrGenPragmas ps) = ps
+cvValSig (RdrTySig vars poly_ty src_loc)
+  = [ Sig v poly_ty noGenPragmas src_loc | v <- vars ]
 
-cvClassOpSig (RdrTySig vars poly_ty pragmas src_loc)
-  = [ ClassOpSig v poly_ty (cvt_pragmas pragmas) src_loc | v <- vars ]
-  where
-    cvt_pragmas RdrNoPragma	       = noClassOpPragmas
-    cvt_pragmas (RdrClassOpPragmas ps) = ps
+cvClassOpSig (RdrTySig vars poly_ty src_loc)
+  = [ ClassOpSig v poly_ty noClassOpPragmas src_loc | v <- vars ]
 
 cvInstDeclSig (RdrSpecValSig        sigs) = sigs
 cvInstDeclSig (RdrInlineValSig      sig)  = [ sig ]
@@ -73,11 +65,11 @@ initially, and non recursive definitions are discovered by the dependency
 analyser.
 
 \begin{code}
-cvBinds :: SrcFile -> SigConverter -> RdrBinding -> ProtoNameHsBinds
+cvBinds :: SrcFile -> SigConverter -> RdrBinding -> RdrNameHsBinds
 cvBinds sf sig_cvtr raw_binding
   = cvSepdBinds sf sig_cvtr (sepDeclsForBinds raw_binding)
 
-cvSepdBinds :: SrcFile -> SigConverter -> [RdrBinding] -> ProtoNameHsBinds
+cvSepdBinds :: SrcFile -> SigConverter -> [RdrBinding] -> RdrNameHsBinds
 cvSepdBinds sf sig_cvtr bindings
   = case (mkMonoBindsAndSigs sf sig_cvtr bindings) of { (mbs, sigs) ->
     if (null sigs)
@@ -85,7 +77,7 @@ cvSepdBinds sf sig_cvtr bindings
     else BindWith   (RecBind mbs) sigs
     }
 
-cvMonoBinds :: SrcFile -> [RdrBinding] -> ProtoNameMonoBinds
+cvMonoBinds :: SrcFile -> [RdrBinding] -> RdrNameMonoBinds
 cvMonoBinds sf bindings
   = case (mkMonoBindsAndSigs sf bottom bindings) of { (mbs,sigs) ->
     if (null sigs)
@@ -100,7 +92,7 @@ cvMonoBinds sf bindings
 mkMonoBindsAndSigs :: SrcFile
 		   -> SigConverter
 		   -> [RdrBinding]
-		   -> (ProtoNameMonoBinds, [ProtoNameSig])
+		   -> (RdrNameMonoBinds, [RdrNameSig])
 
 mkMonoBindsAndSigs sf sig_cvtr fbs
   = foldl mangle_bind (EmptyMonoBinds, []) fbs
@@ -113,7 +105,7 @@ mkMonoBindsAndSigs sf sig_cvtr fbs
     -- function. Otherwise there is only one pattern, which is paired
     -- with a guarded right hand side.
 
-    mangle_bind (b_acc, s_acc) sig@(RdrTySig _ _ _ _)
+    mangle_bind (b_acc, s_acc) sig@(RdrTySig _ _ _)
       = (b_acc, s_acc ++ sig_cvtr sig)
 
     mangle_bind (b_acc, s_acc) (RdrSpecValSig	     sig) = (b_acc, sig ++ s_acc)
@@ -149,7 +141,7 @@ mkMonoBindsAndSigs sf sig_cvtr fbs
 \end{code}
 
 \begin{code}
-cvPatMonoBind :: SrcFile -> RdrMatch -> (ProtoNamePat, [ProtoNameGRHS], ProtoNameHsBinds)
+cvPatMonoBind :: SrcFile -> RdrMatch -> (RdrNamePat, [RdrNameGRHS], RdrNameHsBinds)
 
 cvPatMonoBind sf (RdrMatch_NoGuard srcline srcfun pat expr binding)
   = (pat, [OtherwiseGRHS expr (mkSrcLoc2 sf srcline)], cvBinds sf cvValSig binding)
@@ -157,7 +149,7 @@ cvPatMonoBind sf (RdrMatch_NoGuard srcline srcfun pat expr binding)
 cvPatMonoBind sf (RdrMatch_Guards srcline srcfun pat guardedexprs binding)
   = (pat, map (cvGRHS sf srcline) guardedexprs, cvBinds sf cvValSig binding)
 
-cvFunMonoBind :: SrcFile -> [RdrMatch] -> (ProtoName {-VarName-}, [ProtoNameMatch])
+cvFunMonoBind :: SrcFile -> [RdrMatch] -> (RdrName {-VarName-}, [RdrNameMatch])
 
 cvFunMonoBind sf matches
   = (srcfun {- cheating ... -}, cvMatches sf False matches)
@@ -166,8 +158,8 @@ cvFunMonoBind sf matches
 	       RdrMatch_NoGuard _ sfun _ _ _ -> sfun
 	       RdrMatch_Guards  _ sfun _ _ _ -> sfun
 
-cvMatches :: SrcFile -> Bool -> [RdrMatch] -> [ProtoNameMatch]
-cvMatch	  :: SrcFile -> Bool -> RdrMatch   -> ProtoNameMatch
+cvMatches :: SrcFile -> Bool -> [RdrMatch] -> [RdrNameMatch]
+cvMatch	  :: SrcFile -> Bool -> RdrMatch   -> RdrNameMatch
 
 cvMatches sf is_case matches = map (cvMatch sf is_case) matches
 
@@ -201,7 +193,7 @@ cvMatch sf is_case rdr_match
     doctor_pat (ConOpPatIn p1 op p2) = ConPatIn op [p1, p2]
     doctor_pat other_pat	     = other_pat
 
-cvGRHS :: SrcFile -> SrcLine -> (ProtoNameHsExpr, ProtoNameHsExpr) -> ProtoNameGRHS
+cvGRHS :: SrcFile -> SrcLine -> (RdrNameHsExpr, RdrNameHsExpr) -> RdrNameGRHS
 
 cvGRHS sf sl (g, e) = GRHS g e (mkSrcLoc2 sf sl)
 \end{code}
@@ -223,7 +215,6 @@ defaults	RdrDefaultDecl
 binds		RdrFunctionBinding RdrPatternBinding RdrTySig
 		RdrSpecValSig RdrInlineValSig RdrDeforestSig
 		RdrMagicUnfoldingSig
-iimps		RdrIfaceImportDecl (interfaces only)
 \end{display}
 
 This function isn't called directly; some other function calls it,
@@ -232,99 +223,84 @@ then checks that what it got is appropriate for that situation.
 
 \begin{code}
 sepDecls (RdrTyDecl a)
-	 tys tysigs classes insts instsigs defaults binds iimps ifixs
- = (a:tys,tysigs,classes,insts,instsigs,defaults,binds,iimps,ifixs)
+	 tys tysigs classes insts instsigs defaults binds
+ = (a:tys,tysigs,classes,insts,instsigs,defaults,binds)
 
 sepDecls a@(RdrFunctionBinding _ _)
-	 tys tysigs classes insts instsigs defaults binds iimps ifixs
- = (tys,tysigs,classes,insts,instsigs,defaults,a:binds,iimps,ifixs)
+	 tys tysigs classes insts instsigs defaults binds
+ = (tys,tysigs,classes,insts,instsigs,defaults,a:binds)
 
 sepDecls a@(RdrPatternBinding _ _)
-	 tys tysigs classes insts instsigs defaults binds iimps ifixs
- = (tys,tysigs,classes,insts,instsigs,defaults,a:binds,iimps,ifixs)
+	 tys tysigs classes insts instsigs defaults binds
+ = (tys,tysigs,classes,insts,instsigs,defaults,a:binds)
 
 -- RdrAndBindings catered for below...
 
 sepDecls (RdrClassDecl a)
-	 tys tysigs classes insts instsigs defaults binds iimps ifixs
-  = (tys,tysigs,a:classes,insts,instsigs,defaults,binds,iimps,ifixs)
+	 tys tysigs classes insts instsigs defaults binds
+  = (tys,tysigs,a:classes,insts,instsigs,defaults,binds)
 
 sepDecls (RdrInstDecl a)
-	 tys tysigs classes insts instsigs defaults binds iimps ifixs
-  = (tys,tysigs,classes,a:insts,instsigs,defaults,binds,iimps,ifixs)
+	 tys tysigs classes insts instsigs defaults binds
+  = (tys,tysigs,classes,a:insts,instsigs,defaults,binds)
 
 sepDecls (RdrDefaultDecl a)
-	 tys tysigs classes insts instsigs defaults binds iimps ifixs
-  = (tys,tysigs,classes,insts,instsigs,a:defaults,binds,iimps,ifixs)
+	 tys tysigs classes insts instsigs defaults binds
+  = (tys,tysigs,classes,insts,instsigs,a:defaults,binds)
 
-sepDecls a@(RdrTySig _ _ _ _)
-	 tys tysigs classes insts instsigs defaults binds iimps ifixs
-  = (tys,tysigs,classes,insts,instsigs,defaults,a:binds,iimps,ifixs)
-
-sepDecls (RdrIfaceImportDecl a)
-	 tys tysigs classes insts instsigs defaults binds iimps ifixs
-  = (tys,tysigs,classes,insts,instsigs,defaults,binds,a:iimps,ifixs)
-
-sepDecls (RdrIfaceFixities a)
-	 tys tysigs classes insts instsigs defaults binds iimps ifixs
-  = (tys,tysigs,classes,insts,instsigs,defaults,binds,iimps,a++ifixs)
+sepDecls a@(RdrTySig _ _ _)
+	 tys tysigs classes insts instsigs defaults binds
+  = (tys,tysigs,classes,insts,instsigs,defaults,a:binds)
 
 sepDecls a@(RdrSpecValSig _)
-	 tys tysigs classes insts instsigs defaults binds iimps ifixs
-  = (tys,tysigs,classes,insts,instsigs,defaults,a:binds,iimps,ifixs)
+	 tys tysigs classes insts instsigs defaults binds
+  = (tys,tysigs,classes,insts,instsigs,defaults,a:binds)
 
 sepDecls a@(RdrInlineValSig _)
-	 tys tysigs classes insts instsigs defaults binds iimps ifixs
-  = (tys,tysigs,classes,insts,instsigs,defaults,a:binds,iimps,ifixs)
+	 tys tysigs classes insts instsigs defaults binds
+  = (tys,tysigs,classes,insts,instsigs,defaults,a:binds)
 
 sepDecls a@(RdrDeforestSig _)
-	 tys tysigs classes insts instsigs defaults binds iimps ifixs
-  = (tys,tysigs,classes,insts,instsigs,defaults,a:binds,iimps,ifixs)
+	 tys tysigs classes insts instsigs defaults binds
+  = (tys,tysigs,classes,insts,instsigs,defaults,a:binds)
 
 sepDecls a@(RdrMagicUnfoldingSig _)
-	 tys tysigs classes insts instsigs defaults binds iimps ifixs
-  = (tys,tysigs,classes,insts,instsigs,defaults,a:binds,iimps,ifixs)
+	 tys tysigs classes insts instsigs defaults binds
+  = (tys,tysigs,classes,insts,instsigs,defaults,a:binds)
 
 sepDecls (RdrSpecInstSig a)
-	 tys tysigs classes insts instsigs defaults binds iimps ifixs
-  = (tys,tysigs,classes,insts,a:instsigs,defaults,binds,iimps,ifixs)
+	 tys tysigs classes insts instsigs defaults binds
+  = (tys,tysigs,classes,insts,a:instsigs,defaults,binds)
 
 sepDecls (RdrSpecDataSig a)
-	 tys tysigs classes insts instsigs defaults binds iimps ifixs
-  = (tys,a:tysigs,classes,insts,instsigs,defaults,binds,iimps,ifixs)
+	 tys tysigs classes insts instsigs defaults binds
+  = (tys,a:tysigs,classes,insts,instsigs,defaults,binds)
 
 sepDecls RdrNullBind
-	 tys tysigs classes insts instsigs defaults binds iimps ifixs
-  = (tys,tysigs,classes,insts,instsigs,defaults,binds,iimps,ifixs)
+	 tys tysigs classes insts instsigs defaults binds
+  = (tys,tysigs,classes,insts,instsigs,defaults,binds)
 
 sepDecls (RdrAndBindings bs1 bs2)
-	 tys tysigs classes insts instsigs defaults binds iimps ifixs
-  = case (sepDecls bs2 tys tysigs classes insts instsigs defaults binds iimps ifixs) of {
-      (tys,tysigs,classes,insts,instsigs,defaults,binds,iimps,ifixs) ->
-	  sepDecls bs1 tys tysigs classes insts instsigs defaults binds iimps ifixs
+	 tys tysigs classes insts instsigs defaults binds
+  = case (sepDecls bs2 tys tysigs classes insts instsigs defaults binds) of {
+      (tys,tysigs,classes,insts,instsigs,defaults,binds) ->
+	  sepDecls bs1 tys tysigs classes insts instsigs defaults binds
     }
 \end{code}
 
 \begin{code}
 sepDeclsForTopBinds binding
-  = case (sepDecls binding [] [] [] [] [] [] [] [] [])
-	of { (tys,tysigs,classes,insts,instsigs,defaults,binds,iimps,ifixs) ->
-    ASSERT ((null iimps)
-	 && (null ifixs))
-    (tys,tysigs,classes,insts,instsigs,defaults,binds)
-    }
+  = sepDecls binding [] [] [] [] [] [] []
 
 sepDeclsForBinds binding
-  = case (sepDecls binding [] [] [] [] [] [] [] [] [])
-	of { (tys,tysigs,classes,insts,instsigs,defaults,binds,iimps,ifixs) ->
+  = case (sepDecls binding [] [] [] [] [] [] [])
+	of { (tys,tysigs,classes,insts,instsigs,defaults,binds) ->
     ASSERT ((null tys)
 	 && (null tysigs)
 	 && (null classes)
 	 && (null insts)
 	 && (null instsigs)
-	 && (null defaults)
-	 && (null iimps)
-	 && (null ifixs))
+	 && (null defaults))
     binds
     }
 
@@ -333,7 +309,7 @@ sepDeclsIntoSigsAndBinds binding
     foldr sep_stuff ([],[]) sigs_and_binds
     }
   where
-    sep_stuff s@(RdrTySig _ _ _ _)       (sigs,defs) = (s:sigs,defs)
+    sep_stuff s@(RdrTySig _ _ _)         (sigs,defs) = (s:sigs,defs)
     sep_stuff s@(RdrSpecValSig _)        (sigs,defs) = (s:sigs,defs)
     sep_stuff s@(RdrInlineValSig _)      (sigs,defs) = (s:sigs,defs)
     sep_stuff s@(RdrDeforestSig  _)      (sigs,defs) = (s:sigs,defs)
@@ -342,18 +318,4 @@ sepDeclsIntoSigsAndBinds binding
     sep_stuff d@(RdrPatternBinding  _ _) (sigs,defs) = (sigs,d:defs)
 
 
-sepDeclsForInterface binding
-  = case (sepDecls binding [] [] [] [] [] [] [] [] [])
-	of { (tys,tysigs,classes,insts,instsigs,defaults,sigs,iimps,ifixs) ->
-    ASSERT ((null defaults)
-	 && (null tysigs)
-	 && (null instsigs))
-    ASSERT (not (not_all_sigs sigs))
-    (tys,classes,insts,sigs,iimps,ifixs)
-    }
-  where
-    not_all_sigs sigs = not (all is_a_sig sigs)
-
-    is_a_sig (RdrTySig _ _ _ _) = True
-    is_a_sig anything_else      = False
 \end{code}

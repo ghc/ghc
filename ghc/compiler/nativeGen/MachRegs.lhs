@@ -342,13 +342,11 @@ instance Ord Reg where
     a >	 b = case cmpReg a b of { LT_ -> False; EQ_ -> False; GT__ -> True  }
     _tagCmp a b = case cmpReg a b of { LT_ -> _LT; EQ_ -> _EQ; GT__ -> _GT }
 
-instance NamedThing Reg where
-    -- the *only* method that should be defined is "getItsUnique"!
-    -- (so we can use UniqFMs/UniqSets on Regs
-    getItsUnique (UnmappedReg u _) = u
-    getItsUnique (FixedReg i)	   = mkPseudoUnique1 IBOX(i)
-    getItsUnique (MappedReg i)	   = mkPseudoUnique2 IBOX(i)
-    getItsUnique (MemoryReg i _)   = mkPseudoUnique3 i
+instance Uniquable Reg where
+    uniqueOf (UnmappedReg u _) = u
+    uniqueOf (FixedReg i)      = mkPseudoUnique1 IBOX(i)
+    uniqueOf (MappedReg i)     = mkPseudoUnique2 IBOX(i)
+    uniqueOf (MemoryReg i _)   = mkPseudoUnique3 i
 \end{code}
 
 \begin{code}

@@ -33,7 +33,7 @@ import Id		( idType, isDictFunId, isConstMethodId_maybe,
 			  GenId {-instance NamedThing -}
 			)
 import Maybes		( maybeToBool, catMaybes, firstJust )
-import Outputable	( isAvarop, pprNonOp )
+import Outputable	( isAvarop, pprNonOp, getOrigName )
 import PprStyle		( PprStyle(..) )
 import PprType		( pprGenType, pprParendGenType, pprMaybeTy,
 			  TyCon{-ditto-}, GenType{-ditto-}, GenTyVar

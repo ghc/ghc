@@ -23,7 +23,6 @@ module PprType(
 import Ubiq
 import IdLoop 	-- for paranoia checking
 import TyLoop 	-- for paranoia checking
-import NameLoop	-- for paranoia checking
 
 -- friends:
 -- (PprType can see all the representations it's trying to print)
@@ -39,8 +38,10 @@ import Kind		( Kind(..) )
 import CStrings		( identToC )
 import CmdLineOpts	( opt_OmitInterfacePragmas )
 import Maybes		( maybeToBool )
-import NameTypes	( ShortName, FullName )
-import Outputable	( ifPprShowAll, isAvarop, interpp'SP )
+import Name		( Name )
+import Outputable	( isAvarop, isPreludeDefined, getOrigName,
+			  ifPprShowAll, interpp'SP
+			)
 import PprStyle		( PprStyle(..), codeStyle, showUserishTypes )
 import Pretty
 import TysWiredIn	( listTyCon )
@@ -302,7 +303,7 @@ pprGenTyVar sty (TyVar uniq kind name usage)
 %*									*
 %************************************************************************
 
-ToDo; all this is suspiciously like getOccurrenceName!
+ToDo; all this is suspiciously like getOccName!
 
 \begin{code}
 showTyCon :: PprStyle -> TyCon -> String
@@ -314,7 +315,7 @@ pprTyCon sty FunTyCon 		        = ppStr "(->)"
 pprTyCon sty (TupleTyCon arity)	        = ppBeside (ppPStr SLIT("Tuple")) (ppInt arity)
 pprTyCon sty (PrimTyCon uniq name kind) = ppr sty name
 
-pprTyCon sty tycon@(DataTyCon uniq kind name tyvars ctxt cons derivings nd)
+pprTyCon sty tycon@(DataTyCon uniq name kind tyvars ctxt cons derivings nd)
   = case sty of
       PprDebug   -> pp_tycon_and_uniq
       PprShowAll -> pp_tycon_and_uniq
@@ -391,7 +392,7 @@ getTypeString ty
       = case (maybeAppTyCon ty) of
 	  Nothing -> true_bottom
 	  Just (tycon,_) ->
-	    if fromPreludeCore tycon
+	    if isPreludeDefined tycon
 	    then true_bottom
 	    else (False, fst (getOrigName tycon))
 
@@ -442,7 +443,7 @@ pprTyCon sty@PprInterface (SynonymTyCon k n a vs exp unabstract) specs
     ppCat [ppPStr SLIT("type"), ppr sty n, ppIntersperse ppSP pp_tyvars,
 	   ppEquals, ppr_ty sty lookup_fn tOP_PREC exp]
 
-pprTyCon sty@PprInterface this_tycon@(DataTyCon k n a vs ctxt cons derivings data_or_new) specs
+pprTyCon sty@PprInterface this_tycon@(DataTyCon u n k vs ctxt cons derivings data_or_new) specs
   = ppHang (ppCat [pp_data_or_new,
 		   pprContext sty ctxt,
 		   ppr sty n,

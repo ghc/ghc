@@ -13,7 +13,10 @@ module Outputable (
 	-- NAMED-THING-ERY
 	NamedThing(..),		-- class
 	ExportFlag(..),
-	isExported, getLocalName, ltLexical,
+
+	getItsUnique, getOrigName, getOccName, getExportFlag,
+	getSrcLoc, isLocallyDefined, isPreludeDefined, isExported,
+	getLocalName, getOrigNameRdr, ltLexical,
 
 	-- PRINTERY AND FORCERY
 	Outputable(..), 	-- class
@@ -26,12 +29,14 @@ module Outputable (
 
 	isOpLexeme, pprOp, pprNonOp,
 	isConop, isAconop, isAvarid, isAvarop
-
-	-- and to make the interface self-sufficient...
     ) where
 
 import Ubiq{-uitous-}
 
+import Name		( nameUnique, nameOrigName, nameOccName,
+			  nameExportFlag, nameSrcLoc,
+			  isLocallyDefinedName, isPreludeDefinedName
+			)
 import PprStyle		( PprStyle(..) )
 import Pretty
 import Util		( cmpPString )
@@ -45,63 +50,42 @@ import Util		( cmpPString )
 
 \begin{code}
 class NamedThing a where
-    getExportFlag 	:: a -> ExportFlag
-    isLocallyDefined	:: a -> Bool
-    getOrigName		:: a -> (FAST_STRING{-module-}, FAST_STRING{-name therein-})
-    getOccurrenceName	:: a -> FAST_STRING
-    getInformingModules	:: a -> [FAST_STRING]
-    getSrcLoc		:: a -> SrcLoc
-    getItsUnique	:: a -> Unique
-    fromPreludeCore	:: a -> Bool
-    -- see also friendly functions that follow...
-\end{code}
+    getName :: a -> Name
 
-\begin{description}
-\item[@getExportFlag@:]
-Obvious.
+getItsUnique	    :: NamedThing a => a -> Unique
+getOrigName	    :: NamedThing a => a -> (Module, FAST_STRING)
+getOccName	    :: NamedThing a => a -> RdrName
+getExportFlag	    :: NamedThing a => a -> ExportFlag
+getSrcLoc	    :: NamedThing a => a -> SrcLoc
+isLocallyDefined    :: NamedThing a => a -> Bool
+isPreludeDefined    :: NamedThing a => a -> Bool
 
-\item[@getOrigName@:]
-Obvious.
+getItsUnique	    = nameUnique   	   . getName
+getOrigName	    = nameOrigName 	   . getName
+getOccName	    = nameOccName  	   . getName
+getExportFlag	    = nameExportFlag	   . getName
+getSrcLoc	    = nameSrcLoc	   . getName
+isLocallyDefined    = isLocallyDefinedName . getName
+isPreludeDefined    = isPreludeDefinedName . getName
 
-\item[@isLocallyDefined@:]
-Whether the thing is defined in this module or not.
-
-\item[@getOccurrenceName@:]
-Gets the name by which a thing is known in this module (e.g., if
-renamed, or whatever)...
-
-\item[@getInformingModules@:]
-Gets the name of the modules that told me about this @NamedThing@.
-
-\item[@getSrcLoc@:]
-Obvious.
-
-\item[@fromPreludeCore@:]
-Tests a quite-delicate property: it is \tr{True} iff the entity is
-actually defined in \tr{PreludeCore} (or \tr{PreludeBuiltin}), or if
-it is re-exported by \tr{PreludeCore}.  See the @FullName@ type in
-module \tr{NameTypes}.
-
-NB: Some of the types in, e.g., \tr{PreludeGlaST} {\em fail} this test.
-This is a bummer for types that are wired into the compiler.
-\end{description}
-
-Some functions to go with:
-\begin{code}
 isExported a
   = case (getExportFlag a) of
       NotExported -> False
       _		  -> True
 
 getLocalName :: (NamedThing a) => a -> FAST_STRING
-
 getLocalName = snd . getOrigName
+
+getOrigNameRdr :: (NamedThing a) => a -> RdrName
+getOrigNameRdr n | isPreludeDefined n = Unqual str
+		 | otherwise          = Qual mod str
+  where
+    (mod,str) = getOrigName n
 
 #ifdef USE_ATTACK_PRAGMAS
 {-# SPECIALIZE isExported :: Class -> Bool #-}
 {-# SPECIALIZE isExported :: Id -> Bool #-}
 {-# SPECIALIZE isExported :: TyCon -> Bool #-}
-{-# SPECIALIZE getLocalName :: ShortName -> FAST_STRING #-}
 #endif
 \end{code}
 
@@ -181,7 +165,6 @@ interpp'SP sty xs
 
 {-# SPECIALIZE interpp'SP :: PprStyle -> [(Id, Id)] -> Pretty #-}
 {-# SPECIALIZE interpp'SP :: PprStyle -> [Id] -> Pretty #-}
-{-# SPECIALIZE interpp'SP :: PprStyle -> [ProtoName] -> Pretty #-}
 {-# SPECIALIZE interpp'SP :: PprStyle -> [TyVarTemplate] -> Pretty #-}
 {-# SPECIALIZE interpp'SP :: PprStyle -> [TyVar] -> Pretty #-}
 {-# SPECIALIZE interpp'SP :: PprStyle -> [Type] -> Pretty #-}
@@ -198,8 +181,8 @@ ifnotPprShowAll	  sty p = case sty of PprShowAll -> ppNil ; _ -> p
 \end{code}
 
 These functions test strings to see if they fit the lexical categories
-defined in the Haskell report.  Normally applied as in, e.g.,
-@isConop (getOccurrenceName foo)@... [just for pretty-printing]
+defined in the Haskell report. 
+Normally applied as in e.g. @isConop (getLocalName foo)@
 
 \begin{code}
 isConop, isAconop, isAvarid, isAvarop :: FAST_STRING -> Bool
@@ -249,7 +232,7 @@ And one ``higher-level'' interface to those:
 isOpLexeme :: NamedThing a => a -> Bool
 
 isOpLexeme v
-  = let str = getOccurrenceName v in isAvarop str || isAconop str
+  = let str = snd (getOrigName v) in isAvarop str || isAconop str
 
 -- print `vars`, (op) correctly
 pprOp, pprNonOp :: (NamedThing name, Outputable name) => PprStyle -> name -> Pretty

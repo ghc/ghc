@@ -23,7 +23,7 @@ import Util
 tcClassSigs :: E -> TVE -> Class    	-- Knot tying only!
 	    -> (ClassOp -> SpecEnv)	-- Ditto; the spec info for the class ops
 	    -> TyVarTemplate	 	-- The class type variable, used for error check only
-	    -> [Name]			-- Names with default methods
+	    -> [RnName]			-- Names with default methods
 	    -> [RenamedClassOpSig]
 	    -> Baby_TcM ([ClassOp],	-- class ops
 			 GVE,		-- env for looking up the class ops

@@ -37,7 +37,6 @@ module TyCon(
 ) where
 
 CHK_Ubiq()	-- debugging consistency check
-import NameLoop	-- for paranoia checking
 
 import TyLoop		( Type(..), GenType,
 			  Class(..), GenClass,
@@ -52,7 +51,7 @@ import Kind		( Kind, mkBoxedTypeKind, mkArrowKind, resultKind, argKind )
 import PrelMods		( pRELUDE_BUILTIN )
 
 import Maybes
-import NameTypes	( FullName )
+import Name		( Name, RdrName(..), appendRdr, nameUnique )
 import Unique		( Unique, funTyConKey, mkTupleTyConUnique )
 import Outputable
 import Pretty		( Pretty(..), PrettyRep )
@@ -68,8 +67,8 @@ data TyCon
   = FunTyCon		-- Kind = Type -> Type -> Type
 
   | DataTyCon	Unique{-TyConKey-}
+		Name
 		Kind
-		FullName
 		[TyVar]
 		[(Class,Type)]	-- Its context
 		[Id]		-- Its data constructors, with fully polymorphic types
@@ -84,7 +83,7 @@ data TyCon
 
   | PrimTyCon		-- Primitive types; cannot be defined in Haskell
 	Unique		-- Always unboxed; hence never represented by a closure
-	FullName	-- Often represented by a bit-pattern for the thing
+	Name		-- Often represented by a bit-pattern for the thing
 	Kind		-- itself (eg Int#), but sometimes by a pointer to
 
   | SpecTyCon		-- A specialised TyCon; eg (Arr# Int#), or (List Int#)
@@ -100,7 +99,7 @@ data TyCon
 
   | SynTyCon
 	Unique
-	FullName
+	Name
 	Kind
 	Arity
 	[TyVar]		-- Argument type variables
@@ -114,12 +113,16 @@ data NewOrData
 \end{code}
 
 \begin{code}
-mkFunTyCon	= FunTyCon
-mkDataTyCon	= DataTyCon
-mkTupleTyCon	= TupleTyCon
-mkPrimTyCon	= PrimTyCon
-mkSpecTyCon	= SpecTyCon
-mkSynTyCon	= SynTyCon
+mkFunTyCon   = FunTyCon
+mkTupleTyCon = TupleTyCon
+mkSpecTyCon  = SpecTyCon
+
+mkDataTyCon name
+  = DataTyCon (nameUnique name) name
+mkPrimTyCon name
+  = PrimTyCon (nameUnique name) name
+mkSynTyCon name
+  = SynTyCon (nameUnique name) name
 
 isFunTyCon FunTyCon = True
 isFunTyCon _ = False
@@ -147,7 +150,7 @@ kind2 = mkBoxedTypeKind `mkArrowKind` kind1
 
 tyConKind :: TyCon -> Kind
 tyConKind FunTyCon 			 = kind2
-tyConKind (DataTyCon _ kind _ _ _ _ _ _) = kind
+tyConKind (DataTyCon _ _ kind _ _ _ _ _) = kind
 tyConKind (PrimTyCon _ _ kind)		 = kind
 
 tyConKind (SpecTyCon tc tys)
@@ -300,52 +303,31 @@ instance Ord TyCon where
     a >= b = case (a `cmp` b) of { LT_ -> False; EQ_ -> True;  GT__ -> True  }
     a >	 b = case (a `cmp` b) of { LT_ -> False; EQ_ -> False; GT__ -> True  }
     _tagCmp a b = case (a `cmp` b) of { LT_ -> _LT; EQ_ -> _EQ; GT__ -> _GT }
+
+instance Uniquable TyCon where
+    uniqueOf (DataTyCon u _ _ _ _ _ _ _) = u
+    uniqueOf (PrimTyCon u _ _)		 = u
+    uniqueOf (SynTyCon  u _ _ _ _ _)	 = u
+    uniqueOf tc@(SpecTyCon _ _)		 = panic "uniqueOf:SpecTyCon"
+    uniqueOf tc				 = uniqueOf (getName tc)
 \end{code}
 
 \begin{code}
 instance NamedThing TyCon where
-    getExportFlag tc = case get_name tc of
-			 Nothing   -> NotExported
-			 Just name -> getExportFlag name
+    getName (DataTyCon _ n _ _ _ _ _ _) = n
+    getName (PrimTyCon _ n _)		= n
+    getName (SpecTyCon tc _)		= getName tc
+    getName (SynTyCon _ n _ _ _ _)	= n
+{- LATER:
+    getName FunTyCon			= (pRELUDE_BUILTIN, SLIT("(->)"))
+    getName (TupleTyCon a)		= (pRELUDE_BUILTIN, _PK_ ("Tuple" ++ show a))
+-}
+    getName tc				= panic "TyCon.getName"
 
-
-    isLocallyDefined tc = case get_name tc of
-			    Nothing   -> False
-			    Just name -> isLocallyDefined name
-
-    getOrigName FunTyCon		= (pRELUDE_BUILTIN, SLIT("(->)"))
-    getOrigName (TupleTyCon a)		= (pRELUDE_BUILTIN, _PK_ ("Tuple" ++ show a))
-    getOrigName (SpecTyCon tc tys)	= let (m,n) = getOrigName tc in
-					  (m, n _APPEND_ specMaybeTysSuffix tys)
-    getOrigName	other_tc           	= getOrigName (expectJust "tycon1" (get_name other_tc))
-
-    getOccurrenceName  FunTyCon		= SLIT("(->)")
-    getOccurrenceName (TupleTyCon 0)	= SLIT("()")
-    getOccurrenceName (TupleTyCon a)	= _PK_ ( "(" ++ nOfThem (a-1) ',' ++ ")" )
-    getOccurrenceName (SpecTyCon tc tys)= getOccurrenceName tc _APPEND_ specMaybeTysSuffix tys
-    getOccurrenceName other_tc          = getOccurrenceName (expectJust "tycon2" (get_name other_tc))
-
-    getInformingModules	tc = case get_name tc of
-				Nothing   -> panic "getInformingModule:TyCon"
-				Just name -> getInformingModules name
-
-    getSrcLoc tc = case get_name tc of
-		     Nothing   -> mkBuiltinSrcLoc
-		     Just name -> getSrcLoc name
-
-    getItsUnique tycon = tyConUnique tycon
-
-    fromPreludeCore tc = case get_name tc of
-			   Nothing   -> True
-			   Just name -> fromPreludeCore name
-\end{code}
-
-Emphatically un-exported:
-
-\begin{code}
-get_name (DataTyCon _ _ n _ _ _ _ _) = Just n
-get_name (PrimTyCon _ n _)	     = Just n
-get_name (SpecTyCon tc _)	     = get_name tc
-get_name (SynTyCon _ n _ _ _ _)	     = Just n
-get_name other			     = Nothing
+{- LATER:
+    getName (SpecTyCon tc tys) = let (m,n) = getOrigName tc in
+       			     (m, n _APPEND_ specMaybeTysSuffix tys)
+    getName	other_tc           = getOrigName (expectJust "tycon1" (getName other_tc))
+    getName other			     = Nothing
+-}
 \end{code}

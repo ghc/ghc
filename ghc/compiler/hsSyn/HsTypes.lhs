@@ -15,20 +15,19 @@ module HsTypes (
 	Context(..), ClassAssertion(..)
 
 #ifdef COMPILING_GHC
-	, cmpPolyType, cmpMonoType
 	, pprParendMonoType, pprContext
 	, extractMonoTyNames, extractCtxtTyNames
+	, cmpPolyType, cmpMonoType, cmpContext
 #endif
     ) where
 
 #ifdef COMPILING_GHC
-import Ubiq{-uitous-}
+import Ubiq
 
 import Outputable	( interppSP, ifnotPprForUser )
 import Pretty
-import ProtoName	( cmpProtoName, ProtoName )
 import Type		( Kind )
-import Util		( cmpList, panic# )
+import Util		( thenCmp, cmpList, isIn, panic# )
 
 #endif {- COMPILING_GHC -}
 \end{code}
@@ -83,79 +82,9 @@ data MonoType name
 #endif {- COMPILING_GHC -}
 \end{code}
 
-We do define a specialised equality for these \tr{*Type} types; used
-in checking interfaces.  Most any other use is likely to be {\em
-wrong}, so be careful!
-\begin{code}
-#ifdef COMPILING_GHC
-
-cmpPolyType :: (a -> a -> TAG_) -> PolyType a -> PolyType a -> TAG_
-cmpMonoType :: (a -> a -> TAG_) -> MonoType a -> MonoType a -> TAG_
-cmpContext  :: (a -> a -> TAG_) -> Context  a -> Context  a -> TAG_
-
--- We assume that HsPreForAllTys have been smashed by now.
-# ifdef DEBUG
-cmpPolyType _ (HsPreForAllTy _ _) _ = panic# "cmpPolyType:HsPreForAllTy:1st arg"
-cmpPolyType _ _ (HsPreForAllTy _ _) = panic# "cmpPolyType:HsPreForAllTy:2nd arg"
-# endif
-
-cmpPolyType cmp (HsForAllTy tvs1 c1 t1) (HsForAllTy tvs2 c2 t2)
-  = case (cmp_tvs tvs1 tvs2) of
-      EQ_ -> case (cmpContext cmp c1 c2) of
-	       EQ_ -> cmpMonoType cmp t1 t2
-	       xxx -> xxx
-      xxx -> xxx
-  where
-    cmp_tvs [] [] = EQ_
-    cmp_tvs [] _  = LT_
-    cmp_tvs _  [] = GT_
-    cmp_tvs (a:as) (b:bs)
-      = case cmp a b of { EQ_ -> cmp_tvs as bs; xxx -> xxx }
-    cmp_tvs _ _ = panic# "cmp_tvs"
-
------------
-cmpMonoType cmp (MonoTyVar n1) (MonoTyVar n2)
-  = cmp n1 n2
-
-cmpMonoType cmp (MonoTupleTy tys1) (MonoTupleTy tys2)
-  = cmpList (cmpMonoType cmp) tys1 tys2
-cmpMonoType cmp (MonoListTy ty1) (MonoListTy ty2)
-  = cmpMonoType cmp ty1 ty2
-
-cmpMonoType cmp (MonoTyApp tc1 tys1) (MonoTyApp tc2 tys2)
-  = case cmp tc1 tc2 of { EQ_ -> cmpList (cmpMonoType cmp) tys1 tys2; xxx -> xxx }
-
-cmpMonoType cmp (MonoFunTy a1 b1) (MonoFunTy a2 b2)
-  = case cmpMonoType cmp a1 a2 of { EQ_ -> cmpMonoType cmp b1 b2; xxx -> xxx }
-
-cmpMonoType cmp (MonoDictTy c1 ty1)   (MonoDictTy c2 ty2)
-  = case cmp c1 c2 of { EQ_ -> cmpMonoType cmp ty1 ty2; xxx -> xxx }
-
-cmpMonoType cmp ty1 ty2 -- tags must be different
-  = let tag1 = tag ty1
-	tag2 = tag ty2
-    in
-    if tag1 _LT_ tag2 then LT_ else GT_
-  where
-    tag (MonoTyVar n1)		= (ILIT(1) :: FAST_INT)
-    tag (MonoTupleTy tys1)	= ILIT(2)
-    tag (MonoListTy ty1)	= ILIT(3)
-    tag (MonoTyApp tc1 tys1)	= ILIT(4)
-    tag (MonoFunTy a1 b1)	= ILIT(5)
-    tag (MonoDictTy c1 ty1)	= ILIT(7)
-
--------------------
-cmpContext cmp a b
-  = cmpList cmp_ctxt a b
-  where
-    cmp_ctxt (c1, tv1) (c2, tv2)
-      = case cmp c1 c2 of { EQ_ -> cmp tv1 tv2; xxx -> xxx }
-
--------------------
-\end{code}
-
 This is used in various places:
 \begin{code}
+#ifdef COMPILING_GHC
 pprContext :: (Outputable name) => PprStyle -> (Context name) -> Pretty
 
 pprContext sty []	    = ppNil
@@ -230,23 +159,22 @@ ppr_mono_ty sty ctxt_prec (MonoDictTy clas ty)
 #endif {- COMPILING_GHC -}
 \end{code}
 
-Get the type variable names from a @MonoType@.  Don't use class @Eq@
-because @ProtoNames@ aren't in it.
-
 \begin{code}
 #ifdef COMPILING_GHC
 
-extractCtxtTyNames :: (name -> name -> Bool) -> Context  name -> [name]
-extractMonoTyNames :: (name -> name -> Bool) -> MonoType name -> [name]
+extractCtxtTyNames :: Eq name => Context  name -> [name]
+extractMonoTyNames :: Eq name => MonoType name -> [name]
 
-extractCtxtTyNames eq ctxt
+extractCtxtTyNames ctxt
   = foldr get [] ctxt
   where
     get (clas, tv) acc
-      | is_elem eq tv acc = acc
-      | otherwise	  = tv : acc
+      | tv `is_elem` acc = acc
+      | otherwise        = tv : acc
 
-extractMonoTyNames eq ty
+    is_elem = isIn "extractCtxtTyNames"
+
+extractMonoTyNames ty
   = get ty []
   where
     get (MonoTyApp con tys) acc = foldr get acc tys
@@ -254,12 +182,79 @@ extractMonoTyNames eq ty
     get (MonoFunTy ty1 ty2) acc = get ty1 (get ty2 acc)
     get (MonoDictTy _ ty)   acc = get ty acc
     get (MonoTupleTy tys)   acc = foldr get acc tys
-    get (MonoTyVar name)    acc
-      | is_elem eq name acc	= acc
-      | otherwise		= name : acc
+    get (MonoTyVar tv)      acc
+      | tv `is_elem` acc	= acc
+      | otherwise		= tv : acc
 
-is_elem eq n []     = False
-is_elem eq n (x:xs) = n `eq` x || is_elem eq n xs
+    is_elem = isIn "extractMonoTyNames"
+
+#endif {- COMPILING_GHC -}
+\end{code}
+
+We do define a specialised equality for these \tr{*Type} types; used
+in checking interfaces.  Most any other use is likely to be {\em
+wrong}, so be careful!
+\begin{code}
+#ifdef COMPILING_GHC
+
+cmpPolyType :: (a -> a -> TAG_) -> PolyType a -> PolyType a -> TAG_
+cmpMonoType :: (a -> a -> TAG_) -> MonoType a -> MonoType a -> TAG_
+cmpContext  :: (a -> a -> TAG_) -> Context  a -> Context  a -> TAG_
+
+-- We assume that HsPreForAllTys have been smashed by now.
+# ifdef DEBUG
+cmpPolyType _ (HsPreForAllTy _ _) _ = panic# "cmpPolyType:HsPreForAllTy:1st arg"
+cmpPolyType _ _ (HsPreForAllTy _ _) = panic# "cmpPolyType:HsPreForAllTy:2nd arg"
+# endif
+
+cmpPolyType cmp (HsForAllTy tvs1 c1 t1) (HsForAllTy tvs2 c2 t2)
+  = thenCmp (cmp_tvs tvs1 tvs2)
+	    (thenCmp (cmpContext cmp c1 c2) (cmpMonoType cmp t1 t2))
+  where
+    cmp_tvs [] [] = EQ_
+    cmp_tvs [] _  = LT_
+    cmp_tvs _  [] = GT_
+    cmp_tvs (a:as) (b:bs)
+      = thenCmp (cmp a b) (cmp_tvs as bs)
+    cmp_tvs _ _ = panic# "cmp_tvs"
+
+-----------
+cmpMonoType cmp (MonoTyVar n1) (MonoTyVar n2)
+  = cmp n1 n2
+
+cmpMonoType cmp (MonoTupleTy tys1) (MonoTupleTy tys2)
+  = cmpList (cmpMonoType cmp) tys1 tys2
+cmpMonoType cmp (MonoListTy ty1) (MonoListTy ty2)
+  = cmpMonoType cmp ty1 ty2
+
+cmpMonoType cmp (MonoTyApp tc1 tys1) (MonoTyApp tc2 tys2)
+  = thenCmp (cmp tc1 tc2) (cmpList (cmpMonoType cmp) tys1 tys2)
+
+cmpMonoType cmp (MonoFunTy a1 b1) (MonoFunTy a2 b2)
+  = thenCmp (cmpMonoType cmp a1 a2) (cmpMonoType cmp b1 b2)
+
+cmpMonoType cmp (MonoDictTy c1 ty1)   (MonoDictTy c2 ty2)
+  = thenCmp (cmp c1 c2) (cmpMonoType cmp ty1 ty2)
+
+cmpMonoType cmp ty1 ty2 -- tags must be different
+  = let tag1 = tag ty1
+	tag2 = tag ty2
+    in
+    if tag1 _LT_ tag2 then LT_ else GT_
+  where
+    tag (MonoTyVar n1)		= (ILIT(1) :: FAST_INT)
+    tag (MonoTupleTy tys1)	= ILIT(2)
+    tag (MonoListTy ty1)	= ILIT(3)
+    tag (MonoTyApp tc1 tys1)	= ILIT(4)
+    tag (MonoFunTy a1 b1)	= ILIT(5)
+    tag (MonoDictTy c1 ty1)	= ILIT(7)
+
+-------------------
+cmpContext cmp a b
+  = cmpList cmp_ctxt a b
+  where
+    cmp_ctxt (c1, tv1) (c2, tv2)
+      = thenCmp (cmp c1 c2) (cmp tv1 tv2)
 
 #endif {- COMPILING_GHC -}
 \end{code}

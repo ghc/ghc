@@ -5,7 +5,7 @@
 
 Based on @UniqFMs@ (as you would expect).
 
-Basically, the things need to be in class @NamedThing@.
+Basically, the things need to be in class @Uniquable@.
 
 \begin{code}
 #include "HsVersions.h"
@@ -24,8 +24,8 @@ CHK_Ubiq() -- debugging consistency check
 
 import Maybes		( maybeToBool, Maybe )
 import UniqFM
-import Unique		( Unique )
-import Outputable	( Outputable(..), NamedThing(..), ExportFlag )
+import Unique		( Uniquable(..), Unique )
+import Outputable	( Outputable(..), ExportFlag )
 import SrcLoc		( SrcLoc )
 import Pretty		( Pretty(..), PrettyRep )
 import PprStyle		( PprStyle )
@@ -56,16 +56,16 @@ type UniqSet a = UniqFM a
 emptyUniqSet :: UniqSet a
 emptyUniqSet = MkUniqSet emptyUFM
 
-unitUniqSet :: NamedThing a => a -> UniqSet a
+unitUniqSet :: Uniquable a => a -> UniqSet a
 unitUniqSet x = MkUniqSet (unitUFM x x)
 
 uniqSetToList :: UniqSet a -> [a]
 uniqSetToList (MkUniqSet set) = eltsUFM set
 
-mkUniqSet :: NamedThing a => [a]  -> UniqSet a
+mkUniqSet :: Uniquable a => [a]  -> UniqSet a
 mkUniqSet xs = MkUniqSet (listToUFM [ (x, x) | x <- xs])
 
-addOneToUniqSet :: NamedThing a => UniqSet a -> a -> UniqSet a
+addOneToUniqSet :: Uniquable a => UniqSet a -> a -> UniqSet a
 addOneToUniqSet set x = set `unionUniqSets` unitUniqSet x
 
 unionUniqSets :: UniqSet a -> UniqSet a -> UniqSet a
@@ -83,13 +83,13 @@ minusUniqSet (MkUniqSet set1) (MkUniqSet set2) = MkUniqSet (minusUFM set1 set2)
 intersectUniqSets :: UniqSet a -> UniqSet a -> UniqSet a
 intersectUniqSets (MkUniqSet set1) (MkUniqSet set2) = MkUniqSet (intersectUFM set1 set2)
 
-elementOfUniqSet :: NamedThing a => a -> UniqSet a -> Bool
+elementOfUniqSet :: Uniquable a => a -> UniqSet a -> Bool
 elementOfUniqSet x (MkUniqSet set) = maybeToBool (lookupUFM set x)
 
 isEmptyUniqSet :: UniqSet a -> Bool
 isEmptyUniqSet (MkUniqSet set) = isNullUFM set {-SLOW: sizeUFM set == 0-}
 
-mapUniqSet :: NamedThing b => (a -> b) -> UniqSet a -> UniqSet b
+mapUniqSet :: Uniquable b => (a -> b) -> UniqSet a -> UniqSet b
 mapUniqSet f (MkUniqSet set)
   = MkUniqSet (listToUFM [ let
 			     mapped_thing = f thing

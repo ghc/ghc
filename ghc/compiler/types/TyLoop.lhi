@@ -7,10 +7,11 @@ import PreludePS(_PackedString)
 import PreludeStdIO ( Maybe )
 import Unique ( Unique )
 
+import FieldLabel ( FieldLabel )
 import Id      ( Id, GenId, StrictnessMark, mkTupleCon, mkDataCon,
 		 dataConSig, getInstantiatedDataConSig )
 import PprType ( specMaybeTysSuffix )
-import NameTypes ( FullName )
+import Name    ( Name )
 import TyCon   ( TyCon )
 import TyVar   ( GenTyVar, TyVar )
 import Type    ( GenType, Type )
@@ -39,7 +40,7 @@ getInstantiatedDataConSig :: Id -> [Type] -> ([Type],[Type],Type)
 
 -- Needed in TysWiredIn
 data StrictnessMark = MarkedStrict | NotMarkedStrict
-mkDataCon :: Unique -> FullName -> [StrictnessMark]
+mkDataCon :: Name -> [StrictnessMark] -> [FieldLabel]
 	  -> [TyVar] -> [(Class,Type)] -> [Type] -> TyCon
 	  -> Id
 \end{code}

@@ -7,10 +7,7 @@ import Ubiq --  debugging consistency check
 import UgenUtil
 
 import U_constr
-import U_coresyn	( U_coresyn ) -- for interfaces only
-import U_hpragma
 import U_list
-import U_literal	( U_literal ) -- for interfaces only
 import U_maybe
 import U_qid
 import U_ttype
@@ -20,14 +17,12 @@ type binding;
 		    gtbindid	: ttype; 	/* applied tycon */
 		    gtbindl	: list;  	/* [constr] */
 		    gtbindd	: maybe; 	/* Maybe [deriving] */
-		    gtline	: long;
-		    gtpragma	: hpragma; >;
+		    gtline	: long;	>;
 	ntbind	: < gntbindc	: list;	 	/* [context entries] */
 		    gntbindid	: ttype; 	/* applied tycon */
 		    gntbindcty	: list;  	/* [constr]  (only 1 constrnew) */ 
 		    gntbindd	: maybe; 	/* Maybe [deriving] */
-		    gntline	: long;
-		    gntpragma	: hpragma; >;
+		    gntline	: long;	>;
 	nbind	: < gnbindid	: ttype;
 		    gnbindas	: ttype;
 		    gnline	: long; >;
@@ -37,37 +32,24 @@ type binding;
 		    gfline	: long; >;
 	abind	: < gabindfst	: binding;
 		    gabindsnd	: binding; >;
-	ibind	: < gibindsrc   : long;		/* 1 => source; 0 => interface */
-		    gibindmod   : stringId;	/* the original module */
-		    gibindc	: list;
+	ibind	: < gibindc	: list;
 		    gibindid	: qid;
 		    gibindi	: ttype;
 		    gibindw	: binding;
-		    giline	: long;
-		    gipragma	: hpragma; >;
+		    giline	: long;	>;
 	dbind	: < gdbindts	: list;
 		    gdline	: long; >;
 	cbind	: < gcbindc	: list;
 		    gcbindid	: ttype;
 		    gcbindw	: binding;
-		    gcline	: long;
-		    gcpragma	: hpragma; >;
+		    gcline	: long;	>;
 	sbind	: < gsbindids	: list;
 		    gsbindid	: ttype;
-		    gsline	: long;
-		    gspragma	: hpragma; >;
-
-	mbind	: < gmbindmodn	: stringId;	/* import (in an interface) <mod> <entities> */
-		    gmbindimp	: list;		/* [entity] */
-		    gmline	: long; >;
-	mfbind	: < gmfixes     : list; >;	/* fixites in an import: [fixop] */
+		    gsline	: long;	>;
 
 	nullbind : < >;
 
-	import	: < gibindiface : stringId;
-		    gibindfile	: stringId;
-		    gibinddef	: binding;
-		    gibindimod	: stringId;
+	import	: < gibindimod	: stringId;
 		    gibindqual	: long;
 		    gibindas	: maybe;
 		    gibindspec	: maybe;

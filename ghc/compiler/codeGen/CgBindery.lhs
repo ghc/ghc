@@ -44,6 +44,7 @@ import Id		( idPrimRep, toplevelishId, isDataCon,
 			  GenId{-instance NamedThing-}
 			)
 import Maybes		( catMaybes )
+import Outputable	( isLocallyDefined )
 import PprAbsC		( pprAmode )
 import PprStyle		( PprStyle(..) )
 import StgSyn		( StgArg(..), StgLiveVars(..), GenStgArg(..) )
@@ -122,7 +123,7 @@ newTempAmodeAndIdInfo :: Id -> LambdaFormInfo -> (CAddrMode, CgIdInfo)
 newTempAmodeAndIdInfo name lf_info
   = (temp_amode, temp_idinfo)
   where
-    uniq       	= getItsUnique name
+    uniq       	= uniqueOf name
     temp_amode	= CTemp uniq (idPrimRep name)
     temp_idinfo = tempIdInfo name uniq lf_info
 

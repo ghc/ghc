@@ -19,6 +19,7 @@ import HsSyn
 import RnHsSyn
 import TcHsSyn
 
+import ErrUtils		( Warning(..), Error(..) )
 import Pretty
 import RnUtils		( GlobalNameMappers(..), GlobalNameMapper(..) )
 import Maybes		( MaybeErr(..) )
@@ -61,11 +62,11 @@ typecheckModule
 
     	PprStyle->Pretty),	-- stuff to print for -ddump-deriving
 
-       Bag TcWarning)		-- pretty-print this to get warnings
+       Bag Warning)		-- pretty-print this to get warnings
 
        -- FAILURE ...
-      (Bag TcError,		-- pretty-print this to get errors
-       Bag TcWarning)		-- pretty-print this to get warnings
+      (Bag Error,		-- pretty-print this to get errors
+       Bag Warning)		-- pretty-print this to get warnings
 
 typecheckModule us renamer_name_funs mod
   = initTc us (tcModule renamer_name_funs mod)

@@ -25,8 +25,8 @@ import TcType		( TcType(..), TcMaybe, zonkTcType )
 import Unify		( unifyTauTy, unifyTauTyList )
 
 import Kind		( Kind, mkTypeKind )
-import Name		( Name )
 import Pretty
+import RnHsSyn		( RnName{-instance Outputable-} )
 import Type		( isTyVarTy, mkFunTy, getFunTy_maybe )
 import Util
 \end{code}
@@ -37,7 +37,7 @@ is used in error messages.  It checks that all the equations have the
 same number of arguments before using @tcMatches@ to do the work.
 
 \begin{code}
-tcMatchesFun :: Name
+tcMatchesFun :: RnName
 	     -> TcType s 		-- Expected type
 	     -> [RenamedMatch]
 	     -> TcM s ([TcMatch s], LIE s)
@@ -81,7 +81,7 @@ tcMatchesCase expected_ty matches = tcMatchesExpected expected_ty MCase matches
 
 
 \begin{code}
-data FunOrCase = MCase | MFun Name	-- Records whether doing  fun or case rhss;
+data FunOrCase = MCase | MFun RnName	-- Records whether doing  fun or case rhss;
 					-- used to produced better error messages
 
 tcMatchesExpected :: TcType s

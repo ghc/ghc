@@ -13,8 +13,9 @@ module PrelInfo (
 	pRELUDE_PRIMIO, pRELUDE_IO, pRELUDE_PS,
 	gLASGOW_ST, gLASGOW_MISC,
 
-	-- lookup functions for built-in names, for the renamer:
-	builtinNameInfo,
+	-- finite maps for built-in things (for the renamer and typechecker):
+	builtinNameInfo, BuiltinNames(..),
+	BuiltinKeys(..), BuiltinIdInfos(..),
 
 	-- *odd* values that need to be reached out and grabbed:
 	eRROR_ID, pAT_ERROR_ID, aBSENT_ERROR_ID,
@@ -96,13 +97,19 @@ import TysPrim		-- TYPES
 import TysWiredIn
 
 -- others:
-import CmdLineOpts
-import FiniteMap
-import Id		( mkTupleCon, GenId{-instances-} )
-import Name		( Name(..) )
-import NameTypes	( mkPreludeCoreName, FullName, ShortName )
-import TyCon		( tyConDataCons, mkFunTyCon, mkTupleTyCon, TyCon{-instances-} )
+import CmdLineOpts	( opt_HideBuiltinNames,
+			  opt_HideMostBuiltinNames,
+			  opt_ForConcurrent
+			)
+import FiniteMap	( FiniteMap, emptyFM, listToFM )
+import Id		( mkTupleCon, GenId, Id(..) )
+import Maybes		( catMaybes )
+import Name		( mkBuiltinName )
+import Outputable	( getOrigName )
+import RnHsSyn		( RnName(..) )
+import TyCon		( tyConDataCons, mkFunTyCon, mkTupleTyCon, TyCon )
 import Type
+import UniqFM		( UniqFM, emptyUFM, listToUFM )
 import Unique		-- *Key stuff
 import Util		( nOfThem, panic )
 \end{code}
@@ -117,74 +124,93 @@ We have two ``builtin name funs,'' one to look up @TyCons@ and
 @Classes@, the other to look up values.
 
 \begin{code}
-builtinNameInfo :: (FAST_STRING -> Maybe Name,	-- name lookup fn for values
-		    FAST_STRING -> Maybe Name)	-- name lookup fn for tycons/classes
+builtinNameInfo :: ( BuiltinNames, BuiltinKeys, BuiltinIdInfos )
+
+type BuiltinNames   = FiniteMap FAST_STRING RnName   -- WiredIn Ids/TyCons
+type BuiltinKeys    = FiniteMap FAST_STRING Unique   -- Names with known uniques
+type BuiltinIdInfos = UniqFM IdInfo		     -- Info for known unique Ids
 
 builtinNameInfo
-  = (init_val_lookup_fn, init_tc_lookup_fn)
+  = if opt_HideBuiltinNames then
+	(
+	 emptyFM,
+	 emptyFM,
+	 emptyUFM
+	)
+    else if opt_HideMostBuiltinNames then
+	(
+	 listToFM min_assoc_wired,
+	 emptyFM,
+	 emptyUFM
+	)
+    else
+	(
+	 listToFM assoc_wired,
+	 listToFM assoc_keys,
+	 listToUFM assoc_id_infos
+	)
+
   where
-    --
-    -- values (including data constructors)
-    --
-    init_val_lookup_fn
-      =	if	opt_HideBuiltinNames then
-		(\ x -> Nothing)
-	else if opt_HideMostBuiltinNames then
-		lookupFM (listToFM (concat min_val_assoc_lists))
-	else
-		lookupFM (listToFM (concat val_assoc_lists))
+    min_assoc_wired	-- min needed when compiling bits of Prelude
+	= concat
+	  [
+	    -- tycons
+	    map pcTyConWiredInInfo prim_tycons,
+	    map pcTyConWiredInInfo g_tycons,
+	    map pcTyConWiredInInfo min_nonprim_tycon_list,
 
-    min_val_assoc_lists		-- min needed when compiling bits of Prelude
-	= [
-	    concat (map pcDataConNameInfo g_con_tycons),
-	    concat (map pcDataConNameInfo min_nonprim_tycon_list),
-	    totally_wired_in_Ids,
-	    unboxed_ops
+	    -- data constrs
+	    concat (map pcDataConWiredInInfo g_con_tycons),
+	    concat (map pcDataConWiredInInfo min_nonprim_tycon_list),
+
+	    -- values
+	    map pcIdWiredInInfo wired_in_ids,
+	    primop_ids
 	  ]
 
-    val_assoc_lists
-    	= [
-	    concat (map pcDataConNameInfo g_con_tycons),
-	    concat (map pcDataConNameInfo data_tycons),
-	    totally_wired_in_Ids,
-	    unboxed_ops,
-	    special_class_ops,
-	    if opt_ForConcurrent then parallel_vals else []
+    assoc_wired
+    	= concat
+	  [
+	    -- tycons
+	    map pcTyConWiredInInfo prim_tycons,
+	    map pcTyConWiredInInfo g_tycons,
+	    map pcTyConWiredInInfo data_tycons,
+	    map pcTyConWiredInInfo synonym_tycons,
+
+	    -- data consts
+	    concat (map pcDataConWiredInInfo g_con_tycons),
+	    concat (map pcDataConWiredInInfo data_tycons),
+
+	    -- values
+	    map pcIdWiredInInfo wired_in_ids,
+	    map pcIdWiredInInfo parallel_ids,
+	    primop_ids
 	  ]
 
-    --
-    -- type constructors and classes
-    --
-    init_tc_lookup_fn
-      =	if	opt_HideBuiltinNames then
-		(\ x -> Nothing)
-	else if opt_HideMostBuiltinNames then
-		lookupFM (listToFM (concat min_tc_assoc_lists))
-	else
-		lookupFM (listToFM (concat tc_assoc_lists))
-
-    min_tc_assoc_lists	-- again, pretty ad-hoc
-	= [
-	    map pcTyConNameInfo prim_tycons,
-	    map pcTyConNameInfo g_tycons,
-	    map pcTyConNameInfo min_nonprim_tycon_list
+    assoc_keys
+	= concat
+	  [
+	    id_keys,
+	    tysyn_keys,
+	    class_keys,
+	    class_op_keys
 	  ]
 
-    tc_assoc_lists
-	= [
-	    map pcTyConNameInfo prim_tycons,
-	    map pcTyConNameInfo g_tycons,
-	    map pcTyConNameInfo data_tycons,
-	    map pcTyConNameInfo synonym_tycons,
-	    std_tycon_list,
-	    std_class_list
-	  ]
+    id_keys = map id_key id_keys_infos
+    id_key (str, uniq, info) = (str, uniq)
 
-    -- We let a lot of "non-standard" values be visible, so that we
-    -- can make sense of them in interface pragmas. It's cool, though
-    -- they all have "non-standard" names, so they won't get past
-    -- the parser in user code.
+    assoc_id_infos = catMaybes (map assoc_info id_keys_infos)
+    assoc_info (str, uniq, Just info) = Just (uniq, info)
+    assoc_info (str, uniq, Nothing)   = Nothing
+\end{code}
 
+
+We let a lot of "non-standard" values be visible, so that we can make
+sense of them in interface pragmas. It's cool, though they all have
+"non-standard" names, so they won't get past the parser in user code.
+
+The WiredIn TyCons and DataCons ...
+\begin{code}
 
 prim_tycons
   = [addrPrimTyCon,
@@ -221,12 +247,14 @@ min_nonprim_tycon_list 	-- used w/ HideMostBuiltinNames
       ratioTyCon,
       liftTyCon,
       return2GMPsTyCon,	-- ADR asked for these last two (WDP 94/11)
-      returnIntAndGMPTyCon ]
+      returnIntAndGMPTyCon
+    ]
+
 
 data_tycons
-  = [addrTyCon,
+  = [
+     addrTyCon,
      boolTyCon,
---   byteArrayTyCon,
      charTyCon,
      orderingTyCon,
      doubleTyCon,
@@ -235,8 +263,6 @@ data_tycons
      integerTyCon,
      liftTyCon,
      mallocPtrTyCon,
---   mutableArrayTyCon,
---   mutableByteArrayTyCon,
      ratioTyCon,
      return2GMPsTyCon,
      returnIntAndGMPTyCon,
@@ -260,78 +286,74 @@ data_tycons
     ]
 
 synonym_tycons
-  = [primIoTyCon,
+  = [
+     primIoTyCon,
      rationalTyCon,
      stTyCon,
-     stringTyCon]
-
-
-totally_wired_in_Ids
-  = [(SLIT("error"),		WiredInVal eRROR_ID),
-     (SLIT("patError#"),	WiredInVal pAT_ERROR_ID), -- occurs in i/faces
-     (SLIT("parError#"),	WiredInVal pAR_ERROR_ID), -- ditto
-     (SLIT("_trace"),		WiredInVal tRACE_ID),
-
-     -- now the foldr/build Ids, which need to be built in
-     -- because they have magic unfoldings
-     (SLIT("_build"),		WiredInVal buildId),
-     (SLIT("_augment"),		WiredInVal augmentId),
-     (SLIT("foldl"),		WiredInVal foldlId),
-     (SLIT("foldr"),		WiredInVal foldrId),
-     (SLIT("unpackAppendPS#"),	WiredInVal unpackCStringAppendId),
-     (SLIT("unpackFoldrPS#"),	WiredInVal unpackCStringFoldrId),
-
-     (SLIT("_runST"),		WiredInVal runSTId),
-     (SLIT("_seq_"),		WiredInVal seqId),  -- yes, used in sequential-land, too
-						    -- WDP 95/11
-     (SLIT("realWorld#"),	WiredInVal realWorldPrimId)
+     stringTyCon
     ]
 
-parallel_vals
-  =[(SLIT("_par_"),		WiredInVal parId),
-    (SLIT("_fork_"),		WiredInVal forkId)
+pcTyConWiredInInfo :: TyCon -> (FAST_STRING, RnName)
+pcTyConWiredInInfo tc = (snd (getOrigName tc), WiredInTyCon tc)
+
+pcDataConWiredInInfo :: TyCon -> [(FAST_STRING, RnName)]
+pcDataConWiredInInfo tycon
+  = [ (snd (getOrigName con), WiredInId con) | con <- tyConDataCons tycon ]
+\end{code}
+
+The WiredIn Ids ...
+ToDo: Some of these should be moved to id_keys_infos!
+\begin{code}
+wired_in_ids
+  = [eRROR_ID,
+     pAT_ERROR_ID,	-- occurs in i/faces
+     pAR_ERROR_ID,	-- ditto
+     tRACE_ID,
+
+     runSTId,
+     seqId,
+     realWorldPrimId,
+     
+     -- foldr/build Ids have magic unfoldings
+     buildId,
+     augmentId,
+     foldlId,
+     foldrId,
+     unpackCStringAppendId,
+     unpackCStringFoldrId
+    ]
+
+parallel_ids
+  = if not opt_ForConcurrent then
+	[]
+    else
+        [parId,
+         forkId
 #ifdef GRAN
-    ,
-    (SLIT("_parLocal_"),	WiredInVal parLocalId),
-    (SLIT("_parGlobal_"),	WiredInVal parGlobalId)
-    -- Add later:
-    -- (SLIT("_parAt_"),	WiredInVal parAtId)
-    -- (SLIT("_parAtForNow_"),	WiredInVal parAtForNowId)
-    -- (SLIT("_copyable_"),	WiredInVal copyableId)
-    -- (SLIT("_noFollow_"),	WiredInVal noFollowId)
+    	 ,parLocalId
+	 ,parGlobalId
+	    -- Add later:
+	    -- ,parAtId
+	    -- ,parAtForNowId
+	    -- ,copyableId
+	    -- ,noFollowId
 #endif {-GRAN-}
-   ]
+	]
 
-special_class_ops
-  = let
-	swizzle_over (str, key)
-	  = (str, ClassOpName key bottom1 str bottom2)
+pcIdWiredInInfo :: Id -> (FAST_STRING, RnName)
+pcIdWiredInInfo id = (snd (getOrigName id), WiredInId id)
+\end{code}
 
-	bottom1 = panic "PrelInfo.special_class_ops:class"
-	bottom2 = panic "PrelInfo.special_class_ops:tag"
-    in
-     map swizzle_over
-      [	(SLIT("fromInt"),	fromIntClassOpKey),
-	(SLIT("fromInteger"),	fromIntegerClassOpKey),
-	(SLIT("fromRational"),	fromRationalClassOpKey),
-	(SLIT("enumFrom"),	enumFromClassOpKey),
-	(SLIT("enumFromThen"),	enumFromThenClassOpKey),
-	(SLIT("enumFromTo"),	enumFromToClassOpKey),
-	(SLIT("enumFromThenTo"),enumFromThenToClassOpKey),
-	(SLIT("=="),		eqClassOpKey),
-	(SLIT(">="),		geClassOpKey),
-	(SLIT("-"),		negateClassOpKey)
-      ]
-
-unboxed_ops
-  =  map primOpNameInfo allThePrimOps
-     -- plus some of the same ones but w/ different names ...
-  ++ map fn funny_name_primops
+WiredIn primitive numeric operations ...
+\begin{code}
+primop_ids
+  =  map primOpNameInfo allThePrimOps ++ map fn funny_name_primops
   where
     fn (op,s) = case (primOpNameInfo op) of (_,n) -> (s,n)
 
 funny_name_primops
-  = [(IntAddOp,	     SLIT("+#")),
+  = [
+     (IntAddOp,	     SLIT("+#")),
      (IntSubOp,      SLIT("-#")),
      (IntMulOp,      SLIT("*#")),
      (IntGtOp,       SLIT(">#")),
@@ -350,56 +372,56 @@ funny_name_primops
      (DoubleEqOp,    SLIT("==##")),
      (DoubleNeOp,    SLIT("/=##")),
      (DoubleLtOp,    SLIT("<##")),
-     (DoubleLeOp,    SLIT("<=##"))]
-
-
-std_tycon_list
-  = let
-	swizzle_over (mod, nm, key, arity, is_data)
-	  = let
-		fname = mkPreludeCoreName mod nm
-	    in
-	    (nm, TyConName key fname arity is_data (panic "std_tycon_list:data_cons"))
-    in
-    map swizzle_over
-	[(SLIT("PreludeMonadicIO"), SLIT("IO"), iOTyConKey,    1, False)
-	]
-
-std_class_list
-  = let
-	swizzle_over (str, key)
-	  = (str, ClassName key (mkPreludeCoreName pRELUDE_CORE str) (panic "std_class_list:ops"))
-    in
-    map swizzle_over
-	[(SLIT("Eq"),		eqClassKey),
-	 (SLIT("Ord"),		ordClassKey),
-	 (SLIT("Num"),		numClassKey),
-	 (SLIT("Real"),		realClassKey),
-	 (SLIT("Integral"),	integralClassKey),
-	 (SLIT("Fractional"),	fractionalClassKey),
-	 (SLIT("Floating"),	floatingClassKey),
-	 (SLIT("RealFrac"),	realFracClassKey),
-	 (SLIT("RealFloat"),	realFloatClassKey),
-	 (SLIT("Ix"),		ixClassKey),
-	 (SLIT("Enum"),		enumClassKey),
-	 (SLIT("Show"),		showClassKey),
-	 (SLIT("Read"),		readClassKey),
-	 (SLIT("Monad"),	monadClassKey),
-	 (SLIT("MonadZero"),	monadZeroClassKey),
-	 (SLIT("Binary"),	binaryClassKey),
-	 (SLIT("_CCallable"),	cCallableClassKey),
-	 (SLIT("_CReturnable"), cReturnableClassKey)
-	]
-
+     (DoubleLeOp,    SLIT("<=##"))
+    ]
 \end{code}
 
-Make table entries for various things:
-\begin{code}
-pcTyConNameInfo :: TyCon -> (FAST_STRING, Name)
-pcTyConNameInfo tc = (getOccurrenceName tc, WiredInTyCon tc)
 
-pcDataConNameInfo :: TyCon -> [(FAST_STRING, Name)]
-pcDataConNameInfo tycon
-  = -- slurp out its data constructors...
-    [ (getOccurrenceName con, WiredInVal con) | con <- tyConDataCons tycon ]
+Ids, Synonyms, Classes and ClassOps with builtin keys.
+For the Ids we may also have some builtin IdInfo.
+\begin{code}
+id_keys_infos :: [(FAST_STRING, Unique, Maybe IdInfo)]
+id_keys_infos
+  = [
+    ]
+
+tysyn_keys
+  = [
+     (SLIT("IO"), iOTyConKey)	-- SLIT("PreludeMonadicIO")
+    ]
+
+class_keys
+  = [
+     (SLIT("Eq"),		eqClassKey),
+     (SLIT("Ord"),		ordClassKey),
+     (SLIT("Num"),		numClassKey),
+     (SLIT("Real"),		realClassKey),
+     (SLIT("Integral"),	 	integralClassKey),
+     (SLIT("Fractional"),	fractionalClassKey),
+     (SLIT("Floating"),		floatingClassKey),
+     (SLIT("RealFrac"),		realFracClassKey),
+     (SLIT("RealFloat"),	realFloatClassKey),
+     (SLIT("Ix"),		ixClassKey),
+     (SLIT("Enum"),		enumClassKey),
+     (SLIT("Show"),		showClassKey),
+     (SLIT("Read"),		readClassKey),
+     (SLIT("Monad"),		monadClassKey),
+     (SLIT("MonadZero"),	monadZeroClassKey),
+     (SLIT("Binary"),		binaryClassKey),
+     (SLIT("_CCallable"),	cCallableClassKey),
+     (SLIT("_CReturnable"), 	cReturnableClassKey)
+    ]
+
+class_op_keys
+  = [
+     (SLIT("fromInt"),		fromIntClassOpKey),
+     (SLIT("fromInteger"),	fromIntegerClassOpKey),
+     (SLIT("fromRational"),	fromRationalClassOpKey),
+     (SLIT("enumFrom"),		enumFromClassOpKey),
+     (SLIT("enumFromThen"),	enumFromThenClassOpKey),
+     (SLIT("enumFromTo"),	enumFromToClassOpKey),
+     (SLIT("enumFromThenTo"),	enumFromThenToClassOpKey),
+     (SLIT("=="),		eqClassOpKey),
+     (SLIT(">="),		geClassOpKey)
+    ]
 \end{code}

@@ -44,15 +44,14 @@ import PprStyle		( PprStyle(..) )
 import Pretty
 
 import Id		( GenId )		-- instances
-import Name		( Name )		-- instances
-import ProtoName	( ProtoName )		-- instances
+import Name		( Name, RdrName )	-- instances
 import PprType		( GenType, GenTyVar )	-- instances
+import RnHsSyn		( RnName )		-- instances
 import TyVar		( GenTyVar )		-- instances
-import Unique		( Unique)		-- instances
+import Unique		( Unique )		-- instances
 
 {-
 --import MkIface	( mkInterface )
-
 -}
 
 \end{code}
@@ -77,7 +76,7 @@ doIt (core_cmds, stg_cmds) input_pgm
     show_pass "Reader"				`thenMn_`
     rdModule 					`thenMn`
 
-	\ (mod_name, export_list_fns, absyn_tree) ->
+	\ (mod_name, rdr_module) ->
 
     let
 	-- reader things used much later
@@ -88,10 +87,10 @@ doIt (core_cmds, stg_cmds) input_pgm
 	cc_mod_name = mod_name
     in
     doDump opt_D_dump_rdr "Reader:"
-	(pp_show (ppr pprStyle absyn_tree))	`thenMn_`
+	(pp_show (ppr pprStyle rdr_module))	`thenMn_`
 
     doDump opt_D_source_stats "\nSource Statistics:"
-	(pp_show (ppSourceStats absyn_tree)) 	`thenMn_`
+	(pp_show (ppSourceStats rdr_module)) 	`thenMn_`
 
     -- UniqueSupplies for later use (these are the only lower case uniques)
     getSplitUniqSupplyMn 'r'	`thenMn` \ rn_uniqs ->	-- renamer
@@ -107,30 +106,38 @@ doIt (core_cmds, stg_cmds) input_pgm
     show_pass "Renamer" 			`thenMn_`
 
     case builtinNameInfo
-    of { (init_val_lookup_fn, init_tc_lookup_fn) ->
+    of { (wiredin_fm, key_fm, idinfo_fm) ->
 
-    case (renameModule (init_val_lookup_fn, init_tc_lookup_fn)
-		       absyn_tree
-		       rn_uniqs)
-    of { (mod4, import_names, final_name_funs, rn_errs_bag) ->
-    let
-	-- renamer things used much later
-	cc_import_names = import_names
-    in
+    renameModule wiredin_fm key_fm rn_uniqs rdr_module `thenMn`
+	\ (rn_mod, import_names,
+	   version_info, instance_modules,
+	   rn_errs_bag, rn_warns_bag) ->
 
     if (not (isEmptyBag rn_errs_bag)) then
 	writeMn stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle rn_errs_bag))
-	`thenMn_` writeMn stderr "\n"
-	`thenMn_` exitMn 1
+	`thenMn_` writeMn stderr "\n" `thenMn_`
+	writeMn stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle rn_warns_bag))
+	`thenMn_` writeMn stderr "\n" `thenMn_`
+	exitMn 1
 
     else -- No renaming errors ...
 
+    (if (isEmptyBag rn_warns_bag) then
+	returnMn ()
+     else
+	writeMn stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle rn_warns_bag))
+	`thenMn_` writeMn stderr "\n"
+    )   					`thenMn_`
+
     doDump opt_D_dump_rn "Renamer:"
-	(pp_show (ppr pprStyle mod4))		`thenMn_`
+	(pp_show (ppr pprStyle rn_mod))		`thenMn_`
+
+    exitMn 0
+{- LATER ...
 
     -- ******* TYPECHECKER
     show_pass "TypeCheck" 			`thenMn_`
-    case (case (typecheckModule tc_uniqs final_name_funs mod4) of
+    case (case (typecheckModule tc_uniqs idinfo_fm rn_info rn_mod) of
 	    Succeeded (stuff, warns)
 		-> (emptyBag, warns, stuff)
 	    Failed (errs, warns)
@@ -138,19 +145,21 @@ doIt (core_cmds, stg_cmds) input_pgm
 
     of { (tc_errs_bag, tc_warns_bag, tc_results) ->
 
+    if (not (isEmptyBag tc_errs_bag)) then
+	writeMn stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle tc_errs_bag))
+	`thenMn_` writeMn stderr "\n" `thenMn_`
+	writeMn stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle tc_warns_bag))
+	`thenMn_` writeMn stderr "\n" `thenMn_`
+	exitMn 1
+
+    else ( -- No typechecking errors ...
+
     (if (isEmptyBag tc_warns_bag) then
 	returnMn ()
      else
-	writeMn stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle tc_errs_bag))
+	writeMn stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle tc_warns_bag))
 	`thenMn_` writeMn stderr "\n"
     )   					`thenMn_`
-
-    if (not (isEmptyBag tc_errs_bag)) then
-	writeMn stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle tc_errs_bag))
-	`thenMn_` writeMn stderr "\n"
-	`thenMn_` exitMn 1
-
-    else ( -- No typechecking errors ...
 
     case tc_results
     of {  (typechecked_quint@(recsel_binds, class_binds, inst_binds, val_binds, const_binds),
@@ -245,7 +254,7 @@ doIt (core_cmds, stg_cmds) input_pgm
     let
 	abstractC      = codeGen cc_mod_name     -- module name for CC labelling
 				 cost_centre_info
-				 cc_import_names -- import names for CC registering
+				 import_names -- import names for CC registering
 				 gen_tycons	 -- type constructors generated locally
 				 all_tycon_specs -- tycon specialisations
 				 stg_binds2
@@ -287,8 +296,13 @@ doIt (core_cmds, stg_cmds) input_pgm
 
     doDump opt_D_dump_realC "" c_output_d 	`thenMn_`
     doOutput opt_ProduceC c_output_w 		`thenMn_`
+
     exitMn 0
-    } ) } } }
+    } ) }
+
+LATER -}
+
+    }
   where
     -------------------------------------------------------------
     -- ****** printing styles and column width:
@@ -337,7 +351,7 @@ doIt (core_cmds, stg_cmds) input_pgm
 	else returnMn ()
 
 
-ppSourceStats (HsModule name exports imports fixities typedecls typesigs
+ppSourceStats (HsModule name version exports imports fixities typedecls typesigs
 		      classdecls instdecls instsigs defdecls binds
 		      [{-no sigs-}] src_loc)
  = ppAboves (map pp_val
@@ -433,7 +447,7 @@ ppSourceStats (HsModule name exports imports fixities typedecls typesigs
     sig_info (InlineSig _ _)      = (0,0,0,1)
     sig_info _                    = (0,0,0,0)
 
-    import_info (ImportMod _ qual as spec)
+    import_info (ImportDecl _ qual as spec _)
 	= add6 (1, qual_info qual, as_info as, 0,0,0) (spec_info spec)
     qual_info False  = 0
     qual_info True   = 1

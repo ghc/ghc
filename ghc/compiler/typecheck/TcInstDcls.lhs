@@ -23,7 +23,9 @@ import HsSyn		( InstDecl(..), FixityDecl, Sig(..),
 			  PolyType(..), MonoType )
 import RnHsSyn		( RenamedHsBinds(..), RenamedMonoBinds(..),
 			  RenamedInstDecl(..), RenamedFixityDecl(..),
-			  RenamedSig(..), RenamedSpecInstSig(..) )
+			  RenamedSig(..), RenamedSpecInstSig(..),
+			  RnName(..){-incl instance Outputable-}
+			)
 import TcHsSyn		( TcIdOcc(..), TcHsBinds(..),
 			  TcMonoBinds(..), TcExpr(..), tcIdType,
 			  mkHsTyLam, mkHsTyApp,
@@ -61,8 +63,7 @@ import CoreUtils	( escErrorMsg )
 import Id		( GenId, idType, isDefaultMethodId_maybe )
 import ListSetOps	( minusList )
 import Maybes 		( maybeToBool, expectJust )
-import Name		( Name, getTagFromClassOpName )
-import Outputable
+import Outputable	( getLocalName, getOrigName )
 import PrelInfo		( pAT_ERROR_ID )
 import PprType		( GenType, GenTyVar, GenClass, GenClassOp, TyCon,
 			  pprParendGenType )
@@ -77,7 +78,6 @@ import TyVar		( GenTyVar, mkTyVarSet )
 import TysWiredIn	( stringTy )
 import Unique		( Unique )
 import Util		( panic )
-
 \end{code}
 
 Typechecking instance declarations is done in two passes. The first
@@ -156,7 +156,7 @@ and $dbinds_super$ bind the superclass dictionaries sd1 \ldots sdm.
 \begin{code}
 tcInstDecls1 :: Bag RenamedInstDecl
 	     -> [RenamedSpecInstSig]
-	     -> FAST_STRING		-- module name for deriving
+	     -> Module			-- module name for deriving
 	     -> GlobalNameMappers	-- renamer fns for deriving
 	     -> [RenamedFixityDecl]	-- fixities for deriving
 	     -> TcM s (Bag InstInfo,
@@ -207,8 +207,11 @@ tcInstDecl1 mod_name
 	-- Look things up
     tcLookupClass class_name		`thenNF_Tc` \ (clas_kind, clas) ->
 
+    let
+	de_rn (RnName n) = n
+    in
 	-- Typecheck the context and instance type
-    tcTyVarScope tyvar_names (\ tyvars ->
+    tcTyVarScope (map de_rn tyvar_names) (\ tyvars ->
 	tcContext context		`thenTc` \ theta ->
 	tcMonoTypeKind inst_ty		`thenTc` \ (tau_kind, tau) ->
 	unifyKind clas_kind tau_kind	`thenTc_`
@@ -224,7 +227,9 @@ tcInstDecl1 mod_name
     if (not from_here && (clas `derivedFor` inst_tycon)
 	              && all isTyVarTy arg_tys)
     then
-	if mod_name == inst_mod then
+	if not opt_CompilingPrelude && maybeToBool inst_mod &&
+	   mod_name == expectJust "inst_mod" inst_mod
+ 	then
 		-- Imported instance came from this module;
 		-- discard and derive fresh instance
 	    returnTc emptyBag		
@@ -482,7 +487,7 @@ newMethodId sel_id inst_ty origin loc
 		tcInstType [(clas_tyvar,inst_ty)]
 			   (mkSigmaTy local_tyvars meth_theta sel_tau)
 								`thenNF_Tc` \ method_ty ->
-		newLocalId (getOccurrenceName sel_id) method_ty	`thenNF_Tc` \ meth_id ->
+		newLocalId (getLocalName sel_id) method_ty	`thenNF_Tc` \ meth_id ->
 		returnNF_Tc (emptyLIE, meth_id)
 \end{code}
 
@@ -525,7 +530,7 @@ makeInstanceDeclNoDefaultExpr
 	-> [Id]
 	-> TcType s
 	-> Class
-	-> FAST_STRING
+	-> Maybe Module
 	-> Int
 	-> NF_TcM s (TcExpr s)
 
@@ -553,7 +558,9 @@ makeInstanceDeclNoDefaultExpr origin meth_ids defm_ids inst_ty clas inst_mod tag
     error_msg = "%E" 	-- => No explicit method for \"
 	     	++ escErrorMsg error_str
 
-    error_str = _UNPK_ inst_mod ++ "." ++ _UNPK_ clas_name ++ "."
+    mod_str = case inst_mod of { Nothing -> SLIT("Prelude"); Just m -> m }
+
+    error_str = _UNPK_ mod_str ++ "." ++ _UNPK_ clas_name ++ "."
 	     	++ (ppShow 80 (ppr PprForUser inst_ty)) ++ "."
 	     	++ (ppShow 80 (ppr PprForUser clas_op))	++ "\""
 
@@ -647,13 +654,13 @@ processInstBinds1 inst_tyvars avail_insts method_ids mbind
 		      FunMonoBind op _ locn	       -> (op, locn)
 		      PatMonoBind (VarPatIn op) _ locn -> (op, locn)
 
-        occ    = getOccurrenceName op
+        occ    = getLocalName op
 	origin = InstanceDeclOrigin
     in
     tcAddSrcLoc locn			 $
 
     -- Make a method id for the method
-    let tag       = getTagFromClassOpName op
+    let tag       = panic "processInstBinds1:getTagFromClassOpName"{-getTagFromClassOpName op-}
 	method_id = method_ids !! (tag-1)
 
 	TcId method_bndr = method_id
@@ -935,7 +942,11 @@ derivingWhenInstanceExistsErr clas tycon sty
 
 derivingWhenInstanceImportedErr inst_mod clas tycon sty
   = ppHang (ppBesides [ppStr "Deriving class `", ppr sty clas, ppStr "' type `", ppr sty tycon, ppStr "'"])
-         4 (ppBesides [ppStr "when an instance declared in module `", ppPStr inst_mod, ppStr "' has been imported"])
+         4 (ppBesides [ppStr "when an instance declared in module `", pp_mod, ppStr "' has been imported"])
+  where
+    pp_mod = case inst_mod of
+	       Nothing -> ppPStr SLIT("the standard Prelude")
+	       Just  m -> ppBesides [ppStr "module `", ppPStr m, ppStr "'"]
 
 nonBoxedPrimCCallErr clas inst_ty sty
   = ppHang (ppStr "Instance isn't for a `boxed-primitive' type")

@@ -21,7 +21,7 @@ Haskell).
 --<mkdependHS:friends> UniqSupply
 
 module Unique (
-	Unique,
+	Unique, Uniquable(..),
 	u2i,				-- hack: used in UniqFM
 
 	pprUnique, pprUnique10, showUnique,
@@ -106,7 +106,6 @@ module Unique (
 	monadZeroClassKey,
 	mutableArrayPrimTyConKey,
 	mutableByteArrayPrimTyConKey,
-	negateClassOpKey,
 	nilDataConKey,
 	numClassKey,
 	ordClassKey,
@@ -290,6 +289,12 @@ instance Ord Unique where
 instance Ord3 Unique where
     cmp = cmpUnique
 
+-----------------
+class Uniquable a where
+    uniqueOf :: a -> Unique
+
+instance Uniquable Unique where
+    uniqueOf u = u
 \end{code}
 
 We do sometimes make strings with @Uniques@ in them:
@@ -313,9 +318,6 @@ instance Outputable Unique where
 instance Text Unique where
     showsPrec p uniq rest = _UNPK_ (showUnique uniq)
     readsPrec p = panic "no readsPrec for Unique"
-
-instance NamedThing Unique where
-    getItsUnique u = u
 \end{code}
 
 %************************************************************************
@@ -579,7 +581,6 @@ enumFromToClassOpKey	= mkPreludeMiscIdUnique 38
 enumFromThenToClassOpKey= mkPreludeMiscIdUnique 39
 eqClassOpKey		= mkPreludeMiscIdUnique 40
 geClassOpKey		= mkPreludeMiscIdUnique 41
-negateClassOpKey	= mkPreludeMiscIdUnique 42
 \end{code}
 
 

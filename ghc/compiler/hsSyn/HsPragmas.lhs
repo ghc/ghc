@@ -9,23 +9,22 @@
 
 See also: @Sig@ (``signatures'') which is where user-supplied pragmas
 for values show up; ditto @SpecInstSig@ (for instances) and
-@SpecDataSig@ (for data types and type synonyms).
+@SpecDataSig@ (for data types).
 
 \begin{code}
 #include "HsVersions.h"
 
 module HsPragmas where
 
-import Ubiq{-uitous-}
+import Ubiq
 
 -- friends:
-import HsLoop		( ConDecl )
 import HsCore		( UnfoldingCoreExpr )
 import HsTypes		( MonoType )
 
 -- others:
 import IdInfo
-import Outputable	( Outputable(..){-instances-} )
+import Outputable	( Outputable(..) )
 import Pretty
 \end{code}
 
@@ -34,12 +33,16 @@ Certain pragmas expect to be pinned onto certain constructs.
 Pragma types may be parameterised, just as with any other
 abstract-syntax type.
 
-For a @data@ declaration---makes visible the constructors for an
-abstract @data@ type and indicates which specialisations exist.
+For a @data@ declaration---indicates which specialisations exist.
 \begin{code}
 data DataPragmas name
-  = DataPragmas	[ConDecl name]		   -- hidden data constructors
-		[[Maybe (MonoType name)]]  -- types to which specialised
+  = NoDataPragmas
+  | DataPragmas	[[Maybe (MonoType name)]]  -- types to which specialised
+
+noDataPragmas = NoDataPragmas
+
+isNoDataPragmas NoDataPragmas = True
+isNoDataPragmas _             = False
 \end{code}
 
 These are {\em general} things you can know about any value:
@@ -56,6 +59,9 @@ data GenPragmas name
 		  GenPragmas name)] 	   -- Gen info about the spec'd version
 
 noGenPragmas = NoGenPragmas
+
+isNoGenPragmas NoGenPragmas = True
+isNoGenPragmas _            = False
 
 data ImpUnfolding name
   = NoImpUnfolding
@@ -78,6 +84,11 @@ For a class's super-class dictionary selectors:
 data ClassPragmas name
   = NoClassPragmas
   | SuperDictPragmas [GenPragmas name]	-- list mustn't be empty
+
+noClassPragmas = NoClassPragmas
+
+isNoClassPragmas NoClassPragmas = True
+isNoClassPragmas _              = False
 \end{code}
 
 For a class's method selectors:
@@ -87,7 +98,11 @@ data ClassOpPragmas name
   | ClassOpPragmas  (GenPragmas name) -- for method selector
 		    (GenPragmas name) -- for default method
 
+
 noClassOpPragmas = NoClassOpPragmas
+
+isNoClassOpPragmas NoClassOpPragmas = True
+isNoClassOpPragmas _                = False
 \end{code}
 
 \begin{code}
@@ -106,6 +121,11 @@ data InstancePragmas name
 	[([Maybe (MonoType name)], -- specialised instance; type...
 	  Int,			   -- #dicts to ignore
 	  InstancePragmas name)]   -- (no SpecialisedInstancePragma please!)
+
+noInstancePragmas = NoInstancePragmas
+
+isNoInstancePragmas NoInstancePragmas = True
+isNoInstancePragmas _                 = False
 \end{code}
 
 Some instances for printing (just for debugging, really)

@@ -14,7 +14,6 @@ module PrefixSyn (
 	RdrBinding(..),
 	RdrId(..),
 	RdrMatch(..),
-	RdrTySigPragmas(..),
 	SigConverter(..),
 	SrcFile(..),
 	SrcFun(..),
@@ -23,16 +22,16 @@ module PrefixSyn (
 	readInteger
     ) where
 
-import Ubiq{-uitous-}
+import Ubiq
 
 import HsSyn
 import RdrHsSyn
 import Util		( panic )
 
-type RdrId   = ProtoName
+type RdrId   = RdrName
 type SrcLine = Int
 type SrcFile = FAST_STRING
-type SrcFun  = ProtoName
+type SrcFun  = RdrName
 \end{code}
 
 \begin{code}
@@ -40,51 +39,43 @@ data RdrBinding
   = RdrNullBind
   | RdrAndBindings	RdrBinding RdrBinding
 
-  | RdrTyDecl		ProtoNameTyDecl
+  | RdrTyDecl		RdrNameTyDecl
   | RdrFunctionBinding	SrcLine [RdrMatch]
   | RdrPatternBinding	SrcLine [RdrMatch]
-  | RdrClassDecl 	ProtoNameClassDecl
-  | RdrInstDecl 	ProtoNameInstDecl
-  | RdrDefaultDecl	ProtoNameDefaultDecl
-  | RdrIfaceImportDecl	(IfaceImportDecl ProtoName)
-  | RdrIfaceFixities	[ProtoNameFixityDecl]
+  | RdrClassDecl 	RdrNameClassDecl
+  | RdrInstDecl 	RdrNameInstDecl
+  | RdrDefaultDecl	RdrNameDefaultDecl
 
 			-- signatures are mysterious; we can't
 			-- tell if its a Sig or a ClassOpSig,
 			-- so we just save the pieces:
-  | RdrTySig		[ProtoName]	    -- vars getting sigs
-			ProtoNamePolyType   -- the type
-			RdrTySigPragmas	    -- val/class-op pragmas
+  | RdrTySig		[RdrName]	    -- vars getting sigs
+			RdrNamePolyType     -- the type
 			SrcLoc
 
   -- user pragmas come in in a Sig-ish way/form...
-  | RdrSpecValSig   	[ProtoNameSig]
-  | RdrInlineValSig 	ProtoNameSig
-  | RdrDeforestSig 	ProtoNameSig
-  | RdrMagicUnfoldingSig ProtoNameSig
-  | RdrSpecInstSig  	ProtoNameSpecInstSig
-  | RdrSpecDataSig   	ProtoNameSpecDataSig
+  | RdrSpecValSig   	[RdrNameSig]
+  | RdrInlineValSig 	RdrNameSig
+  | RdrDeforestSig 	RdrNameSig
+  | RdrMagicUnfoldingSig RdrNameSig
+  | RdrSpecInstSig  	RdrNameSpecInstSig
+  | RdrSpecDataSig   	RdrNameSpecDataSig
 
-data RdrTySigPragmas
-  = RdrNoPragma
-  | RdrGenPragmas	ProtoNameGenPragmas
-  | RdrClassOpPragmas	ProtoNameClassOpPragmas
-
-type SigConverter = RdrBinding {- a RdrTySig... -} -> [ProtoNameSig]
+type SigConverter = RdrBinding {- a Sig -} -> [RdrNameSig]
 \end{code}
 
 \begin{code}
 data RdrMatch
   = RdrMatch_NoGuard
 	     SrcLine SrcFun
-	     ProtoNamePat
-	     ProtoNameHsExpr
+	     RdrNamePat
+	     RdrNameHsExpr
 	     RdrBinding
 
   | RdrMatch_Guards
 	     SrcLine SrcFun
-	     ProtoNamePat
-	     [(ProtoNameHsExpr, ProtoNameHsExpr)]
+	     RdrNamePat
+	     [(RdrNameHsExpr, RdrNameHsExpr)]
 	     -- (guard,         expr)
 	     RdrBinding
 \end{code}

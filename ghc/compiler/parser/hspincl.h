@@ -50,8 +50,6 @@
 #include "either.h"
 #include "ttype.h"
 #include "constr.h"
-#include "coresyn.h"
-#include "hpragma.h"
 #include "binding.h"
 #include "entidt.h"
 #include "tree.h"

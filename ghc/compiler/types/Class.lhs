@@ -37,7 +37,7 @@ import TyVar		( TyVar(..), GenTyVar )
 import Usage		( GenUsage, Usage(..), UVar(..) )
 
 import Maybes		( assocMaybe, Maybe )
-import NameTypes	( FullName, ShortName )
+import Name		( Name )
 import Unique		-- Keys for built-in classes
 import Outputable	( Outputable(..), NamedThing(..), ExportFlag )
 import Pretty		( Pretty(..), PrettyRep )
@@ -71,7 +71,7 @@ data GenClassOp ty
 data GenClass tyvar uvar
   = Class
 	Unique		-- Key for fast comparison
-	FullName
+	Name
 
 	tyvar	  	-- The class type variable
 
@@ -112,7 +112,7 @@ type ClassInstEnv = MatchEnv Type Id		-- The Ids are dfuns
 The @mkClass@ function fills in the indirect superclasses.
 
 \begin{code}
-mkClass :: Unique -> FullName -> TyVar
+mkClass :: Unique -> Name -> TyVar
 	-> [Class] -> [Id]
 	-> [ClassOp] -> [Id] -> [Id]
 	-> ClassInstEnv
@@ -250,16 +250,11 @@ instance Ord (GenClass tyvar uvar) where
 \end{code}
 
 \begin{code}
-instance NamedThing (GenClass tyvar uvar) where
-    getExportFlag 	(Class _ n _ _ _ _ _ _ _ _) = getExportFlag n
-    isLocallyDefined	(Class _ n _ _ _ _ _ _ _ _) = isLocallyDefined n
-    getOrigName		(Class _ n _ _ _ _ _ _ _ _) = getOrigName n
-    getOccurrenceName	(Class _ n _ _ _ _ _ _ _ _) = getOccurrenceName n
-    getInformingModules	(Class _ n _ _ _ _ _ _ _ _) = getInformingModules n
-    getSrcLoc		(Class _ n _ _ _ _ _ _ _ _) = getSrcLoc n
-    fromPreludeCore	(Class _ n _ _ _ _ _ _ _ _) = fromPreludeCore n
+instance Uniquable (GenClass tyvar uvar) where
+    uniqueOf (Class u _ _ _ _ _ _ _ _ _) = u
 
-    getItsUnique (Class key _ _ _ _ _ _ _ _ _) = key
+instance NamedThing (GenClass tyvar uvar) where
+    getName (Class _ n _ _ _ _ _ _ _ _) = n
 \end{code}
 
 
@@ -335,4 +330,3 @@ instance Ord (GenClassOp ty) where
     (ClassOp _ i1 _) >  (ClassOp _ i2 _) = i1 >  i2
     -- ToDo: something for _tagCmp? (WDP 94/10)
 \end{code}
-

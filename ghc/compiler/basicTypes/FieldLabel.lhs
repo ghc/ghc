@@ -40,6 +40,6 @@ instance Eq FieldLabel where
 instance Outputable FieldLabel where
     ppr sty (FieldLabel n _ _) = ppr sty n
 
-instance NamedThing FieldLabel
-    -- ToDo: fill this in
+instance NamedThing FieldLabel where
+    getName (FieldLabel n _ _) = n
 \end{code}

@@ -7,7 +7,7 @@
 module SST(
 	SST(..), SST_R, FSST(..), FSST_R,
 
-	_runSST,
+	_runSST, sstToST, stToSST,
 	thenSST, thenSST_, returnSST,
 	thenFSST, thenFSST_, returnFSST, failFSST,
 	recoverFSST, recoverSST, fixFSST,
@@ -16,7 +16,7 @@ module SST(
 	newMutVarSST, readMutVarSST, writeMutVarSST
   ) where
 
-import PreludeGlaST( MutableVar(..), _MutableArray(..) )
+import PreludeGlaST( MutableVar(..), _MutableArray(..), ST(..) )
 
 CHK_Ubiq() -- debugging consistency check
 \end{code}
@@ -27,6 +27,17 @@ type SST   s r = State# s -> SST_R s r
 \end{code}
 
 \begin{code}
+-- converting to/from ST
+
+sstToST :: SST s r -> ST s r
+stToSST :: ST s r -> SST s r
+
+sstToST sst (S# s)
+  = case sst s of SST_R r s' -> (r, S# s')
+stToSST st s
+  = case st (S# s) of (r, S# s') -> SST_R r s'
+
+
 -- Type of runSST should be builtin ...
 -- runSST :: forall r. (forall s. SST s r) -> r
 

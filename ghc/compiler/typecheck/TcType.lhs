@@ -47,7 +47,6 @@ import TcMonad
 import Ubiq
 import Unique		( Unique )
 import UniqFM		( UniqFM )
-import Name		( getNameShortName )
 import Maybes		( assocMaybe )
 import Util		( panic, pprPanic )
 

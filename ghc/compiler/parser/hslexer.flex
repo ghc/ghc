@@ -144,12 +144,12 @@ static int hslineno_save = 0,	    	/* Line Number          	 */
  hspcolno_save = 0;		    	/* Left Indentation	 	 */
 static short icontexts_save = 0;    	/* Indent Context Level 	 */
 
-static BOOLEAN etags_save; /* saved: whether doing etags stuff or not */
-extern BOOLEAN etags;	   /* that which is saved */
+static BOOLEAN etags_save;              /* saved: whether doing etags stuff or not */
+extern BOOLEAN etags;	                /* that which is saved */
 
-extern BOOLEAN nonstandardFlag;	/* Glasgow extensions allowed */
+extern BOOLEAN nonstandardFlag;	        /* Glasgow extensions allowed */
 
-static BOOLEAN in_interface = FALSE; /* TRUE if we are reading a .hi file */
+static BOOLEAN in_interface = FALSE;    /* TRUE if we are reading a .hi file */
 
 extern BOOLEAN ignorePragmas;		/* True when we should ignore pragmas */
 extern int minAcceptablePragmaVersion;	/* see documentation in main.c */
@@ -237,7 +237,7 @@ static int StateDepth = -1;
    list of start states.
  */
 
-%x Char CharEsc Code Comment GlaExt GhcPragma UserPragma String StringEsc
+%x Char CharEsc Code Comment GlaExt UserPragma String StringEsc
 
 isoS			[\xa1-\xbf\xd7\xf7]
 isoL			[\xc0-\xd6\xd8-\xde]
@@ -292,67 +292,11 @@ NL  	    	    	[\n\r]
 			  new_filename(tempf);
 			  hsplineno = hslineno; hscolno = 0; hspcolno = 0;
 			}
-<Code,GlaExt>"{-# GHC_PRAGMA INTERFACE VERSION "{D}+" #-}"   {
-			  sscanf(yytext+33,"%d ",&thisIfacePragmaVersion);
-			}
-<Code,GlaExt>"{-# GHC_PRAGMA "   { 
-    	    	    	  if ( ignorePragmas ||
-			       thisIfacePragmaVersion < minAcceptablePragmaVersion || 
-			       thisIfacePragmaVersion > maxAcceptablePragmaVersion) {
-			     nested_comments = 1;
-			     PUSH_STATE(Comment);
-			  } else {
-			     PUSH_STATE(GhcPragma);
-			     RETURN(GHC_PRAGMA);
-			  }
-			}
-<GhcPragma>"_N_"	    { RETURN(NO_PRAGMA); }
-<GhcPragma>"_NI_"	    { RETURN(NOINFO_PRAGMA); }
-<GhcPragma>"_DEFOREST_"	    { RETURN(DEFOREST_PRAGMA); }
-<GhcPragma>"_SPECIALISE_"   { RETURN(SPECIALISE_PRAGMA); }
-<GhcPragma>"_A_"	    { RETURN(ARITY_PRAGMA); }
-<GhcPragma>"_U_"	    { RETURN(UPDATE_PRAGMA); }
-<GhcPragma>"_S_"	    { RETURN(STRICTNESS_PRAGMA); }
-<GhcPragma>"_K_"	    { RETURN(KIND_PRAGMA); }
-<GhcPragma>"_MF_"	    { RETURN(MAGIC_UNFOLDING_PRAGMA); }
-<GhcPragma>"_F_"	    { RETURN(UNFOLDING_PRAGMA); }
 
-<GhcPragma>"_!_"	    { RETURN(COCON); }
-<GhcPragma>"_#_"	    { RETURN(COPRIM); }
-<GhcPragma>"_APP_"	    { RETURN(COAPP); }
-<GhcPragma>"_TYAPP_"	    { RETURN(COTYAPP); }
-<GhcPragma>"_ALG_"	    { RETURN(CO_ALG_ALTS); }
-<GhcPragma>"_PRIM_"	    { RETURN(CO_PRIM_ALTS); }
-<GhcPragma>"_NO_DEFLT_"	    { RETURN(CO_NO_DEFAULT); }
-<GhcPragma>"_LETREC_"	    { RETURN(CO_LETREC); }
-
-<GhcPragma>"_PRELUDE_DICTS_CC_" { RETURN(CO_PRELUDE_DICTS_CC); }
-<GhcPragma>"_ALL_DICTS_CC_" { RETURN(CO_ALL_DICTS_CC); }
-<GhcPragma>"_USER_CC_"	    { RETURN(CO_USER_CC); }
-<GhcPragma>"_AUTO_CC_"	    { RETURN(CO_AUTO_CC); }
-<GhcPragma>"_DICT_CC_"	    { RETURN(CO_DICT_CC); }
-
-<GhcPragma>"_DUPD_CC_"	    { RETURN(CO_DUPD_CC); }
-<GhcPragma>"_CAF_CC_"	    { RETURN(CO_CAF_CC); }
-
-<GhcPragma>"_SDSEL_"	    { RETURN(CO_SDSEL_ID); }
-<GhcPragma>"_METH_"	    { RETURN(CO_METH_ID); }
-<GhcPragma>"_DEFM_"	    { RETURN(CO_DEFM_ID); }
-<GhcPragma>"_DFUN_"	    { RETURN(CO_DFUN_ID); }
-<GhcPragma>"_CONSTM_"	    { RETURN(CO_CONSTM_ID); }
-<GhcPragma>"_SPEC_"	    { RETURN(CO_SPEC_ID); }
-<GhcPragma>"_WRKR_"	    { RETURN(CO_WRKR_ID); }
-<GhcPragma>"_ORIG_"	    { RETURN(CO_ORIG_NM); /* fully-qualified original name*/ }
-
-<GhcPragma>"_ALWAYS_"	    { RETURN(UNFOLD_ALWAYS); }
-<GhcPragma>"_IF_ARGS_"      { RETURN(UNFOLD_IF_ARGS); }
-
-<GhcPragma>"_NOREP_I_"	    { RETURN(NOREP_INTEGER); }
-<GhcPragma>"_NOREP_R_"	    { RETURN(NOREP_RATIONAL); }
-<GhcPragma>"_NOREP_S_"	    { RETURN(NOREP_STRING); }
-
-<GhcPragma>" #-}"	    { POP_STATE; RETURN(END_PRAGMA); }
-
+<Code,GlaExt>"{-#"{WS}*"INTERFACE" {
+			      PUSH_STATE(UserPragma);
+			      RETURN(INTERFACE_UPRAGMA);
+			    }
 <Code,GlaExt>"{-#"{WS}*"SPECIALI"[SZ]E {
 			      PUSH_STATE(UserPragma);
 			      RETURN(SPECIALISE_UPRAGMA);
@@ -386,7 +330,7 @@ NL  	    	    	[\n\r]
      */
 %}
 
-<Code,GlaExt,GhcPragma>"case" 	{ RETURN(CASE); }
+<Code,GlaExt>"case" 		{ RETURN(CASE); }
 <Code,GlaExt>"class"		{ RETURN(CLASS); }
 <Code,GlaExt,UserPragma>"data"	{ RETURN(DATA); }
 <Code,GlaExt>"default"  	{ RETURN(DEFAULT); }
@@ -395,15 +339,15 @@ NL  	    	    	[\n\r]
 <Code,GlaExt>"else"		{ RETURN(ELSE); }
 <Code,GlaExt>"if"		{ RETURN(IF); }
 <Code,GlaExt>"import"		{ RETURN(IMPORT); }
-<Code,GlaExt,GhcPragma>"in"	{ RETURN(IN); }
+<Code,GlaExt>"in"		{ RETURN(IN); }
 <Code,GlaExt>"infix"		{ RETURN(INFIX); }
 <Code,GlaExt>"infixl"		{ RETURN(INFIXL); }
 <Code,GlaExt>"infixr"		{ RETURN(INFIXR); }
 <Code,GlaExt,UserPragma>"instance" { RETURN(INSTANCE); }
-<Code,GlaExt,GhcPragma>"let"	{ RETURN(LET); }
+<Code,GlaExt>"let"		{ RETURN(LET); }
 <Code,GlaExt>"module"		{ RETURN(MODULE); }
 <Code,GlaExt>"newtype" 		{ RETURN(NEWTYPE); }
-<Code,GlaExt,GhcPragma>"of"	{ RETURN(OF); }
+<Code,GlaExt>"of"		{ RETURN(OF); }
 <Code,GlaExt>"then"		{ RETURN(THEN); }
 <Code,GlaExt>"type"		{ RETURN(TYPE); }
 <Code,GlaExt>"where"		{ RETURN(WHERE); }
@@ -411,14 +355,12 @@ NL  	    	    	[\n\r]
 <Code,GlaExt>"as"		{ RETURN(AS); }
 <Code,GlaExt>"hiding"		{ RETURN(HIDING); }
 <Code,GlaExt>"qualified"	{ RETURN(QUALIFIED); }
-<Code,GlaExt>"interface"        { RETURN(INTERFACE); }
 
-<Code,GlaExt,GhcPragma>"_scc_"	{ RETURN(SCC); }
-<GlaExt,GhcPragma>"_ccall_"	{ RETURN(CCALL); }
-<GlaExt,GhcPragma>"_ccall_GC_"	{ RETURN(CCALL_GC); }
-<GlaExt,GhcPragma>"_casm_"	{ RETURN(CASM); }
-<GlaExt,GhcPragma>"_casm_GC_"	{ RETURN(CASM_GC); }
-<GhcPragma>"_forall_"		{ RETURN(FORALL); }
+<Code,GlaExt>"_scc_"		{ RETURN(SCC); }
+<GlaExt>"_ccall_"		{ RETURN(CCALL); }
+<GlaExt>"_ccall_GC_"		{ RETURN(CCALL_GC); }
+<GlaExt>"_casm_"		{ RETURN(CASM); }
+<GlaExt>"_casm_GC_"		{ RETURN(CASM_GC); }
 
 %{
     /* 
@@ -426,32 +368,30 @@ NL  	    	    	[\n\r]
      */
 %}
 
-<Code,GlaExt,GhcPragma,UserPragma>"("	{ RETURN(OPAREN); }
-<Code,GlaExt,GhcPragma,UserPragma>")"	{ RETURN(CPAREN); }
-<Code,GlaExt,GhcPragma,UserPragma>"["	{ RETURN(OBRACK); }
-<Code,GlaExt,GhcPragma,UserPragma>"]"	{ RETURN(CBRACK); }
-<Code,GlaExt,GhcPragma>"{"		{ RETURN(OCURLY); }
-<Code,GlaExt,GhcPragma>"}"		{ RETURN(CCURLY); }
-<Code,GlaExt,GhcPragma,UserPragma>","	{ RETURN(COMMA); }
-<Code,GlaExt,GhcPragma>";"		{ RETURN(SEMI); }
-<Code,GlaExt,GhcPragma>"`"		{ RETURN(BQUOTE); }
-<Code,GlaExt>"_"			{ RETURN(WILDCARD); }
+<Code,GlaExt,UserPragma>"("	{ RETURN(OPAREN); }
+<Code,GlaExt,UserPragma>")"	{ RETURN(CPAREN); }
+<Code,GlaExt,UserPragma>"["	{ RETURN(OBRACK); }
+<Code,GlaExt,UserPragma>"]"	{ RETURN(CBRACK); }
+<Code,GlaExt>"{"		{ RETURN(OCURLY); }
+<Code,GlaExt>"}"		{ RETURN(CCURLY); }
+<Code,GlaExt,UserPragma>","	{ RETURN(COMMA); }
+<Code,GlaExt>";"		{ RETURN(SEMI); }
+<Code,GlaExt>"`"		{ RETURN(BQUOTE); }
+<Code,GlaExt>"_"		{ RETURN(WILDCARD); }
 
-<Code,GlaExt>".."			{ RETURN(DOTDOT); }
-<Code,GlaExt,GhcPragma,UserPragma>"::"	{ RETURN(DCOLON); }
-<Code,GlaExt,GhcPragma,UserPragma>"="	{ RETURN(EQUAL); }
-<Code,GlaExt,GhcPragma>"\\"		{ RETURN(LAMBDA); }
-<Code,GlaExt,GhcPragma>"|"		{ RETURN(VBAR); }
-<Code,GlaExt>"<-"			{ RETURN(LARROW); }
-<Code,GlaExt,GhcPragma,UserPragma>"->"	{ RETURN(RARROW); }
-<Code,GlaExt>"-"    			{ RETURN(MINUS); }
+<Code,GlaExt>".."		{ RETURN(DOTDOT); }
+<Code,GlaExt,UserPragma>"::"	{ RETURN(DCOLON); }
+<Code,GlaExt,UserPragma>"="	{ RETURN(EQUAL); }
+<Code,GlaExt>"\\"		{ RETURN(LAMBDA); }
+<Code,GlaExt>"|"		{ RETURN(VBAR); }
+<Code,GlaExt>"<-"		{ RETURN(LARROW); }
+<Code,GlaExt,UserPragma>"->"	{ RETURN(RARROW); }
+<Code,GlaExt>"-"    		{ RETURN(MINUS); }
 
-<Code,GlaExt,GhcPragma,UserPragma>"=>"	{ RETURN(DARROW); }
-<Code,GlaExt>"@"			{ RETURN(AT); }
-<Code,GlaExt>"!"			{ RETURN(BANG); }
-<Code,GlaExt>"~"    			{ RETURN(LAZY); }
-
-<GhcPragma>"_/\\_"			{ RETURN(TYLAMBDA); }
+<Code,GlaExt,UserPragma>"=>"	{ RETURN(DARROW); }
+<Code,GlaExt>"@"		{ RETURN(AT); }
+<Code,GlaExt>"!"		{ RETURN(BANG); }
+<Code,GlaExt>"~"    		{ RETURN(LAZY); }
 
 %{
     /*
@@ -477,11 +417,11 @@ NL  	    	    	[\n\r]
 			 yylval.uid = xstrndup(yytext, yyleng);
 			 RETURN(INTEGER);
 			}
-<GlaExt,GhcPragma>("-")?{N}"#"	{
+<GlaExt>("-")?{N}"#"	{
 			 yylval.uid = xstrndup(yytext, yyleng - 1);
 			 RETURN(INTPRIM);
 			}
-<Code,GlaExt,GhcPragma>{N} {
+<Code,GlaExt,UserPragma>{N} {
 			 yylval.uid = xstrndup(yytext, yyleng);
 			 RETURN(INTEGER);
 			}
@@ -492,11 +432,11 @@ NL  	    	    	[\n\r]
      */
 %}
 
-<GlaExt,GhcPragma>("-")?{F}"##" {
+<GlaExt>("-")?{F}"##" 	{
 			 yylval.uid = xstrndup(yytext, yyleng - 2);
 			 RETURN(DOUBLEPRIM);
 			}
-<GlaExt,GhcPragma>("-")?{F}"#" {
+<GlaExt>("-")?{F}"#" 	{
 			 yylval.uid = xstrndup(yytext, yyleng - 1);
 			 RETURN(FLOATPRIM);
 			}
@@ -511,7 +451,7 @@ NL  	    	    	[\n\r]
      */
 %}
 
-<GlaExt,GhcPragma>"``"[^']+"''"	{
+<GlaExt>"``"[^']+"''"	{
 			 hsnewid(yytext + 2, yyleng - 4);
 			 RETURN(CLITLIT);
 			}
@@ -523,14 +463,11 @@ NL  	    	    	[\n\r]
      */
 %}
 
-<GhcPragma>"_NIL_"		{ hsnewid(yytext, yyleng); RETURN(CONID); }
-<GhcPragma>"_TUP_"{D}+		{ hsnewid(yytext, yyleng); RETURN(CONID); }
-<GhcPragma>[a-z]{i}*"$"[a-z]{i}* { hsnewid(yytext, yyleng); RETURN(TYVAR_TEMPLATE_ID); }
 
 %{
 /* These SHOULDNAE work in "Code" (sigh) */
 %}
-<Code,GlaExt,GhcPragma,UserPragma>{Id}"#" { 
+<Code,GlaExt,UserPragma>{Id}"#" { 
 			 if (! (nonstandardFlag || in_interface)) {
 			    char errbuf[ERR_BUF_SIZE];
 			    sprintf(errbuf, "Non-standard identifier (trailing `#'): %s\n", yytext);
@@ -539,7 +476,7 @@ NL  	    	    	[\n\r]
     	    	    	 hsnewid(yytext, yyleng);
     	    	    	 RETURN(_isconstr(yytext) ? CONID : VARID);
 			}
-<Code,GlaExt,GhcPragma,UserPragma>_+{Id} { 
+<Code,GlaExt,UserPragma>_+{Id} { 
 			 if (! (nonstandardFlag || in_interface)) {
 			    char errbuf[ERR_BUF_SIZE];
 			    sprintf(errbuf, "Non-standard identifier (leading underscore): %s\n", yytext);
@@ -549,19 +486,19 @@ NL  	    	    	[\n\r]
     	    	    	 RETURN(isconstr(yytext) ? CONID : VARID);
 			 /* NB: ^^^^^^^^ : not the macro! */
 			}
-<Code,GlaExt,GhcPragma,UserPragma>{Id}	{
+<Code,GlaExt,UserPragma>{Id}	{
     	    	         hsnewid(yytext, yyleng);
 			 RETURN(_isconstr(yytext) ? CONID : VARID);
 			}
-<Code,GlaExt,GhcPragma,UserPragma>{SId}	{
+<Code,GlaExt,UserPragma>{SId}	{
     	    		 hsnewid(yytext, yyleng);
 			 RETURN(_isconstr(yytext) ? CONSYM : VARSYM);
 			}
-<Code,GlaExt,GhcPragma,UserPragma>{Mod}"."{Id}	{
+<Code,GlaExt,UserPragma>{Mod}"."{Id}	{
 			 BOOLEAN isconstr = hsnewqid(yytext, yyleng);
 			 RETURN(isconstr ? QCONID : QVARID);
 			}
-<Code,GlaExt,GhcPragma,UserPragma>{Mod}"."{SId}	{
+<Code,GlaExt,UserPragma>{Mod}"."{SId}	{
 			 BOOLEAN isconstr = hsnewqid(yytext, yyleng);
 			 RETURN(isconstr ? QCONSYM : QVARSYM);
 			}
@@ -576,7 +513,7 @@ NL  	    	    	[\n\r]
     */
 %}
 
-<GlaExt,GhcPragma,UserPragma>"`"{Id}"#`"	{	
+<GlaExt,UserPragma>"`"{Id}"#`"	{	
     	    	    	 hsnewid(yytext + 1, yyleng - 2);
 			 RETURN(_isconstr(yytext+1) ? CONSYM : VARSYM);
 			}
@@ -595,7 +532,7 @@ NL  	    	    	[\n\r]
      */
 %}
 
-<GlaExt,GhcPragma>'({CHAR}|"\"")"'#" {
+<GlaExt>'({CHAR}|"\"")"'#" {
     	    	    	 yylval.uhstring = installHstring(1, yytext+1);
     	    	    	 RETURN(CHARPRIM);
     	    	    	}
@@ -607,7 +544,7 @@ NL  	    	    	[\n\r]
 			 sprintf(errbuf, "'' is not a valid character (or string) literal\n");
 			 hsperror(errbuf);
 			}
-<Code,GlaExt,GhcPragma>'({CHAR}|"\"")* {
+<Code,GlaExt>'({CHAR}|"\"")* {
     	    	    	 hsmlcolno = hspcolno;
     	    	    	 cleartext();
     	    	    	 addtext(yytext+1, yyleng-1);
@@ -675,16 +612,16 @@ NL  	    	    	[\n\r]
      */
 %}
 
-<GlaExt,GhcPragma>"\""({CHAR}|"'")*"\""#  {
+<GlaExt>"\""({CHAR}|"'")*"\""#  {
 			 yylval.uhstring = installHstring(yyleng-3, yytext+1);
 			    /* the -3 accounts for the " on front, "# on the end */
 			 RETURN(STRINGPRIM); 
     	    	    	}
-<Code,GlaExt,GhcPragma>"\""({CHAR}|"'")*"\""  {
+<Code,GlaExt>"\""({CHAR}|"'")*"\""  {
 			 yylval.uhstring = installHstring(yyleng-2, yytext+1);
 			 RETURN(STRING); 
     	    	    	}
-<Code,GlaExt,GhcPragma>"\""({CHAR}|"'")* {
+<Code,GlaExt>"\""({CHAR}|"'")* {
     	    	    	 hsmlcolno = hspcolno;
     	    	    	 cleartext();
     	    	    	 addtext(yytext+1, yyleng-1);
@@ -838,7 +775,7 @@ NL  	    	    	[\n\r]
 %}
 
 <Code,GlaExt,StringEsc>"--".*{NL}?{WS}* |
-<Code,GlaExt,GhcPragma,UserPragma,StringEsc>{WS}+	{ noGap = FALSE; }
+<Code,GlaExt,UserPragma,StringEsc>{WS}+	{ noGap = FALSE; }
 
 %{
     /*
@@ -848,7 +785,7 @@ NL  	    	    	[\n\r]
      */
 %}
 
-<Code,GlaExt,GhcPragma,UserPragma,StringEsc>"{-"	{ 
+<Code,GlaExt,UserPragma,StringEsc>"{-"	{ 
     	    	    	  noGap = FALSE; nested_comments = 1; PUSH_STATE(Comment); 
     	    	    	}
 
@@ -867,7 +804,7 @@ NL  	    	    	[\n\r]
      */
 %}
 
-<INITIAL,Code,GlaExt,GhcPragma,UserPragma>(.|\n)	{ 
+<INITIAL,Code,GlaExt,UserPragma>(.|\n)	{ 
     	    	    	 fprintf(stderr, "\"%s\", line %d, column %d: Illegal character: `", 
     	    	    	    input_filename, hsplineno, hspcolno + 1); 
     	    	    	 format_string(stderr, (unsigned char *) yytext, 1);
@@ -939,10 +876,6 @@ NL  	    	    	[\n\r]
     	    	    	  hsplineno = hslineno; hspcolno = hscolno;
     	    	    	  hsperror("unterminated string literal"); 
     	    	    	}
-<GhcPragma><<EOF>>  	{
-    	    	    	  hsplineno = hslineno; hspcolno = hscolno;
-    	    	    	  hsperror("unterminated interface pragma"); 
-			}
 <UserPragma><<EOF>>  	{
     	    	    	  hsplineno = hslineno; hspcolno = hscolno;
     	    	    	  hsperror("unterminated user-specified pragma"); 
@@ -1171,7 +1104,10 @@ yylex()
 	fprintf(stderr, "finished reading interface (%d:%d:%d)\n", hscolno, hspcolno, INDENTPT);
 #endif
 	eof = FALSE;
-	RETURN(LEOF);
+
+	/* RETURN(LEOF); */
+        hsperror("No longer using yacc to parse interface files");
+
     } else {
 	yyterminate();
     }
@@ -1182,7 +1118,7 @@ yylex()
 /**********************************************************************
 *                                                                     *
 *                                                                     *
-*     Input Processing for Interfaces                                 *
+*     Input Processing for Interfaces -- Not currently used !!!       *
 *                                                                     *
 *                                                                     *
 **********************************************************************/

@@ -10,14 +10,12 @@ Datatype for: @HsBinds@, @Bind@, @Sig@, @MonoBinds@.
 
 module HsBinds where
 
-import Ubiq{-uitous-}
+import Ubiq
 
 -- friends:
 import HsLoop
-
 import HsMatches	( pprMatches, pprGRHSsAndBinds,
-			  Match, GRHSsAndBinds
-			)
+			  Match, GRHSsAndBinds )
 import HsPat		( collectPatBinders, InPat )
 import HsPragmas	( GenPragmas, ClassOpPragmas )
 import HsTypes		( PolyType )

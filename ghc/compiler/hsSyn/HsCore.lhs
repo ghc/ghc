@@ -14,27 +14,22 @@ We could either use this, or parameterise @GenCoreExpr@ on @Types@ and
 #include "HsVersions.h"
 
 module HsCore (
-	-- types:
 	UnfoldingCoreExpr(..), UnfoldingCoreAlts(..),
 	UnfoldingCoreDefault(..), UnfoldingCoreBinding(..),
 	UnfoldingCoreAtom(..), UfId(..), UnfoldingType(..),
-	UnfoldingPrimOp(..), UfCostCentre(..),
-
-	-- function:
-	eqUfExpr
+	UnfoldingPrimOp(..), UfCostCentre(..)
     ) where
 
-import Ubiq{-uitous-}
+import Ubiq
 
 -- friends:
-import HsTypes		( cmpPolyType, MonoType(..), PolyType(..) )
+import HsTypes		( MonoType, PolyType )
 import PrimOp		( PrimOp, tagOf_PrimOp )
 
 -- others:
 import Literal		( Literal )
-import Outputable	( Outputable(..) {-instances-} )
+import Outputable	( Outputable(..) )
 import Pretty
-import ProtoName	( cmpProtoName, eqProtoName, ProtoName )
 import Util		( panic )
 \end{code}
 
@@ -215,128 +210,3 @@ pprUfId sty (WorkerUfId unwrkr)
   = ppBesides [ppStr "({-wrkr-}", pprUfId sty unwrkr, ppStr ")"]
 \end{code}
 
-%************************************************************************
-%*									*
-\subsection[HsCore-equality]{Comparing Core unfoldings}
-%*									*
-%************************************************************************
-
-We want to check that they are {\em exactly} the same.
-
-\begin{code}
---eqUfExpr :: ProtoNameCoreExpr -> ProtoNameCoreExpr -> Bool
-
-eqUfExpr (UfVar v1)     (UfVar v2)     = eqUfId v1 v2
-eqUfExpr (UfLit l1) (UfLit l2) = l1 == l2
-
-eqUfExpr (UfCon c1 tys1 as1) (UfCon c2 tys2 as2)
-  = eq_name c1 c2 && eq_lists eq_type tys1 tys2 && eq_lists eq_atom as1 as2
-eqUfExpr (UfPrim o1 tys1 as1) (UfPrim o2 tys2 as2)
-  = eq_op o1 o2 && eq_lists eq_type tys1 tys2 && eq_lists eq_atom as1 as2
-  where
-    eq_op (UfCCallOp _ _ _ _ _) (UfCCallOp _ _ _ _ _) = True
-    eq_op (UfOtherOp o1)        (UfOtherOp o2)
-      = tagOf_PrimOp o1 _EQ_ tagOf_PrimOp o2
-
-eqUfExpr (UfLam bs1 body1) (UfLam bs2 body2)
-  = eq_binder bs1 bs2 && eqUfExpr body1 body2
-
-eqUfExpr (UfApp fun1 arg1) (UfApp fun2 arg2)
-  = eqUfExpr fun1 fun2 && eq_atom arg1 arg2
-
-eqUfExpr (UfCase scrut1 alts1) (UfCase scrut2 alts2)
-  = eqUfExpr scrut1 scrut2 && eq_alts alts1 alts2
-  where
-    eq_alts (UfCoAlgAlts alts1 deflt1) (UfCoAlgAlts alts2 deflt2)
-      = eq_lists eq_alt alts1 alts2 && eq_deflt deflt1 deflt2
-      where
-       eq_alt (c1,bs1,rhs1) (c2,bs2,rhs2)
-	 = eq_name c1 c2 && eq_lists eq_binder bs1 bs2 && eqUfExpr rhs1 rhs2
-
-    eq_alts (UfCoPrimAlts alts1 deflt1) (UfCoPrimAlts alts2 deflt2)
-      = eq_lists eq_alt alts1 alts2 && eq_deflt deflt1 deflt2
-      where
-       eq_alt (l1,rhs1) (l2,rhs2)
-	 = l1 == l2 && eqUfExpr rhs1 rhs2
-
-    eq_alts _ _ = False -- catch-all
-
-    eq_deflt UfCoNoDefault UfCoNoDefault = True
-    eq_deflt (UfCoBindDefault b1 rhs1) (UfCoBindDefault b2 rhs2)
-      = eq_binder b1 b2 && eqUfExpr rhs1 rhs2
-    eq_deflt _ _ = False
-
-eqUfExpr (UfLet (UfCoNonRec b1 rhs1) body1) (UfLet (UfCoNonRec b2 rhs2) body2)
-  = eq_binder b1 b2 && eqUfExpr rhs1 rhs2 && eqUfExpr body1 body2
-
-eqUfExpr (UfLet (UfCoRec pairs1) body1) (UfLet (UfCoRec pairs2) body2)
-  = eq_lists eq_pair pairs1 pairs2 && eqUfExpr body1 body2
-  where
-    eq_pair (b1,rhs1) (b2,rhs2) = eq_binder b1 b2 && eqUfExpr rhs1 rhs2
-
-eqUfExpr (UfSCC cc1 body1) (UfSCC cc2 body2)
-  = {-trace "eqUfExpr: not comparing cost-centres!"-} (eqUfExpr body1 body2)
-
-eqUfExpr _ _ = False -- Catch-all
-\end{code}
-
-\begin{code}
-eqUfId (BoringUfId n1) (BoringUfId n2)
-  = eq_name n1 n2
-eqUfId (SuperDictSelUfId a1 b1) (SuperDictSelUfId a2 b2)
-  = eq_name a1 a2 && eq_name b1 b2
-eqUfId (ClassOpUfId a1 b1) (ClassOpUfId a2 b2)
-  = eq_name a1 a2 && eq_name b1 b2
-eqUfId (DictFunUfId c1 t1) (DictFunUfId c2 t2)
-  = eq_name c1 c2 && eq_tycon t1 t2 -- NB: **** only compare TyCons ******
-  where
-    eq_tycon = panic "HsCore:eqUfId:eq_tycon:ToDo"
-{- LATER:
-    eq_tycon (UnoverloadedTy ty1) (UnoverloadedTy ty2)
-      = case (cmpInstanceTypes ty1 ty2) of { EQ_ -> True; _ -> False }
-    eq_tycon ty1 ty2
-      = trace "eq_tycon" (eq_type ty1 ty2) -- desperately try something else
--}
-
-eqUfId (ConstMethodUfId	a1 b1 t1) (ConstMethodUfId a2 b2 t2)
-  = eq_name a1 a2 && eq_name b1 b2 && eq_type t1 t2
-eqUfId (DefaultMethodUfId a1 b1) (DefaultMethodUfId a2 b2)
-  = eq_name a1 a2 && eq_name b1 b2
-eqUfId (SpecUfId id1 tms1) (SpecUfId id2 tms2)
-  = eqUfId id1 id2 && eq_lists eq_ty_maybe tms1 tms2
-  where
-    eq_ty_maybe = panic "HsCore:eqUfId:eq_ty_maybe:ToDo"
-{-
-    eq_ty_maybe Nothing Nothing = True
-    eq_ty_maybe (Just ty1) (Just ty2)
-      = eq_type (UnoverloadedTy ty1) (UnoverloadedTy ty2)
-      -- a HACKy way to compare MonoTypes (ToDo) [WDP 94/05/02]
-    eq_ty_maybe _ _ = False
--}
-eqUfId (WorkerUfId id1) (WorkerUfId id2)
-  = eqUfId id1 id2
-eqUfId _ _ = False -- catch-all
-\end{code}
-
-\begin{code}
-eq_atom (UfCoVarAtom id1) (UfCoVarAtom id2) = eqUfId id1 id2
-eq_atom (UfCoLitAtom l1) (UfCoLitAtom l2) = l1 == l2
-eq_atom _ _ = False
-
-eq_binder (n1, ty1) (n2, ty2) = eq_name n1 n2 && eq_type ty1 ty2
-
-eq_name :: ProtoName -> ProtoName -> Bool
-eq_name pn1 pn2 = eqProtoName pn1 pn2 -- uses original names
-
-eq_type ty1 ty2
-  = case (cmpPolyType cmpProtoName ty1 ty2) of { EQ_ -> True; _ -> False }
-\end{code}
-
-\begin{code}
-eq_lists :: (a -> a -> Bool) -> [a] -> [a] -> Bool
-
-eq_lists eq [] [] = True
-eq_lists eq [] _  = False
-eq_lists eq _  [] = False
-eq_lists eq (x:xs) (y:ys) = eq x y && eq_lists eq xs ys
-\end{code}

@@ -16,7 +16,8 @@ import HsSyn		( HsExpr(..), Qual(..), Stmt(..),
 			  Match, Fake, InPat, OutPat, PolyType,
 			  irrefutablePat, collectPatBinders )
 import RnHsSyn		( RenamedHsExpr(..), RenamedQual(..),
-			  RenamedStmt(..), RenamedRecordBinds(..)
+			  RenamedStmt(..), RenamedRecordBinds(..),
+			  RnName{-instance Outputable-}
 			)
 import TcHsSyn		( TcExpr(..), TcQual(..), TcStmt(..),
 			  TcIdOcc(..), TcRecordBinds(..),
@@ -46,6 +47,7 @@ import FieldLabel	( fieldLabelName )
 import Id		( Id(..), GenId, idType, dataConFieldLabels )
 import Kind		( Kind, mkBoxedTypeKind, mkTypeKind, mkArrowKind )
 import GenSpecEtc	( checkSigTyVars, checkSigTyVarsGivenGlobals )
+import Name		( Name{-instance Eq-} )
 import PrelInfo		( intPrimTy, charPrimTy, doublePrimTy,
 			  floatPrimTy, addrPrimTy, addrTy,
 			  boolTy, charTy, stringTy, mkListTy,
@@ -63,7 +65,7 @@ import Unique		( Unique, cCallableClassKey, cReturnableClassKey,
 			  enumFromToClassOpKey, enumFromThenToClassOpKey,
 			  monadClassKey, monadZeroClassKey )
 
-import Name		( Name )		-- Instance 
+--import Name		( Name )		-- Instance 
 import Outputable	( interpp'SP )
 import PprType		( GenType, GenTyVar )	-- Instances
 import Maybes		( maybeToBool )
@@ -621,7 +623,8 @@ tcArg expected_arg_ty arg
 %************************************************************************
 
 \begin{code}
-tcId :: Name -> TcM s (TcExpr s, LIE s, TcType s)
+tcId :: RnName -> TcM s (TcExpr s, LIE s, TcType s)
+
 tcId name
   = 	-- Look up the Id and instantiate its type
     tcLookupLocalValue name	`thenNF_Tc` \ maybe_local ->
@@ -826,7 +829,7 @@ checkRecordFields rbinds data_con
   where 
     data_con_fields = dataConFieldLabels data_con
 
-    ok (field_name, _, _) = any (match field_name) data_con_fields
+    ok (field_name, _, _) = any (match (getName field_name)) data_con_fields
 
     match field_name field_label = field_name == fieldLabelName field_label
 \end{code}

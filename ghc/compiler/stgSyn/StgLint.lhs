@@ -21,7 +21,9 @@ import Id		( idType, isDataCon,
 			)
 import Literal		( literalType, Literal{-instance Outputable-} )
 import Maybes		( catMaybes )
-import Outputable	( Outputable(..){-instance * []-} )
+import Outputable	( Outputable(..){-instance * []-},
+			  isLocallyDefined, getSrcLoc
+			)
 import PprType		( GenType{-instance Outputable-}, TyCon )
 import Pretty		-- quite a bit of it
 import PrimOp		( primOpType )

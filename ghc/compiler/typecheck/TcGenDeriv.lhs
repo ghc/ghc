@@ -11,7 +11,7 @@ This is where we do all the grimy bindings' generation.
 \begin{code}
 #include "HsVersions.h"
 
-module TcGenDeriv (
+module TcGenDeriv {- (
 	a_Expr,
 	a_PN,
 	a_Pat,
@@ -60,17 +60,17 @@ module TcGenDeriv (
 	con2tag_PN, tag2con_PN, maxtag_PN,
 
 	TagThingWanted(..)
-    ) where
+    ) -} where
 
 import Ubiq
 
 import HsSyn		( HsBinds(..), Bind(..), MonoBinds(..), Match(..), GRHSsAndBinds(..),
 			  GRHS(..), HsExpr(..), HsLit(..), InPat(..), Qual(..), Stmt,
 			  ArithSeqInfo, Sig, PolyType, FixityDecl, Fake )
-import RdrHsSyn		( ProtoNameMonoBinds(..), ProtoNameHsExpr(..), ProtoNamePat(..) )
-import RnHsSyn		( RenamedFixityDecl(..) )
+import RdrHsSyn		( RdrNameMonoBinds(..), RdrNameHsExpr(..), RdrNamePat(..) )
+import RnHsSyn		( RnName(..), RenamedFixityDecl(..) )
 
-import RnMonad4		-- initRn4, etc.
+--import RnMonad4		-- initRn4, etc.
 import RnUtils
 
 import Id		( GenId, dataConArity, dataConTag,
@@ -78,13 +78,11 @@ import Id		( GenId, dataConArity, dataConTag,
 			  isDataCon, DataCon(..), ConTag(..) )
 import IdUtils		( primOpId )
 import Maybes		( maybeToBool )
-import Name		( Name(..) )
-import NameTypes	( mkFullName, Provenance(..) )
+--import Name		( Name(..) )
 import Outputable
 import PrimOp
 import PrelInfo
 import Pretty
-import ProtoName	( ProtoName(..) )
 import SrcLoc		( mkGeneratedSrcLoc )
 import TyCon		( TyCon, tyConDataCons, isEnumerationTyCon, maybeTyConSingleCon )
 import Type		( eqTy, isPrimType )
@@ -172,7 +170,10 @@ instance ... Eq (Foo ...) where
 \end{itemize}
 
 \begin{code}
-gen_Eq_binds :: TyCon -> ProtoNameMonoBinds
+foo_TcGenDeriv = panic "Nothing in TcGenDeriv LATER ToDo"
+
+{- LATER:
+gen_Eq_binds :: TyCon -> RdrNameMonoBinds
 
 gen_Eq_binds tycon
   = case (partition (\ con -> dataConArity con == 0)
@@ -200,7 +201,7 @@ gen_Eq_binds tycon
 	    con1_pat = ConPatIn data_con_PN (map VarPatIn as_needed)
 	    con2_pat = ConPatIn data_con_PN (map VarPatIn bs_needed)
 
-	    data_con_PN = Prel (WiredInVal data_con)
+	    data_con_PN = Prel (WiredInId data_con)
 	    as_needed   = take (dataConArity data_con) as_PNs
 	    bs_needed   = take (dataConArity data_con) bs_PNs
 	    tys_needed  = case (dataConSig data_con) of
@@ -315,7 +316,7 @@ cmp_eq _ _ = EQ
 \end{itemize}
 
 \begin{code}
-gen_Ord_binds :: TyCon -> ProtoNameMonoBinds
+gen_Ord_binds :: TyCon -> RdrNameMonoBinds
 
 gen_Ord_binds tycon
   = defaulted `AndMonoBinds` compare
@@ -354,7 +355,7 @@ gen_Ord_binds tycon
 	    con1_pat = ConPatIn data_con_PN (map VarPatIn as_needed)
 	    con2_pat = ConPatIn data_con_PN (map VarPatIn bs_needed)
 
-	    data_con_PN = Prel (WiredInVal data_con)
+	    data_con_PN = Prel (WiredInId data_con)
 	    as_needed   = take (dataConArity data_con) as_PNs
 	    bs_needed   = take (dataConArity data_con) bs_PNs
 	    tys_needed  = case (dataConSig data_con) of
@@ -427,7 +428,7 @@ instance ... Enum (Foo ...) where
 For @enumFromTo@ and @enumFromThenTo@, we use the default methods.
 
 \begin{code}
-gen_Enum_binds :: TyCon -> ProtoNameMonoBinds
+gen_Enum_binds :: TyCon -> RdrNameMonoBinds
 
 gen_Enum_binds tycon
   = enum_from `AndMonoBinds` enum_from_then
@@ -509,7 +510,7 @@ we follow the scheme given in Figure~19 of the Haskell~1.2 report
 (p.~147).
 
 \begin{code}
-gen_Ix_binds :: TyCon -> ProtoNameMonoBinds
+gen_Ix_binds :: TyCon -> RdrNameMonoBinds
 
 gen_Ix_binds tycon
   = if isEnumerationTyCon tycon
@@ -578,7 +579,7 @@ gen_Ix_binds tycon
 			 dc
 
     con_arity   = dataConArity data_con
-    data_con_PN = Prel (WiredInVal data_con)
+    data_con_PN = Prel (WiredInId data_con)
     con_pat  xs = ConPatIn data_con_PN (map VarPatIn xs)
     con_expr xs = foldl HsApp (HsVar data_con_PN) (map HsVar xs)
 
@@ -632,8 +633,8 @@ gen_Ix_binds tycon
 Ignoring all the infix-ery mumbo jumbo (ToDo)
 
 \begin{code}
-gen_Read_binds :: [RenamedFixityDecl] -> TyCon -> ProtoNameMonoBinds
-gen_Show_binds :: [RenamedFixityDecl] -> TyCon -> ProtoNameMonoBinds
+gen_Read_binds :: [RenamedFixityDecl] -> TyCon -> RdrNameMonoBinds
+gen_Show_binds :: [RenamedFixityDecl] -> TyCon -> RdrNameMonoBinds
 
 gen_Read_binds fixities tycon
   = reads_prec `AndMonoBinds` read_list
@@ -653,7 +654,7 @@ gen_Read_binds fixities tycon
       where
 	read_con data_con   -- note: "b" is the string being "read"
 	  = let
-		data_con_PN = Prel (WiredInVal data_con)
+		data_con_PN = Prel (WiredInId data_con)
 		data_con_str= snd  (getOrigName data_con)
 		as_needed   = take (dataConArity data_con) as_PNs
 		bs_needed   = take (dataConArity data_con) bs_PNs
@@ -700,7 +701,7 @@ gen_Show_binds fixities tycon
       where
 	pats_etc data_con
 	  = let
-		data_con_PN = Prel (WiredInVal data_con)
+		data_con_PN = Prel (WiredInId data_con)
 		bs_needed   = take (dataConArity data_con) bs_PNs
 		con_pat     = ConPatIn data_con_PN (map VarPatIn bs_needed)
 		nullary_con = dataConArity data_con == 0
@@ -739,7 +740,7 @@ gen_Show_binds fixities tycon
 ToDo: NOT DONE YET.
 
 \begin{code}
-gen_Binary_binds :: TyCon -> ProtoNameMonoBinds
+gen_Binary_binds :: TyCon -> RdrNameMonoBinds
 
 gen_Binary_binds tycon
   = panic "gen_Binary_binds"
@@ -767,34 +768,34 @@ data TagThingWanted
   = GenCon2Tag | GenTag2Con | GenMaxTag
 
 gen_tag_n_con_monobind
-    :: (ProtoName, Name,    -- (proto)Name for the thing in question
+    :: (RdrName, RnName,    -- (proto)Name for the thing in question
 	TyCon,		    -- tycon in question
 	TagThingWanted)
-    -> ProtoNameMonoBinds
+    -> RdrNameMonoBinds
 
 gen_tag_n_con_monobind (pn, _, tycon, GenCon2Tag)
   = mk_FunMonoBind pn (map mk_stuff (tyConDataCons tycon))
   where
-    mk_stuff :: DataCon -> ([ProtoNamePat], ProtoNameHsExpr)
+    mk_stuff :: DataCon -> ([RdrNamePat], RdrNameHsExpr)
 
     mk_stuff var
       = ASSERT(isDataCon var)
 	([pat], HsLit (HsIntPrim (toInteger ((dataConTag var) - fIRST_TAG))))
       where
 	pat    = ConPatIn var_PN (nOfThem (dataConArity var) WildPatIn)
-	var_PN = Prel (WiredInVal var)
+	var_PN = Prel (WiredInId var)
 
 gen_tag_n_con_monobind (pn, _, tycon, GenTag2Con)
   = mk_FunMonoBind pn (map mk_stuff (tyConDataCons tycon))
   where
-    mk_stuff :: DataCon -> ([ProtoNamePat], ProtoNameHsExpr)
+    mk_stuff :: DataCon -> ([RdrNamePat], RdrNameHsExpr)
 
     mk_stuff var
       = ASSERT(isDataCon var)
 	([lit_pat], HsVar var_PN)
       where
 	lit_pat = ConPatIn mkInt_PN [LitPatIn (HsIntPrim (toInteger ((dataConTag var) - fIRST_TAG)))]
-	var_PN  = Prel (WiredInVal var)
+	var_PN  = Prel (WiredInId var)
 
 gen_tag_n_con_monobind (pn, _, tycon, GenMaxTag)
   = mk_easy_FunMonoBind pn [] [] (HsApp (HsVar mkInt_PN) (HsLit (HsIntPrim max_tag)))
@@ -824,9 +825,9 @@ multi-clause definitions; it generates:
 \end{verbatim}
 
 \begin{code}
-mk_easy_FunMonoBind :: ProtoName -> [ProtoNamePat]
-		    -> [ProtoNameMonoBinds] -> ProtoNameHsExpr
-		    -> ProtoNameMonoBinds
+mk_easy_FunMonoBind :: RdrName -> [RdrNamePat]
+		    -> [RdrNameMonoBinds] -> RdrNameHsExpr
+		    -> RdrNameMonoBinds
 
 mk_easy_FunMonoBind fun pats binds expr
   = FunMonoBind fun [mk_easy_Match pats binds expr] mkGeneratedSrcLoc
@@ -842,9 +843,9 @@ mk_easy_Match pats binds expr
 	-- "recursive" MonoBinds, and it is its job to sort things out
 	-- from there.
 
-mk_FunMonoBind	:: ProtoName
-		-> [([ProtoNamePat], ProtoNameHsExpr)]
-		-> ProtoNameMonoBinds
+mk_FunMonoBind	:: RdrName
+		-> [([RdrNamePat], RdrNameHsExpr)]
+		-> RdrNameMonoBinds
 
 mk_FunMonoBind fun [] = panic "TcGenDeriv:mk_FunMonoBind"
 mk_FunMonoBind fun pats_and_exprs
@@ -858,19 +859,19 @@ mk_FunMonoBind fun pats_and_exprs
 
 \begin{code}
 compare_Case, cmp_eq_Expr ::
-	  ProtoNameHsExpr -> ProtoNameHsExpr -> ProtoNameHsExpr
-	  -> ProtoNameHsExpr -> ProtoNameHsExpr
-	  -> ProtoNameHsExpr
+	  RdrNameHsExpr -> RdrNameHsExpr -> RdrNameHsExpr
+	  -> RdrNameHsExpr -> RdrNameHsExpr
+	  -> RdrNameHsExpr
 compare_gen_Case ::
-	  ProtoName
-	  -> ProtoNameHsExpr -> ProtoNameHsExpr -> ProtoNameHsExpr
-	  -> ProtoNameHsExpr -> ProtoNameHsExpr
-	  -> ProtoNameHsExpr
+	  RdrName
+	  -> RdrNameHsExpr -> RdrNameHsExpr -> RdrNameHsExpr
+	  -> RdrNameHsExpr -> RdrNameHsExpr
+	  -> RdrNameHsExpr
 careful_compare_Case :: -- checks for primitive types...
 	  Type
-	  -> ProtoNameHsExpr -> ProtoNameHsExpr -> ProtoNameHsExpr
-	  -> ProtoNameHsExpr -> ProtoNameHsExpr
-	  -> ProtoNameHsExpr
+	  -> RdrNameHsExpr -> RdrNameHsExpr -> RdrNameHsExpr
+	  -> RdrNameHsExpr -> RdrNameHsExpr
+	  -> RdrNameHsExpr
 
 compare_Case = compare_gen_Case compare_PN
 cmp_eq_Expr = compare_gen_Case cmp_eq_PN
@@ -907,31 +908,31 @@ assoc_ty_id tyids ty
     res = [id | (ty',id) <- tyids, eqTy ty ty']
 
 eq_op_tbl = [
-    (charPrimTy,	Prel (WiredInVal (primOpId CharEqOp))),
-    (intPrimTy,		Prel (WiredInVal (primOpId IntEqOp))),
-    (wordPrimTy,	Prel (WiredInVal (primOpId WordEqOp))),
-    (addrPrimTy,	Prel (WiredInVal (primOpId AddrEqOp))),
-    (floatPrimTy,	Prel (WiredInVal (primOpId FloatEqOp))),
-    (doublePrimTy,	Prel (WiredInVal (primOpId DoubleEqOp))) ]
+    (charPrimTy,	Prel (WiredInId (primOpId CharEqOp))),
+    (intPrimTy,		Prel (WiredInId (primOpId IntEqOp))),
+    (wordPrimTy,	Prel (WiredInId (primOpId WordEqOp))),
+    (addrPrimTy,	Prel (WiredInId (primOpId AddrEqOp))),
+    (floatPrimTy,	Prel (WiredInId (primOpId FloatEqOp))),
+    (doublePrimTy,	Prel (WiredInId (primOpId DoubleEqOp))) ]
 
 lt_op_tbl = [
-    (charPrimTy,	Prel (WiredInVal (primOpId CharLtOp))),
-    (intPrimTy,		Prel (WiredInVal (primOpId IntLtOp))),
-    (wordPrimTy,	Prel (WiredInVal (primOpId WordLtOp))),
-    (addrPrimTy,	Prel (WiredInVal (primOpId AddrLtOp))),
-    (floatPrimTy,	Prel (WiredInVal (primOpId FloatLtOp))),
-    (doublePrimTy,	Prel (WiredInVal (primOpId DoubleLtOp))) ]
+    (charPrimTy,	Prel (WiredInId (primOpId CharLtOp))),
+    (intPrimTy,		Prel (WiredInId (primOpId IntLtOp))),
+    (wordPrimTy,	Prel (WiredInId (primOpId WordLtOp))),
+    (addrPrimTy,	Prel (WiredInId (primOpId AddrLtOp))),
+    (floatPrimTy,	Prel (WiredInId (primOpId FloatLtOp))),
+    (doublePrimTy,	Prel (WiredInId (primOpId DoubleLtOp))) ]
 
 -----------------------------------------------------------------------
 
-and_Expr, append_Expr :: ProtoNameHsExpr -> ProtoNameHsExpr -> ProtoNameHsExpr
+and_Expr, append_Expr :: RdrNameHsExpr -> RdrNameHsExpr -> RdrNameHsExpr
 
 and_Expr    a b = OpApp a (HsVar and_PN)    b
 append_Expr a b = OpApp a (HsVar append_PN) b
 
 -----------------------------------------------------------------------
 
-eq_Expr  :: Type -> ProtoNameHsExpr -> ProtoNameHsExpr -> ProtoNameHsExpr
+eq_Expr  :: Type -> RdrNameHsExpr -> RdrNameHsExpr -> RdrNameHsExpr
 eq_Expr ty a b
   = if not (isPrimType ty) then
        OpApp a (HsVar eq_PN)  b
@@ -942,7 +943,7 @@ eq_Expr ty a b
 \end{code}
 
 \begin{code}
-untag_Expr :: TyCon -> [(ProtoName, ProtoName)] -> ProtoNameHsExpr -> ProtoNameHsExpr
+untag_Expr :: TyCon -> [(RdrName, RdrName)] -> RdrNameHsExpr -> RdrNameHsExpr
 untag_Expr tycon [] expr = expr
 untag_Expr tycon ((untag_this, put_tag_here) : more) expr
   = HsCase (HsApp (con2tag_Expr tycon) (HsVar untag_this)) {-of-}
@@ -952,33 +953,33 @@ untag_Expr tycon ((untag_this, put_tag_here) : more) expr
   where
     grhs = [OtherwiseGRHS (untag_Expr tycon more expr) mkGeneratedSrcLoc]
 
-cmp_tags_Expr :: ProtoName 			-- Comparison op
-	     -> ProtoName -> ProtoName		-- Things to compare
-	     -> ProtoNameHsExpr 		-- What to return if true
-	     -> ProtoNameHsExpr			-- What to return if false
-	     -> ProtoNameHsExpr
+cmp_tags_Expr :: RdrName 			-- Comparison op
+	     -> RdrName -> RdrName		-- Things to compare
+	     -> RdrNameHsExpr 		-- What to return if true
+	     -> RdrNameHsExpr			-- What to return if false
+	     -> RdrNameHsExpr
 
 cmp_tags_Expr op a b true_case false_case
   = HsIf (OpApp (HsVar a) (HsVar op) (HsVar b)) true_case false_case mkGeneratedSrcLoc
 
 enum_from_to_Expr
-	:: ProtoNameHsExpr -> ProtoNameHsExpr
-	-> ProtoNameHsExpr
+	:: RdrNameHsExpr -> RdrNameHsExpr
+	-> RdrNameHsExpr
 enum_from_then_to_Expr
-	:: ProtoNameHsExpr -> ProtoNameHsExpr -> ProtoNameHsExpr
-	-> ProtoNameHsExpr
+	:: RdrNameHsExpr -> RdrNameHsExpr -> RdrNameHsExpr
+	-> RdrNameHsExpr
 
 enum_from_to_Expr      f   t2 = HsApp (HsApp (HsVar enumFromTo_PN) f) t2
 enum_from_then_to_Expr f t t2 = HsApp (HsApp (HsApp (HsVar enumFromThenTo_PN) f) t) t2
 
 showParen_Expr, readParen_Expr
-	:: ProtoNameHsExpr -> ProtoNameHsExpr
-	-> ProtoNameHsExpr
+	:: RdrNameHsExpr -> RdrNameHsExpr
+	-> RdrNameHsExpr
 
 showParen_Expr e1 e2 = HsApp (HsApp (HsVar showParen_PN) e1) e2
 readParen_Expr e1 e2 = HsApp (HsApp (HsVar readParen_PN) e1) e2
 
-nested_compose_Expr :: [ProtoNameHsExpr] -> ProtoNameHsExpr
+nested_compose_Expr :: [RdrNameHsExpr] -> RdrNameHsExpr
 
 nested_compose_Expr [e] = e
 nested_compose_Expr (e:es)
@@ -1010,9 +1011,9 @@ gt_PN		= prelude_method SLIT("Ord") SLIT(">")
 max_PN		= prelude_method SLIT("Ord") SLIT("max")
 min_PN		= prelude_method SLIT("Ord") SLIT("min")
 compare_PN	= prelude_method SLIT("Ord") SLIT("compare")
-ltTag_PN	= Prel (WiredInVal ltDataCon)
-eqTag_PN	= Prel (WiredInVal eqDataCon)
-gtTag_PN	= Prel (WiredInVal gtDataCon)
+ltTag_PN	= Prel (WiredInId ltDataCon)
+eqTag_PN	= Prel (WiredInId eqDataCon)
+gtTag_PN	= Prel (WiredInId gtDataCon)
 enumFrom_PN	 = prelude_method SLIT("Enum") SLIT("enumFrom")
 enumFromTo_PN	 = prelude_method SLIT("Enum") SLIT("enumFromTo")
 enumFromThen_PN	 = prelude_method SLIT("Enum") SLIT("enumFromThen")
@@ -1027,20 +1028,20 @@ showList_PN	 = prelude_method SLIT("Show") SLIT("showList")
 plus_PN		 = prelude_method SLIT("Num")  SLIT("+")
 times_PN	 = prelude_method SLIT("Num")  SLIT("*")
 
-false_PN	= Prel (WiredInVal falseDataCon)
-true_PN		= Prel (WiredInVal trueDataCon)
-eqH_PN		= Prel (WiredInVal (primOpId IntEqOp))
-geH_PN		= Prel (WiredInVal (primOpId IntGeOp))
-leH_PN		= Prel (WiredInVal (primOpId IntLeOp))
-ltH_PN		= Prel (WiredInVal (primOpId IntLtOp))
-minusH_PN	= Prel (WiredInVal (primOpId IntSubOp))
+false_PN	= Prel (WiredInId falseDataCon)
+true_PN		= Prel (WiredInId trueDataCon)
+eqH_PN		= Prel (WiredInId (primOpId IntEqOp))
+geH_PN		= Prel (WiredInId (primOpId IntGeOp))
+leH_PN		= Prel (WiredInId (primOpId IntLeOp))
+ltH_PN		= Prel (WiredInId (primOpId IntLtOp))
+minusH_PN	= Prel (WiredInId (primOpId IntSubOp))
 and_PN		= prelude_val pRELUDE     SLIT("&&")
 not_PN		= prelude_val pRELUDE     SLIT("not")
 append_PN	= prelude_val pRELUDE_LIST SLIT("++")
 map_PN		= prelude_val pRELUDE_LIST SLIT("map")
 compose_PN	= prelude_val pRELUDE     SLIT(".")
-mkInt_PN	= Prel (WiredInVal intDataCon)
-error_PN	= Prel (WiredInVal eRROR_ID)
+mkInt_PN	= Prel (WiredInId intDataCon)
+error_PN	= Prel (WiredInId eRROR_ID)
 showSpace_PN	= prelude_val pRELUDE_TEXT SLIT("showSpace__") -- not quite std
 showString_PN	= prelude_val pRELUDE_TEXT SLIT("showString")
 showParen_PN	= prelude_val pRELUDE_TEXT SLIT("showParen")
@@ -1070,7 +1071,7 @@ c_Pat		= VarPatIn c_PN
 d_Pat		= VarPatIn d_PN
 
 
-con2tag_PN, tag2con_PN, maxtag_PN :: TyCon -> ProtoName
+con2tag_PN, tag2con_PN, maxtag_PN :: TyCon -> RdrName
 
 con2tag_PN tycon
   = let	(mod, nm) = getOrigName tycon
@@ -1091,7 +1092,7 @@ maxtag_PN tycon
     Imp mod maxtag [mod] maxtag
 
 
-con2tag_FN, tag2con_FN, maxtag_FN :: TyCon -> FullName
+con2tag_FN, tag2con_FN, maxtag_FN :: TyCon -> RnName
 
 tag2con_FN tycon
   = let	(mod, nm) = getOrigName tycon
@@ -1110,5 +1111,6 @@ con2tag_FN tycon
 	con2tag	  = SLIT("con2tag_") _APPEND_ nm _APPEND_ SLIT("#")
     in
     mkFullName mod con2tag InventedInThisModule NotExported mkGeneratedSrcLoc
-
+-}
 \end{code}
+

@@ -5,8 +5,8 @@
 
 Based on @FiniteMaps@ (as you would expect).
 
-Basically, the things need to be in class @NamedThing@, and we use the
-@getItsUnique@ method to grab their @Uniques@.
+Basically, the things need to be in class @Uniquable@, and we use the
+@uniqueOf@ method to grab their @Uniques@.
 
 (A similar thing to @UniqSet@, as opposed to @Set@.)
 
@@ -32,7 +32,7 @@ module UniqFM (
 	addToUFM_Directly,
 	addListToUFM_Directly,
 	IF_NOT_GHC(addToUFM_C COMMA)
-	IF_NOT_GHC(addListToUFM_C COMMA)
+	addListToUFM_C,
 	delFromUFM,
 	delListFromUFM,
 	plusUFM,
@@ -57,9 +57,9 @@ module UniqFM (
 CHK_Ubiq() -- debugging consistency check
 #endif
 
-import Unique		( Unique, u2i, mkUniqueGrimily )
+import Unique		( Unique, Uniquable(..), u2i, mkUniqueGrimily )
 import Util
-import Outputable	( Outputable(..), NamedThing(..), ExportFlag )
+import Outputable	( Outputable(..), ExportFlag )
 import Pretty		( Pretty(..), PrettyRep )
 import PprStyle		( PprStyle )
 import SrcLoc		( SrcLoc )
@@ -77,31 +77,31 @@ import SrcLoc		( SrcLoc )
 %*									*
 %************************************************************************
 
-We use @FiniteMaps@, with a (@getItsUnique@-able) @Unique@ as ``key''.
+We use @FiniteMaps@, with a (@uniqueOf@-able) @Unique@ as ``key''.
 
 \begin{code}
 emptyUFM	:: UniqFM elt
 isNullUFM	:: UniqFM elt -> Bool
-unitUFM	:: NamedThing key => key -> elt -> UniqFM elt
+unitUFM		:: Uniquable key => key -> elt -> UniqFM elt
 unitDirectlyUFM -- got the Unique already
 		:: Unique -> elt -> UniqFM elt
-listToUFM	:: NamedThing key => [(key,elt)] -> UniqFM elt
+listToUFM	:: Uniquable key => [(key,elt)] -> UniqFM elt
 listToUFM_Directly
 		:: [(Unique, elt)] -> UniqFM elt
 
-addToUFM	:: NamedThing key => UniqFM elt -> key -> elt  -> UniqFM elt
-addListToUFM	:: NamedThing key => UniqFM elt -> [(key,elt)] -> UniqFM elt
+addToUFM	:: Uniquable key => UniqFM elt -> key -> elt  -> UniqFM elt
+addListToUFM	:: Uniquable key => UniqFM elt -> [(key,elt)] -> UniqFM elt
 addToUFM_Directly
 		:: UniqFM elt -> Unique -> elt -> UniqFM elt
 
-addToUFM_C	:: NamedThing key => (elt -> elt -> elt)
+addToUFM_C	:: Uniquable key => (elt -> elt -> elt)
 			   -> UniqFM elt -> key -> elt -> UniqFM elt
-addListToUFM_C	:: NamedThing key => (elt -> elt -> elt)
+addListToUFM_C	:: Uniquable key => (elt -> elt -> elt)
 			   -> UniqFM elt -> [(key,elt)]
 			   -> UniqFM elt
 
-delFromUFM	:: NamedThing key => UniqFM elt -> key	 -> UniqFM elt
-delListFromUFM	:: NamedThing key => UniqFM elt -> [key] -> UniqFM elt
+delFromUFM	:: Uniquable key => UniqFM elt -> key	 -> UniqFM elt
+delListFromUFM	:: Uniquable key => UniqFM elt -> [key] -> UniqFM elt
 
 plusUFM		:: UniqFM elt -> UniqFM elt -> UniqFM elt
 
@@ -119,11 +119,11 @@ filterUFM	:: (elt -> Bool) -> UniqFM elt -> UniqFM elt
 
 sizeUFM		:: UniqFM elt -> Int
 
-lookupUFM	:: NamedThing key => UniqFM elt -> key -> Maybe elt
+lookupUFM	:: Uniquable key => UniqFM elt -> key -> Maybe elt
 lookupUFM_Directly  -- when you've got the Unique already
 		:: UniqFM elt -> Unique -> Maybe elt
 lookupWithDefaultUFM
-		:: NamedThing key => UniqFM elt -> elt -> key -> elt
+		:: Uniquable key => UniqFM elt -> elt -> key -> elt
 lookupWithDefaultUFM_Directly
 		:: UniqFM elt -> elt -> Unique -> elt
 
@@ -285,7 +285,7 @@ First the ways of building a UniqFM.
 
 \begin{code}
 emptyUFM		     = EmptyUFM
-unitUFM	     key elt = mkLeafUFM (u2i (getItsUnique key)) elt
+unitUFM	     key elt = mkLeafUFM (u2i (uniqueOf key)) elt
 unitDirectlyUFM key elt = mkLeafUFM (u2i key) elt
 
 listToUFM key_elt_pairs
@@ -308,13 +308,13 @@ addToUFM fm key elt = addToUFM_C use_snd fm key elt
 addToUFM_Directly fm u elt = insert_ele use_snd fm (u2i u) elt
 
 addToUFM_C combiner fm key elt
-  = insert_ele combiner fm (u2i (getItsUnique key)) elt
+  = insert_ele combiner fm (u2i (uniqueOf key)) elt
 
 addListToUFM fm key_elt_pairs = addListToUFM_C use_snd fm key_elt_pairs
 addListToUFM_Directly fm uniq_elt_pairs = addListToUFM_directly_C use_snd fm uniq_elt_pairs
 
 addListToUFM_C combiner fm key_elt_pairs
- = foldl (\ fm (k, e) -> insert_ele combiner fm (u2i (getItsUnique k)) e)
+ = foldl (\ fm (k, e) -> insert_ele combiner fm (u2i (uniqueOf k)) e)
 	 fm key_elt_pairs
 
 addListToUFM_directly_C combiner fm uniq_elt_pairs
@@ -327,7 +327,7 @@ Now ways of removing things from UniqFM.
 \begin{code}
 delListFromUFM fm lst = foldl delFromUFM fm lst
 
-delFromUFM fm key = delete fm (u2i (getItsUnique key))
+delFromUFM fm key = delete fm (u2i (uniqueOf key))
 
 delete EmptyUFM _   = EmptyUFM
 delete fm       key = del_ele fm
@@ -596,11 +596,11 @@ looking up in a hurry is the {\em whole point} of this binary tree lark.
 Lookup up a binary tree is easy (and fast).
 
 \begin{code}
-lookupUFM	  fm key = lookup fm (u2i (getItsUnique key))
+lookupUFM	  fm key = lookup fm (u2i (uniqueOf key))
 lookupUFM_Directly fm key = lookup fm (u2i key)
 
 lookupWithDefaultUFM fm deflt key
-  = case lookup fm (u2i (getItsUnique key)) of
+  = case lookup fm (u2i (uniqueOf key)) of
       Nothing  -> deflt
       Just elt -> elt
 

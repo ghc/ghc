@@ -50,7 +50,7 @@ import HeapOffs		( VirtualSpBOffset(..), VirtualHeapOffset(..) )
 import Id		( idPrimRep, toplevelishId,
 			  dataConTag, fIRST_TAG, ConTag(..),
 			  isDataCon, DataCon(..),
-			  idSetToList, GenId{-instance NamedThing,Eq-}
+			  idSetToList, GenId{-instance Uniquable,Eq-}
 			)
 import Maybes		( catMaybes )
 import PprStyle		( PprStyle(..) )
@@ -407,7 +407,7 @@ getPrimAppResultAmodes uniq (StgAlgAlts ty alts other_default)
     -- Turn them into amodes
     arg_amodes = concat (map mk_amodes sorted_alts)
     mk_amodes (con, args, use_mask, rhs)
-      = [ CTemp (getItsUnique arg) (idPrimRep arg) | arg <- args ]
+      = [ CTemp (uniqueOf arg) (idPrimRep arg) | arg <- args ]
 \end{code}
 
 The situation is simpler for primitive

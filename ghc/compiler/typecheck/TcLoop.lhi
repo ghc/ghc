@@ -9,7 +9,7 @@ import HsMatches(GRHSsAndBinds)
 import HsPat(InPat, OutPat)
 import HsSyn(Fake)
 import TcHsSyn(TcIdOcc)
-import Name(Name)
+import RnHsSyn(RnName)
 import TcType(TcMaybe)
 import SST(FSST_R)
 import Unique(Unique)
@@ -21,7 +21,7 @@ import Bag(Bag)
 import Type(GenType)
 import Inst(Inst)
 
-tcGRHSsAndBinds :: GRHSsAndBinds Fake Fake Name (InPat Name) 
+tcGRHSsAndBinds :: GRHSsAndBinds Fake Fake RnName (InPat RnName) 
 	        -> TcDown a 
 		-> TcEnv a 
 		-> State# a 

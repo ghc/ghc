@@ -27,7 +27,7 @@ module HsSyn (
 
      ) where
 
-import Ubiq{-uitous-}
+import Ubiq
 
 -- friends:
 import HsBinds
@@ -39,13 +39,12 @@ import HsMatches
 import HsPat
 import HsTypes
 import HsPragmas	( ClassPragmas, ClassOpPragmas,
-			  DataPragmas, GenPragmas, InstancePragmas
-			)
+			  DataPragmas, GenPragmas, InstancePragmas )
 -- others:
 import FiniteMap	( FiniteMap )
-import Outputable	( ifPprShowAll, interpp'SP, Outputable(..){-instances-} )
+import Outputable	( ifPprShowAll, ifnotPprForUser, interpp'SP, Outputable(..) )
 import Pretty
-import SrcLoc		( SrcLoc{-instances-} )
+import SrcLoc		( SrcLoc )
 \end{code}
 
 @Fake@ is a placeholder type; for when tyvars and uvars aren't used.
@@ -57,29 +56,28 @@ instance Outputable Fake
 
 All we actually declare here is the top-level structure for a module.
 \begin{code}
+type Version = Int
+
 data HsModule tyvar uvar name pat
   = HsModule
-	FAST_STRING		-- module name
+	Module			-- module name
+	(Maybe Version)		-- source interface version number
 	(Maybe [IE name])	-- export list; Nothing => export everything
 				-- Just [] => export *nothing* (???)
 				-- Just [...] => as you would expect...
-	[ImportedInterface tyvar uvar name pat]
-				-- We snaffle interesting stuff out of the
+	[ImportDecl name]	-- We snaffle interesting stuff out of the
 				-- imported interfaces early on, adding that
 				-- info to TyDecls/etc; so this list is
 				-- often empty, downstream.
 	[FixityDecl name]
 	[TyDecl name]
-	[SpecDataSig name]	-- user pragmas that modify TyDecls
+	[SpecDataSig name]		-- user pragmas that modify TyDecls
 	[ClassDecl tyvar uvar name pat]
 	[InstDecl  tyvar uvar name pat]
-	[SpecInstSig name] 	-- user pragmas that modify InstDecls
+	[SpecInstSig name] 		-- user pragmas that modify InstDecls
 	[DefaultDecl name]
-	(HsBinds tyvar uvar name pat)	-- the main stuff!
-	[Sig name]		-- "Sigs" are folded into the "HsBinds"
-				-- pretty early on, so this list is
-				-- often either empty or just the
-				-- interface signatures.
+	(HsBinds tyvar uvar name pat)	-- the main stuff, includes source sigs
+	[Sig name]			-- interface sigs
 	SrcLoc
 \end{code}
 
@@ -88,11 +86,12 @@ instance (NamedThing name, Outputable name, Outputable pat,
 	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
 	=> Outputable (HsModule tyvar uvar name pat) where
 
-    ppr sty (HsModule name exports imports fixities
+    ppr sty (HsModule name iface_version exports imports fixities
 		      typedecls typesigs classdecls instdecls instsigs
 		      defdecls binds sigs src_loc)
       = ppAboves [
 	    ifPprShowAll sty (ppr sty src_loc),
+	    ifnotPprForUser sty (pp_iface_version iface_version),
 	    case exports of
 	      Nothing -> ppCat [ppPStr SLIT("module"), ppPStr name, ppPStr SLIT("where")]
 	      Just es -> ppAboves [
@@ -100,14 +99,21 @@ instance (NamedThing name, Outputable name, Outputable pat,
 			    ppNest 8 (interpp'SP sty es),
 			    ppNest 4 (ppPStr SLIT(") where"))
 			  ],
-	    pp_nonnull imports,	    pp_nonnull fixities,
-	    pp_nonnull typedecls,   pp_nonnull typesigs,
+	    pp_nonnull imports,
+	    pp_nonnull fixities,
+	    pp_nonnull typedecls,
+	    pp_nonnull typesigs,
 	    pp_nonnull classdecls,
-	    pp_nonnull instdecls,   pp_nonnull instsigs,
+	    pp_nonnull instdecls,
+	    pp_nonnull instsigs,
 	    pp_nonnull defdecls,
-	    ppr sty binds,	    pp_nonnull sigs
+	    ppr sty binds,
+	    pp_nonnull sigs
 	]
       where
 	pp_nonnull [] = ppNil
 	pp_nonnull xs = ppAboves (map (ppr sty) xs)
+
+	pp_iface_version Nothing  = ppNil
+	pp_iface_version (Just n) = ppCat [ppStr "{-# INTERFACE", ppInt n, ppStr "#-}"]
 \end{code}

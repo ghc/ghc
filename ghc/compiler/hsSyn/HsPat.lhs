@@ -47,6 +47,12 @@ data InPat name
   | ConOpPatIn	    (InPat name)
 		    name
 		    (InPat name)
+
+  -- We preserve prefix negation and parenthesis for the precedence parser.
+
+  | NegPatIn	    (InPat name)	-- negated pattern
+  | ParPatIn        (InPat name)	-- parenthesised pattern
+
   | ListPatIn	    [InPat name]	-- syntactic list
 					-- must have >= 1 elements
   | TuplePatIn	    [InPat name]	-- tuple
@@ -124,8 +130,15 @@ pprInPat sty (ConPatIn c pats)
 pprInPat sty (ConOpPatIn pat1 op pat2)
  = ppBesides [ppLparen, ppr sty pat1, ppSP, ppr sty op, ppSP, ppr sty pat2, ppRparen]
 
--- ToDo: use pprOp to print op (but this involves fiddling various
--- contexts & I'm lazy...); *PatIns are *rarely* printed anyway... (WDP)
+	-- ToDo: use pprOp to print op (but this involves fiddling various
+	-- contexts & I'm lazy...); *PatIns are *rarely* printed anyway... (WDP)
+
+pprInPat sty (NegPatIn pat)
+  = ppBeside (ppChar '-') (ppParens (pprInPat sty pat))
+
+pprInPat sty (ParPatIn pat)
+  = ppParens (pprInPat sty pat)
+
 
 pprInPat sty (ListPatIn pats)
   = ppBesides [ppLbrack, interpp'SP sty pats, ppRbrack]
@@ -185,7 +198,7 @@ pprOutPat sty (DictPat dicts methods)
 	  ppBesides [ppBracket (interpp'SP sty methods), ppRparen]]
 
 pprConPatTy sty ty
- = ppBesides [ppLparen, ppr sty ty, ppRparen]
+ = ppParens (ppr sty ty)
 \end{code}
 
 %************************************************************************

@@ -8,17 +8,12 @@
 
 module HsImpExp where
 
-import Ubiq{-uitous-}
+import Ubiq
 
--- friends:
-import HsDecls		( FixityDecl, TyDecl, ClassDecl, InstDecl )
-import HsBinds		( Sig )
-
--- others:
 import Outputable
 import PprStyle		( PprStyle(..) )
 import Pretty
-import SrcLoc		( SrcLoc{-instances-} )
+import SrcLoc		( SrcLoc )
 \end{code}
 
 %************************************************************************
@@ -29,22 +24,19 @@ import SrcLoc		( SrcLoc{-instances-} )
 
 One per \tr{import} declaration in a module.
 \begin{code}
-data ImportedInterface tyvar uvar name pat
-  = ImportMod	  (Interface tyvar uvar name pat)
+data ImportDecl name
+  = ImportDecl	  Module			-- module name
 		  Bool				-- qualified?
-		  (Maybe FAST_STRING)		-- as Modid
+		  (Maybe Module)		-- as Module
 		  (Maybe (Bool, [IE name]))	-- (hiding?, names)
+		  SrcLoc
 \end{code}
 
 \begin{code}
-instance (NamedThing name, Outputable name, Outputable pat,
-	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
-	   => Outputable (ImportedInterface tyvar uvar name pat) where
-
-    ppr sty (ImportMod iface qual as spec)
-      = ppAbove (ppHang (ppCat [ppStr "import", pp_qual qual, ppr PprForUser iface, pp_as as])
-	              4 (pp_spec spec))
-		(case sty of {PprForUser -> ppNil; _ -> ppr sty iface})
+instance (Outputable name) => Outputable (ImportDecl name) where
+    ppr sty (ImportDecl mod qual as spec _)
+      = ppHang (ppCat [ppStr "import", pp_qual qual, ppPStr mod, pp_as as])
+	     4 (pp_spec spec)
       where
 	pp_qual False   = ppNil
 	pp_qual True	= ppStr "qualified"
@@ -71,7 +63,7 @@ data IE name
   | IEThingAbs          name		-- Constructor/Type/Class (can't tell)
   | IEThingAll          name		-- Class/Type plus all methods/constructors
   | IEThingWith		name [name]	-- Class/Type plus some methods/constructors
-  | IEModuleContents    FAST_STRING	-- (Export Only)
+  | IEModuleContents    Module		-- (Export Only)
 \end{code}
 
 \begin{code}
@@ -84,61 +76,4 @@ instance (Outputable name) => Outputable (IE name) where
 	= ppBesides [ppr sty thing, ppLparen, ppInterleave ppComma (map (ppr sty) withs), ppRparen]
     ppr sty (IEModuleContents mod)
 	= ppBeside (ppPStr SLIT("module ")) (ppPStr mod)
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Interfaces}
-%*									*
-%************************************************************************
-
-\begin{code}
-data Interface tyvar uvar name pat
-  = Interface	FAST_STRING			-- module name
-		[IfaceImportDecl name]
-		[FixityDecl name]
-		[TyDecl name]			-- data decls may have no constructors
-		[ClassDecl tyvar uvar name pat]	-- without default methods
-		[InstDecl  tyvar uvar name pat]	-- without method defns
-		[Sig name]
-		SrcLoc
-\end{code}
-
-\begin{code}
-instance (NamedThing name, Outputable name, Outputable pat,
-	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
-	     => Outputable (Interface tyvar uvar name pat) where
-
-    ppr PprForUser (Interface name _ _ _ _ _ _ _) = ppPStr name
-
-    ppr sty (Interface name iimpdecls fixities tydecls classdecls instdecls sigs anns)
-      = ppAboves [ppStr "{-",
-		  ifPprShowAll sty (ppr sty anns),
-		  ppCat [ppStr "interface", ppPStr name, ppStr "where"],
-		  ppNest 4 (ppAboves [
-		      pp_nonnull iimpdecls,
-		      pp_nonnull fixities,
-		      pp_nonnull tydecls,
-		      pp_nonnull classdecls,
-		      pp_nonnull instdecls,
-		      pp_nonnull sigs]),
-		  ppStr "-}"]
-      where
-	pp_nonnull [] = ppNil
-	pp_nonnull xs = ppAboves (map (ppr sty) xs)
-\end{code}
-
-\begin{code}
-data IfaceImportDecl name
-  = IfaceImportDecl FAST_STRING	    -- module we're being told about
-		    [IE name]	    -- things we're being told about
-		    SrcLoc
-\end{code}
-
-\begin{code}
-instance Outputable name => Outputable (IfaceImportDecl name) where
-
-    ppr sty (IfaceImportDecl mod names src_loc)
-      = ppHang (ppCat [ppPStr SLIT("import"), ppPStr mod, ppLparen])
-	     4 (ppSep [ppCat [interpp'SP sty names, ppRparen]])
 \end{code}

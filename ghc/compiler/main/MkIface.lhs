@@ -326,7 +326,7 @@ get_tycon_pair tycon
 
 generic_pair thing
   = case (getOrigName       thing) of { (orig_mod, orig_nm) ->
-    case (getOccurrenceName thing) of { occur_name ->
+    case (getOccName thing) of { occur_name ->
     (orig_mod, orig_nm) }}
 \end{code}
 
@@ -381,7 +381,7 @@ do_value better_id_fn inline_env val
   = let
 	sty 	    = PprInterface
 	better_val  = better_id_fn val
-	name_str    = getOccurrenceName better_val -- NB: not orig name!
+	name_str    = getOccName better_val -- NB: not orig name!
 
 	id_info	    = getIdInfo better_val
 
@@ -513,10 +513,10 @@ is_exportable_tycon_or_class export_list_fns tc
 	    export_list_fns tc
 
 in_export_list_or_among_dotdot_modules ignore_Mdotdots (in_export_list, among_dotdot_modules) tc
-  = if in_export_list (getOccurrenceName tc) then
+  = if in_export_list (getOccName tc) then
 	True
     else
---	pprTrace "in_export:" (ppAbove (ppr PprDebug ignore_Mdotdots) (ppPStr (getOccurrenceName tc))) (
+--	pprTrace "in_export:" (ppAbove (ppr PprDebug ignore_Mdotdots) (ppPStr (getOccName  tc))) (
     if ignore_Mdotdots then
 	False
     else

@@ -64,7 +64,7 @@ import Id		( idType, getIdUnfolding, getIdStrictness,
 			  IdEnv(..), IdSet(..), GenId )
 import IdInfo		( StrictnessInfo )
 import Literal		( isNoRepLit, Literal{-instances-} )
-import Outputable	( Outputable(..){-instances-} )
+import Outputable	( isLocallyDefined, Outputable(..){-instances-} )
 import PprCore		-- various instances
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType, GenTyVar )

@@ -45,12 +45,12 @@ import Bag	( emptyBag, unitBag, unionBags, unionManyBags, listToBag, consBag )
 import Class	( Class(..), GenClass, ClassInstEnv(..), getClassInstEnv )
 import Id	( GenId, idType, mkInstId )
 import MatchEnv	( lookupMEnv, insertMEnv )
-import Name	( Name )
-import NameTypes( ShortName, mkShortName )
+import Name	( mkLocalName, Name )
 import Outputable
 import PprType	( GenClass, TyCon, GenType, GenTyVar )	
 import PprStyle	( PprStyle(..) )
 import Pretty
+import RnHsSyn	( RnName{-instance NamedThing-} )
 import SpecEnv	( SpecEnv(..) )
 import SrcLoc	( SrcLoc, mkUnknownSrcLoc )
 import Type	( GenType, eqSimpleTy,
@@ -226,14 +226,14 @@ newOverloadedLit orig lit ty
 
 \begin{code}
 instToId :: Inst s -> TcIdOcc s
-instToId (Dict uniq clas ty orig loc)
-  = TcId (mkInstId uniq (mkDictTy clas ty) (mkShortName SLIT("dict") loc))
-instToId (Method uniq id tys rho_ty orig loc)
-  = TcId (mkInstId uniq tau_ty (mkShortName (getOccurrenceName id) loc))
+instToId (Dict u clas ty orig loc)
+  = TcId (mkInstId u (mkDictTy clas ty) (mkLocalName u SLIT("dict") loc))
+instToId (Method u id tys rho_ty orig loc)
+  = TcId (mkInstId u tau_ty (mkLocalName u (getLocalName id) loc))
   where
     (_, tau_ty) = splitRhoTy rho_ty	-- NB The method Id has just the tau type
-instToId (LitInst uniq list ty orig loc)
-  = TcId (mkInstId uniq ty (mkShortName SLIT("lit") loc))
+instToId (LitInst u list ty orig loc)
+  = TcId (mkInstId u ty (mkLocalName u SLIT("lit") loc))
 \end{code}
 
 \begin{code}
@@ -252,18 +252,18 @@ need, and it's a lot of extra work.
 
 \begin{code}
 zonkInst :: Inst s -> NF_TcM s (Inst s)
-zonkInst (Dict uniq clas ty orig loc)
+zonkInst (Dict u clas ty orig loc)
   = zonkTcType	ty			`thenNF_Tc` \ new_ty ->
-    returnNF_Tc (Dict uniq clas new_ty orig loc)
+    returnNF_Tc (Dict u clas new_ty orig loc)
 
-zonkInst (Method uniq id tys rho orig loc) 		-- Doesn't zonk the id!
+zonkInst (Method u id tys rho orig loc) 		-- Doesn't zonk the id!
   = mapNF_Tc zonkTcType tys		`thenNF_Tc` \ new_tys ->
     zonkTcType rho			`thenNF_Tc` \ new_rho ->
-    returnNF_Tc (Method uniq id new_tys new_rho orig loc)
+    returnNF_Tc (Method u id new_tys new_rho orig loc)
 
-zonkInst (LitInst uniq lit ty orig loc)
+zonkInst (LitInst u lit ty orig loc)
   = zonkTcType ty			`thenNF_Tc` \ new_ty ->
-    returnNF_Tc (LitInst uniq lit new_ty orig loc)
+    returnNF_Tc (LitInst u lit new_ty orig loc)
 \end{code}
 
 

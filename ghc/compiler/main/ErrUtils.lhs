@@ -7,11 +7,11 @@
 #include "HsVersions.h"
 
 module ErrUtils (
-
-	Error(..),
-	addErrLoc, addShortErrLocLine,
-	dontAddErrLoc, pprBagOfErrors
-
+	Error(..), Warning(..), Message(..),
+	addErrLoc,
+	addShortErrLocLine,
+	dontAddErrLoc,
+	pprBagOfErrors
     ) where
 
 import Ubiq{-uitous-}
@@ -24,6 +24,8 @@ import SrcLoc		( mkUnknownSrcLoc, SrcLoc{-instance-} )
 
 \begin{code}
 type Error   = PprStyle -> Pretty
+type Warning = PprStyle -> Pretty
+type Message = PprStyle -> Pretty
 
 addErrLoc :: SrcLoc -> String -> Error -> Error
 addErrLoc locn title rest_of_err_msg sty
@@ -47,4 +49,3 @@ pprBagOfErrors sty bag_of_errors
   = let  pretties = map ( \ e -> e sty ) (bagToList bag_of_errors)  in
     ppAboves (map (\ p -> ppAbove ppSP p) pretties)
 \end{code}
-

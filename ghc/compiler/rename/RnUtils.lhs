@@ -7,132 +7,186 @@
 #include "HsVersions.h"
 
 module RnUtils (
-	mkGlobalNameFun, mkNameFun,
-	GlobalNameMapper(..),  GlobalNameMappers(..),
-	PreludeNameMapper(..), PreludeNameMappers(..),
+	RnEnv(..), QualNames(..),
+	UnqualNames(..), ScopeStack(..),
+	emptyRnEnv, extendGlobalRnEnv, extendLocalRnEnv,
+	lookupRnEnv, lookupTcRnEnv,
 
-	dupNamesErr -- used in various places
+	unknownNameErr,
+	badClassOpErr,
+	qualNameErr,
+	dupNamesErr,
+	shadowedNameWarn,
+	multipleOccWarn,
+
+	-- ToDo: nuke/move? WDP 96/04/05
+	GlobalNameMapper(..),  GlobalNameMappers(..)
     ) where
 
-import Ubiq{-uitous-}
+import Ubiq
 
-import Bag		( bagToList, Bag )
-import FiniteMap	( lookupFM, listToFM )
-import Name		( Name{-instances-} )
-import Outputable	( pprNonOp )
+import Bag		( Bag, emptyBag, snocBag, unionBags )
+import ErrUtils		( addShortErrLocLine, addErrLoc )
+import FiniteMap	( FiniteMap, emptyFM, isEmptyFM,
+			  lookupFM, addListToFM, addToFM )
+import Maybes		( maybeToBool )
+import Name		( RdrName(..), isQual )
+import Outputable	( pprNonOp, getLocalName )
 import PprStyle		( PprStyle(..) )
 import Pretty
-import ProtoName	( ProtoName(..) )
-import Util		( cmpPString, removeDups, pprPanic, panic )
-\end{code}
+import RnHsSyn		( RnName )
+import Util		( assertPanic )
 
-\begin{code}
-type GlobalNameMapper  = ProtoName -> Maybe Name
+type GlobalNameMapper  = RnName -> Maybe Name
 type GlobalNameMappers = (GlobalNameMapper, GlobalNameMapper)
-
-type PreludeNameMapper = FAST_STRING -> Maybe Name
-type PreludeNameMappers = (PreludeNameMapper,		-- Values
-			PreludeNameMapper		-- Types and classes
-		       )
 \end{code}
 
+*********************************************************
+*							*
+\subsection{RnEnv: renaming environment}
+*							*
+*********************************************************
+
+Seperate FiniteMaps are kept for lookup up Qual names,
+Unqual names and Local names.
+
 \begin{code}
-mkGlobalNameFun :: FAST_STRING		-- The module name
-		-> PreludeNameMapper 	-- The prelude things
-		-> [(ProtoName, Name)]	-- The local and imported things
-		-> GlobalNameMapper	-- The global name function
+type RnEnv = ((QualNames, UnqualNames, QualNames, UnqualNames), ScopeStack)
 
-mkGlobalNameFun this_module prel_nf alist
-  = the_fun
-  where
-    the_fun (Prel n)	  = Just n
-    the_fun (Unk s) 	  = case (unk_fun s) of
-			      Just n  -> Just n
-			      Nothing -> prel_nf s
-    the_fun (Imp m d _ _) = imp_fun (d, m) -- NB: module-name 2nd!
+type QualNames    = FiniteMap (FAST_STRING,Module) RnName
+type UnqualNames  = FiniteMap FAST_STRING RnName
+type ScopeStack   = FiniteMap FAST_STRING RnName
 
-    -- Things in the domain of the prelude function shouldn't be put
-    -- in the unk_fun; because the prel_nf will catch them.
-    -- This can arise if, for example, an interface gives a signature
-    -- for a prelude thing.
-    --
-    -- Neither should they be in the domain of the imp_fun, because
-    -- prelude things will have been converted to Prel x rather than
-    -- Imp p q r s.
-    --
-    -- So we strip out prelude things from the alist; this is not just
-    -- desirable, it's essential because get_orig and get_local don't handle
-    -- prelude things.
-
-    non_prel_alist = filter non_prel alist
-
-    non_prel (Prel _, _) = False
-    non_prel other       = True
-
-    -- unk_fun looks up local names (just strings),
-    -- imp_fun looks up original names: (string,string) pairs
-    unk_fun = lookupFM (listToFM [(get_local pn,n) | (pn,n) <- non_prel_alist])
-    imp_fun = lookupFM (listToFM [(get_orig  pn,n) | (pn,n) <- non_prel_alist])
-
-		-- the lists *are* sorted by *some* ordering (by local
-		-- names), but not generally, and not in some way we
-		-- are going to rely on.
-
-    get_local :: ProtoName -> FAST_STRING
-    get_local (Unk s)       = s
-    get_local (Imp _ _ _ l) = l
-    get_local (Prel n)	    = pprPanic "get_local: " (ppr PprShowAll n)
-
-    get_orig :: ProtoName -> (FAST_STRING, FAST_STRING) -- **NB**! module-name 2nd!
-    get_orig (Unk s)       = (s, this_module)
-    get_orig (Imp m d _ _) = (d, m)
-    get_orig (Prel n)	    = pprPanic "get_orig: " (ppr PprShowAll n)
+emptyRnEnv  	  :: RnEnv
+extendGlobalRnEnv :: RnEnv -> [(RdrName,RnName)] -> [(RdrName,RnName)]
+		  -> (RnEnv, Bag (RdrName, RnName, RnName))
+extendLocalRnEnv  :: Bool -> RnEnv -> [RnName] -> (RnEnv, [RnName])
+lookupRnEnv 	  :: RnEnv -> RdrName -> Maybe RnName
+lookupTcRnEnv 	  :: RnEnv -> RdrName -> Maybe RnName
 \end{code}
 
+If the @RdrName@ is a @Qual@, @lookupValue@ looks it up in the global
+value QualNames.  If it is @Unqual@, it looks it up first in the
+ScopeStack, and if it isn't found there, then in the global
+vaule Unqual Names.
 
-@mkNameFun@ builds a function from @ProtoName@s to things, where a
-``thing'' is either a @ProtoName@ (in the case of values), or a
-@(ProtoName, ProtoName -> ProtoName)@ pair in the case of types and
-classes.  It takes:
+@lookupTcRnEnv@ looks up tycons/classes in the alternative global
+name space.
 
-\begin{itemize}
-\item	The name of the interface
-\item	A bag of new string-to-thing bindings to add,
+@extendGlobalRnEnv@ adds global names to the RnEnv. It takes seperate
+value and tycon/class name lists. It returns any duplicate names
+seperatle.
 
-\item	An extractor function, to get a @ProtoName@ out of a thing,
-	for use in error messages.
-\end{itemize}
-The function it returns only expects to see @Unk@ things.
-
-@mkNameFun@ checks for clashes in the domain of the new bindings.
-
-ToDo: it should check for clashes with the prelude bindings too.
+@extendRnEnv@ adds new local names to the ScopeStack in an RnEnv.
+It optionally reports any shadowed names.
 
 \begin{code}
-mkNameFun :: Bag (FAST_STRING, thing)	    -- Value bindings
-	  -> (FAST_STRING -> Maybe thing,   -- The function to use
-	      [[(FAST_STRING,thing)]])	    -- Duplicates, if any
+emptyRnEnv
+  = ((emptyFM, emptyFM, emptyFM, emptyFM), emptyFM)
 
-mkNameFun the_bag
-  = case (removeDups cmp (bagToList the_bag)) of { (no_dup_list, dups) ->
-    case (lookupFM (listToFM no_dup_list))    of { the_fun ->
-    (the_fun, dups) }}
+
+extendGlobalRnEnv ((qual, unqual, tc_qual, tc_unqual), stack) val_list tc_list
+  = ASSERT(isEmptyFM stack)
+    (((qual', unqual', tc_qual, tc_unqual), stack), tc_dups `unionBags` dups)
   where
-    cmp :: (FAST_STRING, a) -> (FAST_STRING, a) -> TAG_
+    (qual', unqual', dups)          = extend_global qual unqual val_list
+    (tc_qual', tc_unqual', tc_dups) = extend_global tc_qual tc_unqual tc_list
 
-    cmp (s1,_) (s2,_) = _CMP_STRING_ s1 s2
+    extend_global qual unqual rdr_list = (qual', unqual', dups)
+      where
+	(qual_list, unqual_list) = partition (isQual.fst) rdr_list
+	qual_in   = map mk_qual qual_list
+	unqual_in = map mk_unqual unqual_list
+	mk_qual   (Qual m s, rn) = ((s,m), rn)
+	mk_unqual (Unqual s, rn) = (s, rn)
+
+	(qual', qual_dups)     = do_dups qual_in qual emptyBag (\ (s,m) -> Qual m s)
+	(unqual', unqual_dups) = do_dups unqual_in unqual emptyBag Unqual
+
+	dups = unqual_dups `unionBags` qual_dups
+
+	do_dups [] fm dups to_rdr = (fm, dups)
+	do_dups ((k,v):rest) fm dups to_rdr
+          = case lookupFM fm k of
+	      Nothing  -> do_dups rest (addToFM fm k v) dups to_rdr
+	      Just cur -> do_dups rest fm (dups `snocBag` (to_rdr k, cur, v)) to_rdr
+
+
+extendLocalRnEnv report_shadows (global, stack) new_local
+  = ((global, new_stack), dups)
+  where
+    (new_stack, dups) = extend new_local stack
+
+    extend names stack
+      = if report_shadows then
+	    do_shadows names stack []
+	else
+	    (addListToFM stack [ (getLocalName n, n) | n <- names], []) 
+
+    do_shadows [] stack dups = (stack, dups)
+    do_shadows (name:names) stack dups
+      = do_shadows names (addToFM stack str name) ext_dups
+      where
+	str = getLocalName name
+	ext_dups = if maybeToBool (lookupFM stack str)
+		   then name:dups
+		   else dups
+
+
+lookupRnEnv ((qual, unqual, _, _), stack) rdr
+  = case rdr of 
+      Unqual str   -> lookup stack str (lookup unqual str Nothing)
+      Qual mod str -> lookup qual (str,mod) Nothing
+  where
+    lookup fm thing do_on_fail
+      = case lookupFM fm thing of
+	    found@(Just name) -> found
+	    Nothing   	      -> do_on_fail
+
+lookupTcRnEnv ((_, _, tc_qual, tc_unqual), _) rdr
+  = case rdr of 
+      Unqual str   -> lookupFM tc_unqual str
+      Qual mod str -> lookupFM tc_qual (str,mod)
 \end{code}
 
+*********************************************************
+*							*
+\subsection{Errors used in RnMonad}
+*							*
+*********************************************************
+
 \begin{code}
-dupNamesErr descriptor ((first_pname,locn1) : dup_things) sty
-  = ppAboves (first_item : map dup_item dup_things)
+unknownNameErr descriptor name locn
+  = addShortErrLocLine locn ( \ sty ->
+    ppBesides [ppStr "undefined ", ppStr descriptor, ppStr ": ", pprNonOp sty name] )
+
+badClassOpErr clas op locn
+  = addErrLoc locn "" ( \ sty ->
+    ppBesides [ppChar '`', pprNonOp sty op, ppStr "' is not an operation of class `",
+	      ppr sty clas, ppStr "'"] )
+
+qualNameErr descriptor (name,locn)
+  = addShortErrLocLine locn ( \ sty ->
+    ppBesides [ppStr "invalid use of qualified ", ppStr descriptor, ppStr ": ", pprNonOp sty name ] )
+
+dupNamesErr descriptor ((name1,locn1) : dup_things) sty
+  = ppAboves (item1 : map dup_item dup_things)
   where
-    first_item
+    item1
       = ppBesides [ ppr PprForUser locn1,
 	    ppStr ": multiple declarations of a ", ppStr descriptor, ppStr ": ",
-	    pprNonOp sty first_pname ]
+	    pprNonOp sty name1 ]
 
-    dup_item (pname, locn)
+    dup_item (name, locn)
       = ppBesides [ ppr PprForUser locn,
-	    ppStr ": here was another declaration of `", pprNonOp sty pname, ppStr "'" ]
+	    ppStr ": here was another declaration of `", pprNonOp sty name, ppStr "'" ]
+
+shadowedNameWarn locn shadow
+  = addShortErrLocLine locn ( \ sty ->
+    ppBesides [ppStr "more than one value with the same name (shadowing): ", ppr sty shadow] )
+
+multipleOccWarn (name, occs) sty
+  = ppBesides [ppStr "multiple names used to refer to `", ppr sty name, ppStr "': ",
+	       ppInterleave ppComma (map (ppr sty) occs)]
 \end{code}
+

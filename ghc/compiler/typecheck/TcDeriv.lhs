@@ -25,26 +25,25 @@ import TcMonad
 import Inst		( InstOrigin(..), InstanceMapper(..) )
 import TcEnv		( getEnv_TyCons )
 import TcKind		( TcKind )
-import TcGenDeriv	-- Deriv stuff
+--import TcGenDeriv	-- Deriv stuff
 import TcInstUtil	( InstInfo(..), mkInstanceRelatedIds, buildInstanceEnvs )
 import TcSimplify	( tcSimplifyThetas )
 
-import RnMonad4
+--import RnMonad4
 import RnUtils		( GlobalNameMappers(..), GlobalNameMapper(..) )
-import RnBinds4		( rnMethodBinds, rnTopBinds )
+--import RnBinds4		( rnMethodBinds, rnTopBinds )
 
 import Bag		( Bag, isEmptyBag, unionBags, listToBag )
 import Class		( GenClass, getClassKey )
-import ErrUtils		( pprBagOfErrors, addErrLoc )
+import CmdLineOpts	( opt_CompilingPrelude )
+import ErrUtils		( pprBagOfErrors, addErrLoc, Error(..) )
 import Id		( dataConSig, dataConArity )
 import Maybes		( assocMaybe, maybeToBool, Maybe(..) )
-import Name		( Name(..) )
-import NameTypes	( mkPreludeCoreName, Provenance(..) )
+--import Name		( Name(..) )
 import Outputable
 import PprType		( GenType, GenTyVar, GenClass, TyCon )
 import PprStyle
 import Pretty
-import ProtoName	( eqProtoName, ProtoName(..), Name )
 import SrcLoc		( mkGeneratedSrcLoc, mkUnknownSrcLoc, SrcLoc )
 import TyCon		( tyConTyVars, tyConDataCons, tyConDerivings,
 			  maybeTyConSingleCon, isEnumerationTyCon, TyCon )
@@ -156,7 +155,7 @@ type DerivSoln = DerivRhs
 %************************************************************************
 
 \begin{code}
-tcDeriving  :: FAST_STRING		-- name of module under scrutiny
+tcDeriving  :: Module			-- name of module under scrutiny
 	    -> GlobalNameMappers	-- for "renaming" bits of generated code
 	    -> Bag InstInfo		-- What we already know about instances
 	    -> [RenamedFixityDecl]	-- Fixity info; used by Read and Show
@@ -164,6 +163,8 @@ tcDeriving  :: FAST_STRING		-- name of module under scrutiny
 		      RenamedHsBinds,	-- Extra generated bindings
 		      PprStyle -> Pretty)  -- Printable derived instance decls;
 				     	   -- for debugging via -ddump-derivings.
+tcDeriving = panic "tcDeriving: ToDo LATER"
+{- LATER:
 
 tcDeriving modname renamer_name_funs inst_decl_infos_in fixities
   =	-- Fish the "deriving"-related information out of the TcEnv
@@ -173,7 +174,7 @@ tcDeriving modname renamer_name_funs inst_decl_infos_in fixities
 	-- Take the equation list and solve it, to deliver a list of
 	-- solutions, a.k.a. the contexts for the instance decls
 	-- required for the corresponding equations.
-    solveDerivEqns modname inst_decl_infos_in eqns
+    solveDerivEqns inst_decl_infos_in eqns
 			    	`thenTc` \ new_inst_infos ->
 
 	-- Now augment the InstInfos, adding in the rather boring
@@ -205,13 +206,15 @@ tcDeriving modname renamer_name_funs inst_decl_infos_in fixities
     in
     gen_tag_n_con_binds deriver_name_funs nm_alist_etc `thenTc` \ extra_binds ->
 
-    mapTc (gen_inst_info modname fixities deriver_name_funs) new_inst_infos
+    mapTc (gen_inst_info maybe_mod fixities deriver_name_funs) new_inst_infos
 						  `thenTc` \ really_new_inst_infos ->
 
     returnTc (listToBag really_new_inst_infos,
 	      extra_binds,
 	      ddump_deriving really_new_inst_infos extra_binds)
   where
+    maybe_mod = if opt_CompilingPrelude then Nothing else Just mod_name
+
     ddump_deriving :: [InstInfo] -> RenamedHsBinds -> (PprStyle -> Pretty)
 
     ddump_deriving inst_infos extra_binds sty
@@ -340,13 +343,12 @@ ordered by sorting on type varible, tv, (major key) and then class, k,
 \end{itemize}
 
 \begin{code}
-solveDerivEqns :: FAST_STRING
-	       -> Bag InstInfo
+solveDerivEqns :: Bag InstInfo
 	       -> [DerivEqn]
 	       -> TcM s [InstInfo]	-- Solns in same order as eqns.
 				  	-- This bunch is Absolutely minimal...
 
-solveDerivEqns modname inst_decl_infos_in orig_eqns
+solveDerivEqns inst_decl_infos_in orig_eqns
   = iterateDeriv initial_solutions
   where
 	-- The initial solutions for the equations claim that each
@@ -365,7 +367,7 @@ solveDerivEqns modname inst_decl_infos_in orig_eqns
       =	    -- Extend the inst info from the explicit instance decls
 	    -- with the current set of solutions, giving a
 
-	add_solns modname inst_decl_infos_in orig_eqns current_solns
+	add_solns inst_decl_infos_in orig_eqns current_solns
 				`thenTc` \ (new_inst_infos, inst_mapper) ->
 
 	    -- Simplify each RHS, using a DerivingOrigin containing an
@@ -412,7 +414,7 @@ add_solns :: FAST_STRING
     -- the eqns and solns move "in lockstep"; we have the eqns
     -- because we need the LHS info for addClassInstance.
 
-add_solns modname inst_infos_in eqns solns
+add_solns inst_infos_in eqns solns
   = buildInstanceEnvs all_inst_infos `thenTc` \ inst_mapper ->
     returnTc (new_inst_infos, inst_mapper)
   where
@@ -506,7 +508,7 @@ the renamer.  What a great hack!
 \end{itemize}
 
 \begin{code}
-gen_inst_info :: FAST_STRING		-- Module name
+gen_inst_info :: Maybe Module		-- Module name; Nothing => Prelude
 	      -> [RenamedFixityDecl]	-- all known fixities;
 					-- may be needed for Text
 	      -> GlobalNameMappers		-- lookup stuff for names we may use
@@ -579,7 +581,7 @@ maxtag_Foo  :: Int		-- ditto (NB: not unboxed)
 
 \begin{code}
 gen_tag_n_con_binds :: GlobalNameMappers
-		    -> [(ProtoName, Name, TyCon, TagThingWanted)]
+		    -> [(RdrName, RnName, TyCon, TagThingWanted)]
 		    -> TcM s RenamedHsBinds
 
 gen_tag_n_con_binds deriver_name_funs nm_alist_etc
@@ -624,7 +626,7 @@ If we have a @tag2con@ function, we also generate a @maxtag@ constant.
 
 \begin{code}
 gen_taggery_Names :: [DerivEqn]
-		  -> TcM s [(ProtoName, Name,	-- for an assoc list
+		  -> TcM s [(RdrName, RnName,	-- for an assoc list
 		  	     TyCon,		-- related tycon
 			     TagThingWanted)]
 
@@ -673,13 +675,14 @@ gen_taggery_Names eqns
 \end{code}
 
 \begin{code}
-derivingEnumErr :: TyCon -> TcError
+derivingEnumErr :: TyCon -> Error
 derivingEnumErr tycon
   = addErrLoc (getSrcLoc tycon) "Can't derive an instance of `Enum'" ( \ sty ->
     ppBesides [ppStr "type `", ppr sty tycon, ppStr "'"] )
 
-derivingIxErr :: TyCon -> TcError
+derivingIxErr :: TyCon -> Error
 derivingIxErr tycon
   = addErrLoc (getSrcLoc tycon) "Can't derive an instance of `Ix'" ( \ sty ->
     ppBesides [ppStr "type `", ppr sty tycon, ppStr "'"] )
+-}
 \end{code}

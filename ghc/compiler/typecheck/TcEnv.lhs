@@ -36,13 +36,15 @@ import Class	( Class(..), GenClass, getClassSig )
 
 import TcMonad
 
-import Name	( Name(..), getNameShortName )
+import Name		( Name{-instance NamedThing-} )
+import Outputable 	( getOccName, getSrcLoc )
 import PprStyle
 import Pretty
-import Type	( splitForAllTy )
-import Unique	( Unique )
-import UniqFM
-import Util	( zipWithEqual, zipWith3Equal, zipLazy, panic, pprPanic )
+import RnHsSyn		( RnName(..) )
+import Type		( splitForAllTy )
+import Unique		( Unique )
+import UniqFM	     
+import Util		( zipWithEqual, zipWith3Equal, zipLazy, panic, pprPanic )
 \end{code}
 
 Data type declarations
@@ -75,10 +77,10 @@ Making new TcTyVars, with knot tying!
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
 tcTyVarScopeGivenKinds 
-	:: [Name]			-- Names of some type variables
+	:: [Name]		-- Names of some type variables
 	-> [TcKind s]
-	-> ([TyVar] -> TcM s a)		-- Thing to type check in their scope
-	-> TcM s a			-- Result
+	-> ([TyVar] -> TcM s a)	-- Thing to type check in their scope
+	-> TcM s a		-- Result
 
 tcTyVarScopeGivenKinds names kinds thing_inside
   = fixTc (\ ~(rec_tyvars, _) ->
@@ -97,7 +99,7 @@ tcTyVarScopeGivenKinds names kinds thing_inside
 		-- Construct the real TyVars
 	let
 	  tyvars	     = zipWithEqual mk_tyvar names kinds'
-	  mk_tyvar name kind = mkTyVar (getNameShortName name) (getItsUnique name) kind
+	  mk_tyvar name kind = mkTyVar name (uniqueOf name) kind
 	in
 	returnTc (tyvars, result)
     )					`thenTc` \ (_,result) ->
@@ -116,7 +118,8 @@ Extending the environments.  Notice the uses of @zipLazy@, which makes sure
 that the knot-tied TyVars, TyCons and Classes aren't looked at too early.
 
 \begin{code}
-tcExtendTyConEnv :: [(Name,Maybe Arity)] -> [TyCon] -> TcM s r -> TcM s r
+tcExtendTyConEnv :: [(RnName,Maybe Arity)] -> [TyCon] -> TcM s r -> TcM s r
+
 tcExtendTyConEnv names_w_arities tycons scope
   = newKindVars (length names_w_arities)	`thenNF_Tc` \ kinds ->
     tcGetEnv					`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
@@ -131,7 +134,7 @@ tcExtendTyConEnv names_w_arities tycons scope
     returnTc result 
 
 
-tcExtendClassEnv :: [Name] -> [Class] -> TcM s r -> TcM s r
+tcExtendClassEnv :: [RnName] -> [Class] -> TcM s r -> TcM s r
 tcExtendClassEnv names classes scope
   = newKindVars (length names)	`thenNF_Tc` \ kinds ->
     tcGetEnv			`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
@@ -190,7 +193,7 @@ Extending and consulting the value environment
 tcExtendGlobalValEnv ids scope
   = tcGetEnv		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
     let
-	gve' = addListToUFM_Directly gve [(getItsUnique id, id) | id <- ids]
+	gve' = addListToUFM_Directly gve [(uniqueOf id, id) | id <- ids]
     in
     tcSetEnv (TcEnv tve tce ce gve' lve gtvs) scope
 
@@ -222,7 +225,7 @@ tcGetGlobalTyVars
 \end{code}
 
 \begin{code}
-tcLookupLocalValue :: Name -> NF_TcM s (Maybe (TcIdBndr s))
+tcLookupLocalValue :: RnName -> NF_TcM s (Maybe (TcIdBndr s))
 tcLookupLocalValue name
   = tcGetEnv 		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
     returnNF_Tc (lookupUFM lve name)
@@ -232,15 +235,15 @@ tcLookupLocalValueByKey uniq
   = tcGetEnv 		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
     returnNF_Tc (lookupUFM_Directly lve uniq)
 
-tcLookupLocalValueOK :: String -> Name -> NF_TcM s (TcIdBndr s)
+tcLookupLocalValueOK :: String -> RnName -> NF_TcM s (TcIdBndr s)
 tcLookupLocalValueOK err name
   = tcGetEnv 		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
     returnNF_Tc (lookupWithDefaultUFM lve (panic err) name)
 
 
-tcLookupGlobalValue :: Name -> NF_TcM s Id
+tcLookupGlobalValue :: RnName -> NF_TcM s Id
 
-tcLookupGlobalValue (WiredInVal id)	-- wired in ids
+tcLookupGlobalValue (WiredInId id)	-- wired in ids
   = returnNF_Tc id
 
 tcLookupGlobalValue name
@@ -255,7 +258,7 @@ tcLookupGlobalValue name
 
 -- A useful function that takes an occurrence of a global thing
 -- and instantiates its type with fresh type variables
-tcGlobalOcc :: Name 
+tcGlobalOcc :: RnName 
 	    -> NF_TcM s (Id, 		-- The Id
 			  [TcType s], 	-- Instance types
 			  TcType s)	-- Rest of its type
@@ -288,14 +291,19 @@ Constructing new Ids
 ~~~~~~~~~~~~~~~~~~~~
 
 \begin{code}
-newMonoIds :: [Name] -> Kind -> ([TcIdBndr s] -> TcM s a) -> TcM s a
+newMonoIds :: [RnName] -> Kind -> ([TcIdBndr s] -> TcM s a) -> TcM s a
+
 newMonoIds names kind m
   = newTyVarTys no_of_names kind	`thenNF_Tc` \ tys ->
     tcGetUniques no_of_names		`thenNF_Tc` \ uniqs ->
     let
-	new_ids            = zipWith3Equal mk_id names uniqs tys
-	mk_id name uniq ty = mkUserLocal (getOccurrenceName name) uniq ty
-					 (getSrcLoc name)
+	new_ids = zipWith3Equal mk_id names uniqs tys
+
+	mk_id name uniq ty
+	  = let
+		name_str = case (getOccName name) of { Unqual n -> n }
+	    in
+	    mkUserLocal name_str uniq ty (getSrcLoc name)
     in
     tcExtendLocalValEnv names new_ids (m new_ids)
   where

@@ -7,31 +7,113 @@
 #include "HsVersions.h"
 
 module Name (
-	-- things for the Name NON-abstract type
-	Name(..),
+	Module(..),
 
-	isTyConName, isClassName, isClassOpName,
-	isUnboundName, invisibleName,
+	RdrName(..),
+	isUnqual,
+	isQual,
+	isConopRdr,
+	appendRdr,
+	rdrToOrig,
+	showRdr,
+	cmpRdr,
 
-	getTagFromClassOpName, getSynNameArity,
+	Name,
+	Provenance,
+	mkLocalName, isLocalName, 
+	mkTopLevName, mkImportedName,
+	mkImplicitName,	isImplicitName,
+	mkBuiltinName,
 
-	getNameShortName, getNameFullName
-
+	nameUnique,
+	nameOrigName,
+	nameOccName,
+	nameExportFlag,
+	nameSrcLoc,
+	isLocallyDefinedName,
+	isPreludeDefinedName
     ) where
 
-import Ubiq{-uitous-}
+import Ubiq
 
-import NameLoop		-- break Name/Id loop, Name/PprType/Id loop
-
-import NameTypes
-import Outputable	( ExportFlag(..) )
+import CStrings		( identToC, cSEP )
+import Outputable	( Outputable(..), ExportFlag(..), isConop )
+import PprStyle		( PprStyle(..), codeStyle )
 import Pretty
-import PprStyle		( PprStyle(..) )
+import PrelMods		( pRELUDE )
 import SrcLoc		( mkBuiltinSrcLoc, mkUnknownSrcLoc )
-import TyCon		( TyCon, synTyConArity )
-import TyVar		( GenTyVar )
 import Unique		( pprUnique, Unique )
-import Util		( panic, panic#, pprPanic )
+import Util		( thenCmp, _CMP_STRING_, panic )
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[RdrName]{The @RdrName@ datatype; names read from files}
+%*									*
+%************************************************************************
+
+\begin{code}
+type Module = FAST_STRING
+
+data RdrName  = Unqual FAST_STRING
+              | Qual Module FAST_STRING
+
+isUnqual (Unqual _) = True
+isUnqual (Qual _ _) = False
+
+isQual (Unqual _) = False
+isQual (Qual _ _) = True
+
+isConopRdr (Unqual n) = isConop n
+isConopRdr (Qual m n) = isConop n
+
+appendRdr (Unqual n) str = Unqual (n _APPEND_ str)
+appendRdr (Qual m n) str = Qual m (n _APPEND_ str)
+
+rdrToOrig (Unqual n) = (pRELUDE, n)
+rdrToOrig (Qual m n) = (m, n)
+
+cmpRdr (Unqual n1)  (Unqual n2)  = _CMP_STRING_ n1 n2
+cmpRdr (Unqual n1)  (Qual m2 n2) = LT_
+cmpRdr (Qual m1 n1) (Unqual n2)  = GT_
+cmpRdr (Qual m1 n1) (Qual m2 n2) = thenCmp (_CMP_STRING_ m1 m2) (_CMP_STRING_ n1 n2) 
+
+instance Eq RdrName where
+    a == b = case (a `cmp` b) of { EQ_ -> True;  _ -> False }
+    a /= b = case (a `cmp` b) of { EQ_ -> False; _ -> True }
+
+instance Ord RdrName where
+    a <= b = case (a `cmp` b) of { LT_ -> True;	 EQ_ -> True;  GT__ -> False }
+    a <	 b = case (a `cmp` b) of { LT_ -> True;	 EQ_ -> False; GT__ -> False }
+    a >= b = case (a `cmp` b) of { LT_ -> False; EQ_ -> True;  GT__ -> True  }
+    a >	 b = case (a `cmp` b) of { LT_ -> False; EQ_ -> False; GT__ -> True  }
+
+instance Ord3 RdrName where
+    cmp = cmpRdr
+
+instance NamedThing RdrName where
+    -- We're sorta faking it here
+    getName rdr_name
+      = Global u rdr_name prov ex [rdr_name]
+      where
+	u    = panic "NamedThing.RdrName:Unique"
+	prov = panic "NamedThing.RdrName:Provenance"
+	ex   = panic "NamedThing.RdrName:ExportFlag"
+
+instance Outputable RdrName where
+    ppr sty (Unqual n) = pp_name sty n
+    ppr sty (Qual m n) = ppBeside (pp_mod sty m) (pp_name sty n)
+
+pp_mod PprInterface        m = ppNil
+pp_mod PprForC             m = ppBesides [identToC m, ppPStr cSEP]
+pp_mod (PprForAsm False _) m = ppBesides [identToC m, ppPStr cSEP]
+pp_mod (PprForAsm True  _) m = ppBesides [ppPStr cSEP, identToC m, ppPStr cSEP]
+pp_mod _                   m = ppBesides [ppPStr m, ppChar '.']
+
+pp_name sty n | codeStyle sty = identToC n
+              | otherwise     = ppPStr n	      
+
+showRdr sty rdr = ppShow 100 (ppr sty rdr)
 \end{code}
 
 %************************************************************************
@@ -42,102 +124,52 @@ import Util		( panic, panic#, pprPanic )
 
 \begin{code}
 data Name
-  = Short	    Unique	-- Local ids and type variables
-		    ShortName
+  = Local    Unique
+             FAST_STRING
+             SrcLoc
 
-	-- Nano-prelude things; truly wired in.
-	-- Includes all type constructors and their associated data constructors
-  | WiredInTyCon    TyCon
-  | WiredInVal	    Id
+  | Global   Unique
+             RdrName      -- original name; Unqual => prelude
+             Provenance   -- where it came from
+             ExportFlag   -- is it exported?
+             [RdrName]    -- ordered occurrence names (usually just one);
+			  -- first may be *un*qual.
 
-  | TyConName	    Unique	-- TyCons other than Prelude ones; need to
-		    FullName	-- separate these because we want to pin on
-		    Arity	-- their arity.
-		    Bool        -- False <=> `type',
-				-- True <=> `data' or `newtype'
-		    [Name]	-- List of user-visible data constructors;
-				-- NB: for `data' types only.
-				-- Used in checking import/export lists.
+data Provenance
+  = LocalDef SrcLoc       -- locally defined; give its source location
 
-  | ClassName	    Unique
-		    FullName
-		    [Name]	-- List of class methods; used for checking
-				-- import/export lists.
+  | Imported SrcLoc       -- imported; give the *original* source location
+         --  [SrcLoc]     -- any import source location(s)
 
-  | ValName	    Unique	-- Top level id
-		    FullName
-
-  | ClassOpName	    Unique
-		    Name	-- Name associated w/ the defined class
-				-- (can get unique and export info, etc., from this)
-		    FAST_STRING	-- The class operation
-		    Int		-- Unique tag within the class
-
-	-- Miscellaneous
-  | Unbound	    FAST_STRING	-- Placeholder for a name which isn't in scope
-				-- Used only so that the renamer can carry on after
-				-- finding an unbound identifier.
-				-- The string is grabbed from the unbound name, for
-				-- debugging information only.
-\end{code}
-
-These @is..@ functions are used in the renamer to check that (eg) a tycon
-is seen in a context which demands one.
-
-\begin{code}
-isTyConName, isClassName, isUnboundName :: Name -> Bool
-
-isTyConName (TyConName _ _ _ _ _) = True
-isTyConName (WiredInTyCon _)	  = True
-isTyConName other		  = False
-
-isClassName (ClassName _ _ _) = True
-isClassName other	      = False
-
-isUnboundName (Unbound _) = True
-isUnboundName other	  = False
-\end{code}
-
-@isClassOpName@ is a little cleverer: it checks to see whether the
-class op comes from the correct class.
-
-\begin{code}
-isClassOpName :: Name	-- The name of the class expected for this op
-	      -> Name	-- The name of the thing which should be a class op
-	      -> Bool
-
-isClassOpName (ClassName uniq1 _ _) (ClassOpName _ (ClassName uniq2 _ _) _ _)
-  = uniq1 == uniq2
-isClassOpName other_class other_op = False
-\end{code}
-
-A Name is ``invisible'' if the user has no business seeing it; e.g., a
-data-constructor for an abstract data type (but whose constructors are
-known because of a pragma).
-\begin{code}
-invisibleName :: Name -> Bool
-
-invisibleName (TyConName _ n _ _ _) = invisibleFullName n
-invisibleName (ClassName _ n _)     = invisibleFullName n
-invisibleName (ValName   _ n)	    = invisibleFullName n
-invisibleName _			    = False
+  | Implicit
+  | Builtin
 \end{code}
 
 \begin{code}
-getTagFromClassOpName :: Name -> Int
-getTagFromClassOpName (ClassOpName _ _ _ tag)  = tag
+mkLocalName = Local
 
-getSynNameArity :: Name -> Maybe Arity
-getSynNameArity (TyConName _ _ arity False{-syn-} _) = Just arity
-getSynNameArity (WiredInTyCon tycon)	             = synTyConArity tycon
-getSynNameArity other_name			     = Nothing
+mkTopLevName   u orig locn exp occs = Global u orig (LocalDef locn) exp occs
+mkImportedName u orig locn exp occs = Global u orig (Imported locn) exp occs
 
-getNameShortName :: Name -> ShortName
-getNameShortName (Short _ sn) = sn
+mkImplicitName :: Unique -> RdrName -> Name
+mkImplicitName u o = Global u o Implicit NotExported []
 
-getNameFullName :: Name -> FullName
-getNameFullName n = get_nm "getNameFullName" n
+mkBuiltinName :: Unique -> Module -> FAST_STRING -> Name
+mkBuiltinName u m n = Global u (Unqual n) Builtin NotExported []
+
+	-- ToDo: what about module ???
+	-- ToDo: exported when compiling builtin ???
+
+isLocalName (Local _ _ _) = True
+isLocalName _ 		= False
+
+isImplicitName (Global _ _ Implicit _ _) = True
+isImplicitName _ 		         = False
+
+isBuiltinName  (Global _ _ Builtin  _ _) = True
+isBuiltinName  _ 		         = False
 \end{code}
+
 
 
 %************************************************************************
@@ -149,17 +181,8 @@ getNameFullName n = get_nm "getNameFullName" n
 \begin{code}
 cmpName n1 n2 = c n1 n2
   where
-    c (Short u1 _)	     (Short u2 _)		= cmp u1 u2
-			      
-    c (WiredInTyCon tc1)     (WiredInTyCon tc2)		= cmp tc1 tc2
-    c (WiredInVal   id1)     (WiredInVal   id2)		= cmp id1 id2
-			      
-    c (TyConName u1 _ _ _ _) (TyConName u2 _ _ _ _) 	= cmp u1 u2
-    c (ClassName u1 _ _)     (ClassName u2 _ _)		= cmp u1 u2
-    c (ValName   u1 _)	     (ValName   u2 _)		= cmp u1 u2
-			      
-    c (ClassOpName u1 _ _ _) (ClassOpName u2 _ _ _)	= cmp u1 u2
-    c (Unbound a)	     (Unbound b)		= panic# "Eq.Name.Unbound"
+    c (Local    u1 _ _)	    (Local    u2 _ _)     = cmp u1 u2
+    c (Global   u1 _ _ _ _) (Global   u2 _ _ _ _) = cmp u1 u2
 
     c other_1 other_2		-- the tags *must* be different
       = let tag1 = tag_Name n1
@@ -167,14 +190,8 @@ cmpName n1 n2 = c n1 n2
 	in
 	if tag1 _LT_ tag2 then LT_ else GT_
 
-    tag_Name (Short _ _)		= (ILIT(1) :: FAST_INT)
-    tag_Name (WiredInTyCon _)		= ILIT(2)
-    tag_Name (WiredInVal _)		= ILIT(3)
-    tag_Name (TyConName _ _ _ _ _)	= ILIT(7)
-    tag_Name (ClassName _ _ _)		= ILIT(8)
-    tag_Name (ValName _ _)		= ILIT(9)
-    tag_Name (ClassOpName _ _ _ _)	= ILIT(10)
-    tag_Name (Unbound _)		= ILIT(11)
+    tag_Name (Local    _ _ _)	  = (ILIT(1) :: FAST_INT)
+    tag_Name (Global   _ _ _ _ _) = ILIT(2)
 \end{code}
 
 \begin{code}
@@ -190,106 +207,68 @@ instance Ord Name where
 
 instance Ord3 Name where
     cmp = cmpName
-\end{code}
 
-\begin{code}
+instance Uniquable Name where
+    uniqueOf = nameUnique
+
 instance NamedThing Name where
-    getExportFlag (Short _ _)		= NotExported
-    getExportFlag (WiredInTyCon _)	= NotExported -- compiler always know about these
-    getExportFlag (WiredInVal _)	= NotExported
-    getExportFlag (ClassOpName _ c _ _) = getExportFlag c
-    getExportFlag other			= getExportFlag (get_nm "getExportFlag" other)
-
-    isLocallyDefined (Short _ _)	   = True
-    isLocallyDefined (WiredInTyCon _)	   = False
-    isLocallyDefined (WiredInVal _)	   = False
-    isLocallyDefined (ClassOpName _ c _ _) = isLocallyDefined c
-    isLocallyDefined other		   = isLocallyDefined (get_nm "isLocallyDefined" other)
-
-    getOrigName (Short _ sn)		= getOrigName sn
-    getOrigName (WiredInTyCon tc)	= getOrigName tc
-    getOrigName (WiredInVal id)		= getOrigName id
-    getOrigName (ClassOpName _ c op _)	= (fst (getOrigName c), op)
-    getOrigName other			= getOrigName (get_nm "getOrigName" other)
-
-    getOccurrenceName (Short _ sn)	   = getOccurrenceName sn
-    getOccurrenceName (WiredInTyCon tc)    = getOccurrenceName tc
-    getOccurrenceName (WiredInVal id)	   = getOccurrenceName id
-    getOccurrenceName (ClassOpName _ _ op _) = op
-    getOccurrenceName (Unbound s)	   =  s _APPEND_ SLIT("<unbound>")
-    getOccurrenceName other		   = getOccurrenceName (get_nm "getOccurrenceName" other)
-
-    getInformingModules thing = panic "getInformingModule:Name"
-
-    getSrcLoc (Short _ sn)	   = getSrcLoc sn
-    getSrcLoc (WiredInTyCon tc)    = mkBuiltinSrcLoc
-    getSrcLoc (WiredInVal id)	   = mkBuiltinSrcLoc
-    getSrcLoc (ClassOpName _ c _ _)  = getSrcLoc c
-    getSrcLoc (Unbound _)	   = mkUnknownSrcLoc
-    getSrcLoc other		   = getSrcLoc (get_nm "getSrcLoc" other)
-
-    getItsUnique (Short		u _)	   = u
-    getItsUnique (WiredInTyCon	t)	   = getItsUnique t
-    getItsUnique (WiredInVal	i)	   = getItsUnique i
-    getItsUnique (TyConName 	u _ _ _ _) = u
-    getItsUnique (ClassName 	u _ _)	   = u
-    getItsUnique (ValName 	u _)	   = u
-    getItsUnique (ClassOpName 	u _ _ _)   = u
-
-    fromPreludeCore (WiredInTyCon _)	   = True
-    fromPreludeCore (WiredInVal _)	   = True
-    fromPreludeCore (ClassOpName _ c _ _)  = fromPreludeCore c
-    fromPreludeCore other		   = False
+    getName n = n
 \end{code}
 
-A useful utility; most emphatically not for export! (but see
-@getNameFullName@...):
 \begin{code}
-get_nm :: String -> Name -> FullName
+nameUnique (Local    u _ _)     = u
+nameUnique (Global   u _ _ _ _) = u
 
-get_nm msg (TyConName _ n _ _ _) = n
-get_nm msg (ClassName _ n _)	 = n
-get_nm msg (ValName   _ n)	 = n
-#ifdef DEBUG
-get_nm msg other = pprPanic ("get_nm:"++msg) (ppr PprShowAll other)
--- If match failure, probably on a ClassOpName or Unbound :-(
-#endif
+nameOrigName (Local    _ n _)	     = (panic "NamedThing.Local.nameOrigName", n)
+nameOrigName (Global   _ orig _ _ _) = rdrToOrig orig
+
+nameOccName (Local    _ n _)	       = Unqual n
+nameOccName (Global   _ orig _ _ []  ) = orig
+nameOccName (Global   _ orig _ _ occs) = head occs
+
+nameExportFlag (Local    _ _ _)	      = NotExported
+nameExportFlag (Global   _ _ _ exp _) = exp
+
+nameSrcLoc (Local  _ _ loc)	              = loc
+nameSrcLoc (Global _ _ (LocalDef loc) _ _) = loc
+nameSrcLoc (Global _ _ (Imported loc) _ _) = loc
+nameSrcLoc (Global _ _ Implicit       _ _) = mkUnknownSrcLoc
+nameSrcLoc (Global _ _ Builtin        _ _) = mkBuiltinSrcLoc
+
+isLocallyDefinedName (Local  _ _ _)	           = True
+isLocallyDefinedName (Global _ _ (LocalDef _) _ _) = True
+isLocallyDefinedName (Global _ _ (Imported _) _ _) = False
+isLocallyDefinedName (Global _ _ Implicit     _ _) = False
+isLocallyDefinedName (Global _ _ Builtin      _ _) = False
+
+isPreludeDefinedName (Local    _ n _)        = False
+isPreludeDefinedName (Global   _ orig _ _ _) = isUnqual orig
 \end{code}
 
 \begin{code}
 instance Outputable Name where
 #ifdef DEBUG
-    ppr PprDebug (Short u s)	    = pp_debug u s
-
-    ppr PprDebug (TyConName u n _ _ _) = pp_debug u n
-    ppr PprDebug (ClassName u n _)     = pp_debug u n
-    ppr PprDebug (ValName u n)         = pp_debug u n
+    ppr PprDebug (Local    u n _)     = pp_debug u (ppPStr n)
+    ppr PprDebug (Global   u o _ _ _) = pp_debug u (ppr PprDebug o)
 #endif
-    ppr sty (Short u s)		  = ppr sty s
-
-    ppr sty (WiredInTyCon tc)	  = ppr sty tc
-    ppr sty (WiredInVal   id)	  = ppr sty id
-
-    ppr sty (TyConName u n a b c) = ppr sty n
-    ppr sty (ClassName u n c)	  = ppr sty n
-    ppr sty (ValName   u n)	  = ppr sty n
-
-    ppr sty (ClassOpName u c s i)
-      = let
-	    ps = ppPStr s
-	in
-	case sty of
-	  PprForUser   -> ps
-	  PprInterface -> ps
-	  PprDebug     -> ps
-	  other	       -> ppBesides [ps, ppChar '{',
-				       ppSep [pprUnique u,
-					      ppStr "op", ppInt i,
-					      ppStr "cls", ppr sty c],
-				       ppChar '}']
-
-    ppr sty (Unbound s) = ppStr ("*UNBOUND*"++ _UNPK_ s)
+    ppr sty        (Local    u n _)             = pp_name sty n
+    ppr PprForUser (Global   u o _ _ []  )      = ppr PprForUser o
+    ppr PprForUser (Global   u o _ _ occs)      = ppr PprForUser (head occs)
+    ppr PprShowAll (Global   u o prov exp occs) = pp_all o prov exp occs
+    ppr sty        (Global   u o _ _ _)         = ppr sty o
 
 pp_debug uniq thing
-  = ppBesides [ppr PprDebug thing, ppStr "{-", pprUnique uniq, ppStr "-}" ]
+  = ppBesides [thing, ppStr "{-", pprUnique uniq, ppStr "-}" ]
+
+pp_all orig prov exp occs
+  = ppBesides [ppr PprShowAll orig, ppr PprShowAll occs, pp_prov prov, pp_exp exp]
+
+pp_exp NotExported = ppNil
+pp_exp ExportAll   = ppPStr SLIT("/EXP(..)")
+pp_exp ExportAbs   = ppPStr SLIT("/EXP")
+
+pp_prov Implicit = ppPStr SLIT("/IMPLICIT")
+pp_prov Builtin  = ppPStr SLIT("/BUILTIN")
+pp_prov _        = ppNil
 \end{code}
+

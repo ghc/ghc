@@ -15,7 +15,9 @@ import Ubiq{-uitous-}
 import HsSyn		( TyDecl(..),  ConDecl(..), BangType(..),
 			  ClassDecl(..), MonoType(..), PolyType(..),
 			  Sig(..), MonoBinds, Fake, InPat, HsBinds(..), Bind, HsExpr )
-import RnHsSyn		( RenamedTyDecl(..), RenamedClassDecl(..) )
+import RnHsSyn		( isRnTyCon, RenamedTyDecl(..), RenamedClassDecl(..),
+			  RnName(..){-instance Uniquable-}
+			)
 import TcHsSyn		( TcHsBinds(..), TcIdOcc(..) )
 
 import TcMonad
@@ -30,7 +32,7 @@ import TcTyDecls	( tcTyDecl, tcRecordSelectors )
 import Bag	
 import Class		( Class(..), getClassSelIds )
 import Digraph		( findSCCs, SCC(..) )
-import Name		( Name, isTyConName )
+import Outputable	( getSrcLoc )
 import PprStyle
 import Pretty
 import UniqSet		( UniqSet(..), emptyUniqSet,
@@ -135,7 +137,10 @@ tcGroup inst_mapper decls
     returnTc (really_final_env, foldr ThenBinds EmptyBinds binds)
 
   where
-    (tyvar_names, tycon_names_w_arities, class_names) = get_binders decls
+    (tyvar_rn_names, tycon_names_w_arities, class_names) = get_binders decls
+
+    tyvar_names = map de_rn tyvar_rn_names
+    de_rn (RnName n) = n
 
     combine do_a do_b
       = do_a `thenTc` \ (a1,a2) ->
@@ -205,13 +210,13 @@ Edges in Type/Class decls
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
 mk_edges (TyD (TyData ctxt name _ condecls _ _ _))
-  = (getItsUnique name, set_to_bag (get_ctxt ctxt `unionUniqSets` get_cons condecls))
+  = (uniqueOf name, set_to_bag (get_ctxt ctxt `unionUniqSets` get_cons condecls))
 mk_edges (TyD (TyNew  ctxt name _ condecl _ _ _))
-  = (getItsUnique name, set_to_bag (get_ctxt ctxt `unionUniqSets` get_cons condecl))
+  = (uniqueOf name, set_to_bag (get_ctxt ctxt `unionUniqSets` get_cons condecl))
 mk_edges (TyD (TySynonym name _ rhs _))
-  = (getItsUnique name, set_to_bag (get_ty rhs))
+  = (uniqueOf name, set_to_bag (get_ty rhs))
 mk_edges (ClD (ClassDecl ctxt name _ sigs _ _ _))
-  = (getItsUnique name, set_to_bag (get_ctxt ctxt `unionUniqSets` get_sigs sigs))
+  = (uniqueOf name, set_to_bag (get_ctxt ctxt `unionUniqSets` get_sigs sigs))
 
 get_ctxt ctxt
   = unionManyUniqSets (map (set_name.fst) ctxt)
@@ -234,7 +239,7 @@ get_cons cons
 get_ty (MonoTyVar tv)
   = emptyUniqSet
 get_ty (MonoTyApp name tys)
-  = (if isTyConName name then set_name name else emptyUniqSet)
+  = (if isRnTyCon name then set_name name else emptyUniqSet)
     `unionUniqSets` get_tys tys
 get_ty (MonoFunTy ty1 ty2)	
   = unionUniqSets (get_ty ty1) (get_ty ty2)
@@ -257,7 +262,7 @@ get_sigs sigs
     get_sig (ClassOpSig _ ty _ _) = get_pty ty
     get_sig other = panic "TcTyClsDecls:get_sig"
 
-set_name name = unitUniqSet (getItsUnique name)
+set_name name = unitUniqSet (uniqueOf name)
 
 set_to_bag set = listToBag (uniqSetToList set)
 \end{code}
@@ -287,9 +292,9 @@ Monad c in bop's type signature means that D must have kind Type->Type.
 
 \begin{code}
 get_binders :: Bag Decl
-	    -> ([Name],			-- TyVars;  no dups
-		[(Name, Maybe Arity)],	-- Tycons;  no dups; arities for synonyms
-		[Name])			-- Classes; no dups
+	    -> ([RnName],		-- TyVars;  no dups
+		[(RnName, Maybe Arity)],-- Tycons;  no dups; arities for synonyms
+		[RnName])		-- Classes; no dups
 
 get_binders decls = (bagToList tyvars, bagToList tycons, bagToList classes)
   where

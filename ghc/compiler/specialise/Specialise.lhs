@@ -44,7 +44,7 @@ import Id		( idType, isDefaultMethodId_maybe, toplevelishId,
 			)
 import Literal		( Literal{-instance Outputable-} )
 import Maybes		( catMaybes, firstJust, maybeToBool )
-import Outputable	( interppSP, Outputable(..){-instance * []-} )
+import Outputable	( interppSP, isLocallyDefined, Outputable(..){-instance * []-} )
 import PprStyle		( PprStyle(..) )
 import PprType		( pprGenType, pprParendGenType, pprMaybeTy,
 			  GenType{-instance Outputable-}, GenTyVar{-ditto-},

@@ -59,9 +59,7 @@ NATIVEGEN_DIR=$(TOP_PWD)/$(CURRENT_DIR)/nativeGen
 parser/U_constr.hs	\
 parser/U_binding.hs	\
 parser/U_pbinding.hs	\
-parser/U_coresyn.hs	\
 parser/U_entidt.hs	\
-parser/U_hpragma.hs	\
 parser/U_list.hs	\
 parser/U_literal.hs	\
 parser/U_maybe.hs	\
@@ -76,7 +74,6 @@ parser/U_ttype.hs
 parser/UgenUtil.lhs	\
 parser/UgenAll.lhs	\
 reader/ReadPrefix.lhs	\
-reader/ReadPragmas.lhs	\
 \
 reader/PrefixSyn.lhs	\
 reader/PrefixToHs.lhs	\
@@ -101,10 +98,8 @@ basicTypes/IdInfo.lhs		\
 basicTypes/IdUtils.lhs		\
 basicTypes/Literal.lhs		\
 basicTypes/Name.lhs 		\
-basicTypes/NameTypes.lhs 	\
 basicTypes/PprEnv.lhs		\
 basicTypes/PragmaInfo.lhs	\
-basicTypes/ProtoName.lhs 	\
 basicTypes/SrcLoc.lhs		\
 basicTypes/UniqSupply.lhs 	\
 basicTypes/Unique.lhs		\
@@ -121,18 +116,15 @@ specialise/SpecEnv.lhs
 
 
 #define RENAMERSRCS_LHS \
-rename/RnPass1.lhs \
-rename/RnPass2.lhs \
-rename/RnPass3.lhs \
-rename/RnPass4.lhs \
 rename/RnHsSyn.lhs \
-rename/RnUtils.lhs \
-rename/RnMonad12.lhs \
-rename/RnMonad3.lhs \
-rename/RnMonad4.lhs \
-rename/RnBinds4.lhs \
-rename/RnExpr4.lhs \
-rename/Rename.lhs
+rename/RnMonad.lhs \
+rename/Rename.lhs \
+rename/RnNames.lhs \
+rename/RnSource.lhs \
+rename/RnBinds.lhs \
+rename/RnExpr.lhs \
+rename/RnIfaces.lhs \
+rename/RnUtils.lhs
 
 #define TCSRCS_LHS \
 typecheck/TcHsSyn.lhs \
@@ -359,14 +351,15 @@ NOT_SO_BASICSRCS_LHS	\
 UTILSRCS_LHS 		\
 MAIN_SRCS_LHS 		\
 READERSRCS_LHS 		\
-RENAMERSRCS_LHS 	\
-TCSRCS_LHS 		\
+RENAMERSRCS_LHS		\
+TCSRCS_LHS		\
 DSSRCS_LHS 		\
 SIMPL_SRCS_LHS 		\
 STG_SRCS_LHS 		\
 BACKSRCS_LHS NATIVEGEN_SRCS_LHS
 
 /*
+\
 */
 /* NB: all the ones that may be empty (e.g., NATIVEGEN_SRCS_LHS)
 	need to be on the last line.
@@ -487,8 +480,6 @@ absCSyn/AbsCLoop.hi : absCSyn/AbsCLoop.lhi
 	$(GHC_UNLIT) absCSyn/AbsCLoop.lhi absCSyn/AbsCLoop.hi
 basicTypes/IdLoop.hi : basicTypes/IdLoop.lhi
 	$(GHC_UNLIT) basicTypes/IdLoop.lhi basicTypes/IdLoop.hi
-basicTypes/NameLoop.hi : basicTypes/NameLoop.lhi
-	$(GHC_UNLIT) basicTypes/NameLoop.lhi basicTypes/NameLoop.hi
 codeGen/CgLoop1.hi : codeGen/CgLoop1.lhi
 	$(GHC_UNLIT) codeGen/CgLoop1.lhi codeGen/CgLoop1.hi
 codeGen/CgLoop2.hi : codeGen/CgLoop2.lhi
@@ -501,8 +492,6 @@ nativeGen/NcgLoop.hi : nativeGen/NcgLoop.lhi
 	$(GHC_UNLIT) nativeGen/NcgLoop.lhi nativeGen/NcgLoop.hi
 prelude/PrelLoop.hi : prelude/PrelLoop.lhi
 	$(GHC_UNLIT) prelude/PrelLoop.lhi prelude/PrelLoop.hi
-reader/RdrLoop.hi : reader/RdrLoop.lhi
-	$(GHC_UNLIT) reader/RdrLoop.lhi reader/RdrLoop.hi
 rename/RnLoop.hi : rename/RnLoop.lhi
 	$(GHC_UNLIT) rename/RnLoop.lhi rename/RnLoop.hi
 simplCore/SmplLoop.hi : simplCore/SmplLoop.lhi
@@ -540,10 +529,8 @@ compile(basicTypes/IdInfo,lhs,-K2m)
 compile(basicTypes/IdUtils,lhs,)
 compile(basicTypes/Literal,lhs,)
 compile(basicTypes/Name,lhs,)
-compile(basicTypes/NameTypes,lhs,)
 compile(basicTypes/PprEnv,lhs,)
 compile(basicTypes/PragmaInfo,lhs,)
-compile(basicTypes/ProtoName,lhs,)
 compile(basicTypes/SrcLoc,lhs,)
 compile(basicTypes/UniqSupply,lhs,)
 compile(basicTypes/Unique,lhs,)
@@ -626,21 +613,17 @@ compile(profiling/CostCentre,lhs,)
 compile(reader/PrefixSyn,lhs,)
 compile(reader/PrefixToHs,lhs,)
 compile(reader/ReadPrefix,lhs,if_ghc(-fvia-C -I$(COMPINFO_DIR) -Iparser '-#include"hspincl.h"'))
-compile(reader/ReadPragmas,lhs,)
 compile(reader/RdrHsSyn,lhs,)
 
-compile(rename/Rename,lhs,)
-compile(rename/RnPass1,lhs,)
-compile(rename/RnPass2,lhs,)
-compile(rename/RnPass3,lhs,)
-compile(rename/RnPass4,lhs,)
-compile(rename/RnUtils,lhs,)
 compile(rename/RnHsSyn,lhs,)
-compile(rename/RnBinds4,lhs,)
-compile(rename/RnExpr4,lhs,)
-compile(rename/RnMonad12,lhs,)
-compile(rename/RnMonad3,lhs,)
-compile(rename/RnMonad4,lhs,)
+compile(rename/RnMonad,lhs,)
+compile(rename/Rename,lhs,)
+compile(rename/RnNames,lhs,)
+compile(rename/RnSource,lhs,)
+compile(rename/RnBinds,lhs,)
+compile(rename/RnExpr,lhs,)
+compile(rename/RnIfaces,lhs,)
+compile(rename/RnUtils,lhs,)
 
 compile(simplCore/BinderInfo,lhs,)
 compile(simplCore/ConFold,lhs,)
@@ -772,9 +755,7 @@ CPP_DEFINES = $(D_DEBUG)
 HSP_SRCS_C =    parser/constr.c		\
 		parser/binding.c	\
 		parser/pbinding.c	\
-		parser/coresyn.c	\
 		parser/entidt.c		\
-		parser/hpragma.c	\
 		parser/hslexer.c	\
 		parser/hsparser.tab.c	\
 		parser/id.c		\
@@ -794,9 +775,7 @@ HSP_SRCS_C =    parser/constr.c		\
 HSP_OBJS_O =    parser/constr.o		\
 		parser/binding.o	\
 		parser/pbinding.o	\
-		parser/coresyn.o	\
 		parser/entidt.o		\
-		parser/hpragma.o	\
 		parser/hslexer.o	\
 		parser/hsparser.tab.o	\
 		parser/id.o		\
@@ -841,14 +820,12 @@ MakeDirectories(install, $(INSTLIBDIR_GHC))
 InstallBinaryTarget(hsp,$(INSTLIBDIR_GHC))
 #endif /* DoInstall... */
 
-YaccRunWithExpectMsg(parser/hsparser,16,0)
+YaccRunWithExpectMsg(parser/hsparser,14,0)
 
 UgenTarget(parser/constr)
 UgenTarget(parser/binding)
 UgenTarget(parser/pbinding)
-UgenTarget(parser/coresyn)
 UgenTarget(parser/entidt)
-UgenTarget(parser/hpragma)
 UgenTarget(parser/list)
 UgenTarget(parser/literal)
 UgenTarget(parser/maybe)
@@ -860,14 +837,12 @@ UgenTarget(parser/ttype)
 UGENS_C = parser/constr.c	\
 	parser/binding.c	\
 	parser/pbinding.c	\
-	parser/coresyn.c	\
 	parser/entidt.c		\
 	parser/literal.c	\
 	parser/list.c		\
 	parser/maybe.c		\
 	parser/either.c		\
 	parser/qid.c		\
-	parser/hpragma.c	\
 	parser/tree.c		\
 	parser/ttype.c
 
@@ -882,9 +857,7 @@ compile(parser/UgenUtil,lhs,$(PARSER_HS_OPTS) '-#include"hspincl.h"')
 compile(parser/U_constr,hs,$(PARSER_HS_OPTS) '-#include"hspincl.h"')
 compile(parser/U_binding,hs,$(PARSER_HS_OPTS) '-#include"hspincl.h"')
 compile(parser/U_pbinding,hs,$(PARSER_HS_OPTS) '-#include"hspincl.h"')
-compile(parser/U_coresyn,hs,$(PARSER_HS_OPTS) '-#include"hspincl.h"')
 compile(parser/U_entidt,hs,$(PARSER_HS_OPTS) '-#include"hspincl.h"')
-compile(parser/U_hpragma,hs,$(PARSER_HS_OPTS) '-#include"hspincl.h"')
 compile(parser/U_list,hs,$(PARSER_HS_OPTS) '-#include"hspincl.h"')
 compile(parser/U_literal,hs,$(PARSER_HS_OPTS) '-#include"hspincl.h"')
 compile(parser/U_maybe,hs,$(PARSER_HS_OPTS) '-#include"hspincl.h"')

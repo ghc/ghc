@@ -138,7 +138,7 @@ data IdInfo
 	-- ToDo: SrcLoc is in FullNames too (could rm?)  but it
 	-- is needed here too for things like ConstMethodIds and the
 	-- like, which don't have full-names of their own Mind you,
-	-- perhaps the FullName for a constant method could give the
+	-- perhaps the Name for a constant method could give the
 	-- class/type involved?
 \end{code}
 

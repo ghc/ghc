@@ -11,7 +11,7 @@ import U_qid
 %}}
 type ttype;
 	tname	: < gtypeid	: qid; 	>;
-	namedtvar : < gnamedtvar : unkId; /* ToDo: rm unkIds entirely??? */ >;
+	namedtvar : < gnamedtvar : qid;	>;
 	tllist	: < gtlist	: ttype; >;
 	ttuple	: < gttuple	: list; >;
 	tfun	: < gtin	: ttype;
@@ -21,11 +21,5 @@ type ttype;
 	tbang	: < gtbang	: ttype; >;
 	context	: < gtcontextl	: list;
 		    gtcontextt	: ttype; >;
-
-	unidict :   < gunidict_clas : qid;
-		      gunidict_ty   : ttype; >;
-	unityvartemplate: <gunityvartemplate : unkId; >;
-	uniforall : < guniforall_tv : list;
-		      guniforall_ty : ttype; >;
 end;
 

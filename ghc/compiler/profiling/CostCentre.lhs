@@ -30,6 +30,7 @@ module CostCentre (
 import Id		( externallyVisibleId, GenId, Id(..) )
 import CStrings		( identToC, stringToC )
 import Maybes		( Maybe(..) )
+import Name		( showRdr, RdrName )
 import Outputable
 import Pretty		( ppShow, prettyToUn )
 import PprStyle		( PprStyle(..) )
@@ -400,8 +401,8 @@ uppCostCentre sty print_as_string cc
 	do_id :: Id -> String
 	do_id id
 	  = if print_as_string
-	    then _UNPK_ (getOccurrenceName id) -- don't want module in the name
-	    else showId sty id	      -- we really do
+	    then showRdr sty (getOccName id)	-- use occ name
+	    else showId sty id	      		-- we really do
 
 	do_calved IsCafCC = "/CAF"
 	do_calved _   	  = ""

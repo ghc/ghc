@@ -128,8 +128,8 @@ instance Outputable (TcIdOcc s) where
   ppr sty (RealId id) = ppr sty id
 
 instance NamedThing (TcIdOcc s) where
-  getOccurrenceName (TcId id)   = getOccurrenceName id
-  getOccurrenceName (RealId id) = getOccurrenceName id
+  getName (TcId id)   = getName id
+  getName (RealId id) = getName id
 \end{code}
 
 

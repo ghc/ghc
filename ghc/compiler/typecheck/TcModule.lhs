@@ -15,7 +15,8 @@ import Ubiq
 import HsSyn		( HsModule(..), HsBinds(..), Bind, HsExpr,
 			  TyDecl, SpecDataSig, ClassDecl, InstDecl,
 			  SpecInstSig, DefaultDecl, Sig, Fake, InPat,
- 			  FixityDecl, IE, ImportedInterface )
+ 			  FixityDecl, IE, ImportDecl
+			)
 import RnHsSyn		( RenamedHsModule(..), RenamedFixityDecl(..) )
 import TcHsSyn		( TypecheckedHsBinds(..), TypecheckedHsExpr(..),
 			  TcIdOcc(..), zonkBinds, zonkInst, zonkId )
@@ -38,8 +39,7 @@ import Bag		( listToBag )
 import Class		( GenClass )
 import Id		( GenId, isDataCon, isMethodSelId, idType )
 import Maybes		( catMaybes )
-import Name		( Name(..) )
-import Outputable	( isExported )
+import Outputable	( isExported, isLocallyDefined )
 import PrelInfo		( unitTy, mkPrimIoTy )
 import Pretty
 import RnUtils		( GlobalNameMappers(..), GlobalNameMapper(..) )
@@ -82,7 +82,7 @@ tcModule :: GlobalNameMappers		-- final renamer info for derivings
 		   PprStyle -> Pretty)	-- -ddump-deriving info
 
 tcModule renamer_name_funs
-	(HsModule mod_name exports imports fixities
+	(HsModule mod_name verion exports imports fixities
 		  ty_decls specdata_sigs cls_decls inst_decls specinst_sigs
 		  default_decls val_decls sigs src_loc)
 

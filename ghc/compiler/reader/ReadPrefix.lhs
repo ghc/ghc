@@ -7,30 +7,26 @@
 #include "HsVersions.h"
 
 module ReadPrefix (
-	rdModule,
-
-	-- used over in ReadPragmas...
-	wlkList, wlkMaybe, rdConDecl, wlkMonoType, rdMonoType
+	rdModule
     )  where
 
-import Ubiq{-uitous-}
-import RdrLoop 		-- for paranoia checking
+import Ubiq
 
 import UgenAll		-- all Yacc parser gumpff...
 import PrefixSyn	-- and various syntaxen.
 import HsSyn
+import HsPragmas	( noDataPragmas, noClassPragmas, noInstancePragmas )
 import RdrHsSyn
+import PrefixToHs
 
--- friends:
-import ReadPragmas
-import PrefixToHs	-- reader utilities
-
--- others:
+import CmdLineOpts	( opt_CompilingPrelude )
+import ErrUtils		( addErrLoc )
 import FiniteMap	( elemFM, FiniteMap )
-import MainMonad	( thenMn, MainIO(..) )
+import MainMonad	( writeMn, exitMn, MainIO(..) )
+import Name		( RdrName(..), isConopRdr )
 import PprStyle		( PprStyle(..) )
 import Pretty
-import ProtoName	( isConopPN, ProtoName(..) )
+import SrcLoc		( SrcLoc )
 import Util		( nOfThem, pprError, panic )
 \end{code}
 
@@ -61,16 +57,20 @@ wlkMaybe wlk_it (U_just x)
 \end{code}
 
 \begin{code}
-rdQid   :: ParseTree -> UgnM ProtoName
+rdQid   :: ParseTree -> UgnM RdrName
 rdQid pt = rdU_qid pt `thenUgn` \ qid -> wlkQid qid
 
-wlkQid	:: U_qid -> UgnM ProtoName
+wlkQid	:: U_qid -> UgnM RdrName
 wlkQid (U_noqual name)
-  = returnUgn (Unk name)
+  = returnUgn (Unqual name)
 wlkQid (U_aqual  mod name)
-  = returnUgn (Qunk mod name)
+  = returnUgn (Qual mod name)
 wlkQid (U_gid n name)
-  = returnUgn (Unk name)
+  = returnUgn (Unqual name)
+
+cvFlag :: U_long -> Bool
+cvFlag 0 = False
+cvFlag 1 = True
 \end{code}
 
 %************************************************************************
@@ -80,57 +80,46 @@ wlkQid (U_gid n name)
 %************************************************************************
 
 \begin{code}
-rdModule :: MainIO
-	   (FAST_STRING,	   -- this module's name
-	    (FAST_STRING -> Bool,  -- a function to chk if <x> is in the export list
-	     FAST_STRING -> Bool), -- a function to chk if <M> is among the M..
-				   -- ("dotdot") modules in the export list.
-	    ProtoNameHsModule)	   -- the main goods
+rdModule :: MainIO (Module,	   	-- this module's name
+	            RdrNameHsModule)	-- the main goods
 
 rdModule
   = _ccall_ hspmain `thenPrimIO` \ pt -> -- call the Yacc parser!
     let
 	srcfile  = _packCString ``input_filename'' -- What A Great Hack! (TM)
     in
-    initUgn srcfile (
+    initUgn 		  $
+    rdU_tree pt `thenUgn` \ (U_hmodule modname himplist hexplist hfixlist
+				       hmodlist srciface_version srcline) ->
 
-    rdU_tree pt `thenUgn` \ (U_hmodule name himplist hexplist hfixlist hmodlist srcline) ->
+    setSrcFileUgn srcfile $
+    setSrcModUgn  modname $
+    mkSrcLocUgn srcline	  $			    \ src_loc	->
+
+    wlkMaybe rdEntities		 hexplist `thenUgn` \ exports	->
+    wlkList  rdImport            himplist `thenUgn` \ imports	->
     wlkList  rdFixOp		 hfixlist `thenUgn` \ fixities 	->
     wlkBinding			 hmodlist `thenUgn` \ binding	->
-    wlkList  rdImportedInterface himplist `thenUgn` \ imports	->
-    wlkMaybe rdEntities		 hexplist `thenUgn` \ exp_list	->
-    mkSrcLocUgn srcline			  `thenUgn` \ src_loc	->
 
-    case sepDeclsForTopBinds binding	  of {
-      (tydecls, tysigs, classdecls, instdecls, instsigs, defaultdecls, binds) ->
+    case sepDeclsForTopBinds binding of
+    (tydecls, tysigs, classdecls, instdecls, instsigs, defaultdecls, binds) ->
 
-    returnUgn (
-     name,
-     mk_export_list_chker exp_list,
-     HsModule name
-	      exp_list
-	      imports
-	      fixities
-	      tydecls
-	      tysigs
-	      classdecls
-	      instdecls
-	      instsigs
-	      defaultdecls
-	      (cvSepdBinds srcfile cvValSig binds)
-	      [{-no sigs-}]
-	      src_loc
-    ) } )
-  where
-    mk_export_list_chker = panic "ReadPrefix:mk_export_list_chker"
-{- LATER:
-    mk_export_list_chker exp_list
-      = case (getExportees exp_list) of
-	  Nothing -> ( \ n -> False, \ n -> False ) -- all suspicious
-	  Just (entity_info, dotdot_modules) ->
-	    ( \ n -> n `elemFM` entity_info,
-	      \ n -> n `elemFM` dotdot_modules )
--}
+      returnUgn (modname,
+       		 HsModule modname
+	      		  (case srciface_version of { 0 -> Nothing; n -> Just n })
+	      		  exports
+	      		  imports
+	      		  fixities
+	      		  tydecls
+	      		  tysigs
+	      		  classdecls
+	      		  instdecls
+	      		  instsigs
+	      		  defaultdecls
+	      		  (cvSepdBinds srcfile cvValSig binds)
+	      		  [{-no interface sigs yet-}]
+	      		  src_loc
+       		)
 \end{code}
 
 %************************************************************************
@@ -140,19 +129,20 @@ rdModule
 %************************************************************************
 
 \begin{code}
-rdExpr :: ParseTree -> UgnM ProtoNameHsExpr
-rdPat  :: ParseTree -> UgnM ProtoNamePat
+rdExpr :: ParseTree -> UgnM RdrNameHsExpr
+rdPat  :: ParseTree -> UgnM RdrNamePat
 
 rdExpr pt = rdU_tree pt `thenUgn` \ tree -> wlkExpr tree
 rdPat  pt = rdU_tree pt `thenUgn` \ tree -> wlkPat  tree
 
-wlkExpr :: U_tree -> UgnM ProtoNameHsExpr
-wlkPat  :: U_tree -> UgnM ProtoNamePat
+wlkExpr :: U_tree -> UgnM RdrNameHsExpr
+wlkPat  :: U_tree -> UgnM RdrNamePat
 
 wlkExpr expr
   = case expr of
-      U_par expr -> -- parenthesised expr
-	wlkExpr expr
+      U_par pexpr -> -- parenthesised expr
+	wlkExpr pexpr	`thenUgn` \ expr ->
+	returnUgn (HsPar expr)
 
       U_lsection lsexp lop -> -- left section
 	wlkExpr lsexp	`thenUgn` \ expr ->
@@ -179,9 +169,9 @@ wlkExpr expr
 	returnUgn (HsSCC label expr)
 
       U_lambda lampats lamexpr srcline -> -- lambda expression
+	mkSrcLocUgn   srcline		$ \ src_loc ->
 	wlkList rdPat lampats	`thenUgn` \ pats ->
 	wlkExpr       lamexpr	`thenUgn` \ body ->
-	mkSrcLocUgn   srcline	`thenUgn` \ src_loc ->
 	returnUgn (
 	    HsLam (foldr PatMatch
 			 (GRHSMatch (GRHSsAndBindsIn
@@ -191,9 +181,9 @@ wlkExpr expr
 	)
 
       U_casee caseexpr casebody srcline ->	-- case expression
+	mkSrcLocUgn srcline	 	 $ \ src_loc ->
 	wlkExpr	        caseexpr `thenUgn` \ expr ->
 	wlkList rdMatch casebody `thenUgn` \ mats ->
-	mkSrcLocUgn    srcline	 `thenUgn` \ src_loc ->
 	getSrcFileUgn		 `thenUgn` \ sf ->
 	let
 	    matches = cvMatches sf True mats
@@ -201,10 +191,10 @@ wlkExpr expr
 	returnUgn (HsCase expr matches src_loc)
 
       U_ife ifpred ifthen ifelse srcline ->	-- if expression
+	mkSrcLocUgn srcline	        $ \ src_loc ->
 	wlkExpr ifpred		`thenUgn` \ e1 ->
 	wlkExpr ifthen		`thenUgn` \ e2 ->
 	wlkExpr ifelse		`thenUgn` \ e3 ->
-	mkSrcLocUgn srcline	`thenUgn` \ src_loc ->
 	returnUgn (HsIf e1 e2 e3 src_loc)
 
       U_let letvdefs letvexpr ->		-- let expression
@@ -216,23 +206,23 @@ wlkExpr expr
 	in
 	returnUgn (HsLet binds expr)
 
-      U_doe gdo srcline ->		-- do expression
+      U_doe gdo srcline ->			-- do expression
+	mkSrcLocUgn srcline		$ \ src_loc ->
 	wlkList rd_stmt gdo	`thenUgn` \ stmts ->
-	mkSrcLocUgn srcline	`thenUgn` \ src_loc ->
 	returnUgn (HsDo stmts src_loc)
         where
 	rd_stmt pt
 	  = rdU_tree pt `thenUgn` \ bind ->
 	    case bind of
 	      U_doexp exp srcline ->
+		mkSrcLocUgn srcline		$ \ src_loc ->
 		wlkExpr exp 		`thenUgn` \ expr ->
-		mkSrcLocUgn srcline	`thenUgn` \ src_loc ->
 		returnUgn (ExprStmt expr src_loc)
 
 	      U_dobind pat exp srcline ->
+		mkSrcLocUgn srcline		$ \ src_loc ->
 		wlkPat  pat		`thenUgn` \ patt ->
 		wlkExpr exp 		`thenUgn` \ expr ->
-		mkSrcLocUgn srcline	`thenUgn` \ src_loc ->
 		returnUgn (BindStmt patt expr src_loc)
 
 	      U_seqlet seqlet ->
@@ -312,9 +302,9 @@ wlkExpr expr
 	wlkExpr arg2	`thenUgn` \ expr2 ->
 	returnUgn (OpApp expr1 (HsVar op) expr2)
 
-      U_negate nexp _ _ -> 		-- prefix negation
+      U_negate nexp ->	 		-- prefix negation
 	wlkExpr nexp	`thenUgn` \ expr ->
-	returnUgn (HsApp (HsVar (Unk SLIT("negate"))) expr)
+	returnUgn (NegApp expr)
 
       U_llist llist -> -- explicit list
 	wlkList rdExpr llist `thenUgn` \ exprs ->
@@ -335,17 +325,17 @@ wlkExpr expr
 	returnUgn (RecordUpd aexp recbinds)
 
 #ifdef DEBUG
-      U_hmodule _ _ _ _ _ _ -> error "U_hmodule"
-      U_as _ _ 		    -> error "U_as"
-      U_lazyp _ 	    -> error "U_lazyp"
-      U_wildp 		    -> error "U_wildp"
-      U_qual _ _ 	    -> error "U_qual"
-      U_guard _ 	    -> error "U_guard"
-      U_seqlet _ 	    -> error "U_seqlet"
-      U_dobind _ _ _ 	    -> error "U_dobind"
-      U_doexp _ _	    -> error "U_doexp"
-      U_rbind _ _	    -> error "U_rbind"
-      U_fixop _ _ _	    -> error "U_fixop"
+      U_hmodule _ _ _ _ _ _ _ -> error "U_hmodule"
+      U_as _ _ 		      -> error "U_as"
+      U_lazyp _ 	      -> error "U_lazyp"
+      U_wildp 		      -> error "U_wildp"
+      U_qual _ _ 	      -> error "U_qual"
+      U_guard _ 	      -> error "U_guard"
+      U_seqlet _ 	      -> error "U_seqlet"
+      U_dobind _ _ _ 	      -> error "U_dobind"
+      U_doexp _ _	      -> error "U_doexp"
+      U_rbind _ _	      -> error "U_rbind"
+      U_fixop _ _ _	      -> error "U_fixop"
 #endif
 
 rdRbind pt
@@ -364,8 +354,9 @@ a series of ``applications''.
 \begin{code}
 wlkPat pat
   = case pat of
-      U_par pat ->  			-- parenthesised pattern
-	wlkPat pat
+      U_par ppat -> 			-- parenthesised pattern
+	wlkPat ppat	`thenUgn` \ pat ->
+	returnUgn (ParPatIn pat)
 
       U_as avar as_pat -> 		-- "as" pattern
 	wlkQid avar	`thenUgn` \ var ->
@@ -378,16 +369,6 @@ wlkPat pat
 
       U_wildp -> returnUgn WildPatIn 	-- wildcard pattern
 
-      --------------------------------------------------------------
-      -- now the prefix items that can either be an expression or
-      -- pattern, except we know they are *patterns* here.
-      --------------------------------------------------------------
-      U_negate nexp _ _ -> 		-- negated pattern: must be a literal
-	wlkPat nexp	`thenUgn` \ lit_pat ->
-	case lit_pat of
-	  LitPatIn lit -> returnUgn (LitPatIn (negLiteral lit))
-	  _	       -> panic "wlkPat: bad negated pattern!"
-
       U_lit lit ->			-- literal pattern
 	wlkLiteral lit	`thenUgn` \ lit ->
 	returnUgn (LitPatIn lit)
@@ -395,7 +376,7 @@ wlkPat pat
       U_ident nn ->			-- simple identifier
 	wlkQid nn	`thenUgn` \ n ->
 	returnUgn (
-	  if isConopPN n
+	  if isConopRdr n
 	  then ConPatIn n []
 	  else VarPatIn n
 	)
@@ -403,16 +384,21 @@ wlkPat pat
       U_ap l r ->	-- "application": there's a list of patterns lurking here!
 	wlkPat r	  	`thenUgn` \ rpat	 ->
 	collect_pats l [rpat] 	`thenUgn` \ (lpat,lpats) ->
-	let
-	    (n, arg_pats)
-	      = case lpat of
-		  VarPatIn x        -> (x,  lpats)
-		  ConPatIn x []     -> (x,  lpats)
-		  ConOpPatIn x op y -> (op, x:y:lpats)
-		  _ -> -- sorry about the weedy msg; the parser missed this one
-		       pprError "ERROR: an illegal `application' of a pattern to another one:"
-			  (ppInterleave ppSP (map (ppr PprForUser) (lpat:lpats)))
-	in
+	(case lpat of
+	    VarPatIn x        -> returnUgn (x,  lpats)
+	    ConPatIn x []     -> returnUgn (x,  lpats)
+	    ConOpPatIn x op y -> returnUgn (op, x:y:lpats)
+	    _ -> getSrcLocUgn 	`thenUgn` \ loc ->
+		 let
+		     err = addErrLoc loc "Illegal pattern `application'"
+			             (\sty -> ppInterleave ppSP (map (ppr sty) (lpat:lpats)))
+		     msg = ppShow 100 (err PprForUser)
+		 in
+	         ioToUgnM  (writeMn stderr msg) `thenUgn` \ _ ->
+		 ioToUgnM  (exitMn 1)		`thenUgn` \ _ ->
+		 returnUgn (error "ReadPrefix")
+
+	)			`thenUgn` \ (n, arg_pats) ->
 	returnUgn (ConPatIn n arg_pats)
 	where
 	  collect_pats pat acc
@@ -424,11 +410,15 @@ wlkPat pat
 		  wlkPat other	`thenUgn` \ pat ->
 		  returnUgn (pat,acc)
 
-      U_infixap fun arg1 arg2 ->
+      U_infixap fun arg1 arg2 ->	-- infix pattern
 	wlkQid fun	`thenUgn` \ op   ->
 	wlkPat arg1	`thenUgn` \ pat1 ->
 	wlkPat arg2	`thenUgn` \ pat2 ->
 	returnUgn (ConOpPatIn pat1 op pat2)
+
+      U_negate npat ->	 		-- negated pattern
+	wlkPat npat	`thenUgn` \ pat ->
+        returnUgn (NegPatIn pat)
 
       U_llist llist -> 			-- explicit list
 	wlkList rdPat llist 	`thenUgn` \ pats ->
@@ -460,16 +450,16 @@ wlkLiteral :: U_literal -> UgnM HsLit
 wlkLiteral ulit
   = returnUgn (
     case ulit of
-      U_integer    s   -> HsInt	       (as_integer  s)
-      U_floatr     s   -> HsFrac       (as_rational s)
-      U_intprim    s   -> HsIntPrim    (as_integer  s)
-      U_doubleprim s   -> HsDoublePrim (as_rational s)
-      U_floatprim  s   -> HsFloatPrim  (as_rational s)
-      U_charr	   s   -> HsChar       (as_char     s)
-      U_charprim   s   -> HsCharPrim   (as_char     s)
-      U_string     s   -> HsString     (as_string   s)
-      U_stringprim s   -> HsStringPrim (as_string   s)
-      U_clitlit    s _ -> HsLitLit     (as_string   s)
+      U_integer    s -> HsInt	       (as_integer  s)
+      U_floatr     s -> HsFrac       (as_rational s)
+      U_intprim    s -> HsIntPrim    (as_integer  s)
+      U_doubleprim s -> HsDoublePrim (as_rational s)
+      U_floatprim  s -> HsFloatPrim  (as_rational s)
+      U_charr	   s -> HsChar       (as_char     s)
+      U_charprim   s -> HsCharPrim   (as_char     s)
+      U_string     s -> HsString     (as_string   s)
+      U_stringprim s -> HsStringPrim (as_string   s)
+      U_clitlit    s -> HsLitLit     (as_string   s)
     )
   where
     as_char s     = _HEAD_ s
@@ -489,54 +479,59 @@ wlkBinding :: U_binding -> UgnM RdrBinding
 
 wlkBinding binding
   = case binding of
-      U_nullbind -> -- null binding
+	-- null binding
+      U_nullbind ->
 	returnUgn RdrNullBind
 
-      U_abind a b -> -- "and" binding (just glue, really)
+	-- "and" binding (just glue, really)
+      U_abind a b ->
 	wlkBinding a    `thenUgn` \ binding1 ->
 	wlkBinding b    `thenUgn` \ binding2 ->
 	returnUgn (RdrAndBindings binding1 binding2)
 
-      U_tbind tctxt ttype tcons tderivs srcline tpragma -> -- "data" declaration
+	-- "data" declaration
+      U_tbind tctxt ttype tcons tderivs srcline ->
+	mkSrcLocUgn	   srcline  	    $ \ src_loc	    ->
 	wlkContext	   tctxt    `thenUgn` \ ctxt	    ->
 	wlkTyConAndTyVars  ttype    `thenUgn` \ (tycon, tyvars) ->
 	wlkList rdConDecl  tcons    `thenUgn` \ cons	    ->
 	wlkDerivings	   tderivs  `thenUgn` \ derivings   ->
-	wlkDataPragma	   tpragma  `thenUgn` \ pragmas	    ->
-	mkSrcLocUgn	   srcline  `thenUgn` \ src_loc	    ->
-	returnUgn (RdrTyDecl (TyData ctxt tycon tyvars cons derivings pragmas src_loc))
+	returnUgn (RdrTyDecl (TyData ctxt tycon tyvars cons derivings noDataPragmas src_loc))
 
-      U_ntbind ntctxt nttype ntcon ntderivs srcline ntpragma -> -- "newtype" declaration
+	-- "newtype" declaration
+      U_ntbind ntctxt nttype ntcon ntderivs srcline ->
+	mkSrcLocUgn	   srcline  	    $ \ src_loc	    ->
 	wlkContext	   ntctxt   `thenUgn` \ ctxt	    ->
 	wlkTyConAndTyVars  nttype   `thenUgn` \ (tycon, tyvars) ->
 	wlkList rdConDecl  ntcon    `thenUgn` \ con	    ->
 	wlkDerivings	   ntderivs `thenUgn` \ derivings   ->
-	wlkDataPragma	   ntpragma `thenUgn` \ pragma	    ->
-	mkSrcLocUgn	   srcline  `thenUgn` \ src_loc	    ->
-	returnUgn (RdrTyDecl (TyNew ctxt tycon tyvars con derivings pragma src_loc))
+	returnUgn (RdrTyDecl (TyNew ctxt tycon tyvars con derivings noDataPragmas src_loc))
 
-      U_nbind nbindid nbindas srcline -> -- "type" declaration
+	-- "type" declaration
+      U_nbind nbindid nbindas srcline -> 		
+	mkSrcLocUgn	  srcline 	  $ \ src_loc	    ->
 	wlkTyConAndTyVars nbindid `thenUgn` \ (tycon, tyvars) ->
 	wlkMonoType	  nbindas `thenUgn` \ expansion	    ->
-	mkSrcLocUgn	  srcline `thenUgn` \ src_loc	    ->
 	returnUgn (RdrTyDecl (TySynonym tycon tyvars expansion src_loc))
 
-      U_fbind fbindl srcline -> -- function binding
+	-- function binding
+      U_fbind fbindl srcline ->
+	mkSrcLocUgn     srcline		$ \ src_loc ->
 	wlkList rdMatch fbindl	`thenUgn` \ matches ->
-	mkSrcLocUgn     srcline	`thenUgn` \ src_loc ->
 	returnUgn (RdrFunctionBinding srcline matches)
 
-      U_pbind pbindl srcline ->  -- pattern binding
+	-- pattern binding
+      U_pbind pbindl srcline ->
+	mkSrcLocUgn     srcline		$ \ src_loc ->
 	wlkList rdMatch pbindl	`thenUgn` \ matches ->
-	mkSrcLocUgn     srcline	`thenUgn` \ src_loc ->
 	returnUgn (RdrPatternBinding srcline matches)
 
-      U_cbind cbindc cbindid cbindw srcline cpragma ->	 	-- "class" declaration
+ 	-- "class" declaration
+      U_cbind cbindc cbindid cbindw srcline ->
+	mkSrcLocUgn	 srcline 	$ \ src_loc	  ->
 	wlkContext	 cbindc	 `thenUgn` \ ctxt	  ->
 	wlkClassAssertTy cbindid `thenUgn` \ (clas, tyvar)->
 	wlkBinding	 cbindw	 `thenUgn` \ binding	  ->
-	wlkClassPragma   cpragma `thenUgn` \ pragma	  ->
-	mkSrcLocUgn	 srcline `thenUgn` \ src_loc	  ->
 	getSrcFileUgn		 `thenUgn` \ sf		  ->
 	let
 	    (class_sigs, class_methods) = sepDeclsIntoSigsAndBinds binding
@@ -545,42 +540,34 @@ wlkBinding binding
 	    final_methods = cvMonoBinds sf class_methods
 	in
 	returnUgn (RdrClassDecl
-	  (ClassDecl ctxt clas tyvar final_sigs final_methods pragma src_loc))
+	  (ClassDecl ctxt clas tyvar final_sigs final_methods noClassPragmas src_loc))
 
-      U_ibind from_source orig_mod		 		-- "instance" declaration
-	      ibindc iclas ibindi ibindw srcline ipragma ->
+	-- "instance" declaration
+      U_ibind ibindc iclas ibindi ibindw srcline ->
+	mkSrcLocUgn	srcline		$ \ src_loc ->
 	wlkContext	ibindc	`thenUgn` \ ctxt    ->
 	wlkQid		iclas	`thenUgn` \ clas    ->
 	wlkMonoType	ibindi	`thenUgn` \ inst_ty ->
 	wlkBinding	ibindw	`thenUgn` \ binding ->
-	wlkInstPragma   ipragma	`thenUgn` \ pragma  ->
-	mkSrcLocUgn	srcline	`thenUgn` \ src_loc ->
+	getSrcModUgn		`thenUgn` \ modname ->
 	getSrcFileUgn		`thenUgn` \ sf	    ->
 	let
-	    from_here = case from_source of { 0 -> False; 1 -> True }
 	    (ss, bs)  = sepDeclsIntoSigsAndBinds binding
 	    binds     = cvMonoBinds sf bs
 	    uprags    = concat (map cvInstDeclSig ss)
 	    ctxt_inst_ty = HsPreForAllTy ctxt inst_ty
+	    maybe_mod = if opt_CompilingPrelude
+			then Nothing
+		        else Just modname
 	in
 	returnUgn (RdrInstDecl
-          (InstDecl clas ctxt_inst_ty binds from_here orig_mod uprags pragma src_loc))
+          (InstDecl clas ctxt_inst_ty binds True maybe_mod uprags noInstancePragmas src_loc))
 
-      U_dbind dbindts srcline -> -- "default" declaration
+	-- "default" declaration
+      U_dbind dbindts srcline ->
+	mkSrcLocUgn        srcline  	$ \ src_loc ->
 	wlkList rdMonoType dbindts  `thenUgn` \ tys ->
-	mkSrcLocUgn        srcline  `thenUgn` \ src_loc ->
 	returnUgn (RdrDefaultDecl (DefaultDecl tys src_loc))
-
-      U_mbind mod mbindimp srcline ->
-	-- "import" declaration in an interface
-	wlkList rdEntity   mbindimp	`thenUgn` \ entities  ->
-	mkSrcLocUgn	   srcline	`thenUgn` \ src_loc   ->
-	returnUgn (RdrIfaceImportDecl (IfaceImportDecl mod entities src_loc))
-
-      U_mfbind fixes ->
-	-- "infix" declarations in an interface
-	wlkList rdFixOp fixes 		`thenUgn` \ fixities  ->
-	returnUgn (RdrIfaceFixities fixities)
 
       a_sig_we_hope ->
 	-- signature(-like) things, including user pragmas
@@ -588,7 +575,7 @@ wlkBinding binding
 \end{code}
 
 \begin{code}
-wlkDerivings :: U_maybe -> UgnM (Maybe [ProtoName])
+wlkDerivings :: U_maybe -> UgnM (Maybe [RdrName])
 
 wlkDerivings (U_nothing) = returnUgn Nothing
 wlkDerivings (U_just pt)
@@ -598,56 +585,59 @@ wlkDerivings (U_just pt)
 \end{code}
 
 \begin{code}
-wlk_sig_thing (U_sbind sbindids sbindid srcline spragma)  -- type signature
-  = wlkList rdQid	sbindids `thenUgn` \ vars    ->
+	-- type signature
+wlk_sig_thing (U_sbind sbindids sbindid srcline)
+  = mkSrcLocUgn		srcline  	$ \ src_loc ->
+    wlkList rdQid	sbindids `thenUgn` \ vars    ->
     wlkPolyType		sbindid  `thenUgn` \ poly_ty ->
-    wlkTySigPragmas	spragma  `thenUgn` \ pragma  ->
-    mkSrcLocUgn		srcline  `thenUgn` \ src_loc ->
-    returnUgn (RdrTySig vars poly_ty pragma src_loc)
+    returnUgn (RdrTySig vars poly_ty src_loc)
 
-wlk_sig_thing (U_vspec_uprag uvar vspec_tys srcline) -- value specialisation user-pragma
-  = wlkQid  uvar		    `thenUgn` \ var ->
+	-- value specialisation user-pragma
+wlk_sig_thing (U_vspec_uprag uvar vspec_tys srcline)
+  = mkSrcLocUgn	srcline		    	    $ \ src_loc ->
+    wlkQid  uvar		    `thenUgn` \ var ->
     wlkList rd_ty_and_id vspec_tys  `thenUgn` \ tys_and_ids ->
-    mkSrcLocUgn	         srcline    `thenUgn` \ src_loc ->
     returnUgn (RdrSpecValSig [SpecSig var ty using_id src_loc
 			     | (ty, using_id) <- tys_and_ids ])
   where
-    rd_ty_and_id :: ParseTree -> UgnM (ProtoNamePolyType, Maybe ProtoName)
+    rd_ty_and_id :: ParseTree -> UgnM (RdrNamePolyType, Maybe RdrName)
     rd_ty_and_id pt
       = rdU_binding pt		`thenUgn` \ (U_vspec_ty_and_id vspec_ty vspec_id) ->
 	wlkPolyType vspec_ty	`thenUgn` \ ty	     ->
 	wlkMaybe rdQid vspec_id	`thenUgn` \ id_maybe ->
 	returnUgn(ty, id_maybe)
 
-wlk_sig_thing (U_ispec_uprag iclas ispec_ty srcline)-- instance specialisation user-pragma
-  = wlkQid	iclas		`thenUgn` \ clas    ->
+	-- instance specialisation user-pragma
+wlk_sig_thing (U_ispec_uprag iclas ispec_ty srcline)
+  = mkSrcLocUgn srcline			$ \ src_loc ->
+    wlkQid	iclas		`thenUgn` \ clas    ->
     wlkMonoType ispec_ty	`thenUgn` \ ty	    ->
-    mkSrcLocUgn srcline		`thenUgn` \ src_loc ->
     returnUgn (RdrSpecInstSig (SpecInstSig clas ty src_loc))
 
-wlk_sig_thing (U_inline_uprag ivar srcline) -- value inlining user-pragma
-  = wlkQid	ivar		`thenUgn` \ var     ->
-    mkSrcLocUgn	srcline      	`thenUgn` \ src_loc ->
+	-- data specialisation user-pragma
+wlk_sig_thing (U_dspec_uprag itycon dspec_tys srcline)
+  = mkSrcLocUgn srcline		 	 $ \ src_loc ->
+    wlkQid	itycon		 `thenUgn` \ tycon   ->
+    wlkList rdMonoType dspec_tys `thenUgn` \ tys     ->
+    returnUgn (RdrSpecDataSig (SpecDataSig tycon (MonoTyApp tycon tys) src_loc))
+
+	-- value inlining user-pragma
+wlk_sig_thing (U_inline_uprag ivar srcline)
+  = mkSrcLocUgn	srcline      		$ \ src_loc ->
+    wlkQid	ivar		`thenUgn` \ var     ->
     returnUgn (RdrInlineValSig (InlineSig var src_loc))
 
-wlk_sig_thing (U_deforest_uprag ivar srcline) -- "deforest me" user-pragma
-  = wlkQid	ivar		`thenUgn` \ var     ->
-    mkSrcLocUgn srcline		`thenUgn` \ src_loc ->
+	-- "deforest me" user-pragma
+wlk_sig_thing (U_deforest_uprag ivar srcline)
+  = mkSrcLocUgn srcline			$ \ src_loc ->
+    wlkQid	ivar		`thenUgn` \ var     ->
     returnUgn (RdrDeforestSig (DeforestSig var src_loc))
 
-wlk_sig_thing (U_magicuf_uprag ivar str srcline) -- "magic" unfolding user-pragma
-  = wlkQid	ivar		`thenUgn` \ var     ->
-    mkSrcLocUgn srcline		`thenUgn` \ src_loc ->
+	-- "magic" unfolding user-pragma
+wlk_sig_thing (U_magicuf_uprag ivar str srcline)
+  = mkSrcLocUgn srcline			$ \ src_loc ->
+    wlkQid	ivar		`thenUgn` \ var     ->
     returnUgn (RdrMagicUnfoldingSig (MagicUnfoldingSig var str src_loc))
-
-wlk_sig_thing (U_dspec_uprag itycon dspec_tys srcline)
-  = wlkQid	itycon		 `thenUgn` \ tycon   ->
-    mkSrcLocUgn srcline		 `thenUgn` \ src_loc ->
-    wlkList rdMonoType dspec_tys `thenUgn` \ tys     ->
-    let
-	spec_ty = MonoTyApp tycon tys
-    in
-    returnUgn (RdrSpecDataSig (SpecDataSig tycon spec_ty src_loc))
 \end{code}
 
 %************************************************************************
@@ -657,24 +647,17 @@ wlk_sig_thing (U_dspec_uprag itycon dspec_tys srcline)
 %************************************************************************
 
 \begin{code}
-rdPolyType :: ParseTree -> UgnM ProtoNamePolyType
-rdMonoType :: ParseTree -> UgnM ProtoNameMonoType
+rdPolyType :: ParseTree -> UgnM RdrNamePolyType
+rdMonoType :: ParseTree -> UgnM RdrNameMonoType
 
 rdPolyType pt = rdU_ttype pt `thenUgn` \ ttype -> wlkPolyType ttype
 rdMonoType pt = rdU_ttype pt `thenUgn` \ ttype -> wlkMonoType ttype
 
-wlkPolyType :: U_ttype -> UgnM ProtoNamePolyType
-wlkMonoType :: U_ttype -> UgnM ProtoNameMonoType
+wlkPolyType :: U_ttype -> UgnM RdrNamePolyType
+wlkMonoType :: U_ttype -> UgnM RdrNameMonoType
 
 wlkPolyType ttype
   = case ttype of
-{-LATER:
-      U_uniforall utvs uty -> -- forall type (pragmas)
-	wlkList rdU_unkId utvs  `thenUgn` \ tvs ->
-	wlkMonoType       uty	`thenUgn` \ ty  ->
-	returnUgn (HsForAllTy tvs ty)
--}
-
       U_context tcontextl tcontextt -> -- context
 	wlkContext  tcontextl	`thenUgn` \ ctxt ->
 	wlkMonoType tcontextt	`thenUgn` \ ty	 ->
@@ -686,7 +669,8 @@ wlkPolyType ttype
 
 wlkMonoType ttype
   = case ttype of
-      U_namedtvar tyvar -> -- type variable
+      U_namedtvar tv -> -- type variable
+	wlkQid tv	`thenUgn` \ tyvar ->
 	returnUgn (MonoTyVar tyvar)
 
       U_tname tcon -> -- type constructor
@@ -700,15 +684,16 @@ wlkMonoType ttype
        where
 	collect t acc
 	  = case t of
-	      U_tapp t1 t2 -> wlkMonoType t2	`thenUgn` \ ty2 ->
-			      collect t1 (ty2:acc)
-	      U_tname tcon -> wlkQid tcon	`thenUgn` \ tycon  ->
-			      returnUgn (tycon, acc)
-	      U_namedtvar tv -> returnUgn (tv, acc)
+	      U_tapp t1 t2   -> wlkMonoType t2	`thenUgn` \ ty2 ->
+			        collect t1 (ty2:acc)
+	      U_tname tcon   -> wlkQid tcon	`thenUgn` \ tycon ->
+			        returnUgn (tycon, acc)
+	      U_namedtvar tv -> wlkQid tv	`thenUgn` \ tyvar ->
+			        returnUgn (tyvar, acc)
 	      U_tllist _ -> panic "tlist"
 	      U_ttuple _ -> panic "ttuple"
 	      U_tfun _ _ -> panic "tfun"
-	      U_tbang _ -> panic "tbang"
+	      U_tbang _  -> panic "tbang"
 	      U_context _ _ -> panic "context"
 	      _ -> panic "something else"
 	      
@@ -725,16 +710,12 @@ wlkMonoType ttype
 	wlkMonoType targ	`thenUgn` \ ty2 ->
 	returnUgn (MonoFunTy ty1 ty2)
 
-      U_unidict uclas t -> -- DictTy (pragmas)
-	wlkQid uclas	`thenUgn` \ clas ->
-	wlkMonoType t	`thenUgn` \ ty	 ->
-	returnUgn (MonoDictTy clas ty)
 \end{code}
 
 \begin{code}
-wlkTyConAndTyVars :: U_ttype -> UgnM (ProtoName, [ProtoName])
-wlkContext   	  :: U_list  -> UgnM ProtoNameContext
-wlkClassAssertTy  :: U_ttype -> UgnM (ProtoName, ProtoName)
+wlkTyConAndTyVars :: U_ttype -> UgnM (RdrName, [RdrName])
+wlkContext   	  :: U_list  -> UgnM RdrNameContext
+wlkClassAssertTy  :: U_ttype -> UgnM (RdrName, RdrName)
 
 wlkTyConAndTyVars ttype
   = wlkMonoType ttype	`thenUgn` \ (MonoTyApp tycon ty_args) ->
@@ -751,7 +732,7 @@ wlkClassAssertTy xs
   = wlkMonoType xs   `thenUgn` \ mono_ty ->
     returnUgn (mk_class_assertion mono_ty)
 
-mk_class_assertion :: ProtoNameMonoType -> (ProtoName, ProtoName)
+mk_class_assertion :: RdrNameMonoType -> (RdrName, RdrName)
 
 mk_class_assertion (MonoTyApp name [(MonoTyVar tyname)]) = (name, tyname)
 mk_class_assertion other
@@ -761,39 +742,39 @@ mk_class_assertion other
 \end{code}
 
 \begin{code}
-rdConDecl :: ParseTree -> UgnM ProtoNameConDecl
+rdConDecl :: ParseTree -> UgnM RdrNameConDecl
 rdConDecl pt
   = rdU_constr pt    `thenUgn` \ blah ->
     wlkConDecl blah
 
-wlkConDecl :: U_constr -> UgnM ProtoNameConDecl
+wlkConDecl :: U_constr -> UgnM RdrNameConDecl
 
 wlkConDecl (U_constrpre ccon ctys srcline)
-  = mkSrcLocUgn srcline		`thenUgn` \ src_loc ->
+  = mkSrcLocUgn srcline			$ \ src_loc ->
     wlkQid	ccon		`thenUgn` \ con	    ->
     wlkList     rdBangType ctys	`thenUgn` \ tys	    ->
     returnUgn (ConDecl con tys src_loc)
 
 wlkConDecl (U_constrinf cty1 cop cty2 srcline)
-  = mkSrcLocUgn srcline		`thenUgn` \ src_loc ->
+  = mkSrcLocUgn srcline			$ \ src_loc ->
     wlkBangType cty1		`thenUgn` \ ty1	    ->
     wlkQid	cop		`thenUgn` \ op	    ->
     wlkBangType cty2		`thenUgn` \ ty2	    ->
     returnUgn (ConOpDecl ty1 op ty2 src_loc)
 
 wlkConDecl (U_constrnew ccon cty srcline)
-  = mkSrcLocUgn srcline		`thenUgn` \ src_loc ->
+  = mkSrcLocUgn srcline			$ \ src_loc ->
     wlkQid	ccon		`thenUgn` \ con	    ->
     wlkMonoType cty		`thenUgn` \ ty	    ->
     returnUgn (NewConDecl con ty src_loc)
 
 wlkConDecl (U_constrrec ccon cfields srcline)
-  = mkSrcLocUgn srcline		`thenUgn` \ src_loc      ->
+  = mkSrcLocUgn srcline			$ \ src_loc      ->
     wlkQid	ccon		`thenUgn` \ con		 ->
     wlkList rd_field cfields	`thenUgn` \ fields_lists ->
     returnUgn (RecConDecl con fields_lists src_loc)
   where
-    rd_field :: ParseTree -> UgnM ([ProtoName], BangType ProtoName)
+    rd_field :: ParseTree -> UgnM ([RdrName], BangType RdrName)
     rd_field pt
       = rdU_constr pt		`thenUgn` \ (U_field fvars fty) ->
 	wlkList rdQid	fvars	`thenUgn` \ vars ->
@@ -803,7 +784,7 @@ wlkConDecl (U_constrrec ccon cfields srcline)
 -----------------
 rdBangType pt = rdU_ttype pt `thenUgn` \ ty -> wlkBangType ty
 
-wlkBangType :: U_ttype -> UgnM (BangType ProtoName)
+wlkBangType :: U_ttype -> UgnM (BangType RdrName)
 
 wlkBangType (U_tbang bty) = wlkMonoType bty `thenUgn` \ ty -> returnUgn (Banged   ty)
 wlkBangType uty		  = wlkMonoType uty `thenUgn` \ ty -> returnUgn (Unbanged ty)
@@ -821,10 +802,10 @@ rdMatch :: ParseTree -> UgnM RdrMatch
 
 rdMatch pt
   = rdU_pbinding pt `thenUgn` \ (U_pgrhs gpat gdexprs gbind gsrcfun srcline) ->
-
-    wlkPat		gpat	`thenUgn` \ pat     ->
-    wlkBinding		gbind	`thenUgn` \ binding ->
-    wlkQid		gsrcfun	`thenUgn` \ srcfun  ->
+    mkSrcLocUgn srcline			$ \ src_loc      ->
+    wlkPat	gpat		`thenUgn` \ pat     ->
+    wlkBinding	gbind		`thenUgn` \ binding ->
+    wlkQid	gsrcfun		`thenUgn` \ srcfun  ->
     let
 	wlk_guards (U_pnoguards exp)
 	  = wlkExpr exp `thenUgn` \ expr ->
@@ -850,51 +831,35 @@ rdMatch pt
 %************************************************************************
 
 \begin{code}
-rdFixOp :: ParseTree -> UgnM ProtoNameFixityDecl
+rdFixOp :: ParseTree -> UgnM RdrNameFixityDecl
 rdFixOp pt 
   = rdU_tree pt `thenUgn` \ fix ->
     case fix of
-      U_fixop op (-1) prec -> returnUgn (InfixL op prec)
-      U_fixop op   0  prec -> returnUgn (InfixN op prec)
-      U_fixop op   1  prec -> returnUgn (InfixR op prec)
+      U_fixop op (-1) prec -> wlkQid op `thenUgn` \ op ->
+				       returnUgn (InfixL op prec)
+      U_fixop op   0  prec -> wlkQid op `thenUgn` \ op ->
+				       returnUgn (InfixN op prec)
+      U_fixop op   1  prec -> wlkQid op `thenUgn` \ op ->
+				       returnUgn (InfixR op prec)
       _ -> error "ReadPrefix:rdFixOp"
 \end{code}
 
 %************************************************************************
 %*									*
-\subsection[rdImportedInterface]{Read an imported interface}
+\subsection[rdImport]{Read an import decl}
 %*									*
 %************************************************************************
 
 \begin{code}
-rdImportedInterface :: ParseTree
-		    -> UgnM ProtoNameImportedInterface
+rdImport :: ParseTree
+	 -> UgnM RdrNameImportDecl
 
-rdImportedInterface pt
-  = rdU_binding pt
-	`thenUgn` \ (U_import ifname iffile binddef imod iqual ias ispec srcline) ->
-
-    mkSrcLocUgn	srcline 		`thenUgn` \ src_loc   	->
+rdImport pt
+  = rdU_binding pt `thenUgn` \ (U_import imod iqual ias ispec srcline) ->
+    mkSrcLocUgn srcline				$ \ src_loc      ->
     wlkMaybe rdU_stringId ias		`thenUgn` \ maybe_as	->
     wlkMaybe rd_spec ispec		`thenUgn` \ maybe_spec	->
-
-    setSrcFileUgn iffile ( -- looking inside the .hi file...
-	wlkBinding binddef
-    )				`thenUgn` \ iface_bs  ->
-
-    case (sepDeclsForInterface iface_bs) of {
-	(tydecls,classdecls,instdecls,sigs,iimpdecls,ifixities) ->
-    let
-	cv_sigs  = concat (map cvValSig sigs)
-
-	cv_iface = Interface ifname iimpdecls ifixities
-			tydecls	classdecls instdecls cv_sigs
-			src_loc
-
-	cv_qual = case iqual of {0 -> False; 1 -> True}
-    in
-    returnUgn (ImportMod cv_iface cv_qual maybe_as maybe_spec)
-    }
+    returnUgn (ImportDecl imod (cvFlag iqual) maybe_as maybe_spec src_loc)
   where
     rd_spec pt = rdU_either pt 		`thenUgn` \ spec ->
       case spec of
@@ -909,7 +874,7 @@ rdEntities pt
   = rdU_list pt		    `thenUgn` \ list ->
     wlkList rdEntity list
 
-rdEntity :: ParseTree -> UgnM (IE ProtoName)
+rdEntity :: ParseTree -> UgnM (IE RdrName)
 
 rdEntity pt
   = rdU_entidt pt `thenUgn` \ entity ->

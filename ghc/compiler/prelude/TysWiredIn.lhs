@@ -96,8 +96,8 @@ import TysPrim
 
 -- others:
 import SpecEnv		( SpecEnv(..) )
-import NameTypes	( mkPreludeCoreName, mkShortName )
 import Kind		( mkBoxedTypeKind, mkArrowKind )
+import Name		( mkBuiltinName )
 import SrcLoc		( mkBuiltinSrcLoc )
 import TyCon		( mkDataTyCon, mkTupleTyCon, mkSynTyCon,
 			  NewOrData(..), TyCon
@@ -114,19 +114,21 @@ addOneToSpecEnv =  error "TysWiredIn:addOneToSpecEnv =  "
 pc_gen_specs = error "TysWiredIn:pc_gen_specs  "
 mkSpecInfo = error "TysWiredIn:SpecInfo"
 
-pcDataTyCon :: Unique{-TyConKey-} -> FAST_STRING -> FAST_STRING -> [TyVar] -> [Id] -> TyCon
-pcDataTyCon key mod name tyvars cons
-  = mkDataTyCon key tycon_kind full_name tyvars
-		[{-no context-}] cons [{-no derivings-}]
+pcDataTyCon :: Unique{-TyConKey-} -> Module -> FAST_STRING
+            -> [TyVar] -> [Id] -> TyCon
+pcDataTyCon key mod str tyvars cons
+  = mkDataTyCon (mkBuiltinName key mod str) tycon_kind 
+		tyvars [{-no context-}] cons [{-no derivings-}]
 		DataType
   where
-    full_name = mkPreludeCoreName mod name
     tycon_kind = foldr (mkArrowKind . getTyVarKind) mkBoxedTypeKind tyvars
 
-pcDataCon :: Unique{-DataConKey-} -> FAST_STRING -> FAST_STRING -> [TyVar] -> ThetaType -> [TauType] -> TyCon -> SpecEnv -> Id
-pcDataCon key mod name tyvars context arg_tys tycon specenv
-  = mkDataCon key (mkPreludeCoreName mod name)
+pcDataCon :: Unique{-DataConKey-} -> Module -> FAST_STRING
+	  -> [TyVar] -> ThetaType -> [TauType] -> TyCon -> SpecEnv -> Id
+pcDataCon key mod str tyvars context arg_tys tycon specenv
+  = mkDataCon (mkBuiltinName key mod str)
 	[ NotMarkedStrict | a <- arg_tys ]
+	[ {- no labelled fields -} ]
 	tyvars context arg_tys tycon
 	-- specenv
 
@@ -432,11 +434,9 @@ mkStateTransformerTy s a = mkSynTy stTyCon [s, a]
 
 stTyCon
   = mkSynTyCon
-     stTyConKey
-     (mkPreludeCoreName gLASGOW_ST SLIT("_ST"))
+     (mkBuiltinName stTyConKey gLASGOW_ST SLIT("_ST"))
      (panic "TysWiredIn.stTyCon:Kind")
-     2
-     [alphaTyVar, betaTyVar]
+     2 [alphaTyVar, betaTyVar]
      (mkFunTys [mkStateTy alphaTy] (mkTupleTy 2 [betaTy, mkStateTy alphaTy]))
 \end{code}
 
@@ -453,12 +453,9 @@ mkPrimIoTy a = mkSynTy primIoTyCon [a]
 
 primIoTyCon
   = mkSynTyCon
-     primIoTyConKey
-     (mkPreludeCoreName pRELUDE_PRIMIO SLIT("PrimIO"))
+     (mkBuiltinName primIoTyConKey pRELUDE_PRIMIO SLIT("PrimIO"))
      (panic "TysWiredIn.primIoTyCon:Kind")
-     1
-     [alphaTyVar]
-     (mkStateTransformerTy realWorldTy alphaTy)
+     1 [alphaTyVar] (mkStateTransformerTy realWorldTy alphaTy)
 \end{code}
 
 %************************************************************************
@@ -649,12 +646,9 @@ ratioDataCon = pcDataCon ratioDataConKey pRELUDE_RATIO SLIT(":%")
 
 rationalTyCon
   = mkSynTyCon
-      rationalTyConKey
-      (mkPreludeCoreName pRELUDE_RATIO SLIT("Rational"))
+      (mkBuiltinName rationalTyConKey pRELUDE_RATIO SLIT("Rational"))
       mkBoxedTypeKind
-      0	 -- arity
-      [] -- tyvars
-      rationalTy -- == mkRatioTy integerTy
+      0	[] rationalTy -- == mkRatioTy integerTy
 \end{code}
 
 %************************************************************************
@@ -709,10 +703,7 @@ stringTy = mkListTy charTy
 
 stringTyCon
  = mkSynTyCon
-     stringTyConKey
-     (mkPreludeCoreName pRELUDE_CORE SLIT("String"))
+     (mkBuiltinName stringTyConKey pRELUDE_CORE SLIT("String"))
      mkBoxedTypeKind
-     0
-     []   -- type variables
-     stringTy
+     0 [] stringTy
 \end{code}

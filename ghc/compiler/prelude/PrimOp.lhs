@@ -37,7 +37,6 @@ import TysWiredIn
 import CStrings		( identToC )
 import CgCompInfo   	( mIN_MP_INT_SIZE, mP_STRUCT_SIZE )
 import HeapOffs		( addOff, intOff, totHdrSize )
-import NameTypes	( mkPreludeCoreName, FullName, ShortName )
 import PprStyle		( codeStyle )
 import PprType		( pprParendGenType, GenTyVar{-instance Outputable-} )
 import Pretty

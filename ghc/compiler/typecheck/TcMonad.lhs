@@ -26,23 +26,26 @@ module TcMonad(
 
 	rn4MtoTcM,
 
-	TcError(..), TcWarning(..), Message(..),
+	TcError(..), TcWarning(..),
 	mkTcErr, arityErr,
 
 	-- For closure
 	MutableVar(..), _MutableArray
   ) where
 
+import Ubiq{-uitous-}
 
 import TcMLoop		( TcEnv, initEnv, TcMaybe )  -- We need the type TcEnv and an initial Env
 
 import Type		( Type(..), GenType )
 import TyVar		( TyVar(..), GenTyVar )
 import Usage		( Usage(..), GenUsage )
+import ErrUtils		( Error(..), Message(..), ErrCtxt(..),
+			  Warning(..) )
 
 import SST
-import RnMonad4
-import RnUtils		( GlobalNameMappers(..), GlobalNameMapper(..) )
+--import RnMonad4
+--LATER:import RnUtils		( GlobalNameMappers(..), GlobalNameMapper(..) )
 
 import Bag		( Bag, emptyBag, isEmptyBag,
 			  foldBag, unitBag, unionBags, snocBag )
@@ -50,8 +53,7 @@ import FiniteMap	( FiniteMap, emptyFM )
 import Outputable	( Outputable(..), NamedThing(..), ExportFlag )
 import ErrUtils		( Error(..) )
 import Maybes		( MaybeErr(..) )
-import Name		( Name )
-import ProtoName	( ProtoName )
+--import Name		( Name )
 import SrcLoc		( SrcLoc, mkUnknownSrcLoc )
 import UniqFM		( UniqFM, emptyUFM )
 import UniqSupply	( UniqSupply, getUnique, getUniques, splitUniqSupply )
@@ -78,8 +80,8 @@ type TcM    s r =  TcDown s -> TcEnv s -> FSST s r ()
 
 initTc :: UniqSupply
        -> TcM _RealWorld r
-       -> MaybeErr (r, Bag TcWarning)
-		   (Bag TcError, Bag  TcWarning)
+       -> MaybeErr (r, Bag Warning)
+		   (Bag Error, Bag  Warning)
 
 initTc us do_this
   = _runSST (
@@ -216,10 +218,46 @@ This elegantly ensures that it can't zap any type variables that
 belong to the main thread.  We throw away any error messages!
 
 \begin{pseudocode}
-forkNF_Tc :: NF_TcM s r -> NF_TcM s r
-forkNF_Tc m down env
-  = forkTcDown down	`thenSST` \ down' ->
-    returnSST (_runSST (m down' (forkTcEnv env)))
+forkNF_Tc :: NF_TcM s' r -> NF_TcM s r
+forkNF_Tc m (TcDown deflts u_var src_loc err_cxt err_var) env
+  = 	-- Get a fresh unique supply
+    readMutVarSST u_var		`thenSST` \ us ->
+    let
+	(us1, us2) = splitUniqSupply us
+    in
+    writeMutVarSST u_var us1	`thenSST_`
+    returnSST (_runSST (
+	newMutVarSST us2 			`thenSST` \ u_var'   ->
+      	newMutVarSST (emptyBag,emptyBag)	`thenSST` \ err_var' ->
+      	newMutVarSST emptyUFM			`thenSST` \ tv_var'  ->
+	let
+            down' = TcDown deflts us_var src_loc err_cxt err_var'
+	    env'  = forkEnv env tv_var'
+	in
+	m down' env'
+
+	-- ToDo: optionally dump any error messages
+    ))
+\end{pseudocode}
+
+@forkTcDown@ makes a new "down" blob for a lazily-computed fork
+of the type checker.
+
+\begin{pseudocode}
+forkTcDown (TcDown deflts u_var src_loc err_cxt err_var)
+  = 	-- Get a fresh unique supply
+    readMutVarSST u_var		`thenSST` \ us ->
+    let
+	(us1, us2) = splitUniqSupply us
+    in
+    writeMutVarSST u_var us1	`thenSST_`
+
+	-- Make fresh MutVars for the unique supply and errors
+    newMutVarSST us2			`thenSST` \ u_var' ->
+    newMutVarSST (emptyBag, emptyBag)	`thenSST` \ err_var' ->
+
+	-- Done
+    returnSST (TcDown deflts u_var' src_loc err_cxt err_var')
 \end{pseudocode}
 
 
@@ -376,8 +414,8 @@ data TcDown s
 
 	SrcLoc				-- Source location
 	(ErrCtxt s)			-- Error context
-	(MutableVar s (Bag TcWarning, 
-		       Bag TcError))
+	(MutableVar s (Bag Warning, 
+		       Bag Error))
 
 type ErrCtxt s = [NF_TcM s Message]	-- Innermost first.  Monadic so that we have a chance
 					-- to deal with bound type variables just before error
@@ -403,31 +441,13 @@ addErrCtxt (TcDown def us loc ctxt errs) msg = TcDown def us loc (msg:ctxt) errs
 getErrCtxt (TcDown def us loc ctxt errs)     = ctxt
 \end{code}
 
-@forkTcDown@ makes a new "down" blob for a lazily-computed fork
-of the type checker.
-
-\begin{code}
-forkTcDown (TcDown deflts u_var src_loc err_cxt err_var)
-  = 	-- Get a fresh unique supply
-    readMutVarSST u_var		`thenSST` \ us ->
-    let
-	(us1, us2) = splitUniqSupply us
-    in
-    writeMutVarSST u_var us1	`thenSST_`
-
-	-- Make fresh MutVars for the unique supply and errors
-    newMutVarSST us2			`thenSST` \ u_var' ->
-    newMutVarSST (emptyBag, emptyBag)	`thenSST` \ err_var' ->
-
-	-- Done
-    returnSST (TcDown deflts u_var' src_loc err_cxt err_var')
-\end{code}
-
 
 \section{rn4MtoTcM}
 %~~~~~~~~~~~~~~~~~~
 
 \begin{code}
+rn4MtoTcM = panic "TcMonad.rn4MtoTcM (ToDo LATER)"
+{- LATER:
 rn4MtoTcM :: GlobalNameMappers -> Rn4M a -> NF_TcM s (a, Bag Error)
 
 rn4MtoTcM name_funs rn_action down env
@@ -443,6 +463,7 @@ rn4MtoTcM name_funs rn_action down env
     returnSST (rn_result, rn_errs)
   where
     u_var = getUniqSupplyVar down
+-}
 \end{code}
 
 
@@ -450,10 +471,8 @@ TypeChecking Errors
 ~~~~~~~~~~~~~~~~~~~
 
 \begin{code}
-type Message   = PprStyle -> Pretty
 type TcError   = Message
 type TcWarning = Message
-
 
 mkTcErr :: SrcLoc 		-- Where
 	-> [Message] 		-- Context

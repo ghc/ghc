@@ -23,24 +23,21 @@ import FiniteMap	( FiniteMap )
 import HeapOffs		( HeapOffset )
 import HsCore		( UnfoldingCoreExpr )
 import HsPat		( OutPat )
-import HsPragmas	( ClassOpPragmas, ClassPragmas, DataPragmas, GenPragmas,
-			  InstancePragmas
-			)
+import HsPragmas	( ClassOpPragmas, ClassPragmas, DataPragmas, GenPragmas, InstancePragmas )
 import Id		( StrictnessMark, GenId, Id(..) )
 import IdInfo		( IdInfo, OptIdInfo(..), ArityInfo, DeforestInfo, Demand, StrictnessInfo, UpdateInfo )
 import Kind		( Kind )
 import Literal		( Literal )
 import Maybes		( MaybeErr )
 import MatchEnv 	( MatchEnv )
-import Name		( Name )
-import NameTypes	( FullName, ShortName )
+import Name		( Module(..), RdrName, Name )
 import Outputable	( ExportFlag, NamedThing(..), Outputable(..) )
 import PprStyle		( PprStyle )
 import PragmaInfo	( PragmaInfo )
 import Pretty		( PrettyRep )
 import PrimOp		( PrimOp )
 import PrimRep		( PrimRep )
-import ProtoName	( ProtoName )
+import RnHsSyn		( RnName )
 import SMRep		( SMRep )
 import SrcLoc		( SrcLoc )
 import TcType		( TcMaybe )
@@ -49,7 +46,7 @@ import TyVar		( GenTyVar, TyVar(..) )
 import Type		( GenType, Type(..) )
 import UniqFM		( UniqFM )
 import UniqSupply	( UniqSupply )
-import Unique		( Unique )
+import Unique		( Unique, Uniquable(..) )
 import Usage		( GenUsage, Usage(..) )
 import Util		( Ord3(..) )
 
@@ -57,14 +54,7 @@ import Util		( Ord3(..) )
 -- to try to contain their visibility.
 
 class NamedThing a where
-	getExportFlag :: a -> ExportFlag
-	isLocallyDefined :: a -> Bool
-	getOrigName :: a -> (_PackedString, _PackedString)
-	getOccurrenceName :: a -> _PackedString
-	getInformingModules :: a -> [_PackedString]
-	getSrcLoc :: a -> SrcLoc
-	getItsUnique :: a -> Unique
-	fromPreludeCore :: a -> Bool
+	getName :: a -> Name
 class OptIdInfo a where
 	noInfo	:: a
 	getInfo	:: IdInfo -> a
@@ -74,6 +64,8 @@ class Ord3 a where
 	cmp :: a -> a -> Int#
 class Outputable a where
 	ppr :: PprStyle -> a -> Int -> Bool -> PrettyRep
+class Uniquable a where
+	uniqueOf :: a -> Unique
 
 -- For datatypes, we ubiquitize those types that (a) are
 -- used everywhere and (b) the compiler doesn't lose much
@@ -95,7 +87,6 @@ data Demand
 data ExportFlag
 data FieldLabel
 data FiniteMap a b
-data FullName	-- NB: fails the optimisation criterion
 data GenClass a b
 data GenClassOp a
 data GenCoreArg a b c
@@ -118,14 +109,14 @@ data Literal
 data MaybeErr a b
 data MatchEnv a b
 data Name
+data RdrName = Unqual _PackedString | Qual _PackedString _PackedString
 data OutPat a b c
 data PprStyle
 data PragmaInfo
 data PrettyRep
 data PrimOp
 data PrimRep	-- NB: an enumeration
-data ProtoName
-data ShortName	-- NB: fails the optimisation criterion
+data RnName
 data SimplifierSwitch
 data SMRep
 data SrcLoc
@@ -144,6 +135,7 @@ data Unique	-- NB: fails the optimisation criterion
 
 -- don't get clever and unexpand some of these synonyms
 -- (GHC 0.26 will barf)
+type Module = _PackedString
 type Arity = Int
 type Class = GenClass (GenTyVar (GenUsage Unique)) Unique
 type ClassOp = GenClassOp (GenType (GenTyVar (GenUsage Unique)) Unique)

@@ -14,6 +14,7 @@ import StgSyn
 import StgUtils
 
 import LambdaLift	( liftProgram )
+import Outputable	( isLocallyDefined )
 import SCCfinal		( stgMassageForProfiling )
 import SatStgRhs	( satStgRhs )
 import StgLint		( lintStgBindings )

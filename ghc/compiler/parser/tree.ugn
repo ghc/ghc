@@ -22,10 +22,11 @@ type tree;
 		    ghexplist	: maybe;	/* Maybe [entity] */
 		    ghfixes     : list;		/* [fixop] */
 		    ghmodlist	: binding;
+		    ghversion   : long;
 		    ghmodline	: long; >;
-	fixop	: < gfixop	: unkId;
+	fixop	: < gfixop	: qid;
 		    gfixinfx	: long;
-		    gfixprec	: long;	>;
+		    gfixprec	: long; >;
 
 	ident	: < gident 	: qid; >;
 	lit 	: < glit	: literal; >;
@@ -35,13 +36,7 @@ type tree;
 	infixap : < ginffun	: qid;
 		    ginfarg1	: tree;
 		    ginfarg2	: tree; >;
-	negate	: < gnexp	: tree;
-		    gnxxx1	: VOID_STAR;
-		    gnxxx2	: VOID_STAR; >;
-	/*
-	  infixap and negate have the same size
-	  so they can be rearranged in precparse
-	*/
+	negate	: < gnexp	: tree;	>;
 
 	lambda	: < glampats	: list;
 		    glamexpr	: tree;

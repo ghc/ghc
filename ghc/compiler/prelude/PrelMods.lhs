@@ -13,7 +13,7 @@ module PrelMods (
 	pRELUDE_LIST, pRELUDE_TEXT,
 	pRELUDE_PRIMIO, pRELUDE_IO, pRELUDE_PS,
 	gLASGOW_ST, gLASGOW_MISC,
-	pRELUDE_FB
+	pRELUDE_FB, fromPrelude
   ) where
 
 CHK_Ubiq() -- debugging consistency check
@@ -33,4 +33,7 @@ pRELUDE_PRIMIO	= SLIT("PreludePrimIO")
 pRELUDE_PS	= SLIT("PreludePS")
 pRELUDE_RATIO	= SLIT("PreludeRatio")
 pRELUDE_TEXT	= SLIT("PreludeText")
+
+fromPrelude :: FAST_STRING -> Bool
+fromPrelude s = (_SUBSTR_ s 0 6 == SLIT("Prelude"))
 \end{code}

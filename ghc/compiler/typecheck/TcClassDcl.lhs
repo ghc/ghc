@@ -19,7 +19,9 @@ import HsSyn		( ClassDecl(..), HsBinds(..), Bind(..), MonoBinds(..),
 import HsPragmas	( ClassPragmas(..) )
 import RnHsSyn		( RenamedClassDecl(..), RenamedClassPragmas(..),
 			  RenamedClassOpSig(..), RenamedMonoBinds(..),
-			  RenamedGenPragmas(..), RenamedContext(..) )
+			  RenamedGenPragmas(..), RenamedContext(..),
+			  RnName{-instance Uniquable-}
+			)
 import TcHsSyn		( TcIdOcc(..), TcHsBinds(..), TcMonoBinds(..), TcExpr(..),
 			  mkHsTyApp, mkHsTyLam, mkHsDictApp, mkHsDictLam, unZonkId )
 
@@ -39,7 +41,7 @@ import CoreUtils	( escErrorMsg )
 import Id		( mkSuperDictSelId, mkMethodSelId, mkDefaultMethodId,
 			  idType )
 import IdInfo		( noIdInfo )
-import Name		( Name, getNameFullName, getTagFromClassOpName )
+import Outputable	( isLocallyDefined, getOrigName, getLocalName )
 import PrelVals		( pAT_ERROR_ID )
 import PprStyle
 import Pretty
@@ -88,7 +90,7 @@ tcClassDecl1 rec_inst_mapper
     tcGetUnique			`thenNF_Tc` \ uniq ->
     let
 	(ops, op_sel_ids, defm_ids) = unzip3 sig_stuff
-	clas = mkClass uniq (getNameFullName class_name) rec_tyvar
+	clas = mkClass uniq (getName class_name) rec_tyvar
 		       scs sc_sel_ids ops op_sel_ids defm_ids
 		       rec_class_inst_env
     in
@@ -174,8 +176,8 @@ tcClassSig rec_clas rec_clas_tyvar rec_classop_spec_fn
 	full_theta  = (rec_clas, mkTyVarTy rec_clas_tyvar) : theta
 	global_ty   = mkSigmaTy full_tyvars full_theta tau
 	local_ty    = mkSigmaTy tyvars theta tau
-	class_op    = mkClassOp (getOccurrenceName op_name)
-				(getTagFromClassOpName op_name)
+	class_op    = mkClassOp (getLocalName op_name)
+				(panic "(getTagFromClassOpName op_name)TcClassDecl"{-(getTagFromClassOpName op_name)-})
 				local_ty
     in
 
@@ -189,7 +191,7 @@ tcClassSig rec_clas rec_clas_tyvar rec_classop_spec_fn
 	-- Build the selector id and default method id
     tcGetUnique					`thenNF_Tc` \ d_uniq ->
     let
-	op_uniq = getItsUnique op_name
+	op_uniq = uniqueOf op_name
 	sel_id  = mkMethodSelId     op_uniq rec_clas class_op global_ty op_info
 	defm_id = mkDefaultMethodId d_uniq  rec_clas class_op False global_ty defm_info
 			-- ToDo: improve the "False"

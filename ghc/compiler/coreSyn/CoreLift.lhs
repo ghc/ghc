@@ -25,6 +25,7 @@ import Id		( idType, mkSysLocal,
 			  nullIdEnv, growIdEnvList, lookupIdEnv, IdEnv(..),
 			  GenId{-instances-}
 			)
+import Outputable	( isLocallyDefined, getSrcLoc )
 import PrelInfo		( liftDataCon, mkLiftTy, statePrimTyCon )
 import TyCon		( isBoxedTyCon, TyCon{-instance-} )
 import Type		( maybeAppDataTyCon, eqTy )
@@ -274,7 +275,7 @@ mkLiftedId id u
   = ASSERT (isUnboxedButNotState unlifted_ty)
     (lifted_id, unlifted_id)
   where
-    id_name     = getOccurrenceName id
+    id_name     = panic "CoreLift.mkLiftedId:id_name" --LATER: getOccName id
     lifted_id   = updateIdType id lifted_ty
     unlifted_id = mkSysLocal id_name u unlifted_ty (getSrcLoc id)
 

@@ -15,12 +15,11 @@ import CoreSyn
 import CoreUnfold	( UnfoldingGuidance(..) )
 import Id		( mkPreludeId )
 import IdInfo		-- quite a few things
-import Name		( Name(..) )
-import NameTypes	( mkPreludeCoreName )
+import Name		( mkBuiltinName )
 import PrelMods		( pRELUDE_BUILTIN )
 import PrimOp		( primOpInfo, tagOf_PrimOp, primOp_str,
-			  PrimOpInfo(..), PrimOpResultInfo(..)
-			)
+			  PrimOpInfo(..), PrimOpResultInfo(..) )
+import RnHsSyn		( RnName(..) )
 import Type		( mkForAllTys, mkFunTys, applyTyCon )
 import TysWiredIn	( boolTy )
 import Unique		( mkPrimOpIdUnique )
@@ -28,10 +27,10 @@ import Util		( panic )
 \end{code}
 
 \begin{code}
-primOpNameInfo :: PrimOp -> (FAST_STRING, Name)
+primOpNameInfo :: PrimOp -> (FAST_STRING, RnName)
 primOpId       :: PrimOp -> Id
 
-primOpNameInfo op = (primOp_str  op, WiredInVal (primOpId op))
+primOpNameInfo op = (primOp_str  op, WiredInId (primOpId op))
 
 primOpId op
   = case (primOpInfo op) of
@@ -62,14 +61,12 @@ primOpId op
 	    (length arg_tys) -- arity
   where
     mk_prim_Id prim_op mod name tyvar_tmpls arg_tys ty arity
-      = mkPreludeId
-	    (mkPrimOpIdUnique (IBOX(tagOf_PrimOp prim_op)))
-	    (mkPreludeCoreName mod name)
-	    ty
-	    (noIdInfo
-		`addInfo` (mkArityInfo arity)
-		`addInfo_UF` (mkUnfolding EssentialUnfolding
-				(mk_prim_unfold prim_op tyvar_tmpls arg_tys)))
+      = mkPreludeId (mkBuiltinName key mod name) ty
+	   (noIdInfo `addInfo` (mkArityInfo arity)
+	          `addInfo_UF` (mkUnfolding EssentialUnfolding
+			         (mk_prim_unfold prim_op tyvar_tmpls arg_tys)))
+      where
+	key = mkPrimOpIdUnique (IBOX(tagOf_PrimOp prim_op))
 \end{code}
 
 
@@ -88,7 +85,7 @@ mk_prim_unfold prim_op tvs arg_tys
   = panic "IdUtils.mk_prim_unfold"
 {-
   = let
-	(inst_env, tyvars, tyvar_tys) = instantiateTyVars tvs (map getItsUnique tvs)
+	(inst_env, tyvars, tyvar_tys) = instantiateTyVars tvs (map uniqueOf tvs)
 	inst_arg_tys		      = map (instantiateTauTy inst_env) arg_tys
 	vars	    		      = mkTemplateLocals inst_arg_tys
     in

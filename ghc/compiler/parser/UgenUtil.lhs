@@ -9,46 +9,39 @@ module UgenUtil (
 	returnPrimIO, thenPrimIO,
 
 	-- stuff defined here
-	UgenUtil..,
-
-	-- complete interface
-	ProtoName
+	UgenUtil..
     ) where
 
 import PreludeGlaST
 
-import Ubiq{-uitous-}
+import Ubiq
 
 import MainMonad	( MainIO(..) )		
-import ProtoName	( ProtoName(..) )
-import SrcLoc		( mkSrcLoc2 )
-
---import ProtoName
---import Outputable
---import Util
+import Name		( RdrName(..) )
+import SrcLoc		( mkSrcLoc2, mkUnknownSrcLoc )
 \end{code}
 
 \begin{code}
 type UgnM a
-  = FAST_STRING		   -- source file name; carried down
+  = (FAST_STRING,Module,SrcLoc)	   -- file, module and src_loc carried down
   -> PrimIO a
 
 {-# INLINE returnUgn #-}
 {-# INLINE thenUgn #-}
 
-returnUgn x mod = returnPrimIO x
+returnUgn x stuff = returnPrimIO x
 
-thenUgn x y mod
-  = x mod	`thenPrimIO` \ z ->
-    y z mod
+thenUgn x y stuff
+  = x stuff	`thenPrimIO` \ z ->
+    y z stuff
 
-initUgn :: FAST_STRING -> UgnM a -> MainIO a
-initUgn srcfile action
-  = action srcfile `thenPrimIO` \ result ->
+initUgn :: UgnM a -> MainIO a
+initUgn action
+  = action (SLIT(""),SLIT(""),mkUnknownSrcLoc) `thenPrimIO` \ result ->
     return result
 
 ioToUgnM :: PrimIO a -> UgnM a
-ioToUgnM x mod = x
+ioToUgnM x stuff = x
 \end{code}
 
 \begin{code}
@@ -60,13 +53,7 @@ rdU_VOID_STAR x = returnUgn x
 
 type U_long = Int
 rdU_long ::  Int -> UgnM U_long
-rdU_long x = returnUgn x -- (A# x) = returnUgn (I# (addr2Int# x))
-
-type U_unkId = ProtoName
-rdU_unkId :: _Addr -> UgnM U_unkId
-rdU_unkId x
-  = rdU_stringId x `thenUgn` \ y ->
-    returnUgn (Unk y)
+rdU_long x = returnUgn x
 
 type U_stringId = FAST_STRING
 rdU_stringId :: _Addr -> UgnM U_stringId
@@ -88,13 +75,24 @@ rdU_hstring x
 \end{code}
 
 \begin{code}
-setSrcFileUgn :: FAST_STRING{-filename-} -> UgnM a -> UgnM a
-setSrcFileUgn file action _ = action file
+setSrcFileUgn :: FAST_STRING -> UgnM a -> UgnM a
+setSrcFileUgn file action stuff@(_,mod,loc) = action (file,mod,loc)
 
-getSrcFileUgn :: UgnM FAST_STRING{-filename-}
-getSrcFileUgn mod = returnUgn mod mod
+getSrcFileUgn :: UgnM FAST_STRING
+getSrcFileUgn stuff@(file,mod,loc) = returnUgn file stuff
 
-mkSrcLocUgn :: U_long -> UgnM SrcLoc
-mkSrcLocUgn ln mod
-  = returnUgn (mkSrcLoc2 mod ln) mod
+setSrcModUgn :: Module -> UgnM a -> UgnM a
+setSrcModUgn mod action stuff@(file,_,loc) = action (file,mod,loc)
+
+getSrcModUgn :: UgnM Module
+getSrcModUgn stuff@(file,mod,loc) = returnUgn mod stuff
+
+mkSrcLocUgn :: U_long -> (SrcLoc -> UgnM a) -> UgnM a
+mkSrcLocUgn ln action (file,mod,_)
+  = action loc (file,mod,loc)
+  where
+    loc = mkSrcLoc2 file ln
+
+getSrcLocUgn :: UgnM SrcLoc
+getSrcLocUgn stuff@(file,mod,loc) = returnUgn loc stuff
 \end{code}

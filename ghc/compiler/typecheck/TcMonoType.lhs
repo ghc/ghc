@@ -12,7 +12,7 @@ import Ubiq{-uitous-}
 
 import HsSyn		( PolyType(..), MonoType(..), Fake )
 import RnHsSyn		( RenamedPolyType(..), RenamedMonoType(..), 
-			  RenamedContext(..)
+			  RenamedContext(..), RnName(..)
 			)
 
 
@@ -34,9 +34,11 @@ import Type		( mkDictTy )
 import Class		( cCallishClassKeys )
 import TyCon		( TyCon, Arity(..) )
 import Unique		( Unique )
-import Name		( Name(..), getNameShortName, isTyConName, getSynNameArity )
 import PprStyle
 import Pretty
+import RnHsSyn		( isRnLocal, isRnClass, isRnTyCon,
+			  RnName{-instance NamedThing-}
+			)
 import Util		( zipWithEqual, panic )
 \end{code}
 
@@ -78,13 +80,13 @@ tcMonoTypeKind (MonoFunTy ty1 ty2)
     tcMonoType ty2	`thenTc` \ tau_ty2 ->
     returnTc (mkTcTypeKind, mkFunTy tau_ty1 tau_ty2)
 
-tcMonoTypeKind (MonoTyApp name@(Short _ _) tys)
-  =	-- Must be a type variable
-    tcLookupTyVar name			`thenNF_Tc` \ (kind,tyvar) ->
+tcMonoTypeKind (MonoTyApp name tys)
+  | isRnLocal name	-- Must be a type variable
+  = tcLookupTyVar name			`thenNF_Tc` \ (kind,tyvar) ->
     tcMonoTyApp kind (mkTyVarTy tyvar) tys
 
 tcMonoTypeKind (MonoTyApp name tys)
-  | isTyConName name 	-- Must be a type constructor
+  | isRnTyCon name 	-- Must be a type constructor
   = tcLookupTyCon name			`thenNF_Tc` \ (kind,maybe_arity,tycon) ->
     case maybe_arity of
 	Just arity -> tcSynApp name kind arity tycon tys	-- synonum
@@ -98,8 +100,10 @@ tcMonoTypeKind (MonoForAllTy tyvars_w_kinds ty)
 	returnTc (mkTcTypeKind, ty')
     )
   where
-    (names, kinds) = unzip tyvars_w_kinds
+    (rn_names, kinds) = unzip tyvars_w_kinds
+    names    = map de_rn rn_names
     tc_kinds = map kindToTcKind kinds
+    de_rn (RnName n) = n
 
 -- for unfoldings only:
 tcMonoTypeKind (MonoDictTy class_name ty)
@@ -161,22 +165,24 @@ Doing this utterly wrecks the whole point of introducing these
 classes so we specifically check that this isn't being done.
 
 \begin{code}
-canBeUsedInContext :: Name -> Bool
-canBeUsedInContext (ClassName uniq _ _) = not (uniq `elem` cCallishClassKeys)
-canBeUsedInContext other 	        = True
+canBeUsedInContext :: RnName -> Bool
+canBeUsedInContext n
+  = isRnClass n && not (uniqueOf n `elem` cCallishClassKeys)
 \end{code}
-
 
 Polytypes
 ~~~~~~~~~
 \begin{code}
 tcPolyType :: RenamedPolyType -> TcM s Type
 tcPolyType (HsForAllTy tyvar_names context ty)
-  = tcTyVarScope tyvar_names (\ tyvars ->
+  = tcTyVarScope names (\ tyvars ->
 	tcContext context	`thenTc` \ theta ->
 	tcMonoType ty		`thenTc` \ tau ->
 	returnTc (mkSigmaTy tyvars theta tau)
     )
+  where
+    names = map de_rn tyvar_names
+    de_rn (RnName n) = n
 \end{code}
 
 Errors and contexts

@@ -8,18 +8,18 @@ import PreludePS	( _PackedString )
 import Class		( GenClass )
 import CoreUnfold	( mkMagicUnfolding, UnfoldingDetails )
 import IdUtils		( primOpNameInfo )
-import Name		( Name )
-import NameTypes	( mkPreludeCoreName, FullName )
+import Name		( Name, mkBuiltinName )
 import PrimOp		( PrimOp )
+import RnHsSyn		( RnName )
 import Type		( mkSigmaTy, mkFunTys, GenType )
 import TyVar		( GenTyVar )
 import Unique		( Unique )
 import Usage		( GenUsage )
 
 mkMagicUnfolding :: Unique -> UnfoldingDetails
-mkPreludeCoreName :: _PackedString -> _PackedString -> FullName
+mkBuiltinName :: Unique -> _PackedString -> _PackedString -> Name
 mkSigmaTy :: [a] -> [(GenClass (GenTyVar (GenUsage Unique)) Unique, GenType a b)] -> GenType a b -> GenType a b
 mkFunTys :: [GenType a b] -> GenType a b -> GenType a b
 
-primOpNameInfo	:: PrimOp -> (_PackedString, Name)
+primOpNameInfo	:: PrimOp -> (_PackedString, RnName)
 \end{code}

@@ -14,7 +14,7 @@ module TysPrim where
 import Ubiq
 
 import Kind		( mkUnboxedTypeKind, mkBoxedTypeKind )
-import NameTypes	( mkPreludeCoreName, FullName )
+import Name		( mkBuiltinName )
 import PrelMods		( pRELUDE_BUILTIN )
 import PrimRep		( PrimRep(..) )	-- getPrimRepInfo uses PrimRep repn
 import TyCon		( mkPrimTyCon, mkDataTyCon, NewOrData(..) )
@@ -38,11 +38,12 @@ alphaTys = mkTyVarTys alphaTyVars
 
 \begin{code}
 -- only used herein
-pcPrimTyCon :: Unique{-TyConKey-} -> FAST_STRING -> Int -> ([PrimRep] -> PrimRep) -> TyCon
-pcPrimTyCon key name arity{-UNUSED-} kind_fn{-UNUSED-}
-  = mkPrimTyCon key full_name mkUnboxedTypeKind
+pcPrimTyCon :: Unique{-TyConKey-} -> FAST_STRING
+	    -> Int -> ([PrimRep] -> PrimRep) -> TyCon
+pcPrimTyCon key str arity{-UNUSED-} kind_fn{-UNUSED-}
+  = mkPrimTyCon name mkUnboxedTypeKind
   where
-    full_name = mkPreludeCoreName pRELUDE_BUILTIN name
+    name = mkBuiltinName key pRELUDE_BUILTIN str
 
 
 charPrimTy	= applyTyCon charPrimTyCon []
@@ -113,14 +114,14 @@ statePrimTyCon	 = pcPrimTyCon statePrimTyConKey SLIT("State#") 1
 \begin{code}
 realWorldTy = applyTyCon realWorldTyCon []
 realWorldTyCon
-  = mkDataTyCon realWorldTyConKey mkBoxedTypeKind full_name
+  = mkDataTyCon name mkBoxedTypeKind 
 	[{-no tyvars-}]
 	[{-no context-}]
 	[{-no data cons!-}] -- we tell you *nothing* about this guy
 	[{-no derivings-}]
 	DataType
   where
-    full_name = mkPreludeCoreName pRELUDE_BUILTIN SLIT("_RealWorld")
+    name = mkBuiltinName realWorldTyConKey pRELUDE_BUILTIN SLIT("_RealWorld")
 
 realWorldStatePrimTy = mkStatePrimTy realWorldTy
 \end{code}

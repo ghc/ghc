@@ -15,7 +15,8 @@ import HsSyn		( HsBinds(..), Bind(..), Sig(..), MonoBinds(..),
 			  GRHSsAndBinds, ArithSeqInfo, HsLit, Fake,
 			  collectBinders )
 import RnHsSyn		( RenamedHsBinds(..), RenamedBind(..), RenamedSig(..), 
-			  RenamedMonoBinds(..) )
+			  RenamedMonoBinds(..), RnName(..)
+			)
 import TcHsSyn		( TcHsBinds(..), TcBind(..), TcMonoBinds(..),
 			  TcIdOcc(..), TcIdBndr(..) )
 
@@ -34,11 +35,11 @@ import Unify		( unifyTauTy )
 import Kind		( mkBoxedTypeKind, mkTypeKind )
 import Id		( GenId, idType, mkUserId )
 import IdInfo		( noIdInfo )
-import Name		( Name )	-- instances
 import Maybes		( assocMaybe, catMaybes, Maybe(..) )
 import Outputable	( pprNonOp )
 import PragmaInfo	( PragmaInfo(..) )
 import Pretty
+import RnHsSyn		( RnName )	-- instances
 import Type		( mkTyVarTy, mkTyVarTys, isTyVarTy,
 			  mkSigmaTy, splitSigmaTy,
 			  splitRhoTy, mkForAllTy, splitForAllTy )
@@ -177,8 +178,12 @@ tcBindAndThen combiner bind sigs do_next
     binder_names = collectBinders bind
 
 
-tcBindAndSigs binder_names bind sigs prag_info_fn
-  = recoverTc (
+tcBindAndSigs binder_rn_names bind sigs prag_info_fn
+  = let
+	binder_names = map de_rn binder_rn_names
+	de_rn (RnName n) = n
+    in
+    recoverTc (
 	-- If typechecking the binds fails, then return with each
 	-- binder given type (forall a.a), to minimise subsequent
 	-- error messages
@@ -193,7 +198,7 @@ tcBindAndSigs binder_names bind sigs prag_info_fn
 
 	-- Create a new identifier for each binder, with each being given
 	-- a type-variable type.
-    newMonoIds binder_names kind (\ mono_ids ->
+    newMonoIds binder_rn_names kind (\ mono_ids ->
 	    tcTySigs sigs		`thenTc` \ sig_info ->
 	    tc_bind bind		`thenTc` \ (bind', lie) ->
 	    returnTc (mono_ids, bind', lie, sig_info)

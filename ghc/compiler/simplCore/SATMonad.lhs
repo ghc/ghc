@@ -141,7 +141,7 @@ newSATName id ty us env
   = case (getUnique us) of { unique ->
     (mkSysLocal new_str unique ty mkUnknownSrcLoc, env) }
   where
-    new_str = getOccurrenceName id _APPEND_ SLIT("_sat")
+    new_str = panic "SATMonad.newSATName (ToDo)" -- getOccName id _APPEND_ SLIT("_sat")
 
 getArgLists :: CoreExpr -> ([Arg Type],[Arg Id])
 getArgLists expr
@@ -216,7 +216,7 @@ saTransform binder rhs
 	    -- A better fix is to use binder directly but with the TopLevel
 	    -- tag (or Exported tag) modified.
 	    fake_binder = mkSysLocal
-			    (getOccurrenceName binder _APPEND_ SLIT("_fsat"))
+			    (getOccName binder _APPEND_ SLIT("_fsat"))
 			    (getItsUnique binder)
 			    (idType binder)
 			    mkUnknownSrcLoc

@@ -201,7 +201,7 @@ mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3,
  mkBuiltinUnique :: Int -> Unique
 
 mkBuiltinUnique i = mkUnique 'B' i
-mkPseudoUnique1 i = mkUnique 'C' i -- used for getItsUnique on Regs
+mkPseudoUnique1 i = mkUnique 'C' i -- used for uniqueOf on Regs
 mkPseudoUnique2 i = mkUnique 'D' i -- ditto
 mkPseudoUnique3 i = mkUnique 'E' i -- ditto
 

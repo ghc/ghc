@@ -11,19 +11,17 @@ Definitions for: @FixityDecl@, @TyDecl@ and @ConDecl@, @ClassDecl@,
 
 module HsDecls where
 
-import Ubiq{-uitous-}
+import Ubiq
 
 -- friends:
 import HsLoop		( nullMonoBinds, MonoBinds, Sig )
 import HsPragmas	( DataPragmas, ClassPragmas,
-			  InstancePragmas, ClassOpPragmas
-			)
+			  InstancePragmas, ClassOpPragmas )
 import HsTypes
 
 -- others:
 import Outputable
 import Pretty
-import ProtoName	( cmpProtoName, ProtoName )
 import SrcLoc		( SrcLoc )
 import Util		( cmpList, panic#{-ToDo:rm eventually-} )
 \end{code}
@@ -33,9 +31,6 @@ import Util		( cmpList, panic#{-ToDo:rm eventually-} )
 \subsection[FixityDecl]{A fixity declaration}
 %*									*
 %************************************************************************
-
-These are only used in generating interfaces at the moment.  They are
-not used in pretty-printing.
 
 \begin{code}
 data FixityDecl name
@@ -173,28 +168,6 @@ data BangType name
   | Unbanged (MonoType name)
 \end{code}
 
-In checking interfaces, we need to ``compare'' @ConDecls@.  Use with care!
-\begin{code}
-eqConDecls cons1 cons2
-  = case (cmpList cmp cons1 cons2) of { EQ_ -> True; _ -> False }
-  where
-    cmp (ConDecl n1 tys1 _) (ConDecl n2 tys2 _)
-      = case cmpProtoName n1 n2 of
-	  EQ_ -> cmpList cmp_bang_ty tys1 tys2
-	  xxx -> xxx
-    cmp (ConOpDecl _ _ _ _) _  = panic# "eqConDecls:ConOpDecl"
-    cmp (RecConDecl _ _ _)  _  = panic# "eqConDecls:RecConDecl"
-    cmp (NewConDecl _ _ _)  _  = panic# "eqConDecls:NewConDecl"
-    -------------
-
-    cmp_ty = cmpMonoType cmpProtoName
-    -------------
-    cmp_bang_ty (Banged   ty1) (Banged   ty2) = cmp_ty ty1 ty2
-    cmp_bang_ty (Unbanged ty1) (Unbanged ty2) = cmp_ty ty1 ty2
-    cmp_bang_ty (Banged   _)   _	      = LT_
-    cmp_bang_ty _	       _	      = GT_
-\end{code}
-
 \begin{code}
 instance (NamedThing name, Outputable name) => Outputable (ConDecl name) where
 
@@ -237,12 +210,17 @@ instance (NamedThing name, Outputable name, Outputable pat,
 		=> Outputable (ClassDecl tyvar uvar name pat) where
 
     ppr sty (ClassDecl context clas tyvar sigs methods pragmas src_loc)
-     = ppAboves [ppCat [ppStr "class", pprContext sty context, ppr sty clas,
-			ppr sty tyvar, ppStr "where"],
-			-- ToDo: really shouldn't print "where" unless there are sigs
-		 ppNest 4 (ppAboves (map (ppr sty) sigs)),
-		 ppNest 4 (ppr sty methods),
-		 ppNest 4 (ppr sty pragmas)]
+     = let 
+           top_matter = ppCat [ppStr "class", pprContext sty context,
+                               ppr sty clas, ppr sty tyvar]
+       in
+       if null sigs && nullMonoBinds methods then
+	   ppAbove top_matter (ppNest 4 (ppr sty pragmas))
+       else
+	   ppAboves [ppCat [top_matter, ppStr "where"],
+		     ppNest 4 (ppAboves (map (ppr sty) sigs)),
+		     ppNest 4 (ppr sty methods),
+		     ppNest 4 (ppr sty pragmas) ]
 \end{code}
 
 %************************************************************************
@@ -265,10 +243,8 @@ data InstDecl tyvar uvar name pat
 				-- module being compiled; False <=> It is from
 				-- an imported interface.
 
-		FAST_STRING	-- The name of the module where the instance decl
-				-- originally came from; easy enough if it's
-				-- the module being compiled; otherwise, the
-				-- info comes from a pragma.
+		(Maybe Module)	-- The name of the module where the instance decl
+				-- originally came from; Nothing => Prelude
 
 		[Sig name]		-- actually user-supplied pragmatic info
 		(InstancePragmas name)	-- interface-supplied pragmatic info
@@ -293,11 +269,10 @@ instance (NamedThing name, Outputable name, Outputable pat,
 	if nullMonoBinds binds && null uprags then
 	    ppAbove top_matter (ppNest 4 (ppr sty pragmas))
 	else
-	    ppAboves [
-	      ppCat [top_matter, ppStr "where"],
-	      if null uprags then ppNil else ppNest 4 (ppr sty uprags),
-	      ppNest 4 (ppr sty binds),
-	      ppNest 4 (ppr sty pragmas) ]
+	    ppAboves [ppCat [top_matter, ppStr "where"],
+	              if null uprags then ppNil else ppNest 4 (ppr sty uprags),
+	              ppNest 4 (ppr sty binds),
+	              ppNest 4 (ppr sty pragmas) ]
 \end{code}
 
 A type for recording what instances the user wants to specialise;

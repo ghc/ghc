@@ -31,12 +31,12 @@ import CmdLineOpts	( opt_IrrefutableTuples )
 import Id		( GenId, idType )
 import Kind		( Kind, mkBoxedTypeKind, mkTypeKind )
 import Maybes		( maybeToBool )
-import Name		( Name )
 import PprType		( GenType, GenTyVar )
 import PrelInfo		( charPrimTy, intPrimTy, floatPrimTy,
 			  doublePrimTy, charTy, stringTy, mkListTy,
 			  mkTupleTy, addrTy, addrPrimTy )
 import Pretty
+import RnHsSyn		( RnName{-instance Outputable-} )
 import Type		( splitFunTy, splitRhoTy, splitSigmaTy, mkTyVarTys,
 			  getFunTy_maybe, maybeAppDataTyCon,
 			  Type(..), GenType
@@ -313,7 +313,7 @@ tcPats (pat:pats)
 unifies the actual args against the expected ones.
 
 \begin{code}
-matchConArgTys :: Name -> [TcType s] -> TcM s (Id, TcType s)
+matchConArgTys :: RnName -> [TcType s] -> TcM s (Id, TcType s)
 
 matchConArgTys con arg_tys
   = tcGlobalOcc con		`thenNF_Tc` \ (con_id, _, con_rho) ->

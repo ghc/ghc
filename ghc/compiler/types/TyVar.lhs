@@ -35,7 +35,7 @@ import UniqFM		( emptyUFM, listToUFM, addToUFM, lookupUFM,
 			  plusUFM, sizeUFM, UniqFM
 			)
 import Maybes		( Maybe(..) )
-import NameTypes	( ShortName )
+import Name		( mkLocalName, Name, RdrName(..) )
 import Pretty		( Pretty(..), PrettyRep, ppBeside, ppPStr )
 import PprStyle		( PprStyle )
 import Outputable	( Outputable(..), NamedThing(..), ExportFlag(..) )
@@ -49,7 +49,7 @@ data GenTyVar flexi_slot
   = TyVar
 	Unique
 	Kind
-	(Maybe ShortName)	-- User name (if any)
+	(Maybe Name)		-- User name (if any)
 	flexi_slot		-- Extra slot used during type and usage
 				-- inference, and to contain usages.
 
@@ -60,7 +60,7 @@ type TyVar = GenTyVar Usage	-- Usage slot makes sense only if Kind = Type
 Simple construction and analysis functions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
-mkTyVar :: ShortName -> Unique -> Kind -> TyVar
+mkTyVar :: Name -> Unique -> Kind -> TyVar
 mkTyVar name uniq kind = TyVar  uniq
 				kind
 				(Just name)
@@ -143,20 +143,10 @@ instance Eq (GenTyVar a) where
 instance Ord3 (GenTyVar a) where
     cmp (TyVar u1 _ _ _) (TyVar u2 _ _ _) = u1 `cmp` u2
 
+instance Uniquable (GenTyVar a) where
+    uniqueOf (TyVar u _ _ _) = u
+
 instance NamedThing (GenTyVar a) where
-    getExportFlag 	(TyVar _ _ _ _) = NotExported
-    isLocallyDefined	(TyVar _ _ _ _) = True
-
-    getOrigName		(TyVar _ _ (Just n) _) = getOrigName n
-    getOrigName		(TyVar u _ _        _) = (panic "getOrigName:TyVar",
-						  showUnique u)
-    getOccurrenceName	(TyVar _ _ (Just n) _) = getOccurrenceName n
-    getOccurrenceName	(TyVar u _ _        _) = showUnique u
-
-    getSrcLoc		(TyVar _ _ (Just n) _) = getSrcLoc n
-    getSrcLoc		(TyVar _ _ _        _) = mkUnknownSrcLoc
-    fromPreludeCore	(TyVar _ _ _ _)	       = False
-
-    getItsUnique	(TyVar u _ _ _)	       = u
-
+    getName		(TyVar _ _ (Just n) _) = n
+    getName		(TyVar u _ _        _) = mkLocalName u (showUnique u) mkUnknownSrcLoc
 \end{code}

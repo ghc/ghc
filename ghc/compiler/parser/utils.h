@@ -118,11 +118,14 @@ tree	function PROTO((tree));
 void	extendfn PROTO((binding, binding));
 void	checkorder PROTO((binding));
 
-void	precparse PROTO((tree));
-void	checkprec PROTO((tree, qid, BOOLEAN));
 void    checkdostmts PROTO((list));
 void	checknobangs PROTO((ttype));
 void	splittyconapp PROTO((ttype, qid *, list *));
+
+/*
+void	precparse PROTO((tree));
+void	checkprec PROTO((tree, qid, BOOLEAN));
+*/
 
 BOOLEAN	isconstr PROTO((char *));
 void	setstartlineno PROTO((void));

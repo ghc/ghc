@@ -20,13 +20,10 @@ import TysWiredIn
 
 -- others:
 import CoreSyn		-- quite a bit
---import CoreUnfold	( UnfoldingGuidance(..), mkMagicUnfolding )
 import IdInfo		-- quite a bit
 import Literal		( mkMachInt )
---import NameTypes	( mkPreludeCoreName )
 import PrimOp		( PrimOp(..) )
 import SpecEnv		( SpecEnv(..), nullSpecEnv )
---import Type		( mkSigmaTy, mkFunTys, GenType(..) )
 import TyVar		( alphaTyVar, betaTyVar )
 import Unique		-- lots of *Keys
 import Util		( panic )
@@ -40,7 +37,7 @@ import Util		( panic )
 pcMiscPrelId :: Unique{-IdKey-} -> FAST_STRING -> FAST_STRING -> Type -> IdInfo -> Id
 
 pcMiscPrelId key mod name ty info
- = mkPreludeId	key (mkPreludeCoreName mod name) ty info
+ = mkPreludeId (mkBuiltinName key mod name) ty info
 \end{code}
 
 %************************************************************************

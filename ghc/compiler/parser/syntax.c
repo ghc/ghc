@@ -35,8 +35,6 @@ qid	fns[MAX_CONTEXTS] = { NULL };
 BOOLEAN samefn[MAX_CONTEXTS] = { FALSE };
 tree	prevpatt[MAX_CONTEXTS] = { NULL };
 
-BOOLEAN inpat = FALSE;
-
 static BOOLEAN	 checkorder2 PROTO((binding, BOOLEAN));
 static BOOLEAN	 checksig PROTO((BOOLEAN, binding));
 
@@ -84,13 +82,6 @@ checksamefn(fn)
 #endif
 }
 
-
-void
-checkinpat()
-{
-  if(!inpat)
-    hsperror("pattern syntax used in expression");
-}
 
 /* ------------------------------------------------------------------------
 */
@@ -327,9 +318,6 @@ lhs_is_patt(tree e)
 
       case ident:
 	return(TRUE);
-	/* This change might break ap infixop below.  BEWARE.
-	   return (isconstr(qid_to_string(gident(e))));
-        */
 
       case ap:
 	{
@@ -433,6 +421,149 @@ binding rule;
     fprintf(stderr,"bind error in decl (%d)\n",tbinding(bind));
 }
 
+
+pbinding
+createpat(guards,where)
+  pbinding guards;
+  binding where;
+{
+  qid func;
+
+  if(FN != NULL)
+    func = FN;
+  else
+    func = mknoqual(install_literal(""));
+
+  return(mkpgrhs(PREVPATT,guards,where,func,endlineno));
+}
+
+
+char *
+ineg(i)
+  char *i;
+{
+  char *p = xmalloc(strlen(i)+2);
+
+  *p = '-';
+  strcpy(p+1,i);
+  return(p);
+}
+
+/*
+  Check the ordering of declarations in a cbody.
+  All signatures must appear before any declarations.
+*/
+
+void
+checkorder(decls)
+  binding decls;
+{
+  /* The ordering must be correct for a singleton */
+  if(tbinding(decls)!=abind)
+    return;
+
+  checkorder2(decls,TRUE);
+}
+
+static BOOLEAN
+checkorder2(decls,sigs)
+  binding decls;
+  BOOLEAN sigs;
+{
+  while(tbinding(decls)==abind)
+    {
+      /* Perform a left-traversal if necessary */
+      binding left = gabindfst(decls);
+      if(tbinding(left)==abind)
+	sigs = checkorder2(left,sigs);
+      else
+	sigs = checksig(sigs,left);
+      decls = gabindsnd(decls);
+    }
+
+  return(checksig(sigs,decls));
+}
+
+static BOOLEAN
+checksig(sig,decl)
+  BOOLEAN sig;
+  binding decl;
+{
+  BOOLEAN issig = tbinding(decl) == sbind || tbinding(decl) == nullbind;
+  if(!sig && issig)
+    hsperror("Signature appears after definition in class body");
+
+  return(issig);
+}
+
+
+/*
+  Check the last expression in a list of do statements.
+*/
+
+void
+checkdostmts(stmts)
+  list stmts;
+{
+  if (tlist(stmts) == lnil)
+      hsperror("do expression with no statements");
+
+  for(; tlist(ltl(stmts)) != lnil; stmts = ltl(stmts))
+      ;
+  if (ttree(lhd(stmts)) != doexp)
+      hsperror("do statements must end with expression");
+}
+
+
+/*
+  Checks there are no bangs in a tycon application.
+*/
+
+void
+checknobangs(app)
+  ttype app;
+{
+  if(tttype(app) == tapp)
+    {
+      if(tttype(gtarg((struct Stapp *)app)) == tbang)
+	hsperror("syntax error: unexpected ! in type");
+
+      checknobangs(gtapp((struct Stapp *)app));
+    }	  
+}
+
+
+/*
+  Splits a tycon application into its constructor and a list of types.
+*/
+
+void
+splittyconapp(app, tyc, tys)
+  ttype app;
+  qid *tyc;
+  list *tys;
+{
+  if(tttype(app) == tapp) 
+    {
+      splittyconapp(gtapp((struct Stapp *)app), tyc, tys);
+      *tys = lapp(*tys, gtarg((struct Stapp *)app));
+    }
+  else if(tttype(app) == tname)
+    {
+      *tyc = gtypeid((struct Stname *)app);
+      *tys = Lnil;
+    }
+  else
+    {
+      hsperror("panic: splittyconap: bad tycon application (no tycon)");
+    }
+}
+
+
+#if 0 
+
+Precedence Parsing Is Now Done In The Compiler !!!
+
 /* 
 
   Precedence Parser for Haskell.  By default operators are left-associative, 
@@ -535,113 +666,6 @@ rearrangeprec(tree left, tree t)
   precparse(left);
 }
 
-pbinding
-createpat(guards,where)
-  pbinding guards;
-  binding where;
-{
-  qid func;
-
-  if(FN != NULL)
-    func = FN;
-  else
-    func = mknoqual(install_literal(""));
-
-  return(mkpgrhs(PREVPATT,guards,where,func,endlineno));
-}
-
-char *
-ineg(i)
-  char *i;
-{
-  char *p = xmalloc(strlen(i)+2);
-
-  *p = '-';
-  strcpy(p+1,i);
-  return(p);
-}
-
-#if 0
-/* UNUSED: at the moment */
-void
-checkmodname(import,interface)
-  id import, interface;
-{
-  if(strcmp(import,interface) != 0)
-    {
-      char errbuf[ERR_BUF_SIZE];
-      sprintf(errbuf,"interface name (%s) does not agree with import name (%s)",interface,import);
-      hsperror(errbuf);
-    }
-}
-#endif /* 0 */
-
-/*
-  Check the ordering of declarations in a cbody.
-  All signatures must appear before any declarations.
-*/
-
-void
-checkorder(decls)
-  binding decls;
-{
-  /* The ordering must be correct for a singleton */
-  if(tbinding(decls)!=abind)
-    return;
-
-  checkorder2(decls,TRUE);
-}
-
-static BOOLEAN
-checkorder2(decls,sigs)
-  binding decls;
-  BOOLEAN sigs;
-{
-  while(tbinding(decls)==abind)
-    {
-      /* Perform a left-traversal if necessary */
-      binding left = gabindfst(decls);
-      if(tbinding(left)==abind)
-	sigs = checkorder2(left,sigs);
-      else
-	sigs = checksig(sigs,left);
-      decls = gabindsnd(decls);
-    }
-
-  return(checksig(sigs,decls));
-}
-
-
-static BOOLEAN
-checksig(sig,decl)
-  BOOLEAN sig;
-  binding decl;
-{
-  BOOLEAN issig = tbinding(decl) == sbind || tbinding(decl) == nullbind;
-  if(!sig && issig)
-    hsperror("Signature appears after definition in class body");
-
-  return(issig);
-}
-
-
-/*
-  Check the last expression in a list of do statements.
-*/
-
-void
-checkdostmts(stmts)
-  list stmts;
-{
-  if (tlist(stmts) == lnil)
-      hsperror("do expression with no statements");
-
-  for(; tlist(ltl(stmts)) != lnil; stmts = ltl(stmts))
-      ;
-  if (ttree(lhd(stmts)) != doexp)
-      hsperror("do statements must end with expression");
-}
-
 
 /*
   Check the precedence of a pattern or expression to ensure that
@@ -674,47 +698,5 @@ checkprec(exp,qfn,right)
     }
 }
 
+#endif /* 0 */
 
-/*
-  Checks there are no bangs in a tycon application.
-*/
-
-void
-checknobangs(app)
-  ttype app;
-{
-  if(tttype(app) == tapp)
-    {
-      if(tttype(gtarg((struct Stapp *)app)) == tbang)
-	hsperror("syntax error: unexpected ! in type");
-
-      checknobangs(gtapp((struct Stapp *)app));
-    }	  
-}
-
-
-/*
-  Splits a tycon application into its constructor and a list of types.
-*/
-
-void
-splittyconapp(app, tyc, tys)
-  ttype app;
-  qid *tyc;
-  list *tys;
-{
-  if(tttype(app) == tapp) 
-    {
-      splittyconapp(gtapp((struct Stapp *)app), tyc, tys);
-      *tys = lapp(*tys, gtarg((struct Stapp *)app));
-    }
-  else if(tttype(app) == tname)
-    {
-      *tyc = gtypeid((struct Stname *)app);
-      *tys = Lnil;
-    }
-  else
-    {
-      hsperror("panic: splittyconap: bad tycon application (no tycon)");
-    }
-}

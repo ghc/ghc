@@ -45,17 +45,20 @@ data HsExpr tyvar uvar id pat
   | HsApp	(HsExpr tyvar uvar id pat)	-- application
 		(HsExpr tyvar uvar id pat)
 
-  -- Operator applications and sections.
+  -- Operator applications:
   -- NB Bracketed ops such as (+) come out as Vars.
+
+  -- NB We need an expr for the operator in an OpApp/Section since
+  -- the typechecker may need to apply the operator to a few types.
 
   | OpApp	(HsExpr tyvar uvar id pat)	-- left operand
 		(HsExpr tyvar uvar id pat)	-- operator
 		(HsExpr tyvar uvar id pat)	-- right operand
 
-  -- ADR Question? Why is the "op" in a section an expr when it will
-  -- have to be of the form (HsVar op) anyway?
-  -- WDP Answer: But when the typechecker gets ahold of it, it may
-  -- apply the var to a few types; it will then be an expression.
+  -- We preserve prefix negation and parenthesis for the precedence parser.
+
+  | NegApp	(HsExpr tyvar uvar id pat)	-- negated expr
+  | HsPar	(HsExpr tyvar uvar id pat)	-- parenthesised expr
 
   | SectionL	(HsExpr tyvar uvar id pat)	-- operand
 		(HsExpr tyvar uvar id pat)	-- operator
@@ -198,6 +201,7 @@ pprExpr sty expr@(HsApp e1 e2)
     collect_args (HsApp fun arg) args = collect_args fun (arg:args)
     collect_args fun		 args = (fun, args)
 
+
 pprExpr sty (OpApp e1 op e2)
   = case op of
       HsVar v -> pp_infixly v
@@ -211,6 +215,13 @@ pprExpr sty (OpApp e1 op e2)
 
     pp_infixly v
       = ppSep [pp_e1, ppCat [pprOp sty v, pp_e2]]
+
+pprExpr sty (NegApp e)
+  = ppBeside (ppChar '-') (ppParens (pprExpr sty e))
+
+pprExpr sty (HsPar e)
+  = ppParens (pprExpr sty e)
+
 
 pprExpr sty (SectionL expr op)
   = case op of

@@ -30,6 +30,7 @@ import CoreSyn		( GenCoreExpr(..), mkValLam, mkTyApp )
 import Id		( GenId, mkDictFunId, mkConstMethodId, mkSysLocal )
 import MatchEnv		( nullMEnv, insertMEnv )
 import Maybes		( MaybeErr(..), mkLookupFunDef )
+import Outputable	( getSrcLoc )
 import PprType		( GenClass, GenType, GenTyVar )
 import Pretty
 import SpecEnv		( SpecEnv(..), nullSpecEnv, addOneToSpecEnv )
@@ -63,8 +64,7 @@ data InstInfo
       [Id]		-- Constant methods (either all or none)
       RenamedMonoBinds	-- Bindings, b
       Bool		-- True <=> local instance decl
-      FAST_STRING	-- Name of module where this instance was
-			-- defined.
+      (Maybe Module)	-- Name of module where this instance defined; Nothing => Prelude
       SrcLoc		-- Source location assoc'd with this instance's defn
       [RenamedSig]	-- User pragmas recorded for generating specialised instances
 \end{code}
@@ -76,7 +76,8 @@ data InstInfo
 %************************************************************************
 
 \begin{code}
-mkInstanceRelatedIds :: Bool -> FAST_STRING
+mkInstanceRelatedIds :: Bool
+		     -> Maybe Module
                      -> RenamedInstancePragmas
 		     -> Class 
 		     -> [TyVar]

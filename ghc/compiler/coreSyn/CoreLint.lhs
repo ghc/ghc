@@ -22,7 +22,9 @@ import Id		( idType, isBottomingId,
 			  getInstantiatedDataConSig, GenId{-instances-}
 			)
 import Maybes		( catMaybes )
-import Outputable	( Outputable(..) )
+import Outputable	( isLocallyDefined, getSrcLoc,
+			  Outputable(..){-instance * []-}
+			)
 import PprCore
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType, GenTyVar, TyCon )

@@ -26,6 +26,7 @@ import Id		( idType, idWantsToBeINLINEd,
 import IdInfo		( willBeDemanded, DemandInfo )
 import Literal		( isNoRepLit )
 import Maybes		( maybeToBool )
+import Outputable	( isLocallyDefined )
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instance Outputable-} )
 import PrelInfo		( realWorldStateTy )
