@@ -8,7 +8,7 @@
 
 This part of the guide is to help people upgrading from a
 previous version of GHC.  Right now, it is mostly to help people
-switching from GHC~0.29 (a Haskell~1.2 compiler, mostly) to GHC~2.04
+switching from GHC~0.29 (a Haskell~1.2 compiler, mostly) to GHC~2.xx
 (a Haskell~1.4 compiler).
 
 %ToDo: index
@@ -158,14 +158,11 @@ The type of the function \tr{fail} changed between draft and real-thing.
 Old: \tr{fail x}; new: \tr{fail (userError x)}.
 Also, what used to be \tr{failWith x} is now just \tr{fail x}.
 
-The function \tr{try} didn't make it into 1.3 I/O.  GHC supplies it
-(at least for now) as @GHCio.tryIO@.
-
 All the system modules named \tr{LibSomething} dropped the \tr{Lib}.
 So: \tr{LibSystem} is now just \tr{System}.
 
-In~0.29, you could mix-n-match @IO@ with @PrimIO@, simply because the
-implementation happend to allow it.  Not any more.
+As of 2.09, GHC doesn't have @PrimIO@, and all @_ccall_@s now return
+type @IO a@, where @a@ is the return type of the @_ccall_@ itself.
 
 The \tr{IOError} type is now abstract; you cannot see it's
 constructors.  1.3 provides functions to query errors.
@@ -256,9 +253,6 @@ make horrible changes to \tr{GHC*} modules....
 
 You can't dig around inside the @ST@/@IO@ monads quite so freely.
 
-If you want to provide your own @mainPrimIO@ routine, it must be
-in a module @GHCmain@, not @Main@.
-
 The old \tr{PreludePrimIO} interface is DEAD.
 
 The even-older \tr{PreludeGlaIO} interface is DEADER.
@@ -277,3 +271,7 @@ and @fwrite@ are dead.
 The \tr{LibPosix} stuff didn't make it into 1.3 I/O, so it has become
 a ``system library'' (\tr{-syslib posix}).  Other than dropping the
 \tr{Lib*} prefix, everything should be the same as in 0.29.
+
+As of GHC 2.09, @mainPrimIO@ is now called @mainIO@, to reflect the
+fact that @PrimIO@ doesn't exist anymore.  If you want to provide your
+own @mainIO@ routine, it must be in a module @GHCmain@, not @Main@.
