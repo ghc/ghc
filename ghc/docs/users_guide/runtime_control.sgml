@@ -409,6 +409,10 @@ command line, you can override the defaults.
 </Para>
 
 <Para>
+Owing to the vagaries of DLL linking, these hooks don't work under Windows.
+</Para>
+
+<Para>
 The function <Function>defaultsHook</Function><IndexTerm><Primary>defaultHook</Primary></IndexTerm> lets you change various
 RTS options.  The commonest use for this is to give your program a
 default heap and/or stack size that is greater than the default.  For
