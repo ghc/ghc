@@ -17,7 +17,9 @@ IMP_Ubiq()
 import HsSyn		( MonoBinds(..), HsExpr(..), InPat, OutPat, HsLit, 
 			  Match, HsBinds, HsType, ArithSeqInfo, Fixity,
 			  GRHSsAndBinds, Stmt, DoOrListComp, Fake )
-import TcHsSyn		( TcIdOcc(..), SYN_IE(TcIdBndr), SYN_IE(TcExpr), SYN_IE(TcMonoBinds) )
+import HsBinds		( andMonoBinds )
+import TcHsSyn		( TcIdOcc(..), SYN_IE(TcIdBndr), SYN_IE(TcExpr), 
+			  SYN_IE(TcMonoBinds), SYN_IE(TcDictBinds) )
 
 import TcMonad
 import Inst		( lookupInst, lookupSimpleInst,
@@ -43,7 +45,7 @@ import PrelInfo		( isNumericClass, isStandardClass, isCcallishClass )
 
 import Maybes		( expectJust, firstJust, catMaybes, seqMaybe, maybeToBool )
 import Outputable	( Outputable(..){-instance * []-} )
---import PprStyle--ToDo:rm
+import PprStyle
 import PprType		( GenType, GenTyVar )
 import Pretty
 import SrcLoc		( noSrcLoc )
@@ -88,7 +90,7 @@ tcSimpl :: Bool				-- True <=> simplify const insts
 	-> LIE s			-- Given; these constrain only local tyvars
 	-> LIE s			-- Wanted
 	-> TcM s (LIE s,			-- Free
-		  [(TcIdOcc s,TcExpr s)],	-- Bindings
+		  TcMonoBinds s,		-- Bindings
 		  LIE s)			-- Remaining wanteds; no dups
 
 tcSimpl squash_consts global_tvs local_tvs givens wanteds
@@ -138,7 +140,7 @@ tcSimpl squash_consts global_tvs local_tvs givens wanteds
     elimSCs givens locals		`thenNF_Tc` \ (sc_binds, locals2) ->
 
 	 -- Finished
-    returnTc (globals, bagToList (sc_binds `unionBags` tycon_binds), locals2)
+    returnTc (globals, sc_binds `AndMonoBinds` tycon_binds, locals2)
   where
     is_ambiguous (Dict _ _ ty _ _)
 	= not (getTyVar "is_ambiguous" ty `elementOfTyVarSet` local_tvs)
@@ -156,7 +158,7 @@ tcSimplify
 	:: TcTyVarSet s			-- ``Local''  type variables
 	-> LIE s			-- Wanted
 	-> TcM s (LIE s,			-- Free
-		  [(TcIdOcc s,TcExpr s)],	-- Bindings
+		  TcDictBinds s,		-- Bindings
 		  LIE s)			-- Remaining wanteds; no dups
 
 tcSimplify local_tvs wanteds
@@ -173,8 +175,8 @@ tcSimplifyAndCheck
 	 :: TcTyVarSet s		-- ``Local''  type variables; ASSERT is fixpoint
 	 -> LIE s			-- Given
 	 -> LIE s			-- Wanted
-	 -> TcM s (LIE s,			-- Free
-		   [(TcIdOcc s,TcExpr s)])	-- Bindings
+	 -> TcM s (LIE s,		-- Free
+		   TcDictBinds s)	-- Bindings
 
 tcSimplifyAndCheck local_tvs givens wanteds
   = tcGetGlobalTyVars			`thenNF_Tc` \ global_tvs ->
@@ -192,7 +194,7 @@ is not overloaded.
 tcSimplifyRank2 :: TcTyVarSet s		-- ``Local'' type variables; ASSERT is fixpoint
 		-> LIE s		-- Given
 		-> TcM s (LIE s,			-- Free
-			  [(TcIdOcc s,TcExpr s)])	-- Bindings
+			  TcDictBinds s)	-- Bindings
 
 
 tcSimplifyRank2 local_tvs givens
@@ -207,14 +209,14 @@ tcSimplifyRank2 local_tvs givens
 
     checkTc (isEmptyBag wanteds) (reduceErr wanteds)	`thenTc_`
 
-    returnTc (free, bagToList dict_binds)
+    returnTc (free, dict_binds)
 \end{code}
 
 @tcSimplifyTop@ deals with constant @Insts@, using the standard simplification
 mechansim with the extra flag to say ``beat out constant insts''.
 
 \begin{code}
-tcSimplifyTop :: LIE s -> TcM s [(TcIdOcc s, TcExpr s)]
+tcSimplifyTop :: LIE s -> TcM s (TcDictBinds s)
 tcSimplifyTop dicts
   = tcSimpl True emptyTyVarSet emptyTyVarSet emptyBag dicts	`thenTc` \ (_, binds, _) ->
     returnTc binds
@@ -232,7 +234,7 @@ elimTyCons :: Bool				-- True <=> Simplify const insts
 	   -> LIE s				-- Given
 	   -> LIE s				-- Wanted
 	   -> TcM s (LIE s,			-- Free
-		     Bag (TcIdOcc s, TcExpr s),	-- Bindings
+		     TcDictBinds s,		-- Bindings
 		     LIE s			-- Remaining wanteds; no dups;
 						-- dicts only (no Methods)
 	       )
@@ -266,9 +268,9 @@ elimTyCons squash_consts is_free_tv givens wanteds
     returnTc (free,binds,irreds)
   where
 --    eTC :: LIE s -> [Inst s]
---	  -> TcM s (LIE s, LIE s, Bag (TcIdOcc s, TcExpr s), LIE s)
+--	  -> TcM s (LIE s, LIE s, TcDictBinds s, LIE s)
 
-    eTC givens [] = returnTc (givens, emptyBag, emptyBag, emptyBag)
+    eTC givens [] = returnTc (givens, emptyBag, EmptyMonoBinds, emptyBag)
 
     eTC givens (wanted:wanteds)
     -- Case 0: same as an existing inst
@@ -277,8 +279,8 @@ elimTyCons squash_consts is_free_tv givens wanteds
 	let
 	  -- Create a new binding iff it's needed
 	  this = expectJust "eTC" maybe_equiv
-	  new_binds | instBindingRequired wanted = (instToId wanted, HsVar (instToId this))
-						   `consBag` binds
+	  new_binds | instBindingRequired wanted = (VarMonoBind (instToId wanted) (HsVar (instToId this)))
+						   `AndMonoBinds` binds
 		    | otherwise			 = binds
 	in
 	returnTc (givens1, frees, new_binds, irreds)
@@ -320,12 +322,12 @@ elimTyCons squash_consts is_free_tv givens wanteds
 
     simplify_it simplify_always givens wanted wanteds
 	-- Recover immediately on no-such-instance errors
-      = recoverTc (returnTc (wanted `consBag` givens, emptyLIE, emptyBag, emptyLIE)) 
+      = recoverTc (returnTc (wanted `consBag` givens, emptyLIE, EmptyMonoBinds, emptyLIE)) 
 		  (simplify_one simplify_always givens wanted)
 				`thenTc` \ (givens1, frees1, binds1, irreds1) ->
 	eTC givens1 wanteds	`thenTc` \ (givens2, frees2, binds2, irreds2) ->
 	returnTc (givens2, frees1 `plusLIE` frees2,
-			   binds1 `unionBags` binds2,
+			   binds1 `AndMonoBinds` binds2,
 		  	   irreds1 `plusLIE` irreds2)
 
 
@@ -338,20 +340,20 @@ elimTyCons squash_consts is_free_tv givens wanteds
 
      | otherwise
      = 		-- An binding is required for this inst
-	lookupInst wanted		`thenTc` \ (simpler_wanteds, bind@(_,rhs)) ->
+	lookupInst wanted		`thenTc` \ (simpler_wanteds, bind@(VarMonoBind _ rhs)) ->
 
 	if (not_var rhs && not simplify_always) then
 	   -- Ho ho!  It isn't trivial to simplify "wanted",
 	   -- because the rhs isn't a simple variable.	Unless the flag
 	   -- simplify_always is set, just give up now and
 	   -- just fling it out the top.
-	   returnTc (wanted `consLIE` givens, unitLIE wanted, emptyBag, emptyLIE)
+	   returnTc (wanted `consLIE` givens, unitLIE wanted, EmptyMonoBinds, emptyLIE)
 	else
 	   -- Aha! Either it's easy, or simplify_always is True
 	   -- so we must do it right here.
 	   eTC givens simpler_wanteds	`thenTc` \ (givens1, frees1, binds1, irreds1) ->
 	   returnTc (wanted `consLIE` givens1, frees1,
-		     binds1 `snocBag` bind,
+		     binds1 `AndMonoBinds` bind,
 		     irreds1)
 
     not_var :: TcExpr s -> Bool
@@ -370,7 +372,7 @@ elimTyCons squash_consts is_free_tv givens wanteds
 elimSCs :: LIE s				-- Given; no dups
 	-> LIE s				-- Wanted; no dups; all dictionaries, all
 						-- constraining just a type variable
-	-> NF_TcM s (Bag (TcIdOcc s,TcExpr s),	-- Bindings
+	-> NF_TcM s (TcDictBinds s,		-- Bindings
 		     LIE s)			-- Minimal wanted set
 
 elimSCs givens wanteds
@@ -381,27 +383,27 @@ elimSCs givens wanteds
 
 elimSCs_help :: LIE s					-- Given; no dups
 	     -> [Inst s]				-- Wanted; no dups;
-	     -> NF_TcM s (Bag (TcIdOcc s, TcExpr s),	-- Bindings
+	     -> NF_TcM s (TcDictBinds s,		-- Bindings
 		    	  LIE s)			-- Minimal wanted set
 
-elimSCs_help given [] = returnNF_Tc (emptyBag, emptyLIE)
+elimSCs_help given [] = returnNF_Tc (EmptyMonoBinds, emptyLIE)
 
 elimSCs_help givens (wanted:wanteds)
   = trySC givens wanted 		`thenNF_Tc` \ (givens1, binds1, irreds1) ->
     elimSCs_help givens1 wanteds	`thenNF_Tc` \ (binds2, irreds2) ->
-    returnNF_Tc (binds1 `unionBags` binds2, irreds1 `plusLIE` irreds2)
+    returnNF_Tc (binds1 `AndMonoBinds` binds2, irreds1 `plusLIE` irreds2)
 
 
 trySC :: LIE s				-- Givens
       -> Inst s				-- Wanted
       -> NF_TcM s (LIE s,			-- New givens,
-		   Bag (TcIdOcc s,TcExpr s),	-- Bindings
+		   TcDictBinds s,		-- Bindings
 		   LIE s)			-- Irreducible wanted set
 
 trySC givens wanted@(Dict _ wanted_class wanted_ty wanted_orig loc)
   | not (maybeToBool maybe_best_subclass_chain)
   = 	-- No superclass relationship
-    returnNF_Tc ((wanted `consLIE` givens), emptyBag, unitLIE wanted)
+    returnNF_Tc ((wanted `consLIE` givens), EmptyMonoBinds, unitLIE wanted)
 
   | otherwise
   = 	-- There's a subclass relationship with a "given"
@@ -418,14 +420,15 @@ trySC givens wanted@(Dict _ wanted_class wanted_ty wanted_orig loc)
     let
 	mk_bind (dict,clas) dict_sub@(Dict _ dict_sub_class ty _ _)
 	  = ((dict_sub, dict_sub_class),
-	     (instToId dict, DictApp (TyApp (HsVar (RealId (classSuperDictSelId dict_sub_class 
+	     (VarMonoBind (instToId dict)
+			  (DictApp (TyApp (HsVar (RealId (classSuperDictSelId dict_sub_class 
 									      clas)))
 					    [ty])
-				     [instToId dict_sub]))
+				     [instToId dict_sub])))
 	(_, new_binds) = mapAccumR mk_bind (wanted,wanted_class) (given : intermediates)
     in
     returnNF_Tc (wanted `consLIE` givens `plusLIE` listToBag intermediates,
-	         listToBag new_binds,
+	         andMonoBinds new_binds,
 	         emptyLIE)
 
   where
@@ -576,9 +579,9 @@ bindInstsOfLocalFuns init_lie local_ids
   where
     bind_inst inst@(Method uniq (TcId id) tys rho orig loc) (insts, binds)
       | id `is_elem` local_ids
-      = lookupInst inst		`thenTc` \ (dict_insts, (id,rhs)) ->
+      = lookupInst inst		`thenTc` \ (dict_insts, bind) ->
 	returnTc (listToBag dict_insts `plusLIE` insts, 
-		  VarMonoBind id rhs `AndMonoBinds` binds)
+		  bind `AndMonoBinds` binds)
 
     bind_inst some_other_inst (insts, binds)
 	-- Either not a method, or a method instance for an id not in local_ids
@@ -710,13 +713,13 @@ now?
 
 \begin{code}
 genCantGenErr insts sty	-- Can't generalise these Insts
-  = ppHang (ppPStr SLIT("Cannot generalise these overloadings (in a _ccall_):")) 
-	   4  (ppAboves (map (ppr sty) (bagToList insts)))
+  = hang (ptext SLIT("Cannot generalise these overloadings (in a _ccall_):")) 
+	   4  (vcat (map (ppr sty) (bagToList insts)))
 \end{code}
 
 \begin{code}
 ambigErr insts sty
-  = ppAboves (map (pprInst sty "Ambiguous overloading") insts)
+  = vcat (map (pprInst sty "Ambiguous overloading") insts)
 \end{code}
 
 @reduceErr@ complains if we can't express required dictionaries in
@@ -724,7 +727,7 @@ terms of the signature.
 
 \begin{code}
 reduceErr insts sty
-  = ppAboves (map (pprInst sty "Context required by inferred type, but missing on a type signature")
+  = vcat (map (pprInst sty "Context required by inferred type, but missing on a type signature")
 	          (bagToList insts))
 \end{code}
 

@@ -30,7 +30,7 @@ import Unify 		( unifyTauTy, unifyTauTyList, unifyTauTyLists )
 
 import Bag		( Bag )
 import CmdLineOpts	( opt_IrrefutableTuples )
-import Id		( GenId, idType )
+import Id		( GenId, idType, SYN_IE(Id) )
 import Kind		( Kind, mkBoxedTypeKind, mkTypeKind )
 import Maybes		( maybeToBool )
 import PprType		( GenType, GenTyVar )
@@ -47,6 +47,10 @@ import TysPrim		( charPrimTy, intPrimTy, floatPrimTy,
 import TysWiredIn	( charTy, stringTy, mkListTy, mkTupleTy, addrTy )
 import Unique		( Unique, eqClassOpKey, geClassOpKey, minusClassOpKey )
 import Util		( assertPanic, panic )
+
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable
+#endif
 \end{code}
 
 \begin{code}
@@ -61,7 +65,7 @@ tcPat :: RenamedPat -> TcM s (TcPat s, LIE s, TcType s)
 
 \begin{code}
 tcPat (VarPatIn name)
-  = tcLookupLocalValueOK ("tcPat1:"{-++ppShow 80 (ppr PprDebug name)-}) name	`thenNF_Tc` \ id ->
+  = tcLookupLocalValueOK ("tcPat1:"{-++show (ppr PprDebug name)-}) name	`thenNF_Tc` \ id ->
     returnTc (VarPat (TcId id), emptyLIE, idType id)
 
 tcPat (LazyPatIn pat)
@@ -377,13 +381,13 @@ matchConArgTys con arg_tys
 Errors and contexts
 ~~~~~~~~~~~~~~~~~~~
 \begin{code}
-patCtxt pat sty = ppHang (ppPStr SLIT("In the pattern:")) 4 (ppr sty pat)
+patCtxt pat sty = hang (ptext SLIT("In the pattern:")) 4 (ppr sty pat)
 
 recordLabel field_label sty
-  = ppHang (ppBesides [ppPStr SLIT("When matching record field"), ppr sty field_label])
-	 4 (ppBesides [ppPStr SLIT("with its immediately enclosing constructor")])
+  = hang (hcat [ptext SLIT("When matching record field"), ppr sty field_label])
+	 4 (hcat [ptext SLIT("with its immediately enclosing constructor")])
 
 recordRhs field_label pat sty
-  = ppHang (ppPStr SLIT("In the record field pattern"))
-	 4 (ppSep [ppr sty field_label, ppChar '=', ppr sty pat])
+  = hang (ptext SLIT("In the record field pattern"))
+	 4 (sep [ppr sty field_label, char '=', ppr sty pat])
 \end{code}

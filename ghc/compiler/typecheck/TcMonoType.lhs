@@ -24,14 +24,19 @@ import Type		( GenType, SYN_IE(Type), SYN_IE(ThetaType),
 			  mkSigmaTy, mkDictTy
 			)
 import TyVar		( GenTyVar, SYN_IE(TyVar), mkTyVar )
+import Outputable
 import PrelInfo		( cCallishClassKeys )
 import TyCon		( TyCon )
-import Name		( Name, OccName, isTvOcc )
+import Name		( Name, OccName, isTvOcc, getOccName )
 import TysWiredIn	( mkListTy, mkTupleTy )
 import Unique		( Unique )
 import PprStyle
 import Pretty
+import UniqFM           ( Uniquable(..) )
 import Util		( zipWithEqual, zipLazy, panic{-, pprPanic ToDo:rm-} )
+
+
+
 \end{code}
 
 
@@ -208,5 +213,5 @@ Errors and contexts
 ~~~~~~~~~~~~~~~~~~~
 \begin{code}
 naughtyCCallContextErr clas_name sty
-  = ppSep [ppPStr SLIT("Can't use class"), ppr sty clas_name, ppPStr SLIT("in a context")]
+  = sep [ptext SLIT("Can't use class"), ppr sty clas_name, ptext SLIT("in a context")]
 \end{code}

@@ -34,8 +34,10 @@ module TcMonad(
 
 	-- For closure
 	SYN_IE(MutableVar),
-#if __GLASGOW_HASKELL__ >= 200
+#if __GLASGOW_HASKELL__ == 201
 	GHCbase.MutableArray
+#elif __GLASGOW_HASKELL__ == 201
+	GlaExts.MutableArray
 #else
 	_MutableArray
 #endif
@@ -64,6 +66,9 @@ import Unique		( Unique )
 import Util
 import Pretty
 import PprStyle		( PprStyle(..) )
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable
+#endif
 
 infixr 9 `thenTc`, `thenTc_`, `thenNF_Tc`, `thenNF_Tc_` 
 \end{code}
@@ -485,8 +490,8 @@ mkTcErr :: SrcLoc 		-- Where
 	-> TcError		-- The complete error report
 
 mkTcErr locn ctxt msg sty
-  = ppHang (ppBesides [ppr PprForUser locn, ppPStr SLIT(": "), msg sty])
-    	 4 (ppAboves [msg sty | msg <- ctxt_to_use])
+  = hang (hcat [ppr PprForUser locn, ptext SLIT(": "), msg sty])
+    	 4 (vcat [msg sty | msg <- ctxt_to_use])
     where
      ctxt_to_use =
        if opt_PprStyle_All then
@@ -500,15 +505,15 @@ mkTcErr locn ctxt msg sty
      takeAtMost n (x:xs) = x:takeAtMost (n-1) xs
 
 arityErr kind name n m sty
-  = ppBesides [ ppChar '`', ppr sty name, ppPStr SLIT("' should have "),
-		n_arguments, ppStr ", but has been given ", ppInt m, ppChar '.']
+  = hsep [ ppr sty name, ptext SLIT("should have"),
+	   n_arguments <> comma, text "but has been given", int m, char '.']
     where
 	errmsg = kind ++ " has too " ++ quantity ++ " arguments"
 	quantity | m < n     = "few"
 		 | otherwise = "many"
-	n_arguments | n == 0 = ppPStr SLIT("no arguments")
-		    | n == 1 = ppPStr SLIT("1 argument")
-		    | True   = ppCat [ppInt n, ppPStr SLIT("arguments")]
+	n_arguments | n == 0 = ptext SLIT("no arguments")
+		    | n == 1 = ptext SLIT("1 argument")
+		    | True   = hsep [int n, ptext SLIT("arguments")]
 \end{code}
 
 
