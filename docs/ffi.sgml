@@ -31,7 +31,7 @@ are specified in the present document,
 <Para>
 a low-level marshalling library, which is part of the
 <Emphasis>Language</Emphasis> part of the <Emphasis>Haskell Extension
-Library</Emphasis> (see <xref linkend="sec-???">), and a
+Library</Emphasis> (see <xref linkend="sec-Storable">), and a
 </Para>
 </ListItem>
 
