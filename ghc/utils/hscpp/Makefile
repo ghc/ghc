@@ -1,12 +1,20 @@
-TOP=../../..
-include $(TOP)/ghc/mk/ghc.mk
+TOP=../..
+include $(TOP)/mk/boilerplate.mk
+WAYS=
 
-PROG=hscpp
+SCRIPT_PROG=hscpp
+SCRIPT_OBJS=hscpp.prl
+SCRIPT_SUBST_VARS=RAWCPP
+
 # no INTERP: do *not* want #! script stuck on the front
-SRC=hscpp.prl
-DESTDIR=$(INSTLIBDIR_GHC)
+# what's the deal? I'll add it for now  -- SOF
+INTERP=$(PERL)
 
-# PerlTagsTarget( *.prl ) /* nothing for the Bourne shell scripts */
+#
+# install setup
+#
+INSTALL_LIBEXECS += $(SCRIPT_PROG)
+CLEAN_FILES += $(SCRIPT_PROG)
 
-include $(TOP)/mk/script.mk
+include $(TOP)/mk/target.mk
 

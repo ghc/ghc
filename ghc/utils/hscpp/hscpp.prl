@@ -1,11 +1,11 @@
-eval "exec perl -S $0 $*"
-     if $running_under_some_random_shell;
+#
+#eval "exec perl -S $0 $*"
+#     if $running_under_some_random_shell;
 #
 # reads CPP output and turns #line things into appropriate Haskell
 # pragmas
 #
 # considered to be GHC-project specific
-#
 #
 # OPTIONALLY processes GENERATE_SPECS pragmas
 # when give flag -genSPECS
@@ -45,6 +45,13 @@ eval "exec perl -S $0 $*"
 #
 # Note: There must be no white space between { }s
 #       Use ( )s around type names when separation is required
+#
+#
+# NOTE: this script needs RAWCPP set in order to do something
+# useful:
+#
+#$RAWCPP='';
+#
 
 $Verbose = 0;
 
@@ -69,7 +76,7 @@ while ($#ARGV >= 0 && $ARGV[0] eq '-v' || $ARGV[0] =~ /^-genSPECS/) {
 }
 #ToDo: print a version number ?
 
-$OrigCpp = '$(RAWCPP)';
+$OrigCpp = ${RAWCPP};
 
 if ( $OrigCpp =~ /(\S+)\s+(.*)/ ) {
     $cmd  = $1;

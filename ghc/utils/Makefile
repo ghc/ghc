@@ -1,20 +1,28 @@
-TOP=../..
-include $(TOP)/ghc/mk/ghc.mk
+TOP=..
+include $(TOP)/mk/boilerplate.mk
 
+#
+# No ways stuff in here (and further below), please
+#
+export WAYS=
+
+ifneq "$(BIN_DIST_NAME)" ""
+# We're doing a binary-dist, descend into a subset of the dirs.
+SUBDIRS = hp2ps hscpp hstags mkdependHS stat2resid unlit
+else
 SUBDIRS = hp2ps		\
 	  hscpp		\
+	  hstags	\
 	  mkdependHS	\
+	  parallel	\
 	  stat2resid	\
 	  ugen		\
 	  unlit
-#	  parallel	\
-
-#	  hstags
-#    not ready to go for 2.01
+endif
 
 # "heap-view" is not in the list because (a) it requires
 #  a Haskell compiler (which you may not have yet), and (b) you are
 #  unlikely to want it desperately.  It is easy to build once you have
 #  a Haskell compiler and if you want it.
 
-include $(TOP)/mk/subdir.mk
+include $(TOP)/mk/target.mk
