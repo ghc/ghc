@@ -211,11 +211,10 @@ repTyClD (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls,
     	return $ Just (loc, dec) }
 
 -- Un-handled cases
-repTyClD (L loc d) = do { dsWarn (loc, hang msg 4 (ppr d)) ;
+repTyClD (L loc d) = do { dsWarn (loc, hang ds_msg 4 (ppr d)) ;
 	          	   return Nothing
 	     		 }
-  where
-    msg = ptext SLIT("Cannot desugar this Template Haskell declaration:")
+
 
 repInstD' (L loc (InstDecl ty binds _))		-- Ignore user pragmas for now
  = do	{ i <- addTyVarBinds tvs $ \tv_bndrs ->
@@ -266,14 +265,22 @@ repSafety PlayRisky = rep2 unsafeName []
 repSafety (PlaySafe False) = rep2 safeName []
 repSafety (PlaySafe True) = rep2 threadsafeName []
 
+ds_msg = ptext SLIT("Cannot desugar this Template Haskell declaration:")
+
 -------------------------------------------------------
 -- 			Constructors
 -------------------------------------------------------
 
 repC :: LConDecl Name -> DsM (Core TH.ConQ)
 repC (L loc (ConDecl con [] (L _ []) details))
-  = do { con1     <- lookupLOcc con ;		-- See note [Binders and occurrences] 
+  = do { con1 <- lookupLOcc con ;		-- See note [Binders and occurrences] 
 	 repConstr con1 details }
+
+repC (L loc con_decl)
+  = do	{ dsWarn (loc, hang ds_msg 4 (ppr con_decl))
+	; return (panic "DsMeta:repC") }
+  where
+
 
 repBangTy :: LBangType Name -> DsM (Core (TH.StrictTypeQ))
 repBangTy (L _ (BangType str ty)) = do 
