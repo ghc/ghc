@@ -1419,7 +1419,7 @@ You can apply a type synonym to a forall type:
  
   f :: Foo (forall b. b->b)
 </programlisting>
-After epxanding the synonym, <literal>f</literal> has the legal (in GHC) type:
+After expanding the synonym, <literal>f</literal> has the legal (in GHC) type:
 <programlisting>
   f :: (forall b. b->b) -> (forall b. b->b) -> Bool
 </programlisting>
