@@ -64,7 +64,10 @@ module Constants (
 	iNT64_SIZE,
 	wORD64_SIZE,
 	
+	wORD_SIZE,
+
 	bLOCK_SIZE,
+	bLOCK_SIZE_W,
 
 	interfaceFileFormatVersion
 
@@ -223,8 +226,15 @@ area is has available.
 rESERVED_C_STACK_BYTES = (RESERVED_C_STACK_BYTES :: Int)
 \end{code}
 
+Size of a word, in bytes
+
+\begin{code}
+wORD_SIZE = (WORD_SIZE :: Int)
+\end{code}
+
 Size of a storage manager block (in bytes).
 
 \begin{code}
 bLOCK_SIZE = (BLOCK_SIZE :: Int)
+bLOCK_SIZE_W = (bLOCK_SIZE `div` wORD_SIZE :: Int)
 \end{code}
