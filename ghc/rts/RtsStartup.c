@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.75 2003/08/22 22:24:15 sof Exp $
+ * $Id: RtsStartup.c,v 1.76 2003/09/24 10:32:11 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -60,11 +60,25 @@
 #include <locale.h>
 #endif
 
+#ifdef HAVE_TERMIOS_H
+#include <termios.h>
+#endif
+#ifdef HAVE_SIGNAL_H
+#include <signal.h>
+#endif
+
 // Flag Structure
 struct RTS_FLAGS RtsFlags;
 
 // Count of how many outstanding hs_init()s there have been.
 static int hs_init_count = 0;
+
+#if HAVE_TERMIOS_H
+// Here we save the terminal settings on the standard file
+// descriptors, if we need to change them (eg. to support NoBuffering
+// input).
+struct termios *saved_termios[3] = {NULL,NULL,NULL};
+#endif
 
 /* -----------------------------------------------------------------------------
    Starting up the RTS
@@ -318,6 +332,26 @@ hs_exit(void)
     resetNonBlockingFd(0);
     resetNonBlockingFd(1);
     resetNonBlockingFd(2);
+
+#if HAVE_TERMIOS_H
+    // Reset the terminal settings on the standard file descriptors,
+    // if we changed them.  See System.Posix.Internals.tcSetAttr for
+    // more details, including the reason we termporarily disable
+    // SIGTTOU here.
+    { 
+	int fd;
+	sigset_t sigset, old_sigset;
+	sigemptyset(&sigset);
+	sigaddset(&sigset, SIGTTOU);
+	sigprocmask(SIG_BLOCK, &sigset, &old_sigset);
+	for (fd = 0; fd <= 2; fd++) {
+	    if (saved_termios[fd] != NULL) {
+		tcsetattr(fd,TCSANOW,saved_termios[fd]);
+	    }
+	}
+	sigprocmask(SIG_SETMASK, &old_sigset, NULL);
+    }
+#endif
 
 #if defined(PAR)
     /* controlled exit; good thread! */
