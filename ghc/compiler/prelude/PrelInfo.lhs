@@ -9,7 +9,7 @@ module PrelInfo (
 	builtinNames, derivingOccurrences,
 	BuiltinNames,
 
-	maybeCharLikeTyCon, maybeIntLikeTyCon,
+	maybeCharLikeCon, maybeIntLikeCon,
 
 	eq_RDR, ne_RDR, le_RDR, lt_RDR, ge_RDR, gt_RDR, max_RDR, min_RDR, 
 	compare_RDR, minBound_RDR, maxBound_RDR, enumFrom_RDR, enumFromTo_RDR,
@@ -308,8 +308,9 @@ knownKeyNames
 ToDo: make it do the ``like'' part properly (as in 0.26 and before).
 
 \begin{code}
-maybeCharLikeTyCon tc = if (uniqueOf tc == charDataConKey) then Just charDataCon else Nothing
-maybeIntLikeTyCon  tc = if (uniqueOf tc == intDataConKey)  then Just intDataCon  else Nothing
+maybeCharLikeCon, maybeIntLikeCon :: Id -> Bool
+maybeCharLikeCon con = uniqueOf con == charDataConKey
+maybeIntLikeCon  con = uniqueOf con == intDataConKey
 \end{code}
 
 %************************************************************************

@@ -92,7 +92,7 @@ import IdInfo		( ArityInfo(..) )
 import Maybes		( maybeToBool )
 import Name		( getOccString )
 import PprType		( getTyDescription )
-import PrelInfo		( maybeCharLikeTyCon, maybeIntLikeTyCon )
+import PrelInfo		( maybeCharLikeCon, maybeIntLikeCon )
 import PrimRep		( getPrimRepSize, separateByPtrFollowness, PrimRep )
 import SMRep		-- all of it
 import TyCon		( TyCon, isNewTyCon )
@@ -642,11 +642,9 @@ chooseDynSMRep lf_info tot_wds ptr_wds
 
 	   (LFCon _ True) -> ConstantRep
 
-	   (LFCon con _ ) -> if maybeToBool (maybeCharLikeTyCon tycon) then CharLikeRep
-			     else if maybeToBool (maybeIntLikeTyCon tycon) then IntLikeRep
+	   (LFCon con _ ) -> if maybeCharLikeCon con then CharLikeRep
+			     else if maybeIntLikeCon con then IntLikeRep
 			     else SpecRep
-			     where
-			     tycon = dataConTyCon con
 
 	   _ 		  -> SpecRep
 	in

@@ -39,7 +39,6 @@ import Id		( dataConTag, dataConRawArgTys,
 			  GenId{-instance NamedThing-}, Id
 			)
 import Name		( getOccString )
-import PrelInfo		( maybeIntLikeTyCon )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
 import TyCon		( tyConDataCons, mkSpecTyCon, TyCon )
 import Type		( typePrimRep, Type )

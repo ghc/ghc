@@ -47,7 +47,7 @@ import Id		( idPrimRep, dataConTag, dataConTyCon,
 			)
 import Literal		( Literal(..) )
 import Maybes		( maybeToBool )
-import PrelInfo		( maybeCharLikeTyCon, maybeIntLikeTyCon )
+import PrelInfo		( maybeCharLikeCon, maybeIntLikeCon )
 import PrimRep		( isFloatingRep, PrimRep(..) )
 import TyCon		( TyCon{-instance Uniquable-} )
 import Util		( isIn, zipWithEqual, panic, assertPanic )
@@ -292,16 +292,15 @@ Because of this, we use can safely return an addressing mode.
 \begin{code}
 buildDynCon binder cc con [arg_amode] all_zero_size_args@False
 
-  | maybeToBool (maybeCharLikeTyCon tycon)
+  | maybeCharLikeCon con
   = ASSERT(isDataCon con)
     absC (CAssign temp_amode (CCharLike arg_amode))	`thenC`
     returnFC temp_id_info
 
-  | maybeToBool (maybeIntLikeTyCon tycon) && in_range_int_lit arg_amode
+  | maybeIntLikeCon con && in_range_int_lit arg_amode
   = ASSERT(isDataCon con)
     returnFC (stableAmodeIdInfo binder (CIntLike arg_amode) (mkConLFInfo con))
   where
-    tycon = dataConTyCon con
     (temp_amode, temp_id_info) = newTempAmodeAndIdInfo binder (mkConLFInfo con)
 
     in_range_int_lit (CLit (MachInt val _)) = val <= mAX_INTLIKE && val >= mIN_INTLIKE
