@@ -151,7 +151,7 @@ you'd like to see this with your very own eyes, just run GHC with the
 
 </Sect3>
 
-<Sect3>
+<Sect3 id="sec-scheduling-policy">
 <Title>Scheduling policy for concurrent/parallel threads
 <IndexTerm><Primary>Scheduling&mdash;concurrent/parallel</Primary></IndexTerm>
 <IndexTerm><Primary>Concurrent/parallel scheduling</Primary></IndexTerm></Title>

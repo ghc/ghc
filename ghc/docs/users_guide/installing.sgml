@@ -28,7 +28,7 @@ so binary distributions allow you to install them without having a Haskell compi
 
 <Para>
 Binary distributions come in &ldquo;bundles,&rdquo; one bundle per file called
-<Literal>&lt;bundle&gt;-&lt;platform&gt;.tar.gz</Literal>.  (See the building guide (<XRef LinkEnd="pre-supposed-doc-tools">) for the definition of a platform.)  Suppose that you untar a binary-distribution bundle, thus:
+<Literal>&lt;bundle&gt;-&lt;platform&gt;.tar.gz</Literal>.  (See the building guide for the definition of a platform.)  Suppose that you untar a binary-distribution bundle, thus:
 </Para>
 
 <Para>
@@ -354,7 +354,7 @@ stuff in your bin directory.
 option, so you can see exactly what pathnames it's using.
 
 If things don't work as expected, check the list of known pitfalls in
-the building guide (<XRef LinkEnd="pre-supposed-doc-tools">.
+the building guide.
 </Para>
 </ListItem>
 
@@ -502,7 +502,7 @@ with a binary distribution, or in source form in
 </Sect1>
 
 
-<Sect1><Title>Installing on Windows</Title>
+<Sect1 id="sec-install-windows"><Title>Installing on Windows</Title>
 
 <Para>
 Getting the Glasgow Haskell Compiler (GHC) to run on Windows platforms can
@@ -916,6 +916,8 @@ work with symlinks.
 </Para>
 </Answer>
 
+</QandAEntry>
+
 <QandAEntry>
 
 <Question>
@@ -1071,6 +1073,8 @@ notes</ULink> as a guide. You should get version
 work, as it needs version 3.0. You should unpack Jade into <Filename>\Jade</Filename>, along with the entities, DocBook into <Filename>\docbook</Filename>, and the DocBook stylesheets into <Filename>\docbook\stylesheets</Filename> (so they actually end up in <Filename>\docbook\stylesheets\docbook</Filename>).
 </Para>
 
+</Sect2>
+
 
 <Sect2>
 <Title>Installing the DocBook tools from source</Title>
@@ -1092,7 +1096,7 @@ make it, ensuring that you have first removed or renamed your old copy. If
 you start getting file not found errors when making the test for
 <Command>hyperref</Command>, you can abort at that point and proceed
 straight to <Command>make install</Command>, or enter them as
-<Filename>../<Emphasis>filename</Emphasis></Filename>.)
+<Filename>../</Filename><Emphasis>filename</Emphasis>.)
 </Para>
 
 <Para>

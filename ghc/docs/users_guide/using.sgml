@@ -2254,7 +2254,7 @@ options the driver passes through to the linker.
 
 </Sect1>
 
-<Sect1>
+<Sect1 id="sec-using-concurrent">
 <Title>Using Concurrent Haskell</Title>
 
 <Para>
@@ -2283,7 +2283,7 @@ LinkEnd="sec-Concurrent">.
 
 </Sect1>
 
-<Sect1>
+<Sect1 id="sec-using-parallel">
 <Title>Using Parallel Haskell</Title>
 
 <Para>
