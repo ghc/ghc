@@ -124,7 +124,7 @@ filterFB c p x r | p x       = x `c` r
 
 {-# RULES
 "filter"	forall p xs.	filter p xs = build (\c n -> foldr (filterFB c p) n xs)
-"filterFB"	forall c p q.	filterFB (filterFB c p) q = filterFB c (\x -> p x && q x)
+"filterFB"	forall c p q.	filterFB (filterFB c p) q = filterFB c (\x -> q x && p x)
 "filterList" 	forall p.	foldr (filterFB (:) p) [] = filterList p
  #-}
 
