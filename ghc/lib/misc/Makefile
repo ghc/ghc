@@ -18,6 +18,14 @@ endif
 
 LIBRARY = libHS$(_way).a
 HS_SRCS	= $(wildcard *.lhs)
+
+# Remove Readline.lhs if readline.h isn't available.
+ifneq "$(GhcLibsWithReadline)" "YES"
+  HS_SRCS := $(filter-out src/Readline.lhs,$(HS_SRCS))
+else
+  SRC_HC_OPTS += -I$(ReadlineIncludePath)
+endif
+
 HS_OBJS = $(HS_SRCS:.lhs=.$(way_)o)
 LIBOBJS = $(HS_OBJS)
 HS_IFACES= $(HS_SRCS:.lhs=.$(way_)hi) GHC.$(way_)hi
