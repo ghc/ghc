@@ -10,7 +10,8 @@ Other modules should access this info through ClosureInfo.
 module SMRep (
 	SMRep(..), ClosureType(..),
 	isConstantRep, isStaticRep,
-	fixedHdrSize, arrHdrSize, fixedItblSize, pprSMRep
+	fixedHdrSize, arrWordsHdrSize, arrPtrsHdrSize,
+        fixedItblSize, pprSMRep
 
 #ifndef OMIT_NATIVE_CODEGEN
 	, getSMRepClosureTypeInt
@@ -50,7 +51,8 @@ module SMRep (
 import CmdLineOpts
 import AbsCSyn		( Liveness(..) )
 import Constants	( sTD_HDR_SIZE, pROF_HDR_SIZE,
-			  gRAN_HDR_SIZE, tICKY_HDR_SIZE, aRR_HDR_SIZE,
+			  gRAN_HDR_SIZE, tICKY_HDR_SIZE, 
+                          aRR_WORDS_HDR_SIZE, aRR_PTRS_HDR_SIZE,
 			  sTD_ITBL_SIZE, pROF_ITBL_SIZE,
 			  gRAN_ITBL_SIZE, tICKY_ITBL_SIZE )
 import Outputable
@@ -111,8 +113,11 @@ tickyHdrSize :: Int{-words-}
 tickyHdrSize | opt_DoTickyProfiling = tICKY_HDR_SIZE
 	     | otherwise	    = 0
 
-arrHdrSize   :: Int{-words-}
-arrHdrSize   = fixedHdrSize + aRR_HDR_SIZE
+arrWordsHdrSize   :: Int{-words-}
+arrWordsHdrSize   = fixedHdrSize + aRR_WORDS_HDR_SIZE
+
+arrPtrsHdrSize   :: Int{-words-}
+arrPtrsHdrSize   = fixedHdrSize + aRR_PTRS_HDR_SIZE
 \end{code}
 
 Size of an info table.

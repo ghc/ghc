@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Constants.h,v 1.8 2000/01/13 14:34:00 hwloidl Exp $
+ * $Id: Constants.h,v 1.9 2000/01/24 18:22:08 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -27,7 +27,8 @@
 #define PAR_HDR_SIZE   0
 #define TICKY_HDR_SIZE 0
 
-#define ARR_HDR_SIZE   1
+#define ARR_WORDS_HDR_SIZE  1
+#define ARR_PTRS_HDR_SIZE   2
 
 /* -----------------------------------------------------------------------------
    Info Table sizes

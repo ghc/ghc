@@ -10,7 +10,7 @@ module Stix (
 	stgBaseReg, stgNode, stgSp, stgSu, stgSpLim, stgHp, stgHpLim, stgTagReg,
 	getUniqLabelNCG,
 
-	fixedHS, arrHS
+	fixedHS, arrWordsHS, arrPtrsHS
     ) where
 
 #include "HsVersions.h"
@@ -24,7 +24,7 @@ import CLabel		( mkAsmTempLabel, CLabel, pprCLabel, pprCLabel_asm )
 import PrimRep          ( PrimRep, showPrimRep )
 import PrimOp           ( PrimOp, pprPrimOp )
 import Unique           ( Unique )
-import SMRep		( fixedHdrSize, arrHdrSize )
+import SMRep		( fixedHdrSize, arrWordsHdrSize, arrPtrsHdrSize )
 import UniqSupply	( returnUs, thenUs, getUniqueUs, UniqSM )
 import Outputable
 \end{code}
@@ -209,6 +209,7 @@ getUniqLabelNCG
   = getUniqueUs	      `thenUs` \ u ->
     returnUs (mkAsmTempLabel u)
 
-fixedHS = StInt (toInteger fixedHdrSize)
-arrHS   = StInt (toInteger arrHdrSize)
+fixedHS     = StInt (toInteger fixedHdrSize)
+arrWordsHS  = StInt (toInteger arrWordsHdrSize)
+arrPtrsHS   = StInt (toInteger arrPtrsHdrSize)
 \end{code}

@@ -149,7 +149,7 @@ primCode [lhs] ReadArrayOp [obj, ix]
 	lhs' = amodeToStix lhs
     	obj' = amodeToStix obj
     	ix' = amodeToStix ix
-    	base = StIndex IntRep obj' arrHS
+    	base = StIndex IntRep obj' arrPtrsHS
     	assign = StAssign PtrRep lhs' (StInd PtrRep (StIndex PtrRep base ix'))
     in
     returnUs (\xs -> assign : xs)
@@ -159,7 +159,7 @@ primCode [] WriteArrayOp [obj, ix, v]
 	obj' = amodeToStix obj
     	ix' = amodeToStix ix
     	v' = amodeToStix v
-    	base = StIndex IntRep obj' arrHS --(StInt (toInteger 3))
+    	base = StIndex IntRep obj' arrPtrsHS
     	assign = StAssign PtrRep (StInd PtrRep (StIndex PtrRep base ix')) v'
     in
     returnUs (\xs -> assign : xs)
@@ -174,7 +174,7 @@ primCode [lhs] (ReadByteArrayOp pk) [obj, ix]
 	lhs' = amodeToStix lhs
     	obj' = amodeToStix obj
     	ix' = amodeToStix ix
-    	base = StIndex IntRep obj' arrHS
+    	base = StIndex IntRep obj' arrWordsHS
     	assign = StAssign pk lhs' (StInd pk (StIndex pk base ix'))
     in
     returnUs (\xs -> assign : xs)
@@ -203,7 +203,7 @@ primCode [] (WriteByteArrayOp pk) [obj, ix, v]
 	obj' = amodeToStix obj
     	ix' = amodeToStix ix
     	v' = amodeToStix v
-    	base = StIndex IntRep obj' arrHS
+    	base = StIndex IntRep obj' arrWordsHS
     	assign = StAssign pk (StInd pk (StIndex pk base ix')) v'
     in
     returnUs (\xs -> assign : xs)
@@ -229,8 +229,8 @@ primCode lhs (CCallOp (Left fn) is_asm may_gc cconv) rhs
 	let base = amodeToStix' x
 	in
 	    case getAmodeRep x of
-	      ArrayRep      -> StIndex PtrRep base arrHS
-	      ByteArrayRep  -> StIndex IntRep base arrHS
+	      ArrayRep      -> StIndex PtrRep base arrPtrsHS
+	      ByteArrayRep  -> StIndex IntRep base arrWordsHS
 	      ForeignObjRep -> StIndex PtrRep base fixedHS
 	      _ -> base
 \end{code}

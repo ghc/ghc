@@ -22,7 +22,7 @@ import CallConv		( cCallConv )
 import OrdList		( OrdList )
 import PrimOp		( PrimOp(..) )
 import PrimRep		( PrimRep(..) )
-import SMRep		( arrHdrSize )
+import SMRep		( arrWordsHdrSize )
 import Stix		( sStLitLbl, StixTree(..), StixTreeList )
 import UniqSupply	( returnUs, thenUs, UniqSM )
 \end{code}
@@ -139,7 +139,7 @@ toStruct str (alloc,size,arr)
     	f1 = StAssign IntRep (mpAlloc str) alloc
     	f2 = StAssign IntRep (mpSize str) size
     	f3 = StAssign PtrRep (mpData str) 
-		(StIndex PtrRep arr (StInt (toInteger arrHdrSize)))
+		(StIndex PtrRep arr (StInt (toInteger arrWordsHdrSize)))
     in
     (f1, f2, f3)
 

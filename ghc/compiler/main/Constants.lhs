@@ -23,7 +23,8 @@ module Constants (
 	pROF_HDR_SIZE,
 	gRAN_HDR_SIZE,
 	tICKY_HDR_SIZE,
-	aRR_HDR_SIZE,
+	aRR_WORDS_HDR_SIZE,
+	aRR_PTRS_HDR_SIZE,
 
 	sTD_ITBL_SIZE,
 	pROF_ITBL_SIZE,
@@ -196,11 +197,12 @@ mAX_Real_Long_REG       = (0::Int)
 Closure header sizes.
 
 \begin{code}
-sTD_HDR_SIZE   = (STD_HDR_SIZE   :: Int)
-pROF_HDR_SIZE  = (PROF_HDR_SIZE  :: Int)
-gRAN_HDR_SIZE  = (GRAN_HDR_SIZE  :: Int)
-tICKY_HDR_SIZE = (TICKY_HDR_SIZE :: Int)
-aRR_HDR_SIZE   = (ARR_HDR_SIZE   :: Int)
+sTD_HDR_SIZE       = (STD_HDR_SIZE       :: Int)
+pROF_HDR_SIZE      = (PROF_HDR_SIZE      :: Int)
+gRAN_HDR_SIZE      = (GRAN_HDR_SIZE      :: Int)
+tICKY_HDR_SIZE     = (TICKY_HDR_SIZE     :: Int)
+aRR_WORDS_HDR_SIZE = (ARR_WORDS_HDR_SIZE :: Int)
+aRR_PTRS_HDR_SIZE  = (ARR_PTRS_HDR_SIZE  :: Int)
 \end{code}
 
 Info Table sizes.
