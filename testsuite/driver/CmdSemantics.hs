@@ -586,7 +586,7 @@ evalExpr (EPipe src cmd)
 -- to the FFI, since ghci can't handle FFI calls right now
 myMkTempName :: String -> Int -> String
 myMkTempName hashable_str ctr
-   = "/tmp/testdriver_" ++ show (hash 0 hashable_str) ++ "_" ++ show ctr
+   = "testdriver_" ++ show (hash 0 hashable_str) ++ "_" ++ show ctr
      where
         hash :: Int -> String -> Int
         hash h []     = h
