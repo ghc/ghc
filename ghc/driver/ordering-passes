@@ -243,15 +243,15 @@ f_worker a b c d = let x = (a,b)
                         True -> (x,x)
                         False -> ((1,1),(2,2))
 
-in this case the simplifier will remove the binding for y 
-as it is not used (we expected this to happen very often, but we do
-not know how many "reboxers" are eventually removed and how many are
-kept), and will keep the binding for x.
-But notice that x is only used in *one* of the branches in the case,
-but is always being allocated! The floating inwards pass would push 
-its definition into the True branch.
+in this case the simplifier will remove the binding for y as it is not
+used (we expected this to happen very often, but we do not know how
+many "reboxers" are eventually removed and how many are kept), and
+will keep the binding for x.  But notice that x is only used in *one*
+of the branches in the case, but is always being allocated! The
+floating inwards pass would push its definition into the True branch.
 A similar benefit occurs if it is only used inside a let definition.
 These are basically the advantages of floating inwards, but they are
-only exposed after the S.A./worker-wrapperisation of the code!
-As we also have reasons to float inwards before S.A. we have to run it twice.
+only exposed after the S.A./worker-wrapperisation of the code!  As we
+also have reasons to float inwards before S.A. we have to run it
+twice.
 
