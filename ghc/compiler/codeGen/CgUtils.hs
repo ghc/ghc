@@ -462,10 +462,14 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
 	; return (assign_tag `consCgStmt` (branch_stmt `consCgStmt` hi_stmts)) 
 	}
   where
-    use_switch 	 = ASSERT( n_branches > 1 && n_tags > 1 ) 
-		   {- pprTrace "mk_switch" (ppr tag_expr <+> text "n_tags: "
-					<+> int n_tags <+> text "dense: "
-					<+> int n_branches) $ -}
+    use_switch 	 = {- pprTrace "mk_switch" (
+			ppr tag_expr <+> text "n_tags:" <+> int n_tags <+>
+			text "n_branches:" <+> int n_branches <+>
+			text "lo_tag: " <+> int lo_tag <+>
+			text "hi_tag: " <+> int hi_tag <+>
+			text "real_lo_tag: " <+> int real_lo_tag <+>
+			text "real_hi_tag: " <+> int real_hi_tag) $ -}
+		   ASSERT( n_branches > 1 && n_tags > 1 ) 
 		   n_tags > 2 && (small || dense)
 		 -- a 2-branch switch always turns into an if.
     small      	 = n_tags <= 4
