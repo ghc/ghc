@@ -1027,15 +1027,6 @@ Prelude> :set -fno-glasgow-exts
       </varlistentry>
 
       <varlistentry>
-	<term>Hugs has a <literal>:add</literal> command for adding
-	modules without throwing away any that are already loaded.
-	Why doesn't this work in GHCi?</term>
-	<listitem>
-	  <para>We haven't implemented it yet.  Sorry about that.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
 	<term><literal>-O</literal> doesn't work with GHCi!</term>
 	<indexterm><primary><option>-O</option></primary>
 	</indexterm>
