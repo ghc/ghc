@@ -1,6 +1,8 @@
 {
 module ParserCore ( parseCore ) where
 
+import ForeignCall
+
 import HsCore
 import RdrHsSyn
 import HsSyn
@@ -199,8 +201,10 @@ exp	:: { UfExpr RdrName }
 	       "InlineCall" -> UfNote UfInlineCall $3
 	       "InlineMe"   -> UfNote UfInlineMe $3
             }
---        | '%external' STRING aty   { External $2 $3 }
-
+        | '%external' STRING aty   { UfFCall (ForeignCall.CCall 
+                                               (CCallSpec (StaticTarget 
+                                                            (mkFastString $2)) 
+                                                          CCallConv (PlaySafe False))) $3 }
 alts1	:: { [UfAlt RdrName] }
 	: alt		{ [$1] }
 	| alt ';' alts1	{ $1:$3 }
@@ -264,6 +268,7 @@ convIntLit i (HsTyVar n)
   | n == intPrimRdrName  = MachInt  i  
   | n == wordPrimRdrName = MachWord i
   | n == charPrimRdrName = MachChar (fromInteger i)
+  | n == addrPrimRdrName && i == 0 = MachNullAddr
 convIntLit i aty
   = pprPanic "Unknown integer literal type" (ppr aty $$ ppr intPrimRdrName) 
 
@@ -275,12 +280,13 @@ convRatLit i aty
   = pprPanic "Unknown rational literal type" (ppr aty $$ ppr intPrimRdrName) 
 
 
-wordPrimRdrName, intPrimRdrName, floatPrimRdrName, doublePrimRdrName :: RdrName
+wordPrimRdrName, intPrimRdrName, floatPrimRdrName, doublePrimRdrName, addrPrimRdrName :: RdrName
 wordPrimRdrName   = nameRdrName wordPrimTyConName
 intPrimRdrName    = nameRdrName intPrimTyConName
 charPrimRdrName   = nameRdrName charPrimTyConName
 floatPrimRdrName  = nameRdrName floatPrimTyConName
 doublePrimRdrName = nameRdrName doublePrimTyConName
+addrPrimRdrName   = nameRdrName addrPrimTyConName
 
 happyError :: P a 
 happyError s l = failP (show l ++ ": Parse error\n") (take 100 s) l
