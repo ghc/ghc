@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.180 2003/11/12 17:49:10 sof Exp $
+ * $Id: Schedule.c,v 1.181 2003/12/05 09:50:39 stolz Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -542,7 +542,7 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
               *prev = m->link;
 	    
 #ifdef DEBUG
-	      removeThreadLabel((StgWord)m->tso);
+	      removeThreadLabel((StgWord)m->tso->id);
 #endif
               releaseCapability(cap);
               RELEASE_LOCK(&sched_mutex);
@@ -577,7 +577,7 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
       if (m->tso->what_next == ThreadComplete
 	  || m->tso->what_next == ThreadKilled) {
 #ifdef DEBUG
-	removeThreadLabel((StgWord)m->tso);
+	removeThreadLabel((StgWord)m->tso->id);
 #endif
 	main_threads = main_threads->link;
 	if (m->tso->what_next == ThreadComplete) {
@@ -1910,7 +1910,7 @@ labelThread(StgPtr tso, char *label)
   buf = stgMallocBytes(len * sizeof(char), "Schedule.c:labelThread()");
   strncpy(buf,label,len);
   /* Update will free the old memory for us */
-  updateThreadLabel((StgWord)tso,buf);
+  updateThreadLabel(((StgTSO *)tso)->id,buf);
 }
 #endif /* DEBUG */
 
@@ -3866,7 +3866,7 @@ printAllThreads(void)
 
   for (t = all_threads; t != END_TSO_QUEUE; t = t->global_link) {
     fprintf(stderr, "\tthread %d @ %p ", t->id, (void *)t);
-    label = lookupThreadLabel((StgWord)t);
+    label = lookupThreadLabel(t->id);
     if (label) fprintf(stderr,"[\"%s\"] ",(char *)label);
     printThreadStatus(t);
     fprintf(stderr,"\n");
