@@ -12,7 +12,6 @@ module Variance(
 #include "HsVersions.h"
 
 import TypeRep          ( Type(..), TyNote(..) )  -- friend
-import Type             ( mkDictTy )
 import TyCon            ( TyCon, ArgVrcs, tyConKind, tyConArity, tyConDataCons, tyConTyVars,
                           tyConArgVrcs_maybe, getSynTyConDefn, isSynTyCon, isAlgTyCon )
 import DataCon          ( dataConRepArgTys )

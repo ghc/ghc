@@ -40,7 +40,7 @@ import TysWiredIn	( boolTy, charTy, mkListTy )
 import PrelMods		( pREL_ERR, pREL_GHC )
 import PrelRules	( primOpRule )
 import Rules		( addRule )
-import Type		( Type, ClassContext, mkDictTy, mkTyConApp, mkTyVarTys,
+import Type		( Type, ClassContext, mkDictTy, mkDictTys, mkTyConApp, mkTyVarTys,
 			  mkFunTys, mkFunTy, mkSigmaTy, classesToPreds,
 			  isUnLiftedType, mkForAllTys, mkTyVarTy, tyVarsOfType, tyVarsOfTypes,
 			  splitSigmaTy, splitFunTy_maybe, 
@@ -286,8 +286,8 @@ mkDataConWrapId data_con
     (tyvars, theta, ex_tyvars, ex_theta, orig_arg_tys, tycon) = dataConSig data_con
     all_tyvars   = tyvars ++ ex_tyvars
 
-    dict_tys     = [mkDictTy clas tys | (clas,tys) <- theta]
-    ex_dict_tys  = [mkDictTy clas tys | (clas,tys) <- ex_theta]
+    dict_tys     = mkDictTys theta
+    ex_dict_tys  = mkDictTys ex_theta
     all_arg_tys  = dict_tys ++ ex_dict_tys ++ orig_arg_tys
     result_ty    = mkTyConApp tycon (mkTyVarTys tyvars)
 

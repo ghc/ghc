@@ -123,8 +123,7 @@ loadInterface doc_str mod_name from
 	mod_map_result ->
 
 	-- READ THE MODULE IN
-   findAndReadIface doc_str mod_name from below_me
-   `thenRn` \ (hi_boot_read, read_result) ->
+   findAndReadIface doc_str mod_name from below_me   `thenRn` \ (hi_boot_read, read_result) ->
    case read_result of {
 	Nothing -> 	-- Not found, so add an empty export env to the Ifaces map
 			-- so that we don't look again
@@ -1049,7 +1048,9 @@ cannaeReadFile file err
 	  text (show err)]
 
 getDeclErr name
-  = ptext SLIT("Failed to find interface decl for") <+> quotes (ppr name)
+  = vcat [ptext SLIT("Failed to find interface decl for") <+> quotes (ppr name),
+	  ptext SLIT("from module") <+> quotes (ppr (nameModule name))
+	 ]
 
 getDeclWarn name loc
   = sep [ptext SLIT("Failed to find (optional) interface decl for") <+> quotes (ppr name),

@@ -20,7 +20,7 @@ import HsSyn		( ExtName(..), ForeignDecl(..), isDynamicExtName, ForKind(..) )
 import HsDecls		( extNameStatic )
 import CallConv
 import TcHsSyn		( TypecheckedForeignDecl )
-import CoreUtils	( exprType, mkInlineMe, bindNonRec )
+import CoreUtils	( exprType, mkInlineMe )
 import DataCon		( DataCon, dataConWrapId )
 import Id		( Id, idType, idName, mkWildId, mkVanillaId )
 import MkId		( mkWorkerId )
@@ -30,16 +30,16 @@ import Name		( mkGlobalName, nameModule, nameOccName, getOccString,
 			  mkForeignExportOcc, isLocalName,
 			  NamedThing(..), Provenance(..), ExportFlag(..)
 			)
-import PrelInfo		( deRefStablePtr_NAME, bindIO_NAME, makeStablePtr_NAME )
+import PrelInfo		( deRefStablePtr_NAME, returnIO_NAME, bindIO_NAME, makeStablePtr_NAME )
 import Type		( unUsgTy,
 			  splitTyConApp_maybe, splitFunTys, splitForAllTys,
 			  Type, mkFunTys, mkForAllTys, mkTyConApp,
-			  mkTyVarTy, mkFunTy, splitAppTy
+			  mkTyVarTy, mkFunTy, splitAppTy, applyTy, funResultTy
 			)
 import PrimOp		( PrimOp(..), CCall(..), CCallTarget(..) )
 import Var		( TyVar )
 import TysPrim		( realWorldStatePrimTy, addrPrimTy )
-import TysWiredIn	( unitTyCon, addrTy, stablePtrTyCon,
+import TysWiredIn	( unitTy, addrTy, stablePtrTyCon,
 			  unboxedTupleCon, addrDataCon
 			)
 import Unique
@@ -193,10 +193,69 @@ dsFExport :: Id
 		 , SDoc
 		 , SDoc
 		 )
-dsFExport i ty mod_name ext_name cconv isDyn =
-     getUniqueDs					`thenDs` \ uniq ->
-     getSrcLocDs					`thenDs` \ src_loc ->
+dsFExport i ty mod_name ext_name cconv isDyn
+  = 	-- BUILD THE returnIO WRAPPER, if necessary
+	-- Look at the result type of the exported function, orig_res_ty
+	-- If it's IO t, return		(\x.x,	        IO t, t)
+	-- If it's plain t, return	(\x.returnIO x, IO t, t)
+     (case splitTyConApp_maybe orig_res_ty of
+	Just (ioTyCon, [res_ty])
+	      -> ASSERT( getUnique ioTyCon == ioTyConKey )
+			-- The function already returns IO t
+		 returnDs (\body -> body, orig_res_ty, res_ty)
+
+	other -> 	-- The function returns t, so wrap the call in returnIO
+		 dsLookupGlobalValue returnIO_NAME	`thenDs` \ retIOId ->
+	         returnDs (\body -> mkApps (Var retIOId) [Type orig_res_ty, body],
+		           funResultTy (applyTy (idType retIOId) orig_res_ty), 
+				-- We don't have ioTyCon conveniently to hand
+			   orig_res_ty)
+
+     )		`thenDs` \ (return_io_wrapper, 	-- Either identity or returnIO
+			    io_res_ty, 		-- IO t
+			    res_ty) ->		-- t
+
+
+	-- BUILD THE deRefStablePtr WRAPPER, if necessary
+     (if isDyn then 
+        newSysLocalDs stbl_ptr_ty			`thenDs` \ stbl_ptr ->
+	newSysLocalDs stbl_ptr_to_ty			`thenDs` \ stbl_value ->
+	dsLookupGlobalValue deRefStablePtr_NAME		`thenDs` \ deRefStablePtrId ->
+	let
+	 the_deref_app = mkApps (Var deRefStablePtrId)
+				[ Type stbl_ptr_to_ty, Var stbl_ptr ]
+        in
+        dsLookupGlobalValue bindIO_NAME			 `thenDs` \ bindIOId ->
+	let
+	 stbl_app cont = mkApps (Var bindIOId)
+				[ Type stbl_ptr_to_ty
+				, Type res_ty
+				, the_deref_app
+				, mkLams [stbl_value] cont]
+        in
+	returnDs (stbl_value, stbl_app, stbl_ptr)
+      else
+        returnDs (i, 
+	          \ body -> body,
+		  panic "stbl_ptr"  -- should never be touched.
+		  ))			`thenDs` \ (i, getFun_wrapper, stbl_ptr) ->
+
+
+	-- BUILD THE HELPER
+     getModuleDs			`thenDs` \ mod -> 
+     getUniqueDs			`thenDs` \ uniq ->
+     getSrcLocDs			`thenDs` \ src_loc ->
+     newSysLocalsDs fe_arg_tys		`thenDs` \ fe_args ->
      let
+        wrapper_args | isDyn      = stbl_ptr:fe_args
+		     | otherwise  = fe_args
+
+        wrapper_arg_tys | isDyn      = stbl_ptr_ty:fe_arg_tys
+		        | otherwise  = fe_arg_tys
+
+	helper_ty =  mkForAllTys tvs $
+		     mkFunTys wrapper_arg_tys io_res_ty
+
 	f_helper_glob = mkVanillaId helper_name helper_ty
 		      where
 			name	            = idName i
@@ -207,97 +266,29 @@ dsFExport i ty mod_name ext_name cconv isDyn =
 			occ	            = mkForeignExportOcc (nameOccName name)
 			prov	            = LocalDef src_loc Exported
 			helper_name         = mkGlobalName uniq mod occ prov
-     in
-     newSysLocalsDs fe_arg_tys				`thenDs` \ fe_args ->
-     (if isDyn then 
-        newSysLocalDs stbl_ptr_ty			`thenDs` \ stbl_ptr ->
-	newSysLocalDs stbl_ptr_to_ty			`thenDs` \ stbl_value ->
-	dsLookupGlobalValue deRefStablePtr_NAME		`thenDs` \ deRefStablePtrId ->
-	let
-	 the_deref_app = mkApps (Var deRefStablePtrId)
-				[ Type stbl_ptr_to_ty, Var stbl_ptr ]
-        in
-	newSysLocalDs (exprType the_deref_app)	 `thenDs` \ x_deref_app ->
-        dsLookupGlobalValue bindIO_NAME			 `thenDs` \ bindIOId ->
-	newSysLocalDs (mkFunTy stbl_ptr_to_ty 
-			       (mkTyConApp ioTyCon [res_ty])) `thenDs` \ x_cont ->
-	let
-	 stbl_app      = \ cont -> 
-		bindNonRec x_cont   (mkLams [stbl_value] cont) $
-		bindNonRec x_deref_app the_deref_app  
-			   (mkApps (Var bindIOId)
-				     [ Type stbl_ptr_to_ty
-				     , Type res_ty
-				     , Var x_deref_app
-				     , Var x_cont])
-        in
-	returnDs (stbl_value, stbl_app, stbl_ptr)
-      else
-        returnDs (i, 
-	          \ body -> body,
-		  panic "stbl_ptr"  -- should never be touched.
-		  ))			`thenDs` \ (i, getFun_wrapper, stbl_ptr) ->
-     let
-      wrapper_args
-       | isDyn      = stbl_ptr:fe_args
-       | otherwise  = fe_args
 
-      wrapper_arg_tys
-       | isDyn      = stbl_ptr_ty:helper_arg_tys
-       | otherwise  = helper_arg_tys
-
-      the_app  = 
-         getFun_wrapper $
- 	 mkApps (Var i) (map (Type . mkTyVarTy) tvs ++ map Var fe_args)
-     in
-     getModuleDs			`thenDs` \ mod -> 
-     getUniqueDs			`thenDs` \ uniq ->
-     let
-      the_body = mkLams (tvs ++ wrapper_args) the_app
-      c_nm     = extNameStatic ext_name
-
-      (h_stub, c_stub) = fexportEntry (moduleUserString mod)
+      	the_app = getFun_wrapper (return_io_wrapper (mkVarApps (Var i) (tvs ++ fe_args)))
+      	the_body = mkLams (tvs ++ wrapper_args) the_app
+      	c_nm     = extNameStatic ext_name
+  
+      	(h_stub, c_stub) = fexportEntry (moduleUserString mod)
       				      c_nm f_helper_glob
-                                      wrapper_arg_tys the_result_ty cconv isDyn
+                                      wrapper_arg_tys res_ty cconv isDyn
      in
      returnDs (NonRec f_helper_glob the_body, h_stub, c_stub)
 
   where
-
    (tvs,sans_foralls)			= splitForAllTys ty
-   (fe_arg_tys', io_res)	        = splitFunTys sans_foralls
-
-
-   Just (ioTyCon, [res_ty])	        = splitTyConApp_maybe io_res
+   (fe_arg_tys', orig_res_ty)	        = splitFunTys sans_foralls
 
    (_, stbl_ptr_ty')			= splitForAllTys stbl_ptr_ty
    (_, stbl_ptr_to_ty)			= splitAppTy stbl_ptr_ty'
 
-   fe_arg_tys
-     | isDyn	    = tail fe_arg_tys'
-     | otherwise    = fe_arg_tys'
+   fe_arg_tys | isDyn	  = tail fe_arg_tys'
+	      | otherwise = fe_arg_tys'
 
-   (stbl_ptr_ty, helper_arg_tys) = 
-     case fe_arg_tys' of
-       (x:xs) | isDyn -> (x,xs)
-       ls	      -> (error "stbl_ptr_ty", ls)
-
-   helper_ty      =  
-	mkForAllTys tvs $
-	mkFunTys arg_tys io_res
-        where
-	  arg_tys
-	   | isDyn	= stbl_ptr_ty : helper_arg_tys
-	   | otherwise  = helper_arg_tys
-
-   the_result_ty =
-     case splitTyConApp_maybe io_res of
-       Just (_,[res_ty]) ->
-         case splitTyConApp_maybe res_ty of
-	   Just (tc,_) | getUnique tc /= getUnique unitTyCon -> Just res_ty
-	   _						     -> Nothing
-       _		 -> Nothing
-   
+   stbl_ptr_ty | isDyn     = head fe_arg_tys'
+	       | otherwise = error "stbl_ptr_ty"
 \end{code}
 
 @foreign export dynamic@ lets you dress up Haskell IO actions
@@ -345,25 +336,21 @@ dsFExportDynamic i ty mod_name ext_name cconv =
      in
      dsFExport  i export_ty mod_name fe_ext_name cconv True
      `thenDs` \ (fe@(NonRec fe_helper fe_expr), h_code, c_code) ->
-     newSysLocalDs arg_ty			            `thenDs` \ cback ->
-     dsLookupGlobalValue makeStablePtr_NAME	   `thenDs` \ makeStablePtrId ->
+     newSysLocalDs arg_ty			`thenDs` \ cback ->
+     dsLookupGlobalValue makeStablePtr_NAME	`thenDs` \ makeStablePtrId ->
      let
 	mk_stbl_ptr_app    = mkApps (Var makeStablePtrId) [ Type arg_ty, Var cback ]
-	mk_stbl_ptr_app_ty = exprType mk_stbl_ptr_app
      in
-     newSysLocalDs mk_stbl_ptr_app_ty			`thenDs` \ x_mk_stbl_ptr_app ->
      dsLookupGlobalValue bindIO_NAME		        `thenDs` \ bindIOId ->
      newSysLocalDs (mkTyConApp stablePtrTyCon [arg_ty]) `thenDs` \ stbl_value ->
      let
-      stbl_app      = \ x_cont cont ret_ty -> 
-	bindNonRec x_cont	     cont	     $
-	bindNonRec x_mk_stbl_ptr_app mk_stbl_ptr_app $
-		   (mkApps (Var bindIOId)
-			   [ Type (mkTyConApp stablePtrTyCon [arg_ty])
-			   , Type ret_ty
-			   , Var x_mk_stbl_ptr_app
-			   , Var x_cont
-			   ])
+      stbl_app cont ret_ty 
+	= mkApps (Var bindIOId)
+		 [ Type (mkTyConApp stablePtrTyCon [arg_ty])
+		 , Type ret_ty
+		 , mk_stbl_ptr_app
+		 , cont
+		 ]
 
        {-
         The arguments to the external function which will
@@ -380,34 +367,31 @@ dsFExportDynamic i ty mod_name ext_name cconv =
 	-- (probably in the RTS.) 
       adjustor	    = SLIT("createAdjustor")
      in
-     dsCCall adjustor adj_args False False addrTy `thenDs` \ ccall_adj ->
+     dsCCall adjustor adj_args False False ioAddrTy `thenDs` \ ccall_adj ->
      let ccall_adj_ty = exprType ccall_adj
+         ccall_io_adj = mkLams [stbl_value]		     $
+			Note (Coerce io_res_ty (unUsgTy ccall_adj_ty))
+			     ccall_adj
      in
-     newSysLocalDs ccall_adj_ty			  `thenDs` \ x_ccall_adj ->
-     let ccall_io_adj = 
-	    mkLams [stbl_value]		     $
-	    bindNonRec x_ccall_adj ccall_adj $
-	    Note (Coerce (mkTyConApp ioTyCon [res_ty]) (unUsgTy ccall_adj_ty))
-		 (Var x_ccall_adj)
-     in
-     newSysLocalDs (exprType ccall_io_adj)	  `thenDs` \ x_ccall_io_adj ->
      let io_app = mkLams tvs	 $
 		  mkLams [cback] $
-		  stbl_app x_ccall_io_adj ccall_io_adj addrTy
+		  stbl_app ccall_io_adj addrTy
      in
      returnDs (NonRec i io_app, fe, h_code, c_code)
 
  where
   (tvs,sans_foralls)		   = splitForAllTys ty
-  ([arg_ty], io_res)		   = splitFunTys sans_foralls
+  ([arg_ty], io_res_ty)		   = splitFunTys sans_foralls
 
-  Just (ioTyCon, [res_ty])	   = splitTyConApp_maybe io_res
+  Just (ioTyCon, [res_ty])	   = splitTyConApp_maybe io_res_ty
 
   export_ty			   = mkFunTy (mkTyConApp stablePtrTyCon [arg_ty]) arg_ty
 
+  ioAddrTy :: Type	-- IO Addr
+  ioAddrTy = mkTyConApp ioTyCon [addrTy]
+
 toCName :: Id -> String
 toCName i = showSDoc (pprCode CStyle (ppr (idName i)))
-
 \end{code}
 
 %*
@@ -425,11 +409,11 @@ fexportEntry :: String
 	     -> FAST_STRING
 	     -> Id 
 	     -> [Type] 
-	     -> Maybe Type 
+	     -> Type 
 	     -> CallConv 
 	     -> Bool
 	     -> (SDoc, SDoc)
-fexportEntry mod_nm c_nm helper args res cc isDyn = (header_bits, c_bits)
+fexportEntry mod_nm c_nm helper args res_ty cc isDyn = (header_bits, c_bits)
  where
    -- name of the (Haskell) helper function generated by the desugarer.
   h_nm	    = ppr helper <> text "_closure"
@@ -449,7 +433,9 @@ fexportEntry mod_nm c_nm helper args res cc isDyn = (header_bits, c_bits)
 	  -- create the application + perform it.
      ,   text "rc=rts_evalIO" <> 
                   parens (foldl appArg (text "(StgClosure*)&" <> h_nm) (zip args c_args) <> comma <> text "&ret") <> semi
-     ,   returnResult
+     ,   text "rts_checkSchedStatus" <> parens (doubleQuotes (text mod_nm <> char '.' <> ptext c_nm) 
+						<> comma <> text "rc") <> semi
+     ,   text "return" <> return_what <> semi
      , rbrace
      ]
 
@@ -458,10 +444,10 @@ fexportEntry mod_nm c_nm helper args res cc isDyn = (header_bits, c_bits)
 
   cParamTypes  = map showStgType real_args
 
-  cResType = 
-   case res of
-     Nothing -> text "void"
-     Just t  -> showStgType t
+  res_ty_is_unit = res_ty == unitTy
+
+  cResType | res_ty_is_unit = text "void"
+	   | otherwise	    = showStgType res_ty
 
   pprCconv
    | cc == cCallConv = empty
@@ -473,17 +459,8 @@ fexportEntry mod_nm c_nm helper args res cc isDyn = (header_bits, c_bits)
 
   mkExtern ty nm = text "extern" <+> ty <+> nm <> semi
 
-  returnResult = 
-    text "rts_checkSchedStatus" <> 
-    parens (doubleQuotes (text mod_nm <> char '.' <> ptext c_nm) <> comma <> text "rc") <> semi $$
-    (case res of
-      Nothing -> text "return"
-      Just _  -> text "return" <> parens (res_name)) <> semi
-
-  res_name = 
-    case res of
-      Nothing -> empty
-      Just t  -> unpackHObj t <> parens (text "ret")
+  return_what | res_ty_is_unit = empty
+	      | otherwise      = parens (unpackHObj res_ty <> parens (text "ret"))
 
   c_args = mkCArgNames 0 args
 

@@ -43,7 +43,7 @@ import OccName		( mkDefaultMethodOcc )
 import BasicTypes	( TopLevelFlag(..) )
 import FiniteMap	( elemFM )
 import PrelInfo		( derivableClassKeys,
-			  deRefStablePtr_NAME, makeStablePtr_NAME, bindIO_NAME
+			  deRefStablePtr_NAME, makeStablePtr_NAME, bindIO_NAME, returnIO_NAME
 			)
 import Bag		( bagToList )
 import List		( partition, nub )
@@ -358,7 +358,7 @@ rnDecl (ForD (ForeignDecl name imp_exp ty ext_nm cconv src_loc))
 		FoLabel    		-> emptyFVs
 		FoExport   | isDyn	-> mkNameSet [makeStablePtr_NAME,
 						      deRefStablePtr_NAME,
-						      bindIO_NAME]
+						      bindIO_NAME, returnIO_NAME]
 			   | otherwise  -> mkNameSet [name']
 		_ -> emptyFVs
     in

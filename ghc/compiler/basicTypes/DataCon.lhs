@@ -31,7 +31,7 @@ import CmdLineOpts	( opt_DictsStrict )
 import TysPrim
 import Type		( Type, ThetaType, TauType, ClassContext,
 			  mkForAllTys, mkFunTys, mkTyConApp, 
-			  mkTyVarTys, mkDictTy,
+			  mkTyVarTys, mkDictTys,
 			  splitAlgTyConApp_maybe, classesToPreds
 			)
 import TyCon		( TyCon, tyConDataCons, isDataTyCon, isProductTyCon,
@@ -262,7 +262,7 @@ mkDataCon name arg_stricts fields
 
     (real_arg_stricts, strict_arg_tyss) 
 	= unzip (zipWith (unbox_strict_arg_ty tycon) arg_stricts orig_arg_tys)
-    rep_arg_tys = [mkDictTy cls tys | (cls,tys) <- ex_theta] ++ concat strict_arg_tyss
+    rep_arg_tys = mkDictTys ex_theta ++ concat strict_arg_tyss
 	
     ex_dict_stricts = map mk_dict_strict_mark ex_theta
 	-- Add a strictness flag for the existential dictionary arguments

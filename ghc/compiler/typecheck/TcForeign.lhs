@@ -177,53 +177,53 @@ checkForeignImport is_dynamic is_safe ty args res
      (x:xs) ->
         check (isAddrTy x) (illegalForeignTyErr True{-Arg-} ty) `thenTc_`
         mapTc (checkForeignArg (isFFIArgumentTy is_safe)) xs	`thenTc_`
-	checkForeignRes (isFFIResultTy) res
+	checkForeignRes True {-NonIO ok-} isFFIResultTy res
  | otherwise =
      mapTc (checkForeignArg (isFFIArgumentTy is_safe)) args     `thenTc_`
-     checkForeignRes (isFFIResultTy) res
+     checkForeignRes True {-NonIO ok-} isFFIResultTy res
 
 checkForeignExport :: Bool -> Type -> [Type] -> Type -> TcM s ()
 checkForeignExport is_dynamic ty args res
  | is_dynamic = 
     -- * the first (and only!) arg has got to be a function type
-    -- * result type is an Addr
+    --   and it must return IO t
+    -- * result type is an Addr or IO Addr
    case args of
      [arg]  ->
 	case splitFunTys arg of
 	   (arg_tys, res_ty) -> 
-		mapTc (checkForeignArg isFFIExternalTy) arg_tys `thenTc_`
-		checkForeignRes (isFFIResultTy) res_ty		`thenTc_`
-		checkForeignRes (isAddrTy) res
+		mapTc (checkForeignArg isFFIExternalTy) arg_tys		`thenTc_`
+		checkForeignRes True  {-NonIO ok-} isFFIResultTy res_ty	`thenTc_`
+		checkForeignRes False {-Must be IO-} isAddrTy	   res
      _      -> check False (illegalForeignTyErr True{-Arg-} ty)
  | otherwise =
      mapTc (checkForeignArg isFFIExternalTy) args  	        `thenTc_`
-     checkForeignRes (isFFIResultTy) res
+     checkForeignRes True {-NonIO ok-} isFFIResultTy res
  
-check :: Bool -> Message -> TcM s ()
-check True _	   = returnTc ()
-check _    the_err = addErrTc the_err `thenNF_Tc_` returnTc ()
-
 checkForeignArg :: (Type -> Bool) -> Type -> TcM s ()
 checkForeignArg pred ty = check (pred ty) (illegalForeignTyErr True{-Arg-} ty)
 
 -- Check that the type has the form 
 --    (IO t) or (t) , and that t satisfies the given predicate.
 --
-checkForeignRes :: (Type -> Bool) -> Type -> TcM s ()
-checkForeignRes pred_res_ty ty =
+checkForeignRes :: Bool -> (Type -> Bool) -> Type -> TcM s ()
+checkForeignRes non_io_result_ok pred_res_ty ty =
  case (splitTyConApp_maybe ty) of
     Just (io, [res_ty]) 
         | (getUnique io) == ioTyConKey && pred_res_ty res_ty 
 	-> returnTc ()
     _   
-        | pred_res_ty ty -> returnTc ()
-	| otherwise      -> check False (illegalForeignTyErr False{-Res-} ty)
-
+        -> check (non_io_result_ok && pred_res_ty ty) 
+		 (illegalForeignTyErr False{-Res-} ty)
 \end{code}
 
 Warnings
 
 \begin{code}
+check :: Bool -> Message -> TcM s ()
+check True _	   = returnTc ()
+check _    the_err = addErrTc the_err `thenNF_Tc_` returnTc ()
+
 illegalForeignTyErr isArg ty
   = hang (hsep [ptext SLIT("Unacceptable"), arg_or_res, ptext SLIT("type in foreign declaration:")])
 	 4 (hsep [ppr ty])
@@ -235,5 +235,4 @@ illegalForeignTyErr isArg ty
 foreignDeclCtxt fo = 
  hang (ptext SLIT("When checking declaration:"))
   4   (ppr fo)
-
 \end{code}

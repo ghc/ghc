@@ -54,7 +54,7 @@ import Name		( Name, nameOccName, isLocallyDefined, NamedThing(..) )
 import NameSet		( emptyNameSet )
 import Outputable
 import Type		( Type, ThetaType, ClassContext,
-			  mkFunTy, mkTyVarTy, mkTyVarTys, mkDictTy,
+			  mkFunTy, mkTyVarTy, mkTyVarTys, mkDictTy, mkDictTys,
 			  mkSigmaTy, mkForAllTys, mkClassPred, classesOfPreds,
 			  boxedTypeKind, mkArrowKind
 			)
@@ -241,7 +241,7 @@ tcClassContext class_name rec_class rec_tyvars context sc_sel_names
 
     let
        sc_theta' = classesOfPreds sc_theta
-       sc_tys = [mkDictTy sc tys | (sc,tys) <- sc_theta']
+       sc_tys = mkDictTys sc_theta'
        sc_sel_ids = zipWithEqual "tcClassContext" mk_super_id sc_sel_names sc_tys
     in
 	-- Done

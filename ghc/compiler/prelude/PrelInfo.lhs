@@ -21,7 +21,7 @@ module PrelInfo (
 	-- Random other things
 	main_NAME, ioTyCon_NAME,
 	deRefStablePtr_NAME, makeStablePtr_NAME,
-	bindIO_NAME,
+	bindIO_NAME, returnIO_NAME,
 
 	maybeCharLikeCon, maybeIntLikeCon,
 	needsDataDeclCtxtClassKeys, cCallishClassKeys, cCallishTyKeys, 
@@ -203,6 +203,7 @@ main_NAME	  = mkKnownKeyGlobal (main_RDR,	         mainKey)
 
  -- Operations needed when compiling FFI decls
 bindIO_NAME	    = mkKnownKeyGlobal (bindIO_RDR,	    bindIOIdKey)
+returnIO_NAME	    = mkKnownKeyGlobal (returnIO_RDR,	    returnIOIdKey)
 deRefStablePtr_NAME = mkKnownKeyGlobal (deRefStablePtr_RDR, deRefStablePtrIdKey)
 makeStablePtr_NAME  = mkKnownKeyGlobal (makeStablePtr_RDR,  makeStablePtrIdKey)
 
@@ -266,6 +267,7 @@ knownKeyNames
     , (deRefStablePtr_RDR,	deRefStablePtrIdKey)
     , (makeStablePtr_RDR,	makeStablePtrIdKey)
     , (bindIO_RDR,		bindIOIdKey)
+    , (returnIO_RDR,		returnIOIdKey)
 
     , (map_RDR,			mapIdKey)
     , (append_RDR,		appendIdKey)
@@ -320,6 +322,7 @@ intTyCon_RDR		= nameRdrName (getName intTyCon)
 ioTyCon_RDR		= tcQual   pREL_IO_BASE_Name SLIT("IO")
 ioDataCon_RDR  	   	= dataQual pREL_IO_BASE_Name SLIT("IO")
 bindIO_RDR	        = varQual  pREL_IO_BASE_Name SLIT("bindIO")
+returnIO_RDR	        = varQual  pREL_IO_BASE_Name SLIT("returnIO")
 
 orderingTyCon_RDR	= tcQual   pREL_BASE_Name SLIT("Ordering")
 

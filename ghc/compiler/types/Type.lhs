@@ -34,7 +34,7 @@ module Type (
 
 	mkTyConApp, mkTyConTy, splitTyConApp_maybe,
 	splitAlgTyConApp_maybe, splitAlgTyConApp, 
-	mkDictTy, mkPredTy, splitPredTy_maybe, splitDictTy_maybe, isDictTy,
+	mkDictTy, mkDictTys, mkPredTy, splitPredTy_maybe, splitDictTy_maybe, isDictTy,
 
 	mkSynTy, isSynTy, deNoteType, 
 
@@ -335,22 +335,12 @@ tell from the type constructor whether it's a dictionary or not.
 mkDictTy :: Class -> [Type] -> Type
 mkDictTy clas tys = TyConApp (classTyCon clas) tys
 
+mkDictTys :: ClassContext -> [Type]
+mkDictTys cxt = [mkDictTy cls tys | (cls,tys) <- cxt]
+
 mkPredTy :: PredType -> Type
 mkPredTy (Class clas tys) = TyConApp (classTyCon clas) tys
 mkPredTy (IParam n ty)    = NoteTy (IPNote n) ty
-
-{-
-splitDictTy_maybe :: Type -> Maybe (Class, [Type])
-splitDictTy_maybe (TyConApp tc tys) 
-  |  maybeToBool maybe_class
-  && tyConArity tc == length tys = Just (clas, tys)
-  where
-     maybe_class = tyConClass_maybe tc
-     Just clas   = maybe_class
-
-splitDictTy_maybe (NoteTy _ ty)	= splitDictTy_maybe ty
-splitDictTy_maybe other		= Nothing
--}
 
 splitPredTy_maybe :: Type -> Maybe PredType
 splitPredTy_maybe (TyConApp tc tys) 
@@ -368,7 +358,7 @@ splitPredTy_maybe other		= Nothing
 splitDictTy_maybe :: Type -> Maybe (Class, [Type])
 splitDictTy_maybe ty
   = case splitPredTy_maybe ty of
-    Just p -> getClassTys_maybe p
+    Just p  -> getClassTys_maybe p
     Nothing -> Nothing
 
 isDictTy :: Type -> Bool
@@ -712,7 +702,7 @@ mkClassPred clas tys = Class clas tys
 
 getClassTys_maybe :: PredType -> Maybe ClassPred
 getClassTys_maybe (Class clas tys) = Just (clas, tys)
-getClassTys_maybe _		    = Nothing
+getClassTys_maybe _		   = Nothing
 
 ipName_maybe :: PredType -> Maybe Name
 ipName_maybe (IParam n _) = Just n

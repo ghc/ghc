@@ -476,8 +476,8 @@ instToId :: Inst -> TcId
 instToId inst = instToIdBndr inst
 
 instToIdBndr :: Inst -> TcId
-instToIdBndr (Dict u (Class clas ty) (_,loc,_))
-  = mkUserLocal (mkDictOcc (getOccName clas)) u (mkDictTy clas ty) loc
+instToIdBndr (Dict u (Class clas tys) (_,loc,_))
+  = mkUserLocal (mkDictOcc (getOccName clas)) u (mkDictTy clas tys) loc
 instToIdBndr (Dict u (IParam n ty) (_,loc,_))
   = ipToId n ty loc
 

@@ -29,7 +29,7 @@ import TcTyDecls	( tcTyDecl, kcTyDecl )
 import TcMonoType	( kcHsTyVar )
 import TcType		( TcKind, newKindVar, newKindVars, kindToTcKind, zonkTcKindToKind )
 
-import Type		( mkArrowKind, boxedTypeKind, mkDictTy )
+import Type		( mkArrowKind, boxedTypeKind )
 
 import Class		( Class )
 import Var		( TyVar, tyVarKind )

@@ -760,5 +760,4 @@ lookupModuleRn x =
   case lookupFM himap x of
     Nothing    -> returnRn (mkVanillaModule x)
     Just (_,x) -> returnRn x
-
 \end{code}

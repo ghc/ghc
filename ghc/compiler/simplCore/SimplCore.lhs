@@ -59,9 +59,7 @@ import StrictAnal	( saBinds )
 import WorkWrap	        ( wwTopBinds )
 import CprAnalyse       ( cprAnalyse )
 
-import Unique		( Unique, Uniquable(..),
-			  ratioTyConKey
-		        )
+import Unique		( Unique, Uniquable(..) )
 import UniqSupply	( UniqSupply, mkSplitUniqSupply, splitUniqSupply, uniqFromSupply )
 import Util		( mapAccumL )
 import SrcLoc		( noSrcLoc )

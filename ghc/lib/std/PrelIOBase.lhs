@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.19 2000/03/28 08:51:09 simonmar Exp $
+% $Id: PrelIOBase.lhs,v 1.20 2000/04/07 13:45:48 simonpj Exp $
 % 
 % (c) The AQUA Project, Glasgow University, 1994-1998
 %
@@ -87,7 +87,7 @@ instance  Monad IO  where
     {-# INLINE (>>)   #-}
     {-# INLINE (>>=)  #-}
     m >> k      =  m >>= \ _ -> k
-    return x	= IO $ \ s -> (# s, x #)
+    return x	= returnIO x
 
     m >>= k     = bindIO m k
     fail s	= error s -- not ioError?
@@ -101,6 +101,8 @@ bindIO (IO m) k = IO ( \ s ->
     (# new_s, a #) -> unIO (k a) new_s
   )
 
+returnIO :: a -> IO a
+returnIO x = IO (\ s -> (# s, x #))
 #endif
 \end{code}
 

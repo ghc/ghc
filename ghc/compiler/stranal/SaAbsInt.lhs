@@ -571,7 +571,8 @@ absApply AbsAnal (AbsApproxFun (d:ds) val) arg
 		other -> AbsApproxFun ds val
 
 #ifdef DEBUG
-absApply anal f@(AbsProd _)       arg = pprPanic ("absApply: Duff function: AbsProd." ++ show anal) ((ppr f) <+> (ppr arg))
+absApply anal f@(AbsProd _) arg 
+  = pprPanic ("absApply: Duff function: AbsProd." ++ show anal) ((ppr f) <+> (ppr arg))
 #endif
 \end{code}
 

@@ -154,6 +154,7 @@ module Unique (
 	recConErrorIdKey,
 	recSelErrIdKey,
 	recUpdErrorIdKey,
+	returnIOIdKey,
 	returnMClassOpKey,
 	runSTRepIdKey,
 	showClassKey,
@@ -635,9 +636,10 @@ concatIdKey		      = mkPreludeMiscIdUnique 33
 filterIdKey		      = mkPreludeMiscIdUnique 34
 zipIdKey		      = mkPreludeMiscIdUnique 35
 bindIOIdKey		      = mkPreludeMiscIdUnique 36
-deRefStablePtrIdKey	      = mkPreludeMiscIdUnique 37
-makeStablePtrIdKey	      = mkPreludeMiscIdUnique 38
-getTagIdKey		      = mkPreludeMiscIdUnique 39
+returnIOIdKey		      = mkPreludeMiscIdUnique 37
+deRefStablePtrIdKey	      = mkPreludeMiscIdUnique 38
+makeStablePtrIdKey	      = mkPreludeMiscIdUnique 39
+getTagIdKey		      = mkPreludeMiscIdUnique 40
 \end{code}
 
 Certain class operations from Prelude classes.  They get their own
