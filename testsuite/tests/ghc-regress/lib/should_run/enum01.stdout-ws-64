@@ -93,9 +93,9 @@ Testing Enum Char:
     (take 7 ['\251', '\252' .. maxBound]) = "\251\252\253\254\255\256\257"
     (take 7 ['\5', '\4' .. minBound]) = "\ENQ\EOT\ETX\STX\SOH\NUL"
 Testing Enum (): 
-    (succ ()) = error "Prelude.Enum.().succ: bad argment"
-    (succ (minBound::())) = error "Prelude.Enum.().succ: bad argment"
-    (succ (maxBound::())) = error "Prelude.Enum.().succ: bad argment"
+    (succ ()) = error "Prelude.Enum.().succ: bad argument"
+    (succ (minBound::())) = error "Prelude.Enum.().succ: bad argument"
+    (succ (maxBound::())) = error "Prelude.Enum.().succ: bad argument"
     (pred ()) = error "Prelude.Enum.().pred: bad argument"
     (pred (minBound::())) = error "Prelude.Enum.().pred: bad argument"
     (pred (maxBound::())) = error "Prelude.Enum.().pred: bad argument"
@@ -109,12 +109,12 @@ Testing Enum ():
 Testing Enum Ordering (derived): 
     (succ LT) = EQ
     (succ (minBound::Ordering)) = EQ
-    (succ (maxBound::Ordering)) = error "Prelude.Enum.Ordering.succ: bad argment"
+    (succ (maxBound::Ordering)) = error "Prelude.Enum.Ordering.succ: bad argument"
     (pred GT) = EQ
     (pred (maxBound::Ordering)) = EQ
-    (pred (minBound::Ordering)) = error "Prelude.Enum.Ordering.pred: bad argment"
+    (pred (minBound::Ordering)) = error "Prelude.Enum.Ordering.pred: bad argument"
     (toEnum 0)::Ordering = LT
-    (toEnum 5)::Ordering = error "Prelude.Enum.Ordering.toEnum: bad argment"
+    (toEnum 5)::Ordering = error "Prelude.Enum.Ordering.toEnum: bad argument"
     (fromEnum LT) = 0
     (fromEnum EQ) = 1
     (fromEnum GT) = 2
@@ -146,12 +146,12 @@ Testing Enum Ordering (derived):
 Testing Enum Bool: 
     (succ False) = True
     (succ (minBound::Bool)) = True
-    (succ (maxBound::Bool)) = error "Prelude.Enum.Bool.succ: bad argment"
+    (succ (maxBound::Bool)) = error "Prelude.Enum.Bool.succ: bad argument"
     (pred True) = False
     (pred (maxBound::Bool)) = False
-    (pred (minBound::Bool)) = error "Prelude.Enum.Bool.pred: bad argment"
+    (pred (minBound::Bool)) = error "Prelude.Enum.Bool.pred: bad argument"
     (toEnum 0)::Bool = False
-    (toEnum 5)::Bool = error "Prelude.Enum.Bool.toEnum: bad argment"
+    (toEnum 5)::Bool = error "Prelude.Enum.Bool.toEnum: bad argument"
     (fromEnum False) = 0
     (fromEnum True) = 1
     ([False ..]) = [False,True]
