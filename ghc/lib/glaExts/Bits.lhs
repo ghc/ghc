@@ -1,7 +1,11 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1998
 %
-\section[Bits]{The @Bits@ Module}
+\section[Bits]{The @Bits@ interface}
+
+Defines the @Bits@ class containing bit-based operations.
+See library document for details on the semantics of the
+individual operations.
 
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
