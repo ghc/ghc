@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPhases.hs,v 1.20 2002/07/05 16:15:14 sof Exp $
+-- $Id: DriverPhases.hs,v 1.21 2002/07/05 20:30:38 sof Exp $
 --
 -- GHC Driver
 --
@@ -122,5 +122,5 @@ isExtCore_file      = extcoreish_suffix     . getFileSuffix
 
 isSourceFile :: FilePath -> Bool
 isSourceFile   f    =
-   haskellish_src_file f ||
+   haskellish_file f ||
    cish_file   f
