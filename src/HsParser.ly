@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
-$Id: HsParser.ly,v 1.15 2002/07/15 10:14:31 simonmar Exp $
+$Id: HsParser.ly,v 1.16 2002/07/15 16:16:50 simonmar Exp $
 
 (c) Simon Marlow, Sven Panne 1997-2002
 
@@ -188,12 +188,14 @@ The Export List
 >	: '(' exportlist ')'			{ $2 }
 
 > exportlist :: { [HsExportSpec] }
->	:  export ',' exportlist		{ $1 : $3 }
->	|  export exp_doc ',' exportlist	{ $1 : $2 : $4 }
+>	:  export exportlist1			{ $1 : $2 }
 >	|  exp_doc exportlist			{ $1 : $2 }
-> 	|  ',' exportlist			{ $2 }
->	|  export				{ [$1] }
 > 	|  {- empty -}				{ [] }
+
+> exportlist1 :: { [HsExportSpec] }
+>	:  exp_doc exportlist1			{ $1 : $2 }
+> 	|  ',' exportlist			{ $2 }
+>	|  {- empty -}				{ [] }
 
 > exp_doc :: { HsExportSpec }
 > 	: docsection			{ case $1 of { (i,s) -> HsEGroup i s } }
