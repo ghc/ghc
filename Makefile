@@ -331,7 +331,8 @@ all ::
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
 	for i in $(SUBDIRS); do \
 	   if [ -d $$i ]; then \
-	      $(MAKE) -C $$i boot all; \
+	      $(MAKE) -C $$i boot; \
+	      $(MAKE) -C $$i all; \
 	      if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
 	      fi; \
 	done
