@@ -117,7 +117,7 @@ bounds (Array b _)  = b
   = let n# = case (index bounds i) of { I# x -> x } -- index fails if out of range
     in
     case (indexArray# arr# n#) of
-      (# _, v #) -> v
+      (# v #) -> v
 
 #ifdef USE_FOLDR_BUILD
 {-# INLINE array #-}
@@ -633,7 +633,7 @@ thawArray (Array ixs arr#) = ST $ \ s# ->
 	  | cur# ==# end#
 	    = (# st#, to# #)
 	  | otherwise
-	    = case indexArray#  from# cur#        of { (# _, ele #) ->
+	    = case indexArray#  from# cur#        of { (# ele #) ->
 	      case writeArray# to#   cur# ele st# of { s1# ->
 	      copy (cur# +# 1#) end# from# to# s1#
 	      }}
