@@ -77,6 +77,8 @@ import NHC.FFI
 
 #ifdef __HUGS__
 import Hugs.Directory
+import Control.Exception       ( bracket )
+import System.IO
 #endif /* __HUGS__ */
 
 #ifdef __GLASGOW_HASKELL__
@@ -491,7 +493,14 @@ Neither path may refer to an existing directory.
 -}
 copyFile :: FilePath -> FilePath -> IO ()
 copyFile fromFPath toFPath =
-#if (!(defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ > 600))
+#if defined(__HUGS__)
+	(bracket (openBinaryFile fromFPath ReadMode) hClose $ \hFrom ->
+	 bracket (openBinaryFile toFPath WriteMode) hClose $ \hTo -> do
+	 hGetContents hFrom >>= hPutStr hTo
+	 try (getPermissions fromFPath >>= setPermissions toFPath)
+	 return ()) `catch` \err ->
+		ioError (annotateIOError err "copyFile" Nothing Nothing)
+#elif (!defined(__GLASGOW_HASKELL__) || __GLASGOW_HASKELL__ <= 600)
 	do readFile fromFPath >>= writeFile toFPath
 	   try (getPermissions fromFPath >>= setPermissions toFPath)
 	   return ()
