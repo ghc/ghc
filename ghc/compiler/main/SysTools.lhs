@@ -107,17 +107,7 @@ import CString		( CString, peekCString )
 #if __GLASGOW_HASKELL__ > 504
 import System.Cmd       ( rawSystem )
 #else
-
-	-- For Win32 and GHC <= 504
-	-- rawSystem is defined in this module
-	-- We just need an import
-#if __GLASGOW_HASKELL__ < 503
-import PrelIOBase( ioException, IOException(..), IOErrorType(InvalidArgument) )
-#else				
-import GHC.IOBase( ioException, IOException(..), IOErrorType(InvalidArgument) )
-#endif
-import CError   ( throwErrnoIfMinus1 )
-import CString	( withCString )
+import SystemExts       ( rawSystem )
 #endif
 
 #else /* Not Win32 */
@@ -428,7 +418,7 @@ initSysTools minusB_args
 	}
 
 #if defined(mingw32_HOST_OS)
-foreign import stdcall "GetTempPathA" unsafe getTempPath :: Int -> CString -> IO Int32
+foreign import stdcall unsafe "GetTempPathA" getTempPath :: Int -> CString -> IO Int32
 #endif
 \end{code}
 
@@ -853,14 +843,14 @@ getExecDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
 				    return (Just (reverse (dropList "/bin/ghc.exe" (reverse (unDosifyPath s)))))
 
 
-foreign import stdcall "GetModuleFileNameA" unsafe 
+foreign import stdcall unsafe "GetModuleFileNameA"
   getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
 #else
 getExecDir :: IO (Maybe String) = do return Nothing
 #endif
 
 #ifdef mingw32_HOST_OS
-foreign import "_getpid" unsafe getProcessID :: IO Int -- relies on Int == Int32 on Windows
+foreign import ccall unsafe "_getpid" getProcessID :: IO Int -- relies on Int == Int32 on Windows
 #elif __GLASGOW_HASKELL__ > 504
 getProcessID :: IO Int
 getProcessID = GHC.Posix.c_getpid >>= return . fromIntegral
@@ -877,26 +867,4 @@ quote s  = "\"" ++ s ++ "\""
 quote s = s
 #endif
 
-\end{code}
-
-This next blob is in System.Cmd after 5.04, but until then it needs
-to be here (for Win32 only).
-
-\begin{code}
-#if defined(mingw32_HOST_OS)
-#if __GLASGOW_HASKELL__ <= 504
-
-rawSystem :: String -> IO ExitCode
-rawSystem "" = ioException (IOError Nothing InvalidArgument "rawSystem" "null command" Nothing)
-rawSystem cmd =
-  withCString cmd $ \s -> do
-    status <- throwErrnoIfMinus1 "rawSystem" (primRawSystem s)
-    case status of
-        0  -> return ExitSuccess
-        n  -> return (ExitFailure n)
-
-foreign import ccall "rawSystemCmd" unsafe primRawSystem :: CString -> IO Int
-
-#endif
-#endif
 \end{code}
