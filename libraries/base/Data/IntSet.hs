@@ -94,7 +94,6 @@ import Data.Bits
 import Data.Int
 
 import qualified Data.List as List
-import Data.Monoid
 import Data.Typeable
 
 {-
@@ -578,15 +577,6 @@ nequal t1 t2   = True
 instance Ord IntSet where
     compare s1 s2 = compare (toAscList s1) (toAscList s2) 
     -- tentative implementation. See if more efficient exists.
-
-{--------------------------------------------------------------------
-  Monoid 
---------------------------------------------------------------------}
-
-instance Monoid IntSet where
-    mempty = empty
-    mappend = union
-    mconcat = unions
 
 {--------------------------------------------------------------------
   Show

@@ -148,7 +148,6 @@ module Data.Map  (
             ) where
 
 import Prelude hiding (lookup,map,filter,foldr,foldl,null)
-import Data.Monoid
 import qualified Data.Set as Set
 import qualified Data.List as List
 import Data.Typeable
@@ -1296,15 +1295,6 @@ instance (Eq k,Eq a) => Eq (Map k a) where
 
 instance (Ord k, Ord v) => Ord (Map k v) where
     compare m1 m2 = compare (toList m1) (toList m2)
-
-{--------------------------------------------------------------------
-  Monoid 
---------------------------------------------------------------------}
-
-instance (Ord k) => Monoid (Map k v) where
-    mempty = empty
-    mappend = union
-    mconcat = unions
 
 {--------------------------------------------------------------------
   Functor

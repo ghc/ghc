@@ -112,7 +112,6 @@ module Data.Set  (
             ) where
 
 import Prelude hiding (filter,foldr,null,map)
-import Data.Monoid
 import qualified Data.List as List
 import Data.Typeable
 
@@ -504,15 +503,6 @@ instance Eq a => Eq (Set a) where
 
 instance Ord a => Ord (Set a) where
     compare s1 s2 = compare (toAscList s1) (toAscList s2) 
-
-{--------------------------------------------------------------------
-  Monoid 
---------------------------------------------------------------------}
-
-instance Ord a => Monoid (Set a) where
-    mempty = empty
-    mappend = union
-    mconcat = unions
 
 {--------------------------------------------------------------------
   Show

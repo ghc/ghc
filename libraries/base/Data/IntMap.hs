@@ -135,7 +135,6 @@ module Data.IntMap  (
 import Prelude hiding (lookup,map,filter,foldr,foldl,null)
 import Data.Bits 
 import Data.Int
-import Data.Monoid
 import qualified Data.IntSet as IntSet
 import Data.Typeable
 
@@ -969,15 +968,6 @@ instance Ord a => Ord (IntMap a) where
 
 instance Functor IntMap where
     fmap = map
-
-{--------------------------------------------------------------------
-  Monoid 
---------------------------------------------------------------------}
-
-instance Ord a => Monoid (IntMap a) where
-    mempty = empty
-    mappend = union
-    mconcat = unions
 
 {--------------------------------------------------------------------
   Show 
