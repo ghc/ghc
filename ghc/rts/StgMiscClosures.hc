@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.42 2000/04/18 15:06:19 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.43 2000/04/19 10:51:59 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -576,7 +576,7 @@ NON_ENTERABLE_ENTRY_CODE(MUT_ARR_PTRS_FROZEN);
    Mutable Variables
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(MUT_VAR_info, MUT_VAR_entry, 1, 1, MUT_VAR, , EF_, 0, 0);
+INFO_TABLE(MUT_VAR_info, MUT_VAR_entry, 1, 1, MUT_VAR, , EF_, "MUT_VAR", "MUT_VAR");
 NON_ENTERABLE_ENTRY_CODE(MUT_VAR);
 
 /* -----------------------------------------------------------------------------
