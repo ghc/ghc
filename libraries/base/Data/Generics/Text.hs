@@ -57,8 +57,8 @@ gread :: Data a => ReadS a
 
 This is a read operation which insists on prefix notation.  (The
 Haskell 98 read deals with infix operators subject to associativity
-and precedence as well.) We use gunfoldM to "parse" the input. To be
-precise, gunfoldM is used for all types except String. The
+and precedence as well.) We use gunfoldR to "parse" the input. To be
+precise, gunfoldR is used for all types except String. The
 type-specific case for String uses basic String read.
 
 -}
@@ -68,7 +68,7 @@ gread = readP_to_S gread'
  where
 
   gread' :: Data a => ReadP a
-  gread' = gdefault `extB` scase
+  gread' = gdefault `extR` scase
 
 
    where
@@ -90,7 +90,7 @@ gread = readP_to_S gread'
 		-- Do the real work
 	 str   <- parseConstr		-- Get a lexeme for the constructor
          con   <- str2con str		-- Convert it to a Constr (may fail)
-         x     <- gunfoldM con gread'	-- Read the children
+         x     <- gunfoldR con gread'	-- Read the children
 
 		-- Drop "  )  "
          skipSpaces			-- Discard leading space

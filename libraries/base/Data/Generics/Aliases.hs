@@ -18,14 +18,15 @@
 module Data.Generics.Aliases ( 
 
 	-- * Combinators to \"make\" generic functions via cast
-	mkT, mkQ, mkM, mkMp, mkB,
-	extT, extQ, extM, extMp, extB,
+	mkT, mkQ, mkM, mkMp, mkR,
+	extT, extQ, extM, extMp, extB, extR,
 
 	-- * Type synonyms for generic function types
 	GenericT, 
 	GenericQ,
 	GenericM,
 	GenericB,
+	GenericR,
         Generic,
         Generic'(..),
 
@@ -36,7 +37,11 @@ module Data.Generics.Aliases (
 	recoverMp,
 	recoverQ,
 	choiceMp,
-	choiceQ
+	choiceQ,
+
+        -- * Operators for (over-appreciated) unfolding
+        gunfoldB,
+        gunfoldR
 
   ) where
 
@@ -57,7 +62,12 @@ import Data.Generics.Basics
 --   start from a type-specific case;
 --   preserve the term otherwise
 --
-mkT :: (Typeable a, Typeable b) => (b -> b) -> a -> a
+mkT :: ( Typeable a
+       , Typeable b
+       )
+    => (b -> b)
+    -> a 
+    -> a
 mkT f = case cast f of
                Just g -> g
                Nothing -> id
@@ -67,7 +77,13 @@ mkT f = case cast f of
 --   start from a type-specific case;
 --   return a constant otherwise
 --
-mkQ :: (Typeable a, Typeable b) => r -> (b -> r) -> a -> r
+mkQ :: ( Typeable a
+       , Typeable b
+       )
+    => r
+    -> (b -> r)
+    -> a 
+    -> r
 (r `mkQ` br) a = case cast a of
                         Just b  -> br b
                         Nothing -> r
@@ -77,11 +93,13 @@ mkQ :: (Typeable a, Typeable b) => r -> (b -> r) -> a -> r
 --   start from a type-specific case;
 --   resort to return otherwise
 --
-mkM :: ( Monad m,
-         Typeable a,
-         Typeable b
+mkM :: ( Monad m
+       , Typeable a
+       , Typeable b
        )
-    => (b -> m b) -> a -> m a
+    => (b -> m b)
+    -> a 
+    -> m a
 mkM f = case castarr f of
               Just g  -> g
               Nothing -> return
@@ -99,11 +117,13 @@ use a point-free style whenever possible.
 -- | Make a generic monadic transformation for MonadPlus;
 --   use \"const mzero\" (i.e., failure) instead of return as default.
 --
-mkMp :: ( MonadPlus m,
-          Typeable a,
-          Typeable b
+mkMp :: ( MonadPlus m
+        , Typeable a
+        , Typeable b
         )
-     => (b -> m b) -> a -> m a
+     => (b -> m b)
+     -> a
+     -> m a
 mkMp = maybe (const mzero) id . castarr
 
 
@@ -111,50 +131,69 @@ mkMp = maybe (const mzero) id . castarr
 --   start from a type-specific ase;
 --   resort to no build (i.e., mzero) otherwise
 --
-mkB :: ( MonadPlus m,
-         Typeable a,
-         Typeable b
+mkR :: ( MonadPlus m
+       , Typeable a
+       , Typeable b
        )
     => m b -> m a
-mkB = maybe mzero id . castss
+mkR = maybe mzero id . castss
 
 
 -- | Extend a generic transformation by a type-specific case
-extT :: (Typeable a, Typeable b) => (a -> a) -> (b -> b) -> a -> a
+extT :: ( Typeable a
+        , Typeable b 
+        )
+     => (a -> a)
+     -> (b -> b)
+     -> a
+     -> a
 extT f = maybe f id . cast
 
 
 -- | Extend a generic query by a type-specific case
-extQ :: (Typeable a, Typeable b) => (a -> q) -> (b -> q) -> a -> q
+extQ :: ( Typeable a
+        , Typeable b
+        )
+     => (a -> q)
+     -> (b -> q)
+     -> a
+     -> q
 extQ f g a = maybe (f a) g (cast a)
 
 
 -- | Extend a generic monadic transformation by a type-specific case
-extM :: ( Monad m,
-          Typeable a,
-          Typeable b
+extM :: ( Monad m
+        , Typeable a
+        , Typeable b
         )
      => (a -> m a) -> (b -> m b) -> a -> m a
 extM f = maybe f id . castarr
 
 
 -- | Extend a generic MonadPlus transformation by a type-specific case
-extMp :: ( MonadPlus m,
-           Typeable a,
-           Typeable b
+extMp :: ( MonadPlus m
+         , Typeable a
+         , Typeable b
          )
       => (a -> m a) -> (b -> m b) -> a -> m a
 extMp = extM
 
 
+-- | Extend a generic builder
+extB :: ( Typeable a
+        , Typeable b
+        )
+     => a -> b -> a
+extB a = maybe a id . cast
 
--- | Extend a generic builder by a type-specific case
-extB :: (Monad m,
-         Typeable a,
-         Typeable b
+
+-- | Extend a generic reader
+extR :: ( Monad m
+        , Typeable a
+        , Typeable b
         )
      => m a -> m b -> m a
-extB f = maybe f id . castss
+extR f = maybe f id . castss
 
 
 ------------------------------------------------------------------------------
@@ -182,10 +221,16 @@ type GenericQ r = forall a. Data a => a -> r
 type GenericM m = forall a. Data a => a -> m a
 
 
--- | Generic monadic builders with input i,
+-- | Generic builders
+--   i.e., produce an \"a\".
+--
+type GenericB = forall a. Data a => a
+
+
+-- | Generic readers, say monadic builders,
 --   i.e., produce an \"a\" with the help of a monad \"m\".
 --
-type GenericB m = forall a. Data a => m a
+type GenericR m = forall a. Data a => m a
 
 
 -- | The general scheme underlying generic functions
@@ -239,3 +284,27 @@ recoverMp f = f `choiceMp` return
 -- | Recover from the failure of monadic query by a constant
 recoverQ :: MonadPlus m => r -> GenericQ (m r) -> GenericQ (m r)
 recoverQ r f = f `choiceQ` const (return r)
+
+
+
+------------------------------------------------------------------------------
+--
+--	Generic unfolding
+--
+------------------------------------------------------------------------------
+
+-- | Construct an initial term with undefined immediate subterms
+--   and then map over the skeleton to fill in proper terms.
+gunfoldB :: Data a
+         => Constr
+         -> (forall a. Data a => a)
+         -> a
+gunfoldB c f = gmapT (const f) (fromConstr c)
+
+
+-- | Monadic variation on \"gunfoldB\"
+gunfoldR :: (Monad m, Data a)
+         => Constr
+         -> (forall a. Data a => m a)
+         -> m a
+gunfoldR c f = gmapM (const f) $ fromConstr c

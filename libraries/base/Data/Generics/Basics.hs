@@ -56,9 +56,6 @@ module Data.Generics.Basics (
         gmapMp,
         gmapMo,
 
-	-- * Generic unfolding defined in terms of gfoldl and fromConstr
-	gunfoldM	-- :: Monad m => ... -> m a
-
   ) where
 
 
@@ -601,19 +598,3 @@ instance (Typeable a, Typeable b) => Data (a -> b) where
   toConstr _   = FunConstr
   fromConstr _ = undefined
   dataTypeOf _ = FunType
-
-
-------------------------------------------------------------------------------
---
---	Generic unfolding
---
-------------------------------------------------------------------------------
-
--- | Construct an initial with undefined immediate subterms
---   and then map over the skeleton to fill in proper terms.
---
-gunfoldM :: (Monad m, Data a)
-         => Constr
-         -> (forall a. Data a => m a)
-         -> m a
-gunfoldM c f = gmapM (const f) $ fromConstr c
