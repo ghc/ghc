@@ -291,8 +291,6 @@ dist-package-zip ::
 
 DIST_CLEAN_FILES += config.cache config.status
 
-MAINTAINER_CLEAN_FILES += configure
-
 all ::
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
 	for i in $(SUBDIRS); do \
