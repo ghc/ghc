@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ClosureFlags.c,v 1.4 1999/11/09 15:46:49 simonmar Exp $
+ * $Id: ClosureFlags.c,v 1.5 2000/01/12 12:39:20 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -14,6 +14,13 @@ StgWord16 closure_flags[] = {
 /* 
  * These *must* be in the same order as the closure types in
  * ClosureTypes.h.
+ */
+
+/* ToDo: some of these flags seem to be duplicated.
+ *       - NS is the same as HNF, and the negation of THU
+ * (however, we set NS for indirections, which is probably the
+ *  right thing to do, since we never get indirections pointing
+ *  to thunks.)
  */
 
 /*			     HNF  BTM   NS  STA  THU MUT UPT SRT */
@@ -47,11 +54,11 @@ StgWord16 closure_flags[] = {
 /* BCO		   	*/ (_HNF|     _NS                        ),
 /* AP_UPD		*/ (     _BTM|         _THU              ),
 /* PAP		   	*/ (_HNF|     _NS                        ),
-/* IND		   	*/ ( 0                                   ),
-/* IND_OLDGEN	   	*/ ( 0                                   ),
-/* IND_PERM		*/ ( 0                                   ),
-/* IND_OLDGEN_PERM	*/ ( 0                                   ),
-/* IND_STATIC	   	*/ (              _STA                   ),
+/* IND		   	*/ (          _NS                        ),
+/* IND_OLDGEN	   	*/ (          _NS                        ),
+/* IND_PERM		*/ (          _NS                        ),
+/* IND_OLDGEN_PERM	*/ (          _NS                        ),
+/* IND_STATIC	   	*/ (          _NS|_STA                   ),
 /* CAF_UNENTERED        */ ( 0                                   ),
 /* CAF_ENTERED          */ ( 0                                   ),
 /* CAF_BLACKHOLE   	*/ ( 	 _BTM|_NS|         _MUT|_UPT     ),
