@@ -26,10 +26,12 @@ represents variables, both term variables and type variables:
 </pre>
 <ul>
 <li> The <code>varName</code> field contains the identity of the variable:
-its unique number, and its print-name.  The unique number is cached in the
-<code>realUnique</code> field, just to make comparison of <code>Var</code>s a little faster.
+its unique number, and its print-name.  See "<a href="names.html">The truth about names</a>".
 
-<p><li> The <code>Type</code> field gives the type of a term variable, or the kind of a
+<p><li> The <code>realUnique</code> field caches the unique number in the
+<code>varName</code> field, just to make comparison of <code>Var</code>s a little faster.
+
+<p><li> The <code>varType</code> field gives the type of a term variable, or the kind of a
 type variable.  (Types and kinds are both represented by a <code>Type</code>.)
 
 <p><li> The <code>varDetails</code> field distinguishes term variables from type variables,
@@ -56,6 +58,7 @@ We define a couple of type synonyms:
 </pre>
 just to help us document the occasions when we are expecting only term variables,
 or only type variables.
+
 
 <h2> The <code>VarDetails</code> field </h2>
 
@@ -206,24 +209,15 @@ to find calls to overloaded functions, <em>and then discards the <code>SpecPragm
 So <code>SpecPragma</code> behaves a like <code>Exported</code>, at least until the specialiser.
 
 
-<h3>Global and Local <code>Name</code>s</h3>
+<h3> ExternalNames and InternalNames </h3>
 
 Notice that whether an Id is a <code>LocalId</code> or <code>GlobalId</code> is 
-not the same as whether the Id has a <code>Local</code> or <code>Global</code> <code>Name</code>:
+not the same as whether the Id has an <code>ExternaName</code> or an <code>InternalName</code>
+(see "<a href="names.html#sort">The truth about Names</a>"):
 <ul>
-<li> Every <code>GlobalId</code> has a <code>Global</code> <code>Name</code>.
+<li> Every <code>GlobalId</code> has an <code>ExternalName</code>.
 <li> A <code>LocalId</code> might have either kind of <code>Name</code>.
 </ul>
-The significance of Global vs Local names is this:
-<ul>
-<li> A <code>Global</code> Name has a module and occurrence name; a <code>Local</code> 
-has only an occurrence name.
-<p> <li> A <code>Global</code> Name has a unique that never changes.  It is never
-cloned.  This is important, because the simplifier invents new names pretty freely,
-but we don't want to lose the connnection with the type environment (constructed earlier).
-A <code>Local</code> name can be cloned freely.
-</ul>
-
 
 <!-- hhmts start -->
 Last modified: Tue Nov 13 14:11:35 EST 2001

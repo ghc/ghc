@@ -16,31 +16,12 @@ Roughly speaking, It has the type:
 <pre>
    HsModule RdrName -> HsModule Name
 </pre>
-That is, it converts all the <tt>RdrNames</tt> to <tt>Names</tt>.
+That is, it converts all the <tt>RdrNames</tt> to <a href="names.html"><tt>Names</tt></a>.
 
-<h2> OccNames, RdrNames, and Names </h2>
+<h2> RdrNames </h2>
 
 A <tt>RdrNames</tt> is pretty much just a string (for an unqualified name
-like "<tt>f</tt>") or a pair of strings (for a qualified name like "<tt>M.f</tt>").
-Well, not quite just strings, because in Haskell a name like "C" could mean a type 
-constructor or data constructor, depending on context.  So GHC defines a type 
-<tt>OccName</tt> (defined in <tt>basicTypes/OccName.lhs</tt>) that is a pair of
-a <tt>FastString</tt> and a <tt>NameSpace</tt> indicating which name space the
-name is drawn from:
-<pre>
-    data OccName = OccName NameSpace EncodedFS
-</pre>
-The <tt>EncodedFS</tt> is a synonym for <tt>FastString</tt> indicating that the
-string is Z-encoded.  (Details in <tt>OccName.lhs</tt>.)
-<p>
-The name spaces are:
-<ul>
-<li> <tt>VarName</tt>: ordinary variables
-<li> <tt>TvName</tt>: type variables
-<li> <tt>DataName</tt>: data constructors
-<li> <tt>TcClsName</tt>: type constructors and classes (in Haskell they share a name space)
-</ul>
-So a <tt>RdrName</tt> is defined thus:
+like "<tt>f</tt>") or a pair of strings (for a qualified name like "<tt>M.f</tt>"):
 <pre>
     data RdrName = RdrName Qual OccName
     
@@ -54,35 +35,11 @@ So a <tt>RdrName</tt> is defined thus:
 	      | Orig ModuleName	    -- This is an *original* name; the module is the place
 				    -- where the thing was defined
 </pre>
+The OccName type is described in <a href="names.html#occname">"The truth about names"</a>.
+<p>
 The <tt>OrigName</tt> variant is used internally; it allows GHC to speak of <tt>RdrNames</tt>
 that refer to the original name of the thing.
 
-<p>
-On the other hand, a <tt>Name</tt>:
-<ul>
-<li> Contains the <em>original name</em> for the thing.   
-<li> Contains a <tt>Unique</tt> that makes it easy to compare names for equality quickly.
-<li> Contains a <tt>SrcLoc</tt> saying where the name was bound.
-</ul>
-The <em>original name</em> of an entity (type constructor, class, function etc) is
-the (module,name) pair describing where the thing was originally defined.  So for example,
-if we have
-<pre>
-  module M where
-    f = e1
-    g = e2
-
-  module A where
-    import qualified M as Q
-    import M
-    a = Q.f + g
-</pre>
-then the RdrNames for "a", "Q.f" and "g" get replaced by the Names
-"A.a", "M.f", and "M.g" respectively.
-<p>
-<tt>Names</tt> come in two flavours: Local and Global.  The Global kind contain
-both a <tt>Module</tt> and an <tt>OccName</tt>
-Not all Names are qualifed.  Local (e.g. lambda-bound) names are given Local Names
 
 <h2> Rebindable syntax </h2>
 
