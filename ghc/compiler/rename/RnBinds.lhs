@@ -531,6 +531,6 @@ missingSigWarn var
     loc = nameSrcLoc var  -- TODO: make a proper span
 
 methodBindErr mbind
- =  hang (ptext SLIT("Can't handle multiple methods defined by one pattern binding"))
+ =  hang (ptext SLIT("Pattern bindings (except simple variables) not allowed in instance declarations"))
        4 (ppr mbind)
 \end{code}
