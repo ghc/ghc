@@ -84,6 +84,7 @@ exposed-modules:
 	Foreign.Ptr,
 	Foreign.StablePtr,
 	Foreign.Storable,
+	GHC.ConsoleHandler,
 	GHC.Dotnet,
 	GHC.Exts,
 	GHC.ForeignPtr,
