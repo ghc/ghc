@@ -28,7 +28,7 @@ import OccName	( NameSpace, tcName,
 		  mkSrcOccFS, mkSrcVarOcc,
 		  isDataOcc, isTvOcc
 		)
-import Module   ( ModuleName,
+import Module   ( ModuleName, pprModuleName,
 		  mkSysModuleFS, mkSrcModuleFS
 		)
 import Outputable
@@ -95,8 +95,8 @@ mkPreludeQual :: NameSpace -> ModuleName -> FAST_STRING -> RdrName
 mkPreludeQual sp mod n = RdrName (Qual mod) (mkSrcOccFS sp n)
 
 qualifyRdrName :: ModuleName -> RdrName -> RdrName
-qualifyRdrName mod (RdrName Unqual occ) = RdrName (Qual mod) occ
-qualifyRdrName mod rdr_name		= rdr_name 
+	-- Sets the module name of a RdrName, even if it has one already
+qualifyRdrName mod (RdrName _ occ) = RdrName (Qual mod) occ
 \end{code}
 
 \begin{code}
@@ -132,7 +132,7 @@ instance Outputable RdrName where
     ppr (RdrName qual occ) = pp_qual qual <> ppr occ
 			   where
 				pp_qual Unqual = empty
-				pp_qual (Qual mod) = ppr mod <> dot
+				pp_qual (Qual mod) = pprModuleName mod <> dot
 
 instance Eq RdrName where
     a == b = case (a `compare` b) of { EQ -> True;  _ -> False }

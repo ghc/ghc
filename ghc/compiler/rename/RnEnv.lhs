@@ -794,4 +794,3 @@ dupNamesErr descriptor ((name,loc) : dup_things)
 	      $$ 
 	      (ptext SLIT("in") <+> descriptor))
 \end{code}
-

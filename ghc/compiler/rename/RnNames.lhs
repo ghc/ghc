@@ -273,10 +273,7 @@ importsFromLocalDecls mod_name rec_exp_fn decls
 	all_names = [name | avail <- avails, name <- availNames avail]
 
 	dups :: [[Name]]
-	dups = filter non_singleton (equivClassesByUniq getUnique all_names)
-	     where
-		non_singleton (x1:x2:xs) = True
-		non_singleton other      = False
+	(_, dups) = removeDups compare all_names
     in
 	-- Check for duplicate definitions
     mapRn_ (addErrRn . dupDeclErr) dups		`thenRn_` 
@@ -293,9 +290,18 @@ importsFromLocalDecls mod_name rec_exp_fn decls
 		   (\n -> n)
 
   where
-    newLocalName rdr_name loc = newLocalTopBinder mod (rdrNameOcc rdr_name)
-						  rec_exp_fn loc
     mod = mkThisModule mod_name
+
+    newLocalName rdr_name loc 
+	= (if isQual rdr_name then
+		qualNameErr (text "the binding for" <+> quotes (ppr rdr_name)) (rdr_name,loc)
+		-- There should never be a qualified name in a binding position (except in instance decls)
+		-- The parser doesn't check this because the same parser parses instance decls
+	    else 
+		returnRn ())			`thenRn_`
+
+	  newLocalTopBinder mod (rdrNameOcc rdr_name) rec_exp_fn loc
+
 
 getLocalDeclBinders :: (RdrName -> SrcLoc -> RnMG Name)	-- New-name function
 		    -> RdrNameHsDecl
