@@ -413,10 +413,14 @@ endif
 ifneq "$(SCRIPT_LINK)" ""
 all :: $(SCRIPT_LINK)
 
-# The use of -L is non-standard, but I've yet to find
-# an implementation of `test' that doesn't like it.
+#
+# Don't want to overwrite $(SCRIPT_LINK)s that aren't symbolic
+# links. Testing for symbol links is problematic to do in
+# a portable fashion using a /bin/sh test, so we simply rely
+# on perl.
+#
 $(SCRIPT_LINK) : $(SCRIPT_PROG)
-	@if ( test ! -f $(SCRIPT_LINK) -o -L $(SCRIPT_LINK) ); then \
+	@if ( perl -e '$$fn="$(SCRIPT_LINK)"; exit ((! -f $$fn || -l $$fn) ? 0 : 1);' ); then \
 	   echo "Creating a symbol link from $(SCRIPT_PROG) to $(SCRIPT_LINK)"; \
 	   $(RM) $(SCRIPT_LINK); \
 	   $(LN_S) $(SCRIPT_PROG) $(SCRIPT_LINK); \
@@ -477,8 +481,9 @@ install-dirs ::
 ifneq "$(INSTALL_PROGS)" ""
 install:: $(INSTALL_PROGS)
 	@$(INSTALL_DIR) $(bindir)
-	for i in $(INSTALL_PROGS); do \
-		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i$(exeext) $(bindir); \
+	@for i in $(INSTALL_PROGS); do \
+		echo $(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i$(exeext) $(bindir); \
+		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i$(exeext) $(bindir);      \
 	done
 endif
 
@@ -607,30 +612,30 @@ endif
 # Use with care..
 #
 uninstall:: 
-ifeq ($(INSTALL_PROGS),)
-	@for i in $(INSTALL_PROGS) ; do				\
+	@for i in $(INSTALL_PROGS) "" ; do			\
+	  if test "$$i"; then 					\
 		echo rm -f $(bindir)/`basename $$i`;		\
 		rm -f $(bindir)/`basename $$i`;			\
+	  fi; 							\
 	done
-endif
-ifeq ($(INSTALL_LIBS),)
-	@for i in $(INSTALL_LIBS); do				\
+	@for i in $(INSTALL_LIBS) ""; do			\
+	  if test "$$i"; then 					\
 		echo rm -f $(libdir)/`basename $$i`;		\
 		rm -f $(libdir)/`basename $$i`;			\
+	  fi;							\
 	done
-endif
-ifeq ($(INSTALL_LIBEXECS),)
-	@for i in $(INSTALL_LIBEXECS); do			\
+	@for i in $(INSTALL_LIBEXECS) ""; do			\
+	  if test "$$i"; then 					\
 		echo rm -f $(libexecdir)/`basename $$i`;	\
 		rm -f $(libexecdir)/`basename $$i`;		\
+	  fi;							\
 	done
-endif
-ifeq ($(INSTALL_DATAS),)
-	@for i in $(INSTALL_DATAS); do				\
+	@for i in $(INSTALL_DATAS) ""; do			\
+	  if test "$$i"; then 					\
 		echo rm -f $(datadir)/`basename $$i`;		\
 		rm -f $(datadir)/`basename $$i`;		\
+	  fi;							\
 	done
-endif
 
 #
 # install-strip is from the GNU Makefile standard.
