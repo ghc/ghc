@@ -21,7 +21,7 @@ module VarEnv (
 
 	-- SubstEnvs
 	SubstEnv, TyVarSubstEnv, SubstResult(..),
-	emptySubstEnv, substEnvEnv,
+	emptySubstEnv, substEnvEnv, elemSubstEnv,
 	mkSubstEnv, lookupSubstEnv, extendSubstEnv, extendSubstEnvList,
 	delSubstEnv, delSubstEnvList, noTypeSubst, isEmptySubstEnv
     ) where
@@ -92,6 +92,9 @@ isEmptySubstEnv (SE s _) = isEmptyVarEnv s
 
 lookupSubstEnv :: SubstEnv -> Var -> Maybe SubstResult
 lookupSubstEnv (SE s _) v = lookupVarEnv s v
+
+elemSubstEnv :: Var -> SubstEnv -> Bool
+elemSubstEnv v (SE s _) = elemVarEnv v s
 
 extendSubstEnv :: SubstEnv -> Var -> SubstResult -> SubstEnv
 extendSubstEnv (SE s nt) v r = SE (extendVarEnv s v r) (noTys r nt)
