@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.84 2002/02/11 08:20:44 chak Exp $
+$Id: Parser.y,v 1.85 2002/02/11 09:27:22 simonpj Exp $
 
 Haskell grammar.
 
@@ -348,23 +348,20 @@ topdecl :: { RdrBinding }
 		-- Instead we just say b is out of scope
 		{ RdrHsDecl (TyClD (TySynonym (fst $3) (snd $3) $5 $1)) }
 
-	| srcloc 'data' ctype constrs deriving
-		{% checkDataHeader "data" $3 `thenP` \(cs,c,ts) ->
-		   returnP (RdrHsDecl (TyClD
-		      (mkTyData DataType cs c ts (reverse $4) (length $4) $5 $1))) }
+	| srcloc 'data' tycl_hdr constrs deriving
+		{% returnP (RdrHsDecl (TyClD
+		      (mkTyData DataType $3 (reverse $4) (length $4) $5 $1))) }
 
-	| srcloc 'newtype' ctype '=' newconstr deriving
-		{% checkDataHeader "newtype" $3 `thenP` \(cs,c,ts) ->
-		   returnP (RdrHsDecl (TyClD
-		      (mkTyData NewType cs c ts [$5] 1 $6 $1))) }
+	| srcloc 'newtype' tycl_hdr '=' newconstr deriving
+		{% returnP (RdrHsDecl (TyClD
+		      (mkTyData NewType $3 [$5] 1 $6 $1))) }
 
-	| srcloc 'class' ctype fds where
-		{% checkDataHeader "class" $3 `thenP` \(cs,c,ts) ->
-		   let 
+	| srcloc 'class' tycl_hdr fds where
+		{% let 
 			(binds,sigs) = cvMonoBindsAndSigs cvClassOpSig (groupBindings $5) 
 		   in
 	 	   returnP (RdrHsDecl (TyClD
-		      (mkClassDecl cs c ts $4 sigs (Just binds) $1))) }
+		      (mkClassDecl $3 $4 sigs (Just binds) $1))) }
 
 	| srcloc 'instance' inst_type where
 		{ let (binds,sigs) 
@@ -377,6 +374,114 @@ topdecl :: { RdrBinding }
 	| '{-# DEPRECATED' deprecations '#-}'	 	{ $2 }
 	| '{-# RULES' rules '#-}'		 	{ $2 }
       	| decl						{ $1 }
+
+-- tycl_hdr parses the header of a type or class decl,
+-- which takes the form
+--	T a b
+-- 	Eq a => T a
+--	(Eq a, Ord b) => T a b
+-- Rather a lot of inlining here, else we get reduce/reduce errors
+tycl_hdr :: { (RdrNameContext, RdrName, [RdrNameHsTyVar]) }
+	: '(' types ')' '=>' tycon tyvars	{% mapP checkPred $2		`thenP` \ cxt ->
+						   returnP (cxt, $5, $6) }
+	| tycon tyvars '=>' tycon tyvars	{% checkTyVars $2	`thenP` \ args ->
+						   returnP ([HsClassP $1 args], $4, $5) }
+	| qtycon tyvars '=>' tycon tyvars	{% checkTyVars $2	`thenP` \ args ->
+						   returnP ([HsClassP $1 args], $4, $5) }
+	| tycon tyvars				{ ([], $1, $2) }
+
+decls 	:: { [RdrBinding] }
+	: decls ';' decl		{ $3 : $1 }
+	| decls ';'			{ $1 }
+	| decl				{ [$1] }
+	| {- empty -}			{ [] }
+
+decl 	:: { RdrBinding }
+	: fixdecl			{ $1 }
+	| valdef			{ $1 }
+	| '{-# INLINE'   srcloc activation qvar '#-}'	      { RdrSig (InlineSig True  $4 $3 $2) }
+	| '{-# NOINLINE' srcloc inverse_activation qvar '#-}' { RdrSig (InlineSig False $4 $3 $2) }
+	| '{-# SPECIALISE' srcloc qvar '::' sigtypes '#-}'
+	 	{ foldr1 RdrAndBindings 
+		    (map (\t -> RdrSig (SpecSig $3 t $2)) $5) }
+	| '{-# SPECIALISE' srcloc 'instance' inst_type '#-}'
+		{ RdrSig (SpecInstSig $4 $2) }
+
+wherebinds :: { RdrNameHsBinds }
+	: where			{ cvBinds cvValSig (groupBindings $1) }
+
+where 	:: { [RdrBinding] }
+	: 'where' decllist		{ $2 }
+	| {- empty -}			{ [] }
+
+declbinds :: { RdrNameHsBinds }
+	: decllist			{ cvBinds cvValSig (groupBindings $1) }
+
+decllist :: { [RdrBinding] }
+	: '{'            decls '}'	{ $2 }
+	|     layout_on  decls close	{ $2 }
+
+fixdecl :: { RdrBinding }
+	: srcloc infix prec ops	    	{ foldr1 RdrAndBindings
+					    [ RdrSig (FixSig (FixitySig n 
+							    (Fixity $3 $2) $1))
+					    | n <- $4 ] }
+
+-----------------------------------------------------------------------------
+-- Transformation Rules
+
+rules	:: { RdrBinding }
+	:  rules ';' rule			{ $1 `RdrAndBindings` $3 }
+        |  rules ';'				{ $1 }
+        |  rule					{ $1 }
+	|  {- empty -}				{ RdrNullBind }
+
+rule  	:: { RdrBinding }
+	: STRING activation rule_forall infixexp '=' srcloc exp
+	     { RdrHsDecl (RuleD (HsRule $1 $2 $3 $4 $7 $6)) }
+
+activation :: { Activation }           -- Omitted means AlwaysActive
+        : {- empty -}                           { AlwaysActive }
+        | explicit_activation                   { $1 }
+
+inverse_activation :: { Activation }   -- Omitted means NeverActive
+        : {- empty -}                           { NeverActive }
+        | explicit_activation                   { $1 }
+
+explicit_activation :: { Activation }  -- In brackets
+        : '[' INTEGER ']'                       { ActiveAfter  (fromInteger $2) }
+        | '[' '~' INTEGER ']'                   { ActiveBefore (fromInteger $3) }
+
+rule_forall :: { [RdrNameRuleBndr] }
+	: 'forall' rule_var_list '.'            { $2 }
+        | {- empty -}				{ [] }
+
+rule_var_list :: { [RdrNameRuleBndr] }
+        : rule_var				{ [$1] }
+        | rule_var rule_var_list		{ $1 : $2 }
+
+rule_var :: { RdrNameRuleBndr }
+	: varid                              	{ RuleBndr $1 }
+       	| '(' varid '::' ctype ')'             	{ RuleBndrSig $2 $4 }
+
+-----------------------------------------------------------------------------
+-- Deprecations
+
+deprecations :: { RdrBinding }
+	: deprecations ';' deprecation		{ $1 `RdrAndBindings` $3 }
+	| deprecations ';'			{ $1 }
+	| deprecation				{ $1 }
+	| {- empty -}				{ RdrNullBind }
+
+-- SUP: TEMPORARY HACK, not checking for `module Foo'
+deprecation :: { RdrBinding }
+	: srcloc depreclist STRING
+		{ foldr RdrAndBindings RdrNullBind 
+			[ RdrHsDecl (DeprecD (Deprecation n $3 $1)) | n <- $2 ] }
+
+
+-----------------------------------------------------------------------------
+-- Foreign import and export declarations
 
 -- for the time being, the following accepts foreign declarations conforming
 -- to the FFI Addendum, Version 1.0 as well as pre-standard declarations
@@ -491,97 +596,6 @@ fdecl2DEPRECATED
     -- left this one unchanged for the moment as type imports are not
     -- covered currently by the FFI standard -=chak
 
-decls 	:: { [RdrBinding] }
-	: decls ';' decl		{ $3 : $1 }
-	| decls ';'			{ $1 }
-	| decl				{ [$1] }
-	| {- empty -}			{ [] }
-
-decl 	:: { RdrBinding }
-	: fixdecl			{ $1 }
-	| valdef			{ $1 }
-	| '{-# INLINE'   srcloc activation qvar '#-}'	      { RdrSig (InlineSig True  $4 $3 $2) }
-	| '{-# NOINLINE' srcloc inverse_activation qvar '#-}' { RdrSig (InlineSig False $4 $3 $2) }
-	| '{-# SPECIALISE' srcloc qvar '::' sigtypes '#-}'
-	 	{ foldr1 RdrAndBindings 
-		    (map (\t -> RdrSig (SpecSig $3 t $2)) $5) }
-	| '{-# SPECIALISE' srcloc 'instance' inst_type '#-}'
-		{ RdrSig (SpecInstSig $4 $2) }
-
-wherebinds :: { RdrNameHsBinds }
-	: where			{ cvBinds cvValSig (groupBindings $1) }
-
-where 	:: { [RdrBinding] }
-	: 'where' decllist		{ $2 }
-	| {- empty -}			{ [] }
-
-declbinds :: { RdrNameHsBinds }
-	: decllist			{ cvBinds cvValSig (groupBindings $1) }
-
-decllist :: { [RdrBinding] }
-	: '{'            decls '}'	{ $2 }
-	|     layout_on  decls close	{ $2 }
-
-fixdecl :: { RdrBinding }
-	: srcloc infix prec ops	    	{ foldr1 RdrAndBindings
-					    [ RdrSig (FixSig (FixitySig n 
-							    (Fixity $3 $2) $1))
-					    | n <- $4 ] }
-
------------------------------------------------------------------------------
--- Transformation Rules
-
-rules	:: { RdrBinding }
-	:  rules ';' rule			{ $1 `RdrAndBindings` $3 }
-        |  rules ';'				{ $1 }
-        |  rule					{ $1 }
-	|  {- empty -}				{ RdrNullBind }
-
-rule  	:: { RdrBinding }
-	: STRING activation rule_forall infixexp '=' srcloc exp
-	     { RdrHsDecl (RuleD (HsRule $1 $2 $3 $4 $7 $6)) }
-
-activation :: { Activation }           -- Omitted means AlwaysActive
-        : {- empty -}                           { AlwaysActive }
-        | explicit_activation                   { $1 }
-
-inverse_activation :: { Activation }   -- Omitted means NeverActive
-        : {- empty -}                           { NeverActive }
-        | explicit_activation                   { $1 }
-
-explicit_activation :: { Activation }  -- In brackets
-        : '[' INTEGER ']'                       { ActiveAfter  (fromInteger $2) }
-        | '[' '~' INTEGER ']'                   { ActiveBefore (fromInteger $3) }
-
-rule_forall :: { [RdrNameRuleBndr] }
-	: 'forall' rule_var_list '.'            { $2 }
-        | {- empty -}				{ [] }
-
-rule_var_list :: { [RdrNameRuleBndr] }
-        : rule_var				{ [$1] }
-        | rule_var rule_var_list		{ $1 : $2 }
-
-rule_var :: { RdrNameRuleBndr }
-	: varid                              	{ RuleBndr $1 }
-       	| '(' varid '::' ctype ')'             	{ RuleBndrSig $2 $4 }
-
------------------------------------------------------------------------------
--- Deprecations
-
-deprecations :: { RdrBinding }
-	: deprecations ';' deprecation		{ $1 `RdrAndBindings` $3 }
-	| deprecations ';'			{ $1 }
-	| deprecation				{ $1 }
-	| {- empty -}				{ RdrNullBind }
-
--- SUP: TEMPORARY HACK, not checking for `module Foo'
-deprecation :: { RdrBinding }
-	: srcloc depreclist STRING
-		{ foldr RdrAndBindings RdrNullBind 
-			[ RdrHsDecl (DeprecD (Deprecation n $3 $1)) | n <- $2 ] }
-
------------------------------------------------------------------------------
--- Foreign declarations
 
 callconv :: { CallConv }
 	  : 'stdcall'			{ CCall  StdCallConv }
@@ -644,6 +658,13 @@ ctype	:: { RdrNameHsType }
 	-- A type of form (context => type) is an *implicit* HsForAllTy
 	| type				{ $1 }
 
+-- We parse a context as a btype so that we don't get reduce/reduce
+-- errors in ctype.  The basic problem is that
+--	(Eq a, Ord a)
+-- looks so much like a tuple type.  We can't tell until we find the =>
+context :: { RdrNameContext }
+	: btype 			{% checkContext $1 }
+
 type :: { RdrNameHsType }
 	: gentype '->' type		{ HsFunTy $1 $3 }
 	| ipvar '::' type		{ mkHsIParamTy $1 $3 }
@@ -688,7 +709,7 @@ simpletype :: { (RdrName, [RdrNameHsTyVar]) }
 	: tycon tyvars			{ ($1, reverse $2) }
 
 tyvars :: { [RdrNameHsTyVar] }
-	: tyvars tyvar			{ UserTyVar $2 : $1 }
+	: tyvar tyvars			{ UserTyVar $1 : $2 }
 	| {- empty -}			{ [] }
 
 fds :: { [([RdrName], [RdrName])] }
@@ -731,9 +752,6 @@ constr :: { RdrNameConDecl }
 forall :: { [RdrNameHsTyVar] }
 	: 'forall' tyvars '.'		{ $2 }
 	| {- empty -}			{ [] }
-
-context :: { RdrNameContext }
-	: btype 			{% checkContext $1 }
 
 constr_stuff :: { (RdrName, RdrNameConDetails) }
 	: btype				{% mkVanillaCon $1 []		    }
@@ -1075,7 +1093,9 @@ deprec_var : var			{ $1 }
 	   | tycon			{ $1 }
 
 gtycon 	:: { RdrName }
-	: qtycon			{ $1 }
+	: tycon				{ $1 }
+	| qtycon			{ $1 }
+ 	| '(' tyconop ')'		{ $2 }
  	| '(' qtyconop ')'		{ $2 }
 	| '(' ')'			{ unitTyCon_RDR }
 	| '(' '->' ')'			{ funTyCon_RDR }
@@ -1183,7 +1203,7 @@ special_id
 -----------------------------------------------------------------------------
 -- ConIds
 
-qconid :: { RdrName }
+qconid :: { RdrName }	-- Qualified or unqualifiedb
 	: conid			{ $1 }
 	| QCONID		{ mkQual dataName $1 }
 
@@ -1193,7 +1213,7 @@ conid 	:: { RdrName }
 -----------------------------------------------------------------------------
 -- ConSyms
 
-qconsym :: { RdrName }
+qconsym :: { RdrName }	-- Qualified or unqualifiedb
 	: consym		{ $1 }
 	| QCONSYM		{ mkQual dataName $1 }
 
@@ -1270,13 +1290,11 @@ tycon 	:: { RdrName }
 tyconop	:: { RdrName }
 	: CONSYM		{ mkUnqual tcClsName $1 }
 
-qtycon :: { RdrName }
-	: tycon			{ $1 }
-	| QCONID		{ mkQual tcClsName $1 }
+qtycon :: { RdrName }	-- Just the qualified kind
+	: QCONID		{ mkQual tcClsName $1 }
 
-qtyconop :: { RdrName }
- 	  : tyconop		{ $1 }
-	  | QCONSYM		{ mkQual tcClsName $1 }
+qtyconop :: { RdrName }	-- Just the qualified kind
+	  : QCONSYM		{ mkQual tcClsName $1 }
 
 commas :: { Int }
 	: commas ','			{ $1 + 1 }

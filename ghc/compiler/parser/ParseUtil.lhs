@@ -24,8 +24,9 @@ module ParseUtil (
 			      
 	, checkPrec 	      -- String -> P String
 	, checkContext	      -- HsType -> P HsContext
+	, checkPred	      -- HsType -> P HsPred
+	, checkTyVars	      -- [HsTyVar] -> P [HsType]
 	, checkInstType	      -- HsType -> P HsType
-	, checkDataHeader     -- HsQualType -> P (HsContext,HsName,[HsName])
 	, checkPattern	      -- HsExp -> P HsPat
 	, checkPatterns	      -- SrcLoc -> [HsExp] -> P [HsPat]
 	, checkDo	      -- [Stmt] -> P [Stmt]
@@ -112,24 +113,32 @@ checkInstType t
 	ty ->   checkDictTy ty [] `thenP` \ dict_ty->
 	      	returnP (HsForAllTy Nothing [] dict_ty)
 
+checkTyVars :: [RdrNameHsTyVar] -> P [RdrNameHsType]
+checkTyVars tvs = mapP chk tvs
+	        where
+		  chk (UserTyVar tv) = returnP (HsTyVar tv)
+		  chk other	     = parseError "Illegal kinded type variable"
+
 checkContext :: RdrNameHsType -> P RdrNameContext
 checkContext (HsTupleTy _ ts) 	-- (Eq a, Ord b) shows up as a tuple type
-  = mapP (\t -> checkPred t []) ts `thenP` \ps ->
-    returnP ps
+  = mapP checkPred ts
 
 checkContext (HsTyVar t)	-- Empty context shows up as a unit type ()
   | t == unitTyCon_RDR = returnP []
 
 checkContext t 
-  = checkPred t [] `thenP` \p ->
+  = checkPred t `thenP` \p ->
     returnP [p]
 
-checkPred :: RdrNameHsType -> [RdrNameHsType] -> P (HsPred RdrName)
-checkPred (HsTyVar t) args | not (isRdrTyVar t) 
-  	= returnP (HsClassP t args)
-checkPred (HsAppTy l r) args = checkPred l (r:args)
-checkPred (HsPredTy (HsIParam n ty)) [] = returnP (HsIParam n ty)
-checkPred _ _ = parseError "Illegal class assertion"
+checkPred :: RdrNameHsType -> P (HsPred RdrName)
+checkPred (HsPredTy (HsIParam n ty)) = returnP (HsIParam n ty)
+checkPred (HsAppTy l r)
+  = go l [r]
+  where
+    go (HsTyVar t) args   | not (isRdrTyVar t) 
+		  	  = returnP (HsClassP t args)
+    go (HsAppTy l r) args = go l (r:args)
+    go _ 	     _    = parseError "Illegal class assertion"
 
 checkDictTy :: RdrNameHsType -> [RdrNameHsType] -> P RdrNameHsType
 checkDictTy (HsTyVar t) args@(_:_) | not (isRdrTyVar t) 
@@ -137,32 +146,6 @@ checkDictTy (HsTyVar t) args@(_:_) | not (isRdrTyVar t)
 checkDictTy (HsAppTy l r) args = checkDictTy l (r:args)
 checkDictTy _ _ = parseError "Malformed context in instance header"
 
--- Put more comments!
--- Checks that the lhs of a datatype declaration
--- is of the form Context => T a b ... z
-checkDataHeader :: String	-- data/newtype/class
-		-> RdrNameHsType 
-		-> P (RdrNameContext, RdrName, [RdrNameHsTyVar])
-
-checkDataHeader s (HsForAllTy Nothing cs t) =
-   checkSimple s t []	     `thenP` \(c,ts) ->
-   returnP (cs,c,map UserTyVar ts)
-checkDataHeader s t =
-   checkSimple s t []	     `thenP` \(c,ts) ->
-   returnP ([],c,map UserTyVar ts)
-
--- Checks the type part of the lhs of 
--- a data/newtype/class declaration
-checkSimple :: String -> RdrNameHsType -> [RdrName] -> P ((RdrName,[RdrName]))
-checkSimple s (HsAppTy l (HsTyVar a)) xs | isRdrTyVar a 
-   = checkSimple s l (a:xs)
-checkSimple s (HsTyVar tycon) xs | not (isRdrTyVar tycon) = returnP (tycon,xs)
-
-checkSimple s (HsOpTy (HsTyVar t1) tycon (HsTyVar t2)) [] 
-  | not (isRdrTyVar tycon) && isRdrTyVar t1 && isRdrTyVar t2
-  = returnP (tycon,[t1,t2])
-
-checkSimple s t _ = parseError ("Malformed " ++ s ++ " declaration")
 
 ---------------------------------------------------------------------------
 -- Checking statements in a do-expression
