@@ -23,7 +23,7 @@ import SMRep		( fixedItblSize,
 			)
 import Constants   	( mIN_UPD_SIZE )
 import CLabel           ( CLabel, mkReturnInfoLabel, mkReturnPtLabel,
-                          mkClosureTblLabel, mkClosureLabel
+                          mkClosureTblLabel, mkClosureLabel,
 			  moduleRegdLabel )
 import ClosureInfo	( infoTableLabelFromCI, entryLabelFromCI,
 			  fastLabelFromCI, closureUpdReqd,
