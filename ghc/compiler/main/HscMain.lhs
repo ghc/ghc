@@ -14,6 +14,8 @@ module HscMain ( HscResult(..), hscMain,
 
 #ifdef GHCI
 import RdrHsSyn		( RdrNameHsExpr )
+import Rename		( renameExpr )
+import CoreToStg	( coreExprToStg )
 import StringBuffer	( stringToStringBuffer, freeStringBuffer )
 import Unique		( Uniquable(..) )
 import Type		( splitTyConApp_maybe )
@@ -27,22 +29,20 @@ import StringBuffer	( hGetStringBuffer )
 import Parser
 import Lex		( PState(..), ParseResult(..) )
 import SrcLoc		( mkSrcLoc )
-import Rename		( checkOldIface, renameModule, renameExpr, closeIfaceDecls )
+import Rename		( checkOldIface, renameModule, closeIfaceDecls )
 import Rules		( emptyRuleBase )
 import PrelInfo		( wiredInThingEnv, wiredInThings )
 import PrelNames	( knownKeyNames )
 import MkIface		( completeIface, mkModDetailsFromIface, mkModDetails,
 			  writeIface, pprIface )
 import TcModule
-import Type
 import InstEnv		( emptyInstEnv )
 import Desugar
 import SimplCore
-import CoreSyn		( bindersOfBinds )
 import CoreUtils	( coreBindsSize )
 import CoreTidy		( tidyCorePgm )
 import CoreSat
-import CoreToStg	( coreToStg, coreExprToStg )
+import CoreToStg	( coreToStg )
 import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
 import CodeOutput	( codeOutput )
@@ -215,17 +215,22 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
 	; let env_tc = tc_env tc_result
 
  	    -------------------
- 	    -- DESUGAR, SIMPLIFY, TIDY-CORE
+ 	    -- DESUGAR
+ 	    -------------------
+	; (ds_binds, ds_rules, foreign_stuff) 
+             <- deSugar dflags pcs_tc hst this_mod print_unqualified tc_result
+
+ 	    -------------------
+ 	    -- SIMPLIFY, TIDY-CORE
  	    -------------------
       	  -- We grab the the unfoldings at this point.
-	; (pcs_simpl, tidy_binds, orphan_rules, foreign_stuff)
-	      <- dsThenSimplThenTidy dflags pcs_tc hst this_mod 
- 				print_unqualified is_exported tc_result
+	; (pcs_simpl, tidy_binds, orphan_rules)
+	      <- simplThenTidy dflags pcs_tc hst this_mod is_exported ds_binds ds_rules
       	    
  	    -------------------
  	    -- BUILD THE NEW ModDetails AND ModIface
  	    -------------------
-	; let new_details = mkModDetails env_tc tidy_binds  orphan_rules
+	; let new_details = mkModDetails env_tc tidy_binds orphan_rules
 	; final_iface <- mkFinalIface ghci_mode dflags location 
                                       maybe_checked_iface new_iface new_details
 
@@ -234,7 +239,6 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
  	    -------------------
 	; (stg_binds, cost_centre_info) 
 		<- myCoreToStg dflags this_mod tidy_binds
-
 
  	    -------------------
  	    -- COMPLETE CODE GENERATION
@@ -301,6 +305,23 @@ myParseModule dflags src_filename
       }}
 
 
+simplThenTidy dflags pcs hst this_mod is_exported binds rules
+ = do -- Do main Core-language transformations ---------
+      -- _scc_     "Core2Core"
+      (simplified, orphan_rules) 
+         <- core2core dflags pcs hst is_exported binds rules
+
+      -- Do saturation and convert to A-normal form
+      --    NOTE: future passes cannot transform the syntax, only annotate it
+      saturated <- coreSatPgm dflags simplified
+
+      -- Do the final tidy-up
+      (pcs', tidy_binds, tidy_orphan_rules) 
+         <- tidyCorePgm dflags this_mod pcs saturated orphan_rules
+      
+      return (pcs', tidy_binds, tidy_orphan_rules)
+
+
 restOfCodeGeneration dflags toInterp this_mod imported_module_names cost_centre_info 
                      foreign_stuff env_tc stg_binds tidy_binds
                      hit pit -- these last two for mapping ModNames to Modules
@@ -329,7 +350,7 @@ restOfCodeGeneration dflags toInterp this_mod imported_module_names cost_centre_
     local_tycons     = typeEnvTyCons env_tc
     local_classes    = typeEnvClasses env_tc
     imported_modules = map mod_name_to_Module imported_module_names
-    (fe_binders,h_code,c_code) = foreign_stuff
+    (h_code,c_code,fe_binders) = foreign_stuff
 
     mod_name_to_Module :: ModuleName -> Module
     mod_name_to_Module nm
@@ -341,28 +362,6 @@ restOfCodeGeneration dflags toInterp this_mod imported_module_names cost_centre_
          in  mi_module str_mi
     barf nm = pprPanic "mod_name_to_Module: no hst or pst mapping for" 
                        (ppr nm)
-
-
-dsThenSimplThenTidy dflags pcs hst this_mod print_unqual is_exported tc_result
- = do ------------------  Desugaring ---------------------------------
-      -- _scc_     "DeSugar"
-      (desugared, rules, h_code, c_code, fe_binders) 
-         <- deSugar dflags pcs hst this_mod print_unqual tc_result
-
-      ------------------  Main Core-language transformations ---------
-      -- _scc_     "Core2Core"
-      (simplified, orphan_rules) 
-         <- core2core dflags pcs hst is_exported desugared rules
-
-      -- Do saturation and convert to A-normal form
-      --    NOTE: future passes cannot transform the syntax, only annotate it
-      saturated <- coreSatPgm dflags simplified
-
-      -- Do the final tidy-up
-      (pcs', tidy_binds, tidy_orphan_rules) 
-         <- tidyCorePgm dflags this_mod pcs saturated orphan_rules
-      
-      return (pcs', tidy_binds, tidy_orphan_rules, (fe_binders,h_code,c_code))
 
 
 myCoreToStg dflags this_mod tidy_binds
@@ -392,13 +391,7 @@ myCoreToStg dflags this_mod tidy_binds
 %************************************************************************
 
 \begin{code}
-#ifndef GHCI
-hscExpr dflags hst hit pcs this_module expr
-  = panic "hscExpr: non-interactive build"
-hscTypeExpr dflags hst hit pcs0 this_module expr
-  = panic "hscTypeExpr: non-interactive build"
-#else 
-
+#ifdef GHCI
 hscExpr
   :: DynFlags
   -> HomeSymbolTable	

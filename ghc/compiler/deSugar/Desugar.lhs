@@ -50,7 +50,7 @@ deSugar :: DynFlags
 	-> PersistentCompilerState -> HomeSymbolTable
 	-> Module -> PrintUnqualified
         -> TcResults
-	-> IO ([CoreBind], [(Id,CoreRule)], SDoc, SDoc, [CoreBndr])
+	-> IO ([CoreBind], [(Id,CoreRule)], (SDoc, SDoc, [CoreBndr]))
 
 deSugar dflags pcs hst mod_name unqual
         (TcResults {tc_env   = local_type_env,
@@ -63,7 +63,7 @@ deSugar dflags pcs hst mod_name unqual
 	-- Do desugaring
 	; let (result, ds_warns) = initDs dflags us lookup mod_name
 					  (dsProgram mod_name all_binds rules fo_decls)    
-	      (ds_binds, ds_rules, _, _, _) = result
+	      (ds_binds, ds_rules, _) = result
 
 	-- Display any warnings
         ; doIfSet (not (isEmptyBag ds_warns))
@@ -135,7 +135,7 @@ dsProgram mod_name all_binds rules fo_decls
 	local_binders = mkVarSet (bindersOfBinds ds_binds)
     in
     mapDs (dsRule local_binders) rules	`thenDs` \ rules' ->
-    returnDs (ds_binds, rules', h_code, c_code, fe_binders)
+    returnDs (ds_binds, rules', (h_code, c_code, fe_binders))
   where
     auto_scc | opt_SccProfilingOn = TopLevel
 	     | otherwise          = NoSccs
