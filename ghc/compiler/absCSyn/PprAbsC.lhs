@@ -49,7 +49,7 @@ import Maybes		( maybeToBool, catMaybes )
 import PrimOp		( primOpNeedsWrapper )
 import MachOp		( MachOp(..) )
 import ForeignCall	( ForeignCall(..) )
-import PrimRep		( isFloatingRep, PrimRep(..), getPrimRepSize, getPrimRepArrayElemSize )
+import PrimRep		( isFloatingRep, PrimRep(..), getPrimRepSize )
 import SMRep		( pprSMRep )
 import Unique		( pprUnique, Unique{-instance NamedThing-} )
 import UniqSet		( emptyUniqSet, elementOfUniqSet,
@@ -439,17 +439,18 @@ pprAbsC stmt@(CStaticClosure cl_info cost_centre amodes) _
     info_lbl    = infoTableLabelFromCI cl_info
 
     ppr_payload [] = empty
-    ppr_payload ls = comma <+> 
-		     braces (hsep (punctuate comma (map ((text "(L_)" <>).ppr_item) ls)))
+    ppr_payload ls = 
+	comma <+> 
+	  (braces $ hsep $ punctuate comma $
+	   map (text "(L_)" <>) (foldr ppr_item [] ls))
 
-    ppr_item item
-      | rep == VoidRep   = text "0" -- might not even need this...
-      | rep == FloatRep  = ppr_amode (floatToWord item)
-      | rep == DoubleRep = hcat (punctuate (text ", (L_)")
-			 	 (map ppr_amode (doubleToWords item)))
-      | otherwise  	 = ppr_amode item
+    ppr_item item rest
+      | rep == VoidRep   = rest
+      | rep == FloatRep  = ppr_amode (floatToWord item) : rest
+      | rep == DoubleRep = map ppr_amode (doubleToWords item) ++ rest
+      | otherwise  	 = ppr_amode item : rest
       where 
-	rep = getAmodeRep item
+	rep  = getAmodeRep item
 
 
 pprAbsC stmt@(CClosureInfoAndCode cl_info slow maybe_fast cl_descr) _
