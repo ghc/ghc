@@ -350,7 +350,14 @@ char **argv; {
 
     /* Prefix the output with line pragmas */
     if (prefix_str) {
-      fprintf(ostream, "#line 1 \"%s\"\n{-# LINE 1 \"%s\" #-}\n", prefix_str, prefix_str);
+      /* Both GHC and CPP understand the #line pragma.
+       * We used to throw in both a #line and a {-# LINE #-} pragma
+       * here, but CPP doesn't understand {-# LINE #-} so it thought
+       * the line numbers were off by one.  We could put the {-# LINE
+       * #-} before the #line, but there's no point since GHC
+       * understands #line anyhow.  --SDM 8/2003
+       */
+      fprintf(ostream, "#line 1 \"%s\"\n", prefix_str, prefix_str);
     }
 
     unlit(file, istream, ostream);
