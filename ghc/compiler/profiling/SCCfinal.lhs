@@ -37,9 +37,8 @@ import SrcLoc		( noSrcLoc )
 import Type		( splitSigmaTy, splitFunTy_maybe )
 import UniqSupply	( getUnique, splitUniqSupply, UniqSupply )
 import Unique           ( Unique )
-import Util		( removeDups, assertPanic )
+import Util		( removeDups, assertPanic, trace )
 import Outputable	
-import GlaExts		( trace )
 
 infixr 9 `thenMM`, `thenMM_`
 \end{code}
