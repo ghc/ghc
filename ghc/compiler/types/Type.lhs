@@ -44,7 +44,7 @@ module Type (
         mkUsForAllTy, mkUsForAllTys, splitUsForAllTys, substUsTy, 
 
 	mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
-	applyTy, applyTys, mkPiType, hoistForAllTys,
+	applyTy, applyTys, hoistForAllTys,
 
 	TauType, RhoType, SigmaType, PredType(..), ThetaType,
 	ClassPred, ClassContext, mkClassPred,
@@ -618,14 +618,7 @@ splitForAllTys ty = case splitUsgTy_maybe ty of
      split orig_ty t			  tvs = (reverse tvs, orig_ty)
 \end{code}
 
-@mkPiType@ makes a (->) type or a forall type, depending on whether
-it is given a type variable or a term variable.
-
-\begin{code}
-mkPiType :: Var -> Type -> Type		-- The more polymorphic version doesn't work...
-mkPiType v ty | isId v    = mkFunTy (idType v) ty
-	      | otherwise = mkForAllTy v ty
-\end{code}
+-- (mkPiType now in CoreUtils)
 
 Applying a for-all to its arguments
 

@@ -252,7 +252,7 @@ mkDataConWrapId data_con
 
     wrap_rhs | isNewTyCon tycon
 	     = ASSERT( null ex_tyvars && null ex_dict_args && length orig_arg_tys == 1 )
-		-- No existentials on a newtype, but it can have a contex
+		-- No existentials on a newtype, but it can have a context
 		-- e.g. 	newtype Eq a => T a = MkT (...)
 
 	       mkLams tyvars $ mkLams dict_args $ Lam id_arg1 $

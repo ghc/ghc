@@ -7,7 +7,7 @@
 module Rules (
 	RuleBase, prepareLocalRuleBase, prepareOrphanRuleBase,
         unionRuleBase, lookupRule, addRule, addIdSpecialisations,
-	ProtoCoreRule(..), pprProtoCoreRule,
+	ProtoCoreRule(..), pprProtoCoreRule, pprRuleBase,
 	localRule, orphanRule
     ) where
 
@@ -493,6 +493,11 @@ unionRuleBase (rule_ids1, black_ids1) (rule_ids2, black_ids2)
                               new_rules = foldl (addRule id1) rules1 (rulesRules rules2)
                           in
                           setIdSpecialisation id1 new_rules
+
+pprRuleBase :: RuleBase -> SDoc
+pprRuleBase (rules,_) = vcat [ pprCoreRule (ppr id) rs
+                             | id <- varSetElems rules,
+                               rs <- rulesRules $ idSpecialisation id ]
 
 -- prepareLocalRuleBase takes the CoreBinds and rules defined in this module.
 -- It attaches those rules that are for local Ids to their binders, and

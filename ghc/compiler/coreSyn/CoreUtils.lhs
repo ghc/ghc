@@ -8,6 +8,7 @@ module CoreUtils (
 	-- Construction
 	mkNote, mkInlineMe, mkSCC, mkCoerce,
 	bindNonRec, mkIfThenElse, mkAltExpr,
+        mkPiType,
 
 	-- Properties of expressions
 	exprType, coreAltsType, exprArity,
@@ -85,13 +86,7 @@ exprType (Case _ _ alts)        = coreAltsType alts
 exprType (Note (Coerce ty _) e) = ty  -- **! should take usage from e
 exprType (Note (TermUsg u) e)   = mkUsgTy u (unUsgTy (exprType e))
 exprType (Note other_note e)    = exprType e
-exprType (Lam binder expr)
-  | isId binder    = (case idLBVarInfo binder of
-                       IsOneShotLambda -> mkUsgTy UsOnce
-                       otherwise       -> id) $
-                     idType binder `mkFunTy` exprType expr
-  | isTyVar binder = mkForAllTy binder (exprType expr)
-
+exprType (Lam binder expr)      = mkPiType binder (exprType expr)
 exprType e@(App _ _)
   = case collectArgs e of
 	(fun, args) -> applyTypeToArgs e (exprType fun) args
@@ -100,6 +95,20 @@ exprType other = pprTrace "exprType" (pprCoreExpr other) alphaTy
 
 coreAltsType :: [CoreAlt] -> Type
 coreAltsType ((_,_,rhs) : _) = exprType rhs
+\end{code}
+
+@mkPiType@ makes a (->) type or a forall type, depending on whether
+it is given a type variable or a term variable.  We cleverly use the
+lbvarinfo field to figure out the right annotation for the arrove in
+case of a term variable.
+
+\begin{code}
+mkPiType :: Var -> Type -> Type		-- The more polymorphic version doesn't work...
+mkPiType v ty | isId v    = (case idLBVarInfo v of
+                               IsOneShotLambda -> mkUsgTy UsOnce
+                               otherwise       -> id) $
+                            mkFunTy (idType v) ty
+	      | isTyVar v = mkForAllTy v ty
 \end{code}
 
 \begin{code}

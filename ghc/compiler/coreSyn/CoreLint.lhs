@@ -7,7 +7,7 @@
 module CoreLint (
 	lintCoreBindings,
 	lintUnfolding, 
-	beginPass, endPass
+	beginPass, endPass, endPassWithRules
     ) where
 
 #include "HsVersions.h"
@@ -16,8 +16,9 @@ import IO	( hPutStr, hPutStrLn, stderr, stdout )
 
 import CmdLineOpts      ( opt_D_show_passes, opt_DoCoreLinting, opt_PprStyle_Debug )
 import CoreSyn
+import Rules            ( RuleBase, pprRuleBase )
 import CoreFVs		( idFreeVars, mustHaveLocalBinding )
-import CoreUtils	( exprOkForSpeculation, coreBindsSize )
+import CoreUtils	( exprOkForSpeculation, coreBindsSize, mkPiType )
 
 import Bag
 import Literal		( Literal, literalType )
@@ -29,11 +30,12 @@ import Subst		( mkTyVarSubst, substTy )
 import Name		( isLocallyDefined, getSrcLoc )
 import PprCore
 import ErrUtils		( doIfSet, dumpIfSet, ghcExit, Message, 
-			  ErrMsg, addErrLocHdrLine, pprBagOfErrors )
+			  ErrMsg, addErrLocHdrLine, pprBagOfErrors,
+                          WarnMsg, pprBagOfWarnings)
 import PrimRep		( PrimRep(..) )
 import SrcLoc		( SrcLoc, noSrcLoc, isNoSrcLoc )
 import Type		( Type, Kind, tyVarsOfType,
-			  splitFunTy_maybe, mkPiType, mkTyVarTy, unUsgTy,
+			  splitFunTy_maybe, mkTyVarTy,
 			  splitForAllTy_maybe, splitTyConApp_maybe,
 			  isUnLiftedType, typeKind, 
 			  isUnboxedTupleType,
@@ -42,6 +44,7 @@ import Type		( Type, Kind, tyVarsOfType,
 import PprType		( {- instance Outputable Type -} )
 import TyCon		( TyCon, isPrimTyCon, tyConDataCons )
 import BasicTypes	( RecFlag(..), isNonRec )
+import Maybe
 import Outputable
 
 infixr 9 `thenL`, `seqL`
@@ -68,7 +71,16 @@ beginPass pass_name
 
 endPass :: String -> Bool -> [CoreBind] -> IO [CoreBind]
 endPass pass_name dump_flag binds
+  = do  
+        (binds, _) <- endPassWithRules pass_name dump_flag binds Nothing
+        return binds
+
+endPassWithRules :: String -> Bool -> [CoreBind] -> Maybe RuleBase
+                 -> IO ([CoreBind], Maybe RuleBase)
+endPassWithRules pass_name dump_flag binds rules
   = do 
+        -- ToDo: force the rules?
+
 	-- Report result size if required
 	-- This has the side effect of forcing the intermediate to be evaluated
 	if opt_D_show_passes then
@@ -78,12 +90,15 @@ endPass pass_name dump_flag binds
 
 	-- Report verbosely, if required
 	dumpIfSet dump_flag pass_name
-		  (pprCoreBindings binds)
+		  (pprCoreBindings binds $$ case rules of
+                                              Nothing -> empty
+                                              Just rb -> pprRuleBase rb)
 
 	-- Type check
 	lintCoreBindings pass_name binds
+        -- ToDo: lint the rules
 
-	return binds
+	return (binds, rules)
 \end{code}
 
 
@@ -126,11 +141,13 @@ lintCoreBindings whoDunnit binds
 
 lintCoreBindings whoDunnit binds
   = case (initL (lint_binds binds)) of
-      Nothing       -> doIfSet opt_D_show_passes
-			(hPutStr stderr ("*** Core Linted result of " ++ whoDunnit ++ "\n"))
+      (Nothing, Nothing)       -> done_lint
 
-      Just bad_news -> printDump (display bad_news)	>>
-		       ghcExit 1
+      (Nothing, Just warnings) -> printDump (warn warnings) >>
+                                  done_lint
+
+      (Just bad_news, warns)   -> printDump (display bad_news warns)	>>
+		                  ghcExit 1
   where
 	-- Put all the top-level binders in scope at the start
 	-- This is because transformation rules can bring something
@@ -142,10 +159,24 @@ lintCoreBindings whoDunnit binds
 				  returnL ()
     lint_bind (NonRec bndr rhs) = lintSingleBinding NonRecursive (bndr,rhs)
 
-    display bad_news
+    done_lint = doIfSet opt_D_show_passes
+		        (hPutStr stderr ("*** Core Linted result of " ++ whoDunnit ++ "\n"))
+    warn warnings
+      = vcat [
+                text ("*** Core Lint Warnings: in result of " ++ whoDunnit ++ " ***"),
+                warnings,
+                offender
+        ]
+
+    display bad_news warns
       = vcat [
 		text ("*** Core Lint Errors: in result of " ++ whoDunnit ++ " ***"),
 		bad_news,
+                maybe offender warn warns  -- either offender or warnings (with offender)
+        ]
+
+    offender
+      = vcat [
 		ptext SLIT("*** Offending Program ***"),
 		pprCoreBindings binds,
 		ptext SLIT("*** End of Offense ***")
@@ -165,11 +196,11 @@ We use this to check all unfoldings that come in from interfaces
 lintUnfolding :: SrcLoc
 	      -> [Var]		-- Treat these as in scope
 	      -> CoreExpr
-	      -> Maybe Message		-- Nothing => OK
+	      -> (Maybe Message, Maybe Message)		-- (Nothing,_) => OK
 
 lintUnfolding locn vars expr
   | not opt_DoCoreLinting
-  = Nothing
+  = (Nothing, Nothing)
 
   | otherwise
   = initL (addLoc (ImportedUnfolding locn) $
@@ -197,7 +228,8 @@ lintSingleBinding rec_flag (binder,rhs)
     checkTys binder_ty ty (mkRhsMsg binder ty)	`seqL`
 
 	-- Check (not isUnLiftedType) (also checks for bogus unboxed tuples)
-    checkL (not (isUnLiftedType binder_ty) || (isNonRec rec_flag && exprOkForSpeculation rhs))
+    checkL (not (isUnLiftedType binder_ty)
+            || (isNonRec rec_flag && exprOkForSpeculation rhs))
  	   (mkRhsPrimMsg binder rhs)		`seqL`
 
         -- Check whether binder's specialisations contain any out-of-scope variables
@@ -227,7 +259,7 @@ lintCoreExpr (Note (Coerce to_ty from_ty) expr)
   = lintCoreExpr expr 	`thenL` \ expr_ty ->
     lintTy to_ty	`seqL`
     lintTy from_ty	`seqL`
-    checkTys from_ty (unUsgTy expr_ty) (mkCoerceErr from_ty expr_ty)	`seqL`
+    checkTys from_ty expr_ty (mkCoerceErr from_ty expr_ty)	`seqL`
     returnL to_ty
 
 lintCoreExpr (Note other_note expr)
@@ -252,10 +284,14 @@ lintCoreExpr e@(App fun arg)
 
 lintCoreExpr (Lam var expr)
   = addLoc (LambdaBodyOf var)	$
-    checkL (not (isUnboxedTupleType (idType var))) (mkUnboxedTupleMsg var)
+    (if isId var then    
+       checkL (not (isUnboxedTupleType (idType var))) (mkUnboxedTupleMsg var)
+     else
+       returnL ())
 				`seqL`
     (addInScopeVars [var]	$
      lintCoreExpr expr		`thenL` \ ty ->
+
      returnL (mkPiType var ty))
 
 lintCoreExpr e@(Case scrut var alts)
@@ -277,7 +313,8 @@ lintCoreExpr e@(Case scrut var alts)
    addInScopeVars [var]				(
 
 	-- Check the alternatives
-   checkAllCasesCovered e scrut_ty alts		`seqL`
+   checkAllCasesCovered e scrut_ty alts	`seqL`
+
    mapL (lintCoreAlt scrut_ty) alts		`thenL` \ (alt_ty : alt_tys) ->
    mapL (check alt_ty) alt_tys			`seqL`
    returnL alt_ty)
@@ -294,31 +331,40 @@ lintCoreExpr e@(Type ty)
 %*									*
 %************************************************************************
 
-The boolean argument indicates whether we should flag type
-applications to primitive types as being errors.
+The basic version of these functions checks that the argument is a
+subtype of the required type, as one would expect.
 
 \begin{code}
 lintCoreArgs :: Type -> [CoreArg] -> LintM Type
+lintCoreArgs = lintCoreArgs0 checkTys
 
-lintCoreArgs ty [] = returnL ty
-lintCoreArgs ty (a : args)
-  = lintCoreArg  ty a		`thenL` \ res ->
-    lintCoreArgs res args
+lintCoreArg :: Type -> CoreArg -> LintM Type
+lintCoreArg = lintCoreArg0 checkTys
 \end{code}
 
-\begin{code}
-lintCoreArg :: Type -> CoreArg -> LintM Type
+The primitive version of these functions takes a check argument,
+allowing a different comparison.
 
-lintCoreArg ty a@(Type arg_ty)
+\begin{code}
+lintCoreArgs0 check_tys ty [] = returnL ty
+lintCoreArgs0 check_tys ty (a : args)
+  = lintCoreArg0  check_tys ty a	`thenL` \ res ->
+    lintCoreArgs0 check_tys res args
+
+lintCoreArg0 check_tys ty a@(Type arg_ty)
   = lintTy arg_ty			`seqL`
     lintTyApp ty arg_ty
 
-lintCoreArg fun_ty arg
+lintCoreArg0 check_tys fun_ty arg
   = -- Make sure function type matches argument
     lintCoreExpr arg		`thenL` \ arg_ty ->
-    case (splitFunTy_maybe fun_ty) of
-      Just (arg,res) | (arg_ty == arg) -> returnL res
-      _ 			       -> addErrL (mkAppMsg fun_ty arg_ty)
+    let
+      err = mkAppMsg fun_ty arg_ty
+    in
+    case splitFunTy_maybe fun_ty of
+      Just (arg,res) -> check_tys arg arg_ty err `seqL`
+                        returnL res
+      _              -> addErrL err
 \end{code}
 
 \begin{code}
@@ -327,6 +373,7 @@ lintTyApp ty arg_ty
       Nothing -> addErrL (mkTyAppMsg ty arg_ty)
 
       Just (tyvar,body) ->
+        if not (isTyVar tyvar) then addErrL (mkTyAppMsg ty arg_ty) else
 	let
 	    tyvar_kind = tyVarKind tyvar
 	    argty_kind = typeKind arg_ty
@@ -358,6 +405,8 @@ lintTyApps fun_ty (arg_ty : arg_tys)
 %************************************************************************
 
 \begin{code}
+checkAllCasesCovered :: CoreExpr -> Type -> [CoreAlt] -> LintM ()
+
 checkAllCasesCovered e ty [] = addErrL (mkNullAltsMsg e)
 
 checkAllCasesCovered e ty [(DEFAULT,_,_)] = nopL
@@ -418,7 +467,7 @@ lintCoreAlt scrut_ty alt@(LitAlt lit, args, rhs)
 lintCoreAlt scrut_ty alt@(DataAlt con, args, rhs)
   = addLoc (CaseAlt alt) (
 
-    mapL (\arg -> checkL (not (isUnboxedTupleType (idType arg))) 
+    mapL (\arg -> checkL (not (isUnboxedTupleType (idType arg)))
 			(mkUnboxedTupleMsg arg)) args `seqL`
 
     addInScopeVars args (
@@ -438,7 +487,8 @@ lintCoreAlt scrut_ty alt@(DataAlt con, args, rhs)
     ))
   where
     mk_arg b | isTyVar b = Type (mkTyVarTy b)
-	     | otherwise = Var b
+	     | isId    b = Var b
+             | otherwise = pprPanic "lintCoreAlt:mk_arg " (ppr b)
 \end{code}
 
 %************************************************************************
@@ -451,6 +501,7 @@ lintCoreAlt scrut_ty alt@(DataAlt con, args, rhs)
 lintBinder :: Var -> LintM ()
 lintBinder v = nopL
 -- ToDo: lint its type
+-- ToDo: lint its rules
 
 lintTy :: Type -> LintM ()
 lintTy ty = mapL checkIdInScope (varSetElems (tyVarsOfType ty))	`seqL`
@@ -469,7 +520,8 @@ lintTy ty = mapL checkIdInScope (varSetElems (tyVarsOfType ty))	`seqL`
 type LintM a = [LintLocInfo] 	-- Locations
 	    -> IdSet		-- Local vars in scope
 	    -> Bag ErrMsg	-- Error messages so far
-	    -> (Maybe a, Bag ErrMsg)	-- Result and error messages (if any)
+            -> Bag WarnMsg      -- Warning messages so far
+	    -> (Maybe a, Bag ErrMsg, Bag WarnMsg)  -- Result and error/warning messages (if any)
 
 data LintLocInfo
   = RhsOf Id		-- The variable bound
@@ -481,31 +533,31 @@ data LintLocInfo
 \end{code}
 
 \begin{code}
-initL :: LintM a -> Maybe Message
+initL :: LintM a -> (Maybe Message {- errors -}, Maybe Message {- warnings -})
 initL m
-  = case (m [] emptyVarSet emptyBag) of { (_, errs) ->
-    if isEmptyBag errs then
-	Nothing
-    else
-	Just (pprBagOfErrors errs)
-    }
+  = case m [] emptyVarSet emptyBag emptyBag of
+      (_, errs, warns) -> (ifNonEmptyBag errs  pprBagOfErrors,
+                           ifNonEmptyBag warns pprBagOfWarnings)
+  where
+    ifNonEmptyBag bag f | isEmptyBag bag = Nothing
+                        | otherwise      = Just (f bag)
 
 returnL :: a -> LintM a
-returnL r loc scope errs = (Just r, errs)
+returnL r loc scope errs warns = (Just r, errs, warns)
 
 nopL :: LintM a
-nopL loc scope errs = (Nothing, errs)
+nopL loc scope errs warns = (Nothing, errs, warns)
 
 thenL :: LintM a -> (a -> LintM b) -> LintM b
-thenL m k loc scope errs
-  = case m loc scope errs of
-      (Just r, errs')  -> k r loc scope errs'
-      (Nothing, errs') -> (Nothing, errs')
+thenL m k loc scope errs warns
+  = case m loc scope errs warns of
+      (Just r, errs', warns')  -> k r loc scope errs' warns'
+      (Nothing, errs', warns') -> (Nothing, errs', warns')
 
 seqL :: LintM a -> LintM b -> LintM b
-seqL m k loc scope errs
-  = case m loc scope errs of
-      (_, errs') -> k loc scope errs'
+seqL m k loc scope errs warns
+  = case m loc scope errs warns of
+      (_, errs', warns') -> k loc scope errs' warns'
 
 mapL :: (a -> LintM b) -> [a] -> LintM [b]
 mapL f [] = returnL []
@@ -517,16 +569,19 @@ mapL f (x:xs)
 
 \begin{code}
 checkL :: Bool -> Message -> LintM ()
-checkL True  msg loc scope errs = (Nothing, errs)
-checkL False msg loc scope errs = (Nothing, addErr errs msg loc)
+checkL True  msg = nopL
+checkL False msg = addErrL msg
 
 addErrL :: Message -> LintM a
-addErrL msg loc scope errs = (Nothing, addErr errs msg loc)
+addErrL msg loc scope errs warns = (Nothing, addErr errs msg loc, warns)
+
+addWarnL :: Message -> LintM a
+addWarnL msg loc scope errs warns = (Nothing, errs, addErr warns msg loc)
 
 addErr :: Bag ErrMsg -> Message -> [LintLocInfo] -> Bag ErrMsg
-
+-- errors or warnings, actually... they're the same type.
 addErr errs_so_far msg locs
-  = ASSERT (not (null locs))
+  = ASSERT( not (null locs) )
     errs_so_far `snocBag` mk_msg msg
   where
    (loc, cxt1) = dumpLoc (head locs)
@@ -539,12 +594,12 @@ addErr errs_so_far msg locs
      | otherwise      = addErrLocHdrLine loc context msg
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
-addLoc extra_loc m loc scope errs
-  = m (extra_loc:loc) scope errs
+addLoc extra_loc m loc scope errs warns
+  = m (extra_loc:loc) scope errs warns
 
 addInScopeVars :: [Var] -> LintM a -> LintM a
-addInScopeVars ids m loc scope errs
-  = m loc (scope `unionVarSet` mkVarSet ids) errs
+addInScopeVars ids m loc scope errs warns
+  = m loc (scope `unionVarSet` mkVarSet ids) errs warns
 \end{code}
 
 \begin{code}
@@ -560,16 +615,18 @@ checkBndrIdInScope binder id
 	   ppr binder
 
 checkInScope :: SDoc -> Var -> LintM ()
-checkInScope loc_msg var loc scope errs
+checkInScope loc_msg var loc scope errs warns
   |  mustHaveLocalBinding var && not (var `elemVarSet` scope)
-  = (Nothing, addErr errs (hsep [ppr var, loc_msg]) loc)
+  = (Nothing, addErr errs (hsep [ppr var, loc_msg]) loc, warns)
   | otherwise
-  = (Nothing,errs)
+  = nopL loc scope errs warns
 
 checkTys :: Type -> Type -> Message -> LintM ()
-checkTys ty1 ty2 msg loc scope errs
-  | ty1 == ty2 = (Nothing, errs)
-  | otherwise  = (Nothing, addErr errs msg loc)
+-- check ty2 is subtype of ty1 (ie, has same structure but usage
+-- annotations need only be consistent, not equal)
+checkTys ty1 ty2 msg
+  | ty1 == ty2 = nopL
+  | otherwise  = addErrL msg
 \end{code}
 
 
@@ -586,7 +643,10 @@ dumpLoc (RhsOf v)
 dumpLoc (LambdaBodyOf b)
   = (getSrcLoc b, brackets (ptext SLIT("in body of lambda with binder") <+> pp_binder b))
 
-dumpLoc (BodyOfLetRec bs)
+dumpLoc (BodyOfLetRec [])
+  = (noSrcLoc, brackets (ptext SLIT("In body of a letrec with no binders")))
+
+dumpLoc (BodyOfLetRec bs@(_:_))
   = ( getSrcLoc (head bs), brackets (ptext SLIT("in body of letrec with binders") <+> pp_binders bs))
 
 dumpLoc (AnExpr e)
@@ -598,11 +658,12 @@ dumpLoc (CaseAlt (con, args, rhs))
 dumpLoc (ImportedUnfolding locn)
   = (locn, brackets (ptext SLIT("in an imported unfolding")))
 
-pp_binders :: [Id] -> SDoc
+pp_binders :: [Var] -> SDoc
 pp_binders bs = sep (punctuate comma (map pp_binder bs))
 
-pp_binder :: Id -> SDoc
-pp_binder b = hsep [ppr b, dcolon, ppr (idType b)]
+pp_binder :: Var -> SDoc
+pp_binder b | isId b    = hsep [ppr b, dcolon, ppr (idType b)]
+            | isTyVar b = hsep [ppr b, dcolon, ppr (tyVarKind b)]
 \end{code}
 
 \begin{code}
@@ -651,6 +712,7 @@ mkBadPatMsg con_result_ty scrut_ty
 ------------------------------------------------------
 --	Other error messages
 
+mkAppMsg :: Type -> Type -> Message
 mkAppMsg fun arg
   = vcat [ptext SLIT("Argument value doesn't match argument type:"),
 	      hang (ptext SLIT("Fun type:")) 4 (ppr fun),
