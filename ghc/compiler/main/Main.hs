@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.139 2004/09/30 10:37:17 simonpj Exp $
+-- $Id: Main.hs,v 1.140 2004/11/11 16:07:46 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -32,8 +32,7 @@ import Packages		( showPackages, getPackageConfigMap, basePackage,
 			)
 import DriverPipeline	( staticLink, doMkDLL, runPipeline )
 import DriverState	( buildStgToDo,
-			  findBuildTag, 
-			  getPackageExtraGhcOpts, unregFlags, 
+			  findBuildTag, unregFlags, 
 			  v_GhcMode, v_GhcModeFlag, GhcMode(..),
 			  v_Keep_tmp_files, v_Ld_inputs, v_Ways, 
 			  v_Output_file, v_Output_hi, 
@@ -151,9 +150,7 @@ main =
    way_opts <- findBuildTag
    let unreg_opts | cGhcUnregisterised == "YES" = unregFlags
 		  | otherwise = []
-   pkg_extra_opts <- getPackageExtraGhcOpts
-   extra_non_static <- processArgs static_flags 
-			   (unreg_opts ++ way_opts ++ pkg_extra_opts) []
+   extra_non_static <- processArgs static_flags (unreg_opts ++ way_opts) []
 
 	-- Give the static flags to hsc
    static_opts <- buildStaticHscOpts

@@ -295,10 +295,10 @@ mungePackagePaths :: String -> [PackageConfig] -> [PackageConfig]
 -- with the current libdir (obtained from the -B option).
 mungePackagePaths top_dir ps = map munge_pkg ps
  where 
-  munge_pkg p = p{ import_dirs  = munge_paths (import_dirs p),
-		   include_dirs = munge_paths (include_dirs p),
-    		   library_dirs = munge_paths (library_dirs p),
-		   framework_dirs = munge_paths (framework_dirs p) }
+  munge_pkg p = p{ importDirs  = munge_paths (importDirs p),
+		   includeDirs = munge_paths (includeDirs p),
+    		   libraryDirs = munge_paths (libraryDirs p),
+		   frameworkDirs = munge_paths (frameworkDirs p) }
 
   munge_paths = map munge_path
 
@@ -361,22 +361,22 @@ getPackageImportPath = do
   ps <- getExplicitAndAutoPackageConfigs
 		  -- import dirs are always derived from the 'auto' 
 		  -- packages as well as the explicit ones
-  return (nub (filter notNull (concatMap import_dirs ps)))
+  return (nub (filter notNull (concatMap importDirs ps)))
 
 getPackageIncludePath :: [PackageName] -> IO [String]
 getPackageIncludePath pkgs = do
   ps <- getExplicitPackagesAnd pkgs
-  return (nub (filter notNull (concatMap include_dirs ps)))
+  return (nub (filter notNull (concatMap includeDirs ps)))
 
 	-- includes are in reverse dependency order (i.e. rts first)
 getPackageCIncludes :: [PackageConfig] -> IO [String]
 getPackageCIncludes pkg_configs = do
-  return (reverse (nub (filter notNull (concatMap c_includes pkg_configs))))
+  return (reverse (nub (filter notNull (concatMap includes pkg_configs))))
 
 getPackageLibraryPath :: [PackageName] -> IO [String]
 getPackageLibraryPath pkgs = do 
   ps <- getExplicitPackagesAnd pkgs
-  return (nub (filter notNull (concatMap library_dirs ps)))
+  return (nub (filter notNull (concatMap libraryDirs ps)))
 
 getPackageLinkOpts :: [PackageName] -> IO [String]
 getPackageLinkOpts pkgs = do
@@ -386,9 +386,9 @@ getPackageLinkOpts pkgs = do
   static <- readIORef v_Static
   let 
 	imp        = if static then "" else "_imp"
-      	libs p     = map addSuffix (hACK (hs_libraries p)) ++ extra_libraries p
+      	libs p     = map addSuffix (hACK (hsLibraries p)) ++ extraLibraries p
 	imp_libs p = map (++imp) (libs p)
-	all_opts p = map ("-l" ++) (imp_libs p) ++ extra_ld_opts p
+	all_opts p = map ("-l" ++) (imp_libs p) ++ extraLdOpts p
 
 	suffix     = if null tag then "" else  '_':tag
 	rts_suffix = if null rts_tag then "" else  '_':rts_tag
@@ -429,21 +429,16 @@ getPackageLinkOpts pkgs = do
          libs
 #      endif
 
-getPackageExtraGhcOpts :: IO [String]
-getPackageExtraGhcOpts = do
-  ps <- getExplicitAndAutoPackageConfigs
-  return (concatMap extra_ghc_opts ps)
-
 getPackageExtraCcOpts :: [PackageName] -> IO [String]
 getPackageExtraCcOpts pkgs = do
   ps <- getExplicitPackagesAnd pkgs
-  return (concatMap extra_cc_opts ps)
+  return (concatMap extraCcOpts ps)
 
 #ifdef darwin_TARGET_OS
 getPackageFrameworkPath  :: [PackageName] -> IO [String]
 getPackageFrameworkPath pkgs = do
   ps <- getExplicitPackagesAnd pkgs
-  return (nub (filter notNull (concatMap framework_dirs ps)))
+  return (nub (filter notNull (concatMap frameworkDirs ps)))
 
 getPackageFrameworks  :: [PackageName] -> IO [String]
 getPackageFrameworks pkgs = do
@@ -465,7 +460,7 @@ getExplicitPackagesAnd pkg_names = do
 getExplicitAndAutoPackageConfigs :: IO [PackageConfig]
 getExplicitAndAutoPackageConfigs = do
   pkg_map <- getPackageConfigMap
-  let auto_packages = [ mkPackageName (name p) | p <- eltsUFM pkg_map, auto p ]
+  let auto_packages = [ packageConfigName p | p <- eltsUFM pkg_map, exposed p ]
   getExplicitPackagesAnd auto_packages
 
 -----------------------------------------------------------------------------

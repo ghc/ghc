@@ -5,13 +5,16 @@
 
 \begin{code}
 module Packages (
-	PackageConfig(..), 
+	PackageConfig,
+	InstalledPackageInfo(..),
+	Version(..),
+	PackageIdentifier(..),
 	defaultPackageConfig,
 	packageDependents, 
 	showPackages,
 
 	PackageName,		-- Instance of Outputable
-	mkPackageName, packageNameString,
+	mkPackageName, packageIdName, packageConfigName, packageNameString,
 	basePackage, rtsPackage, haskell98Package, thPackage, -- :: PackageName
 
 	PackageConfigMap, emptyPkgMap, lookupPkg,
@@ -21,6 +24,9 @@ where
 
 #include "HsVersions.h"
 
+import Distribution.InstalledPackageInfo
+import Distribution.Package
+import Data.Version
 import CmdLineOpts	( dynFlag, verbosity )
 import ErrUtils		( dumpIfSet )
 import Outputable	( docToSDoc )
@@ -32,18 +38,11 @@ import Pretty
 import DATA_IOREF
 
 -- -----------------------------------------------------------------------------
--- The PackageConfig type
+-- Our PackageConfig type is just InstalledPackageInfo from Cabal.  Later we
+-- might need to extend it with some GHC-specific stuff, but for now it's fine.
 
-#define WANT_PRETTY
-#define INTERNAL_PRETTY
--- Yes, do generate pretty-printing stuff for packages, and use our
--- own Pretty library rather than Text.PrettyPrint
-
--- There's a blob of code shared with ghc-pkg, 
--- so we just include it from there 
--- Primarily it defines	PackageConfig (a record)
-
-#include "../utils/ghc-pkg/Package.hs"
+type PackageConfig = InstalledPackageInfo
+defaultPackageConfig = emptyInstalledPackageInfo
 
 -- -----------------------------------------------------------------------------
 -- Package names
@@ -52,6 +51,12 @@ type PackageName = FastString	-- No encoding at all
 
 mkPackageName :: String -> PackageName
 mkPackageName = mkFastString
+
+packageIdName :: PackageIdentifier -> PackageName
+packageIdName = mkPackageName . showPackageId
+
+packageConfigName :: PackageConfig -> PackageName
+packageConfigName = packageIdName . package
 
 packageNameString :: PackageName -> String
 packageNameString = unpackFS
@@ -65,7 +70,7 @@ thPackage        = FSLIT("template-haskell")	-- Template Haskell libraries in he
 packageDependents :: PackageConfig -> [PackageName]
 -- Impedence matcher, because PackageConfig has Strings 
 -- not PackageNames at the moment.  Sigh.
-packageDependents pkg = map mkPackageName (package_deps pkg)
+packageDependents pkg = map packageIdName (depends pkg)
 
 -- -----------------------------------------------------------------------------
 -- A PackageConfigMap maps a PackageName to a PackageConfig
@@ -83,7 +88,7 @@ extendPkgMap :: PackageConfigMap -> [PackageConfig] -> PackageConfigMap
 extendPkgMap pkg_map new_pkgs 
   = foldl add pkg_map new_pkgs
   where
-    add pkg_map p = addToUFM pkg_map (mkFastString (name p)) p
+    add pkg_map p = addToUFM pkg_map (packageConfigName p) p
 
 GLOBAL_VAR(v_Package_details, emptyPkgMap, PackageConfigMap)
 
@@ -109,7 +114,7 @@ showPackages :: PackageConfigMap -> IO ()
 showPackages pkg_map
   = do  { verb <- dynFlag verbosity
 	; dumpIfSet (verb >= 3) "Packages"
-	  	    (docToSDoc (vcat (map dumpPkgGuts ps)))
+	  	    (docToSDoc (vcat (map (text.showInstalledPackageInfo) ps)))
 	}
   where
     ps = eltsUFM pkg_map

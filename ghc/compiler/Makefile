@@ -507,8 +507,8 @@ primop-usage.hs-incl: prelude/primops.txt
 #-----------------------------------------------------------------------------
 # 		Linking
 
-# Include libghccompat in stage1.  In stage2 onwards, all these libraries
-# will be available from the main libraries.
+# Include libghccompat in stage1 only.  In stage2 onwards, all these
+# libraries will be available from the main libraries.
 ifeq "$(stage)" "1"
 SRC_HC_OPTS += -i$(GHC_LIB_COMPAT_DIR)
 SRC_LD_OPTS += -L$(GHC_LIB_COMPAT_DIR) -lghccompat

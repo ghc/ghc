@@ -24,6 +24,7 @@ import qualified PrintJava
 import OccurAnal	( occurAnalyseBinds )
 #endif
 
+import Distribution.Package	( showPackageId )
 import PprC		( writeCs )
 import CmmLint		( cmmLint )
 import Packages
@@ -125,7 +126,7 @@ outputC dflags filenm flat_absC
        --
        let packages = dep_pkgs dependencies
        pkg_configs <- getExplicitPackagesAnd packages
-       let pkg_names = map name pkg_configs
+       let pkg_names = map (showPackageId.package) pkg_configs
 
        c_includes <- getPackageCIncludes pkg_configs
        let cmdline_includes = cmdlineHcIncludes dflags -- -#include options
@@ -244,7 +245,7 @@ outputForeignStubs dflags (ForeignStubs h_code c_code _ _)
 
 	-- we need the #includes from the rts package for the stub files
 	rts_pkgs <- getPackageDetails [rtsPackage]
- 	let rts_includes = concatMap mk_include (concatMap c_includes rts_pkgs)
+ 	let rts_includes = concatMap mk_include (concatMap includes rts_pkgs)
 	    mk_include i = "#include \"" ++ i ++ "\"\n"
 
 	stub_h_file_exists

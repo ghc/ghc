@@ -1066,8 +1066,8 @@ staticLink o_files dep_packages = do
 
     let extra_os = if static || no_hs_main
                    then []
-                   else [ head (library_dirs rts_pkg) ++ "/Main.dll_o",
-                          head (library_dirs std_pkg) ++ "/PrelMain.dll_o" ]
+                   else [ head (libraryDirs rts_pkg) ++ "/Main.dll_o",
+                          head (libraryDirs std_pkg) ++ "/PrelMain.dll_o" ]
 
     (md_c_flags, _) <- machdepCCOpts
     SysTools.runLink ( [ SysTools.Option verb
@@ -1132,8 +1132,8 @@ doMkDLL o_files dep_packages = do
 
     let extra_os = if static || no_hs_main
                    then []
-                   else [ head (library_dirs rts_pkg) ++ "/Main.dll_o",
-                          head (library_dirs std_pkg) ++ "/PrelMain.dll_o" ]
+                   else [ head (libraryDirs rts_pkg) ++ "/Main.dll_o",
+                          head (libraryDirs std_pkg) ++ "/PrelMain.dll_o" ]
 
     (md_c_flags, _) <- machdepCCOpts
     SysTools.runMkDLL

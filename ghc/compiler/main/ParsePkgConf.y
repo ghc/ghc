@@ -3,7 +3,7 @@ module ParsePkgConf( loadPackageConfig ) where
 
 #include "HsVersions.h"
 
-import Packages  ( PackageConfig(..), defaultPackageConfig )
+import Packages
 import Lexer
 import CmdLineOpts
 import FastString
@@ -26,6 +26,7 @@ import EXCEPTION ( throwDyn )
  VARID   	{ L _ (ITvarid    $$) }
  CONID   	{ L _ (ITconid    $$) }
  STRING		{ L _ (ITstring   $$) }
+ INT		{ L _ (ITinteger  $$) }
 
 %monad { P } { >>= } { return }
 %lexer { lexer } { L _ ITeof }
@@ -49,46 +50,90 @@ fields  :: { PackageConfig -> PackageConfig }
 	| fields ',' field		{ \p -> $1 ($3 p) }
 
 field	:: { PackageConfig -> PackageConfig }
-	: VARID '=' STRING		
-                 {% case unpackFS $1 of { 
-		   "name" -> return (\ p -> p{name = unpackFS $3});
-		   _      -> happyError } }
+	: VARID '=' pkgid
+		{% case unpackFS $1 of
+		        "package"     -> return (\p -> p{package = $3})
+			_other        -> happyError
+		}
+
+	| VARID '=' STRING		{ id }
+		-- we aren't interested in the string fields, they're all
+		-- boring (copyright, maintainer etc.)
 			
-        | VARID '=' bool
-		{\p -> case unpackFS $1 of {
-		   	"auto" -> p{auto = $3};
-		   	_      -> p } }
+        | VARID '=' CONID
+		{% case unpackFS $1 of {
+		   	"exposed" -> 
+			   case unpackFS $3 of {
+				"True"  -> return (\p -> p{exposed=True});
+				"False" -> return (\p -> p{exposed=False});
+				_       -> happyError };
+		   	"license" -> return id; -- not interested
+		   	_         -> happyError }
+		}
+
+	| VARID '=' CONID STRING	{ id }
+		-- another case of license
 
 	| VARID '=' strlist		
 		{\p -> case unpackFS $1 of
-		        "import_dirs"     -> p{import_dirs     = $3}
-		        "library_dirs"    -> p{library_dirs    = $3}
-		        "hs_libraries"    -> p{hs_libraries    = $3}
-		        "extra_libraries" -> p{extra_libraries = $3}
-		        "include_dirs"    -> p{include_dirs    = $3}
-		        "c_includes"      -> p{c_includes      = $3}
-		        "package_deps"    -> p{package_deps    = $3}
-		        "extra_ghc_opts"  -> p{extra_ghc_opts  = $3}
-		        "extra_cc_opts"   -> p{extra_cc_opts   = $3}
-		        "extra_ld_opts"   -> p{extra_ld_opts   = $3}
-		        "framework_dirs"  -> p{framework_dirs  = $3}
-		        "extra_frameworks"-> p{extra_frameworks= $3}
-			_other            -> p
+		        "exposedModules"    -> p{exposedModules    = $3}
+		        "hiddenModules"     -> p{hiddenModules     = $3}
+		        "importDirs"        -> p{importDirs        = $3}
+		        "libraryDirs"       -> p{libraryDirs       = $3}
+		        "hsLibraries"       -> p{hsLibraries       = $3}
+		        "extraLibraries"    -> p{extraLibraries    = $3}
+		        "includeDirs"       -> p{includeDirs       = $3}
+		        "includes"          -> p{includes          = $3}
+		        "extraHugsOpts"     -> p{extraHugsOpts     = $3}
+		        "extraCcOpts"       -> p{extraCcOpts       = $3}
+		        "extraLdOpts"       -> p{extraLdOpts       = $3}
+		        "frameworkDirs"     -> p{frameworkDirs     = $3}
+		        "extraFrameworks"   -> p{extraFrameworks   = $3}
+		        "haddockInterfaces" -> p{haddockInterfaces = $3}
+		        "haddockHTMLs"      -> p{haddockHTMLs      = $3}
+		        "depends"     	    -> p{depends = []}
+				-- empty list only, non-empty handled below
+			other -> p
 		}
+
+	| VARID '=' pkgidlist
+		{% case unpackFS $1 of
+		        "depends"     -> return (\p -> p{depends = $3})
+			_other        -> happyError
+		}
+
+pkgid	:: { PackageIdentifier }
+	: CONID '{' VARID '=' STRING ',' VARID '=' version '}'
+			{ PackageIdentifier{ pkgName = unpackFS $5, 
+					     pkgVersion = $9 } }
+
+version :: { Version }
+	: CONID '{' VARID '=' intlist ',' VARID '=' strlist '}'
+			{ Version{ versionBranch=$5, versionTags=$9 } }
+
+pkgidlist :: { [PackageIdentifier] }
+	: '[' pkgids ']'		{ $2 }
+	-- empty list case is covered by strlist, to avoid conflicts
+
+pkgids	:: { [PackageIdentifier] }
+	: pkgid				{ [ $1 ] }
+	| pkgid ',' pkgids		{ $1 : $3 }
+
+intlist :: { [Int] }
+        : '[' ']'			{ [] }
+	| '[' ints ']'			{ $2 }
+
+ints	:: { [Int] }
+	: INT				{ [ fromIntegral $1 ] }
+	| INT ',' ints			{ fromIntegral $1 : $3 }
 
 strlist :: { [String] }
         : '[' ']'			{ [] }
-	| '[' strs ']'			{ reverse $2 }
+	| '[' strs ']'			{ $2 }
 
 strs	:: { [String] }
 	: STRING			{ [ unpackFS $1 ] }
-	| strs ',' STRING		{ unpackFS $3 : $1 }
-
-bool    :: { Bool }
-	: CONID				{% case unpackFS $1 of {
-					    "True"  -> return True;
-					    "False" -> return False;
-					    _       -> happyError } }
+	| STRING ',' strs 		{ unpackFS $1 : $3 }
 
 {
 happyError :: P a
