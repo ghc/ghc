@@ -74,7 +74,7 @@ import MkExternalCore	( emitExternalCore )
 import ParserCore
 import ParserCoreUtils
 import FiniteMap	( emptyFM )
-import Name		( nameModule, getName )
+import Name		( nameModule )
 import NameEnv		( emptyNameEnv, mkNameEnv )
 import NameSet		( emptyNameSet )
 import Module		( Module, ModLocation(..), showModMsg )

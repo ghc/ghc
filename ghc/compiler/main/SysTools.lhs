@@ -86,11 +86,11 @@ import Directory	( doesFileExist, removeFile )
 
 -- GHC <= 4.08 didn't have rawSystem, and runs into problems with long command
 -- lines on mingw32, so we disallow it now.
-#if defined(mingw32_HOST_OS) && (__GLASGOW_HASKELL__ <= 408)
+#if defined(mingw32_TARGET_OS) && (__GLASGOW_HASKELL__ <= 408)
 #error GHC <= 4.08 is not supported for bootstrapping GHC on i386-unknown-mingw32
 #endif
 
-#ifndef mingw32_HOST_OS
+#ifndef mingw32_TARGET_OS
 #if __GLASGOW_HASKELL__ > 504
 import qualified GHC.Posix
 #else
@@ -103,7 +103,7 @@ import Foreign
 import CString		( CString, peekCString )
 #endif
 
-#ifdef mingw32_HOST_OS
+#ifdef mingw32_TARGET_OS
 #if __GLASGOW_HASKELL__ > 504
 import System.Cmd       ( rawSystem )
 #else
@@ -272,7 +272,7 @@ initSysTools minusB_args
 		| am_installed = installed_bin cGHC_MANGLER_PGM
 		| otherwise    = inplace cGHC_MANGLER_DIR_REL cGHC_MANGLER_PGM
 
-#ifndef mingw32_HOST_OS
+#ifndef mingw32_TARGET_OS
 	-- check whether TMPDIR is set in the environment
 	; IO.try (do dir <- getEnv "TMPDIR" -- fails if not set
 	      	     setTmpDir dir
@@ -314,7 +314,7 @@ initSysTools minusB_args
 	     throwDyn (InstallationError 
 		         ("Can't find package.conf as " ++ pkgconfig_path))
 
-#if defined(mingw32_HOST_OS)
+#if defined(mingw32_TARGET_OS)
 	--		WINDOWS-SPECIFIC STUFF
 	-- On Windows, gcc and friends are distributed with GHC,
 	-- 	so when "installed" we look in TopDir/bin
@@ -417,8 +417,8 @@ initSysTools minusB_args
 	; return ()
 	}
 
-#if defined(mingw32_HOST_OS)
-foreign import stdcall unsafe "GetTempPathA" getTempPath :: Int -> CString -> IO Int32
+#if defined(mingw32_TARGET_OS)
+foreign import stdcall "GetTempPathA" unsafe getTempPath :: Int -> CString -> IO Int32
 #endif
 \end{code}
 
@@ -701,7 +701,7 @@ runSomething :: String		-- For -v message
 runSomething phase_name pgm args
  = traceCmd phase_name cmd_line $
    do   {
-#ifndef mingw32_HOST_OS
+#ifndef mingw32_TARGET_OS
 	  exit_code <- system cmd_line
 #else
           exit_code <- rawSystem cmd_line
@@ -772,7 +772,7 @@ pgmPath :: String		-- Directory string in Unix format
 
 
 
-#if defined(mingw32_HOST_OS)
+#if defined(mingw32_TARGET_OS)
 
 --------------------- Windows version ------------------
 dosifyPaths xs = map dosifyPath xs
@@ -832,7 +832,7 @@ slash s1 s2 = s1 ++ ('/' : s2)
 -----------------------------------------------------------------------------
 -- Define	getExecDir     :: IO (Maybe String)
 
-#if defined(mingw32_HOST_OS)
+#if defined(mingw32_TARGET_OS)
 getExecDir :: IO (Maybe String)
 getExecDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
 		buf <- mallocArray len
@@ -843,14 +843,14 @@ getExecDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
 				    return (Just (reverse (dropList "/bin/ghc.exe" (reverse (unDosifyPath s)))))
 
 
-foreign import stdcall unsafe "GetModuleFileNameA"
+foreign import stdcall "GetModuleFileNameA" unsafe
   getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
 #else
 getExecDir :: IO (Maybe String) = do return Nothing
 #endif
 
-#ifdef mingw32_HOST_OS
-foreign import ccall unsafe "_getpid" getProcessID :: IO Int -- relies on Int == Int32 on Windows
+#ifdef mingw32_TARGET_OS
+foreign import ccall "_getpid" unsafe getProcessID :: IO Int -- relies on Int == Int32 on Windows
 #elif __GLASGOW_HASKELL__ > 504
 getProcessID :: IO Int
 getProcessID = GHC.Posix.c_getpid >>= return . fromIntegral
@@ -860,7 +860,7 @@ getProcessID = Posix.getProcessID
 #endif
 
 quote :: String -> String
-#if defined(mingw32_HOST_OS)
+#if defined(mingw32_TARGET_OS)
 quote "" = ""
 quote s  = "\"" ++ s ++ "\""
 #else

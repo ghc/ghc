@@ -53,7 +53,7 @@ import TyCon		( DataConDetails(..), tyConTyVars, tyConDataCons, tyConTheta,
 			  isFunTyCon, isPrimTyCon, isNewTyCon, isClassTyCon, 
 			  isSynTyCon, isAlgTyCon, isForeignTyCon,
 			  getSynTyConDefn, tyConGenInfo, tyConDataConDetails, tyConArity )
-import Class		( classExtraBigSig, classTyCon, DefMeth(..) )
+import Class		( classExtraBigSig, classTyCon )
 import FieldLabel	( fieldLabelType )
 import TcType		( tcSplitForAllTys, tcFunResultTy, tidyTopType, deNoteType, tyClsNamesOfDFunHead )
 import SrcLoc		( noSrcLoc )

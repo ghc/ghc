@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.112 2003/02/07 09:39:02 simonpj Exp $
+-- $Id: DriverFlags.hs,v 1.113 2003/02/21 13:26:58 simonpj Exp $
 --
 -- Driver flags
 --
@@ -362,7 +362,7 @@ dynamic_flags = [
 	-- on all other systems, quoting is necessary, to avoid interpretation
 	-- of shell metacharacters in the arguments (e.g. green-card's
 	-- -DBEGIN_GHC_ONLY='}-' trick).
-#ifndef mingw32_HOST_OS
+#ifndef mingw32_TARGET_OS
   ,  ( "D",		Prefix (\s -> addOpt_P ("-D'"++s++"'") ) )
   ,  ( "U",		Prefix (\s -> addOpt_P ("-U'"++s++"'") ) )
 #else

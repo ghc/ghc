@@ -26,20 +26,19 @@ import Id		( idType, idInfo, idName, idCoreRules,
 import IdInfo		{- loads of stuff -}
 import NewDemand	( isBottomingSig, topSig )
 import BasicTypes	( isNeverActive )
-import Name		( getOccName, nameOccName, mkInternalName, mkExternalName, 
+import Name		( getOccName, nameOccName, mkInternalName, 
 		  	  localiseName, isExternalName, nameSrcLoc
 			)
 import RnEnv		( lookupOrigNameCache, newExternalName )
 import NameEnv		( filterNameEnv )
 import OccName		( TidyOccEnv, initTidyOccEnv, tidyOccName )
 import Type		( tidyTopType )
-import Module		( Module, moduleName )
+import Module		( Module )
 import HscTypes		( PersistentCompilerState( pcs_nc ), 
 			  NameCache( nsNames, nsUniqs ),
 			  TypeEnv, extendTypeEnvList, typeEnvIds,
 			  ModGuts(..), ModGuts, TyThing(..)
 			)
-import FiniteMap	( lookupFM, addToFM )
 import Maybes		( orElse )
 import ErrUtils		( showPass, dumpIfSet_core )
 import UniqFM		( mapUFM )
