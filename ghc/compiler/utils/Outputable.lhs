@@ -246,6 +246,7 @@ class Outputable a where
 
 \begin{code}
 instance Outputable Bool where
+    ppr True  = ptext SLIT("True")
     ppr False = ptext SLIT("False")
 
 instance Outputable Int where
