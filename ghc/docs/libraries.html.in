@@ -7,65 +7,85 @@
   <BODY>
     <H1>Haskell Hierarchical Libraries</H1>
 
-    <P>The libraries are divided into several <EM>packages</EM>.</P>
+    <P>The libraries are divided into several <EM>packages</EM>:</P>
 
-    <P><EM>GHC/GHCi users note</EM>: most of the time, all the packages are
-    available without the need to use any additional command-line
-    options.  The only time when this is not the case is when linking
-    a program on the command line, without using the <tt>--make</tt>
-    option: in this case you must list all the packages to link to by
-    adding the <tt>-package P</tt> flag (where <tt>P</tt> is the
-    package name) to the command line for each package.  See the
-    User's Guide for more details.</P>
-
-    <P><EM>Hugs users note</EM>: Hugs currently provides modules
-    from the <TT>base</TT>, <TT>haskell98</TT>, <TT>network</TT> and
-    <TT>haskell-src</TT> packages.  These modules are always available,
-    as a single hierarchy; Hugs does not use the package subdivision.</P>
-
-    <P>
-        <UL>
-          <LI>
-            <A HREF="base/index.html"><TT>base</TT></a>:
-            the Prelude, and a large collection of useful libraries.
-          </LI>
-          <LI>
-            <A HREF="haskell98/index.html"><TT>haskell98</TT></a>:
-            Haskell 98 and FFI Standard Libraries.
-          </LI>
-          <LI>
-            <A HREF="network/index.html"><TT>network</TT></a>:
-            networking support libraries.
-          </LI>
-          <LI>
-            <A HREF="haskell-src/index.html"><TT>haskell-src</TT></a>:
-            manipulating Haskell source code.
-          </LI>
-          <LI>
-            <A HREF="readline/index.html"><TT>readline</TT></a>:
-            a library for interactively reading input from  the console
-          </LI>
-          <LI>
-            <A HREF="unix/index.html"><TT>unix</TT></a>:
-            supplies POSIX functionality (not all platforms).
-          </LI>
+    <DL>
+      <DT>
+	<A HREF="base/index.html"><TT>base</TT></a>
+      </DT><DD>
+	the Prelude, and a large collection of useful libraries.
+      </DD>
+      <DT>
+	<A HREF="haskell98/index.html"><TT>haskell98</TT></a>
+      </DT><DD>
+	Haskell 98 and FFI Standard Libraries.
+      </DD>
+      <DT>
+	<A HREF="network/index.html"><TT>network</TT></a>
+      </DT><DD>
+	networking support libraries.
+      </DD>
+      <DT>
+	<A HREF="haskell-src/index.html"><TT>haskell-src</TT></a>
+      </DT><DD>
+	manipulating Haskell source code.
+      </DD>
+      <DT>
+	<A HREF="readline/index.html"><TT>readline</TT></a>
+      </DT><DD>
+	a library for interactively reading input from  the console
+      </DD>
+      <DT>
+	<A HREF="unix/index.html"><TT>unix</TT></a>
+      </DT><DD>
+	supplies POSIX functionality (not all platforms).
+      </DD>
 @HOpenGLHTMLStart@
-          <LI>
-            <A HREF="OpenGL/index.html"><TT>OpenGL</TT></a>:
-            3D rendering.
-          </LI>
-          <LI>
-            <A HREF="GLUT/index.html"><TT>GLUT</TT></a>:
-            the OpenGL utility toolkit.
-          </LI>
+      <DT>
+	<A HREF="OpenGL/index.html"><TT>OpenGL</TT></a>
+      </DT><DD>
+	3D rendering.
+      </DD>
+      <DT>
+	<A HREF="GLUT/index.html"><TT>GLUT</TT></a>
+      </DT><DD>
+	the OpenGL utility toolkit.
+      </DD>
 @HOpenGLHTMLEnd@
 @ObjectIOHTMLStart@
-	  <LI>
-	    <A HREF="ObjectIO/index.html"><TT>ObjectIO</TT></a>: GUI library.
-          </LI>
+      <DT>
+	<A HREF="ObjectIO/index.html"><TT>ObjectIO</TT></a>
+      </DT><DD>
+	GUI library.
+      </DD>
 @ObjectIOHTMLEnd@
-        </UL>
-	</P>
+    </DL>
+
+    <H2>Implementation-specific notes</H2>
+
+    <DL>
+      <DT>GHC/GHCi</DT>
+      <DD>
+	Most of the time, all the packages are available without the
+	need to use any additional command-line options.  The only
+	time when this is not the case is when linking a program on the
+	command line, without using the <tt>--make</tt> option: in this
+	case you must list all the packages to link to by adding the
+	<tt>-package</tt> <i>P</i> flag (where <i>P</i> is the package
+	name) to the command line for each package.
+	See the <a href="users_guide/users-guide.html">User's Guide</a>
+	for more details.
+      </DD>
+
+      <DT>Hugs</DT>
+      <DD>
+	Hugs currently provides modules from the <tt>base</tt>,
+	<tt>haskell98</tt>, <tt>network</tt> and <tt>haskell-src</tt> packages.
+	These modules are always available, as a single hierarchy;
+	Hugs does not use the package subdivision.
+      </DD>
+
+    </DL>
 
   </BODY>
 </HTML>
