@@ -46,8 +46,7 @@ def rm_nofail ( $_files )
    $res = run $cmd
 }
 
--- Generate unique temporary file names.
-
+-- Pipe an error message through normalise_errmsg.
 def normalise_errmsg ( $errmsg )
 {
    $unpathify = $confdir ++ "/../../utils/normalise_errmsg/normalise_errmsg"
@@ -55,7 +54,23 @@ def normalise_errmsg ( $errmsg )
    return $normd
 }
 
+-- Give hints as to why a test is failing.
+def say_fail_because_noteq ( $filename1, $filename2 )
+{
+   print "--- FAIL because the following files differ:"
+   print "        " ++ $filename1 ++ " " ++ $filename2
+}
 
+def say_fail_because_nonempty ( $filename1 )
+{
+   print "--- FAIL because the following file is non-empty:"
+   print "        " ++ $filename1
+}
+
+def say_fail_because_compiler_barfd ( $res )
+{
+   print "--- FAIL because the compiler returned non-zero exit code = " ++ $res
+}
 
 ---------------------------------------------------------------
 --- COMPILATION                                             ---
@@ -159,10 +174,14 @@ def simple_run_main( $_extra_args )
 -- returns True if both files exist and are identical.
 def exist_and_same ( $_file1, $_file2 )
 {
-   if   not( exists($_file1) && exists($_file2))
+   if   not(exists($_file1) && exists($_file2))
    then return False
    else print "vanilla-test: comparing " ++ $_file1 ++ " and " ++ $_file2
-        return (contents($_file1) == contents($_file2))
+        $cts1 = contents($_file1)
+        $cts2 = contents($_file2)
+        $same = $cts1 == $cts2
+        if not($same) then say_failing_because_noteq($_file1, $_file2) fi
+        return $same
    fi
 }
 
@@ -251,7 +270,10 @@ def vanilla-comp-test-actions ( $extra_compile_args )
    $res = simple_build_Main_WRK ( $extra_compile_args, True )
 
    -- If the compiler barf'd, fail.
-   if $res /= "0" then return False fi
+   if   $res /= "0" 
+   then say_fail_because_compiler_barfd ( $res )
+        return False 
+   fi
 
    -- If there's an expected .stderr (presumably containing
    -- warnings), ensure the compiler produced the same.
@@ -261,12 +283,16 @@ def vanilla-comp-test-actions ( $extra_compile_args )
    if   exists($expected_stderr) && 
         (normalise_errmsg(contents($actual_stderr))
              /= normalise_errmsg(contents($expected_stderr)))
-   then return False 
+   then say_fail_because_noteq($expected_stderr, $actual_stderr)
+        return False 
    fi
 
    -- There's no expected stderr, so just insist that the compiler
    -- produced nothing on stderr.
-   if contents($actual_stderr) /= "" then return False fi
+   if   contents($actual_stderr) /= "" 
+   then say_fail_because_nonempty($actual_stderr)
+        return False
+   fi
 
    -- Must have succeeded.
    return True
