@@ -404,8 +404,8 @@ partition		:: (a -> Bool) -> [a] -> ([a],[a])
 {-# INLINE partition #-}
 partition p xs = foldr (select p) ([],[]) xs
 
-select p x (ts,fs) | p x       = (x:ts,fs)
-                   | otherwise = (ts, x:fs)
+select p x ~(ts,fs) | p x       = (x:ts,fs)
+                    | otherwise = (ts, x:fs)
 
 -- | The 'mapAccumL' function behaves like a combination of 'map' and
 -- 'foldl'; it applies a function to each element of a list, passing
