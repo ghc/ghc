@@ -90,7 +90,7 @@ import Panic
 import CmdLineOpts	( DynFlags(..), getDynFlags )
 import Maybes		( expectJust )
 
-import IOExts
+import DATA_IOREF	( readIORef )
 
 #ifdef GHCI
 import RdrName		( lookupRdrEnv )
@@ -100,10 +100,9 @@ import VarEnv		( emptyTidyEnv )
 import BasicTypes	( Fixity, defaultFixity )
 import Interpreter	( HValue )
 import HscMain		( hscStmt )
-import GlaExts		( unsafeCoerce# )
+import GHC.Exts		( unsafeCoerce# )
 import Foreign
-import CForeign
-import Exception	( Exception, try )
+import Control.Exception as Exception ( Exception, try )
 #endif
 
 import EXCEPTION	( throwDyn )
