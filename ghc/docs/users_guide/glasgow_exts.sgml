@@ -3463,7 +3463,7 @@ What follows is a brief introduction to the notation;
 it won't make much sense unless you've read Hughes's paper.
 This notation is translated to ordinary Haskell,
 using combinators from the
-<ulink url="../base/Control.Arrow.html"><literal>Control.Arrow</literal></ulink>
+<ulink url="../libraries/base/Control.Arrow.html"><literal>Control.Arrow</literal></ulink>
 module.
 </para>
 
