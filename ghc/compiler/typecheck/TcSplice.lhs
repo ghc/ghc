@@ -34,7 +34,7 @@ import Name		( Name )
 import TcRnMonad
 
 import TysWiredIn	( mkListTy )
-import DsMeta		( expQTyConName, decQTyConName, typQTyConName, decTyConName, qTyConName )
+import DsMeta		( expQTyConName, decQTyConName, typeQTyConName, decTyConName, qTyConName )
 import ErrUtils (Message)
 import Outputable
 import Panic		( showException )
@@ -105,7 +105,7 @@ tc_bracket (ExpBr expr)
 
 tc_bracket (TypBr typ) 
   = tcHsSigType ExprSigCtxt typ		`thenM_`
-    tcMetaTy typQTyConName
+    tcMetaTy typeQTyConName
 	-- Result type is Type (= Q Typ)
 
 tc_bracket (DecBr decls)
