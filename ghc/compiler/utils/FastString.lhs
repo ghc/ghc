@@ -48,7 +48,7 @@ module FastString
 #define COMPILING_FAST_STRING
 #include "HsVersions.h"
 
-#if __GLASGOW_HASKELL__ < 301
+#if 0 && __GLASGOW_HASKELL__ < 301
 import PackBase
 import STBase		( StateAndPtr#(..) )
 import IOHandle		( filePtr, readHandle, writeHandle )
@@ -78,7 +78,14 @@ import PrimPacked
 import GlaExts
 import Addr		( Addr(..) )
 import MutableArray	( MutableArray(..) )
+
+-- ForeignObj is now exported abstractly.
+#if __GLASGOW_HASKELL__ >= 303
+import qualified PrelForeign as Foreign  ( ForeignObj(..) )
+#else
 import Foreign		( ForeignObj(..) )
+#endif
+
 import IOExts		( IORef, newIORef, readIORef, writeIORef )
 import IO
 
