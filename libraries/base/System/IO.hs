@@ -170,6 +170,9 @@ import GHC.Show
 #ifdef __HUGS__
 import Hugs.IO
 import Hugs.IOExts
+import Hugs.IORef
+import Hugs.Prelude	( throw, Exception(NonTermination) )
+import System.IO.Unsafe	( unsafeInterleaveIO )
 #endif
 
 #ifdef __NHC__
@@ -374,7 +377,7 @@ hPrint hdl 	=  hPutStrLn hdl . show
 -- ---------------------------------------------------------------------------
 -- fixIO
 
-#ifdef __GLASGOW_HASKELL__
+#if defined(__GLASGOW_HASKELL__) || defined(__HUGS__)
 fixIO :: (a -> IO a) -> IO a
 fixIO k = do
     ref <- newIORef (throw NonTermination)
