@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.24 2000/12/18 12:43:04 sewardj Exp $
+-- $Id: InteractiveUI.hs,v 1.25 2001/01/10 17:19:01 sewardj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -162,7 +162,9 @@ runCommand c =
    doCommand c
 
 doCommand (':' : command) = specialCommand command
-doCommand expr            = timeIt (evalExpr expr) >> return False
+doCommand expr            = do timeIt (evalExpr expr
+                                       >> evalExpr "Prelude.putStr \"\n\"")
+                               return False
 
 evalExpr expr
  = do st <- getGHCiState

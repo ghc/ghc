@@ -5,8 +5,8 @@
  * Copyright (c) 1994-2000.
  *
  * $RCSfile: Interpreter.c,v $
- * $Revision: 1.9 $
- * $Date: 2001/01/09 17:36:21 $
+ * $Revision: 1.10 $
+ * $Date: 2001/01/10 17:21:18 $
  * ---------------------------------------------------------------------------*/
 
 #ifdef GHCI
@@ -129,6 +129,7 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
        /* Start of the bytecode interpreter                    */
        /* ---------------------------------------------------- */
        {
+          int do_print_stack = 1;
           register int       bciPtr     = 1; /* instruction pointer */
           register StgBCO*   bco        = (StgBCO*)obj;
           register UShort*   instrs     = (UShort*)(&bco->instrs->payload[0]);
@@ -146,9 +147,12 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
 
           ASSERT(bciPtr <= instrs[0]);
           IF_DEBUG(evaluator,
+		   //if (do_print_stack) {
 		   //fprintf(stderr, "\n-- BEGIN stack\n");
 		   //printStack(iSp,cap->rCurrentTSO->stack+cap->rCurrentTSO->stack_size,iSu);
 		   //fprintf(stderr, "-- END stack\n\n");
+		   //}
+                   do_print_stack = 1;
 		   fprintf(stderr,"iSp = %p   iSu = %p   pc = %d      ", iSp, iSu, bciPtr);
                   disInstr(bco,bciPtr);
                   if (0) { int i;
@@ -189,6 +193,7 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                  ASSERT((W_*)iSp+o1 < (W_*)iSu);
                  StackWord(-1) = StackWord(o1);
                  iSp--;
+                 do_print_stack = 0;
                  goto nextInsn;
               }
               case bci_PUSH_LL: {
@@ -224,13 +229,13 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                  goto nextInsn;
               }
               case bci_PUSH_UBX: {
+                 int i;
                  int o_lits = BCO_NEXT;
                  int n_words = BCO_NEXT;
-                 for (; n_words > 0; n_words--) {
-                    iSp --;
-                    StackWord(0) = BCO_LIT(o_lits);
-                    o_lits++;
-                 }
+                 iSp -= n_words;
+                 for (i = 0; i < n_words; i++)
+                    StackWord(i) = BCO_LIT(o_lits+i);
+                 do_print_stack = 0;
                  goto nextInsn;
               }
               case bci_PUSH_TAG: {
@@ -331,14 +336,47 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                     bciPtr = failto;
                  goto nextInsn;
               }
+              case bci_TESTLT_I: {
+                 /* The top thing on the stack should be a tagged int. */
+                 int discr   = BCO_NEXT;
+                 int failto  = BCO_NEXT;
+                 I_ stackInt = (I_)StackWord(1);
+                 ASSERT(1 == StackWord(0));
+                 if (stackInt >= (I_)BCO_LIT(discr))
+                    bciPtr = failto;
+                 goto nextInsn;
+              }
               case bci_TESTEQ_I: {
                  /* The top thing on the stack should be a tagged int. */
                  int discr   = BCO_NEXT;
                  int failto  = BCO_NEXT;
                  I_ stackInt = (I_)StackWord(1);
                  ASSERT(1 == StackWord(0));
-		 fprintf(stderr, "TESTEQ_I: discr = %d, stack = %d\n",(I_)BCO_LIT(discr), stackInt); 
                  if (stackInt != (I_)BCO_LIT(discr))
+                    bciPtr = failto;
+                 goto nextInsn;
+              }
+              case bci_TESTLT_D: {
+                 /* The top thing on the stack should be a tagged double. */
+                 int discr   = BCO_NEXT;
+                 int failto  = BCO_NEXT;
+                 StgDouble stackDbl, discrDbl;
+                 ASSERT(sizeofW(StgDouble) == StackWord(0));
+                 stackDbl = PK_DBL( & StackWord(1) );
+                 discrDbl = PK_DBL( & BCO_LIT(discr) );
+                 if (stackDbl >= discrDbl)
+                    bciPtr = failto;
+                 goto nextInsn;
+              }
+              case bci_TESTEQ_D: {
+                 /* The top thing on the stack should be a tagged double. */
+                 int discr   = BCO_NEXT;
+                 int failto  = BCO_NEXT;
+                 StgDouble stackDbl, discrDbl;
+                 ASSERT(sizeofW(StgDouble) == StackWord(0));
+                 stackDbl = PK_DBL( & StackWord(1) );
+                 discrDbl = PK_DBL( & BCO_LIT(discr) );
+                 if (stackDbl != discrDbl)
                     bciPtr = failto;
                  goto nextInsn;
               }
@@ -355,8 +393,8 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                  StgInfoTable* ret_itbl    = (StgInfoTable*)StackWord(tag +1);
                  ASSERT(tag <= 2); /* say ... */
                  if (ret_itbl == (StgInfoTable*)&stg_ctoi_ret_R1_info
-                     /* || ret_itbl == stg_ctoi_ret_F1_info
-                        || ret_itbl == stg_ctoi_ret_D1_info */) {
+                     || ret_itbl == (StgInfoTable*)&stg_ctoi_ret_F1_info
+                     || ret_itbl == (StgInfoTable*)&stg_ctoi_ret_D1_info) {
                      /* Returning to interpreted code.  Interpret the BCO 
                         immediately underneath the itbl. */
                      StgBCO* ret_bco = (StgBCO*)StackWord(tag +1+1);
@@ -379,11 +417,8 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                  barf("interpretBCO: hit a CASEFAIL");
 
               /* As yet unimplemented */
-              case bci_TESTLT_I:
               case bci_TESTLT_F:
               case bci_TESTEQ_F:
-              case bci_TESTLT_D:
-              case bci_TESTEQ_D:
 
               /* Errors */
               default: 

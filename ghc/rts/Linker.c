@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.6 2000/12/15 17:29:35 simonmar Exp $
+ * $Id: Linker.c,v 1.7 2001/01/10 17:21:18 sewardj Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -133,6 +133,7 @@ static int ocResolve_PEi386     ( ObjectCode* oc );
       SymX(stg_IND_STATIC_info)			\
       SymX(stg_EMPTY_MVAR_info)			\
       SymX(stg_MUT_ARR_PTRS_FROZEN_info)	\
+      SymX(stg_WEAK_info)                       \
       SymX(stg_CHARLIKE_closure)		\
       SymX(stg_INTLIKE_closure)			\
       SymX(stg_CAF_UNENTERED_entry)		\

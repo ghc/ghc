@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.56 2000/12/15 10:37:51 sewardj Exp $
+ * $Id: StgMiscClosures.hc,v 1.57 2001/01/10 17:21:18 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -136,9 +136,59 @@ STG_CtoI_RET_R1_Template(stg_ctoi_ret_R1_7_entry);
 VEC_POLY_INFO_TABLE(stg_ctoi_ret_R1,0, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, EF_);
 
 /* When the returned value is in F1 ... */
-/* TODO */
+#define STG_CtoI_RET_F1_Template(label) 	\
+   IFN_(label)			        \
+   {                                    \
+      StgPtr bco;                       \
+      FB_				\
+      bco = ((StgPtr*)Sp)[1];           \
+      Sp -= sizeofW(StgFloat);		\
+      ASSIGN_FLT((W_*)Sp, F1);          \
+      Sp -= 1;				\
+      ((StgPtr*)Sp)[0] = bco;		\
+      JMP_(stg_yield_to_interpreter);   \
+      FE_                               \
+   }
+
+STG_CtoI_RET_F1_Template(stg_ctoi_ret_F1_entry);
+STG_CtoI_RET_F1_Template(stg_ctoi_ret_F1_0_entry);
+STG_CtoI_RET_F1_Template(stg_ctoi_ret_F1_1_entry);
+STG_CtoI_RET_F1_Template(stg_ctoi_ret_F1_2_entry);
+STG_CtoI_RET_F1_Template(stg_ctoi_ret_F1_3_entry);
+STG_CtoI_RET_F1_Template(stg_ctoi_ret_F1_4_entry);
+STG_CtoI_RET_F1_Template(stg_ctoi_ret_F1_5_entry);
+STG_CtoI_RET_F1_Template(stg_ctoi_ret_F1_6_entry);
+STG_CtoI_RET_F1_Template(stg_ctoi_ret_F1_7_entry);
+
+VEC_POLY_INFO_TABLE(stg_ctoi_ret_F1,0, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, EF_);
+
+
 /* When the returned value is in D1 ... */
-/* TODO */
+#define STG_CtoI_RET_D1_Template(label) 	\
+   IFN_(label)			        \
+   {                                    \
+      StgPtr bco;                       \
+      FB_				\
+      bco = ((StgPtr*)Sp)[1];           \
+      Sp -= sizeofW(StgDouble);		\
+      ASSIGN_DBL((W_*)Sp, D1);          \
+      Sp -= 1;				\
+      ((StgPtr*)Sp)[0] = bco;		\
+      JMP_(stg_yield_to_interpreter);   \
+      FE_                               \
+   }
+
+STG_CtoI_RET_D1_Template(stg_ctoi_ret_D1_entry);
+STG_CtoI_RET_D1_Template(stg_ctoi_ret_D1_0_entry);
+STG_CtoI_RET_D1_Template(stg_ctoi_ret_D1_1_entry);
+STG_CtoI_RET_D1_Template(stg_ctoi_ret_D1_2_entry);
+STG_CtoI_RET_D1_Template(stg_ctoi_ret_D1_3_entry);
+STG_CtoI_RET_D1_Template(stg_ctoi_ret_D1_4_entry);
+STG_CtoI_RET_D1_Template(stg_ctoi_ret_D1_5_entry);
+STG_CtoI_RET_D1_Template(stg_ctoi_ret_D1_6_entry);
+STG_CtoI_RET_D1_Template(stg_ctoi_ret_D1_7_entry);
+
+VEC_POLY_INFO_TABLE(stg_ctoi_ret_D1,0, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, EF_);
 
 
 /* The other way round: when the interpreter returns a value to

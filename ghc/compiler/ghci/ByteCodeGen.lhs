@@ -55,7 +55,7 @@ import MArray		( castSTUArray,
 			  newAddrArray, writeAddrArray )
 import Foreign		( Storable(..), Word8, Word16, Word32, Ptr(..), 
 			  malloc, castPtr, plusPtr, mallocBytes )
-import Addr		( Word, addrToInt, nullAddr, writeCharOffAddr )
+import Addr		( Word, addrToInt, writeCharOffAddr )
 import Bits		( Bits(..), shiftR )
 import CTypes		( CInt )
 
@@ -354,7 +354,7 @@ mkProtoBCO nm instrs_ordlist origin
 -- resulting BCO a name.
 schemeR :: (Id, AnnExpr Id VarSet) -> BcM ()
 schemeR (nm, rhs) 
-
+{-
    | trace (showSDoc (
               (char ' '
                $$ (ppr.filter (not.isTyVar).varSetElems.fst) rhs
@@ -362,7 +362,7 @@ schemeR (nm, rhs)
                $$ char ' '
               ))) False
    = undefined
-
+-}
    | otherwise
    = schemeR_wrk rhs nm (collect [] rhs)
 
@@ -407,7 +407,7 @@ schemeE d s p e@(fvs, AnnVar v)
    = -- returning an unboxed value.  Heave it on the stack, SLIDE, and RETURN.
      let (push, szw) = pushAtom True d p (AnnVar v)
      in  returnBc (push 			-- value onto stack
-                   `snocOL` SLIDE szw (d-s) 	-- clear to sequel
+                   `appOL`  mkSLIDE szw (d-s) 	-- clear to sequel
                    `snocOL` RETURN v_rep)	-- go
    where
       v_rep = typePrimRep (idType v)
@@ -416,8 +416,8 @@ schemeE d s p (fvs, AnnLit literal)
    = let (push, szw) = pushAtom True d p (AnnLit literal)
          l_rep = literalPrimRep literal
      in  returnBc (push 			-- value onto stack
-                   `snocOL` SLIDE szw (d-s) 	-- clear to sequel
-                   `snocOL` RETURN l_rep)		-- go
+                   `appOL`  mkSLIDE szw (d-s) 	-- clear to sequel
+                   `snocOL` RETURN l_rep)	-- go
 
 schemeE d s p (fvs, AnnLet binds b)
    = let (xs,rhss) = case binds of AnnNonRec x rhs  -> ([x],[rhs])
@@ -473,6 +473,7 @@ schemeE d s p (fvs, AnnCase scrut bndr alts)
         scrut_primrep = typePrimRep (idType bndr)
         isAlgCase
            = case scrut_primrep of
+                CharRep -> False ; AddrRep -> False
                 IntRep -> False ; FloatRep -> False ; DoubleRep -> False
                 PtrRep -> True
                 other  -> pprPanic "ByteCodeGen.schemeE" (ppr other)
@@ -486,7 +487,7 @@ schemeE d s p (fvs, AnnCase scrut bndr alts)
                  p''            = addListToFM 
                                    p' (zip binds_r (mkStackOffsets d' binds_r_t_szsw))
                  d''            = d' + binds_t_szw
-                 unpack_code    = mkUnpackCode 0 0 (map (typePrimRep.idType) binds_f)
+                 unpack_code    = mkUnpackCode {-0 0-} (map (typePrimRep.idType) binds_f)
              in schemeE d'' s p'' rhs	`thenBc` \ rhs_code -> 
                 returnBc (my_discr alt, unpack_code `appOL` rhs_code)
            | otherwise 
@@ -573,31 +574,35 @@ should_args_be_tagged (_, other)
    = panic "should_args_be_tagged: tail call to non-con, non-var"
 
 
--- Make code to unpack a constructor onto the stack, adding
--- tags for the unboxed bits.  Takes the PrimReps of the constructor's
--- arguments, and a travelling offset along both the constructor
--- (off_h) and the stack (off_s).
-mkUnpackCode :: Int -> Int -> [PrimRep] -> BCInstrList
-mkUnpackCode off_h off_s [] = nilOL
-mkUnpackCode off_h off_s (r:rs)
-   | isFollowableRep r
-   = let (rs_ptr, rs_nptr) = span isFollowableRep (r:rs)
-         ptrs_szw = sum (map untaggedSizeW rs_ptr) 
-     in  ASSERT(ptrs_szw == length rs_ptr)
-         ASSERT(off_h == 0)
-         ASSERT(off_s == 0)
-         UNPACK ptrs_szw 
-         `consOL` mkUnpackCode (off_h + ptrs_szw) (off_s + ptrs_szw) rs_nptr
-   | otherwise
-   = case r of
-        IntRep    -> approved
-        FloatRep  -> approved
-        DoubleRep -> approved
+-- Make code to unpack the top-of-stack constructor onto the stack, 
+-- adding tags for the unboxed bits.  Takes the PrimReps of the 
+-- constructor's arguments.  off_h and off_s are travelling offsets
+-- along the constructor and the stack.
+mkUnpackCode :: [PrimRep] -> BCInstrList
+mkUnpackCode reps
+   = all_code
      where
-        approved = UPK_TAG usizeW off_h off_s   `consOL` theRest
-        theRest  = mkUnpackCode (off_h + usizeW) (off_s + tsizeW) rs
-        usizeW   = untaggedSizeW r
-        tsizeW   = taggedSizeW r
+        all_code = ptrs_code `appOL` do_nptrs ptrs_szw ptrs_szw reps_nptr
+
+        reps_ptr  = filter isFollowableRep reps
+        reps_nptr = filter (not.isFollowableRep) reps
+        
+        ptrs_szw  = sum (map untaggedSizeW reps_ptr)
+        ptrs_code | null reps_ptr = nilOL
+                  | otherwise     = unitOL (UNPACK ptrs_szw)
+
+        do_nptrs off_h off_s [] = nilOL
+        do_nptrs off_h off_s (npr:nprs)
+           = case npr of
+                IntRep -> approved ; FloatRep -> approved
+                DoubleRep -> approved ; AddrRep -> approved
+                _ -> pprPanic "ByteCodeGen.mkUnpackCode" (ppr npr)
+             where
+                approved = UPK_TAG usizeW off_h off_s   `consOL` theRest
+                theRest  = do_nptrs (off_h + usizeW) (off_s + tsizeW) nprs
+                usizeW   = untaggedSizeW npr
+                tsizeW   = taggedSizeW npr
+
 
 -- Push an atom onto the stack, returning suitable code & number of
 -- stack words used.  Pushes it either tagged or untagged, since 
@@ -698,6 +703,9 @@ pushAtom False d p (AnnLit lit)
 
 pushAtom tagged d p (AnnApp f (_, AnnType _))
    = pushAtom tagged d p (snd f)
+
+pushAtom tagged d p (AnnNote note e)
+   = pushAtom tagged d p (snd e)
 
 pushAtom tagged d p other
    = pprPanic "ByteCodeGen.pushAtom" 
@@ -1088,12 +1096,10 @@ mkBits findLabel st proto_insns
                ret_itbl_addr = case pk of
                                   PtrRep    -> stg_ctoi_ret_R1_info
                                   IntRep    -> stg_ctoi_ret_R1_info
+                                  CharRep   -> stg_ctoi_ret_R1_info
                                   FloatRep  -> stg_ctoi_ret_F1_info
                                   DoubleRep -> stg_ctoi_ret_D1_info
                                   _ -> pprPanic "mkBits.ctoi_itbl" (ppr pk)
-                               where  -- TEMP HACK
-                                  stg_ctoi_ret_F1_info = nullAddr
-                                  stg_ctoi_ret_D1_info = nullAddr
 
        itoc_itbl st pk
           = addr st ret_itbl_addr
@@ -1104,8 +1110,8 @@ mkBits findLabel st proto_insns
                                   DoubleRep -> stg_gc_d1_info
                      
 foreign label "stg_ctoi_ret_R1_info" stg_ctoi_ret_R1_info :: Addr
---foreign label "stg_ctoi_ret_F1_info" stg_ctoi_ret_F1_info :: Addr
---foreign label "stg_ctoi_ret_D1_info" stg_ctoi_ret_D1_info :: Addr
+foreign label "stg_ctoi_ret_F1_info" stg_ctoi_ret_F1_info :: Addr
+foreign label "stg_ctoi_ret_D1_info" stg_ctoi_ret_D1_info :: Addr
 
 foreign label "stg_gc_unbx_r1_info" stg_gc_unbx_r1_info :: Addr
 foreign label "stg_gc_f1_info"      stg_gc_f1_info :: Addr
