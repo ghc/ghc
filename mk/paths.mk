@@ -94,10 +94,10 @@ INSTALL_DIR     = $(FPTOOLS_TOP)/glafp-utils/mkdirhier/mkdirhier
 # compile it twice.
 
 # So we figure out the sources in three stages: first figure out
-# what's in the current directory.  Then figure out all the "derived"
-# sources (eg. A.hsc generates A.hs and A_hsc.c), and finally put all
-# these together and remove duplicates (GNU make's handy sort function
-# does the duplicate removing).
+# what's in the current directory (this is $(PRE_SRCS)).  Then figure
+# out all the "derived" sources (eg. A.hsc generates A.hs and
+# A_hsc.c), and finally put all these together and remove duplicates
+# (GNU make's handy sort function does the duplicate removing).
 #
 # BOOT_SRCS: list of machine generated Haskell modules.
 # HS_SRCS:   list of Haskell modules you want to compile.
@@ -110,18 +110,24 @@ INSTALL_DIR     = $(FPTOOLS_TOP)/glafp-utils/mkdirhier/mkdirhier
 
 PRE_SRCS    = $(wildcard *.lhs *.hs *.c *.prl *.lprl *.lit *.verb *.hsc)
 
-HSC_SRCS    = $(filter %.hsc, $(PRE_SRCS))
-HSC_HS_SRCS = $(patsubst %.hsc,%.hs,$(HSC_SRCS))
-HSC_C_SRCS  = $(patsubst %.hsc,%_hsc.c,$(HSC_SRCS))
-HSC_C_OBJS  = $(patsubst %.hsc,%_hsc.o,$(HSC_SRCS))
+DERIVED_SRCS = $(patsubst %.hsc, %.hs %_hsc.c %_hsc.h, \
+		  $(filter %.hsc, $(PRE_SRCS) ))
 
-SRCS        = $(sort $(PRE_SRCS) $(HSC_HS_SRCS) $(HSC_C_SRCS))
+# EXCLUDED_SRCS can be set in the Makefile, otherwise it defaults to empty.
+EXCLUDED_DERIVED_SRCS = $(patsubst %.hsc,%.hs %_hsc.c, \
+			    $(filter %.hsc, $(EXCLUDED_SRCS)))
+CLOSED_EXCLUDED_SRCS  = $(sort $(EXCLUDED_SRCS) $(EXCLUDED_DERIVED_SRCS))
+
+SRCS        = $(filter-out $(CLOSED_EXCLUDED_SRCS), \
+	        $(sort $(PRE_SRCS) $(HSC_DERIVED_SRCS)))
 
 HS_SRCS	    = $(filter %.lhs %.hs %.hc,$(sort $(SRCS) $(BOOT_SRCS)))
 HS_OBJS     = $(addsuffix .$(way_)o,$(basename $(HS_SRCS)))
 HS_HCS      = $(addsuffix .$(way_)hc,$(basename $(HS_SRCS)))
 HS_SS       = $(addsuffix .$(way_)s,$(basename $(HS_SRCS)))
 HS_IFACES   = $(addsuffix .$(way_)hi,$(basename $(HS_SRCS)))
+
+HSC_C_OBJS  = $(patsubst %_hsc.c,%_hsc.o,$(SRCS))
 
 C_SRCS      = $(filter %.c,$(SRCS)) 
 C_OBJS      = $(addsuffix .$(way_)o,$(basename $(C_SRCS)))
@@ -184,9 +190,7 @@ TAGS_C_SRCS=$(C_SRCS)
 MOSTLY_CLEAN_FILES += $(HS_OBJS) $(C_OBJS)
 CLEAN_FILES        += $(HS_PROG) $(C_PROG) $(SCRIPT_PROG) $(SCRIPT_LINK) \
 		      $(PROG) $(LIBRARY) $(HS_IFACES) $(HS_SS) a.out \
-		      $(patsubst %.hsc,%.hs,$(HSC_SRCS)) \
-		      $(patsubst %.hsc,%_hsc.c,$(HSC_SRCS)) \
-		      $(patsubst %.hsc,%_hsc.h,$(HSC_SRCS))
+		      $(DERIVED_SRCS)
 
 # Don't clean the .hc files if we're bootstrapping
 ifneq "$(BootingFromHc)" "YES"
