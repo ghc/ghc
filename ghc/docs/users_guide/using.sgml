@@ -764,7 +764,8 @@ ghc --make Main.hs
 	  <para>Provides the standard warnings plus
 	  <option>-fwarn-incomplete-patterns</option>,
 	  <option>-fwarn-unused-matches</option>,
-	  <option>-fwarn-unused-imports</option> and
+	  <option>-fwarn-unused-imports</option>,
+	  <option>-fwarn-misc</option>, and
 	  <option>-fwarn-unused-binds</option>.</para>
 	</listitem>
       </varlistentry>
@@ -772,7 +773,7 @@ ghc --make Main.hs
       <varlistentry>
 	<term><option>-w</option>:</term>
 	<listitem>
-	  <IndexTerm><Primary>-w option</Primary></IndexTerm>
+	  <IndexTerm><Primary><option>-w</option></Primary></IndexTerm>
 	  <para>Turns off all warnings, including the standard ones.</para>
 	</listitem>
       </varlistentry>
@@ -780,7 +781,7 @@ ghc --make Main.hs
       <varlistentry>
 	<term><option>-Wall</option>:</term>
 	<listitem>
-	  <indexterm><primary>-Wall option</primary></indexterm>
+	  <indexterm><primary><option>-Wall</option></primary></indexterm>
 	  <para>Turns on all warning options.</para>
 	</listitem>
       </varlistentry>
@@ -809,7 +810,7 @@ ghc --make Main.hs
       <varlistentry>
 	<term><option>-fwarn-duplicate-exports</option>:</term>
 	<listitem>
-	  <indexterm><primary>-fwarn-duplicate-exports option</primary></indexterm>
+	  <indexterm><primary><option>-fwarn-duplicate-exports</option></primary></indexterm>
 	  <indexterm><primary>duplicate exports, warning</primary></indexterm>
 	  <indexterm><primary>export lists, duplicates</primary></indexterm>
 
@@ -826,7 +827,7 @@ ghc --make Main.hs
       <varlistentry>
 	<term><option>-fwarn-hi-shadowing</option>:</term>
 	<listitem>
-	  <indexterm><primary>-fwarn-hi-shadowing option</primary></indexterm>
+	  <indexterm><primary><option>-fwarn-hi-shadowing</option></primary></indexterm>
 	  <indexterm><primary>shadowing</primary>
 	    <secondary>interface files</secondary></indexterm>
 
@@ -840,7 +841,7 @@ ghc --make Main.hs
       <varlistentry>
 	<term><option>-fwarn-incomplete-patterns</option>:</term>
 	<listitem>
-	  <indexterm><primary>-fwarn-incomplete-patterns option</primary></indexterm>
+	  <indexterm><primary><option>-fwarn-incomplete-patterns</option></primary></indexterm>
 	  <indexterm><primary>incomplete patterns, warning</primary></indexterm>
 	  <indexterm><primary>patterns, incomplete</primary></indexterm>
 
@@ -862,9 +863,20 @@ g [] = 2
       </varlistentry>
 
       <varlistentry>
+	<term><option>-fwarn-misc</option>:</term>
+	<indexterm><primary><option>-fwarn-misc</option></primary></indexterm>
+	<listitem>
+	  <para>Turns on warnings for various harmless but untidy
+	  things.  This currently includes: importing a type with
+	  <literal>(..)</literal> when the export is abstract, and
+	  listing duplicate class assertions in a qualified type.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term><option>-fwarn-missing-fields</option>:</term>
 	<listitem>
-	  <indexterm><primary>-fwarn-missing-fields option</primary></indexterm>
+	  <indexterm><primary><option>-fwarn-missing-fields</option></primary></indexterm>
 	  <indexterm><primary>missing fields, warning</primary></indexterm>
 	  <indexterm><primary>fields, missing</primary></indexterm>
 
@@ -879,7 +891,7 @@ g [] = 2
       <varlistentry>
 	<term><option>-fwarn-missing-methods</option>:</term>
 	<listitem>
-	  <indexterm><primary>-fwarn-missing-methods option</primary></indexterm>
+	  <indexterm><primary><option>-fwarn-missing-methods</option></primary></indexterm>
 	  <indexterm><primary>missing methods, warning</primary></indexterm>
 	  <indexterm><primary>methods, missing</primary></indexterm>
 
@@ -893,7 +905,7 @@ g [] = 2
       <varlistentry>
 	<term><option>-fwarn-missing-signatures</option>:</term>
 	<listitem>
-	  <indexterm><primary>-fwarn-missing-signatures option</primary></indexterm>
+	  <indexterm><primary><option>-fwarn-missing-signatures</option></primary></indexterm>
 	  <indexterm><primary>type signatures, missing</primary></indexterm>
 
 	  <para>If you would like GHC to check that every top-level
@@ -906,7 +918,7 @@ g [] = 2
       <varlistentry>
 	<term><option>-fwarn-name-shadowing</option>:</term>
 	<listitem>
-	  <indexterm><primary>-fwarn-name-shadowing option</primary></indexterm>
+	  <indexterm><primary><option>-fwarn-name-shadowing</option></primary></indexterm>
 	  <indexterm><primary>shadowing, warning</primary></indexterm>
 	  
 	  <para>This option causes a warning to be emitted whenever an
@@ -924,7 +936,7 @@ g [] = 2
 
       <varlistentry>
 	<term><option>-fwarn-overlapping-patterns</option>:</term>
-	<indexterm><primary>-fwarn-overlapping-patterns option</primary></indexterm>
+	<indexterm><primary><option>-fwarn-overlapping-patterns</option></primary></indexterm>
 	<indexterm><primary>overlapping patterns, warning</primary></indexterm>
 	<indexterm><primary>patterns, overlapping</primary></indexterm>
 	<listitem>
@@ -960,7 +972,7 @@ f "2"    = 2
       <varlistentry>
 	<term><option>-fwarn-type-defaults</option>:</term>
 	<listitem>
-	  <indexterm><primary>-fwarn-type-defaults option</primary></indexterm>
+	  <indexterm><primary><option>-fwarn-type-defaults</option></primary></indexterm>
 	  <indexterm><primary>defaulting mechanism, warning</primary></indexterm>
 	  <para>Have the compiler warn/inform you where in your source
           the Haskell defaulting mechanism for numeric types kicks
@@ -980,7 +992,7 @@ f "2"    = 2
       <varlistentry>
 	<term><option>-fwarn-unused-binds</option>:</term>
 	<listitem>
-	  <indexterm><primary>-fwarn-unused-binds option</primary></indexterm>
+	  <indexterm><primary><option>-fwarn-unused-binds</option></primary></indexterm>
 	  <indexterm><primary>unused binds, warning</primary></indexterm>
 	  <indexterm><primary>binds, unused</primary></indexterm>
 	  <para>Report any function definitions (and local bindings)
@@ -992,7 +1004,7 @@ f "2"    = 2
       <varlistentry>
 	<term><option>-fwarn-unused-imports</option>:</term>
 	<listitem>
-	  <indexterm><primary>-fwarn-unused-imports option</primary></indexterm>
+	  <indexterm><primary><option>-fwarn-unused-imports</option></primary></indexterm>
 	  <indexterm><primary>unused imports, warning</primary></indexterm>
 	  <indexterm><primary>imports, unused</primary></indexterm>
 
@@ -1004,7 +1016,7 @@ f "2"    = 2
       <varlistentry>
 	<term><option>-fwarn-unused-matches</option>:</term>
 	<listitem>
-	  <indexterm><primary>-fwarn-unused-matches option</primary></indexterm>
+	  <indexterm><primary><option>-fwarn-unused-matches</option></primary></indexterm>
 	  <indexterm><primary>unused matches, warning</primary></indexterm>
 	  <indexterm><primary>matches, unused</primary></indexterm>
 
@@ -1020,10 +1032,11 @@ f "2"    = 2
     </VariableList>
 
     <para>If you're feeling really paranoid, the
-    <option>-dcore-lint</option> option<indexterm><primary>-dcore-lint
-    option</primary></indexterm> is a good choice.  It turns on
-    heavyweight intra-pass sanity-checking within GHC.  (It checks
-    GHC's sanity, not yours.)</para>
+    <option>-dcore-lint</option>
+    option<indexterm><primary><option>-dcore-lint</option></primary></indexterm>
+    is a good choice.  It turns on heavyweight intra-pass
+    sanity-checking within GHC.  (It checks GHC's sanity, not
+    yours.)</para>
 
   </sect1>
 
