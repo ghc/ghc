@@ -1,5 +1,5 @@
 
-module RunOneTest ( run_one_test )
+module RunOneTest ( run_one_test, splitPathname )
 where
 
 import CmdSyntax
@@ -23,26 +23,47 @@ import System	( ExitCode(..) )
 --       which the testconfig.T file says should happen, the second
 --       is what actually happened.
 
-run_one_test :: FilePath	-- test dir
+run_one_test :: FilePath	-- path to the .T file
              -> [(Var, String)]	-- default var bindings
 		-- containing at least $tool, $confdir, $conffile
              -> IO (Maybe (Result, Result))
-run_one_test test_dir p_default
+run_one_test test_path p_default
    = do { putStr "\n"
-        ; officialMsg ("====== " ++ test_dir ++ " ======")
-        ; dir_exists <- doesDirectoryExist test_dir
-        ; if    not dir_exists 
-           then do officialMsg ("test directory `" ++ test_dir ++ 
+        ; officialMsg ("====== " ++ test_path ++ " ======")
+        ; t_exists <- doesFileExist test_path
+        ; if    not t_exists 
+           then do officialMsg ("test file `" ++ test_path ++ 
                                 "' doesn't exist.")
                    return Nothing
            else 
 
-     do { let p_init = p_default ++ [("testdir", test_dir)]
+     do { let (test_dir, test_file) = splitPathname test_path
+        ; let p_init = p_default ++ [("testdir",  test_dir),
+                                     ("testroot", rdrop2 test_file)]
         ; let tds = [mkInclude (EVar "confdir") (EVar "conffile"),
-                     mkInclude (EVar "testdir") (EString "testconfig.T")]
+                     mkInclude (EVar "testdir") 
+                               (EOp OpAppend (EVar "testroot") (EString ".T"))]
         -- ; print (show tds, show p_init)
         ; doEval test_dir p_init tds
      }}
      where
         mkInclude dir file 
            = TInclude (EOp OpAppend dir (EOp OpAppend (EString "/") file))
+        rdrop2 t_file_name
+           | take 2 (reverse t_file_name) == "T."
+           = take (length t_file_name - 2) t_file_name
+           | otherwise
+           = panic "rdrop2"
+
+
+-- (eg) "foo/bar/xyzzy.ext" --> ("foo/bar", "xyzzy.ext")
+splitPathname :: String -> (String, String)
+splitPathname full
+   | '/' `notElem` full = (".", full)
+   | otherwise
+   = let full_r = reverse full
+         f_r    = takeWhile (/= '/') full_r
+         p_r    = drop (1 + length f_r) full_r
+     in  if null p_r then (".", reverse f_r)
+                     else (reverse p_r, reverse f_r)
+

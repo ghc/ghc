@@ -1,14 +1,14 @@
 
 module Main where
 
-import RunOneTest 	( run_one_test )
+import RunOneTest 	( run_one_test, splitPathname )
 import CmdSyntax	( Var, Result(..), Expr(..), officialMsg, panic )
 import Directory
 import System
 import List
 
 findTests :: FilePath        -- name of root dir of tests
-          -> IO [FilePath]   -- name of all dirs containing "testconfig.T"
+          -> IO [FilePath]   -- paths to all files matching "*.T"
 
 findTests root_in
    = snarf ((reverse . dropWhile (== '/') . reverse) root_in)
@@ -29,17 +29,16 @@ findTests root_in
 
                 tagged_contents <- mapM tag_subdir dir_contents
                 --print tagged_contents
-                let include_this_dir
-                       = (not.null) [ () | (False, f) <- tagged_contents, 
-                                                         f == "testconfig.T"]
+                let tests_in_this_dir
+                       = [ scrub (this_dir++"/"++f) 
+                         | (False, f) <- tagged_contents, 
+                           take 2 (reverse f) == "T." ]
                 let subdir_names
                        = [ f | (True, f) <- tagged_contents ]
                 subdir_testss
                    <- mapM (\d -> snarf root (dir++"/"++d)) subdir_names
                 let subdir_tests 
-                       = (if include_this_dir then [scrub (root++"/"++dir)] 
-                                              else [])
-                         ++ concat subdir_testss
+                       = tests_in_this_dir ++ concat subdir_testss
                 return subdir_tests
 
         -- (eg)   "tests/./test1/run.stderr"  -->  "tests/test1/run.stderr"
@@ -107,15 +106,7 @@ main_really arg_ws0
         ; putStr "\n"
         -- ; exitWith ExitSuccess
      }}}
-     where
-        splitPathname full
-           | '/' `notElem` full = (".", full)
-           | otherwise
-           = let full_r = reverse full
-                 f_r    = takeWhile (/= '/') full_r
-                 p_r    = drop (1 + length f_r) full_r
-             in  if null p_r then (".", reverse f_r)
-                             else (reverse p_r, reverse f_r)
+
 
 -- Summarise overall outcome
 executive_summary :: [(FilePath, Maybe (Result, Result))] -> String
