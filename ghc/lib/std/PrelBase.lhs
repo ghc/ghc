@@ -759,7 +759,7 @@ showList__ showx []     = showString "[]"
 showList__ showx (x:xs) = showChar '[' . showx x . showl xs
   where
     showl []     = showChar ']'
-    showl (x:xs) = showString ", " . showx x . showl xs
+    showl (x:xs) = showChar ',' . showx x . showl xs
 
 showSpace :: ShowS
 showSpace = {-showChar ' '-} \ xs -> ' ' : xs

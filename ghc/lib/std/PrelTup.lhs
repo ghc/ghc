@@ -86,29 +86,29 @@ data (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o p q r 
 
 \begin{code}
 instance  (Show a, Show b) => Show (a,b)  where
-    showsPrec p (x,y) = showChar '(' . shows x . showString ", " .
+    showsPrec p (x,y) = showChar '(' . shows x . showChar ',' .
                                        shows y . showChar ')'
     showList	= showList__ (showsPrec 0) 
 
 instance (Show a, Show b, Show c) => Show (a, b, c) where
-    showsPrec p (x,y,z) = showChar '(' . showsPrec 0 x . showString ", " .
-					 showsPrec 0 y . showString ", " .
+    showsPrec p (x,y,z) = showChar '(' . showsPrec 0 x . showChar ',' .
+					 showsPrec 0 y . showChar ',' .
 					 showsPrec 0 z . showChar ')'
     showList	= showList__ (showsPrec 0) 
 
 instance (Show a, Show b, Show c, Show d) => Show (a, b, c, d) where
-    showsPrec p (w,x,y,z) = showChar '(' . showsPrec 0 w . showString ", " .
-					   showsPrec 0 x . showString ", " .
-					   showsPrec 0 y . showString ", " .
+    showsPrec p (w,x,y,z) = showChar '(' . showsPrec 0 w . showChar ',' .
+					   showsPrec 0 x . showChar ',' .
+					   showsPrec 0 y . showChar ',' .
 					   showsPrec 0 z . showChar ')'
 
     showList	= showList__ (showsPrec 0) 
 
 instance (Show a, Show b, Show c, Show d, Show e) => Show (a, b, c, d, e) where
-    showsPrec p (v,w,x,y,z) = showChar '(' . showsPrec 0 v . showString ", " .
-					     showsPrec 0 w . showString ", " .
-					     showsPrec 0 x . showString ", " .
-					     showsPrec 0 y . showString ", " .
+    showsPrec p (v,w,x,y,z) = showChar '(' . showsPrec 0 v . showChar ',' .
+					     showsPrec 0 w . showChar ',' .
+					     showsPrec 0 x . showChar ',' .
+					     showsPrec 0 y . showChar ',' .
 					     showsPrec 0 z . showChar ')'
     showList	= showList__ (showsPrec 0) 
 \end{code}
