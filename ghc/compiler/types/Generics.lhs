@@ -231,7 +231,7 @@ mkTyConGenInfo :: TyCon -> Name -> Name -> Maybe (EP Id)
 -- for the fromT and toT conversion functions.
 
 mkTyConGenInfo tycon from_name to_name
-  | not opt_GlasgowExts
+  | True -- not opt_GlasgowExts
   = Nothing
 
   | null datacons 	-- Abstractly imported types don't have
