@@ -234,7 +234,7 @@ CLEAN_FILES += $(CONFIG_HS)
 ALL_DIRS = \
   utils basicTypes types hsSyn prelude rename typecheck deSugar coreSyn \
   specialise simplCore stranal stgSyn simplStg codeGen absCSyn main \
-  profiling parser usageSP cprAnalysis compMan ndpFlatten
+  profiling parser cprAnalysis compMan ndpFlatten
 
 # Make sure we include Config.hs even if it doesn't exist yet...
 ALL_SRCS += $(CONFIG_HS)
