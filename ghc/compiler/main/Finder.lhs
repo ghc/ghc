@@ -84,7 +84,7 @@ maybeHomeModule mod_name = do
 		   contents <- softGetDirectoryContents path
                    let clean_contents = filter isUsefulFile contents
 		   return (addListToFM fm (zip clean_contents (repeat path)))
-	   home_map <- foldM extendFM emptyFM home_imports
+	   home_map <- foldM extendFM emptyFM (reverse home_imports)
 	   writeIORef v_HomeDirCache (Just home_map)
 	   return home_map
 
