@@ -1,6 +1,6 @@
 <!-- FFI docs as a chapter -->
 
 <Chapter id="ffi">
-<Title>Foreign interface</Title>
+<Title>Foreign function interface</Title>
 &ffi-body;
 </Chapter>
