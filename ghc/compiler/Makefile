@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.42 1998/06/04 11:36:51 sof Exp $
+# $Id: Makefile,v 1.43 1998/07/02 08:44:24 simonm Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -167,8 +167,8 @@ rename/ParseIface_HAPPY_OPTS    += -g
 
 ifeq "$(TARGETPLATFORM)" "hppa1.1-hp-hpux9"
 rename/RnMonad_HC_OPTS 		= -fvia-C -O2 -O2-for-C
-else
 endif
+
 rename/RnEnv_HC_OPTS 		= -fvia-C
 rename/RnSource_HC_OPTS		= -H12m
 rename/RnIfaces_HC_OPTS		= -H8m -fvia-C
@@ -191,6 +191,11 @@ utils/FastString_HC_OPTS	= -fvia-C
 utils/StringBuffer_HC_OPTS	= -fvia-C -fno-prune-tydecls
 utils/Digraph_HC_OPTS		= -fglasgow-exts -fvia-C
 utils/DirUtils_HC_OPTS 		= -fvia-C
+
+ifeq "$(alpha_HOST_ARCH)" "1"
+# "stbu" bug in alpha native code generator...
+basicTypes/Unique_HC_OPTS	= -fvia-C
+endif
 
 # flags for PrimPacked:
 #
