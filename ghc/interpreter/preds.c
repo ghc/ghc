@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: preds.c,v $
- * $Revision: 1.6 $
- * $Date: 1999/10/15 21:40:54 $
+ * $Revision: 1.7 $
+ * $Date: 1999/10/19 15:11:31 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -174,7 +174,7 @@ Cell ev; {
  *
  * ------------------------------------------------------------------------*/
 
-Int cutoff = 16;                        /* Used to limit depth of recursion*/
+Int cutoff = 60;                        /* Used to limit depth of recursion*/
 
 static Void local cutoffExceeded(pi,o,pi1,o1,ps)
 Cell pi, pi1;                           /* Display error msg when cutoff   */
