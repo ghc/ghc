@@ -16,7 +16,7 @@ import HsSyn as Hs
 	(	HsExpr(..), HsLit(..), ArithSeqInfo(..), 
 		HsStmtContext(..), 
 		Match(..), GRHSs(..), GRHS(..), HsPred(..),
-		HsDecl(..), InstDecl(..), ConDecl(..),
+		HsDecl(..), TyClDecl(..), InstDecl(..), ConDecl(..),
 		Stmt(..), HsBinds(..), MonoBinds(..), Sig(..),
 		Pat(..), HsConDetails(..), HsOverLit, BangType(..),
 		placeHolderType, HsType(..), HsTupCon(..),

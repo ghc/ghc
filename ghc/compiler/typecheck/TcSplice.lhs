@@ -211,7 +211,7 @@ runMetaD e = runMeta e
 
 -- Warning: if Q is anything other than IO, we need to change this
 tcRunQ :: Meta.Q a -> TcM a
-tcRunQ thing = ioToTcRn thing
+tcRunQ (Meta.Q thing) = ioToTcRn thing
 
 
 runMeta :: TypecheckedHsExpr 	-- Of type X
