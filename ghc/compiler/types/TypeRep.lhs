@@ -127,6 +127,12 @@ The TyCon still says "I'm a newtype", but we do not represent the
 newtype application as a SourceType; instead as a TyConApp.
 
 
+NOTE: currently [March 02] we regard a newtype as 'recursive' if it's in a
+mutually recursive group.  That's a bit conservative: only if there's a loop
+consisting only of newtypes do we need consider it as recursive.  But it's
+not so easy to discover that, and the situation isn't that common.
+
+
 %************************************************************************
 %*									*
 \subsection{The data type}
