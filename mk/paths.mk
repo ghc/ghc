@@ -59,7 +59,7 @@ INSTALL_DIR     = $(FPTOOLS_TOP)/glafp-utils/mkdirhier/mkdirhier
 #
 # The install variables does not have any defaults,
 # what files to install have to be specified in the Makefiles.
-# 
+#
 #INSTALL_PROGS += $(HS_PROG) $(C_PROG)
 #INSTALL_LIBS  += $(LIBRARY)
 #INSTALL_DATAS += $(HS_IFACES)
@@ -79,7 +79,7 @@ INSTALL_DIR     = $(FPTOOLS_TOP)/glafp-utils/mkdirhier/mkdirhier
 # link your program.
 #
 # The general rules:
-#   
+#
 #   SRCS - sources, might be prefixed to indicate what type of source
 #          they are.
 #   OBJS - object files (possibly prefixed).
@@ -136,7 +136,7 @@ HS_IFACES   = $(addsuffix .$(way_)hi,$(basename $(HS_SRCS)))
 
 HSC_C_OBJS  = $(addsuffix _hsc.$(way_)o,$(basename $(filter %.hsc,$(SRCS))))
 
-C_SRCS      = $(filter %.c,$(SRCS)) 
+C_SRCS      = $(filter %.c,$(SRCS))
 C_OBJS      = $(addsuffix .$(way_)o,$(basename $(C_SRCS)))
 
 # SCRIPT_SRCS:  list of raw script files (in literate form)
@@ -159,7 +159,7 @@ OBJS=$(HS_OBJS) $(C_OBJS) $(SCRIPT_OBJS)
 #
 # The default set of files for the dependency generators to work on
 # is just their source equivalents.
-# 
+#
 
 ifneq "$(BootingFromHc)" "YES"
 MKDEPENDHS_SRCS=$(HS_SRCS)
@@ -167,7 +167,7 @@ else
 MKDEPENDHS_SRCS=
 endif
 
-MKDEPENDC_SRCS=$(C_SRCS) 
+MKDEPENDC_SRCS=$(C_SRCS)
 
 #------------------------------------------------------------------
 #
@@ -175,7 +175,7 @@ MKDEPENDC_SRCS=$(C_SRCS)
 #
 # The default set of files for the dependency generators to work on
 # is just their source equivalents.
-# 
+#
 TAGS_HS_SRCS=$(HS_SRCS)
 TAGS_C_SRCS=$(C_SRCS)
 
@@ -183,7 +183,7 @@ TAGS_C_SRCS=$(C_SRCS)
 # Clean file make-variables.
 #
 # The following three variables are used to control
-# what gets removed when doing `make clean' 
+# what gets removed when doing `make clean'
 #
 # MOSTLYCLEAN_FILES   object code etc., but not stuff
 #                     that is slow to recompile and/or stable
@@ -218,14 +218,14 @@ MOSTLY_CLEAN_FILES += \
 #------------------------------------------------------------------
 #
 # Distribution setup
-# 
+#
 # Following variables are used for creating source and binary distributions:
 #
 #  SRC_DIST_NAME && BIN_DIST_NAME  -- the package names
 #
 #  SRC_DIST_FILES = list of extra files to include from a build tree into a source
 #                   distribution
-#  
+#
 #  SRC_DIST_DIR  = what the current directory in the source/build tree
 #                  maps to in the source distrib. tree being created.
 #
@@ -246,7 +246,7 @@ SRC_DIST_NAME=$(ProjectNameShort)-$(ProjectVersion)
 #
 #  BIN_DIST_DIRS=   at the toplevel, list of directories to descend into when
 #		    building the distribution tree.
-#  
+#
 #  An extra directory variable that is set during bin-dists is $(bindist_top), giving
 #  the abs. path to the root of the binary installation tree. (useful when punting
 #  stuff like README and ANNOUNCE into a distrib, for instance)
