@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.24 2003/08/20 15:54:45 panne Exp $
+ * $Id: HsBase.h,v 1.25 2003/09/02 16:07:11 ross Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -427,7 +427,15 @@ __hscore_lstat( HsAddr fname, HsAddr st )
 #endif
 }
 
-INLINE HsInt __hscore_path_max() { return PATH_MAX; }
+#ifdef PATH_MAX
+/* A size that will contain many path names, but not necessarily all
+ * (PATH_MAX is not defined on systems with unlimited path length,
+ * e.g. the Hurd).
+ */
+INLINE HsInt __hscore_long_path_size() { return PATH_MAX; }
+#else
+INLINE HsInt __hscore_long_path_size() { return 4096; }
+#endif
 
 INLINE mode_t __hscore_R_OK() { return R_OK; }
 INLINE mode_t __hscore_W_OK() { return W_OK; }

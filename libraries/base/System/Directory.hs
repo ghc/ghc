@@ -517,8 +517,8 @@ The operating system has no notion of current directory.
 
 getCurrentDirectory :: IO FilePath
 getCurrentDirectory = do
-  p <- mallocBytes path_max
-  go p path_max
+  p <- mallocBytes long_path_size
+  go p long_path_size
   where go p bytes = do
     	  p' <- c_getcwd p (fromIntegral bytes)
 	  if p' /= nullPtr 
@@ -651,8 +651,8 @@ unionCMode     :: CMode -> CMode -> CMode
 unionCMode     = (+)
 
 
-foreign import ccall unsafe "__hscore_path_max"
-  path_max :: Int
+foreign import ccall unsafe "__hscore_long_path_size"
+  long_path_size :: Int
 
 foreign import ccall unsafe "__hscore_R_OK" r_OK :: CMode
 foreign import ccall unsafe "__hscore_W_OK" w_OK :: CMode
