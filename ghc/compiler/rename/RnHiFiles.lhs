@@ -39,6 +39,7 @@ import RnEnv
 import RnMonad
 import ParseIface	( parseIface )
 
+import PrelNames	( gHC_PRIM_Name, gHC_PRIM )
 import Name		( Name {-instance NamedThing-}, 
 			  nameModule, isLocalName, nameIsLocalOrFrom
 			 )
@@ -497,6 +498,11 @@ findAndReadIface :: SDoc -> ModuleName
 
 findAndReadIface doc_str mod_name hi_boot_file
   = traceRn trace_msg			`thenRn_`
+
+    -- Check for GHC.Prim, and return its static interface
+    if mod_name == gHC_PRIM_Name
+	then returnRn (Right (gHC_PRIM, ghcPrimIface))
+	else
 
     -- In interactive or --make mode, we are *not allowed* to demand-load
     -- a home package .hi file.  So don't even look for them.

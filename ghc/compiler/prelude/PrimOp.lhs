@@ -36,7 +36,7 @@ import Type		( Type, mkForAllTys, mkFunTy, mkFunTys, typePrimRep, tyConAppTyCon 
 import PprType          () -- get at Outputable Type instance.
 import Unique		( mkPrimOpIdUnique )
 import BasicTypes	( Arity, Boxity(..) )
-import PrelNames	( pREL_GHC, pREL_GHC_Name )
+import PrelNames	( gHC_PRIM, gHC_PRIM_Name )
 import Outputable
 import FastTypes
 \end{code}
@@ -397,10 +397,10 @@ mkPrimOpIdName :: PrimOp -> Name
 	-- We have to pass in the Id itself because it's a WiredInId
 	-- and hence recursive
 mkPrimOpIdName op
-  = mkWiredInName pREL_GHC (primOpOcc op) (mkPrimOpIdUnique (primOpTag op))
+  = mkWiredInName gHC_PRIM (primOpOcc op) (mkPrimOpIdUnique (primOpTag op))
 
 primOpRdrName :: PrimOp -> RdrName 
-primOpRdrName op = mkRdrOrig pREL_GHC_Name (primOpOcc op)
+primOpRdrName op = mkRdrOrig gHC_PRIM_Name (primOpOcc op)
 
 primOpOcc :: PrimOp -> OccName
 primOpOcc op = case (primOpInfo op) of
@@ -469,14 +469,7 @@ compare_fun_ty ty = mkFunTys [ty, ty] boolTy
 Output stuff:
 \begin{code}
 pprPrimOp  :: PrimOp -> SDoc
-pprPrimOp other_op
-  = getPprStyle $ \ sty ->
-    if ifaceStyle sty then	-- For interfaces Print it qualified with PrelGHC.
-	ptext SLIT("PrelGHC.") <> pprOccName occ
-    else
-	pprOccName occ
-  where
-    occ = primOpOcc other_op
+pprPrimOp other_op = pprOccName (primOpOcc other_op)
 \end{code}
 
 Names for some primops (for ndpFlatten/FlattenMonad.lhs)

@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.87 2002/03/04 17:01:30 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.88 2002/03/05 14:18:55 simonmar Exp $
 --
 -- Driver flags
 --
@@ -19,7 +19,6 @@ module DriverFlags (
 #include "HsVersions.h"
 #include "../includes/config.h"
 
-import BinIface		( compileIface )
 import MkIface		( showIface )
 import DriverState
 import DriverPhases
@@ -167,8 +166,6 @@ static_flags =
 
       ------- interfaces ----------------------------------------------------
   ,  ( "-show-iface"     , HasArg (\f -> do showIface f
-					    exitWith ExitSuccess))
-  ,  ( "-compile-iface"  , HasArg (\f -> do compileIface f
 					    exitWith ExitSuccess))
 
       ------- verbosity ----------------------------------------------------

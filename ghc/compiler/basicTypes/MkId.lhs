@@ -21,11 +21,12 @@ module MkId (
 	mkPrimOpId, mkFCallId,
 
 	-- And some particular Ids; see below for why they are wired in
-	wiredInIds,
+	wiredInIds, ghcPrimIds,
 	unsafeCoerceId, realWorldPrimId, voidArgId, nullAddrId,
-	eRROR_ID, eRROR_CSTRING_ID, rEC_SEL_ERROR_ID, pAT_ERROR_ID, rEC_CON_ERROR_ID,
-	rEC_UPD_ERROR_ID, iRREFUT_PAT_ERROR_ID, nON_EXHAUSTIVE_GUARDS_ERROR_ID,
-	nO_METHOD_BINDING_ERROR_ID, aBSENT_ERROR_ID, pAR_ERROR_ID
+	eRROR_ID, eRROR_CSTRING_ID, rEC_SEL_ERROR_ID, pAT_ERROR_ID,
+	rEC_CON_ERROR_ID, rEC_UPD_ERROR_ID, iRREFUT_PAT_ERROR_ID,
+	nON_EXHAUSTIVE_GUARDS_ERROR_ID,	nO_METHOD_BINDING_ERROR_ID,
+	aBSENT_ERROR_ID, pAR_ERROR_ID
     ) where
 
 #include "HsVersions.h"
@@ -111,24 +112,27 @@ wiredInIds
 	-- error-reporting functions that they have an 'open' 
 	-- result type. -- sof 1/99]
 
-      aBSENT_ERROR_ID
-    , eRROR_ID
-    , eRROR_CSTRING_ID
-    , iRREFUT_PAT_ERROR_ID
-    , nON_EXHAUSTIVE_GUARDS_ERROR_ID
-    , nO_METHOD_BINDING_ERROR_ID
-    , pAR_ERROR_ID
-    , pAT_ERROR_ID
-    , rEC_CON_ERROR_ID
-    , rEC_UPD_ERROR_ID
+    aBSENT_ERROR_ID,
+    eRROR_ID,
+    eRROR_CSTRING_ID,
+    iRREFUT_PAT_ERROR_ID,
+    nON_EXHAUSTIVE_GUARDS_ERROR_ID,
+    nO_METHOD_BINDING_ERROR_ID,
+    pAR_ERROR_ID,
+    pAT_ERROR_ID,
+    rEC_CON_ERROR_ID,
+    rEC_UPD_ERROR_ID
+    ] ++ ghcPrimIds
 
-	-- These can't be defined in Haskell, but they have
+-- These Ids are exported from GHC.Prim
+ghcPrimIds
+  = [ 	-- These can't be defined in Haskell, but they have
 	-- perfectly reasonable unfoldings in Core
-    , realWorldPrimId
-    , unsafeCoerceId
-    , nullAddrId
-    , getTagId
-    , seqId
+    realWorldPrimId,
+    unsafeCoerceId,
+    nullAddrId,
+    getTagId,
+    seqId
     ]
 \end{code}
 
@@ -787,7 +791,7 @@ another gun with which to shoot yourself in the foot.
 \begin{code}
 -- unsafeCoerce# :: forall a b. a -> b
 unsafeCoerceId
-  = pcMiscPrelId unsafeCoerceIdKey pREL_GHC FSLIT("unsafeCoerce#") ty info
+  = pcMiscPrelId unsafeCoerceIdKey gHC_PRIM FSLIT("unsafeCoerce#") ty info
   where
     info = noCafNoTyGenIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
 	   
@@ -802,13 +806,13 @@ unsafeCoerceId
 -- The reason is is here is because we don't provide 
 -- a way to write this literal in Haskell.
 nullAddrId 
-  = pcMiscPrelId nullAddrIdKey pREL_GHC FSLIT("nullAddr#") addrPrimTy info
+  = pcMiscPrelId nullAddrIdKey gHC_PRIM FSLIT("nullAddr#") addrPrimTy info
   where
     info = noCafNoTyGenIdInfo `setUnfoldingInfo` 
 	   mkCompulsoryUnfolding (Lit nullAddrLit)
 
 seqId
-  = pcMiscPrelId seqIdKey pREL_GHC FSLIT("seq") ty info
+  = pcMiscPrelId seqIdKey gHC_PRIM FSLIT("seq") ty info
   where
     info = noCafNoTyGenIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
 	   
@@ -824,7 +828,7 @@ evaluate its argument and call the dataToTag# primitive.
 
 \begin{code}
 getTagId
-  = pcMiscPrelId getTagIdKey pREL_GHC FSLIT("getTag#") ty info
+  = pcMiscPrelId getTagIdKey gHC_PRIM FSLIT("getTag#") ty info
   where
     info = noCafNoTyGenIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
 	-- We don't provide a defn for this; you must inline it
@@ -849,7 +853,7 @@ This comes up in strictness analysis
 
 \begin{code}
 realWorldPrimId	-- :: State# RealWorld
-  = pcMiscPrelId realWorldPrimIdKey pREL_GHC FSLIT("realWorld#")
+  = pcMiscPrelId realWorldPrimIdKey gHC_PRIM FSLIT("realWorld#")
 		 realWorldStatePrimTy
 		 (noCafNoTyGenIdInfo `setUnfoldingInfo` mkOtherCon [])
 	-- The mkOtherCon makes it look that realWorld# is evaluated

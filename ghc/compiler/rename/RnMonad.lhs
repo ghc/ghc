@@ -23,16 +23,6 @@ module RnMonad(
 
 #include "HsVersions.h"
 
-#if   defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 405
-import IOExts		( fixIO )
-#elif defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 302
-import PrelIOBase	( fixIO )	-- Should be in GlaExts
-#else
-import IOBase		( fixIO )
-#endif
-import IOExts		( IORef, newIORef, readIORef, writeIORef, unsafePerformIO )
-import IO		( hPutStr, stderr )
-	
 import HsSyn		
 import RdrHsSyn
 import RnHsSyn		( RenamedFixitySig )
@@ -58,8 +48,13 @@ import Name		( Name, OccName, NamedThing(..),
 			  nameOccName,
 			  decode, mkLocalName, mkKnownKeyGlobal
 			)
-import NameEnv		( NameEnv, lookupNameEnv, emptyNameEnv, extendNameEnvList )
-import Module		( Module, ModuleName, ModuleSet, emptyModuleSet,				    PackageName )
+import NameEnv		( NameEnv, lookupNameEnv, emptyNameEnv,
+			  extendNameEnvList )
+import Module		( Module, ModuleName, ModuleSet, emptyModuleSet,
+			  PackageName )
+import PrelInfo		( ghcPrimExports, 
+			  cCallableClassDecl, cReturnableClassDecl, assertDecl )
+import PrelNames	( mkUnboundName, gHC_PRIM_Name )
 import NameSet		
 import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
 import SrcLoc		( SrcLoc, generatedSrcLoc, noSrcLoc )
@@ -69,8 +64,11 @@ import Maybes		( seqMaybe )
 import Bag		( Bag, emptyBag, isEmptyBag, snocBag )
 import UniqSupply
 import Outputable
-import PrelNames	( mkUnboundName )
 
+import IOExts		( IORef, newIORef, readIORef, writeIORef, 
+			  fixIO, unsafePerformIO )
+import IO		( hPutStr, stderr )
+	
 infixr 9 `thenRn`, `thenRn_`
 \end{code}
 
@@ -228,6 +226,31 @@ data ParsedIface
       pi_rules	   :: (Version, [RdrNameRuleDecl]),	-- Rules, with their version
       pi_deprecs   :: IfaceDeprecs			-- Deprecations
     }
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Wired-in interfaces}
+%*									*
+%************************************************************************
+
+\begin{code}
+ghcPrimIface :: ParsedIface
+ghcPrimIface = ParsedIface {
+      pi_mod	 = gHC_PRIM_Name,
+      pi_pkg     = FSLIT("base"),
+      pi_vers    = 1,
+      pi_orphan  = False,
+      pi_usages  = [],
+      pi_exports = (1, [(gHC_PRIM_Name, ghcPrimExports)]),
+      pi_decls   = [(1,cCallableClassDecl), 
+		    (1,cReturnableClassDecl), 
+		    (1,assertDecl)],
+      pi_fixity  = [],
+      pi_insts   = [],
+      pi_rules   = (1,[]),
+      pi_deprecs = Nothing
+ }
 \end{code}
 
 %************************************************************************

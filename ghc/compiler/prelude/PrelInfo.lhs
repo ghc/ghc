@@ -10,6 +10,8 @@ module PrelInfo (
 
 	wiredInThings, 	-- Names of wired in things
 	wiredInThingEnv,
+	ghcPrimExports,
+	cCallableClassDecl, cReturnableClassDecl, assertDecl,
 	
 	-- Primop RdrNames
 	eqH_Char_RDR,   ltH_Char_RDR,   eqH_Word_RDR,  ltH_Word_RDR, 
@@ -28,20 +30,26 @@ module PrelInfo (
 
 #include "HsVersions.h"
 
--- friends:
 import PrelNames	-- Prelude module names
 
-import PrimOp		( PrimOp(..), allThePrimOps, primOpRdrName )
+import PrimOp		( PrimOp(..), allThePrimOps, primOpRdrName, primOpOcc )
 import DataCon		( DataCon )
+import Id		( idName )
 import MkId		( mkPrimOpId, wiredInIds )
 import MkId		-- All of it, for re-export
+import Name		( nameOccName, nameRdrName )
+import RdrName		( mkRdrUnqual )
+import HsSyn		( HsTyVarBndr(..), TyClDecl(..), HsType(..) )
+import OccName		( mkVarOcc )
 import TysPrim		( primTyCons )
 import TysWiredIn	( wiredInTyCons )
-import HscTypes 	( TyThing(..), implicitTyThingIds, TypeEnv, mkTypeEnv )
-
--- others:
+import RdrHsSyn		( mkClassDecl )
+import HscTypes 	( TyThing(..), implicitTyThingIds, TypeEnv, mkTypeEnv,
+			  GenAvailInfo(..), RdrAvailInfo )
 import Class	 	( Class, classKey )
-import Type		( funTyCon )
+import Type		( funTyCon, openTypeKind, liftedTypeKind )
+import TyCon		( tyConName )
+import SrcLoc		( noSrcLoc )
 import Util		( isIn )
 \end{code}
 
@@ -79,6 +87,57 @@ We let a lot of "non-standard" values be visible, so that we can make
 sense of them in interface pragmas. It's cool, though they all have
 "non-standard" names, so they won't get past the parser in user code.
 
+%************************************************************************
+%*									*
+\subsection{Export lists for pseudo-modules (GHC.Prim)}
+%*									*
+%************************************************************************
+
+GHC.Prim "exports" all the primops and primitive types, some 
+wired-in Ids, and the CCallable & CReturnable classes.
+
+\begin{code}
+ghcPrimExports :: [RdrAvailInfo]
+ = AvailTC cCallableOcc [ cCallableOcc ] :
+   AvailTC cReturnableOcc [ cReturnableOcc ] :
+   Avail (nameOccName assertName) :	-- doesn't have an Id
+   map (Avail . nameOccName . idName) ghcPrimIds ++
+   map (Avail . primOpOcc) allThePrimOps ++
+   [ AvailTC occ [occ] |
+     n <- funTyCon : primTyCons, let occ = nameOccName (tyConName n) 
+   ]
+ where
+   cCallableOcc = nameOccName cCallableClassName
+   cReturnableOcc = nameOccName cReturnableClassName
+
+assertDecl
+  = IfaceSig { 
+ 	tcdName = nameRdrName assertName,
+	tcdType = HsForAllTy (Just [liftedAlpha]) [] (HsTyVar alpha),
+	tcdIdInfo = [],
+	tcdLoc = noSrcLoc
+    }
+
+cCallableClassDecl
+  = mkClassDecl
+    ([], nameRdrName cCallableClassName, [openAlpha])
+    [] -- no fds
+    [] -- no sigs
+    Nothing -- no mbinds
+    noSrcLoc
+
+cReturnableClassDecl
+  = mkClassDecl
+    ([], nameRdrName cReturnableClassName, [openAlpha])
+    [] -- no fds
+    [] -- no sigs
+    Nothing -- no mbinds
+    noSrcLoc
+
+alpha = mkRdrUnqual (mkVarOcc FSLIT("a"))
+openAlpha = IfaceTyVar alpha openTypeKind
+liftedAlpha = IfaceTyVar alpha liftedTypeKind
+\end{code}
 
 %************************************************************************
 %*									*
