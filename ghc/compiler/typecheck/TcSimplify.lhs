@@ -328,7 +328,8 @@ tcSimplifyToDicts wanted_lie
     ASSERT( null frees )
     returnTc (mkLIE irreds, binds)
   where
-    wanteds	= bagToList wanted_lie
+    -- see comment on wanteds in tcSimplify
+    wanteds = filter notFunDep (bagToList wanted_lie)
 
 	-- Reduce methods and lits only; stop as soon as we get a dictionary
     try_me inst	| isDict inst = DontReduce

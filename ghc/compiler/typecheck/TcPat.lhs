@@ -17,8 +17,7 @@ import TcHsSyn		( TcPat, TcId )
 import TcMonad
 import Inst		( Inst, OverloadedLit(..), InstOrigin(..),
 			  emptyLIE, plusLIE, LIE,
-			  newMethod, newOverloadedLit, 
-			  newDicts, instToIdBndr
+			  newMethod, newOverloadedLit, newDicts
 			)
 import Name		( Name, getOccName, getSrcLoc )
 import FieldLabel	( fieldLabelName )

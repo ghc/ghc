@@ -22,7 +22,7 @@ import BasicTypes	( RecFlag(..) )
 
 import Inst		( Inst, InstOrigin(..), OverloadedLit(..),
 			  LIE, emptyLIE, unitLIE, plusLIE, plusLIEs, newOverloadedLit,
-			  newMethod, instOverloadedFun, newDicts, instToId )
+			  newMethod, instOverloadedFun, newDicts )
 import TcBinds		( tcBindsAndThen )
 import TcEnv		( tcInstId,
 			  tcLookupValue, tcLookupClassByKey,
