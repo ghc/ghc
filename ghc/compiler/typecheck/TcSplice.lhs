@@ -656,6 +656,10 @@ reifyName :: NamedThing n => n -> TH.Name
 reifyName thing
   | isExternalName name = mk_varg mod occ_str
   | otherwise	        = TH.mkNameU occ_str (getKey (getUnique name))
+	-- Many of the things we reify have local bindings, and 
+	-- NameL's aren't supposed to appear in binding positions, so
+	-- we use NameU.  When/if we start to reify nested things, that
+	-- have free variables, we may need to generate NameL's for them.
   where
     name    = getName thing
     mod     = moduleUserString (nameModule name)

@@ -911,7 +911,7 @@ globalVar name
   | otherwise
   = do 	{ MkC occ <- occNameLit name
 	; MkC uni <- coreIntLit (getKey (getUnique name))
-	; rep2 mkNameUName [occ,uni] }
+	; rep2 mkNameLName [occ,uni] }
   where
       name_mod = moduleUserString (nameModule name)
       name_occ = nameOccName name
@@ -1326,7 +1326,7 @@ templateHaskellNames :: [Name]
 
 templateHaskellNames = [
     returnQName, bindQName, sequenceQName, newNameName, liftName,
-    mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName, mkNameUName, 
+    mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName, mkNameLName, 
 
     -- Lit
     charLName, stringLName, integerLName, intPrimLName,
@@ -1422,7 +1422,7 @@ mkNameName     = thFun FSLIT("mkName")     mkNameIdKey
 mkNameG_vName  = thFun FSLIT("mkNameG_v")  mkNameG_vIdKey
 mkNameG_dName  = thFun FSLIT("mkNameG_d")  mkNameG_dIdKey
 mkNameG_tcName = thFun FSLIT("mkNameG_tc") mkNameG_tcIdKey
-mkNameUName    = thFun FSLIT("mkNameU")    mkNameUIdKey
+mkNameLName    = thFun FSLIT("mkNameL")    mkNameLIdKey
 
 
 -------------------- TH.Lib -----------------------
@@ -1604,7 +1604,7 @@ mkNameIdKey          = mkPreludeMiscIdUnique 205
 mkNameG_vIdKey       = mkPreludeMiscIdUnique 206
 mkNameG_dIdKey       = mkPreludeMiscIdUnique 207
 mkNameG_tcIdKey      = mkPreludeMiscIdUnique 208
-mkNameUIdKey         = mkPreludeMiscIdUnique 209
+mkNameLIdKey         = mkPreludeMiscIdUnique 209
 
 
 -- data Lit = ...

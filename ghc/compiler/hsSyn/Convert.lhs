@@ -15,7 +15,8 @@ import Language.Haskell.TH.Syntax as TH
 
 import HsSyn as Hs
 import qualified Class (FunDep)
-import RdrName	( RdrName, mkRdrUnqual, mkRdrQual, mkOrig, getRdrName )
+import RdrName	( RdrName, mkRdrUnqual, mkRdrQual, mkOrig, getRdrName, nameRdrName )
+import Name	( mkInternalName )
 import Module   ( Module, mkModule )
 import RdrHsSyn	( mkClassDecl, mkTyData )
 import qualified OccName
@@ -28,9 +29,10 @@ import ForeignCall ( Safety(..), CCallConv(..), CCallTarget(..),
                      CExportSpec(..)) 
 import Char 	( isAscii, isAlphaNum, isAlpha )
 import List	( partition )
-import Unique	( mkUniqueGrimily )
+import Unique	( Unique, mkUniqueGrimily )
 import ErrUtils (Message)
-import GLAEXTS	( Int(..) )
+import GLAEXTS	( Int(..), Int# )
+import SrcLoc	( noSrcLoc )
 import Bag	( emptyBag, consBag )
 import FastString
 import Outputable
@@ -406,10 +408,11 @@ thRdrName :: OccName.NameSpace -> TH.Name -> RdrName
 thRdrName ns (TH.Name occ TH.NameS)           = mkRdrUnqual (mk_occ ns occ)
 thRdrName ns (TH.Name occ (TH.NameQ mod))     = mkRdrQual (mk_mod mod) (mk_occ ns occ)
 thRdrName ns (TH.Name occ (TH.NameG ns' mod)) = mkOrig    (mk_mod mod) (mk_occ ns occ)
+thRdrName ns (TH.Name occ (TH.NameL uniq))    = nameRdrName (mkInternalName (mk_uniq uniq) (mk_occ ns occ) noSrcLoc)
 thRdrName ns (TH.Name occ (TH.NameU uniq))    
   = mkRdrUnqual (OccName.mkOccName ns uniq_str)
   where
-    uniq_str = TH.occString occ ++ '[' : shows (mkUniqueGrimily (I# uniq)) "]"
+    uniq_str = TH.occString occ ++ '[' : shows (mk_uniq uniq) "]"
 	-- The idea here is to make a name that 
 	-- a) the user could not possibly write, and
 	-- b) cannot clash with another NameU
@@ -425,5 +428,8 @@ mk_occ ns occ = OccName.mkOccFS ns (mkFastString (TH.occString occ))
 
 mk_mod :: TH.ModName -> Module
 mk_mod mod = mkModule (TH.modString mod)
+
+mk_uniq :: Int# -> Unique
+mk_uniq u = mkUniqueGrimily (I# u)
 \end{code}
 
