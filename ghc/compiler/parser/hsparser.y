@@ -916,6 +916,7 @@ maybe_where:
 	|  WHERE vocurly decls vccurly		{ $$ = $3; }
            /* A where containing no decls is OK */
 	|  WHERE 				{ $$ = mknullbind(); }
+	|  WHERE ocurly ccurly			{ $$ = mknullbind(); }
 	|  /* empty */				{ $$ = mknullbind(); }
 	;
 
