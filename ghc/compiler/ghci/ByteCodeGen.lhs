@@ -53,10 +53,12 @@ import MArray		( castSTUArray,
 			  newAddrArray, writeAddrArray )
 import Foreign		( Storable(..), Word8, Word16, Word32, Ptr(..), 
 			  malloc, castPtr, plusPtr )
-import Addr		( Word, Addr, addrToInt, nullAddr )
+import Addr		( Word, addrToInt, nullAddr )
 import Bits		( Bits(..), shiftR )
 
-import PrelGHC		( BCO#, newBCO#, unsafeCoerce#, ByteArray#, Array# )
+import PrelAddr		( Addr(..) )
+import PrelGHC		( BCO#, newBCO#, unsafeCoerce#, 
+			  ByteArray#, Array#, addrToHValue# )
 import IOExts		( IORef, fixIO )
 import ArrayBase	
 import PrelArr		( Array(..) )
@@ -132,36 +134,37 @@ linkIModules :: ItblEnv    -- incoming global itbl env; returned updated
 	     -> ClosureEnv -- incoming global closure env; returned updated
 	     -> [([UnlinkedBCO], ItblEnv)]
 	     -> IO ([HValue], ItblEnv, ClosureEnv)
-linkIModules gie gce mods = do
-  let (bcoss, ies) = unzip mods
-      bcos = concat bcoss
-      top_level_binders = map nameOfUnlinkedBCO bcos
-      final_gie = foldr plusFM gie ies
-  
-  (new_bcos, new_gce) <-
-    fixIO (\ ~(new_bcos, new_gce) -> do
-      new_bcos <- linkBCOs final_gie new_gce bcos
-      let new_gce = addListToFM gce (zip top_level_binders new_bcos)
-      return (new_bcos, new_gce))
-
-  return (new_bcos, final_gie, new_gce)
+linkIModules gie gce mods 
+   = do let (bcoss, ies) = unzip mods
+            bcos = concat bcoss
+            final_gie = foldr plusFM gie ies
+        (final_gce, linked_bcos) <- linkSomeBCOs final_gie gce bcos
+        return (linked_bcos, final_gie, final_gce)
 
 
 linkIExpr :: ItblEnv -> ClosureEnv -> UnlinkedBCOExpr
           -> IO HValue 	  -- IO BCO# really
 linkIExpr ie ce (root_ul_bco, aux_ul_bcos)
-   = do let aux_ul_binders = map nameOfUnlinkedBCO aux_ul_bcos
-        (aux_bcos, aux_ce) 
-           <- fixIO 
-                (\ ~(aux_bcos, new_ce) 
-                 -> do new_bcos <- linkBCOs ie new_ce aux_ul_bcos
-                       let new_ce = addListToFM ce (zip aux_ul_binders new_bcos)
-                       return (new_bcos, new_ce)
-                )
-        [root_bco]
-           <- linkBCOs ie aux_ce [root_ul_bco]
+   = do (aux_ce, _) <- linkSomeBCOs ie ce aux_ul_bcos
+        (_, [root_bco]) <- linkSomeBCOs ie aux_ce [root_ul_bco]
         return root_bco
 
+-- Link a bunch of BCOs and return them + updated closure env.
+linkSomeBCOs :: ItblEnv -> ClosureEnv -> [UnlinkedBCO]
+                -> IO (ClosureEnv, [HValue])
+linkSomeBCOs ie ce_in ul_bcos
+   = do let nms = map nameOfUnlinkedBCO ul_bcos
+        hvals <- fixIO 
+                    ( \ hvs -> let ce_out = addListToFM ce_in (zipLazily nms hvs)
+                               in  mapM (linkBCO ie ce_out) ul_bcos )
+        let ce_out = addListToFM ce_in (zip nms hvals)
+        return (ce_out, hvals)
+     where
+        -- A lazier zip, in which no demand is propagated to the second
+        -- list unless some demand is propagated to the snd of one of the
+        -- result list elems.
+        zipLazily []     ys = []
+        zipLazily (x:xs) ys = (x, head ys) : zipLazily xs (tail ys)
 
 
 data UnlinkedBCO
@@ -270,7 +273,8 @@ instance Outputable BCInstr where
    ppr (PUSH_TAG n)          = text "PUSH_TAG" <+> int n
    ppr (SLIDE n d)           = text "SLIDE   " <+> int n <+> int d
    ppr (ALLOC sz)            = text "ALLOC   " <+> int sz
-   ppr (MKAP offset sz)      = text "MKAP    " <+> int offset <+> int sz
+   ppr (MKAP offset sz)      = text "MKAP    " <+> int sz <+> text "words," 
+                                               <+> int offset <+> text "stkoff"
    ppr (UNPACK sz)           = text "UNPACK  " <+> int sz
    ppr (UPK_TAG n m k)       = text "UPK_TAG " <+> int n <> text "words" 
                                                <+> int m <> text "conoff"
@@ -328,7 +332,7 @@ type BCEnv = FiniteMap Id Int	-- To find vars on the stack
 -- Create a BCO and do a spot of peephole optimisation on the insns
 -- at the same time.
 mkProtoBCO nm instrs_ordlist origin
-   = ProtoBCO nm (peep (fromOL instrs_ordlist)) origin
+   = ProtoBCO nm (id {-peep-} (fromOL instrs_ordlist)) origin
      where
         peep (PUSH_L off1 : PUSH_L off2 : PUSH_L off3 : rest)
            = PUSH_LLL off1 (off2-1) (off3-2) : peep rest
@@ -345,7 +349,19 @@ mkProtoBCO nm instrs_ordlist origin
 -- variable to which this value was bound, so as to give the
 -- resulting BCO a name.
 schemeR :: (Id, AnnExpr Id VarSet) -> BcM ()
-schemeR (nm, rhs) = schemeR_wrk rhs nm (collect [] rhs)
+schemeR (nm, rhs) 
+{-
+   | trace (showSDoc (
+              (char ' '
+               $$ (ppr.filter (not.isTyVar).varSetElems.fst) rhs
+               $$ pprCoreExpr (deAnnotate rhs)
+               $$ char ' '
+              ))) False
+   = undefined
+-}
+   | otherwise
+   = schemeR_wrk rhs nm (collect [] rhs)
+
 
 collect xs (_, AnnLam x e) 
    = collect (if isTyVar x then xs else (x:xs)) e
@@ -358,7 +374,7 @@ schemeR_wrk original_body nm (args, body)
          szsw_args = map taggedIdSizeW all_args
          szw_args  = sum szsw_args
          p_init    = listToFM (zip all_args (mkStackOffsets 0 szsw_args))
-         argcheck  = if null args then nilOL else unitOL (ARGCHECK szw_args)
+         argcheck  = {-if null args then nilOL else-} unitOL (ARGCHECK szw_args)
      in
      schemeE szw_args 0 p_init body 		`thenBc` \ body_code ->
      emitBc (mkProtoBCO (getName nm) (appOL argcheck body_code) (Right original_body))
@@ -401,6 +417,8 @@ schemeE d s p (fvs, AnnLet binds b)
                                    AnnRec xs_n_rhss -> unzip xs_n_rhss
          n     = length xs
          fvss  = map (filter (not.isTyVar).varSetElems.fst) rhss
+
+         -- Sizes of tagged free vars, + 1 for the fn
          sizes = map (\rhs_fvs -> 1 + sum (map taggedIdSizeW rhs_fvs)) fvss
 
          -- This p', d' defn is safe because all the items being pushed
@@ -627,6 +645,7 @@ pushAtom False d p (AnnLit lit)
         MachInt i    -> code IntRep
         MachFloat r  -> code FloatRep
         MachDouble r -> code DoubleRep
+        MachChar c   -> code CharRep
      where
         code rep
            = let size_host_words = untaggedSizeW rep
@@ -1014,6 +1033,7 @@ mkBits findLabel st proto_insns
        literal st (MachInt j)    = int st (fromIntegral j)
        literal st (MachFloat r)  = float st (fromRational r)
        literal st (MachDouble r) = double st (fromRational r)
+       literal st (MachChar c)   = int st c
 
        ctoi_itbl st pk
           = addr st ret_itbl_addr
@@ -1155,18 +1175,13 @@ GLOBAL_VAR(v_cafTable, [], [HValue])
 --   = do linked_expr <- linkIExpr ie ce (root_bco, other_bcos)
 --	return linked_expr
 
-
-linkBCOs :: ItblEnv -> ClosureEnv -> [UnlinkedBCO] 
-         -> IO [HValue]   -- IO [BCO#] really
-linkBCOs ie ce binds = mapM (linkBCO ie ce) binds
-
 linkBCO ie ce (UnlinkedBCO nm insnsSS literalsSS ptrsSS itblsSS)
    = do insns    <- listFromSS insnsSS
         literals <- listFromSS literalsSS
         ptrs     <- listFromSS ptrsSS
         itbls    <- listFromSS itblsSS
 
-        let linked_ptrs  = map (lookupCE ce) ptrs
+        linked_ptrs  <- mapM (lookupCE ce) ptrs
         linked_itbls <- mapM (lookupIE ie) itbls
 
         let n_insns    = sizeSS insnsSS
@@ -1209,11 +1224,16 @@ newBCO a b c d
    = IO (\s -> case newBCO# a b c d s of (# s1, bco #) -> (# s1, BCO bco #))
 
 
-lookupCE :: ClosureEnv -> Name -> HValue
+lookupCE :: ClosureEnv -> Name -> IO HValue
 lookupCE ce nm 
    = case lookupFM ce nm of
-        Just aa -> unsafeCoerce# aa
-        Nothing -> pprPanic "ByteCodeGen.lookupCE" (ppr nm)
+        Just aa -> return aa
+        Nothing 
+           -> do m <- lookupSymbol (nameToCLabel nm "closure")
+                 case m of
+                    Just (A# addr) -> case addrToHValue# addr of
+                                         (# hval #) -> return hval
+                    Nothing        -> pprPanic "ByteCodeGen.lookupCE" (ppr nm)
 
 lookupIE :: ItblEnv -> Name -> IO Addr
 lookupIE ie con_nm 
