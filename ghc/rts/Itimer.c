@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.13 2000/04/03 15:54:49 simonmar Exp $
+ * $Id: Itimer.c,v 1.14 2000/06/20 15:12:14 simonmar Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -78,6 +78,8 @@ handle_tick(int unused STG_UNUSED)
 
   /* For threadDelay etc., see Select.c */
   ticks_since_select++;
+
+  context_switch = 1;
 }
 
 
