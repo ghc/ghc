@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.23 2002/04/11 12:03:43 simonpj Exp $
+# $Id: Makefile,v 1.24 2002/04/24 16:13:26 simonmar Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -87,6 +87,36 @@ endif # TARGETPLATFORM = i386-unknown-mingw32
 
 
 # -----------------------------------------------------------------------------
+# Doc building with Haddock
+
+EXCLUDED_HADDOCK_SRCS = \
+	GHC/Err.lhs \
+	Data/Generics.hs \
+	GHC/PArr.hs \
+	Control/Monad/Error.hs \
+	Control/Monad/Reader.hs \
+	Control/Monad/State.hs \
+	Control/Monad/Writer.hs
+
+HS_PPS = $(addsuffix .raw-hs, $(basename $(filter-out $(EXCLUDED_HADDOCK_SRCS), $(HS_SRCS))))
+
+HADDOCK = $(FPTOOLS_TOP)/haddock/src/haddock-inplace
+
+# Urgh, hack needed to ensure that the value of HS_SRCS is computed in time for
+# the docs rule below.
+PRE_SRCS := $(ALL_SRCS)
+
+.PHONY: docs
+haddock-docs : $(HS_PPS)
+	$(HADDOCK) -t "Haskell Core Libraries" -h -s "." $(HS_PPS)
+
+%.raw-hs : %.lhs
+	$(GHC_INPLACE) $(HC_OPTS) -D__HADDOCK__ -E -cpp $< -o $<.tmp && sed -e 's/^#.*//' <$<.tmp >$@
+
+%.raw-hs : %.hs
+	$(GHC_INPLACE) $(HC_OPTS) -E -cpp $< -o $<.tmp && sed -e 's/^#.*//' <$<.tmp >$@
+
+# -----------------------------------------------------------------------------
 
 include $(TOP)/mk/target.mk
 
@@ -96,5 +126,4 @@ HSbase.o : $(GHCI_LIBOBJS)
 	$(LD) -r $(LD_X) -o HSbase2.o $(filter-out GHC/%, $(GHCI_LIBOBJS))
 	@touch HSbase.o
 endif # TARGETPLATFORM = i386-unknown-mingw32
-
 
