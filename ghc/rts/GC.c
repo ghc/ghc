@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.158 2003/08/14 15:36:13 simonmar Exp $
+ * $Id: GC.c,v 1.159 2003/08/26 12:12:49 simonmar Exp $
  *
  * (c) The GHC Team 1998-2003
  *
@@ -2131,6 +2131,7 @@ selector_loop:
       }
 
       case AP:
+      case AP_STACK:
       case THUNK:
       case THUNK_1_0:
       case THUNK_0_1:
