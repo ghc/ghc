@@ -62,7 +62,7 @@ core2core :: DynFlags		-- includes spec of what core-to-core passes to do
 	  -> HomeSymbolTable
 	  -> IsExported
 	  -> [CoreBind]		-- Binds in
-	  -> [IdCoreRule]	-- Rules in
+	  -> [IdCoreRule]	-- Rules defined in this module
 	  -> IO ([CoreBind], [IdCoreRule])  -- binds, local orphan rules out
 
 core2core dflags pcs hst is_exported binds rules
@@ -74,11 +74,11 @@ core2core dflags pcs hst is_exported binds rules
 	let (cp_us, ru_us) = splitUniqSupply us
 
 		-- COMPUTE THE RULE BASE TO USE
-	(rule_base, local_rule_stuff, orphan_rules)
+	(rule_base, local_rule_ids, orphan_rules, rule_rhs_fvs)
 		<- prepareRules dflags pkg_rule_base hst ru_us binds rules
 
 		-- PREPARE THE BINDINGS
-	let binds1 = updateBinders local_rule_stuff is_exported binds
+	let binds1 = updateBinders local_rule_ids rule_rhs_fvs is_exported binds
 
 		-- DO THE BUSINESS
 	(stats, processed_binds)
@@ -198,8 +198,9 @@ prepareRules :: DynFlags -> PackageRuleBase -> HomeSymbolTable
 	     -> [CoreBind]
 	     -> [IdCoreRule]		-- Local rules
 	     -> IO (RuleBase, 		-- Full rule base
-		    (IdSet,IdSet),	-- Local rule Ids, and RHS fvs
-		    [IdCoreRule]) 	-- Orphan rules
+		    IdSet,		-- Local rule Ids
+		    [IdCoreRule],	-- Orphan rules
+		    IdSet) 		-- RHS free vars of all rules
 
 prepareRules dflags pkg_rule_base hst us binds rules
   = do	{ let (better_rules,_) = initSmpl dflags sw_chkr us local_ids black_list_all 
@@ -209,7 +210,7 @@ prepareRules dflags pkg_rule_base hst us binds rules
 		        (vcat (map pprIdCoreRule better_rules))
 
 	; let (local_rules, orphan_rules) = partition (isLocalId . fst) better_rules
-	      local_rule_rhs_fvs	  = unionVarSets (map (ruleRhsFreeVars . snd) local_rules)
+	      rule_rhs_fvs		  = unionVarSets (map (ruleRhsFreeVars . snd) better_rules)
 	      local_rule_base		  = extendRuleBaseList emptyRuleBase local_rules
 	      local_rule_ids		  = ruleBaseIds local_rule_base	-- Local Ids with rules attached
 	      imp_rule_base		  = foldl add_rules pkg_rule_base (moduleEnvElts hst)
@@ -217,7 +218,7 @@ prepareRules dflags pkg_rule_base hst us binds rules
 	      final_rule_base		  = addRuleBaseFVs rule_base (ruleBaseFVs local_rule_base)
 		-- The last step black-lists the free vars of local rules too
 
-	; return (final_rule_base, (local_rule_ids, local_rule_rhs_fvs), orphan_rules)
+	; return (final_rule_base, local_rule_ids, orphan_rules, rule_rhs_fvs)
     }
   where
     sw_chkr any	     = SwBool False			-- A bit bogus
@@ -233,8 +234,8 @@ prepareRules dflags pkg_rule_base hst us binds rules
     local_ids = foldr (unionVarSet . mkVarSet . bindersOf) emptyVarSet binds
 
 
-updateBinders :: (IdSet, 		-- Locally defined ids with their Rules attached
-		  IdSet)		-- Ids free in the RHS of local rules
+updateBinders :: IdSet	 		-- Locally defined ids with their Rules attached
+	      -> IdSet			-- Ids free in the RHS of local rules
 	      -> IsExported
 	      -> [CoreBind] -> [CoreBind]
 	-- A horrible function
@@ -260,7 +261,7 @@ updateBinders :: (IdSet, 		-- Locally defined ids with their Rules attached
 --     the rules (maybe we should?), so this substitution would make the rule
 --     bogus.
 
-updateBinders (rule_ids, rule_rhs_fvs) is_exported binds
+updateBinders rule_ids rule_rhs_fvs is_exported binds
   = map update_bndrs binds
   where
     update_bndrs (NonRec b r) = NonRec (update_bndr b) r

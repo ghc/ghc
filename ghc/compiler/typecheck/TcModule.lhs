@@ -349,6 +349,9 @@ tcImports pcs hst get_fixity this_mod decls
 	
 	
         tcIfaceRules (pcs_rules pcs) this_mod iface_rules	`thenNF_Tc` \ (new_pcs_rules, local_rules) ->
+		-- When relinking this module from its interface-file decls
+		-- we'll have IfaceRules that are in fact local to this module
+		-- That's the reason we we get any local_rules out here
 
 	tcGetEnv						`thenTc` \ unf_env ->
 	let
