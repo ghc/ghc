@@ -208,7 +208,7 @@ basicKnownKeyNames
 	-- Others
 	otherwiseIdName, 
 	plusIntegerName, timesIntegerName,
-	eqStringName, assertName, runSTRepName,
+	eqStringName, assertName, assertErrorName, runSTRepName,
 	printName, splitName, fstName, sndName,
 
 	-- Booleans
