@@ -255,6 +255,15 @@ on how to set things up for easy ``ticky-ticky'' profiling.  For more
 information, see Section <ref name="Using ``ticky-ticky'' profiling
 (for implementors)" id="ticky-ticky">.
 
+<tag>@-xc@:</tag>
+<nidx>-xc RTS option</nidx>
+<nidx>cost centre display on exception</nidx>
+Display the current cost centre stack whenever an exception is
+raised.  The program must have been compiled with profiling turned on:
+see Section <ref name="Profiling" id="profiling">.  This feature is
+experimental; one day it will display the information only on
+<em>uncaught</em> exceptions.
+
 <tag>@-D<num>@:</tag>
 <nidx>-D RTS option</nidx>
 An RTS debugging flag; varying quantities of output depending on which

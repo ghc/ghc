@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.22 1999/11/12 10:18:59 simonmar Exp $
+ * $Id: Updates.hc,v 1.23 1999/11/29 12:02:46 keithw Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -624,6 +624,19 @@ FN_(raisezh_fast)
   StgClosure *raise_closure;
   FB_
     /* args : R1 = error */
+
+#if defined(PROFILING)
+
+    /* Debugging tool: on raising an  exception, show where we are. */
+
+    /* ToDo: currently this is a hack.  Would be much better if
+     * the info was only displayed for an *uncaught* exception.
+     */
+    if (RtsFlags.ProfFlags.showCCSOnException) {
+      STGCALL2(print_ccs,stderr,CCCS);
+    }
+
+#endif
 
     p = Su;
 

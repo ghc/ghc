@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.20 1999/11/02 15:06:00 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.21 1999/11/29 12:02:44 keithw Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -90,6 +90,7 @@ void initRtsFlagsDefaults(void)
 
 #ifdef PROFILING
     RtsFlags.ProfFlags.doHeapProfile = rtsFalse;
+    RtsFlags.ProfFlags.showCCSOnException = rtsFalse;
 
     RtsFlags.ProfFlags.ccSelector    = NULL;
     RtsFlags.ProfFlags.modSelector   = NULL;
@@ -244,6 +245,8 @@ usage_text[] = {
 "  The selection logic used is summarised as follows:",
 "    ([-c] or [-m] or [-g]) and ([-d] or [-y] or [-k]) and [-a]",
 "    where an option is true if not specified",
+"",
+"  -xc      Show current cost centre stack on raising an exception",
 # endif
 "",
 "  -z<tbl><size>  set hash table <size> for <tbl> (C, M, G, D or Y)",
@@ -363,6 +366,7 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
 		 TICKY-only (same order as defined in RtsFlags.lh);
 		 within those groups, mostly in case-insensitive
 		 alphabetical order.
+                 Final group is x*, which allows for more options.
 	      */
 
 #ifdef TICKY_TICKY
@@ -803,6 +807,29 @@ error = rtsTrue;
 
 		if (RtsFlags.TickyFlags.tickyFile == NULL) error = rtsTrue;
 	        ) break;
+
+	      /* =========== EXTENDED OPTIONS =================== */
+
+              case 'x': /* Extend the argument space */
+                switch(rts_argv[arg][2]) {
+                  case '\0':
+		    fprintf(stderr, "setupRtsFlags: Incomplete RTS option: %s\n",rts_argv[arg]);
+		    error = rtsTrue;
+		    break;
+
+                  case 'c': /* Debugging tool: show current cost centre on an exception */
+                    PROFILING_BUILD_ONLY(
+                    RtsFlags.ProfFlags.showCCSOnException = rtsTrue;
+                    ) break;
+
+                  /* The option prefix '-xx' is reserved for future extension.  KSW 1999-11. */
+
+	          default:
+		    fprintf(stderr, "setupRtsFlags: Unknown RTS option: %s\n",rts_argv[arg]);
+		    error = rtsTrue;
+		    break;
+                }
+                break;  /* defensive programming */
 
 	      /* =========== OH DEAR ============================ */
 	      default:
