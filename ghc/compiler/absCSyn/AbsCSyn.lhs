@@ -39,7 +39,9 @@ IMP_Ubiq(){-uitous-}
 #if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(AbsCLoop)
 #else
+# if  ! OMIT_NATIVE_CODEGEN
 import {-# SOURCE #-} MachMisc
+# endif
 import {-# SOURCE #-} CLabel
 import {-# SOURCE #-} ClosureInfo
 import {-# SOURCE #-} CgRetConv

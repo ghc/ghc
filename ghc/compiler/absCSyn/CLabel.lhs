@@ -58,11 +58,11 @@ import {-# SOURCE #-} CgRetConv
 
 
 #if ! OMIT_NATIVE_CODEGEN
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
+# if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(NcgLoop)		( underscorePrefix, fmtAsmLbl )
-#else
+# else
 import {-# SOURCE #-} MachMisc ( underscorePrefix, fmtAsmLbl )
-#endif
+# endif
 #endif
 
 import CStrings		( pp_cSEP )
