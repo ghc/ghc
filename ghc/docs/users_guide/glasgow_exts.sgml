@@ -154,6 +154,397 @@ with GHC.
 <!--    included from primitives.sgml  -->
 &primitives;
 
+<!-- ====================== SYNTACTIC EXTENSIONS =======================  -->
+
+<sect1 id="syntax-extns">
+<title>Syntactic extensions</title>
+ 
+    <!-- ====================== HIERARCHICAL MODULES =======================  -->
+
+    <sect2 id="hierarchical-modules">
+      <title>Hierarchical Modules</title>
+
+      <para>GHC supports a small extension to the syntax of module
+      names: a module name is allowed to contain a dot
+      <literal>&lsquo;.&rsquo;</literal>.  This is also known as the
+      &ldquo;hierarchical module namespace&rdquo; extension, because
+      it extends the normally flat Haskell module namespace into a
+      more flexible hierarchy of modules.</para>
+
+      <para>This extension has very little impact on the language
+      itself; modules names are <emphasis>always</emphasis> fully
+      qualified, so you can just think of the fully qualified module
+      name as <quote>the module name</quote>.  In particular, this
+      means that the full module name must be given after the
+      <literal>module</literal> keyword at the beginning of the
+      module; for example, the module <literal>A.B.C</literal> must
+      begin</para>
+
+<programlisting>module A.B.C</programlisting>
+
+
+      <para>It is a common strategy to use the <literal>as</literal>
+      keyword to save some typing when using qualified names with
+      hierarchical modules.  For example:</para>
+
+<programlisting>
+import qualified Control.Monad.ST.Strict as ST
+</programlisting>
+
+      <para>Hierarchical modules have an impact on the way that GHC
+      searches for files.  For a description, see <xref
+      linkend="finding-hierarchical-modules">.</para>
+
+      <para>GHC comes with a large collection of libraries arranged
+      hierarchically; see the accompanying library documentation.
+      There is an ongoing project to create and maintain a stable set
+      of <quote>core</quote> libraries used by several Haskell
+      compilers, and the libraries that GHC comes with represent the
+      current status of that project.  For more details, see <ulink
+      url="http://www.haskell.org/~simonmar/libraries/libraries.html">Haskell
+      Libraries</ulink>.</para>
+
+    </sect2>
+
+    <!-- ====================== PATTERN GUARDS =======================  -->
+
+<sect2 id="pattern-guards">
+<title>Pattern guards</title>
+
+<para>
+<indexterm><primary>Pattern guards (Glasgow extension)</primary></indexterm>
+The discussion that follows is an abbreviated version of Simon Peyton Jones's original <ULink URL="http://research.microsoft.com/~simonpj/Haskell/guards.html">proposal</ULink>. (Note that the proposal was written before pattern guards were implemented, so refers to them as unimplemented.)
+</para>
+
+<para>
+Suppose we have an abstract data type of finite maps, with a
+lookup operation:
+
+<programlisting>
+lookup :: FiniteMap -> Int -> Maybe Int
+</programlisting>
+
+The lookup returns <function>Nothing</function> if the supplied key is not in the domain of the mapping, and <function>(Just v)</function> otherwise,
+where <VarName>v</VarName> is the value that the key maps to.  Now consider the following definition:
+</para>
+
+<programlisting>
+clunky env var1 var2 | ok1 && ok2 = val1 + val2
+| otherwise  = var1 + var2
+where
+  m1 = lookup env var1
+  m2 = lookup env var2
+  ok1 = maybeToBool m1
+  ok2 = maybeToBool m2
+  val1 = expectJust m1
+  val2 = expectJust m2
+</programlisting>
+
+<para>
+The auxiliary functions are 
+</para>
+
+<programlisting>
+maybeToBool :: Maybe a -&gt; Bool
+maybeToBool (Just x) = True
+maybeToBool Nothing  = False
+
+expectJust :: Maybe a -&gt; a
+expectJust (Just x) = x
+expectJust Nothing  = error "Unexpected Nothing"
+</programlisting>
+
+<para>
+What is <function>clunky</function> doing? The guard <literal>ok1 &&
+ok2</literal> checks that both lookups succeed, using
+<function>maybeToBool</function> to convert the <function>Maybe</function>
+types to booleans. The (lazily evaluated) <function>expectJust</function>
+calls extract the values from the results of the lookups, and binds the
+returned values to <VarName>val1</VarName> and <VarName>val2</VarName>
+respectively.  If either lookup fails, then clunky takes the
+<literal>otherwise</literal> case and returns the sum of its arguments.
+</para>
+
+<para>
+This is certainly legal Haskell, but it is a tremendously verbose and
+un-obvious way to achieve the desired effect.  Arguably, a more direct way
+to write clunky would be to use case expressions:
+</para>
+
+<programlisting>
+clunky env var1 var1 = case lookup env var1 of
+  Nothing -&gt; fail
+  Just val1 -&gt; case lookup env var2 of
+    Nothing -&gt; fail
+    Just val2 -&gt; val1 + val2
+where
+  fail = val1 + val2
+</programlisting>
+
+<para>
+This is a bit shorter, but hardly better.  Of course, we can rewrite any set
+of pattern-matching, guarded equations as case expressions; that is
+precisely what the compiler does when compiling equations! The reason that
+Haskell provides guarded equations is because they allow us to write down
+the cases we want to consider, one at a time, independently of each other. 
+This structure is hidden in the case version.  Two of the right-hand sides
+are really the same (<function>fail</function>), and the whole expression
+tends to become more and more indented. 
+</para>
+
+<para>
+Here is how I would write clunky:
+</para>
+
+<programlisting>
+clunky env var1 var1
+  | Just val1 &lt;- lookup env var1
+  , Just val2 &lt;- lookup env var2
+  = val1 + val2
+...other equations for clunky...
+</programlisting>
+
+<para>
+The semantics should be clear enough.  The qualifers are matched in order. 
+For a <literal>&lt;-</literal> qualifier, which I call a pattern guard, the
+right hand side is evaluated and matched against the pattern on the left. 
+If the match fails then the whole guard fails and the next equation is
+tried.  If it succeeds, then the appropriate binding takes place, and the
+next qualifier is matched, in the augmented environment.  Unlike list
+comprehensions, however, the type of the expression to the right of the
+<literal>&lt;-</literal> is the same as the type of the pattern to its
+left.  The bindings introduced by pattern guards scope over all the
+remaining guard qualifiers, and over the right hand side of the equation.
+</para>
+
+<para>
+Just as with list comprehensions, boolean expressions can be freely mixed
+with among the pattern guards.  For example:
+</para>
+
+<programlisting>
+f x | [y] <- x
+    , y > 3
+    , Just z <- h y
+    = ...
+</programlisting>
+
+<para>
+Haskell's current guards therefore emerge as a special case, in which the
+qualifier list has just one element, a boolean expression.
+</para>
+</sect2>
+
+    <!-- ===================== Recursive do-notation ===================  -->
+
+<sect2 id="mdo-notation">
+<title>The recursive do-notation
+</title>
+
+<para> The recursive do-notation (also known as mdo-notation) is implemented as described in
+"A recursive do for Haskell",
+Levent Erkok, John Launchbury",
+Haskell Workshop 2002, pages: 29-37. Pittsburgh, Pennsylvania. 
+</para>
+<para>
+The do-notation of Haskell does not allow <emphasis>recursive bindings</emphasis>,
+that is, the variables bound in a do-expression are visible only in the textually following 
+code block. Compare this to a let-expression, where bound variables are visible in the entire binding
+group. It turns out that several applications can benefit from recursive bindings in
+the do-notation, and this extension provides the necessary syntactic support.
+</para>
+<para>
+Here is a simple (yet contrived) example:
+</para>
+<programlisting>
+justOnes = mdo xs <- Just (1:xs)
+               return xs
+</programlisting>
+<para>
+As you can guess <literal>justOnes</literal> will evaluate to <literal>Just [1,1,1,...</literal>.
+</para>
+
+<para>
+The Control.Monad.Fix library introduces the <literal>MonadFix</literal> class. It's definition is:
+</para>
+<programlisting>
+class Monad m => MonadFix m where
+   mfix :: (a -> m a) -> m a
+</programlisting>
+<para>
+The function <literal>mfix</literal>
+dictates how the required recursion operation should be performed. If recursive bindings are required for a monad,
+then that monad must be declared an instance of the <literal>MonadFix</literal> class.
+For details, see the above mentioned reference.
+</para>
+<para>
+The following instances of <literal>MonadFix</literal> are automatically provided: List, Maybe, IO, and
+state monads (both lazy and strict).
+</para>
+<para>
+There are three important points in using the recursive-do notation:
+<itemizedlist>
+<listitem><para>
+The recursive version of the do-notation uses the keyword <literal>mdo</literal> (rather
+than <literal>do</literal>).
+</para></listitem>
+
+<listitem><para>
+If you want to declare an instance of the <literal>MonadFix</literal> class for one of 
+your own monads, or you need to refer to the class name <literal>MonadFix</literal> in any other way (for 
+instance when writing a type constraint), then your program should 
+<literal>import Control.Monad.MonadFix</literal>.
+Otherwise, you don't need to import any special libraries to use the mdo-notation. That is,
+as long as you only use the predefined instances mentioned above, the mdo-notation will
+be automatically available. 
+To be on the safe side, of course, you can simply import it in all cases.
+</para></listitem>
+
+<listitem><para>
+As with other extensions, ghc should be given the flag <literal>-fglasgow-exts</literal>
+</para></listitem>
+</itemizedlist>
+</para>
+
+<para>
+Historical note: The old implementation of the mdo-notation (and most
+of the existing documents) used the name
+<literal>MonadRec</literal> for the class and the corresponding library.
+This name is no longer supported.
+</para>
+
+<para>
+The web page: <ulink url="http://www.cse.ogi.edu/PacSoft/projects/rmb">http://www.cse.ogi.edu/PacSoft/projects/rmb</ulink>
+contains up to date information on recursive monadic bindings.
+</para>
+
+</sect2>
+
+   <!-- ===================== PARALLEL LIST COMPREHENSIONS ===================  -->
+
+  <sect2 id="parallel-list-comprehensions">
+    <title>Parallel List Comprehensions</title>
+    <indexterm><primary>list comprehensions</primary><secondary>parallel</secondary>
+    </indexterm>
+    <indexterm><primary>parallel list comprehensions</primary>
+    </indexterm>
+
+    <para>Parallel list comprehensions are a natural extension to list
+    comprehensions.  List comprehensions can be thought of as a nice
+    syntax for writing maps and filters.  Parallel comprehensions
+    extend this to include the zipWith family.</para>
+
+    <para>A parallel list comprehension has multiple independent
+    branches of qualifier lists, each separated by a `|' symbol.  For
+    example, the following zips together two lists:</para>
+
+<programlisting>
+   [ (x, y) | x <- xs | y <- ys ] 
+</programlisting>
+
+    <para>The behavior of parallel list comprehensions follows that of
+    zip, in that the resulting list will have the same length as the
+    shortest branch.</para>
+
+    <para>We can define parallel list comprehensions by translation to
+    regular comprehensions.  Here's the basic idea:</para>
+
+    <para>Given a parallel comprehension of the form: </para>
+
+<programlisting>
+   [ e | p1 <- e11, p2 <- e12, ... 
+       | q1 <- e21, q2 <- e22, ... 
+       ... 
+   ] 
+</programlisting>
+
+    <para>This will be translated to: </para>
+
+<programlisting>
+   [ e | ((p1,p2), (q1,q2), ...) <- zipN [(p1,p2) | p1 <- e11, p2 <- e12, ...] 
+                                         [(q1,q2) | q1 <- e21, q2 <- e22, ...] 
+                                         ... 
+   ] 
+</programlisting>
+
+    <para>where `zipN' is the appropriate zip for the given number of
+    branches.</para>
+
+  </sect2>
+
+<sect2 id="rebindable-syntax">
+<title>Rebindable syntax</title>
+
+
+      <para>GHC allows most kinds of built-in syntax to be rebound by
+      the user, to facilitate replacing the <literal>Prelude</literal>
+      with a home-grown version, for example.</para>
+
+            <para>You may want to define your own numeric class
+            hierarchy.  It completely defeats that purpose if the
+            literal "1" means "<literal>Prelude.fromInteger
+            1</literal>", which is what the Haskell Report specifies.
+            So the <option>-fno-implicit-prelude</option> flag causes
+            the following pieces of built-in syntax to refer to
+            <emphasis>whatever is in scope</emphasis>, not the Prelude
+            versions:</para>
+
+	    <itemizedlist>
+	      <listitem>
+		<para>Integer and fractional literals mean
+                "<literal>fromInteger 1</literal>" and
+                "<literal>fromRational 3.2</literal>", not the
+                Prelude-qualified versions; both in expressions and in
+                patterns. </para>
+		<para>However, the standard Prelude <literal>Eq</literal> class
+		is still used for the equality test necessary for literal patterns.</para>
+	      </listitem>
+
+	      <listitem>
+		<para>Negation (e.g. "<literal>- (f x)</literal>")
+		means "<literal>negate (f x)</literal>" (not
+		<literal>Prelude.negate</literal>).</para>
+	      </listitem>
+
+	      <listitem>
+		<para>In an n+k pattern, the standard Prelude
+                <literal>Ord</literal> class is still used for comparison,
+                but the necessary subtraction uses whatever
+                "<literal>(-)</literal>" is in scope (not
+                "<literal>Prelude.(-)</literal>").</para>
+	      </listitem>
+
+	      <listitem>
+	  <para>"Do" notation is translated using whatever
+	      functions <literal>(>>=)</literal>,
+	      <literal>(>>)</literal>, <literal>fail</literal>, and
+	      <literal>return</literal>, are in scope (not the Prelude
+	      versions).  List comprehensions, and parallel array
+	      comprehensions, are unaffected.  </para></listitem>
+	    </itemizedlist>
+
+	     <para>Be warned: this is an experimental facility, with fewer checks than
+	     usual.  In particular, it is essential that the functions GHC finds in scope
+	     must have the appropriate types, namely:
+	     <screen>
+	        fromInteger  :: forall a. (...) => Integer  -> a
+		fromRational :: forall a. (...) => Rational -> a
+		negate       :: forall a. (...) => a -> a
+		(-)          :: forall a. (...) => a -> a -> a
+		(>>=)	     :: forall m a. (...) => m a -> (a -> m b) -> m b
+		(>>)	     :: forall m a. (...) => m a -> m b -> m b
+		return	     :: forall m a. (...) => a      -> m a
+		fail	     :: forall m a. (...) => String -> m a
+	     </screen>
+	     (The (...) part can be any context including the empty context; that part 
+	     is up to you.)
+	     If the functions don't have the right type, very peculiar things may 
+	     happen.  Use <literal>-dcore-lint</literal> to
+	     typecheck the desugared program.  If Core Lint is happy you should be all right.</para>
+
+</sect2>
+</sect1>
+
 
 <!-- TYPE SYSTEM EXTENSIONS -->
 <sect1 id="type-extensions">
@@ -2363,10 +2754,279 @@ in <literal>f4</literal>'s scope.
 </sect3>
 </sect2>
 
+<sect2 id="newtype-deriving">
+<title>Generalised derived instances for newtypes</title>
+
+<para>
+When you define an abstract type using <literal>newtype</literal>, you may want
+the new type to inherit some instances from its representation. In
+Haskell 98, you can inherit instances of <literal>Eq</literal>, <literal>Ord</literal>,
+<literal>Enum</literal> and <literal>Bounded</literal> by deriving them, but for any
+other classes you have to write an explicit instance declaration. For
+example, if you define
+
+<programlisting> 
+  newtype Dollars = Dollars Int 
+</programlisting> 
+
+and you want to use arithmetic on <literal>Dollars</literal>, you have to
+explicitly define an instance of <literal>Num</literal>:
+
+<programlisting> 
+  instance Num Dollars where
+    Dollars a + Dollars b = Dollars (a+b)
+    ...
+</programlisting>
+All the instance does is apply and remove the <literal>newtype</literal>
+constructor. It is particularly galling that, since the constructor
+doesn't appear at run-time, this instance declaration defines a
+dictionary which is <emphasis>wholly equivalent</emphasis> to the <literal>Int</literal>
+dictionary, only slower!
+</para>
+
+
+<sect3> <title> Generalising the deriving clause </title>
+<para>
+GHC now permits such instances to be derived instead, so one can write 
+<programlisting> 
+  newtype Dollars = Dollars Int deriving (Eq,Show,Num)
+</programlisting> 
+
+and the implementation uses the <emphasis>same</emphasis> <literal>Num</literal> dictionary
+for <literal>Dollars</literal> as for <literal>Int</literal>. Notionally, the compiler
+derives an instance declaration of the form
+
+<programlisting> 
+  instance Num Int => Num Dollars
+</programlisting> 
+
+which just adds or removes the <literal>newtype</literal> constructor according to the type.
+</para>
+<para>
+
+We can also derive instances of constructor classes in a similar
+way. For example, suppose we have implemented state and failure monad
+transformers, such that
+
+<programlisting> 
+  instance Monad m => Monad (State s m) 
+  instance Monad m => Monad (Failure m)
+</programlisting> 
+In Haskell 98, we can define a parsing monad by 
+<programlisting> 
+  type Parser tok m a = State [tok] (Failure m) a
+</programlisting> 
+
+which is automatically a monad thanks to the instance declarations
+above. With the extension, we can make the parser type abstract,
+without needing to write an instance of class <literal>Monad</literal>, via
+
+<programlisting> 
+  newtype Parser tok m a = Parser (State [tok] (Failure m) a)
+                         deriving Monad
+</programlisting>
+In this case the derived instance declaration is of the form 
+<programlisting> 
+  instance Monad (State [tok] (Failure m)) => Monad (Parser tok m) 
+</programlisting> 
+
+Notice that, since <literal>Monad</literal> is a constructor class, the
+instance is a <emphasis>partial application</emphasis> of the new type, not the
+entire left hand side. We can imagine that the type declaration is
+``eta-converted'' to generate the context of the instance
+declaration.
+</para>
+<para>
+
+We can even derive instances of multi-parameter classes, provided the
+newtype is the last class parameter. In this case, a ``partial
+application'' of the class appears in the <literal>deriving</literal>
+clause. For example, given the class
+
+<programlisting> 
+  class StateMonad s m | m -> s where ... 
+  instance Monad m => StateMonad s (State s m) where ... 
+</programlisting> 
+then we can derive an instance of <literal>StateMonad</literal> for <literal>Parser</literal>s by 
+<programlisting> 
+  newtype Parser tok m a = Parser (State [tok] (Failure m) a)
+                         deriving (Monad, StateMonad [tok])
+</programlisting>
+
+The derived instance is obtained by completing the application of the
+class to the new type:
+
+<programlisting> 
+  instance StateMonad [tok] (State [tok] (Failure m)) =>
+           StateMonad [tok] (Parser tok m)
+</programlisting>
+</para>
+<para>
+
+As a result of this extension, all derived instances in newtype
+declarations are treated uniformly (and implemented just by reusing
+the dictionary for the representation type), <emphasis>except</emphasis>
+<literal>Show</literal> and <literal>Read</literal>, which really behave differently for
+the newtype and its representation.
+</para>
+</sect3>
+
+<sect3> <title> A more precise specification </title>
+<para>
+Derived instance declarations are constructed as follows. Consider the
+declaration (after expansion of any type synonyms)
+
+<programlisting> 
+  newtype T v1...vn = T' (S t1...tk vk+1...vn) deriving (c1...cm) 
+</programlisting> 
+
+where <literal>S</literal> is a type constructor, <literal>t1...tk</literal> are 
+types,
+<literal>vk+1...vn</literal> are type variables which do not occur in any of
+the <literal>ti</literal>, and the <literal>ci</literal> are partial applications of
+classes of the form <literal>C t1'...tj'</literal>.  The derived instance
+declarations are, for each <literal>ci</literal>,
+
+<programlisting> 
+  instance ci (S t1...tk vk+1...v) => ci (T v1...vp)
+</programlisting>
+where <literal>p</literal> is chosen so that <literal>T v1...vp</literal> is of the 
+right <emphasis>kind</emphasis> for the last parameter of class <literal>Ci</literal>.
+</para>
+<para>
+
+As an example which does <emphasis>not</emphasis> work, consider 
+<programlisting> 
+  newtype NonMonad m s = NonMonad (State s m s) deriving Monad 
+</programlisting> 
+Here we cannot derive the instance 
+<programlisting> 
+  instance Monad (State s m) => Monad (NonMonad m) 
+</programlisting> 
+
+because the type variable <literal>s</literal> occurs in <literal>State s m</literal>,
+and so cannot be "eta-converted" away. It is a good thing that this
+<literal>deriving</literal> clause is rejected, because <literal>NonMonad m</literal> is
+not, in fact, a monad --- for the same reason. Try defining
+<literal>>>=</literal> with the correct type: you won't be able to.
+</para>
+<para>
+
+Notice also that the <emphasis>order</emphasis> of class parameters becomes
+important, since we can only derive instances for the last one. If the
+<literal>StateMonad</literal> class above were instead defined as
+
+<programlisting> 
+  class StateMonad m s | m -> s where ... 
+</programlisting>
+
+then we would not have been able to derive an instance for the
+<literal>Parser</literal> type above. We hypothesise that multi-parameter
+classes usually have one "main" parameter for which deriving new
+instances is most interesting.
+</para>
+</sect3>
+
+</sect2>
+
 
 </sect1>
 <!-- ==================== End of type system extensions =================  -->
   
+<!-- ====================== TEMPLATE HASKELL =======================  -->
+
+<sect1 id="template-haskell">
+<title>Template Haskell</title>
+
+<para>Template Haskell allows you to do compile-time meta-programming in Haskell.  The background 
+the main technical innovations are discussed in "<ulink
+url="http://research.microsoft.com/~simonpj/papers/meta-haskell">
+Template Meta-programming for Haskell</ulink>", in 
+Proc Haskell Workshop 2002.
+</para>
+
+<para>
+The documentation here describes the realisation in GHC.  (It's rather sketchy just now;
+Tim Sheard is going to expand it.)
+</para>
+
+<sect2>  <title> Using Template Haskell </title>
+<para>
+    Template Haskell has the following new syntactic constructions.  You need to use the flag  
+	        <literal>-fglasgow-exts</literal> to switch these syntactic extensions on.
+
+	<itemizedlist>
+	      <listitem><para>
+		  A splice is written <literal>$x</literal>, where <literal>x</literal> is an
+		  identifier, or <literal>$(...)</literal>, where the "..." is an arbitrary expression.
+		  There must be no space between the "$" and the identifier or parenthesis.  This use
+		  of "$" overrides its meaning as an infix operator, just as "M.x" overrides the meaning
+		  of "." as an infix operator.  If you want the infix operator, put spaces around it.
+		  </para>
+	      <para> A splice can occur in place of 
+		  <itemizedlist>
+		    <listitem><para> an expression;</para></listitem>
+		    <listitem><para> a list of top-level declarations;</para></listitem>
+		    <listitem><para> a pattern;</para></listitem>
+		    <listitem><para> a type;</para></listitem>
+		    </itemizedlist>
+		</para></listitem>
+
+
+	      <listitem><para>
+		  A expression quotation is written in Oxford brackets, thus:
+		  <itemizedlist>
+		    <listitem><para> <literal>[| ... |]</literal>, where the "..." is an expression;</para></listitem>
+		    <listitem><para> <literal>[d| ... |]</literal>, where the "..." is a list of top-level declarations;</para></listitem>
+		    <listitem><para> <literal>[p| ... |]</literal>, where the "..." is a pattern;</para></listitem>
+		    <listitem><para> <literal>[t| ... |]</literal>, where the "..." is a type;</para></listitem>
+		  </itemizedlist></para></listitem>
+
+	      <listitem><para>
+		  Reification is written thus:
+		  <itemizedlist>
+		    <listitem><para> <literal>reifyDecl T</literal>, where <literal>T</literal> is a type constructor; this expression
+		      has type <literal>Dec</literal>. </para></listitem>
+		    <listitem><para> <literal>reifyDecl C</literal>, where <literal>C</literal> is a class; has type <literal>Dec</literal>.</para></listitem>
+		    <listitem><para> <literal>reifyType f</literal>, where <literal>f</literal> is an identifier; has type <literal>Typ</literal>.</para></listitem>
+		    <listitem><para> Still to come: fixities </para></listitem>
+		    
+		  </itemizedlist></para>
+		</listitem>
+
+		  
+	</itemizedlist>
+</para>
+</sect2>
+
+<sect2>  <title> Using Template Haskell </title>
+<para>
+<itemizedlist>
+    <listitem><para>
+    The data types and monadic constructor functions for Template Haskell are in the library
+    <literal>Language.Haskell.THSyntax</literal>.
+    </para></listitem>
+
+    <listitem><para>
+	    If the module contains any top-level splices that must be run, you must use GHC with
+	    <literal>--make</literal> or <literal>--interactive</literal> flags.  (Reason: that 
+	    means it walks the dependency tree and knows what modules must be linked etc.)
+   </para></listitem>
+
+    <listitem><para>
+    You can only run a function at compile time if it is imported from another module.  That is,
+	    you can't define a function in a module, and call it from within a splice in the same module.
+	    (It would make sense to do so, but it's hard to implement.)
+   </para></listitem>
+
+    <listitem><para>
+	    The flag <literal>-ddump-splices</literal> shows the expansion of all top-level splices as they happen.
+   </para></listitem>
+</itemizedlist>
+</para>
+</sect2>
+ 
+</sect1>
 
 <!-- ==================== ASSERTIONS =================  -->
 
@@ -2453,395 +3113,6 @@ Assertion failures can be caught, see the documentation for the
 
 </sect1>
 
-
-<sect1 id="syntax-extns">
-<title>Syntactic extensions</title>
-
-<!-- ====================== HIERARCHICAL MODULES =======================  -->
-
-    <sect2 id="hierarchical-modules">
-      <title>Hierarchical Modules</title>
-
-      <para>GHC supports a small extension to the syntax of module
-      names: a module name is allowed to contain a dot
-      <literal>&lsquo;.&rsquo;</literal>.  This is also known as the
-      &ldquo;hierarchical module namespace&rdquo; extension, because
-      it extends the normally flat Haskell module namespace into a
-      more flexible hierarchy of modules.</para>
-
-      <para>This extension has very little impact on the language
-      itself; modules names are <emphasis>always</emphasis> fully
-      qualified, so you can just think of the fully qualified module
-      name as <quote>the module name</quote>.  In particular, this
-      means that the full module name must be given after the
-      <literal>module</literal> keyword at the beginning of the
-      module; for example, the module <literal>A.B.C</literal> must
-      begin</para>
-
-<programlisting>module A.B.C</programlisting>
-
-
-      <para>It is a common strategy to use the <literal>as</literal>
-      keyword to save some typing when using qualified names with
-      hierarchical modules.  For example:</para>
-
-<programlisting>
-import qualified Control.Monad.ST.Strict as ST
-</programlisting>
-
-      <para>Hierarchical modules have an impact on the way that GHC
-      searches for files.  For a description, see <xref
-      linkend="finding-hierarchical-modules">.</para>
-
-      <para>GHC comes with a large collection of libraries arranged
-      hierarchically; see the accompanying library documentation.
-      There is an ongoing project to create and maintain a stable set
-      of <quote>core</quote> libraries used by several Haskell
-      compilers, and the libraries that GHC comes with represent the
-      current status of that project.  For more details, see <ulink
-      url="http://www.haskell.org/~simonmar/libraries/libraries.html">Haskell
-      Libraries</ulink>.</para>
-
-    </sect2>
-
-<!-- ====================== PATTERN GUARDS =======================  -->
-
-<sect2 id="pattern-guards">
-<title>Pattern guards</title>
-
-<para>
-<indexterm><primary>Pattern guards (Glasgow extension)</primary></indexterm>
-The discussion that follows is an abbreviated version of Simon Peyton Jones's original <ULink URL="http://research.microsoft.com/~simonpj/Haskell/guards.html">proposal</ULink>. (Note that the proposal was written before pattern guards were implemented, so refers to them as unimplemented.)
-</para>
-
-<para>
-Suppose we have an abstract data type of finite maps, with a
-lookup operation:
-
-<programlisting>
-lookup :: FiniteMap -> Int -> Maybe Int
-</programlisting>
-
-The lookup returns <function>Nothing</function> if the supplied key is not in the domain of the mapping, and <function>(Just v)</function> otherwise,
-where <VarName>v</VarName> is the value that the key maps to.  Now consider the following definition:
-</para>
-
-<programlisting>
-clunky env var1 var2 | ok1 && ok2 = val1 + val2
-| otherwise  = var1 + var2
-where
-  m1 = lookup env var1
-  m2 = lookup env var2
-  ok1 = maybeToBool m1
-  ok2 = maybeToBool m2
-  val1 = expectJust m1
-  val2 = expectJust m2
-</programlisting>
-
-<para>
-The auxiliary functions are 
-</para>
-
-<programlisting>
-maybeToBool :: Maybe a -&gt; Bool
-maybeToBool (Just x) = True
-maybeToBool Nothing  = False
-
-expectJust :: Maybe a -&gt; a
-expectJust (Just x) = x
-expectJust Nothing  = error "Unexpected Nothing"
-</programlisting>
-
-<para>
-What is <function>clunky</function> doing? The guard <literal>ok1 &&
-ok2</literal> checks that both lookups succeed, using
-<function>maybeToBool</function> to convert the <function>Maybe</function>
-types to booleans. The (lazily evaluated) <function>expectJust</function>
-calls extract the values from the results of the lookups, and binds the
-returned values to <VarName>val1</VarName> and <VarName>val2</VarName>
-respectively.  If either lookup fails, then clunky takes the
-<literal>otherwise</literal> case and returns the sum of its arguments.
-</para>
-
-<para>
-This is certainly legal Haskell, but it is a tremendously verbose and
-un-obvious way to achieve the desired effect.  Arguably, a more direct way
-to write clunky would be to use case expressions:
-</para>
-
-<programlisting>
-clunky env var1 var1 = case lookup env var1 of
-  Nothing -&gt; fail
-  Just val1 -&gt; case lookup env var2 of
-    Nothing -&gt; fail
-    Just val2 -&gt; val1 + val2
-where
-  fail = val1 + val2
-</programlisting>
-
-<para>
-This is a bit shorter, but hardly better.  Of course, we can rewrite any set
-of pattern-matching, guarded equations as case expressions; that is
-precisely what the compiler does when compiling equations! The reason that
-Haskell provides guarded equations is because they allow us to write down
-the cases we want to consider, one at a time, independently of each other. 
-This structure is hidden in the case version.  Two of the right-hand sides
-are really the same (<function>fail</function>), and the whole expression
-tends to become more and more indented. 
-</para>
-
-<para>
-Here is how I would write clunky:
-</para>
-
-<programlisting>
-clunky env var1 var1
-  | Just val1 &lt;- lookup env var1
-  , Just val2 &lt;- lookup env var2
-  = val1 + val2
-...other equations for clunky...
-</programlisting>
-
-<para>
-The semantics should be clear enough.  The qualifers are matched in order. 
-For a <literal>&lt;-</literal> qualifier, which I call a pattern guard, the
-right hand side is evaluated and matched against the pattern on the left. 
-If the match fails then the whole guard fails and the next equation is
-tried.  If it succeeds, then the appropriate binding takes place, and the
-next qualifier is matched, in the augmented environment.  Unlike list
-comprehensions, however, the type of the expression to the right of the
-<literal>&lt;-</literal> is the same as the type of the pattern to its
-left.  The bindings introduced by pattern guards scope over all the
-remaining guard qualifiers, and over the right hand side of the equation.
-</para>
-
-<para>
-Just as with list comprehensions, boolean expressions can be freely mixed
-with among the pattern guards.  For example:
-</para>
-
-<programlisting>
-f x | [y] <- x
-    , y > 3
-    , Just z <- h y
-    = ...
-</programlisting>
-
-<para>
-Haskell's current guards therefore emerge as a special case, in which the
-qualifier list has just one element, a boolean expression.
-</para>
-</sect2>
-
-<!-- ===================== Recursive do-notation ===================  -->
-
-<sect2 id="mdo-notation">
-<title>The recursive do-notation
-</title>
-
-<para> The recursive do-notation (also known as mdo-notation) is implemented as described in
-"A recursive do for Haskell",
-Levent Erkok, John Launchbury",
-Haskell Workshop 2002, pages: 29-37. Pittsburgh, Pennsylvania. 
-</para>
-<para>
-The do-notation of Haskell does not allow <emphasis>recursive bindings</emphasis>,
-that is, the variables bound in a do-expression are visible only in the textually following 
-code block. Compare this to a let-expression, where bound variables are visible in the entire binding
-group. It turns out that several applications can benefit from recursive bindings in
-the do-notation, and this extension provides the necessary syntactic support.
-</para>
-<para>
-Here is a simple (yet contrived) example:
-</para>
-<programlisting>
-justOnes = mdo xs <- Just (1:xs)
-               return xs
-</programlisting>
-<para>
-As you can guess <literal>justOnes</literal> will evaluate to <literal>Just [1,1,1,...</literal>.
-</para>
-
-<para>
-The Control.Monad.Fix library introduces the <literal>MonadFix</literal> class. It's definition is:
-</para>
-<programlisting>
-class Monad m => MonadFix m where
-   mfix :: (a -> m a) -> m a
-</programlisting>
-<para>
-The function <literal>mfix</literal>
-dictates how the required recursion operation should be performed. If recursive bindings are required for a monad,
-then that monad must be declared an instance of the <literal>MonadFix</literal> class.
-For details, see the above mentioned reference.
-</para>
-<para>
-The following instances of <literal>MonadFix</literal> are automatically provided: List, Maybe, IO, and
-state monads (both lazy and strict).
-</para>
-<para>
-There are three important points in using the recursive-do notation:
-<itemizedlist>
-<listitem><para>
-The recursive version of the do-notation uses the keyword <literal>mdo</literal> (rather
-than <literal>do</literal>).
-</para></listitem>
-
-<listitem><para>
-If you want to declare an instance of the <literal>MonadFix</literal> class for one of 
-your own monads, or you need to refer to the class name <literal>MonadFix</literal> in any other way (for 
-instance when writing a type constraint), then your program should 
-<literal>import Control.Monad.MonadFix</literal>.
-Otherwise, you don't need to import any special libraries to use the mdo-notation. That is,
-as long as you only use the predefined instances mentioned above, the mdo-notation will
-be automatically available. 
-To be on the safe side, of course, you can simply import it in all cases.
-</para></listitem>
-
-<listitem><para>
-As with other extensions, ghc should be given the flag <literal>-fglasgow-exts</literal>
-</para></listitem>
-</itemizedlist>
-</para>
-
-<para>
-Historical note: The old implementation of the mdo-notation (and most
-of the existing documents) used the name
-<literal>MonadRec</literal> for the class and the corresponding library.
-This name is no longer supported.
-</para>
-
-<para>
-The web page: <ulink url="http://www.cse.ogi.edu/PacSoft/projects/rmb">http://www.cse.ogi.edu/PacSoft/projects/rmb</ulink>
-contains up to date information on recursive monadic bindings.
-</para>
-
-</sect2>
-
-<!-- ===================== PARALLEL LIST COMPREHENSIONS ===================  -->
-
-  <sect2 id="parallel-list-comprehensions">
-    <title>Parallel List Comprehensions</title>
-    <indexterm><primary>list comprehensions</primary><secondary>parallel</secondary>
-    </indexterm>
-    <indexterm><primary>parallel list comprehensions</primary>
-    </indexterm>
-
-    <para>Parallel list comprehensions are a natural extension to list
-    comprehensions.  List comprehensions can be thought of as a nice
-    syntax for writing maps and filters.  Parallel comprehensions
-    extend this to include the zipWith family.</para>
-
-    <para>A parallel list comprehension has multiple independent
-    branches of qualifier lists, each separated by a `|' symbol.  For
-    example, the following zips together two lists:</para>
-
-<programlisting>
-   [ (x, y) | x <- xs | y <- ys ] 
-</programlisting>
-
-    <para>The behavior of parallel list comprehensions follows that of
-    zip, in that the resulting list will have the same length as the
-    shortest branch.</para>
-
-    <para>We can define parallel list comprehensions by translation to
-    regular comprehensions.  Here's the basic idea:</para>
-
-    <para>Given a parallel comprehension of the form: </para>
-
-<programlisting>
-   [ e | p1 <- e11, p2 <- e12, ... 
-       | q1 <- e21, q2 <- e22, ... 
-       ... 
-   ] 
-</programlisting>
-
-    <para>This will be translated to: </para>
-
-<programlisting>
-   [ e | ((p1,p2), (q1,q2), ...) <- zipN [(p1,p2) | p1 <- e11, p2 <- e12, ...] 
-                                         [(q1,q2) | q1 <- e21, q2 <- e22, ...] 
-                                         ... 
-   ] 
-</programlisting>
-
-    <para>where `zipN' is the appropriate zip for the given number of
-    branches.</para>
-
-  </sect2>
-
-<sect2 id="rebindable-syntax">
-<title>Rebindable syntax</title>
-
-
-      <para>GHC allows most kinds of built-in syntax to be rebound by
-      the user, to facilitate replacing the <literal>Prelude</literal>
-      with a home-grown version, for example.</para>
-
-            <para>You may want to define your own numeric class
-            hierarchy.  It completely defeats that purpose if the
-            literal "1" means "<literal>Prelude.fromInteger
-            1</literal>", which is what the Haskell Report specifies.
-            So the <option>-fno-implicit-prelude</option> flag causes
-            the following pieces of built-in syntax to refer to
-            <emphasis>whatever is in scope</emphasis>, not the Prelude
-            versions:</para>
-
-	    <itemizedlist>
-	      <listitem>
-		<para>Integer and fractional literals mean
-                "<literal>fromInteger 1</literal>" and
-                "<literal>fromRational 3.2</literal>", not the
-                Prelude-qualified versions; both in expressions and in
-                patterns. </para>
-		<para>However, the standard Prelude <literal>Eq</literal> class
-		is still used for the equality test necessary for literal patterns.</para>
-	      </listitem>
-
-	      <listitem>
-		<para>Negation (e.g. "<literal>- (f x)</literal>")
-		means "<literal>negate (f x)</literal>" (not
-		<literal>Prelude.negate</literal>).</para>
-	      </listitem>
-
-	      <listitem>
-		<para>In an n+k pattern, the standard Prelude
-                <literal>Ord</literal> class is still used for comparison,
-                but the necessary subtraction uses whatever
-                "<literal>(-)</literal>" is in scope (not
-                "<literal>Prelude.(-)</literal>").</para>
-	      </listitem>
-
-	      <listitem>
-	  <para>"Do" notation is translated using whatever
-	      functions <literal>(>>=)</literal>,
-	      <literal>(>>)</literal>, <literal>fail</literal>, and
-	      <literal>return</literal>, are in scope (not the Prelude
-	      versions).  List comprehensions, and parallel array
-	      comprehensions, are unaffected.  </para></listitem>
-	    </itemizedlist>
-
-	     <para>Be warned: this is an experimental facility, with fewer checks than
-	     usual.  In particular, it is essential that the functions GHC finds in scope
-	     must have the appropriate types, namely:
-	     <screen>
-	        fromInteger  :: forall a. (...) => Integer  -> a
-		fromRational :: forall a. (...) => Rational -> a
-		negate       :: forall a. (...) => a -> a
-		(-)          :: forall a. (...) => a -> a -> a
-		(>>=)	     :: forall m a. (...) => m a -> (a -> m b) -> m b
-		(>>)	     :: forall m a. (...) => m a -> m b -> m b
-		return	     :: forall m a. (...) => a      -> m a
-		fail	     :: forall m a. (...) => String -> m a
-	     </screen>
-	     (The (...) part can be any context including the empty context; that part 
-	     is up to you.)
-	     If the functions don't have the right type, very peculiar things may 
-	     happen.  Use <literal>-dcore-lint</literal> to
-	     typecheck the desugared program.  If Core Lint is happy you should be all right.</para>
-
-</sect2>
-</sect1>
 
 <!-- =============================== PRAGMAS ===========================  -->
 
@@ -3941,180 +4212,6 @@ Just to finish with, here's another example I rather like:
 </programlisting>
 </para>
 </sect2>
-</sect1>
-
-<sect1 id="newtype-deriving">
-<title>Generalised derived instances for newtypes</title>
-
-<para>
-When you define an abstract type using <literal>newtype</literal>, you may want
-the new type to inherit some instances from its representation. In
-Haskell 98, you can inherit instances of <literal>Eq</literal>, <literal>Ord</literal>,
-<literal>Enum</literal> and <literal>Bounded</literal> by deriving them, but for any
-other classes you have to write an explicit instance declaration. For
-example, if you define
-
-<programlisting> 
-  newtype Dollars = Dollars Int 
-</programlisting> 
-
-and you want to use arithmetic on <literal>Dollars</literal>, you have to
-explicitly define an instance of <literal>Num</literal>:
-
-<programlisting> 
-  instance Num Dollars where
-    Dollars a + Dollars b = Dollars (a+b)
-    ...
-</programlisting>
-All the instance does is apply and remove the <literal>newtype</literal>
-constructor. It is particularly galling that, since the constructor
-doesn't appear at run-time, this instance declaration defines a
-dictionary which is <emphasis>wholly equivalent</emphasis> to the <literal>Int</literal>
-dictionary, only slower!
-</para>
-
-<sect2> <title> Generalising the deriving clause </title>
-<para>
-GHC now permits such instances to be derived instead, so one can write 
-<programlisting> 
-  newtype Dollars = Dollars Int deriving (Eq,Show,Num)
-</programlisting> 
-
-and the implementation uses the <emphasis>same</emphasis> <literal>Num</literal> dictionary
-for <literal>Dollars</literal> as for <literal>Int</literal>. Notionally, the compiler
-derives an instance declaration of the form
-
-<programlisting> 
-  instance Num Int => Num Dollars
-</programlisting> 
-
-which just adds or removes the <literal>newtype</literal> constructor according to the type.
-</para>
-<para>
-
-We can also derive instances of constructor classes in a similar
-way. For example, suppose we have implemented state and failure monad
-transformers, such that
-
-<programlisting> 
-  instance Monad m => Monad (State s m) 
-  instance Monad m => Monad (Failure m)
-</programlisting> 
-In Haskell 98, we can define a parsing monad by 
-<programlisting> 
-  type Parser tok m a = State [tok] (Failure m) a
-</programlisting> 
-
-which is automatically a monad thanks to the instance declarations
-above. With the extension, we can make the parser type abstract,
-without needing to write an instance of class <literal>Monad</literal>, via
-
-<programlisting> 
-  newtype Parser tok m a = Parser (State [tok] (Failure m) a)
-                         deriving Monad
-</programlisting>
-In this case the derived instance declaration is of the form 
-<programlisting> 
-  instance Monad (State [tok] (Failure m)) => Monad (Parser tok m) 
-</programlisting> 
-
-Notice that, since <literal>Monad</literal> is a constructor class, the
-instance is a <emphasis>partial application</emphasis> of the new type, not the
-entire left hand side. We can imagine that the type declaration is
-``eta-converted'' to generate the context of the instance
-declaration.
-</para>
-<para>
-
-We can even derive instances of multi-parameter classes, provided the
-newtype is the last class parameter. In this case, a ``partial
-application'' of the class appears in the <literal>deriving</literal>
-clause. For example, given the class
-
-<programlisting> 
-  class StateMonad s m | m -> s where ... 
-  instance Monad m => StateMonad s (State s m) where ... 
-</programlisting> 
-then we can derive an instance of <literal>StateMonad</literal> for <literal>Parser</literal>s by 
-<programlisting> 
-  newtype Parser tok m a = Parser (State [tok] (Failure m) a)
-                         deriving (Monad, StateMonad [tok])
-</programlisting>
-
-The derived instance is obtained by completing the application of the
-class to the new type:
-
-<programlisting> 
-  instance StateMonad [tok] (State [tok] (Failure m)) =>
-           StateMonad [tok] (Parser tok m)
-</programlisting>
-</para>
-<para>
-
-As a result of this extension, all derived instances in newtype
-declarations are treated uniformly (and implemented just by reusing
-the dictionary for the representation type), <emphasis>except</emphasis>
-<literal>Show</literal> and <literal>Read</literal>, which really behave differently for
-the newtype and its representation.
-</para>
-</sect2>
-
-<sect2> <title> A more precise specification </title>
-<para>
-Derived instance declarations are constructed as follows. Consider the
-declaration (after expansion of any type synonyms)
-
-<programlisting> 
-  newtype T v1...vn = T' (S t1...tk vk+1...vn) deriving (c1...cm) 
-</programlisting> 
-
-where <literal>S</literal> is a type constructor, <literal>t1...tk</literal> are 
-types,
-<literal>vk+1...vn</literal> are type variables which do not occur in any of
-the <literal>ti</literal>, and the <literal>ci</literal> are partial applications of
-classes of the form <literal>C t1'...tj'</literal>.  The derived instance
-declarations are, for each <literal>ci</literal>,
-
-<programlisting> 
-  instance ci (S t1...tk vk+1...v) => ci (T v1...vp)
-</programlisting>
-where <literal>p</literal> is chosen so that <literal>T v1...vp</literal> is of the 
-right <emphasis>kind</emphasis> for the last parameter of class <literal>Ci</literal>.
-</para>
-<para>
-
-As an example which does <emphasis>not</emphasis> work, consider 
-<programlisting> 
-  newtype NonMonad m s = NonMonad (State s m s) deriving Monad 
-</programlisting> 
-Here we cannot derive the instance 
-<programlisting> 
-  instance Monad (State s m) => Monad (NonMonad m) 
-</programlisting> 
-
-because the type variable <literal>s</literal> occurs in <literal>State s m</literal>,
-and so cannot be "eta-converted" away. It is a good thing that this
-<literal>deriving</literal> clause is rejected, because <literal>NonMonad m</literal> is
-not, in fact, a monad --- for the same reason. Try defining
-<literal>>>=</literal> with the correct type: you won't be able to.
-</para>
-<para>
-
-Notice also that the <emphasis>order</emphasis> of class parameters becomes
-important, since we can only derive instances for the last one. If the
-<literal>StateMonad</literal> class above were instead defined as
-
-<programlisting> 
-  class StateMonad m s | m -> s where ... 
-</programlisting>
-
-then we would not have been able to derive an instance for the
-<literal>Parser</literal> type above. We hypothesise that multi-parameter
-classes usually have one "main" parameter for which deriving new
-instances is most interesting.
-</para>
-</sect2>
-
 </sect1>
 
 
