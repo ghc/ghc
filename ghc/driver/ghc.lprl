@@ -525,6 +525,9 @@ $NoImplicitPrelude = 0;
 # external main is provided instead.
 $NoHaskellMain=0;
 
+# Hash to keep track of 
+%Syslibs_added = ();
+
 } # end of initDriverGlobals (Sigh)
 
 # we split the argv passed to the driver into three:
@@ -2510,9 +2513,6 @@ to the syslib family. The info bit consist of the following:
 
 \begin{code}
 
-# Hash to keep track of 
-%Syslibs_added = ();
-
 sub add_syslib {
     local($syslib) = @_;
 
@@ -2711,7 +2711,10 @@ sub add_syslib {
     }
 
     # Make sure that header file HsFoo.h is included for syslib foo.
-    push(@CcInjects, "#include \"Hs\u$syslib.h\"\n") unless ( exists $Syslibs_added{$syslib} );
+    if ( !exists $Syslibs_added{$syslib} ) {
+      push(@CcInjects, "#include \"Hs\u$syslib.h\"\n");
+      push(@Include_dir, "$TopPwd/hslibs/$syslib/cbits") unless ( $INSTALLING );
+    }
 
     # This check is here to avoid syslib loops from
     # spoiling the party. A side-effect of it is that
