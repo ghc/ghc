@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.28 2001/08/14 13:40:09 sewardj Exp $
+ * $Id: RtsAPI.c,v 1.29 2001/08/29 11:20:40 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -23,7 +23,7 @@ HaskellObj
 rts_mkChar (HsChar c)
 {
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
-  p->header.info = Czh_con_info;
+  SET_HDR(p, Czh_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)(StgChar)c;
   return p;
 }
@@ -32,7 +32,7 @@ HaskellObj
 rts_mkInt (HsInt i)
 {
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
-  p->header.info = Izh_con_info;
+  SET_HDR(p, Izh_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)(StgInt)i;
   return p;
 }
@@ -41,7 +41,7 @@ HaskellObj
 rts_mkInt8 (HsInt8 i)
 {
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
-  p->header.info = I8zh_con_info;
+  SET_HDR(p, I8zh_con_info, CCS_SYSTEM);
   /* Make sure we mask out the bits above the lowest 8 */
   p->payload[0]  = (StgClosure *)(StgInt)((unsigned)i & 0xff);
   return p;
@@ -51,7 +51,7 @@ HaskellObj
 rts_mkInt16 (HsInt16 i)
 {
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
-  p->header.info = I16zh_con_info;
+  SET_HDR(p, I16zh_con_info, CCS_SYSTEM);
   /* Make sure we mask out the relevant bits */
   p->payload[0]  = (StgClosure *)(StgInt)((unsigned)i & 0xffff);
   return p;
@@ -61,8 +61,8 @@ HaskellObj
 rts_mkInt32 (HsInt32 i)
 {
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
-  p->header.info = I32zh_con_info;
-  p->payload[0]  = (StgClosure *)(StgInt)i;
+  SET_HDR(p, I32zh_con_info, CCS_SYSTEM);
+  p->payload[0]  = (StgClosure *)(StgInt)((unsigned)i & 0xffffffff);
   return p;
 }
 
@@ -71,7 +71,7 @@ rts_mkInt64 (HsInt64 i)
 {
   long long *tmp;
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,2));
-  p->header.info = I64zh_con_info;
+  SET_HDR(p, I64zh_con_info, CCS_SYSTEM);
   tmp  = (long long*)&(p->payload[0]);
   *tmp = (StgInt64)i;
   return p;
@@ -81,7 +81,7 @@ HaskellObj
 rts_mkWord (HsWord i)
 {
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
-  p->header.info = Wzh_con_info;
+  SET_HDR(p, Wzh_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)(StgWord)i;
   return p;
 }
@@ -91,7 +91,7 @@ rts_mkWord8 (HsWord8 w)
 {
   /* see rts_mkInt* comments */
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
-  p->header.info = W8zh_con_info;
+  SET_HDR(p, W8zh_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)(StgWord)(w & 0xff);
   return p;
 }
@@ -101,7 +101,7 @@ rts_mkWord16 (HsWord16 w)
 {
   /* see rts_mkInt* comments */
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
-  p->header.info = W16zh_con_info;
+  SET_HDR(p, W16zh_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)(StgWord)(w & 0xffff);
   return p;
 }
@@ -111,8 +111,8 @@ rts_mkWord32 (HsWord32 w)
 {
   /* see rts_mkInt* comments */
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
-  p->header.info = W32zh_con_info;
-  p->payload[0]  = (StgClosure *)(StgWord)w;
+  SET_HDR(p, W32zh_con_info, CCS_SYSTEM);
+  p->payload[0]  = (StgClosure *)(StgWord)(w & 0xffffffff);
   return p;
 }
 
@@ -123,7 +123,7 @@ rts_mkWord64 (HsWord64 w)
 
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,2));
   /* see mk_Int8 comment */
-  p->header.info = W64zh_con_info;
+  SET_HDR(p, W64zh_con_info, CCS_SYSTEM);
   tmp  = (unsigned long long*)&(p->payload[0]);
   *tmp = (StgWord64)w;
   return p;
@@ -133,7 +133,7 @@ HaskellObj
 rts_mkFloat (HsFloat f)
 {
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
-  p->header.info = Fzh_con_info;
+  SET_HDR(p, Fzh_con_info, CCS_SYSTEM);
   ASSIGN_FLT((P_)p->payload, (StgFloat)f);
   return p;
 }
@@ -142,7 +142,7 @@ HaskellObj
 rts_mkDouble (HsDouble d)
 {
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,sizeofW(StgDouble)));
-  p->header.info = Dzh_con_info;
+  SET_HDR(p, Dzh_con_info, CCS_SYSTEM);
   ASSIGN_DBL((P_)p->payload, (StgDouble)d);
   return p;
 }
@@ -151,7 +151,7 @@ HaskellObj
 rts_mkStablePtr (HsStablePtr s)
 {
   StgClosure *p = (StgClosure *)allocate(sizeofW(StgHeader)+1);
-  p->header.info = StablePtr_con_info;
+  SET_HDR(p, StablePtr_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)s;
   return p;
 }
@@ -160,7 +160,7 @@ HaskellObj
 rts_mkPtr (HsPtr a)
 {
   StgClosure *p = (StgClosure *)allocate(sizeofW(StgHeader)+1);
-  p->header.info = Ptr_con_info;
+  SET_HDR(p, Ptr_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)a;
   return p;
 }
