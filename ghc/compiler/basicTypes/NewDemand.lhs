@@ -45,6 +45,12 @@ data DmdType = DmdType
 	-- DmdResult = BotRes        <=>  Bot
 	-- DmdResult = TopRes/ResCPR <=>  Abs
 
+	-- 		ANOTHER IMPORTANT INVARIANT
+	-- The Demands in the argument list are never
+	--	Bot, Err, Seq Defer ds
+	-- Handwavey reason: these don't correspond to calling conventions
+	-- See DmdAnal.funArgDemand for details
+
 type DmdEnv = VarEnv Demand
 
 data DmdResult = TopRes	-- Nothing known	
@@ -201,7 +207,10 @@ data Demand
   deriving( Eq )
 	-- Equality needed for fixpoints in DmdAnal
 
-data Keepity = Keep | Drop | Defer
+data Keepity = Keep 	-- Strict and I need the box
+	     | Drop	-- Strict, but I don't need the box
+	     | Defer	-- Lazy, if you *do* evaluate, I need
+			--	 the components but not the box
 	     deriving( Eq )
 
 mkSeq :: Keepity -> [Demand] -> Demand

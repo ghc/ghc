@@ -20,7 +20,7 @@ import PprCore
 import CoreUtils	( exprIsValue, exprArity )
 import DataCon		( dataConTyCon )
 import TyCon		( isProductTyCon, isRecursiveTyCon )
-import Id		( Id, idType, idDemandInfo, 
+import Id		( Id, idType, idDemandInfo, idArity,
 			  isDataConId, isImplicitId, isGlobalId,
 			  idNewStrictness, idNewStrictness_maybe, getNewStrictness, setIdNewStrictness,
 			  idNewDemandInfo, setIdNewDemandInfo, newStrictnessFromOld )
@@ -82,7 +82,7 @@ dmdAnalTopBind sigs (NonRec id rhs)
   = (sigs, NonRec id rhs)	-- It's pre-computed in MkId.lhs
   | otherwise
   = let
-	(sigs', _, (id', rhs')) = downRhs TopLevel sigs (id, rhs)
+	(sigs', _, (id', rhs')) = dmdAnalRhs TopLevel sigs (id, rhs)
     in
     (sigs', NonRec id' rhs')    
 
@@ -132,6 +132,9 @@ dmdAnal sigs Lazy e = let
 	--    We still want to mark x as demanded, because it will be when we
 	--    enter the let.  If we analyse f's arg with a Lazy demand, we'll
 	--    just mark x as Lazy
+	-- c) The application rule wouldn't be right either
+	--    Evaluating (f x) in a L demand does *not* cause
+	--    evaluation of f in a C(L) demand!
 
 
 dmdAnal sigs dmd (Lit lit)
@@ -156,6 +159,8 @@ dmdAnal sigs dmd (App fun (Type ty))
   where
     (fun_ty, fun') = dmdAnal sigs dmd fun
 
+-- Lots of the other code is there to make this
+-- beautiful, compositional, application rule :-)
 dmdAnal sigs dmd (App fun arg)	-- Non-type arguments
   = let				-- [Type arg handled above]
 	(fun_ty, fun') 	  = dmdAnal sigs (Call dmd) fun
@@ -232,7 +237,7 @@ dmdAnal sigs dmd (Case scrut case_bndr alts)
 
 dmdAnal sigs dmd (Let (NonRec id rhs) body) 
   = let
-	(sigs', lazy_fv, (id1, rhs')) = downRhs NotTopLevel sigs (id, rhs)
+	(sigs', lazy_fv, (id1, rhs')) = dmdAnalRhs NotTopLevel sigs (id, rhs)
 	(body_ty, body') 	      = dmdAnal sigs' dmd body
 	(body_ty1, id2)    	      = annotateBndr body_ty id1
 	body_ty2		      = addLazyFVs body_ty1 lazy_fv
@@ -315,7 +320,7 @@ dmdFix top_lvl sigs orig_pairs
 	  ((sigs', lazy_fv'), pair')
 	  --	 )
  	where
-	  (sigs', lazy_fv1, pair') = downRhs top_lvl sigs (id,rhs)
+	  (sigs', lazy_fv1, pair') = dmdAnalRhs top_lvl sigs (id,rhs)
 	  lazy_fv'		   = plusUFM_C both lazy_fv lazy_fv1   
 	  -- old_sig   		   = lookup sigs id
 	  -- new_sig  	   	   = lookup sigs' id
@@ -331,13 +336,13 @@ dmdFix top_lvl sigs orig_pairs
     lookup sigs var = case lookupVarEnv sigs var of
 			Just (sig,_) -> sig
 
-downRhs :: TopLevelFlag 
+dmdAnalRhs :: TopLevelFlag 
 	-> SigEnv -> (Id, CoreExpr)
 	-> (SigEnv,  DmdEnv, (Id, CoreExpr))
 -- Process the RHS of the binding, add the strictness signature
 -- to the Id, and augment the environment with the signature as well.
 
-downRhs top_lvl sigs (id, rhs)
+dmdAnalRhs top_lvl sigs (id, rhs)
  = (sigs', lazy_fv, (id', rhs'))
  where
   arity		    = exprArity rhs   -- The idArity may not be up to date
@@ -464,13 +469,14 @@ nonAbsentArgs (d   : ds) = 1 + nonAbsentArgs ds
 \begin{code}
 splitDmdTy :: DmdType -> (Demand, DmdType)
 -- Split off one function argument
+-- We already have a suitable demand on all
+-- free vars, so no need to add more!
 splitDmdTy (DmdType fv (dmd:dmds) res_ty) = (dmd, DmdType fv dmds res_ty)
-splitDmdTy ty@(DmdType fv [] TopRes)         = (Lazy, ty)
-splitDmdTy ty@(DmdType fv [] BotRes)         = (Bot,  ty)
+splitDmdTy ty@(DmdType fv [] TopRes)      = (Lazy, ty)
+splitDmdTy ty@(DmdType fv [] BotRes)      = (Bot,  ty)
 	-- NB: Bot not Abs
 splitDmdTy (DmdType fv [] RetCPR)   	  = panic "splitDmdTy"
-	-- We already have a suitable demand on all
-	-- free vars, so no need to add more!
+	-- We should not be applying a product as a function!
 \end{code}
 
 \begin{code}
@@ -585,16 +591,18 @@ dmdTransform sigs var dmd
   | isDataConId var,		-- Data constructor
     Seq k ds <- res_dmd,	-- and the demand looks inside its fields
     let StrictSig dmd_ty = idNewStrictness var,	-- It must have a strictness sig
-    let DmdType _ con_ds con_res = dmd_ty
-  = if length con_ds == length ds then	-- Saturated, so unleash the demand
+    let DmdType _ _ con_res = dmd_ty
+  = if idArity var == call_depth then		-- Saturated, so unleash the demand
 	-- ds can be empty, when we are just seq'ing the thing
 	let 
 	   arg_ds = case k of
-			Keep  -> zipWith lub ds con_ds
+			Keep  -> bothLazy_s ds
 			Drop  -> ds
-			Defer -> ds
+			Defer -> pprTrace "dmdTransform: surprising!" (ppr var) 
+					-- I don't think this can happen
+				 ds
 		-- Important!  If we Keep the constructor application, then
-		-- we need the demands the constructor places (usually lazy)
+		-- we need the demands the constructor places (always lazy)
 		-- If not, we don't need to.  For example:
 		--	f p@(x,y) = (p,y)	-- S(AL)
 		--	g a b     = f (a,b)
@@ -655,6 +663,7 @@ deferType (DmdType fv _ _) = DmdType (mapVarEnv defer fv) [] TopRes
 	-- Notice that we throw away info about both arguments and results
 	-- For example,   f = let ... in \x -> x
 	-- We don't want to get a stricness type V->T for f.
+	-- Peter??
 
 ---------------
 bothLazy :: Demand -> Demand
@@ -709,6 +718,9 @@ lubType (DmdType fv1 ds1 r1) (DmdType fv2 ds2 r2)
 -----------------------------------
 -- (t1 `bothType` t2) takes the argument/result info from t1,
 -- using t2 just for its free-var info
+-- NB: Don't forget about r2!  It might be BotRes, which is
+--     a bottom demand on all the in-scope variables.
+-- Peter: can this be done more neatly?
 bothType (DmdType fv1 ds1 r1) (DmdType fv2 ds2 r2)
   = DmdType both_fv2 ds1 (r1 `bothRes` r2)
   where
@@ -727,9 +739,8 @@ lubRes r1     r2     = TopRes
 
 -- If either diverges, the whole thing does
 -- Otherwise take CPR info from the first
-bothRes BotRes r2     = BotRes
-bothRes r1     BotRes = BotRes
-bothRes r1     r2     = r1
+bothRes r1 BotRes = BotRes
+bothRes r1 r2     = r1
 \end{code}
 
 \begin{code}
