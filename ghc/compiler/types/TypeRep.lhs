@@ -523,6 +523,8 @@ ppr_type p ty@(ForAllTy _ _)
     split2 ps ty		    = (reverse ps, ty)
 
 ppr_tc_app :: Prec -> TyCon -> [Type] -> SDoc
+ppr_tc_app p tc [] 
+  = ppr tc
 ppr_tc_app p tc [ty] 
   | tc `hasKey` listTyConKey = brackets (pprType ty)
   | tc `hasKey` parrTyConKey = ptext SLIT("[:") <> pprType ty <> ptext SLIT(":]")
