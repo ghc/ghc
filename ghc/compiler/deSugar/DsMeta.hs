@@ -1089,6 +1089,7 @@ repLiteral lit
   where
     lit_name = case lit of
 		 HsInteger _ -> integerLName
+		 HsInt     _ -> integerLName
 		 HsChar _    -> charLName
 		 HsString _  -> stringLName
 		 HsRat _ _   -> rationalLName
@@ -1166,7 +1167,7 @@ templateHaskellNames :: NameSet
 -- The names that are implicitly mentioned by ``bracket''
 -- Should stay in sync with the import list of DsMeta
 templateHaskellNames
-  = mkNameSet [ integerLName,charLName, stringLName, rationalLName,
+  = mkNameSet [ integerLName, charLName, stringLName, rationalLName,
 		plitName, pvarName, ptupName, 
 		pconName, ptildeName, paspatName, pwildName, 
                 varName, conName, litName, appName, infixEName, lamName,
