@@ -10,7 +10,7 @@ We start with the @pprXXX@s with some cross-platform commonality
 \begin{code}
 #include "nativeGen/NCG.h"
 
-module PprMach ( pprInstr, pprSize, pprUserReg ) where
+module PprMach ( pprInstr, pprSize, pprUserReg IF_OS_darwin(COMMA pprDyldSymbolStub, ) ) where
 
 #include "HsVersions.h"
 
@@ -2036,6 +2036,34 @@ pprRI (RIImm r) = pprImm r
 
 pprFSize DF = empty
 pprFSize F = char 's'
+
+{-
+  The Mach-O object file format used in Darwin/Mac OS X needs a so-called
+  "symbol stub" for every function that might be imported from a dynamic
+  library.
+  The stubs are always the same, and they are all output at the end of the
+  generated assembly (see AsmCodeGen.lhs), so we don't use the Instr datatype.
+  Instead, we just pretty-print it directly.
+-}
+
+#if darwin_TARGET_OS
+pprDyldSymbolStub fn =
+    vcat [
+	ptext SLIT(".symbol_stub"),
+	ptext SLIT("L_") <> ftext fn <> ptext SLIT("$stub:"),
+	    ptext SLIT("\t.indirect_symbol _") <> ftext fn,
+	    ptext SLIT("\tlis r11,ha16(L_") <> ftext fn <> ptext SLIT("$lazy_ptr)"),
+	    ptext SLIT("\tlwz r12,lo16(L_") <> ftext fn <> ptext SLIT("$lazy_ptr)(r11)"),
+	    ptext SLIT("\tmtctr r12"),
+	    ptext SLIT("\taddi r11,r11,lo16(L_") <> ftext fn <> ptext SLIT("$lazy_ptr)"),
+	    ptext SLIT("\tbctr"),
+	ptext SLIT(".lazy_symbol_pointer"),
+	ptext SLIT("L_") <> ftext fn <> ptext SLIT("$lazy_ptr:"),
+	    ptext SLIT("\t.indirect_symbol _") <> ftext fn,
+	    ptext SLIT("\t.long dyld_stub_binding_helper")
+    ]
+#endif
+
 
 #endif {-powerpc_TARGET_ARCH-}
 \end{code}

@@ -21,7 +21,8 @@ module Stix (
         mapNat, mapAndUnzipNat, mapAccumLNat,
         getUniqueNat, getDeltaNat, setDeltaNat,
         NatM_State, mkNatM_State,
-        uniqOfNatM_State, deltaOfNatM_State,
+        uniqOfNatM_State, deltaOfNatM_State, importsOfNatM_State,
+	addImportNat,
 
 	getUniqLabelNCG, getNatLabelNCG,
         ncgPrimopMoan,
@@ -527,16 +528,20 @@ liftStrings_wrk [] acc_stix acc_strs
 
 The NCG's monad.
 
+The monad keeps a UniqSupply, the current stack delta and
+a list of imported entities, which is only used for
+Darwin (Mac OS X).
+
 \begin{code}
-data NatM_State = NatM_State UniqSupply Int
+data NatM_State = NatM_State UniqSupply Int [FastString]
 type NatM result = NatM_State -> (result, NatM_State)
 
 mkNatM_State :: UniqSupply -> Int -> NatM_State
-mkNatM_State = NatM_State
+mkNatM_State us delta = NatM_State us delta []
 
-uniqOfNatM_State  (NatM_State us delta) = us
-deltaOfNatM_State (NatM_State us delta) = delta
-
+uniqOfNatM_State  (NatM_State us delta imports) = us
+deltaOfNatM_State (NatM_State us delta imports) = delta
+importsOfNatM_State (NatM_State us delta imports) = imports
 
 initNat :: NatM_State -> NatM a -> (a, NatM_State)
 initNat init_st m = case m init_st of { (r,st) -> (r,st) }
@@ -576,17 +581,21 @@ mapAccumLNat f b (x:xs)
 
 
 getUniqueNat :: NatM Unique
-getUniqueNat (NatM_State us delta)
+getUniqueNat (NatM_State us delta imports)
     = case splitUniqSupply us of
-         (us1,us2) -> (uniqFromSupply us1, (NatM_State us2 delta))
+         (us1,us2) -> (uniqFromSupply us1, (NatM_State us2 delta imports))
 
 getDeltaNat :: NatM Int
-getDeltaNat st@(NatM_State us delta)
+getDeltaNat st@(NatM_State us delta imports)
    = (delta, st)
 
 setDeltaNat :: Int -> NatM ()
-setDeltaNat delta (NatM_State us _)
-   = ((), NatM_State us delta)
+setDeltaNat delta (NatM_State us _ imports)
+   = ((), NatM_State us delta imports)
+
+addImportNat :: FastString -> NatM ()
+addImportNat imp (NatM_State us delta imports)
+   = ((), NatM_State us delta (imp:imports))
 \end{code}
 
 Giving up in a not-too-inelegant way.

@@ -41,6 +41,7 @@ import Stix		( getNatLabelNCG, StixStmt(..), StixExpr(..),
                           NatM, thenNat, returnNat, mapNat, 
                           mapAndUnzipNat, mapAccumLNat,
                           getDeltaNat, setDeltaNat, getUniqueNat,
+			  IF_OS_darwin(addImportNat COMMA,)
                           ncgPrimopMoan,
 			  ncg_target_is_32bit
 			)
@@ -512,8 +513,8 @@ iselExpr64 (StCall fn cconv kind args)
   = genCCall fn cconv kind args			`thenNat` \ call ->
     getNewRegNCG IntRep				`thenNat` \ r_dst_lo ->
     let r_dst_hi = getHiVRegFromLo r_dst_lo
-        mov_lo = MR r_dst_lo r3
-        mov_hi = MR r_dst_hi r4
+        mov_lo = MR r_dst_lo r4
+        mov_hi = MR r_dst_hi r3
     in
     returnNat (
        ChildCode64 (call `snocOL` mov_hi `snocOL` mov_lo) 
@@ -3491,8 +3492,14 @@ genCCall fn cconv kind args
 	    `appOL` moveFinalCode
     in 
 	case fn of
-	    Left lbl -> returnNat (	passArguments
-			    `snocOL`	BL (ImmLab False (ftext lbl)) usedRegs
+	    Left lbl ->
+		addImportNat lbl			`thenNat` \ _ ->
+		returnNat (passArguments
+			    `snocOL`	BL (ImmLit $ ftext 
+					     (FSLIT("L_")
+					     `appendFS` lbl
+					     `appendFS` FSLIT("$stub")))
+					   usedRegs
 			    `appOL`	move_sp_up)
 	    Right dyn ->
 		getRegister dyn				`thenNat` \ dynReg ->

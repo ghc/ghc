@@ -25,11 +25,16 @@ import Stix		( StixReg(..), StixStmt(..), StixExpr(..), StixVReg(..),
                           liftStrings,
                           initNat, 
                           mkNatM_State,
-                          uniqOfNatM_State, deltaOfNatM_State )
+                          uniqOfNatM_State, deltaOfNatM_State,
+			  importsOfNatM_State )
 import UniqSupply	( returnUs, thenUs, initUs, 
                           UniqSM, UniqSupply,
 			  lazyMapUs )
 import MachMisc		( IF_ARCH_i386(i386_insert_ffrees,) )
+#if darwin_TARGET_OS
+import PprMach		( pprDyldSymbolStub )
+import List		( group, sort )
+#endif
 
 import qualified Pretty
 import Outputable
@@ -92,12 +97,21 @@ So, here we go:
 nativeCodeGen :: AbstractC -> UniqSupply -> (SDoc, Pretty.Doc)
 nativeCodeGen absC us
    = let absCstmts         = mkAbsCStmtList absC
-         (sdoc_pairs, us1) = initUs us (lazyMapUs absCtoNat absCstmts)
-         stix_sdocs        = map fst sdoc_pairs
-         insn_sdocs        = map snd sdoc_pairs
+         (results, us1)    = initUs us (lazyMapUs absCtoNat absCstmts)
+         stix_sdocs        = [ stix | (stix, insn, imports) <- results ]
+         insn_sdocs        = [ insn | (stix, insn, imports) <- results ]
+         imports           = [ imports | (stix, insn, imports) <- results ]
 
-         insn_sdoc         = my_vcat insn_sdocs
+         insn_sdoc         = my_vcat insn_sdocs IF_OS_darwin(Pretty.$$ dyld_stubs,)
          stix_sdoc         = vcat stix_sdocs
+
+#if darwin_TARGET_OS
+	 -- Generate "symbol stubs" for all external symbols that might
+	 -- come from a dynamic library.
+
+         dyld_stubs         = Pretty.vcat $  map pprDyldSymbolStub $
+					     map head $ group $ sort $ concat imports
+#endif
 
 #        ifdef NCG_DEBUG
          my_trace m x = trace m x
@@ -118,18 +132,18 @@ nativeCodeGen absC us
                   (stix_sdoc, insn_sdoc)
 
 
-absCtoNat :: AbstractC -> UniqSM (SDoc, Pretty.Doc)
+absCtoNat :: AbstractC -> UniqSM (SDoc, Pretty.Doc, [FastString])
 absCtoNat absC
    = _scc_ "genCodeAbstractC" genCodeAbstractC absC        `thenUs` \ stixRaw ->
      _scc_ "genericOpt"       genericOpt stixRaw           `bind`   \ stixOpt ->
      _scc_ "liftStrings"      liftStrings stixOpt          `thenUs` \ stixLifted ->
-     _scc_ "genMachCode"      genMachCode stixLifted       `thenUs` \ pre_regalloc ->
+     _scc_ "genMachCode"      genMachCode stixLifted       `thenUs` \ (pre_regalloc, imports) ->
      _scc_ "regAlloc"         regAlloc pre_regalloc        `bind`   \ almost_final ->
      _scc_ "x86fp_kludge"     x86fp_kludge almost_final    `bind`   \ final_mach_code ->
      _scc_ "vcat"     Pretty.vcat (map pprInstr final_mach_code)  `bind`   \ final_sdoc ->
      _scc_ "pprStixTrees"     pprStixStmts stixOpt         `bind`   \ stix_sdoc ->
      returnUs ({-\_ -> Pretty.vcat (map pprInstr almost_final),-}
-               stix_sdoc, final_sdoc)
+               stix_sdoc, final_sdoc, imports)
      where
         bind f x = x f
 
@@ -157,16 +171,17 @@ Switching between the two monads whilst carrying along the same Unique
 supply breaks abstraction.  Is that bad?
 
 \begin{code}
-genMachCode :: [StixStmt] -> UniqSM InstrBlock
+genMachCode :: [StixStmt] -> UniqSM (InstrBlock, [FastString])
 
 genMachCode stmts initial_us
   = let initial_st             = mkNatM_State initial_us 0
         (instr_list, final_st) = initNat initial_st (stmtsToInstrs stmts)
         final_us               = uniqOfNatM_State final_st
         final_delta            = deltaOfNatM_State final_st
+	final_imports          = importsOfNatM_State final_st
     in
         if   final_delta == 0
-        then (instr_list, final_us)
+        then ((instr_list, final_imports), final_us)
         else pprPanic "genMachCode: nonzero final delta"
                       (int final_delta)
 \end{code}
