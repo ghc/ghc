@@ -1981,7 +1981,7 @@ ED_(True_closure);
 extern I_ required_thread_count;
 
 #ifdef PAR
-#define COUNT_SPARK     TSO_GLOBALSPARKS(CurrentTSO)++
+#define COUNT_SPARK     TSO_GLOBALSPARKS(CurrentTSO)++; sparksCreated++
 #else
 #define COUNT_SPARK
 #endif
