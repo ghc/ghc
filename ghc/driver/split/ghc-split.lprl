@@ -124,12 +124,11 @@ sub collectDyldStuff_powerpc_darwin {
 	$_ = <TMPI>;
 	if ( $_ eq '' || /^L(_.+)\$.+:/ ) {
 	    if ( $label ne '' ) {
-		$DyldChunksDefined{$label} .= $section . $chunk_label . $alignment . $ chunk;
+		$DyldChunksDefined{$label} .= $section . $alignment . $chunk_label . $ chunk;
 		if( $section =~ s/\.data/\.non_lazy_symbol_pointer/ ) {
 		    $chunk = "\t.indirect_symbol $label\n\t.long 0\n";
 		}
-		$DyldChunks{$label} .= $section . $chunk_label . $chunk;
-		# don't use $alignment, it's only needed for .data, which we change into .non_lazy_symbol_pointer
+		$DyldChunks{$label} .= $section . $alignment . $chunk_label . $chunk;
 		print STDERR "### dyld chunk: $label\n$section$alignment$chunk\n###\n" if $Dump_asm_splitting_info;
 	    }
 	    last if ($_ eq '');
@@ -147,7 +146,8 @@ sub collectDyldStuff_powerpc_darwin {
 	} elsif ( /^\s*\.section\s+__TEXT,__symbol_stub1,symbol_stubs,pure_instructions,\d+/ ) {
 	    $cur_section = $_;
 	    printf STDERR "section: $cur_section\n" if $Dump_asm_splitting_info;
-	    $cur_alignment = ''
+                # always make sure we align things
+	    $cur_alignment = '\t.align 2'
 	} elsif ( /^\s*\.align.*/ ) { 
 	    $cur_alignment = $_;
 	    printf STDERR "alignment: $cur_alignment\n" if $Dump_asm_splitting_info;
@@ -490,7 +490,7 @@ sub process_asm_block_powerpc_darwin {
     $str =~ s/L_.*\$.*:\n(.|\n)*//;
 
     # remove/record any literal constants defined here
-    while ( $str =~ s/^(\s+.const_data\n\s+\.align.*\n(LC\d+):\n(\s\.(byte|short|long|fill|space|ascii).*\n)+)// ) {
+    while ( $str =~ s/^(\s+.const.*\n\s+\.align.*\n(LC\d+):\n(\s\.(byte|short|long|fill|space|ascii).*\n)+)// ) {
 	local($label) = $2;
 	local($body)  = $1;
 
