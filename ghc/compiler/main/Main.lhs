@@ -87,12 +87,17 @@ doIt (core_cmds, stg_cmds)
   = doIfSet opt_Verbose 
 	(hPutStr stderr "Glasgow Haskell Compiler, version " 	>>
  	 hPutStr stderr compiler_version                    	>>
-	 hPutStr stderr ", for Haskell 98\n")			>>
+	 hPutStr stderr ", for Haskell 98\n"			>>
+	 hPutStr stderr "\tcompiled by GHC version "		>>
+	 hPutStr stderr booter_version				>>
+	 hPutStr stderr "\n")					>>
 
 	--------------------------  Reader  ----------------
-    show_pass "Reader"	>>
-    _scc_     "Reader"
+    show_pass "Parser"	>>
+    _scc_     "Parser"
     parseModule		>>= \ (mod_name, rdr_module) ->
+
+    dumpIfSet opt_D_dump_parsed "Parser" (ppr rdr_module) >>
 
     dumpIfSet opt_D_source_stats "Source Statistics"
 	(ppSourceStats False rdr_module)	 	>>
@@ -358,6 +363,11 @@ compiler_version =
   go ls@[x,y] = '.':ls
   go (x:xs)   = x:go xs
 
+booter_version
+ = case "\ 
+	\ __GLASGOW_HASKELL__" of
+    ' ':n:ns -> n:'.':ns
+    ' ':m    -> m
 \end{code}
 
 \begin{code}

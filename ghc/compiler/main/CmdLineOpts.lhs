@@ -27,7 +27,7 @@ module CmdLineOpts (
 	opt_D_dump_foreign,
 	opt_D_dump_inlinings,
 	opt_D_dump_occur_anal,
-	opt_D_dump_rdr,
+	opt_D_dump_parsed,
 	opt_D_dump_realC,
 	opt_D_dump_rn,
 	opt_D_dump_rules,
@@ -305,7 +305,7 @@ opt_D_dump_flatC		= lookUp  SLIT("-ddump-flatC")
 opt_D_dump_foreign		= lookUp  SLIT("-ddump-foreign-stubs")
 opt_D_dump_inlinings		= lookUp  SLIT("-ddump-inlinings")
 opt_D_dump_occur_anal		= lookUp  SLIT("-ddump-occur-anal")
-opt_D_dump_rdr			= lookUp  SLIT("-ddump-rdr")
+opt_D_dump_parsed		= lookUp  SLIT("-ddump-parsed")
 opt_D_dump_realC		= lookUp  SLIT("-ddump-realC")
 opt_D_dump_rn			= lookUp  SLIT("-ddump-rn")
 opt_D_dump_simpl		= lookUp  SLIT("-ddump-simpl")
