@@ -348,8 +348,8 @@ opt_UnfoldingConDiscount	= lookup_def_int "-funfolding-con-discount"	   uNFOLDIN
 			
 opt_LiberateCaseThreshold	= lookup_def_int "-fliberate-case-threshold"	   lIBERATE_CASE_THRESHOLD
 opt_WarnNameShadowing		= lookUp  SLIT("-fwarn-name-shadowing")
-opt_WarnIncompletePatterns	= not (lookUp  SLIT("-fno-warn-incomplete-patterns"))
-opt_WarnOverlappedPatterns	= not (lookUp  SLIT("-fno-warn-overlapped-patterns"))
+opt_WarnIncompletePatterns	= lookUp  SLIT("-fwarn-incomplete-patterns")
+opt_WarnOverlappedPatterns	= lookUp  SLIT("-fwarn-overlapped-patterns")
 opt_WarnUnusedNames		= lookUp  SLIT("-fwarn-unused-names")
 opt_PruneTyDecls		= not (lookUp SLIT("-fno-prune-tydecls"))
 opt_PruneInstDecls		= not (lookUp SLIT("-fno-prune-instdecls"))
