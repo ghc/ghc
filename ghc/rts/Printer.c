@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.15 1999/07/14 13:44:19 simonmar Exp $
+ * $Id: Printer.c,v 1.16 1999/11/22 16:16:35 sewardj Exp $
  *
  * Copyright (c) 1994-1999.
  *
@@ -310,7 +310,7 @@ StgPtr printStackObj( StgPtr sp )
 
     if (IS_ARG_TAG(*sp)) {
 
-#ifdef DEBUG_EXTRA
+#ifdef DEBUG
         StackTag tag = (StackTag)*sp;
         switch ( tag ) {
         case ILLEGAL_TAG:
@@ -345,7 +345,7 @@ StgPtr printStackObj( StgPtr sp )
         }
         sp += 1 + ARG_SIZE(tag);
 
-#else /* !DEBUG_EXTRA */
+#else /* !DEBUG */
 	{
 	    StgWord tag = *sp++;
 	    nat i;
