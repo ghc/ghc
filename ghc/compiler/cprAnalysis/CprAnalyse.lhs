@@ -437,7 +437,7 @@ isConProdType _ = False
 -- Should I look through notes? I think so ...
 isCon :: CoreExpr -> Bool
 isCon (Con c _) = isWHNFCon c  -- is this the right test?
-isCon (Note _n e) = isCon e
+isCon (Note _ e) = isCon e
 isCon _         = False
 
 -- Compose a function with itself n times.  (nth rather than twice)
