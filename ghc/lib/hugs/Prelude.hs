@@ -113,7 +113,7 @@ module Prelude (
     ,unsafeInterleaveIO,nh_write,primCharToInt
 
     -- debugging hacks
-    ,ST(..)
+    --,ST(..)
   ) where
 
 -- Standard value bindings {Prelude} ----------------------------------------
