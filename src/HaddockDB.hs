@@ -10,8 +10,14 @@ import HaddockTypes
 import HaddockUtil
 
 import HsSyn
+
+#if __GLASGOW_HASKELL__ < 503
 import Pretty
 import FiniteMap
+#else
+import Text.PrettyPrint
+import Data.FiniteMap
+#endif
 
 -----------------------------------------------------------------------------
 -- Printing the results in DocBook format

@@ -1,8 +1,15 @@
 module HaddockHH(ppHHContents, ppHHIndex) where
 
 import HsSyn hiding(Doc)
+
+#if __GLASGOW_HASKELL__ < 503
 import Pretty
 import FiniteMap
+#else
+import Text.PrettyPrint
+import Data.FiniteMap
+#endif
+
 import HaddockModuleTree
 import HaddockUtil
 import HaddockTypes

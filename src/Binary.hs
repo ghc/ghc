@@ -56,6 +56,10 @@ module Binary
 
 import FastMutInt
 
+import Char
+import Monad
+
+#if __GLASGOW_HASKELL__ < 503
 import IOExts
 import Bits
 import Int
@@ -64,42 +68,68 @@ import Char
 import Monad
 import Exception
 import GlaExts hiding (ByteArray, newByteArray, freezeByteArray)
+import Array
 import IO
-#if __GLASGOW_HASKELL__ < 503
-import PrelIOBase	--	( IOError(..), IOErrorType(..) )
-import PrelReal		--	( Ratio(..) )
-import PrelIOBase	-- 	( IO(..) )
+import PrelIOBase		( IOError(..), IOErrorType(..)
+#if __GLASGOW_HASKELL__ > 411
+				, IOException(..)
+#endif
+				)
+import PrelReal			( Ratio(..) )
+import PrelIOBase	 	( IO(..) )
 #else
-import System.IO.Error ( mkIOError, eofErrorType )
-import GHC.Real ( Ratio(..) )
-import GHC.IOBase ( IO(..) )
+import Data.Array.IO
+import Data.Array
+import Data.Bits
+import Data.Int
+import Data.Word
+import Data.IORef
+import Data.Char		( ord, chr )
+import Data.Array.Base  	( unsafeRead, unsafeWrite )
+import Control.Monad		( when )
+import Control.Exception	( throwDyn )
+import System.IO as IO
+import System.IO.Unsafe		( unsafeInterleaveIO )
+import System.IO.Error		( mkIOError, eofErrorType )
+import GHC.Real			( Ratio(..) )
+import GHC.Exts
+import GHC.IOBase	 	( IO(..) )
+import GHC.Word			( Word8(..) )
+#if __GLASGOW_HASKELL__ < 601
+-- openFileEx is available from the lang package, but we want to 
+-- be independent of hslibs libraries.
+import GHC.Handle		( openFileEx, IOModeEx(..) )
+#else
+import System.IO		( openBinaryFile )
+#endif
 #endif
 
-type BinArray = MutableByteArray RealWorld Int
-newArray_ :: Ix ix => (ix, ix) -> IO (MutableByteArray RealWorld ix)
-newArray_ bounds     = stToIO (newCharArray bounds)
+import IO
 
-unsafeWrite :: Ix ix => MutableByteArray RealWorld ix -> ix -> Word8 -> IO ()
-unsafeWrite arr ix e = stToIO (writeWord8Array arr ix e)
-
-unsafeRead :: Ix ix => MutableByteArray RealWorld ix -> ix -> IO Word8
-unsafeRead  arr ix   = stToIO (readWord8Array arr ix)
-
-hPutArray :: Handle -> MutableByteArray RealWorld a -> Int -> IO ()
-hPutArray h arr sz   = hPutBufBA h arr sz
-
-hGetArray :: Handle -> MutableByteArray RealWorld a -> Int -> IO Int
-hGetArray h sz       = hGetBufBA h sz
+#if __GLASGOW_HASKELL__ < 601
+openBinaryFile f mode = openFileEx f (BinaryMode mode)
+#endif
 
 #if __GLASGOW_HASKELL__ < 503
+type BinArray = MutableByteArray RealWorld Int
+newArray_ bounds     = stToIO (newCharArray bounds)
+unsafeWrite arr ix e = stToIO (writeWord8Array arr ix e)
+unsafeRead  arr ix   = stToIO (readWord8Array arr ix)
+#if __GLASGOW_HASKELL__ < 411
+newByteArray#        = newCharArray#
+#endif
+hPutArray h arr sz   = hPutBufBAFull h arr sz
+hGetArray h sz       = hGetBufBAFull h sz
+
 mkIOError :: IOErrorType -> String -> Maybe Handle -> Maybe FilePath -> Exception
 mkIOError t location maybe_hdl maybe_filename
   = IOException (IOError maybe_hdl t location ""
+#if __GLASGOW_HASKELL__ > 411
 		         maybe_filename
+#endif
   		)
 
 eofErrorType = EOF
-#endif
 
 #ifndef SIZEOF_HSINT
 #define SIZEOF_HSINT  INT_SIZE_IN_BYTES
@@ -109,7 +139,9 @@ eofErrorType = EOF
 #define SIZEOF_HSWORD WORD_SIZE_IN_BYTES
 #endif
 
---type BinArray = IOUArray Int Word8
+#else
+type BinArray = IOUArray Int Word8
+#endif
 
 data BinHandle
   = BinMem {		-- binary data stored in an unboxed array
@@ -204,7 +236,7 @@ isEOFBin (BinIO _ _ h) = hIsEOF h
 writeBinMem :: BinHandle -> FilePath -> IO ()
 writeBinMem (BinIO _ _ _) _ = error "Data.Binary.writeBinMem: not a memory handle"
 writeBinMem (BinMem _ ix_r _ arr_r0) fn = do
-  h <- openFileEx fn (BinaryMode WriteMode)
+  h <- openBinaryFile fn WriteMode
   arr <- readIORef arr_r0
   ix  <- readFastMutInt ix_r
   hPutArray h arr ix

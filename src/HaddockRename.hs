@@ -16,7 +16,12 @@ module HaddockRename (
 import HaddockTypes
 import HsSyn
 
+#if __GLASGOW_HASKELL__ < 503
 import FiniteMap
+#else
+import Data.FiniteMap
+#endif
+
 import Monad
 
 -- -----------------------------------------------------------------------------

@@ -3,7 +3,15 @@ include $(TOP)/mk/boilerplate.mk
 
 INSTALLING=1
 
+ghc_ge_504 = $(shell if (test $(GhcCanonVersion) -ge 504); then echo YES; else echo NO; fi)
+
+# Don't use any hslibs packages in GHC >= 5.04
+ifeq "$(ghc_ge_504)" "YES"
+SRC_HC_OPTS += -package network -fglasgow-exts -cpp
+else
 SRC_HC_OPTS += -package data -package text -package util -package net -fglasgow-exts -cpp
+endif
+
 HS_PROG = haddock.bin
 
 HsParser_HC_OPTS      += -Onot

@@ -12,7 +12,12 @@ module HaddockTypes (
   DocOption(..), InstHead,
  ) where
 
+#if __GLASGOW_HASKELL__ < 503
 import FiniteMap
+#else
+import Data.FiniteMap
+#endif
+
 import HsSyn
 
 -- ---------------------------------------------------------------------------

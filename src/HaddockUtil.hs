@@ -26,15 +26,23 @@ module HaddockUtil (
 
 import HsSyn
 
-import FiniteMap
 import List	( intersect )
 import Maybe
 import IO	( hPutStr, stderr )
 import System
-import RegexString
 import Binary
-import IOExts
 import Monad
+
+#if __GLASGOW_HASKELL__ < 503
+import RegexString
+import FiniteMap
+import IOExts
+#else
+import Text.Regex
+import Data.FiniteMap
+import Data.IORef
+import System.IO.Unsafe	 ( unsafePerformIO )
+#endif
 
 -- -----------------------------------------------------------------------------
 -- Some Utilities
@@ -167,7 +175,11 @@ declDoc _ = Nothing
 parseModuleHeader :: String -> (String, Maybe ModuleInfo)
 parseModuleHeader str =
   case matchRegexAll moduleHeaderRE str of
+#if __GLASGOW_HASKELL__ < 503
 	Just (_, _, after, _, (_:_:_:s1:s2:s3:_)) -> 
+#else
+	Just (_, _, after, (_:_:_:s1:s2:s3:_)) -> 
+#endif
 	   (after, Just (ModuleInfo { 
 				 portability = s3,
 				 stability   = s2,

@@ -16,11 +16,17 @@ import HsSyn
 
 import IO
 import Maybe	( fromJust, isJust )
-import FiniteMap
 import List 	( sortBy )
 import Char	( toUpper, toLower, isAlpha, ord )
 import Monad	( when, unless )
+
+#if __GLASGOW_HASKELL__ < 503
+import FiniteMap
 import URI	( escapeString, unreserved )
+#else
+import Data.FiniteMap
+import Network.URI ( escapeString, unreserved )
+#endif
 
 import Html
 import qualified Html

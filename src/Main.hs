@@ -20,9 +20,7 @@ import Binary
 import HsParser
 import HsParseMonad
 import HsSyn
-import GetOpt
 import System
-import FiniteMap
 
 --import Pretty
 
@@ -32,11 +30,19 @@ import Monad	( when )
 import Char	( isSpace )
 import IO
 
-#ifdef __GLASGOW_HASKELL__
-import IOExts
-#endif
-
+#if __GLASGOW_HASKELL__ < 503
 import MonadWriter
+import FiniteMap
+import GetOpt
+import IOExts
+#else
+import Control.Monad.Writer
+import Data.FiniteMap
+import System.Console.GetOpt
+import Data.IORef
+import Debug.Trace
+import System.IO.Unsafe	 ( unsafePerformIO )
+#endif
 
 #if __GLASGOW_HASKELL__ < 500
 import Regex

@@ -39,7 +39,12 @@ module Digraph(
 #define ARR_ELT		(COMMA)
 
 -- Extensions
+#if __GLASGOW_HASKELL__ < 503
 import ST
+#else
+import Control.Monad.ST
+import Data.Array.ST hiding (indices,bounds)
+#endif
 
 -- std interfaces
 import Maybe
@@ -233,6 +238,17 @@ draw (Node x ts0) = grp this (space (length this)) (stLoop ts0)
 %************************************************************************
 
 \begin{code}
+#if __GLASGOW_HASKELL__ >= 504
+newSTArray :: Ix i => (i,i) -> e -> ST s (STArray s i e)
+newSTArray = newArray
+
+readSTArray :: Ix i => STArray s i e -> i -> ST s e
+readSTArray = readArray
+
+writeSTArray :: Ix i => STArray s i e -> i -> e -> ST s ()
+writeSTArray = writeArray
+#endif
+
 type Set s    = STArray s Vertex Bool
 
 mkEmpty      :: Bounds -> ST s (Set s)
