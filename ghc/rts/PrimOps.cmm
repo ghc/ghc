@@ -1005,7 +1005,7 @@ CATCH_RETRY_FRAME_ENTRY_TEMPLATE(,%ENTRY_CODE(Sp(SP_OFF)))
           /* Previous attempt is no longer valid: try again */                           \
           "ptr" trec = foreign "C" stmStartTransaction(NO_TREC "ptr");                   \
           StgTSO_trec(CurrentTSO) = trec;                                                \
-          StgAtomicallyFrame_waiting(frame) = 0; /* false; */                            \
+          StgAtomicallyFrame_waiting(frame) = 0 :: CInt; /* false; */                    \
           R1 = StgAtomicallyFrame_code(frame);                                           \
           Sp_adj(-1);                                                                    \
           jump RET_LBL(stg_ap_v);                                                        \
@@ -1138,7 +1138,7 @@ atomicallyzh_fast
   frame = Sp;
 
   SET_HDR(frame,stg_atomically_frame_info,CCCS);
-  StgAtomicallyFrame_waiting(frame) = 0; // False
+  StgAtomicallyFrame_waiting(frame) = 0 :: CInt; // False
   StgAtomicallyFrame_code(frame) = R1;
 
   /* Start the memory transcation */
@@ -1193,7 +1193,7 @@ catchRetryzh_fast
   frame = Sp;
   
   SET_HDR(frame, stg_catch_retry_frame_info, CCCS);
-  StgCatchRetryFrame_running_alt_code(frame) = 0; // false;
+  StgCatchRetryFrame_running_alt_code(frame) = 0 :: CInt; // false;
   StgCatchRetryFrame_first_code(frame) = R1;
   StgCatchRetryFrame_alt_code(frame) = R2;
   StgCatchRetryFrame_first_code_trec(frame) = new_trec;
@@ -1230,7 +1230,7 @@ retry_pop_stack:
       // Retry in the first code: try the alternative
       "ptr" trec = foreign "C" stmStartTransaction(outer "ptr");
       StgTSO_trec(CurrentTSO) = trec;
-      StgCatchRetryFrame_running_alt_code(frame) = 1; // true;
+      StgCatchRetryFrame_running_alt_code(frame) = 1 :: CInt; // true;
       R1 = StgCatchRetryFrame_alt_code(frame);
       Sp_adj(-1);
       jump RET_LBL(stg_ap_v);
@@ -1250,7 +1250,7 @@ retry_pop_stack:
         // Merge failed: we musn't propagate the retry.  Try both paths again.
         "ptr" trec = foreign "C" stmStartTransaction(outer "ptr");
         StgCatchRetryFrame_first_code_trec(frame) = trec;
-        StgCatchRetryFrame_running_alt_code(frame) = 0; // false;
+        StgCatchRetryFrame_running_alt_code(frame) = 0 :: CInt; // false;
         StgTSO_trec(CurrentTSO) = trec;
         R1 = StgCatchRetryFrame_first_code(frame);
         Sp_adj(-1);
@@ -1265,7 +1265,7 @@ retry_pop_stack:
   r = foreign "C" stmWait(CurrentTSO "ptr", trec "ptr");
   if (r) {
     // Transaction was valid: stmWait put us on the TVars' queues, we now block
-    StgAtomicallyFrame_waiting(frame) = 1; // true
+    StgAtomicallyFrame_waiting(frame) = 1 :: CInt; // true
     Sp = frame;
     jump stg_block_noregs;
   } else {
