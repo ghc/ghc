@@ -1,0 +1,5 @@
+-- type-variable tidying problem in 6.4
+-- incorrect type: (Monad m) => (m a, b) -> m b
+-- correct   type: (Monad m) => (m a, b) -> m b1
+let f (a,b) = a >> undefined
+:t f
