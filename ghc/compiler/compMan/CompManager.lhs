@@ -640,7 +640,13 @@ getValidLinkable old_linkables objects_allowed new_linkables summary
            src_date = ms_hs_date summary
 
 	   valid_linkable
-	      =  filter (\l -> linkableTime l > src_date) linkable
+	      =  filter (\l -> linkableTime l >= src_date) linkable
+		-- why '>=' rather than '>' above?  If the filesystem stores
+		-- times to the nearset second, we may occasionally find that
+		-- the object & source have the same modification time, 
+		-- especially if the source was automatically generated
+		-- and compiled.  Using >= is slightly unsafe, but it matches
+		-- make's behaviour.
 
        return (valid_linkable ++ new_linkables)
 
