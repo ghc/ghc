@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.12 2001/12/10 14:07:30 simonmar Exp $
+-- $Id: primops.txt.pp,v 1.13 2001/12/13 10:47:28 sewardj Exp $
 --
 -- Primitive Operations
 --
@@ -227,14 +227,14 @@ primop   Int2IntegerOp    "int2Integer#"
    with out_of_line = True
 
 primop   ISllOp   "uncheckedIShiftL#" GenPrimOp  Int# -> Int# -> Int#
-	 {Shift left.  Result undefined if shift amount equals 
-          or exceeds word size.} 
+	 {Shift left.  Result undefined if shift amount is not
+          in the range 0 to word size - 1 inclusive.}
 primop   ISraOp   "uncheckedIShiftRA#" GenPrimOp Int# -> Int# -> Int#
-	 {Shift right arithmetic.  Result undefined if shift amount equals 
-          or exceeds word size.} 
+	 {Shift right arithmetic.  Result undefined if shift amount is not
+          in the range 0 to word size - 1 inclusive.}
 primop   ISrlOp   "uncheckedIShiftRL#" GenPrimOp Int# -> Int# -> Int#
-	 {Shift right logical.  Result undefined if shift amount equals 
-          or exceeds word size.} 
+	 {Shift right logical.  Result undefined if shift amount is not
+          in the range 0 to word size - 1 inclusive.}
 
 ------------------------------------------------------------------------
 section "Word#"
@@ -267,11 +267,11 @@ primop   XorOp   "xor#"   Dyadic   Word# -> Word# -> Word#
 primop   NotOp   "not#"   Monadic   Word# -> Word#
 
 primop   SllOp   "uncheckedShiftL#"   GenPrimOp   Word# -> Int# -> Word#
-	 {Shift left logical.   Result undefined if shift amount equals 
-          or exceeds word size.}
+	 {Shift left logical.   Result undefined if shift amount is not
+          in the range 0 to word size - 1 inclusive.}
 primop   SrlOp   "uncheckedShiftRL#"   GenPrimOp   Word# -> Int# -> Word#
-	 {Shift right logical.   Result undefined if shift amount equals 
-          or exceeds word size.}
+	 {Shift right logical.   Result undefined if shift  amount is not
+          in the range 0 to word size - 1 inclusive.}
 
 primop   Word2IntOp   "word2Int#"   GenPrimOp   Word# -> Int#
 
