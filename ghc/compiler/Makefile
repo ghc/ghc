@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.195 2001/10/23 16:47:30 rrt Exp $
+# $Id: Makefile,v 1.196 2001/11/03 01:44:04 sof Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -304,7 +304,7 @@ main/SysTools_HC_OPTS		= -fno-cse
 # compiler doesn't realise that the stcall foreign imports are indeed
 # stdcall, and doesn't generate the Foo@8 name for them
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-main/SysTools_HC_OPTS		+= '-\#include <windows.h>'
+main/SysTools_HC_OPTS		+= '-\#include <windows.h>' '-\#include <process.h>'
 endif
 
 # ----------------------------------------------------------------------------
