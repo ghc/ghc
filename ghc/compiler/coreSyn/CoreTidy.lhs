@@ -35,6 +35,9 @@ import Util		( mapAccumL )
 \end{code}
 
 
+This module contains "tidying" code for *nested* expressions, bindings, rules.
+The code for *top-level* bindings is in TidyPgm.
+
 %************************************************************************
 %*									*
 \subsection{Tidying expressions, rules}
