@@ -4251,8 +4251,24 @@ There are a few other things to do:
 <itemizedlist>
 <listitem>
 <para>
+By default, cygwin provides the command shell <filename>ash</filename>
+as <filename>sh.exe</filename>. We have often seen build-system problems that 
+turn out to be due to bugs in <filename>ash</filename>
+(to do with quoting
+and length of command lines).  On the other hand <filename>bash</filename> seems
+to be rock solid.
+So, in <filename>cygwin/bin</filename>
+remove the supplied <filename>sh.exe</filename> (or rename it as <filename>ash.exe</filename>),
+and copy <filename>bash.exe</filename> to  <filename>sh.exe</filename>.
+You'll need to do this in Windows Explorer or the Windows <command>cmd</command> shell, because
+you can't rename a running program!
+</para>
+</listitem>
+
+<listitem>
+<para>
 Some script files used in the make system start with "<Command>#!/bin/perl</Command>",
-(and similarly for <Command>bash</Command>).  Notice the hardwired path!
+(and similarly for <Command>sh</Command>).  Notice the hardwired path!
 So you need to ensure that your <Filename>/bin</Filename> directory has the following
 binaries in it:
 <itemizedlist>
@@ -4264,21 +4280,10 @@ All these come in Cygwin's <Filename>bin</Filename> directory, which you probabl
 installed as <Filename>c:/cygwin/bin</Filename>.  By default Cygwin mounts "<Filename>/</Filename>" as
 <Filename>c:/cygwin</Filename>, so if you just take the defaults it'll all work ok.
 (You can discover where your Cygwin
-root directory <Filename>/</Filename> is by typing <Command>mount</Command>).
+root directory <Filename>/</Filename> is by typing <Command>mount</Command>.)
 Provided <Filename>/bin</Filename> points to the Cygwin <Filename>bin</Filename>
-directory, there's no need to copy anything.
-</para>
-</listitem>
-
-<listitem>
-<para>
-By default, cygwin provides the command shell <filename>ash</filename>
-as <filename>sh.exe</filename>. It has a couple of 'issues' (to do with quoting
-and length of command lines), so
-in your <filename>/bin</filename> directory, make sure that <filename>
-bash.exe</filename> is also provided as <filename>sh.exe</filename>
-(i.e. overwrite the old <filename>sh.exe</filename> with a copy of
-<filename>bash.exe</filename>).
+directory, there's no need to copy anything.  If not, copy these binaries from the <filename>cygwin/bin</filename>
+directory (after fixing the <filename>sh.exe</filename> stuff mentioned in the previous bullet).
 </para>
 </listitem>
 </itemizedlist>
