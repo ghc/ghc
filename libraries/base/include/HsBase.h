@@ -406,6 +406,18 @@ __hscore_PrelHandle_read( HsInt fd, HsAddr ptr, HsInt off, int sz )
 
 }
 
+INLINE HsInt
+__hscore_PrelHandle_send( HsInt fd, HsAddr ptr, HsInt off, int sz )
+{
+    return send(fd,(char *)ptr + off, sz, 0);
+}
+
+INLINE HsInt
+__hscore_PrelHandle_recv( HsInt fd, HsAddr ptr, HsInt off, int sz )
+{
+    return recv(fd,(char *)ptr + off, sz, 0);
+}
+
 #if defined(mingw32_TARGET_OS) || defined(_MSC_VER)
 INLINE long *
 __hscore_Time_ghcTimezone( void ) { return &_timezone; }
