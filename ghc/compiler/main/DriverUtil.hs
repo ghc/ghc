@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.16 2000/12/20 15:44:01 rrt Exp $
+-- $Id: DriverUtil.hs,v 1.17 2001/03/06 15:00:25 rrt Exp $
 --
 -- Utils for the driver
 --
@@ -171,7 +171,8 @@ kludgedSystem cmd phase_name
 		   (\_ -> throwDyn (PhaseFailed phase_name (ExitFailure 1)))
 #else
    pid <- myGetProcessID
-   let tmp = "/tmp/sh" ++ show pid
+   tmp_dir <- readIORef v_TmpDir
+   let tmp = tmp_dir++"/sh"++show pid
    h <- openFile tmp WriteMode
    hPutStrLn h cmd
    hClose h

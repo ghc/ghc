@@ -97,8 +97,8 @@ data HscResult
    | HscRecomp   PersistentCompilerState -- updated PCS
                  ModDetails  		 -- new details (HomeSymbolTable additions)
                  ModIface		 -- new iface (if any compilation was done)
-	         (Maybe String) 	 -- generated stub_h filename (in /tmp)
-	         (Maybe String)  	 -- generated stub_c filename (in /tmp)
+	         (Maybe String) 	 -- generated stub_h filename (in TMPDIR)
+	         (Maybe String)  	 -- generated stub_c filename (in TMPDIR)
 	         (Maybe ([UnlinkedBCO],ItblEnv)) -- interpreted code, if any
              
 

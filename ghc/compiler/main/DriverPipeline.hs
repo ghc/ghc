@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.52 2001/02/27 12:36:37 rrt Exp $
+-- $Id: DriverPipeline.hs,v 1.53 2001/03/06 15:00:25 rrt Exp $
 --
 -- GHC Driver
 --
@@ -101,7 +101,7 @@ getGhcMode flags
 -- genPipeline
 --
 -- Herein is all the magic about which phases to run in which order, whether
--- the intermediate files should be in /tmp or in the current directory,
+-- the intermediate files should be in TMPDIR or in the current directory,
 -- what the suffix of the intermediate files should be, etc.
 
 -- The following compilation pipeline algorithm is fairly hacky.  A
