@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.38 2002/08/16 13:29:06 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.39 2002/11/01 11:05:46 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -985,8 +985,14 @@ heapCensus( void )
   stat_startHeapCensus();
 #endif
 
-  // traverse the heap, collecting the census info
+  // Traverse the heap, collecting the census info
+
+  // First the small_alloc_list: we have to fix the free pointer at
+  // the end by calling tidyAllocatedLists() first.
+  tidyAllocateLists();
   heapCensusChain( census, small_alloc_list );
+
+  // Now traverse the heap in each generation/step.
   if (RtsFlags.GcFlags.generations == 1) {
       heapCensusChain( census, g0s0->to_blocks );
   } else {

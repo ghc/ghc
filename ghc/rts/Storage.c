@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.69 2002/10/15 11:02:32 simonmar Exp $
+ * $Id: Storage.c,v 1.70 2002/11/01 11:05:47 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -542,6 +542,16 @@ allocated_bytes( void )
     }
 	
     return allocated;
+}
+
+void
+tidyAllocateLists (void)
+{
+    if (small_alloc_list != NULL) {
+	ASSERT(alloc_Hp >= small_alloc_list->start && 
+	       alloc_Hp <= small_alloc_list->start + BLOCK_SIZE);
+	small_alloc_list->free = alloc_Hp;
+    }
 }
 
 /* ---------------------------------------------------------------------------

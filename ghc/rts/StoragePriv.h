@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StoragePriv.h,v 1.21 2002/03/20 23:07:02 sebc Exp $
+ * $Id: StoragePriv.h,v 1.22 2002/11/01 11:05:47 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -54,6 +54,7 @@ extern void     allocNurseries ( void );
 extern void     resetNurseries ( void );
 extern bdescr * allocNursery   ( bdescr *last_bd, nat blocks );
 extern void     resizeNursery  ( nat blocks );
+extern void     tidyAllocateLists ( void );
 
 /* Stats 'n' stuff */
 extern lnat calcAllocated  ( void );
