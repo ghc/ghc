@@ -355,6 +355,11 @@ ifeq "$(bootstrapped)" "YES"
 utils/Binary_HC_OPTS		= -funbox-strict-fields
 endif
 
+# 4.08.2's NCG can't cope with Binary
+ifeq "$(compiling_with_4xx)" "YES"
+utils/Binary_HC_OPTS		+= -fvia-C
+endif
+
 # ByteCodeItbls uses primops that the NCG doesn't support yet.
 ghci/ByteCodeItbls_HC_OPTS	= -fvia-C
 ghci/ByteCodeLink_HC_OPTS	= -fvia-C -monly-3-regs
