@@ -16,9 +16,7 @@ import {-# SOURCE #-} TcExpr  ( tcExpr )
 import HsSyn		( HsExpr(..), HsBinds(..), MonoBinds(..), Sig(..), InPat(..),
 			  collectMonoBinders, andMonoBinds
 			)
-import RnHsSyn		( RenamedHsBinds, RenamedSig(..), 
-			  RenamedMonoBinds
-			)
+import RnHsSyn		( RenamedHsBinds, RenamedSig, RenamedMonoBinds )
 import TcHsSyn		( TcHsBinds, TcMonoBinds,
 			  TcIdOcc(..), TcIdBndr, 
 			  tcIdType
