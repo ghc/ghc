@@ -84,6 +84,7 @@ module Debug.QuickCheck.Batch
 			--	[TestOptions -> IO TestResult] -> IO ()
    , defOpt		-- :: TestOptions
    , TestOptions (..)
+   , TestResult (..)
    , isBottom		-- :: a -> Bool
    , bottom		-- :: a 		{- _|_ -}
    ) where
