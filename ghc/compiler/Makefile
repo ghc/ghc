@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.176 2001/07/17 17:27:20 sof Exp $
+# $Id: Makefile,v 1.177 2001/07/21 19:08:44 sof Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -374,7 +374,7 @@ ghc-inplace : $(HS_PROG)
 	chmod 755 $@
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 	@$(RM) $@.bat
-	echo "@"$(subst /,\\,$(FPTOOLS_TOP_ABS)/ghc/compiler/$(HS_PROG)) "-B$(FPTOOLS_TOP_ABS) %*" >$@.bat
+	echo "@"$(subst /,\\,$(FPTOOLS_TOP_ABS)/ghc/compiler/$(HS_PROG)) "-B$(FPTOOLS_TOP_ABS) %1 %2 %3 %4 %5 %6 %7 %8 %9" >$@.bat
 	chmod 755 $@.bat
 endif
 
