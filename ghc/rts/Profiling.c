@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.32 2002/07/05 01:23:45 mthomas Exp $
+ * $Id: Profiling.c,v 1.33 2002/11/01 11:16:33 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -38,7 +38,8 @@ unsigned int HP_ID;
 
 /* figures for the profiling report.
  */
-static lnat total_alloc, total_prof_ticks;
+static ullong total_alloc;
+static lnat   total_prof_ticks;
 
 /* Globals for opening the profiling log file(s)
  */
@@ -732,9 +733,8 @@ reportCCSProfiling( void )
 	    total_prof_ticks, TICK_MILLISECS);
 
     fprintf(prof_file, "\ttotal alloc = %11s bytes",
-	    ullong_format_string((ullong) total_alloc * sizeof(W_),
+	    ullong_format_string(total_alloc * sizeof(W_),
 				 temp, rtsTrue/*commas*/));
-    /* ToDo: 64-bit error! */
 
 #if defined(PROFILING_DETAIL_COUNTS)
     fprintf(prof_file, "  (%lu closures)", total_allocs);
