@@ -2562,7 +2562,7 @@ The only use for the <literal>Unused</literal> constructor was to force the corr
 kind for the type variable <literal>cxt</literal>.
 </para>
 <para>
-GHC allows you to specify the kind of a type variable directly, wherever
+GHC now instead allows you to specify the kind of a type variable directly, wherever
 a type variable is explicitly bound.  Namely:
 <itemizedlist>
 <listitem><para><literal>data</literal> declarations:
