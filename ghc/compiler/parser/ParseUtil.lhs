@@ -286,7 +286,7 @@ checkValSig
 	-> RdrNameHsType
 	-> SrcLoc
 	-> P RdrBinding
-checkValSig (HsVar v) ty loc = returnP (RdrSig (Sig v ty loc))
+checkValSig (HsVar v) ty loc | isUnqual v = returnP (RdrSig (Sig v ty loc))
 checkValSig other     ty loc = parseError "Type signature given for an expression"
 
 
