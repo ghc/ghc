@@ -48,7 +48,7 @@ import TyCon		( tyConTyVars, tyConDataCons, tyConArity, newTyConRep,
 			)
 import TcType		( TcType, ThetaType, mkTyVarTys, mkTyConApp, getClassPredTys_maybe,
 			  isUnLiftedType, mkClassPred, tyVarsOfTypes, tcSplitFunTys, 
-			  tcSplitTyConApp_maybe, tcEqTypes, mkAppTys )
+			  tcEqTypes, mkAppTys )
 import Type		( splitAppTys )
 import Var		( TyVar, tyVarKind )
 import VarSet		( mkVarSet, subVarSet )
@@ -56,7 +56,6 @@ import PrelNames
 import Util		( zipWithEqual, sortLt, notNull )
 import ListSetOps	( removeDups,  assoc )
 import Outputable
-import Maybe		( isJust )
 \end{code}
 
 %************************************************************************

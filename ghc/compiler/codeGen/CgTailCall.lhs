@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgTailCall.lhs,v 1.34 2002/09/11 10:14:32 simonpj Exp $
+% $Id: CgTailCall.lhs,v 1.35 2002/10/25 16:54:56 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -28,7 +28,6 @@ module CgTailCall (
 
 import CgMonad
 import AbsCSyn
-import PprAbsC		( pprAmode )
 
 import AbsCUtils	( mkAbstractCs, getAmodeRep )
 import CgBindery	( getArgAmodes, getCAddrMode, getCAddrModeAndInfo )

@@ -16,7 +16,7 @@ import HsSyn		( HsExpr(..), HsBinds(..), Match(..), GRHSs(..), GRHS(..),
 			  MonoBinds(..), Stmt(..), HsMatchContext(..), HsStmtContext(..),
 			  pprMatch, getMatchLoc, isDoExpr,
 			  pprMatchContext, pprStmtContext, pprStmtResultContext,
-			  mkMonoBind, nullMonoBinds, collectSigTysFromPats, andMonoBindList
+			  mkMonoBind, collectSigTysFromPats, andMonoBindList
 			)
 import RnHsSyn		( RenamedMatch, RenamedGRHSs, RenamedStmt, 
 			  RenamedPat, RenamedMatchContext )

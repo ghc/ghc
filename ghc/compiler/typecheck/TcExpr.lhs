@@ -26,7 +26,7 @@ import TcRnMonad
 import TcUnify		( tcSubExp, tcGen, (<$>),
 			  unifyTauTy, unifyFunTy, unifyListTy, unifyPArrTy,
 			  unifyTupleTy )
-import BasicTypes	( RecFlag(..),  isMarkedStrict )
+import BasicTypes	( isMarkedStrict )
 import Inst		( InstOrigin(..), 
 			  newOverloadedLit, newMethodFromName, newIPDict,
 			  newDicts, newMethodWithGivenTy, 
@@ -39,7 +39,6 @@ import TcEnv		( tcLookupClass, tcLookupGlobal_maybe, tcLookupIdLvl,
 import TcMatches	( tcMatchesCase, tcMatchLambda, tcDoStmts )
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..) )
 import TcPat		( badFieldCon )
-import TcSimplify	( tcSimplifyIPs )
 import TcMType		( tcInstTyVars, tcInstType, newHoleTyVarTy, zapToType,
 			  newTyVarTy, newTyVarTys, zonkTcType, readHoleResult )
 import TcType		( TcType, TcSigmaType, TcRhoType, TyVarDetails(VanillaTv),

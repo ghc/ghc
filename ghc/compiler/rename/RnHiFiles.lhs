@@ -14,7 +14,7 @@ module RnHiFiles (
 #include "HsVersions.h"
 
 import DriverState	( v_GhcMode, isCompManagerMode )
-import DriverUtil	( splitFilename, replaceFilenameSuffix )
+import DriverUtil	( replaceFilenameSuffix )
 import CmdLineOpts	( opt_IgnoreIfacePragmas )
 import Parser		( parseIface )
 import HscTypes		( ModIface(..), emptyModIface,
@@ -69,7 +69,6 @@ import Outputable
 import Bag
 import BinIface		( readBinIface )
 import Panic
-import Config
 
 import EXCEPTION as Exception
 import DATA_IOREF	( readIORef )

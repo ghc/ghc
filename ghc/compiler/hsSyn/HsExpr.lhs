@@ -19,7 +19,7 @@ import HsImpExp		( isOperator, pprHsVar )
 -- others:
 import ForeignCall	( Safety )
 import PprType		( pprParendType )
-import Type		( Type, TyThing )
+import Type		( Type )
 import Var		( TyVar, Id )
 import Name		( Name )
 import DataCon		( DataCon )

@@ -34,7 +34,7 @@ module Name (
 #include "HsVersions.h"
 
 import OccName		-- All of it
-import Module		( Module, ModuleName, moduleName, isHomeModule )
+import Module		( Module, moduleName, isHomeModule )
 import CmdLineOpts	( opt_Static )
 import SrcLoc		( noSrcLoc, isWiredInLoc, wiredInSrcLoc, SrcLoc )
 import Unique		( Unique, Uniquable(..), getKey, pprUnique )

@@ -58,7 +58,7 @@ import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
 import CodeOutput	( codeOutput )
 
-import Module		( ModuleName, moduleName, emptyModuleEnv )
+import Module		( emptyModuleEnv )
 import CmdLineOpts
 import DriverPhases     ( isExtCore_file )
 import ErrUtils		( dumpIfSet_dyn, showPass, printError )
@@ -71,9 +71,8 @@ import HscTypes
 import MkExternalCore	( emitExternalCore )
 import ParserCore
 import ParserCoreUtils
-import FiniteMap	( FiniteMap, plusFM, emptyFM, addToFM )
-import OccName		( OccName )
-import Name		( Name, nameModule, nameOccName, getName )
+import FiniteMap	( emptyFM )
+import Name		( Name, nameModule, getName )
 import NameEnv		( emptyNameEnv, mkNameEnv )
 import NameSet		( emptyNameSet )
 import Module		( Module, ModLocation(..), showModMsg )

@@ -18,7 +18,6 @@ import {-# SOURCE #-} HsExpr ( HsExpr, pprExpr,
 import HsImpExp		( pprHsVar )
 import HsPat		( Pat )
 import HsTypes		( HsType )
-import CoreSyn		( CoreExpr )
 import PprCore		( {- instance Outputable (Expr a) -} )
 
 --others:

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.84 2002/10/24 14:17:49 simonpj Exp $
+-- $Id: DriverState.hs,v 1.85 2002/10/25 16:54:58 simonpj Exp $
 --
 -- Settings for the driver
 --
@@ -26,7 +26,7 @@ import Util
 import Config
 import Panic
 
-import DATA_IOREF	( IORef, newIORef, readIORef, writeIORef )
+import DATA_IOREF	( IORef, readIORef, writeIORef )
 import EXCEPTION
 
 import List

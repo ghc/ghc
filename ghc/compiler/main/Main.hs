@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.113 2002/10/24 13:08:35 simonmar Exp $
+-- $Id: Main.hs,v 1.114 2002/10/25 16:54:59 simonpj Exp $
 --
 -- GHC Driver program
 --
@@ -19,6 +19,7 @@ module Main (main) where
 
 #ifdef GHCI
 import InteractiveUI
+import DriverPhases( objish_file )
 #endif
 
 
@@ -42,8 +43,7 @@ import DriverFlags	( buildStaticHscOpts,
 			  dynamic_flags, processArgs, static_flags)
 
 import DriverMkDepend	( beginMkDependHS, endMkDependHS )
-import DriverPhases	( Phase(HsPp, Hsc), haskellish_src_file, objish_file,
-			  isSourceFile )
+import DriverPhases	( Phase(HsPp, Hsc), haskellish_src_file, isSourceFile )
 
 import DriverUtil	( add, handle, handleDyn, later, splitFilename,
 			  unknownFlagsErr, getFileSuffix )
