@@ -29,7 +29,7 @@ TOP:=$(GHC_TOP)
 -include $(TOP)/mk/paths.mk
 -include $(TOP)/mk/opts.mk
 -include $(TOP)/mk/version.mk
-include $(TOP)/mk/suffix.mk
+-include $(TOP)/mk/suffix.mk
 
 # -----------------------------------------------------------------
 # Override $(libdir) and $(datadir), so GHC stuff gets installed 
