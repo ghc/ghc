@@ -9,11 +9,12 @@ import DsMonad	( DsM(..) )
 import DsBinds	( dsBinds )
 import DsExpr	( dsExpr )
 import DsUtils	( EquationInfo, MatchResult )
+import FastString ( FastString )
 import Id	( Id(..) )
 import Match	( match, matchSimply )
+import PreludeStdIO ( Maybe )
 import TcHsSyn	( TypecheckedHsBinds(..), TypecheckedHsExpr(..), TypecheckedPat(..) )
 import Type	( Type(..) )
-
 match :: [Id]		  -- Variables rep'ing the exprs we're matching with
       -> [EquationInfo]	  -- Info about patterns, etc. (type synonym below)
       -> [EquationInfo]	  -- Potentially shadowing equations above this one
@@ -26,6 +27,6 @@ matchSimply :: CoreExpr			-- Scrutinee
 	    -> CoreExpr			-- Return this if it does
 	    -> DsM CoreExpr
 
-dsBinds :: TypecheckedHsBinds -> DsM [CoreBinding]
+dsBinds :: Maybe (FastString, FastString) -> TypecheckedHsBinds -> DsM [CoreBinding]
 dsExpr  :: TypecheckedHsExpr  -> DsM CoreExpr
 \end{code}
