@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.h,v 1.12 2002/01/21 17:18:43 sof Exp $
+ * $Id: MBlock.h,v 1.13 2002/02/14 17:21:50 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -10,7 +10,7 @@
 #define __MBLOCK_H__
 extern lnat mblocks_allocated;
 
-#ifdef ENABLE_WIN32_DLL_SUPPORT
+#if defined(mingw32_TARGET_OS)
 extern int is_heap_alloced(const void* p);
 #endif
 

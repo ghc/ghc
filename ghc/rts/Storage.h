@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.40 2002/02/04 20:21:16 sof Exp $
+ * $Id: Storage.h,v 1.41 2002/02/14 17:21:50 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -435,7 +435,7 @@ extern void* DATA_SECTION_END_MARKER_DECL;
 #ifdef TEXT_BEFORE_HEAP
 # define HEAP_ALLOCED(x)  ((StgPtr)(x) >= (StgPtr)(HEAP_BASE))
 #else
-extern int is_heap_alloced(const void* x);
+/* mingw, really */
 # define HEAP_ALLOCED(x)  (is_heap_alloced(x))
 #endif
 
