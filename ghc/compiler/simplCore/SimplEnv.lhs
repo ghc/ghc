@@ -413,15 +413,15 @@ lookupUnfolding env id
 	Just (_,_,info) -> info
 	Nothing		-> NoUnfolding
 
-modifyOutEnvItem :: (OutId, BinderInfo, Unfolding)
-	         -> (OutId, BinderInfo, Unfolding) 
-	         -> (OutId, BinderInfo, Unfolding)
-modifyOutEnvItem (id, occ, info1) (_, _, info2)
-  = case (info1, info2) of
-		(OtherLit ls1, OtherLit ls2) -> (id,occ, OtherLit (ls1++ls2))
-		(OtherCon cs1, OtherCon cs2) -> (id,occ, OtherCon (cs1++cs2))
-		(_,            NoUnfolding)  -> (id,occ, info1)
-		other	       		     -> (id,occ, info2)
+modifyOutEnvItem :: (OutId, BinderInfo, Unfolding)	-- Existing
+	         -> (OutId, BinderInfo, Unfolding) 	-- New
+	         -> (OutId, BinderInfo, Unfolding)	
+modifyOutEnvItem (_, _, info1) (id, occ, info2)
+  = (id, occ, case (info1, info2) of
+		(OtherLit ls1, OtherLit ls2) -> OtherLit (ls1++ls2)
+		(OtherCon cs1, OtherCon cs2) -> OtherCon (cs1++cs2)
+		(_,            NoUnfolding)  -> info1
+		other	       		     -> info2)
 \end{code}
 
 

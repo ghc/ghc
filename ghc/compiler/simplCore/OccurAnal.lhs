@@ -22,7 +22,7 @@ import CmdLineOpts	( opt_D_dump_occur_anal, SimplifierSwitch(..) )
 import CoreSyn
 import Digraph		( stronglyConnCompR, SCC(..) )
 import Id		( idWantsToBeINLINEd, addNoInlinePragma, nukeNoInlinePragma,
-			  omitIfaceSigForId, isSpecPragmaId,
+			  omitIfaceSigForId, isSpecPragmaId, getIdSpecialisation,
 			  idType, idUnique, Id,
 			  emptyIdSet, unionIdSets, mkIdSet,
 			  elementOfIdSet,
@@ -33,6 +33,7 @@ import Id		( idWantsToBeINLINEd, addNoInlinePragma, nukeNoInlinePragma,
 			  mapIdEnv, lookupIdEnv, elemIdEnv, addOneToIdEnv
 			)
 import Specialise       ( idSpecVars )
+import SpecEnv		( isEmptySpecEnv )
 import Name		( isExported, isLocallyDefined )
 import Type		( splitFunTy_maybe, splitForAllTys )
 import Maybes		( maybeToBool )
@@ -459,6 +460,9 @@ reOrderRec env (CyclicSCC binds)
 	  || inlineMe env bndr		-- Dont pick INLINE thing
 	  || isOneFunOcc occ_info	-- Dont pick single-occ thing
 	  || not_fun_ty (idType bndr)	-- Dont pick data-ty thing
+	  || not (isEmptySpecEnv (getIdSpecialisation bndr))
+		-- Avoid things with a SpecEnv; we'd like
+		-- to take advantage of the SpecEnv in the subsuequent bindings
 
 	-- isOneFunOcc looks for one textual occurrence, whether inside lambda or whatever.
 	-- We stick to just FunOccs because if we're not going to be able
