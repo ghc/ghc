@@ -16,6 +16,7 @@ module MkIface (
 import HsSyn
 import HsCore		( HsIdInfo(..), UfExpr(..), toUfExpr, toUfBndr )
 import HsTypes		( toHsTyVars )
+import TysPrim		( alphaTyVars )
 import BasicTypes	( Fixity(..), NewOrData(..),
 			  Version, initialVersion, bumpVersion, 
 			)
@@ -45,9 +46,10 @@ import Name		( getName, nameModule, toRdrName, isGlobalName,
 import NameEnv
 import NameSet
 import OccName		( pprOccName )
-import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, isAlgTyCon, tyConGenIds,
-			  tyConTheta, tyConTyVars, tyConDataCons, tyConFamilySize, 
-			  isClassTyCon, isForeignTyCon
+import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, 
+			  isAlgTyCon, tyConGenIds, tyConTheta, tyConTyVars,
+			  tyConDataCons, tyConFamilySize, isPrimTyCon,
+			  isClassTyCon, isForeignTyCon, tyConArity
 			)
 import Class		( classExtraBigSig, classTyCon, DefMeth(..) )
 import FieldLabel	( fieldLabelType )
@@ -202,6 +204,18 @@ ifaceTyCls (ATyCon tycon) = ty_decl
 	    = ForeignType { tcdName   = getName tycon,
 			    tcdFoType = DNType,	-- The only case at present
 			    tcdLoc    = noSrcLoc }
+
+	    | isPrimTyCon tycon
+		-- needed in GHCi for ':info Int#', for example
+	    = TyData {  tcdND     = DataType,
+			tcdCtxt   = [],
+			tcdName   = getName tycon,
+		 	tcdTyVars = toHsTyVars (take (tyConArity tycon) alphaTyVars),
+			tcdCons   = [],
+			tcdNCons  = 0,
+			tcdDerivs = Nothing,
+		        tcdSysNames  = [],
+			tcdLoc	     = noSrcLoc }
 
 	    | otherwise = pprPanic "ifaceTyCls" (ppr tycon)
 
