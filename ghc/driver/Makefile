@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.55 2001/03/15 15:54:35 simonmar Exp $
+# $Id: Makefile,v 1.56 2001/03/19 18:15:59 sewardj Exp $
 #
 
 TOP=..
@@ -90,7 +90,7 @@ INPLACE_SCRIPT_PROG    = ghci-inplace
 SCRIPT_OBJS	  = ghci.sh
 INTERP		  = $(SHELL)
 SCRIPT_SUBST_VARS = GHCBIN TOPDIROPT
-INSTALL_SCRIPTS  += $(SCRIPT_PROG)
+INSTALL_SCRIPTS  += $(SCRIPT_PROG) ghc5
 
 ifeq "$(INSTALLING)" "1"
 SCRIPT_PROG 	=  $(INSTALLED_SCRIPT_PROG)
@@ -113,6 +113,16 @@ endif
 
 override datadir=$(libdir)
 INSTALL_DATAS += ghc-usage.txt
+
+ghc5 :
+	rm -f ghc5
+	echo "#!/bin/sh" > ghc5
+	echo "# You (the user) need to set GHC_TOPDIR to make it work!" >> ghc5
+	echo "GHC_TOPDIR=/path/to/root/of/ghc/installation/tree" >> ghc5
+	echo "GHC_PLATFORM=$(TARGETPLATFORM)" >> ghc5
+	cat ghc5.sh >> ghc5
+
+
 
 # -----------------------------------------------------------------------------
 
