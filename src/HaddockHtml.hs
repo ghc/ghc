@@ -748,7 +748,9 @@ ppHsAType :: HsType -> Html
 ppHsAType (HsTyTuple True l)  = parenList . map ppHsType $ l
 ppHsAType (HsTyTuple False l) = ubxParenList . map ppHsType $ l
 ppHsAType (HsTyVar name) = ppHsName name
-ppHsAType (HsTyCon name) = ppHsQName name
+ppHsAType (HsTyCon name)
+  | name == fun_tycon_name = parens $ ppHsQName name
+  | otherwise              = ppHsQName name
 ppHsAType (HsTyApp (HsTyCon (Qual _ (HsTyClsName (HsSpecial "[]")))) b )
   = brackets $ ppHsType b
 ppHsAType t = parens $ ppHsType t
