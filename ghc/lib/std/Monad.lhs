@@ -12,7 +12,7 @@ module Monad
 	, mplus     -- :: (MonadPlus m) => m a -> m a -> m a
 	)
     , join          -- :: (Monad m) => m (m a) -> m a
-    , guard	    -- :: (Monad m) => Bool -> m ()
+    , guard	    -- :: (MonadPlus m) => Bool -> m ()
     , when          -- :: (Monad m) => Bool -> m () -> m ()
     , unless        -- :: (Monad m) => Bool -> m () -> m ()
     , ap	    -- :: (Monad m) => (m (a -> b)) -> (m a) -> m b
