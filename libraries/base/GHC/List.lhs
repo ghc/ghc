@@ -341,7 +341,7 @@ take_unsafe_UInt_append	m  ls rs  =
     (x:xs) -> x : take_unsafe_UInt_append (m -# 1#) xs rs
 
 drop (I# n#) ls
-  | n# <# 0#	= []
+  | n# <# 0#	= ls
   | otherwise	= drop# n# ls
     where
 	drop# :: Int# -> [a] -> [a]
