@@ -186,7 +186,7 @@ createOSThread ( OSThreadId* pId, void (*startProc)(void))
 			   startProcWrapper,
 			   (void*)startProc,
 			   0,
-			   (unsigned*)pId) == NULL);
+			   (unsigned*)pId) == 0);
 }
 
 OSThreadId
