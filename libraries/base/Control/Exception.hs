@@ -185,7 +185,7 @@ catch =  ExceptionBase.catchException
 -- exceptions: 'ioErrors', 'arithExceptions', and so on.  For example,
 -- to catch just calls to the 'error' function, we could use
 --
--- >   result \<- catchJust errorCalls thing_to_try handler
+-- >   result <- catchJust errorCalls thing_to_try handler
 --
 -- Any other exceptions which are not matched by the predicate
 -- are re-raised, and may be caught by an enclosing
@@ -460,8 +460,10 @@ in an asynchronous-exception-safe way, you will need to use
 Some operations are /interruptible/, which means that they can receive
 asynchronous exceptions even in the scope of a 'block'.  Any function
 which may itself block is defined as interruptible; this includes
-'takeMVar' (but not 'tryTakeMVar'), and most operations which perform
-some I\/O with the outside world..  The reason for having
+'Control.Concurrent.MVar.takeMVar'
+(but not 'Control.Concurrent.MVar.tryTakeMVar'),
+and most operations which perform
+some I\/O with the outside world.  The reason for having
 interruptible operations is so that we can write things like
 
 >      block (
@@ -470,14 +472,15 @@ interruptible operations is so that we can write things like
 >               (\e -> ...)
 >      )
 
-if the 'takeMVar' was not interruptible, then this particular
+if the 'Control.Concurrent.MVar.takeMVar' was not interruptible,
+then this particular
 combination could lead to deadlock, because the thread itself would be
 blocked in a state where it can\'t receive any asynchronous exceptions.
-With 'takeMVar' interruptible, however, we can be
+With 'Control.Concurrent.MVar.takeMVar' interruptible, however, we can be
 safe in the knowledge that the thread can receive exceptions right up
-until the point when the 'takeMVar' succeeds.
+until the point when the 'Control.Concurrent.MVar.takeMVar' succeeds.
 Similar arguments apply for other interruptible operations like
-'GHC.Handle.openFile'.
+'System.IO.openFile'.
 -}
 
 -- -----------------------------------------------------------------------------

@@ -620,7 +620,7 @@ data AsyncException
 	-- 	* GHC currently does not throw 'HeapOverflow' exceptions.
   | ThreadKilled
 	-- ^This exception is raised by another thread
-	-- calling 'killThread', or by the system
+	-- calling 'Control.Concurrent.killThread', or by the system
 	-- if it needs to terminate the thread for some
 	-- reason.
   deriving (Eq, Ord)
