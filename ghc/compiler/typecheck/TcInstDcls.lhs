@@ -9,7 +9,7 @@
 module TcInstDcls (
 	tcInstDecls1,
 	tcInstDecls2,
-	processInstBinds
+	tcMethodBind
     ) where
 
 
@@ -17,28 +17,32 @@ IMP_Ubiq()
 
 import HsSyn		( HsDecl(..), InstDecl(..), TyDecl, ClassDecl, DefaultDecl,
 			  FixityDecl, IfaceSig, Sig(..),
-			  SpecInstSig(..), HsBinds(..), Bind(..),
-			  MonoBinds(..), GRHSsAndBinds, Match, 
+			  SpecInstSig(..), HsBinds(..),
+			  MonoBinds(..), GRHSsAndBinds(..), GRHS(..), Match, 
 			  InPat(..), OutPat(..), HsExpr(..), HsLit(..),
 			  Stmt, DoOrListComp, ArithSeqInfo, Fake, Fixity,
-			  HsType(..), HsTyVar )
+			  HsType(..), HsTyVar,
+			  SYN_IE(RecFlag), recursive, nonRecursive, collectMonoBinders,
+			  andMonoBinds
+			)
 import RnHsSyn		( SYN_IE(RenamedHsBinds), SYN_IE(RenamedMonoBinds),
-			  SYN_IE(RenamedInstDecl), SYN_IE(RenamedFixityDecl),
+			  SYN_IE(RenamedInstDecl), SYN_IE(RenamedFixityDecl), SYN_IE(RenamedHsExpr),
 			  SYN_IE(RenamedSig), SYN_IE(RenamedSpecInstSig), SYN_IE(RenamedHsDecl)
 			)
-import TcHsSyn		( TcIdOcc(..), SYN_IE(TcHsBinds),
+import TcHsSyn		( TcIdOcc(..), SYN_IE(TcIdBndr), SYN_IE(TcHsBinds),
 			  SYN_IE(TcMonoBinds), SYN_IE(TcExpr), tcIdType,
 			  mkHsTyLam, mkHsTyApp,
 			  mkHsDictLam, mkHsDictApp )
 
-
+import TcBinds		( tcBindWithSigs, TcSigInfo(..) )
 import TcMonad
 import RnMonad		( SYN_IE(RnNameSupply) )
 import Inst		( Inst, InstOrigin(..), SYN_IE(InstanceMapper),
-			  newDicts, newMethod, SYN_IE(LIE), emptyLIE, plusLIE )
+			  instToId, newDicts, newMethod, SYN_IE(LIE), emptyLIE, plusLIE )
 import TcBinds		( tcPragmaSigs, checkSigTyVars )
+import PragmaInfo	( PragmaInfo(..) )
 import TcDeriv		( tcDeriving )
-import TcEnv		( tcLookupClass, newLocalId, tcExtendGlobalTyVars )
+import TcEnv		( tcLookupClass, newLocalId, tcExtendGlobalTyVars, tcGetGlobalTyVars )
 import SpecEnv		( SpecEnv )
 import TcGRHSs		( tcGRHSsAndBinds )
 import TcInstUtil	( InstInfo(..), mkInstanceRelatedIds, buildInstanceEnvs )
@@ -47,44 +51,56 @@ import TcMatches	( tcMatchesFun )
 import TcMonoType	( tcTyVarScope, tcContext, tcHsTypeKind )
 import TcSimplify	( tcSimplifyAndCheck )
 import TcType		( SYN_IE(TcType), SYN_IE(TcTyVar), SYN_IE(TcTyVarSet), 
-			  tcInstSigTyVars, tcInstType, tcInstTheta, tcInstTcType
+			  tcInstSigTyVars, tcInstType, tcInstSigTcType, 
+			  tcInstTheta, tcInstTcType, tcInstSigType
 			)
 import Unify		( unifyTauTy, unifyTauTyLists )
 
 
 import Bag		( emptyBag, unitBag, unionBags, unionManyBags,
-			  concatBag, foldBag, bagToList )
+			  concatBag, foldBag, bagToList, listToBag,
+			  Bag )
 import CmdLineOpts	( opt_GlasgowExts, opt_CompilingGhcInternals,
 			  opt_OmitDefaultInstanceMethods,
 			  opt_SpecialiseOverloaded
 			)
 import Class		( GenClass, GenClassOp, 
 			  classBigSig, classOps, classOpLocalType,
-			  classOpTagByOccName_maybe
+			  classDefaultMethodId, SYN_IE(Class)
 			  )
-import Id		( GenId, idType, isDefaultMethodId_maybe, isNullaryDataCon, dataConArgTys )
-import PrelInfo		( isCcallishClass )
+import Id		( GenId, idType, isDefaultMethodId_maybe, 
+			  isNullaryDataCon, dataConArgTys, SYN_IE(Id) )
 import ListSetOps	( minusList )
-import Maybes 		( maybeToBool, expectJust )
-import Name		( getOccString, occNameString, moduleString, isLocallyDefined, OccName, Name{--O only-} )
+import Maybes 		( maybeToBool, expectJust, seqMaybe )
+import Name		( nameOccName, getOccString, occNameString, moduleString, getOccName,
+			  isLocallyDefined, OccName, Name{--O only-}, SYN_IE(Module),
+			  NamedThing(..)
+			)
 import PrelVals		( nO_EXPLICIT_METHOD_ERROR_ID )
 import PprType		( GenType, GenTyVar, GenClass, GenClassOp, TyCon,
 			  pprParendGenType
 			)
 import PprStyle
-import SrcLoc		( SrcLoc )
+import Outputable
+import SrcLoc		( SrcLoc, noSrcLoc )
 import Pretty
 import TyCon		( isSynTyCon, derivedFor )
 import Type		( GenType(..), SYN_IE(ThetaType), mkTyVarTys, isPrimType,
 			  splitSigmaTy, splitAppTys, isTyVarTy, matchTy, mkSigmaTy,
-			  getTyCon_maybe, maybeAppTyCon,
+			  getTyCon_maybe, maybeAppTyCon, SYN_IE(Type),
 			  maybeBoxedPrimType, maybeAppDataTyCon, splitRhoTy, eqTy
 			)
-import TyVar		( GenTyVar, SYN_IE(GenTyVarSet), mkTyVarSet, unionTyVarSets )
+import TyVar		( GenTyVar, SYN_IE(GenTyVarSet), tyVarSetToList, 
+		          mkTyVarSet, unionTyVarSets, SYN_IE(TyVar) )
 import TysPrim		( byteArrayPrimTyCon, mutableByteArrayPrimTyCon )
 import TysWiredIn	( stringTy )
 import Unique		( Unique, cCallableClassKey, cReturnableClassKey )
-import Util		( zipEqual, panic, pprPanic, pprTrace )
+import UniqFM           ( Uniquable(..) )
+import Util		( zipEqual, panic, pprPanic, pprTrace
+#if __GLASGOW_HASKELL__ < 202
+		          , trace 
+#endif
+			)
 \end{code}
 
 Typechecking instance declarations is done in two passes. The first
@@ -166,7 +182,7 @@ tcInstDecls1 :: [RenamedHsDecl]
 	     -> RnNameSupply			-- for renaming derivings
 	     -> TcM s (Bag InstInfo,
 		       RenamedHsBinds,
-		       PprStyle -> Pretty)
+		       PprStyle -> Doc)
 
 tcInstDecls1 decls mod_name rn_name_supply
   = 	-- Do the ordinary instance declarations
@@ -315,8 +331,7 @@ is the @dfun_theta@ below.
 First comes the easy case of a non-local instance decl.
 
 \begin{code}
-tcInstDecl2 :: InstInfo
-	    -> NF_TcM s (LIE s, TcHsBinds s)
+tcInstDecl2 :: InstInfo -> NF_TcM s (LIE s, TcHsBinds s)
 
 tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
 		      inst_decl_theta dfun_theta
@@ -324,6 +339,17 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
 		      locn uprags)
   | not (isLocallyDefined dfun_id)
   = returnNF_Tc (emptyLIE, EmptyBinds)
+
+{-
+  -- I deleted this "optimisation" because when importing these
+  -- instance decls the renamer would look for the dfun bindings and they weren't there.
+  -- This would be fixable, but it seems simpler just to produce a tiny void binding instead,
+  -- even though it's never used.
+
+	-- This case deals with CCallable etc, which don't need any bindings
+  | isNoDictClass clas			
+  = returnNF_Tc (emptyLIE, EmptyBinds)
+-}
 
   | otherwise
   =	 -- Prime error recovery
@@ -333,6 +359,7 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
 	-- Get the class signature
     tcInstSigTyVars inst_tyvars		`thenNF_Tc` \ (inst_tyvars', _, tenv) ->
     let 
+	origin = InstanceDeclOrigin
         (class_tyvar,
 	 super_classes, sc_sel_ids,
 	 class_ops, op_sel_ids, defm_ids) = classBigSig clas
@@ -342,8 +369,6 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
     tcInstTheta tenv inst_decl_theta	`thenNF_Tc` \ inst_decl_theta' ->
     let
 	sc_theta'        = super_classes `zip` repeat inst_ty'
- 	origin    	 = InstanceDeclOrigin
-	mk_method sel_id = newMethod origin (RealId sel_id) [inst_ty']
     in
 	 -- Create dictionary Ids from the specified instance contexts.
     newDicts origin sc_theta'		`thenNF_Tc` \ (sc_dicts,        sc_dict_ids) ->
@@ -351,37 +376,34 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
     newDicts origin inst_decl_theta'	`thenNF_Tc` \ (inst_decl_dicts, _) ->
     newDicts origin [(clas,inst_ty')]	`thenNF_Tc` \ (this_dict,       [this_dict_id]) ->
 
-	 -- Create method variables
-    mapAndUnzipNF_Tc mk_method op_sel_ids	`thenNF_Tc` \ (meth_insts_s, meth_ids) ->
-
-	 -- Collect available Insts
+	 -- Check the method bindings
     let
 	inst_tyvars_set' = mkTyVarSet inst_tyvars'
-
-	avail_insts	 -- These insts are in scope; quite a few, eh?
-	  = unionManyBags (this_dict : dfun_arg_dicts : meth_insts_s) 
-
-	mk_method_expr
-	  = makeInstanceDeclDefaultMethodExpr locn clas meth_ids defm_ids inst_ty' this_dict_id 
+	check_from_this_class (bndr, loc)
+	  | nameOccName bndr `elem` sel_names = returnTc ()
+	  | otherwise			      = recoverTc (returnTc ()) $
+						tcAddSrcLoc loc $
+						failTc (instBndrErr bndr clas)
+	sel_names = map getOccName op_sel_ids
     in
+    mapTc check_from_this_class (bagToList (collectMonoBinders monobinds))	`thenTc_`
     tcExtendGlobalTyVars inst_tyvars_set' (
-	processInstBinds clas mk_method_expr avail_insts meth_ids monobinds
-    )				 	`thenTc` \ (insts_needed, method_mbinds) ->
-    let
-	-- Create the dict and method binds
-	dict_bind
-	    = VarMonoBind this_dict_id (Dictionary sc_dict_ids meth_ids)
+	mapAndUnzip3Tc (tcMethodBind (getDefmRhs clas) inst_ty' monobinds) 
+		       (op_sel_ids `zip` [0..])
+    )				 	`thenTc` \ (method_binds_s, insts_needed_s, meth_lies_w_ids) ->
 
-	dict_and_method_binds
-	    = dict_bind `AndMonoBinds` method_mbinds
-
-    in
 	-- Check the overloading constraints of the methods and superclasses
+    let
+	(meth_lies, meth_ids) = unzip meth_lies_w_ids
+	avail_insts	 -- These insts are in scope; quite a few, eh?
+	  = this_dict `plusLIE` dfun_arg_dicts `plusLIE`  unionManyBags meth_lies
+    in
     tcAddErrCtxt (bindSigCtxt meth_ids) (
 	tcSimplifyAndCheck
 		 inst_tyvars_set'			-- Local tyvars
 		 avail_insts
-		 (sc_dicts `unionBags` insts_needed)	-- Need to get defns for all these
+		 (sc_dicts `unionBags` 
+		  unionManyBags insts_needed_s)		-- Need to get defns for all these
     )					 `thenTc` \ (const_lie, super_binds) ->
 
 	-- Check that we *could* construct the superclass dictionaries,
@@ -389,7 +411,7 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
 	-- the check ensures that the caller will never have a problem building
 	-- them.
     tcAddErrCtxt superClassSigCtxt (
-    tcSimplifyAndCheck
+        tcSimplifyAndCheck
 		 inst_tyvars_set'		-- Local tyvars
 		 inst_decl_dicts		-- The instance dictionaries available
 		 sc_dicts			-- The superclass dicationaries reqd
@@ -402,64 +424,36 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
 	spec_sigs = [ s | s@(SpecSig _ _ _ _) <- uprags ]
     in
     tcPragmaSigs spec_sigs		`thenTc` \ (_, spec_binds, spec_lie) ->
+
+	-- Create the result bindings
     let
-	-- Complete the binding group, adding any spec_binds
-	inst_binds
-	  = AbsBinds
+	dict_bind    = VarMonoBind this_dict_id (Dictionary sc_dict_ids meth_ids)
+	method_binds = andMonoBinds method_binds_s
+
+	main_bind
+	  = MonoBind (
+		AbsBinds
 		 inst_tyvars'
 		 dfun_arg_dicts_ids
-		 [(this_dict_id, RealId dfun_id)] 
-		 super_binds
-		 (RecBind dict_and_method_binds)
-
-	    `ThenBinds`
-	    spec_binds
+		 [(inst_tyvars', RealId dfun_id, this_dict_id)] 
+		 (super_binds	`AndMonoBinds` 
+		  method_binds	`AndMonoBinds`
+		  dict_bind))
+		[] recursive		-- Recursive to play safe
     in
-
-    returnTc (const_lie `plusLIE` spec_lie, inst_binds)
+    returnTc (const_lie `plusLIE` spec_lie,
+	      main_bind `ThenBinds` spec_binds)
 \end{code}
 
-The next function makes a default method which calls the global default method, at
-the appropriate instance type.
+The next function looks for a method binding; if there isn't one it
+manufactures one that just calls the global default method.
 
 See the notes under default decls in TcClassDcl.lhs.
 
 \begin{code}
-makeInstanceDeclDefaultMethodExpr
-	:: SrcLoc
-	-> Class
-	-> [TcIdOcc s]
-	-> [Id]
-	-> TcType s
-	-> TcIdOcc s
-	-> Int
-	-> NF_TcM s (TcExpr s)
-
-makeInstanceDeclDefaultMethodExpr src_loc clas meth_ids defm_ids inst_ty this_dict tag
-  | not defm_is_err		-- Not sure that the default method is just error message
-  = 	-- def_op_id = defm_id inst_ty this_dict
-    returnNF_Tc (mkHsDictApp (mkHsTyApp (HsVar (RealId defm_id)) [inst_ty]) [this_dict])
-
-  | otherwise		-- There's definitely no default decl in the class,
-			-- so we produce a warning, and a better run=time error message too
-  = warnTc True (omitDefaultMethodWarn clas_op clas_name inst_ty)
-					`thenNF_Tc_`
-
-    returnNF_Tc (HsApp (mkHsTyApp (HsVar (RealId nO_EXPLICIT_METHOD_ERROR_ID)) [tcIdType meth_id])
-		       (HsLitOut (HsString (_PK_ error_msg)) stringTy))
-  where
-    idx	    = tag - 1
-    meth_id = meth_ids !! idx
-    defm_id = defm_ids  !! idx
-
-    Just (_, _, defm_is_err) = isDefaultMethodId_maybe defm_id
-
-    error_msg = ppShow 80 (ppSep [ppr PprForUser clas_op, ppPStr SLIT("at"), ppr PprForUser src_loc])
-
-    clas_op = (classOps clas) !! idx
-    clas_name = getOccString clas
+getDefmRhs :: Class -> Int -> RenamedHsExpr
+getDefmRhs clas idx = HsVar (getName (classDefaultMethodId clas idx))
 \end{code}
-
 
 
 %************************************************************************
@@ -468,194 +462,48 @@ makeInstanceDeclDefaultMethodExpr src_loc clas meth_ids defm_ids inst_ty this_di
 %*									*
 %************************************************************************
 
-@processInstBinds@ returns a @MonoBinds@ which binds
-all the method ids (which are passed in).  It is used
-	- both for instance decls,
-	- and to compile the default-method declarations in a class decl.
-
-Any method ids which don't have a binding have a suitable default
-binding created for them. The actual right-hand side used is
-created using a function which is passed in, because the right thing to
-do differs between instance and class decls.
-
 \begin{code}
-processInstBinds
-	:: Class
-	-> (Int -> NF_TcM s (TcExpr s))    -- Function to make default method
-	-> LIE s			   -- available Insts
-	-> [TcIdOcc s]			   -- Local method ids in tag order
-					   --	(instance tyvars are free in their types)
-	-> RenamedMonoBinds
-	-> TcM s (LIE s,		   -- These are required
-		  TcMonoBinds s)
+tcMethodBind 
+	:: (Int -> RenamedHsExpr)			-- Function mapping a tag to default RHS
+	-> TcType s					-- Instance type
+	-> RenamedMonoBinds				-- Method binding
+	-> (Id, Int)					-- Selector ID (and its 0-indexed tag)
+							--  for which binding is wanted
+	-> TcM s (TcMonoBinds s, LIE s, (LIE s, TcIdOcc s))
 
-processInstBinds clas mk_default_method_rhs avail_insts method_ids monobinds
-  =
-	 -- Process the explicitly-given method bindings
-    processInstBinds1 clas avail_insts method_ids monobinds
-	 		`thenTc` \ (tags, insts_needed_in_methods, method_binds) ->
-
-	 -- Find the methods not handled, and make default method bindings for them.
+tcMethodBind deflt_fn inst_ty meth_binds (sel_id, idx)
+  = newMethod origin (RealId sel_id) [inst_ty]	`thenNF_Tc` \ meth@(_, TcId meth_id) ->
+    tcInstSigTcType (idType meth_id)		`thenNF_Tc` \ (tyvars', rho_ty') ->
     let
-	unmentioned_tags = [1.. length method_ids] `minusList` tags
-    in
-    mapNF_Tc mk_default_method unmentioned_tags
-			`thenNF_Tc` \ default_bind_list ->
+	meth_name    = getName meth_id
+	default_bind = PatMonoBind (VarPatIn meth_name)
+				   (GRHSsAndBindsIn [OtherwiseGRHS (deflt_fn idx) noSrcLoc] EmptyBinds)
+				   noSrcLoc
 
-    returnTc (insts_needed_in_methods,
-	      foldr AndMonoBinds method_binds default_bind_list)
+        (op_name, op_bind) = case go (getOccName sel_id) meth_binds of
+				Just stuff -> stuff
+				Nothing    -> (meth_name, default_bind)
+
+	(theta', tau') = splitRhoTy rho_ty'
+	sig_info       = TySigInfo op_name meth_id tyvars' theta' tau' noSrcLoc
+    in
+    tcBindWithSigs [op_name] op_bind [sig_info]
+		   nonRecursive (\_ -> NoPragmaInfo)	`thenTc` \ (binds, insts, _) ->
+
+    returnTc (binds, insts, meth)
   where
-	-- From a tag construct us the passed-in function to construct
-	-- the binding for the default method
-    mk_default_method tag = mk_default_method_rhs tag 	`thenNF_Tc` \ rhs ->
-			    returnNF_Tc (VarMonoBind (method_ids !! (tag-1)) rhs)
+    origin = InstanceDeclOrigin 	-- Poor
+
+    go occ EmptyMonoBinds 	= Nothing
+    go occ (AndMonoBinds b1 b2) = go occ b1 `seqMaybe` go occ b2
+
+    go occ b@(FunMonoBind op_name _ _ locn)          | nameOccName op_name == occ = Just (op_name, b)
+						     | otherwise		  = Nothing
+    go occ b@(PatMonoBind (VarPatIn op_name) _ locn) | nameOccName op_name == occ = Just (op_name, b)
+						     | otherwise		  = Nothing
+    go occ other = panic "Urk! Bad instance method binding"
 \end{code}
 
-\begin{code}
-processInstBinds1
-	:: Class
-	-> LIE s		-- available Insts
-	-> [TcIdOcc s]		-- Local method ids in tag order (instance tyvars are free),
-	-> RenamedMonoBinds
-	-> TcM s ([Int],	-- Class-op tags accounted for
-		  LIE s,	-- These are required
-		  TcMonoBinds s)
-
-processInstBinds1 clas avail_insts method_ids EmptyMonoBinds
-  = returnTc ([], emptyLIE, EmptyMonoBinds)
-
-processInstBinds1 clas avail_insts method_ids (AndMonoBinds mb1 mb2)
-  = processInstBinds1 clas avail_insts method_ids mb1
-				 `thenTc`	\ (op_tags1,dicts1,method_binds1) ->
-    processInstBinds1 clas avail_insts method_ids mb2
-				 `thenTc`	\ (op_tags2,dicts2,method_binds2) ->
-    returnTc (op_tags1 ++ op_tags2,
-	      dicts1 `unionBags` dicts2,
-	      AndMonoBinds method_binds1 method_binds2)
-\end{code}
-
-\begin{code}
-processInstBinds1 clas avail_insts method_ids mbind
-  =
-    -- Find what class op is being defined here.  The complication is
-    -- that we could have a PatMonoBind or a FunMonoBind.  If the
-    -- former, it should only bind a single variable, or else we're in
-    -- trouble (I'm not sure what the static semantics of methods
-    -- defined in a pattern binding with multiple patterns is!)
-    -- Renamer has reduced us to these two cases.
-    let
-	(op,locn) = case mbind of
-		      FunMonoBind op _ _ locn	       -> (op, locn)
-		      PatMonoBind (VarPatIn op) _ locn -> (op, locn)
-
-        occ     = getOccName op
-	origin  = InstanceDeclOrigin
-    in
-    tcAddSrcLoc locn			 $
-
-    -- Make a method id for the method
-    let
-	maybe_tag  = classOpTagByOccName_maybe clas occ
-	(Just tag) = maybe_tag
-	method_id  = method_ids !! (tag-1)
-	method_ty  = tcIdType method_id
-    in
-    -- check that the method mentioned is actually in the class:
-    checkMaybeTc maybe_tag (instMethodNotInClassErr occ clas) `thenTc_`
-
-    tcInstTcType method_ty		`thenNF_Tc` \ (method_tyvars, method_rho) ->
-    let
-	(method_theta, method_tau) = splitRhoTy method_rho
-    in
-    newDicts origin method_theta	`thenNF_Tc` \ (method_dicts,method_dict_ids) ->
-
-    case (method_tyvars, method_dict_ids) of
-
-      ([],[]) -> -- The simple case; no local polymorphism or overloading in the method
-
-		-- Type check the method itself
-	tcMethodBind method_id method_tau mbind	`thenTc` \ (mbind', lieIop) ->
-	returnTc ([tag], lieIop, mbind')
-
-      other ->	-- It's a locally-polymorphic and/or overloaded method; UGH!
-
-		-- Make a new id for (a) the local, non-overloaded method
-		-- and		     (b) the locally-overloaded method
-		-- The latter is needed just so we can return an AbsBinds wrapped
-		-- up inside a MonoBinds.
-
-
-		-- Make the method_tyvars into signature tyvars so they
-		-- won't get unified with anything.
-	tcInstSigTyVars method_tyvars		`thenNF_Tc` \ (sig_tyvars, sig_tyvar_tys, _) ->
-	unifyTauTyLists sig_tyvar_tys (mkTyVarTys method_tyvars)	`thenTc_`
-
-	newLocalId occ method_tau		`thenNF_Tc` \ local_id ->
-	newLocalId occ method_ty		`thenNF_Tc` \ copy_id ->
-	let
-	    tc_local_id = TcId local_id
-	    tc_copy_id  = TcId copy_id
-	    sig_tyvar_set = mkTyVarSet sig_tyvars
-	in
-		-- Typecheck the method
-	tcMethodBind tc_local_id method_tau mbind `thenTc` \ (mbind', lieIop) ->
-
-		-- Check the overloading part of the signature.
-
-	-- =========== POSSIBLE BUT NOT DONE =================
-		-- Simplify everything fully, even though some
-		-- constraints could "really" be left to the next
-		-- level out. The case which forces this is
-		--
-		-- 	class Foo a where { op :: Bar a => a -> a }
-		--
-		-- Here we must simplify constraints on "a" to catch all
-		-- the Bar-ish things.
-
-		-- We don't do this because it's currently illegal Haskell (not sure why),
-		-- and because the local type of the method would have a context at
-		-- the front with no for-all, which confuses the hell out of everything!
-	-- ====================================================
-
-	tcAddErrCtxt (methodSigCtxt op method_ty) (
-	    checkSigTyVars
-		sig_tyvars method_tau				`thenTc_`
-
-	  tcSimplifyAndCheck
-		sig_tyvar_set
-		(method_dicts `plusLIE` avail_insts)
-		lieIop
-	) 					 `thenTc` \ (f_dicts, dict_binds) ->
-
-
-	returnTc ([tag],
-		  f_dicts,
-		  VarMonoBind method_id
-			 (HsLet
-			     (AbsBinds
-				method_tyvars
-				method_dict_ids
-				[(tc_local_id, tc_copy_id)]
-				dict_binds
-				(NonRecBind mbind'))
-			     (HsVar tc_copy_id)))
-\end{code}
-
-\begin{code}
-tcMethodBind :: TcIdOcc s -> TcType s -> RenamedMonoBinds
-	     -> TcM s (TcMonoBinds s, LIE s)
-
-tcMethodBind meth_id meth_ty (FunMonoBind name inf matches locn)
-  = tcMatchesFun name meth_ty matches `thenTc` \ (rhs', lie) ->
-    returnTc (FunMonoBind meth_id inf rhs' locn, lie)
-
-tcMethodBind meth_id meth_ty pbind@(PatMonoBind pat grhss_and_binds locn)
-  -- pat is sure to be a (VarPatIn op)
-  = tcAddErrCtxt (patMonoBindsCtxt pbind) $
-    tcGRHSsAndBinds grhss_and_binds 	`thenTc` \ (grhss_and_binds', lie, rhs_ty) ->
-    unifyTauTy meth_ty rhs_ty 		`thenTc_`
-    returnTc (PatMonoBind (VarPat meth_id) grhss_and_binds' locn, lie)
-\end{code}
 
 
 %************************************************************************
@@ -749,13 +597,13 @@ tcSpecInstSig e ce tce inst_infos inst_mapper (SpecInstSig class_name ty src_loc
     getSwitchCheckerTc		`thenNF_Tc` \ sw_chkr ->
     (if sw_chkr SpecialiseTrace then
 	pprTrace "Specialised Instance: "
-	(ppAboves [ppCat [if null simpl_theta then ppNil else ppr PprDebug simpl_theta,
-			  if null simpl_theta then ppNil else ppPStr SLIT("=>"),
+	(vcat [hsep [if null simpl_theta then empty else ppr PprDebug simpl_theta,
+			  if null simpl_theta then empty else ptext SLIT("=>"),
 			  ppr PprDebug clas,
 			  pprParendGenType PprDebug inst_ty],
-		   ppCat [ppPStr SLIT("        derived from:"),
-			  if null unspec_theta then ppNil else ppr PprDebug unspec_theta,
-			  if null unspec_theta then ppNil else ppPStr SLIT("=>"),
+		   hsep [ptext SLIT("        derived from:"),
+			  if null unspec_theta then empty else ppr PprDebug unspec_theta,
+			  if null unspec_theta then empty else ptext SLIT("=>"),
 			  ppr PprDebug clas,
 			  pprParendGenType PprDebug unspec_inst_ty]])
     else id) (
@@ -856,11 +704,11 @@ ccallable_type   ty = isPrimType ty ||				-- Allow CCallable Int# etc
   where
     byte_arr_thing = case maybeAppDataTyCon ty of
 			Just (tycon, ty_args, [data_con]) -> 
---			 	pprTrace "cc1" (ppSep [ppr PprDebug tycon, ppr PprDebug data_con,
---						       ppSep (map (ppr PprDebug) data_con_arg_tys)])(
+--			 	pprTrace "cc1" (sep [ppr PprDebug tycon, ppr PprDebug data_con,
+--						       sep (map (ppr PprDebug) data_con_arg_tys)])(
 		     		length data_con_arg_tys == 2 &&
 				maybeToBool maybe_arg2_tycon &&
---			 	pprTrace "cc2" (ppSep [ppr PprDebug arg2_tycon]) (
+--			 	pprTrace "cc2" (sep [ppr PprDebug arg2_tycon]) (
 				(arg2_tycon == byteArrayPrimTyCon ||
 				 arg2_tycon == mutableByteArrayPrimTyCon)
 --				))
@@ -884,56 +732,59 @@ creturnable_type ty = maybeToBool (maybeBoxedPrimType ty) ||
 
 instTypeErr ty sty
   = case ty of
-      SynTy tc _ _ -> ppBesides [ppPStr SLIT("The type synonym `"), ppr sty tc, rest_of_msg]
-      TyVarTy tv   -> ppBesides [ppPStr SLIT("The type variable `"), ppr sty tv, rest_of_msg]
-      other	   -> ppBesides [ppPStr SLIT("The type `"), ppr sty ty, rest_of_msg]
+      SynTy tc _ _ -> hcat [ptext SLIT("The type synonym `"), ppr sty tc, rest_of_msg]
+      TyVarTy tv   -> hcat [ptext SLIT("The type variable `"), ppr sty tv, rest_of_msg]
+      other	   -> hcat [ptext SLIT("The type `"), ppr sty ty, rest_of_msg]
   where
-    rest_of_msg = ppPStr SLIT("' cannot be used as an instance type.")
+    rest_of_msg = ptext SLIT("' cannot be used as an instance type.")
+
+instBndrErr bndr clas sty
+  = hsep [ptext SLIT("Class"), ppr sty clas, ptext SLIT("does not have a method"), ppr sty bndr]
 
 derivingWhenInstanceExistsErr clas tycon sty
-  = ppHang (ppBesides [ppPStr SLIT("Deriving class `"), 
+  = hang (hsep [ptext SLIT("Deriving class"), 
 		       ppr sty clas, 
-		       ppPStr SLIT("' type `"), ppr sty tycon, ppChar '\''])
-         4 (ppPStr SLIT("when an explicit instance exists"))
+		       ptext SLIT("type"), ppr sty tycon])
+         4 (ptext SLIT("when an explicit instance exists"))
 
 derivingWhenInstanceImportedErr inst_mod clas tycon sty
-  = ppHang (ppBesides [ppPStr SLIT("Deriving class `"), 
+  = hang (hsep [ptext SLIT("Deriving class"), 
 		       ppr sty clas, 
-		       ppPStr SLIT("' type `"), ppr sty tycon, ppChar '\''])
-         4 (ppBesides [ppPStr SLIT("when an instance declared in module `"), 
-		       pp_mod, ppPStr SLIT("' has been imported")])
+		       ptext SLIT("type"), ppr sty tycon])
+         4 (hsep [ptext SLIT("when an instance declared in module"), 
+		       pp_mod, ptext SLIT("has been imported")])
   where
-    pp_mod = ppBesides [ppPStr SLIT("module `"), ppPStr inst_mod, ppChar '\'']
+    pp_mod = hsep [ptext SLIT("module"), ptext inst_mod]
 
 nonBoxedPrimCCallErr clas inst_ty sty
-  = ppHang (ppPStr SLIT("Unacceptable instance type for ccall-ish class"))
-	 4 (ppBesides [ ppPStr SLIT("class `"), ppr sty clas, ppPStr SLIT("' type `"),
-    		        ppr sty inst_ty, ppChar '\''])
+  = hang (ptext SLIT("Unacceptable instance type for ccall-ish class"))
+	 4 (hsep [ ptext SLIT("class"), ppr sty clas, ptext SLIT("type"),
+    		        ppr sty inst_ty])
 
 omitDefaultMethodWarn clas_op clas_name inst_ty sty
-  = ppCat [ppPStr SLIT("Warning: Omitted default method for"),
-	   ppr sty clas_op, ppPStr SLIT("in instance"),
-	   ppStr clas_name, pprParendGenType sty inst_ty]
+  = hsep [ptext SLIT("Warning: Omitted default method for"),
+	   ppr sty clas_op, ptext SLIT("in instance"),
+	   text clas_name, pprParendGenType sty inst_ty]
 
 instMethodNotInClassErr occ clas sty
-  = ppHang (ppPStr SLIT("Instance mentions a method not in the class"))
-	 4 (ppBesides [ppPStr SLIT("class `"), ppr sty clas, ppPStr SLIT("' method `"),
-    		       ppr sty occ, ppChar '\''])
+  = hang (ptext SLIT("Instance mentions a method not in the class"))
+	 4 (hsep [ptext SLIT("class"), ppr sty clas, ptext SLIT("method"),
+    		       ppr sty occ])
 
 patMonoBindsCtxt pbind sty
-  = ppHang (ppPStr SLIT("In a pattern binding:"))
+  = hang (ptext SLIT("In a pattern binding:"))
 	 4 (ppr sty pbind)
 
 methodSigCtxt name ty sty
-  = ppHang (ppBesides [ppPStr SLIT("When matching the definition of class method `"),
-	               ppr sty name, ppPStr SLIT("' to its signature :") ])
+  = hang (hsep [ptext SLIT("When matching the definition of class method"),
+	               ppr sty name, ptext SLIT("to its signature :") ])
 	 4 (ppr sty ty)
 
 bindSigCtxt method_ids sty
-  = ppHang (ppPStr SLIT("When checking type signatures for: "))
-	 4 (ppInterleave (ppStr ", ") (map (ppr sty) method_ids))
+  = hang (ptext SLIT("When checking type signatures for: "))
+	 4 (hsep (punctuate comma (map (ppr sty) method_ids)))
 
 superClassSigCtxt sty
-  = ppPStr SLIT("When checking superclass constraints on instance declaration")
+  = ptext SLIT("When checking superclass constraints on instance declaration")
 
 \end{code}
