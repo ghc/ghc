@@ -225,11 +225,9 @@ GhcStage3HcOpts=
 # (way 'u') to get unregisterised code, but the default way will be
 # registerised.
 #
-# NOTE: this is not the same as building the compiler itself
-# unregisterised.  That's done by either (a) bootstrapping with a
-# compiler that was built with GhcUnregisterised=YES, or (b)
-# bootstrapping with a compiler that has way 'u' libraries, and the
-# flag '-unreg' is added to GhcHcOpts above.
+# NOTE: the stage1 compiler will be a registerised binary (assuming
+# the compiler you build with is generating registerised binaries), but
+# the stage2 compiler will be an unregisterised binary.
 #
 GhcUnregisterised=NO
 
