@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.23 2000/04/28 17:16:10 rrt Exp $
+# $Id: Makefile,v 1.24 2000/05/11 12:50:51 rrt Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -136,6 +136,10 @@ boot ::
 
 all :: gmp/libgmp.a
 
+ifeq "$(way)" "dll"
+all :: gmp/gmp.dll
+endif
+
 install :: gmp/libgmp.a
 
 clean ::
@@ -180,7 +184,10 @@ endif
 INSTALL_LIBS += $(LIBRARY)
 ifeq "$(EnableWin32DLLs)" "YES"
 INSTALL_PROGS += $(DLL_NAME) gmp/gmp.dll
-INSTALL_LIBS += $(patsubst %.a, %_imp.a, $(LIBRARY))
+ifneq "$(way)" "dll"
+INSTALL_LIBS += $(patsubst %_imp.a, $(LIBARY))
+endif
+INSTALL_LIBS += $(patsubst %.a, $(LIBRARY))
 INSTALL_LIBS += gmp/libgmp_imp.a Main.dll_o
 endif
 
