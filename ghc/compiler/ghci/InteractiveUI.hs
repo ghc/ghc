@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.62 2001/04/24 13:05:51 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.63 2001/04/26 11:08:32 sewardj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -10,13 +10,8 @@
 {-# OPTIONS -#include "Linker.h" #-}
 module InteractiveUI ( interactiveUI, ghciWelcomeMsg ) where
 
+#include "../includes/config.h"
 #include "HsVersions.h"
-
-#if HAVE_READLINE_4_2 == 1 || HAVE_READLINE_4 == 1
-#undef NO_READLINE
-#else
-#define NO_READLINE
-#endif
 
 import CompManager
 import CmStaticInfo
@@ -34,8 +29,8 @@ import Config
 
 import Exception
 import Dynamic
-#ifndef NO_READLINE
-import Readline
+#if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
+import Readline 
 #endif
 import IOExts
 
@@ -127,7 +122,7 @@ interactiveUI cmstate mod cmdline_libs = do
 	     Nothing  -> return (cmstate, True, [])
 	     Just m -> cmLoadModule cmstate m
 
-#ifndef NO_READLINE
+#if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
    Readline.initialize
 #endif
 
@@ -172,7 +167,7 @@ runGHCi = do
   	     Right hdl -> fileLoop hdl False
 
   -- read commands from stdin
-#ifndef NO_READLINE
+#if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
   readlineLoop
 #else
   fileLoop stdin True
@@ -206,7 +201,7 @@ stringLoop (s:ss) = do
 	l  -> do quit <- runCommand l
                  if quit then return () else stringLoop ss
 
-#ifndef NO_READLINE
+#if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
 readlineLoop :: GHCi ()
 readlineLoop = do
    st <- getGHCiState
