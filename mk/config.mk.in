@@ -175,13 +175,6 @@ GhcHcOpts=
 # GhcWithHscBuiltViaC - build GHC compiler proper (\`hsc') from .hc files?
 GhcWithHscBuiltViaC=@BootingFromHc@
 
-# Build hsc with -O and turn optimising flag on when compiling
-# the intermediate C file
-GhcUseGccForOptAsm=YES
-
-# Compile intermediate C file with debugging options set.
-GhcUseGccForDebuggingAsm=YES
-
 # Build a registerised version of hsc and runtime
 # (unregisterised used for Hugs at the moment)
 GhcWithRegisterised=YES
@@ -197,7 +190,6 @@ GhcWithNativeCodeGen=$(shell if (test x$(findstring $(HostArch_CPP),i386 alpha s
 # Building various ways?
 # (right now, empty if not).
 BuildingParallel=$(subst mp,YES,$(filter mp,$(WAYS)))
-BuildingProfiling=$(subst p,YES,$(filter p,$(WAYS)))
 BuildingGranSim=$(subst mg,YES,$(filter mg,$(WAYS)))
 
 #---------------------------------------------------------------
@@ -243,10 +235,6 @@ GhcLibsWithReadline=NO
 # (no path == in standard include path)
 #
 ReadlineIncludePath=
-
-# Build the socket libraries?  (ToDo: is this used?)
-#
-GhcLibsWithSockets=YES
 
 # Strip local symbols from libraries?  This can make the libraries smaller,
 # but makes debugging somewhat more difficult.  Doesn't work with all ld's.
