@@ -377,7 +377,8 @@ foreign import ccall "&timezone" timezone :: Ptr CTime
 gmtoff x = do 
   dst <- (#peek struct tm,tm_isdst) x
   tz <- if dst then peek altzone else peek timezone
-  return (-fromIntegral tz)
+  let realToInteger = round . realToFrac :: Real a => a -> Integer
+  return (-fromIntegral (realToInteger tz))
 # else /* ! HAVE_DECL_ALTZONE */
 
 #if !defined(mingw32_TARGET_OS)
