@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Weak.c,v 1.15 2000/06/20 15:18:40 simonmar Exp $
+ * $Id: Weak.c,v 1.16 2000/11/13 14:40:37 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -34,10 +34,10 @@ finalizeWeakPointersNow(void)
   
   while ((w = weak_ptr_list)) {
     weak_ptr_list = w->link;
-    if (w->header.info != &DEAD_WEAK_info) {
-	w->header.info = &DEAD_WEAK_info;
+    if (w->header.info != &stg_DEAD_WEAK_info) {
+	w->header.info = &stg_DEAD_WEAK_info;
 	IF_DEBUG(weak,fprintf(stderr,"Finalising weak pointer at %p -> %p\n", w, w->key));
-	if (w->finalizer != &NO_FINALIZER_closure) {
+	if (w->finalizer != &stg_NO_FINALIZER_closure) {
 	    rts_evalIO(w->finalizer,NULL);
 	}
     }
@@ -67,7 +67,7 @@ scheduleFinalizers(StgWeak *list)
 
     /* count number of finalizers first... */
     for (n = 0, w = list; w; w = w->link) { 
-	if (w->finalizer != &NO_FINALIZER_closure)
+	if (w->finalizer != &stg_NO_FINALIZER_closure)
 	    n++;
     }
 	
@@ -76,15 +76,15 @@ scheduleFinalizers(StgWeak *list)
     IF_DEBUG(weak,fprintf(stderr,"weak: batching %d finalizers\n", n));
 
     arr = (StgMutArrPtrs *)allocate(sizeofW(StgMutArrPtrs) + n);
-    SET_HDR(arr, &MUT_ARR_PTRS_FROZEN_info, CCS_SYSTEM);
+    SET_HDR(arr, &stg_MUT_ARR_PTRS_FROZEN_info, CCS_SYSTEM);
     arr->ptrs = n;
 
     for (n = 0, w = list; w; w = w->link) {
-	if (w->finalizer != &NO_FINALIZER_closure) {
+	if (w->finalizer != &stg_NO_FINALIZER_closure) {
 	    arr->payload[n] = w->finalizer;
 	    n++;
 	}
-	w->header.info = &DEAD_WEAK_info;
+	w->header.info = &stg_DEAD_WEAK_info;
     }
 
     t = createIOThread(RtsFlags.GcFlags.initialStkSize, 

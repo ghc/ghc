@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.c,v 1.21 2000/04/14 15:18:06 sewardj Exp $
+ * $Id: Sanity.c,v 1.22 2000/11/13 14:40:37 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -35,6 +35,7 @@
 #include "RtsUtils.h"
 #include "BlockAlloc.h"
 #include "Sanity.h"
+#include "Schedule.h"
 #include "StoragePriv.h"   // for END_OF_STATIC_LIST
 
 //@node Macros, Stack sanity, Includes

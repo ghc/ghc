@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.19 2000/08/25 13:12:07 simonmar Exp $
+ * $Id: Schedule.h,v 1.20 2000/11/13 14:40:37 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -204,15 +204,9 @@ void print_bq (StgClosure *node);
  */
 
 /* this is the NIL ptr for a TSO queue (e.g. runnable queue) */
-#define END_TSO_QUEUE  ((StgTSO *)(void*)&END_TSO_QUEUE_closure)
+#define END_TSO_QUEUE  ((StgTSO *)(void*)&stg_END_TSO_QUEUE_closure)
 /* this is the NIL ptr for a list CAFs */
-#define END_ECAF_LIST   ((StgCAF *)(void*)&END_TSO_QUEUE_closure)
-#if defined(PAR) || defined(GRAN)
-/* this is the NIL ptr for a blocking queue */
-# define END_BQ_QUEUE  ((StgBlockingQueueElement *)(void*)&END_TSO_QUEUE_closure)
-/* this is the NIL ptr for a blocked fetch queue (as in PendingFetches in GUM) */
-# define END_BF_QUEUE  ((StgBlockedFetch *)(void*)&END_TSO_QUEUE_closure)
-#endif
+#define END_ECAF_LIST   ((StgCAF *)(void*)&stg_END_TSO_QUEUE_closure)
 
 //@cindex APPEND_TO_RUN_QUEUE
 /* Add a thread to the end of the run queue.

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.86 2000/11/01 11:41:47 simonmar Exp $
+ * $Id: GC.c,v 1.87 2000/11/13 14:40:37 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -834,7 +834,7 @@ traverse_weak_ptr_list(void)
     /* There might be a DEAD_WEAK on the list if finalizeWeak# was
      * called on a live weak pointer object.  Just remove it.
      */
-    if (w->header.info == &DEAD_WEAK_info) {
+    if (w->header.info == &stg_DEAD_WEAK_info) {
       next_w = ((StgDeadWeak *)w)->link;
       *last_w = next_w;
       continue;
@@ -1089,7 +1089,7 @@ static void addBlock(step *step)
 static __inline__ void 
 upd_evacuee(StgClosure *p, StgClosure *dest)
 {
-  p->header.info = &EVACUATED_info;
+  p->header.info = &stg_EVACUATED_info;
   ((StgEvacuated *)p)->evacuee = dest;
 }
 
@@ -1264,7 +1264,7 @@ mkMutCons(StgClosure *ptr, generation *gen)
   q = (StgMutVar *)step->hp;
   step->hp += sizeofW(StgMutVar);
 
-  SET_HDR(q,&MUT_CONS_info,CCS_GC);
+  SET_HDR(q,&stg_MUT_CONS_info,CCS_GC);
   q->var = ptr;
   recordOldToNewPtrs((StgMutClosure *)q);
 
@@ -1356,7 +1356,7 @@ loop:
     }
 
   case MUT_VAR:
-    ASSERT(q->header.info != &MUT_CONS_info);
+    ASSERT(q->header.info != &stg_MUT_CONS_info);
   case MVAR:
     to = copy(q,sizeW_fromITBL(info),step);
     recordMutable((StgMutClosure *)to);
@@ -1978,7 +1978,7 @@ scavenge(step *step)
 
     case IND_PERM:
       if (step->gen->no != 0) {
-	SET_INFO(((StgClosure *)p), &IND_OLDGEN_PERM_info);
+	SET_INFO(((StgClosure *)p), &stg_IND_OLDGEN_PERM_info);
       }
       /* fall through */
     case IND_OLDGEN_PERM:
@@ -2024,7 +2024,7 @@ scavenge(step *step)
 
     case MUT_VAR:
       /* ignore MUT_CONSs */
-      if (((StgMutVar *)p)->header.info != &MUT_CONS_info) {
+      if (((StgMutVar *)p)->header.info != &stg_MUT_CONS_info) {
 	evac_gen = 0;
 	((StgMutVar *)p)->var = evacuate(((StgMutVar *)p)->var);
 	evac_gen = saved_evac_gen;
@@ -2436,7 +2436,7 @@ scavenge_mut_once_list(generation *gen)
        * it from the mutable list if possible by promoting whatever it
        * points to.
        */
-      ASSERT(p->header.info == &MUT_CONS_info);
+      ASSERT(p->header.info == &stg_MUT_CONS_info);
       if (scavenge_one(((StgMutVar *)p)->var) == rtsTrue) {
 	/* didn't manage to promote everything, so put the
 	 * MUT_CONS back on the list.
@@ -2552,7 +2552,7 @@ scavenge_mutable_list(generation *gen)
        * it from the mutable list if possible by promoting whatever it
        * points to.
        */
-      ASSERT(p->header.info != &MUT_CONS_info);
+      ASSERT(p->header.info != &stg_MUT_CONS_info);
       ((StgMutVar *)p)->var = evacuate(((StgMutVar *)p)->var);
       p->mut_link = gen->mut_list;
       gen->mut_list = p;
@@ -3168,7 +3168,7 @@ gcCAFs(void)
     if (STATIC_LINK(info,p) == NULL) {
       IF_DEBUG(gccafs, fprintf(stderr, "CAF gc'd at 0x%04x\n", (int)p));
       /* black hole it */
-      SET_INFO(p,&BLACKHOLE_info);
+      SET_INFO(p,&stg_BLACKHOLE_info);
       p = STATIC_LINK2(info,p);
       *pp = p;
     }
@@ -3223,16 +3223,16 @@ threadLazyBlackHole(StgTSO *tso)
        * The blackhole made for a CAF is a CAF_BLACKHOLE, so they
        * don't interfere with this optimisation.
        */
-      if (bh->header.info == &BLACKHOLE_info) {
+      if (bh->header.info == &stg_BLACKHOLE_info) {
 	return;
       }
 
-      if (bh->header.info != &BLACKHOLE_BQ_info &&
-	  bh->header.info != &CAF_BLACKHOLE_info) {
+      if (bh->header.info != &stg_BLACKHOLE_BQ_info &&
+	  bh->header.info != &stg_CAF_BLACKHOLE_info) {
 #if (!defined(LAZY_BLACKHOLING)) && defined(DEBUG)
         fprintf(stderr,"Unexpected lazy BHing required at 0x%04x\n",(int)bh);
 #endif
-	SET_INFO(bh,&BLACKHOLE_info);
+	SET_INFO(bh,&stg_BLACKHOLE_info);
       }
 
       update_frame = update_frame->link;
@@ -3313,7 +3313,7 @@ threadSqueezeStack(StgTSO *tso)
 	     })
     switch (get_itbl(frame)->type) {
     case UPDATE_FRAME: upd_frames++;
-                       if (frame->updatee->header.info == &BLACKHOLE_info)
+                       if (frame->updatee->header.info == &stg_BLACKHOLE_info)
 			 bhs++;
                        break;
     case STOP_FRAME:  stop_frames++;
@@ -3329,7 +3329,7 @@ threadSqueezeStack(StgTSO *tso)
     }
 #endif
     if (get_itbl(frame)->type == UPDATE_FRAME
-	&& frame->updatee->header.info == &BLACKHOLE_info) {
+	&& frame->updatee->header.info == &stg_BLACKHOLE_info) {
         break;
     }
   }
@@ -3395,11 +3395,11 @@ threadSqueezeStack(StgTSO *tso)
 #  if (!defined(LAZY_BLACKHOLING)) && defined(DEBUG)
 #    error Unimplemented lazy BH warning.  (KSW 1999-01)
 #  endif
-      if (GET_INFO(updatee_bypass) == BLACKHOLE_BQ_info
-	  || GET_INFO(updatee_bypass) == CAF_BLACKHOLE_info
+      if (GET_INFO(updatee_bypass) == stg_BLACKHOLE_BQ_info
+	  || GET_INFO(updatee_bypass) == stg_CAF_BLACKHOLE_info
 	  ) {
 	/* Sigh.  It has one.  Don't lose those threads! */
-	  if (GET_INFO(updatee_keep) == BLACKHOLE_BQ_info) {
+	  if (GET_INFO(updatee_keep) == stg_BLACKHOLE_BQ_info) {
 	  /* Urgh.  Two queues.  Merge them. */
 	  P_ keep_tso = ((StgBlockingQueue *)updatee_keep)->blocking_queue;
 	  
@@ -3439,13 +3439,13 @@ threadSqueezeStack(StgTSO *tso)
        */
       if (is_update_frame) {
 	StgBlockingQueue *bh = (StgBlockingQueue *)frame->updatee;
-	if (bh->header.info != &BLACKHOLE_info &&
-	    bh->header.info != &BLACKHOLE_BQ_info &&
-	    bh->header.info != &CAF_BLACKHOLE_info) {
+	if (bh->header.info != &stg_BLACKHOLE_info &&
+	    bh->header.info != &stg_BLACKHOLE_BQ_info &&
+	    bh->header.info != &stg_CAF_BLACKHOLE_info) {
 #if (!defined(LAZY_BLACKHOLING)) && defined(DEBUG)
           fprintf(stderr,"Unexpected lazy BHing required at 0x%04x\n",(int)bh);
 #endif
-	  SET_INFO(bh,&BLACKHOLE_info);
+	  SET_INFO(bh,&stg_BLACKHOLE_info);
 	}
       }
 

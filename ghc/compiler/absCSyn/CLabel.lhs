@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.41 2000/11/06 08:15:20 simonpj Exp $
+% $Id: CLabel.lhs,v 1.42 2000/11/13 14:40:38 simonmar Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -246,19 +246,19 @@ mkStgUpdatePAPLabel		= RtsLabel (Rts_Code "stg_update_PAP")
 mkSplitMarkerLabel		= RtsLabel (Rts_Code "__stg_split_marker")
 mkUpdInfoLabel			= RtsLabel RtsUpdInfo
 mkSeqInfoLabel			= RtsLabel RtsSeqInfo
-mkIndInfoLabel			= RtsLabel (Rts_Info "IND_info")
-mkIndStaticInfoLabel		= RtsLabel (Rts_Info "IND_STATIC_info")
+mkIndInfoLabel			= RtsLabel (Rts_Info "stg_IND_info")
+mkIndStaticInfoLabel		= RtsLabel (Rts_Info "stg_IND_STATIC_info")
 mkRtsGCEntryLabel str		= RtsLabel (RtsGCEntryLabel str)
 mkMainRegTableLabel		= RtsLabel RtsMainRegTable
-mkCharlikeClosureLabel		= RtsLabel (Rts_Closure "CHARLIKE_closure")
-mkIntlikeClosureLabel		= RtsLabel (Rts_Closure "INTLIKE_closure")
-mkMAP_FROZEN_infoLabel		= RtsLabel (Rts_Info "MUT_ARR_PTRS_FROZEN_info")
+mkCharlikeClosureLabel		= RtsLabel (Rts_Closure "stg_CHARLIKE_closure")
+mkIntlikeClosureLabel		= RtsLabel (Rts_Closure "stg_INTLIKE_closure")
+mkMAP_FROZEN_infoLabel		= RtsLabel (Rts_Info "stg_MUT_ARR_PTRS_FROZEN_info")
 
 mkTopTickyCtrLabel		= RtsLabel RtsTopTickyCtr
-mkBlackHoleInfoTableLabel	= RtsLabel (RtsBlackHoleInfoTbl SLIT("BLACKHOLE_info"))
-mkCAFBlackHoleInfoTableLabel	= RtsLabel (RtsBlackHoleInfoTbl SLIT("CAF_BLACKHOLE_info"))
+mkBlackHoleInfoTableLabel	= RtsLabel (RtsBlackHoleInfoTbl SLIT("stg_BLACKHOLE_info"))
+mkCAFBlackHoleInfoTableLabel	= RtsLabel (RtsBlackHoleInfoTbl SLIT("stg_CAF_BLACKHOLE_info"))
 mkSECAFBlackHoleInfoTableLabel	= if opt_DoTickyProfiling then
-                                    RtsLabel (RtsBlackHoleInfoTbl SLIT("SE_CAF_BLACKHOLE_info"))
+                                    RtsLabel (RtsBlackHoleInfoTbl SLIT("stg_SE_CAF_BLACKHOLE_info"))
                                   else  -- RTS won't have info table unless -ticky is on
                                     panic "mkSECAFBlackHoleInfoTableLabel requires -ticky"
 mkRtsPrimOpLabel primop		= RtsLabel (RtsPrimOp primop)
@@ -467,8 +467,8 @@ pprCLbl (RtsLabel RtsShouldNeverHappenCode) = ptext SLIT("NULL")
 -- used to be stg_error_entry but Windows can't have DLL entry points as static
 -- initialisers, and besides, this ShouldNeverHappen, right?
 
-pprCLbl (RtsLabel RtsUpdInfo)            = ptext SLIT("upd_frame_info")
-pprCLbl (RtsLabel RtsSeqInfo)            = ptext SLIT("seq_frame_info")
+pprCLbl (RtsLabel RtsUpdInfo)            = ptext SLIT("stg_upd_frame_info")
+pprCLbl (RtsLabel RtsSeqInfo)            = ptext SLIT("stg_seq_frame_info")
 pprCLbl (RtsLabel RtsMainRegTable)       = ptext SLIT("MainRegTable")
 pprCLbl (RtsLabel (RtsGCEntryLabel str)) = text str
 pprCLbl (RtsLabel (Rts_Closure str))     = text str
@@ -480,28 +480,28 @@ pprCLbl (RtsLabel RtsTopTickyCtr) = ptext SLIT("top_ct")
 pprCLbl (RtsLabel (RtsBlackHoleInfoTbl info)) = ptext info
 
 pprCLbl (RtsLabel (RtsSelectorInfoTbl upd_reqd offset))
-  = hcat [ptext SLIT("__sel_"), text (show offset),
+  = hcat [ptext SLIT("stg_sel_"), text (show offset),
 		ptext (if upd_reqd 
 			then SLIT("_upd_info") 
 			else SLIT("_noupd_info"))
 	]
 
 pprCLbl (RtsLabel (RtsSelectorEntry upd_reqd offset))
-  = hcat [ptext SLIT("__sel_"), text (show offset),
+  = hcat [ptext SLIT("stg_sel_"), text (show offset),
 		ptext (if upd_reqd 
 			then SLIT("_upd_entry") 
 			else SLIT("_noupd_entry"))
 	]
 
 pprCLbl (RtsLabel (RtsApInfoTbl upd_reqd arity))
-  = hcat [ptext SLIT("__ap_"), text (show arity),
+  = hcat [ptext SLIT("stg_ap_"), text (show arity),
 		ptext (if upd_reqd 
 			then SLIT("_upd_info") 
 			else SLIT("_noupd_info"))
 	]
 
 pprCLbl (RtsLabel (RtsApEntry upd_reqd arity))
-  = hcat [ptext SLIT("__ap_"), text (show arity),
+  = hcat [ptext SLIT("stg_ap_"), text (show arity),
 		ptext (if upd_reqd 
 			then SLIT("_upd_entry") 
 			else SLIT("_noupd_entry"))

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.66 2000/11/07 13:30:40 simonmar Exp $
+ * $Id: PrimOps.h,v 1.67 2000/11/13 14:40:36 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -547,11 +547,11 @@ LI_ stg_word64ToInt64 (StgWord64);
 
 #ifdef DEBUG
 #define BYTE_ARR_CTS(a)				  \
- ({ ASSERT(GET_INFO((StgArrWords *)(a)) == &ARR_WORDS_info); 	  \
+ ({ ASSERT(GET_INFO((StgArrWords *)(a)) == &stg_ARR_WORDS_info); 	  \
     REAL_BYTE_ARR_CTS(a); })
 #define PTRS_ARR_CTS(a)				  \
- ({ ASSERT((GET_INFO((StgMutArrPtrs  *)(a)) == &MUT_ARR_PTRS_FROZEN_info)	  \
-	|| (GET_INFO((StgMutArrPtrs  *)(a)) == &MUT_ARR_PTRS_info));  \
+ ({ ASSERT((GET_INFO((StgMutArrPtrs  *)(a)) == &stg_MUT_ARR_PTRS_FROZEN_info)	  \
+	|| (GET_INFO((StgMutArrPtrs  *)(a)) == &stg_MUT_ARR_PTRS_info));  \
     REAL_PTRS_ARR_CTS(a); })
 #else
 #define BYTE_ARR_CTS(a)		REAL_BYTE_ARR_CTS(a)
@@ -619,7 +619,7 @@ extern I_ resetGenSymZh(void);
 
 #define unsafeFreezzeArrayzh(r,a)					\
 	{								\
-        SET_INFO((StgClosure *)a,&MUT_ARR_PTRS_FROZEN_info);            \
+        SET_INFO((StgClosure *)a,&stg_MUT_ARR_PTRS_FROZEN_info);        \
 	r = a;								\
 	}
 
@@ -691,7 +691,7 @@ EXTFUN_RTS(newMutVarzh_fast);
 #define sameMVarzh(r,a,b)        r=(I_)((a)==(b))
 
 /* Assume external decl of EMPTY_MVAR_info is in scope by now */
-#define isEmptyMVarzh(r,a)       r=(I_)((GET_INFO((StgMVar*)(a))) == &EMPTY_MVAR_info )
+#define isEmptyMVarzh(r,a)       r=(I_)((GET_INFO((StgMVar*)(a))) == &stg_EMPTY_MVAR_info )
 EXTFUN_RTS(newMVarzh_fast);
 EXTFUN_RTS(takeMVarzh_fast);
 EXTFUN_RTS(tryTakeMVarzh_fast);
@@ -870,7 +870,7 @@ EXTFUN_RTS(mkWeakzh_fast);
 EXTFUN_RTS(finalizzeWeakzh_fast);
 
 #define deRefWeakzh(code,val,w)				\
-  if (((StgWeak *)w)->header.info == &WEAK_info) {	\
+  if (((StgWeak *)w)->header.info == &stg_WEAK_info) {	\
 	code = 1;					\
 	val = (P_)((StgWeak *)w)->value;		\
   } else {						\

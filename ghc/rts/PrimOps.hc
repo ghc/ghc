@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.57 2000/11/07 13:30:41 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.58 2000/11/13 14:40:37 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -256,7 +256,7 @@ W_ GHC_ZCCReturnable_static_info[0];
      size = sizeofW(StgArrWords)+ stuff_size;		\
      p = (StgArrWords *)RET_STGCALL1(P_,allocate,size);	\
      TICK_ALLOC_PRIM(sizeofW(StgArrWords),stuff_size,0); \
-     SET_HDR(p, &ARR_WORDS_info, CCCS);		\
+     SET_HDR(p, &stg_ARR_WORDS_info, CCCS);		\
      p->words = stuff_size;				\
      TICK_RET_UNBOXED_TUP(1)				\
      RET_P(p);						\
@@ -286,7 +286,7 @@ FN_(newArrayzh_fast)
     arr = (StgMutArrPtrs *)RET_STGCALL1(P_, allocate, size);
     TICK_ALLOC_PRIM(sizeofW(StgMutArrPtrs), n, 0);
 
-    SET_HDR(arr,&MUT_ARR_PTRS_info,CCCS);
+    SET_HDR(arr,&stg_MUT_ARR_PTRS_info,CCCS);
     arr->ptrs = n;
 
     init = R2.w;
@@ -311,7 +311,7 @@ FN_(newMutVarzh_fast)
   CCS_ALLOC(CCCS,sizeofW(StgMutVar));
 
   mv = (StgMutVar *)(Hp-sizeofW(StgMutVar)+1);
-  SET_HDR(mv,&MUT_VAR_info,CCCS);
+  SET_HDR(mv,&stg_MUT_VAR_info,CCCS);
   mv->var = R1.cl;
 
   TICK_RET_UNBOXED_TUP(1);
@@ -338,7 +338,7 @@ FN_(mkForeignObjzh_fast)
   CCS_ALLOC(CCCS,sizeofW(StgForeignObj)); /* ccs prof */
 
   result = (StgForeignObj *) (Hp + 1 - sizeofW(StgForeignObj));
-  SET_HDR(result,&FOREIGN_info,CCCS);
+  SET_HDR(result,&stg_FOREIGN_info,CCCS);
   result->data = R1.p;
 
   /* returns (# s#, ForeignObj# #) */
@@ -352,7 +352,7 @@ FN_(mkForeignObjzh_fast)
 FN_(unsafeThawArrayzh_fast)
 {
   FB_
-  SET_INFO((StgClosure *)R1.cl,&MUT_ARR_PTRS_info);
+  SET_INFO((StgClosure *)R1.cl,&stg_MUT_ARR_PTRS_info);
   recordMutable((StgMutClosure*)R1.cl);
 
   TICK_RET_UNBOXED_TUP(1);
@@ -376,7 +376,7 @@ FN_(mkWeakzh_fast)
   FB_
 
   if (R3.cl == NULL) {
-    R3.cl = &NO_FINALIZER_closure;
+    R3.cl = &stg_NO_FINALIZER_closure;
   }
 
   HP_CHK_GEN_TICKY(sizeofW(StgWeak),R1_PTR|R2_PTR|R3_PTR, mkWeakzh_fast,);
@@ -385,7 +385,7 @@ FN_(mkWeakzh_fast)
   CCS_ALLOC(CCCS,sizeofW(StgWeak)); /* ccs prof */
 
   w = (StgWeak *) (Hp + 1 - sizeofW(StgWeak));
-  SET_HDR(w, &WEAK_info, CCCS);
+  SET_HDR(w, &stg_WEAK_info, CCCS);
 
   w->key        = R1.cl;
   w->value      = R2.cl;
@@ -411,18 +411,18 @@ FN_(finalizzeWeakzh_fast)
   w = (StgDeadWeak *)R1.p;
 
   /* already dead? */
-  if (w->header.info == &DEAD_WEAK_info) {
-      RET_NP(0,&NO_FINALIZER_closure);
+  if (w->header.info == &stg_DEAD_WEAK_info) {
+      RET_NP(0,&stg_NO_FINALIZER_closure);
   }
 
   /* kill it */
-  w->header.info = &DEAD_WEAK_info;
+  w->header.info = &stg_DEAD_WEAK_info;
   f = ((StgWeak *)w)->finalizer;
   w->link = ((StgWeak *)w)->link;
 
   /* return the finalizer */
-  if (f == &NO_FINALIZER_closure) {
-      RET_NP(0,&NO_FINALIZER_closure);
+  if (f == &stg_NO_FINALIZER_closure) {
+      RET_NP(0,&stg_NO_FINALIZER_closure);
   } else {
       RET_NP(1,f);
   }
@@ -449,7 +449,7 @@ FN_(int2Integerzh_fast)
    CCS_ALLOC(CCCS,sizeofW(StgArrWords)+1); /* ccs prof */
 
    p = (StgArrWords *)Hp - 1;
-   SET_ARR_HDR(p, &ARR_WORDS_info, CCCS, 1);
+   SET_ARR_HDR(p, &stg_ARR_WORDS_info, CCCS, 1);
 
    /* mpz_set_si is inlined here, makes things simpler */
    if (val < 0) { 
@@ -486,7 +486,7 @@ FN_(word2Integerzh_fast)
    CCS_ALLOC(CCCS,sizeofW(StgArrWords)+1); /* ccs prof */
 
    p = (StgArrWords *)Hp - 1;
-   SET_ARR_HDR(p, &ARR_WORDS_info, CCCS, 1);
+   SET_ARR_HDR(p, &stg_ARR_WORDS_info, CCCS, 1);
 
    if (val != 0) {
 	s = 1;
@@ -535,7 +535,7 @@ FN_(int64ToIntegerzh_fast)
    CCS_ALLOC(CCCS,sizeofW(StgArrWords)+words_needed); /* ccs prof */
 
    p = (StgArrWords *)(Hp-words_needed+1) - 1;
-   SET_ARR_HDR(p, &ARR_WORDS_info, CCCS, words_needed);
+   SET_ARR_HDR(p, &stg_ARR_WORDS_info, CCCS, words_needed);
 
    if ( val < 0LL ) {
      neg = 1;
@@ -586,7 +586,7 @@ FN_(word64ToIntegerzh_fast)
    CCS_ALLOC(CCCS,sizeofW(StgArrWords)+words_needed); /* ccs prof */
 
    p = (StgArrWords *)(Hp-words_needed+1) - 1;
-   SET_ARR_HDR(p, &ARR_WORDS_info, CCCS, words_needed);
+   SET_ARR_HDR(p, &stg_ARR_WORDS_info, CCCS, words_needed);
 
    hi = (W_)((LW_)val / 0x100000000ULL);
    if ( val >= 0x100000000ULL ) { 
@@ -749,7 +749,7 @@ FN_(decodeFloatzh_fast)
   /* Be prepared to tell Lennart-coded __decodeFloat	*/
   /* where mantissa._mp_d can be put (it does not care about the rest) */
   p = (StgArrWords *)Hp - 1;
-  SET_ARR_HDR(p,&ARR_WORDS_info,CCCS,1)
+  SET_ARR_HDR(p,&stg_ARR_WORDS_info,CCCS,1)
   mantissa._mp_d = (void *)BYTE_ARR_CTS(p);
 
   /* Perform the operation */
@@ -781,7 +781,7 @@ FN_(decodeDoublezh_fast)
   /* Be prepared to tell Lennart-coded __decodeDouble	*/
   /* where mantissa.d can be put (it does not care about the rest) */
   p = (StgArrWords *)(Hp-ARR_SIZE+1);
-  SET_ARR_HDR(p, &ARR_WORDS_info, CCCS, DOUBLE_MANTISSA_SIZE);
+  SET_ARR_HDR(p, &stg_ARR_WORDS_info, CCCS, DOUBLE_MANTISSA_SIZE);
   mantissa._mp_d = (void *)BYTE_ARR_CTS(p);
 
   /* Perform the operation */
@@ -836,9 +836,9 @@ FN_(newMVarzh_fast)
   CCS_ALLOC(CCCS,sizeofW(StgMVar)); /* ccs prof */
   
   mvar = (StgMVar *) (Hp - sizeofW(StgMVar) + 1);
-  SET_HDR(mvar,&EMPTY_MVAR_info,CCCS);
-  mvar->head = mvar->tail = (StgTSO *)&END_TSO_QUEUE_closure;
-  mvar->value = (StgClosure *)&END_TSO_QUEUE_closure;
+  SET_HDR(mvar,&stg_EMPTY_MVAR_info,CCCS);
+  mvar->head = mvar->tail = (StgTSO *)&stg_END_TSO_QUEUE_closure;
+  mvar->value = (StgClosure *)&stg_END_TSO_QUEUE_closure;
 
   TICK_RET_UNBOXED_TUP(1);
   RET_P(mvar);
@@ -865,31 +865,31 @@ FN_(takeMVarzh_fast)
   /* If the MVar is empty, put ourselves on its blocking queue,
    * and wait until we're woken up.
    */
-  if (info == &EMPTY_MVAR_info) {
-    if (mvar->head == (StgTSO *)&END_TSO_QUEUE_closure) {
+  if (info == &stg_EMPTY_MVAR_info) {
+    if (mvar->head == (StgTSO *)&stg_END_TSO_QUEUE_closure) {
       mvar->head = CurrentTSO;
     } else {
       mvar->tail->link = CurrentTSO;
     }
-    CurrentTSO->link = (StgTSO *)&END_TSO_QUEUE_closure;
+    CurrentTSO->link = (StgTSO *)&stg_END_TSO_QUEUE_closure;
     CurrentTSO->why_blocked = BlockedOnMVar;
     CurrentTSO->block_info.closure = (StgClosure *)mvar;
     mvar->tail = CurrentTSO;
 
 #ifdef SMP
     /* unlock the MVar */
-    mvar->header.info = &EMPTY_MVAR_info;
+    mvar->header.info = &stg_EMPTY_MVAR_info;
 #endif
     BLOCK(R1_PTR, takeMVarzh_fast);
   }
 
   val = mvar->value;
-  mvar->value = (StgClosure *)&END_TSO_QUEUE_closure;
+  mvar->value = (StgClosure *)&stg_END_TSO_QUEUE_closure;
 
   /* do this last... we might have locked the MVar in the SMP case,
    * and writing the info pointer will unlock it.
    */
-  SET_INFO(mvar,&EMPTY_MVAR_info);
+  SET_INFO(mvar,&stg_EMPTY_MVAR_info);
 
   TICK_RET_UNBOXED_TUP(1);
   RET_P(val);
@@ -913,24 +913,24 @@ FN_(tryTakeMVarzh_fast)
   info = GET_INFO(mvar);
 #endif
 
-  if (info == &EMPTY_MVAR_info) {
+  if (info == &stg_EMPTY_MVAR_info) {
 
 #ifdef SMP
     /* unlock the MVar */
-    mvar->header.info = &EMPTY_MVAR_info;
+    mvar->header.info = &stg_EMPTY_MVAR_info;
 #endif
 
     /* HACK: we need a pointer to pass back, so we abuse NO_FINALIZER_closure */
-    RET_NP(0, &NO_FINALIZER_closure);
+    RET_NP(0, &stg_NO_FINALIZER_closure);
   }
 
   val = mvar->value;
-  mvar->value = (StgClosure *)&END_TSO_QUEUE_closure;
+  mvar->value = (StgClosure *)&stg_END_TSO_QUEUE_closure;
 
   /* do this last... we might have locked the MVar in the SMP case,
    * and writing the info pointer will unlock it.
    */
-  SET_INFO(mvar,&EMPTY_MVAR_info);
+  SET_INFO(mvar,&stg_EMPTY_MVAR_info);
 
   TICK_RET_UNBOXED_TUP(1);
   RET_NP(1,val);
@@ -953,7 +953,7 @@ FN_(putMVarzh_fast)
   info = GET_INFO(mvar);
 #endif
 
-  if (info == &FULL_MVAR_info) {
+  if (info == &stg_FULL_MVAR_info) {
 #ifdef INTERPRETER
     fprintf(stderr, "fatal: put on a full MVar in Hugs; aborting\n" );
     exit(1);
@@ -968,7 +968,7 @@ FN_(putMVarzh_fast)
   /* wake up the first thread on the queue, it will continue with the
    * takeMVar operation and mark the MVar empty again.
    */
-  if (mvar->head != (StgTSO *)&END_TSO_QUEUE_closure) {
+  if (mvar->head != (StgTSO *)&stg_END_TSO_QUEUE_closure) {
     ASSERT(mvar->head->why_blocked == BlockedOnMVar);
 #if defined(GRAN)
     mvar->head = RET_STGCALL2(StgTSO *,unblockOne,mvar->head,mvar);
@@ -978,19 +978,19 @@ FN_(putMVarzh_fast)
 #else
     mvar->head = RET_STGCALL1(StgTSO *,unblockOne,mvar->head);
 #endif
-    if (mvar->head == (StgTSO *)&END_TSO_QUEUE_closure) {
-      mvar->tail = (StgTSO *)&END_TSO_QUEUE_closure;
+    if (mvar->head == (StgTSO *)&stg_END_TSO_QUEUE_closure) {
+      mvar->tail = (StgTSO *)&stg_END_TSO_QUEUE_closure;
     }
 
     /* unlocks the MVar in the SMP case */
-    SET_INFO(mvar,&FULL_MVAR_info);
+    SET_INFO(mvar,&stg_FULL_MVAR_info);
 
     /* yield, to give the newly woken thread a chance to take the MVar */
     JMP_(stg_yield_noregs);
   }
 
   /* unlocks the MVar in the SMP case */
-  SET_INFO(mvar,&FULL_MVAR_info);
+  SET_INFO(mvar,&stg_FULL_MVAR_info);
 
   JMP_(ENTRY_CODE(Sp[0]));
   FE_
@@ -1016,7 +1016,7 @@ FN_(makeStableNamezh_fast)
   /* Is there already a StableName for this heap object? */
   if (stable_ptr_table[index].sn_obj == NULL) {
     sn_obj = (StgStableName *) (Hp - sizeofW(StgStableName) + 1);
-    sn_obj->header.info = &STABLE_NAME_info;
+    sn_obj->header.info = &stg_STABLE_NAME_info;
     sn_obj->sn = index;
     stable_ptr_table[index].sn_obj = (StgClosure *)sn_obj;
   } else {

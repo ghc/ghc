@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.19 2000/11/07 10:42:56 simonmar Exp $
+ * $Id: Updates.h,v 1.20 2000/11/13 14:40:36 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -123,8 +123,8 @@ extern void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
 #define DO_AWAKEN_BQ(bqe, node)  STGCALL2(awakenBlockedQueue, bqe, node);
 
 #define AWAKEN_BQ(info,closure)						\
-     	if (info == &BLACKHOLE_BQ_info ||               \
-	    info == &FETCH_ME_BQ_info ||                \
+     	if (info == &stg_BLACKHOLE_BQ_info ||               \
+	    info == &stg_FETCH_ME_BQ_info ||                \
 	    get_itbl(closure)->type == RBH) {		                \
 		StgBlockingQueueElement *bqe = ((StgBlockingQueue *)closure)->blocking_queue;\
 		ASSERT(bqe!=END_BQ_QUEUE);		                \
@@ -140,7 +140,7 @@ extern void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
    not checked. The rest of the code is the same as for GUM.
 */
 #define AWAKEN_BQ(info,closure)						\
-     	if (info == &BLACKHOLE_BQ_info ||               \
+     	if (info == &stg_BLACKHOLE_BQ_info ||               \
 	    get_itbl(closure)->type == RBH) {		                \
 		StgBlockingQueueElement *bqe = ((StgBlockingQueue *)closure)->blocking_queue;\
 		ASSERT(bqe!=END_BQ_QUEUE);		                \
@@ -156,7 +156,7 @@ extern void awakenBlockedQueue(StgTSO *q);
 		 ((StgBlockingQueue *)closure)->blocking_queue);
 
 #define AWAKEN_BQ(info,closure)						\
-     	if (info == &BLACKHOLE_BQ_info) {				\
+     	if (info == &stg_BLACKHOLE_BQ_info) {				\
           DO_AWAKEN_BQ(closure);                                        \
 	}
 
@@ -172,14 +172,14 @@ extern void awakenBlockedQueue(StgTSO *q);
 #define PUSH_STD_CCCS(frame)
 #endif
 
-extern DLL_IMPORT_RTS const StgPolyInfoTable upd_frame_info; 
+extern DLL_IMPORT_RTS const StgPolyInfoTable stg_upd_frame_info; 
 
 #define PUSH_UPD_FRAME(target, Sp_offset)			\
 	{							\
 		StgUpdateFrame *__frame;			\
 		TICK_UPDF_PUSHED(target, GET_INFO((StgClosure*)target)); \
 		__frame = (StgUpdateFrame *)(Sp + (Sp_offset)) - 1; \
-		SET_INFO(__frame, (StgInfoTable *)&upd_frame_info);   \
+		SET_INFO(__frame, (StgInfoTable *)&stg_upd_frame_info);   \
 		__frame->link = Su;				\
 		__frame->updatee = (StgClosure *)(target);	\
 		PUSH_STD_CCCS(__frame);				\
@@ -221,7 +221,7 @@ extern void newCAF(StgClosure*);
     LOCK_CLOSURE(cafptr);						\
     STGCALL1(newCAF,(StgClosure *)cafptr);				\
     ((StgInd *)cafptr)->indirectee   = (StgClosure *)(bhptr);		\
-    SET_INFO((StgInd *)cafptr,(const StgInfoTable*)&IND_STATIC_info);	\
+    SET_INFO((StgInd *)cafptr,(const StgInfoTable*)&stg_IND_STATIC_info);\
   }
 
 #ifdef INTERPRETER
@@ -232,16 +232,16 @@ extern void newCAF_made_by_Hugs(StgCAF*);
    Update-related prototypes
    -------------------------------------------------------------------------- */
 
-DLL_IMPORT_RTS extern STGFUN(upd_frame_entry);
+DLL_IMPORT_RTS extern STGFUN(stg_upd_frame_entry);
 
-extern DLL_IMPORT_RTS const StgInfoTable PAP_info;
-DLL_IMPORT_RTS STGFUN(PAP_entry);
+extern DLL_IMPORT_RTS const StgInfoTable stg_PAP_info;
+DLL_IMPORT_RTS STGFUN(stg_PAP_entry);
 
 EXTFUN_RTS(stg_update_PAP);
 
-extern DLL_IMPORT_RTS const StgInfoTable AP_UPD_info;
-DLL_IMPORT_RTS STGFUN(AP_UPD_entry);
+extern DLL_IMPORT_RTS const StgInfoTable stg_AP_UPD_info;
+DLL_IMPORT_RTS STGFUN(stg_AP_UPD_entry);
 
-extern DLL_IMPORT_RTS const StgInfoTable raise_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_raise_info;
 
 #endif /* UPDATES_H */

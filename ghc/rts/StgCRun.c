@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.20 2000/08/15 14:18:43 simonmar Exp $
+ * $Id: StgCRun.c,v 1.21 2000/11/13 14:40:37 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -321,9 +321,11 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 StgThreadReturnCode
 StgRun(StgFunPtr f, StgRegTable *basereg) {
 
-    unsigned char space[RESERVED_C_STACK_BYTES+sizeof(void *)];
+    unsigned char space[RESERVED_C_STACK_BYTES];
+#if 0
     register void *i7 __asm__("%i7");
     ((void **)(space))[100] = i7;
+#endif
     f();
     __asm__ volatile (
 	    ".align 4\n"		
@@ -340,8 +342,10 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
      * terrible.  We could do much better by coding it directly in
      * assembler.
      */
+#if 0
     __asm__ volatile ("ld %1,%0" 
 		      : "=r" (i7) : "m" (((void **)(space))[100]));
+#endif
     return (StgThreadReturnCode)R1.i;
 }
 

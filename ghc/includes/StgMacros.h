@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.35 2000/11/07 10:42:56 simonmar Exp $
+ * $Id: StgMacros.h,v 1.36 2000/11/13 14:40:36 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -422,7 +422,7 @@ EXTINFO_RTS(stg_gen_chk_info);
              }							\
           }							\
 	}							\
-        SET_INFO(R1.cl,&BLACKHOLE_info)
+        SET_INFO(R1.cl,&stg_BLACKHOLE_info)
 #    define UPD_BH_SINGLE_ENTRY(info)				\
         TICK_UPD_BH_SINGLE_ENTRY();				\
         {							\
@@ -436,14 +436,14 @@ EXTINFO_RTS(stg_gen_chk_info);
              }							\
           }							\
 	}							\
-        SET_INFO(R1.cl,&BLACKHOLE_info)
+        SET_INFO(R1.cl,&stg_BLACKHOLE_info)
 #  else
 #    define UPD_BH_UPDATABLE(info)		\
         TICK_UPD_BH_UPDATABLE();		\
-        SET_INFO(R1.cl,&BLACKHOLE_info)
+        SET_INFO(R1.cl,&stg_BLACKHOLE_info)
 #    define UPD_BH_SINGLE_ENTRY(info)		\
         TICK_UPD_BH_SINGLE_ENTRY();		\
-        SET_INFO(R1.cl,&SE_BLACKHOLE_info)
+        SET_INFO(R1.cl,&stg_SE_BLACKHOLE_info)
 #  endif
 #else /* !EAGER_BLACKHOLING */
 #  define UPD_BH_UPDATABLE(thunk)    /* nothing */
@@ -617,7 +617,7 @@ static inline StgInt64 PK_Int64(W_ p_src[])
    Catch frames
    -------------------------------------------------------------------------- */
 
-extern DLL_IMPORT_RTS const StgPolyInfoTable catch_frame_info;
+extern DLL_IMPORT_RTS const StgPolyInfoTable stg_catch_frame_info;
 
 /* -----------------------------------------------------------------------------
    Seq frames
@@ -626,14 +626,14 @@ extern DLL_IMPORT_RTS const StgPolyInfoTable catch_frame_info;
    an update...
    -------------------------------------------------------------------------- */
 
-extern DLL_IMPORT_RTS const StgPolyInfoTable seq_frame_info;
+extern DLL_IMPORT_RTS const StgPolyInfoTable stg_seq_frame_info;
 
 #define PUSH_SEQ_FRAME(sp)					\
 	{							\
 		StgSeqFrame *__frame;				\
 		TICK_SEQF_PUSHED();  				\
 		__frame = (StgSeqFrame *)(sp); 			\
-		SET_HDR_(__frame,&seq_frame_info,CCCS);        	\
+		SET_HDR_(__frame,&stg_seq_frame_info,CCCS);    	\
 		__frame->link = Su;				\
 		Su = (StgUpdateFrame *)__frame;			\
 	}

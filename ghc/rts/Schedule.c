@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.80 2000/11/07 10:42:57 simonmar Exp $
+ * $Id: Schedule.c,v 1.81 2000/11/13 14:40:37 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1358,7 +1358,7 @@ createThread_(nat size, rtsBool have_lock)
   tso = (StgTSO *)allocate(size);
   TICK_ALLOC_TSO(size-TSO_STRUCT_SIZEW, 0);
 
-  SET_HDR(tso, &TSO_info, CCS_SYSTEM);
+  SET_HDR(tso, &stg_TSO_info, CCS_SYSTEM);
 #if defined(GRAN)
   SET_GRAN_HDR(tso, ThisPE);
 #endif
@@ -2257,9 +2257,9 @@ unblockOneLocked(StgBlockingQueueElement *bqe, StgClosure *node)
 	 see comments on RBHSave closures above */
     case CONSTR:
       /* check that the closure is an RBHSave closure */
-      ASSERT(get_itbl((StgClosure *)bqe) == &RBH_Save_0_info ||
-	     get_itbl((StgClosure *)bqe) == &RBH_Save_1_info ||
-	     get_itbl((StgClosure *)bqe) == &RBH_Save_2_info);
+      ASSERT(get_itbl((StgClosure *)bqe) == &stg_RBH_Save_0_info ||
+	     get_itbl((StgClosure *)bqe) == &stg_RBH_Save_1_info ||
+	     get_itbl((StgClosure *)bqe) == &stg_RBH_Save_2_info);
       break;
 
     default:
@@ -2757,7 +2757,7 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
    * returns to the next return address on the stack.
    */
   if ( LOOKS_LIKE_GHC_INFO((void*)*sp) ) {
-    *(--sp) = (W_)&dummy_ret_closure;
+    *(--sp) = (W_)&stg_dummy_ret_closure;
   }
 
   while (1) {
@@ -2776,7 +2776,7 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
        */
       ap = (StgAP_UPD *)allocate(sizeofW(StgPAP) + 2);
       TICK_ALLOC_UPD_PAP(3,0);
-      SET_HDR(ap,&PAP_info,cf->header.prof.ccs);
+      SET_HDR(ap,&stg_PAP_info,cf->header.prof.ccs);
 	      
       ap->n_args = 2;
       ap->fun = cf->handler;	/* :: Exception -> IO a */
@@ -2797,7 +2797,7 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
        * unblockAsyncExceptions_ret stack frame.
        */
       if (!cf->exceptions_blocked) {
-	*(sp--) = (W_)&unblockAsyncExceptionszh_ret_info;
+	*(sp--) = (W_)&stg_unblockAsyncExceptionszh_ret_info;
       }
       
       /* Ensure that async exceptions are blocked when running the handler.
@@ -2835,7 +2835,7 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
       
     case UPDATE_FRAME:
       {
-	SET_HDR(ap,&AP_UPD_info,su->header.prof.ccs /* ToDo */); 
+	SET_HDR(ap,&stg_AP_UPD_info,su->header.prof.ccs /* ToDo */); 
 	TICK_ALLOC_UP_THK(words+1,0);
 	
 	IF_DEBUG(scheduler,
@@ -2864,13 +2864,13 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
 	/* We want a PAP, not an AP_UPD.  Fortunately, the
 	 * layout's the same.
 	 */
-	SET_HDR(ap,&PAP_info,su->header.prof.ccs /* ToDo */);
+	SET_HDR(ap,&stg_PAP_info,su->header.prof.ccs /* ToDo */);
 	TICK_ALLOC_UPD_PAP(words+1,0);
 	
 	/* now build o = FUN(catch,ap,handler) */
 	o = (StgClosure *)allocate(sizeofW(StgClosure)+2);
 	TICK_ALLOC_FUN(2,0);
-	SET_HDR(o,&catch_info,su->header.prof.ccs /* ToDo */);
+	SET_HDR(o,&stg_catch_info,su->header.prof.ccs /* ToDo */);
 	o->payload[0] = (StgClosure *)ap;
 	o->payload[1] = cf->handler;
 	
@@ -2891,13 +2891,13 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
 	StgSeqFrame *sf = (StgSeqFrame *)su;
 	StgClosure* o;
 	
-	SET_HDR(ap,&PAP_info,su->header.prof.ccs /* ToDo */);
+	SET_HDR(ap,&stg_PAP_info,su->header.prof.ccs /* ToDo */);
 	TICK_ALLOC_UPD_PAP(words+1,0);
 	
 	/* now build o = FUN(seq,ap) */
 	o = (StgClosure *)allocate(sizeofW(StgClosure)+1);
 	TICK_ALLOC_SE_THK(1,0);
-	SET_HDR(o,&seq_info,su->header.prof.ccs /* ToDo */);
+	SET_HDR(o,&stg_seq_info,su->header.prof.ccs /* ToDo */);
 	o->payload[0] = (StgClosure *)ap;
 	
 	IF_DEBUG(scheduler,
@@ -3151,9 +3151,9 @@ print_bq (StgClosure *node)
       break;
     case CONSTR:
       fprintf(stderr," %s (IP %p),",
-	      (get_itbl(bqe) == &RBH_Save_0_info ? "RBH_Save_0" :
-	       get_itbl(bqe) == &RBH_Save_1_info ? "RBH_Save_1" :
-	       get_itbl(bqe) == &RBH_Save_2_info ? "RBH_Save_2" :
+	      (get_itbl(bqe) == &stg_RBH_Save_0_info ? "RBH_Save_0" :
+	       get_itbl(bqe) == &stg_RBH_Save_1_info ? "RBH_Save_1" :
+	       get_itbl(bqe) == &stg_RBH_Save_2_info ? "RBH_Save_2" :
 	       "RBH_Save_?"), get_itbl(bqe));
       break;
     default:
@@ -3205,9 +3205,9 @@ print_bq (StgClosure *node)
       break;
     case CONSTR:
       fprintf(stderr," %s (IP %p),",
-	      (get_itbl(bqe) == &RBH_Save_0_info ? "RBH_Save_0" :
-	       get_itbl(bqe) == &RBH_Save_1_info ? "RBH_Save_1" :
-	       get_itbl(bqe) == &RBH_Save_2_info ? "RBH_Save_2" :
+	      (get_itbl(bqe) == &stg_RBH_Save_0_info ? "RBH_Save_0" :
+	       get_itbl(bqe) == &stg_RBH_Save_1_info ? "RBH_Save_1" :
+	       get_itbl(bqe) == &stg_RBH_Save_2_info ? "RBH_Save_2" :
 	       "RBH_Save_?"), get_itbl(bqe));
       break;
     default:

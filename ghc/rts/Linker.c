@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.1 2000/10/06 15:33:27 simonmar Exp $
+ * $Id: Linker.c,v 1.2 2000/11/13 14:40:37 simonmar Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -105,32 +105,35 @@ static int ocResolve_PEi386     ( ObjectCode* oc );
       Sym(stg_gen_chk)				\
       SymX(stg_exit)				\
       SymX(stg_update_PAP)			\
-      SymX(__ap_2_upd_info)			\
-      SymX(__ap_3_upd_info)			\
-      SymX(__ap_4_upd_info)			\
-      SymX(__ap_5_upd_info)			\
-      SymX(__ap_6_upd_info)			\
-      SymX(__ap_7_upd_info)			\
-      SymX(__ap_8_upd_info)			\
-      SymX(__sel_0_upd_info)			\
-      SymX(__sel_1_upd_info)			\
-      SymX(__sel_2_upd_info)			\
-      SymX(__sel_3_upd_info)			\
-      SymX(__sel_4_upd_info)			\
-      SymX(__sel_5_upd_info)			\
-      SymX(__sel_6_upd_info)			\
-      SymX(__sel_7_upd_info)			\
-      SymX(__sel_8_upd_info)			\
-      SymX(__sel_9_upd_info)			\
-      SymX(__sel_10_upd_info)			\
-      SymX(__sel_11_upd_info)			\
-      SymX(__sel_12_upd_info)			\
-      SymX(upd_frame_info)			\
-      SymX(seq_frame_info)			\
-      SymX(CAF_BLACKHOLE_info)			\
-      SymX(IND_STATIC_info)			\
-      SymX(EMPTY_MVAR_info)			\
-      SymX(MUT_ARR_PTRS_FROZEN_info)		\
+      SymX(stg_ap_2_upd_info)			\
+      SymX(stg_ap_3_upd_info)			\
+      SymX(stg_ap_4_upd_info)			\
+      SymX(stg_ap_5_upd_info)			\
+      SymX(stg_ap_6_upd_info)			\
+      SymX(stg_ap_7_upd_info)			\
+      SymX(stg_ap_8_upd_info)			\
+      SymX(stg_sel_0_upd_info)			\
+      SymX(stg_sel_1_upd_info)			\
+      SymX(stg_sel_2_upd_info)			\
+      SymX(stg_sel_3_upd_info)			\
+      SymX(stg_sel_4_upd_info)			\
+      SymX(stg_sel_5_upd_info)			\
+      SymX(stg_sel_6_upd_info)			\
+      SymX(stg_sel_7_upd_info)			\
+      SymX(stg_sel_8_upd_info)			\
+      SymX(stg_sel_9_upd_info)			\
+      SymX(stg_sel_10_upd_info)			\
+      SymX(stg_sel_11_upd_info)			\
+      SymX(stg_sel_12_upd_info)			\
+      SymX(stg_upd_frame_info)			\
+      SymX(stg_seq_frame_info)			\
+      SymX(stg_CAF_BLACKHOLE_info)		\
+      SymX(stg_IND_STATIC_info)			\
+      SymX(stg_EMPTY_MVAR_info)			\
+      SymX(stg_MUT_ARR_PTRS_FROZEN_info)	\
+      SymX(stg_CHARLIKE_closure)		\
+      SymX(stg_INTLIKE_closure)			\
+      SymX(stg_CAF_UNENTERED_entry)		\
       SymX(newCAF)				\
       SymX(putMVarzh_fast)			\
       SymX(newMVarzh_fast)			\
@@ -143,8 +146,6 @@ static int ocResolve_PEi386     ( ObjectCode* oc );
       SymX(killThreadzh_fast)			\
       SymX(waitReadzh_fast)			\
       SymX(waitWritezh_fast)			\
-      SymX(CHARLIKE_closure)			\
-      SymX(INTLIKE_closure)			\
       SymX(suspendThread)			\
       SymX(resumeThread)			\
       SymX(stackOverflow)			\
@@ -194,7 +195,6 @@ static int ocResolve_PEi386     ( ObjectCode* oc );
       SymX(stable_ptr_table)			\
       SymX(shutdownHaskellAndExit)		\
       Sym(stg_enterStackTop)			\
-      SymX(CAF_UNENTERED_entry)			\
       Sym(stg_yield_to_Hugs)			\
       Sym(StgReturn)				\
       Sym(init_stack)				\

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.21 2000/11/07 10:42:56 simonmar Exp $
+ * $Id: StgMiscClosures.h,v 1.22 2000/11/13 14:40:36 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -14,60 +14,58 @@
 
 /* entry code */
 
-STGFUN(IND_entry);
-STGFUN(IND_STATIC_entry);
-STGFUN(IND_PERM_entry);
-STGFUN(IND_OLDGEN_entry);
-STGFUN(IND_OLDGEN_PERM_entry);
-STGFUN(CAF_UNENTERED_entry);
-STGFUN(CAF_ENTERED_entry);
-STGFUN(CAF_BLACKHOLE_entry);
-STGFUN(BLACKHOLE_entry);
-STGFUN(BLACKHOLE_BQ_entry);
+STGFUN(stg_IND_entry);
+STGFUN(stg_IND_STATIC_entry);
+STGFUN(stg_IND_PERM_entry);
+STGFUN(stg_IND_OLDGEN_entry);
+STGFUN(stg_IND_OLDGEN_PERM_entry);
+STGFUN(stg_CAF_UNENTERED_entry);
+STGFUN(stg_CAF_ENTERED_entry);
+STGFUN(stg_CAF_BLACKHOLE_entry);
+STGFUN(stg_BLACKHOLE_entry);
+STGFUN(stg_BLACKHOLE_BQ_entry);
 #ifdef SMP
-STGFUN(WHITEHOLE_entry);
+STGFUN(stg_WHITEHOLE_entry);
 #endif
 #ifdef TICKY_TICKY
-STGFUN(SE_BLACKHOLE_entry);
-STGFUN(SE_CAF_BLACKHOLE_entry);
+STGFUN(stg_SE_BLACKHOLE_entry);
+STGFUN(stg_SE_CAF_BLACKHOLE_entry);
 #endif
 #if defined(PAR) || defined(GRAN)
-STGFUN(RBH_entry);
+STGFUN(stg_RBH_entry);
 #endif
-STGFUN(BCO_entry);
-STGFUN(EVACUATED_entry);
-STGFUN(FOREIGN_entry);
-STGFUN(WEAK_entry);
-STGFUN(NO_FINALIZER_entry);
-STGFUN(DEAD_WEAK_entry);
-STGFUN(STABLE_NAME_entry);
-STGFUN(TSO_entry);
-STGFUN(FULL_MVAR_entry);
-STGFUN(EMPTY_MVAR_entry);
-STGFUN(ARR_WORDS_entry);
-STGFUN(MUT_ARR_PTRS_entry);
-STGFUN(MUT_ARR_PTRS_FROZEN_entry);
-STGFUN(MUT_VAR_entry);
-STGFUN(END_TSO_QUEUE_entry);
-STGFUN(MUT_CONS_entry);
-STGFUN(END_MUT_LIST_entry);
-STGFUN(dummy_ret_entry);
+STGFUN(stg_BCO_entry);
+STGFUN(stg_EVACUATED_entry);
+STGFUN(stg_FOREIGN_entry);
+STGFUN(stg_WEAK_entry);
+STGFUN(stg_NO_FINALIZER_entry);
+STGFUN(stg_DEAD_WEAK_entry);
+STGFUN(stg_STABLE_NAME_entry);
+STGFUN(stg_TSO_entry);
+STGFUN(stg_FULL_MVAR_entry);
+STGFUN(stg_EMPTY_MVAR_entry);
+STGFUN(stg_ARR_WORDS_entry);
+STGFUN(stg_MUT_ARR_PTRS_entry);
+STGFUN(stg_MUT_ARR_PTRS_FROZEN_entry);
+STGFUN(stg_MUT_VAR_entry);
+STGFUN(stg_END_TSO_QUEUE_entry);
+STGFUN(stg_MUT_CONS_entry);
+STGFUN(stg_END_MUT_LIST_entry);
+STGFUN(stg_dummy_ret_entry);
 
 #ifdef GHCI
 /* entry code for constructors created by the metacircular interpreter */
-STGFUN(mci_constr_entry);
-STGFUN(mci_constr1_entry);
-STGFUN(mci_constr2_entry);
-STGFUN(mci_constr3_entry);
-STGFUN(mci_constr4_entry);
-STGFUN(mci_constr5_entry);
-STGFUN(mci_constr6_entry);
-STGFUN(mci_constr7_entry);
-STGFUN(mci_constr8_entry);
+STGFUN(stg_mci_constr_entry);
+STGFUN(stg_mci_constr1_entry);
+STGFUN(stg_mci_constr2_entry);
+STGFUN(stg_mci_constr3_entry);
+STGFUN(stg_mci_constr4_entry);
+STGFUN(stg_mci_constr5_entry);
+STGFUN(stg_mci_constr6_entry);
+STGFUN(stg_mci_constr7_entry);
+STGFUN(stg_mci_constr8_entry);
 #endif
 
-/* this is the NIL ptr for a TSO queue (e.g. runnable queue) */
-#define END_TSO_QUEUE  ((StgTSO *)(void*)&END_TSO_QUEUE_closure)
 #if defined(PAR) || defined(GRAN)
 /* this is the NIL ptr for a blocking queue */
 # define END_BQ_QUEUE  ((StgBlockingQueueElement *)(void*)&END_TSO_QUEUE_closure)
@@ -77,65 +75,65 @@ STGFUN(mci_constr8_entry);
 
 /* info tables */
 
-extern DLL_IMPORT_RTS const StgInfoTable IND_info;
-extern DLL_IMPORT_RTS const StgInfoTable IND_STATIC_info;
-extern DLL_IMPORT_RTS const StgInfoTable IND_PERM_info;
-extern DLL_IMPORT_RTS const StgInfoTable IND_OLDGEN_info;
-extern DLL_IMPORT_RTS const StgInfoTable IND_OLDGEN_PERM_info;
-extern DLL_IMPORT_RTS const StgInfoTable CAF_UNENTERED_info;
-extern DLL_IMPORT_RTS const StgInfoTable CAF_ENTERED_info;
-extern DLL_IMPORT_RTS const StgInfoTable CAF_BLACKHOLE_info;
-extern DLL_IMPORT_RTS const StgInfoTable BLACKHOLE_info;
-extern DLL_IMPORT_RTS const StgInfoTable BLACKHOLE_BQ_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_IND_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_IND_STATIC_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_IND_PERM_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_IND_OLDGEN_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_IND_OLDGEN_PERM_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_CAF_UNENTERED_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_CAF_ENTERED_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_CAF_BLACKHOLE_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_BLACKHOLE_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_BLACKHOLE_BQ_info;
 #ifdef SMP
-extern DLL_IMPORT_RTS const StgInfoTable WHITEHOLE_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_WHITEHOLE_info;
 #endif
 #ifdef TICKY_TICKY
-extern DLL_IMPORT_RTS const StgInfoTable SE_BLACKHOLE_info;
-extern DLL_IMPORT_RTS const StgInfoTable SE_CAF_BLACKHOLE_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_SE_BLACKHOLE_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_SE_CAF_BLACKHOLE_info;
 #endif
 #if defined(PAR) || defined(GRAN)
-extern DLL_IMPORT_RTS const StgInfoTable RBH_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_RBH_info;
 #endif
-extern DLL_IMPORT_RTS const StgInfoTable BCO_info;
-extern DLL_IMPORT_RTS const StgInfoTable EVACUATED_info;
-extern DLL_IMPORT_RTS const StgInfoTable FOREIGN_info;
-extern DLL_IMPORT_RTS const StgInfoTable WEAK_info;
-extern DLL_IMPORT_RTS const StgInfoTable DEAD_WEAK_info;
-extern DLL_IMPORT_RTS const StgInfoTable STABLE_NAME_info;
-extern DLL_IMPORT_RTS const StgInfoTable FULL_MVAR_info;
-extern DLL_IMPORT_RTS const StgInfoTable EMPTY_MVAR_info;
-extern DLL_IMPORT_RTS const StgInfoTable TSO_info;
-extern DLL_IMPORT_RTS const StgInfoTable ARR_WORDS_info;
-extern DLL_IMPORT_RTS const StgInfoTable MUT_ARR_WORDS_info;
-extern DLL_IMPORT_RTS const StgInfoTable MUT_ARR_PTRS_info;
-extern DLL_IMPORT_RTS const StgInfoTable MUT_ARR_PTRS_FROZEN_info;
-extern DLL_IMPORT_RTS const StgInfoTable MUT_VAR_info;
-extern DLL_IMPORT_RTS const StgInfoTable END_TSO_QUEUE_info;
-extern DLL_IMPORT_RTS const StgInfoTable MUT_CONS_info;
-extern DLL_IMPORT_RTS const StgInfoTable END_MUT_LIST_info;
-extern DLL_IMPORT_RTS const StgInfoTable catch_info;
-extern DLL_IMPORT_RTS const StgInfoTable seq_info;
-extern DLL_IMPORT_RTS const StgInfoTable dummy_ret_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_BCO_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_EVACUATED_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_FOREIGN_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_WEAK_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_DEAD_WEAK_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_STABLE_NAME_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_FULL_MVAR_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_EMPTY_MVAR_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_TSO_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_ARR_WORDS_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_MUT_ARR_WORDS_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_MUT_ARR_PTRS_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_MUT_ARR_PTRS_FROZEN_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_MUT_VAR_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_END_TSO_QUEUE_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_MUT_CONS_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_END_MUT_LIST_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_catch_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_seq_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_dummy_ret_info;
 
 #ifdef INTERPRETER
 
 EXTFUN(Hugs_CONSTR_entry);
 
-extern const vec_info_8 ret_bco_info;
+extern const vec_info_8 stg_ret_bco_info;
 
 #endif /* INTERPRETER */
 
 /* closures */
 
-extern DLL_IMPORT_RTS StgClosure END_TSO_QUEUE_closure;
-extern DLL_IMPORT_RTS StgClosure END_MUT_LIST_closure;
-extern DLL_IMPORT_RTS StgClosure NO_FINALIZER_closure;
-extern DLL_IMPORT_RTS StgClosure dummy_ret_closure;
-extern DLL_IMPORT_RTS StgClosure forceIO_closure;
+extern DLL_IMPORT_RTS StgClosure stg_END_TSO_QUEUE_closure;
+extern DLL_IMPORT_RTS StgClosure stg_END_MUT_LIST_closure;
+extern DLL_IMPORT_RTS StgClosure stg_NO_FINALIZER_closure;
+extern DLL_IMPORT_RTS StgClosure stg_dummy_ret_closure;
+extern DLL_IMPORT_RTS StgClosure stg_forceIO_closure;
 
-extern DLL_IMPORT_RTS StgIntCharlikeClosure CHARLIKE_closure[];
-extern DLL_IMPORT_RTS StgIntCharlikeClosure INTLIKE_closure[];
+extern DLL_IMPORT_RTS StgIntCharlikeClosure stg_CHARLIKE_closure[];
+extern DLL_IMPORT_RTS StgIntCharlikeClosure stg_INTLIKE_closure[];
 
 /* standard entry points */
 
@@ -145,86 +143,86 @@ extern DLL_IMPORT_RTS StgIntCharlikeClosure INTLIKE_closure[];
 
 /* standard selector thunks */
 
-EXTINFO_RTS __sel_0_upd_info;
-EXTINFO_RTS __sel_1_upd_info;
-EXTINFO_RTS __sel_2_upd_info;
-EXTINFO_RTS __sel_3_upd_info;
-EXTINFO_RTS __sel_4_upd_info;
-EXTINFO_RTS __sel_5_upd_info;
-EXTINFO_RTS __sel_6_upd_info;
-EXTINFO_RTS __sel_7_upd_info;
-EXTINFO_RTS __sel_8_upd_info;
-EXTINFO_RTS __sel_8_upd_info;
-EXTINFO_RTS __sel_9_upd_info;
-EXTINFO_RTS __sel_10_upd_info;
-EXTINFO_RTS __sel_11_upd_info;
-EXTINFO_RTS __sel_12_upd_info;
-EXTINFO_RTS __sel_13_upd_info;
-EXTINFO_RTS __sel_14_upd_info;
-EXTINFO_RTS __sel_15_upd_info;
+EXTINFO_RTS stg_sel_0_upd_info;
+EXTINFO_RTS stg_sel_1_upd_info;
+EXTINFO_RTS stg_sel_2_upd_info;
+EXTINFO_RTS stg_sel_3_upd_info;
+EXTINFO_RTS stg_sel_4_upd_info;
+EXTINFO_RTS stg_sel_5_upd_info;
+EXTINFO_RTS stg_sel_6_upd_info;
+EXTINFO_RTS stg_sel_7_upd_info;
+EXTINFO_RTS stg_sel_8_upd_info;
+EXTINFO_RTS stg_sel_8_upd_info;
+EXTINFO_RTS stg_sel_9_upd_info;
+EXTINFO_RTS stg_sel_10_upd_info;
+EXTINFO_RTS stg_sel_11_upd_info;
+EXTINFO_RTS stg_sel_12_upd_info;
+EXTINFO_RTS stg_sel_13_upd_info;
+EXTINFO_RTS stg_sel_14_upd_info;
+EXTINFO_RTS stg_sel_15_upd_info;
 
-EXTINFO_RTS __sel_0_noupd_info;
-EXTINFO_RTS __sel_1_noupd_info;
-EXTINFO_RTS __sel_2_noupd_info;
-EXTINFO_RTS __sel_3_noupd_info;
-EXTINFO_RTS __sel_4_noupd_info;
-EXTINFO_RTS __sel_5_noupd_info;
-EXTINFO_RTS __sel_6_noupd_info;
-EXTINFO_RTS __sel_7_noupd_info;
-EXTINFO_RTS __sel_8_noupd_info;
-EXTINFO_RTS __sel_9_noupd_info;
-EXTINFO_RTS __sel_10_noupd_info;
-EXTINFO_RTS __sel_11_noupd_info;
-EXTINFO_RTS __sel_12_noupd_info;
-EXTINFO_RTS __sel_13_noupd_info;
-EXTINFO_RTS __sel_14_noupd_info;
-EXTINFO_RTS __sel_15_noupd_info;
+EXTINFO_RTS stg_sel_0_noupd_info;
+EXTINFO_RTS stg_sel_1_noupd_info;
+EXTINFO_RTS stg_sel_2_noupd_info;
+EXTINFO_RTS stg_sel_3_noupd_info;
+EXTINFO_RTS stg_sel_4_noupd_info;
+EXTINFO_RTS stg_sel_5_noupd_info;
+EXTINFO_RTS stg_sel_6_noupd_info;
+EXTINFO_RTS stg_sel_7_noupd_info;
+EXTINFO_RTS stg_sel_8_noupd_info;
+EXTINFO_RTS stg_sel_9_noupd_info;
+EXTINFO_RTS stg_sel_10_noupd_info;
+EXTINFO_RTS stg_sel_11_noupd_info;
+EXTINFO_RTS stg_sel_12_noupd_info;
+EXTINFO_RTS stg_sel_13_noupd_info;
+EXTINFO_RTS stg_sel_14_noupd_info;
+EXTINFO_RTS stg_sel_15_noupd_info;
 
   /* and their standard entry points  -- KSW 1998-12 */
 
-EXTFUN_RTS(__sel_0_upd_entry);
-EXTFUN_RTS(__sel_1_upd_entry);
-EXTFUN_RTS(__sel_2_upd_entry);
-EXTFUN_RTS(__sel_3_upd_entry);
-EXTFUN_RTS(__sel_4_upd_entry);
-EXTFUN_RTS(__sel_5_upd_entry);
-EXTFUN_RTS(__sel_6_upd_entry);
-EXTFUN_RTS(__sel_7_upd_entry);
-EXTFUN_RTS(__sel_8_upd_entry);
-EXTFUN_RTS(__sel_8_upd_entry);
-EXTFUN_RTS(__sel_9_upd_entry);
-EXTFUN_RTS(__sel_10_upd_entry);
-EXTFUN_RTS(__sel_11_upd_entry);
-EXTFUN_RTS(__sel_12_upd_entry);
-EXTFUN_RTS(__sel_13_upd_entry);
-EXTFUN_RTS(__sel_14_upd_entry);
-EXTFUN_RTS(__sel_15_upd_entry);
+EXTFUN_RTS(stg_sel_0_upd_entry);
+EXTFUN_RTS(stg_sel_1_upd_entry);
+EXTFUN_RTS(stg_sel_2_upd_entry);
+EXTFUN_RTS(stg_sel_3_upd_entry);
+EXTFUN_RTS(stg_sel_4_upd_entry);
+EXTFUN_RTS(stg_sel_5_upd_entry);
+EXTFUN_RTS(stg_sel_6_upd_entry);
+EXTFUN_RTS(stg_sel_7_upd_entry);
+EXTFUN_RTS(stg_sel_8_upd_entry);
+EXTFUN_RTS(stg_sel_8_upd_entry);
+EXTFUN_RTS(stg_sel_9_upd_entry);
+EXTFUN_RTS(stg_sel_10_upd_entry);
+EXTFUN_RTS(stg_sel_11_upd_entry);
+EXTFUN_RTS(stg_sel_12_upd_entry);
+EXTFUN_RTS(stg_sel_13_upd_entry);
+EXTFUN_RTS(stg_sel_14_upd_entry);
+EXTFUN_RTS(stg_sel_15_upd_entry);
 
-EXTFUN_RTS(__sel_0_noupd_entry);
-EXTFUN_RTS(__sel_1_noupd_entry);
-EXTFUN_RTS(__sel_2_noupd_entry);
-EXTFUN_RTS(__sel_3_noupd_entry);
-EXTFUN_RTS(__sel_4_noupd_entry);
-EXTFUN_RTS(__sel_5_noupd_entry);
-EXTFUN_RTS(__sel_6_noupd_entry);
-EXTFUN_RTS(__sel_7_noupd_entry);
-EXTFUN_RTS(__sel_8_noupd_entry);
-EXTFUN_RTS(__sel_9_noupd_entry);
-EXTFUN_RTS(__sel_10_noupd_entry);
-EXTFUN_RTS(__sel_11_noupd_entry);
-EXTFUN_RTS(__sel_12_noupd_entry);
-EXTFUN_RTS(__sel_13_noupd_entry);
-EXTFUN_RTS(__sel_14_noupd_entry);
-EXTFUN_RTS(__sel_15_noupd_entry);
+EXTFUN_RTS(stg_sel_0_noupd_entry);
+EXTFUN_RTS(stg_sel_1_noupd_entry);
+EXTFUN_RTS(stg_sel_2_noupd_entry);
+EXTFUN_RTS(stg_sel_3_noupd_entry);
+EXTFUN_RTS(stg_sel_4_noupd_entry);
+EXTFUN_RTS(stg_sel_5_noupd_entry);
+EXTFUN_RTS(stg_sel_6_noupd_entry);
+EXTFUN_RTS(stg_sel_7_noupd_entry);
+EXTFUN_RTS(stg_sel_8_noupd_entry);
+EXTFUN_RTS(stg_sel_9_noupd_entry);
+EXTFUN_RTS(stg_sel_10_noupd_entry);
+EXTFUN_RTS(stg_sel_11_noupd_entry);
+EXTFUN_RTS(stg_sel_12_noupd_entry);
+EXTFUN_RTS(stg_sel_13_noupd_entry);
+EXTFUN_RTS(stg_sel_14_noupd_entry);
+EXTFUN_RTS(stg_sel_15_noupd_entry);
 
 /* standard ap thunks */
 
-EXTINFO_RTS __ap_1_upd_info;
-EXTINFO_RTS __ap_2_upd_info;
-EXTINFO_RTS __ap_3_upd_info;
-EXTINFO_RTS __ap_4_upd_info;
-EXTINFO_RTS __ap_5_upd_info;
-EXTINFO_RTS __ap_6_upd_info;
-EXTINFO_RTS __ap_7_upd_info;
-EXTINFO_RTS __ap_8_upd_info;
+EXTINFO_RTS stg_ap_1_upd_info;
+EXTINFO_RTS stg_ap_2_upd_info;
+EXTINFO_RTS stg_ap_3_upd_info;
+EXTINFO_RTS stg_ap_4_upd_info;
+EXTINFO_RTS stg_ap_5_upd_info;
+EXTINFO_RTS stg_ap_6_upd_info;
+EXTINFO_RTS stg_ap_7_upd_info;
+EXTINFO_RTS stg_ap_8_upd_info;
 

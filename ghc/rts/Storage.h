@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.16 2000/04/14 15:18:07 sewardj Exp $
+ * $Id: Storage.h,v 1.17 2000/11/13 14:40:37 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -104,7 +104,7 @@ recordMutable(StgMutClosure *p)
   bdescr *bd;
 
 #ifdef SMP
-  ASSERT(p->header.info == &WHITEHOLE_info || closure_MUTABLE(p));
+  ASSERT(p->header.info == &stg_WHITEHOLE_info || closure_MUTABLE(p));
 #else
   ASSERT(closure_MUTABLE(p));
 #endif
@@ -135,15 +135,15 @@ recordOldToNewPtrs(StgMutClosure *p)
     bd = Bdescr((P_)p1);						\
     if (bd->gen->no == 0) {						\
       ((StgInd *)p1)->indirectee = p2;					\
-      SET_INFO(p1,&IND_info);						\
+      SET_INFO(p1,&stg_IND_info);						\
       TICK_UPD_NEW_IND();						\
     } else {								\
       ((StgIndOldGen *)p1)->indirectee = p2;				\
-      if (info != &BLACKHOLE_BQ_info) {					\
+      if (info != &stg_BLACKHOLE_BQ_info) {					\
         ((StgIndOldGen *)p1)->mut_link = bd->gen->mut_once_list;	\
         bd->gen->mut_once_list = (StgMutClosure *)p1;			\
       }									\
-      SET_INFO(p1,&IND_OLDGEN_info);					\
+      SET_INFO(p1,&stg_IND_OLDGEN_info);					\
       TICK_UPD_OLD_IND();						\
     }									\
   }
@@ -157,15 +157,15 @@ updateWithPermIndirection(const StgInfoTable *info, StgClosure *p1, StgClosure *
   bd = Bdescr((P_)p1);
   if (bd->gen->no == 0) {
     ((StgInd *)p1)->indirectee = p2;
-    SET_INFO(p1,&IND_PERM_info);
+    SET_INFO(p1,&stg_IND_PERM_info);
     TICK_UPD_NEW_PERM_IND(p1);
   } else {
     ((StgIndOldGen *)p1)->indirectee = p2;
-    if (info != &BLACKHOLE_BQ_info) {
+    if (info != &stg_BLACKHOLE_BQ_info) {
       ((StgIndOldGen *)p1)->mut_link = bd->gen->mut_once_list;
       bd->gen->mut_once_list = (StgMutClosure *)p1;
     }
-    SET_INFO(p1,&IND_OLDGEN_PERM_info);
+    SET_INFO(p1,&stg_IND_OLDGEN_PERM_info);
     TICK_UPD_OLD_PERM_IND();
   }
 }

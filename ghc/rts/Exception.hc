@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: Exception.hc,v 1.14 2000/05/25 09:16:56 simonmar Exp $
+ * $Id: Exception.hc,v 1.15 2000/11/13 14:40:37 simonmar Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2000
  *
  * Exception support
  *
@@ -55,11 +55,11 @@ FN_(blockAsyncExceptionszh_fast)
     if (CurrentTSO->blocked_exceptions == NULL) {
       CurrentTSO->blocked_exceptions = END_TSO_QUEUE;
       /* avoid growing the stack unnecessarily */
-      if (Sp[0] == (W_)&blockAsyncExceptionszh_ret_info) {
+      if (Sp[0] == (W_)&stg_blockAsyncExceptionszh_ret_info) {
 	Sp++;
       } else {
 	Sp--;
-	Sp[0] = (W_)&unblockAsyncExceptionszh_ret_info;
+	Sp[0] = (W_)&stg_unblockAsyncExceptionszh_ret_info;
       }
     }
     Sp--;
@@ -68,8 +68,8 @@ FN_(blockAsyncExceptionszh_fast)
   FE_
 }
 
-INFO_TABLE_SRT_BITMAP(unblockAsyncExceptionszh_ret_info, unblockAsyncExceptionszh_ret_entry, 0, 0, 0, 0, RET_SMALL, , EF_, 0, 0);
-FN_(unblockAsyncExceptionszh_ret_entry)
+INFO_TABLE_SRT_BITMAP(stg_unblockAsyncExceptionszh_ret_info, stg_unblockAsyncExceptionszh_ret_entry, 0, 0, 0, 0, RET_SMALL, , EF_, 0, 0);
+FN_(stg_unblockAsyncExceptionszh_ret_entry)
 {
   FB_
     ASSERT(CurrentTSO->blocked_exceptions != NULL);
@@ -117,11 +117,11 @@ FN_(unblockAsyncExceptionszh_fast)
       CurrentTSO->blocked_exceptions = NULL;
 
       /* avoid growing the stack unnecessarily */
-      if (Sp[0] == (W_)&unblockAsyncExceptionszh_ret_info) {
+      if (Sp[0] == (W_)&stg_unblockAsyncExceptionszh_ret_info) {
 	Sp++;
       } else {
 	Sp--;	
-	Sp[0] = (W_)&blockAsyncExceptionszh_ret_info;
+	Sp[0] = (W_)&stg_blockAsyncExceptionszh_ret_info;
       }
     }
     Sp--;
@@ -130,8 +130,8 @@ FN_(unblockAsyncExceptionszh_fast)
   FE_
 }
 
-INFO_TABLE_SRT_BITMAP(blockAsyncExceptionszh_ret_info, blockAsyncExceptionszh_ret_entry, 0, 0, 0, 0, RET_SMALL, , EF_, 0, 0);
-FN_(blockAsyncExceptionszh_ret_entry)
+INFO_TABLE_SRT_BITMAP(stg_blockAsyncExceptionszh_ret_info, stg_blockAsyncExceptionszh_ret_entry, 0, 0, 0, 0, RET_SMALL, , EF_, 0, 0);
+FN_(stg_blockAsyncExceptionszh_ret_entry)
 {
   FB_
     ASSERT(CurrentTSO->blocked_exceptions == NULL);
@@ -249,15 +249,15 @@ FN_(killThreadzh_fast)
 #define SP_OFF 1
 #endif
 
-CATCH_FRAME_ENTRY_TEMPLATE(catch_frame_entry,ENTRY_CODE(Sp[SP_OFF]));
-CATCH_FRAME_ENTRY_TEMPLATE(catch_frame_0_entry,RET_VEC(Sp[SP_OFF],0));
-CATCH_FRAME_ENTRY_TEMPLATE(catch_frame_1_entry,RET_VEC(Sp[SP_OFF],1));
-CATCH_FRAME_ENTRY_TEMPLATE(catch_frame_2_entry,RET_VEC(Sp[SP_OFF],2));
-CATCH_FRAME_ENTRY_TEMPLATE(catch_frame_3_entry,RET_VEC(Sp[SP_OFF],3));
-CATCH_FRAME_ENTRY_TEMPLATE(catch_frame_4_entry,RET_VEC(Sp[SP_OFF],4));
-CATCH_FRAME_ENTRY_TEMPLATE(catch_frame_5_entry,RET_VEC(Sp[SP_OFF],5));
-CATCH_FRAME_ENTRY_TEMPLATE(catch_frame_6_entry,RET_VEC(Sp[SP_OFF],6));
-CATCH_FRAME_ENTRY_TEMPLATE(catch_frame_7_entry,RET_VEC(Sp[SP_OFF],7));
+CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_entry,ENTRY_CODE(Sp[SP_OFF]));
+CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_0_entry,RET_VEC(Sp[SP_OFF],0));
+CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_1_entry,RET_VEC(Sp[SP_OFF],1));
+CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_2_entry,RET_VEC(Sp[SP_OFF],2));
+CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_3_entry,RET_VEC(Sp[SP_OFF],3));
+CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_4_entry,RET_VEC(Sp[SP_OFF],4));
+CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_5_entry,RET_VEC(Sp[SP_OFF],5));
+CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_6_entry,RET_VEC(Sp[SP_OFF],6));
+CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_7_entry,RET_VEC(Sp[SP_OFF],7));
 
 #ifdef PROFILING
 #define CATCH_FRAME_BITMAP 7
@@ -270,7 +270,7 @@ CATCH_FRAME_ENTRY_TEMPLATE(catch_frame_7_entry,RET_VEC(Sp[SP_OFF],7));
  * kind of return to the activation record underneath us on the stack.
  */
 
-VEC_POLY_INFO_TABLE(catch_frame, CATCH_FRAME_BITMAP, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, CATCH_FRAME,, EF_);
+VEC_POLY_INFO_TABLE(stg_catch_frame, CATCH_FRAME_BITMAP, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, CATCH_FRAME,, EF_);
 
 /* -----------------------------------------------------------------------------
  * The catch infotable
@@ -303,7 +303,7 @@ FN_(catchzh_fast)
     /* Set up the catch frame */
     Sp -= sizeofW(StgCatchFrame);
     fp = (StgCatchFrame *)Sp;
-    SET_HDR(fp,(StgInfoTable *)&catch_frame_info,CCCS);
+    SET_HDR(fp,(StgInfoTable *)&stg_catch_frame_info,CCCS);
     fp -> handler = R2.cl;
     fp -> exceptions_blocked = (CurrentTSO->blocked_exceptions != NULL);
     fp -> link = Su;
@@ -329,7 +329,7 @@ FN_(catchzh_fast)
  * It is used in raisezh_fast to update thunks on the update list
  * -------------------------------------------------------------------------- */
 
-INFO_TABLE(raise_info,raise_entry,1,0,THUNK,,EF_,0,0);
+INFO_TABLE(stg_raise_info,raise_entry,1,0,THUNK,,EF_,0,0);
 STGFUN(raise_entry)
 {
   FB_
@@ -368,7 +368,7 @@ FN_(raisezh_fast)
      */
     raise_closure = (StgClosure *)RET_STGCALL1(P_,allocate,
 					       sizeofW(StgClosure)+1);
-    raise_closure->header.info = &raise_info;
+    raise_closure->header.info = &stg_raise_info;
     raise_closure->payload[0] = R1.cl;
 
     while (1) {
@@ -422,7 +422,7 @@ FN_(raisezh_fast)
      * unblockAsyncExceptions_ret stack frame.
      */
     if (! ((StgCatchFrame *)p)->exceptions_blocked) {
-      *(--Sp) = (W_)&unblockAsyncExceptionszh_ret_info;
+      *(--Sp) = (W_)&stg_unblockAsyncExceptionszh_ret_info;
     }
 
     /* Ensure that async excpetions are blocked when running the handler.

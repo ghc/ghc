@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.27 2000/11/07 10:42:56 simonmar Exp $
+ * $Id: ClosureMacros.h,v 1.28 2000/11/13 14:40:36 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -153,12 +153,12 @@ extern int is_heap_alloced(const void* x);
 
 /* Tiresome predicates needed to check for pointers into the closure tables */
 #define IS_CHARLIKE_CLOSURE(p) \
-    ( (P_)(p) >= (P_)CHARLIKE_closure && \
-      (char*)(p) <= ((char*)CHARLIKE_closure + \
+    ( (P_)(p) >= (P_)stg_CHARLIKE_closure && \
+      (char*)(p) <= ((char*)stg_CHARLIKE_closure + \
                      (MAX_CHARLIKE-MIN_CHARLIKE) * sizeof(StgIntCharlikeClosure)) )
 #define IS_INTLIKE_CLOSURE(p) \
-    ( (P_)(p) >= (P_)INTLIKE_closure && \
-      (char*)(p) <= ((char*)INTLIKE_closure + \
+    ( (P_)(p) >= (P_)stg_INTLIKE_closure && \
+      (char*)(p) <= ((char*)stg_INTLIKE_closure + \
                      (MAX_INTLIKE-MIN_INTLIKE) * sizeof(StgIntCharlikeClosure)) )
 
 #define LOOKS_LIKE_STATIC_CLOSURE(r) (((*(((unsigned long *)(r))-1)) == 0) || IS_CHARLIKE_CLOSURE(r) || IS_INTLIKE_CLOSURE(r))
@@ -348,8 +348,8 @@ static __inline__ StgWord tso_sizeW ( StgTSO *tso )
    INTLIKE and CHARLIKE closures.
    -------------------------------------------------------------------------- */
 
-#define CHARLIKE_CLOSURE(n) ((P_)&CHARLIKE_closure[(n)-MIN_CHARLIKE])
-#define INTLIKE_CLOSURE(n)  ((P_)&INTLIKE_closure[(n)-MIN_INTLIKE])
+#define CHARLIKE_CLOSURE(n) ((P_)&stg_CHARLIKE_closure[(n)-MIN_CHARLIKE])
+#define INTLIKE_CLOSURE(n)  ((P_)&stg_INTLIKE_closure[(n)-MIN_INTLIKE])
 
 /* -----------------------------------------------------------------------------
    Closure Tables (for enumerated data types)

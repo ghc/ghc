@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.27 2000/11/01 11:41:47 simonmar Exp $
+ * $Id: Storage.c,v 1.28 2000/11/13 14:40:37 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -496,7 +496,7 @@ stgAllocForGMP (size_t size_in_bytes)
   
   /* allocate and fill it in. */
   arr = (StgArrWords *)allocate(total_size_in_words);
-  SET_ARR_HDR(arr, &ARR_WORDS_info, CCCS, data_size_in_words);
+  SET_ARR_HDR(arr, &stg_ARR_WORDS_info, CCCS, data_size_in_words);
   
   /* and return a ptr to the goods inside the array */
   return(BYTE_ARR_CTS(arr));

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.28 2000/05/16 15:56:00 simonmar Exp $
+ * $Id: Updates.hc,v 1.29 2000/11/13 14:40:37 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -142,8 +142,8 @@ VEC_POLY_INFO_TABLE(upd_frame,UPD_FRAME_BITMAP, NULL/*srt*/, 0/*srt_off*/, 0/*sr
    really an optimisation? --SDM)
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(PAP_info,PAP_entry,/*special layout*/0,0,PAP,,EF_,"PAP","PAP");
-STGFUN(PAP_entry)
+INFO_TABLE(stg_PAP_info,stg_PAP_entry,/*special layout*/0,0,PAP,,EF_,"PAP","PAP");
+STGFUN(stg_PAP_entry)
 {
   nat Words;
   P_ p;
@@ -298,7 +298,7 @@ EXTFUN(stg_update_PAP)
 
 	PapClosure = (StgPAP *)(Hp + 1 - PapSize); /* The new PapClosure */
 
-	SET_HDR(PapClosure,&PAP_info,CCS_pap);
+	SET_HDR(PapClosure,&stg_PAP_info,CCS_pap);
 	PapClosure->n_args = Words;
 	PapClosure->fun = Fun;
 
@@ -413,8 +413,8 @@ EXTFUN(stg_update_PAP)
    -------------------------------------------------------------------------- */
 
 
-INFO_TABLE(AP_UPD_info,AP_UPD_entry,/*special layout*/0,0,AP_UPD,,EF_,"AP_UPD","AP_UPD");
-STGFUN(AP_UPD_entry)
+INFO_TABLE(stg_AP_UPD_info,stg_AP_UPD_entry,/*special layout*/0,0,AP_UPD,,EF_,"AP_UPD","AP_UPD");
+STGFUN(stg_AP_UPD_entry)
 {
   nat Words;
   P_ p;
@@ -430,7 +430,7 @@ STGFUN(AP_UPD_entry)
   /* 
    * Check for stack overflow.
    */
-  STK_CHK(Words+sizeofW(StgUpdateFrame),AP_UPD_entry,R2.p,1,);
+  STK_CHK(Words+sizeofW(StgUpdateFrame),stg_AP_UPD_entry,R2.p,1,);
 
   PUSH_UPD_FRAME(R1.p, 0);
   Sp -= sizeofW(StgUpdateFrame) + Words;
@@ -478,17 +478,17 @@ STGFUN(AP_UPD_entry)
       FE_					\
    }
 
-SEQ_FRAME_ENTRY_TEMPLATE(seq_frame_entry,  ENTRY_CODE(Sp[0]));
-SEQ_FRAME_ENTRY_TEMPLATE(seq_frame_0_entry,ENTRY_CODE(Sp[0]));
-SEQ_FRAME_ENTRY_TEMPLATE(seq_frame_1_entry,ENTRY_CODE(Sp[0]));
-SEQ_FRAME_ENTRY_TEMPLATE(seq_frame_2_entry,ENTRY_CODE(Sp[0]));
-SEQ_FRAME_ENTRY_TEMPLATE(seq_frame_3_entry,ENTRY_CODE(Sp[0]));
-SEQ_FRAME_ENTRY_TEMPLATE(seq_frame_4_entry,ENTRY_CODE(Sp[0]));
-SEQ_FRAME_ENTRY_TEMPLATE(seq_frame_5_entry,ENTRY_CODE(Sp[0]));
-SEQ_FRAME_ENTRY_TEMPLATE(seq_frame_6_entry,ENTRY_CODE(Sp[0]));
-SEQ_FRAME_ENTRY_TEMPLATE(seq_frame_7_entry,ENTRY_CODE(Sp[0]));
+SEQ_FRAME_ENTRY_TEMPLATE(stg_seq_frame_entry,  ENTRY_CODE(Sp[0]));
+SEQ_FRAME_ENTRY_TEMPLATE(stg_seq_frame_0_entry,ENTRY_CODE(Sp[0]));
+SEQ_FRAME_ENTRY_TEMPLATE(stg_seq_frame_1_entry,ENTRY_CODE(Sp[0]));
+SEQ_FRAME_ENTRY_TEMPLATE(stg_seq_frame_2_entry,ENTRY_CODE(Sp[0]));
+SEQ_FRAME_ENTRY_TEMPLATE(stg_seq_frame_3_entry,ENTRY_CODE(Sp[0]));
+SEQ_FRAME_ENTRY_TEMPLATE(stg_seq_frame_4_entry,ENTRY_CODE(Sp[0]));
+SEQ_FRAME_ENTRY_TEMPLATE(stg_seq_frame_5_entry,ENTRY_CODE(Sp[0]));
+SEQ_FRAME_ENTRY_TEMPLATE(stg_seq_frame_6_entry,ENTRY_CODE(Sp[0]));
+SEQ_FRAME_ENTRY_TEMPLATE(stg_seq_frame_7_entry,ENTRY_CODE(Sp[0]));
 
-VEC_POLY_INFO_TABLE(seq_frame, UPD_FRAME_BITMAP, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, SEQ_FRAME,, EF_);
+VEC_POLY_INFO_TABLE(stg_seq_frame, UPD_FRAME_BITMAP, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, SEQ_FRAME,, EF_);
 
 /* -----------------------------------------------------------------------------
  * The seq infotable
@@ -501,11 +501,11 @@ VEC_POLY_INFO_TABLE(seq_frame, UPD_FRAME_BITMAP, NULL/*srt*/, 0/*srt_off*/, 0/*s
  * It is used in deleteThread when reverting blackholes.
  * -------------------------------------------------------------------------- */
 
-INFO_TABLE(seq_info,seq_entry,1,0,FUN,,EF_,0,0);
-STGFUN(seq_entry)
+INFO_TABLE(stg_seq_info,stg_seq_entry,1,0,FUN,,EF_,0,0);
+STGFUN(stg_seq_entry)
 {
   FB_
-  STK_CHK_GEN(sizeofW(StgSeqFrame), NO_PTRS, seq_entry, );
+  STK_CHK_GEN(sizeofW(StgSeqFrame), NO_PTRS, stg_seq_entry, );
   Sp -= sizeofW(StgSeqFrame);
   PUSH_SEQ_FRAME(Sp);
   R1.cl = R1.cl->payload[0];

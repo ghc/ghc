@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StoragePriv.h,v 1.11 2000/11/01 11:41:47 simonmar Exp $
+ * $Id: StoragePriv.h,v 1.12 2000/11/13 14:40:37 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -64,7 +64,7 @@ dbl_link_onto(bdescr *bd, bdescr **list)
  * A mutable list is ended with END_MUT_LIST, so that we can use NULL
  * as an indication that an object is not on a mutable list.
  */
-#define END_MUT_LIST ((StgMutClosure *)(void *)&END_MUT_LIST_closure)
+#define END_MUT_LIST ((StgMutClosure *)(void *)&stg_END_MUT_LIST_closure)
 
 #ifdef DEBUG
 extern void memInventory(void);

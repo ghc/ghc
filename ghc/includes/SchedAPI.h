@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: SchedAPI.h,v 1.10 2000/04/14 15:18:05 sewardj Exp $
+ * $Id: SchedAPI.h,v 1.11 2000/11/13 14:40:36 simonmar Exp $
  *
  * (c) The GHC Team 1998
  *
@@ -82,7 +82,7 @@ createStrictIOThread(nat stack_size,  StgClosure *closure) {
   t = createThread(stack_size);
 #endif
   pushClosure(t,closure);
-  pushClosure(t,(StgClosure*)&forceIO_closure);
+  pushClosure(t,(StgClosure*)&stg_forceIO_closure);
   return t;
 }
 
