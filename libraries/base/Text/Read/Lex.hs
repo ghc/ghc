@@ -98,7 +98,7 @@ lexPunc =
   do c <- satisfy isPuncChar
      return (Punc [c])
  where
-  isPuncChar c = c `elem` ",;()[]{}_`"
+  isPuncChar c = c `elem` ",;()[]{}`"
 
 -- ----------------------------------------------------------------------
 -- Symbols
@@ -119,10 +119,12 @@ lexSymbol =
 
 lexId :: ReadP Lexeme
 lexId =
-  do c <- satisfy isAlpha
+  do c <- satisfy isIdsChar
      s <- munch isIdfChar
      return (Ident (c:s))
  where
+	-- Identifiers can start with a '_'
+  isIdsChar c = isAlpha c || c == '_'
   isIdfChar c = isAlphaNum c || c `elem` "_'"
 
 -- ---------------------------------------------------------------------------
