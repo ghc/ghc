@@ -21,7 +21,7 @@ module TcSimplify (
 
 import {-# SOURCE #-} TcUnify( unifyTauTy )
 import TcEnv		-- temp
-import HsSyn		( HsBind(..), LHsBinds, HsExpr(..), LHsExpr )
+import HsSyn		( HsBind(..), LHsBinds, HsExpr(..), LHsExpr, pprLHsBinds )
 import TcHsSyn		( TcId, TcDictBinds, mkHsApp, mkHsTyApp, mkHsDictApp )
 
 import TcRnMonad
@@ -35,8 +35,8 @@ import Inst		( lookupInst, LookupInstResult(..),
 			  newDictsFromOld, tcInstClassOp,
 			  getDictClassTys, isTyVarDict,
 			  instLoc, zonkInst, tidyInsts, tidyMoreInsts,
-			  Inst, pprInsts, pprInstsInFull, tcGetInstEnvs,
-			  isIPDict, isInheritableInst, pprDFuns
+			  Inst, pprInsts, pprDictsInFull, tcGetInstEnvs,
+			  isIPDict, isInheritableInst, pprDFuns, pprDictsTheta
 			)
 import TcEnv		( tcGetGlobalTyVars, tcLookupId, findGlobals )
 import InstEnv		( lookupInstEnv, classInstEnv )
@@ -44,7 +44,7 @@ import TcMType		( zonkTcTyVarsAndFV, tcInstTyVars, checkAmbiguity )
 import TcType		( TcTyVar, TcTyVarSet, ThetaType, TyVarDetails(VanillaTv),
 			  mkClassPred, isOverloadedTy, mkTyConApp,
 			  mkTyVarTy, tcGetTyVar, isTyVarClassPred, mkTyVarTys,
-			  tyVarsOfPred, tcEqType )
+			  tyVarsOfPred, tcEqType, pprPred )
 import Id		( idType, mkUserLocal )
 import Var		( TyVar )
 import Name		( getOccName, getSrcLoc )
@@ -855,6 +855,64 @@ tcSimplCheck doc get_qtvs givens wanted_lie
 %*									*
 %************************************************************************
 
+tcSimplifyRestricted infers which type variables to quantify for a 
+group of restricted bindings.  This isn't trivial.
+
+Eg1:	id = \x -> x
+	We want to quantify over a to get id :: forall a. a->a
+	
+Eg2:	eq = (==)
+	We do not want to quantify over a, because there's an Eq a 
+	constraint, so we get eq :: a->a->Bool	(notice no forall)
+
+So, assume:
+	RHS has type 'tau', whose free tyvars are tau_tvs
+	RHS has constraints 'wanteds'
+
+Plan A (simple)
+  Quantify over (tau_tvs \ ftvs(wanteds))
+  This is bad. The constraints may contain (Monad (ST s))
+  where we have 	instance Monad (ST s) where...
+  so there's no need to be monomorphic in s!
+
+  Also the constraint might be a method constraint,
+  whose type mentions a perfectly innocent tyvar:
+	  op :: Num a => a -> b -> a
+  Here, b is unconstrained.  A good example would be
+	foo = op (3::Int)
+  We want to infer the polymorphic type
+	foo :: forall b. b -> b
+
+
+Plan B (cunning, used for a long time up to and including GHC 6.2)
+  Step 1: Simplify the constraints as much as possible (to deal 
+  with Plan A's problem).  Then set
+	qtvs = tau_tvs \ ftvs( simplify( wanteds ) )
+
+  Step 2: Now simplify again, treating the constraint as 'free' if 
+  it does not mention qtvs, and trying to reduce it otherwise.
+  The reasons for this is to maximise sharing.
+
+  This fails for a very subtle reason.  Suppose that in the Step 2
+  a constraint (Foo (Succ Zero) (Succ Zero) b) gets thrown upstairs as 'free'.
+  In the Step 1 this constraint might have been simplified, perhaps to
+  (Foo Zero Zero b), AND THEN THAT MIGHT BE IMPROVED, to bind 'b' to 'T'.
+  This won't happen in Step 2... but that in turn might prevent some other
+  constraint mentioning 'b' from being simplified... and that in turn
+  breaks the invariant that no constraints are quantified over.
+
+  Test typecheck/should_compile/tc177 (which failed in GHC 6.2) demonstrates
+  the problem.
+
+
+Plan C (brutal)
+  Step 1: Simplify the constraints as much as possible (to deal 
+  with Plan A's problem).  Then set
+	qtvs = tau_tvs \ ftvs( simplify( wanteds ) )
+  Return the bindings from Step 1.
+  
+
+
 \begin{code}
 tcSimplifyRestricted 	-- Used for restricted binding groups
 			-- i.e. ones subject to the monomorphism restriction
@@ -863,72 +921,37 @@ tcSimplifyRestricted 	-- Used for restricted binding groups
 	-> [Inst]		-- Free in the RHSs
 	-> TcM ([TcTyVar],	-- Tyvars to quantify (zonked)
 		TcDictBinds)	-- Bindings
+	-- tcSimpifyRestricted returns no constraints to
+	-- quantify over; by definition there are none.
+	-- They are all thrown back in the LIE
 
 tcSimplifyRestricted doc tau_tvs wanteds
-  = 	-- First squash out all methods, to find the constrained tyvars
-   	-- We can't just take the free vars of wanted_lie because that'll
-	-- have methods that may incidentally mention entirely unconstrained variables
-	--  	e.g. a call to 	f :: Eq a => a -> b -> b
-	-- Here, b is unconstrained.  A good example would be
-	--	foo = f (3::Int)
-	-- We want to infer the polymorphic type
-	--	foo :: forall b. b -> b
-
 	-- 'reduceMe': Reduce as far as we can.  Don't stop at
 	-- dicts; the idea is to get rid of as many type
 	-- variables as possible, and we don't want to stop
 	-- at (say) Monad (ST s), because that reduces
 	-- immediately, with no constraint on s.
-    simpleReduceLoop doc reduceMe wanteds	`thenM` \ (foo_frees, foo_binds, constrained_dicts) ->
+  = simpleReduceLoop doc reduceMe wanteds	`thenM` \ (frees, binds, irreds) ->
+    ASSERT( null frees )
 
 	-- Next, figure out the tyvars we will quantify over
     zonkTcTyVarsAndFV (varSetElems tau_tvs)	`thenM` \ tau_tvs' ->
     tcGetGlobalTyVars				`thenM` \ gbl_tvs ->
     let
-	constrained_tvs = tyVarsOfInsts constrained_dicts
-	qtvs = (tau_tvs' `minusVarSet` oclose (fdPredsOfInsts constrained_dicts) gbl_tvs)
-			 `minusVarSet` constrained_tvs
+	constrained_tvs = tyVarsOfInsts irreds
+	qtvs = (tau_tvs' `minusVarSet` constrained_tvs)
+			 `minusVarSet` oclose (fdPredsOfInsts irreds) gbl_tvs
+		-- The second minusVarSet arranges not to quantify over
+		-- any tyvars that are functionally determined by ones in
+		-- the environment
     in
     traceTc (text "tcSimplifyRestricted" <+> vcat [
-		pprInsts wanteds, pprInsts foo_frees, pprInsts constrained_dicts,
-		ppr foo_binds,
+		pprInsts wanteds, pprInsts frees, pprInsts irreds,
+		pprLHsBinds binds,
 		ppr constrained_tvs, ppr tau_tvs', ppr qtvs ])	`thenM_`
 
-	-- The first step may have squashed more methods than
-	-- necessary, so try again, this time knowing the exact
-	-- set of type variables to quantify over.
-	--
-	-- We quantify only over constraints that are captured by qtvs;
-	-- these will just be a subset of non-dicts.  This in contrast
-	-- to normal inference (using isFreeWhenInferring) in which we quantify over
-	-- all *non-inheritable* constraints too.  This implements choice
-	-- (B) under "implicit parameter and monomorphism" above.
-	--
-	-- Remember that we may need to do *some* simplification, to
-	-- (for example) squash {Monad (ST s)} into {}.  It's not enough
-	-- just to float all constraints
-    restrict_loop doc qtvs wanteds
-	-- We still need a loop because improvement can take place
-	-- E.g. if we have (C (T a)) and the instance decl
-	--	instance D Int b => C (T a) where ...
-	-- and there's a functional dependency for D.   Then we may improve
-	-- the tyep variable 'b'.
-
-restrict_loop doc qtvs wanteds
-  = mappM zonkInst wanteds			`thenM` \ wanteds' ->
-    zonkTcTyVarsAndFV (varSetElems qtvs)	`thenM` \ qtvs' ->
-    let
-        try_me inst | isFreeWrtTyVars qtvs' inst = Free
-	            | otherwise                  = ReduceMe
-    in
-    reduceContext doc try_me [] wanteds'	`thenM` \ (no_improvement, frees, binds, irreds) ->
-    if no_improvement then
-	ASSERT( null irreds )
-	extendLIEs frees			`thenM_`
-	returnM (varSetElems qtvs', binds)
-    else
-	restrict_loop doc qtvs' (irreds ++ frees)	`thenM` \ (qtvs1, binds1) ->
-	returnM (qtvs1, binds `unionBags` binds1)
+    extendLIEs irreds						`thenM_`
+    returnM (varSetElems qtvs, binds)
 \end{code}
 
 
@@ -2113,7 +2136,7 @@ addTopIPErrs dicts
     (tidy_env, tidy_dicts) = tidyInsts dicts
     report dicts = addErrTcM (tidy_env, mk_msg dicts)
     mk_msg dicts = addInstLoc dicts (ptext SLIT("Unbound implicit parameter") <> 
-				     plural tidy_dicts <+> pprInsts tidy_dicts)
+				     plural tidy_dicts <+> pprDictsTheta tidy_dicts)
 
 addNoInstanceErrs :: Maybe SDoc	-- Nothing => top level
 				-- Just d => d describes the construct
@@ -2157,15 +2180,16 @@ addNoInstanceErrs mb_what givens dicts
     	no_inst_doc | null no_inst_dicts = empty
 		    | otherwise = vcat [addInstLoc no_inst_dicts heading, probable_fix]
 	heading | null givens = ptext SLIT("No instance") <> plural no_inst_dicts <+> 
-				ptext SLIT("for") <+> pprInsts no_inst_dicts
-		| otherwise   = sep [ptext SLIT("Could not deduce") <+> pprInsts no_inst_dicts,
-				     nest 2 $ ptext SLIT("from the context") <+> pprInsts tidy_givens]
+				ptext SLIT("for") <+> pprDictsTheta no_inst_dicts
+		| otherwise   = sep [ptext SLIT("Could not deduce") <+> pprDictsTheta no_inst_dicts,
+				     nest 2 $ ptext SLIT("from the context") <+> pprDictsTheta tidy_givens]
     in
     addErrTcM (tidy_env3, no_inst_doc $$ overlap_doc)
  
   where
     mk_overlap_msg dict (matches, unifiers)
-      = vcat [	addInstLoc [dict] ((ptext SLIT("Overlapping instances for") <+> ppr dict)),
+      = vcat [	addInstLoc [dict] ((ptext SLIT("Overlapping instances for") 
+					<+> pprPred (dictPred dict))),
     		sep [ptext SLIT("Matching instances") <> colon,
     		     nest 2 (pprDFuns (dfuns ++ unifiers))],
 		if null unifiers 
@@ -2180,12 +2204,12 @@ addNoInstanceErrs mb_what givens dicts
     mk_probable_fix tidy_env (Just what) dicts	-- Nested (type signatures, instance decls)
       = returnM (tidy_env, sep [ptext SLIT("Probable fix:"), nest 2 fix1, nest 2 fix2])
       where
-    	fix1 = sep [ptext SLIT("Add") <+> pprInsts dicts,
+    	fix1 = sep [ptext SLIT("Add") <+> pprDictsTheta dicts,
 		    ptext SLIT("to the") <+> what]
 
     	fix2 | null instance_dicts = empty
 	     | otherwise	   = ptext SLIT("Or add an instance declaration for")
-				     <+> pprInsts instance_dicts
+				     <+> pprDictsTheta instance_dicts
 	instance_dicts = [d | d <- dicts, isClassDict d, not (isTyVarDict d)]
 		-- Insts for which it is worth suggesting an adding an instance declaration
 		-- Exclude implicit parameters, and tyvar dicts
@@ -2211,7 +2235,7 @@ addTopAmbigErrs dicts
 	  dicts = map fst pairs
 	  msg = sep [text "Ambiguous type variable" <> plural tvs <+> 
 			     pprQuotedList tvs <+> in_msg,
-		     nest 2 (pprInstsInFull dicts)]
+		     nest 2 (pprDictsInFull dicts)]
 	  in_msg | isSingleton dicts = text "in the top-level constraint:"
 		 | otherwise         = text "in these top-level constraints:"
 
@@ -2246,7 +2270,7 @@ warnDefault dicts default_ty
     (_, tidy_dicts) = tidyInsts dicts
     warn_msg  = vcat [ptext SLIT("Defaulting the following constraint(s) to type") <+>
 				quotes (ppr default_ty),
-		      pprInstsInFull tidy_dicts]
+		      pprDictsInFull tidy_dicts]
 
 -- Used for the ...Thetas variants; all top level
 badDerivedPred pred
@@ -2257,7 +2281,7 @@ badDerivedPred pred
 reduceDepthErr n stack
   = vcat [ptext SLIT("Context reduction stack overflow; size =") <+> int n,
 	  ptext SLIT("Use -fcontext-stack20 to increase stack size to (e.g.) 20"),
-	  nest 4 (pprInstsInFull stack)]
+	  nest 4 (pprDictsInFull stack)]
 
-reduceDepthMsg n stack = nest 4 (pprInstsInFull stack)
+reduceDepthMsg n stack = nest 4 (pprDictsInFull stack)
 \end{code}

@@ -654,7 +654,10 @@ tcApp fun args res_ty
 -- and say so.
 -- The ~(Check...) is because in the Infer case the tcSubExp 
 -- definitely won't fail, so we can be certain we're in the Check branch
-checkArgsCtxt fun args ~(Check expected_res_ty) actual_res_ty tidy_env
+checkArgsCtxt fun args (Infer _) actual_res_ty tidy_env
+  = return (tidy_env, ptext SLIT("Urk infer"))
+
+checkArgsCtxt fun args (Check expected_res_ty) actual_res_ty tidy_env
   = zonkTcType expected_res_ty	  `thenM` \ exp_ty' ->
     zonkTcType actual_res_ty	  `thenM` \ act_ty' ->
     let

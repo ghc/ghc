@@ -47,7 +47,7 @@ module TcEnv(
 
 #include "HsVersions.h"
 
-import HsSyn		( LRuleDecl, LHsBinds, LSig )
+import HsSyn		( LRuleDecl, LHsBinds, LSig, pprLHsBinds )
 import TcIface		( tcImportDecl )
 import TcRnMonad
 import TcMType		( zonkTcType, zonkTcTyVar, zonkTcTyVarsAndFV )
@@ -601,7 +601,7 @@ pprInstInfo info = vcat [ptext SLIT("InstInfo:") <+> ppr (idType (iDFunId info))
 
 pprInstInfoDetails info = pprInstInfo info $$ nest 2 (details (iBinds info))
   where
-    details (VanillaInst b _)  = ppr b
+    details (VanillaInst b _)  = pprLHsBinds b
     details (NewTypeDerived _) = text "Derived from the representation type"
 
 simpleInstInfoTy :: InstInfo -> Type

@@ -8,7 +8,7 @@ module Inst (
 	showLIE,
 
 	Inst, 
-	pprInst, pprInsts, pprInstsInFull, pprDFuns,
+	pprInst, pprInsts, pprDFuns, pprDictsTheta, pprDictsInFull,
 	tidyInsts, tidyMoreInsts,
 
 	newDictsFromOld, newDicts, cloneDict, 
@@ -63,7 +63,7 @@ import TcType	( Type, TcType, TcThetaType, TcTyVarSet,
 		  getClassPredTys, getClassPredTys_maybe, mkPredName,
 		  isInheritablePred, isIPPred, matchTys,
 		  tidyType, tidyTypes, tidyFreeTyVars, tcSplitSigmaTy, 
-		  pprPred, pprParendType, pprThetaArrow, pprClassPred
+		  pprPred, pprParendType, pprThetaArrow, pprTheta, pprClassPred
 		)
 import Kind	( isSubKind )
 import HscTypes	( ExternalPackageState(..) )
@@ -496,27 +496,33 @@ relevant in error messages.
 instance Outputable Inst where
     ppr inst = pprInst inst
 
-pprInsts :: [Inst] -> SDoc
-pprInsts insts  = parens (sep (punctuate comma (map pprInst insts)))
+pprDictsTheta :: [Inst] -> SDoc
+-- Print in type-like fashion (Eq a, Show b)
+pprDictsTheta dicts = pprTheta (map dictPred dicts)
 
-pprInstsInFull insts
-  = vcat (map go insts)
+pprDictsInFull :: [Inst] -> SDoc
+-- Print in type-like fashion, but with source location
+pprDictsInFull dicts 
+  = vcat (map go dicts)
   where
-    go inst = sep [quotes (ppr inst), nest 2 (pprInstLoc (instLoc inst))]
+    go dict = sep [quotes (ppr (dictPred dict)), nest 2 (pprInstLoc (instLoc dict))]
 
-pprInst (LitInst u lit ty loc)
-  = hsep [ppr lit, ptext SLIT("at"), ppr ty, show_uniq u]
+pprInsts :: [Inst] -> SDoc
+-- Debugging: print the evidence :: type
+pprInsts insts  = brackets (interpp'SP insts)
 
-pprInst (Dict u pred loc) = pprPred pred <+> show_uniq u
+pprInst, pprInstInFull :: Inst -> SDoc
+-- Debugging: print the evidence :: type
+pprInst (LitInst id lit ty loc) = ppr id <+> dcolon <+> ppr ty
+pprInst (Dict id pred loc)      = ppr id <+> dcolon <+> pprPred pred
 
-pprInst m@(Method u id tys theta tau loc)
-  = hsep [ppr id, ptext SLIT("at"), 
-	  brackets (sep (map pprParendType tys)) {- ,
-	  ptext SLIT("theta"), ppr theta,
-	  ptext SLIT("tau"), ppr tau
-	  show_uniq u,
-	  ppr (instToId m) -}]
+pprInst m@(Method inst_id id tys theta tau loc)
+  = ppr inst_id <+> dcolon <+> 
+	braces (sep [ppr id <+> ptext SLIT("at"),
+		     brackets (sep (map pprParendType tys))])
 
+pprInstInFull inst
+  = sep [quotes (pprInst inst), nest 2 (pprInstLoc (instLoc inst))]
 
 pprDFuns :: [DFunId] -> SDoc
 -- Prints the dfun as an instance declaration
@@ -549,7 +555,7 @@ showLIE :: SDoc -> TcM ()	-- Debugging
 showLIE str
   = do { lie_var <- getLIEVar ;
 	 lie <- readMutVar lie_var ;
-	 traceTc (str <+> pprInstsInFull (lieToList lie)) }
+	 traceTc (str <+> vcat (map pprInstInFull (lieToList lie))) }
 \end{code}
 
 
