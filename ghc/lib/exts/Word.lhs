@@ -69,6 +69,7 @@ module Word
 	, sizeofWord64
 
 	-- The "official" place to get these from is Foreign
+#ifndef __PARALLEL_HASKELL__
 	, indexWord8OffForeignObj
 	, indexWord16OffForeignObj
 	, indexWord32OffForeignObj
@@ -83,6 +84,7 @@ module Word
 	, writeWord16OffForeignObj
 	, writeWord32OffForeignObj
 	, writeWord64OffForeignObj
+#endif
 	
 	-- non-standard, GHC specific
 	, wordToInt
@@ -1069,9 +1071,6 @@ NOTE: the index is in units of the size of the type, *not* bytes.
 indexWord8OffAddr  :: Addr -> Int -> Word8
 indexWord8OffAddr (A# a#) (I# i#) = intToWord8 (I# (ord# (indexCharOffAddr# a# i#)))
 
-indexWord8OffForeignObj  :: ForeignObj -> Int -> Word8
-indexWord8OffForeignObj (ForeignObj fo#) (I# i#) = intToWord8 (I# (ord# (indexCharOffForeignObj# fo# i#)))
-
 indexWord16OffAddr :: Addr -> Int -> Word16
 indexWord16OffAddr a i =
 #ifdef WORDS_BIGENDIAN
@@ -1084,31 +1083,8 @@ indexWord16OffAddr a i =
    l = indexWord8OffAddr a byte_idx
    h = indexWord8OffAddr a (byte_idx+1)
 
-indexWord16OffForeignObj :: ForeignObj -> Int -> Word16
-indexWord16OffForeignObj fo i =
-#ifdef WORDS_BIGENDIAN
-  intToWord16 ( word8ToInt l + (word8ToInt maxBound) * word8ToInt h)
-#else
-  intToWord16 ( word8ToInt h + (word8ToInt maxBound) * word8ToInt l)
-#endif
- where
-   byte_idx = i * 2
-   l = indexWord8OffForeignObj fo byte_idx
-   h = indexWord8OffForeignObj fo (byte_idx+1)
-
 indexWord32OffAddr :: Addr -> Int -> Word32
 indexWord32OffAddr (A# a#) i = wordToWord32 (W# (indexWordOffAddr# a# i'#))
- where
-   -- adjust index to be in Word units, not Word32 ones.
-  (I# i'#) 
-#if WORD_SIZE_IN_BYTES==8
-   = i `div` 2
-#else
-   = i
-#endif
-
-indexWord32OffForeignObj :: ForeignObj -> Int -> Word32
-indexWord32OffForeignObj (ForeignObj fo#) i = wordToWord32 (W# (indexWordOffForeignObj# fo# i'#))
  where
    -- adjust index to be in Word units, not Word32 ones.
   (I# i'#) 
@@ -1126,12 +1102,41 @@ indexWord64OffAddr (A# a#) (I# i#)
  = W64# (indexWord64OffAddr# a# i#)
 #endif
 
+#ifndef __PARALLEL_HASKELL__
+
+indexWord8OffForeignObj  :: ForeignObj -> Int -> Word8
+indexWord8OffForeignObj (ForeignObj fo#) (I# i#) = intToWord8 (I# (ord# (indexCharOffForeignObj# fo# i#)))
+
+indexWord16OffForeignObj :: ForeignObj -> Int -> Word16
+indexWord16OffForeignObj fo i =
+#ifdef WORDS_BIGENDIAN
+  intToWord16 ( word8ToInt l + (word8ToInt maxBound) * word8ToInt h)
+#else
+  intToWord16 ( word8ToInt h + (word8ToInt maxBound) * word8ToInt l)
+#endif
+ where
+   byte_idx = i * 2
+   l = indexWord8OffForeignObj fo byte_idx
+   h = indexWord8OffForeignObj fo (byte_idx+1)
+
+indexWord32OffForeignObj :: ForeignObj -> Int -> Word32
+indexWord32OffForeignObj (ForeignObj fo#) i = wordToWord32 (W# (indexWordOffForeignObj# fo# i'#))
+ where
+   -- adjust index to be in Word units, not Word32 ones.
+  (I# i'#) 
+#if WORD_SIZE_IN_BYTES==8
+   = i `div` 2
+#else
+   = i
+#endif
+
 indexWord64OffForeignObj :: ForeignObj -> Int -> Word64
 indexWord64OffForeignObj (ForeignObj fo#) (I# i#)
 #if WORD_SIZE_IN_BYTES==8
  = W64# (indexWordOffForeignObj# fo# i#)
 #else
  = W64# (indexWord64OffForeignObj# fo# i#)
+#endif
 #endif
 
 \end{code}
@@ -1142,20 +1147,11 @@ Read words out of mutable memory:
 readWord8OffAddr :: Addr -> Int -> IO Word8
 readWord8OffAddr a i = _casm_ `` %r=(StgWord8)(((StgWord8*)%0)[(StgInt)%1]); '' a i
 
-readWord8OffForeignObj :: ForeignObj -> Int -> IO Word8
-readWord8OffForeignObj fo i = _casm_ `` %r=(StgWord8)(((StgWord8*)%0)[(StgInt)%1]); '' fo i
-
 readWord16OffAddr  :: Addr -> Int -> IO Word16
 readWord16OffAddr a i = _casm_ `` %r=(StgWord16)(((StgWord16*)%0)[(StgInt)%1]); '' a i
 
-readWord16OffForeignObj  :: ForeignObj -> Int -> IO Word16
-readWord16OffForeignObj fo i = _casm_ `` %r=(StgWord16)(((StgWord16*)%0)[(StgInt)%1]); '' fo i
-
 readWord32OffAddr  :: Addr -> Int -> IO Word32
 readWord32OffAddr a i = _casm_ `` %r=(StgWord32)(((StgWord32*)%0)[(StgInt)%1]); '' a i
-
-readWord32OffForeignObj  :: ForeignObj -> Int -> IO Word32
-readWord32OffForeignObj fo i = _casm_ `` %r=(StgWord32)(((StgWord32*)%0)[(StgInt)%1]); '' fo i
 
 readWord64OffAddr  :: Addr -> Int -> IO Word64
 #if WORD_SIZE_IN_BYTES==8
@@ -1164,12 +1160,25 @@ readWord64OffAddr a i = _casm_ `` %r=(StgWord)(((StgWord*)%0)[(StgInt)%1]); '' a
 readWord64OffAddr a i = _casm_ `` %r=(StgWord64)(((StgWord64*)%0)[(StgInt)%1]); '' a i
 #endif
 
+#ifndef __PARALLEL_HASKELL__
+readWord8OffForeignObj :: ForeignObj -> Int -> IO Word8
+readWord8OffForeignObj fo i = _casm_ `` %r=(StgWord8)(((StgWord8*)%0)[(StgInt)%1]); '' fo i
+
+readWord16OffForeignObj  :: ForeignObj -> Int -> IO Word16
+readWord16OffForeignObj fo i = _casm_ `` %r=(StgWord16)(((StgWord16*)%0)[(StgInt)%1]); '' fo i
+
+readWord32OffForeignObj  :: ForeignObj -> Int -> IO Word32
+readWord32OffForeignObj fo i = _casm_ `` %r=(StgWord32)(((StgWord32*)%0)[(StgInt)%1]); '' fo i
+
 readWord64OffForeignObj  :: ForeignObj -> Int -> IO Word64
 #if WORD_SIZE_IN_BYTES==8
 readWord64OffForeignObj fo i = _casm_ `` %r=(StgWord)(((StgWord*)%0)[(StgInt)%1]); '' fo i
 #else
 readWord64OffForeignObj fo i = _casm_ `` %r=(StgWord64)(((StgWord64*)%0)[(StgInt)%1]); '' fo i
 #endif
+
+#endif 
+
 \end{code}
 
 Note: we provide primops for the writing via Addrs since that's used
@@ -1204,6 +1213,8 @@ writeWord64OffAddr (A# a#) (I# i#) (W64# w#) = IO $ \ s# ->
       case (writeWord64OffAddr#  a# i# w# s#) of s2# -> IOok s2# () 
 #endif
 
+#ifndef __PARALLEL_HASKELL__
+
 writeWord8OffForeignObj  :: ForeignObj -> Int -> Word8  -> IO ()
 writeWord8OffForeignObj fo i w = _casm_ `` (((StgWord16*)%0)[(StgInt)%1])=(StgWord16)%2; '' fo i w
 
@@ -1228,5 +1239,6 @@ writeWord64OffForeignObj fo i e = _casm_ `` (((StgWord*)%0)[(StgInt)%1])=(StgWor
 writeWord64OffForeignObj fo i e = _casm_ `` (((StgWord64*)%0)[(StgInt)%1])=(StgWord64)%2; '' fo i e
 #endif
 
+#endif
 
 \end{code}
