@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.40 2001/02/09 17:29:59 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.41 2001/02/11 14:33:27 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -43,6 +43,7 @@ import IO
 import Char
 import Monad ( when )
 
+import PrelGHC 		( unsafeCoerce# )
 
 -----------------------------------------------------------------------------
 
@@ -53,10 +54,13 @@ ghciWelcomeMsg = "\
 \/ /_\\\\/ __  / /___| |      http://www.haskell.org/ghc/\n\ 
 \\\____/\\/ /_/\\____/|_|      Type :? for help.\n"
 
-commands :: [(String, String -> GHCi Bool)]
-commands = [
+GLOBAL_VAR(commands, builtin_commands, [(String, String -> GHCi Bool)])
+
+builtin_commands :: [(String, String -> GHCi Bool)]
+builtin_commands = [
   ("add",	keepGoing addModule),
   ("cd",    	keepGoing changeDirectory),
+  ("def",	keepGoing defineMacro),
   ("help",	keepGoing help),
   ("?",		keepGoing help),
   ("load",	keepGoing loadModule),
@@ -65,6 +69,7 @@ commands = [
   ("set",	keepGoing setOptions),
   ("type",	keepGoing typeOfExpr),
   ("unset",	keepGoing unsetOptions),
+  ("undef",     keepGoing undefineMacro),
   ("quit",	quit)
   ]
 
@@ -190,6 +195,15 @@ fileLoop hdl prompt = do
 	    l  -> do quit <- runCommand l
           	     if quit then return () else fileLoop hdl prompt
 
+stringLoop :: [String] -> GHCi ()
+stringLoop [] = return ()
+stringLoop (s:ss) = do
+   st <- getGHCiState
+   case remove_spaces s of
+	"" -> stringLoop ss
+	l  -> do quit <- runCommand l
+                 if quit then return () else stringLoop ss
+
 #ifndef NO_READLINE
 readlineLoop :: GHCi ()
 readlineLoop = do
@@ -278,7 +292,8 @@ specialCommand :: String -> GHCi Bool
 specialCommand ('!':str) = shellEscape (dropWhile isSpace str)
 specialCommand str = do
   let (cmd,rest) = break isSpace str
-  case [ (s,f) | (s,f) <- commands, prefixMatch cmd s ] of
+  cmds <- io (readIORef commands)
+  case [ (s,f) | (s,f) <- cmds, prefixMatch cmd s ] of
      []      -> io (hPutStr stdout ("unknown command `:" ++ cmd ++ "'\n" 
 		                    ++ shortHelpText) >> return False)
      [(_,f)] -> f (dropWhile isSpace rest)
@@ -321,6 +336,52 @@ moduleNameToModule mn
 
 changeDirectory :: String -> GHCi ()
 changeDirectory d = io (setCurrentDirectory d)
+
+defineMacro :: String -> GHCi ()
+defineMacro s = do
+  let (macro_name, definition) = break isSpace s
+  cmds <- io (readIORef commands)
+  if (null macro_name) 
+	then throwDyn (OtherError "invalid macro name") 
+	else do
+  if (macro_name `elem` map fst cmds) 
+	then throwDyn (OtherError 
+		("command `" ++ macro_name ++ "' already defined"))
+	else do
+
+  -- give the expression a type signature, so we can be sure we're getting
+  -- something of the right type.
+  let new_expr = '(' : definition ++ ") :: String -> IO String"
+
+  -- compile the expression
+  st <- getGHCiState
+  dflags <- io (getDynFlags)
+  (new_cmstate, maybe_stuff) <- 
+      	 io (cmGetExpr (cmstate st) dflags False (current_module st) new_expr)
+  setGHCiState st{cmstate = new_cmstate}
+  case maybe_stuff of
+     Nothing -> return ()
+     Just (hv, unqual, ty) 
+	-> io (writeIORef commands 
+		 ((macro_name, keepGoing (runMacro hv)) : cmds))
+
+runMacro :: HValue{-String -> IO String-} -> String -> GHCi ()
+runMacro fun s = do
+  str <- io ((unsafeCoerce# fun :: String -> IO String) s)
+  stringLoop (lines str)
+
+undefineMacro :: String -> GHCi ()
+undefineMacro macro_name = do
+  cmds <- io (readIORef commands)
+  if (macro_name `elem` map fst builtin_commands) 
+	then throwDyn (OtherError
+		("command `" ++ macro_name ++ "' cannot be undefined"))
+	else do
+  if (macro_name `notElem` map fst cmds) 
+	then throwDyn (OtherError 
+		("command `" ++ macro_name ++ "' not defined"))
+	else do
+  io (writeIORef commands (filter ((/= macro_name) . fst) cmds))
 
 loadModule :: String -> GHCi ()
 loadModule path = timeIt (loadModule' path)
