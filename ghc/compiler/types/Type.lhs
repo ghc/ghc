@@ -15,7 +15,7 @@ module Type (
 	typeCon,					-- :: BX -> KX
 	liftedTypeKind, unliftedTypeKind, openTypeKind,	-- :: KX
 	mkArrowKind, mkArrowKinds,			-- :: KX -> KX -> KX
-	isTypeKind,
+	isTypeKind, isAnyTypeKind,
 	funTyCon,
 
         usageKindCon,					-- :: KX
@@ -121,12 +121,15 @@ import UniqSet		( sizeUniqSet )		-- Should come via VarSet
 hasMoreBoxityInfo :: Kind -> Kind -> Bool
 -- (k1 `hasMoreBoxityInfo` k2) checks that k1 <: k2
 hasMoreBoxityInfo k1 k2
-  | k2 `eqKind` openTypeKind = ok k1
+  | k2 `eqKind` openTypeKind = isAnyTypeKind k1
   | otherwise	  	     = k1 `eqKind` k2
   where
-    ok (TyConApp tc _) = tc == typeCon || tc == openKindCon
-    ok (NoteTy _ k)    = ok k
-    ok other	       = False
+
+isAnyTypeKind :: Kind -> Bool
+-- True of kind * and *# and ?
+isAnyTypeKind (TyConApp tc _) = tc == typeCon || tc == openKindCon
+isAnyTypeKind (NoteTy _ k)    = isAnyTypeKind k
+isAnyTypeKind other	      = False
 
 isTypeKind :: Kind -> Bool
 -- True of kind * and *#
