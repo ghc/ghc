@@ -45,7 +45,8 @@ import Bag		( emptyBag, unitBag, unionBags, Bag )
 
 import CmdLineOpts	( opt_UnfoldingCreationThreshold,
 			  opt_UnfoldingUseThreshold,
-			  opt_UnfoldingConDiscount
+			  opt_UnfoldingConDiscount,
+			  opt_UnfoldingKeenessFactor
 			)
 import Constants	( uNFOLDING_CHEAP_OP_COST,
 			  uNFOLDING_DEAR_OP_COST,
@@ -482,13 +483,21 @@ smallEnoughToInline _ _ UnfoldNever  = False
 smallEnoughToInline arg_is_evald_s result_is_scruted
 	      (UnfoldIfGoodArgs m_tys_wanted n_vals_wanted discount_vec size scrut_discount)
   = enough_args n_vals_wanted arg_is_evald_s &&
-    discounted_size <= opt_UnfoldingUseThreshold
+    size - discount <= opt_UnfoldingUseThreshold
   where
 
     enough_args n [] | n > 0 = False	-- A function with no value args => don't unfold
     enough_args _ _	     = True	-- Otherwise it's ok to try
 
-    discounted_size = (size - args_discount) - result_discount
+	-- We multiple the raw discounts (args_discount and result_discount)
+	-- ty opt_UnfoldingKeenessFactor because the former have to do with
+	-- *size* whereas the discounts imply that there's some extra *efficiency*
+	-- to be gained (e.g. beta reductions, case reductions) by inlining.
+    discount :: Int
+    discount = round (
+		      opt_UnfoldingKeenessFactor * 
+		      fromInt (args_discount + result_discount)
+		     )
 
     args_discount = sum (zipWith arg_discount discount_vec arg_is_evald_s)
     result_discount | result_is_scruted = scrut_discount
