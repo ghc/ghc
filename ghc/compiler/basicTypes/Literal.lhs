@@ -392,10 +392,11 @@ pprLit lit
       MachWord64 w | code_style -> pprHexVal w
 		   | otherwise  -> ptext SLIT("__word64") <+> integer w
 
-      MachFloat f | code_style -> ptext SLIT("(StgFloat)") <> rational f
+      MachFloat f | code_style -> ptext SLIT("(StgFloat)") <> code_rational f
                   | otherwise  -> ptext SLIT("__float") <+> rational f
 
-      MachDouble d -> rational d
+      MachDouble d | code_style -> code_rational d
+		   | otherwise  -> rational d
 
       MachAddr p | code_style -> ptext SLIT("(void*)") <> integer p
 	         | otherwise  -> ptext SLIT("__addr") <+> integer p
@@ -407,6 +408,11 @@ pprLit lit
 		      | otherwise   -> parens (hsep [ptext SLIT("__litlit"), 
 						     pprHsString s,
 						     pprParendType ty])
+
+-- negative floating literals in code style need parentheses to avoid
+-- interacting with surrounding syntax.
+code_rational d | d < 0     = parens (rational d)
+                | otherwise = rational d
 
 pprIntVal :: Integer -> SDoc
 -- Print negative integers with parens to be sure it's unambiguous
