@@ -35,6 +35,7 @@ The predicates below look costly, but aren't, GHC+GCC do a great job
 at the big case below.
 
 \begin{code}
+{-# INLINE is_ctype #-}
 is_ctype :: Int -> Char# -> Bool
 is_ctype mask c = (fromIntegral (charType (C# c)) .&. fromIntegral mask) /= (0::Int32)
 
