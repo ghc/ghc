@@ -113,8 +113,7 @@ data HValue     = HValue  -- dummy type, actually a pointer to some Real Code.
 -- remove all entries for a given set of modules from the environment
 filterNameMap :: [ModuleName] -> FiniteMap Name a -> FiniteMap Name a
 filterNameMap mods env 
-   = filterFM (\n _ -> moduleName (nameModule n) `notElem` mods) env
-
+   = filterFM (\n _ -> moduleName (nameModule n) `elem` mods) env
 \end{code}
 
 %************************************************************************
