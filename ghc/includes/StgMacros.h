@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.39 2001/11/08 12:46:31 simonmar Exp $
+ * $Id: StgMacros.h,v 1.40 2001/11/08 16:17:35 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -784,20 +784,17 @@ LoadThreadState (void)
  * Suspending/resuming threads for doing external C-calls (_ccall_GC).
  * These functions are defined in rts/Schedule.c.
  */
-StgInt       suspendThread ( Capability *cap );
-Capability * resumeThread  ( StgInt );
+StgInt        suspendThread ( StgRegTable * );
+StgRegTable * resumeThread  ( StgInt );
 
 #define SUSPEND_THREAD(token)			\
    SaveThreadState();				\
-   token = suspendThread((Capability *)((void *)BaseReg - sizeof(StgFunTable)));
+   token = suspendThread(BaseReg);
 
 #ifdef SMP
 #define RESUME_THREAD(token)			\
-  { Capability c;				\
-    c = resumeThread(token);			\
-    BaseReg = &c.r;				\
+    BaseReg = resumeThread(token);		\
     LoadThreadState();				\
-  }
 #else
 #define RESUME_THREAD(token)			\
    (void)resumeThread(token);			\

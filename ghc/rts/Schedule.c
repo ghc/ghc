@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.105 2001/11/08 12:46:31 simonmar Exp $
+ * $Id: Schedule.c,v 1.106 2001/11/08 16:17:35 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1356,9 +1356,13 @@ void deleteAllThreads ( void )
  * ------------------------------------------------------------------------- */
    
 StgInt
-suspendThread( Capability *cap )
+suspendThread( StgRegTable *reg )
 {
   nat tok;
+  Capability *cap;
+
+  // assume that *reg is a pointer to the StgRegTable part of a Capability
+  cap = (Capability *)((void *)reg - sizeof(StgFunTable));
 
   ACQUIRE_LOCK(&sched_mutex);
 
@@ -1382,7 +1386,7 @@ suspendThread( Capability *cap )
   return tok; 
 }
 
-Capability *
+StgRegTable *
 resumeThread( StgInt tok )
 {
   StgTSO *tso, **prev;
@@ -1420,7 +1424,7 @@ resumeThread( StgInt tok )
   cap->r.rCurrentTSO = tso;
 
   RELEASE_LOCK(&sched_mutex);
-  return cap;
+  return &cap->r;
 }
 
 
