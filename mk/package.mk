@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.5 2002/02/14 15:14:00 simonmar Exp $
+# $Id: package.mk,v 1.6 2002/02/17 13:46:39 panne Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -79,10 +79,12 @@ override datadir:=$(libdir)/imports/$(PACKAGE)
 # structure when we install the interfaces.
 ifeq "$(HIERARCHICAL_LIB)" "YES"
 INSTALL_DATAS_WITH_DIRS += $(HS_IFACES)
+ifneq "$(ALL_DIRS)" ""
 install ::
 	@for i in $(ALL_DIRS); do \
 		$(INSTALL_DIR) $(datadir)/$$i; \
 	done
+endif
 else
 INSTALL_DATAS += $(HS_IFACES)
 endif
