@@ -47,12 +47,13 @@ endif
 SRC_INSTALL_OPTS += $(INSTALL_OWNER) $(INSTALL_GROUP)
 
 #
-# Invocations of `install' for the three different classes
+# Invocations of `install' for the four different classes
 # of targets:
 #
 
 INSTALL_PROGRAM = $(INSTALL) -m 755
 INSTALL_SCRIPT  = $(INSTALL) -m 755
+INSTALL_SHLIB   = $(INSTALL) -m 755
 INSTALL_DATA    = $(INSTALL) -m 644
 INSTALL_DIR     = $(FPTOOLS_TOP)/glafp-utils/mkdirhier/mkdirhier
 

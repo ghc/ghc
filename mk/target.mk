@@ -839,6 +839,8 @@ install:: $(INSTALL_LIBS)
 		    $(RANLIB) $(libdir)/`basename $$i` ;; \
 		  *.dll) \
 		    $(INSTALL_DATA) -s $(INSTALL_OPTS) $$i $(libdir) ;; \
+		  *.so) \
+		    $(INSTALL_SHLIB) $(INSTALL_OPTS) $$i $(libdir) ;; \
 		  *) \
 		    $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(libdir); \
 		esac; \
