@@ -1339,6 +1339,7 @@ data Integer = J# Int# Int# ByteArray#
 
 -- misc
 trace :: String -> a -> a
+data Lift a = Lift a
 
 -- re-exported interfaces:
 module ByteArray
