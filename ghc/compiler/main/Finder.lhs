@@ -5,15 +5,15 @@
 
 \begin{code}
 module Finder (
-    Finder, 		-- =  ModuleName -> IO (Maybe (Module, ModuleLocation))
-    newFinder, 		-- :: PackageConfigInfo -> IO Finder, 
+    newFinder, 		-- :: PackageConfigInfo -> IO (), 
+    findModule,		-- :: ModuleName -> IO (Maybe (Module, ModuleLocation))
     ModuleLocation(..),
-    mkHomeModuleLocn
+    mkHomeModuleLocn,
   ) where
 
 #include "HsVersions.h"
 
-import HscTypes		( Finder, ModuleLocation(..) )
+import HscTypes		( ModuleLocation(..) )
 import CmStaticInfo
 import DriverPhases
 import DriverState
@@ -36,28 +36,28 @@ source, interface, and object files for a module live.
 \begin{code}
 
 -- caches contents of package directories, never expunged
-GLOBAL_VAR(v_PkgDirCache,    Nothing,  Maybe (FiniteMap String (PackageName, FilePath)))
+GLOBAL_VAR(v_PkgDirCache,    error "no pkg cache!",  FiniteMap String (PackageName, FilePath))
 
 -- caches contents of home directories, expunged whenever we
 -- create a new finder.
 GLOBAL_VAR(v_HomeDirCache,   Nothing,  Maybe (FiniteMap String FilePath))
 
 
-newFinder :: PackageConfigInfo -> IO Finder
+newFinder :: PackageConfigInfo -> IO ()
 newFinder (PackageConfigInfo pkgs) = do
   -- expunge our home cache
   writeIORef v_HomeDirCache Nothing
 
-  -- and return the finder
-  return (finder pkgs)
+  -- lazilly fill in the package cache
+  writeIORef v_PkgDirCache (unsafePerformIO (newPkgCache pkgs))
 
   
-finder :: [Package] -> ModuleName -> IO (Maybe (Module, ModuleLocation))
-finder pkgs name = do
+findModule :: [Package] -> ModuleName -> IO (Maybe (Module, ModuleLocation))
+findModule pkgs name = do
   j <- maybeHomeModule name
   case j of
 	Just home_module -> return (Just home_module)
-	Nothing -> maybePackageModule pkgs name
+	Nothing -> maybePackageModule name
 
 maybeHomeModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
 maybeHomeModule mod_name = do
@@ -115,32 +115,25 @@ mkHomeModuleLocn mod_name basename source_fn = do
 	         }
 	))
 
-maybePackageModule :: [Package] -> ModuleName 
-	-> IO (Maybe (Module, ModuleLocation))
 
-maybePackageModule pkgs mod_name = do
-  maybe_pkg_cache <- readIORef v_PkgDirCache
+newPkgCache :: [Package] -> IO (FiniteMap String (PackageName, FilePath))
+newPkgCache pkgs = do
+    let extendFM fm pkg = do
+    	    let dirs = import_dirs pkg
+    		pkg_name = _PK_ (name pkg)
+    	    let addDir fm dir = do
+    		    contents <- getDirectoryContents' dir
+    		    return (addListToFM fm (zip contents 
+    					       (repeat (pkg_name,dir))))
+    	    foldM addDir fm dirs
+    
+    pkg_map <- foldM extendFM emptyFM pkgs
+    return pkg_map
 
-  -- populate the package cache, if necessary
-  pkg_cache <-
-    case maybe_pkg_cache of 
-      Nothing -> do
 
-	let extendFM fm pkg = do
-		let dirs = import_dirs pkg
-		    pkg_name = _PK_ (name pkg)
-		let addDir fm dir = do
-			contents <- getDirectoryContents' dir
-			return (addListToFM fm (zip contents 
-						   (repeat (pkg_name,dir))))
-                foldM addDir fm dirs
-
-  	pkg_map <- foldM extendFM emptyFM pkgs
-	writeIORef v_PkgDirCache (Just pkg_map)
-        return pkg_map
-
-      Just pkg_cache -> 
-        return pkg_cache
+maybePackageModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
+maybePackageModule mod_name = do
+  pkg_cache <- readIORef v_PkgDirCache
 
   -- hi-suffix for packages depends on the build tag.
   package_hisuf <-
@@ -150,7 +143,7 @@ maybePackageModule pkgs mod_name = do
 		else return (tag ++ "_hi")
 
   let basename = moduleNameString mod_name
-      hi  = basename ++ '.':package_hisuf
+      hi = basename ++ '.':package_hisuf
 
   case lookupFM pkg_cache hi of
 	Nothing -> return Nothing
@@ -162,7 +155,6 @@ maybePackageModule pkgs mod_name = do
 				obj_file = error "package module; no object"
 			   }
 		   ))
-
 
 getDirectoryContents' d
    = IO.catch (getDirectoryContents d)
