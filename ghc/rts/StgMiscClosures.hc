@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.44 2000/04/27 16:29:55 sewardj Exp $
+ * $Id: StgMiscClosures.hc,v 1.45 2000/06/25 17:25:42 panne Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -41,6 +41,7 @@ STGFUN(type##_entry)							\
   FB_									\
     DUMP_ERRMSG(#type " object entered!\n");                            \
     STGCALL1(shutdownHaskellAndExit, EXIT_FAILURE);			\
+    return NULL;							\
   FE_									\
 }
 
@@ -588,6 +589,7 @@ STGFUN(stg_error_entry)							\
   FB_									\
     DUMP_ERRMSG("fatal: stg_error_entry");                              \
     STGCALL1(shutdownHaskellAndExit, EXIT_FAILURE);			\
+    return NULL;							\
   FE_									\
 }
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Main.c,v 1.24 2000/04/26 09:28:18 simonmar Exp $
+ * $Id: Main.c,v 1.25 2000/06/25 17:25:42 panne Exp $
  *
  * (c) The GHC Team 1998-2000
  *
@@ -126,5 +126,6 @@ int main(int argc, char *argv[])
       barf("main thread completed with invalid status");
     }
     shutdownHaskellAndExit(exit_status);
+    return 0; /* never reached, keep gcc -Wall happy */
 }
 # endif /* BATCH_MODE */
