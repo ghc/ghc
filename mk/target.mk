@@ -709,7 +709,7 @@ SRC_INSTALL_OPTS += -g $(INSTALL_GROUP)
 endif
 
 
-ifneq "$(INSTALL_PROGS)" ""
+ifneq "$(strip $(INSTALL_PROGS))" ""
 
 #
 # Here's an interesting one - when using the win32 version
@@ -727,8 +727,8 @@ install:: $(INSTALL_PROGS)
 	@for i in $(INSTALL_PROGS); do \
 		    echo $(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(bindir); \
 		    $(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(bindir) ;  \
-                    if `test $(darwin_TARGET_OS) == 1` ; \
-                    then sh $(FPTOOLS_TOP)/mk/fix_install_names.sh $(libdir) $(bindir)/$$i ; \
+                    if test "$(darwin_TARGET_OS)" = "1"; then \
+                      sh $(FPTOOLS_TOP)/mk/fix_install_names.sh $(libdir) $(bindir)/$$i ; \
                     fi ; \
 	done
 endif
@@ -737,7 +737,7 @@ endif
 # Just like INSTALL_PROGS, but prefix with install sites bin/lib/data and
 # install without stripping.
 #
-ifneq "$(INSTALL_SCRIPTS)" ""
+ifneq "$(strip $(INSTALL_SCRIPTS))" ""
 install:: $(INSTALL_SCRIPTS)
 	@$(INSTALL_DIR) $(bindir)
 	for i in $(INSTALL_SCRIPTS); do \
@@ -745,7 +745,7 @@ install:: $(INSTALL_SCRIPTS)
 	done
 endif
 
-ifneq "$(INSTALL_LIB_SCRIPTS)" ""
+ifneq "$(strip $(INSTALL_LIB_SCRIPTS))" ""
 install:: $(INSTALL_LIB_SCRIPTS)
 	@$(INSTALL_DIR) $(libdir)
 	for i in $(INSTALL_LIB_SCRIPTS); do \
@@ -753,7 +753,7 @@ install:: $(INSTALL_LIB_SCRIPTS)
 	done
 endif
 
-ifneq "$(INSTALL_LIBEXEC_SCRIPTS)" ""
+ifneq "$(strip $(INSTALL_LIBEXEC_SCRIPTS))" ""
 install:: $(INSTALL_LIBEXEC_SCRIPTS)
 	@$(INSTALL_DIR) $(libexecdir)
 	for i in $(INSTALL_LIBEXEC_SCRIPTS); do \
@@ -761,7 +761,7 @@ install:: $(INSTALL_LIBEXEC_SCRIPTS)
 	done
 endif
 
-ifneq "$(INSTALL_LIBS)" ""
+ifneq "$(strip $(INSTALL_LIBS))" ""
 install:: $(INSTALL_LIBS)
 	@$(INSTALL_DIR) $(libdir)
 	for i in $(INSTALL_LIBS); do \
@@ -782,7 +782,7 @@ install:: $(INSTALL_LIBS)
 	done
 endif
 
-ifneq "$(INSTALL_LIBEXECS)" ""
+ifneq "$(strip $(INSTALL_LIBEXECS))" ""
 #
 # See above comment next to defn of INSTALL_PROGS for what
 # the purpose of this one-liner is.
@@ -796,7 +796,7 @@ install:: $(INSTALL_LIBEXECS)
 	done
 endif
 
-ifneq "$(INSTALL_DATAS)" ""
+ifneq "$(strip $(INSTALL_DATAS))" ""
 install:: $(INSTALL_DATAS)
 	@$(INSTALL_DIR) $(datadir)
 	for i in $(INSTALL_DATAS); do \
@@ -804,7 +804,7 @@ install:: $(INSTALL_DATAS)
 	done
 endif
 
-ifneq "$(INSTALL_IFACES)" ""
+ifneq "$(strip $(INSTALL_IFACES))" ""
 install:: $(INSTALL_IFACES)
 	@$(INSTALL_DIR) $(ifacedir)
 	for i in $(INSTALL_IFACES); do \
@@ -812,7 +812,7 @@ install:: $(INSTALL_IFACES)
 	done
 endif
 
-ifneq "$(INSTALL_IFACES_WITH_DIRS)" ""
+ifneq "$(strip $(INSTALL_IFACES_WITH_DIRS))" ""
 install:: $(INSTALL_IFACES_WITH_DIRS)
 	@$(INSTALL_DIR) $(ifacedir)
 	for i in $(INSTALL_IFACES_WITH_DIRS); do \
@@ -820,7 +820,7 @@ install:: $(INSTALL_IFACES_WITH_DIRS)
 	done
 endif
 
-ifneq "$(INSTALL_INCLUDES)" ""
+ifneq "$(strip $(INSTALL_INCLUDES))" ""
 install:: $(INSTALL_INCLUDES)
 	@$(INSTALL_DIR) $(includedir)
 	for i in $(INSTALL_INCLUDES); do \
@@ -828,7 +828,7 @@ install:: $(INSTALL_INCLUDES)
 	done
 endif
 
-ifneq "$(INSTALL_DOCS)" ""
+ifneq "$(strip $(INSTALL_DOCS))" ""
 ifneq "$(XMLDocWays)" ""
 install-docs:: $(INSTALL_DOCS)
 	@$(INSTALL_DIR) $(datadir)	
@@ -839,7 +839,7 @@ endif
 endif
 
 # TODO: The following could be an entry for an Obfuscated Makefile Contest...
-ifneq "$(INSTALL_XML_DOC)" ""
+ifneq "$(strip $(INSTALL_XML_DOC))" ""
 ifneq "$(XMLDocWays)" ""
 install-docs:: $(foreach i,$(XMLDocWays),$(INSTALL_XML_DOC)$(patsubst %.html-no-chunks,%.html,$(patsubst %.htmlhelp,%.chm,$(patsubst %.html,%/index.html,.$(i)))))
 	@$(INSTALL_DIR) $(datadir)	
