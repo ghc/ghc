@@ -36,6 +36,8 @@ import Foreign.Ptr
 import Foreign.C.Types
 import Foreign.C.TypesISO
 
+#include "MachDeps.h"
+
 #ifdef __GLASGOW_HASKELL__
 import GHC.Storable
 #elif defined(__HUGS__)
@@ -139,9 +141,13 @@ class Storable a where
    -- restrictions might apply; see 'peek'.
  
    -- circular default instances
+#ifdef __GLASGOW_HASKELL__
    peekElemOff = peekElemOff_ undefined
       where peekElemOff_ :: a -> Ptr a -> Int -> IO a
             peekElemOff_ undef ptr off = peekByteOff ptr (off * sizeOf undef)
+#else
+   peekElemOff ptr off = peekByteOff ptr (off * sizeOfPtr ptr undefined)
+#endif
    pokeElemOff ptr off val = pokeByteOff ptr (off * sizeOf val) val
 
    peekByteOff ptr off = peek (ptr `plusPtr` off)
@@ -150,6 +156,13 @@ class Storable a where
    peek ptr = peekElemOff ptr 0
    poke ptr = pokeElemOff ptr 0
 \end{code}
+
+#ifndef __GLASGOW_HASKELL__
+\begin{code}
+sizeOfPtr :: Storable a => Ptr a -> a -> Int
+sizeOfPtr px x = sizeOf x
+\end{code}
+#endif
 
 System-dependent, but rather obvious instances
 
@@ -167,8 +180,13 @@ instance Storable (T) where {			\
     peekElemOff = read;				\
     pokeElemOff = write }
 
+#ifdef __GLASGOW_HASKELL__
 STORABLE(Char,SIZEOF_INT32,ALIGNMENT_INT32,
 	 readWideCharOffPtr,writeWideCharOffPtr)
+#elif defined(__HUGS__)
+STORABLE(Char,SIZEOF_CHAR,ALIGNMENT_HSCHAR,
+	 readCharOffPtr,writeCharOffPtr)
+#endif
 
 STORABLE(Int,SIZEOF_HSINT,ALIGNMENT_HSINT,
 	 readIntOffPtr,writeIntOffPtr)
