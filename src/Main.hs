@@ -56,11 +56,12 @@ main = do
   cmdline <- getArgs
   case getOpt Permute options cmdline of
     (flags, args, []    ) -> run flags args
-    (_,     _,    errors) -> do sequence_ (map putStr errors)
-				putStr usage
+    (_,     _,    errors) -> do prog <- getProgName
+                                die (concat errors ++
+                                     usageInfo (usageHeader prog) options)
 
-usage :: String
-usage = usageInfo "usage: haddock [OPTION] file...\n" options
+usageHeader :: String -> String
+usageHeader prog = prog ++ " [OPTION...] file...\n"
 
 data Flag
   = Flag_CSS String
@@ -76,7 +77,8 @@ data Flag
   | Flag_Prologue FilePath
   | Flag_ReadInterface FilePath
   | Flag_SourceURL String
-  | Flag_Verbose
+  | Flag_Help
+  | Flag_Version
   deriving (Eq)
 
 options :: [OptDescr Flag]
@@ -96,8 +98,6 @@ options =
 	"base URL for links to source code",
     Option ['t']  ["title"]    (ReqArg Flag_Heading "TITLE")
 	"page heading",
-    Option ['v']  ["verbose"]  (NoArg Flag_Verbose)
-	"be verbose",
     Option ['i'] ["read-interface"] (ReqArg Flag_ReadInterface "FILE")
 	"read an interface from FILE",
     Option []  ["css"]         (ReqArg Flag_CSS "FILE") 
@@ -109,7 +109,11 @@ options =
     Option []  ["ms-help"]    (NoArg Flag_MSHtmlHelp)
 	"Produce Microsoft HTML Help files (with -h)",
     Option []  ["no-implicit-prelude"] (NoArg Flag_NoImplicitPrelude)
- 	"Do not assume Prelude is imported"
+ 	"Do not assume Prelude is imported",
+    Option ['?']  ["help"]  (NoArg Flag_Help)
+	"display this help and exit",
+    Option ['V']  ["version"]  (NoArg Flag_Version)
+	"output version information and exit"
   ]
 
 saved_flags :: IORef [Flag]
@@ -117,6 +121,11 @@ saved_flags = unsafePerformIO (newIORef (error "no flags yet"))
 
 run :: [Flag] -> [FilePath] -> IO ()
 run flags files = do
+  when (Flag_Help `elem` flags) $ do
+     prog <- getProgName
+     putStrLn (usageInfo (usageHeader prog) options)
+     exitWith ExitSuccess
+
   let title = case [str | Flag_Heading str <- flags] of
 		[] -> ""
 		(t:_) -> t
@@ -125,10 +134,8 @@ run flags files = do
 			[] -> Nothing
 			(t:_) -> Just t
 
-  when (Flag_Verbose `elem` flags) $
-     hPutStrLn stderr 
-	  ("Haddock version " ++ projectVersion ++
-		", (c) Simon Marlow 2002")
+  when (Flag_Version `elem` flags) $
+     putStrLn ("Haddock version " ++ projectVersion ++ ", (c) Simon Marlow 2002")
 
   libdir <- case [str | Flag_Lib str <- flags] of
 		[] -> dieMsg "no --lib option"
@@ -257,8 +264,7 @@ parse_file file = do
     (\h -> do stuff <- hGetContents h 
 	      case parse stuff (SrcLoc 1 1) 1 0 [] of
 	        Ok _ e -> return e
-	        Failed err -> do hPutStrLn stderr (file ++ ':':err)
-				 exitWith (ExitFailure 1)
+	        Failed err -> die (file ++ ':':err)
     )
 
 getPrologue :: [Flag] -> IO (Maybe Doc)

@@ -422,12 +422,22 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-v</option></term>
-	<term><option>--verbose</option></term>
-	<indexterm><primary><option>-v</option></primary></indexterm>
-	<indexterm><primary><option>--verbose</option></primary></indexterm>
+	<term><option>-?</option></term>
+	<term><option>--help</option></term>
+	<indexterm><primary><option>-?</option></primary></indexterm>
+	<indexterm><primary><option>--help</option></primary></indexterm>
 	<listitem>
-	  <para>Reserved for future expansion.</para>
+	  <para>Display help and exit.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-V</option></term>
+	<term><option>--version</option></term>
+	<indexterm><primary><option>-V</option></primary></indexterm>
+	<indexterm><primary><option>--version</option></primary></indexterm>
+	<listitem>
+	  <para>Output version information and exit.</para>
 	</listitem>
       </varlistentry>
 
