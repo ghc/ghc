@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.23 2001/10/31 10:30:29 simonmar Exp $
+ * $Id: RtsUtils.c,v 1.24 2002/02/14 16:55:07 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -224,18 +224,17 @@ time_str(void)
  * clean up for us.
  * -------------------------------------------------------------------------- */
 
+#if !defined(mingw32_TARGET_OS)
 void
 resetNonBlockingFd(int fd)
 {
   long fd_flags;
 
-#if !defined(mingw32_TARGET_OS)
   /* clear the non-blocking flag on this file descriptor */
   fd_flags = fcntl(fd, F_GETFL);
   if (fd_flags & O_NONBLOCK) {
     fcntl(fd, F_SETFL, fd_flags & ~O_NONBLOCK);
   }
-#endif
 }
 
 void
@@ -243,12 +242,15 @@ setNonBlockingFd(int fd)
 {
   long fd_flags;
 
-#if !defined(mingw32_TARGET_OS)
   /* clear the non-blocking flag on this file descriptor */
   fd_flags = fcntl(fd, F_GETFL);
   fcntl(fd, F_SETFL, fd_flags | O_NONBLOCK);
-#endif
 }
+#else
+/* Don't support non-blocking FDs (yet) on mingw */
+void resetNonBlockingFd(int fd STG_UNUSED) {}
+void setNonBlockingFd(int fd STG_UNUSED) {}
+#endif
 
 static ullong startTime = 0;
 
