@@ -1787,7 +1787,7 @@ types, in which there is a for-all in the argument types.:
 <Para>
 
 <ProgramListing>
-T1 :: forall a. (forall b. b -&#62; b -&#62; b) -&#62; a -&#62; T1 a
+T1 :: forall a. (forall b. b -&#62; b -&#62; b) -&#62; a -&#62; T a
 MkMonad :: forall m. (forall a. a -&#62; m a)
                   -&#62; (forall a b. m a -&#62; (a -&#62; m b) -&#62; m b)
                   -&#62; MonadT m
