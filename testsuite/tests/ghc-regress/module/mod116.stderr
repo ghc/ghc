@@ -1,2 +1,2 @@
 
-mod116.hs:2:17: Type constructor or class not in scope: `M2'
+mod116.hs:2:17: Not in scope: type constructor or class `M2'

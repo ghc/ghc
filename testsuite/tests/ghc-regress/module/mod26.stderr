@@ -1,2 +1,2 @@
 
-mod26.hs:3:20: Type variable not in scope: `b'
+mod26.hs:3:20: Not in scope: type variable `b'

@@ -1,2 +1,2 @@
 
-mod29.hs:6:11: Type constructor or class not in scope: `Char'
+mod29.hs:6:11: Not in scope: type constructor or class `Char'

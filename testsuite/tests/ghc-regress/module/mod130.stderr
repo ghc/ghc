@@ -1,2 +1,2 @@
 
-mod130.hs:7:4: Variable not in scope: `<'
+mod130.hs:7:4: Not in scope:  `<'

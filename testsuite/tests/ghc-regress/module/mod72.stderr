@@ -1,2 +1,2 @@
 
-mod72.hs:3:6: Variable not in scope: `g'
+mod72.hs:3:6: Not in scope:  `g'

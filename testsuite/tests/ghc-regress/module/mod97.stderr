@@ -1,2 +1,2 @@
 
-mod97.hs:4:8: Variable not in scope: `=='
+mod97.hs:4:8: Not in scope:  `=='

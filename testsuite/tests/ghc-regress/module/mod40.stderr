@@ -1,5 +1,5 @@
 
-mod40.hs:4:14:
+mod40.hs:4:0:
     Cycle in class declarations (via superclasses):
-      C2 (mod40.hs:4:14)
-      C1 (mod40.hs:3:14)
+      mod40.hs:4:0-30: class (C1 a) => C2 a
+      mod40.hs:3:0-30: class (C2 a) => C1 a
