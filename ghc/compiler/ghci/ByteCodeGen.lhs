@@ -910,17 +910,16 @@ mkBits findLabel st proto_insns
             where
                ret_itbl_addr 
                   = case pk of
-                       IntRep    -> stg_ret_R1_info
-                       FloatRep  -> stg_ret_F1_info
-                       DoubleRep -> stg_ret_D1_info
+                       IntRep    -> stg_ctoi_ret_R1_info
+                       FloatRep  -> stg_ctoi_ret_F1_info
+                       DoubleRep -> stg_ctoi_ret_D1_info
                     where  -- TEMP HACK
-                       stg_ret_R1_info = nullAddr
-                       stg_ret_F1_info = nullAddr
-                       stg_ret_D1_info = nullAddr
+                       stg_ctoi_ret_F1_info = nullAddr
+                       stg_ctoi_ret_D1_info = nullAddr
                      
---foreign label "stg_ret_R1_info" stg_ret_R1_info :: Addr
---foreign label "stg_ret_F1_info" stg_ret_F1_info :: Addr
---foreign label "stg_ret_D1_info" stg_ret_D1_info :: Addr
+foreign label "stg_ctoi_ret_R1_info" stg_ctoi_ret_R1_info :: Addr
+--foreign label "stg_ctoi_ret_F1_info" stg_ctoi_ret_F1_info :: Addr
+--foreign label "stg_ctoi_ret_D1_info" stg_ctoi_ret_D1_info :: Addr
 
 -- The size in bytes of an instruction.
 instrSizeB :: BCInstr -> Int
@@ -1135,7 +1134,7 @@ make_constr_itbls cons
         mk_vecret_itbl (dcon, conNo)
            = mk_itbl dcon conNo (vecret_entry conNo)
         mk_dirret_itbl (dcon, conNo)
-           = mk_itbl dcon conNo mci_constr_entry
+           = mk_itbl dcon conNo stg_interp_constr_entry
 
         mk_itbl :: DataCon -> Int -> Addr -> IO (Name,ItblPtr)
         mk_itbl dcon conNo entry_addr
@@ -1182,26 +1181,26 @@ byte 2 w = (w `shiftR` 16) .&. 0xFF
 byte 3 w = (w `shiftR` 24) .&. 0xFF
 
 
-vecret_entry 0 = mci_constr1_entry
-vecret_entry 1 = mci_constr2_entry
-vecret_entry 2 = mci_constr3_entry
-vecret_entry 3 = mci_constr4_entry
-vecret_entry 4 = mci_constr5_entry
-vecret_entry 5 = mci_constr6_entry
-vecret_entry 6 = mci_constr7_entry
-vecret_entry 7 = mci_constr8_entry
+vecret_entry 0 = stg_interp_constr1_entry
+vecret_entry 1 = stg_interp_constr2_entry
+vecret_entry 2 = stg_interp_constr3_entry
+vecret_entry 3 = stg_interp_constr4_entry
+vecret_entry 4 = stg_interp_constr5_entry
+vecret_entry 5 = stg_interp_constr6_entry
+vecret_entry 6 = stg_interp_constr7_entry
+vecret_entry 7 = stg_interp_constr8_entry
 
 -- entry point for direct returns for created constr itbls
-foreign label "stg_mci_constr_entry" mci_constr_entry :: Addr
+foreign label "stg_interp_constr_entry" stg_interp_constr_entry :: Addr
 -- and the 8 vectored ones
-foreign label "stg_mci_constr1_entry" mci_constr1_entry :: Addr
-foreign label "stg_mci_constr2_entry" mci_constr2_entry :: Addr
-foreign label "stg_mci_constr3_entry" mci_constr3_entry :: Addr
-foreign label "stg_mci_constr4_entry" mci_constr4_entry :: Addr
-foreign label "stg_mci_constr5_entry" mci_constr5_entry :: Addr
-foreign label "stg_mci_constr6_entry" mci_constr6_entry :: Addr
-foreign label "stg_mci_constr7_entry" mci_constr7_entry :: Addr
-foreign label "stg_mci_constr8_entry" mci_constr8_entry :: Addr
+foreign label "stg_interp_constr1_entry" stg_interp_constr1_entry :: Addr
+foreign label "stg_interp_constr2_entry" stg_interp_constr2_entry :: Addr
+foreign label "stg_interp_constr3_entry" stg_interp_constr3_entry :: Addr
+foreign label "stg_interp_constr4_entry" stg_interp_constr4_entry :: Addr
+foreign label "stg_interp_constr5_entry" stg_interp_constr5_entry :: Addr
+foreign label "stg_interp_constr6_entry" stg_interp_constr6_entry :: Addr
+foreign label "stg_interp_constr7_entry" stg_interp_constr7_entry :: Addr
+foreign label "stg_interp_constr8_entry" stg_interp_constr8_entry :: Addr
 
 
 
