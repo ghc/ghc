@@ -56,7 +56,7 @@ import HscTypes         ( WhetherHasOrphans, IsBootInterface, GenAvailInfo(..),
 import RdrName          ( RdrName, mkRdrUnqual, mkIfaceOrig )
 import Name		( OccName )
 import OccName          ( mkSysOccFS,
-			  tcName, varName, ipName, dataName, clsName, tvName,
+			  tcName, varName, dataName, clsName, tvName,
 			  EncodedFS 
 			)
 import Module           ( ModuleName, PackageName, mkSysModuleNameFS, mkModule )
@@ -627,7 +627,7 @@ qvar_name	:  var_name		{ $1 }
 		|  qvar_fs      	{ mkIfaceOrig varName $1 }
 
 ipvar_name	:: { RdrName }
-		:  IPVARID		{ mkRdrUnqual (mkSysOccFS ipName (tailFS $1)) }
+		:  IPVARID		{ mkRdrUnqual (mkSysOccFS varName (tailFS $1)) }
 
 qvar_names1	:: { [RdrName] }
 qvar_names1	: qvar_name		{ [$1] }

@@ -7,7 +7,7 @@
 \begin{code}
 module OccName (
 	-- The NameSpace type; abstact
-	NameSpace, tcName, clsName, tcClsName, dataName, varName, ipName,
+	NameSpace, tcName, clsName, tcClsName, dataName, varName, 
 	tvName, nameSpaceString, 
 
 	-- The OccName type
@@ -20,7 +20,7 @@ module OccName (
  	mkDerivedTyConOcc, mkClassTyConOcc, mkClassDataConOcc, mkSpecOcc,
 	mkGenOcc1, mkGenOcc2, 
 	
-	isSysOcc, isTvOcc, isDataOcc, isDataSymOcc, isSymOcc, isIPOcc, isValOcc,
+	isSysOcc, isTvOcc, isDataOcc, isDataSymOcc, isSymOcc, isValOcc,
 
 	occNameFS, occNameString, occNameUserString, occNameSpace, occNameFlavour, 
 	setOccNameSpace,
@@ -83,7 +83,6 @@ pprEncodedFS fs
 
 \begin{code}
 data NameSpace = VarName	-- Variables
-	       | IPName		-- Implicit Parameters
 	       | DataName	-- Data constructors
 	       | TvName		-- Type variables
 	       | TcClsName	-- Type constructors and classes; Haskell has them
@@ -99,13 +98,11 @@ tcClsName = TcClsName		-- Not sure which!
 dataName = DataName
 tvName   = TvName
 varName  = VarName
-ipName   = IPName
 
 
 nameSpaceString :: NameSpace -> String
 nameSpaceString DataName  = "Data constructor"
 nameSpaceString VarName   = "Variable"
-nameSpaceString IPName    = "Implicit Param"
 nameSpaceString TvName    = "Type variable"
 nameSpaceString TcClsName = "Type constructor or class"
 \end{code}
@@ -243,9 +240,6 @@ isDataOcc other		       = False
 -- Pretty inefficient!
 isSymOcc (OccName DataName s) = isLexConSym (decodeFS s)
 isSymOcc (OccName VarName s)  = isLexSym (decodeFS s)
-
-isIPOcc (OccName IPName _) = True
-isIPOcc _		   = False
 \end{code}
 
 

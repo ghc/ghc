@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.53 2001/02/20 09:40:43 simonpj Exp $
+$Id: Parser.y,v 1.54 2001/02/20 15:36:55 simonpj Exp $
 
 Haskell grammar.
 
@@ -21,7 +21,7 @@ import RdrName
 import PrelNames	( mAIN_Name, unitTyCon_RDR, funTyCon_RDR, listTyCon_RDR,
 			  tupleTyCon_RDR, unitCon_RDR, nilCon_RDR, tupleCon_RDR
 			)
-import OccName		( UserFS, varName, ipName, tcName, dataName, tcClsName, tvName )
+import OccName		( UserFS, varName, tcName, dataName, tcClsName, tvName )
 import SrcLoc		( SrcLoc )
 import Module
 import CallConv
@@ -924,7 +924,7 @@ qvar 	:: { RdrName }
 -- *after* we see the close paren.
 
 ipvar	:: { RdrName }
-	: IPVARID		{ (mkUnqual ipName (tailFS $1)) }
+	: IPVARID		{ (mkUnqual varName (tailFS $1)) }
 
 qcon	:: { RdrName }
 	: qconid		{ $1 }

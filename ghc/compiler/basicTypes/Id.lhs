@@ -24,7 +24,6 @@ module Id (
 	-- Predicates
 	isImplicitId, isDeadBinder,
 	externallyVisibleId,
-	isIP,
 	isSpecPragmaId,	isRecordSelector,
 	isPrimOpId, isPrimOpId_maybe, isDictFunId,
 	isDataConId, isDataConId_maybe, 
@@ -88,7 +87,7 @@ import IdInfo
 import Demand		( Demand )
 import Name	 	( Name, OccName,
 			  mkSysLocalName, mkLocalName,
-			  getOccName, isIPOcc
+			  getOccName
 			) 
 import OccName		( UserFS )
 import PrimRep		( PrimRep )
@@ -296,8 +295,6 @@ isImplicitId id
 isDeadBinder :: Id -> Bool
 isDeadBinder bndr | isId bndr = isDeadOcc (idOccInfo bndr)
 		  | otherwise = False	-- TyVars count as not dead
-
-isIP id = isIPOcc (getOccName id)
 \end{code}
 
 
