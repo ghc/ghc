@@ -643,47 +643,28 @@ put GHC in a place with a space-free path.
 <sect2 id="winfaq">
 <title>Installing ghc-win32 FAQ</title>
 
-<qandaset>
+      <variablelist>
+	<varlistentry>
+	  <term>I'm having trouble with symlinks.</term>
+	  <listitem>
+	    <para>Symlinks only work under Cygwin (<xref linkend="sec-install" />), so binaries not linked to the Cygwin
+	      DLL, in particular those built for Mingwin, will not work with
+	      symlinks.</para>
+	  </listitem>
+	</varlistentry>
 
-<qandaentry>
-
-<question>
-<para>
-I'm having trouble with symlinks.
-</para>
-</question>
-
-<answer>
-<para>
-Symlinks only work under Cygwin (<xref linkend="sec-install"/>), so binaries
-not linked to the Cygwin DLL, in particular those built for Mingwin, will not
-work with symlinks.
-</para>
-</answer>
-
-</qandaentry>
-
-<qandaentry>
-
-<question>
-<para>
-I'm getting &ldquo;permission denied&rdquo; messages from the <command>rm</command> or
-<command>mv</command>.
-</para>
-</question>
-
-<answer>
-<para>
-This can have various causes: trying to rename a directory when an Explorer
-window is open on it tends to fail. Closing the window generally cures the
-problem, but sometimes its cause is more mysterious, and logging off and back
-on or rebooting may be the quickest cure.
-</para>
-</answer>
-
-</qandaentry>
-
-</qandaset>
+	<varlistentry>
+	  <term>I'm getting &ldquo;permission denied&rdquo; messages from the
+	    <command>rm</command> or <command>mv</command>.</term>
+	  <listitem>
+	    <para>This can have various causes: trying to rename a directory
+	      when an Explorer window is open on it tends to fail. Closing the
+	      window generally cures the problem, but sometimes its cause is
+	      more mysterious, and logging off and back on or rebooting may be
+	      the quickest cure.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
 
 <!-- doesn't add much value any longer; leave out [sof 7/2002].
 <para>
