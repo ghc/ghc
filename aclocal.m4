@@ -657,10 +657,12 @@ dnl The name to #define.
 define(<<AC_TYPE_NAME>>, translit(htype_$1, [a-z *], [A-Z_P]))dnl
 dnl The cache variable name.
 define(<<AC_CV_NAME>>, translit(fptools_cv_htype_$1, [ *], [_p]))dnl
+define(<<AC_CV_NAME_supported>>, translit(fptools_cv_htype_sup_$1, [ *], [_p]))dnl
 changequote([, ])dnl
 AC_MSG_CHECKING(Haskell type for $1)
 AC_CACHE_VAL(AC_CV_NAME,
-[AC_TRY_RUN([#include <stdio.h>
+[AC_CV_NAME_supported=yes;
+AC_TRY_RUN([#include <stdio.h>
 #include <stddef.h>
 
 #ifdef HAVE_SYS_TYPES_H
@@ -727,15 +729,19 @@ main() {
   }
   fclose(f);
   exit(0);
-}], AC_CV_NAME=`cat conftestval`,
-ifelse([$2], , AC_CV_NAME=NotReallyAType,      AC_CV_NAME=$2),
-ifelse([$3], , AC_CV_NAME=NotReallyATypeCross, AC_CV_NAME=$3))]) dnl
-AC_MSG_RESULT($AC_CV_NAME)
-AC_DEFINE_UNQUOTED(AC_TYPE_NAME, $AC_CV_NAME, [Define to Haskell type for $1])
+}],AC_CV_NAME=`cat conftestval`,
+ifelse([$2], , [AC_CV_NAME=NotReallyAType; AC_CV_NAME_supported=no], AC_CV_NAME=$2),
+ifelse([$3], , [AC_CV_NAME=NotReallyATypeCross; AC_CV_NAME_supported=no], AC_CV_NAME=$3))]) dnl
+if test "$AC_CV_NAME_supported" == yes; then
+  AC_MSG_RESULT($AC_CV_NAME)
+  AC_DEFINE_UNQUOTED(AC_TYPE_NAME, $AC_CV_NAME)
+else
+  AC_MSG_RESULT([not supported])
+fi
 undefine([AC_TYPE_NAME])dnl
 undefine([AC_CV_NAME])dnl
+undefine([AC_CV_NAME_supported])dnl
 ])
-
 
 dnl Based on AC_TRY_LINK - run iftrue if links cleanly with no warning
 
