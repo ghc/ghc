@@ -137,10 +137,10 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
             = [0x89, 0x86] ++ lit32 offB
          ret				-- ret
             = [0xC3]
-         fstl_offesimem	offB		-- fstl   offB(%esi)
-            = [0xDD, 0x96] ++ lit32 offB
-         fsts_offesimem	offB		-- fsts   offB(%esi)
-            = [0xD9, 0x96] ++ lit32 offB
+         fstpl_offesimem offB		-- fstpl   offB(%esi)
+            = [0xDD, 0x9E] ++ lit32 offB
+         fstps_offesimem offB		-- fstps   offB(%esi)
+            = [0xD9, 0x9E] ++ lit32 offB
          lit32 :: Int -> [Word8]
          lit32 i = let w32 = (fromIntegral i) :: Word32
                    in  map (fromIntegral . ( .&. 0xFF))
@@ -246,16 +246,16 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
            movl        %edx, 4(%esi)
            movl        %eax, 8(%esi)
         or
-           fstl        4(%esi)
+           fstpl       4(%esi)
         or
-           fsts        4(%esi)
+           fstps       4(%esi)
      -}
      ++ case r_rep of
            IntRep    -> movl_eax_offesimem 4
            WordRep   -> movl_eax_offesimem 4
            AddrRep   -> movl_eax_offesimem 4
-           DoubleRep -> fstl_offesimem 4
-           FloatRep  -> fsts_offesimem 4
+           DoubleRep -> fstpl_offesimem 4
+           FloatRep  -> fstps_offesimem 4
            VoidRep   -> []
            other     -> pprPanic "ByteCodeFFI.mkMarshalCode_wrk(x86)" (ppr r_rep)
 
