@@ -1,0 +1,33 @@
+#include "config.h"
+
+Package {
+        name           = "core",
+#ifdef INSTALLING
+	import_dirs    = [ "$libdir/imports/core" ]
+#else
+	import_dirs    = [ "$libdir/libraries/core" ],
+#endif
+        source_dirs    = [],
+#ifdef INSTALLING
+        library_dirs   = [ "$libdir" ]
+#else
+        library_dirs   = [ "$libdir/libraries/core"
+                         , "$libdir/libraries/core/cbits" ],
+#endif
+        hs_libraries      = [ "HScore" ],
+	extra_libraries   = [ "HScore_cbits"
+#ifdef mingw32_TARGET_OS
+                            , "wsock32", "msvcrt"
+#endif
+			    ],
+#ifdef INSTALLING
+        include_dirs   = []
+#else
+        include_dirs   = [ "$libdir/libraries/core/include" ],
+#endif
+        c_includes     = [ "HsCore.h" ],
+        package_deps   = [ "rts" ],
+        extra_ghc_opts = [],
+        extra_cc_opts  = [],
+        extra_ld_opts  = []
+}
