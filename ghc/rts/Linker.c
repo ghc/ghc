@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.13 2001/01/28 17:14:11 simonmar Exp $
+ * $Id: Linker.c,v 1.14 2001/01/28 20:53:38 qrczak Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -139,6 +139,9 @@ static int ocResolve_PEi386     ( ObjectCode* oc );
       SymX(stg_sel_10_upd_info)			\
       SymX(stg_sel_11_upd_info)			\
       SymX(stg_sel_12_upd_info)			\
+      SymX(stg_sel_13_upd_info)			\
+      SymX(stg_sel_14_upd_info)			\
+      SymX(stg_sel_15_upd_info)			\
       SymX(stg_upd_frame_info)			\
       SymX(stg_seq_frame_info)			\
       SymX(stg_CAF_BLACKHOLE_info)		\
@@ -232,7 +235,16 @@ static int ocResolve_PEi386     ( ObjectCode* oc );
       SymX(PatErrorHdrHook)			\
       SymX(defaultsHook)			\
       SymX(PreTraceHook)			\
-      SymX(PostTraceHook)
+      SymX(PostTraceHook)			\
+      SymX(stg_sig_install)			\
+      Sym(nocldstop)				\
+      SymX(createAdjustor)			\
+      SymX(rts_mkInt)				\
+      SymX(rts_mkStablePtr)			\
+      SymX(rts_apply)				\
+      SymX(rts_evalIO)				\
+      SymX(rts_checkSchedStatus)		\
+      SymX(rts_getInt)
 
 #ifndef SUPPORT_LONG_LONGS
 #define RTS_LONG_LONG_SYMS /* nothing */
