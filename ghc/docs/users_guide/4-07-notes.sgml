@@ -23,11 +23,12 @@
       </listitem>
 
       <listitem>
-	<para>Implicit parameters.</para>
-      </listitem>
-
-      <listitem>
-	<para>Functional dependencies.</para>
+	<para>Implicit parameters.  This Haskell extension gives a
+	statically-typed version of dynamic scoping that avoids the
+	worst problems of dynamic scoping in lisp.  See the
+	<ulink url="http://www.cse.ogi.ed/~jlewis/implicit.ps.gz">POPL paper</ulink>
+	for more details.  It is enabled by <option>-fglasgow-exts</option>.
+	</para>
       </listitem>
 
       <listitem>
