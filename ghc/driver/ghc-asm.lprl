@@ -1154,7 +1154,8 @@ sub print_doctored {
     local($_, $need_fallthru_patch) = @_;
 
     if ( $TargetPlatform !~ /^i386-/ 
-      || ! /^\t[a-z]/ ) { # no instructions in here, apparently
+      || ! /^\t[a-z]/  # no instructions in here, apparently
+      || /^${T_US}_reg[A-Za-z0-9_]+:/) {
 	print OUTASM $_;
 	return;
     }
