@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.73 2002/07/17 09:14:27 simonmar Exp $
+# $Id: Makefile,v 1.74 2002/08/09 20:59:41 sof Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -34,7 +34,7 @@ WAYS=$(GhcLibWays)
 PACKAGE = rts
 
 # Tells the build system not to add various Haskellish options to $(SRC_HC_OPTS)
-NON_HS_PKG = YES
+NON_HS_PACKAGE = YES
 
 # grab sources from these subdirectories
 ALL_DIRS = hooks parallel
