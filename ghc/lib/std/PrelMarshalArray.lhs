@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelMarshalArray.lhs,v 1.1 2001/01/11 17:25:57 simonmar Exp $
+% $Id: PrelMarshalArray.lhs,v 1.2 2001/03/15 20:35:49 qrczak Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -12,45 +12,54 @@ module PrelMarshalArray (
 
   -- allocation
   --
-  mallocArray,   -- :: Storable a => Int -> IO (Ptr a)
-  mallocArray0,  -- :: Storable a => Int -> IO (Ptr a)
+  mallocArray,    -- :: Storable a => Int -> IO (Ptr a)
+  mallocArray0,   -- :: Storable a => Int -> IO (Ptr a)
 
-  allocaArray,   -- :: Storable a => Int -> (Ptr a -> IO b) -> IO b
-  allocaArray0,  -- :: Storable a => Int -> (Ptr a -> IO b) -> IO b
+  allocaArray,    -- :: Storable a => Int -> (Ptr a -> IO b) -> IO b
+  allocaArray0,   -- :: Storable a => Int -> (Ptr a -> IO b) -> IO b
 
-  reallocArray,  -- :: Storable a => Ptr a -> Int -> IO (Ptr a)
-  reallocArray0, -- :: Storable a => Ptr a -> Int -> IO (Ptr a)
+  reallocArray,   -- :: Storable a => Ptr a -> Int -> IO (Ptr a)
+  reallocArray0,  -- :: Storable a => Ptr a -> Int -> IO (Ptr a)
 
   -- marshalling
   --
-  peekArray,     -- :: Storable a =>         Int -> Ptr a -> IO [a]
-  peekArray0,    -- :: (Storable a, Eq a) => a   -> Ptr a -> IO [a]
+  peekArray,      -- :: Storable a =>         Int -> Ptr a -> IO [a]
+  peekArray0,     -- :: (Storable a, Eq a) => a   -> Ptr a -> IO [a]
 
-  pokeArray,     -- :: Storable a =>      Ptr a -> [a] -> IO ()
-  pokeArray0,    -- :: Storable a => a -> Ptr a -> [a] -> IO ()
+  pokeArray,      -- :: Storable a =>      Ptr a -> [a] -> IO ()
+  pokeArray0,     -- :: Storable a => a -> Ptr a -> [a] -> IO ()
 
   -- combined allocation and marshalling
   --
-  newArray,      -- :: Storable a =>      [a] -> IO (Ptr a)
-  newArray0,     -- :: Storable a => a -> [a] -> IO (Ptr a)
+  newArray,       -- :: Storable a =>      [a] -> IO (Ptr a)
+  newArray0,      -- :: Storable a => a -> [a] -> IO (Ptr a)
 
-  withArray,     -- :: Storable a =>      [a] -> (Ptr a -> IO b) -> IO b
-  withArray0,    -- :: Storable a => a -> [a] -> (Ptr a -> IO b) -> IO b
+  withArray,      -- :: Storable a =>      [a] -> (Ptr a -> IO b) -> IO b
+  withArray0,     -- :: Storable a => a -> [a] -> (Ptr a -> IO b) -> IO b
+
+  -- destruction
+  --
+  destructArray,  -- :: Storable a =>         Int -> Ptr a -> IO ()
+  destructArray0, -- :: (Storable a, Eq a) => a   -> Ptr a -> IO ()
 
   -- copying (argument order: destination, source)
   --
-  copyArray,     -- :: Storable a => Ptr a -> Ptr a -> Int -> IO ()
-  moveArray,     -- :: Storable a => Ptr a -> Ptr a -> Int -> IO ()
+  copyArray,      -- :: Storable a => Ptr a -> Ptr a -> Int -> IO ()
+  moveArray,      -- :: Storable a => Ptr a -> Ptr a -> Int -> IO ()
+
+  -- finding the length
+  --
+  lengthArray0,   -- :: (Storable a, Eq a) => a -> Ptr a -> IO Int
 
   -- indexing
   --
-  advancePtr     -- :: Storable a => Ptr a -> Int -> Ptr a
+  advancePtr      -- :: Storable a => Ptr a -> Int -> Ptr a
 ) where
 
 import Monad	    (zipWithM_)
 
 import PrelPtr	        (Ptr, plusPtr)
-import PrelStorable     (Storable(sizeOf, peekElemOff, pokeElemOff))
+import PrelStorable     (Storable(sizeOf,peekElemOff,pokeElemOff,destruct))
 import PrelMarshalAlloc (mallocBytes, allocaBytes, reallocBytes)
 import PrelMarshalUtils (copyBytes, moveBytes)
 
@@ -146,7 +155,7 @@ newArray vals  = do
   return ptr
 
 -- write a list of storable elements into a newly allocated, consecutive
--- sequence of storable values, where the end is fixed by the given end maker
+-- sequence of storable values, where the end is fixed by the given end marker
 --
 newArray0             :: Storable a => a -> [a] -> IO (Ptr a)
 newArray0 marker vals  = do
@@ -157,22 +166,51 @@ newArray0 marker vals  = do
 -- temporarily store a list of storable values in memory
 --
 withArray        :: Storable a => [a] -> (Ptr a -> IO b) -> IO b
-withArray vals f  = allocaArray (length vals) $ \ptr -> do
-  pokeArray ptr vals
-  f ptr
+withArray vals f  =
+  allocaArray len $ \ptr -> do
+      pokeArray ptr vals
+      res <- f ptr
+      destructArray len ptr
+      return res
+  where
+    len = length vals
 
--- `like withArray', but a terminator indicates where the array ends
+-- like `withArray', but a terminator indicates where the array ends
 --
 withArray0               :: Storable a => a -> [a] -> (Ptr a -> IO b) -> IO b
-withArray0 marker vals f  = allocaArray0 (length vals) $ \ptr -> do
-  pokeArray0 marker ptr vals
-  f ptr
+withArray0 marker vals f  =
+  allocaArray0 len $ \ptr -> do
+      pokeArray0 marker ptr vals
+      res <- f ptr
+      destructArray (len+1) ptr
+      return res
+  where
+    len = length vals
 
 
--- copying
+-- destruction
+-- -----------
+
+-- destruct each element of an array (in reverse order)
+--
+destructArray          :: Storable a => Int -> Ptr a -> IO ()
+destructArray size ptr  =
+  sequence_ [destruct (ptr `advancePtr` i)
+    | i <- [size-1, size-2 .. 0]]
+
+-- like `destructArray', but a terminator indicates where the array ends
+--
+destructArray0            :: (Storable a, Eq a) => a -> Ptr a -> IO ()
+destructArray0 marker ptr  = do
+  size <- lengthArray0 marker ptr
+  sequence_ [destruct (ptr `advancePtr` i)
+    | i <- [size, size-1 .. 0]]
+
+
+-- copying (argument order: destination, source)
 -- -------
 
--- copies the given number of elements from the second array (source) into the
+-- copy the given number of elements from the second array (source) into the
 -- first array (destination); the copied areas may *not* overlap
 --
 copyArray :: Storable a => Ptr a -> Ptr a -> Int -> IO ()
@@ -181,7 +219,7 @@ copyArray  = doCopy undefined
     doCopy                     :: Storable a => a -> Ptr a -> Ptr a -> Int -> IO ()
     doCopy dummy dest src size  = copyBytes dest src (size * sizeOf dummy)
 
--- copies the given number of elements from the second array (source) into the
+-- copy the given number of elements from the second array (source) into the
 -- first array (destination); the copied areas *may* overlap
 --
 moveArray :: Storable a => Ptr a -> Ptr a -> Int -> IO ()
@@ -189,6 +227,19 @@ moveArray  = doMove undefined
   where
     doMove                     :: Storable a => a -> Ptr a -> Ptr a -> Int -> IO ()
     doMove dummy dest src size  = moveBytes dest src (size * sizeOf dummy)
+
+
+-- finding the length
+-- ------------------
+
+-- return the number of elements in an array, excluding the terminator
+--
+lengthArray0            :: (Storable a, Eq a) => a -> Ptr a -> IO Int
+lengthArray0 marker ptr  = loop 0
+  where
+    loop i = do
+        val <- peekElemOff ptr i
+        if val == marker then return i else loop (i+1)
 
 
 -- indexing

@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelMarshalUtils.lhs,v 1.1 2001/01/11 17:25:57 simonmar Exp $
+% $Id: PrelMarshalUtils.lhs,v 1.2 2001/03/15 20:35:49 qrczak Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -43,7 +43,7 @@ module PrelMarshalUtils (
 import Monad	    	( liftM )
 
 import PrelPtr	        ( Ptr, nullPtr )
-import PrelStorable	( Storable (poke) )
+import PrelStorable	( Storable(poke,destruct) )
 import PrelCTypesISO    ( CSize )
 import PrelMarshalAlloc ( malloc, alloca )
 
@@ -66,7 +66,12 @@ new val  =
 --
 {- FIXME: should be called `with' -}
 withObject       :: Storable a => a -> (Ptr a -> IO b) -> IO b
-withObject val f  = alloca $ \ptr -> do poke ptr val; f ptr
+withObject val f  =
+  alloca $ \ptr -> do
+    poke ptr val
+    res <- f ptr
+    destruct ptr
+    return res
 
 
 -- marshalling of Boolean values (non-zero corresponds to `True')
