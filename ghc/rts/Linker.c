@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.113 2003/02/10 10:41:52 simonmar Exp $
+ * $Id: Linker.c,v 1.114 2003/02/10 23:35:03 wolfgang Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -91,6 +91,8 @@ static int ocResolve_PEi386     ( ObjectCode* oc );
 static int ocVerifyImage_MachO    ( ObjectCode* oc );
 static int ocGetNames_MachO       ( ObjectCode* oc );
 static int ocResolve_MachO        ( ObjectCode* oc );
+
+static void machoInitSymbolsWithoutUnderscore();
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -550,6 +552,13 @@ typedef struct _RtsSymbolVal {
       Sym(__ashrdi3)				\
       Sym(__lshrdi3)				\
       Sym(__eprintf)
+      
+      // Symbols that don't have a leading underscore
+      // on Mac OS X. They have to receive special treatment,
+      // see machoInitSymbolsWithoutUnderscore()
+#define RTS_MACHO_NOUNDERLINE_SYMBOLS		\
+      Sym(saveFP)				\
+      Sym(restFP)
 #else
 #define RTS_EXTRA_SYMBOLS /* nothing */
 #endif
@@ -658,6 +667,10 @@ initLinker( void )
 	ghciInsertStrHashTable("(GHCi built-in symbols)",
                                symhash, sym->lbl, sym->addr);
     }
+#   if defined(OBJFORMAT_MACHO)
+    machoInitSymbolsWithoutUnderscore();
+#   endif
+
 #   if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
     dl_prog_handle = dlopen(NULL, RTLD_LAZY);
 #   endif
@@ -2939,7 +2952,7 @@ static int ocVerifyImage_MachO(ObjectCode* oc)
     return 1;
 }
 
-static void resolveImports(
+static int resolveImports(
     ObjectCode* oc,
     char *image,
     struct symtab_command *symLC,
@@ -2965,15 +2978,17 @@ static void resolveImports(
 	    addr = lookupSymbol(nm);
 	if(!addr)
 	{
-	    fprintf(stderr, "not found: %s\n", nm);
-	    abort();
+	    belch("\n%s: unknown symbol `%s'", oc->fileName, nm);
+	    return 0;
 	}
 	ASSERT(addr);
 	((void**)(image + sect->offset))[i] = addr;
     }
+    
+    return 1;
 }
 
-static void relocateSection(char *image, 
+static int relocateSection(char *image, 
     struct symtab_command *symLC, struct nlist *nlist,
     struct section* sections, struct section *sect)
 {
@@ -2981,9 +2996,9 @@ static void relocateSection(char *image,
     int i,n;
     
     if(!strcmp(sect->sectname,"__la_symbol_ptr"))
-	return;
+	return 1;
     else if(!strcmp(sect->sectname,"__nl_symbol_ptr"))
-	return;
+	return 1;
 
     n = sect->nreloc;
     relocs = (struct relocation_info*) (image + sect->reloff);
@@ -3013,9 +3028,9 @@ static void relocateSection(char *image,
 	    if(reloc->r_pcrel && !reloc->r_extern)
 		continue;
 		
-	    if(!reloc->r_pcrel && reloc->r_length == 2)
+	    if(reloc->r_length == 2)
 	    {
-		unsigned long word;
+		unsigned long word = 0;
 
 		unsigned long* wordPtr = (unsigned long*) (image + sect->offset + reloc->r_address);
 		
@@ -3038,6 +3053,12 @@ static void relocateSection(char *image,
 		    word = ((unsigned short*) wordPtr)[1] << 16;
 		    word += ((short)relocs[i+1].r_address & (short)0xFFFF);
 		}
+		else if(reloc->r_type == PPC_RELOC_BR24)
+		{
+		    word = *wordPtr;
+		    word = (word & 0x03FFFFFC) | (word & 0x02000000) ? 0xFC000000 : 0;
+		}
+
 
 		if(!reloc->r_extern)
 		{
@@ -3053,7 +3074,14 @@ static void relocateSection(char *image,
 		    struct nlist *symbol = &nlist[reloc->r_symbolnum];
 		    char *nm = image + symLC->stroff + symbol->n_un.n_strx;
 		    word = (unsigned long) (lookupSymbol(nm));
-		    ASSERT(word);
+		    if(!word)
+		    {
+			belch("\nunknown symbol `%s'", nm);
+			return 0;
+		    }
+		    
+		    if(reloc->r_pcrel)
+			word -= ((long)image) + sect->offset + reloc->r_address;
 		}
 		
 		if(reloc->r_type == GENERIC_RELOC_VANILLA)
@@ -3077,13 +3105,17 @@ static void relocateSection(char *image,
 			+ ((word & (1<<15)) ? 1 : 0);
 		    i++; continue;
 		}
-		continue;
+		else if(reloc->r_type == PPC_RELOC_BR24)
+		{
+		    *wordPtr = (*wordPtr & 0xFC000003) | (word & 0x03FFFFFC);
+		    continue;
+		}
 	    }
-	    fprintf(stderr, "unknown reloc\n");
-	    abort();
-	    ASSERT(2 + 2 == 5);
+	    barf("\nunknown relocation %d",reloc->r_type);
+	    return 0;
 	}
     }
+    return 1;
 }
 
 static int ocGetNames_MachO(ObjectCode* oc)
@@ -3243,13 +3275,16 @@ static int ocResolve_MachO(ObjectCode* oc)
     indirectSyms = (unsigned long*) (image + dsymLC->indirectsymoff);
 
     if(la_ptrs)
-	resolveImports(oc,image,symLC,la_ptrs,indirectSyms,nlist);
+	if(!resolveImports(oc,image,symLC,la_ptrs,indirectSyms,nlist))
+	    return 0;
     if(nl_ptrs)
-	resolveImports(oc,image,symLC,nl_ptrs,indirectSyms,nlist);
+	if(!resolveImports(oc,image,symLC,nl_ptrs,indirectSyms,nlist))
+	    return 0;
     
     for(i=0;i<segLC->nsects;i++)
     {
-	relocateSection(image,symLC,nlist,sections,&sections[i]);
+	if(!relocateSection(image,symLC,nlist,sections,&sections[i]))
+	    return 0;
     }
 
     /* Free the local symbol table; we won't need it again. */
@@ -3258,4 +3293,25 @@ static int ocResolve_MachO(ObjectCode* oc)
     return 1;
 }
 
+/*
+ * The Mach-O object format uses leading underscores. But not everywhere.
+ * There is a small number of runtime support functions defined in
+ * libcc_dynamic.a whose name does not have a leading underscore.
+ * As a consequence, we can't get their address from C code.
+ * We have to use inline assembler just to take the address of a function.
+ * Yuck.
+ */
+
+static void machoInitSymbolsWithoutUnderscore()
+{
+    void *p;
+
+#undef Sym    
+#define Sym(x)						\
+    __asm__ ("lis %0,hi16(" #x ")\n\tori %0,%0,lo16(" #x ")" : "=r" (p));	\
+    ghciInsertStrHashTable("(GHCi built-in symbols)", symhash, #x, p);
+    
+    RTS_MACHO_NOUNDERLINE_SYMBOLS
+
+}
 #endif
