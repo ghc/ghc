@@ -171,19 +171,15 @@ config-pkgs ::
 	  fi; \
 	done
 
-# Convert pwd's UNC reported path into DOS style
-# (cygwin32 only.)
-CURRENT_DIR = `pwd | sed 's|^//\(.\)|\1:|'`
-
 in-place ::
-	$(MAKE) $(MFLAGS) config-pkgs bindir=$(CURRENT_DIR)/bin/$(platform) libdir=$(CURRENT_DIR)/lib/$(platform) datadir=$(CURRENT_DIR)/share
+	$(MAKE) $(MFLAGS) config-pkgs bindir=`pwd`/bin/$(platform) libdir=`pwd`/lib/$(platform) datadir=`pwd`/share
 	if test -x "./post-inplace-script" ; then \
 		echo "Running project-specific post-inplace script ..." ; \
-		./post-inplace-script $(platform) $(CURRENT_DIR) \
+		./post-inplace-script $(platform) `pwd` \
 			$(package)-$(version); \
 		echo "Done" ; \
 	fi
-	@echo "Finished configuring..to use, add $(CURRENT_DIR)/bin/$(platform) to your PATH."
+	@echo "Finished configuring..to use, add `pwd`/bin/$(platform) to your PATH."
 
 install-dirs ::
 	$(INSTALL_DIR) $(bindir)
