@@ -10,8 +10,11 @@
 
 #define OFFSET(table, x) ((StgUnion *) &(x) - (StgUnion *) (&table))
 
+
 #define OFFSET_Dbl1 OFFSET(MainRegTable, MAIN_Dbl1)
 #define OFFSET_Dbl2 OFFSET(MainRegTable, MAIN_Dbl2)
+#define OFFSET_Lng1 OFFSET(MainRegTable, MAIN_Lng1)
+#define OFFSET_Lng2 OFFSET(MainRegTable, MAIN_Lng2)
 #define OFFSET_Flt1 OFFSET(MainRegTable, MAIN_Flt1)
 #define OFFSET_Flt2 OFFSET(MainRegTable, MAIN_Flt2)
 #define OFFSET_Flt3 OFFSET(MainRegTable, MAIN_Flt3)
@@ -58,6 +61,10 @@ main()
 
     printf("#define OFFSET_Dbl1 %d\n", OFFSET_Dbl1);
     printf("#define OFFSET_Dbl2 %d\n", OFFSET_Dbl2);
+#if HAVE_LONG_LONG && SIZEOF_LONG < 8
+    printf("#define OFFSET_Lng1 %d\n", OFFSET_Lng1);
+    printf("#define OFFSET_Lng2 %d\n", OFFSET_Lng2);
+#endif
     printf("#define OFFSET_Flt1 %d\n", OFFSET_Flt1);
     printf("#define OFFSET_Flt2 %d\n", OFFSET_Flt2);
     printf("#define OFFSET_Flt3 %d\n", OFFSET_Flt3);
