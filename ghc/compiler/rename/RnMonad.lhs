@@ -354,8 +354,10 @@ renameSourceCode mod_name name_supply m
 
 	(if not (isEmptyBag errs) then
 		pprTrace "Urk! renameSourceCode found errors" (display errs) 
+#ifdef DEBUG
 	 else if not (isEmptyBag warns) then
 		pprTrace "Urk! renameSourceCode found warnings" (display warns)
+#endif
 	 else
 		id) $
 
