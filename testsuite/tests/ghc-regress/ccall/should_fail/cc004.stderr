@@ -1,28 +1,47 @@
 
 cc004.hs:8:
-    Ambiguous type variable(s) `a' in the constraint `Num a'
-    arising from use of `+' at cc004.hs:8
+    Ambiguous type variable(s) `a' in the constraint (Num a)
+      arising from use of `+' at cc004.hs:8
+    Possible cause: the monomorphism restriction applied to the following:
+      foo :: IO a (bound at cc004.hs:8)
     In the first argument of `return', namely `(a + 1)'
     In the body of a lambda: return (a + 1)
+    In a lambda abstraction: \ a -> return (a + 1)
 
 cc004.hs:8:
     Ambiguous type variable(s) `a'
-	in the constraint `GHC.Prim.CReturnable a'
-    arising from the result of the _ccall_ to `f' at cc004.hs:8
+      in the constraint (GHC.Prim.CReturnable a)
+      arising from the result of the _ccall_ to `f' at cc004.hs:8
+    Possible cause: the monomorphism restriction applied to the following:
+      foo :: IO a (bound at cc004.hs:8)
     In the first argument of `thenADR', namely `_ccall_ f'
     In a right-hand side of function `foo':
 	(_ccall_ f) `thenADR` (\ a -> return (a + 1))
+    In the definition of `foo':
+	foo = (_ccall_ f) `thenADR` (\ a -> return (... + 1))
+	    where
+		thenADR :: forall a b. IO a -> (a -> IO b) -> IO b
+		thenADR = (>>=)
 
 cc004.hs:15:
-    Ambiguous type variable(s) `a' in the constraint `Num a'
-    arising from use of `+' at cc004.hs:15
+    Ambiguous type variable(s) `a' in the constraint (Num a)
+      arising from use of `+' at cc004.hs:15
+    Possible cause: the monomorphism restriction applied to the following:
+      bar :: IO a (bound at cc004.hs:15)
     In the first argument of `return', namely `(a + 1)'
     In the body of a lambda: return (a + 1)
+    In a lambda abstraction: \ a -> return (a + 1)
 
 cc004.hs:15:
     Ambiguous type variable(s) `a'
-	in the constraint `GHC.Prim.CReturnable a'
-    arising from the result of the _ccall_ to `f' at cc004.hs:15
+      in the constraint (GHC.Prim.CReturnable a)
+      arising from the result of the _ccall_ to `f' at cc004.hs:15
+    Possible cause: the monomorphism restriction applied to the following:
+      bar :: IO a (bound at cc004.hs:15)
     In the first argument of `thenADR', namely `_ccall_ f'
     In a right-hand side of function `bar':
 	(_ccall_ f) `thenADR` (\ a -> return (a + 1))
+    In the definition of `bar':
+	bar = (_ccall_ f) `thenADR` (\ a -> return (... + 1))
+	    where
+		thenADR = (>>=)
