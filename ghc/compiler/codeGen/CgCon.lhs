@@ -290,7 +290,7 @@ cgReturnDataCon con amodes all_zero_size_args
 
     case sequel of
 
-      CaseAlts _ (Just (alts, Just (Nothing, (_,deflt_lbl))))
+      CaseAlts _ (Just (alts, Just (maybe_deflt, (_,deflt_lbl))))
 	| not (dataConTag con `is_elem` map fst alts)
 	->
 		-- Special case!  We're returning a constructor to the default case
@@ -304,7 +304,9 @@ cgReturnDataCon con amodes all_zero_size_args
 		--	if the default is a non-bind-default (ie does not use y),
 		--	then we should simply jump to the default join point;
 
-		performReturn AbsCNop {- No reg assts -} jump_to_join_point
+		case maybe_deflt of
+		    Nothing -> performReturn AbsCNop {- No reg assts -} jump_to_join_point
+		    Just _  -> build_it_then jump_to_join_point
 	where
 	  is_elem = isIn "cgReturnDataCon"
 	  jump_to_join_point sequel = absC (CJump (CLbl deflt_lbl CodePtrRep))
@@ -372,30 +374,33 @@ cgReturnDataCon con amodes all_zero_size_args
 			False   {-node doesn't point-}
 		
           | otherwise ->
-			-- BUILD THE OBJECT IN THE HEAP
-			-- The first "con" says that the name bound to this
-			-- closure is "con", which is a bit of a fudge, but it only
-			-- affects profiling
-
-			-- This Id is also used to get a unique for a
-			-- temporary variable, if the closure is a CHARLIKE.
-			-- funilly enough, this makes the unique always come
-			-- out as '54' :-)
-		  buildDynCon (mkDataConId con) currentCCS 
-			con amodes all_zero_size_args
-							`thenFC` \ idinfo ->
-		  idInfoToAmode PtrRep idinfo		`thenFC` \ amode ->
-
-
-			-- RETURN
-		  profCtrC SLIT("TICK_RET_NEW") [mkIntCLit (length amodes)] `thenC`
-		  -- could use doTailCall here.
-		  performReturn (move_to_reg amode node) 
-			(mkStaticAlgReturnCode con)
+		build_it_then (mkStaticAlgReturnCode con)
 
   where
     con_name = dataConName con
 
     move_to_reg :: CAddrMode -> MagicId -> AbstractC
     move_to_reg src_amode dest_reg = CAssign (CReg dest_reg) src_amode
+
+    build_it_then return =
+		-- BUILD THE OBJECT IN THE HEAP
+		-- The first "con" says that the name bound to this
+		-- closure is "con", which is a bit of a fudge, but it only
+		-- affects profiling
+
+		-- This Id is also used to get a unique for a
+		-- temporary variable, if the closure is a CHARLIKE.
+		-- funilly enough, this makes the unique always come
+		-- out as '54' :-)
+	  buildDynCon (mkDataConId con) currentCCS 
+		con amodes all_zero_size_args
+						`thenFC` \ idinfo ->
+	  idInfoToAmode PtrRep idinfo		`thenFC` \ amode ->
+
+
+		-- RETURN
+	  profCtrC SLIT("TICK_RET_NEW") [mkIntCLit (length amodes)] `thenC`
+	  -- could use doTailCall here.
+	  performReturn (move_to_reg amode node) return
+
 \end{code}
