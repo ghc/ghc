@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: CPUTime.hsc,v 1.6 2002/02/11 12:29:13 simonmar Exp $
+-- $Id: CPUTime.hsc,v 1.7 2002/04/24 16:03:39 simonmar Exp $
 --
 -- The standard CPUTime library.
 --
@@ -65,7 +65,7 @@ getCPUTime = do
 		* 1000000)
 
 type CRUsage = ()
-foreign import unsafe getrusage :: CInt -> Ptr CRUsage -> IO CInt
+foreign import ccall unsafe getrusage :: CInt -> Ptr CRUsage -> IO CInt
 #else
 # if defined(HAVE_TIMES)
     allocaBytes (#const sizeof(struct tms)) $ \ p_tms -> do
@@ -76,7 +76,7 @@ foreign import unsafe getrusage :: CInt -> Ptr CRUsage -> IO CInt
 			`div` fromIntegral clockTicks)
 
 type CTms = ()
-foreign import unsafe times :: Ptr CTms -> IO CClock
+foreign import ccall unsafe times :: Ptr CTms -> IO CClock
 # else
     ioException (IOError Nothing UnsupportedOperation 
 			 "getCPUTime"
@@ -108,8 +108,8 @@ foreign import unsafe times :: Ptr CTms -> IO CClock
 type FILETIME = ()
 type HANDLE = ()
 -- need proper Haskell names (initial lower-case character)
-foreign import "GetCurrentProcess" unsafe getCurrentProcess :: IO (Ptr HANDLE)
-foreign import "GetProcessTimes" unsafe getProcessTimes :: Ptr HANDLE -> Ptr FILETIME -> Ptr FILETIME -> Ptr FILETIME -> Ptr FILETIME -> IO CInt
+foreign import ccall unsafe "GetCurrentProcess" getCurrentProcess :: IO (Ptr HANDLE)
+foreign import ccall unsafe "GetProcessTimes" getProcessTimes :: Ptr HANDLE -> Ptr FILETIME -> Ptr FILETIME -> Ptr FILETIME -> Ptr FILETIME -> IO CInt
 
 #endif /* not _WIN32 */
 
@@ -122,5 +122,5 @@ clockTicks =
     (#const CLK_TCK)
 #else
     unsafePerformIO (sysconf (#const _SC_CLK_TCK) >>= return . fromIntegral)
-foreign import unsafe sysconf :: CInt -> IO CLong
+foreign import ccall unsafe sysconf :: CInt -> IO CLong
 #endif

@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Trace.hs,v 1.1 2001/06/28 14:15:02 simonmar Exp $
+-- $Id: Trace.hs,v 1.2 2002/04/24 16:01:51 simonmar Exp $
 --
 -- The trace function.
 --
@@ -37,5 +37,5 @@ trace string expr = unsafePerformIO $ do
     postTraceHook fd
     return expr
 
-foreign import "PostTraceHook" postTraceHook :: Int -> IO ()
+foreign import ccall "PostTraceHook" postTraceHook :: Int -> IO ()
 #endif
