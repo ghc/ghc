@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.135 2003/10/01 10:57:41 wolfgang Exp $
+ * $Id: Linker.c,v 1.136 2003/10/08 09:42:34 wolfgang Exp $
  *
  * (c) The GHC Team, 2000-2003
  *
@@ -89,6 +89,7 @@ static int ocVerifyImage_PEi386 ( ObjectCode* oc );
 static int ocGetNames_PEi386    ( ObjectCode* oc );
 static int ocResolve_PEi386     ( ObjectCode* oc );
 #elif defined(OBJFORMAT_MACHO)
+static int ocAllocateJumpIslands_MachO ( ObjectCode* oc );
 static int ocVerifyImage_MachO    ( ObjectCode* oc );
 static int ocGetNames_MachO       ( ObjectCode* oc );
 static int ocResolve_MachO        ( ObjectCode* oc );
@@ -1047,6 +1048,11 @@ loadObj( char *path )
    fclose(f);
 
 #endif /* USE_MMAP */
+
+#  if defined(OBJFORMAT_MACHO)
+   r = ocAllocateJumpIslands_MachO ( oc );
+   if (!r) { return r; }
+#endif
 
    /* verify the in-memory image */
 #  if defined(OBJFORMAT_ELF)
@@ -2999,12 +3005,66 @@ ia64_reloc_pcrel21(Elf_Addr target, Elf_Addr value, ObjectCode *oc)
   
   I hereby formally apologize for the hackish nature of this code.
   Things that need to be done:
-  *) get common symbols and .bss sections to work properly.
-	Haskell modules seem to work, but C modules can cause problems
+  *) handle uninitialized data sections ("__common").
+	Normal common definitions work, but beware if you pass -fno-common to gcc.
   *) implement ocVerifyImage_MachO
-  *) add more sanity checks. The current code just has to segfault if there's a
-     broken .o file.
+  *) add still more sanity checks.
 */
+
+
+/*
+  ocAllocateJumpIslands_MachO
+  
+  Allocate additional space at the end of the object file image to make room
+  for jump islands.
+  
+  PowerPC relative branch instructions have a 24 bit displacement field.
+  As PPC code is always 4-byte-aligned, this yields a +-32MB range.
+  If a particular imported symbol is outside this range, we have to redirect
+  the jump to a short piece of new code that just loads the 32bit absolute
+  address and jumps there.
+  This function just allocates space for one 16 byte jump island for every
+  undefined symbol in the object file. The code for the islands is filled in by
+  makeJumpIsland below.
+*/
+
+static const int islandSize = 16;
+
+static int ocAllocateJumpIslands_MachO(ObjectCode* oc)
+{
+    char *image = (char*) oc->image;
+    struct mach_header *header = (struct mach_header*) image;
+    struct load_command *lc = (struct load_command*) (image + sizeof(struct mach_header));
+    unsigned i;
+
+    for(i=0;i<header->ncmds;i++)
+    {
+	if(lc->cmd == LC_DYSYMTAB)
+        {
+	    struct dysymtab_command *dsymLC = (struct dysymtab_command*) lc;
+            unsigned long nundefsym = dsymLC->nundefsym;
+            oc->island_start_symbol = dsymLC->iundefsym;
+            oc->n_islands = nundefsym;
+            
+            if(nundefsym > 0)
+            {
+#ifdef USE_MMAP
+                #error ocAllocateJumpIslands_MachO doesn't want USE_MMAP to be defined
+#else
+                oc->image = stgReallocBytes(
+                    image, oc->fileSize + islandSize * nundefsym,
+                    "ocAllocateJumpIslands_MachO");
+#endif                    
+                oc->jump_islands = oc->image + oc->fileSize;
+                memset(oc->jump_islands, 0, islandSize * nundefsym);
+            }
+            
+            break;  // there can be only one LC_DSYMTAB
+        }
+	lc = (struct load_command *) ( ((char*)lc) + lc->cmdsize );
+    }
+    return 1;
+}
 
 static int ocVerifyImage_MachO(ObjectCode* oc)
 {
@@ -3047,6 +3107,31 @@ static int resolveImports(
     }
     
     return 1;
+}
+
+static void* makeJumpIsland(
+    ObjectCode* oc,
+    unsigned long symbolNumber,
+    void* target)
+{
+    if(symbolNumber < oc->island_start_symbol ||
+        symbolNumber - oc->island_start_symbol > oc->n_islands)
+        return NULL;
+    symbolNumber -= oc->island_start_symbol;
+    
+    void *island = (void*) ((char*)oc->jump_islands + islandSize * symbolNumber);
+    unsigned long *p = (unsigned long*) island;
+    
+        // lis r12, hi16(target)
+    *p++ = 0x3d800000 | ( ((unsigned long) target) >> 16 );
+        // ori r12, r12, lo16(target)
+    *p++ = 0x618c0000 | ( ((unsigned long) target) & 0xFFFF ); 
+        // mtctr r12
+    *p++ = 0x7d8903a6;
+        // bctr
+    *p++ = 0x4e800420;
+    
+    return (void*) island;
 }
 
 static int relocateSection(
@@ -3095,7 +3180,9 @@ static int relocateSection(
 	    if(reloc->r_length == 2)
 	    {
 		unsigned long word = 0;
-
+                unsigned long jumpIsland = 0;
+                long offsetToJumpIsland;
+                
 		unsigned long* wordPtr = (unsigned long*) (image + sect->offset + reloc->r_address);
 		checkProddableBlock(oc,wordPtr);
 		
@@ -3146,7 +3233,15 @@ static int relocateSection(
 		    }
 		    
 		    if(reloc->r_pcrel)
+                    {
+                        jumpIsland = (long) makeJumpIsland(oc,reloc->r_symbolnum,(void*)word);
 			word -= ((long)image) + sect->offset + reloc->r_address;
+                        if(jumpIsland != 0)
+                        {
+                            offsetToJumpIsland = jumpIsland
+                                - (((long)image) + sect->offset + reloc->r_address);
+                        }
+                    }
 		}
 		
 		if(reloc->r_type == GENERIC_RELOC_VANILLA)
@@ -3172,6 +3267,19 @@ static int relocateSection(
 		}
 		else if(reloc->r_type == PPC_RELOC_BR24)
 		{
+                    if((long)word > (long)0x01FFFFFF || (long)word < (long)0xFFE00000)
+                    {
+                        // The branch offset is too large.
+                        // Therefore, we try to use a jump island.
+                        if(jumpIsland == 0)
+                            barf("unconditional relative branch out of range: "
+                                 "no jump island available");
+                            
+                        word = offsetToJumpIsland;
+                        if((long)word > (long)0x01FFFFFF || (long)word < (long)0xFFE00000)
+                            barf("unconditional relative branch out of range: "
+                                 "jump island out of range");
+                    }
 		    *wordPtr = (*wordPtr & 0xFC000003) | (word & 0x03FFFFFC);
 		    continue;
 		}

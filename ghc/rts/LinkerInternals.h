@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: LinkerInternals.h,v 1.6 2002/06/09 13:37:44 matthewc Exp $
+ * $Id: LinkerInternals.h,v 1.7 2003/10/08 09:42:35 wolfgang Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -75,6 +75,12 @@ typedef struct _ObjectCode {
     /* Procedure Linkage Table for this object */
     void *plt;
     unsigned int pltIndex;
+#endif
+
+#ifdef darwin_TARGET_OS
+    char*           jump_islands;
+    unsigned long   island_start_symbol;
+    unsigned long   n_islands;
 #endif
 
 } ObjectCode;
