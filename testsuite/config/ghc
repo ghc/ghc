@@ -22,8 +22,9 @@ if (ghc_with_native_codegen == 1):
 if (ghc_with_profiling == 1):
 	config.compile_ways.append('prof')
 	config.run_ways.append('prof')
-	config.compile_ways.append('profasm')
-	config.run_ways.append('profasm')
+	if (ghc_with_native_codegen == 1):
+		config.compile_ways.append('profasm')
+		config.run_ways.append('profasm')
 
 if (ghc_with_unreg == 1):
 	config.compile_ways.append('unreg')
