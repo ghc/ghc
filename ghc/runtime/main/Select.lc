@@ -84,7 +84,7 @@ AwaitEvent(I_ delta)
      */
     FD_ZERO(&rfd);
     FD_ZERO(&wfd);
-    for(tso = WaitingThreadsHd; tso != Prelude_Z91Z93_closure; tso = TSO_LINK(tso)) {
+    for(tso = WaitingThreadsHd; tso != PrelBase_Z91Z93_closure; tso = TSO_LINK(tso)) {
 	us = (I_) TSO_EVENT(tso);
 	if (us > 0) {
 	    /* Looking at a delay event */
@@ -142,7 +142,7 @@ AwaitEvent(I_ delta)
      */
 
     prev = NULL;
-    for(tso = WaitingThreadsHd; tso != Prelude_Z91Z93_closure; tso = next) {
+    for(tso = WaitingThreadsHd; tso != PrelBase_Z91Z93_closure; tso = next) {
 	next = TSO_LINK(tso);
 	us = (I_) TSO_EVENT(tso);
 	if (us > 0) {
@@ -161,19 +161,19 @@ AwaitEvent(I_ delta)
 	if (ready) {
 
 #if defined(GRAN)
-            if (ThreadQueueTl == Prelude_Z91Z93_closure)
+            if (ThreadQueueTl == PrelBase_Z91Z93_closure)
 		ThreadQueueHd = tso;
             else
 		TSO_LINK(ThreadQueueTl) = tso;
 	    ThreadQueueTl = tso;
-	    TSO_LINK(tso) = Prelude_Z91Z93_closure;
+	    TSO_LINK(tso) = PrelBase_Z91Z93_closure;
 #else
-            if (RunnableThreadsTl == Prelude_Z91Z93_closure)
+            if (RunnableThreadsTl == PrelBase_Z91Z93_closure)
 		RunnableThreadsHd = tso;
             else
 		TSO_LINK(RunnableThreadsTl) = tso;
 	    RunnableThreadsTl = tso;
-	    TSO_LINK(tso) = Prelude_Z91Z93_closure;
+	    TSO_LINK(tso) = PrelBase_Z91Z93_closure;
 #endif
 	} else {
 	    if (prev == NULL)
@@ -184,9 +184,9 @@ AwaitEvent(I_ delta)
 	}
     }
     if (prev == NULL)
-	WaitingThreadsHd = WaitingThreadsTl = Prelude_Z91Z93_closure;
+	WaitingThreadsHd = WaitingThreadsTl = PrelBase_Z91Z93_closure;
     else {
-	TSO_LINK(prev) = Prelude_Z91Z93_closure;
+	TSO_LINK(prev) = PrelBase_Z91Z93_closure;
 	WaitingThreadsTl = prev;
     }
 }
