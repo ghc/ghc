@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.21 2003/03/21 15:45:56 sof Exp $
+# $Id: Makefile,v 1.22 2003/09/04 09:56:16 simonmar Exp $
 #
 
 TOP = ..
@@ -43,22 +43,26 @@ $(H_CONFIG) :
 	@echo "#define __FPTOOLS_CONFIG_H__" >>$@
 	@echo >> $@
 	@echo "#define HostPlatform_TYPE   $(HostPlatform_CPP)" >> $@
-	@echo "#define TargetPlatform_TYPE $(HostPlatform_CPP)" >> $@
-	@echo "#define BuildPlatform_TYPE  $(HostPlatform_CPP)" >> $@
+	@echo "#define TargetPlatform_TYPE $(TargetPlatform_CPP)" >> $@
+	@echo "#define BuildPlatform_TYPE  $(BuildPlatform_CPP)" >> $@
 	@echo >> $@
 	@echo "#define $(HostPlatform_CPP)_HOST		1" >> $@
-	@echo "#define $(HostPlatform_CPP)_TARGET	1" >> $@
-	@echo "#define $(HostPlatform_CPP)_BUILD  	1" >> $@
+	@echo "#define $(TargetPlatform_CPP)_TARGET	1" >> $@
+	@echo "#define $(BuildPlatform_CPP)_BUILD  	1" >> $@
 	@echo >> $@
 	@echo "#define $(HostArch_CPP)_HOST_ARCH	1" >> $@
-	@echo "#define $(HostArch_CPP)_TARGET_ARCH	1" >> $@
-	@echo "#define $(HostArch_CPP)_BUILD_ARCH  	1" >> $@
+	@echo "#define $(TargetArch_CPP)_TARGET_ARCH	1" >> $@
+	@echo "#define $(BuildArch_CPP)_BUILD_ARCH  	1" >> $@
 	@echo "#define HOST_ARCH			\"$(HostArch_CPP)\"" >> $@
+	@echo "#define TARGET_ARCH			\"$(TargetArch_CPP)\"" >> $@
+	@echo "#define BUILD_ARCH			\"$(BuildArch_CPP)\"" >> $@
 	@echo >> $@
 	@echo "#define $(HostOS_CPP)_HOST_OS		1" >> $@
-	@echo "#define $(HostOS_CPP)_TARGET_OS		1" >> $@  
-	@echo "#define $(HostOS_CPP)_BUILD_OS 		1" >> $@
+	@echo "#define $(TargetOS_CPP)_TARGET_OS	1" >> $@  
+	@echo "#define $(BuildOS_CPP)_BUILD_OS 		1" >> $@
 	@echo "#define HOST_OS 				\"$(HostOS_CPP)\"" >> $@
+	@echo "#define TARGET_OS			\"$(TargetOS_CPP)\"" >> $@
+	@echo "#define BUILD_OS				\"$(BuildOS_CPP)\"" >> $@
 ifeq "$(HostOS_CPP)" "irix"
 	@echo "#ifndef $(IRIX_MAJOR)_TARGET_OS		 " >> $@  
 	@echo "#define $(IRIX_MAJOR)_TARGET_OS		1" >> $@  
@@ -66,8 +70,8 @@ ifeq "$(HostOS_CPP)" "irix"
 endif
 	@echo >> $@
 	@echo "#define $(HostVendor_CPP)_HOST_VENDOR	1" >> $@
-	@echo "#define $(HostVendor_CPP)_TARGET_VENDOR  1" >> $@
-	@echo "#define $(HostVendor_CPP)_BUILD_VENDOR 	1" >> $@
+	@echo "#define $(TargetVendor_CPP)_TARGET_VENDOR  1" >> $@
+	@echo "#define $(BuildVendor_CPP)_BUILD_VENDOR 	1" >> $@
 	@cat $(FPTOOLS_TOP)/mk/$@ >> $@
 	@echo "#endif /* __FPTOOLS_CONFIG_H__ */"          >> $@
 	@echo "Done."
