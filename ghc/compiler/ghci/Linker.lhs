@@ -16,8 +16,9 @@ necessary.
 {-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
 
 module Linker ( HValue, initLinker, showLinkerState,
-		linkPackages, linkLibraries, findLinkable,
-		linkModules, unload, extendLinkEnv, linkExpr,
+		findLinkable,
+		linkLibraries, linkExpr,
+		unload, extendLinkEnv, 
 		LibrarySpec(..)
 	) where
 
@@ -630,6 +631,13 @@ linkPackages :: DynFlags -> [PackageName] -> IO ()
 -- (unless of course they are already linked)
 -- The dependents are linked automatically, and it doesn't matter
 -- what order you specify the input packages.
+--
+-- NOTE: in fact, since each module tracks all the packages it depends on,
+--	 we don't really need to use the package-config dependencies.
+-- However we do need the package-config stuff (to find aux libs etc),
+-- and following them lets us load libraries in the right order, which 
+-- perhaps makes the error message a bit more localised if we get a link
+-- failure.  So the dependency walking code is still here.
 
 linkPackages dflags new_pkgs
    = do	{ pls 	  <- readIORef v_PersistentLinkerState
