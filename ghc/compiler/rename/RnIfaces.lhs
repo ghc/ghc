@@ -369,6 +369,15 @@ checkUpToDate mod_name
 
 checkModUsage [] = returnRn True		-- Yes!  Everything is up to date!
 
+checkModUsage ((mod_name, old_mod_vers, _, Specifically []) : rest)
+	-- If CurrentModule.hi contains 
+	--	import Foo :: ;
+	-- then that simply records that Foo lies below CurrentModule in the
+	-- hierarchy, but CurrentModule doesn't depend in any way on Foo.
+	-- In this case we don't even want to open Foo's interface.
+  = traceRn (ptext SLIT("Nothing used from:") <+> ppr mod_name)	`thenRn_`
+    checkModUsage rest	-- This one's ok, so check the rest
+
 checkModUsage ((mod_name, old_mod_vers, _, whats_imported) : rest)
   = loadInterface doc_str mod_name ImportBySystem	`thenRn` \ (mod, ifaces) ->
     let
@@ -696,10 +705,6 @@ getImportVersions this_mod (ExportEnv export_avails _ export_all_mods)
 	mod_map   = iImpModInfo ifaces
 	imp_names = iVSlurp     ifaces
 
-	export_mods :: FiniteMap ModuleName ()		-- Set of home modules for
-							-- things in the export list
-	export_mods = listToFM [(moduleName (nameModule (availName a)), ()) | a <- export_avails]
-	
 	-- mv_map groups together all the things imported from a particular module.
 	mv_map :: FiniteMap ModuleName [(Name,Version)]
 	mv_map = foldr add_mv emptyFM imp_names
@@ -720,38 +725,39 @@ getImportVersions this_mod (ExportEnv export_avails _ export_all_mods)
 	-- whether something is a boot file along with the usage info for it, but 
 	-- I can't be bothered just now.
 
-	mk_version_info mod_name (version, has_orphans, Nothing) so_far
-	   = ASSERT( not has_orphans )	-- If has_orphans is true we will have opened it
-	     so_far	-- We didn't even read this module's interface 
-			-- so don't record dependency on it.
+	mk_version_info mod_name (version, has_orphans, contents) so_far
+	   = let
+		go_for_it exports = (mod_name, version, has_orphans, exports) : so_far
+	     in 
+	     case contents of
+		Nothing -> 	-- We didn't even open the interface
+			-- This happens when a module, Foo, that we explicitly imported has 
+			-- 'import Baz' in its interface file, recording that Baz is below
+			-- Foo in the module dependency hierarchy.  We want to propagate this
+			-- information.  The Nothing says that we didn't even open the interface
+			-- file but we must still propagate the dependeny info.
+		   go_for_it (Specifically [])
 
-	mk_version_info mod_name (version, has_orphans, Just (mod, boot_import, _)) so_far
-	   |  boot_import			-- Don't record any usage info for this module
-	   || (is_lib_module && not has_orphans)
-	   = so_far		
+		Just (mod, boot_import, _)		-- We did open the interface
+		   |  boot_import			-- Don't record any usage info for this module
+		   || (is_lib_module && not has_orphans)
+		   -> so_far		
 	   
-	   |  is_lib_module 			-- Record the module but not
-	   || mod_name `elem` export_all_mods	-- detailed version information for the imports
-	   = go_for_it Everything
+		   |  is_lib_module 			-- Record the module but not detailed
+		   || mod_name `elem` export_all_mods	-- version information for the imports
+		   -> go_for_it Everything
 
-	   |  otherwise
-	   = case lookupFM mv_map mod_name of
-		Just whats_imported
-		  -> go_for_it (Specifically whats_imported)
-
-		Nothing		-- This happens if you have
-				--	import Foo
-				-- but don't actually *use* anything from Foo
-		  |  has_orphans 			-- Check for (a) orphans (we must never forget them)
-		  || mod_name `elemFM` export_mods	-- or (b) something from the module is exported
-		  -> 	-- ...in which case record an empty dependency list
-		     go_for_it (Specifically [])
-
-		  | otherwise   -> so_far 	-- No point in recording any dependency
-	   where
-	     is_lib_module     = isLibModule mod
-	     go_for_it exports = (mod_name, version, has_orphans, exports) : so_far
-
+		   |  otherwise
+		   -> case lookupFM mv_map mod_name of
+			Just whats_imported -> go_for_it (Specifically whats_imported)
+			Nothing		    -> go_for_it (Specifically [])
+						-- This happens if you have
+						--	import Foo
+						-- but don't actually *use* anything from Foo
+					 	-- In which case record an empty dependency list
+		   where
+		     is_lib_module     = isLibModule mod
+	     
     in
 	-- A module shouldn't load its own interface
 	-- This seems like a convenient place to check
