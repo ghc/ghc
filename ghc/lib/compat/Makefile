@@ -6,6 +6,7 @@ ALL_DIRS = \
 	Compat \
 	Distribution \
 	Distribution/Compat \
+	System \
 	cbits
 
 LIBRARY = libghccompat.a
