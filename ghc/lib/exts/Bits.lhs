@@ -12,9 +12,7 @@ individual operations.
 
 module Bits where
 
-#ifdef __HUGS__
-import PreludeBuiltin
-#else
+#ifndef __HUGS__
 import PrelBase
 #endif
 
