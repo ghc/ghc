@@ -77,7 +77,7 @@ import Var		( TyVar, tyVarKind, tyVarName,
 -- others:
 import TcRnMonad          -- TcType, amongst others
 import FunDeps		( grow )
-import Name		( Name, setNameUnique, mkSysTvName, mkSystemName, getOccName )
+import Name		( Name, setNameUnique, mkSysTvName )
 import VarSet
 import VarEnv
 import CmdLineOpts	( dopt, DynFlag(..) )
@@ -174,24 +174,38 @@ tcInstType ty = tc_inst_type (mappM tcInstTyVar) ty
 
 
 ---------------------------------------------
-tcInstSigType :: Name -> TcType -> TcM ([TcTyVar], TcThetaType, TcType)
+tcInstSigType :: Name -> [Name] -> TcType -> TcM ([TcTyVar], TcThetaType, TcType)
 -- Instantiate a type with fresh SigSkol variables
 -- See Note [Signature skolems] in TcType.
 -- 
--- Tne new type variables have the sane Name as the original.
--- We don't need a fresh unique, because the renamer has made them
+-- Tne new type variables have the sane Name as the original *iff* they are scoped.
+-- For scoped tyvars, we don't need a fresh unique, because the renamer has made them
 -- unique, and it's better not to do so because we extend the envt
 -- with them as scoped type variables, and we'd like to avoid spurious
 -- 's = s' bindings in error messages
-tcInstSigType id_name ty = tc_inst_type (tcInstSigTyVars id_name) ty
+--
+-- For non-scoped ones, we *must* instantiate fresh ones:
+--	
+--	type T = forall a. [a] -> [a]
+--	f :: T; 
+--	f = g where { g :: T; g = <rhs> }
+--
+-- We must not use the same 'a' from the defn of T at both places!!
 
-tcInstSigTyVars :: Name -> [TyVar] -> TcM [TcTyVar]
-tcInstSigTyVars id_name tyvars
+tcInstSigType id_name scoped_names ty = tc_inst_type (tcInstSigTyVars id_name scoped_names) ty
+
+tcInstSigTyVars :: Name -> [Name] -> [TyVar] -> TcM [TcTyVar]
+tcInstSigTyVars id_name scoped_names tyvars
   = mapM new_tv tyvars
   where
-    new_tv tv = do { ref <- newMutVar Flexi ;
-		   ; return (mkTcTyVar (tyVarName tv) (tyVarKind tv) 
-				       (SigSkolTv id_name ref)) }
+    new_tv tv 
+      = do { let name = tyVarName tv
+	   ; ref <- newMutVar Flexi
+	   ; name' <- if name `elem` scoped_names 
+		      then return name
+		      else do { uniq <- newUnique; return (setNameUnique name uniq) }
+	   ; return (mkTcTyVar name' (tyVarKind tv) 
+			       (SigSkolTv id_name ref)) }
 			    
 
 ---------------------------------------------

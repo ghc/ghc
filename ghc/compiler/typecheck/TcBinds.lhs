@@ -14,7 +14,7 @@ import {-# SOURCE #-} TcExpr  ( tcCheckSigma, tcCheckRho )
 import CmdLineOpts	( DynFlag(Opt_MonomorphismRestriction) )
 import HsSyn		( HsExpr(..), HsBind(..), LHsBinds, Sig(..),
 			  LSig, Match(..), HsBindGroup(..), IPBind(..), 
-			  HsType(..), hsLTyVarNames, isVanillaLSig,
+			  HsType(..), HsExplicitForAll(..), hsLTyVarNames, isVanillaLSig,
 			  LPat, GRHSs, MatchGroup(..), emptyLHsBinds, isEmptyLHsBinds,
 			  collectHsBindBinders, collectPatBinders, pprPatBind
 			)
@@ -593,21 +593,18 @@ tcTySig :: LSig Name -> TcM TcSigInfo
 tcTySig (L span (Sig (L _ name) ty))
   = setSrcSpan span		$
     do	{ sigma_ty <- tcHsSigType (FunSigCtxt name) ty
-	; (tvs, theta, tau) <- tcInstSigType name sigma_ty
+	; (tvs, theta, tau) <- tcInstSigType name scoped_names sigma_ty
 	; loc <- getInstLoc (SigOrigin (SigSkol name))
-
-	; let poly_id = mkLocalId name sigma_ty
-
+	; return (TcSigInfo { sig_id = mkLocalId name sigma_ty, 
+			      sig_tvs = tvs, sig_theta = theta, sig_tau = tau, 
+			      sig_scoped = scoped_names, sig_loc = loc }) }
+  where
 		-- The scoped names are the ones explicitly mentioned
 		-- in the HsForAll.  (There may be more in sigma_ty, because
 		-- of nested type synonyms.  See Note [Scoped] with TcSigInfo.)
-	      scoped_names = case ty of
-				L _ (HsForAllTy _ tvs _ _) -> hsLTyVarNames tvs
-				other 		    	   -> []
-
-	; return (TcSigInfo { sig_id = poly_id, sig_scoped = scoped_names,
-			      sig_tvs = tvs, sig_theta = theta, sig_tau = tau, 
-			      sig_loc = loc }) }
+    scoped_names = case ty of
+			L _ (HsForAllTy Explicit tvs _ _) -> hsLTyVarNames tvs
+			other 		    		  -> []
 \end{code}
 
 \begin{code}
