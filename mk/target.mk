@@ -671,17 +671,6 @@ install-dirs ::
 # within the various install targets instead.
 #install:: install-dirs
 
-# Install libraries automatically
-# ToDo: this is a bit magical, maybe do this for packages only? --SDM
-ifneq "$(LIBRARY)" ""
-INSTALL_LIBS  += $(LIBRARY)
-ifeq "$(DLLized)" "YES"
-INSTALL_PROGS += $(DLL_NAME)
-INSTALL_LIBS += $(patsubst %.a,%_imp.a, $(LIBRARY))
-endif
-INSTALL_DATAS += $(HS_IFACES)
-endif
-
 ifneq "$(INSTALL_PROGS)" ""
 
 #
@@ -768,6 +757,14 @@ install:: $(INSTALL_DATAS)
 	@$(INSTALL_DIR) $(datadir)
 	for i in $(INSTALL_DATAS); do \
 		$(INSTALL_DATA) $(INSTALL_OPTS) $$i $(datadir); \
+	done
+endif
+
+ifneq "$(INSTALL_DATAS_WITH_DIRS)" ""
+install:: $(INSTALL_DATAS_WITH_DIRS)
+	@$(INSTALL_DIR) $(datadir)
+	for i in $(INSTALL_DATAS_WITH_DIRS); do \
+		$(INSTALL_DATA) $(INSTALL_OPTS) $$i $(datadir)/`dirname $$i`; \
 	done
 endif
 

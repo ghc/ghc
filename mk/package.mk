@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.4 2002/02/13 15:48:03 simonmar Exp $
+# $Id: package.mk,v 1.5 2002/02/14 15:14:00 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -60,15 +60,32 @@ all :: $(LIBRARY)
 
 # -----------------------------------------------------------------------------
 # Installation; need to install .hi files as well as libraries
-#
+
+INSTALL_LIBS  += $(LIBRARY)
+
+ifeq "$(DLLized)" "YES"
+INSTALL_PROGS += $(DLL_NAME)
+INSTALL_LIBS += $(patsubst %.a,%_imp.a, $(LIBRARY))
+endif
+
 # The interface files are put inside the $(libdir), since they
 # might (potentially) be platform specific..
 #
 # override is used here because for binary distributions, datadir is
 # set on the command line. sigh.
-#
-
 override datadir:=$(libdir)/imports/$(PACKAGE)
+
+# If the lib consists of a hierachy of modules, we must retain the directory
+# structure when we install the interfaces.
+ifeq "$(HIERARCHICAL_LIB)" "YES"
+INSTALL_DATAS_WITH_DIRS += $(HS_IFACES)
+install ::
+	@for i in $(ALL_DIRS); do \
+		$(INSTALL_DIR) $(datadir)/$$i; \
+	done
+else
+INSTALL_DATAS += $(HS_IFACES)
+endif
 
 # -----------------------------------------------------------------------------
 # Dependencies
