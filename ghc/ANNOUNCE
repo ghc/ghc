@@ -1,8 +1,8 @@
-	     The Glasgow Haskell Compiler -- version 3.01
+	     The Glasgow Haskell Compiler -- version 3.02
 	    ==============================================
 
 We are pleased to announce a new release of the Glasgow Haskell
-Compiler (GHC), version 3.01.  The source distribution is freely
+Compiler (GHC), version 3.02.  The source distribution is freely
 available via the World-Wide Web and through anon. FTP; details below.
 
 Haskell is "the" standard lazy functional programming language; the
@@ -14,16 +14,14 @@ related information is available from the Haskell home page at
 + What's new
 =============
 
-GHC 3.01 is a source-only release.  Major news items:
+GHC 3.02 is a source-only release.  Major news items:
 
-	* Lots of bug-fixes for the mult-parameter type class support.
+	* A new specialiser,
+	* Many bugs fixed, including several performance-related ones,
+	* A new unsafeCoerce# primitive.
 
-	* Re-organisation of libraries, and hslibs nuked. (see the
-	  release notes/documentation for the full story).
-
-	* The User's Guide is now in SGML, and the literate tools are
-	  no longer required to format any of the documentation in the
-	  tree, hence we removed them from the distribution.
+GHC 3.02 produces the fastest code since 0.29, but there's still
+plenty of tuning to do.
 
 + Mailing lists
 ================
@@ -80,6 +78,6 @@ Similar platforms should work with minimal hacking effort.  The installer's
 guide included in distribution gives a complete run-down of what-ports-work;
 an on-line version can be found at
 
-   http://www.dcs.gla.ac.uk/fp/software/ghc/3.01/installation_guide/installing_toc.html
+   http://www.dcs.gla.ac.uk/fp/software/ghc/3.02/installation_guide/installing_toc.html
 
 EOF
