@@ -347,9 +347,9 @@ foreign label "stg_ctoi_ret_F1_info"  stg_ctoi_ret_F1_info :: Addr
 foreign label "stg_ctoi_ret_D1_info"  stg_ctoi_ret_D1_info :: Addr
 foreign label "stg_ctoi_ret_V_info"   stg_ctoi_ret_V_info :: Addr
 
-foreign label "stg_gc_unbx_r1_info" stg_gc_unbx_r1_info :: Addr
-foreign label "stg_gc_f1_info"      stg_gc_f1_info :: Addr
-foreign label "stg_gc_d1_info"      stg_gc_d1_info :: Addr
+foreign label "stg_gc_unbx_r1_ret_info" stg_gc_unbx_r1_info :: Addr
+foreign label "stg_gc_f1_ret_info"      stg_gc_f1_info :: Addr
+foreign label "stg_gc_d1_ret_info"      stg_gc_d1_info :: Addr
 
 -- The size in 16-bit entities of an instruction.
 instrSize16s :: BCInstr -> Int
