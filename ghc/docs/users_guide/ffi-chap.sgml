@@ -132,64 +132,83 @@ extern HsInt foo(HsInt a0);</programlisting>
 
 <programlisting>
 #include &lt;stdio.h&gt;
+#include "HsFFI.h"
+
+#ifdef __GLASGOW_HASKELL__
 #include "foo_stub.h"
+#endif
 
-#include "RtsAPI.h"
-
+#ifdef __GLASGOW_HASKELL__
 extern void __stginit_Foo ( void );
+#endif
 
 int main(int argc, char *argv[])
 {
   int i;
 
-  startupHaskell(argc, argv, __stginit_Foo);
+  hs_init(&amp;argc, &amp;argv);
+#ifdef __GLASGOW_HASKELL__
+  hs_add_root(__stginit_Foo);
+#endif
 
   for (i = 0; i < 5; i++) {
     printf("%d\n", foo(2500));
   }
 
-  shutdownHaskell();
-
+  hs_exit();
   return 0;
 }</programlisting>
 
-	<para>The call to <literal>startupHaskell()</literal>
+	<para>We've surrounded the GHC-specific bits with
+	<literal>#ifdef __GLASGOW_HASKELL__</literal>; the rest of the
+	code should be portable across Haskell implementations that
+	support the FFI standard.</para>
+
+	<para>The call to <literal>hs_init()</literal>
 	initializes GHC's runtime system.  Do NOT try to invoke any
 	Haskell functions before calling
-	<literal>startupHaskell()</literal>: strange things will
+	<literal>hs_init()</literal>: strange things will
 	undoubtedly happen.</para>
 
 	<para>We pass <literal>argc</literal> and
-	<literal>argv</literal> to <literal>startupHaskell()</literal>
+	<literal>argv</literal> to <literal>hs_init()</literal>
 	so that it can separate out any arguments for the RTS
 	(i.e. those arguments between
 	<literal>+RTS...-RTS</literal>).</para>
 
-	<para>The third argument to <literal>startupHaskell()</literal>
-	is used for initializing the Haskell modules in the program.
-	It must be the name of the initialization function for the
-	"top" module in the program/library - in other words, the
-	module which directly or indirectly imports all the other
-	Haskell modules in the program.  In a standalone Haskell
-	program this would be module <literal>Main</literal>, but when
-	you are only using the Haskell code as a library it may not
-	be.  If your library doesn't have such a module, then it is
-	straightforward to create one, purely for this initialization
-	process.  The name of the initialization function for module
+	<para>Next, we call
+	<function>hs_add_root</function><indexterm><primary><function>hs_add_root</function></primary>
+	</indexterm>, a GHC-specific interface which is required to
+	initialise the Haskell modules in the program.  The argument
+	to <function>hs_add_root</function> should be the name of the
+	initialization function for the "root" module in your program
+	- in other words, the module which directly or indirectly
+	imports all the other Haskell modules in the program.  In a
+	standalone Haskell program the root module is normally
+	<literal>Main</literal>, but when you are using Haskell code
+	from a library it may not be.  If your program has multiple
+	root modules, then you can call
+	<function>hs_add_root</function> multiple times, one for each
+	root.  The name of the initialization function for module
 	<replaceable>M</replaceable> is
 	<literal>__stginit_<replaceable>M</replaceable></literal>, and
 	it may be declared as an external function symbol as in the
 	code above.</para>
 
 	<para>After we've finished invoking our Haskell functions, we
-	can call <literal>shutdownHaskell()</literal>, which
+	can call <literal>hs_exit()</literal>, which
 	terminates the RTS.  It runs any outstanding finalizers and
 	generates any profiling or stats output that might have been
 	requested.</para>
 
-	<para>The functions <literal>startupHaskell()</literal> and
-	<literal>shutdownHaskell()</literal> may be called only once
-	each, and only in that order.</para>
+	<para>There can be multiple calls to
+	<literal>hs_init()</literal>, but each one should be matched
+	by one (and only one) call to
+	<literal>hs_exit()</literal><footnote><para>The outermost
+	<literal>hs_exit()</literal> will actually de-initialise the
+	system.  NOTE that currently GHC's runtime cannot reliably
+	re-initialise after this has happened.</para>
+	</footnote>.</para>
 
 	<para>NOTE: when linking the final program, it is normally
 	easiest to do the link using GHC, although this isn't
