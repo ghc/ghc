@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.1 2001/03/15 15:51:38 simonmar Exp $
+-- $Id: Main.hs,v 1.2 2001/03/16 10:04:31 simonmar Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -7,7 +7,6 @@
 module Main where
 
 import Package
-import Config
 
 #ifdef __GLASGOW_HASKELL__
 import qualified Exception
