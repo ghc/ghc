@@ -49,7 +49,7 @@ module TysPrim(
 import Var		( TyVar, mkSysTyVar )
 import Name		( Name )
 import PrimRep		( PrimRep(..) )
-import TyCon		( TyCon, ArgVrcs, mkPrimTyCon )
+import TyCon		( TyCon, ArgVrcs, mkPrimTyCon, mkLiftedPrimTyCon )
 import Type		( mkTyConApp, mkTyConTy, mkTyVarTys, mkTyVarTy,
 			  unliftedTypeKind, liftedTypeKind, openTypeKind, mkArrowKinds
 			)
@@ -208,7 +208,7 @@ RealWorld is deeply magical.  It is *primitive*, but it is not
 RealWorld; it's only used in the type system, to parameterise State#.
 
 \begin{code}
-realWorldTyCon = mkPrimTyCon realWorldTyConName liftedTypeKind 0 [] PrimPtrRep
+realWorldTyCon = mkLiftedPrimTyCon realWorldTyConName liftedTypeKind 0 [] PrimPtrRep
 realWorldTy	     = mkTyConTy realWorldTyCon
 realWorldStatePrimTy = mkStatePrimTy realWorldTy	-- State# RealWorld
 \end{code}

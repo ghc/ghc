@@ -19,6 +19,7 @@ module TyCon(
 	mkClassTyCon,
 	mkFunTyCon,
 	mkPrimTyCon,
+	mkLiftedPrimTyCon,
 	mkTupleTyCon,
 	mkSynTyCon,
 	mkKindCon,
@@ -318,7 +319,15 @@ mkForeignTyCon name ext_name kind arity arg_vrcs
     }
 
 
+-- most Prim tycons are lifted
 mkPrimTyCon name kind arity arg_vrcs rep
+  = mkPrimTyCon' name kind arity arg_vrcs rep True  
+
+-- but RealWorld is lifted
+mkLiftedPrimTyCon name kind arity arg_vrcs rep
+  = mkPrimTyCon' name kind arity arg_vrcs rep False
+
+mkPrimTyCon' name kind arity arg_vrcs rep is_unlifted
   = PrimTyCon {
 	tyConName    = name,
 	tyConUnique  = nameUnique name,
@@ -326,7 +335,7 @@ mkPrimTyCon name kind arity arg_vrcs rep
 	tyConArity   = arity,
         tyConArgVrcs = arg_vrcs,
 	primTyConRep = rep,
-	isUnLifted   = True,
+	isUnLifted   = is_unlifted,
 	tyConExtName = Nothing
     }
 
