@@ -74,9 +74,9 @@ tdefs	:: { [RdrNameHsDecl] }
 
 tdef	:: { RdrNameHsDecl }
 	: '%data' q_tc_name tbinds '=' '{' cons1 '}'
-                { TyClD (TyData DataType [] $2 $3 (DataCons $6) Nothing [] noSrcLoc) }
+                { TyClD (mkTyData DataType ([], $2, $3) (DataCons $6) Nothing noSrcLoc) }
 	| '%newtype' q_tc_name tbinds trep 
-		{ TyClD (TyData NewType []  $2 $3 ($4 $2 $3) Nothing [] noSrcLoc) }
+		{ TyClD (mkTyData NewType ([], $2, $3) ($4 $2 $3) Nothing noSrcLoc) }
 
 trep    :: { (RdrName -> [HsTyVarBndr RdrName] -> DataConDetails (ConDecl RdrName)) }
         : {- empty -}   { (\ x ts -> Unknown) }
@@ -146,7 +146,7 @@ cons1	:: { [ConDecl RdrName] }
 
 con	:: { ConDecl RdrName }
 	: q_d_name attbinds atys 
-		{ ConDecl $1 $1 $2 [] (VanillaCon (map unbangedType $3)) noSrcLoc}
+		{ mkConDecl $1 $2 [] (VanillaCon (map unbangedType $3)) noSrcLoc}
 
 atys	:: { [ RdrNameHsType] }
 	: {- empty -}   { [] }
