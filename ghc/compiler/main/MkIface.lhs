@@ -17,8 +17,8 @@ import HsSyn
 import HsCore		( HsIdInfo(..), UfExpr(..), toUfExpr, toUfBndr )
 import HsTypes		( toHsTyVars )
 import TysPrim		( alphaTyVars )
-import BasicTypes	( Fixity(..), NewOrData(..),
-			  Version, initialVersion, bumpVersion, 
+import BasicTypes	( Fixity(..), NewOrData(..), Activation(..),
+			  Version, initialVersion, bumpVersion 
 			)
 import RnMonad
 import RnHsSyn		( RenamedInstDecl, RenamedTyClDecl )
@@ -313,12 +313,12 @@ ifaceInstance dfun_id
 ifaceRule (id, BuiltinRule _ _)
   = pprTrace "toHsRule: builtin" (ppr id) (bogusIfaceRule id)
 
-ifaceRule (id, Rule name bndrs args rhs)
-  = IfaceRule name (map toUfBndr bndrs) (getName id)
+ifaceRule (id, Rule name act bndrs args rhs)
+  = IfaceRule name act (map toUfBndr bndrs) (getName id)
 	      (map toUfExpr args) (toUfExpr rhs) noSrcLoc
 
 bogusIfaceRule id
-  = IfaceRule SLIT("bogus") [] (getName id) [] (UfVar (getName id)) noSrcLoc
+  = IfaceRule SLIT("bogus") NeverActive [] (getName id) [] (UfVar (getName id)) noSrcLoc
 \end{code}
 
 

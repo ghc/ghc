@@ -167,8 +167,9 @@ instDeclFVs (InstDecl inst_ty _ _ maybe_dfun _)
     (case maybe_dfun of { Just n -> unitFV n; Nothing -> emptyFVs })
 
 ----------------
-ruleDeclFVs (HsRule _ _ _ _ _ _) = emptyFVs
-ruleDeclFVs (IfaceRule _ vars _ args rhs _)
+ruleDeclFVs (HsRule _ _ _ _ _ _ _) = emptyFVs
+ruleDeclFVs (IfaceRuleOut _ _)	   = emptyFVs
+ruleDeclFVs (IfaceRule _ _ vars _ args rhs _)
   = delFVs (map ufBinderName vars) $
     ufExprFVs rhs `plusFV` plusFVs (map ufExprFVs args)
 

@@ -38,7 +38,10 @@ module BasicTypes(
 
         EP(..),
 
-	StrictnessMark(..), isMarkedUnboxed, isMarkedStrict
+	StrictnessMark(..), isMarkedUnboxed, isMarkedStrict,
+
+	CompilerPhase, pprPhase, 
+	Activation(..), isActive, isNeverActive, isAlwaysActive
    ) where
 
 #include "HsVersions.h"
@@ -289,7 +292,7 @@ isDeadOcc other	  = False
 
 isFragileOcc :: OccInfo -> Bool
 isFragileOcc (OneOcc _ _) = True
-isFragileOcc other	      = False
+isFragileOcc other	  = False
 \end{code}
 
 \begin{code}
@@ -334,4 +337,44 @@ instance Outputable StrictnessMark where
   ppr MarkedStrict     = ptext SLIT("!")
   ppr MarkedUnboxed    = ptext SLIT("! !")
   ppr NotMarkedStrict  = empty
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Activation}
+%*									*
+%************************************************************************
+
+When a rule or inlining is active
+
+\begin{code}
+type CompilerPhase = Int	-- Compilation phase
+				-- Phases decrease towards zero
+				-- Zero is the last phase
+
+pprPhase :: CompilerPhase -> SDoc
+pprPhase n = brackets (int n)
+
+data Activation = NeverActive
+		| AlwaysActive
+		| ActiveAfter CompilerPhase	-- Active in this phase and later
+		deriving( Eq )			-- Eq used in comparing rules in HsDecls
+
+instance Outputable Activation where
+   ppr AlwaysActive    = empty		-- The default
+   ppr (ActiveAfter n) = pprPhase n
+   ppr NeverActive     = ptext SLIT("NEVER")
+    
+isActive :: CompilerPhase -> Activation -> Bool
+isActive p NeverActive     = False
+isActive p AlwaysActive    = True
+isActive p (ActiveAfter n) = p <= n
+
+isNeverActive, isAlwaysActive :: Activation -> Bool
+isNeverActive NeverActive = True
+isNeverActive act	  = False
+
+isAlwaysActive AlwaysActive = True
+isAlwaysActive other	    = False
 \end{code}

@@ -43,7 +43,6 @@ import TysWiredIn	( intTyCon )
 import Name		( NamedThing(..), mkSysLocalName, nameSrcLoc )
 import NameSet
 import UniqFM		( isNullUFM )
-import FiniteMap	( elemFM )
 import UniqSet		( emptyUniqSet )
 import List		( intersectBy )
 import ListSetOps	( removeDups )

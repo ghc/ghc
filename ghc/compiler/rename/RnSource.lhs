@@ -217,15 +217,19 @@ finishSourceInstDecl (InstDecl _       mbinds uprags _               _      )
 %*********************************************************
 
 \begin{code}
-rnIfaceRuleDecl (IfaceRule rule_name vars fn args rhs src_loc)
+rnIfaceRuleDecl (IfaceRule rule_name act vars fn args rhs src_loc)
   = pushSrcLocRn src_loc	$
     lookupOccRn fn		`thenRn` \ fn' ->
     rnCoreBndrs vars		$ \ vars' ->
     mapRn rnCoreExpr args	`thenRn` \ args' ->
     rnCoreExpr rhs		`thenRn` \ rhs' ->
-    returnRn (IfaceRule rule_name vars' fn' args' rhs' src_loc)
+    returnRn (IfaceRule rule_name act vars' fn' args' rhs' src_loc)
 
-rnHsRuleDecl (HsRule rule_name tvs vars lhs rhs src_loc)
+rnIfaceRuleDecl (IfaceRuleOut fn rule)		-- Builtin rules come this way
+  = lookupOccRn fn		`thenRn` \ fn' ->
+    returnRn (IfaceRuleOut fn' rule)
+
+rnHsRuleDecl (HsRule rule_name act tvs vars lhs rhs src_loc)
   = ASSERT( null tvs )
     pushSrcLocRn src_loc			$
 
@@ -241,7 +245,7 @@ rnHsRuleDecl (HsRule rule_name tvs vars lhs rhs src_loc)
 	bad_vars = [var | var <- ids, not (var `elemNameSet` fv_lhs)]
     in
     mapRn (addErrRn . badRuleVar rule_name) bad_vars	`thenRn_`
-    returnRn (HsRule rule_name sig_tvs' vars' lhs' rhs' src_loc,
+    returnRn (HsRule rule_name act sig_tvs' vars' lhs' rhs' src_loc,
 	      fv_vars `plusFV` fv_lhs `plusFV` fv_rhs)
   where
     doc = text "In the transformation rule" <+> ptext rule_name

@@ -24,7 +24,7 @@ import PprCore		( {- instance Outputable (Expr a) -} )
 import Name		( Name )
 import PrelNames	( isUnboundName )
 import NameSet		( NameSet, elemNameSet, nameSetToList )
-import BasicTypes	( RecFlag(..), Fixity )
+import BasicTypes	( RecFlag(..), Fixity, Activation(..), pprPhase )
 import Outputable	
 import SrcLoc		( SrcLoc )
 import Var		( TyVar )
@@ -249,12 +249,9 @@ data Sig name
 		(HsType name)	-- ... to these types
 		SrcLoc
 
-  | InlineSig	name		-- INLINE f
-	 	(Maybe Int)	-- phase
-		SrcLoc
-
-  | NoInlineSig	name		-- NOINLINE f
-	 	(Maybe Int)	-- phase
+  | InlineSig	Bool		-- True <=> INLINE f, False <=> NOINLINE f
+	 	name		-- Function name
+		Activation	-- When inlining is *active*
 		SrcLoc
 
   | SpecInstSig (HsType name)	-- (Class tys); should be a specialisation of the 
@@ -292,13 +289,12 @@ sigForThisGroup ns sig
 	       | otherwise 	 -> n `elemNameSet` ns
 
 sigName :: Sig name -> Maybe name
-sigName (Sig         n _ _)             = Just n
-sigName (ClassOpSig  n _ _ _)           = Just n
-sigName (SpecSig     n _ _)             = Just n
-sigName (InlineSig   n _   _)           = Just n
-sigName (NoInlineSig n _   _)           = Just n
-sigName (FixSig (FixitySig n _ _))      = Just n
-sigName other				= Nothing
+sigName (Sig         n _ _)        = Just n
+sigName (ClassOpSig  n _ _ _)      = Just n
+sigName (SpecSig     n _ _)        = Just n
+sigName (InlineSig _ n _ _)        = Just n
+sigName (FixSig (FixitySig n _ _)) = Just n
+sigName other			   = Nothing
 
 isFixitySig :: Sig name -> Bool
 isFixitySig (FixSig _) = True
@@ -311,8 +307,7 @@ isClassOpSig _			  = False
 isPragSig :: Sig name -> Bool
 	-- Identifies pragmas 
 isPragSig (SpecSig _ _ _)     = True
-isPragSig (InlineSig   _ _ _) = True
-isPragSig (NoInlineSig _ _ _) = True
+isPragSig (InlineSig _ _ _ _) = True
 isPragSig (SpecInstSig _ _)   = True
 isPragSig other		      = False
 \end{code}
@@ -321,8 +316,8 @@ isPragSig other		      = False
 hsSigDoc (Sig        _ _ loc) 	      = (SLIT("type signature"),loc)
 hsSigDoc (ClassOpSig _ _ _ loc)       = (SLIT("class-method type signature"), loc)
 hsSigDoc (SpecSig    _ _ loc) 	      = (SLIT("SPECIALISE pragma"),loc)
-hsSigDoc (InlineSig  _ _    loc)      = (SLIT("INLINE pragma"),loc)
-hsSigDoc (NoInlineSig  _ _  loc)      = (SLIT("NOINLINE pragma"),loc)
+hsSigDoc (InlineSig True  _ _ loc)    = (SLIT("INLINE pragma"),loc)
+hsSigDoc (InlineSig False _ _ loc)    = (SLIT("NOINLINE pragma"),loc)
 hsSigDoc (SpecInstSig _ loc)	      = (SLIT("SPECIALISE instance pragma"),loc)
 hsSigDoc (FixSig (FixitySig _ _ loc)) = (SLIT("fixity declaration"), loc)
 \end{code}
@@ -357,11 +352,15 @@ ppr_sig (SpecSig var ty _)
 	      nest 4 (ppr ty <+> text "#-}")
 	]
 
-ppr_sig (InlineSig var phase _)
-      = hsep [text "{-# INLINE", ppr_phase phase, ppr var, text "#-}"]
+ppr_sig (InlineSig True var phase _)
+      = hsep [text "{-# INLINE", ppr phase, ppr var, text "#-}"]
 
-ppr_sig (NoInlineSig var phase _)
-      = hsep [text "{-# NOINLINE", ppr_phase phase, ppr var, text "#-}"]
+ppr_sig (InlineSig False var phase _)
+      = hsep [text "{-# NOINLINE", pp_phase phase, ppr var, text "#-}"]
+      where
+	pp_phase NeverActive     = empty		-- NOINLINE f
+	pp_phase (ActiveAfter n) = pprPhase n		-- NOINLINE [2] f
+	pp_phase AlwaysActive    = text "ALWAYS?" 	-- Unexpected
 
 ppr_sig (SpecInstSig ty _)
       = hsep [text "{-# SPECIALIZE instance", ppr ty, text "#-}"]
@@ -371,10 +370,6 @@ ppr_sig (FixSig fix_sig) = ppr fix_sig
 
 instance Outputable name => Outputable (FixitySig name) where
   ppr (FixitySig name fixity loc) = sep [ppr fixity, ppr name]
-
-ppr_phase :: Maybe Int -> SDoc
-ppr_phase Nothing  = empty
-ppr_phase (Just n) = int n
 \end{code}
 
 Checking for distinct signatures; oh, so boring
@@ -382,9 +377,8 @@ Checking for distinct signatures; oh, so boring
 
 \begin{code}
 eqHsSig :: Sig Name -> Sig Name -> Bool
-eqHsSig (Sig n1 _ _)         (Sig n2 _ _)         = n1 == n2
-eqHsSig (InlineSig n1 _ _)   (InlineSig n2 _ _)   = n1 == n2
-eqHsSig (NoInlineSig n1 _ _) (NoInlineSig n2 _ _) = n1 == n2
+eqHsSig (Sig n1 _ _)         (Sig n2 _ _)          = n1 == n2
+eqHsSig (InlineSig b1 n1 _ _)(InlineSig b2 n2 _ _) = b1 == b2 && n1 == n2
 
 eqHsSig (SpecInstSig ty1 _)  (SpecInstSig ty2 _)  = ty1 == ty2
 eqHsSig (SpecSig n1 ty1 _)   (SpecSig n2 ty2 _)   =

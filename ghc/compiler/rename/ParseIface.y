@@ -38,7 +38,8 @@ import HsTypes		( mkHsForAllTy, mkHsTupCon )
 import HsCore
 import Literal		( Literal(..), mkMachInt, mkMachInt64, mkMachWord, mkMachWord64 )
 import BasicTypes	( Fixity(..), FixityDirection(..), StrictnessMark(..),
-			  NewOrData(..), Version, initialVersion, Boxity(..)
+			  NewOrData(..), Version, initialVersion, Boxity(..),
+                          Activation(..)
 			)
 import CostCentre       ( CostCentre(..), IsCafCC(..), IsDupdCC(..) )
 import Type		( Kind, mkArrowKind, liftedTypeKind, openTypeKind, usageTypeKind )
@@ -141,7 +142,7 @@ import FastString	( tailFS )
  '__A'		{ ITarity }
  '__P'		{ ITspecialise }
  '__C'		{ ITnocaf }
- '__U'		{ ITunfold $$ }
+ '__U'		{ ITunfold }
  '__S'		{ ITstrict $$ }
  '__R'		{ ITrules }
  '__M'		{ ITcprinfo }
@@ -421,8 +422,12 @@ rules	   :: { [RdrNameRuleDecl] }
 	   | rule ';' rules	{ $1:$3 }
 
 rule	   :: { RdrNameRuleDecl }
-rule	   : src_loc STRING rule_forall qvar_name 
-	     core_args '=' core_expr	{ IfaceRule $2 $3 $4 $5 $7 $1 } 
+rule	   : src_loc STRING activation rule_forall qvar_name 
+	     core_args '=' core_expr	{ IfaceRule $2 $3 $4 $5 $6 $8 $1 } 
+
+activation :: { Activation }
+activation : {- empty -}                { AlwaysActive }
+           | INTEGER                    { ActiveAfter (fromInteger $1) }
 
 rule_forall	:: { [UfBinder RdrName] }
 rule_forall	: '__forall' '{' core_bndrs '}'	{ $3 }
@@ -749,16 +754,8 @@ id_info_item	:: { HsIdInfo RdrName }
 		| '__P' qvar_name INTEGER	{ HsWorker $2 (fromInteger $3) }
 
 inline_prag     :: { InlinePragInfo }
-                :  {- empty -}                  { NoInlinePragInfo }
-		| '[' from_prag phase ']'	{ IMustNotBeINLINEd $2 $3 }
-
-from_prag	:: { Bool }
-		: {- empty -}			{ True }
-		| '!'				{ False }
-
-phase		:: { Maybe Int }
-		: {- empty -}			{ Nothing }
-		| INTEGER 			{ Just (fromInteger $1) }
+                :  {- empty -}                  { AlwaysActive }
+		| '[' INTEGER ']'               { ActiveAfter (fromInteger $2) }
 
 -------------------------------------------------------
 core_expr	:: { UfExpr RdrName }

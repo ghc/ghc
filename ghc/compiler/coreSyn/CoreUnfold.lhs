@@ -26,7 +26,7 @@ module CoreUnfold (
 	certainlyWillInline, 
 	okToUnfoldInHiFile,
 
-	callSiteInline, blackListed
+	callSiteInline
     ) where
 
 #include "HsVersions.h"
@@ -43,16 +43,14 @@ import PprCore		( pprCoreExpr )
 import OccurAnal	( occurAnalyseGlobalExpr )
 import CoreUtils	( exprIsValue, exprIsCheap, exprIsTrivial )
 import Id		( Id, idType, isId,
-			  idSpecialisation, idInlinePragma, idUnfolding,
+			  idUnfolding,
 			  isFCallId_maybe, globalIdDetails
 			)
-import VarSet
+import DataCon		( isUnboxedTupleCon )
 import Literal		( isLitLitLit, litSize )
 import PrimOp		( primOpIsDupable, primOpOutOfLine )
 import ForeignCall	( okToExposeFCall )
-import IdInfo		( InlinePragInfo(..), OccInfo(..), GlobalIdDetails(..),
-			  isNeverInlinePrag
-			)
+import IdInfo		( OccInfo(..), GlobalIdDetails(..) )
 import Type		( isUnLiftedType )
 import PrelNames	( hasKey, buildIdKey, augmentIdKey )
 import Bag
@@ -77,6 +75,7 @@ mkTopUnfolding expr = mkUnfolding True {- Top level -} expr
 mkUnfolding top_lvl expr
   = CoreUnfolding (occurAnalyseGlobalExpr expr)
 		  top_lvl
+
 		  (exprIsValue expr)
 			-- Already evaluated
 
@@ -298,7 +297,7 @@ sizeExpr bOMB_OUT_SIZE top_args expr
       | fun `hasKey` augmentIdKey = augmentSize
       | otherwise 
       = case globalIdDetails fun of
-	  DataConId dc -> conSizeN (valArgCount args)
+	  DataConId dc -> conSizeN dc (valArgCount args)
 
 	  FCallId fc   -> sizeN opt_UF_DearOp
 	  PrimOpId op  -> primOpSize op (valArgCount args)
@@ -370,24 +369,35 @@ maxSize _              TooBig				  = TooBig
 maxSize s1@(SizeIs n1 _ _) s2@(SizeIs n2 _ _) | n1 ># n2  = s1
 					      | otherwise = s2
 
-sizeZero     	= SizeIs (_ILIT 0) emptyBag (_ILIT 0)
-sizeOne      	= SizeIs (_ILIT 1) emptyBag (_ILIT 0)
+sizeZero     	= SizeIs (_ILIT 0)  emptyBag (_ILIT 0)
+sizeOne      	= SizeIs (_ILIT 1)  emptyBag (_ILIT 0)
 sizeN n 	= SizeIs (iUnbox n) emptyBag (_ILIT 0)
-conSizeN n      = SizeIs (_ILIT 1) emptyBag (iUnbox n +# _ILIT 1)
+conSizeN dc n   
+  | isUnboxedTupleCon dc = SizeIs (_ILIT 0) emptyBag (iUnbox n +# _ILIT 1)
+  | otherwise		 = SizeIs (_ILIT 1) emptyBag (iUnbox n +# _ILIT 1)
 	-- Treat constructors as size 1; we are keen to expose them
 	-- (and we charge separately for their args).  We can't treat
 	-- them as size zero, else we find that (iBox x) has size 1,
 	-- which is the same as a lone variable; and hence 'v' will 
 	-- always be replaced by (iBox x), where v is bound to iBox x.
-
-primOpSize op n_args
- | not (primOpIsDupable op) = sizeN opt_UF_DearOp
- | not (primOpOutOfLine op) = sizeN (1 - n_args)
-	-- Be very keen to inline simple primops.
-	-- We give a discount of 1 for each arg so that (op# x y z) costs 1.
+	--
+	-- However, unboxed tuples count as size zero
 	-- I found occasions where we had 
 	--	f x y z = case op# x y z of { s -> (# s, () #) }
 	-- and f wasn't getting inlined
+
+primOpSize op n_args
+ | not (primOpIsDupable op) = sizeN opt_UF_DearOp
+ | not (primOpOutOfLine op) = sizeN (2 - n_args)
+	-- Be very keen to inline simple primops.
+	-- We give a discount of 1 for each arg so that (op# x y z) costs 2.
+	-- We can't make it cost 1, else we'll inline let v = (op# x y z) 
+	-- at every use of v, which is excessive.
+	--
+	-- A good example is:
+	--	let x = +# p q in C {x}
+	-- Even though x get's an occurrence of 'many', its RHS looks cheap,
+	-- and there's a good chance it'll get inlined back into C's RHS. Urgh!
  | otherwise	      	    = sizeOne
 
 buildSize = SizeIs (-2#) emptyBag 4#
@@ -456,8 +466,8 @@ certainlyWillInline :: Id -> Bool
 certainlyWillInline v
   = case idUnfolding v of
 
-	CoreUnfolding _ _ is_value _ g@(UnfoldIfGoodArgs n_vals _ size _)
-	   ->    is_value 
+	CoreUnfolding _ _ _ is_cheap g@(UnfoldIfGoodArgs n_vals _ size _)
+	   ->    is_cheap
 	      && size - (n_vals +1) <= opt_UF_UseThreshold
 
 	other -> False
@@ -517,7 +527,7 @@ StrictAnal.addStrictnessInfoToTopId
 
 \begin{code}
 callSiteInline :: DynFlags
-	       -> Bool			-- True <=> the Id is black listed
+	       -> Bool			-- True <=> the Id can be inlined
 	       -> Bool			-- 'inline' note at call site
 	       -> OccInfo
 	       -> Id			-- The Id
@@ -526,7 +536,7 @@ callSiteInline :: DynFlags
 	       -> Maybe CoreExpr	-- Unfolding, if any
 
 
-callSiteInline dflags black_listed inline_call occ id arg_infos interesting_cont
+callSiteInline dflags active_inline inline_call occ id arg_infos interesting_cont
   = case idUnfolding id of {
 	NoUnfolding -> Nothing ;
 	OtherCon cs -> Nothing ;
@@ -536,7 +546,7 @@ callSiteInline dflags black_listed inline_call occ id arg_infos interesting_cont
 		-- for these things, so we must inline it.
 		-- Only a couple of primop-like things have 
 		-- compulsory unfoldings (see MkId.lhs).
-		-- We don't allow them to be black-listed
+		-- We don't allow them to be inactive
 
 	CoreUnfolding unf_template is_top is_value is_cheap guidance ->
 
@@ -547,8 +557,8 @@ callSiteInline dflags black_listed inline_call occ id arg_infos interesting_cont
 	n_val_args  = length arg_infos
 
  	yes_or_no 
-	  | black_listed = False
-	  | otherwise    = case occ of
+	  | not active_inline = False
+	  | otherwise = case occ of
 				IAmDead		     -> pprTrace "callSiteInline: dead" (ppr id) False
 				IAmALoopBreaker      -> False
 				OneOcc in_lam one_br -> (not in_lam || is_cheap) && consider_safe in_lam True  one_br
@@ -579,8 +589,10 @@ callSiteInline dflags black_listed inline_call occ id arg_infos interesting_cont
 		-- Note: there used to be a '&& not top_level' in the guard above,
 		--	 but that stopped us inlining top-level functions used only once,
 		--	 which is stupid
-	  = WARN( not in_lam, ppr id )	-- If (not in_lam) && one_br then PreInlineUnconditionally
-					-- should have caught it, shouldn't it?
+	  = WARN( not is_top && not in_lam, ppr id )
+			-- If (not in_lam) && one_br then PreInlineUnconditionally
+			-- should have caught it, shouldn't it?  Unless it's a top
+			-- level thing.
 	    not (null arg_infos) || interesting_cont
 
 	  | otherwise
@@ -589,7 +601,7 @@ callSiteInline dflags black_listed inline_call occ id arg_infos interesting_cont
 	      UnfoldIfGoodArgs n_vals_wanted arg_discounts size res_discount
 
 		  | enough_args && size <= (n_vals_wanted + 1)
-			-- No size increase
+			-- Inline unconditionally if there no size increase
 			-- Size of call is n_vals_wanted (+1 for the function)
 		  -> True
 
@@ -626,7 +638,7 @@ callSiteInline dflags black_listed inline_call occ id arg_infos interesting_cont
     in    
     if dopt Opt_D_dump_inlinings dflags then
 	pprTrace "Considering inlining"
-		 (ppr id <+> vcat [text "black listed:" <+> ppr black_listed,
+		 (ppr id <+> vcat [text "active:" <+> ppr active_inline,
 				   text "occ info:" <+> ppr occ,
 			  	   text "arg infos" <+> ppr arg_infos,
 				   text "interesting continuation" <+> ppr interesting_cont,
@@ -670,95 +682,3 @@ computeDiscount n_vals_wanted arg_discounts res_discount arg_infos result_used
     result_discount | result_used = res_discount	-- Over-applied, or case scrut
 	            | otherwise	  = 0
 \end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Black-listing}
-%*									*
-%************************************************************************
-
-Inlining is controlled by the "Inline phase" number, which is set
-by the per-simplification-pass '-finline-phase' flag.
-
-For optimisation we use phase 1,2 and nothing (i.e. no -finline-phase flag)
-in that order.  The meanings of these are determined by the @blackListed@ function
-here.
-
-The final simplification doesn't have a phase number.
-
-Pragmas
-~~~~~~~
-	Pragma		Black list if
-
-(least black listing, most inlining)
-	INLINE n foo	phase is Just p *and* p<n *and* foo appears on LHS of rule
-	INLINE foo	phase is Just p *and*           foo appears on LHS of rule
-	NOINLINE n foo	phase is Just p *and* (p<n *or* foo appears on LHS of rule)
-	NOINLINE foo	always
-(most black listing, least inlining)
-
-\begin{code}
-blackListed :: IdSet 		-- Used in transformation rules
-	    -> Maybe Int	-- Inline phase
-	    -> Id -> Bool	-- True <=> blacklisted
-	
--- The blackListed function sees whether a variable should *not* be 
--- inlined because of the inline phase we are in.  This is the sole
--- place that the inline phase number is looked at.
-
-blackListed rule_vars Nothing		-- Last phase
-  = \v -> isNeverInlinePrag (idInlinePragma v)
-
-blackListed rule_vars (Just phase)
-  = \v -> normal_case rule_vars phase v
-
-normal_case rule_vars phase v 
-  = case idInlinePragma v of
-	NoInlinePragInfo -> has_rules
-
-	IMustNotBeINLINEd from_INLINE Nothing
-	  | from_INLINE -> has_rules	-- Black list until final phase
-	  | otherwise   -> True		-- Always blacklisted
-
-	IMustNotBeINLINEd from_INLINE (Just threshold)
-	  | from_INLINE -> (phase < threshold && has_rules)
-	  | otherwise   -> (phase < threshold || has_rules)
-  where
-    has_rules =  v `elemVarSet` rule_vars
-	      || not (isEmptyCoreRules (idSpecialisation v))
-\end{code}
-
-
-SLPJ 95/04: Why @runST@ must be inlined very late:
-\begin{verbatim}
-f x =
-  runST ( \ s -> let
-		    (a, s')  = newArray# 100 [] s
-		    (_, s'') = fill_in_array_or_something a x s'
-		  in
-		  freezeArray# a s'' )
-\end{verbatim}
-If we inline @runST@, we'll get:
-\begin{verbatim}
-f x = let
-	(a, s')  = newArray# 100 [] realWorld#{-NB-}
-	(_, s'') = fill_in_array_or_something a x s'
-      in
-      freezeArray# a s''
-\end{verbatim}
-And now the @newArray#@ binding can be floated to become a CAF, which
-is totally and utterly wrong:
-\begin{verbatim}
-f = let
-    (a, s')  = newArray# 100 [] realWorld#{-NB-} -- YIKES!!!
-    in
-    \ x ->
-	let (_, s'') = fill_in_array_or_something a x s' in
-	freezeArray# a s''
-\end{verbatim}
-All calls to @f@ will share a {\em single} array!  
-
-Yet we do want to inline runST sometime, so we can avoid
-needless code.  Solution: black list it until the last moment.
-

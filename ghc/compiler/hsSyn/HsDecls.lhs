@@ -32,8 +32,8 @@ import PprCore		( pprCoreRule )
 import HsCore		( UfExpr, UfBinder, HsIdInfo, pprHsIdInfo,
 			  eq_ufBinders, eq_ufExpr, pprUfExpr 
 			)
-import CoreSyn		( CoreRule(..) )
-import BasicTypes	( NewOrData(..), StrictnessMark(..) )
+import CoreSyn		( CoreRule(..), RuleName )
+import BasicTypes	( NewOrData(..), StrictnessMark(..), Activation(..) )
 import ForeignCall	( CExportSpec, CCallSpec, DNCallSpec, CCallConv )
 
 -- others:
@@ -760,7 +760,8 @@ instance Outputable FoType where
 \begin{code}
 data RuleDecl name pat
   = HsRule			-- Source rule
-	FAST_STRING		-- Rule name
+	RuleName		-- Rule name
+	Activation
 	[name]			-- Forall'd tyvars, filled in by the renamer with
 				-- tyvars mentioned in sigs; then filled out by typechecker
 	[RuleBndr name]		-- Forall'd term vars
@@ -769,7 +770,8 @@ data RuleDecl name pat
 	SrcLoc		
 
   | IfaceRule	 		-- One that's come in from an interface file; pre-typecheck
-	FAST_STRING
+	RuleName
+	Activation
 	[UfBinder name]		-- Tyvars and term vars
 	name			-- Head of lhs
 	[UfExpr name]		-- Args of LHS
@@ -780,13 +782,13 @@ data RuleDecl name pat
 	name			-- Head of LHS
 	CoreRule
 
-isIfaceRuleDecl (HsRule _ _ _ _ _ _) = False
-isIfaceRuleDecl other		     = True
+isIfaceRuleDecl (HsRule _ _ _ _ _ _ _) = False
+isIfaceRuleDecl other		       = True
 
 ifaceRuleDeclName :: RuleDecl name pat -> name
-ifaceRuleDeclName (IfaceRule _ _ n _ _ _) = n
-ifaceRuleDeclName (IfaceRuleOut n r)	  = n
-ifaceRuleDeclName (HsRule fs _ _ _ _ _)   = pprPanic "ifaceRuleDeclName" (ppr fs)
+ifaceRuleDeclName (IfaceRule _ _ _ n _ _ _) = n
+ifaceRuleDeclName (IfaceRuleOut n r)	    = n
+ifaceRuleDeclName (HsRule fs _ _ _ _ _ _)   = pprPanic "ifaceRuleDeclName" (ppr fs)
 
 data RuleBndr name
   = RuleBndr name
@@ -794,15 +796,15 @@ data RuleBndr name
 
 instance (NamedThing name, Ord name) => Eq (RuleDecl name pat) where
   -- Works for IfaceRules only; used when comparing interface file versions
-  (IfaceRule n1 bs1 f1 es1 rhs1 _) == (IfaceRule n2 bs2 f2 es2 rhs2 _)
-     = n1==n2 && f1 == f2 && 
+  (IfaceRule n1 a1 bs1 f1 es1 rhs1 _) == (IfaceRule n2 a2 bs2 f2 es2 rhs2 _)
+     = n1==n2 && f1 == f2 && a1==a2 &&
        eq_ufBinders emptyEqHsEnv bs1 bs2 (\env -> 
        eqListBy (eq_ufExpr env) (rhs1:es1) (rhs2:es2))
 
 instance (NamedThing name, Outputable name, Outputable pat)
 	      => Outputable (RuleDecl name pat) where
-  ppr (HsRule name tvs ns lhs rhs loc)
-	= sep [text "{-# RULES" <+> doubleQuotes (ptext name),
+  ppr (HsRule name act tvs ns lhs rhs loc)
+	= sep [text "{-# RULES" <+> doubleQuotes (ptext name) <+> ppr act,
 	       pp_forall, ppr lhs, equals <+> ppr rhs,
                text "#-}" ]
 	where
@@ -811,8 +813,8 @@ instance (NamedThing name, Outputable name, Outputable pat)
 					    fsep (map ppr tvs ++ map ppr ns)
 					    <> dot
 
-  ppr (IfaceRule name tpl_vars fn tpl_args rhs loc) 
-    = hsep [ doubleQuotes (ptext name),
+  ppr (IfaceRule name act tpl_vars fn tpl_args rhs loc) 
+    = hsep [ doubleQuotes (ptext name), ppr act,
 	   ptext SLIT("__forall") <+> braces (interppSP tpl_vars),
 	   ppr fn <+> sep (map (pprUfExpr parens) tpl_args),
 	   ptext SLIT("=") <+> ppr rhs

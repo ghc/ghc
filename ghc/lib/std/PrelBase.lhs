@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelBase.lhs,v 1.51 2001/08/17 17:18:54 apt Exp $
+% $Id: PrelBase.lhs,v 1.52 2001/09/26 15:12:37 simonpj Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -243,25 +243,26 @@ The rest of the prelude list functions are in PrelList.
 foldr            :: (a -> b -> b) -> b -> [a] -> b
 -- foldr _ z []     =  z
 -- foldr f z (x:xs) =  f x (foldr f z xs)
-{-# INLINE foldr #-}
+{-# INLINE [0] foldr #-}
+-- Inline only in the final stage, after the foldr/cons rule has had a chance
 foldr k z xs = go xs
 	     where
 	       go []     = z
 	       go (y:ys) = y `k` go ys
 
 build 	:: forall a. (forall b. (a -> b -> b) -> b -> b) -> [a]
-{-# INLINE 2 build #-}
+{-# INLINE [1] build #-}
 	-- The INLINE is important, even though build is tiny,
  	-- because it prevents [] getting inlined in the version that
 	-- appears in the interface file.  If [] *is* inlined, it
 	-- won't match with [] appearing in rules in an importing module.
 	--
-	-- The "2" says to inline in phase 2
+	-- The "1" says to inline in phase 1
 
 build g = g (:) []
 
 augment :: forall a. (forall b. (a->b->b) -> b -> b) -> [a] -> [a]
-{-# INLINE 2 augment #-}
+{-# INLINE [1] augment #-}
 augment g xs = g (:) xs
 
 {-# RULES
@@ -295,6 +296,7 @@ augment g xs = g (:) xs
 
 \begin{code}
 map :: (a -> b) -> [a] -> [b]
+{-# NOINLINE [1] map #-}
 map = mapList
 
 -- Note eta expanded
@@ -318,6 +320,7 @@ mapList f (x:xs) = f x : mapList f xs
 ----------------------------------------------
 \begin{code}
 (++) :: [a] -> [a] -> [a]
+{-# NOINLINE [1] (++) #-}
 (++) = append
 
 {-# RULES
@@ -450,6 +453,8 @@ String equality is used when desugaring pattern-matches against strings.
 \begin{code}
 eqString :: String -> String -> Bool
 eqString = (==)
+
+{-# RULES "eqString" (==) = eqString #-}
 \end{code}
 
 %*********************************************************
@@ -687,6 +692,7 @@ unpacking the strings of error messages.
 
 \begin{code}
 unpackCString# :: Addr# -> [Char]
+{-# NOINLINE [1] unpackCString# #-}
 unpackCString# a = unpackCStringList# a
 
 unpackCStringList# :: Addr# -> [Char]
@@ -710,6 +716,9 @@ unpackAppendCString# addr rest
 	ch = indexCharOffAddr# addr nh
 
 unpackFoldrCString# :: Addr# -> (Char  -> a -> a) -> a -> a 
+{-# NOINLINE [0] unpackFoldrCString# #-}
+-- Don't inline till right at the end;
+-- usually the unpack-list rule turns it into unpackCStringList
 unpackFoldrCString# addr f z 
   = unpack 0#
   where

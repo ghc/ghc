@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelEnum.lhs,v 1.16 2001/08/29 09:34:05 simonmar Exp $
+% $Id: PrelEnum.lhs,v 1.17 2001/09/26 15:12:37 simonpj Exp $
 %
 % (c) The University of Glasgow, 1992-2001
 %
@@ -204,10 +204,12 @@ instance  Enum Char  where
     {-# INLINE enumFromThenTo #-}
     enumFromThenTo (C# x1) (C# x2) (C# y) = efdtChar (ord# x1) (ord# x2) (ord# y)
 
+{-# NOINLINE [1] eftChar #-}
+{-# NOINLINE [1] efdChar #-}
+{-# NOINLINE [1] efdtChar #-}
 eftChar  = eftCharList
 efdChar  = efdCharList
 efdtChar = efdtCharList
-
 
 {-# RULES
 "eftChar"	forall x y.	eftChar x y	  = build (\c n -> eftCharFB c n x y)
@@ -221,7 +223,7 @@ efdtChar = efdtCharList
 
 -- We can do better than for Ints because we don't
 -- have hassles about arithmetic overflow at maxBound
-{-# INLINE eftCharFB #-}
+{-# INLINE [0] eftCharFB #-}
 eftCharFB c n x y = go x
 		 where
 		    go x | x ># y    = n
@@ -232,6 +234,7 @@ eftCharList x y | x ># y    = []
 
 
 -- For enumFromThenTo we give up on inlining
+{-# NOINLINE [0] efdCharFB #-}
 efdCharFB c n x1 x2
   | delta >=# 0# = go_up_char_fb c n x1 delta 0x10FFFF#
   | otherwise    = go_dn_char_fb c n x1 delta 0#
@@ -244,6 +247,7 @@ efdCharList x1 x2
   where
     delta = x2 -# x1
 
+{-# NOINLINE [0] efdtCharFB #-}
 efdtCharFB c n x1 x2 lim
   | delta >=# 0# = go_up_char_fb c n x1 delta lim
   | otherwise    = go_dn_char_fb c n x1 delta lim
@@ -325,6 +329,9 @@ instance  Enum Int  where
     {-# INLINE enumFromThenTo #-}
     enumFromThenTo (I# x1) (I# x2) (I# y) = efdtInt x1 x2 y
 
+{-# NOINLINE [1] eftInt #-}
+{-# NOINLINE [1] efdInt #-}
+{-# NOINLINE [1] efdtInt #-}
 eftInt 	= eftIntList
 efdInt 	= efdIntList
 efdtInt = efdtIntList
@@ -340,7 +347,7 @@ efdtInt = efdtIntList
  #-}
 
 
-{-# INLINE eftIntFB #-}
+{-# INLINE [0] eftIntFB #-}
 eftIntFB c n x y | x ># y    = n	
 		 | otherwise = go x
 		 where
@@ -358,6 +365,7 @@ eftIntList x y | x ># y    = []
 
 -- For enumFromThenTo we give up on inlining; so we don't worry
 -- about duplicating occurrences of "c"
+{-# NOINLINE [0] efdtIntFB #-}
 efdtIntFB c n x1 x2 y
   | delta >=# 0# = if x1 ># y then n else go_up_int_fb c n x1 delta lim
   | otherwise    = if x1 <# y then n else go_dn_int_fb c n x1 delta lim 
@@ -372,6 +380,7 @@ efdtIntList x1 x2 y
     delta = x2 -# x1
     lim   = y -# delta
 
+{-# NOINLINE [0] efdIntFB #-}
 efdIntFB c n x1 x2
   | delta >=# 0# = case maxInt of I# y -> go_up_int_fb c n x1 delta (y -# delta)
   | otherwise    = case minInt of I# y -> go_dn_int_fb c n x1 delta (y -# delta)

@@ -20,14 +20,13 @@ import TcHsSyn		( TypecheckedForeignDecl )
 import CoreUtils	( exprType, mkInlineMe )
 import Id		( Id, idType, idName, mkVanillaGlobal, mkSysLocal,
 			  setInlinePragma )
-import IdInfo		( neverInlinePrag, vanillaIdInfo )
+import IdInfo		( vanillaIdInfo )
 import Literal		( Literal(..) )
 import Module		( Module, moduleUserString )
 import Name		( mkGlobalName, nameModule, nameOccName, getOccString, 
 			  mkForeignExportOcc, isLocalName,
 			  NamedThing(..),
 			)
-
 import Type		( repType, eqType )
 import TcType		( Type, mkFunTys, mkForAllTys, mkTyConApp,
 			  mkFunTy, applyTy, 
@@ -47,8 +46,8 @@ import TysPrim		( addrPrimTy )
 import PrelNames	( hasKey, ioTyConKey, deRefStablePtrName, newStablePtrName,
 			  bindIOName, returnIOName
 			)
+import BasicTypes	( Activation( NeverActive ) )
 import Outputable
-
 import Maybe 		( fromJust )
 \end{code}
 
@@ -393,7 +392,7 @@ dsFExportDynamic mod_name id cconv
          io_app = mkLams tvs	 $
 		  mkLams [cback] $
 		  stbl_app ccall_io_adj res_ty
-	 fed = (id `setInlinePragma` neverInlinePrag, io_app)
+	 fed = (id `setInlinePragma` NeverActive, io_app)
 		-- Never inline the f.e.d. function, because the litlit
 		-- might not be in scope in other modules.
      in

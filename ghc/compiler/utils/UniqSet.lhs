@@ -12,7 +12,7 @@ module UniqSet (
 	UniqSet,    -- abstract type: NOT
 
 	mkUniqSet, uniqSetToList, emptyUniqSet, unitUniqSet,
-	addOneToUniqSet, addListToUniqSet, delOneFromUniqSet,
+	addOneToUniqSet, addListToUniqSet, delOneFromUniqSet, delListFromUniqSet,
 	unionUniqSets, unionManyUniqSets, minusUniqSet,
 	elementOfUniqSet, mapUniqSet, intersectUniqSets,
 	isEmptyUniqSet, filterUniqSet, sizeUniqSet, foldUniqSet,
@@ -69,6 +69,9 @@ addOneToUniqSet (MkUniqSet set) x = MkUniqSet (addToUFM set x x)
 
 delOneFromUniqSet :: Uniquable a => UniqSet a -> a -> UniqSet a
 delOneFromUniqSet (MkUniqSet set) x = MkUniqSet (delFromUFM set x)
+
+delListFromUniqSet :: Uniquable a => UniqSet a -> [a] -> UniqSet a
+delListFromUniqSet (MkUniqSet set) xs = MkUniqSet (delListFromUFM set xs)
 
 addListToUniqSet :: Uniquable a => UniqSet a -> [a] -> UniqSet a
 addListToUniqSet (MkUniqSet set) xs = MkUniqSet (addListToUFM set [(x,x) | x<-xs])

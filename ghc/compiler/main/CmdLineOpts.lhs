@@ -6,10 +6,9 @@
 \begin{code}
 
 module CmdLineOpts (
-	CoreToDo(..),
-	SimplifierSwitch(..), isAmongSimpl,
-	StgToDo(..),
-	SwitchResult(..),
+	CoreToDo(..), StgToDo(..),
+	SimplifierSwitch(..), 
+	SimplifierMode(..),
 
 	HscLang(..),
 	DynFlag(..),	-- needed non-abstractly by DriverFlags
@@ -17,8 +16,6 @@ module CmdLineOpts (
 
 	v_Static_hsc_opts,
 
-	intSwitchSet,
-	switchIsOn,
 	isStaticHscFlag,
 
 	-- Manipulating DynFlags
@@ -115,22 +112,15 @@ module CmdLineOpts (
 
 #include "HsVersions.h"
 
-import Array	( array, (//) )
 import GlaExts
 import IOExts	( IORef, readIORef, writeIORef )
+import BasicTypes	( CompilerPhase )
 import Constants	-- Default values for some flags
 import Util
 import FastTypes
 import Config
 
 import Maybes		( firstJust )
-import Panic		( panic )
-
-#if __GLASGOW_HASKELL__ < 301
-import ArrBase	( Array(..) )
-#else
-import PrelArr  ( Array(..) )
-#endif
 \end{code}
 
 %************************************************************************
@@ -173,19 +163,13 @@ main loop (\tr{main/Main.lhs}), in the Core-to-Core processing loop
 %************************************************************************
 
 \begin{code}
-data SwitchResult
-  = SwBool	Bool		-- on/off
-  | SwString	FAST_STRING	-- nothing or a String
-  | SwInt	Int		-- nothing or an Int
-\end{code}
-
-\begin{code}
 data CoreToDo		-- These are diff core-to-core passes,
 			-- which may be invoked in any order,
   			-- as many times as you like.
 
   = CoreDoSimplify	-- The core-to-core simplifier.
-	(SimplifierSwitch -> SwitchResult)
+	SimplifierMode
+	[SimplifierSwitch]
 			-- Each run of the simplifier can take a different
 			-- set of simplifier-specific flags.
   | CoreDoFloatInwards
@@ -201,8 +185,8 @@ data CoreToDo		-- These are diff core-to-core passes,
   | CoreDoCPResult
   | CoreDoGlomBinds
   | CoreCSE
-  | CoreDoRuleCheck String	-- Check for non-application of rules 
-				-- matching this string
+  | CoreDoRuleCheck CompilerPhase String	-- Check for non-application of rules 
+						-- matching this string
 
   | CoreDoNothing 	 -- useful when building up lists of these things
 \end{code}
@@ -216,12 +200,13 @@ data StgToDo
 \end{code}
 
 \begin{code}
+data SimplifierMode 		-- See comments in SimplMonad
+  = SimplGently
+  | SimplPhase Int
+
 data SimplifierSwitch
   = MaxSimplifierIterations Int
-  | SimplInlinePhase Int
-  | DontApplyRules
   | NoCaseOfCase
-  | SimplLetToCase
 \end{code}
 
 %************************************************************************
@@ -660,7 +645,8 @@ isStaticHscFlag f =
 	"fno-prune-tydecls",
 	"static",
 	"funregisterised",
-	"fext-core"
+	"fext-core",
+	"frule-check"
 	]
   || any (flip prefixMatch f) [
 	"fcontext-stack",
@@ -676,116 +662,11 @@ isStaticHscFlag f =
 
 %************************************************************************
 %*									*
-\subsection{Switch ordering}
-%*									*
-%************************************************************************
-
-These things behave just like enumeration types.
-
-\begin{code}
-instance Eq SimplifierSwitch where
-    a == b = tagOf_SimplSwitch a ==# tagOf_SimplSwitch b
-
-instance Ord SimplifierSwitch where
-    a <  b  = tagOf_SimplSwitch a <# tagOf_SimplSwitch b
-    a <= b  = tagOf_SimplSwitch a <=# tagOf_SimplSwitch b
-
-
-tagOf_SimplSwitch (SimplInlinePhase _)		= _ILIT(1)
-tagOf_SimplSwitch (MaxSimplifierIterations _)	= _ILIT(2)
-tagOf_SimplSwitch DontApplyRules		= _ILIT(3)
-tagOf_SimplSwitch SimplLetToCase		= _ILIT(4)
-tagOf_SimplSwitch NoCaseOfCase			= _ILIT(5)
-
--- If you add anything here, be sure to change lAST_SIMPL_SWITCH_TAG, too!
-
-lAST_SIMPL_SWITCH_TAG = 5
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Switch lookup}
-%*									*
-%************************************************************************
-
-\begin{code}
-isAmongSimpl :: [SimplifierSwitch] -> SimplifierSwitch -> SwitchResult
-isAmongSimpl on_switches		-- Switches mentioned later occur *earlier*
-					-- in the list; defaults right at the end.
-  = let
-	tidied_on_switches = foldl rm_dups [] on_switches
-		-- The fold*l* ensures that we keep the latest switches;
-		-- ie the ones that occur earliest in the list.
-
-	sw_tbl :: Array Int SwitchResult
-	sw_tbl = (array	(0, lAST_SIMPL_SWITCH_TAG) -- bounds...
-			all_undefined)
-		 // defined_elems
-
-	all_undefined = [ (i, SwBool False) | i <- [0 .. lAST_SIMPL_SWITCH_TAG ] ]
-
-	defined_elems = map mk_assoc_elem tidied_on_switches
-    in
-    -- (avoid some unboxing, bounds checking, and other horrible things:)
-#if __GLASGOW_HASKELL__ < 405
-    case sw_tbl of { Array bounds_who_needs_'em stuff ->
-#else
-    case sw_tbl of { Array _ _ stuff ->
-#endif
-    \ switch ->
-	case (indexArray# stuff (tagOf_SimplSwitch switch)) of
-#if __GLASGOW_HASKELL__ < 400
-	  Lift v -> v
-#elif __GLASGOW_HASKELL__ < 403
-	  (# _, v #) -> v
-#else
-	  (# v #) -> v
-#endif
-    }
-  where
-    mk_assoc_elem k@(MaxSimplifierIterations lvl)
-	= (iBox (tagOf_SimplSwitch k), SwInt lvl)
-    mk_assoc_elem k@(SimplInlinePhase n)
-	= (iBox (tagOf_SimplSwitch k), SwInt n)
-    mk_assoc_elem k
-	= (iBox (tagOf_SimplSwitch k), SwBool True) -- I'm here, Mom!
-
-    -- cannot have duplicates if we are going to use the array thing
-    rm_dups switches_so_far switch
-      = if switch `is_elem` switches_so_far
-    	then switches_so_far
-	else switch : switches_so_far
-      where
-	sw `is_elem` []     = False
-	sw `is_elem` (s:ss) = (tagOf_SimplSwitch sw) ==# (tagOf_SimplSwitch s)
-			    || sw `is_elem` ss
-\end{code}
-
-
-%************************************************************************
-%*									*
 \subsection{Misc functions for command-line options}
 %*									*
 %************************************************************************
 
 
-\begin{code}
-switchIsOn :: (switch -> SwitchResult) -> switch -> Bool
-
-switchIsOn lookup_fn switch
-  = case (lookup_fn switch) of
-      SwBool False -> False
-      _	    	   -> True
-
-intSwitchSet :: (switch -> SwitchResult)
-	     -> (Int -> switch)
-	     -> Maybe Int
-
-intSwitchSet lookup_fn switch
-  = case (lookup_fn (switch (panic "intSwitchSet"))) of
-      SwInt int -> Just int
-      _	    	-> Nothing
-\end{code}
 
 \begin{code}
 startsWith :: String -> String -> Maybe String

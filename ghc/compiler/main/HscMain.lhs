@@ -14,6 +14,7 @@ module HscMain ( HscResult(..), hscMain,
 #include "HsVersions.h"
 
 #ifdef GHCI
+import Interpreter
 import ByteCodeGen	( byteCodeGen )
 import CoreTidy		( tidyCoreExpr )
 import CorePrep		( corePrepExpr )
@@ -29,10 +30,12 @@ import HscTypes		( InteractiveContext(..) )
 import PrelNames	( iNTERACTIVE )
 import StringBuffer	( stringToStringBuffer )
 import FastString       ( mkFastString )
+import Maybes		( catMaybes )
 #endif
 
 import HsSyn
 
+import RdrName		( mkRdrOrig )
 import Id		( idName )
 import IdInfo		( CafInfo(..), CgInfoEnv, CgInfo(..) )
 import StringBuffer	( hGetStringBuffer, freeStringBuffer )
@@ -43,6 +46,7 @@ import Finder		( findModule )
 import Rename		( checkOldIface, renameModule, closeIfaceDecls )
 import Rules		( emptyRuleBase )
 import PrelInfo		( wiredInThingEnv, wiredInThings )
+import PrelRules	( builtinRules )
 import PrelNames	( knownKeyNames )
 import MkIface		( mkFinalIface )
 import TcModule
@@ -65,9 +69,8 @@ import ErrUtils		( dumpIfSet_dyn, showPass, printError )
 import Util		( unJust )
 import UniqSupply	( mkSplitUniqSupply )
 
-import Bag		( emptyBag )
+import Bag		( consBag, emptyBag )
 import Outputable
-import Interpreter
 import HscStats		( ppSourceStats )
 import HscTypes
 import FiniteMap	( FiniteMap, plusFM, emptyFM, addToFM )
@@ -79,7 +82,7 @@ import Module		( Module )
 import IOExts		( newIORef, readIORef, writeIORef, unsafePerformIO )
 
 import Monad		( when )
-import Maybe		( isJust, fromJust, catMaybes )
+import Maybe		( isJust, fromJust )
 import IO
 
 import MkExternalCore	( emitExternalCore )
@@ -694,10 +697,18 @@ initPersistentRenamerState :: IO PersistentRenamerState
 			      	      nsIPs   = emptyFM },
 	      prsDecls 	 = (emptyNameEnv, 0),
 	      prsInsts 	 = (emptyBag, 0),
-	      prsRules 	 = (emptyBag, 0),
+	      prsRules 	 = foldr add_rule (emptyBag, 0) builtinRules,
 	      prsImpMods = emptyFM
             }
         )
+  where
+    add_rule (name,rule) (rules, n_rules)
+	 = (gated_decl `consBag` rules, n_rules+1)
+	where
+	   gated_decl = (gate_fn, (mod, IfaceRuleOut rdr_name rule))
+	   mod	      = nameModule name
+	   rdr_name   = mkRdrOrig (moduleName mod) (nameOccName name)
+	   gate_fn vis_fn = vis_fn name	-- Load the rule whenever name is visible
 
 initOrigNames :: FiniteMap (ModuleName,OccName) Name
 initOrigNames 

@@ -16,7 +16,7 @@ import CoreUtils	( exprType, eqExpr )
 import CoreFVs 		( exprsFreeVars )
 import DataCon		( dataConRepArity )
 import Type		( tyConAppArgs )
-import PprCore		( pprCoreRules, pprCoreRule )
+import PprCore		( pprCoreRules )
 import Id		( Id, idName, idType, idSpecialisation,
 			  isDataConId_maybe,
 			  mkUserLocal, mkSysLocal )
@@ -28,6 +28,7 @@ import Rules		( addIdSpecialisations )
 import OccName		( mkSpecOcc )
 import ErrUtils		( dumpIfSet_dyn )
 import CmdLineOpts	( DynFlags, DynFlag(..) )
+import BasicTypes	( Activation(..) )
 import Outputable
 
 import Maybes		( orElse )
@@ -35,7 +36,6 @@ import Util		( mapAccumL )
 import List		( nubBy, partition )
 import UniqSupply
 import Outputable
-import UniqFM		( ufmToList )
 \end{code}
 
 -----------------------------------------------------
@@ -506,7 +506,7 @@ spec_one env fn rhs (pats, n)
 	rule_name = _PK_ ("SC:" ++ showSDoc (ppr fn <> int n))
 	spec_rhs  = mkLams bndrs (mkApps rhs pats)
 	spec_id   = mkUserLocal spec_occ spec_uniq (exprType spec_rhs) fn_loc
-	rule      = Rule rule_name bndrs pats (mkVarApps (Var spec_id) bndrs)
+	rule      = Rule rule_name AlwaysActive bndrs pats (mkVarApps (Var spec_id) bndrs)
     in
     returnUs (rule, (spec_id, spec_rhs))
 \end{code}

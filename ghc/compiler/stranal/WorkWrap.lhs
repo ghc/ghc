@@ -16,12 +16,12 @@ import Id		( Id, idType, idNewStrictness, idArity, isOneShotLambda,
 			  setIdNewStrictness, zapIdNewStrictness, idInlinePragma, mkWorkerId,
 			  setIdWorkerInfo, setInlinePragma )
 import Type		( Type )
-import IdInfo		( InlinePragInfo(..), isNeverInlinePrag, WorkerInfo(..)	)
+import IdInfo		( WorkerInfo(..) )
 import NewDemand        ( Demand(..), StrictSig(..), DmdType(..), DmdResult(..), 
 			  mkTopDmdType, isBotRes, returnsCPR
 			)
 import UniqSupply	( UniqSupply, initUs_, returnUs, thenUs, mapUs, getUniqueUs, UniqSM )
-import BasicTypes	( RecFlag(..), isNonRec )
+import BasicTypes	( RecFlag(..), isNonRec, Activation(..), isNeverActive )
 import CmdLineOpts
 import WwLib
 import Outputable
@@ -182,7 +182,7 @@ tryWW	:: RecFlag
 					-- if two, then a worker and a
 					-- wrapper.
 tryWW is_rec fn_id rhs
-  | isNeverInlinePrag inline_prag
+  | isNeverActive inline_prag
 	-- Don't split NOINLINE things, because they will never be inlined
 	-- Furthermore, zap the strictess info in the Id.  Why?  Because
 	-- the NOINLINE says "don't expose any of the inner workings at the call 
@@ -237,8 +237,8 @@ tryWW is_rec fn_id rhs
 
 	wrap_rhs = wrap_fn work_id
 	wrap_id  = fn_id `setIdWorkerInfo`	HasWorker work_id arity
-			 `setInlinePragma`	NoInlinePragInfo	-- Zap any inline pragma;
-									-- Put it on the worker instead
+			 `setInlinePragma`	AlwaysActive	-- Zap any inline pragma;
+								-- Put it on the worker instead
     in
     returnUs ([(work_id, work_rhs), (wrap_id, wrap_rhs)])
 	-- Worker first, because wrapper mentions it

@@ -10,7 +10,7 @@ module CorePrep (
 
 #include "HsVersions.h"
 
-import CoreUtils( exprIsAtom, exprType, exprIsValue, etaExpand )
+import CoreUtils( exprIsAtom, exprType, exprIsValue, etaExpand, exprOkForSpeculation )
 import CoreFVs	( exprFreeVars )
 import CoreLint	( endPass )
 import CoreSyn
@@ -103,15 +103,22 @@ corePrepExpr dflags expr
 -- ---------------------------------------------------------------------------
 
 data FloatingBind = FloatLet CoreBind
-		  | FloatCase Id CoreExpr
+		  | FloatCase Id CoreExpr Bool
+			-- The bool indicates "ok-for-speculation"
 
 type CloneEnv = IdEnv Id	-- Clone local Ids
 
 allLazy :: OrdList FloatingBind -> Bool
-allLazy floats = foldOL check True floats
+allLazy floats = foldrOL check True floats
 	       where
-		 check (FloatLet _)    y = y
-		 check (FloatCase _ _) y = False
+		 check (FloatLet _)  		   y = y
+		 check (FloatCase _ _ ok_for_spec) y = ok_for_spec && y
+	-- The ok-for-speculation flag says that it's safe to
+	-- float this Case out of a let, and thereby do it more eagerly
+
+-- ---------------------------------------------------------------------------
+-- 			Bindings
+-- ---------------------------------------------------------------------------
 
 corePrepTopBinds :: CloneEnv -> [CoreBind] -> UniqSM [CoreBind]
 corePrepTopBinds env [] = returnUs []
@@ -120,14 +127,10 @@ corePrepTopBinds env (bind : binds)
   = corePrepBind env bind	`thenUs` \ (env', floats) ->
     ASSERT( allLazy floats )
     corePrepTopBinds env' binds	`thenUs` \ binds' ->
-    returnUs (foldOL add binds' floats)
+    returnUs (foldrOL add binds' floats)
   where
     add (FloatLet bind) binds = bind : binds
 
-
--- ---------------------------------------------------------------------------
--- 			Bindings
--- ---------------------------------------------------------------------------
 
 corePrepBind :: CloneEnv -> CoreBind -> UniqSM (CloneEnv, OrdList FloatingBind)
 -- Used for non-top-level bindings
@@ -345,7 +348,7 @@ maybeSaturate fn expr n_args ty
     fn_arity	 = idArity fn
     excess_arity = fn_arity - n_args
     saturate_it  = getUs 	`thenUs` \ us ->
-		   returnUs (etaExpand excess_arity us expr ty)
+		   returnUs (etaExpand excess_arity (uniqsFromSupply us) expr ty)
 
 -- ---------------------------------------------------------------------------
 -- Precipitating the floating bindings
@@ -384,7 +387,7 @@ mkNonRec bndr dem floats rhs
 	-- It's a strict let, or the binder is unlifted,
 	-- so we definitely float all the bindings
   = ASSERT( not (isUnboxedTupleType bndr_rep_ty) )
-    returnUs (floats `snocOL` FloatCase bndr rhs)
+    returnUs (floats `snocOL` FloatCase bndr rhs (exprOkForSpeculation rhs))
 
   | otherwise
 	-- Don't float
@@ -398,10 +401,10 @@ mkBinds :: OrdList FloatingBind -> CoreExpr -> UniqSM CoreExpr
 mkBinds binds body 
   | isNilOL binds = returnUs body
   | otherwise	  = deLam body		`thenUs` \ body' ->
-		    returnUs (foldOL mk_bind body' binds)
+		    returnUs (foldrOL mk_bind body' binds)
   where
-    mk_bind (FloatCase bndr rhs) body = mkCase rhs bndr [(DEFAULT, [], body)]
-    mk_bind (FloatLet bind)      body = Let bind body
+    mk_bind (FloatCase bndr rhs _) body = mkCase rhs bndr [(DEFAULT, [], body)]
+    mk_bind (FloatLet bind)        body = Let bind body
 
 -- ---------------------------------------------------------------------------
 -- Eliminate Lam as a non-rhs (STG doesn't have such a thing)
@@ -569,7 +572,7 @@ cloneBndrs env bs = mapAccumLUs cloneBndr env bs
 cloneBndr  :: CloneEnv -> Var -> UniqSM (CloneEnv, Var)
 cloneBndr env bndr
   | isId bndr && isLocalId bndr		-- Top level things, which we don't want
-					-- to clone, have become ConstantIds by now
+					-- to clone, have become GlobalIds by now
   = getUniqueUs   `thenUs` \ uniq ->
     let
 	bndr' = setVarUnique bndr uniq

@@ -18,7 +18,7 @@ module CoreSyn (
 	isTyVar, isId, 
 	bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts, 
 	collectBinders, collectTyBinders, collectValBinders, collectTyAndValBinders,
-	collectArgs, collectBindersIgnoringNotes,
+	collectArgs, 
 	coreExprCc,
 	flattenBinds, 
 
@@ -55,6 +55,7 @@ import Var		( Var, Id, TyVar, isTyVar, isId )
 import Type		( Type, mkTyVarTy, seqType )
 import Literal	        ( Literal, mkMachInt )
 import DataCon		( DataCon, dataConId )
+import BasicTypes	( Activation )
 import VarSet
 import Outputable
 \end{code}
@@ -169,6 +170,7 @@ type IdCoreRule = (Id,CoreRule)		-- Rules don't have their leading Id inside the
 
 data CoreRule
   = Rule RuleName
+	 Activation	-- When the rule is active
 	 [CoreBndr]	-- Forall'd variables
 	 [CoreExpr]	-- LHS args
 	 CoreExpr	-- RHS
@@ -181,7 +183,7 @@ isBuiltinRule (BuiltinRule _ _) = True
 isBuiltinRule _		        = False
 
 ruleName :: CoreRule -> RuleName
-ruleName (Rule n _ _ _)    = n
+ruleName (Rule n _ _ _ _)  = n
 ruleName (BuiltinRule n _) = n
 \end{code}
 
@@ -423,7 +425,6 @@ order.
 
 \begin{code}
 collectBinders	             :: Expr b -> ([b],         Expr b)
-collectBindersIgnoringNotes  :: Expr b -> ([b],         Expr b)
 collectTyBinders       	     :: CoreExpr -> ([TyVar],     CoreExpr)
 collectValBinders      	     :: CoreExpr -> ([Id],        CoreExpr)
 collectTyAndValBinders 	     :: CoreExpr -> ([TyVar], [Id], CoreExpr)
@@ -432,16 +433,6 @@ collectBinders expr
   = go [] expr
   where
     go bs (Lam b e) = go (b:bs) e
-    go bs e	     = (reverse bs, e)
-
--- This one ignores notes.  It's used in CoreUnfold and StrAnal
--- when we aren't going to put the expression back together from
--- the pieces, so we don't mind losing the Notes
-collectBindersIgnoringNotes expr
-  = go [] expr
-  where
-    go bs (Lam b e)  = go (b:bs) e
-    go bs (Note _ e) = go    bs  e
     go bs e	     = (reverse bs, e)
 
 collectTyAndValBinders expr
@@ -571,8 +562,8 @@ seqRules :: CoreRules -> ()
 seqRules (Rules rules fvs) = seq_rules rules `seq` seqVarSet fvs
 
 seq_rules [] = ()
-seq_rules (Rule fs bs es e : rules) = seqBndrs bs `seq` seqExprs (e:es) `seq` seq_rules rules
-seq_rules (BuiltinRule _ _ : rules) = seq_rules rules
+seq_rules (Rule fs _ bs es e : rules) = seqBndrs bs `seq` seqExprs (e:es) `seq` seq_rules rules
+seq_rules (BuiltinRule _ _   : rules) = seq_rules rules
 \end{code}
 
 

@@ -31,6 +31,7 @@ import VarSet
 import VarEnv
 import TcType		( mkTyVarTy )
 import qualified TcType ( match )
+import BasicTypes	( Activation, CompilerPhase, isActive )
 
 import Outputable
 import Maybe		( isJust, isNothing, fromMaybe )
@@ -82,16 +83,20 @@ where pi' :: Lift Int# is the specialised version of pi.
 %************************************************************************
 
 \begin{code}
-matchRules :: InScopeSet -> [CoreRule] -> [CoreExpr] -> Maybe (RuleName, CoreExpr)
+matchRules :: (Activation -> Bool) -> InScopeSet
+	   -> [CoreRule] -> [CoreExpr] -> Maybe (RuleName, CoreExpr)
 -- See comments on matchRule
-matchRules in_scope [] args = Nothing
-matchRules in_scope (rule:rules) args
-  = case matchRule in_scope rule args of
+matchRules is_active in_scope [] args = Nothing
+matchRules is_active in_scope (rule:rules) args
+  = case matchRule is_active in_scope rule args of
 	Just result -> Just result
-	Nothing	    -> matchRules in_scope rules args
+	Nothing	    -> matchRules is_active in_scope rules args
 
+noBlackList :: Activation -> Bool
+noBlackList act = False		-- Nothing is black listed
 
-matchRule :: InScopeSet -> CoreRule -> [CoreExpr] -> Maybe (RuleName, CoreExpr)
+matchRule :: (Activation -> Bool) -> InScopeSet
+	  -> CoreRule -> [CoreExpr] -> Maybe (RuleName, CoreExpr)
 
 -- If (matchRule rule args) returns Just (name,rhs)
 -- then (f args) matches the rule, and the corresponding
@@ -136,12 +141,15 @@ matchRule :: InScopeSet -> CoreRule -> [CoreExpr] -> Maybe (RuleName, CoreExpr)
 --	(\x->E)	matches (\x->F x)
 
 
-matchRule in_scope rule@(BuiltinRule name match_fn) args
+matchRule is_active in_scope rule@(BuiltinRule name match_fn) args
   = case match_fn args of
 	Just expr -> Just (name,expr)
 	Nothing   -> Nothing
 
-matchRule in_scope rule@(Rule rn tpl_vars tpl_args rhs) args
+matchRule is_active in_scope rule@(Rule rn act tpl_vars tpl_args rhs) args
+  | not (is_active act)
+  = Nothing
+  | otherwise
   = go tpl_args args emptySubst
 	-- We used to use the in_scope set, but I don't think that's necessary
 	-- After all, the result is going to be simplified again with that in_scope set
@@ -429,7 +437,7 @@ addRule id (Rules rules rhs_fvs) rule
 	-- that shoudn't be.  E.g.
 	--	RULE:  f (f x y) z  ==>  f x (f y z)
 
-insertRule rules new_rule@(Rule _ tpl_vars tpl_args _)
+insertRule rules new_rule@(Rule _ _ tpl_vars tpl_args _)
   = go rules
   where
     tpl_var_set = mkInScopeSet (mkVarSet tpl_vars)
@@ -440,7 +448,7 @@ insertRule rules new_rule@(Rule _ tpl_vars tpl_args _)
     go (rule:rules) | new_is_more_specific rule = (new_rule:rule:rules)
 		    | otherwise		        = rule : go rules
 
-    new_is_more_specific rule = isJust (matchRule tpl_var_set rule tpl_args)
+    new_is_more_specific rule = isJust (matchRule noBlackList tpl_var_set rule tpl_args)
 
 addIdSpecialisations :: Id -> [CoreRule] -> Id
 addIdSpecialisations id rules
@@ -457,10 +465,11 @@ addIdSpecialisations id rules
 %************************************************************************
 
 \begin{code}
-lookupRule :: InScopeSet -> Id -> [CoreExpr] -> Maybe (RuleName, CoreExpr)
-lookupRule in_scope fn args
+lookupRule :: (Activation -> Bool) -> InScopeSet
+	   -> Id -> [CoreExpr] -> Maybe (RuleName, CoreExpr)
+lookupRule is_active in_scope fn args
   = case idSpecialisation fn of
-	Rules rules _ -> matchRules in_scope rules args
+	Rules rules _ -> matchRules is_active in_scope rules args
 \end{code}
 
 
@@ -483,10 +492,10 @@ all its (active) rules.  No need to construct a rule base or anything
 like that.
 
 \begin{code}
-ruleCheckProgram :: String -> [CoreBind] -> SDoc
+ruleCheckProgram :: CompilerPhase -> String -> [CoreBind] -> SDoc
 -- Report partial matches for rules beginning 
 -- with the specified string
-ruleCheckProgram rule_pat binds 
+ruleCheckProgram phase rule_pat binds 
   | isEmptyBag results
   = text "Rule check results: no rule application sites"
   | otherwise
@@ -495,10 +504,10 @@ ruleCheckProgram rule_pat binds
 	  vcat [ p $$ line | p <- bagToList results ]
 	 ]
   where
-    results = unionManyBags (map (ruleCheckBind rule_pat) binds)
+    results = unionManyBags (map (ruleCheckBind (phase, rule_pat)) binds)
     line = text (take 20 (repeat '-'))
 	  
-type RuleCheckEnv = String 	-- Pattern
+type RuleCheckEnv = (CompilerPhase, String) 	-- Phase and Pattern
 
 ruleCheckBind :: RuleCheckEnv -> CoreBind -> Bag SDoc
    -- The Bag returned has one SDoc for each call site found
@@ -519,29 +528,23 @@ ruleCheck env (Case e _ as) = ruleCheck env e `unionBags`
 ruleCheckApp env (App f a) as = ruleCheck env a `unionBags` ruleCheckApp env f (a:as)
 ruleCheckApp env (Var f) as   = ruleCheckFun env f as
 ruleCheckApp env other as     = ruleCheck env other
-
-ruleCheckFun :: RuleCheckEnv -> Id -> [CoreExpr] -> Bag SDoc
-ruleCheckFun env fun args 
-  = ruleAppCheck match fun args
-  where
-    match rule_name = env `isPrefixOf` _UNPK_ rule_name
 \end{code}
 
 \begin{code}
-ruleAppCheck :: (RuleName -> Bool) -> Id -> [CoreExpr] -> Bag SDoc
+ruleCheckFun :: RuleCheckEnv -> Id -> [CoreExpr] -> Bag SDoc
 -- Produce a report for all rules matching the predicate
 -- saying why it doesn't match the specified application
 
-ruleAppCheck name_match fn args
+ruleCheckFun (phase, pat) fn args
   | null name_match_rules = emptyBag
-  | otherwise		  = unitBag (ruleAppCheck_help fn args name_match_rules)
+  | otherwise		  = unitBag (ruleAppCheck_help phase fn args name_match_rules)
   where
     name_match_rules = case idSpecialisation fn of
 			  Rules rules _ -> filter match rules
-    match rule = name_match (ruleName rule)
+    match rule = pat `isPrefixOf` _UNPK_ (ruleName rule)
 
-ruleAppCheck_help :: Id -> [CoreExpr] -> [CoreRule] -> SDoc
-ruleAppCheck_help fn args rules
+ruleAppCheck_help :: CompilerPhase -> Id -> [CoreExpr] -> [CoreRule] -> SDoc
+ruleAppCheck_help phase fn args rules
   = 	-- The rules match the pattern, so we want to print something
     vcat [text "Expression:" <+> ppr (mkApps (Var fn) args),
 	  vcat (map check_rule rules)]
@@ -552,15 +555,16 @@ ruleAppCheck_help fn args rules
     check_rule rule = rule_herald rule <> colon <+> rule_info rule
 
     rule_herald (BuiltinRule name _) = text "Builtin rule" <+> doubleQuotes (ptext name)
-    rule_herald (Rule name _ _ _)    = text "Rule" <+> doubleQuotes (ptext name)
+    rule_herald (Rule name _ _ _ _)  = text "Rule" <+> doubleQuotes (ptext name)
 
     rule_info rule
-	| Just (name,_) <- matchRule emptyInScopeSet rule args
+	| Just (name,_) <- matchRule noBlackList emptyInScopeSet rule args
 	= text "matches (which is very peculiar!)"
 
     rule_info (BuiltinRule name fn) = text "does not match"
 
-    rule_info (Rule name rule_bndrs rule_args _)
+    rule_info (Rule name act rule_bndrs rule_args _)
+	| not (isActive phase act)    = text "active only in later phase"
 	| n_args < n_rule_args	      = text "too few arguments"
 	| n_mismatches == n_rule_args = text "no arguments match"
 	| n_mismatches == 0	      = text "all arguments match (considered individually), but the rule as a whole does not"

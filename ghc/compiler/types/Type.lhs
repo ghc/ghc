@@ -62,10 +62,11 @@ module Type (
 	usageAnnOfType, typeKind, addFreeTyVars,
 
 	-- Tidying up for printing
-	tidyType,     tidyTypes,
-	tidyOpenType, tidyOpenTypes,
-	tidyTyVar,    tidyTyVars, tidyFreeTyVars,
-	tidyTopType,  tidyPred,
+	tidyType,      tidyTypes,
+	tidyOpenType,  tidyOpenTypes,
+	tidyTyVarBndr, tidyFreeTyVars,
+	tidyOpenTyVar, tidyOpenTyVars,
+	tidyTopType,   tidyPred,
 
 	-- Comparison
 	eqType, eqKind, eqUsage, 
@@ -756,36 +757,34 @@ an interface file.
 It doesn't change the uniques at all, just the print names.
 
 \begin{code}
-tidyTyVar :: TidyEnv -> TyVar -> (TidyEnv, TyVar)
-tidyTyVar env@(tidy_env, subst) tyvar
-  = case lookupVarEnv subst tyvar of
-
-	Just tyvar' -> 	-- Already substituted
-		(env, tyvar')
-
-	Nothing -> 	-- Make a new nice name for it
-
-		case tidyOccName tidy_env (getOccName name) of
-		    (tidy', occ') -> 	-- New occname reqd
-				((tidy', subst'), tyvar')
-			      where
-				subst' = extendVarEnv subst tyvar tyvar'
-				tyvar' = setTyVarName tyvar name'
-				name'  = mkLocalName (getUnique name) occ' noSrcLoc
-					-- Note: make a *user* tyvar, so it printes nicely
-					-- Could extract src loc, but no need.
+tidyTyVarBndr :: TidyEnv -> TyVar -> (TidyEnv, TyVar)
+tidyTyVarBndr (tidy_env, subst) tyvar
+  = case tidyOccName tidy_env (getOccName name) of
+      (tidy', occ') -> 	-- New occname reqd
+			((tidy', subst'), tyvar')
+		    where
+			subst' = extendVarEnv subst tyvar tyvar'
+			tyvar' = setTyVarName tyvar name'
+			name'  = mkLocalName (getUnique name) occ' noSrcLoc
+				-- Note: make a *user* tyvar, so it printes nicely
+				-- Could extract src loc, but no need.
   where
     name = tyVarName tyvar
-
-tidyTyVars :: TidyEnv -> [TyVar] -> (TidyEnv, [TyVar])
-tidyTyVars env tyvars = mapAccumL tidyTyVar env tyvars
 
 tidyFreeTyVars :: TidyEnv -> TyVarSet -> TidyEnv
 -- Add the free tyvars to the env in tidy form,
 -- so that we can tidy the type they are free in
-tidyFreeTyVars env tyvars = foldl add env (varSetElems tyvars)
-			  where
-			    add env tv = fst (tidyTyVar env tv)
+tidyFreeTyVars env tyvars = fst (tidyOpenTyVars env (varSetElems tyvars))
+
+tidyOpenTyVars :: TidyEnv -> [TyVar] -> (TidyEnv, [TyVar])
+tidyOpenTyVars env tyvars = mapAccumL tidyOpenTyVar env tyvars
+
+tidyOpenTyVar :: TidyEnv -> TyVar -> (TidyEnv, TyVar)
+-- Treat a new tyvar as a binder, and give it a fresh tidy name
+tidyOpenTyVar env@(tidy_env, subst) tyvar
+  = case lookupVarEnv subst tyvar of
+	Just tyvar' -> (env, tyvar')		-- Already substituted
+	Nothing	    -> tidyTyVarBndr env tyvar	-- Treat it as a binder
 
 tidyType :: TidyEnv -> Type -> Type
 tidyType env@(tidy_env, subst) ty
@@ -802,7 +801,7 @@ tidyType env@(tidy_env, subst) ty
     go (FunTy fun arg)	    = (FunTy SAPPLY (go fun)) SAPPLY (go arg)
     go (ForAllTy tv ty)	    = ForAllTy tvp SAPPLY (tidyType envp ty)
 			      where
-			        (envp, tvp) = tidyTyVar env tv
+			        (envp, tvp) = tidyTyVarBndr env tv
     go (UsageTy u ty)	    = (UsageTy SAPPLY (go u)) SAPPLY (go ty)
 
     go_note (SynNote ty)        = SynNote SAPPLY (go ty)
@@ -964,7 +963,7 @@ eq_ty env (TyVarTy tv1)       (TyVarTy tv2)       = case lookupVarEnv env tv1 of
 							  Just tv1a -> tv1a == tv2
 							  Nothing   -> tv1  == tv2
 eq_ty env (ForAllTy tv1 t1)   (ForAllTy tv2 t2)   
-	| tv1 == tv2				  = eq_ty env t1 t2
+	| tv1 == tv2				  = eq_ty (delVarEnv env tv1)        t1 t2
 	| otherwise				  = eq_ty (extendVarEnv env tv1 tv2) t1 t2
 eq_ty env (AppTy s1 t1)       (AppTy s2 t2)       = (eq_ty env s1 s2) && (eq_ty env t1 t2)
 eq_ty env (FunTy s1 t1)       (FunTy s2 t2)       = (eq_ty env s1 s2) && (eq_ty env t1 t2)

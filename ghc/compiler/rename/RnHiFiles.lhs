@@ -429,7 +429,7 @@ loadRules mod (rule_bag, n_slurped) (version, rules)
 loadRule :: Module -> RdrNameRuleDecl -> RnM d (GatedDecl RdrNameRuleDecl)
 -- "Gate" the rule simply by whether the rule variable is
 -- needed.  We can refine this later.
-loadRule mod decl@(IfaceRule _ _ var _ _ src_loc)
+loadRule mod decl@(IfaceRule _ _ _ var _ _ src_loc)
   = lookupIfaceName var		`thenRn` \ var_name ->
     returnRn (\vis_fn -> vis_fn var_name, (mod, decl))
 
@@ -676,9 +676,6 @@ packageNameMismatchWarn requested_mod read_mod =
 warnRedundantSourceImport mod_name
   = ptext SLIT("Unnecessary {- SOURCE -} in the import of module")
           <+> quotes (ppr mod_name)
-
-notLoaded mod
-  = ptext SLIT("Module") <+> quotes (ppr mod) <+> ptext SLIT("is not loaded")
 
 warnSelfImport mod
   = ptext SLIT("Importing my own interface: module") <+> ppr mod

@@ -54,7 +54,6 @@ import ListSetOps	( removeDups, equivClasses )
 import Util		( sortLt )
 import List		( nub )
 import UniqFM		( lookupWithDefaultUFM )
-import Maybes		( orElse )
 import CmdLineOpts
 import FastString	( FastString )
 \end{code}

@@ -321,9 +321,6 @@ wordResult result
 \begin{code}
 type RuleFun = [CoreExpr] -> Maybe CoreExpr
 
-or_rule :: RuleFun -> RuleFun -> RuleFun
-or_rule r1 r2 args = maybe (r2 args) Just (r1 args) -- i.e.: r1 args `mplus` r2 args
-
 twoLits :: (Literal -> Literal -> Maybe CoreExpr) -> RuleFun
 twoLits rule [Lit l1, Lit l2] = rule (convFloating l1) (convFloating l2)
 twoLits rule _                = Nothing

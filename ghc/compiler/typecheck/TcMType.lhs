@@ -60,7 +60,7 @@ import TcType		( tcEqType, tcCmpPred,
 
 			  liftedTypeKind, unliftedTypeKind, openTypeKind, defaultKind, superKind,
 			  superBoxity, liftedBoxity, hasMoreBoxityInfo, typeKind,
-			  tyVarsOfType, tyVarsOfTypes, tidyOpenType, tidyOpenTypes, tidyTyVar,
+			  tyVarsOfType, tyVarsOfTypes, tidyOpenType, tidyOpenTypes, tidyOpenTyVar,
 			  eqKind, isTypeKind,
 
 			  isFFIArgumentTy, isFFIImportResultTy
@@ -1436,7 +1436,7 @@ unifyKindCtxt swapped tv1 ty2 tidy_env	-- not swapped => tv1 expected, ty2 infer
 	    where
 	      (pp_expected, pp_actual) | swapped   = (pp2, pp1)
 				       | otherwise = (pp1, pp2)
-	      (env1, tv1') = tidyTyVar tidy_env tv1
+	      (env1, tv1') = tidyOpenTyVar tidy_env tv1
 	      (env2, ty2') = tidyOpenType  env1 ty2
 	      pp1 = ppr tv1'
 	      pp2 = ppr ty2'
@@ -1457,13 +1457,13 @@ unifyWithSigErr tyvar ty
   = (env2, hang (ptext SLIT("Cannot unify the type-signature variable") <+> quotes (ppr tidy_tyvar))
 	      4 (ptext SLIT("with the type") <+> quotes (ppr tidy_ty)))
   where
-    (env1, tidy_tyvar) = tidyTyVar emptyTidyEnv tyvar
-    (env2, tidy_ty)    = tidyOpenType  env1     ty
+    (env1, tidy_tyvar) = tidyOpenTyVar emptyTidyEnv tyvar
+    (env2, tidy_ty)    = tidyOpenType  env1         ty
 
 unifyOccurCheck tyvar ty
   = (env2, hang (ptext SLIT("Occurs check: cannot construct the infinite type:"))
 	      4 (sep [ppr tidy_tyvar, char '=', ppr tidy_ty]))
   where
-    (env1, tidy_tyvar) = tidyTyVar emptyTidyEnv tyvar
-    (env2, tidy_ty)    = tidyOpenType  env1     ty
+    (env1, tidy_tyvar) = tidyOpenTyVar emptyTidyEnv tyvar
+    (env2, tidy_ty)    = tidyOpenType  env1         ty
 \end{code}

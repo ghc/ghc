@@ -17,13 +17,13 @@ import Id		( setIdStrictness, setInlinePragma,
 			  idDemandInfo, setIdDemandInfo, isBottomingId,
 			  Id
 			)
-import IdInfo		( neverInlinePrag )
 import CoreLint		( showPass, endPass )
 import ErrUtils		( dumpIfSet_dyn )
 import SaAbsInt
 import SaLib
 import Demand		( Demand, wwStrict, isStrict, isLazy )
 import Util		( zipWith3Equal, stretchZipWith )
+import BasicTypes	( Activation( NeverActive ) )
 import Outputable
 import FastTypes
 \end{code}
@@ -196,7 +196,7 @@ saTopBind str_env abs_env (Rec pairs)
 -- This avoids fruitless inlining of top level error functions
 addStrictnessInfoToTopId str_val abs_val bndr
   = if isBottomingId new_id then
-	new_id `setInlinePragma` neverInlinePrag
+	new_id `setInlinePragma` NeverActive
     else
 	new_id
   where

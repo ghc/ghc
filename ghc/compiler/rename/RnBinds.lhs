@@ -537,15 +537,10 @@ renameSig (FixSig (FixitySig v fix src_loc))
     lookupSigOccRn v		`thenRn` \ new_v ->
     returnRn (FixSig (FixitySig new_v fix src_loc))
 
-renameSig (InlineSig v p src_loc)
+renameSig (InlineSig b v p src_loc)
   = pushSrcLocRn src_loc $
     lookupSigOccRn v		`thenRn` \ new_v ->
-    returnRn (InlineSig new_v p src_loc)
-
-renameSig (NoInlineSig v p src_loc)
-  = pushSrcLocRn src_loc $
-    lookupSigOccRn v		`thenRn` \ new_v ->
-    returnRn (NoInlineSig new_v p src_loc)
+    returnRn (InlineSig b new_v p src_loc)
 \end{code}
 
 

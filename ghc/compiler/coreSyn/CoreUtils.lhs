@@ -7,8 +7,8 @@
 module CoreUtils (
 	-- Construction
 	mkNote, mkInlineMe, mkSCC, mkCoerce,
-	bindNonRec, mkIfThenElse, mkAltExpr,
-        mkPiType,
+	bindNonRec, needsCaseBinding,
+	mkIfThenElse, mkAltExpr, mkPiType,
 
 	-- Taking expressions apart
 	findDefault, findAlt, hasDefault,
@@ -48,23 +48,26 @@ import VarSet
 import VarEnv
 import Name		( hashName )
 import Literal		( hashLiteral, literalType, litIsDupable )
-import DataCon		( DataCon, dataConRepArity )
+import DataCon		( DataCon, dataConRepArity, dataConArgTys, isExistentialDataCon, dataConTyCon )
 import PrimOp		( primOpOkForSpeculation, primOpIsCheap )
 import Id		( Id, idType, globalIdDetails, idNewStrictness, idLBVarInfo, 
 			  mkWildId, idArity, idName, idUnfolding, idInfo, isOneShotLambda,
-			  isDataConId_maybe, mkSysLocal, hasNoBinding
+			  isDataConId_maybe, mkSysLocal, hasNoBinding, isDataConId, isBottomingId
 			)
 import IdInfo		( LBVarInfo(..),  
 			  GlobalIdDetails(..),
 			  megaSeqIdInfo )
 import NewDemand	( appIsBottom )
-import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe, 
+import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe, splitFunTy,
 			  applyTys, isUnLiftedType, seqType, mkUTy, mkTyVarTy,
-			  splitForAllTy_maybe, isForAllTy, splitNewType_maybe, eqType
+			  splitForAllTy_maybe, isForAllTy, splitNewType_maybe, 
+			  splitTyConApp_maybe, eqType
 			)
+import TyCon		( tyConArity )
 import TysWiredIn	( boolTy, trueDataCon, falseDataCon )
 import CostCentre	( CostCentre )
-import UniqSupply	( UniqSupply, splitUniqSupply, uniqFromSupply )
+import BasicTypes	( Arity )
+import Unique		( Unique )
 import Outputable
 import TysPrim		( alphaTy )	-- Debugging only
 \end{code}
@@ -224,8 +227,13 @@ bindNonRec :: Id -> CoreExpr -> CoreExpr -> CoreExpr
 -- that give Core Lint a heart attack.  Actually the simplifier
 -- deals with them perfectly well.
 bindNonRec bndr rhs body 
-  | isUnLiftedType (idType bndr) = Case rhs bndr [(DEFAULT,[],body)]
-  | otherwise			 = Let (NonRec bndr rhs) body
+  | needsCaseBinding (idType bndr) rhs = Case rhs bndr [(DEFAULT,[],body)]
+  | otherwise			       = Let (NonRec bndr rhs) body
+
+needsCaseBinding ty rhs = isUnLiftedType ty && not (exprOkForSpeculation rhs)
+	-- Make a case expression instead of a let
+	-- These can arise either from the desugarer,
+	-- or from beta reductions: (\x.e) (x +# y)
 \end{code}
 
 \begin{code}
@@ -512,7 +520,9 @@ idAppIsBottom id n_val_args = appIsBottom (idNewStrictness id) n_val_args
 \end{code}
 
 @exprIsValue@ returns true for expressions that are certainly *already* 
-evaluated to WHNF.  This is used to decide whether it's ok to change
+evaluated to *head* normal form.  This is used to decide whether it's ok 
+to change
+
 	case x of _ -> e   ===>   e
 
 and to decide whether it's safe to discard a `seq`
@@ -520,12 +530,13 @@ and to decide whether it's safe to discard a `seq`
 So, it does *not* treat variables as evaluated, unless they say they are.
 
 But it *does* treat partial applications and constructor applications
-as values, even if their arguments are non-trivial; 
+as values, even if their arguments are non-trivial, provided the argument
+type is lifted; 
 	e.g.  (:) (f x) (map f xs)	is a value
 	      map (...redex...)		is a value
 Because `seq` on such things completes immediately
 
-A possible worry: constructors with unboxed args:
+For unlifted argument types, we have to be careful:
 		C (f x :: Int#)
 Suppose (f x) diverges; then C (f x) is not a value.  True, but
 this form is illegal (see the invariants in CoreSyn).  Args of unboxed
@@ -538,37 +549,77 @@ exprIsValue (Type ty)	  = True	-- Types are honorary Values; we don't mind
 exprIsValue (Lit l)	  = True
 exprIsValue (Lam b e)  	  = isRuntimeVar b || exprIsValue e
 exprIsValue (Note _ e) 	  = exprIsValue e
-exprIsValue other_expr
-  = go other_expr 0
-  where
-    go (Var f) n_args = idAppIsValue f n_args
-	
-    go (App f a) n_args
-	| not (isRuntimeArg a) = go f n_args
-	| otherwise   	       = go f (n_args + 1) 
-
-    go (Note _ f) n_args = go f n_args
-
-    go other n_args = False
-
-idAppIsValue :: Id -> Int -> Bool
-idAppIsValue id n_val_args 
-  = case globalIdDetails id of
-	DataConId _ -> True
-	PrimOpId _  -> n_val_args < idArity id
-	other | n_val_args == 0 -> isEvaldUnfolding (idUnfolding id)
-	      | otherwise       -> n_val_args < idArity id
+exprIsValue (Var v)	  = idArity v > 0 || isEvaldUnfolding (idUnfolding v)
+	-- The idArity case catches data cons and primops that 
+	-- don't have unfoldings
 	-- A worry: what if an Id's unfolding is just itself: 
 	-- then we could get an infinite loop...
+exprIsValue other_expr
+  | (Var fun, args) <- collectArgs other_expr,
+    isDataConId fun || valArgCount args < idArity fun
+  = check (idType fun) args
+  | otherwise
+  = False
+  where
+	-- 'check' checks that unlifted-type args are in
+	-- fact guaranteed non-divergent
+    check fun_ty []		 = True
+    check fun_ty (Type _ : args) = case splitForAllTy_maybe fun_ty of
+				     Just (_, ty) -> check ty args
+    check fun_ty (arg : args)
+	| isUnLiftedType arg_ty = exprOkForSpeculation arg
+	| otherwise		= check res_ty args
+	where
+	  (arg_ty, res_ty) = splitFunTy fun_ty
 \end{code}
 
 \begin{code}
 exprIsConApp_maybe :: CoreExpr -> Maybe (DataCon, [CoreExpr])
-exprIsConApp_maybe (Note InlineMe expr) = exprIsConApp_maybe expr
+exprIsConApp_maybe (Note (Coerce to_ty from_ty) expr)
+  = 	-- Maybe this is over the top, but here we try to turn
+	-- 	coerce (S,T) ( x, y )
+	-- effectively into 
+	--	( coerce S x, coerce T y )
+	-- This happens in anger in PrelArrExts which has a coerce
+	--	case coerce memcpy a b of
+	--	  (# r, s #) -> ...
+	-- where the memcpy is in the IO monad, but the call is in
+	-- the (ST s) monad
+    case exprIsConApp_maybe expr of {
+	Nothing 	  -> Nothing ;
+	Just (dc, args)   -> 
+  
+    case splitTyConApp_maybe to_ty of {
+	Nothing -> Nothing ;
+	Just (tc, tc_arg_tys) | tc /= dataConTyCon dc   -> Nothing
+			      | isExistentialDataCon dc -> Nothing
+			      | otherwise	        ->
+		-- Type constructor must match
+		-- We knock out existentials to keep matters simple(r)
+    let
+	arity   	 = tyConArity tc
+	val_args	 = drop arity args
+	to_arg_tys 	 = dataConArgTys dc tc_arg_tys
+	mk_coerce ty arg = mkCoerce ty (exprType arg) arg
+	new_val_args	 = zipWith mk_coerce to_arg_tys val_args
+    in
+    ASSERT( all isTypeArg (take arity args) )
+    ASSERT( length val_args == length to_arg_tys )
+    Just (dc, map Type tc_arg_tys ++ new_val_args)
+    }}
+
+exprIsConApp_maybe (Note _ expr)
+  = exprIsConApp_maybe expr
     -- We ignore InlineMe notes in case we have
     --	x = __inline_me__ (a,b)
     -- All part of making sure that INLINE pragmas never hurt
     -- Marcin tripped on this one when making dictionaries more inlinable
+    --
+    -- In fact, we ignore all notes.  For example,
+    --  	case _scc_ "foo" (C a b) of
+    --			C a b -> e
+    -- should be optimised away, but it will be only if we look
+    -- through the SCC note.
 
 exprIsConApp_maybe expr = analyse (collectArgs expr)
   where
@@ -645,78 +696,118 @@ exprEtaExpandArity :: CoreExpr -> (Int, Bool)
 --	case x of p -> \s -> ...
 -- because for I/O ish things we really want to get that \s to the top.
 -- We are prepared to evaluate x each time round the loop in order to get that
---
--- Consider	let x = expensive in \y z -> E
+
+-- It's all a bit more subtle than it looks.  Consider one-shot lambdas
+-- 		let x = expensive in \y z -> E
 -- We want this to have arity 2 if the \y-abstraction is a 1-shot lambda
--- 
--- Hence the list of Bools returned by go1
---	NB: this is particularly important/useful for IO state 
---	transformers, where we often get
---		let x = E in \ s -> ...
---	and the \s is a real-world state token abstraction.  Such 
--- 	abstractions are almost invariably 1-shot, so we want to
---	pull the \s out, past the let x=E.  
--- 	The hack is in Id.isOneShotLambda
+-- Hence the ArityType returned by arityType
+
+-- NB: this is particularly important/useful for IO state 
+-- transformers, where we often get
+-- 	let x = E in \ s -> ...
+-- and the \s is a real-world state token abstraction.  Such 
+-- abstractions are almost invariably 1-shot, so we want to
+-- pull the \s out, past the let x=E.  
+-- The hack is in Id.isOneShotLambda
+--
+-- Consider also 
+--	f = \x -> error "foo"
+-- Here, arity 1 is fine.  But if it is
+--	f = \x -> case e of 
+--			True  -> error "foo"
+--			False -> \y -> x+y
+-- then we want to get arity 2.
+-- Hence the ABot/ATop in ArityType
+
 
 exprEtaExpandArity e
   = go 0 e
   where
     go :: Int -> CoreExpr -> (Int,Bool)
-    go ar (Lam x e)  | isId x   	= go (ar+1) e
-		     | otherwise 	= go ar e
-    go ar (Note n e) | ok_note n	= go ar e
-    go ar other 	     		= (ar + ar', ar' == 0)
-					where
-					  ar' = length (go1 other)
+    go ar (Lam x e)  | isId x    = go (ar+1) e
+		     | otherwise = go ar e
+    go ar (Note n e) | ok_note n = go ar e
+    go ar other 	     	 = (ar + ar', ar' == 0)
+				 where
+				    ar' = arityDepth (arityType other)
 
-    go1 :: CoreExpr -> [Bool]
+-- A limited sort of function type
+data ArityType = AFun Bool ArityType	-- True <=> one-shot
+	       | ATop			-- Know nothing
+	       | ABot			-- Diverges
+
+arityDepth :: ArityType -> Arity
+arityDepth (AFun _ ty) = 1 + arityDepth ty
+arityDepth ty	       = 0
+
+andArityType ABot	    at2		  = at2
+andArityType ATop	    at2		  = ATop
+andArityType (AFun t1 at1)  (AFun t2 at2) = AFun (t1 && t2) (andArityType at1 at2)
+andArityType at1	    at2		  = andArityType at2 at1
+
+arityType :: CoreExpr -> ArityType
 	-- (go1 e) = [b1,..,bn]
 	-- means expression can be rewritten \x_b1 -> ... \x_bn -> body
 	-- where bi is True <=> the lambda is one-shot
 
-    go1 (Note n e) | ok_note n	= go1 e
-    go1 (Var v)			= replicate (idArity v) False	-- When the type of the Id
-								-- encodes one-shot-ness, use
-								-- the idinfo here
+arityType (Note n e)
+  | ok_note n = arityType e
+  | otherwise = ATop
+
+arityType (Var v) 
+  = mk (idArity v)
+  where
+    mk :: Arity -> ArityType
+    mk 0 | isBottomingId v  = ABot
+         | otherwise	    = ATop
+    mk n 		    = AFun False (mk (n-1))
+
+			-- When the type of the Id encodes one-shot-ness,
+			-- use the idinfo here
 
 	-- Lambdas; increase arity
-    go1 (Lam x e)  | isId x     = isOneShotLambda x : go1 e
-		   | otherwise	= go1 e
+arityType (Lam x e) | isId x    = AFun (isOneShotLambda x) (arityType e)
+		    | otherwise	= arityType e
 
 	-- Applications; decrease arity
-    go1 (App f (Type _))	= go1 f
-    go1 (App f a)  		= case go1 f of
-				    (one_shot : xs) | one_shot || exprIsCheap a -> xs
-				    other					-> []
+arityType (App f (Type _)) = arityType f
+arityType (App f a)  	   = case arityType f of
+				AFun one_shot xs | one_shot	 -> xs
+						 | exprIsCheap a -> xs
+				other				 -> ATop
 							   
 	-- Case/Let; keep arity if either the expression is cheap
 	-- or it's a 1-shot lambda
-    go1 (Case scrut _ alts) = case foldr1 (zipWith (&&)) [go1 rhs | (_,_,rhs) <- alts] of
-				xs@(one_shot : _) | one_shot || exprIsCheap scrut -> xs
-				other						  -> []
-    go1 (Let b e) = case go1 e of
-		      xs@(one_shot : _) | one_shot || all exprIsCheap (rhssOfBind b) -> xs
-		      other							     -> []
+arityType (Case scrut _ alts) = case foldr1 andArityType [arityType rhs | (_,_,rhs) <- alts] of
+				  xs@(AFun one_shot _) | one_shot -> xs
+				  xs | exprIsCheap scrut	  -> xs
+				     | otherwise	 	  -> ATop
 
-    go1 other = []
-    
-    ok_note InlineMe = False
-    ok_note other    = True
-	    -- Notice that we do not look through __inline_me__
-	    -- This may seem surprising, but consider
-	    --	f = _inline_me (\x -> e)
-	    -- We DO NOT want to eta expand this to
-	    --	f = \x -> (_inline_me (\x -> e)) x
-	    -- because the _inline_me gets dropped now it is applied, 
-	    -- giving just
-	    --	f = \x -> e
-	    -- A Bad Idea
+arityType (Let b e) = case arityType e of
+		        xs@(AFun one_shot _) | one_shot			      -> xs
+		        xs		     | all exprIsCheap (rhssOfBind b) -> xs
+					     | otherwise		      -> ATop
+
+arityType other = ATop
+
+ok_note InlineMe = False
+ok_note other    = True
+    -- Notice that we do not look through __inline_me__
+    -- This may seem surprising, but consider
+    --		f = _inline_me (\x -> e)
+    -- We DO NOT want to eta expand this to
+    --		f = \x -> (_inline_me (\x -> e)) x
+    -- because the _inline_me gets dropped now it is applied, 
+    -- giving just
+    --		f = \x -> e
+    -- A Bad Idea
+
 \end{code}
 
 
 \begin{code}
 etaExpand :: Int	  	-- Add this number of value args
-	  -> UniqSupply
+	  -> [Unique]
 	  -> CoreExpr -> Type	-- Expression and its type
 	  -> CoreExpr
 -- (etaExpand n us e ty) returns an expression with 
@@ -758,8 +849,7 @@ etaExpand n us expr ty
  	  Just (arg_ty, res_ty) -> Lam arg1 (etaExpand (n-1) us2 (App expr (Var arg1)) res_ty)
 				where
 				   arg1	      = mkSysLocal SLIT("eta") uniq arg_ty
- 				   (us1, us2) = splitUniqSupply us
-				   uniq	      = uniqFromSupply us1 
+ 				   (uniq:us2) = us
 				   
 	; Nothing ->
 
@@ -768,7 +858,6 @@ etaExpand n us expr ty
  	  Nothing  -> pprTrace "Bad eta expand" (ppr expr $$ ppr ty) expr
     	}}}
 \end{code}
-
 
 exprArity is a cheap-and-cheerful version of exprEtaExpandArity.
 It tells how many things the expression can be applied to before doing
@@ -791,6 +880,8 @@ Similarly, see the ok_note check in exprEtaExpandArity.  So
 won't be eta-expanded.
 
 And in any case it seems more robust to have exprArity be a bit more intelligent.
+But note that 	(\x y z -> f x y z)
+should have arity 3, regardless of f's arity.
 
 \begin{code}
 exprArity :: CoreExpr -> Int

@@ -15,24 +15,27 @@ import CmdLineOpts	( DynFlags, DynFlag(..), opt_OmitInterfacePragmas )
 import CoreSyn
 import CoreUnfold	( noUnfolding, mkTopUnfolding, okToUnfoldInHiFile )
 import CoreFVs		( ruleSomeFreeVars, exprSomeFreeVars )
+import PprCore		( pprIdCoreRule )
 import CoreLint		( showPass, endPass )
 import VarEnv
 import VarSet
 import Var		( Id, Var )
 import Id		( idType, idInfo, idName, isExportedId, 
 			  idSpecialisation, idUnique, isDataConWrapId,
-			  mkVanillaGlobal, isLocalId, isRecordSelector,
-			  setIdUnfolding, hasNoBinding, mkUserLocal,
-			  idNewDemandInfo, setIdNewDemandInfo
+			  mkVanillaGlobal, mkGlobalId, isLocalId, 
+			  hasNoBinding, mkUserLocal, isGlobalId, globalIdDetails,
+			  idNewDemandInfo, setIdNewDemandInfo, 
+			  idNewStrictness_maybe, setIdNewStrictness
 			) 
 import IdInfo		{- loads of stuff -}
 import NewDemand	( isBottomingSig, topSig, isStrictDmd )
+import BasicTypes	( isNeverActive )
 import Name		( getOccName, nameOccName, globaliseName, setNameOcc, 
 		  	  localiseName, isGlobalName, setNameUnique
 			)
 import NameEnv		( filterNameEnv )
 import OccName		( TidyOccEnv, initTidyOccEnv, tidyOccName )
-import Type		( tidyTopType, tidyType, tidyTyVar )
+import Type		( tidyTopType, tidyType, tidyTyVarBndr )
 import Module		( Module, moduleName )
 import HscTypes		( PersistentCompilerState( pcs_PRS ), 
 			  PersistentRenamerState( prsOrig ),
@@ -42,12 +45,13 @@ import HscTypes		( PersistentCompilerState( pcs_PRS ),
 			)
 import FiniteMap	( lookupFM, addToFM )
 import Maybes		( maybeToBool, orElse )
-import ErrUtils		( showPass )
+import ErrUtils		( showPass, dumpIfSet_core )
 import SrcLoc		( noSrcLoc )
 import UniqFM		( mapUFM )
 import UniqSupply	( splitUniqSupply, uniqFromSupply )
 import List		( partition )
 import Util		( mapAccumL )
+import Maybe		( isNothing, fromJust )
 import Outputable
 \end{code}
 
@@ -178,6 +182,9 @@ tidyCorePgm dflags mod pcs cg_info_env
 					  md_binds = tidy_binds }
 
    	; endPass dflags "Tidy Core" Opt_D_dump_simpl tidy_binds
+	; dumpIfSet_core dflags Opt_D_dump_simpl
+		"Tidy Core Rules"
+		(vcat (map pprIdCoreRule tidy_rules))
 
 	; return (pcs', tidy_details)
 	}
@@ -307,7 +314,7 @@ addExternal (id,rhs) needed
 						spec_ids
 
     idinfo	   = idInfo id
-    dont_inline	   = isNeverInlinePrag (inlinePragInfo idinfo)
+    dont_inline	   = isNeverActive (inlinePragInfo idinfo)
     loop_breaker   = isLoopBreaker (occInfo idinfo)
     bottoming_fn   = isBottomingSig (newStrictnessInfo idinfo `orElse` topSig)
     spec_ids	   = rulesRhsFreeVars (specInfo idinfo)
@@ -429,11 +436,6 @@ tidyTopBinder mod ext_ids cg_info_env tidy_env rhs
 -- all, but in any case it will have the error message inline so it won't matter.
 
 
-  | isRecordSelector id	-- We can't use the "otherwise" case, because that
-			-- forgets the IdDetails, which forgets that this is
-			-- a record selector, which confuses an importing module
-  = (env, id `setIdUnfolding` unfold_info)
-
   | otherwise
 	-- This function is the heart of Step 2
 	-- The second env is the one to use for the IdInfo
@@ -452,7 +454,11 @@ tidyTopBinder mod ext_ids cg_info_env tidy_env rhs
     cg_info = lookupCgInfo cg_info_env name'
     idinfo' = tidyIdInfo tidy_env is_external unfold_info cg_info id
 
-    id'	       = mkVanillaGlobal name' ty' idinfo'
+    id' | isGlobalId id = mkGlobalId (globalIdDetails id) name' ty' idinfo'
+	| otherwise     = mkVanillaGlobal		  name' ty' idinfo'
+	-- The test ensures that record selectors (which must be tidied; see above)
+	-- retain their details.  If it's forgotten, importing modules get confused.
+
     subst_env' = extendVarEnv subst_env2 id id'
 
     maybe_external = lookupVarEnv ext_ids id
@@ -542,10 +548,10 @@ tidyIdRules env ((fn,rule) : rules)
 
 tidyRule :: TidyEnv -> CoreRule -> CoreRule
 tidyRule env rule@(BuiltinRule _ _) = rule
-tidyRule env (Rule name vars tpl_args rhs)
+tidyRule env (Rule name act vars tpl_args rhs)
   = tidyBndrs env vars			=: \ (env', vars) ->
     map (tidyExpr env') tpl_args  	=: \ tpl_args ->
-     (Rule name vars tpl_args (tidyExpr env' rhs))
+     (Rule name act vars tpl_args (tidyExpr env' rhs))
 \end{code}
 
 %************************************************************************
@@ -560,11 +566,11 @@ tidyBind :: TidyEnv
 	 ->  (TidyEnv, CoreBind)
 
 tidyBind env (NonRec bndr rhs)
-  = tidyBndrWithRhs env (bndr,rhs) =: \ (env', bndr') ->
+  = tidyLetBndr env (bndr,rhs)		=: \ (env', bndr') ->
     (env', NonRec bndr' (tidyExpr env' rhs))
 
 tidyBind env (Rec prs)
-  = mapAccumL tidyBndrWithRhs env prs 	=: \ (env', bndrs') ->
+  = mapAccumL tidyLetBndr env prs	=: \ (env', bndrs') ->
     map (tidyExpr env') (map snd prs)	=: \ rhss' ->
     (env', Rec (zip bndrs' rhss'))
 
@@ -611,26 +617,43 @@ tidyVarOcc (_, var_env) v = case lookupVarEnv var_env v of
 -- tidyBndr is used for lambda and case binders
 tidyBndr :: TidyEnv -> Var -> (TidyEnv, Var)
 tidyBndr env var
-  | isTyVar var = tidyTyVar env var
-  | otherwise   = tidyId env var
+  | isTyVar var = tidyTyVarBndr env var
+  | otherwise   = tidyIdBndr env var
 
 tidyBndrs :: TidyEnv -> [Var] -> (TidyEnv, [Var])
 tidyBndrs env vars = mapAccumL tidyBndr env vars
 
--- tidyBndrWithRhs is used for let binders
-tidyBndrWithRhs :: TidyEnv -> (Id, CoreExpr) -> (TidyEnv, Var)
-tidyBndrWithRhs env (id,rhs) 
-  = add_dmd_info (tidyId env id)
+tidyLetBndr :: TidyEnv -> (Id, CoreExpr) -> (TidyEnv, Var)
+-- Used for local (non-top-level) let(rec)s
+tidyLetBndr env (id,rhs) 
+  = ((tidy_env,new_var_env), final_id)
   where
-	-- We add demand info for let(rec) binders, because
-	-- that's what tells CorePrep to generate a case instead of a thunk
-    add_dmd_info (env,new_id) 
-	| isStrictDmd dmd_info = (env, setIdNewDemandInfo new_id dmd_info)
-	| otherwise	       = (env, new_id)
-    dmd_info = idNewDemandInfo id
+    ((tidy_env,var_env), new_id) = tidyIdBndr env id
 
-tidyId :: TidyEnv -> Id -> (TidyEnv, Id)
-tidyId env@(tidy_env, var_env) id
+	-- We need to keep around any interesting strictness and demand info
+	-- because later on we may need to use it when converting to A-normal form.
+	-- eg.
+	--	f (g x),  where f is strict in its argument, will be converted
+	--	into  case (g x) of z -> f z  by CorePrep, but only if f still
+	-- 	has its strictness info.
+	--
+	-- Similarly for the demand info - on a let binder, this tells 
+	-- CorePrep to turn the let into a case.
+    final_id
+	| totally_boring_info = new_id
+	| otherwise = new_id `setIdNewDemandInfo` dmd_info
+			     `setIdNewStrictness` fromJust maybe_new_strictness
+
+    -- override the env we get back from tidyId with the new IdInfo
+    -- so it gets propagated to the usage sites.
+    new_var_env = extendVarEnv var_env id final_id
+
+    dmd_info		 = idNewDemandInfo id
+    maybe_new_strictness = idNewStrictness_maybe id
+    totally_boring_info  = isNothing maybe_new_strictness && not (isStrictDmd dmd_info) 
+
+tidyIdBndr :: TidyEnv -> Id -> (TidyEnv, Id)
+tidyIdBndr env@(tidy_env, var_env) id
   = 	-- Non-top-level variables
     let 
 	-- Give the Id a fresh print-name, *and* rename its type
@@ -640,7 +663,7 @@ tidyId env@(tidy_env, var_env) id
 	-- All local Ids now have the same IdInfo, which should save some
 	-- space.
 	(tidy_env', occ') = tidyOccName tidy_env (getOccName id)
-        ty'          	  = tidyType (tidy_env,var_env) (idType id)
+        ty'          	  = tidyType env (idType id)
 	id'          	  = mkUserLocal occ' (idUnique id) ty' noSrcLoc
 	var_env'	  = extendVarEnv var_env id id'
     in

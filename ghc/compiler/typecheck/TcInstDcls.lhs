@@ -58,7 +58,7 @@ import FunDeps		( checkInstFDs )
 import Generics		( validGenericInstanceType )
 import Module		( Module, foldModuleEnv )
 import Name		( getSrcLoc )
-import NameSet		( unitNameSet, nameSetToList )
+import NameSet		( unitNameSet, emptyNameSet, nameSetToList )
 import PrelInfo		( eRROR_ID )
 import TyCon		( TyCon )
 import Subst		( mkTopTyVarSubst, substTheta )
@@ -610,11 +610,16 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id,
         dict_constr   = classDataCon clas
 	scs_and_meths = map instToId (sc_dicts ++ meth_insts)
 	this_dict_id  = instToId this_dict
-	inlines       = unitNameSet (idName dfun_id)
+	inlines       | null dfun_arg_dicts = emptyNameSet
+		      | otherwise	    = unitNameSet (idName dfun_id)
 		-- Always inline the dfun; this is an experimental decision
 		-- because it makes a big performance difference sometimes.
 		-- Often it means we can do the method selection, and then
 		-- inline the method as well.  Marcin's idea; see comments below.
+		--
+		-- BUT: don't inline it if it's a constant dictionary;
+		-- we'll get all the benefit without inlining, and we get
+		-- a **lot** of code duplication if we inline it
 
 	dict_rhs
 	  | null scs_and_meths
@@ -646,7 +651,7 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id,
 	  = AbsBinds
 		 zonked_inst_tyvars
 		 (map instToId dfun_arg_dicts)
-		 [(inst_tyvars', dfun_id, this_dict_id)] 
+		 [(inst_tyvars', local_dfun_id, this_dict_id)] 
 		 inlines
 		 (lie_binds1	`AndMonoBinds` 
 		  lie_binds2	`AndMonoBinds`

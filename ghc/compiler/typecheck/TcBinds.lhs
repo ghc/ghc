@@ -45,15 +45,14 @@ import TcType		( mkTyVarTy, mkForAllTys, mkFunTys, tyVarsOfType,
 import CoreFVs		( idFreeTyVars )
 import Id		( mkLocalId, setInlinePragma )
 import Var		( idType, idName )
-import IdInfo		( InlinePragInfo(..) )
 import Name		( Name, getOccName, getSrcLoc )
 import NameSet
 import Var		( tyVarKind )
 import VarSet
 import Bag
 import Util		( isIn )
-import Maybes		( maybeToBool )
-import BasicTypes	( TopLevelFlag(..), RecFlag(..), isNonRec, isNotTopLevel )
+import BasicTypes	( TopLevelFlag(..), RecFlag(..), isNonRec, isNotTopLevel,
+			  isAlwaysActive )
 import FiniteMap	( listToFM, lookupFM )
 import Outputable
 \end{code}
@@ -258,14 +257,10 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
 	exports  = zipWith mk_export binder_names zonked_mono_ids
 	dict_tys = map idType zonked_dict_ids
 
-	inlines    = mkNameSet [name | InlineSig name _ loc <- inline_sigs]
-        no_inlines = listToFM ([(name, IMustNotBeINLINEd False phase) | NoInlineSig name phase loc <- inline_sigs] ++
-			       [(name, IMustNotBeINLINEd True  phase) | InlineSig   name phase loc <- inline_sigs, maybeToBool phase])
-		-- "INLINE n foo" means inline foo, but not until at least phase n
-		-- "NOINLINE n foo" means don't inline foo until at least phase n, and even 
-		--		    then only if it is small enough etc.
-		-- "NOINLINE foo" means don't inline foo ever, which we signal with a (IMustNotBeINLINEd Nothing)
-		-- See comments in CoreUnfold.blackListed for the Authorised Version
+	inlines    = mkNameSet [name | InlineSig True name _ loc <- inline_sigs]
+        no_inlines = listToFM [(name, phase) | InlineSig _ name phase _ <- inline_sigs, 
+					       not (isAlwaysActive phase)]
+			-- AlwaysActive is the default, so don't bother with them
 
 	mk_export binder_name zonked_mono_id
 	  = (tyvars, 
@@ -660,8 +655,9 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
 	newTyVarTy kind 		`thenNF_Tc` \ pat_ty -> 
 
 		-- 	Now typecheck the pattern
-		-- We don't support binding fresh type variables in the
-		-- pattern of a pattern binding.  For example, this is illegal:
+		-- We don't support binding fresh (not-already-in-scope) scoped 
+		-- type variables in the pattern of a pattern binding.  
+		-- For example, this is illegal:
 		--	(x::a, y::b) = e
 		-- whereas this is ok
 		--	(x::Int, y::Bool) = e

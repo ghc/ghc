@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.73 2001/08/20 10:19:47 simonmar Exp $
+$Id: Parser.y,v 1.74 2001/09/26 15:12:35 simonpj Exp $
 
 Haskell grammar.
 
@@ -28,7 +28,8 @@ import OccName		( UserFS, varName, tcName, dataName, tcClsName, tvName )
 import SrcLoc		( SrcLoc )
 import Module
 import CmdLineOpts	( opt_SccProfilingOn )
-import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), NewOrData(..), StrictnessMark(..) )
+import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), 
+			  NewOrData(..), StrictnessMark(..), Activation(..) )
 import Panic
 
 import GlaExts
@@ -145,7 +146,7 @@ Conflicts: 14 shift/reduce
  '__A'		{ ITarity }
  '__P'		{ ITspecialise }
  '__C'		{ ITnocaf }
- '__U'		{ ITunfold $$ }
+ '__U'		{ ITunfold }
  '__S'		{ ITstrict $$ }
  '__M'		{ ITcprinfo $$ }
 -}
@@ -414,17 +415,13 @@ decls 	:: { [RdrBinding] }
 decl 	:: { RdrBinding }
 	: fixdecl			{ $1 }
 	| valdef			{ $1 }
-	| '{-# INLINE'   srcloc opt_phase qvar '#-}'	 { RdrSig (InlineSig $4 $3 $2) }
-	| '{-# NOINLINE' srcloc opt_phase qvar '#-}'	 { RdrSig (NoInlineSig $4 $3 $2) }
+	| '{-# INLINE'   srcloc activation qvar '#-}'	      { RdrSig (InlineSig True  $4 $3 $2) }
+	| '{-# NOINLINE' srcloc inverse_activation qvar '#-}' { RdrSig (InlineSig False $4 $3 $2) }
 	| '{-# SPECIALISE' srcloc qvar '::' sigtypes '#-}'
 	 	{ foldr1 RdrAndBindings 
 		    (map (\t -> RdrSig (SpecSig $3 t $2)) $5) }
 	| '{-# SPECIALISE' srcloc 'instance' inst_type '#-}'
 		{ RdrSig (SpecInstSig $4 $2) }
-
-opt_phase :: { Maybe Int }
-          : INTEGER                     { Just (fromInteger $1) }
-          | {- empty -}                 { Nothing }
 
 wherebinds :: { RdrNameHsBinds }
 	: where			{ cvBinds cvValSig (groupBindings $1) }
@@ -456,8 +453,16 @@ rules	:: { RdrBinding }
 	|  {- empty -}				{ RdrNullBind }
 
 rule  	:: { RdrBinding }
-	: STRING rule_forall infixexp '=' srcloc exp
-	     { RdrHsDecl (RuleD (HsRule $1 [] $2 $3 $6 $5)) }
+	: STRING activation rule_forall infixexp '=' srcloc exp
+	     { RdrHsDecl (RuleD (HsRule $1 $2 [] $3 $4 $7 $6)) }
+
+activation :: { Activation }           -- Omitted means AlwaysActive
+        : {- empty -}                           { AlwaysActive }
+        | '[' INTEGER ']'                       { ActiveAfter (fromInteger $2) }
+
+inverse_activation :: { Activation }   -- Omitted means NeverActive
+        : {- empty -}                           { NeverActive }
+        | '[' INTEGER ']'                       { ActiveAfter (fromInteger $2) }
 
 rule_forall :: { [RdrNameRuleBndr] }
 	: 'forall' rule_var_list '.'            { $2 }
@@ -500,6 +505,7 @@ unsafe_flag :: { Safety }
 
 ext_name :: { Maybe CLabelString }
 	: STRING		{ Just $1 }
+	| STRING STRING		{ Just $2 }	-- Ignore "module name" for now
 	| {- empty -}           { Nothing }
 
 

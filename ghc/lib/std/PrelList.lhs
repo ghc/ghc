@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelList.lhs,v 1.27 2001/08/28 15:12:37 simonmar Exp $
+% $Id: PrelList.lhs,v 1.28 2001/09/26 15:12:37 simonpj Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -118,9 +118,11 @@ length l                =  len l 0#
 -- filter, applied to a predicate and a list, returns the list of those
 -- elements that satisfy the predicate; i.e.,
 -- filter p xs = [ x | x <- xs, p x]
+{-# NOINLINE [1] filter #-}
 filter :: (a -> Bool) -> [a] -> [a]
 filter = filterList
 
+{-# INLINE [0] filter #-}
 filterFB c p x r | p x       = x `c` r
 		 | otherwise = r
 
@@ -202,6 +204,7 @@ scanr1 f (x:xs)		=  f x q : qs
 -- iterate f x returns an infinite list of repeated applications of f to x:
 -- iterate f x == [x, f x, f (f x), ...]
 iterate :: (a -> a) -> a -> [a]
+{-# NOINLINE [1] iterate #-}
 iterate = iterateList
 
 iterateFB c f x = x `c` iterateFB c f (f x)
@@ -216,9 +219,12 @@ iterateList f x =  x : iterateList f (f x)
 
 -- repeat x is an infinite list, with x the value of every element.
 repeat :: a -> [a]
+{-# NOINLINE [1] repeat #-}
 repeat = repeatList
 
+{-# INLINE [0] repeatFB #-}
 repeatFB c x = xs where xs = x `c` xs
+
 repeatList x = xs where xs = x :   xs
 
 {-# RULES
@@ -514,8 +520,10 @@ tuples are in the List module.
 \begin{code}
 ----------------------------------------------
 zip :: [a] -> [b] -> [(a,b)]
+{-# NOINLINE [1] zip #-}
 zip = zipList
 
+{-# INLINE [0] zipFB #-}
 zipFB c x y r = (x,y) `c` r
 
 
@@ -548,9 +556,10 @@ zip3 _      _      _      = []
 \begin{code}
 ----------------------------------------------
 zipWith :: (a->b->c) -> [a]->[b]->[c]
+{-# NOINLINE [1] zipWith #-}
 zipWith = zipWithList
 
-
+{-# INLINE [0] zipWithFB #-}
 zipWithFB c f x y r = (x `f` y) `c` r
 
 zipWithList                 :: (a->b->c) -> [a] -> [b] -> [c]

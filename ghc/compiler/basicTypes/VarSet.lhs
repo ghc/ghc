@@ -11,7 +11,7 @@ module VarSet (
 	elemVarSet, varSetElems, subVarSet,
 	unionVarSet, unionVarSets,
 	intersectVarSet, intersectsVarSet,
-	isEmptyVarSet, delVarSet, delVarSetByKey,
+	isEmptyVarSet, delVarSet, delVarSetList, delVarSetByKey,
 	minusVarSet, foldVarSet, filterVarSet,
 	lookupVarSet, mapVarSet, sizeVarSet, seqVarSet
     ) where
@@ -44,6 +44,7 @@ unitVarSet	:: Var -> VarSet
 extendVarSet	:: VarSet -> Var -> VarSet
 elemVarSet	:: Var -> VarSet -> Bool
 delVarSet	:: VarSet -> Var -> VarSet
+delVarSetList	:: VarSet -> [Var] -> VarSet
 minusVarSet	:: VarSet -> VarSet -> VarSet
 isEmptyVarSet	:: VarSet -> Bool
 mkVarSet	:: [Var] -> VarSet
@@ -74,6 +75,7 @@ varSetElems	= uniqSetToList
 elemVarSet	= elementOfUniqSet
 minusVarSet	= minusUniqSet
 delVarSet	= delOneFromUniqSet
+delVarSetList	= delListFromUniqSet
 isEmptyVarSet	= isEmptyUniqSet
 mkVarSet	= mkUniqSet
 foldVarSet	= foldUniqSet

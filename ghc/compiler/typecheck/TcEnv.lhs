@@ -71,7 +71,6 @@ import InstEnv		( InstEnv, emptyInstEnv )
 import HscTypes		( lookupType, TyThing(..) )
 import Util		( zipEqual )
 import SrcLoc		( SrcLoc )
-import qualified PrelNames 
 import Outputable
 
 import IOExts		( newIORef )

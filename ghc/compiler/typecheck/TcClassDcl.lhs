@@ -607,10 +607,8 @@ find_bind sel_name meth_name other  = Nothing	-- Default case
 find_prags sel_name meth_name [] = []
 find_prags sel_name meth_name (SpecSig name ty loc : prags) 
      | name == sel_name = SpecSig meth_name ty loc : find_prags sel_name meth_name prags
-find_prags sel_name meth_name (InlineSig name phase loc : prags)
-   | name == sel_name = InlineSig meth_name phase loc : find_prags sel_name meth_name prags
-find_prags sel_name meth_name (NoInlineSig name phase loc : prags)
-   | name == sel_name = NoInlineSig meth_name phase loc : find_prags sel_name meth_name prags
+find_prags sel_name meth_name (InlineSig sense name phase loc : prags)
+   | name == sel_name = InlineSig sense meth_name phase loc : find_prags sel_name meth_name prags
 find_prags sel_name meth_name (prag:prags) = find_prags sel_name meth_name prags
 \end{code}
 

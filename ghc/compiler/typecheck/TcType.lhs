@@ -89,7 +89,7 @@ module TcType (
   isPrimitiveType,
 
   tidyTopType, tidyType, tidyPred, tidyTypes, tidyFreeTyVars, tidyOpenType, tidyOpenTypes,
-  tidyTyVar, tidyTyVars,
+  tidyTyVarBndr, tidyOpenTyVar, tidyOpenTyVars,
   typeKind, eqKind, eqUsage,
 
   tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta
@@ -115,7 +115,7 @@ import Type		(	-- Re-exports
 			  isUnLiftedType, isUnboxedTupleType, isPrimitiveType,
 			  splitNewType_maybe, splitTyConApp_maybe,
 			  tidyTopType, tidyType, tidyPred, tidyTypes, tidyFreeTyVars, tidyOpenType, tidyOpenTypes,
-			  tidyTyVar, tidyTyVars, eqKind, eqUsage,
+			  tidyTyVarBndr, tidyOpenTyVar, tidyOpenTyVars, eqKind, eqUsage,
 			  hasMoreBoxityInfo, liftedBoxity, superBoxity, typeKind, superKind
 			)
 import TyCon		( TyCon, isUnLiftedTyCon )
@@ -130,13 +130,12 @@ import CmdLineOpts	( DynFlags, DynFlag( Opt_GlasgowExts ), dopt )
 import Name		( Name, NamedThing(..), mkLocalName )
 import OccName		( OccName, mkDictOcc )
 import NameSet
-import PrelNames	-- Lots (e.g. in isFFIArgumentTy
+import PrelNames	-- Lots (e.g. in isFFIArgumentTy)
 import TysWiredIn	( ptrTyCon, funPtrTyCon, addrTyCon, unitTyCon )
 import Unique		( Unique, Uniquable(..) )
 import SrcLoc		( SrcLoc )
 import Util		( cmpList, thenCmp )
 import Maybes		( maybeToBool, expectJust )
-import BasicTypes	( Boxity(..) )
 import Outputable
 \end{code}
 

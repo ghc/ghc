@@ -49,25 +49,25 @@ tcIfaceRules pkg_rule_base mod decls
 
 tcIfaceRule :: RenamedRuleDecl -> TcM TypecheckedRuleDecl
   -- No zonking necessary!
-tcIfaceRule rule@(IfaceRule name vars fun args rhs src_loc)
+tcIfaceRule (IfaceRule name act vars fun args rhs src_loc)
   = tcAddSrcLoc src_loc 		$
     tcAddErrCtxt (ruleCtxt name)	$
     tcVar fun				`thenTc` \ fun' ->
     tcCoreLamBndrs vars			$ \ vars' ->
     mapTc tcCoreExpr args		`thenTc` \ args' ->
     tcCoreExpr rhs			`thenTc` \ rhs' ->
-    let
-	new_rule :: TypecheckedRuleDecl
-	new_rule = IfaceRuleOut fun' (Rule name vars' args' rhs')
-    in
-    returnTc new_rule
+    returnTc (IfaceRuleOut fun' (Rule name act vars' args' rhs'))
+
+tcIfaceRule (IfaceRuleOut fun rule)	-- Built-in rules come this way
+  = tcVar fun				`thenTc` \ fun' ->
+    returnTc (IfaceRuleOut fun' rule)   
 
 tcSourceRules :: [RenamedRuleDecl] -> TcM (LIE, [TypecheckedRuleDecl])
 tcSourceRules decls
   = mapAndUnzipTc tcSourceRule decls	`thenTc` \ (lies, decls') ->
     returnTc (plusLIEs lies, decls')
 
-tcSourceRule (HsRule name sig_tvs vars lhs rhs src_loc)
+tcSourceRule (HsRule name act sig_tvs vars lhs rhs src_loc)
   = tcAddSrcLoc src_loc 				$
     tcAddErrCtxt (ruleCtxt name)			$
     newTyVarTy openTypeKind				`thenNF_Tc` \ rule_ty ->
@@ -125,7 +125,7 @@ tcSourceRule (HsRule name sig_tvs vars lhs rhs src_loc)
 			 forall_tvs
 			 lhs_dicts rhs_lie	`thenTc` \ (forall_tvs1, lie', rhs_binds) ->
 
-    returnTc (lie', HsRule	name forall_tvs1
+    returnTc (lie', HsRule	name act forall_tvs1
 				(map RuleBndr tpl_ids)	-- yuk
 				(mkHsLet lhs_binds lhs')
 				(mkHsLet rhs_binds rhs')

@@ -435,7 +435,6 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
 	   `setArityInfo`	  arity
 	   `setUnfoldingInfo`     mkTopUnfolding rhs_w_str
 	   `setNewStrictnessInfo` Just strict_sig
-	-- Unfolding and strictness added by dmdAnalTopId
 
 	-- Allocate Ids.  We do it a funny way round because field_dict_tys is
 	-- almost always empty.  Also note that we use length_tycon_theta
@@ -902,8 +901,6 @@ pcMiscPrelId key mod str ty info
 pc_bottoming_Id key mod name ty
  = pcMiscPrelId key mod name ty bottoming_info
  where
-    
-    arity	   = 1
     strict_sig	   = mkStrictSig (mkTopDmdType [evalDmd] BotRes)
     bottoming_info = noCafNoTyGenIdInfo `setNewStrictnessInfo` Just strict_sig
 	-- these "bottom" out, no matter what their arguments

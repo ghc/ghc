@@ -9,7 +9,7 @@ module Specialise ( specProgram ) where
 #include "HsVersions.h"
 
 import CmdLineOpts	( DynFlags, DynFlag(..) )
-import Id		( Id, idName, idType, mkUserLocal, idSpecialisation )
+import Id		( Id, idName, idType, mkUserLocal, idSpecialisation, isDataConWrapId )
 import TcType		( Type, mkTyVarTy, tcSplitSigmaTy, 
 			  tyVarsOfTypes, tyVarsOfTheta, 
 			  mkForAllTys, tcCmpType
@@ -24,7 +24,6 @@ import VarSet
 import VarEnv
 import CoreSyn
 import CoreUtils	( applyTypeToArgs )
-import CoreUnfold	( certainlyWillInline )
 import CoreFVs		( exprFreeVars, exprsFreeVars )
 import CoreLint		( showPass, endPass )
 import PprCore		( pprCoreRules )
@@ -38,6 +37,7 @@ import Name		( nameOccName, mkSpecOcc, getSrcLoc )
 import FiniteMap
 import Maybes		( catMaybes, maybeToBool )
 import ErrUtils		( dumpIfSet_dyn )
+import BasicTypes	( Activation( AlwaysActive ) )
 import Bag
 import List		( partition )
 import Util		( zipEqual, zipWithEqual, cmpList )
@@ -788,7 +788,14 @@ specDefn subst calls (fn, rhs)
   |  n_tyvars == length rhs_tyvars	-- Rhs of fn's defn has right number of big lambdas
   && n_dicts  <= length rhs_bndrs	-- and enough dict args
   && not (null calls_for_me)		-- And there are some calls to specialise
-  && not (certainlyWillInline fn)	-- And it's not small
+  && not (isDataConWrapId fn)		-- And it's not a data con wrapper, which have
+					-- stupid overloading that simply discard the dictionary
+
+-- At one time I tried not specialising small functions
+-- but sometimes there are big functions marked INLINE
+-- that we'd like to specialise.  In particular, dictionary
+-- functions, which Marcin is keen to inline
+--  && not (certainlyWillInline fn)	-- And it's not small
 					-- If it's small, it's better just to inline
 					-- it than to construct lots of specialisations
   =   -- Specialise the body of the function
@@ -820,7 +827,11 @@ specDefn subst calls (fn, rhs)
     n_tyvars	       = length tyvars
     n_dicts	       = length theta
 
-    (rhs_tyvars, rhs_ids, rhs_body) = collectTyAndValBinders rhs
+	-- It's important that we "see past" any INLINE pragma
+	-- else we'll fail to specialise an INLINE thing
+    (inline_me, rhs') 		    = dropInline rhs
+    (rhs_tyvars, rhs_ids, rhs_body) = collectTyAndValBinders rhs'
+
     rhs_dicts = take n_dicts rhs_ids
     rhs_bndrs = rhs_tyvars ++ rhs_dicts
     body      = mkLams (drop n_dicts rhs_ids) rhs_body
@@ -878,14 +889,22 @@ specDefn subst calls (fn, rhs)
 		-- The rule to put in the function's specialisation is:
 		--	forall b,d, d1',d2'.  f t1 b t3 d d1' d2' = f1 b d  
            spec_env_rule = Rule (_PK_ ("SPEC " ++ showSDoc (ppr fn)))
+				AlwaysActive
 			        (poly_tyvars ++ rhs_dicts')
 				inst_args 
 				(mkTyApps (Var spec_f) (map mkTyVarTy poly_tyvars))
 
 		-- Add the { d1' = dx1; d2' = dx2 } usage stuff
 	   final_uds = foldr addDictBind rhs_uds (my_zipEqual "spec_call" rhs_dicts' call_ds)
+
+	-- NOTE: we don't add back in any INLINE pragma on the RHS, so even if
+	-- the original function said INLINE, the specialised copies won't.
+	-- The idea is that the point of inlining was precisely to specialise
+	-- the function at its call site, and that's not so important for the
+	-- specialised copies.   But it still smells like an ad hoc decision.
+
 	in
-        returnSM ((spec_f, spec_rhs),
+        returnSM ((spec_f, spec_rhs),	
 	          final_uds,
 		  spec_env_rule)
 
@@ -893,6 +912,10 @@ specDefn subst calls (fn, rhs)
 	my_zipEqual doc xs ys 
 	 | length xs /= length ys = pprPanic "my_zipEqual" (ppr xs $$ ppr ys $$ (ppr fn <+> ppr call_ts) $$ ppr rhs)
 	 | otherwise		  = zipEqual doc xs ys
+
+dropInline :: CoreExpr -> (Bool, CoreExpr) 
+dropInline (Note InlineMe rhs) = (True, rhs)
+dropInline rhs		       = (False, rhs)
 \end{code}
 
 %************************************************************************
@@ -983,7 +1006,7 @@ mkCallUDs subst f args
   | null theta
   || length spec_tys /= n_tyvars
   || length dicts    /= n_dicts
-  || maybeToBool (lookupRule (substInScope subst) f args)
+  || maybeToBool (lookupRule (\act -> True) (substInScope subst) f args)
 	-- There's already a rule covering this call.  A typical case
 	-- is where there's an explicit user-provided rule.  Then
 	-- we don't want to create a specialised version 

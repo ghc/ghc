@@ -27,7 +27,7 @@ import Var		( isTyVar )
 import IdInfo		( IdInfo, megaSeqIdInfo, 
 			  arityInfo, ppArityInfo, 
 			  specInfo, cprInfo, ppCprInfo, 
-			  strictnessInfo, ppStrictnessInfo, cgInfo,
+			  strictnessInfo, ppStrictnessInfo, 
 			  cprInfo, ppCprInfo, 
 			  workerInfo, ppWorkerInfo,
                           tyGenInfo, ppTyGenInfo,
@@ -348,7 +348,6 @@ ppIdInfo b info
 	    ppWorkerInfo (workerInfo info),
 	    ppStrictnessInfo s,
 	    ppr (newStrictnessInfo info),
---	    pprCgInfo c,
             ppCprInfo m,
 	    pprCoreRules b p
 	-- Inline pragma, occ, demand, lbvar info
@@ -359,7 +358,6 @@ ppIdInfo b info
     a = arityInfo info
     g = tyGenInfo info
     s = strictnessInfo info
---  c = cgInfo info
     m = cprInfo info
     p = specInfo info
 \end{code}
@@ -376,8 +374,8 @@ pprCoreRule :: SDoc -> CoreRule -> SDoc
 pprCoreRule pp_fn (BuiltinRule name _)
   = ifPprDebug (ptext SLIT("Built in rule") <+> doubleQuotes (ptext name))
 
-pprCoreRule pp_fn (Rule name tpl_vars tpl_args rhs)
-  = doubleQuotes (ptext name) <+> 
+pprCoreRule pp_fn (Rule name act tpl_vars tpl_args rhs)
+  = doubleQuotes (ptext name) <+> ppr act <+>
     sep [
 	  ptext SLIT("__forall") <+> braces (sep (map pprTypedBinder tpl_vars)),
 	  nest 2 (pp_fn <+> sep (map pprArg tpl_args)),

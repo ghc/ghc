@@ -33,7 +33,7 @@ import HsTypes		( HsType, pprParendHsType, pprHsTyVarBndr, toHsType,
 -- others:
 import Id		( idArity, idType, isDataConId_maybe, isFCallId_maybe )
 import Var		( varType, isId )
-import IdInfo		( InlinePragInfo, pprInlinePragInfo )
+import IdInfo		( InlinePragInfo )
 import Name		( Name, NamedThing(..), getName, toRdrName )
 import RdrName		( RdrName, rdrNameOcc )
 import OccName		( isTvOcc )
@@ -388,7 +388,7 @@ data HsIdInfo name
 -- NB: Specialisations and rules come in separately and are
 -- only later attached to the Id.  Partial reason: some are orphans.
 
-ppr_hs_info (HsUnfold prag unf) = ptext SLIT("__U") <> pprInlinePragInfo prag <+> parens (pprUfExpr noParens unf)
+ppr_hs_info (HsUnfold prag unf) = ptext SLIT("__U") <> ppr prag <+> parens (pprUfExpr noParens unf)
 ppr_hs_info (HsArity arity)     = ptext SLIT("__A") <+> int arity
 ppr_hs_info (HsStrictness str)  = ptext SLIT("__S") <+> pprIfaceStrictSig str
 ppr_hs_info HsNoCafRefs		= ptext SLIT("__C")

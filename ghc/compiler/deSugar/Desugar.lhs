@@ -162,11 +162,11 @@ ppr_ds_rules rules
 
 \begin{code}
 dsRule :: IdSet -> TypecheckedRuleDecl -> DsM (Id, CoreRule)
-dsRule in_scope (HsRule name sig_tvs vars lhs rhs loc)
+dsRule in_scope (HsRule name act sig_tvs vars lhs rhs loc)
   = putSrcLocDs loc		$
     ds_lhs all_vars lhs		`thenDs` \ (fn, args) ->
     dsExpr rhs			`thenDs` \ core_rhs ->
-    returnDs (fn, Rule name tpl_vars args core_rhs)
+    returnDs (fn, Rule name act tpl_vars args core_rhs)
   where
     tpl_vars = sig_tvs ++ [var | RuleBndr var <- vars]
     all_vars = mkInScopeSet (in_scope `unionVarSet` mkVarSet tpl_vars)

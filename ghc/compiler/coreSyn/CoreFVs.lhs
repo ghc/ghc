@@ -161,7 +161,7 @@ make the whole module an orphan module, which is bad.
 \begin{code}
 ruleLhsFreeNames :: IdCoreRule -> NameSet
 ruleLhsFreeNames (fn, BuiltinRule _ _) = unitNameSet (varName fn)
-ruleLhsFreeNames (fn, Rule _ tpl_vars tpl_args rhs)
+ruleLhsFreeNames (fn, Rule _ _ tpl_vars tpl_args rhs)
   = addOneToNameSet (exprsFreeNames tpl_args `del_binders` tpl_vars) (varName fn)
 
 exprFreeNames :: CoreExpr -> NameSet
@@ -202,14 +202,14 @@ del_binders names bndrs = foldl (\s b -> delFromNameSet s (varName b)) names bnd
 \begin{code}
 ruleRhsFreeVars :: CoreRule -> VarSet
 ruleRhsFreeVars (BuiltinRule _ _) = noFVs
-ruleRhsFreeVars (Rule str tpl_vars tpl_args rhs)
+ruleRhsFreeVars (Rule str _ tpl_vars tpl_args rhs)
   = rule_fvs isLocalVar emptyVarSet
   where
     rule_fvs = addBndrs tpl_vars (expr_fvs rhs)
 
 ruleSomeFreeVars :: InterestingVarFun -> CoreRule -> VarSet
 ruleSomeFreeVars interesting (BuiltinRule _ _) = noFVs
-ruleSomeFreeVars interesting (Rule _ tpl_vars tpl_args rhs)
+ruleSomeFreeVars interesting (Rule _ _ tpl_vars tpl_args rhs)
   = rule_fvs interesting emptyVarSet
   where
     rule_fvs = addBndrs tpl_vars $
@@ -219,7 +219,7 @@ ruleLhsFreeIds :: CoreRule -> VarSet
 -- This finds all the free Ids on the LHS of the rule
 -- *including* imported ids
 ruleLhsFreeIds (BuiltinRule _ _) = noFVs
-ruleLhsFreeIds (Rule _ tpl_vars tpl_args rhs)
+ruleLhsFreeIds (Rule _ _ tpl_vars tpl_args rhs)
   = foldl delVarSet (exprsSomeFreeVars isId tpl_args) tpl_vars
 \end{code}
 

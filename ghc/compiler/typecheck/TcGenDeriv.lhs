@@ -392,26 +392,6 @@ gen_Ord_binds tycon
 								-- inexhaustive patterns
 		    | otherwise		= eqTag_Expr		-- Some nullary constructors;
 								-- Tags are equal, no args => return EQ
-    --------------------------------------------------------------------
-
-{- Not necessary: the default decls in PrelBase handle these 
-
-defaulted = foldr1 AndMonoBinds [lt, le, ge, gt, max_, min_]
-
-lt = mk_easy_FunMonoBind generatedSrcLoc lt_RDR [a_Pat, b_Pat] [] (
-	    compare_Case true_Expr  false_Expr false_Expr a_Expr b_Expr)
-le = mk_easy_FunMonoBind generatedSrcLoc le_RDR [a_Pat, b_Pat] [] (
-	    compare_Case true_Expr  true_Expr  false_Expr a_Expr b_Expr)
-ge = mk_easy_FunMonoBind generatedSrcLoc ge_RDR [a_Pat, b_Pat] [] (
-	    compare_Case false_Expr true_Expr  true_Expr  a_Expr b_Expr)
-gt = mk_easy_FunMonoBind generatedSrcLoc gt_RDR [a_Pat, b_Pat] [] (
-	    compare_Case false_Expr false_Expr true_Expr  a_Expr b_Expr)
-
-max_ = mk_easy_FunMonoBind generatedSrcLoc max_RDR [a_Pat, b_Pat] [] (
-	    compare_Case b_Expr a_Expr a_Expr a_Expr b_Expr)
-min_ = mk_easy_FunMonoBind generatedSrcLoc min_RDR [a_Pat, b_Pat] [] (
-	    compare_Case a_Expr b_Expr b_Expr a_Expr b_Expr)
--}
 \end{code}
 
 %************************************************************************
@@ -1067,12 +1047,6 @@ isLRAssoc get_fixity nm =
        Fixity _ InfixN -> (False, False)
        Fixity _ InfixR -> (False, True)
        Fixity _ InfixL -> (True,  False)
-
-isInfixOccName :: String -> Bool
-isInfixOccName str = 
-   case str of
-     (':':_) -> True
-     _       -> False
 \end{code}
 
 
@@ -1195,10 +1169,6 @@ mk_easy_App f xs = foldl HsApp (HsVar f) (map HsVar xs)
 ToDo: Better SrcLocs.
 
 \begin{code}
-compare_Case ::
-	  RdrNameHsExpr -> RdrNameHsExpr -> RdrNameHsExpr
-	  -> RdrNameHsExpr -> RdrNameHsExpr
-	  -> RdrNameHsExpr
 compare_gen_Case ::
 	  RdrName
 	  -> RdrNameHsExpr -> RdrNameHsExpr -> RdrNameHsExpr
@@ -1210,7 +1180,6 @@ careful_compare_Case :: -- checks for primitive types...
 	  -> RdrNameHsExpr -> RdrNameHsExpr
 	  -> RdrNameHsExpr
 
-compare_Case = compare_gen_Case compare_RDR
 cmp_eq_Expr a b = HsApp (HsApp (HsVar cmp_eq_RDR) a) b
 	-- Was: compare_gen_Case cmp_eq_RDR
 

@@ -43,7 +43,7 @@ import TcType		( Type, Kind, SourceType(..), ThetaType,
 			  mkAppTys, mkRhoTy,
 			  liftedTypeKind, unliftedTypeKind, mkArrowKind,
 			  mkArrowKinds, tcGetTyVar_maybe, tcGetTyVar, tcSplitFunTy_maybe,
-		  	  tidyOpenType, tidyOpenTypes, tidyTyVar, tidyTyVars,
+		  	  tidyOpenType, tidyOpenTypes, tidyOpenTyVar, tidyOpenTyVars,
 			  tyVarsOfType, mkForAllTys
 			)
 import Inst		( Inst, InstOrigin(..), newMethodWithGivenTy, instToId )
@@ -61,7 +61,7 @@ import Name		( Name )
 import TysWiredIn	( mkListTy, mkTupleTy, genUnitTyCon )
 import BasicTypes	( Boxity(..) )
 import SrcLoc		( SrcLoc )
-import Util		( mapAccumL, isSingleton )
+import Util		( isSingleton )
 import Outputable
 
 \end{code}
@@ -696,8 +696,8 @@ checkSigTyVars sig_tyvars free_tyvars
 
         failWithTcM (env3, main_msg $$ nest 4 (vcat msgs))
       where
-	(env1, tidy_tvs) = mapAccumL tidyTyVar emptyTidyEnv sig_tyvars
-	(env2, tidy_tys) = tidyOpenTypes env1 sig_tys
+	(env1, tidy_tvs) = tidyOpenTyVars emptyTidyEnv sig_tyvars
+	(env2, tidy_tys) = tidyOpenTypes  env1	       sig_tys
 
 	main_msg = ptext SLIT("Inferred type is less polymorphic than expected")
 
@@ -770,7 +770,7 @@ find_frees tv tidy_env acc (ftv:ftvs)
   = zonkTcTyVar ftv	`thenNF_Tc` \ ty ->
     if tv `elemVarSet` tyVarsOfType ty then
 	let
-	    (tidy_env', ftv') = tidyTyVar tidy_env ftv
+	    (tidy_env', ftv') = tidyOpenTyVar tidy_env ftv
 	in
 	find_frees tv tidy_env' (ftv':acc) ftvs
     else
@@ -814,7 +814,7 @@ sigCtxt :: Message -> [TcTyVar] -> TcThetaType -> TcTauType
 sigCtxt when sig_tyvars sig_theta sig_tau tidy_env
   = zonkTcType sig_tau		`thenNF_Tc` \ actual_tau ->
     let
-	(env1, tidy_sig_tyvars)  = tidyTyVars tidy_env sig_tyvars
+	(env1, tidy_sig_tyvars)  = tidyOpenTyVars tidy_env sig_tyvars
 	(env2, tidy_sig_rho)	 = tidyOpenType env1 (mkRhoTy sig_theta sig_tau)
 	(env3, tidy_actual_tau)  = tidyOpenType env2 actual_tau
 	msg = vcat [ptext SLIT("Signature type:    ") <+> pprType (mkForAllTys tidy_sig_tyvars tidy_sig_rho),

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.57 2001/09/14 15:51:42 simonpj Exp $
+-- $Id: DriverState.hs,v 1.58 2001/09/26 15:12:34 simonpj Exp $
 --
 -- Settings for the driver
 --
@@ -193,30 +193,30 @@ buildCoreToDo = do
 
    if opt_level == 0 then return
       [
-	CoreDoSimplify (isAmongSimpl [
+	CoreDoSimplify (SimplPhase 0) [
 	    MaxSimplifierIterations max_iter
-	])
+	]
       ]
 
     else {- opt_level >= 1 -} return [ 
 
 	-- initial simplify: mk specialiser happy: minimum effort please
-	CoreDoSimplify (isAmongSimpl [
-	    SimplInlinePhase 0,
+	CoreDoSimplify SimplGently [
+			-- 	Simplify "gently"
 			-- Don't inline anything till full laziness has bitten
 			-- In particular, inlining wrappers inhibits floating
 			-- e.g. ...(case f x of ...)...
 			--  ==> ...(case (case x of I# x# -> fw x#) of ...)...
 			--  ==> ...(case x of I# x# -> case fw x# of ...)...
 			-- and now the redex (f x) isn't floatable any more
-	    DontApplyRules,
 			-- Similarly, don't apply any rules until after full 
 			-- laziness.  Notably, list fusion can prevent floating.
+
             NoCaseOfCase,
 			-- Don't do case-of-case transformations.
 			-- This makes full laziness work better
 	    MaxSimplifierIterations max_iter
-	]),
+	],
 
 	-- Specialisation is best done before full laziness
 	-- so that overloaded functions have all their dictionary lambdas manifest
@@ -225,33 +225,33 @@ buildCoreToDo = do
 	CoreDoFloatOutwards False{-not full-},
 	CoreDoFloatInwards,
 
-	CoreDoSimplify (isAmongSimpl [
-	   SimplInlinePhase 1,
-		-- Want to run with inline phase 1 after the specialiser to give
+	CoreDoSimplify (SimplPhase 2) [
+		-- Want to run with inline phase 2 after the specialiser to give
 		-- maximum chance for fusion to work before we inline build/augment
-		-- in phase 2.  This made a difference in 'ansi' where an 
+		-- in phase 1.  This made a difference in 'ansi' where an 
 		-- overloaded function wasn't inlined till too late.
 	   MaxSimplifierIterations max_iter
-	]),
+	],
+	case rule_check of { Just pat -> CoreDoRuleCheck 2 pat; Nothing -> CoreDoNothing },
 
 	-- infer usage information here in case we need it later.
         -- (add more of these where you need them --KSW 1999-04)
         if usageSP then CoreDoUSPInf else CoreDoNothing,
 
-	CoreDoSimplify (isAmongSimpl [
+	CoreDoSimplify (SimplPhase 1) [
 		-- Need inline-phase2 here so that build/augment get 
 		-- inlined.  I found that spectral/hartel/genfft lost some useful
 		-- strictness in the function sumcode' if augment is not inlined
 		-- before strictness analysis runs
-	   SimplInlinePhase 2,
 	   MaxSimplifierIterations max_iter
-	]),
+	],
+	case rule_check of { Just pat -> CoreDoRuleCheck 1 pat; Nothing -> CoreDoNothing },
 
-	CoreDoSimplify (isAmongSimpl [
-	   MaxSimplifierIterations 3
-		-- No -finline-phase: allow all Ids to be inlined now
+	CoreDoSimplify (SimplPhase 0) [
+		-- Phase 0: allow all Ids to be inlined now
 		-- This gets foldr inlined before strictness analysis
-		--
+
+	   MaxSimplifierIterations 3
 		-- At least 3 iterations because otherwise we land up with
 		-- huge dead expressions because of an infelicity in the 
 		-- simpifier.   
@@ -259,17 +259,18 @@ buildCoreToDo = do
 		-- ==>  let k = BIG in letrec go = \xs -> ...(k x).... in go xs
 		-- ==>  let k = BIG in letrec go = \xs -> ...(BIG x).... in go xs
 		-- Don't stop now!
-	]),
+
+	],
+	case rule_check of { Just pat -> CoreDoRuleCheck 0 pat; Nothing -> CoreDoNothing },
 
 	if cpr        then CoreDoCPResult   else CoreDoNothing,
 	if strictness then CoreDoStrictness else CoreDoNothing,
 	CoreDoWorkerWrapper,
 	CoreDoGlomBinds,
 
-	CoreDoSimplify (isAmongSimpl [
+	CoreDoSimplify (SimplPhase 0) [
 	   MaxSimplifierIterations max_iter
-		-- No -finline-phase: allow all Ids to be inlined now
-	]),
+	],
 
 	CoreDoFloatOutwards False{-not full-},
 		-- nofib/spectral/hartel/wang doubles in speed if you
@@ -297,6 +298,8 @@ buildCoreToDo = do
 -- Case-liberation for -O2.  This should be after
 -- strictness analysis and the simplification which follows it.
 
+	case rule_check of { Just pat -> CoreDoRuleCheck 0 pat; Nothing -> CoreDoNothing },
+
 	if opt_level >= 2 then
 	   CoreLiberateCase
 	else
@@ -307,12 +310,9 @@ buildCoreToDo = do
 	   CoreDoNothing,
 
 	-- Final clean-up simplification:
-	CoreDoSimplify (isAmongSimpl [
+	CoreDoSimplify (SimplPhase 0) [
 	  MaxSimplifierIterations max_iter
-		-- No -finline-phase: allow all Ids to be inlined now
-	]),
-
-	case rule_check of { Just pat -> CoreDoRuleCheck pat; Nothing -> CoreDoNothing }
+	]
      ]
 
 buildStgToDo :: IO [ StgToDo ]

@@ -36,7 +36,6 @@ module Lex (
 import Char 		( isSpace, toUpper )
 import List             ( isSuffixOf )
 
-import IdInfo		( InlinePragInfo(..) )
 import PrelNames	( mkTupNameStr )
 import CmdLineOpts	( opt_HiVersion, opt_NoHiCheck )
 import ForeignCall	( Safety(..) )
@@ -152,7 +151,7 @@ data Token
   | ITarity 
   | ITspecialise
   | ITnocaf
-  | ITunfold InlinePragInfo
+  | ITunfold
   | ITstrict StrictSig
   | ITrules
   | ITcprinfo
@@ -346,7 +345,7 @@ ghcExtensionKeywordsFM = listToUFM $
 	("__C",			ITnocaf),
 	("__R",			ITrules),
         ("__D",			ITdeprecated),
-        ("__U",			ITunfold NoInlinePragInfo),
+        ("__U",			ITunfold),
 	
         ("__ccall",		ITccall (False, False, PlayRisky)),
         ("__ccall_GC",		ITccall (False, False, PlaySafe)),

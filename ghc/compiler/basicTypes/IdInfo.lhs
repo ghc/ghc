@@ -50,8 +50,7 @@ module IdInfo (
 
 	-- Inline prags
 	InlinePragInfo(..), 
-	inlinePragInfo, setInlinePragInfo, pprInlinePragInfo,
-	isNeverInlinePrag, neverInlinePrag,
+	inlinePragInfo, setInlinePragInfo, 
 
 	-- Occurrence info
 	OccInfo(..), isFragileOcc, isDeadOcc, isLoopBreaker,
@@ -89,7 +88,8 @@ import Var              ( Id )
 import BasicTypes	( OccInfo(..), isFragileOcc, isDeadOcc, seqOccInfo, isLoopBreaker,
 			  InsideLam, insideLam, notInsideLam, 
 			  OneBranch, oneBranch, notOneBranch,
-			  Arity
+			  Arity,
+			  Activation(..)
 			)
 import DataCon		( DataCon )
 import ForeignCall	( ForeignCall )
@@ -331,7 +331,7 @@ vanillaIdInfo
 	    unfoldingInfo	= noUnfolding,
 	    cprInfo		= NoCPRInfo,
 	    lbvarInfo		= NoLBVarInfo,
-	    inlinePragInfo 	= NoInlinePragInfo,
+	    inlinePragInfo 	= AlwaysActive,
 	    occInfo		= NoOccInfo,
 	    newDemandInfo	= topDmd,
 	    newStrictnessInfo   = Nothing
@@ -390,36 +390,13 @@ ppArityInfo (Just arity) = hsep [ptext SLIT("Arity"), int arity]
 %************************************************************************
 
 \begin{code}
-data InlinePragInfo
-  = NoInlinePragInfo
-  | IMustNotBeINLINEd Bool		-- True <=> came from an INLINE prag, False <=> came from a NOINLINE prag
-		      (Maybe Int)	-- Phase number from pragma, if any
-  deriving( Eq )
-	-- The True, Nothing case doesn't need to be recorded
-
-	-- SEE COMMENTS WITH CoreUnfold.blackListed on the
-	-- exact significance of the IMustNotBeINLINEd pragma
-
-isNeverInlinePrag :: InlinePragInfo -> Bool
-isNeverInlinePrag (IMustNotBeINLINEd _ Nothing) = True
-isNeverInlinePrag other			        = False
-
-neverInlinePrag :: InlinePragInfo
-neverInlinePrag = IMustNotBeINLINEd True{-should be False? --SDM -} Nothing
-
-instance Outputable InlinePragInfo where
-  -- This is now parsed in interface files
-  ppr NoInlinePragInfo = empty
-  ppr other_prag       = ptext SLIT("__U") <> pprInlinePragInfo other_prag
-
-pprInlinePragInfo NoInlinePragInfo  		     = empty
-pprInlinePragInfo (IMustNotBeINLINEd True Nothing)   = empty
-pprInlinePragInfo (IMustNotBeINLINEd True (Just n))  = brackets (int n)
-pprInlinePragInfo (IMustNotBeINLINEd False Nothing)  = brackets (char '!')
-pprInlinePragInfo (IMustNotBeINLINEd False (Just n)) = brackets (char '!' <> int n)
-							
-instance Show InlinePragInfo where
-  showsPrec p prag = showsPrecSDoc p (ppr prag)
+type InlinePragInfo = Activation
+	-- Tells when the inlining is active
+	-- When it is active the thing may be inlined, depending on how
+	-- big it is.
+	--
+	-- If there was an INLINE pragma, then as a separate matter, the
+	-- RHS will have been made to look small with a CoreSyn Inline Note
 \end{code}
 
 
