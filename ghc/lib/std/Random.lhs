@@ -38,8 +38,7 @@ import PrelArr		( MutableVar, newVar, readVar, writeVar )
 import PrelReal		( toInt )
 import PrelFloat	( float2Double, double2Float )
 import Time		( getClockTime, ClockTime(..) )
-#endif
-import CPUTime		( getCPUTime )
+#else
 import Prelude
 import privileged Prelude
 			( IORef
@@ -48,9 +47,10 @@ import privileged Prelude
 			, writeIORef
 			, unsafePerformIO
 			)
+#endif
 
-
-import Char ( isSpace, chr, ord )
+import CPUTime		( getCPUTime )
+import Char		( isSpace, chr, ord )
 \end{code}
 
 \begin{code}
