@@ -2411,7 +2411,7 @@ genCCall fn cconv kind args
     -- ToDo:needed (WDP 96/03) ???
     fn__2 = case (_HEAD_ fn) of
 	      '.' -> ImmLit (ptext fn)
-	      _   -> ImmLab (ptext fn)
+	      _   -> ImmLab False (ptext fn)
 
     ------------------------------------
     {-  Try to get a value into a specific register (or registers) for
