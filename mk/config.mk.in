@@ -152,16 +152,26 @@ GhcCompilerWays=
 
 # Extra option flags to pass to the compiler that compiles the compiler
 # (Ones that are essential are wired into ghc/compiler/Makefile)
-# Typical ones:
-#	-H25m		allocate a bigger heap (might speed up compilation)
+# Typical options to use here:
+#
+#	-DDEBUG		include debugging code and assertions (will make the
+#			compiler slower and produce debugging output, but useful
+#			for development)
+#
+#	-dcore-lint	check the types after every pass of the compiler;
+#			a pretty strong internal check of the compiler being
+#			used to compile GHC.  Useful when bootstrapping.
+GhcHcOpts=-Rghc-timing
+
+# Extra Haskell compiler options to use when compiling all Haskell
+# *programs* (not libraries), including GHC itself.
+# Typical options to use here:
+#
+#	-H25m		use a bigger heap (to speed up compilation)
 #
 #	-O		compile an optimised compiler
 #
-#	-DDEBUG		include consistency/assertion checks in the compiled compiler
-#
-#	-dcore-lint	check the types after every pass of the compiler;
-#			a pretty strong internal check
-GhcHcOpts=-O -Rghc-timing
+FptoolsHcOpts=-O
 
 # Build a compiler that will build *unregisterised* libraries and
 # binaries by default.  Unregisterised code is supposed to compile and
@@ -301,9 +311,6 @@ HsLibsFor	= ghc
 
 # hslibs for GHC also uses the following variables (defined above):
 #   GhcLibWays, GhcLibHcOpts, GhcLibToolsHcOpts, DLLized, StripLibraries
-
-# Haskell compiler options for tools in fptools
-FptoolsHcOpts=-O
 
 # Build the Haskell Readline bindings?
 #
