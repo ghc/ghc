@@ -823,7 +823,7 @@ objectTyConKey				= mkPreludeTyConUnique 83
 eitherTyConKey				= mkPreludeTyConUnique 84
 
 ---------------- Template Haskell -------------------
---	USES TyConUniques 100-119
+--	USES TyConUniques 100-129
 -----------------------------------------------------
 
 unitTyConKey = mkTupleTyConUnique Boxed 0

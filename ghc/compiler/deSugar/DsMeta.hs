@@ -582,12 +582,12 @@ repGuards other
                 g <- repPatGE (nonEmptyCoreList ss')
                 return (gs, g)
 
-repFields :: [(Located Name, LHsExpr Name)] -> DsM (Core [TH.FieldExp])
+repFields :: [(Located Name, LHsExpr Name)] -> DsM (Core [TH.Q TH.FieldExp])
 repFields flds = do
         fnames <- mapM lookupLOcc (map fst flds)
         es <- mapM repLE (map snd flds)
-        fs <- zipWithM (\n x -> rep2 fieldExpName [unC n, unC x]) fnames es
-        coreList fieldExpTyConName fs
+        fs <- zipWithM repFieldExp fnames es
+        coreList fieldExpQTyConName fs
 
 
 -----------------------------------------------------------------------------
@@ -1044,11 +1044,14 @@ repListExp (MkC es) = rep2 listEName [es]
 repSigExp :: Core TH.ExpQ -> Core TH.TypeQ -> DsM (Core TH.ExpQ)
 repSigExp (MkC e) (MkC t) = rep2 sigEName [e,t]
 
-repRecCon :: Core TH.Name -> Core [TH.FieldExp]-> DsM (Core TH.ExpQ)
-repRecCon (MkC c) (MkC fs) = rep2 recCName [c,fs]
+repRecCon :: Core TH.Name -> Core [TH.Q TH.FieldExp]-> DsM (Core TH.ExpQ)
+repRecCon (MkC c) (MkC fs) = rep2 recConEName [c,fs]
 
-repRecUpd :: Core TH.ExpQ -> Core [TH.FieldExp] -> DsM (Core TH.ExpQ)
+repRecUpd :: Core TH.ExpQ -> Core [TH.Q TH.FieldExp] -> DsM (Core TH.ExpQ)
 repRecUpd (MkC e) (MkC fs) = rep2 recUpdEName [e,fs]
+
+repFieldExp :: Core TH.Name -> Core TH.ExpQ -> DsM (Core (TH.Q TH.FieldExp))
+repFieldExp (MkC n) (MkC x) = rep2 fieldExpName [n,x]
 
 repInfixApp :: Core TH.ExpQ -> Core TH.ExpQ -> Core TH.ExpQ -> DsM (Core TH.ExpQ)
 repInfixApp (MkC x) (MkC y) (MkC z) = rep2 infixAppName [x,y,z]
@@ -1348,7 +1351,7 @@ templateHaskellNames = [
     decQTyConName, conQTyConName, strictTypeQTyConName,
     varStrictTypeQTyConName, typeQTyConName, expTyConName, decTyConName,
     typeTyConName, matchTyConName, clauseTyConName, patQTyConName,
-    fieldPatQTyConName]
+    fieldPatQTyConName, fieldExpQTyConName]
 
 tH_SYN_Name = mkModuleName "Language.Haskell.TH.Syntax"
 tH_LIB_Name = mkModuleName "Language.Haskell.TH.Lib"
@@ -1523,10 +1526,11 @@ conQTyConName           = libTc FSLIT("ConQ")          conQTyConKey
 strictTypeQTyConName    = libTc FSLIT("StrictTypeQ")    strictTypeQTyConKey
 varStrictTypeQTyConName = libTc FSLIT("VarStrictTypeQ") varStrictTypeQTyConKey
 typeQTyConName          = libTc FSLIT("TypeQ")          typeQTyConKey
+fieldExpQTyConName      = libTc FSLIT("FieldExpQ")      fieldExpQTyConKey
 patQTyConName           = libTc FSLIT("PatQ")           patQTyConKey
 fieldPatQTyConName      = libTc FSLIT("FieldPatQ")      fieldPatQTyConKey
 
---	TyConUniques available: 100-119
+--	TyConUniques available: 100-129
 -- 	Check in PrelNames if you want to change this
 
 expTyConKey             = mkPreludeTyConUnique 100
@@ -1550,6 +1554,7 @@ fieldPatTyConKey        = mkPreludeTyConUnique 117
 nameTyConKey            = mkPreludeTyConUnique 118
 patQTyConKey            = mkPreludeTyConUnique 119
 fieldPatQTyConKey       = mkPreludeTyConUnique 120
+fieldExpQTyConKey       = mkPreludeTyConUnique 121
 
 -- 	IdUniques available: 200-399
 -- 	If you want to change this, make sure you check in PrelNames
