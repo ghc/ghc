@@ -8,7 +8,7 @@ import ST
 import ST
 import MutableArray
 import ByteArray
-import Int( Num(fromInt) )
+import Int( fromInt )
 	
 import Ratio
 import Array

@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.17 2001/02/28 10:45:40 rrt Exp $
+# $Id: Makefile,v 1.18 2001/03/28 14:26:34 simonmar Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
@@ -33,6 +33,9 @@ cg016_RUNTEST_OPTS = -x 1	# should override the -x 0 above.
 cg021_RUNTEST_OPTS = +RTS -K2m
 cg025_RUNTEST_OPTS = -x 1 cg025.hs
 cg045_RUNTEST_OPTS = -x 1
+
+# tmp, until we fix the problems with seq#...
+cg045_HC_OPTS = -O
 
 # mkdependHS doesn't understand OPTIONS pragmas...
 SRC_MKDEPENDHS_OPTS += -fglasgow-exts
