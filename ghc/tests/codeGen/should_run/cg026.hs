@@ -55,7 +55,7 @@ test_ints
 	  fill_in arr# 0# (size# -# 1#) >>
 
 	    -- freeze the puppy:
-	  freezeIntArray arr#
+	  freezeByteArray arr#
 	)
 
     fill_in :: MutableByteArray s Int -> Int# -> Int# -> ST s ()
@@ -92,7 +92,7 @@ test_addrs
 	  fill_in arr# 0# (size# -# 1#) >>
 
 	    -- freeze the puppy:
-	  freezeAddrArray arr#
+	  freezeByteArray arr#
 	)
 
     fill_in :: MutableByteArray s Int -> Int# -> Int# -> ST s ()
@@ -133,7 +133,7 @@ test_floats
 	  fill_in arr# 0# (size# -# 1#) >>
 
 	    -- freeze the puppy:
-	  freezeFloatArray arr#
+	  freezeByteArray arr#
 	)
 
     fill_in :: MutableByteArray s Int -> Int# -> Int# -> ST s ()
@@ -174,7 +174,7 @@ test_doubles
 	  fill_in arr# 0# (size# -# 1#) >>
 
 	    -- freeze the puppy:
-	  freezeDoubleArray arr#
+	  freezeByteArray arr#
 	)
 
     fill_in :: MutableByteArray s Int -> Int# -> Int# -> ST s ()
