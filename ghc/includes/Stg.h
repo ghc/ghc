@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.31 2000/05/26 10:14:33 sewardj Exp $
+ * $Id: Stg.h,v 1.32 2000/05/27 14:28:06 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -183,7 +183,7 @@ void _stgAssert (char *, unsigned int);
 DLL_IMPORT_RTS extern char **prog_argv;	/* so we can get at these from Haskell */
 DLL_IMPORT_RTS extern int    prog_argc;
 
-extern char **envyron;
+extern char **environ;
 
 extern void stackOverflow(void);
 
