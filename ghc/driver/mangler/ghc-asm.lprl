@@ -843,6 +843,7 @@ sub mangle_asm {
 
     	# toss all calls to __DISCARD__
 	$c =~ s/^\t(call|jbsr|jal)\s+${T_US}__DISCARD__\n//go;
+	$c =~ s/^\tjsr\s+\$26\s*,\s*${T_US}__DISCARD__\n//go if $TargetPlatform =~ /^alpha-/;
 	$c =~ s/^\tbl\s+L___DISCARD__\$stub\n//go if $TargetPlatform =~ /^powerpc-apple-.*/;
 
 	# IA64: mangle tailcalls into jumps here

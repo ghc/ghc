@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TailCalls.h,v 1.10 2002/06/03 13:08:41 matthewc Exp $
+ * $Id: TailCalls.h,v 1.11 2002/08/21 22:06:03 ken Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -85,9 +85,10 @@ extern void __DISCARD__(void);
 
 register void *_procedure __asm__("$27");
 
-#define JMP_(cont)	    	    	    	\
-    do { _procedure = (void *)(cont);    	\
-         goto *_procedure;    	    	    	\
+#define JMP_(cont)				\
+    do { _procedure = (void *)(cont);		\
+         __DISCARD__();				\
+         goto *_procedure;			\
        } while(0)
 
 /* Don't need these for alpha mangling */
