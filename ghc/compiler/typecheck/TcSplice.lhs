@@ -349,10 +349,10 @@ Two successive brackets aren't allowed
 showSplice :: String -> TypecheckedHsExpr -> SDoc -> TcM ()
 showSplice what before after
   = getSrcLocM		`thenM` \ loc ->
-    traceSplice (hang (ppr loc <> colon <+> text "Splicing" <+> text what) 4
-		      (sep [nest 2 (ppr before),
-			    text "======>",
-			    nest 2 after]))
+    traceSplice (vcat [ppr loc <> colon <+> text "Splicing" <+> text what, 
+		       nest 2 (sep [nest 2 (ppr before),
+				    text "======>",
+				    nest 2 after])])
 
 illegalSplice level
   = ptext SLIT("Illegal splice at level") <+> ppr level

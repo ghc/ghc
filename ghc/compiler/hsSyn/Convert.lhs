@@ -107,7 +107,7 @@ cvt (Infix (Just x) s (Just y)) = OpApp (cvt x) (HsVar(vName s)) undefined (cvt 
 cvt (Infix Nothing  s (Just y)) = SectionR (HsVar(vName s)) (cvt y)
 cvt (Infix (Just x) s Nothing ) = SectionL (cvt x) (HsVar(vName s))
 cvt (Infix Nothing  s Nothing ) = HsVar(vName s) -- Can I indicate this is an infix thing?
-
+cvt (SigExp e t)		= ExprWithTySig (cvt e) (cvtType t)
 
 cvtdecs :: [Meta.Dec] -> HsBinds RdrName
 cvtdecs [] = EmptyBinds

@@ -42,7 +42,7 @@ import HsSyn  	  ( Pat(..), HsExpr(..), Stmt(..), HsLit(..), HsOverLit(..),
 		    toHsType
 		  )
 
-import PrelNames  ( mETA_META_Name )
+import PrelNames  ( mETA_META_Name, rationalTyConName )
 import MkIface	  ( ifaceTyThing )
 import Name       ( Name, nameOccName, nameModule )
 import OccName	  ( isDataOcc, isTvOcc, occNameUserString )
@@ -320,10 +320,13 @@ repE (HsVar x)            =
 	Just (Splice e)  -> do { e' <- dsExpr e
 			       ; return (MkC e') } }
 repE (HsIPVar x) = panic "DsMeta.repE: Can't represent implicit parameters"
-repE (HsLit l)   = do { a <- repLiteral l;           repLit a }
-repE (HsLam m)   = repLambda m
-repE (HsApp x y) = do {a <- repE x; b <- repE y; repApp a b}
--- HsOverLit l	never happens (if it does, the catch-all will find it)
+
+	-- Remember, we're desugaring renamer output here, so
+	-- HsOverlit can definitely occur
+repE (HsOverLit l) = do { a <- repOverloadedLiteral l; repLit a }
+repE (HsLit l)     = do { a <- repLiteral l;           repLit a }
+repE (HsLam m)     = repLambda m
+repE (HsApp x y)   = do {a <- repE x; b <- repE y; repApp a b}
 
 repE (OpApp e1 op fix e2) =
   case op of
@@ -904,6 +907,13 @@ repLiteral lit
     uh_oh = pprPanic "DsMeta.repLiteral: trying to represent exotic literal"
 		    (ppr lit)
 
+repOverloadedLiteral :: HsOverLit -> DsM (Core M.Lit)
+repOverloadedLiteral (HsIntegral i _)   = repLiteral (HsInt i)
+repOverloadedLiteral (HsFractional f _) = do { rat_ty <- lookupType rationalTyConName ;
+					       repLiteral (HsRat f rat_ty) }
+	-- The type Rational will be in the environment, becuase 
+	-- the smart constructor 'THSyntax.rationalL' uses it in its type,
+	-- and rationalL is sucked in when any TH stuff is used
               
 --------------- Miscellaneous -------------------
 
