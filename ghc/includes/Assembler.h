@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Assembler.h,v 1.8 1999/10/15 11:02:06 sewardj Exp $
+ * $Id: Assembler.h,v 1.9 1999/10/19 11:41:35 sewardj Exp $
  *
  * (c) The GHC Team 1994-1998.
  *
@@ -247,16 +247,11 @@ extern const AsmPrim ccall_Id;
 extern const AsmPrim ccall_IO;
 
 typedef struct {
-  char *        arg_tys;
-  int           arg_size;
-  char *        result_tys;
-  int           result_size;
+  unsigned int  num_args;
+  char*         arg_tys;
+  unsigned int  num_results;
+  char*         result_tys;
 } CFunDescriptor;
-
-typedef struct {
-  char *        arg_tys;
-  char *        result_tys;
-} HFunDescriptor;
 
 CFunDescriptor* mkDescriptor( char* as, char* rs );
 
