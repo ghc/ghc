@@ -348,8 +348,8 @@ char **argv; {
         }
 
     /* Prefix the output with line pragmas */
-    if (add_line_prag_long) {
-      fprintf(ostream, "# 1 \"%s\"\n");{-# LINE 1 \"%s\" #-}\n", prefix_str, prefix_str);
+    if (prefix_str) {
+      fprintf(ostream, "#line 1 \"%s\"\n);{-# LINE 1 \"%s\" #-}\n", prefix_str, prefix_str);
     }
 
     unlit(file, istream, ostream);
