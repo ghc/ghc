@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.124 2003/06/26 20:58:33 panne Exp $
+ * $Id: Linker.c,v 1.125 2003/07/20 21:28:04 panne Exp $
  *
  * (c) The GHC Team, 2000-2003
  *
@@ -461,6 +461,8 @@ typedef struct _RtsSymbolVal {
       SymX(stable_ptr_table)			\
       SymX(stackOverflow)			\
       SymX(stg_CAF_BLACKHOLE_info)		\
+      SymX(stg_BLACKHOLE_BQ_info)		\
+      SymX(awakenBlockedQueue)			\
       SymX(stg_CHARLIKE_closure)		\
       SymX(stg_EMPTY_MVAR_info)			\
       SymX(stg_IND_STATIC_info)			\
