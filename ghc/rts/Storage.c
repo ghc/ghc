@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.7 1999/01/26 16:16:30 simonm Exp $
+ * $Id: Storage.c,v 1.8 1999/01/28 15:04:02 simonm Exp $
  *
  * Storage manager front end
  *
@@ -14,6 +14,7 @@
 #include "MBlock.h"
 #include "gmp.h"
 #include "Weak.h"
+#include "Sanity.h"
 
 #include "Storage.h"
 #include "StoragePriv.h"
@@ -49,6 +50,11 @@ initStorage (void)
   nat g, s;
   step *step;
   generation *gen;
+
+  if (RtsFlags.GcFlags.heapSizeSuggestion > 
+      RtsFlags.GcFlags.maxHeapSize) {
+    barf("Suggested heap size (-H<size>) is larger than max. heap size (-M<size>)\n");
+  }
 
   initBlockAllocator();
   
@@ -169,6 +175,38 @@ allocNursery (bdescr *last_bd, nat blocks)
     last_bd = bd;
   }
   return last_bd;
+}
+
+extern void
+resizeNursery ( nat blocks )
+{
+  bdescr *bd;
+
+  if (nursery_blocks == blocks) {
+    ASSERT(g0s0->n_blocks == blocks);
+    return;
+  }
+
+  else if (nursery_blocks < blocks) {
+    IF_DEBUG(gc, fprintf(stderr, "Increasing size of nursery to %d blocks\n", 
+			 blocks));
+    g0s0->blocks = allocNursery(g0s0->blocks, blocks-nursery_blocks);
+  } 
+
+  else {
+    bdescr *next_bd;
+    
+    IF_DEBUG(gc, fprintf(stderr, "Decreasing size of nursery to %d blocks\n", 
+			 blocks));
+    for (bd = g0s0->blocks; nursery_blocks > blocks; nursery_blocks--) {
+      next_bd = bd->link;
+      freeGroup(bd);
+      bd = next_bd;
+    }
+    g0s0->blocks = bd;
+  }
+  
+  g0s0->n_blocks = nursery_blocks = blocks;
 }
 
 void
@@ -345,6 +383,69 @@ stgDeallocForGMP (void *ptr STG_UNUSED,
 }
 
 /* -----------------------------------------------------------------------------
+   Stats and stuff
+   -------------------------------------------------------------------------- */
+
+/* Approximate the amount of live data in the heap.  To be called just
+ * after garbage collection (see GarbageCollect()).
+ */
+extern lnat 
+calcLive(void)
+{
+  nat g, s;
+  lnat live = 0;
+  step *step;
+
+  if (RtsFlags.GcFlags.generations == 1) {
+    live = g0s0->to_blocks * BLOCK_SIZE_W + 
+      ((lnat)g0s0->hp_bd->free - (lnat)g0s0->hp_bd->start) / sizeof(W_);
+  }
+
+  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+    for (s = 0; s < generations[g].n_steps; s++) {
+      /* approximate amount of live data (doesn't take into account slop
+	 * at end of each block).
+	 */
+      if (g == 0 && s == 0) { 
+	  continue; 
+      }
+      step = &generations[g].steps[s];
+      live += step->n_blocks * BLOCK_SIZE_W + 
+	((lnat)step->hp_bd->free -(lnat)step->hp_bd->start) / sizeof(W_);
+    }
+  }
+  return live;
+}
+
+/* Approximate the number of blocks that will be needed at the next
+ * garbage collection.
+ *
+ * Assume: all data currently live will remain live.  Steps that will
+ * be collected next time will therefore need twice as many blocks
+ * since all the data will be copied.
+ */
+extern lnat 
+calcNeeded(void)
+{
+  lnat needed = 0;
+  nat g, s;
+  step *step;
+
+  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+    for (s = 0; s < generations[g].n_steps; s++) {
+      if (g == 0 && s == 0) { continue; }
+      step = &generations[g].steps[s];
+      if (generations[g].steps[0].n_blocks > generations[g].max_blocks) {
+	needed += 2 * step->n_blocks;
+      } else {
+	needed += step->n_blocks;
+      }
+    }
+  }
+  return needed;
+}
+
+/* -----------------------------------------------------------------------------
    Debugging
 
    memInventory() checks for memory leaks by counting up all the
@@ -407,6 +508,35 @@ memInventory(void)
 	    mblocks_allocated * BLOCKS_PER_MBLOCK);
   }
 #endif
+}
+
+/* Full heap sanity check. */
+
+extern void
+checkSanity(nat N)
+{
+  nat g, s;
+
+  if (RtsFlags.GcFlags.generations == 1) {
+    checkHeap(g0s0->to_space, NULL);
+    checkChain(g0s0->large_objects);
+  } else {
+    
+    for (g = 0; g <= N; g++) {
+      for (s = 0; s < generations[g].n_steps; s++) {
+	if (g == 0 && s == 0) { continue; }
+	checkHeap(generations[g].steps[s].blocks, NULL);
+      }
+    }
+    for (g = N+1; g < RtsFlags.GcFlags.generations; g++) {
+      for (s = 0; s < generations[g].n_steps; s++) {
+	checkHeap(generations[g].steps[s].blocks,
+		  generations[g].steps[s].blocks->start);
+	checkChain(generations[g].steps[s].large_objects);
+      }
+    }
+    checkFreeListSanity();
+  }
 }
 
 #endif

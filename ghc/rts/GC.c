@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.21 1999/01/27 16:41:14 simonm Exp $
+ * $Id: GC.c,v 1.22 1999/01/28 15:04:00 simonm Exp $
  *
  * Two-space garbage collector
  *
@@ -511,6 +511,9 @@ void GarbageCollect(void (*get_roots)(void))
     }
   }
   
+  /* Guess the amount of live data for stats. */
+  live = calcLive();
+
   /* Two-space collector:
    * Free the old to-space, and estimate the amount of live data.
    */
@@ -523,8 +526,6 @@ void GarbageCollect(void (*get_roots)(void))
     for (bd = g0s0->to_space; bd != NULL; bd = bd->link) {
       bd->evacuated = 0;	/* now from-space */
     }
-    live = g0s0->to_blocks * BLOCK_SIZE_W + 
-      ((lnat)g0s0->hp_bd->free - (lnat)g0s0->hp_bd->start) / sizeof(W_);
 
     /* For a two-space collector, we need to resize the nursery. */
     
@@ -563,71 +564,44 @@ void GarbageCollect(void (*get_roots)(void))
 	blocks = RtsFlags.GcFlags.minAllocAreaSize;
       }
     }
+    resizeNursery(blocks);
     
-    if (nursery_blocks < blocks) {
-      IF_DEBUG(gc, fprintf(stderr, "Increasing size of nursery to %d blocks\n", 
-			   blocks));
-      g0s0->blocks = allocNursery(g0s0->blocks, blocks-nursery_blocks);
-    } else {
-      bdescr *next_bd;
-      
-      IF_DEBUG(gc, fprintf(stderr, "Decreasing size of nursery to %d blocks\n", 
-			   blocks));
-      for (bd = g0s0->blocks; nursery_blocks > blocks; nursery_blocks--) {
-	next_bd = bd->link;
-	freeGroup(bd);
-	bd = next_bd;
-      }
-      g0s0->blocks = bd;
-    }
-    
-    g0s0->n_blocks = nursery_blocks = blocks;
-
   } else {
     /* Generational collector:
-     * estimate the amount of live data, and adjust the allocation
-     * area size if the user has given us a suggestion (+RTS -H<blah>)
+     * If the user has given us a suggested heap size, adjust our
+     * allocation area to make best use of the memory available.
      */
 
-    live = 0;
-    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-      for (s = 0; s < generations[g].n_steps; s++) {
-	/* approximate amount of live data (doesn't take into account slop
-	 * at end of each block).  ToDo: this more accurately.
-	 */
-	if (g == 0 && s == 0) { continue; }
-	step = &generations[g].steps[s];
-	live += step->n_blocks * BLOCK_SIZE_W + 
-	  ((lnat)step->hp_bd->free -(lnat)step->hp_bd->start) / sizeof(W_);
-      }
-    }
-
     if (RtsFlags.GcFlags.heapSizeSuggestion) {
-      nat avail_blocks = 
-	(RtsFlags.GcFlags.heapSizeSuggestion - live / BLOCK_SIZE_W) / 2;
-      nat blocks;
-      
-      if (avail_blocks > RtsFlags.GcFlags.minAllocAreaSize) {
-	blocks = avail_blocks;
+      int blocks;
+      nat needed = calcNeeded(); 	/* approx blocks needed at next GC */
+
+      /* Guess how much will be live in generation 0 step 0 next time.
+       * A good approximation is the amount of data that was live this
+       * time:  this assumes (1) that the size of G0S0 will be roughly
+       * the same as last time, and (2) that the promotion rate will be
+       * constant.
+       *
+       * If we don't know how much was live in G0S0 (because there's no
+       * step 1), then assume 30% (which is usually an overestimate).
+       */
+      if (g0->n_steps == 1) {
+	needed += (g0s0->n_blocks * 30) / 100;
       } else {
+	needed += g0->steps[1].n_blocks;
+      }
+
+      /* Now we have a rough guess at the number of blocks needed for
+       * the next GC, subtract this from the user's suggested heap size
+       * and use the rest for the allocation area.
+       */
+      blocks = (int)RtsFlags.GcFlags.heapSizeSuggestion - (int)needed;
+      
+      if (blocks < (int)RtsFlags.GcFlags.minAllocAreaSize) {
 	blocks = RtsFlags.GcFlags.minAllocAreaSize;
       }
-
-      if (blocks > g0s0->n_blocks) {
-	/* need to add some blocks on */
-	fprintf(stderr, "Increasing size of alloc area to %d blocks\n", blocks);
-	g0s0->blocks = allocNursery(g0s0->blocks, avail_blocks - g0s0->n_blocks);
-      } else {
-	bdescr *next_bd;
-	fprintf(stderr, "Decreasing size of alloc area to %d blocks\n", blocks);
-	for (bd = g0s0->blocks; nursery_blocks > blocks; nursery_blocks--) {
-	  next_bd = bd->link;
-	  freeGroup(bd);
-	  bd = next_bd;
-	}
-	g0s0->blocks = bd;
-      }
-      g0s0->n_blocks = nursery_blocks = blocks;
+      
+      resizeNursery((nat)blocks);
     }
   }
 
@@ -667,29 +641,9 @@ void GarbageCollect(void (*get_roots)(void))
   scheduleFinalisers(old_weak_ptr_list);
   
   /* check sanity after GC */
-#ifdef DEBUG
-  if (RtsFlags.GcFlags.generations == 1) {
-    IF_DEBUG(sanity, checkHeap(g0s0->to_space, NULL));
-    IF_DEBUG(sanity, checkChain(g0s0->large_objects));
-  } else {
+  IF_DEBUG(sanity, checkSanity(N));
 
-    for (g = 0; g <= N; g++) {
-      for (s = 0; s < generations[g].n_steps; s++) {
-	if (g == 0 && s == 0) { continue; }
-	IF_DEBUG(sanity, checkHeap(generations[g].steps[s].blocks, NULL));
-      }
-    }
-    for (g = N+1; g < RtsFlags.GcFlags.generations; g++) {
-      for (s = 0; s < generations[g].n_steps; s++) {
-	IF_DEBUG(sanity, checkHeap(generations[g].steps[s].blocks,
-				   generations[g].steps[s].blocks->start));
-	IF_DEBUG(sanity, checkChain(generations[g].steps[s].large_objects));
-      }
-    }
-    IF_DEBUG(sanity, checkFreeListSanity());
-  }
-#endif
-
+  /* extra GC trace info */
   IF_DEBUG(gc, stat_describe_gens());
 
 #ifdef DEBUG

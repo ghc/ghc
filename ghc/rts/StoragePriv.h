@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StoragePriv.h,v 1.5 1999/01/19 17:06:05 simonm Exp $
+ * $Id: StoragePriv.h,v 1.6 1999/01/28 15:04:02 simonm Exp $
  *
  * Internal Storage Manger Interface
  *
@@ -106,7 +106,11 @@ extern nat nursery_blocks;
 extern nat alloc_blocks;
 extern nat alloc_blocks_lim;
 
-extern bdescr *allocNursery (bdescr *last_bd, nat blocks);
+extern bdescr *allocNursery ( bdescr *last_bd, nat blocks );
+extern void resizeNursery ( nat blocks );
+
+extern lnat calcLive( void );
+extern lnat calcNeeded( void );
 
 static inline void
 dbl_link_onto(bdescr *bd, bdescr **list)
@@ -127,6 +131,7 @@ dbl_link_onto(bdescr *bd, bdescr **list)
 
 #ifdef DEBUG
 extern void memInventory(void);
+extern void checkSanity(nat N);
 #endif
 
 #endif /* STORAGEPRIV_H */
