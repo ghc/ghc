@@ -168,26 +168,47 @@ Relative to John's original paper, there are the following new features:
 -}
 
 module Text.PrettyPrint.HughesPJ (
+
+	-- * The document type
         Doc,            -- Abstract
-        Mode(..), TextDetails(..),
 
-        empty, isEmpty, nest,
-
-        text, char, ptext,
-        int, integer, float, double, rational,
-        parens, brackets, braces, quotes, doubleQuotes,
+	-- * Primitive Documents
+        empty,
         semi, comma, colon, space, equals,
         lparen, rparen, lbrack, rbrack, lbrace, rbrace,
 
+	-- * Converting values into documents
+        text, char, ptext,
+        int, integer, float, double, rational,
+
+	-- * Wrapping documents in delimiters
+        parens, brackets, braces, quotes, doubleQuotes,
+
+	-- * Combining documents
         (<>), (<+>), hcat, hsep, 
         ($$), ($+$), vcat, 
         sep, cat, 
         fsep, fcat, 
-
+	nest,
         hang, punctuate,
         
---      renderStyle,            -- Haskell 1.3 only
-        render, fullRender
+	-- * Predicates on documents
+	isEmpty,
+
+	-- * Rendering documents
+
+	-- ** Default rendering
+	render, 
+
+	-- ** Rendering with a particular style
+	Style(..),
+	style,
+        renderStyle,
+
+	-- ** General rendering
+        fullRender,
+        Mode(..), TextDetails(..),
+
   ) where
 
 
@@ -202,47 +223,60 @@ infixl 5 $$, $+$
 
 -- The primitive Doc values
 
-empty                     :: Doc
-isEmpty                   :: Doc    -> Bool
-text                      :: String -> Doc 
-char                      :: Char -> Doc
+isEmpty :: Doc    -> Bool;  -- ^ Returns 'True' if the document is empty
 
-semi, comma, colon, space, equals              :: Doc
-lparen, rparen, lbrack, rbrack, lbrace, rbrace :: Doc
+empty   :: Doc;			-- ^ An empty document
+semi	:: Doc;			-- ^ A \';\' character
+comma	:: Doc;			-- ^ A \',\' character
+colon	:: Doc;			-- ^ A \':\' character
+space	:: Doc;			-- ^ A space character
+equals	:: Doc;			-- ^ A \'=\' character
+lparen	:: Doc;			-- ^ A \'(\' character
+rparen	:: Doc;			-- ^ A \')\' character
+lbrack	:: Doc;			-- ^ A \'[\' character
+rbrack	:: Doc;			-- ^ A \']\' character
+lbrace	:: Doc;			-- ^ A \'{\' character
+rbrace	:: Doc;			-- ^ A \'}\' character
 
-parens, brackets, braces  :: Doc -> Doc 
-quotes, doubleQuotes      :: Doc -> Doc
-
-int      :: Int -> Doc
-integer  :: Integer -> Doc
-float    :: Float -> Doc
-double   :: Double -> Doc
+text	 :: String   -> Doc
+ptext	 :: String   -> Doc
+char 	 :: Char     -> Doc
+int      :: Int      -> Doc
+integer  :: Integer  -> Doc
+float    :: Float    -> Doc
+double   :: Double   -> Doc
 rational :: Rational -> Doc
 
 
+parens       :: Doc -> Doc; 	-- ^ Wrap document in @(...)@
+brackets     :: Doc -> Doc;  	-- ^ Wrap document in @[...]@
+braces	     :: Doc -> Doc;   	-- ^ Wrap document in @{...}@
+quotes	     :: Doc -> Doc;	-- ^ Wrap document in @\'...\'@
+doubleQuotes :: Doc -> Doc;	-- ^ Wrap document in @\"...\"@
+
 -- Combining @Doc@ values
 
-(<>)   :: Doc -> Doc -> Doc     -- Beside
-hcat   :: [Doc] -> Doc          -- List version of <>
-(<+>)  :: Doc -> Doc -> Doc     -- Beside, separated by space
-hsep   :: [Doc] -> Doc          -- List version of <+>
+(<>)   :: Doc -> Doc -> Doc;     -- ^Beside
+hcat   :: [Doc] -> Doc;          -- ^List version of '\<>'
+(<+>)  :: Doc -> Doc -> Doc;     -- ^Beside, separated by space
+hsep   :: [Doc] -> Doc;          -- ^List version of '\<+>'
 
-($$)   :: Doc -> Doc -> Doc     -- Above; if there is no
-                                -- overlap it "dovetails" the two
-vcat   :: [Doc] -> Doc          -- List version of $$
+($$)   :: Doc -> Doc -> Doc;     -- ^Above; if there is no
+                                -- overlap it \"dovetails\" the two
+vcat   :: [Doc] -> Doc;          -- ^List version of '$$'
 
-cat    :: [Doc] -> Doc          -- Either hcat or vcat
-sep    :: [Doc] -> Doc          -- Either hsep or vcat
-fcat   :: [Doc] -> Doc          -- ``Paragraph fill'' version of cat
-fsep   :: [Doc] -> Doc          -- ``Paragraph fill'' version of sep
+cat    :: [Doc] -> Doc;          -- ^ Either hcat or vcat
+sep    :: [Doc] -> Doc;          -- ^ Either hsep or vcat
+fcat   :: [Doc] -> Doc;          -- ^ \"Paragraph fill\" version of cat
+fsep   :: [Doc] -> Doc;          -- ^ \"Paragraph fill\" version of sep
 
-nest   :: Int -> Doc -> Doc     -- Nested
+nest   :: Int -> Doc -> Doc;     -- ^ Nested
 
 
 -- GHC-specific ones.
 
-hang :: Doc -> Int -> Doc -> Doc
-punctuate :: Doc -> [Doc] -> [Doc]      -- punctuate p [d1, ... dn] = [d1 <> p, d2 <> p, ... dn-1 <> p, dn]
+hang :: Doc -> Int -> Doc -> Doc;	-- ^ @hang d1 n d2 = sep [d1, nest n d2]@
+punctuate :: Doc -> [Doc] -> [Doc];      -- ^ @punctuate p [d1, ... dn] = [d1 \<> p, d2 \<> p, ... dn-1 \<> p, dn]@
 
 
 -- Displaying @Doc@ values. 
@@ -250,30 +284,37 @@ punctuate :: Doc -> [Doc] -> [Doc]      -- punctuate p [d1, ... dn] = [d1 <> p, 
 instance Show Doc where
   showsPrec prec doc cont = showDoc doc cont
 
-render     :: Doc -> String             -- Uses default style
-fullRender :: Mode
-           -> Int                       -- Line length
-           -> Float                     -- Ribbons per line
-           -> (TextDetails -> a -> a)   -- What to do with text
-           -> a                         -- What to do at the end
-           -> Doc
-           -> a                         -- Result
+-- | Renders the document as a string using the default style
+render     :: Doc -> String
 
-{-      When we start using 1.3 
+-- | The general rendering interface
+fullRender :: Mode			-- ^Rendering mode
+           -> Int                       -- ^Line length
+           -> Float                     -- ^Ribbons per line
+           -> (TextDetails -> a -> a)   -- ^What to do with text
+           -> a                         -- ^What to do at the end
+           -> Doc			-- ^The document
+           -> a                         -- ^Result
+
+-- | Render the document as a string using a specified style
 renderStyle  :: Style -> Doc -> String
-data Style = Style { lineLength     :: Int,     -- In chars
-                     ribbonsPerLine :: Float,   -- Ratio of ribbon length to line length
-                     mode :: Mode
-             }
-style :: Style          -- The default style
-style = Style { lineLength = 100, ribbonsPerLine = 2.5, mode = PageMode }
--}
 
-data Mode = PageMode            -- Normal 
-          | ZigZagMode          -- With zig-zag cuts
-          | LeftMode            -- No indentation, infinitely long lines
-          | OneLineMode         -- All on one line
+-- | A rendering style
+data Style
+ = Style { mode           :: Mode     -- ^ The rendering mode
+ 	 , lineLength     :: Int      -- ^ Length of line, in chars
+         , ribbonsPerLine :: Float    -- ^ Ratio of ribbon length to line length
+         }
 
+-- | The default style (@mode=PageMode, lineLength=100, ribbonsPerLine=1.5@)
+style :: Style
+style = Style { lineLength = 100, ribbonsPerLine = 1.5, mode = PageMode }
+
+-- | Rendering mode
+data Mode = PageMode            -- ^Normal 
+          | ZigZagMode          -- ^With zig-zag cuts
+          | LeftMode            -- ^No indentation, infinitely long lines
+          | OneLineMode         -- ^All on one line
 
 -- ---------------------------------------------------------------------------
 -- The Doc calculus
@@ -396,6 +437,7 @@ punctuate p (d:ds) = go d ds
 -- A Doc represents a *set* of layouts.  A Doc with
 -- no occurrences of Union or NoDoc represents just one layout.
 
+-- | The abstract type of documents
 data Doc
  = Empty                                -- empty
  | NilAbove Doc                         -- text "" $$ x
