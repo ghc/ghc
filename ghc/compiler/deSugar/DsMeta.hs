@@ -196,27 +196,28 @@ repTyClD :: TyClDecl Name -> DsM (Maybe (Core M.Decl))
 
 repTyClD (TyData { tcdND = DataType, tcdCtxt = [], 
 		   tcdName = tc, tcdTyVars = tvs, 
-		   tcdCons = DataCons cons, tcdDerivs = mb_derivs }) 
- = do { tc1  <- lookupOcc tc ;		-- See note [Binders and occurrences] 
-	tvs1  <- repTvs tvs ;
-	cons1 <- mapM repC cons ;
-	cons2 <- coreList consTyConName cons1 ;
-	derivs1 <- repDerivs mb_derivs ;
-	dec <- repData tc1 tvs1 cons2 derivs1 ;
-	return (Just dec) }
+		   tcdCons = DataCons cons, tcdDerivs = mb_derivs }) =
+  do 
+    tc1 <- lookupOcc tc			-- See note [Binders and occurrences] 
+    dec <- addTyVarBinds decTyConName tvs $ \bndrs -> do
+      cons1   <- mapM repC cons
+      cons2   <- coreList consTyConName cons1
+      derivs1 <- repDerivs mb_derivs
+      repData tc1 (coreList' stringTy bndrs) cons2 derivs1
+    return $ Just dec
 
 repTyClD (ClassDecl { tcdCtxt = cxt, tcdName = cls, 
 		      tcdTyVars = tvs, tcdFDs = [], 
-		      tcdSigs = sigs, tcdMeths = Just binds
-	})
- = do { cls1 <- lookupOcc cls ;		-- See note [Binders and occurrences] 
-	tvs1 <- repTvs tvs ;
-	cxt1 <- repContext cxt ;
-	sigs1  <- rep_sigs sigs ;
-	binds1 <- rep_monobind binds ;
-	decls1 <- coreList declTyConName (sigs1 ++ binds1) ;
-	dec <- repClass cxt1 cls1 tvs1 decls1 ;
-	return (Just dec) }
+		      tcdSigs = sigs, tcdMeths = Just binds }) =
+  do 
+    cls1 <- lookupOcc cls		-- See note [Binders and occurrences] 
+    dec  <- addTyVarBinds decTyConName tvs $ \bndrs -> do
+	      cxt1   <- repContext cxt
+	      sigs1  <- rep_sigs sigs
+	      binds1 <- rep_monobind binds
+	      decls1 <- coreList declTyConName (sigs1 ++ binds1)
+	      repClass cxt1 cls1 (coreList' stringTy bndrs) decls1
+    return $ Just dec
 
 -- Un-handled cases
 repTyClD d = do { addDsWarn (hang msg 4 (ppr d)) ;
@@ -302,6 +303,23 @@ repTvs :: [HsTyVarBndr Name] -> DsM (Core [String])
 repTvs tvs = do { tvs1 <- mapM (localVar . hsTyVarName) tvs ;
 		  return (coreList' stringTy tvs1) } 
 
+-- gensym a list of type variables and enter them into the meta environment;
+-- the computations passed as the second argument is executed in that extended
+-- meta environment and gets the *original* names as an argument
+--
+addTyVarBinds :: Name			         -- type constructor for 'a'
+	      -> [HsTyVarBndr Name]	         -- the binders to be added
+	      -> ([Core String] -> DsM (Core (M.Q a))) -- action in the ext env
+	      -> DsM (Core (M.Q a))
+addTyVarBinds resTyName tvs m =
+  do
+    let names = map hsTyVarName tvs
+    freshNames <- mkGenSyms names
+    term       <- addBinds freshNames $ do
+		    bndrs <- mapM lookupBinder names 
+		    m bndrs
+    wrapGenSyns resTyName freshNames term
+
 -- represent a type context
 --
 repContext :: HsContext Name -> DsM (Core M.Ctxt)
@@ -329,15 +347,10 @@ repTys tys = mapM repTy tys
 --
 repTy :: HsType Name -> DsM (Core M.Type)
 repTy (HsForAllTy bndrs ctxt ty)  = 
-  do
-    let names = map hsTyVarName (fromMaybe [] bndrs)
-    freshNames <- mkGenSyms names
-    forallTy   <- addBinds freshNames $ do
-		    bndrs' <- mapM lookupBinder names 
-		    ctxt'  <- repContext ctxt
-		    ty'    <- repTy ty
-		    repTForall (coreList' stringTy bndrs') ctxt' ty'
-    wrapGenSyns typTyConName freshNames forallTy
+  addTyVarBinds typTyConName (fromMaybe [] bndrs) $ \bndrs' -> do
+    ctxt'  <- repContext ctxt
+    ty'    <- repTy ty
+    repTForall (coreList' stringTy bndrs') ctxt' ty'
 repTy (HsTyVar n)
   | isTvOcc (nameOccName n)       = do 
 				      tv1 <- lookupBinder n
