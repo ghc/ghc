@@ -140,12 +140,12 @@ deSugarExpr :: HscEnv
 	    -> Module -> GlobalRdrEnv -> TypeEnv 
  	    -> TypecheckedHsExpr
 	    -> IO CoreExpr
-deSugarExpr hsc_env pcs mod_name rdr_env type_env tc_expr
+deSugarExpr hsc_env pcs this_mod rdr_env type_env tc_expr
   = do	{ showPass dflags "Desugar"
 	; us <- mkSplitUniqSupply 'd'
 
 	-- Do desugaring
-	; let (core_expr, ds_warns) = initDs dflags us lookup mod_name (dsExpr tc_expr)    
+	; let (core_expr, ds_warns) = initDs dflags us lookup this_mod (dsExpr tc_expr)    
 	      warn_doc = pprBagOfWarnings (mapBag mk_warn ds_warns)
 
 	-- Display any warnings
@@ -161,10 +161,12 @@ deSugarExpr hsc_env pcs mod_name rdr_env type_env tc_expr
     dflags   = hsc_dflags hsc_env
     hpt      = hsc_HPT hsc_env
     pte      = eps_PTE (pcs_EPS pcs)
-    lookup n = lookupNameEnv type_env n	`orElse`	-- Look in the type env of the
+    lookup n = pprTrace "lookup" (ppr type_env) (
+	       lookupNameEnv type_env n	`orElse`	-- Look in the type env of the
 							-- current module first
 	       lookupType hpt pte n 	`orElse`	-- Then other modules
 	       pprPanic "Desugar: lookup:" (ppr n)
+		)
 
     mk_warn :: (SrcLoc,SDoc) -> (SrcLoc, Pretty.Doc)
     mk_warn (loc,sdoc) = addShortWarnLocLine loc print_unqual sdoc

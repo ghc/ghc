@@ -216,10 +216,10 @@ runMeta :: TypecheckedHsExpr 	-- Of type X
 	-> TcM t		-- Of type t
 runMeta expr
   = getTopEnv		`thenM` \ top_env ->
+    getGblEnv		`thenM` \ tcg_env ->
     getEps		`thenM` \ eps ->
     getNameCache	`thenM` \ name_cache -> 
     getModule		`thenM` \ this_mod ->
-    getGlobalRdrEnv	`thenM` \ rdr_env -> 
     let
 	ghci_mode = top_mode top_env
 
@@ -228,10 +228,12 @@ runMeta expr
 
 	pcs = PCS { pcs_nc = name_cache, pcs_EPS = eps }
 
-	print_unqual = unQualInScope rdr_env
+	type_env = tcg_type_env tcg_env
+	rdr_env  = tcg_rdr_env tcg_env
     in
-    ioToTcRn (HscMain.compileExpr hsc_env pcs this_mod 
-				  print_unqual expr) `thenM` \ hval ->
+    ioToTcRn (HscMain.compileExpr 
+		hsc_env pcs this_mod 
+	        rdr_env type_env expr)	`thenM` \ hval ->
 
     tryM (tcRunQ (unsafeCoerce# hval))	`thenM` \ either_tval ->
 
