@@ -17,7 +17,7 @@
 # version label of your release tarball.
 
 %define name haddock
-%define version 0.4
+%define version 0.5
 %define release 1
 
 Summary: Haddock documentation tool for annotated Haskell source code
@@ -55,6 +55,7 @@ should all be ok).
 %setup -n haddock-%{version}
 
 %build
+test -f configure || autoconf
 ./configure --prefix=%{prefix}
 make
 (cd haddock/doc ; make dvi ps html ; gzip -f -9 *.dvi *.ps )
@@ -78,6 +79,10 @@ rm -rf ${RPM_BUILD_ROOT}
 %{prefix}/bin/haddock-%{version}
 
 %changelog
+
+* Mon Jul 28 2003 Sven Panne <sven_panne@yahoo.com>
+- Updated to version 0.5
+- Automagically generate configure if it is not there
 
 * Tue Jul 23 2002 Simon Marlow <simonmar@microsoft.com>
 - Updated to version 0.4
