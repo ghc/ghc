@@ -491,12 +491,13 @@ cmLoadModule cmstate1 rootname
               let mods_to_zap_names 
                      = findPartiallyCompletedCycles modsDone_names 
 			  mg2_with_srcimps
-              let (hst4, hit4, ui4)
-                     = removeFromTopLevelEnvs mods_to_zap_names (hst3,hit3,ui3)
-
               let mods_to_keep
                      = filter ((`notElem` mods_to_zap_names).name_of_summary) 
 			  modsDone
+
+              let (hst4, hit4, ui4)
+                     = retainInTopLevelEnvs (map name_of_summary mods_to_keep) 
+                                            (hst3,hit3,ui3)
 
 	      -- clean up after ourselves
 	      cleanTempFilesExcept verb (ppFilesFromSummaries mods_to_keep)
@@ -821,10 +822,10 @@ upsweep_mod ghci_mode dflags oldUI threaded1 summary1 reachable_inc_me
 	   -- in interactive mode, all home modules below us *must* have an
 	   -- interface in the HIT.  We never demand-load home interfaces in
 	   -- interactive mode.
-            (hst1_strictDC, hit1_strictDC)
+            (hst1_strictDC, hit1_strictDC, [])
                = ASSERT(ghci_mode == Batch || 
 			all (`elemUFM` hit1) reachable_only)
-		 retainInTopLevelEnvs reachable_only (hst1,hit1)
+		 retainInTopLevelEnvs reachable_only (hst1,hit1,[])
 
             old_linkable 
                = unJust "upsweep_mod:old_linkable" maybe_old_linkable
@@ -856,22 +857,14 @@ upsweep_mod ghci_mode dflags oldUI threaded1 summary1 reachable_inc_me
 	      -> do let threaded2 = CmThreaded pcs2 hst1 hit1
                     return (threaded2, Nothing)
 
--- Remove unwanted modules from the top level envs (HST, HIT, UI).
-removeFromTopLevelEnvs :: [ModuleName]
-                       -> (HomeSymbolTable, HomeIfaceTable, UnlinkedImage)
-                       -> (HomeSymbolTable, HomeIfaceTable, UnlinkedImage)
-removeFromTopLevelEnvs zap_these (hst, hit, ui)
-   = (delListFromUFM hst zap_these,
-      delListFromUFM hit zap_these,
-      filterModuleLinkables (`notElem` zap_these) ui
-     )
-
+-- Filter modules in the top level envs (HST, HIT, UI).
 retainInTopLevelEnvs :: [ModuleName]
-                        -> (HomeSymbolTable, HomeIfaceTable)
-                        -> (HomeSymbolTable, HomeIfaceTable)
-retainInTopLevelEnvs keep_these (hst, hit)
+                        -> (HomeSymbolTable, HomeIfaceTable, UnlinkedImage)
+                        -> (HomeSymbolTable, HomeIfaceTable, UnlinkedImage)
+retainInTopLevelEnvs keep_these (hst, hit, ui)
    = (retainInUFM hst keep_these,
-      retainInUFM hit keep_these
+      retainInUFM hit keep_these,
+      filterModuleLinkables (`elem` keep_these) ui
      )
      where
         retainInUFM :: Uniquable key => UniqFM elt -> [key] -> UniqFM elt
