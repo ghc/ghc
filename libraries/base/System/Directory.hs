@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Directory.hs,v 1.1 2002/02/05 17:32:27 simonmar Exp $
+-- $Id: Directory.hs,v 1.2 2002/04/24 15:47:10 sof Exp $
 --
 -- System-independent interface to directory manipulation.
 --
@@ -470,13 +470,12 @@ getPermissions name = do
   exec  <- c_access s x_OK
   withFileStatus name $ \st -> do
   is_dir <- isDirectory st
-  is_reg <- isRegularFile st
   return (
     Permissions {
       readable   = read  == 0,
       writable   = write == 0,
       executable = not is_dir && exec == 0,
-      searchable = not is_reg && exec == 0
+      searchable = is_dir && exec == 0
     }
    )
 
@@ -515,11 +514,6 @@ isDirectory :: Ptr CStat -> IO Bool
 isDirectory stat = do
   mode <- st_mode stat
   return (s_isdir mode)
-
-isRegularFile :: Ptr CStat -> IO Bool
-isRegularFile stat = do
-  mode <- st_mode stat
-  return (s_isreg mode)
 
 emptyCMode     :: CMode
 emptyCMode     = 0
