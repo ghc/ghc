@@ -28,8 +28,8 @@ module Maybes (
 	catMaybes
     ) where
 
-CHK_Ubiq()			-- debugging consistency check
-import Unique  (Unique)		-- only for specialising
+CHK_Ubiq()		-- debugging consistency check
+import Unique  (Unique)	-- only for specialising
 
 #if __GLASGOW_HASKELL__ >= 204
 import Maybe( catMaybes, mapMaybe )
