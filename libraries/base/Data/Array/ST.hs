@@ -34,11 +34,12 @@ import Data.Array.Base	( STUArray, castSTUArray, UArray, unsafeFreezeSTUArray )
 import Control.Monad.ST	( ST, runST )
 
 #ifdef __HUGS__
-import Hugs.ST		( STArray )
+import Hugs.Array	( Array )
+import Hugs.ST		( STArray, unsafeFreezeSTArray )
 #endif
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.Arr		( STArray, Array )
+import GHC.Arr		( STArray, Array, unsafeFreezeSTArray )
 #endif
 
 -- | A safe way to create and work with a mutable array before returning an
@@ -49,7 +50,7 @@ import GHC.Arr		( STArray, Array )
 runSTArray :: (Ix i)
 	   => (forall s . ST s (STArray s i e))
 	   -> Array i e
-runSTArray st = runST (st >>= unsafeFreeze)
+runSTArray st = runST (st >>= unsafeFreezeSTArray)
 
 -- | A safe way to create and work with an unboxed mutable array before
 -- returning an immutable array for later perusal.  This function
