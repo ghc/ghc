@@ -21,6 +21,7 @@ module HscTypes (
 	IfaceDecls, mkIfaceDecls, dcl_tycl, dcl_rules, dcl_insts,
 
 	VersionInfo(..), initialVersionInfo, lookupVersion,
+	FixityEnv, lookupFixity,
 
 	TyThing(..), isTyClThing, implicitTyThingIds,
 
@@ -53,7 +54,7 @@ module HscTypes (
 
 #include "HsVersions.h"
 
-import RdrName		( RdrName, RdrNameEnv, addListToRdrEnv, emptyRdrEnv, 
+import RdrName		( RdrName, RdrNameEnv, addListToRdrEnv, 
 			  mkRdrUnqual, rdrEnvToList )
 import Name		( Name, NamedThing, getName, nameOccName, nameModule, nameSrcLoc )
 import NameEnv
@@ -67,7 +68,7 @@ import Class		( Class, classSelIds )
 import TyCon		( TyCon, isNewTyCon, tyConGenIds, tyConSelIds, tyConDataConsIfAvailable )
 import DataCon		( dataConId, dataConWrapId )
 
-import BasicTypes	( Version, initialVersion, Fixity, IPName )
+import BasicTypes	( Version, initialVersion, Fixity, defaultFixity, IPName )
 
 import HsSyn		( DeprecTxt, tyClDeclName, ifaceRuleDeclName )
 import RdrHsSyn		( RdrNameInstDecl, RdrNameRuleDecl, RdrNameTyClDecl )
@@ -177,7 +178,7 @@ data ModIface
 		-- Its top level environment or Nothing if we read this
 		-- interface from a file.
 
-        mi_fixities :: !(NameEnv Fixity),   -- Fixities
+        mi_fixities :: !FixityEnv,	    -- Fixities
 	mi_deprecs  :: !Deprecations,	    -- Deprecations
 
 	mi_decls    :: IfaceDecls	    -- The RnDecls form of ModDetails
@@ -490,6 +491,13 @@ pprAvail (AvailTC n ns) = ppr n <> case {- filter (/= n) -} ns of
 					ns' -> braces (hsep (punctuate comma (map ppr ns')))
 
 pprAvail (Avail n) = ppr n
+\end{code}
+
+\begin{code}
+type FixityEnv = NameEnv Fixity
+
+lookupFixity :: FixityEnv -> Name -> Fixity
+lookupFixity env n = lookupNameEnv env n `orElse` defaultFixity
 \end{code}
 
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Main.c,v 1.32 2002/01/22 13:54:22 simonmar Exp $
+ * $Id: Main.c,v 1.33 2002/02/05 15:42:04 simonpj Exp $
  *
  * (c) The GHC Team 1998-2000
  *
@@ -39,7 +39,7 @@
 # include <windows.h>
 #endif
 
-extern void __stginit_PrelMain(void);
+extern void __stginit_Main(void);
 
 /* Hack: we assume that we're building a batch-mode system unless 
  * INTERPRETER is set
@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
     SchedulerStatus status;
     /* all GranSim/GUM init is done in startupHaskell; sets IAmMainThread! */
 
-    startupHaskell(argc,argv,__stginit_PrelMain);
+    startupHaskell(argc,argv,__stginit_Main);
 
     /* kick off the computation by creating the main thread with a pointer
        to mainIO_closure representing the computation of the overall program;

@@ -23,7 +23,7 @@ import RnTypes		( rnHsType, rnHsSigType, rnHsTypeFVs, rnContext )
 
 import RnBinds		( rnTopBinds, rnMethodBinds, renameSigs, renameSigsFVs )
 import RnEnv		( lookupTopBndrRn, lookupOccRn, lookupIfaceName,
-			  lookupOrigNames, lookupSysBinder, newLocalsRn,
+			  lookupSysBinder, newLocalsRn,
 			  bindLocalsFVRn, bindPatSigTyVars,
 			  bindTyVarsRn, extendTyVarEnvFVRn,
 			  bindCoreLocalRn, bindCoreLocalsRn, bindLocalNames,
@@ -35,7 +35,6 @@ import Class		( FunDep, DefMeth (..) )
 import DataCon		( dataConId )
 import Name		( Name, NamedThing(..) )
 import NameSet
-import PrelInfo		( derivableClassKeys )
 import PrelNames	( deRefStablePtrName, newStablePtrName,
 			  bindIOName, returnIOName
 			)
@@ -45,7 +44,6 @@ import Outputable
 import SrcLoc		( SrcLoc )
 import CmdLineOpts	( DynFlag(..) )
 				-- Warn of unused for-all'd tyvars
-import Unique		( Uniquable(..) )
 import Maybes		( maybeToBool )
 \end{code}
 

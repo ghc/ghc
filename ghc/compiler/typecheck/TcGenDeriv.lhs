@@ -34,7 +34,7 @@ import HsSyn		( InPat(..), HsExpr(..), MonoBinds(..),
 import RdrHsSyn		( mkHsOpApp, RdrNameMonoBinds, RdrNameHsExpr, RdrNamePat )
 import RdrName		( RdrName, mkUnqual )
 import BasicTypes	( RecFlag(..), Fixity(..), FixityDirection(..)
-			, maxPrecedence, defaultFixity
+			, maxPrecedence
 			, Boxity(..)
 			)
 import FieldLabel       ( fieldLabelName )
@@ -48,6 +48,7 @@ import Name		( getOccString, getOccName, getSrcLoc, occNameString,
 			  isDataSymOcc, isSymOcc
 			)
 
+import HscTypes		( FixityEnv, lookupFixity )
 import PrelInfo		-- Lots of RdrNames
 import SrcLoc		( generatedSrcLoc, SrcLoc )
 import TyCon		( TyCon, isNewTyCon, tyConDataCons, isEnumerationTyCon,
@@ -60,7 +61,7 @@ import TysPrim		( charPrimTy, intPrimTy, wordPrimTy, addrPrimTy,
 import Util		( mapAccumL, zipEqual, zipWithEqual, isSingleton,
 			  zipWith3Equal, nOfThem )
 import Panic		( panic, assertPanic )
-import Maybes		( maybeToBool, orElse )
+import Maybes		( maybeToBool )
 import Constants
 import List		( partition, intersperse )
 
@@ -751,7 +752,7 @@ gen_Ix_binds tycon
 %************************************************************************
 
 \begin{code}
-gen_Read_binds :: (Name -> Maybe Fixity) -> TyCon -> RdrNameMonoBinds
+gen_Read_binds :: FixityEnv -> TyCon -> RdrNameMonoBinds
 
 gen_Read_binds get_fixity tycon
   = reads_prec `AndMonoBinds` read_list
@@ -908,7 +909,7 @@ gen_Read_binds get_fixity tycon
 %************************************************************************
 
 \begin{code}
-gen_Show_binds :: (Name -> Maybe Fixity) -> TyCon -> RdrNameMonoBinds
+gen_Show_binds :: FixityEnv -> TyCon -> RdrNameMonoBinds
 
 gen_Show_binds get_fixity tycon
   = shows_prec `AndMonoBinds` show_list
@@ -1012,7 +1013,7 @@ gen_Show_binds get_fixity tycon
 \end{code}
 
 \begin{code}
-getLRPrecs :: Bool -> (Name -> Maybe Fixity) -> Name -> [Integer]
+getLRPrecs :: Bool -> FixityEnv -> Name -> [Integer]
 getLRPrecs is_infix get_fixity nm = [lp, rp]
     where
      {-
@@ -1035,15 +1036,14 @@ getLRPrecs is_infix get_fixity nm = [lp, rp]
 defaultPrecedence :: Integer
 defaultPrecedence = fromInt maxPrecedence
 
-getPrecedence :: (Name -> Maybe Fixity) -> Name -> Integer
+getPrecedence :: FixityEnv -> Name -> Integer
 getPrecedence get_fixity nm 
-   = case get_fixity nm of
-        Just (Fixity x _) -> fromInt x
-        other	          -> defaultPrecedence
+   = case lookupFixity get_fixity nm of
+        Fixity x _ -> fromInt x
 
-isLRAssoc :: (Name -> Maybe Fixity) -> Name -> (Bool, Bool)
+isLRAssoc :: FixityEnv -> Name -> (Bool, Bool)
 isLRAssoc get_fixity nm =
-     case get_fixity nm `orElse` defaultFixity of
+     case lookupFixity get_fixity nm of
        Fixity _ InfixN -> (False, False)
        Fixity _ InfixR -> (False, True)
        Fixity _ InfixL -> (True,  False)

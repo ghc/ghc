@@ -20,7 +20,7 @@
 -- Note: used to be called PrelTopHandler.lhs, so if you're looking
 --       for CVS info, try 'cvs log'ging it too.
 module PrelTopHandler (
-   topHandler, reportStackOverflow, reportError 
+   runMain, reportStackOverflow, reportError 
   ) where
 
 import IO
@@ -29,6 +29,10 @@ import PrelCString
 import PrelPtr
 import PrelIOBase
 import PrelException
+
+-- runMain is applied to Main.main by TcModule
+runMain :: IO a -> IO ()
+runMain main = catchException (main >> return ()) topHandler
 
 topHandler :: Exception -> IO ()
 topHandler err = catchException (real_handler err) topHandler

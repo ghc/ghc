@@ -25,7 +25,7 @@ import RnEnv
 import RnMonad
 
 import FiniteMap
-import PrelNames	( pRELUDE_Name, mAIN_Name, main_RDR_Unqual, isUnboundName )
+import PrelNames	( pRELUDE_Name, mAIN_Name, isUnboundName )
 import Module		( ModuleName, moduleName, WhereFrom(..) )
 import Name		( Name, nameSrcLoc, nameOccName )
 import NameSet
@@ -38,7 +38,7 @@ import RdrName		( rdrNameOcc, setRdrNameOcc )
 import OccName		( setOccNameSpace, dataName )
 import NameSet		( elemNameSet, emptyNameSet )
 import Outputable
-import Maybes		( maybeToBool, catMaybes, mapMaybe )
+import Maybes		( maybeToBool, catMaybes )
 import ListSetOps	( removeDups )
 import Util		( sortLt )
 import List		( partition )
@@ -449,13 +449,14 @@ exportsFromAvail :: ModuleName
 	-- Complains about exports items not in scope
 exportsFromAvail this_mod Nothing 
 		 mod_avail_env entity_avail_env global_name_env
-  = exportsFromAvail this_mod true_exports mod_avail_env entity_avail_env global_name_env
+  = exportsFromAvail this_mod (Just true_exports) mod_avail_env 
+		     entity_avail_env global_name_env
   where
-    true_exports = Just $ if this_mod == mAIN_Name
-                          then [IEVar main_RDR_Unqual]
-                               -- export Main.main *only* unless otherwise specified,
-                          else [IEModuleContents this_mod]
-                               -- but for all other modules export everything.
+    true_exports 
+      | this_mod == mAIN_Name = []
+              -- Export nothing; Main.$main is automatically exported
+      | otherwise	      = [IEModuleContents this_mod]
+              -- but for all other modules export everything.
 
 exportsFromAvail this_mod (Just export_items) 
 		 mod_avail_env entity_avail_env global_name_env

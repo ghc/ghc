@@ -45,9 +45,8 @@ import TcType		( Type, ThetaType, TcKind, TcTyVar, TcTyVarSet,
 			  tyVarsOfTypes, tcSplitDFunTy,
 			  getDFunTyKey, tcTyConAppTyCon
 			)
-import Id		( idName, isDataConWrapId_maybe )
-import IdInfo		( vanillaIdInfo )
-import Var		( TyVar, Id, idType, lazySetIdInfo, idInfo )
+import Id		( isDataConWrapId_maybe )
+import Var		( TyVar, Id, idType )
 import VarSet
 import DataCon		( DataCon )
 import TyCon		( TyCon )

@@ -17,14 +17,14 @@ import HsSyn
 import HsCore		( HsIdInfo(..), UfExpr(..), toUfExpr, toUfBndr )
 import HsTypes		( toHsTyVars )
 import TysPrim		( alphaTyVars )
-import BasicTypes	( Fixity(..), NewOrData(..), Activation(..),
+import BasicTypes	( NewOrData(..), Activation(..),
 			  Version, initialVersion, bumpVersion 
 			)
 import NewDemand	( isTopSig )
 import RnMonad
 import RnHsSyn		( RenamedInstDecl, RenamedTyClDecl )
 import HscTypes		( VersionInfo(..), ModIface(..), ModDetails(..),
-			  ModuleLocation(..), GhciMode(..),
+			  ModuleLocation(..), GhciMode(..), FixityEnv, lookupFixity,
 			  IfaceDecls, mkIfaceDecls, dcl_tycl, dcl_rules, dcl_insts,
 			  TyThing(..), DFunId, Avails, TypeEnv,
 			  WhatsImported(..), GenAvailInfo(..), 
@@ -401,7 +401,7 @@ addVersionInfo (Just old_iface@(ModIface { mi_version  = old_version,
     pp_change False what = text what <+> ptext SLIT("changed")
 
 diffDecls :: VersionInfo				-- Old version
-	  -> NameEnv Fixity -> NameEnv Fixity		-- Old and new fixities
+	  -> FixityEnv -> FixityEnv			-- Old and new fixities
 	  -> [RenamedTyClDecl] -> [RenamedTyClDecl]	-- Old and new decls
 	  -> (Bool,		-- True <=> no change
 	      SDoc,		-- Record of differences
@@ -414,7 +414,7 @@ diffDecls (VersionInfo { vers_module = old_mod_vers, vers_decls = old_decls_vers
 	-- When seeing if two decls are the same, 
 	-- remember to check whether any relevant fixity has changed
     eq_tc  d1 d2 = d1 == d2 && all (same_fixity . fst) (tyClDeclNames d1)
-    same_fixity n = lookupNameEnv old_fixities n == lookupNameEnv new_fixities n
+    same_fixity n = lookupFixity old_fixities n == lookupFixity new_fixities n
 
     diff ok_so_far pp new_vers []  []      = (ok_so_far, pp, new_vers)
     diff ok_so_far pp new_vers (od:ods) [] = diff False (pp $$ only_old od) new_vers	      ods []

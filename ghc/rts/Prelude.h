@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.h,v 1.17 2002/01/22 13:54:22 simonmar Exp $
+ * $Id: Prelude.h,v 1.18 2002/02/05 15:42:04 simonpj Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -18,7 +18,7 @@ extern DLL_IMPORT const StgClosure PrelBase_True_closure;
 extern DLL_IMPORT const StgClosure PrelBase_False_closure;
 extern DLL_IMPORT const StgClosure PrelPack_unpackCString_closure;
 extern DLL_IMPORT const StgClosure PrelWeak_runFinalizzerBatch_closure;
-extern const StgClosure PrelMain_mainIO_closure;
+extern const StgClosure Main_zdmain_closure;
 
 extern DLL_IMPORT const StgClosure PrelIOBase_stackOverflow_closure;
 extern DLL_IMPORT const StgClosure PrelIOBase_heapOverflow_closure;
@@ -63,7 +63,7 @@ extern DLL_IMPORT const StgInfoTable PrelStable_StablePtr_con_info;
 #define False_closure             (&PrelBase_False_closure)
 #define unpackCString_closure     (&PrelPack_unpackCString_closure)
 #define runFinalizerBatch_closure (&PrelWeak_runFinalizzerBatch_closure)
-#define mainIO_closure            (&PrelMain_mainIO_closure)
+#define mainIO_closure            (&Main_zdmain_closure)
 
 #define stackOverflow_closure     (&PrelIOBase_stackOverflow_closure)
 #define heapOverflow_closure      (&PrelIOBase_heapOverflow_closure)

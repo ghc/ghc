@@ -66,8 +66,7 @@ import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
 import CodeOutput	( codeOutput )
 
-import Module		( ModuleName, moduleName, mkHomeModule, 
-			  moduleUserString, lookupModuleEnv )
+import Module		( ModuleName, moduleName, mkHomeModule )
 import CmdLineOpts
 import DriverState	( v_HCHeader )
 import ErrUtils		( dumpIfSet_dyn, showPass, printError )
@@ -221,33 +220,21 @@ hscRecomp ghci_mode dflags have_object
  	    -------------------
  	    -- RENAME
  	    -------------------
-	; (pcs_rn, print_unqualified, maybe_rn_result) 
+	; (pcs_rn, print_unqual, maybe_rn_result) 
       	     <- _scc_ "Rename" 
-		 renameModule dflags hit hst pcs_ch this_mod rdr_module
+		 renameModule dflags ghci_mode hit hst pcs_ch this_mod rdr_module
       	; case maybe_rn_result of {
-      	     Nothing -> return (HscFail pcs_ch{-was: pcs_rn-});
-      	     Just (is_exported, new_iface, rn_hs_decls) -> do {
-
-    	-- In interactive mode, we don't want to discard any top-level
-    	-- entities at all (eg. do not inline them away during
-    	-- simplification), and retain them all in the TypeEnv so they are
-    	-- available from the command line.
-	--
-	-- isGlobalName separates the user-defined top-level names from those
-	-- introduced by the type checker.
-
-	; let dont_discard | ghci_mode == Interactive = isGlobalName
-			   | otherwise = is_exported
+      	     Nothing -> return (HscFail pcs_ch);
+      	     Just (dont_discard, new_iface, rn_result) -> do {
 
  	    -------------------
  	    -- TYPECHECK
  	    -------------------
 	; maybe_tc_result 
 	    <- _scc_ "TypeCheck" 
-	       typecheckModule dflags pcs_rn hst new_iface 
-					     print_unqualified rn_hs_decls 
+	       typecheckModule dflags pcs_rn hst print_unqual rn_result
 	; case maybe_tc_result of {
-      	     Nothing -> return (HscFail pcs_ch{-was: pcs_rn-});
+      	     Nothing -> return (HscFail pcs_ch);
       	     Just (pcs_tc, tc_result) -> do {
     
  	    -------------------
@@ -255,7 +242,7 @@ hscRecomp ghci_mode dflags have_object
  	    -------------------
 	; (ds_details, foreign_stuff) 
              <- _scc_ "DeSugar" 
-		deSugar dflags pcs_tc hst this_mod print_unqualified tc_result
+		deSugar dflags pcs_tc hst this_mod print_unqual tc_result
 
 	; pcs_middle
 	    <- _scc_ "pcs_middle"

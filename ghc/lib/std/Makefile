@@ -88,26 +88,17 @@ endif
 
 DLL_DESCRIPTION="GHC-compiled Haskell Prelude"
 
-ifeq "$(DLLized)" "YES"
-EXCLUDED_SRCS += Prelmain.lhs
-# PrelMain.dll_o isn't to be included in the final .a, 
-# but it needs to be generated
-all :: PrelMain.dll_o
-endif
-
 CLEAN_FILES += PrelGHC.hi-boot PrelGHC.hi $(foreach way, $(WAYS), PrelGHC.$(way)_hi)
 
 #-----------------------------------------------------------------------------
 # 	Building the library for GHCi
 #
-# The procedure differs from that in fptools/mk/target.mk in two ways:
-#  (a) we don't want PrelMain in the GHCi std library
-#  (b) on Win32 we must split it into two, because a single .o file can't
+# The procedure differs from that in fptools/mk/target.mk in one way:
+#  (*) on Win32 we must split it into two, because a single .o file can't
 #      have more than 65536 relocations in it.
 #      
 
-# we don't want PrelMain in the GHCi library.
-GHCI_LIBOBJS = $(filter-out PrelMain.$(way_)o,$(HS_OBJS))
+GHCI_LIBOBJS = $(HS_OBJS)
 
 # Turn off standard rule which creates HSstd.o from LIBOBJS.
 DONT_WANT_STD_GHCI_LIB_RULE=YES
@@ -144,9 +135,6 @@ override datadir:=$(libdir)/imports/std
 #
 # Files to install from here
 # 
-ifeq "$(DLLized)" "YES"
-INSTALL_LIBS  += PrelMain.dll_o
-endif
 
 INSTALL_DATAS += PrelGHC.$(way_)hi
 

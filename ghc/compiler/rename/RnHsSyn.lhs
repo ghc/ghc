@@ -20,11 +20,11 @@ import Outputable
 
 
 \begin{code}
+type RenamedHsDecl		= HsDecl		Name RenamedPat
 type RenamedArithSeqInfo	= ArithSeqInfo		Name RenamedPat
 type RenamedClassOpSig		= Sig			Name
 type RenamedConDecl		= ConDecl		Name
 type RenamedContext		= HsContext 		Name
-type RenamedHsDecl		= HsDecl		Name RenamedPat
 type RenamedRuleDecl		= RuleDecl		Name RenamedPat
 type RenamedTyClDecl		= TyClDecl		Name RenamedPat
 type RenamedDefaultDecl		= DefaultDecl		Name
@@ -33,7 +33,6 @@ type RenamedGRHS		= GRHS			Name RenamedPat
 type RenamedGRHSs		= GRHSs			Name RenamedPat
 type RenamedHsBinds		= HsBinds		Name RenamedPat
 type RenamedHsExpr		= HsExpr		Name RenamedPat
-type RenamedHsModule		= HsModule		Name RenamedPat
 type RenamedInstDecl		= InstDecl		Name RenamedPat
 type RenamedMatchContext	= HsMatchContext	Name
 type RenamedMatch		= Match			Name RenamedPat

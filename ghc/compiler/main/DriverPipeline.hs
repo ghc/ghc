@@ -45,7 +45,9 @@ import Config
 import Panic
 import Util
 
+#ifdef GHCI
 import Time 		( getClockTime )
+#endif
 import Directory
 import System
 import IOExts
@@ -910,8 +912,7 @@ doLink o_files = do
 	 	      ++ pkg_extra_ld_opts
 	 	      ++ extra_ld_opts
 	              ++ if static && not no_hs_main then
-			    [ "-u", prefixUnderscore "PrelMain_mainIO_closure",
-			      "-u", prefixUnderscore "__stginit_PrelMain"] 
+			    [ "-u", prefixUnderscore "Main_zdmain_closure"] 
 			 else []))
 
     -- parallel only: move binary to another dir -- HWL

@@ -12,12 +12,12 @@ module TcInstDcls ( tcInstDecls1, tcIfaceInstDecls1, addInstDFuns,
 
 import CmdLineOpts	( DynFlag(..) )
 
-import HsSyn		( HsDecl(..), InstDecl(..), TyClDecl(..), HsType(..),
+import HsSyn		( InstDecl(..), TyClDecl(..), HsType(..),
 			  MonoBinds(..), HsExpr(..),  HsLit(..), Sig(..), HsTyVarBndr(..),
 			  andMonoBindList, collectMonoBinders, 
 			  isClassDecl, toHsType
 			)
-import RnHsSyn		( RenamedHsBinds, RenamedInstDecl, RenamedHsDecl, 
+import RnHsSyn		( RenamedHsBinds, RenamedInstDecl, 
 			  RenamedMonoBinds, RenamedTyClDecl, RenamedHsType, 
 			  extractHsTyVars, maybeGenericMatch
 			)
@@ -27,14 +27,14 @@ import TcClassDcl	( tcMethodBind, badMethodErr )
 import TcMonad       
 import TcMType		( tcInstSigType, checkValidTheta, checkValidInstHead, instTypeErr, 
 			  UserTypeCtxt(..), SourceTyCtxt(..) )
-import TcType		( mkClassPred, mkTyVarTy, mkTyVarTys, tcSplitForAllTys,
+import TcType		( mkClassPred, mkTyVarTy, tcSplitForAllTys,
 			  tcSplitSigmaTy, getClassPredTys, tcSplitPredTy_maybe,
 			  TyVarDetails(..)
 			)
 import Inst		( InstOrigin(..), newDicts, instToId,
 			  LIE, mkLIE, emptyLIE, plusLIE, plusLIEs )
 import TcDeriv		( tcDeriving )
-import TcEnv		( TcEnv, tcExtendGlobalValEnv, isLocalThing,
+import TcEnv		( tcExtendGlobalValEnv, 
 			  tcExtendTyVarEnvForMeths, tcLookupId, tcLookupClass,
  			  InstInfo(..), pprInstInfo, simpleInstInfoTyCon, 
 			  simpleInstInfoTy, newDFunName
@@ -44,11 +44,11 @@ import PprType		( pprClassPred )
 import TcMonoType	( tcHsTyVars, kcHsSigType, tcHsType, tcHsSigType )
 import TcUnify		( checkSigTyVars )
 import TcSimplify	( tcSimplifyCheck )
-import HscTypes		( HomeSymbolTable, DFunId, 
+import HscTypes		( HomeSymbolTable, DFunId, FixityEnv,
 			  PersistentCompilerState(..), PersistentRenamerState,
-			  ModDetails(..), PackageInstEnv
+			  ModDetails(..)
 			)
-import Subst		( substTy, substTheta )
+import Subst		( substTheta )
 import DataCon		( classDataCon )
 import Class		( Class, classBigSig )
 import Var		( idName, idType )
@@ -63,17 +63,15 @@ import NameSet		( unitNameSet, emptyNameSet, nameSetToList )
 import TyCon		( TyCon )
 import Subst		( mkTopTyVarSubst, substTheta )
 import TysWiredIn	( genericTyCons )
-import Name             ( Name )
 import SrcLoc           ( SrcLoc )
 import Unique		( Uniquable(..) )
 import Util             ( lengthExceeds, isSingleton )
-import BasicTypes	( NewOrData(..), Fixity )
+import BasicTypes	( NewOrData(..) )
 import ErrUtils		( dumpIfSet_dyn )
 import ListSetOps	( Assoc, emptyAssoc, plusAssoc_C, mapAssoc, 
 			  assocElts, extendAssoc_C, equivClassesByUniq, minusList
 			)
 import Maybe		( catMaybes )
-import List             ( partition )
 import Outputable
 \end{code}
 
@@ -163,7 +161,7 @@ Gather up the instance declarations from their various sources
 tcInstDecls1	-- Deal with source-code instance decls
    :: PersistentRenamerState	
    -> InstEnv 			-- Imported instance envt
-   -> (Name -> Maybe Fixity)	-- for deriving Show and Read
+   -> FixityEnv			-- for deriving Show and Read
    -> Module			-- Module for deriving
    -> [RenamedTyClDecl]		-- For deriving stuff
    -> [RenamedInstDecl]		-- Source code instance decls

@@ -15,45 +15,46 @@ module TcModule (
 import CmdLineOpts	( DynFlag(..), DynFlags, dopt )
 import HsSyn		( HsBinds(..), MonoBinds(..), HsDecl(..), HsExpr(..),
 			  Stmt(..), InPat(..), HsMatchContext(..), HsDoContext(..), RuleDecl(..),
-			  isSourceInstDecl, nullBinds, mkSimpleMatch, placeHolderType
+			  isSourceInstDecl, mkSimpleMatch, placeHolderType
 			)
-import PrelNames	( mAIN_Name, mainName, ioTyConName, printName,
-			  returnIOName, bindIOName, failIOName, 
-			  itName
+import PrelNames	( ioTyConName, printName,
+			  returnIOName, bindIOName, failIOName, runMainName, 
+			  dollarMainName, itName
 			)
 import MkId		( unsafeCoerceId )
-import RnHsSyn		( RenamedHsBinds, RenamedHsDecl, RenamedStmt,
-			  RenamedHsExpr, RenamedRuleDecl, RenamedTyClDecl, RenamedInstDecl )
+import RnHsSyn		( RenamedHsDecl, RenamedStmt, RenamedHsExpr, 
+			  RenamedRuleDecl, RenamedTyClDecl, RenamedInstDecl )
 import TcHsSyn		( TypecheckedMonoBinds, TypecheckedHsExpr,
 			  TypecheckedForeignDecl, TypecheckedRuleDecl,
 			  zonkTopBinds, zonkForeignExports, zonkRules, mkHsLet,
 			  zonkExpr, zonkIdBndr
 			)
 
+import Rename		( RnResult(..) )
 import MkIface		( pprModDetails )
 import TcExpr 		( tcMonoExpr )
 import TcMonad
-import TcMType		( newTyVarTy, zonkTcType, tcInstType )
+import TcMType		( newTyVarTy, zonkTcType )
 import TcType		( Type, liftedTypeKind, openTypeKind,
-			  tyVarsOfType, tidyType, tcFunResultTy,
-			  mkForAllTys, mkFunTys, mkTyConApp, tcSplitForAllTys
+			  tyVarsOfType, tcFunResultTy,
+			  mkForAllTys, mkFunTys, mkTyConApp, tcSplitForAllTys,
+			  tcSplitTyConApp_maybe, isUnitTy
 			)
 import TcMatches	( tcStmtsAndThen )
-import Inst		( emptyLIE, plusLIE )
+import Inst		( LIE, emptyLIE, plusLIE )
 import TcBinds		( tcTopBinds )
 import TcClassDcl	( tcClassDecls2 )
 import TcDefaults	( tcDefaults, defaultDefaultTys )
-import TcEnv		( TcEnv, RecTcEnv, InstInfo(iDFunId), tcExtendGlobalValEnv, tcLookup_maybe,
+import TcEnv		( TcEnv, RecTcEnv, InstInfo(iDFunId), tcExtendGlobalValEnv, 
 			  isLocalThing, tcSetEnv, tcSetInstEnv, initTcEnv, getTcGEnv,
 			  tcExtendGlobalEnv, tcExtendGlobalTypeEnv, 
 			  tcLookupGlobalId, tcLookupTyCon,
-			  TcTyThing(..), TyThing(..), tcLookupId 
+			  TyThing(..), tcLookupId 
 			)
 import TcRules		( tcIfaceRules, tcSourceRules )
 import TcForeign	( tcForeignImports, tcForeignExports )
 import TcIfaceSig	( tcInterfaceSigs )
 import TcInstDcls	( tcInstDecls1, tcIfaceInstDecls1, addInstDFuns, initInstEnv, tcInstDecls2 )
-import TcUnify		( unifyTauTy )
 import TcSimplify	( tcSimplifyTop, tcSimplifyInfer )
 import TcTyClsDecls	( tcTyAndClassDecls )
 import CoreUnfold	( unfoldingTemplate )
@@ -61,12 +62,11 @@ import TysWiredIn	( mkListTy, unitTy )
 import ErrUtils		( printErrorsAndWarnings, errorsFound, 
 			  dumpIfSet_dyn, dumpIfSet_dyn_or, showPass )
 import Rules		( extendRuleBase )
-import Id		( Id, idType, idUnfolding )
-import Module           ( Module, moduleName )
-import Name		( Name )
-import NameEnv		( lookupNameEnv )
+import Id		( Id, mkLocalId, idType, idUnfolding, setIdLocalExported )
+import Module           ( Module )
+import Name		( Name, getName, getSrcLoc )
 import TyCon		( tyConGenInfo )
-import BasicTypes       ( EP(..), Fixity, RecFlag(..) )
+import BasicTypes       ( EP(..), RecFlag(..) )
 import SrcLoc		( noSrcLoc )
 import Outputable
 import IO		( stdout )
@@ -339,9 +339,8 @@ typecheckModule
 	:: DynFlags
 	-> PersistentCompilerState
 	-> HomeSymbolTable
-	-> ModIface		-- Iface for this module
 	-> PrintUnqualified	-- For error printing
-	-> [RenamedHsDecl]
+	-> RnResult
 	-> IO (Maybe (PersistentCompilerState, TcResults))
 			-- The new PCS is Augmented with imported information,
 						-- (but not stuff from this module)
@@ -357,27 +356,19 @@ data TcResults
     }
 
 
-typecheckModule dflags pcs hst mod_iface unqual decls
+typecheckModule dflags pcs hst unqual rn_result
   = do	{ maybe_tc_result <- typecheck dflags pcs hst unqual $
-			     tcModule pcs hst get_fixity this_mod decls
+			     tcModule pcs hst rn_result
 	; printTcDump dflags unqual maybe_tc_result
 	; return maybe_tc_result }
-  where
-    this_mod   = mi_module   mod_iface
-    fixity_env = mi_fixities mod_iface
-
-    get_fixity :: Name -> Maybe Fixity
-    get_fixity nm = lookupNameEnv fixity_env nm
-
 
 tcModule :: PersistentCompilerState
 	 -> HomeSymbolTable
-	 -> (Name -> Maybe Fixity)
-	 -> Module
-	 -> [RenamedHsDecl]
+	 -> RnResult
 	 -> TcM (PersistentCompilerState, TcResults)
 
-tcModule pcs hst get_fixity this_mod decls
+tcModule pcs hst (RnResult { rr_decls = decls, rr_mod = this_mod, 
+			     rr_fixities = fix_env, rr_main = maybe_main_name })
   = fixTc (\ ~(unf_env, _, _) ->
 		-- Loop back the final environment, including the fully zonked
 		-- versions of bindings from this module.  In the presence of mutual
@@ -385,7 +376,7 @@ tcModule pcs hst get_fixity this_mod decls
 		-- in this module, which is why the knot is so big
 
 		-- Type-check the type and class decls, and all imported decls
-	tcImports unf_env pcs hst get_fixity this_mod 
+	tcImports unf_env pcs hst this_mod 
 		  tycl_decls iface_inst_decls iface_rule_decls	   `thenTc` \ (env1, new_pcs) ->
 
     	tcSetEnv env1				$
@@ -393,7 +384,7 @@ tcModule pcs hst get_fixity this_mod decls
 		-- Do the source-language instances, including derivings
 	initInstEnv new_pcs hst			`thenNF_Tc` \ inst_env1 ->
 	tcInstDecls1 (pcs_PRS new_pcs) inst_env1
-		     get_fixity this_mod 
+		     fix_env this_mod 
 		     tycl_decls src_inst_decls 	`thenTc` \ (inst_env2, inst_info, deriv_binds) ->
 	tcSetInstEnv inst_env2			$
 
@@ -428,7 +419,7 @@ tcModule pcs hst get_fixity this_mod decls
 	
 		-- CHECK THAT main IS DEFINED WITH RIGHT TYPE, IF REQUIRED
         traceTc (text "Tc10")			`thenNF_Tc_`
-	tcCheckMain this_mod			`thenTc_`
+	tcCheckMain maybe_main_name		`thenTc` \ (main_bind, lie_main) ->
 
 	     -- Deal with constant or ambiguous InstIds.  How could
 	     -- there be ambiguous ones?  They can only arise if a
@@ -449,19 +440,21 @@ tcModule pcs hst get_fixity this_mod decls
 			   lie_instdecls `plusLIE`
 			   lie_clasdecls `plusLIE`
 			   lie_fodecls	 `plusLIE`
-			   lie_rules
+			   lie_rules	 `plusLIE`
+			   lie_main
 	in
 	tcSimplifyTop lie_alldecls	`thenTc` \ const_inst_binds ->
-        traceTc (text "endsimpltop") `thenTc_`
+        traceTc (text "endsimpltop")	`thenTc_`
 	
 	    -- Backsubstitution.    This must be done last.
 	    -- Even tcSimplifyTop may do some unification.
 	let
-	    all_binds = val_binds		`AndMonoBinds`
-			    inst_binds		`AndMonoBinds`
-			    cls_dm_binds	`AndMonoBinds`
-			    const_inst_binds	`AndMonoBinds`
-			    foe_binds
+	    all_binds = val_binds	 `AndMonoBinds`
+			inst_binds	 `AndMonoBinds`
+			cls_dm_binds	 `AndMonoBinds`
+			const_inst_binds `AndMonoBinds`
+			foe_binds	 `AndMonoBinds`
+			main_bind
 	in
  	traceTc (text "Tc7")		`thenNF_Tc_`
 	zonkTopBinds all_binds		`thenNF_Tc` \ (all_binds', final_env)  ->
@@ -590,7 +583,6 @@ tcIfaceImports this_mod decls
 tcImports :: RecTcEnv
 	  -> PersistentCompilerState
 	  -> HomeSymbolTable
-	  -> (Name -> Maybe Fixity)
 	  -> Module
 	  -> [RenamedTyClDecl]
 	  -> [RenamedInstDecl]
@@ -608,7 +600,7 @@ tcImports :: RecTcEnv
 -- tcImports is only called when processing source code,
 -- so that any interface-file declarations are for other modules, not this one
 
-tcImports unf_env pcs hst get_fixity this_mod 
+tcImports unf_env pcs hst this_mod 
 	  tycl_decls inst_decls rule_decls
    	  -- (unf_env :: RecTcEnv) is used for type-checking interface pragmas
 	  -- which is done lazily [ie failure just drops the pragma
@@ -688,48 +680,43 @@ addIfaceRules rule_base rules
 %************************************************************************
 
 We must check that in module Main,
-	a) main is defined
-	b) main :: forall a1...an. IO t,  for some type t
+	a) Main.main is in scope
+	b) Main.main :: forall a1...an. IO t,  for some type t
 
-If we have
-	main = error "Urk"
-then the type of main will be 
-	main :: forall a. a
-and that should pass the test too.  
+Then we build
+	$main = PrelTopHandler.runMain Main.main
 
-So we just instantiate the type and unify with IO t, and declare 
-victory if doing so succeeds.
+The function
+  PrelTopHandler :: IO a -> IO ()
+catches the top level exceptions.  
+It accepts a Main.main of any type (IO a).
 
 \begin{code}
-tcCheckMain :: Module -> TcM ()
-tcCheckMain this_mod
-  | not (moduleName this_mod == mAIN_Name )
-  = returnTc ()
+tcCheckMain :: Maybe Name -> TcM (TypecheckedMonoBinds, LIE)
+tcCheckMain Nothing = returnTc (EmptyMonoBinds, emptyLIE)
 
-  | otherwise
-  =	-- First unify the main_id with IO t, for any old t
-    tcLookup_maybe mainName		`thenNF_Tc` \ maybe_thing ->
-    case maybe_thing of
-	Just (ATcId main_id) -> check_main_ty (idType main_id)
-	other		     -> addErrTc noMainErr	
+tcCheckMain (Just main_name)
+  = tcLookupId main_name		`thenNF_Tc` \ main_id ->
+	-- If it is not Nothing, it should be in the env
+    tcAddSrcLoc (getSrcLoc main_id)	$
+    tcAddErrCtxt mainCtxt		$
+    newTyVarTy liftedTypeKind		`thenNF_Tc` \ ty ->
+    tcMonoExpr rhs ty			`thenTc` \ (main_expr, lie) ->
+    zonkTcType ty			`thenNF_Tc` \ ty ->
+    ASSERT( is_io_unit ty )
+    let
+       dollar_main_id = setIdLocalExported (mkLocalId dollarMainName ty)
+    in
+    returnTc (VarMonoBind dollar_main_id main_expr, lie)
   where
-    check_main_ty main_ty
-      = tcInstType main_ty		`thenNF_Tc` \ (tvs, theta, main_tau) ->
-	newTyVarTy liftedTypeKind	`thenNF_Tc` \ arg_ty ->
-	tcLookupTyCon ioTyConName	`thenNF_Tc` \ ioTyCon ->
-	tcAddErrCtxtM (mainTypeCtxt main_ty)	$
-	if not (null theta) then 
-		failWithTc empty	-- Context has the error message
-	else
-	unifyTauTy main_tau (mkTyConApp ioTyCon [arg_ty])
+    rhs = HsApp (HsVar runMainName) (HsVar main_name)
 
-mainTypeCtxt main_ty tidy_env 
-  = zonkTcType main_ty		`thenNF_Tc` \ main_ty' ->
-    returnNF_Tc (tidy_env, ptext SLIT("`main' has the illegal type") <+> 
-	 		 	 quotes (ppr (tidyType tidy_env main_ty')))
+is_io_unit :: Type -> Bool	-- True for IO ()
+is_io_unit tau = case tcSplitTyConApp_maybe tau of
+		   Just (tc, [arg]) -> getName tc == ioTyConName && isUnitTy arg
+		   other	    -> False
 
-noMainErr = hsep [ptext SLIT("Module") <+> quotes (ppr mAIN_Name), 
-	  	  ptext SLIT("must include a definition for") <+> quotes (ptext SLIT("main"))]
+mainCtxt = ptext SLIT("When checking the type of 'main'")
 \end{code}
 
 

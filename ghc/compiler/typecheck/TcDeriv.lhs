@@ -14,11 +14,11 @@ import HsSyn		( HsBinds(..), MonoBinds(..), TyClDecl(..),
 			  collectLocatedMonoBinders )
 import RdrHsSyn		( RdrNameMonoBinds )
 import RnHsSyn		( RenamedHsBinds, RenamedMonoBinds, RenamedTyClDecl, RenamedHsPred )
-import CmdLineOpts	( DynFlag(..), DynFlags )
+import CmdLineOpts	( DynFlag(..) )
 
 import TcMonad
 import TcEnv		( tcSetInstEnv, newDFunName, InstInfo(..), pprInstInfo,
-			  tcLookupClass, tcLookupTyCon, tcExtendTyVarEnv
+			  tcLookupTyCon, tcExtendTyVarEnv
 			)
 import TcGenDeriv	-- Deriv stuff
 import InstEnv		( InstEnv, simpleDFunClassTyCon, extendInstEnv )
@@ -28,11 +28,11 @@ import TcSimplify	( tcSimplifyDeriv )
 import RnBinds		( rnMethodBinds, rnTopMonoBinds )
 import RnEnv		( bindLocatedLocalsRn )
 import RnMonad		( renameDerivedCode, thenRn, mapRn, returnRn )
-import HscTypes		( DFunId, PersistentRenamerState )
+import HscTypes		( DFunId, PersistentRenamerState, FixityEnv )
 
 import BasicTypes	( Fixity, NewOrData(..) )
 import Class		( className, classKey, classTyVars, Class )
-import ErrUtils		( dumpIfSet_dyn, Message )
+import ErrUtils		( dumpIfSet_dyn )
 import MkId		( mkDictFunId )
 import DataCon		( dataConRepArgTys, isNullaryDataCon, isExistentialDataCon )
 import PrelInfo		( needsDataDeclCtxtClassKeys )
@@ -51,11 +51,10 @@ import TcType		( TcType, ThetaType, mkTyVarTys, mkTyConApp, getClassPredTys_mayb
 import Var		( TyVar, tyVarKind )
 import VarSet		( mkVarSet, subVarSet )
 import PrelNames
-import Util		( zipWithEqual, sortLt, eqListBy )
+import Util		( zipWithEqual, sortLt )
 import ListSetOps	( removeDups,  assoc )
 import Outputable
 import Maybe		( isJust )
-import List		( nub )
 import FastString 	( FastString )
 \end{code}
 
@@ -190,7 +189,7 @@ context to the instance decl.  The "offending classes" are
 tcDeriving  :: PersistentRenamerState
 	    -> Module			-- name of module under scrutiny
 	    -> InstEnv			-- What we already know about instances
-	    -> (Name -> Maybe Fixity)	-- used in deriving Show and Read
+	    -> FixityEnv	-- used in deriving Show and Read
 	    -> [RenamedTyClDecl]	-- All type constructors
 	    -> TcM ([InstInfo],		-- The generated "instance decls".
 		    RenamedHsBinds)	-- Extra generated bindings
@@ -616,7 +615,7 @@ the renamer.  What a great hack!
 -- Generate the method bindings for the required instance
 -- (paired with class name, as we need that when renaming
 --  the method binds)
-gen_bind :: (Name -> Maybe Fixity) -> DFunId -> (Name, RdrNameMonoBinds)
+gen_bind :: FixityEnv -> DFunId -> (Name, RdrNameMonoBinds)
 gen_bind get_fixity dfun
   = (cls_nm, binds)
   where

@@ -16,7 +16,7 @@ module RnHiFiles (
 
 #include "HsVersions.h"
 
-import DriverState	( GhcMode(..), v_GhcMode, isCompManagerMode )
+import DriverState	( v_GhcMode, isCompManagerMode )
 import DriverUtil	( splitFilename )
 import CmdLineOpts	( opt_IgnoreIfacePragmas )
 import HscTypes		( ModuleLocation(..),
@@ -28,7 +28,7 @@ import HscTypes		( ModuleLocation(..),
 			  AvailInfo, GenAvailInfo(..), Avails, Deprecations(..)
 			 )
 import HsSyn		( TyClDecl(..), InstDecl(..),
-			  HsType(..), HsPred(..), FixitySig(..), RuleDecl(..),
+			  FixitySig(..), RuleDecl(..),
 			  tyClDeclNames, tyClDeclSysNames, hsTyVarNames, getHsInstHead,
 			)
 import RdrHsSyn		( RdrNameTyClDecl, RdrNameInstDecl, RdrNameRuleDecl )

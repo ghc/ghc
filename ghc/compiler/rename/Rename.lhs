@@ -5,7 +5,7 @@
 
 \begin{code}
 module Rename ( 
-	renameModule, renameStmt, renameRdrName, mkGlobalContext,
+	renameModule, RnResult(..), renameStmt, renameRdrName, mkGlobalContext,
 	closeIfaceDecls, checkOldIface, slurpIface
   ) where
 
@@ -39,14 +39,14 @@ import RnEnv		( availsToNameSet,
 			  warnUnusedLocalBinds, warnUnusedModules, 
 			  lookupSrcName, getImplicitStmtFVs, 
 			  getImplicitModuleFVs, newGlobalName, unQualInScope,
-			  ubiquitousNames, lookupOccRn, 
+			  ubiquitousNames, lookupOccRn, checkMain,
 			  plusGlobalRdrEnv, mkGlobalRdrEnv
 			)
 import Module           ( Module, ModuleName, WhereFrom(..),
 			  moduleNameUserString, moduleName,
 			  moduleEnvElts
 			)
-import Name		( Name, nameModule )
+import Name		( Name, nameModule, isGlobalName )
 import NameEnv
 import NameSet
 import RdrName		( foldRdrEnv, isQual )
@@ -72,17 +72,17 @@ import List		( partition, nub )
 %*********************************************************
 
 \begin{code}
-renameModule :: DynFlags
+renameModule :: DynFlags -> GhciMode
 	     -> HomeIfaceTable -> HomeSymbolTable
 	     -> PersistentCompilerState 
 	     -> Module -> RdrNameHsModule 
 	     -> IO (PersistentCompilerState, PrintUnqualified,
-		    Maybe (IsExported, ModIface, [RenamedHsDecl]))
+		    Maybe (IsExported, ModIface, RnResult))
 	-- Nothing => some error occurred in the renamer
 
-renameModule dflags hit hst pcs this_module rdr_module
+renameModule dflags ghci_mode hit hst pcs this_module rdr_module
   = renameSource dflags hit hst pcs this_module $
-    rename this_module rdr_module
+    rename ghci_mode this_module rdr_module
 \end{code}
 
 \begin{code}
@@ -300,9 +300,22 @@ renameSource dflags hit hst old_pcs this_module thing_inside
 \end{code}
 
 \begin{code}
-rename :: Module -> RdrNameHsModule 
-       -> RnMG (PrintUnqualified, Maybe (IsExported, ModIface, [RenamedHsDecl]))
-rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec loc)
+data RnResult 	-- A RenamedModule ia passed from renamer to typechecker
+  = RnResult { rr_mod      :: Module,	  -- Same as in the ModIface, 
+	       rr_fixities :: FixityEnv,  -- but convenient to have it here
+
+	       rr_main :: Maybe Name, 	  -- Just main, for module Main, 
+					  -- Nothing for other modules
+
+	       rr_decls :: [RenamedHsDecl]	
+			-- The other declarations of the module
+			-- Fixity and deprecations have already been slurped out
+    }			-- and are now in the ModIface for the module
+
+rename :: GhciMode -> Module -> RdrNameHsModule 
+       -> RnMG (PrintUnqualified, Maybe (IsExported, ModIface, RnResult))
+rename ghci_mode this_module 
+       contents@(HsModule _ _ exports imports local_decls mod_deprec loc)
   = pushSrcLocRn loc		$
 
  	-- FIND THE GLOBAL NAME ENVIRONMENT
@@ -352,6 +365,26 @@ rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec
     rnSourceDecls gbl_env global_avail_env 
 		  local_fixity_env local_decls		`thenRn` \ (rn_local_decls, source_fvs) ->
 
+	-- GET ANY IMPLICIT FREE VARIALBES
+    getImplicitModuleFVs rn_local_decls	  `thenRn` \ implicit_fvs ->
+    checkMain ghci_mode mod_name gbl_env  `thenRn` \ (maybe_main_name, main_fvs, implicit_main_fvs) ->
+    let
+	export_fvs = availsToNameSet export_avails
+	used_fvs   = source_fvs `plusFV` export_fvs `plusFV` main_fvs
+		-- The export_fvs make the exported names look just as if they
+		-- occurred in the source program.  For the reasoning, see the
+		-- comments with RnIfaces.mkImportInfo
+		-- It also helps reportUnusedNames, which of course must not complain
+		-- that 'f' isn't mentioned if it is mentioned in the export list
+
+	needed_fvs = implicit_fvs `plusFV` implicit_main_fvs `plusFV` used_fvs
+		-- It's important to do the "plus" this way round, so that
+		-- when compiling the prelude, locally-defined (), Bool, etc
+		-- override the implicit ones. 
+
+    in
+    traceRn (text "Needed FVs:" <+> fsep (map ppr (nameSetToList needed_fvs)))	`thenRn_`
+
 	-- EXIT IF ERRORS FOUND
 	-- We exit here if there are any errors in the source, *before*
 	-- we attempt to slurp the decls from the interfaces, otherwise
@@ -365,25 +398,7 @@ rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec
     else
 
 	-- SLURP IN ALL THE NEEDED DECLARATIONS
-   	-- Find out what re-bindable names to use for desugaring
-    getImplicitModuleFVs mod_name rn_local_decls	`thenRn` \ implicit_fvs ->
-    let
-	export_fvs  = availsToNameSet export_avails
-	source_fvs2 = source_fvs `plusFV` export_fvs
-		-- The export_fvs make the exported names look just as if they
-		-- occurred in the source program.  For the reasoning, see the
-		-- comments with RnIfaces.mkImportInfo
-		-- It also helps reportUnusedNames, which of course must not complain
-		-- that 'f' isn't mentioned if it is mentioned in the export list
-
-	source_fvs3 = implicit_fvs `plusFV` source_fvs2
-		-- It's important to do the "plus" this way round, so that
-		-- when compiling the prelude, locally-defined (), Bool, etc
-		-- override the implicit ones. 
-
-    in
-    traceRn (text "Source FVs:" <+> fsep (map ppr (nameSetToList source_fvs3)))	`thenRn_`
-    slurpImpDecls source_fvs3			`thenRn` \ rn_imp_decls ->
+    slurpImpDecls needed_fvs			`thenRn` \ rn_imp_decls ->
     rnDump rn_imp_decls rn_local_decls		`thenRn_` 
 
 	-- GENERATE THE VERSION/USAGE INFO
@@ -402,6 +417,19 @@ rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec
 	
 	final_decls = rn_local_decls ++ rn_imp_decls
 
+    	-- In interactive mode, we don't want to discard any top-level
+    	-- entities at all (eg. do not inline them away during
+    	-- simplification), and retain them all in the TypeEnv so they are
+    	-- available from the command line.
+	--
+	-- isGlobalName separates the user-defined top-level names from those
+	-- introduced by the type checker.
+	dont_discard :: Name -> Bool
+	dont_discard | ghci_mode == Interactive = isGlobalName
+		     | otherwise 		= (`elemNameSet` exported_names)
+
+	exported_names    = availsToNameSet export_avails
+
 	mod_iface = ModIface {	mi_module   = this_module,
 			        mi_package  = opt_InPackage,
 				mi_version  = initialVersionInfo,
@@ -415,18 +443,20 @@ rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec
 				mi_decls    = panic "mi_decls"
 		    }
 
-	is_exported name  = name `elemNameSet` exported_names
-	exported_names    = availsToNameSet export_avails
+	rn_result = RnResult { rr_mod      = this_module,
+			       rr_fixities = fixities,
+			       rr_decls    = final_decls,
+			       rr_main     = maybe_main_name }
     in
 
 	-- REPORT UNUSED NAMES, AND DEBUG DUMP 
     reportUnusedNames mod_iface print_unqualified 
 		      imports full_avail_env gbl_env
-		      source_fvs2 rn_imp_decls		`thenRn_`
-		-- NB: source_fvs2: include exports (else we get bogus 
+		      used_fvs rn_imp_decls		`thenRn_`
+		-- NB: used_fvs: include exports (else we get bogus 
 		--     warnings of unused things) but not implicit FVs.
 
-    returnRn (print_unqualified, Just (is_exported, mod_iface, final_decls))
+    returnRn (print_unqualified, Just (dont_discard, mod_iface, rn_result))
   where
     mod_name = moduleName this_module
 \end{code}

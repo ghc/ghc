@@ -21,7 +21,7 @@ import HsTypes		( hsTyVarName, replaceTyVarName )
 import HscTypes		( Provenance(..), pprNameProvenance, hasBetterProv,
 			  ImportReason(..), GlobalRdrEnv, GlobalRdrElt(..), AvailEnv,
 			  AvailInfo, Avails, GenAvailInfo(..), NameSupply(..), 
-			  ModIface(..),
+			  ModIface(..), GhciMode(..),
 			  Deprecations(..), lookupDeprec,
 			  extendLocalRdrEnv
 			)
@@ -39,8 +39,8 @@ import Module		( ModuleName, moduleName, mkVanillaModule,
 			  mkSysModuleNameFS, moduleNameFS, WhereFrom(..) )
 import PrelNames	( mkUnboundName, 
 			  derivingOccurrences,
-			  mAIN_Name, pREL_MAIN_Name, 
-			  ioTyConName, intTyConName, 
+			  mAIN_Name, main_RDR_Unqual,
+			  runMainName, intTyConName, 
 			  boolTyConName, funTyConName,
 			  unpackCStringName, unpackCStringFoldrName, unpackCStringUtf8Name,
 			  eqStringName, printName, 
@@ -415,15 +415,10 @@ getImplicitStmtFVs 	-- Compiling a statement
 		-- These are all needed implicitly when compiling a statement
 		-- See TcModule.tc_stmts
 
-getImplicitModuleFVs mod_name decls	-- Compiling a module
+getImplicitModuleFVs decls	-- Compiling a module
   = lookupOrigNames deriv_occs		`thenRn` \ deriving_names ->
-    returnRn (deriving_names `plusFV` implicit_main `plusFV` ubiquitousNames)
+    returnRn (deriving_names `plusFV` ubiquitousNames)
   where
-	-- Add occurrences for IO or PrimIO
-	implicit_main |  mod_name == mAIN_Name
-		      || mod_name == pREL_MAIN_Name = unitFV ioTyConName
-		      |  otherwise 		    = emptyFVs
-
 	-- deriv_classes is now a list of HsTypes, so a "normal" one
 	-- appears as a (HsClassP c []).  The non-normal ones for the new
 	-- newtype-deriving extension, and they don't require any
@@ -444,6 +439,30 @@ ubiquitousNames
 	-- Add occurrences for very frequently used types.
 	--  	 (e.g. we don't want to be bothered with making funTyCon a
 	--	  free var at every function application!)
+
+checkMain ghci_mode mod_name gbl_env
+	-- LOOKUP main IF WE'RE IN MODULE Main
+	-- The main point of this is to drag in the declaration for 'main',
+	-- its in another module, and for the Prelude function 'runMain',
+	-- so that the type checker will find them
+	--
+	-- We have to return the main_name separately, because it's a
+	-- bona fide 'use', and should be recorded as such, but the others aren't
+  | mod_name /= mAIN_Name
+  = returnRn (Nothing, emptyFVs, emptyFVs)
+
+  | not (main_RDR_Unqual `elemRdrEnv` gbl_env)
+  = complain_no_main		`thenRn_`
+    returnRn (Nothing, emptyFVs, emptyFVs)
+
+  | otherwise
+  = lookupSrcName gbl_env main_RDR_Unqual	`thenRn` \ main_name ->
+    returnRn (Just main_name, unitFV main_name, unitFV runMainName)
+
+  where
+    complain_no_main | ghci_mode == Interactive = addWarnRn noMainMsg
+		     | otherwise 		= addErrRn  noMainMsg
+		-- In interactive mode, only warn about the absence of main
 \end{code}
 
 %************************************************************************
@@ -1008,6 +1027,8 @@ shadowedNameWarn shadow
   = hsep [ptext SLIT("This binding for"), 
 	       quotes (ppr shadow),
 	       ptext SLIT("shadows an existing binding")]
+
+noMainMsg = ptext SLIT("No 'main' defined in module Main")
 
 unknownNameErr name
   = sep [text flavour, ptext SLIT("not in scope:"), quotes (ppr name)]

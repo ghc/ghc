@@ -96,7 +96,7 @@ knownKeyNames
  =  [
 	-- Type constructors (synonyms especially)
 	ioTyConName, ioDataConName,
-	mainName,
+	runMainName,
 	orderingTyConName,
 	rationalTyConName,
 	ratioDataConName,
@@ -226,8 +226,8 @@ pREL_PTR_Name     = mkModuleName "PrelPtr"
 pREL_ERR_Name     = mkModuleName "PrelErr"
 pREL_REAL_Name    = mkModuleName "PrelReal"
 pREL_FLOAT_Name   = mkModuleName "PrelFloat"
+pREL_TOP_HANDLER_Name = mkModuleName "PrelTopHandler"
 
-pREL_MAIN_Name    = mkModuleName "PrelMain"
 mAIN_Name	  = mkModuleName "Main"
 pREL_INT_Name	  = mkModuleName "PrelInt"
 pREL_WORD_Name	  = mkModuleName "PrelWord"
@@ -308,7 +308,8 @@ compiler (notably the deriving mechanism) need to mention their names,
 and it's convenient to write them all down in one place.
 
 \begin{code}
-mainName = varQual mAIN_Name SLIT("main") mainKey
+dollarMainName = varQual mAIN_Name SLIT("$main") dollarMainKey
+runMainName    = varQual pREL_TOP_HANDLER_Name SLIT("runMain") runMainKey
 
 -- Stuff from PrelGHC
 usOnceTyConName  = kindQual SLIT(".") usOnceTyConKey
@@ -860,6 +861,13 @@ voidArgIdKey		      = mkPreludeMiscIdUnique 47
 splitIdKey		      = mkPreludeMiscIdUnique 48
 fstIdKey		      = mkPreludeMiscIdUnique 49
 sndIdKey		      = mkPreludeMiscIdUnique 50
+otherwiseIdKey		      = mkPreludeMiscIdUnique 51
+mapIdKey		      = mkPreludeMiscIdUnique 52
+assertIdKey		      = mkPreludeMiscIdUnique 53
+runSTRepIdKey		      = mkPreludeMiscIdUnique 54
+
+dollarMainKey		      = mkPreludeMiscIdUnique 55
+runMainKey		      = mkPreludeMiscIdUnique 56
 \end{code}
 
 Certain class operations from Prelude classes.  They get their own
@@ -867,6 +875,8 @@ uniques so we can look them up easily when we want to conjure them up
 during type checking.
 
 \begin{code}
+	-- Just a place holder for  unbound variables  produced by the renamer:
+unboundKey		      = mkPreludeMiscIdUnique 101 
 fromIntegerClassOpKey	      = mkPreludeMiscIdUnique 102
 minusClassOpKey		      = mkPreludeMiscIdUnique 103
 fromRationalClassOpKey	      = mkPreludeMiscIdUnique 104
@@ -879,20 +889,9 @@ geClassOpKey		      = mkPreludeMiscIdUnique 110
 negateClassOpKey	      = mkPreludeMiscIdUnique 111
 failMClassOpKey		      = mkPreludeMiscIdUnique 112
 thenMClassOpKey		      = mkPreludeMiscIdUnique 113 -- (>>=)
-	-- Just a place holder for  unbound variables  produced by the renamer:
-unboundKey		      = mkPreludeMiscIdUnique 114 
 fromEnumClassOpKey	      = mkPreludeMiscIdUnique 115
-			      
-mainKey			      = mkPreludeMiscIdUnique 116
 returnMClassOpKey	      = mkPreludeMiscIdUnique 117
-otherwiseIdKey		      = mkPreludeMiscIdUnique 118
 toEnumClassOpKey	      = mkPreludeMiscIdUnique 119
-mapIdKey		      = mkPreludeMiscIdUnique 120
-\end{code}
-
-\begin{code}
-assertIdKey		      = mkPreludeMiscIdUnique 121
-runSTRepIdKey		      = mkPreludeMiscIdUnique 122
 \end{code}
 
 
