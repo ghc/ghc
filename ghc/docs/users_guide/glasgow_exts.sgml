@@ -1570,6 +1570,18 @@ valid way to write <literal>g</literal>'s type signature:
   g :: Int -> Int -> forall b. b -> Int
 </programlisting>
 </para>
+<para>
+When doing this hoisting operation, GHC eliminates duplicate constraints.  For
+example:
+<programlisting>
+  type Foo a = (?x::Int) => Bool -> a
+  g :: Foo (Foo Int)
+</programlisting>
+means
+<programlisting>
+  g :: (?x::Int) => Bool -> Bool -> Int
+</programlisting>
+</para>
 </sect2>
 
 
