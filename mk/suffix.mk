@@ -84,14 +84,14 @@ ifneq "$(BootingFromHc)" "YES"
 
 %.$(way_)hi : %.$(way_)o
 	@if [ ! -f $@ ] ; then \
-	    echo Panic! $< exists, but $@ does not. \
+	    echo Panic! $< exists, but $@ does not.; \
 	    exit 1; \
 	else exit 0 ; \
 	fi							
 
 %.$(way_)hi : %.$(way_)hc
 	@if [ ! -f $@ ] ; then \
-	    echo Panic! $< exists, but $@ does not. \
+	    echo Panic! $< exists, but $@ does not.; \
 	    exit 1; \
 	else exit 0 ; \
 	fi
