@@ -57,9 +57,6 @@ where
 
 #include "HsVersions.h"
 
-import MkIface --tmp
-import HsSyn 	-- tmp
-
 import CmLink
 import CmTypes
 import DriverPipeline
@@ -1151,6 +1148,7 @@ topological_sort include_source_imports summaries
 downsweep :: [FilePath] -> [ModSummary] -> IO [ModSummary]
 downsweep roots old_summaries
    = do rootSummaries <- mapM getRootSummary roots
+	checkDuplicates rootSummaries
         all_summaries
            <- loop (concat (map (\ m -> zip (repeat (fromMaybe "<unknown>" (ml_hs_file (ms_location m))))
 	   				    (ms_imps m)) rootSummaries))
@@ -1178,6 +1176,21 @@ downsweep roots old_summaries
            where 
 		 hs_file = file ++ ".hs"
 		 lhs_file = file ++ ".lhs"
+
+	-- In a root module, the filename is allowed to diverge from the module
+	-- name, so we have to check that there aren't multiple root files
+	-- defining the same module (otherwise the duplicates will be silently
+ 	-- ignored, leading to confusing behaviour).
+	checkDuplicates :: [ModSummary] -> IO ()
+	checkDuplicates summaries = mapM_ check summaries
+  	  where check summ = 
+		  case dups of
+			[] -> return ()
+			files -> multiRootsErr modl files
+		   where modl = ms_mod summ
+			 dups = 
+			   [ fromJust (ml_hs_file (ms_location summ'))
+			   | summ' <- summaries, ms_mod summ' == modl ]
 
         getSummary :: (FilePath,ModuleName) -> IO (Maybe ModSummary)
         getSummary (currentMod,nm)
@@ -1290,4 +1303,10 @@ packageModErr mod
   = throwDyn (CmdLineError (showSDoc (text "module" <+>
 				   quotes (ppr mod) <+>
 				   text "is a package module")))
+
+multiRootsErr mod files
+  = throwDyn (ProgramError (showSDoc (
+	text "module" <+> quotes (ppr mod) <+> 
+	text "is defined in multiple files:" <+>
+	sep (map text files))))
 \end{code}
