@@ -116,8 +116,8 @@ AC_PROG_GNUCPP
 #
 AC_OUTPUT(Makefile)
 
-echo "**************************************************"
+echo "****************************************************"
 echo "Configuration done, ready to either 'make install'"
-echo "or 'make in-place'."
+echo "or 'make in-place', followed by 'make install-docs'."
 echo "(see README and INSTALL files for more info.)"
-echo "**************************************************"
+echo "****************************************************"
