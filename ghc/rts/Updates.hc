@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.21 1999/11/09 15:47:00 simonmar Exp $
+ * $Id: Updates.hc,v 1.22 1999/11/12 10:18:59 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -60,15 +60,7 @@
 	   */								\
 	  TICK_UPD_CON_IN_NEW(sizeW_fromITBL(get_itbl(Su)));		\
 									\
-	  if (Bdescr(updatee)->back != BaseReg) {			\
-		LOCK_CLOSURE(Su);					\
-	  }								\
-									\
- 	  UPD_IND_NOLOCK(Su,R1.p);					\
-									\
-	  /* update the updatee with an indirection 			\
-	   * to the return value 					\
-	   */								\
+ 	  UPD_IND(Su,R1.p);						\
 									\
 	  /* reset Su to the next update frame */			\
 	  Su = ((StgUpdateFrame *)Sp)->link;				\
