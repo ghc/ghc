@@ -7,6 +7,8 @@ dnl
 # Is it there?
 AC_INIT(Makefile.in)
 
+exeext=''
+
 #
 # First off, what system are we running under?
 #
@@ -37,6 +39,7 @@ i[[3456]]86-*-netbsd*)
 i[[3456]]86-*-solaris2*)
 	TargetPlatform=i386-unknown-solaris2;;
 i[[3456]]86-*-cygwin32*)
+	exeext='.exe'
 	TargetPlatform=i386-unknown-cygwin32;;
 m68k-next-nextstep2)
 	TargetPlatform=m68k-next-nextstep2;;
@@ -66,6 +69,7 @@ esac
 echo "Which we'll further canonicalise into: $TargetPlatform"
 
 AC_SUBST(TargetPlatform)
+AC_SUBST(exeext)
 
 AC_CHECK_PROG(PerlCmd,perl,$ac_dir/$ac_word)
 if test -z "$PerlCmd"; then
@@ -85,8 +89,7 @@ chmod u+x conftest
 if test $? -ne 69; then
    echo "It does!"
 else
-   echo "It doesn't!  Perhaps \`#!$PerlCmd' is too long (often 32 characters max)"
-   exit 1
+   echo "It doesn't!  Perhaps \`#!$PerlCmd' is too long (often 32 characters max).."
 fi
 rm -f conftest
 
