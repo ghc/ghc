@@ -14,7 +14,10 @@ module Literal
 
 	, inIntRange, inWordRange, tARGET_MAX_INT, inCharRange
 
-	, word2IntLit, int2WordLit, char2IntLit, int2CharLit
+	, word2IntLit, int2WordLit
+	, intToInt8Lit, intToInt16Lit, intToInt32Lit
+	, wordToWord8Lit, wordToWord16Lit, wordToWord32Lit
+	, char2IntLit, int2CharLit
 	, float2IntLit, int2FloatLit, double2IntLit, int2DoubleLit
 	, addr2IntLit, int2AddrLit, float2DoubleLit, double2FloatLit
 	) where
@@ -35,6 +38,8 @@ import Util		( thenCmp )
 
 import Ratio 		( numerator )
 import FastString	( uniqueOfFS, lengthFS )
+import Int		( Int8,  Int16,  Int32 )
+import Word		( Word8, Word16, Word32 )
 import Char		( ord, chr )
 \end{code}
 
@@ -156,9 +161,13 @@ inCharRange c =  c >= 0 && c <= tARGET_MAX_CHAR
 	Coercions
 	~~~~~~~~~
 \begin{code}
-word2IntLit, int2WordLit, char2IntLit, int2CharLit,
- float2IntLit, int2FloatLit, double2IntLit, int2DoubleLit,
- addr2IntLit, int2AddrLit, float2DoubleLit, double2FloatLit :: Literal -> Literal
+word2IntLit, int2WordLit,
+  intToInt8Lit, intToInt16Lit, intToInt32Lit,
+  wordToWord8Lit, wordToWord16Lit, wordToWord32Lit,
+  char2IntLit, int2CharLit,
+  float2IntLit, int2FloatLit, double2IntLit, int2DoubleLit,
+  addr2IntLit, int2AddrLit, float2DoubleLit, double2FloatLit
+  :: Literal -> Literal
 
 word2IntLit (MachWord w) 
   | w > tARGET_MAX_INT = MachInt (w - tARGET_MAX_WORD - 1)
@@ -167,6 +176,13 @@ word2IntLit (MachWord w)
 int2WordLit (MachInt i)
   | i < 0     = MachWord (1 + tARGET_MAX_WORD + i)	-- (-1)  --->  tARGET_MAX_WORD
   | otherwise = MachWord i
+
+intToInt8Lit    (MachInt  i) = MachInt  (toInteger (fromInteger i :: Int8))
+intToInt16Lit   (MachInt  i) = MachInt  (toInteger (fromInteger i :: Int16))
+intToInt32Lit   (MachInt  i) = MachInt  (toInteger (fromInteger i :: Int32))
+wordToWord8Lit  (MachWord w) = MachWord (toInteger (fromInteger w :: Word8))
+wordToWord16Lit (MachWord w) = MachWord (toInteger (fromInteger w :: Word16))
+wordToWord32Lit (MachWord w) = MachWord (toInteger (fromInteger w :: Word32))
 
 char2IntLit (MachChar c) = MachInt  (toInteger c)
 int2CharLit (MachInt  i) = MachChar (fromInteger i)

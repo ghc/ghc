@@ -20,7 +20,10 @@ import CoreSyn
 import Id		( mkWildId )
 import Literal		( Literal(..), isLitLitLit, mkMachInt, mkMachWord
 			, literalType
-			, word2IntLit, int2WordLit, char2IntLit, int2CharLit
+			, word2IntLit, int2WordLit
+			, intToInt8Lit, intToInt16Lit, intToInt32Lit
+			, wordToWord8Lit, wordToWord16Lit, wordToWord32Lit
+			, char2IntLit, int2CharLit
 			, float2IntLit, int2FloatLit, double2IntLit, int2DoubleLit
 			, addr2IntLit, int2AddrLit, float2DoubleLit, double2FloatLit
 			)
@@ -84,6 +87,12 @@ primOpRule op
 	-- coercions
     primop_rule Word2IntOp 	= oneLit (litCoerce word2IntLit     op_name)
     primop_rule Int2WordOp 	= oneLit (litCoerce int2WordLit     op_name)
+    primop_rule IntToInt8Op 	= oneLit (litCoerce intToInt8Lit    op_name)
+    primop_rule IntToInt16Op 	= oneLit (litCoerce intToInt16Lit   op_name)
+    primop_rule IntToInt32Op 	= oneLit (litCoerce intToInt32Lit   op_name)
+    primop_rule WordToWord8Op 	= oneLit (litCoerce wordToWord8Lit  op_name)
+    primop_rule WordToWord16Op 	= oneLit (litCoerce wordToWord16Lit op_name)
+    primop_rule WordToWord32Op 	= oneLit (litCoerce wordToWord32Lit op_name)
     primop_rule OrdOp   	= oneLit (litCoerce char2IntLit     op_name)
     primop_rule ChrOp    	= oneLit (litCoerce int2CharLit	    op_name)
     primop_rule Float2IntOp	= oneLit (litCoerce float2IntLit    op_name)
