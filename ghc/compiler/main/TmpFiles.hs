@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: TmpFiles.hs,v 1.12 2000/12/11 12:30:58 rrt Exp $
+-- $Id: TmpFiles.hs,v 1.13 2000/12/11 14:42:21 sewardj Exp $
 --
 -- Temporary file management
 --
@@ -19,7 +19,6 @@ module TmpFiles (
 -- main
 import Config
 import Util
-import DriverUtil ( kludgedSystem )
 
 -- hslibs
 import Exception
@@ -81,4 +80,3 @@ add :: IORef [a] -> a -> IO ()
 add var x = do
   xs <- readIORef var
   writeIORef var (x:xs)
-
