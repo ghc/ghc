@@ -655,7 +655,7 @@ nameToCLabel n suffix
 
 primopToCLabel :: PrimOp -> String{-suffix-} -> String
 primopToCLabel primop suffix
-   = let str = "PrelPrimopWrappers_" ++ occNameString (primOpOcc primop) ++ '_':suffix
+   = let str = "GHCziPrimopWrappers_" ++ occNameString (primOpOcc primop) ++ '_':suffix
      in --trace ("primopToCLabel: " ++ str)
         str
 
