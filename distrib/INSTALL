@@ -26,7 +26,7 @@ template to give you a real Makefile.
       not updating unwritable cache ./config.cache
 
 This is a known problem of generated autoconf configure scripts running
-on cygwin32, but harmless (it only means you get to re-do all the configure
+on cygwin, but harmless (it only means you get to re-do all the configure
 tests should you decide to re-run the script.)
 ]
 
@@ -37,7 +37,7 @@ the details of where the different pieces of the bundle are heading when
 -- possibly helpful).
 
 For more information, please consult the installation guide in
-{html,dvi,info}/ghc-2.10/installing{.dvi,.info,_toc.html}.
+{html,dvi,info}/ghc-<version>/installing{.dvi,.info,_toc.html}.
 
 Bug reports/suggestions for improvement to the installation procedure/setup
 (as well as other GHC related troubles you're experiencing, of course),
@@ -48,50 +48,33 @@ Enjoy.
 
 -------Win32 users only----------------------------------------
 NOTE to Win32 users: to enjoy any sort of happiness with the GHC
-tools, you will have to install the cygwin32 toolchain, which dresses
+tools, you will have to install the cygwin toolchain, which dresses
 up the Win32 environment into something more UNIX-like (which
-this initial port of ghc relies on being the case). The cygwin32 tools
+this initial port of ghc relies on being the case). The cygwin tools
 are available from
 
-    ftp://ftp.cygnus.com/pub/gnu-win32/latest/
-       (Cygnus Solutions; Mt. View, CA.)
-    ftp://sunsite.doc.ic.ac.uk/pub/gnu/cygnus/gnu-win32/
-        (Sunsite Northern Europe; Imperial College, London)
-    ftp://ftp.crl.go.jp/pub/GNU/cygnus/gnu-win32/
-	(CRL, Ministry of Posts and Telecom., Japan)
+    http://sourceware.cygnus.com/cygwin/
 
-GHC was built with beta18 of the cygwin32 tools and depends on
-it to work.
+GHC was built with beta20.1 of the cygwin tools and depends on it
+to work.
 
-The GHC tools are also quite picky about Perl, the commonly-used
-Hip/ActiveWare Win32 port of perl5 just ain't Cool Enough (main reason: 
-GHC scripts assume they are talking to an underlying UNIX command
-shell). A basic port of perl5.004 done on top of cygwin32-b18 is
-is available from 
-
-   ftp://ftp.dcs.gla.ac.uk/pub/haskell/glasgow/working/perl5-004pl1.zip
-
-this port is by no means complete, but is sufficient for our needs.
-(more complete perl5 cygwin32 binary bundles are available
- elsewhere - search the web if you need it.)
-
-Install both cygwin32&perl5 before continuing. Couple of things
-to remember doing while installing these two:
+Install cygwin before continuing. Couple of things to remember
+doing while installing these two:
 
   - Create a toplevel /bin directory, and copy bash.exe into it
     as sh.exe (we'll need this for running the configure script.)
     Add /bin to your PATH.
   - Create a toplevel /tmp directory.
-  - If you don't have a good reason not to, it is also recommended
-    that you also put the perl binary inside /bin as well. Don't
-    put it inside the bin/ directory inside the installed cygwin32
-    tree, as this is likely to cause #! not to work on perl scripts
-    (path is likely to exceed 32 chars.)
 
-NOTE: If you're planning to install ghc on a drive different from
-where you're going to compile programs, you either need to
-change the TMPDIR variable in the Makefile to "." or the
-environment variable TMPDIR to "." when running ghc. This is clearly
-not desirable, but the only solution known to work under beta18.
+Additionally, ghc requires perl to operate, so included in the
+binary distribution is a perl binary, (perl.exe in the toplevel
+directory.) Install (as in copy :-) this somewhere along your
+PATH too (/bin is a good choice.)
+
+This is hardly beatiful, but it avoids having to download and install
+yet another package, including piles of (useful) perl libraries that the
+ghc perl code does not require to operate. Besides which, there's a
+dearth of readily useable perl distributions 'out there' that contain
+cygwin-compiled binaries, something we really do depend on.
 
 -------Win32 users only----------------------------------------
