@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.22 2001/01/24 15:46:19 simonmar Exp $
+ * $Id: Storage.h,v 1.23 2001/01/26 14:17:01 simonpj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -259,24 +259,81 @@ void printMutOnceList(generation *gen);
 void printMutableList(generation *gen);
 #endif DEBUG
 
-/* -----------------------------------------------------------------------------
-   Macros for distinguishing data pointers from code pointers
-   -------------------------------------------------------------------------- */
-/*
- * We use some symbols inserted automatically by the linker to decide
- * whether a pointer points to text, data, or user space.  These tests
- * assume that text is lower in the address space than data, which in
- * turn is lower than user allocated memory.  
- *
- * If this assumption is false (say on some strange architecture) then
- * the tests IS_CODE_PTR and IS_DATA_PTR below will need to be
- * modified (and that should be all that's necessary).
- *
- * _start      } start of read-only text space
- * _etext      } end   of read-only text space
- * _end } end of read-write data space 
+/* --------------------------------------------------------------------------
+                      Address space layout macros
+   --------------------------------------------------------------------------
+
+   Here are the assumptions GHC makes about address space layout.
+   Broadly, it thinks there are three sections:
+
+     CODE    Read-only.  Contains code and read-only data (such as
+                info tables)
+             Also called "text"
+
+     DATA    Read-write data.  Contains static closures (and on some
+                architectures, info tables too)
+
+     HEAP    Dynamically-allocated closures
+
+   Three macros identify these three areas:
+     IS_CODE(p), IS_DATA(p), HEAP_ALLOCED(p)
+
+   HEAP_ALLOCED is called FOR EVERY SINGLE CLOSURE during GC.
+   It needs to be FAST.
+
+   Implementation of HEAP_ALLOCED
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   Concerning HEAP, most of the time (certainly under [Static] and [GHCi],
+   we ensure that the heap is allocated above some fixed address HEAP_BASE
+   (defined in MBlock.h).  In this case we set TEXT_BEFORE_HEAP, and we
+   get a nice fast test.
+
+   Sometimes we can't be quite sure.  For example in Windows, we can't 
+   fix where our heap address space comes from.  In this case we un-set 
+   TEXT_BEFORE_HEAP. That makes it more expensive to test whether a pointer
+   comes from the HEAP section, because we need to look at the allocator's
+   address maps (see HEAP_ALLOCED macro)
+
+   Implementation of CODE and DATA
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   Concerning CODE and DATA, there are three main regimes:
+
+     [Static] Totally      The segments are contiguous, and laid out 
+     statically linked     exactly as above
+
+     [GHCi] Static,        GHCi may load new modules, but it knows the
+     except for GHCi       address map, so for any given address it can
+                           still tell which section it belongs to
+
+     [DLL] OS-supported    Chunks of CODE and DATA may be mixed in 
+     dynamic loading       the address space, and we can't tell how
+
+
+   For the [Static] case, we assume memory is laid out like this
+   (in order of increasing addresses)
+
+       Start of memory
+           CODE section
+       TEXT_SECTION_END_MARKER   (usually _etext)
+           DATA section
+       DATA_SECTION_END_MARKER   (usually _end)
+           ???
+       HEAP_BASE
+           HEAP section
+
+   For the [GHCi] case, we have to consult GHCi's dynamic linker's
+   address maps, which is done by macros
+         is_dynamically_loaded_code_or_rodata_ptr
+         is_dynamically_loaded_code_or_rwdata_ptr
+
+   For the [DLL] case, IS_CODE and IS_DATA are really not usable at all.
  */
-extern StgFun start;
+
+
+#undef TEXT_BEFORE_HEAP
+#ifndef mingw32_TARGET_OS
+#define TEXT_BEFORE_HEAP 1
+#endif
 
 extern void* TEXT_SECTION_END_MARKER_DECL;
 extern void* DATA_SECTION_END_MARKER_DECL;
@@ -298,6 +355,9 @@ extern void* DATA_SECTION_END_MARKER_DECL;
 
 /* The HEAP_ALLOCED test below is called FOR EVERY SINGLE CLOSURE
  * during GC.  It needs to be FAST.
+ *
+ * BEWARE: when we're dynamically loading code (for GHCi), make sure
+ * that we don't load any code above HEAP_BASE, or this test won't work.
  */
 #ifdef TEXT_BEFORE_HEAP
 # define HEAP_ALLOCED(x)  ((StgPtr)(x) >= (StgPtr)(HEAP_BASE))
@@ -306,6 +366,75 @@ extern int is_heap_alloced(const void* x);
 # define HEAP_ALLOCED(x)  (is_heap_alloced(x))
 #endif
 
+
+/* --------------------------------------------------------------------------
+   Macros for distinguishing data pointers from code pointers
+   --------------------------------------------------------------------------
+
+  Specification
+  ~~~~~~~~~~~~~
+  The garbage collector needs to make some critical distinctions between pointers.
+  In particular we need
+ 
+     LOOKS_LIKE_GHC_INFO(p)          p points to an info table
+
+  For both of these macros, p is
+      *either* a pointer to a closure (static or heap allocated)
+      *or* a return address on the (Haskell) stack
+
+  (Return addresses are in fact info-pointers, so that the Haskell stack
+  looks very like a chunk of heap.)
+
+  The garbage collector uses LOOKS_LIKE_GHC_INFO when walking the stack, as it
+  walks over the "pending arguments" on its way to the next return address.
+  It is called moderately often, but not as often as HEAP_ALLOCED
+
+
+  Implementation
+  ~~~~~~~~~~~~~~
+  LOOKS_LIKE_GHC_INFO is more complicated because of the need to distinguish 
+  between static closures and info tables.  It's a known portability problem.
+  We have three approaches:
+
+  Plan A: Address-space partitioning.  
+    Keep info tables in the (single, contiguous) text segment:    IS_CODE_PTR(p)
+    and static closures in the (single, contiguous) data segment: IS_DATA_PTR(p)
+
+  Plan A can fail for two reasons:
+    * In many environments (eg. dynamic loading),
+      text and data aren't in a single contiguous range.  
+    * When we compile through vanilla C (no mangling) we sometimes
+      can't guaranteee to put info tables in the text section.  This
+      happens eg. on MacOS where the C compiler refuses to put const
+      data in the text section if it has any code pointers in it
+      (which info tables do *only* when we're compiling without
+      TABLES_NEXT_TO_CODE).
+    
+  Hence, Plan B: (compile-via-C-with-mangling, or native code generation)
+    Put a zero word before each static closure.
+    When compiling to native code, or via C-with-mangling, info tables
+    are laid out "backwards" from the address specified in the info pointer
+    (the entry code goes forward from the info pointer).  Hence, the word
+    before the one referenced the info pointer is part of the info table,
+    and is guaranteed non-zero.
+
+    For reasons nobody seems to fully understand, the statically-allocated tables
+    of INTLIKE and CHARLIKE closures can't have this zero word, so we
+    have to test separately for them.
+
+    Plan B fails altogether for the compile-through-vanilla-C route, because
+    info tables aren't laid out backwards.
+
+
+  Hence, Plan C: (unregisterised, compile-through-vanilla-C route only)
+    If we didn't manage to get info tables into the text section, then
+    we can distinguish between a static closure pointer and an info
+    pointer as follows:  the first word of an info table is a code pointer,
+    and therefore in text space, whereas the first word of a closure pointer
+    is an info pointer, and therefore not.  Shazam!
+*/
+
+
 /* When working with Win32 DLLs, static closures are identified by
    being prefixed with a zero word. This is needed so that we can
    distinguish between pointers to static closures and (reversed!)
@@ -313,7 +442,7 @@ extern int is_heap_alloced(const void* x);
 
    This 'scheme' breaks down for closure tables such as CHARLIKE,
    so we catch these separately.
-   
+  
    LOOKS_LIKE_STATIC_CLOSURE() 
        - discriminates between static closures and info tbls
          (needed by LOOKS_LIKE_GHC_INFO() below - [Win32 DLLs only.])
@@ -374,6 +503,7 @@ extern int is_heap_alloced(const void* x);
 # define LOOKS_LIKE_GHC_INFO(info) (!HEAP_ALLOCED(info) \
                                     && !LOOKS_LIKE_STATIC_CLOSURE(info))
 #endif
+
 
 /* -----------------------------------------------------------------------------
    Macros for calculating how big a closure will be (used during allocation)
