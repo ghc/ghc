@@ -36,7 +36,7 @@ import IdInfo           ( vanillaIdInfo, setUnfoldingInfo )
 import CoreUnfold       ( mkTopUnfolding ) 
 
 import Unique		( Uniquable(..), mkBuiltinUnique )
-import SrcLoc		( mkBuiltinSrcLoc )
+import SrcLoc		( builtinSrcLoc )
 import Maybes		( maybeToBool, expectJust )
 import Outputable 
 
@@ -473,6 +473,6 @@ genericNames :: [Name]
 genericNames = [mkSysLocalName (mkBuiltinUnique i) (_PK_ ('g' : show i)) | i <- [1..]]
 (g1:g2:g3:_) = genericNames
 
-mk_hs_lam pats body = HsPar (HsLam (mkSimpleMatch pats body Nothing mkBuiltinSrcLoc))
+mk_hs_lam pats body = HsPar (HsLam (mkSimpleMatch pats body Nothing builtinSrcLoc))
 idexpr		    = mk_hs_lam [VarPatIn g3] (HsVar g3)
 \end{code}
