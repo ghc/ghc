@@ -4,8 +4,6 @@ for various bits of the RTS.  They are linked
 in instead of the defaults.
 */
 
-#include <string.h>
-
 /* For GHC 4.08, we are relying on the fact that RtsFlags has
  * compatibile layout with the current version, because we're
  * #including the current version of RtsFlags.h below.  4.08 didn't
@@ -21,6 +19,8 @@ in instead of the defaults.
 #endif
 
 #include "HsFFI.h"
+
+#include <string.h>
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
