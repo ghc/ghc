@@ -41,15 +41,12 @@ The easy way is to go to the WWW page, which should be self-explanatory:
 
 We supply binary builds in the native package format for various
 flavours of Linux and BSD, and in InstallShield form for Windows
-folks.  Everybody else gets a .tar.gz which can be installed where you
-want.
+folks.  Binary builds for other platforms are available as a .tar.gz
+which can be installed wherever you want.  The source distribution is
+also available from the same place.
 
 Once you have the distribution, please follow the pointers in the
 README file to find all of the documentation about this release.
-
-The source distribution is freely available via the World-Wide Web,
-under a BSD-style license.  See below for download details.  Pre-built
-packages for Linux, FreeBSD, Solaris and Win32 are also available.
 
 
 More details about what's new
@@ -110,7 +107,8 @@ platforms, together with an interactive system for convenient, quick
 development.  The distribution includes space and time profiling
 facilities, a large collection of libraries, and support for various
 language extensions, including concurrency, exceptions, and foreign
-language interfaces (C, whatever).
+language interfaces (C, whatever).  GHC is distributed under a
+BSD-style open source license.
 
 A wide variety of Haskell related resources (tutorials, libraries,
 specifications, documentation, compilers, interpreters, references,
