@@ -635,8 +635,8 @@ shortOutIndirections binds
   | otherwise 		  = [Rec (flattenBinds binds')]	-- See Note [Rules and indirect-zapping]
   where
     ind_env 	       = makeIndEnv binds
-    exp_ids 	       = varSetElems ind_env
-    exp_id_set	       = mkVarSet exp_ids
+    exp_ids 	       = varSetElems ind_env	-- These exported Ids are the subjects
+    exp_id_set	       = mkVarSet exp_ids	-- of the indirection-elimination
     no_need_to_flatten = all (null . rulesRules . idSpecialisation) exp_ids
     binds' 	       = concatMap zap binds
 
