@@ -41,14 +41,14 @@ import Usage		( pprUVar, GenUsage(..), SYN_IE(Usage), SYN_IE(UVar) )
 
 -- others:
 import CStrings		( identToC )
-import CmdLineOpts	( opt_OmitInterfacePragmas )
+import CmdLineOpts	( opt_OmitInterfacePragmas, opt_PprUserLength )
 import Maybes		( maybeToBool )
 import Name	{-	(  nameString, Name{-instance Outputable-}, 
 			   OccName, pprOccName, getOccString
 			) -}
-import Outputable	( ifPprShowAll, interpp'SP, Outputable(..) )
+import Outputable	( PprStyle(..), codeStyle, userStyle, ifaceStyle,
+			  ifPprShowAll, interpp'SP, Outputable(..) )
 import PprEnv
-import PprStyle		( PprStyle(..), codeStyle, userStyle, ifaceStyle )
 import Pretty
 import UniqFM		( addToUFM_Directly, lookupUFM_Directly{-, ufmToList ToDo:rm-},
 			  Uniquable(..) )
@@ -59,7 +59,7 @@ import Util
 \begin{code}
 instance (Eq tyvar, Outputable tyvar,
 	  Eq uvar,  Outputable uvar  ) => Outputable (GenType tyvar uvar) where
-    ppr PprQuote ty = quotes (pprGenType PprForUser ty)
+    ppr PprQuote ty = quotes (pprGenType (PprForUser opt_PprUserLength) ty)
     ppr sty ty = pprGenType sty ty
 
 instance Outputable TyCon where
@@ -73,16 +73,16 @@ instance Outputable ty => Outputable (GenClassOp ty) where
     ppr sty clsop = pprGenClassOp sty clsop
 
 instance Outputable (GenTyVar flexi) where
-    ppr PprQuote ty = quotes (pprGenTyVar PprForUser ty)
+    ppr PprQuote ty = quotes (pprGenTyVar (PprForUser opt_PprUserLength) ty)
     ppr sty tv = pprGenTyVar sty tv
 
 -- and two SPECIALIZEd ones:
 instance Outputable {-Type, i.e.:-}(GenType TyVar UVar) where
-    ppr PprQuote ty  = quotes (pprGenType PprForUser ty)
+    ppr PprQuote ty  = quotes (pprGenType (PprForUser opt_PprUserLength) ty)
     ppr other_sty ty = pprGenType other_sty ty
 
 instance Outputable {-TyVar, i.e.:-}(GenTyVar Usage) where
-    ppr PprQuote ty   = quotes (pprGenTyVar PprForUser ty)
+    ppr PprQuote ty   = quotes (pprGenTyVar (PprForUser opt_PprUserLength) ty)
     ppr other_sty  ty = pprGenTyVar other_sty ty
 \end{code}
 
