@@ -15,7 +15,7 @@ module Type (
 	mkSynTy, isSynTy,
 
 	mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
-	applyTy, applyTys,
+	applyTy, applyTys, isForAllTy,
 
 	TauType, RhoType, SigmaType, ThetaType,
 	isTauTy,
@@ -332,6 +332,11 @@ splitForAllTy_maybe :: GenType flexi -> Maybe (GenTyVar flexi, GenType flexi)
 splitForAllTy_maybe (SynTy _ ty)        = splitForAllTy_maybe ty
 splitForAllTy_maybe (ForAllTy tyvar ty) = Just(tyvar, ty)
 splitForAllTy_maybe _		        = Nothing
+
+isForAllTy :: GenType flexi -> Bool
+isForAllTy (SynTy _ ty)        = isForAllTy ty
+isForAllTy (ForAllTy tyvar ty) = True
+isForAllTy _		     = False
 
 splitForAllTys :: GenType flexi -> ([GenTyVar flexi], GenType flexi)
 splitForAllTys ty = split ty ty []
