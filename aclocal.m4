@@ -273,8 +273,8 @@ fi;
 changequote([, ])dnl
 ])
 if test -d $srcdir/ghc -a ! -f $srcdir/ghc/compiler/parser/Parser.hs; then
-  FP_COMPARE_VERSIONS([$fptools_cv_happy_version],[-lt],[1.14],
-  [AC_MSG_ERROR([Happy version 1.14 or later is required to compile GHC.])])[]dnl
+  FP_COMPARE_VERSIONS([$fptools_cv_happy_version],[-lt],[1.15],
+  [AC_MSG_ERROR([Happy version 1.15 or later is required to compile GHC.])])[]dnl
 fi
 HappyVersion=$fptools_cv_happy_version;
 AC_SUBST(HappyVersion)
