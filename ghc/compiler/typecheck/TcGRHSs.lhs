@@ -53,7 +53,7 @@ tcGRHS expected_ty (GRHS guard expr locn)
   where
     tc_stmts []		  = tcExpr expr expected_ty	  `thenTc`    \ (expr2, expr_lie) ->
 			    returnTc (([], expr2), expr_lie)
-    tc_stmts (stmt:stmts) = tcStmt tcExpr ListComp (\x->x) combine stmt $
+    tc_stmts (stmt:stmts) = tcStmt tcExpr Guard (\x->x) combine stmt $
 			    tc_stmts stmts
 
     combine stmt _ (stmts, expr) = (stmt:stmts, expr)
