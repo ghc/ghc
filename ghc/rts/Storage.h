@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.31 2001/03/02 16:15:53 simonmar Exp $
+ * $Id: Storage.h,v 1.32 2001/05/03 16:33:27 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -254,7 +254,7 @@ updateWithPermIndirection(const StgInfoTable *info, StgClosure *p1, StgClosure *
 #if defined(DEBUG)
 void printMutOnceList(generation *gen);
 void printMutableList(generation *gen);
-#endif DEBUG
+#endif /* DEBUG */
 
 /* --------------------------------------------------------------------------
                       Address space layout macros
@@ -535,5 +535,5 @@ static __inline__ StgOffset mut_arr_ptrs_sizeW( StgMutArrPtrs* x )
 static __inline__ StgWord tso_sizeW ( StgTSO *tso )
 { return TSO_STRUCT_SIZEW + tso->stack_size; }
 
-#endif STORAGE_H
+#endif /* STORAGE_H */
 

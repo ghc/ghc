@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: BlockAlloc.h,v 1.8 1999/11/09 15:46:49 simonmar Exp $
+ * $Id: BlockAlloc.h,v 1.9 2001/05/03 16:32:55 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -48,4 +48,4 @@ extern void checkFreeListSanity(void);
 nat         countFreeList(void);
 #endif
 
-#endif BLOCK_ALLOC_H
+#endif /* BLOCK_ALLOC_H */
