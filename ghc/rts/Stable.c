@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.c,v 1.12 2000/09/04 15:08:42 simonmar Exp $
+ * $Id: Stable.c,v 1.13 2000/09/04 15:17:03 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -107,7 +107,7 @@ unsigned int SPT_size;
  *
  * A stable pointer has a weighted reference count N attached to it
  * (actually in its upper 5 bits), which represents the weight
- * 2^N.  The stable name entry keeps a 32-bit reference count, which
+ * 2^(N-1).  The stable name entry keeps a 32-bit reference count, which
  * represents any weight between 1 and 2^32 (represented as zero).
  * When the weight is 2^32, the stable name table owns "all" of the
  * stable pointers to this object, and the entry can be garbage
@@ -225,7 +225,7 @@ StgStablePtr
 getStablePtr(StgPtr p)
 {
   StgWord sn = lookupStableName(p);
-  StgWord weight, weight_2;
+  StgWord weight, n;
   weight = stable_ptr_table[sn].weight;
   if (weight == 0) {
     weight = (StgWord)1 << (BITS_IN(StgWord)-1);
@@ -238,11 +238,11 @@ getStablePtr(StgPtr p)
   else {
     weight /= 2;
     /* find log2(weight) */
-    for (weight_2 = 1; weight != 1; weight_2++) {
+    for (n = 0; weight != 1; n++) {
       weight >>= 1;
     }
-    stable_ptr_table[sn].weight -= 1 << (weight_2 - 1);
-    return (StgStablePtr)(sn + (weight_2 << STABLEPTR_WEIGHT_SHIFT));
+    stable_ptr_table[sn].weight -= 1 << n;
+    return (StgStablePtr)(sn + ((n+1) << STABLEPTR_WEIGHT_SHIFT));
   }
 }
 
@@ -322,7 +322,7 @@ markStablePtrTable(rtsBool full)
 	  }
 	  (StgClosure *)p->addr = new;
 	}
-	IF_DEBUG(stable, fprintf(stderr,"Stable ptr %d still alive at %p, weight %d\n", p - stable_ptr_table, new, p->weight));
+	IF_DEBUG(stable, fprintf(stderr,"Stable ptr %d still alive at %p, weight %u\n", p - stable_ptr_table, new, p->weight));
       }
     }
   }
