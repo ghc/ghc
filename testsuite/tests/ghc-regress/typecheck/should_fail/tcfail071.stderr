@@ -1,10 +1,8 @@
 
 tcfail071.hs:8:
     Mismatched contexts
-    When matching the contexts of the signatures for
-      g :: forall c. c -> c
-      f :: forall c. (Ord c) => c -> c
-    The signature contexts in a mutually recursive group should all be identical
+    When matching the contexts of the signatures for `g' and `f'
+	(the signature contexts in a mutually recursive group should all be identical)
     When generalising the type(s) for g, f
 
 tcfail071.hs:10:
