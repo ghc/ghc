@@ -574,7 +574,7 @@ instance Bits Int64 where
     isSigned _                 = True
 
 {-# RULES
-"fromIntegral/a->Int64" fromIntegral = \x -> case fromIntegral x of I# x# -> I64# (intToInt64# x#)
+"fromIntegral/a->Int64" fromIntegral = \x -> case fromIntegral x of I# x# -> I64# x#
 "fromIntegral/Int64->a" fromIntegral = \(I64# x#) -> fromIntegral (I# x#)
   #-}
 
