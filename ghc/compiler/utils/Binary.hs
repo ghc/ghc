@@ -3,6 +3,12 @@
 -- (c) The University of Glasgow 2002
 --
 -- Binary I/O library, with special tweaks for GHC
+--
+-- Based on the nhc98 Binary library, which is copyright
+-- (c) Malcolm Wallace and Colin Runciman, University of York, 1998.
+-- Under the terms of the license for that software, we must tell you
+-- where you can obtain the original version of the Binary library, namely
+--     http://www.cs.york.ac.uk/fp/nhc98/
 
 module Binary
   ( {-type-}  Bin,
