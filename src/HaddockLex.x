@@ -34,12 +34,11 @@ $ident    = [$alphanum \_\.\!\#\$\%\&\*\+\/\<\=\>\?\@\\\\\^\|\-\~]
  $ws*			{ begin string }		
 }
 
--- beginning of a line: don't ignore whitespace, unless this is the start
--- of a new paragraph.
+-- beginning of a line
 <line> {
   $ws* \>		{ begin birdtrack }
   $ws* \n		{ token TokPara `andBegin` para }
-  () 			{ begin string }
+  $ws* 			{ begin string }
 }
 
 <birdtrack> .*	\n?	{ strtoken TokBirdTrack `andBegin` line }
@@ -50,8 +49,9 @@ $ident    = [$alphanum \_\.\!\#\$\%\&\*\+\/\<\=\>\?\@\\\\\^\|\-\~]
   \#.*\#			{ strtoken $ \s -> TokAName (init (tail s)) }
   [\'\`] $ident+ [\'\`]		{ ident }
   \\ .				{ strtoken (TokString . tail) }
-  -- allow single-quotes to be literal if they don't surround identifiers
-  [\'\`]			{ strtoken TokString }
+  -- allow special characters through if they don't fit one of the previous
+  -- patterns.
+  [\'\`\<\#\\]			{ strtoken TokString }
   [^ $special \< \# \n \'\` \\]* \n { strtoken TokString `andBegin` line }
   [^ $special \< \# \n \'\` \\]+    { strtoken TokString }
 }
@@ -83,7 +83,7 @@ alexGetChar (_, c:cs) = Just (c, (c,cs))
 alexInputPrevChar (c,_) = c
 
 tokenise :: String -> [Token]
-tokenise str = let toks = go ('\n',str) para in {- trace (show toks) -} toks
+tokenise str = let toks = go ('\n',str) para in {-trace (show toks)-} toks
   where go inp@(_,str) sc =
 	  case alexScan inp sc of
 		AlexEOF -> []
