@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------------
- * $Id: daVinci.c,v 1.3 2003/08/01 14:58:48 panne Exp $
+ * $Id: daVinci.c,v 1.4 2003/08/01 15:10:34 panne Exp $
  *									
  *	Copyright (C) 1995-2000 University of Oxford
  *									
@@ -20,6 +20,7 @@
 #include "daVinci.h"
 #include <stdarg.h>
 #include <string.h>
+#include <ctype.h>
 
 static char* extra_space(int);
 static void recur_graphToDaVinci(int,Matrix *, Matrix *,char*,int);
@@ -292,7 +293,6 @@ static char *printUncompressNode(int node, object_cost *ptr) {
   char name   [MAX_FUNNAME+40];
   char module [MAX_FUNNAME+40];
   char group  [MAX_FUNNAME+40];
-  char syncs[MAX_FUNNAME+40];
   char head [MAX_FUNNAME+40];
   char comp [MAX_FUNNAME+40];
   char comm [MAX_FUNNAME+40];
@@ -325,7 +325,6 @@ static char *printUncompressNode(int node, object_cost *ptr) {
     sprintf(group,"%s",tempstring3+1);
   }
 
-  sprintf(syncs,"");
   if (NodeviewTime) {
 
     sprintf(head, "Metric   Total  \\n");
@@ -357,9 +356,6 @@ static char *printUncompressNode(int node, object_cost *ptr) {
   strcat(res,group);
   strcat(res,"\\n\\n");
  
-  /* padding = extra_space((width-strlen(syncs)+3)/2); */
-  //strcat(res,padding);
-  strcat(res,syncs);
   strcat(res,head);
   strcat(res,comp);
   strcat(res,comm);
@@ -461,7 +457,7 @@ int percentToColour(double colour) {
 
 static void recur_graphToDaVinci(int node,Matrix *graph,Matrix *costs,char* p_zeronodes, int mode){
   object_cost *ptr;
-  int i,j,no_children=0,*children,colour;
+  int i,j,no_children=0,*children=NULL,colour;
   char *node_str;
   char tempnode[MAX_FUNNAME];
   if (Mat(int,*graph,node,node)<0) {
@@ -532,7 +528,7 @@ static void recur_graphToDaVinci(int node,Matrix *graph,Matrix *costs,char* p_ze
 
 static void recur_graphToDaVinci_old(int node,Matrix *graph, Matrix *costs) {
   object_cost *ptr;
-  int i,j,no_children=0,*children,colour;
+  int i,j,no_children=0,*children=NULL,colour;
   char *node_str;
   if (Mat(int,*graph,node,node)<0) {
     fprintf(logFile,"r(\"%d\") ",node);
