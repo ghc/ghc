@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.57 $
- * $Date: 2000/04/27 16:35:29 $
+ * $Revision: 1.58 $
+ * $Date: 2000/05/12 13:34:07 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -2528,7 +2528,6 @@ Type type; {
       SymX(putMVarzh_fast)            \
       SymX(newMVarzh_fast)            \
       SymX(takeMVarzh_fast)           \
-      SymX(takeMaybeMVarzh_fast)      \
       SymX(catchzh_fast)              \
       SymX(raisezh_fast)              \
       SymX(delayzh_fast)              \
@@ -2644,20 +2643,13 @@ Type type; {
       SymX(__imp__tzname)            \
       SymX(__imp__timezone)          \
       SymX(tzset)                    \
-      Sym(log)                       \
-      Sym(exp)                       \
+      SymX(log)                      \
+      SymX(exp)                      \
       Sym(sqrt)                      \
       Sym(sin)                       \
       Sym(cos)                       \
-      Sym(tan)                       \
-      Sym(asin)                      \
-      Sym(acos)                      \
-      Sym(atan)                      \
-      Sym(sinh)                      \
-      Sym(cosh)                      \
-      Sym(tanh)                      \
-      Sym(pow)                       \
-      Sym(__errno)                   \
+      SymX(pow)                      \
+      SymX(__errno)                  \
       Sym(stat)                      \
       Sym(fstat)                     \
       Sym(gettimeofday)              \
@@ -2668,7 +2660,7 @@ Type type; {
 
 
 #define EXTERN_SYMS_linux            \
-      SymX(__errno_location)          \
+      SymX(__errno_location)         \
       Sym(__xstat)                   \
       Sym(__fxstat)                  \
       Sym(__lxstat)                  \

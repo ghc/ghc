@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.71 $
- * $Date: 2000/05/12 11:59:39 $
+ * $Revision: 1.72 $
+ * $Date: 2000/05/12 13:34:06 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -138,7 +138,7 @@ static ConId currentModule_failed = NIL; /* Remember failed module from :r */
 
 #ifdef DIET_HEP
 
-#include "diet_hep.h"
+#include "DietHEP.h"
 
 static int diet_hep_initialised = 0;
 

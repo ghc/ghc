@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.76 $
- * $Date: 2000/05/10 09:02:25 $
+ * $Revision: 1.77 $
+ * $Date: 2000/05/12 13:34:07 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -20,7 +20,13 @@
 #include "object.h"
 #include <setjmp.h>
 #include "Stg.h"
-#include "Storage.h"      /* for MarkRoot */
+
+/* #include "Storage.h"
+   We'd like to, but Storage.h and storage.h look the same under
+   Cygwin, alas, causing compilation chaos.  So just copy what
+   we need to know, which is ...
+*/
+extern StgClosure* MarkRoot ( StgClosure* );
 
 /*#define DEBUG_SHOWUSE*/
 
