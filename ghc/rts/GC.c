@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.133 2002/04/13 05:16:25 sof Exp $
+ * $Id: GC.c,v 1.134 2002/04/19 10:25:00 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1104,31 +1104,41 @@ traverse_weak_ptr_list(void)
 	      continue;
 	  }
 	  
-	  ASSERT(get_itbl(w)->type == WEAK);
-	  
-	  /* Now, check whether the key is reachable.
-	   */
-	  new = isAlive(w->key);
-	  if (new != NULL) {
-	      w->key = new;
-	      // evacuate the value and finalizer 
-	      w->value = evacuate(w->value);
-	      w->finalizer = evacuate(w->finalizer);
-	      // remove this weak ptr from the old_weak_ptr list 
-	      *last_w = w->link;
-	      // and put it on the new weak ptr list 
-	      next_w  = w->link;
-	      w->link = weak_ptr_list;
-	      weak_ptr_list = w;
-	      flag = rtsTrue;
-	      IF_DEBUG(weak, belch("Weak pointer still alive at %p -> %p", 
-				   w, w->key));
+	  switch (get_itbl(w)->type) {
+
+	  case EVACUATED:
+	      next_w = (StgWeak *)((StgEvacuated *)w)->evacuee;
+	      *last_w = next_w;
 	      continue;
-	  }
-	  else {
-	      last_w = &(w->link);
-	      next_w = w->link;
-	      continue;
+
+	  case WEAK:
+	      /* Now, check whether the key is reachable.
+	       */
+	      new = isAlive(w->key);
+	      if (new != NULL) {
+		  w->key = new;
+		  // evacuate the value and finalizer 
+		  w->value = evacuate(w->value);
+		  w->finalizer = evacuate(w->finalizer);
+		  // remove this weak ptr from the old_weak_ptr list 
+		  *last_w = w->link;
+		  // and put it on the new weak ptr list 
+		  next_w  = w->link;
+		  w->link = weak_ptr_list;
+		  weak_ptr_list = w;
+		  flag = rtsTrue;
+		  IF_DEBUG(weak, belch("Weak pointer still alive at %p -> %p", 
+				       w, w->key));
+		  continue;
+	      }
+	      else {
+		  last_w = &(w->link);
+		  next_w = w->link;
+		  continue;
+	      }
+
+	  default:
+	      barf("traverse_weak_ptr_list: not WEAK");
 	  }
       }
       
@@ -1241,6 +1251,9 @@ mark_weak_ptr_list ( StgWeak **list )
 
   last_w = list;
   for (w = *list; w; w = w->link) {
+      // w might be WEAK, EVACUATED, or DEAD_WEAK (actually CON_STATIC) here
+      ASSERT(w->header.info == &stg_DEAD_WEAK_info 
+	     || get_itbl(w)->type == WEAK || get_itbl(w)->type == EVACUATED);
       (StgClosure *)w = evacuate((StgClosure *)w);
       *last_w = w;
       last_w = &(w->link);
