@@ -18,6 +18,7 @@ module Monad (
     join,           -- :: (Monad m) => m (m a) -> m a
     mapAndUnzipM,   -- :: (Monad m) => (a -> m (b,c)) -> [a] -> m ([b], [c])
     zipWithM,       -- :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m [c]
+    zipWithM_,	    -- :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m ()
     foldM,          -- :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m a 
     when,           -- :: (Monad m) => Bool -> m () -> m ()
     unless,         -- :: (Monad m) => Bool -> m () -> m ()
@@ -85,6 +86,9 @@ mapAndUnzipM f xs = accumulate (map f xs) >>= return . unzip
 
 zipWithM         :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m [c]
 zipWithM f xs ys = accumulate (zipWith f xs ys)
+
+zipWithM_ :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m ()
+zipWithM_ f xs ys = sequence (zipWith f xs ys)
 
 foldM            :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m a
 foldM f a []     = return a
