@@ -20,7 +20,7 @@ module TcUnify (
 
 
 import HsSyn		( HsExpr(..) )
-import TcHsSyn		( TypecheckedHsExpr, TcPat, mkHsLet,
+import TcHsSyn		( mkHsLet,
 			  ExprCoFn, idCoercion, isIdCoercion, mkCoercion, (<.>), (<$>) )
 import TypeRep		( Type(..), SourceType(..), TyNote(..), openKindCon )
 
@@ -37,7 +37,6 @@ import TcType		( TcKind, TcType, TcSigmaType, TcRhoType, TcTyVar, TcTauType,
 			  eqKind, openTypeKind, liftedTypeKind, isTypeKind, mkArrowKind,
 			  hasMoreBoxityInfo, allDistinctTyVars
 			)
-import qualified Type	( getTyVar_maybe )
 import Inst		( newDicts, instToId, tcInstCall )
 import TcMType		( getTcTyVar, putTcTyVar, tcInstType, readHoleResult, newKindVar,
 			  newTyVarTy, newTyVarTys, newOpenTypeKind, newHoleTyVarTy, 
@@ -55,7 +54,6 @@ import Name		( isSystemName )
 import ErrUtils		( Message )
 import BasicTypes	( Boxity, Arity, isBoxed )
 import Util		( equalLength, notNull )
-import Maybe		( isNothing )
 import Outputable
 \end{code}
 

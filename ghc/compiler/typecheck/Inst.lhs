@@ -39,7 +39,7 @@ module Inst (
 import {-# SOURCE #-}	TcExpr( tcExpr )
 
 import HsSyn	( HsLit(..), HsOverLit(..), HsExpr(..) )
-import TcHsSyn	( TcExpr, TcId, TcIdSet, TypecheckedHsExpr,
+import TcHsSyn	( TcExpr, TcId, TcIdSet, 
 		  mkHsTyApp, mkHsDictApp, mkHsConApp, zonkId,
 		  mkCoercion, ExprCoFn
 		)
@@ -52,7 +52,7 @@ import TcMType	( zonkTcType, zonkTcTypes, zonkTcPredType, zapToType,
 import TcType	( Type, TcType, TcThetaType, TcTyVarSet,
 		  SourceType(..), PredType, TyVarDetails(VanillaTv),
 		  tcSplitForAllTys, tcSplitForAllTys, mkTyConApp,
-		  tcSplitMethodTy, tcSplitPhiTy, mkGenTyConApp,
+		  tcSplitPhiTy, mkGenTyConApp,
 		  isIntTy,isFloatTy, isIntegerTy, isDoubleTy,
 		  tcIsTyVarTy, mkPredTy, mkTyVarTy, mkTyVarTys,
 		  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tidyPred,

@@ -28,7 +28,7 @@ import CoreUnfold
 import CoreLint		( lintUnfolding )
 import WorkWrap		( mkWrapper )
 
-import Id		( Id, mkVanillaGlobal, mkLocalId, idInfo )
+import Id		( Id, mkVanillaGlobal, mkLocalId )
 import MkId		( mkFCallId )
 import IdInfo
 import TyCon		( tyConDataCons, tyConTyVars )
