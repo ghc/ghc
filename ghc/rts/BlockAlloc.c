@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: BlockAlloc.c,v 1.4 1999/02/05 16:02:35 simonm Exp $
+ * $Id: BlockAlloc.c,v 1.5 1999/03/26 14:54:43 simonm Exp $
  *
  * (c) The GHC Team 1998-1999
  * 
@@ -88,8 +88,10 @@ allocGroup(nat n)
   initMBlock(mblock);		/* initialise the start fields */
   bd = FIRST_BDESCR(mblock);
   initGroup(n,bd);		/* we know the group will fit */
-  initGroup(BLOCKS_PER_MBLOCK-n, bd+n);
-  freeGroup(bd+n);      	/* add the rest on to the free list */
+  if (n < BLOCKS_PER_MBLOCK) {
+    initGroup(BLOCKS_PER_MBLOCK-n, bd+n);
+    freeGroup(bd+n);      	/* add the rest on to the free list */
+  }
   return bd;
 }
 
