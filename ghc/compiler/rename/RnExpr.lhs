@@ -121,10 +121,10 @@ rnPat (ConOpPatIn pat1 con _ pat2)
 
     getModeRn		`thenRn` \ mode ->
 	-- See comments with rnExpr (OpApp ...)
-    (case mode of
-	InterfaceMode -> returnRn (ConOpPatIn pat1' con' defaultFixity pat2')
-	SourceMode    -> lookupFixityRn con'	`thenRn` \ fixity ->
-			 mkConOpPatRn pat1' con' fixity pat2'
+    (if isInterfaceMode mode
+	then returnRn (ConOpPatIn pat1' con' defaultFixity pat2')
+	else lookupFixityRn con'	`thenRn` \ fixity ->
+	     mkConOpPatRn pat1' con' fixity pat2'
     )								`thenRn` \ pat' ->
     returnRn (pat', fvs1 `plusFV` fvs2 `addOneFV` con')
 
@@ -313,10 +313,10 @@ rnExpr (OpApp e1 op _ e2)
 	-- that the deriving code generator got the association correct
 	-- Don't even look up the fixity when in interface mode
     getModeRn				`thenRn` \ mode -> 
-    (case mode of
-	SourceMode    -> lookupFixityRn op_name		`thenRn` \ fixity ->
-			 mkOpAppRn e1' op' fixity e2'
-	InterfaceMode -> returnRn (OpApp e1' op' defaultFixity e2')
+    (if isInterfaceMode mode
+	then returnRn (OpApp e1' op' defaultFixity e2')
+	else lookupFixityRn op_name		`thenRn` \ fixity ->
+	     mkOpAppRn e1' op' fixity e2'
     )					`thenRn` \ final_e -> 
 
     returnRn (final_e,
@@ -734,10 +734,10 @@ checkPrecMatch True op (Match _ (p1:p2:_) _ _)
 	-- True indicates an infix lhs
   = getModeRn 		`thenRn` \ mode ->
 	-- See comments with rnExpr (OpApp ...)
-    case mode of
-	InterfaceMode -> returnRn ()
-	SourceMode    -> checkPrec op p1 False	`thenRn_`
-			 checkPrec op p2 True
+    if isInterfaceMode mode
+	then returnRn ()
+	else checkPrec op p1 False	`thenRn_`
+	     checkPrec op p2 True
 
 checkPrecMatch True op _ = panic "checkPrecMatch"
 

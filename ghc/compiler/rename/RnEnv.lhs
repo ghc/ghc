@@ -18,7 +18,7 @@ import HscTypes		( Provenance(..), pprNameProvenance, hasBetterProv,
 			  ImportReason(..), GlobalRdrEnv, AvailEnv,
 			  AvailInfo, Avails, GenAvailInfo(..), NameSupply(..) )
 import RnMonad
-import Name		( Name, NamedThing(..),
+import Name		( Name,
 			  getSrcLoc, 
 			  mkLocalName, mkGlobalName,
 			  mkIPName, nameOccName, nameModule_maybe,
@@ -177,13 +177,12 @@ lookupBndrRn rdr_name
 
 lookupTopBndrRn rdr_name
   = getModeRn	`thenRn` \ mode ->
-    case mode of 
-	InterfaceMode -> lookupIfaceName rdr_name	
-
-	SourceMode    -> -- Source mode, so look up a *qualified* version
-			 -- of the name, so that we get the right one even
-			 -- if there are many with the same occ name
-			 -- There must *be* a binding
+    if isInterfaceMode mode
+	then lookupIfaceName rdr_name	
+	else     -- Source mode, so look up a *qualified* version
+	         -- of the name, so that we get the right one even
+		 -- if there are many with the same occ name
+		 -- There must *be* a binding
 		getModuleRn		`thenRn` \ mod ->
 		getGlobalNameEnv	`thenRn` \ global_env ->
     		lookupSrcName global_env (qualifyRdrName (moduleName mod) rdr_name)
@@ -216,11 +215,32 @@ lookupOccRn rdr_name
 
 lookupGlobalOccRn rdr_name
   = getModeRn 		`thenRn` \ mode ->
-    case mode of 
-	SourceMode    -> getGlobalNameEnv			`thenRn` \ global_env ->
-    			 lookupSrcName global_env rdr_name
+    if (isInterfaceMode mode)
+	then lookupIfaceName rdr_name
+	else 
 
-	InterfaceMode -> lookupIfaceName rdr_name
+    getGlobalNameEnv	`thenRn` \ global_env ->
+    case mode of 
+	SourceMode -> lookupSrcName global_env rdr_name
+
+	CmdLineMode
+	 | not (isQual rdr_name) -> 
+		lookupSrcName global_env rdr_name
+
+		-- We allow qualified names on the command line to refer to 
+		-- *any* name exported by any module in scope, just as if 
+		-- there was an "import qualified M" declaration for every 
+		-- module.
+		--
+		-- First look up the name in the normal environment.  If
+		-- it isn't there, we manufacture a new occurrence of an
+		-- original name.
+	 | otherwise -> 
+		case lookupRdrEnv global_env rdr_name of
+		       Just _  -> lookupSrcName global_env rdr_name
+		       Nothing -> newGlobalName (rdrNameModule rdr_name)
+						(rdrNameOcc rdr_name)
+
 
 lookupSrcName :: GlobalRdrEnv -> RdrName -> RnM d Name
 -- NB: passed GlobalEnv explicitly, not necessarily in RnMS monad
@@ -270,7 +290,6 @@ calls it at all I think).
 
   \fbox{{\em Jan 98: this comment is wrong: @rnHsType@ uses it quite a bit.}}
 
-
 \begin{code}
 lookupOrigNames :: [RdrName] -> RnM d NameSet
 lookupOrigNames rdr_names
@@ -278,10 +297,10 @@ lookupOrigNames rdr_names
     returnRn (mkNameSet names)
 \end{code}
 
-lookupSysBinder is used for the "system binders" of a type, class, or instance decl.
-It ensures that the module is set correctly in the name cache, and sets the provenance
-on the returned name too.  The returned name will end up actually in the type, class,
-or instance.
+lookupSysBinder is used for the "system binders" of a type, class, or
+instance decl.  It ensures that the module is set correctly in the
+name cache, and sets the provenance on the returned name too.  The
+returned name will end up actually in the type, class, or instance.
 
 \begin{code}
 lookupSysBinder rdr_name
@@ -290,7 +309,6 @@ lookupSysBinder rdr_name
     getSrcLocRn				`thenRn` \ loc ->
     newTopBinder mod rdr_name loc
 \end{code}
-
 
 
 %*********************************************************

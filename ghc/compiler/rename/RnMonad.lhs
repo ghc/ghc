@@ -166,8 +166,12 @@ data SDown = SDown {
 			-- with RnIfaces.lookupLocalFixity
 		}
 
-data RnMode	= SourceMode			-- Renaming source code
-		| InterfaceMode			-- Renaming interface declarations.  
+data RnMode	= SourceMode		-- Renaming source code
+		| InterfaceMode		-- Renaming interface declarations.  
+		| CmdLineMode		-- Renaming a command-line expression
+
+isInterfaceMode InterfaceMode = True
+isInterfaceMode _ = False
 \end{code}
 
 %===================================================

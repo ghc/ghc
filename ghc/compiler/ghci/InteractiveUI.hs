@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.27 2001/01/18 10:51:53 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.28 2001/01/18 12:54:16 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -167,7 +167,8 @@ doCommand expr
    = do expr_expanded <- expandExpr expr
         -- io (putStrLn ( "Before: " ++ expr ++ "\nAfter:  " ++ expr_expanded))
         expr_ok <- timeIt (do ok <- evalExpr expr_expanded
-                              when ok (evalExpr "PrelIO.putChar \'\\n\'" >> return ())
+                              when ok (evalExpr "PrelHandle.hFlush PrelHandle.stdout" >> return ())
+                              when ok (evalExpr "PrelHandle.hFlush PrelHandle.stderr" >> return ())
                               return ok)
         when expr_ok (rememberExpr expr_expanded)
         return False

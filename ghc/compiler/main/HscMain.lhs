@@ -433,7 +433,7 @@ hscExpr dflags hst hit pcs0 this_module expr wrap_print
         if (wrap_print && not is_IO_type)
 		then do (new_pcs, maybe_stuff)
 			  <- hscExpr dflags hst hit pcs2 this_module
-				("putStr (show (" ++ expr ++ "))") False
+				("PrelIO.print (" ++ expr ++ ")") False
 		        case maybe_stuff of
 			   Nothing -> return (new_pcs, maybe_stuff)
 			   Just (bcos, _, _) ->

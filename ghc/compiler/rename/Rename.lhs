@@ -126,7 +126,7 @@ renameExpr dflags hit hst pcs this_module expr
 	      print_unqual = unQualInScope rdr_env
 	  in 
  
-	  initRnMS rdr_env emptyLocalFixityEnv SourceMode (rnExpr expr)	
+	  initRnMS rdr_env emptyLocalFixityEnv CmdLineMode (rnExpr expr)	
 						`thenRn` \ (e,fvs) -> 
 
 	  checkErrsRn				`thenRn` \ no_errs_so_far ->
