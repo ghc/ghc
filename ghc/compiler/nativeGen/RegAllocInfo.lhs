@@ -777,10 +777,10 @@ spillReg dyn (MemoryReg i pk)
 	{-Alpha: spill below the stack pointer (?)-}
 	 IF_ARCH_alpha( ST sz dyn (spRel i)
 
-	{-I386: spill below stack pointer leaving 2 words/spill-}
+	{-I386: spill above stack pointer leaving 2 words/spill-}
 	,IF_ARCH_i386 ( if pk == FloatRep || pk == DoubleRep
-                        then GST sz dyn (spRel (-16 + (-2 * i)))
-                        else MOV sz (OpReg dyn) (OpAddr (spRel (-16 + (-2 * i))))
+                        then GST sz dyn (spRel (16 + 2 * i))
+                        else MOV sz (OpReg dyn) (OpAddr (spRel (16 + 2 * i)))
 
 	{-SPARC: spill below frame pointer leaving 2 words/spill-}
 	,IF_ARCH_sparc( ST sz dyn (fpRel (-2 * i))
@@ -796,8 +796,8 @@ loadReg (MemoryReg i pk) dyn
     mkUnitList (
 	 IF_ARCH_alpha( LD  sz dyn (spRel i)
 	,IF_ARCH_i386 ( if   pk == FloatRep || pk == DoubleRep
-                        then GLD sz (spRel (-16 + (-2 * i))) dyn
-                        else MOV sz (OpAddr (spRel (-16 + (-2 * i)))) (OpReg dyn)
+                        then GLD sz (spRel (16 + 2 * i)) dyn
+                        else MOV sz (OpAddr (spRel (16 + 2 * i))) (OpReg dyn)
 	,IF_ARCH_sparc( LD  sz (fpRel (-2 * i)) dyn
 	,)))
     )
