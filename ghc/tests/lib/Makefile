@@ -1,10 +1,10 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.4 1998/09/20 15:33:58 simonm Exp $
+# $Id: Makefile,v 1.5 2001/05/01 11:46:56 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
 
-SUBDIRS = should_run 
+SUBDIRS = should_run net
 
 # posix009 hangs on Linux, disabled for now --SDM
 # posix
