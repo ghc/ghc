@@ -464,11 +464,7 @@ datadir0		= @datadir@
 #sysconfdir		= @datadir@
 #sharedstatedir		= @sharedstatedir@
 #localstatedir		= @localstatedir@
-ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 libdir0			= @libdir@
-else
-libdir0                 = @prefix@
-endif
 includedir		= @includedir@
 oldincludedir		= @oldincludedir@
 mandir			= @mandir@
@@ -480,13 +476,8 @@ mandir			= @mandir@
 # override libdir and datadir to put project-specific stuff in
 # a subdirectory with the version number included.
 #
-ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 libdir     = $(if $(ProjectNameShort),$(libdir0)/$(ProjectNameShort)-$(ProjectVersion),$(libdir0))
 datadir    = $(if $(ProjectNameShort),$(datadir0)/$(ProjectNameShort)-$(ProjectVersion),$(datadir0))
-else
-libdir	   = $(libdir0)
-datadir    = $(datadir0)
-endif
 
 # Default place for putting interface files is $(libdir)
 # (overriden for packages in package.mk)
