@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.47 2001/06/28 10:19:48 sewardj Exp $
+-- $Id: DriverState.hs,v 1.48 2001/07/09 17:44:08 sof Exp $
 --
 -- Settings for the driver
 --
@@ -25,6 +25,7 @@ import Panic
 import List
 import Char  
 import Monad
+import Directory ( doesDirectoryExist )
 
 -----------------------------------------------------------------------------
 -- non-configured things
@@ -326,8 +327,66 @@ GLOBAL_VAR(v_Cmdline_libraries,   [], [String])
 
 addToDirList :: IORef [String] -> String -> IO ()
 addToDirList ref path
-  = do paths <- readIORef ref
-       writeIORef ref (paths ++ split split_marker path)
+  = do paths           <- readIORef ref
+       shiny_new_ones  <- splitUp path
+       writeIORef ref (paths ++ shiny_new_ones)
+
+  where
+    splitUp ::String -> IO [String]
+#ifdef mingw32_TARGET_OS
+     -- 'hybrid' support for DOS-style paths in directory lists.
+     -- 
+     -- That is, if "foo:bar:baz" is used, this interpreted as
+     -- consisting of three entries, 'foo', 'bar', 'baz'.
+     -- However, with "c:/foo:c:\\foo;x:/bar", this is interpreted
+     -- as four elts, "c:/foo", "c:\\foo", "x", and "/bar" --
+     -- *provided* c:/foo exists and x:/bar doesn't.
+     --
+     -- Notice that no attempt is made to fully replace the 'standard'
+     -- split marker ':' with the Windows / DOS one, ';'. The reason being
+     -- that this will cause too much breakage for users & ':' will
+     -- work fine even with DOS paths, if you're not insisting on being silly.
+     -- So, use either.
+    splitUp []         = return []
+    splitUp (x:':':div:xs) 
+      | div `elem` dir_markers = do
+          let (p,rs) = findNextPath xs
+          ps  <- splitUp rs
+           {-
+             Consult the file system to check the interpretation
+             of (x:':':div:p) -- this is arguably excessive, we
+             could skip this test & just say that it is a valid
+             dir path.
+           -}
+          flg <- doesDirectoryExist (x:':':div:p)
+          if flg then
+             return ((x:':':div:p):ps)
+           else
+             return ([x]:(div:p):ps)
+    splitUp xs = do
+      let (p,rs) = findNextPath xs
+      ps <- splitUp rs
+      return (cons p ps)
+    
+    cons "" xs = xs
+    cons x  xs = x:xs
+
+    -- will be called either when we've consumed nought or the "<Drive>:/" part of
+    -- a DOS path, so splitting is just a Q of finding the next split marker.
+    findNextPath xs = 
+        case break (`elem` split_markers) xs of
+	   (p, d:ds) -> (p, ds)
+	   (p, xs)   -> (p, xs)
+
+    split_markers :: [Char]
+    split_markers = [':', ';']
+
+    dir_markers :: [Char]
+    dir_markers = ['/', '\\']
+
+#else
+    splitUp xs = return (split split_marker xs)
+#endif
 
 GLOBAL_VAR(v_HCHeader, "", String)
 
