@@ -12,8 +12,7 @@ import HaddockTypes
 	'/'	{ TokSpecial '/' }
 	'['	{ TokSpecial '[' }
 	']'	{ TokSpecial ']' }
-	'<'	{ TokSpecial '<' }
-	'>'	{ TokSpecial '>' }
+	URL	{ TokURL $$ }
 	'*'	{ TokBullet }
 	'(n)'	{ TokNumber }
 	PARA    { TokPara }
@@ -48,11 +47,11 @@ seq	:: { ParsedDoc }
 elem	:: { ParsedDoc }
 	: STRING		{ DocString $1 }
 	| '/' STRING '/'	{ DocEmphasis (DocString $2) }
-	| '<' STRING '>'	{ DocURL $2 }
+	| URL			{ DocURL $1 }
 	| SQUO STRING SQUO	{ DocIdentifier $2 }
 	| DQUO STRING DQUO	{ DocModule $2 }
 	| '[' seq ']'		{ DocMonospaced $2 }
 
 {
-happyError = error "Parse error in doc string"
+happyError toks = error ("parse error in doc string: "  ++ show (take 3 toks))
 }
