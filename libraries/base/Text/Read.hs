@@ -9,8 +9,6 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Read.hs,v 1.2 2002/04/24 16:31:46 simonmar Exp $
---
 -- Exiting the program.
 --
 -----------------------------------------------------------------------------

@@ -9,8 +9,6 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Foreign.hs,v 1.3 2002/04/24 16:31:37 simonmar Exp $
---
 -- A collection of data types, classes, and functions for interfacing
 -- with another programming language. This is only a convenience module
 -- in the future, but currently it has the additional task of hiding

@@ -8,8 +8,6 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Diff.hs,v 1.3 2002/04/24 16:31:43 simonmar Exp $
---
 -- Functional arrays with constant-time update.
 --
 -----------------------------------------------------------------------------

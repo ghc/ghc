@@ -9,8 +9,6 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Prelude.hs,v 1.3 2002/04/24 16:31:37 simonmar Exp $
---
 -- Standard module imported by default into Haskell modules.
 --
 -----------------------------------------------------------------------------

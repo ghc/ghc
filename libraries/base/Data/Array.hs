@@ -9,8 +9,6 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Array.hs,v 1.2 2002/04/24 16:31:39 simonmar Exp $
---
 -- Basic non-strict arrays.
 --
 -----------------------------------------------------------------------------

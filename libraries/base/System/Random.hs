@@ -8,8 +8,6 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Random.hs,v 1.4 2002/04/24 16:31:45 simonmar Exp $
---
 -- Random numbers.
 --
 -----------------------------------------------------------------------------

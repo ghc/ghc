@@ -8,8 +8,6 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Trace.hs,v 1.3 2002/04/24 16:31:43 simonmar Exp $
---
 -- The trace function.
 --
 -----------------------------------------------------------------------------

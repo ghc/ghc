@@ -8,8 +8,6 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Time.hsc,v 1.12 2002/04/24 16:31:45 simonmar Exp $
---
 -- The standard Time library.
 --
 -----------------------------------------------------------------------------

@@ -9,8 +9,6 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Tuple.hs,v 1.3 2002/04/24 16:31:42 simonmar Exp $
---
 -- The tuple data types, and associated functions.
 --
 -----------------------------------------------------------------------------

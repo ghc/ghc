@@ -8,8 +8,6 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Cmd.hs,v 1.3 2002/04/24 16:31:45 simonmar Exp $
---
 -- Executing a command.
 --
 -----------------------------------------------------------------------------

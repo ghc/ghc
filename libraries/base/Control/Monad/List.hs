@@ -9,8 +9,6 @@
 -- Stability   :  experimental
 -- Portability :  non-portable ( requires mulit-parameter type classes )
 --
--- $Id: List.hs,v 1.2 2002/04/24 16:31:38 simonmar Exp $
---
 -- The List monad.
 --
 -----------------------------------------------------------------------------

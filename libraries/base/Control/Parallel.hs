@@ -8,8 +8,6 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Parallel.hs,v 1.2 2002/04/24 16:31:37 simonmar Exp $
---
 -- Parallel Constructs
 --
 -----------------------------------------------------------------------------

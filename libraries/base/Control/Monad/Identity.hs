@@ -9,8 +9,6 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Identity.hs,v 1.2 2002/04/24 16:31:38 simonmar Exp $
---
 -- The Identity monad.
 --
 --	  Inspired by the paper:

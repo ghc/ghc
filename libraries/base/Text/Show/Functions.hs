@@ -8,8 +8,6 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Functions.hs,v 1.2 2002/04/24 16:31:47 simonmar Exp $
---
 -- Optional instance of Text.Show.Show for functions.
 --
 -----------------------------------------------------------------------------

@@ -9,8 +9,6 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: String.hs,v 1.5 2002/04/24 16:31:44 simonmar Exp $
---
 -- Utilities for primitive marshaling
 --
 -----------------------------------------------------------------------------

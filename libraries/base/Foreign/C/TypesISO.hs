@@ -9,8 +9,6 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: TypesISO.hs,v 1.4 2002/04/24 16:31:44 simonmar Exp $
---
 -- A mapping of C types defined by the ISO C standard to corresponding Haskell
 -- types. Like CTypes, this is a cool hack...
 --

@@ -8,8 +8,6 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: IArray.hs,v 1.2 2002/04/24 16:31:43 simonmar Exp $
---
 -- Overloaded immutable array class.
 --
 -----------------------------------------------------------------------------

@@ -9,8 +9,6 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Show.hs,v 1.3 2002/04/24 16:31:46 simonmar Exp $
---
 -- The Show class and associated functions.
 --
 -----------------------------------------------------------------------------

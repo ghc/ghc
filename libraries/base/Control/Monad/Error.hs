@@ -8,8 +8,6 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (reqruires multi-param type classes)
 --
--- $Id: Error.hs,v 1.2 2002/04/24 16:31:38 simonmar Exp $
---
 -- The Error monad.
 --
 -- Rendered by Michael Weber <michael.weber@post.rwth-aachen.de>,

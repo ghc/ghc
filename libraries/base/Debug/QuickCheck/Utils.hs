@@ -8,8 +8,6 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Utils.hs,v 1.3 2002/04/24 16:31:43 simonmar Exp $
---
 -- These are some general purpose utilities for use with QuickCheck.
 --
 -----------------------------------------------------------------------------

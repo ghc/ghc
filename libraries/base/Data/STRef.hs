@@ -8,8 +8,6 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (requires non-portable module ST)
 --
--- $Id: STRef.hs,v 1.4 2002/04/24 16:31:40 simonmar Exp $
---
 -- Mutable references in the ST monad.
 --
 -----------------------------------------------------------------------------

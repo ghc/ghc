@@ -9,8 +9,6 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: MArray.hs,v 1.2 2002/04/24 16:31:43 simonmar Exp $
---
 -- Class of mutable arrays, and operations on them.
 --
 -----------------------------------------------------------------------------

@@ -9,8 +9,6 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Html.hs,v 1.2 2002/04/24 16:31:46 simonmar Exp $
---
 -- An Html combinator library
 --
 -----------------------------------------------------------------------------

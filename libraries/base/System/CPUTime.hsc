@@ -8,8 +8,6 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: CPUTime.hsc,v 1.8 2002/04/24 16:31:45 simonmar Exp $
---
 -- The standard CPUTime library.
 --
 -----------------------------------------------------------------------------

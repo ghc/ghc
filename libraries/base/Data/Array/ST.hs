@@ -8,8 +8,6 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: ST.hs,v 1.2 2002/04/24 16:31:43 simonmar Exp $
---
 -- Mutable boxed/unboxed arrays in the ST monad.
 --
 -----------------------------------------------------------------------------

@@ -8,8 +8,6 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Locale.hs,v 1.2 2002/04/24 16:31:45 simonmar Exp $
---
 -- Operations for defining locale-specific date and time formats.
 --
 -----------------------------------------------------------------------------

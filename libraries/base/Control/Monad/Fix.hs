@@ -9,8 +9,6 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Fix.hs,v 1.5 2002/04/24 16:31:38 simonmar Exp $
---
 -- The Fix monad.
 --
 --	  Inspired by the paper:

@@ -8,8 +8,6 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (uses Control.Exception, Control.Concurrent)
 --
--- $Id: Poly.hs,v 1.2 2002/04/24 16:31:43 simonmar Exp $
---
 -- This is an attempt to emulate polymorphic types for the 
 -- purposes of testing by using abstract monomorphic types.
 -- 

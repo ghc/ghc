@@ -8,8 +8,6 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Unique.hs,v 1.2 2002/04/24 16:31:43 simonmar Exp $
---
 -- An infinite supply of unique objects, supporting ordering and equality.
 --
 -----------------------------------------------------------------------------

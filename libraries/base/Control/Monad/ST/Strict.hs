@@ -8,8 +8,6 @@
 -- Stability   :  provisional
 -- Portability :  non-portable (requires universal quantification for runST)
 --
--- $Id: Strict.hs,v 1.3 2002/04/24 16:31:39 simonmar Exp $
---
 -- The strict ST monad (identical to Control.Monad.ST)
 --
 -----------------------------------------------------------------------------

@@ -8,8 +8,6 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Complex.hs,v 1.3 2002/04/24 16:31:39 simonmar Exp $
---
 -- Complex numbers.
 --
 -----------------------------------------------------------------------------

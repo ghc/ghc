@@ -9,8 +9,6 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Int.hs,v 1.4 2002/04/24 16:31:39 simonmar Exp $
---
 -- Sized Integer types.
 --
 -----------------------------------------------------------------------------

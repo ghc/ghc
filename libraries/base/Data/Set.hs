@@ -8,8 +8,6 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Set.hs,v 1.2 2002/04/24 16:31:40 simonmar Exp $
---
 -- This implementation of sets sits squarely upon Data.FiniteMap.
 --
 -----------------------------------------------------------------------------

@@ -9,8 +9,6 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Array.hs,v 1.5 2002/04/24 16:31:44 simonmar Exp $
---
 -- Marshalling support: routines allocating, storing, and retrieving Haskell
 -- lists that are represented as arrays in the foreign language
 --

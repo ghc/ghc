@@ -8,8 +8,6 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Storable.hs,v 1.3 2002/04/24 16:31:43 simonmar Exp $
---
 -- A storable array is an IO-mutable array which stores its
 -- contents in a contiguous memory block living in the C
 -- heap. Elements are stored according to the class Storable.

@@ -8,8 +8,6 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Arrow.hs,v 1.2 2002/04/24 17:57:55 ross Exp $
---
 -- Basic arrow definitions, based on
 --	/Generalising Monads to Arrows/, by John Hughes,
 --	/Science of Computer Programming/ 37, pp67-111, May 2000.

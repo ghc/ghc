@@ -8,8 +8,6 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: MVar.hs,v 1.2 2002/04/24 16:31:37 simonmar Exp $
---
 -- MVars: Synchronising variables
 --
 -----------------------------------------------------------------------------

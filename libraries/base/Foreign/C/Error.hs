@@ -9,8 +9,6 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Error.hs,v 1.7 2002/04/24 16:31:44 simonmar Exp $
---
 -- C-specific Marshalling support: Handling of C "errno" error codes
 --
 -----------------------------------------------------------------------------

@@ -8,8 +8,6 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: PackedString.hs,v 1.4 2002/04/24 16:31:39 simonmar Exp $
---
 -- The PackedString type, and associated operations.
 --
 -- Original GHC implementation by Bryan O'Sullivan, 

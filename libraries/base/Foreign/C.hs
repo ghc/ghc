@@ -9,8 +9,6 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: C.hs,v 1.3 2002/04/24 16:31:44 simonmar Exp $
---
 -- Bundles the C specific FFI library functionality
 --
 -----------------------------------------------------------------------------

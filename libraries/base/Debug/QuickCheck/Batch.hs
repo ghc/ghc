@@ -8,8 +8,6 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (uses Control.Exception, Control.Concurrent)
 --
--- $Id: Batch.hs,v 1.2 2002/04/24 16:31:43 simonmar Exp $
---
 -- This is a batch driver for runing QuickCheck.
 --
 -----------------------------------------------------------------------------

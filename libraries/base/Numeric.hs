@@ -9,8 +9,6 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Numeric.hs,v 1.7 2002/04/24 16:31:37 simonmar Exp $
---
 -- Odds and ends, mostly functions for reading and showing
 -- RealFloat-like kind of values.
 --

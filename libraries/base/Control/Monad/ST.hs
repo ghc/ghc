@@ -8,8 +8,6 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (requires universal quantification for runST)
 --
--- $Id: ST.hs,v 1.6 2002/04/24 16:31:38 simonmar Exp $
---
 -- The State Transformer Monad, ST
 --
 -----------------------------------------------------------------------------

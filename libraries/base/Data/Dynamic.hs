@@ -9,8 +9,6 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Dynamic.hs,v 1.6 2002/04/24 16:31:39 simonmar Exp $
---
 -- The Dynamic interface provides basic support for dynamic types.
 -- 
 -- Operations for injecting values of arbitrary type into

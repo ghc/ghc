@@ -8,8 +8,6 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: QuickCheck.hs,v 1.2 2002/04/24 16:31:43 simonmar Exp $
---
 -- QuickCheck v.0.2
 -- DRAFT implementation; last update 000104.
 -- Koen Claessen, John Hughes.

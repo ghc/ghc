@@ -8,8 +8,6 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: GetOpt.hs,v 1.3 2002/04/24 16:31:45 simonmar Exp $
---
 -- A Haskell port of GNU's getopt library 
 --
 -----------------------------------------------------------------------------

@@ -9,8 +9,6 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Char.hs,v 1.3 2002/04/24 16:31:39 simonmar Exp $
---
 -- The Char type and associated operations.
 --
 -----------------------------------------------------------------------------

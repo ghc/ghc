@@ -8,8 +8,6 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Ix.hs,v 1.3 2002/04/24 16:31:39 simonmar Exp $
---
 -- Class of index types.
 --
 -----------------------------------------------------------------------------

@@ -8,8 +8,6 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: StableName.hs,v 1.4 2002/04/24 16:31:45 simonmar Exp $
---
 -- Giving an object a stable (GC-invariant) name.
 --
 -----------------------------------------------------------------------------

@@ -8,8 +8,6 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Environment.hs,v 1.6 2002/04/24 16:31:45 simonmar Exp $
---
 -- Miscellaneous information about the system environment.
 --
 -----------------------------------------------------------------------------

@@ -9,8 +9,6 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Word.hs,v 1.4 2002/04/24 16:31:43 simonmar Exp $
---
 -- Sized unsigned integer types.
 --
 -----------------------------------------------------------------------------

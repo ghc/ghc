@@ -8,8 +8,6 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Weak.hs,v 1.3 2002/04/24 16:31:45 simonmar Exp $
---
 -- Weak references, weak pairs, weak pointers, and finalizers.
 --
 -----------------------------------------------------------------------------

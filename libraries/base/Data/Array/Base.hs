@@ -9,8 +9,6 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Base.hs,v 1.7 2002/04/24 16:31:43 simonmar Exp $
---
 -- Basis for IArray and MArray.  Not intended for external consumption;
 -- use IArray or MArray instead.
 --

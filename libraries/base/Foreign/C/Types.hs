@@ -9,8 +9,6 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Types.hs,v 1.4 2002/04/24 16:31:44 simonmar Exp $
---
 -- Mapping of C types to corresponding Haskell types. A cool hack...
 --
 -----------------------------------------------------------------------------

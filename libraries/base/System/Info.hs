@@ -8,8 +8,6 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Info.hs,v 1.3 2002/04/24 16:31:45 simonmar Exp $
---
 -- Misc information about the characteristics of the host 
 -- architecture/machine lucky enough to run your program.
 --

@@ -8,8 +8,6 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Unsafe.hs,v 1.2 2002/04/24 16:31:45 simonmar Exp $
---
 -- "Unsafe" IO operations.
 --
 -----------------------------------------------------------------------------

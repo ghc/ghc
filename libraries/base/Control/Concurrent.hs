@@ -8,8 +8,6 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Concurrent.hs,v 1.6 2002/04/24 16:31:37 simonmar Exp $
---
 -- A common interface to a collection of useful concurrency
 -- abstractions.
 --

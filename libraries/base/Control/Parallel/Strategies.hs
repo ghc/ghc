@@ -8,15 +8,13 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Strategies.hs,v 1.2 2002/04/24 16:31:39 simonmar Exp $
---
 -- Parallel strategy combinators
 --
 -----------------------------------------------------------------------------
 
 {-
 Time-stamp: <Wed Mar 21 2001 00:45:34 Stardate: [-30]6360.15 hwloidl>
-$Id: Strategies.hs,v 1.2 2002/04/24 16:31:39 simonmar Exp $
+$Id: Strategies.hs,v 1.3 2002/04/26 13:34:06 simonmar Exp $
 
 This module defines parallel strategy combinators
 
@@ -25,8 +23,8 @@ This module defines parallel strategy combinators
 	Based on Version VII (1/5/96) `Strategies96' of type a -> ()
 
 Author:    $Author: simonmar $
-Date:      $Date: 2002/04/24 16:31:39 $
-Revision:  $Revision: 1.2 $
+Date:      $Date: 2002/04/26 13:34:06 $
+Revision:  $Revision: 1.3 $
 Source:    $Source: /srv/cvs/cvs.haskell.org/fptools/libraries/base/Control/Parallel/Strategies.hs,v $
 State:     $State: Exp $
 
@@ -50,6 +48,10 @@ The history of the Strategies module:
 
 Changelog:
 $Log: Strategies.hs,v $
+Revision 1.3  2002/04/26 13:34:06  simonmar
+Remove \$Id\$ from all files: it isn't particularly useful (see
+previous discussion on cvs-ghc@haskell.org), and it confuses Haddock.
+
 Revision 1.2  2002/04/24 16:31:39  simonmar
 Add the single character '|' to the header comment of each module so
 that Haddock will parse it as the module documentation.
@@ -281,8 +283,8 @@ declaration of @par@ and @seq@ despite renaming the imported versions.
 > infixl 6 $||, $|            -- strategic function application (seq and par)
 > infixl 9 .|, .||, -|, -||   -- strategic (inverse) function composition
 
-> strategy_version = "$Revision: 1.2 $"
-> strategy_id = "$Id: Strategies.hs,v 1.2 2002/04/24 16:31:39 simonmar Exp $"
+> strategy_version = "$Revision: 1.3 $"
+> strategy_id = "$Id: Strategies.hs,v 1.3 2002/04/26 13:34:06 simonmar Exp $"
 
 ------------------------------------------------------------------------------
 			Strategy Type, Application and Semantics	      

@@ -8,8 +8,6 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: FiniteMap.hs,v 1.2 2002/04/24 16:31:39 simonmar Exp $
---
 -- A finite map implementation, derived from the paper:
 -- 	   S Adams, "Efficient sets: a balancing act"
 -- 	   Journal of functional programming 3(4) Oct 1993, pp553-562

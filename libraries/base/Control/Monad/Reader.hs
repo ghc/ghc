@@ -10,8 +10,6 @@
 -- Portability :  non-portable ( requires mulit-parameter type classes,
 --				 requires functional dependencies )
 --
--- $Id: Reader.hs,v 1.2 2002/04/24 16:31:38 simonmar Exp $
---
 -- Declaration of the Monoid class,and instances for list and functions
 --
 --	  Inspired by the paper

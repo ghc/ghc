@@ -9,8 +9,6 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: IO.hs,v 1.7 2002/04/24 16:31:43 simonmar Exp $
---
 -- Mutable boxed/unboxed arrays in the IO monad.
 --
 -----------------------------------------------------------------------------

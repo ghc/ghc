@@ -10,8 +10,6 @@
 -- Portability :  non-portable ( requires mulit-parameter type classes,
 --				 requires functional dependencies )
 --
--- $Id: State.hs,v 1.2 2002/04/24 16:31:38 simonmar Exp $
---
 -- State monads.
 --
 --	  Inspired by the paper

@@ -8,8 +8,6 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: IORef.hs,v 1.5 2002/04/24 16:31:39 simonmar Exp $
---
 -- Mutable references in the IO monad.
 --
 -----------------------------------------------------------------------------
