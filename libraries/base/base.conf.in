@@ -18,10 +18,10 @@ Package {
 #                           ifndef mingw32_TARGET_OS
                             [ "HSbase" ],
 #                           else
-                            -- This splitting is the subject of a totally 
-                            -- horrible hack, which glues HSstd1 and HSstd2 
-                            -- back into HSstd for the purposes of static linking.
-                            -- See DriverState.getPackageLibraries for details.
+                            /* This splitting is the subject of a totally 
+                               horrible hack, which glues HSstd1 and HSstd2 
+                               back into HSstd for the purposes of static linking.
+                               See DriverState.getPackageLibraries for details. */
                             [ "HSbase1", "HSbase2" ],
 #                           endif
 	extra_libraries   = [ "HSbase_cbits"
