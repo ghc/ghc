@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: FrontPanel.c,v 1.7 2001/10/31 14:38:00 simonmar Exp $
+ * $Id: FrontPanel.c,v 1.8 2003/06/24 08:49:55 stolz Exp $
  *
  * (c) The GHC Team 2000
  *
@@ -397,6 +397,7 @@ updateFrontPanel( void )
 			    block_width, block_height, blocks_per_line );
 	    }
 	    
+#if 0 /* Segfaults because bd appears to be bogus but != NULL. stolz, 2003-06-24 */
 	    /* color each block */
 	    for (; a <= LAST_BLOCK(m); (char *)a += BLOCK_SIZE) {
 		bd = Bdescr((P_)a);
@@ -409,6 +410,7 @@ updateFrontPanel( void )
 				block_width, block_height, blocks_per_line );
 		}
 	    }
+#endif
 	}
 
 	
@@ -673,7 +675,7 @@ residencyCensus( void )
 			type = BlackHole;
 			break;
 
-		    case AP_UPD:
+		    case AP:
 			size = pap_sizeW((StgPAP *)p);
 			type = Thunk;
 			break;
